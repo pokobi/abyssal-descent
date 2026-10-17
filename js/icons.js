@@ -40,7 +40,6 @@
     '👻': ['ghost', '#d8e8ff'],
     '🎲': ['rolling-dices', '#eef2f6'],
     '🔮': ['crystal-ball', '#c08cff'],
-    '💠': ['crystal-growth', '#6ad0ff'],
     '🪔': ['magic-lamp', '#ffb050'],
     '📦': ['locked-chest', '#c08a50'],
     '⚖': ['scales', '#e8c890'],

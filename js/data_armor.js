@@ -93,6 +93,11 @@
     { id: 'op', name: '操作速度', min: 1, max: 10, stat: 'opSpeed' },
   ];
   G.ENCHANT_BY_ID = Object.fromEntries(G.ENCHANTS.map((e) => [e.id, e]));
+  // ---------------- durability ----------------
+  // every piece has a total durability by rarity; hits you take wear the pieces you are wearing; at 0 the piece breaks and is gone for good.
+  // (an item with no 'dur' field is brand new: shop stock, older saves)
+  G.ARMOR_DUR = { common: 100, uncommon: 150, rare: 220, epic: 320, legendary: 450 };
+  G.armorMaxDur = (d) => (d ? G.ARMOR_DUR[d.rarity] || 100 : 0);
   const ENCH_COUNT = { common: [[0, 100]], uncommon: [[0, 100]], rare: [[0, 90], [1, 10]], epic: [[0, 20], [1, 70], [2, 10]], legendary: [[1, 20], [2, 70], [3, 10]] };
   G.rollEnchants = function (rarity, rnd) {
     rnd = rnd || Math.random;

@@ -1265,3 +1265,7 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 .sd.sp2 i, .wc-legend span { font-style: normal; }
 .sdw { color: #f2b95c; } .sdb { color: #6fd6ff; }
 .wc-legend { display: flex; flex-wrap: wrap; gap: 0.2em 1em; margin-top: 0.5em; font-size: 0.78em; font-weight: 700; opacity: 0.92; }
+
+/* armour durability bar (inventory cells and equipment slots) */
+.iv-dur { position: absolute; left: 6%; right: 6%; bottom: 3%; height: max(3px, 7%); background: rgba(0,0,0,0.7); border-radius: 2px; overflow: hidden; pointer-events: none; z-index: 3; }
+.iv-dur::after { content: ''; display: block; height: 100%; width: calc(var(--f) * 100%); background: var(--dc, #6ee06a); box-shadow: 0 0 4px var(--dc, #6ee06a); }

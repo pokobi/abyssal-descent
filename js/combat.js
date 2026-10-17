@@ -543,6 +543,7 @@
       if (P.temps.has('thornarmor') && ctx.src === 'melee') C.damageEnemy(atk, amount * (G.abilities.skm('thornarmor').x_reflect ? 2 : 1), { src: 'skill', sk: 'thornarmor', proc: true, noBuffs: true });
     }
     P.hp -= dmg;
+    if (G.Inv && G.Inv.wear && ctx.src !== 'dot' && ctx.src !== 'fall') G.Inv.wear(P, dmg + osHit); // worn armour takes the hit
     P.lastHurtT = G.game.time;
     G.game.run.dmgTaken += dmg + osHit;
     G.game.areaDamage += dmg + osHit;

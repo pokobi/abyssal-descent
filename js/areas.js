@@ -264,7 +264,14 @@
 
   // ---------------- NPC events ----------------
   const cost = (base) => Math.round((base + GM.area * base * 0.12) / 10) * 10;
+  // armour repair: price follows the missing durability (see G.Inv.repairCost)
+  const repairPrice = (which, frac) => Math.max(10, Math.round(GM.price(G.Inv.repairCost(P, which, frac)) / 10) * 10);
   AR.EVENTS = [
+    { id: 'armorer', npc: '旅の鎧職人', icon: '🛡️', text: '「傷んだ鎧は命取りだ。腕のいい職人が直してやろう」',
+      opts: () => { const eq = G.Inv.damaged(P, 'equip').length, all = G.Inv.damaged(P, 'all').length, c1 = repairPrice('equip', 1), c2 = repairPrice('all', 1), ch = repairPrice('equip', 0.5);
+        return [{ icon: '🛡️', label: `装備中の防具をすべて修理（${c1}🪙）`, sub: eq ? `傷んでいる防具 ${eq}点 → 耐久を全回復` : '傷んでいる防具はない', disabled: !eq || GM.run.coins < c1, run: () => { GM.run.coins -= c1; G.Inv.repair(P, 'equip', 1); G.ui.toast('🛡️ 装備中の防具を修理した', 'good'); } },
+          { icon: '🎒', label: `持っている防具をすべて修理（${c2}🪙）`, sub: all ? `バッグの中も含めて ${all}点 → 耐久を全回復` : '傷んでいる防具はない', disabled: !all || GM.run.coins < c2, run: () => { GM.run.coins -= c2; G.Inv.repair(P, 'all', 1); G.ui.toast('🎒 持っている防具を修理した', 'good'); } },
+          { icon: '🔧', label: `応急処置（${ch}🪙）`, sub: eq ? '装備中の防具の失われた耐久を半分だけ回復' : '傷んでいる防具はない', disabled: !eq || GM.run.coins < ch, run: () => { GM.run.coins -= ch; G.Inv.repair(P, 'equip', 0.5); G.ui.toast('🔧 応急処置をした', 'good'); } }]; } },
     { id: 'blood_altar', npc: '血の司祭', icon: '🩸', text: '「血を捧げよ。さすれば力を授けよう」\n最大HPを永続的に10%失う代わりに、上位の加護を一つ選べる。',
       opts: () => [{ icon: '🩸', label: '血を捧げる', sub: '最大HP -10%（永続） → 上位の加護を選択', run: () => { P.permMaxHp -= Math.round(P.stats.maxHp * 0.1); P.recalc(); return { boon: 'boost' }; } }] },
     { id: 'gambler', npc: '骸骨の賭博師', icon: '🎲', text: '「賭けをしないか？ 所持金の3割を賭けて、勝てば倍だ」',
@@ -335,7 +342,7 @@
   };
   AR.useShrine = function (it) {
     const cs = AR.curses();
-    const opts = [{ icon: '🙏', label: '祈る', sub: 'HP全回復 ＋ スキル・アルティメット／グラップル／防御の強化を一つ選ぶ', onPick: () => { it.used = true; G.combat.heal(9999); G.sfx.bell(); setTimeout(() => GM.offerBuffs(false, { filter: (b) => G.isTech(b) || b.cat === 'defense' || (b.cat === 'mobility' && /グラップル|鉤/.test(b.desc + b.name)), title: 'BLESSING', sub: '祠の加護 — 一つを選べ' }), 50); } }];
+    const opts = [{ icon: '🙏', label: '祈る', sub: 'HP全回復 ＋ 装備中の防具の耐久も全回復 ＋ スキル・アルティメット／グラップル／防御の強化を一つ選ぶ', onPick: () => { it.used = true; G.combat.heal(9999); G.Inv.repair(P, 'equip', 1); G.sfx.bell(); setTimeout(() => GM.offerBuffs(false, { filter: (b) => G.isTech(b) || b.cat === 'defense' || (b.cat === 'mobility' && /グラップル|鉤/.test(b.desc + b.name)), title: 'BLESSING', sub: '祠の加護 — 一つを選べ' }), 50); } }];
     if (cs.length) opts.push({ icon: '✨', label: '浄化を願う', sub: `呪いを一つ解き、HPを50%回復（${cs.map((id) => G.BUFF_BY_ID[id].name).join('・')}）`, onPick: () => { it.used = true; AR.removeCurse(cs[0]); G.combat.heal(P.stats.maxHp * 0.5); } });
     opts.push({ icon: '🚶', label: '立ち去る', onPick: () => {} });
     GM.modal('⛩️ 祈りの祠', '静かな祠だ。ここで祈れば力が満ちる。（一度だけ）', opts);
@@ -368,6 +375,8 @@
     { const ord = G.weapons.order(), head = opts.splice(0, opts.length).sort((a, b) => ord.indexOf(a._tok) - ord.indexOf(b._tok)); opts.push(...head); }
     const pc = GM.price(450 + GM.area * 20);
     opts.push({ icon: '🔨', label: `スキルを鍛える（${pc}🪙）`, sub: 'スキル・アルティメットの強化を一つ選ぶ', disabled: GM.run.coins < pc, onPick: () => { GM.run.coins -= pc; setTimeout(() => GM.offerBuffs(false, { filter: G.isTech, title: 'FORGED SKILL', sub: 'スキル・アルティメットの強化を一つ選べ' }), 50); } });
+    { const c = repairPrice('all', 1), n = G.Inv.damaged(P, 'all').length;
+      opts.push({ icon: '🛡️', label: `防具をすべて修理（${c}🪙）`, sub: n ? `傷んでいる防具 ${n}点（バッグの中も含む）→ 耐久を全回復` : '傷んでいる防具はない', disabled: !n || GM.run.coins < c, onPick: () => { GM.run.coins -= c; G.Inv.repair(P, 'all', 1); G.sfx.explosion(G.world.anvilPos, 0.2); G.ui.toast('🛡️ 防具を修理した', 'good'); } }); }
     opts.push({ icon: '🚶', label: 'やめておく', onPick: () => {} });
     GM.modal('⚒️ 鍛冶場', '炉の熱気が肌を焼く。武器を鍛えるか？（何度でも利用可能）', opts);
   };

@@ -10,7 +10,49 @@
   // ---------------- item instances ----------------
   // { uid, type: 'item' | 'armor' | 'valuable' | 'att', id, n, x, y, rot, ench? }
   IV.make = function (type, id, n, extra) { return Object.assign({ uid: uidN++, type, id, n: n || 1, x: 0, y: 0, rot: false }, extra || {}); };
-  IV.makeArmor = function (id, rnd) { const d = G.ARMOR_BY_ID[id]; return IV.make('armor', id, 1, { ench: G.rollEnchants(d.rarity, rnd) }); };
+  // worn = true for found loot: 0 - 90% of the durability is already gone
+  IV.makeArmor = function (id, rnd, worn) {
+    const d = G.ARMOR_BY_ID[id], extra = { ench: G.rollEnchants(d.rarity, rnd) };
+    if (worn) extra.dur = Math.max(1, Math.round(G.armorMaxDur(d) * (1 - 0.9 * (rnd || Math.random)())));
+    return IV.make('armor', id, 1, extra);
+  };
+  // ---- armour durability ----
+  IV.durMax = (it) => G.armorMaxDur(G.ARMOR_BY_ID[it.id]);
+  IV.durOf = (it) => (it.dur === undefined ? IV.durMax(it) : it.dur);
+  IV.durFrac = (it) => { const m = IV.durMax(it); return m ? Math.max(0, Math.min(1, IV.durOf(it) / m)) : 1; };
+  // how much of a hit each worn piece takes (normalised over what you actually wear)
+  const WEAR_SHARE = { chest: 0.35, head: 0.2, legs: 0.2, feet: 0.15, hands: 0.1 };
+  IV.WEAR_K = 30; // durability points a hit of your whole max HP costs, summed over all worn pieces
+  IV.wear = function (P, dmg) {
+    if (!P.equip || !(dmg > 0)) return;
+    const worn = Object.keys(P.equip).filter((k) => P.equip[k]);
+    if (!worn.length) return;
+    const tot = worn.reduce((s, k) => s + (WEAR_SHARE[k] || 0.1), 0), pts = IV.WEAR_K * dmg / Math.max(20, P.stats.maxHp);
+    let broke = false;
+    for (const k of worn) {
+      const it = P.equip[k], was = IV.durFrac(it);
+      it.dur = IV.durOf(it) - pts * (WEAR_SHARE[k] || 0.1) / tot;
+      const d = G.ARMOR_BY_ID[it.id];
+      if (it.dur <= 0) {
+        P.equip[k] = null; broke = true;
+        G.sfx.shieldBreak && G.sfx.shieldBreak(P.pos); G.sfx.mech('magOut', 0, 1);
+        G.ui.toast(`💥 ${d.name} が壊れた！`, 'warn'); G.ui.feed(`💥 ${d.name} が壊れた`, 'big');
+      } else if (was > 0.2 && IV.durFrac(it) <= 0.2) {
+        G.ui.toastSmall(`⚠ ${d.name} の耐久が残りわずか`); G.sfx.ui('deny');
+      }
+    }
+    if (broke) P.recalc();
+    if (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen()) IV.onChange && IV.onChange();
+  };
+  // repair: which = 'equip' | 'all' (also what is in the bag); frac = share of the missing durability restored (1 = fully)
+  IV.damaged = (P, which) => { const out = []; for (const k in P.equip) if (P.equip[k]) out.push(P.equip[k]); if (which === 'all') for (const o of P.bag.items) if (o.type === 'armor') out.push(o); return out.filter((o) => IV.durFrac(o) < 0.995); };
+  IV.repairCost = (P, which, frac) => { let c = 0; for (const o of IV.damaged(P, which)) c += G.ARMOR_BY_ID[o.id].price * 0.3 * (1 - IV.durFrac(o)) * (frac || 1); return c; };
+  IV.repair = function (P, which, frac) {
+    let n = 0;
+    for (const o of IV.damaged(P, which)) { const m = IV.durMax(o); o.dur = Math.min(m, IV.durOf(o) + (m - IV.durOf(o)) * (frac || 1)); n++; }
+    if (n) { G.sfx.mech('magIn', 0, 0.9); if (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen()) IV.onChange && IV.onChange(); }
+    return n;
+  };
   IV.def = function (it) {
     if (!it) return null;
     if (it.type === 'item') return G.ITEM_BY_ID[it.id];
@@ -36,7 +78,7 @@
     const d = IV.def(it); if (!d) return 0;
     const R = G.Pawn ? G.Pawn.RATE : 0.4;
     if (it.type === 'valuable') return d.value * it.n;
-    if (it.type === 'armor') return Math.max(5, Math.round(d.price * R * (1 + 0.15 * (it.ench ? it.ench.length : 0)) / 5) * 5);
+    if (it.type === 'armor') return Math.max(5, Math.round(d.price * R * (1 + 0.15 * (it.ench ? it.ench.length : 0)) * (0.2 + 0.8 * IV.durFrac(it)) / 5) * 5); // the more worn, the less it sells for
     return Math.max(1, Math.round((d.price || 0) * R / 5) * 5) * it.n;
   };
 
@@ -217,8 +259,8 @@
   };
 
   // ---------------- serialisation (mid-run save) ----------------
-  IV.ser = (it) => ({ t: it.type, id: it.id, n: it.n, x: it.x, y: it.y, r: it.rot ? 1 : 0, e: it.ench });
-  IV.de = (o) => IV.make(o.t, o.id, o.n, { x: o.x, y: o.y, rot: !!o.r, ench: o.e });
+  IV.ser = (it) => ({ t: it.type, id: it.id, n: it.n, x: it.x, y: it.y, r: it.rot ? 1 : 0, e: it.ench, d: it.dur });
+  IV.de = (o) => IV.make(o.t, o.id, o.n, Object.assign({ x: o.x, y: o.y, rot: !!o.r, ench: o.e }, o.d !== undefined && o.d !== null ? { dur: o.d } : {}));
   IV.snap = (P) => ({ bag: P.bag.items.map(IV.ser), spec: Object.fromEntries(Object.entries(P.spec || {}).map(([k, c]) => [k, c.items.map(IV.ser)])), equip: Object.fromEntries(Object.entries(P.equip).map(([k, v]) => [k, v ? IV.ser(v) : null])) });
   IV.load = function (P, d) {
     IV.setupPlayer(P);
@@ -238,7 +280,7 @@
   IV.rollThing = function (kind, luck, floor) {
     const r = pickR(rarityW(luck, floor));
     if (kind === 'valuable') return IV.make('valuable', pickOf(G.VALUABLES, r).id, 1);
-    if (kind === 'armor') return IV.makeArmor(pickOf(G.ARMOR, r).id);
+    if (kind === 'armor') return IV.makeArmor(pickOf(G.ARMOR, r).id, null, true); // loot is secondhand
     if (kind === 'att') return IV.make('att', pickOf(G.ATTACHMENTS, r).id, 1);
     if (kind === 'grenade') return IV.make('item', pickOf(G.ITEMS.filter((i) => i.cat === 'grenade'), r).id, 1 + (Math.random() < 0.3 ? 1 : 0));
     const cons = G.ITEMS.filter((i) => i.cat !== 'grenade' && !i.noLoot && !(i.data && i.data.chest));

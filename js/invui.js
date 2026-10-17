@@ -81,8 +81,14 @@
     const big = Math.min(w, h);
     const ench = it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : '';
     const fit = it.type === 'att' && attFits(it);
+    const dur = it.type === 'armor' ? durBar(it) : '';
     return `<div class="iv-it t-${it.type}${fit ? ' iv-fit' : ''}" data-uid="${it.uid}" data-where="${where}" style="--rc:${R(d.rarity)};left:${it.x * cell}px;top:${it.y * cell}px;width:${w * cell - 3}px;height:${h * cell - 3}px">
-      <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}</div>`;
+      <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
+  }
+  // armour durability: a thin bar along the bottom of the cell (green > amber > red)
+  function durBar(it) {
+    const f = IV.durFrac(it), col = f > 0.5 ? '#6ee06a' : f > 0.2 ? '#f0b040' : '#ff4a3a';
+    return `<i class="iv-dur" style="--f:${f.toFixed(3)};--dc:${col}"></i>`;
   }
   // an attachment that would be a free upgrade: some gun has its socket empty and can take it
   function attFits(it) { const a = G.ATT_BY_ID[it.id]; return !!a && G.weapons.gunsInOrder().some((w) => !w.atts[a.slot] && a.compat(w.def)); }
@@ -93,7 +99,7 @@
   function eqBox(S, cls) {
     const it = P.equip[S.id], d = it && IV.def(it);
     return `<div class="iv-eq ${cls || ''}${it ? ' on' : ''}" data-eq="${S.id}" style="--rc:${d ? R(d.rarity) : '#3a332a'}">
-      <span class="iv-eql">${S.name}</span>${it ? `<div class="iv-it t-armor" data-uid="${it.uid}" data-where="eq:${S.id}" style="--rc:${R(d.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.95)}">${G.armorIcon(d)}</span><em class="iv-def">🛡${d.def}</em>${it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : ''}</div>` : `<span class="iv-ghosticon">${S.icon}</span>`}</div>`;
+      <span class="iv-eql">${S.name}</span>${it ? `<div class="iv-it t-armor" data-uid="${it.uid}" data-where="eq:${S.id}" style="--rc:${R(d.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.95)}">${G.armorIcon(d)}</span><em class="iv-def">🛡${d.def}</em>${it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : ''}${durBar(it)}</div>` : `<span class="iv-ghosticon">${S.icon}</span>`}</div>`;
   }
   function weaponBoxes() {
     const W = G.weapons, guns = W.gunsInOrder(), A = G.ATT_BY_ID;
@@ -504,6 +510,8 @@
       body += `<div class="ivt-r">部位 <b>${S.name}</b>　素材 <b>${M.name}</b></div><div class="ivt-r">🛡️ 防御力 <b>${d.def}</b>　⚖️ 重さ <b>${d.weight || 'なし'}</b></div>`;
       for (const fx of d.fixed) body += `<div class="ivt-fx">◆ ${fx.desc}</div>`;
       for (const e of it.ench || []) body += `<div class="ivt-en">✦ ${G.enchantText(e)}</div>`;
+      { const f = IV.durFrac(it), col = f > 0.5 ? '#6ee06a' : f > 0.2 ? '#f0b040' : '#ff4a3a';
+        body += `<div class="ivt-r">🔧 耐久 <b style="color:${col}">${Math.ceil(IV.durOf(it))} / ${IV.durMax(it)}</b>（${Math.round(f * 100)}%）</div>`; }
     } else body += `<div class="ivt-d">${U.esc(d.desc || '')}</div>`;
     body += `<div class="ivt-v">売値 ${U.fmt(IV.value(it))}🪙</div>`;
     return body;

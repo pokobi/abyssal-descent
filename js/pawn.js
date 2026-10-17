@@ -1,0 +1,191 @@
+'use strict';
+// Pawn counter in the merchant hall: sell weapons, melee weapons, skills, attachments, items and grenades for a fraction of their price.
+// The starting pistol (and bare fists) can't be sold; selling a weapon or an attachment mounted on one asks for confirmation first.
+(function () {
+  const PW = (G.Pawn = {});
+  const U = G.U;
+  PW.RATE = 0.4; // sell for 40% of the base price
+  const P = () => G.player, GM = () => G.game;
+  const fmt = (n) => U.fmt(n);
+  const R = (r) => G.ui.R(r);
+
+  PW.weaponValue = (w) => Math.max(1, Math.round((w.def.price || 0) * PW.RATE * (1 + 0.2 * (w.lv || 0)) / 5) * 5);
+  PW.meleeValue = (m) => Math.max(1, Math.round((m.def.price || 0) * PW.RATE * (1 + 0.2 * (m.lv || 0)) / 5) * 5);
+  PW.attValue = (id) => { const a = G.ATT_BY_ID[id]; return a ? Math.max(1, Math.round((a.price || 0) * PW.RATE / 5) * 5) : 0; };
+  PW.skillValue = (sk) => Math.max(1, Math.round((sk.def.price || 0) * PW.RATE * (1 + 0.2 * (sk.lv || 0)) / 5) * 5);
+  PW.itemValue = (id) => { const it = G.ITEM_BY_ID[id]; return it ? Math.max(1, Math.round((it.price || 0) * PW.RATE / 5) * 5) : 0; };
+
+  function pay(v, what) {
+    GM().run.coins += v;
+    G.sfx.coins && G.sfx.coins(Math.min(8, 2 + Math.floor(v / 200)));
+    G.sfx.ui('buy');
+    G.ui.toast(`⚖️ ${what} を売却 +${fmt(v)}🪙`, 'good');
+    G.ui.refreshWeapon(); G.ui.refreshItems();
+    G.ui._ikey = null;
+  }
+  // re-open the list after every sale (or after backing out of a confirmation)
+  const again = () => { GM()._keepModal = true; setTimeout(PW.open, 0); };
+
+  function sellGun(w, withAtts) {
+    const p = P(), i = p.weapons.indexOf(w); if (i < 0) return;
+    let v = PW.weaponValue(w);
+    const atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]);
+    if (withAtts) v += atts.reduce((s, a) => s + PW.attValue(a), 0); else for (const a of atts) p.attStash.push(a);
+    w.atts = {};
+    const wasCur = p.weapon === w;
+    p.weapons.splice(i, 1);
+    if (p.wIdx >= p.weapons.length || wasCur) p.wIdx = 0;
+    else if (i < p.wIdx) p.wIdx--;
+    G.weapons.dirty = true;
+    if (!p.meleeMode) G.weapons.equip(false);
+    pay(v, w.def.name + (withAtts && atts.length ? '（アタッチメント込み）' : ''));
+    if (!withAtts && atts.length) G.ui.toastSmall(`🗃️ アタッチメント${atts.length}個をインベントリへ移した`);
+  }
+  function sellMelee() {
+    const p = P(), m = p.melee, v = PW.meleeValue(m);
+    p.melee = G.weapons.makeMelee(G.DEFAULT_MELEE);
+    if (p.meleeMode) G.weapons.melee.equip(false);
+    pay(v, m.def.name);
+  }
+  function sellAtt(id, from) {
+    const p = P();
+    if (from === 'stash') { const k = p.attStash.indexOf(id); if (k < 0) return; p.attStash.splice(k, 1); }
+    else { const a = G.ATT_BY_ID[id]; delete from.atts[a.slot]; from.ver++; G.weapons.dirty = true; if (!p.meleeMode && from === p.weapon) G.weapons.equip(true); }
+    pay(PW.attValue(id), G.ATT_BY_ID[id].name);
+  }
+  function sellItem(id, grenade) {
+    const p = P();
+    if (grenade) { if (!p.itemCount(id)) return; p.takeItem(id); if (G.GrenHold && G.GrenHold.active()) G.GrenHold.putAway(true); }
+    else if (!p.takeItem(id)) return;
+    pay(PW.itemValue(id), G.ITEM_BY_ID[id].name);
+  }
+
+  function sellSkill(i) {
+    const p = P(), sk = p.skills[i]; if (!sk) return;
+    const v = PW.skillValue(sk);
+    // Q is never empty: selling an ultimate puts the default one back
+    p.skills[i] = sk.def.ult ? Object.assign(G.abilities.makeSlot(G.DEFAULT_ULT), { cd: 30 }) : null;
+    G.ui.buildAbilityRow && G.ui.buildAbilityRow();
+    pay(v, sk.def.name);
+  }
+  function confirmSkill(i) {
+    const sk = P().skills[i], d = sk.def, key = G.input.skillKey(i);
+    const augs = [...P().buffs.keys()].filter((id) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].skill === sk.id).length;
+    GM().modal(`⚠ ${d.ult ? 'アルティメット' : 'スキル'}を売却しますか？`, `<b style="color:${R(d.rarity)}">[${key}] ${d.icon} ${U.esc(d.name)}${sk.lv ? ' Lv' + sk.lv : ''}</b> を売却します。${d.ult ? 'Q枠は初期のアルティメット（不屈の城塞）に戻ります。' : key + '枠は空になります。'}${augs ? `<br>このスキル専用の強化（${augs}種）は、同じスキルを再び手に入れるまで効果がありません。` : ''}`, [
+      { icon: '💰', label: `売る（+${fmt(PW.skillValue(sk))}🪙）`, onPick: () => { sellSkill(i); again(); } },
+      { icon: '↩', label: 'やめる', onPick: again },
+    ]);
+  }
+  // ---------------- confirmations ----------------
+  function confirmGun(w) {
+    const atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]);
+    const base = PW.weaponValue(w), extra = atts.reduce((s, a) => s + PW.attValue(a), 0);
+    const attTxt = atts.length ? `<br>装着中のアタッチメント：${atts.map((a) => `${G.ATT_BY_ID[a].icon} ${G.ATT_BY_ID[a].name}`).join('、')}` : '';
+    const opts = [];
+    if (atts.length) {
+      opts.push({ icon: '🗃️', label: `武器だけ売る（+${fmt(base)}🪙）`, sub: 'アタッチメントは外してインベントリへ', onPick: () => { sellGun(w, false); again(); } });
+      opts.push({ icon: '💰', label: `アタッチメントごと売る（+${fmt(base + extra)}🪙）`, sub: 'アタッチメントも一緒に手放します', onPick: () => { sellGun(w, true); again(); } });
+    } else opts.push({ icon: '💰', label: `売る（+${fmt(base)}🪙）`, onPick: () => { sellGun(w, false); again(); } });
+    opts.push({ icon: '↩', label: 'やめる', onPick: again });
+    GM().modal('⚠ 武器を売却しますか？', `<b style="color:${R(w.def.rarity)}">${G.weapons.keyLabel(w)}${w.def.icon} ${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</b> を売却します。売った武器は戻ってきません。${w.lv ? `<br>⚒️ 鍛冶の強化（+${w.lv}）も失われます。` : ''}${attTxt}`, opts);
+  }
+  function confirmMelee() {
+    const m = P().melee;
+    GM().modal('⚠ 近接武器を売却しますか？', `<b style="color:${R(m.def.rarity)}">${m.def.icon} ${U.esc(m.def.name)}${m.lv ? ' +' + m.lv : ''}</b> を売却します。売ると近接武器はサバイバルナイフに戻ります。`, [
+      { icon: '💰', label: `売る（+${fmt(PW.meleeValue(m))}🪙）`, onPick: () => { sellMelee(); again(); } },
+      { icon: '↩', label: 'やめる', onPick: again },
+    ]);
+  }
+  function confirmAtt(id, w) {
+    const a = G.ATT_BY_ID[id];
+    GM().modal('⚠ 装着中のアタッチメントを売却しますか？', `<b style="color:${R(a.rarity)}">${a.icon} ${U.esc(a.name)}</b> は <b>${G.weapons.keyLabel(w)}${w.def.icon} ${U.esc(w.def.name)}</b> に装着中です。<br>外して売却すると、その武器から効果（${U.esc(a.desc)}）がなくなります。`, [
+      { icon: '💰', label: `外して売る（+${fmt(PW.attValue(id))}🪙）`, onPick: () => { sellAtt(id, w); again(); } },
+      { icon: '↩', label: 'やめる', onPick: again },
+    ]);
+  }
+
+  // ---------------- the counter: categories, one row per thing, bulk sale of valuables ----------------
+  PW.tab = 'all';
+  const CATS = [['all', '全て'], ['weapon', '🔫 武器'], ['melee', '🗡️ 近接'], ['att', '🔩 アタッチメント'], ['item', '🧪 消耗品'], ['grenade', '💣 投擲物'], ['skill', '🔮 スキル'], ['armor', '🛡️ 防具'], ['valuable', '💰 金品']];
+  function sellInst(it, n) {
+    const p = P(), IV = G.Inv; n = Math.min(n || 1, it.n);
+    const unit = IV.value(Object.assign({}, it, { n: 1 }));
+    const d = IV.def(it);
+    const home = IV.pcs(p).find((c) => c.items.includes(it)) || p.bag;
+    it.n -= n; if (it.n <= 0) IV.remove(home, it); else IV.changed(home);
+    if (it.type === 'item' && d.cat === 'grenade' && G.GrenHold && G.GrenHold.active()) G.GrenHold.putAway(true);
+    pay(unit * n, d.name + (n > 1 ? ` ×${n}` : ''));
+  }
+  function rows() {
+    const p = P(), IV = G.Inv, out = [];
+    const guns = G.weapons.gunsInOrder();
+    for (const w of guns) {
+      const start = w.id === 'starter', last = p.weapons.length <= 1, atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]);
+      out.push({ cat: 'weapon', icon: w.def.icon, rc: w.def.rarity, name: `${G.weapons.keyLabel(w)}${w.def.name}${w.lv ? ' +' + w.lv : ''}`, sub: start ? '初期装備は売れません' : last ? '最後の銃は売れません' : `銃${atts.length ? `・アタッチメント${atts.length}個装着中` : ''}`, v: start || last ? 0 : PW.weaponValue(w), no: start || last, act: () => { GM()._keepModal = true; setTimeout(() => confirmGun(w), 0); } });
+    }
+    if (p.melee && !G.isDefaultMelee(p.melee.id)) out.push({ cat: 'melee', icon: p.melee.def.icon, rc: p.melee.def.rarity, name: p.melee.def.name + (p.melee.lv ? ' +' + p.melee.lv : ''), sub: '近接武器（売るとサバイバルナイフに戻る）', v: PW.meleeValue(p.melee), act: () => { sellMelee(); PW.open(); } });
+    for (const w of guns) for (const sl in w.atts) { const id = w.atts[sl], a = G.ATT_BY_ID[id]; if (a) out.push({ cat: 'att', icon: a.icon, rc: a.rarity, name: a.name, sub: `${w.def.name}に装着中`, v: PW.attValue(id), act: () => { GM()._keepModal = true; setTimeout(() => confirmAtt(id, w), 0); } }); }
+    p.skills.forEach((sk, i) => { if (!sk) return; const def = sk.id === G.DEFAULT_ULT; out.push({ cat: 'skill', icon: sk.def.icon, rc: sk.def.rarity, name: `[${G.input.skillKey(i)}] ${sk.def.name}${sk.lv ? ' Lv' + sk.lv : ''}`, sub: def ? '初期装備のアルティメットは売れません' : sk.def.ult ? 'アルティメット' : 'スキル', v: def ? 0 : PW.skillValue(sk), no: def, act: () => { GM()._keepModal = true; setTimeout(() => confirmSkill(i), 0); } }); });
+    // everything in the bag
+    for (const it of IV.pcs(p).flatMap((c) => c.items).sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))) {
+      const d = IV.def(it); if (!d) continue;
+      const cat = it.type === 'item' ? (d.cat === 'grenade' ? 'grenade' : 'item') : it.type;
+      const unit = IV.value(Object.assign({}, it, { n: 1 }));
+      const sub = it.type === 'armor' ? `${G.ARMOR_SLOT_BY_ID[d.slot].name}防具・防御力${d.def}${it.ench && it.ench.length ? '・' + it.ench.map(G.enchantText).join(' ') : ''}` : it.type === 'valuable' ? '金品（売却専用）' : it.type === 'att' ? 'アタッチメント（インベントリ）' : d.passive ? '所持品（常時効果）' : cat === 'grenade' ? '投擲物' : '消耗品';
+      out.push({ cat, icon: it.type === 'armor' ? G.armorIcon(d) : d.icon, rc: d.rarity, name: d.name + (it.n > 1 ? ` ×${it.n}` : ''), sub, v: unit, n: it.n, act: () => { sellInst(it, 1); PW.open(); }, actAll: it.n > 1 ? () => { sellInst(it, it.n); PW.open(); } : null });
+    }
+    return out;
+  }
+  PW.open = function () {
+    const p = P(), IV = G.Inv;
+    const all = rows();
+    const list = all.filter((r) => PW.tab === 'all' || r.cat === PW.tab);
+    const vals = p.bag.items.filter((o) => o.type === 'valuable');
+    const valSum = vals.reduce((s, o) => s + IV.value(o), 0);
+    GM().state = 'modal'; G.input.exitLock();
+    const s = G.ui.screen(`<div class="panel pw-panel" style="width:min(820px,96vw)">
+      <div class="pw-head"><h2>⚖️ 買取屋</h2><span>買値の<b>${Math.round(PW.RATE * 100)}%</b>で買い取る（金品は満額）</span>${G.ui.coinBox()}</div>
+      <div class="pw-tabs">${CATS.map(([k, n]) => { const c = k === 'all' ? all.length : all.filter((r) => r.cat === k).length; return `<span class="pw-tab${PW.tab === k ? ' on' : ''}${c ? '' : ' none'}" data-t="${k}">${n} <small>${c}</small></span>`; }).join('')}</div>
+      <div class="pw-bulk"><button class="btn${vals.length ? ' primary' : ''}" id="pw-vals" ${vals.length ? '' : 'disabled'}>💰 金品を一括売却（${vals.length}点 +${fmt(valSum)}🪙）</button></div>
+      <div class="pw-list">${list.length ? list.map((r, i) => `<div class="pw-row${r.no ? ' no' : ''}" style="--rc:${R(r.rc || 'common')}"><span class="pw-ic">${r.icon}</span><div class="pw-t"><b>${U.esc(r.name)}</b><small>${U.esc(r.sub)}</small></div><span class="pw-v">${r.no ? '—' : '+' + fmt(r.v) + '🪙' + (r.n > 1 ? '<small>/1個</small>' : '')}</span>${r.no ? '' : `<button class="btn small" data-s="${i}">売る</button>`}${r.actAll ? `<button class="btn small" data-a="${i}">すべて（+${fmt(r.v * r.n)}）</button>` : ''}</div>`).join('') : '<div class="pw-none">売れるものがない</div>'}</div>
+      <div style="text-align:right;margin-top:10px"><button class="btn" id="pw-close">🚶 取引を終える</button></div></div>`, 'dim');
+    s.querySelectorAll('.pw-tab').forEach((t) => t.onclick = () => { PW.tab = t.dataset.t; G.sfx.ui('click'); PW.open(); });
+    s.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => list[+b.dataset.s].act());
+    s.querySelectorAll('[data-a]').forEach((b) => b.onclick = () => list[+b.dataset.a].actAll());
+    s.querySelector('#pw-vals').onclick = () => {
+      if (!vals.length) return;
+      for (const o of vals) IV.remove(p.bag, o);
+      pay(valSum, `金品${vals.length}点`);
+      PW.open();
+    };
+    s.querySelector('#pw-close').onclick = () => { G.sfx.ui('click'); GM()._keepModal = false; GM().resume(); };
+  };
+
+  // ---------------- trade-in: a weapon that gets replaced is sold automatically ----------------
+  // same rate as the pawn counter (starter pistol / fists are worth nothing); 鉄屑回収 adds +30% of the price on top
+  PW.tradeValue = function (w, melee) {
+    if (!w || (melee ? G.isDefaultMelee(w.id) : w.id === 'starter')) return 0;
+    const base = melee ? PW.meleeValue(w) : PW.weaponValue(w);
+    return base + (P().has('e_salvage') ? Math.round((w.def.price || 0) * 0.3 / 5) * 5 : 0);
+  };
+  PW.tradeIn = function (w, melee) {
+    const v = PW.tradeValue(w, melee);
+    if (v > 0) {
+      GM().run.coins += v;
+      G.sfx.coins && G.sfx.coins(Math.min(6, 2 + Math.floor(v / 300)));
+      G.ui.toast(`♻️ ${w.def.icon} ${w.def.name} を下取り +${fmt(v)}🪙`, 'good');
+    }
+    return v;
+  };
+
+  // ---------------- the counter in the merchant hall ----------------
+  PW.setup = function (w) {
+    if (!w.sellPos) return;
+    const def = G.ENEMY_BY_ID.skeleton_normal || G.ENEMY_BY_ID.imp_normal || G.ENEMIES[0];
+    const m = G.enemies.buildModel(def, { ally: true });
+    if (w.pawnNpc) { m.group.position.set(w.pawnNpc.x, 0, w.pawnNpc.z); m.group.rotation.y = w.pawnNpc.ry; } else { m.group.position.set(w.sellPos.x - 1.6, 0, w.sellPos.z); m.group.rotation.y = Math.PI / 2; }
+    w.group.add(m.group);
+    w.lightSources.push({ pos: w.sellPos.clone().add(new THREE.Vector3(0, 2.2, 0)), color: '#ffe0a0', intensity: 7, range: 7, flame: 0, emit: false, ph: 0, prio: 1.6, steady: true });
+    PW.npc = m;
+  };
+})();

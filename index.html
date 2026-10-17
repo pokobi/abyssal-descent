@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ABYSSAL DESCENT — 深淵降下</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="canvas-wrap"></div>
+  <canvas id="speedlines"></canvas>
+  <div id="vignette"></div>
+  <div id="dmg-flash"></div>
+  <div id="lowhp"></div>
+  <div id="status-tint"></div>
+  <div id="scope-overlay"><div class="scope-ret"></div></div>
+  <div id="worldui"></div>
+
+  <div id="hud" class="hidden">
+    <div id="crosshair">
+      <i class="ch-t"></i><i class="ch-b"></i><i class="ch-l"></i><i class="ch-r"></i><i class="ch-dot"></i>
+    </div>
+    <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+    <div id="grapple-ind"><span class="gi-icon">⚓</span><span class="gi-dist"></span></div>
+    <div id="dirind"></div>
+    <div id="pile-ind" class="hidden">⬇ パイルドライバー詠唱中</div>
+
+    <div id="hud-tl">
+      <div id="area-title"></div>
+      <div id="area-sub"></div>
+      <div id="objective"></div>
+    </div>
+    <div id="hud-tr">
+      <div id="coins"><span class="coin-ic">🪙</span><span id="coin-val">0</span></div>
+      <div id="coin-pops"></div>
+      <div id="run-meta"></div>
+    </div>
+    <div id="compass"><div id="compass-strip"></div><div id="compass-center"></div></div>
+    <div id="hud-buffs"></div>
+    <div id="hud-bl">
+      <div id="hp-wrap">
+        <div id="hp-icon">❤</div>
+        <div id="hp-bars">
+          <div id="os-bar"><div id="os-fill"></div></div>
+          <div id="hp-bar"><div id="hp-trail"></div><div id="hp-fill"></div></div>
+        </div>
+        <div id="hp-text"></div>
+      </div>
+      <div id="tempfx"></div>
+    </div>
+    <div id="hud-br">
+      <div id="weapon-slots"></div>
+      <div id="weapon-info">
+        <div id="weapon-name"></div>
+        <div id="weapon-atts"></div>
+        <div id="ammo"><span id="ammo-mag">0</span><span id="ammo-sep">/</span><span id="ammo-max">0</span></div>
+        <div id="reload-bar"><div></div></div>
+      </div>
+    </div>
+    <div id="hud-bc">
+      <div id="ability-row"></div>
+      <div id="item-row"></div>
+    </div>
+    <div id="feed"></div>
+    <div id="toasts"></div>
+    <div id="interact-panel" class="hidden"></div>
+    <div id="bossbar" class="hidden">
+      <div id="boss-name"></div>
+      <div id="boss-bar"><div id="boss-trail"></div><div id="boss-fill"></div></div>
+      <div id="boss-shield"><div id="boss-shield-fill"></div></div>
+      <div id="boss-phase"></div>
+    </div>
+    <div id="banner"></div>
+    <div id="status-overlay" class="hidden"></div>
+    <div id="fps"></div>
+  </div>
+
+  <div id="screens"></div>
+  <div id="fade"></div>
+  <div id="loading"><div class="ld-title">ABYSSAL DESCENT</div><div class="ld-bar"><div id="ld-fill"></div></div><div id="ld-text">読み込み中…</div></div>
+  <div id="fatal" class="hidden"></div>
+</div>
+
+<script>
+  window.addEventListener('error', function (e) {
+    var f = document.getElementById('fatal');
+    if (!f) return;
+    f.classList.remove('hidden');
+    f.innerHTML += '<div>⚠ ' + (e.message || e) + ' <small>' + (e.filename || '').split('/').pop() + ':' + (e.lineno || '') + '</small></div>';
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/data_weapons.js"></script>
+<script src="js/data_items.js"></script>
+<script src="js/data_armor.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/data_buffs.js"></script>
+<script src="js/data_enemies.js"></script>
+<script src="js/input.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/world.js"></script>
+<script src="js/props.js"></script>
+<script src="js/levelgen.js"></script>
+<script src="js/fieldgen.js"></script>
+<script src="js/fields.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/player.js"></script>
+<script src="js/avatar.js"></script>
+<script src="js/pstatus.js"></script>
+<script src="js/hudextra.js"></script>
+<script src="js/tutorial.js"></script>
+<script src="js/pawn.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/melee.js"></script>
+<script src="js/itemanim.js"></script>
+<script src="js/abilities.js"></script>
+<script src="js/ultimates.js"></script>
+<script src="js/skillaug.js"></script>
+<script src="js/grenhold.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/bosses.js"></script>
+<script src="js/bosses2.js"></script>
+<script src="js/bosses3.js"></script>
+<script src="js/bosses4.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/statusui.js"></script>
+<script src="js/codex.js"></script>
+<script src="js/runplan.js"></script>
+<script src="js/areas.js"></script>
+<script src="js/depth.js"></script>
+<script src="js/rooms2.js"></script>
+<script src="js/midsave.js"></script>
+<script src="js/game.js"></script>
+<script src="js/devmode.js"></script>
+<script src="js/invui.js"></script>
+</body>
+</html>

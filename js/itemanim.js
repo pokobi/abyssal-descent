@@ -147,9 +147,39 @@
     plate: [[0, -0.18, -0.24, -0.34, 0, 0.3, 0], [0.35, -0.02, -0.02, -0.32, -0.3, 0, 0], [0.7, 0, -0.24, -0.2, -1.2, 0, 0], [1, -0.05, -0.41, -0.2, -1.2, 0, 0]],
     device: [[0, 0.14, -0.26, -0.35, 0, 0, 0], [0.38, 0.02, 0.04, -0.36, 0.2, 0.5, 0], [0.62, 0.02, 0.05, -0.36, 0.2, 2.2, 0], [1, 0.14, -0.31, -0.35, 0, 0, 0]],
   };
+  // ------------------------------------------------ searching a chest / corpse: both hands dig in front of you, in a loop
+  // (the gun is lowered meanwhile). Faster as the search nears its end; the hands sink in and out smoothly.
+  let rum = null;
+  function rummage(dt, on) {
+    if (!G.weapons.vmRoot) return;
+    if (on && !rum) {
+      mats();
+      if (!root) { root = new THREE.Group(); G.weapons.vmScene.add(root); }
+      const g = new THREE.Group(); root.add(g);
+      const l = hand(g, false), r = hand(g, true);
+      rum = { g, l, r, t: 0, k: 0 };
+    }
+    if (!rum) return;
+    rum.k = U.damp(rum.k, on ? 1 : 0, on ? 9 : 10, dt);
+    const S = G.game.search, prog = S ? Math.min(1, S.t / Math.max(0.01, S.dur)) : 1;
+    rum.t += dt * (7 + prog * 5);
+    const t = rum.t, sink = (1 - rum.k) * 0.42;
+    // each hand: forward / back strokes with a scoop at the bottom, the two out of phase
+    const pose = (h, side, ph) => {
+      const a = t + ph, s = Math.sin(a), c = Math.cos(a);
+      h.position.set(side * (0.1 + c * 0.02), -0.075 - sink + Math.max(0, s) * 0.035, -0.42 + c * 0.05);
+      h.rotation.set(0.28 + Math.max(0, -s) * 0.38, side * -0.12 + c * 0.08, side * (0.1 + s * 0.1));
+    };
+    pose(rum.l, -1, 0); pose(rum.r, 1, Math.PI);
+    rum.g.position.set(0, 0, 0);
+    if (on && Math.sin(t) > 0.97 && Math.random() < 0.5) G.sfx.whoosh && G.sfx.whoosh(0.08, 0.6 + Math.random() * 0.3, true);
+    if (!on && rum.k < 0.02) { root.remove(rum.g); rum = null; }
+  }
   IA.update = function (dt) {
     const holding = G.GrenHold && G.GrenHold.active();
-    IA.lower = U.damp(IA.lower, cur || holding ? 1 : 0, cur || holding ? 14 : 8, dt);
+    const searching = !!(G.game && G.game.search) && !cur;
+    IA.lower = U.damp(IA.lower, cur || holding || searching ? 1 : 0, cur || holding || searching ? 14 : 8, dt);
+    rummage(dt, searching);
     if (!cur) return;
     const c = cur;
     c.t += dt;

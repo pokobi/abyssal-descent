@@ -82,18 +82,18 @@
     });
   }
   G.ARMOR_BY_ID = Object.fromEntries(G.ARMOR.map((a) => [a.id, a]));
-  // random enchantments (epic and up; a lucky few below). No duplicates on one piece.
+  // random enchantments: none below rare; kind and value fully random (0.1 steps). No duplicates on one piece.
   G.ENCHANTS = [
-    { id: 'dmg', name: '与ダメ', min: 1, max: 5, stat: 'dmg' },
-    { id: 'red', name: '被ダメ軽減', min: 1, max: 5, stat: 'armor' },
-    { id: 'heal', name: '回復力', min: 1, max: 5, stat: 'healMul' },
-    { id: 'crit', name: '会心率', min: 0.5, max: 2.5, stat: 'critChance' },
-    { id: 'critd', name: '会心ダメ', min: 1, max: 5, stat: 'critMul' },
-    { id: 'move', name: '移動速度', min: 1, max: 5, stat: 'moveSpeed' },
-    { id: 'op', name: '操作速度', min: 1, max: 5, stat: 'opSpeed' },
+    { id: 'dmg', name: '与ダメ', min: 1, max: 10, stat: 'dmg' },
+    { id: 'red', name: '被ダメ軽減', min: 1, max: 10, stat: 'armor' },
+    { id: 'heal', name: '回復力', min: 1, max: 10, stat: 'healMul' },
+    { id: 'crit', name: '会心率', min: 0.5, max: 5, stat: 'critChance' },
+    { id: 'critd', name: '会心ダメ', min: 1, max: 10, stat: 'critMul' },
+    { id: 'move', name: '移動速度', min: 1, max: 10, stat: 'moveSpeed' },
+    { id: 'op', name: '操作速度', min: 1, max: 10, stat: 'opSpeed' },
   ];
   G.ENCHANT_BY_ID = Object.fromEntries(G.ENCHANTS.map((e) => [e.id, e]));
-  const ENCH_COUNT = { common: [[0, 95], [1, 5]], uncommon: [[0, 95], [1, 5]], rare: [[0, 95], [1, 5]], epic: [[0, 60], [1, 35], [2, 5]], legendary: [[1, 60], [2, 35], [3, 5]] };
+  const ENCH_COUNT = { common: [[0, 100]], uncommon: [[0, 100]], rare: [[0, 90], [1, 10]], epic: [[0, 20], [1, 70], [2, 10]], legendary: [[1, 20], [2, 70], [3, 10]] };
   G.rollEnchants = function (rarity, rnd) {
     rnd = rnd || Math.random;
     const t = ENCH_COUNT[rarity] || ENCH_COUNT.common;
@@ -102,7 +102,8 @@
     const pool = G.ENCHANTS.slice(), out = [];
     for (let i = 0; i < n && pool.length; i++) {
       const e = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
-      out.push({ id: e.id, v: Math.round((e.min + rnd() * (e.max - e.min)) * 10) / 10 });
+      const steps = Math.round((e.max - e.min) * 10); // every 0.1 step from min to max is equally likely
+      out.push({ id: e.id, v: Math.round((e.min + Math.floor(rnd() * (steps + 1)) / 10) * 10) / 10 });
     }
     return out;
   };

@@ -256,5 +256,20 @@
     pvFrame();
     PV.raf = requestAnimationFrame(pvLoop);
   };
+  // the preview renderer, created and its shaders compiled once, ahead of the first Tab / chest screen
+  SU.warm = function () {
+    if (!pvInit()) return;
+    try {
+      const d = G.WEAPON_BY_ID && (G.WEAPON_BY_ID.starter || G.WEAPONS[0]);
+      const g = new THREE.Group();
+      if (d) g.add(G.weapons.displayModel(d, {}));
+      if (G.MELEE && G.MELEE[0]) g.add(G.weapons.meleeDisplayModel(G.MELEE[0]));
+      PV.scene.add(g); PV.scene.updateMatrixWorld(true);
+      PV.cam.position.set(0, 0.1, 1.2); PV.cam.lookAt(0, 0, 0);
+      PV.r.compile(PV.scene, PV.cam);
+      PV.r.render(PV.scene, PV.cam);
+      PV.scene.remove(g);
+    } catch (e) { /* ignore */ }
+  };
   SU.unmount = function () { if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = 0; PV.items = []; };
 })();

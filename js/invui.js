@@ -30,6 +30,29 @@
     render();
   };
   function onResize() { if (root && !drag) render(); }
+  // build the screen once, hidden and silent (both the Tab view and the loot view), so the first real opening has its styles,
+  // fonts and layout ready. Called once per page from G.Warm.ui().
+  UIV.warm = function () {
+    if (root || UIV._warm) return;
+    P = G.player; GM = G.game; if (!P || !GM.run || P.dead) return;
+    UIV._warm = true;
+    const keepCont = IV.openCont, keepSrc = IV.openSrc, sfxUi = G.sfx.ui;
+    G.sfx.ui = () => {};
+    try {
+      for (const cont of [null, IV.container(6, 4, '', 'box')]) {
+        IV.openCont = cont; IV.openSrc = null;
+        root = document.createElement('div'); root.id = 'inv-ui'; root.style.visibility = 'hidden';
+        G.ui.el.hud.appendChild(root);
+        render(); root.offsetHeight;
+        try { G.StatusUI.unmount(); } catch (e) { /* ignore */ }
+        root.remove(); root = null;
+        const ov = G.ui.el.statusOv; G.ui.statusOverlay(false);
+        for (const k of ['left', 'top', 'width', 'height', 'right', 'bottom']) ov.style.removeProperty(k);
+        document.body.classList.remove('inv-open', 'inv-loot'); document.body.style.removeProperty('--s');
+      }
+    } catch (e) { console.warn('inventory warm-up failed', e); root = null; }
+    G.sfx.ui = sfxUi; IV.openCont = keepCont; IV.openSrc = keepSrc;
+  };
   UIV.close = function () {
     if (!root) return;
     if (drag) endDrag(null);

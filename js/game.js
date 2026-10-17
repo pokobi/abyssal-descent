@@ -68,6 +68,9 @@
     ldFill.style.width = '100%';
     ldText.textContent = '準備完了';
     GM.toTitle();
+    ldText.textContent = '描画を準備中…';
+    await new Promise((r) => setTimeout(r, 30));
+    if (G.Warm) G.Warm.boot(); // title world shaders, viewmodel, previews: behind the loading screen
     setTimeout(() => document.getElementById('loading').classList.add('done'), 300);
     requestAnimationFrame(frame);
   }
@@ -399,6 +402,7 @@
     if (G.save.data.settings.fullscreen) I.fullscreen();
     GM.route = []; GM.rewardPending = null;
     GM.enterArea(1, 'combat');
+    if (G.Warm && !GM._uiWarmed) { GM._uiWarmed = true; setTimeout(() => G.Warm.ui(), 1500); }
     setTimeout(() => { G.ui.itemCard(G.ITEM_BY_ID.h_bandage, `[${G.K('item1')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.h_medkit, `[${G.K('item2')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.g_frag, `[${G.K('grenade')} で構え→クリックで投擲]`, { noBanner: true }); G.ui.toastSmall('💡 Tab で持ち物・装備・ステータスをまとめて確認できます'); }, 3200);
   };
   // ---------------- attachments: stash & moving between weapons ----------------
@@ -579,6 +583,7 @@
     GM.state = 'playing';
     G.ui.refreshWeapon(); G.ui.refreshItems();
     G.sfx.setAmbience(kind === 'boss' || kind === 'cursed' ? 1.4 : 1);
+    if (G.Warm) G.Warm.world(); // shaders + textures of the finished area (props, NPCs, enemies included), before the first frame
   };
   function layoutName(l) { return { courtyard: '中庭', halls: '回廊', chasm: '大裂谷', terrace: '段丘', crypt: '納骨堂' }[l] || '遺構'; }
 

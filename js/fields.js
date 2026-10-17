@@ -144,7 +144,7 @@
         if (e.boss || !inside(f, e.pos) || e.pos.y > (f.kind === 'vent' ? 1 : 0.5) || (e.def.flyer && f.kind !== 'vent')) continue;
         switch (f.kind) {
           case 'water': e.wetUntil = G.game.time + 2; if (e.st.burn) e.st.burn = 0; break;
-          case 'lava': C.status(e, 'burn', 1); C.damageEnemy(e, C.scale(6), { src: 'dot', proc: true, noMarker: true }); break;
+          // lava does not hurt monsters (burning from the player's own weapons and skills works as usual)
           case 'mud': e.st.slow = Math.max(e.st.slow || 0, 0.5); break;
           case 'poison': C.status(e, 'poison', 1); break;
           case 'thorns': C.damageEnemy(e, C.scale(4), { src: 'dot', proc: true, noMarker: true }); e.st.slow = Math.max(e.st.slow || 0, 0.4); break;

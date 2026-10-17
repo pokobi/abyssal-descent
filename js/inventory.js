@@ -233,7 +233,7 @@
   // ---------------- loot tables ----------------
   const pickR = (W) => { let t = 0; for (const k in W) t += W[k]; let x = Math.random() * t; for (const k in W) { x -= W[k]; if (x <= 0) return k; } return Object.keys(W)[0]; };
   const rarityW = (luck, floor) => Object.fromEntries(G.RARITY_ORDER.map((r) => [r, G.RARITY[r].tier < (floor || 0) ? 0 : G.rarityWeight(r, G.Run ? G.Run.depthArea(G.game.area) : G.game.area, luck)]));
-  const pickOf = (arr, r) => { let c = arr.filter((o) => o.rarity === r); if (!c.length) c = arr; return c[Math.floor(Math.random() * c.length)]; };
+  const pickOf = (arr, r) => { let c = arr.filter((o) => o.rarity === r); if (!c.length) c = arr; return G.thinFairy(() => c[Math.floor(Math.random() * c.length)]); };
   // one random thing of a kind
   IV.rollThing = function (kind, luck, floor) {
     const r = pickR(rarityW(luck, floor));

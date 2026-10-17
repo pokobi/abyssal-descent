@@ -63,6 +63,9 @@
   G.ITEM_CAT = { grenade: { name: '投擲物', icon: '💣' }, heal: { name: '回復', icon: '❤️' }, util: { name: '補助', icon: '🧰' } };
   // fixed keys by category: 4 = heal, 5 = guard, 6 = boost, 7 = tools (G = grenades). Hold the key for a selection wheel.
   // keys 4 and 5 are two identical consumable pockets: any item except grenades goes into either (G = grenades only)
+  // the fairy bottle (a free revive) is far too strong to be common: whenever a drop / shop roll lands on it, it only stays with this chance
+  G.FAIRY_KEEP = 0.12;
+  G.thinFairy = (pick) => { let it = pick(); for (let i = 0; i < 6 && it && it.id === 'h_fairy' && Math.random() > G.FAIRY_KEEP; i++) it = pick(); return it; };
   G.ITEM_SLOTS = [
     { id: 'c1', key: '4', name: '消耗品', icon: '🧪' },
     { id: 'c2', key: '5', name: '消耗品', icon: '🧪' },

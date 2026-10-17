@@ -1120,7 +1120,7 @@
     const rar = rollRarity(r, luck);
     let c = arr.filter((o) => o.rarity === rar);
     if (!c.length) c = arr;
-    return r.pick(c);
+    return G.thinFairy(() => r.pick(c));
   }
   GM.pickOffer = function (k, used, r) {
     r = r || new G.RNG((Math.random() * 1e9) >>> 0);
@@ -1593,7 +1593,7 @@
     for (let i = ord.indexOf(rar); i >= 0 && !pool.length; i--) pool = G.ITEMS.filter((x) => x.rarity === ord[i]);
     // early on a plain chest leans towards healing
     if (tier === 0 && GM.area <= 3 && Math.random() < 0.6) { const h = pool.filter((x) => x.cat === 'heal'); if (h.length) pool = h; }
-    const itm = U.pick(pool);
+    const itm = G.thinFairy(() => U.pick(pool));
     const R = G.RARITY[itm.rarity];
     if (P.addItem(itm.id, 1)) { G.ui.toast(`${itm.icon} 【${R.name}】${itm.name} を手に入れた`, 'good'); G.ui.gain(itm); }
     else { const c = Math.round((itm.price || 100) * 0.5); G.combat.coins(c, pos.clone().add(V(0, 0.6, 0))); G.ui.toastSmall(`${itm.icon} ${itm.name}（持ちきれないのでコイン${c}枚に）`); }

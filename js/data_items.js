@@ -72,6 +72,16 @@
   ];
   const GUARD = ['u_plate', 'u_battery', 'u_iron', 'u_ward', 'u_invis', 'u_doll'];
   const TOOL = ['u_sand', 'u_turret', 'u_map', 'u_ammo'];
+  // grenades: a much bigger blast and far more damage to enemy shields (the descriptions follow the numbers)
+  G.GRENADE_RADIUS_MUL = 1.6; G.GRENADE_SHIELD_MUL = 3;
+  for (const it of G.ITEMS) {
+    if (it.cat !== 'grenade' || !it.data) continue;
+    const d = it.data;
+    if (d.r) { d.r = Math.round(d.r * G.GRENADE_RADIUS_MUL * 10) / 10; it.desc = it.desc.replace(/半径(\d+(?:\.\d+)?)m/g, () => `半径${d.r}m`); }
+    d.shieldMul = (d.shieldMul || 1) * G.GRENADE_SHIELD_MUL;
+    it.desc = it.desc.replace(/×(\d+)/g, (m, n) => `×${n * G.GRENADE_SHIELD_MUL}`);
+    if (!/シールド/.test(it.desc) && d.dmg > 0 && !d.zone && !d.stun && !d.decoy) it.desc += ` シールドへのダメージ×${d.shieldMul}。`;
+  }
   for (const it of G.ITEMS) { it.sub = it.cat === 'grenade' ? 'g' : it.cat === 'heal' ? 'heal' : GUARD.includes(it.id) ? 'guard' : TOOL.includes(it.id) ? 'tool' : 'boost'; it.slot = it.cat === 'grenade' ? 'g' : 'c'; }
   // items that work just by being carried (e.g. the fairy bottle) take no key slot at all
   for (const it of G.ITEMS) if (it.data && it.data.revive) { it.passive = true; it.slot = 'passive'; }

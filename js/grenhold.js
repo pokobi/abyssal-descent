@@ -78,16 +78,7 @@
       tmpM.compose(p, tmpQ.identity(), tmpS.set(s, s, s)); g.dots.setMatrixAt(i, tmpM);
     }
     g.dots.count = NDOT; g.dots.instanceMatrix.needsUpdate = true; g.dots.visible = true;
-    if (hit) {
-      const r = Math.max(0.6, d.r || 2);
-      // the blast marker always lies on the floor under the impact point (a grenade hitting a wall drops there anyway)
-      const fl = G.world.floorBelow(hit.p.x + hit.n.x * 0.2, hit.p.y + 0.3, hit.p.z + hit.n.z * 0.2);
-      g.mark.position.set(hit.p.x + hit.n.x * 0.2, (fl > -50 ? fl : hit.p.y) + 0.05, hit.p.z + hit.n.z * 0.2);
-      g.mark.quaternion.setFromUnitVectors(V(0, 0, 1), UPV);
-      g.mark.scale.setScalar(r * (0.9 + 0.1 * g.k));
-      g.ring.material.opacity = 0.45 + Math.sin(t * 8) * 0.15;
-      g.mark.visible = true;
-    } else g.mark.visible = false;
+    g.mark.visible = false; // only the arc is drawn; the blast-radius marker on the floor is gone
   }
 
   // ---------------- throw physics (shared by the guide and the real throw) ----------------

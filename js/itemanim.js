@@ -150,13 +150,24 @@
   // ------------------------------------------------ searching a chest / corpse: both hands dig in front of you, in a loop
   // (the gun is lowered meanwhile). Faster as the search nears its end; the hands sink in and out smoothly.
   let rum = null;
+  // one whole hand, palm down: forearm + cuff + palm + four fingers + thumb, all joined (reads as a single hand)
+  function digHand(p, side) {
+    const g = new THREE.Group(); p.add(g);
+    const fore = cyl(g, M.sleeve, 0.03, 0.34, 0, 0.016, 0.2, Math.PI / 2 + 0.12, 0, 0);       // forearm running back toward the camera
+    cyl(g, M.glove, 0.035, 0.05, 0, 0.011, 0.055, Math.PI / 2 + 0.12, 0, 0);                    // cuff
+    box(g, M.glove, 0.084, 0.03, 0.09, 0, 0, 0);                                                // palm / back of the hand
+    const fingers = new THREE.Group(); fingers.position.set(0, -0.002, -0.044); g.add(fingers);
+    for (let i = 0; i < 4; i++) { const f = box(fingers, M.glove, 0.017, 0.02, 0.058, -0.03 + i * 0.02, 0, -0.027); f.scale.z = i === 0 || i === 3 ? 0.05 : 0.058; }
+    const th = box(g, M.glove, 0.02, 0.022, 0.05, -side * 0.048, -0.006, -0.012, 0, -side * 0.6, 0);  // thumb on the inner side
+    return { g, fingers, th, fore };
+  }
   function rummage(dt, on) {
     if (!G.weapons.vmRoot) return;
     if (on && !rum) {
       mats();
       if (!root) { root = new THREE.Group(); G.weapons.vmScene.add(root); }
       const g = new THREE.Group(); root.add(g);
-      const l = hand(g, false), r = hand(g, true);
+      const l = digHand(g, -1), r = digHand(g, 1);
       rum = { g, l, r, t: 0, k: 0 };
     }
     if (!rum) return;
@@ -165,10 +176,12 @@
     rum.t += dt * (7 + prog * 5);
     const t = rum.t, sink = (1 - rum.k) * 0.42;
     // each hand: forward / back strokes with a scoop at the bottom, the two out of phase
-    const pose = (h, side, ph) => {
-      const a = t + ph, s = Math.sin(a), c = Math.cos(a);
-      h.position.set(side * (0.1 + c * 0.02), -0.075 - sink + Math.max(0, s) * 0.035, -0.42 + c * 0.05);
-      h.rotation.set(0.28 + Math.max(0, -s) * 0.38, side * -0.12 + c * 0.08, side * (0.1 + s * 0.1));
+    const pose = (H, side, ph) => {
+      const a = t + ph, s = Math.sin(a), c = Math.cos(a), h = H.g;
+      // reach forward (fingers open) -> press down and pull back (fingers curl) -> lift
+      h.position.set(side * (0.105 + c * 0.015), -0.08 - sink + Math.max(0, s) * 0.035, -0.44 + c * 0.05);
+      h.rotation.set(0.32 + Math.max(0, -s) * 0.3, side * 0.18 + c * 0.06, side * (-0.12 + s * 0.08));
+      H.fingers.rotation.x = 0.25 + Math.max(0, -s) * 0.9;
     };
     pose(rum.l, -1, 0); pose(rum.r, 1, Math.PI);
     rum.g.position.set(0, 0, 0);

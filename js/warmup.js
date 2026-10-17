@@ -34,6 +34,47 @@
     } catch (e) { console.warn('warm world failed', e); }
   };
 
+  // The same, but WITHOUT blocking the page: the driver compiles in parallel (KHR_parallel_shader_compile) and we just wait.
+  // Never waits longer than `limit` ms; resolves either way.
+  W.worldAsync = function (limit) {
+    const r = G.renderer, sc = G.scene, cam = G.camera;
+    if (!r || !sc || !cam) return Promise.resolve();
+    const t0 = now();
+    try { sc.updateMatrixWorld(true); r.compile(sc, cam); uploadTextures(sc, r); } catch (e) { console.warn('warm world failed', e); return Promise.resolve(); }
+    const tc = now() - t0;
+    // compile() only starts the links; the page used to block on them at the first draw. Wait for the drivers here instead (polling, not blocking).
+    return new Promise((resolve) => {
+      const deadline = now() + (limit || 3500);
+      const tick = () => {
+        let pending = false;
+        const ps = r.info.programs || [];
+        for (let i = 0; i < ps.length; i++) { const p = ps[i]; if (p && p.isReady && !p.isReady()) { pending = true; break; } }
+        if (!pending || now() > deadline) { if (G.Perf && G.Perf.note) G.Perf.note(`シェーダー準備 ${Math.round(now() - t0)}ms（呼び出し ${Math.round(tc)}ms）${pending ? ' 時間切れ' : ''}`); resolve(); }
+        else setTimeout(tick, 8);
+      };
+      tick();
+    });
+  };
+  // one model of every enemy kind, parked far below the world, so every shader they need exists before the first fight
+  W.enemyModels = function () {
+    const sc = G.scene; if (!sc || !G.enemies || !G.enemies.buildModel || !G.ENEMIES) return null;
+    const tmp = new THREE.Group(); tmp.position.set(0, -800, 0);
+    const seen = new Set();
+    for (const d of G.ENEMIES) { const k = d.plan + '|' + d.variant; if (seen.has(k)) continue; seen.add(k); try { tmp.add(G.enemies.buildModel(d, { scale: 1 }).group); } catch (e) { /* ignore */ } }
+    sc.add(tmp);
+    return tmp;
+  };
+  W.bootAsync = async function () {
+    const r = G.renderer; if (!r) return;
+    const t0 = now();
+    const tmp = W.enemyModels();
+    try { await W.worldAsync(8000); } catch (e) { /* ignore */ }
+    if (tmp) { G.scene.remove(tmp); }
+    try { warmViewmodel(r); } catch (e) { /* ignore */ }
+    try { if (G.StatusUI && G.StatusUI.warm) G.StatusUI.warm(); } catch (e) { /* ignore */ }
+    if (W.log) console.log('[warm] bootAsync', (now() - t0).toFixed(0) + 'ms');
+  };
+
   // the first-person scene: current gun, hands, and one of each item model (they share materials, so a few are enough)
   function warmViewmodel(r) {
     const Wp = G.weapons;

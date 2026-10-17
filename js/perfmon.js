@@ -37,6 +37,9 @@
   }
   function unwrapAll() { for (const [o, f, orig] of wrapped) o[f] = orig; wrapped = []; }
 
+  // free-text events (pointer-lock timing, shader preparation ...) are kept with the spikes so the report shows what happened when
+  PF.notes = [];
+  PF.note = function (text) { PF.notes.push({ t: +((now() - (startT || now())) / 1000).toFixed(1), text }); if (PF.notes.length > 80) PF.notes.shift(); };
   PF.begin = function (ts) {
     const interval = prevNow ? ts - prevNow : 0; prevNow = ts;
     PF._interval = interval; t0 = now(); phases = {};
@@ -98,6 +101,7 @@
     if (s) L.push(`fps ${s.fps.toFixed(1)} avg ${s.avg.toFixed(1)}ms p50 ${s.p50.toFixed(1)} p99 ${s.p99.toFixed(1)} max ${s.max.toFixed(0)} 1%low ${s.low1.toFixed(0)}fps js ${s.js.toFixed(1)}ms heap ${s.heap.toFixed(0)}MB alloc ${s.alloc.toFixed(1)}MB/s gc ${s.gcPerMin.toFixed(0)}/min calls ${s.calls} tris ${s.tris}`);
     L.push(`spikes ${PF.spikes.length}  longtasks ${longTasks.length}`);
     for (const k of PF.spikes.slice(-60)) L.push(`${k.t}s  ${k.iv}ms (js ${k.js})  ${k.cause}  state=${k.st} area=${k.area} ${k.field} enemies=${k.enemies}`);
+    if (PF.notes.length) L.push('events: ' + PF.notes.slice(-30).map((n) => `${n.t}s ${n.text}`).join(' | '));
     if (longTasks.length) L.push('long tasks: ' + longTasks.slice(-20).map((x) => `${x.t}s:${x.d}ms`).join(' '));
     return L.join('\n');
   };

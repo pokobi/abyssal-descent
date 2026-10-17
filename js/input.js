@@ -87,9 +87,21 @@
     if (G.game && !G.game.debug && (G.game.state === 'playing' || G.game.state === 'paused' || G.game.state === 'buff')) { e.preventDefault(); e.returnValue = ''; }
   });
 
+  // A pointer lock with raw (unadjusted) input can take hundreds of ms to come back on some Windows setups, and the page stalls meanwhile
+  // (menus / inventory / pause all give the lock up and take it again). The first lock stays raw; if a RE-lock turns out slow
+  // we switch to a plain lock for the rest of the session.
+  let lockT0 = 0, rawSlow = false;
+  try { rawSlow = sessionStorage.getItem('ad.rawSlow') === '1'; } catch (e) { /* ignore */ }
+  I.lockStats = { n: 0, last: 0, max: 0, plain: () => rawSlow };
   document.addEventListener('pointerlockchange', () => {
     const was = I.locked;
     I.locked = document.pointerLockElement === I.el;
+    if (I.locked && lockT0) {
+      const dt = performance.now() - lockT0; lockT0 = 0;
+      const S = I.lockStats; S.last = Math.round(dt); S.max = Math.max(S.max, S.last); S.n++;
+      if (G.Perf && G.Perf.note) G.Perf.note(`ポインターロック取得 ${S.last}ms${rawSlow ? '（通常ロック）' : '（生入力）'}`);
+      if (S.n >= 2 && dt > 250 && !rawSlow) { rawSlow = true; try { sessionStorage.setItem('ad.rawSlow', '1'); } catch (e) { /* ignore */ } if (G.Perf && G.Perf.note) G.Perf.note('再ロックが遅いので、以降は通常のロックに切り替え'); }
+    }
     // leaving the lock normally drops held keys; during the boon choice we keep them so you keep moving
     if (!I.locked) { if (!(G.game && G.game.state === 'buff') && !document.hasFocus()) I.keys = {}; else if (!(G.game && G.game.state === 'buff')) { const keep = {}; for (const k of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight']) if (I.keys[k]) keep[k] = true; I.keys = keep; } I.mouse = [false, false, false, false, false]; I.lastLockExit = performance.now(); }
     if (was !== I.locked) G.emit('lockchange', I.locked);
@@ -100,7 +112,9 @@
     if (!I.el) return;
     // Esc drops out of fullscreen along with the pointer lock: going back into the game goes back into fullscreen too
     if (G.save && G.save.data && G.save.data.settings.fullscreen) I.fullscreen();
+    lockT0 = performance.now();
     try {
+      if (rawSlow) { I.el.requestPointerLock(); return; }
       const p = I.el.requestPointerLock({ unadjustedMovement: true });
       if (p && p.catch) p.catch(() => { try { const p2 = I.el.requestPointerLock(); if (p2 && p2.catch) p2.catch(() => G.emit('lockerror')); } catch (e) { G.emit('lockerror'); } });
     } catch (e) { try { I.el.requestPointerLock(); } catch (e2) { G.emit('lockerror'); } }

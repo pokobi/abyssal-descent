@@ -70,7 +70,7 @@
     GM.toTitle();
     ldText.textContent = '描画を準備中…';
     await new Promise((r) => setTimeout(r, 30));
-    if (G.Warm) G.Warm.boot(); // title world shaders, viewmodel, previews: behind the loading screen
+    if (G.Warm) { if (G.Warm.bootAsync) await G.Warm.bootAsync(); else G.Warm.boot(); } // title world + every enemy kind, viewmodel, previews: behind the loading screen, without blocking the page
     setTimeout(() => document.getElementById('loading').classList.add('done'), 300);
     requestAnimationFrame(frame);
   }
@@ -583,7 +583,12 @@
     GM.state = 'playing';
     G.ui.refreshWeapon(); G.ui.refreshItems();
     G.sfx.setAmbience(kind === 'boss' || kind === 'cursed' ? 1.4 : 1);
-    if (G.Warm) G.Warm.world(); // shaders + textures of the finished area (props, NPCs, enemies included), before the first frame
+    // shaders + textures of the finished area, compiled in parallel behind a black screen (nothing runs or draws until it is ready)
+    if (G.Warm && G.Warm.worldAsync) {
+      const fade = document.getElementById('fade'), had = fade.classList.contains('on');
+      fade.classList.add('on'); GM._warming = true;
+      GM._warmP = G.Warm.worldAsync().then(() => { GM._warming = false; if (!had) fade.classList.remove('on'); });
+    } else if (G.Warm) G.Warm.world();
   };
   function layoutName(l) { return { courtyard: '中庭', halls: '回廊', chasm: '大裂谷', terrace: '段丘', crypt: '納骨堂' }[l] || '遺構'; }
 
@@ -1632,8 +1637,8 @@
         const next = t.exit.type || 'combat';
         setTimeout(() => {
           GM.enterArea(GM.area + 1, next);
-          GM.transitioning = false;
-          document.getElementById('fade').classList.remove('on');
+          // stay dark until the new area's shaders are ready (enterArea started that job)
+          (GM._warmP || Promise.resolve()).then(() => { GM.transitioning = false; document.getElementById('fade').classList.remove('on'); });
         }, 650);
         return;
       }
@@ -1837,6 +1842,7 @@
     const PF = G.Perf; if (PF && PF.on) PF.begin(now);
     let dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    if (GM._warming) { I.endFrame(); if (PF && PF.on) PF.end(); return; } // the new area's shaders are compiling: run and draw nothing
     fpsAcc += dt; fpsN++;
     if (fpsAcc > 0.5) { G.ui.fps(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
     try {

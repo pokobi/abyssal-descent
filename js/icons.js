@@ -339,6 +339,8 @@
 
   // ---------------- registry ----------------
   const SPEC = {}, FALLBACK = {};
+  // overshield (next to the HP): a see-through light-blue shield with a pale rim
+  const OS = () => [{ d: PATHS.shield || '', c: '#8fdcff', o: 0.62, ring: '#d8f4ff' }, { d: PATHS.shield || '', c: '#ffffff', o: 0.2, s: 0.6, x: 102, y: 90 }];
   IC.def = function (key, layers, fallback) { SPEC[key] = layers; if (fallback) FALLBACK[key] = fallback; delete SVG[key]; return key; };
   IC.has = (key) => !!SPEC[key];
   for (const e in EMO) { const [n, c] = EMO[e]; if (PATHS[n]) SPEC['e:' + e] = [big(n, c)]; }
@@ -394,8 +396,8 @@
         ol += `<circle cx="${cx}" cy="${cy}" r="${r * 1.04}" stroke-width="30"/>`;
         fl += `<circle cx="${cx}" cy="${cy}" r="${r * 1.04}" fill="#17110c" stroke="${mix(l.c, '#000000', 0.25)}" stroke-width="10"/>`;
       }
-      if (!l.back) ol += `<path${tf}${fr} d="${l.d}" stroke-width="${(36 / s).toFixed(1)}"/>`;
-      fl += `<path${tf}${fr} d="${l.d}" fill="url(#${grad(l.c)})"${l.o != null ? ` opacity="${l.o}"` : ''}/>`;
+      if (!l.back && !l.ring) ol += `<path${tf}${fr} d="${l.d}" stroke-width="${(36 / s).toFixed(1)}"/>`;
+      fl += `<path${tf}${fr} d="${l.d}" fill="url(#${grad(l.c)})"${l.ring ? ` stroke="${l.ring}" stroke-width="${(22 / s).toFixed(1)}" stroke-linejoin="round"` : ''}${l.o != null ? ` opacity="${l.o}"` : ''}/>`;
     }
     SVG[key] = `<svg viewBox="-20 -20 552 552" aria-hidden="true"><g fill="#0b0806" stroke="#0b0806" stroke-linejoin="round" opacity="0.9">${ol}</g>${fl}</svg>`;
     return SVG[key];
@@ -426,7 +428,7 @@
       if (l.s || l.x || l.y) { g.translate(l.x || 0, l.y || 0); g.scale(l.s || 1, l.s || 1); }
       fn(l); g.restore();
     } };
-    each((l) => { if (l.back) return; g.lineWidth = 36 / ((l.s || 1) * (l.gk || 1)); g.stroke(path2d(l.d)); });
+    each((l) => { if (l.back || l.ring) return; g.lineWidth = 36 / ((l.s || 1) * (l.gk || 1)); g.stroke(path2d(l.d)); });
     each((l) => {
       if (l.back) { g.beginPath(); g.arc(256, 256, 266, 0, Math.PI * 2); g.fillStyle = '#17110c'; g.fill(); g.lineWidth = 10 / (l.s || 1); g.strokeStyle = mix(l.c, '#000000', 0.25); g.stroke(); }
       const gr = g.createLinearGradient(0, 0, 128, 512);
@@ -727,6 +729,7 @@
 
   // give the game's data its icons (data files are loaded before this one)
   IC.applyData = function () {
+    IC.def('ui:os', OS());
     for (const [k, layers] of Object.entries(ATT)) IC.def('att:' + k, layers);
     if (G.ATTACHMENTS) for (const a of G.ATTACHMENTS) if (SPEC['att:' + a.id]) a.icon = IC.ch('att:' + a.id, a.icon);
     if (G.ATT_SLOTS) for (const [id, s] of Object.entries(G.ATT_SLOTS)) if (SLOT_ICON[id]) { IC.def('slot:' + id, ATT[SLOT_ICON[id]]); s.icon = IC.ch('slot:' + id, s.icon); }

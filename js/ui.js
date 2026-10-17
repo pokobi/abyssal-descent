@@ -240,7 +240,7 @@
     if (P.hp < lastHp) { /* trail lags behind via css transition */ }
     e.hpTrail.style.width = (hpk * 100) + '%';
     lastHp = P.hp;
-    e.hpText.innerHTML = `${Math.ceil(Math.max(0, P.hp))}<small> / ${st.maxHp}</small>${P.os > 0.5 ? ` <span class="os-num" title="オーバーシールド">🛡+${Math.ceil(P.os)}</span>` : ''} <span class="revives" title="魂の灯火（死亡時に燃えて復活する）">🪔×${P.revives || 0}</span>`;
+    e.hpText.innerHTML = `${Math.ceil(Math.max(0, P.hp))}<small> / ${st.maxHp}</small>${P.os > 0.5 ? ` <span class="os-num" title="オーバーシールド">${G.Icons ? G.Icons.html('ui:os') : '🛡'}+${Math.ceil(P.os)}</span>` : ''} <span class="revives" title="魂の灯火（死亡時に燃えて復活する）">🪔×${P.revives || 0}</span>`;
     e.osFill.style.width = Math.min(100, P.os / Math.max(50, st.maxHp) * 100) + '%';
     e.lowhp.style.opacity = hpk < 0.3 ? (0.5 + Math.sin(G.game.time * 6) * 0.25) * (1 - hpk / 0.3) : 0;
     if (hpk < 0.3 && !P.dead) { UI._hb = (UI._hb || 0) - dt; if (UI._hb <= 0) { UI._hb = 0.5 + hpk * 2; G.sfx.heartbeat(1 - hpk / 0.3); } }

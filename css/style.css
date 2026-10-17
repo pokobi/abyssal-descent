@@ -1269,3 +1269,7 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 /* armour durability bar (inventory cells and equipment slots) */
 .iv-dur { position: absolute; left: 6%; right: 6%; bottom: 3%; height: max(3px, 7%); background: rgba(0,0,0,0.7); border-radius: 2px; overflow: hidden; pointer-events: none; z-index: 3; }
 .iv-dur::after { content: ''; display: block; height: 100%; width: calc(var(--f) * 100%); background: var(--dc, #6ee06a); box-shadow: 0 0 4px var(--dc, #6ee06a); }
+
+/* armour cells: the defence number sits clear of the durability bar */
+.iv-eq .iv-def { bottom: calc(max(3px, 7%) + 0.45em); }
+.iv-it.t-armor .iv-def { top: 1px; }

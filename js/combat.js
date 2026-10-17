@@ -416,6 +416,8 @@
       if (d < r + 0.4) C.damagePlayer(dmg * (1 - 0.5 * d / (r + 0.4)), { src: 'explosion', pos, attacker: info.attacker, elem: info.elem });
       return;
     }
+    // your own grenade hurts you too: inside the blast you take half of its damage
+    if (info.grenade && !info.isCluster && !info.noSelf && d < r) C.damagePlayer(dmg * 0.5 / ((C.ENEMY_DMG || 1) * Math.max(0.1, 1 + P.stats.enemyDmg)), { src: 'explosion', pos }); // exactly half of the grenade's damage (before your armour)
     for (const e of G.enemies.inRadius(pos, r + 0.6)) {
       if (info.los && !C.pileLos(pos, e)) continue;
       const dd = Math.max(0, e.pos.distanceTo(pos) - e.radius);

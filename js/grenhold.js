@@ -41,7 +41,8 @@
       const rm = new THREE.MeshBasicMaterial({ color: 0xff7040, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
       const ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), rm); ring.renderOrder = 5;
       const fill = new THREE.Mesh(new THREE.CircleGeometry(0.92, 48), new THREE.MeshBasicMaterial({ color: 0xff5020, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })); fill.renderOrder = 5;
-      const mark = new THREE.Group(); mark.add(ring); mark.add(fill);
+      // the landing guide: just a small glowing sphere where the grenade will come down (no radius circle)
+      const mark = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffa050, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending })); mark.renderOrder = 6;
       guide = { dots, mark, ring, fill, k: 0 };
     }
     if (guide.dots.parent !== G.scene) { G.scene.add(guide.dots); G.scene.add(guide.mark); }
@@ -65,7 +66,7 @@
       if (eh && (d.impact || d.sticky)) { pos.addScaledVector(dir, eh.t); hit = { p: pos.clone(), n: UPV }; break; }
       pos.addScaledVector(dir, L);
       // skip the part right in front of the lens (huge, distracting dots)
-      if (pos.distanceToSquared(G.camera.position) > 1.6 * 1.6) pts.push(pos.clone());
+      if (pos.distanceToSquared(G.camera.position) > 0.45 * 0.45) pts.push(pos.clone());
       if (pos.y < -200) break;
     }
     // spread the dots evenly along the computed path
@@ -74,11 +75,18 @@
     for (let i = 0; i < NDOT; i++) {
       if (i >= n) { tmpM.makeScale(0, 0, 0); g.dots.setMatrixAt(i, tmpM); continue; }
       const p = pts[Math.min(pts.length - 1, Math.floor(i * every))];
-      const s = (0.045 + 0.02 * Math.max(0, Math.sin(t * 10 - i * 0.5))) * g.k * (0.6 + 0.4 * i / NDOT);
+      const near = Math.min(1, 0.12 + p.distanceTo(G.camera.position) * 0.16); // dots close to the lens stay small
+      const s = (0.045 + 0.02 * Math.max(0, Math.sin(t * 10 - i * 0.5))) * g.k * (0.6 + 0.4 * i / NDOT) * near;
       tmpM.compose(p, tmpQ.identity(), tmpS.set(s, s, s)); g.dots.setMatrixAt(i, tmpM);
     }
     g.dots.count = NDOT; g.dots.instanceMatrix.needsUpdate = true; g.dots.visible = true;
-    g.mark.visible = false; // only the arc is drawn; the blast-radius marker on the floor is gone
+    if (hit) {
+      // on the floor under the impact point (a grenade hitting a wall drops there anyway)
+      const fl = G.world.floorBelow(hit.p.x + hit.n.x * 0.2, hit.p.y + 0.3, hit.p.z + hit.n.z * 0.2);
+      g.mark.position.set(hit.p.x + hit.n.x * 0.2, (fl > -50 ? fl : hit.p.y) + 0.14, hit.p.z + hit.n.z * 0.2);
+      g.mark.scale.setScalar((0.9 + 0.2 * Math.sin(t * 9)) * (0.6 + 0.4 * g.k));
+      g.mark.visible = true;
+    } else g.mark.visible = false;
   }
 
   // ---------------- throw physics (shared by the guide and the real throw) ----------------
@@ -95,8 +103,8 @@
     if (under) {
       // a softer, flatter lob that rolls along the floor
       const fl = f.clone(); fl.y = fl.y * 0.6; fl.normalize();
-      vel = fl.multiplyScalar(9.5 * pw).add(V(0, 2.2, 0));
-    } else vel = f.clone().multiplyScalar(17 * pw).add(V(0, 3.5, 0));
+      vel = fl.multiplyScalar(13.5 * pw).add(V(0, 3.6, 0));
+    } else vel = f.clone().multiplyScalar(20 * pw).add(V(0, 8, 0)); // a real lob: a good upward kick, so it clearly arcs out of the hand (about twice the old distance)
     vel.addScaledVector(p.vel, 0.5);
     return { o, vel };
   };

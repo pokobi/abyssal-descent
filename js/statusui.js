@@ -75,7 +75,7 @@
   }
   function meleeCard() {
     const m = P.melee, d = m.def, s = G.weapons.meleeStats(m), st = P.stats, B = G.PLAYER_BASE;
-    const dmgMul = Math.max(0.1, 1 + (st.dmg || 0)); // 与ダメ counts in the shown damage and DPS
+    const dmgMul = Math.max(0.1, 1 + (st.dmg || 0) + (st.meleeDmg || 0)); // 与ダメ + 近接ダメージ (both always apply to a melee weapon) count in the shown damage and DPS
     const crit = st.critChance + (s.critChance || 0), dps = s.dmg * dmgMul / s.swing, dps0 = d.dmg / d.swing;
     const tiles = [
       tile('ダメージ', dv(s.dmg * dmgMul, d.dmg, { mid: d.dmg * Math.pow(1.13, m.lv || 0) })),

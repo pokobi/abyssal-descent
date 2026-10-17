@@ -8,6 +8,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script>
+/* touch device detection (?mobile=1 / ?pc=1 force it). A PC loads nothing extra; a phone adds css/mobile.css + js/mobile.js. */
+(function () {
+  var q = location.search, ua = navigator.userAgent, mm = window.matchMedia;
+  var m = /[?&]mobile=1/.test(q) ? true : /[?&]pc=1/.test(q) ? false
+    : ((mm && mm('(pointer: coarse)').matches && mm('(hover: none)').matches) || /Android|iPhone|iPod/i.test(ua) || /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  window.G_MOBILE = !!m;
+  if (m) {
+    document.documentElement.classList.add('m');
+    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'css/mobile.css'; document.head.appendChild(l);
+  }
+})();
+</script>
 </head>
 <body>
 <div id="app">
@@ -140,5 +153,6 @@
 <script src="js/game.js"></script>
 <script src="js/devmode.js"></script>
 <script src="js/invui.js"></script>
+<script>if (window.G_MOBILE) { var ms = document.createElement('script'); ms.src = 'js/mobile.js'; document.body.appendChild(ms); }</script>
 </body>
 </html>

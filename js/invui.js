@@ -106,16 +106,18 @@
     if (!root) return;
     const loot = !!IV.openCont, C = IV.openCont;
     // layout: sizes come from the window so nothing is wasted (1920x1080 = 1.0)
-    const Wd = innerWidth, Ht = innerHeight;
-    SC = Math.max(0.62, Math.min(1.6, Math.min(Wd / 1920, Ht / 1080)));
+    // phone: a taller virtual screen (the root scrolls) and no status column - the status sheet stays in the pause menu
+    const MB = !!window.G_MOBILE;
+    const Wd = innerWidth, Ht = MB ? Math.max(innerHeight, 520) : innerHeight;
+    SC = MB ? Math.max(0.3, Math.min(1, Math.min(Wd / 1920, Ht / 1080))) : Math.max(0.62, Math.min(1.6, Math.min(Wd / 1920, Ht / 1080)));
     const padX = Wd * 0.02, padY = Ht * 0.03, gap = Math.round(10 * SC);
     const IW = Wd - 2 * padX, IH = Ht - 2 * padY;
-    const sw = Math.round(IW * 0.25), aw = Math.round(IW * 0.095), mw = IW - sw - aw - 2 * gap;
+    const sw = MB ? 0 : Math.round(IW * 0.25), aw = Math.round(IW * 0.095), mw = IW - sw - aw - 2 * gap;
     const footH = Math.round(24 * SC), hW = Math.round(IH * 0.31), hS = Math.round(IH * 0.15), hI = IH - hW - hS - footH - 3 * gap;
     CS = Math.floor(Math.max(24, 0.9 * Math.min((mw - 30 * SC) / IV.BAG[0], (hI - 86 * SC) / (IV.BAG[1] + 1))));
     // looting: only the inventory, big and centred (bag next to the chest / corpse) so it never looks like the Tab screen
     if (loot) CS = Math.floor(Math.max(26, Math.min((IW * 0.95 - 90 * SC - 250 * SC) / (IV.BAG[0] + C.cols * 1.3), (IH * 0.88 - 150 * SC) / (IV.BAG[1] + 1), (IH * 0.88 - 150 * SC) / (C.rows * 1.3))));
-    document.body.style.setProperty('--s', SC.toFixed(3));
+    document.body.style.setProperty('--s', (MB ? Math.max(SC, 0.5) : SC).toFixed(3));
     document.body.classList.add('inv-open');
     document.body.classList.toggle('inv-loot', loot);
     const st = P.stats, def = st.defense || 0;
@@ -128,7 +130,7 @@
       ? `<div class="iv-panel iv-contp"><div class="iv-ph"><b>${C.kind === 'corpse' ? '💀 ' + U.esc(C.name) + 'の亡骸' : '📦 ' + U.esc(C.name)}</b><button class="btn small" id="iv-all">すべて取る</button></div><div class="iv-contbody">${gridEl(C, 'cont', Math.round(CS * 1.3))}</div></div>`
       : '';
     const ov = G.ui.el.statusOv;
-    if (loot) G.ui.statusOverlay(false); else G.ui.statusOverlay(true, true, true);
+    if (loot || MB) G.ui.statusOverlay(false); else G.ui.statusOverlay(true, true, true);
     const invPanel = `<div class="iv-panel iv-invpanel"><div class="iv-ph"><b>🎒 インベントリ</b><span>${P.bag.items.length}個　·　金品の価値 <b>${U.fmt(valTotal)}</b>🪙</span></div><div class="iv-bagwrap">${gridEl(P.bag, 'bag')}</div><div class="iv-specs">${specs}</div></div>`;
     if (loot) {
       const eqPanel = `<div class="iv-panel iv-eqpanel"><div class="iv-ph"><b>🛡 装備</b><span>防御 <b>${Math.round(def)}</b></span></div><div class="iv-eqgrid">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.hands)}${eqBox(SL.legs)}${eqBox(SL.feet)}</div></div>`;
@@ -150,7 +152,7 @@
     root.querySelectorAll('.iv-sk').forEach((el) => wireBox(el, 's'));
     G.StatusUI.mount(root);
     // the status sheet fills the left cell (it lives in the HUD layer, so it is placed over it)
-    if (!loot) {
+    if (!loot && !MB) {
       const r = root.querySelector('.iv-cell-st').getBoundingClientRect();
       ov.style.setProperty('left', r.left + 'px', 'important'); ov.style.setProperty('top', r.top + 'px', 'important');
       ov.style.setProperty('width', r.width + 'px', 'important'); ov.style.setProperty('height', r.height + 'px', 'important');

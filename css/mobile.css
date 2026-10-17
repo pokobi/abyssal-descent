@@ -1,0 +1,87 @@
+/* ABYSSAL DESCENT — smartphone layer. Loaded only on touch devices (see index.html); the PC never sees this file.
+   --u = viewport height / 360 (set from mobile.js). Every size below is in u so the layout holds on any phone, always landscape. */
+html.m, html.m body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+html.m #app { touch-action: none; }
+html.m #screens { touch-action: manipulation; }
+html.m #screens * { touch-action: pan-x pan-y; }
+html.m #fps, html.m #dev-badge, html.m #dev-info { display: none !important; }
+
+/* ---------- controls ---------- */
+#m-ui, #m-btns { position: absolute; inset: 0; pointer-events: none; display: none; }
+html.m-play #m-ui, html.m-play #m-btns { display: block; }
+#m-ui { z-index: 3; }
+#m-btns { z-index: 24; }
+#m-look { position: absolute; inset: 0; pointer-events: auto; }
+#m-stickzone { position: absolute; left: 0; bottom: 0; width: 40%; height: 70%; pointer-events: auto; }
+#m-stick { position: absolute; width: calc(var(--r) * 2); height: calc(var(--r) * 2); margin: calc(var(--r) * -1) 0 0 calc(var(--r) * -1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.07); opacity: 0; transition: opacity .12s; pointer-events: none; }
+#m-stick.on { opacity: 1; }
+#m-stick i { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%; background: rgba(255,255,255,0.36); border: 2px solid rgba(255,255,255,0.6); }
+html.m-play #m-stickzone::after { content: '移動'; position: absolute; left: calc(var(--u) * 52); bottom: calc(var(--u) * 44); color: rgba(255,255,255,0.18); font-size: calc(var(--u) * 22); font-weight: 900; letter-spacing: 2px; pointer-events: none; }
+.mb { position: absolute; pointer-events: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; background: rgba(14,12,10,0.5); border: 2px solid rgba(255,255,255,0.32); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.5); touch-action: none; line-height: 1; }
+.mb .mi { font-size: 1em; filter: drop-shadow(0 1px 2px #000); }
+.mb .mt { font-size: 0.3em; font-weight: 900; margin-top: 0.12em; color: rgba(255,255,255,0.85); text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.mb.fire { background: rgba(190,40,30,0.42); border-color: rgba(255,120,100,0.7); }
+.mb.sys { background: rgba(14,12,10,0.6); border-color: rgba(255,255,255,0.25); }
+.mb.press { background: rgba(255,255,255,0.26); transform: scale(0.93); }
+.mb.fire.press { background: rgba(255,80,60,0.6); }
+.mb.lit { background: rgba(217,180,106,0.42); border-color: var(--gold2, #f1d79b); }
+#m-close { display: none; position: absolute; z-index: 90; right: calc(var(--u) * 10); top: calc(var(--u) * 8); padding: calc(var(--u) * 7) calc(var(--u) * 16); border-radius: 999px; background: rgba(14,12,10,0.88); border: 2px solid var(--gold, #d9b46a); color: #fff; font-weight: 900; font-size: calc(var(--u) * 15); }
+html.m-inv #m-close { display: block; }
+#m-rotate { display: none; position: fixed; inset: 0; z-index: 500; background: #050505; color: #f1d79b; align-items: center; justify-content: center; text-align: center; }
+#m-rotate.on { display: flex; }
+#m-rotate .mr-ic { font-size: 56px; animation: mrrot 1.8s ease-in-out infinite; }
+#m-rotate .mr-t { font-size: 22px; font-weight: 900; margin-top: 10px; }
+#m-rotate .mr-s { font-size: 13px; opacity: 0.7; margin-top: 6px; }
+@keyframes mrrot { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+
+/* ---------- HUD: smaller, and out of the thumbs' way ---------- */
+html.m #crosshair { transform: scale(1.1); }
+html.m #compass, html.m #area-sub, html.m #run-meta, html.m #hud-buffs .bicon:nth-child(n+9), html.m #weapon-atts, html.m #grapple-ind, html.m #feed { display: none !important; }
+html.m #hud-tl { left: calc(var(--u) * 10 + env(safe-area-inset-left, 0px)); top: calc(var(--u) * 6); max-width: 36vw; }
+html.m #hud-tl > * { zoom: 0.62; }
+html.m #objective { min-width: 0; }
+html.m #hud-tr { right: calc(var(--u) * 92); top: calc(var(--u) * 6); }
+html.m #hud-tr > * { zoom: 0.62; }
+html.m #hud-buffs { left: calc(var(--u) * 10); top: calc(var(--u) * 78); zoom: 0.62; max-height: 36vh; }
+html.m #hud-bl { left: calc(var(--u) * 8 + env(safe-area-inset-left, 0px)); bottom: calc(var(--u) * 6); }
+html.m #hud-bl > * { zoom: 0.6; }
+html.m #hp-bars { width: calc(var(--u) * 170 / 0.6); }
+html.m #pstatus { zoom: 0.6; }
+/* weapon info: top right, under the coins and the pause / bag buttons */
+html.m #hud-br { right: calc(var(--u) * 10 + env(safe-area-inset-right, 0px)); bottom: auto; top: calc(var(--u) * 50); }
+html.m #hud-br > * { zoom: 0.62; }
+html.m #weapon-info { min-width: 0; padding: 6px 10px; }
+html.m #ammo { font-size: 30px; }
+html.m .wslot { pointer-events: auto; padding: 8px 12px; touch-action: none; }
+/* skills / items along the bottom */
+html.m #hud-bc { bottom: calc(var(--u) * 5); transform: translateX(-50%); gap: calc(var(--u) * 4); }
+html.m #hud-bc .ab { pointer-events: auto; touch-action: none; width: calc(var(--u) * 40); height: calc(var(--u) * 40); font-size: calc(var(--u) * 20); border-radius: 9px; }
+html.m #hud-bc .ab.small { width: calc(var(--u) * 34); height: calc(var(--u) * 34); font-size: calc(var(--u) * 17); }
+html.m #ability-row, html.m #item-row { gap: calc(var(--u) * 6); }
+html.m .ab .key { display: none; }
+html.m .ab .cdt { font-size: calc(var(--u) * 14); }
+html.m .ab-sep { width: calc(var(--u) * 6); }
+html.m #interact-panel { zoom: 0.62; top: 40%; }
+html.m #bossbar { top: calc(var(--u) * 8); width: min(46vw, 560px); zoom: 0.72; }
+html.m #toasts { top: 16%; zoom: 0.72; }
+html.m #banner { zoom: 0.7; }
+html.m #item-cards, html.m #gain-host, html.m #anom-alert { zoom: 0.66; }
+html.m #pile-ind, html.m #gren-hint { zoom: 0.7; }
+html.m #hp-wrap { padding: 6px 10px; }
+
+/* ---------- menus, shops, pop-ups: scaled so they fit a phone-sized landscape screen ---------- */
+html.m #screens { zoom: 0.66; }
+html.m #screens .panel { max-height: calc(100vh / 0.66 - 24px); overflow: auto; -webkit-overflow-scrolling: touch; }
+html.m .title-logo { font-size: clamp(30px, 7vh, 60px); }
+html.m .title-menu { gap: 7px; margin-top: 14px; }
+html.m .btn { min-height: 44px; }
+html.m #tut { zoom: 0.66; }
+html.m #item-cards { left: calc(var(--u) * 10) !important; right: auto !important; top: calc(var(--u) * 96) !important; width: 34vw !important; }
+html.m .title-foot { display: none; }
+
+/* inventory: the screen is taller than the phone; the layer scrolls (drag the empty background), items drag on their own */
+html.m #inv-ui { overflow-y: auto; overflow-x: hidden; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+html.m #inv-ui .iv-it, html.m #inv-ui .iv-wbox, html.m #inv-ui .iv-sk, html.m #inv-ui .iv-as, html.m #inv-ui .iv-eq { touch-action: none; }
+html.m #inv-ui .iv-cell-st { display: none; }
+html.m #inv-ui .iv-foot-wrap { display: none; }
+html.m .side-info { display: none !important; }

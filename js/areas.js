@@ -47,7 +47,7 @@
     g.fillStyle = 'rgba(14,11,8,0.88)'; g.fillRect(8, 8, 496, 204);
     g.strokeStyle = t.color; g.lineWidth = 6; g.strokeRect(8, 8, 496, 204);
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.font = '86px "Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.fillText(t.icon, 256, 70);
+    g.font = '86px "Segoe UI Emoji","Noto Color Emoji",sans-serif'; if (G.Icons && G.Icons.split(t.icon).some((q) => typeof q !== 'string')) G.Icons.fillText(g, t.icon, 256, 70, { iconScale: 1.05 }); else g.fillText(t.icon, 256, 70);
     g.font = '900 44px "Noto Sans JP",sans-serif'; g.fillStyle = t.color; g.fillText(t.name, 256, 140);
     g.font = '500 24px "Noto Sans JP",sans-serif'; g.fillStyle = '#e8dcc4'; g.fillText(t.hint, 256, 186);
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;

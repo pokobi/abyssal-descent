@@ -305,7 +305,7 @@
     g.fillStyle = 'rgba(8,6,4,0.42)'; g.beginPath(); g.roundRect ? g.roundRect(6, 6, cw - 12, ch - 12, 40) : g.rect(6, 6, cw - 12, ch - 12); g.fill();
     g.strokeStyle = col; g.globalAlpha = 0.5; g.lineWidth = 3; g.stroke(); g.globalAlpha = 1;
     g.font = '900 ' + (opts.size || 84) + 'px "Noto Sans JP","Segoe UI Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.shadowColor = col; g.shadowBlur = 18; g.fillStyle = col; g.fillText(text, cw / 2, ch / 2 + 4);
+    g.shadowColor = col; g.shadowBlur = 18; g.fillStyle = col; (G.Icons ? G.Icons.fillText : (g2, t2, x2, y2, o2) => { if (o2 && o2.stroke) g2.strokeText(t2, x2, y2); g2.fillText(t2, x2, y2); })(g, text, cw / 2, ch / 2 + 4);
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
     const grp = new THREE.Group();
     for (const side of [0, Math.PI]) {

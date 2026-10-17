@@ -147,6 +147,8 @@
     });
     for (; free > 0; free--) slot('⇕', empty, false);
   };
+  // tile icons: only touch the DOM when the icon really changes (the icon layer swaps characters for drawings)
+  UI.setIc = (el, v) => { const ic = el.querySelector('.ic'); v = String(v); if (ic._v !== v) { ic._v = v; ic.textContent = v; } };
   UI.buildAbilityRow = function () {
     const row = UI.el.abilityRow; row.innerHTML = '';
     UI.abEls = [];
@@ -154,9 +156,9 @@
     const keys = [0, 1, 2, 3].map((i) => G.input.skillKey(i));
     // Q = ultimate (big, gold), then the skills X/Z/V and the pile driver (also a skill), then the grapple
     for (let i = 0; i < 4; i++) { const d = mk(keys[i]); if (i === 0) { d.classList.add('ult'); d.insertAdjacentHTML('beforeend', '<span class="ulttag">ULT</span>'); } row.appendChild(d); UI.abEls.push(d); if (i === 0) row.insertAdjacentHTML('beforeend', '<span class="ab-sep"></span>'); }
-    UI.pileEl = mk(G.input.keyName('crouch')); UI.pileEl.classList.add('pileab'); UI.pileEl.title = `パイルドライバー（空中で${G.input.keyName('crouch')}）`; UI.pileEl.querySelector('.ic').textContent = '🔨'; row.appendChild(UI.pileEl);
+    UI.pileEl = mk(G.input.keyName('crouch')); UI.pileEl.classList.add('pileab'); UI.pileEl.title = `パイルドライバー（空中で${G.input.keyName('crouch')}）`; UI.setIc(UI.pileEl, '🔨'); row.appendChild(UI.pileEl);
     row.insertAdjacentHTML('beforeend', '<span class="ab-sep"></span>');
-    UI.grEl = mk(G.input.keyName('grapple')); UI.grEl.querySelector('.ic').textContent = '⚓'; row.appendChild(UI.grEl);
+    UI.grEl = mk(G.input.keyName('grapple')); UI.setIc(UI.grEl, '⚓'); row.appendChild(UI.grEl);
     const irow = UI.el.itemRow; irow.innerHTML = '';
     UI.gnEl = mk(G.input.keyName('grenade'), true); irow.appendChild(UI.gnEl);
     UI.itEls = [];
@@ -270,9 +272,9 @@
     // abilities
     for (let i = 0; i < 4; i++) {
       const sk = P.skills[i], el = UI.abEls[i];
-      if (!sk) { el.classList.add('empty'); el.querySelector('.ic').textContent = '·'; setCd(el, 0, 0, false); el.querySelector('.cnt').textContent = ''; el.removeAttribute('data-tip'); continue; }
+      if (!sk) { el.classList.add('empty'); UI.setIc(el, '·'); setCd(el, 0, 0, false); el.querySelector('.cnt').textContent = ''; el.removeAttribute('data-tip'); continue; }
       el.classList.remove('empty');
-      el.querySelector('.ic').textContent = sk.def.icon;
+      UI.setIc(el, sk.def.icon);
       const ready = G.abilities.ready(sk);
       const frac = sk.maxCharges ? (sk.charges > 0 ? 0 : sk.cd / Math.max(0.01, sk.maxCd)) : sk.cd / Math.max(0.01, sk.maxCd);
       setCd(el, Math.max(0, Math.min(1, frac)), sk.maxCharges && sk.charges > 0 ? 0 : sk.cd, ready);
@@ -292,16 +294,16 @@
       slowT = 0.2; UI._itemsDirty = false;
       const gid = P.grenadeSel, gn = P.grenades[gid] || 0;
       const gi = G.ITEM_BY_ID[gid];
-      UI.gnEl.querySelector('.ic').textContent = gi && gn ? gi.icon : '💣';
+      UI.setIc(UI.gnEl, gi && gn ? gi.icon : '💣');
       UI.gnEl.querySelector('.cnt').textContent = gn ? '×' + gn : '';
       UI.gnEl.classList.toggle('empty', !gn);
       const types = Object.keys(P.grenades).filter((k) => P.grenades[k] > 0).length;
       { const gk = G.input.keyName('grenade'); UI.gnEl.querySelector('.key').textContent = types > 1 ? `${gk} (${G.input.keyName('cycleGrenade')})` : gk; }
       G.ITEM_SLOTS.forEach((S, i) => {
         const el = UI.itEls[i], id = P.selItem(S.id), kinds = P.slotItems(S.id).length;
-        if (!id) { el.classList.add('empty'); el.querySelector('.ic').textContent = '·'; el.querySelector('.cnt').textContent = ''; return; }
+        if (!id) { el.classList.add('empty'); UI.setIc(el, '·'); el.querySelector('.cnt').textContent = ''; return; }
         el.classList.remove('empty');
-        el.querySelector('.ic').textContent = G.ITEM_BY_ID[id].icon; el.querySelector('.cnt').textContent = '×' + P.itemCount(id) + (kinds > 1 ? ` +${kinds - 1}` : '');
+        UI.setIc(el, G.ITEM_BY_ID[id].icon); el.querySelector('.cnt').textContent = '×' + P.itemCount(id) + (kinds > 1 ? ` +${kinds - 1}` : '');
       });
       // buffs grid
       const sig = [...P.buffs].map(([k, n]) => k + n).join();

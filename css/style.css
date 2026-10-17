@@ -1249,3 +1249,10 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 .iv-it.iv-fit { animation: ivfit 1.1s ease-in-out infinite alternate; }
 .iv-fitb { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); font-size: 0.6em; padding: 0 0.4em; border-radius: 0.3em 0.3em 0 0; background: #2a8a4a; color: #eaffef; white-space: nowrap; line-height: 1.5; }
 .iv-as.iv-fitslot { border-color: #6ef08a; border-style: dashed; box-shadow: 0 0 8px rgba(110,240,140,0.5); }
+
+/* ---------------- vector icons (js/icons.js) ---------------- */
+.gx { display: inline-block; width: 1.18em; height: 1.18em; vertical-align: -0.24em; line-height: 0; flex: none; }
+.gx svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.55)); }
+/* armour: the drawing carries the material colour, the disc is just a dark plate with a ring of it */
+.amat::before, .amat.mat-chain::before, .amat.mat-scale::before, .amat.mat-cloth::before { background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--mc) 26%, #1c1712), #0e0b08 72%); box-shadow: inset 0 0 0 0.06em color-mix(in srgb, var(--mc) 75%, #000), 0 0 0.25em color-mix(in srgb, var(--mc) 40%, transparent); }
+.amat > span { font-size: 0.86em; }

@@ -354,7 +354,8 @@
       g.fillStyle = gr; g.fillRect(0, 0, s, s);
       g.font = (s * 0.55) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(icon, s / 2, s / 2 + s * 0.04);
+      const key = G.Icons && G.Icons.split(String(icon)).find((q) => typeof q !== 'string');
+      if (key) G.Icons.drawIcon(g, key.key, s * 0.18, s * 0.18, s * 0.64); else g.fillText(icon, s / 2, s / 2 + s * 0.04);
     });
     iconCache[key] = t;
     return t;
@@ -367,8 +368,8 @@
     if (opts.bg) { g.fillStyle = opts.bg; g.fillRect(0, 0, w, h); }
     g.font = (opts.weight || 900) + ' ' + (opts.size || 34) + 'px "Noto Sans JP","Segoe UI Emoji",sans-serif';
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.strokeText(text, w / 2, h / 2);
-    g.fillStyle = opts.color || '#f1d79b'; g.fillText(text, w / 2, h / 2);
+    g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.fillStyle = opts.color || '#f1d79b';
+    (G.Icons ? G.Icons.fillText : (g2, t2, x2, y2, o2) => { if (o2 && o2.stroke) g2.strokeText(t2, x2, y2); g2.fillText(t2, x2, y2); })(g, text, w / 2, h / 2, { stroke: true });
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     return t;
   };

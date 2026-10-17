@@ -208,7 +208,7 @@
       g.font = '900 30px "Noto Sans JP","Segoe UI Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.9)';
       const txt = `${d.icon} 味方 ${d.name} Lv${m.lv}`;
-      g.strokeText(txt, 160, 28); g.fillStyle = '#9fe8ff'; g.fillText(txt, 160, 28);
+      g.fillStyle = '#9fe8ff'; (G.Icons ? G.Icons.fillText : (g2, t2, x2, y2, o2) => { if (o2 && o2.stroke) g2.strokeText(t2, x2, y2); g2.fillText(t2, x2, y2); })(g, txt, 160, 28, { stroke: true });
       g.fillStyle = 'rgba(0,0,0,0.75)'; g.fillRect(40, 58, 240, 20);
       g.fillStyle = down ? '#666' : hpK > 0.5 ? '#5fe07a' : hpK > 0.25 ? '#ffd050' : '#ff5050'; g.fillRect(43, 61, 234 * Math.max(0, hpK), 14);
       g.strokeStyle = '#9fe8ff'; g.lineWidth = 2; g.strokeRect(40, 58, 240, 20);

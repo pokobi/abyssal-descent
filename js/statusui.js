@@ -16,15 +16,17 @@
     const unit = o.unit || '', txt = (o.fmt ? o.fmt(cur) : num(cur, o.dec)) + unit;
     if (!base || Math.abs(cur - base) < Math.max(1e-6, Math.abs(base) * 0.005)) return `<b class="sv">${txt}</b>`;
     const pct = o.abs ? cur - base : (cur / base - 1) * 100, better = o.lowerBetter ? pct < 0 : pct > 0;
-    // split: o.mid = the value with the weapon's own upgrades only (level + attachments), so the change can be told apart:
-    //   amber = the weapon itself, cyan = buffs / damage-up / enchantments. The two add up to the total in the brackets.
-    if (o.mid != null && Math.abs(o.mid - base) >= Math.max(1e-6, Math.abs(base) * 0.005) && Math.abs(cur - o.mid) >= Math.max(1e-6, Math.abs(base) * 0.005)) {
-      const f = (x) => `${x > 0 ? '+' : ''}${Math.round(x)}`;
-      const a = o.abs ? o.mid - base : (o.mid - base) / base * 100, b = o.abs ? cur - o.mid : (cur - o.mid) / base * 100, pt = o.abs ? 'pt' : '%';
-      return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd sp2">(<i class="sdw">${f(a)}${pt}</i> <i class="sdb">${f(b)}${pt}</i>)</span>`;
+    // split: o.mid = the value with only the weapon's upgrade level (+n) applied.
+    //   amber = the +n upgrade, as a fixed amount (e.g. +9.8);  cyan = everything else (attachments, buffs, 与ダメ, enchantments), as a % of the upgraded value.
+    if (o.mid != null) {
+      const eps = Math.max(1e-6, Math.abs(base) * 0.005);
+      const dl = o.mid - base, hasL = Math.abs(dl) >= eps, hasB = Math.abs(cur - o.mid) >= eps;
+      const fx = (x) => `${x > 0 ? '+' : '-'}${o.fmt ? o.fmt(Math.abs(x)) : num(Math.abs(x), o.dec)}${unit}`;
+      const bp = o.abs ? cur - o.mid : (o.mid ? (cur / o.mid - 1) * 100 : 0), bt = `${bp > 0 ? '+' : ''}${Math.round(bp)}${o.abs ? 'pt' : '%'}`;
+      const parts = (hasL ? [`<i class="sdw">${fx(dl)}</i>`] : []).concat(hasB ? [`<i class="sdb">${bt}</i>`] : []);
+      if (parts.length) return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd sp2">(${parts.join(' ')})</span>`;
+      return `<b class="sv">${txt}</b>`;
     }
-    if (o.mid != null && Math.abs(o.mid - base) >= Math.max(1e-6, Math.abs(base) * 0.005)) return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd sp2">(<i class="sdw">${pct > 0 ? '+' : ''}${Math.round(pct)}${o.abs ? 'pt' : '%'}</i>)</span>`;
-    if (o.mid != null) return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd sp2">(<i class="sdb">${pct > 0 ? '+' : ''}${Math.round(pct)}${o.abs ? 'pt' : '%'}</i>)</span>`;
     return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd ${better ? 'up' : 'dn'}">(${pct > 0 ? '+' : ''}${Math.round(pct)}${o.abs ? 'pt' : '%'})</span>`;
   }
   const panel = (en, jp, body, cls) => `<section class="sp ${cls || ''}"><header><span class="en">${en}</span><span class="jp">${jp}</span></header><div class="sp-b">${body}</div></section>`;
@@ -34,18 +36,18 @@
   const preview = (kind, def, atts) => { if (noPv) return ''; const id = pend.length; pend.push({ id, kind, def, atts }); return `<canvas class="pv" data-pv="${id}" width="448" height="256"></canvas>`; };
 
   // ---------------- weapons ----------------
-  // the weapon's stats as if the player had no bonuses (only its own upgrade level and attachments): used to tell the two sources apart
+  // the weapon's stats with only its upgrade level (+n): no attachments, no player bonuses; used to tell the +n part from everything else
   function bareStats(w) {
-    const pl = G.player, real = pl.stats, cache = w._sc, dyn = pl.dynFireRate;
-    try { pl.stats = Object.assign({}, G.PLAYER_BASE); pl.dynFireRate = 0; w._sc = null; return Object.assign({}, G.weapons.stats(w)); } finally { pl.stats = real; pl.dynFireRate = dyn; w._sc = cache; }
+    const pl = G.player, real = pl.stats, cache = w._sc, dyn = pl.dynFireRate, atts = w.atts;
+    try { pl.stats = Object.assign({}, G.PLAYER_BASE); pl.dynFireRate = 0; w.atts = {}; w._sc = null; return Object.assign({}, G.weapons.stats(w)); } finally { pl.stats = real; pl.dynFireRate = dyn; w.atts = atts; w._sc = cache; }
   }
-  const legend = '<div class="wc-legend"><span class="sdw">■ 武器の強化・アタッチメント</span><span class="sdb">■ バフ・与ダメなど</span></div>';
+  const legend = '<div class="wc-legend"><span class="sdw">■ 武器の強化 +n（固定値）</span><span class="sdb">■ アタッチメント・バフ・与ダメなど（%）</span></div>';
   function gunCard(w) {
     const d = w.def, s = G.weapons.stats(w), st = P.stats, cur = w === P.weapon && !P.meleeMode;
     const trait = d.trait ? G.WEAPON_TRAITS[d.trait] : null;
     const crit = st.critChance + (s.critChance || 0), B = G.PLAYER_BASE;
     const dmgMul = Math.max(0.1, 1 + (st.dmg || 0)); // 与ダメ (boons, enchantments ...) counts in the shown damage and DPS
-    const s0 = bareStats(w); // the weapon alone: upgrade level + attachments
+    const s0 = bareStats(w); // the weapon with its +n level only
     const tiles = [
       tile('ダメージ', dv(s.dmg * dmgMul, d.dmg, { mid: s0.dmg }) + (s.pellets > 1 ? `<span class="sx">×${s.pellets}</span>` : '')),
       tile('連射', dv(s.rpm, d.rpm, { unit: '/分', dec: 0, mid: s0.rpm })),

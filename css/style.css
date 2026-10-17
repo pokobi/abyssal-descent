@@ -1259,3 +1259,9 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 
 #hp-text .os-num .gx { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 0.05em; }
 #hp-text .os-num .gx svg { filter: drop-shadow(0 0 3px rgba(120,200,255,0.7)); }
+
+/* weapon cards: where a change comes from. amber = the weapon itself (upgrade level, attachments), cyan = buffs / damage-up / enchantments */
+.sd.sp2 { color: inherit; }
+.sd.sp2 i, .wc-legend span { font-style: normal; }
+.sdw { color: #f2b95c; } .sdb { color: #6fd6ff; }
+.wc-legend { display: flex; flex-wrap: wrap; gap: 0.2em 1em; margin-top: 0.5em; font-size: 0.78em; font-weight: 700; opacity: 0.92; }

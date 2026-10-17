@@ -16,6 +16,15 @@
     const unit = o.unit || '', txt = (o.fmt ? o.fmt(cur) : num(cur, o.dec)) + unit;
     if (!base || Math.abs(cur - base) < Math.max(1e-6, Math.abs(base) * 0.005)) return `<b class="sv">${txt}</b>`;
     const pct = o.abs ? cur - base : (cur / base - 1) * 100, better = o.lowerBetter ? pct < 0 : pct > 0;
+    // split: o.mid = the value with the weapon's own upgrades only (level + attachments), so the change can be told apart:
+    //   amber = the weapon itself, cyan = buffs / damage-up / enchantments. The two add up to the total in the brackets.
+    if (o.mid != null && Math.abs(o.mid - base) >= Math.max(1e-6, Math.abs(base) * 0.005) && Math.abs(cur - o.mid) >= Math.max(1e-6, Math.abs(base) * 0.005)) {
+      const f = (x) => `${x > 0 ? '+' : ''}${Math.round(x)}`;
+      const a = o.abs ? o.mid - base : (o.mid - base) / base * 100, b = o.abs ? cur - o.mid : (cur - o.mid) / base * 100, pt = o.abs ? 'pt' : '%';
+      return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd sp2">(<i class="sdw">${f(a)}${pt}</i> <i class="sdb">${f(b)}${pt}</i>)</span>`;
+    }
+    if (o.mid != null && Math.abs(o.mid - base) >= Math.max(1e-6, Math.abs(base) * 0.005)) return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd sp2">(<i class="sdw">${pct > 0 ? '+' : ''}${Math.round(pct)}${o.abs ? 'pt' : '%'}</i>)</span>`;
+    if (o.mid != null) return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd sp2">(<i class="sdb">${pct > 0 ? '+' : ''}${Math.round(pct)}${o.abs ? 'pt' : '%'}</i>)</span>`;
     return `<b class="sv ${better ? 'up' : 'dn'}">${txt}</b><span class="sd ${better ? 'up' : 'dn'}">(${pct > 0 ? '+' : ''}${Math.round(pct)}${o.abs ? 'pt' : '%'})</span>`;
   }
   const panel = (en, jp, body, cls) => `<section class="sp ${cls || ''}"><header><span class="en">${en}</span><span class="jp">${jp}</span></header><div class="sp-b">${body}</div></section>`;
@@ -25,20 +34,27 @@
   const preview = (kind, def, atts) => { if (noPv) return ''; const id = pend.length; pend.push({ id, kind, def, atts }); return `<canvas class="pv" data-pv="${id}" width="448" height="256"></canvas>`; };
 
   // ---------------- weapons ----------------
+  // the weapon's stats as if the player had no bonuses (only its own upgrade level and attachments): used to tell the two sources apart
+  function bareStats(w) {
+    const pl = G.player, real = pl.stats, cache = w._sc, dyn = pl.dynFireRate;
+    try { pl.stats = Object.assign({}, G.PLAYER_BASE); pl.dynFireRate = 0; w._sc = null; return Object.assign({}, G.weapons.stats(w)); } finally { pl.stats = real; pl.dynFireRate = dyn; w._sc = cache; }
+  }
+  const legend = '<div class="wc-legend"><span class="sdw">■ 武器の強化・アタッチメント</span><span class="sdb">■ バフ・与ダメなど</span></div>';
   function gunCard(w) {
     const d = w.def, s = G.weapons.stats(w), st = P.stats, cur = w === P.weapon && !P.meleeMode;
     const trait = d.trait ? G.WEAPON_TRAITS[d.trait] : null;
     const crit = st.critChance + (s.critChance || 0), B = G.PLAYER_BASE;
     const dmgMul = Math.max(0.1, 1 + (st.dmg || 0)); // 与ダメ (boons, enchantments ...) counts in the shown damage and DPS
+    const s0 = bareStats(w); // the weapon alone: upgrade level + attachments
     const tiles = [
-      tile('ダメージ', dv(s.dmg * dmgMul, d.dmg) + (s.pellets > 1 ? `<span class="sx">×${s.pellets}</span>` : '')),
-      tile('連射', dv(s.rpm, d.rpm, { unit: '/分', dec: 0 })),
-      tile('装弾数', dv(s.mag, d.mag, { dec: 0 })),
-      tile('リロード', dv(s.reload, d.reload, { unit: '秒', lowerBetter: true })),
-      tile('射程', dv(s.range, d.range, { unit: 'm', dec: 0 })),
-      tile('会心率', dv(crit * 100, B.critChance * 100, { unit: '%', dec: 0, abs: true })),
-      tile('会心ダメージ', dv((st.critMul - 1) * 100, (B.critMul - 1) * 100, { unit: '%', dec: 0, abs: true })),
-      tile('ヘッドショット', dv(s.headMul, d.headMul, { unit: '倍' })),
+      tile('ダメージ', dv(s.dmg * dmgMul, d.dmg, { mid: s0.dmg }) + (s.pellets > 1 ? `<span class="sx">×${s.pellets}</span>` : '')),
+      tile('連射', dv(s.rpm, d.rpm, { unit: '/分', dec: 0, mid: s0.rpm })),
+      tile('装弾数', dv(s.mag, d.mag, { dec: 0, mid: s0.mag })),
+      tile('リロード', dv(s.reload, d.reload, { unit: '秒', lowerBetter: true, mid: s0.reload })),
+      tile('射程', dv(s.range, d.range, { unit: 'm', dec: 0, mid: s0.range })),
+      tile('会心率', dv(crit * 100, B.critChance * 100, { unit: '%', dec: 0, abs: true, mid: (B.critChance + (s0.critChance || 0)) * 100 })),
+      tile('会心ダメージ', dv((st.critMul - 1) * 100, (B.critMul - 1) * 100, { unit: '%', dec: 0, abs: true, mid: (B.critMul - 1) * 100 })),
+      tile('ヘッドショット', dv(s.headMul, d.headMul, { unit: '倍', mid: s0.headMul })),
     ].join('');
     const attDesc = (() => { const on = Object.keys(G.ATT_SLOTS).map((sl) => w.atts[sl] && G.ATT_BY_ID[w.atts[sl]]).filter(Boolean); return on.length ? `<div class="wc-attd">${on.map((a) => `<div><span>${a.icon} ${esc(a.name)}</span>${esc(a.desc || '')}</div>`).join('')}</div>` : ''; })();
     const atts = Object.keys(G.ATT_SLOTS).map((sl) => { const a = w.atts[sl] && G.ATT_BY_ID[w.atts[sl]]; return a ? `<span class="att on" ${UI.tipAttr(a)}>${a.icon}<em>${esc(a.name)}</em></span>` : `<span class="att" title="${G.ATT_SLOTS[sl].name}">${G.ATT_SLOTS[sl].icon}</span>`; }).join('');
@@ -52,7 +68,7 @@
           ${trait ? `<div class="tr">${trait.icon} ${esc(trait.name)}</div>` : ''}
         </div>
       </div>
-      <div class="wc-grid">${tiles}</div>
+      <div class="wc-grid">${tiles}</div>${legend}
       <div class="wc-att">${atts}</div>${G.weapons.FALLOFF[d.arch] ? `<div class="wc-attd"><div><span>📉 距離減衰</span>遠くの敵ほどダメージが下がる</div></div>` : `<div class="wc-attd"><div><span>🎯 減衰なし</span>距離によってダメージが下がらない</div></div>`}${attDesc}</div>`;
   }
   function meleeCard() {
@@ -60,12 +76,12 @@
     const dmgMul = Math.max(0.1, 1 + (st.dmg || 0)); // 与ダメ counts in the shown damage and DPS
     const crit = st.critChance + (s.critChance || 0), dps = s.dmg * dmgMul / s.swing, dps0 = d.dmg / d.swing;
     const tiles = [
-      tile('ダメージ', dv(s.dmg * dmgMul, d.dmg)),
-      tile('攻撃間隔', dv(s.swing, d.swing, { unit: '秒', lowerBetter: true })),
-      tile('リーチ', dv(s.range, d.range, { unit: 'm' })),
+      tile('ダメージ', dv(s.dmg * dmgMul, d.dmg, { mid: d.dmg * Math.pow(1.13, m.lv || 0) })),
+      tile('攻撃間隔', dv(s.swing, d.swing, { unit: '秒', lowerBetter: true, mid: d.swing })),
+      tile('リーチ', dv(s.range, d.range, { unit: 'm', mid: d.range })),
       tile('重撃', `<b class="sv">×${s.heavy[0]}</b>`),
-      tile('会心率', dv(crit * 100, (d.critChance || 0) * 100 + B.critChance * 100, { unit: '%', dec: 0, abs: true })),
-      tile('会心ダメージ', dv((st.critMul - 1) * 100, (B.critMul - 1) * 100, { unit: '%', dec: 0, abs: true })),
+      tile('会心率', dv(crit * 100, (d.critChance || 0) * 100 + B.critChance * 100, { unit: '%', dec: 0, abs: true, mid: ((d.critChance || 0) + B.critChance) * 100 })),
+      tile('会心ダメージ', dv((st.critMul - 1) * 100, (B.critMul - 1) * 100, { unit: '%', dec: 0, abs: true, mid: (B.critMul - 1) * 100 })),
       tile('ヘッドショット', `<b class="sv">${num(d.headMul || 1)}倍</b>`),
       tile('移動', `<b class="sv">×${num(d.moveMul)}</b>`),
     ].join('');
@@ -79,7 +95,7 @@
           ${d.traitDesc ? `<div class="tr">✦ ${esc(d.traitDesc)}</div>` : ''}
         </div>
       </div>
-      <div class="wc-grid">${tiles}</div></div>`;
+      <div class="wc-grid">${tiles}</div>${legend}</div>`;
   }
 
   // ---------------- skills ----------------

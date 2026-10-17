@@ -153,8 +153,8 @@
   // one whole hand, palm down: forearm + cuff + palm + four fingers + thumb, all joined (reads as a single hand)
   function digHand(p, side) {
     const g = new THREE.Group(); p.add(g);
-    const fore = cyl(g, M.sleeve, 0.03, 0.34, 0, 0.016, 0.2, Math.PI / 2 + 0.12, 0, 0);       // forearm running back toward the camera
-    cyl(g, M.glove, 0.035, 0.05, 0, 0.011, 0.055, Math.PI / 2 + 0.12, 0, 0);                    // cuff
+    const fore = cyl(g, M.sleeve, 0.03, 0.34, 0, 0, 0.215, Math.PI / 2, 0, 0);       // forearm running back toward the camera
+    cyl(g, M.glove, 0.034, 0.05, 0, 0, 0.06, Math.PI / 2, 0, 0);                    // cuff
     box(g, M.glove, 0.084, 0.03, 0.09, 0, 0, 0);                                                // palm / back of the hand
     const fingers = new THREE.Group(); fingers.position.set(0, -0.002, -0.044); g.add(fingers);
     for (let i = 0; i < 4; i++) { const f = box(fingers, M.glove, 0.017, 0.02, 0.058, -0.03 + i * 0.02, 0, -0.027); f.scale.z = i === 0 || i === 3 ? 0.05 : 0.058; }
@@ -181,7 +181,7 @@
       // reach forward (fingers open) -> press down and pull back (fingers curl) -> lift
       h.position.set(side * (0.105 + c * 0.015), -0.08 - sink + Math.max(0, s) * 0.035, -0.44 + c * 0.05);
       h.rotation.set(0.32 + Math.max(0, -s) * 0.3, side * 0.18 + c * 0.06, side * (-0.12 + s * 0.08));
-      H.fingers.rotation.x = 0.25 + Math.max(0, -s) * 0.9;
+      H.fingers.rotation.x = 0.12 + Math.max(0, -s) * 0.7;
     };
     pose(rum.l, -1, 0); pose(rum.r, 1, Math.PI);
     rum.g.position.set(0, 0, 0);

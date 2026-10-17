@@ -96,7 +96,15 @@
         i++;
       }
       this.pts.geometry.setDrawRange(0, this.n);
-      this.pos.needsUpdate = true; this.col.needsUpdate = true; this.siz.needsUpdate = true;
+      // upload only the live part of the buffers (and nothing at all while the system is empty): these were whole-buffer uploads every frame
+      if (this.n > 0 || this._had) {
+        const n = Math.max(this.n, 1);
+        this.pos.updateRange.offset = 0; this.pos.updateRange.count = n * 3;
+        this.col.updateRange.offset = 0; this.col.updateRange.count = n * 4;
+        this.siz.updateRange.offset = 0; this.siz.updateRange.count = n;
+        this.pos.needsUpdate = true; this.col.needsUpdate = true; this.siz.needsUpdate = true;
+      }
+      this._had = this.n > 0;
     }
     clear() { this.n = 0; this.pts.geometry.setDrawRange(0, 0); }
   }
@@ -393,7 +401,8 @@
   FX.update = function (dt, cam, renderer) {
     const h = renderer.domElement.height;
     const sc = h * 0.5 / Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5);
-    for (const s of [FX.add, FX.flame, FX.norm]) { s.mat.uniforms.uScale.value = sc; s.update(dt); }
+    const sys = FX._sys || (FX._sys = [FX.add, FX.flame, FX.norm]);
+    for (let i = 0; i < 3; i++) { const s = sys[i]; s.mat.uniforms.uScale.value = sc; s.update(dt); }
     for (const t of pools.tracer) if (t.t > 0) { t.t -= dt; t.m.material.opacity = Math.max(0, t.t / t.ml); if (t.t <= 0) t.m.visible = false; }
     for (const d of pools.decal) if (d.m.visible) { d.t -= dt; if (d.t <= 0) d.m.visible = false; else if (d.t < 4 && d.op !== undefined) d.m.material.opacity = d.op * d.t / 4; }
     for (const r of pools.ring) if (r.t > 0) {

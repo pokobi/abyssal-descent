@@ -1834,6 +1834,7 @@
   // ---------------- main loop ----------------
   function frame(now) {
     requestAnimationFrame(frame);
+    const PF = G.Perf; if (PF && PF.on) PF.begin(now);
     let dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     fpsAcc += dt; fpsN++;
@@ -1873,6 +1874,7 @@
       if (!GM._errShown) { GM._errShown = true; const f = document.getElementById('fatal'); f.classList.remove('hidden'); f.innerHTML += '<div>⚠ ' + U.esc(e.message) + '<br><small>' + U.esc((e.stack || '').split('\n').slice(0, 3).join(' | ')) + '</small></div>'; setTimeout(() => { GM._errShown = false; }, 4000); }
     }
     I.endFrame();
+    if (PF && PF.on) PF.end();
   }
   function update(dt) {
     const S = G.save.data.settings;

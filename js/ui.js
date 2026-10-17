@@ -224,10 +224,17 @@
   };
   UI.abilityDeny = function (sk) { const i = P.skills.indexOf(sk); if (i >= 0) { const el = UI.abEls[i]; el.style.transform = 'translateX(3px)'; setTimeout(() => el.style.transform = '', 80); } };
   UI.refreshItems = function () { UI._itemsDirty = true; };
+  // change-only DOM writes: the HUD is refreshed every frame, but a write that changes nothing still costs (garbage, style work)
+  const sText = (el, v) => { v = String(v); if (el._t !== v) { el._t = v; el.textContent = v; } };
+  const sStyle = (el, k, v) => { const c = el._s || (el._s = {}); if (c[k] !== v) { c[k] = v; el.style[k] = v; } };
+  const sClass = (el, k, on) => { on = !!on; const c = el._c || (el._c = {}); if (c[k] !== on) { c[k] = on; el.classList.toggle(k, on); } };
+  const sHtml = (el, v) => { if (el._h !== v) { el._h = v; el.innerHTML = v; } };
   function setCd(el, frac, secs, ready) {
-    el.querySelector('.cd').style.setProperty('--p', Math.round(frac * 100) + '%');
-    el.querySelector('.cdt').textContent = secs > 0 ? (secs < 10 ? secs.toFixed(1) : Math.ceil(secs)) : '';
-    el.classList.toggle('ready', !!ready);
+    const cd = el._cd || (el._cd = el.querySelector('.cd')), ct = el._cdt || (el._cdt = el.querySelector('.cdt'));
+    const pc = Math.round(frac * 100);
+    if (el._pc !== pc) { el._pc = pc; cd.style.setProperty('--p', pc + '%'); }
+    sText(ct, secs > 0 ? (secs < 10 ? secs.toFixed(1) : Math.ceil(secs)) : '');
+    sClass(el, 'ready', ready);
   }
   let slowT = 0, lastHp = -1, trailHp = 0;
   UI.update = function (dt) {
@@ -236,58 +243,58 @@
     const st = P.stats;
     // HP
     const hpk = Math.max(0, P.hp) / st.maxHp;
-    e.hpFill.style.width = (hpk * 100) + '%';
-    if (P.hp < lastHp) { /* trail lags behind via css transition */ }
-    e.hpTrail.style.width = (hpk * 100) + '%';
+    sStyle(e.hpFill, 'width', (hpk * 100).toFixed(2) + '%');
+    sStyle(e.hpTrail, 'width', (hpk * 100).toFixed(2) + '%'); // the trail lags behind via css transition
     lastHp = P.hp;
-    e.hpText.innerHTML = `${Math.ceil(Math.max(0, P.hp))}<small> / ${st.maxHp}</small>${P.os > 0.5 ? ` <span class="os-num" title="オーバーシールド">${G.Icons ? G.Icons.html('ui:os') : '🛡'}+${Math.ceil(P.os)}</span>` : ''} <span class="revives" title="魂の灯火（死亡時に燃えて復活する）">🪔×${P.revives || 0}</span>`;
-    e.osFill.style.width = Math.min(100, P.os / Math.max(50, st.maxHp) * 100) + '%';
-    e.lowhp.style.opacity = hpk < 0.3 ? (0.5 + Math.sin(G.game.time * 6) * 0.25) * (1 - hpk / 0.3) : 0;
+    { const hk = Math.ceil(Math.max(0, P.hp)) + '|' + st.maxHp + '|' + (P.os > 0.5 ? Math.ceil(P.os) : 0) + '|' + (P.revives || 0); if (UI._hk !== hk) { UI._hk = hk; e.hpText.innerHTML = `${Math.ceil(Math.max(0, P.hp))}<small> / ${st.maxHp}</small>${P.os > 0.5 ? ` <span class="os-num" title="オーバーシールド">${G.Icons ? G.Icons.html('ui:os') : '🛡'}+${Math.ceil(P.os)}</span>` : ''} <span class="revives" title="魂の灯火（死亡時に燃えて復活する）">🪔×${P.revives || 0}</span>`; } }
+    sStyle(e.osFill, 'width', Math.min(100, P.os / Math.max(50, st.maxHp) * 100).toFixed(1) + '%');
+    sStyle(e.lowhp, 'opacity', hpk < 0.3 ? ((0.5 + Math.sin(G.game.time * 6) * 0.25) * (1 - hpk / 0.3)).toFixed(3) : 0);
     if (hpk < 0.3 && !P.dead) { UI._hb = (UI._hb || 0) - dt; if (UI._hb <= 0) { UI._hb = 0.5 + hpk * 2; G.sfx.heartbeat(1 - hpk / 0.3); } }
     // ammo
     const w = P.weapon, ws = G.weapons.curStats;
     if (w && ws && P.meleeMode) {
-      e.ammoMag.textContent = '⚔'; e.ammoMax.textContent = '近接';
-      e.ammo.classList.remove('low'); e.reloadBar.style.opacity = 0;
+      sText(e.ammoMag, '⚔'); sText(e.ammoMax, '近接');
+      sClass(e.ammo, 'low', false); sStyle(e.reloadBar, 'opacity', 0);
       const ch = e.crosshair.children;
-      ch[0].style.top = '-13px'; ch[1].style.top = '4px'; ch[2].style.left = '-13px'; ch[3].style.left = '4px';
-      e.crosshair.style.opacity = P.sprinting ? 0.25 : 0.8; e.crosshair.classList.remove('ads');
+      sStyle(ch[0], 'top', '-13px'); sStyle(ch[1], 'top', '4px'); sStyle(ch[2], 'left', '-13px'); sStyle(ch[3], 'left', '4px');
+      sStyle(e.crosshair, 'opacity', P.sprinting ? 0.25 : 0.8); sClass(e.crosshair, 'ads', false);
     } else if (w && ws) {
-      e.ammoMag.textContent = st.infAmmo > 0 ? '∞' : w.mag;
-      e.ammoMax.textContent = ws.mag;
-      e.ammo.classList.toggle('low', w.mag <= Math.max(1, ws.mag * 0.25));
-      e.reloadBar.style.opacity = w.reloading ? 1 : 0;
-      if (w.reloading) e.reloadBar.firstChild.style.width = ((1 - w.reloadT / w.reloadDur) * 100) + '%';
+      sText(e.ammoMag, st.infAmmo > 0 ? '∞' : w.mag);
+      sText(e.ammoMax, ws.mag);
+      sClass(e.ammo, 'low', w.mag <= Math.max(1, ws.mag * 0.25));
+      sStyle(e.reloadBar, 'opacity', w.reloading ? 1 : 0);
+      if (w.reloading) sStyle(e.reloadBar.firstChild, 'width', ((1 - w.reloadT / w.reloadDur) * 100).toFixed(1) + '%');
       // crosshair spread
       const sp = G.weapons.currentSpread(ws);
       const vf = THREE.MathUtils.degToRad(G.camera.fov);
       const gap = 6 + Math.tan(THREE.MathUtils.degToRad(sp) / 2) / Math.tan(vf / 2) * window.innerHeight / 2;
       const ch = e.crosshair.children;
-      ch[0].style.top = (-gap - 9) + 'px'; ch[1].style.top = gap + 'px'; ch[2].style.left = (-gap - 9) + 'px'; ch[3].style.left = gap + 'px';
+      const gq = Math.round(gap * 2) / 2; // half-pixel steps: no style write for sub-pixel jitter
+      sStyle(ch[0], 'top', (-gq - 9) + 'px'); sStyle(ch[1], 'top', gq + 'px'); sStyle(ch[2], 'left', (-gq - 9) + 'px'); sStyle(ch[3], 'left', gq + 'px');
       const ads = G.weapons.adsT > 0.6;
       const scoped = !!G.weapons.isScoped;
-      e.crosshair.style.opacity = P.sprinting ? 0.25 : scoped || G.weapons.dotAds ? 0 : 1;
-      e.crosshair.classList.toggle('ads', ads);
+      sStyle(e.crosshair, 'opacity', P.sprinting ? 0.25 : scoped || G.weapons.dotAds ? 0 : 1);
+      sClass(e.crosshair, 'ads', ads);
     }
     // abilities
     for (let i = 0; i < 4; i++) {
       const sk = P.skills[i], el = UI.abEls[i];
-      if (!sk) { el.classList.add('empty'); UI.setIc(el, '·'); setCd(el, 0, 0, false); el.querySelector('.cnt').textContent = ''; el.removeAttribute('data-tip'); continue; }
-      el.classList.remove('empty');
+      if (!sk) { sClass(el, 'empty', true); UI.setIc(el, '·'); setCd(el, 0, 0, false); sText(el._cnt || (el._cnt = el.querySelector('.cnt')), ''); if (el.hasAttribute('data-tip')) el.removeAttribute('data-tip'); continue; }
+      sClass(el, 'empty', false);
       UI.setIc(el, sk.def.icon);
       const ready = G.abilities.ready(sk);
       const frac = sk.maxCharges ? (sk.charges > 0 ? 0 : sk.cd / Math.max(0.01, sk.maxCd)) : sk.cd / Math.max(0.01, sk.maxCd);
       setCd(el, Math.max(0, Math.min(1, frac)), sk.maxCharges && sk.charges > 0 ? 0 : sk.cd, ready);
-      el.querySelector('.cnt').textContent = (sk.maxCharges ? sk.charges + '/' + sk.maxCharges : '') + (sk.lv ? ' Lv' + sk.lv : '');
-      const bar = el.querySelector('.bar'); bar.style.width = sk.maxCharges && sk.charges < sk.maxCharges ? ((1 - sk.cd / Math.max(0.01, sk.maxCd)) * 100) + '%' : '0';
+      sText(el._cnt || (el._cnt = el.querySelector('.cnt')), (sk.maxCharges ? sk.charges + '/' + sk.maxCharges : '') + (sk.lv ? ' Lv' + sk.lv : ''));
+      const bar = el._bar || (el._bar = el.querySelector('.bar')); sStyle(bar, 'width', sk.maxCharges && sk.charges < sk.maxCharges ? ((1 - sk.cd / Math.max(0.01, sk.maxCd)) * 100).toFixed(1) + '%' : '0');
     }
     const gcd = P.grappleCd, gmax = 3.2 * (1 - st.grappleCd);
     setCd(UI.grEl, gcd / Math.max(0.01, gmax), gcd, gcd <= 0);
-    UI.grEl.classList.toggle('active-on', P.grapple.state === 'attached');
+    sClass(UI.grEl, 'active-on', P.grapple.state === 'attached');
     const pmax = P.pileCdMax();
     setCd(UI.pileEl, P.pileFree ? 0 : (P.pileCd || 0) / pmax, P.pileFree ? 0 : P.pileCd || 0, P.pileReady());
-    UI.pileEl.classList.toggle('active-on', !!P.pileState);
-    const lv = P.pileLevel(); UI.pileEl.querySelector('.cnt').textContent = lv ? 'Lv' + lv : '';
+    sClass(UI.pileEl, 'active-on', !!P.pileState);
+    const lv = P.pileLevel(); sText(UI.pileEl._cnt || (UI.pileEl._cnt = UI.pileEl.querySelector('.cnt')), lv ? 'Lv' + lv : '');
     // items (throttled)
     slowT -= dt;
     if (slowT <= 0 || UI._itemsDirty) {
@@ -316,11 +323,11 @@
         { const rows = Math.max(3, Math.floor((innerHeight - (UI._bTop || 170) - 230) / 38)); const cols = Math.max(4, Math.ceil(P.buffs.size / rows)); e.buffs.style.gridTemplateColumns = `repeat(${cols}, 34px)`; }
       }
       // temp effects
-      e.tempfx.innerHTML = [...P.temps].filter(([id, t]) => t.t < 999 && !id.startsWith('regen_')).map(([, t]) => t).map((t) => `<div class="tfx">${t.icon}<span>${Math.ceil(t.t)}s</span></div>`).join('') + (P.os > 0 ? `<div class="tfx">💠${Math.ceil(P.os)}</div>` : '');
+      sHtml(e.tempfx, [...P.temps].filter(([id, t]) => t.t < 999 && !id.startsWith('regen_')).map(([, t]) => t).map((t) => `<div class="tfx">${t.icon}<span>${Math.ceil(t.t)}s</span></div>`).join('') + (P.os > 0 ? `<div class="tfx">💠${Math.ceil(P.os)}</div>` : ''));
       // coins & meta
-      e.coinVal.textContent = U.fmt(G.game.run.coins);
+      sText(e.coinVal, U.fmt(G.game.run.coins));
       const r = G.game.run;
-      e.runMeta.innerHTML = `⏱ <b>${U.time(G.game.time - r.startT)}</b>　💀 <b>${r.kills}</b>　🎯 <b>${r.headshots}</b><br>🌱 シード <b>${G.game.seed}</b><br><span style="letter-spacing:2px">${(G.game.route || []).slice(-12).map((k) => G.Areas.TYPES[k].icon).join('')}</span>`;
+      sHtml(e.runMeta, `⏱ <b>${U.time(G.game.time - r.startT)}</b>　💀 <b>${r.kills}</b>　🎯 <b>${r.headshots}</b><br>🌱 シード <b>${G.game.seed}</b><br><span style="letter-spacing:2px">${(G.game.route || []).slice(-12).map((k) => G.Areas.TYPES[k].icon).join('')}</span>`);
       UI.updateObjective();
       // the boon grid always sits just below the top-left panel (objective / run info grow and shrink)
       { const tl = document.getElementById('hud-tl'); if (tl) { const y = Math.max(170, Math.round(tl.getBoundingClientRect().bottom + 10)); if (UI._bTop !== y) { UI._bTop = y; e.buffs.style.top = y + 'px'; e.buffs.style.maxHeight = `calc(100vh - ${y + 230}px)`; } } }
@@ -337,7 +344,9 @@
     if (UI.tintT > 0) { UI.tintT -= dt; if (UI.tintT <= 0) UI.el.tint.style.opacity = 0; }
     UI.updateCompass();
   };
+  let compassT = 0;
   UI.updateCompass = function () {
+    const nowT = performance.now(); if (nowT - compassT < 33) return; compassT = nowT; // 30 Hz is plenty for a compass strip
     const strip = UI.el.compass; const W2 = 230;
     const items = [];
     const card = [['N', 0], ['E', Math.PI / 2], ['S', Math.PI], ['W', -Math.PI / 2]];
@@ -352,7 +361,7 @@
     for (const e of G.enemies.list) { if (!e.alive || e.noBar || e.boss && !e.showBar || n > 40) continue; n++; items.push([rel(Math.atan2(e.pos.x - P.pos.x, -(e.pos.z - P.pos.z))), `<span class="enemy${e.elite ? ' elite' : ''}" style="left:${W2}px"></span>`]); }
     let html = '';
     for (const [a, h] of items) { if (Math.abs(a) > Math.PI / 2) continue; const x = W2 + a / (Math.PI / 2) * W2; html += h.replace(`left:${W2}px`, `left:${x.toFixed(1)}px`); }
-    strip.innerHTML = html;
+    sHtml(strip, html);
   };
   UI.updateObjective = function () {
     const o = G.game.objective; const el = UI.el.objective;
@@ -433,7 +442,7 @@
   };
   UI.showInteract = function (o) {
     const p = UI.el.interact;
-    if (!o) { p.classList.add('hidden'); UI._ikey = null; return; }
+    if (!o) { if (UI._ikey !== null || !p.classList.contains('hidden')) p.classList.add('hidden'); UI._ikey = null; return; }
     if (UI._ikey === o.key && !o.force) return;
     UI._ikey = o.key;
     p.classList.remove('hidden');
@@ -450,7 +459,7 @@
     }
     const now = performance.now();
     // a hide request in the same game frame as a show (ritual gauge vs. the interaction pass) is ignored
-    if (k < 0) { if (now > (UI._hrDone || 0) && UI._hrShownAt !== G.game.time) el.className = ''; return; }
+    if (k < 0) { if (now > (UI._hrDone || 0) && UI._hrShownAt !== G.game.time && el.className !== '') el.className = ''; return; }
     UI._hrShownAt = G.game.time;
     if (mode === 'done') {
       UI._hrDone = now + 450;
@@ -459,10 +468,13 @@
       return;
     }
     if (now < (UI._hrDone || 0)) return;
-    el.className = 'on' + (mode === 'pry' ? ' pry' : '') + (k > 0.75 ? ' near' : '') + (o && o.cls ? ' ' + o.cls : '');
-    el.style.setProperty('--p', (k * 100).toFixed(1) + '%');
-    el.querySelector('.hr-key').textContent = o && o.center ? o.center : k > 0 ? Math.floor(k * 100) + '%' : G.K('interact');
-    el.querySelector('.hr-lab').textContent = o && o.label ? o.label : mode === 'pry' ? 'こじ開け中…' : k > 0 ? `${G.K('interact')} を押し続けて` : `${G.K('interact')} 長押しで開ける`;
+    const cn = 'on' + (mode === 'pry' ? ' pry' : '') + (k > 0.75 ? ' near' : '') + (o && o.cls ? ' ' + o.cls : '');
+    if (el.className !== cn) el.className = cn;
+    const pv = (k * 100).toFixed(1) + '%'; if (el._pv !== pv) { el._pv = pv; el.style.setProperty('--p', pv); }
+    const hk = el._hk || (el._hk = el.querySelector('.hr-key')), hl = el._hl || (el._hl = el.querySelector('.hr-lab'));
+    const kt = o && o.center ? o.center : k > 0 ? Math.floor(k * 100) + '%' : G.K('interact');
+    const lt = o && o.label ? o.label : mode === 'pry' ? 'こじ開け中…' : k > 0 ? `${G.K('interact')} を押し続けて` : `${G.K('interact')} 長押しで開ける`;
+    if (hk.textContent !== kt) hk.textContent = kt; if (hl.textContent !== lt) hl.textContent = lt;
   };
   UI.shakeInteract = function () { const p = UI.el.interact; p.classList.remove('shake'); void p.offsetWidth; p.classList.add('shake'); };
   UI.showHud = function (on) { UI.el.hud.classList.toggle('hidden', !on); };

@@ -213,16 +213,16 @@
     const t = G.game.time;
     const top = act[0];
     // ---- heal over time (timed items only; permanent regen buffs are not shown) ----
-    const hots = [];
-    let pending = 0;
-    for (const [id, tm] of P.temps) if (id.startsWith('regen_') && tm.t > 0 && tm.mods && tm.mods.hpRegen) { hots.push([id, tm]); pending += tm.t * tm.mods.hpRegen * Math.max(0, 1 + (P.stats.healMul || 0)); }
+    let pending = 0, healing = false;
+    for (const [id, tm] of P.temps) if (id.startsWith('regen_') && tm.t > 0 && tm.mods && tm.mods.hpRegen) { healing = true; pending += tm.t * tm.mods.hpRegen * Math.max(0, 1 + (P.stats.healMul || 0)); }
     const mx = P.stats.maxHp;
     if (ghost) {
       // heal-over-time (bandage, regen potion): a guide segment shows where the HP bar will end up
       const hpNow = Math.max(0, P.hp);
       const tgt = pending > 0 && !P.dead ? Math.min(mx, hpNow + pending) : 0;
-      ghost.style.width = (tgt > 0 ? U.clamp(tgt / mx, 0, 1) * 100 : 0) + '%';
-      ghost.style.opacity = tgt > hpNow + 0.5 ? 1 : 0;
+      const gw = (tgt > 0 ? U.clamp(tgt / mx, 0, 1) * 100 : 0).toFixed(1) + '%', go = tgt > hpNow + 0.5 ? 1 : 0;
+      if (ghost._w !== gw) { ghost._w = gw; ghost.style.width = gw; }
+      if (ghost._o !== go) { ghost._o = go; ghost.style.opacity = go; }
     }
     // ---- HUD icons with ring gauges (throttled) ----
     acc -= dt;
@@ -254,7 +254,7 @@
       });
       // HP bar tint
       // only ailments that eat HP (burn / poison) tint the HP bar; slow and shock don't
-      if (hpFill) { const hpTop = ['burn', 'poison'].find((k) => s[k] > 0) || null; for (const k of ORDER) hpFill.classList.toggle('hp-' + k, k === hpTop); }
+      if (hpFill) { const hpTop = s.burn > 0 ? 'burn' : s.poison > 0 ? 'poison' : null; if (hpFill._top !== hpTop) { hpFill._top = hpTop; for (const k of ORDER) hpFill.classList.toggle('hp-' + k, k === hpTop); } }
     }
     // ---- screen: strong coloured edges + a light full-screen wash, each status with its own motion ----
     if (top) {
@@ -296,7 +296,7 @@
     }
     // ---- particles: around the hand (first person) or the whole body (third person) ----
     const tp = AV && AV.tpK > 0.4;
-    if (hots.length && !P.dead && P.hp < mx) {
+    if (healing && !P.dead && P.hp < mx) {
       // rising green motes + soft green rim at the screen edge while healing
       if (Math.random() < dt * (tp ? 16 : 8)) {
         const b = tp ? P.pos.clone().add(V(U.rand(-0.4, 0.4), U.rand(0.1, 1.5), U.rand(-0.4, 0.4))) : P.pos.clone().add(V(U.rand(-0.6, 0.6), U.rand(0.2, 0.9), U.rand(-0.6, 0.6)));

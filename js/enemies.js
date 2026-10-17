@@ -1451,10 +1451,13 @@
       b = { el, lv: el.querySelector('.lv'), nm: el.querySelector('.nm'), tr: el.querySelector('.hb .tr'), fl: el.querySelector('.hb .fl'), sb: el.querySelector('.sb'), sfl: el.querySelector('.sb .fl'), st: el.querySelector('.st'), used: false };
       E.bars.push(b);
     }
-    b.used = true; b.key = null; b.el.style.display = '';
+    b.used = true; b.key = null; b.el.style.display = ''; if (b.el._s) b.el._s.display = '';
     return b;
   }
   const scr = {};
+  const _hpv = new THREE.Vector3();
+  // change-only style writes (no DOM work, no string garbage when nothing moved)
+  const sty = (el, k, v) => { const c = el._s || (el._s = {}); if (c[k] !== v) { c[k] = v; el.style[k] = v; } };
   E.updateBars = function () {
     const cam = G.camera;
     const sharp = P.has('o_sharp');
@@ -1463,15 +1466,15 @@
       const show = e.alive && !e.burrowed && !(e.cloakOn) && e.state !== 'spawn' && !e.untargetable && (e.marked || (e.hasLOS || G.game.time - e.lastHitT < 3 || e.showBar) && e.pos.distanceTo(P.pos) < (sharp ? 90 : 55));
       if (e.marked) E.edgeMark(e, show);
       if (!show) { if (e.bar) { e.bar.el.style.display = 'none'; e.bar.used = false; e.bar = null; } continue; }
-      const hp = V(e.pos.x, e.pos.y + e.height + 0.35, e.pos.z);
+      const hp = _hpv.set(e.pos.x, e.pos.y + e.height + 0.35, e.pos.z);
       if (e.barPos) hp.copy(e.barPos());
       if (!G.fx.project(hp, scr)) { if (e.bar) { e.bar.el.style.display = 'none'; e.bar.used = false; e.bar = null; } continue; }
       if (!e.bar) e.bar = getBar();
       const b = e.bar;
-      b.el.style.left = scr.x + 'px'; b.el.style.top = scr.y + 'px';
-      const key = e.level + e.def.name + (e.elite ? 1 : 0) + (e.cursed ? 'c' : '') + (e.mutIcons || '') + (e.pileRes || '') + (e.marked ? 'm' : '');
-      if (b.key !== key) {
-        b.key = key;
+      sty(b.el, 'left', Math.round(scr.x * 2) / 2 + 'px'); sty(b.el, 'top', Math.round(scr.y * 2) / 2 + 'px');
+      const ke = !!e.elite, kc = !!e.cursed, km = !!e.marked;
+      if (b.kl !== e.level || b.kn !== e.def.name || b.ke !== ke || b.kc !== kc || b.kmi !== e.mutIcons || b.kp !== e.pileRes || b.km !== km || b.key === null) {
+        b.kl = e.level; b.kn = e.def.name; b.ke = ke; b.kc = kc; b.kmi = e.mutIcons; b.kp = e.pileRes; b.km = km; b.key = 1;
         b.lv.textContent = e.boss ? '' : 'Lv.' + e.level;
         b.nm.textContent = (e.pileRes ? '🪨' + ['', 'Ⅰ', 'Ⅱ', 'Ⅲ'][e.pileRes] + ' ' : '') + (e.mutIcons ? e.mutIcons + ' ' : '') + (e.cursed ? '😈' : '') + (e.elite ? '★' + (e.eliteMod ? e.eliteMod.icon : '') + ' ' : '') + (e.def.vicon && !e.boss ? e.def.vicon + ' ' : '') + e.def.name;
         b.el.classList.toggle('elite', !!e.elite);
@@ -1479,15 +1482,14 @@
         let tg = b.el.querySelector('.tg');
         if (e.marked) { if (!tg) { tg = document.createElement('div'); tg.className = 'tg'; b.el.prepend(tg); } tg.textContent = e.champion ? '👑 覇者 — 討伐対象' : '🎯 標的 — 討伐対象'; } else if (tg) tg.remove();
       }
-      b.fl.style.width = (Math.max(0, e.hp) / e.maxHp * 100) + '%';
-      b.tr.style.width = (Math.max(0, e.hp) / e.maxHp * 100) + '%';
-      b.sb.style.display = e.maxShield > 0 ? '' : 'none';
-      if (e.maxShield > 0) b.sfl.style.width = (e.shield / e.maxShield * 100) + '%';
+      { const hw = (Math.max(0, e.hp) / e.maxHp * 100).toFixed(1) + '%'; sty(b.fl, 'width', hw); sty(b.tr, 'width', hw); }
+      sty(b.sb, 'display', e.maxShield > 0 ? '' : 'none');
+      if (e.maxShield > 0) sty(b.sfl, 'width', (e.shield / e.maxShield * 100).toFixed(1) + '%');
       const s = e.st; let icons = '';
       if (s.burn > 0) icons += '🔥'; if (s.frost > 0 || s.frozen > 0) icons += s.frozen > 0 ? '🧊' : '❄️'; if (s.poison > 0) icons += '☠️' + (s.poisonStacks > 1 ? s.poisonStacks : ''); if (s.shock > 0) icons += '⚡'; if (s.bleed > 0) icons += '🩸'; if (s.stun > 0) icons += '💫'; if (!e.boss && G.game.time < (e.stunImmuneUntil || 0)) icons += '🛡️'; if (s.slow > 0) icons += '🐌'; if (s.mark > 0) icons += '🎯'; if (s.fear > 0) icons += '😱';
       if (b.icons !== icons) { b.icons = icons; b.st.textContent = icons; }
       const dist = e.pos.distanceTo(P.pos);
-      b.el.style.opacity = dist > 40 && !e.marked ? 0.6 : 1;
+      sty(b.el, 'opacity', dist > 40 && !e.marked ? 0.6 : 1);
     }
     for (const [e, m] of E.marks) if (!e.alive || !E.list.includes(e)) { m.remove(); E.marks.delete(e); }
   };

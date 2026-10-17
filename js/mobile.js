@@ -235,8 +235,11 @@
     wasOn = play;
     // ads button light follows the real state
     const ads = btnLayer.querySelector('[data-id=ads]'); if (ads) ads.classList.toggle('lit', adsOn);
-    requestAnimationFrame(tick);
   }
-  requestAnimationFrame(tick);
+  const loop = () => { tick(); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+  // also on a timer and on every lock change, so the controls appear even when frames are throttled
+  setInterval(tick, 200);
+  G.on('lockchange', () => setTimeout(tick, 0));
   window.__mobile = { kd, ku, tapKey, releaseAll, layout };
 })();

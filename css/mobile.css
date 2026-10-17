@@ -88,3 +88,8 @@ html.m .side-info { display: none !important; }
 /* stacking: look / stick layer (3) < HUD with its tappable tiles (6) < buttons (24) < menus (30) */
 html.m #hud { z-index: 6; }
 html.m #screens { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
+/* the menu layer itself lets touches through, but every open screen takes them (as on the PC) and scrolls if it is taller than the phone */
+html.m #screens > .screen { pointer-events: auto; overflow-y: auto; overflow-x: hidden; align-items: safe center; -webkit-overflow-scrolling: touch; }
+/* difficulty: the four cards side by side so they fit a landscape phone */
+html.m .df-cards { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+html.m .df-card .df-desc { min-height: 0; }

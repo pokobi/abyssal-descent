@@ -60,6 +60,10 @@
     for (const b of btnEls) b.classList.remove('press');
   }
 
+  // holding the fire button keeps a semi-auto / burst gun shooting as fast as it can (a phone has no fast clicking finger)
+  const endFrame0 = I.endFrame;
+  I.endFrame = function () { endFrame0(); if (fireN > 0 && I.locked) I.mpressed[0] = true; };
+
   // touches that follow a real finger produce "compatibility" mouse events; while playing they must not reach the game
   ['mousedown', 'mouseup', 'mousemove', 'contextmenu'].forEach((t) => window.addEventListener(t, (e) => {
     if (e.__m) return;

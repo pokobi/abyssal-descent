@@ -85,3 +85,6 @@ html.m #inv-ui .iv-it, html.m #inv-ui .iv-wbox, html.m #inv-ui .iv-sk, html.m #i
 html.m #inv-ui .iv-cell-st { display: none; }
 html.m #inv-ui .iv-foot-wrap { display: none; }
 html.m .side-info { display: none !important; }
+/* stacking: look / stick layer (3) < HUD with its tappable tiles (6) < buttons (24) < menus (30) */
+html.m #hud { z-index: 6; }
+html.m #screens { position: absolute; inset: 0; z-index: 30; pointer-events: none; }

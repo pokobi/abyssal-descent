@@ -599,7 +599,9 @@
       <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（影なし）</option><option value="med">中</option><option value="high">高</option></select><span></span></div>
       ${rowC('dmgNums', '🔢 ダメージ表記')}${rowC('crouchToggle', '🧎 しゃがみ切替式')}${rowC('autoSprint', '🏃 常に走る（Shiftで歩く）')}${rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')}${rowC('invertY', '↕️ 上下反転')}${rowC('fullscreen', '⛶ 開始時フルスクリーン')}${rowC('showFps', '📈 FPS表示')}${rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認')}
       <div class="set-row"><span>⌨️ キー配置</span><button class="btn small" id="s-keys">キー設定を開く</button><span></span></div>
+      <div class="set-row"><span>🗑️ データのリセット</span><button class="btn small" id="s-reset">リセットする…</button><span></span></div>
       <div style="margin-top:18px;text-align:right"><button class="btn" id="s-back">↩ 戻る</button></div></div>`, 'dim');
+    s.querySelector('#s-reset').onclick = () => { G.sfx.ui('click'); UI.resetData(() => UI.settings(back)); };
     s.querySelector('#s-quality').value = S.quality;
     s.querySelector('#s-keys').onclick = () => { G.sfx.ui('click'); UI.keyConfig(() => UI.settings(back)); };
     for (const id of ['sens', 'adsSens', 'fov', 'volume', 'shake', 'bob']) {
@@ -609,6 +611,31 @@
     for (const id of ['dmgNums', 'crouchToggle', 'autoSprint', 'sprintToggle', 'invertY', 'fullscreen', 'showFps', 'askTutorial']) { const inp = s.querySelector('#s-' + id); inp.onchange = () => { S[id] = inp.checked; G.save.write(); }; }
     s.querySelector('#s-quality').onchange = (e) => { S.quality = e.target.value; G.save.write(); G.game.applyQuality(); };
     s.querySelector('#s-back').onclick = () => { G.sfx.ui('click'); back(); };
+  };
+  // data reset: choose what, then confirm (nothing can be undone); the page reloads afterwards
+  UI.resetData = function (back) {
+    const kinds = {
+      settings: ['⚙️ 設定のみ', '操作感度・音量・画質・キー配置などを初期値に戻します。プレイ進捗はそのまま。'],
+      progress: ['📖 プレイ進捗のみ', '図鑑・記録・クリア履歴（エクストラの解放）・中断データを消します。設定はそのまま。'],
+      all: ['🧹 すべて', '設定とプレイ進捗の両方を消し、初めて起動した状態に戻します。'],
+    };
+    const pick = () => {
+      const s = UI.screen(`<div class="panel" style="width:min(560px,94vw)"><h2>🗑️ データのリセット</h2>
+        <div style="font-size:13.5px;color:#ddd3c0;line-height:1.6;margin-bottom:10px">消すものを選んでください。リセット後、ゲームを再読み込みします。</div>
+        <div class="col">${Object.entries(kinds).map(([k, [t, d]]) => `<button class="choice" data-k="${k}" style="display:block;width:100%;text-align:left;color:#e8dcc0;font:inherit"><b>${t}</b><div style="font-size:12px;opacity:.8;margin-top:2px">${d}</div></button>`).join('')}</div>
+        <div style="margin-top:14px;text-align:right"><button class="btn" id="rs-back">↩ 戻る</button></div></div>`, 'dim');
+      s.querySelectorAll('[data-k]').forEach((b) => b.onclick = () => { G.sfx.ui('click'); confirm(b.dataset.k); });
+      s.querySelector('#rs-back').onclick = () => { G.sfx.ui('click'); back(); };
+    };
+    const confirm = (k) => {
+      const s = UI.screen(`<div class="panel" style="width:min(520px,94vw);text-align:center"><h2>⚠️ 本当にリセットしますか？</h2>
+        <div style="font-size:15px;color:#ecdcb8;margin:8px 0"><b>${kinds[k][0]}</b></div>
+        <div style="font-size:13px;color:#ddd3c0;line-height:1.6">${kinds[k][1]}<br><b style="color:#ff8a7a">この操作は元に戻せません。</b>${G.game && G.game.run && G.game.state !== 'title' ? '<br>プレイ中の冒険は、そのまま終了します。' : ''}</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:18px"><button class="btn primary" id="rs-yes" style="background:#8a2a2a">リセットする</button><button class="btn" id="rs-no">やめる</button></div></div>`, 'dim');
+      s.querySelector('#rs-no').onclick = () => { G.sfx.ui('click'); pick(); };
+      s.querySelector('#rs-yes').onclick = () => { G.sfx.ui('select'); G.save.reset(k); if (G.game) G.game.state = 'title'; s.querySelector('.panel').innerHTML = '<h2>リセットしました</h2><div style="margin-top:8px">再読み込みします…</div>'; setTimeout(() => location.reload(), 500); };
+    };
+    pick();
   };
   // key configuration: click a row, press a key (Esc cancels). A key already used elsewhere is swapped over.
   UI.keyConfig = function (back) {

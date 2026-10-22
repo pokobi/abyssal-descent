@@ -99,6 +99,16 @@ window.G = window.G || {};
       return d;
     },
     write() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); } catch (e) { /* storage unavailable */ } },
+    // what: 'settings' (options and key bindings), 'progress' (codex, records, clears, the saved run) or 'all'. The page reloads afterwards.
+    reset(what) {
+      const def = this.defaults();
+      if (what === 'settings' || what === 'all') this.data.settings = def.settings;
+      if (what === 'progress' || what === 'all') {
+        this.data.codex = def.codex; this.data.records = def.records;
+        try { localStorage.removeItem('abyss_run_v1'); } catch (e) { /* ignore */ }
+      }
+      this._dirty2 = false; this.write();
+    },
     mark(kind, id, n) {
       const c = this.data.codex[kind]; if (!c) return;
       const first = !c[id];

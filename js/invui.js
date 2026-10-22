@@ -343,7 +343,7 @@
     drag.ghost.style.left = x - Math.min(drag.gx, w - 10) + 'px'; drag.ghost.style.top = y - Math.min(drag.gy, h - 10) + 'px';
     root.querySelectorAll('.iv-hl').forEach((n) => n.remove());
     const t = target(x, y);
-    drag.ghost.classList.toggle('iv-out', !!(t && t.ground && drag.f.it && !drag.f.as));
+    drag.ghost.classList.toggle('iv-out', !!(t && t.ground && (drag.f.it || drag.f.wslot !== undefined) && !drag.f.as));
     if (t && t.grid && drag.f.it) {
       const ok = canDrop(t);
       const [gw, gh] = dims();
@@ -353,7 +353,7 @@
     }
     root.querySelectorAll('.iv-eq').forEach((n) => n.classList.toggle('hover', !!(t && t.eq === n.dataset.eq)));
     root.querySelectorAll('.iv-as').forEach((n) => n.classList.toggle('hover', !!(t && t.as === n.dataset.as)));
-    root.querySelectorAll('[data-wslot]').forEach((n) => n.classList.toggle('hover', !!(t && t.wslot !== undefined && t.wslot === +n.dataset.wslot)));
+    { const hw = t && (t.wslot !== undefined ? t.wslot : (t.as && drag.f.it && drag.f.it.type === 'att' ? +t.as.split(':')[0] : undefined)); root.querySelectorAll('[data-wslot]').forEach((n) => n.classList.toggle('hover', hw !== undefined && hw === +n.dataset.wslot)); }
     root.querySelectorAll('[data-sk]').forEach((n) => n.classList.toggle('hover', !!(t && t.sk !== undefined && t.sk === n.dataset.sk)));
   }
   function target(x, y) {
@@ -420,10 +420,17 @@
     ghost.remove(); el.classList.remove('iv-dragging');
     const rot = drag.rot; drag = null;
     // guns / skills onto each other
+    if (f.wslot !== undefined && t && t.ground) {
+      const w = G.weapons.gunsInOrder()[f.wslot];
+      if (w && GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else { G.sfx.ui('deny'); G.ui.toastSmall('最後の銃は捨てられない'); }
+      render(); return;
+    }
     if (f.wslot !== undefined) { if (t && t.wslot !== undefined && t.wslot !== f.wslot) swapGuns(); render(); return; }
     if (f.sk !== undefined) { if (t && t.sk !== undefined && +t.sk !== f.sk) swapSkills(f.sk, +t.sk); render(); return; }
     if (!t) { render(); return; }
     if (t.ground) { if (f.as) { render(); return; } discard(f); return; }
+    // a part dropped anywhere on a gun's box (even on the wrong little socket) goes into the socket it belongs to
+    if (t.as && it.type === 'att' && G.ATT_BY_ID[it.id] && !(f.as && f.as.w === G.weapons.gunsInOrder()[+t.as.split(':')[0]])) t = { wslot: +t.as.split(':')[0] };
     if (t.wslot !== undefined) {
       const w = G.weapons.gunsInOrder()[t.wslot];
       if (it.type === 'att' && w) { if (f.as) { if (f.as.w !== w && GM.moveAtt(it.id, f.as.w, w)) G.sfx.mech('magIn'); else G.sfx.ui('deny'); render(); } else if (isMine(f.from)) equipAtt(it, w); else { G.sfx.ui('deny'); render(); } return; }

@@ -14,7 +14,7 @@
     { title: 'ようこそ、深淵へ', info: true, body: () => `このチュートリアルでは、実際に体を動かしながら<b>操作</b>と<b>ゲームの流れ</b>を学びます。<br>敵に倒されることはありません（HPが減りすぎると自動で回復します）。<br><br>・説明だけのページは ${k('Enter')} か ${k('ホイールクリック')} で次へ<br>・手順を飛ばしたい時は ${k('Backspace')}<br>・途中でやめる時は ${k('Esc')} → 「チュートリアルを終了」` },
     { title: '視点と移動', body: () => `${k('マウス')} を動かして周りを見回し、${k(G.K('forward'))}${k(G.K('left'))}${k(G.K('back'))}${k(G.K('right'))} で歩き回ってみましょう。<br><small>マウスが効かない時は画面をクリックしてください（マウスがゲームに固定されます）。</small>`, goal: '15m 移動する',
       check: (s) => Math.min(1, s.dist / 15) },
-    { title: '走る・歩く', body: () => G.save.data.settings.autoSprint ? `このゲームは<b>標準で常に走って</b>います。<br>${k(G.K('sprint'))} を<b>押している間だけ歩き</b>になります（足音が小さく、狙いが安定）。<br><small>設定で「常に走る」を切ると、Shift で走る方式になります。</small>` : `${k(G.K('sprint'))} で走ります（設定で切替式にもできます）。`, goal: () => G.save.data.settings.autoSprint ? 'Shift を押しながら2秒歩く' : 'Shift で2秒走る',
+    { title: '走る・歩く', body: () => G.save.data.settings.autoSprint ? `このゲームは<b>標準で常に走って</b>います。<br>${k(G.K('sprint'))} を<b>押している間だけ歩き</b>になります（足音が小さく、狙いが安定）。<br><small>設定で「常に走る」を切ると、Shift で走る方式になります。</small>` : `${k(G.K('sprint'))} で走り始めます。<b>離しても、止まる・狙う・撃つ・リロード・しゃがむまでは走り続けます</b>（もう一度押すと止まります）。`, goal: () => G.save.data.settings.autoSprint ? 'Shift を押しながら2秒歩く' : 'Shift で2秒走る',
       check: (s, dt) => { const moving = ['forward', 'back', 'left', 'right'].some((b) => I.down(b)); const ok = G.save.data.settings.autoSprint ? I.down('sprint') && moving : P.sprinting; if (ok) s.t = (s.t || 0) + dt; return Math.min(1, (s.t || 0) / 2); } },
     { title: 'ジャンプとよじ登り', body: () => `${k(G.K('jump'))} でジャンプします。<br>腰より高い段差や木箱の前で ${k(G.K('jump'))} を<b>押し続ける</b>と、縁に手をかけて<b>よじ登れます</b>。`, goal: '3回ジャンプする',
       check: (s) => Math.min(1, s.jumps / 3) },

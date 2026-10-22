@@ -120,7 +120,7 @@
     // tracers
     pools.tracer = [];
     const tg = new THREE.BoxGeometry(1, 1, 1); tg.translate(0, 0, -0.5);
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 100; i++) {
       const m = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: 0xffd8a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false; m.frustumCulled = false; scene.add(m); pools.tracer.push({ m, t: 0, ml: 0 });
     }
@@ -287,6 +287,8 @@
     m.material.opacity = 1;
     m.visible = true; t.t = t.ml = life || 0.06;
   };
+  // a tracer that covers exactly the stretch a -> b (FX.tracer's box grows from its first point AWAY from the second one)
+  FX.seg = function (a, b, color, width, life) { FX.tracer(b, b.clone().multiplyScalar(2).sub(a), color, width, life); };
   FX.lightning = function (a, b, color) {
     const segs = 7;
     let prev = a.clone();
@@ -295,11 +297,35 @@
     for (let i = 1; i <= segs; i++) {
       const p = a.clone().addScaledVector(dir, i / segs);
       if (i < segs) { p.x += rs(len * 0.07); p.y += rs(len * 0.07); p.z += rs(len * 0.07); }
-      FX.tracer(prev, p, color || 0xcfe0ff, 0.045, 0.12);
+      FX.seg(prev, p, color || 0xcfe0ff, 0.045, 0.12);
       prev = p;
     }
     FX.flash(b, color || 0xbfd8ff, 25, 0.1, 8);
     FX.sparks(b, null, 6, color || 0xcfe0ff, 6);
+  };
+  // a lightning bolt that comes down from the sky onto `p` (electric weapons): jagged main bolt with a side branch, flash, shock ring, sparks.
+  // limited to a few per second so a rapid-fire arc gun does not turn the screen white
+  let strikeT = 0;
+  FX.strike = function (p, color, big) {
+    const now = performance.now();
+    if (now - strikeT < (big ? 120 : 260)) return;
+    strikeT = now;
+    const col = color || 0xcfe0ff, H = big ? 14 : 11; // (indoor vaults are 16 m high: the bolt stays below the ceiling)
+    let prev = p.clone().add(new THREE.Vector3(rs(1.5), H, rs(1.5)));
+    const segs = 8;
+    for (let i = 1; i <= segs; i++) {
+      const q = p.clone(); q.y = p.y + H * (1 - i / segs);
+      if (i < segs) { q.x += rs(1.1 * (1 - i / segs) + 0.2); q.z += rs(1.1 * (1 - i / segs) + 0.2); }
+      FX.seg(prev, q, 0xffffff, big ? 0.11 : 0.075, 0.2);
+      FX.seg(prev, q, col, big ? 0.24 : 0.17, 0.2); // a wider, coloured glow around the white core
+      if (i === 4 || i === 6) { const br = q.clone().add(new THREE.Vector3(rs(3), -rs(2) - 1.5, rs(3))); FX.seg(q, br, col, 0.05, 0.14); }
+      prev = q;
+    }
+    FX.flash(p.clone().add(new THREE.Vector3(0, 1, 0)), col, big ? 90 : 55, 0.18, big ? 22 : 15);
+    FX.ring(p, big ? 3.2 : 2.0, col, 0.3);
+    FX.sparks(p, null, big ? 16 : 9, col, 8);
+    if (G.player && big) G.player.addShake(0.12);
+    if (G.sfx.zap) G.sfx.zap(p);
   };
   FX.decal = function (p, n, kind, size, ground, color) {
     const d = pools.decal[pools.decalIdx++ % pools.decal.length];

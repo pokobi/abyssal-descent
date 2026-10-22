@@ -112,6 +112,8 @@
     const hasPow = POW_K.some((k) => p0[k] != null) || /ダメージ|焼|撃|爆/.test(d.desc);
     const line = [`<span><label>クールタイム</label>${dv(cd, baseCd, { unit: '秒', lowerBetter: true })}</span>`];
     if (hasPow) line.push(`<span><label>威力</label>${dv(pow * 100, powBase * 100, { unit: '%', dec: 0 })}</span>`);
+    // the actual numbers (what one hit / one second / one heal really amounts to with the current level and bonuses)
+    for (const [k, lab] of [['dmg', 'ダメージ'], ['dps', '毎秒ダメージ'], ['heal', '回復'], ['hps', '毎秒回復']]) if (p0[k] != null && p0[k] > 0) line.push(`<span><label>${lab}</label>${dv(p0[k] * pow, p0[k] * powBase, { dec: 0 })}</span>`);
     for (const k of AREA_K) if (p0[k]) { line.push(`<span><label>${k === 'len' ? '長さ' : k === 'range' ? '射程' : k === 'w' ? '幅' : '範囲'}</label>${dv(p[k], p0[k], { unit: 'm' })}</span>`); break; }
     if (p0.dur) line.push(`<span><label>効果時間</label>${dv(p.dur, p0.dur, { unit: '秒' })}</span>`);
     if (sk.maxCharges > 1 || p0.charges) line.push(`<span><label>チャージ</label>${dv(sk.maxCharges || 1, p0.charges || 1, { dec: 0 })}</span>`);
@@ -126,8 +128,8 @@
       else if (u === '体' || u === '個' || u === '本') k = ['n'].find((x) => p0[x] === v && !used.has(x));
       if (!k) return `<b class="sv">${n}${u || ''}</b>`;
       used.add(k);
-      const cur = AREA_K.includes(k) || k === 'dur' ? p[k] : POW_K.includes(k) ? p0[k] * pow / powBase : p[k];
-      return dv(cur, v, { unit: u || '', dec: Number.isInteger(v) && Math.abs(cur - Math.round(cur)) < 0.05 ? 0 : 1 });
+      const cur = AREA_K.includes(k) || k === 'dur' ? p[k] : POW_K.includes(k) ? p0[k] * pow : p[k]; // the real number: base x level x the skill power constant x bonuses
+      return dv(cur, POW_K.includes(k) ? v * powBase : v, { unit: u || '', dec: Number.isInteger(v) && Math.abs(cur - Math.round(cur)) < 0.05 ? 0 : 1 });
     });
     const augs = [...P.buffs].filter(([id]) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].skill === sk.id);
     const ready = A.ready(sk), left = sk.maxCharges ? `${sk.charges}/${sk.maxCharges}` : ready ? 'READY' : `${Math.ceil(sk.cd)}秒`;

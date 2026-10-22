@@ -34,7 +34,7 @@
     ['h_troll', 'heal', 'トロールの心臓', '🫀', 'epic', 320, '最大HP+15（永続）、HP40回復。', { heal: 40, maxHp: 15 }],
     ['h_apple', 'heal', '黄金の林檎', '🍎', 'rare', 220, 'HP50回復＋オーバーシールド40。', { heal: 50, os: 40 }],
     ['h_herb', 'heal', '薬草', '🌿', 'common', 45, 'HPを25即時回復。', { heal: 25 }],
-    ['h_fairy', 'heal', '妖精の小瓶', '🧚', 'legendary', 650, '所持していると、死亡時に自動で使用されHP全快で復活する。', { revive: true }],
+    ['h_fairy', 'heal', '妖精の小瓶', '🧚', 'legendary', 7500, '所持していると、死亡時に自動で使用されHP全快で復活する。', { revive: true }],
     ['h_water', 'heal', '清めの水', '💧', 'common', 50, '状態異常を解除し、HP15回復。', { heal: 15, cleanse: true }],
     // utilities
     ['u_plate', 'util', '鎧板', '🛡️', 'common', 90, 'オーバーシールド+35。', { os: 35 }],
@@ -64,7 +64,7 @@
   // fixed keys by category: 4 = heal, 5 = guard, 6 = boost, 7 = tools (G = grenades). Hold the key for a selection wheel.
   // keys 4 and 5 are two identical consumable pockets: any item except grenades goes into either (G = grenades only)
   // the fairy bottle (a free revive) is far too strong to be common: whenever a drop / shop roll lands on it, it only stays with this chance
-  G.FAIRY_KEEP = 0.12;
+  G.FAIRY_KEEP = 0.01;
   G.thinFairy = (pick) => { let it = pick(); for (let i = 0; i < 6 && it && it.id === 'h_fairy' && Math.random() > G.FAIRY_KEEP; i++) it = pick(); return it; };
   G.ITEM_SLOTS = [
     { id: 'c1', key: '4', name: '消耗品', icon: '🧪' },

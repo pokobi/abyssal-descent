@@ -172,7 +172,7 @@
   // everything here is real geometry (not just a texture): ragged wall runs, tilted stone chunks, moss slabs that cling to the stone.
   F.ruinDressing = function (w, rng, occ, W, D, HT) {
     const PGm = G.Props.PG, M = G.Props.M;
-    const MOSS = () => [rng.range(0.12, 0.22), rng.range(0.3, 0.46), rng.range(0.08, 0.16)];
+    const MOSS = () => [rng.range(0.08, 0.16), rng.range(0.22, 0.34), rng.range(0.4, 0.6)]; // cold blue lichen
     // 1) ragged wall runs: each metre-wide piece is a different height, so the top is a broken skyline
     for (let i = 0; i < 14; i++) {
       const alongX = rng.chance(0.5), len = rng.int(6, 10), r = occ.place(rng, alongX ? len : 2, alongX ? 2 : len, 1.2, 30);
@@ -261,13 +261,57 @@
     return w;
   }
 
+
+  // ---------------------------------------------------------------- a chasm across the area (not common)
+  // The floor is left out of a wide band across the middle; a few stone bridges cross it (the first one carries the main path).
+  // Falling in costs 15% of your HP and puts you back on the last safe ground (see player.js fellInPit); foes that fall die.
+  F.chasmMask = function (rng, W, D, occ) {
+    const pit = new Uint8Array(W * D);
+    const z0 = Math.floor(D * 0.42), z1 = Math.floor(D * 0.57);
+    for (let z = z0; z < z1; z++) for (let x = 3; x < W - 3; x++) pit[z * W + x] = 1;
+    occ.mark(0, z0 - 1, W, z1 + 1, 1);
+    const nb = rng.int(2, 3);
+    {
+      const list = [[W / 2 - 1.6, W / 2 + 1.6, z0, z1]];
+      for (let i = 1; i < nb; i++) { const bx = rng.chance(0.5) ? rng.range(8, W / 2 - 9) : rng.range(W / 2 + 9, W - 8); list.push([bx - 1.6, bx + 1.6, z0, z1]); }
+      pit.bridges = list; pit.band = { z0, z1 };
+    }
+    return pit;
+  };
+  F.chasmDress = function (w, rng, W, D, pit, glow) {
+    const { z0, z1 } = pit.band;
+    w._bridges = pit.bridges; w._pit = pit.band;
+    for (const [a, b] of pit.bridges) {
+      w.solid('block', a, -0.6, z0 - 0.01, b, 0, z1 + 0.01, { uv: 2 });
+      w.solid('trim', a, 0, z0, a + 0.3, 0.9, z1, { uv: 1 }); w.solid('trim', b - 0.3, 0, z0, b, 0.9, z1, { uv: 1 });   // railings
+      w.solid('block', a + 0.2, -12, (z0 + z1) / 2 - 0.6, b - 0.2, -0.6, (z0 + z1) / 2 + 0.6, { uv: 3 });                 // arch support down into the dark
+      P().torch(w, a, 1.6, z0 + 0.5, 'px'); P().torch(w, b, 1.6, z1 - 0.5, 'nx');
+    }
+    w.solid('trim', 3, 0, z0 - 0.3, W - 3, 0.25, z0, { uv: 1, tag: 'lip' });
+    w.solid('trim', 3, 0, z1, W - 3, 0.25, z1 + 0.3, { uv: 1, tag: 'lip' });
+    w.visual('dark', 3, -14, z0, W - 3, -13.9, z1, { uv: 4, grad: false });
+    for (let x = 10; x < W - 6; x += 14) w.addLight(x, -6, (z0 + z1) / 2, { flame: 0, intensity: 14, range: 14, color: glow || '#5a7ae0', emit: false, prio: 0.7 });
+    w.abyss = { z0, z1 };
+    if (rng.chance(0.4)) {
+      const ix = W / 2 + rng.range(-9, 9);
+      if (pit.bridges.every(([a, b]) => ix + 3.5 < a || ix - 3.5 > b)) {
+        w.solid('wall', ix - 3, -12, z0 + 2, ix + 3, 2.5, z1 - 2, { uv: 3 });
+        w.solid('trim', ix - 3.06, 2.25, z0 + 1.94, ix + 3.06, 2.5, z1 - 1.94, { uv: 2 });
+        P().brazier(w, ix, 2.5, (z0 + z1) / 2, 1);
+        w.platTops.push({ x0: ix - 2.5, z0: z0 + 2.5, x1: ix + 2.5, z1: z1 - 2.5, y: 2.5, cx: ix + 1.5, cz: (z0 + z1) / 2 });
+      }
+    }
+  };
+
   // ---------------------------------------------------------------- 1) the moonlit graveyard
   function genGrave(area, seed, extraChests, gates, kind) {
     const { rng, W, D, w, occ } = base(area, seed, 'grave');
     reserve(occ, W, D, gates);
-    H.floors(w, W, D, null, 'floor');
+    const pit = area >= 4 && rng.chance(0.2) ? F.chasmMask(rng, W, D, occ) : null; // now and then a chasm cuts the graveyard in two
+    H.floors(w, W, D, pit, 'floor');
     H.perimeter(w, rng, W, D, { gates, h: 4.6 });
-    const layout = rng.pick(['rows', 'chapel', 'barrow']);
+    if (pit) F.chasmDress(w, rng, W, D, pit, '#6a8ae8');
+    const layout = pit ? 'chasm' : rng.pick(['rows', 'chapel', 'barrow']);
     w.layout = layout;
     // gravel paths from the entrance to every exit
     const cxs = LG.gateXs(W, gates || 1);
@@ -337,8 +381,10 @@
     // barred windows high in both side walls (between the buttresses)
     const wins = [];
     for (let z = 16; z < D - 12; z += 16) wins.push([z + 0.6, z + 3.6, 6.2, 12.4]);
-    H.floors(w, W, D, null, rng.chance(0.5) ? 'cobble' : 'floor');
+    const pit = area >= 4 && rng.chance(0.15) ? F.chasmMask(rng, W, D, occ) : null;
+    H.floors(w, W, D, pit, rng.chance(0.5) ? 'cobble' : 'floor');
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0, windows: wins });
+    if (pit) F.chasmDress(w, rng, W, D, pit, '#7a60d8');
     F.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: rng.int(1, 3) });
     for (const [a, b, y0, y1] of wins) for (const side of [-1, 1]) {
       const xw = side < 0 ? 0 : W, zc = (a + b) / 2;
@@ -351,7 +397,7 @@
       if (rng.chance(0.8)) F.moonShaft(w, xw, (y0 + y1) / 2, zc, xw - side * rng.range(6, 10), 0.05, zc + rng.range(-2, 2));
       w.addLight(xw - side * 1.2, (y0 + y1) / 2, zc, { flame: 0, intensity: 5, range: 11, color: '#8aa8ff', emit: false, prio: 0.7, steady: true });
     }
-    const layout = rng.pick(['nave', 'gallery', 'gatehouse']);
+    const layout = pit ? 'nave' : rng.pick(['nave', 'gallery', 'gatehouse']);
     w.layout = layout;
     if (layout === 'nave') {
       // two rows of heavy piers up to the vault
@@ -524,15 +570,17 @@
     }
     if (ruined) {
       // collapse: fallen columns, rubble mounds, holes torn in the vault, dim red light
-      for (let i = 0; i < 9; i++) { const r = occ.place(rng, 6, 2, 1, 12); if (r) F.fallenColumn(w, r.x0 + 3, r.z0 + 1, rng.range(4, 6), true, rng); }
-      for (let i = 0; i < 22; i++) { const r = occ.place(rng, 2, 2, 0.8, 10); if (r) P().rubble(w, r.x0 + 1, 0, r.z0 + 1, rng, rng.range(1, 2.4)); }
-      // lava: pools where the floor has split open, and long fissures. Touching it sets you alight (see player.js)
-      for (let i = 0; i < 4; i++) { const r = occ.place(rng, rng.int(5, 8), rng.int(5, 8), 1.2, 30); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1); }
-      for (let i = 0; i < 4; i++) { const ax = rng.chance(0.5), len = rng.int(9, 15), r = occ.place(rng, ax ? len : 2, ax ? 2 : len, 1, 30); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1); }
-      for (let i = 0; i < 5; i++) { const r = occ.place(rng, 3, 3, 0.8, 20); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1); }
+      for (let i = 0; i < 14; i++) { const r = occ.place(rng, 6, 2, 1, 12); if (r) F.fallenColumn(w, r.x0 + 3, r.z0 + 1, rng.range(4, 6), true, rng); }
+      for (let i = 0; i < 40; i++) { const r = occ.place(rng, 2, 2, 0.8, 10); if (r) P().rubble(w, r.x0 + 1, 0, r.z0 + 1, rng, rng.range(1, 2.4)); }
+      // blue fire: pools where the floor has split open, and long fissures. Touching it sets you alight with a fierce burn (see player.js)
+      for (let i = 0; i < 8; i++) { const r = occ.place(rng, rng.int(5, 8), rng.int(5, 8), 1.2, 30); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1, { blue: true }); }
+      for (let i = 0; i < 8; i++) { const ax = rng.chance(0.5), len = rng.int(9, 15), r = occ.place(rng, ax ? len : 2, ax ? 2 : len, 1, 30); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1, { blue: true }); }
+      for (let i = 0; i < 9; i++) { const r = occ.place(rng, 3, 3, 0.8, 20); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1, { blue: true }); }
+      // braziers of blue flame scattered through the ruin, so it is never pitch dark
+      for (let i = 0; i < 12; i++) { const r = occ.place(rng, 2, 2, 1, 20); if (r) P().brazier(w, r.x0 + 1, 0, r.z0 + 1, rng.range(0.8, 1.2)); }
       // torn-open floors of the upper levels would be the next step; for now the vault is shredded and the dark leaks in
       for (let i = 0; i < 9; i++) { const x = rng.range(8, W - 14), z = rng.range(10, D - 16); w.visual('dark', x, HT - 0.04, z, x + rng.range(3, 6), HT - 0.02, z + rng.range(3, 6), { uv: 1, grad: false }); }
-      for (let i = 0; i < 3; i++) { const x = rng.range(10, W - 10), z = rng.range(14, D - 14); w.addLight(x, 1.2, z, { flame: 0.5, intensity: 5, range: 9, color: '#ff5a30', prio: 0.8 }); P().candles(w, x, 0, z, rng, false); }
+      for (let i = 0; i < 3; i++) { const x = rng.range(10, W - 10), z = rng.range(14, D - 14); w.addLight(x, 1.2, z, { flame: 0.5, intensity: 7, range: 11, color: '#4a8aff', prio: 0.8 }); P().candles(w, x, 0, z, rng, false); }
     } else {
       for (let i = 0; i < 3; i++) { const r = occ.place(rng, 3, 2, 1, 12); if (r) P().bookshelf(w, r.x0 + 1.5, r.z0 + 1, 0, true, rng); }
       for (let i = 0; i < 3; i++) { const r = occ.place(rng, 3, 3, 1.2, 12); if (r) P().cage(w, r.x0 + 1.5, r.z0 + 1.5, 0, 1, rng); }
@@ -597,7 +645,7 @@
       const x = cx + sx * (hw - 0.6);
       if (ruined && rng.chance(0.3)) { P().pillarSquare(w, x, z, 0, rng.range(2, 6), 1.0); P().rubble(w, x - sx * 1.2, 0, z, rng, 1); continue; }
       P().pillarSquare(w, x, z, 0, HC, 1.0);
-      if ((z / 6) % 2 < 1) P().torch(w, x - sx * 0.65, 3.6, z, sx < 0 ? 'px' : 'nx'); else if (rng.chance(0.5)) P().banner(w, cx + sx * hw, 9, z + 3, sx < 0 ? 'px' : 'nx', 5, ruined ? 0x2a1010 : 0x4a0e0e);
+      if ((z / 6) % 2 < 1) P().torch(w, x - sx * 0.65, 3.6, z, sx < 0 ? 'px' : 'nx'); else if (rng.chance(0.5)) P().banner(w, cx + sx * hw, 9, z + 3, sx < 0 ? 'px' : 'nx', 5, ruined ? 0x101a3a : 0x4a0e0e);
     }
     P().rug(w, cx - hw - 3, nz, 0, 5, 8, [0.18, 0.12, 0.08]);
     for (let z = gz1 + 2; z < D; z += 14) P().chandelier(w, cx, HC - 4, z + 5, HC);
@@ -608,7 +656,7 @@
     w.solid('block', cx - gate, dh, gz0, cx + gate, HC + 2, gz1, { uv: 4 });
     w.visual('trim', cx - gate - 0.6, 0, gz1, cx - gate, dh + 0.6, gz1 + 0.3, { uv: 1 }); w.visual('trim', cx + gate, 0, gz1, cx + gate + 0.6, dh + 0.6, gz1 + 0.3, { uv: 1 });
     w.visual('trim', cx - gate - 0.6, dh, gz1, cx + gate + 0.6, dh + 0.6, gz1 + 0.3, { uv: 1 });
-    for (const sx of [-1, 1]) w.addLight(cx + sx * (gate + 1.2), 5, gz1 + 1.2, { flame: 0.3, intensity: 7, range: 10, color: ruined ? '#ff5a30' : '#ff9a50', prio: 1.2 });
+    for (const sx of [-1, 1]) w.addLight(cx + sx * (gate + 1.2), 5, gz1 + 1.2, { flame: 0.3, intensity: 7, range: 10, color: ruined ? '#4a8aff' : '#ff9a50', prio: 1.2 });
     const col = w.addCollider(cx - gate, 0, gz0 + 1.2, cx + gate, dh, gz1 - 0.6, { surf: 'stone', noGrapple: true });
     const door = { x: cx, gate, dh, z: (gz0 + gz1) / 2 + 0.3, col, k: 0, mesh: null, state: 'closed' };
     w.deferred.push((grp) => {

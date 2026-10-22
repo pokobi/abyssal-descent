@@ -20,9 +20,9 @@
     { id: 'plate', name: '板金', def: 1.65, w: 1.5, col: '#c8ccd2' },
   ];
   G.ARMOR_MAT_BY_ID = Object.fromEntries(G.ARMOR_MATS.map((m) => [m.id, m]));
-  // the material shows at a glance: the piece sits on a disc of the material's colour with a small tag (布 革 鱗 鎖 板)
+  // the material shows at a glance: the piece sits on a disc of the material's colour with a small tag naming the body part (頭 胴 脚 手 足)
   const MAT_TAG = { cloth: '布', leather: '革', scale: '鱗', chain: '鎖', plate: '板' };
-  G.armorIcon = (d) => { const m = d && G.ARMOR_MAT_BY_ID[d.mat]; return m ? `<span class="amat mat-${m.id}" style="--mc:${m.col}"><span>${d.icon}</span><i>${MAT_TAG[m.id]}</i></span>` : (d ? d.icon : ''); };
+  G.armorIcon = (d) => { const m = d && G.ARMOR_MAT_BY_ID[d.mat]; return m ? `<span class="amat mat-${m.id}" style="--mc:${m.col}"><span>${d.icon}</span><i>${(G.ARMOR_SLOT_BY_ID[d.slot] || {}).name || MAT_TAG[m.id]}</i></span>` : (d ? d.icon : ''); };
   const RMUL = { common: 1, uncommon: 1.3, rare: 1.65, epic: 2.05, legendary: 2.5 };
   const RPRICE = { common: 120, uncommon: 220, rare: 420, epic: 800, legendary: 1500 };
   const NOUN = {

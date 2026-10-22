@@ -377,7 +377,7 @@
       else bar = `<div class="ob-bar"><div style="width:${Math.round(U.clamp(sg[0] ? sg[0].k : 0, 0, 1) * 100)}%"></div></div>`;
     } else if (o.progress) bar = `<div class="ob-bar"><div style="width:${Math.round(o.progress() * 100)}%"></div></div>`;
     const sub = !o.done && o.sub ? o.sub() : o.done && o.kind ? '✅ 目標達成' : '';
-    const html = `<div class="ob-row"><span class="ob-ic">${o.icon}</span><span>${o.text()}</span></div>${sub ? `<div class="ob-sub">${sub}</div>` : ''}${an ? `<div class="ob-row" style="color:#ff9a7a;font-size:12px">⚠ 異変: ${an}</div>` : ''}${bar}`;
+    const html = `<div class="ob-row"><span class="ob-ic">${o.icon}</span><span>${o.text()}</span></div>${sub ? `<div class="ob-sub">${sub}</div>` : ''}${an ? `<div class="ob-row" style="color:#ff9a7a;font-size:12px">⚠ 異変: ${an}</div>` : ''}${G.game.enrage && G.game.enrage.lv ? `<div class="ob-row" style="color:#ff6a50;font-size:12px">🔥 激化 Lv${G.game.enrage.lv}（被ダメ+${Math.round(G.game.enrage.lv * 15)}% ／ 敵の動き+${Math.round(G.game.enrage.lv * 3)}%）</div>` : ''}${bar}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
   };
   // the whole run as a strip of nodes grouped by field: visited areas show what they were, the guardians are marked, "you are here" glows
@@ -411,7 +411,7 @@
     b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   };
   // guardians' displayed level (the boss bar and the codex use the same number)
-  UI.bossLv = (lv) => Math.round(lv * 1.6 + 8);
+  UI.bossLv = (lv) => Math.round(lv * 1.6 + 8) + (G.Run ? G.Run.lvOff() : 0); // + the difficulty's level offset, like every other enemy
   UI.bossBar = function (o) {
     const e = UI.el;
     if (!o) { e.boss.classList.add('hidden'); document.body.classList.remove('boss-on'); return; }
@@ -799,7 +799,7 @@
       <div class="death-title" style="font-size:44px">FALLEN</div><div style="color:var(--dim);margin-top:-2px;letter-spacing:4px">致命傷: ${U.esc(cause || '不明')}</div>
       <div class="revive-ticket">🪔</div>
       <div style="font-size:15px;color:#ecdcb8">魂の灯火を燃やし、深淵より還りますか？ <b style="color:var(--gold2)">残り ${left} 灯</b></div>
-      <div style="font-size:12px;color:var(--dim);margin-top:4px">HP全快・3秒無敵で、最後に立っていた安全な場所から再開します</div>
+      <div style="font-size:12px;color:var(--dim);margin-top:4px">このエリアの入口から再開します（持ち物・バフ・敵は入った時点に戻る／HP全快・クールタイムリセット）</div>
       <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap">
         <button class="btn primary" id="rv-yes">🪔 灯火を燃やす（Enter）</button><button class="btn" id="rv-no">💀 闇に還る</button>
       </div></div>`, 'dim');

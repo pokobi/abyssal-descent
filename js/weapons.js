@@ -665,11 +665,12 @@
       if (P.temps.has('cloak') && !W._cloakUsed) { info.forceCrit = true; W._cloakUsed = true; G.combat.untemp('cloak'); }
       G.combat.damageEnemy(h.e, dmg, info);
       if (s.explo || w.def.trait === 'explosiveRounds') G.combat.explode(hp, 1.6, s.dmg * 0.6 * fall, { src: 'explosion', small: true, proc: true });
-      if (w.def.trait === 'chainHit' && Math.random() < 0.5) G.combat.chain(h.e, 2, s.dmg * 0.5, 9, { src: 'bullet', proc: true });
-      if (s.chain) G.combat.chain(h.e, s.chain, s.dmg * 0.6, 8, { src: 'bullet', proc: true, elem: 'shock', elemChance: 0.3 });
+      if (w.def.trait === 'chainHit' && Math.random() < 0.5) { G.combat.chain(h.e, 2, s.dmg * 0.5, 9, { src: 'bullet', proc: true }); G.fx.strike(h.e.centerPos()); }
+      if (s.chain) { G.combat.chain(h.e, s.chain, s.dmg * 0.6, 8, { src: 'bullet', proc: true, elem: 'shock', elemChance: 0.3 }); if (Math.random() < 0.35) G.fx.strike(h.e.centerPos()); }
+      if (w.def.trait === 'shock' && Math.random() < 0.2) G.fx.strike(h.e.centerPos());
       if (w.def.trait === 'headhunter' && info.head) G.combat.refillN(2);
       if (w.def.trait === 'voidmaw' && h.e.alive && !h.e.boss) { const to = P.pos.clone().sub(h.e.pos).setY(0); if (to.lengthSq() > 4) h.e.knockback(to.normalize(), 3.5); G.combat.status(h.e, 'mark', 3); }
-      if (w.def.trait === 'stormcall' && info.head) { G.fx.lightning(hp.clone().add(V(U.rand(-2, 2), 16, U.rand(-2, 2))), hp, 0xd0e0ff); G.combat.chain(h.e, 5, s.dmg * 1.2, 14, { src: 'bullet', proc: true }); G.sfx.zap(hp); }
+      if (w.def.trait === 'stormcall' && info.head) { G.fx.strike(hp, 0xd0e0ff, true); G.combat.chain(h.e, 5, s.dmg * 1.2, 14, { src: 'bullet', proc: true }); G.sfx.zap(hp); }
       if (w.def.pull || s.pull) { /* projectile only */ }
       // ricochet to another enemy
       if (depth < 2 && (Math.random() < s.ricochet || P.temps.has('ricostorm'))) {

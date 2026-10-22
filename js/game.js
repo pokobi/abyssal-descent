@@ -531,7 +531,7 @@
     P.spawnAt(w);
     G.weapons.equip(true);
     G.weapons.hidden(false);
-    GM.areaCleared = false; GM.areaDamage = 0; GM.areaStartT = GM.time; GM.areaKills = 0;
+    GM.areaCleared = false; GM.areaDamage = 0; GM.areaStartT = GM.time; GM.areaKills = 0; GM.enrageReset();
     GM.objective = null; GM.waves = null; GM.shop = null; GM.clearMarkers(); GM.clearSweep = false; { const fmk = document.getElementById('free-markers'); if (fmk) fmk.innerHTML = ''; } GM.mimic = null; GM.mimicT = -1; GM.ambushReward = false;
     GM.areaMods = { hp: G.Run.hpMul(n), dmg: G.Run.dmgMul(n) };
     GM.arng = new G.RNG(seed ^ 0x51ed);
@@ -599,12 +599,12 @@
     let pick = n === 1 ? 'exterminate' : r.weighted(['exterminate', 'survive', 'hunt', 'ritual'], () => 1);
     if (variant === 'elite') pick = 'hunt';
     if (variant === 'cursed' || variant === 'vault') pick = 'exterminate';
-    // ---- wave plan: at most 3 waves, at most 5 foes per wave, at most 10 foes per area ----
+    // ---- wave plan: at most 3 waves; the number of foes follows a total-HP budget (see wavePlan) ----
     const waves = GM.wavePlan(n, variant, pick);
     const total = waves.reduce((s, w) => s + w.n, 0);
     const O = GM.objective = { kind: pick, killed: 0, total, spawned: 0, waves, wave: 0, waveT: 1.2, waveAlive: 0 };
-    // fewer foes, but each one hits harder and lasts longer
-    const tough = Math.min(1.5, 1.28 + n * 0.01);
+    // a little tougher than the plain numbers, to make up for gear and buffs
+    const tough = Math.min(1.3, 1.14 + n * 0.006);
     GM.areaMods.hp *= tough * (1 + (waves.overflow || 0) * 0.07);
     GM.areaMods.dmg *= Math.min(1.18, 1.06 + n * 0.005);
     GM.spawnT = 0.5;
@@ -679,27 +679,43 @@
   GM.CAP_BY_STAGE = [3, 4, 4, 5, 5, 6, 7, 8, 9, 10];
   GM.enemyCap = (n) => G.Run.cap(n);
   const splitN = (total, k) => { const out = []; let left = total; for (let i = 0; i < k; i++) { const v = Math.round(left / (k - i)); out.push(v); left -= v; } return out.sort((a, b) => a - b); };
+  // How many foes an area brings is limited by their combined toughness, not by a head count: the budget is a number of "average foes
+  // of this depth" (x1.8 the old head count), and every foe drawn costs its own HP (a hound 0.55, an ogre 2.6, an abyss golem 8).
+  // Weak packs therefore come in bigger numbers, heavy hitters in small ones, and the area never gets more HP to chew through than planned.
+  GM.FOE_MAX = 18; // hard ceiling per area (performance)
+  GM.foeWeight = (def) => def.hp / 100;
   GM.wavePlan = function (n, variant, pick) {
-    let total = GM.enemyCap(n);
-    // curses that add foes raise the count up to 10; whatever doesn't fit becomes extra toughness
-    let overflow = 0;
-    const extra = Math.round(total * P.stats.extraEnemies);
-    if (extra > 0) { const room = Math.max(0, 10 - total); total += Math.min(room, extra); overflow = Math.max(0, extra - room); }
-    else if (extra < 0) total = Math.max(2, total + extra);
-    if (variant === 'cursed') total += 2; // the cursed arena always brings more than the area cap
+    const r = GM.arng, cap = GM.enemyCap(n), pool = enemyPool(n);
+    const avgW = pool.reduce((s, p) => s + GM.foeWeight(p[0]) * p[1], 0) / Math.max(1e-6, pool.reduce((s, p) => s + p[1], 0));
+    const mulE = 1 + (P.stats.extraEnemies || 0); // curses / blessings that change how many foes come
+    let budget = cap * avgW * 1.8 * Math.max(0.4, mulE);
+    const minN = Math.max(2, Math.round(cap * Math.max(0.5, Math.min(1, mulE))));
+    const defs = []; let used = 0;
+    while (defs.length < GM.FOE_MAX) {
+      const d = r.weighted(pool, (p) => p[1])[0], w = GM.foeWeight(d);
+      if (defs.length >= minN && used + w > budget) break;
+      defs.push(d); used += w;
+    }
+    let overflow = 0; // what the ceiling kept out becomes extra toughness for the foes that did come
+    if (defs.length >= GM.FOE_MAX && budget - used > avgW) overflow = Math.round((budget - used) / avgW);
+    if (variant === 'cursed') for (let i = 0; i < 2 && defs.length < GM.FOE_MAX + 2; i++) defs.push(r.weighted(pool, (p) => p[1])[0]); // the cursed arena always brings more
+    const total = defs.length;
     let plan;
     if (pick === 'ritual') plan = splitN(Math.max(3, total), 3).map((v) => ({ n: Math.max(1, v) }));
-    else if (pick === 'survive') plan = splitN(total, total <= 5 ? 2 : 3).map((v) => ({ n: Math.max(1, v) }));
+    else if (pick === 'survive') plan = splitN(total, total <= 6 ? 2 : 3).map((v) => ({ n: Math.max(1, v) }));
     else if (pick === 'hunt') {
-      const targets = variant === 'elite' ? (total >= 6 ? 2 : 1) : total >= 6 ? 2 : 1;
-      const k = total <= 4 ? 2 : total <= 7 ? 2 : 3;
+      const targets = total >= 9 ? 2 : 1;
+      const k = total <= 7 ? 2 : 3;
       plan = splitN(total, k).map((v) => ({ n: Math.max(1, v) }));
       // targets arrive with the later waves
       const last = plan[plan.length - 1]; last.target = targets; last.n = Math.max(last.n, targets);
     } else {
-      const k = variant === 'cursed' ? 3 : total <= 3 ? 1 : total <= 6 ? 2 : 3;
+      const k = variant === 'cursed' ? 3 : total <= 4 ? 1 : total <= 9 ? 2 : 3;
       plan = splitN(total, k).map((v) => ({ n: Math.max(1, v) }));
     }
+    // hand the drawn kinds out wave by wave (the marked foes of a hunt take the toughest ones left)
+    let at = 0;
+    for (const wv of plan) { wv.defs = []; for (let i = 0; i < wv.n; i++) wv.defs.push(defs[at++ % defs.length]); }
     plan.overflow = overflow;
     return plan;
   };
@@ -711,7 +727,7 @@
     let tg = wv.target || 0;
     for (let i = 0; i < wv.n; i++) {
       const isT = tg > 0;
-      const e = GM.spawnEnemy({ wave: true, elite: isT, mark: isT, champion: isT && O.champion });
+      const e = GM.spawnEnemy({ wave: true, elite: isT, mark: isT, champion: isT && O.champion, def: wv.defs && wv.defs[i] });
       if (!e) continue;
       e.waveFoe = true; e.waveNo = O.wave; O.spawned++; O.waveSize++;
       if (isT) { tg--; O.marked++; G.ui.toast(`${O.champion ? '👑' : '🎯'} 標的出現: ${e.def.name}`, 'warn'); }
@@ -796,10 +812,32 @@
     if (O.kind === 'hunt' && e.marked) O.markKilled++;
   };
   // after a clear, anything hostile that is still (or again) standing fades away
+  // ---- fights that drag on (hard / extra): hit-and-run chipping is not a way to win ----
+  // after a grace period (longer for more foes, longer still for a guardian) the foes grow frantic: every `step` seconds the
+  // "frenzy" level rises (max 10): +15% damage and +3% speed (cooldowns, attack tempo, projectiles) per level.
+  GM.enrage = { lv: 0, t: 0, grace: 0, step: 20, dmg: 1, tm: 1, warned: false, on: false };
+  GM.enrageReset = function () { Object.assign(GM.enrage, { lv: 0, t: 0, grace: 0, dmg: 1, tm: 1, warned: false, on: false }); };
+  GM.updateEnrage = function (dt) {
+    const E = GM.enrage, id = G.Run.cur.id, O = GM.objective;
+    let on = false, grace = 0, step = 20;
+    if ((id === 'hard' || id === 'extra') && !GM.areaCleared && GM.state === 'playing') {
+      if (['combat', 'elite', 'cursed', 'vault'].includes(GM.stage) && O && O.waves && O.wave > 0) { on = true; grace = (90 + 10 * (O.total || 6)) * (id === 'extra' ? 0.85 : 1); step = 20; }
+      else if (GM.stage === 'boss' && GM.bossEngaged && G.bosses.active && !G.bosses.active.dead) { on = true; grace = id === 'extra' ? 200 : 240; step = 30; }
+    }
+    E.on = on;
+    if (!on) { if (E.lv && GM.areaCleared) GM.enrageReset(); return; }
+    E.t += dt; E.grace = grace; E.step = step;
+    const lv = E.t > grace ? Math.min(10, 1 + Math.floor((E.t - grace) / step)) : 0;
+    if (lv > E.lv) {
+      E.lv = lv; E.dmg = 1 + 0.15 * lv; E.tm = 1 + 0.03 * lv;
+      G.ui.toast(`🔥 戦いが長引いている — 敵が激化した（激化 Lv${lv}：被ダメ+${Math.round(0.15 * lv * 100)}% 敵の動き+${Math.round(0.03 * lv * 100)}%）`, 'warn');
+      G.sfx.heartbeat && G.sfx.heartbeat(1);
+    } else if (!E.warned && E.t > grace - 20 && lv === 0) { E.warned = true; G.ui.toastSmall('⏳ 戦いが長引くと、敵が激化する'); }
+  };
   function sweepCleared() {
     if (!GM.clearSweep || !GM.areaCleared) return;
     for (const e of G.enemies.list) {
-      if (!e.alive || e.custom || e.ally || e.isTarget || e.def.id === 'mimic_gold') continue;
+      if (!e.alive || e.custom || e.ally || e.isTarget || e.def.id === 'mimic_gold' || e.def.id === 'mimic_trap') continue; // a mimic that bit after the clear is a fight you chose
       G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1);
       e.noReward = true; e.alive = false; e.dying = false; e.remove && e.remove();
     }
@@ -974,7 +1012,7 @@
     G.Rooms2.onAreaClear();
     if (bossKill && G.Run.revivesAllowed()) { P.revives++; setTimeout(() => G.ui.toast(`🪔 守護者の魂を奪い、魂の灯火が一つ灯った（${P.revives}灯）`, 'good'), 1200); }
     const O = GM.objective; if (O) O.done = true;
-    for (const e of G.enemies.list) if (e.alive && !e.boss && !e.isTarget && e.def.id !== 'mimic_gold') { G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1); e.noReward = true; e.hp = 0; G.combat.killEnemy(e, { src: 'clear', proc: true }, 0); }
+    for (const e of G.enemies.list) if (e.alive && !e.boss && !e.isTarget && e.def.id !== 'mimic_gold' && e.def.id !== 'mimic_trap') { G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1); e.noReward = true; e.hp = 0; G.combat.killEnemy(e, { src: 'clear', proc: true }, 0); }
     G.combat.collectAllPickups();
     const n = GM.area;
     const t = GM.time - GM.areaStartT;
@@ -1065,6 +1103,28 @@
     else { const old = P.weapons[P.wIdx]; G.Pawn.tradeIn(old); GM.stashAtts(old); P.weapons[P.wIdx] = G.weapons.make(id); G.weapons.equip(false); }
     G.ui.itemCard(wd, '[武器]'); G.ui.refreshWeapon();
   };
+  // a gun thrown away from the inventory screen becomes a pickup on the ground that keeps its upgrades, parts and ammo
+  GM.dropGun = function (w) {
+    if (!w || P.weapons.length < 2) return false; // the last gun can not go: there would be nothing to shoot with
+    const cur = P.weapons[P.wIdx];
+    G.weapons.order(); // makes sure the key layout refers to guns that still exist
+    P.weapons.splice(P.weapons.indexOf(w), 1);
+    P.wOrder = (P.wOrder || []).map((t) => (t === w ? null : t));
+    if (cur === w) { P.wIdx = 0; G.weapons.equip(false); } else P.wIdx = P.weapons.indexOf(cur);
+    w.reloading = false;
+    const it = G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, mag: w.mag, kills: w.kills || 0 } });
+    G.Inv.dropToGround(it, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(P.forward().setY(0).normalize(), 0.9));
+    G.weapons.order(); G.ui.refreshWeapon(); P.recalc();
+    return true;
+  };
+  GM.takeGun = function (it) {
+    if (P.weapons.length >= P.stats.weaponSlots) return false;
+    const x = it.gun || {}, w = G.weapons.make(it.id);
+    w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; w.ver++; w.mag = x.mag ?? w.mag;
+    P.weapons.push(w); G.weapons.switchTo(P.weapons.length - 1); G.ui.refreshWeapon(); P.recalc();
+    const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を拾った`);
+    return true;
+  };
   GM.giveSkill = function (id) {
     if (G.SKILL_BY_ID[id] && G.SKILL_BY_ID[id].ult) { P.skills[0] = G.abilities.makeSlot(id); G.ui.itemCard(G.SKILL_BY_ID[id], '[Q アルティメット]'); return; }
     let i = [1, 2, 3].find((k) => !P.skills[k]) || 3;
@@ -1151,7 +1211,7 @@
     }
     return null;
   };
-  GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、肉体を呼び戻す（HP全快・3秒無敵・周囲の敵を吹き飛ばす）。' };
+  GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、そのエリアに入った最初から再開する（持ち物・バフ・敵はその時点に戻り、HP全快・クールタイムはリセット）。' };
   GM.revivePrice = () => GM.price(4200 + GM.area * 160);
   GM.SVC_FORGE = { id: 'svc_forge', name: '鍛冶屋の出張', icon: '⚒️', rarity: 'rare', desc: '所持している銃か近接武器を1つ選んで強化値+1（ダメージ×1.13）。' };
   GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（威力×1.3・CT-2%）。' };
@@ -1682,20 +1742,33 @@
       else final();
     }, 1600);
   };
+  // A soul lantern restarts the area from the beginning: you, your gear, buffs, coins and the foes are exactly as they were when you walked in
+  // (the checkpoint written on entry), cooldowns are fresh and HP is full. The lantern itself is spent.
   GM.revive = function () {
+    const d = GM.loadRun();
     GM.deathFrozen = false;
-    P.revives--;
-    P.dead = false; P.deathT = 0;
-    P.pos.copy(P.lastSafe); P.pos.y += 0.05; P.vel.set(0, 0, 0);
-    G.world.depenetrate(P.pos, P.hw, P.height);
-    P.hp = P.stats.maxHp; P.invulnT = 3; P.st = {};
-    P.grapple.state = 'none'; P.pileState = null;
-    // the rebirth blasts everything nearby away
-    const c = P.chestPos();
-    for (const e of G.enemies.inRadius(c, 9)) { const d = e.pos.clone().sub(P.pos).setY(0); if (d.lengthSq() < 0.01) d.set(1, 0, 0); if (!e.boss && e.knockback) e.knockback(d.normalize(), 16); G.combat.stun(e, 2); }
-    G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), 9, 0xffd070, 0.8); G.fx.flash(c, 0xffe0a0, 60, 0.6, 16); G.fx.sparks(c, null, 40, 0xffd070, 8);
+    const left = P.revives - 1;
+    if (!d || d.area !== GM.area) { // no checkpoint for this area (should not happen): fall back to rising where you fell
+      P.revives = left; P.dead = false; P.deathT = 0;
+      P.pos.copy(P.lastSafe); P.pos.y += 0.05; P.vel.set(0, 0, 0); G.world.depenetrate(P.pos, P.hw, P.height);
+      P.hp = P.stats.maxHp; P.invulnT = 3; P.st = {}; P.grapple.state = 'none'; P.pileState = null;
+      G.sfx.heal(); G.ui.showHud(true); GM.resume(); return;
+    }
+    G.combat.clear(); G.enemies.clear(); G.bosses.clear(); G.fx.clear();
+    G.ui.bossBar(null);
+    GM.run = Object.assign({ coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 }, d.run, { combo: 0, lastKillT: -10, multiT: -10 });
+    GM.applyPlayerSnap(d);
+    P.revives = left;
+    P.dead = false; P.deathT = 0; P.st = {}; P.temps = new Map();
+    for (const sk of P.skills) if (sk) { sk.cd = 0; if (sk.maxCharges) sk.charges = sk.maxCharges; }
+    G.weapons.dirty = true;
+    GM.area = d.area;
+    GM.route = (d.route || []).slice(0, -1);
+    GM.rewardPending = null;
+    GM.enterArea(d.area, d.kind);
+    P.hp = P.stats.maxHp; P.invulnT = 3;
     G.sfx.heal();
-    G.ui.toast(`🪔 魂の灯火が燃え尽き、深淵より還った（残り ${P.revives}灯）`, 'good');
+    G.ui.toast(`🪔 魂の灯火が燃え尽き、エリア ${d.area} の入口から再び（残り ${P.revives}灯）`, 'good');
     G.ui.showHud(true);
     GM.resume();
   };
@@ -1751,7 +1824,7 @@
       const d2 = s.pos.distanceToSquared(cp);
       if (d2 > 45 * 45) continue;
       let a = (flameAcc.get(s) || 0) + dt * 16 * Math.min(2.5, s.flame) * (d2 > 25 * 25 ? 0.4 : 1);
-      while (a >= 1) { a -= 1; G.fx.flameLick(s.pos.x, s.pos.y, s.pos.z, s.flame); }
+      while (a >= 1) { a -= 1; G.fx.flameLick(s.pos.x, s.pos.y, s.pos.z, s.flame, w.mats.biome.flame); }
       flameAcc.set(s, a);
     }
     GM._ambT = (GM._ambT || 0) - dt;
@@ -1888,17 +1961,19 @@
     const gdt = dt * GM.timeScale * (GM.dev ? GM.dev.speed : 1);
     GM.time += gdt;
     if (GM.chronoT > 0) { GM.chronoT -= gdt; GM.enemyTimeScale = 1 - GM.chronoSlow; } else GM.enemyTimeScale = 1;
+    GM.enemyTimeScale *= GM.enrage.tm;
     if (GM.dev) { if (GM.dev.freeze) GM.enemyTimeScale = 0; if (GM.dev.noCd) { for (const s of P.skills) if (s) { s.cd = 0; if (s.maxCharges) s.charges = s.maxCharges; } P.pileCd = 0; P.grappleCd = 0; } }
     if (GM.state === 'dead') { if (GM.deathFrozen) return; P.update(gdt); G.enemies.update(gdt); G.bosses.update(gdt); G.combat.update(gdt); G.fx.update(gdt, camera, renderer); G.LightPool.update(gdt, G.world, camera.position, GM.time); return; }
     P.update(gdt);
     G.weapons.update(gdt);
     G.abilities.update(gdt);
     G.enemies.update(gdt);
-    G.bosses.update(gdt);
+    G.bosses.update(gdt * GM.enrage.tm);
     if (G.bosses.active) for (const p of G.bosses.active.parts) if (p.alive && !p.removed) G.combat.updateStatus(p, gdt);
     G.combat.update(gdt);
     G.buffs.emit('tick', gdt);
     updateObjective(gdt);
+    GM.updateEnrage(gdt);
     updateHighFire(gdt);
     G.Fields.update(gdt);
     G.Areas.update(gdt);

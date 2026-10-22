@@ -16,6 +16,7 @@
   F.KINDS = {
     water: { name: '浅瀬', icon: '💧', tip: '浅瀬：少し遅くなる・炎上が消える・濡れた敵は電撃に弱い' },
     lava: { name: '溶岩', icon: '🌋', tip: '溶岩：踏むと燃える（敵も）' },
+    // (a blue-flame patch is a 'lava' field with blue = true: the same burning, in the ruined depths)
     moss: { name: '苔', icon: '🌿', tip: '苔：足が滑る・スライディングが伸びる' },
     ice: { name: '氷床', icon: '❄️', tip: '氷床：とても滑る' },
     mud: { name: '泥沼', icon: '🟫', tip: '泥沼：移動とジャンプが重くなる（敵も遅くなる）' },
@@ -52,15 +53,15 @@
       F.add(w, kind, r.x0, r.z0, r.x1, r.z1);
     }
   };
-  F.add = function (w, kind, x0, z0, x1, z1) {
-    const f = { kind, x0, z0, x1, z1, y: 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0 };
+  F.add = function (w, kind, x0, z0, x1, z1, opts) {
+    const f = { kind, x0, z0, x1, z1, y: 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue) };
     w.fields = w.fields || [];
     w.fields.push(f);
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const flat = (mat, h, o) => w.visual(mat, x0, 0.0, z0, x1, h || 0.03, z1, Object.assign({ uv: 3, grad: false, skip: { bottom: true } }, o || {}));
     switch (kind) {
       case 'water': flat('water', 0.035); w.waterZones.push(f); break;
-      case 'lava': flat('lava'); w.lavaZones.push(f); w.addLight(cx, 0.6, cz, { flame: 0, intensity: 12, range: 11, color: '#ff6a20', prio: 1.0, emit: false }); break;
+      case 'lava': flat(f.blue ? 'bluefire' : 'lava'); w.lavaZones.push(f); w.addLight(cx, 0.6, cz, { flame: 0, intensity: f.blue ? 14 : 12, range: 11, color: f.blue ? '#3a8aff' : '#ff6a20', prio: 1.0, emit: false }); break;
       case 'ice': flat('ice', 0.04); break;
       case 'moss': flat('moss', 0.025); break;
       case 'mud': flat('mud', 0.03); break;
@@ -110,6 +111,11 @@
     for (const f of w.fields) {
       const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
       // ambient life
+      // blue fire: tall pale-blue tongues rise out of the patch (only close ones, only a few at a time)
+      if (f.kind === 'lava' && f.blue && Math.hypot(cx - feet.x, cz - feet.z) < 40 + (f.x1 - f.x0 + f.z1 - f.z0) / 2) {
+        const n = Math.min(3.5, (f.x1 - f.x0) * (f.z1 - f.z0) * 0.12 + 0.6) * dt * 9;
+        for (let k = Math.random() < n % 1 ? 1 : 0, m = Math.floor(n); k <= m; k++) G.fx.flameLick(U.rand(f.x0, f.x1), 0.06, U.rand(f.z0, f.z1), U.rand(1.7, 2.8), 0x4a9cff);
+      }
       if (f.kind === 'poison' && Math.random() < dt * 3) G.fx.norm.spawn(U.rand(f.x0, f.x1), 0.1, U.rand(f.z0, f.z1), 0, 0.4, 0, 1.4, 0.2, 0.7, 0.4, 0.85, 0.15, 0.5, -0.1, 0.5);
       if (f.kind === 'holy' && f.cap > 0 && Math.random() < dt * 6) G.fx.add.spawn(U.rand(f.x0, f.x1), 0.1, U.rand(f.z0, f.z1), 0, U.rand(0.6, 1.4), 0, 1.2, 0.08, 0.01, 0.6, 0.9, 1, 0.9, -0.2, 0.4);
       if (f.kind === 'vent' && Math.random() < dt * 14) G.fx.norm.spawn(U.rand(f.x0, f.x1), 0.2, U.rand(f.z0, f.z1), U.rand(-0.2, 0.2), U.rand(5, 9), U.rand(-0.2, 0.2), 0.7, 0.15, 0.6, 0.85, 0.92, 1, 0.35, 0, 0.6);

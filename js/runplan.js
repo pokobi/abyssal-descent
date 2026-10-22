@@ -34,7 +34,7 @@
   // enemy level: deeper difficulties start (and stay) at higher levels. Level already scales HP / damage, so the multipliers
   // below are divided by what the level offset adds, which keeps the overall toughness exactly as tuned.
   R.LV_OFF = { easy: 0, normal: 2, hard: 8, extra: 18 };
-  R.lvOff = () => (R.LV_OFF[R.cur.id] || 0) + (R.cur.id === 'extra' ? 3 * R.cur.lv : 0);
+  R.lvOff = () => (R.LV_OFF[R.cur.id] || 0) + (R.cur.id === 'extra' ? 7 * R.cur.lv : 0);
   R.enemyLv = (n) => Math.max(1, n + R.lvOff());
   const fHp = (L) => (1 + 0.11 * L) * Math.pow(1.015, L), fDmg = (L) => 1 + 0.04 * L;
   // guardians keep their own level curve (area based), so they use the plain multipliers
@@ -70,10 +70,16 @@
     halls: ['warlock', 'boneking', 'cerberus', 'executioner', 'colossus'],
     ruin: ['ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver'],
   };
+  // a run never meets the same guardian twice: the earlier guardians of the run are drawn first (same seed, same result), then excluded
   R.bossFor = function (n) {
-    const pool = (R.BOSS_POOLS[R.field(n)] || []).filter((id) => G.BOSS_BY_ID[id] && G.bosses.has(id));
-    if (!pool.length) return null;
-    const rng = new G.RNG(((G.game.seed || 1) ^ G.U.hashStr('boss' + n)) >>> 0);
-    return pool[Math.floor(rng.next() * pool.length)];
+    const used = new Set(), draw = (m) => {
+      const pool = (R.BOSS_POOLS[R.field(m)] || []).filter((id) => G.BOSS_BY_ID[id] && G.bosses.has(id));
+      if (!pool.length) return null;
+      const fresh = pool.filter((id) => !used.has(id)), c = fresh.length ? fresh : pool;
+      const rng = new G.RNG(((G.game.seed || 1) ^ G.U.hashStr('boss' + m)) >>> 0);
+      const id = c[Math.floor(rng.next() * c.length)]; used.add(id); return id;
+    };
+    for (let m = 6; m < n; m += 6) draw(m);
+    return draw(n);
   };
 })();

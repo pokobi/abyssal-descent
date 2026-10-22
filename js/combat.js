@@ -416,8 +416,8 @@
       if (d < r + 0.4) C.damagePlayer(dmg * (1 - 0.5 * d / (r + 0.4)), { src: 'explosion', pos, attacker: info.attacker, elem: info.elem });
       return;
     }
-    // your own grenade hurts you too: inside the blast you take half of its damage
-    if (info.grenade && !info.isCluster && !info.noSelf && d < r) C.damagePlayer(dmg * 0.5 / ((C.ENEMY_DMG || 1) * Math.max(0.1, 1 + P.stats.enemyDmg)), { src: 'explosion', pos }); // exactly half of the grenade's damage (before your armour)
+    // your own grenade hurts you too: inside the blast you take a fifth (20%) of its damage
+    if (info.grenade && !info.isCluster && !info.noSelf && d < r) C.damagePlayer(dmg * 0.2 / ((C.ENEMY_DMG || 1) * Math.max(0.1, 1 + P.stats.enemyDmg)), { src: 'explosion', pos }); // exactly 20% of the grenade's damage (before your armour)
     for (const e of G.enemies.inRadius(pos, r + 0.6)) {
       if (info.los && !C.pileLos(pos, e)) continue;
       const dd = Math.max(0, e.pos.distanceTo(pos) - e.radius);
@@ -518,6 +518,7 @@
     info = info || {};
     if (P.invulnT > 0 || (G.game.dev && G.game.dev.god)) return 0;
     amount *= 1 + P.stats.enemyDmg;
+    if (G.game.enrage && G.game.enrage.lv && info.src !== 'fall' && info.src !== 'dot') amount *= G.game.enrage.dmg; // a fight that drags on (see game.js updateEnrage)
     // defence (from armour) is its own reduction, applied before the percentage ones
     amount *= C.ENEMY_DMG * C.defMul(P.stats.defense);
     if ((info.src === 'explosion' || info.src === 'aoe') && P.stats.blastRes) amount *= Math.max(0.2, 1 - P.stats.blastRes);

@@ -311,7 +311,7 @@
       if (heavy && s.trait === 'reap' && !e.boss && e.hp < e.maxHp * 0.25) { d = e.hp + e.shield + 1; info.forceCrit = true; }
       C.damageEnemy(e, d, info);
       if (heavy) C.stun(e, s.trait === 'quake' ? 1.2 : 0.5);
-      if (s.trait === 'thunder' && Math.random() < 0.4) C.chain(e, 2, d * 0.35, 8, { src: 'melee', proc: true });
+      if (s.trait === 'thunder' && (heavy || Math.random() < 0.4)) { C.chain(e, 2, d * 0.35, 8, { src: 'melee', proc: true }); G.fx.strike(e.centerPos(), 0xcfe0ff, heavy); }
       G.fx.blood(e.centerPos(), f, e.bloodColor || 0x6a0a0a, heavy ? 10 : 5);
       if (def.trait === 'midas' && !e.boss) C.coins(heavy ? 6 : 2, e.centerPos());
       if (def.trait === 'devour' && !e.alive && e.mut) { W.devour = Math.min(10, (W.devour || 0) + 1); C.heal(P.stats.maxHp * 0.05); G.ui.toastSmall(`🌑 魂を喰らった（${W.devour}重）`); }

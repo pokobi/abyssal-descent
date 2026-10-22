@@ -192,11 +192,17 @@
       if (S.crouchToggle) { if (crouchHit) this.crouchToggle = !this.crouchToggle; wantCrouch = this.crouchToggle; }
       else wantCrouch = I.down('crouch');
       if (S.autoSprint) this.sprintToggle = !I.down('sprint'); // run by default, hold Shift to walk
-      else if (S.sprintToggle) { if (I.hit('sprint')) this.sprintToggle = !this.sprintToggle; } else this.sprintToggle = I.down('sprint');
+      else {
+        // a tap of Shift starts a run that goes on by itself until it breaks (you stop, aim, shoot, reload, crouch); Shift again ends it early
+        const shDown = I.down('sprint');
+        if (!shDown) this._spCancel = false;
+        if (I.hit('sprint') && this.sprinting) { this.sprintToggle = false; this._spCancel = true; }
+        else if (shDown && !this._spCancel) this.sprintToggle = true;
+      }
       const ads = G.weapons.adsT > 0.3;
       const canSprintAfterShot = t - this.lastShotT > (G.weapons.curStats && G.weapons.curStats.sprintFire ? 0.05 : 0.22);
       this.sprinting = this.sprintToggle && fwdIn > 0 && !ads && !this.crouching && canSprintAfterShot && !G.weapons.reloadBlocksSprint() && !(this.st.shock > 0);
-      if (!this.sprinting && S.sprintToggle && !S.autoSprint && fwdIn <= 0) this.sprintToggle = false;
+      if (!this.sprinting && !S.autoSprint && !I.down('sprint') && this.sprintToggle) this.sprintToggle = false; // the run broke: it does not resume by itself
 
       // pile driver trigger: crouch in air
       this.pileCd = Math.max(0, (this.pileCd || 0) - dt);

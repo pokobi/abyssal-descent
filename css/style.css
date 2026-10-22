@@ -1273,3 +1273,17 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 /* armour cells: the defence number sits clear of the durability bar */
 .iv-eq .iv-def { bottom: calc(max(3px, 7%) + 0.45em); }
 .iv-it.t-armor .iv-def { top: 1px; }
+
+/* ---- epic / legendary: a quiet glow around the frame (picked up from the rarity colour, so every place that shows an item gets it) ---- */
+@keyframes rarEpic { 0%, 100% { box-shadow: 0 0 3px color-mix(in srgb, #b06be0 40%, transparent), inset 0 0 5px color-mix(in srgb, #b06be0 18%, transparent); } 50% { box-shadow: 0 0 9px color-mix(in srgb, #b06be0 60%, transparent), inset 0 0 9px color-mix(in srgb, #b06be0 30%, transparent); } }
+@keyframes rarLeg { 0%, 100% { box-shadow: 0 0 4px color-mix(in srgb, #f0a030 50%, transparent), inset 0 0 6px color-mix(in srgb, #f0a030 22%, transparent); } 50% { box-shadow: 0 0 12px color-mix(in srgb, #f0a030 75%, transparent), inset 0 0 11px color-mix(in srgb, #f0a030 38%, transparent); } }
+@keyframes rarSheen { 0% { transform: translateX(-130%) skewX(-20deg); } 55%, 100% { transform: translateX(260%) skewX(-20deg); } }
+:is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf, .it)[style*="--rc:#b06be0"] { animation: rarEpic 3.2s ease-in-out infinite; }
+:is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf, .it)[style*="--rc:#f0a030"] { animation: rarLeg 2.6s ease-in-out infinite; }
+.iv-it.iv-fit[style*="--rc:#b06be0"], .iv-it.iv-fit[style*="--rc:#f0a030"] { animation: ivfit 1.1s ease-in-out infinite alternate; }
+/* legendary: a thin light slowly sweeps across small tiles */
+:is(.iv-it, .iv-sk)[style*="--rc:#f0a030"] { overflow: hidden; }
+:is(.iv-it, .iv-sk)[style*="--rc:#f0a030"]::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 38%; background: linear-gradient(90deg, transparent, rgba(255,236,190,0.22), transparent); pointer-events: none; animation: rarSheen 4.2s ease-in-out infinite; }
+.card[style*="--rc:#b06be0"] { box-shadow: 0 10px 40px rgba(0,0,0,0.6), 0 0 18px color-mix(in srgb, #b06be0 28%, transparent), inset 0 0 30px color-mix(in srgb, #b06be0 18%, transparent); }
+.card[style*="--rc:#f0a030"] { box-shadow: 0 10px 40px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, #f0a030 36%, transparent), inset 0 0 30px color-mix(in srgb, #f0a030 22%, transparent); }
+html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf, .it)[style*="--rc:#b06be0"], html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf, .it)[style*="--rc:#f0a030"] { animation: none; }

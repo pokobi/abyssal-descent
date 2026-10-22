@@ -457,7 +457,7 @@
         mesh(g, PG().oct, glowM(a.col || 0x9a50ff, 2.2), 0.6, 1.1, 0.6);
         const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.05, 6, 24), glowM(a.col || 0x9a50ff, 1.5)); ring.rotation.x = Math.PI / 2; g.add(ring);
         G.scene.add(g);
-        const p = this.part({ name: a.totem || '守りの結晶', shared: false, hp: Math.round((a.hp || 260) * this.hpScale), maxHp: Math.round((a.hp || 260) * this.hpScale), hitW: [{ r: 0.9, part: 'body', w: g.position.clone() }], radius: 0.9 });
+        const p = this.part({ name: a.totem || '守りの結晶', shared: false, hp: Math.round((a.hp || 260) * this.hpScale), maxHp: Math.round((a.hp || 260) * this.hpScale), hitW: [{ r: 0.9, part: 'body', w: g.position.clone() }], radius: 0.9, height: 1.8, showBar: true });
         p.die = () => { if (!p.alive) return false; p.alive = false; G.scene.remove(g); G.fx.explosion(g.position.clone(), 2, a.col || 0x9a50ff); G.sfx.explosion(g.position, 0.7); return true; };
         this.totems.push({ g, p, y, ph: i });
       }

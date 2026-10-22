@@ -59,6 +59,7 @@
     if (it.type === 'armor') return G.ARMOR_BY_ID[it.id];
     if (it.type === 'valuable') return G.VALUABLE_BY_ID[it.id];
     if (it.type === 'att') return G.ATT_BY_ID[it.id];
+    if (it.type === 'gun') return G.WEAPON_BY_ID[it.id]; // a gun lying on the ground (only ever on the ground)
     return null;
   };
   IV.baseSize = function (it) {
@@ -259,8 +260,8 @@
   };
 
   // ---------------- serialisation (mid-run save) ----------------
-  IV.ser = (it) => ({ t: it.type, id: it.id, n: it.n, x: it.x, y: it.y, r: it.rot ? 1 : 0, e: it.ench, d: it.dur });
-  IV.de = (o) => IV.make(o.t, o.id, o.n, Object.assign({ x: o.x, y: o.y, rot: !!o.r, ench: o.e }, o.d !== undefined && o.d !== null ? { dur: o.d } : {}));
+  IV.ser = (it) => ({ t: it.type, id: it.id, n: it.n, x: it.x, y: it.y, r: it.rot ? 1 : 0, e: it.ench, d: it.dur, g: it.gun });
+  IV.de = (o) => IV.make(o.t, o.id, o.n, Object.assign({ x: o.x, y: o.y, rot: !!o.r, ench: o.e }, (o.d !== undefined && o.d !== null ? { dur: o.d } : {}), o.g ? { gun: o.g } : {}));
   IV.snap = (P) => ({ bag: P.bag.items.map(IV.ser), spec: Object.fromEntries(Object.entries(P.spec || {}).map(([k, c]) => [k, c.items.map(IV.ser)])), equip: Object.fromEntries(Object.entries(P.equip).map(([k, v]) => [k, v ? IV.ser(v) : null])) });
   IV.load = function (P, d) {
     IV.setupPlayer(P);
@@ -349,6 +350,11 @@
   };
   IV.pickUp = function (gr) {
     const P = G.player;
+    if (gr.it.type === 'gun') {
+      if (!G.game.takeGun(gr.it)) { G.ui.toastSmall('🔫 武器スロットがいっぱい — 先に別の銃を捨てる'); G.sfx.ui('deny'); return false; }
+      G.world.group.remove(gr.g); IV.ground.splice(IV.ground.indexOf(gr), 1); G.sfx.ui('select');
+      return true;
+    }
     const left = IV.stow(P, gr.it);
     if (left > 0) { G.ui.toastSmall('🎒 インベントリに空きがない'); G.sfx.ui('deny'); return false; }
     G.save.mark('items', gr.it.id);

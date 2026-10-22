@@ -153,7 +153,7 @@
       this.vel.set(0, 0, 0);
       this.yaw = s.yaw; this.pitch = 0;
       this.grounded = true; this.coyote = 0.1; this.jumps = 0;
-      this.crouching = false; this.sliding = false; this.height = this.standH; this.eyeH = 1.62; this._slideRun = false;
+      this.crouching = false; this.sliding = false; this.height = this.standH; this.eyeH = 1.62; this._slideRun = false; this._sjRun = false;
       this.mantle = null; this.pileState = null;
       this.grapple.state = 'none'; this.grappleCd = 0;
       this.lastSafe.copy(this.pos);
@@ -204,8 +204,9 @@
       }
       const ads = G.weapons.adsT > 0.3;
       const canSprintAfterShot = t - this.lastShotT > (G.weapons.curStats && G.weapons.curStats.sprintFire ? 0.05 : 0.22);
-      this.sprinting = this.sprintToggle && fwdIn > 0 && !ads && !this.crouching && canSprintAfterShot && !G.weapons.reloadBlocksSprint() && !(this.st.shock > 0);
-      if (!this.sprinting && !S.autoSprint && !I.down('sprint') && this.sprintToggle && !this.sliding) this.sprintToggle = false; // the run broke: it does not resume by itself
+      if (this._sjRun && this.grounded) this._sjRun = false; // a slide-jump keeps the run through the air (even with crouch still held); landing ends that
+      this.sprinting = this.sprintToggle && fwdIn > 0 && !ads && (!this.crouching || this._sjRun) && canSprintAfterShot && !G.weapons.reloadBlocksSprint() && !(this.st.shock > 0);
+      if (!this.sprinting && !S.autoSprint && !I.down('sprint') && this.sprintToggle && !this.sliding && !this._sjRun) this.sprintToggle = false; // the run broke: it does not resume by itself
 
       // pile driver trigger: crouch in air
       this.pileCd = Math.max(0, (this.pileCd || 0) - dt);
@@ -269,7 +270,7 @@
       // armour: speed builds up the longer you keep sprinting (+x per second, up to 3 steps)
       this.sprintT = this.sprinting ? (this.sprintT || 0) + dt : 0;
       if (this.sprinting) targetSpeed = 9.7 * (1 + st.moveSpeed + Math.min(3, Math.floor(this.sprintT)) * (st.sprintRamp || 0)) * this.moveMul();
-      if (this.crouching && !this.sliding) targetSpeed = 3.3 * (1 + st.moveSpeed * 0.5) * this.moveMul();
+      if (this.crouching && !this.sliding && !this._sjRun) targetSpeed = 3.3 * (1 + st.moveSpeed * 0.5) * this.moveMul();
       if (G.weapons.adsT > 0.5) targetSpeed *= 0.62;
       if (this.st.slow > 0) targetSpeed *= 0.6;
       if (this.inWater) targetSpeed *= 0.9;
@@ -315,7 +316,7 @@
       if (this.jumpBuf > 0 && !this.pileState && !(this.dragT > 0)) {
         if (this.grounded || this.coyote > 0) {
           this.vel.y = 7.6 * (1 + st.jumpPower) * (this.fieldJump || 1);
-          if (this.sliding) { this.endSlide(); const hs = Math.hypot(this.vel.x, this.vel.z); if (hs > 0) { const k = Math.min(1.08, 15 / hs); this.vel.x *= k; this.vel.z *= k; } }
+          if (this.sliding) { const run = this._slideRun; this.endSlide(); if (run) this._sjRun = true; const hs = Math.hypot(this.vel.x, this.vel.z); if (hs > 0) { const k = Math.min(1.08, 15 / hs); this.vel.x *= k; this.vel.z *= k; } }
           this.grounded = false; this.coyote = 0; this.jumpBuf = 0; this.jumps = 1;
           G.sfx.jump(); G.buffs.emit('onJump', { air: false });
           if (this.crouching && !wantCrouch) this.crouching = false;

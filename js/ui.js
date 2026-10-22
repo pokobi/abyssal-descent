@@ -369,6 +369,16 @@
     for (const [a, h] of items) { if (Math.abs(a) > Math.PI / 2) continue; const x = W2 + a / (Math.PI / 2) * W2; html += h.replace(`left:${W2}px`, `left:${x.toFixed(1)}px`); }
     sHtml(strip, html);
   };
+  // the frenzy timer: a quiet thin bar with the time left until the foes grow frantic (and, once they have, until the next step)
+  UI.enrageGauge = function () {
+    const E = G.game.enrage; if (!E || !E.on || !E.grace) return '';
+    const fmt = (t) => { t = Math.max(0, Math.ceil(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+    if (E.lv > 0) {
+      const into = (E.t - E.grace) % E.step, k = E.lv >= 10 ? 1 : into / E.step;
+      return `<div class="en-g hot"><span>🔥 激化 Lv${E.lv}（被ダメ+${E.lv * 15}% ／ 敵の動き+${E.lv * 3}%）${E.lv < 10 ? ' 次まで ' + fmt(E.step - into) : ''}</span><i><b style="width:${Math.round(k * 100)}%"></b></i></div>`;
+    }
+    return `<div class="en-g"><span>⏳ 激化まで ${fmt(E.grace - E.t)}</span><i><b style="width:${Math.round(U.clamp(E.t / E.grace, 0, 1) * 100)}%"></b></i></div>`;
+  };
   UI.updateObjective = function () {
     const o = G.game.objective; const el = UI.el.objective;
     if (!o) { el.style.display = 'none'; return; }
@@ -383,7 +393,7 @@
       else bar = `<div class="ob-bar"><div style="width:${Math.round(U.clamp(sg[0] ? sg[0].k : 0, 0, 1) * 100)}%"></div></div>`;
     } else if (o.progress) bar = `<div class="ob-bar"><div style="width:${Math.round(o.progress() * 100)}%"></div></div>`;
     const sub = !o.done && o.sub ? o.sub() : o.done && o.kind ? '✅ 目標達成' : '';
-    const html = `<div class="ob-row"><span class="ob-ic">${o.icon}</span><span>${o.text()}</span></div>${sub ? `<div class="ob-sub">${sub}</div>` : ''}${an ? `<div class="ob-row" style="color:#ff9a7a;font-size:12px">⚠ 異変: ${an}</div>` : ''}${G.game.enrage && G.game.enrage.lv ? `<div class="ob-row" style="color:#ff6a50;font-size:12px">🔥 激化 Lv${G.game.enrage.lv}（被ダメ+${Math.round(G.game.enrage.lv * 15)}% ／ 敵の動き+${Math.round(G.game.enrage.lv * 3)}%）</div>` : ''}${bar}`;
+    const html = `<div class="ob-row"><span class="ob-ic">${o.icon}</span><span>${o.text()}</span></div>${sub ? `<div class="ob-sub">${sub}</div>` : ''}${an ? `<div class="ob-row" style="color:#ff9a7a;font-size:12px">⚠ 異変: ${an}</div>` : ''}${UI.enrageGauge()}${bar}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
   };
   // the whole run as a strip of nodes grouped by field: visited areas show what they were, the guardians are marked, "you are here" glows

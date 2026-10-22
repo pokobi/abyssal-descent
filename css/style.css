@@ -1324,3 +1324,10 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 .pw-row .pw-t small { font-size: 12px; }
 
 #hp-trail { transition: none; } /* the damage trail is animated from ui.js */
+
+/* frenzy timer (inside the objective panel): quiet */
+.en-g { margin-top: 4px; font-size: 11px; color: #9a8e7a; opacity: 0.85; }
+.en-g i { display: block; height: 2px; margin-top: 2px; background: rgba(255,255,255,0.1); }
+.en-g i b { display: block; height: 100%; background: rgba(200,180,140,0.55); }
+.en-g.hot { color: #e08a6a; opacity: 1; }
+.en-g.hot i b { background: rgba(230,100,70,0.8); }

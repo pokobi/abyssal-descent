@@ -838,8 +838,8 @@
     const E = GM.enrage, id = G.Run.cur.id, O = GM.objective;
     let on = false, grace = 0, step = 20;
     if ((id === 'hard' || id === 'extra') && !GM.areaCleared && GM.state === 'playing') {
-      if (['combat', 'elite', 'cursed', 'vault'].includes(GM.stage) && O && O.waves && O.wave > 0) { on = true; grace = (90 + 10 * (O.total || 6)) * (id === 'extra' ? 0.85 : 1); step = 20; }
-      else if (GM.stage === 'boss' && GM.bossEngaged && G.bosses.active && !G.bosses.active.dead) { on = true; grace = id === 'extra' ? 200 : 240; step = 30; }
+      // combat areas only (guardian fights are not timed); the grace grows with the number of foes
+      if (['combat', 'elite', 'cursed', 'vault'].includes(GM.stage) && O && O.waves && O.wave > 0) { on = true; grace = (150 + 15 * (O.total || 6)) * (id === 'extra' ? 0.85 : 1); step = 25; }
     }
     E.on = on;
     if (!on) { if (E.lv && GM.areaCleared) GM.enrageReset(); return; }

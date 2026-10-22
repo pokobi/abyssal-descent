@@ -136,7 +136,9 @@
     n = G.Run.depthArea(n);
     let chance = n < 14 ? 0 : Math.min(0.75, 0.3 + (n - 14) * 0.025);
     if (P.has('pact_anomaly')) chance = 1;
-    if (Math.random() < chance) A.list.push(U.pick(D.ANOMS).id);
+    // drawn from the run seed and the area, so entering the same area again (a soul lantern restarts it) gives the same anomaly
+    const rng = new G.RNG((GM.seed ^ U.hashStr('anom' + GM.area + kind)) >>> 0);
+    if (rng.next() < chance) A.list.push(D.ANOMS[Math.floor(rng.next() * D.ANOMS.length)].id);
     if (P.has('pact_night') && !A.list.includes('darkness')) A.list.push('darkness');
     if (P.has('pact_hunted') && !A.list.includes('stalker')) A.list.push('stalker');
     if (!A.list.length) return;

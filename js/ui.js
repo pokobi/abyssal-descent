@@ -764,7 +764,18 @@
         const id = c.dataset.id; G.sfx.ui('select'); stopDrone(false); onPick({ id, lv: id === 'extra' ? xlv : 0 });
       });
     };
-    const setExtra = (on) => {
+    // switching between hard and extra fades the whole screen (UI and the world behind it) to black, swaps, and fades back in
+    let veiling = false;
+    const veil = (swap) => {
+      if (veiling) return; veiling = true;
+      const v = document.createElement('div'); v.className = 'df-veil'; document.body.appendChild(v); void v.offsetWidth; v.classList.add('on');
+      setTimeout(() => {
+        swap();
+        setTimeout(() => { v.classList.remove('on'); setTimeout(() => { v.remove(); veiling = false; }, 600); }, 150);
+      }, 600);
+    };
+    const setExtra = (on) => veil(() => {
+      if (!s.isConnected) return;
       extra = on; render();
       if (on) {
         if (G.sfx.hellSting) G.sfx.hellSting(lvK());
@@ -774,7 +785,7 @@
         applyLevel();
         if (!watch) watch = setInterval(() => { if (!s.isConnected) stopDrone(false); }, 300);
       } else { stopDrone(true); G.sfx.ui('click'); }
-    };
+    });
     render();
     s.querySelector('#df-back').onclick = () => { G.sfx.ui('click'); stopDrone(extra); back(); };
   };

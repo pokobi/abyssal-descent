@@ -1312,3 +1312,6 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 .df-hell .df-title { color: #d8b8b8; letter-spacing: calc(6px + var(--hk) * 8px); transition: letter-spacing 0.6s; }
 
 .df-cards.solo { grid-template-columns: minmax(0, 440px); justify-content: center; }
+
+.df-veil { position: fixed; inset: 0; z-index: 9999; background: #000; opacity: 0; pointer-events: all; transition: opacity 0.6s ease; }
+.df-veil.on { opacity: 1; }

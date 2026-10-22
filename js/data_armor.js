@@ -91,6 +91,14 @@
     { id: 'critd', name: '会心ダメ', min: 1, max: 10, stat: 'critMul' },
     { id: 'move', name: '移動速度', min: 1, max: 10, stat: 'moveSpeed' },
     { id: 'op', name: '操作速度', min: 1, max: 10, stat: 'opSpeed' },
+    { id: 'luck', name: '幸運', min: 1, max: 10, stat: 'luck' },              // +0.01 .. +0.10 luck (a 幸運 boon is +0.35)
+    { id: 'skill', name: 'スキルダメ', min: 1, max: 10, stat: 'skillDmg' },
+    { id: 'melee', name: '近接ダメ', min: 1, max: 10, stat: 'meleeDmg' },
+    { id: 'blast', name: '爆発ダメ', min: 1, max: 10, stat: 'explosionDmg' },
+    { id: 'cdr', name: 'スキルCT短縮', min: 1, max: 8, stat: 'cdr' },
+    { id: 'grapple', name: 'グラップルCT短縮', min: 1, max: 10, stat: 'grappleCd' },
+    { id: 'coin', name: 'コイン獲得', min: 1, max: 10, stat: 'coinMul' },
+    { id: 'vamp', name: '吸血', min: 0.5, max: 3, stat: 'lifesteal' },
   ];
   G.ENCHANT_BY_ID = Object.fromEntries(G.ENCHANTS.map((e) => [e.id, e]));
   // ---------------- durability ----------------

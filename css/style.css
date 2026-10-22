@@ -1310,3 +1310,5 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 @keyframes dfFlick { 0% { opacity: 0.45; } 100% { opacity: 0.75; } }
 .df-hell { --hk: 0; background: transparent !important; }
 .df-hell .df-title { color: #d8b8b8; letter-spacing: calc(6px + var(--hk) * 8px); transition: letter-spacing 0.6s; }
+
+.df-cards.solo { grid-template-columns: minmax(0, 440px); justify-content: center; }

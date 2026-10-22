@@ -747,27 +747,21 @@
     const s = UI.screen(`<div class="df-wrap"><h2 class="df-title">難易度を選択</h2><div class="df-cards"></div>
       <div style="text-align:center;margin-top:22px"><button class="btn" id="df-back">↩ 戻る</button></div></div>`);
     const cardsEl = s.querySelector('.df-cards'), wrap = s.querySelector('.df-wrap');
-    const stopDrone = () => { if (drone) { drone.stop(); drone = null; } grade(false); if (watch) { clearInterval(watch); watch = null; } };
-    // the backdrop of the hidden mode is the ordinary scene, graded: darker and harder-contrast the higher the level (no replacement picture)
-    const cvs = () => G.renderer && G.renderer.domElement;
-    const grade = (on) => {
-      const c = cvs(); if (!c) return;
-      if (!on) { c.style.filter = ''; c.style.transition = ''; return; }
-      const k = lvK();
-      c.style.transition = 'filter 0.8s ease';
-      c.style.filter = `brightness(${(0.72 - k * 0.27).toFixed(2)}) contrast(${(1.2 + k * 0.35).toFixed(2)}) saturate(${(0.85 - k * 0.3).toFixed(2)})`;
-    };
+    const stopDrone = (restore) => { if (drone) { drone.stop(); drone = null; } if (watch) { clearInterval(watch); watch = null; } if (restore && G.game.titleWorld) G.game.titleWorld(false); };
+    // the backdrop of the hidden mode is the blue-flame ruin of field 4 (the title scene's world is swapped, and swapped back)
     let watch = null;
-    const applyLevel = () => { const k = lvK(); s.style.setProperty('--hk', k.toFixed(3)); if (extra) grade(true); };
+    // the higher the level, the thicker the fog of the ruin behind the cards
+    const applyLevel = () => { const k = lvK(); s.style.setProperty('--hk', k.toFixed(3)); const f = extra && G.scene && G.scene.fog; if (f && f.density !== undefined) { if (f._b === undefined) f._b = f.density; f.density = f._b * (1 + k * 0.9); } };
     const render = () => {
-      cardsEl.innerHTML = ['easy', 'normal', extra ? 'extra' : 'hard'].map(card).join('');
+      cardsEl.innerHTML = (extra ? ['extra'] : ['easy', 'normal', 'hard']).map(card).join(''); // in the hidden mode the extra card stands alone, in the middle
+      cardsEl.classList.toggle('solo', extra);
       s.classList.toggle('df-hell', extra); applyLevel();
       const upd = () => { const b = s.querySelector('#df-xlv'); if (b) { b.textContent = `エクストラ ${xlv}`; s.querySelector('#df-xmul').textContent = xlv >= 10 ? '至高の試練' : ''; } };
       upd();
       s.querySelectorAll('[data-x]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const nx = xlv + (+b.dataset.x); if (nx >= 1 && nx <= R.maxExtra()) { xlv = nx; upd(); applyLevel(); G.sfx.ui('click'); if (G.sfx.hellSting) G.sfx.hellSting(lvK() * 0.8); if (drone) drone.set(lvK()); } else G.sfx.ui('deny'); });
       s.querySelectorAll('[data-sw]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); setExtra(b.dataset.sw === '1'); });
       cardsEl.querySelectorAll('.df-card').forEach((c) => c.onclick = () => {
-        const id = c.dataset.id; G.sfx.ui('select'); stopDrone(); onPick({ id, lv: id === 'extra' ? xlv : 0 });
+        const id = c.dataset.id; G.sfx.ui('select'); stopDrone(false); onPick({ id, lv: id === 'extra' ? xlv : 0 });
       });
     };
     const setExtra = (on) => {
@@ -775,12 +769,14 @@
       if (on) {
         if (G.sfx.hellSting) G.sfx.hellSting(lvK());
         if (!drone && G.sfx.hellDrone) drone = G.sfx.hellDrone(lvK());
-        grade(true);
-        if (!watch) watch = setInterval(() => { if (!s.isConnected) stopDrone(); }, 300); // the screen was closed some other way: undo the grading
-      } else { stopDrone(); G.sfx.ui('click'); }
+        if (G.game.titleWorld) G.game.titleWorld(true);
+        if (G.scene.fog) G.scene.fog._b = undefined;
+        applyLevel();
+        if (!watch) watch = setInterval(() => { if (!s.isConnected) stopDrone(false); }, 300);
+      } else { stopDrone(true); G.sfx.ui('click'); }
     };
     render();
-    s.querySelector('#df-back').onclick = () => { G.sfx.ui('click'); stopDrone(); back(); };
+    s.querySelector('#df-back').onclick = () => { G.sfx.ui('click'); stopDrone(extra); back(); };
   };
   UI.victory = function (o) {
     const r = G.game.run, R = G.Run;

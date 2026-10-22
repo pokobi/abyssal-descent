@@ -100,3 +100,5 @@ html.m .df-card .df-desc { font-size: 11px !important; margin: 6px 0 !important;
 html.m .df-card .df-meta { font-size: 10px !important; }
 html.m .df-up { font-size: 12px !important; padding: 6px !important; margin-top: 8px !important; }
 html.m .df-card .df-desc { min-height: 0; }
+
+html.m .df-cards.solo { grid-template-columns: minmax(0, 60%) !important; justify-content: center !important; }

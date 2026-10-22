@@ -368,6 +368,16 @@
   GM.updateDread = updateDread;
 
   // ---------------- run flow ----------------
+  // the world behind the title screens: a random one, or (the hidden extra mode on the difficulty screen) the blue-flame ruin of field 4
+  GM.titleWorld = function (ruin) {
+    let w;
+    if (ruin) {
+      const keep = G.Run.cur; G.Run.cur = { id: 'extra', lv: 1 };
+      try { w = G.LevelGen.generate(13, (Math.random() * 1e9) >>> 0); } finally { G.Run.cur = keep; }
+    } else w = G.LevelGen.generate(1 + Math.floor(Math.random() * 25), (Math.random() * 1e9) >>> 0);
+    setWorld(w);
+    GM.titleT = 0;
+  };
   GM.toTitle = function () {
     if (G.Tutorial.active) G.Tutorial.stop();
     GM.state = 'title';

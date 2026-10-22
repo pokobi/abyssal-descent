@@ -51,6 +51,8 @@
     G.on('lockchange', onLock);
     G.on('lockerror', () => { if (GM.debug) return; if (GM.state === 'paused' || GM.state === 'resuming' || GM.state === 'playing') { GM.state = 'paused'; G.ui.clickToResume(); } });
     window.addEventListener('resize', onResize); onResize();
+    // browsers keep audio muted until the page has been clicked / a key pressed: start the sound with the very first of those, wherever it lands (title screen included)
+    { const wake = () => { G.sfx.init(); window.removeEventListener('pointerdown', wake, true); window.removeEventListener('keydown', wake, true); }; window.addEventListener('pointerdown', wake, true); window.addEventListener('keydown', wake, true); }
     document.addEventListener('visibilitychange', () => { if (document.hidden && GM.state === 'playing') pause(); if (document.hidden) G.sfx.suspend(); else G.sfx.resume(); });
     window.addEventListener('keydown', (e) => {
       // Tab and B open the same screen: gear, bag, weapons + attachments and the full status sheet side by side

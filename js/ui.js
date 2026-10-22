@@ -244,7 +244,13 @@
     // HP
     const hpk = Math.max(0, P.hp) / st.maxHp;
     sStyle(e.hpFill, 'width', (hpk * 100).toFixed(2) + '%');
-    sStyle(e.hpTrail, 'width', (hpk * 100).toFixed(2) + '%'); // the trail lags behind via css transition
+    // the pale "damage trail": jumps up with the bar, but after a hit it holds a moment and then drains down to it.
+    // (driven here, not by a CSS transition: continuous regeneration changes the width every frame and restarted that transition forever,
+    // which left the old, higher level standing as a bar that looked like a promise of "healing up to here")
+    { let tr = UI._tr === undefined ? hpk : UI._tr;
+      if (hpk >= tr) { tr = hpk; UI._trHold = 0; }
+      else { if (lastHp - P.hp > 0.5) UI._trHold = 0.25; if (UI._trHold > 0) UI._trHold -= dt; else tr = Math.max(hpk, tr - dt * 1.1); }
+      UI._tr = tr; sStyle(e.hpTrail, 'width', (tr * 100).toFixed(2) + '%'); }
     lastHp = P.hp;
     { const hk = Math.ceil(Math.max(0, P.hp)) + '|' + st.maxHp + '|' + (P.os > 0.5 ? Math.ceil(P.os) : 0) + '|' + (P.revives || 0); if (UI._hk !== hk) { UI._hk = hk; e.hpText.innerHTML = `${Math.ceil(Math.max(0, P.hp))}<small> / ${st.maxHp}</small>${P.os > 0.5 ? ` <span class="os-num" title="オーバーシールド">${G.Icons ? G.Icons.html('ui:os') : '🛡'}+${Math.ceil(P.os)}</span>` : ''} <span class="revives" title="魂の灯火（死亡時に燃えて復活する）">🪔×${P.revives || 0}</span>`; } }
     sStyle(e.osFill, 'width', Math.min(100, P.os / Math.max(50, st.maxHp) * 100).toFixed(1) + '%');

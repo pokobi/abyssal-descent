@@ -1322,3 +1322,5 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 .pw-row { padding: 9px 13px; gap: 13px; }
 .pw-row .pw-ic { font-size: 28px; width: 36px; }
 .pw-row .pw-t small { font-size: 12px; }
+
+#hp-trail { transition: none; } /* the damage trail is animated from ui.js */

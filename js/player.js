@@ -1,6 +1,9 @@
 'use strict';
 // First-person player: movement (walk/sprint/crouch/slide/jump/mantle), grapple, pile driver, camera feel, stats.
 (function () {
+  // the grapple's cooldown: 15 s, shortened by the grapple-cooldown stat (never below 15% of that)
+  G.GRAPPLE_CD = 15;
+  G.grappleCdOf = (st) => G.GRAPPLE_CD * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0)));
   const U = G.U, I = G.input;
   const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   const BASE = {
@@ -652,7 +655,7 @@
       } else if (gr.state === 'reelEnemy') {
         gr.t += dt;
         const e = gr.enemy;
-        if (!e || !e.alive || gr.t > 0.6) { gr.state = 'retract'; this.grappleCd = 3 * (1 - st.grappleCd); }
+        if (!e || !e.alive || gr.t > 0.6) { gr.state = 'retract'; this.grappleCd = G.grappleCdOf(st); }
         else {
           const toMe = this.pos.clone().sub(e.pos); toMe.y = 0;
           if (toMe.length() > 2.2) e.pos.addScaledVector(toMe.normalize(), 28 * dt);
@@ -699,7 +702,7 @@
       if (gr.state === 'attached' && jumpBoost) { this.vel.y = Math.max(this.vel.y, 0) + 6.5; G.sfx.jump(); }
       gr.state = 'retract';
       gr.endT = G.game.time;
-      this.grappleCd = 3.2 * (1 - this.stats.grappleCd);
+      this.grappleCd = G.grappleCdOf(this.stats);
     }
 
     // ---- pile driver (innate, upgradable) ----

@@ -288,7 +288,7 @@
       sText(el._cnt || (el._cnt = el.querySelector('.cnt')), (sk.maxCharges ? sk.charges + '/' + sk.maxCharges : '') + (sk.lv ? ' Lv' + sk.lv : ''));
       const bar = el._bar || (el._bar = el.querySelector('.bar')); sStyle(bar, 'width', sk.maxCharges && sk.charges < sk.maxCharges ? ((1 - sk.cd / Math.max(0.01, sk.maxCd)) * 100).toFixed(1) + '%' : '0');
     }
-    const gcd = P.grappleCd, gmax = 3.2 * (1 - st.grappleCd);
+    const gcd = P.grappleCd, gmax = G.grappleCdOf(st);
     setCd(UI.grEl, gcd / Math.max(0.01, gmax), gcd, gcd <= 0);
     sClass(UI.grEl, 'active-on', P.grapple.state === 'attached');
     const pmax = P.pileCdMax();

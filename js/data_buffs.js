@@ -170,6 +170,14 @@
   add('m_grapdmg', '鉤縄の一撃', '⚓', 'rare', 'mobility', 'グラップル中と解除後2秒間、与ダメ+30%。', { hooks: { preHit(c) { if (P.grapple.state === 'attached' || G.game.time - P.grapple.endT < 2) c.bonus += 0.3; } } });
   add('m_grapenemy', '獲物の鉤爪', '🪝', 'epic', 'mobility', '敵にグラップル可能。命中した敵を引き寄せてダメージ＋スタン。', { flag: true });
   add('m_graprange', '長鎖', '⛓️', 'common', 'mobility', 'グラップル射程+15m。', { mods: { grappleRange: 15 }, max: 2 });
+  // ---- grapple (its cooldown is 15 s by default, so these matter) ----
+  add('g_oil', '鉤縄の油', '🛢️', 'uncommon', 'mobility', 'グラップルのクールタイム-25%。', { mods: { grappleCd: 0.25 }, max: 3 });
+  add('g_recoil', '反動利用', '🏹', 'uncommon', 'mobility', 'グラップル使用時、4秒間 与ダメ+20%。', { max: 2, hooks: { onGrapple(c, n) { C.temp('g_recoil', 4, { dmg: 0.2 * n }, '🏹'); } } });
+  add('g_gale', '疾風の鉤', '🌬️', 'uncommon', 'mobility', 'グラップル使用時、4秒間 移動速度+30%。', { hooks: { onGrapple() { C.temp('g_gale', 4, { moveSpeed: 0.3 }, '🌬️'); } } });
+  add('g_wave', '鉤縄衝撃', '💥', 'rare', 'mobility', 'グラップル使用時、周囲5mに衝撃波（ダメージ＋ノックバック）。', { max: 2, hooks: { onGrapple(c, n) { C.explode(P.pos.clone().setY(P.pos.y + 0.8), 5, sc(60 * n), { src: 'buff', proc: true, knock: 8, color: 0xbfd8ff }); } } });
+  add('g_guard', '鉤縄の加護', '🛡️', 'rare', 'mobility', 'グラップル使用時、オーバーシールド+25（最大60）。', { hooks: { onGrapple() { C.overshield(25, 60); } } });
+  add('g_aerial', '空中戦の流儀', '🕊️', 'epic', 'mobility', 'グラップルで移動している最中に敵を倒すと、グラップルのクールタイムを即リセット。', { hooks: { onKill() { const g = P.grapple; if (g && (g.state === 'attached' || g.state === 'firing' || g.state === 'retract' || (G.game.time - (g.endT || -10)) < 3)) { P.grappleCd = 0; G.ui.toastSmall('⚓ グラップル再使用可能'); } } } });
+  add('g_twin', '双鉤', '⚓', 'legendary', 'mobility', 'グラップルのクールタイム-40%・射程+10m・巻き取り速度+25%。', { mods: { grappleCd: 0.4, grappleRange: 10, grappleSpeed: 0.25 } });
   add('m_grapspeed', '巻上げ機', '⚙️', 'uncommon', 'mobility', 'グラップルの巻き取り速度+35%。', { mods: { grappleSpeed: 0.35 }, max: 2 });
   add('m_grapshield', '吊り盾', '💠', 'uncommon', 'defense', 'グラップル開始時、オーバーシールド+15（最大60）。', { hooks: { onGrapple() { C.overshield(15, 60); } } });
   add('m_momentum', '疾走の勢い', '🚀', 'rare', 'mobility', '秒速11m以上で移動中、与ダメ+20%・被ダメ-15%。', { hooks: { preHit(c) { if (P.speedH > 11) c.bonus += 0.2; }, preDamaged(c) { if (P.speedH > 11) c.red += 0.15; } } });

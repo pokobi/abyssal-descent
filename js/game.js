@@ -58,6 +58,11 @@
       const invReady = () => GM.state === 'playing' || GM.state === 'resuming' || (GM.state === 'paused' && !!document.querySelector('#screens .clicklock'));
       if ((G.BIND.status.includes(e.code) || G.BIND.inventory.includes(e.code)) && invReady()) { e.preventDefault(); if (!e.repeat && G.InvUI && !G.InvUI.isOpen()) { if (GM.state !== 'playing') { GM.state = 'playing'; G.ui.clearScreen(); } G.InvUI.open(null); } return; }
       if (e.code === 'Escape' && (GM.state === 'buff')) e.preventDefault();
+      // Esc on a menu that can simply be left (a choice / shop / event panel, or the pause menu) goes back to the game
+      if (e.code === 'Escape' && !e.repeat) {
+        const cancel = GM.state === 'modal' ? document.querySelector('#screens #c-cancel') : GM.state === 'paused' ? document.querySelector('#screens #p-resume') : null;
+        if (cancel) { e.preventDefault(); GM.escCloseT = performance.now(); cancel.click(); }
+      }
       // I = pause menu toggle (Esc sometimes gets swallowed by the browser while the pointer is locked)
       if (e.code === 'KeyI' && !e.repeat && !(e.target && e.target.tagName === 'INPUT')) {
         if (GM.state === 'playing') { e.preventDefault(); GM.state = 'paused'; I.exitLock(); G.ui.statusOverlay(false); G.ui.pause(); }
@@ -1719,6 +1724,9 @@
   function onLock(locked) {
     if (locked) {
       if (GM.state === 'paused' || GM.state === 'resuming' || GM.state === 'buff' || GM.state === 'modal') { GM.state = 'playing'; G.ui.clearScreen(); G.sfx.resume(); }
+    } else if ((GM.state === 'playing' || GM.state === 'resuming') && performance.now() - (GM.escCloseT || -1e9) < 900) {
+      // Esc closed a screen and the browser dropped the lock again together with fullscreen: take the lock back instead of showing the pause menu
+      GM.escCloseT = 0; setTimeout(() => { if ((GM.state === 'playing' || GM.state === 'resuming') && !I.locked) I.requestLock(); }, 120);
     } else if (GM.state === 'playing') pause();
   }
   GM.debug = /debug/.test(location.search);

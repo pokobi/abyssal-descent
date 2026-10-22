@@ -478,7 +478,7 @@
   window.addEventListener('keydown', (e) => {
     if (!root) return;
     if (drag && e.code === 'KeyR' && drag.f.it) { e.preventDefault(); e.stopPropagation(); drag.rot = !drag.rot; moveGhost(drag.x, drag.y); return; }
-    if (e.code === 'Escape' || G.BIND.status.includes(e.code) || (G.BIND.inventory && G.BIND.inventory.includes(e.code)) || (IV.openCont && G.BIND.interact.includes(e.code))) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) UIV.close(); }
+    if (e.code === 'Escape' || G.BIND.status.includes(e.code) || (G.BIND.inventory && G.BIND.inventory.includes(e.code)) || (IV.openCont && G.BIND.interact.includes(e.code))) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) { if (e.code === 'Escape') G.game.escCloseT = performance.now(); UIV.close(); } }
   }, true);
 
   // ---------------- context menu ----------------

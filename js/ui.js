@@ -728,28 +728,47 @@
   // ---- difficulty select (new run) ----
   UI.difficulty = function (onPick, back) {
     const R = G.Run, D = R.DIFFS, rec = R.rec();
-    let xlv = Math.max(1, R.maxExtra());
+    const canExtra = R.unlocked('extra', 1); // extra stays hidden until hard has been cleared
+    let xlv = Math.max(1, R.maxExtra()), extra = false, drone = null;
     const card = (id) => {
-      const d = D[id], open = id !== 'extra' || R.unlocked('extra', 1);
+      const d = D[id];
       const cleared = id === 'extra' ? Object.keys(rec).filter((k) => /^extra\d+$/.test(k)).length : rec[id];
-      return `<div class="df-card${open ? '' : ' locked'}" data-id="${id}" style="--dc:${d.col}">
-        <div class="df-ic">${open ? d.icon : '🔒'}</div><div class="df-en">${d.en}</div><div class="df-name">${d.name}${cleared ? '<span class="df-clr">CLEAR</span>' : ''}</div>
-        <div class="df-desc">${open ? d.desc : 'ハードをクリアすると解放'}</div>
+      const sw = id === 'hard' && canExtra ? `<button class="df-up" data-sw="1">▲ 裏難易度<small>上げる</small></button>` : id === 'extra' ? `<button class="df-up down" data-sw="0">▼ ハードへ戻る</button>` : '';
+      return `<div class="df-card${id === 'extra' ? ' extra' : ''}" data-id="${id}" style="--dc:${d.col}">
+        ${id === 'extra' ? '<div class="df-flame"></div>' : ''}
+        <div class="df-ic">${d.icon}</div><div class="df-en">${d.en}</div><div class="df-name">${d.name}${cleared ? '<span class="df-clr">CLEAR</span>' : ''}</div>
+        <div class="df-desc">${d.desc}</div>
         <div class="df-meta">全${d.areas}エリア・ボス${d.areas / 6}体</div>
-        ${id === 'extra' && open ? `<div class="df-lv"><button class="btn small" data-x="-1">◀</button><b id="df-xlv">エクストラ ${xlv}</b><button class="btn small" data-x="1">▶</button></div><div class="df-meta" id="df-xmul"></div>` : ''}
+        ${id === 'extra' ? `<div class="df-lv"><button class="btn small" data-x="-1">◀</button><b id="df-xlv">エクストラ ${xlv}</b><button class="btn small" data-x="1">▶</button></div><div class="df-meta" id="df-xmul"></div>` : ''}
+        ${sw}
       </div>`;
     };
-    const s = UI.screen(`<div class="df-wrap"><h2 class="df-title">難易度を選択</h2><div class="df-cards">${['easy', 'normal', 'hard', 'extra'].map(card).join('')}</div>
-      <div style="text-align:center;margin-top:18px"><button class="btn" id="df-back">↩ 戻る</button></div></div>`);
-    const upd = () => { const b = s.querySelector('#df-xlv'); if (b) { b.textContent = `エクストラ ${xlv}`; s.querySelector('#df-xmul').textContent = xlv >= 10 ? '至高の試練' : ''; } };
-    upd();
-    s.querySelectorAll('[data-x]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const nx = xlv + (+b.dataset.x); if (nx >= 1 && nx <= R.maxExtra()) { xlv = nx; upd(); G.sfx.ui('click'); } else G.sfx.ui('deny'); });
-    s.querySelectorAll('.df-card').forEach((c) => c.onclick = () => {
-      const id = c.dataset.id;
-      if (c.classList.contains('locked')) { G.sfx.ui('deny'); return; }
-      G.sfx.ui('select'); onPick({ id, lv: id === 'extra' ? xlv : 0 });
-    });
-    s.querySelector('#df-back').onclick = () => { G.sfx.ui('click'); back(); };
+    const s = UI.screen(`<div class="df-wrap"><h2 class="df-title">難易度を選択</h2><div class="df-cards"></div>
+      <div style="text-align:center;margin-top:22px"><button class="btn" id="df-back">↩ 戻る</button></div></div>`);
+    const cardsEl = s.querySelector('.df-cards'), wrap = s.querySelector('.df-wrap');
+    const stopDrone = () => { if (drone) { drone.stop(); drone = null; } };
+    const render = () => {
+      cardsEl.innerHTML = ['easy', 'normal', extra ? 'extra' : 'hard'].map(card).join('');
+      s.classList.toggle('df-hell', extra);
+      const upd = () => { const b = s.querySelector('#df-xlv'); if (b) { b.textContent = `エクストラ ${xlv}`; s.querySelector('#df-xmul').textContent = xlv >= 10 ? '至高の試練' : ''; } };
+      upd();
+      s.querySelectorAll('[data-x]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const nx = xlv + (+b.dataset.x); if (nx >= 1 && nx <= R.maxExtra()) { xlv = nx; upd(); G.sfx.ui('click'); G.sfx.heartbeat && G.sfx.heartbeat(0.8); } else G.sfx.ui('deny'); });
+      s.querySelectorAll('[data-sw]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); setExtra(b.dataset.sw === '1'); });
+      cardsEl.querySelectorAll('.df-card').forEach((c) => c.onclick = () => {
+        const id = c.dataset.id; G.sfx.ui('select'); stopDrone(); onPick({ id, lv: id === 'extra' ? xlv : 0 });
+      });
+    };
+    const setExtra = (on) => {
+      extra = on; render();
+      if (on) {
+        G.sfx.rumble && G.sfx.rumble(2.4, 1); G.sfx.death && G.sfx.death(); G.sfx.heartbeat && G.sfx.heartbeat(1.2);
+        setTimeout(() => G.sfx.heartbeat && extra && G.sfx.heartbeat(1), 700);
+        if (!drone && G.sfx.drone) { drone = G.sfx.drone(); drone.set(1); }
+        wrap.classList.remove('df-shake'); void wrap.offsetWidth; wrap.classList.add('df-shake');
+      } else { stopDrone(); G.sfx.ui('click'); }
+    };
+    render();
+    s.querySelector('#df-back').onclick = () => { G.sfx.ui('click'); stopDrone(); back(); };
   };
   UI.victory = function (o) {
     const r = G.game.run, R = G.Run;

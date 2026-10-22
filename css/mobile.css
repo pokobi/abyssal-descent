@@ -91,5 +91,12 @@ html.m #screens { position: absolute; inset: 0; z-index: 30; pointer-events: non
 /* the menu layer itself lets touches through, but every open screen takes them (as on the PC) and scrolls if it is taller than the phone */
 html.m #screens > .screen { pointer-events: auto; overflow-y: auto; overflow-x: hidden; align-items: safe center; -webkit-overflow-scrolling: touch; }
 /* difficulty: the four cards side by side so they fit a landscape phone */
-html.m .df-cards { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+html.m .df-cards { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 10px !important; }
+html.m .df-card { padding: 12px 10px !important; }
+html.m .df-card .df-ic { font-size: 34px !important; }
+html.m .df-card .df-en { font-size: 13px !important; letter-spacing: 3px !important; }
+html.m .df-card .df-name { font-size: 18px !important; }
+html.m .df-card .df-desc { font-size: 11px !important; margin: 6px 0 !important; }
+html.m .df-card .df-meta { font-size: 10px !important; }
+html.m .df-up { font-size: 12px !important; padding: 6px !important; margin-top: 8px !important; }
 html.m .df-card .df-desc { min-height: 0; }

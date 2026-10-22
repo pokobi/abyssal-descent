@@ -1292,6 +1292,20 @@
       beam.position.y = top + 20; beam.renderOrder = 6; beam.raycast = () => {}; this.model.group.add(beam);
       this.tgtFx = { om, beam, col };
     }
+    // the hunt / champion highlight (outline, sky beam, curse ring) goes out once the body has been searched
+    clearTarget() {
+      const f = this.tgtFx;
+      if (f) {
+        const hulls = []; this.model.group.traverse((o) => { if (o.userData && o.userData.tgtHull) hulls.push(o); });
+        for (const h of hulls) if (h.parent) h.parent.remove(h);
+        if (f.beam && f.beam.parent) f.beam.parent.remove(f.beam);
+        if (f.beam) { f.beam.geometry.dispose(); f.beam.material.dispose(); }
+        if (f.om) f.om.dispose();
+        this.tgtFx = null;
+      }
+      if (this.cursedRing && this.cursedRing.parent) { this.cursedRing.parent.remove(this.cursedRing); this.cursedRing = null; }
+      this.marked = false; this.champion = false;
+    }
     makeCurseRing(col) {
       if (this.cursedRing) return;
       const r = this.radius;

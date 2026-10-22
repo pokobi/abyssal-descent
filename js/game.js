@@ -1465,7 +1465,7 @@
       G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `死体を漁る — ${GM.searchDur(2).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? '中身を確認できる' : '一度押すと漁り始める。', action: c.searched ? '開く' : S ? '漁っている…' : '漁る' });
       if (I.hit('interact') && !S) {
         if (c.searched) G.InvUI.open(c.cont, c);
-        else GM.startSearch(c, e.pos.clone().setY(e.pos.y + 0.45), 2, '💀', () => { c.searched = true; G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '死体を漁っている…');
+        else GM.startSearch(c, e.pos.clone().setY(e.pos.y + 0.45), 2, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '死体を漁っている…');
       }
       return;
     } else if (best.type === 'loot') {

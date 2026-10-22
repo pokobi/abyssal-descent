@@ -51,9 +51,10 @@ window.G = window.G || {};
   };
   G.RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
   // rarity weight scaled by progress & luck
-  G.rarityWeight = (r, area, luck) => {
+  G.rarityWeight = (r, area, luck) => G.rarityWeightD(r, G.Run && G.game && G.game.run ? G.Run.depthArea(area || 1) : (area || 1), luck);
+  // the same, for an explicit depth (drops use their own "loot depth", see runplan.js)
+  G.rarityWeightD = (r, d, luck) => {
     const t = G.RARITY[r].tier;
-    const d = G.Run && G.game && G.game.run ? G.Run.depthArea(area || 1) : (area || 1);
     const prog = Math.min(1, d / 30);
     // epic and legendary only show up deep down: epic from about depth 7 (fully open at 22), legendary from 15 (fully open at 34)
     const ramp = (a, b) => Math.max(0, Math.min(1, (d - a) / (b - a)));

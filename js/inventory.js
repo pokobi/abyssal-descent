@@ -78,7 +78,7 @@
   IV.value = function (it) {
     const d = IV.def(it); if (!d) return 0;
     const R = G.Pawn ? G.Pawn.RATE : 0.4;
-    if (it.type === 'valuable') return d.value * it.n;
+    if (it.type === 'valuable') return Math.max(1, Math.round(d.value * it.n * (G.Run ? G.Run.valuableMul() : 1)));
     if (it.type === 'armor') return Math.max(5, Math.round(d.price * R * (1 + 0.15 * (it.ench ? it.ench.length : 0)) * (0.2 + 0.8 * IV.durFrac(it)) / 5) * 5); // the more worn, the less it sells for
     return Math.max(1, Math.round((d.price || 0) * R / 5) * 5) * it.n;
   };
@@ -275,7 +275,7 @@
 
   // ---------------- loot tables ----------------
   const pickR = (W) => { let t = 0; for (const k in W) t += W[k]; let x = Math.random() * t; for (const k in W) { x -= W[k]; if (x <= 0) return k; } return Object.keys(W)[0]; };
-  const rarityW = (luck, floor) => Object.fromEntries(G.RARITY_ORDER.map((r) => [r, G.RARITY[r].tier < (floor || 0) ? 0 : G.rarityWeight(r, G.Run ? G.Run.depthArea(G.game.area) : G.game.area, luck)]));
+  const rarityW = (luck, floor) => Object.fromEntries(G.RARITY_ORDER.map((r) => [r, G.RARITY[r].tier < (floor || 0) ? 0 : G.rarityWeightD(r, G.Run ? G.Run.lootDepth(G.game.area) : G.game.area, luck)]));
   const pickOf = (arr, r) => { let c = arr.filter((o) => o.rarity === r); if (!c.length) c = arr; return G.thinFairy(() => c[Math.floor(Math.random() * c.length)]); };
   // one random thing of a kind
   IV.rollThing = function (kind, luck, floor) {
@@ -289,7 +289,7 @@
   };
   const KIND_W = { chest: { item: 30, grenade: 10, valuable: 32, armor: 18, att: 10 }, corpse: { item: 32, grenade: 10, valuable: 40, armor: 18 } };
   IV.fill = function (c, n, src, luck, floor) {
-    for (let i = 0; i < n; i++) { const it = IV.rollThing(pickR(KIND_W[src]), luck, i === 0 ? floor : 0); IV.put(c, it); }
+    for (let i = 0; i < n; i++) { const kw = Object.assign({}, KIND_W[src]); if (G.Run) kw.valuable *= G.Run.valuableShare(); const it = IV.rollThing(pickR(kw), luck, i === 0 ? floor : 0); IV.put(c, it); }
     return c;
   };
   // chests: plain 4x3 / fine 5x4 / ornate 6x5; contents grow with the grade and depth

@@ -215,7 +215,7 @@
   add('e_reroll', '運命の再配', '🎲', 'uncommon', 'economy', '加護選択時にリロールが1回可能になる。', { mods: { buffRerolls: 1 }, max: 3 });
   add('e_luck', '幸運', '🍀', 'uncommon', 'economy', '高レアリティの加護・商品が出やすくなる。', { mods: { luck: 0.35 }, max: 3 });
   add('e_treasure', '宝探し', '🗺️', 'uncommon', 'economy', '各エリアに宝箱が1つ追加される。', { mods: { extraChests: 1 }, max: 3 });
-  add('e_chestbonus', '宝箱の主', '📦', 'common', 'economy', '宝箱の中身が高レアリティになりやすい（幸運+0.5相当・宝箱のみ）。', { mods: { chestBonus: 0.5 }, max: 3 });
+  add('e_chestbonus', '宝箱の主', '📦', 'common', 'economy', '宝箱から得られるコイン+50%、中身も高レアリティになりやすい（宝箱のみ・幸運+0.5相当）。', { mods: { chestBonus: 0.5 }, max: 3 });
   add('e_speedrun', '速攻', '⏱️', 'uncommon', 'economy', '速攻クリアボーナスが2倍。', { flag: true });
   add('e_flawless', '無傷の誇り', '🏅', 'uncommon', 'economy', '無傷クリアボーナスが2倍、無傷クリア毎に最大HP+3。', { hooks: { onAreaClear(c) { if (c.flawless) { P.permMaxHp += 3; P.recalc(); } } } });
   add('e_free', '常連客', '🎁', 'epic', 'economy', 'ショップの商品が1つ無料になる（エリアごとに1回・リロールでは増えない）。', { flag: true });

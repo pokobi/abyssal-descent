@@ -729,7 +729,7 @@
   UI.difficulty = function (onPick, back) {
     const R = G.Run, D = R.DIFFS, rec = R.rec();
     const canExtra = R.unlocked('extra', 1); // extra stays hidden until hard has been cleared
-    let xlv = Math.max(1, R.maxExtra()), extra = false, drone = null, ash = null;
+    let xlv = Math.max(1, R.maxExtra()), extra = false, drone = null;
     const lvK = () => (xlv - 1) / 9; // 0 .. 1 over extra 1 .. 10
     const card = (id) => {
       const d = D[id];
@@ -747,33 +747,18 @@
     const s = UI.screen(`<div class="df-wrap"><h2 class="df-title">難易度を選択</h2><div class="df-cards"></div>
       <div style="text-align:center;margin-top:22px"><button class="btn" id="df-back">↩ 戻る</button></div></div>`);
     const cardsEl = s.querySelector('.df-cards'), wrap = s.querySelector('.df-wrap');
-    const stopDrone = () => { if (drone) { drone.stop(); drone = null; } if (ash) { ash.stop = true; ash.cv.remove(); ash = null; } };
-    // the backdrop of the hidden mode: no colour wash, just a darkening world with ash drifting down; more, heavier and slower to settle at higher levels
-    const startAsh = () => {
-      if (ash) return;
-      const cv = document.createElement('canvas'); cv.className = 'df-ash'; s.insertBefore(cv, s.firstChild);
-      const st = ash = { cv, stop: false, p: [] }, g = cv.getContext('2d');
-      const fit = () => { cv.width = Math.max(2, innerWidth >> 1); cv.height = Math.max(2, innerHeight >> 1); };
-      fit();
-      let last = performance.now();
-      const frame = (now) => {
-        if (st.stop || !cv.isConnected) return;
-        const dt = Math.min(0.05, (now - last) / 1000); last = now;
-        const k = lvK(), want = Math.round(40 + k * 150);
-        while (st.p.length < want) st.p.push({ x: Math.random() * cv.width, y: Math.random() * cv.height, r: 0.6 + Math.random() * (1.2 + k * 1.4), v: 6 + Math.random() * 10, dr: (Math.random() - 0.5) * 6, a: 0.12 + Math.random() * 0.35 });
-        if (st.p.length > want) st.p.length = want;
-        g.clearRect(0, 0, cv.width, cv.height);
-        for (const q of st.p) {
-          q.y += q.v * (0.6 + k * 0.9) * dt; q.x += q.dr * dt;
-          if (q.y > cv.height + 4) { q.y = -4; q.x = Math.random() * cv.width; }
-          g.fillStyle = `rgba(${150 - k * 40},${140 - k * 50},${135 - k * 50},${q.a})`;
-          g.fillRect(q.x, q.y, q.r, q.r * (1 + k));
-        }
-        requestAnimationFrame(frame);
-      };
-      requestAnimationFrame(frame);
+    const stopDrone = () => { if (drone) { drone.stop(); drone = null; } grade(false); if (watch) { clearInterval(watch); watch = null; } };
+    // the backdrop of the hidden mode is the ordinary scene, graded: darker and harder-contrast the higher the level (no replacement picture)
+    const cvs = () => G.renderer && G.renderer.domElement;
+    const grade = (on) => {
+      const c = cvs(); if (!c) return;
+      if (!on) { c.style.filter = ''; c.style.transition = ''; return; }
+      const k = lvK();
+      c.style.transition = 'filter 0.8s ease';
+      c.style.filter = `brightness(${(0.72 - k * 0.27).toFixed(2)}) contrast(${(1.2 + k * 0.35).toFixed(2)}) saturate(${(0.85 - k * 0.3).toFixed(2)})`;
     };
-    const applyLevel = () => { const k = lvK(); s.style.setProperty('--hk', k.toFixed(3)); };
+    let watch = null;
+    const applyLevel = () => { const k = lvK(); s.style.setProperty('--hk', k.toFixed(3)); if (extra) grade(true); };
     const render = () => {
       cardsEl.innerHTML = ['easy', 'normal', extra ? 'extra' : 'hard'].map(card).join('');
       s.classList.toggle('df-hell', extra); applyLevel();
@@ -790,8 +775,8 @@
       if (on) {
         if (G.sfx.hellSting) G.sfx.hellSting(lvK());
         if (!drone && G.sfx.hellDrone) drone = G.sfx.hellDrone(lvK());
-        startAsh();
-        wrap.classList.remove('df-shake'); void wrap.offsetWidth; wrap.classList.add('df-shake');
+        grade(true);
+        if (!watch) watch = setInterval(() => { if (!s.isConnected) stopDrone(); }, 300); // the screen was closed some other way: undo the grading
       } else { stopDrone(); G.sfx.ui('click'); }
     };
     render();

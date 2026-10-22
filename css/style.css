@@ -1308,9 +1308,5 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 @keyframes dfPulse { 0%, 100% { box-shadow: 0 0 22px rgba(224,40,64,0.55), 0 0 60px rgba(160,0,30,0.4); } 50% { box-shadow: 0 0 40px rgba(255,50,70,0.9), 0 0 110px rgba(200,0,40,0.65); } }
 @keyframes dfFlame { from { transform: scaleY(0.85) translateY(6px); opacity: 0.75; } to { transform: scaleY(1.15) translateY(-8px); opacity: 1; } }
 @keyframes dfFlick { 0% { opacity: 0.45; } 100% { opacity: 0.75; } }
-@keyframes dfShake { 0% { transform: translate(0,0); } 15% { transform: translate(-7px, 4px); } 30% { transform: translate(6px, -5px); } 45% { transform: translate(-5px, -3px); } 60% { transform: translate(4px, 4px); } 80% { transform: translate(-2px, 1px); } 100% { transform: translate(0,0); } }
-.df-wrap.df-shake { animation: dfShake 0.55s ease-out; }
-.df-hell { --hk: 0; background: radial-gradient(ellipse at 50% 45%, rgb(calc(20 - var(--hk) * 12), calc(14 - var(--hk) * 9), calc(15 - var(--hk) * 10)) 0%, rgb(calc(8 - var(--hk) * 6), calc(5 - var(--hk) * 4), calc(6 - var(--hk) * 5)) 70%, #020001 100%) !important; }
-.df-hell .df-title { color: #c8a0a0; text-shadow: none; letter-spacing: calc(6px + var(--hk) * 8px); transition: letter-spacing 0.6s; }
-.df-ash { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; image-rendering: pixelated; }
-.df-hell .df-wrap { position: relative; z-index: 1; }
+.df-hell { --hk: 0; background: transparent !important; }
+.df-hell .df-title { color: #d8b8b8; letter-spacing: calc(6px + var(--hk) * 8px); transition: letter-spacing 0.6s; }

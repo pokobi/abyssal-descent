@@ -108,7 +108,7 @@
     const p0 = d.p, p = A.scaleP(sk);
     const baseCd = ult ? d.cd : d.cd * A.SKILL_CD_MUL, cd = A.cdOf(sk);
     const powBase = ult ? 1 : A.SKILL_POW_MUL;
-    const pow = (ult ? A.ultPower(sk) : A.power(sk)) * (1 + st.skillDmg + (ult ? st.ultDmg || 0 : 0));
+    const pow = (ult ? A.ultPower(sk) : A.power(sk)) * (1 + st.dmg + st.skillDmg + (ult ? st.ultDmg || 0 : 0)); // 与ダメ and スキルダメージ add up, as in C.damageEnemy
     const hasPow = POW_K.some((k) => p0[k] != null) || /ダメージ|焼|撃|爆/.test(d.desc);
     const line = [`<span><label>クールタイム</label>${dv(cd, baseCd, { unit: '秒', lowerBetter: true })}</span>`];
     if (hasPow) line.push(`<span><label>威力</label>${dv(pow * 100, powBase * 100, { unit: '%', dec: 0 })}</span>`);
@@ -140,7 +140,8 @@
       ${augs.length ? `<div class="sc-a">${augs.map(([id, n]) => { const b = G.BUFF_BY_ID[id]; return `<span ${UI.tipAttr(b)} style="--rc:${R(b.rarity)}">${b.icon}${n > 1 ? `<sub>${n}</sub>` : ''}</span>`; }).join('')}</div>` : ''}</div>`;
   }
   function pileCard() {
-    const pi = P.pileInfo();
+    const pi = P.pileInfo(), pk = 1 + (P.stats.dmg || 0) + (P.stats.skillDmg || 0); // the shockwave is a skill hit: 与ダメ + スキルダメージ apply
+    pi.dmg *= pk; pi.dmgMax *= pk;
     return `<div class="sc" style="--rc:var(--gold2)">
       <div class="sc-h"><span class="key">${G.input.keyName('crouch')}</span><span class="ic">🔨</span><span class="nm">パイルドライバー${pi.lvl ? `<b class="lv">Lv${pi.lvl}</b>` : ''}</span><span class="st ${P.pileReady() ? 'ok' : ''}">${P.pileReady() ? 'READY' : Math.ceil(P.pileCd) + '秒'}</span></div>
       <div class="sc-l"><span><label>クールタイム</label>${dv(pi.cd, 8, { unit: '秒', lowerBetter: true })}</span><span><label>威力</label>${dv(pi.dmg, 120, { dec: 0 })}</span><span><label>範囲</label>${dv(pi.radius, 5.5, { unit: 'm' })}</span></div>

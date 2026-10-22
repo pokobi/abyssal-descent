@@ -143,7 +143,7 @@
     const vals = p.bag.items.filter((o) => o.type === 'valuable');
     const valSum = vals.reduce((s, o) => s + IV.value(o), 0);
     GM().state = 'modal'; G.input.exitLock();
-    const s = G.ui.screen(`<div class="panel pw-panel" style="width:min(820px,96vw)">
+    const s = G.ui.screen(`<div class="panel pw-panel" style="width:min(940px,96vw)">
       <div class="pw-head"><h2>⚖️ 買取屋</h2><span>買値の<b>${Math.round(PW.RATE * 100)}%</b>で買い取る（金品は満額）</span>${G.ui.coinBox()}</div>
       <div class="pw-tabs">${CATS.map(([k, n]) => { const c = k === 'all' ? all.length : all.filter((r) => r.cat === k).length; return `<span class="pw-tab${PW.tab === k ? ' on' : ''}${c ? '' : ' none'}" data-t="${k}">${n} <small>${c}</small></span>`; }).join('')}</div>
       <div class="pw-bulk"><button class="btn${vals.length ? ' primary' : ''}" id="pw-vals" ${vals.length ? '' : 'disabled'}>💰 金品を一括売却（${vals.length}点 +${fmt(valSum)}🪙）</button></div>

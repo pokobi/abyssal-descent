@@ -1202,9 +1202,9 @@ body.inv-loot #inv-ui { background: radial-gradient(ellipse at center, rgba(28,2
 .iv-eqgrid .iv-eq.head { grid-column: 1 / -1; height: calc(var(--cs) * 1.5); }
 
 /* money box: shop / pawn / vending stone screens */
-.coinbox { display: inline-flex; align-items: center; gap: 0.5em; padding: 0.3em 0.9em; font-size: 20px; color: #ffe9a8; background: linear-gradient(180deg, rgba(96,64,10,0.95), rgba(40,26,6,0.97)); border: 2px solid #e8b860; border-radius: 8px; box-shadow: 0 0 16px rgba(232,184,96,0.45), inset 0 0 10px rgba(255,220,120,0.22); white-space: nowrap; }
-.coinbox b { font-size: 1.25em; font-weight: 900; text-shadow: 0 0 6px rgba(255,200,80,0.6); }
-.coinbox small { font-size: 0.5em; letter-spacing: 0.12em; opacity: 0.8; }
+.coinbox { display: inline-flex; align-items: baseline; gap: 0.45em; padding: 0.15em 0.2em; font-size: 16px; color: #cdbf9c; background: none; border: none; border-bottom: 1px solid rgba(205,191,156,0.25); border-radius: 0; box-shadow: none; white-space: nowrap; }
+.coinbox b { font-size: 1.1em; font-weight: 700; text-shadow: none; }
+.coinbox small { font-size: 0.7em; letter-spacing: 0.1em; opacity: 0.7; }
 .coinbox.float { position: absolute; right: 34px; top: 10px; z-index: 2; font-size: 17px; }
 .pw-head { align-items: center; gap: 1em; }
 
@@ -1313,3 +1313,12 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 
 .df-cards.solo { grid-template-columns: minmax(0, 440px); justify-content: center; }
 
+
+/* pawn counter: a little larger */
+.pw-panel { font-size: 1.14em; }
+.pw-panel .pw-head span { font-size: 14px; }
+.pw-tab { padding: 5px 13px; font-size: 14.5px; }
+.pw-list { max-height: 56vh; gap: 5px; }
+.pw-row { padding: 9px 13px; gap: 13px; }
+.pw-row .pw-ic { font-size: 28px; width: 36px; }
+.pw-row .pw-t small { font-size: 12px; }

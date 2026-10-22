@@ -764,15 +764,21 @@
         const id = c.dataset.id; G.sfx.ui('select'); stopDrone(false); onPick({ id, lv: id === 'extra' ? xlv : 0 });
       });
     };
-    // switching between hard and extra fades the whole screen (UI and the world behind it) to black, swaps, and fades back in
+    // switching between hard and extra: the cards melt away (blur + shrink) while the world behind blurs and washes out, swap, then both focus back in
     let veiling = false;
     const veil = (swap) => {
       if (veiling) return; veiling = true;
-      const v = document.createElement('div'); v.className = 'df-veil'; document.body.appendChild(v); void v.offsetWidth; v.classList.add('on');
+      const c = G.renderer && G.renderer.domElement, T = 'filter 0.3s ease, transform 0.3s ease, opacity 0.3s ease';
+      wrap.style.transition = T; if (c) c.style.transition = T;
+      wrap.style.opacity = '0'; wrap.style.filter = 'blur(8px)'; wrap.style.transform = 'scale(0.96)';
+      if (c) { c.style.filter = 'blur(12px) brightness(1.5)'; c.style.transform = 'scale(1.05)'; }
       setTimeout(() => {
         swap();
-        setTimeout(() => { v.classList.remove('on'); setTimeout(() => { v.remove(); veiling = false; }, 600); }, 150);
-      }, 600);
+        wrap.style.transition = 'none'; wrap.style.transform = 'scale(1.04)'; void wrap.offsetWidth;
+        wrap.style.transition = T; wrap.style.opacity = '1'; wrap.style.filter = 'none'; wrap.style.transform = 'none';
+        if (c) { c.style.filter = ''; c.style.transform = ''; }
+        setTimeout(() => { wrap.style.transition = ''; wrap.style.filter = ''; wrap.style.transform = ''; wrap.style.opacity = ''; if (c) c.style.transition = ''; veiling = false; }, 330);
+      }, 320);
     };
     const setExtra = (on) => veil(() => {
       if (!s.isConnected) return;

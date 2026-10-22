@@ -223,6 +223,7 @@
             if (dh < 10 && r < 0.45) this.act = { k: 'sweep', t: 0 };
             else if (r < 0.75 || dh < 14) this.act = { k: 'slam', t: 0 };
             else this.act = { k: 'throw', t: 0, n: this.phase >= 2 ? 3 : 1 };
+            { const xa = BS.pickX('colossus', this, dh); if (xa) this.act = xa; } // new patterns (bosses5.js)
           }
         } else this.doAct(dt);
         for (let i = 0; i < 2; i++) { J.legs[i].rotation.x = Math.sin((this.walk || 0) + i * Math.PI) * 0.25; }
@@ -238,6 +239,7 @@
     doAct(dt) {
       const a = this.act, J = this.J; a.t += dt;
       const sp = 1 + (this.phase - 1) * 0.2;
+      if (a.k.startsWith('x_')) { if (BS.runX(this, a, dt)) { this.act = null; this.noTurnT = 1.6 / sp; this.cd = U.rand(1.2, 2) / sp; } return; }
       if (a.k === 'slam') {
         const wind = 1.3 / sp;
         if (a.t < wind) { for (const ar of J.arms) ar.sh.rotation.x = -2.8 * (a.t / wind); if (!a.tele) { a.tele = this.tele(this.pos, 6, wind, 0xd06020); G.ui.toastSmall('⚠ 衝撃波 — ジャンプで回避！'); } return; }
@@ -337,6 +339,7 @@
       this.t += dt; this.stateT -= dt;
       const sp = this.hp < this.maxHp * 0.5 ? 1.35 : 1;
       if (this.hp < this.maxHp * 0.5 && this.phase === 1) { this.phase = 2; G.ui.toast('大蛇が激昂した！', 'warn'); G.sfx.monster(this.pos, 'roar', 0.4, 1.3); }
+      BS.xTick(this, dt, 'wyrm'); // new patterns run alongside its dives (bosses5.js)
       if (this.state === 'under') {
         // travel under the floor toward the player
         const tx = P.pos.x, tz = P.pos.z;
@@ -653,6 +656,7 @@
             else if (dh > 8) this.act = { k: 'chain', t: 0 };
             else if (r < 0.5) this.act = { k: 'cleave', t: 0 };
             else this.act = { k: 'spin', t: 0 };
+            { const xa = BS.pickX('executioner', this, dh); if (xa) this.act = xa; }
           }
         } else this.doAct(dt, sp);
         for (let i = 0; i < 2; i++) J.legs[i].rotation.x = Math.sin((this.walk || 0) + i * Math.PI) * 0.35;
@@ -663,6 +667,7 @@
     }
     doAct(dt, sp) {
       const a = this.act, J = this.J; a.t += dt;
+      if (a.k.startsWith('x_')) { if (BS.runX(this, a, dt)) { this.act = null; this.cd = 1.3 / sp; } return; }
       if (a.k === 'charge') {
         const wind = 1.0 / sp;
         if (a.t < wind) {
@@ -785,6 +790,7 @@
             if (dh < 5) this.act = { k: 'bite', t: 0 };
             else if (r < 0.5) this.act = { k: 'leap', t: 0 };
             else this.act = { k: 'web', t: 0 };
+            { const xa = BS.pickX('broodmother', this, dh); if (xa) this.act = xa; }
           }
         } else this.doAct(dt, sp);
         if (this.groundT <= 0 && !this.act) { this.state = 'climb'; this.stateT = 1.5; this.from = this.pos.clone(); G.sfx.monster(this.pos, 'chitter', 0.5, 1.2); G.ui.toast('女王が巣へ退避した！ 卵嚢を壊せ！', 'warn'); }
@@ -827,6 +833,7 @@
     }
     doAct(dt, sp) {
       const a = this.act; a.t += dt;
+      if (a.k.startsWith('x_')) { if (BS.runX(this, a, dt)) { this.act = null; this.cd = 1.4 / sp; } return; }
       if (a.k === 'bite') {
         if (a.t > 0.5 && !a.hit) { a.hit = true; if (this.playerDistH() < 5.5) this.hurtPlayer(26, 'melee', null, 'poison'); G.sfx.monster(this.pos, 'hiss', 0.6, 1); }
         if (a.t > 1) { this.act = null; this.cd = 1; }

@@ -207,6 +207,8 @@
       this.main.dmgMul = (info) => (this.S.dmgMul ? this.S.dmgMul(this, info) : 1);
       this.pos.set(world.arenaCenter.x, 0, world.arenaCenter.z - 6);
       this.state = 'fight'; this.minions = []; this.totems = []; this.speedK = 1;
+      this.tempo = BS.tempo ? BS.tempo() : 1; // harder modes: everything the guardian does runs a little faster (see bosses5.js)
+      if (S.deco) S.deco(this, this.J);
       this.pose = { n: null, k: 0 };
       this.cd = 2.2;
       if (S.init) S.init(this);
@@ -229,7 +231,7 @@
       if (this.totems.length) { this.totems = this.totems.filter((t) => t.p.alive); this.main.invuln = this.totems.length > 0; if (!this.main.invuln) { G.ui.toast(S.shieldDown || '守りが崩れた — 今だ！', 'good'); G.sfx.explosion(this.pos, 0.8); } for (const t of this.totems) { t.g.rotation.y += dt; t.g.position.y = t.y + Math.sin(this.t * 2 + t.ph) * 0.3; t.p.pos.copy(t.g.position); t.p.centerRef.copy(t.g.position); t.p.hitW[0].w.copy(t.g.position); } }
       this.minions = this.minions.filter((e) => e.alive);
       const dh = this.playerDistH();
-      this.cd -= dt * this.speedK;
+      this.cd -= dt * this.speedK * this.tempo;
       if (this.graceT > 0) this.graceT -= dt;
       if (this.state === 'stunned') {
         // dazed: no moving, no attacking; stars over the head
@@ -252,11 +254,12 @@
       this.bar();
     }
     choose(dh) {
-      const S = this.S, list = S.attacks.filter((a) => (a.min ?? 0) <= dh && dh <= (a.max ?? 99) && (a.phase || 1) <= this.phase && !(a.minions && this.minions.length >= (a.cap || 4)) && !(a.k === 'shield' && this.totems.length));
+      const S = this.S, rank = BS.diffRank ? BS.diffRank() : 1, list = S.attacks.filter((a) => (a.diff || 0) <= rank && (a.min ?? 0) <= dh && dh <= (a.max ?? 99) && (a.phase || 1) <= this.phase && (!a.upto || this.phase <= a.upto) && !(a.minions && this.minions.length >= (a.cap || 4)) && !(a.k === 'shield' && this.totems.length));
       if (!list.length) { this.cd = 0.4; return; }
-      let tot = 0; for (const a of list) tot += a.w || 1;
+      const wt = (a) => (a.w || 1) * (a.heavy && BS.heavyMul ? BS.heavyMul() : 1); // heavy attacks come up more often in the harder modes
+      let tot = 0; for (const a of list) tot += wt(a);
       let x = Math.random() * tot, pick = list[0];
-      for (const a of list) { x -= a.w || 1; if (x <= 0) { pick = a; break; } }
+      for (const a of list) { x -= wt(a); if (x <= 0) { pick = a; break; } }
       this.act = Object.assign({ t: 0, step: 0 }, pick);
       this.pose = { n: pick.pose || null, k: 0, head: pick.head };
     }
@@ -265,7 +268,7 @@
     // ---------------- the attack library ----------------
     run(dt) {
       const a = this.act, P = Pl(), S = this.S;
-      a.t += dt * this.speedK;
+      a.t += dt * this.speedK * this.tempo;
       const wind = a.wind || 0.7;
       const fwd = V(Math.sin(this.yaw), 0, Math.cos(this.yaw));
       this.pose.k = Math.min(1, a.t / Math.max(0.15, wind));
@@ -279,7 +282,7 @@
             const to = P.pos.clone().sub(this.pos).setY(0), d = to.length(), ang = d > 0.01 ? to.normalize().dot(fwd) : 1;
             if (d < a.r && ang > (a.arc ?? 0.2) && P.pos.y < (a.h || 4)) { this.hit(a.dmg, 'melee', this.pos.clone(), a.elem); P.vel.addScaledVector(fwd, a.knock || 8); P.vel.y = Math.max(P.vel.y, 3); }
             G.fx.ring(this.pos.clone().addScaledVector(fwd, a.r * 0.5).setY(0.2), a.r * 0.7, a.col || 0xffa060, 0.3);
-            if (a.combo && (a.n = (a.n || 1)) < a.combo) { a.n++; a.t = wind * 0.45; a.done = false; a.tele = null; this.pose.hit = 0; break; }
+            if (a.combo && (a.n = (a.n || 1)) < a.combo + (BS.diffRank && BS.diffRank() >= 2 ? 1 : 0)) { a.n++; a.t = wind * 0.45; a.done = false; a.tele = null; this.pose.hit = 0; break; }
           }
           if (a.t > wind + (a.rec || 0.5)) this.end();
           break;
@@ -325,13 +328,13 @@
         }
         case 'volley': { // fans of projectiles at you
           if (a.t < wind) { this.face(P.pos, dt, 4); sfxW(); break; }
-          const gap = a.gap || 0.35, n = a.salvos || 1;
+          const gap = a.gap || 0.35, n = (a.salvos || 1) + (BS.diffRank && BS.diffRank() >= 3 ? 1 : 0);
           while ((a.step || 0) < n && a.t >= wind + (a.step || 0) * gap) {
             a.step = (a.step || 0) + 1;
             const from = (this.J.tip ? this.J.tip.getWorldPosition(V()) : this.pos.clone().setY(this.J.height * 0.7));
             const aim = P.chestPos().add(P.vel.clone().multiplyScalar(a.lead || 0.25));
             const dir = aim.sub(from).normalize();
-            const cnt = a.n || 3, spr = a.spread || 0.25;
+            const cnt = (a.n || 3) + (BS.diffRank && BS.diffRank() >= 2 ? 1 : 0), spr = a.spread || 0.25;
             for (let i = 0; i < cnt; i++) {
               const off = cnt === 1 ? 0 : (i - (cnt - 1) / 2) * spr / Math.max(1, cnt - 1) * 2;
               const d = dir.clone().applyAxisAngle(V(0, 1, 0), off);
@@ -439,9 +442,9 @@
           if (a.t > wind + 0.6) this.end();
           break;
         }
-        default: this.end();
+        default: if (BS.atk && BS.atk[a.k]) { if (BS.atk[a.k].call(this, a, dt, fwd)) this.end(a.recCd); } else this.end();
       }
-      if (this.act && this.act.k !== 'leap') this.hYbase = U.damp(this.hYbase || 0, 0, 6, dt);
+      if (this.act && this.act.k !== 'leap' && !(BS.atk && BS.atk[this.act.k] && BS.atk[this.act.k].air)) this.hYbase = U.damp(this.hYbase || 0, 0, 6, dt);
     }
     stunned(t) {
       this.act = null; this.cd = t; this.hYbase = 0;

@@ -153,6 +153,13 @@
       outer.visible = inner.visible = false; outer.renderOrder = inner.renderOrder = 4; scene.add(outer, inner);
       pools.tele.push({ outer, inner, t: 0, ml: 1, active: false });
     }
+    // line telegraphs (a lane on the floor: fissures, shock lines, beams)
+    pools.teleL = [];
+    for (let i = 0; i < 20; i++) {
+      const m = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, color: 0xc02010, opacity: 0.3, polygonOffset: true, polygonOffsetFactor: -2 }));
+      m.visible = false; m.renderOrder = 4; m.frustumCulled = false; scene.add(m);
+      pools.teleL.push({ m, t: 0, ml: 1, active: false });
+    }
     // beams
     pools.beam = [];
     const bg = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true); bg.rotateX(Math.PI / 2); bg.translate(0, 0, -0.5);
@@ -191,6 +198,7 @@
     FX.add.clear(); FX.flame.clear(); FX.norm.clear();
     for (const d of pools.decal) d.m.visible = false;
     for (const t of pools.tele) { t.outer.visible = t.inner.visible = false; t.active = false; }
+    for (const t of pools.teleL) { t.m.visible = false; t.active = false; }
     for (const r of pools.ring) r.m.visible = false;
     for (const b of pools.beam) b.m.visible = false;
     for (const d of pools.debris) d.m.visible = false;
@@ -368,7 +376,18 @@
     o.follow = null;
     return o;
   };
-  FX.clearTelegraphs = function () { for (const t of pools.tele) { t.outer.visible = t.inner.visible = false; t.active = false; } };
+  // a lane from a to b, `width` wide, filling in over `dur` seconds
+  FX.teleLine = function (a, b, width, dur, color) {
+    const o = pools.teleL.find((x) => !x.active) || pools.teleL[0];
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 0.01;
+    o.active = true; o.t = 0; o.ml = dur;
+    o.m.position.set((a.x + b.x) / 2, (a.y || 0) + 0.07, (a.z + b.z) / 2);
+    o.m.rotation.set(0, Math.atan2(dx, dz), 0); o.m.scale.set(width, 1, len);
+    o.m.material.color.set(color || 0xc02010); o.m.material.opacity = 0.12; o.m.visible = true;
+    return o;
+  };
+  FX.endTeleLine = function (o) { if (o) { o.active = false; o.m.visible = false; } };
+  FX.clearTelegraphs = function () { for (const t of pools.teleL) { t.m.visible = false; t.active = false; } for (const t of pools.tele) { t.outer.visible = t.inner.visible = false; t.active = false; } };
   FX.endTelegraph = function (o) { if (o) { o.active = false; o.outer.visible = o.inner.visible = false; } };
   FX.beam = function (a, b, color, width, life) {
     const o = pools.beam.find((x) => x.t <= 0) || pools.beam[0];
@@ -442,6 +461,11 @@
       o.inner.scale.setScalar(Math.max(0.01, o.r * 2 * k));
       o.outer.material.opacity = 0.6 + 0.4 * Math.sin(o.t * 20);
       if (o.t > o.ml + 0.05) FX.endTelegraph(o);
+    }
+    for (const o of pools.teleL) if (o.active) {
+      o.t += dt; const k = Math.min(1, o.t / o.ml);
+      o.m.material.opacity = 0.14 + 0.5 * k * k + 0.12 * Math.sin(o.t * 22);
+      if (o.t > o.ml + 0.05) FX.endTeleLine(o);
     }
     for (const b of pools.beam) if (b.t > 0) {
       b.t -= dt; b.m.material.opacity = Math.max(0, b.t / b.ml);

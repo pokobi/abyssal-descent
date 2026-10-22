@@ -78,6 +78,7 @@
   };
   // a run never meets the same guardian twice: the earlier guardians of the run are drawn first (same seed, same result), then excluded
   R.bossFor = function (n) {
+    if (R.cur.id === 'extra' && R.isLast(n)) return 'sovereign'; // extra: the last guardian is always the Crimson Sovereign, on its own field
     const used = new Set(), draw = (m) => {
       const pool = (R.BOSS_POOLS[R.field(m)] || []).filter((id) => G.BOSS_BY_ID[id] && G.bosses.has(id));
       if (!pool.length) return null;

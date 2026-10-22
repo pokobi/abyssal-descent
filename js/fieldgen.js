@@ -710,8 +710,64 @@
     return obj;
   };
 
+  // ---------------------------------------------------------------- the last guardian's field (extra, area 18)
+  // A floating arena of 7x7 stone tiles over a bottomless dark, under a crimson sky. The guardian tears tiles away and raises them again
+  // (see bosses6.js); whoever falls takes a heavy hit and is put back on the ledge at the entrance.
+  F.TILE_N = 7; F.TILE_S = 8;
+  F.finalArena = function (area, seed) {
+    const rng = new G.RNG(seed);
+    const W = 76, AD = 76, ROAD = 82, D = AD + ROAD;
+    const w = new G.World(W, D, 'crimson');
+    w.arenaD = AD; w.bossStyle = { arena: 'void', facade: 'ruin' }; w.field = 'ruin'; w.final = true;
+    w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
+    const cx = W / 2, cz = AD / 2 - 2, N = F.TILE_N, S = F.TILE_S;
+    const LEDGE = 64; // the entrance ledge (never collapses) starts here
+    // no floor at all in the arena: only the ledge and the road
+    const pit = new Uint8Array(W * (AD + 3));
+    for (let z = 0; z < LEDGE; z++) for (let x = 0; x < W; x++) pit[z * W + x] = 1;
+    H.floors(w, W, AD + 3, pit, 'cobble');
+    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, voidArena: true, arenaD: AD, h: 8 });
+    const nook = roadHall(w, rng, W, AD, D, true);
+    const vx = nook.nx, vz = nook.nz;
+    w.stoneVendor = F.stoneVendor(w, vx - 0.6, vz, 0, 1);
+    w.roadMerchant = w.stoneVendor.pos.clone().setY(0);
+    w.miniSlots = [];
+    w.miniHeal = V(vx + 1.6, 0, vz + 4.2);
+    w.road = { z0: AD + 7, z1: D - 4 };
+    w.npcSpots = [];
+    w.killY = -12;
+    w.arenaCenter = V(cx, 0, cz);
+    w.bossPillars = [];
+    w.fallFrac = 0.32; w.fallSpot = V(cx, 0.1, AD - 4); // a fall costs 32% x the enemy-damage factor (1.25) = about 40% of max HP
+    // the tiles: one slab + one collider each, so a tile can be taken away and given back
+    w.tiles = [];
+    const x0 = cx - N * S / 2, z0 = cz - N * S / 2;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const tx0 = x0 + i * S, tz0 = z0 + j * S;
+      const m = new THREE.Mesh(PG().box, w.mats[(i + j) % 2 ? 'block' : 'floor'].clone());
+      m.scale.set(S - 0.08, 1, S - 0.08); m.position.set(tx0 + S / 2, -0.5, tz0 + S / 2); m.receiveShadow = true;
+      m.material.emissive = new THREE.Color(0x000000);
+      w.group.add(m);
+      const col = w.addCollider(tx0 + 0.04, -1, tz0 + 0.04, tx0 + S - 0.04, 0, tz0 + S - 0.04, { surf: 'stone', noGrapple: false });
+      w.tiles.push({ i, j, x0: tx0, z0: tz0, x1: tx0 + S, z1: tz0 + S, cx: tx0 + S / 2, cz: tz0 + S / 2, mesh: m, col, state: 'up', timer: 0, dy: 0, vy: 0 });
+    }
+    // the dark below, glowing violet-red far down
+    w.visual('voidglow', 0, -16, 0, W, -15.9, LEDGE, { uv: 6, grad: false });
+    for (let z = 8; z < LEDGE; z += 18) for (let x = 8; x < W; x += 20) w.addLight(x, -9, z, { flame: 0, intensity: 14, range: 20, color: '#ff3a8a', emit: false, prio: 0.6, steady: true });
+    // the entrance ledge: braziers and a low parapet
+    for (const sx of [-1, 1]) { P().brazier(w, cx + sx * 12, 0, LEDGE + 3, 1.2); P().pillarSquare(w, cx + sx * 20, LEDGE + 2, 0, 9, 1.4); }
+    w.visual('trim', 4, 0, LEDGE - 0.3, W - 4, 0.3, LEDGE, { uv: 1 });
+    w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
+    w.isBoss = true;
+    if (w.slideDoor) w.slideDoor.col.alive = false;
+    H.validate(w);
+    if (w.slideDoor) w.slideDoor.col.alive = true;
+    return w;
+  };
+
   // ---------------------------------------------------------------- the guardian's field
   LG.boss = function (area, seed, bossId) {
+    if (bossId === 'sovereign') return F.finalArena(area, seed);
     const rng = new G.RNG(seed);
     const style = LG.bossStyle(bossId, seed);
     if (style.arena === 'throne') style.arena = 'fortress';

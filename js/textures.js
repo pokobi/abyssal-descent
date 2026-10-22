@@ -400,6 +400,8 @@
   T.BIOMES.halls = { name: '螺旋の大迷宮', stone: '#8a8074', stone2: '#72695e', floor: '#6c6458', trim: '#a0968a', rock: '#564e46', wood: '#7a6046', fog: '#120e0a', fogD: 0.02, hemiS: '#6a6070', hemiG: '#241a12', amb: 0.3, moon: '#d0b890', moonI: 0.5, torch: '#ff8a40', cloth: '#4a2a12', accent: 'bones', storeys: true };
   // 4: the ruined depths: the same vertical build, collapsed, lit by blue flames (braziers, torches and the patches of blue fire in the floor)
   T.BIOMES.ruin = { name: '蒼炎の廃都', stone: '#7a8296', stone2: '#646c80', floor: '#5c6479', trim: '#9aa4bc', rock: '#4c5468', wood: '#4a4258', fog: '#0c1628', fogD: 0.016, hemiS: '#7a94d0', hemiG: '#1e2640', amb: 0.5, moon: '#8ab0ff', moonI: 0.9, torch: '#4a9cff', flame: 0x4a9cff, cloth: '#142450', accent: 'bones', storeys: true, ruined: true };
+  // the very last guardian's field: a crimson-violet sky and stone over a bottomless dark (not a fire / blue-fire place like the others)
+  T.BIOMES.crimson = { name: '終焉の紅月', stone: '#8a4c74', stone2: '#6a3658', floor: '#563052', trim: '#e096c8', rock: '#42243e', wood: '#4a2a40', fog: '#2a0c30', fogD: 0.011, hemiS: '#e088cc', hemiG: '#44124c', amb: 0.62, moon: '#ff62a8', moonI: 1.9, torch: '#ff4a9a', flame: 0xff4a9a, cloth: '#701052', accent: 'bones', outdoor: 'ruins', sky: ['#14010f', '#52103a', '#b0306e'], sunDir: [0.15, 0.32, -0.92], sunCol: [1.0, 0.28, 0.56], stars: true, mtnCol: 0x2e0a28, leaf: 0x2a1030, night: true };
   T.biomeFor = (area) => (G.Run ? G.Run.field(area) : 'grave');
 
   const matCache = {};
@@ -445,6 +447,7 @@
     M.water.normalScale.set(0.15, 0.15);
     M.lava = new THREE.MeshStandardMaterial({ color: 0x2a0800, emissive: 0xff5a10, emissiveIntensity: 1.6, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     M.bluefire = new THREE.MeshStandardMaterial({ color: 0x06102a, emissive: 0x2a86ff, emissiveIntensity: 1.7, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
+    M.voidglow = new THREE.MeshStandardMaterial({ color: 0x16020f, emissive: 0xff2a8a, emissiveIntensity: 1.1, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     M.ice = new THREE.MeshStandardMaterial({ color: 0xbfe0f0, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.85, normalMap: t.rock.normalMap });
     M.ice.normalScale.set(0.4, 0.4);
     // field gimmicks

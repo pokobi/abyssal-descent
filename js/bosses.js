@@ -215,7 +215,7 @@
           this.yaw += U.clamp(U.wrapAngle(want - this.yaw), -maxTurn, maxTurn);
         }
         if (this.noTurnT > 0 && Math.random() < dt * 3) G.fx.dust(this.pos.clone().add(V(0, 0.2, 0)), V(0, 1, 0), 0x8a7a60, 2);
-        this.cd -= dt;
+        this.cd -= dt * BS.tempo();
         if (!this.act) {
           if (dh > 9) { const l = dh; const b = this.groundMove((P.pos.x - this.pos.x) / l, (P.pos.z - this.pos.z) / l, 1.9 + this.phase * 0.3, dt, 2.3); this.walk = (this.walk || 0) + dt * 2.5; if (Math.sin(this.walk * 2) > 0.98) { G.sfx.rumble(0.3, 0.6); P.addShake(0.08); } }
           if (this.cd <= 0) {
@@ -238,7 +238,7 @@
     }
     doAct(dt) {
       const a = this.act, J = this.J; a.t += dt;
-      const sp = 1 + (this.phase - 1) * 0.2;
+      const sp = (1 + (this.phase - 1) * 0.2) * BS.tempo();
       if (a.k.startsWith('x_')) { if (BS.runX(this, a, dt)) { this.act = null; this.noTurnT = 1.6 / sp; this.cd = U.rand(1.2, 2) / sp; } return; }
       if (a.k === 'slam') {
         const wind = 1.3 / sp;
@@ -337,7 +337,7 @@
     update(dt) {
       if (this.dead) return this.updateDeath(dt);
       this.t += dt; this.stateT -= dt;
-      const sp = this.hp < this.maxHp * 0.5 ? 1.35 : 1;
+      const sp = this.hp < this.maxHp * 0.5 ? 1.35 * BS.tempo() : BS.tempo();
       if (this.hp < this.maxHp * 0.5 && this.phase === 1) { this.phase = 2; G.ui.toast('大蛇が激昂した！', 'warn'); G.sfx.monster(this.pos, 'roar', 0.4, 1.3); }
       BS.xTick(this, dt, 'wyrm'); // new patterns run alongside its dives (bosses5.js)
       if (this.state === 'under') {
@@ -634,7 +634,7 @@
       if (this.dead) return this.updateDeath(dt);
       this.t += dt;
       const J = this.J;
-      const sp = this.hp < this.maxHp * 0.5 ? 1.3 : 1;
+      const sp = this.hp < this.maxHp * 0.5 ? 1.3 * BS.tempo() : BS.tempo();
       if (sp > 1 && this.phase === 1) { this.phase = 2; G.ui.toast('処刑人の怒りが増した', 'warn'); G.sfx.monster(this.pos, 'roar', 0.5, 1.2); }
       const dh = this.playerDistH();
       if (this.state === 'stunned') {
@@ -775,7 +775,7 @@
     update(dt) {
       if (this.dead) return this.updateDeath(dt);
       this.t += dt;
-      const sp = this.hp < this.maxHp * 0.5 ? 1.3 : 1;
+      const sp = this.hp < this.maxHp * 0.5 ? 1.3 * BS.tempo() : BS.tempo();
       if (sp > 1 && this.phase === 1) { this.phase = 2; G.ui.toast('女王が狂乱した！', 'warn'); }
       const dh = this.playerDistH();
       let moving = false;

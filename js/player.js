@@ -410,14 +410,18 @@
       return best ? best.surf : 'stone';
     }
     fellInPit() {
-      const dmg = this.has('m_feather') ? 0 : Math.round(this.stats.maxHp * 0.15);
-      this.pos.copy(this.lastSafe); this.pos.y += 0.05;
+      const wf = G.world.fallFrac || 0.15;
+      let dmg = this.has('m_feather') ? 0 : Math.round(this.stats.maxHp * wf);
+      if (G.world.fallSpot) { dmg = Math.min(dmg, Math.max(0, Math.floor(this.hp) - 1)); this.pos.copy(G.world.fallSpot); } // the last field: a heavy fall that never kills, then back to the entrance ledge
+      else this.pos.copy(this.lastSafe);
+      this.pos.y += 0.05;
       this.vel.set(0, 0, 0);
       G.world.depenetrate(this.pos, this.hw, this.height);
       this.grapple.state = 'none';
       this.pileState = null;
       if (dmg) { G.combat.damagePlayer(dmg, { src: 'fall' }); }
       G.ui.toast('奈落に落ちた…' + (dmg ? ` -${dmg}HP` : ''), 'warn');
+      if (G.world.fallSpot) this.invulnT = Math.max(this.invulnT || 0, 2.5);
       G.ui.fadeFlash();
     }
 

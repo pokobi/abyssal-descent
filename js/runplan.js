@@ -72,9 +72,9 @@
   // ---- guardians: each field has its own pool; one is drawn at random (equal odds) ----
   R.BOSS_POOLS = {
     grave: ['houndlord', 'boneking', 'broodmother', 'wyrm', 'colossus'],
-    gate: ['warlock', 'boneking', 'cerberus', 'madman', 'executioner', 'colossus'],
-    halls: ['warlock', 'boneking', 'cerberus', 'executioner', 'colossus'],
-    ruin: ['ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver'],
+    gate: ['warlock', 'boneking', 'cerberus', 'madman', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur'],
+    halls: ['warlock', 'boneking', 'cerberus', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur'],
+    ruin: ['ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver', 'warden', 'arbiter', 'minotaur', 'cinderpriest', 'ashdrake'],
   };
   // a run never meets the same guardian twice: the earlier guardians of the run are drawn first (same seed, same result), then excluded
   R.bossFor = function (n) {

@@ -729,7 +729,8 @@
   UI.difficulty = function (onPick, back) {
     const R = G.Run, D = R.DIFFS, rec = R.rec();
     const canExtra = R.unlocked('extra', 1); // extra stays hidden until hard has been cleared
-    let xlv = Math.max(1, R.maxExtra()), extra = false, drone = null;
+    let xlv = Math.max(1, R.maxExtra()), extra = false, drone = null, ash = null;
+    const lvK = () => (xlv - 1) / 9; // 0 .. 1 over extra 1 .. 10
     const card = (id) => {
       const d = D[id];
       const cleared = id === 'extra' ? Object.keys(rec).filter((k) => /^extra\d+$/.test(k)).length : rec[id];
@@ -746,13 +747,39 @@
     const s = UI.screen(`<div class="df-wrap"><h2 class="df-title">難易度を選択</h2><div class="df-cards"></div>
       <div style="text-align:center;margin-top:22px"><button class="btn" id="df-back">↩ 戻る</button></div></div>`);
     const cardsEl = s.querySelector('.df-cards'), wrap = s.querySelector('.df-wrap');
-    const stopDrone = () => { if (drone) { drone.stop(); drone = null; } };
+    const stopDrone = () => { if (drone) { drone.stop(); drone = null; } if (ash) { ash.stop = true; ash.cv.remove(); ash = null; } };
+    // the backdrop of the hidden mode: no colour wash, just a darkening world with ash drifting down; more, heavier and slower to settle at higher levels
+    const startAsh = () => {
+      if (ash) return;
+      const cv = document.createElement('canvas'); cv.className = 'df-ash'; s.insertBefore(cv, s.firstChild);
+      const st = ash = { cv, stop: false, p: [] }, g = cv.getContext('2d');
+      const fit = () => { cv.width = Math.max(2, innerWidth >> 1); cv.height = Math.max(2, innerHeight >> 1); };
+      fit();
+      let last = performance.now();
+      const frame = (now) => {
+        if (st.stop || !cv.isConnected) return;
+        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const k = lvK(), want = Math.round(40 + k * 150);
+        while (st.p.length < want) st.p.push({ x: Math.random() * cv.width, y: Math.random() * cv.height, r: 0.6 + Math.random() * (1.2 + k * 1.4), v: 6 + Math.random() * 10, dr: (Math.random() - 0.5) * 6, a: 0.12 + Math.random() * 0.35 });
+        if (st.p.length > want) st.p.length = want;
+        g.clearRect(0, 0, cv.width, cv.height);
+        for (const q of st.p) {
+          q.y += q.v * (0.6 + k * 0.9) * dt; q.x += q.dr * dt;
+          if (q.y > cv.height + 4) { q.y = -4; q.x = Math.random() * cv.width; }
+          g.fillStyle = `rgba(${150 - k * 40},${140 - k * 50},${135 - k * 50},${q.a})`;
+          g.fillRect(q.x, q.y, q.r, q.r * (1 + k));
+        }
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    };
+    const applyLevel = () => { const k = lvK(); s.style.setProperty('--hk', k.toFixed(3)); };
     const render = () => {
       cardsEl.innerHTML = ['easy', 'normal', extra ? 'extra' : 'hard'].map(card).join('');
-      s.classList.toggle('df-hell', extra);
+      s.classList.toggle('df-hell', extra); applyLevel();
       const upd = () => { const b = s.querySelector('#df-xlv'); if (b) { b.textContent = `エクストラ ${xlv}`; s.querySelector('#df-xmul').textContent = xlv >= 10 ? '至高の試練' : ''; } };
       upd();
-      s.querySelectorAll('[data-x]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const nx = xlv + (+b.dataset.x); if (nx >= 1 && nx <= R.maxExtra()) { xlv = nx; upd(); G.sfx.ui('click'); G.sfx.heartbeat && G.sfx.heartbeat(0.8); } else G.sfx.ui('deny'); });
+      s.querySelectorAll('[data-x]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const nx = xlv + (+b.dataset.x); if (nx >= 1 && nx <= R.maxExtra()) { xlv = nx; upd(); applyLevel(); G.sfx.ui('click'); if (G.sfx.hellSting) G.sfx.hellSting(lvK() * 0.8); if (drone) drone.set(lvK()); } else G.sfx.ui('deny'); });
       s.querySelectorAll('[data-sw]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); setExtra(b.dataset.sw === '1'); });
       cardsEl.querySelectorAll('.df-card').forEach((c) => c.onclick = () => {
         const id = c.dataset.id; G.sfx.ui('select'); stopDrone(); onPick({ id, lv: id === 'extra' ? xlv : 0 });
@@ -761,9 +788,9 @@
     const setExtra = (on) => {
       extra = on; render();
       if (on) {
-        G.sfx.rumble && G.sfx.rumble(2.4, 1); G.sfx.death && G.sfx.death(); G.sfx.heartbeat && G.sfx.heartbeat(1.2);
-        setTimeout(() => G.sfx.heartbeat && extra && G.sfx.heartbeat(1), 700);
-        if (!drone && G.sfx.drone) { drone = G.sfx.drone(); drone.set(1); }
+        if (G.sfx.hellSting) G.sfx.hellSting(lvK());
+        if (!drone && G.sfx.hellDrone) drone = G.sfx.hellDrone(lvK());
+        startAsh();
         wrap.classList.remove('df-shake'); void wrap.offsetWidth; wrap.classList.add('df-shake');
       } else { stopDrone(); G.sfx.ui('click'); }
     };

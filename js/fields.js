@@ -1,7 +1,7 @@
 'use strict';
 // Field gimmicks: patches of ground that change how you (and the monsters) move and fight.
 //   water   — slows a little, puts out burning, wet foes take +50% shock damage
-//   lava    — burns everything that stands in it
+//   lava    — sets the player alight (monsters are not hurt by it)
 //   moss    — slippery footing, slides go faster
 //   ice     — very slippery
 //   mud     — heavy: slow walking, weak jumps (foes are slowed too)
@@ -15,7 +15,7 @@
   const U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   F.KINDS = {
     water: { name: '浅瀬', icon: '💧', tip: '浅瀬：少し遅くなる・炎上が消える・濡れた敵は電撃に弱い' },
-    lava: { name: '溶岩', icon: '🌋', tip: '溶岩：踏むと燃える（敵も）' },
+    lava: { name: '溶岩', icon: '🌋', tip: '溶岩：踏むと激しく燃える（敵は平気）' },
     // (a blue-flame patch is a 'lava' field with blue = true: the same burning, in the ruined depths)
     moss: { name: '苔', icon: '🌿', tip: '苔：足が滑る・スライディングが伸びる' },
     ice: { name: '氷床', icon: '❄️', tip: '氷床：とても滑る' },
@@ -131,7 +131,7 @@
       // ---- the player ----
       const pin = inside(f, feet) && (f.kind === 'vent' ? feet.y < 1 : onGround);
       if (pin) {
-        if (!seen.k[f.kind]) { seen.k[f.kind] = true; G.ui.toastSmall(`${F.KINDS[f.kind].icon} ${F.KINDS[f.kind].tip}`); }
+        const tk = f.blue ? 'blue' : f.kind; if (!seen.k[tk]) { seen.k[tk] = true; G.ui.toastSmall(f.blue ? '🔵 蒼炎：踏むと激しく燃える（敵は平気）' : `${F.KINDS[f.kind].icon} ${F.KINDS[f.kind].tip}`); }
         switch (f.kind) {
           case 'water': if (P.st.burn > 0) { P.st.burn = 0; G.fx.smoke && G.fx.smoke(P.pos.clone().setY(0.5), 6, 0.6, 0x9aa4aa, 0.5, 0.8); } break;
           case 'moss': P.fieldSlip = 0.35; P.fieldSlide = 1.5; break;

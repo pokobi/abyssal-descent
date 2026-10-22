@@ -788,6 +788,37 @@
       stop() { out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4); setTimeout(() => { try { oscs.forEach((o) => o.stop()); src.stop(); lfo.stop(); } catch (e) {} }, 1600); },
     };
   };
+  // the hidden "extra" difficulty: a sinking sound. k = 0 .. 1 (extra 1 .. 10): the lower, the heavier.
+  // sting: a long fall in pitch into the sub-bass, with a dull thud; drone: sub tones that sit lower (and louder) the higher the level
+  A.hellSting = function (k) {
+    if (!ctx) return;
+    k = Math.max(0, Math.min(1, k || 0));
+    const t = ctx.currentTime, out = dest(null, 0.5); out.gain.value = 0.9;
+    const lo = 34 - k * 14; // 34 Hz at extra 1, 20 Hz at extra 10
+    tn({ t, f0: 130 - k * 30, f1: lo, d: 2.8 + k * 1.2, g: 0.9, to: out, type: 'sine' });
+    tn({ t: t + 0.05, f0: 190, f1: lo * 1.5, d: 2.2, g: 0.35, to: out, type: 'triangle', lp: 260 });
+    nz({ t, buf: 'brown', f: [['lowpass', 420 - k * 200, 0.7, 60, 2.6]], g: 0.8, a: 0.04, d: 2.6 + k, to: out });
+    tn({ t: t + 0.02, f0: 70, f1: 24, d: 0.5, g: 1.0, to: out, type: 'sine' }); // the thud
+  };
+  A.hellDrone = function (k) {
+    if (!ctx) return { set() {}, stop() {} };
+    const out = ctx.createGain(); out.gain.value = 0.0001; out.connect(dest(null, 0.3));
+    const oscs = [];
+    const mk = (f, g, type) => { const o = ctx.createOscillator(); o.type = type || 'sine'; o.frequency.value = f; const og = ctx.createGain(); og.gain.value = g; o.connect(og); og.connect(out); o.start(); oscs.push([o, f]); return o; };
+    mk(36, 0.6); mk(36.6, 0.5); mk(54, 0.18); mk(72.3, 0.07, 'triangle');
+    const src = ctx.createBufferSource(); src.buffer = brown; src.loop = true;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 120; lp.Q.value = 2;
+    const ng = ctx.createGain(); ng.gain.value = 0.5; src.connect(lp); lp.connect(ng); ng.connect(out); src.start();
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.09; const lg = ctx.createGain(); lg.gain.value = 0.3; lfo.connect(lg); lg.connect(ng.gain); lfo.start();
+    const set = (v) => {
+      v = Math.max(0, Math.min(1, v)); const now = ctx.currentTime;
+      out.gain.setTargetAtTime(0.35 + v * 0.45, now, 0.6);
+      for (const [o, f] of oscs) o.frequency.setTargetAtTime(f * (1 - v * 0.42), now, 0.8); // the whole drone sinks
+      lp.frequency.setTargetAtTime(150 - v * 80, now, 0.8);
+    };
+    set(k || 0);
+    return { set, stop() { out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4); setTimeout(() => { try { oscs.forEach(([o]) => o.stop()); src.stop(); lfo.stop(); } catch (e) { /* ignore */ } }, 1600); } };
+  };
   // breathy whisper somewhere around the listener
   A.whisper = function (pos) {
     if (!ctx || !voice(0.5)) return;

@@ -153,7 +153,7 @@
       this.vel.set(0, 0, 0);
       this.yaw = s.yaw; this.pitch = 0;
       this.grounded = true; this.coyote = 0.1; this.jumps = 0;
-      this.crouching = false; this.sliding = false; this.height = this.standH; this.eyeH = 1.62;
+      this.crouching = false; this.sliding = false; this.height = this.standH; this.eyeH = 1.62; this._slideRun = false;
       this.mantle = null; this.pileState = null;
       this.grapple.state = 'none'; this.grappleCd = 0;
       this.lastSafe.copy(this.pos);
@@ -205,7 +205,7 @@
       const ads = G.weapons.adsT > 0.3;
       const canSprintAfterShot = t - this.lastShotT > (G.weapons.curStats && G.weapons.curStats.sprintFire ? 0.05 : 0.22);
       this.sprinting = this.sprintToggle && fwdIn > 0 && !ads && !this.crouching && canSprintAfterShot && !G.weapons.reloadBlocksSprint() && !(this.st.shock > 0);
-      if (!this.sprinting && !S.autoSprint && !I.down('sprint') && this.sprintToggle) this.sprintToggle = false; // the run broke: it does not resume by itself
+      if (!this.sprinting && !S.autoSprint && !I.down('sprint') && this.sprintToggle && !this.sliding) this.sprintToggle = false; // the run broke: it does not resume by itself
 
       // pile driver trigger: crouch in air
       this.pileCd = Math.max(0, (this.pileCd || 0) - dt);
@@ -540,6 +540,7 @@
     // ---- slide ----
     startSlide() {
       this.sliding = true; this.slideT = 0; this.crouching = true;
+      this._slideRun = !!(this.sprinting || this.sprintToggle); // a slide out of a run: the run carries on when the slide is over
       const hs = Math.hypot(this.vel.x, this.vel.z) || 1;
       const boost = Math.max(hs, 12.8 * (1 + this.stats.slideBoost));
       this.vel.x *= boost / hs; this.vel.z *= boost / hs;
@@ -550,6 +551,7 @@
     }
     endSlide() {
       this.sliding = false; this.slideEndT = G.game.time;
+      if (this._slideRun) { this._slideRun = false; this.sprintToggle = true; }
       if (this.slideLoop) { this.slideLoop.stop(); this.slideLoop = null; }
     }
     // ---- mantle ----

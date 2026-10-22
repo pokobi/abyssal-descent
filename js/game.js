@@ -1696,7 +1696,10 @@
       if (Math.random() < [0.5, 0.6, 0.7][tier]) { const k = tier >= 2 ? U.randi(2, 3) : U.randi(1, 2); for (let i = 0; i < k; i++) C_orb(it.pos.clone().add(V(U.rand(-0.4, 0.4), 0.7, U.rand(-0.4, 0.4)))); }
       G.buffs.emit('onChest', {});
     }, 350);
-    it.cont = G.Inv.chestLoot(tier);
+    // what a chest holds is fixed by the run seed, the area and the chest's place: restarting the area (a soul lantern) opens the same contents
+    { const rng = new G.RNG((GM.seed ^ U.hashStr('chest' + GM.area + ':' + Math.round(it.pos.x) + ',' + Math.round(it.pos.z))) >>> 0), keep = Math.random;
+      Math.random = () => rng.next();
+      try { it.cont = G.Inv.chestLoot(tier); } finally { Math.random = keep; } }
     it.openAnim = 0;
     G.ui.showInteract(null);
     G.InvUI.open(it.cont, it);
@@ -1776,6 +1779,13 @@
     }
     G.combat.clear(); G.enemies.clear(); G.bosses.clear(); G.fx.clear();
     G.ui.bossBar(null);
+    // everything timed or half-done from the life that ended
+    GM.chronoT = 0; GM.enemyTimeScale = 1;
+    if (G.abilities.clearUltAuras) G.abilities.clearUltAuras();
+    if (G.GrenHold) G.GrenHold.putAway(true);
+    if (G.ItemAnim && G.ItemAnim.abort) G.ItemAnim.abort();
+    for (const k of ['wardT', 'bladesT', 'invisT', 'smokeT', 'healZoneT', 'dragT', 'pileLandT']) P[k] = 0;
+    P.healGauge = null; P.sprintToggle = false; P.sprinting = false; P._spCancel = false;
     GM.run = Object.assign({ coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 }, d.run, { combo: 0, lastKillT: -10, multiT: -10 });
     GM.applyPlayerSnap(d);
     P.revives = left;

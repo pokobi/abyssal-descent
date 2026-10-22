@@ -25,7 +25,7 @@
 
   AR.rollGates = function (nextArea) {
     if (G.Run.isBoss(nextArea)) return ['boss'];
-    const r = Math.random;
+    const rg = new G.RNG((GM.seed ^ U.hashStr('gates' + nextArea)) >>> 0), r = () => rg.next(); // seeded: the same doors after a restart
     const keys = Object.keys(AR.TYPES).filter((k) => k !== 'boss' && AR.TYPES[k].min <= nextArea);
     const out = [];
     // always offer at least one fight so the build keeps growing
@@ -384,7 +384,7 @@
   // ---------------- vault: some chests bite ----------------
   AR.setupVault = function () {
     const w = G.world;
-    for (const it of w.interactables) if (it.type === 'chest' && Math.random() < 0.3 + GM.area * 0.005) it.trap = true;
+    for (const it of w.interactables) if (it.type === 'chest' && GM.arng.next() < 0.3 + GM.area * 0.005) it.trap = true; // seeded: the same chests bite after a restart
   };
   AR.springTrap = function (it) {
     if (it.mesh) it.mesh.visible = false;

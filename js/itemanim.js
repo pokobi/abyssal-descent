@@ -226,5 +226,7 @@
       c.onDone && c.onDone();
     }
   };
+  // drop whatever is being used WITHOUT applying it (a revive puts the inventory back as it was)
+  IA.abort = function () { if (!cur) return; root.remove(cur.g); if (cur.fore) root.remove(cur.fore); cur = null; };
   IA.cancel = function () { if (!cur) return; if (!cur.applied && cur.onApply) { try { cur.onApply(); } catch (e) { console.error(e); } } root.remove(cur.g); if (cur.fore) root.remove(cur.fore); cur = null; };
 })();

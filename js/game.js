@@ -1951,10 +1951,9 @@
       }
       else if (GM.state === 'buff') {
         // the boon choice is an overlay: the world keeps running and WASD still moves while the cursor picks a card;
-        // number keys belong to the cards and E/skills/items stay idle
+        // number keys do nothing here (cards are picked with the mouse / wheel + Enter) and E/skills/items stay idle
         const api = G.ui._buffApi;
         if (api) {
-          for (const k in I.pressed) { const m = /^Digit([1-9])$/.exec(k); if (m) api.pick(+m[1] - 1); }
           if (I.wheel) api.move(Math.sign(I.wheel));
           if (I.pressed.Enter || (I.locked && I.mpressed[0])) api.confirm();
           if (I.pressed.KeyR) api.reroll();

@@ -74,7 +74,7 @@
     if (it.type !== 'item') return 1;
     const d = IV.def(it);
     if (d && d.passive) return 3;
-    return d && d.cat === 'grenade' ? 5 : 50; // consumables stack up to 50 in one cell; grenades and relic-like passives keep their small stacks
+    return 50; // consumables and grenades stack up to 50 in one cell; relic-like passives keep their small stacks
   };
   IV.value = function (it) {
     const d = IV.def(it); if (!d) return 0;

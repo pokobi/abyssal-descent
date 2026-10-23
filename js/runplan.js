@@ -43,8 +43,8 @@
   R.hpMul = (n) => Math.max(0.15, R.mul(n) * fHp(n - 1) / fHp(n - 1 + R.lvOff()));
   R.dmgMul = (n) => Math.max(0.15, Math.pow(R.mul(n), 0.8) * fDmg(n - 1) / fDmg(n - 1 + R.lvOff())); // damage climbs a little slower than toughness
   // the depth that decides the RARITY of drops (chests, corpses): hard / extra push their mutation depth far ahead of the area number,
-  // but loot only follows a quarter of that lead (at most 6 ahead), so epic / legendary stay late-run things there too
-  R.lootDepth = (n) => { const d = R.depthArea(n); return d <= n ? d : n + Math.min(6, (d - n) * 0.25); };
+  // but loot only follows about a third of that lead (at least +3 in hard / +5 in extra, at most 9 ahead), so epic / legendary stay late-run things there too
+  R.lootDepth = (n) => { const d = R.depthArea(n); if (R.cur.id === 'easy' || R.cur.id === 'normal') return d; return n + Math.max(R.cur.id === 'extra' ? 5 : 3, Math.min(9, (d - n) * 0.35)); };
   // what a "valuable" (sell-only trinket) is worth, and how often it drops: less in the harder modes, where everything else is richer
   R.valuableMul = () => (R.cur.id === 'extra' ? 0.5 : R.cur.id === 'hard' ? 0.7 : 1);
   R.valuableShare = () => (R.cur.id === 'extra' ? 0.5 : R.cur.id === 'hard' ? 0.65 : 1);

@@ -269,6 +269,7 @@
     if (e.hp <= 0) C.killEnemy(e, info, overkill);
     if (src === 'skill' && !info.proc && !info.noTech && dealt + shieldDealt > 0) C.techOnHit(e, dealt + shieldDealt, info);
     { const skId = info.sk || ((src === 'skill' || src === 'explosion') && C.curSk); if (skId && !info.noSkOn && dealt + shieldDealt > 0 && C.skOnHit) C.skOnHit(e, dealt + shieldDealt, skId, info); }
+    if (G.game.run && !e.ally && !info.ally) G.game.run.dmgDealt = (G.game.run.dmgDealt || 0) + dealt + shieldDealt; // the run's total damage (result screen)
     return dealt + shieldDealt;
   };
   C.killEnemy = function (e, info, overkill) {

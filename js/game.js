@@ -1044,7 +1044,7 @@
     const flawless = GM.areaDamage <= 0;
     if (flawless && stage !== 'trial') { const b = Math.round((80 + n * 10) * (P.has('e_flawless') ? 2 : 1)); setTimeout(() => { G.combat.coins(b, null, '無傷'); G.ui.feed(`🏅 無傷ボーナス +${b}`, 'big'); }, 900); }
     G.buffs.emit('onAreaClear', { flawless, time: t });
-    if (stage !== 'trial') G.ui.banner('AREA CLEAR', bossKill ? '— 守護者は倒れた —' : '— 次の道を選べ —');
+    if (stage !== 'trial') G.ui.banner(bossKill && G.Run.isLast(GM.area) ? 'THE END' : 'AREA CLEAR', bossKill ? (G.Run.isLast(GM.area) ? '— 最後の守護者は倒れた —' : '— 守護者は倒れた —') : '— 次の道を選べ —');
     G.sfx.ui('clear');
     if (!(bossKill && G.Run.isLast(GM.area))) G.Areas.openGates(); // the last guardian ends the run: no road onward
     if (stage !== 'boss') setTimeout(() => G.Areas.spawnMiniShop(), 600);
@@ -1090,8 +1090,8 @@
       G.ui.banner('深淵を制した', `— ${G.Run.label()} クリア —`, true);
       setTimeout(() => GM.victory(), 3800);
     }
-    const c = G.world.arenaCenter;
-    G.Props.chest(G.world, c.x, c.z, 0, 0, 2);
+    const c = G.world.arenaCenter, lastOne = G.Run.isLast(GM.area); // the last guardian ends the run: no chest, no road onward
+    if (!lastOne) G.Props.chest(G.world, c.x, c.z, 0, 0, 2);
     if (boss && boss.baseDef && G.BOSS_BY_ID[boss.baseDef.id] && G.BOSS_BY_ID[boss.baseDef.id].final) {
       // the Abyss King: a hoard worthy of the deepest throne
       G.Props.chest(G.world, c.x - 5, c.z + 2, 0, 0.4, 2); G.Props.chest(G.world, c.x + 5, c.z + 2, 0, -0.4, 2);
@@ -1101,7 +1101,7 @@
       setTimeout(() => { G.ui.toast('🪔🪔 魂の灯火が二つ灯った', 'good'); G.ui.banner(`第${GM.run.kingsSlain}の深淵を踏破`, '— だが、深淵はさらに深く続いている —'); }, 2500);
     }
     G.world.flushDeferred();
-    G.ui.toast('👑 装飾された宝箱が現れた！', 'good');
+    if (!lastOne) G.ui.toast('👑 装飾された宝箱が現れた！', 'good');
     clearArea({ boss: true });
   };
   GM.spawnChestNear = function (tier) {
@@ -1204,6 +1204,14 @@
     if (!c.length) c = arr;
     return G.thinFairy(() => r.pick(c));
   }
+  // the armour shelf is where gear is bought: mostly epic / legendary (a little less of the legendary in the first few areas)
+  function pickArmor(r, luck) {
+    const ramp = 0.45 + 0.55 * Math.min(1, (GM.area || 1) / 8), lk = 1 + Math.max(0, luck) * 0.5;
+    const W = { common: 3, uncommon: 9, rare: 28, epic: 38 * lk, legendary: 22 * ramp * lk };
+    const rar = r.weighted(G.RARITY_ORDER.filter((k) => W[k] !== undefined), (k) => W[k]);
+    const c = G.ARMOR.filter((o) => o.rarity === rar);
+    return r.pick(c.length ? c : G.ARMOR);
+  }
   GM.pickOffer = function (k, used, r) {
     r = r || new G.RNG((Math.random() * 1e9) >>> 0);
     const luck = P.stats.luck;
@@ -1218,7 +1226,7 @@
       else if (k === 'skill') c = pickBy(r, G.SKILLS.filter((x) => !P.skills.some((s) => s && s.id === x.id)), luck);
       else if (k === 'attachment') { const comp = G.ATTACHMENTS.filter((a) => P.weapons.some((pw) => a.compat(pw.def))); c = pickBy(r, comp.length ? comp : G.ATTACHMENTS, luck); }
       else if (k === 'grenade') c = pickBy(r, G.ITEMS.filter((x) => x.cat === 'grenade'), luck);
-      else if (k === 'armor') c = pickBy(r, G.ARMOR, luck);
+      else if (k === 'armor') c = pickArmor(r, luck);
       else if (k === 'util') c = pickBy(r, G.ITEMS.filter((x) => x.cat !== 'grenade'), luck);
       else if (k === 'item') c = pickBy(r, G.ITEMS, luck);
       else if (k === 'pile' || k === 'tech') c = GM.rollBuffs(1, false, G.isTech)[0];
@@ -1786,7 +1794,8 @@
     if (G.ItemAnim && G.ItemAnim.abort) G.ItemAnim.abort();
     for (const k of ['wardT', 'bladesT', 'invisT', 'smokeT', 'healZoneT', 'dragT', 'pileLandT']) P[k] = 0;
     P.healGauge = null; P.sprintToggle = false; P.sprinting = false; P._spCancel = false;
-    GM.run = Object.assign({ coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 }, d.run, { combo: 0, lastKillT: -10, multiT: -10 });
+    { const keepT = GM.run.playT || 0, keepD = GM.run.dmgDealt || 0; // time and damage dealt are totals of the whole run: a restart of the area does not take them back
+      GM.run = Object.assign({ coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 }, d.run, { combo: 0, lastKillT: -10, multiT: -10, playT: keepT, dmgDealt: keepD }); }
     GM.applyPlayerSnap(d);
     P.revives = left;
     P.dead = false; P.deathT = 0; P.st = {}; P.temps = new Map();
@@ -1989,6 +1998,7 @@
     GM.timeScale = P.has('x_slowtime') && G.weapons.adsT > 0.5 ? 0.75 : 1;
     const gdt = dt * GM.timeScale * (GM.dev ? GM.dev.speed : 1);
     GM.time += gdt;
+    if (GM.run && GM.state !== 'title') GM.run.playT = (GM.run.playT || 0) + gdt; // total play time of the run (kept through reloads with the checkpoint)
     if (GM.chronoT > 0) { GM.chronoT -= gdt; GM.enemyTimeScale = 1 - GM.chronoSlow; } else GM.enemyTimeScale = 1;
     GM.enemyTimeScale *= GM.enrage.tm;
     if (GM.dev) { if (GM.dev.freeze) GM.enemyTimeScale = 0; if (GM.dev.noCd) { for (const s of P.skills) if (s) { s.cd = 0; if (s.maxCharges) s.charges = s.maxCharges; } P.pileCd = 0; P.grappleCd = 0; } }

@@ -123,6 +123,20 @@
     // the items sitting in a consumable pocket (key 4 / key 5 / G)
     slotItems(slot) { const c = this.spec && this.spec[slot]; const ids = []; if (c) for (const o of c.items) if (o.type === 'item' && !ids.includes(o.id)) ids.push(o.id); return ids; }
     selItem(slot) { let id = this.isel[slot]; const l = this.slotItems(slot); if (!id || !l.includes(id)) { id = l[0] || null; this.isel[slot] = id; } return id; }
+    // when a pocket (G / 4 / 5) has room again, consumables / throwables waiting in the bag move in by themselves; the selected grenade follows what you still own
+    refillPockets() {
+      const IV = G.Inv; if (!this.bag || !this.spec) return;
+      for (const it of this.bag.items.slice()) {
+        if (it.type !== 'item') continue;
+        const k = IV.specOf(it); if (!k) continue;
+        const list = k === 'g' ? [this.spec.g] : [this.spec.c1, this.spec.c2];
+        for (const c of list) for (const o of c.items) if (it.n > 0 && o.type === it.type && o.id === it.id && o.n < IV.maxStack(o)) { const t = Math.min(IV.maxStack(o) - o.n, it.n); o.n += t; it.n -= t; IV.changed(c); IV.changed(this.bag); }
+        if (it.n <= 0) { IV.remove(this.bag, it); continue; }
+        IV.remove(this.bag, it);
+        if (!list.some((c) => IV.put(c, it) === 0)) IV.put(this.bag, it);
+      }
+      if (this.grenades && !this.grenades[this.grenadeSel]) { const o = Object.keys(this.grenades).find((x) => this.grenades[x] > 0); if (o) { this.grenadeSel = o; if (G.GrenHold && G.GrenHold.refresh) G.GrenHold.refresh(); } }
+    }
     takeItem(id) { if (!this.itemCount(id)) return false; return G.Inv.takeAll(this, 'item', id, 1); }
     addItem(id, n) {
       const it = G.ITEM_BY_ID[id]; if (!it) return false;
@@ -165,6 +179,7 @@
 
     // ------------------------------------------------------------
     update(dt) {
+      this._rfT = (this._rfT || 0) - dt; if (this._rfT <= 0) { this._rfT = 0.5; if (!(G.InvUI && G.InvUI.isOpen())) this.refillPockets(); }
       const w = G.world, S = G.save.data.settings, st = this.stats;
       const t = G.game.time;
       if (this.dead) return this.updateDeadCam(dt);

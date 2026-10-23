@@ -333,7 +333,7 @@
       // coins & meta
       sText(e.coinVal, U.fmt(G.game.run.coins));
       const r = G.game.run;
-      sHtml(e.runMeta, `⏱ <b>${U.time(G.game.time - r.startT)}</b>　💀 <b>${r.kills}</b>　🎯 <b>${r.headshots}</b><br>🌱 シード <b>${G.game.seed}</b><br><span style="letter-spacing:2px">${(G.game.route || []).slice(-12).map((k) => G.Areas.TYPES[k].icon).join('')}</span>`);
+      sHtml(e.runMeta, `⏱ <b>${U.time(r.playT !== undefined ? r.playT : G.game.time - r.startT)}</b>　💀 <b>${r.kills}</b>　⚔️ <b>${U.fmt(Math.round(r.dmgDealt || 0))}</b><br>🌱 シード <b>${G.game.seed}</b><br><span style="letter-spacing:2px">${(G.game.route || []).slice(-12).map((k) => G.Areas.TYPES[k].icon).join('')}</span>`);
       UI.updateObjective();
       // the boon grid always sits just below the top-left panel (objective / run info grow and shrink)
       { const tl = document.getElementById('hud-tl'); if (tl) { const y = Math.max(170, Math.round(tl.getBoundingClientRect().bottom + 10)); if (UI._bTop !== y) { UI._bTop = y; e.buffs.style.top = y + 'px'; e.buffs.style.maxHeight = `calc(100vh - ${y + 230}px)`; } } }
@@ -549,7 +549,7 @@
         <button class="btn" id="t-settings">⚙️ 設定</button>
         <button class="btn" id="t-help">🎮 操作方法</button>
       </div>
-      <div class="title-rec">🏆 クリア ${['easy', 'normal', 'hard'].map((k) => `<b style="color:${(rec.clears || {})[k] ? G.Run.DIFFS[k].col : '#5a5048'}">${G.Run.DIFFS[k].name}${(rec.clears || {})[k] ? '✓' : ''}</b>`).join(' ')}${G.Run.maxExtra() ? `　<b style="color:${G.Run.DIFFS.extra.col}">エクストラ ${G.Run.maxExtra() - ((rec.clears || {})['extra' + G.Run.maxExtra()] ? 0 : 1)}✓</b>` : ''}　|　💀 最多撃破 <b>${rec.bestKills}</b>　|　🎲 挑戦回数 <b>${rec.runs}</b>　|　☠ 累計撃破 <b>${rec.totalKills}</b></div>
+      <div class="title-rec">🏆 クリア ${['easy', 'normal', 'hard'].map((k) => `<b style="color:${(rec.clears || {})[k] ? G.Run.DIFFS[k].col : '#5a5048'}">${G.Run.DIFFS[k].name}${(rec.clears || {})[k] ? '✓' : ''}</b>`).join(' ')}${(() => { const m = G.Run.maxExtra(), c = m - ((rec.clears || {})['extra' + m] ? 0 : 1); return c > 0 ? `　<b style="color:${G.Run.DIFFS.extra.col}">エクストラ ${c}✓</b>` : ''; })()}　|　💀 最多撃破 <b>${rec.bestKills}</b>　|　🎲 挑戦回数 <b>${rec.runs}</b>　|　☠ 累計撃破 <b>${rec.totalKills}</b></div>
       <div class="title-foot">クリックでゲーム開始時にマウスがロックされます　·　推奨: フルスクリーン（Ctrl+W 等の誤操作防止）</div>
     </div>`);
     let diffPick = null;
@@ -846,9 +846,9 @@
       <div class="stats-grid">
         <div class="stat-box"><div class="sv">🗺️ ${G.game.area}/${R.areas()}</div><div class="sl">踏破エリア</div></div>
         <div class="stat-box"><div class="sv">💀 ${r.kills}</div><div class="sl">撃破数</div></div>
-        <div class="stat-box"><div class="sv">🎯 ${r.headshots}</div><div class="sl">ヘッドショット</div></div>
+        <div class="stat-box"><div class="sv">⚔️ ${U.fmt(Math.round(r.dmgDealt || 0))}</div><div class="sl">与えたダメージ</div></div>
         <div class="stat-box"><div class="sv">🪙 ${U.fmt(r.coinsTotal)}</div><div class="sl">獲得コイン</div></div>
-        <div class="stat-box"><div class="sv">⏱ ${U.time(G.game.time - r.startT)}</div><div class="sl">クリアタイム</div></div>
+        <div class="stat-box"><div class="sv">⏱ ${U.time(r.playT !== undefined ? r.playT : G.game.time - r.startT)}</div><div class="sl">クリアタイム</div></div>
         <div class="stat-box"><div class="sv">🌟 ${P.buffs.size}</div><div class="sl">取得加護</div></div>
         <div class="stat-box"><div class="sv">🩸 ${U.fmt(Math.round(r.dmgTaken || 0))}</div><div class="sl">被ダメージ</div></div>
         <div class="stat-box"><div class="sv">🪔 ${P.revives || 0}</div><div class="sl">残った灯火</div></div>
@@ -868,9 +868,9 @@
       <div class="stats-grid">
         <div class="stat-box"><div class="sv">🗺️ ${G.game.area}/${G.Run.areas()}</div><div class="sl">到達エリア（${G.Run.label()}）</div></div>
         <div class="stat-box"><div class="sv">💀 ${r.kills}</div><div class="sl">撃破数</div></div>
-        <div class="stat-box"><div class="sv">🎯 ${r.headshots}</div><div class="sl">ヘッドショット</div></div>
+        <div class="stat-box"><div class="sv">⚔️ ${U.fmt(Math.round(r.dmgDealt || 0))}</div><div class="sl">与えたダメージ</div></div>
         <div class="stat-box"><div class="sv">🪙 ${U.fmt(r.coinsTotal)}</div><div class="sl">獲得コイン</div></div>
-        <div class="stat-box"><div class="sv">⏱ ${U.time(G.game.time - r.startT)}</div><div class="sl">生存時間</div></div>
+        <div class="stat-box"><div class="sv">⏱ ${U.time(r.playT !== undefined ? r.playT : G.game.time - r.startT)}</div><div class="sl">生存時間</div></div>
         <div class="stat-box"><div class="sv">🌟 ${P.buffs.size}</div><div class="sl">取得加護</div></div>
       </div>
       <div style="font-size:13px;color:var(--dim)">致命傷: ${U.esc(stats.cause || '不明')}　·　シード ${G.game.seed}${stats.newRecord ? '　·　<b style="color:var(--gold2)">🏆 新記録！</b>' : ''}</div>

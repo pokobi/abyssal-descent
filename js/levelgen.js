@@ -216,16 +216,32 @@
     const gh = 6;
     if (OUT) opts.beams = 0;
     const gxs = opts.noExits ? [] : LG.gateXs(W, opts.gates || 1); // noExits: the last area of a run has no door onward, just wall
+    // opts.notches (strata fields): [{side: 'N' | 'S', x0, x1, y0, y1}] niches carved out of the north / south wall, from its inner face to the outside
+    const nts = opts.notches || [];
+    const wallBlock = (side, xa, xb, ya, yb) => {
+      const za = side === 'N' ? -WALL_T : D, zb = side === 'N' ? 0 : D + WALL_T;
+      const hit = nts.filter((n) => n.side === side && n.x1 > xa && n.x0 < xb && n.y1 > ya && n.y0 < yb);
+      const xs = [xa, xb];
+      for (const n of hit) xs.push(Math.max(xa, Math.min(xb, n.x0)), Math.max(xa, Math.min(xb, n.x1)));
+      const ux = [...new Set(xs)].sort((p, q) => p - q);
+      for (let i = 0; i < ux.length - 1; i++) {
+        const a = ux[i], b = ux[i + 1], m = (a + b) / 2;
+        const cuts = hit.filter((n) => n.x0 < m && n.x1 > m).map((n) => [Math.max(n.y0, ya), Math.min(n.y1, yb)]).sort((p, q) => p[0] - q[0]);
+        let y = ya;
+        for (const [c0, c1] of cuts) { if (c0 > y) w.solid('block', a, y, za, b, c0, zb, { uv: 4 }); y = Math.max(y, c1); }
+        if (yb > y) w.solid('block', a, y, za, b, yb, zb, { uv: 4 });
+      }
+    };
     // south wall (z = D..D+T) — the sky island is open on the south/east/west edges
-    if (OUT !== 'sky') w.solid('block', -WALL_T, 0, D, W + WALL_T, H, D + WALL_T, { uv: 4 });
+    if (OUT !== 'sky') wallBlock('S', -WALL_T, W + WALL_T, 0, H);
     // north wall with one or more exit openings
     let wx = -WALL_T;
     for (const gx of gxs) {
-      w.solid('block', wx, 0, -WALL_T, gx - 2.5, H, 0, { uv: 4 });
-      w.solid('block', gx - 2.5, gh, -WALL_T, gx + 2.5, H, 0, { uv: 4 });
+      wallBlock('N', wx, gx - 2.5, 0, H);
+      wallBlock('N', gx - 2.5, gx + 2.5, gh, H);
       wx = gx + 2.5;
     }
-    w.solid('block', wx, 0, -WALL_T, W + WALL_T, H, 0, { uv: 4 });
+    wallBlock('N', wx, W + WALL_T, 0, H);
     // west / east (a void arena only keeps them along the road)
     const sideZ0 = opts.voidArena ? opts.arenaD : 0;
     if (OUT !== 'sky') {
@@ -282,10 +298,11 @@
       if (rng.chance(0.25)) P().banner(w, W, Math.min(8.5, H - 1), z - sp / 2, 'nx', Math.min(4, H - 3));
     }
     for (let x = sp; x < W - 2; x += sp) {
-      if (Math.abs(x - W / 2) > 5 && OUT !== 'sky') butt(x, 0, 'S');
-      if (gxs.every((g) => Math.abs(x - g) > 5.2)) butt(x, 0, 'N');
-      if (Math.abs(x - sp / 2 - W / 2) > 4 && OUT !== 'sky') P().torch(w, x - sp / 2, 3.3 + (opts.southY || 0), D, 'nz');
-      if (gxs.every((g) => Math.abs(x - sp / 2 - g) > 4.8)) P().torch(w, x - sp / 2, 3.3, 0, 'pz');
+      const notched = (side, xx, r) => nts.some((n) => n.side === side && xx + r > n.x0 && xx - r < n.x1); // strata: no buttress or torch where a room is dug into the wall
+      if (Math.abs(x - W / 2) > 5 && OUT !== 'sky' && !notched('S', x, 0.8)) butt(x, 0, 'S');
+      if (gxs.every((g) => Math.abs(x - g) > 5.2) && !notched('N', x, 0.8)) butt(x, 0, 'N');
+      if (Math.abs(x - sp / 2 - W / 2) > 4 && OUT !== 'sky' && !notched('S', x - sp / 2, 0.3)) P().torch(w, x - sp / 2, 3.3 + (opts.southY || 0), D, 'nz');
+      if (gxs.every((g) => Math.abs(x - sp / 2 - g) > 4.8) && !notched('N', x - sp / 2, 0.3)) P().torch(w, x - sp / 2, 3.3, 0, 'pz');
     }
     // entrance gate (decorative, closed portcullis on the south wall)
     // the entrance gate sits on whatever ground the south end has (boss roads start far below)

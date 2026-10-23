@@ -858,8 +858,8 @@
         // run away along the flow field gradient (maximise distance)
         const i = w.navIdx(this.pos.x, this.pos.z, this.pos.y);
         if (i >= 0 && w.ndist[i] < Infinity) {
-          const W = w.W, ic = i % (W * w.D); const ix = ic % W, iz = (ic / W) | 0; let best = w.ndist[i], bx = 0, bz = 0;
-          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { if (ix + dx < 0 || iz + dz < 0 || ix + dx >= W || iz + dz >= w.D) continue; const a = w.land(i, (iz + dz) * W + ix + dx); if (a >= 0 && !w.nb[a] && w.ndist[a] < Infinity && w.ndist[a] > best) { best = w.ndist[a]; bx = dx; bz = dz; } }
+          const W = w.W, ic = i % w.N; const ix = ic % W, iz = (ic / W) | 0; let best = w.ndist[i], bx = 0, bz = 0;
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { if (ix + dx < 0 || iz + dz < 0 || ix + dx >= W || iz + dz >= w.Dn) continue; const a = w.land(i, (iz + dz) * W + ix + dx); if (a >= 0 && !w.nb[a] && w.ndist[a] < Infinity && w.ndist[a] > best) { best = w.ndist[a]; bx = dx; bz = dz; } }
           const l = Math.hypot(bx, bz) || 1; out.x = bx / l; out.z = bz / l;
         }
         if (Math.random() < 0.02) G.sfx.monster(this.pos, 'chitter', 1.3, 0.5);
@@ -1200,7 +1200,7 @@
       }
       this.clampBounds();
     }
-    clampBounds() { const w = G.world; this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); }
+    clampBounds() { const w = G.world; this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); if (w.nooks) { const [lo, hi] = w.zLimits(this.pos.x, this.pos.y, 0.5); this.pos.z = U.clamp(this.pos.z, lo, hi); } else this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); }
     // circle vs AABB push-out within a vertical band; returns true if blocked
     pushOut(dx, dz, y0, y1) {
       const w = G.world, r = this.radius * 0.8;

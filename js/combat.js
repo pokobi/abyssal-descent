@@ -480,7 +480,7 @@
     for (let z = Math.floor(d.col.z0) - 1; z <= Math.ceil(d.col.z1); z++) for (let x = Math.floor(d.col.x0) - 1; x <= Math.ceil(d.col.x1); x++) {
       const i0 = W.navIdx(x + 0.5, z + 0.5); if (i0 < 0) continue;
       for (let k = 0; k < (W.L || 1); k++) {
-        const i = i0 + k * W.N; if (W.nf[i] === -Infinity || (W.nhz && W.nhz[i])) continue;
+        const i = i0 + k * W.N; if (W.nf[i] === -Infinity || (W.nhz && W.nhz[i]) || (W.nbk && W.nbk[i])) continue;
         const a = W.query(x + 0.5 - 0.32, W.nf[i] + 0.85, z + 0.5 - 0.32, x + 0.5 + 0.32, W.nf[i] + 1.9, z + 0.5 + 0.32);
         W.nb[i] = a.length ? 1 : 0;
       }
@@ -500,7 +500,7 @@
     for (let z = Math.floor(d.col.z0) - 1; z <= Math.ceil(d.col.z1); z++) for (let x = Math.floor(d.col.x0) - 1; x <= Math.ceil(d.col.x1); x++) {
       const i0 = W.navIdx(x + 0.5, z + 0.5); if (i0 < 0) continue;
       for (let k = 0; k < (W.L || 1); k++) {
-        const i = i0 + k * W.N; if (W.nf[i] === -Infinity || (W.nhz && W.nhz[i])) continue;
+        const i = i0 + k * W.N; if (W.nf[i] === -Infinity || (W.nhz && W.nhz[i]) || (W.nbk && W.nbk[i])) continue;
         const a = W.query(x + 0.5 - 0.32, W.nf[i] + 0.85, z + 0.5 - 0.32, x + 0.5 + 0.32, W.nf[i] + 1.9, z + 0.5 + 0.32);
         W.nb[i] = a.length ? 1 : 0;
       }

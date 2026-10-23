@@ -402,7 +402,7 @@
       const inTunnel = this.pos.z < 0.5 && (w.exits || []).some((ex) => this.pos.x > ex.gx0 && this.pos.x < ex.gx1);
       if (!inTunnel) {
         this.pos.x = U.clamp(this.pos.x, 0.36, w.W - 0.36);
-        this.pos.z = U.clamp(this.pos.z, 0.36, w.D - 0.36);
+        if (w.nooks) { const [lo, hi] = w.zLimits(this.pos.x, this.pos.y, 0.36); this.pos.z = U.clamp(this.pos.z, lo, hi); } else this.pos.z = U.clamp(this.pos.z, 0.36, w.D - 0.36);
       }
       // safe position memory
       if (this.grounded && !this.pileState) {

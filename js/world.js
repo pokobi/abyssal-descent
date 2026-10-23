@@ -90,7 +90,7 @@
   // ---------------- world ----------------
   class World {
     constructor(W, D, biome) {
-      this.W = W; this.D = D; this.biome = biome;
+      this.W = W; this.D = D; this.biome = biome; this.zo = 0; this.Dn = D;
       this.mats = G.Tex.materials(biome);
       this.batch = new Batch();
       this.colliders = [];
@@ -264,15 +264,16 @@
     // ---- nav grid (1m) ----
     // A world with storeys over storeys (this.navLayers > 1, the strata fields) keeps one nav node per walkable surface in a
     // cell: node = layer * N + cell, layers sorted bottom-up. Ordinary worlds have one layer, so node == cell as before.
+    // navPad (strata fields): extra nav rows beyond the north and south walls, for the barred rooms dug into them; row r is z = r - navPad.
     buildNav() {
-      const W = this.W, D = this.D;
+      const W = this.W, zo = this.navPad || 0, D = this.D + 2 * zo;
+      this.zo = zo; this.Dn = D;
       const N = W * D, LM = this.navLayers || 1;
-      const tops = [];
       const per = [];
       const tmp = [];
       let L = 1;
       for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
-        const cx = x + 0.5, cz = z + 0.5;
+        const cx = x + 0.5, cz = z - zo + 0.5;
         tmp.length = 0;
         this.query(cx - 0.01, -60, cz - 0.01, cx + 0.01, 60, cz + 0.01, tmp);
         tmp.sort((a, b) => a.y0 - b.y0);
@@ -294,7 +295,7 @@
       this.nhz = L > 1 ? new Uint8Array(N * L) : null;
       this.npen = new Float32Array(N * L);
       for (let i = 0; i < N; i++) {
-        const ts = per[i], cx = (i % W) + 0.5, cz = ((i / W) | 0) + 0.5;
+        const ts = per[i], cx = (i % W) + 0.5, cz = ((i / W) | 0) - zo + 0.5;
         for (let k = 0; k < ts.length; k++) {
           const n = k * N + i, floor = ts[k];
           this.nf[n] = floor;
@@ -305,6 +306,16 @@
           this.nb[n] = tmp.some((c) => !c.navIgnore) ? 1 : 0; // a cell gate counts as open: monsters path through it (and batter it down)
           // strata: the lava trench and the roof are no place to walk or spawn
           if (L > 1 && this.navHazard && this.navHazard(cx, floor, cz)) { this.nb[n] = 1; this.nhz[n] = 1; }
+        }
+      }
+      // iron bars (cell fronts) are thin enough to slip between two cell centres: block the cells on both sides of them
+      this.nbk = null;
+      for (const c of this.colliders) {
+        if (!c.navBlock || c.alive === false) continue;
+        this.nbk = this.nbk || new Uint8Array(N * L);
+        for (let z = Math.floor(c.z0 + zo - 0.001); z <= Math.floor(c.z1 + zo - 0.001); z++) for (let x = Math.floor(c.x0 + 0.001); x <= Math.floor(c.x1 - 0.001); x++) {
+          if (x < 0 || x >= W || z < 0 || z >= D) continue;
+          for (let k = 0; k < L; k++) { const n = k * N + z * W + x; if (this.nf[n] > -Infinity && this.nf[n] > c.y0 - 0.3 && this.nf[n] < c.y1 - 1) { this.nb[n] = 1; this.nbk[n] = 1; } }
         }
       }
       // clearance penalty
@@ -357,7 +368,7 @@
     }
     // y (optional): the surface at or just below that height (strata); without it, the lowest one
     navIdx(x, z, y) {
-      const xi = Math.floor(x), zi = Math.floor(z); if (xi < 0 || zi < 0 || xi >= this.W || zi >= this.D) return -1;
+      const xi = Math.floor(x), zi = Math.floor(z) + this.zo; if (xi < 0 || zi < 0 || xi >= this.W || zi >= this.Dn) return -1;
       const i = zi * this.W + xi;
       if (this.L > 1 && y !== undefined) {
         let best = i;
@@ -365,6 +376,12 @@
         return best;
       }
       return i;
+    }
+    // z limits of movement at (x, y): the area itself, plus the barred rooms dug into the north / south walls (strata fields)
+    zLimits(x, y, r) {
+      let lo = r, hi = this.D - r;
+      if (this.nooks) for (const n of this.nooks) if (x > n.x0 - 0.2 && x < n.x1 + 0.2 && y > n.y0 - 1.2 && y < n.y1 + 1) { if (n.side === 'N') lo = Math.min(lo, n.zlo + r); else hi = Math.max(hi, n.zhi - r); }
+      return [lo, hi];
     }
     navFloor(x, z, y) { const i = this.navIdx(x, z, y); return i < 0 ? -Infinity : this.nf[i]; }
     canStep(a, b) { // a->b walkable (for monsters)
@@ -374,7 +391,7 @@
     }
     // flood reachable set (forward edges) for validation
     reach(fromIdx) {
-      const W = this.W, D = this.D, N = W * D;
+      const W = this.W, D = this.Dn, N = this.N;
       const seen = new Uint8Array(N * (this.L || 1));
       const q = [fromIdx]; seen[fromIdx] = 1;
       while (q.length) {
@@ -391,7 +408,7 @@
     }
     // Dijkstra on reversed edges from target => ndist[i] = cost to reach target from i
     updateFlow(tx, tz, ty) {
-      const W = this.W, D = this.D, N = W * D, L = this.L || 1;
+      const W = this.W, D = this.Dn, N = this.N, L = this.L || 1;
       let t = this.navIdx(tx, tz, ty);
       if (t < 0) return;
       if (this.nb[t]) { // target inside blocked cell: use nearest open neighbour
@@ -450,7 +467,7 @@
     }
     // direction toward target following the flow field (null if unreachable)
     flowDir(x, z, out, y) {
-      const W = this.W, N = W * this.D;
+      const W = this.W, N = this.N;
       const i = this.navIdx(x, z, y);
       if (i < 0 || this.ndist[i] === Infinity) return null;
       const ic = i % N, ix = ic % W, iz = (ic / W) | 0;
@@ -458,7 +475,7 @@
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dz) continue;
         const ax = ix + dx, az = iz + dz;
-        if (ax < 0 || az < 0 || ax >= W || az >= this.D) continue;
+        if (ax < 0 || az < 0 || ax >= W || az >= this.Dn) continue;
         const a = this.land(i, az * W + ax);
         if (a < 0) continue;
         if (dx && dz) { const c1 = this.land(i, az * W + ix), c2 = this.land(i, iz * W + ax); if (c1 < 0 || c2 < 0 || this.nb[c1] || this.nb[c2]) continue; }
@@ -467,7 +484,7 @@
       }
       if (!bx && !bz) return null;
       // aim at next cell center (smooths movement)
-      out.x = ix + bx + 0.5 - x; out.z = iz + bz + 0.5 - z;
+      out.x = ix + bx + 0.5 - x; out.z = iz - this.zo + bz + 0.5 - z;
       const l = Math.hypot(out.x, out.z) || 1; out.x /= l; out.z /= l;
       return out;
     }
@@ -482,12 +499,12 @@
     }
     randomOpenCell(rng, filter) {
       for (let k = 0; k < 400; k++) {
-        const x = Math.floor(rng.next() * this.W), z = Math.floor(rng.next() * this.D);
+        const x = Math.floor(rng.next() * this.W), z = Math.floor(rng.next() * this.Dn);
         const i = (this.L > 1 ? Math.floor(rng.next() * this.L) * this.N : 0) + z * this.W + x;
         if (this.nb[i] || this.nf[i] === -Infinity) continue;
         if (this.npen[i] > 0.4) continue;
-        if (filter && !filter(x + 0.5, z + 0.5, i)) continue;
-        return { x: x + 0.5, y: this.nf[i], z: z + 0.5, i };
+        if (filter && !filter(x + 0.5, z - this.zo + 0.5, i)) continue;
+        return { x: x + 0.5, y: this.nf[i], z: z - this.zo + 0.5, i };
       }
       return null;
     }

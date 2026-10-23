@@ -215,7 +215,7 @@
     const H = OUT === 'ruins' ? Math.min(opts.h || WALL_H, 8) : (opts.h || WALL_H), TOP = opts.top || WALL_TOP;
     const gh = 6;
     if (OUT) opts.beams = 0;
-    const gxs = LG.gateXs(W, opts.gates || 1);
+    const gxs = opts.noExits ? [] : LG.gateXs(W, opts.gates || 1); // noExits: the last area of a run has no door onward, just wall
     // south wall (z = D..D+T) — the sky island is open on the south/east/west edges
     if (OUT !== 'sky') w.solid('block', -WALL_T, 0, D, W + WALL_T, H, D + WALL_T, { uv: 4 });
     // north wall with one or more exit openings

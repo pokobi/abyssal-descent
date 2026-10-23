@@ -726,7 +726,7 @@
     const pit = new Uint8Array(W * (AD + 3));
     for (let z = 0; z < LEDGE; z++) for (let x = 0; x < W; x++) pit[z * W + x] = 1;
     H.floors(w, W, AD + 3, pit, 'cobble');
-    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, voidArena: true, arenaD: AD, h: 8 });
+    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, noExits: true, voidArena: true, arenaD: AD, h: 8 });
     const nook = roadHall(w, rng, W, AD, D, true);
     const vx = nook.nx, vz = nook.nz;
     w.stoneVendor = F.stoneVendor(w, vx - 0.6, vz, 0, 1);
@@ -779,10 +779,10 @@
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
     const cx = W / 2, cz = AD / 2 - 2;
     H.floors(w, W, AD + 3, null, style.arena === 'colosseum' ? 'floor' : 'cobble');
-    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, h: outdoor ? 3.2 : 16, top: outdoor ? undefined : 24 });
+    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, noExits: !!(G.Run && G.Run.isLast(area)), h: outdoor ? 3.2 : 16, top: outdoor ? undefined : 24 });
     if (outdoor) {
       // the guardian's field is ringed by a tall iron fence on the low cemetery wall
-      F.fence(w, 0.2, 0.2, W - 0.2, 0.2, 5.5, LG.gateXs(W, 3).map((g) => [g - 2.6, g + 2.6]));
+      F.fence(w, 0.2, 0.2, W - 0.2, 0.2, 5.5, G.Run && G.Run.isLast(area) ? [] : LG.gateXs(W, 3).map((g) => [g - 2.6, g + 2.6]));
       F.fence(w, 0.2, 0.2, 0.2, AD, 5.5, []); F.fence(w, W - 0.2, 0.2, W - 0.2, AD, 5.5, []);
     } else F.ceiling(w, rng, 0, 0, W, AD, 24, { chandeliers: 2, ruined: field === 'ruin' });
     const nook = outdoor ? roadGrave(w, rng, W, AD, D) : roadHall(w, rng, W, AD, D, field === 'ruin');

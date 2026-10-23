@@ -158,10 +158,21 @@
   A.samplesOn = () => A.force ? A.force === 'sample' : G.save.data.settings.sfxSamples !== false;
   const usable = (key) => A.samplesOn() && (A.force === 'sample' || !offKeys.has(key)) && SB.bank[key];
   const pend = {};
+  // sfx/sfxdata.js (tools/sfx/pack_data.js): every file as base64 in one script, which works from file:// too; loaded only when a fetch fails
+  let dataP = null;
+  function dataBuf(f) {
+    dataP = dataP || new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'sfx/sfxdata.js'; s.onload = ok; s.onerror = () => no('no sfxdata'); document.head.appendChild(s); });
+    return dataP.then(() => {
+      const b64 = G.SFXDATA && G.SFXDATA[f]; if (!b64) return Promise.reject('missing ' + f);
+      const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      return u.buffer;
+    });
+  }
   function fetchBuf(f) {
     if (pend[f]) return pend[f];
     bufs[f] = null;
     return (pend[f] = fetch('sfx/' + f + '.mp3').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+      .catch(() => dataBuf(f)) // opened from disk (file://) or the files are blocked: take them from the packed copy instead
       .then((ab) => new Promise((ok, no) => ctx.decodeAudioData(ab, ok, no)))
       .then((b) => (bufs[f] = b), () => (bufs[f] = false)));
   }

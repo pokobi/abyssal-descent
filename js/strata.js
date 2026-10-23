@@ -362,6 +362,7 @@
       const r = s === 'W' ? { x0: 0, z0: 0, x1: amin(WL[k], 0, D), z1: D } : { x0: amax(ER[k], 0, D), z0: 0, x1: W, z1: D };
       for (let z = 7; z < D - 3; z += 13) if (!nR(s, k, z)) P().torch(w, s === 'W' ? 0 : W, y + 3.2, z, s === 'W' ? 'px' : 'nx');
       dress(w, rng, L.occ, y, k, r, ruined);
+      cover(w, rng, L.occ, y, k, r, ruined, k < NL - 1 ? SP - 0.75 : SP);
     }
 
     // ---- chests: only in the barred rooms, four or five an area (a vault hall keeps its six, spread over the storeys) ----
@@ -420,6 +421,50 @@
       for (let i = 0; i < (k ? 1 : 2); i++) { const q = o.place(rng, rng.int(3, 6), rng.int(3, 6), 1.2, 30); if (q) G.Fields.add(w, 'lava', q.x0, q.z0, q.x1, q.z1, { blue: true, y: y + 0.005 }); }
       for (let i = 0; i < n * 2; i++) { const x = rng.range(r.x0 + 1, r.x1 - 2), z = rng.range(r.z0 + 1, r.z1 - 2); w.visual('floor', x, y + 0.02, z, x + rng.range(0.5, 2), y + 0.05, z + rng.range(0.5, 2), { uv: 1, tint: [rng.range(0.08, 0.16), rng.range(0.22, 0.34), rng.range(0.4, 0.6)], grad: false }); }
       if (rng.chance(0.7)) { const q = o.place(rng, 2, 2, 1, 20); if (q) { w.addLight(q.x0 + 1, y + 1.2, q.z0 + 1, { flame: 0.5, intensity: 7, range: 11, color: '#4a8aff', prio: 0.8 }); P().candles(w, q.x0 + 1, y, q.z0 + 1, rng, false); } }
+    }
+  }
+  // cover on a storey: full-height pillars, stretches of wall and a few small walled rooms (open to the sky, two doorways each), so the halls
+  // are not one wide open floor. h: the height up to the next slab. Everything is placed through the storey's occupancy, clear of stairs, bridge
+  // landings, holes and the rooms' doorways.
+  function cover(w, rng, o, y, k, r, ruined, h) {
+    const area = Math.max(0, (r.x1 - r.x0) * (r.z1 - r.z0));
+    const wallBox = (x0, z0, x1, z1, hh) => {
+      w.solid('wall', x0, y, z0, x1, y + hh, z1, { uv: 2 });
+      w.visual('trim', x0 - 0.05, y + hh, z0 - 0.05, x1 + 0.05, y + hh + 0.12, z1 + 0.05, { uv: 1 });
+    };
+    // pillars
+    for (let i = 0, n = Math.round(area / 330); i < n; i++) {
+      const q = o.place(rng, 2, 2, 1.6); if (!q) continue;
+      if (ruined && rng.chance(0.3)) { P().pillarSquare(w, q.x0 + 1, q.z0 + 1, y, rng.range(2.5, 5), 1.1); P().rubble(w, q.x0 + 2.4, y, q.z0 + 1, rng, 1.1); } else P().pillarSquare(w, q.x0 + 1, q.z0 + 1, y, h, 1.1);
+    }
+    // stretches of wall (a broken, uneven top on the fourth field)
+    for (let i = 0, n = Math.round(area / 650); i < n; i++) {
+      const L = rng.int(6, 10), alongX = rng.chance(0.5), q = alongX ? o.place(rng, L, 2, 1.8) : o.place(rng, 2, L, 1.8); if (!q) continue;
+      const hh = rng.range(3.2, 4.2);
+      if (alongX) { for (let a = q.x0; a < q.x1; a += 2) wallBox(a, q.z0 + 0.45, Math.min(q.x1, a + 2), q.z0 + 1.55, ruined ? rng.range(1.6, hh) : hh); P().torch(w, q.x0 + L / 2, y + 2.4, q.z0 + 1.55, 'pz'); }
+      else { for (let a = q.z0; a < q.z1; a += 2) wallBox(q.x0 + 0.45, a, q.x0 + 1.55, Math.min(q.z1, a + 2), ruined ? rng.range(1.6, hh) : hh); P().torch(w, q.x0 + 1.55, y + 2.4, q.z0 + L / 2, 'px'); }
+    }
+    // small rooms: open to the sky, a doorway on two of the sides
+    for (let i = 0, n = rng.chance(0.55) ? 1 : 0; i < n; i++) {
+      const rw = rng.int(8, 11), rd = rng.int(7, 9), q = o.place(rng, rw, rd, 2.2); if (!q) continue;
+      const t = 0.5, hh = rng.range(3.4, 4.2), gap = 3.4;
+      const sides = ['N', 'S', 'W', 'E'].sort(() => rng.next() - 0.5).slice(0, 2);
+      const seg = (side) => {
+        const horiz = side === 'N' || side === 'S', len = horiz ? rw : rd;
+        const door = sides.includes(side), c = rng.range(2 + gap / 2, len - 2 - gap / 2);
+        const parts = door ? [[0, c - gap / 2], [c + gap / 2, len]] : [[0, len]];
+        for (const [a, b] of parts) {
+          if (horiz) { const z = side === 'N' ? q.z0 : q.z1 - t; wallBox(q.x0 + a, z, q.x0 + b, z + t, ruined ? rng.range(2.2, hh) : hh); }
+          else { const x = side === 'W' ? q.x0 : q.x1 - t; wallBox(x, q.z0 + a, x + t, q.z0 + b, ruined ? rng.range(2.2, hh) : hh); }
+        }
+      };
+      for (const sd of ['N', 'S', 'W', 'E']) seg(sd);
+      const cx = (q.x0 + q.x1) / 2, cz = (q.z0 + q.z1) / 2;
+      P().brazier(w, cx, y, cz, 1);
+      if (rng.chance(0.6)) P().crate(w, q.x0 + 1.4, q.z0 + 1.4, y, rng);
+      if (rng.chance(0.5)) P().barrel(w, q.x1 - 1.4, q.z1 - 1.4, y, rng, false);
+      if (rng.chance(0.4)) P().table(w, cx + 2, cz - 1.5, y, true, rng);
+      if (rng.chance(0.5)) P().bones(w, cx - 2, y, cz + 1.5, rng);
     }
   }
   S.gen = gen;

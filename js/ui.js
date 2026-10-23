@@ -210,10 +210,16 @@
         const o = WH.shift + (sd > 0 ? WH.gap : -WH.gap);
         poly = clip(poly, nx * o, ny * o, nx * sd, ny * sd);
       }
+      // the pinwheel shift leaves each shard's middle a little off its slot angle: turn the shard (about the hub) until its middle sits exactly on it,
+      // so the shards, the icons and the direction you aim at all line up and the spacing is even
+      const ca = -Math.PI / 2 + i * step;
+      const cen = (P) => { let A = 0, X = 0, Y = 0; for (let k = 0; k < P.length; k++) { const [x0, y0] = P[k], [x1, y1] = P[(k + 1) % P.length], c = x0 * y1 - x1 * y0; A += c; X += (x0 + x1) * c; Y += (y0 + y1) * c; } return [X / (3 * A), Y / (3 * A)]; };
+      let [cx, cy] = cen(poly);
+      const turn = ca - Math.atan2(cy, cx), ct = Math.cos(turn), st = Math.sin(turn);
+      poly = poly.map((q) => [q[0] * ct - q[1] * st, q[0] * st + q[1] * ct]);
+      [cx, cy] = cen(poly);
       paths.push('M' + poly.map((q) => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L') + 'Z');
-      let cx = 0, cy = 0; for (const q of poly) { cx += q[0]; cy += q[1]; } cx /= poly.length; cy /= poly.length;
-      const ca = -Math.PI / 2 + i * step, rc = (WH.in + WH.out) / 2 + 4;
-      centers.push([Math.cos(ca) * rc * 0.5 + cx * 0.5, Math.sin(ca) * rc * 0.5 + cy * 0.5, Math.cos(ca) * 9, Math.sin(ca) * 9]);
+      centers.push([cx, cy, Math.cos(ca) * 9, Math.sin(ca) * 9]);
     }
     return { paths, centers };
   }

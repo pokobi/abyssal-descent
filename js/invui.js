@@ -23,7 +23,8 @@
       root = document.createElement('div'); root.id = 'inv-ui';
       G.ui.el.hud.appendChild(root); // inside the HUD layer, so the message areas (toasts, banners ...) can sit above the dark backdrop without being moved
       root.addEventListener('contextmenu', (e) => e.preventDefault());
-      root.addEventListener('pointerdown', (e) => { if (!menu || !menu.contains(e.target)) closeMenu(); });
+      // (a right click on an item opens the menu in its own handler, which runs first: do not close it again here)
+      root.addEventListener('pointerdown', (e) => { if (e.button === 2 && e.target.closest('.iv-it, .iv-wbox')) return; if (!menu || !menu.contains(e.target)) closeMenu(); });
       window.addEventListener('resize', onResize);
     }
     G.sfx.ui('open'); G.ui.showInteract(null); G.ui.holdRing(-1);
@@ -238,6 +239,13 @@
     el.addEventListener('mousemove', (e) => { if (!drag && tip) placeTip(e); });
     el.addEventListener('mouseleave', hideTip);
     el.addEventListener('pointerdown', (e) => {
+      // right click on a gun: its menu (the last gun cannot be thrown away)
+      if (e.button === 2 && kind === 'w' && !el.classList.contains('empty') && !e.target.closest('.iv-as')) {
+        e.preventDefault(); closeMenu(); hideTip();
+        const w = G.weapons.gunsInOrder()[+el.dataset.wslot]; if (!w) return;
+        popMenu([['🗑️ 捨てる', () => { if (GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else { G.sfx.ui('deny'); G.ui.toastSmall('最後の銃は捨てられない'); } render(); }]], e);
+        return;
+      }
       if (e.button !== 0 || e.target.closest('.iv-as')) return;
       closeMenu();
       if (kind === 'w' && !el.classList.contains('empty') && G.weapons.gunsInOrder().length) startDrag({ wslot: +el.dataset.wslot }, el, e);

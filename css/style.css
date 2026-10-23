@@ -1091,7 +1091,7 @@ body.boss-on #objective { display: none; }
 @keyframes ivglow { from { box-shadow: 0 0 0 2px #6ef08a, 0 0 6px rgba(110,240,140,0.4); } to { box-shadow: 0 0 0 3px #b6ffc6, 0 0 22px rgba(110,240,140,0.95); } }
 .iv-glow { animation: ivglow 0.7s ease-in-out infinite alternate; border-color: #6ef08a !important; }
 .iv-eq.hover, .iv-as.hover, .iv-wbox.hover, .iv-sk.hover { box-shadow: 0 0 0 3px #fff, 0 0 18px #6ef08a !important; }
-.iv-menu { position: fixed; z-index: 90; min-width: 11em; background: rgba(18,14,10,0.98); border: 1px solid rgba(220,190,130,0.4); border-radius: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.7); font-size: calc(13px * var(--s, 1)); }
+.iv-menu { position: fixed; z-index: 90; min-width: 11em; background: rgba(18,14,10,0.98); border: 1px solid rgba(220,190,130,0.4); border-radius: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.7); font-size: calc(15px * var(--s, 1)); }
 .iv-menu div { padding: 0.45em 1em; color: #e8dcc4; cursor: pointer; }
 .iv-menu div:hover { background: rgba(255,200,110,0.18); }
 /* hover cards */

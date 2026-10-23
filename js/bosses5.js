@@ -129,7 +129,8 @@
 
   // shock rings spreading from the guardian one after another: jump each one
   atk.rings = function (a) {
-    const P = Pl(), n = a.n || 3, gap = a.gap || 0.75, speed = a.speed || 15, W = a.wind || 0.8, col = a.col || 0xffa060, R = 44;
+    // rings you have to jump: never more than three, far enough apart to land, take off again and time the next one, and not too fast
+    const P = Pl(), n = Math.min(3, a.n || 3), gap = Math.max(1.4, a.gap || 0.75), speed = Math.min(13, a.speed || 15), W = a.wind || 0.8, col = a.col || 0xffa060, R = 44;
     if (!a.rg) {
       sfxCast(this, a); pose(this, 1);
       a.o = this.pos.clone().setY(0); a.rg = []; a.tele = FX().telegraph(a.o, 5, W, col);
@@ -139,7 +140,7 @@
       if (a.t < g.t0) continue;
       if (!g.started) { g.started = true; FX().ring(a.o.clone().setY(0.2), R, col, R / speed); G.sfx.explosion(a.o, 1.0); P.addShake(0.5); FX().dust(a.o, V(0, 1, 0), 0x7a6a50, 14); }
       const r = (a.t - g.t0) * speed;
-      if (!g.hit && Math.abs(hd(P.pos, a.o) - r) < 1.35 && P.pos.y < 0.95) { g.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', a.o, a.elem); P.vel.y = Math.max(P.vel.y, 5); }
+      if (!g.hit && Math.abs(hd(P.pos, a.o) - r) < 1.1 && P.pos.y < 0.6) { g.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', a.o, a.elem); P.vel.y = Math.max(P.vel.y, 5); }
     }
     return a.t > W + (n - 1) * gap + R / speed;
   };
@@ -150,7 +151,7 @@
     if (a.ang === undefined) { a.ang = Math.random() * 6.28; a.acc = 0; sfxCast(this, a); pose(this, 1); }
     if (a.t < W) return false;
     a.ang += (a.rot || 1.5) * dt * (a.flip ? -1 : 1);
-    a.acc += dt * (a.rate || 11);
+    a.acc += dt * (a.rate || 8);
     const from = this.pos.clone().setY(a.y || 1.6);
     while (a.acc >= 1) {
       a.acc--;
@@ -180,7 +181,7 @@
       if (Math.random() < 0.5) FX().beam(c.clone().addScaledVector(w.perp, wid / 2).setY(0.5), c.clone().addScaledVector(w.perp, -wid / 2).setY(0.5), col, 0.35, 0.07);
       if (Math.random() < 0.6) FX().dust(c.clone().addScaledVector(w.perp, U.rand(-wid / 2, wid / 2)), V(0, 1, 0), 0x8a8a8a, 1);
       const rel = P.pos.clone().sub(w.o), along = rel.dot(w.dir), across = Math.abs(rel.dot(w.perp));
-      if (!w.hit && Math.abs(along - d) < 1.5 && across < wid / 2 + 0.3 && P.pos.y < 0.95) { w.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', c, a.elem); P.vel.y = Math.max(P.vel.y, 5); P.vel.addScaledVector(w.dir, 6); }
+      if (!w.hit && Math.abs(along - d) < 1.5 && across < wid / 2 + 0.3 && P.pos.y < 0.6) { w.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', c, a.elem); P.vel.y = Math.max(P.vel.y, 5); P.vel.addScaledVector(w.dir, 6); }
     }
     return !live;
   };

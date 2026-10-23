@@ -28,7 +28,7 @@
     for (let i = boss.waves.length - 1; i >= 0; i--) {
       const w = boss.waves[i];
       w.r += w.speed * dt; w.m.scale.setScalar(w.r); w.m.material.opacity = Math.max(0, 0.9 * (1 - w.r / w.maxR));
-      if (!w.hit && Math.abs(distH(P.pos, w.c) - w.r) < 0.9 && P.pos.y < 0.8) { w.hit = true; boss.hurtPlayer(w.dmg, 'aoe', w.c); P.vel.y = 6; }
+      if (!w.hit && Math.abs(distH(P.pos, w.c) - w.r) < 0.9 && P.pos.y < 0.6) { w.hit = true; boss.hurtPlayer(w.dmg, 'aoe', w.c); P.vel.y = 6; }
       if (w.r >= w.maxR) { G.scene.remove(w.m); boss.waves.splice(i, 1); }
     }
   }
@@ -473,7 +473,7 @@
           a.hit = true; G.sfx.explosion(a.to, 2); G.fx.dust(a.to, V(0, 1, 0), 0x4a3a5a, 30); G.fx.decal(a.to.clone().setY(0.03), V(0, 1, 0), 'crack', 7, true); P.addShake(0.8);
           if (distH(P.pos, a.to) < 4.2 && P.pos.y < 2.5) this.hurtPlayer(40, 'aoe', a.to);
           shockwave(this, a.to, 15, 26, 22, 0xb040ff); G.ui.toastSmall('⚠ 衝撃波 — ジャンプ！');
-          if (this.phase >= 2) setTimeout(() => { if (!this.dead && this.form === 1) shockwave(this, a.to, 18, 26, 22, 0xff4080); }, 450);
+          if (this.phase >= 2) setTimeout(() => { if (!this.dead && this.form === 1) shockwave(this, a.to, 14, 26, 22, 0xff4080); }, 1300); // the second ring used to follow 0.45 s behind, faster: no time to land and jump again
         }
         if (a.t > 2.0) end();
       } else if (a.k === 'blink') {

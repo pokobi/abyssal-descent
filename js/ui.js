@@ -181,7 +181,7 @@
     vig.style.boxShadow = `inset 0 0 220px 60px ${urgent ? 'rgba(255,40,20,0.75)' : 'rgba(255,170,40,0.6)'}`;
   };
   // ---- the wheel's shape: a hub in the middle and one cut-stone shard per entry around it, a gap between the shards.
-  // The gaps are straight lines shifted off the centre the same way for every shard (a pinwheel), the rim is a little ragged. ----
+  // The gaps are straight lines shifted off the centre the same way for every shard (a pinwheel); both rims are true circles. ----
   const WH = { hub: 74, in: 90, out: 190, gap: 5, shift: 22 };
   function wheelShapes(n) {
     const clip = (poly, px, py, nx, ny) => { // keep what lies on the side of the line (px,py) that (nx,ny) points to
@@ -194,15 +194,14 @@
       }
       return out;
     };
-    const rnd = (i, j) => { const x = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return (x - Math.floor(x)) * 2 - 1; };
     const step = Math.PI * 2 / n, paths = [], centers = [];
     for (let i = 0; i < n; i++) {
       const a0 = -Math.PI / 2 + (i - 0.5) * step, a1 = a0 + step; // the shard of slot i lies between two boundary angles
       const pts = [];
-      // outer rim (coarse, ragged), then inner rim (smooth, follows the hub)
-      const nOut = Math.max(3, Math.round(step / 0.42));
-      for (let k = 0; k <= nOut; k++) { const a = a0 - 0.2 + (step + 0.4) * k / nOut; const r = WH.out + (k === 0 || k === nOut ? 0 : rnd(i, k) * 7); pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
-      const nIn = Math.max(6, Math.round(step / 0.12));
+      // outer rim, then inner rim (which follows the hub): both sampled finely so they read as circles
+      const nOut = Math.max(8, Math.round(step / 0.06));
+      for (let k = 0; k <= nOut; k++) { const a = a0 - 0.2 + (step + 0.4) * k / nOut; pts.push([Math.cos(a) * WH.out, Math.sin(a) * WH.out]); }
+      const nIn = Math.max(8, Math.round(step / 0.06));
       for (let k = nIn; k >= 0; k--) { const a = a0 - 0.2 + (step + 0.4) * k / nIn; pts.push([Math.cos(a) * WH.in, Math.sin(a) * WH.in]); }
       let poly = pts;
       // boundary lines: shifted sideways (pinwheel); this shard keeps the near side of its two lines, with half a gap to spare
@@ -211,8 +210,6 @@
         const o = WH.shift + (sd > 0 ? WH.gap : -WH.gap);
         poly = clip(poly, nx * o, ny * o, nx * sd, ny * sd);
       }
-      // a ragged, cut-stone look: nudge the corners
-      poly = poly.map((q, k) => [q[0] + rnd(i, k + 40) * 2.2, q[1] + rnd(i, k + 70) * 2.2]);
       paths.push('M' + poly.map((q) => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L') + 'Z');
       let cx = 0, cy = 0; for (const q of poly) { cx += q[0]; cy += q[1]; } cx /= poly.length; cy /= poly.length;
       const ca = -Math.PI / 2 + i * step, rc = (WH.in + WH.out) / 2 + 4;

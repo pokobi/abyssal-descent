@@ -365,13 +365,13 @@
         const mk = (pt) => { const d = C.addDecoy(pt, p.dur, sc(p.dmg) * (m.x_nova ? 1.5 : 1)); if (d && m.x_nova) d.explodeR = 8; };
         mk(a.floorPt);
         if (m.x_twin) { const f = P.forward(); f.y = 0; f.normalize(); mk(a.floorPt.clone().add(V(-f.z * 3, 0, f.x * 3))); }
-        if (m.x_cloak) { C.temp('decoy_cloak', 2.5, { invis: 1 }, '👻'); G.ui.tint('cloak', 2.5); }
+        if (m.x_cloak) { C.temp('decoy_cloak', 2.5, { invis: 1 }, '👻'); }
         break;
       }
       case 'cloak':
         C.temp('cloak', p.dur, { invis: 1, critMul: m.x_assassin ? 1.0 : 0, moveSpeed: m.x_speed ? 0.3 : 0, hpRegen: m.x_heal ? P.stats.maxHp * 0.04 : 0 }, '👻'); G.weapons._cloakUsed = false;
         if (m.x_smoke) C.zone(P.pos.clone(), 5, 6, 'smoke', 0);
-        G.sfx.magic(P.pos, 'dark'); G.ui.tint('cloak', p.dur); break;
+        G.sfx.magic(P.pos, 'dark'); break;
       case 'overdrive':
         C.temp('overdrive', p.dur, { infAmmo: 1, fireRate: m.x_rate ? 0.9 : 0.6, dmg: m.x_dmg ? 0.2 : 0 }, '🔫');
         if (m.x_reload) for (const w of P.weapons) if (w && w.mag !== undefined) w.mag = G.weapons.stats(w).mag;
@@ -648,7 +648,7 @@
     if (d.turret) { const a = aim(5); C.spawnTurret(a.floorPt, d.turret, C.scale(26)); }
     if (d.decoy) { const a = aim(6); C.addDecoy(a.floorPt, d.decoy, 0); }
     if (d.grapple) P.grappleCd = 0;
-    if (d.invis) { C.temp('invis_item', d.invis, { invis: 1 }, '👻'); G.ui.tint('cloak', d.invis); }
+    if (d.invis) { C.temp('invis_item', d.invis, { invis: 1 }, '👻'); }
     if (d.ward) { P.wardT = d.ward; G.fx.bubble(P.chestPos(), 3.2, 0xd0b0ff); G.sfx.magic(P.pos); }
     if (d.refill) { for (const w of P.weapons) w.mag = G.weapons.stats(w).mag; G.sfx.mech('magIn'); }
     if (d.chest) {

@@ -199,6 +199,39 @@
     const s = G.player.st || {};
     return ORDER.filter((k) => s[k] > 0);
   };
+  // ---- invisibility: the hands and whatever they hold (first person) and your body (third person) turn see-through,
+  // and the screen edges shimmer. The see-through look uses per-mesh copies of the materials (gun materials are shared
+  // with weapons lying around), handed back when the effect has faded out.
+  let ghostK = 0, ghostVig = null;
+  const ghosted = new Set();
+  function ghostMesh(o, op) {
+    if (!o.isMesh || !o.material || o.userData._noGhost) return;
+    let g = o.userData._ghost;
+    if (!g) {
+      const src = o.material, arr = Array.isArray(src) ? src : [src];
+      if (arr.some((m) => m.transparent || m.blending !== THREE.NormalBlending || m.isShaderMaterial)) { o.userData._noGhost = true; return; } // flashes / glows / lenses / the scope picture keep their own look
+      const cl = arr.map((m) => { const c = m.clone(); c.transparent = true; c.depthWrite = false; return c; });
+      g = o.userData._ghost = { src, cl, shadow: o.castShadow };
+      o.material = Array.isArray(src) ? cl : cl[0];
+      o.castShadow = false;
+      ghosted.add(o);
+    }
+    for (const m of g.cl) m.opacity = op;
+  }
+  function unghostAll() {
+    for (const o of ghosted) { const g = o.userData._ghost; if (!g) continue; o.material = g.src; o.castShadow = g.shadow; for (const m of g.cl) m.dispose(); delete o.userData._ghost; }
+    ghosted.clear();
+  }
+  function updateInvis(dt, t, P) {
+    const on = (P.stats.invis || 0) > 0 && !P.dead;
+    ghostK = U.clamp(ghostK + (on ? dt * 4 : -dt * 3), 0, 1);
+    if (!ghostVig) { ghostVig = document.createElement('div'); ghostVig.id = 'invis-vig'; document.body.appendChild(ghostVig); }
+    ghostVig.style.opacity = (ghostK * (0.8 + 0.2 * Math.sin(t * 2.2))).toFixed(2);
+    if (ghostK <= 0) { if (ghosted.size) unghostAll(); return; }
+    const op = 1 - ghostK * (0.7 + 0.08 * Math.sin(t * 5));
+    if (G.weapons.vmScene) G.weapons.vmScene.traverse((o) => ghostMesh(o, op));
+    if (G.avatar && G.avatar.root) G.avatar.root.traverse((o) => ghostMesh(o, op));
+  }
   PS.update = function (dt) {
     const P = G.player; if (!P || !P.st) return;
     ensureDom();
@@ -277,6 +310,7 @@
     const [lookId, lookTmp] = pickLook(P, invOn);
     const look = lookId ? PS.LOOKS[lookId] : null;
     updateLook(lookId, look, dt, t, P, lookTmp);
+    updateInvis(dt, t, P);
     const vis = invOn ? look : top ? PS.DEFS[top] : look;
     // ---- recolour the held weapon (gun or melee) and the hands ----
     const key = G.weapons.vmKey;

@@ -120,7 +120,7 @@
         A.auras.push({ kind: 'fire', t: p.dur, r: p.r, dps: sc(p.dps), follow: true, col: 0xff5010, burn: true, sk: id, onEnd: m.x_end ? () => C.explode(P.pos.clone().add(V(0, 1, 0)), 12, sc(400), Object.assign({ color: 0xff5010 }, info)) : null });
         if (m.x_heal) C.temp('ult_inferno_heal', p.dur, { hpRegen: st.maxHp * 0.02 }, '💚');
         G.sfx.fire && G.sfx.fire(P.pos, true); break;
-      case 'ult_shadow': C.temp('ult_shadow', p.dur, { invis: 1, critChance: 0.6, critMul: m.x_lethal ? 1.0 : 0.5, lifesteal: m.x_vamp ? 0.05 : 0, moveSpeed: m.x_speed ? 0.3 : 0 }, '🥷', '影の舞'); G.ui.tint('cloak', p.dur); G.sfx.magic(P.pos, 'dark'); break;
+      case 'ult_shadow': C.temp('ult_shadow', p.dur, { invis: 1, critChance: 0.6, critMul: m.x_lethal ? 1.0 : 0.5, lifesteal: m.x_vamp ? 0.05 : 0, moveSpeed: m.x_speed ? 0.3 : 0 }, '🥷', '影の舞'); G.sfx.magic(P.pos, 'dark'); break;
       case 'ult_orbital': A.auras.push({ kind: 'beam', t: p.dur, r: p.r, dps: sc(p.dps), pt: aimPt(70), track: m.x_track ? 9 : 3, sk: id }); G.sfx.zap && G.sfx.zap(P.pos); break;
       case 'ult_sanctuary': A.auras.push({ kind: 'holy', t: p.dur, r: p.r, dps: sc(p.dps), c: P.pos.clone(), heal: m.x_heal ? 0.07 : 0.04, follow: !!m.x_follow, sk: id }); G.sfx.magic(P.pos, 'holy'); break;
       case 'ult_bloodstorm': A.auras.push({ kind: 'drain', t: p.dur, r: p.r, dps: sc(p.dps), follow: true, ls: m.x_ls ? 0.65 : 0.4, over: !!m.x_over, sk: id }); G.sfx.magic(P.pos, 'dark'); break;

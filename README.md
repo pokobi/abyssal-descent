@@ -31,3 +31,20 @@ The silhouettes were recoloured (gradient fill and outline) for this game. Icons
 The attachment icons (optics, muzzles, barrels, magazines, grips, stocks, rounds, triggers) and some gun icons
 (sniper / marksman rifles, shotgun, LMG, rocket & grenade launchers, railgun, tesla gun, nail gun, harpoon gun) are original
 drawings made for this game; their small corner badges reuse the game-icons.net silhouettes listed above.
+
+Sound effects: recorded samples in `sfx/`, all released under [CC0](https://creativecommons.org/publicdomain/zero/1.0/)
+(no attribution required; credited here with thanks). They were cut, level-matched and re-encoded for this game.
+Every sound also has a procedural fallback, and `sounds.html` lists which file each sound uses.
+
+- [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library) — gunshots
+- Kenney — [Impact Sounds](https://kenney.nl/assets/impact-sounds), [Interface Sounds](https://kenney.nl/assets/interface-sounds), [RPG Audio](https://kenney.nl/assets/rpg-audio), [Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds), [UI Audio](https://kenney.nl/assets/ui-audio)
+- rubberduck — [80 CC0 creature SFX](https://opengameart.org/content/80-cc0-creature-sfx), [80 CC0 creature SFX #2](https://opengameart.org/content/80-cc0-creture-sfx-2), [100 CC0 SFX](https://opengameart.org/content/100-cc0-sfx), [100 CC0 SFX #2](https://opengameart.org/content/100-cc0-sfx-2), [50 CC0 Sci-Fi SFX](https://opengameart.org/content/50-cc0-sci-fi-sfx)
+- artisticdude — [Swishes Sound Pack](https://opengameart.org/content/swishes-sound-pack)
+- StarNinjas — [20 Sword Sound Effects](https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes)
+- Vehicle — [Fantasy Weapons and Apparel SFX Library](https://opengameart.org/content/fantasy-weapons-and-apparel-sfx-library)
+- JaggedStone — [Magic Spell SFX](https://opengameart.org/content/magic-spell-sfx), [Loopable Dungeon Ambience](https://opengameart.org/content/loopable-dungeon-ambience)
+- Paul Wortmann — [Dark Cavern Ambient](https://opengameart.org/content/dark-cavern-ambient)
+- yd — [Dungeon Ambience](https://opengameart.org/content/dungeon-ambience)
+- PagDev — [Fireplace Sound loop](https://opengameart.org/content/fireplace-sound-loop)
+- AntumDeluge — [Fire Crackling](https://opengameart.org/content/fire-crackling)
+- IgnasD — [Wind](https://opengameart.org/content/wind)

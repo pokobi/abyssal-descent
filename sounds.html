@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>効果音チェック - ABYSSAL DESCENT</title>
+<style>
+  :root { --bg: #0f0d12; --panel: #1a1720; --line: #2e2936; --text: #e8e2d6; --dim: #9a92a6; --acc: #e0a050; --ok: #7cc47c; --off: #c46a6a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.6 system-ui, 'Hiragino Sans', 'Yu Gothic UI', sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: rgba(15, 13, 18, 0.96); border-bottom: 1px solid var(--line); padding: 12px 16px; }
+  h1 { margin: 0 0 4px; font-size: 18px; color: var(--acc); letter-spacing: 0.05em; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .bar .stat { color: var(--dim); font-size: 13px; margin-left: auto; }
+  main { max-width: 1100px; margin: 0 auto; padding: 8px 16px 80px; }
+  .intro { color: var(--dim); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+  .intro b { color: var(--text); }
+  h2 { font-size: 15px; margin: 26px 0 8px; color: var(--acc); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .row { display: grid; grid-template-columns: 26px minmax(150px, 1.1fr) auto minmax(160px, 1fr); gap: 8px 12px; align-items: center; padding: 8px 6px; border-bottom: 1px solid #221e29; }
+  .row.off .name { opacity: 0.45; text-decoration: line-through; }
+  .name small { display: block; color: var(--dim); font-size: 12px; font-family: ui-monospace, monospace; }
+  .btns { display: flex; flex-wrap: wrap; gap: 4px; }
+  button { background: #2a2532; color: var(--text); border: 1px solid #3c3546; border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 13px; cursor: pointer; }
+  button:hover { border-color: var(--acc); }
+  button.rec { background: #2c3424; border-color: #4a5a3a; }
+  button.syn { background: #2a2a3a; border-color: #45456a; }
+  button.big { padding: 6px 12px; }
+  button.on { background: #5a4422; border-color: var(--acc); }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--ok); }
+  input.memo { width: 100%; background: #14121a; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 13px; }
+  .src { grid-column: 2 / -1; color: var(--dim); font-size: 12px; }
+  .src a { color: #b9a8d8; }
+  .synthlist { color: var(--dim); columns: 2; font-size: 13px; }
+  @media (max-width: 720px) { .row { grid-template-columns: 26px 1fr; } .btns, .memo { grid-column: 2; } .synthlist { columns: 1; } }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #2a2532; border: 1px solid var(--acc); border-radius: 8px; padding: 8px 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎧 効果音チェック</h1>
+  <div class="bar">
+    <button class="big" id="start">▶ 音を有効にする</button>
+    <button class="big" id="export">📋 チェック結果をコピー</button>
+    <button class="big" id="allon">すべて「使う」に戻す</button>
+    <span class="stat" id="stat">読み込み前</span>
+  </div>
+</header>
+<main>
+  <div class="intro">
+    <b>使い方：</b>各行の <b>▶録音</b> がゲームに入れた録音素材、<b>▶合成</b> が今までの合成音です。数字ボタンで個別の候補を聴けます（ゲームでは候補の中からランダムに鳴ります）。<br>
+    気に入らない音は左のチェックを外すと、<b>ゲームでもその音だけ合成音に戻ります</b>（このブラウザに保存）。メモ欄に「もっと重く」などを書いて、最後に <b>📋 チェック結果をコピー</b> を押してチャットに貼ってください。<br>
+    録音素材をまとめて切りたい時は、ゲームの設定の「🎧 録音素材の効果音」をOFFにします。素材はすべて CC0（著作権放棄・クレジット不要）です。出典は各行の下と README にあります。
+  </div>
+  <div id="list"></div>
+  <h2>合成音のまま残しているもの</h2>
+  <div class="synthlist" id="synth"></div>
+</main>
+<div id="toast"></div>
+<script>
+  // minimal stand-in for the game globals audio.js needs
+  window.G = { save: { data: { settings: { volume: 0.8, sfxSamples: true } } } };
+</script>
+<script src="js/sfxbank.js"></script>
+<script src="js/audio.js"></script>
+<script>
+(function () {
+  const A = G.sfx, SB = G.SFXBANK;
+  const grass = (fn) => () => { const w = G.world; G.world = { mats: { biome: { floorTex: 'grass' } } }; try { fn(); } finally { G.world = w; } };
+  // [key, label, procedural equivalent]
+  const CAT = [
+    ['銃声', [
+      ['gun_pistol', 'ハンドガン', () => A.gun('pistol')], ['gun_revolver', 'リボルバー', () => A.gun('revolver')], ['gun_smg', 'サブマシンガン', () => A.gun('smg')],
+      ['gun_rifle', 'アサルトライフル', () => A.gun('rifle')], ['gun_dmr', 'マークスマンライフル', () => A.gun('dmr')], ['gun_sniper', 'スナイパーライフル', () => A.gun('sniper')],
+      ['gun_shotgun', 'ショットガン', () => A.gun('shotgun')], ['gun_lmg', '機関銃', () => A.gun('lmg')], ['gun_minigun', 'ミニガン', () => A.gun('minigun')],
+      ['gun_suppressed', 'サプレッサー付き', () => A.gun('pistol', { suppressed: true })], ['launch_rocket', 'ロケットランチャー', () => A.launcher('rocket')], ['launch_rail', 'レールガン', () => A.launcher('rail')],
+      ['loop_flame', '火炎放射（ループ）', 'loop'],
+    ]],
+    ['リロード・操作音', [
+      ['mech_magOut', 'マガジンを抜く', () => A.mech('magOut')], ['mech_magIn', 'マガジンを差す', () => A.mech('magIn')], ['mech_click', 'カチッ（撃鉄など）', () => A.mech('click')],
+      ['mech_empty', '弾切れ', () => A.mech('empty')], ['mech_switch', '武器の切り替え', () => A.mech('switch')], ['mech_grab', '手に取る', () => A.mech('grab')], ['mech_shell', '弾を込める', () => A.mech('shell')],
+    ]],
+    ['足音・移動', [
+      ['step_stone', '足音（石）', () => A.step('stone', 0.75)], ['step_grass', '足音（草地の屋外）', grass(() => A.step('stone', 0.75))], ['step_wood', '足音（木）', () => A.step('wood', 0.75)],
+      ['step_water', '足音（水）', () => A.step('water', 0.75)], ['step_metal', '足音（金属）', () => A.step('metal', 0.75)], ['jump', 'ジャンプ', () => A.jump()],
+      ['land', '着地', () => A.land(0.6, 'stone')], ['land_wood', '着地（木）', () => A.land(0.6, 'wood')], ['mantle', 'よじ登り', () => A.mantle()],
+      ['grapple_hit', 'グラップルが刺さる', () => A.grappleHit(null)], ['ratchet', 'グラップルの巻き取り', () => A.ratchet()],
+    ]],
+    ['戦闘', [
+      ['hit_flesh', '敵に命中', () => A.hitFlesh(null, false, false)], ['hit_shield', '盾・装甲に命中', () => A.hitShield(null)], ['shield_break', '盾が割れる', () => A.shieldBreak(null)],
+      ['impact_stone', '着弾（石）', () => A.impact(null, 'stone')], ['impact_wood', '着弾（木）', () => A.impact(null, 'wood')], ['impact_metal', '着弾（金属）', () => A.impact(null, 'metal')],
+      ['bounce', '投擲物の跳ね返り', () => A.bounce(null, 6)], ['explosion', '爆発', () => A.explosion(null, 1)], ['swing', '近接の空振り', () => A.swing(false, 'blunt')],
+      ['swing_blade', '刃物の振り（空振りに重ねる）', () => A.swing(false, 'blade')], ['melee_slice', '斬撃が当たる', () => A.meleeHit(true, 'blade')], ['melee_blunt', '打撃が当たる', () => A.meleeHit(true, 'blunt')],
+      ['throw', '投げる', () => A.throwG()], ['hurt', '被弾（自分）', () => A.hurt(20)],
+    ]],
+    ['敵の声', [
+      ['mon_growl', 'うなり（獣・大型）', () => A.monster(null, 'growl')], ['mon_roar', '咆哮', () => A.monster(null, 'roar')], ['mon_snarl', '威嚇', () => A.monster(null, 'snarl')],
+      ['mon_screech', '金切り声', () => A.monster(null, 'screech')], ['mon_hiss', 'シュー（息）', () => A.monster(null, 'hiss')], ['mon_chitter', '虫のさえずり', () => A.monster(null, 'chitter')],
+      ['mon_groan', 'うめき（アンデッド）', () => A.monster(null, 'groan')], ['mon_wail', '遠吠え・嘆き', () => A.monster(null, 'wail')], ['mon_gurgle', 'ごぼごぼ（スライム）', () => A.monster(null, 'gurgle')],
+      ['mon_buzz', '羽音', () => A.monster(null, 'buzz')], ['mon_die', '撃破', () => A.monsterDie(null, 'growl', 1)], ['spit', '吐きかけ', () => A.spit(null)], ['attack_wind', '攻撃の予備動作', () => A.attackWind(null, false)],
+    ]],
+    ['魔法・属性・物', [
+      ['magic', '魔法', () => A.magic(null, 'light')], ['fire', '炎', () => A.fire(null, false)], ['ice', '氷', () => A.ice(null)], ['heal', '回復', () => A.heal()],
+      ['break_wood', '木箱が壊れる', () => A.breakObj(null, 'wood')], ['break_ceramic', '壺が割れる', () => A.breakObj(null, 'ceramic')], ['break_stone', '石が崩れる', () => A.breakObj(null, 'stone')],
+      ['shield_up', 'バリア展開', () => A.shieldUp()], ['bell', '鐘（ボス・ゲート）', () => A.bell()], ['chest_pry', '宝箱をこじ開ける', () => A.chestPry(0.5, null)], ['chest_unlock', '宝箱が開く', () => A.chestUnlock(null)],
+    ]],
+    ['UI・取得', [
+      ['coins', 'コイン', () => A.coins(5)], ['pickup', 'アイテムを拾う', () => A.pickup()], ['ui_hover', 'カーソルを合わせる', () => A.ui('hover')], ['ui_click', 'クリック', () => A.ui('click')],
+      ['ui_open', '画面を開く', () => A.ui('open')], ['ui_card', 'カードをめくる', () => A.ui('card')], ['ui_select', '決定', () => A.ui('select')], ['ui_error', 'エラー', () => A.ui('error')],
+      ['ui_skill', 'スキル', () => A.ui('skill')], ['ui_ready', 'クールタイム終了', () => A.ui('ready')], ['ui_deny', '使えない', () => A.ui('deny')], ['ult_ready', 'アルティメット準備完了', () => A.ultReady()], ['tick', '時計の音', () => A.tick(0)],
+    ]],
+    ['環境音', [
+      ['drip', '水滴', () => A.drip(null)], ['thunder', '雷鳴', () => A.thunder(0)], ['crackle', '松明のはぜる音', () => A.crackle(null)], ['lava', '溶岩の泡', () => A.lava(null)], ['wind', '風（屋外の突風）', () => A.wind(1)],
+      ['amb_cave', '環境音: 洞窟（地下墓所）', 'loop'], ['amb_deep', '環境音: 深部（神殿・迷宮・溶鉱）', 'loop'], ['amb_cavern', '環境音: 大空洞（水没・凍結・冥門・王城）', 'loop'],
+      ['amb_water', '環境音: 水の流れ（水没回廊に重ねる）', 'loop'], ['amb_fire', '環境音: 炎（溶鉱・蒼炎に重ねる）', 'loop'], ['amb_wind', '環境音: 風（屋外・凍結）', 'loop'],
+    ]],
+  ];
+  const SYNTH = ['ヘッドショット音・命中確認音（聞き分けやすさ優先）', '心音・死亡', 'ダッシュの風切り（長さが毎回違うため）', '鎖・グラップル発射', '跳弾', '電撃（テスラ・雷）', '地鳴り・石扉', '無敵・ゴールドバリア被弾', 'アルティメット発動', '警報・儀式の詠唱・儀式完了', 'ボス前の重低音・エクストラの沈む音', 'ささやき', 'コイン1枚・飲む', 'クリア・レベルアップ・レア入手のファンファーレ', 'ポンプ・ボルト・シリンダー・セル交換の一連の動作', 'グレネードランチャー・クロスボウ・ハープーン・ネイルガン', 'ミニガンの回転音・スライディング'];
+
+  let off = new Set(JSON.parse(localStorage.getItem('abyss_sfx_off') || '[]'));
+  let memo = JSON.parse(localStorage.getItem('abyss_sfx_memo') || '{}');
+  const save = () => { localStorage.setItem('abyss_sfx_off', JSON.stringify([...off])); localStorage.setItem('abyss_sfx_memo', JSON.stringify(memo)); A.loadPrefs(); };
+  const toast = (t) => { const e = document.getElementById('toast'); e.textContent = t; e.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('show'), 1800); };
+  const loops = {};
+  let started = false;
+
+  function srcHtml(key) {
+    const b = SB.bank[key]; if (!b) return '';
+    const by = {};
+    for (const f of b.f) { const [pk, orig] = SB.files[f]; by[pk] = by[pk] || []; if (!by[pk].includes(orig)) by[pk].push(orig); }
+    return Object.entries(by).map(([pk, list]) => { const p = SB.packs[pk] || [pk, '']; return `出典: <a href="${p[1]}" target="_blank" rel="noopener">${p[0]}</a>（CC0） ${list.join(', ')}`; }).join('<br>');
+  }
+  function build() {
+    const L = document.getElementById('list');
+    for (const [title, rows] of CAT) {
+      const h = document.createElement('h2'); h.textContent = title; L.appendChild(h);
+      for (const [key, label, fn] of rows) {
+        const b = SB.bank[key]; if (!b) continue;
+        const r = document.createElement('div'); r.className = 'row' + (off.has(key) ? ' off' : '');
+        const isLoop = fn === 'loop';
+        r.innerHTML = `<input type="checkbox" title="ゲームで使う" ${off.has(key) ? '' : 'checked'}>
+          <div class="name">${label}<small>${key}</small></div>
+          <div class="btns">${isLoop ? '<button class="rec lp">▶ 再生 / ■ 停止</button>' : `<button class="rec r">▶録音</button>${b.f.length > 1 ? b.f.map((f, i) => `<button class="v" data-f="${f}">${i + 1}</button>`).join('') : ''}<button class="syn s">▶合成</button>`}</div>
+          <input class="memo" placeholder="メモ（例: もっと重く / 2番だけ不要）" value="${(memo[key] || '').replace(/"/g, '&quot;')}">
+          <div class="src">${srcHtml(key)}</div>`;
+        r.querySelector('input[type=checkbox]').onchange = (e) => { if (e.target.checked) off.delete(key); else off.add(key); r.classList.toggle('off', !e.target.checked); save(); };
+        r.querySelector('.memo').oninput = (e) => { memo[key] = e.target.value; if (!memo[key]) delete memo[key]; save(); };
+        const need = () => { if (!started) { toast('先に「▶ 音を有効にする」を押してください'); return false; } return true; };
+        if (isLoop) {
+          r.querySelector('.lp').onclick = (e) => {
+            if (!need()) return;
+            if (loops[key]) { loops[key].stop(0.3); delete loops[key]; e.target.classList.remove('on'); return; }
+            A.force = 'sample';
+            const lv = key === 'loop_flame' ? 0.45 : 0.5;
+            const go = () => { loops[key] = A._loopKey(key, lv); A.force = null; if (loops[key]) e.target.classList.add('on'); };
+            A.fetchSample(b.f[0]).then(go);
+          };
+        } else {
+          r.querySelector('.r').onclick = () => { if (!need()) return; A.force = 'sample'; try { fn(); } finally { A.force = null; } };
+          r.querySelector('.s').onclick = () => { if (!need()) return; A.force = 'synth'; try { fn(); } finally { A.force = null; } };
+          r.querySelectorAll('.v').forEach((btn) => (btn.onclick = () => { if (need()) A.playFile(key, btn.dataset.f); }));
+        }
+        L.appendChild(r);
+      }
+    }
+    document.getElementById('synth').innerHTML = SYNTH.map((s) => '・' + s).join('<br>');
+  }
+  build();
+
+  document.getElementById('start').onclick = () => {
+    if (started) return;
+    A.init(); started = true;
+    const all = []; for (const k in SB.bank) all.push(...SB.bank[k].f);
+    let done = 0; const st = document.getElementById('stat');
+    st.textContent = `読み込み中… 0 / ${all.length}`;
+    Promise.all(all.map((f) => A.fetchSample(f).then(() => { done++; st.textContent = `読み込み中… ${done} / ${all.length}`; }))).then(() => {
+      const bad = all.filter((f) => !A.sampleBuf(f));
+      st.textContent = bad.length ? `${all.length - bad.length} / ${all.length} 読み込み（失敗 ${bad.length}）` : `${all.length} 個の素材を読み込みました`;
+    });
+    document.getElementById('start').textContent = '✓ 音は有効です';
+  };
+  document.getElementById('allon').onclick = () => { off.clear(); save(); document.querySelectorAll('.row').forEach((r) => { r.classList.remove('off'); r.querySelector('input[type=checkbox]').checked = true; }); toast('すべて「使う」に戻しました'); };
+  document.getElementById('export').onclick = () => {
+    const lines = ['【効果音チェック結果】'];
+    for (const [title, rows] of CAT) for (const [key, label] of rows) {
+      if (!SB.bank[key]) continue;
+      if (off.has(key) || memo[key]) lines.push(`${off.has(key) ? '✗不使用' : '○使用'} ${label}（${key}）${memo[key] ? '：' + memo[key] : ''}`);
+    }
+    if (lines.length === 1) lines.push('すべて使用・メモなし');
+    const text = lines.join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast('コピーしました。チャットに貼ってください'), () => { prompt('この文章をコピーしてください', text); });
+  };
+
+  // level matching used once when the bank is built: procedural vs recorded loudness per key (loudest 50 ms)
+  window.__calibrate = async function () {
+    const loud = (d) => { const w = Math.floor(A.now ? 2400 : 2400); let m = 0; for (let i = 0; i + w <= d.length; i += 600) { let s = 0; for (let j = i; j < i + w; j++) s += d[j] * d[j]; m = Math.max(m, Math.sqrt(s / w)); } return m; };
+    const out = {};
+    for (const [, rows] of CAT) for (const [key, , fn] of rows) {
+      if (fn === 'loop' || !SB.bank[key]) continue;
+      let syn = 0, rec = 0; const N = 6;
+      for (let i = 0; i < N; i++) {
+        A.force = 'synth'; syn += loud(await A.renderOffline(fn, 3));
+        A.force = 'sample'; rec += loud(await A.renderOffline(fn, 3));
+      }
+      A.force = null;
+      out[key] = { syn: +(syn / N).toFixed(4), rec: +(rec / N).toFixed(4) };
+    }
+    return out;
+  };
+})();
+</script>
+</body>
+</html>

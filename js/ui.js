@@ -660,6 +660,7 @@
       ${rowR('adsSens', '🎯 ADS感度倍率', 0.2, 1.5, 0.05, (v) => (+v).toFixed(2))}
       ${rowR('fov', '👁️ 視野角（水平）', 80, 120, 1, (v) => v + '°')}
       ${rowR('volume', '🔊 音量', 0, 1, 0.01, (v) => Math.round(v * 100) + '%')}
+      ${rowC('sfxSamples', '🎧 録音素材の効果音（OFFで従来の合成音）')}
       ${rowR('shake', '📳 画面揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
       ${rowR('bob', '🚶 視点の揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
       <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（影なし）</option><option value="med">中</option><option value="high">高</option></select><span></span></div>
@@ -674,7 +675,7 @@
       const inp = s.querySelector('#s-' + id), v = s.querySelector('#v-' + id);
       inp.oninput = () => { S[id] = +inp.value; v.textContent = inp.parentElement.querySelector('.v').textContent = id === 'fov' ? S[id] + '°' : id === 'volume' || id === 'shake' || id === 'bob' ? Math.round(S[id] * 100) + '%' : (+S[id]).toFixed(2); if (id === 'volume') G.sfx.setVolume(S[id]); G.save.write(); };
     }
-    for (const id of ['dmgNums', 'crouchToggle', 'autoSprint', 'sprintToggle', 'invertY', 'fullscreen', 'showFps', 'askTutorial']) { const inp = s.querySelector('#s-' + id); inp.onchange = () => { S[id] = inp.checked; G.save.write(); }; }
+    for (const id of ['dmgNums', 'crouchToggle', 'autoSprint', 'sprintToggle', 'invertY', 'fullscreen', 'showFps', 'askTutorial', 'sfxSamples']) { const inp = s.querySelector('#s-' + id); inp.onchange = () => { S[id] = inp.checked; G.save.write(); if (id === 'sfxSamples') G.sfx.refreshAmbience(); }; }
     s.querySelector('#s-quality').onchange = (e) => { S.quality = e.target.value; G.save.write(); G.game.applyQuality(); };
     s.querySelector('#s-back').onclick = () => { G.sfx.ui('click'); back(); };
   };

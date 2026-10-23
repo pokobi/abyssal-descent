@@ -67,6 +67,7 @@
     gunBus.connect(shaper); shaper.connect(dry);
     white = makeNoise('white', 2); pink = makeNoise('pink', 2); brown = makeNoise('brown', 3);
     A.startAmbience();
+    preload();
   };
   A.setVolume = (v) => { A.volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); };
   A.suspend = () => { if (ctx && ctx.state === 'running') ctx.suspend(); };
@@ -144,6 +145,72 @@
   }
   const vr = (v, p) => v * (1 + (Math.random() * 2 - 1) * p);
 
+  // ---------- recorded samples (js/sfxbank.js, files in sfx/) ----------
+  // smp(key, ...) plays one variant of a bank key and returns true; it returns false (so the caller falls back to the
+  // procedural sound) when samples are switched off in the settings, the key is switched off in sounds.html,
+  // or its files have not finished loading yet.
+  const SB = G.SFXBANK || { bank: {}, files: {} };
+  const bufs = {}, lastPick = {};
+  let offKeys = new Set();
+  A.loadPrefs = function () { try { offKeys = new Set(JSON.parse(localStorage.getItem('abyss_sfx_off') || '[]')); } catch (e) { offKeys = new Set(); } };
+  A.loadPrefs();
+  A.force = null; // 'synth' | 'sample' (sounds.html comparisons)
+  A.samplesOn = () => A.force ? A.force === 'sample' : G.save.data.settings.sfxSamples !== false;
+  const usable = (key) => A.samplesOn() && (A.force === 'sample' || !offKeys.has(key)) && SB.bank[key];
+  const pend = {};
+  function fetchBuf(f) {
+    if (pend[f]) return pend[f];
+    bufs[f] = null;
+    return (pend[f] = fetch('sfx/' + f + '.mp3').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+      .then((ab) => new Promise((ok, no) => ctx.decodeAudioData(ab, ok, no)))
+      .then((b) => (bufs[f] = b), () => (bufs[f] = false)));
+  }
+  // one-shots load in the background a few at a time after the audio starts; looping beds load when first needed
+  function preload() {
+    const list = [];
+    for (const k in SB.bank) if (!SB.bank[k].loop) list.push(...SB.bank[k].f);
+    let i = 0;
+    const next = () => { if (i < list.length) fetchBuf(list[i++]).then(next); };
+    for (let n = 0; n < 4; n++) next();
+  }
+  A.sampleBuf = (f) => bufs[f];
+  A.fetchSample = fetchBuf;
+  function smp(key, pos, vol, rate, wet, bus) {
+    if (!ctx || !usable(key)) return false;
+    const b = SB.bank[key], fs = b.f;
+    const ready = fs.filter((f) => bufs[f]);
+    if (!ready.length) return false;
+    let f = ready[Math.floor(Math.random() * ready.length)];
+    if (ready.length > 1 && f === lastPick[key]) f = ready[(ready.indexOf(f) + 1) % ready.length];
+    lastPick[key] = f;
+    const buf = bufs[f];
+    const r = b.r || [0.94, 1.06];
+    const pr = Math.max(0.3, Math.min(3, (rate || 1) * (r[0] + Math.random() * (r[1] - r[0]))));
+    if (!voice(buf.duration / pr)) return true;
+    const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = pr;
+    const out = dest(pos, wet != null ? wet : b.wet != null ? b.wet : 0.25, bus);
+    out.gain.value *= (vol == null ? 1 : vol) * (b.v || 1);
+    src.connect(out); src.start();
+    return true;
+  }
+  A.smp = smp;
+  // sounds.html: play one file of a key as the game would (its bank level, no random pitch)
+  A.playFile = function (key, f) {
+    const buf = bufs[f]; if (!ctx || !buf) return false;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const out = dest(null, (SB.bank[key] && SB.bank[key].wet) || 0.25); out.gain.value *= (SB.bank[key] && SB.bank[key].v) || 1;
+    src.connect(out); src.start(); return src;
+  };
+  // sounds.html level matching: renders fn() into an offline buffer (dry path only) and returns its samples
+  A.renderOffline = function (fn, secs) {
+    const keep = { ctx, master, dry, revSend, gunBus, voices };
+    const oc = new OfflineAudioContext(1, Math.ceil(ctx.sampleRate * secs), ctx.sampleRate);
+    ctx = oc; master = oc.createGain(); master.connect(oc.destination);
+    dry = oc.createGain(); dry.connect(master); revSend = oc.createGain(); gunBus = oc.createGain(); gunBus.connect(dry); voices = 0;
+    try { fn(); } finally { ({ ctx, master, dry, revSend, gunBus, voices } = keep); }
+    return oc.startRendering().then((b) => b.getChannelData(0));
+  };
+
   // ---------- weapons ----------
   const GUN = {
     pistol: { thump: [150, 55], tg: 0.55, body: 2600, bd: 0.12, bg: 0.6, crack: 0.35, wet: 0.5, tail: 0.25 },
@@ -161,6 +228,12 @@
   A.gun = function (kind, opts) {
     if (!ctx || !voice(1)) return;
     opts = opts || {};
+    if (smp('gun_' + (opts.suppressed ? 'suppressed' : GUN[kind] ? kind : 'rifle'), null, opts.vol)) {
+      if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35);
+      if (kind === 'sniper') A.mech('bolt', 0.4);
+      if (kind === 'revolver') A.mech('click', 0.2);
+      return;
+    }
     const p = GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle;
     const t = ctx.currentTime;
     const out = dest(null, p.wet * 0.9, gunBus);
@@ -185,7 +258,9 @@
   };
   // projectile launchers / special
   A.launcher = function (kind) {
-    if (!ctx || !voice(1)) return;
+    if (!ctx) return;
+    if ((kind === 'rocket' || kind === 'rail') && smp('launch_' + kind)) return;
+    if (!voice(1)) return;
     const t = ctx.currentTime, out = dest(null, 0.6);
     if (kind === 'rocket') {
       nz({ t, buf: 'pink', f: [['lowpass', 1800, 0.7, 300, 0.5]], g: 0.9, a: 0.01, d: 0.6, to: out });
@@ -210,8 +285,26 @@
     }
   };
   // looping sources (flamethrower, minigun spin, slide, grapple reel, burning)
+  // a looping recorded bed: {set(v), stop()}; null when the key is off or not loaded
+  function smpLoop(key, target, wet, to) {
+    if (!ctx || !usable(key)) return null;
+    const f = SB.bank[key].f[0], buf = bufs[f];
+    if (!buf) { fetchBuf(f); return null; }
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+    src.connect(g); g.connect(to || dest(null, wet));
+    src.start(0, Math.random() * buf.duration);
+    const lv = target * (SB.bank[key].v || 1);
+    g.gain.setTargetAtTime(lv, ctx.currentTime, 0.04);
+    return {
+      set(v) { g.gain.setTargetAtTime(Math.max(0.0001, lv * v), ctx.currentTime, 0.05); },
+      stop(fade) { g.gain.setTargetAtTime(0.0001, ctx.currentTime, fade || 0.06); setTimeout(() => { try { src.stop(); } catch (e) {} }, (fade || 0.06) * 7000); },
+    };
+  }
+  A._loopKey = (key, lv) => smpLoop(key, lv, 0.2);
   A.loop = function (kind) {
     if (!ctx) return { stop() {}, set() {} };
+    if (kind === 'flame') { const l = smpLoop('loop_flame', 0.45, 0.4); if (l) return l; }
     const src = ctx.createBufferSource();
     src.buffer = kind === 'flame' ? pink : kind === 'slide' ? white : brown;
     src.loop = true;
@@ -236,6 +329,8 @@
   // mechanical sounds: reload parts
   A.mech = function (kind, delay, vol) {
     if (!ctx || !voice(0.4)) return;
+    if (!delay && smp('mech_' + kind, null, vol)) return;
+    if (delay && SB.bank['mech_' + kind] && usable('mech_' + kind)) { setTimeout(() => A.mech(kind, 0, vol), delay * 1000); return; }
     const t = ctx.currentTime + (delay || 0);
     const out = dest(null, 0.25); out.gain.value = vol || 1;
     const clack = (tt, f, g, q) => {
@@ -262,7 +357,11 @@
 
   // ---------- movement ----------
   A.step = function (surface, intensity) {
-    if (!ctx || !voice(0.3)) return;
+    if (!ctx) return;
+    const bio = G.world && G.world.mats && G.world.mats.biome;
+    const sk = surface === 'stone' && bio && bio.floorTex === 'grass' ? 'grass' : surface || 'stone';
+    if (smp('step_' + sk, null, 0.35 * intensity, 0.92 + intensity * 0.08) || smp('step_stone', null, 0.35 * intensity)) return;
+    if (!voice(0.3)) return;
     const t = ctx.currentTime, out = dest(null, 0.15);
     out.gain.value = 0.35 * intensity;
     if (surface === 'wood') {
@@ -283,13 +382,13 @@
     }
   };
   A.jump = function () {
-    if (!ctx) return;
+    if (!ctx || smp('jump', null, 0.35)) return;
     const t = ctx.currentTime, out = dest(null, 0.1); out.gain.value = 0.35;
     nz({ t, buf: 'pink', f: [['bandpass', 700, 0.8]], g: 0.3, d: 0.09, to: out });
     nz({ t: t + 0.02, f: [['bandpass', 1500, 0.6, 600, 0.2]], g: 0.12, a: 0.03, d: 0.18, to: out });
   };
   A.land = function (intensity, surface) {
-    if (!ctx) return;
+    if (!ctx || smp(surface === 'wood' ? 'land_wood' : 'land', null, Math.min(1.2, 0.3 + intensity * 0.9), 1.1 - Math.min(0.25, intensity * 0.25))) return;
     const t = ctx.currentTime, out = dest(null, 0.25);
     out.gain.value = Math.min(1.2, 0.3 + intensity * 0.9);
     tn({ t, f0: 110, f1: 45, d: 0.12 + intensity * 0.1, g: 0.8, to: out, type: 'triangle', lp: 300 });
@@ -304,7 +403,7 @@
     nz({ t, buf: 'brown', f: [['lowpass', 500]], g: 0.4, a: dur * 0.2, d: dur * 0.6, to: out });
   };
   A.mantle = function () {
-    if (!ctx) return;
+    if (!ctx || smp('mantle', null, 0.5)) return;
     const t = ctx.currentTime, out = dest(null, 0.1); out.gain.value = 0.5;
     nz({ t, buf: 'pink', f: [['bandpass', 600, 1]], g: 0.4, d: 0.08, to: out });
     nz({ t: t + 0.12, buf: 'pink', f: [['lowpass', 800]], g: 0.5, d: 0.06, to: out });
@@ -328,7 +427,7 @@
     A.chain(0.3, 0.45);
   };
   A.grappleHit = function (pos) {
-    if (!ctx) return;
+    if (!ctx || smp('grapple_hit', pos, 0.8, 1, 0.5)) return;
     const t = ctx.currentTime, out = dest(pos, 0.5);
     nz({ t, f: [['bandpass', 2000, 5]], g: 0.6, d: 0.06, to: out });
     nz({ t, buf: 'pink', f: [['lowpass', 1200]], g: 0.5, d: 0.12, to: out });
@@ -336,14 +435,16 @@
     tn({ t, f0: 2730, d: 0.12, g: 0.03, to: out });
   };
   A.ratchet = function () {
-    if (!ctx || !voice(0.1)) return;
+    if (!ctx || smp('ratchet', null, 0.35) || !voice(0.1)) return;
     const t = ctx.currentTime, out = dest(null, 0.1); out.gain.value = 0.35;
     nz({ t, f: [['bandpass', vr(2200, 0.1), 8]], g: 0.25, d: 0.02, to: out });
   };
 
   // ---------- combat ----------
   A.hitFlesh = function (pos, head, big) {
-    if (!ctx || !voice(0.3)) return;
+    if (!ctx) return;
+    if (!head && smp('hit_flesh', pos, big ? 1 : 0.7, big ? 0.9 : 1, 0.15)) return;
+    if (!voice(0.3)) return;
     const t = ctx.currentTime, out = dest(pos, 0.15);
     out.gain.value = big ? 1 : 0.7;
     nz({ t, buf: 'pink', f: [['lowpass', vr(900, 0.2), 1.2]], g: 0.7, d: 0.07, to: out });
@@ -364,7 +465,7 @@
     if (kill) { tn({ t, f0: 180, f1: 60, d: 0.18, g: 0.5, to: out, type: 'triangle' }); nz({ t: t + 0.02, buf: 'pink', f: [['lowpass', 900]], g: 0.4, d: 0.2, to: out }); }
   };
   A.hitShield = function (pos) {
-    if (!ctx || !voice(0.3)) return;
+    if (!ctx || smp('hit_shield', pos, 0.7, 1, 0.4) || !voice(0.3)) return;
     const t = ctx.currentTime, out = dest(pos, 0.4); out.gain.value = 0.7;
     // dense metallic "tock" - inharmonic partials, but kept low & damped
     const base = vr(620, 0.06);
@@ -375,6 +476,7 @@
   // shield shatter: a sharp crack, a burst of glassy shards raining down, and a heavy low thud
   A.shieldBreak = function (pos) {
     if (!ctx) return;
+    if (smp('shield_break', pos, 1.15, 1, 0.7)) { const t = ctx.currentTime, out = dest(pos, 0.5); tn({ t, f0: 150, f1: 42, d: 0.35, g: 0.75, to: out, type: 'triangle', lp: 400 }); return; }
     const t = ctx.currentTime, out = dest(pos, 0.7);
     out.gain.value *= 1.15;
     // initial crack (broadband snap)
@@ -412,7 +514,7 @@
     nz({ t, f: [['bandpass', 2800, 6, 1400, 0.25]], g: 0.3, d: 0.25, to: out });
   };
   A.impact = function (pos, surface) {
-    if (!ctx || !voice(0.2)) return;
+    if (!ctx || smp('impact_' + (surface === 'wood' || surface === 'metal' ? surface : 'stone'), pos, 0.45, 1, 0.3) || !voice(0.2)) return;
     const t = ctx.currentTime, out = dest(pos, 0.3); out.gain.value = 0.45;
     if (surface === 'wood') { nz({ t, f: [['bandpass', 700, 2]], g: 0.5, d: 0.05, to: out }); tn({ t, f0: 220, f1: 120, d: 0.05, g: 0.2, to: out }); }
     else if (surface === 'metal') { nz({ t, f: [['bandpass', 2400, 5]], g: 0.4, d: 0.05, to: out }); tn({ t, f0: vr(1500, 0.1), d: 0.12, g: 0.06, to: out }); }
@@ -421,6 +523,7 @@
   A.explosion = function (pos, size) {
     if (!ctx) return;
     size = size || 1;
+    if (smp('explosion', pos, Math.min(1.6, 0.8 + size * 0.3), 1.08 - Math.min(0.3, size * 0.1), 1.0)) return;
     const t = ctx.currentTime, out = dest(pos, 1.0); out.gain.value = Math.min(1.6, 0.8 + size * 0.3);
     tn({ t, f0: 75, f1: 28, d: 0.8 + size * 0.3, g: 1.0, to: out, type: 'sine' });
     nz({ t, buf: 'brown', f: [['lowpass', 1200, 0.6, 120, 1.2]], g: 1.0, a: 0.004, d: 1.0 + size * 0.4, to: out });
@@ -430,6 +533,7 @@
   };
   A.melee = function (hit) {
     if (!ctx) return;
+    if (smp('swing', null, 0.6)) { if (hit) setTimeout(() => smp('melee_blunt', null, 0.8), 80); return; }
     const t = ctx.currentTime, out = dest(null, 0.2);
     nz({ t, buf: 'pink', f: [['bandpass', 500, 1, 1500, 0.15]], g: 0.4, a: 0.03, d: 0.12, to: out });
     if (hit) { tn({ t: t + 0.08, f0: 140, f1: 60, d: 0.1, g: 0.7, to: out, type: 'triangle' }); nz({ t: t + 0.08, buf: 'pink', f: [['lowpass', 1100]], g: 0.7, d: 0.1, to: out }); }
@@ -437,6 +541,8 @@
   // melee weapon swing: blades whistle, blunt weapons whoosh low
   A.swing = function (heavy, mcat) {
     if (!ctx) return;
+    const blade0 = mcat === 'blade' || mcat === 'knife' || mcat === 'scythe' || mcat === 'spear';
+    if (smp('swing', null, heavy ? 0.9 : 0.6, mcat === 'blunt' || mcat === 'axe' ? 0.75 : heavy ? 0.85 : 1)) { if (blade0) smp('swing_blade', null, 0.35, heavy ? 0.9 : 1.05); return; }
     const t = ctx.currentTime, out = dest(null, 0.15); out.gain.value = heavy ? 0.9 : 0.6;
     const blade = mcat === 'blade' || mcat === 'knife' || mcat === 'scythe' || mcat === 'spear';
     const f0 = mcat === 'blunt' || mcat === 'axe' ? 380 : mcat === 'fist' ? 600 : 1100;
@@ -445,6 +551,7 @@
   };
   A.meleeHit = function (hit, mcat, heavy) {
     if (!ctx || !hit) return;
+    if (smp(mcat === 'blade' || mcat === 'knife' || mcat === 'scythe' || mcat === 'spear' ? 'melee_slice' : 'melee_blunt', null, heavy ? 1.1 : 0.8, heavy ? 0.85 : 1)) return;
     const t = ctx.currentTime, out = dest(null, 0.25); out.gain.value = heavy ? 1.1 : 0.8;
     if (mcat === 'blade' || mcat === 'knife' || mcat === 'scythe' || mcat === 'spear') {
       // wet slice: sharp transient + short squelch
@@ -461,12 +568,13 @@
   };
   A.throwG = function () {
     if (!ctx) return;
+    if (smp('throw', null, 0.5)) { A.mech('click', 0, 0.6); return; }
     const t = ctx.currentTime, out = dest(null, 0.1);
     A.mech('click', 0, 0.6);
     nz({ t: t + 0.08, buf: 'pink', f: [['bandpass', 600, 1, 1600, 0.2]], g: 0.35, a: 0.04, d: 0.16, to: out });
   };
   A.bounce = function (pos, v) {
-    if (!ctx || !voice(0.1)) return;
+    if (!ctx || smp('bounce', pos, Math.min(1, v * 0.12), 1, 0.2) || !voice(0.1)) return;
     const t = ctx.currentTime, out = dest(pos, 0.2); out.gain.value = Math.min(1, v * 0.12);
     nz({ t, f: [['bandpass', 1300, 4]], g: 0.4, d: 0.04, to: out });
     tn({ t, f0: 300, f1: 200, d: 0.04, g: 0.2, to: out });
@@ -474,7 +582,7 @@
 
   // ---------- player state ----------
   A.hurt = function (amount) {
-    if (!ctx) return;
+    if (!ctx || smp('hurt', null, Math.min(1, 0.4 + amount / 40), 1, 0.1)) return;
     const t = ctx.currentTime, out = dest(null, 0.1);
     const k = Math.min(1, 0.4 + amount / 40);
     out.gain.value = k;
@@ -490,7 +598,7 @@
     tn({ t: t + 0.18, f0: 55, f1: 38, d: 0.1, g: 0.6, to: out, lp: 150 });
   };
   A.heal = function () {
-    if (!ctx) return;
+    if (!ctx || smp('heal', null, 0.5, 1, 0.4)) return;
     const t = ctx.currentTime, out = dest(null, 0.4); out.gain.value = 0.5;
     nz({ t, buf: 'pink', f: [['bandpass', 500, 1, 1800, 0.5]], g: 0.3, a: 0.15, d: 0.4, to: out });
     nz({ t: t + 0.05, f: [['bandpass', 1200, 3]], g: 0.15, a: 0.05, d: 0.25, to: out }); // liquid
@@ -511,8 +619,10 @@
   // ---------- monsters ----------
   // kinds: growl, snarl, screech, roar, hiss, chitter, groan, gurgle, wail, rumble, buzz
   A.monster = function (pos, kind, pitch, vol) {
-    if (!ctx || !voice(1)) return;
+    if (!ctx) return;
     pitch = pitch || 1; vol = vol || 1;
+    if (smp('mon_' + kind, pos, 0.75 * vol, pitch, 0.45)) return;
+    if (!voice(1)) return;
     const t = ctx.currentTime, out = dest(pos, 0.45); out.gain.value *= 0.75 * vol;
     const vox = (f, d, g, formants, type) => {
       // saw/noise source shaped by formant filters
@@ -545,24 +655,25 @@
   };
   A.monsterDie = function (pos, kind, pitch) {
     if (!ctx) return;
+    if (smp('mon_die', pos, 0.7, (pitch || 1) * 0.9, 0.4)) { const t = ctx.currentTime, out = dest(pos, 0.3); tn({ t: t + 0.2, f0: 90, f1: 40, d: 0.2, g: 0.4, to: out, type: 'triangle' }); return; }
     A.monster(pos, kind === 'chitter' ? 'hiss' : kind === 'slosh' ? 'gurgle' : 'groan', (pitch || 1) * 0.9, 0.9);
     const t = ctx.currentTime, out = dest(pos, 0.3);
     tn({ t: t + 0.2, f0: 90, f1: 40, d: 0.2, g: 0.4, to: out, type: 'triangle' });
     nz({ t: t + 0.2, buf: 'pink', f: [['lowpass', 700]], g: 0.4, d: 0.2, to: out });
   };
   A.attackWind = function (pos, big) {
-    if (!ctx || !voice(0.4)) return;
+    if (!ctx || smp('attack_wind', pos, big ? 0.9 : 0.5, big ? 0.8 : 1, 0.2) || !voice(0.4)) return;
     const t = ctx.currentTime, out = dest(pos, 0.2); out.gain.value = big ? 0.9 : 0.5;
     nz({ t, buf: 'pink', f: [['bandpass', big ? 300 : 700, 1, big ? 900 : 2000, 0.3]], g: 0.5, a: 0.15, d: 0.2, to: out });
   };
   A.spit = function (pos) {
-    if (!ctx || !voice(0.3)) return;
+    if (!ctx || smp('spit', pos, 0.6, 1, 0.25) || !voice(0.3)) return;
     const t = ctx.currentTime, out = dest(pos, 0.25);
     nz({ t, f: [['bandpass', 900, 2, 400, 0.15]], g: 0.5, d: 0.15, to: out });
     tn({ t, f0: 200, f1: 90, d: 0.1, g: 0.2, to: out });
   };
   A.magic = function (pos, kind) {
-    if (!ctx || !voice(0.6)) return;
+    if (!ctx || smp('magic', pos, 0.6, kind === 'dark' ? 0.7 : 1, 0.6) || !voice(0.6)) return;
     const t = ctx.currentTime, out = dest(pos, 0.6); out.gain.value = 0.6;
     // low, airy and organic - no pure beeps
     nz({ t, buf: 'pink', f: [['bandpass', kind === 'dark' ? 300 : 600, 2, kind === 'dark' ? 150 : 1200, 0.5]], g: 0.6, a: 0.1, d: 0.5, to: out });
@@ -575,13 +686,13 @@
     nz({ t, buf: 'brown', f: [['lowpass', 260]], g: 0.4, d: 0.15, to: out });
   };
   A.fire = function (pos, big) {
-    if (!ctx || !voice(0.6)) return;
+    if (!ctx || smp('fire', pos, big ? 1 : 0.6, big ? 0.85 : 1, 0.4) || !voice(0.6)) return;
     const t = ctx.currentTime, out = dest(pos, 0.4); out.gain.value = big ? 1 : 0.6;
     nz({ t, buf: 'pink', f: [['lowpass', 1200, 0.6, 500, 0.5]], g: 0.7, a: 0.06, d: 0.6, to: out });
     for (let i = 0; i < 6; i++) nz({ t: t + Math.random() * 0.4, f: [['bandpass', vr(2400, 0.4), 3]], g: 0.12, d: 0.02, to: out });
   };
   A.ice = function (pos) {
-    if (!ctx || !voice(0.5)) return;
+    if (!ctx || smp('ice', pos, 0.6, 1, 0.5) || !voice(0.5)) return;
     const t = ctx.currentTime, out = dest(pos, 0.5); out.gain.value = 0.6;
     for (let i = 0; i < 12; i++) nz({ t: t + Math.random() * 0.25, f: [['bandpass', vr(3000, 0.3), 6]], g: 0.12, d: 0.03, to: out });
     nz({ t, buf: 'pink', f: [['bandpass', 1200, 1.5, 3000, 0.3]], g: 0.3, a: 0.02, d: 0.3, to: out });
@@ -599,7 +710,7 @@
     A.chain(dur * 0.8, 0.35);
   };
   A.breakObj = function (pos, mat) {
-    if (!ctx) return;
+    if (!ctx || smp('break_' + (mat === 'wood' || mat === 'ceramic' ? mat : 'stone'), pos, 0.8, 1, 0.4)) return;
     const t = ctx.currentTime, out = dest(pos, 0.4);
     if (mat === 'wood') {
       nz({ t, f: [['bandpass', 600, 1.5]], g: 0.7, d: 0.12, to: out });
@@ -622,17 +733,18 @@
     nz({ t, f: [['bandpass', 3800, 4]], g: 0.15, d: 0.02, to: out });
   };
   A.coins = function (n) {
-    if (!ctx) return;
+    if (!ctx || smp('coins', null, 0.3 + Math.min(8, n) * 0.06)) return;
     for (let i = 0; i < Math.min(8, n); i++) setTimeout(() => A.coin(), i * 45 + Math.random() * 20);
   };
   A.pickup = function () {
-    if (!ctx) return;
+    if (!ctx || smp('pickup', null, 0.4)) return;
     const t = ctx.currentTime, out = dest(null, 0.2); out.gain.value = 0.4;
     nz({ t, buf: 'pink', f: [['bandpass', 900, 1.5]], g: 0.3, d: 0.08, to: out });
     A.mech('grab', 0.03);
   };
   A.ui = function (kind) {
     if (!ctx) return;
+    if (kind === 'buy' ? smp('coins', null, 0.6) : kind === 'rare' ? false : smp('ui_' + kind, null, 0.5, 1, 0.08)) return;
     const t = ctx.currentTime, out = dest(null, 0.12);
     switch (kind) {
       case 'hover': out.gain.value = 0.18; nz({ t, f: [['bandpass', 1800, 3]], g: 0.3, d: 0.02, to: out }); break;
@@ -652,7 +764,7 @@
   };
   A.bell = function () {
     // deep bronze bell for boss/portal moments
-    if (!ctx) return;
+    if (!ctx || smp('bell', null, 0.5, 0.75, 1.0)) return;
     const t = ctx.currentTime, out = dest(null, 1.0); out.gain.value = 0.5;
     const base = 82;
     [[1, 0.5], [2.0, 0.3], [2.4, 0.22], [3.0, 0.15], [4.16, 0.1], [5.4, 0.06]].forEach(([m, g]) => tn({ t, f0: base * m, d: 3.5 - m * 0.3, g, to: out, type: 'sine' }));
@@ -690,7 +802,7 @@
   };
   // the golden barrier going up, and absorbing a hit
   A.shieldUp = function () {
-    if (!ctx) return;
+    if (!ctx || smp('shield_up', null, 0.5, 1, 0.7)) return;
     const t = ctx.currentTime, out = dest(null, 0.7); out.gain.value = 0.5;
     [392, 523, 659, 784].forEach((f, i) => tn({ t: t + i * 0.04, f0: f, f1: f * 1.02, d: 0.9, g: 0.12, to: out, type: 'triangle', lp: 3500 }));
     nz({ t, buf: 'pink', f: [['bandpass', 1200, 1.5, 4000, 0.5]], g: 0.3, a: 0.1, d: 0.6, to: out });
@@ -709,7 +821,7 @@
     tn({ t, f0: 90, f1: 40, d: 0.6, g: 0.6, to: out }); nz({ t, buf: 'pink', f: [['bandpass', 400, 1, 3000, 0.5]], g: 0.4, a: 0.05, d: 0.8, to: out });
   };
   A.ultReady = function () {
-    if (!ctx) return;
+    if (!ctx || smp('ult_ready', null, 0.4, 1, 0.6)) return;
     const t = ctx.currentTime, out = dest(null, 0.6); out.gain.value = 0.4;
     [659, 880, 1319].forEach((f, i) => tn({ t: t + i * 0.08, f0: f, d: 0.8, g: 0.12, to: out, type: 'triangle', lp: 4000 }));
   };
@@ -761,9 +873,35 @@
     src.start(); s2.start(); lfo.start(); lfo2.start();
     amb = { g, g2 };
   };
-  A.setAmbience = function (v) { if (amb) { amb.g.gain.setTargetAtTime(0.12 * v, ctx.currentTime, 0.5); } };
+  // recorded room tone per area look: [bank key, level] layers, crossfaded when the area changes.
+  // the procedural rumble stays underneath, quieter while a recorded bed plays.
+  const BEDS = {
+    catacombs: [['amb_cave', 0.5]], temple: [['amb_deep', 0.6]], halls: [['amb_deep', 0.6]], gate: [['amb_cavern', 0.4]], abyss: [['amb_cavern', 0.45]],
+    flooded: [['amb_cavern', 0.35], ['amb_water', 0.3]], forge: [['amb_deep', 0.5], ['amb_fire', 0.35]], frozen: [['amb_cavern', 0.35], ['amb_wind', 0.25]],
+    ruins: [['amb_wind', 0.4]], bloodmoon: [['amb_wind', 0.4]], grave: [['amb_wind', 0.35]], crimson: [['amb_wind', 0.4]], ruin: [['amb_wind', 0.35], ['amb_fire', 0.2]],
+    sky: [['amb_wind', 0.55]], void: [['amb_wind', 0.35], ['amb_cavern', 0.25]],
+  };
+  let beds = [], bedKey = null, bedV = 1;
+  function setBeds(v) {
+    const bk = (G.world && G.world.biome) || 'catacombs';
+    const want = A.samplesOn() ? BEDS[bk] || BEDS.catacombs : [];
+    if (bk !== bedKey || beds.length !== want.length) {
+      for (const b of beds) b.stop(1.2);
+      beds = [];
+      for (const [k, lv] of want) {
+        const l = smpLoop(k, lv, 0.2);
+        if (l) beds.push(l);
+        else if (usable(k)) A.fetchSample(SB.bank[k].f[0]).then((b) => { if (b && bedKey === bk) { bedKey = null; setBeds(bedV); } });
+      }
+      bedKey = bk;
+    }
+    for (const b of beds) b.set(v);
+    if (amb) amb.g.gain.setTargetAtTime(0.12 * v * (beds.length ? 0.55 : 1), ctx.currentTime, 0.5);
+  }
+  A.setAmbience = function (v) { bedV = v; if (amb) setBeds(v); };
+  A.refreshAmbience = () => { bedKey = null; if (amb) setBeds(bedV); };
   A.drip = function (pos) {
-    if (!ctx || !voice(0.5)) return;
+    if (!ctx || smp('drip', pos, 0.25, 1, 1.2) || !voice(0.5)) return;
     const t = ctx.currentTime, out = dest(pos, 1.2); out.gain.value = 0.25;
     const f = vr(1400, 0.3);
     tn({ t, f0: f, f1: f * 1.8, fd: 0.03, d: 0.06, g: 0.12, to: out });
@@ -833,13 +971,15 @@
   // distant thunder roll
   A.thunder = function (delay) {
     if (!ctx) return;
+    if (!delay && smp('thunder', null, 0.9, 1, 0.5)) return;
+    if (delay && usable('thunder') && SB.bank.thunder.f.some((f) => bufs[f])) { setTimeout(() => A.thunder(0), delay * 1000); return; }
     const t = ctx.currentTime + (delay || 0), out = dest(null, 0.5); out.gain.value = 0.9;
     nz({ t, buf: 'white', f: [['lowpass', 2400]], g: 0.35, a: 0.005, d: 0.25, to: out });
     nz({ t: t + 0.05, buf: 'brown', f: [['lowpass', 260, 0.8, 80, 3]], g: 1.0, a: 0.15, d: 3.2, to: out });
   };
   // prying an ornate chest: a wooden creak plus a rattling lock, both rising in pitch with progress (k 0..1)
   A.chestPry = function (k, pos) {
-    if (!ctx) return;
+    if (!ctx || smp('chest_pry', pos, 0.55 + k * 0.35, 0.8 + k * 0.5, 0.15)) return;
     const t = ctx.currentTime, out = dest(pos, 0.15);
     nz({ t, buf: 'brown', f: [['bandpass', vr(260 + k * 480, 0.15), 6, vr(420 + k * 700, 0.1), 0.14]], g: 0.55 + k * 0.35, a: 0.012, d: vr(0.13, 0.3), to: out, rate: 0.6 });
     nz({ t: t + 0.012, buf: 'white', f: [['bandpass', vr(3000 + k * 1600, 0.2), 10]], g: 0.22 + k * 0.28, d: 0.03, to: out });
@@ -847,7 +987,7 @@
   };
   // the lock finally snaps: click + thud + a short shimmer
   A.chestUnlock = function (pos) {
-    if (!ctx) return;
+    if (!ctx || smp('chest_unlock', pos, 0.7, 1, 0.3)) return;
     const t = ctx.currentTime, out = dest(pos, 0.3);
     nz({ t, buf: 'white', f: [['bandpass', 2600, 4]], g: 0.7, d: 0.05, to: out });
     tn({ t, f0: 2300, f1: 1400, d: 0.12, g: 0.25, to: out, type: 'triangle' });
@@ -856,7 +996,7 @@
   };
   // clock tick for timed challenges: 0 = normal, 1 = urgent (higher, louder), 2 = half-second tock in the last seconds
   A.tick = function (lvl, sec) {
-    if (!ctx) return;
+    if (!ctx || smp('tick', null, lvl === 2 ? 0.35 : lvl === 1 ? 0.95 : 0.6, lvl === 1 ? 1.3 : lvl === 2 ? 0.8 : 1, 0.05)) return;
     const t = ctx.currentTime, out = dest(null, 0.05); out.gain.value = lvl === 2 ? 0.35 : lvl === 1 ? 0.95 : 0.6;
     const f = lvl === 2 ? 900 : lvl === 1 ? 1500 + (5 - (sec || 5)) * 120 : 1150;
     nz({ t, buf: 'white', f: [['bandpass', f * 2, 8]], g: 0.5, d: 0.025, to: out });
@@ -865,19 +1005,19 @@
   };
   // soft gust of wind for open-air stages
   A.wind = function (v) {
-    if (!ctx || !voice(0.3)) return;
+    if (!ctx || smp('wind', null, 0.18 * (v || 1), 1, 0.1) || !voice(0.3)) return;
     const t = ctx.currentTime, out = dest(null, 0.1); out.gain.value = 0.18 * (v || 1);
     nz({ t, buf: 'pink', f: [['bandpass', vr(450, 0.4), 0.9]], g: 0.25, a: 0.6 + Math.random() * 0.6, d: 1.8 + Math.random() * 1.4, to: out });
     nz({ t: t + 0.3, buf: 'pink', f: [['bandpass', vr(1300, 0.3), 2.5]], g: 0.07, a: 0.8, d: 1.6, to: out });
   };
   A.crackle = function (pos) {
-    if (!ctx || !voice(0.2)) return;
+    if (!ctx || smp('crackle', pos, 0.25, 1, 0.2) || !voice(0.2)) return;
     const t = ctx.currentTime, out = dest(pos, 0.2); out.gain.value = 0.25;
     for (let i = 0; i < 3; i++) nz({ t: t + Math.random() * 0.1, f: [['bandpass', vr(2000, 0.5), 3]], g: 0.2, d: 0.015, to: out });
     nz({ t, buf: 'pink', f: [['lowpass', 700]], g: 0.1, a: 0.05, d: 0.2, to: out });
   };
   A.lava = function (pos) {
-    if (!ctx || !voice(0.5)) return;
+    if (!ctx || smp('lava', pos, 0.3, 1, 0.4) || !voice(0.5)) return;
     const t = ctx.currentTime, out = dest(pos, 0.4); out.gain.value = 0.3;
     nz({ t, buf: 'brown', f: [['bandpass', vr(200, 0.3), 3, 90, 0.4]], g: 0.6, a: 0.02, d: 0.4, to: out });
   };

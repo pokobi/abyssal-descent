@@ -83,7 +83,7 @@ window.G = window.G || {};
     data: null,
     defaults() {
       return {
-        settings: { sens: 1.0, adsSens: 0.8, fov: 100, volume: 0.8, quality: 'high', dmgNums: true, crouchToggle: false, sprintToggle: false, autoSprint: false, invertY: false, shake: 1.0, bob: 1.0, fullscreen: true, showFps: false, askTutorial: true },
+        settings: { sens: 1.0, adsSens: 0.8, fov: 100, volume: 0.8, quality: 'high', dmgNums: true, crouchToggle: false, sprintToggle: false, autoSprint: false, invertY: false, shake: 1.0, bob: 1.0, fullscreen: true, showFps: false, askTutorial: true, sfxSamples: true },
         codex: { enemies: {}, kills: {}, items: {}, buffs: {}, bosses: {} },
         records: { bestArea: 0, bestKills: 0, runs: 0, totalKills: 0, bestCoins: 0 },
       };

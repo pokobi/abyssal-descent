@@ -1055,61 +1055,69 @@
   // Every stall has a stepped counter (three wares in front, two on a raised shelf behind), so a stall is short and the whole hall reads at a glance.
   LG.shop = function (area, seed, gates) {
     const rng = new G.RNG(seed);
-    const W = 40, D = 40;
+    const W = 44, D = 44;
     const w = new G.World(W, D, G.Tex.biomeFor(area));
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
     floors(w, W, D, null, 'floor');
     perimeter(w, rng, W, D, { h: 10, top: 16, beams: 0, gates });
     // ceiling beams + chandeliers make it a hall
     for (let z = 6; z < D - 4; z += 7) { w.solid('woodDark', 0, 9.2, z - 0.35, W, 9.9, z + 0.35, { uv: 2 }); }
-    for (const [cx, cz] of [[W / 2, 12], [W / 2, 26], [8, 20], [W - 8, 20]]) P().chandelier(w, cx, 6.0, cz, 9.2);
+    for (const [cx, cz] of [[W / 2, 13], [W / 2, 30], [9, 22], [W - 9, 22]]) P().chandelier(w, cx, 6.0, cz, 9.2);
     // red carpet from the door up to the two islands and on between them to the exits; braziers along it and a few warm lights over the aisle
-    P().rug(w, W / 2, 30, 0, 4, 18, [0.45, 0.08, 0.06]);
-    P().rug(w, W / 2, 11, 0, 1.8, 14, [0.45, 0.08, 0.06]);
-    for (const sx of [-1, 1]) P().brazier(w, W / 2 + sx * 3.4, 0, 27, 1);
-    for (const z of [12, 27, 34]) w.addLight(W / 2, 4.6, z, { flame: 0, emit: false, intensity: 12, range: 17, color: '#ffd8a8', prio: 1.1, steady: true });
+    P().rug(w, W / 2, 33.6, 0, 4, 20, [0.45, 0.08, 0.06]);
+    P().rug(w, W / 2, 14, 0, 1.4, 12, [0.45, 0.08, 0.06]);
+    for (const sx of [-1, 1]) P().brazier(w, W / 2 + sx * 3.4, 0, 30, 1);
+    for (const z of [13, 30, 38]) w.addLight(W / 2, 4.6, z, { flame: 0, emit: false, intensity: 12, range: 17, color: '#ffd8a8', prio: 1.1, steady: true });
 
     w.shopSlots = [];
     // one stall. origin: where its back wall starts; a: unit vector along the stall; n: unit vector from the wall into the hall.
     // u runs along the stall, d is the distance from the wall.
-    const SP = 2.5;
+    const SP = 3.0; // wide enough apart (and the back row high enough) that you never buy the one beside the one you meant
     const stall = (name, col, light, txt, cnt, origin, a, n, opt) => {
       opt = opt || {};
-      const nf = cnt <= 3 ? cnt : 3, nb = cnt - nf, sp = cnt <= 3 ? 2.6 : SP, L = nf * sp + 2.2;
+      const nf = cnt <= 3 ? cnt : 3, nb = cnt - nf, sp = cnt <= 3 ? 2.8 : SP, L = nf * sp + 2.2;
       const wp = (u, d) => [origin[0] + a[0] * u + n[0] * d, origin[1] + a[1] * u + n[1] * d];
       const bx = (u0, u1, d0, d1, y0, y1, kind, mat, o) => {
         const p = wp(u0, d0), q = wp(u1, d1);
         (kind === 'v' ? w.visual : w.solid).call(w, mat, Math.min(p[0], q[0]), y0, Math.min(p[1], q[1]), Math.max(p[0], q[0]), y1, Math.max(p[1], q[1]), o || { uv: 1 });
       };
       // raised shelf behind, counter in front (with a coloured skirt and a stone top)
-      if (nb) { bx(0.4, L - 0.4, 0.5, 1.6, 0, 1.6, 's', 'woodDark', { uv: 1.5 }); bx(0.3, L - 0.3, 0.4, 1.7, 1.6, 1.7, 's', 'trim'); }
+      if (nb) { bx(0.4, L - 0.4, 0.45, 1.55, 0, 1.95, 's', 'woodDark', { uv: 1.5 }); bx(0.3, L - 0.3, 0.35, 1.65, 1.95, 2.05, 's', 'trim'); }
       bx(0.3, L - 0.3, 1.95, 3.1, 0, 1.05, 's', 'woodDark', { uv: 1.5 });
       bx(0.2, L - 0.2, 1.85, 3.2, 1.05, 1.15, 's', 'trim');
       bx(0.45, L - 0.45, 3.14, 3.18, 0.15, 0.95, 'v', 'cloth2', { uv: 1, tint: col, grad: false });
       for (let i = 0; i < nf; i++) { const p = wp(1.1 + sp * (i + 0.5), 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1, big: !!opt.gold }); }
-      for (let j = 0; j < nb; j++) { const p = wp(1.1 + sp * (j + 1), 1.05); w.shopSlots.push({ x: p[0], y: 1.7, z: p[1], face: 1 }); }
+      for (let j = 0; j < nb; j++) { const p = wp(1.1 + sp * (j + 1), 0.95); w.shopSlots.push({ x: p[0], y: 2.05, z: p[1], face: 1 }); }
+      // a ware of its own beside the stall (the weapon / skill upgrade): a separate plinth with its own little sign
+      if (opt.extra) {
+        bx(L + 0.5, L + 1.9, 1.9, 3.1, 0, 1.05, 's', 'block'); bx(L + 0.4, L + 2.0, 1.8, 3.2, 1.05, 1.15, 's', 'trim');
+        bx(L + 0.55, L + 1.85, 3.12, 3.16, 0.15, 0.95, 'v', 'cloth2', { uv: 1, tint: light, grad: false });
+        const p = wp(L + 1.2, 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1 });
+        const sl = wp(L + 1.2, 3.2); P().label(w, opt.extra, sl[0], 3.35, sl[1], Math.atan2(n[0], n[1]), 2.4, { color: txt, size: 60 });
+        w.addLight(p[0], 2.6, p[1], { flame: 0, emit: false, intensity: 5, range: 6, color: txt, prio: 0.8, steady: true });
+      }
       // backdrop (a low wall in the stall's colour), corner posts
       bx(0, L, 0, 0.16, 0, opt.low ? 2.6 : 3.4, 's', 'wall', { uv: 2 });
       bx(0.2, L - 0.2, 0.2, 0.24, 0.4, opt.low ? 2.4 : 3.2, 'v', 'cloth2', { uv: 1, tint: col, grad: false });
-      for (const u of [0.1, L - 0.1]) for (const d of [0.1, 3.2]) bx(u - 0.1, u + 0.1, d - 0.1, d + 0.1, 0, 3.5, 's', 'woodDark');
+      for (const u of [0.1, L - 0.1]) for (const d of [0.1, 3.2]) bx(u - 0.1, u + 0.1, d - 0.1, d + 0.1, 0, 4.15, 's', 'woodDark');
       // striped awning over the whole depth of the stall, a glowing trim along its front edge
       const nq = Math.round(L / 0.8);
       for (let q = 0; q < nq; q++) {
         const c = q % 2 ? col : light, u0 = -0.15 + (L + 0.3) * q / nq, u1 = -0.15 + (L + 0.3) * (q + 1) / nq;
-        bx(u0, u1, 0.2, 3.3, 3.5, 3.62, 'v', 'cloth2', { uv: 1, tint: c, grad: false });
-        bx(u0, u1, 3.27, 3.33, 3.1, 3.5, 'v', 'cloth2', { uv: 1, tint: c, grad: false });
+        bx(u0, u1, 0.2, 3.3, 4.15, 4.27, 'v', 'cloth2', { uv: 1, tint: c, grad: false });
+        bx(u0, u1, 3.27, 3.33, 3.75, 4.15, 'v', 'cloth2', { uv: 1, tint: c, grad: false });
       }
-      bx(-0.15, L + 0.15, 3.25, 3.35, 3.02, 3.1, 'v', 'glow', { uv: 1, tint: light, grad: false });
+      bx(-0.15, L + 0.15, 3.25, 3.35, 3.67, 3.75, 'v', 'glow', { uv: 1, tint: light, grad: false });
       const lc = wp(L / 2, 1.8), ly = Math.atan2(n[0], n[1]), lb = wp(L / 2, 3.3);
       w.addLight(lc[0], 2.7, lc[1], { flame: 0, emit: false, intensity: 7, range: 9, color: txt, prio: 0.9, steady: true });
       const rg = wp(L / 2, 4.2); P().rug(w, rg[0], rg[1], 0.02, a[0] ? L - 0.6 : 3.6, a[0] ? 3.6 : L - 0.6, col);
-      P().label(w, name, lb[0], 4.3, lb[1], ly, 4.2, { color: txt });
+      P().label(w, name, lb[0], 4.95, lb[1], ly, 4.2, { color: txt });
       const cd = wp(0.9, 2.5); P().candles(w, cd[0], 1.15, cd[1], rng, true);
       // the showpiece: gold edging on the counter and the posts, a spotlight over the wares
       if (opt.gold) {
         bx(0.15, L - 0.15, 3.18, 3.28, 1.0, 1.2, 'v', 'gold');
         bx(0.15, L - 0.15, 1.8, 3.28, 1.15, 1.19, 'v', 'gold');
-        for (const u of [0.1, L - 0.1]) for (const d of [0.1, 3.2]) bx(u - 0.13, u + 0.13, d - 0.13, d + 0.13, 3.35, 3.6, 'v', 'gold');
+        for (const u of [0.1, L - 0.1]) for (const d of [0.1, 3.2]) bx(u - 0.13, u + 0.13, d - 0.13, d + 0.13, 4.0, 4.25, 'v', 'gold');
         const sp2 = wp(L / 2, 2.4); w.addLight(sp2[0], 4.4, sp2[1], { flame: 0, emit: false, intensity: 16, range: 8, color: '#fff2d0', prio: 1.6, steady: true });
       }
       // an island's back (seen on the way to the exits): banners on its backdrop
@@ -1117,21 +1125,21 @@
       return L;
     };
     const ZONES = [
-      ['⚔ 武器', [0.62, 0.1, 0.08], [0.85, 0.45, 0.4], '#ffb0a0', 3], ['✨ スキル', [0.12, 0.25, 0.65], [0.5, 0.65, 0.95], '#a8c8ff', 5], ['🔩 強化・パーツ', [0.38, 0.4, 0.44], [0.75, 0.78, 0.82], '#e0e4ea', 5],
-      ['🧪 消耗品', [0.1, 0.5, 0.18], [0.5, 0.85, 0.55], '#a0f0b0', 5], ['🛡 防具', [0.6, 0.4, 0.1], [0.92, 0.75, 0.4], '#ffd890', 5], ['🔮 加護', [0.42, 0.12, 0.6], [0.75, 0.55, 0.9], '#e0b8ff', 5],
+      ['⚔ 武器', [0.62, 0.1, 0.08], [0.85, 0.45, 0.4], '#ffb0a0', 3], ['✨ スキル', [0.12, 0.25, 0.65], [0.5, 0.65, 0.95], '#a8c8ff', 5], ['🔩 アタッチメント', [0.38, 0.4, 0.44], [0.75, 0.78, 0.82], '#e0e4ea', 3],
+      ['🧪 消耗品', [0.1, 0.5, 0.18], [0.5, 0.85, 0.55], '#a0f0b0', 3], ['🛡 防具', [0.6, 0.4, 0.1], [0.92, 0.75, 0.4], '#ffd890', 5], ['🔮 加護', [0.42, 0.12, 0.6], [0.75, 0.55, 0.9], '#e0b8ff', 5],
     ];
     // slot order is fixed (the shop fills them in this order): weapons, skills, parts, consumables, armour, boons
     const place = {
-      0: [[9, 17.2], [1, 0], [0, 1], { low: true, gold: true }],    // islands straight ahead of the door: the weapons ...
-      1: [[0.6, 8.5], [0, 1], [1, 0]],                              // west wall
-      2: [[0.6, 19.7], [0, 1], [1, 0]],
-      3: [[W - 0.6, 8.5], [0, 1], [-1, 0]],                         // east wall
-      4: [[W - 0.6, 19.7], [0, 1], [-1, 0]],
-      5: [[21, 17.2], [1, 0], [0, 1], { low: true }],               // ... and the boons, beside them
+      0: [[9.4, 20], [1, 0], [0, 1], { low: true, gold: true, extra: '⚒ 武器強化' }], // islands straight ahead of the door: the weapons (+ the upgrade) ...
+      1: [[0.6, 8.5], [0, 1], [1, 0], { extra: '📖 スキル強化' }],                    // west wall: skills (+ the skill tome), attachments
+      2: [[0.6, 23.5], [0, 1], [1, 0]],
+      3: [[W - 0.6, 8.5], [0, 1], [-1, 0]],                                          // east wall: consumables, armour
+      4: [[W - 0.6, 21], [0, 1], [-1, 0]],
+      5: [[23.6, 20], [1, 0], [0, 1], { low: true }],                                // ... and the boons, beside them
     };
     ZONES.forEach(([name, col, light, txt, cnt], zi) => { const p = place[zi]; stall(name, col, light, txt, cnt, p[0], p[1], p[2], p[3]); });
     // a few shelves and crates in the free corners
-    P().bookshelf(w, 1.0, 37.6, 0, false, rng); P().weaponRack(w, 10.5, 16.6, 0, true);
+    P().bookshelf(w, 1.0, D - 2.4, 0, false, rng); P().weaponRack(w, 11.5, 19.4, 0, true);
     for (let i = 0; i < 2; i++) { P().barrel(w, 1.2, 4 + i * 1.0, 0, rng); P().crate(w, W - 1.4, 4 + i * 1.2, 0, rng); }
     // the pawn counter on the south wall, east of the door: made to stand out with a gold rug, a warm light and a big gold label
     const pcx = W - 9, pz = D - 3.0;

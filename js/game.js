@@ -1318,14 +1318,16 @@
     const luck = P.stats.luck;
     for (const o of S.offers) if (o.mesh) w.group.remove(o.mesh);
     // six booths (slot order = hall layout): weapons (3) / skills (5, the first is always an ultimate) / upgrades + parts (5) / consumables (5) / armour (5) / boons (5)
-    const kinds = ['arms', 'arms', 'arms',
-      'ult', 'skill', 'skill', 'skill', 'skill',
-      'attachment', 'attachment', 'attachment', 'forge', 'tome',
-      'item', 'item', 'item', 'item', 'item',
+    // (the weapon upgrade sits on its own plinth by the weapon island, the skill tome by the skill stall)
+    const kinds = ['arms', 'arms', 'arms', 'forge',
+      'ult', 'skill', 'skill', 'skill', 'skill', 'tome',
+      'attachment', 'attachment', 'attachment',
+      'item', 'item', 'item',
       'armor', 'armor', 'armor', 'armor', 'armor',
       'buff', 'buff', 'buff', 'buff', 'tech'];
+    const item0 = kinds.indexOf('item');
     if (GM.area >= 15 && r.chance(0.6)) { kinds[2] = kinds[0]; kinds[0] = 'mythic'; }
-    if (GM.area >= 8) kinds[27] = 'relic';
+    if (GM.area >= 8) kinds[kinds.length - 1] = 'relic';
     const used = new Set();
     const offers = [];
     const curW = P.weapon.def;
@@ -1334,7 +1336,7 @@
       // weapon pedestals are fully random between guns and melee, but never more than one melee weapon
       if (k === 'arms') { k = meleeN === 0 && r.chance(G.MELEE.length / (G.MELEE.length + G.WEAPONS.length) * 1.3) ? 'melee' : 'weapon'; if (k === 'melee') meleeN++; }
       if (k === 'mythic' && meleeN > 0) k = 'mythicGun'; // never two melee weapons on the shelves
-      let obj = GM.pickOffer(k === 'item' ? (i < 15 ? 'grenade' : 'util') : k, used, r);
+      let obj = GM.pickOffer(k === 'item' ? (i === item0 ? 'grenade' : 'util') : k, used, r);
       if (obj && k === 'mythic' && obj.kind === 'melee') meleeN++;
       if (k === 'mythicGun') k = 'mythic';
       if (!obj && (k === 'mythic' || k === 'relic' || k === 'tome')) { k = k === 'mythic' ? 'weapon' : k === 'tome' ? 'skill' : 'buff'; obj = GM.pickOffer(k, used, r); }

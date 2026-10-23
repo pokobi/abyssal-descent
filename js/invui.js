@@ -161,7 +161,7 @@
       : '';
     const ov = G.ui.el.statusOv;
     if (loot || MB) G.ui.statusOverlay(false); else G.ui.statusOverlay(true, true, true);
-    const invPanel = `<div class="iv-panel iv-invpanel"><div class="iv-ph"><b>🎒 インベントリ</b><span>${P.bag.items.length}個　·　金品の価値 <b>${U.fmt(valTotal)}</b>🪙</span></div><div class="iv-bagwrap">${gridEl(P.bag, 'bag')}</div><div class="iv-specs">${specs}</div></div>`;
+    const invPanel = `<div class="iv-panel iv-invpanel"><div class="iv-ph"><b>🎒 インベントリ</b><span>${P.bag.items.length}個　·　金品の価値 <b>${U.fmt(valTotal)}</b>🪙<button class="iv-sort" id="iv-sort" title="種類 → レアリティ順に並べて左上へ詰める">⇅ 整理</button></span></div><div class="iv-bagwrap">${gridEl(P.bag, 'bag')}</div><div class="iv-specs">${specs}</div></div>`;
     if (loot) {
       const eqPanel = `<div class="iv-panel iv-eqpanel"><div class="iv-ph"><b>🛡 装備</b><span>防御 <b>${Math.round(def)}</b></span></div><div class="iv-eqgrid">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.hands)}${eqBox(SL.legs)}${eqBox(SL.feet)}</div></div>`;
       root.innerHTML = `<div class="iv-screen loot" style="--cs:${CS}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px"><div class="iv-lootrow">${eqPanel}${invPanel}${left}</div><div class="iv-lootnote">ドラッグで移動・入れ替え　<b>ダブルクリック</b> 反対側へ移す／使う　<b>右クリック</b> メニュー　<b>R</b> 回転　<b>${G.K('interact')}</b>・<b>Esc</b> 閉じる　（装備の確認は ${G.K('status')} キー）</div></div>`;
@@ -174,6 +174,8 @@
       <div class="iv-skillrow">${eqBox(SL.hands, 'hand')}<div class="iv-sks">${skillBoxes()}</div></div>
       ${invPanel}
     </div>`;
+    const srt = root.querySelector('#iv-sort');
+    if (srt) srt.onclick = () => { closeMenu(); const ok = IV.sortContainer(P.bag); G.sfx.ui(ok ? 'select' : 'deny'); if (!ok) G.ui.toastSmall('🎒 並べ替えできなかった'); render(); };
     const all = root.querySelector('#iv-all');
     if (all) all.onclick = () => { takeAll(); };
     root.querySelectorAll('.iv-it').forEach((el) => wire(el));

@@ -126,6 +126,30 @@
     return 0;
   };
   IV.canPut = function (c, type, id, n) { const tmp = { cols: c.cols, rows: c.rows, items: c.items.map((o) => Object.assign({}, o)) }; return IV.put(tmp, IV.make(type, id, n || 1)) === 0; };
+  // tidy a container: same-kind stacks merged, then ordered by kind (armour, attachments, consumables, valuables) and, within a kind, by rarity
+  // (best first), packed from the top left. Returns false (nothing changed) if the new arrangement would not fit.
+  const KIND_RANK = { armor: 0, att: 1, item: 2, valuable: 3 };
+  const ITEM_CAT = { heal: 0, util: 1, grenade: 2 };
+  IV.sortContainer = function (c) {
+    const items = c.items.slice(), merged = [], snap = items.map((o) => [o, o.n, o.x, o.y, o.rot]);
+    const byId = {};
+    for (const it of items) {
+      if (it.type !== 'item') { merged.push(it); continue; }
+      (byId[it.id] = byId[it.id] || []).push(it);
+    }
+    for (const id in byId) {
+      const list = byId[id], cap = IV.maxStack(list[0]); let total = list.reduce((n, o) => n + o.n, 0);
+      for (const o of list) { if (total <= 0) break; o.n = Math.min(cap, total); total -= o.n; merged.push(o); }
+    }
+    const tier = (it) => { const d = IV.def(it); return d && G.RARITY[d.rarity] ? G.RARITY[d.rarity].tier : 0; };
+    const key = (it) => { const d = IV.def(it) || {}; return [KIND_RANK[it.type] ?? 9, it.type === 'item' ? (ITEM_CAT[d.cat] ?? 9) : 0, -tier(it), -(d.price || d.value || 0), String(d.name || it.id), -it.n]; };
+    merged.sort((a, b) => { const ka = key(a), kb = key(b); for (let i = 0; i < ka.length; i++) { if (ka[i] < kb[i]) return -1; if (ka[i] > kb[i]) return 1; } return 0; });
+    const tmp = { cols: c.cols, rows: c.rows, items: [] };
+    for (const it of merged) { const sp = IV.findSpot(tmp, it); if (!sp) { for (const [o, n, x, y, r] of snap) Object.assign(o, { n, x, y, rot: r }); return false; } Object.assign(it, sp); tmp.items.push(it); }
+    c.items = tmp.items;
+    IV.changed(c);
+    return true;
+  };
   IV.remove = function (c, it) { const i = c.items.indexOf(it); if (i >= 0) c.items.splice(i, 1); IV.changed(c); };
   IV.ver = 0;
   IV.changed = function (c) { IV.ver++; if (G.player && (c === G.player.bag || c.kind === 'spec')) { G.ui && (G.ui._itemsDirty = true); if (G.ui && G.ui.refreshItems) G.ui.refreshItems(); } if (IV.onChange) IV.onChange(c); };

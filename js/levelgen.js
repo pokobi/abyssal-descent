@@ -1049,86 +1049,102 @@
   }
 
   // ---------------- shop hall ----------------
+  // A compact market: the weapon stall stands as an island in the middle of the hall, straight ahead of the entrance; the other five stalls line the
+  // west and east walls and the south wall beside the door; the pawn counter, the re-stock altar and the fountain are all next to the entrance.
+  // Every stall has a stepped counter (three wares in front, two on a raised shelf behind), so a stall is short and the whole hall reads at a glance.
   LG.shop = function (area, seed, gates) {
     const rng = new G.RNG(seed);
-    const W = 40, D = 66;
+    const W = 38, D = 40;
     const w = new G.World(W, D, G.Tex.biomeFor(area));
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
     floors(w, W, D, null, 'floor');
     perimeter(w, rng, W, D, { h: 10, top: 16, beams: 0, gates });
     // ceiling beams + chandeliers make it a hall
     for (let z = 6; z < D - 4; z += 7) { w.solid('woodDark', 0, 9.2, z - 0.35, W, 9.9, z + 0.35, { uv: 2 }); }
-    for (let z = 9.5; z < D - 6; z += 14) P().chandelier(w, W / 2, 6.0, z, 9.2);
-    // red carpet aisle
-    P().rug(w, W / 2, D / 2 + 2, 0, 4, D - 10, [0.45, 0.08, 0.06]);
-    // market booths: six stalls (three on each side of the aisle), one per kind of ware, three shelves each. Every booth has a counter,
-    // a backdrop, corner posts and a striped awning in its own colour; the aisle between them stays open.
+    for (const [cx, cz] of [[W / 2, 12], [W / 2, 26], [8, 20], [W - 8, 20]]) P().chandelier(w, cx, 6.0, cz, 9.2);
+    // red carpet from the door to the weapon island, and on to the exits
+    P().rug(w, W / 2, 31.5, 0, 4, 16, [0.45, 0.08, 0.06]);
+    P().rug(w, W / 2, 14, 0, 4, 12, [0.45, 0.08, 0.06]);
+
     w.shopSlots = [];
-    const rows = [W / 2 - 10, W / 2 + 10];
+    // one stall. origin: where its back wall starts; a: unit vector along the stall; n: unit vector from the wall into the hall.
+    // u runs along the stall, d is the distance from the wall.
+    const SP = 2.5;
+    const stall = (name, col, light, txt, cnt, origin, a, n, opt) => {
+      opt = opt || {};
+      const nf = cnt <= 3 ? cnt : 3, nb = cnt - nf, sp = cnt <= 3 ? 3.0 : SP, L = nf * sp + 2.2;
+      const wp = (u, d) => [origin[0] + a[0] * u + n[0] * d, origin[1] + a[1] * u + n[1] * d];
+      const bx = (u0, u1, d0, d1, y0, y1, kind, mat, o) => {
+        const p = wp(u0, d0), q = wp(u1, d1);
+        (kind === 'v' ? w.visual : w.solid).call(w, mat, Math.min(p[0], q[0]), y0, Math.min(p[1], q[1]), Math.max(p[0], q[0]), y1, Math.max(p[1], q[1]), o || { uv: 1 });
+      };
+      // raised shelf behind, counter in front (with a coloured skirt and a stone top)
+      if (nb) { bx(0.4, L - 0.4, 0.5, 1.6, 0, 1.6, 's', 'woodDark', { uv: 1.5 }); bx(0.3, L - 0.3, 0.4, 1.7, 1.6, 1.7, 's', 'trim'); }
+      bx(0.3, L - 0.3, 1.95, 3.1, 0, 1.05, 's', 'woodDark', { uv: 1.5 });
+      bx(0.2, L - 0.2, 1.85, 3.2, 1.05, 1.15, 's', 'trim');
+      bx(0.45, L - 0.45, 3.14, 3.18, 0.15, 0.95, 'v', 'cloth2', { uv: 1, tint: col, grad: false });
+      for (let i = 0; i < nf; i++) { const p = wp(1.1 + sp * (i + 0.5), 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1 }); }
+      for (let j = 0; j < nb; j++) { const p = wp(1.1 + sp * (j + 1), 1.05); w.shopSlots.push({ x: p[0], y: 1.7, z: p[1], face: 1 }); }
+      // backdrop (a low wall in the stall's colour), corner posts
+      bx(0, L, 0, 0.16, 0, opt.low ? 2.6 : 3.4, 's', 'wall', { uv: 2 });
+      bx(0.2, L - 0.2, 0.2, 0.24, 0.4, opt.low ? 2.4 : 3.2, 'v', 'cloth2', { uv: 1, tint: col, grad: false });
+      for (const u of [0.1, L - 0.1]) for (const d of [0.1, 3.2]) bx(u - 0.1, u + 0.1, d - 0.1, d + 0.1, 0, 3.5, 's', 'woodDark');
+      // striped awning over the whole depth of the stall, a glowing trim along its front edge
+      const nq = Math.round(L / 0.8);
+      for (let q = 0; q < nq; q++) {
+        const c = q % 2 ? col : light, u0 = -0.15 + (L + 0.3) * q / nq, u1 = -0.15 + (L + 0.3) * (q + 1) / nq;
+        bx(u0, u1, 0.2, 3.3, 3.5, 3.62, 'v', 'cloth2', { uv: 1, tint: c, grad: false });
+        bx(u0, u1, 3.27, 3.33, 3.1, 3.5, 'v', 'cloth2', { uv: 1, tint: c, grad: false });
+      }
+      bx(-0.15, L + 0.15, 3.25, 3.35, 3.02, 3.1, 'v', 'glow', { uv: 1, tint: light, grad: false });
+      const lc = wp(L / 2, 1.8), ly = Math.atan2(n[0], n[1]), lb = wp(L / 2, 3.3);
+      w.addLight(lc[0], 2.7, lc[1], { flame: 0, emit: false, intensity: 7, range: 9, color: txt, prio: 0.9, steady: true });
+      const rg = wp(L / 2, 4.2); P().rug(w, rg[0], rg[1], 0.02, a[0] ? L - 0.6 : 3.6, a[0] ? 3.6 : L - 0.6, col);
+      P().label(w, name, lb[0], 4.3, lb[1], ly, 4.2, { color: txt });
+      const cd = wp(0.9, 2.5); P().candles(w, cd[0], 1.15, cd[1], rng, true);
+      return L;
+    };
     const ZONES = [
       ['⚔ 武器', [0.62, 0.1, 0.08], [0.85, 0.45, 0.4], '#ffb0a0', 3], ['✨ スキル', [0.12, 0.25, 0.65], [0.5, 0.65, 0.95], '#a8c8ff', 5], ['🔩 強化・パーツ', [0.38, 0.4, 0.44], [0.75, 0.78, 0.82], '#e0e4ea', 5],
       ['🧪 消耗品', [0.1, 0.5, 0.18], [0.5, 0.85, 0.55], '#a0f0b0', 5], ['🛡 防具', [0.6, 0.4, 0.1], [0.92, 0.75, 0.4], '#ffd890', 5], ['🔮 加護', [0.42, 0.12, 0.6], [0.75, 0.55, 0.9], '#e0b8ff', 5],
     ];
-    const cursor = [7.5, 7.5];
-    ZONES.forEach(([name, col, light, txt, cnt], zi) => {
-      const left = zi < 3, j = zi % 3, rx = left ? rows[0] : rows[1], s = left ? -1 : 1; // s: direction towards the outer wall
-      const fx = left ? rx - 0.6 : rx + 0.6;
-      const SP = 2.8, L = cnt * SP + 2.2, ci = left ? 0 : 1;
-      const z0 = cursor[ci], z1 = z0 + L, zc = (z0 + z1) / 2; cursor[ci] = z1 + 2.2;
-      // counter with a coloured skirt, a stone top and the three display spots
-      w.solid('woodDark', fx - 0.6, 0, z0 + 0.3, fx + 0.6, 1.05, z1 - 0.3, { uv: 1.5 });
-      w.visual('cloth2', fx - s * 0.62, 0.15, z0 + 0.45, fx - s * 0.58, 0.95, z1 - 0.45, { uv: 1, tint: col, grad: false });
-      w.solid('trim', fx - 0.7, 1.05, z0 + 0.2, fx + 0.7, 1.15, z1 - 0.2, { uv: 1 });
-      for (let k = 0; k < cnt; k++) w.shopSlots.push({ x: fx, y: 1.15, z: z0 + 2.5 + k * SP, face: left ? 1 : -1 });
-      // backdrop (a low wall in the booth's colour) and corner posts
-      const bx = fx + s * 1.8;
-      w.solid('wall', bx - 0.08, 0, z0, bx + 0.08, 3.2, z1, { uv: 2 });
-      w.visual('cloth2', bx - s * 0.1 - 0.03, 0.4, z0 + 0.3, bx - s * 0.1 + 0.03, 3.0, z1 - 0.3, { uv: 1, tint: col, grad: false });
-      for (const pz of [z0 + 0.1, z1 - 0.1]) for (const px of [bx, fx - s * 1.3]) w.solid('woodDark', px - 0.1, 0, pz - 0.1, px + 0.1, 3.5, pz + 0.1, { uv: 1 });
-      // striped awning
-      const ax0 = Math.min(bx + s * 0.2, fx - s * 1.5), ax1 = Math.max(bx + s * 0.2, fx - s * 1.5), n = Math.round(L / 0.8);
-      for (let q = 0; q < n; q++) {
-        const za = z0 - 0.15 + (z1 - z0 + 0.3) * q / n, zb = z0 - 0.15 + (z1 - z0 + 0.3) * (q + 1) / n, c = q % 2 ? col : light;
-        w.visual('cloth2', ax0, 3.5, za, ax1, 3.62, zb, { uv: 1, tint: c, grad: false });
-        w.visual('cloth2', fx - s * 1.5 - 0.03, 3.1, za, fx - s * 1.5 + 0.03, 3.5, zb, { uv: 1, tint: c, grad: false }); // front valance
-      }
-      // a glowing trim along the awning edge and a coloured light, so each booth reads from far down the hall
-      w.visual('glow', fx - s * 1.5 - 0.05, 3.02, z0 - 0.15, fx - s * 1.5 + 0.05, 3.1, z1 + 0.15, { uv: 1, tint: light, grad: false });
-      w.addLight(fx - s * 0.6, 2.7, zc, { flame: 0, emit: false, intensity: 7, range: 9, color: txt, prio: 0.9, steady: true });
-      P().rug(w, rx, zc, 0.02, 3.6, L - 0.6, col);
-      P().label(w, name, fx - s * 1.5, 4.3, zc, left ? Math.PI / 2 : -Math.PI / 2, 4.2, { color: txt });
-      P().candles(w, fx, 1.15, z0 + 0.8, rng, true);
-    });
-    // stalls / side décor
-    P().bookshelf(w, 1.0, 12, 0, false, rng); P().bookshelf(w, W - 1.0, 12, 0, false, rng);
-    P().weaponRack(w, 1.0, 22, 0, false); P().weaponRack(w, W - 1.0, 22, 0, false);
-    for (let i = 0; i < 3; i++) { P().barrel(w, 1.2, 26 + i * 1.0, 0, rng); P().crate(w, W - 1.4, 26 + i * 1.2, 0, rng); }
-    // a little way in from the entrance, straight ahead: the pawn counter with the re-stock altar next to it (the healing fountain is by the door, on the right)
-    const mz = D - 3.2;
-    w.merchantPos = new THREE.Vector3(1.2, 0, mz);
-    const pz = D - 15, pcx = W / 2;
-    w.solid('woodDark', pcx - 1.7, 0, pz - 0.7, pcx + 1.7, 1.1, pz + 0.7, { uv: 1.5 });
-    w.solid('wood', pcx - 1.8, 1.1, pz - 0.8, pcx + 1.8, 1.2, pz + 0.8, { uv: 1.5 });
-    // made to stand out: a gold rug, a warm light and a big gold label
-    P().rug(w, pcx, pz + 1.4, 0.02, 7.6, 5.2, [0.75, 0.55, 0.12]);
-    w.addLight(pcx, 3.2, pz + 0.5, { flame: 0, emit: false, intensity: 10, range: 11, color: '#ffd070', prio: 1.2, steady: true });
-    P().label(w, '💰 買取屋', pcx, 3.6, pz - 0.2, 0, 5, { color: '#ffe08a', size: 96 });
-    P().crate(w, pcx - 2.6, pz - 1.4, 0, rng); P().urn && P().urn(w, pcx + 2.4, pz - 1.4, 0, rng);
-    w.sellPos = new THREE.Vector3(pcx, 1.2, pz + 1.3);
-    w.pawnNpc = { x: pcx, z: pz - 1.2, ry: 0 };
-    // re-stock altar beside the pawn counter
-    const rcx = W / 2 + 5.6;
-    w.rerollPos = new THREE.Vector3(rcx, 0, pz);
-    w.solid('trim', rcx - 1, 0, pz - 1, rcx + 1, 0.3, pz + 1, { uv: 1 });
-    w.solid('block', rcx - 0.6, 0.3, pz - 0.6, rcx + 0.6, 1.0, pz + 0.6, { uv: 1 });
-    P().candles(w, rcx + 0.3, 1.0, pz, rng, true);
-    P().label(w, '🔄 品揃えの入れ替え', rcx, 2.6, pz, 0, 3.6, { color: '#ffd8a0', size: 78 });
-    // healing fountain
-    const fxp = W / 2 + 9;
-    w.fountainPos = new THREE.Vector3(fxp, 0, mz);
-    P().well(w, fxp, mz, 0);
-    P().label(w, '💧 癒しの泉', fxp, 3.4, mz, -Math.PI / 2, 3.6, { color: '#a8e8ff' }); // faces the entrance
-    for (const [x, z] of [[3, 4], [W - 3, 4], [3, D - 4], [W - 3, D - 4]]) P().brazier(w, x, 0, z, 1);
+    // slot order is fixed (the shop fills them in this order): weapons, skills, parts, consumables, armour, boons
+    const place = {
+      0: [[W / 2 - 5.5, 19.8], [1, 0], [0, 1], { low: true }],      // the weapon island, straight ahead of the door
+      1: [[0.6, 9], [0, 1], [1, 0]],                                // west wall
+      2: [[0.6, 20.2], [0, 1], [1, 0]],
+      3: [[W - 0.6, 9], [0, 1], [-1, 0]],                           // east wall
+      4: [[W - 0.6, 20.2], [0, 1], [-1, 0]],
+      5: [[2.4, D - 0.6], [1, 0], [0, -1]],                         // south wall, west of the door
+    };
+    ZONES.forEach(([name, col, light, txt, cnt], zi) => { const p = place[zi]; stall(name, col, light, txt, cnt, p[0], p[1], p[2], p[3]); });
+    // a few shelves and crates in the free corners
+    P().bookshelf(w, 1.0, 34, 0, false, rng); P().weaponRack(w, W - 1.0, 34, 0, false);
+    for (let i = 0; i < 2; i++) { P().barrel(w, 1.2, 4 + i * 1.0, 0, rng); P().crate(w, W - 1.4, 4 + i * 1.2, 0, rng); }
+    // the pawn counter on the south wall, east of the door: made to stand out with a gold rug, a warm light and a big gold label
+    const pcx = W - 8, pz = D - 3.0;
+    w.merchantPos = new THREE.Vector3(1.2, 0, D - 3.2);
+    w.solid('woodDark', pcx - 1.9, 0, pz - 0.7, pcx + 1.9, 1.1, pz + 0.7, { uv: 1.5 });
+    w.solid('wood', pcx - 2.0, 1.1, pz - 0.8, pcx + 2.0, 1.2, pz + 0.8, { uv: 1.5 });
+    P().rug(w, pcx, pz - 2.4, 0.02, 7.6, 4.2, [0.75, 0.55, 0.12]);
+    w.addLight(pcx, 3.2, pz - 0.8, { flame: 0, emit: false, intensity: 10, range: 11, color: '#ffd070', prio: 1.2, steady: true });
+    P().label(w, '💰 買取屋', pcx, 3.6, pz + 0.4, Math.PI, 5, { color: '#ffe08a', size: 96 });
+    P().crate(w, pcx - 3.1, pz + 0.9, 0, rng); P().urn && P().urn(w, pcx + 3.0, pz + 0.9, 0, rng);
+    w.sellPos = new THREE.Vector3(pcx, 1.2, pz - 1.4);
+    w.pawnNpc = { x: pcx, z: pz + 0.8, ry: Math.PI };
+    // re-stock altar by the east wall, close to the door
+    const rcx = W - 3.5, rcz = D - 10;
+    w.rerollPos = new THREE.Vector3(rcx, 0, rcz);
+    w.solid('trim', rcx - 1, 0, rcz - 1, rcx + 1, 0.3, rcz + 1, { uv: 1 });
+    w.solid('block', rcx - 0.6, 0.3, rcz - 0.6, rcx + 0.6, 1.0, rcz + 0.6, { uv: 1 });
+    P().candles(w, rcx + 0.3, 1.0, rcz, rng, true);
+    P().label(w, '🔄 品揃えの入れ替え', rcx, 2.6, rcz, -Math.PI / 2, 3.6, { color: '#ffd8a0', size: 78 });
+    // healing fountain by the west wall, close to the door
+    const fxp = 3.2, fzp = D - 10;
+    w.fountainPos = new THREE.Vector3(fxp, 0, fzp);
+    P().well(w, fxp, fzp, 0);
+    P().label(w, '💧 癒しの泉', fxp, 3.4, fzp, Math.PI / 2, 3.6, { color: '#a8e8ff' });
+    for (const [x, z] of [[3, 4], [W - 3, 4], [3, D - 3], [W - 3, D - 3]]) P().brazier(w, x, 0, z, 1);
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
     w.isShop = true;
     validate(w);

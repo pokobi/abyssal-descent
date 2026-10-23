@@ -67,7 +67,6 @@
     gunBus.connect(shaper); shaper.connect(dry);
     white = makeNoise('white', 2); pink = makeNoise('pink', 2); brown = makeNoise('brown', 3);
     A.startAmbience();
-    preload();
   };
   A.setVolume = (v) => { A.volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); };
   A.suspend = () => { if (ctx && ctx.state === 'running') ctx.suspend(); };
@@ -145,82 +144,14 @@
   }
   const vr = (v, p) => v * (1 + (Math.random() * 2 - 1) * p);
 
-  // ---------- recorded samples (js/sfxbank.js, files in sfx/) ----------
-  // smp(key, ...) plays one variant of a bank key and returns true; it returns false (so the caller falls back to the
-  // procedural sound) when samples are switched off in the settings, the key is switched off in sounds.html,
-  // or its files have not finished loading yet.
-  const SB = G.SFXBANK || { bank: {}, files: {} };
-  const bufs = {}, lastPick = {};
-  let offKeys = new Set();
-  A.loadPrefs = function () { try { offKeys = new Set(JSON.parse(localStorage.getItem('abyss_sfx_off') || '[]')); } catch (e) { offKeys = new Set(); } };
-  A.loadPrefs();
-  A.force = null; // 'synth' | 'sample' (sounds.html comparisons)
-  A.samplesOn = () => A.force ? A.force === 'sample' : G.save.data.settings.sfxSamples !== false;
-  const usable = (key) => A.samplesOn() && (A.force === 'sample' || !offKeys.has(key)) && SB.bank[key];
-  const pend = {};
-  // sfx/sfxdata.js (tools/sfx/pack_data.js): every file as base64 in one script, which works from file:// too; loaded only when a fetch fails
-  let dataP = null;
-  function dataBuf(f) {
-    dataP = dataP || new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'sfx/sfxdata.js'; s.onload = ok; s.onerror = () => no('no sfxdata'); document.head.appendChild(s); });
-    return dataP.then(() => {
-      const b64 = G.SFXDATA && G.SFXDATA[f]; if (!b64) return Promise.reject('missing ' + f);
-      const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-      return u.buffer;
-    });
-  }
-  function fetchBuf(f) {
-    if (pend[f]) return pend[f];
-    bufs[f] = null;
-    return (pend[f] = fetch('sfx/' + f + '.mp3').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
-      .catch(() => dataBuf(f)) // opened from disk (file://) or the files are blocked: take them from the packed copy instead
-      .then((ab) => new Promise((ok, no) => ctx.decodeAudioData(ab, ok, no)))
-      .then((b) => (bufs[f] = b), () => (bufs[f] = false)));
-  }
-  // one-shots load in the background a few at a time after the audio starts; looping beds load when first needed
-  function preload() {
-    const list = [];
-    for (const k in SB.bank) if (!SB.bank[k].loop) list.push(...SB.bank[k].f);
-    let i = 0;
-    const next = () => { if (i < list.length) fetchBuf(list[i++]).then(next); };
-    for (let n = 0; n < 4; n++) next();
-  }
-  A.sampleBuf = (f) => bufs[f];
-  A.fetchSample = fetchBuf;
-  function smp(key, pos, vol, rate, wet, bus) {
-    if (!ctx || !usable(key)) return false;
-    const b = SB.bank[key], fs = b.f;
-    const ready = fs.filter((f) => bufs[f]);
-    if (!ready.length) return false;
-    let f = ready[Math.floor(Math.random() * ready.length)];
-    if (ready.length > 1 && f === lastPick[key]) f = ready[(ready.indexOf(f) + 1) % ready.length];
-    lastPick[key] = f;
-    const buf = bufs[f];
-    const r = b.r || [0.94, 1.06];
-    const pr = Math.max(0.3, Math.min(3, (rate || 1) * (r[0] + Math.random() * (r[1] - r[0]))));
-    if (!voice(buf.duration / pr)) return true;
-    const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = pr;
-    const out = dest(pos, wet != null ? wet : b.wet != null ? b.wet : 0.25, bus);
-    out.gain.value *= (vol == null ? 1 : vol) * (b.v || 1);
-    src.connect(out); src.start();
-    return true;
-  }
+  // ---------- no recorded samples: every sound is synthesized ----------
+  // smp() and friends are kept as inert hooks (they always report "not played"), so the call sites below fall through to the synthesized sound.
+  const SB = { bank: {}, files: {} }, bufs = {};
+  const usable = () => false;
+  A.samplesOn = () => false;
+  const fetchBuf = () => Promise.resolve(false);
+  const smp = () => false;
   A.smp = smp;
-  // sounds.html: play one file of a key as the game would (its bank level, no random pitch)
-  A.playFile = function (key, f) {
-    const buf = bufs[f]; if (!ctx || !buf) return false;
-    const src = ctx.createBufferSource(); src.buffer = buf;
-    const out = dest(null, (SB.bank[key] && SB.bank[key].wet) || 0.25); out.gain.value *= (SB.bank[key] && SB.bank[key].v) || 1;
-    src.connect(out); src.start(); return src;
-  };
-  // sounds.html level matching: renders fn() into an offline buffer (dry path only) and returns its samples
-  A.renderOffline = function (fn, secs) {
-    const keep = { ctx, master, dry, revSend, gunBus, voices };
-    const oc = new OfflineAudioContext(1, Math.ceil(ctx.sampleRate * secs), ctx.sampleRate);
-    ctx = oc; master = oc.createGain(); master.connect(oc.destination);
-    dry = oc.createGain(); dry.connect(master); revSend = oc.createGain(); gunBus = oc.createGain(); gunBus.connect(dry); voices = 0;
-    try { fn(); } finally { ({ ctx, master, dry, revSend, gunBus, voices } = keep); }
-    return oc.startRendering().then((b) => b.getChannelData(0));
-  };
 
   // ---------- weapons ----------
   const GUN = {

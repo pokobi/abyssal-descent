@@ -1049,7 +1049,7 @@
   }
 
   // ---------------- shop hall ----------------
-  // A compact market: two island stalls stand straight ahead of the entrance (the weapons, trimmed in gold under a spotlight, and the boons);
+  // A compact market: two island stalls stand straight ahead of the entrance (the weapons, trimmed in gold under a spotlight, and the skills);
   // the other four stalls line the west and east walls; the fountain and the re-stock altar sit by the walls near the door, clear of the stalls,
   // and the pawn counter is on the south wall beside the door.
   // Every stall has a stepped counter (three wares in front, two on a raised shelf behind), so a stall is short and the whole hall reads at a glance.
@@ -1086,14 +1086,14 @@
       bx(0.3, L - 0.3, 1.95, 3.1, 0, 1.05, 's', 'woodDark', { uv: 1.5 });
       bx(0.2, L - 0.2, 1.85, 3.2, 1.05, 1.15, 's', 'trim');
       bx(0.45, L - 0.45, 3.14, 3.18, 0.15, 0.95, 'v', 'cloth2', { uv: 1, tint: col, grad: false });
-      for (let i = 0; i < nf; i++) { const p = wp(1.1 + sp * (i + 0.5), 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1, big: !!opt.gold }); }
-      for (let j = 0; j < nb; j++) { const p = wp(1.1 + sp * (j + 1), 0.95); w.shopSlots.push({ x: p[0], y: 2.05, z: p[1], face: 1 }); }
+      for (let i = 0; i < nf; i++) { const p = wp(1.1 + sp * (i + 0.5), 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1, nx: n[0], nz: n[1], big: !!opt.gold }); }
+      for (let j = 0; j < nb; j++) { const p = wp(1.1 + sp * (j + 1), 0.95); w.shopSlots.push({ x: p[0], y: 2.05, z: p[1], face: 1, nx: n[0], nz: n[1] }); }
       // a ware of its own beside the stall (the weapon / skill upgrade): a separate plinth with its own little sign
       if (opt.extra) {
         const eu = opt.extraBack ? -1.2 : L + 1.2; // on the near side or the far side of the stall
         bx(eu - 0.7, eu + 0.7, 1.9, 3.1, 0, 1.05, 's', 'block'); bx(eu - 0.8, eu + 0.8, 1.8, 3.2, 1.05, 1.15, 's', 'trim');
         bx(eu - 0.65, eu + 0.65, 3.12, 3.16, 0.15, 0.95, 'v', 'cloth2', { uv: 1, tint: light, grad: false });
-        const p = wp(eu, 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1 });
+        const p = wp(eu, 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1, nx: n[0], nz: n[1] });
         const sl = wp(eu, 3.2); P().label(w, opt.extra, sl[0], 3.35, sl[1], Math.atan2(n[0], n[1]), 2.4, { color: txt, size: 60 });
         w.addLight(p[0], 2.6, p[1], { flame: 0, emit: false, intensity: 5, range: 6, color: txt, prio: 0.8, steady: true });
       }
@@ -1131,16 +1131,16 @@
     ];
     // slot order is fixed (the shop fills them in this order): weapons, skills, parts, consumables, armour, boons
     const place = {
-      0: [[9.4, 20], [1, 0], [0, 1], { low: true, gold: true, extra: '⚒ 武器強化' }], // islands straight ahead of the door: the weapons (+ the upgrade) ...
-      1: [[0.6, 24.2], [0, 1], [1, 0], { extra: '📖 スキル強化', extraBack: true }], // west wall: attachments in the north, skills (+ the skill tome) in the south
-      2: [[0.6, 8.5], [0, 1], [1, 0]],
+      0: [[10, 20], [1, 0], [0, 1], { low: true, gold: true, extra: '⚒ 武器強化', extraBack: true }], // islands straight ahead of the door: the weapons (the upgrade on the near end) ...
+      1: [[23, 20], [1, 0], [0, 1], { low: true, extra: '📖 スキル強化' }],          // ... and the skills (the skill tome on the far end)
+      2: [[0.6, 8.5], [0, 1], [1, 0]],                                               // west wall: attachments in the north, boons in the south
       3: [[W - 0.6, 8.5], [0, 1], [-1, 0]],                                          // east wall: consumables, armour
       4: [[W - 0.6, 21], [0, 1], [-1, 0]],
-      5: [[23.6, 20], [1, 0], [0, 1], { low: true }],                                // ... and the boons, beside them
+      5: [[0.6, 24.2], [0, 1], [1, 0]],
     };
     ZONES.forEach(([name, col, light, txt, cnt], zi) => { const p = place[zi]; stall(name, col, light, txt, cnt, p[0], p[1], p[2], p[3]); });
     // a few shelves and crates in the free corners
-    P().bookshelf(w, 1.0, D - 2.4, 0, false, rng); P().weaponRack(w, 11.5, 19.4, 0, true);
+    P().bookshelf(w, 1.0, D - 2.4, 0, false, rng); P().weaponRack(w, 12, 19.4, 0, true);
     for (let i = 0; i < 2; i++) { P().barrel(w, 1.2, 4 + i * 1.0, 0, rng); P().crate(w, W - 1.4, 4 + i * 1.2, 0, rng); }
     // the pawn counter on the south wall, east of the door: made to stand out with a gold rug, a warm light and a big gold label
     const pcx = W - 9, pz = D - 3.0;

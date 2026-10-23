@@ -148,20 +148,6 @@
     }
     return len;
   };
-  // a plank bridge between two ledges at height y (broken: a gap in the middle you must jump / grapple)
-  F.bridge = function (w, x0, z0, x1, z1, y, broken) {
-    const alongX = x1 - x0 > z1 - z0;
-    const parts = broken ? (alongX ? [[x0, (x0 + x1) / 2 - 1.3], [(x0 + x1) / 2 + 1.3, x1]] : [[z0, (z0 + z1) / 2 - 1.3], [(z0 + z1) / 2 + 1.3, z1]]) : [alongX ? [x0, x1] : [z0, z1]];
-    for (const [a, b] of parts) {
-      if (alongX) { w.solid('wood', a, y - 0.25, z0, b, y, z1, { uv: 1, tag: 'bridge' }); w.visual('woodDark', a, y - 0.5, z0 + 0.1, b, y - 0.25, z0 + 0.3, { uv: 1 }); w.visual('woodDark', a, y - 0.5, z1 - 0.3, b, y - 0.25, z1 - 0.1, { uv: 1 }); }
-      else { w.solid('wood', x0, y - 0.25, a, x1, y, b, { uv: 1, tag: 'bridge' }); w.visual('woodDark', x0 + 0.1, y - 0.5, a, x0 + 0.3, y - 0.25, b, { uv: 1 }); w.visual('woodDark', x1 - 0.3, y - 0.5, a, x1 - 0.1, y - 0.25, b, { uv: 1 }); }
-      // rope rails
-      for (const s of [0, 1]) {
-        if (alongX) { const z = s ? z1 - 0.05 : z0 + 0.05; w.visual('woodDark', a, y + 0.9, z - 0.03, b, y + 0.96, z + 0.03, { uv: 1 }); w.addCollider(a, y, z - 0.05, b, y + 0.95, z + 0.05, { surf: 'wood', noGrapple: true }); for (let u = a; u <= b; u += 1.6) w.visual('woodDark', u - 0.05, y, z - 0.05, u + 0.05, y + 0.96, z + 0.05, { uv: 1 }); }
-        else { const x = s ? x1 - 0.05 : x0 + 0.05; w.visual('woodDark', x - 0.03, y + 0.9, a, x + 0.03, y + 0.96, b, { uv: 1 }); w.addCollider(x - 0.05, y, a, x + 0.05, y + 0.95, b, { surf: 'wood', noGrapple: true }); for (let u = a; u <= b; u += 1.6) w.visual('woodDark', x - 0.05, y, u - 0.05, x + 0.05, y + 0.96, u + 0.05, { uv: 1 }); }
-      }
-    }
-  };
   // ---------------------------------------------------------------- shared area plumbing
   function base(area, seed, biomeKey, sz) {
     const rng = new G.RNG(seed);

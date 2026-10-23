@@ -1,15 +1,29 @@
 'use strict';
 // Fields 3 and 4 (halls / ruin): the whole area is split in two by a deep chasm running across it. Each half is a stack of
 // 3 or 4 storeys (the ground plus slabs above), joined within a half by stairs, wooden ramps and the odd ladder.
-// Across the chasm: at least one plank bridge (walkers use it), sometimes more, and swaying chain bridges (player only).
+// The slab edges along the chasm are ragged (short runs of different lengths); the gap is never narrower than 12 m.
+// Across the chasm: at least one plank bridge (walkers use it), sometimes more, and swaying chain bridges (player only);
+// bridges may cross at a slant and are knocked together from loose planks.
 // At the bottom of the chasm runs a trench of lava (blue in the ruin): nothing spawns there, monsters will not walk in,
 // and one knocked in is thrown back out (enemies.js). The player burns and can climb out by the low ledges.
-// The runtime half (chain bridges, ladders) is driven from player.js.
+// Against the outer walls stand barred prison cells, some shut by an iron gate: the player opens it (2 s), a monster
+// whose way leads through it batters it down.
+// The runtime half (chain bridges, ladders, cell gates) is driven from player.js / enemies.js / game.js.
 (function () {
   const LG = G.LevelGen, H = LG._, FG = G.FieldGen, U = G.U;
   const P = () => G.Props;
   const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
-  const S = (G.Strata = { chains: [], ladders: [] });
+  const S = (G.Strata = { chains: [], ladders: [], doors: [] });
+  const MIN_GAP = 12;
+  const _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _v = new THREE.Vector3(), _s = new THREE.Vector3();
+  // a box with yaw / pitch / roll (order YXZ: yaw last) into the static batch
+  function box(w, mk, x, y, z, sx, sy, sz, ry, rx, rz, tint) {
+    _e.set(rx || 0, ry || 0, rz || 0, 'YXZ'); _q.setFromEuler(_e);
+    w.batch.geo(mk, G.Props.PG.box, new THREE.Matrix4().compose(_v.set(x, y, z), _q, _s.set(sx, sy, sz)), tint ? { tint } : undefined);
+  }
+  const amin = (a, x0, x1) => { let m = Infinity; for (let x = Math.max(0, x0); x < Math.min(a.length, x1); x++) m = Math.min(m, a[x]); return m; };
+  const amax = (a, x0, x1) => { let m = -Infinity; for (let x = Math.max(0, x0); x < Math.min(a.length, x1); x++) m = Math.max(m, a[x]); return m; };
+  const runs = (a) => { const out = []; let s = 0; for (let x = 1; x <= a.length; x++) if (x === a.length || a[x] !== a[s]) { out.push({ x0: s, x1: x, e: a[s] }); s = x; } return out; };
 
   // a rectangle minus holes, as a list of rectangles (x strips)
   function cut(r, holes) {
@@ -28,6 +42,92 @@
     }
     return out;
   }
+
+  // ---- a plank bridge: walkable deck in short staggered steps (so it may run at a slant), dressed with loose, uneven planks ----
+  function plankBridge(w, rng, xa, xb, z0, z1, y, bw) {
+    const L = z1 - z0, n = Math.max(4, Math.ceil(L / 0.8));
+    for (let i = 0; i < n; i++) {
+      const za = z0 + (i * L) / n, zb = z0 + ((i + 1) * L) / n, xo = xa + (xb - xa) * ((i + 0.5) / n);
+      const c = w.addCollider(xo, y - 0.25, za, xo + bw, y, zb, { surf: 'wood' }); c.tag = 'bridge';
+      for (const sx of [xo + 0.05, xo + bw - 0.05]) w.addCollider(sx - 0.05, y, za, sx + 0.05, y + 0.95, zb, { surf: 'wood', noGrapple: true });
+    }
+    const th = Math.atan2(xb - xa, L), Ld = Math.hypot(xb - xa, L), dx = Math.sin(th), dz = Math.cos(th), px = Math.cos(th), pz = -Math.sin(th);
+    const cx0 = xa + bw / 2;
+    const at = (u, side) => [cx0 + dx * u + px * side, z0 + dz * u + pz * side];
+    // two stringers underneath, a little off true
+    for (const sd of [-1, 1]) { const [x, z] = at(Ld / 2, sd * (bw / 2 - 0.3)); box(w, 'woodDark', x, y - 0.17, z, 0.16, 0.14, Ld + 0.4, th + rng.range(-0.015, 0.015), rng.range(-0.01, 0.01)); }
+    // the deck: planks of different lengths and widths, each laid down a little askew, with gaps between them
+    for (let u = rng.range(0.1, 0.25); u < Ld - 0.12; u += rng.range(0.3, 0.42)) {
+      const [x, z] = at(u, rng.range(-0.12, 0.12));
+      const tone = rng.range(0.7, 1.12);
+      box(w, rng.chance(0.3) ? 'woodDark' : 'wood', x, y - 0.04 + rng.range(-0.012, 0.02), z, bw * rng.range(0.9, 1.16), rng.range(0.045, 0.07), rng.range(0.2, 0.3), th + rng.range(-0.13, 0.13), rng.range(-0.03, 0.03), rng.range(-0.035, 0.035), [tone, tone * rng.range(0.9, 1), tone * rng.range(0.82, 0.95)]);
+    }
+    // leaning posts and sagging rope rails
+    for (const sd of [-1, 1]) {
+      let prev = null;
+      for (let u = 0.2; u <= Ld - 0.1; u += rng.range(1.5, 2.1)) {
+        const [x, z] = at(u, sd * (bw / 2 - 0.05)), hgt = rng.range(0.92, 1.08), lx = rng.range(-0.07, 0.07), lz = rng.range(-0.07, 0.07);
+        box(w, 'woodDark', x + lx * hgt / 2, y + hgt / 2, z + lz * hgt / 2, 0.09, hgt, 0.09, rng.range(0, 1.5), lz, -lx);
+        const top = [x + lx * hgt, y + hgt - 0.05, z + lz * hgt];
+        if (prev) {
+          const mx = (prev[0] + top[0]) / 2, my = (prev[1] + top[1]) / 2 - 0.1, mz = (prev[2] + top[2]) / 2;
+          for (const [a, b] of [[prev, [mx, my, mz]], [[mx, my, mz], top]]) {
+            const ddx = b[0] - a[0], ddy = b[1] - a[1], ddz = b[2] - a[2], len = Math.hypot(ddx, ddy, ddz), hz = Math.hypot(ddx, ddz);
+            box(w, 'woodDark', (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, 0.035, 0.035, len, Math.atan2(ddx, ddz), -Math.atan2(ddy, hz));
+          }
+        }
+        prev = top;
+      }
+    }
+  }
+
+  // ---- a prison cell against the outer wall (s: 'N' wall at z = 0, 'S' wall at z = D); returns false if it does not fit ----
+  function cell(w, rng, o, s, y, W, D, area) {
+    const cw = rng.int(5, 7), d = rng.int(4, 5), hc = 3.4;
+    for (let t = 0; t < 30; t++) {
+      const x0 = rng.int(3, W - 3 - cw), x1 = x0 + cw;
+      const fa = s === 'N' ? 2 : D - d - 2.5, fb = s === 'N' ? d + 2.5 : D - 2;
+      if (!o.free(x0 - 0.6, fa, x1 + 0.6, fb)) continue;
+      o.mark(x0 - 0.6, s === 'N' ? 0 : D - d - 2.5, x1 + 0.6, s === 'N' ? d + 2.5 : D, 2);
+      const za = s === 'N' ? 0 : D - d, zb = s === 'N' ? d : D, zf = s === 'N' ? d : D - d, back = s === 'N' ? 0 : D;
+      // stone sides and a roof
+      w.solid('wall', x0, y, za, x0 + 0.35, y + hc, zb, { uv: 2 }); w.solid('wall', x1 - 0.35, y, za, x1, y + hc, zb, { uv: 2 });
+      w.solid('block', x0 - 0.1, y + hc, s === 'N' ? 0 : zf - 0.12, x1 + 0.1, y + hc + 0.35, s === 'N' ? zf + 0.12 : D, { uv: 2 });
+      // the bars, with a doorway; shots and sight pass between them, bodies do not
+      const ia = x0 + 0.35, ib = x1 - 0.35, dw = 1.5, da = U.clamp(ia + rng.range(0.4, ib - ia - dw - 0.4), ia + 0.3, ib - dw - 0.3), db = da + dw, dh = 2.25;
+      for (let x = ia + 0.1; x < ib - 0.05; x += 0.2) {
+        if (x > da - 0.05 && x < db + 0.05) { w.visual('iron', x - 0.025, y + dh, zf - 0.025, x + 0.025, y + hc, zf + 0.025, { uv: 1 }); continue; }
+        w.visual('iron', x - 0.025, y, zf - 0.025, x + 0.025, y + hc, zf + 0.025, { uv: 1 });
+      }
+      for (const ry of [0.12, 1.3]) { w.visual('iron', ia, y + ry, zf - 0.04, da, y + ry + 0.06, zf + 0.04, { uv: 1 }); w.visual('iron', db, y + ry, zf - 0.04, ib, y + ry + 0.06, zf + 0.04, { uv: 1 }); }
+      w.visual('iron', ia, y + hc - 0.14, zf - 0.04, ib, y + hc - 0.06, zf + 0.04, { uv: 1 });
+      w.visual('iron', da - 0.06, y + dh - 0.04, zf - 0.05, db + 0.06, y + dh + 0.04, zf + 0.05, { uv: 1 });
+      const bar = (a, y0, b, y1) => { const c = w.addCollider(a, y0, zf - 0.06, b, y1, zf + 0.06, { surf: 'metal', noGrapple: true }); c.bars = true; return c; };
+      bar(ia, y, da, y + hc); bar(db, y, ib, y + hc); bar(da, y + dh, db, y + hc);
+      // half the cells keep an iron gate in the doorway
+      if (rng.chance(0.5)) {
+        const c = bar(da + 0.02, y, db - 0.02, y + dh); c.navIgnore = true; // monsters plan their way through it (and batter it down)
+        const door = { x0: da, x1: db, z: zf, y, h: dh, hinge: rng.chance(0.5) ? 0 : 1, face: s === 'N' ? 1 : -1, col: c, hp: 100, state: 'closed' };
+        const it = { type: 'celldoor', pos: V((da + db) / 2, y + 1.2, zf), door };
+        door.it = it; w.doors.push(door); w.interactables.push(it);
+      }
+      // inside: straw, chains on the back wall, bones, sometimes a chest
+      const icx = (ia + ib) / 2, izc = (za + zb) / 2;
+      for (let i = 0; i < 5; i++) { const x = rng.range(ia + 0.2, ib - 1), z = rng.range(za + 0.4, zb - 1); w.visual('wood', x, y + 0.01, z, x + rng.range(0.6, 1.4), y + 0.03, z + rng.range(0.4, 1), { uv: 1, tint: [0.95, 0.82, 0.45], grad: false }); }
+      for (let i = 0; i < rng.int(1, 2); i++) P().chain(w, rng.range(ia + 0.5, ib - 0.5), y + rng.range(0.6, 1.4), back + (s === 'N' ? 0.12 : -0.12), rng.range(1.2, 2.2));
+      if (rng.chance(0.6)) P().bones(w, rng.range(ia + 0.5, ib - 0.5), y, izc + rng.range(-1, 1), rng);
+      if (rng.chance(0.4)) P().skull(w, rng.range(ia + 0.5, ib - 0.5), y, izc + rng.range(-1, 1), rng.range(0, 6));
+      if (rng.chance(w.doors.length && w.doors[w.doors.length - 1].x0 === da ? 0.5 : 0.3)) {
+        const tier = rng.chance(0.1 + area * 0.004) ? 2 : rng.chance(0.35) ? 1 : 0;
+        const cz = s === 'N' ? za + 1.1 : zb - 1.1, cx = U.clamp(icx + rng.range(-1, 1), ia + 0.8, ib - 0.8);
+        if (LG.chestSpotFree(w, cx, y, cz)) P().chest(w, cx, cz, y, s === 'N' ? 0 : Math.PI, tier);
+      }
+      if (rng.chance(0.5)) P().torch(w, icx, y + 2.4, back, s === 'N' ? 'pz' : 'nz');
+      return true;
+    }
+    return false;
+  }
+
   function gen(area, seed, extraChests, gates, kind, ruined) {
     const rng = new G.RNG(seed);
     const size = Math.min(88, 72 + (seed % 4) * 4);
@@ -41,28 +141,42 @@
     for (let k = 0; k < NL; k++) Y.push(k * SP);
     const HT = Y[NL - 1] + 8;
     const cz = D / 2 + rng.range(-2, 2);
-    const eN = [], eS = []; // per storey: the north half ends at eN, the south half starts at eS
+    // per storey, per metre of x: the north half ends at EN[k][x], the south half starts at ES[k][x].
+    // Each edge is made of runs 3-11 m long, set back 0-3 m at random: the gap is always MIN_GAP or more.
+    const EN = [], ES = [];
     for (let k = 0; k < NL; k++) {
-      const g = rng.range(12, 15), c = cz + rng.range(-1.5, 1.5);
-      eN.push(Math.round(c - g / 2)); eS.push(Math.round(c + g / 2));
+      const base = Math.round(cz + rng.range(-1.5, 1.5) - MIN_GAP / 2), n = new Int16Array(W), s = new Int16Array(W);
+      for (const [arr, sg] of [[n, -1], [s, 1]]) {
+        let x = 0;
+        while (x < W) { const L = rng.int(3, 11), j = rng.int(0, 3); for (let i = x; i < Math.min(W, x + L); i++) arr[i] = sg < 0 ? base - j : base + MIN_GAP + j; x += L; }
+      }
+      EN.push(n); ES.push(s);
     }
     // the slabs shut out the light from above: a brighter fill and thinner haze than the open halls had
     w.envOverride = ruined ? { amb: 1.0, hemiS: '#8ea6e0', hemiG: '#2c3658', fog: '#101a2e', fogD: 0.011 } : { amb: 0.95, hemiS: '#a8968a', hemiG: '#4a3a2a', fog: '#1c1610', fogD: 0.012 };
-    const T = { z0: eN[0], z1: eS[0], y: -1.0, blue: ruined };
-    w.trench = T; w.strata = { Y, eN, eS, HT };
+    const T = { z0: amin(EN[0], 0, W), z1: amax(ES[0], 0, W), n: EN[0], s: ES[0], y: -1.0, blue: ruined };
+    w.trench = T; w.strata = { Y, EN, ES, HT };
     w.navLayers = NL + 3;
     w.navHazard = (x, y, z) => (z > T.z0 && z < T.z1 && y < -0.2) || y > HT - 1;
     // ground: floors on both halves, the trench between them (rock bed, a low ledge on each side to climb out by, lava)
     const pit = new Uint8Array(W * D);
-    for (let z = T.z0; z < T.z1; z++) for (let x = 0; x < W; x++) pit[z * W + x] = 1;
+    for (let x = 0; x < W; x++) for (let z = EN[0][x]; z < ES[0][x]; z++) pit[z * W + x] = 1;
     const fm = rng.chance(0.5) ? 'floor' : 'cobble';
     H.floors(w, W, D, pit, fm);
-    w.solid('rock', 0, -14, T.z0, W, T.y, T.z1, { uv: 5, grad: false });
-    w.solid('block', 0, T.y, T.z0, W, -0.5, T.z0 + 0.8, { uv: 2 });
-    w.solid('block', 0, T.y, T.z1 - 0.8, W, -0.5, T.z1, { uv: 2 });
-    G.Fields.add(w, 'lava', 0, T.z0 + 0.8, W, T.z1 - 0.8, { blue: ruined, y: T.y, noLight: true });
-    for (let x = 6; x < W - 3; x += 12) w.addLight(x, 0.4, (T.z0 + T.z1) / 2, { flame: 0, intensity: 16, range: 15, color: ruined ? '#3a8aff' : '#ff6a20', prio: 1.1, emit: false });
-    occ.mark(0, T.z0 - 1, W, T.z1 + 1, 2);
+    {
+      let xs = 0;
+      for (let x = 1; x <= W; x++) {
+        if (x < W && EN[0][x] === EN[0][xs] && ES[0][x] === ES[0][xs]) continue;
+        const n = EN[0][xs], s = ES[0][xs];
+        w.solid('rock', xs, -14, n, x, T.y, s, { uv: 5, grad: false });
+        w.solid('block', xs, T.y, n, x, -0.5, n + 0.8, { uv: 2 });
+        w.solid('block', xs, T.y, s - 0.8, x, -0.5, s, { uv: 2 });
+        G.Fields.add(w, 'lava', xs, n + 0.8, x, s - 0.8, { blue: ruined, y: T.y, noLight: true });
+        xs = x;
+      }
+    }
+    for (let x = 6; x < W - 3; x += 12) w.addLight(x, 0.4, (EN[0][x] + ES[0][x]) / 2, { flame: 0, intensity: 16, range: 15, color: ruined ? '#3a8aff' : '#ff6a20', prio: 1.1, emit: false });
+    for (let x = 0; x < W; x++) occ.mark(x, EN[0][x] - 1, x + 1, ES[0][x] + 1, 2);
     // reserve the entrance, the exits and the mini shop
     occ.mark(W / 2 - 6, D - 10, W / 2 + 6, D, 2);
     for (const gx of LG.gateXs(W, gates || 1)) occ.mark(gx - 6, 0, gx + 6, 9, 2);
@@ -71,15 +185,14 @@
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0 });
     F_ceiling(w, rng, W, D, HT, ruined);
 
-    // per storey and half: what lies on it (occupancy), its surface rectangle and the holes cut in it
-    const half = (s, k) => (s === 'N' ? { x0: 0, z0: 0, x1: W, z1: eN[k] } : { x0: 0, z0: eS[k], x1: W, z1: D });
+    // per storey and half: what lies on it (occupancy), the holes cut in it, the railings around them
+    const inner = (s, k) => (s === 'N' ? { x0: 0, z0: 0, x1: W, z1: amin(EN[k], 0, W) } : { x0: 0, z0: amax(ES[k], 0, W), x1: W, z1: D });
     const lv = { N: [], S: [] };
     for (const s of ['N', 'S']) for (let k = 0; k < NL; k++) {
       let o = occ;
       if (k > 0) {
         o = H.Occ(W, D);
-        const r = half(s, k);
-        o.mark(0, 0, W, r.z0, 2); o.mark(0, r.z1, W, D, 2);
+        for (let x = 0; x < W; x++) { if (s === 'N') o.mark(x, EN[k][x], x + 1, D, 2); else o.mark(x, 0, x + 1, ES[k][x], 2); }
         o.mark(0, 0, 2, D, 2); o.mark(W - 2, 0, W, D, 2); o.mark(0, 0, W, 2, 2); o.mark(0, D - 2, W, D, 2);
       }
       lv[s].push({ occ: o, holes: [], par: [] });
@@ -92,9 +205,9 @@
 
     // ---- climbing within a half: one walkable flight per storey (stone stairs or a wooden ramp), now and then a ladder or a second flight ----
     const wd = 2.6, len = LG.stairsLen(SP);
+    const band = (s, k) => (s === 'N' ? [4, Math.min(amin(EN[k], 0, W), amin(EN[k + 1], 0, W)) - 4] : [Math.max(amax(ES[k], 0, W), amax(ES[k + 1], 0, W)) + 4, D - 4]);
     const flight = (s, k, wood) => {
-      const lo = lv[s][k], hi = lv[s][k + 1];
-      const za = s === 'N' ? 4 : Math.max(eS[k], eS[k + 1]) + 4, zb = s === 'N' ? Math.min(eN[k], eN[k + 1]) - 4 : D - 4;
+      const lo = lv[s][k], hi = lv[s][k + 1], [za, zb] = band(s, k);
       for (let t = 0; t < 60; t++) {
         const dirE = rng.chance(0.5), c = Math.round(rng.range(za, zb)) + 0.5;
         const e = dirE ? rng.int(5, W - 6 - Math.ceil(len)) : rng.int(6 + Math.ceil(len), W - 5);
@@ -114,8 +227,7 @@
       return false;
     };
     const ladder = (s, k) => {
-      const lo = lv[s][k], hi = lv[s][k + 1];
-      const za = s === 'N' ? 4 : Math.max(eS[k], eS[k + 1]) + 4, zb = s === 'N' ? Math.min(eN[k], eN[k + 1]) - 4 : D - 4;
+      const lo = lv[s][k], hi = lv[s][k + 1], [za, zb] = band(s, k);
       for (let t = 0; t < 40; t++) {
         const x = rng.int(5, W - 5) + 0.5, z = Math.round(rng.range(za, zb)) + 0.5;
         const dir = rng.pick([[1, 0], [-1, 0], [0, 1], [0, -1]]);
@@ -143,24 +255,29 @@
       if (rng.chance(0.3)) { if (rng.chance(0.6)) ladder(s, k); else flight(s, k, rng.chance(0.5)); }
     }
 
-    // ---- across the chasm: a plank bridge for certain, sometimes more planks or a chain bridge ----
+    // ---- across the chasm: a plank bridge for certain, sometimes more planks or a chain bridge; any of them may slant ----
     w.chains = [];
-    const bridgeXs = [];
+    const spans = [];
     const across = (k, chain) => {
-      const y = Y[k], z0 = eN[k], z1 = eS[k], bw = chain ? 2 : 3;
-      for (let t = 0; t < 40; t++) {
-        const bx = rng.int(6, W - 6 - bw);
-        if (bridgeXs.some((x) => Math.abs(x - bx) < 7)) continue;
+      const y = Y[k], bw = chain ? 1.8 : 2.6;
+      for (let t = 0; t < 50; t++) {
+        const xa = rng.range(6, W - 6 - bw), xb = U.clamp(xa + (rng.chance(0.7) ? rng.range(-3.5, 3.5) : 0), 5, W - 5 - bw);
+        if (spans.some((sp) => Math.abs(sp[0] - xa) < 7 || Math.abs(sp[1] - xb) < 7)) continue;
+        const zN = amin(EN[k], Math.floor(xa) - 1, Math.ceil(xa + bw) + 1), zS = amax(ES[k], Math.floor(xb) - 1, Math.ceil(xb + bw) + 1);
         const nO = lv.N[k].occ, sO = lv.S[k].occ;
-        if (k > 0 && (!nO.free(bx - 1, z0 - 3.5, bx + bw + 1, z0 - 0.01) || !sO.free(bx - 1, z1 + 0.01, bx + bw + 1, z1 + 3.5))) continue;
-        if (k === 0 && (!occ.free(bx - 1, z0 - 4.5, bx + bw + 1, z0 - 1.01) || !occ.free(bx - 1, z1 + 1.01, bx + bw + 1, z1 + 4.5))) continue;
-        nO.mark(bx - 1, z0 - 3.5, bx + bw + 1, z0, 2); sO.mark(bx - 1, z1, bx + bw + 1, z1 + 3.5, 2);
-        bridgeXs.push(bx);
-        if (!chain) FG.bridge(w, bx, z0, bx + bw, z1, y, false);
+        if (k > 0 && (!nO.free(xa - 1, zN - 3.5, xa + bw + 1, zN - 0.01) || !sO.free(xb - 1, zS + 0.01, xb + bw + 1, zS + 3.5))) continue;
+        if (k === 0 && (!occ.free(xa - 1, zN - 4.5, xa + bw + 1, zN - 1.01) || !occ.free(xb - 1, zS + 1.01, xb + bw + 1, zS + 4.5))) continue;
+        nO.mark(xa - 1, zN - 3.5, xa + bw + 1, zN + 3, 2); sO.mark(xb - 1, zS - 3, xb + bw + 1, zS + 3.5, 2);
+        spans.push([xa, xb]);
+        if (!chain) plankBridge(w, rng, xa, xb, zN - 0.6, zS + 0.6, y, bw);
         else {
-          const x = bx + bw / 2;
-          for (const zz of [z0, z1]) for (const sx of [-0.95, 0.95]) w.solid('iron', x + sx - 0.07, y, zz - 0.07 + (zz === z0 ? -0.15 : 0.15), x + sx + 0.07, y + 1.25, zz + 0.07 + (zz === z0 ? -0.15 : 0.15), { uv: 1, noGrapple: true });
-          w.chains.push({ x, z0, z1, y, hw: 0.8 });
+          const c = { xa: xa + bw / 2, xb: xb + bw / 2, z0: zN - 0.15, z1: zS + 0.15, y, hw: bw / 2, seed: rng.int(1, 1e6) };
+          for (const [x, zz, sg] of [[c.xa, zN, -1], [c.xb, zS, 1]]) for (const sx of [-1, 1]) {
+            const px = x + sx * (c.hw + 0.18) + rng.range(-0.06, 0.06), pzz = zz + sg * 0.18;
+            w.addCollider(px - 0.07, y, pzz - 0.07, px + 0.07, y + 1.25, pzz + 0.07, { surf: 'metal', noGrapple: true });
+            box(w, 'iron', px, y + 0.62, pzz, 0.13, 1.25, 0.13, rng.range(0, 1), rng.range(-0.06, 0.06), rng.range(-0.06, 0.06));
+          }
+          w.chains.push(c);
         }
         return true;
       }
@@ -171,17 +288,25 @@
     const extra = rng.chance(0.55) ? rng.int(1, 2) : 0;
     for (let i = 0; i < extra; i++) { const chain = rng.chance(0.5); across(chain ? rng.int(1, NL - 1) : rng.int(0, NL - 1), chain); } // chains sag: never right over the lava
     // keep the chasm edges of the upper storeys clear of furniture and chests
-    for (let k = 1; k < NL; k++) { lv.N[k].occ.mark(0, eN[k] - 1.5, W, eN[k], 1); lv.S[k].occ.mark(0, eS[k], W, eS[k] + 1.5, 1); }
+    for (let k = 1; k < NL; k++) for (let x = 0; x < W; x++) { lv.N[k].occ.mark(x, EN[k][x] - 1.5, x + 1, EN[k][x], 1); lv.S[k].occ.mark(x, ES[k][x], x + 1, ES[k][x] + 1.5, 1); }
 
-    // ---- the slabs (cut around the holes), their railings, chasm-side trim ----
+    // ---- prison cells along the outer walls (about one storey in three on each side) ----
+    w.doors = [];
+    for (const s of ['N', 'S']) for (let k = 0; k < NL; k++) if (rng.chance(0.33)) { cell(w, rng, lv[s][k].occ, s, Y[k], W, D, area); if (rng.chance(0.3)) cell(w, rng, lv[s][k].occ, s, Y[k], W, D, area); }
+
+    // ---- the slabs (ragged along the chasm, cut around the holes), their railings, edge trim ----
     for (const s of ['N', 'S']) for (let k = 1; k < NL; k++) {
       const L = lv[s][k], y = Y[k];
-      for (const r of cut(half(s, k), L.holes)) {
-        w.solid(fm, r.x0, y - 0.3, r.z0, r.x1, y, r.z1, { uv: 4, grad: false });
-        w.solid('block', r.x0, y - 0.75, r.z0, r.x1, y - 0.3, r.z1, { uv: 3 });
+      for (const rn of runs(s === 'N' ? EN[k] : ES[k])) {
+        const r = s === 'N' ? { x0: rn.x0, z0: 0, x1: rn.x1, z1: rn.e } : { x0: rn.x0, z0: rn.e, x1: rn.x1, z1: D };
+        for (const q of cut(r, L.holes)) {
+          w.solid(fm, q.x0, y - 0.3, q.z0, q.x1, y, q.z1, { uv: 4, grad: false });
+          w.solid('block', q.x0, y - 0.75, q.z0, q.x1, y - 0.3, q.z1, { uv: 3 });
+        }
+        w.visual('trim', rn.x0, y - 0.85, rn.e - 0.12, rn.x1, y - 0.6, rn.e + 0.12, { uv: 1 });
+        // broken stones lying along the lip
+        if (rng.chance(0.5)) { const x = rng.range(rn.x0 + 0.5, rn.x1 - 0.5), z = rn.e + (s === 'N' ? -0.45 : 0.45); box(w, 'block', x, y + 0.08, z, rng.range(0.3, 0.7), rng.range(0.12, 0.2), rng.range(0.25, 0.45), rng.range(0, 3), rng.range(-0.1, 0.1), rng.range(-0.1, 0.1)); }
       }
-      const ez = s === 'N' ? eN[k] : eS[k];
-      w.visual('trim', 0, y - 0.85, ez - 0.12, W, y - 0.6, ez + 0.12, { uv: 1 });
       for (const p of L.par) {
         const r = p.r, T0 = 0.35;
         const pr = { x0: r.x0 - (p.open === 'W' ? 0 : T0), z0: r.z0 - (p.open === 'N' ? 0 : T0), x1: r.x1 + (p.open === 'E' ? 0 : T0), z1: r.z1 + (p.open === 'S' ? 0 : T0) };
@@ -189,7 +314,7 @@
       }
       // the slab is held up by square piers along the chasm side
       for (let x = 8 + rng.int(0, 4); x < W - 6; x += rng.int(10, 14)) {
-        const pz = s === 'N' ? eN[k] - 1.4 : eS[k] + 1.4, b = lv[s][k - 1];
+        const pz = s === 'N' ? amin(EN[k], x - 1, x + 2) - 1.4 : amax(ES[k], x - 1, x + 2) + 1.4, b = lv[s][k - 1];
         if (b.occ.free(x - 1, pz - 1, x + 1, pz + 1) && L.holes.every((h) => x + 1 < h.x0 || x - 1 > h.x1 || pz + 1 < h.z0 || pz - 1 > h.z1)) {
           b.occ.mark(x - 1, pz - 1, x + 1, pz + 1, 2);
           if (ruined && rng.chance(0.25)) { P().pillarSquare(w, x, pz, Y[k - 1], rng.range(2, 4), 1.1); P().rubble(w, x + 1.4, Y[k - 1], pz, rng, 1.1); }
@@ -199,13 +324,13 @@
     }
     // chains and vines hanging down the chasm walls
     for (let i = 0; i < 10; i++) {
-      const k = rng.int(1, NL - 1), s = rng.chance(0.5) ? 'N' : 'S', x = rng.range(4, W - 4), ez = s === 'N' ? eN[k] + 0.2 : eS[k] - 0.2;
+      const k = rng.int(1, NL - 1), s = rng.chance(0.5) ? 'N' : 'S', x = rng.int(4, W - 4) + 0.5, ez = s === 'N' ? EN[k][Math.floor(x)] + 0.2 : ES[k][Math.floor(x)] - 0.2;
       if (ruined) P().vines(w, x, Y[k] - 0.8, ez, s === 'N' ? 'pz' : 'nz', rng.range(2, 5), rng); else P().chain(w, x, Y[k] - 0.8 - 3, ez, 3);
     }
 
     // ---- light and furnishing on every storey ----
     for (const s of ['N', 'S']) for (let k = 0; k < NL; k++) {
-      const y = Y[k], L = lv[s][k], r = half(s, k);
+      const y = Y[k], L = lv[s][k], r = inner(s, k);
       for (let z = r.z0 + 5; z < r.z1 - 3; z += 13) { P().torch(w, 0, y + 3.2, z, 'px'); P().torch(w, W, y + 3.2, z, 'nx'); }
       dress(w, rng, L.occ, y, k, r, ruined);
     }
@@ -232,7 +357,7 @@
     FG.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, ruined });
     if (ruined) for (let i = 0; i < 7; i++) { const x = rng.range(8, W - 14), z = rng.range(10, D - 16); w.visual('dark', x, HT - 0.04, z, x + rng.range(3, 6), HT - 0.02, z + rng.range(3, 6), { uv: 1, grad: false }); }
   }
-  // furnishing for one storey of one half (y: its floor)
+  // furnishing for one storey of one half (y: its floor; r: the part of it clear of the ragged chasm edge)
   function dress(w, rng, o, y, k, r, ruined) {
     const area = (r.x1 - r.x0) * (r.z1 - r.z0), n = Math.round(area / 110);
     for (let i = 0; i < n; i++) {
@@ -260,20 +385,36 @@
   }
   S.gen = gen;
 
-  // ---------------------------------------------------------------- runtime: chain bridges and ladders
-  // chain bridge: sags under you, sways sideways (and keeps swaying for a while). Not walkable for monsters.
+  // ---------------------------------------------------------------- runtime
   S.build = function (w) {
-    S.chains = []; S.ladders = (w && w.ladders) || [];
-    if (!w || !w.chains) return;
-    const plankG = new THREE.BoxGeometry(1, 1, 1);
-    for (const c of w.chains) {
-      const L = c.z1 - c.z0, n = Math.max(8, Math.round(L / 0.5));
-      const g = new THREE.Group();
-      const planks = [], links = [];
-      for (let i = 0; i < n; i++) { const m = new THREE.Mesh(plankG, w.mats.wood); m.scale.set(c.hw * 2, 0.07, L / n * 0.82); m.castShadow = true; m.receiveShadow = true; g.add(m); planks.push(m); }
-      for (let i = 0; i < n; i++) for (let s = 0; s < 4; s++) { const m = new THREE.Mesh(plankG, w.mats.iron); m.scale.set(0.05, 0.05, L / n * 1.02); g.add(m); links.push(m); }
+    S.chains = []; S.ladders = (w && w.ladders) || []; S.doors = (w && w.doors) || [];
+    if (!w) return;
+    const boxG = new THREE.BoxGeometry(1, 1, 1);
+    // chain bridges: loose planks of different sizes on two sagging chains, hand chains above
+    for (const c of w.chains || []) {
+      const L = c.z1 - c.z0, rnd = new G.RNG(c.seed), g = new THREE.Group(), planks = [], links = [];
+      const ts = []; for (let u = rnd.range(0.15, 0.3); u < L - 0.1; u += rnd.range(0.38, 0.55)) ts.push(u / L);
+      for (const t of ts) {
+        const m = new THREE.Mesh(boxG, rnd.chance(0.3) ? w.mats.woodDark : w.mats.wood); m.rotation.order = 'YXZ';
+        m.scale.set(c.hw * 2 * rnd.range(0.85, 1.18), rnd.range(0.05, 0.075), rnd.range(0.2, 0.3)); m.castShadow = true; m.receiveShadow = true;
+        g.add(m); planks.push({ m, t, yaw: rnd.range(-0.16, 0.16), off: rnd.range(-0.1, 0.1), roll: rnd.range(-0.05, 0.05) });
+      }
+      const nl = Math.max(8, Math.round(L / 0.45));
+      for (let i = 0; i < nl; i++) for (let s = 0; s < 4; s++) { const m = new THREE.Mesh(boxG, w.mats.iron); m.rotation.order = 'YXZ'; m.scale.set(0.05, 0.05, L / nl * 1.06); g.add(m); links.push({ m, i, s }); }
       w.group.add(g);
-      S.chains.push({ c, L, n, planks, links, sway: 0, swayV: 0, bob: 0, bobV: 0, load: 0, tp: 0.5, on: false });
+      S.chains.push({ c, L, nl, planks, links, th: Math.atan2(c.xb - c.xa, L), sway: 0, swayV: 0, bob: 0, bobV: 0, load: 0, tp: 0.5, on: false });
+    }
+    // cell gates: bars hung on a hinge; their material tints towards rust as they are battered
+    for (const d of S.doors) {
+      const g = new THREE.Group(), mat = w.mats.iron.clone(), wd = d.x1 - d.x0;
+      g.position.set(d.hinge ? d.x1 : d.x0, d.y, d.z);
+      const sg = d.hinge ? -1 : 1, bars = [];
+      for (let x = 0.1; x < wd - 0.05; x += 0.19) { const m = new THREE.Mesh(boxG, mat); m.scale.set(0.05, d.h - 0.06, 0.05); m.position.set(sg * x, d.h / 2, 0); m.castShadow = true; g.add(m); bars.push({ m, x: sg * x, bend: (Math.random() - 0.5) * 2 }); }
+      for (const yy of [0.12, 1.1, d.h - 0.1]) { const m = new THREE.Mesh(boxG, mat); m.scale.set(wd - 0.06, 0.07, 0.07); m.position.set(sg * wd / 2, yy, 0); g.add(m); }
+      const lock = new THREE.Mesh(boxG, mat); lock.scale.set(0.16, 0.22, 0.12); lock.position.set(sg * (wd - 0.12), 1.1, 0); g.add(lock);
+      w.group.add(g);
+      Object.assign(d, { g, mat, bars, base: mat.color.clone(), ang: 0, fall: 0, shake: 0 });
+      S.paintDoor(d);
     }
     S.update(0);
   };
@@ -282,6 +423,7 @@
     const s = Math.sin(Math.PI * t);
     return { dy: 0.3 * s + b.load * 0.75 * Math.sin(Math.PI * b.tp) * tri(t, b.tp) + b.bob * s, dx: b.sway * s };
   }
+  const cxAt = (b, t) => b.c.xa + (b.c.xb - b.c.xa) * t;
   S.update = function (dt) {
     const Pp = G.player && G.player.pos;
     for (const b of S.chains) {
@@ -290,20 +432,35 @@
       b.swayV += (-18 * b.sway - 0.35 * b.swayV) * dt; b.sway += b.swayV * dt;
       b.bobV += (-40 * b.bob - 3 * b.bobV) * dt; b.bob += b.bobV * dt;
       b.load = U.damp(b.load, b.on ? 1 : 0, 6, dt);
-      if (Pp && Math.abs(Pp.x - c.x) > 60 && Math.abs(Pp.z - (c.z0 + c.z1) / 2) > 60 && dt) continue;
-      for (let i = 0; i < b.n; i++) {
-        const t = (i + 0.5) / b.n, sh = shape(b, t), z = c.z0 + t * b.L, y = c.y - sh.dy - 0.04;
-        const t2 = Math.min(1, t + 0.5 / b.n), sh2 = shape(b, t2), slope = Math.atan2(sh2.dy - sh.dy, (t2 - t) * b.L);
-        const pl = b.planks[i]; pl.position.set(c.x + sh.dx, y, z); pl.rotation.set(slope, 0, 0);
-        for (let s = 0; s < 4; s++) {
-          const lk = b.links[i * 4 + s], side = s % 2 ? 1 : -1, up = s >= 2;
-          const hy = up ? 0.95 * (1 - 0.25 * Math.sin(Math.PI * t)) : -0.02;
-          lk.position.set(c.x + sh.dx * (up ? 0.8 : 1) + side * (c.hw + 0.04), y + hy, z); lk.rotation.set(slope, 0, 0);
-        }
+      if (Pp && dt && Math.abs(Pp.x - (c.xa + c.xb) / 2) > 60 && Math.abs(Pp.z - (c.z0 + c.z1) / 2) > 60) continue;
+      const px = Math.cos(b.th), pz = -Math.sin(b.th);
+      for (const p of b.planks) {
+        const t = p.t, sh = shape(b, t), t2 = Math.min(1, t + 0.03), sh2 = shape(b, t2);
+        const slope = Math.atan2(sh2.dy - sh.dy, (t2 - t) * b.L);
+        p.m.position.set(cxAt(b, t) + sh.dx + px * p.off, c.y - sh.dy - 0.04, c.z0 + t * b.L + pz * p.off);
+        p.m.rotation.set(slope, b.th + p.yaw, p.roll);
+      }
+      for (const l of b.links) {
+        const t = (l.i + 0.5) / b.nl, sh = shape(b, t), t2 = Math.min(1, t + 0.5 / b.nl), sh2 = shape(b, t2);
+        const side = l.s % 2 ? 1 : -1, up = l.s >= 2, hy = up ? 0.95 * (1 - 0.25 * Math.sin(Math.PI * t)) : -0.03;
+        const slope = Math.atan2(sh2.dy - sh.dy, (t2 - t) * b.L), off = side * (c.hw + 0.04);
+        l.m.position.set(cxAt(b, t) + sh.dx * (up ? 0.8 : 1) + px * off, c.y - sh.dy - 0.04 + hy, c.z0 + t * b.L + pz * off);
+        l.m.rotation.set(slope, b.th, 0);
       }
     }
+    // cell gates: swinging open, falling flat when broken, rattling while battered
+    for (const d of S.doors) {
+      if (!d.g) continue;
+      if (d.state === 'open' && d.ang < 1.75) d.ang = Math.min(1.75, d.ang + dt * 2.6);
+      if (d.state === 'broken' && d.fall < 1) d.fall = Math.min(1, d.fall + dt * 3.2);
+      d.shake = Math.max(0, d.shake - dt * 4);
+      const sg = d.hinge ? -1 : 1;
+      d.g.rotation.set(d.face * d.fall * 1.45, sg * d.face * -d.ang, 0);
+      d.g.position.x = (d.hinge ? d.x1 : d.x0) + (d.shake ? (Math.random() - 0.5) * 0.04 * d.shake : 0);
+      d.g.position.z = d.z + d.face * d.fall * 0.15;
+    }
   };
-  // player.js physics: stand on a chain bridge (sets grounded); returns true while on one
+  // ---- chain bridges: player.js physics stands you on one (sets grounded); true while on one ----
   S.support = function (Pl, dt, preVy) {
     let on = null;
     for (const b of S.chains) {
@@ -312,7 +469,7 @@
       const t = (Pl.pos.z - c.z0) / b.L;
       if (b.on || b.load < 0.05) b.tp = t;
       const sh = shape(b, t), h = c.y - sh.dy;
-      if (Math.abs(Pl.pos.x - (c.x + sh.dx)) > c.hw + 0.15 || Pl.pos.y > h + 0.15 || Pl.pos.y < h - 0.7) { b.on = false; continue; }
+      if (Math.abs(Pl.pos.x - (cxAt(b, t) + sh.dx)) > c.hw + 0.15 || Pl.pos.y > h + 0.15 || Pl.pos.y < h - 0.7) { b.on = false; continue; }
       if (!b.on) { // landing: the deck dips and starts to swing
         const f = Math.min(12, Math.max(0, -(preVy || 0)));
         b.bobV += f * 0.12; b.swayV += (Math.random() < 0.5 ? -1 : 1) * (0.4 + f * 0.12);
@@ -329,7 +486,7 @@
     S.onChain = !!on;
     return !!on;
   };
-  // player.js: climbing a ladder (hold forward or jump inside its opening)
+  // ---- ladders: player.js climbs while you hold forward or jump inside the opening ----
   S.ladder = function (Pl, wantUp, dt) {
     for (const l of S.ladders) {
       if (Math.abs(Pl.pos.x - l.x) > 0.75 || Math.abs(Pl.pos.z - l.z) > 0.75 || Pl.pos.y < l.y0 - 0.2 || Pl.pos.y > l.y1 + 0.3) continue;
@@ -338,6 +495,48 @@
       Pl.vel.y = 4.6; Pl.vel.x = (l.x - Pl.pos.x) * 6; Pl.vel.z = (l.z - Pl.pos.z) * 6;
       Pl.grounded = false; Pl.jumps = 0; Pl.coyote = 0;
       Pl._ladT = (Pl._ladT || 0) - dt; if (Pl._ladT <= 0) { Pl._ladT = 0.42; G.sfx.step('wood', 0.5); }
+      return true;
+    }
+    return false;
+  };
+  // ---- cell gates ----
+  // battered look: rust creeping in, bars bowing (more and more as the gate gives)
+  S.paintDoor = function (d) {
+    const k = 1 - d.hp / 100;
+    d.mat.color.copy(d.base).lerp(new THREE.Color(0x6a3a20), Math.min(1, k * 1.1));
+    for (const b of d.bars) { b.m.rotation.z = b.bend * k * k * 0.45; b.m.rotation.x = b.bend * k * 0.18; b.m.position.x = b.x + b.bend * k * 0.06; }
+  };
+  const doorPos = (d) => V((d.x0 + d.x1) / 2, d.y + 1.1, d.z);
+  function free(d, state) {
+    d.state = state; d.col.alive = false; d.it.opened = true;
+    if (G.game.search && G.game.search.it === d.it) G.game.cancelSearch();
+  }
+  S.openDoor = function (d) {
+    if (d.state !== 'closed') return;
+    free(d, 'open');
+    G.sfx.chestUnlock(doorPos(d)); G.sfx.chain(0.35, 0.3);
+  };
+  S.breakDoor = function (d) {
+    if (d.state !== 'closed') return;
+    d.hp = 0; S.paintDoor(d); free(d, 'broken');
+    const p = doorPos(d);
+    G.sfx.shieldBreak(p); G.sfx.impact(p, 'metal');
+    G.fx.debris(p, G.world.mats.iron, 10, 0.08, 6); G.fx.dust(p.clone().setY(d.y + 0.1), V(0, 1, 0), 0x7a6a50, 10);
+  };
+  // enemies.js: a monster pressed against a shut gate on its way batters it; the stronger it is, the sooner the gate gives
+  S.bash = function (e, dt) {
+    for (const d of S.doors) {
+      if (d.state !== 'closed' || Math.abs(e.pos.y - d.y) > 1.2) continue;
+      if (e.pos.x < d.x0 - 1.3 || e.pos.x > d.x1 + 1.3 || Math.abs(e.pos.z - d.z) > e.radius + 0.6) continue; // pressed against the gate or the bars beside it
+      e.yaw = Math.atan2(0, d.z - e.pos.z); e.bashAt = G.game.time;
+      e.bashT = (e.bashT || 0) - dt;
+      if (e.bashT > 0) return true;
+      e.bashT = 0.8; e.atk = 1;
+      d.hp -= (9 + (e.level || 1) * 1.1) * (e.big ? 1.6 : 1) * (e.elite ? 1.3 : 1);
+      d.shake = 1;
+      const p = V(U.clamp(e.pos.x, d.x0, d.x1), d.y + 1 + Math.random() * 0.6, d.z);
+      if (d.hp <= 0) S.breakDoor(d);
+      else { S.paintDoor(d); G.sfx.hitShield(p); G.fx.debris(p, G.world.mats.iron, 3, 0.05, 3); }
       return true;
     }
     return false;

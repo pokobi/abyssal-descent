@@ -1442,6 +1442,7 @@
       else if (it.type === 'npc' && !it.used) consider(it.pos, 1.0, { type: 'npc', it }, 4);
       else if (it.type === 'shrine' && !it.used) consider(it.pos, 1.2, { type: 'shrine', it }, 4);
       else if (it.type === 'anvil') consider(it.pos, 1.2, { type: 'anvil', it }, 4);
+      else if (it.type === 'celldoor' && it.door.state === 'closed') consider(it.pos, 1.0, { type: 'celldoor', it }, 3.4);
     }
     lookTarget = best;
     G.ui.holdRing(-1); // shown again below while a search is running
@@ -1496,6 +1497,12 @@
       const dur = GM.searchDur(GM.CHEST_SEARCH[it.tier]);
       G.ui.showInteract({ key: 'chest' + it.tier + (S ? 's' : ''), icon: it.icon, name: GM.CHEST_NAMES[it.tier], rc: ['#b8b2a7', '#4d9be6', '#f0a030'][it.tier], cat: `宝箱 — 探索 ${dur.toFixed(1)}秒`, desc: S ? '探索中… 視点を大きく外したり離れると最初からやり直し' : '一度押すと探索を始める。終わるまで宝箱から目を離さないこと。', action: S ? '探索中…' : '探す' });
       if (I.hit('interact') && !S) GM.startSearch(it, it.pos, GM.CHEST_SEARCH[it.tier], it.icon, () => { G.sfx.chestUnlock && G.sfx.chestUnlock(it.pos); doInteract(best); });
+      return;
+    } else if (best.type === 'celldoor') {
+      // a prison cell's iron gate (strata fields): one press, keep looking at it for 2 s
+      const it = best.it, S = GM.search && GM.search.it === it ? GM.search : null, dur = GM.searchDur(2);
+      G.ui.showInteract({ key: 'cdoor' + (S ? 's' : ''), icon: '🔓', name: '鉄格子の扉', rc: '#9aa4b0', cat: `開ける — ${dur.toFixed(1)}秒`, desc: S ? '開けている… 視点を大きく外したり離れると最初からやり直し' : '一度押すと開け始める。終わるまで扉から目を離さないこと。', action: S ? '開けている…' : '開ける' });
+      if (I.hit('interact') && !S) GM.startSearch(it, it.pos, 2, '🔓', () => G.Strata.openDoor(it.door), '扉を開けている…');
       return;
     }
     if (I.hit('interact')) doInteract(best);

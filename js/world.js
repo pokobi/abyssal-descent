@@ -172,6 +172,7 @@
           if (c.st === st || !c.alive) continue; c.st = st;
           if (c.ghost && !(opts && opts.ghost)) continue; // invisible anti-perch walls don't stop shots, sight or the grapple
           if (filt && !filt(c)) continue;
+          if (c.bars && !(opts && opts.bars)) continue; // cell bars: shots and sight pass between them
           let t1 = (c.x0 - o.x) * ix, t2 = (c.x1 - o.x) * ix;
           let tmin = Math.min(t1, t2), tmax = Math.max(t1, t2), ax = 0;
           t1 = (c.y0 - o.y) * iy; t2 = (c.y1 - o.y) * iy;
@@ -278,7 +279,7 @@
         let floor = -Infinity;
         const ts = [];
         for (const c of tmp) {
-          if (c.dest) continue;
+          if (c.dest || c.navIgnore) continue;
           if (floor === -Infinity) { floor = c.y1; continue; }
           if (c.y0 <= floor + 0.8) floor = Math.max(floor, c.y1);
           else if (LM > 1) { ts.push(floor); floor = c.y1; }
@@ -301,7 +302,7 @@
           // blocked if something solid occupies body space near the cell center
           tmp.length = 0;
           this.query(cx - 0.32, floor + 0.85, cz - 0.32, cx + 0.32, floor + 1.9, cz + 0.32, tmp);
-          this.nb[n] = tmp.length ? 1 : 0;
+          this.nb[n] = tmp.some((c) => !c.navIgnore) ? 1 : 0; // a cell gate counts as open: monsters path through it (and batter it down)
           // strata: the lava trench and the roof are no place to walk or spawn
           if (L > 1 && this.navHazard && this.navHazard(cx, floor, cz)) { this.nb[n] = 1; this.nhz[n] = 1; }
         }

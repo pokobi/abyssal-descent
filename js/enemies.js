@@ -811,14 +811,15 @@
       this._stT = (this._stT || 0) + dt;
       if (this._stT > 1.5) {
         // failsafe: stuck out of sight for ~6s -> slip back into the fight near the player (an area must always be clearable)
-        const stuck = this._stP && !this.attackState && this._stP.distanceTo(this.pos) < 0.4 && distH > 6 && !this.hasLOS;
+        const bashing = this.bashAt && G.game.time - this.bashAt < 1.2; // battering a cell gate is not being stuck
+        const stuck = !bashing && this._stP && !this.attackState && this._stP.distanceTo(this.pos) < 0.4 && distH > 6 && !this.hasLOS;
         this._stN = stuck ? (this._stN || 0) + 1 : 0;
         if (this._stN >= 4 && !this.custom && !this.boss && !this.burrowed) {
           this._stN = 0;
           const c = w0().randomOpenCell({ next: Math.random }, (x, z, idx) => (!w0().reachMask || w0().reachMask[idx]) && Math.hypot(x - P.pos.x, z - P.pos.z) > 10 && Math.hypot(x - P.pos.x, z - P.pos.z) < 24);
           if (c) { G.fx.smoke(this.centerPos(), 6, 1, 0x1a1412, 1, 1); this.pos.set(c.x, c.y + (this.flyer ? this.alt : 0), c.z); this.vel.set(0, 0, 0); this.climb = 0; G.fx.smoke(this.centerPos(), 6, 1, 0x1a1412, 1, 1); }
         }
-        if (this._stP && this.mv > 0.5 && !this.attackState && this._stP.distanceTo(this.pos) < 0.4 && distH > 4) {
+        if (!bashing && this._stP && this.mv > 0.5 && !this.attackState && this._stP.distanceTo(this.pos) < 0.4 && distH > 4) {
           const a = Math.random() * Math.PI * 2; this.vel.x += Math.cos(a) * 6; this.vel.z += Math.sin(a) * 6;
           if (!this.flyer && this.grounded) this.vel.y = 5;
         }
@@ -1156,6 +1157,7 @@
         const diving = this.attackState && this.attackState.kind === 'swoop' && this.attackState.t >= this.attackState.wind;
         if (!diving) this.pos.y = U.damp(this.pos.y, ty, 2.5, dt);
         this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.2, this.pos.y + this.height);
+        if (this.hitWallFlag && G.Strata.doors.length && !this.boss) G.Strata.bash(this, dt);
         if (!this.def.hover) {
           const fb = w.floorBelow(this.pos.x, this.pos.y + 1.2, this.pos.z);
           if (fb > -50 && this.pos.y < fb + 0.35) {
@@ -1178,6 +1180,7 @@
         }
       }
       this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.6, this.pos.y + this.height);
+      if (this.hitWallFlag && G.Strata.doors.length && !this.boss) G.Strata.bash(this, dt);
       // vertical / ground
       this.vel.y -= 22 * dt;
       const ny = this.pos.y + this.vel.y * dt;
@@ -1187,7 +1190,8 @@
       else { this.pos.y = ny; this.grounded = false; }
       if (this.pos.y < w.killY) { this.hp = 0; C.killEnemy(this, { src: 'fall' }, 0); }
       if (w.trench && this.grounded && !this.tramp && this.pos.y < w.trench.y + 0.6 && this.pos.z > w.trench.z0 && this.pos.z < w.trench.z1) {
-        const T = w.trench, toN = this.pos.z - T.z0 < T.z1 - this.pos.z, tz = toN ? T.z0 - 1.8 : T.z1 + 1.8;
+        const T = w.trench, xi = U.clamp(Math.floor(this.pos.x), 0, T.n.length - 1), n = T.n[xi], s = T.s[xi];
+        const toN = this.pos.z - n < s - this.pos.z, tz = toN ? n - 1.8 : s + 1.8;
         this.vel.y = 12.5; this.grounded = false;
         this.tramp = { vx: 0, vz: (tz - this.pos.z) / 1.05, t: 1.25 };
         G.fx.flash(this.pos.clone().setY(this.pos.y + 0.3), T.blue ? 0x4a9cff : 0xff7a30, 30, 0.25, 6);

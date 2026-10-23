@@ -50,7 +50,7 @@
         if (sk.cd <= 0) {
           if (sk.maxCharges) { sk.charges = Math.min(sk.maxCharges, sk.charges + 1); if (sk.charges < sk.maxCharges) sk.cd = A.cdOf(sk); else sk.cd = 0; }
           else sk.cd = 0;
-          if (A.isUlt(sk)) { G.sfx.ultReady ? G.sfx.ultReady() : G.sfx.ui('rare'); G.ui.toast(`⚡ アルティメット準備完了 — ${sk.def.icon} ${sk.def.name}（Q）`, 'good'); }
+          if (A.isUlt(sk)) { G.sfx.ultReady ? G.sfx.ultReady() : G.sfx.ui('rare'); G.ui.toast(`⚡ アルティメット準備完了 — ${sk.def.icon} ${sk.def.name}（${G.input.skillKey(0)}）`, 'good'); }
           else G.sfx.ui('ready');
           G.ui.abilityFlash(sk);
         }

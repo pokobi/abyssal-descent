@@ -197,7 +197,7 @@
               o[j] = o[k]; o[k] = t;
               P.wOrder = o.map((x) => x || null);
               const inf = W.tokInfo(t);
-              G.ui.toastSmall(`🔁 [${k + 1}] に ${inf.icon} ${inf.name} を割り当て`);
+              G.ui.toastSmall(`🔁 [${G.K('w' + (k + 1))}] に ${inf.icon} ${inf.name} を割り当て`);
             }
             W.selectTok(t); G.sfx.ui('click'); G.ui.refreshWeapon();
           }

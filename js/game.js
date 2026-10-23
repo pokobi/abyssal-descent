@@ -1146,7 +1146,7 @@
     return true;
   };
   GM.giveSkill = function (id) {
-    if (G.SKILL_BY_ID[id] && G.SKILL_BY_ID[id].ult) { P.skills[0] = G.abilities.makeSlot(id); G.ui.itemCard(G.SKILL_BY_ID[id], '[Q アルティメット]'); return; }
+    if (G.SKILL_BY_ID[id] && G.SKILL_BY_ID[id].ult) { P.skills[0] = G.abilities.makeSlot(id); G.ui.itemCard(G.SKILL_BY_ID[id], `[${G.input.skillKey(0)} アルティメット]`); return; }
     let i = [1, 2, 3].find((k) => !P.skills[k]) || 3;
     P.skills[i] = G.abilities.makeSlot(id);
     G.ui.itemCard(G.SKILL_BY_ID[id], `[${G.input.skillKey(i)}]`);
@@ -1239,7 +1239,7 @@
     }
     return null;
   };
-  GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、そのエリアに入った最初から再開する（持ち物・バフ・敵はその時点に戻り、HP全快・クールタイムはリセット）。' };
+  GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、そのエリアに入った最初から再開する（持ち物・加護・敵はその時点に戻り、HP全快・クールタイムはリセット）。' };
   GM.revivePrice = () => GM.price(4200 + GM.area * 160);
   GM.SVC_FORGE = { id: 'svc_forge', name: '鍛冶屋の出張', icon: '⚒️', rarity: 'rare', desc: '所持している銃か近接武器を1つ選んで強化値+1（ダメージ×1.13）。' };
   GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（威力×1.3・CT-2%）。' };
@@ -1468,7 +1468,7 @@
     } else if (best.type === 'shrine') {
       G.ui.showInteract({ key: 'shrine', icon: '⛩️', name: '祈りの祭壇', rc: '#60d0c0', cat: '全回復＋強化を一つ', desc: '一度だけ祈ることができる。', action: '祈る' });
     } else if (best.type === 'anvil') {
-      G.ui.showInteract({ key: 'anvil' + coins, icon: '⚒️', name: '鍛冶の金床', rc: '#e08040', cat: '武器・スキルの強化', desc: `${P.weapon.def.name} +${P.weapon.lv || 0}（最大+5）`, action: '鍛える' });
+      G.ui.showInteract({ key: 'anvil' + coins, icon: '⚒️', name: '鍛冶の金床', rc: '#e08040', cat: '武器・スキルの強化', desc: `${P.weapon.def.name} +${P.weapon.lv || 0}（最大+${G.Areas.FORGE_MAX}）`, action: '鍛える' });
     } else if (best.type === 'corpse') {
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;
@@ -1555,7 +1555,7 @@
       stats = cmp('💥ダメージ', ob.dmg, cur.dmg, (v) => Math.round(v)) + cmp('⚡攻撃間隔', ob.swing, cur.swing, (v) => v.toFixed(2) + 's', 'low') + cmp('📊DPS', ob.dmg / ob.swing, cur.dmg / cur.swing, (v) => Math.round(v)) + cmp('📏リーチ', ob.range, cur.range, (v) => v + 'm') + cmp('🔨重撃', ob.heavy[0], cur.heavy[0], (v) => '×' + v) + cmp('👟移動', ob.moveMul, cur.moveMul, (v) => '×' + v.toFixed(2));
       if (ob.traitDesc) note += '✦ ' + ob.traitDesc + '　';
       { const tv = G.Pawn.tradeValue(P.melee, true); if (tv > 0) note += `♻️ 今の${P.melee.def.name}は下取り +${U.fmt(tv)}🪙　`; }
-      note += `⚠ 現在の ${cur.icon}${cur.name} と交換（キー3）`;
+      note += `⚠ 現在の ${cur.icon}${cur.name} と交換（${G.K('w3')}）`;
     } else if (o.kind === 'forge') {
       cat = '⚒️ 強化サービス'; note = `購入時に強化する武器を選ぶ（上限+${G.Areas.FORGE_MAX}）・価格は武器の強化値で変わる`;
     } else if (o.kind === 'tome') {
@@ -1577,8 +1577,8 @@
       if (ob.slot === 'c') cat += `　[${G.K('item1')} / ${G.K('item2')}キー: 消耗品]`; else if (ob.passive) cat += '　[常時：持っているだけで発動]';
       if (have) note += ` 所持 ×${have}`;
     } else if (o.kind === 'ult') {
-      cat = `🌟 アルティメット（Q） · CT ${ob.cd}秒`;
-      const cur = P.skills[0]; note = cur ? `⚠ 現在の ${cur.def.icon} ${cur.def.name} と入れ替え` : 'Qに装備';
+      cat = `🌟 アルティメット（${G.input.skillKey(0)}） · CT ${ob.cd}秒`;
+      const cur = P.skills[0]; note = cur ? `⚠ 現在の ${cur.def.icon} ${cur.def.name} と入れ替え` : `${G.input.skillKey(0)}に装備`;
     } else if (o.kind === 'skill') {
       cat = `🔮 スキル（${[1, 2, 3].map((i) => G.input.skillKey(i)).join('/')}） · CT ${Math.round(ob.cd * G.abilities.SKILL_CD_MUL)}秒`;
       const free = [1, 2, 3].find((i) => !P.skills[i]);
@@ -1619,7 +1619,7 @@
       const o = t.o, ob = o.obj;
       if (o.kind === 'forge' && !o.free) o.price = GM.forgeRange()[0];
       if (run.coins < o.price) return deny('🪙 コインが足りない');
-      const done = () => { run.coins -= o.price; o.sold = true; GM.quietUntil = performance.now() + 1200; G.sfx.ui('buy'); G.fx.sparks(o.pos, null, 20, 0xffd070, 4); G.fx.ring(o.pos.clone().setY(o.slot.y), 0.8, 0xffd070, 0.5); o.mesh.visible = false; G.ui.showInteract(null); G.ui.toast(`${ob.icon} ${ob.name} を購入`, 'good'); if (o.kind !== 'item' && o.kind !== 'forge' && o.kind !== 'tome') G.ui.itemCard(ob, o.kind === 'skill' ? '[スキル]' : o.kind === 'ult' ? '[Q アルティメット]' : o.kind === 'weapon' ? '[武器]' : o.kind === 'melee' ? '[近接:3]' : o.kind === 'revive' ? '[魂の灯火]' : o.kind === 'attachment' ? '[装着]' : '[加護]'); G.ui.refreshWeapon(); G.ui.refreshItems(); if (o.kind !== 'revive' && o.kind !== 'forge' && o.kind !== 'tome') G.save.mark(o.kind === 'buff' ? 'buffs' : 'items', ob.id); };
+      const done = () => { run.coins -= o.price; o.sold = true; GM.quietUntil = performance.now() + 1200; G.sfx.ui('buy'); G.fx.sparks(o.pos, null, 20, 0xffd070, 4); G.fx.ring(o.pos.clone().setY(o.slot.y), 0.8, 0xffd070, 0.5); o.mesh.visible = false; G.ui.showInteract(null); G.ui.toast(`${ob.icon} ${ob.name} を購入`, 'good'); if (o.kind !== 'item' && o.kind !== 'forge' && o.kind !== 'tome') G.ui.itemCard(ob, o.kind === 'skill' ? '[スキル]' : o.kind === 'ult' ? `[${G.input.skillKey(0)} アルティメット]` : o.kind === 'weapon' ? '[武器]' : o.kind === 'melee' ? `[近接:${G.K('w3')}]` : o.kind === 'revive' ? '[魂の灯火]' : o.kind === 'attachment' ? '[装着]' : '[加護]'); G.ui.refreshWeapon(); G.ui.refreshItems(); if (o.kind !== 'revive' && o.kind !== 'forge' && o.kind !== 'tome') G.save.mark(o.kind === 'buff' ? 'buffs' : 'items', ob.id); };
       if (o.kind === 'buff') { P.addBuff(ob.id); return done(); }
       if (o.kind === 'armor') { G.Inv.give(P, 'armor', ob.id, 1, { ench: (o.inst && o.inst.ench) || [] }); return done(); }
       if (o.kind === 'revive') { P.revives++; G.sfx.ui('rare'); return done(); }
@@ -1632,7 +1632,7 @@
       if (o.kind === 'tome') {
         const list = P.skills.map((s, i) => [s, i]).filter(([s]) => s && (s.lv || 0) < G.abilities.MAXLV);
         const pileOpt = { icon: '🔨', label: `[${G.input.keyName('crouch')}] パイルドライバー Lv${P.pileLevel()} → Lv${P.pileLevel() + 1}`, onPick: () => { P.pileTome = (P.pileTome || 0) + 1; G.sfx.ui('rare'); done(); } };
-        return modal('📘 どのスキルを強化する？', 'レベル+1（スキル：威力×1.3／パイルドライバー：威力+60%／アルティメット：威力×1.25・クールタイム-2%）', [pileOpt].concat(list.map(([s, i]) => ({ icon: s.def.icon, label: `[${G.input.skillKey(i)}]${s.def.ult ? '（ULT）' : ''} ${s.def.name} Lv${s.lv || 0} → Lv${(s.lv || 0) + 1}`, onPick: () => { s.lv = (s.lv || 0) + 1; s.maxCd = G.abilities.cdOf(s); done(); G.sfx.magic(P.pos, 'holy'); } }))));
+        return modal('📘 どのスキルを強化する？', 'レベル+1（スキル：威力×1.3・クールタイム-2%／パイルドライバー：威力+60%／アルティメット：威力×1.25・クールタイム-2%）', [pileOpt].concat(list.map(([s, i]) => ({ icon: s.def.icon, label: `[${G.input.skillKey(i)}]${s.def.ult ? '（ULT）' : ''} ${s.def.name} Lv${s.lv || 0} → Lv${(s.lv || 0) + 1}`, onPick: () => { s.lv = (s.lv || 0) + 1; s.maxCd = G.abilities.cdOf(s); done(); G.sfx.magic(P.pos, 'holy'); } }))));
       }
       if (o.kind === 'melee') { G.Pawn.tradeIn(P.melee, true); P.melee = G.weapons.makeMelee(ob.id); P.melee.lv = o.lv || 0; done(); if (P.meleeMode) G.weapons.melee.equip(false); else G.weapons.setMelee(); return; }
       if (o.kind === 'item') { if (!P.canAddItem(ob.id)) return deny('持ち物がいっぱい'); P.addItem(ob.id, 1); return done(); }
@@ -1645,7 +1645,7 @@
       if (o.kind === 'skill') {
         const free = [1, 2, 3].find((i) => !P.skills[i]);
         if (free) { P.skills[free] = G.abilities.makeSlot(ob.id); return done(); }
-        return modal('交換するスキルスロットを選択', `${ob.icon} <b>${ob.name}</b> を装備するスロットを選んでください（Qはアルティメット専用）。`, P.skills.map((s, i) => [s, i]).filter(([, i]) => i > 0).map(([s, i]) => ({ icon: s.def.icon, label: G.input.skillKey(i) + ': ' + s.def.name, sub: '交換すると失われます', onPick: () => { P.skills[i] = G.abilities.makeSlot(ob.id); done(); } })));
+        return modal('交換するスキルスロットを選択', `${ob.icon} <b>${ob.name}</b> を装備するスロットを選んでください（${G.input.skillKey(0)}はアルティメット専用）。`, P.skills.map((s, i) => [s, i]).filter(([, i]) => i > 0).map(([s, i]) => ({ icon: s.def.icon, label: G.input.skillKey(i) + ': ' + s.def.name, sub: '交換すると失われます', onPick: () => { P.skills[i] = G.abilities.makeSlot(ob.id); done(); } })));
       }
       if (o.kind === 'attachment') {
         const ok = G.weapons.gunsInOrder().map((pw) => [pw, P.weapons.indexOf(pw)]).filter(([pw]) => ob.compat(pw.def));

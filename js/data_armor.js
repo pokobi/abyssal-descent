@@ -43,7 +43,7 @@
   // fixed (non-random) effects on high-rarity pieces, listed in the codex.
   // head / chest / legs: toughness, legs / feet: movement, hands: weapons and handling
   const FX = {
-    toughA: { desc: '状態異常の時間-20%', mods: { statusRes: 0.2 } },
+    toughA: { desc: '状態異常の持続時間-20%', mods: { statusRes: 0.2 } },
     toughB: { desc: '炎上・毒のダメージ-30%', mods: { dotRes: 0.3 } },
     toughC: { desc: '爆発・範囲攻撃の被ダメ-20%', mods: { blastRes: 0.2 } },
     toughD: { desc: '最大HP+25', mods: { maxHp: 25 } },
@@ -53,7 +53,7 @@
     moveC: { desc: 'スライディングの加速+25%', mods: { slideBoost: 0.25 } },
     moveD: { desc: '空中での制御+40%', mods: { airControl: 0.4 } },
     handA: { desc: '操作速度+20%', mods: { opSpeed: 0.2 } },
-    handB: { desc: '近接武器の攻撃速度+20%', mods: { meleeCd: 0.2 } },
+    handB: { desc: '近接攻撃の間隔-20%', mods: { meleeCd: 0.2 } },
     handC: { desc: 'リロード速度+12%', mods: { reloadSpeed: 0.12 } },
     handD: { desc: '反動-15%', mods: { recoil: -0.15 } },
   };

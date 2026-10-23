@@ -151,7 +151,7 @@
   };
 
   // ---------------- registration ----------------
-  G.BOSSES.push({ id: 'sovereign', name: '虚無の君主', title: 'CRIMSON SOVEREIGN', icon: '🌑', desc: '深淵の最奥、紅い月の下に浮かぶ闘技場の主。床の石畳を剥がし、奈落を口を開けさせながら戦う。足元が赤く光ったら、床が崩れる合図。', mech: ['エクストラのエリア18に必ず現れる', '床が定期的に崩れて奈落になる（赤く光ってから約2秒）', '落ちると最大HPの約40%のダメージを受け、入口の足場へ戻される', 'HPが減るほど、崩れ方が大きく速くなる'], field: true, ending: true });
+  G.BOSSES.push({ id: 'sovereign', name: '虚無の君主', title: 'CRIMSON SOVEREIGN', icon: '🌑', desc: '深淵の最奥、紅い月の下に浮かぶ闘技場の主。床の石畳を剥がし、足元に奈落を開かせながら戦う。足元が赤く光ったら、床が崩れる合図。', mech: ['エクストラのエリア18に必ず現れる', '床が定期的に崩れて奈落になる（赤く光ってから約2秒）', '落ちると最大HPの約40%のダメージを受け、入口の足場へ戻される', 'HPが減るほど、崩れ方が大きく速くなる'], field: true, ending: true });
   G.BOSS_BY_ID = Object.fromEntries(G.BOSSES.map((b) => [b.id, b]));
   SP.sovereign._v5 = true;
   BS.CLS.sovereign = BS.CLS.houndlord;

@@ -27,10 +27,10 @@
   const OH = {
     oh_burn: '命中した敵を炎上させる。', oh_frost: '命中した敵に冷気を付与し鈍らせる。', oh_poison: '命中した敵を毒に侵す。',
     oh_shock: '命中時35%で近くの敵2体へ雷撃が連鎖する。', oh_stun: '命中した敵を0.8秒スタンさせる（同じ敵には2秒に1回・ボス無効）。',
-    oh_vamp: 'このスキルの与ダメの6%を回復する。', oh_mark: '命中した敵に3秒間の刻印（被ダメ+60%）。',
+    oh_vamp: 'このスキルの与ダメの6%を回復する。', oh_mark: '命中した敵に3秒間の刻印（受けるダメージ+60%）。',
     oh_blast: '命中時30%で小爆発（与ダメの40%）が起きる。', oh_exec: 'HP12%以下になった通常敵を即死させる。',
     oc_heal: '使用時、HP12＋最大HPの4%を回復。', oc_shield: '使用時、6秒間だけ持続するシールド+25。', oc_dmg: '使用後4秒間、与ダメ+15%。',
-    oc_haste: '使用後3秒間、移動速度+25%。', oc_ammo: '使用時、構えている武器の弾倉を満タンにする。', oc_echo: '使用時20%でクールタイムが発生しない。',
+    oc_haste: '使用後3秒間、移動速度+25%。', oc_ammo: '使用時、構えている武器のマガジンを満タンにする。', oc_echo: '使用時20%でクールタイムが発生しない。',
     oc_nova: '使用時、自分の周囲5mに衝撃波（80ダメージ）を放つ。',
   };
   C = G.combat;
@@ -90,7 +90,7 @@
     barrier: [['x_wide', '城壁', '🧱', 'uncommon', { x_wide: 1 }, '壁の幅+60%・高さ+30%。'], ['x_spikes', '棘の壁', '🌵', 'rare', { x_spikes: 1 }, '壁の周囲3mの敵に毎秒40ダメージ。'], ['x_heal', '癒しの壁', '💚', 'rare', { x_heal: 1 }, '壁の近くにいる間、毎秒HP6回復。'], ['oc_shield', '盾の構え', '🛡️', 'uncommon', { oc_shield: 1 }]],
     decoy: [['x_twin', '双子の幻', '🎭', 'rare', { x_twin: 1 }, '囮を2体生み出す。'], ['x_nova', '大爆発', '💥', 'rare', { x_nova: 1 }, '消滅時の爆発の範囲+60%・ダメージ+50%。'], ['x_cloak', '身代わり', '👻', 'epic', { x_cloak: 1 }, '使用時、2.5秒間透明になる。'], ['oh_stun', '幻惑', '💫', 'uncommon', { oh_stun: 1 }]],
     cloak: [['x_assassin', '暗殺術', '🗡️', 'epic', { x_assassin: 1 }, '透明中、会心ダメージ+100%。'], ['x_speed', '影走り', '🏃', 'uncommon', { x_speed: 1 }, '透明中、移動速度+30%。'], ['x_heal', '影の癒し', '💚', 'rare', { x_heal: 1 }, '透明中、毎秒最大HPの4%回復。'], ['x_smoke', '煙幕', '💨', 'uncommon', { x_smoke: 1 }, '使用時、足元に煙幕を張る。']],
-    overdrive: [['x_rate', '過熱', '🔥', 'rare', { x_rate: 1 }, '連射速度+60%→+90%。'], ['x_dmg', '徹甲弾', '🎯', 'rare', { x_dmg: 1 }, '効果中、与ダメ+20%。'], ['x_reload', '全弾装填', '♻️', 'uncommon', { x_reload: 1 }, '使用時、全ての武器の弾倉を満タンにする。'], ['oc_haste', '突撃', '👟', 'uncommon', { oc_haste: 1 }]],
+    overdrive: [['x_rate', '過熱', '🔥', 'rare', { x_rate: 1 }, '連射速度+60%→+90%。'], ['x_dmg', '徹甲弾', '🎯', 'rare', { x_dmg: 1 }, '効果中、与ダメ+20%。'], ['x_reload', '全弾装填', '♻️', 'uncommon', { x_reload: 1 }, '使用時、全ての武器のマガジンを満タンにする。'], ['oc_haste', '突撃', '👟', 'uncommon', { oc_haste: 1 }]],
     blades: [['x_more', '刃の追加', '🌀', 'rare', { x_more: 1 }, '刃の数+3。'], ['x_wide', '大旋風', '⭕', 'uncommon', { x_wide: 1 }, '刃の回転半径+1.5m。'], ['oh_burn', '炎刃', '🔥', 'uncommon', { oh_burn: 1 }], ['oh_frost', '氷刃', '❄️', 'uncommon', { oh_frost: 1 }], ['oh_vamp', '吸血刃', '🩸', 'rare', { oh_vamp: 1 }]],
     leap: [['x_far', '大跳躍', '🦘', 'uncommon', { x_far: 1 }, '跳躍距離+40%。'], ['oh_stun', '雷震', '💫', 'uncommon', { oh_stun: 1 }], ['oc_shield', '着地の構え', '🛡️', 'uncommon', { oc_shield: 1 }], ['oh_burn', '炎の着地', '🔥', 'uncommon', { oh_burn: 1 }], ['charges', '連続跳躍', '🦵', 'rare', { charges: 1 }, 'チャージ数+1。']],
     mark: [['x_spread', '伝染する刻印', '🦠', 'epic', { x_spread: 1 }, '刻印された敵を倒すと、近くの敵2体に刻印が移る。'], ['x_multi', '多重刻印', '🎯', 'rare', { x_multi: 1 }, '狙った敵の近くの敵2体にも刻印する。'], ['x_heal', '処刑の糧', '💚', 'uncommon', { x_heal: 1 }, '刻印された敵を倒すとHP+15。'], ['oc_dmg', '狩人の昂り', '⚔️', 'uncommon', { oc_dmg: 1 }]],

@@ -5,7 +5,7 @@
   let C = null, P = null;
   G.bindBuffs = () => { C = G.combat; P = G.player; };
   const CAT = {
-    stat: { name: '能力', icon: '📈' }, pile: { name: 'スキル強化', icon: '🔨' }, curse: { name: '呪い', icon: '🕯️' }, trade: { name: '代償', icon: '⚖️' }, offense: { name: '攻撃', icon: '⚔️' }, defense: { name: '防御', icon: '🛡️' },
+    stat: { name: '能力', icon: '📈' }, pile: { name: 'パイルドライバー強化', icon: '🔨' }, curse: { name: '呪い', icon: '🕯️' }, trade: { name: '代償', icon: '⚖️' }, offense: { name: '攻撃', icon: '⚔️' }, defense: { name: '防御', icon: '🛡️' },
     mobility: { name: '機動', icon: '👟' }, economy: { name: '経済', icon: '🪙' }, element: { name: '属性', icon: '🌈' }, summon: { name: '召喚', icon: '👻' }, skill: { name: 'スキル強化', icon: '🔮' }, ult: { name: 'アルティメット強化', icon: '🌟' }, melee: { name: '近接', icon: '🗡️' }, pact: { name: '契約', icon: '📜' }, relic: { name: '遺物', icon: '🏺' },
   };
   G.BUFF_CAT = CAT;
@@ -61,14 +61,14 @@
   add('t_bigmag', '大容量主義', '🛢️', 'uncommon', 'trade', '装弾数+80%、リロード速度-25%', { mods: { magSize: 0.8, reloadSpeed: -0.25 } });
   add('t_quick', '早業', '🤹', 'uncommon', 'trade', 'リロード速度+50%、装弾数-20%', { mods: { reloadSpeed: 0.5, magSize: -0.2 } });
   add('t_sniper', '狙撃の構え', '🔭', 'rare', 'trade', 'ADS中の与ダメ+30%、腰だめの拡散+40%', { mods: { adsDmg: 0.3, hipSpread: 0.4 } });
-  add('t_miser', '守銭奴', '💰', 'uncommon', 'trade', 'コイン+40%、ショップ価格+15%', { mods: { coinMul: 0.4, shopDiscount: -0.15 } });
+  add('t_miser', '守銭奴', '💰', 'uncommon', 'trade', 'コイン獲得量+40%、ショップの価格+15%', { mods: { coinMul: 0.4, shopDiscount: -0.15 } });
   add('t_gamble', '博打打ち', '🎲', 'rare', 'trade', '会心率+15%、会心ダメージ-20%', { mods: { critChance: 0.15, critMul: -0.2 } });
   add('t_overclock', 'オーバークロック', '🔥', 'rare', 'trade', 'スキルのクールタイム-25%、最大HP-20', { mods: { cdr: 0.25, maxHp: -20 } });
   add('t_tank', '城壁', '🏰', 'uncommon', 'trade', '被ダメ-12%、移動速度-8%', { mods: { armor: 0.12, moveSpeed: -0.08 } });
   add('t_junkie', '興奮剤中毒', '💊', 'uncommon', 'trade', '連射速度+20%・移動速度+10%、被ダメ+10%', { mods: { fireRate: 0.2, moveSpeed: 0.1, armor: -0.1 } });
   add('t_hollow', '空ろな器', '🫙', 'rare', 'trade', '与ダメ+20%、回復量-40%', { mods: { dmg: 0.2, healMul: -0.4 } });
-  add('t_cursed', '呪われた金貨', '🪙', 'rare', 'trade', 'コイン+60%、敵の攻撃力+15%', { mods: { coinMul: 0.6, enemyDmg: 0.15 } });
-  add('t_light', '軽装', '🪶', 'uncommon', 'trade', '移動速度+12%・ジャンプ+15%、装弾数-15%', { mods: { moveSpeed: 0.12, jumpPower: 0.15, magSize: -0.15 } });
+  add('t_cursed', '呪われた金貨', '🪙', 'rare', 'trade', 'コイン獲得量+60%、敵の攻撃力+15%', { mods: { coinMul: 0.6, enemyDmg: 0.15 } });
+  add('t_light', '軽装', '🪶', 'uncommon', 'trade', '移動速度+12%・ジャンプ力+15%、装弾数-15%', { mods: { moveSpeed: 0.12, jumpPower: 0.15, magSize: -0.15 } });
   add('t_bulwark', '不動の砦', '🗿', 'rare', 'trade', '最大HP+40・被ダメ-8%、ジャンプ力-20%', { mods: { maxHp: 40, armor: 0.08, jumpPower: -0.2 } });
   add('t_chaos', '混沌の加護', '🌀', 'epic', 'trade', '与ダメ+30%・会心率+10%、敵のHP+20%', { mods: { dmg: 0.3, critChance: 0.1, enemyHp: 0.2 } });
 
@@ -117,7 +117,7 @@
   procElem('h_shock', '帯電', '⚡', 'common', 'shock', 0.08, '命中時8%で電撃を付与。');
   procElem('h_bleed', '鋸刃', '🩸', 'common', 'bleed', 0.12, '命中時12%で出血を付与。');
   add('h_chain', '雷鎖', '⛓️', 'rare', 'element', '命中時15%で2体に雷撃が連鎖（ダメージ50%）。', { max: 2, hooks: { onHit(c, n) { if (!c.proc && Math.random() < 0.15 * n) C.chain(c.e, 2, c.dmg * 0.5 + 5, 10, { src: 'buff', proc: true, elem: 'shock' }); } } });
-  add('h_focus', '弱点看破', '🔍', 'uncommon', 'offense', '同じ敵に連続命中するたびダメ+2%（最大+20%）。', {
+  add('h_focus', '弱点看破', '🔍', 'uncommon', 'offense', '同じ敵に連続命中するたび与ダメ+2%（最大+20%）。', {
     hooks: { preHit(c, n, s) { if (s.e === c.e) c.bonus += Math.min(0.2, (s.k || 0) * 0.02); }, onHit(c, n, s) { if (c.proc) return; if (s.e === c.e) s.k = (s.k || 0) + 1; else { s.e = c.e; s.k = 0; } } },
   });
   add('h_first', '先制の一撃', '🗡️', 'uncommon', 'offense', 'HP満タンの敵へのダメージ+40%。', { hooks: { preHit(c) { if (c.e.hp >= c.e.maxHp && c.e.shield <= 0) c.bonus += 0.4; } } });
@@ -206,7 +206,7 @@
   add('d_phoenix', '不死鳥', '🐦', 'legendary', 'defense', 'ラン中1回だけ、死亡時にHP全快で復活し周囲に大爆発を起こす。', { flag: true });
   add('d_vampaura', '吸血の霧', '🌫️', 'epic', 'defense', '周囲6mの敵から毎秒生命力を吸収する。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.5; let tot = 0; for (const e of C.inRadius(P.pos, 6)) { C.damageEnemy(e, sc(4) * n, { src: 'buff', proc: true, silent: true }); tot += Math.max(1.2, G.player.stats.maxHp * 0.003); } if (tot) C.heal(tot * n, true); } } });
   add('d_iron', '鉄の皮膚', '🪖', 'uncommon', 'defense', '1回の被ダメが最大HPの25%を超えなくなる。', { flag: true });
-  add('d_cleanse', '浄化の加護', '✨', 'uncommon', 'defense', '状態異常の効果時間-60%。', { flag: true });
+  add('d_cleanse', '浄化の加護', '✨', 'uncommon', 'defense', '状態異常の持続時間-60%。', { flag: true });
 
   // ---------- economy & meta ----------
   add('e_interest', '利子', '🏦', 'rare', 'economy', 'エリア開始時、所持コインの8%（最大120）を得る。', { max: 2, hooks: { onAreaStart(c, n) { const v = Math.min(120 * n, Math.floor(G.game.run.coins * 0.08 * n)); if (v > 0) C.coins(v, null, '利子'); } } });
@@ -224,7 +224,7 @@
   add('e_bandolier', '弾薬帯', '🎗️', 'uncommon', 'economy', 'エリア開始時に破片手榴弾+1。', { max: 3, hooks: { onAreaStart(c, n) { P.addItem('g_frag', n); } } });
   add('e_destroy', '破壊衝動', '🪓', 'common', 'economy', '破壊可能オブジェクトからのコイン+100%、破壊時に稀に回復薬。', { flag: true });
   add('e_chestbless', '宝箱の祝福', '🎁', 'rare', 'economy', '宝箱を開けると20秒間ランダムな強化を得る。', { hooks: { onChest() { const opts = [['dmg', 0.3, '💪'], ['fireRate', 0.3, '🔁'], ['moveSpeed', 0.3, '👟'], ['armor', 0.3, '🛡️'], ['critChance', 0.2, '💢']]; const o = opts[Math.floor(Math.random() * opts.length)]; C.temp('e_chestbless', 20, { [o[0]]: o[1] }, o[2]); } } });
-  add('e_stealth', '隠密', '🤫', 'uncommon', 'offense', 'エリア開始時5秒間、敵に発見されない。その間の攻撃ダメ+100%。', { hooks: { onAreaStart() { C.temp('e_stealth', 5, { invis: 1 }, '🤫'); }, preHit(c) { if (P.stats.invis > 0) c.bonus += 1.0; } } });
+  add('e_stealth', '隠密', '🤫', 'uncommon', 'offense', 'エリア開始時5秒間、敵に発見されない。その間の与ダメ+100%。', { hooks: { onAreaStart() { C.temp('e_stealth', 5, { invis: 1 }, '🤫'); }, preHit(c) { if (P.stats.invis > 0) c.bonus += 1.0; } } });
   add('e_hawk', '鷹の目', '🦅', 'rare', 'skill', '25m以上でのヘッドショット時、スキルのクールタイム-1秒。', { hooks: { onHit(c) { if (c.head && c.dist > 25 && !c.proc) C.cdReduce(1); } } });
   add('e_bounty', '賞金首', '💰', 'uncommon', 'economy', '精鋭撃破時のコイン×2。', { flag: true });
   add('e_salvage', '鉄屑回収', '🔩', 'common', 'economy', '武器の下取り額が、価格の30%分さらに増える。', { flag: true });
@@ -270,17 +270,17 @@
   add('o_closer', '幕引き', '🎬', 'rare', 'offense', '残り敵が3体以下になると与ダメ+40%。', { hooks: { preHit(c) { if (G.enemies.aliveCount() <= 3) c.bonus += 0.4; } } });
   add('o_bloodlust', '血の渇望', '🧛', 'rare', 'defense', '出血中の敵へのダメージで与ダメの6%を回復。', { hooks: { onHit(c) { if (c.e.st && c.e.st.bleed > 0 && !c.proc) C.heal(c.dmg * 0.06); } } });
   add('o_meleeshock', '雷拳', '🤜', 'uncommon', 'offense', '近接攻撃が雷撃を伴い、周囲に連鎖する。', { hooks: { onHit(c) { if (c.src === 'melee') C.chain(c.e, 3, c.dmg * 0.5, 8, { src: 'buff', proc: true, elem: 'shock' }); } } });
-  add('o_meleecd', '格闘術', '🥋', 'uncommon', 'offense', '近接攻撃のクールタイム-40%、近接ダメ+40%。', { mods: { meleeDmg: 0.4, meleeCd: 0.4 } });
+  add('o_meleecd', '格闘術', '🥋', 'uncommon', 'offense', '近接攻撃の間隔-40%、近接ダメージ+40%。', { mods: { meleeDmg: 0.4, meleeCd: 0.4 } });
   add('o_grenadecd', '投擲の名手', '🎯', 'uncommon', 'offense', '投擲物の飛距離+35%、ダメージ+20%。', { mods: { grenadeDmg: 0.2, throwPow: 0.35 } });
   add('o_scavenger', '漁り屋', '🦝', 'common', 'economy', '敵が稀に回復の雫を落とすようになる（+8%）。', { mods: { healDrop: 0.08 }, max: 3 });
   add('o_magnetism', '黄金の引力', '🧲', 'common', 'economy', 'コインの取得範囲+4m、コイン+5%。', { mods: { pickupRange: 4, coinMul: 0.05 } });
   add('o_shieldpierce', '盾貫き', '🗡️', 'rare', 'offense', 'シールドを持つ敵にも、ダメージの25%が本体へ貫通する。', { flag: true });
   add('o_cripple', '足止め', '🦵', 'uncommon', 'offense', '脚（下半身）への命中で敵を4秒間30%鈍化。', { hooks: { onHit(c) { if (c.part === 'body' && c.lowHit && !c.proc) C.status(c.e, 'slow', 1); } } });
-  add('o_executioner', '断頭台', '🪓', 'legendary', 'offense', 'ヘッドショット倍率+60%、ヘッドショットキルでスキルのクールタイム-2秒。', { mods: { headMul: 0.6 }, hooks: { onKill(c) { if (c.head) C.cdReduce(2); } } });
+  add('o_executioner', '断頭台', '🪓', 'legendary', 'offense', 'ヘッドショット倍率+60%、ヘッドショットで撃破するとスキルのクールタイム-2秒。', { mods: { headMul: 0.6 }, hooks: { onKill(c) { if (c.head) C.cdReduce(2); } } });
   add('o_ammohoard', '弾薬庫', '🗃️', 'uncommon', 'offense', '装弾数+30%、20%で弾を消費しない。', { mods: { magSize: 0.3, ammoSave: 0.2 } });
   add('o_frenzyshot', '連射狂', '🔥', 'rare', 'offense', '撃ち続けると連射速度が徐々に上昇（最大+40%）。', { hooks: { tick(dt, n, s) { if (G.game.time - P.lastShotT < 0.3) s.v = Math.min(0.4, (s.v || 0) + dt * 0.15); else s.v = Math.max(0, (s.v || 0) - dt * 0.5); P.dynFireRate = s.v; } } });
-  add('o_sharp', '鋭敏', '👃', 'common', 'offense', '敵のHPバーが遠くからでも見える。精鋭へのダメ+10%。', { mods: { eliteDmg: 0.1 }, flag: true });
-  add('o_thunderjump', '雷鳴の跳躍', '⛈️', 'rare', 'mobility', '二段目以降のジャンプ時に足元へ雷撃。', { hooks: { onJump(c) { if (c.air) for (const e of C.inRadius(P.pos, 5)) C.damageEnemy(e, sc(30), { src: 'buff', proc: true, elem: 'shock' }); } } });
+  add('o_sharp', '鋭敏', '👃', 'common', 'offense', '敵のHPバーが遠くからでも見える。精鋭へのダメージ+10%。', { mods: { eliteDmg: 0.1 }, flag: true });
+  add('o_thunderjump', '雷踏み', '⛈️', 'rare', 'mobility', '二段目以降のジャンプ時に足元へ雷撃。', { hooks: { onJump(c) { if (c.air) for (const e of C.inRadius(P.pos, 5)) C.damageEnemy(e, sc(30), { src: 'buff', proc: true, elem: 'shock' }); } } });
   add('o_grapplebomb', '鉤爆', '💣', 'rare', 'mobility', 'グラップルの着弾点で小爆発が起きる。', { hooks: { onGrapple(c) { C.explode(c.point, 3, sc(40), { src: 'buff', proc: true, small: true }); } } });
 
   // ---------- sturdier defence (plain, always-on survivability) ----------
@@ -288,14 +288,14 @@
   add('d_bonecage', '骨の籠手', '🦴', 'common', 'defense', '最大HP+10、被ダメ-4%。', { mods: { maxHp: 10, armor: 0.04 }, max: 3 });
   add('d_healboost', '治癒の才', '🩹', 'common', 'defense', '回復量+30%。', { mods: { healMul: 0.3 }, max: 3 });
   add('d_plate', '板金鎧', '🛡️', 'uncommon', 'defense', '被ダメ-8%。', { mods: { armor: 0.08 }, max: 3 });
-  add('d_bloodpact', '血の契約', '🫀', 'uncommon', 'defense', '最大HP+25%。', { mods: { maxHpPct: 0.25 }, max: 2 });
+  add('d_bloodpact', '溢れる生命', '🫀', 'uncommon', 'defense', '最大HP+25%。', { mods: { maxHpPct: 0.25 }, max: 2 });
   add('d_light', '身軽', '🍃', 'uncommon', 'defense', '回避率+8%。', { mods: { dodge: 0.08 }, max: 3 });
   add('d_ward', '守りの護符', '🧿', 'uncommon', 'defense', 'エリア開始時と各WAVE開始時にオーバーシールド+35。', { hooks: { onAreaStart() { C.overshield(35, 35); }, onWave() { C.overshield(35, 35); } } });
   add('d_spring', '生命の泉', '⛲', 'uncommon', 'defense', '3秒間被弾しないと、毎秒最大HPの2.5%を回復する。', { hooks: { tick(dt) { if (G.game.time - P.lastHurtT > 3 && P.hp < P.stats.maxHp) C.heal(P.stats.maxHp * 0.025 * dt, true); } } });
   add('d_resolve', '不退転', '🪨', 'uncommon', 'defense', '被弾する度に5秒間、被ダメ-6%（最大5重）。', { hooks: { onDamaged(c, n, s) { s.v = Math.min(5, (s.v || 0) + 1); s.t = 5; }, preDamaged(c, n, s) { c.red += (s.v || 0) * 0.06; }, tick(dt, n, s) { if (s.t > 0) { s.t -= dt; if (s.t <= 0) s.v = 0; } } }, counter: (s) => (s.v || 0) + '重' });
   add('d_eliteguard', '精鋭殺しの鎧', '🎖️', 'uncommon', 'defense', '精鋭・覇者からの被ダメ-25%。', { hooks: { preDamaged(c) { if (c.attacker && (c.attacker.elite || c.attacker.champion)) c.red += 0.25; } } });
   add('d_stoneskin', '石肌', '🗿', 'rare', 'defense', '最大HPの20%を超える大きな一撃の被ダメ-40%。', { hooks: { preDamaged(c) { if (c.amount > P.stats.maxHp * 0.2) c.red += 0.4; } } });
-  add('d_bulwark', '不動の構え', '🏯', 'rare', 'defense', '立ち止まっている時かしゃがみ中、被ダメ-30%。', { hooks: { preDamaged(c) { if ((P.speedH || 0) < 1 || P.crouching) c.red += 0.3; } } });
+  add('d_bulwark', '堅守の構え', '🏯', 'rare', 'defense', '立ち止まっている時かしゃがみ中、被ダメ-30%。', { hooks: { preDamaged(c) { if ((P.speedH || 0) < 1 || P.crouching) c.red += 0.3; } } });
   add('d_lifeline', '命綱', '🪢', 'rare', 'defense', 'HPが30%を下回ると即座に最大HPの35%を回復（40秒に1回）。', { hooks: { onDamaged(c, n, s) { if (P.hp > 0 && P.hp < P.stats.maxHp * 0.3 && G.game.time - (s.last ?? -99) > 40) { s.last = G.game.time; C.heal(P.stats.maxHp * 0.35); G.ui.toast('🪢 命綱が繋いだ！', 'good'); } } } });
   add('d_emergency', '緊急障壁', '🚨', 'rare', 'defense', '最大HPの25%以上の被弾を受けると、オーバーシールド+40（15秒に1回）。', { hooks: { onDamaged(c, n, s) { if (c.amount >= P.stats.maxHp * 0.25 && G.game.time - (s.last ?? -99) > 15) { s.last = G.game.time; C.overshield(40, 40); } } } });
   add('d_bossguard', '守護者の外套', '🧥', 'rare', 'defense', 'ボスからの被ダメ-25%。', { hooks: { preDamaged(c) { if (c.attacker && c.attacker.boss) c.red += 0.25; } } });
@@ -307,12 +307,12 @@
   // ---------- melee (slot 3) ----------
   const isM = (c) => c.src === 'melee' && !c.proc;
   add('k_whet', '研ぎ師の業', '🪨', 'common', 'melee', '近接ダメージ+25%。', { mods: { meleeDmg: 0.25 }, max: 4 });
-  add('k_haste', '疾風の太刀筋', '🌬️', 'uncommon', 'melee', '近接攻撃の速度+18%。', { mods: { meleeCd: 0.18 }, max: 2 });
+  add('k_haste', '疾風の太刀筋', '🌬️', 'uncommon', 'melee', '近接攻撃の間隔-18%。', { mods: { meleeCd: 0.18 }, max: 2 });
   add('k_reach', '長き腕', '🦾', 'uncommon', 'melee', '近接攻撃のリーチ+0.7m。', { mods: { meleeRange: 0.7 }, max: 2 });
   add('k_light', '軽装の心得', '🪶', 'common', 'melee', '近接武器を持っている間、移動速度+8%。', { mods: { meleeMove: 0.08 }, max: 2 });
   add('k_backstab', '背刺し', '🗡️', 'rare', 'melee', '背後からの近接攻撃は与ダメ+100%かつ必ず会心。', { hooks: { preHit(c) { if (isM(c) && c.backstab) { c.bonus += 1.0; c.forceCrit = true; } } } });
   add('k_bloodedge', '血吸いの刃', '🩸', 'rare', 'melee', '近接攻撃の与ダメの5%を回復する。', { hooks: { onHit(c) { if (isM(c)) C.heal(c.dmg * 0.05, true); } } });
-  add('k_killrush', '殺陣', '🏃', 'uncommon', 'melee', '近接で倒すと3秒間、移動速度+25%・近接ダメ+20%。', { hooks: { onKill(c) { if (c.src === 'melee') C.temp('k_killrush', 3, { moveSpeed: 0.25, meleeDmg: 0.2 }, '🏃'); } } });
+  add('k_killrush', '殺陣', '🏃', 'uncommon', 'melee', '近接で倒すと3秒間、移動速度+25%・近接ダメージ+20%。', { hooks: { onKill(c) { if (c.src === 'melee') C.temp('k_killrush', 3, { moveSpeed: 0.25, meleeDmg: 0.2 }, '🏃'); } } });
   add('k_armorpierce', '鎧通し', '🔩', 'uncommon', 'melee', '近接攻撃のシールドへのダメージ+120%。', { hooks: { preHit(c) { if (isM(c)) c.shieldBonus += 1.2; } } });
   add('k_parry', '見切り', '🤺', 'epic', 'melee', '重撃の溜め中は被ダメ-70%。溜め中に被弾すると、その重撃のダメージ+80%。', { hooks: { preDamaged(c) { if (P.meleeMode && G.weapons.ms.ph === 'hwind') { c.red += 0.7; G.weapons.ms.parried = true; } }, preHit(c) { if (isM(c) && c.heavy && G.weapons.ms.parried) c.bonus += 0.8; } } });
   add('k_cleave', '旋風', '🌀', 'rare', 'melee', '重撃が全方位を薙ぎ払う（範囲+0.8m）。', { flag: true });
@@ -320,14 +320,14 @@
   add('k_execute', '介錯', '⚰️', 'rare', 'melee', 'HP30%以下の敵への近接ダメージ+70%。', { hooks: { preHit(c) { if (isM(c) && c.e.hp < c.e.maxHp * 0.3) c.bonus += 0.7; } } });
   add('k_momentum', '突進の勢い', '💨', 'uncommon', 'melee', '移動速度に応じて近接ダメージが最大+45%（スライディング中は最大）。', { hooks: { preHit(c) { if (isM(c)) c.bonus += Math.min(0.45, (P.speedH || 0) / 12 * 0.45); } } });
   add('k_air', '空中斬り', '🦅', 'rare', 'melee', '空中での近接ダメージ+50%。空中で当てると少し浮き上がる。', { hooks: { preHit(c) { if (isM(c) && !P.grounded) c.bonus += 0.5; }, onHit(c) { if (isM(c) && !P.grounded && P.vel.y < 4) P.vel.y = 4; } } });
-  add('k_fury', '闘志', '🔥', 'rare', 'melee', '近接を当てる度に近接ダメ+5%（最大10重・3秒当てないと消える）。', { hooks: { onHit(c, n, s) { if (isM(c)) { s.v = Math.min(10, (s.v || 0) + 1); s.t = 3; } }, preHit(c, n, s) { if (isM(c)) c.bonus += (s.v || 0) * 0.05; }, tick(dt, n, s) { if (s.t > 0) { s.t -= dt; if (s.t <= 0) s.v = 0; } } }, counter: (s) => (s.v || 0) + '重' });
+  add('k_fury', '闘志', '🔥', 'rare', 'melee', '近接を当てる度に近接ダメージ+5%（最大10重・3秒当てないと消える）。', { hooks: { onHit(c, n, s) { if (isM(c)) { s.v = Math.min(10, (s.v || 0) + 1); s.t = 3; } }, preHit(c, n, s) { if (isM(c)) c.bonus += (s.v || 0) * 0.05; }, tick(dt, n, s) { if (s.t > 0) { s.t -= dt; if (s.t <= 0) s.v = 0; } } }, counter: (s) => (s.v || 0) + '重' });
   add('k_guard', '構え', '🛡️', 'uncommon', 'melee', '近接武器を持っている間、被ダメ-15%。', { hooks: { preDamaged(c) { if (P.meleeMode) c.red += 0.15; } } });
-  add('k_quickdraw', '早業', '⚡', 'uncommon', 'melee', '近接武器に持ち替えて2秒以内の最初の一撃が与ダメ+100%。持ち替えが一瞬になる。', { flag: true, hooks: { preHit(c) { if (isM(c) && G.game.time - (G.weapons.meleeDrawT || -9) < 2 && !G.weapons.quickUsed) { c.bonus += 1.0; G.weapons.quickUsed = true; } } } });
+  add('k_quickdraw', '抜刀術', '⚡', 'uncommon', 'melee', '近接武器に持ち替えて2秒以内の最初の一撃が与ダメ+100%。持ち替えが一瞬になる。', { flag: true, hooks: { preHit(c) { if (isM(c) && G.game.time - (G.weapons.meleeDrawT || -9) < 2 && !G.weapons.quickUsed) { c.bonus += 1.0; G.weapons.quickUsed = true; } } } });
   add('k_laceration', '裂傷', '🩹', 'common', 'melee', '近接攻撃が50%で出血を付与する。', { hooks: { onHit(c) { if (isM(c) && Math.random() < 0.5) C.status(c.e, 'bleed', 1); } } });
   add('k_quake', '大地の怒り', '🌋', 'epic', 'melee', '重撃が必ず周囲3.5mに衝撃波（与ダメ45%・スタン）を起こす。', { flag: true });
   add('k_vigor', '闘気', '💪', 'uncommon', 'melee', '近接で倒すとHP+6回復。', { hooks: { onKill(c) { if (c.src === 'melee') C.heal(6); } }, max: 2 });
   add('k_throw', '投げ短剣', '🔪', 'rare', 'melee', '近接の通常攻撃3回毎に、狙った先へ短剣を投げる（貫通・出血）。', { flag: true });
-  add('k_master', '剣聖', '⚔️', 'legendary', 'melee', '近接ダメ+60%・攻撃速度+20%・重撃の隙-40%。', { mods: { meleeDmg: 0.6, meleeCd: 0.2, meleeRecover: 0.4 } });
+  add('k_master', '剣聖', '⚔️', 'legendary', 'melee', '近接ダメージ+60%・近接攻撃の間隔-20%・重撃の隙-40%。', { mods: { meleeDmg: 0.6, meleeCd: 0.2, meleeRecover: 0.4 } });
 
   // ---------- abyssal pacts (offered after every boss from area 25: a lasting hardship + a lasting reward) ----------
   const pact = (id, name, icon, desc, def) => add(id, name, icon, 'epic', 'pact', desc, Object.assign({ pact: true }, def));

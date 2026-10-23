@@ -41,7 +41,7 @@
     const pl = G.player, real = pl.stats, cache = w._sc, dyn = pl.dynFireRate, atts = w.atts;
     try { pl.stats = Object.assign({}, G.PLAYER_BASE); pl.dynFireRate = 0; w.atts = {}; w._sc = null; return Object.assign({}, G.weapons.stats(w)); } finally { pl.stats = real; pl.dynFireRate = dyn; w.atts = atts; w._sc = cache; }
   }
-  const legend = '<div class="wc-legend"><span class="sdw">■ 武器の強化 +n（固定値）</span><span class="sdb">■ アタッチメント・バフ・与ダメなど（%）</span></div>';
+  const legend = '<div class="wc-legend"><span class="sdw">■ 武器の強化 +n（固定値）</span><span class="sdb">■ アタッチメント・加護・与ダメなど（%）</span></div>';
   function gunCard(w) {
     const d = w.def, s = G.weapons.stats(w), st = P.stats, cur = w === P.weapon && !P.meleeMode;
     const trait = d.trait ? G.WEAPON_TRAITS[d.trait] : null;

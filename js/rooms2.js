@@ -69,7 +69,7 @@
           if (s.revive) return { icon: GM.REVIVE.icon, label: `${GM.REVIVE.name}（${fmt(s.price)}🪙）`, sub: GM.REVIVE.desc, disabled: coins() < s.price, run: () => { pay(s.price); s.n--; P.revives++; G.ui.toast('🪔 魂の灯火が一つ灯った', 'good'); return { reopen: true }; } };
           const S = null;
           const full = !P.canAddItem(s.it.id);
-          return { icon: s.it.icon, label: `${s.it.name}（${fmt(s.price)}🪙）　残り${s.n}`, sub: `${s.it.passive ? '[常時] ' : s.it.cat === 'grenade' ? '[G:投擲] ' : '[4/5:消耗品] '}${s.it.desc}　所持 ${s.it.cat === 'grenade' ? (P.grenades[s.it.id] || 0) : P.itemCount(s.it.id)}${full ? '（持ち物がいっぱい）' : ''}`, disabled: coins() < s.price || full, run: () => { pay(s.price); s.n--; P.addItem(s.it.id, 1); return { reopen: true }; } };
+          return { icon: s.it.icon, label: `${s.it.name}（${fmt(s.price)}🪙）　残り${s.n}`, sub: `${s.it.passive ? '[常時] ' : s.it.cat === 'grenade' ? `[${G.K('grenade')}:投擲] ` : `[${G.K('item1')}/${G.K('item2')}:消耗品] `}${s.it.desc}　所持 ${s.it.cat === 'grenade' ? (P.grenades[s.it.id] || 0) : P.itemCount(s.it.id)}${full ? '（持ち物がいっぱい）' : ''}`, disabled: coins() < s.price || full, run: () => { pay(s.price); s.n--; P.addItem(s.it.id, 1); return { reopen: true }; } };
         });
         const tc = GM.price(60 + GM.area * 8);
         out.push({ icon: w.stoneVendor ? '✨' : '🩹', label: w.stoneVendor ? `癒しの光を浴びる（${fmt(tc)}🪙）` : `手当てを受ける（${fmt(tc)}🪙）`, sub: treated ? '一度だけ' : 'HPを40%回復（一度だけ）', disabled: treated || coins() < tc || P.hp >= P.stats.maxHp, run: () => { pay(tc); treated = true; C.heal(P.stats.maxHp * 0.4); G.sfx.heal(); return { reopen: true }; } });
@@ -87,7 +87,7 @@
         const bet = Math.max(100, Math.round(coins() * 0.25 / 10) * 10), lot = GM.price(400), slot = GM.price(150);
         return [
           { icon: '🎲', label: `倍か無か（${fmt(bet)}🪙）`, sub: '所持の25%を賭ける。47%で倍になる', disabled: coins() < bet, run: () => { pay(bet); if (Math.random() < 0.47) { gain(bet * 2, '倍!'); G.ui.toast(`🎲 当たり！ +${fmt(bet * 2)}`, 'good'); G.sfx.ui('rare'); } else { G.ui.toast('🎲 外れ…', 'warn'); G.sfx.ui('deny'); } return { reopen: true }; } },
-          { icon: '📦', label: `宝箱くじ（${fmt(lot)}🪙）`, sub: '古びた50%・上等30%・装飾12%・ミミック8%', disabled: coins() < lot, run: () => { pay(lot); const r = Math.random(); if (r < 0.08) { G.ui.toast('😱 ミミックだ！', 'warn'); for (let i = 0; i < 2; i++) GM.spawnEnemy({ elite: true, near: true }); return {}; } const tier = r < 0.2 ? 2 : r < 0.5 ? 1 : 0; GM.spawnChestNear(tier); G.ui.toast(['📦 古びた宝箱', '💎 装飾された宝箱', '👑 王の宝箱！'][tier], 'good'); return { reopen: true }; } },
+          { icon: '📦', label: `宝箱くじ（${fmt(lot)}🪙）`, sub: '古びた50%・上等30%・装飾12%・ミミック8%', disabled: coins() < lot, run: () => { pay(lot); const r = Math.random(); if (r < 0.08) { G.ui.toast('😱 ミミックだ！', 'warn'); for (let i = 0; i < 2; i++) GM.spawnEnemy({ elite: true, near: true }); return {}; } const tier = r < 0.2 ? 2 : r < 0.5 ? 1 : 0; GM.spawnChestNear(tier); G.ui.toast(['📦 古びた宝箱', '💎 上等な宝箱', '👑 装飾された宝箱！'][tier], 'good'); return { reopen: true }; } },
           { icon: '🎰', label: `スロット（${fmt(slot)}🪙）`, sub: '2倍25%・5倍10%・15倍4%・大当たり50倍1%', disabled: coins() < slot, run: () => {
             pay(slot); const r = Math.random(); const sym = ['🍒', '💎', '💀', '👑', '🔔'];
             let mul = 0; if (r < 0.01) mul = 50; else if (r < 0.05) mul = 15; else if (r < 0.15) mul = 5; else if (r < 0.4) mul = 2;
@@ -152,7 +152,7 @@
   };
   R2.grant = function (l) {
     if (l.kind === 'weapon') GM.giveWeapon(l.obj.id);
-    else if (l.kind === 'melee') { G.Pawn.tradeIn(P.melee, true); P.melee = G.weapons.makeMelee(l.obj.id); if (P.meleeMode) G.weapons.melee.equip(false); G.ui.itemCard(l.obj, '[近接:3]'); G.ui.refreshWeapon(); }
+    else if (l.kind === 'melee') { G.Pawn.tradeIn(P.melee, true); P.melee = G.weapons.makeMelee(l.obj.id); if (P.meleeMode) G.weapons.melee.equip(false); G.ui.itemCard(l.obj, `[近接:${G.K('w3')}]`); G.ui.refreshWeapon(); }
     else { P.addBuff(l.obj.id); G.ui.itemCard(l.obj, l.kind === 'relic' ? '[遺物]' : '[加護]'); }
   };
 

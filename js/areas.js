@@ -18,7 +18,7 @@
     shrine: { name: '祈りの祠', icon: '⛩️', hint: '全回復＋強化を一つ', color: '#60d0c0', w: 0.9, min: 3 },
     forge: { name: '鍛冶場', icon: '⚒️', hint: '武器とスキルを鍛える', color: '#e08040', w: 0.9, min: 3 },
     cursed: { name: '呪いの闘技場', icon: '☠️', hint: '強化された敵／報酬: 加護×2', color: '#d0405a', w: 0.8, min: 4 },
-    boss: { name: '守護者の間', icon: '👿', hint: 'ボスが待ち構える', color: '#ff5030', w: 0, min: 5 },
+    boss: { name: '守護者の間', icon: '👿', hint: '守護者が待ち構える', color: '#ff5030', w: 0, min: 5 },
   };
   AR.ARENA = ['combat', 'elite', 'cursed', 'vault', 'trial'];
   AR.ROOMS = ['event', 'shrine', 'forge', 'casino', 'bank', 'auction', 'merc', 'offering'];
@@ -270,7 +270,7 @@
     { id: 'armorer', npc: '旅の鎧職人', icon: '🛡️', text: '「傷んだ鎧は命取りだ。腕のいい職人が直してやろう」',
       opts: () => { const eq = G.Inv.damaged(P, 'equip').length, all = G.Inv.damaged(P, 'all').length, c1 = repairPrice('equip', 1), c2 = repairPrice('all', 1), ch = repairPrice('equip', 0.5);
         return [{ icon: '🛡️', label: `装備中の防具をすべて修理（${c1}🪙）`, sub: eq ? `傷んでいる防具 ${eq}点 → 耐久を全回復` : '傷んでいる防具はない', disabled: !eq || GM.run.coins < c1, run: () => { GM.run.coins -= c1; G.Inv.repair(P, 'equip', 1); G.ui.toast('🛡️ 装備中の防具を修理した', 'good'); } },
-          { icon: '🎒', label: `持っている防具をすべて修理（${c2}🪙）`, sub: all ? `バッグの中も含めて ${all}点 → 耐久を全回復` : '傷んでいる防具はない', disabled: !all || GM.run.coins < c2, run: () => { GM.run.coins -= c2; G.Inv.repair(P, 'all', 1); G.ui.toast('🎒 持っている防具を修理した', 'good'); } },
+          { icon: '🎒', label: `持っている防具をすべて修理（${c2}🪙）`, sub: all ? `インベントリの中も含めて ${all}点 → 耐久を全回復` : '傷んでいる防具はない', disabled: !all || GM.run.coins < c2, run: () => { GM.run.coins -= c2; G.Inv.repair(P, 'all', 1); G.ui.toast('🎒 持っている防具を修理した', 'good'); } },
           { icon: '🔧', label: `応急処置（${ch}🪙）`, sub: eq ? '装備中の防具の失われた耐久を半分だけ回復' : '傷んでいる防具はない', disabled: !eq || GM.run.coins < ch, run: () => { GM.run.coins -= ch; G.Inv.repair(P, 'equip', 0.5); G.ui.toast('🔧 応急処置をした', 'good'); } }]; } },
     { id: 'blood_altar', npc: '血の司祭', icon: '🩸', text: '「血を捧げよ。さすれば力を授けよう」\n最大HPを永続的に10%失う代わりに、上位の加護を一つ選べる。',
       opts: () => [{ icon: '🩸', label: '血を捧げる', sub: '最大HP -10%（永続） → 上位の加護を選択', run: () => { P.permMaxHp -= Math.round(P.stats.maxHp * 0.1); P.recalc(); return { boon: 'boost' }; } }] },
@@ -376,7 +376,7 @@
     const pc = GM.price(450 + GM.area * 20);
     opts.push({ icon: '🔨', label: `スキルを鍛える（${pc}🪙）`, sub: 'スキル・アルティメットの強化を一つ選ぶ', disabled: GM.run.coins < pc, onPick: () => { GM.run.coins -= pc; setTimeout(() => GM.offerBuffs(false, { filter: G.isTech, title: 'FORGED SKILL', sub: 'スキル・アルティメットの強化を一つ選べ' }), 50); } });
     { const c = repairPrice('all', 1), n = G.Inv.damaged(P, 'all').length;
-      opts.push({ icon: '🛡️', label: `防具をすべて修理（${c}🪙）`, sub: n ? `傷んでいる防具 ${n}点（バッグの中も含む）→ 耐久を全回復` : '傷んでいる防具はない', disabled: !n || GM.run.coins < c, onPick: () => { GM.run.coins -= c; G.Inv.repair(P, 'all', 1); G.sfx.explosion(G.world.anvilPos, 0.2); G.ui.toast('🛡️ 防具を修理した', 'good'); } }); }
+      opts.push({ icon: '🛡️', label: `防具をすべて修理（${c}🪙）`, sub: n ? `傷んでいる防具 ${n}点（インベントリの中も含む）→ 耐久を全回復` : '傷んでいる防具はない', disabled: !n || GM.run.coins < c, onPick: () => { GM.run.coins -= c; G.Inv.repair(P, 'all', 1); G.sfx.explosion(G.world.anvilPos, 0.2); G.ui.toast('🛡️ 防具を修理した', 'good'); } }); }
     opts.push({ icon: '🚶', label: 'やめておく', onPick: () => {} });
     GM.modal('⚒️ 鍛冶場', '炉の熱気が肌を焼く。武器を鍛えるか？（何度でも利用可能）', opts);
   };

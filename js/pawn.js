@@ -71,7 +71,7 @@
   function confirmSkill(i) {
     const sk = P().skills[i], d = sk.def, key = G.input.skillKey(i);
     const augs = [...P().buffs.keys()].filter((id) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].skill === sk.id).length;
-    GM().modal(`⚠ ${d.ult ? 'アルティメット' : 'スキル'}を売却しますか？`, `<b style="color:${R(d.rarity)}">[${key}] ${d.icon} ${U.esc(d.name)}${sk.lv ? ' Lv' + sk.lv : ''}</b> を売却します。${d.ult ? 'Q枠は初期のアルティメット（不屈の城塞）に戻ります。' : key + '枠は空になります。'}${augs ? `<br>このスキル専用の強化（${augs}種）は、同じスキルを再び手に入れるまで効果がありません。` : ''}`, [
+    GM().modal(`⚠ ${d.ult ? 'アルティメット' : 'スキル'}を売却しますか？`, `<b style="color:${R(d.rarity)}">[${key}] ${d.icon} ${U.esc(d.name)}${sk.lv ? ' Lv' + sk.lv : ''}</b> を売却します。${d.ult ? `${key}枠は初期のアルティメット（${G.SKILL_BY_ID[G.DEFAULT_ULT].name}）に戻ります。` : key + '枠は空になります。'}${augs ? `<br>このスキル専用の強化（${augs}種）は、同じスキルを再び手に入れるまで効果がありません。` : ''}`, [
       { icon: '💰', label: `売る（+${fmt(PW.skillValue(sk))}🪙）`, onPick: () => { sellSkill(i); again(); } },
       { icon: '↩', label: 'やめる', onPick: again },
     ]);

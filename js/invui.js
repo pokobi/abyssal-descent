@@ -106,7 +106,7 @@
     const W = G.weapons, guns = W.gunsInOrder(), A = G.ATT_BY_ID;
     const out = [0, 1].map((i) => {
       const w = guns[i];
-      if (!w) return `<div class="iv-wbox empty" data-wslot="${i}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b class="dim">— 武器スロット —</b></span></div></div>`;
+      if (!w) return `<div class="iv-wbox empty" data-wslot="${i}"><div class="iv-wh"><kbd>${G.K('w' + (i + 1))}</kbd><span class="wnm"><b class="dim">— 武器スロット —</b></span></div></div>`;
       const cells = Object.keys(G.ATT_SLOTS).map((sl) => {
         const id = w.atts[sl], a = id && A[id], S = G.ATT_SLOTS[sl];
         const wantsOne = !a && [...P.bag.items, ...(IV.openCont ? IV.openCont.items : [])].some((q) => { const qa = q.type === 'att' && A[q.id]; return qa && qa.slot === sl && qa.compat(w.def); });
@@ -116,7 +116,7 @@
       return `<div class="iv-wbox" data-wslot="${i}" style="--rc:${R(w.def.rarity)}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b style="color:${R(w.def.rarity)}">${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</b><small>${U.esc(w.def.cat || '')}</small></span><span class="wdps"><b>${dps}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('gun', w.def, w.atts)}</div><div class="iv-asg">${cells}</div></div>`;
     });
     const m = P.melee, md = m.def, ms = W.meleeStats(m);
-    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>3</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}</b><small>${U.esc(md.cat || '')}・固定</small></span><span class="wdps"><b>${Math.round(ms.dmg / ms.swing)}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>
+    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}</b><small>${U.esc(md.cat || '')}・固定</small></span><span class="wdps"><b>${Math.round(ms.dmg / ms.swing)}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>
       <div class="iv-mst"><div><small>ダメージ</small><b>${Math.round(ms.dmg)}</b></div><div><small>間隔</small><b>${ms.swing.toFixed(2)}s</b></div><div><small>リーチ</small><b>${ms.range}m</b></div></div></div>`);
     return out.join('');
   }
@@ -306,7 +306,7 @@
     const o = G.weapons.order(); const t = o[0]; o[0] = o[1]; o[1] = t; P.wOrder = o.map((x) => x || null);
     G.ui.refreshWeapon(); G.sfx.ui('click');
     const a = o[0], b = o[1];
-    G.ui.toastSmall(`🔁 [1] ${a ? a.def.name : '空き'}　[2] ${b ? b.def.name : '空き'}`);
+    G.ui.toastSmall(`🔁 [${G.K('w1')}] ${a ? a.def.name : '空き'}　[${G.K('w2')}] ${b ? b.def.name : '空き'}`);
   }
   function swapSkills(i, j) {
     if (i === j || ![1, 2, 3].includes(i) || ![1, 2, 3].includes(j)) { G.sfx.ui('deny'); return; }

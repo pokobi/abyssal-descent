@@ -8,6 +8,8 @@ if (!window.__errHooked) {
   window.addEventListener('error', (e) => window.__errs.push('WIN ' + e.message));
 }
 window.__log = window.__log || [];
+// a hidden tab throttles timers hard; a message-channel hop does not
+const __hop = () => new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
 window.__stats = window.__stats || { areas: [], stuck: 0 };
 window.__bot = async function (ms, opts) {
   opts = opts || {};
@@ -56,7 +58,7 @@ window.__bot = async function (ms, opts) {
     I.keys.KeyW = false;
     if (GM.area !== lastArea) { window.__stats.areas.push([lastArea, Math.round(GM.time - areaT0)]); window.__log.push(`AREA ${GM.area} ${GM.stage} ${(GM.objective && GM.objective.kind) || ''}`); lastArea = GM.area; areaT0 = GM.time; }
     if (GM.time - areaT0 > 400) { window.__log.push(`SLOW area ${GM.area} ${GM.stage} ${(GM.objective && GM.objective.kind) || ''} alive=${foes.length}`); window.__stats.stuck++; return 'slow'; }
-    await new Promise((r) => setTimeout(r, 0));
+    await __hop();
   }
   return 'time';
 };

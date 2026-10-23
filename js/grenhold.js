@@ -134,7 +134,7 @@
     if (!hint) { hint = document.createElement('div'); hint.id = 'gren-hint'; (G.ui.el && G.ui.el.hud || document.body).appendChild(hint); }
     if (on && h) {
       const it = G.ITEM_BY_ID[h.id];
-      hint.innerHTML = `<b>${it.icon} ${it.name} ×${P().grenades[h.id] || 0}</b><span><kbd>左クリック</kbd>投げる</span><span><kbd>右クリック</kbd>下投げ</span><span><kbd>長押し</kbd>軌道表示</span><span><kbd>G</kbd>しまう</span>`;
+      hint.innerHTML = `<b>${it.icon} ${it.name} ×${P().grenades[h.id] || 0}</b><span><kbd>左クリック</kbd>投げる</span><span><kbd>右クリック</kbd>下投げ</span><span><kbd>長押し</kbd>軌道表示</span><span><kbd>${G.K('grenade')}</kbd>しまう</span>`;
     }
     hint.classList.toggle('on', !!on);
   }

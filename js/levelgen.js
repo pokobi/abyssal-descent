@@ -1104,7 +1104,7 @@
     const fxp = W / 2 + 9;
     w.fountainPos = new THREE.Vector3(fxp, 0, mz);
     P().well(w, fxp, mz, 0);
-    P().label(w, '💧 回復の泉', fxp, 3.4, mz, -Math.PI / 2, 3.6, { color: '#a8e8ff' }); // faces the entrance
+    P().label(w, '💧 癒しの泉', fxp, 3.4, mz, -Math.PI / 2, 3.6, { color: '#a8e8ff' }); // faces the entrance
     for (const [x, z] of [[3, 4], [W - 3, 4], [3, D - 4], [W - 3, D - 4]]) P().brazier(w, x, 0, z, 1);
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
     w.isShop = true;

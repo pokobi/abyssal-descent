@@ -7,7 +7,7 @@
   PS.DEFS = {
     burn: { icon: '🔥', name: '炎上', col: '#ff7a20', rgb: [1, 0.45, 0.1] },
     poison: { icon: '☠️', name: '毒', col: '#6ad040', rgb: [0.35, 0.85, 0.2] },
-    shock: { icon: '⚡', name: '感電', col: '#ffe060', rgb: [1, 0.9, 0.35] },
+    shock: { icon: '⚡', name: '電撃', col: '#ffe060', rgb: [1, 0.9, 0.35] },
     slow: { icon: '🐌', name: '鈍化', col: '#70b0ff', rgb: [0.45, 0.7, 1] },
   };
   const ORDER = ['burn', 'poison', 'shock', 'slow'];

@@ -89,7 +89,7 @@
       html += bar('📏', 'リーチ', o.range, 4.5, o.range + 'm');
       html += bar('🔨', '重撃倍率', o.heavy[0], 3.5, '×' + o.heavy[0]);
       html += bar('👟', '移動速度', o.moveMul - 1, 0.2, '+' + Math.round((o.moveMul - 1) * 100) + '%');
-      html += `<div style="margin-top:8px"><span class="tag">🔑 3 で持ち替え / 左:連撃 / 右:重撃</span>${o.traitDesc ? `<span class="tag">✦ ${o.traitDesc}</span>` : ''}${o.elem ? `<span class="tag">${{ burn: '🔥 炎上', frost: '❄️ 冷気', poison: '☠️ 毒', shock: '⚡ 電撃', bleed: '🩸 出血' }[o.elem]} ${Math.round(o.elemChance * 100)}%</span>` : ''}${o.critChance ? `<span class="tag">💢 会心+${Math.round(o.critChance * 100)}%</span>` : ''}${o.lifesteal ? `<span class="tag">🩸 吸血${Math.round(o.lifesteal * 100)}%</span>` : ''}<span class="tag">🪙 ${o.price ? U.fmt(o.price) : '初期装備'}</span></div>`;
+      html += `<div style="margin-top:8px"><span class="tag">🔑 ${G.K('w3')} で持ち替え / 左:連撃 / 右:重撃</span>${o.traitDesc ? `<span class="tag">✦ ${o.traitDesc}</span>` : ''}${o.elem ? `<span class="tag">${{ burn: '🔥 炎上', frost: '❄️ 冷気', poison: '☠️ 毒', shock: '⚡ 電撃', bleed: '🩸 出血' }[o.elem]} ${Math.round(o.elemChance * 100)}%</span>` : ''}${o.critChance ? `<span class="tag">💢 会心+${Math.round(o.critChance * 100)}%</span>` : ''}${o.lifesteal ? `<span class="tag">🩸 吸血${Math.round(o.lifesteal * 100)}%</span>` : ''}<span class="tag">🪙 ${o.price ? U.fmt(o.price) : '初期装備'}</span></div>`;
     } else if (tab === 'enemy') {
       const lv = Math.max(1, o.minArea);
       html += bar('❤️', '体力 (Lv.1)', o.hp, 900);
@@ -107,7 +107,7 @@
         html += '<div style="margin-top:4px;font-size:12px;color:var(--dim)">基準：ノーマル・エリア6の守護者（難易度やエリアで変わります）</div>';
         if (st.weak.length) html += `<div style="margin-top:6px"><span class="tag">🎯 部位: ${st.weak.map(U.esc).join(' / ')}</span></div>`;
       }
-      html += `<div style="margin-top:6px">${o.mech.map((m) => `<div style="padding:4px 0">◆ ${m}</div>`).join('')}</div><div style="margin-top:8px"><span class="tag">⚔ 出現: ${Object.keys(G.Run.BOSS_POOLS).filter((f) => G.Run.BOSS_POOLS[f].includes(o.id)).map((f) => G.Run.FIELD_NAME[f]).join('・') || '—'}の守護者</span></div>`;
+      html += `<div style="margin-top:6px">${o.mech.map((m) => `<div style="padding:4px 0">◆ ${m}</div>`).join('')}</div><div style="margin-top:8px"><span class="tag">⚔ 出現: ${o.id === 'sovereign' ? 'エクストラのエリア18（専用のフィールド）' : (Object.keys(G.Run.BOSS_POOLS).filter((f) => G.Run.BOSS_POOLS[f].includes(o.id)).map((f) => G.Run.FIELD_NAME[f]).join('・') || '—') + 'の守護者'}</span></div>`;
     } else if (tab === 'stage') {
       html += stageDetail(o);
     } else if (tab === 'attachment') {
@@ -123,10 +123,10 @@
     } else if (tab === 'valuable') {
       html += `<div style="margin-top:8px"><span class="tag">💰 売値 ${U.fmt(o.value)}🪙</span><span class="tag">📐 大きさ ${o.size[0]}×${o.size[1]}</span><span class="tag">⚖️ 商人で売却専用</span></div>`;
     } else if (tab === 'item') {
-      html += `<div><span class="tag">${G.ITEM_CAT[o.cat].icon} ${G.ITEM_CAT[o.cat].name}</span><span class="tag">🔑 ${o.cat === 'grenade' ? 'G で構え→左クリック投擲/右クリック下投げ' : (o.passive ? '常時：持っているだけで発動' : `${G.K('item1')} / ${G.K('item2')} で使用`)}</span><span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
+      html += `<div><span class="tag">${G.ITEM_CAT[o.cat].icon} ${G.ITEM_CAT[o.cat].name}</span><span class="tag">🔑 ${o.cat === 'grenade' ? `${G.K('grenade')} で構え→左クリック投擲/右クリック下投げ` : (o.passive ? '常時：持っているだけで発動' : `${G.K('item1')} / ${G.K('item2')} で使用`)}</span><span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
     } else if (tab === 'ult') {
       html += bar('⏳', 'クールタイム', o.cd, 160, o.cd + '秒');
-      html += `<div><span class="tag">🔑 Q（アルティメット専用枠）</span>${o.id === G.DEFAULT_ULT ? '<span class="tag">🎁 初期装備</span>' : `<span class="tag">🪙 ${U.fmt(o.price)}</span>`}</div>`;
+      html += `<div><span class="tag">🔑 ${G.input.skillKey(0)}（アルティメット専用枠）</span>${o.id === G.DEFAULT_ULT ? '<span class="tag">🎁 初期装備</span>' : `<span class="tag">🪙 ${U.fmt(o.price)}</span>`}</div>`;
     } else if (tab === 'skill') {
       html += bar('⏳', 'クールタイム', o.cd, 35, o.cd + '秒');
       html += `<div><span class="tag">🔑 ${[0, 1, 2, 3].map((i) => G.input.skillKey(i)).join(' / ')}</span>${o.p.charges ? `<span class="tag">🔋 チャージ ${o.p.charges}</span>` : ''}<span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;

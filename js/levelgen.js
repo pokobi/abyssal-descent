@@ -1090,10 +1090,11 @@
       for (let j = 0; j < nb; j++) { const p = wp(1.1 + sp * (j + 1), 0.95); w.shopSlots.push({ x: p[0], y: 2.05, z: p[1], face: 1 }); }
       // a ware of its own beside the stall (the weapon / skill upgrade): a separate plinth with its own little sign
       if (opt.extra) {
-        bx(L + 0.5, L + 1.9, 1.9, 3.1, 0, 1.05, 's', 'block'); bx(L + 0.4, L + 2.0, 1.8, 3.2, 1.05, 1.15, 's', 'trim');
-        bx(L + 0.55, L + 1.85, 3.12, 3.16, 0.15, 0.95, 'v', 'cloth2', { uv: 1, tint: light, grad: false });
-        const p = wp(L + 1.2, 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1 });
-        const sl = wp(L + 1.2, 3.2); P().label(w, opt.extra, sl[0], 3.35, sl[1], Math.atan2(n[0], n[1]), 2.4, { color: txt, size: 60 });
+        const eu = opt.extraBack ? -1.2 : L + 1.2; // on the near side or the far side of the stall
+        bx(eu - 0.7, eu + 0.7, 1.9, 3.1, 0, 1.05, 's', 'block'); bx(eu - 0.8, eu + 0.8, 1.8, 3.2, 1.05, 1.15, 's', 'trim');
+        bx(eu - 0.65, eu + 0.65, 3.12, 3.16, 0.15, 0.95, 'v', 'cloth2', { uv: 1, tint: light, grad: false });
+        const p = wp(eu, 2.5); w.shopSlots.push({ x: p[0], y: 1.15, z: p[1], face: 1 });
+        const sl = wp(eu, 3.2); P().label(w, opt.extra, sl[0], 3.35, sl[1], Math.atan2(n[0], n[1]), 2.4, { color: txt, size: 60 });
         w.addLight(p[0], 2.6, p[1], { flame: 0, emit: false, intensity: 5, range: 6, color: txt, prio: 0.8, steady: true });
       }
       // backdrop (a low wall in the stall's colour), corner posts
@@ -1131,8 +1132,8 @@
     // slot order is fixed (the shop fills them in this order): weapons, skills, parts, consumables, armour, boons
     const place = {
       0: [[9.4, 20], [1, 0], [0, 1], { low: true, gold: true, extra: '⚒ 武器強化' }], // islands straight ahead of the door: the weapons (+ the upgrade) ...
-      1: [[0.6, 8.5], [0, 1], [1, 0], { extra: '📖 スキル強化' }],                    // west wall: skills (+ the skill tome), attachments
-      2: [[0.6, 23.5], [0, 1], [1, 0]],
+      1: [[0.6, 24.2], [0, 1], [1, 0], { extra: '📖 スキル強化', extraBack: true }], // west wall: attachments in the north, skills (+ the skill tome) in the south
+      2: [[0.6, 8.5], [0, 1], [1, 0]],
       3: [[W - 0.6, 8.5], [0, 1], [-1, 0]],                                          // east wall: consumables, armour
       4: [[W - 0.6, 21], [0, 1], [-1, 0]],
       5: [[23.6, 20], [1, 0], [0, 1], { low: true }],                                // ... and the boons, beside them

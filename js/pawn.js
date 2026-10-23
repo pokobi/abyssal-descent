@@ -187,5 +187,48 @@
     w.group.add(m.group);
     w.lightSources.push({ pos: w.sellPos.clone().add(new THREE.Vector3(0, 2.2, 0)), color: '#ffe0a0', intensity: 7, range: 7, flame: 0, emit: false, ph: 0, prio: 1.6, steady: true });
     PW.npc = m;
+    PW.hintStart(w);
+  };
+  // ---- a few seconds after you step in, the counter is pointed out: a gold glow and light pillar on it, a screen marker, and a notice ----
+  PW.h = null;
+  PW.hintStart = function (w) {
+    PW.hintEnd();
+    const n = w.pawnNpc; if (!n) return;
+    const g = new THREE.Group(); g.position.set(n.x, 0, n.z - 0.8);
+    const glowM = new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide });
+    const box = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1.5, 2.0), glowM); box.position.y = 0.62; g.add(box);
+    const beamM = new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.1, 7, 16, 1, true), beamM); beam.position.y = 4.4; g.add(beam);
+    w.group.add(g);
+    const root = document.getElementById('worldui'), el = document.createElement('div'); el.className = 'exit-mark pawn-mark'; el.style.setProperty('--c', '#ffd060'); el.style.display = 'none';
+    el.innerHTML = '<span>💰</span><em>買取屋</em><b></b>'; if (root) root.appendChild(el);
+    PW.h = { w, g, glowM, beamM, el, d: el.querySelector('b'), t: 0, toasted: false, done: false };
+  };
+  PW.hintEnd = function () {
+    const h = PW.h; if (!h) return; PW.h = null;
+    if (h.g.parent) h.g.parent.remove(h.g); h.glowM.dispose(); h.beamM.dispose(); h.el.remove();
+  };
+  const _pv = new THREE.Vector3();
+  PW.update = function (dt) {
+    const h = PW.h; if (!h) return;
+    const GM = G.game;
+    if (G.world !== h.w || GM.stage !== 'shop') { PW.hintEnd(); return; }
+    if (GM.state === 'playing') h.t += dt;
+    const P = G.player, sp = h.w.sellPos, near = Math.hypot(P.pos.x - sp.x, P.pos.z - sp.z) < 3.2;
+    if (near && h.t > 2) h.done = true;
+    const T0 = 1.5, T1 = 11, k = h.done ? 0 : h.t < T0 ? 0 : h.t > T1 ? 0 : Math.min(1, (h.t - T0) / 0.6, (T1 - h.t) / 1.2);
+    if (h.t > T1 || (h.done && h.t > 2)) { PW.hintEnd(); return; }
+    if (!h.toasted && h.t >= T0) { h.toasted = true; G.ui.toast('💰 買取屋 — 要らない物や武器を売ってコインに換えられる（カウンターの前でインタラクト）', 'good'); G.sfx.ui && G.sfx.ui('select'); }
+    const pulse = 0.55 + 0.45 * Math.sin(GM.time * 5);
+    h.glowM.opacity = k * (0.16 + 0.16 * pulse); h.beamM.opacity = k * 0.16;
+    // the screen marker: over the counter, at the screen edge when it is out of view
+    const el = h.el; if (k <= 0) { el.style.display = 'none'; return; }
+    _pv.set(sp.x, 3.0, sp.z + 1.4).project(G.camera);
+    let sx = _pv.x, sy = _pv.y; const behind = _pv.z > 1; if (behind) { sx = -sx; sy = -sy; }
+    const out = behind || Math.abs(sx) > 0.9 || Math.abs(sy) > 0.85;
+    if (out) { const q = Math.max(Math.abs(sx) / 0.9, Math.abs(sy) / 0.85, 0.001); sx /= q; sy /= q; if (behind) sy = Math.max(sy, 0.85); }
+    el.style.display = ''; el.style.opacity = (0.9 * k).toFixed(2); el.style.left = ((sx * 0.5 + 0.5) * innerWidth) + 'px'; el.style.top = ((-sy * 0.5 + 0.5) * innerHeight) + 'px';
+    el.classList.toggle('edge', out);
+    const dd = Math.round(Math.hypot(P.pos.x - sp.x, P.pos.z - sp.z)); if (h.dv !== dd) { h.dv = dd; h.d.textContent = dd + 'm'; }
   };
 })();

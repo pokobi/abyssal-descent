@@ -1935,6 +1935,7 @@
     }
   }
   function updateWorldFx(dt) {
+    if (G.Pawn && G.Pawn.update) G.Pawn.update(dt);
     const w = G.world; if (!w) return;
     const cp = camera.position;
     updateFireBeds(w, cp, dt);

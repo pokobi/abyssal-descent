@@ -850,7 +850,12 @@
         // strata fields: flyers follow the air routes (open air across the chasm, between the slabs of the storeys)
         if (this.flyer && w.navLayers > 1) {
           const band = this._band || (this._band = { lo: 0, hi: 0 });
-          if (!this.hasLOS && w.airDir(this.pos.x, this.pos.z, this.pos.y, o)) { band.lo = o.lo; band.hi = o.hi; this.airOn = true; return o; }
+          if (!this.hasLOS && w.airDir(this.pos.x, this.pos.z, this.pos.y, o)) { band.lo = o.lo; band.hi = o.hi; this.airOn = true; this._airLast = { x: o.x, z: o.z, t: G.game.time };
+            // the next stretch of air is lower / higher than where we hover (a gap in a slab, then a storey under it): first change height in the open, don't fly into the slab edge
+            if (this.pos.y > o.hi + 0.2 || this.pos.y < o.lo - 0.6) { o.x *= 0.12; o.z *= 0.12; }
+            return o; }
+          // no route known for this cell right now (the field is only refreshed a few times a second): keep the last heading instead of turning round
+          if (!this.hasLOS && this._airLast && G.game.time - this._airLast.t < 0.7) { o.x = this._airLast.x * 0.5; o.z = this._airLast.z * 0.5; this.airOn = !!w.airBand(this.pos.x, this.pos.z, this.pos.y, band); return o; }
           const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; this.airOn = !!w.airBand(this.pos.x, this.pos.z, this.pos.y, band);
           return o;
         }

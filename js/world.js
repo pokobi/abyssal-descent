@@ -429,11 +429,13 @@
       const want = new Set(wanted || []); let left = want.size;
       const { rs, ra, rd } = this.aadj;
       dist[t] = 0; push(t, 0);
-      let pops = 0;
+      let pops = 0, stopAt = Infinity;
       while (hn > 0 && pops++ < this.N * this.L * 4) {
         const kTop = hk[0], b = pop();
         if (kTop > dist[b]) continue;
-        if (want.has(b)) { want.delete(b); if (--left <= 0) break; }
+        // keep going a good way past the last flyer: it moves several metres before the next update and must not step onto cells with no distance yet
+        if (kTop > stopAt) break;
+        if (want.has(b)) { want.delete(b); if (--left <= 0) stopAt = kTop + 12; }
         for (let e = rs[b], e1 = rs[b + 1]; e < e1; e++) {
           const a = ra[e], nd = dist[b] + (DIAG[rd[e]] ? 1.414 : 1);
           if (nd < dist[a]) { dist[a] = nd; push(a, nd); }

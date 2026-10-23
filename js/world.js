@@ -390,6 +390,24 @@
       if (this.nooks) for (const n of this.nooks) if (z > n.a0 - 0.2 && z < n.a1 + 0.2 && y > n.y0 - 1.2 && y < n.y1 + 1) { if (n.side === 'W') lo = Math.min(lo, n.lo + r); else hi = Math.max(hi, n.hi - r); }
       return [lo, hi];
     }
+    // prison bars (or a shut cell gate) between a and b on the same storey? Sight and shots pass through them, a walker does not:
+    // it has to go round through the doorway (and batter a shut gate down) instead of heading straight at you
+    barsBetween(a, b) {
+      if (this.doors && this.doors.length) {
+        for (const d of this.doors) {
+          if (d.state !== 'closed' || Math.abs(a.y - d.y) > 2) continue;
+          const t = (d.plane - a.x) / ((b.x - a.x) || 1e-6); if (t < 0 || t > 1) continue;
+          const z = a.z + (b.z - a.z) * t; if (z > d.lo - 0.1 && z < d.hi + 0.1) return true;
+        }
+      }
+      if (!this.nbk) return false;
+      const dx = b.x - a.x, dz = b.z - a.z, n = Math.ceil(Math.hypot(dx, dz) / 0.4);
+      for (let i = 1; i < n; i++) {
+        const k = i / n, x = a.x + dx * k, z = a.z + dz * k, idx = this.navIdx(x, z, a.y);
+        if (idx >= 0 && this.nbk[idx]) return true;
+      }
+      return false;
+    }
     // ---- air routes for flyers (strata fields) ----
     // A surface node's open air runs from its floor up to nc. Two nodes of neighbouring cells connect if their air overlaps by a flyer's height,
     // so a flyer can cross the chasm (open air at every height) and slip between the storeys, but never through a slab.

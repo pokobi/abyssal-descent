@@ -843,6 +843,13 @@
       } else this.aggroM = false;
       return { pos: P.pos, eye: P.chestPos(), vel: P.vel, invisible: P.stats.invis > 0 || P.smokeT > 0, isPlayer: true };
     }
+    // prison bars / a shut gate between this walker and its target (looked up a few times a second)
+    barredFrom(tgt) {
+      const w = G.world;
+      if (this.flyer || !w.barsBetween || (!w.nbk && !(w.doors && w.doors.length))) return false;
+      if (!this._barC || G.game.time - this._barC.t > 0.15) this._barC = { t: G.game.time, v: w.barsBetween(this.pos, tgt.pos) };
+      return this._barC.v;
+    }
     decideMove(tgt, toT, distH, dt) {
       const def = this.def, ai = def.ai, w = G.world;
       const out = { x: 0, z: 0 };
@@ -863,7 +870,7 @@
         if (this.flyer && (this.hasLOS || !w.flowDir(this.pos.x, this.pos.z, o, this.pos.y))) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; return o; }
         if (this.flyer) return o;
         const f = w.flowDir(this.pos.x, this.pos.z, o, this.pos.y);
-        if (!f || (this.hasLOS && distH < 7 && Math.abs(toT.y) < 2.5)) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; } // in sight and on the same level: straight at you
+        if (!f || (this.hasLOS && distH < 7 && Math.abs(toT.y) < 2.5 && !this.barredFrom(tgt))) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; } // in sight and on the same level: straight at you (unless prison bars are in the way: then round through the doorway)
         return o;
       };
       if (ai === 'flee') {
@@ -895,14 +902,14 @@
       }
       // melee / flank
       if (this.cloaked && distH > 10) this.setCloak(true);
-      if (ai === 'flank' && distH < 14 && distH > 3 && this.hasLOS) {
+      if (ai === 'flank' && distH < 14 && distH > 3 && this.hasLOS && !this.barredFrom(tgt)) {
         const ang = Math.atan2(-toT.x, -toT.z) + this.flankAng;
         const gx = tgt.pos.x + Math.sin(ang) * 3.5, gz = tgt.pos.z + Math.cos(ang) * 3.5;
         const dx = gx - this.pos.x, dz = gz - this.pos.z, l = Math.hypot(dx, dz) || 1;
         out.x = dx / l; out.z = dz / l;
         return out;
       }
-      if (distH < def.range * 0.7 && this.hasLOS) return out;
+      if (distH < def.range * 0.7 && this.hasLOS && !this.barredFrom(tgt)) return out;
       return flow(out);
     }
     tryAttack(tgt, toT, distH) {
@@ -913,6 +920,7 @@
       const k = def.attack;
       const begin = (wind, data) => { this.attackState = Object.assign({ kind: k, t: 0, wind }, data || {}); this.wind = 0; };
       if (!this.hasLOS && !['burrow', 'support'].includes(k)) return;
+      if (['lunge', 'pounce', 'slash', 'slam', 'bounce', 'dashslash', 'charge'].includes(k) && this.barredFrom(tgt)) return; // no melee through prison bars
       switch (k) {
         case 'lunge': if (distH < 6.5 && Math.abs(dy) < 2.5) begin(0.35); break;
         case 'pounce': if (distH < def.range && Math.abs(dy) < 3) begin(0.4); else if (distH < 18 && Math.random() < 0.02) begin(0.4, { web: true }); break;

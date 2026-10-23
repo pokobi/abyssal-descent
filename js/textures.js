@@ -433,8 +433,12 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
           acc += act * (ring * 1.5 + body);
         }
         float swell = 0.8 + 0.24 * sin(vWP.x * 0.7 + uTime * 1.1) * sin(vWP.z * 0.6 - uTime * 0.8) + 0.08 * sin(uTime * 2.3 + vWP.x * 1.7 + vWP.z * 1.3);
-        totalEmissiveRadiance *= swell * (1.0 + acc * 0.95);
-        totalEmissiveRadiance += ${blue ? 'vec3(acc * 0.04, acc * 0.2, acc * 0.45)' : 'vec3(acc * 0.4, acc * 0.22, acc * 0.05)'};
+        // dark crust drifting over the surface, hot cracks between it; bubbles push through in a deep orange (blue: deep blue), never white
+        float cr = sin(vWP.x * 1.1 + sin(vWP.z * 0.9 + uTime * 0.3) * 1.5) * sin(vWP.z * 1.3 - uTime * 0.2 + sin(vWP.x * 0.8) * 1.5) * 0.5 + 0.5;
+        float crust = smoothstep(0.5, 0.9, cr);
+        float a1 = min(acc, 1.0);
+        totalEmissiveRadiance *= swell * (1.0 - crust * 0.5) * (1.0 + a1 * 0.45) * mix(vec3(1.0), ${blue ? 'vec3(0.55, 0.8, 1.0)' : 'vec3(1.0, 0.5, 0.18)'}, a1);
+        totalEmissiveRadiance += ${blue ? 'vec3(a1 * 0.02, a1 * 0.1, a1 * 0.3)' : 'vec3(a1 * 0.3, a1 * 0.08, 0.0)'};
       }`);
     };
     m.needsUpdate = true;

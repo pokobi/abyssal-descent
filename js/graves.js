@@ -36,8 +36,8 @@
     if (!w || !w.graves || !w.graves.length) return;
     sph = sph || new THREE.SphereGeometry(1, 10, 6); box = box || new THREE.BoxGeometry(1, 1, 1); cyl = cyl || new THREE.CylinderGeometry(0.5, 0.5, 1, 10); ringTex = ringTex || makeRing();
     const ruin = w.biome === 'ruin', tint = ruin ? 0x4a78ff : 0x9a50ff, wisp = ruin ? [0.35, 0.6, 1] : [0.62, 0.4, 1];
-    const stoneM = new THREE.MeshStandardMaterial({ color: 0x4a4650, roughness: 0.85, emissive: ruin ? 0x0a1230 : 0x1c0a30, emissiveIntensity: 0.9 });
-    const dirtM = new THREE.MeshStandardMaterial({ color: 0x1e1614, roughness: 1, emissive: ruin ? 0x081028 : 0x140824, emissiveIntensity: 0.7 });
+    const stoneM = new THREE.MeshStandardMaterial({ color: 0x0c0b10, roughness: 0.7, emissive: ruin ? 0x060a1c : 0x120620, emissiveIntensity: 0.9 });
+    const dirtM = new THREE.MeshStandardMaterial({ color: 0x060505, roughness: 1, emissive: ruin ? 0x081028 : 0x140824, emissiveIntensity: 0.7 });
     for (const d of w.graves) {
       const g = new THREE.Group(); g.position.set(d.x, d.y, d.z); g.rotation.y = d.ry; g.scale.setScalar(1.3);
       const parts = [];
@@ -99,6 +99,7 @@
       if (o.used) continue;
       const dxz = Math.hypot(P.pos.x - o.x, P.pos.z - o.z), inR = dxz < Gr.TRIGGER && Math.abs(P.pos.y - o.y) < 2.8;
       o.dwell = inR ? o.dwell + dt : Math.max(0, o.dwell - dt * 1.5);
+      if (inR && !o.warned) { o.warned = true; G.ui.toast('⚰️ 墓がうごめいている… 範囲にとどまると敵が湧く', 'warn'); } // once per grave
       const k = Math.min(1, o.dwell / Gr.DWELL);
       // idle shimmer, stronger as it stirs
       o.glow.material.opacity = 0.3 + 0.12 * Math.sin(t * 2.4 + o.ph) + k * 0.55;

@@ -989,11 +989,11 @@
   // boiling lava: one bloop (blue: a little higher and glassier), and a bed of bubbling that swells as you near lava
   A.lavaPop = function (pos, blue) {
     if (!ctx || !voice(0.25)) return;
-    const t = ctx.currentTime, out = dest(pos, 0.3); out.gain.value = 0.55;
-    const f = vr(blue ? 470 : 300, 0.4);
-    tn({ t, f0: f * 0.6, f1: f * 1.9, fd: 0.07, d: 0.13, g: 0.5, to: out, type: 'sine' });
-    nz({ t: t + 0.03, buf: 'pink', f: [['bandpass', f * 3, 2.5]], g: 0.2, d: 0.06, to: out });
-    if (Math.random() < 0.3) tn({ t: t + 0.09, f0: f * 0.8, f1: f * 2.2, fd: 0.06, d: 0.1, g: 0.25, to: out, type: 'sine' }); // a second, smaller one
+    const t = ctx.currentTime, out = dest(pos, 0.3); out.gain.value = 0.14;
+    const f = vr(blue ? 150 : 105, 0.35);
+    tn({ t, f0: f * 0.6, f1: f * 1.6, fd: 0.09, d: 0.16, g: 0.5, to: out, type: 'sine' });
+    nz({ t: t + 0.03, buf: 'brown', f: [['bandpass', f * 2, 2]], g: 0.25, d: 0.08, to: out });
+    if (Math.random() < 0.3) tn({ t: t + 0.1, f0: f * 0.8, f1: f * 1.7, fd: 0.07, d: 0.12, g: 0.25, to: out, type: 'sine' }); // a second, smaller one
   };
   let boil = null;
   A.boilBed = function (v, blue) {
@@ -1010,8 +1010,8 @@
       src.start(); l1.start(); l2.start();
       boil = { g, f };
     }
-    boil.g.gain.setTargetAtTime(Math.max(0.0001, v * 0.22), ctx.currentTime, 0.25);
-    boil.f.frequency.setTargetAtTime(blue ? 330 : 230, ctx.currentTime, 0.4);
+    boil.g.gain.setTargetAtTime(Math.max(0.0001, v * 0.055), ctx.currentTime, 0.25);
+    boil.f.frequency.setTargetAtTime(blue ? 170 : 120, ctx.currentTime, 0.4);
   };
   // distant thunder roll
   A.thunder = function (delay) {

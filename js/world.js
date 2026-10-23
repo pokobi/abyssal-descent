@@ -526,7 +526,9 @@
       if (this.t <= 0) {
         this.t = 0.25;
         const S = world.lightSources;
-        const arr = S.map((s) => [s, s.pos.distanceToSquared(camPos) / (s.prio || 1)]).sort((a, b) => a[1] - b[1]);
+        // stacked storeys: a light one floor up or down is behind a slab, so the ones on your own storey come first
+        const vk = world.strata ? 9 : 1;
+        const arr = S.map((s) => { const dy = s.pos.y - camPos.y; return [s, (s.pos.distanceToSquared(camPos) + dy * dy * (vk - 1)) / (s.prio || 1)]; }).sort((a, b) => a[1] - b[1]);
         for (let i = 0; i < this.N; i++) {
           const l = this.lights[i];
           const s = arr[i] ? arr[i][0] : null;

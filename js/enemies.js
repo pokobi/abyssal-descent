@@ -912,7 +912,7 @@
         case 'spore': if (distH < def.range) begin(0.8); break;
         case 'beam': if (distH < def.range) begin(1.3, { lockYaw: false }); break;
         case 'charge': if (distH > 4 && distH < def.range && Math.abs(dy) < 1.5) begin(0.75, { lockYaw: true }); else if (distH < 3) begin(0.4, { bite: true }); break;
-        case 'boulder': if (distH > 7 && distH < def.range) begin(0.9, { throwing: true }); else if (distH < 4.2 + this.radius * 0.5) begin(0.9, { slam: true }); break;
+        case 'boulder': if (distH > 7 && distH < def.range) begin(0.9, { throwing: true }); else if (distH < 4.2 + this.radius * 0.5 && Math.abs(dy) < 2.5) begin(0.9, { slam: true }); break;
         case 'dashslash': if (distH < def.range) { this.setCloak(false); begin(0.35); } break;
         case 'support': begin(0.8); break;
       }
@@ -957,7 +957,7 @@
             G.fx.ring(A.c, def.range * 1.1, 0xc0a080, 0.4); G.fx.dust(A.c, V(0, 1, 0), 0x8a7a60, 14); G.fx.decal(A.c.clone().setY(A.c.y + 0.02), V(0, 1, 0), 'crack', def.range * 1.4, true);
             G.sfx.explosion(A.c, 0.5); P.addShake(Math.max(0, 0.6 - P.pos.distanceTo(A.c) * 0.04));
             const d = Math.hypot(tgt.pos.x - A.c.x, tgt.pos.z - A.c.z);
-            if (d < def.range && tgt.pos.y - A.c.y < 0.9) hitPlayer(this.dmg, 'aoe');
+            if (d < def.range && tgt.pos.y - A.c.y < 0.9 && tgt.pos.y - A.c.y > -1.5) hitPlayer(this.dmg, 'aoe');
           }
           if (A.t - A.wind > 0.8) end();
           return { x: 0, z: 0 };
@@ -1018,7 +1018,7 @@
           return { x: 0, z: 0 };
         }
         case 'charge': {
-          if (A.bite) { if (inWind) return { x: 0, z: 0 }; if (!A.hit) { A.hit = true; this.atk = 1; if (distH < this.radius + 1.5) hitPlayer(this.dmg * 0.7); } if (A.t - A.wind > 0.3) end(1.2); return { x: 0, z: 0 }; }
+          if (A.bite) { if (inWind) return { x: 0, z: 0 }; if (!A.hit) { A.hit = true; this.atk = 1; if (distH < this.radius + 1.5 && Math.abs(toT.y) < 2) hitPlayer(this.dmg * 0.7); } if (A.t - A.wind > 0.3) end(1.2); return { x: 0, z: 0 }; }
           if (inWind) { if (!A.dir) { this.yaw = Math.atan2(toT.x, toT.z); } if (Math.random() < 0.3) G.fx.dust(this.pos, V(0, 1, 0), 0x7a6a50, 1); A.dir = V(dirx, 0, dirz); this.yaw = Math.atan2(dirx, dirz); return { x: 0, z: 0 }; }
           if (!A.roar) { A.roar = true; G.sfx.monster(this.pos, 'roar', def.pitch * 1.2, 0.8); }
           this.atk = 0.5;
@@ -1123,7 +1123,7 @@
       this.surfaceT -= dt;
       if (this.surfaceT <= 0) { this.burrowed = true; G.fx.dust(this.pos, V(0, 1, 0), 0x7a6a50, 12); G.sfx.monster(this.pos, 'rumble', 1.2, 0.7); this.atkCd = 1.5; return out; }
       // above ground: chase & bite
-      if (distH < this.radius + 2.2 && this.atkCd <= 0 && !this.vel.y) { this.atkCd = 1.2; this.atk = 1; C.damagePlayer(this.dmg * 0.8, { src: 'melee', attacker: this, pos: this.pos.clone(), elem: this.def.elem }); G.sfx.monster(this.pos, 'snarl', 0.7, 0.8); }
+      if (distH < this.radius + 2.2 && Math.abs(toT.y) < 2 && this.atkCd <= 0 && !this.vel.y) { this.atkCd = 1.2; this.atk = 1; C.damagePlayer(this.dmg * 0.8, { src: 'melee', attacker: this, pos: this.pos.clone(), elem: this.def.elem }); G.sfx.monster(this.pos, 'snarl', 0.7, 0.8); }
       out.x = toT.x / l; out.z = toT.z / l; out.speed = this.speed * 0.7;
       return out;
     }

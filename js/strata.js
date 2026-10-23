@@ -46,6 +46,8 @@
       const g = rng.range(12, 15), c = cz + rng.range(-1.5, 1.5);
       eN.push(Math.round(c - g / 2)); eS.push(Math.round(c + g / 2));
     }
+    // the slabs shut out the light from above: a brighter fill and thinner haze than the open halls had
+    w.envOverride = ruined ? { amb: 1.0, hemiS: '#8ea6e0', hemiG: '#2c3658', fog: '#101a2e', fogD: 0.011 } : { amb: 0.95, hemiS: '#a8968a', hemiG: '#4a3a2a', fog: '#1c1610', fogD: 0.012 };
     const T = { z0: eN[0], z1: eS[0], y: -1.0, blue: ruined };
     w.trench = T; w.strata = { Y, eN, eS, HT };
     w.navLayers = NL + 3;

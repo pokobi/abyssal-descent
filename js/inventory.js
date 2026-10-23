@@ -73,7 +73,8 @@
   IV.maxStack = function (it) {
     if (it.type !== 'item') return 1;
     const d = IV.def(it);
-    return d && d.passive ? 3 : 5;
+    if (d && d.passive) return 3;
+    return d && d.cat === 'grenade' ? 5 : 50; // consumables stack up to 50 in one cell; grenades and relic-like passives keep their small stacks
   };
   IV.value = function (it) {
     const d = IV.def(it); if (!d) return 0;

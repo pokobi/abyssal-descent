@@ -1447,6 +1447,13 @@
 
   // ---------------- interaction ----------------
   let lookTarget = null;
+  const _cdv = new THREE.Vector3(), _cbx = new THREE.Box3(), _cray = new THREE.Ray(), _chit = new THREE.Vector3(), _csz = new THREE.Vector3(), _cctr = new THREE.Vector3();
+  // the world-space box of a corpse's model (re-measured while it is still falling, then kept)
+  function corpseBox(c) {
+    const e = c.e, m = e.model && e.model.group; if (!m) return null;
+    if (!c.box || (!(e.deathT > 0.75) && GM.time - (c.boxT || -9) > 0.1)) { m.updateMatrixWorld(true); c.box = (c.box || new THREE.Box3()).setFromObject(m); c.boxT = GM.time; }
+    return c.box;
+  }
   function updateInteraction(dt) {
     const w = G.world;
     const eye = camera.position, f = P.forward();
@@ -1467,7 +1474,25 @@
       if (GM.shop.mini && !GM.shop.healUsed && GM.shop.healPos) consider(GM.shop.healPos, 0.9, { type: 'miniheal' }, 3.4);
       if (!GM.shop.mini && w.sellPos) consider(w.sellPos, 1.3, { type: 'sell' }, 3.6);
     }
-    for (const c of G.Inv.corpses) if (c.e && !c.e.removed) consider(c.e.pos.clone().setY(c.e.pos.y + 0.45), 1.8, { type: 'corpse', c }, 4.4);
+    // a corpse lies on its side, so its body is metres away from where the foe stood: aim at the body itself (a ray against its bounding box),
+    // the nearest one you are looking at wins; a near miss on the centre still counts a little further down
+    // when several bodies lie in line, the one whose middle is nearest the crosshair (relative to its size) is the one you mean
+    let cBest = null, cScore = Infinity, cT = 0;
+    for (const c of G.Inv.corpses) {
+      const e = c.e; if (!e || e.removed || Math.hypot(e.pos.x - eye.x, e.pos.z - eye.z) > 9) continue;
+      const b = corpseBox(c); if (!b) continue;
+      _cbx.copy(b).expandByScalar(0.3);
+      let t = Infinity;
+      if (_cbx.containsPoint(eye)) t = 0; else { _cray.set(eye, f); const hp = _cray.intersectBox(_cbx, _chit); if (hp) t = eye.distanceTo(hp); }
+      const ctr = b.getCenter(_cctr), sz = b.getSize(_csz), half = Math.max(0.5, Math.max(sz.x, sz.y, sz.z) / 2);
+      const along = _cdv.copy(ctr).sub(eye).dot(f), perp = Math.sqrt(Math.max(0, ctr.distanceToSquared(eye) - along * along));
+      let score;
+      if (t <= 4.4) score = perp / half;                                              // the crosshair is on the body
+      else if (along > 0 && perp < Math.min(1.3, Math.max(0.7, Math.max(sz.x, sz.z) * 0.4)) && ctr.distanceTo(eye) <= 4.4) { score = 2 + perp; t = ctr.distanceTo(eye); } // a near miss on the middle
+      else continue;
+      if (score < cScore) { cScore = score; cBest = { type: 'corpse', c }; cT = t; }
+    }
+    if (cBest && cT < bd) { bd = cT; best = cBest; }
     for (const g of G.Inv.ground) consider(g.pos, 0.6, { type: 'loot', g }, 3.2);
     for (const it of w.interactables) {
       if (it.type === 'chest' && it.opened && it.cont && it.cont.items.length) consider(it.pos, 0.9, { type: 'chestOpen', it }, 3.2);
@@ -1511,7 +1536,7 @@
       G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `死体を漁る — ${GM.searchDur(2).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? '中身を確認できる' : '一度押すと漁り始める。', action: c.searched ? '開く' : S ? '漁っている…' : '漁る' });
       if (I.hit('interact') && !S) {
         if (c.searched) G.InvUI.open(c.cont, c);
-        else GM.startSearch(c, e.pos.clone().setY(e.pos.y + 0.45), 2, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '死体を漁っている…');
+        else GM.startSearch(c, (c.box ? c.box.getCenter(V()) : e.pos.clone().setY(e.pos.y + 0.45)), 2, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '死体を漁っている…');
       }
       return;
     } else if (best.type === 'loot') {
@@ -1564,9 +1589,12 @@
     const S = GM.search; if (!S) return;
     if (P.dead || GM.state !== 'playing' || (S.it && (S.it.opened || S.it.looted))) { GM.cancelSearch(); return; }
     const eye = camera.position, f = P.forward();
-    const to = S.pos.clone().sub(eye), d = to.length();
+    const to = S.pos.clone().sub(eye), box = S.it && S.it.box; // a corpse is judged by its whole body, not just its middle
+    let d = to.length(); if (box) d = Math.min(d, box.distanceToPoint(eye) + 1);
     if (d > 4.4) { GM.cancelSearch('離れたので探索をやめた'); return; }
-    if (to.normalize().dot(f) < 0.72) { GM.cancelSearch('目を離したので探索をやめた'); return; } // ~44° off the target resets
+    let aimed = to.normalize().dot(f) >= 0.72; // ~44° off the target resets
+    if (!aimed && box) { _cbx.copy(box).expandByScalar(0.5); aimed = _cbx.containsPoint(eye) || !!_cray.set(eye, f).intersectBox(_cbx, _chit); }
+    if (!aimed) { GM.cancelSearch('目を離したので探索をやめた'); return; }
     S.t += dt;
     const k = Math.min(1, S.t / S.dur);
     const it = S.it;

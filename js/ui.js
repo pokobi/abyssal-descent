@@ -181,8 +181,8 @@
     vig.style.boxShadow = `inset 0 0 220px 60px ${urgent ? 'rgba(255,40,20,0.75)' : 'rgba(255,170,40,0.6)'}`;
   };
   // ---- the wheel's shape: a hub in the middle and one cut-stone shard per entry around it, a gap between the shards.
-  // The gaps are straight lines shifted off the centre the same way for every shard (a pinwheel); both rims are true circles. ----
-  const WH = { hub: 74, in: 90, out: 190, gap: 5, shift: 22 };
+  // Every shard is a symmetric ring sector, the gaps are even and run from the centre; both rims are true circles. ----
+  const WH = { hub: 74, in: 90, out: 190, gap: 6, shift: 0 };
   function wheelShapes(n) {
     const clip = (poly, px, py, nx, ny) => { // keep what lies on the side of the line (px,py) that (nx,ny) points to
       const out = [];

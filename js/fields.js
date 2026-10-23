@@ -99,17 +99,44 @@
     const c = V((f.x0 + f.x1) / 2, 0.05, (f.z0 + f.z1) / 2);
     G.sfx.fire && G.sfx.fire(c, true); G.fx.fireBurst && G.fx.fireBurst(c, Math.max(f.x1 - f.x0, f.z1 - f.z0) / 2);
   };
+  const rs = (a) => (Math.random() - 0.5) * 2 * a;
+  let popT = 0;
+  function boilLava(f, dt, dist) {
+    const cam = G.camera.position, blue = !!f.blue, y = f.y + 0.05;
+    const area = (f.x1 - f.x0) * (f.z1 - f.z0);
+    let n = Math.min(8, 0.5 + area * 0.03) * dt * (1 - dist / 50);
+    popT -= dt;
+    const c = blue ? [0.35, 0.75, 1] : [1, 0.58, 0.16], c1 = blue ? [0.08, 0.28, 0.95] : [0.9, 0.15, 0.02];
+    for (let i = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0); i > 0; i--) {
+      const x0 = Math.max(f.x0, cam.x - 32), x1 = Math.min(f.x1, cam.x + 32), z0 = Math.max(f.z0, cam.z - 32), z1 = Math.min(f.z1, cam.z + 32);
+      if (x1 <= x0 || z1 <= z0) break;
+      const px = U.rand(x0, x1), pz = U.rand(z0, z1);
+      G.fx.add.spawn(px, y + 0.06, pz, 0, 0.25, 0, 0.34, 0.1, 0.8 + Math.random() * 0.5, c[0] * 1.3, c[1] * 1.3, c[2] * 1.3, 0.7, 0, 3, c1[0], c1[1], c1[2]); // the swelling bubble
+      for (let k = 3 + Math.floor(Math.random() * 4); k > 0; k--) G.fx.add.spawn(px, y + 0.12, pz, rs(1.5), 2 + Math.random() * 2.8, rs(1.5), 0.5 + Math.random() * 0.5, 0.07, 0.02, c[0], c[1], c[2], 1, 9.8, 0.3); // droplets
+      if (Math.random() < 0.3) G.fx.norm.spawn(px, y + 0.25, pz, rs(0.3), 0.7 + Math.random() * 0.8, rs(0.3), 1.6 + Math.random(), 0.25, 1.2, blue ? 0.38 : 0.5, blue ? 0.5 : 0.4, blue ? 0.65 : 0.34, 0.22, -0.1, 0.8); // steam
+      if (Math.random() < 0.25) G.fx.add.spawn(px, y + 0.3, pz, rs(0.4), 0.8 + Math.random() * 1.2, rs(0.4), 1.4 + Math.random(), 0.05, 0.01, c[0], c[1], c[2], 0.9, -0.2, 0.6); // an ember floating up
+      if (dist < 22 && popT <= 0 && G.sfx.lavaPop) { popT = 0.1 + Math.random() * 0.08; G.sfx.lavaPop(V(px, y, pz), blue); }
+    }
+  }
   F.update = function (dt) {
     const w = G.world, P = G.player, C = G.combat;
     P.fieldSpeed = 1; P.fieldSlip = 1; P.fieldJump = 1; P.fieldSlide = 1;
-    if (!w || !w.fields || !w.fields.length || P.dead) return;
+    if (!w || !w.fields || !w.fields.length || P.dead) { if (G.sfx.boilBed) G.sfx.boilBed(0); return; }
     if (!seen || seen.run !== G.game.run) seen = { run: G.game.run, k: {} };
     tick -= dt; hurtT -= dt;
     const doTick = tick <= 0; if (doTick) tick = 0.25;
     const feet = P.pos;
     const moving = Math.hypot(P.vel.x, P.vel.z) > 1.2;
+    const cam = G.camera ? G.camera.position : feet;
+    let boilNear = 99, boilBlue = false;
     for (const f of w.fields) {
       const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
+      // boiling lava: bubbles swell and pop in a splash of droplets, steam and embers drift off it (looks and sounds only; the hit area is unchanged)
+      if (f.kind === 'lava') {
+        const ddx = Math.max(f.x0 - cam.x, 0, cam.x - f.x1), ddz = Math.max(f.z0 - cam.z, 0, cam.z - f.z1), dist = Math.hypot(ddx, ddz);
+        if (dist < boilNear) { boilNear = dist; boilBlue = !!f.blue; }
+        if (dist < 45 && Math.abs(cam.y - f.y) < 28) boilLava(f, dt, dist);
+      }
       // ambient life
       // blue fire: tall pale-blue tongues rise out of the patch (only close ones, only a few at a time)
       if (f.kind === 'lava' && f.blue && Math.hypot(cx - feet.x, cz - feet.z) < 40 + (f.x1 - f.x0 + f.z1 - f.z0) / 2) {
@@ -160,5 +187,6 @@
         }
       }
     }
+    if (G.sfx.boilBed) G.sfx.boilBed(Math.max(0, 1 - boilNear / 28), boilBlue); // the bubbling bed swells as you near lava
   };
 })();

@@ -405,6 +405,40 @@
   T.biomeFor = (area) => (G.Run ? G.Run.field(area) : 'grave');
 
   const matCache = {};
+  // boiling lava: the surface glows brighter where bubbles swell and pop (rings that grow and burst at pseudo-random spots), over a slow
+  // churning swell. Only the look changes; time comes from T.lavaT (updated by the game loop).
+  T.lavaT = { value: 0 };
+  function boil(m, blue) {
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = T.lavaT;
+      sh.vertexShader = `varying vec3 vWP;
+` + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+      sh.fragmentShader = `uniform float uTime; varying vec3 vWP;
+float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+` + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        vec2 p = vWP.xz; float acc = 0.0;
+        for (int i = 0; i < 3; i++) {
+          float fi = float(i);
+          vec2 q = p * (0.5 + fi * 0.3) + vec2(fi * 5.7, fi * 2.3);
+          vec2 c = floor(q); vec2 f = fract(q);
+          float h = h21(c + fi);
+          float ph = fract(uTime * (0.3 + 0.35 * h21(c + 9.0 + fi)) + h * 7.0);
+          vec2 ctr = vec2(0.25 + 0.5 * h21(c + 3.0), 0.25 + 0.5 * h21(c + 6.0));
+          float r = ph * 0.36; float d = length(f - ctr);
+          float ring = smoothstep(0.07, 0.0, abs(d - r)) * (1.0 - ph);
+          float body = smoothstep(r, r * 0.55, d) * smoothstep(0.0, 0.3, ph) * (1.0 - ph) * 0.4;
+          float act = step(0.42, h21(c + 13.0 + fi));   // not every spot boils
+          acc += act * (ring * 1.5 + body);
+        }
+        float swell = 0.8 + 0.24 * sin(vWP.x * 0.7 + uTime * 1.1) * sin(vWP.z * 0.6 - uTime * 0.8) + 0.08 * sin(uTime * 2.3 + vWP.x * 1.7 + vWP.z * 1.3);
+        totalEmissiveRadiance *= swell * (1.0 + acc * 0.95);
+        totalEmissiveRadiance += ${blue ? 'vec3(acc * 0.04, acc * 0.2, acc * 0.45)' : 'vec3(acc * 0.4, acc * 0.22, acc * 0.05)'};
+      }`);
+    };
+    m.needsUpdate = true;
+  }
   T.materials = function (biomeKey) {
     if (matCache[biomeKey]) return matCache[biomeKey];
     const B = T.BIOMES[biomeKey];
@@ -447,6 +481,7 @@
     M.water.normalScale.set(0.15, 0.15);
     M.lava = new THREE.MeshStandardMaterial({ color: 0x2a0800, emissive: 0xff5a10, emissiveIntensity: 1.6, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     M.bluefire = new THREE.MeshStandardMaterial({ color: 0x06102a, emissive: 0x2a86ff, emissiveIntensity: 1.7, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
+    boil(M.lava, false); boil(M.bluefire, true);
     M.voidglow = new THREE.MeshStandardMaterial({ color: 0x16020f, emissive: 0xff2a8a, emissiveIntensity: 1.1, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     M.ice = new THREE.MeshStandardMaterial({ color: 0xbfe0f0, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.85, normalMap: t.rock.normalMap });
     M.ice.normalScale.set(0.4, 0.4);
@@ -463,6 +498,7 @@
     // vertex-coloured variants for merged static geometry; plain ones are used by standalone meshes
     M.vc = {};
     for (const k in M) { const m = M[k]; if (m && m.isMaterial) { if (m.isMeshStandardMaterial) { const c = m.clone(); c.vertexColors = true; M.vc[k] = c; } else M.vc[k] = m; } }
+    boil(M.vc.lava, false); boil(M.vc.bluefire, true); // the copies the world is actually drawn with
     M.biome = B;
     matCache[biomeKey] = M;
     return M;

@@ -332,7 +332,9 @@
           const xx = x + dx, zz = z + dz;
           if (xx < 0 || zz < 0 || xx >= W || zz >= D) { p += 0.35; continue; }
           const b = this.land(n, zz * W + xx);
-          if (b < 0 || this.nb[b]) p += 0.35;
+          if (b < 0) p += 0.35;
+          else if (this.nb[b]) p += this.nhz && (this.nhz[b] || this.nf[b] < this.nf[n] - 2.6) ? 0.1 : 0.35;
+          else if (this.L > 1 && this.nf[b] < this.nf[n] - 2.6) p += 0.1;
         }
         this.npen[n] = p;
       }
@@ -353,7 +355,7 @@
             const b = this.land(a, zz * W + xx);
             if (b < 0) continue;
             const dh = this.nf[b] - this.nf[a];
-            if (dh > 0.8 || dh < -6.5) continue;
+            if (dh > 0.8 || dh < -2.6) continue;
             adj[a * 8 + d] = b; cnt[b + 1]++;
           }
         }
@@ -463,7 +465,7 @@
     canStep(a, b) { // a->b walkable (for monsters)
       if (this.nb[a] || this.nb[b]) return false;
       const d = this.nf[b] - this.nf[a];
-      return d <= 0.8 && d >= -6.5 && (this.L === 1 || this.land(a, b % this.N) === b);
+      return d <= 0.8 && d >= (this.L > 1 ? -2.6 : -6.5) && (this.L === 1 || this.land(a, b % this.N) === b); // storeys: no leaping off a slab edge (stairs and steps only)
     }
     // flood reachable set (forward edges) for validation
     reach(fromIdx) {
@@ -554,7 +556,7 @@
         if (ax < 0 || az < 0 || ax >= W || az >= this.Dn) continue;
         const a = this.land(i, az * W + ax);
         if (a < 0) continue;
-        if (dx && dz) { const c1 = this.land(i, az * W + ix), c2 = this.land(i, iz * W + ax); if (c1 < 0 || c2 < 0 || this.nb[c1] || this.nb[c2]) continue; }
+        if (dx && dz) { const c1 = this.land(i, az * W + ix), c2 = this.land(i, iz * W + ax); if (c1 < 0 || c2 < 0 || this.nb[c1] || this.nb[c2] || !this.canStep(i, c1) || !this.canStep(i, c2)) continue; }
         if (!this.canStep(i, a)) continue; // never steer into a cell we can't actually walk into
         if (this.ndist[a] < best) { best = this.ndist[a]; bx = dx; bz = dz; }
       }
@@ -571,7 +573,7 @@
       if (a < 0 || cb < 0) return false;
       if (a % this.N === cb) return true;
       const b = this.land(a, cb);
-      return b >= 0 && !this.nhz[b];
+      return b >= 0 && !this.nhz[b] && this.nf[b] >= this.nf[a] - 2.6;
     }
     randomOpenCell(rng, filter) {
       for (let k = 0; k < 400; k++) {

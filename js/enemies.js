@@ -858,7 +858,7 @@
         if (this.flyer && (this.hasLOS || !w.flowDir(this.pos.x, this.pos.z, o, this.pos.y))) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; return o; }
         if (this.flyer) return o;
         const f = w.flowDir(this.pos.x, this.pos.z, o, this.pos.y);
-        if (!f || (this.hasLOS && distH < 7)) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; }
+        if (!f || (this.hasLOS && distH < 7 && Math.abs(toT.y) < 2.5)) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; } // in sight and on the same level: straight at you
         return o;
       };
       if (ai === 'flee') {

@@ -968,6 +968,51 @@
       nz({ t: tt, buf: 'pink', f: [['bandpass', vr(3200, 0.2), 9]], g: 0.05, a: 0.03, d: 0.12, to: out });
     }
   };
+  // ---- spawn graves: a grave stirring (k 0..1: how close it is to opening) and the moment it opens ----
+  A.graveStir = function (k, pos) {
+    if (!ctx || !voice(0.8)) return;
+    const t = ctx.currentTime, out = dest(pos, 0.7); out.gain.value = 0.4 + k * 0.6;
+    // a low wet thump from underneath, earth shifting, and a thin breath that comes nearer
+    tn({ t, f0: 78 + k * 40, f1: 40, d: 0.32, g: 0.7, to: out, type: 'sine' });
+    nz({ t, buf: 'brown', f: [['lowpass', 300 + k * 350, 0.7]], g: 0.55, a: 0.04, d: 0.4, to: out });
+    if (k > 0.25) nz({ t: t + 0.04, buf: 'pink', f: [['bandpass', 800 + k * 1500, 4, 450, 0.45]], g: 0.1 + 0.12 * k, a: 0.12, d: 0.5, to: out });
+    if (k > 0.7) tn({ t, f0: 210 + k * 120, f1: 150, d: 0.4, g: 0.05, to: out, type: 'sawtooth', lp: 900 });
+  };
+  A.graveRise = function (pos) {
+    if (!ctx) return;
+    const t = ctx.currentTime, out = dest(pos, 0.9); out.gain.value = 0.9;
+    tn({ t, f0: 90, f1: 30, d: 0.6, g: 0.9, to: out, type: 'sine' });
+    nz({ t, buf: 'brown', f: [['lowpass', 900, 0.7, 150, 0.7]], g: 0.9, a: 0.01, d: 0.8, to: out });
+    for (let i = 0; i < 9; i++) nz({ t: t + Math.random() * 0.35, f: [['bandpass', vr(1800, 0.5), 3]], g: 0.18, d: 0.05, to: out });  // the earth cracking
+    nz({ t: t + 0.1, buf: 'pink', f: [['bandpass', 600, 3, 2400, 0.7]], g: 0.35, a: 0.2, d: 0.7, to: out });                              // a hollow gust
+  };
+  // boiling lava: one bloop (blue: a little higher and glassier), and a bed of bubbling that swells as you near lava
+  A.lavaPop = function (pos, blue) {
+    if (!ctx || !voice(0.25)) return;
+    const t = ctx.currentTime, out = dest(pos, 0.3); out.gain.value = 0.55;
+    const f = vr(blue ? 470 : 300, 0.4);
+    tn({ t, f0: f * 0.6, f1: f * 1.9, fd: 0.07, d: 0.13, g: 0.5, to: out, type: 'sine' });
+    nz({ t: t + 0.03, buf: 'pink', f: [['bandpass', f * 3, 2.5]], g: 0.2, d: 0.06, to: out });
+    if (Math.random() < 0.3) tn({ t: t + 0.09, f0: f * 0.8, f1: f * 2.2, fd: 0.06, d: 0.1, g: 0.25, to: out, type: 'sine' }); // a second, smaller one
+  };
+  let boil = null;
+  A.boilBed = function (v, blue) {
+    if (!ctx) return;
+    if (!boil) {
+      const src = ctx.createBufferSource(); src.buffer = brown; src.loop = true;
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 230; f.Q.value = 1.3;
+      const mod = ctx.createGain(); mod.gain.value = 0.65;   // the bubbling flutter
+      const l1 = ctx.createOscillator(); l1.frequency.value = 5.3; const lg1 = ctx.createGain(); lg1.gain.value = 0.35; l1.connect(lg1); lg1.connect(mod.gain);
+      const l2 = ctx.createOscillator(); l2.frequency.value = 8.7; const lg2 = ctx.createGain(); lg2.gain.value = 0.2; l2.connect(lg2); lg2.connect(mod.gain);
+      const g = ctx.createGain(); g.gain.value = 0.0001;      // how near the lava is
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
+      src.connect(f); f.connect(hp); hp.connect(mod); mod.connect(g); g.connect(dest(null, 0.1));
+      src.start(); l1.start(); l2.start();
+      boil = { g, f };
+    }
+    boil.g.gain.setTargetAtTime(Math.max(0.0001, v * 0.22), ctx.currentTime, 0.25);
+    boil.f.frequency.setTargetAtTime(blue ? 330 : 230, ctx.currentTime, 0.4);
+  };
   // distant thunder roll
   A.thunder = function (delay) {
     if (!ctx) return;

@@ -95,8 +95,8 @@
       w.visual('iron', xf - 0.05, y + dh - 0.04, da - 0.06, xf + 0.05, y + dh + 0.04, db + 0.06, { uv: 1 });
       const bar = (a, y0, b, y1, block) => { const c = w.addCollider(xf - 0.06, y0, a, xf + 0.06, y1, b, { surf: 'metal', noGrapple: true }); c.bars = true; if (block) c.navBlock = true; return c; };
       bar(z0, y, da, y + hc, true); bar(db, y, z1, y + hc, true); bar(da, y + dh, db, y + hc, false);
-      // half the rooms keep an iron gate in the doorway
-      if (rng.chance(0.5)) {
+      // every room keeps an iron gate in the doorway
+      {
         const c = bar(da + 0.02, y, db - 0.02, y + dh, false); c.navIgnore = true; // monsters plan their way through it (and batter it down)
         const door = { axis: 'z', plane: xf, lo: da, hi: db, y, h: dh, hinge: rng.chance(0.5) ? 0 : 1, face: s === 'W' ? 1 : -1, col: c, hp: 100, state: 'closed' };
         const it = { type: 'celldoor', pos: V(xf, y + 1.2, (da + db) / 2), door };
@@ -300,7 +300,6 @@
         spans[k].push(zc);
         const xa = xw - 0.5, xb = xe + 0.5;
         const c = w.addCollider(xa, y - 0.1, zc - 0.25, xb, y, zc + 0.25, { surf: 'metal', noGrapple: true }); c.enemyOnly = true; // monsters walk it like a path; the player balances on the rope itself (strata runtime)
-        for (const x of [xa + 0.35, xb - 0.35]) { box(w, 'iron', x, y + 0.28, zc, 0.14, 0.62, 0.14, rng.range(0, 1), rng.range(-0.05, 0.05), rng.range(-0.05, 0.05)); box(w, 'iron', x, y + 0.03, zc, 0.5, 0.06, 0.5, rng.range(0, 1)); }
         w.ropes.push({ xa, xb, z: zc, y, seed: rng.int(1, 1e6) });
         w.addLight((xw + xe) / 2, y + 2.2, zc, { flame: 0, intensity: 7, range: 12, color: ruined ? '#6a9aff' : '#ffb070', emit: false, prio: 0.8, steady: true });
         return true;
@@ -432,10 +431,10 @@
     const boxG = new THREE.BoxGeometry(1, 1, 1);
     // tightropes: a thin chain, drawn as one instanced strip of links
     for (const r of w.ropes || []) {
-      const L = r.xb - r.xa, n = Math.max(12, Math.round(L / 0.26));
-      const im = new THREE.InstancedMesh(boxG, ropeMat(), n); im.frustumCulled = false; im.castShadow = true;
+      const L = r.xb - r.xa, n = Math.max(24, Math.round(L / 0.115));   // links overlap: a ring every 11 cm
+      const im = new THREE.InstancedMesh(linkGeo(), ropeMat(), n); im.frustumCulled = false; im.castShadow = true;
       w.group.add(im);
-      S.ropes.push({ r, L, n, im, sway: 0, swayV: 0, bob: 0, bobV: 0, load: 0, tp: 0.5, on: false });
+      S.ropes.push({ r, L, n, im, bob: 0, bobV: 0, load: 0, tp: 0.5, on: false });
     }
     // cell gates: bars hung on a hinge; their material tints towards rust as they are battered
     for (const d of S.doors) {
@@ -452,30 +451,30 @@
     }
     S.update(0);
   };
-  // pale steel with a faint glow of its own, so the thin line shows up against the dark below it
-  let _rm = null;
-  const ropeMat = () => _rm || (_rm = new THREE.MeshStandardMaterial({ color: 0xb4bcc8, emissive: 0x2a3038, roughness: 0.4, metalness: 0.7 }));
+  // dark silver links: rings threaded through one another (every other one turned a quarter), not a thread
+  let _rm = null, _lg = null;
+  const ropeMat = () => _rm || (_rm = new THREE.MeshStandardMaterial({ color: 0x80878f, emissive: 0x14171b, roughness: 0.42, metalness: 0.85 }));
+  const linkGeo = () => _lg || (_lg = new THREE.TorusGeometry(0.5, 0.17, 6, 12));
   const tri = (t, p) => (t < p ? t / Math.max(p, 1e-3) : (1 - t) / Math.max(1 - p, 1e-3));
-  // height drop (+) and sideways offset (z) of the rope at t (0..1 along it)
+  // height drop (+) of the rope at t (0..1 along it): a slight sag of its own, deeper under your weight
   function shape(b, t) {
     const s = Math.sin(Math.PI * t);
-    return { dy: 0.12 * s + b.load * 0.5 * Math.sin(Math.PI * b.tp) * tri(t, b.tp) + b.bob * s, dz: b.sway * s };
+    return { dy: 0.12 * s + b.load * 0.5 * Math.sin(Math.PI * b.tp) * tri(t, b.tp) + b.bob * s, dz: 0 };
   }
   const _o = new THREE.Object3D();
   S.update = function (dt) {
     const Pp = G.player && G.player.pos;
     for (const b of S.ropes) {
       const r = b.r;
-      // sideways sway: a soft, lightly damped spring; vertical bob after a landing
-      b.swayV += (-14 * b.sway - 0.3 * b.swayV) * dt; b.sway += b.swayV * dt;
+      // vertical bob after a landing (no sideways sway)
       b.bobV += (-40 * b.bob - 3 * b.bobV) * dt; b.bob += b.bobV * dt;
       b.load = U.damp(b.load, b.on ? 1 : 0, 6, dt);
       if (Pp && dt && Math.abs(Pp.x - (r.xa + r.xb) / 2) > 70 && Math.abs(Pp.z - r.z) > 70) continue;
       for (let i = 0; i < b.n; i++) {
         const t = (i + 0.5) / b.n, sh = shape(b, t), t2 = Math.min(1, t + 0.5 / b.n), sh2 = shape(b, t2);
-        _o.position.set(r.xa + t * b.L, r.y - sh.dy - 0.03, r.z + sh.dz);
+        _o.position.set(r.xa + t * b.L, r.y - sh.dy - 0.05, r.z);
         _o.rotation.set(i % 2 ? Math.PI / 2 : 0, 0, -Math.atan2(sh2.dy - sh.dy, (t2 - t) * b.L));
-        _o.scale.set(b.L / b.n * 1.7, 0.075, 0.075); _o.updateMatrix(); b.im.setMatrixAt(i, _o.matrix);
+        _o.scale.set(0.2, 0.13, 0.13); _o.updateMatrix(); b.im.setMatrixAt(i, _o.matrix);
       }
       b.im.instanceMatrix.needsUpdate = true;
     }
@@ -490,7 +489,7 @@
       d.g.position.z = d.hz + (d.shake ? (Math.random() - 0.5) * 0.04 * d.shake : 0);
     }
   };
-  // ---- tightropes: player.js physics stands you on one (sets grounded). It takes balance: the rope sways, it is as thin as a hand, and it
+  // ---- tightropes: player.js physics stands you on one (sets grounded). It takes balance: the chain is as thin as a hand and it
   // pushes you off centre (an inverted pendulum): steer with the side keys or fall. Monsters cross it on a hidden strip, no fuss. ----
   S.support = function (Pl, dt, preVy) {
     let on = null;
@@ -504,17 +503,13 @@
       if (Math.abs(dz) > (b.on ? 0.26 : 0.34) || Pl.pos.y > h + 0.15 || Pl.pos.y < h - 0.7) { b.on = false; continue; }
       if (!b.on) { // landing: the rope dips and starts to swing
         const f = Math.min(12, Math.max(0, -(preVy || 0)));
-        b.bobV += f * 0.1; b.swayV += (Math.random() < 0.5 ? -1 : 1) * (0.3 + f * 0.1);
+        b.bobV += f * 0.1;
         G.sfx.chain(0.25, 0.2 + f * 0.03);
       }
-      // walking rocks it; it carries you only on its centre line and pushes you away from it
-      const sp = Math.hypot(Pl.vel.x, Pl.vel.z);
-      if (sp > 1.5 && Math.random() < dt * 3) b.swayV += (Math.random() < 0.5 ? -1 : 1) * sp * 0.05;
-      const noise = (Math.sin(T * 2.1 + r.seed) + Math.sin(T * 3.4 + r.seed * 1.7) * 0.8) * 0.2;
-      Pl.pos.z += (dz * 2.6 + noise + b.swayV * Math.sin(Math.PI * t) * 0.4) * dt;
+      // it carries you only on its centre line and nudges you away from it (an inverted pendulum): steer with the side keys
+      Pl.pos.z += dz * 2.6 * dt;
       Pl.pos.y = h; if (Pl.vel.y < 0) Pl.vel.y = 0; Pl.grounded = true;
       b.on = true; on = b;
-      if (Math.abs(b.swayV) > 0.7 && Math.random() < dt * 2) G.sfx.chain(0.2, 0.12);
     }
     S.onRope = !!on;
     return !!on;

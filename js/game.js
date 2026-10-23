@@ -2031,6 +2031,7 @@
     updateHighFire(gdt);
     G.Fields.update(gdt);
     G.Strata.update(gdt);
+    G.Tex.lavaT.value = GM.time;
     G.Graves.update(gdt);
     G.Areas.update(gdt);
     G.Depth.update(gdt);

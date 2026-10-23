@@ -66,7 +66,7 @@
   // The niche is carved out of the wall (levelgen perimeter, via notches) and lined with extra masonry behind it; its mouth is a wall of
   // bars flush with the wall face. Returns false if it does not fit.
   function cell(w, rng, o, s, k, y, W, D, area, fm, ctx) {
-    const cw = rng.int(10, 18), d = rng.int(6, 9), hc = rng.range(4, 4.6), ext = 1.2, WT = LG._.WALL_T;
+    const cw = rng.int(10, 18), d = rng.int(6, 9), hc = rng.range(5.2, 5.8), ext = 1.2, WT = LG._.WALL_T;
     const sg = s === 'W' ? -1 : 1, xf = s === 'W' ? 0 : W;
     const X = (u) => xf + sg * u;                                   // depth u from the mouth -> x
     for (let t = 0; t < 50; t++) {
@@ -85,12 +85,12 @@
       ctx.notches.push({ side: s, a0: z0, a1: z1, y0: y, y1: y + hc });
       ctx.nooks.push({ side: s, k, a0: z0, a1: z1, y0: y - 0.6, y1: y + hc, lo: -(d + ext), hi: W + d + ext });
       // the bars across the mouth, with a doorway
-      const dw = 2, da = rng.int(z0 + 2, z1 - 2 - dw), db = da + dw, dh = 2.3; // whole metres: the nav cells in the doorway stay open
+      const dw = 2, da = rng.int(z0 + 2, z1 - 2 - dw), db = da + dw, dh = 4; // whole metres: the nav cells in the doorway stay open
       for (let z = z0 + 0.12; z < z1 - 0.05; z += 0.2) {
         if (z > da - 0.05 && z < db + 0.05) { w.visual('iron', xf - 0.025, y + dh, z - 0.025, xf + 0.025, y + hc, z + 0.025, { uv: 1 }); continue; }
         w.visual('iron', xf - 0.025, y, z - 0.025, xf + 0.025, y + hc, z + 0.025, { uv: 1 });
       }
-      for (const ry of [0.12, 1.3, 2.5]) { w.visual('iron', xf - 0.04, y + ry, z0, xf + 0.04, y + ry + 0.06, da, { uv: 1 }); w.visual('iron', xf - 0.04, y + ry, db, xf + 0.04, y + ry + 0.06, z1, { uv: 1 }); }
+      for (const ry of [0.12, 1.3, 2.5, 3.6]) { w.visual('iron', xf - 0.04, y + ry, z0, xf + 0.04, y + ry + 0.06, da, { uv: 1 }); w.visual('iron', xf - 0.04, y + ry, db, xf + 0.04, y + ry + 0.06, z1, { uv: 1 }); }
       w.visual('iron', xf - 0.04, y + hc - 0.14, z0, xf + 0.04, y + hc - 0.06, z1, { uv: 1 });
       w.visual('iron', xf - 0.05, y + dh - 0.04, da - 0.06, xf + 0.05, y + dh + 0.04, db + 0.06, { uv: 1 });
       const bar = (a, y0, b, y1, block) => { const c = w.addCollider(xf - 0.06, y0, a, xf + 0.06, y1, b, { surf: 'metal', noGrapple: true }); c.bars = true; if (block) c.navBlock = true; return c; };

@@ -1360,7 +1360,7 @@
     if (o.kind === 'weapon' || o.kind === 'melee') {
       disp = o.kind === 'melee' ? G.weapons.meleeDisplayModel(o.obj) : G.weapons.displayModel(o.obj);
       const box = new THREE.Box3().setFromObject(disp); const c = box.getCenter(V()); disp.position.sub(c);
-      const wrap = new THREE.Group(); wrap.add(disp); wrap.scale.setScalar(1.3); disp = wrap; disp.position.y = 0.45;
+      const wrap = new THREE.Group(); wrap.add(disp); wrap.scale.setScalar(s.big ? 1.75 : 1.3); disp = wrap; disp.position.y = s.big ? 0.55 : 0.45; // the weapon island shows its guns larger
     } else {
       disp = new THREE.Group();
       const PG = G.Props.PG;

@@ -395,6 +395,35 @@
     P.addShake(0.3);
   };
 
+  // ---------------- exit markers (the stacked-storey fields: the hanging sign is hidden by the slabs above) ----------------
+  // a small screen marker per open gate: icon, name, distance; at the edge of the screen when the gate is out of view
+  const _em = new THREE.Vector3();
+  AR.exitMarks = function (w) {
+    const root = document.getElementById('worldui');
+    const on = root && w.exits && w.strata && GM.state === 'playing';
+    for (const ex of w.exits || []) {
+      let m = ex.mark;
+      if (!on || !ex.open || !ex.type) { if (m) m.style.display = 'none'; continue; }
+      if (!m) {
+        m = ex.mark = document.createElement('div'); m.className = 'exit-mark';
+        const T = AR.TYPES[ex.type]; m.style.setProperty('--c', typeof T.color === 'string' ? T.color : '#' + (+T.color).toString(16).padStart(6, '0'));
+        m.innerHTML = `<span>${T.icon}</span><em>${T.name || ''}</em><b></b>`; root.appendChild(m);
+        ex.markD = m.querySelector('b');
+      }
+      _em.set(ex.x, 3.2, 0.5).project(G.camera);
+      const W = innerWidth, H = innerHeight;
+      let sx = _em.x, sy = _em.y;
+      if (_em.z > 1) { sx = -sx; sy = -sy; } // behind: mirror so it points the way round
+      const out = _em.z > 1 || Math.abs(sx) > 0.9 || Math.abs(sy) > 0.85;
+      if (out) { const k = Math.max(Math.abs(sx) / 0.9, Math.abs(sy) / 0.85, 0.001); sx /= k; sy /= k; if (_em.z > 1) sy = Math.max(sy, 0.85) * 1; }
+      m.style.display = ''; m.style.left = ((sx * 0.5 + 0.5) * W) + 'px'; m.style.top = ((-sy * 0.5 + 0.5) * H) + 'px';
+      m.classList.toggle('edge', out);
+      const d = Math.round(Math.hypot(P.pos.x - ex.x, P.pos.z - 0.5, (P.pos.y - 1.5)));
+      if (ex.markDv !== d) { ex.markDv = d; ex.markD.textContent = d + 'm'; }
+    }
+  };
+  AR.clearExitMarks = function (w) { for (const ex of (w && w.exits) || []) if (ex.mark) { ex.mark.remove(); ex.mark = null; } };
+
   // ---------------- per-frame ----------------
   AR.update = function (dt) {
     AR.updateTrial(dt);
@@ -404,6 +433,7 @@
       if (it.model && it.type === 'npc') { const to = P.pos.clone().sub(it.model.group.position); it.model.group.rotation.y = Math.atan2(to.x, to.z); if (it.used && it.model.group.visible) { it.model.group.visible = false; G.fx.smoke(it.pos, 12, 1, 0x4a3a5a, 0.6, 1.2); } }
     }
     for (const ex of w.exits || []) if (ex.label) { ex.label.position.y = 10.4 + Math.sin(GM.time * 1.5 + ex.idx) * 0.12; }
+    AR.exitMarks(w);
     if (GM.ambushReward && G.enemies.aliveCount() === 0) { GM.ambushReward = false; GM.spawnChestNear(2); G.ui.toast('👑 待ち伏せを退けた！ 宝箱が残された', 'good'); }
   };
 })();

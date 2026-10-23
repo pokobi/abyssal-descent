@@ -108,6 +108,7 @@
     w.finalize(scene, G.save.data.settings.quality);
     G.Strata.build(w);
     G.Graves.build(w);
+    document.querySelectorAll('.exit-mark').forEach((e) => e.remove()); // the last area's gate markers
     const B = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
     scene.fog.color.set(B.fog); scene.fog.density = B.fogD;
     scene.background = new THREE.Color(B.fog);

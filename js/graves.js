@@ -71,8 +71,28 @@
     G.sfx.graveRise ? G.sfx.graveRise(pos) : G.sfx.breakObj(pos, 'stone');
     G.game.spawnEnemy({ at: pos, grave: true });
   };
+  // the foe a grave raised keeps a pale haze and a ring of the grave's colour, so it can be told from the area's own foes
+  function aura(e) {
+    const ruin = G.world && G.world.biome === 'ruin', col = ruin ? 0x4a78ff : 0x9a50ff, h = e.height || 1.8, r = e.radius || 0.5;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+    sp.scale.set(Math.max(h, r * 3) * 1.5, h * 1.5, 1); sp.position.y = h * 0.5;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.25, r * 1.8, 18), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.07;
+    e.model.group.add(sp, ring); e.graveAura = { sp, ring, t: 0, wisp: ruin ? [0.35, 0.6, 1] : [0.62, 0.4, 1] };
+  }
+  function auraTick(dt) {
+    const t = G.game.time;
+    for (const e of G.enemies.list) {
+      if (!e.graveSpawn || !e.alive || !e.model) continue;
+      if (!e.graveAura) aura(e);
+      const a = e.graveAura; a.sp.material.opacity = 0.3 + 0.1 * Math.sin(t * 3 + (e.id || 0)); a.ring.rotation.z += dt * 1.2; a.ring.material.opacity = 0.34 + 0.1 * Math.sin(t * 2.2);
+      a.t -= dt;
+      if (a.t <= 0 && e.pos.distanceTo(G.player.pos) < 45) { a.t = 0.28; G.fx.add.spawn(e.pos.x + (Math.random() - 0.5) * e.radius * 2, e.pos.y + 0.2, e.pos.z + (Math.random() - 0.5) * e.radius * 2, 0, 0.6 + Math.random() * 0.6, 0, 1.0, 0.1, 0.02, a.wisp[0], a.wisp[1], a.wisp[2], 0.7, -0.1, 0.5); }
+    }
+  }
   Gr.update = function (dt) {
     const P = G.player;
+    if (G.game.state === 'playing') auraTick(dt);
     if (!Gr.list.length || G.game.state !== 'playing' || P.dead) return;
     const t = G.game.time, cam = G.camera ? G.camera.position : P.pos;
     for (const o of Gr.list) {

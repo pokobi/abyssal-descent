@@ -1343,3 +1343,10 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 .en-g i b { display: block; height: 100%; background: rgba(200,180,140,0.55); }
 .en-g.hot { color: #e08a6a; opacity: 1; }
 .en-g.hot i b { background: rgba(230,100,70,0.8); }
+.exit-mark { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; opacity: 0.88; text-shadow: 0 0 3px #000, 0 0 6px #000; }
+.exit-mark span { font-size: 26px; filter: drop-shadow(0 0 6px var(--c, #fff)); }
+.exit-mark em { font-style: normal; font-size: 12px; color: var(--c, #fff); letter-spacing: 1px; }
+.exit-mark b { font-size: 11px; color: #e8e0d0; font-weight: normal; }
+.exit-mark.edge { opacity: 0.7; }
+.ebar.grave .en { color: #cdb4ff; }
+.ebar.grave .hb { border-color: #6a3cc0; box-shadow: 0 0 5px rgba(150,90,255,0.55); }

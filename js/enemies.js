@@ -1522,10 +1522,12 @@
       const b = e.bar;
       sty(b.el, 'left', Math.round(scr.x * 2) / 2 + 'px'); sty(b.el, 'top', Math.round(scr.y * 2) / 2 + 'px');
       const ke = !!e.elite, kc = !!e.cursed, km = !!e.marked;
-      if (b.kl !== e.level || b.kn !== e.def.name || b.ke !== ke || b.kc !== kc || b.kmi !== e.mutIcons || b.kp !== e.pileRes || b.km !== km || b.key === null) {
-        b.kl = e.level; b.kn = e.def.name; b.ke = ke; b.kc = kc; b.kmi = e.mutIcons; b.kp = e.pileRes; b.km = km; b.key = 1;
+      const kg = !!e.graveSpawn;
+      if (b.kl !== e.level || b.kn !== e.def.name || b.ke !== ke || b.kc !== kc || b.kmi !== e.mutIcons || b.kp !== e.pileRes || b.km !== km || b.kg !== kg || b.key === null) {
+        b.kl = e.level; b.kn = e.def.name; b.ke = ke; b.kc = kc; b.kmi = e.mutIcons; b.kp = e.pileRes; b.km = km; b.kg = kg; b.key = 1;
+        b.el.classList.toggle('grave', kg);
         b.lv.textContent = e.boss ? '' : 'Lv.' + e.level;
-        b.nm.textContent = (e.pileRes ? '🪨' + ['', 'Ⅰ', 'Ⅱ', 'Ⅲ'][e.pileRes] + ' ' : '') + (e.mutIcons ? e.mutIcons + ' ' : '') + (e.cursed ? '😈' : '') + (e.elite ? '★' + (e.eliteMod ? e.eliteMod.icon : '') + ' ' : '') + (e.def.vicon && !e.boss ? e.def.vicon + ' ' : '') + e.def.name;
+        b.nm.textContent = (e.pileRes ? '🪨' + ['', 'Ⅰ', 'Ⅱ', 'Ⅲ'][e.pileRes] + ' ' : '') + (e.mutIcons ? e.mutIcons + ' ' : '') + (e.cursed ? '😈' : '') + (e.graveSpawn ? '⚰️ ' : '') + (e.elite ? '★' + (e.eliteMod ? e.eliteMod.icon : '') + ' ' : '') + (e.def.vicon && !e.boss ? e.def.vicon + ' ' : '') + e.def.name;
         b.el.classList.toggle('elite', !!e.elite);
         b.el.classList.toggle('target', !!e.marked); b.el.classList.toggle('champ', !!(e.marked && e.champion));
         let tg = b.el.querySelector('.tg');

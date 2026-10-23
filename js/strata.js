@@ -117,15 +117,12 @@
       for (const zz of [z0 + 0.3, z1 - 0.3]) P().web(w, back - sg * 0.2, y + hc - 0.2, zz, s === 'W' ? Math.PI / 2 : -Math.PI / 2, rng.range(0.9, 1.5));
       const nt = Math.max(2, Math.round(cw / 4));
       for (let i = 0; i < nt; i++) P().torch(w, back, y + 2.4, z0 + (i + 0.5) * cw / nt, s === 'W' ? 'px' : 'nx');
-      // chests: most rooms hold one, many two
-      const nch = rng.chance(0.85) ? 1 + (rng.chance(0.35) ? 1 : 0) + (rng.chance(0.12) ? 1 : 0) : 0;
-      for (let i = 0; i < nch; i++) {
-        const tier = rng.chance(0.1 + area * 0.004) ? 2 : rng.chance(0.35) ? 1 : 0;
-        for (let t2 = 0; t2 < 14; t2++) { const q = { a: rng.range(z0 + 1, z1 - 1), u: d - 1.1 }; const x = X(q.u); if (LG.chestSpotFree(w, x, y, q.a) && clear(q, 2.4)) { items.push(q); P().chest(w, x, q.a, y, s === 'W' ? Math.PI / 2 : -Math.PI / 2, tier); break; } }
-      }
-      // spawn graves: the rooms are where they stand thickest
-      const ng = ctx.ruined ? (rng.chance(0.75) ? rng.int(1, 3) : 0) : (rng.chance(0.55) ? (rng.chance(0.3) ? 2 : 1) : 0);
-      for (let i = 0; i < ng; i++) place(2.4, (x, z) => G.Graves.add(w, x, y, z, rng.range(0, 6)));
+      // chests and graves are not placed here: the area picks which rooms get them (a handful of chests, a few graves) once every room exists
+      ctx.rooms = ctx.rooms || [];
+      ctx.rooms.push({
+        chest: (tier) => { for (let t2 = 0; t2 < 14; t2++) { const q = { a: rng.range(z0 + 1, z1 - 1), u: d - 1.1 }; const x = X(q.u); if (LG.chestSpotFree(w, x, y, q.a) && clear(q, 2.4)) { items.push(q); P().chest(w, x, q.a, y, s === 'W' ? Math.PI / 2 : -Math.PI / 2, tier); return true; } } return false; },
+        grave: () => place(2.4, (x, z) => G.Graves.add(w, x, y, z, rng.range(0, 6))),
+      });
       return true;
     }
     return false;
@@ -367,22 +364,25 @@
       dress(w, rng, L.occ, y, k, r, ruined);
     }
 
-    // ---- chests anywhere, on any storey ----
-    const nChest = (kind === 'vault' ? 6 : (area <= 4 ? 2 : rng.chance(0.75) ? 1 : 0) + (rng.chance(0.25) ? 1 : 0)) + (extraChests || 0);
-    for (let i = 0; i < nChest; i++) {
-      const tier = rng.chance(0.08 + area * 0.004) ? 2 : rng.chance(0.3) ? 1 : 0;
-      for (let t = 0; t < 12; t++) {
-        const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 1), o = lv[s][k].occ;
-        const r = o.place(rng, 2, 2, 1); if (!r) continue;
-        const x = r.x0 + 1, z = r.z0 + 1;
-        if (LG.chestSpotFree(w, x, Y[k], z)) { P().chest(w, x, z, Y[k], rng.range(0, 6), tier); break; }
+    // ---- chests: only in the barred rooms, four or five an area (a vault hall keeps its six, spread over the storeys) ----
+    const tierOf = () => (rng.chance(0.08 + area * 0.004) ? 2 : rng.chance(0.3) ? 1 : 0);
+    const rooms = ctx.rooms || [], order = rooms.map((_, i) => i).sort(() => rng.next() - 0.5);
+    if (kind === 'vault') {
+      for (let i = 0; i < 6 + (extraChests || 0); i++) for (let t = 0; t < 12; t++) {
+        const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 1), r = lv[s][k].occ.place(rng, 2, 2, 1); if (!r) continue;
+        if (LG.chestSpotFree(w, r.x0 + 1, Y[k], r.z0 + 1)) { P().chest(w, r.x0 + 1, r.z0 + 1, Y[k], rng.range(0, 6), tierOf()); break; }
       }
+    } else {
+      const nChest = rng.int(4, 5) + (extraChests || 0);
+      for (let i = 0, placed = 0, guard = 0; placed < nChest && order.length && guard < nChest * 6; guard++, i++) if (rooms[order[i % order.length]].chest(tierOf())) placed++;
     }
-    // spawn graves outside the rooms too: some on the third field, a few more on the fourth
-    for (let i = 0, n = ruined ? rng.int(2, 3) : rng.int(1, 2); i < n; i++) {
-      for (let t = 0; t < 12; t++) {
+    // ---- spawn graves: about three on the third field, about five on the fourth; most stand in the rooms ----
+    for (let i = 0, n = ruined ? rng.int(4, 6) : rng.int(2, 4); i < n; i++) {
+      let done = false;
+      if (order.length && rng.chance(0.8)) for (let t = 0; t < order.length && !done; t++) done = !!rooms[order[(i + t) % order.length]].grave();
+      for (let t = 0; t < 12 && !done; t++) {
         const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 1), r = lv[s][k].occ.place(rng, 2, 2, 1.2); if (!r) continue;
-        G.Graves.add(w, r.x0 + 1, Y[k], r.z0 + 1, rng.range(0, 6)); break;
+        G.Graves.add(w, r.x0 + 1, Y[k], r.z0 + 1, rng.range(0, 6)); done = true;
       }
     }
     if (G.Fields) G.Fields.place(w, rng, occ, W, D, area);

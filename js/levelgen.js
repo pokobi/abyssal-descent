@@ -1526,7 +1526,7 @@
     // get an invisible column instead, so there is simply nowhere to stand
     const ghost = (c) => { const g = w.addCollider(c.x0 - 0.06, c.y1, c.z0 - 0.06, c.x1 + 0.06, c.y1 + 40, c.z1 + 0.06, { noGrapple: true, surf: c.surf }); g.ghost = true; };
     for (const c of w.colliders.slice()) {
-      if (c.alive === false || c.ghost || c.tag === 'bridge') continue;
+      if (c.alive === false || c.ghost || c.noFire || c.tag === 'bridge') continue;
       const sx = c.x1 - c.x0, sz = c.z1 - c.z0;
       if (sx < 0.1 || sz < 0.1) continue;
       const mx = (c.x0 + c.x1) / 2, mz = (c.z0 + c.z1) / 2;
@@ -1540,7 +1540,7 @@
       } else {
         if (c.y1 < LG.FIRE_Y_AREA || mx < -4 || mx > W + 4 || mz < -4 || mz > w.D + 4) continue;
         // a walkway you can walk to from the spawn is not a perch (wall pilaster caps, corbels, beams, wall tops are)
-        const ni = w.navIdx(mx, mz);
+        const ni = w.navIdx(mx, mz, c.y1);
         if (ni >= 0 && w.reachMask && w.reachMask[ni] && Math.abs(w.nf[ni] - c.y1) < 0.4) continue;
         if (plats.some((p) => mx > p.x0 - 1 && mx < p.x1 + 1 && mz > p.z0 - 1 && mz < p.z1 + 1 && Math.abs((p.y ?? 0) - c.y1) < 0.15)) continue; // the chest platform itself (not pillars or beams above it)
         if (mx < 0 || mx > W || mz < 0 || mz > w.D) bed = false; // on / beyond the outer wall

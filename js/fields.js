@@ -54,14 +54,14 @@
     }
   };
   F.add = function (w, kind, x0, z0, x1, z1, opts) {
-    const f = { kind, x0, z0, x1, z1, y: 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue) };
+    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue) };
     w.fields = w.fields || [];
     w.fields.push(f);
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    const flat = (mat, h, o) => w.visual(mat, x0, 0.0, z0, x1, h || 0.03, z1, Object.assign({ uv: 3, grad: false, skip: { bottom: true } }, o || {}));
+    const flat = (mat, h, o) => w.visual(mat, x0, f.y, z0, x1, f.y + (h || 0.03), z1, Object.assign({ uv: 3, grad: false, skip: { bottom: true } }, o || {}));
     switch (kind) {
       case 'water': flat('water', 0.035); w.waterZones.push(f); break;
-      case 'lava': flat(f.blue ? 'bluefire' : 'lava'); w.lavaZones.push(f); w.addLight(cx, 0.6, cz, { flame: 0, intensity: f.blue ? 14 : 12, range: 11, color: f.blue ? '#3a8aff' : '#ff6a20', prio: 1.0, emit: false }); break;
+      case 'lava': flat(f.blue ? 'bluefire' : 'lava'); w.lavaZones.push(f); if (!(opts && opts.noLight)) w.addLight(cx, f.y + 0.6, cz, { flame: 0, intensity: f.blue ? 14 : 12, range: 11, color: f.blue ? '#3a8aff' : '#ff6a20', prio: 1.0, emit: false }); break;
       case 'ice': flat('ice', 0.04); break;
       case 'moss': flat('moss', 0.025); break;
       case 'mud': flat('mud', 0.03); break;
@@ -106,7 +106,7 @@
     if (!seen || seen.run !== G.game.run) seen = { run: G.game.run, k: {} };
     tick -= dt; hurtT -= dt;
     const doTick = tick <= 0; if (doTick) tick = 0.25;
-    const feet = P.pos, onGround = P.grounded && feet.y < 0.25;
+    const feet = P.pos;
     const moving = Math.hypot(P.vel.x, P.vel.z) > 1.2;
     for (const f of w.fields) {
       const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
@@ -114,7 +114,7 @@
       // blue fire: tall pale-blue tongues rise out of the patch (only close ones, only a few at a time)
       if (f.kind === 'lava' && f.blue && Math.hypot(cx - feet.x, cz - feet.z) < 40 + (f.x1 - f.x0 + f.z1 - f.z0) / 2) {
         const n = Math.min(3.5, (f.x1 - f.x0) * (f.z1 - f.z0) * 0.12 + 0.6) * dt * 9;
-        for (let k = Math.random() < n % 1 ? 1 : 0, m = Math.floor(n); k <= m; k++) G.fx.flameLick(U.rand(f.x0, f.x1), 0.06, U.rand(f.z0, f.z1), U.rand(1.7, 2.8), 0x4a9cff);
+        for (let k = Math.random() < n % 1 ? 1 : 0, m = Math.floor(n); k <= m; k++) G.fx.flameLick(U.rand(f.x0, f.x1), f.y + 0.06, U.rand(f.z0, f.z1), U.rand(1.7, 2.8), 0x4a9cff);
       }
       if (f.kind === 'poison' && Math.random() < dt * 3) G.fx.norm.spawn(U.rand(f.x0, f.x1), 0.1, U.rand(f.z0, f.z1), 0, 0.4, 0, 1.4, 0.2, 0.7, 0.4, 0.85, 0.15, 0.5, -0.1, 0.5);
       if (f.kind === 'holy' && f.cap > 0 && Math.random() < dt * 6) G.fx.add.spawn(U.rand(f.x0, f.x1), 0.1, U.rand(f.z0, f.z1), 0, U.rand(0.6, 1.4), 0, 1.2, 0.08, 0.01, 0.6, 0.9, 1, 0.9, -0.2, 0.4);
@@ -129,7 +129,8 @@
         else for (const e of G.enemies.list) if (e.alive && e.st && e.st.burn > 0 && inside(f, e.pos) && e.pos.y < 0.5) { F.ignite(f); break; }
       }
       // ---- the player ----
-      const pin = inside(f, feet) && (f.kind === 'vent' ? feet.y < 1 : onGround);
+      const onGround = P.grounded && feet.y < f.y + 0.25 && feet.y > f.y - 0.3;
+      const pin = inside(f, feet) && (f.kind === 'vent' ? feet.y < f.y + 1 && feet.y > f.y - 0.3 : onGround);
       if (pin) {
         const tk = f.blue ? 'blue' : f.kind; if (!seen.k[tk]) { seen.k[tk] = true; G.ui.toastSmall(f.blue ? '🔵 蒼炎：踏むと激しく燃える' : `${F.KINDS[f.kind].icon} ${F.KINDS[f.kind].tip}`); }
         switch (f.kind) {
@@ -146,8 +147,8 @@
       }
       // ---- monsters ----
       if (!doTick) continue;
-      for (const e of G.enemies.inRadius(V(cx, 0, cz), Math.hypot(f.x1 - f.x0, f.z1 - f.z0) / 2 + 1)) {
-        if (e.boss || !inside(f, e.pos) || e.pos.y > (f.kind === 'vent' ? 1 : 0.5) || (e.def.flyer && f.kind !== 'vent')) continue;
+      for (const e of G.enemies.inRadius(V(cx, f.y, cz), Math.hypot(f.x1 - f.x0, f.z1 - f.z0) / 2 + 1)) {
+        if (e.boss || !inside(f, e.pos) || e.pos.y > f.y + (f.kind === 'vent' ? 1 : 0.5) || e.pos.y < f.y - 0.5 || (e.def.flyer && f.kind !== 'vent')) continue;
         switch (f.kind) {
           case 'water': e.wetUntil = G.game.time + 2; if (e.st.burn) e.st.burn = 0; break;
           // lava does not hurt monsters (burning from the player's own weapons and skills works as usual)

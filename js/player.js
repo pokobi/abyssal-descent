@@ -346,6 +346,7 @@
         }
       }
       if (this.grapple.state === 'attached' && I.hit('jump')) { this.detachGrapple(true); }
+      if (G.Strata.ladders.length && this.grapple.state !== 'attached' && !this.pileState) G.Strata.ladder(this, fwdIn > 0 || I.down('jump'), dt);
       // speed cap safety
       const vmax = 60; if (this.vel.length() > vmax) this.vel.setLength(vmax);
 
@@ -380,6 +381,7 @@
         if (g2 > -Infinity && this.pos.y - g2 < 0.58) { this.pos.y = g2; this.grounded = true; this.vel.y = 0; }
         else { this.grounded = false; this.coyote = 0.12; }
       } else this.grounded = false;
+      if (G.Strata.chains.length) G.Strata.support(this, dt, preVy);
       if (stepped > 0) { this.eyeOff -= Math.min(0.5, stepped); }
       // landing
       if (this.grounded && !wasGrounded) {
@@ -420,6 +422,7 @@
     }
     surfaceBelow() {
       if (this.inWater) return 'water';
+      if (G.Strata.onChain) return 'metal';
       const a = G.world.query(this.pos.x - 0.1, this.pos.y - 0.1, this.pos.z - 0.1, this.pos.x + 0.1, this.pos.y + 0.01, this.pos.z + 0.1);
       let best = null; for (const c of a) if (!best || c.y1 > best.y1) best = c;
       return best ? best.surf : 'stone';
@@ -446,7 +449,7 @@
       // hazards / surfaces
       this.inWater = false;
       for (const z of w.waterZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < 0.2) this.inWater = true;
-      if (this.grounded && this.pos.y < 0.2) for (const z of w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1) {
+      if (this.grounded && !G.Strata.onChain) for (const z of w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
         this._lavaT = (this._lavaT || 0) - dt;
         if (this._lavaT <= 0) { this._lavaT = 0.4; G.combat.damagePlayer(5 + G.game.area * 0.6, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }
         // lava sets you alight with a fierce, long burn (it hurts several times more than an ordinary one)

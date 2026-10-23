@@ -106,6 +106,7 @@
     G.LightPool.reset();
     G.world = w;
     w.finalize(scene, G.save.data.settings.quality);
+    G.Strata.build(w);
     const B = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
     scene.fog.color.set(B.fog); scene.fog.density = B.fogD;
     scene.background = new THREE.Color(B.fog);
@@ -1876,7 +1877,7 @@
       if (w.mats.biome.outdoor && Math.random() < 0.5) G.sfx.wind && G.sfx.wind(w.mats.biome.outdoor === 'sky' ? 1 : 0.6);
       let near = null, nd = 1e9; for (const s of w.lightSources) if (s.flame > 0.8) { const d = s.pos.distanceToSquared(cp); if (d < nd) { nd = d; near = s; } }
       if (near && nd < 64) G.sfx.crackle(near.pos);
-      if (w.lavaZones.length && Math.random() < 0.5) { const z = U.pick(w.lavaZones); G.sfx.lava(V((z.x0 + z.x1) / 2, 0, (z.z0 + z.z1) / 2)); }
+      if (w.lavaZones.length && Math.random() < 0.5) { const z = U.pick(w.lavaZones); G.sfx.lava(V((z.x0 + z.x1) / 2, z.y || 0, (z.z0 + z.z1) / 2)); }
     }
     if (skyDome) skyDome.position.copy(cp);
     updateFinalField(dt);
@@ -2018,6 +2019,7 @@
     GM.updateEnrage(gdt);
     updateHighFire(gdt);
     G.Fields.update(gdt);
+    G.Strata.update(gdt);
     G.Areas.update(gdt);
     G.Depth.update(gdt);
     G.PStatus.update(gdt);

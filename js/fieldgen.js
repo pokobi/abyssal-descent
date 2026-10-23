@@ -2,8 +2,8 @@
 // The four fields of a run (see runplan.js):
 //  grave  - outdoors on a moonlit night among graves, fences, dead trees and mausoleums
 //  gate   - the dungeon entrance: high vaulted halls with a ceiling, barred windows onto the night outside, moonlight falling in
-//  halls  - deeper: two or three storeys joined by stairs, wooden ramps and bridges (walkers route over them; flyers cut across)
-//  ruin   - the ruined depths: the same vertical build, collapsed, darker
+//  halls  - deeper: 3-4 storeys on either side of a lava chasm, joined by stairs, ramps, ladders and bridges (see strata.js)
+//  ruin   - the ruined depths: the same build over blue fire, collapsed, darker
 // plus their guardian approaches (no stairs on the road; a fenced arena outdoors, a long hall + sliding stone door below ground)
 // and the ancient stone vending machine that replaces the roadside merchant.
 (function () {
@@ -137,7 +137,7 @@
       const k = Math.min(1, i * 2.2 / len), top = h1 - (h1 - h0) * k + 0.95;
       for (const s of [-1, 1]) {
         const v = c + s * (wd / 2 + 0.08);
-        if (along) w.visual('woodDark', v - 0.06, 0, u - 0.06, v + 0.06, top, u + 0.06, { uv: 1 }); else w.visual('woodDark', u - 0.06, 0, v - 0.06, u + 0.06, top, v + 0.06, { uv: 1 });
+        if (along) w.visual('woodDark', v - 0.06, h0, u - 0.06, v + 0.06, top, u + 0.06, { uv: 1 }); else w.visual('woodDark', u - 0.06, h0, v - 0.06, u + 0.06, top, v + 0.06, { uv: 1 });
       }
     }
     // hand rails (thin colliders so you don't fall off; walkers keep to the planks)
@@ -162,81 +162,6 @@
       }
     }
   };
-  F.fallenColumn = function (w, x, z, L, alongX, rng) {
-    const r = 0.45;
-    if (alongX) w.solid('block', x - L / 2, 0, z - r, x + L / 2, r * 2, z + r, { uv: 2 }); else w.solid('block', x - r, 0, z - L / 2, x + r, r * 2, z + L / 2, { uv: 2 });
-    P().rubble(w, alongX ? x + L / 2 + 0.6 : x, 0, alongX ? z : z + L / 2 + 0.6, rng, 1.0);
-  };
-
-  // the ruined depths: broken walls with jagged tops, snapped pillars, fallen masonry, cracked floors, moss over everything, hanging vines.
-  // everything here is real geometry (not just a texture): ragged wall runs, tilted stone chunks, moss slabs that cling to the stone.
-  F.ruinDressing = function (w, rng, occ, W, D, HT) {
-    const PGm = G.Props.PG, M = G.Props.M;
-    const MOSS = () => [rng.range(0.08, 0.16), rng.range(0.22, 0.34), rng.range(0.4, 0.6)]; // cold blue lichen
-    // 1) ragged wall runs: each metre-wide piece is a different height, so the top is a broken skyline
-    for (let i = 0; i < 14; i++) {
-      const alongX = rng.chance(0.5), len = rng.int(6, 10), r = occ.place(rng, alongX ? len : 2, alongX ? 2 : len, 1.2, 30);
-      if (!r) continue;
-      const peak = rng.range(1.6, 3.6);
-      for (let k = 0; k < len; k++) {
-        const t = k / (len - 1), hgt = Math.max(0.3, peak * (0.3 + 0.7 * Math.sin(t * Math.PI)) * rng.range(0.45, 1.05));
-        const x = alongX ? r.x0 + k : r.x0 + 0.5, z = alongX ? r.z0 + 0.5 : r.z0 + k;
-        w.solid(k % 3 === 1 ? 'wall' : 'block', alongX ? x : x - 0.4, 0, alongX ? z - 0.4 : z, alongX ? x + 1 : x + 0.4, hgt, alongX ? z + 0.4 : z + 1, { uv: 2 });
-        // a chipped corner stone lying on top / beside
-        if (rng.chance(0.5)) w.batch.geo('block', PGm.dode, M(x + (alongX ? 0.5 : 0), hgt + 0.12, z + (alongX ? 0 : 0.5), 0.22, 0.17, 0.24, rng.range(0, 3), rng.range(0, 3), 0), { su: 0.3, sv: 0.3 });
-        if (rng.chance(0.55)) { const a2 = alongX ? [x + 0.05, hgt - 0.02, z - 0.43, x + 0.95, hgt + 0.06, z + 0.43] : [x - 0.43, hgt - 0.02, z + 0.05, x + 0.43, hgt + 0.06, z + 0.95]; w.visual('floor', ...a2, { uv: 1, tint: MOSS(), grad: false }); }
-      }
-      G.Props.rubble(w, alongX ? r.x0 + len / 2 : r.x0 + 1.4, 0, alongX ? r.z0 + 1.4 : r.z0 + len / 2, rng, 1.3);
-    }
-    // 2) snapped pillars (octagonal shafts with a jagged crown) with moss at their feet
-    for (let i = 0; i < 18; i++) {
-      const r = occ.place(rng, 2, 2, 1.3, 30); if (!r) continue;
-      const cx = r.x0 + 1, cz = r.z0 + 1;
-      G.Props.pillarRound(w, cx, cz, 0, rng.range(3, 7), rng.range(0.45, 0.65), true, rng);
-      w.visual('floor', cx - 0.9, 0.02, cz - 0.9, cx + 0.9, 0.06, cz + 0.9, { uv: 1, tint: MOSS(), grad: false });
-    }
-    // 3) fallen masonry: big tilted chunks with a collider, and scattered smaller ones
-    for (let i = 0; i < 20; i++) {
-      const r = occ.place(rng, 3, 3, 1, 30); if (!r) continue;
-      const cx = r.x0 + 1.5, cz = r.z0 + 1.5, s = rng.range(0.7, 1.3);
-      w.batch.geo('block', PGm.dode, M(cx, s * 0.5, cz, s, s * 0.75, s * 0.9, rng.range(-0.3, 0.3), rng.range(0, 3), rng.range(-0.3, 0.3)), { su: 0.6, sv: 0.6 });
-      w.addCollider(cx - s * 0.75, 0, cz - s * 0.75, cx + s * 0.75, s * 0.95, cz + s * 0.75);
-      for (let k = 0; k < 5; k++) { const q = rng.range(0.12, 0.3); w.batch.geo('block', PGm.dode, M(cx + rng.range(-1.4, 1.4), q * 0.5, cz + rng.range(-1.4, 1.4), q, q * 0.7, q * 0.9, rng.range(0, 3), rng.range(0, 3), 0), { su: 0.3, sv: 0.3 }); }
-      w.visual('floor', cx - 1.2, 0.02, cz - 1.2, cx + 1.2, 0.05, cz + 1.2, { uv: 1, tint: MOSS(), grad: false });
-    }
-    // 4) moss: floor patches, slabs on the lower wall faces, creeping up the walls
-    for (let i = 0; i < 90; i++) {
-      const x = rng.range(2, W - 2), z = rng.range(2, D - 2), sx = rng.range(0.5, 2.2), sz = rng.range(0.5, 2.2);
-      w.visual('floor', x, 0.02, z, x + sx, 0.045 + rng.range(0, 0.02), z + sz, { uv: 1, tint: MOSS(), grad: false });
-    }
-    for (let i = 0; i < 46; i++) {
-      const side = rng.int(0, 3), y = rng.range(0.2, 9), h = rng.range(0.8, 3.6), len = rng.range(1, 4.5);
-      const t = side < 2 ? rng.range(3, D - 3) : rng.range(3, W - 3);
-      if (side === 0) w.visual('wall', 0, y, t, 0.07, y + h, t + len, { uv: 1, tint: MOSS(), grad: false });
-      else if (side === 1) w.visual('wall', W - 0.07, y, t, W, y + h, t + len, { uv: 1, tint: MOSS(), grad: false });
-      else if (side === 2) w.visual('wall', t, y, 0, t + len, y + h, 0.07, { uv: 1, tint: MOSS(), grad: false });
-      else w.visual('wall', t, y, D - 0.07, t + len, y + h, D, { uv: 1, tint: MOSS(), grad: false });
-    }
-    // 5) cracks in the floor and breaches in the walls (dark gashes with rubble heaped below)
-    for (let i = 0; i < 70; i++) {
-      const x = rng.range(3, W - 3), z = rng.range(3, D - 3), L = rng.range(1.2, 4), ax = rng.chance(0.5);
-      w.visual('dark', x, 0.021, z, ax ? x + L : x + 0.08, 0.03, ax ? z + 0.08 : z + L, { uv: 1, grad: false });
-    }
-    for (let i = 0; i < 18; i++) {
-      const side = rng.int(0, 1), t = rng.range(10, D - 12), y0 = rng.range(0.5, 3), hh = rng.range(2, 4.5), wd = rng.range(2, 4);
-      if (side === 0) { w.visual('dark', 0, y0, t, 0.1, y0 + hh, t + wd, { uv: 1, grad: false }); G.Props.rubble(w, 1.2, 0, t + wd / 2, rng, rng.range(1, 1.6)); }
-      else { w.visual('dark', W - 0.1, y0, t, W, y0 + hh, t + wd, { uv: 1, grad: false }); G.Props.rubble(w, W - 1.2, 0, t + wd / 2, rng, rng.range(1, 1.6)); }
-    }
-    // 6) vines hanging down the walls
-    for (let i = 0; i < 16; i++) {
-      const side = rng.int(0, 3), y = rng.range(7, 16), h = rng.range(3, 8);
-      if (side === 0) G.Props.vines(w, 0.02, y, rng.range(4, D - 4), 'px', h, rng);
-      else if (side === 1) G.Props.vines(w, W - 0.02, y, rng.range(4, D - 4), 'nx', h, rng);
-      else if (side === 2) G.Props.vines(w, rng.range(4, W - 4), y, 0.02, 'pz', h, rng);
-      else G.Props.vines(w, rng.range(4, W - 4), y, D - 0.02, 'nz', h, rng);
-    }
-  };
-
   // ---------------------------------------------------------------- shared area plumbing
   function base(area, seed, biomeKey, sz) {
     const rng = new G.RNG(seed);
@@ -429,170 +354,7 @@
   }
 
   // ---------------------------------------------------------------- 3 / 4) the storeyed depths (and their ruin)
-  function genStoreys(area, seed, extraChests, gates, kind, ruined) {
-    const { rng, W, D, w, occ } = base(area, seed, ruined ? 'ruin' : 'halls', Math.min(88, 70 + rng0(seed) * 4));
-    reserve(occ, W, D, gates);
-    const HT = 26, L1 = 4.5, L2 = 9, L3 = 13.5;
-    H.floors(w, W, D, null, rng.chance(0.5) ? 'floor' : 'cobble');
-    H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0 });
-    F.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: ruined ? 1 : rng.int(2, 3), ruined });
-    const z0 = 14, z1 = D - 14;
-    const west = rng.chance(0.5);
-    const sA = west ? 'W' : 'E', sB = west ? 'E' : 'W';
-    // storey 1 along side A (y = 4.5) and storey 2 along side B (y = 9, reached from a 4.5 landing)
-    const dA = rng.int(8, 10);
-    const ax0 = sA === 'W' ? 0 : W - dA, ax1 = sA === 'W' ? dA : W;
-    w.solid('wall', ax0, 0, z0, ax1, L1 - 0.25, z1, { uv: 3 });
-    w.solid('trim', ax0, L1 - 0.25, z0 - 0.06, ax1, L1, z1 + 0.06, { uv: 2 });
-    w.platTops.push({ x0: ax0 + 1, z0: z0 + 1, x1: ax1 - 1, z1: z1 - 1, y: L1, cx: (ax0 + ax1) / 2, cz: (z0 + z1) / 2 });
-    const edgeA = sA === 'W' ? ax1 : ax0, inA = sA === 'W' ? 'E' : 'W';
-    const gapsA = [];
-    // a stone stair and a long wooden ramp up to storey 1
-    // the far end of storey 1 rises on: stairs up to a second floor (9), on it more stairs up to a third (13.5)
-    const a3 = 7, zs1 = z1 - a3 - 10, zbase = zs1 - 9, acx = (ax0 + ax1) / 2, a3z0 = zs1 + 10;
-    const sz1 = z0 + 3.4, sz2 = zbase - 2.2;
-    H.stairs(w, inA, edgeA, sz1, 2.8, 0, L1, 'trim'); gapsA.push({ side: inA, a: sz1 - 1.5, b: sz1 + 1.5 });
-    const szs = [sz1];
-    if (sz2 - sz1 > 4) { F.ramp(w, inA, edgeA, sz2, 2.2, 0, L1); gapsA.push({ side: inA, a: sz2 - 1.3, b: sz2 + 1.3 }); szs.push(sz2); }
-    const lenA = LG.stairsLen(L1);
-    occ.mark(ax0, z0, ax1, z1);
-    {
-      // floor 2: a solid block at 9 from zs1 to the end wall; floor 3: a block at 13.5 over its last stretch
-      w.solid('wall', ax0, L1 - 0.25, zs1, ax1, L2 - 0.25, z1, { uv: 3 });
-      w.solid('trim', ax0, L2 - 0.25, zs1 - 0.06, ax1, L2, z1 + 0.06, { uv: 2 });
-      H.stairs(w, 'N', zs1, acx, 3, L1, L2, 'trim');
-      w.solid('wall', ax0, L2 - 0.25, a3z0, ax1, L3 - 0.25, z1, { uv: 3 });
-      w.solid('trim', ax0, L3 - 0.25, a3z0 - 0.06, ax1, L3, z1 + 0.06, { uv: 2 });
-      H.stairs(w, 'N', a3z0, acx, 3, L2, L3, 'trim');
-      w.platTops.push({ x0: ax0 + 1, z0: zs1 + 1, x1: ax1 - 1, z1: zs1 + 9, y: L2, cx: acx, cz: zs1 + 5 });
-      w.platTops.push({ x0: ax0 + 1, z0: a3z0 + 1, x1: ax1 - 1, z1: z1 - 1, y: L3, cx: acx, cz: (a3z0 + z1) / 2 });
-      H.parapet(w, ax0, zs1, ax1, z1, L2, [{ side: 'N', a: acx - 1.6, b: acx + 1.6 }, { side: sA, a: -1, b: 999 }]);
-      H.parapet(w, ax0, a3z0, ax1, z1, L3, [{ side: 'N', a: acx - 1.6, b: acx + 1.6 }, { side: sA, a: -1, b: 999 }, { side: inA, a: (a3z0 + z1) / 2 - 1.5, b: (a3z0 + z1) / 2 + 1.5 }]);
-      P().brazier(w, sA === 'W' ? ax0 + 1.6 : ax1 - 1.6, L3, z1 - 1.6, 1, true);
-    }
-    for (const sz of szs) occ.mark(sA === 'W' ? ax1 : ax0 - lenA - 1.5, sz - 2.5, sA === 'W' ? ax1 + lenA + 1.5 : ax0, sz + 2.5);
-    // storey 2: landing (4.5) + high gallery (9)
-    const dB = rng.int(7, 9), dL = 6;
-    const bx0 = sB === 'W' ? 0 : W - dB, bx1 = sB === 'W' ? dB : W;
-    const lx0 = sB === 'W' ? bx1 : bx0 - dL, lx1 = sB === 'W' ? bx1 + dL : bx0;
-    const bz0 = z0 + 4, bz1 = z1 - 4;
-    w.solid('wall', bx0, 0, bz0, bx1, L2 - 0.25, bz1, { uv: 3 });
-    w.solid('trim', bx0, L2 - 0.25, bz0 - 0.06, bx1, L2, bz1 + 0.06, { uv: 2 });
-    const lz0 = bz0 + (bz1 - bz0) * 0.3, lz1 = bz0 + (bz1 - bz0) * 0.7;
-    w.solid('wall', lx0, 0, lz0, lx1, L1 - 0.25, lz1, { uv: 3 });
-    w.solid('trim', lx0, L1 - 0.25, lz0 - 0.06, lx1, L1, lz1 + 0.06, { uv: 2 });
-    w.platTops.push({ x0: bx0 + 1, z0: bz0 + 1, x1: bx1 - 1, z1: bz1 - 1, y: L2, cx: (bx0 + bx1) / 2, cz: (bz0 + bz1) / 2 });
-    // ground -> landing: wooden ramp along z; landing -> gallery: stone stairs along z
-    const lEdge = sB === 'W' ? lx1 : lx0, inB = sB === 'W' ? 'E' : 'W';
-    F.ramp(w, inB, lEdge, lz0 + (lz1 - lz0) * 0.78, 2.2, 0, L1);
-    // stone stairs along the landing, hugging the gallery face, climbing to the gallery
-    const se = lz0 + LG.stairsLen(L2 - L1) + 0.6, stx = sB === 'W' ? bx1 + 1.2 : bx0 - 1.2;
-    H.stairs(w, 'S', se - LG.stairsLen(L2 - L1), stx, 2.4, L1, L2, 'trim');
-    const lenB = LG.stairsLen(L1);
-    occ.mark(Math.min(bx0, lx0) - (sB === 'W' ? 0 : lenB + 1.5), bz0, Math.max(bx1, lx1) + (sB === 'W' ? lenB + 1.5 : 0), bz1);
-    const stTop = se - LG.stairsLen(L2 - L1); // the stairs' highest step (they descend toward +z)
-    const gapsB = [{ side: inB, a: stTop - 0.4, b: stTop + 1.4 }];
-    // a sky bridge leaves the gallery towards the middle of the hall (see below): the parapet is open there
-    const zm = bz0 + (bz1 - bz0) * 0.8;
-    gapsB.push({ side: inB, a: zm - 1.5, b: zm + 1.5 });
-    H.parapet(w, ax0, z0, ax1, z1, L1, gapsA.concat([{ side: sA, a: -1, b: 999 }]));
-    H.parapet(w, bx0, bz0, bx1, bz1, L2, gapsB.concat([{ side: sB, a: -1, b: 999 }]));
-    // a central tower platform (4.5) joined to storey 1 by a plank bridge
-    const tw = 9, tcx = sA === 'W' ? ax1 + 6 + tw / 2 : ax0 - 6 - tw / 2, tcz = D / 2;
-    const T = { x0: Math.round(tcx - tw / 2), z0: Math.round(tcz - tw / 2), x1: Math.round(tcx + tw / 2), z1: Math.round(tcz + tw / 2) };
-    if (occ.free(T.x0 - 1, T.z0 - 1, T.x1 + 1, T.z1 + 1)) {
-      occ.mark(T.x0 - 1, T.z0 - 1, T.x1 + 1, T.z1 + 1);
-      w.solid('wall', T.x0, 0, T.z0, T.x1, L1 - 0.25, T.z1, { uv: 3 });
-      w.solid('trim', T.x0 - 0.06, L1 - 0.25, T.z0 - 0.06, T.x1 + 0.06, L1, T.z1 + 0.06, { uv: 2 });
-      w.platTops.push({ x0: T.x0 + 0.5, z0: T.z0 + 0.5, x1: T.x1 - 0.5, z1: T.z1 - 0.5, y: L1, cx: tcx, cz: tcz });
-      const bzc = tcz, near = sA === 'W' ? ax1 : ax0, far = sA === 'W' ? T.x0 : T.x1;
-      if (Math.abs(far - near) > 1.5) F.bridge(w, Math.min(near, far), bzc - 1.2, Math.max(near, far), bzc + 1.2, L1, ruined && rng.chance(0.6));
-      // and a ramp down on the far side
-      F.ramp(w, sA === 'W' ? 'E' : 'W', sA === 'W' ? T.x1 : T.x0, tcz + 2.2, 2.0, 0, L1);
-      H.parapet(w, T.x0, T.z0, T.x1, T.z1, L1, [{ side: sA === 'W' ? 'W' : 'E', a: bzc - 1.4, b: bzc + 1.4 }, { side: sA === 'W' ? 'E' : 'W', a: tcz + 0.9, b: tcz + 3.5 }]);
-      P().brazier(w, tcx, L1, tcz, 1.1, true);
-    }
-    // sky bridges: gallery -> pillar -> pillar across the nave, all at gallery height (9m). Reachable on foot; a long way down.
-    {
-      const dirIn = sB === 'W' ? 1 : -1;
-      let px = sB === 'W' ? bx1 : bx0;
-      const ps = 5;
-      if (occ.free(Math.min(px, px + dirIn * 40), zm - 3, Math.max(px, px + dirIn * 40), zm + 3)) {
-        for (let k = 0; k < 2; k++) {
-          const gapL = k === 0 ? 8 : 7;
-          const nx0 = dirIn > 0 ? px + gapL : px - gapL - ps, nx1 = nx0 + ps;
-          if (nx0 < 3 || nx1 > W - 3 || !occ.free(nx0 - 1, zm - ps / 2 - 1, nx1 + 1, zm + ps / 2 + 1)) break;
-          occ.mark(nx0 - 1, zm - ps / 2 - 1, nx1 + 1, zm + ps / 2 + 1);
-          w.solid('wall', nx0, 0, zm - ps / 2, nx1, L2 - 0.25, zm + ps / 2, { uv: 3 });
-          w.solid('trim', nx0 - 0.06, L2 - 0.25, zm - ps / 2 - 0.06, nx1 + 0.06, L2, zm + ps / 2 + 0.06, { uv: 2 });
-          const bxa = dirIn > 0 ? px : nx1, bxb = dirIn > 0 ? nx0 : px;
-          F.bridge(w, bxa, zm - 1.2, bxb, zm + 1.2, L2, ruined && rng.chance(0.5));
-          occ.mark(Math.min(bxa, bxb), zm - 2, Math.max(bxa, bxb), zm + 2);
-          P().brazier(w, (nx0 + nx1) / 2, L2, zm, 1, true);
-          px = dirIn > 0 ? nx1 : nx0;
-        }
-      }
-    }
-    // a high span from the third floor: bridge to a tall stone pillar-top in the nave, and on to another
-    {
-      const dirIn = sA === 'W' ? 1 : -1, zc = (a3z0 + z1) / 2, ps = 6;
-      let px = sA === 'W' ? ax1 : ax0;
-      for (let k = 0; k < 2; k++) {
-        const gapL = 8, nx0 = dirIn > 0 ? px + gapL : px - gapL - ps, nx1 = nx0 + ps;
-        if (nx0 < 3 || nx1 > W - 3 || !occ.free(nx0 - 1, zc - ps / 2 - 1, nx1 + 1, zc + ps / 2 + 1)) break;
-        occ.mark(nx0 - 1, zc - ps / 2 - 1, nx1 + 1, zc + ps / 2 + 1);
-        w.solid('wall', nx0, 0, zc - ps / 2, nx1, L3 - 0.25, zc + ps / 2, { uv: 3 });
-        w.solid('trim', nx0 - 0.06, L3 - 0.25, zc - ps / 2 - 0.06, nx1 + 0.06, L3, zc + ps / 2 + 0.06, { uv: 2 });
-        const bxa = dirIn > 0 ? px : nx1, bxb = dirIn > 0 ? nx0 : px;
-        F.bridge(w, bxa, zc - 1.2, bxb, zc + 1.2, L3, ruined && rng.chance(0.5));
-        occ.mark(Math.min(bxa, bxb), zc - 2, Math.max(bxa, bxb), zc + 2);
-        w.platTops.push({ x0: nx0 + 1, z0: zc - 2, x1: nx1 - 1, z1: zc + 2, y: L3, cx: (nx0 + nx1) / 2, cz: zc });
-        P().brazier(w, (nx0 + nx1) / 2, L3, zc, 1, true);
-        px = dirIn > 0 ? nx1 : nx0;
-      }
-    }
-    // a stepped ziggurat in the open: four 1.2m tiers you can jump up, with a chest-worthy top
-    {
-      const r = occ.place(rng, 14, 14, 1.5, 30);
-      if (r) {
-        const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
-        [[13, 1.2], [10, 2.4], [7, 3.6], [4, 4.8]].forEach(([s, hh], i, arr) => {
-          w.solid(i % 2 ? 'trim' : 'wall', cx - s / 2, i ? arr[i - 1][1] : 0, cz - s / 2, cx + s / 2, hh, cz + s / 2, { uv: 2 });
-        });
-        w.platTops.push({ x0: cx - 2, z0: cz - 2, x1: cx + 2, z1: cz + 2, y: 4.8, cx, cz });
-        P().brazier(w, cx, 4.8, cz, 1.0, true);
-      }
-    }
-    // piers to the ceiling, torches on the storey faces
-    for (let z = z0 + 6; z < z1 - 4; z += 10) {
-      for (const x of [W * 0.38, W * 0.62]) if (occ.free(x - 1.2, z - 1.2, x + 1.2, z + 1.2)) { occ.mark(x - 1.2, z - 1.2, x + 1.2, z + 1.2); if (ruined && rng.chance(0.35)) { P().pillarSquare(w, x, z, 0, rng.range(3, 8), 1.3); P().rubble(w, x + 1.4, 0, z, rng, 1.2); } else P().pillarSquare(w, x, z, 0, HT, 1.3); }
-      if (!ruined || rng.chance(0.5)) { P().torch(w, edgeA, L1 - 1.4, z, sA === 'W' ? 'px' : 'nx'); P().torch(w, sB === 'W' ? bx1 : bx0, L2 - 1.4, z, sB === 'W' ? 'px' : 'nx'); }
-    }
-    if (ruined) {
-      // collapse: fallen columns, rubble mounds, holes torn in the vault, dim red light
-      for (let i = 0; i < 14; i++) { const r = occ.place(rng, 6, 2, 1, 12); if (r) F.fallenColumn(w, r.x0 + 3, r.z0 + 1, rng.range(4, 6), true, rng); }
-      for (let i = 0; i < 40; i++) { const r = occ.place(rng, 2, 2, 0.8, 10); if (r) P().rubble(w, r.x0 + 1, 0, r.z0 + 1, rng, rng.range(1, 2.4)); }
-      // blue fire: pools where the floor has split open, and long fissures. Touching it sets you alight with a fierce burn (see player.js)
-      for (let i = 0; i < 8; i++) { const r = occ.place(rng, rng.int(5, 8), rng.int(5, 8), 1.2, 30); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1, { blue: true }); }
-      for (let i = 0; i < 8; i++) { const ax = rng.chance(0.5), len = rng.int(9, 15), r = occ.place(rng, ax ? len : 2, ax ? 2 : len, 1, 30); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1, { blue: true }); }
-      for (let i = 0; i < 9; i++) { const r = occ.place(rng, 3, 3, 0.8, 20); if (r) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1, { blue: true }); }
-      // braziers of blue flame scattered through the ruin, so it is never pitch dark
-      for (let i = 0; i < 12; i++) { const r = occ.place(rng, 2, 2, 1, 20); if (r) P().brazier(w, r.x0 + 1, 0, r.z0 + 1, rng.range(0.8, 1.2)); }
-      // torn-open floors of the upper levels would be the next step; for now the vault is shredded and the dark leaks in
-      for (let i = 0; i < 9; i++) { const x = rng.range(8, W - 14), z = rng.range(10, D - 16); w.visual('dark', x, HT - 0.04, z, x + rng.range(3, 6), HT - 0.02, z + rng.range(3, 6), { uv: 1, grad: false }); }
-      for (let i = 0; i < 3; i++) { const x = rng.range(10, W - 10), z = rng.range(14, D - 14); w.addLight(x, 1.2, z, { flame: 0.5, intensity: 7, range: 11, color: '#4a8aff', prio: 0.8 }); P().candles(w, x, 0, z, rng, false); }
-    } else {
-      for (let i = 0; i < 3; i++) { const r = occ.place(rng, 3, 2, 1, 12); if (r) P().bookshelf(w, r.x0 + 1.5, r.z0 + 1, 0, true, rng); }
-      for (let i = 0; i < 3; i++) { const r = occ.place(rng, 3, 3, 1.2, 12); if (r) P().cage(w, r.x0 + 1.5, r.z0 + 1.5, 0, 1, rng); }
-    }
-    if (ruined) F.ruinDressing(w, rng, occ, W, D, HT);
-    H.structures(w, rng, occ, W, D, 2 + Math.floor(W * D / 1600));
-    H.scatter(w, rng, occ, W, D, 10 + Math.floor(W * D / 600));
-    return finish(w, rng, occ, W, D, area, kind, extraChests);
-  }
-  const rng0 = (seed) => (seed % 4);
-
-  F.gen = { grave: genGrave, gate: genGate, halls: (a, s, e, g, k) => genStoreys(a, s, e, g, k, false), ruin: (a, s, e, g, k) => genStoreys(a, s, e, g, k, true) };
+  F.gen = { grave: genGrave, gate: genGate, halls: (a, s, e, g, k) => G.Strata.gen(a, s, e, g, k, false), ruin: (a, s, e, g, k) => G.Strata.gen(a, s, e, g, k, true) };
   // route LevelGen.generate through the field generators
   const gen0 = LG.generate;
   LG.generate = function (area, seed, opts) {
@@ -601,7 +363,7 @@
     if (!f) return gen0(area, seed, opts);
     for (let t = 0; t < 8; t++) {
       const w = f(area, (seed + t * 7919) >>> 0, opts.extraChests, opts.gates || 3, opts.kind);
-      if (H.validate(w)) { w.seed = seed; w.field = field; H.fireTops(w, {}); return w; }
+      if (w && H.validate(w)) { w.seed = seed; w.field = field; H.fireTops(w, {}); return w; }
     }
     return gen0(area, seed, opts);
   };

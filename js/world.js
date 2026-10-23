@@ -2,6 +2,11 @@
 // World container: merged static geometry, AABB colliders + spatial hash, raycasts, kinematic box movement, nav grid & flow field.
 (function () {
   const CS = 4; // hash cell size (m)
+  // the 8 nav directions; for a diagonal, the indices of its two straight parts (corner-cutting check)
+  const DIRS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+  const dirIdx = (dx, dz) => DIRS.findIndex((d) => d[0] === dx && d[1] === dz);
+  const DIAG = DIRS.map((d) => (d[0] && d[1] ? 1 : 0));
+  const DXI = DIRS.map((d) => (d[0] && d[1] ? dirIdx(d[0], 0) : -1)), DZI = DIRS.map((d) => (d[0] && d[1] ? dirIdx(0, d[1]) : -1));
 
   // ---------------- geometry batching ----------------
   class Batch {
@@ -256,78 +261,142 @@
     }
 
     // ---- nav grid (1m) ----
+    // A world with storeys over storeys (this.navLayers > 1, the strata fields) keeps one nav node per walkable surface in a
+    // cell: node = layer * N + cell, layers sorted bottom-up. Ordinary worlds have one layer, so node == cell as before.
     buildNav() {
       const W = this.W, D = this.D;
-      const N = W * D;
-      this.nf = new Float32Array(N);
-      this.nb = new Uint8Array(N);
-      this.npen = new Float32Array(N);
+      const N = W * D, LM = this.navLayers || 1;
+      const tops = [];
+      const per = [];
       const tmp = [];
+      let L = 1;
       for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
-        const i = z * W + x;
         const cx = x + 0.5, cz = z + 0.5;
         tmp.length = 0;
         this.query(cx - 0.01, -60, cz - 0.01, cx + 0.01, 60, cz + 0.01, tmp);
         tmp.sort((a, b) => a.y0 - b.y0);
         let floor = -Infinity;
+        const ts = [];
         for (const c of tmp) {
           if (c.dest) continue;
           if (floor === -Infinity) { floor = c.y1; continue; }
           if (c.y0 <= floor + 0.8) floor = Math.max(floor, c.y1);
+          else if (LM > 1) { ts.push(floor); floor = c.y1; }
         }
-        this.nf[i] = floor;
-        if (floor === -Infinity) { this.nb[i] = 1; continue; }
-        // blocked if something solid occupies body space near the cell center
-        tmp.length = 0;
-        this.query(cx - 0.32, floor + 0.85, cz - 0.32, cx + 0.32, floor + 1.9, cz + 0.32, tmp);
-        if (tmp.some((c) => !c.dest || true)) this.nb[i] = tmp.length ? 1 : 0;
+        if (floor > -Infinity || !ts.length) ts.push(floor);
+        if (ts.length > LM) ts.length = LM;
+        per.push(ts); if (ts.length > L) L = ts.length;
+      }
+      this.N = N; this.L = L;
+      this.nf = new Float32Array(N * L).fill(-Infinity);
+      this.nb = new Uint8Array(N * L).fill(1);
+      this.nhz = L > 1 ? new Uint8Array(N * L) : null;
+      this.npen = new Float32Array(N * L);
+      for (let i = 0; i < N; i++) {
+        const ts = per[i], cx = (i % W) + 0.5, cz = ((i / W) | 0) + 0.5;
+        for (let k = 0; k < ts.length; k++) {
+          const n = k * N + i, floor = ts[k];
+          this.nf[n] = floor;
+          if (floor === -Infinity) { this.nb[n] = 1; continue; }
+          // blocked if something solid occupies body space near the cell center
+          tmp.length = 0;
+          this.query(cx - 0.32, floor + 0.85, cz - 0.32, cx + 0.32, floor + 1.9, cz + 0.32, tmp);
+          this.nb[n] = tmp.length ? 1 : 0;
+          // strata: the lava trench and the roof are no place to walk or spawn
+          if (L > 1 && this.navHazard && this.navHazard(cx, floor, cz)) { this.nb[n] = 1; this.nhz[n] = 1; }
+        }
       }
       // clearance penalty
-      for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+      for (let n = 0; n < N * L; n++) {
+        if (this.nf[n] === -Infinity) continue;
+        const i = n % N, x = i % W, z = (i / W) | 0;
         let p = 0;
         for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
           const xx = x + dx, zz = z + dz;
-          if (xx < 0 || zz < 0 || xx >= W || zz >= D || this.nb[zz * W + xx]) p += 0.35;
+          if (xx < 0 || zz < 0 || xx >= W || zz >= D) { p += 0.35; continue; }
+          const b = this.land(n, zz * W + xx);
+          if (b < 0 || this.nb[b]) p += 0.35;
         }
-        this.npen[z * W + x] = p;
+        this.npen[n] = p;
       }
-      this.ndist = new Float32Array(N).fill(Infinity);
-      this.heap = new Int32Array(N * 8 + 16);
-      this.hkey = new Float32Array(N * 8 + 16);
+      this.ndist = new Float32Array(N * L).fill(Infinity);
+      this.heap = new Int32Array(N * L * 8 + 16);
+      this.hkey = new Float32Array(N * L * 8 + 16);
+      // strata: the geometry of every step (which node you land on, if the height change is walkable) never changes,
+      // so it is worked out once here, with the reverse edges the flow field walks (only blocking can change later)
+      this.nadj = null;
+      if (L > 1) {
+        const NL = N * L, adj = new Int32Array(NL * 8).fill(-1), cnt = new Int32Array(NL + 1);
+        for (let a = 0; a < NL; a++) {
+          if (this.nf[a] === -Infinity) continue;
+          const i = a % N, x = i % W, z = (i / W) | 0;
+          for (let d = 0; d < 8; d++) {
+            const xx = x + DIRS[d][0], zz = z + DIRS[d][1];
+            if (xx < 0 || zz < 0 || xx >= W || zz >= D) continue;
+            const b = this.land(a, zz * W + xx);
+            if (b < 0) continue;
+            const dh = this.nf[b] - this.nf[a];
+            if (dh > 0.8 || dh < -6.5) continue;
+            adj[a * 8 + d] = b; cnt[b + 1]++;
+          }
+        }
+        for (let b = 0; b < NL; b++) cnt[b + 1] += cnt[b];
+        const ra = new Int32Array(cnt[NL]), rd = new Uint8Array(cnt[NL]), fill = cnt.slice(0, NL);
+        for (let a = 0; a < NL; a++) for (let d = 0; d < 8; d++) { const b = adj[a * 8 + d]; if (b >= 0) { const e = fill[b]++; ra[e] = a; rd[e] = d; } }
+        this.nadj = adj; this.rs = cnt; this.ra = ra; this.rd = rd;
+      }
     }
-    navIdx(x, z) { const xi = Math.floor(x), zi = Math.floor(z); if (xi < 0 || zi < 0 || xi >= this.W || zi >= this.D) return -1; return zi * this.W + xi; }
-    navFloor(x, z) { const i = this.navIdx(x, z); return i < 0 ? -Infinity : this.nf[i]; }
+    // the node you end up on stepping from node a into cell cb (the highest surface no more than a step above you); -1: none
+    land(a, cb) {
+      if (this.L === 1) return cb;
+      const N = this.N, fa = this.nf[a];
+      let best = -1, bf = -Infinity;
+      for (let k = 0; k < this.L; k++) { const n = k * N + cb, f = this.nf[n]; if (f === -Infinity) break; if (f <= fa + 0.8 && f > bf) { bf = f; best = n; } }
+      return best;
+    }
+    // y (optional): the surface at or just below that height (strata); without it, the lowest one
+    navIdx(x, z, y) {
+      const xi = Math.floor(x), zi = Math.floor(z); if (xi < 0 || zi < 0 || xi >= this.W || zi >= this.D) return -1;
+      const i = zi * this.W + xi;
+      if (this.L > 1 && y !== undefined) {
+        let best = i;
+        for (let k = 1; k < this.L; k++) { const n = k * this.N + i, f = this.nf[n]; if (f === -Infinity || f > y + 0.6) break; best = n; }
+        return best;
+      }
+      return i;
+    }
+    navFloor(x, z, y) { const i = this.navIdx(x, z, y); return i < 0 ? -Infinity : this.nf[i]; }
     canStep(a, b) { // a->b walkable (for monsters)
       if (this.nb[a] || this.nb[b]) return false;
       const d = this.nf[b] - this.nf[a];
-      return d <= 0.8 && d >= -6.5;
+      return d <= 0.8 && d >= -6.5 && (this.L === 1 || this.land(a, b % this.N) === b);
     }
     // flood reachable set (forward edges) for validation
     reach(fromIdx) {
       const W = this.W, D = this.D, N = W * D;
-      const seen = new Uint8Array(N);
+      const seen = new Uint8Array(N * (this.L || 1));
       const q = [fromIdx]; seen[fromIdx] = 1;
       while (q.length) {
         const a = q.pop();
-        const ax = a % W, az = (a / W) | 0;
+        const ac = a % N, ax = ac % W, az = (ac / W) | 0;
         for (let k = 0; k < 4; k++) {
           const bx = ax + (k === 0 ? 1 : k === 1 ? -1 : 0), bz = az + (k === 2 ? 1 : k === 3 ? -1 : 0);
           if (bx < 0 || bz < 0 || bx >= W || bz >= D) continue;
-          const b = bz * W + bx;
-          if (!seen[b] && this.canStep(a, b)) { seen[b] = 1; q.push(b); }
+          const b = this.land(a, bz * W + bx);
+          if (b >= 0 && !seen[b] && this.canStep(a, b)) { seen[b] = 1; q.push(b); }
         }
       }
       return seen;
     }
     // Dijkstra on reversed edges from target => ndist[i] = cost to reach target from i
-    updateFlow(tx, tz) {
-      const W = this.W, D = this.D;
-      let t = this.navIdx(tx, tz);
+    updateFlow(tx, tz, ty) {
+      const W = this.W, D = this.D, N = W * D, L = this.L || 1;
+      let t = this.navIdx(tx, tz, ty);
       if (t < 0) return;
       if (this.nb[t]) { // target inside blocked cell: use nearest open neighbour
         let best = -1, bd = 1e9;
         for (let r = 1; r < 4 && best < 0; r++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
-          const i = this.navIdx(tx + dx, tz + dz); if (i >= 0 && !this.nb[i]) { const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = i; } }
+          const i = this.navIdx(tx + dx, tz + dz, ty); if (i >= 0 && !this.nb[i]) { const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = i; } }
         }
         if (best < 0) return; t = best;
       }
@@ -337,40 +406,61 @@
       const pop = () => { const r = heap[0]; hn--; heap[0] = heap[hn]; hk[0] = hk[hn]; let n = 0; for (;;) { const l = n * 2 + 1, rr = l + 1; let m = n; if (l < hn && hk[l] < hk[m]) m = l; if (rr < hn && hk[rr] < hk[m]) m = rr; if (m === n) break; const ti = heap[m], tk = hk[m]; heap[m] = heap[n]; hk[m] = hk[n]; heap[n] = ti; hk[n] = tk; n = m; } return r; };
       dist[t] = 0; push(t, 0);
       let pops = 0;
-      while (hn > 0 && pops++ < W * D * 3) {
+      const blk = (n) => n < 0 || this.nb[n];
+      if (this.nadj) {
+        const nb = this.nb, adj = this.nadj, rs = this.rs, ra = this.ra, rd = this.rd, pen = this.npen;
+        while (hn > 0 && pops++ < N * L * 3) {
+          const kTop = hk[0];
+          const b = pop();
+          if (kTop > dist[b] || nb[b]) continue;
+          for (let e = rs[b], e1 = rs[b + 1]; e < e1; e++) {
+            const a = ra[e], d = rd[e];
+            if (nb[a]) continue;
+            if (DIAG[d]) { const c1 = adj[a * 8 + DXI[d]], c2 = adj[a * 8 + DZI[d]]; if (c1 < 0 || c2 < 0 || nb[c1] || nb[c2]) continue; }
+            const nd = dist[b] + (DIAG[d] ? 1.414 : 1) + pen[a];
+            if (nd < dist[a]) { dist[a] = nd; push(a, nd); }
+          }
+        }
+        this.flowTarget = t;
+        return;
+      }
+      while (hn > 0 && pops++ < W * D * 3 * L) {
         const kTop = hk[0];
         const b = pop();
         if (kTop > dist[b]) continue;
-        const bx = b % W, bz = (b / W) | 0;
+        const bc = b % N, bx = bc % W, bz = (bc / W) | 0;
         for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
           if (!dx && !dz) continue;
           const ax = bx + dx, az = bz + dz;
           if (ax < 0 || az < 0 || ax >= W || az >= D) continue;
-          const a = az * W + ax;
-          if (!this.canStep(a, b)) continue;
-          if (dx && dz) { // no corner cutting
-            const c1 = az * W + bx, c2 = bz * W + ax;
-            if (this.nb[c1] || this.nb[c2]) continue;
+          for (let k = 0; k < L; k++) {
+            const a = k * N + az * W + ax;
+            if (this.nf[a] === -Infinity) break;
+            if (!this.canStep(a, b)) continue;
+            if (dx && dz) { // no corner cutting
+              if (blk(this.land(a, az * W + bx)) || blk(this.land(a, bz * W + ax))) continue;
+            }
+            const nd = dist[b] + (dx && dz ? 1.414 : 1) + this.npen[a];
+            if (nd < dist[a]) { dist[a] = nd; push(a, nd); }
           }
-          const nd = dist[b] + (dx && dz ? 1.414 : 1) + this.npen[a];
-          if (nd < dist[a]) { dist[a] = nd; push(a, nd); }
         }
       }
       this.flowTarget = t;
     }
     // direction toward target following the flow field (null if unreachable)
-    flowDir(x, z, out) {
-      const W = this.W;
-      const i = this.navIdx(x, z);
+    flowDir(x, z, out, y) {
+      const W = this.W, N = W * this.D;
+      const i = this.navIdx(x, z, y);
       if (i < 0 || this.ndist[i] === Infinity) return null;
-      const ix = i % W, iz = (i / W) | 0;
+      const ic = i % N, ix = ic % W, iz = (ic / W) | 0;
       let best = this.ndist[i], bx = 0, bz = 0;
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dz) continue;
         const ax = ix + dx, az = iz + dz;
         if (ax < 0 || az < 0 || ax >= W || az >= this.D) continue;
-        const a = az * W + ax;
-        if (dx && dz && (this.nb[az * W + ix] || this.nb[iz * W + ax])) continue;
+        const a = this.land(i, az * W + ax);
+        if (a < 0) continue;
+        if (dx && dz) { const c1 = this.land(i, az * W + ix), c2 = this.land(i, iz * W + ax); if (c1 < 0 || c2 < 0 || this.nb[c1] || this.nb[c2]) continue; }
         if (!this.canStep(i, a)) continue; // never steer into a cell we can't actually walk into
         if (this.ndist[a] < best) { best = this.ndist[a]; bx = dx; bz = dz; }
       }
@@ -380,10 +470,19 @@
       const l = Math.hypot(out.x, out.z) || 1; out.x /= l; out.z /= l;
       return out;
     }
+    // strata: may a walker at p step on to (nx, nz)? false over the lava trench / off into nothing
+    walkerSafe(p, nx, nz) {
+      if (this.L === 1) return true;
+      const a = this.navIdx(p.x, p.z, p.y), cb = this.navIdx(nx, nz);
+      if (a < 0 || cb < 0) return false;
+      if (a % this.N === cb) return true;
+      const b = this.land(a, cb);
+      return b >= 0 && !this.nhz[b];
+    }
     randomOpenCell(rng, filter) {
       for (let k = 0; k < 400; k++) {
         const x = Math.floor(rng.next() * this.W), z = Math.floor(rng.next() * this.D);
-        const i = z * this.W + x;
+        const i = (this.L > 1 ? Math.floor(rng.next() * this.L) * this.N : 0) + z * this.W + x;
         if (this.nb[i] || this.nf[i] === -Infinity) continue;
         if (this.npen[i] > 0.4) continue;
         if (filter && !filter(x + 0.5, z + 0.5, i)) continue;

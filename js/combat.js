@@ -478,9 +478,12 @@
     d.alive = false; G.world.removeCollider(d.col); if (d.mesh) G.world.group.remove(d.mesh);
     const W = G.world;
     for (let z = Math.floor(d.col.z0) - 1; z <= Math.ceil(d.col.z1); z++) for (let x = Math.floor(d.col.x0) - 1; x <= Math.ceil(d.col.x1); x++) {
-      const i = W.navIdx(x + 0.5, z + 0.5); if (i < 0) continue;
-      const a = W.query(x + 0.5 - 0.32, W.nf[i] + 0.85, z + 0.5 - 0.32, x + 0.5 + 0.32, W.nf[i] + 1.9, z + 0.5 + 0.32);
-      W.nb[i] = a.length ? 1 : 0;
+      const i0 = W.navIdx(x + 0.5, z + 0.5); if (i0 < 0) continue;
+      for (let k = 0; k < (W.L || 1); k++) {
+        const i = i0 + k * W.N; if (W.nf[i] === -Infinity || (W.nhz && W.nhz[i])) continue;
+        const a = W.query(x + 0.5 - 0.32, W.nf[i] + 0.85, z + 0.5 - 0.32, x + 0.5 + 0.32, W.nf[i] + 1.9, z + 0.5 + 0.32);
+        W.nb[i] = a.length ? 1 : 0;
+      }
     }
   };
   C.breakDestructible = function (d) {
@@ -495,9 +498,12 @@
     // re-open nav cells
     const W = G.world;
     for (let z = Math.floor(d.col.z0) - 1; z <= Math.ceil(d.col.z1); z++) for (let x = Math.floor(d.col.x0) - 1; x <= Math.ceil(d.col.x1); x++) {
-      const i = W.navIdx(x + 0.5, z + 0.5); if (i < 0) continue;
-      const a = W.query(x + 0.5 - 0.32, W.nf[i] + 0.85, z + 0.5 - 0.32, x + 0.5 + 0.32, W.nf[i] + 1.9, z + 0.5 + 0.32);
-      W.nb[i] = a.length ? 1 : 0;
+      const i0 = W.navIdx(x + 0.5, z + 0.5); if (i0 < 0) continue;
+      for (let k = 0; k < (W.L || 1); k++) {
+        const i = i0 + k * W.N; if (W.nf[i] === -Infinity || (W.nhz && W.nhz[i])) continue;
+        const a = W.query(x + 0.5 - 0.32, W.nf[i] + 0.85, z + 0.5 - 0.32, x + 0.5 + 0.32, W.nf[i] + 1.9, z + 0.5 + 0.32);
+        W.nb[i] = a.length ? 1 : 0;
+      }
     }
     const mul = P.has('e_destroy') ? 2 : 1;
     if (d.explosive) {

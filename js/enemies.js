@@ -847,18 +847,18 @@
       const out = { x: 0, z: 0 };
       const flow = (o) => {
         // flyers go straight while they can see you; otherwise they follow the ground flow field around walls
-        if (this.flyer && (this.hasLOS || !w.flowDir(this.pos.x, this.pos.z, o))) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; return o; }
+        if (this.flyer && (this.hasLOS || !w.flowDir(this.pos.x, this.pos.z, o, this.pos.y))) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; return o; }
         if (this.flyer) return o;
-        const f = w.flowDir(this.pos.x, this.pos.z, o);
+        const f = w.flowDir(this.pos.x, this.pos.z, o, this.pos.y);
         if (!f || (this.hasLOS && distH < 7)) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; }
         return o;
       };
       if (ai === 'flee') {
         // run away along the flow field gradient (maximise distance)
-        const i = w.navIdx(this.pos.x, this.pos.z);
+        const i = w.navIdx(this.pos.x, this.pos.z, this.pos.y);
         if (i >= 0 && w.ndist[i] < Infinity) {
-          const W = w.W; const ix = i % W, iz = (i / W) | 0; let best = w.ndist[i], bx = 0, bz = 0;
-          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const a = (iz + dz) * W + ix + dx; if (ix + dx < 0 || iz + dz < 0 || ix + dx >= W || iz + dz >= w.D) continue; if (!w.nb[a] && w.ndist[a] < Infinity && w.ndist[a] > best) { best = w.ndist[a]; bx = dx; bz = dz; } }
+          const W = w.W, ic = i % (W * w.D); const ix = ic % W, iz = (ic / W) | 0; let best = w.ndist[i], bx = 0, bz = 0;
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { if (ix + dx < 0 || iz + dz < 0 || ix + dx >= W || iz + dz >= w.D) continue; const a = w.land(i, (iz + dz) * W + ix + dx); if (a >= 0 && !w.nb[a] && w.ndist[a] < Infinity && w.ndist[a] > best) { best = w.ndist[a]; bx = dx; bz = dz; } }
           const l = Math.hypot(bx, bz) || 1; out.x = bx / l; out.z = bz / l;
         }
         if (Math.random() < 0.02) G.sfx.monster(this.pos, 'chitter', 1.3, 0.5);
@@ -1081,7 +1081,7 @@
     }
     blink(dir, d) {
       const np = this.pos.clone().addScaledVector(dir, d);
-      const i = G.world.navIdx(np.x, np.z);
+      const i = G.world.navIdx(np.x, np.z, this.pos.y);
       if (i < 0 || G.world.nb[i] || G.world.nf[i] === -Infinity) return;
       G.fx.smoke(this.centerPos(), 8, 0.8, 0x1a1020, 0.5, 0.8);
       this.pos.x = np.x; this.pos.z = np.z; if (!this.flyer && !this.def.hover) this.pos.y = G.world.nf[i];
@@ -1099,9 +1099,9 @@
       if (this.burrowed) {
         // underground: approach, then telegraph and erupt beneath the target
         this.model.group.visible = false;
-        if (Math.random() < dt * 12) G.fx.dust(V(this.pos.x, G.world.navFloor(this.pos.x, this.pos.z) + 0.05, this.pos.z), V(0, 1, 0), 0x6a5a48, 2);
+        if (Math.random() < dt * 12) G.fx.dust(V(this.pos.x, G.world.navFloor(this.pos.x, this.pos.z, this.pos.y) + 0.05, this.pos.z), V(0, 1, 0), 0x6a5a48, 2);
         this._rumble = (this._rumble || 0) - dt; if (this._rumble <= 0 && distH < 20) { this._rumble = 0.8; G.sfx.monster(this.pos, 'rumble', 1.4, 0.5); }
-        if (!this.erupt && distH < 4 && this.atkCd <= 0) { this.erupt = { t: 0, c: tgt.pos.clone() }; this.erupt.c.y = G.world.navFloor(tgt.pos.x, tgt.pos.z); if (!isFinite(this.erupt.c.y)) this.erupt.c.y = tgt.pos.y; this.tele = G.fx.telegraph(this.erupt.c, 2.6, 0.85, 0xb06020); }
+        if (!this.erupt && distH < 4 && this.atkCd <= 0) { this.erupt = { t: 0, c: tgt.pos.clone() }; this.erupt.c.y = G.world.navFloor(tgt.pos.x, tgt.pos.z, tgt.pos.y); if (!isFinite(this.erupt.c.y)) this.erupt.c.y = tgt.pos.y; this.tele = G.fx.telegraph(this.erupt.c, 2.6, 0.85, 0xb06020); }
         if (this.erupt) {
           this.erupt.t += dt;
           if (this.erupt.t > 0.85) {
@@ -1115,7 +1115,7 @@
           }
           return out;
         }
-        const f = G.world.flowDir(this.pos.x, this.pos.z, out);
+        const f = G.world.flowDir(this.pos.x, this.pos.z, out, this.pos.y);
         if (!f) { out.x = toT.x / l; out.z = toT.z / l; }
         out.speed = this.speed * 1.4;
         return out;
@@ -1146,10 +1146,10 @@
       if (pd < pr && pd > 0.001 && Math.abs(this.pos.y - P.pos.y) < 1.8) { dx += px / pd * (pr - pd) * 10; dz += pz / pd * (pr - pd) * 10; }
       this.mv = U.damp(this.mv, Math.min(1, Math.hypot(mx, mz) * speed / Math.max(1, this.speed)), 8, dt);
       this.walk += Math.hypot(dx, dz) * dt * (3.2 / Math.max(0.6, this.model.scale));
-      if (this.burrowed) { this.pos.x += dx * dt; this.pos.z += dz * dt; const f = w.navFloor(this.pos.x, this.pos.z); if (isFinite(f)) this.pos.y = f; this.clampBounds(); return; }
+      if (this.burrowed) { this.pos.x += dx * dt; this.pos.z += dz * dt; const f = w.navFloor(this.pos.x, this.pos.z, this.pos.y); if (isFinite(f)) this.pos.y = f; this.clampBounds(); return; }
       if (fly) {
         // 3D: maintain altitude above floor
-        const fl = w.navFloor(this.pos.x, this.pos.z);
+        const fl = w.navFloor(this.pos.x, this.pos.z, this.pos.y);
         // pressed against a wall: climb over it
         this.climb = this.hitWallFlag ? Math.min(7, (this.climb || 0) + dt * 6) : Math.max(0, (this.climb || 0) - dt * 1.5);
         const ty = Math.max(isFinite(fl) ? fl : 0, P.pos.y) + (this.def.hover ? 0.2 : this.alt) + this.climb;
@@ -1168,6 +1168,15 @@
         this.grounded = false;
         return;
       }
+      // strata: walkers never step out over the lava trench; one that lands in it anyway is thrown back out, like off a trampoline
+      if (w.trench) {
+        if (this.tramp) { dx = this.tramp.vx; dz = this.tramp.vz; this.tramp.t -= dt; if (this.tramp.t <= 0 || (this.grounded && this.tramp.t < 0.9)) this.tramp = null; }
+        else {
+          const r = Math.min(this.radius, 0.6) + 0.15;
+          if (dx && !w.walkerSafe(this.pos, this.pos.x + dx * dt + Math.sign(dx) * r, this.pos.z)) { dx = 0; this.vel.x = 0; }
+          if (dz && !w.walkerSafe(this.pos, this.pos.x, this.pos.z + dz * dt + Math.sign(dz) * r)) { dz = 0; this.vel.z = 0; }
+        }
+      }
       this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.6, this.pos.y + this.height);
       // vertical / ground
       this.vel.y -= 22 * dt;
@@ -1177,6 +1186,14 @@
       if (top > -Infinity && ny <= top) { this.pos.y = U.damp(this.pos.y, top, 18, dt); if (top - this.pos.y < 0.02) this.pos.y = top; if (this.vel.y < 0) this.vel.y = 0; this.grounded = true; }
       else { this.pos.y = ny; this.grounded = false; }
       if (this.pos.y < w.killY) { this.hp = 0; C.killEnemy(this, { src: 'fall' }, 0); }
+      if (w.trench && this.grounded && !this.tramp && this.pos.y < w.trench.y + 0.6 && this.pos.z > w.trench.z0 && this.pos.z < w.trench.z1) {
+        const T = w.trench, toN = this.pos.z - T.z0 < T.z1 - this.pos.z, tz = toN ? T.z0 - 1.8 : T.z1 + 1.8;
+        this.vel.y = 12.5; this.grounded = false;
+        this.tramp = { vx: 0, vz: (tz - this.pos.z) / 1.05, t: 1.25 };
+        G.fx.flash(this.pos.clone().setY(this.pos.y + 0.3), T.blue ? 0x4a9cff : 0xff7a30, 30, 0.25, 6);
+        for (let k = 0; k < 6; k++) G.fx.flameLick(this.pos.x + U.rand(-0.6, 0.6), this.pos.y + 0.05, this.pos.z + U.rand(-0.6, 0.6), U.rand(1.2, 2), T.blue ? 0x4a9cff : undefined);
+        G.sfx.bounce(this.pos, 9); G.sfx.lava(this.pos);
+      }
       this.clampBounds();
     }
     clampBounds() { const w = G.world; this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); }
@@ -1347,7 +1364,7 @@
       const k = Math.min(1, this.deathT / 0.6);
       m.inner.rotation.z = k * 1.45 * (this.yaw > 0 ? 1 : -1);
       m.inner.position.y = -k * this.radius * 0.4;
-      if (this.flyer && this.pos.y > G.world.navFloor(this.pos.x, this.pos.z) + 0.3) this.pos.y -= dt * 8;
+      if (this.flyer && this.pos.y > G.world.navFloor(this.pos.x, this.pos.z, this.pos.y) + 0.3) this.pos.y -= dt * 8;
       m.group.position.copy(this.pos);
       if (this.deathT > 1.6 && !this.corpse) {
         const s = Math.max(0.001, 1 - (this.deathT - 1.6) * 2.5);
@@ -1444,7 +1461,7 @@
       flowT = 0.3;
       const d = C.getDecoy();
       const tp = d ? d.pos : P.pos;
-      G.world.updateFlow(tp.x, tp.z);
+      G.world.updateFlow(tp.x, tp.z, tp.y);
     }
     for (let i = E.list.length - 1; i >= 0; i--) {
       const e = E.list[i];

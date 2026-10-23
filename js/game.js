@@ -1475,7 +1475,7 @@
       else if (it.type === 'npc' && !it.used) consider(it.pos, 1.0, { type: 'npc', it }, 4);
       else if (it.type === 'shrine' && !it.used) consider(it.pos, 1.2, { type: 'shrine', it }, 4);
       else if (it.type === 'anvil') consider(it.pos, 1.2, { type: 'anvil', it }, 4);
-      else if (it.type === 'celldoor' && it.door.state === 'closed') consider(it.pos, 1.0, { type: 'celldoor', it }, 3.4);
+      else if (it.type === 'celldoor' && it.door.state !== 'broken') consider(it.pos, 1.0, { type: 'celldoor', it }, 3.4);
     }
     lookTarget = best;
     G.ui.holdRing(-1); // shown again below while a search is running
@@ -1533,7 +1533,12 @@
       return;
     } else if (best.type === 'celldoor') {
       // a prison cell's iron gate (strata fields): one press, keep looking at it for 2 s
-      const it = best.it, S = GM.search && GM.search.it === it ? GM.search : null, dur = GM.searchDur(2);
+      const it = best.it, closing = it.door.state === 'open', tgt = closing ? (it.closer || (it.closer = { door: it.door })) : it, S = GM.search && GM.search.it === tgt ? GM.search : null, dur = GM.searchDur(2);
+      if (closing) { // an open gate can be shut again: the same hold, and only when nobody stands in the doorway
+        G.ui.showInteract({ key: 'cdoorc' + (S ? 's' : ''), icon: '🔒', name: '鉄格子の扉', rc: '#9aa4b0', cat: `閉める — ${dur.toFixed(1)}秒`, desc: S ? '閉めている… 視点を大きく外したり離れると最初からやり直し' : '一度押して、そのまま扉を見続ける', action: '閉める' });
+        if (I.hit('interact') && !S) GM.startSearch(tgt, it.pos, 2, '🔒', () => { if (!G.Strata.closeDoor(it.door)) G.ui.toastSmall('🚪 扉の前に誰かいて閉められない'); }, '扉を閉めている…');
+        return;
+      }
       G.ui.showInteract({ key: 'cdoor' + (S ? 's' : ''), icon: '🔓', name: '鉄格子の扉', rc: '#9aa4b0', cat: `開ける — ${dur.toFixed(1)}秒`, desc: S ? '開けている… 視点を大きく外したり離れると最初からやり直し' : '一度押すと開け始める。終わるまで扉から目を離さないこと。', action: S ? '開けている…' : '開ける' });
       if (I.hit('interact') && !S) GM.startSearch(it, it.pos, 2, '🔓', () => G.Strata.openDoor(it.door), '扉を開けている…');
       return;
@@ -1868,6 +1873,7 @@
   // ---------------- world ambience ----------------
   const flameAcc = new Map();
   const FIRE_COL = [0xff4a10, 0xff6a18, 0xff8a28, 0xffb040];
+  const BLUE_COL = [0x1040ff, 0x2a6aff, 0x4a8aff, 0x80b8ff];
   function updateFireBeds(w, cp, dt) {
     if (!w.fireRects || !w.fireRects.length) return;
     // budget the flames: the nearest beds burn densest, long beams only burn around the camera
@@ -1886,9 +1892,9 @@
       while (r.acc >= 1) {
         r.acc -= 1;
         const x = U.rand(sx0, sx1), z = U.rand(sz0, sz1), s = r.low ? U.rand(1.5, 2.3) : U.rand(2.2, 3.6);
-        G.fx.flameLick(x, r.y + 0.1, z, s, FIRE_COL[(Math.random() * 4) | 0]);
+        G.fx.flameLick(x, r.y + 0.1, z, s, (r.blue ? BLUE_COL : FIRE_COL)[(Math.random() * 4) | 0]);
         // long walkways / beams burn low and clean (they run across the view); short perches roar
-        if (r.low) { if (Math.random() < 0.3) G.fx.flame.spawn(x, r.y + 0.2, z, U.rand(-0.2, 0.2), U.rand(1.6, 2.8), U.rand(-0.2, 0.2), U.rand(0.35, 0.55), U.rand(0.6, 0.9), 0.1, 1.8, 0.55, 0.12, 1, -1, 1.2); if (Math.random() < 0.3) G.fx.norm.spawn(x, r.y + 0.2, z, 0, U.rand(1.2, 2), 0, 0.4, 0.5, 0.1, 1.0, 0.35, 0.04, 0.85, -0.8, 1); continue; }
+        if (r.low) { if (Math.random() < 0.3) G.fx.flame.spawn(x, r.y + 0.2, z, U.rand(-0.2, 0.2), U.rand(1.6, 2.8), U.rand(-0.2, 0.2), U.rand(0.35, 0.55), U.rand(0.6, 0.9), 0.1, r.blue ? 0.15 : 1.8, 0.55, r.blue ? 1.8 : 0.12, 1, -1, 1.2); if (Math.random() < 0.3) G.fx.norm.spawn(x, r.y + 0.2, z, 0, U.rand(1.2, 2), 0, 0.4, 0.5, 0.1, r.blue ? 0.08 : 1.0, 0.35, r.blue ? 1.0 : 0.04, 0.85, -0.8, 1); continue; }
         // tall roaring tongues (well above the rim, so they show from the ground), embers and black smoke
         if (Math.random() < 0.75) G.fx.flame.spawn(x, r.y + 0.3, z, U.rand(-0.35, 0.35), U.rand(3.5, 6.5), U.rand(-0.35, 0.35), U.rand(0.45, 0.8), U.rand(0.9, 1.6), 0.15, 1.8, U.rand(0.45, 0.75), 0.1, 1, -2, 1.1);
         if (Math.random() < 0.18) G.fx.add.spawn(x, r.y + 0.3, z, U.rand(-1, 1), U.rand(2, 5.5), U.rand(-1, 1), U.rand(0.8, 1.7), 0.05, 0.01, 1.7, 0.6, 0.15, 1, -0.4, 0.4);

@@ -69,7 +69,8 @@
       ex.light.on = true; ex.light.intensity = 30; ex.light.color = T.color;
       if (ex.glow) ex.glow.material.color.set(T.color);
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(T), transparent: true, depthWrite: false }));
-      sp.scale.set(5.6, 2.4, 1); sp.position.set(ex.x, 10.4, 1.2);
+      ex.labelY = w.strata ? 12.8 : 10.4; // the stacked-storey fields burn the ledge under the sign: hang it higher
+      sp.scale.set(5.6, 2.4, 1); sp.position.set(ex.x, ex.labelY, 1.2);
       w.group.add(sp); ex.label = sp;
     });
     if (!instant) { G.sfx.stoneGrind(V(w.W / 2, 2, 0), 2); G.sfx.bell(); }
@@ -432,7 +433,7 @@
       if (it.model && it.model.animate) it.model.animate({ walk: 0, mv: 0, atk: 0, wind: Math.max(0, Math.sin(GM.time * 0.9)) * 0.25, flinch: 0, t: GM.time });
       if (it.model && it.type === 'npc') { const to = P.pos.clone().sub(it.model.group.position); it.model.group.rotation.y = Math.atan2(to.x, to.z); if (it.used && it.model.group.visible) { it.model.group.visible = false; G.fx.smoke(it.pos, 12, 1, 0x4a3a5a, 0.6, 1.2); } }
     }
-    for (const ex of w.exits || []) if (ex.label) { ex.label.position.y = 10.4 + Math.sin(GM.time * 1.5 + ex.idx) * 0.12; }
+    for (const ex of w.exits || []) if (ex.label) { ex.label.position.y = (ex.labelY || 10.4) + Math.sin(GM.time * 1.5 + ex.idx) * 0.12; }
     AR.exitMarks(w);
     if (GM.ambushReward && G.enemies.aliveCount() === 0) { GM.ambushReward = false; GM.spawnChestNear(2); G.ui.toast('👑 待ち伏せを退けた！ 宝箱が残された', 'good'); }
   };

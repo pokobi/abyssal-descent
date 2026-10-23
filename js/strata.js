@@ -317,6 +317,17 @@
     }
     w.nooks = ctx.nooks;
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0, notches: ctx.notches });
+    // the lintel over each exit gate is a ledge a running jump can reach: it burns (blue flames on the fourth field), has an invisible column
+    // over it so there is nowhere to stand, and the exit sign hangs well above the flames (areas.js)
+    w.fireRects = w.fireRects || [];
+    for (const gx of LG.gateXs(W, gates || 1)) {
+      const x0 = gx - 4.6, x1 = gx + 4.6, z0 = 0, z1 = 1.45, yT = 8.9;
+      w.batch.box('iron', x0, yT, z0, x1, yT + 0.16, z1, { tint: [0.13, 0.12, 0.12], grad: false });
+      w.batch.box('glow', x0 + 0.1, yT + 0.16, z0 + 0.1, x1 - 0.1, yT + 0.18, z1 - 0.1, { tint: ruined ? [0.1, 0.3, 1] : [1, 0.3, 0.05], grad: false });
+      w.fireRects.push({ x0, x1, z0, z1, y: yT + 0.18, acc: 0, low: true, blue: !!ruined });
+      const gc = w.addCollider(x0 - 0.06, yT, z0 - 0.06, x1 + 0.06, yT + 3, z1 + 0.06, { noGrapple: true, surf: 'stone' }); gc.ghost = true; gc.noFire = true;
+      w.addLight(gx, yT + 1.4, 0.8, { flame: 0, emit: false, intensity: 8, range: 10, color: ruined ? '#4a8aff' : '#ff5a18', prio: 0.55 });
+    }
 
     // ---- the slabs (ragged along the chasm, cut around the holes), their railings, edge trim ----
     for (const s of ['W', 'E']) for (let k = 1; k < NL; k++) {
@@ -527,6 +538,7 @@
     for (const d of S.doors) {
       if (!d.g) continue;
       if (d.state === 'open' && d.ang < 1.75) d.ang = Math.min(1.75, d.ang + dt * 2.6);
+      else if (d.state === 'closed' && d.ang > 0) d.ang = Math.max(0, d.ang - dt * 2.6);
       if (d.state === 'broken' && d.fall < 1) d.fall = Math.min(1, d.fall + dt * 3.2);
       d.shake = Math.max(0, d.shake - dt * 4);
       d.g.rotation.set(-d.face * d.fall * 1.45, -Math.PI / 2 + d.face * d.sg * d.ang, 0);
@@ -588,6 +600,16 @@
     if (d.state !== 'closed') return;
     free(d, 'open');
     G.sfx.chestUnlock(doorPos(d)); G.sfx.chain(0.35, 0.3);
+  };
+  // shutting an open gate again (the player holds interact, like opening it); not while anybody stands in the doorway
+  S.closeDoor = function (d) {
+    if (d.state !== 'open') return false;
+    const inDoor = (p, r) => Math.abs(p.x - d.plane) < 1.1 + r && p.z > d.lo - 0.4 - r && p.z < d.hi + 0.4 + r && p.y > d.y - 1.5 && p.y < d.y + d.h;
+    if (inDoor(G.player.pos, 0.3)) return false;
+    for (const e of G.enemies.list) if (e.alive && inDoor(e.pos, e.radius || 0.5)) return false;
+    d.state = 'closed'; d.col.alive = true; d.it.opened = false;
+    G.sfx.chain(0.35, 0.3); G.sfx.mech && G.sfx.mech('click', 0, 0.8);
+    return true;
   };
   S.breakDoor = function (d) {
     if (d.state !== 'closed') return;

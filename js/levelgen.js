@@ -1557,7 +1557,7 @@
     }
   }
   function fireTops(w, o) {
-    w.fireRects = [];
+    w.fireRects = w.fireRects || []; // (the stacked-storey fields add their own gate-ledge fires before this)
     const W = w.W;
     if (o.boss) { w.fireY = LG.FIRE_Y; w.fireZ = o.AD + 1; }
     const plats = w.platTops || [];

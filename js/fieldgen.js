@@ -127,26 +127,9 @@
     const nch = opts.chandeliers ?? 2;
     for (let i = 0; i < nch; i++) P().chandelier(w, rng.range(x0 + 10, x1 - 10), y - rng.range(4, 6), rng.range(z0 + 12, z1 - 12), y - 0.7);
   };
-  // a wooden ramp: shallow plank steps with side rails and support posts
+  // a wooden ramp: shallow plank steps, no rails (only the planks)
   F.ramp = function (w, side, e, c, wd, h0, h1) {
-    const len = H.stairs(w, side, e, c, wd, h0, h1, 'wood');
-    const sg = side === 'S' || side === 'E' ? 1 : -1;
-    const along = side === 'N' || side === 'S';
-    for (let i = 0; i <= Math.ceil(len / 2.2); i++) {
-      const u = e + sg * Math.min(len, i * 2.2);
-      const k = Math.min(1, i * 2.2 / len), top = h1 - (h1 - h0) * k + 0.95;
-      for (const s of [-1, 1]) {
-        const v = c + s * (wd / 2 + 0.08);
-        if (along) w.visual('woodDark', v - 0.06, h0, u - 0.06, v + 0.06, top, u + 0.06, { uv: 1 }); else w.visual('woodDark', u - 0.06, h0, v - 0.06, u + 0.06, top, v + 0.06, { uv: 1 });
-      }
-    }
-    // hand rails (thin colliders so you don't fall off; walkers keep to the planks)
-    for (const s of [-1, 1]) {
-      const v = c + s * (wd / 2 + 0.08);
-      const ua = Math.min(e, e + sg * len), ub = Math.max(e, e + sg * len);
-      if (along) w.addCollider(v - 0.05, h0, ua, v + 0.05, h1 + 0.95, ub, { surf: 'wood', noGrapple: true }); else w.addCollider(ua, h0, v - 0.05, ub, h1 + 0.95, v + 0.05, { surf: 'wood', noGrapple: true });
-    }
-    return len;
+    return H.stairs(w, side, e, c, wd, h0, h1, 'wood');
   };
   // ---------------------------------------------------------------- shared area plumbing
   function base(area, seed, biomeKey, sz) {
@@ -166,6 +149,7 @@
   }
   function finish(w, rng, occ, W, D, area, kind, extraChests) {
     if (G.Fields) G.Fields.place(w, rng, occ, W, D, area);
+    if (G.Graves) G.Graves.scatter(w, rng, occ, W, D, w.biome === 'grave' ? 1 : 2);
     H.placeChests(w, rng, occ, (kind === 'vault' ? 6 : (area <= 4 ? 2 : rng.chance(0.75) ? 1 : 0) + (rng.chance(0.25) ? 1 : 0)) + (extraChests || 0), area);
     w.miniSlots = [-6, -2, 2].map((dx) => ({ x: W / 2 + dx, y: 1.15, z: 12, face: 1 })); w.miniHeal = V(W / 2 + 6, 0, 12);
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };

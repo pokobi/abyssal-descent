@@ -90,7 +90,7 @@
   // ---------------- world ----------------
   class World {
     constructor(W, D, biome) {
-      this.W = W; this.D = D; this.biome = biome; this.zo = 0; this.Dn = D;
+      this.W = W; this.D = D; this.biome = biome; this.zo = 0; this.Dn = D; this.xo = 0; this.Wn = W;
       this.mats = G.Tex.materials(biome);
       this.batch = new Batch();
       this.colliders = [];
@@ -141,6 +141,7 @@
         const a = this.hash.get(this._hkey(cx, cz)); if (!a) continue;
         for (const c of a) {
           if (c.st === this.stamp || !c.alive) continue; c.st = this.stamp;
+          if (c.enemyOnly && this.pp) continue; // this.pp: set while the player moves
           if (c.x1 > x0 && c.x0 < x1 && c.y1 > y0 && c.y0 < y1 && c.z1 > z0 && c.z0 < z1) out.push(c);
         }
       }
@@ -170,6 +171,7 @@
         const a = this.hash.get(this._hkey(cx, cz));
         if (a) for (const c of a) {
           if (c.st === st || !c.alive) continue; c.st = st;
+          if (c.enemyOnly) continue;
           if (c.ghost && !(opts && opts.ghost)) continue; // invisible anti-perch walls don't stop shots, sight or the grapple
           if (filt && !filt(c)) continue;
           if (c.bars && !(opts && opts.bars)) continue; // cell bars: shots and sight pass between them
@@ -264,41 +266,44 @@
     // ---- nav grid (1m) ----
     // A world with storeys over storeys (this.navLayers > 1, the strata fields) keeps one nav node per walkable surface in a
     // cell: node = layer * N + cell, layers sorted bottom-up. Ordinary worlds have one layer, so node == cell as before.
-    // navPad (strata fields): extra nav rows beyond the north and south walls, for the barred rooms dug into them; row r is z = r - navPad.
+    // navPadX / navPad (strata fields): extra nav columns / rows beyond the walls, for the barred rooms dug into them; column c is x = c - navPadX, row r is z = r - navPad.
     buildNav() {
-      const W = this.W, zo = this.navPad || 0, D = this.D + 2 * zo;
-      this.zo = zo; this.Dn = D;
+      const xo = this.navPadX || 0, zo = this.navPad || 0, W = this.W + 2 * xo, D = this.D + 2 * zo;
+      this.xo = xo; this.zo = zo; this.Wn = W; this.Dn = D;
       const N = W * D, LM = this.navLayers || 1;
-      const per = [];
+      const per = [], perc = [];
       const tmp = [];
       let L = 1;
       for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
-        const cx = x + 0.5, cz = z - zo + 0.5;
+        const cx = x - xo + 0.5, cz = z - zo + 0.5;
         tmp.length = 0;
         this.query(cx - 0.01, -60, cz - 0.01, cx + 0.01, 60, cz + 0.01, tmp);
         tmp.sort((a, b) => a.y0 - b.y0);
         let floor = -Infinity;
-        const ts = [];
+        const ts = [], cs = [];
         for (const c of tmp) {
           if (c.dest || c.navIgnore) continue;
           if (floor === -Infinity) { floor = c.y1; continue; }
           if (c.y0 <= floor + 0.8) floor = Math.max(floor, c.y1);
-          else if (LM > 1) { ts.push(floor); floor = c.y1; }
+          else if (LM > 1) { ts.push(floor); cs.push(c.y0); floor = c.y1; }
         }
         if (floor > -Infinity || !ts.length) ts.push(floor);
         if (ts.length > LM) ts.length = LM;
-        per.push(ts); if (ts.length > L) L = ts.length;
+        per.push(ts); perc.push(cs); if (ts.length > L) L = ts.length;
       }
       this.N = N; this.L = L;
       this.nf = new Float32Array(N * L).fill(-Infinity);
       this.nb = new Uint8Array(N * L).fill(1);
       this.nhz = L > 1 ? new Uint8Array(N * L) : null;
+      this.nc = L > 1 ? new Float32Array(N * L).fill(1e9) : null; // the open air above each surface ends at nc (the underside of whatever is above it)
       this.npen = new Float32Array(N * L);
+      this.aadj = null; this.ndistA = null;
       for (let i = 0; i < N; i++) {
-        const ts = per[i], cx = (i % W) + 0.5, cz = ((i / W) | 0) - zo + 0.5;
+        const ts = per[i], cx = (i % W) - xo + 0.5, cz = ((i / W) | 0) - zo + 0.5;
         for (let k = 0; k < ts.length; k++) {
           const n = k * N + i, floor = ts[k];
           this.nf[n] = floor;
+          if (this.nc && k < perc[i].length) this.nc[n] = perc[i][k];
           if (floor === -Infinity) { this.nb[n] = 1; continue; }
           // blocked if something solid occupies body space near the cell center
           tmp.length = 0;
@@ -313,7 +318,7 @@
       for (const c of this.colliders) {
         if (!c.navBlock || c.alive === false) continue;
         this.nbk = this.nbk || new Uint8Array(N * L);
-        for (let z = Math.floor(c.z0 + zo - 0.001); z <= Math.floor(c.z1 + zo - 0.001); z++) for (let x = Math.floor(c.x0 + 0.001); x <= Math.floor(c.x1 - 0.001); x++) {
+        for (let z = Math.floor(c.z0 + zo - 0.001); z <= Math.floor(c.z1 + zo - 0.001); z++) for (let x = Math.floor(c.x0 + xo + 0.001); x <= Math.floor(c.x1 + xo - 0.001); x++) {
           if (x < 0 || x >= W || z < 0 || z >= D) continue;
           for (let k = 0; k < L; k++) { const n = k * N + z * W + x; if (this.nf[n] > -Infinity && this.nf[n] > c.y0 - 0.3 && this.nf[n] < c.y1 - 1) { this.nb[n] = 1; this.nbk[n] = 1; } }
         }
@@ -368,8 +373,8 @@
     }
     // y (optional): the surface at or just below that height (strata); without it, the lowest one
     navIdx(x, z, y) {
-      const xi = Math.floor(x), zi = Math.floor(z) + this.zo; if (xi < 0 || zi < 0 || xi >= this.W || zi >= this.Dn) return -1;
-      const i = zi * this.W + xi;
+      const xi = Math.floor(x) + this.xo, zi = Math.floor(z) + this.zo; if (xi < 0 || zi < 0 || xi >= this.Wn || zi >= this.Dn) return -1;
+      const i = zi * this.Wn + xi;
       if (this.L > 1 && y !== undefined) {
         let best = i;
         for (let k = 1; k < this.L; k++) { const n = k * this.N + i, f = this.nf[n]; if (f === -Infinity || f > y + 0.6) break; best = n; }
@@ -377,11 +382,82 @@
       }
       return i;
     }
-    // z limits of movement at (x, y): the area itself, plus the barred rooms dug into the north / south walls (strata fields)
-    zLimits(x, y, r) {
-      let lo = r, hi = this.D - r;
-      if (this.nooks) for (const n of this.nooks) if (x > n.x0 - 0.2 && x < n.x1 + 0.2 && y > n.y0 - 1.2 && y < n.y1 + 1) { if (n.side === 'N') lo = Math.min(lo, n.zlo + r); else hi = Math.max(hi, n.zhi - r); }
+    // movement limits at (z, y): the area itself, plus the barred rooms dug into the west / east walls (strata fields); returns [xlo, xhi]
+    xLimits(z, y, r) {
+      let lo = r, hi = this.W - r;
+      if (this.nooks) for (const n of this.nooks) if (z > n.a0 - 0.2 && z < n.a1 + 0.2 && y > n.y0 - 1.2 && y < n.y1 + 1) { if (n.side === 'W') lo = Math.min(lo, n.lo + r); else hi = Math.max(hi, n.hi - r); }
       return [lo, hi];
+    }
+    // ---- air routes for flyers (strata fields) ----
+    // A surface node's open air runs from its floor up to nc. Two nodes of neighbouring cells connect if their air overlaps by a flyer's height,
+    // so a flyer can cross the chasm (open air at every height) and slip between the storeys, but never through a slab.
+    airOK(a, b) {
+      if (this.nf[a] > this.airMaxY || this.nf[b] > this.airMaxY) return false;
+      return Math.min(this.nc[a], this.nc[b]) - Math.max(this.nf[a], this.nf[b]) - 0.2 >= 1.8;
+    }
+    buildAir() {
+      const W = this.Wn, D = this.Dn, N = this.N, L = this.L, NL = N * L;
+      const cnt = new Int32Array(NL + 1), fromList = [];
+      const cells = new Int32Array(8);
+      for (let a = 0; a < NL; a++) {
+        if (this.nf[a] === -Infinity || this.nf[a] > this.airMaxY) continue;
+        const i = a % N, x = i % W, z = (i / W) | 0;
+        for (let d = 0; d < 8; d++) {
+          const xx = x + DIRS[d][0], zz = z + DIRS[d][1];
+          if (xx < 0 || zz < 0 || xx >= W || zz >= D) continue;
+          const cb = zz * W + xx;
+          for (let k = 0; k < L; k++) { const b = k * N + cb; if (this.nf[b] === -Infinity) break; if (this.airOK(a, b)) { fromList.push(a, b, d); cnt[b + 1]++; } }
+        }
+      }
+      for (let b = 0; b < NL; b++) cnt[b + 1] += cnt[b];
+      const ra = new Int32Array(cnt[NL]), rd = new Uint8Array(cnt[NL]), fill = cnt.slice(0, NL);
+      for (let e = 0; e < fromList.length; e += 3) { const b = fromList[e + 1], p = fill[b]++; ra[p] = fromList[e]; rd[p] = fromList[e + 2]; }
+      this.aadj = { rs: cnt, ra, rd };
+    }
+    // flyers' distance field towards (tx, tz, ty); stops as soon as every wanted node (the flyers' own) is settled
+    updateAirFlow(tx, tz, ty, wanted) {
+      if (!this.nc) return false;
+      if (this.airMaxY === undefined) this.airMaxY = (this.strata ? this.strata.HT : 1e9) - 1;
+      if (!this.aadj) { this.buildAir(); this.ndistA = new Float32Array(this.N * this.L); }
+      let t = this.navIdx(tx, tz, ty); if (t < 0) return false;
+      const dist = this.ndistA; dist.fill(Infinity);
+      const heap = this.heap, hk = this.hkey; let hn = 0;
+      const push = (i, k) => { let n = hn++; heap[n] = i; hk[n] = k; while (n > 0) { const p = (n - 1) >> 1; if (hk[p] <= hk[n]) break; const ti = heap[p], tk = hk[p]; heap[p] = heap[n]; hk[p] = hk[n]; heap[n] = ti; hk[n] = tk; n = p; } };
+      const pop = () => { const r = heap[0]; hn--; heap[0] = heap[hn]; hk[0] = hk[hn]; let n = 0; for (;;) { const l = n * 2 + 1, rr = l + 1; let m = n; if (l < hn && hk[l] < hk[m]) m = l; if (rr < hn && hk[rr] < hk[m]) m = rr; if (m === n) break; const ti = heap[m], tk = hk[m]; heap[m] = heap[n]; hk[m] = hk[n]; heap[n] = ti; hk[n] = tk; n = m; } return r; };
+      const want = new Set(wanted || []); let left = want.size;
+      const { rs, ra, rd } = this.aadj;
+      dist[t] = 0; push(t, 0);
+      let pops = 0;
+      while (hn > 0 && pops++ < this.N * this.L * 4) {
+        const kTop = hk[0], b = pop();
+        if (kTop > dist[b]) continue;
+        if (want.has(b)) { want.delete(b); if (--left <= 0) break; }
+        for (let e = rs[b], e1 = rs[b + 1]; e < e1; e++) {
+          const a = ra[e], nd = dist[b] + (DIAG[rd[e]] ? 1.414 : 1);
+          if (nd < dist[a]) { dist[a] = nd; push(a, nd); }
+        }
+      }
+      return true;
+    }
+    // the way on for a flyer at (x, y, z): direction (out.x, out.z) and the altitude band [out.lo, out.hi] to fly in; null if there is no route
+    airDir(x, z, y, out) {
+      if (!this.ndistA) return null;
+      const i = this.navIdx(x, z, y); if (i < 0 || this.ndistA[i] === Infinity) return null;
+      const W = this.Wn, N = this.N, ic = i % N, ix = ic % W, iz = (ic / W) | 0;
+      let best = this.ndistA[i], bb = -1, bd = -1;
+      for (let d = 0; d < 8; d++) {
+        const xx = ix + DIRS[d][0], zz = iz + DIRS[d][1]; if (xx < 0 || zz < 0 || xx >= W || zz >= this.Dn) continue;
+        for (let k = 0; k < this.L; k++) { const b = k * N + zz * W + xx; if (this.nf[b] === -Infinity) break; if (this.ndistA[b] < best && this.airOK(i, b)) { best = this.ndistA[b]; bb = b; bd = d; } }
+      }
+      if (bb < 0) return null;
+      out.x = DIRS[bd][0]; out.z = DIRS[bd][1]; const l = Math.hypot(out.x, out.z); out.x /= l; out.z /= l;
+      out.lo = Math.max(this.nf[i], this.nf[bb]) + 0.4; out.hi = Math.min(this.nc[i], this.nc[bb]) - 0.3;
+      return out;
+    }
+    // the altitude band of the air a flyer at (x, y, z) is in
+    airBand(x, z, y, out) {
+      const i = this.navIdx(x, z, y); if (i < 0 || !this.nc) return null;
+      out.lo = this.nf[i] + 0.4; out.hi = this.nc[i] - 0.3; return out;
     }
     navFloor(x, z, y) { const i = this.navIdx(x, z, y); return i < 0 ? -Infinity : this.nf[i]; }
     canStep(a, b) { // a->b walkable (for monsters)
@@ -391,7 +467,7 @@
     }
     // flood reachable set (forward edges) for validation
     reach(fromIdx) {
-      const W = this.W, D = this.Dn, N = this.N;
+      const W = this.Wn, D = this.Dn, N = this.N;
       const seen = new Uint8Array(N * (this.L || 1));
       const q = [fromIdx]; seen[fromIdx] = 1;
       while (q.length) {
@@ -408,7 +484,7 @@
     }
     // Dijkstra on reversed edges from target => ndist[i] = cost to reach target from i
     updateFlow(tx, tz, ty) {
-      const W = this.W, D = this.Dn, N = this.N, L = this.L || 1;
+      const W = this.Wn, D = this.Dn, N = this.N, L = this.L || 1;
       let t = this.navIdx(tx, tz, ty);
       if (t < 0) return;
       if (this.nb[t]) { // target inside blocked cell: use nearest open neighbour
@@ -467,7 +543,7 @@
     }
     // direction toward target following the flow field (null if unreachable)
     flowDir(x, z, out, y) {
-      const W = this.W, N = this.N;
+      const W = this.Wn, N = this.N;
       const i = this.navIdx(x, z, y);
       if (i < 0 || this.ndist[i] === Infinity) return null;
       const ic = i % N, ix = ic % W, iz = (ic / W) | 0;
@@ -484,7 +560,7 @@
       }
       if (!bx && !bz) return null;
       // aim at next cell center (smooths movement)
-      out.x = ix + bx + 0.5 - x; out.z = iz - this.zo + bz + 0.5 - z;
+      out.x = ix - this.xo + bx + 0.5 - x; out.z = iz - this.zo + bz + 0.5 - z;
       const l = Math.hypot(out.x, out.z) || 1; out.x /= l; out.z /= l;
       return out;
     }
@@ -499,12 +575,12 @@
     }
     randomOpenCell(rng, filter) {
       for (let k = 0; k < 400; k++) {
-        const x = Math.floor(rng.next() * this.W), z = Math.floor(rng.next() * this.Dn);
-        const i = (this.L > 1 ? Math.floor(rng.next() * this.L) * this.N : 0) + z * this.W + x;
+        const x = Math.floor(rng.next() * this.Wn), z = Math.floor(rng.next() * this.Dn);
+        const i = (this.L > 1 ? Math.floor(rng.next() * this.L) * this.N : 0) + z * this.Wn + x;
         if (this.nb[i] || this.nf[i] === -Infinity) continue;
         if (this.npen[i] > 0.4) continue;
-        if (filter && !filter(x + 0.5, z - this.zo + 0.5, i)) continue;
-        return { x: x + 0.5, y: this.nf[i], z: z - this.zo + 0.5, i };
+        if (filter && !filter(x - this.xo + 0.5, z - this.zo + 0.5, i)) continue;
+        return { x: x - this.xo + 0.5, y: this.nf[i], z: z - this.zo + 0.5, i };
       }
       return null;
     }

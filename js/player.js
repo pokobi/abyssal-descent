@@ -381,7 +381,7 @@
         if (g2 > -Infinity && this.pos.y - g2 < 0.58) { this.pos.y = g2; this.grounded = true; this.vel.y = 0; }
         else { this.grounded = false; this.coyote = 0.12; }
       } else this.grounded = false;
-      if (G.Strata.chains.length) G.Strata.support(this, dt, preVy);
+      if (G.Strata.ropes.length) G.Strata.support(this, dt, preVy);
       if (stepped > 0) { this.eyeOff -= Math.min(0.5, stepped); }
       // landing
       if (this.grounded && !wasGrounded) {
@@ -401,8 +401,8 @@
       if (this.pos.y < w.killY) this.fellInPit();
       const inTunnel = this.pos.z < 0.5 && (w.exits || []).some((ex) => this.pos.x > ex.gx0 && this.pos.x < ex.gx1);
       if (!inTunnel) {
-        this.pos.x = U.clamp(this.pos.x, 0.36, w.W - 0.36);
-        if (w.nooks) { const [lo, hi] = w.zLimits(this.pos.x, this.pos.y, 0.36); this.pos.z = U.clamp(this.pos.z, lo, hi); } else this.pos.z = U.clamp(this.pos.z, 0.36, w.D - 0.36);
+        this.pos.z = U.clamp(this.pos.z, 0.36, w.D - 0.36);
+        if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.36); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.36, w.W - 0.36);
       }
       // safe position memory
       if (this.grounded && !this.pileState) {
@@ -422,7 +422,7 @@
     }
     surfaceBelow() {
       if (this.inWater) return 'water';
-      if (G.Strata.onChain) return 'metal';
+      if (G.Strata.onRope) return 'metal';
       const a = G.world.query(this.pos.x - 0.1, this.pos.y - 0.1, this.pos.z - 0.1, this.pos.x + 0.1, this.pos.y + 0.01, this.pos.z + 0.1);
       let best = null; for (const c of a) if (!best || c.y1 > best.y1) best = c;
       return best ? best.surf : 'stone';
@@ -449,7 +449,7 @@
       // hazards / surfaces
       this.inWater = false;
       for (const z of w.waterZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < 0.2) this.inWater = true;
-      if (this.grounded && !G.Strata.onChain) for (const z of w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
+      if (this.grounded && !G.Strata.onRope) for (const z of w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
         this._lavaT = (this._lavaT || 0) - dt;
         if (this._lavaT <= 0) { this._lavaT = 0.4; G.combat.damagePlayer(5 + G.game.area * 0.6, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }
         // lava sets you alight with a fierce, long burn (it hurts several times more than an ordinary one)

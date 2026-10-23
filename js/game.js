@@ -107,6 +107,7 @@
     G.world = w;
     w.finalize(scene, G.save.data.settings.quality);
     G.Strata.build(w);
+    G.Graves.build(w);
     const B = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
     scene.fog.color.set(B.fog); scene.fog.density = B.fogD;
     scene.background = new THREE.Color(B.fog);
@@ -771,9 +772,10 @@
     const w = G.world, r = GM.arng, n = GM.area;
     const pool = enemyPool(n);
     const def = opts.def || r.weighted(pool, (p) => p[1])[0];
-    const c = w.randomOpenCell(r, (x, z, idx) => (!w.reachMask || w.reachMask[idx]) && Math.hypot(x - P.pos.x, z - P.pos.z) > (opts.near ? 10 : opts.wave ? 13 : 17) && Math.hypot(x - P.pos.x, z - P.pos.z) < (opts.wave ? 40 : 60));
+    // opts.at: a fixed spot (a spawn grave) instead of a random open cell
+    const c = opts.at ? { x: opts.at.x, y: opts.at.y, z: opts.at.z } : w.randomOpenCell(r, (x, z, idx) => (!w.reachMask || w.reachMask[idx]) && Math.hypot(x - P.pos.x, z - P.pos.z) > (opts.near ? 10 : opts.wave ? 13 : 17) && Math.hypot(x - P.pos.x, z - P.pos.z) < (opts.wave ? 40 : 60));
     if (!c) return null;
-    const pos = V(c.x, c.y + (def.flyer ? 3 : 0), c.z);
+    const pos = V(c.x, c.y + (def.flyer ? (opts.at ? 1.4 : 3) : 0), c.z);
     const mods = GM.areaMods || { hp: 1, dmg: 1 };
     const elite = opts.elite || r.chance(Math.min(0.24, Math.max(0, n - 2) * 0.016) + (GM.stage === 'cursed' ? 0.3 : 0) + (P.has('pact_elite') ? 0.15 : 0));
     const lvl = G.Run.enemyLv(n) + r.int(0, 1) + (elite ? 2 : 0) + (opts.champion ? 2 : 0);
@@ -787,6 +789,7 @@
     if (opts.champion) { e.champion = true; e.makeCurseRing(0xff3018); }
     if (opts.champion) { e.eliteMod2 = U.pick([{ id: 'regen', icon: '💚' }, { id: 'rage', icon: '😡' }, { id: 'fast', icon: '💨' }]); if (e.eliteMod2.id === 'fast') e.speed *= 1.25; e.def = Object.assign({}, e.def, { name: '覇者・' + e.def.name }); }
     if (opts.mark) { e.marked = true; e.markTarget && e.markTarget(!!opts.champion); }
+    if (opts.grave) { e.graveSpawn = true; e.ignoreCount = true; } // raised by a spawn grave: outside the cap, the waves and the kill target
     G.Depth.onSpawn(e, opts);
     // shock resistance vs. the pile driver: appears from area 16, with levels I–III deeper down
     const dn = G.Run.depthArea(n);
@@ -817,7 +820,7 @@
   };
   GM.extraSpawned = function () { /* summoned / split foes no longer raise the kill target; waves only end when everything hostile is down */ };
   GM.onEnemyKilled = function (e) {
-    if (e.boss) return;
+    if (e.boss || e.graveSpawn) return;
     GM.areaKills++;
     const O = GM.objective;
     if (e.def.id === 'mimic_gold') {
@@ -858,7 +861,7 @@
   function sweepCleared() {
     if (!GM.clearSweep || !GM.areaCleared) return;
     for (const e of G.enemies.list) {
-      if (!e.alive || e.custom || e.ally || e.isTarget || e.def.id === 'mimic_gold' || e.def.id === 'mimic_trap') continue; // a mimic that bit after the clear is a fight you chose
+      if (!e.alive || e.custom || e.ally || e.isTarget || e.graveSpawn || e.def.id === 'mimic_gold' || e.def.id === 'mimic_trap') continue; // a mimic that bit after the clear is a fight you chose
       G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1);
       e.noReward = true; e.alive = false; e.dying = false; e.remove && e.remove();
     }
@@ -2014,7 +2017,8 @@
     GM.enemyTimeScale *= GM.enrage.tm;
     if (GM.dev) { if (GM.dev.freeze) GM.enemyTimeScale = 0; if (GM.dev.noCd) { for (const s of P.skills) if (s) { s.cd = 0; if (s.maxCharges) s.charges = s.maxCharges; } P.pileCd = 0; P.grappleCd = 0; } }
     if (GM.state === 'dead') { if (GM.deathFrozen) return; P.update(gdt); G.enemies.update(gdt); G.bosses.update(gdt); G.combat.update(gdt); G.fx.update(gdt, camera, renderer); G.LightPool.update(gdt, G.world, camera.position, GM.time); return; }
-    P.update(gdt);
+    if (G.world) G.world.pp = true; // the player's own movement does not see monster-only colliders (the tightrope)
+    try { P.update(gdt); } finally { if (G.world) G.world.pp = false; }
     G.weapons.update(gdt);
     G.abilities.update(gdt);
     G.enemies.update(gdt);
@@ -2027,6 +2031,7 @@
     updateHighFire(gdt);
     G.Fields.update(gdt);
     G.Strata.update(gdt);
+    G.Graves.update(gdt);
     G.Areas.update(gdt);
     G.Depth.update(gdt);
     G.PStatus.update(gdt);

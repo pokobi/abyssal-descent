@@ -216,20 +216,23 @@
     const gh = 6;
     if (OUT) opts.beams = 0;
     const gxs = opts.noExits ? [] : LG.gateXs(W, opts.gates || 1); // noExits: the last area of a run has no door onward, just wall
-    // opts.notches (strata fields): [{side: 'N' | 'S', x0, x1, y0, y1}] niches carved out of the north / south wall, from its inner face to the outside
+    // opts.notches (strata fields): [{side: 'N' | 'S' | 'W' | 'E', a0, a1, y0, y1}] niches carved out of a wall, from its inner face to the outside
+    // (a0..a1: the extent along the wall, x for N / S, z for W / E)
     const nts = opts.notches || [];
     const wallBlock = (side, xa, xb, ya, yb) => {
-      const za = side === 'N' ? -WALL_T : D, zb = side === 'N' ? 0 : D + WALL_T;
-      const hit = nts.filter((n) => n.side === side && n.x1 > xa && n.x0 < xb && n.y1 > ya && n.y0 < yb);
+      const alongX = side === 'N' || side === 'S';
+      const t0 = side === 'N' ? -WALL_T : side === 'S' ? D : side === 'W' ? -WALL_T : W, t1 = t0 + WALL_T;
+      const box = (a, b, y0, y1) => (alongX ? w.solid('block', a, y0, t0, b, y1, t1, { uv: 4 }) : w.solid('block', t0, y0, a, t1, y1, b, { uv: 4 }));
+      const hit = nts.filter((n) => n.side === side && n.a1 > xa && n.a0 < xb && n.y1 > ya && n.y0 < yb);
       const xs = [xa, xb];
-      for (const n of hit) xs.push(Math.max(xa, Math.min(xb, n.x0)), Math.max(xa, Math.min(xb, n.x1)));
+      for (const n of hit) xs.push(Math.max(xa, Math.min(xb, n.a0)), Math.max(xa, Math.min(xb, n.a1)));
       const ux = [...new Set(xs)].sort((p, q) => p - q);
       for (let i = 0; i < ux.length - 1; i++) {
         const a = ux[i], b = ux[i + 1], m = (a + b) / 2;
-        const cuts = hit.filter((n) => n.x0 < m && n.x1 > m).map((n) => [Math.max(n.y0, ya), Math.min(n.y1, yb)]).sort((p, q) => p[0] - q[0]);
+        const cuts = hit.filter((n) => n.a0 < m && n.a1 > m).map((n) => [Math.max(n.y0, ya), Math.min(n.y1, yb)]).sort((p, q) => p[0] - q[0]);
         let y = ya;
-        for (const [c0, c1] of cuts) { if (c0 > y) w.solid('block', a, y, za, b, c0, zb, { uv: 4 }); y = Math.max(y, c1); }
-        if (yb > y) w.solid('block', a, y, za, b, yb, zb, { uv: 4 });
+        for (const [c0, c1] of cuts) { if (c0 > y) box(a, b, y, c0); y = Math.max(y, c1); }
+        if (yb > y) box(a, b, y, yb);
       }
     };
     // south wall (z = D..D+T) — the sky island is open on the south/east/west edges
@@ -250,7 +253,7 @@
       const sideWall = (xa, xb) => {
         let z = sideZ0;
         for (const [a, b, y0, y1] of wins) { w.solid('block', xa, 0, z, xb, H, a, { uv: 4 }); w.solid('block', xa, 0, a, xb, y0, b, { uv: 4 }); w.solid('block', xa, y1, a, xb, H, b, { uv: 4 }); z = b; }
-        w.solid('block', xa, 0, z, xb, H, D, { uv: 4 });
+        wallBlock(xa < 0 ? 'W' : 'E', z, D, 0, H);
       };
       sideWall(-WALL_T, 0); sideWall(W, W + WALL_T);
     }
@@ -292,13 +295,16 @@
     for (let z = sp; z < D - 2; z += sp) {
       if (opts.voidArena && z < opts.arenaD + 2) continue;
       if (OUT === 'sky') { if (z % 16 === 0) { P().brazier(w, 1.4, 0, z, 1); P().brazier(w, W - 1.4, 0, z, 1); } continue; }
-      butt(0, z, 'W'); butt(0, z, 'E');
-      P().torch(w, 0, 3.3, z - sp / 2, 'px'); P().torch(w, W, 3.3, z - sp / 2, 'nx');
-      if (rng.chance(0.25)) P().banner(w, 0, Math.min(8.5, H - 1), z - sp / 2, 'px', Math.min(4, H - 3));
-      if (rng.chance(0.25)) P().banner(w, W, Math.min(8.5, H - 1), z - sp / 2, 'nx', Math.min(4, H - 3));
+      const sNot = (side, zz, r) => nts.some((n) => n.side === side && zz + r > n.a0 && zz - r < n.a1); // strata: no buttress / torch / banner where a room is dug into the wall
+      if (!sNot('W', z, 0.8)) butt(0, z, 'W');
+      if (!sNot('E', z, 0.8)) butt(0, z, 'E');
+      if (!sNot('W', z - sp / 2, 0.3)) P().torch(w, 0, 3.3, z - sp / 2, 'px');
+      if (!sNot('E', z - sp / 2, 0.3)) P().torch(w, W, 3.3, z - sp / 2, 'nx');
+      if (rng.chance(0.25) && !sNot('W', z - sp / 2, 1.5)) P().banner(w, 0, Math.min(8.5, H - 1), z - sp / 2, 'px', Math.min(4, H - 3));
+      if (rng.chance(0.25) && !sNot('E', z - sp / 2, 1.5)) P().banner(w, W, Math.min(8.5, H - 1), z - sp / 2, 'nx', Math.min(4, H - 3));
     }
     for (let x = sp; x < W - 2; x += sp) {
-      const notched = (side, xx, r) => nts.some((n) => n.side === side && xx + r > n.x0 && xx - r < n.x1); // strata: no buttress or torch where a room is dug into the wall
+      const notched = (side, xx, r) => nts.some((n) => n.side === side && xx + r > n.a0 && xx - r < n.a1); // strata: no buttress or torch where a room is dug into the wall
       if (Math.abs(x - W / 2) > 5 && OUT !== 'sky' && !notched('S', x, 0.8)) butt(x, 0, 'S');
       if (gxs.every((g) => Math.abs(x - g) > 5.2) && !notched('N', x, 0.8)) butt(x, 0, 'N');
       if (Math.abs(x - sp / 2 - W / 2) > 4 && OUT !== 'sky' && !notched('S', x - sp / 2, 0.3)) P().torch(w, x - sp / 2, 3.3 + (opts.southY || 0), D, 'nz');

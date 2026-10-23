@@ -847,6 +847,13 @@
       const def = this.def, ai = def.ai, w = G.world;
       const out = { x: 0, z: 0 };
       const flow = (o) => {
+        // strata fields: flyers follow the air routes (open air across the chasm, between the slabs of the storeys)
+        if (this.flyer && w.navLayers > 1) {
+          const band = this._band || (this._band = { lo: 0, hi: 0 });
+          if (!this.hasLOS && w.airDir(this.pos.x, this.pos.z, this.pos.y, o)) { band.lo = o.lo; band.hi = o.hi; this.airOn = true; return o; }
+          const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; this.airOn = !!w.airBand(this.pos.x, this.pos.z, this.pos.y, band);
+          return o;
+        }
         // flyers go straight while they can see you; otherwise they follow the ground flow field around walls
         if (this.flyer && (this.hasLOS || !w.flowDir(this.pos.x, this.pos.z, o, this.pos.y))) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; return o; }
         if (this.flyer) return o;
@@ -858,7 +865,7 @@
         // run away along the flow field gradient (maximise distance)
         const i = w.navIdx(this.pos.x, this.pos.z, this.pos.y);
         if (i >= 0 && w.ndist[i] < Infinity) {
-          const W = w.W, ic = i % w.N; const ix = ic % W, iz = (ic / W) | 0; let best = w.ndist[i], bx = 0, bz = 0;
+          const W = w.Wn, ic = i % w.N; const ix = ic % W, iz = (ic / W) | 0; let best = w.ndist[i], bx = 0, bz = 0;
           for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { if (ix + dx < 0 || iz + dz < 0 || ix + dx >= W || iz + dz >= w.Dn) continue; const a = w.land(i, (iz + dz) * W + ix + dx); if (a >= 0 && !w.nb[a] && w.ndist[a] < Infinity && w.ndist[a] > best) { best = w.ndist[a]; bx = dx; bz = dz; } }
           const l = Math.hypot(bx, bz) || 1; out.x = bx / l; out.z = bz / l;
         }
@@ -1153,7 +1160,8 @@
         const fl = w.navFloor(this.pos.x, this.pos.z, this.pos.y);
         // pressed against a wall: climb over it
         this.climb = this.hitWallFlag ? Math.min(7, (this.climb || 0) + dt * 6) : Math.max(0, (this.climb || 0) - dt * 1.5);
-        const ty = Math.max(isFinite(fl) ? fl : 0, P.pos.y) + (this.def.hover ? 0.2 : this.alt) + this.climb;
+        let ty = Math.max(isFinite(fl) ? fl : 0, P.pos.y) + (this.def.hover ? 0.2 : this.alt) + this.climb;
+        if (this.airOn && w.navLayers > 1) { const b = this._band; ty = U.clamp(P.pos.y + (this.def.hover ? 0.2 : this.alt) + this.climb, b.lo, Math.max(b.lo, b.hi - this.height)); } // stay in the air band we are in: never through a slab
         const diving = this.attackState && this.attackState.kind === 'swoop' && this.attackState.t >= this.attackState.wind;
         if (!diving) this.pos.y = U.damp(this.pos.y, ty, 2.5, dt);
         this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.2, this.pos.y + this.height);
@@ -1189,18 +1197,20 @@
       if (top > -Infinity && ny <= top) { this.pos.y = U.damp(this.pos.y, top, 18, dt); if (top - this.pos.y < 0.02) this.pos.y = top; if (this.vel.y < 0) this.vel.y = 0; this.grounded = true; }
       else { this.pos.y = ny; this.grounded = false; }
       if (this.pos.y < w.killY) { this.hp = 0; C.killEnemy(this, { src: 'fall' }, 0); }
-      if (w.trench && this.grounded && !this.tramp && this.pos.y < w.trench.y + 0.6 && this.pos.z > w.trench.z0 && this.pos.z < w.trench.z1) {
-        const T = w.trench, xi = U.clamp(Math.floor(this.pos.x), 0, T.n.length - 1), n = T.n[xi], s = T.s[xi];
-        const toN = this.pos.z - n < s - this.pos.z, tz = toN ? n - 1.8 : s + 1.8;
+      if (w.trench && this.grounded && !this.tramp && this.pos.y < w.trench.y + 0.6 && this.pos.z > w.trench.zN && this.pos.z < w.trench.zS && this.pos.x > w.trench.w[U.clamp(Math.floor(this.pos.z), 0, w.trench.w.length - 1)] && this.pos.x < w.trench.e[U.clamp(Math.floor(this.pos.z), 0, w.trench.w.length - 1)]) {
+        const T = w.trench, zi = U.clamp(Math.floor(this.pos.z), 0, T.w.length - 1), wl = T.w[zi], er = T.e[zi];
+        // the nearest way out: the west bank, the east bank, or round the north / south end
+        const dW = this.pos.x - wl, dE = er - this.pos.x, dN = this.pos.z - T.zN, dS = T.zS - this.pos.z, m = Math.min(dW, dE, dN, dS);
+        const tx = m === dW ? wl - 1.8 : m === dE ? er + 1.8 : this.pos.x, tz = m === dN ? T.zN - 1.8 : m === dS ? T.zS + 1.8 : this.pos.z;
         this.vel.y = 12.5; this.grounded = false;
-        this.tramp = { vx: 0, vz: (tz - this.pos.z) / 1.05, t: 1.25 };
+        this.tramp = { vx: (tx - this.pos.x) / 1.05, vz: (tz - this.pos.z) / 1.05, t: 1.25 };
         G.fx.flash(this.pos.clone().setY(this.pos.y + 0.3), T.blue ? 0x4a9cff : 0xff7a30, 30, 0.25, 6);
         for (let k = 0; k < 6; k++) G.fx.flameLick(this.pos.x + U.rand(-0.6, 0.6), this.pos.y + 0.05, this.pos.z + U.rand(-0.6, 0.6), U.rand(1.2, 2), T.blue ? 0x4a9cff : undefined);
         G.sfx.bounce(this.pos, 9); G.sfx.lava(this.pos);
       }
       this.clampBounds();
     }
-    clampBounds() { const w = G.world; this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); if (w.nooks) { const [lo, hi] = w.zLimits(this.pos.x, this.pos.y, 0.5); this.pos.z = U.clamp(this.pos.z, lo, hi); } else this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); }
+    clampBounds() { const w = G.world; this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.5); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); }
     // circle vs AABB push-out within a vertical band; returns true if blocked
     pushOut(dx, dz, y0, y1) {
       const w = G.world, r = this.radius * 0.8;
@@ -1466,6 +1476,10 @@
       const d = C.getDecoy();
       const tp = d ? d.pos : P.pos;
       G.world.updateFlow(tp.x, tp.z, tp.y);
+      if (G.world.navLayers > 1) {
+        const wanted = []; for (const e of E.list) if (e.alive && e.flyer && !e.custom) { const n = G.world.navIdx(e.pos.x, e.pos.z, e.pos.y); if (n >= 0) wanted.push(n); }
+        if (wanted.length) G.world.updateAirFlow(tp.x, tp.z, tp.y, wanted);
+      }
     }
     for (let i = E.list.length - 1; i >= 0; i--) {
       const e = E.list[i];

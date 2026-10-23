@@ -386,13 +386,16 @@ button { font-family: inherit; }
 /* item slots & radial wheel */
 .ab .slotcap { position: absolute; right: 2px; top: 1px; font-size: 9px; opacity: 0.8; z-index: 3; }
 #iwheel { position: fixed; left: 50%; top: 50%; width: 0; height: 0; z-index: 30; pointer-events: none; }
-#iwheel .iw-ring { position: absolute; left: -165px; top: -165px; width: 330px; height: 330px; border-radius: 50%; background: radial-gradient(circle, rgba(10,8,6,0.82) 0 38%, rgba(10,8,6,0.55) 39% 70%, rgba(10,8,6,0) 71%); border: 1px solid rgba(255,220,150,0.18); animation: iwIn 0.12s ease-out; }
-#iwheel .iw-center { position: absolute; left: -70px; top: -52px; width: 140px; text-align: center; color: #e8dcc4; font-size: 12px; }
+#iwheel .iw-svg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); overflow: visible; animation: iwIn 0.12s ease-out; filter: drop-shadow(0 4px 14px rgba(0,0,0,0.6)); }
+#iwheel .iw-hub { fill: rgba(10,8,6,0.86); stroke: rgba(255,220,150,0.45); stroke-width: 2.5; }
+#iwheel .iw-seg { fill: rgba(22,17,12,0.82); stroke: rgba(255,225,160,0.5); stroke-width: 2.5; stroke-linejoin: round; transition: transform 0.08s, fill 0.08s, stroke 0.08s; }
+#iwheel .iw-seg.sel { fill: rgba(60,46,28,0.94); stroke: var(--rc, #f1d79b); stroke-width: 3.5; transform: translate(var(--tx), var(--ty)); }
+#iwheel .iw-center { position: absolute; left: -64px; top: -50px; width: 128px; text-align: center; color: #e8dcc4; font-size: 12px; }
 #iwheel .iw-name { margin-top: 4px; font-size: 13px; }
 #iwheel .iw-desc { font-size: 10.5px; color: #cfc4b0; line-height: 1.35; margin-top: 2px; }
-#iwheel .iw-it { position: absolute; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: rgba(30,24,18,0.9); border: 2px solid rgba(255,255,255,0.15); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 24px; transition: transform 0.08s, border-color 0.08s; }
+#iwheel .iw-it { position: absolute; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: none; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 24px; transition: transform 0.08s, border-color 0.08s; }
 #iwheel .iw-it b { font-size: 10px; color: #f1d79b; margin-top: -2px; }
-#iwheel .iw-it.sel { border-color: var(--rc); transform: scale(1.22); box-shadow: 0 0 14px var(--rc); }
+#iwheel .iw-it.sel { transform: scale(1.22) translate(0, -1px); filter: drop-shadow(0 0 8px var(--rc)); }
 @keyframes iwIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* player status effects: ring-gauge icons, tinted HP bar, coloured screen edges */

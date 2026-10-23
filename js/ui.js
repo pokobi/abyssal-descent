@@ -180,16 +180,63 @@
     vig.style.opacity = urgent ? (0.35 + Math.pow(beat, 4) * 0.5).toFixed(2) : warn ? (0.15 + Math.pow(beat, 6) * 0.2).toFixed(2) : 0;
     vig.style.boxShadow = `inset 0 0 220px 60px ${urgent ? 'rgba(255,40,20,0.75)' : 'rgba(255,170,40,0.6)'}`;
   };
+  // ---- the wheel's shape: a hub in the middle and one cut-stone shard per entry around it, a gap between the shards.
+  // The gaps are straight lines shifted off the centre the same way for every shard (a pinwheel), the rim is a little ragged. ----
+  const WH = { hub: 74, in: 90, out: 190, gap: 5, shift: 22 };
+  function wheelShapes(n) {
+    const clip = (poly, px, py, nx, ny) => { // keep what lies on the side of the line (px,py) that (nx,ny) points to
+      const out = [];
+      for (let i = 0; i < poly.length; i++) {
+        const A = poly[i], B = poly[(i + 1) % poly.length];
+        const da = (A[0] - px) * nx + (A[1] - py) * ny, db = (B[0] - px) * nx + (B[1] - py) * ny;
+        if (da >= 0) out.push(A);
+        if ((da >= 0) !== (db >= 0)) { const k = da / (da - db); out.push([A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k]); }
+      }
+      return out;
+    };
+    const rnd = (i, j) => { const x = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return (x - Math.floor(x)) * 2 - 1; };
+    const step = Math.PI * 2 / n, paths = [], centers = [];
+    for (let i = 0; i < n; i++) {
+      const a0 = -Math.PI / 2 + (i - 0.5) * step, a1 = a0 + step; // the shard of slot i lies between two boundary angles
+      const pts = [];
+      // outer rim (coarse, ragged), then inner rim (smooth, follows the hub)
+      const nOut = Math.max(3, Math.round(step / 0.42));
+      for (let k = 0; k <= nOut; k++) { const a = a0 - 0.2 + (step + 0.4) * k / nOut; const r = WH.out + (k === 0 || k === nOut ? 0 : rnd(i, k) * 7); pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+      const nIn = Math.max(6, Math.round(step / 0.12));
+      for (let k = nIn; k >= 0; k--) { const a = a0 - 0.2 + (step + 0.4) * k / nIn; pts.push([Math.cos(a) * WH.in, Math.sin(a) * WH.in]); }
+      let poly = pts;
+      // boundary lines: shifted sideways (pinwheel); this shard keeps the near side of its two lines, with half a gap to spare
+      for (const [a, sd] of [[a0, 1], [a1, -1]]) {
+        const nx = -Math.sin(a), ny = Math.cos(a); // the normal points clockwise
+        const o = WH.shift + (sd > 0 ? WH.gap : -WH.gap);
+        poly = clip(poly, nx * o, ny * o, nx * sd, ny * sd);
+      }
+      // a ragged, cut-stone look: nudge the corners
+      poly = poly.map((q, k) => [q[0] + rnd(i, k + 40) * 2.2, q[1] + rnd(i, k + 70) * 2.2]);
+      paths.push('M' + poly.map((q) => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L') + 'Z');
+      let cx = 0, cy = 0; for (const q of poly) { cx += q[0]; cy += q[1]; } cx /= poly.length; cy /= poly.length;
+      const ca = -Math.PI / 2 + i * step, rc = (WH.in + WH.out) / 2 + 4;
+      centers.push([Math.cos(ca) * rc * 0.5 + cx * 0.5, Math.sin(ca) * rc * 0.5 + cy * 0.5, Math.cos(ca) * 9, Math.sin(ca) * 9]);
+    }
+    return { paths, centers };
+  }
+  function wheelHtml(n, head, cells) {
+    const sh = wheelShapes(n), V = WH.out + 22;
+    return `<svg class="iw-svg" viewBox="${-V} ${-V} ${V * 2} ${V * 2}" width="${V * 2}" height="${V * 2}"><circle class="iw-hub" r="${WH.hub}"/>` +
+      sh.paths.map((d, i) => `<path class="iw-seg" data-i="${i}" d="${d}" style="--tx:${sh.centers[i][2]}px;--ty:${sh.centers[i][3]}px"/>`).join('') + '</svg>' +
+      `<div class="iw-center">${head}<div class="iw-name"></div></div>` +
+      cells.map((c, i) => `<div class="iw-it${c.sel ? ' sel' : ''}" data-i="${i}" style="left:${sh.centers[i][0]}px;top:${sh.centers[i][1]}px;--rc:${c.rc}"><span>${c.icon}</span><b>${c.sub}</b></div>`).join('');
+  }
   // ---- radial item wheel (hold an item key) ----
   UI.itemWheel = function (slot, list, cur) {
     UI.itemWheelClose();
     const S = slot === 'g' ? { name: '投擲物', icon: '💣' } : G.ITEM_SLOTS.find((s) => s.id === slot);
     const d = document.createElement('div'); d.id = 'iwheel';
     const n = list.length, R0 = 120;
-    d.innerHTML = `<div class="iw-ring"></div><div class="iw-center"><div style="font-size:26px">${S.icon}</div><div>${S.name}</div><div class="iw-name"></div></div>` + list.map((id, i) => {
-      const it = G.ITEM_BY_ID[id], a = -Math.PI / 2 + i / n * Math.PI * 2, cnt = slot === 'g' ? P.grenades[id] : P.itemCount(id);
-      return `<div class="iw-it${id === cur ? ' sel' : ''}" data-i="${i}" style="left:${Math.cos(a) * R0}px;top:${Math.sin(a) * R0}px;--rc:${R(it.rarity)}"><span>${it.icon}</span><b>×${cnt}</b></div>`;
-    }).join('');
+    d.innerHTML = wheelHtml(n, `<div style="font-size:26px">${S.icon}</div><div>${S.name}</div>`, list.map((id) => {
+      const it = G.ITEM_BY_ID[id];
+      return { sel: id === cur, rc: R(it.rarity), icon: it.icon, sub: '×' + (slot === 'g' ? P.grenades[id] : P.itemCount(id)) };
+    }));
     UI.el.hud.appendChild(d);
     UI._iw = { list, sel: Math.max(0, list.indexOf(cur)), vx: 0, vy: 0, el: d };
     UI.itemWheelMove(0, 0);
@@ -200,11 +247,10 @@
     const W = G.weapons;
     const d = document.createElement('div'); d.id = 'iwheel'; d.className = 'ww';
     const n = list.length, R0 = 120;
-    d.innerHTML = `<div class="iw-ring"></div><div class="iw-center"><div style="font-size:24px">🔁</div><div>キー <b style="color:var(--gold2)">${k + 1}</b> に割り当て</div><div class="iw-name"></div></div>` + list.map((t, i) => {
-      const inf = W.tokInfo(t), a = -Math.PI / 2 + i / n * Math.PI * 2;
-      const key = W.order().indexOf(t);
-      return `<div class="iw-it${t === cur ? ' sel' : ''}" data-i="${i}" style="left:${Math.cos(a) * R0}px;top:${Math.sin(a) * R0}px;--rc:${R(inf.rarity)}"><span>${inf.icon}</span><b>${key < 3 ? key + 1 : '⇕'}</b></div>`;
-    }).join('');
+    d.innerHTML = wheelHtml(n, `<div style="font-size:24px">🔁</div><div>キー <b style="color:var(--gold2)">${k + 1}</b> に割り当て</div>`, list.map((t) => {
+      const inf = W.tokInfo(t), key = W.order().indexOf(t);
+      return { sel: t === cur, rc: R(inf.rarity), icon: inf.icon, sub: key < 3 ? key + 1 : '⇕' };
+    }));
     UI.el.hud.appendChild(d);
     UI._iw = { list, sel: Math.max(0, list.indexOf(cur)), vx: 0, vy: 0, el: d, info: (t) => { const inf = W.tokInfo(t); return `<b style="color:${R(inf.rarity)}">${inf.icon} ${U.esc(inf.name)}</b>${inf.sub ? `<div class="iw-desc">${inf.sub}</div>` : ''}`; } };
     UI.itemWheelMove(0, 0);
@@ -213,7 +259,8 @@
     const w = UI._iw; if (!w) return;
     w.vx = U.clamp(w.vx + dx, -160, 160); w.vy = U.clamp(w.vy + dy, -160, 160);
     if (Math.hypot(w.vx, w.vy) > 28) { let a = Math.atan2(w.vy, w.vx) + Math.PI / 2; if (a < 0) a += Math.PI * 2; w.sel = Math.round(a / (Math.PI * 2) * w.list.length) % w.list.length; }
-    w.el.querySelectorAll('.iw-it').forEach((e, i) => e.classList.toggle('sel', i === w.sel));
+    w.el.querySelectorAll('.iw-it, .iw-seg').forEach((e) => e.classList.toggle('sel', +e.dataset.i === w.sel));
+    { const sg = w.el.querySelector(`.iw-seg[data-i="${w.sel}"]`), c = w.list[w.sel]; if (sg) { const t = (w.info ? G.weapons.tokInfo(c) : G.ITEM_BY_ID[c]); sg.style.setProperty('--rc', t ? R(t.rarity) : '#f1d79b'); } }
     if (w.info) { w.el.querySelector('.iw-name').innerHTML = w.info(w.list[w.sel]); return; }
     const it = G.ITEM_BY_ID[w.list[w.sel]]; w.el.querySelector('.iw-name').innerHTML = it ? `<b style="color:${R(it.rarity)}">${it.name}</b><div class="iw-desc">${U.esc(it.desc)}</div>` : '';
   };

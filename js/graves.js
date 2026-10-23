@@ -38,6 +38,7 @@
     const ruin = w.biome === 'ruin', tint = ruin ? 0x4a78ff : 0x9a50ff, wisp = ruin ? [0.35, 0.6, 1] : [0.62, 0.4, 1];
     const stoneM = new THREE.MeshStandardMaterial({ color: 0x0c0b10, roughness: 0.7, emissive: ruin ? 0x060a1c : 0x120620, emissiveIntensity: 0.9 });
     const dirtM = new THREE.MeshStandardMaterial({ color: 0x060505, roughness: 1, emissive: ruin ? 0x081028 : 0x140824, emissiveIntensity: 0.7 });
+    let gi = 0;
     for (const d of w.graves) {
       const g = new THREE.Group(); g.position.set(d.x, d.y, d.z); g.rotation.y = d.ry; g.scale.setScalar(1.3);
       const parts = [];
@@ -54,8 +55,15 @@
       const ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: ringTex, color: tint, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.04, 0.2); ring.scale.set(3.2, 3.2, 1); g.add(ring);
       w.group.add(g);
-      Gr.list.push({ x: d.x, y: d.y, z: d.z, g, glow, ring, stone, wisp, tint, ph: Math.random() * 6, used: false, dwell: 0, wT: 0, sT: 0, dT: 0, base: g.position.clone() });
+      Gr.list.push({ i: gi++, x: d.x, y: d.y, z: d.z, g, glow, ring, stone, wisp, tint, ph: Math.random() * 6, used: false, dwell: 0, wT: 0, sT: 0, dT: 0, base: g.position.clone() });
     }
+  };
+  // mid-area save: which graves are still there (the rest have already raised their foe) and which have given their warning
+  Gr.save = () => ({ left: Gr.list.map((o) => o.i), warned: Gr.list.filter((o) => o.warned).map((o) => o.i) });
+  Gr.restore = function (S) {
+    if (!S) return;
+    for (const o of Gr.list) { if (!S.left.includes(o.i)) { o.used = true; Gr.drop(o); } else if ((S.warned || []).includes(o.i)) o.warned = true; }
+    Gr.list = Gr.list.filter((o) => !o.used);
   };
   Gr.drop = function (o) { if (o.g && o.g.parent) o.g.parent.remove(o.g); if (o.glow) o.glow.material.dispose(); if (o.ring) { o.ring.geometry.dispose(); o.ring.material.dispose(); } };
 

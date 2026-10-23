@@ -85,11 +85,13 @@
       id: e.def.id, lv: e.level, pos: vec(e.pos), yaw: r2(e.yaw), hp: e.hp, maxHp: e.maxHp, shield: e.shield, maxShield: e.maxShield, dmg: e.dmg, speed: e.speed,
       elite: !!e.elite, em: e.eliteMod && e.eliteMod.id, em2: e.eliteMod2 && e.eliteMod2.id, champ: !!e.champion, cursed: !!e.cursed, marked: !!e.marked,
       mut: e.mut ? Object.keys(e.mut) : null, mutRev: !!e.mutRevived, pileRes: e.pileRes || 0, wf: !!e.waveFoe, wn: e.waveNo || 0,
-      noReward: !!e.noReward, revived: !!e.revived, split: !!e.split, sc: r2((e.model && e.model.scale || 1) / (e.elite ? 1.15 : 1)), mimic: e.def.id === 'mimic_gold',
+      noReward: !!e.noReward, revived: !!e.revived, split: !!e.split, sc: r2((e.model && e.model.scale || 1) / (e.elite ? 1.15 : 1)), mimic: e.def.id === 'mimic_gold', gs: !!e.graveSpawn,
     }));
     // world changes
     S.dest = w.destructibles.map((d) => (d.alive ? 1 : 0));
     S.exits = (w.exits || []).map((ex) => ({ type: ex.type || null, open: !!ex.open }));
+    if (G.Strata && G.Strata.doors.length) S.doors = G.Strata.saveDoors();
+    if (G.Graves && (w.graves || []).length) S.graves = G.Graves.save();
     S.npcs = w.interactables.filter((i) => i.type === 'npc' || i.type === 'shrine').map((i) => !!i.used);
     if (GM.shop) {
       const sh = GM.shop, slots = sh.mini ? w.miniSlots : w.shopSlots;
@@ -137,6 +139,8 @@
       restoreChests(S);
       (S.dest || []).forEach((alive, i) => { const d = w.destructibles[i]; if (d && !alive && d.alive) G.combat.removeDestructibleSilent(d); });
       restorePickups(S);
+      if (S.doors) G.Strata.restoreDoors(S.doors);
+      if (S.graves) G.Graves.restore(S.graves);
       // NPCs / shrine already used
       const npcs = w.interactables.filter((i) => i.type === 'npc' || i.type === 'shrine');
       (S.npcs || []).forEach((u, i) => { if (npcs[i]) npcs[i].used = u; });
@@ -204,6 +208,7 @@
     if (s.champ) { e.champion = true; e.makeCurseRing(0xff3018); e.def = Object.assign({}, e.def, { name: '覇者・' + def.name }); }
     if (s.mut && s.mut.length) { e.mut = {}; for (const id of s.mut) e.mut[id] = true; e.mutT = U.rand(2, 5); e.mutIcons = s.mut.map((id) => G.Depth.MUT_BY_ID[id].icon).join(''); e.mutCol = G.Depth.MUT_BY_ID[s.mut[0]].col; }
     if (s.pileRes) e.pileRes = s.pileRes;
+    if (s.gs) { e.graveSpawn = true; e.ignoreCount = true; } // raised by a grave: outside the cap, the waves and the target
     if (s.mimic) { e.escapeT = 20; GM.mimic = e; }
     // skip the spawn rise and give the player a breath before they attack
     e.state = 'chase'; e.stateT = 0; if (e.model.inner) e.model.inner.position.y = 0; e.model.group.scale.setScalar(1);

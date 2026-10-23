@@ -551,6 +551,16 @@
     G.sfx.shieldBreak(p); G.sfx.impact(p, 'metal');
     G.fx.debris(p, G.world.mats.iron, 10, 0.08, 6); G.fx.dust(p.clone().setY(d.y + 0.1), V(0, 1, 0), 0x7a6a50, 10);
   };
+  // mid-area save (midsave.js): each gate's state and how battered it is, restored without sound or swing
+  S.saveDoors = () => S.doors.map((d) => [d.state, Math.round(d.hp)]);
+  S.restoreDoors = function (list) {
+    (list || []).forEach((v, i) => {
+      const d = S.doors[i]; if (!d || !v) return;
+      d.hp = v[1]; if (d.g) S.paintDoor(d);
+      if (v[0] === 'open') { free(d, 'open'); d.ang = 1.75; } else if (v[0] === 'broken') { free(d, 'broken'); d.fall = 1; }
+    });
+    S.update(0);
+  };
   // enemies.js: a monster pressed against a shut gate on its way batters it; the stronger it is, the sooner the gate gives
   S.bash = function (e, dt) {
     for (const d of S.doors) {

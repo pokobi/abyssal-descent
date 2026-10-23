@@ -81,13 +81,40 @@
     setTimeout(() => document.getElementById('loading').classList.add('done'), 300);
     requestAnimationFrame(frame);
   }
+  // graphics settings. High is the full look and is never touched; medium and low trade looks for speed in earnest:
+  // render scale, shadows, number of live lights, particle amount, normal maps, draw distance (with the fog thickened to hide it)
+  const QP = {
+    low: { pr: 0.6, far: 110, fogK: 1.45, lights: 3, keep: 0.25, shadow: false, nm: false },
+    med: { pr: 1.0, far: 220, fogK: 1.12, lights: 5, keep: 0.6, shadow: true, size: 1024, soft: false, nm: true },
+    high: { pr: 1.5, far: 400, fogK: 1, lights: 8, keep: 1, shadow: true, size: 2048, soft: true, nm: true },
+  };
+  GM.QP = QP;
+  // normal maps off on low (kept on the material so high / medium bring them back)
+  GM.qualityMaterials = function () {
+    const q = QP[G.save.data.settings.quality] || QP.high;
+    const pass = (root) => root && root.traverse((o) => {
+      if (!o.material) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        if (!m.isMeshStandardMaterial) continue;
+        if (!q.nm && m.normalMap) { m.userData._nm = m.normalMap; m.normalMap = null; m.needsUpdate = true; }
+        else if (q.nm && !m.normalMap && m.userData._nm) { m.normalMap = m.userData._nm; m.userData._nm = null; m.needsUpdate = true; }
+      }
+    });
+    pass(scene); pass(G.weapons && G.weapons.vmScene);
+  };
   GM.applyQuality = function () {
-    const q = G.save.data.settings.quality;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, q === 'high' ? 1.5 : q === 'med' ? 1.15 : 0.85));
-    renderer.shadowMap.enabled = q !== 'low';
-    moon.castShadow = q !== 'low';
-    const sz = q === 'high' ? 2048 : 1024;
+    const key = G.save.data.settings.quality, q = QP[key] || QP.high;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pr));
+    renderer.shadowMap.enabled = q.shadow;
+    renderer.shadowMap.type = q.soft === false ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+    moon.castShadow = q.shadow;
+    const sz = q.size || 1024;
     if (moon.shadow.mapSize.x !== sz) { moon.shadow.mapSize.set(sz, sz); if (moon.shadow.map) { moon.shadow.map.dispose(); moon.shadow.map = null; } }
+    camera.far = q.far; camera.updateProjectionMatrix();
+    if (GM._fogBase !== undefined) { scene.fog.density = GM._fogBase * q.fogK; G.fx.setFog(scene.fog.color.getStyle(), scene.fog.density); }
+    G.LightPool.active = q.lights;
+    G.fx.keep = q.keep;
+    GM.qualityMaterials();
     scene.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => m.needsUpdate = true); } });
     onResize();
   };
@@ -110,9 +137,11 @@
     G.Graves.build(w);
     document.querySelectorAll('.exit-mark').forEach((e) => e.remove()); // the last area's gate markers
     const B = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
-    scene.fog.color.set(B.fog); scene.fog.density = B.fogD;
+    GM._fogBase = B.fogD; const qk = (QP[G.save.data.settings.quality] || QP.high);
+    scene.fog.color.set(B.fog); scene.fog.density = B.fogD * qk.fogK;
     scene.background = new THREE.Color(B.fog);
-    G.fx.setFog(B.fog, B.fogD);
+    G.fx.setFog(B.fog, B.fogD * qk.fogK);
+    GM.qualityMaterials();
     hemi.color.set(B.hemiS); hemi.groundColor.set(B.hemiG); hemi.intensity = 0.75 + B.amb * 0.6;
     amb.color.set(B.hemiS); amb.intensity = B.amb * 1.3;
     moon.color.set(B.moon); moon.intensity = 1.1 * B.moonI;

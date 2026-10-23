@@ -663,7 +663,7 @@
       ${rowR('volume', '🔊 音量', 0, 1, 0.01, (v) => Math.round(v * 100) + '%')}
       ${rowR('shake', '📳 画面揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
       ${rowR('bob', '🚶 視点の揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
-      <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（影なし）</option><option value="med">中</option><option value="high">高</option></select><span></span></div>
+      <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（軽量：低解像度・影なし・簡易ライト）</option><option value="med">中（標準：解像度1.0倍・影は軽め）</option><option value="high">高（最高画質）</option></select><span></span></div>
       ${rowC('dmgNums', '🔢 ダメージ表記')}${rowC('crouchToggle', '🧎 しゃがみ切替式')}${rowC('autoSprint', `🏃 常に走る（${G.K('sprint')}で歩く）`)}${rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')}${rowC('invertY', '↕️ 上下反転')}${rowC('fullscreen', '⛶ 開始時フルスクリーン')}${rowC('showFps', '📈 FPS表示')}${rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認')}
       <div class="set-row"><span>⌨️ キー配置</span><button class="btn small" id="s-keys">キー設定を開く</button><span></span></div>
       <div class="set-row"><span>🗑️ データのリセット</span><button class="btn small" id="s-reset">リセットする…</button><span></span></div>

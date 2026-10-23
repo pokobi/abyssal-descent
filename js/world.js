@@ -610,7 +610,7 @@
 
   // ---------------- dynamic torch lights (constant light count) ----------------
   const LightPool = (G.LightPool = {
-    lights: [], N: 8, t: 0,
+    lights: [], N: 8, active: 8, t: 0,
     init(scene) {
       for (let i = 0; i < this.N; i++) {
         const l = new THREE.PointLight(0xff9a50, 0, 14, 2);
@@ -627,9 +627,11 @@
         // stacked storeys: a light one floor up or down is behind a slab, so the ones on your own storey come first
         const vk = world.strata ? 9 : 1;
         const arr = S.map((s) => { const dy = s.pos.y - camPos.y; return [s, (s.pos.distanceToSquared(camPos) + dy * dy * (vk - 1)) / (s.prio || 1)]; }).sort((a, b) => a[1] - b[1]);
+        const act = Math.min(this.N, this.active || this.N);
         for (let i = 0; i < this.N; i++) {
           const l = this.lights[i];
-          const s = arr[i] ? arr[i][0] : null;
+          l.visible = i < act; // the lights beyond the quality setting are out of the scene's light count altogether
+          const s = i < act && arr[i] ? arr[i][0] : null;
           if (l.userData.src !== s) { l.userData.src = s; l.userData.fade = 0; }
         }
       }

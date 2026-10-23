@@ -58,6 +58,7 @@
       g.setDrawRange(0, 0);
     }
     spawn(x, y, z, vx, vy, vz, life, s0, s1, r, gg, b, a, grav, drag, r1, g1, b1) {
+      if (FX.keep < 1 && Math.random() > FX.keep) return; // lower graphics settings keep only a share of the particles
       let i = this.n;
       if (i >= this.max) { i = Math.floor(Math.random() * this.max); } else this.n++;
       const i3 = i * 3, i4 = i * 4;
@@ -110,6 +111,7 @@
   }
 
   const pools = {};
+  FX.keep = 1;
   FX.init = function (sc, cam) {
     scene = sc; camera = cam;
     FX.add = new PSys(4000, true, G.Tex.spr.soft);

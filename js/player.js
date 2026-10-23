@@ -122,6 +122,8 @@
     itemCount(id) { return this.bag ? G.Inv.countAll(this, 'item', id) : 0; }
     // the items sitting in a consumable pocket (key 4 / key 5 / G)
     slotItems(slot) { const c = this.spec && this.spec[slot]; const ids = []; if (c) for (const o of c.items) if (o.type === 'item' && !ids.includes(o.id)) ids.push(o.id); return ids; }
+    // the pocket's cells in order, left to right: the item id in each cell or null (the selection wheel mirrors it: cell 1 up, 2 right, 3 down, 4 left)
+    slotCells(slot) { const c = this.spec && this.spec[slot]; const cells = []; if (!c) return cells; for (let i = 0; i < c.cols; i++) cells.push(null); for (const o of c.items) if (o.type === 'item' && o.x >= 0 && o.x < c.cols) cells[o.x] = o.id; return cells; }
     selItem(slot) { let id = this.isel[slot]; const l = this.slotItems(slot); if (!id || !l.includes(id)) { id = l[0] || null; this.isel[slot] = id; } return id; }
     // when a pocket (G / 4 / 5) has room again, consumables / throwables waiting in the bag move in by themselves; the selected grenade follows what you still own
     refillPockets() {

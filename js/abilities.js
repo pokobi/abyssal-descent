@@ -594,8 +594,8 @@
     if (I.down(pr.act)) {
       pr.t += dt;
       if (pr.t > 0.22 && !pr.wheel) {
-        const list = pr.slot === 'g' ? grenadeList() : P.slotItems(pr.slot);
-        if (list.length > 1) { pr.wheel = true; G.ui.itemWheel(pr.slot, list, pr.slot === 'g' ? P.grenadeSel : P.selItem(pr.slot)); G.sfx.ui('open'); }
+        const list = P.slotCells(pr.slot).map((id) => (id && (pr.slot !== 'g' || P.grenades[id] > 0) ? id : null)); // a fixed ring: every cell keeps its place, empty ones stay empty
+        if (list.filter(Boolean).length > 1) { pr.wheel = true; G.ui.itemWheel(pr.slot, list, pr.slot === 'g' ? P.grenadeSel : P.selItem(pr.slot)); G.sfx.ui('open'); }
       }
       if (pr.wheel) { G.ui.itemWheelMove(I.mx, I.my); G.game.chronoT = Math.max(G.game.chronoT || 0, 0.1); G.game.chronoSlow = 0.65; }
       return;

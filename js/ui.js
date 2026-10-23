@@ -228,7 +228,7 @@
     return `<svg class="iw-svg" viewBox="${-V} ${-V} ${V * 2} ${V * 2}" width="${V * 2}" height="${V * 2}"><circle class="iw-hub" r="${WH.hub}"/>` +
       sh.paths.map((d, i) => `<path class="iw-seg" data-i="${i}" d="${d}" style="--tx:${sh.centers[i][2]}px;--ty:${sh.centers[i][3]}px"/>`).join('') + '</svg>' +
       `<div class="iw-center">${head}<div class="iw-name"></div></div>` +
-      cells.map((c, i) => `<div class="iw-it${c.sel ? ' sel' : ''}" data-i="${i}" style="left:${sh.centers[i][0]}px;top:${sh.centers[i][1]}px;--rc:${c.rc}"><span>${c.icon}</span><b>${c.sub}</b></div>`).join('');
+      cells.map((c, i) => `<div class="iw-it${c.sel ? ' sel' : ''}${c.empty ? ' empty' : ''}" data-i="${i}" style="left:${sh.centers[i][0]}px;top:${sh.centers[i][1]}px;--rc:${c.rc}"><span>${c.icon}</span><b>${c.sub}</b></div>`).join('');
   }
   // ---- radial item wheel (hold an item key) ----
   UI.itemWheel = function (slot, list, cur) {
@@ -238,6 +238,7 @@
     const n = list.length, R0 = 120;
     d.innerHTML = wheelHtml(n, `<div style="font-size:26px">${S.icon}</div><div>${S.name}</div>`, list.map((id) => {
       const it = G.ITEM_BY_ID[id];
+      if (!it) return { empty: true, rc: '#6a5a40', icon: '', sub: '' }; // an empty cell keeps its place on the ring
       return { sel: id === cur, rc: R(it.rarity), icon: it.icon, sub: '×' + (slot === 'g' ? P.grenades[id] : P.itemCount(id)) };
     }));
     UI.el.hud.appendChild(d);

@@ -1350,3 +1350,4 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 .exit-mark.edge { opacity: 0.7; }
 .ebar.grave .en { color: #cdb4ff; }
 .ebar.grave .hb { border-color: #6a3cc0; box-shadow: 0 0 5px rgba(150,90,255,0.55); }
+.iw-it.empty { opacity: 0.28; }

@@ -266,8 +266,9 @@
   IV.load = function (P, d) {
     IV.setupPlayer(P);
     if (d && d.bag) {
-      for (const o of d.bag) { if (!IV.def({ type: o.t, id: o.id })) continue; const it = IV.de(o); if (IV.fits(P.bag, ...IV.size(it), it.x, it.y)) P.bag.items.push(it); else IV.put(P.bag, it); }
-      for (const k in d.spec || {}) for (const o of d.spec[k]) { if (!IV.def({ type: o.t, id: o.id })) continue; const it = IV.de(o); if (P.spec[k] && IV.fits(P.spec[k], ...IV.size(it), it.x, it.y)) P.spec[k].items.push(it); else IV.stow(P, it); }
+      const retired = (o) => { const pr = o.t === 'item' && G.RETIRED_ITEMS && G.RETIRED_ITEMS[o.id]; if (pr) P.retiredCoins = (P.retiredCoins || 0) + Math.round(pr * 0.5) * (o.n || 1); };
+      for (const o of d.bag) { if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (IV.fits(P.bag, ...IV.size(it), it.x, it.y)) P.bag.items.push(it); else IV.put(P.bag, it); }
+      for (const k in d.spec || {}) for (const o of d.spec[k]) { if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (P.spec[k] && IV.fits(P.spec[k], ...IV.size(it), it.x, it.y)) P.spec[k].items.push(it); else IV.stow(P, it); }
       for (const k in d.equip || {}) if (d.equip[k] && G.ARMOR_BY_ID[d.equip[k].id]) P.equip[k] = IV.de(d.equip[k]);
       IV.changed(P.bag);
     }

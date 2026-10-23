@@ -512,6 +512,7 @@
     P.pileTome = d.pileTome || 0;
     if (P.skills[0] && !P.skills[0].def.ult) { const s = P.skills[0]; const free = [1, 2, 3].find((i) => !P.skills[i]); if (free) P.skills[free] = s; P.skills[0] = null; }
     if (!P.skills[0]) P.skills[0] = G.abilities.makeSlot(G.DEFAULT_ULT);
+    P.retiredCoins = 0;
     if (d.invGrid) G.Inv.load(P, d.invGrid);
     else {
       // older saves: rebuild the bag from the item counts
@@ -523,6 +524,8 @@
       P.inv = inv;
       P.attStash = (d.attStash || []).filter((a) => G.ATT_BY_ID[a]);
     }
+    if (P.retiredCoins > 0 && GM.run) { const rc = P.retiredCoins; GM.run.coins += rc; setTimeout(() => G.ui.toast(`🪙 廃止された消耗品を ${rc} コインに換えた`, 'good'), 1500); }
+    P.retiredCoins = 0;
     P.grenadeSel = d.grenadeSel || Object.keys(P.grenades)[0] || 'g_frag';
     P.isel = Object.assign({ c1: null, c2: null }, d.isel && d.isel.c1 !== undefined ? d.isel : {});
     P.revives = d.revives ?? 3;

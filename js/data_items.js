@@ -33,33 +33,18 @@
     ['h_blood', 'heal', '血の小瓶', '🩸', 'uncommon', 110, 'HP40回復＋10秒間与ダメ+15%。', { heal: 40, temp: { dmg: 0.15 }, dur: 10 }],
     ['h_troll', 'heal', 'トロールの心臓', '🫀', 'epic', 320, '最大HP+15（永続）、HP40回復。', { heal: 40, maxHp: 15 }],
     ['h_apple', 'heal', '黄金の林檎', '🍎', 'rare', 220, 'HP50回復＋オーバーシールド40。', { heal: 50, os: 40 }],
-    ['h_herb', 'heal', '薬草', '🌿', 'common', 45, 'HPを25即時回復。', { heal: 25 }],
     ['h_fairy', 'heal', '妖精の小瓶', '🧚', 'legendary', 7500, '所持していると、死亡時に自動で使用されHP全快で復活する。', { revive: true }],
-    ['h_water', 'heal', '清めの水', '💧', 'common', 50, '状態異常を解除し、HP15回復。', { heal: 15, cleanse: true }],
+    ['h_water', 'heal', '清めの水', '💧', 'rare', 180, '状態異常を解除してHP10回復。さらに90秒間、状態異常の持続時間-70%・継続ダメージ-50%。', { heal: 10, cleanse: true, resist: 90 }],
     // utilities
-    ['u_plate', 'util', '鎧板', '🛡️', 'common', 90, 'オーバーシールド+35。', { os: 35 }],
-    ['u_battery', 'util', '魔力電池', '🔋', 'uncommon', 150, 'オーバーシールド+80。', { os: 80 }],
-    ['u_adren', 'util', 'アドレナリン', '💊', 'uncommon', 120, '10秒間、移動速度+30%・連射速度+20%。', { temp: { moveSpeed: 0.3, fireRate: 0.2 }, dur: 10 }],
-    ['u_rage', 'util', '憤怒の薬', '😡', 'uncommon', 130, '12秒間、与ダメ+35%。', { temp: { dmg: 0.35 }, dur: 12 }],
+    ['u_plate', 'util', '鎧板', '🛡️', 'uncommon', 120, 'オーバーシールド+35。', { os: 35 }],
+    ['u_battery', 'util', '魔力電池', '🔋', 'rare', 190, 'オーバーシールド+80。', { os: 80 }],
     ['u_iron', 'util', '鉄皮の薬', '🪨', 'uncommon', 130, '10秒間、被ダメ-50%。', { temp: { armor: 0.5 }, dur: 10 }],
-    ['u_focus', 'util', '集中の薬', '🎯', 'rare', 170, '6秒間、周囲の時間が半分の速さになる。', { slowmo: 6 }],
-    ['u_infinite', 'util', '無限の護符', '♾️', 'rare', 170, '10秒間、弾薬を消費しない。', { temp: { infAmmo: 1 }, dur: 10 }],
-    ['u_sand', 'util', '時の砂', '⏳', 'rare', 230, '全スキルとグラップルのクールタイムを即座にリセット。', { cdReset: true }],
-    ['u_turret', 'util', '自動弩砲キット', '🏹', 'rare', 210, '25秒間、近くの敵を自動で撃つ弩砲を設置。', { turret: 25 }],
-    ['u_doll', 'util', '囮人形', '🎎', 'uncommon', 120, '10秒間、敵の注意を引く人形を設置。', { decoy: 10 }],
-    ['u_wind', 'util', '疾風の巻物', '📜', 'uncommon', 110, '8秒間、移動速度+50%、グラップル即時回復。', { temp: { moveSpeed: 0.5 }, dur: 8, grapple: true }],
-    ['u_lucky', 'util', '幸運の金貨', '🪙', 'rare', 180, '60秒間、コイン獲得量+100%。', { temp: { coinMul: 1.0 }, dur: 60 }],
     ['u_invis', 'util', '透明薬', '👻', 'rare', 190, '8秒間透明になり、敵に狙われなくなる。', { invis: 8 }],
-    ['u_map', 'util', '宝の地図', '🗺️', 'uncommon', 150, '現在のエリアに宝箱を出現させる。', { chest: true }],
-    ['u_feather', 'util', '浮遊の羽根', '🪶', 'common', 60, '15秒間、重力が弱まり高く跳べる。', { temp: { jumpPower: 0.4, lowGrav: 1 }, dur: 15 }],
-    ['u_ward', 'util', '結界石', '🔮', 'rare', 210, '8秒間、自分の周りに投射物を防ぐ結界を張る。', { ward: 8 }],
-    ['u_ammo', 'util', '弾薬箱', '📦', 'common', 40, '全武器のマガジンを即座に満タンにする。', { refill: true }],
-    ['u_berserk', 'util', '狂戦士茸', '🍄', 'epic', 260, '10秒間、与ダメ+60%・連射速度+30%、ただし被ダメ+30%。', { temp: { dmg: 0.6, fireRate: 0.3, armor: -0.3 }, dur: 10 }],
-    ['u_lantern', 'util', '魂のランタン', '🏮', 'epic', 280, '15秒間、撃破毎にHP+8、コイン+3。', { temp: { soulLantern: 1 }, dur: 15 }],
-    ['u_whet', 'util', '砥石', '🔪', 'common', 70, '20秒間、近接ダメージ+150%、会心率+10%。', { temp: { meleeDmg: 1.5, critChance: 0.1 }, dur: 20 }],
   ];
   G.ITEMS = IT.map(([id, cat, name, icon, rarity, price, desc, data]) => ({ id, cat, name, icon, rarity, price, desc, data, kind: 'item' }));
   G.ITEM_BY_ID = Object.fromEntries(G.ITEMS.map((i) => [i.id, i]));
+  // consumables that were retired (the kit was cut down to what gets used): a held one is turned into coins when a saved run loads (inventory.js IV.load)
+  G.RETIRED_ITEMS = {'h_herb': 45, 'u_adren': 120, 'u_rage': 130, 'u_focus': 170, 'u_infinite': 170, 'u_sand': 230, 'u_turret': 210, 'u_doll': 120, 'u_wind': 110, 'u_lucky': 180, 'u_map': 150, 'u_feather': 60, 'u_ward': 210, 'u_ammo': 40, 'u_berserk': 260, 'u_lantern': 280, 'u_whet': 70};
   G.ITEM_CAT = { grenade: { name: '投擲物', icon: '💣' }, heal: { name: '回復', icon: '❤️' }, util: { name: '補助', icon: '🧰' } };
   // fixed keys by category: 4 = heal, 5 = guard, 6 = boost, 7 = tools (G = grenades). Hold the key for a selection wheel.
   // keys 4 and 5 are two identical consumable pockets: any item except grenades goes into either (G = grenades only)
@@ -70,8 +55,8 @@
     { id: 'c1', key: '4', name: '消耗品', icon: '🧪' },
     { id: 'c2', key: '5', name: '消耗品', icon: '🧪' },
   ];
-  const GUARD = ['u_plate', 'u_battery', 'u_iron', 'u_ward', 'u_invis', 'u_doll'];
-  const TOOL = ['u_sand', 'u_turret', 'u_map', 'u_ammo'];
+  const GUARD = ['u_plate', 'u_battery', 'u_iron', 'u_invis'];
+  const TOOL = [];
   // grenades: a much bigger blast and far more damage to enemy shields (the descriptions follow the numbers)
   G.GRENADE_RADIUS_MUL = 1.6; G.GRENADE_SHIELD_MUL = 3;
   for (const it of G.ITEMS) {

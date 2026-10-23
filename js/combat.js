@@ -294,7 +294,6 @@
       if (e.elite && P.has('e_bounty')) base *= 2;
       if (P.has('k_combo')) base *= 1 + Math.min(1, (run.combo - 1) * 0.1);
       if (info.head) base += 3;
-      if (P.temps.has('u_lantern')) { base += 3; C.heal(8); }
       C.coins(Math.round(base), e.centerPos());
       if (Math.random() < 0.09 + P.stats.healDrop) C.spawnPickup('orb', e.centerPos(), 15);
       if (run.multi >= 2) {

@@ -1871,7 +1871,7 @@
     if (G.abilities.clearUltAuras) G.abilities.clearUltAuras();
     if (G.GrenHold) G.GrenHold.putAway(true);
     if (G.ItemAnim && G.ItemAnim.abort) G.ItemAnim.abort();
-    for (const k of ['wardT', 'bladesT', 'invisT', 'smokeT', 'healZoneT', 'dragT', 'pileLandT']) P[k] = 0;
+    for (const k of ['wardT', 'bladesT', 'invisT', 'smokeT', 'healZoneT', 'dragT', 'pullT', 'gravFreeAt', 'pileLandT']) P[k] = 0;
     P.healGauge = null; P.sprintToggle = false; P.sprinting = false; P._spCancel = false;
     { const keepT = GM.run.playT || 0, keepD = GM.run.dmgDealt || 0; // time and damage dealt are totals of the whole run: a restart of the area does not take them back
       GM.run = Object.assign({ coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 }, d.run, { combo: 0, lastKillT: -10, multiT: -10, playT: keepT, dmgDealt: keepD }); }

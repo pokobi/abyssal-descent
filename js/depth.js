@@ -62,21 +62,42 @@
       }
     }
     if (m.haste) for (const o of G.enemies.inRadius(e.pos, 8)) if (!o.boss) o.hasteT = 0.5;
-    if (m.gravity && e.mutT <= 0 && e.hasLOS !== false) {
-      e.mutT = U.rand(5, 7);
-      const d = P.pos.distanceTo(e.pos);
-      if (d < 22 && d > 3) {
-        const tg = G.fx.telegraph(P.pos.clone(), 1.5, 0.7, 0x9060ff);
-        setTimeout(() => {
-          if (!e.alive || P.dead) return;
-          const dir = e.pos.clone().sub(P.pos); dir.y = 0; const l = dir.length(); if (l < 0.1) return; dir.divideScalar(l);
-          P.vel.x += dir.x * Math.min(30, l * 1.8); P.vel.z += dir.z * Math.min(30, l * 1.8); P.vel.y = Math.max(P.vel.y, 4); P.dragT = 0.35;
-          G.fx.lightning(e.centerPos(), P.chestPos(), 0xa070ff); G.sfx.whoosh(0.4, 0.8); P.addShake(0.2);
-        }, 700);
+    // gravity: a short, readable pull. A violet line runs from the foe to you for a second (and a mark at the screen edge shows which way), then you are
+    // drawn up to 4.5 m towards it. Nobody can pull you again for the next 14 s, whichever foe it is. (Bosses with hooks are separate and unchanged.)
+    if (m.gravity) {
+      const gw = e.gravWarn;
+      if (gw) {
+        gw.t += dt;
+        const k = Math.min(1, gw.t / 1.0), src = e.centerPos(), tgt = P.chestPos();
+        if (!e.alive || P.dead) { endGrav(e, gw); }
+        else {
+          G.fx.beam(src, tgt, 0xa070ff, 0.025 + 0.09 * k, 0.09);
+          // the floor line: where you would be drawn to, from where you stand now
+          const dir = e.pos.clone().sub(P.pos); dir.y = 0; const l = dir.length() || 1; dir.divideScalar(l); const dist = Math.max(0, Math.min(4.5, l - 2.8));
+          if (gw.line) { const ax = P.pos.x, az = P.pos.z, bx = ax + dir.x * dist, bz = az + dir.z * dist, o = gw.line; o.m.position.set((ax + bx) / 2, P.pos.y + 0.07, (az + bz) / 2); o.m.rotation.set(0, Math.atan2(dir.x, dir.z), 0); o.m.scale.set(1.2, 1, Math.max(0.1, dist)); }
+          gw.hit.t = 0.4;
+          if (!gw.b2 && gw.t > 0.5) { gw.b2 = true; G.sfx.magic(e.pos, 'dark'); }
+          if (gw.t >= 1.0) {
+            if (dist > 0.6) { P.pullDir = dir; P.pullSpd = dist / 0.4; P.pullT = 0.4; P.dragT = 0.4; P.vel.y = Math.max(P.vel.y, 2); G.fx.lightning(src, tgt, 0xa070ff); G.sfx.whoosh(0.4, 0.8); P.addShake(0.15); }
+            endGrav(e, gw);
+          }
+        }
+      } else if (e.mutT <= 0 && e.hasLOS !== false && GM.time > (P.gravFreeAt || 0) && !P.dead) {
+        e.mutT = U.rand(7, 10);
+        const d = P.pos.distanceTo(e.pos);
+        if (d < 20 && d > 4.5) {
+          P.gravFreeAt = GM.time + 15; // one pull at a time, and a long rest afterwards
+          const line = G.fx.teleLine(P.pos.clone(), P.pos.clone(), 1.2, 1.0, 0xa070ff);
+          const el = document.createElement('div'); el.className = 'di grav'; G.ui.el.dirind.appendChild(el);
+          const hit = { el, pos: e.pos, t: 0.4 }; G.ui.dirHits.push(hit);
+          e.gravWarn = { t: 0, line, hit };
+          G.sfx.magic(e.pos, 'dark'); G.ui.toastSmall && G.ui.toastSmall('⚠ 引き寄せ — 紫の線の先へ引かれる');
+        }
       }
     }
     if (m.frenzy && e.hp < e.maxHp * 0.4) { if (!e.frenzied) { e.frenzied = true; G.sfx.monster(e.pos, e.def.sound, (e.def.pitch || 1) * 1.2, 1); } if (e.atkCd > 0) e.atkCd -= dt * 0.6; }
   };
+  function endGrav(e, gw) { if (gw.line) G.fx.endTeleLine(gw.line); gw.hit.t = 0.15; e.gravWarn = null; }
   D.onHurt = function (e, info, dealt) {
     const m = e.mut;
     if (m.mirror && info.src === 'bullet' && dealt > 0 && !info.proc) {

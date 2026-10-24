@@ -250,6 +250,71 @@
     const dmg = () => 45 * Math.pow(1.3, m.lv - 1) * (d.ranged ? 0.8 : 1);
     const maxHp = () => Math.round((d.ranged ? 260 : 420) * Math.pow(1.3, m.lv - 1) * (1 + GM.area * 0.04));
     G.fx.smoke(pos, 8, 1, 0x8080a0, 1, 1);
+    // ---- the stacked-storey fields (halls / ruin): walk the nav like any foe does, never straight through slabs, bars or over the lava ----
+    const dirv = { x: 0, z: 0 };
+    let tgt = null, seekT = 0, fT = 0, fGoal = null, lostT = 0, farT = 0, skip = new Map();
+    const here = () => { const w = G.world, i = w.navIdx(ent.pos.x, ent.pos.z, ent.pos.y); return i >= 0 && w.ndistM ? w.ndistM[i] : Infinity; }; // steps left to the goal along the walkable route
+    const eyeP = () => V(ent.pos.x, ent.pos.y + 1.5, ent.pos.z);
+    function pickTarget() {
+      let best = null, bs = Infinity;
+      for (const e of G.enemies.list) {
+        if (!e.alive || e.ally || e.burrowed || e.untargetable || e.custom) continue;
+        if ((skip.get(e) || 0) > G.game.time) continue;
+        const dx = e.pos.x - ent.pos.x, dz = e.pos.z - ent.pos.z, dy = Math.abs(e.pos.y - ent.pos.y), dd = Math.hypot(dx, dz);
+        if (dd > 36) continue;
+        const sc = dd + (dy > 3 ? 20 + dy * 2 : 0) + (Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) > 28 ? 40 : 0); // enemies on another storey and ones far from you come last
+        if (sc < bs) { bs = sc; best = e; }
+      }
+      return best;
+    }
+    function stratMove(a, dt, reach) {
+      const w = G.world;
+      seekT -= dt; fT -= dt;
+      if (!tgt || !tgt.alive || seekT <= 0) { seekT = 0.5; tgt = pickTarget(); fT = 0; }
+      let moving = false;
+      const goal = tgt ? tgt.pos : P.pos;
+      // the gates of the cells: a shut one in the way is simply opened
+      for (const dr of G.Strata.doors) if (dr.state === 'closed' && Math.abs(ent.pos.y - dr.y) < 2 && Math.abs(ent.pos.x - dr.plane) < 1.7 && ent.pos.z > dr.lo - 0.8 && ent.pos.z < dr.hi + 0.8) G.Strata.openDoor(dr);
+      if (tgt) {
+        const dx = tgt.pos.x - ent.pos.x, dz = tgt.pos.z - ent.pos.z, l = Math.hypot(dx, dz), dy = Math.abs(tgt.pos.y - ent.pos.y);
+        ent.yaw = Math.atan2(dx, dz);
+        const seen = w.los(eyeP(), tgt.centerPos());
+        const inRange = d.ranged ? (l < reach && seen) : (l < tgt.radius + reach && dy < 2.5 && !w.barsBetween(ent.pos, tgt.pos));
+        if (inRange) {
+          if (ent.cd <= 0) {
+            ent.cd = d.ranged ? 1.1 : 0.8; ent.atk = 0.4;
+            if (d.ranged) { const from = ent.pos.clone().add(V(0, 1.6, 0)), dir = tgt.centerPos().sub(from).normalize(); C.spawnProjectile({ kind: 'arrow', pos: from.clone().addScaledVector(dir, 0.6), vel: dir.multiplyScalar(60), grav: 2, owner: 'player', dmg: dmg(), radius: 0.12, info: { src: 'ally', noMarker: true } }); }
+            else { C.damageEnemy(tgt, dmg(), { src: 'ally', noMarker: true, pos: tgt.centerPos() }); G.sfx.melee(true); }
+          }
+          return false;
+        }
+        if (fT <= 0 || fGoal !== tgt) { fT = 0.35; fGoal = tgt; if (!w.walkField(goal.x, goal.z, goal.y, ent.pos.x, ent.pos.z, ent.pos.y) || here() > 75) { skip.set(tgt, G.game.time + 4); tgt = null; seekT = 0.2; fGoal = null; return false; } } // unreachable, or a long way round (another storey): pick another foe
+        moving = stepAlong(dt, 6);
+        if (!moving) { lostT += dt; if (lostT > 2) { skip.set(tgt, G.game.time + 3); tgt = null; seekT = 0.2; lostT = 0; } } else lostT = 0;
+        return moving;
+      }
+      // nobody to fight: stay with you
+      const dx = P.pos.x - ent.pos.x, dz = P.pos.z - ent.pos.z, l = Math.hypot(dx, dz), dy = Math.abs(P.pos.y - ent.pos.y);
+      if (l > 4 || dy > 3) {
+        if (fT <= 0 || fGoal !== 'p') { fT = 0.35; fGoal = 'p'; if (!w.walkField(P.pos.x, P.pos.z, P.pos.y, ent.pos.x, ent.pos.z, ent.pos.y)) lostT += 0.35; }
+        farT = here() > 75 ? farT + dt : 0; // a long way round (the stairs of three storeys): after a moment it simply catches up
+        moving = stepAlong(dt, 7);
+        if (moving) ent.yaw = Math.atan2(dirv.x, dirv.z);
+        if (!moving && l > 6) lostT += dt; else if (moving) lostT = Math.max(0, lostT - dt);
+      }
+      if (l > 40 || lostT > 4 || farT > 2.5 || (dy > 12 && l < 14 && lostT > 1.5)) { // cut off from you: catch up
+        lostT = 0; farT = 0; ent.pos.set(P.pos.x + 1.5, P.pos.y, P.pos.z + 1.5); const gy = w.groundAt(V(ent.pos.x, P.pos.y + 0.8, ent.pos.z), 0.2, 12); ent.pos.y = gy > -Infinity ? gy : P.pos.y;
+        G.fx.smoke(ent.pos, 6, 1, 0x8080a0, 1, 1);
+      }
+      return moving;
+    }
+    function stepAlong(dt, speed) {
+      const w = G.world;
+      if (!w.flowDir(ent.pos.x, ent.pos.z, dirv, ent.pos.y, w.ndistM)) return false;
+      if (!w.walkerSafe(ent.pos, ent.pos.x + dirv.x * (speed * dt + 0.5), ent.pos.z + dirv.z * (speed * dt + 0.5))) return false; // never over the lava or off a slab edge
+      G.enemies.groundMove(ent, dirv.x, dirv.z, speed, dt);
+      return true;
+    }
     const ally = R2.mercAlly = C.addAlly({
       t: 1e9, ent, hp: maxHp(), down: 0, lastHurt: -10,
       info() { return { merc: true, icon: d.icon, name: d.name, lv: m.lv, hp: this.hp, maxHp: maxHp(), down: this.down, left: m.left }; },
@@ -272,9 +337,11 @@
         if (this.hp > maxHp()) this.hp = maxHp();
         if (G.game.time - this.lastHurt > 5) this.hp = Math.min(maxHp(), this.hp + maxHp() * 0.04 * dt);
         ent.cd -= dt;
-        const e = G.enemies.nearest(ent.pos, 40);
         let moving = false;
         const reach = d.ranged ? 16 : 1.4;
+        if (G.world.navLayers > 1) moving = stratMove(this, dt, reach);
+        else {
+        const e = G.enemies.nearest(ent.pos, 40);
         if (e && !e.ally) {
           const to = e.pos.clone().sub(ent.pos); to.y = 0; const l = to.length();
           ent.yaw = Math.atan2(to.x, to.z);
@@ -288,6 +355,7 @@
           const to = P.pos.clone().sub(ent.pos); to.y = 0; const l = to.length();
           if (l > 4) { G.enemies.groundMove(ent, to.x / l, to.z / l, 7, dt); moving = true; ent.yaw = Math.atan2(to.x, to.z); }
           if (l > 30) { ent.pos.copy(P.pos).add(V(1.5, 0, 1.5)); ent.pos.y = G.world.groundAt(V(ent.pos.x, P.pos.y + 0.8, ent.pos.z), 0.2, 12) > -Infinity ? G.world.groundAt(V(ent.pos.x, P.pos.y + 0.8, ent.pos.z), 0.2, 12) : P.pos.y; }
+        }
         }
         ent.atk = Math.max(0, ent.atk - dt); ent.walk += moving ? dt * 9 : 0;
         mdl.group.position.copy(ent.pos); mdl.group.rotation.y = ent.yaw;

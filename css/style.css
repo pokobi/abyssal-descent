@@ -1353,3 +1353,4 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 .iw-it.empty { opacity: 0.28; }
 .iv-ph span .iv-sort { margin-left: 0.9em; padding: 0.15em 0.7em; font: inherit; font-size: 1em; color: #e8d6b0; background: rgba(60,46,28,0.85); border: 1px solid rgba(220,190,130,0.45); border-radius: 0.3em; cursor: pointer; pointer-events: auto; }
 .iv-ph span .iv-sort:hover { background: rgba(110,84,44,0.95); color: #fff1cc; border-color: rgba(240,205,130,0.8); }
+#dirind .di.grav { background: radial-gradient(ellipse at 50% 100%, rgba(150,100,255,0.9), rgba(150,100,255,0) 70%); }

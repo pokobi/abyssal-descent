@@ -367,6 +367,29 @@
     o.r = r; o.t = o.ml = dur || 0.4; o.start = (opts && opts.start) || 0.1;
     o.m.scale.setScalar(0.01); o.m.visible = true;
   };
+  // a shock ring you jump over: a band of fixed width centred exactly on radius r (what the hit test uses), with a white-hot edge, a short trail
+  // behind it and a glow ahead, on a plane that reaches maxR. set(r) every frame; it disappears by itself when it is no longer refreshed.
+  const SR_VS = 'varying vec2 vP; void main() { vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  const SR_FS = `uniform float uR; uniform float uHW; uniform vec3 uCol; uniform float uA; varying vec2 vP;
+    void main() {
+      float d = length(vP), e = abs(d - uR);
+      float band = 1.0 - smoothstep(uHW * 0.85, uHW, e);             // the part that hurts: exactly the width of the hit test
+      float core = 1.0 - smoothstep(0.0, uHW * 0.55, e);               // its white-hot middle
+      float trail = (d < uR) ? exp(-(uR - d) * 0.55) * 0.35 : 0.0;     // what has just passed
+      float lead = (d > uR) ? exp(-(d - uR) * 1.6) * 0.45 : 0.0;       // a hint of what is coming
+      float a = clamp(band + trail + lead, 0.0, 1.0) * uA;
+      if (a < 0.02) discard;
+      vec3 c = mix(uCol, vec3(1.0), core * 0.85);
+      gl_FragColor = vec4(c * (0.9 + band * 0.6), a);
+    }`;
+  FX.shocks = [];
+  FX.shockRing = function (c, color, hw, maxR) {
+    const R = maxR || 50, g = new THREE.PlaneGeometry(R * 2, R * 2); g.rotateX(-Math.PI / 2);
+    const mat = new THREE.ShaderMaterial({ uniforms: { uR: { value: 0 }, uHW: { value: hw || 0.8 }, uCol: { value: new THREE.Color(color || 0xffa040) }, uA: { value: 1 } }, vertexShader: SR_VS, fragmentShader: SR_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    const m = new THREE.Mesh(g, mat); m.position.set(c.x, c.y + 0.16, c.z); m.frustumCulled = false; m.renderOrder = 6; scene.add(m);
+    const o = { m, life: 0.3, set(r, a) { mat.uniforms.uR.value = r; mat.uniforms.uA.value = a === undefined ? 1 : a; this.life = 0.3; }, dispose() { if (m.parent) m.parent.remove(m); g.dispose(); mat.dispose(); o.dead = true; } };
+    FX.shocks.push(o); return o;
+  };
   // ground telegraph: grows to radius r over dur, returns handle with .done
   FX.telegraph = function (p, r, dur, color) {
     const o = pools.tele.find((x) => !x.active) || pools.tele[0];
@@ -452,6 +475,7 @@
     for (let i = 0; i < 3; i++) { const s = sys[i]; s.mat.uniforms.uScale.value = sc; s.update(dt); }
     for (const t of pools.tracer) if (t.t > 0) { t.t -= dt; t.m.material.opacity = Math.max(0, t.t / t.ml); if (t.t <= 0) t.m.visible = false; }
     for (const d of pools.decal) if (d.m.visible) { d.t -= dt; if (d.t <= 0) d.m.visible = false; else if (d.t < 4 && d.op !== undefined) d.m.material.opacity = d.op * d.t / 4; }
+    for (let i = FX.shocks.length - 1; i >= 0; i--) { const o = FX.shocks[i]; if (o.dead) { FX.shocks.splice(i, 1); continue; } o.life -= dt; if (o.life <= 0) { o.dispose(); FX.shocks.splice(i, 1); } }
     for (const r of pools.ring) if (r.t > 0) {
       r.t -= dt; const k = 1 - r.t / r.ml;
       r.m.scale.setScalar(Math.max(0.01, r.r * 2 * (r.start + (1 - r.start) * (1 - Math.pow(1 - k, 2)))));

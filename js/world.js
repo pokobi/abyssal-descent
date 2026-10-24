@@ -563,13 +563,44 @@
       }
       this.flowTarget = t;
     }
+    // ---- an ally's own walking field (stacked-storey fields): distances to (tx, tz, ty), settled a little past the ally's own cell ----
+    walkField(tx, tz, ty, fx, fz, fy) {
+      if (!this.nadj) return false;
+      const W = this.Wn, N = this.N, L = this.L;
+      let t = this.navIdx(tx, tz, ty); if (t < 0) return false;
+      if (this.nb[t]) { let best = -1, bd = 1e9; for (let r = 1; r < 4 && best < 0; r++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const i = this.navIdx(tx + dx, tz + dz, ty); if (i >= 0 && !this.nb[i]) { const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = i; } } } if (best < 0) return false; t = best; }
+      const src = this.navIdx(fx, fz, fy);
+      if (!this.ndistM) this.ndistM = new Float32Array(N * L);
+      const dist = this.ndistM; dist.fill(Infinity);
+      const heap = this.heap, hk = this.hkey; let hn = 0;
+      const push = (i, k) => { let n = hn++; heap[n] = i; hk[n] = k; while (n > 0) { const p = (n - 1) >> 1; if (hk[p] <= hk[n]) break; const ti = heap[p], tk = hk[p]; heap[p] = heap[n]; hk[p] = hk[n]; heap[n] = ti; hk[n] = tk; n = p; } };
+      const pop = () => { const r = heap[0]; hn--; heap[0] = heap[hn]; hk[0] = hk[hn]; let n = 0; for (;;) { const l = n * 2 + 1, rr = l + 1; let m = n; if (l < hn && hk[l] < hk[m]) m = l; if (rr < hn && hk[rr] < hk[m]) m = rr; if (m === n) break; const ti = heap[m], tk = hk[m]; heap[m] = heap[n]; hk[m] = hk[n]; heap[n] = ti; hk[n] = tk; n = m; } return r; };
+      const nb = this.nb, adj = this.nadj, rs = this.rs, ra = this.ra, rd = this.rd, pen = this.npen;
+      dist[t] = 0; push(t, 0);
+      let pops = 0, stopAt = Infinity;
+      while (hn > 0 && pops++ < N * L * 3) {
+        const kTop = hk[0], b = pop();
+        if (kTop > dist[b] || nb[b]) continue;
+        if (kTop > stopAt) break;
+        if (b === src && stopAt === Infinity) stopAt = kTop + 10;
+        for (let e = rs[b], e1 = rs[b + 1]; e < e1; e++) {
+          const a = ra[e], d = rd[e];
+          if (nb[a]) continue;
+          if (DIAG[d]) { const c1 = adj[a * 8 + DXI[d]], c2 = adj[a * 8 + DZI[d]]; if (c1 < 0 || c2 < 0 || nb[c1] || nb[c2]) continue; }
+          const nd = dist[b] + (DIAG[d] ? 1.414 : 1) + pen[a];
+          if (nd < dist[a]) { dist[a] = nd; push(a, nd); }
+        }
+      }
+      return src >= 0 && dist[src] < Infinity;
+    }
     // direction toward target following the flow field (null if unreachable)
-    flowDir(x, z, out, y) {
+    flowDir(x, z, out, y, field) {
+      const nd = field || this.ndist;
       const W = this.Wn, N = this.N;
       const i = this.navIdx(x, z, y);
-      if (i < 0 || this.ndist[i] === Infinity) return null;
+      if (i < 0 || nd[i] === Infinity) return null;
       const ic = i % N, ix = ic % W, iz = (ic / W) | 0;
-      let best = this.ndist[i], bx = 0, bz = 0;
+      let best = nd[i], bx = 0, bz = 0;
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dz) continue;
         const ax = ix + dx, az = iz + dz;
@@ -578,7 +609,7 @@
         if (a < 0) continue;
         if (dx && dz) { const c1 = this.land(i, az * W + ix), c2 = this.land(i, iz * W + ax); if (c1 < 0 || c2 < 0 || this.nb[c1] || this.nb[c2] || !this.canStep(i, c1) || !this.canStep(i, c2)) continue; }
         if (!this.canStep(i, a)) continue; // never steer into a cell we can't actually walk into
-        if (this.ndist[a] < best) { best = this.ndist[a]; bx = dx; bz = dz; }
+        if (nd[a] < best) { best = nd[a]; bx = dx; bz = dz; }
       }
       if (!bx && !bz) return null;
       // aim at next cell center (smooths movement)

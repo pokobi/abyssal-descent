@@ -229,6 +229,7 @@
       this.pileCd = Math.max(0, (this.pileCd || 0) - dt);
       this.pileLandT = Math.max(0, (this.pileLandT || 0) - dt);
       this.dragT = Math.max(0, (this.dragT || 0) - dt); // reeled in by a chain / hook: no control of your own
+      if (this.pullT > 0) { this.pullT -= dt; this.vel.x = this.pullDir.x * this.pullSpd; this.vel.z = this.pullDir.z * this.pullSpd; } // the gravity pull of an ordinary foe (depth.js): a fixed, short glide
       if (this.grounded && this.pileFree && !this.pileState && this._pileBounced && this.vel.y <= 0) { this.pileFree = false; this._pileBounced = false; }
       if (crouchHit && !this.grounded && !this.pileState && !this.mantle) {
         const below = w.groundAt(this.pos, this.hw, 60);

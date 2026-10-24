@@ -249,18 +249,16 @@
           G.sfx.explosion(this.pos, 1.8); P.addShake(0.7);
           G.fx.dust(this.pos, V(0, 1, 0), 0x8a7a60, 30); G.fx.decal(this.pos.clone().setY(0.03), V(0, 1, 0), 'crack', 9, true);
           a.wave = { r: 3, mesh: null };
-          const m = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 64), new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-          m.rotation.x = -Math.PI / 2; m.position.set(this.pos.x, 0.25, this.pos.z); G.scene.add(m); a.wave.mesh = m;
+          a.wave.sr = G.fx.shockRing(this.pos.clone().setY(0), 0xffb070, 0.8, 34); // drawn band = tested band (fx.js)
         }
         // expanding shockwave: hits grounded players as it passes
         const w = a.wave;
         w.r += dt * 16 * sp;
-        w.mesh.scale.setScalar(w.r);
-        w.mesh.material.opacity = Math.max(0, 1 - w.r / 34);
+        w.sr.set(w.r, Math.max(0.2, 1 - Math.max(0, w.r - 20) / 14 * 0.8));
         if (Math.random() < 0.8) { const an = Math.random() * 6.28; G.fx.dust(V(this.pos.x + Math.cos(an) * w.r, 0.1, this.pos.z + Math.sin(an) * w.r), V(0, 1, 0), 0x8a7a60, 1); }
         const d = this.playerDistH();
-        if (!a.hitP && Math.abs(d - w.r) < 1.0 && P.pos.y < 0.7) { a.hitP = true; this.hurtPlayer(32, 'aoe'); P.vel.y = 6; }
-        if (w.r > 34) { G.scene.remove(w.mesh); this.act = null; this.noTurnT = 2.4 / sp; this.cd = U.rand(1.5, 2.5) / sp; }
+        if (!a.hitP && Math.abs(d - w.r) < 0.8 && P.pos.y < 0.6) { a.hitP = true; this.hurtPlayer(32, 'aoe'); P.vel.y = 6; }
+        if (w.r > 34) { w.sr.dispose(); this.act = null; this.noTurnT = 2.4 / sp; this.cd = U.rand(1.5, 2.5) / sp; }
       } else if (a.k === 'sweep') {
         const wind = 1.0 / sp;
         const arm = J.arms[1];

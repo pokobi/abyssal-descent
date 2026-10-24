@@ -20,16 +20,14 @@
   }
   // an expanding shockwave ring on the ground (jump over it)
   function shockwave(boss, c, speed, maxR, dmg, col) {
-    const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 64), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    m.rotation.x = -Math.PI / 2; m.position.set(c.x, 0.3, c.z); G.scene.add(m);
-    boss.waves.push({ c: c.clone(), r: 1.5, speed, maxR, dmg, m, hit: false });
+    boss.waves.push({ c: c.clone(), r: 1.5, speed, maxR, dmg, sr: G.fx.shockRing(c, col, 0.75, maxR), hit: false }); // drawn band = tested band (fx.js)
   }
   function updateWaves(boss, dt) {
     for (let i = boss.waves.length - 1; i >= 0; i--) {
       const w = boss.waves[i];
-      w.r += w.speed * dt; w.m.scale.setScalar(w.r); w.m.material.opacity = Math.max(0, 0.9 * (1 - w.r / w.maxR));
-      if (!w.hit && Math.abs(distH(P.pos, w.c) - w.r) < 0.9 && P.pos.y < 0.6) { w.hit = true; boss.hurtPlayer(w.dmg, 'aoe', w.c); P.vel.y = 6; }
-      if (w.r >= w.maxR) { G.scene.remove(w.m); boss.waves.splice(i, 1); }
+      w.r += w.speed * dt; w.sr.set(w.r, 1 - Math.max(0, w.r - w.maxR * 0.6) / (w.maxR * 0.4) * 0.6);
+      if (!w.hit && Math.abs(distH(P.pos, w.c) - w.r) < 0.75 && P.pos.y < 0.6) { w.hit = true; boss.hurtPlayer(w.dmg, 'aoe', w.c); P.vel.y = 6; }
+      if (w.r >= w.maxR) { w.sr.dispose(); boss.waves.splice(i, 1); }
     }
   }
 

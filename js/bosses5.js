@@ -128,6 +128,7 @@
   };
 
   // shock rings spreading from the guardian one after another: jump each one
+  const RING_HW = 0.8; // half-width of a jump-over ring, drawn and tested
   atk.rings = function (a) {
     // rings you have to jump: never more than three, far enough apart to land, take off again and time the next one, and not too fast
     const P = Pl(), n = Math.min(3, a.n || 3), gap = Math.max(1.4, a.gap || 0.75), speed = Math.min(13, a.speed || 15), W = a.wind || 0.8, col = a.col || 0xffa060, R = 44;
@@ -138,9 +139,10 @@
     }
     for (const g of a.rg) {
       if (a.t < g.t0) continue;
-      if (!g.started) { g.started = true; FX().ring(a.o.clone().setY(0.2), R, col, R / speed); G.sfx.explosion(a.o, 1.0); P.addShake(0.5); FX().dust(a.o, V(0, 1, 0), 0x7a6a50, 14); }
+      if (!g.started) { g.started = true; g.sr = FX().shockRing(a.o, col, RING_HW, R); G.sfx.explosion(a.o, 1.0); P.addShake(0.5); FX().dust(a.o, V(0, 1, 0), 0x7a6a50, 14); }
       const r = (a.t - g.t0) * speed;
-      if (!g.hit && Math.abs(hd(P.pos, a.o) - r) < 1.1 && P.pos.y < 0.6) { g.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', a.o, a.elem); P.vel.y = Math.max(P.vel.y, 5); }
+      if (g.sr) { if (r > R) { g.sr.dispose(); g.sr = null; } else g.sr.set(r, 1 - Math.max(0, r - R * 0.6) / (R * 0.4) * 0.6); } // the drawn band is exactly the hit band
+      if (!g.hit && Math.abs(hd(P.pos, a.o) - r) < RING_HW && P.pos.y < 0.6) { g.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', a.o, a.elem); P.vel.y = Math.max(P.vel.y, 5); }
     }
     return a.t > W + (n - 1) * gap + R / speed;
   };
@@ -178,10 +180,10 @@
       if (a.t < w.t0) { live = true; continue; }
       const d = (a.t - w.t0) * speed; if (d > len) continue; live = true;
       const c = w.o.clone().addScaledVector(w.dir, d);
-      if (Math.random() < 0.5) FX().beam(c.clone().addScaledVector(w.perp, wid / 2).setY(0.5), c.clone().addScaledVector(w.perp, -wid / 2).setY(0.5), col, 0.35, 0.07);
+      { const a0 = c.clone().addScaledVector(w.perp, wid / 2).setY(0.3), b0 = c.clone().addScaledVector(w.perp, -wid / 2).setY(0.3); FX().beam(a0, b0, 0xffffff, 0.12, 0.09); FX().beam(a0, b0, col, 0.4, 0.09); } // a solid bar of light along the front: the hit test is the same width, 1 m deep
       if (Math.random() < 0.6) FX().dust(c.clone().addScaledVector(w.perp, U.rand(-wid / 2, wid / 2)), V(0, 1, 0), 0x8a8a8a, 1);
       const rel = P.pos.clone().sub(w.o), along = rel.dot(w.dir), across = Math.abs(rel.dot(w.perp));
-      if (!w.hit && Math.abs(along - d) < 1.5 && across < wid / 2 + 0.3 && P.pos.y < 0.6) { w.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', c, a.elem); P.vel.y = Math.max(P.vel.y, 5); P.vel.addScaledVector(w.dir, 6); }
+      if (!w.hit && Math.abs(along - d) < 0.9 && across < wid / 2 + 0.1 && P.pos.y < 0.6) { w.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', c, a.elem); P.vel.y = Math.max(P.vel.y, 5); P.vel.addScaledVector(w.dir, 6); }
     }
     return !live;
   };

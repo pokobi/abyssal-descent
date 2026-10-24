@@ -94,6 +94,7 @@
       const b = G.BUFF_BY_ID[id];
       if (b && b.mods && b.mods.maxHp > 0) this.hp += b.mods.maxHp;
       if (b && b.mods && b.mods.maxHpPct) this.hp = Math.min(this.hp, this.stats.maxHp);
+      if (b && b.mastery) { const s = this.skills.find((x) => x && x.id === b.skill); if (s) { s.lv = Math.min(G.abilities.MAXLV, (s.lv || 0) + 1); s.maxCd = G.abilities.cdOf(s); } } // 習熟: the skill gains a level
       G.save.mark('buffs', id);
       if (G.ui) G.ui._itemsDirty = true;
     }

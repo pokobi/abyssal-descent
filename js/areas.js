@@ -13,7 +13,7 @@
     elite: { name: '精鋭狩り', icon: '👑', hint: '強力な精鋭／報酬: 上位の加護', color: '#e0b040', w: 2.2, min: 2 },
     trial: { name: '射的の試練', icon: '🎯', hint: '制限時間内に的を撃て／スコアで報酬', color: '#5ab0e0', w: 1.4, min: 2 },
     event: { name: '邂逅', icon: '❓', hint: '誰かが待っている…（危険もある）', color: '#a880e0', w: 1.6, min: 2 },
-    shop: { name: '商人の間', icon: '🛒', hint: '武器・スキル・アイテムを購入', color: '#7acb6a', w: 1.5, min: 2 },
+    shop: { name: '商人の間', icon: '🛒', hint: '武器・スキル・アイテムを購入', color: '#7acb6a', w: 0.9, min: 2 },
     vault: { name: '宝物庫', icon: '💰', hint: '大量の宝箱（ミミック注意）', color: '#f0c040', w: 1.0, min: 3 },
     shrine: { name: '祈りの祠', icon: '⛩️', hint: '全回復＋強化を一つ', color: '#60d0c0', w: 0.9, min: 3 },
     forge: { name: '鍛冶場', icon: '⚒️', hint: '武器とスキルを鍛える', color: '#e08040', w: 0.9, min: 3 },
@@ -25,16 +25,15 @@
 
   AR.rollGates = function (nextArea) {
     if (G.Run.isBoss(nextArea)) return ['boss'];
-    const rg = new G.RNG((GM.seed ^ U.hashStr('gates' + nextArea)) >>> 0), r = () => rg.next(); // seeded: the same doors after a restart
+    if (G.Run.isPrep(nextArea)) return ['shop']; // the area before a guardian is always a single merchant hall
+    const rg = new G.RNG((GM.seed ^ U.hashStr('gates' + nextArea)) >>> 0), r = () => rg.next(); // from the run's own random key: the same doors after a restart
     const keys = Object.keys(AR.TYPES).filter((k) => k !== 'boss' && AR.TYPES[k].min <= nextArea);
     const out = [];
     // always offer at least one fight so the build keeps growing
     const fights = keys.filter((k) => k === 'combat' || k === 'elite' || k === 'cursed');
     out.push(U.weighted(fights, (k) => AR.TYPES[k].w, r));
-    // the area right before a guardian always offers a merchant
-    if (G.Run.isBoss(nextArea + 1) && keys.includes('shop')) out.push('shop');
     while (out.length < 3) {
-      const k = U.weighted(keys.filter((x) => !out.includes(x)), (k) => AR.TYPES[k].w * (k === 'shop' && G.Run.isBoss(nextArea + 1) ? 3 : 1) * (k === 'combat' ? 0.8 : 1), r);
+      const k = U.weighted(keys.filter((x) => !out.includes(x)), (k) => AR.TYPES[k].w * (k === 'combat' ? 0.8 : 1), r);
       out.push(k);
     }
     return U.shuffle(out, r);
@@ -57,9 +56,9 @@
     const w = G.world;
     if (!w.exits) return;
     let types = preset && preset.length && preset.every((t) => t && AR.TYPES[t]) ? preset : AR.rollGates(GM.area + 1);
-    // fewer exits than choices: the fight and the pre-guardian merchant are the ones that must survive
+    // fewer exits than choices: the fight is the one that must survive
     const nEx = w.exits.filter((ex) => !ex.open).length;
-    if (!preset && nEx < types.length) { const pri = (t) => (t === 'combat' || t === 'elite' || t === 'cursed' ? 0 : t === 'shop' && G.Run.isBoss(GM.area + 2) ? 1 : 2); types = types.slice().sort((a, b) => pri(a) - pri(b)); }
+    if (!preset && nEx < types.length) { const pri = (t) => (t === 'combat' || t === 'elite' || t === 'cursed' ? 0 : 1); types = types.slice().sort((a, b) => pri(a) - pri(b)); }
     w.exits.forEach((ex, i) => {
       if (ex.open) return;
       ex.type = types[i % types.length];
@@ -287,7 +286,7 @@
     { id: 'peddler', npc: '怪しい行商人', icon: '🎁', text: '「中身は開けてのお楽しみさ。損はさせない…たぶんね」',
       opts: () => [{ icon: '🎁', label: `謎の箱を買う（${cost(160)}🪙）`, sub: '武器／スキル／アイテム／呪い のどれか', disabled: GM.run.coins < cost(160), run: () => { GM.run.coins -= cost(160); const r = Math.random(); if (r < 0.25) { const wd = U.pick(G.WEAPONS.filter((x) => G.RARITY[x.rarity].tier >= 2)); GM.giveWeapon(wd.id); } else if (r < 0.42) { const sk = U.pick(G.SKILLS.filter((x) => !P.skills.some((s) => s && s.id === x.id))); GM.giveSkill(sk.id); } else if (r < 0.82) { for (let i = 0; i < 2; i++) { const it = U.pick(G.ITEMS.filter((x) => G.RARITY[x.rarity].tier >= 1)); P.addItem(it.id, 1); } } else AR.addCurse(); } }] },
     { id: 'ambush', npc: '物乞いの老人', icon: '🧓', text: '「…近う寄れ…」\n（どこか様子がおかしい）',
-      opts: () => [{ icon: '⚔️', label: '近づく', sub: '???', run: () => { G.ui.toast('罠だ！ 魔物が現れた！', 'warn'); for (let i = 0; i < 2 + Math.floor(GM.area / 6); i++) GM.spawnEnemy({ elite: true, near: true }); GM.ambushReward = true; } }] },
+      opts: () => [{ icon: '⚔️', label: '近づく', sub: '???', run: () => { G.ui.toast('罠だ！ 魔物が現れた！', 'warn'); for (let i = 0; i < 2 + Math.floor(GM.area / G.Run.CYCLE); i++) GM.spawnEnemy({ elite: true, near: true }); GM.ambushReward = true; } }] },
     { id: 'spirit', npc: '囚われた精霊', icon: '🧚', text: '「封印を解いて…あなたの力を少しだけ分けて…」',
       opts: () => [{ icon: '💔', label: '生命力を分け与える', sub: '現在HPの40%を失う → 使い魔を得る', run: () => { P.hp = Math.max(1, P.hp * 0.6); const b = P.has('z_owl') ? 'z_wolf' : 'z_owl'; P.addBuff(b); G.ui.itemCard(G.BUFF_BY_ID[b], '[使い魔]'); } }] },
     { id: 'alchemist', npc: '錬金術師', icon: '⚗️', text: '「素材をくれれば、もっと良い物にしてやろう」',

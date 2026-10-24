@@ -118,7 +118,7 @@
         html += bar('❤️', '体力', st.hp, bossHpMax(), U.fmt(st.hp));
         html += bar('⚔️', '攻撃倍率', st.dmg, 3, '×' + st.dmg.toFixed(2));
         html += bar('📐', 'サイズ', st.size, 14, st.size.toFixed(1) + 'm');
-        html += '<div style="margin-top:4px;font-size:12px;color:var(--dim)">基準：ノーマル・エリア6の守護者（難易度やエリアで変わります）</div>';
+        html += '<div style="margin-top:4px;font-size:12px;color:var(--dim)">基準：ノーマル・エリア7の守護者（難易度やエリアで変わります）</div>';
         if (st.weak.length) html += `<div style="margin-top:6px"><span class="tag">🎯 部位: ${st.weak.map(U.esc).join(' / ')}</span></div>`;
       }
       html += `<div style="margin-top:6px">${o.mech.map((m) => `<div style="padding:4px 0">◆ ${m}</div>`).join('')}</div><div style="margin-top:8px"><span class="tag">⚔ 出現: ${o.id === 'sovereign' ? 'エクストラのエリア18（専用のフィールド）' : (Object.keys(G.Run.BOSS_POOLS).filter((f) => G.Run.BOSS_POOLS[f].includes(o.id)).map((f) => G.Run.FIELD_NAME[f]).join('・') || '—') + 'の守護者'}</span></div>`;
@@ -198,8 +198,8 @@
     return h;
   }
   const bossCache = {};
-  // every guardian is shown at the same reference point (normal difficulty, area 6) so the numbers can be compared across the list
-  const BOSS_REF = 6;
+  // every guardian is shown at the same reference point (normal difficulty, area 7) so the numbers can be compared across the list
+  const BOSS_REF = 7;
   function bossStats(o) {
     if (bossCache[o.id]) return bossCache[o.id];
     const R = G.Run, GM = G.game, keepRun = R.cur, keepArea = GM.area;

@@ -370,7 +370,7 @@
       // coins & meta
       sText(e.coinVal, U.fmt(G.game.run.coins));
       const r = G.game.run;
-      sHtml(e.runMeta, `⏱ <b>${U.time(r.playT !== undefined ? r.playT : G.game.time - r.startT)}</b>　💀 <b>${r.kills}</b>　⚔️ <b>${U.fmt(Math.round(r.dmgDealt || 0))}</b><br>🌱 シード <b>${G.game.seed}</b><br><span style="letter-spacing:2px">${(G.game.route || []).slice(-12).map((k) => G.Areas.TYPES[k].icon).join('')}</span>`);
+      sHtml(e.runMeta, `⏱ <b>${U.time(r.playT !== undefined ? r.playT : G.game.time - r.startT)}</b>　💀 <b>${r.kills}</b>　⚔️ <b>${U.fmt(Math.round(r.dmgDealt || 0))}</b><br><span style="letter-spacing:2px">${(G.game.route || []).slice(-12).map((k) => G.Areas.TYPES[k].icon).join('')}</span>`);
       UI.updateObjective();
       // the boon grid always sits just below the top-left panel (objective / run info grow and shrink)
       { const tl = document.getElementById('hud-tl'); if (tl) { const y = Math.max(170, Math.round(tl.getBoundingClientRect().bottom + 10)); if (UI._bTop !== y) { UI._bTop = y; e.buffs.style.top = y + 'px'; e.buffs.style.maxHeight = `calc(100vh - ${y + 230}px)`; } } }
@@ -442,10 +442,10 @@
     for (let a = 1; a <= tot; a++) {
       const f = R.field(a), last = segs[segs.length - 1];
       if (!last || last.f !== f || R.seg(a) !== last.s) segs.push({ f, s: R.seg(a), nodes: [] });
-      const boss = R.isBoss(a), done = a < n, cur = a === n, kind = (GM.route || [])[a - 1];
-      segs[segs.length - 1].nodes.push(`<i class="rt-n${boss ? ' boss' : ''}${done ? ' done' : ''}${cur ? ' cur' : ''}" title="エリア${a}${boss ? '（守護者）' : ''}">${boss ? '👑' : done || cur ? (ROUTE_ICON[kind] || a) : a}</i>`);
+      const boss = R.isBoss(a), prep = R.isPrep(a), done = a < n, cur = a === n, kind = (GM.route || [])[a - 1];
+      segs[segs.length - 1].nodes.push(`<i class="rt-n${boss ? ' boss' : ''}${done ? ' done' : ''}${cur ? ' cur' : ''}" title="エリア${a}${boss ? '（守護者）' : prep ? '（準備の商人）' : ''}">${boss ? '👑' : done || cur ? (ROUTE_ICON[kind] || a) : prep ? '🛒' : a}</i>`);
     }
-    const nb = Math.min(tot, Math.ceil(n / 6) * 6);
+    const nb = Math.min(tot, Math.ceil(n / R.CYCLE) * R.CYCLE);
     return `<div class="rt-bar">${segs.map((s) => `<div class="rt-seg"><span class="rt-name">${G.Run.FIELD_NAME[s.f] || s.f}</span><span class="rt-nodes">${s.nodes.join('')}</span></div>`).join('')}</div><div class="rt-next">${n >= tot ? '最後の守護者が待つ' : nb === n ? '👑 守護者の間' : `👑 守護者まで あと${nb - n}エリア（エリア${nb}）`}</div>`;
   };
   UI.setArea = function (title, sub) {
@@ -580,7 +580,6 @@
       <div class="title-menu">
         ${G.game.loadRun() ? `<button class="btn primary" id="t-cont">▶ 続きから（エリア ${G.game.loadRun().area}）</button>` : ''}
         <button class="btn ${G.game.loadRun() ? '' : 'primary'}" id="t-start">⚔️ 深淵へ潜る${G.game.loadRun() ? '（新しく始める）' : ''}</button>
-        <div class="title-seed">🌱 シード <input id="t-seed" placeholder="ランダム" maxlength="12"></div>
         <button class="btn" id="t-tut">📘 チュートリアル</button>
         <button class="btn" id="t-codex">📖 図鑑</button>
         <button class="btn" id="t-settings">⚙️ 設定</button>
@@ -590,19 +589,18 @@
       <div class="title-foot">クリックでゲーム開始時にマウスがロックされます　·　推奨: フルスクリーン（Ctrl+W 等の誤操作防止）</div>
     </div>`);
     let diffPick = null;
-    const go = () => { G.sfx.init(); G.sfx.ui('select'); const v = s.querySelector('#t-seed').value.trim(); G.game.startRun(v, diffPick); };
-    const tut = () => { G.sfx.init(); G.sfx.ui('select'); G.Tutorial.start(s.querySelector('#t-seed') ? s.querySelector('#t-seed').value.trim() : ''); };
+    const go = () => { G.sfx.init(); G.sfx.ui('select'); G.game.startRun(diffPick); };
+    const tut = () => { G.sfx.init(); G.sfx.ui('select'); G.Tutorial.start(); };
     // a new run first asks whether you want the tutorial (can be turned off)
     const newRun = () => UI.difficulty((d) => { diffPick = d; askTut(); }, () => UI.title());
     const askTut = () => {
       const S = G.save.data.settings;
       if (S.askTutorial === false) return go();
       G.sfx.init(); G.sfx.ui('open');
-      const seedV = s.querySelector('#t-seed').value.trim();
       UI.choice('📘 チュートリアルを受けますか？', '基本操作（移動・射撃・近接・グラップル・パイルドライバー）、アイテムや投擲物の使い方とホイール、エリアの流れまで、実際に体を動かしながら学べます（約5〜8分）。<br>チュートリアルが終わると、そのまま本編が始まります。', [
-        { icon: '📘', label: 'チュートリアルを受ける', sub: 'はじめての方におすすめ', onPick: () => { G.sfx.ui('select'); G.Tutorial.start(seedV); } },
-        { icon: '⚔️', label: 'すぐに本編を始める', onPick: () => { G.sfx.ui('select'); G.game.startRun(seedV, diffPick); } },
-        { icon: '🚫', label: '今後は聞かずに本編を始める', sub: '設定からいつでも戻せます', onPick: () => { S.askTutorial = false; G.save.write(); G.sfx.ui('select'); G.game.startRun(seedV, diffPick); } },
+        { icon: '📘', label: 'チュートリアルを受ける', sub: 'はじめての方におすすめ', onPick: () => { G.sfx.ui('select'); G.Tutorial.start(); } },
+        { icon: '⚔️', label: 'すぐに本編を始める', onPick: () => { G.sfx.ui('select'); G.game.startRun(diffPick); } },
+        { icon: '🚫', label: '今後は聞かずに本編を始める', sub: '設定からいつでも戻せます', onPick: () => { S.askTutorial = false; G.save.write(); G.sfx.ui('select'); G.game.startRun(diffPick); } },
       ], () => UI.title());
     };
     s.querySelector('#t-start').onclick = () => {
@@ -633,7 +631,7 @@
         ${k(G.K('status') + ' / ' + G.K('inventory'), '持ち物・装備・ステータスの画面（防具・アタッチメントの付け替え、武器1/2の入れ替え、持ち物の整理、加護や効果の一覧）')}${k('Esc / I', 'ポーズ（Iはもう一度押すと再開）')}
       </div>
       <h3>🗺️ 流れ</h3>
-      <div style="font-size:13.5px;line-height:1.7;color:#ddd3c0">エリアの目標を達成すると北の3つの門が開き、行き先（戦闘・精鋭・射的・邂逅・商人・宝物庫・祠・鍛冶場・呪いの闘技場 など）を自由に選べます。門の前には旅の商人（または古の交換石機）も店を出します。6エリアごとに守護者（ボス）が待ち構え、最後の守護者を倒すとクリアです（ボス戦の舞台は守護者ごとに変わります）。敵はエリアが進むほど強く（Lv表示）、一部はシールドを持ちます（EMP・電撃・爆発が有効）。コインは撃破・クリア・ボーナス・宝箱・破壊可能オブジェクトから得られます。</div>
+      <div style="font-size:13.5px;line-height:1.7;color:#ddd3c0">エリアの目標を達成すると北の3つの門が開き、行き先（戦闘・精鋭・射的・邂逅・商人・宝物庫・祠・鍛冶場・呪いの闘技場 など）を自由に選べます。門の前には旅の商人（または古の交換石機）も店を出します。7エリアごとに守護者（ボス）が待ち構え（その手前の6つ目は、商人だけの準備の間）、最後の守護者を倒すとクリアです（ボス戦の舞台は守護者ごとに変わります）。敵はエリアが進むほど強く（Lv表示）、一部はシールドを持ちます（EMP・電撃・爆発が有効）。コインは撃破・クリア・ボーナス・宝箱・破壊可能オブジェクトから得られます。</div>
       <div style="margin-top:18px;text-align:right"><button class="btn" id="h-back">↩ 戻る</button></div></div>`, 'dim');
     s.querySelector('#h-back').onclick = () => { G.sfx.ui('click'); back(); };
   };
@@ -731,7 +729,7 @@
         ${G.Dev && G.Dev.on() ? '<button class="btn" id="p-dev">🛠 デバッグ（F9）</button>' : ''}
         ${G.Tutorial.active ? '<button class="btn" id="p-tutend">📘 チュートリアルを終了して本編へ</button>' : ''}
         <button class="btn" id="p-quit">🏳 諦めてタイトルへ</button>
-      </div><div style="margin-top:12px;font-size:12px;color:var(--dim)">エリア ${G.game.area} · シード ${G.game.seed}</div></div>`, 'dim');
+      </div><div style="margin-top:12px;font-size:12px;color:var(--dim)">エリア ${G.game.area}</div></div>`, 'dim');
     s.querySelector('#p-resume').onclick = () => G.game.resume();
     s.querySelector('#p-status').onclick = () => { G.sfx.ui('open'); const sc = UI.screen(`<div class="panel" style="width:min(1000px,94vw);display:grid;grid-template-columns:1.3fr 1fr;gap:24px">${UI.statusHTML()}<div style="grid-column:1/-1;text-align:right"><button class="btn" id="st-back">↩ 戻る</button></div></div>`, 'dim'); sc.querySelector('#st-back').onclick = () => UI.pause(); };
     s.querySelector('#p-codex').onclick = () => { G.sfx.ui('open'); G.codex.open(() => UI.pause()); };
@@ -819,7 +817,7 @@
         ${id === 'extra' ? '<div class="df-flame"></div>' : ''}
         <div class="df-ic">${d.icon}</div><div class="df-en">${d.en}</div><div class="df-name">${d.name}${cleared ? '<span class="df-clr">CLEAR</span>' : ''}</div>
         <div class="df-desc">${d.desc}</div>
-        <div class="df-meta">全${d.areas}エリア・ボス${d.areas / 6}体</div>
+        <div class="df-meta">全${d.areas}エリア・ボス${d.areas / G.Run.CYCLE}体</div>
         ${id === 'extra' ? `<div class="df-lv"><button class="btn small" data-x="-1">◀</button><b id="df-xlv">エクストラ ${xlv}</b><button class="btn small" data-x="1">▶</button></div><div class="df-meta" id="df-xmul"></div>` : ''}
         ${sw}
       </div>`;
@@ -891,12 +889,12 @@
         <div class="stat-box"><div class="sv">🪔 ${P.revives || 0}</div><div class="sl">残った灯火</div></div>
       </div>
       ${o.unlock ? `<div class="vic-unlock">🔓 ${o.unlock} が解放されました</div>` : ''}
-      <div style="font-size:13px;color:var(--dim)">シード ${G.game.seed}${o.first ? '　·　<b style="color:var(--gold2)">🏆 初クリア！</b>' : ''}</div>
+      <div style="font-size:13px;color:var(--dim)">${o.first ? '<b style="color:var(--gold2)">🏆 初クリア！</b>' : ''}</div>
       <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap">
         <button class="btn primary" id="v-title">🏠 タイトルへ</button><button class="btn" id="v-again">🎲 同じ難易度でもう一度</button>
       </div></div>`, 'dim');
     s.querySelector('#v-title').onclick = () => { G.sfx.ui('click'); G.game.toTitle(); };
-    s.querySelector('#v-again').onclick = () => { G.sfx.ui('select'); G.game.startRun('', Object.assign({}, R.cur)); };
+    s.querySelector('#v-again').onclick = () => { G.sfx.ui('select'); G.game.startRun(Object.assign({}, R.cur)); };
   };
   UI.death = function (stats) {
     const r = G.game.run;
@@ -910,12 +908,11 @@
         <div class="stat-box"><div class="sv">⏱ ${U.time(r.playT !== undefined ? r.playT : G.game.time - r.startT)}</div><div class="sl">生存時間</div></div>
         <div class="stat-box"><div class="sv">🌟 ${P.buffs.size}</div><div class="sl">取得加護</div></div>
       </div>
-      <div style="font-size:13px;color:var(--dim)">致命傷: ${U.esc(stats.cause || '不明')}　·　シード ${G.game.seed}${stats.newRecord ? '　·　<b style="color:var(--gold2)">🏆 新記録！</b>' : ''}</div>
+      <div style="font-size:13px;color:var(--dim)">致命傷: ${U.esc(stats.cause || '不明')}${stats.newRecord ? '　·　<b style="color:var(--gold2)">🏆 新記録！</b>' : ''}</div>
       <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap">
-        <button class="btn primary" id="d-retry">🔁 同じシードで再挑戦</button><button class="btn" id="d-new">🎲 新しいシード</button><button class="btn" id="d-title">🏠 タイトルへ</button>
+        <button class="btn primary" id="d-retry">🔁 もう一度挑戦</button><button class="btn" id="d-title">🏠 タイトルへ</button>
       </div></div>`, 'dim');
-    s.querySelector('#d-retry').onclick = () => { G.sfx.ui('select'); G.game.startRun(String(G.game.seed)); };
-    s.querySelector('#d-new').onclick = () => { G.sfx.ui('select'); G.game.startRun(''); };
+    s.querySelector('#d-retry').onclick = () => { G.sfx.ui('select'); G.game.startRun(); };
     s.querySelector('#d-title').onclick = () => { G.sfx.ui('click'); G.game.toTitle(); };
   };
   UI.revivePrompt = function (left, cause, onRevive, onGiveUp) {

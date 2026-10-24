@@ -31,7 +31,7 @@
     setInterval(() => {
       if (!D.on() || !GM.run || !P.pos) { info.textContent = ''; return; }
       const cheats = Object.entries({ 無敵: GM.dev.god, 一撃: GM.dev.oneHit, CT無: GM.dev.noCd, 敵停止: GM.dev.freeze }).filter(([, v]) => v).map(([k]) => k).join(' ');
-      info.textContent = `AREA ${GM.area} ${GM.stage} · seed ${GM.seed} · pos ${P.pos.x.toFixed(1)},${P.pos.y.toFixed(1)},${P.pos.z.toFixed(1)} · 敵 ${G.enemies.list.filter((e) => e.alive).length} · ×${GM.dev.speed} ${cheats}`;
+      info.textContent = `AREA ${GM.area} ${GM.stage} · pos ${P.pos.x.toFixed(1)},${P.pos.y.toFixed(1)},${P.pos.z.toFixed(1)} · 敵 ${G.enemies.list.filter((e) => e.alive).length} · ×${GM.dev.speed} ${cheats}`;
     }, 250);
   };
 
@@ -85,7 +85,7 @@
     const T = G.Areas.TYPES;
     const kindName = (k) => (T[k] ? T[k].icon + ' ' + T[k].name : { casino: '🎰 賭場', bank: '🏦 銀行', auction: '🔨 競売', merc: '🗡️ 傭兵', offering: '🙏 献納' }[k] || k);
     if (tab === 'run') {
-      ACT.start = () => { const sd = panel.querySelector('#dv-seed').value.trim(), df = panel.querySelector('#dv-diff').value.split(':'); if (panel) panel.remove(); panel = null; back = null; D.keep = true; GM.startRun(sd || undefined, { id: df[0], lv: +df[1] || 0 }); D.keep = false; GM.run.dev = true; };
+      ACT.start = () => { const df = panel.querySelector('#dv-diff').value.split(':'); if (panel) panel.remove(); panel = null; back = null; D.keep = true; GM.startRun({ id: df[0], lv: +df[1] || 0 }); D.keep = false; GM.run.dev = true; };
       ACT.unlockAll = () => { const c = G.Run.rec(); c.easy = c.normal = c.hard = c.easy || 1; for (let k = 1; k <= 10; k++) c['extra' + k] = c['extra' + k] || 1; G.save.write(); toast('全難易度を解放'); };
       ACT.go = () => {
         const n = Math.max(1, +panel.querySelector('#dv-area').value | 0), k = panel.querySelector('#dv-kind').value, b = panel.querySelector('#dv-boss').value;
@@ -105,7 +105,7 @@
       const bosses = G.BOSSES.map((b) => `<option value="${b.id}">${b.icon || '👿'} ${esc(b.name)}</option>`).join('');
       return `${sec('ラン')}
         <div class="dv-row">難易度 <select id="dv-diff">${['easy', 'normal', 'hard'].map((k) => `<option value="${k}:0" ${G.Run.cur.id === k ? 'selected' : ''}>${G.Run.DIFFS[k].name}</option>`).join('')}${Array.from({ length: 10 }, (_, i) => `<option value="extra:${i + 1}" ${G.Run.cur.id === 'extra' && G.Run.cur.lv === i + 1 ? 'selected' : ''}>エクストラ${i + 1}</option>`).join('')}</select></div>
-        <div class="dv-row">シード ${'<input class="dv-n wide" id="dv-seed" placeholder="空欄でランダム">'} ${btn('start', '▶ 新しいランを開始')}</div>
+        <div class="dv-row">${btn('start', '▶ 新しいランを開始')}</div>
         ${inRun() ? `${sec('エリア移動')}
         <div class="dv-row">エリア ${num('dv-area', GM.area || 1)} 種類 <select id="dv-kind">${AREA_KINDS.map((k) => `<option value="${k}" ${k === GM.stage ? 'selected' : ''}>${kindName(k)}</option>`).join('')}</select></div>
         <div class="dv-row">ボス <select id="dv-boss"><option value="">（エリア番号どおり）</option>${bosses}</select> ${btn('go', '🚪 移動', 'pri')}</div>

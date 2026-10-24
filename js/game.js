@@ -432,12 +432,12 @@
     G.weapons.hidden(true);
     G.ui.title();
   };
-  GM.startRun = function (seedStr, diff) {
+  GM.startRun = function (diff) {
     G.sfx.init();
     if (G.Dev && !G.Dev.keep && G.Dev.on()) G.Dev.disable();
     if (diff) G.Run.set(diff.id, diff.lv);
-    let seed;
-    if (seedStr && /^\d+$/.test(seedStr)) seed = parseInt(seedStr, 10) >>> 0; else if (seedStr) seed = U.hashStr(seedStr); else seed = (Math.random() * 999999999) >>> 0;
+    // every run is generated at random; this key only lets a reloaded / restarted area be rebuilt exactly as it was (never shown, never chosen)
+    const seed = (Math.random() * 999999999) >>> 0;
     GM.seed = seed;
     GM.rng = new G.RNG(seed);
     GM.time = 0;
@@ -573,7 +573,7 @@
     GM.area = n;
     GM.stage = kind;
     GM.route = GM.route || []; GM.route.push(kind);
-    const gates = G.Run.isBoss(n + 1) ? 1 : 3;
+    const gates = G.Run.isBoss(n + 1) || G.Run.isPrep(n + 1) ? 1 : 3;
     const seed = (GM.seed ^ U.hashStr('area' + n + kind)) >>> 0;
     let w;
     if (kind === 'shop') w = G.LevelGen.shop(n, seed, gates);

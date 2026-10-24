@@ -1,15 +1,15 @@
 'use strict';
-// Run plan: difficulty, segments of 6 areas (the 6th is a guardian), which field each segment is in,
+// Run plan: difficulty, segments of 7 areas (5 ordinary ones, a merchant-only preparation area, then the guardian), which field each segment is in,
 // the enemy cap, stat multipliers and the "depth" used by mutations / anomalies / pile resistance.
 (function () {
   const R = (G.Run = {});
 
   // fields: graveyard (outdoor night) / gate (dungeon entrance) / halls (deep multi-storey dungeon) / ruin (the ruined depths)
   R.DIFFS = {
-    easy: { name: 'イージー', en: 'EASY', icon: '🌙', col: '#7acb6a', areas: 12, mul: 0.65, segs: [['grave', 3], ['grave', 5]], depth: [0, 0], desc: '初めての方に。短めの冒険で、敵も穏やか。' },
-    normal: { name: 'ノーマル', en: 'NORMAL', icon: '⚔️', col: '#e0c070', areas: 18, mul: 1, segs: [['grave', 3], ['gate', 5], ['halls', 7]], depth: [0, 0, 0], desc: '標準の難易度。' },
-    hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 18, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
-    extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#d0405a', areas: 18, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
+    easy: { name: 'イージー', en: 'EASY', icon: '🌙', col: '#7acb6a', areas: 14, mul: 0.65, segs: [['grave', 3], ['grave', 5]], depth: [0, 0], desc: '初めての方に。短めの冒険で、敵も穏やか。' },
+    normal: { name: 'ノーマル', en: 'NORMAL', icon: '⚔️', col: '#e0c070', areas: 21, mul: 1, segs: [['grave', 3], ['gate', 5], ['halls', 7]], depth: [0, 0, 0], desc: '標準の難易度。' },
+    hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 21, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
+    extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#d0405a', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
   };
   R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟' };
   R.cur = { id: 'normal', lv: 0 };
@@ -18,8 +18,10 @@
   R.label = (d) => { d = d || R.cur; const D = R.DIFFS[d.id]; return d.id === 'extra' ? `${D.name}${d.lv}` : D.name; };
   R.key = (d) => { d = d || R.cur; return d.id === 'extra' ? 'extra' + d.lv : d.id; };
   R.areas = () => R.def().areas;
-  R.seg = (n) => Math.max(0, Math.min(R.def().segs.length - 1, Math.floor((Math.max(1, n) - 1) / 6)));
-  R.isBoss = (n) => n % 6 === 0;
+  R.CYCLE = 7; // areas 1-5 ordinary, 6 = the merchant-only preparation area, 7 = the guardian
+  R.seg = (n) => Math.max(0, Math.min(R.def().segs.length - 1, Math.floor((Math.max(1, n) - 1) / R.CYCLE)));
+  R.isBoss = (n) => n % R.CYCLE === 0;
+  R.isPrep = (n) => n % R.CYCLE === R.CYCLE - 1;
   R.isLast = (n) => n >= R.areas();
   R.field = (n) => R.def().segs[R.seg(n)][0];
   R.cap = (n) => R.def().segs[R.seg(n)][1];
@@ -76,7 +78,7 @@
     halls: ['warlock', 'boneking', 'cerberus', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur'],
     ruin: ['ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver', 'warden', 'arbiter', 'minotaur', 'cinderpriest', 'ashdrake'],
   };
-  // a run never meets the same guardian twice: the earlier guardians of the run are drawn first (same seed, same result), then excluded
+  // a run never meets the same guardian twice: the earlier guardians of the run are drawn first (drawn from the run's own random key, so a restarted area meets the same one), then excluded
   R.bossFor = function (n) {
     if (R.cur.id === 'extra' && R.isLast(n)) return 'sovereign'; // extra: the last guardian is always the Crimson Sovereign, on its own field
     const used = new Set(), draw = (m) => {
@@ -86,7 +88,7 @@
       const rng = new G.RNG(((G.game.seed || 1) ^ G.U.hashStr('boss' + m)) >>> 0);
       const id = c[Math.floor(rng.next() * c.length)]; used.add(id); return id;
     };
-    for (let m = 6; m < n; m += 6) draw(m);
+    for (let m = R.CYCLE; m < n; m += R.CYCLE) draw(m);
     return draw(n);
   };
 })();

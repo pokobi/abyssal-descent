@@ -59,15 +59,14 @@
       setup: (s) => { const f = P.forward().setY(0).normalize(); const p = P.pos.clone().addScaledVector(f, 3); const w = G.world; if (!(w.boxFree(p.x - 0.7, p.y + 0.05, p.z - 0.7, p.x + 0.7, p.y + 1, p.z + 0.7))) p.copy(P.pos).add(V(0, 0, -2)); s.chest = G.Props.chest(w, p.x, p.z, w.floorBelow(p.x, P.pos.y + 1, p.z) > -50 ? w.floorBelow(p.x, P.pos.y + 1, p.z) : P.pos.y, Math.atan2(-f.x, -f.z), 2); w.flushDeferred(); G.fx.ring(p.clone().setY(P.pos.y + 0.1), 1.5, 0xffd070, 0.6); },
       check: (s) => (s.chest && s.chest.opened ? 1 : 0) },
     { title: '画面の見方', info: true, body: () => ul('<b>左下</b>　HP・状態異常・味方。🪔の数字は<b>魂の灯火</b>（倒れた時に1つ使って復活）', '<b>左上</b>　エリアと目標', '<b>右上</b>　コイン・時間・撃破数　<b>上中央</b>　コンパス', '<b>右下</b>　武器と弾　<b>下中央</b>　スキル・アイテム') },
-    { title: 'ゲームの流れ', info: true, body: () => ul('エリアの<b>目標</b>（殲滅・生存・狩猟・儀式）を達成すると、<b>加護</b>を1つ選べる', 'クリア後は<b>門が3つ</b>開く。看板を見て、次の行き先を選ぶ（戦闘・商人・宝物庫など）', '<b>6エリアごとに守護者</b>（ボス）。最後の守護者を倒すとクリア') },
+    { title: 'ゲームの流れ', info: true, body: () => ul('エリアの<b>目標</b>（殲滅・生存・狩猟・儀式）を達成すると、<b>加護</b>を1つ選べる', 'クリア後は<b>門が3つ</b>開く。看板を見て、次の行き先を選ぶ（戦闘・商人・宝物庫など）', '<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は、商人だけの<b>準備の間</b>。最後の守護者を倒すとクリア') },
     { title: '準備完了！', info: true, finish: true, body: () => ul('お疲れさまでした。', '進行は自動で保存され、タイトルの「続きから」で再開できます', `操作は ${k('Esc')} →「操作方法」でいつでも確認できます`, `${k('Enter')} で本編を始めます`) },
   ];
 
   // ---------------------------------------------------------------- lifecycle
-  T.start = function (seedStr) {
+  T.start = function () {
     GM = G.game; P = G.player;
-    T.seedStr = seedStr || '';
-    GM.startRun(seedStr);
+    GM.startRun();
     G.save.data.records.runs = Math.max(0, G.save.data.records.runs - 1); G.save.write();
     T.active = true; GM.tutorial = true; document.body.classList.add('tut-on');
     GM.clearRun(); // nothing to "continue" from a tutorial
@@ -89,7 +88,7 @@
   T.finish = function () {
     T.stop();
     G.ui.toast('⚔️ 本編を開始します', 'good');
-    G.game.startRun('');
+    G.game.startRun();
   };
   function ensureEl() {
     if (el) return;

@@ -28,6 +28,28 @@
   const sfxCast = (b, a) => { if (!a.sw) { a.sw = true; G.sfx.magic(b.pos, a.snd || 'dark'); } };
   const boom = (c, r, col, dmgFn) => { FX().explosion(c.clone().setY(0.4), r * 0.55, col, { decal: false }); FX().ring(c.clone().setY(0.15), r, col, 0.4); G.sfx.explosion(c, 0.7); if (dmgFn) dmgFn(); };
 
+  // ================================================================ fairness floors
+  // applied to every attack a guardian picks, whatever its spec says: wind-ups you can read (in real seconds, after the guardian's
+  // own speed-up), short combos, a ring fired right after a blink that leaves gaps, shots you can sidestep, blink strikes you can leave
+  const MINW = { swipe: 0.42, charge: 0.5, leap: 0.45, slam: 0.55, volley: 0.38, pull: 0.45, breath: 0.5, nova: 0.5, blink: 0.3 };
+  BS.fair = function (a, boss) {
+    const rate = boss && boss.atkRate ? boss.atkRate() : 1;
+    if (MINW[a.k] !== undefined) a.wind = Math.max(a.wind ?? 0.7, MINW[a.k] * rate);
+    if (a.k === 'nova' && a.max === 0) { a.n = Math.min(a.n || 16, 11); a.wind = Math.max(a.wind, 0.6 * rate); a.speed = Math.min(a.speed || 14, 11); }
+    if (a.dmg > 40) a.dmg = 40 + (a.dmg - 40) * 0.5; // the very heaviest single blows (leaps, charges of the big beasts) are toned down
+    const rank = BS.diffRank();
+    if (a.k === 'volley') { // a fan you can slip through: at most 4 shots (5 in hard+), with a lane of about 0.3 rad between neighbours
+      a.speed = Math.min(a.speed || 22, 24); a.n = Math.min(a.n || 3, 4);
+      const cnt = a.n + (rank >= 2 ? 1 : 0); if (cnt > 1) a.spread = Math.max(a.spread || 0.25, 0.3 * (cnt - 1) / 2);
+    }
+    if (a.k === 'nova' && a.max !== 0) { a.n = Math.min(a.n || 16, 18); a.waves = Math.min(a.waves || 1, rank >= 2 ? 3 : 2); }
+    if (a.k === 'spiral' || a.k === 'x_spiral') { a.rate = Math.min(a.rate || 8, 6); a.arms = Math.min(a.arms || 3, 3); }
+    if (a.k === 'breath') { a.r = Math.min(a.r || 11, 13); a.dmg = Math.min(a.dmg || 10, 10); } // the long breaths: a reach you can step out of, and a little less burn per tick
+    if (a.k === 'mblink' || a.k === 'x_mblink') { a.hits = Math.min(a.hits || 3, 3); a.tele = Math.max(a.tele || 0.5, 0.8); a.r = Math.min(a.r || 5.2, 4.4); }
+    if (a.k === 'chase' || a.k === 'x_chase') a.delay = Math.max(a.delay || 0.95, 0.85);
+    return a;
+  };
+
   // ================================================================ the attack library
   // Each function runs with `this` = the guardian, gets the attack's state object `a` (a.t = seconds since it began) and returns true when it is over.
   const atk = (BS.atk = {});
@@ -76,7 +98,8 @@
     const o = this.pos.clone().setY(a.h || 1.1);
     a.tick -= dt;
     for (let k = 0; k < a.arms; k++) {
-      const an = a.ang + k * Math.PI * 2 / a.arms, end = o.clone().add(V(Math.sin(an) * len, 0, Math.cos(an) * len));
+      const an = a.ang + k * Math.PI * 2 / a.arms, dir = V(Math.sin(an), 0, Math.cos(an));
+      const wh = G.world.raycast(o, dir, len), end = o.clone().addScaledVector(dir, wh ? wh.t : len); // cut short by the first pillar / wall: the drawn beam is the hit beam
       FX().beam(o, end, col, wid * 0.45, 0.07);
       if (Math.random() < 0.7) FX().sparks(end.clone().setY(0.2), null, 2, col, 4);
       if (a.tick <= 0) { const s = segDist(P.pos.x, P.pos.z, o, end); if (s.d < wid / 2 + 0.35 && (!a.low || P.pos.y < 1.3)) this.hurtPlayer(a.dmg || 9, 'aoe', o, a.elem); }
@@ -116,7 +139,7 @@
     if (!a.s) { a.s = { i: 0, next: a.wind || 0.5, cur: null }; sfxCast(this, a); pose(this, 1); }
     const s = a.s;
     if (!s.cur && s.i < n && a.t >= s.next) {
-      const d = Math.max(0.5, (a.delay || 0.95) - s.i * 0.07), c = P.pos.clone().setY(0);
+      const d = Math.max(0.62, (a.delay || 0.95) - s.i * 0.07), c = P.pos.clone().setY(0);
       s.cur = { c, t: a.t + d, tele: FX().telegraph(c, r, d, col) }; s.i++;
     }
     if (s.cur && a.t >= s.cur.t) {

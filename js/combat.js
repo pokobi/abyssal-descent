@@ -402,6 +402,15 @@
   };
 
   // ---------------- AoE ----------------
+  // does an enemy blast at pos reach you? the blast point must see your chest or your waist. It is first pulled back a little, away
+  // from you: a shot that bursts on the near face of a pillar then has to cross the pillar to reach you (a ray that starts inside a box ignores it)
+  C.blastReaches = function (pos) {
+    const pl = G.player, w = G.world, c = pl.chestPos(), waist = V(pl.pos.x, pl.pos.y + 0.6, pl.pos.z);
+    const o = pos.clone(); o.y += 0.35; const toP = c.clone().sub(o); const L = toP.length();
+    if (L < 1.2) return true; // right on top of you
+    o.addScaledVector(toP, -0.3 / L);
+    return w.los(o, c) || w.los(o, waist);
+  };
   C.explode = function (pos, r, dmg, info) {
     info = Object.assign({ src: 'explosion' }, info || {});
     if (!info.enemy && !info.sk && C.curSk) info.sk = C.curSk;
@@ -414,7 +423,7 @@
     G.player.addShake(Math.max(0, (info.small ? 0.25 : 0.7) * (1 - d / (r * 4))));
     if (info.enemy) {
       // enemy explosion hurts the player
-      if (d < r + 0.4) C.damagePlayer(dmg * (1 - 0.5 * d / (r + 0.4)), { src: 'explosion', pos, attacker: info.attacker, elem: info.elem });
+      if (d < r + 0.4 && C.blastReaches(pos)) C.damagePlayer(dmg * (1 - 0.5 * d / (r + 0.4)), { src: 'explosion', pos, attacker: info.attacker, elem: info.elem });
       return;
     }
     // your own grenade hurts you too: inside the blast you take a fifth (20%) of its damage
@@ -706,7 +715,7 @@
           if (p.onHitEnemy) p.onHitEnemy(e, hp);
           if (p.pierce-- <= 0) done = true;
         }
-      } else if (p.owner === 'enemy' && hitPlayer(p, step)) {
+      } else if (p.owner === 'enemy' && hitPlayer(p, wh ? Math.max(0, wh.t) : step)) { // only up to the wall this shot hits: never through a pillar
         done = true;
       } else if (p.owner === 'enemy' && hitMerc(p, step)) {
         done = true;
@@ -772,8 +781,10 @@
     }
     return false;
   }
+  // how big an enemy shot looks (the bright core / the solid part, not its soft glow): a shot only hits you with what you can see of it
+  const SHOT_VIS = { soul: 0.28, orb: 0.32, darkorb: 0.34, frostorb: 0.38, fireball: 0.46, bigfire: 0.95, acid: 0.34, web: 0.2, spit: 0.16, spore: 0.27, boulder: 0.62, icespear: 0.16 };
   function hitPlayer(p, step) {
-    const pl = G.player;
+    const pl = G.player, rad = Math.min(p.radius, SHOT_VIS[p.kind] ?? p.radius);
     // segment vs vertical capsule
     const a = p.pos, b = p.pos.clone().addScaledVector(tmpD, step);
     const ph = pl.height;
@@ -782,7 +793,8 @@
       const dy = U.clamp(q.y - pl.pos.y, 0, ph);
       const dx = q.x - pl.pos.x, dz = q.z - pl.pos.z;
       const dist = Math.hypot(dx, dz, q.y - (pl.pos.y + dy));
-      if (dist < 0.42 + p.radius) {
+      if (dist < 0.42 + rad) {
+        if (rad > 0.2 && !G.world.los(q, V(pl.pos.x, pl.pos.y + dy, pl.pos.z))) continue; // the edge of a big orb brushing past cover
         if (p.explode) { p.pos.copy(q); detonate(p); return true; }
         C.damagePlayer(p.dmg, { src: 'ranged', pos: p.pos.clone(), attacker: p.attacker, elem: p.elem });
         if (p.onHitPlayer) p.onHitPlayer(q);

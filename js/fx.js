@@ -393,7 +393,7 @@
   // ground telegraph: grows to radius r over dur, returns handle with .done
   FX.telegraph = function (p, r, dur, color) {
     const o = pools.tele.find((x) => !x.active) || pools.tele[0];
-    o.active = true; o.t = 0; o.ml = dur; o.r = r;
+    o.active = true; o.t = 0; o.ml = dur / (FX.teleK || 1); o.r = r; // teleK: a guardian whose clock runs fast fills its warnings just as fast (they end exactly on the hit)
     o.outer.position.set(p.x, p.y + 0.06, p.z); o.inner.position.set(p.x, p.y + 0.07, p.z);
     o.outer.scale.setScalar(r * 2); o.inner.scale.setScalar(0.01);
     o.outer.material.color.set(color || 0xc02010); o.inner.material.color.set(color || 0xa01808);
@@ -401,11 +401,13 @@
     o.follow = null;
     return o;
   };
+  // move a live warning circle (it keeps its fill progress)
+  FX.teleMove = function (o, p) { if (!o || !o.active) return; o.outer.position.set(p.x, p.y + 0.06, p.z); o.inner.position.set(p.x, p.y + 0.07, p.z); };
   // a lane from a to b, `width` wide, filling in over `dur` seconds
   FX.teleLine = function (a, b, width, dur, color) {
     const o = pools.teleL.find((x) => !x.active) || pools.teleL[0];
     const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 0.01;
-    o.active = true; o.t = 0; o.ml = dur;
+    o.active = true; o.t = 0; o.ml = dur / (FX.teleK || 1);
     o.m.position.set((a.x + b.x) / 2, (a.y || 0) + 0.07, (a.z + b.z) / 2);
     o.m.rotation.set(0, Math.atan2(dx, dz), 0); o.m.scale.set(width, 1, len);
     o.m.material.color.set(color || 0xc02010); o.m.material.opacity = 0.12; o.m.visible = true;

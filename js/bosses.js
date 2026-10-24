@@ -706,7 +706,7 @@
           // caught: reeled all the way in, fast, with no control of your own — then the cleave
           if (l > 2.8) { P.vel.x = to.x / l * 36; P.vel.z = to.z / l * 36; P.vel.y = Math.max(P.vel.y, 2.5); P.dragT = 0.15; if (Math.random() < dt * 20) G.sfx.chain(0.3, 1.2); }
           else a.pulled = 0;
-          if (a.pulled <= 0) { P.vel.x *= 0.2; P.vel.z *= 0.2; this.act = { k: 'cleave', t: 0.25 }; return; }
+          if (a.pulled <= 0) { P.vel.x *= 0.2; P.vel.z *= 0.2; this.act = { k: 'cleave', t: 0 }; return; } // the whole wind-up: you were just dragged in
         }
         if (a.t > 2 && !(a.pulled > 0)) { J.arms[0].sh.rotation.x = 0; this.act = null; this.cd = 1.5; }
       } else if (a.k === 'cleave') {

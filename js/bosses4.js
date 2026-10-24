@@ -260,29 +260,36 @@
       let tot = 0; for (const a of list) tot += wt(a);
       let x = Math.random() * tot, pick = list[0];
       for (const a of list) { x -= wt(a); if (x <= 0) { pick = a; break; } }
-      this.act = Object.assign({ t: 0, step: 0 }, pick);
+      this.act = BS.fair(Object.assign({ t: 0, step: 0 }, pick), this);
       this.pose = { n: pick.pose || null, k: 0, head: pick.head };
     }
     end(cd) { this.act = null; this.cd = cd ?? (this.S.cd || 1.6); this.hY = 0; }
     hit(dmg, src, pos, elem) { this.hurtPlayer(dmg, src, pos, elem); }
     // ---------------- the attack library ----------------
+    // how fast the attack clock runs: phase speed x difficulty tempo, but capped so the fastest moves stay readable
+    atkRate() { const cap = [1.15, 1.25, 1.35, 1.45][BS.diffRank ? BS.diffRank() : 1]; return Math.min(this.speedK * this.tempo, cap); }
     run(dt) {
+      G.fx.teleK = this.atkRate();
+      try { this.run0(dt); } finally { G.fx.teleK = 1; }
+    }
+    run0(dt) {
       const a = this.act, P = Pl(), S = this.S;
-      a.t += dt * this.speedK * this.tempo;
+      a.t += dt * this.atkRate();
       const wind = a.wind || 0.7;
       const fwd = V(Math.sin(this.yaw), 0, Math.cos(this.yaw));
       this.pose.k = Math.min(1, a.t / Math.max(0.15, wind));
       const sfxW = () => { if (!a.sw) { a.sw = true; G.sfx.monster(this.pos, a.cry || 'roar', S.pitch || 0.6, 0.9); } };
       switch (a.k) {
         case 'swipe': { // reach + arc in front
-          if (a.t < wind) { this.face(P.pos, dt, 6); sfxW(); if (!a.tele) a.tele = G.fx.telegraph(this.pos.clone().addScaledVector(fwd, a.r * 0.55), a.r * 0.6, wind, a.col || 0xff5030); break; }
+          // the warning circle follows the swing while it turns, and the blow lands exactly on it
+          const sc = this.pos.clone().addScaledVector(fwd, a.r * 0.55).setY(0);
+          if (a.t < wind) { this.face(P.pos, dt, 6); sfxW(); if (!a.tele) a.tele = G.fx.telegraph(sc, a.r * 0.6, wind - a.t, a.col || 0xff5030); else G.fx.teleMove(a.tele, sc); break; }
           this.pose.hit = Math.min(1, (a.t - wind) / 0.15);
           if (!a.done) {
             a.done = true; G.sfx.whoosh(0.7, 0.6);
-            const to = P.pos.clone().sub(this.pos).setY(0), d = to.length(), ang = d > 0.01 ? to.normalize().dot(fwd) : 1;
-            if (d < a.r && ang > (a.arc ?? 0.2) && P.pos.y < (a.h || 4)) { this.hit(a.dmg, 'melee', this.pos.clone(), a.elem); P.vel.addScaledVector(fwd, a.knock || 8); P.vel.y = Math.max(P.vel.y, 3); }
+            if (Math.hypot(P.pos.x - sc.x, P.pos.z - sc.z) < a.r * 0.6 + 0.4 && P.pos.y < (a.h || 4)) { this.hit(a.dmg, 'melee', this.pos.clone(), a.elem); P.vel.addScaledVector(fwd, a.knock || 8); P.vel.y = Math.max(P.vel.y, 3); }
             G.fx.ring(this.pos.clone().addScaledVector(fwd, a.r * 0.5).setY(0.2), a.r * 0.7, a.col || 0xffa060, 0.3);
-            if (a.combo && (a.n = (a.n || 1)) < a.combo + (BS.diffRank && BS.diffRank() >= 2 ? 1 : 0)) { a.n++; a.t = wind * 0.45; a.done = false; a.tele = null; this.pose.hit = 0; break; }
+            if (a.combo && (a.n = (a.n || 1)) < Math.min(3, a.combo + (BS.diffRank && BS.diffRank() >= 2 ? 1 : 0))) { a.n++; a.t = wind * 0.45; a.done = false; a.tele = null; this.pose.hit = 0; break; }
           }
           if (a.t > wind + (a.rec || 0.5)) this.end();
           break;
@@ -303,7 +310,7 @@
           break;
         }
         case 'charge': { // run through you in a line
-          if (a.t < wind) { this.face(P.pos, dt, 5); sfxW(); if (!a.tele) { a.tele = []; for (let i = 1; i <= 6; i++) a.tele.push(G.fx.telegraph(this.pos.clone().addScaledVector(fwd, i * 3.2), 1.5, wind, 0xff5030)); } break; }
+          if (a.t < wind) { this.face(P.pos, dt, 5); sfxW(); if (!a.tele) { a.tele = []; for (let i = 1; i <= 6; i++) a.tele.push(G.fx.telegraph(this.pos.clone().addScaledVector(fwd, i * 3.2), 1.5, wind, 0xff5030)); } else a.tele.forEach((t, i) => G.fx.teleMove(t, this.pos.clone().addScaledVector(fwd, (i + 1) * 3.2))); break; } // the lane turns with the charger: it runs where it shows
           this.mv = 2; this.walk = (this.walk || 0) + dt * 14;
           const blocked = this.groundMove(fwd.x, fwd.z, a.speed || 20, dt, S.radius || 1.6);
           if (!a.done && this.playerDistH() < (S.radius || 1.6) + 1.4 && P.pos.y < 3) { a.done = true; this.hit(a.dmg, 'melee'); P.vel.addScaledVector(fwd, a.knock || 16); P.vel.y = 6; }
@@ -373,14 +380,14 @@
         }
         case 'breath': { // a cone that keeps burning while it lasts
           if (a.t < wind) { this.face(P.pos, dt, 4); sfxW(); break; }
-          this.face(P.pos, dt, a.track || 1.2);
+          this.face(P.pos, dt, Math.min(0.6, a.track || 0.6)); // slow enough to outrun sideways, even close in
           const from = (this.J.heads ? this.J.heads[a.head || 0].head : this.J.head).getWorldPosition(V());
-          if (Math.random() < 0.85) for (let i = 0; i < 3; i++) { const d = fwd.clone().applyAxisAngle(V(0, 1, 0), U.rand(-0.35, 0.35)); G.fx.flame.spawn(from.x, from.y, from.z, d.x * U.rand(10, 16), U.rand(-1, 1), d.z * U.rand(10, 16), U.rand(0.4, 0.7), U.rand(0.5, 1.1), 0.2, ...(a.rgb || [1, 0.5, 0.15]), 0.9, 0, 0); }
+          if (Math.random() < 0.85) for (let i = 0; i < 3; i++) { const d = fwd.clone().applyAxisAngle(V(0, 1, 0), U.rand(-0.35, 0.35)); const fs = U.rand(0.65, 0.95) * (a.r || 11); G.fx.flame.spawn(from.x, from.y, from.z, d.x * fs, U.rand(-1, 1), d.z * fs, U.rand(0.4, 0.7), U.rand(0.5, 1.1), 0.2, ...(a.rgb || [1, 0.5, 0.15]), 0.9, 0, 0); }
           a.tick = (a.tick || 0) - dt;
           if (a.tick <= 0) {
             a.tick = 0.25;
             const to = P.pos.clone().sub(this.pos).setY(0), d = to.length();
-            if (d < (a.r || 11) && to.normalize().dot(fwd) > 0.82 && P.pos.y < 4) this.hit(a.dmg, 'aoe', from, a.elem);
+            if (d < (a.r || 11) && to.normalize().dot(fwd) > 0.92 && P.pos.y < 4 && (G.world.los(from, P.chestPos()) || G.world.los(from, V(P.pos.x, P.pos.y + 0.5, P.pos.z)))) this.hit(a.dmg, 'aoe', from, a.elem); // a pillar between you and the mouth shields you
             if (a.zone && Math.random() < 0.5) C().zone(this.pos.clone().addScaledVector(fwd, U.rand(3, (a.r || 11) - 1)).setY(0.05), 1.6, 4, a.zone, 6 * this.dmgScale, { enemy: true });
           }
           if (a.t > wind + (a.dur || 2.4)) this.end();
@@ -413,7 +420,7 @@
             this.root.visible = true; G.fx.smoke(this.pos.clone().setY(2), 14, 1.6, 0x1a0a20, 0.6, 1.4); G.sfx.magic(this.pos, 'dark');
             this.face(P.pos, 1, 99);
           }
-          if (a.t > (a.wind || 0.4) + 0.25) { const next = a.then && S.attacks.find((x) => x.id === a.then); this.act = null; if (next) { this.act = Object.assign({ t: 0, step: 0 }, next); this.pose = { n: next.pose || null, k: 0 }; } else this.end(0.6); }
+          if (a.t > (a.wind || 0.4) + 0.25) { const next = a.then && S.attacks.find((x) => x.id === a.then); this.act = null; if (next) { this.act = BS.fair(Object.assign({ t: 0, step: 0 }, next), this); this.pose = { n: next.pose || null, k: 0 }; } else this.end(0.6); }
           break;
         }
         case 'pull': { // a hook: if it catches you, you are dragged in hard (then the follow-up)
@@ -430,7 +437,7 @@
             const to = this.pos.clone().sub(P.pos); to.y = 0; const l = to.length();
             if (l > (S.radius || 1.6) + 1.4) { P.vel.x = to.x / l * 34; P.vel.z = to.z / l * 34; P.vel.y = Math.max(P.vel.y, 2.4); P.dragT = 0.15; }
             else a.pulled = 0;
-            if (a.pulled <= 0) { P.vel.x *= 0.2; P.vel.z *= 0.2; const next = S.attacks.find((x) => x.id === a.then); this.act = next ? Object.assign({ t: (next.wind || 0.7) * 0.5, step: 0 }, next) : null; if (!next) this.end(); else this.pose = { n: next.pose || null, k: 0.5 }; }
+            if (a.pulled <= 0) { P.vel.x *= 0.2; P.vel.z *= 0.2; const next = S.attacks.find((x) => x.id === a.then); this.act = next ? BS.fair(Object.assign({ t: 0, step: 0 }, next), this) : null; if (!next) this.end(); else this.pose = { n: next.pose || null, k: 0 }; } // the follow-up keeps its whole wind-up: you were just dragged in
             break;
           }
           if (a.t > wind + 1.4) this.end();
@@ -531,13 +538,13 @@
       dmgMul: (b) => (b.state === 'stunned' ? 1.5 : 1),
     },
     madman: {
-      hp: 3600, rig: 'human', speed: 6.0, radius: 1.3, range: 3.5, stride: 7, pitch: 1.1, cd: 1.0, blood: 0x6a0a08,
+      hp: 3600, rig: 'human', speed: 6.0, radius: 1.3, range: 3.5, stride: 7, pitch: 1.1, cd: 1.2, blood: 0x6a0a08,
       look: () => ({ s: 1.35, hunch: true, weapon: 'cleavers', eyes: 0xffd040, m: { body: M('#6a4a3a', { map: tex().skin.map, normalMap: tex().skin.normalMap }), skin: M('#7a5a4a', { map: tex().skin.map }), armor: M('#3a2a20', { map: tex().cloth.map, roughness: 1 }) } }),
       attacks: [
         { k: 'swipe', pose: 'swing', wind: 0.35, r: 4.6, arc: 0.0, dmg: 18, knock: 5, max: 6, w: 3, combo: 4, rec: 0.3, cry: 'screech' },
-        { k: 'charge', wind: 0.45, speed: 24, dur: 0.9, dmg: 22, knock: 12, min: 6, w: 2.5 },
+        { k: 'charge', wind: 0.55, speed: 24, dur: 0.9, dmg: 22, knock: 12, min: 6, w: 2.5 },
         { id: 'hook', k: 'pull', pose: 'throw', wind: 0.55, dmg: 10, then: 'frenzy', min: 7, max: 26, w: 1.5 },
-        { id: 'frenzy', k: 'swipe', pose: 'swing', wind: 0.3, r: 4.6, arc: -0.2, dmg: 20, knock: 6, combo: 5, rec: 0.4, w: 0, max: 0 },
+        { id: 'frenzy', k: 'swipe', pose: 'swing', wind: 0.5, r: 4.6, arc: -0.2, dmg: 20, knock: 6, combo: 3, rec: 0.5, w: 0, max: 0 },
         { k: 'volley', pose: 'throw', wind: 0.45, n: 2, spread: 0.18, salvos: 3, gap: 0.3, proj: 'spear', speed: 30, dmg: 16, min: 8, w: 1.5, snd: 'dark' },
       ],
       phases: [{ at: 0.5, speed: 1.4, msg: '😱 獄囚が狂乱した！（動きと攻撃が速くなる）' }],

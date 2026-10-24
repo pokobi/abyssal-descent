@@ -27,7 +27,7 @@
     const ok = L.filter((x) => (x.phase || 1) <= (boss.phase || 1) && x.k !== boss._lastX);
     if (!ok.length) return null;
     const pick = ok[Math.floor(Math.random() * ok.length)]; boss._lastX = pick.k;
-    return Object.assign({ t: 0 }, pick);
+    return BS.fair(Object.assign({ t: 0 }, pick), boss);
   };
   // the dive-and-erupt serpent has no attack list: its new patterns start on its state changes and run alongside the dive
   const XT = { wyrm: { surface: [{ k: 'x_shockline', n: 4, spread: 0.45, wid: 5, dmg: 28, col: 0xd08040 }, { k: 'x_rings', n: 3, speed: 14, dmg: 30, col: 0xd08040, phase: 2 }], under: [{ k: 'x_chase', n: 4, r: 3, dmg: 24, col: 0xd08040 }] } };
@@ -37,7 +37,7 @@
     const trig = XT[key]; if (!trig || b.state === b._xst) return;
     b._xst = b.state;
     const list = (trig[b.state] || []).filter((x) => (x.phase || 1) <= (b.phase || 1));
-    if (list.length && Math.random() < Math.min(0.9, 0.5 * BS.heavyMul())) b.xa = Object.assign({ t: 0 }, list[Math.floor(Math.random() * list.length)]);
+    if (list.length && Math.random() < Math.min(0.9, 0.5 * BS.heavyMul())) b.xa = BS.fair(Object.assign({ t: 0 }, list[Math.floor(Math.random() * list.length)]), b);
   };
 
   // ---- the data-driven guardians: new attacks (flags: heavy = favoured in harder modes, phase = from that phase on) ----

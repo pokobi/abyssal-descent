@@ -28,6 +28,9 @@
     if (kind === 'buff') return !!c.buffs[o.id];
     return !!c.items[o.id];
   };
+  // not yet met: monsters, guardians, fields and the abyss are hidden completely (name, icon, model, text); everything else shows name and icon only
+  const SECRET = new Set(['enemy', 'boss', 'stage', 'depth']);
+  const secret = (kind, o) => SECRET.has(kind) && !disc(kind, o);
   CX.open = function (back) {
     backFn = back;
     const total = TABS.reduce((a, t) => a + t[2]().length, 0);
@@ -50,13 +53,18 @@
   function list() {
     const t = TABS.find((x) => x[0] === tab);
     let a = t[2]();
-    if (query) { const q = query.toLowerCase(); a = a.filter((o) => (o.name + (o.desc || '') + (o.cat || '')).toLowerCase().includes(q)); }
+    if (query) {
+      const q = query.toLowerCase();
+      a = a.filter((o) => disc(tab, o) ? (o.name + (o.desc || '') + (o.cat || '')).toLowerCase().includes(q) : !secret(tab, o) && o.name.toLowerCase().includes(q)); // hidden entries are only found by their visible name
+    }
     return a;
   }
   function renderGrid() {
     const g = document.getElementById('cx-grid'); if (!g) return;
     const a = list();
-    g.innerHTML = a.map((o, i) => `<div class="cx-item ${disc(tab, o) ? '' : 'undisc'} ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">${o.mat ? G.armorIcon(o) : o.icon}${o.vicon ? '<small style="font-size:11px">' + o.vicon + '</small>' : ''}</span><span class="cn">${U.esc(o.name)}</span></div>`).join('');
+    g.innerHTML = a.map((o, i) => secret(tab, o)
+      ? `<div class="cx-item undisc ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:#5a5248"><span class="ci">❔</span><span class="cn">？？？</span></div>`
+      : `<div class="cx-item ${disc(tab, o) ? '' : 'undisc'} ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">${o.mat ? G.armorIcon(o) : o.icon}${o.vicon ? '<small style="font-size:11px">' + o.vicon + '</small>' : ''}</span><span class="cn">${U.esc(o.name)}</span></div>`).join('');
     g.querySelectorAll('.cx-item').forEach((el) => el.onclick = () => { sel = a[+el.dataset.i]; G.sfx.ui('click'); g.querySelectorAll('.cx-item').forEach((x) => x.classList.remove('sel')); el.classList.add('sel'); renderDetail(); });
     if (!sel && a.length) sel = a[0];
     renderDetail();
@@ -64,7 +72,14 @@
   const bar = (ic, label, v, max, txt) => `<div class="r"><span>${ic}</span><span>${label}</span><div class="sbar"><div style="width:${Math.min(100, v / max * 100)}%"></div></div><span class="v">${txt ?? Math.round(v)}</span></div>`;
   function renderDetail() {
     const d = document.getElementById('cx-detail'); if (!d || !sel) return;
-    const o = sel, rc = G.ui.R(o.rarity || 'epic');
+    const o = sel;
+    if (!disc(tab, o)) {
+      // not met yet: nothing but the bare fact (monsters / guardians / fields / the abyss do not even give their name)
+      const sec = SECRET.has(tab), rc0 = sec ? '#5a5248' : G.ui.R(o.rarity || 'epic');
+      d.innerHTML = `<div style="--rc:${rc0}"><div class="cd-icon">${sec ? '❔' : o.mat ? G.armorIcon(o) : o.icon}</div><div class="cd-name">${sec ? '？？？' : U.esc(o.name)}</div><div class="cd-cat">❔ 未発見</div><div class="cd-desc">${sec ? 'まだ出会っていない。出会うまで、詳細は分からない。' : '説明と数値は、手に入れる（見つける）と見られる。'}</div></div>`;
+      return;
+    }
+    const rc = G.ui.R(o.rarity || 'epic');
     const rar = G.RARITY[o.rarity];
     let html = `<div style="--rc:${rc}">`;
     const want3d = tab === 'weapon' || tab === 'enemy' || tab === 'melee' || tab === 'boss';
@@ -178,9 +193,9 @@
   function stageDetail(o) {
     const pool = (G.Run.BOSS_POOLS[o.key] || []).map((id) => G.BOSS_BY_ID[id]).filter(Boolean);
     let h = `<div style="margin-top:8px;font-weight:700">🗺️ 登場する難易度・区分</div><div style="font-size:12.5px;line-height:1.7;color:#cfc4b0">${o.where.join('　/　') || '—'}</div>`;
-    h += `<div style="margin-top:10px;font-weight:700">👑 守護者（この中から1体が等確率で現れる）</div><div style="margin-top:4px">${pool.map((b) => `<span class="tag">${b.icon} ${U.esc(b.name)}</span>`).join('')}</div>`;
+    h += `<div style="margin-top:10px;font-weight:700">👑 守護者（この中から1体が等確率で現れる）</div><div style="margin-top:4px">${pool.map((b) => G.save.data.codex.bosses[b.id] ? `<span class="tag">${b.icon} ${U.esc(b.name)}</span>` : '<span class="tag">❔ ？？？</span>').join('')}</div>`;
     const pool2 = G.game.enemyPool(13, o.key).slice().sort((a, b) => b[1] - a[1]).slice(0, 8);
-    h += `<div style="margin-top:10px;font-weight:700">👹 よく現れる魔物</div><div style="margin-top:4px">${pool2.map(([e]) => `<span class="tag">${e.icon} ${U.esc(e.name)}</span>`).join('')}</div>`;
+    h += `<div style="margin-top:10px;font-weight:700">👹 よく現れる魔物</div><div style="margin-top:4px">${pool2.map(([e]) => G.save.data.codex.enemies[e.id] ? `<span class="tag">${e.icon} ${U.esc(e.name)}</span>` : '<span class="tag">❔ ？？？</span>').join('')}</div>`;
     return h;
   }
   const bossCache = {};

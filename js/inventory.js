@@ -195,6 +195,12 @@
     if (it.type === 'armor' && !IV.noAuto && P.equip) {
       const d = G.ARMOR_BY_ID[it.id];
       if (d && !P.equip[d.slot] && IV.equip(P, it, null)) { if (G.ui && G.ui.toastSmall) G.ui.toastSmall(`🛡 ${d.name} を装備した`); return 0; }
+      // the very same piece (same kind and rarity) with more durability replaces the worn one; enchanted pieces are never swapped automatically
+      const cur = d && P.equip[d.slot];
+      if (cur && cur.id === it.id && !(cur.ench && cur.ench.length) && !(it.ench && it.ench.length) && IV.durOf(it) > IV.durOf(cur)) {
+        const a = Math.round(IV.durOf(cur)), b = Math.round(IV.durOf(it)), m = IV.durMax(it);
+        if (IV.equip(P, it, null)) { if (G.ui && G.ui.toastSmall) G.ui.toastSmall(`🛡 ${d.name} を耐久の高い方に付け替えた（${a}→${b} / ${m}）`); return 0; }
+      }
     }
     const left = IV.put(P.bag, it);
     if (left === 0 && it.type === 'att') IV.autoAtt(P, it);

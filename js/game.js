@@ -1291,8 +1291,16 @@
   GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、そのエリアに入った最初から再開する（持ち物・加護・敵はその時点に戻り、HP全快・クールタイムはリセット）。' };
   GM.revivePrice = () => GM.price(4200 + GM.area * 160);
   GM.SVC_FORGE = { id: 'svc_forge', name: '鍛冶屋の出張', icon: '⚒️', rarity: 'rare', desc: '所持している銃か近接武器を1つ選んで強化値+1（ダメージ×1.13）。' };
-  GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（威力×1.3・CT-2%）。' };
-  GM.tomePrice = () => GM.price(900 * Math.pow(1.25, Math.min(...P.skills.filter((s) => s).map((s) => s.lv || 0).concat([0]))));
+  GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（威力×1.3・CT-2%）。価格は、選んだスキルの今の Lv で決まる。' };
+  // what the tome can raise right now, each with its own price (the same rule as the forge: 900 x 1.25^that skill's Lv)
+  GM.tomeTargets = function () {
+    const MAXLV = G.abilities.MAXLV, out = [], AR = G.Areas;
+    if (P.pileLevel() < MAXLV) out.push({ pile: true, lv: P.pileLevel(), cost: AR.skillLvCost(P.pileLevel()) });
+    P.skills.forEach((s, i) => { if (s && (s.lv || 0) < MAXLV) out.push({ s, i, lv: s.lv || 0, cost: AR.skillLvCost(s.lv || 0) }); });
+    return out;
+  };
+  GM.tomeRange = function () { const c = GM.tomeTargets().map((x) => x.cost); return c.length ? [Math.min(...c), Math.max(...c)] : [0, 0]; };
+  GM.tomePrice = () => GM.tomeRange()[0];
   // relics are capped at 3: a 4th one asks which owned relic to give up for it
   GM.relicSwap = function (ob, o) {
     o = o || {};
@@ -1310,7 +1318,7 @@
   GM.shopLv = () => Math.min(10, Math.floor((G.Run.depthArea(GM.area) - 1) / 5));
   GM.forgeTargets = () => G.weapons.orderList().map((t) => (t === 'm' ? { w: P.melee, gun: false, t } : { w: t, gun: true, t })).filter((x) => (x.w.lv || 0) < G.Areas.FORGE_MAX);
   GM.forgeRange = function () { const c = GM.forgeTargets().map((x) => G.Areas.forgeCost(x.w)); return c.length ? [Math.min(...c), Math.max(...c)] : [0, 0]; };
-  GM.priceLabel = (o) => (o.free ? '無料!' : o.kind === 'forge' ? (() => { const [a, b] = GM.forgeRange(); return a === b ? U.fmt(a) : `${U.fmt(a)}~${U.fmt(b)}`; })() : U.fmt(o.price));
+  GM.priceLabel = (o) => (o.free ? '無料!' : o.kind === 'forge' || o.kind === 'tome' ? (() => { const [a, b] = o.kind === 'forge' ? GM.forgeRange() : GM.tomeRange(); return a === b ? U.fmt(a) : `${U.fmt(a)}~${U.fmt(b)}`; })() : U.fmt(o.price));
   GM.offerPrice = function (kind, obj) {
     if (kind === 'forge') return GM.forgeRange()[0];
     if (kind === 'tome') return GM.tomePrice();
@@ -1650,7 +1658,7 @@
     } else if (o.kind === 'forge') {
       cat = '⚒️ 強化サービス'; note = `購入時に強化する武器を選ぶ（上限+${G.Areas.FORGE_MAX}）・価格は武器の強化値で変わる`;
     } else if (o.kind === 'tome') {
-      cat = '📘 スキル強化'; note = '購入時に強化するスキルを選ぶ：' + P.skills.filter((s) => s).map((s) => `${s.def.icon}Lv${s.lv || 0}`).join(' ');
+      cat = '📘 スキル強化'; note = '購入時に強化するスキルを選ぶ・価格はそのスキルの Lv で変わる：' + P.skills.filter((s) => s).map((s) => `${s.def.icon}Lv${s.lv || 0}`).join(' ');
     } else if (o.kind === 'relic') {
       cat = '🏺 遺物（常時効果・最大3つ）'; note = `所持遺物 ${GM.relicCount()}/3` + (GM.relicCount() >= 3 ? '　⚠ 購入時に手持ちの遺物と入れ替え' : '');
     } else if (o.kind === 'revive') {
@@ -1709,6 +1717,7 @@
       GM._buying = true; setTimeout(() => { GM._buying = false; }, 0);
       const o = t.o, ob = o.obj;
       if (o.kind === 'forge' && !o.free) o.price = GM.forgeRange()[0];
+      if (o.kind === 'tome') o.price = GM.tomeRange()[0];
       if (run.coins < o.price) return deny('🪙 コインが足りない');
       const done = () => { run.coins -= o.price; o.sold = true; GM.quietUntil = performance.now() + 1200; G.sfx.ui('buy'); G.fx.sparks(o.pos, null, 20, 0xffd070, 4); G.fx.ring(o.pos.clone().setY(o.slot.y), 0.8, 0xffd070, 0.5); o.mesh.visible = false; G.ui.showInteract(null); G.ui.toast(`${ob.icon} ${ob.name} を購入`, 'good'); if (o.kind !== 'item' && o.kind !== 'forge' && o.kind !== 'tome') G.ui.itemCard(ob, o.kind === 'skill' ? '[スキル]' : o.kind === 'ult' ? `[${G.input.skillKey(0)} アルティメット]` : o.kind === 'weapon' ? '[武器]' : o.kind === 'melee' ? `[近接:${G.K('w3')}]` : o.kind === 'revive' ? '[魂の灯火]' : o.kind === 'attachment' ? '[装着]' : '[加護]'); G.ui.refreshWeapon(); G.ui.refreshItems(); if (o.kind !== 'revive' && o.kind !== 'forge' && o.kind !== 'tome') G.save.mark(o.kind === 'buff' ? 'buffs' : 'items', ob.id); };
       if (o.kind === 'buff') { P.addBuff(ob.id); return done(); }
@@ -1721,9 +1730,16 @@
         return modal('⚒️ どれを鍛える？', `強化値+1（ダメージ×1.13）・強化値が高いほど高くなる`, list.map((x) => { const c = o.free ? 0 : G.Areas.forgeCost(x.w); return { icon: x.w.def.icon, label: `${G.weapons.keyLabel(x.t)}${x.w.def.name} +${x.w.lv || 0} → +${(x.w.lv || 0) + 1}（${o.free ? '無料' : U.fmt(c) + '🪙'}）`, disabled: run.coins < c, onPick: () => { o.price = c; x.w.lv = (x.w.lv || 0) + 1; if (x.gun) { x.w.ver++; if (x.w === P.weapon) G.weapons.equip(true); } done(); G.sfx.mech('magIn'); G.ui.toast(`⚒️ ${x.w.def.name} を +${x.w.lv} に強化した`, 'good'); } }; }));
       }
       if (o.kind === 'tome') {
-        const list = P.skills.map((s, i) => [s, i]).filter(([s]) => s && (s.lv || 0) < G.abilities.MAXLV);
-        const pileOpt = { icon: '🔨', label: `[${G.input.keyName('crouch')}] パイルドライバー Lv${P.pileLevel()} → Lv${P.pileLevel() + 1}`, onPick: () => { P.pileTome = (P.pileTome || 0) + 1; G.sfx.ui('rare'); done(); } };
-        return modal('📘 どのスキルを強化する？', 'レベル+1（スキル：威力×1.3・クールタイム-2%／パイルドライバー：威力+60%／アルティメット：威力×1.25・クールタイム-2%）', [pileOpt].concat(list.map(([s, i]) => ({ icon: s.def.icon, label: `[${G.input.skillKey(i)}]${s.def.ult ? '（ULT）' : ''} ${s.def.name} Lv${s.lv || 0} → Lv${(s.lv || 0) + 1}`, onPick: () => { s.lv = (s.lv || 0) + 1; s.maxCd = G.abilities.cdOf(s); done(); G.sfx.magic(P.pos, 'holy'); } }))));
+        const list = GM.tomeTargets();
+        if (!list.length) return deny('全て最大レベル');
+        return modal('📘 どのスキルを強化する？', 'レベル+1（スキル：威力×1.3・クールタイム-2%／パイルドライバー：威力+60%／アルティメット：威力×1.25・クールタイム-2%）　価格は、そのスキルの今の Lv で決まる', list.map((x) => {
+          const d = x.pile ? { icon: '🔨', name: 'パイルドライバー', key: G.input.keyName('crouch') } : { icon: x.s.def.icon, name: x.s.def.name, key: G.input.skillKey(x.i) };
+          return { icon: d.icon, label: `[${d.key}]${!x.pile && x.s.def.ult ? '（ULT）' : ''} ${d.name} Lv${x.lv} → Lv${x.lv + 1}（${U.fmt(x.cost)}🪙）`, disabled: run.coins < x.cost, onPick: () => {
+            o.price = x.cost;
+            if (x.pile) { P.pileTome = (P.pileTome || 0) + 1; G.sfx.ui('rare'); done(); }
+            else { x.s.lv = x.lv + 1; x.s.maxCd = G.abilities.cdOf(x.s); done(); G.sfx.magic(P.pos, 'holy'); }
+          } };
+        }));
       }
       if (o.kind === 'melee') { G.Pawn.tradeIn(P.melee, true); P.melee = G.weapons.makeMelee(ob.id); P.melee.lv = o.lv || 0; done(); if (P.meleeMode) G.weapons.melee.equip(false); else G.weapons.setMelee(); return; }
       if (o.kind === 'item') { if (!P.canAddItem(ob.id)) return deny('持ち物がいっぱい'); P.addItem(ob.id, 1); return done(); }

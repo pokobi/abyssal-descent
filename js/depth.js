@@ -262,7 +262,7 @@
   // ---------------------------------------------------------------- pacts
   D.offerPact = function (after) {
     GM.offerBuffs(false, {
-      filter: (b) => b.cat === 'pact', title: 'ABYSSAL PACT', sub: '深淵は代償を求める — 誓いを一つ結べ（必須・報酬付き）', noSkip: true, noReroll: true,
+      filter: (b) => b.cat === 'pact', title: 'ABYSSAL PACT', sub: '深淵は代償を求める — 誓いを一つ結べ（必須・報酬付き）', noReroll: true,
       onPicked: (b) => { if (b.id === 'pact_merciless') { P.revives++; G.ui.toast('🪔 魂の灯火が一つ灯った', 'good'); } },
       after,
     });

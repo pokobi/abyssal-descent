@@ -355,6 +355,21 @@
   };
   AR.FORGE_MAX = 15;
   AR.forgeCost = (w) => GM.price(300 * Math.pow(1.27, w.lv || 0) + GM.area * 15);
+  // skill levels at the forge: +1 for a chosen skill / ultimate / the pile driver; the price follows that skill's own level
+  AR.skillLvCost = (lv) => GM.price(900 * Math.pow(1.25, lv));
+  AR.skillForge = function () {
+    const MAXLV = G.abilities.MAXLV, out = [];
+    const fx = () => { G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7); };
+    const pl = P.pileLevel(), pc = AR.skillLvCost(pl);
+    out.push({ icon: '🔨', label: `[${G.input.keyName('crouch')}] パイルドライバー Lv${pl} → Lv${pl + 1}（${pc}🪙）`, sub: pl >= MAXLV ? '最大レベル' : '威力+60%', disabled: pl >= MAXLV || GM.run.coins < pc, onPick: () => { GM.run.coins -= pc; P.pileTome = (P.pileTome || 0) + 1; fx(); G.ui.toast(`⚒️ パイルドライバー Lv${P.pileLevel()}`, 'good'); } });
+    P.skills.forEach((s, i) => {
+      if (!s) return;
+      const lv = s.lv || 0, c = AR.skillLvCost(lv), mx = lv >= MAXLV, ult = !!s.def.ult;
+      out.push({ icon: s.def.icon, label: `[${G.input.skillKey(i)}]${ult ? '（ULT）' : ''} ${s.def.name} Lv${lv} → Lv${lv + 1}（${c}🪙）`, sub: mx ? '最大レベル' : `威力×${ult ? 1.25 : 1.3}・クールタイム-2%`, disabled: mx || GM.run.coins < c, onPick: () => { GM.run.coins -= c; s.lv = lv + 1; fx(); G.ui.toast(`⚒️ ${s.def.name} Lv${s.lv}`, 'good'); } });
+    });
+    out.push({ icon: '↩', label: '戻る', onPick: () => { GM._keepModal = true; setTimeout(() => AR.useForge(), 0); } });
+    GM.modal('⚒️ スキルを Lv+1', 'どのスキルを鍛える？（価格は、そのスキルの今の Lv で決まる）', out);
+  };
   AR.useForge = function () {
     const opts = G.weapons.gunsInOrder().map((pw) => {
       const lv = pw.lv || 0, c = AR.forgeCost(pw);
@@ -374,7 +389,8 @@
     }
     { const ord = G.weapons.order(), head = opts.splice(0, opts.length).sort((a, b) => ord.indexOf(a._tok) - ord.indexOf(b._tok)); opts.push(...head); }
     const pc = GM.price(450 + GM.area * 20);
-    opts.push({ icon: '🔨', label: `スキルを鍛える（${pc}🪙）`, sub: 'スキル・アルティメットの強化を一つ選ぶ', disabled: GM.run.coins < pc, onPick: () => { GM.run.coins -= pc; setTimeout(() => GM.offerBuffs(false, { filter: G.isTech, title: 'FORGED SKILL', sub: 'スキル・アルティメットの強化を一つ選べ' }), 50); } });
+    opts.push({ icon: '📘', label: 'スキルを Lv+1', sub: 'スキル・アルティメット・パイルドライバーのレベルを上げる（どれを上げるかを選ぶ）', onPick: () => { GM._keepModal = true; setTimeout(() => AR.skillForge(), 0); } });
+    opts.push({ icon: '🔨', label: `スキルの加護を得る（${pc}🪙）`, sub: 'スキル・アルティメットの強化を一つ選ぶ', disabled: GM.run.coins < pc, onPick: () => { GM.run.coins -= pc; setTimeout(() => GM.offerBuffs(false, { filter: G.isTech, title: 'FORGED SKILL', sub: 'スキル・アルティメットの強化を一つ選べ' }), 50); } });
     { const c = repairPrice('all', 1), n = G.Inv.damaged(P, 'all').length;
       opts.push({ icon: '🛡️', label: `防具をすべて修理（${c}🪙）`, sub: n ? `傷んでいる防具 ${n}点（インベントリの中も含む）→ 耐久を全回復` : '傷んでいる防具はない', disabled: !n || GM.run.coins < c, onPick: () => { GM.run.coins -= c; G.Inv.repair(P, 'all', 1); G.sfx.explosion(G.world.anvilPos, 0.2); G.ui.toast('🛡️ 防具を修理した', 'good'); } }); }
     opts.push({ icon: '🚶', label: 'やめておく', onPick: () => {} });

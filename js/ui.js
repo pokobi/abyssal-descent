@@ -769,9 +769,9 @@
     const s = UI.screen(`<div class="bs-wrap">
       <div class="side-info"><h3 style="margin-top:0">❤️ HP <b style="float:right">${Math.ceil(P.hp)} / ${st.maxHp}</b></h3><div class="si-stat"><span>🪙 コイン</span><b>${U.fmt(G.game.run.coins)}</b></div><div class="si-stat"><span>🗺️ エリア</span><b>${G.game.area}</b></div>${UI.statsTable()}<h3>🌟 所持加護（${P.buffs.size}）</h3><div class="si-buffs">${sideBuffs || '<span style="color:var(--dim);font-size:12px;grid-column:1/-1">なし</span>'}</div></div>
       <div class="bs-title">${opts.title || 'CHOOSE A BOON'}</div>
-      <div class="bs-sub">${opts.sub || '加護を一つ選べ'}　<span class="bs-keys">クリック：選択 ／ ホイール：切替 → Enter：決定${opts.rerolls > 0 ? ' ／ R：リロール' : ''}${opts.noSkip ? '' : ' ／ Backspace：スキップ'} ／ 選択中も${['forward', 'left', 'back', 'right'].map(G.K).join('')}で移動可能</span></div>
+      <div class="bs-sub">${opts.sub || '加護を一つ選べ'}　<span class="bs-keys">クリック：選択 ／ ホイール：切替 → Enter：決定${opts.reroll ? ' ／ R：リロール' : ''} ／ 選択中も${['forward', 'left', 'back', 'right'].map(G.K).join('')}で移動可能</span></div>
       <div class="bs-cards">${cards}</div>
-      <div class="bs-actions">${opts.rerolls > 0 ? `<button class="btn" id="bs-reroll">🎲 リロール（残り${opts.rerolls}）</button>` : ''}${opts.noSkip ? '' : `<button class="btn small" id="bs-skip">⏭ スキップ（+${opts.skipCoins || 60}🪙）</button>`}</div>
+      <div class="bs-actions">${opts.reroll ? `<button class="btn" ${opts.reroll.afford ? '' : 'disabled'} id="bs-reroll">🎲 リロール（${opts.reroll.free > 0 ? `無料 残り${opts.reroll.free}` : `${U.fmt(opts.reroll.cost)}🪙`}）</button>` : ''}</div>
     </div>`, 'live');
     let picked = false;
     const pick = (i) => {
@@ -783,8 +783,7 @@
       setTimeout(() => opts.onPick(choices[i]), 300);
     };
     s.querySelectorAll('.card').forEach((el) => { el.onclick = () => pick(+el.dataset.i); });
-    const rr = s.querySelector('#bs-reroll'); if (rr) rr.onclick = () => { G.sfx.ui('card'); opts.onReroll(); };
-    const sk = s.querySelector('#bs-skip'); if (sk) sk.onclick = () => { if (picked) return; picked = true; G.input.requestLock(); G.sfx.ui('click'); opts.onSkip(); };
+    const rr = s.querySelector('#bs-reroll'); if (rr) rr.onclick = () => { if (picked) return; G.sfx.ui('card'); opts.onReroll(); };
     // keyboard / wheel / click control while the mouse stays locked
     let hl = 0;
     const els = [...s.querySelectorAll('.card')];
@@ -796,7 +795,6 @@
       move: (d) => { if (picked) return; hl = (hl + d + choices.length) % choices.length; paint(); G.sfx.ui('click'); },
       confirm: () => pick(hl),
       reroll: () => { const r = s.querySelector('#bs-reroll'); if (r && !picked) r.onclick(); },
-      skip: () => { const k = s.querySelector('#bs-skip'); if (k && !picked) k.onclick(); },
     };
     UI._buffKeys = null;
     setTimeout(() => G.sfx.ui('card'), 100); setTimeout(() => G.sfx.ui('card'), 220); setTimeout(() => G.sfx.ui('card'), 340);

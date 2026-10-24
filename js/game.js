@@ -1189,10 +1189,10 @@
   };
 
   // ---------------- buff choices ----------------
-  GM.rollBuffs = function (n, boost, filter) {
+  GM.rollBuffs = function (n, boost, filter, exclude) {
     const luck = P.stats.luck + (boost ? 1.2 : 0);
     const owned = new Set(P.skills.filter(Boolean).map((s) => s.id));
-    const pool = G.BUFFS.filter((b) => b.cat !== 'curse' && (P.buffs.get(b.id) || 0) < b.max && (!b.skill || owned.has(b.skill)) && (filter ? filter(b) : b.cat !== 'pact' && b.cat !== 'relic'));
+    const pool = G.BUFFS.filter((b) => b.cat !== 'curse' && (P.buffs.get(b.id) || 0) < b.max && (!b.skill || owned.has(b.skill)) && !(exclude && exclude.has(b.id)) && (filter ? filter(b) : b.cat !== 'pact' && b.cat !== 'relic'));
     const out = [];
     const r = Math.random;
     for (let i = 0; i < n && pool.length; i++) {
@@ -1210,26 +1210,39 @@
     }
     return out;
   };
+  // rerolls: a free pool for the whole run (3, +1 per Fate Redeal), then coins at a price that doubles with every paid reroll
+  GM.rerollInfo = function () {
+    const run = GM.run, free = Math.max(0, 3 + (P.stats.buffRerolls || 0) - (run.rerollUsed || 0));
+    return { free, cost: GM.price(1000 * Math.pow(2, run.rerollPaid || 0)) };
+  };
   GM.offerBuffs = function (boost, o) {
     o = o || {};
     GM.state = 'buff';
     // free the cursor so the cards can be clicked; held movement keys survive the unlock (see input.js)
     I.exitLock();
-    let rerolls = P.stats.buffRerolls;
+    const seen = new Set(); // what this screen has already shown: a reroll never brings it back
     const done = () => { GM.rewardPending = null; GM.resume(); if (o.after) o.after(); };
-    const show = () => {
-      let choices = GM.rollBuffs(Math.max(2, P.stats.buffChoices), boost, o.filter);
-      if (!choices.length) choices = GM.rollBuffs(3, boost);
+    const render = (choices) => {
+      for (const b of choices) seen.add(b.id);
+      const ri = GM.rerollInfo();
       G.ui.buffSelect(choices, {
-        rerolls, skipCoins: 60 + GM.area * 6,
         title: o.title || (boost ? 'ROYAL BOON' : 'CHOOSE A BOON'), sub: o.sub || (boost ? '強大な加護 — 一つを選べ' : undefined),
-        noSkip: o.noSkip, rerolls: o.noReroll ? 0 : rerolls,
+        reroll: o.noReroll ? null : { free: ri.free, cost: ri.cost, afford: ri.free > 0 || GM.run.coins >= ri.cost },
         onPick: (b) => { P.addBuff(b.id); if (o.onPicked) o.onPicked(b); G.ui.toast(`${b.icon} ${b.name} を${b.cat === 'pact' ? '結んだ' : '獲得'}`, b.cat === 'pact' ? 'warn' : 'good'); done(); },
-        onReroll: () => { rerolls--; show(); },
-        onSkip: () => { G.combat.coins(60 + GM.area * 6, null, 'スキップ'); done(); },
+        onReroll: () => {
+          const ri2 = GM.rerollInfo();
+          if (ri2.free <= 0 && GM.run.coins < ri2.cost) { G.sfx.ui('deny'); return; }
+          const next = GM.rollBuffs(Math.max(2, P.stats.buffChoices), boost, o.filter, seen);
+          if (!next.length) { G.sfx.ui('deny'); G.ui.toastSmall('🎲 もう出せる候補がない'); return; }
+          if (ri2.free > 0) GM.run.rerollUsed = (GM.run.rerollUsed || 0) + 1;
+          else { GM.run.coins -= ri2.cost; GM.run.rerollPaid = (GM.run.rerollPaid || 0) + 1; G.sfx.coins(3); }
+          render(next);
+        },
       });
     };
-    show();
+    let first = GM.rollBuffs(Math.max(2, P.stats.buffChoices), boost, o.filter);
+    if (!first.length) first = GM.rollBuffs(3, boost);
+    render(first);
   };
 
   // ---------------- shop ----------------
@@ -2059,7 +2072,6 @@
           if (I.wheel) api.move(Math.sign(I.wheel));
           if (I.pressed.Enter || (I.locked && I.mpressed[0])) api.confirm();
           if (I.pressed.KeyR) api.reroll();
-          if (I.pressed.Backspace) api.skip();
         }
         for (const k in I.pressed) if (/^Digit|^Key[EQXZGTRF]$|^Enter$|^Backspace$/.test(k)) delete I.pressed[k];
         I.mouse = [false, false, false, false, false]; I.mpressed = [false, false, false, false, false]; I.wheel = 0;

@@ -141,8 +141,8 @@
     const ult = !!s.ult, p = s.p, head = `${s.icon}${s.name}：`;
     const mk = (key, name, icon, rarity, sm, desc, max) => list.push({ id: `sk_${s.id}_${key}`, name: `${name}（${s.name}）`, icon, rarity, cat: ult ? 'ult' : 'skill', desc: head + (desc || descOf(sm)), sm, skill: s.id, max: max || 1, kind: 'buff' });
     if (!NODMG.has(s.id)) mk('dmg', '威力強化', '💥', 'uncommon', { dmg: 0.35 }, 'ダメージ+35%。', 3);
-    // mastery: the skill's own level +1 (the Lv itself is raised when the boon is taken, see Player.addBuff; it is not offered at Lv 15)
-    mk('mastery', '習熟', '📘', 'rare', {}, `レベル+1（威力×${ult ? 1.25 : 1.3}・クールタイム-2%）。`, 3);
+    // mastery: +1 level in a separate layer (shown Lv(base+mastery), numbers use the total) - the only way past Lv 15 (up to 15+3)
+    mk('mastery', '習熟', '📘', 'rare', {}, `別枠でレベル+1（威力×${ult ? 1.25 : 1.3}・クールタイム-2%）。Lv15の上限を超えられる唯一の手段（最大+3）。`, 3);
     list[list.length - 1].mastery = true;
     mk('cd', '短縮詠唱', '⏳', 'uncommon', { cd: ult ? 0.12 : 0.15 }, `クールタイム-${ult ? 12 : 15}%。`, 2);
     if (p.r || p.len || p.range || p.w || ['blades', 'ult_bladestorm'].includes(s.id)) mk('area', '範囲拡張', '⭕', 'uncommon', { area: 0.25 }, '範囲・射程+25%。', 2);

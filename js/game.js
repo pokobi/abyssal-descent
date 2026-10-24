@@ -1192,8 +1192,7 @@
   GM.rollBuffs = function (n, boost, filter, exclude) {
     const luck = P.stats.luck + (boost ? 1.2 : 0);
     const owned = new Set(P.skills.filter(Boolean).map((s) => s.id));
-    const lvOf = (id) => { const s = P.skills.find((x) => x && x.id === id); return s ? s.lv || 0 : 99; };
-    const pool = G.BUFFS.filter((b) => b.cat !== 'curse' && (P.buffs.get(b.id) || 0) < b.max && (!b.skill || owned.has(b.skill)) && !(b.mastery && lvOf(b.skill) >= G.abilities.MAXLV) && !(exclude && exclude.has(b.id)) && (filter ? filter(b) : b.cat !== 'pact' && b.cat !== 'relic'));
+    const pool = G.BUFFS.filter((b) => b.cat !== 'curse' && (P.buffs.get(b.id) || 0) < b.max && (!b.skill || owned.has(b.skill)) && !(exclude && exclude.has(b.id)) && (filter ? filter(b) : b.cat !== 'pact' && b.cat !== 'relic'));
     const out = [];
     const r = Math.random;
     for (let i = 0; i < n && pool.length; i++) {

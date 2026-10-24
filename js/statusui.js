@@ -134,7 +134,7 @@
     const augs = [...P.buffs].filter(([id]) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].skill === sk.id);
     const ready = A.ready(sk), left = sk.maxCharges ? `${sk.charges}/${sk.maxCharges}` : ready ? 'READY' : `${Math.ceil(sk.cd)}秒`;
     return `<div class="sc ${ult ? 'ult' : ''}" style="--rc:${R(d.rarity)}">
-      <div class="sc-h"><span class="key">${key}</span><span class="ic">${d.icon}</span><span class="nm">${esc(d.name)}${sk.lv ? `<b class="lv">Lv${sk.lv}</b>` : ''}${ult ? '<em class="tag">ULT</em>' : ''}</span><span class="st ${ready ? 'ok' : ''}">${left}</span></div>
+      <div class="sc-h"><span class="key">${key}</span><span class="ic">${d.icon}</span><span class="nm">${esc(d.name)}${A.lvHTML(sk) ? `<b class="lv">${A.lvHTML(sk)}</b>` : ''}${ult ? '<em class="tag">ULT</em>' : ''}</span><span class="st ${ready ? 'ok' : ''}">${left}</span></div>
       <div class="sc-l">${line.join('')}</div>
       <div class="sc-d">${desc}</div>
       ${augs.length ? `<div class="sc-a">${augs.map(([id, n]) => { const b = G.BUFF_BY_ID[id]; return `<span ${UI.tipAttr(b)} style="--rc:${R(b.rarity)}">${b.icon}${n > 1 ? `<sub>${n}</sub>` : ''}</span>`; }).join('')}</div>` : ''}</div>`;

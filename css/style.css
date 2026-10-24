@@ -501,6 +501,7 @@ button { font-family: inherit; }
 .iv-merc .pa-hp > div { height: 100%; background: linear-gradient(90deg, #3aa050, #80e070); }
 .iv-merc.down .pa-hp > div { background: #666; }
 .iv-merc .pa-hp span { position: absolute; inset: 0; font-size: 0.75em; line-height: 1.15em; text-align: center; color: #fff; text-shadow: 0 0 2px #000; }
+.lv-m { color: #6fe0ff; font-weight: 800; text-shadow: 0 0 6px rgba(80,200,255,0.5); } .lv-m small { font-size: 0.72em; margin-left: 2px; opacity: 0.9; }
 #pallies .pa-xp span, .iv-merc .pa-xp span { position: absolute; inset: 0; font-size: 7.5px; line-height: 8px; text-align: center; color: #fff; text-shadow: 0 0 2px #000; }
 #pallies .pa-hp span, #pallies .pa-t span { position: absolute; inset: 0; font-size: 8.5px; line-height: 9px; text-align: center; color: #fff; text-shadow: 0 0 2px #000; }
 /* ---- boss level ---- */

@@ -71,7 +71,7 @@
   function confirmSkill(i) {
     const sk = P().skills[i], d = sk.def, key = G.input.skillKey(i);
     const augs = [...P().buffs.keys()].filter((id) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].skill === sk.id).length;
-    GM().modal(`⚠ ${d.ult ? 'アルティメット' : 'スキル'}を売却しますか？`, `<b style="color:${R(d.rarity)}">[${key}] ${d.icon} ${U.esc(d.name)}${sk.lv ? ' Lv' + sk.lv : ''}</b> を売却します。${d.ult ? `${key}枠は初期のアルティメット（${G.SKILL_BY_ID[G.DEFAULT_ULT].name}）に戻ります。` : key + '枠は空になります。'}${augs ? `<br>このスキル専用の強化（${augs}種）は、同じスキルを再び手に入れるまで効果がありません。` : ''}`, [
+    GM().modal(`⚠ ${d.ult ? 'アルティメット' : 'スキル'}を売却しますか？`, `<b style="color:${R(d.rarity)}">[${key}] ${d.icon} ${U.esc(d.name)}${G.abilities.lvText(sk) ? ' ' + G.abilities.lvText(sk) : ''}</b> を売却します。${d.ult ? `${key}枠は初期のアルティメット（${G.SKILL_BY_ID[G.DEFAULT_ULT].name}）に戻ります。` : key + '枠は空になります。'}${augs ? `<br>このスキル専用の強化（${augs}種）は、同じスキルを再び手に入れるまで効果がありません。` : ''}`, [
       { icon: '💰', label: `売る（+${fmt(PW.skillValue(sk))}🪙）`, onPick: () => { sellSkill(i); again(); } },
       { icon: '↩', label: 'やめる', onPick: again },
     ]);
@@ -125,7 +125,7 @@
     }
     if (p.melee && !G.isDefaultMelee(p.melee.id)) out.push({ cat: 'melee', icon: p.melee.def.icon, rc: p.melee.def.rarity, name: p.melee.def.name + (p.melee.lv ? ' +' + p.melee.lv : ''), sub: '近接武器（売るとサバイバルナイフに戻る）', v: PW.meleeValue(p.melee), act: () => { sellMelee(); PW.open(); } });
     for (const w of guns) for (const sl in w.atts) { const id = w.atts[sl], a = G.ATT_BY_ID[id]; if (a) out.push({ cat: 'att', icon: a.icon, rc: a.rarity, name: a.name, sub: `${w.def.name}に装着中`, v: PW.attValue(id), act: () => { GM()._keepModal = true; setTimeout(() => confirmAtt(id, w), 0); } }); }
-    p.skills.forEach((sk, i) => { if (!sk) return; const def = sk.id === G.DEFAULT_ULT; out.push({ cat: 'skill', icon: sk.def.icon, rc: sk.def.rarity, name: `[${G.input.skillKey(i)}] ${sk.def.name}${sk.lv ? ' Lv' + sk.lv : ''}`, sub: def ? '初期装備のアルティメットは売れません' : sk.def.ult ? 'アルティメット' : 'スキル', v: def ? 0 : PW.skillValue(sk), no: def, act: () => { GM()._keepModal = true; setTimeout(() => confirmSkill(i), 0); } }); });
+    p.skills.forEach((sk, i) => { if (!sk) return; const def = sk.id === G.DEFAULT_ULT; out.push({ cat: 'skill', icon: sk.def.icon, rc: sk.def.rarity, name: `[${G.input.skillKey(i)}] ${sk.def.name}${G.abilities.lvText(sk) ? ' ' + G.abilities.lvText(sk) : ''}`, sub: def ? '初期装備のアルティメットは売れません' : sk.def.ult ? 'アルティメット' : 'スキル', v: def ? 0 : PW.skillValue(sk), no: def, act: () => { GM()._keepModal = true; setTimeout(() => confirmSkill(i), 0); } }); });
     // everything in the bag
     for (const it of IV.pcs(p).flatMap((c) => c.items).sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))) {
       const d = IV.def(it); if (!d) continue;

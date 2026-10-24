@@ -33,7 +33,7 @@
   const A = G.abilities;
   let P, C;
   const env = () => { P = G.player; C = G.combat; };
-  A.ultPower = (sk) => Math.pow(1.25, (sk && sk.lv) || 0) * (1 + (sk ? A.skm(sk.id).dmg : 0));
+  A.ultPower = (sk) => Math.pow(1.25, A.totalLv(sk)) * (1 + (sk ? A.skm(sk.id).dmg : 0));
   A.auras = [];
   A.castUlt = function (sk) {
     env();

@@ -328,7 +328,7 @@
       const ready = G.abilities.ready(sk);
       const frac = sk.maxCharges ? (sk.charges > 0 ? 0 : sk.cd / Math.max(0.01, sk.maxCd)) : sk.cd / Math.max(0.01, sk.maxCd);
       setCd(el, Math.max(0, Math.min(1, frac)), sk.maxCharges && sk.charges > 0 ? 0 : sk.cd, ready);
-      sText(el._cnt || (el._cnt = el.querySelector('.cnt')), (sk.maxCharges ? sk.charges + '/' + sk.maxCharges : '') + (sk.lv ? ' Lv' + sk.lv : ''));
+      sHtml(el._cnt || (el._cnt = el.querySelector('.cnt')), (sk.maxCharges ? sk.charges + '/' + sk.maxCharges : '') + (G.abilities.lvHTML(sk) ? ' ' + G.abilities.lvHTML(sk) : ''));
       const bar = el._bar || (el._bar = el.querySelector('.bar')); sStyle(bar, 'width', sk.maxCharges && sk.charges < sk.maxCharges ? ((1 - sk.cd / Math.max(0.01, sk.maxCd)) * 100).toFixed(1) + '%' : '0');
     }
     const gcd = P.grappleCd, gmax = G.grappleCdOf(st);

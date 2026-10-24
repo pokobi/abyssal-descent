@@ -16,14 +16,19 @@
     return s;
   };
   A.SKILL_CD_MUL = 1.2; A.SKILL_POW_MUL = 0.85;
+  // Mastery boons add levels in a separate layer: shown as Lv(base+mastery), and the numbers use the total (so Lv 15 can be passed, up to 15+3)
+  A.mastery = (sk) => { const p = G.player; return sk && p && p.buffs ? p.buffs.get('sk_' + sk.id + '_mastery') || 0 : 0; };
+  A.totalLv = (sk) => ((sk && sk.lv) || 0) + A.mastery(sk);
+  A.lvHTML = (sk) => { const b = (sk && sk.lv) || 0, m = A.mastery(sk); return m ? `<span class="lv-m">Lv${b + m}<small>(${b}+${m})</small></span>` : b ? 'Lv' + b : ''; };
+  A.lvText = (sk) => { const b = (sk && sk.lv) || 0, m = A.mastery(sk); return m ? `Lv${b + m}(${b}+${m})` : b ? 'Lv' + b : ''; };
   A.cdOf = (sk) => {
-    const st = P.stats, lvK = 1 - Math.min(0.3, 0.02 * (sk.lv || 0));
+    const st = P.stats, lvK = 1 - Math.min(0.36, 0.02 * A.totalLv(sk));
     const own = 1 - Math.min(0.5, A.skm ? A.skm(sk.id).cd : 0);
     if (sk.def.ult) return sk.def.cd * (1 - st.cdr * 0.5) * (1 - (st.ultCd || 0)) * lvK * own;
     return sk.def.cd * A.SKILL_CD_MUL * (1 - st.cdr) * (1 - (st.skillCd || 0)) * lvK * own * (P.temps.has('ult_overcharge') ? 0.3 : 1);
   };
   // skill power grows with its level (raised with skill tomes / buying the same skill again)
-  A.power = (sk) => Math.pow(1.3, (sk && sk.lv) || 0) * A.SKILL_POW_MUL * (1 + (sk && A.skm ? A.skm(sk.id).dmg : 0));
+  A.power = (sk) => Math.pow(1.3, A.totalLv(sk)) * A.SKILL_POW_MUL * (1 + (sk && A.skm ? A.skm(sk.id).dmg : 0));
   A.isUlt = (sk) => !!(sk && sk.def && sk.def.ult);
   A.MAXLV = 15;
   A.ready = (sk) => sk && (sk.maxCharges ? sk.charges > 0 : sk.cd <= 0);

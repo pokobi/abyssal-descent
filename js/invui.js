@@ -126,7 +126,7 @@
       const key = G.input.skillKey(i);
       if (!sk) { out.push(`<div class="iv-sk empty${i === 0 ? ' ult' : ''}" data-sk="${i}"><kbd>${key}</kbd><span class="snm dim">— 空き —</span></div>`); return; }
       const ready = A.ready(sk), st = sk.maxCharges ? `${sk.charges}/${sk.maxCharges}` : ready ? 'READY' : `${Math.ceil(sk.cd)}s`;
-      out.push(`<div class="iv-sk${i === 0 ? ' ult' : ''}" data-sk="${i}" style="--rc:${R(sk.def.rarity)}"><kbd>${key}</kbd><span class="sic">${sk.def.icon}</span><span class="snm">${U.esc(sk.def.name)}</span><span class="sst${ready ? ' ok' : ''}">${sk.lv ? 'Lv' + sk.lv + ' · ' : ''}${st}</span></div>`);
+      out.push(`<div class="iv-sk${i === 0 ? ' ult' : ''}" data-sk="${i}" style="--rc:${R(sk.def.rarity)}"><kbd>${key}</kbd><span class="sic">${sk.def.icon}</span><span class="snm">${U.esc(sk.def.name)}</span><span class="sst${ready ? ' ok' : ''}">${A.lvHTML(sk) ? A.lvHTML(sk) + ' · ' : ''}${st}</span></div>`);
     });
     const pi = P.pileInfo();
     out.push(`<div class="iv-sk fixed" data-sk="pile" style="--rc:var(--gold2)"><kbd>${G.input.keyName('crouch')}</kbd><span class="sic">🔨</span><span class="snm">パイルドライバー</span><span class="sst${P.pileReady() ? ' ok' : ''}">${pi.lvl ? 'Lv' + pi.lvl + ' · ' : ''}${P.pileReady() ? 'READY' : Math.ceil(P.pileCd) + 's'}</span></div>`);

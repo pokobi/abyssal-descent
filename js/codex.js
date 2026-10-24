@@ -28,8 +28,8 @@
     if (kind === 'buff') return !!c.buffs[o.id];
     return !!c.items[o.id];
   };
-  // not yet met: monsters, guardians, fields and the abyss are hidden completely (name, icon, model, text); everything else shows name and icon only
-  const SECRET = new Set(['enemy', 'boss', 'stage', 'depth']);
+  // not yet met: monsters and guardians are hidden completely (name, icon, model, text); everything else is shown as it is
+  const SECRET = new Set(['enemy', 'boss']);
   const secret = (kind, o) => SECRET.has(kind) && !disc(kind, o);
   CX.open = function (back) {
     backFn = back;
@@ -55,7 +55,7 @@
     let a = t[2]();
     if (query) {
       const q = query.toLowerCase();
-      a = a.filter((o) => disc(tab, o) ? (o.name + (o.desc || '') + (o.cat || '')).toLowerCase().includes(q) : !secret(tab, o) && o.name.toLowerCase().includes(q)); // hidden entries are only found by their visible name
+      a = a.filter((o) => !secret(tab, o) && (o.name + (o.desc || '') + (o.cat || '')).toLowerCase().includes(q)); // a hidden monster / guardian is never found by search
     }
     return a;
   }
@@ -73,10 +73,9 @@
   function renderDetail() {
     const d = document.getElementById('cx-detail'); if (!d || !sel) return;
     const o = sel;
-    if (!disc(tab, o)) {
-      // not met yet: nothing but the bare fact (monsters / guardians / fields / the abyss do not even give their name)
-      const sec = SECRET.has(tab), rc0 = sec ? '#5a5248' : G.ui.R(o.rarity || 'epic');
-      d.innerHTML = `<div style="--rc:${rc0}"><div class="cd-icon">${sec ? '❔' : o.mat ? G.armorIcon(o) : o.icon}</div><div class="cd-name">${sec ? '？？？' : U.esc(o.name)}</div><div class="cd-cat">❔ 未発見</div><div class="cd-desc">${sec ? 'まだ出会っていない。出会うまで、詳細は分からない。' : '説明と数値は、手に入れる（見つける）と見られる。'}</div></div>`;
+    if (secret(tab, o)) {
+      // a monster / guardian not met yet: nothing but the bare fact
+      d.innerHTML = '<div style="--rc:#5a5248"><div class="cd-icon">❔</div><div class="cd-name">？？？</div><div class="cd-cat">❔ 未発見</div><div class="cd-desc">まだ出会っていない。出会うまで、詳細は分からない。</div></div>';
       return;
     }
     const rc = G.ui.R(o.rarity || 'epic');

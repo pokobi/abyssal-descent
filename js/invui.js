@@ -132,6 +132,12 @@
     out.push(`<div class="iv-sk fixed" data-sk="pile" style="--rc:var(--gold2)"><kbd>${G.input.keyName('crouch')}</kbd><span class="sic">🔨</span><span class="snm">パイルドライバー</span><span class="sst${P.pileReady() ? ' ok' : ''}">${pi.lvl ? 'Lv' + pi.lvl + ' · ' : ''}${P.pileReady() ? 'READY' : Math.ceil(P.pileCd) + 's'}</span></div>`);
     return out.join('');
   }
+  // the contracted mercenary under the armour column: Lv, HP (with the locked part), XP. Hover for the full numbers.
+  function mercChip() {
+    const R2 = G.Rooms2, m = GM.run && GM.run.merc; if (!R2 || !m || m.left <= 0 || !R2.mercStats) return '';
+    const s = R2.mercStats(m), a = R2.mercAlly, hp = a ? a.hp : s.cap, need = m.lv >= R2.MERC.cap ? 0 : R2.mercNeed(m.lv), down = a && a.down > 0;
+    return `<div class="iv-merc${down ? ' down' : ''}" data-merc="1"><div class="mc-h"><span>${s.d.icon}</span><b>Lv${m.lv}</b><small>残${m.left}</small></div><div class="pa-hp"><div style="width:${U.clamp(hp / s.full, 0, 1) * 100}%"></div>${s.downs ? `<i class="pa-lock" style="width:${Math.min(100, s.downs * 25)}%"></i>` : ''}<span>${down ? (a.down === Infinity ? '戦闘不能' : 'ダウン ' + Math.ceil(a.down) + '秒') : Math.ceil(hp) + '/' + s.cap}</span></div><div class="pa-xp"><div style="width:${need ? U.clamp((m.xp || 0) / need, 0, 1) * 100 : 100}%"></div><span>${need ? 'XP ' + (m.xp || 0) + '/' + need : 'XP MAX'}</span></div></div>`;
+  }
   function render() {
     if (!root) return;
     const loot = !!IV.openCont, C = IV.openCont;
@@ -168,7 +174,7 @@
     } else
     root.innerHTML = `<div class="iv-screen" style="--cs:${CS}px;--sw:${sw}px;--aw:${aw}px;--hw:${hW}px;--hs:${hS}px;--ft:${footH}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px">
       <div class="iv-cell-st">${left}</div>
-      <div class="iv-armorcol">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.legs)}${eqBox(SL.feet)}${help}</div>
+      <div class="iv-armorcol">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.legs)}${eqBox(SL.feet)}${help}${mercChip()}</div>
       <div class="iv-weaprow">${weaponBoxes()}</div>
       <div class="iv-foot-wrap">${foot}</div>
       <div class="iv-skillrow">${eqBox(SL.hands, 'hand')}<div class="iv-sks">${skillBoxes()}</div></div>
@@ -182,6 +188,11 @@
     root.querySelectorAll('.iv-wbox[data-wslot]').forEach((el) => wireBox(el, 'w'));
     root.querySelectorAll('.iv-wbox[data-melee]').forEach((el) => wireBox(el, 'm'));
     root.querySelectorAll('.iv-sk').forEach((el) => wireBox(el, 's'));
+    root.querySelectorAll('.iv-merc').forEach((el) => {
+      el.addEventListener('mouseenter', (e) => { if (!drag) showTip(G.Rooms2.mercTip(), e, false); });
+      el.addEventListener('mousemove', (e) => { if (!drag && tip) placeTip(e); });
+      el.addEventListener('mouseleave', hideTip);
+    });
     G.StatusUI.mount(root);
     // the status sheet fills the left cell (it lives in the HUD layer, so it is placed over it)
     if (!loot && !MB) {

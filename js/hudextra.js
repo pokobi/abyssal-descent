@@ -55,9 +55,10 @@
   function allyHTML(a) {
     const inf = a.info ? a.info() : null; if (!inf) return '';
     const hpK = inf.maxHp ? U.clamp(inf.hp / inf.maxHp, 0, 1) : null, tK = inf.tMax ? U.clamp(inf.t / inf.tMax, 0, 1) : null;
-    const down = inf.down > 0;
+    const down = inf.down > 0, lockK = inf.downs ? Math.min(1, inf.downs * 0.25) : 0;
+    const xpBar = inf.merc && inf.lv ? `<div class="pa-xp"><div style="width:${inf.need ? U.clamp(inf.xp / inf.need, 0, 1) * 100 : 100}%"></div><span>${inf.need ? `XP ${inf.xp}/${inf.need}` : 'XP MAX'}</span></div>` : '';
     return `<div class="pa ${inf.merc ? 'merc' : ''} ${down ? 'down' : ''}"><span class="pa-ic">${inf.icon}</span><div class="pa-body"><div class="pa-name">${inf.merc ? '<em>契約</em>' : ''}${U.esc(inf.name)}${inf.lv ? ` <b>Lv${inf.lv}</b>` : ''}${inf.left ? ` <small>残${inf.left}エリア</small>` : ''}</div>`
-      + (hpK !== null ? `<div class="pa-hp"><div style="width:${(hpK * 100).toFixed(1)}%"></div><span>${down ? `ダウン ${Math.ceil(inf.down)}秒` : `${Math.ceil(inf.hp)}/${Math.round(inf.maxHp)}`}</span></div>` : '')
+      + (hpK !== null ? `<div class="pa-hp"><div style="width:${(hpK * 100).toFixed(1)}%"></div>${lockK ? `<i class="pa-lock" style="width:${(lockK * 100).toFixed(0)}%"></i>` : ''}<span>${down ? (inf.down === Infinity ? '戦闘不能' : `ダウン ${Math.ceil(inf.down)}秒`) : `${Math.ceil(inf.hp)}/${Math.round(inf.cap || inf.maxHp)}`}</span></div>${xpBar}` : '')
       + (tK !== null ? `<div class="pa-t"><div style="width:${(tK * 100).toFixed(1)}%"></div><span>${Math.ceil(inf.t)}秒</span></div>` : '')
       + '</div></div>';
   }

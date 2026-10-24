@@ -114,7 +114,7 @@
   };
   R2.onAreaClear = function () {
     if (GM.run.bank > 0) { const it = Math.round(GM.run.bank * 0.08); GM.run.bank += it; G.ui.feed(`🏦 利息 +${fmt(it)}（預金 ${fmt(GM.run.bank)}）`); }
-    if (GM.run.merc && GM.run.merc.left > 0) { GM.run.merc.left--; if (GM.run.merc.left <= 0) { G.ui.toast('🛡️ 傭兵の契約が満了した', 'warn'); GM.run.merc = null; } }
+    if (GM.run.merc && GM.run.merc.left > 0) { GM.run.merc.left--; if (GM.run.merc.left <= 0) { const m = GM.run.merc; rosterSave(m); G.ui.toast(`🛡️ 傭兵の契約が満了した（Lv${m.lv} は名簿に残る）`, 'warn'); GM.run.merc = null; } }
   };
 
   // ---------------- auction ----------------
@@ -158,21 +158,81 @@
 
   // ---------------- mercenaries ----------------
   const MERCS = {
-    sword: { name: '傭兵剣士', icon: '🗡️', def: 'brute_normal', base: 1400, ranged: false, desc: '敵に斬り込む前衛。' },
-    bow: { name: '傭兵弓兵', icon: '🏹', def: 'skeleton_bone', base: 1700, ranged: true, desc: '後方から矢を射る。' },
+    sword: { name: '傭兵剣士', icon: '🗡️', def: 'brute_normal', base: 1400, role: '前衛', hp: 420, dmg: 45, cd: 0.8, range: 1.4, ranged: false, desc: '敵に斬り込む前衛。' },
+    bow: { name: '傭兵弓兵', icon: '🏹', def: 'skeleton_bone', base: 1700, role: '後衛', hp: 260, dmg: 36, cd: 1.1, range: 16, ranged: true, desc: '後方から矢を射る。' },
+    shield: { name: '傭兵盾兵', icon: '🛡️', def: 'skeleton_elder', base: 1600, role: '壁役', hp: 780, dmg: 28, cd: 1.0, range: 1.4, ranged: false, reduce: 0.3, taunt: 14, desc: '被ダメージ−30%。14m以内の敵はあなたより盾兵を優先して狙う。' },
+    mage: { name: '傭兵魔術師', icon: '🔮', def: 'shaman_normal', base: 2000, role: '後衛', hp: 220, dmg: 30, cd: 1.6, range: 18, ranged: true, splash: 3.5, desc: '着弾点の半径3.5mに範囲ダメージ（外側は半分）。体力が低い。' },
+    medic: { name: '傭兵衛生兵', icon: '➕', def: 'skeleton_crystal', base: 1800, role: '支援', hp: 300, dmg: 14, cd: 1.4, range: 10, ranged: true, heal: 0.06, healCd: 4, desc: '4秒ごとにあなたの最大体力の6%を回復（体力90%以下のとき）。攻撃は弱い。' },
   };
   R2.MERCS = MERCS;
+  // contract / growth / down rules (see mercStats and spawnMerc)
+  const MERC = { cap: 10, term: 8, ext: 4, grow: 1.25, downMax: 4, downT: 10, lock: 0.25 };
+  R2.MERC = MERC;
+  const mercNeed = (lv) => 6 + 4 * (lv - 1);
+  R2.mercNeed = mercNeed;
+  // everything a mercenary is worth right now: full HP, the HP cap after this area's downs, damage, dps
+  R2.mercStats = function (m) {
+    const d = MERCS[m.type], gr = Math.pow(MERC.grow, m.lv - 1), downs = Math.min(MERC.downMax, m.downs || 0);
+    const full = Math.round(d.hp * gr * (1 + (GM.area || 1) * 0.04));
+    const cap = downs >= MERC.downMax ? 0 : Math.round(full * (1 - MERC.lock * downs));
+    const dmg = d.dmg * gr;
+    return { d, full, cap, downs, dmg, cd: d.cd, range: d.range, dps: dmg / d.cd, healPct: d.heal ? d.heal * (1 + (m.lv - 1) * 0.1) : 0 };
+  };
+  // the roster keeps each type's Lv / XP for the rest of the run, so a lapsed contract is not a lost investment
+  function rosterSave(m) { if (!m) return; const r = GM.run.mercRoster || (GM.run.mercRoster = {}); r[m.type] = { lv: m.lv, xp: m.xp || 0 }; }
+  // set the Lv (training, XP) and let a living mercenary's HP follow the new maximum
+  function mercSetLv(m, lv) {
+    const a = R2.mercAlly, c0 = a ? R2.mercStats(m).cap : 0;
+    m.lv = lv;
+    if (a && !a.dead && a.down <= 0) a.hp += R2.mercStats(m).cap - c0;
+  }
+  R2.mercXp = function (n) {
+    const m = GM.run.merc; if (!m || m.left <= 0 || m.lv >= MERC.cap) return;
+    m.xp = (m.xp || 0) + n; let up = 0;
+    while (m.lv < MERC.cap && m.xp >= mercNeed(m.lv)) { m.xp -= mercNeed(m.lv); mercSetLv(m, m.lv + 1); up++; }
+    if (m.lv >= MERC.cap) m.xp = 0;
+    rosterSave(m);
+    if (up) {
+      const d = MERCS[m.type], a = R2.mercAlly;
+      G.ui.toast(`${d.icon} ${d.name}が Lv${m.lv} に上がった`, 'good');
+      if (a && !a.dead) { G.fx.ring(a.ent.pos.clone().setY(a.ent.pos.y + 0.1), 2.2, 0xffe090, 0.5); G.fx.sparks(a.ent.pos.clone().add(V(0, 1.4, 0)), null, 14, 0xffe090, 4); }
+      G.sfx.ui && G.sfx.ui('select');
+    }
+  };
+  // XP for every kill, yours or the mercenary's (a downed one still gains it); boss adds and clear sweeps give none
+  R2.mercKill = function (e) { if (!GM.run || !GM.run.merc || e.noReward || e.bossSpawn) return; R2.mercXp(e.boss ? 20 : e.elite ? 5 : 1); };
+  // Tab screen: the hover card (also usable by anything else that wants the numbers)
+  R2.mercTip = function () {
+    const m = GM.run && GM.run.merc; if (!m || m.left <= 0) return '';
+    const s = R2.mercStats(m), d = s.d, a = R2.mercAlly, hp = a ? a.hp : s.cap, need = m.lv >= MERC.cap ? 0 : mercNeed(m.lv);
+    const row = (k, v) => `<div class="ivt-r">${k}　<b>${v}</b></div>`;
+    const lockTxt = s.downs >= MERC.downMax ? '<b style="color:#ff9090">戦闘不能（このエリアでは復帰しない）</b>' : s.downs ? `${s.downs}/${MERC.downMax}回　最大体力 ${100 - MERC.lock * 100 * s.downs}%（このエリアのみ）` : 'なし（4ダウンで復帰不可）';
+    const sp = [d.reduce ? `被ダメージ −${d.reduce * 100}%` : '', d.taunt ? `${d.taunt}m以内の敵を引きつける` : '', d.splash ? `範囲 半径${d.splash}m（外側は半分）` : '', d.heal ? `${d.healCd}秒ごとに最大体力の${(s.healPct * 100).toFixed(1)}%を回復` : ''].filter(Boolean);
+    return `<div class="ivt-h">${d.icon} ${U.esc(d.name)} <b style="color:#ffd890">Lv${m.lv}</b></div><div class="ivt-s">${d.role}・契約 残り${m.left}エリア</div>`
+      + row('経験値', need ? `${m.xp || 0} / ${need}` : 'MAX')
+      + row('体力', `${Math.ceil(hp)} / ${s.cap}（最大 ${s.full}）`)
+      + row('攻撃力', `${Math.round(s.dmg)}${d.splash ? '（範囲）' : ''}`)
+      + row('攻撃間隔', `${s.cd.toFixed(1)}秒`)
+      + row('DPS', Math.round(s.dps))
+      + row('射程', d.range <= 2 ? '近接' : `${d.range}m`)
+      + (sp.length ? `<div class="ivt-fx">✦ ${sp.join('／')}</div>` : '')
+      + `<div class="ivt-v">ダウン: ${lockTxt}</div>`
+      + `<div class="ivt-s" style="margin-top:0.3em">敵を倒すと経験値（通常1・精鋭5・守護者20）。詰所でコインでも鍛えられる。</div>`;
+  };
   R2.setup_merc = function (c) {
     npc(G.ENEMY_BY_ID.brute_normal, c, {
       id: 'merc', npc: '傭兵隊長', icon: '🛡️', repeat: true,
-      get text() { const m = GM.run.merc; return `「腕は確かだ。契約は3エリア分。倒れても起き上がるが、金は前払いだ」<br>${m ? `現在の契約: ${MERCS[m.type].icon} ${MERCS[m.type].name} Lv${m.lv}（残り${m.left}エリア）` : '現在の契約: なし'}`; },
+      get text() { const m = GM.run.merc; return `「腕は確かだ。契約は${MERC.term}エリア分。倒れても起き上がるが、金は前払いだ。腕前は名簿に残る」<br>${m ? `現在の契約: ${MERCS[m.type].icon} ${MERCS[m.type].name} Lv${m.lv}（残り${m.left}エリア）` : '現在の契約: なし'}`; },
       opts: () => {
-        const m = GM.run.merc;
-        const out = Object.entries(MERCS).map(([k, d]) => { const pr = GM.price(d.base); return { icon: d.icon, label: `${d.name}を雇う（${fmt(pr)}🪙）`, sub: `${d.desc} Lv1・3エリア契約${m ? '（今の契約は解除）' : ''}`, disabled: coins() < pr, run: () => { pay(pr); GM.run.merc = { type: k, lv: 1, left: 3 }; R2.spawnMerc(); G.ui.toast(`${d.icon} ${d.name}と契約した`, 'good'); return { reopen: true }; } }; });
+        const m = GM.run.merc, ros = GM.run.mercRoster || {};
+        const out = Object.entries(MERCS).map(([k, d]) => {
+          const pr = GM.price(d.base), rs = ros[k], same = m && m.type === k;
+          return { icon: d.icon, label: `${d.name}を雇う（${fmt(pr)}🪙）`, sub: `${d.desc} ${rs ? `名簿 Lv${rs.lv} から再開` : 'Lv1'}・${MERC.term}エリア契約${m && !same ? '（今の契約は解除）' : ''}`, disabled: coins() < pr || same, run: () => { pay(pr); if (m) rosterSave(m); const r2 = ros[k]; GM.run.merc = { type: k, lv: r2 ? r2.lv : 1, xp: r2 ? r2.xp : 0, left: MERC.term, downs: 0, dArea: 0 }; R2.spawnMerc(); G.ui.toast(`${d.icon} ${d.name}と契約した`, 'good'); return { reopen: true }; } };
+        });
         if (m) {
-          const up = GM.price(900 * Math.pow(1.35, m.lv)), ext = GM.price(MERCS[m.type].base * 0.6);
-          out.push({ icon: '⬆️', label: `鍛える Lv${m.lv}→${m.lv + 1}（${fmt(up)}🪙）`, sub: '与ダメージ×1.3', disabled: coins() < up, run: () => { pay(up); m.lv++; return { reopen: true }; } });
-          out.push({ icon: '📜', label: `契約延長 +3エリア（${fmt(ext)}🪙）`, sub: `残り${m.left} → ${m.left + 3}`, disabled: coins() < ext, run: () => { pay(ext); m.left += 3; return { reopen: true }; } });
+          const up = GM.price(900 * Math.pow(1.35, m.lv)), ext = GM.price(MERCS[m.type].base * 0.6), cap = m.lv >= MERC.cap;
+          out.push({ icon: '⬆️', label: cap ? `鍛える（Lv${MERC.cap} が上限）` : `鍛える Lv${m.lv}→${m.lv + 1}（${fmt(up)}🪙）`, sub: `火力・体力×${MERC.grow}　経験値 ${m.xp || 0}/${cap ? '—' : mercNeed(m.lv)}`, disabled: cap || coins() < up, run: () => { pay(up); mercSetLv(m, m.lv + 1); if (m.lv >= MERC.cap) m.xp = 0; rosterSave(m); return { reopen: true }; } });
+          out.push({ icon: '📜', label: `契約延長 +${MERC.ext}エリア（${fmt(ext)}🪙）`, sub: `残り${m.left} → ${m.left + MERC.ext}`, disabled: coins() < ext, run: () => { pay(ext); m.left += MERC.ext; return { reopen: true }; } });
         }
         return out;
       },
@@ -201,8 +261,8 @@
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.9, 32), new THREE.MeshBasicMaterial({ color: ALLY_COL, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2; G.scene.add(ring);
     let last = '', host = null, el = null;
-    const draw = (hpK, down, downT) => {
-      const key = `${m.lv}|${Math.round(hpK * 40)}|${down ? Math.ceil(downT) : -1}`;
+    const draw = (hpK, down, downT, downs) => {
+      const key = `${m.lv}|${Math.round(hpK * 40)}|${down ? (downT === Infinity ? 'x' : Math.ceil(downT)) : -1}|${downs}`;
       if (key === last) return; last = key;
       const g = tagC.getContext('2d'); g.clearRect(0, 0, 320, 96);
       g.font = '900 30px "Noto Sans JP","Segoe UI Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -211,8 +271,12 @@
       g.fillStyle = '#9fe8ff'; (G.Icons ? G.Icons.fillText : (g2, t2, x2, y2, o2) => { if (o2 && o2.stroke) g2.strokeText(t2, x2, y2); g2.fillText(t2, x2, y2); })(g, txt, 160, 28, { stroke: true });
       g.fillStyle = 'rgba(0,0,0,0.75)'; g.fillRect(40, 58, 240, 20);
       g.fillStyle = down ? '#666' : hpK > 0.5 ? '#5fe07a' : hpK > 0.25 ? '#ffd050' : '#ff5050'; g.fillRect(43, 61, 234 * Math.max(0, hpK), 14);
+      if (downs) { // the part of the bar that this area's downs have locked away
+        const lw = 234 * MERC.lock * downs; g.fillStyle = '#3a3a40'; g.fillRect(43 + 234 - lw, 61, lw, 14);
+        g.strokeStyle = '#7a7a84'; g.lineWidth = 2; g.beginPath(); for (let x = 43 + 234 - lw; x < 277; x += 8) { g.moveTo(x, 75); g.lineTo(Math.min(277, x + 14), 61); } g.stroke();
+      }
       g.strokeStyle = '#9fe8ff'; g.lineWidth = 2; g.strokeRect(40, 58, 240, 20);
-      if (down) { g.font = '900 18px "Noto Sans JP",sans-serif'; g.fillStyle = '#ffd0d0'; g.lineWidth = 4; g.strokeStyle = '#000'; g.strokeText(`ダウン ${Math.ceil(downT)}秒`, 160, 69); g.fillText(`ダウン ${Math.ceil(downT)}秒`, 160, 69); }
+      if (down) { g.font = '900 18px "Noto Sans JP",sans-serif'; g.fillStyle = '#ffd0d0'; g.lineWidth = 4; g.strokeStyle = '#000'; const dt2 = downT === Infinity ? '戦闘不能' : `ダウン ${Math.ceil(downT)}秒`; g.strokeText(dt2, 160, 69); g.fillText(dt2, 160, 69); }
       tagT.needsUpdate = true;
     };
     return {
@@ -223,7 +287,7 @@
         outline.opacity = 0.75 + 0.2 * Math.sin(t * 3);
         losT -= dt; if (losT <= 0) { losT = 0.2; hidden = !G.world.los(G.camera.position, p.clone().setY(p.y + 1.2)); }
         xk = U.damp(xk, hidden ? 1 : 0, 8, dt); xray.opacity = 0.32 * xk; xray.visible = xk > 0.01;
-        draw(a.hp / Math.max(1, a.info().maxHp), a.down > 0, a.down);
+        { const inf = a.info(); draw(a.hp / Math.max(1, inf.maxHp), a.down > 0, a.down, inf.downs); }
         // off-screen pointer
         if (!host) { host = document.getElementById('ally-markers'); if (!host) { host = document.createElement('div'); host.id = 'ally-markers'; G.ui.el.hud.appendChild(host); } el = document.createElement('div'); el.className = 'am'; host.appendChild(el); }
         const v = p.clone().setY(p.y + 1.6).project(G.camera), Wd = window.innerWidth, Hd = window.innerHeight;
@@ -247,8 +311,25 @@
     const pos = P.pos.clone().add(V(1.5, 0, 1.5));
     mdl.group.position.copy(pos); G.scene.add(mdl.group);
     const ent = { pos: pos.clone(), vel: V(), yaw: 0, radius: 0.5, height: 2, def, cd: 0, walk: 0, atk: 0 };
-    const dmg = () => 45 * Math.pow(1.3, m.lv - 1) * (d.ranged ? 0.8 : 1);
-    const maxHp = () => Math.round((d.ranged ? 260 : 420) * Math.pow(1.3, m.lv - 1) * (1 + GM.area * 0.04));
+    // the down penalty lasts for one area only: a new area starts with a clean slate
+    if (m.dArea !== GM.area) { m.dArea = GM.area; m.downs = 0; }
+    const dmg = () => R2.mercStats(m).dmg;
+    const maxHp = () => R2.mercStats(m).cap; // the HP that is not locked by this area's downs
+    // one blow, per type (melee: sword / shield; arrow: bow; instant arcane bolt with a splash: mage; weak green bolt: medic)
+    function strike(tgt) {
+      const from = ent.pos.clone().add(V(0, 1.6, 0));
+      if (d.splash || d.heal) {
+        const to = tgt.centerPos(), col = d.heal ? 0x70ff90 : 0xb080ff;
+        G.fx.lightning(from, to, col);
+        C.damageEnemy(tgt, dmg(), { src: 'ally', noMarker: true, pos: to });
+        if (d.splash) {
+          G.fx.ring(tgt.pos.clone().setY(tgt.pos.y + 0.1), d.splash, col, 0.35);
+          for (const o of G.enemies.list) if (o !== tgt && o.alive && !o.ally && Math.hypot(o.pos.x - tgt.pos.x, o.pos.z - tgt.pos.z) < d.splash && Math.abs(o.pos.y - tgt.pos.y) < 3) C.damageEnemy(o, dmg() * 0.5, { src: 'ally', noMarker: true, pos: o.centerPos() });
+        }
+      } else if (d.ranged) { const dir = tgt.centerPos().sub(from).normalize(); C.spawnProjectile({ kind: 'arrow', pos: from.clone().addScaledVector(dir, 0.6), vel: dir.multiplyScalar(60), grav: 2, owner: 'player', dmg: dmg(), radius: 0.12, info: { src: 'ally', noMarker: true } }); }
+      else { C.damageEnemy(tgt, dmg(), { src: 'ally', noMarker: true, pos: tgt.centerPos() }); G.sfx.melee(true); }
+    }
+    let healT = d.healCd || 0;
     G.fx.smoke(pos, 8, 1, 0x8080a0, 1, 1);
     // ---- the stacked-storey fields (halls / ruin): walk the nav like any foe does, never straight through slabs, bars or over the lava ----
     const dirv = { x: 0, z: 0 };
@@ -281,11 +362,7 @@
         const seen = w.los(eyeP(), tgt.centerPos());
         const inRange = d.ranged ? (l < reach && seen) : (l < tgt.radius + reach && dy < 2.5 && !w.barsBetween(ent.pos, tgt.pos));
         if (inRange) {
-          if (ent.cd <= 0) {
-            ent.cd = d.ranged ? 1.1 : 0.8; ent.atk = 0.4;
-            if (d.ranged) { const from = ent.pos.clone().add(V(0, 1.6, 0)), dir = tgt.centerPos().sub(from).normalize(); C.spawnProjectile({ kind: 'arrow', pos: from.clone().addScaledVector(dir, 0.6), vel: dir.multiplyScalar(60), grav: 2, owner: 'player', dmg: dmg(), radius: 0.12, info: { src: 'ally', noMarker: true } }); }
-            else { C.damageEnemy(tgt, dmg(), { src: 'ally', noMarker: true, pos: tgt.centerPos() }); G.sfx.melee(true); }
-          }
+          if (ent.cd <= 0) { ent.cd = d.cd; ent.atk = 0.4; strike(tgt); }
           return false;
         }
         if (fT <= 0 || fGoal !== tgt) { fT = 0.35; fGoal = tgt; if (!w.walkField(goal.x, goal.z, goal.y, ent.pos.x, ent.pos.z, ent.pos.y) || here() > 75) { skip.set(tgt, G.game.time + 4); tgt = null; seekT = 0.2; fGoal = null; return false; } } // unreachable, or a long way round (another storey): pick another foe
@@ -317,17 +394,23 @@
     }
     const ally = R2.mercAlly = C.addAlly({
       t: 1e9, ent, hp: maxHp(), down: 0, lastHurt: -10,
-      info() { return { merc: true, icon: d.icon, name: d.name, lv: m.lv, hp: this.hp, maxHp: maxHp(), down: this.down, left: m.left }; },
+      taunt: d.taunt || 0,
+      info() { const s = R2.mercStats(m); return { merc: true, icon: d.icon, name: d.name, lv: m.lv, hp: this.hp, maxHp: s.full, cap: s.cap, downs: s.downs, down: this.down, left: m.left, xp: m.xp || 0, need: m.lv >= MERC.cap ? 0 : mercNeed(m.lv) }; },
       targetable() { return this.down <= 0; },
       hurt(v) {
         if (this.down > 0) return;
+        if (d.reduce) v *= 1 - d.reduce;
         this.hp -= v; this.lastHurt = G.game.time; G.fx.sparks(ent.pos.clone().add(V(0, 1.2, 0)), null, 4, 0xff3030, 2);
-        if (this.hp <= 0) { this.hp = 0; this.down = 10; G.ui.toast(`${d.icon} ${d.name}がダウンした（10秒後に復帰）`, 'warn'); G.fx.smoke(ent.pos, 6, 1, 0x606070, 1, 1); }
+        if (this.hp <= 0) {
+          this.hp = 0; m.downs = (m.downs || 0) + 1; G.fx.smoke(ent.pos, 6, 1, 0x606070, 1, 1);
+          if (m.downs >= MERC.downMax) { this.down = Infinity; G.ui.toast(`${d.icon} ${d.name}は戦闘不能になった（このエリアでは復帰しない）`, 'bad'); }
+          else { this.down = MERC.downT; G.ui.toast(`${d.icon} ${d.name}がダウンした（${MERC.downT}秒後に復帰・最大体力 ${Math.round(100 - MERC.lock * 100 * m.downs)}%）`, 'warn'); }
+        }
       },
       update(dt) {
         // stay on the floor: fall when standing on nothing (after a teleport / a ledge / a lowered floor), also while idle or downed
         { const gy = G.world.groundAt(V(ent.pos.x, ent.pos.y + 0.8, ent.pos.z), 0.2, 10); if (gy > -Infinity) ent.pos.y = ent.pos.y > gy + 0.05 ? Math.max(gy, ent.pos.y - 24 * dt) : gy; }
-        // downed: lies still, gets back up with half HP (the contract says they never die)
+        // downed: lies still for a fixed 10 s and gets back up with half of the (locked-down) maximum; the 4th down lasts the whole area
         if (this.down > 0) {
           this.down -= dt;
           mdl.group.position.copy(ent.pos); mdl.group.rotation.set(-1.35, ent.yaw, 0);
@@ -336,9 +419,21 @@
         }
         if (this.hp > maxHp()) this.hp = maxHp();
         if (G.game.time - this.lastHurt > 5) this.hp = Math.min(maxHp(), this.hp + maxHp() * 0.04 * dt);
+        // the medic's pulse: a slice of your max HP every few seconds while you are hurt
+        if (d.heal) {
+          healT -= dt;
+          if (healT <= 0) {
+            healT = d.healCd;
+            if (!P.dead && P.hp < P.stats.maxHp * 0.9 && Math.hypot(P.pos.x - ent.pos.x, P.pos.z - ent.pos.z) < 25) {
+              C.heal(P.stats.maxHp * R2.mercStats(m).healPct, true);
+              G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), 1.6, 0x70ff90, 0.4); G.fx.sparks(P.chestPos(), null, 8, 0x80ff9a, 3);
+              G.ui.feed(`➕ ${d.name}があなたを回復`);
+            }
+          }
+        }
         ent.cd -= dt;
         let moving = false;
-        const reach = d.ranged ? 16 : 1.4;
+        const reach = d.range;
         if (G.world.navLayers > 1) moving = stratMove(this, dt, reach);
         else {
         const e = G.enemies.nearest(ent.pos, 40);
@@ -346,11 +441,7 @@
           const to = e.pos.clone().sub(ent.pos); to.y = 0; const l = to.length();
           ent.yaw = Math.atan2(to.x, to.z);
           if (l > e.radius + reach) { G.enemies.groundMove(ent, to.x / l, to.z / l, 6, dt); moving = true; }
-          else if (ent.cd <= 0) {
-            ent.cd = d.ranged ? 1.1 : 0.8; ent.atk = 0.4;
-            if (d.ranged) { const from = ent.pos.clone().add(V(0, 1.6, 0)), dir = e.centerPos().sub(from).normalize(); C.spawnProjectile({ kind: 'arrow', pos: from.clone().addScaledVector(dir, 0.6), vel: dir.multiplyScalar(60), grav: 2, owner: 'player', dmg: dmg(), radius: 0.12, info: { src: 'ally', noMarker: true } }); }
-            else { C.damageEnemy(e, dmg(), { src: 'ally', noMarker: true, pos: e.centerPos() }); G.sfx.melee(true); }
-          }
+          else if (ent.cd <= 0) { ent.cd = d.cd; ent.atk = 0.4; strike(e); }
         } else {
           const to = P.pos.clone().sub(ent.pos); to.y = 0; const l = to.length();
           if (l > 4) { G.enemies.groundMove(ent, to.x / l, to.z / l, 7, dt); moving = true; ent.yaw = Math.atan2(to.x, to.z); }

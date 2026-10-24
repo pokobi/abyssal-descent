@@ -493,6 +493,18 @@ button { font-family: inherit; }
 #pallies .pa-hp div { height: 100%; background: linear-gradient(90deg, #3aa050, #80e070); }
 #pallies .pa.down .pa-hp div { background: #666; }
 #pallies .pa-t div { height: 100%; background: linear-gradient(90deg, #6070c0, #a0b0ff); }
+/* the part of the HP bar locked away by this area's downs: grey, hatched, cannot be healed */
+#pallies .pa-lock, .iv-merc .pa-lock { position: absolute; right: 0; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, #3a3a40 0 3px, #55555e 3px 5px); border-left: 1px solid #8a8a94; }
+#pallies .pa-xp, .iv-merc .pa-xp { position: relative; height: 8px; margin-top: 2px; border-radius: 3px; background: rgba(255,255,255,0.12); overflow: hidden; }
+#pallies .pa-xp div, .iv-merc .pa-xp div { height: 100%; background: linear-gradient(90deg, #c09030, #ffe090); }
+.iv-armorcol .iv-merc { flex: 0 0 auto; box-sizing: border-box; padding: 0.35em 0.5em; border: 1px solid rgba(170,180,255,0.6); border-radius: 0.35em; background: rgba(14,11,8,0.96); font-size: 0.95em; color: #d8ccb4; cursor: help; }
+.iv-merc.down { opacity: 0.7; }
+.iv-merc .mc-h { display: flex; align-items: center; gap: 0.4em; } .iv-merc .mc-h b { color: #ffd890; } .iv-merc .mc-h small { margin-left: auto; color: #9aa0c8; }
+.iv-merc .pa-hp { position: relative; height: 0.85em; margin-top: 0.2em; border-radius: 0.3em; background: rgba(255,255,255,0.12); overflow: hidden; }
+.iv-merc .pa-hp > div { height: 100%; background: linear-gradient(90deg, #3aa050, #80e070); }
+.iv-merc.down .pa-hp > div { background: #666; }
+.iv-merc .pa-hp span { position: absolute; inset: 0; font-size: 0.75em; line-height: 1.15em; text-align: center; color: #fff; text-shadow: 0 0 2px #000; }
+#pallies .pa-xp span, .iv-merc .pa-xp span { position: absolute; inset: 0; font-size: 7.5px; line-height: 8px; text-align: center; color: #fff; text-shadow: 0 0 2px #000; }
 #pallies .pa-hp span, #pallies .pa-t span { position: absolute; inset: 0; font-size: 8.5px; line-height: 9px; text-align: center; color: #fff; text-shadow: 0 0 2px #000; }
 /* ---- boss level ---- */
 .boss-lv { display: inline-block; font-size: 13px; padding: 0 7px; margin-right: 10px; border-radius: 5px; background: rgba(160,30,20,0.85); border: 1px solid #ff9070; color: #fff; vertical-align: 3px; letter-spacing: 1px; }

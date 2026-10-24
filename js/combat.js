@@ -278,6 +278,7 @@
     if (!really) return;
     if (e.ally) return;
     run.kills++;
+    if (G.Rooms2 && G.Rooms2.mercKill) G.Rooms2.mercKill(e); // XP for the mercenary
     if (info.head) run.headshots++;
     G.save.mark('kills', e.def.id); G.save.data.records.totalKills++;
     // combo & multikill

@@ -837,7 +837,7 @@
       if (mc && !mc.dead && mc.targetable && mc.targetable() && !this.stalker) {
         const dm = mc.ent.pos.distanceTo(this.pos), dp = this.pos.distanceTo(P.pos);
         const pInvis = P.stats.invis > 0 || P.smokeT > 0;
-        const wantM = pInvis ? dm < 30 : this.aggroM ? dm < dp * 1.2 : dm < dp * 0.85;
+        const wantM = (mc.taunt && dm < mc.taunt) || (pInvis ? dm < 30 : this.aggroM ? dm < dp * 1.2 : dm < dp * 0.85); // a shield bearer pulls every foe within its taunt range
         this.aggroM = wantM;
         if (wantM) return { pos: mc.ent.pos, eye: V(mc.ent.pos.x, mc.ent.pos.y + 1.3, mc.ent.pos.z), vel: V(), invisible: false, isPlayer: false, ally: mc };
       } else this.aggroM = false;

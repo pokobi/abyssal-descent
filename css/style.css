@@ -444,7 +444,6 @@ button { font-family: inherit; }
 @media (max-width: 700px) { #gren-hint { flex-wrap: wrap; white-space: normal; max-width: 90vw; justify-content: center; } }
 
 /* weapon key wheel */
-#iwheel.ww .iw-it b { font-size: 11px; color: #f1d79b; }
 
 /* centre hold gauge (ornate chests) */
 #hold-ring { position: fixed; left: 50%; top: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; z-index: 7; pointer-events: none; opacity: 0; transform: scale(0.85); transition: opacity .12s, transform .12s; }
@@ -655,6 +654,16 @@ button { font-family: inherit; }
 @keyframes tutPop2 { 0% { transform: translateX(-50%) translateY(-10px) scale(0.97); opacity: 0.4; } 100% { transform: translateX(-50%); opacity: 1; } }
 @media (max-width: 700px) { #tut { top: 56px; bottom: auto; } #tut.on { transform: translateX(-50%); } }
 
+#tut .tut-b ul { margin: 0; padding: 0; list-style: none; }
+#tut .tut-b li { position: relative; padding-left: 1.1em; margin: 0.15em 0; }
+#tut .tut-b li::before { content: '▸'; position: absolute; left: 0; color: #c8a050; }
+#tut .tut-tip { margin-top: 6px; font-size: 12.5px; color: #b8ab92; }
+/* menus (pause, settings, choices...) cover the tutorial panel instead of sitting under it */
+body:has(#screens > .screen) #tut { visibility: hidden; }
+/* the Tab screen fills the window: the panel shrinks into the lower part of the status column so the step can still be read */
+body.inv-open #tut.on { left: 2.4vw; right: auto; top: auto; bottom: 4vh; transform: none; width: min(380px, 23vw); padding: 10px 14px; z-index: 62; }
+body.inv-open #tut .tut-t { font-size: 16px; margin-bottom: 4px; }
+body.inv-open #tut .tut-b { font-size: 12.5px; line-height: 1.6; }
 /* while the tutorial panel occupies the upper centre, notices move below it */
 body.tut-on #toasts { top: 60%; }
 body.tut-on #banner { top: 52%; }

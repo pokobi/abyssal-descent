@@ -245,20 +245,6 @@
     UI._iw = { list, sel: Math.max(0, list.indexOf(cur)), vx: 0, vy: 0, el: d };
     UI.itemWheelMove(0, 0);
   };
-  // ---- radial weapon wheel (hold 1-3): the pick is assigned to that key ----
-  UI.weaponWheel = function (k, list, cur) {
-    UI.itemWheelClose();
-    const W = G.weapons;
-    const d = document.createElement('div'); d.id = 'iwheel'; d.className = 'ww';
-    const n = list.length, R0 = 120;
-    d.innerHTML = wheelHtml(n, `<div style="font-size:24px">🔁</div><div>キー <b style="color:var(--gold2)">${G.K('w' + (k + 1))}</b> に割り当て</div>`, list.map((t) => {
-      const inf = W.tokInfo(t), key = W.order().indexOf(t);
-      return { sel: t === cur, rc: R(inf.rarity), icon: inf.icon, sub: key < 3 ? key + 1 : '⇕' };
-    }));
-    UI.el.hud.appendChild(d);
-    UI._iw = { list, sel: Math.max(0, list.indexOf(cur)), vx: 0, vy: 0, el: d, info: (t) => { const inf = W.tokInfo(t); return `<b style="color:${R(inf.rarity)}">${inf.icon} ${U.esc(inf.name)}</b>${inf.sub ? `<div class="iw-desc">${inf.sub}</div>` : ''}`; } };
-    UI.itemWheelMove(0, 0);
-  };
   UI.itemWheelMove = function (dx, dy) {
     const w = UI._iw; if (!w) return;
     w.vx = U.clamp(w.vx + dx, -160, 160); w.vy = U.clamp(w.vy + dy, -160, 160);
@@ -643,7 +629,7 @@
         ${k(G.K('grapple'), `グラップル（押し続けて巻き取り / 離すと解除 / ${G.K('jump')}で跳躍解除）`)}${k(G.K('interact'), 'インタラクト（購入・宝箱・出口）')}
         ${k(G.input.skillKey(0), 'アルティメット（強力・CT約2分）')}${k([1, 2, 3].map((i) => G.input.skillKey(i)).join(' / '), 'スキル（持ち物画面でドラッグして入れ替え）')}
         ${k(G.K('grenade'), '投擲物を投げる（長押しで選択ホイール）')}${k(G.K('cycleGrenade'), '投擲物の切替')}
-        ${k(['item1', 'item2'].map(G.K).join(' / '), '消耗品の使用（どちらの枠にも入る）・長押しで選択ホイール')}${k(['w1', 'w2', 'w3'].map(G.K).join('・') + ' / ホイール', '武器の切替（ホイールは全武器を順に）')}${k(['w1', 'w2'].map(G.K).join('・') + ' 長押し', '銃1・銃2の入れ替え（持ち物画面のドラッグでも可）')}
+        ${k(['item1', 'item2'].map(G.K).join(' / '), '消耗品の使用（どちらの枠にも入る）・長押しで選択ホイール')}${k(['w1', 'w2', 'w3'].map(G.K).join('・') + ' / ホイール', '武器の切替（ホイールは全武器を順に）')}${k(G.K('status'), '銃1・銃2の入れ替え（持ち物画面で銃どうしをドラッグ）')}
         ${k(G.K('status') + ' / ' + G.K('inventory'), '持ち物・装備・ステータスの画面（防具・アタッチメントの付け替え、武器1/2の入れ替え、持ち物の整理、加護や効果の一覧）')}${k('Esc / I', 'ポーズ（Iはもう一度押すと再開）')}
       </div>
       <h3>🗺️ 流れ</h3>

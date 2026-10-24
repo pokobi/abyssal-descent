@@ -76,6 +76,7 @@ html.m .title-logo { font-size: clamp(30px, 7vh, 60px); }
 html.m .title-menu { gap: 7px; margin-top: 14px; }
 html.m .btn { min-height: 44px; }
 html.m #tut { zoom: 0.66; }
+html.m body.inv-open #tut.on { width: min(560px, 70vw); } /* the phone's Tab screen has no status column: keep the panel readable */
 html.m #item-cards { left: calc(var(--u) * 10) !important; right: auto !important; top: calc(var(--u) * 96) !important; width: 34vw !important; }
 html.m .title-foot { display: none; }
 

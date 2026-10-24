@@ -177,35 +177,12 @@
     if (t === 'm') { const d = G.player.melee.def; return { icon: d.icon, name: d.name, rarity: d.rarity, sub: '近接' }; }
     return { icon: t.def.icon, name: t.def.name, rarity: t.def.rarity, sub: t.lv ? '+' + t.lv : '' };
   };
-  W.kh = null; // a number key being held: tap = switch, hold = choose which weapon lives on that key
+  // 1/2/3 switch straight to that slot (which gun sits on 1 or 2 is changed by drag & drop in the Tab screen)
   W.handleSwitch = function () {
     P = G.player;
     const o = W.order();
-    for (let k = 0; k < 3; k++) if (I.hit('w' + (k + 1))) { if (o[k]) W.selectTok(o[k]); if (k < 2 && !W.kh) W.kh = { k, t0: G.game.time, wheel: false }; }
-    const kh = W.kh;
-    if (kh) {
-      if (I.down('w' + (kh.k + 1))) {
-        if (!kh.wheel && G.game.time - kh.t0 > 0.3 && W.gunsInOrder().length > 1) { kh.wheel = true; G.ui.weaponWheel(kh.k, W.gunsInOrder(), o[kh.k] || W.gunsInOrder()[0]); G.sfx.ui('open'); }
-        if (kh.wheel) { G.ui.itemWheelMove(I.mx, I.my); G.game.chronoT = Math.max(G.game.chronoT || 0, 0.1); G.game.chronoSlow = 0.65; }
-      } else {
-        if (kh.wheel) {
-          const t = G.ui.itemWheelClose();
-          if (t) {
-            const j = o.indexOf(t), k = kh.k;
-            if (j !== k) {
-              while (o.length <= k) o.push(null);
-              o[j] = o[k]; o[k] = t;
-              P.wOrder = o.map((x) => x || null);
-              const inf = W.tokInfo(t);
-              G.ui.toastSmall(`🔁 [${G.K('w' + (k + 1))}] に ${inf.icon} ${inf.name} を割り当て`);
-            }
-            W.selectTok(t); G.sfx.ui('click'); G.ui.refreshWeapon();
-          }
-        }
-        W.kh = null;
-      }
-    }
-    if (I.wheel && !(W.kh && W.kh.wheel)) {
+    for (let k = 0; k < 3; k++) if (I.hit('w' + (k + 1)) && o[k]) W.selectTok(o[k]);
+    if (I.wheel) {
       const L = W.orderList(), cur = L.indexOf(W.curTok());
       W.selectTok(L[(cur + (I.wheel > 0 ? 1 : L.length - 1)) % L.length]);
     }

@@ -585,7 +585,7 @@
   // ---------------- item keys: tap = use the selected item, hold = selection wheel ----------------
   const SLOTKEYS = [['grenade', 'g'], ['item1', 'c1'], ['item2', 'c2']];
   A.press = null;
-  A.wheelOpen = () => !!(A.press && A.press.wheel) || !!(G.weapons.kh && G.weapons.kh.wheel);
+  A.wheelOpen = () => !!(A.press && A.press.wheel);
   const grenadeList = () => Object.keys(P.grenades).filter((k) => P.grenades[k] > 0);
   A.updateItemKeys = function (dt) {
     if (I.hit('cycleGrenade')) A.cycleGrenade();

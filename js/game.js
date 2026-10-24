@@ -61,8 +61,10 @@
       if ((G.BIND.status.includes(e.code) || G.BIND.inventory.includes(e.code)) && invReady()) { e.preventDefault(); if (!e.repeat && G.InvUI && !G.InvUI.isOpen()) { if (GM.state !== 'playing') { GM.state = 'playing'; G.ui.clearScreen(); } G.InvUI.open(null); } return; }
       if (e.code === 'Escape' && (GM.state === 'buff')) e.preventDefault();
       // Esc on a menu that can simply be left (a choice / shop / event panel, or the pause menu) goes back to the game
-      if (e.code === 'Escape' && !e.repeat) {
-        const cancel = GM.state === 'modal' ? document.querySelector('#screens #c-cancel') : GM.state === 'paused' ? document.querySelector('#screens #p-resume') : null;
+      // (a boon pick is a forced choice and stays as it is; the key-binding screen keeps Esc for cancelling a key capture)
+      if (e.code === 'Escape' && !e.repeat && GM.state !== 'playing' && GM.state !== 'resuming' && GM.state !== 'buff' && !document.querySelector('#screens .kc-btn.wait')) {
+        // every screen has one button that leaves it (cancel / back / end the deal / resume): Esc presses it
+        const cancel = document.querySelector('#screens :is(#c-cancel, #pw-close, #cx-back, #h-back, #s-back, #rs-back, #rs-no, #kc-back, #st-back, #df-back, #p-resume)') || document.querySelector('#dv-close');
         if (cancel) { e.preventDefault(); GM.escCloseT = performance.now(); cancel.click(); }
       }
       // I = pause menu toggle (Esc sometimes gets swallowed by the browser while the pointer is locked)

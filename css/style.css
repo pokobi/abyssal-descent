@@ -658,10 +658,16 @@ button { font-family: inherit; }
 #tut .tut-b li::before { content: '▸'; position: absolute; left: 0; color: #c8a050; }
 #tut .tut-tip { margin-top: 6px; font-size: 12.5px; color: #b8ab92; }
 /* menus (pause, settings, choices...) cover the tutorial panel instead of sitting under it */
-body:has(#screens > .screen) #tut { visibility: hidden; }
+body:has(#screens > .screen:not(:has(.clicklock))) #tut { visibility: hidden; } /* (not for the small 'click to resume' prompt) */
 /* the Tab screen fills the window: the panel shrinks into the lower part of the status column so the step can still be read */
 body.inv-open #tut.on { left: 2.4vw; right: auto; top: auto; bottom: 4vh; transform: none; width: min(380px, 23vw); padding: 10px 14px; z-index: 62; }
 body.inv-open #tut .tut-t { font-size: 16px; margin-bottom: 4px; }
+/* the loot screen has no status column: the panel sits centred in the free strip under the three panels */
+body.inv-loot #tut.on { left: 50%; right: auto; bottom: 1vh; width: min(540px, calc(100vw - 32px)); transform: translateX(-50%); }
+body.inv-loot #tut .tut-tip, body.inv-loot #tut .tut-foot { display: none; }
+body.inv-open:not(.inv-loot) #tut.pop { animation: tutPopIv .3s ease-out; } /* the corner panel pops in place (the centred one keeps its own pop) */
+@keyframes tutPopIv { 0% { transform: scale(0.97); opacity: 0.4; } 100% { transform: none; opacity: 1; } }
+body.tut-on.inv-loot .iv-lootnote { visibility: hidden; } /* the panel takes its place (it explains the same keys) */
 body.inv-open #tut .tut-b { font-size: 12.5px; line-height: 1.6; }
 /* while the tutorial panel occupies the upper centre, notices move below it */
 body.tut-on #toasts { top: 60%; }

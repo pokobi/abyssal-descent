@@ -181,7 +181,7 @@
       ${invPanel}
     </div>`;
     const srt = root.querySelector('#iv-sort');
-    if (srt) srt.onclick = () => { closeMenu(); const ok = IV.sortContainer(P.bag); G.sfx.ui(ok ? 'select' : 'deny'); if (!ok) G.ui.toastSmall('🎒 並べ替えできなかった'); render(); };
+    if (srt) srt.onclick = () => { closeMenu(); IV.acts = (IV.acts || 0) + 1; const ok = IV.sortContainer(P.bag); G.sfx.ui(ok ? 'select' : 'deny'); if (!ok) G.ui.toastSmall('🎒 並べ替えできなかった'); render(); };
     const all = root.querySelector('#iv-all');
     if (all) all.onclick = () => { takeAll(); };
     root.querySelectorAll('.iv-it').forEach((el) => wire(el));
@@ -437,6 +437,7 @@
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
     if (!drag) return;
+    IV.acts = (IV.acts || 0) + 1; // something was dragged and dropped (the tutorial watches this)
     const { f, ghost, el } = drag; const it = f.it;
     ghost.remove(); el.classList.remove('iv-dragging');
     const rot = drag.rot; drag = null;

@@ -1066,6 +1066,11 @@
     // the abyss hardens the survivor: a little permanent max HP per cleared area
     P.permMaxHp = (P.permMaxHp || 0) + 4; P.recalc();
     G.Rooms2.onAreaClear();
+    // Fate Redeal: every 3 cleared areas one used free reroll comes back (progress waits while the pool is full)
+    if (P.has('e_reroll')) {
+      const run = GM.run; run.rerollTick = Math.min(3, (run.rerollTick || 0) + 1);
+      if (run.rerollTick >= 3 && (run.rerollUsed || 0) > 0) { run.rerollUsed--; run.rerollTick = 0; G.ui.toast('🎲 無料リロールが1回回復した', 'good'); }
+    }
     if (bossKill && G.Run.revivesAllowed()) { P.revives++; setTimeout(() => G.ui.toast(`🪔 守護者の魂を奪い、魂の灯火が一つ灯った（${P.revives}灯）`, 'good'), 1200); }
     const O = GM.objective; if (O) O.done = true;
     for (const e of G.enemies.list) if (e.alive && !e.boss && !e.isTarget && e.def.id !== 'mimic_gold' && e.def.id !== 'mimic_trap') { G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1); e.noReward = true; e.hp = 0; G.combat.killEnemy(e, { src: 'clear', proc: true }, 0); }
@@ -1210,9 +1215,9 @@
     }
     return out;
   };
-  // rerolls: a free pool for the whole run (3, +1 per Fate Redeal), then coins at a price that doubles with every paid reroll
+  // rerolls: a free pool for the whole run (3; Fate Redeal gives one back every 3 cleared areas), then coins at a price that doubles with every paid reroll
   GM.rerollInfo = function () {
-    const run = GM.run, free = Math.max(0, 3 + (P.stats.buffRerolls || 0) - (run.rerollUsed || 0));
+    const run = GM.run, free = Math.max(0, 3 - (run.rerollUsed || 0));
     return { free, cost: GM.price(1000 * Math.pow(2, run.rerollPaid || 0)) };
   };
   GM.offerBuffs = function (boost, o) {

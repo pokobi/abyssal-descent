@@ -770,7 +770,7 @@
       <div class="side-info"><h3 style="margin-top:0">❤️ HP <b style="float:right">${Math.ceil(P.hp)} / ${st.maxHp}</b></h3><div class="si-stat"><span>🪙 コイン</span><b>${U.fmt(G.game.run.coins)}</b></div><div class="si-stat"><span>🗺️ エリア</span><b>${G.game.area}</b></div>${UI.statsTable()}<h3>🌟 所持加護（${P.buffs.size}）</h3><div class="si-buffs">${sideBuffs || '<span style="color:var(--dim);font-size:12px;grid-column:1/-1">なし</span>'}</div></div>
       <div class="bs-title">${opts.title || 'CHOOSE A BOON'}</div>
       <div class="bs-sub">${opts.sub || '加護を一つ選べ'}　<span class="bs-keys">クリック：選択 ／ ホイール：切替 → Enter：決定${opts.reroll ? ' ／ R：リロール' : ''} ／ 選択中も${['forward', 'left', 'back', 'right'].map(G.K).join('')}で移動可能</span></div>
-      <div class="bs-cards">${cards}</div>
+      <div class="bs-cards" data-n="${choices.length}">${cards}</div>
       <div class="bs-actions">${opts.reroll ? `<button class="btn" ${opts.reroll.afford ? '' : 'disabled'} id="bs-reroll">🎲 リロール（${opts.reroll.free > 0 ? `無料 残り${opts.reroll.free}` : `${U.fmt(opts.reroll.cost)}🪙`}）</button>` : ''}</div>
     </div>`, 'live');
     let picked = false;

@@ -1374,3 +1374,17 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 .iv-ph span .iv-sort { margin-left: 0.9em; padding: 0.15em 0.7em; font: inherit; font-size: 1em; color: #e8d6b0; background: rgba(60,46,28,0.85); border: 1px solid rgba(220,190,130,0.45); border-radius: 0.3em; cursor: pointer; pointer-events: auto; }
 .iv-ph span .iv-sort:hover { background: rgba(110,84,44,0.95); color: #fff1cc; border-color: rgba(240,205,130,0.8); }
 #dirind .di.grav { background: radial-gradient(ellipse at 50% 100%, rgba(150,100,255,0.9), rgba(150,100,255,0) 70%); }
+
+/* boon cards: 4-6 choices (Choices boon, pact) share the room to the right of the status column instead of overlapping it or being squashed */
+.bs-wrap { box-sizing: border-box; padding-left: 330px; padding-right: 24px; }
+.bs-cards { width: 100%; justify-content: center; gap: clamp(10px, 1.4vw, 26px); }
+.bs-cards .card { flex: 0 1 250px; min-width: 0; width: auto; box-sizing: border-box; }
+.bs-cards .card .c-name { overflow-wrap: anywhere; }
+@media (max-width: 1400px) { .bs-wrap { padding-left: 250px; } .bs-cards .card { flex-basis: 205px; } }
+.bs-cards[data-n="4"] .card { min-height: 320px; }
+.bs-cards[data-n="5"] .card, .bs-cards[data-n="6"] .card { min-height: 300px; padding: 14px 10px; }
+.bs-cards[data-n="5"] .card .c-icon, .bs-cards[data-n="6"] .card .c-icon { width: 72px; height: 72px; font-size: 40px; margin: 10px 0 8px; }
+.bs-cards[data-n="5"] .card .c-name, .bs-cards[data-n="6"] .card .c-name { font-size: 16px; }
+.bs-cards[data-n="5"] .card .c-desc, .bs-cards[data-n="6"] .card .c-desc { font-size: 12.5px; line-height: 1.5; margin-top: 8px; }
+.bs-cards[data-n="6"] .card .c-desc { font-size: 12px; }
+html.m .bs-wrap { padding-left: 24px; }

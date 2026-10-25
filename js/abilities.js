@@ -53,7 +53,6 @@
       case 'ult_shadow': return [row('会心率', 'critChance', 0.6), row('会心ダメージ', 'critMul', m.x_lethal ? 1 : 0.5)];
       case 'ult_titan': return [row('最大HP', 'maxHpPct', 0.8), row('近接ダメージ', 'meleeDmg', 1.5), row('パイルドライバー威力', 'pileDmg', 1), row('被ダメ軽減', 'armor', m.x_iron ? 0.4 : 0.25)];
       case 'ult_overcharge': return [['スキルのCT短縮', 70, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L))), '%']];
-      case 'ult_timestop': return [['敵の速さ（残り）', 5, 5, '%', 0, true]];
       case 'ult_sanctuary': { const h = m.x_heal ? 7 : 4; return [['毎秒回復（最大HP比）', h, h * k, '%', 1]]; }
       case 'berserk': return [row('与ダメ', 'dmg', m.x_fury ? 0.8 : 0.5), row('連射速度', 'fireRate', 0.3), row('吸血', 'lifesteal', 0.05)];
       case 'haste': return [row('移動速度', 'moveSpeed', 0.6), row('ジャンプ力', 'jumpPower', m.x_jump ? 0.6 : 0.3)];
@@ -62,8 +61,8 @@
       case 'healaura': return [row('被ダメ軽減', 'armor', m.x_armor ? 0.35 : 0.2)];
       case 'warcry': return [row('与ダメ', 'dmg', m.x_rally ? 0.45 : 0.25)];
       case 'cloak': return [['最初の一撃の会心倍率', 2.5, 1 + 1.5 * k, '倍', 2]];
-      case 'chrono': { const b = pc(m.x_deep ? 0.2 : 0.4); return [['敵の速さ（残り）', b, pc(Math.max(0.08, (m.x_deep ? 0.2 : 0.4) * Math.pow(0.93, L))), '%', 0, true]]; }
-      case 'mark': return [['受けるダメージ', 160, 100 + 60 * (1 + 0.5 * (k - 1)), '%']];
+      case 'chrono': { const b = m.x_deep ? 0.2 : 0.4; return [['敵を遅くする割合', pc(1 - b), pc(1 - Math.max(0.08, b * Math.pow(0.93, L))), '%']]; }
+      case 'mark': return [['受けるダメージ増加', 60, 60 * (1 + 0.5 * (k - 1)), '%']];
       case 'rewind': return [['巻き戻り時の回復（最大HP比）', 0, 2 * L, '%']];
       case 'flight': return [['上昇の勢い', 100, 100 * (1 + 0.02 * L), '%']];
       case 'dash': case 'dash2': return [['突進の距離', 100, 100 * (1 + 0.03 * L), '%']];

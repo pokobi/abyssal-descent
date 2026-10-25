@@ -109,16 +109,18 @@
     const burst = (cls, ms) => { const b = document.createElement('div'); b.className = cls; UI.el.hud.appendChild(b); setTimeout(() => b.remove(), ms); };
     if (want && !S.on) {
       S.on = true; S.k = target; S.tick = 0.25;
-      const big = target >= 0.5;
-      burst('tf-flash', 600); burst('tf-burst', 800); if (big) setTimeout(() => burst('tf-burst', 800), 140);
-      if (P && G.fx) { G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), big ? 16 : 8, 0x9fc0ff, 0.9); G.fx.flash(P.chestPos(), 0xcfe0ff, big ? 70 : 35, 0.5, 20); }
-      G.sfx.timeIn(target);
+      // only a full time stop gets the burst and the rolling ripple; a plain slow-down is just a quiet blue frame and a softer sound
+      if (target >= 0.94) {
+        burst('tf-flash', 600); burst('tf-burst', 800); setTimeout(() => burst('tf-burst', 800), 140);
+        if (P && G.fx) { G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), 16, 0x9fc0ff, 0.9); G.fx.flash(P.chestPos(), 0xcfe0ff, 70, 0.5, 20); }
+        G.sfx.timeIn(target);
+      } else G.sfx.timeIn(target * 0.55);
     } else if (!want && S.on) {
-      S.on = false; burst('tf-flash', 600); G.sfx.timeOut(S.k);
+      S.on = false; if (S.strong) burst('tf-flash', 600); G.sfx.timeOut(S.strong ? S.k : S.k * 0.55);
     }
     if (S.on) {
-      S.k = U.damp(S.k, target, 5, dt);
-      el.style.opacity = String(Math.min(1, 0.3 + 0.8 * S.k)); el.classList.toggle('stop', S.k >= 0.8);
+      S.k = U.damp(S.k, target, 5, dt); S.strong = target >= 0.94;
+      el.style.opacity = String(S.strong ? 1 : Math.min(0.75, 0.2 + 0.7 * S.k)); el.classList.toggle('stop', S.strong);
       S.tick -= dt; if (S.tick <= 0) { S.tick = 0.65 + 0.7 * S.k; G.sfx.timeTick(S.k); }
       G.sfx.timeDrone(S.k);
     } else el.style.opacity = '0';

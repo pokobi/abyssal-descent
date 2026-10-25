@@ -114,8 +114,9 @@
     if (hasPow) line.push(`<span><label>威力</label>${dv(pow * 100, powBase * 100, { unit: '%', dec: 0 })}</span>`);
     // the actual numbers (what one hit / one second / one heal really amounts to with the current level and bonuses)
     const ek = A.effK(sk); // heals grow with the effect factor, damage with the power factor
-    for (const [k, lab] of [['dmg', 'ダメージ'], ['dps', '毎秒ダメージ'], ['heal', '回復'], ['hps', '毎秒回復']]) if (p0[k] != null && p0[k] > 0) { const f = k === 'heal' || k === 'hps' ? ek : pow; line.push(`<span><label>${lab}</label>${dv(p0[k] * f, p0[k] * (k === 'heal' || k === 'hps' ? 1 : powBase), { dec: 0 })}</span>`); }
-    for (const [lab, b, n, unit, dec, low] of A.effInfo(sk)) line.push(`<span><label>${lab}</label>${dv(n, b, { unit, dec: dec === undefined ? 0 : dec, lowerBetter: !!low })}</span>`);
+    for (const [k, lab] of [['dmg', 'ダメージ'], ['dps', '毎秒ダメージ']]) if (p0[k] != null && p0[k] > 0) { const f = pow; line.push(`<span><label>${lab}</label>${dv(p0[k] * f, p0[k] * (k === 'heal' || k === 'hps' ? 1 : powBase), { dec: 0 })}</span>`); }
+    // what a level changes in the buff / heal skills goes into the description's own numbers (below); only the ones the text does not mention get a row
+    const eff = A.effInfo(sk).map((e) => ({ e, used: false })), effDv = (z) => dv(z.e[2], z.e[1], { unit: z.e[3] === '倍' ? '' : z.e[3], dec: z.e[4] === undefined ? 0 : z.e[4], lowerBetter: !!z.e[5] });
     for (const k of AREA_K) if (p0[k]) { line.push(`<span><label>${k === 'len' ? '長さ' : k === 'range' ? '射程' : k === 'w' ? '幅' : '範囲'}</label>${dv(p[k], p0[k], { unit: 'm' })}</span>`); break; }
     if (p0.dur) line.push(`<span><label>効果時間</label>${dv(p.dur, p0.dur, { unit: '秒' })}</span>`);
     if (sk.maxCharges > 1 || p0.charges) line.push(`<span><label>チャージ</label>${dv(sk.maxCharges || 1, p0.charges || 1, { dec: 0 })}</span>`);
@@ -128,6 +129,7 @@
       else if (u === 'm') k = AREA_K.find((x) => p0[x] === v && !used.has(x));
       else if (!u) k = POW_K.concat(['n']).find((x) => p0[x] === v && !used.has(x));
       else if (u === '体' || u === '個' || u === '本') k = ['n'].find((x) => p0[x] === v && !used.has(x));
+      if (!k) { const z = eff.find((q) => !q.used && (u === '%' || u === '倍' || !u) && ((u === '倍' || !u) ? Math.abs(q.e[1] - v) < 1e-6 && q.e[3] === '倍' : q.e[3] === '%' && Math.round(q.e[1]) === v)); if (z) { z.used = true; return effDv(z) + (u === '倍' ? '倍' : ''); } }
       if (!k) return `<b class="sv">${n}${u || ''}</b>`;
       used.add(k);
       const cur = AREA_K.includes(k) || k === 'dur' ? p[k] : (k === 'heal' || k === 'hps') ? p0[k] * ek : POW_K.includes(k) ? p0[k] * pow : p[k]; // the real number: base x level x the skill power constant x bonuses
@@ -137,7 +139,7 @@
     const ready = A.ready(sk), left = sk.maxCharges ? `${sk.charges}/${sk.maxCharges}` : ready ? 'READY' : `${Math.ceil(sk.cd)}秒`;
     return `<div class="sc ${ult ? 'ult' : ''}" style="--rc:${R(d.rarity)}">
       <div class="sc-h"><span class="key">${key}</span><span class="ic">${d.icon}</span><span class="nm">${esc(d.name)}${A.lvHTML(sk) ? `<b class="lv">${A.lvHTML(sk)}</b>` : ''}${ult ? '<em class="tag">ULT</em>' : ''}</span><span class="st ${ready ? 'ok' : ''}">${left}</span></div>
-      <div class="sc-l">${line.join('')}</div>
+      <div class="sc-l">${line.concat(eff.filter((z) => !z.used).map((z) => `<span><label>${z.e[0]}</label>${effDv(z)}</span>`)).join('')}</div>
       <div class="sc-d">${desc}</div>
       ${augs.length ? `<div class="sc-a">${augs.map(([id, n]) => { const b = G.BUFF_BY_ID[id]; return `<span ${UI.tipAttr(b)} style="--rc:${R(b.rarity)}">${b.icon}${n > 1 ? `<sub>${n}</sub>` : ''}</span>`; }).join('')}</div>` : ''}</div>`;
   }

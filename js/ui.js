@@ -114,12 +114,21 @@
         burst('tf-flash', 600); burst('tf-burst', 800); setTimeout(() => burst('tf-burst', 800), 140);
         if (P && G.fx) { G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), 16, 0x9fc0ff, 0.9); G.fx.flash(P.chestPos(), 0xcfe0ff, 70, 0.5, 20); }
         G.sfx.timeIn(target);
-      } else G.sfx.timeIn(target * 0.55);
+      } else { burst('tf-edge', 700); G.sfx.timeIn(target * 0.55); }
     } else if (!want && S.on) {
       S.on = false; if (S.strong) burst('tf-flash', 600); G.sfx.timeOut(S.strong ? S.k : S.k * 0.55);
     }
     if (S.on) {
       S.k = U.damp(S.k, target, 5, dt); S.strong = target >= 0.94;
+      // faint rewinding-clock marks scattered over the screen (a few at a time, barely there)
+      S.clk = (S.clk || 0) - dt;
+      if (S.clk <= 0 && el.querySelectorAll('.tf-clk').length < (S.strong ? 9 : 6)) {
+        S.clk = S.strong ? 0.4 : 0.75;
+        const c = document.createElement('div'), sz = 26 + Math.random() * 30; c.className = 'tf-clk';
+        c.style.cssText = `left:${(4 + Math.random() * 88).toFixed(1)}%;top:${(6 + Math.random() * 84).toFixed(1)}%;width:${sz.toFixed(0)}px;height:${sz.toFixed(0)}px;animation-duration:${(2.6 + Math.random() * 1.6).toFixed(1)}s`;
+        c.innerHTML = '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 24a16 16 0 1 1 5 11.5"/><path d="M7 15v9h9"/><path d="M24 15v9l6 4"/></svg>';
+        el.appendChild(c); setTimeout(() => c.remove(), 4400);
+      }
       el.style.opacity = String(S.strong ? 1 : Math.min(0.75, 0.2 + 0.7 * S.k)); el.classList.toggle('stop', S.strong);
       S.tick -= dt; if (S.tick <= 0) { S.tick = 0.65 + 0.7 * S.k; G.sfx.timeTick(S.k); }
       G.sfx.timeDrone(S.k);

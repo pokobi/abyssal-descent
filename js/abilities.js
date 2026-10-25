@@ -29,6 +29,19 @@
   };
   // skill power grows with its level (raised with skill tomes / buying the same skill again)
   A.power = (sk) => Math.pow(1.3, A.totalLv(sk)) * A.SKILL_POW_MUL * (1 + (sk && A.skm ? A.skm(sk.id).dmg : 0));
+  // the other half of levelling: buffs and heals grow too (damage uses A.power). +10% of every buff amount per level; damage reduction closes in on a cap
+  A.effK = (sk) => 1 + 0.1 * A.totalLv(sk);
+  const AMT = ['dmg', 'fireRate', 'lifesteal', 'moveSpeed', 'jumpPower', 'reloadSpeed', 'critChance', 'critMul', 'skillDmg', 'meleeDmg', 'pileDmg', 'maxHpPct'];
+  A.effStats = (sk, s) => {
+    const o = {}, k = A.effK(sk), L = A.totalLv(sk);
+    for (const key in s) {
+      const v = s[key];
+      if (key === 'armor' && v > 0) o[key] = Math.min(0.92, 1 - (1 - v) * Math.pow(0.93, L));
+      else if (AMT.includes(key) && v > 0) o[key] = key === 'critChance' ? Math.min(1, v * k) : v * k;
+      else o[key] = v;
+    }
+    return o;
+  };
   A.isUlt = (sk) => !!(sk && sk.def && sk.def.ult);
   A.MAXLV = 15;
   A.ready = (sk) => sk && (sk.maxCharges ? sk.charges > 0 : sk.cd <= 0);
@@ -138,11 +151,13 @@
     const rk = 1 + (ult ? 0 : st.skillRad || 0) + m.area, dk = 1 + (ult ? st.ultDur || 0 : st.skillDur || 0) + m.dur;
     for (const k of ['r', 'len', 'range', 'w']) if (p[k]) p[k] *= rk;
     if (p.dur) p.dur *= dk;
+    if (!p.dmg && !p.dps) { const u = 1 + 0.04 * A.totalLv(sk); if (p.dur) p.dur *= u; if (p.range) p.range *= u; } // pure utility: longer / farther
     return p;
   };
   function castSkill(sk) {
     const p = A.scaleP(sk), m = A.skm(sk.id);
     const sc = (v) => v * A.power(sk);
+    const ek = A.effK(sk), tmp = (a, d, s, i, l) => C.temp(a, d, A.effStats(sk, s), i, l);
     const id = sk.id;
     const later = (fn, ms) => A.later(id, fn, ms);
     let ok = true;
@@ -209,7 +224,7 @@
       }
       case 'chrono':
         G.game.chronoT = p.dur; G.game.chronoSlow = m.x_deep ? 0.2 : p.slow;
-        if (m.x_self || m.x_vuln) C.temp('chrono_fx', p.dur, { moveSpeed: m.x_self ? 0.2 : 0, fireRate: m.x_self ? 0.2 : 0, dmg: m.x_vuln ? 0.25 : 0 }, '⏳');
+        if (m.x_self || m.x_vuln) tmp('chrono_fx', p.dur, { moveSpeed: m.x_self ? 0.2 : 0, fireRate: m.x_self ? 0.2 : 0, dmg: m.x_vuln ? 0.25 : 0 }, '⏳');
         G.sfx.magic(P.pos, 'dark'); G.sfx.rumble(0.8, 0.5); G.ui.tint('chrono', p.dur); break;
       case 'shockwave': {
         const wave = (k) => {
@@ -254,7 +269,7 @@
         const o = P.chestPos(), hit = G.enemies.inRadius(o, p.r);
         for (const e of hit) { C.damageEnemy(e, sc(p.dmg), { src: 'skill' }); C.status(e, 'frost', 5); }
         if (m.x_shatter) later(() => { for (const e of hit) if (e.alive && e.st && (e.st.frozen > 0 || e.st.frost > 0)) { C.damageEnemy(e, sc(p.dmg), { src: 'skill', elem: 'frost' }); G.fx.sparks(e.centerPos(), null, 10, 0xd8f0ff, 5); } G.sfx.ice(P.pos); }, 1200);
-        if (m.x_armor) C.temp('frost_armor', 5, { armor: 0.25 }, '🛡️');
+        if (m.x_armor) tmp('frost_armor', 5, { armor: 0.25 }, '🛡️');
         G.fx.ring(P.pos, p.r, 0xcfefff, 0.5);
         for (let i = 0; i < 60; i++) { const an = Math.random() * 6.28; G.fx.norm.spawn(P.pos.x, P.pos.y + 0.3, P.pos.z, Math.cos(an) * U.rand(6, 14), U.rand(0, 2), Math.sin(an) * U.rand(6, 14), 0.7, 0.3, 1.0, 0.85, 0.93, 1.0, 0.6, 0, 3); }
         G.sfx.ice(o); C.zone(P.pos.clone(), p.r * (m.x_zone ? 1 : 0.7), m.x_zone ? 8 : 3, 'frost', 0);
@@ -269,9 +284,9 @@
         break;
       }
       case 'healaura': {
-        const z = C.zone(P.pos.clone(), p.r, p.dur, 'heal', 0, { hps: p.hps * (m.x_potent ? 1.6 : 1), interval: 0.25 });
+        const z = C.zone(P.pos.clone(), p.r, p.dur, 'heal', 0, { hps: p.hps * ek * (m.x_potent ? 1.6 : 1), interval: 0.25 });
         if (m.x_follow) z.follow = true;
-        C.temp('healaura', p.dur, { armor: m.x_armor ? 0.35 : 0.2 }, '💚');
+        tmp('healaura', p.dur, { armor: m.x_armor ? 0.35 : 0.2 }, '💚');
         if (m.x_purge) { P.st = {}; G.ui.toastSmall('✨ 状態異常を浄化'); }
         G.sfx.heal(); break;
       }
@@ -346,7 +361,7 @@
         P.addShake(0.2);
         break;
       }
-      case 'berserk': C.temp('berserk', p.dur, { dmg: m.x_fury ? 0.8 : 0.5, fireRate: 0.3, lifesteal: 0.05, armor: m.x_guard ? 0.2 : 0, moveSpeed: m.x_speed ? 0.25 : 0 }, '😡'); G.sfx.monster(null, 'roar', 1.6, 0.4); G.ui.tint('rage', p.dur); break;
+      case 'berserk': tmp('berserk', p.dur, { dmg: m.x_fury ? 0.8 : 0.5, fireRate: 0.3, lifesteal: 0.05, armor: m.x_guard ? 0.2 : 0, moveSpeed: m.x_speed ? 0.25 : 0 }, '😡'); G.sfx.monster(null, 'roar', 1.6, 0.4); G.ui.tint('rage', p.dur); break;
       case 'barrier': {
         const f = P.forward(); f.y = 0; f.normalize();
         const c = P.pos.clone().addScaledVector(f, 2.6);
@@ -370,15 +385,15 @@
         const mk = (pt) => { const d = C.addDecoy(pt, p.dur, sc(p.dmg) * (m.x_nova ? 1.5 : 1)); if (d && m.x_nova) d.explodeR = 8; };
         mk(a.floorPt);
         if (m.x_twin) { const f = P.forward(); f.y = 0; f.normalize(); mk(a.floorPt.clone().add(V(-f.z * 3, 0, f.x * 3))); }
-        if (m.x_cloak) { C.temp('decoy_cloak', 2.5, { invis: 1 }, '👻'); }
+        if (m.x_cloak) { tmp('decoy_cloak', 2.5, { invis: 1 }, '👻'); }
         break;
       }
       case 'cloak':
-        C.temp('cloak', p.dur, { invis: 1, critMul: m.x_assassin ? 1.0 : 0, moveSpeed: m.x_speed ? 0.3 : 0, hpRegen: m.x_heal ? P.stats.maxHp * 0.04 : 0 }, '👻'); G.weapons._cloakUsed = false;
+        tmp('cloak', p.dur, { invis: 1, critMul: m.x_assassin ? 1.0 : 0, moveSpeed: m.x_speed ? 0.3 : 0, hpRegen: m.x_heal ? P.stats.maxHp * 0.04 : 0 }, '👻'); G.weapons._cloakUsed = false;
         if (m.x_smoke) C.zone(P.pos.clone(), 5, 6, 'smoke', 0);
         G.sfx.magic(P.pos, 'dark'); break;
       case 'overdrive':
-        C.temp('overdrive', p.dur, { infAmmo: 1, fireRate: m.x_rate ? 0.9 : 0.6, dmg: m.x_dmg ? 0.2 : 0 }, '🔫');
+        tmp('overdrive', p.dur, { infAmmo: 1, fireRate: m.x_rate ? 0.9 : 0.6, dmg: m.x_dmg ? 0.2 : 0 }, '🔫');
         if (m.x_reload) for (const w of P.weapons) if (w && w.mag !== undefined) w.mag = G.weapons.stats(w).mag;
         G.sfx.mech('boltBack'); break;
       case 'blades': P.bladesT = p.dur; P.bladesDps = sc(p.dps); P.bladesN = 6 + (m.x_more ? 3 : 0); P.bladesR = 3 + (m.x_wide ? 1.5 : 0) + m.area * 3; P.bladesSk = id; P.bladesUlt = false; G.sfx.whoosh(0.5, 0.8); break;
@@ -398,7 +413,7 @@
         G.sfx.magic(a.e.pos, 'dark'); break;
       }
       case 'toxic': { const a = aim(40); C.zone(a.floorPt, p.r, p.dur, 'poison', sc(18), { stacks: m.x_virulent ? 2 : 1 }); G.sfx.spit(a.floorPt); break; }
-      case 'ricostorm': C.temp('ricostorm', p.dur, { dmg: m.x_dmg ? 0.2 : 0, fireRate: m.x_rate ? 0.25 : 0 }, '↪️'); break;
+      case 'ricostorm': tmp('ricostorm', p.dur, { dmg: m.x_dmg ? 0.2 : 0, fireRate: m.x_rate ? 0.25 : 0 }, '↪️'); break;
       case 'grasp': {
         const a = aim(40), pt = a.floorPt.clone();
         C.zone(pt, p.r, p.dur, 'grasp', sc(p.dps), { interval: 0.25, onEnd: m.x_crush ? () => C.explode(pt.clone().add(V(0, 1, 0)), p.r * 0.7, sc(150), { src: 'skill', color: 0x6a2080 }) : null });
@@ -407,7 +422,7 @@
       case 'holynova': {
         const o = P.chestPos();
         for (const e of G.enemies.inRadius(o, p.r)) C.damageEnemy(e, sc(p.dmg) * (e.def.undead ? 3 : 1), { src: 'skill', knock: 6 });
-        C.heal(p.heal * (m.x_heal ? 2 : 1));
+        C.heal(p.heal * ek * (m.x_heal ? 2 : 1));
         if (m.x_sanct) C.zone(P.pos.clone(), p.r * 0.6, 5, 'holy', sc(30), { interval: 0.5 });
         G.fx.ring(P.pos, p.r, 0xffe8a0, 0.6); G.fx.flash(o, 0xffe8a0, 70, 0.3, 25);
         for (let i = 0; i < 50; i++) { const an = Math.random() * 6.28; G.fx.add.spawn(P.pos.x, P.pos.y + 1, P.pos.z, Math.cos(an) * U.rand(5, 12), U.rand(-1, 3), Math.sin(an) * U.rand(5, 12), 0.7, 0.2, 0.02, 1.4, 1.2, 0.7, 1, 0, 2); }
@@ -423,7 +438,7 @@
           C.damageEnemy(e, e.hp + e.shield + 1, { src: 'skill' }); n++;
         }
         if (!n) { G.ui.toastSmall('⚰️ 収穫できる魂がない'); ok = false; break; }
-        C.heal((m.x_heal ? 12 : 5) * n); G.sfx.magic(P.pos, 'dark'); G.ui.feed(`魂の収穫 ×${n}`, 'big');
+        C.heal((m.x_heal ? 12 : 5) * n * ek); G.sfx.magic(P.pos, 'dark'); G.ui.feed(`魂の収穫 ×${n}`, 'big');
         if (m.x_reset && n >= 3) sk.halfCd = true;
         break;
       }
@@ -437,7 +452,7 @@
         } });
         break;
       }
-      case 'haste': C.temp('haste', p.dur, { moveSpeed: 0.6, jumpPower: m.x_jump ? 0.6 : 0.3, armor: m.x_dodge ? 0.15 : 0, reloadSpeed: m.x_reload ? 0.5 : 0, fireRate: m.x_reload ? 0.15 : 0 }, '🏃'); G.sfx.whoosh(0.4, 0.8, true); break;
+      case 'haste': tmp('haste', p.dur, { moveSpeed: 0.6, jumpPower: m.x_jump ? 0.6 : 0.3, armor: m.x_dodge ? 0.15 : 0, reloadSpeed: m.x_reload ? 0.5 : 0, fireRate: m.x_reload ? 0.15 : 0 }, '🏃'); G.sfx.whoosh(0.4, 0.8, true); break;
       case 'rewind': {
         const t0 = G.game.time - p.t - (m.x_time ? 2 : 0);
         let h = P.history[0];
@@ -460,7 +475,7 @@
         P.invulnT = 0.3; G.sfx.whoosh(0.2, 1.0); P.fovKick = 16;
         break;
       }
-      case 'warcry': for (const e of G.enemies.inRadius(P.pos, p.r)) C.fear(e, m.x_long ? 5 : 3); C.temp('warcry', 8, { dmg: m.x_rally ? 0.45 : 0.25 }, '📯'); G.sfx.monster(null, 'roar', 1.5, 0.5); G.fx.ring(P.pos, p.r, 0xffc070, 0.6); break;
+      case 'warcry': for (const e of G.enemies.inRadius(P.pos, p.r)) C.fear(e, m.x_long ? 5 : 3); tmp('warcry', 8, { dmg: m.x_rally ? 0.45 : 0.25 }, '📯'); G.sfx.monster(null, 'roar', 1.5, 0.5); G.fx.ring(P.pos, p.r, 0xffc070, 0.6); break;
       case 'arrowrain': { const a = aim(45); C.zone(a.floorPt, p.r, p.dur, 'arrowrain', sc(p.dps), { interval: 0.25 }); G.sfx.whoosh(0.8, 0.6); break; }
       case 'quake': {
         const shake = (k) => {
@@ -473,10 +488,10 @@
         if (m.x_after) later(() => shake(0.5), 1000);
         break;
       }
-      case 'thornarmor': C.temp('thornarmor', p.dur, { armor: m.x_harden ? 0.5 : 0.35, hpRegen: m.x_heal ? 3 : 0 }, '🌵'); G.sfx.mech('grab'); break;
+      case 'thornarmor': tmp('thornarmor', p.dur, { armor: m.x_harden ? 0.5 : 0.35, hpRegen: m.x_heal ? 3 : 0 }, '🌵'); G.sfx.mech('grab'); break;
       case 'flight':
         P.vel.y = 17; P.grounded = false; P.glideT = p.dur + 1.5;
-        if (m.x_sky) C.temp('flight_sky', p.dur + 1.5, { dmg: 0.25 }, '🎯');
+        if (m.x_sky) tmp('flight_sky', p.dur + 1.5, { dmg: 0.25 }, '🎯');
         if (m.x_dive) P.leap = { t: -0.6, r: 6 * (1 + m.area), dmg: sc(140), sk: id, maxT: p.dur + 6 };
         G.sfx.whoosh(0.6, 1.0, true); P.fovKick = 12; for (let i = 0; i < 20; i++) G.fx.norm.spawn(P.pos.x, P.pos.y, P.pos.z, U.rand(-3, 3), U.rand(-1, 0), U.rand(-3, 3), 0.6, 0.3, 1.2, 0.8, 0.8, 0.8, 0.4, 0, 2); break;
       default: ok = false;

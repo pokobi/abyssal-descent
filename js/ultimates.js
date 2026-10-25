@@ -43,14 +43,14 @@
   function castUlt(sk) {
     const st = P.stats, def = sk.def, pw = A.ultPower(sk), id = sk.id, m = A.skm(id);
     const p = A.scaleP(sk);
-    const sc = (v) => v * pw;
+    const sc = (v) => v * pw, tmp = (a, d, s, i, l) => C.temp(a, d, A.effStats(sk, s), i, l);
     const info = { src: 'skill', ult: true };
     const aimPt = (range) => A.aim(range || 50).floorPt.clone();
     const later = (fn, ms) => A.later(id, fn, ms);
     let ok = true;
     switch (id) {
       case 'ult_bastion': {
-        C.temp('ult_bastion', p.dur, { armor: m.x_fort ? 0.72 : 0.6, hpRegen: st.maxHp * (m.x_regen ? 0.05 : 0.03) * pw }, '🏰', '不屈の城塞');
+        tmp('ult_bastion', p.dur, { armor: m.x_fort ? 0.72 : 0.6, hpRegen: st.maxHp * (m.x_regen ? 0.05 : 0.03) * pw }, '🏰', '不屈の城塞');
         if (m.x_nova) for (const e of G.enemies.inRadius(P.pos, 8)) { const to = e.pos.clone().sub(P.pos).setY(0).normalize(); C.damageEnemy(e, sc(150), Object.assign({ knock: 20, dir: to.setY(0.5) }, info)); }
         G.fx.ring(P.pos.clone(), 3, 0xffd070, 0.6); G.fx.ring(P.pos.clone(), 5, 0xfff0b0, 0.9); G.fx.flash(P.chestPos(), 0xffd070, 80, 0.4, 16); G.sfx.magic(P.pos, 'holy'); G.sfx.shieldUp ? G.sfx.shieldUp() : G.sfx.bell();
         for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; G.fx.add.spawn(P.pos.x + Math.cos(a) * 1.2, P.pos.y + 0.2, P.pos.z + Math.sin(a) * 1.2, Math.cos(a) * 2, U.rand(2, 5), Math.sin(a) * 2, 0.9, 0.12, 0.02, 1, 0.85, 0.4, 1, 0, 0); }
@@ -69,9 +69,9 @@
       }
       case 'ult_timestop':
         G.game.chronoT = p.dur; G.game.chronoSlow = 0.05;
-        C.temp('ult_timestop', p.dur, { dmg: m.x_free ? 0.35 : 0, hpRegen: m.x_heal ? st.maxHp * 0.04 : 0 }, '⏱️', '時止め');
+        tmp('ult_timestop', p.dur, { dmg: m.x_free ? 0.35 : 0, hpRegen: m.x_heal ? st.maxHp * 0.04 : 0 }, '⏱️', '時止め');
         G.ui.tint('chrono', p.dur); G.sfx.magic(P.pos, 'dark'); G.sfx.bell(); break;
-      case 'ult_berserk': C.temp('ult_berserk', p.dur, { dmg: (0.8 + (m.x_rage ? 0.4 : 0)) * pw, fireRate: 0.4, lifesteal: 0.08 + (m.x_blood ? 0.06 : 0), moveSpeed: 0.2, armor: m.x_iron ? 0.3 : 0 }, '👹', '鬼神化'); G.ui.tint('rage', p.dur); G.sfx.monster(null, 'roar', 1.3, 0.6); break;
+      case 'ult_berserk': tmp('ult_berserk', p.dur, { dmg: 0.8 + (m.x_rage ? 0.4 : 0), fireRate: 0.4, lifesteal: 0.08 + (m.x_blood ? 0.06 : 0), moveSpeed: 0.2, armor: m.x_iron ? 0.3 : 0 }, '👹', '鬼神化'); G.ui.tint('rage', p.dur); G.sfx.monster(null, 'roar', 1.3, 0.6); break;
       case 'ult_blackhole': {
         const pt = aimPt(45);
         C.zone(pt, p.r, p.dur, 'gravity', 0, { onEnd: () => { C.explode(pt.clone().add(V(0, 1, 0)), p.r * 0.75, sc(p.dmg) * (m.x_crush ? 1.6 : 1), Object.assign({ color: 0xa070ff }, info)); P.addShake(0.6); } });
@@ -90,9 +90,9 @@
         break;
       }
       case 'ult_phoenix':
-        C.temp('ult_phoenix', p.dur, { hpRegen: m.x_heal ? st.maxHp * 0.02 : 0 }, '🐦', '鳳凰転生'); P.phoenixFull = !!m.x_rebirth;
+        tmp('ult_phoenix', p.dur, { hpRegen: m.x_heal ? st.maxHp * 0.02 : 0 }, '🐦', '鳳凰転生'); P.phoenixFull = !!m.x_rebirth;
         A.auras.push({ kind: 'fire', t: p.dur, r: p.r, dps: sc(p.dps), follow: true, col: 0xff7030, sk: id }); G.sfx.fire && G.sfx.fire(P.pos, true); G.fx.fireBurst(P.pos.clone(), 3); break;
-      case 'ult_armory': C.temp('ult_armory', p.dur, { infAmmo: 1, fireRate: m.x_rate ? 1.2 : 0.8, dmg: m.x_dmg ? 0.25 : 0 }, '🔫', '無限兵装'); C.refill && C.refill(1, true); G.sfx.mech('boltBack'); G.sfx.mech('boltFwd', 0.15); break;
+      case 'ult_armory': tmp('ult_armory', p.dur, { infAmmo: 1, fireRate: m.x_rate ? 1.2 : 0.8, dmg: m.x_dmg ? 0.25 : 0 }, '🔫', '無限兵装'); C.refill && C.refill(1, true); G.sfx.mech('boltBack'); G.sfx.mech('boltFwd', 0.15); break;
       case 'ult_legion': { const n = p.n + (m.x_more ? 3 : 0); for (let i = 0; i < n; i++) A.summonSkeleton(P.pos.clone().add(V(Math.cos(i * 6.28 / n) * 2.5, 0, Math.sin(i * 6.28 / n) * 2.5)), p.dur, sc(p.dmg), m.x_explode ? sc(150) : 0); G.sfx.monster(P.pos, 'groan', 1.1, 0.8); break; }
       case 'ult_tsunami': {
         const f = P.forward(); f.y = 0; f.normalize();
@@ -113,21 +113,21 @@
         const hit = G.enemies.inRadius(P.pos, p.r);
         for (const e of hit) { C.damageEnemy(e, sc(p.dmg), Object.assign({ elem: 'frost' }, info)); C.status(e, 'frost', 10); }
         if (m.x_shatter) later(() => { for (const e of hit) if (e.alive) { C.damageEnemy(e, sc(p.dmg) * 0.6, Object.assign({ elem: 'frost' }, info)); G.fx.sparks(e.centerPos(), null, 10, 0xd8f0ff, 5); } G.sfx.ice(P.pos); }, 1500);
-        if (m.x_armor) C.temp('ult_cryo_armor', 8, { armor: 0.3 }, '🛡️');
+        if (m.x_armor) tmp('ult_cryo_armor', 8, { armor: 0.3 }, '🛡️');
         G.fx.ring(P.pos, p.r, 0xcfefff, 0.8); G.fx.flash(P.chestPos(), 0xd8f0ff, 70, 0.4, 30); G.sfx.magic(P.pos, 'ice'); break;
       }
       case 'ult_inferno':
         A.auras.push({ kind: 'fire', t: p.dur, r: p.r, dps: sc(p.dps), follow: true, col: 0xff5010, burn: true, sk: id, onEnd: m.x_end ? () => C.explode(P.pos.clone().add(V(0, 1, 0)), 12, sc(400), Object.assign({ color: 0xff5010 }, info)) : null });
-        if (m.x_heal) C.temp('ult_inferno_heal', p.dur, { hpRegen: st.maxHp * 0.02 }, '💚');
+        if (m.x_heal) tmp('ult_inferno_heal', p.dur, { hpRegen: st.maxHp * 0.02 }, '💚');
         G.sfx.fire && G.sfx.fire(P.pos, true); break;
-      case 'ult_shadow': C.temp('ult_shadow', p.dur, { invis: 1, critChance: 0.6, critMul: m.x_lethal ? 1.0 : 0.5, lifesteal: m.x_vamp ? 0.05 : 0, moveSpeed: m.x_speed ? 0.3 : 0 }, '🥷', '影の舞'); G.sfx.magic(P.pos, 'dark'); break;
+      case 'ult_shadow': tmp('ult_shadow', p.dur, { invis: 1, critChance: 0.6, critMul: m.x_lethal ? 1.0 : 0.5, lifesteal: m.x_vamp ? 0.05 : 0, moveSpeed: m.x_speed ? 0.3 : 0 }, '🥷', '影の舞'); G.sfx.magic(P.pos, 'dark'); break;
       case 'ult_orbital': A.auras.push({ kind: 'beam', t: p.dur, r: p.r, dps: sc(p.dps), pt: aimPt(70), track: m.x_track ? 9 : 3, sk: id }); G.sfx.zap && G.sfx.zap(P.pos); break;
       case 'ult_sanctuary': A.auras.push({ kind: 'holy', t: p.dur, r: p.r, dps: sc(p.dps), c: P.pos.clone(), heal: m.x_heal ? 0.07 : 0.04, follow: !!m.x_follow, sk: id }); G.sfx.magic(P.pos, 'holy'); break;
       case 'ult_bloodstorm': A.auras.push({ kind: 'drain', t: p.dur, r: p.r, dps: sc(p.dps), follow: true, ls: m.x_ls ? 0.65 : 0.4, over: !!m.x_over, sk: id }); G.sfx.magic(P.pos, 'dark'); break;
-      case 'ult_overcharge': C.cdResetAll(); P.pileCd = 0; C.temp('ult_overcharge', p.dur, { skillDmg: m.x_power ? 0.3 : 0 }, '🔋', '過充電'); G.sfx.zap && G.sfx.zap(P.pos); G.fx.flash(P.chestPos(), 0x80d0ff, 50, 0.3, 14); break;
+      case 'ult_overcharge': C.cdResetAll(); P.pileCd = 0; tmp('ult_overcharge', p.dur, { skillDmg: m.x_power ? 0.3 : 0 }, '🔋', '過充電'); G.sfx.zap && G.sfx.zap(P.pos); G.fx.flash(P.chestPos(), 0x80d0ff, 50, 0.3, 14); break;
       case 'ult_titan': {
         const before = st.maxHp;
-        C.temp('ult_titan', p.dur, { maxHpPct: 0.8, meleeDmg: 1.5, pileDmg: 1.0, armor: m.x_iron ? 0.4 : 0.25 }, '🗿', '巨人化');
+        tmp('ult_titan', p.dur, { maxHpPct: 0.8, meleeDmg: 1.5, pileDmg: 1.0, armor: m.x_iron ? 0.4 : 0.25 }, '🗿', '巨人化');
         P.hp += Math.max(0, P.stats.maxHp - before);
         if (m.x_heal) C.heal(P.stats.maxHp * 0.3);
         if (m.x_stomp) A.auras.push({ kind: 'stomp', t: p.dur, r: 8 * (1 + m.area), dmg: sc(80), follow: true, every: 1.5, sk: id });

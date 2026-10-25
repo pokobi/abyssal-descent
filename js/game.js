@@ -1296,7 +1296,7 @@
   GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、そのエリアに入った最初から再開する（持ち物・加護・敵はその時点に戻り、HP全快・クールタイムはリセット）。' };
   GM.revivePrice = () => GM.price(4200 + GM.area * 160);
   GM.SVC_FORGE = { id: 'svc_forge', name: '鍛冶屋の出張', icon: '⚒️', rarity: 'rare', desc: '所持している銃か近接武器を1つ選んで強化値+1（ダメージ×1.13）。' };
-  GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（威力×1.3・CT-2%）。価格は、選んだスキルの今の Lv で決まる。' };
+  GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（効果量UP・CT-2%）。価格は、選んだスキルの今の Lv で決まる。' };
   // what the tome can raise right now, each with its own price (the same rule as the forge: 900 x 1.25^that skill's Lv)
   GM.tomeTargets = function () {
     const MAXLV = G.abilities.MAXLV, out = [], AR = G.Areas;
@@ -1737,7 +1737,7 @@
       if (o.kind === 'tome') {
         const list = GM.tomeTargets();
         if (!list.length) return deny('全て最大レベル');
-        return modal('📘 どのスキルを強化する？', 'レベル+1（スキル：威力×1.3・クールタイム-2%／パイルドライバー：威力+60%／アルティメット：威力×1.25・クールタイム-2%）　価格は、そのスキルの今の Lv で決まる', list.map((x) => {
+        return modal('📘 どのスキルを強化する？', 'レベル+1（スキル・アルティメット：効果量UP・クールタイム-2%／パイルドライバー：威力+60%）　価格は、そのスキルの今の Lv で決まる', list.map((x) => {
           const d = x.pile ? { icon: '🔨', name: 'パイルドライバー', key: G.input.keyName('crouch') } : { icon: x.s.def.icon, name: x.s.def.name, key: G.input.skillKey(x.i) };
           return { icon: d.icon, label: `[${d.key}]${!x.pile && x.s.def.ult ? '（ULT）' : ''} ${d.name} Lv${x.lv} → Lv${x.lv + 1}（${U.fmt(x.cost)}🪙）`, disabled: run.coins < x.cost, onPick: () => {
             o.price = x.cost;

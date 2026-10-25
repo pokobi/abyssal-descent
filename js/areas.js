@@ -366,7 +366,7 @@
     P.skills.forEach((s, i) => {
       if (!s) return;
       const lv = s.lv || 0, c = AR.skillLvCost(lv), mx = lv >= MAXLV, ult = !!s.def.ult;
-      out.push({ icon: s.def.icon, label: `[${G.input.skillKey(i)}]${ult ? '（ULT）' : ''} ${s.def.name} Lv${lv} → Lv${lv + 1}（${c}🪙）`, sub: mx ? '最大レベル' : `威力×${ult ? 1.25 : 1.3}・クールタイム-2%`, disabled: mx || GM.run.coins < c, onPick: () => { GM.run.coins -= c; s.lv = lv + 1; fx(); G.ui.toast(`⚒️ ${s.def.name} Lv${s.lv}`, 'good'); } });
+      out.push({ icon: s.def.icon, label: `[${G.input.skillKey(i)}]${ult ? '（ULT）' : ''} ${s.def.name} Lv${lv} → Lv${lv + 1}（${c}🪙）`, sub: mx ? '最大レベル' : '効果量UP・クールタイム-2%', disabled: mx || GM.run.coins < c, onPick: () => { GM.run.coins -= c; s.lv = lv + 1; fx(); G.ui.toast(`⚒️ ${s.def.name} Lv${s.lv}`, 'good'); } });
     });
     out.push({ icon: '↩', label: '戻る', onPick: () => { GM._keepModal = true; setTimeout(() => AR.useForge(), 0); } });
     GM.modal('⚒️ スキルを Lv+1', 'どのスキルを鍛える？（価格は、そのスキルの今の Lv で決まる）', out);

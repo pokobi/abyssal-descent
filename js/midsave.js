@@ -74,6 +74,7 @@
     S.ground = G.Inv.ground.map((g) => ({ it: G.Inv.ser(g.it), pos: vec(g.g.position) }));
     if (GM.stage === 'boss') { S.boss = { engaged: !!GM.bossEngaged }; S.exits = (w.exits || []).map((ex) => ({ type: ex.type || null, open: !!ex.open })); return S; }
     S.elapsed = GM.time - (GM.areaStartT || 0); S.areaDamage = GM.areaDamage || 0; S.areaKills = GM.areaKills || 0; S.areaMods = GM.areaMods;
+    S.enrage = { t: GM.enrage.t, lv: GM.enrage.lv, warned: !!GM.enrage.warned }; // the "fight drags on" timer survives a reload (it must not be a way to reset it)
     const O = GM.objective;
     if (O) {
       S.obj = {};
@@ -125,6 +126,7 @@
       w.depenetrate(P.pos, P.hw, P.height);
       GM.areaStartT = GM.time - (S.elapsed || 0); GM.areaDamage = S.areaDamage || 0; GM.areaKills = S.areaKills || 0;
       if (S.areaMods) GM.areaMods = S.areaMods;
+      if (S.enrage) { const E = GM.enrage; E.t = S.enrage.t || 0; E.lv = S.enrage.lv || 0; E.warned = !!S.enrage.warned; E.dmg = 1 + 0.15 * E.lv; E.tm = 1 + 0.03 * E.lv; }
       // objective / waves
       const O = GM.objective;
       if (O && S.obj && !S.trialRestart) {

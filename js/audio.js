@@ -167,6 +167,23 @@
     suppressed: { thump: [180, 90], tg: 0.25, body: 900, bd: 0.07, bg: 0.4, crack: 0.05, wet: 0.15, tail: 0.05 },
     nail: { thump: [220, 120], tg: 0.25, body: 1600, bd: 0.05, bg: 0.4, crack: 0.15, wet: 0.2, tail: 0.05 },
   };
+  // every named weapon has its own voice: a stable pitch / body / crack / tail drawn from its id, one of five characters, and a flavour for its trait
+  const hs = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const hr = (h, k) => (Math.imul(h ^ Math.imul(k, 0x9E3779B1), 2246822519) >>> 0) % 1000 / 1000; // 0..1, a different value per k
+  const CHAR = ['plain', 'ring', 'boom', 'snap', 'rasp'];
+  function gunVoice(base, o) {
+    if (!o.id) return { p: base, h: 0, c: 'plain', cf: 4200 };
+    const h = hs(o.id), p = Object.assign({}, base), pit = 0.78 + hr(h, 1) * 0.52;
+    p.thump = [base.thump[0] * pit, base.thump[1] * pit];
+    p.body = base.body * (0.75 + hr(h, 2) * 0.55);
+    p.tail = base.tail * (0.75 + hr(h, 4) * 0.8) * (o.rar === 'legendary' ? 1.3 : 1);
+    p.tg = base.tg * (0.85 + hr(h, 5) * 0.4);
+    p.bd = base.bd * (0.8 + hr(h, 6) * 0.5);
+    const c = CHAR[Math.floor(hr(h, 7) * CHAR.length)];
+    if (c === 'boom') { p.tg *= 1.35; p.body *= 0.7; p.tail *= 1.3; p.crack *= 0.7; }
+    else if (c === 'snap') { p.tail *= 0.2; p.crack *= 1.4; p.bd *= 0.6; p.tg *= 0.8; }
+    return { p, h, c, cf: 3000 + hr(h, 3) * 3200 };
+  }
   A.gun = function (kind, opts) {
     if (!ctx || !voice(1)) return;
     opts = opts || {};
@@ -176,7 +193,7 @@
       if (kind === 'revolver') A.mech('click', 0.2);
       return;
     }
-    const p = GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle;
+    const gv = gunVoice(GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle, opts.suppressed ? {} : opts), p = gv.p;
     const t = ctx.currentTime;
     const out = dest(null, p.wet * 0.9, gunBus);
     out.gain.value = opts.vol || 1;
@@ -184,7 +201,7 @@
     // mechanical click / transient
     nz({ t, f: [['highpass', 3500]], g: p.crack * 0.9, d: 0.012, to: out });
     // supersonic crack (broadband, quick)
-    nz({ t, f: [['bandpass', 4200 * pr, 0.8]], g: p.crack, d: 0.03 + p.crack * 0.02, to: out });
+    nz({ t, f: [['bandpass', gv.cf * pr, 0.8]], g: p.crack, d: 0.03 + p.crack * 0.02, to: out });
     // body (gas expansion)
     nz({ t, buf: 'pink', f: [['lowpass', p.body * pr, 0.9, p.body * 0.35, p.bd]], g: p.bg, a: 0.001, d: p.bd, to: out });
     // low thump (chest punch)
@@ -193,6 +210,20 @@
     if (p.tail > 0.1) {
       const tail = dest(null, 1.2, dry); tail.gain.value = 0.35;
       nz({ t: t + 0.01, buf: 'brown', f: [['lowpass', 900, 0.6, 200, p.tail]], g: p.tail * 0.6, a: 0.01, d: p.tail, to: tail });
+    }
+    if (!opts.suppressed && opts.id) {
+      // character
+      if (gv.c === 'ring') tn({ t: t + 0.004, f0: 1300 + hr(gv.h, 8) * 1700, d: 0.2, g: 0.13, to: out, type: 'sine' });
+      else if (gv.c === 'rasp') nz({ t, f: [['bandpass', 1100 + hr(gv.h, 9) * 900, 2.2]], g: 0.35, a: 0.002, d: 0.07, to: out });
+      // trait flavour
+      const tr = opts.trait;
+      if (tr === 'shock' || tr === 'thunder' || tr === 'stormcall' || tr === 'chainHit') { nz({ t, f: [['bandpass', 6500, 3, 2500, 0.1]], g: 0.3, d: 0.1, to: out }); tn({ t, f0: 900, f1: 260, d: 0.09, g: 0.12, to: out, type: 'square', lp: 2500 }); }
+      else if (tr === 'incendiary' || tr === 'explosiveRounds' || tr === 'flameWave' || tr === 'cluster') { nz({ t, buf: 'brown', f: [['lowpass', 700, 0.7, 150, 0.3]], g: 0.5, a: 0.01, d: 0.3, to: out }); tn({ t, f0: 75, f1: 32, d: 0.25, g: 0.4, to: out, type: 'sine' }); }
+      else if (tr === 'cryo') tn({ t: t + 0.005, f0: 3400, f1: 2300, d: 0.16, g: 0.1, to: out, type: 'sine' });
+      else if (tr === 'ricochet' || tr === 'homing') tn({ t: t + 0.03, f0: 2500, f1: 1500, d: 0.12, g: 0.09, to: out, type: 'triangle' });
+      else if (tr === 'lifesteal' || tr === 'devour' || tr === 'reap' || tr === 'voidmaw') tn({ t, f0: 110, f1: 70, d: 0.18, g: 0.3, to: out, type: 'sawtooth', lp: 320 });
+      else if (tr === 'toxic') nz({ t: t + 0.01, f: [['bandpass', 1800, 1.2, 700, 0.18]], g: 0.2, d: 0.2, to: out });
+      else if (tr === 'double' || tr === 'echo') { nz({ t: t + 0.05, f: [['highpass', 3000]], g: p.crack * 0.5, d: 0.012, to: out }); tn({ t: t + 0.05, f0: p.thump[0] * 0.8, f1: p.thump[1], d: 0.08, g: p.tg * 0.4, to: out, type: 'triangle', lp: 400 }); }
     }
     if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35);
     if (kind === 'sniper') A.mech('bolt', 0.4);

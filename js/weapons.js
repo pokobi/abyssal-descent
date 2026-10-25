@@ -763,7 +763,7 @@
     }
     // feedback
     const silent = model && model.suppressed || w.def.trait === 'silent';
-    if (s.proj) G.sfx.launcher(s.sound); else if (s.sound === 'tesla') { G.sfx.zap(null); G.sfx.gun('nail', { vol: 0.5 }); } else if (s.sound === 'rail') G.sfx.launcher('rail'); else G.sfx.gun(s.sound, { suppressed: silent, auto: s.auto || s.autoShot });
+    if (s.proj) G.sfx.launcher(s.sound); else if (s.sound === 'tesla') { G.sfx.zap(null); G.sfx.gun('nail', { vol: 0.5 }); } else if (s.sound === 'rail') G.sfx.launcher('rail'); else G.sfx.gun(s.sound, { suppressed: silent, auto: s.auto || s.autoShot, id: w.def.id, trait: w.def.trait, rar: w.def.rarity });
     if (!silent) G.fx.flash(muzzle, 0xffb060, s.sound === 'shotgun' ? 45 : 25, 0.06, 10);
     anim.flash = silent ? 0.02 : 0.05;
     const crouchRec = P.crouching && P.grounded ? 1 - (s.crouchRecoil || 0) : 1;

@@ -111,9 +111,9 @@ button { font-family: inherit; }
 #hp-wrap { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
 #hp-icon { font-size: 22px; color: var(--hp2); }
 #hp-bars { width: clamp(120px, 19vw, 280px); }
-#os-bar { position: relative; z-index: 3; height: 5px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: visible; margin-bottom: 3px; }
-#os-fill { height: 100%; width: 0; max-width: 200%; border-radius: 2px; background: linear-gradient(90deg, #6aa8d8, #cfe8ff); box-shadow: 0 0 6px rgba(130,190,255,0.55); transition: width .15s; }
-#hp-bar { position: relative; height: 16px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+#os-bar { height: 5px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
+#os-fill { height: 100%; width: 0; background: linear-gradient(90deg, #6aa8d8, #cfe8ff); transition: width .15s; }
+#hp-bar { position: relative; transition: width .2s; height: 16px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
 #hp-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #e8483a, #a3241c); transition: width .1s; }
 #hp-trail { position: absolute; left: 0; top: 0; bottom: 0; background: #f3d39a; transition: width .6s .25s; }
 #hp-text { font-weight: 900; font-size: 20px; min-width: 90px; text-align: right; }
@@ -1422,4 +1422,3 @@ html.m .bs-wrap { padding-left: 24px; }
 @keyframes tfBurst { 0% { transform: scale(0.2); opacity: 1; } 100% { transform: scale(8); opacity: 0; } }
 .tf-flash { position: absolute; inset: 0; pointer-events: none; z-index: 2; background: radial-gradient(circle, rgba(230,240,255,0.55), rgba(120,150,255,0.15) 60%, transparent 80%); animation: tfFlash .5s ease-out forwards; }
 @keyframes tfFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
-#hp-text { position: relative; z-index: 5; } /* the overshield bar can run past the end of the HP bar: the numbers stay readable on top of it */

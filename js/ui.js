@@ -11,7 +11,7 @@
   UI.init = function () {
     P = G.player;
     UI.el = {
-      hud: $('hud'), hpFill: $('hp-fill'), hpTrail: $('hp-trail'), hpText: $('hp-text'), osFill: $('os-fill'), coinVal: $('coin-val'), coins: $('coins'), coinPops: $('coin-pops'),
+      hud: $('hud'), hpBar: $('hp-bar'), hpFill: $('hp-fill'), hpTrail: $('hp-trail'), hpText: $('hp-text'), osFill: $('os-fill'), coinVal: $('coin-val'), coins: $('coins'), coinPops: $('coin-pops'),
       runMeta: $('run-meta'), wName: $('weapon-name'), wAtts: $('weapon-atts'), ammoMag: $('ammo-mag'), ammoMax: $('ammo-max'), ammo: $('ammo'), reloadBar: $('reload-bar'), wSlots: $('weapon-slots'),
       abilityRow: $('ability-row'), itemRow: $('item-row'), buffs: $('hud-buffs'), tempfx: $('tempfx'), feed: $('feed'), toasts: $('toasts'), interact: $('interact-panel'),
       boss: $('bossbar'), bossName: $('boss-name'), bossFill: $('boss-fill'), bossTrail: $('boss-trail'), bossShield: $('boss-shield'), bossShieldFill: $('boss-shield-fill'), bossPhase: $('boss-phase'),
@@ -325,8 +325,9 @@
       UI._tr = tr; sStyle(e.hpTrail, 'width', (tr * 100).toFixed(2) + '%'); }
     lastHp = P.hp;
     { const hk = Math.ceil(Math.max(0, P.hp)) + '|' + st.maxHp + '|' + (P.os > 0.5 ? Math.ceil(P.os) : 0) + '|' + (P.revives || 0); if (UI._hk !== hk) { UI._hk = hk; e.hpText.innerHTML = `${Math.ceil(Math.max(0, P.hp))}<small> / ${st.maxHp}</small>${P.os > 0.5 ? ` <span class="os-num" title="オーバーシールド">${G.Icons ? G.Icons.html('ui:os') : '🛡'}+${Math.ceil(P.os)}</span>` : ''} <span class="revives" title="魂の灯火（死亡時に燃えて復活する）">🪔×${P.revives || 0}</span>`; } }
-    { const op = Math.min(200, P.os / Math.max(50, st.maxHp) * 100), sp = op > 100 ? Math.round(10000 / op) : 100; // the part beyond max HP runs past the end of the bar, in a brighter colour
-      sStyle(e.osFill, 'width', op.toFixed(1) + '%'); sStyle(e.osFill, 'background', sp < 100 ? `linear-gradient(90deg, #6aa8d8 0, #cfe8ff ${sp}%, #fff3b0 ${sp}%, #ffffff 100%)` : 'linear-gradient(90deg, #6aa8d8, #cfe8ff)'); }
+    { // both bars share one scale: past max HP the HP bar gets shorter and the overshield bar fills the whole length
+      const mx = Math.max(st.maxHp, P.os, 50);
+      sStyle(e.hpBar, 'width', (st.maxHp / mx * 100).toFixed(1) + '%'); sStyle(e.osFill, 'width', Math.min(100, P.os / mx * 100).toFixed(1) + '%'); }
     sStyle(e.lowhp, 'opacity', hpk < 0.3 ? ((0.5 + Math.sin(G.game.time * 6) * 0.25) * (1 - hpk / 0.3)).toFixed(3) : 0);
     if (hpk < 0.3 && !P.dead) { UI._hb = (UI._hb || 0) - dt; if (UI._hb <= 0) { UI._hb = 0.5 + hpk * 2; G.sfx.heartbeat(1 - hpk / 0.3); } }
     // ammo

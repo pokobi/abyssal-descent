@@ -749,7 +749,15 @@
         <button class="btn" id="p-quit">🏳 諦めてタイトルへ</button>
       </div><div style="margin-top:12px;font-size:12px;color:var(--dim)">エリア ${G.game.area}</div></div>`, 'dim');
     s.querySelector('#p-resume').onclick = () => G.game.resume();
-    s.querySelector('#p-status').onclick = () => { G.sfx.ui('open'); const sc = UI.screen(`<div class="panel" style="width:min(1000px,94vw);display:grid;grid-template-columns:1.3fr 1fr;gap:24px">${UI.statusHTML()}<div style="grid-column:1/-1;text-align:right"><button class="btn" id="st-back">↩ 戻る</button></div></div>`, 'dim'); sc.querySelector('#st-back').onclick = () => UI.pause(); };
+    s.querySelector('#p-status').onclick = () => {
+      // the real status sheet (its styles belong to the overlay); Esc or the button goes back to the pause menu
+      G.sfx.ui('open'); UI.clearScreen(); UI.statusOverlay(true, true);
+      const o = UI.el.statusOv; o.insertAdjacentHTML('beforeend', '<button class="btn" id="st-back" style="position:fixed;right:4vw;bottom:4vh;z-index:30">↩ 戻る</button>');
+      const back = () => { window.removeEventListener('keydown', onEsc, true); UI.statusOverlay(false); UI.pause(); };
+      const onEsc = (e) => { if (e.code === 'Escape' || e.code === 'KeyI') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) back(); } };
+      window.addEventListener('keydown', onEsc, true);
+      o.querySelector('#st-back').onclick = () => { G.sfx.ui('click'); back(); };
+    };
     s.querySelector('#p-codex').onclick = () => { G.sfx.ui('open'); G.codex.open(() => UI.pause()); };
     s.querySelector('#p-settings').onclick = () => { G.sfx.ui('open'); UI.settings(() => UI.pause()); };
     s.querySelector('#p-help').onclick = () => { G.sfx.ui('open'); UI.help(() => UI.pause()); };

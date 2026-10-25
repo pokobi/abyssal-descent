@@ -317,15 +317,14 @@
     }
     w.nooks = ctx.nooks;
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0, notches: ctx.notches });
-    // the lintel over each exit gate is a ledge a running jump can reach: it burns (blue flames on the fourth field), has an invisible column
-    // over it so there is nowhere to stand, and the exit sign hangs well above the flames (areas.js)
+    // the lintel over each gate (exit and entrance alike) is a ledge a running jump can reach: it burns (blue flames on the fourth field)
     w.fireRects = w.fireRects || [];
-    for (const gx of LG.gateXs(W, gates || 1)) {
-      const x0 = gx - 4.6, x1 = gx + 4.6, z0 = 0, z1 = 1.45, yT = 8.9;
+    for (const [gx, z0, z1, lz] of [...LG.gateXs(W, gates || 1).map((x) => [x, 0, 1.45, 0.8]), [W / 2, D - 1.45, D, D - 0.8]]) {
+      const x0 = gx - 4.6, x1 = gx + 4.6, yT = 8.9;
       w.batch.box('iron', x0, yT, z0, x1, yT + 0.16, z1, { tint: [0.13, 0.12, 0.12], grad: false });
       w.batch.box('glow', x0 + 0.1, yT + 0.16, z0 + 0.1, x1 - 0.1, yT + 0.18, z1 - 0.1, { tint: ruined ? [0.1, 0.3, 1] : [1, 0.3, 0.05], grad: false });
       w.fireRects.push({ x0, x1, z0, z1, y: yT + 0.18, acc: 0, low: true, blue: !!ruined });
-      w.addLight(gx, yT + 1.4, 0.8, { flame: 0, emit: false, intensity: 8, range: 10, color: ruined ? '#4a8aff' : '#ff5a18', prio: 0.55 });
+      w.addLight(gx, yT + 1.4, lz, { flame: 0, emit: false, intensity: 8, range: 10, color: ruined ? '#4a8aff' : '#ff5a18', prio: 0.55 });
     }
 
     // ---- the slabs (ragged along the chasm, cut around the holes), their railings, edge trim ----

@@ -240,7 +240,7 @@
       e.lastHitT = G.game.time;
       e.flinch = Math.min(1, e.flinch + (src === 'dot' ? 0.05 : 0.35));
       if (!info.silent) {
-        G.fx.dmgNum(pos, dmg, src === 'dot' ? (info.elem === 'poison' ? 'poison' : 'dot') : info.head ? 'head' : crit ? 'crit' : '');
+        G.fx.dmgNum(pos, crit && src !== 'dot' ? Math.max(1, Math.round(dmg)) + '!!' : dmg, src === 'dot' ? (info.elem === 'poison' ? 'poison' : 'dot') : info.head ? 'head' : ''); // a crit is marked with '!!' after the number (any colour)
         if (src === 'bullet' || src === 'melee') {
           G.fx.blood(pos, info.dir ? info.dir.clone() : null, e.bloodColor, info.head ? 12 : 6);
           G.sfx.hitFlesh(pos, false, dmg > 60);

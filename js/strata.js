@@ -153,7 +153,7 @@
       WL.push(l); ER.push(r);
     }
     // the slabs shut out the light from above: a brighter fill and thinner haze than the open halls had
-    w.envOverride = ruined ? { amb: 1.15, hemiS: '#8ea6e0', hemiG: '#2c3658', fog: '#101a2e', fogD: 0.009 } : { amb: 1.1, hemiS: '#a8968a', hemiG: '#4a3a2a', fog: '#1c1610', fogD: 0.01 };
+    w.envOverride = ruined ? { amb: 0.72, hemiS: '#6880b8', hemiG: '#1c243c', fog: '#0a1222', fogD: 0.011 } : { amb: 1.1, hemiS: '#a8968a', hemiG: '#4a3a2a', fog: '#1c1610', fogD: 0.01 };
     const T = { zN: Zn, zS: Zs, w: WL[0], e: ER[0], y: -1.0, blue: ruined };
     w.trench = T; w.strata = { Y, WL, ER, HT, Zn, Zs };
     w.navLayers = NL + 3; w.navPadX = 12;
@@ -325,7 +325,6 @@
       w.batch.box('iron', x0, yT, z0, x1, yT + 0.16, z1, { tint: [0.13, 0.12, 0.12], grad: false });
       w.batch.box('glow', x0 + 0.1, yT + 0.16, z0 + 0.1, x1 - 0.1, yT + 0.18, z1 - 0.1, { tint: ruined ? [0.1, 0.3, 1] : [1, 0.3, 0.05], grad: false });
       w.fireRects.push({ x0, x1, z0, z1, y: yT + 0.18, acc: 0, low: true, blue: !!ruined });
-      const gc = w.addCollider(x0 - 0.06, yT, z0 - 0.06, x1 + 0.06, yT + 3, z1 + 0.06, { noGrapple: true, surf: 'stone' }); gc.ghost = true; gc.noFire = true;
       w.addLight(gx, yT + 1.4, 0.8, { flame: 0, emit: false, intensity: 8, range: 10, color: ruined ? '#4a8aff' : '#ff5a18', prio: 0.55 });
     }
 

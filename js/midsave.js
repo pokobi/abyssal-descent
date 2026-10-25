@@ -23,7 +23,7 @@
     try {
       const d = GM.loadRun(); if (!d || d.area !== GM.area) return;
       d.mid = MS.snapshot();
-      localStorage.setItem('abyss_run_v1', JSON.stringify(d));
+      localStorage.setItem(GM.runKey(), JSON.stringify(d));
     } catch (e) { /* storage unavailable */ }
   };
 

@@ -85,7 +85,7 @@
     const T = G.Areas.TYPES;
     const kindName = (k) => (T[k] ? T[k].icon + ' ' + T[k].name : { casino: '🎰 賭場', bank: '🏦 銀行', auction: '🔨 競売', merc: '🗡️ 傭兵', offering: '🙏 献納' }[k] || k);
     if (tab === 'run') {
-      ACT.start = () => { const df = panel.querySelector('#dv-diff').value.split(':'); if (panel) panel.remove(); panel = null; back = null; D.keep = true; GM.startRun({ id: df[0], lv: +df[1] || 0 }); D.keep = false; GM.run.dev = true; };
+      ACT.start = () => { const df = panel.querySelector('#dv-diff').value.split(':'); if (panel) panel.remove(); panel = null; back = null; D.keep = true; GM.startRun({ id: df[0], lv: +df[1] || 0 }, null); D.keep = false; GM.run.dev = true; };
       ACT.unlockAll = () => { const c = G.Run.rec(); c.easy = c.normal = c.hard = c.easy || 1; for (let k = 1; k <= 10; k++) c['extra' + k] = c['extra' + k] || 1; G.save.write(); toast('全難易度を解放'); };
       ACT.go = () => {
         const n = Math.max(1, +panel.querySelector('#dv-area').value | 0), k = panel.querySelector('#dv-kind').value, b = panel.querySelector('#dv-boss').value;

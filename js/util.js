@@ -106,7 +106,7 @@ window.G = window.G || {};
       if (what === 'settings' || what === 'all') this.data.settings = def.settings;
       if (what === 'progress' || what === 'all') {
         this.data.codex = def.codex; this.data.records = def.records;
-        try { localStorage.removeItem('abyss_run_v1'); } catch (e) { /* ignore */ }
+        try { for (const k of ['abyss_run_v1', 'abyss_run_v1_s2', 'abyss_run_v1_s3']) localStorage.removeItem(k); } catch (e) { /* ignore */ }
       }
       this._dirty2 = false; this.write();
     },

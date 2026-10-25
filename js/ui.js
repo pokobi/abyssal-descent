@@ -589,8 +589,8 @@
       <div class="title-logo">ABYSSAL DESCENT</div>
       <div class="title-jp">深 淵 降 下</div>
       <div class="title-menu">
-        ${G.game.loadRun() ? `<button class="btn primary" id="t-cont">▶ 続きから（エリア ${G.game.loadRun().area}）</button>` : ''}
-        <button class="btn ${G.game.loadRun() ? '' : 'primary'}" id="t-start">⚔️ 深淵へ潜る${G.game.loadRun() ? '（新しく始める）' : ''}</button>
+        ${G.game.slotsUsed() ? `<button class="btn primary" id="t-cont">▶ 続きから${G.game.slotsUsed() > 1 ? `（${G.game.slotsUsed()}件の記録）` : `（エリア ${G.game.loadRun(UI.firstUsedSlot()).area}）`}</button>` : ''}
+        <button class="btn ${G.game.slotsUsed() ? '' : 'primary'}" id="t-start">⚔️ 深淵へ潜る${G.game.slotsUsed() ? '（新しく始める）' : ''}</button>
         <button class="btn" id="t-tut">📘 チュートリアル</button>
         <button class="btn" id="t-codex">📖 図鑑</button>
         <button class="btn" id="t-settings">⚙️ 設定</button>
@@ -600,32 +600,72 @@
       <div class="title-foot">クリックでゲーム開始時にマウスがロックされます　·　推奨: フルスクリーン（Ctrl+W 等の誤操作防止）</div>
     </div>`);
     let diffPick = null;
-    const go = () => { G.sfx.init(); G.sfx.ui('select'); G.game.startRun(diffPick); };
+    const go = () => { G.sfx.init(); G.sfx.ui('select'); G.game.startRun(diffPick, slotPick); };
     const tut = () => { G.sfx.init(); G.sfx.ui('select'); G.Tutorial.start(); };
     // a new run first asks whether you want the tutorial (can be turned off)
+    // a new run goes into the first free slot; with all three taken you choose which record to replace
+    let slotPick;
     const newRun = () => UI.difficulty((d) => { diffPick = d; askTut(); }, () => UI.title());
+    const slotThen = (fn) => UI.slotForNew((s) => { slotPick = s; fn(); }, () => UI.title());
     const askTut = () => {
       const S = G.save.data.settings;
       if (S.askTutorial === false) return go();
       G.sfx.init(); G.sfx.ui('open');
       UI.choice('📘 チュートリアルを受けますか？', '基本操作（移動・射撃・近接・グラップル・パイルドライバー）、アイテムや投擲物の使い方とホイール、エリアの流れまで、実際に体を動かしながら学べます（約5〜8分）。<br>チュートリアルが終わると、そのまま本編が始まります。', [
         { icon: '📘', label: 'チュートリアルを受ける', sub: 'はじめての方におすすめ', onPick: () => { G.sfx.ui('select'); G.Tutorial.start(); } },
-        { icon: '⚔️', label: 'すぐに本編を始める', onPick: () => { G.sfx.ui('select'); G.game.startRun(diffPick); } },
-        { icon: '🚫', label: '今後は聞かずに本編を始める', sub: '設定からいつでも戻せます', onPick: () => { S.askTutorial = false; G.save.write(); G.sfx.ui('select'); G.game.startRun(diffPick); } },
+        { icon: '⚔️', label: 'すぐに本編を始める', onPick: () => { G.sfx.ui('select'); G.game.startRun(diffPick, slotPick); } },
+        { icon: '🚫', label: '今後は聞かずに本編を始める', sub: '設定からいつでも戻せます', onPick: () => { S.askTutorial = false; G.save.write(); G.sfx.ui('select'); G.game.startRun(diffPick, slotPick); } },
       ], () => UI.title());
     };
-    s.querySelector('#t-start').onclick = () => {
-      if (!G.game.loadRun()) return newRun();
-      UI.choice('新しく始めますか？', '中断中のランのデータは消えます。', [{ icon: '⚔️', label: '新しく始める', onPick: () => { G.game.clearRun(); newRun(); } }, { icon: '↩', label: 'やめる', onPick: () => UI.title() }]);
-    };
-    const ct = s.querySelector('#t-cont'); if (ct) ct.onclick = () => { G.sfx.init(); G.sfx.ui('select'); G.game.continueRun(); };
+    s.querySelector('#t-start').onclick = () => slotThen(newRun);
+    const ct = s.querySelector('#t-cont'); if (ct) ct.onclick = () => { G.sfx.init(); G.sfx.ui('select'); UI.slotMenu(() => UI.title()); };
     s.querySelector('#t-codex').onclick = () => { G.sfx.init(); G.sfx.ui('open'); G.codex.open(() => UI.title()); };
-    s.querySelector('#t-tut').onclick = () => {
-      if (!G.game.loadRun()) return tut();
-      UI.choice('チュートリアルを始めますか？', '中断中のランのデータは消えます。', [{ icon: '📘', label: 'チュートリアルを始める', onPick: () => { G.game.clearRun(); tut(); } }, { icon: '↩', label: 'やめる', onPick: () => UI.title() }]);
-    };
+    s.querySelector('#t-tut').onclick = () => tut();
     s.querySelector('#t-settings').onclick = () => { G.sfx.init(); G.sfx.ui('open'); UI.settings(() => UI.title()); };
     s.querySelector('#t-help').onclick = () => { G.sfx.init(); G.sfx.ui('open'); UI.help(() => UI.title()); };
+  };
+  // ---- save slots (three records of a run in progress) ----
+  UI.firstUsedSlot = () => { for (let i = 1; i <= G.game.SLOTS; i++) if (G.game.loadRun(i)) return i; return 0; };
+  const slotText = (i) => {
+    const d = G.game.loadRun(i), n = `スロット${i}`;
+    if (!d) return { label: `${n}　（空き）`, sub: '' };
+    const df = d.run && d.run.diff && G.Run.DIFFS[d.run.diff.id], t = new Date(d.t);
+    const p2 = (v) => String(v).padStart(2, '0');
+    return { label: `${n}　エリア ${d.area}${df ? '・' + df.name : ''}`, sub: `最終保存 ${t.getMonth() + 1}/${t.getDate()} ${p2(t.getHours())}:${p2(t.getMinutes())}` };
+  };
+  // pick a record to continue (or delete)
+  UI.slotMenu = function (back) {
+    const GM = G.game, opts = [];
+    for (let i = 1; i <= GM.SLOTS; i++) {
+      const d = GM.loadRun(i), tx = slotText(i);
+      if (d) opts.push({ icon: '▶', label: tx.label, sub: tx.sub, onPick: () => GM.continueRun(i) });
+    }
+    opts.push({ icon: '🗑', label: '記録を消す…', onPick: () => UI.slotDelete(back) });
+    opts.push({ icon: '↩', label: '戻る', onPick: back });
+    UI.choice('▶ 続きから', 'どの記録から再開しますか？', opts, back);
+  };
+  UI.slotDelete = function (back) {
+    const GM = G.game, opts = [];
+    for (let i = 1; i <= GM.SLOTS; i++) {
+      if (!GM.loadRun(i)) continue;
+      const tx = slotText(i);
+      opts.push({ icon: '🗑', label: tx.label, sub: tx.sub, onPick: () => UI.choice('記録を消しますか？', `${tx.label}（${tx.sub}）を消します。元に戻せません。`, [{ icon: '🗑', label: '消す', onPick: () => { GM.clearRun(i); if (GM.slot === i) GM.slot = null; if (GM.slotsUsed()) UI.slotMenu(() => UI.title()); else UI.title(); } }, { icon: '↩', label: 'やめる', onPick: () => UI.slotDelete(back) }]) });
+    }
+    opts.push({ icon: '↩', label: '戻る', onPick: () => UI.slotMenu(back) });
+    UI.choice('🗑 記録を消す', 'どの記録を消しますか？', opts, () => UI.slotMenu(back));
+  };
+  // a slot for a new run: the first free one, or (all three taken) the one the player chooses to replace
+  UI.slotForNew = function (cb, cancel) {
+    const GM = G.game, free = GM.firstEmptySlot();
+    if (free) return cb(free);
+    G.input.exitLock(); if (GM.state !== 'title') GM.state = 'modal';
+    const opts = [];
+    for (let i = 1; i <= GM.SLOTS; i++) {
+      const tx = slotText(i);
+      opts.push({ icon: '♻', label: tx.label, sub: `${tx.sub}　（この記録を消して始める）`, onPick: () => UI.choice('この記録を上書きしますか？', `${tx.label}（${tx.sub}）は消えます。`, [{ icon: '⚔️', label: '上書きして始める', onPick: () => cb(i) }, { icon: '↩', label: 'やめる', onPick: () => UI.slotForNew(cb, cancel) }], () => UI.slotForNew(cb, cancel)) });
+    }
+    opts.push({ icon: '↩', label: 'やめる', onPick: cancel });
+    UI.choice('記録がいっぱいです', '新しく始めるには、どれか1つを上書きします。', opts, cancel);
   };
   UI.help = function (back) {
     const k = (a, b) => `<kbd>${a}</kbd><span>${b}</span>`;

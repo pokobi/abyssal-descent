@@ -432,8 +432,10 @@
     G.weapons.hidden(true);
     G.ui.title();
   };
-  GM.startRun = function (diff) {
+  // slot: 1..3 = save there (the old run in that slot is replaced by the first checkpoint); null = no saving (tutorial, dev); undefined = the slot in use
+  GM.startRun = function (diff, slot) {
     G.sfx.init();
+    GM.slot = slot === undefined ? (GM.slot || GM.firstEmptySlot() || 1) : slot;
     if (G.Dev && !G.Dev.keep && G.Dev.on()) G.Dev.disable();
     if (diff) G.Run.set(diff.id, diff.lv);
     // every run is generated at random; this key only lets a reloaded / restarted area be rebuilt exactly as it was (never shown, never chosen)
@@ -486,7 +488,11 @@
   }
 
   // ---------------- run checkpoint (saved on every area entry; resume restarts that area) ----------------
-  const RUN_KEY = 'abyss_run_v1';
+  // three save slots for the run in progress (slot 1 keeps the old key, so an existing save is simply slot 1). GM.slot = the slot of the run being played (null: no saving, e.g. the tutorial)
+  GM.SLOTS = 3; GM.slot = null;
+  GM.runKey = (s) => ((s || GM.slot) === 1 ? 'abyss_run_v1' : 'abyss_run_v1_s' + (s || GM.slot));
+  GM.firstEmptySlot = () => { for (let i = 1; i <= GM.SLOTS; i++) if (!GM.loadRun(i)) return i; return 0; };
+  GM.slotsUsed = () => { let n = 0; for (let i = 1; i <= GM.SLOTS; i++) if (GM.loadRun(i)) n++; return n; };
   GM.playerSnap = function () {
     return {
       hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
@@ -499,15 +505,17 @@
     };
   };
   GM.saveRun = function (n, kind) {
+    if (!GM.slot) return;
     try {
       const d = Object.assign({ v: 1, t: Date.now(), seed: GM.seed, area: n, kind, route: GM.route || [], run: GM.run }, GM.playerSnap());
-      localStorage.setItem(RUN_KEY, JSON.stringify(d));
+      localStorage.setItem(GM.runKey(), JSON.stringify(d));
     } catch (e) { /* storage unavailable: the run simply can't be resumed */ }
   };
-  GM.loadRun = function () { try { const d = JSON.parse(localStorage.getItem(RUN_KEY) || 'null'); return d && d.v === 1 ? d : null; } catch (e) { return null; } };
-  GM.clearRun = function () { try { localStorage.removeItem(RUN_KEY); } catch (e) { /* ignore */ } };
-  GM.continueRun = function () {
-    const d = GM.loadRun(); if (!d) return;
+  GM.loadRun = function (s) { if (!(s || GM.slot)) return null; try { const d = JSON.parse(localStorage.getItem(GM.runKey(s)) || 'null'); return d && d.v === 1 ? d : null; } catch (e) { return null; } };
+  GM.clearRun = function (s) { if (!(s || GM.slot)) return; try { localStorage.removeItem(GM.runKey(s)); } catch (e) { /* ignore */ } };
+  GM.continueRun = function (s) {
+    const d = GM.loadRun(s); if (!d) return;
+    GM.slot = s || GM.slot;
     G.sfx.init();
     GM.seed = d.seed; GM.rng = new G.RNG((d.seed ^ U.hashStr('resume' + d.area)) >>> 0);
     GM.time = 0;

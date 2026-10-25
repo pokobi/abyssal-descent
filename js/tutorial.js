@@ -88,10 +88,9 @@
   // ---------------------------------------------------------------- lifecycle
   T.start = function () {
     GM = G.game; P = G.player;
-    GM.startRun();
+    GM.startRun(undefined, null); // the tutorial never saves
     G.save.data.records.runs = Math.max(0, G.save.data.records.runs - 1); G.save.write();
     T.active = true; GM.tutorial = true; document.body.classList.add('tut-on');
-    GM.clearRun(); // nothing to "continue" from a tutorial
     GM.objective = { tutorial: true, icon: '📘', text: () => `チュートリアル ${idx + 1}/${STEPS.length}`, progress: () => (idx + (st ? st.prog || 0 : 0)) / STEPS.length, done: false };
     GM.mimicT = -1;
     G.ui.setArea('TUTORIAL', '📘 チュートリアル — 訓練場');
@@ -110,7 +109,7 @@
   T.finish = function () {
     T.stop();
     G.ui.toast('⚔️ 本編を開始します', 'good');
-    G.game.startRun();
+    G.ui.slotForNew((s) => G.game.startRun(undefined, s), () => G.game.toTitle());
   };
   function ensureEl() {
     if (el) return;

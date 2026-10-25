@@ -1079,6 +1079,12 @@
       const run = GM.run; run.rerollTick = Math.min(3, (run.rerollTick || 0) + 1);
       if (run.rerollTick >= 3 && (run.rerollUsed || 0) > 0) { run.rerollUsed--; run.rerollTick = 0; G.ui.toast('🎲 無料リロールが1回回復した', 'good'); }
     }
+    // a guardian's fall teaches every skill and ultimate you carry: +1 level (the normal level, not mastery; Lv 15 is the cap)
+    if (bossKill) {
+      const A = G.abilities, up = [];
+      for (const s of P.skills) if (s && (s.lv || 0) < A.MAXLV) { s.lv = (s.lv || 0) + 1; s.maxCd = A.cdOf(s); up.push(s); }
+      if (up.length) setTimeout(() => { G.sfx.magic(P.pos, 'holy'); G.ui.toast(`📘 守護者の力が宿り、スキル・アルティメットが全て Lv+1（${up.map((s) => s.def.name + ' ' + A.lvText(s)).join('、')}）`, 'good'); }, 1000);
+    }
     if (bossKill && G.Run.revivesAllowed()) { P.revives++; setTimeout(() => G.ui.toast(`🪔 守護者の魂を奪い、魂の灯火が一つ灯った（${P.revives}灯）`, 'good'), 1200); }
     const O = GM.objective; if (O) O.done = true;
     for (const e of G.enemies.list) if (e.alive && !e.boss && !e.isTarget && e.def.id !== 'mimic_gold' && e.def.id !== 'mimic_trap') { G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1); e.noReward = true; e.hp = 0; G.combat.killEnemy(e, { src: 'clear', proc: true }, 0); }

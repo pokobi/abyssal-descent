@@ -8,14 +8,15 @@
   });
   const B = (G.BIND = {
     forward: ['KeyW', 'ArrowUp'], back: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
-    jump: ['Space'], sprint: ['ShiftLeft', 'ShiftRight'], crouch: ['ControlLeft', 'ControlRight', 'KeyC'],
+    jump: ['Space'], sprint: ['ShiftLeft', 'ShiftRight'], crouch: ['ControlLeft', 'KeyC'],
     reload: ['KeyR'], interact: ['KeyE'], grapple: ['KeyF'], grenade: ['KeyG'], cycleGrenade: ['KeyT'],
     skill1: ['KeyQ'], skill2: ['KeyX'], skill3: ['KeyZ'], skill4: ['KeyV'],
     item1: ['Digit4'], item2: ['Digit5'],
     w1: ['Digit1'], w2: ['Digit2'], w3: ['Digit3'],
     status: ['Tab'], inventory: ['KeyB'],
   });
-  // ---- rebinding: settings.keys = { action: code } replaces an action's main key; the code is taken away from every other action ----
+  // ---- rebinding: settings.keys = { action: [code1, code2] } (two keys per action; null = empty). Mouse extras are pseudo key codes:
+  // MouseMiddle / Mouse4 / Mouse5 (side buttons) / WheelUp / WheelDown. They are sent as key events (see below), so everything that reads keys just works ----
   const DEF = JSON.parse(JSON.stringify(B)); I.DEFAULT_BIND = DEF;
   I.BIND_LIST = [
     ['skill1', '🌟 アルティメット'], ['skill2', '✨ スキル1'], ['skill3', '✨ スキル2'], ['skill4', '✨ スキル3'],
@@ -26,17 +27,30 @@
     ['inventory', '🎒 持ち物・ステータス画面（サブキー）'], ['w1', '🔫 武器1'], ['w2', '🔫 武器2'], ['w3', '🗡️ 近接武器'], ['status', '🎒 持ち物・ステータス画面'],
   ];
   let bound = new Set();
+  I.slots = (a) => {
+    const S = G.save && G.save.data && G.save.data.settings, o = S && S.keys && S.keys[a];
+    const d = Array.isArray(o) ? o : DEF[a];
+    return [d[0] || null, d[1] || null];
+  };
   I.applyBinds = function () {
-    const S = G.save && G.save.data && G.save.data.settings, ov = (S && S.keys) || {};
-    for (const a in DEF) B[a] = DEF[a].slice();
-    for (const a in ov) {
-      if (!B[a] || !ov[a]) continue;
-      for (const b in B) if (b !== a) B[b] = B[b].filter((k) => k !== ov[a]);
-      B[a] = [ov[a]].concat(B[a].slice(1).filter((k) => k !== ov[a]));
+    const S = G.save && G.save.data && G.save.data.settings;
+    if (S && S.keys && Object.values(S.keys).some((v) => typeof v === 'string')) {
+      // old saves: one main key per action (taken away from the others); turn them into the two-slot form
+      const ov = S.keys, tmp = {};
+      for (const a in DEF) tmp[a] = DEF[a].slice();
+      for (const a in ov) {
+        if (typeof ov[a] !== 'string' || !tmp[a]) continue;
+        for (const b in tmp) if (b !== a) tmp[b] = tmp[b].filter((k) => k !== ov[a]);
+        tmp[a] = [ov[a]].concat(tmp[a].slice(1).filter((k) => k !== ov[a]));
+      }
+      S.keys = {};
+      for (const a in tmp) S.keys[a] = [tmp[a][0] || null, tmp[a][1] || null];
+      try { G.save.write(); } catch (e) { /* ignore */ }
     }
+    for (const a in DEF) B[a] = I.slots(a).filter(Boolean);
     bound = new Set(Object.values(B).flat());
   };
-  const KN = { ControlLeft: 'Ctrl', ControlRight: 'Ctrl', ShiftLeft: 'Shift', ShiftRight: 'Shift', AltLeft: 'Alt', AltRight: 'Alt', Space: 'Space', Tab: 'Tab', CapsLock: 'Caps', Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Enter: 'Enter', Backspace: 'BS' };
+  const KN = { ControlLeft: 'Ctrl', ControlRight: 'Ctrl', ShiftLeft: 'Shift', ShiftRight: 'Shift', AltLeft: 'Alt', AltRight: 'Alt', Space: 'Space', Tab: 'Tab', CapsLock: 'Caps', Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Enter: 'Enter', Backspace: 'BS', MouseMiddle: 'ホイールクリック', Mouse4: 'サイド1', Mouse5: 'サイド2', WheelUp: 'ホイール↑', WheelDown: 'ホイール↓' };
   I.codeName = (c) => (!c ? '—' : KN[c] || (/^Key/.test(c) ? c.slice(3) : /^Digit/.test(c) ? c.slice(5) : /^Numpad/.test(c) ? 'Num' + c.slice(6) : c));
   I.keyName = (a) => I.codeName(B[a] && B[a][0]);
   I.skillKey = (i) => I.keyName('skill' + (i + 1));
@@ -63,12 +77,31 @@
   let blurT = 0;
   window.addEventListener('blur', () => { I.mouse = [false, false, false, false, false]; clearTimeout(blurT); blurT = setTimeout(() => { if (!document.hasFocus()) I.keys = {}; }, 600); });
   window.addEventListener('focus', () => clearTimeout(blurT));
+  // mouse extras (wheel click, side buttons, wheel) become key events for the codes above; only for codes that are bound (or while a key is being captured)
+  I.capturing = false;
+  const synth = (type, code) => { try { window.dispatchEvent(new KeyboardEvent(type, { code, key: code, bubbles: true, cancelable: true })); } catch (err) { /* ignore */ } };
+  const BTN = { 1: 'MouseMiddle', 3: 'Mouse4', 4: 'Mouse5' };
+  const wantPseudo = (c) => I.capturing || bound.has(c);
   window.addEventListener('mousedown', (e) => {
+    const pc = BTN[e.button];
+    if (pc && wantPseudo(pc)) { e.preventDefault(); synth('keydown', pc); }
+    else if (e.button >= 3 && (I.locked || (G.game && G.game.state === 'playing'))) e.preventDefault(); // the side buttons are browser back / forward
     if (e.button === 1 && (I.locked || (G.game && G.game.state === 'playing'))) e.preventDefault();
     if (!I.locked) return;
     I.mouse[e.button] = true; I.mpressed[e.button] = true;
   });
-  window.addEventListener('mouseup', (e) => { I.mouse[e.button] = false; I.mreleased[e.button] = true; });
+  window.addEventListener('mouseup', (e) => {
+    I.mouse[e.button] = false; I.mreleased[e.button] = true;
+    const pc = BTN[e.button];
+    if (pc && I.keys[pc]) synth('keyup', pc);
+    if (e.button >= 3 && (pc && wantPseudo(pc) || I.locked)) e.preventDefault();
+  });
+  window.addEventListener('auxclick', (e) => { if (e.button >= 3 && (wantPseudo(BTN[e.button]) || I.locked)) e.preventDefault(); }, true);
+  window.addEventListener('wheel', (e) => {
+    const c = e.deltaY < 0 ? 'WheelUp' : e.deltaY > 0 ? 'WheelDown' : null;
+    if (!c || !(I.capturing || (I.locked && bound.has(c)))) return;
+    e.preventDefault(); synth('keydown', c); setTimeout(() => synth('keyup', c), 80);
+  }, { passive: false, capture: true });
   window.addEventListener('contextmenu', (e) => { if (I.locked || (G.game && G.game.state === 'playing')) e.preventDefault(); });
   window.addEventListener('mousemove', (e) => {
     if (!I.locked) return;
@@ -80,7 +113,8 @@
   window.addEventListener('wheel', (e) => {
     // while the Tab status sheet is open the wheel scrolls it instead of switching weapons
     if (G.ui && G.ui.statusOpen && G.ui.statusOpen()) { G.ui.statusScroll(e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1)); return; }
-    if (I.locked || (G.game && G.game.state === 'buff')) { I.wheel += Math.sign(e.deltaY); }
+    // a wheel direction that is bound to an action no longer switches weapons
+    if ((I.locked && !bound.has(e.deltaY < 0 ? 'WheelUp' : 'WheelDown')) || (G.game && G.game.state === 'buff')) { I.wheel += Math.sign(e.deltaY); }
   }, { passive: true });
   // safety net so Ctrl+W during crouch-walk can't silently kill a run
   window.addEventListener('beforeunload', (e) => {

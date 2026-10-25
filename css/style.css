@@ -1399,3 +1399,5 @@ html.m .bs-wrap { padding-left: 24px; }
 #tut .tut-tile i { font-style: normal; font-size: 28px; line-height: 1.2; }
 #tut .tut-tile b { font-size: 12.5px; color: var(--tc); text-align: center; }
 #tut .tut-tile small { font-size: 10.5px; color: #b8ab92; text-align: center; line-height: 1.35; }
+.kc-btns { display: flex; gap: 6px; }
+.kc-btn { min-width: 112px; }

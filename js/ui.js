@@ -564,13 +564,24 @@
   };
 
   // ---------------- screens ----------------
+  // a screen that is rebuilt (a sale, a purchase, a key change...) keeps its scroll position: remembered per scrollable element
+  // (by its place in the tree) and put back when the new screen has the same heading
+  const sig = (s) => { const h = s.querySelector('h2, .ch-title, .c-title'); return h ? h.textContent.replace(/[\d,.]+/g, '').trim() : ''; };
+  const snapScroll = () => {
+    const s = UI.el.screens.firstElementChild; if (!s) return null;
+    const pos = [], walk = (el, path) => { if (el.scrollTop > 0) pos.push([path, el.scrollTop]); [...el.children].forEach((c, i) => walk(c, path + '/' + i)); };
+    walk(s, ''); return { sig: sig(s), pos, t: performance.now() };
+  };
   UI.screen = function (html, cls) {
+    let keep = snapScroll() || (UI._scrollKeep && performance.now() - UI._scrollKeep.t < 500 ? UI._scrollKeep : null);
+    UI._scrollKeep = null; if (UI._noKeep) { keep = null; UI._noKeep = false; } // (a tab change starts from the top)
     UI.el.screens.innerHTML = `<div class="screen ${cls || ''}">${html}</div>`;
     const s = UI.el.screens.firstChild;
+    if (keep && keep.pos.length && keep.sig === sig(s)) for (const [path, top] of keep.pos) { let el = s; for (const i of path.split('/').filter(Boolean)) el = el && el.children[+i]; if (el) el.scrollTop = top; }
     s.querySelectorAll('button, .card, .choice, .cx-tab, .cx-item').forEach((b) => b.addEventListener('mouseenter', () => G.sfx.ui('hover')));
     return s;
   };
-  UI.clearScreen = function () { UI.el.screens.innerHTML = ''; UI.tt.style.display = 'none'; UI._buffApi = null; };
+  UI.clearScreen = function () { UI._scrollKeep = snapScroll(); UI.el.screens.innerHTML = ''; UI.tt.style.display = 'none'; UI._buffApi = null; };
 
   UI.title = function () {
     const rec = G.save.data.records;
@@ -688,31 +699,38 @@
     };
     pick();
   };
-  // key configuration: click a row, press a key (Esc cancels). A key already used elsewhere is swapped over.
+  // key configuration: each action has two slots. Click a slot, press a key / wheel click / side button / wheel (Esc cancels, right-click empties a slot).
+  // A key already used by another action is taken away from it.
   UI.keyConfig = function (back) {
     const I = G.input, S = G.save.data.settings;
-    let waiting = null;
+    let waiting = null; // { a, i }
+    const snap = () => { S.keys = S.keys || {}; for (const [a] of I.BIND_LIST) if (!Array.isArray(S.keys[a])) S.keys[a] = I.slots(a); };
+    const done = () => { I.applyBinds(); G.save.write(); if (UI.buildAbilityRow && G.player && G.player.skills) UI.buildAbilityRow(); };
     const render = () => {
-      const rows = I.BIND_LIST.map(([a, label]) => `<div class="set-row kc-row"><span>${label}</span><button class="btn small kc-btn${waiting === a ? ' wait' : ''}" data-a="${a}">${waiting === a ? 'キーを押す…（Escで取消）' : I.keyName(a)}</button><span>${S.keys && S.keys[a] ? '✎' : ''}</span></div>`).join('');
-      const s = UI.screen(`<div class="panel" style="width:min(640px,94vw);max-height:90vh;overflow:auto"><h2>⌨️ キー設定</h2>
-        <div class="kc-note">項目をクリックして新しいキーを押してください。他の操作で使用中のキーを選ぶと、その操作と入れ替わります。</div>
+      I.capturing = !!waiting;
+      const rows = I.BIND_LIST.map(([a, label]) => { const sl = I.slots(a); return `<div class="set-row kc-row"><span>${label}</span><span class="kc-btns">${[0, 1].map((i) => { const w = waiting && waiting.a === a && waiting.i === i; return `<button class="btn small kc-btn${w ? ' wait' : ''}" data-a="${a}" data-i="${i}">${w ? '入力待ち…' : I.codeName(sl[i])}</button>`; }).join('')}</span></div>`; }).join('');
+      const s = UI.screen(`<div class="panel" style="width:min(680px,94vw);max-height:90vh;overflow:auto"><h2>⌨️ キー設定</h2>
+        <div class="kc-note">各操作に、キーを2つまで割り当てられます。枠をクリックして、新しいキー・マウスのホイール（回す／クリック）・サイドボタンを押してください（Escで取消、右クリックで空にする）。他の操作で使っているキーを選ぶと、そちらは空になります。</div>
         ${rows}
         <div style="margin-top:18px;display:flex;justify-content:space-between"><button class="btn small" id="kc-reset">↺ 初期設定に戻す</button><button class="btn" id="kc-back">↩ 戻る</button></div></div>`, 'dim');
-      s.querySelectorAll('.kc-btn').forEach((b) => { b.onclick = () => { G.sfx.ui('click'); waiting = b.dataset.a; render(); }; });
-      s.querySelector('#kc-reset').onclick = () => { G.sfx.ui('click'); S.keys = {}; I.applyBinds(); G.save.write(); if (UI.buildAbilityRow && G.player && G.player.skills) UI.buildAbilityRow(); render(); };
-      s.querySelector('#kc-back').onclick = () => { G.sfx.ui('click'); waiting = null; window.removeEventListener('keydown', onKey, true); back(); };
+      s.querySelectorAll('.kc-btn').forEach((b) => {
+        b.onclick = () => { G.sfx.ui('click'); waiting = { a: b.dataset.a, i: +b.dataset.i }; render(); };
+        b.oncontextmenu = (ev) => { ev.preventDefault(); snap(); S.keys[b.dataset.a][+b.dataset.i] = null; waiting = null; done(); G.sfx.ui('click'); render(); };
+      });
+      s.querySelector('#kc-reset').onclick = () => { G.sfx.ui('click'); S.keys = {}; waiting = null; done(); render(); };
+      s.querySelector('#kc-back').onclick = () => { G.sfx.ui('click'); waiting = null; I.capturing = false; window.removeEventListener('keydown', onKey, true); back(); };
     };
     const onKey = (e) => {
       if (!waiting) return;
       e.preventDefault(); e.stopPropagation();
       if (e.code === 'Escape') { waiting = null; render(); return; }
-      const a = waiting, code = e.code, prev = G.BIND[a][0];
-      S.keys = S.keys || {};
-      // whoever had this key as its main key takes our old one
-      for (const [b] of I.BIND_LIST) if (b !== a && G.BIND[b][0] === code) S.keys[b] = prev;
-      S.keys[a] = code;
-      I.applyBinds(); G.save.write(); G.sfx.ui('select');
-      if (UI.buildAbilityRow && G.player && G.player.skills) UI.buildAbilityRow();
+      const { a, i } = waiting, code = e.code;
+      snap();
+      const lost = [];
+      for (const [b, label] of I.BIND_LIST) for (let j = 0; j < 2; j++) if (S.keys[b][j] === code && !(b === a && j === i)) { S.keys[b][j] = null; if (b !== a) lost.push(label.replace(/^\S+\s/, '')); }
+      S.keys[a][i] = code;
+      done(); G.sfx.ui('select');
+      if (lost.length) G.ui.toastSmall(`${I.codeName(code)} を「${lost.join('」「')}」から外しました`);
       waiting = null; render();
     };
     window.addEventListener('keydown', onKey, true);

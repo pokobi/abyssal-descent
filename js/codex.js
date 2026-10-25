@@ -36,7 +36,7 @@
     const total = TABS.reduce((a, t) => a + t[2]().length, 0);
     const found = TABS.reduce((a, t) => a + t[2]().filter((o) => disc(t[0], o)).length, 0);
     const s = G.ui.screen(`<div class="codex"><div class="cx-head"><h2>📖 深淵図鑑</h2>${TABS.map((t) => `<span class="cx-tab ${t[0] === tab ? 'on' : ''}" data-t="${t[0]}">${t[1]} <span class="cx-count">${t[2]().length}</span></span>`).join('')}<span class="cx-count" style="margin-left:8px">発見 ${found}/${total}</span><input id="cx-q" placeholder="🔍 検索" value="${U.esc(query)}"><button class="btn small" id="cx-back">↩ 戻る</button></div><div class="cx-body"><div class="cx-grid" id="cx-grid"></div><div class="cx-detail" id="cx-detail"></div></div></div>`, 'dim');
-    s.querySelectorAll('.cx-tab').forEach((el) => el.onclick = () => { tab = el.dataset.t; sel = null; G.sfx.ui('click'); CX.open(back); });
+    s.querySelectorAll('.cx-tab').forEach((el) => el.onclick = () => { tab = el.dataset.t; sel = null; G.sfx.ui('click'); G.ui._noKeep = true; CX.open(back); });
     s.querySelector('#cx-back').onclick = () => { G.sfx.ui('click'); CX.close(); back(); };
     const q = s.querySelector('#cx-q');
     q.oninput = () => { query = q.value; renderGrid(); };

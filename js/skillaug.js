@@ -41,7 +41,7 @@
     if (m.oh_burn) C.status(e, 'burn', 2 * m.oh_burn);
     if (m.oh_frost) C.status(e, 'frost', 2 * m.oh_frost);
     if (m.oh_poison) C.status(e, 'poison', 2 * m.oh_poison);
-    if (m.oh_mark && e.alive) C.status(e, 'mark', 3);
+    if (m.oh_mark && e.alive) { if (!(e.st.mark > 0)) e.st.markMul = 1.6; C.status(e, 'mark', 3); }
     if (m.oh_stun && e.alive && !e.boss && G.game.time - (e._skStunT || -9) > 2) { e._skStunT = G.game.time; C.stun(e, 0.8 * m.oh_stun); }
     if (m.oh_vamp) C.heal(dealt * 0.06 * m.oh_vamp, true);
     if (m.oh_shock && e.alive && Math.random() < 0.35 * m.oh_shock) C.chain(e, 2, dealt * 0.3, 8, base);

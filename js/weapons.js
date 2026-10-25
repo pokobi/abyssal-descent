@@ -827,7 +827,7 @@
       if (w.def.trait === 'execute' && !h.e.boss && h.e.hp < h.e.maxHp * 0.2) info.forceExecute = true;
       let dmg = s.dmg * fall * pmul;
       if (info.forceExecute) dmg = h.e.hp + h.e.shield + 1;
-      if (P.temps.has('cloak') && !W._cloakUsed) { info.forceCrit = true; W._cloakUsed = true; G.combat.untemp('cloak'); }
+      if (P.temps.has('cloak') && !W._cloakUsed) { info.forceCrit = true; info.cloakMul = W._cloakMul; W._cloakUsed = true; G.combat.untemp('cloak'); }
       G.combat.damageEnemy(h.e, dmg, info);
       if (s.explo || w.def.trait === 'explosiveRounds') G.combat.explode(hp, 1.6, s.dmg * 0.6 * fall, { src: 'explosion', small: true, proc: true });
       if (w.def.trait === 'chainHit' && Math.random() < 0.5) { G.combat.chain(h.e, 2, s.dmg * 0.5, 9, { src: 'bullet', proc: true }); G.fx.strike(h.e.centerPos()); }

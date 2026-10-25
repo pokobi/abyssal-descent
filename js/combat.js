@@ -192,10 +192,10 @@
     let crit = false;
     if (src === 'bullet' || src === 'melee' || src === 'skill' || src === 'ally') {
       let cc = st.critChance + (info.critBonus || 0);
-      if (info.forceCrit || ctx.forceCrit || Math.random() < cc) { crit = true; dmg *= info.forceCrit ? Math.max(2.5, st.critMul) : st.critMul; }
+      if (info.forceCrit || ctx.forceCrit || Math.random() < cc) { crit = true; dmg *= info.forceCrit ? Math.max(info.cloakMul || 2.5, st.critMul) : st.critMul; }
     }
     ctx.crit = crit;
-    if (e.st.mark > 0) dmg *= 1.6;
+    if (e.st.mark > 0) dmg *= e.st.markMul || 1.6; // 'mark' skill levels raise it
     if (e.dmgMul) dmg *= e.dmgMul(info, ctx);
     // front armour (beetles etc.)
     let armored = false;
@@ -312,7 +312,7 @@
       const sk = P.skills.find((s) => s && s.id === 'mark'); if (sk) sk.cd = 0;
       const m = G.abilities.skm('mark');
       if (m.x_heal) C.heal(15);
-      if (m.x_spread) { let n = 0; for (const o of G.enemies.inRadius(e.pos, 12)) { if (o === e || !o.alive || n >= 2) continue; C.status(o, 'mark', 8); o.st.markKillReset = true; G.fx.beam(e.centerPos(), o.centerPos(), 0xff4030, 0.04, 0.3); n++; } }
+      if (m.x_spread) { let n = 0; for (const o of G.enemies.inRadius(e.pos, 12)) { if (o === e || !o.alive || n >= 2) continue; C.status(o, 'mark', 8); o.st.markMul = e.st.markMul; o.st.markKillReset = true; G.fx.beam(e.centerPos(), o.centerPos(), 0xff4030, 0.04, 0.3); n++; } }
     }
     G.game.onEnemyKilled(e);
   };
@@ -559,7 +559,7 @@
     const atk = info.attacker;
     if (atk && atk.alive && atk.isEnemy) {
       if (P.temps.has('ult_bastion') && G.abilities.skm('ult_bastion').x_thorns) C.damageEnemy(atk, amount * 2, { src: 'skill', ult: true, sk: 'ult_bastion', proc: true, noBuffs: true });
-      if (P.temps.has('thornarmor') && ctx.src === 'melee') C.damageEnemy(atk, amount * (G.abilities.skm('thornarmor').x_reflect ? 2 : 1), { src: 'skill', sk: 'thornarmor', proc: true, noBuffs: true });
+      if (P.temps.has('thornarmor') && ctx.src === 'melee') C.damageEnemy(atk, amount * (G.abilities.skm('thornarmor').x_reflect ? 2 : 1) * G.abilities.effK(P.skills.find((s) => s && s.id === 'thornarmor')), { src: 'skill', sk: 'thornarmor', proc: true, noBuffs: true });
     }
     P.hp -= dmg;
     if (G.Inv && G.Inv.wear && ctx.src !== 'dot' && ctx.src !== 'fall') G.Inv.wear(P, dmg + osHit); // worn armour takes the hit

@@ -25,7 +25,7 @@
     const st = P.stats, lvK = 1 - Math.min(0.36, 0.02 * A.totalLv(sk));
     const own = 1 - Math.min(0.5, A.skm ? A.skm(sk.id).cd : 0);
     if (sk.def.ult) return sk.def.cd * (1 - st.cdr * 0.5) * (1 - (st.ultCd || 0)) * lvK * own;
-    return sk.def.cd * A.SKILL_CD_MUL * (1 - st.cdr) * (1 - (st.skillCd || 0)) * lvK * own * (P.temps.has('ult_overcharge') ? 0.3 : 1);
+    return sk.def.cd * A.SKILL_CD_MUL * (1 - st.cdr) * (1 - (st.skillCd || 0)) * lvK * own * (P.temps.has('ult_overcharge') ? (P.ocCd || 0.3) : 1);
   };
   // skill power grows with its level (raised with skill tomes / buying the same skill again)
   A.power = (sk) => Math.pow(1.3, A.totalLv(sk)) * A.SKILL_POW_MUL * (1 + (sk && A.skm ? A.skm(sk.id).dmg : 0));
@@ -151,7 +151,7 @@
     const rk = 1 + (ult ? 0 : st.skillRad || 0) + m.area, dk = 1 + (ult ? st.ultDur || 0 : st.skillDur || 0) + m.dur;
     for (const k of ['r', 'len', 'range', 'w']) if (p[k]) p[k] *= rk;
     if (p.dur) p.dur *= dk;
-    if (!p.dmg && !p.dps) { const u = 1 + 0.04 * A.totalLv(sk); if (p.dur) p.dur *= u; if (p.range) p.range *= u; } // pure utility: longer / farther
+    if (!p.dmg && !p.dps && p.range) p.range *= 1 + 0.04 * A.totalLv(sk); // a pure-utility jump goes farther (durations are never stretched by levels)
     return p;
   };
   function castSkill(sk) {
@@ -223,7 +223,7 @@
         break;
       }
       case 'chrono':
-        G.game.chronoT = p.dur; G.game.chronoSlow = m.x_deep ? 0.2 : p.slow;
+        G.game.chronoT = p.dur; G.game.chronoSlow = Math.max(0.08, (m.x_deep ? 0.2 : p.slow) * Math.pow(0.93, A.totalLv(sk))); // the stronger the level, the slower the world
         if (m.x_self || m.x_vuln) tmp('chrono_fx', p.dur, { moveSpeed: m.x_self ? 0.2 : 0, fireRate: m.x_self ? 0.2 : 0, dmg: m.x_vuln ? 0.25 : 0 }, '⏳');
         G.sfx.magic(P.pos, 'dark'); G.sfx.rumble(0.8, 0.5); G.ui.tint('chrono', p.dur); break;
       case 'shockwave': {
@@ -389,7 +389,7 @@
         break;
       }
       case 'cloak':
-        tmp('cloak', p.dur, { invis: 1, critMul: m.x_assassin ? 1.0 : 0, moveSpeed: m.x_speed ? 0.3 : 0, hpRegen: m.x_heal ? P.stats.maxHp * 0.04 : 0 }, '👻'); G.weapons._cloakUsed = false;
+        tmp('cloak', p.dur, { invis: 1, critMul: m.x_assassin ? 1.0 : 0, moveSpeed: m.x_speed ? 0.3 : 0, hpRegen: m.x_heal ? P.stats.maxHp * 0.04 : 0 }, '👻'); G.weapons._cloakUsed = false; G.weapons._cloakMul = 1 + 1.5 * ek;
         if (m.x_smoke) C.zone(P.pos.clone(), 5, 6, 'smoke', 0);
         G.sfx.magic(P.pos, 'dark'); break;
       case 'overdrive':
@@ -409,7 +409,7 @@
         const a = aim(60, true); if (!a.e) { G.ui.toastSmall('🎯 対象がいない'); ok = false; break; }
         const targets = [a.e];
         if (m.x_multi) for (const e of G.enemies.inRadius(a.e.pos, 10)) { if (targets.length >= 3) break; if (!targets.includes(e)) targets.push(e); }
-        for (const e of targets) { C.status(e, 'mark', p.dur); e.st.markKillReset = true; G.fx.ring(e.pos, 1.2, 0xff4030, 0.6); }
+        for (const e of targets) { C.status(e, 'mark', p.dur); e.st.markMul = 1 + 0.6 * (1 + 0.5 * (ek - 1)); e.st.markKillReset = true; G.fx.ring(e.pos, 1.2, 0xff4030, 0.6); }
         G.sfx.magic(a.e.pos, 'dark'); break;
       }
       case 'toxic': { const a = aim(40); C.zone(a.floorPt, p.r, p.dur, 'poison', sc(18), { stacks: m.x_virulent ? 2 : 1 }); G.sfx.spit(a.floorPt); break; }

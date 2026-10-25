@@ -122,9 +122,9 @@
         G.sfx.fire && G.sfx.fire(P.pos, true); break;
       case 'ult_shadow': tmp('ult_shadow', p.dur, { invis: 1, critChance: 0.6, critMul: m.x_lethal ? 1.0 : 0.5, lifesteal: m.x_vamp ? 0.05 : 0, moveSpeed: m.x_speed ? 0.3 : 0 }, '🥷', '影の舞'); G.sfx.magic(P.pos, 'dark'); break;
       case 'ult_orbital': A.auras.push({ kind: 'beam', t: p.dur, r: p.r, dps: sc(p.dps), pt: aimPt(70), track: m.x_track ? 9 : 3, sk: id }); G.sfx.zap && G.sfx.zap(P.pos); break;
-      case 'ult_sanctuary': A.auras.push({ kind: 'holy', t: p.dur, r: p.r, dps: sc(p.dps), c: P.pos.clone(), heal: m.x_heal ? 0.07 : 0.04, follow: !!m.x_follow, sk: id }); G.sfx.magic(P.pos, 'holy'); break;
+      case 'ult_sanctuary': A.auras.push({ kind: 'holy', t: p.dur, r: p.r, dps: sc(p.dps), c: P.pos.clone(), heal: (m.x_heal ? 0.07 : 0.04) * A.effK(sk), follow: !!m.x_follow, sk: id }); G.sfx.magic(P.pos, 'holy'); break;
       case 'ult_bloodstorm': A.auras.push({ kind: 'drain', t: p.dur, r: p.r, dps: sc(p.dps), follow: true, ls: m.x_ls ? 0.65 : 0.4, over: !!m.x_over, sk: id }); G.sfx.magic(P.pos, 'dark'); break;
-      case 'ult_overcharge': C.cdResetAll(); P.pileCd = 0; tmp('ult_overcharge', p.dur, { skillDmg: m.x_power ? 0.3 : 0 }, '🔋', '過充電'); G.sfx.zap && G.sfx.zap(P.pos); G.fx.flash(P.chestPos(), 0x80d0ff, 50, 0.3, 14); break;
+      case 'ult_overcharge': P.ocCd = Math.max(0.12, 0.3 * Math.pow(0.95, A.totalLv(sk))); C.cdResetAll(); P.pileCd = 0; tmp('ult_overcharge', p.dur, { skillDmg: m.x_power ? 0.3 : 0 }, '🔋', '過充電'); G.sfx.zap && G.sfx.zap(P.pos); G.fx.flash(P.chestPos(), 0x80d0ff, 50, 0.3, 14); break;
       case 'ult_titan': {
         const before = st.maxHp;
         tmp('ult_titan', p.dur, { maxHpPct: 0.8, meleeDmg: 1.5, pileDmg: 1.0, armor: m.x_iron ? 0.4 : 0.25 }, '🗿', '巨人化');

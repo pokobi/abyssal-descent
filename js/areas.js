@@ -289,8 +289,8 @@
       opts: () => [{ icon: '⚔️', label: '近づく', sub: '???', run: () => { G.ui.toast('罠だ！ 魔物が現れた！', 'warn'); for (let i = 0; i < 2 + Math.floor(GM.area / G.Run.CYCLE); i++) GM.spawnEnemy({ elite: true, near: true }); GM.ambushReward = true; } }] },
     { id: 'spirit', npc: '囚われた精霊', icon: '🧚', text: '「封印を解いて…あなたの力を少しだけ分けて…」',
       opts: () => [{ icon: '💔', label: '生命力を分け与える', sub: '現在HPの40%を失う → 使い魔を得る', run: () => { P.hp = Math.max(1, P.hp * 0.6); const b = P.has('z_owl') ? 'z_wolf' : 'z_owl'; P.addBuff(b); G.ui.itemCard(G.BUFF_BY_ID[b], '[使い魔]'); } }] },
-    { id: 'alchemist', npc: '錬金術師', icon: '⚗️', text: '「素材をくれれば、もっと良い物にしてやろう」',
-      opts: () => { const total = Object.values(P.inv).reduce((a, n) => a + n, 0); return [{ icon: '⚗️', label: 'アイテム2つを錬成', sub: '手持ちアイテム2つ → レア以上のアイテム1つ', disabled: total < 2, run: () => { for (let k = 0; k < 2; k++) { const ids = Object.keys(P.inv).filter((i) => P.inv[i] > 0).sort((a, b) => G.RARITY[G.ITEM_BY_ID[a].rarity].tier - G.RARITY[G.ITEM_BY_ID[b].rarity].tier); if (ids.length) P.takeItem(ids[0]); } const it = U.pick(G.ITEMS.filter((x) => x.cat !== 'grenade' && G.RARITY[x.rarity].tier >= 2)); P.addItem(it.id, 1); G.ui.refreshItems(); } },
+    { id: 'alchemist', npc: '錬金術師', icon: '⚗️', repeat: true, text: '「素材をくれれば、もっと良い物にしてやろう」',
+      opts: () => { const total = Object.values(P.inv).reduce((a, n) => a + n, 0); return [{ icon: '⚗️', label: 'アイテム2つを錬成', sub: '素材を2つ選ぶ → 出来上がる候補から1つを選ぶ', disabled: total < 2, run: () => ({ sub: (back) => AR.alchemy(back) }) },
         { icon: '🧪', label: `霊薬を安く買う（${cost(90)}🪙）`, sub: '生命の霊薬（HP全回復）', disabled: GM.run.coins < cost(90), run: () => { GM.run.coins -= cost(90); P.addItem('h_elixir', 1); } }]; } },
     { id: 'purifier', npc: '浄化の僧', icon: '📿', text: '「呪いに蝕まれておるな。祓ってしんぜよう」',
       opts: () => { const cs = AR.curses(); return [{ icon: '✨', label: `全ての呪いを祓う（${cost(140)}🪙）`, sub: cs.length ? `呪い ${cs.length}種` : '呪いはない', disabled: !cs.length || GM.run.coins < cost(140), run: () => { GM.run.coins -= cost(140); for (const id of cs) { P.buffs.delete(id); } P.recalc(); G.ui.toast('✨ 全ての呪いが祓われた', 'good'); } },
@@ -316,7 +316,40 @@
       w.interactables.push({ type: 'npc', ev, pos: pos.clone().add(V(0, 1.4, 0)), model: m, used: false });
     });
   };
+  // the alchemist: pick two of your items, then choose what they become (a rare-or-better item, at least as good as the average of the two)
+  AR.alchemy = function (back, ev) {
+    const tier = (id) => G.RARITY[G.ITEM_BY_ID[id].rarity].tier;
+    const stock = () => Object.keys(P.inv).filter((id) => P.inv[id] > 0 && G.ITEM_BY_ID[id]).sort((a, b) => tier(a) - tier(b));
+    const keep = (fn) => { GM._keepModal = true; setTimeout(fn, 0); };
+    const pickSecond = (first) => {
+      const list = stock().filter((id) => id !== first || P.inv[id] > 1);
+      const opts = list.map((id) => { const d = G.ITEM_BY_ID[id]; return { icon: d.icon, label: `${d.name}　×${P.inv[id] - (id === first ? 1 : 0)}`, sub: G.RARITY[d.rarity].name, onPick: () => keep(() => pickResult(first, id)) }; });
+      opts.push({ icon: '↩', label: '素材を選び直す', onPick: () => keep(pickFirst) });
+      GM.modal('⚗️ 2つ目の素材', `1つ目：${G.ITEM_BY_ID[first].icon} ${G.ITEM_BY_ID[first].name}`, opts);
+    };
+    const pickFirst = () => {
+      const opts = stock().map((id) => { const d = G.ITEM_BY_ID[id]; return { icon: d.icon, label: `${d.name}　×${P.inv[id]}`, sub: G.RARITY[d.rarity].name, onPick: () => keep(() => pickSecond(id)) }; });
+      opts.push({ icon: '↩', label: 'やめる', onPick: () => keep(back) });
+      GM.modal('⚗️ 1つ目の素材', '錬成に使うアイテムを選ぶ。素材のレア度が高いほど、良い物ができる。', opts);
+    };
+    const pickResult = (a, b) => {
+      const minT = Math.max(2, Math.round((tier(a) + tier(b)) / 2));
+      let pool = G.ITEMS.filter((x) => x.cat !== 'grenade' && G.RARITY[x.rarity].tier >= minT);
+      if (!pool.length) pool = G.ITEMS.filter((x) => x.cat !== 'grenade' && G.RARITY[x.rarity].tier >= 2);
+      const cands = U.shuffle(pool.slice()).slice(0, 3);
+      const A = G.ITEM_BY_ID[a], B = G.ITEM_BY_ID[b];
+      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: d.desc || '', onPick: () => {
+        P.takeItem(a); P.takeItem(b); P.addItem(d.id, 1); G.ui.refreshItems();
+        const it = AR._alchIt; if (it) it.used = true;
+        G.sfx.ui('rare'); G.ui.toast(`⚗️ ${A.name} ＋ ${B.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[錬成した]');
+      } }));
+      opts.push({ icon: '↩', label: '素材を選び直す', onPick: () => keep(pickFirst) });
+      GM.modal('⚗️ 何ができた？', `${A.icon} ${A.name} ＋ ${B.icon} ${B.name} から、次のうち1つを錬成できる。`, opts);
+    };
+    pickFirst();
+  };
   AR.runEvent = function (it) {
+    AR._alchIt = it;
     const ev = it.ev;
     const opts = ev.opts();
     const choices = opts.map((o) => ({ icon: o.icon, label: o.label, sub: o.sub || '', disabled: o.disabled, onPick: () => {

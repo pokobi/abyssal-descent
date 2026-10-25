@@ -82,7 +82,7 @@
   add('k_reload', '戦闘の高揚', '♻️', 'uncommon', 'offense', '撃破時、マガジンの20%を補充。', { max: 3, hooks: { onKill(c, n) { C.refill(0.2 * n); } } });
   add('k_speed', '狩人の疾走', '🐆', 'uncommon', 'mobility', '撃破時、3秒間移動速度+25%。', { hooks: { onKill() { C.temp('k_speed', 3, { moveSpeed: 0.25 }, '🐆'); } } });
   add('k_cd', '魂の循環', '⏳', 'rare', 'skill', '撃破時、スキルのクールタイム-0.5秒。', { max: 3, hooks: { onKill(c, n) { C.cdReduce(0.5 * n); } } });
-  add('k_shield', '魂の障壁', '💠', 'uncommon', 'defense', '撃破時、オーバーシールド+5（最大50）。', { max: 3, hooks: { onKill(c, n) { C.overshield(5 * n, 50); } } });
+  add('k_shield', '魂の障壁', '💠', 'uncommon', 'defense', '撃破時、オーバーシールド+5。', { max: 3, hooks: { onKill(c, n) { C.overshield(5 * n, 50); } } });
   add('k_chain', '雷葬', '⚡', 'rare', 'element', '撃破時、近くの敵2体に雷撃（電撃付与）。', { max: 2, hooks: { onKill(c, n) { C.chain(c.pos, 2 * n, sc(30), 10, { src: 'buff', proc: true, elem: 'shock' }); } } });
   add('k_frenzy', '殺戮の狂乱', '🩸', 'rare', 'offense', '撃破毎に与ダメ+3%（最大+30%）。5秒間撃破がないとリセット。', {
     hooks: {
@@ -175,11 +175,11 @@
   add('g_recoil', '反動利用', '🏹', 'uncommon', 'mobility', 'グラップル使用時、4秒間 与ダメ+20%。', { max: 2, hooks: { onGrapple(c, n) { C.temp('g_recoil', 4, { dmg: 0.2 * n }, '🏹'); } } });
   add('g_gale', '疾風の鉤', '🌬️', 'uncommon', 'mobility', 'グラップル使用時、4秒間 移動速度+30%。', { hooks: { onGrapple() { C.temp('g_gale', 4, { moveSpeed: 0.3 }, '🌬️'); } } });
   add('g_wave', '鉤縄衝撃', '💥', 'rare', 'mobility', 'グラップル使用時、周囲5mに衝撃波（ダメージ＋ノックバック）。', { max: 2, hooks: { onGrapple(c, n) { C.explode(P.pos.clone().setY(P.pos.y + 0.8), 5, sc(60 * n), { src: 'buff', proc: true, knock: 8, color: 0xbfd8ff }); } } });
-  add('g_guard', '鉤縄の加護', '🛡️', 'rare', 'mobility', 'グラップル使用時、オーバーシールド+25（最大60）。', { hooks: { onGrapple() { C.overshield(25, 60); } } });
+  add('g_guard', '鉤縄の加護', '🛡️', 'rare', 'mobility', 'グラップル使用時、オーバーシールド+25。', { hooks: { onGrapple() { C.overshield(25, 60); } } });
   add('g_aerial', '空中戦の流儀', '🕊️', 'epic', 'mobility', 'グラップルで移動している最中に敵を倒すと、グラップルのクールタイムを即リセット。', { hooks: { onKill() { const g = P.grapple; if (g && (g.state === 'attached' || g.state === 'firing' || g.state === 'retract' || (G.game.time - (g.endT || -10)) < 3)) { P.grappleCd = 0; G.ui.toastSmall('⚓ グラップル再使用可能'); } } } });
   add('g_twin', '双鉤', '⚓', 'legendary', 'mobility', 'グラップルのクールタイム-40%・射程+10m・巻き取り速度+25%。', { mods: { grappleCd: 0.4, grappleRange: 10, grappleSpeed: 0.25 } });
   add('m_grapspeed', '巻上げ機', '⚙️', 'uncommon', 'mobility', 'グラップルの巻き取り速度+35%。', { mods: { grappleSpeed: 0.35 }, max: 2 });
-  add('m_grapshield', '吊り盾', '💠', 'uncommon', 'defense', 'グラップル開始時、オーバーシールド+15（最大60）。', { hooks: { onGrapple() { C.overshield(15, 60); } } });
+  add('m_grapshield', '吊り盾', '💠', 'uncommon', 'defense', 'グラップル開始時、オーバーシールド+15。', { hooks: { onGrapple() { C.overshield(15, 60); } } });
   add('m_momentum', '疾走の勢い', '🚀', 'rare', 'mobility', '秒速11m以上で移動中、与ダメ+20%・被ダメ-15%。', { hooks: { preHit(c) { if (P.speedH > 11) c.bonus += 0.2; }, preDamaged(c) { if (P.speedH > 11) c.red += 0.15; } } });
   add('m_sprintreload', '走行装填', '🏃', 'uncommon', 'mobility', 'スプリント中もリロードでき、リロード速度+25%。', { mods: { reloadSpeed: 0.25 }, flag: true });
   add('m_skillhaste', '詠唱疾走', '⚡', 'uncommon', 'mobility', 'スキル使用時、3秒間移動速度+30%。', { hooks: { onSkill() { C.temp('m_skillhaste', 3, { moveSpeed: 0.3 }, '⚡'); } } });

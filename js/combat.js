@@ -42,10 +42,12 @@
     const max = P.stats.maxHp;
     const over = P.hp + amount - max;
     P.hp = Math.min(max, P.hp + amount);
-    if (over > 0 && P.has('d_overheal')) P.os = Math.min(Math.max(P.os, 60), P.os + over);
+    if (over > 0 && P.has('d_overheal')) P.os = Math.min(Math.max(P.os, C.osMax()), P.os + over);
     if (!silent && amount >= 5) G.ui.healFlash();
   };
-  C.overshield = function (amount, cap) { if (!P) return; P.os = Math.min(Math.max(P.os, cap || 9999), P.os + amount); };
+  // the overshield can pile up to twice your max HP (the per-source caps that used to stop it at 35-200 are gone)
+  C.osMax = () => P.stats.maxHp * 2;
+  C.overshield = function (amount, cap) { if (!P) return; P.os = Math.min(Math.max(P.os, C.osMax()), P.os + amount); };
   // a shield that only lasts `dur` seconds
   C.timedShield = function (amount, dur, cap) { if (!P) return; const b = P.os; C.overshield(amount, cap); const add = P.os - b; if (add > 0) (P.tShields || (P.tShields = [])).push({ left: add, t: dur }); };
   C.temp = function (id, dur, mods, icon, label) {

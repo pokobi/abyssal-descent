@@ -844,7 +844,7 @@
           const d2 = t2.centerPos().sub(hp).normalize();
           const ex = new Set(exclude || []); ex.add(h.e);
           G.fx.tracer(hp, t2.centerPos(), 0xffe0a0, 0.02, 0.08);
-          W.traceShot(w, Object.assign({}, s, { pierce: 0 }), hp.clone().addScaledVector(d2, 0.2), d2, hp, 1, depth + 1, ex);
+          W.traceShot(w, Object.assign({}, s, { pierce: 0, dmg: s.dmg * (P.temps.has('ricostorm') ? (W._ricoMul || 1) : 1) }), hp.clone().addScaledVector(d2, 0.2), d2, hp, 1, depth + 1, ex);
           G.sfx.ricochet(hp);
         }
       }

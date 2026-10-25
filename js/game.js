@@ -2136,6 +2136,8 @@
     GM.time += gdt;
     if (GM.run && GM.state !== 'title') GM.run.playT = (GM.run.playT || 0) + gdt; // total play time of the run (kept through reloads with the checkpoint)
     if (GM.chronoT > 0) { GM.chronoT -= gdt; GM.enemyTimeScale = 1 - GM.chronoSlow; } else GM.enemyTimeScale = 1;
+    // how strongly time is being bent (skill, ultimate, item, relic, perk; not the item wheel's brief slowdown)
+    G.ui.timeFx(Math.max((GM.chronoT > 0 && !(G.abilities.wheelOpen && G.abilities.wheelOpen())) ? GM.chronoSlow : 0, 1 - GM.timeScale), dt);
     GM.enemyTimeScale *= GM.enrage.tm;
     if (GM.dev) { if (GM.dev.freeze) GM.enemyTimeScale = 0; if (GM.dev.noCd) { for (const s of P.skills) if (s) { s.cd = 0; if (s.maxCharges) s.charges = s.maxCharges; } P.pileCd = 0; P.grappleCd = 0; } }
     if (GM.state === 'dead') { if (GM.deathFrozen) return; P.update(gdt); G.enemies.update(gdt); G.bosses.update(gdt); G.combat.update(gdt); G.fx.update(gdt, camera, renderer); G.LightPool.update(gdt, G.world, camera.position, GM.time); return; }

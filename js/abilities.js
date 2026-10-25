@@ -151,7 +151,8 @@
     const rk = 1 + (ult ? 0 : st.skillRad || 0) + m.area, dk = 1 + (ult ? st.ultDur || 0 : st.skillDur || 0) + m.dur;
     for (const k of ['r', 'len', 'range', 'w']) if (p[k]) p[k] *= rk;
     if (p.dur) p.dur *= dk;
-    if (!p.dmg && !p.dps && p.range) p.range *= 1 + 0.04 * A.totalLv(sk); // a pure-utility jump goes farther (durations are never stretched by levels)
+    if (!p.dmg && !p.dps && p.range) p.range *= 1 + 0.04 * A.totalLv(sk); // a pure-utility jump goes farther
+    if (sk.id === 'barrier' || sk.id === 'ult_timestop') p.dur *= 1 + 0.04 * A.totalLv(sk); // (the only two whose level stretches the time; every other duration stays as it is)
     return p;
   };
   function castSkill(sk) {
@@ -192,7 +193,7 @@
         let dx = fx * f + rx * r, dz = fz * f + rz * r; const l = Math.hypot(dx, dz);
         if (l < 0.1) { dx = fx; dz = fz; } else { dx /= l; dz /= l; }
         const from = P.pos.clone(), to = from.clone().add(V(dx * 7, 0, dz * 7));
-        P.vel.set(dx * p.power, P.grounded ? 2.5 : Math.max(P.vel.y, 1.5), dz * p.power);
+        const dpw = p.power * (1 + 0.03 * A.totalLv(sk)); P.vel.set(dx * dpw, P.grounded ? 2.5 : Math.max(P.vel.y, 1.5), dz * dpw);
         P.grounded = false; P.invulnT = 0.18; P.fovKick = 12;
         G.sfx.whoosh(0.35, 0.9);
         for (let i = 0; i < 16; i++) G.fx.norm.spawn(P.pos.x, P.pos.y + 0.8, P.pos.z, -dx * U.rand(2, 6) + U.rand(-1, 1), U.rand(0, 1), -dz * U.rand(2, 6) + U.rand(-1, 1), 0.5, 0.3, 0.9, 0.7, 0.7, 0.72, 0.35, 0, 2);
@@ -223,7 +224,7 @@
         break;
       }
       case 'chrono':
-        G.game.chronoT = p.dur; G.game.chronoSlow = Math.max(0.08, (m.x_deep ? 0.2 : p.slow) * Math.pow(0.93, A.totalLv(sk))); // the stronger the level, the slower the world
+        G.game.chronoT = p.dur; G.game.chronoSlow = 1 - Math.max(0.08, (m.x_deep ? 0.2 : p.slow) * Math.pow(0.93, A.totalLv(sk))); // p.slow = the speed that is left; levels leave less of it
         if (m.x_self || m.x_vuln) tmp('chrono_fx', p.dur, { moveSpeed: m.x_self ? 0.2 : 0, fireRate: m.x_self ? 0.2 : 0, dmg: m.x_vuln ? 0.25 : 0 }, '⏳');
         G.sfx.magic(P.pos, 'dark'); G.sfx.rumble(0.8, 0.5); G.ui.tint('chrono', p.dur); break;
       case 'shockwave': {
@@ -413,7 +414,7 @@
         G.sfx.magic(a.e.pos, 'dark'); break;
       }
       case 'toxic': { const a = aim(40); C.zone(a.floorPt, p.r, p.dur, 'poison', sc(18), { stacks: m.x_virulent ? 2 : 1 }); G.sfx.spit(a.floorPt); break; }
-      case 'ricostorm': tmp('ricostorm', p.dur, { dmg: m.x_dmg ? 0.2 : 0, fireRate: m.x_rate ? 0.25 : 0 }, '↪️'); break;
+      case 'ricostorm': G.weapons._ricoMul = 1 + 0.06 * A.totalLv(sk); tmp('ricostorm', p.dur, { dmg: m.x_dmg ? 0.2 : 0, fireRate: m.x_rate ? 0.25 : 0 }, '↪️'); break;
       case 'grasp': {
         const a = aim(40), pt = a.floorPt.clone();
         C.zone(pt, p.r, p.dur, 'grasp', sc(p.dps), { interval: 0.25, onEnd: m.x_crush ? () => C.explode(pt.clone().add(V(0, 1, 0)), p.r * 0.7, sc(150), { src: 'skill', color: 0x6a2080 }) : null });
@@ -461,6 +462,7 @@
         const from = P.pos.clone();
         G.fx.smoke(P.chestPos(), 8, 0.8, 0x4a6a8a, 0.4, 0.8);
         P.pos.copy(h.p); P.vel.set(0, 0, 0); P.hp = Math.max(P.hp, h.hp); G.world.depenetrate(P.pos, P.hw, P.height);
+        { const hl = 0.02 * A.totalLv(sk); if (hl > 0) C.heal(P.stats.maxHp * hl); } // each level: +2% max HP healed on the way back
         if (m.x_heal) C.heal(P.stats.maxHp * 0.2);
         if (m.x_nova) C.explode(from.add(V(0, 1, 0)), 5, sc(120), { src: 'skill', color: 0x80b0ff });
         G.sfx.magic(P.pos); G.ui.tint('rewind', 0.5); P.fovKick = 12;
@@ -490,7 +492,7 @@
       }
       case 'thornarmor': tmp('thornarmor', p.dur, { armor: m.x_harden ? 0.5 : 0.35, hpRegen: m.x_heal ? 3 : 0 }, '🌵'); G.sfx.mech('grab'); break;
       case 'flight':
-        P.vel.y = 17; P.grounded = false; P.glideT = p.dur + 1.5;
+        P.vel.y = 17 * (1 + 0.02 * A.totalLv(sk)); P.grounded = false; P.glideT = p.dur + 1.5;
         if (m.x_sky) tmp('flight_sky', p.dur + 1.5, { dmg: 0.25 }, '🎯');
         if (m.x_dive) P.leap = { t: -0.6, r: 6 * (1 + m.area), dmg: sc(140), sk: id, maxT: p.dur + 6 };
         G.sfx.whoosh(0.6, 1.0, true); P.fovKick = 12; for (let i = 0; i < 20; i++) G.fx.norm.spawn(P.pos.x, P.pos.y, P.pos.z, U.rand(-3, 3), U.rand(-1, 0), U.rand(-3, 3), 0.6, 0.3, 1.2, 0.8, 0.8, 0.8, 0.4, 0, 2); break;

@@ -735,6 +735,44 @@
       case 'deny': out.gain.value = 0.3; tn({ t, f0: 130, d: 0.1, g: 0.3, to: out, type: 'triangle', lp: 500 }); break;
     }
   };
+  // ---- time slowing / stopping: a falling sweep going in, a low hum and slow clock ticks while it lasts, a rising sweep coming out ----
+  A.timeIn = function (k) {
+    if (!ctx || !voice(1.3)) return;
+    const t = ctx.currentTime, out = dest(null, 0.7), g = 0.55 + 0.45 * k; out.gain.value = 0.9;
+    tn({ t, f0: 560, f1: 40, d: 1.15, g: 0.5 * g, to: out, type: 'sine' });
+    tn({ t, f0: 280, f1: 36, d: 1.25, g: 0.32 * g, to: out, type: 'sawtooth', lp: 700 });
+    nz({ t, buf: 'pink', f: [['lowpass', 5200, 0.8, 160, 1.05]], g: 0.45 * g, a: 0.01, d: 1.05, to: out });
+    nz({ t, f: [['bandpass', 3200, 2.2, 420, 0.8]], g: 0.16 * g, d: 0.8, to: out });
+    if (k >= 0.8) { A.bell(); tn({ t: t + 0.05, f0: 90, f1: 28, d: 1.0, g: 0.5, to: out, type: 'triangle' }); }
+  };
+  A.timeOut = function (k) {
+    if (!ctx || !voice(0.9)) return;
+    const t = ctx.currentTime, out = dest(null, 0.6), g = 0.5 + 0.4 * k; out.gain.value = 0.8;
+    tn({ t, f0: 60, f1: 1000, d: 0.55, g: 0.34 * g, to: out, type: 'sine' });
+    nz({ t, buf: 'white', f: [['bandpass', 600, 2, 6500, 0.5]], g: 0.2 * g, a: 0.05, d: 0.5, to: out });
+    tn({ t: t + 0.45, f0: 900, f1: 880, d: 0.25, g: 0.1 * g, to: out, type: 'triangle', lp: 3500 });
+  };
+  A.timeTick = function (k) {
+    if (!ctx) return;
+    const t = ctx.currentTime, out = dest(null, 0.35); out.gain.value = 0.5 + 0.4 * k;
+    nz({ t, f: [['bandpass', 2300 + Math.random() * 400, 6]], g: 0.3, d: 0.03, to: out });
+    tn({ t, f0: 1500, f1: 900, d: 0.06, g: 0.1, to: out, type: 'triangle' });
+    tn({ t: t + 0.01, f0: 140, f1: 90, d: 0.12, g: 0.18 * (0.5 + k), to: out, type: 'sine' });
+  };
+  let tdr = null;
+  A.timeDrone = function (k) {
+    if (!ctx) return;
+    if (!tdr) {
+      const out = dest(null, 0.5); out.gain.value = 0.0001;
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter();
+      o1.type = 'triangle'; o2.type = 'sine'; o1.frequency.value = 46; o2.frequency.value = 69; lp.type = 'lowpass'; lp.frequency.value = 260;
+      o1.connect(lp); o2.connect(lp); lp.connect(out); o1.start(); o2.start();
+      tdr = { out, o1, o2, t: 0, w: 0 };
+    }
+    const now = ctx.currentTime; tdr.t = performance.now();
+    tdr.out.gain.setTargetAtTime(0.05 + 0.1 * k, now, 0.15); tdr.o1.frequency.setTargetAtTime(46 - 14 * k, now, 0.3);
+    if (!tdr.w) tdr.w = setInterval(() => { if (performance.now() - tdr.t > 300) { tdr.out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.12); clearInterval(tdr.w); tdr.w = 0; } }, 120);
+  };
   A.bell = function () {
     // deep bronze bell for boss/portal moments
     if (!ctx || smp('bell', null, 0.5, 0.75, 1.0)) return;

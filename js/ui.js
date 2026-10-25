@@ -99,6 +99,30 @@
     UI.tintT = dur; UI.tintK = k;
     const f = UI.el.tint; f.style.transition = 'opacity .3s'; f.style.background = TINTS[k] || 'none'; f.style.opacity = 1;
   };
+  // ---- time slowing / stopping (chrono, time stop, the item, the hourglass, the ADS perk): one effect for all of them, scaled by how strong the slowdown is.
+  // a bluish, desaturated frame with a ripple that keeps rolling out, a burst when it starts, ticking and a low hum while it lasts (audio.js)
+  UI.timeFx = function (target, dt) {
+    const S = UI._tf || (UI._tf = { k: 0, on: false, tick: 0 });
+    let el = UI._tfEl;
+    if (!el) { el = UI._tfEl = document.createElement('div'); el.id = 'timefx'; UI.el.hud.appendChild(el); }
+    const want = target > 0.05;
+    const burst = (cls, ms) => { const b = document.createElement('div'); b.className = cls; UI.el.hud.appendChild(b); setTimeout(() => b.remove(), ms); };
+    if (want && !S.on) {
+      S.on = true; S.k = target; S.tick = 0.25;
+      const big = target >= 0.5;
+      burst('tf-flash', 600); burst('tf-burst', 800); if (big) setTimeout(() => burst('tf-burst', 800), 140);
+      if (P && G.fx) { G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), big ? 16 : 8, 0x9fc0ff, 0.9); G.fx.flash(P.chestPos(), 0xcfe0ff, big ? 70 : 35, 0.5, 20); }
+      G.sfx.timeIn(target);
+    } else if (!want && S.on) {
+      S.on = false; burst('tf-flash', 600); G.sfx.timeOut(S.k);
+    }
+    if (S.on) {
+      S.k = U.damp(S.k, target, 5, dt);
+      el.style.opacity = String(Math.min(1, 0.3 + 0.8 * S.k)); el.classList.toggle('stop', S.k >= 0.8);
+      S.tick -= dt; if (S.tick <= 0) { S.tick = 0.65 + 0.7 * S.k; G.sfx.timeTick(S.k); }
+      G.sfx.timeDrone(S.k);
+    } else el.style.opacity = '0';
+  };
   UI.scope = function (on, kind) { if (kind && UI.el.scope.dataset.kind !== kind) UI.el.scope.dataset.kind = kind; UI.el.scope.style.opacity = on ? 1 : 0; UI.el.crosshair.style.opacity = on ? 0 : UI.el.crosshair.style.opacity; };
   UI.pileIndicator = function (on) { UI.el.pileInd.classList.toggle('hidden', !on); };
   UI.grappleHint = function (pv, state, cd) {

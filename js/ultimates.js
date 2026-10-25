@@ -68,7 +68,7 @@
         G.sfx.rumble(3, 1); break;
       }
       case 'ult_timestop':
-        G.game.chronoT = p.dur; G.game.chronoSlow = 0.05;
+        G.game.chronoT = p.dur; G.game.chronoSlow = 0.95; // enemies keep 5% of their speed
         tmp('ult_timestop', p.dur, { dmg: m.x_free ? 0.35 : 0, hpRegen: m.x_heal ? st.maxHp * 0.04 : 0 }, '⏱️', '時止め');
         G.ui.tint('chrono', p.dur); G.sfx.magic(P.pos, 'dark'); G.sfx.bell(); break;
       case 'ult_berserk': tmp('ult_berserk', p.dur, { dmg: 0.8 + (m.x_rage ? 0.4 : 0), fireRate: 0.4, lifesteal: 0.08 + (m.x_blood ? 0.06 : 0), moveSpeed: 0.2, armor: m.x_iron ? 0.3 : 0 }, '👹', '鬼神化'); G.ui.tint('rage', p.dur); G.sfx.monster(null, 'roar', 1.3, 0.6); break;

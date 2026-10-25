@@ -9,8 +9,8 @@
   const fmt = (n) => U.fmt(n);
   const R = (r) => G.ui.R(r);
 
-  PW.weaponValue = (w) => Math.max(1, Math.round((w.def.price || 0) * PW.RATE * (1 + 0.2 * (w.lv || 0)) / 5) * 5);
-  PW.meleeValue = (m) => Math.max(1, Math.round((m.def.price || 0) * PW.RATE * (1 + 0.2 * (m.lv || 0)) / 5) * 5);
+  PW.weaponValue = (w) => w.def.price ? Math.max(5, Math.round(w.def.price * PW.RATE * (1 + 0.2 * (w.lv || 0)) / 5) * 5) : (w.lv || 0) * 60;
+  PW.meleeValue = (m) => m.def.price ? Math.max(5, Math.round(m.def.price * PW.RATE * (1 + 0.2 * (m.lv || 0)) / 5) * 5) : (m.lv || 0) * 60;
   PW.attValue = (id) => { const a = G.ATT_BY_ID[id]; return a ? Math.max(1, Math.round((a.price || 0) * PW.RATE / 5) * 5) : 0; };
   PW.skillValue = (sk) => Math.max(1, Math.round((sk.def.price || 0) * PW.RATE * (1 + 0.2 * (sk.lv || 0)) / 5) * 5);
   PW.itemValue = (id) => { const it = G.ITEM_BY_ID[id]; return it ? Math.max(1, Math.round((it.price || 0) * PW.RATE / 5) * 5) : 0; };
@@ -43,7 +43,7 @@
   }
   function sellMelee() {
     const p = P(), m = p.melee, v = PW.meleeValue(m);
-    p.melee = G.weapons.makeMelee(G.DEFAULT_MELEE);
+    p.melee = G.weapons.makeMelee(G.BARE_MELEE || 'fists');
     if (p.meleeMode) G.weapons.melee.equip(false);
     pay(v, m.def.name);
   }
@@ -91,7 +91,7 @@
   }
   function confirmMelee() {
     const m = P().melee;
-    GM().modal('⚠ 近接武器を売却しますか？', `<b style="color:${R(m.def.rarity)}">${m.def.icon} ${U.esc(m.def.name)}${m.lv ? ' +' + m.lv : ''}</b> を売却します。売ると近接武器はサバイバルナイフに戻ります。`, [
+    GM().modal('⚠ 近接武器を売却しますか？', `<b style="color:${R(m.def.rarity)}">${m.def.icon} ${U.esc(m.def.name)}${m.lv ? ' +' + m.lv : ''}</b> を売却します。売ると近接武器は素手になります。`, [
       { icon: '💰', label: `売る（+${fmt(PW.meleeValue(m))}🪙）`, onPick: () => { sellMelee(); again(); } },
       { icon: '↩', label: 'やめる', onPick: again },
     ]);
@@ -121,9 +121,9 @@
     const guns = G.weapons.gunsInOrder();
     for (const w of guns) {
       const start = w.id === 'starter', last = p.weapons.length <= 1, atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]);
-      out.push({ cat: 'weapon', icon: w.def.icon, rc: w.def.rarity, name: `${G.weapons.keyLabel(w)}${w.def.name}${w.lv ? ' +' + w.lv : ''}`, sub: start ? '初期装備は売れません' : last ? '最後の銃は売れません' : `銃${atts.length ? `・アタッチメント${atts.length}個装着中` : ''}`, v: start || last ? 0 : PW.weaponValue(w), no: start || last, act: () => { GM()._keepModal = true; setTimeout(() => confirmGun(w), 0); } });
+      out.push({ cat: 'weapon', icon: w.def.icon, rc: w.def.rarity, name: `${G.weapons.keyLabel(w)}${w.def.name}${w.lv ? ' +' + w.lv : ''}`, sub: last ? '最後の銃は売れません' : `${start ? '初期装備' : '銃'}${w.lv ? `・強化+${w.lv}` : start ? '（未強化は0🪙）' : ''}${atts.length ? `・アタッチメント${atts.length}個装着中` : ''}`, v: last ? 0 : PW.weaponValue(w), no: last, act: () => { GM()._keepModal = true; setTimeout(() => confirmGun(w), 0); } });
     }
-    if (p.melee && !G.isDefaultMelee(p.melee.id)) out.push({ cat: 'melee', icon: p.melee.def.icon, rc: p.melee.def.rarity, name: p.melee.def.name + (p.melee.lv ? ' +' + p.melee.lv : ''), sub: '近接武器（売るとサバイバルナイフに戻る）', v: PW.meleeValue(p.melee), act: () => { sellMelee(); PW.open(); } });
+    if (p.melee && p.melee.id !== (G.BARE_MELEE || 'fists')) { const startM = p.melee.id === G.DEFAULT_MELEE; out.push({ cat: 'melee', icon: p.melee.def.icon, rc: p.melee.def.rarity, name: p.melee.def.name + (p.melee.lv ? ' +' + p.melee.lv : ''), sub: `${startM ? '初期近接武器' : '近接武器'}${p.melee.lv ? `・強化+${p.melee.lv}` : startM ? '（未強化は0🪙）' : ''}（売ると素手になる）`, v: PW.meleeValue(p.melee), act: () => { GM()._keepModal = true; setTimeout(() => confirmMelee(), 0); } }); }
     for (const w of guns) for (const sl in w.atts) { const id = w.atts[sl], a = G.ATT_BY_ID[id]; if (a) out.push({ cat: 'att', icon: a.icon, rc: a.rarity, name: a.name, sub: `${w.def.name}に装着中`, v: PW.attValue(id), act: () => { GM()._keepModal = true; setTimeout(() => confirmAtt(id, w), 0); } }); }
     p.skills.forEach((sk, i) => { if (!sk) return; const def = sk.id === G.DEFAULT_ULT; out.push({ cat: 'skill', icon: sk.def.icon, rc: sk.def.rarity, name: `[${G.input.skillKey(i)}] ${sk.def.name}${G.abilities.lvText(sk) ? ' ' + G.abilities.lvText(sk) : ''}`, sub: def ? '初期装備のアルティメットは売れません' : sk.def.ult ? 'アルティメット' : 'スキル', v: def ? 0 : PW.skillValue(sk), no: def, act: () => { GM()._keepModal = true; setTimeout(() => confirmSkill(i), 0); } }); });
     // everything in the bag
@@ -164,9 +164,9 @@
   // ---------------- trade-in: a weapon that gets replaced is sold automatically ----------------
   // same rate as the pawn counter (starter pistol / fists are worth nothing); 鉄屑回収 adds +30% of the price on top
   PW.tradeValue = function (w, melee) {
-    if (!w || (melee ? G.isDefaultMelee(w.id) : w.id === 'starter')) return 0;
+    if (!w || (melee && w.id === (G.BARE_MELEE || 'fists'))) return 0;
     const base = melee ? PW.meleeValue(w) : PW.weaponValue(w);
-    return base + (P().has('e_salvage') ? Math.round((w.def.price || 0) * 0.3 / 5) * 5 : 0);
+    return base + (w.def.price && P().has('e_salvage') ? Math.round((w.def.price || 0) * 0.3 / 5) * 5 : 0);
   };
   PW.tradeIn = function (w, melee) {
     const v = PW.tradeValue(w, melee);

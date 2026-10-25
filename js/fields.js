@@ -165,7 +165,7 @@
           case 'moss': P.fieldSlip = 0.35; P.fieldSlide = 1.5; break;
           case 'ice': P.fieldSlip = 0.12; P.fieldSlide = 1.8; break;
           case 'mud': P.fieldSpeed = 0.62; P.fieldJump = 0.72; break;
-          case 'poison': if (doTick) { P.st.poison = Math.max(P.st.poison || 0, 2.5); P.st.poisonStacks = Math.min(5, (P.st.poisonStacks || 0) + (Math.random() < 0.3 ? 1 : 0)); } break;
+          case 'poison': if (doTick) { P.st.poisonStacks = Math.min(5, (P.st.poison > 0 ? P.st.poisonStacks || 1 : 0) + (P.st.poison > 0 ? (Math.random() < 0.3 ? 1 : 0) : 1)); P.st.poison = Math.max(P.st.poison || 0, 2.5); } break;
           case 'holy': if (f.cap > 0 && P.hp < P.stats.maxHp) { const h = Math.min(f.cap, 4 * dt * Math.max(1, P.stats.maxHp / 100)); f.cap -= h; C.heal(h, true); if (f.cap <= 0) { G.ui.toastSmall('✨ 聖泉が枯れた'); if (f.light) f.light.intensity = 0.5; } } break;
           case 'thorns': P.fieldSpeed = 0.8; if (moving && hurtT <= 0) { hurtT = 0.5; C.damagePlayer(3 + G.game.area * 0.2, { src: 'aoe', pos: P.pos.clone() }); } break;
           case 'oil': if (f.burnT > 0 && hurtT <= 0) { hurtT = 0.5; C.damagePlayer(5 + G.game.area * 0.4, { src: 'aoe', elem: 'fire', pos: P.pos.clone() }); } break;

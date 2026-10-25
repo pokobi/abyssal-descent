@@ -60,6 +60,7 @@
     if (it.type === 'valuable') return G.VALUABLE_BY_ID[it.id];
     if (it.type === 'att') return G.ATT_BY_ID[it.id];
     if (it.type === 'gun') return G.WEAPON_BY_ID[it.id]; // a gun lying on the ground (only ever on the ground)
+    if (it.type === 'melee') return G.MELEE_BY_ID[it.id];
     return null;
   };
   IV.baseSize = function (it) {
@@ -76,11 +77,12 @@
     if (d && d.passive) return 3;
     return 50; // consumables and grenades stack up to 50 in one cell; relic-like passives keep their small stacks
   };
+  IV.enchMul = (it) => (it && it.ench && it.ench.length ? 1.65 + it.ench.reduce((s, e) => { const E = G.ENCHANT_BY_ID[e.id], q = E && E.max > E.min ? U.clamp((e.v - E.min) / (E.max - E.min), 0, 1) : 0.5; return s + 0.35 + 0.35 * q; }, 0) : 1);
   IV.value = function (it) {
     const d = IV.def(it); if (!d) return 0;
     const R = G.Pawn ? G.Pawn.RATE : 0.4;
     if (it.type === 'valuable') return Math.max(1, Math.round(d.value * it.n * (G.Run ? G.Run.valuableMul() : 1)));
-    if (it.type === 'armor') return Math.max(5, Math.round(d.price * R * (1 + 0.15 * (it.ench ? it.ench.length : 0)) * (0.2 + 0.8 * IV.durFrac(it)) / 5) * 5); // the more worn, the less it sells for
+    if (it.type === 'armor') return Math.max(5, Math.round(d.price * R * IV.enchMul(it) * (0.2 + 0.8 * IV.durFrac(it)) / 5) * 5); // the more worn, the less it sells for
     return Math.max(1, Math.round((d.price || 0) * R / 5) * 5) * it.n;
   };
 
@@ -382,6 +384,7 @@
   };
   IV.pickUp = function (gr) {
     const P = G.player;
+    if (gr.it.type === 'melee') { G.game.takeMelee(gr.it); G.world.group.remove(gr.g); IV.ground.splice(IV.ground.indexOf(gr), 1); G.sfx.ui('select'); return true; }
     if (gr.it.type === 'gun') {
       if (!G.game.takeGun(gr.it)) { G.ui.toastSmall('🔫 武器スロットがいっぱい — 先に別の銃を捨てる'); G.sfx.ui('deny'); return false; }
       G.world.group.remove(gr.g); IV.ground.splice(IV.ground.indexOf(gr), 1); G.sfx.ui('select');

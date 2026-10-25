@@ -327,7 +327,7 @@
     const dotMul = 1 + (st.dotDmg || 0);
     switch (kind) {
       case 'fire': case 'burn':
-        s.burn = 4; s.burnDps = Math.max(s.burnDps || 0, C.scale(7) * (1 + st.burnDmg) * dotMul * (0.8 + stacks * 0.2)); break;
+        s.burnLv = Math.min(5, (s.burn > 0 ? s.burnLv || 1 : 0) + stacks); s.burn = 4; s.burnDps = C.scale(7) * (1 + st.burnDmg) * dotMul * (0.7 + s.burnLv * 0.3); break;
       case 'frost':
         if (s.frozen > 0) break;
         s.frostStacks = (s.frostStacks || 0) + stacks; s.frost = 4;
@@ -346,7 +346,7 @@
         break;
       }
       case 'shock':
-        s.shock = 1.5;
+        s.shockLv = Math.min(5, (s.shock > 0 ? s.shockLv || 1 : 0) + stacks); s.shock = 1.5;
         if (!C.stunImmune(e)) s.stun = Math.max(s.stun || 0, 0.18);
         if (!s._shockLock) {
           s._shockLock = true;
@@ -356,7 +356,7 @@
         }
         G.fx.sparks(e.centerPos(), null, 5, 0xfff0a0, 4);
         break;
-      case 'bleed': s.bleed = 5; s.bleedDps = Math.max(s.bleedDps || 0, C.scale(6) * dotMul * (0.8 + stacks * 0.25)); break;
+      case 'bleed': s.bleedLv = Math.min(5, (s.bleed > 0 ? s.bleedLv || 1 : 0) + stacks); s.bleed = 5; s.bleedDps = C.scale(6) * dotMul * (0.7 + s.bleedLv * 0.3); break;
       case 'slow': s.slow = 4; break;
       case 'mark': s.mark = stacks; break;
       case 'root': s.root = stacks; break;
@@ -377,10 +377,11 @@
       if (s.poison > 0 && s.poisonStacks > 0) C.damageEnemy(e, C.scale(2.4) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
       if (s.bleed > 0) C.damageEnemy(e, s.bleedDps * 0.5, { src: 'dot', elem: 'bleed' });
     }
-    if (s.burn > 0) { s.burn -= dt; if (Math.random() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8); }
+    if (s.burn > 0) { s.burn -= dt; if (s.burn <= 0) s.burnLv = 0; if (Math.random() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8); }
     if (s.poison > 0) { s.poison -= dt; if (s.poison <= 0) s.poisonStacks = 0; if (Math.random() < dt * 5) G.fx.norm.spawn(e.pos.x, e.pos.y + e.height * 0.6, e.pos.z, U.rand(-0.3, 0.3), -0.5, U.rand(-0.3, 0.3), 0.8, 0.12, 0.3, 0.45, 0.7, 0.15, 0.7, 2, 0.5); }
-    if (s.bleed > 0) { s.bleed -= dt; if (Math.random() < dt * 6) G.fx.blood(e.centerPos(), null, e.bloodColor, 1); }
+    if (s.bleed > 0) { s.bleed -= dt; if (s.bleed <= 0) s.bleedLv = 0; if (Math.random() < dt * 6) G.fx.blood(e.centerPos(), null, e.bloodColor, 1); }
     if (s.shock > 0 && Math.random() < dt * 8) G.fx.sparks(e.centerPos(), null, 2, 0xfff0a0, 3);
+    if (s.shock <= 0) s.shockLv = 0;
   };
   C.speedMul = function (e) {
     const s = e.st;
@@ -575,11 +576,11 @@
     // statuses on player
     const ps = P.st;
     const cl = P.has('d_cleanse') ? 0.4 : 1;
-    if (info.elem === 'fire') { ps.burn = 3 * cl; }
-    if (info.elem === 'frost') { ps.slow = 2.5 * cl; }
-    if (info.elem === 'poison') { ps.poison = 4 * cl; ps.poisonStacks = Math.min(5, (ps.poisonStacks || 0) + 1); }
-    if (info.elem === 'shock') { ps.shock = 0.6 * cl; }
-    if (info.elem === 'web') { ps.slow = 2.5 * cl; }
+    if (info.elem === 'fire') { ps.burnLv = Math.min(5, (ps.burn > 0 ? ps.burnLv || 1 : 0) + 1); ps.burn = 3 * cl; }
+    if (info.elem === 'frost') { ps.slowLv = Math.min(3, (ps.slow > 0 ? ps.slowLv || 1 : 0) + 1); ps.slow = 2.5 * cl; }
+    if (info.elem === 'poison') { ps.poisonStacks = Math.min(5, (ps.poison > 0 ? ps.poisonStacks || 0 : 0) + 1); ps.poison = 4 * cl; }
+    if (info.elem === 'shock') { ps.shockLv = Math.min(3, (ps.shock > 0 ? ps.shockLv || 1 : 0) + 1); ps.shock = 0.6 * cl; }
+    if (info.elem === 'web') { ps.slowLv = Math.min(3, (ps.slow > 0 ? ps.slowLv || 1 : 0) + 1); ps.slow = 2.5 * cl; }
     G.game.lastCause = info.attacker && info.attacker.def ? info.attacker.def.name : ({ melee: '近接攻撃', ranged: '遠距離攻撃', explosion: '爆発', aoe: '範囲攻撃', dot: '状態異常', fall: '奈落' }[ctx.src] || ctx.src);
     G.buffs.emit('onDamaged', { amount: dmg + osHit, raw: amount, src: ctx.src, attacker: info.attacker });
     if (P.hp <= 0) P.onLethal();

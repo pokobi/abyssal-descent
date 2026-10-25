@@ -148,7 +148,7 @@
       const gap = 14 + rng.int(0, 3), base = Math.round(cxm + rng.range(-0.5, 0.5) - gap / 2), l = new Int16Array(D), r = new Int16Array(D);
       for (const [arr, sg] of [[l, -1], [r, 1]]) {
         let z = 0;
-        while (z < D) { const L = rng.int(3, 11), j = rng.int(0, 3); for (let i = z; i < Math.min(D, z + L); i++) arr[i] = sg < 0 ? base - j : base + gap + j; z += L; }
+        while (z < D) { const L = rng.int(ruined ? 2 : 3, ruined ? 8 : 11), j = rng.int(0, ruined ? 4 : 3); for (let i = z; i < Math.min(D, z + L); i++) arr[i] = sg < 0 ? base - j : base + gap + j; z += L; }
       }
       WL.push(l); ER.push(r);
     }
@@ -339,8 +339,11 @@
           w.solid('block', q.x0, y - 0.75, q.z0, q.x1, y - 0.3, q.z1, { uv: 3 });
         }
         w.visual('trim', rn.e - 0.12, y - 0.85, rn.x0, rn.e + 0.12, y - 0.6, rn.x1, { uv: 1 });
-        // broken stones lying along the lip
-        if (rng.chance(0.5)) { const z = rng.range(rn.x0 + 0.5, rn.x1 - 0.5), x = rn.e + (s === 'W' ? -0.45 : 0.45); box(w, 'block', x, y + 0.08, z, rng.range(0.25, 0.45), rng.range(0.12, 0.2), rng.range(0.3, 0.7), rng.range(0, 3), rng.range(-0.1, 0.1), rng.range(-0.1, 0.1)); }
+        // broken stones lying along the lip (much heavier in the ruin)
+        for (let m = 0, cnt = ruined ? rng.int(2, 4) : (rng.chance(0.5) ? 1 : 0); m < cnt && rn.x1 - rn.x0 > 1.2; m++) {
+          const z = rng.range(rn.x0 + 0.5, rn.x1 - 0.5), x = rn.e + (s === 'W' ? -rng.range(0.3, 0.9) : rng.range(0.3, 0.9));
+          box(w, 'block', x, y + 0.1, z, rng.range(0.3, 0.7), rng.range(0.14, 0.32), rng.range(0.35, 0.85), rng.range(0, 3), rng.range(-0.22, 0.22), rng.range(-0.22, 0.22));
+        }
       }
       for (const p of L.par) {
         const r = p.r, T0 = 0.35;
@@ -355,15 +358,19 @@
         const stands = (k - 1 === 0 && (z < Zn - 1 || z > Zs + 1)) || (s === 'W' ? x + 1 < below : x - 1 > below);
         if (stands && b.occ.free(x - 1, z - 1, x + 1, z + 1) && L.holes.every((h) => x + 1 < h.x0 || x - 1 > h.x1 || z + 1 < h.z0 || z - 1 > h.z1)) {
           b.occ.mark(x - 1, z - 1, x + 1, z + 1, 2);
-          if (ruined && rng.chance(0.25)) { P().pillarSquare(w, x, z, Y[k - 1], rng.range(2, 4), 1.1); P().rubble(w, x + 1.4, Y[k - 1], z, rng, 1.1); }
-          else P().pillarSquare(w, x, z, Y[k - 1], SP - 0.75, 1.1);
+          if (ruined && rng.chance(0.65)) {
+            P().pillarSquare(w, x, z, Y[k - 1], rng.range(1.6, 4.2), 1.1);
+            P().rubble(w, x + (s === 'W' ? -1.1 : 1.1), Y[k - 1], z, rng, 1.35);
+            box(w, 'block', x + rng.range(-0.8, 0.8), Y[k - 1] + 0.28, z + rng.range(-0.8, 0.8), 0.75, 0.55, 1.4, rng.range(0, 3.14), rng.range(-0.35, 0.35), rng.range(-0.25, 0.25));
+          } else P().pillarSquare(w, x, z, Y[k - 1], SP - 0.75, 1.1);
         }
       }
     }
     // chains and vines hanging down the chasm walls
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0, n = ruined ? 32 : 12; i < n; i++) {
       const k = rng.int(1, NL - 1), s = rng.chance(0.5) ? 'W' : 'E', z = rng.int(4, D - 4) + 0.5, ex = (s === 'W' ? WL : ER)[k][Math.floor(z)];
-      if (ruined) P().vines(w, ex + (s === 'W' ? -0.2 : 0.2), Y[k] - 0.8, z, s === 'W' ? 'px' : 'nx', rng.range(2, 5), rng); else P().chain(w, ex + (s === 'W' ? -0.2 : 0.2), Y[k] - 0.8 - 3, z, 3);
+      if (ruined && rng.chance(0.75)) P().vines(w, ex + (s === 'W' ? -0.2 : 0.2), Y[k] - 0.8, z, s === 'W' ? 'px' : 'nx', rng.range(2.5, 6.5), rng);
+      else P().chain(w, ex + (s === 'W' ? -0.2 : 0.2), Y[k] - 0.8 - 3, z, rng.range(2.2, 4.2));
     }
 
     // ---- light and furnishing on every storey ----
@@ -406,7 +413,13 @@
   }
   function F_ceiling(w, rng, W, D, HT, ruined) {
     FG.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, ruined });
-    if (ruined) for (let i = 0; i < 7; i++) { const x = rng.range(8, W - 14), z = rng.range(10, D - 16); w.visual('dark', x, HT - 0.04, z, x + rng.range(3, 6), HT - 0.02, z + rng.range(3, 6), { uv: 1, grad: false }); }
+    if (ruined) {
+      for (let i = 0; i < 14; i++) {
+        const x = rng.range(6, W - 12), z = rng.range(8, D - 14), sx = rng.range(3.5, 7.5), sz = rng.range(3.5, 7.5);
+        w.visual('dark', x, HT - 0.04, z, x + sx, HT - 0.02, z + sz, { uv: 1, grad: false });
+        box(w, 'woodDark', x + sx * 0.5, HT - rng.range(0.6, 1.6), z + sz * 0.5, 0.35, 0.35, sx * 0.85, rng.range(0, 3.14), rng.range(0.2, 0.55), rng.range(-0.2, 0.2));
+      }
+    }
   }
   // furnishing for one storey of one half (y: its floor; r: the part of it clear of the ragged chasm edge)
   function dress(w, rng, o, y, k, r, ruined) {
@@ -419,19 +432,25 @@
       else if (t < 0.56) { const q = o.place(rng, 2, 2, 1.5); if (!q) continue; P().brazier(w, q.x0 + 1, y, q.z0 + 1, 1); }
       else if (t < 0.68) { const q = o.place(rng, 2, 2, 0.5); if (!q) continue; P().rubble(w, q.x0 + 1, y, q.z0 + 1, rng, rng.range(0.8, 1.6)); }
       else if (t < 0.8) {
-        if (ruined) { const q = o.place(rng, 6, 2, 1); if (!q) continue; w.solid('block', q.x0, y, q.z0 + 0.55, q.x1, y + 0.9, q.z1 - 0.55, { uv: 2 }); P().rubble(w, q.x1 + 0.2, y, q.z0 + 1, rng, 1); }
+        if (ruined) { const q = o.place(rng, 6, 2, 1); if (!q) continue; w.solid('block', q.x0, y, q.z0 + 0.55, q.x1, y + 0.9, q.z1 - 0.55, { uv: 2 }); P().rubble(w, q.x1 + 0.2, y, q.z0 + 1, rng, 1.2); box(w, 'block', (q.x0 + q.x1) / 2, y + 1.05, q.z0 + 1, rng.range(1.2, 2.2), 0.38, 0.85, rng.range(-0.2, 0.2), rng.range(-0.25, 0.25), rng.range(-0.3, 0.3)); }
         else { const q = o.place(rng, 3, 2, 1); if (!q) continue; P().bookshelf(w, q.x0 + 1.5, q.z0 + 1, y, true, rng); }
       } else if (t < 0.9) {
-        if (ruined) { const q = o.place(rng, 2, 2, 1); if (!q) continue; P().pillarRound(w, q.x0 + 1, q.z0 + 1, y, rng.range(1.5, 3.5), rng.range(0.45, 0.6), true, rng); }
+        if (ruined) { const q = o.place(rng, 2, 2, 1); if (!q) continue; P().pillarRound(w, q.x0 + 1, q.z0 + 1, y, rng.range(1.2, 3.2), rng.range(0.45, 0.6), true, rng); P().rubble(w, q.x0 + 1, y, q.z0 + 1, rng, 0.9); }
         else { const q = o.place(rng, 3, 3, 1.2); if (!q) continue; P().cage(w, q.x0 + 1.5, q.z0 + 1.5, y, 1, rng); }
       } else { const q = o.place(rng, 3, 2, 1); if (!q) continue; P().table(w, q.x0 + 1.5, q.z0 + 1, y, true, rng); }
     }
-    for (let i = 0; i < n * 0.6; i++) { const x = rng.range(r.x0 + 3, r.x1 - 3), z = rng.range(r.z0 + 3, r.z1 - 3); if (o.free(x - 0.5, z - 0.5, x + 0.5, z + 0.5)) (rng.chance(0.5) ? P().bones(w, x, y, z, rng) : P().skull(w, x, y, z, rng.range(0, 6))); }
+    for (let i = 0, nb = Math.round(n * (ruined ? 1.35 : 0.6)); i < nb; i++) { const x = rng.range(r.x0 + 3, r.x1 - 3), z = rng.range(r.z0 + 3, r.z1 - 3); if (o.free(x - 0.5, z - 0.5, x + 0.5, z + 0.5)) (rng.chance(0.5) ? P().bones(w, x, y, z, rng) : P().skull(w, x, y, z, rng.range(0, 6))); }
     if (ruined) {
-      // blue fire welling up through the cracked floors, moss, a few cold lights
-      for (let i = 0; i < (k ? 1 : 2); i++) { const q = o.place(rng, rng.int(3, 6), rng.int(3, 6), 1.2, 30); if (q) G.Fields.add(w, 'lava', q.x0, q.z0, q.x1, q.z1, { blue: true, y: y + 0.005 }); }
-      for (let i = 0; i < n * 2; i++) { const x = rng.range(r.x0 + 1, r.x1 - 2), z = rng.range(r.z0 + 1, r.z1 - 2); w.visual('floor', x, y + 0.02, z, x + rng.range(0.5, 2), y + 0.05, z + rng.range(0.5, 2), { uv: 1, tint: [rng.range(0.08, 0.16), rng.range(0.22, 0.34), rng.range(0.4, 0.6)], grad: false }); }
-      if (rng.chance(0.7)) { const q = o.place(rng, 2, 2, 1, 20); if (q) { w.addLight(q.x0 + 1, y + 1.2, q.z0 + 1, { flame: 0.5, intensity: 7, range: 11, color: '#4a8aff', prio: 0.8 }); P().candles(w, q.x0 + 1, y, q.z0 + 1, rng, false); } }
+      // blue fire welling up through the cracked floors, shattered masonry, deep fissures, moss and cold lights
+      for (let i = 0; i < (k ? 2 : 3); i++) { const q = o.place(rng, rng.int(3, 6), rng.int(3, 6), 1.2, 30); if (q) G.Fields.add(w, 'lava', q.x0, q.z0, q.x1, q.z1, { blue: true, y: y + 0.005 }); }
+      for (let i = 0; i < Math.round(n * 0.9); i++) {
+        const q = o.place(rng, 2, 2, 0.6, 20); if (!q) continue;
+        P().rubble(w, q.x0 + 1, y, q.z0 + 1, rng, rng.range(1.0, 1.9));
+        if (rng.chance(0.65)) box(w, 'block', q.x0 + 1 + rng.range(-0.35, 0.35), y + 0.22, q.z0 + 1 + rng.range(-0.35, 0.35), rng.range(0.65, 1.35), rng.range(0.25, 0.5), rng.range(0.55, 1.15), rng.range(0, 3.14), rng.range(-0.35, 0.35), rng.range(-0.3, 0.3));
+      }
+      for (let i = 0; i < n * 3; i++) { const x = rng.range(r.x0 + 1, r.x1 - 2), z = rng.range(r.z0 + 1, r.z1 - 2); w.visual('floor', x, y + 0.02, z, x + rng.range(0.6, 2.4), y + 0.05, z + rng.range(0.6, 2.4), { uv: 1, tint: [rng.range(0.06, 0.15), rng.range(0.2, 0.34), rng.range(0.38, 0.62)], grad: false }); }
+      for (let i = 0; i < Math.round(n * 1.4); i++) { const x = rng.range(r.x0 + 2, r.x1 - 2), z = rng.range(r.z0 + 2, r.z1 - 2); box(w, 'dark', x, y + 0.015, z, rng.range(0.12, 0.28), 0.02, rng.range(1.4, 3.6), rng.range(0, 3.14), 0, 0); }
+      if (rng.chance(0.85)) { const q = o.place(rng, 2, 2, 1, 20); if (q) { w.addLight(q.x0 + 1, y + 1.2, q.z0 + 1, { flame: 0.5, intensity: 7, range: 11, color: '#4a8aff', prio: 0.8 }); P().candles(w, q.x0 + 1, y, q.z0 + 1, rng, false); } }
     }
   }
   // cover on a storey: full-height pillars, stretches of wall and a few small walled rooms (open to the sky, two doorways each), so the halls
@@ -442,18 +461,24 @@
     const wallBox = (x0, z0, x1, z1, hh) => {
       w.solid('wall', x0, y, z0, x1, y + hh, z1, { uv: 2 });
       w.visual('trim', x0 - 0.05, y + hh, z0 - 0.05, x1 + 0.05, y + hh + 0.12, z1 + 0.05, { uv: 1 });
+      if (ruined && rng.chance(0.55)) box(w, 'block', (x0 + x1) / 2 + rng.range(-0.25, 0.25), y + hh + 0.16, (z0 + z1) / 2 + rng.range(-0.25, 0.25), Math.min(1.1, Math.abs(x1 - x0) * 0.7), rng.range(0.18, 0.38), Math.min(1.1, Math.abs(z1 - z0) * 0.7), rng.range(-0.3, 0.3), rng.range(-0.22, 0.22), rng.range(-0.22, 0.22));
     };
     // pillars
     for (let i = 0, n = Math.round(area / 330); i < n; i++) {
       const q = o.place(rng, 2, 2, 1.6); if (!q) continue;
-      if (ruined && rng.chance(0.3)) { P().pillarSquare(w, q.x0 + 1, q.z0 + 1, y, rng.range(2.5, 5), 1.1); P().rubble(w, q.x0 + 2.4, y, q.z0 + 1, rng, 1.1); } else P().pillarSquare(w, q.x0 + 1, q.z0 + 1, y, h, 1.1);
+      if (ruined && rng.chance(0.65)) {
+        const ph = rng.range(1.6, 4.6);
+        P().pillarSquare(w, q.x0 + 1, q.z0 + 1, y, ph, 1.1);
+        P().rubble(w, q.x0 + 1.9, y, q.z0 + 1, rng, 1.35);
+        box(w, 'block', q.x0 + 1 + rng.range(-0.7, 0.7), y + 0.25, q.z0 + 1 + rng.range(-0.7, 0.7), 0.8, 0.5, 1.3, rng.range(0, 3.14), rng.range(-0.35, 0.35), rng.range(-0.25, 0.25));
+      } else P().pillarSquare(w, q.x0 + 1, q.z0 + 1, y, h, 1.1);
     }
     // stretches of wall (a broken, uneven top on the fourth field)
     for (let i = 0, n = Math.round(area / 650); i < n; i++) {
       const L = rng.int(6, 10), alongX = rng.chance(0.5), q = alongX ? o.place(rng, L, 2, 1.8) : o.place(rng, 2, L, 1.8); if (!q) continue;
       const hh = rng.range(3.2, 4.2);
-      if (alongX) { for (let a = q.x0; a < q.x1; a += 2) wallBox(a, q.z0 + 0.45, Math.min(q.x1, a + 2), q.z0 + 1.55, ruined ? rng.range(1.6, hh) : hh); P().torch(w, q.x0 + L / 2, y + 2.4, q.z0 + 1.55, 'pz'); }
-      else { for (let a = q.z0; a < q.z1; a += 2) wallBox(q.x0 + 0.45, a, q.x0 + 1.55, Math.min(q.z1, a + 2), ruined ? rng.range(1.6, hh) : hh); P().torch(w, q.x0 + 1.55, y + 2.4, q.z0 + L / 2, 'px'); }
+      if (alongX) { for (let a = q.x0; a < q.x1; a += 2) wallBox(a, q.z0 + 0.45, Math.min(q.x1, a + 2), q.z0 + 1.55, ruined ? rng.range(1.1, hh) : hh); P().torch(w, q.x0 + L / 2, y + 2.4, q.z0 + 1.55, 'pz'); if (ruined) P().rubble(w, q.x0 + rng.range(1, L - 1), y, q.z0 + 1.7, rng, 1.1); }
+      else { for (let a = q.z0; a < q.z1; a += 2) wallBox(q.x0 + 0.45, a, q.x0 + 1.55, Math.min(q.z1, a + 2), ruined ? rng.range(1.1, hh) : hh); P().torch(w, q.x0 + 1.55, y + 2.4, q.z0 + L / 2, 'px'); if (ruined) P().rubble(w, q.x0 + 1.7, y, q.z0 + rng.range(1, L - 1), rng, 1.1); }
     }
     // small rooms: open to the sky, a doorway on two of the sides
     for (let i = 0, n = rng.chance(0.55) ? 1 : 0; i < n; i++) {

@@ -99,7 +99,7 @@
     }
     return pip.mat;
   };
-  const LENS_Q = 0.7; // the lens covers this much of the screen height while aiming
+  const LENS_Q = 0.92; // the lens covers this much of the screen height while aiming
   // how much the whole screen zooms while aiming through a scope: the rest of the magnification happens inside the lens
   W.camZoom = function () {
     const s = W.curStats; if (!s) return 1;
@@ -396,7 +396,7 @@
         // the lens sits clearly in front of the eyecup's end face (they used to share a plane and z-fought = flicker), and always wins the depth test
         const lens = new THREE.Mesh(new THREE.CircleGeometry(r * 1.3, 48), W.pipMaterial());
         lens.position.set(0, cy, z + len / 2 + 0.066); lens.renderOrder = 5; g.add(lens);
-        M.pipLens = lens; M.lensZ = lens.position.z; M.sightY = cy;
+        M.pipLens = lens; M.lensZ = lens.position.z; M.lensR = r * 1.3; M.sightY = cy;
       } else if (v === 'acog') {
         M.scopeOptic = true; M.scopeKind = v;
         const len = v === 'acog' ? 0.11 : v === 'scope' ? 0.2 : 0.28, r = v === 'acog' ? 0.017 : v === 'scope' ? 0.019 : 0.023;
@@ -943,7 +943,7 @@
     anim.swayY = U.damp(anim.swayY, U.clamp(I.my * 0.0006, -0.05, 0.05), 10, dt);
     anim.kick = U.damp(anim.kick, 0, 14, dt);
     const sightY = model.sightY;
-    const adsPos = V(0, -sightY - (model.dotSight || model.scopeOptic ? 0 : 0.012), model.pip ? -0.088 - model.lensZ : -0.44);
+    const adsPos = V(0, -sightY - (model.dotSight || model.scopeOptic ? 0 : 0.012), model.pip ? -(model.lensR || 0.028) * 2.32 - model.lensZ : -0.44);
     const p = hipPos.clone().lerp(adsPos, ads);
     let rx = 0, ry = 0, rz = 0;
     // bob

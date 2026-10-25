@@ -115,6 +115,29 @@
     }
   }
   let bvig = null, bubble = null, shards = null, guardT = 0;
+  function ensureBubble() {
+    if (bubble) return;
+    bubble = new THREE.Group();
+    const add = (geo, o) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial(Object.assign({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }, o)));
+    const m1 = add(new THREE.SphereGeometry(1.15, 24, 16), { opacity: 0.12, side: THREE.DoubleSide });
+    const m2 = add(new THREE.IcosahedronGeometry(1.2, 1), { wireframe: true, opacity: 0.35 });
+    const m3 = add(new THREE.IcosahedronGeometry(1.32, 2), { wireframe: true, opacity: 0.3 });
+    const halo = add(new THREE.TorusGeometry(1.45, 0.05, 8, 64), { opacity: 0.8 }); halo.rotation.x = Math.PI / 2;
+    bubble.add(m1, m2, m3, halo); bubble.userData = { m1, m2, m3, halo };
+    shards = new THREE.Group();
+    const sm = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    for (let i = 0; i < 8; i++) { const h = new THREE.Mesh(i < 4 ? new THREE.CircleGeometry(0.2, 6) : new THREE.OctahedronGeometry(0.16, 0), sm); h.userData.a = (i % 4) / 4 * Math.PI * 2 + (i >= 4 ? Math.PI / 4 : 0); h.userData.hi = i >= 4; shards.add(h); }
+    shards.userData.mat = sm;
+  }
+  PS.warm = function () {
+    ensureDom();
+    if (!bvig) { bvig = document.createElement('div'); bvig.id = 'buff-vig'; bvig.style.opacity = 0; document.body.appendChild(bvig); }
+    ensureBubble();
+    if (G.scene && bubble.parent !== G.scene) { G.scene.add(bubble); G.scene.add(shards); }
+    bubble.visible = true; shards.visible = true;
+    if (G.renderer && G.scene && G.camera) { try { G.renderer.compile(G.scene, G.camera); } catch (e) { /* ignore */ } }
+    bubble.visible = false; shards.visible = false;
+  };
   // a hit softened by the bastion: golden ring + chime + "-N 軽減"
   PS.guardHit = function (raw, taken) {
     guardT = 1;
@@ -154,7 +177,8 @@
     if (look.inv) { const left = G.player.invulnT || 0; bvig.style.opacity = (left < 1 ? 0.35 + Math.abs(Math.sin(t * (14 + (1 - left) * 20))) * 0.65 : 0.85 + pulse * 0.15).toFixed(2); }
     if (!look.shield) { if (bubble) { bubble.visible = false; shards.visible = false; } return; }
     // the barrier around your body (third person) and golden plates orbiting you (visible at the view edges)
-    if (!bubble) {
+    ensureBubble();
+    if (false) {
       bubble = new THREE.Group();
       const add = (geo, o) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial(Object.assign({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }, o)));
       const m1 = add(new THREE.SphereGeometry(1.15, 24, 16), { opacity: 0.12, side: THREE.DoubleSide });
@@ -264,7 +288,8 @@
       // persistent elements (rebuilding them every tick restarted their animations = flicker)
       const want = [];
       // (heal-over-time is shown on the HP bar only: no ring)
-      for (const k of act) { const d = PS.DEFS[k]; want.push({ key: k, cls: 'bad st-' + k, col: d.col, icon: d.icon, name: d.name, frac: U.clamp(s[k] / (max[k] || 1), 0, 1), badge: k === 'poison' && s.poisonStacks > 1 ? '×' + s.poisonStacks : '', t: s[k] }); }
+      const ROMAN = ['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ'];
+      for (const k of act) { const d = PS.DEFS[k], lv = Math.min(10, Math.max(1, k === 'poison' ? s.poisonStacks || 1 : s[k + 'Lv'] || 1)), rm = ROMAN[lv] || 'Ⅰ'; want.push({ key: k, cls: 'bad st-' + k, col: d.col, icon: d.icon, name: d.name + rm, frac: U.clamp(s[k] / (max[k] || 1), 0, 1), badge: rm, t: s[k] }); }
       const keep = new Set(want.map((w) => w.key));
       for (const [key, el] of PS.els) if (!keep.has(key)) { el.classList.add('out'); PS.els.delete(key); setTimeout(() => el.remove(), 220); }
       want.forEach((w, i) => {
@@ -281,6 +306,7 @@
         el._t = w.t;
         el.style.setProperty('--p', (w.frac * 100).toFixed(1) + '%');
         const b = el.querySelector('.pst-b'); if (b.textContent !== w.badge) { b.textContent = w.badge; b.style.display = w.badge ? '' : 'none'; }
+        const nm = el.querySelector('.pst-n'); if (nm && nm.textContent !== w.name) { nm.textContent = w.name; el.title = w.name; }
         el.querySelector('.pst-t').textContent = w.t.toFixed(1) + 's';
         el.classList.toggle('low', w.frac < 0.25);
         if (host.children[i] !== el) host.insertBefore(el, host.children[i] || null);

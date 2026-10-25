@@ -192,6 +192,36 @@
     pools.flashIdx = 0;
     FX.world = document.getElementById('worldui');
   };
+  FX.withWarm = function (fn) {
+    if (!scene || !pools.tracer) return fn();
+    const saved = [];
+    const show = (m, mat) => {
+      if (!m) return;
+      saved.push([m, m.visible, m.material, m.frustumCulled]);
+      if (mat) m.material = mat;
+      m.visible = true; m.frustumCulled = false;
+    };
+    if (pools.tracer[0]) show(pools.tracer[0].m);
+    if (pools.decal[0]) show(pools.decal[0].m, FX.dmats.hole);
+    if (pools.decal[1]) show(pools.decal[1].m, FX.dmats.scorch);
+    if (pools.decal[2]) show(pools.decal[2].m, FX.dmats.crack);
+    if (pools.decal[3]) {
+      if (!FX.splatMats[0x5a1010]) FX.splatMats[0x5a1010] = new THREE.MeshBasicMaterial({ map: G.Tex.spr.splat, color: 0x5a1010, transparent: true, depthWrite: false, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -3 });
+      show(pools.decal[3].m, FX.splatMats[0x5a1010]);
+    }
+    if (pools.ring[0]) show(pools.ring[0].m);
+    if (pools.tele[0]) { show(pools.tele[0].outer); show(pools.tele[0].inner); }
+    if (pools.teleL[0]) show(pools.teleL[0].m);
+    if (pools.beam[0]) show(pools.beam[0].m);
+    if (pools.bubble[0]) show(pools.bubble[0].m);
+    if (pools.debris[0]) show(pools.debris[0].m, (G.world && G.world.mats && G.world.mats.rock) || FX.dmats.hole);
+    const sr = FX.shockRing(new THREE.Vector3(0, -500, 0), 0xffa040, 0.8, 10);
+    try { return fn(); } finally {
+      sr.dispose();
+      const idx = FX.shocks.indexOf(sr); if (idx >= 0) FX.shocks.splice(idx, 1);
+      for (const [m, vis, mat, fc] of saved) { m.visible = vis; m.material = mat; m.frustumCulled = fc; }
+    }
+  };
 
   FX.setFog = function (color, density) {
     for (const s of [FX.add, FX.flame, FX.norm]) { s.mat.uniforms.uFogD.value = density; s.mat.uniforms.uFogC.value.set(color); }

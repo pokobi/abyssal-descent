@@ -416,7 +416,7 @@
     {
       const mw = P.melee, lv = mw.lv || 0, c = AR.forgeCost(mw);
       const mx = lv >= AR.FORGE_MAX;
-      opts.push({ _tok: 'm', icon: mw.def.icon, label: `${G.weapons.keyLabel('m')}${mw.def.name} +${lv} → +${lv + 1}（${c}🪙）`, sub: mx ? '最大強化' : `近接ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}）`, disabled: mx || GM.run.coins < c, onPick: () => {
+      if (mw.id !== (G.BARE_MELEE || 'fists')) opts.push({ _tok: 'm', icon: mw.def.icon, label: `${G.weapons.keyLabel('m')}${mw.def.name} +${lv} → +${lv + 1}（${c}🪙）`, sub: mx ? '最大強化' : `近接ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}）`, disabled: mx || GM.run.coins < c, onPick: () => {
         GM.run.coins -= c; mw.lv = lv + 1; G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7);
         G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${mw.def.name} +${mw.lv}`, 'good');
       } });

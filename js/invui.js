@@ -115,8 +115,8 @@
       const dps = Math.round(W.dps(W.stats(w)));
       return `<div class="iv-wbox" data-wslot="${i}" style="--rc:${R(w.def.rarity)}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b style="color:${R(w.def.rarity)}">${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</b><small>${U.esc(w.def.cat || '')}</small></span><span class="wdps"><b>${dps}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('gun', w.def, w.atts)}</div><div class="iv-asg">${cells}</div></div>`;
     });
-    const m = P.melee, md = m.def, ms = W.meleeStats(m);
-    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}</b><small>${U.esc(md.cat || '')}・固定</small></span><span class="wdps"><b>${Math.round(ms.dmg / ms.swing)}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>
+    const m = P.melee, md = m.def, ms = W.meleeStats(m), mfx = W.meleeFx ? W.meleeFx(md) : [];
+    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}</b><small>${U.esc(md.cat || '')}${md.id === (G.BARE_MELEE || 'fists') ? '・素手' : mfx.length ? ' · ' + U.esc(mfx[0]) : ''}</small></span><span class="wdps"><b>${Math.round(ms.dmg / ms.swing)}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>
       <div class="iv-mst"><div><small>ダメージ</small><b>${Math.round(ms.dmg)}</b></div><div><small>間隔</small><b>${ms.swing.toFixed(2)}s</b></div><div><small>リーチ</small><b>${ms.range}m</b></div></div></div>`);
     return out.join('');
   }
@@ -259,9 +259,16 @@
         popMenu([['🗑️ 捨てる', () => { if (GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else { G.sfx.ui('deny'); G.ui.toastSmall('最後の銃は捨てられない'); } render(); }]], e);
         return;
       }
+      if (e.button === 2 && kind === 'm') {
+        e.preventDefault(); closeMenu(); hideTip();
+        const m = P.melee; if (!m) return;
+        popMenu([['🗑️ 捨てる', () => { if (GM.dropMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${m.def.name} を捨てた（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('素手は捨てられない'); } render(); }]], e);
+        return;
+      }
       if (e.button !== 0 || e.target.closest('.iv-as')) return;
       closeMenu();
       if (kind === 'w' && !el.classList.contains('empty') && G.weapons.gunsInOrder().length) startDrag({ wslot: +el.dataset.wslot }, el, e);
+      else if (kind === 'm' && P.melee && P.melee.id !== (G.BARE_MELEE || 'fists')) startDrag({ melee: true }, el, e);
       else if (kind === 's' && el.dataset.sk !== 'pile' && el.dataset.sk !== '0' && !el.classList.contains('empty')) startDrag({ sk: +el.dataset.sk }, el, e);
     });
   }
@@ -364,7 +371,7 @@
     drag.ghost.style.left = x - Math.min(drag.gx, w - 10) + 'px'; drag.ghost.style.top = y - Math.min(drag.gy, h - 10) + 'px';
     root.querySelectorAll('.iv-hl').forEach((n) => n.remove());
     const t = target(x, y);
-    drag.ghost.classList.toggle('iv-out', !!(t && t.ground && (drag.f.it || drag.f.wslot !== undefined) && !drag.f.as));
+    drag.ghost.classList.toggle('iv-out', !!(t && t.ground && (drag.f.it || drag.f.wslot !== undefined || drag.f.melee) && !drag.f.as));
     if (t && t.grid && drag.f.it) {
       const ok = canDrop(t);
       const [gw, gh] = dims();
@@ -442,6 +449,10 @@
     ghost.remove(); el.classList.remove('iv-dragging');
     const rot = drag.rot; drag = null;
     // guns / skills onto each other
+    if (f.melee) {
+      if (t && t.ground) { const m = P.melee; if (m && GM.dropMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${m.def.name} を捨てた（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('素手は捨てられない'); } }
+      render(); return;
+    }
     if (f.wslot !== undefined && t && t.ground) {
       const w = G.weapons.gunsInOrder()[f.wslot];
       if (w && GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else { G.sfx.ui('deny'); G.ui.toastSmall('最後の銃は捨てられない'); }

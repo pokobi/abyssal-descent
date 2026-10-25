@@ -7,7 +7,7 @@
   const ms = { ph: 'idle', t: 0, dur: 0, hitAt: 0, hitDone: false, side: 1, combo: 0, lungeT: 0 };
   W.ms = ms;
 
-  W.makeMelee = function (id) { G.save.mark('items', id); return { id, def: G.MELEE_BY_ID[id], lv: 0 }; };
+  W.makeMelee = function (id) { if (id !== 'fists') G.save.mark('items', id); return { id, def: G.MELEE_BY_ID[id], lv: 0 }; };
   W.meleeStats = function (m) {
     const d = m.def, st = G.player.stats;
     const s = Object.assign({}, d);
@@ -25,6 +25,17 @@
     return P.melee.def.moveMul * (1 + (P.stats.meleeMove || 0)) * (heavy ? 0.45 : 1);
   };
   W.meleeBusy = () => ms.ph !== 'idle';
+  const MELEM = { bleed: ['🩸', '出血'], frost: ['❄️', '冷気'], burn: ['🔥', '炎上'], poison: ['☠️', '毒'], shock: ['⚡', '感電'] };
+  W.meleeFx = function (d) {
+    const out = [];
+    if (d.traitDesc) out.push('✦ ' + d.traitDesc);
+    if (d.elem && MELEM[d.elem]) out.push(`${MELEM[d.elem][0]} ${MELEM[d.elem][1]}付与 ${Math.round((d.elemChance || 0) * 100)}%（重撃100%）`);
+    if (d.shieldMul && d.shieldMul > 1) out.push(`🛡️ シールド特効 +${Math.round((d.shieldMul - 1) * 100)}%`);
+    if (d.lifesteal) out.push(`🩸 吸血 ${Math.round(d.lifesteal * 100)}%`);
+    if (d.critChance) out.push(`🎯 会心率 +${Math.round(d.critChance * 100)}%`);
+    if (d.headMul && d.headMul > 1.55) out.push(`💀 頭部 ×${d.headMul}`);
+    return out;
+  };
 
   // ---------------- viewmodels ----------------
   function buildMelee(def) {

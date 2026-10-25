@@ -1300,7 +1300,7 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 
 /* weapon cards: where a change comes from. amber = the weapon itself (upgrade level, attachments), cyan = buffs / damage-up / enchantments */
 .sd.sp2 { color: inherit; }
-.sd.sp2 i, .wc-legend span { font-style: normal; }
+.sd.sp2 i, .lv i, .lv-m i, .wc-legend span { font-style: normal; }
 .sdw { color: #f2b95c; } .sdb { color: #6fd6ff; }
 .wc-legend { display: flex; flex-wrap: wrap; gap: 0.2em 1em; margin-top: 0.5em; font-size: 0.78em; font-weight: 700; opacity: 0.92; }
 

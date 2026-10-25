@@ -33,7 +33,8 @@
   const A = G.abilities;
   let P, C;
   const env = () => { P = G.player; C = G.combat; };
-  A.ultPower = (sk) => Math.pow(1.25, A.totalLv(sk)) * (1 + (sk ? A.skm(sk.id).dmg : 0));
+  A.ultPower = (sk, bare) => Math.pow(1.25, bare ? (sk && sk.lv) || 0 : A.totalLv(sk)) * (1 + (!bare && sk ? A.skm(sk.id).dmg : 0));
+  A.bastionRegenK = (sk, bare) => 1 + 0.04 * (bare ? (sk && sk.lv) || 0 : A.totalLv(sk));
   A.auras = [];
   A.castUlt = function (sk) {
     env();
@@ -50,7 +51,7 @@
     let ok = true;
     switch (id) {
       case 'ult_bastion': {
-        tmp('ult_bastion', p.dur, { armor: m.x_fort ? 0.72 : 0.6, hpRegen: st.maxHp * (m.x_regen ? 0.05 : 0.03) * pw }, '🏰', '不屈の城塞');
+        tmp('ult_bastion', p.dur, { armor: m.x_fort ? 0.72 : 0.6, hpRegen: st.maxHp * (m.x_regen ? 0.05 : 0.03) * A.bastionRegenK(sk) }, '🏰', '不屈の城塞');
         if (m.x_nova) for (const e of G.enemies.inRadius(P.pos, 8)) { const to = e.pos.clone().sub(P.pos).setY(0).normalize(); C.damageEnemy(e, sc(150), Object.assign({ knock: 20, dir: to.setY(0.5) }, info)); }
         G.fx.ring(P.pos.clone(), 3, 0xffd070, 0.6); G.fx.ring(P.pos.clone(), 5, 0xfff0b0, 0.9); G.fx.flash(P.chestPos(), 0xffd070, 80, 0.4, 16); G.sfx.magic(P.pos, 'holy'); G.sfx.shieldUp ? G.sfx.shieldUp() : G.sfx.bell();
         for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; G.fx.add.spawn(P.pos.x + Math.cos(a) * 1.2, P.pos.y + 0.2, P.pos.z + Math.sin(a) * 1.2, Math.cos(a) * 2, U.rand(2, 5), Math.sin(a) * 2, 0.9, 0.12, 0.02, 1, 0.85, 0.4, 1, 0, 0); }

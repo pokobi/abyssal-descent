@@ -126,7 +126,7 @@
     if (m.blink && e.alive && GM.time - (e.blinkT || -9) > 4 && Math.random() < 0.3) {
       e.blinkT = GM.time;
       const w = G.world;
-      const c = w.randomOpenCell(new G.RNG((Math.random() * 1e9) >>> 0), (x, z, idx) => (!w.reachMask || w.reachMask[idx]) && Math.hypot(x - P.pos.x, z - P.pos.z) > 5 && Math.hypot(x - P.pos.x, z - P.pos.z) < 10);
+      const c = w.randomOpenCell(new G.RNG((Math.random() * 1e9) >>> 0), (x, z, idx) => (!w.reachMask || w.reachMask[idx]) && Math.abs(w.nf[idx] - e.pos.y) < 2.5 && Math.hypot(x - P.pos.x, z - P.pos.z) > 5 && Math.hypot(x - P.pos.x, z - P.pos.z) < 10);
       if (c) { G.fx.smoke(e.centerPos(), 8, 1, 0x3050a0, 0.5, 0.6); e.pos.set(c.x, c.y + (e.flyer ? 2.5 : 0), c.z); e.vel.set(0, 0, 0); G.fx.smoke(e.centerPos(), 8, 1, 0x3050a0, 0.5, 0.6); G.sfx.whoosh(0.3, 1.4); }
     }
   };

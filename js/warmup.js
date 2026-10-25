@@ -28,7 +28,7 @@
     const t0 = now();
     try {
       sc.updateMatrixWorld(true);
-      r.compile(sc, cam);
+      if (G.fx && G.fx.withWarm) G.fx.withWarm(() => r.compile(sc, cam)); else r.compile(sc, cam);
       const n = uploadTextures(sc, r);
       if (W.log) console.log('[warm] world', (now() - t0).toFixed(0) + 'ms', n + ' textures');
     } catch (e) { console.warn('warm world failed', e); }
@@ -40,7 +40,7 @@
     const r = G.renderer, sc = G.scene, cam = G.camera;
     if (!r || !sc || !cam) return Promise.resolve();
     const t0 = now();
-    try { sc.updateMatrixWorld(true); r.compile(sc, cam); uploadTextures(sc, r); } catch (e) { console.warn('warm world failed', e); return Promise.resolve(); }
+    try { sc.updateMatrixWorld(true); if (G.fx && G.fx.withWarm) G.fx.withWarm(() => r.compile(sc, cam)); else r.compile(sc, cam); uploadTextures(sc, r); } catch (e) { console.warn('warm world failed', e); return Promise.resolve(); }
     const tc = now() - t0;
     // compile() only starts the links; the page used to block on them at the first draw. Wait for the drivers here instead (polling, not blocking).
     return new Promise((resolve) => {
@@ -71,6 +71,8 @@
     try { await W.worldAsync(8000); } catch (e) { /* ignore */ }
     if (tmp) { G.scene.remove(tmp); }
     try { warmViewmodel(r); } catch (e) { /* ignore */ }
+    try { if (G.Icons && G.Icons.warm) G.Icons.warm(); } catch (e) { /* ignore */ }
+    try { if (G.PStatus && G.PStatus.warm) G.PStatus.warm(); } catch (e) { /* ignore */ }
     try { if (G.StatusUI && G.StatusUI.warm) G.StatusUI.warm(); } catch (e) { /* ignore */ }
     if (W.log) console.log('[warm] bootAsync', (now() - t0).toFixed(0) + 'ms');
   };
@@ -99,6 +101,8 @@
     const t0 = now();
     try { W.world(); } catch (e) { /* ignore */ }
     try { warmViewmodel(r); } catch (e) { /* ignore */ }
+    try { if (G.Icons && G.Icons.warm) G.Icons.warm(); } catch (e) { /* ignore */ }
+    try { if (G.PStatus && G.PStatus.warm) G.PStatus.warm(); } catch (e) { /* ignore */ }
     try { if (G.StatusUI && G.StatusUI.warm) G.StatusUI.warm(); } catch (e) { /* ignore */ }
     if (W.log) console.log('[warm] boot', (now() - t0).toFixed(0) + 'ms');
   };

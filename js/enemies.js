@@ -816,7 +816,7 @@
         this._stN = stuck ? (this._stN || 0) + 1 : 0;
         if (this._stN >= 4 && !this.custom && !this.boss && !this.burrowed) {
           this._stN = 0;
-          const c = w0().randomOpenCell({ next: Math.random }, (x, z, idx) => (!w0().reachMask || w0().reachMask[idx]) && Math.hypot(x - P.pos.x, z - P.pos.z) > 10 && Math.hypot(x - P.pos.x, z - P.pos.z) < 24);
+          const c = w0().randomOpenCell({ next: Math.random }, (x, z, idx) => (!w0().reachMask || w0().reachMask[idx]) && Math.abs(w0().nf[idx] - P.pos.y) < 2.5 && Math.hypot(x - P.pos.x, z - P.pos.z) > 10 && Math.hypot(x - P.pos.x, z - P.pos.z) < 24);
           if (c) { G.fx.smoke(this.centerPos(), 6, 1, 0x1a1412, 1, 1); this.pos.set(c.x, c.y + (this.flyer ? this.alt : 0), c.z); this.vel.set(0, 0, 0); this.climb = 0; G.fx.smoke(this.centerPos(), 6, 1, 0x1a1412, 1, 1); }
         }
         if (!bashing && this._stP && this.mv > 0.5 && !this.attackState && this._stP.distanceTo(this.pos) < 0.4 && distH > 4) {
@@ -1103,7 +1103,7 @@
     blink(dir, d) {
       const np = this.pos.clone().addScaledVector(dir, d);
       const i = G.world.navIdx(np.x, np.z, this.pos.y);
-      if (i < 0 || G.world.nb[i] || G.world.nf[i] === -Infinity) return;
+      if (i < 0 || G.world.nb[i] || G.world.nf[i] === -Infinity || Math.abs(G.world.nf[i] - this.pos.y) > 2.5) return;
       G.fx.smoke(this.centerPos(), 8, 0.8, 0x1a1020, 0.5, 0.8);
       this.pos.x = np.x; this.pos.z = np.z; if (!this.flyer && !this.def.hover) this.pos.y = G.world.nf[i];
       G.fx.smoke(this.centerPos(), 8, 0.8, 0x1a1020, 0.5, 0.8);
@@ -1122,7 +1122,7 @@
         this.model.group.visible = false;
         if (Math.random() < dt * 12) G.fx.dust(V(this.pos.x, G.world.navFloor(this.pos.x, this.pos.z, this.pos.y) + 0.05, this.pos.z), V(0, 1, 0), 0x6a5a48, 2);
         this._rumble = (this._rumble || 0) - dt; if (this._rumble <= 0 && distH < 20) { this._rumble = 0.8; G.sfx.monster(this.pos, 'rumble', 1.4, 0.5); }
-        if (!this.erupt && distH < 4 && this.atkCd <= 0) { this.erupt = { t: 0, c: tgt.pos.clone() }; this.erupt.c.y = G.world.navFloor(tgt.pos.x, tgt.pos.z, tgt.pos.y); if (!isFinite(this.erupt.c.y)) this.erupt.c.y = tgt.pos.y; this.tele = G.fx.telegraph(this.erupt.c, 2.6, 0.85, 0xb06020); }
+        if (!this.erupt && distH < 4 && Math.abs(toT.y) < 2.5 && this.atkCd <= 0) { this.erupt = { t: 0, c: tgt.pos.clone() }; this.erupt.c.y = G.world.navFloor(tgt.pos.x, tgt.pos.z, tgt.pos.y); if (!isFinite(this.erupt.c.y)) this.erupt.c.y = tgt.pos.y; this.tele = G.fx.telegraph(this.erupt.c, 2.6, 0.85, 0xb06020); }
         if (this.erupt) {
           this.erupt.t += dt;
           if (this.erupt.t > 0.85) {
@@ -1551,8 +1551,8 @@
       { const hw = (Math.max(0, e.hp) / e.maxHp * 100).toFixed(1) + '%'; sty(b.fl, 'width', hw); sty(b.tr, 'width', hw); }
       sty(b.sb, 'display', e.maxShield > 0 ? '' : 'none');
       if (e.maxShield > 0) sty(b.sfl, 'width', (e.shield / e.maxShield * 100).toFixed(1) + '%');
-      const s = e.st; let icons = '';
-      if (s.burn > 0) icons += '🔥'; if (s.frost > 0 || s.frozen > 0) icons += s.frozen > 0 ? '🧊' : '❄️'; if (s.poison > 0) icons += '☠️' + (s.poisonStacks > 1 ? s.poisonStacks : ''); if (s.shock > 0) icons += '⚡'; if (s.bleed > 0) icons += '🩸'; if (s.stun > 0) icons += '💫'; if (!e.boss && G.game.time < (e.stunImmuneUntil || 0)) icons += '🛡️'; if (s.slow > 0) icons += '🐌'; if (s.mark > 0) icons += '🎯'; if (s.fear > 0) icons += '😱';
+      const s = e.st, R = (n) => ['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ', 'Ⅺ', 'Ⅻ', 'XIII'][Math.min(13, Math.max(1, n || 1))] || 'Ⅰ'; let icons = '';
+      if (s.burn > 0) icons += '🔥' + R(s.burnLv || 1) + ' '; if (s.frost > 0 || s.frozen > 0) icons += (s.frozen > 0 ? '🧊' : '❄️' + R(s.frostStacks || 1)) + ' '; if (s.poison > 0) icons += '☠️' + R(s.poisonStacks || 1) + ' '; if (s.shock > 0) icons += '⚡' + R(s.shockLv || 1) + ' '; if (s.bleed > 0) icons += '🩸' + R(s.bleedLv || 1) + ' '; if (s.stun > 0) icons += '💫'; if (!e.boss && G.game.time < (e.stunImmuneUntil || 0)) icons += '🛡️'; if (s.slow > 0) icons += '🐌'; if (s.mark > 0) icons += '🎯'; if (s.fear > 0) icons += '😱';
       if (b.icons !== icons) { b.icons = icons; b.st.textContent = icons; }
       const dist = e.pos.distanceTo(P.pos);
       sty(b.el, 'opacity', dist > 40 && !e.marked ? 0.6 : 1);

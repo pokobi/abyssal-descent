@@ -87,6 +87,7 @@
       tile('ヘッドショット', `<b class="sv">${num(d.headMul || 1)}倍</b>`),
       tile('移動', `<b class="sv">×${num(d.moveMul)}</b>`),
     ].join('');
+    const fxLines = G.weapons.meleeFx ? G.weapons.meleeFx(d) : (d.traitDesc ? ['✦ ' + d.traitDesc] : []);
     return `<div class="wc ${P.meleeMode ? 'cur' : ''}" style="--rc:${R(d.rarity)}">
       <div class="wc-top">
         <div class="wc-pv">${preview('melee', d)}<span class="key">${G.weapons.keyLabel('m').replace(/[\[\]]/g, '') || '·'}</span></div>
@@ -94,32 +95,33 @@
           <div class="nm">${esc(d.name)}${m.lv ? `<b class="lv">+${m.lv}</b>` : ''}</div>
           <div class="cat">${esc(d.cat)}・${G.RARITY[d.rarity].name}</div>
           <div class="dps"><b>${Math.round(dps)}</b><span>DPS</span>${Math.abs(dps - dps0) > dps0 * 0.005 ? `<span class="sd ${dps > dps0 ? 'up' : 'dn'}">(${dps > dps0 ? '+' : ''}${Math.round((dps / dps0 - 1) * 100)}%)</span>` : ''}</div>
-          ${d.traitDesc ? `<div class="tr">✦ ${esc(d.traitDesc)}</div>` : ''}
+          ${fxLines.map((x) => `<div class="tr">${esc(x)}</div>`).join('')}
         </div>
       </div>
-      <div class="wc-grid">${tiles}</div>${legend}</div>`;
+      <div class="wc-grid">${tiles}</div>${legend}${d.desc ? `<div class="wc-attd"><div><span>🗡️ 特徴</span>${esc(d.desc)}</div></div>` : ''}</div>`;
   }
 
   // ---------------- skills ----------------
+  const skLegend = '<div class="wc-legend"><span class="sdw">■ スキル強化 Lv（固定値）</span><span class="sdb">■ 加護・専用強化・能力値（%）</span></div>';
   const AREA_K = ['r', 'len', 'range', 'w'];
   const POW_K = ['dmg', 'dps', 'heal', 'hps'];
   function skillCard(sk, key) {
     const A = G.abilities, st = P.stats, d = sk.def, ult = !!d.ult;
-    const p0 = d.p, p = A.scaleP(sk);
-    const baseCd = ult ? d.cd : d.cd * A.SKILL_CD_MUL, cd = A.cdOf(sk);
-    const powBase = ult ? 1 : A.SKILL_POW_MUL;
+    const p0 = d.p, p = A.scaleP(sk), pMid = A.scaleP(sk, true);
+    const baseCd = ult ? d.cd : d.cd * A.SKILL_CD_MUL, cd = A.cdOf(sk), cdMid = A.cdOf(sk, true);
+    const powBase = ult ? 1 : A.SKILL_POW_MUL, powMid = ult ? A.ultPower(sk, true) : A.power(sk, true);
     const pow = (ult ? A.ultPower(sk) : A.power(sk)) * (1 + st.dmg + st.skillDmg + (ult ? st.ultDmg || 0 : 0)); // 与ダメ and スキルダメージ add up, as in C.damageEnemy
     const hasPow = ['dmg', 'dps'].some((k) => p0[k] != null) || (!A.effInfo(sk).length && !['heal', 'hps'].some((k) => p0[k] != null) && /ダメージ|焼|撃|爆/.test(d.desc));
-    const line = [`<span><label>クールタイム</label>${dv(cd, baseCd, { unit: '秒', lowerBetter: true })}</span>`];
-    if (hasPow) line.push(`<span><label>威力</label>${dv(pow * 100, powBase * 100, { unit: '%', dec: 0 })}</span>`);
+    const line = [`<span><label>クールタイム</label>${dv(cd, baseCd, { unit: '秒', lowerBetter: true, mid: cdMid })}</span>`];
+    if (hasPow) line.push(`<span><label>威力</label>${dv(pow * 100, powBase * 100, { unit: '%', dec: 0, mid: powMid * 100 })}</span>`);
     // the actual numbers (what one hit / one second / one heal really amounts to with the current level and bonuses)
-    const ek = A.effK(sk); // heals grow with the effect factor, damage with the power factor
-    for (const [k, lab] of [['dmg', 'ダメージ'], ['dps', '毎秒ダメージ']]) if (p0[k] != null && p0[k] > 0) { const f = pow; line.push(`<span><label>${lab}</label>${dv(p0[k] * f, p0[k] * (k === 'heal' || k === 'hps' ? 1 : powBase), { dec: 0 })}</span>`); }
+    const ek = A.effK(sk), ekMid = A.effK(sk, true); // heals grow with the effect factor, damage with the power factor
+    for (const [k, lab] of [['dmg', 'ダメージ'], ['dps', '毎秒ダメージ']]) if (p0[k] != null && p0[k] > 0) { const f = pow; line.push(`<span><label>${lab}</label>${dv(p0[k] * f, p0[k] * (k === 'heal' || k === 'hps' ? 1 : powBase), { dec: 0, mid: p0[k] * powMid })}</span>`); }
     // what a level changes in the buff / heal skills goes into the description's own numbers (below); only the ones the text does not mention get a row
-    const eff = A.effInfo(sk).map((e) => ({ e, used: false })), effDv = (z) => dv(z.e[2], z.e[1], { unit: z.e[3] === '倍' ? '' : z.e[3], dec: z.e[4] === undefined ? 0 : z.e[4], lowerBetter: !!z.e[5] });
-    for (const k of AREA_K) if (p0[k]) { line.push(`<span><label>${k === 'len' ? '長さ' : k === 'range' ? '射程' : k === 'w' ? '幅' : '範囲'}</label>${dv(p[k], p0[k], { unit: 'm' })}</span>`); break; }
-    if (p0.dur) line.push(`<span><label>効果時間</label>${dv(p.dur, p0.dur, { unit: '秒' })}</span>`);
-    if (sk.maxCharges > 1 || p0.charges) line.push(`<span><label>チャージ</label>${dv(sk.maxCharges || 1, p0.charges || 1, { dec: 0 })}</span>`);
+    const eff = A.effInfo(sk).map((e) => ({ e, used: false })), effDv = (z) => dv(z.e[2], z.e[1], { mid: z.e[6], unit: z.e[3] === '倍' ? '' : z.e[3], dec: z.e[4] === undefined ? 0 : z.e[4], lowerBetter: !!z.e[5] });
+    for (const k of AREA_K) if (p0[k]) { line.push(`<span><label>${k === 'len' ? '長さ' : k === 'range' ? '射程' : k === 'w' ? '幅' : '範囲'}</label>${dv(p[k], p0[k], { unit: 'm', mid: pMid[k] })}</span>`); break; }
+    if (p0.dur) line.push(`<span><label>効果時間</label>${dv(p.dur, p0.dur, { unit: '秒', mid: pMid.dur })}</span>`);
+    if (sk.maxCharges > 1 || p0.charges) line.push(`<span><label>チャージ</label>${dv(sk.maxCharges || 1, p0.charges || 1, { dec: 0, mid: p0.charges || 1 })}</span>`);
     // the description: numbers that come from the skill's own parameters are recomputed; every number is bold
     const used = new Set();
     const desc = esc(d.desc).replace(/(\d+(?:\.\d+)?)(秒|m|体|個|本|%|倍)?/g, (all, n, u) => {
@@ -133,14 +135,15 @@
       if (!k) return `<b class="sv">${n}${u || ''}</b>`;
       used.add(k);
       const cur = AREA_K.includes(k) || k === 'dur' ? p[k] : (k === 'heal' || k === 'hps') ? p0[k] * ek : POW_K.includes(k) ? p0[k] * pow : p[k]; // the real number: base x level x the skill power constant x bonuses
-      return dv(cur, (k === 'heal' || k === 'hps') ? v : POW_K.includes(k) ? v * powBase : v, { unit: u || '', dec: Number.isInteger(v) && Math.abs(cur - Math.round(cur)) < 0.05 ? 0 : 1 });
+      const mid = AREA_K.includes(k) || k === 'dur' ? pMid[k] : (k === 'heal' || k === 'hps') ? p0[k] * ekMid : POW_K.includes(k) ? p0[k] * powMid : pMid[k];
+      return dv(cur, (k === 'heal' || k === 'hps') ? v : POW_K.includes(k) ? v * powBase : v, { mid, unit: u || '', dec: Number.isInteger(v) && Math.abs(cur - Math.round(cur)) < 0.05 ? 0 : 1 });
     });
     const augs = [...P.buffs].filter(([id]) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].skill === sk.id);
     const ready = A.ready(sk), left = sk.maxCharges ? `${sk.charges}/${sk.maxCharges}` : ready ? 'READY' : `${Math.ceil(sk.cd)}秒`;
     return `<div class="sc ${ult ? 'ult' : ''}" style="--rc:${R(d.rarity)}">
       <div class="sc-h"><span class="key">${key}</span><span class="ic">${d.icon}</span><span class="nm">${esc(d.name)}${A.lvHTML(sk) ? `<b class="lv">${A.lvHTML(sk)}</b>` : ''}${ult ? '<em class="tag">ULT</em>' : ''}</span><span class="st ${ready ? 'ok' : ''}">${left}</span></div>
       <div class="sc-l">${line.concat(eff.filter((z) => !z.used).map((z) => `<span><label>${z.e[0]}</label>${effDv(z)}</span>`)).join('')}</div>
-      <div class="sc-d">${desc}</div>
+      <div class="sc-d">${desc}</div>${skLegend}
       ${augs.length ? `<div class="sc-a">${augs.map(([id, n]) => { const b = G.BUFF_BY_ID[id]; return `<span ${UI.tipAttr(b)} style="--rc:${R(b.rarity)}">${b.icon}${n > 1 ? `<sub>${n}</sub>` : ''}</span>`; }).join('')}</div>` : ''}</div>`;
   }
   function pileCard() {

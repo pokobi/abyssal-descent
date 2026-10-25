@@ -291,7 +291,7 @@
       if (this.sprinting) targetSpeed = 9.7 * (1 + st.moveSpeed + Math.min(3, Math.floor(this.sprintT)) * (st.sprintRamp || 0)) * this.moveMul();
       if (this.crouching && !this.sliding && !this._sjRun) targetSpeed = 3.3 * (1 + st.moveSpeed * 0.5) * this.moveMul();
       if (G.weapons.adsT > 0.5) targetSpeed *= 0.62;
-      if (this.st.slow > 0) targetSpeed *= 0.6;
+      if (this.st.slow > 0) targetSpeed *= Math.max(0.4, 0.7 - 0.1 * ((this.st.slowLv || 1) - 1));
       if (this.inWater) targetSpeed *= 0.9;
       targetSpeed *= this.fieldSpeed || 1;
 
@@ -457,7 +457,7 @@
         this._lavaT = (this._lavaT || 0) - dt;
         if (this._lavaT <= 0) { this._lavaT = 0.4; G.combat.damagePlayer(5 + G.game.area * 0.6, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }
         // lava sets you alight with a fierce, long burn (it hurts several times more than an ordinary one)
-        this.st.burn = Math.max(this.st.burn || 0, 5); this.st.burnMul = 4;
+        this.st.burn = Math.max(this.st.burn || 0, 5); this.st.burnMul = 4; this.st.burnLv = Math.max(this.st.burnLv || 1, 3);
       }
       // footsteps
       if (this.grounded && this.speedH > 1.2 && !this.sliding) {
@@ -552,15 +552,15 @@
       const s = this.st;
       const sdt = dt / Math.max(0.3, 1 - (this.stats.statusRes || 0)); // armour: statuses wear off sooner
       const dr = Math.max(0.1, 1 - (this.stats.dotRes || 0));
-      for (const k of ['slow', 'shock']) if (s[k] > 0) s[k] -= sdt;
+      for (const k of ['slow', 'shock']) if (s[k] > 0) { s[k] -= sdt; if (s[k] <= 0) s[k + 'Lv'] = 0; }
       s.tick = (s.tick || 0) - dt;
       if (s.tick <= 0) {
         s.tick = 0.5;
         const sc = (1 + 0.1 * (G.game.area - 1)) * dr;
-        if (s.burn > 0) { G.combat.damagePlayer(1.6 * sc * (s.burnMul || 1), { src: 'dot', elem: null }); }
+        if (s.burn > 0) { G.combat.damagePlayer(1.6 * sc * (s.burnMul || 1) * (0.7 + 0.3 * (s.burnLv || 1)), { src: 'dot', elem: null }); }
         if (s.poison > 0) { G.combat.damagePlayer(0.8 * sc * (s.poisonStacks || 1), { src: 'dot' }); }
       }
-      if (s.burn > 0) { s.burn -= sdt; if (s.burn <= 0) s.burnMul = 1; }
+      if (s.burn > 0) { s.burn -= sdt; if (s.burn <= 0) { s.burnMul = 1; s.burnLv = 0; } }
       if (s.poison > 0) { s.poison -= sdt; if (s.poison <= 0) s.poisonStacks = 0; }
     }
 

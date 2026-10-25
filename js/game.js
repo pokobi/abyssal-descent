@@ -455,7 +455,7 @@
     if (G.save.data.settings.fullscreen) I.fullscreen();
     GM.route = []; GM.rewardPending = null;
     GM.enterArea(1, 'combat');
-    if (G.Warm && !GM._uiWarmed) { GM._uiWarmed = true; setTimeout(() => G.Warm.ui(), 1500); }
+    if (G.Warm && !GM._uiWarmed) { GM._uiWarmed = true; G.Warm.ui(); }
     setTimeout(() => { G.ui.itemCard(G.ITEM_BY_ID.h_bandage, `[${G.K('item1')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.h_medkit, `[${G.K('item2')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.g_frag, `[${G.K('grenade')} で構え→クリックで投擲]`, { noBanner: true }); G.ui.toastSmall('💡 Tab で持ち物・装備・ステータスをまとめて確認できます'); }, 3200);
   };
   // ---------------- attachments: stash & moving between weapons ----------------
@@ -549,7 +549,7 @@
     if (!P.weapons.length) P.weapons = [G.weapons.make('starter')];
     P.wIdx = Math.min(d.wIdx || 0, P.weapons.length - 1);
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));
-    if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id === 'fists' ? G.DEFAULT_MELEE : d.melee.id); P.melee.lv = d.melee.lv || 0; }
+    if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; }
     P.skills = [0, 1, 2, 3].map((i) => { if (!(d.skills && d.skills[i] && G.SKILL_BY_ID[d.skills[i]])) return null; const s = G.abilities.makeSlot(d.skills[i]); s.lv = (d.skillLv && d.skillLv[i]) || 0; return s; });
     P.pileTome = d.pileTome || 0;
     if (P.skills[0] && !P.skills[0].def.ult) { const s = P.skills[0]; const free = [1, 2, 3].find((i) => !P.skills[i]); if (free) P.skills[free] = s; P.skills[0] = null; }
@@ -920,7 +920,7 @@
     if (!on) {
       fireT = 0;
       if (fireLv > 0) { fireCool -= dt; if (fireCool <= 0) { fireCool = 0.35; fireLv--; } }
-      fireEl.classList.toggle('on', fireLv > 0); if (fireLv > 0) fireEl.textContent = `🔥 炎上 Lv.${fireLv}`;
+      fireEl.classList.toggle('on', fireLv > 0); if (fireLv > 0) fireEl.textContent = `🔥 炎上 ${['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ'][fireLv] || 'Lv.' + fireLv}`;
       return;
     }
     fireT += dt; fireTick -= dt; fireWarnT -= dt; fireCool = 0.35;
@@ -928,7 +928,7 @@
     if (fireT < 0.25) return;
     if (fireWarnT <= 0) { fireWarnT = 4; G.ui.toast('🔥 高所は炎に包まれている！ 降りろ！', 'warn'); }
     if (fireTick <= 0) { fireTick = 0.5; fireLv++; G.combat.damagePlayer((4 + GM.area * 0.25) * (1 + (fireLv - 1) * 0.5), { src: 'aoe', elem: 'fire', pos: P.pos.clone() }); }
-    fireEl.classList.add('on'); fireEl.textContent = `🔥 炎上 Lv.${fireLv}`;
+    fireEl.classList.add('on'); fireEl.textContent = `🔥 炎上 ${['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ'][fireLv] || 'Lv.' + fireLv}`;
     fireEl.style.setProperty('--h', Math.max(0, 40 - fireLv * 4));
   }
   // green outline + glow + pillar on the healing basin while the hint is active
@@ -1200,6 +1200,30 @@
     const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を拾った`);
     return true;
   };
+  GM.dropMelee = function () {
+    const m = P.melee;
+    if (!m || m.id === (G.BARE_MELEE || 'fists')) return false;
+    const it = G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0 } });
+    G.Inv.dropToGround(it, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(P.forward().setY(0).normalize(), 0.9));
+    P.melee = G.weapons.makeMelee(G.BARE_MELEE || 'fists');
+    if (P.meleeMode) G.weapons.melee.equip(false);
+    G.ui.refreshWeapon(); P.recalc();
+    return true;
+  };
+  GM.takeMelee = function (it) {
+    const prev = P.melee;
+    if (prev && prev.id !== (G.BARE_MELEE || 'fists')) {
+      const old = G.Inv.make('melee', prev.id, 1, { gun: { lv: prev.lv || 0 } });
+      G.Inv.dropToGround(old, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)));
+    }
+    const m = G.weapons.makeMelee(it.id);
+    m.lv = (it.gun && it.gun.lv) || 0;
+    P.melee = m;
+    if (P.meleeMode) G.weapons.melee.equip(false);
+    G.ui.refreshWeapon(); P.recalc();
+    const d = G.MELEE_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name}${m.lv ? ' +' + m.lv : ''} を拾った`);
+    return true;
+  };
   GM.giveSkill = function (id) {
     if (G.SKILL_BY_ID[id] && G.SKILL_BY_ID[id].ult) { P.skills[0] = G.abilities.makeSlot(id); G.ui.itemCard(G.SKILL_BY_ID[id], `[${G.input.skillKey(0)} アルティメット]`); return; }
     let i = [1, 2, 3].find((k) => !P.skills[k]) || 3;
@@ -1335,7 +1359,7 @@
   GM.relicCount = () => [...P.buffs.keys()].filter((id) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].cat === 'relic').length;
   // deeper shops stock weapons that are already forged (you pay for it)
   GM.shopLv = () => Math.min(10, Math.floor((G.Run.depthArea(GM.area) - 1) / 5));
-  GM.forgeTargets = () => G.weapons.orderList().map((t) => (t === 'm' ? { w: P.melee, gun: false, t } : { w: t, gun: true, t })).filter((x) => (x.w.lv || 0) < G.Areas.FORGE_MAX);
+  GM.forgeTargets = () => G.weapons.orderList().map((t) => (t === 'm' ? { w: P.melee, gun: false, t } : { w: t, gun: true, t })).filter((x) => x.w.id !== (G.BARE_MELEE || 'fists') && (x.w.lv || 0) < G.Areas.FORGE_MAX);
   GM.forgeRange = function () { const c = GM.forgeTargets().map((x) => G.Areas.forgeCost(x.w)); return c.length ? [Math.min(...c), Math.max(...c)] : [0, 0]; };
   GM.priceLabel = (o) => (o.free ? '無料!' : o.kind === 'forge' || o.kind === 'tome' ? (() => { const [a, b] = o.kind === 'forge' ? GM.forgeRange() : GM.tomeRange(); return a === b ? U.fmt(a) : `${U.fmt(a)}~${U.fmt(b)}`; })() : U.fmt(o.price));
   GM.offerPrice = function (kind, obj) {
@@ -1386,7 +1410,7 @@
       used.add(obj.id);
       const kind = k === 'pile' || k === 'tech' ? 'buff' : k === 'mythic' ? (obj.kind === 'melee' ? 'melee' : 'weapon') : k;
       const inst = kind === 'armor' ? G.Inv.makeArmor(obj.id, () => r.next()) : null; // armour: enchantments are rolled when the shelf is stocked
-      offers.push({ kind, obj, inst, price: Math.round(GM.offerPrice(kind, obj) * (inst ? 1 + 0.15 * inst.ench.length : 1) / 10) * 10, sold: false, slot: w.shopSlots[i], lv: (kind === 'weapon' || kind === 'melee') && !obj.mythic ? GM.shopLv() : 0 });
+      offers.push({ kind, obj, inst, price: Math.round(GM.offerPrice(kind, obj) * (inst ? G.Inv.enchMul(inst) : 1) / 10) * 10, sold: false, slot: w.shopSlots[i], lv: (kind === 'weapon' || kind === 'melee') && !obj.mythic ? GM.shopLv() : 0 });
     });
     if (P.has('e_free') && GM.run.freeArea !== GM.area) { const g = offers.filter((o) => o.kind !== 'buff'); if (g.length) { const f = r.pick(g); f.price = 0; f.free = true; GM.run.freeArea = GM.area; } }
     // rare: a revive charm for a fortune
@@ -1561,7 +1585,7 @@
       const info = describeOffer(o);
       G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: o.kind === 'forge' && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= (o.kind === 'forge' && !o.free ? GM.forgeRange()[0] : o.price), action: info.action || '購入' });
     } else if (best.type === 'sell') {
-      G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・アイテム・投擲物を売却できる。初期装備のピストルは売れない。', action: '売る' });
+      G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・防具・アイテム・投擲物を売却できる。', action: '売る' });
     } else if (best.type === 'reroll') {
       const cost = GM.rerollCost();
       G.ui.showInteract({ key: 'reroll' + coins, icon: '🎲', name: '運命の祭壇', cat: 'ショップの品揃えを入れ替える', desc: '売れ残った商品を全て新しいものに入れ替えます。使う度に価格が上がります。', price: cost, afford: coins >= cost, action: 'リロール' });

@@ -239,8 +239,8 @@
     // the starting melee weapon. Same overall strength as the old bare fists (light DPS ~67, heavy ~73/s, same move speed):
     // a little more reach and faster swings, but a narrower arc, lighter knockback and smaller hits
     ['m_basic', 'サバイバルナイフ', '🔪', 'common', 'knife', { dmg: 20, swing: 0.3, range: 2.5, arc: 0.66, heavy: [2.75, 0.34, 0.41], moveMul: 1.12, knock: 3 }, null, 'sknife', '最初から持っている頑丈なナイフ。素早い連撃と少し長いリーチ。右クリックで深く突き刺す。'],
-    // legacy: only kept so that old saves holding bare fists still load (they are swapped for the knife)
-    ['fists', '素手', '👊', 'common', 'fist', { dmg: 24, swing: 0.36, range: 2.3, arc: 0.6, heavy: [2.6, 0.38, 0.45], moveMul: 1.12, knock: 6 }, null, 'fists', '拳ひとつで深淵に挑む。軽く、素早い。右クリックで渾身のストレート。'],
+    // bare hands when no melee weapon is held (weaker than the starting knife)
+    ['fists', '素手', '👊', 'common', 'fist', { dmg: 12, swing: 0.38, range: 2.0, arc: 0.6, heavy: [2.2, 0.38, 0.45], moveMul: 1.12, knock: 3 }, null, 'fists', '近接武器を持たない素手の状態。リーチが短く威力も控えめだが、右クリックでストレートを放てる。'],
     ['m_knife', 'コンバットナイフ', '🔪', 'common', 'knife', { dmg: 36, swing: 0.3, range: 2.5, arc: 0.62, heavy: [2.8, 0.32, 0.4], moveMul: 1.16, knock: 3, critChance: 0.1 }, null, 'knife', '軍用の頑丈なナイフ。最速の連撃と高い機動力。'],
     ['m_kukri', 'ククリ', '🗡️', 'uncommon', 'knife', { dmg: 46, swing: 0.36, range: 2.6, arc: 0.55, heavy: [2.8, 0.36, 0.45], moveMul: 1.14, knock: 4, elem: 'bleed', elemChance: 0.45 }, null, 'kukri', '湾曲した刃が肉を裂き、出血を付与する。'],
     ['m_machete', 'マチェーテ', '🗡️', 'common', 'blade', { dmg: 50, swing: 0.44, range: 2.8, arc: 0.35, heavy: [2.6, 0.42, 0.5], moveMul: 1.12, knock: 5 }, 'sweep', 'machete', '幅広の山刀。横薙ぎで複数の敵を巻き込む。'],
@@ -266,6 +266,7 @@
   for (const m of G.MELEE) if (m.id === 'm_devour' || m.id === 'm_midas') { m.mythic = true; m.price = m.id === 'm_devour' ? 9500 : 6500; }
   G.MELEE_BY_ID = Object.fromEntries(G.MELEE.map((m) => [m.id, m]));
   G.DEFAULT_MELEE = 'm_basic';
+  G.BARE_MELEE = 'fists';
   G.MELEE_BY_ID.fists.legacy = true;
   G.isDefaultMelee = (id) => id === G.DEFAULT_MELEE || id === 'fists';
 })();

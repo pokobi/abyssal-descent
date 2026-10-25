@@ -19,21 +19,22 @@
   // Mastery boons add levels in a separate layer: shown as Lv(base+mastery), and the numbers use the total (so Lv 15 can be passed, up to 15+3)
   A.mastery = (sk) => { const p = G.player; return sk && p && p.buffs ? p.buffs.get('sk_' + sk.id + '_mastery') || 0 : 0; };
   A.totalLv = (sk) => ((sk && sk.lv) || 0) + A.mastery(sk);
-  A.lvHTML = (sk) => { const b = (sk && sk.lv) || 0, m = A.mastery(sk); return m ? `<span class="lv-m">Lv${b + m}<small>(${b}+${m})</small></span>` : b ? 'Lv' + b : ''; };
+  A.lvHTML = (sk) => { const b = (sk && sk.lv) || 0, m = A.mastery(sk); return m ? `<span class="lv-m"><i class="sdw">Lv${b}</i><i class="sdb">+${m}</i></span>` : b ? `<span class="sdw">Lv${b}</span>` : ''; };
   A.lvText = (sk) => { const b = (sk && sk.lv) || 0, m = A.mastery(sk); return m ? `Lv${b + m}(${b}+${m})` : b ? 'Lv' + b : ''; };
-  A.cdOf = (sk) => {
-    const st = P.stats, lvK = 1 - Math.min(0.36, 0.02 * A.totalLv(sk));
-    const own = 1 - Math.min(0.5, A.skm ? A.skm(sk.id).cd : 0);
+  A.cdOf = (sk, bare) => {
+    const L = bare ? (sk && sk.lv) || 0 : A.totalLv(sk), lvK = 1 - Math.min(0.36, 0.02 * L);
+    if (bare) return sk.def.cd * (sk.def.ult ? 1 : A.SKILL_CD_MUL) * lvK;
+    const st = P.stats, own = 1 - Math.min(0.5, A.skm ? A.skm(sk.id).cd : 0);
     if (sk.def.ult) return sk.def.cd * (1 - st.cdr * 0.5) * (1 - (st.ultCd || 0)) * lvK * own;
     return sk.def.cd * A.SKILL_CD_MUL * (1 - st.cdr) * (1 - (st.skillCd || 0)) * lvK * own * (P.temps.has('ult_overcharge') ? (P.ocCd || 0.3) : 1);
   };
   // skill power grows with its level (raised with skill tomes / buying the same skill again)
-  A.power = (sk) => Math.pow(1.3, A.totalLv(sk)) * A.SKILL_POW_MUL * (1 + (sk && A.skm ? A.skm(sk.id).dmg : 0));
+  A.power = (sk, bare) => Math.pow(1.3, bare ? (sk && sk.lv) || 0 : A.totalLv(sk)) * A.SKILL_POW_MUL * (1 + (!bare && sk && A.skm ? A.skm(sk.id).dmg : 0));
   // the other half of levelling: buffs and heals grow too (damage uses A.power). +10% of every buff amount per level; damage reduction closes in on a cap
-  A.effK = (sk) => 1 + 0.1 * A.totalLv(sk);
+  A.effK = (sk, bare) => 1 + 0.1 * (bare ? (sk && sk.lv) || 0 : A.totalLv(sk));
   const AMT = ['dmg', 'fireRate', 'lifesteal', 'moveSpeed', 'jumpPower', 'reloadSpeed', 'critChance', 'critMul', 'skillDmg', 'meleeDmg', 'pileDmg', 'maxHpPct'];
-  A.effStats = (sk, s) => {
-    const o = {}, k = A.effK(sk), L = A.totalLv(sk);
+  A.effStats = (sk, s, bare) => {
+    const o = {}, k = A.effK(sk, bare), L = bare ? (sk && sk.lv) || 0 : A.totalLv(sk);
     for (const key in s) {
       const v = s[key];
       if (key === 'armor' && v > 0) o[key] = Math.min(0.92, 1 - (1 - v) * Math.pow(0.93, L));
@@ -42,31 +43,32 @@
     }
     return o;
   };
-  // what a level changes in the skills whose effect is not damage: [label, base, now, unit, decimals, lowerIsBetter] (for the status screen; the numbers mirror castSkill / castUlt)
+  // what a level changes in the skills whose effect is not damage: [label, base, now, unit, decimals, lowerIsBetter, mid] (for the status screen; the numbers mirror castSkill / castUlt)
   A.effInfo = function (sk) {
-    const id = sk.id, m = A.skm(id), k = A.effK(sk), L = A.totalLv(sk), pw = A.isUlt(sk) ? A.ultPower(sk) : 1;
-    const es = (key, v) => A.effStats(sk, { [key]: v })[key], pc = (v) => v * 100, row = (lab, key, v) => [lab, pc(v), pc(es(key, v)), '%'];
+    const id = sk.id, m = A.skm(id), k = A.effK(sk), k0 = A.effK(sk, true), L = A.totalLv(sk), L0 = (sk && sk.lv) || 0;
+    const es = (key, v, bare) => A.effStats(sk, { [key]: v }, bare)[key], pc = (v) => v * 100;
+    const row = (lab, key, v0, vCur) => { const v = vCur !== undefined ? vCur : v0; return [lab, pc(v0), pc(es(key, v, false)), '%', undefined, false, pc(es(key, v0, true))]; };
     switch (id) {
-      case 'ult_bastion': { const r = m.x_regen ? 5 : 3; return [row('被ダメ軽減', 'armor', m.x_fort ? 0.72 : 0.6), ['毎秒回復（最大HP比）', r, r * pw, '%', 1]]; }
-      case 'ult_berserk': return [row('与ダメ', 'dmg', 0.8 + (m.x_rage ? 0.4 : 0)), row('連射速度', 'fireRate', 0.4), row('吸血', 'lifesteal', 0.08 + (m.x_blood ? 0.06 : 0)), row('移動速度', 'moveSpeed', 0.2)];
-      case 'ult_armory': return [row('連射速度', 'fireRate', m.x_rate ? 1.2 : 0.8)];
-      case 'ult_shadow': return [row('会心率', 'critChance', 0.6), row('会心ダメージ', 'critMul', m.x_lethal ? 1 : 0.5)];
-      case 'ult_titan': return [row('最大HP', 'maxHpPct', 0.8), row('近接ダメージ', 'meleeDmg', 1.5), row('パイルドライバー威力', 'pileDmg', 1), row('被ダメ軽減', 'armor', m.x_iron ? 0.4 : 0.25)];
-      case 'ult_overcharge': return [['スキルのCT短縮', 70, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L))), '%']];
-      case 'ult_sanctuary': { const h = m.x_heal ? 7 : 4; return [['毎秒回復（最大HP比）', h, h * k, '%', 1]]; }
-      case 'berserk': return [row('与ダメ', 'dmg', m.x_fury ? 0.8 : 0.5), row('連射速度', 'fireRate', 0.3), row('吸血', 'lifesteal', 0.05)];
-      case 'haste': return [row('移動速度', 'moveSpeed', 0.6), row('ジャンプ力', 'jumpPower', m.x_jump ? 0.6 : 0.3)];
-      case 'overdrive': return [row('連射速度', 'fireRate', m.x_rate ? 0.9 : 0.6)];
-      case 'thornarmor': return [row('被ダメ軽減', 'armor', m.x_harden ? 0.5 : 0.35), ['反射ダメージ', m.x_reflect ? 200 : 100, (m.x_reflect ? 200 : 100) * k, '%']];
-      case 'healaura': return [row('被ダメ軽減', 'armor', m.x_armor ? 0.35 : 0.2)];
-      case 'warcry': return [row('与ダメ', 'dmg', m.x_rally ? 0.45 : 0.25)];
-      case 'cloak': return [['最初の一撃の会心倍率', 2.5, 1 + 1.5 * k, '倍', 2]];
-      case 'chrono': { const b = m.x_deep ? 0.2 : 0.4; return [['敵を遅くする割合', pc(1 - b), pc(1 - Math.max(0.08, b * Math.pow(0.93, L))), '%']]; }
-      case 'mark': return [['受けるダメージ増加', 60, 60 * (1 + 0.5 * (k - 1)), '%']];
-      case 'rewind': return [['巻き戻り時の回復（最大HP比）', 0, 2 * L, '%']];
-      case 'flight': return [['上昇の勢い', 100, 100 * (1 + 0.02 * L), '%']];
-      case 'dash': case 'dash2': return [['突進の距離', 100, 100 * (1 + 0.03 * L), '%']];
-      case 'ricostorm': return [['跳弾のダメージ', 100, 100 * (1 + 0.06 * L), '%']];
+      case 'ult_bastion': { const r = m.x_regen ? 5 : 3, rk = A.bastionRegenK ? A.bastionRegenK(sk) : 1 + 0.04 * L, rk0 = A.bastionRegenK ? A.bastionRegenK(sk, true) : 1 + 0.04 * L0; return [row('被ダメ軽減', 'armor', 0.6, m.x_fort ? 0.72 : 0.6), ['毎秒回復（最大HP比）', 3, r * rk, '%', 1, false, 3 * rk0]]; }
+      case 'ult_berserk': return [row('与ダメ', 'dmg', 0.8, 0.8 + (m.x_rage ? 0.4 : 0)), row('連射速度', 'fireRate', 0.4), row('吸血', 'lifesteal', 0.08, 0.08 + (m.x_blood ? 0.06 : 0)), row('移動速度', 'moveSpeed', 0.2)];
+      case 'ult_armory': return [row('連射速度', 'fireRate', 0.8, m.x_rate ? 1.2 : 0.8)];
+      case 'ult_shadow': return [row('会心率', 'critChance', 0.6), row('会心ダメージ', 'critMul', 0.5, m.x_lethal ? 1 : 0.5)];
+      case 'ult_titan': return [row('最大HP', 'maxHpPct', 0.8), row('近接ダメージ', 'meleeDmg', 1.5), row('パイルドライバー威力', 'pileDmg', 1), row('被ダメ軽減', 'armor', 0.25, m.x_iron ? 0.4 : 0.25)];
+      case 'ult_overcharge': return [['スキルのCT短縮', 70, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L))), '%', 0, false, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L0)))]];
+      case 'ult_sanctuary': { const h = m.x_heal ? 7 : 4; return [['毎秒回復（最大HP比）', 4, h * k, '%', 1, false, 4 * k0]]; }
+      case 'berserk': return [row('与ダメ', 'dmg', 0.5, m.x_fury ? 0.8 : 0.5), row('連射速度', 'fireRate', 0.3), row('吸血', 'lifesteal', 0.05)];
+      case 'haste': return [row('移動速度', 'moveSpeed', 0.6), row('ジャンプ力', 'jumpPower', 0.3, m.x_jump ? 0.6 : 0.3)];
+      case 'overdrive': return [row('連射速度', 'fireRate', 0.6, m.x_rate ? 0.9 : 0.6)];
+      case 'thornarmor': return [row('被ダメ軽減', 'armor', 0.35, m.x_harden ? 0.5 : 0.35), ['反射ダメージ', 100, (m.x_reflect ? 200 : 100) * k, '%', 0, false, 100 * k0]];
+      case 'healaura': return [row('被ダメ軽減', 'armor', 0.2, m.x_armor ? 0.35 : 0.2)];
+      case 'warcry': return [row('与ダメ', 'dmg', 0.25, m.x_rally ? 0.45 : 0.25)];
+      case 'cloak': return [['最初の一撃の会心倍率', 2.5, 1 + 1.5 * k, '倍', 2, false, 1 + 1.5 * k0]];
+      case 'chrono': { const b = m.x_deep ? 0.2 : 0.4; return [['敵を遅くする割合', 60, pc(1 - Math.max(0.08, b * Math.pow(0.93, L))), '%', 0, false, pc(1 - Math.max(0.08, 0.4 * Math.pow(0.93, L0)))]]; }
+      case 'mark': return [['受けるダメージ増加', 60, 60 * (1 + 0.5 * (k - 1)), '%', 0, false, 60 * (1 + 0.5 * (k0 - 1))]];
+      case 'rewind': return [['巻き戻り時の回復（最大HP比）', 0, 2 * L, '%', 0, false, 2 * L0]];
+      case 'flight': return [['上昇の勢い', 100, 100 * (1 + 0.02 * L), '%', 0, false, 100 * (1 + 0.02 * L0)]];
+      case 'dash': case 'dash2': return [['突進の距離', 100, 100 * (1 + 0.03 * L), '%', 0, false, 100 * (1 + 0.03 * L0)]];
+      case 'ricostorm': return [['跳弾のダメージ', 100, 100 * (1 + 0.06 * L), '%', 0, false, 100 * (1 + 0.06 * L0)]];
     }
     return [];
   };
@@ -174,13 +176,16 @@
     try { castSkill(sk); } finally { C.curSk = prev; }
   };
   // range / duration augments (all skills + this skill's own) scale the skill's numbers
-  A.scaleP = function (sk) {
-    const p = Object.assign({}, sk.def.p), st = P.stats, m = A.skm(sk.id), ult = A.isUlt(sk);
-    const rk = 1 + (ult ? 0 : st.skillRad || 0) + m.area, dk = 1 + (ult ? st.ultDur || 0 : st.skillDur || 0) + m.dur;
-    for (const k of ['r', 'len', 'range', 'w']) if (p[k]) p[k] *= rk;
-    if (p.dur) p.dur *= dk;
-    if (!p.dmg && !p.dps && p.range) p.range *= 1 + 0.04 * A.totalLv(sk); // a pure-utility jump goes farther
-    if (sk.id === 'barrier' || sk.id === 'ult_timestop') p.dur *= 1 + 0.04 * A.totalLv(sk); // (the only two whose level stretches the time; every other duration stays as it is)
+  A.scaleP = function (sk, bare) {
+    const p = Object.assign({}, sk.def.p), L = bare ? (sk && sk.lv) || 0 : A.totalLv(sk);
+    if (!bare) {
+      const st = P.stats, m = A.skm(sk.id), ult = A.isUlt(sk);
+      const rk = 1 + (ult ? 0 : st.skillRad || 0) + m.area, dk = 1 + (ult ? st.ultDur || 0 : st.skillDur || 0) + m.dur;
+      for (const k of ['r', 'len', 'range', 'w']) if (p[k]) p[k] *= rk;
+      if (p.dur) p.dur *= dk;
+    }
+    if (!p.dmg && !p.dps && p.range) p.range *= 1 + 0.04 * L; // a pure-utility jump goes farther
+    if (sk.id === 'barrier' || sk.id === 'ult_timestop') p.dur *= 1 + 0.04 * L; // (the only two whose level stretches the time; every other duration stays as it is)
     return p;
   };
   function castSkill(sk) {

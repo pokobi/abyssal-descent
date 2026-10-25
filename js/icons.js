@@ -758,5 +758,21 @@
     for (const list of [G.ITEMS, G.VALUABLES]) if (list) for (const it of list) { const x = ITEMX[it.id]; if (x && PATHS[x[0]]) { IC.def('item:' + it.id, [big(x[0], x[1])]); it.icon = IC.ch('item:' + it.id, it.icon); } }
     if (G.ARMOR_SLOTS) for (const s of G.ARMOR_SLOTS) { const n = ARMOR[s.id] && ARMOR[s.id].plate; if (n) { IC.def('aslot:' + s.id, [big(n, '#9a8a70')]); s.icon = IC.ch('aslot:' + s.id, s.icon); } }
   };
+  IC.warm = function () {
+    if (IC._warmed) return;
+    IC._warmed = true;
+    if (!RX) buildRx();
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:240px;height:240px;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1';
+    for (const k in SPEC) {
+      box.appendChild(iconNode(k));
+      for (const l of SPEC[k]) if (l.d) path2d(l.d);
+    }
+    if (document.body) {
+      document.body.appendChild(box);
+      void box.offsetWidth;
+      setTimeout(() => box.remove(), 120);
+    }
+  };
   IC.applyData();
 })();

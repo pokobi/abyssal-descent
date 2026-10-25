@@ -114,10 +114,10 @@
     });
     w.addLight(x1, y1 + 0.5, z1, { flame: 0, intensity: 4, range: 9, color: '#9ab4ff', emit: false, prio: 0.8, steady: true });
   };
-  // the ceiling: a solid slab (grapple can't latch) with beams, chains and the odd chandelier
+  // the ceiling: a solid slab (the grapple latches onto it) with beams, chains and the odd chandelier
   F.ceiling = function (w, rng, x0, z0, x1, z1, y, opts) {
     opts = opts || {};
-    w.solid('block', x0 - 3, y, z0 - 3, x1 + 3, y + 1.2, z1 + 3, { uv: 4, noGrapple: true });
+    w.solid('block', x0 - 3, y, z0 - 3, x1 + 3, y + 1.2, z1 + 3, { uv: 4 });
     w.ceilingY = y;
     for (let z = z0 + 5; z < z1 - 2; z += opts.beamStep || 7) {
       if (opts.ruined && rng.chance(0.3)) continue;

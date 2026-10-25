@@ -14,6 +14,10 @@
   const ul = (...a) => `<ul>${a.filter(Boolean).map((x) => `<li>${x}</li>`).join('')}</ul>`;
   const WASD = () => ['forward', 'left', 'back', 'right'].map((b) => k(G.K(b))).join('');
   const CROUCH = () => G.BIND.crouch.map(G.input.codeName).filter((v, i, a) => a.indexOf(v) === i).map(k).join(' / ');
+  // little picture tiles under the text: [icon, name, small line, colour]
+  const tiles = (a) => `<div class="tut-vis">${a.map((t) => `<div class="tut-tile" style="--tc:${t[3]}"><i>${t[0]}</i><b>${t[1]}</b><small>${t[2]}</small></div>`).join('')}</div>`;
+  const RAR = { common: 'コモン', uncommon: 'アンコモン', rare: 'レア', epic: 'エピック', legendary: 'レジェンダリー' };
+  const AT = (id) => G.Areas.TYPES[id];
   const invOpen = () => (G.ui.statusOpen && G.ui.statusOpen()) || (G.InvUI && G.InvUI.isOpen());
   // a chest right in front of you (on the floor, facing you)
   const putChest = (tier) => { const f = P.forward().setY(0).normalize(); const p = P.pos.clone().addScaledVector(f, 3); const w = G.world; if (!(w.boxFree(p.x - 0.7, p.y + 0.05, p.z - 0.7, p.x + 0.7, p.y + 1, p.z + 0.7))) p.copy(P.pos).add(V(0, 0, -2)); const y = w.floorBelow(p.x, P.pos.y + 1, p.z); const c = G.Props.chest(w, p.x, p.z, y > -50 ? y : P.pos.y, Math.atan2(-f.x, -f.z), tier); w.flushDeferred(); G.fx.ring(p.clone().setY(P.pos.y + 0.1), 1.5, 0xffd070, 0.6); return c; };
@@ -61,8 +65,24 @@
     { title: 'アタッチメント', body: () => ul('インベントリに<b>レッドドットサイト</b>を入れました', `${k(G.K('status'))} で開き、銃の枠へ<b>ドラッグ</b>（付く場所が光る）`, 'ダブルクリックでも自動で付く'), goal: 'レッドドットを銃に付ける',
       setup: () => { if (!P.weapons.some((w) => w.atts.optic === 'o_reddot') && !P.attStash.includes('o_reddot')) { G.Inv.noAuto = true; P.attStash.push('o_reddot'); G.Inv.noAuto = false; } },
       check: () => (P.weapons.some((w) => w.atts.optic === 'o_reddot') ? 1 : 0) },
+    { title: '加護（永続の強化）', body: () => ul('エリアの<b>目標</b>（殲滅・生存・狩猟・儀式）を達成すると、<b>加護</b>を1つ選べる', '加護は<b>その周回の間ずっと続く強化</b>（攻撃力・HP・移動・スキルなど）。取るほど強くなる', '色はレア度。気に入らなければ<b>リロール</b>（無料3回）'),
+      vis: (s) => tiles((s.sample || []).map((b) => [b.icon, b.name, RAR[b.rarity] || b.rarity, `var(--c-${b.rarity})`])),
+      get goal() { return `${k('Enter')} で加護の選択画面を開き、1つ選ぶ`; },
+      setup: (s) => { s.sample = GM.rollBuffs(3); },
+      check: (s) => {
+        if (!s.opened && (I.pressed.Enter || I.pressed.NumpadEnter)) {
+          delete I.pressed.Enter; s.opened = true;
+          GM.offerBuffs(false, { title: 'CHOOSE A BOON', sub: '練習：好きな加護を1つ選ぼう（選ぶとこの周回ずっと有効）', onPicked: () => { s.picked = true; } });
+        }
+        return s.picked ? 1 : s.opened ? 0.5 : 0;
+      } },
+    { title: '次のエリアを選ぶ', body: () => ul('エリアをクリアすると、奥の壁に<b>門が3つ</b>開く。門の上の<b>看板</b>が行き先', '戦闘は加護とコイン、商人の間は買い物、❓や⛩️は出会い・回復…と中身が違う', '入ったら戻れない。持ち物とコインを見て選ぼう'),
+      vis: () => tiles(['combat', 'shop', 'shrine'].map((id) => [AT(id).icon, AT(id).name, AT(id).hint.split('／')[0], AT(id).color])),
+      tip: () => '練習用に門を開けました。看板は北の壁。まっすぐ進んで約10秒。入っても本編には進みません。', goal: 'どれかの門に入る',
+      setup: (s) => { G.Areas.openGates(false, ['combat', 'shop', 'shrine']); },
+      check: (s) => (s.gate ? 1 : 0) },
     { title: '画面の見方', info: true, body: () => ul('<b>左下</b>　HP・状態異常・味方。🪔の数字は<b>魂の灯火</b>（倒れた時に1つ使って復活）', '<b>左上</b>　エリアと目標', '<b>右上</b>　コイン・時間・撃破数　<b>上中央</b>　コンパス', '<b>右下</b>　武器と弾　<b>下中央</b>　スキル・アイテム') },
-    { title: '準備完了！', info: true, finish: true, body: () => ul('エリアの<b>目標</b>（殲滅・生存・狩猟・儀式）を達成すると、<b>加護</b>を1つ選べる', 'クリア後は<b>門が3つ</b>開く。看板を見て次の行き先を選ぶ', '<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は商人だけの<b>準備の間</b>', `進行は自動保存。操作は ${k('Esc')} →「操作方法」でいつでも確認できます`) },
+    { title: '準備完了！', info: true, finish: true, body: () => ul('<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は商人だけの<b>準備の間</b>', `進行は自動保存。操作は ${k('Esc')} →「操作方法」でいつでも確認できます`) },
   ];
 
   // ---------------------------------------------------------------- lifecycle
@@ -117,7 +137,7 @@
     const goal = typeof s.goal === 'function' ? s.goal() : s.goal;
     const pct = Math.round((st.prog || 0) * 100);
     const html = `<div class="tut-h"><span>📘 チュートリアル</span><b>${idx + 1} / ${STEPS.length}</b></div>
-      <div class="tut-t">${s.title}</div><div class="tut-b">${s.body()}</div>${s.tip ? `<div class="tut-tip">💡 ${s.tip()}</div>` : ''}
+      <div class="tut-t">${s.title}</div><div class="tut-b">${s.body()}</div>${s.vis ? s.vis(st) : ''}${s.tip ? `<div class="tut-tip">💡 ${s.tip()}</div>` : ''}
       ${s.info ? `<div class="tut-foot"><span>${s.finish ? `${k('Enter')} / ${k('ホイールクリック')} 本編へ` : `${k('Enter')} / ${k('ホイールクリック')} 次へ`}</span><span>${k('Backspace')} 飛ばす</span></div>`
         : `<div class="tut-goal">🎯 ${goal}</div><div class="tut-bar"><div style="width:${pct}%"></div></div><div class="tut-foot"><span>やってみよう！</span><span>${k('Backspace')} 飛ばす</span></div>`}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
@@ -125,6 +145,7 @@
     if (fresh) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
   }
 
+  T.onGate = function (ex) { if (st && !st.gate) { st.gate = ex.type || 'combat'; G.ui.toastSmall('🚪 本番ならここで次のエリアへ（練習なので進みません）'); } };
   T.update = function (dt) {
     if (!T.active || !st) return;
     const s = STEPS[idx];

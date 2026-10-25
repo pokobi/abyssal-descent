@@ -1834,6 +1834,7 @@
     if (GM.transitioning || !w.exits || GM.state !== 'playing') return;
     for (const t of w.triggers) {
       if (t.kind === 'exit' && t.exit && t.exit.open && P.pos.x > t.x0 && P.pos.x < t.x1 && P.pos.z > t.z0 && P.pos.z < t.z1) {
+        if (G.Tutorial.active) { G.Tutorial.onGate(t.exit); return; } // practice gates lead nowhere
         GM.transitioning = true;
         G.sfx.whoosh(0.8, 0.8); G.sfx.rumble(1, 0.6);
         document.getElementById('fade').classList.add('on');

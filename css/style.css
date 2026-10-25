@@ -1394,3 +1394,8 @@ html.m :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf
 .bs-cards[data-n="5"] .card .c-desc, .bs-cards[data-n="6"] .card .c-desc { font-size: 12.5px; line-height: 1.5; margin-top: 8px; }
 .bs-cards[data-n="6"] .card .c-desc { font-size: 12px; }
 html.m .bs-wrap { padding-left: 24px; }
+#tut .tut-vis { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
+#tut .tut-tile { flex: 1 1 0; max-width: 170px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px 7px; border-radius: 8px; background: rgba(20,15,10,0.7); border: 2px solid var(--tc); box-shadow: 0 0 12px color-mix(in srgb, var(--tc) 35%, transparent); }
+#tut .tut-tile i { font-style: normal; font-size: 28px; line-height: 1.2; }
+#tut .tut-tile b { font-size: 12.5px; color: var(--tc); text-align: center; }
+#tut .tut-tile small { font-size: 10.5px; color: #b8ab92; text-align: center; line-height: 1.35; }

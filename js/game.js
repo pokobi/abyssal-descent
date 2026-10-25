@@ -1489,7 +1489,12 @@
   // the world-space box of a corpse's model (re-measured while it is still falling, then kept)
   function corpseBox(c) {
     const e = c.e, m = e.model && e.model.group; if (!m) return null;
-    if (!c.box || (!(e.deathT > 0.75) && GM.time - (c.boxT || -9) > 0.1)) { m.updateMatrixWorld(true); c.box = (c.box || new THREE.Box3()).setFromObject(m); c.boxT = GM.time; }
+    if (!c.box || (!(e.deathT > 0.75) && GM.time - (c.boxT || -9) > 0.1)) {
+      m.updateMatrixWorld(true); c.box = (c.box || new THREE.Box3()).setFromObject(m); c.boxT = GM.time;
+      // a model with a broken part gives an empty / NaN box: fall back to a box around where the body lies
+      const b = c.box;
+      if (![b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].every(Number.isFinite) || b.isEmpty()) { const r = Math.max(0.5, e.radius || 0.6), h = Math.max(0.4, (e.height || 1) * 0.4); b.min.set(e.pos.x - r, e.pos.y, e.pos.z - r); b.max.set(e.pos.x + r, e.pos.y + h, e.pos.z + r); }
+    }
     return c.box;
   }
   function updateInteraction(dt) {
@@ -1571,9 +1576,9 @@
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;
       const n = c.cont.items.length;
-      G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `死体を漁る — ${GM.searchDur(2).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? '中身を確認できる' : '一度押すと漁り始める。', action: c.searched ? '開く' : S ? '漁っている…' : '漁る' });
+      G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `死体を漁る — ${GM.searchDur(2).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? (n ? '中身を確認できる' : '何も残っていない') : '一度押すと漁り始める。', action: c.searched ? (n ? '開く' : null) : S ? '漁っている…' : '漁る' });
       if (I.hit('interact') && !S) {
-        if (c.searched) G.InvUI.open(c.cont, c);
+        if (c.searched) { if (n) G.InvUI.open(c.cont, c); }
         else GM.startSearch(c, (c.box ? c.box.getCenter(V()) : e.pos.clone().setY(e.pos.y + 0.45)), 2, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '死体を漁っている…');
       }
       return;

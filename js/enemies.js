@@ -1247,8 +1247,10 @@
       m.group.position.copy(this.pos);
       m.group.rotation.y = this.yaw;
       const stunned = this.st.stun > 0 || this.st.frozen > 0;
-      if (!stunned || this.st.frozen <= 0) this.animT = (this.animT || 0) + dt * (this.st.frozen > 0 ? 0 : 1);
-      if (m.J && !m.worm) m.animate({ walk: this.walk, mv: this.mv, atk: this.atk, wind: this.wind, flinch: this.flinch, t: this.animT, stunned, throwing: this.attackState && this.attackState.throwing });
+      if (!(this.animT >= 0)) this.animT = 0; // (never leave it unset: a foe stunned before its first frame fed NaN into every pose and its corpse box)
+      if (!stunned || !(this.st.frozen > 0)) this.animT += dt * (this.st.frozen > 0 ? 0 : 1);
+      const fin = (v) => (Number.isFinite(v) ? v : 0);
+      if (m.J && !m.worm) m.animate({ walk: fin(this.walk), mv: fin(this.mv), atk: fin(this.atk), wind: fin(this.wind), flinch: fin(this.flinch), t: this.animT, stunned, throwing: this.attackState && this.attackState.throwing });
       if (m.worm) this.animateWorm(dt);
       if (this.atk > 0 && !this.attackState) this.atk = Math.max(0, this.atk - dt * 3);
       // hit flash & status tint: every condition recolours the body so it reads at a glance

@@ -500,7 +500,7 @@
     UI._ikey = o.key;
     p.classList.remove('hidden');
     p.style.setProperty('--rc', o.rc || 'var(--line)');
-    p.innerHTML = `<div class="ip-head"><div class="ip-icon">${o.icon}</div><div><div class="ip-name">${U.esc(o.name)}</div><div class="ip-cat">${o.cat || ''}</div></div></div>${o.desc ? `<div class="ip-desc">${o.desc}</div>` : ''}${o.stats ? `<div class="ip-stats">${o.stats}</div>` : ''}${o.note ? `<div class="ip-note">${o.note}</div>` : ''}<div class="ip-foot"><div class="ip-price ${o.afford === false ? 'no' : ''}">${o.price !== undefined ? '🪙 ' + (typeof o.price === 'string' ? o.price : U.fmt(o.price)) : ''}</div><div class="ip-key">${G.K('interact')} ${o.action || '購入'}</div></div>`;
+    p.innerHTML = `<div class="ip-head"><div class="ip-icon">${o.icon}</div><div><div class="ip-name">${U.esc(o.name)}</div><div class="ip-cat">${o.cat || ''}</div></div></div>${o.desc ? `<div class="ip-desc">${o.desc}</div>` : ''}${o.stats ? `<div class="ip-stats">${o.stats}</div>` : ''}${o.note ? `<div class="ip-note">${o.note}</div>` : ''}<div class="ip-foot"><div class="ip-price ${o.afford === false ? 'no' : ''}">${o.price !== undefined ? '🪙 ' + (typeof o.price === 'string' ? o.price : U.fmt(o.price)) : ''}</div>${o.action === null ? '' : `<div class="ip-key">${G.K('interact')} ${o.action || '購入'}</div>`}</div>`;
   };
   // ---- centre-screen hold gauge (ornate chests) ----
   UI.holdRing = function (k, mode, o) {

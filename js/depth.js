@@ -22,7 +22,7 @@
     { id: 'haste', name: '疾風', icon: '💨', col: 0x80ffb0, desc: '自分と周囲の仲間の移動速度を上げる。' },
     { id: 'leech', name: '吸魂', icon: '🩸', col: 0xc01030, desc: '攻撃を当てると大きく回復する。' },
     { id: 'gravity', name: '重力', icon: '🧲', col: 0x9060ff, desc: '定期的にプレイヤーを引き寄せる。' },
-    { id: 'mirror', name: '鏡面', icon: '🪞', col: 0xd0e8ff, desc: '受けた銃弾ダメージの一部を撃ち手へ反射する。' },
+    { id: 'mirror', name: '鏡面', icon: '🪞', col: 0xd0e8ff, desc: '数秒ごとに青く光る。光っている間（約2秒）に銃で撃つと、一部が自分に跳ね返る。' },
     { id: 'splitter', name: '分裂', icon: '🧬', col: 0xa0e040, desc: '倒されると小さな分身を2体生む。' },
     { id: 'frenzy', name: '狂乱', icon: '😈', col: 0xff3030, desc: 'HPが40%を切ると速く、攻撃間隔も短くなる。' },
     { id: 'nullify', name: '無効化', icon: '🚫', col: 0xb0b0b0, desc: '状態異常とスタンを一切受けない。' },
@@ -59,6 +59,24 @@
         if (!o.maxShield) { o.maxShield = Math.round(o.maxHp * 0.3); }
         o.shield = Math.min(o.maxShield, (o.shield || 0) + o.maxHp * 0.06);
         if (Math.random() < 0.3) G.fx.tracer(e.centerPos(), o.centerPos(), 0x80d0ff, 0.02, 0.15);
+      }
+    }
+    // mirror: a readable stance instead of a constant tax. A pale ring flashes (0.8 s warning), then for 2 s the foe glints blue and bullets that hit it
+    // send a little of their damage back at you (see onHurt). Outside the stance nothing is reflected; melee, skills and explosions never are.
+    if (m.mirror) {
+      if (e.mirT === undefined) e.mirT = U.rand(3, 6);
+      e.mirT -= dt;
+      if (e.mirOn > 0) {
+        e.mirOn -= dt;
+        e.mirFx = (e.mirFx || 0) - dt;
+        if (e.mirFx <= 0) { e.mirFx = 0.3; G.fx.flash(e.centerPos(), 0xd0e8ff, 30, 0.16, 7); G.fx.ring(e.pos.clone().setY(e.pos.y + 0.1), 1.3, 0xd0e8ff, 0.35); }
+      } else if (e.mirWarn > 0) {
+        e.mirWarn -= dt;
+        if (e.mirWarn <= 0) { e.mirOn = 2.0; e.mirFx = 0; G.sfx.shieldUp && G.sfx.shieldUp(); }
+      } else if (e.mirT <= 0 && e.hasLOS !== false && !P.dead && P.pos.distanceTo(e.pos) < 40) {
+        e.mirT = U.rand(7, 10); e.mirWarn = 0.8;
+        G.fx.ring(e.pos.clone().setY(e.pos.y + 0.1), 2.4, 0xd0e8ff, 0.8); G.fx.flash(e.centerPos(), 0xd0e8ff, 45, 0.5, 9); G.sfx.magic(e.pos, 'holy');
+        if (!P.mirTip) { P.mirTip = true; G.ui.toastSmall && G.ui.toastSmall('🪞 鏡面 — 青く光っている間に撃つと、ダメージが跳ね返る'); }
       }
     }
     if (m.haste) for (const o of G.enemies.inRadius(e.pos, 8)) if (!o.boss) o.hasteT = 0.5;
@@ -100,10 +118,10 @@
   function endGrav(e, gw) { if (gw.line) G.fx.endTeleLine(gw.line); gw.hit.t = 0.15; e.gravWarn = null; }
   D.onHurt = function (e, info, dealt) {
     const m = e.mut;
-    if (m.mirror && info.src === 'bullet' && dealt > 0 && !info.proc) {
-      e.mirrorAcc = (e.mirrorAcc || 0) + dealt * 0.12;
+    if (m.mirror && e.mirOn > 0 && info.src === 'bullet' && dealt > 0 && !info.proc) {
+      e.mirrorAcc = (e.mirrorAcc || 0) + dealt * 0.1;
       const now = GM.time;
-      if (now - (e.mirrorT || -9) > 0.4 && e.mirrorAcc > 1) { e.mirrorT = now; const d = Math.min(e.mirrorAcc, P.stats.maxHp * 0.08); e.mirrorAcc = 0; C.damagePlayer(d, { src: 'ranged', attacker: e, pos: e.centerPos() }); G.fx.tracer(e.centerPos(), P.chestPos(), 0xd0e8ff, 0.02, 0.12); }
+      if (now - (e.mirrorT || -9) > 0.5 && e.mirrorAcc > 1) { e.mirrorT = now; const d = Math.min(e.mirrorAcc, P.stats.maxHp * 0.04); e.mirrorAcc = 0; C.damagePlayer(d, { src: 'ranged', attacker: e, pos: e.centerPos() }); G.fx.tracer(e.centerPos(), P.chestPos(), 0xd0e8ff, 0.02, 0.12); }
     }
     if (m.blink && e.alive && GM.time - (e.blinkT || -9) > 4 && Math.random() < 0.3) {
       e.blinkT = GM.time;

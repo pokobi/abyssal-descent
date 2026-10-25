@@ -542,6 +542,7 @@
       }
     }
     // ---- stock: where the gun's own stock ends (or, on a pistol, behind the slide) ----
+    const stockFrom = g.children.length;
     if (atts.stock) {
       const v = atop(atts.stock), ry = MP.rear[0], rz = MP.rear[1], has = MP.stock, rub = mats.poly;
       if (v === 'heavy' || v === 'tac' || v === 'cheek') {
@@ -560,6 +561,7 @@
         box(0.014, 0.012, 0.04, 0, ry - 0.007, rz + 0.01, AM.dark);
       }
     }
+    M.stockParts = g.children.slice(stockFrom); // the add-on stock reaches back past the eye on some guns: it is hidden while aiming down the sights
     // ---- trigger group ----
     if (atts.trigger) {
       const id = atts.trigger, tx = MP.rw + 0.004, ty = M.grip.y + 0.032, tz = M.grip.z - 0.052;
@@ -1011,6 +1013,7 @@
       flashSprite.visible = flashSprite2.visible = true;
       vmLight.position.copy(mp); vmLight.intensity = 6;
     } else { flashSprite.visible = flashSprite2.visible = false; vmLight.intensity = 0; }
+    if (model.stockParts && model.stockParts.length) { const sv = W.adsT < 0.35; for (const o of model.stockParts) o.visible = sv; }
     // scope overlay
     const scoped = !!model.scopeOptic && !model.pip && W.adsT > 0.9;
     const lensOn = !!model.pip && W.adsT > 0.5;

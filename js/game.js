@@ -2146,7 +2146,7 @@
     G.weapons.update(gdt);
     G.abilities.update(gdt);
     G.enemies.update(gdt);
-    G.bosses.update(gdt * GM.enrage.tm);
+    G.bosses.update(gdt * GM.enemyTimeScale); // time slowing / stopping works on guardians too (enemyTimeScale already carries the enrage factor)
     if (G.bosses.active) for (const p of G.bosses.active.parts) if (p.alive && !p.removed) G.combat.updateStatus(p, gdt);
     G.combat.update(gdt);
     G.buffs.emit('tick', gdt);

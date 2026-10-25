@@ -42,6 +42,35 @@
     }
     return o;
   };
+  // what a level changes in the skills whose effect is not damage: [label, base, now, unit, decimals, lowerIsBetter] (for the status screen; the numbers mirror castSkill / castUlt)
+  A.effInfo = function (sk) {
+    const id = sk.id, m = A.skm(id), k = A.effK(sk), L = A.totalLv(sk), pw = A.isUlt(sk) ? A.ultPower(sk) : 1;
+    const es = (key, v) => A.effStats(sk, { [key]: v })[key], pc = (v) => v * 100, row = (lab, key, v) => [lab, pc(v), pc(es(key, v)), '%'];
+    switch (id) {
+      case 'ult_bastion': { const r = m.x_regen ? 5 : 3; return [row('被ダメ軽減', 'armor', m.x_fort ? 0.72 : 0.6), ['毎秒回復（最大HP比）', r, r * pw, '%', 1]]; }
+      case 'ult_berserk': return [row('与ダメ', 'dmg', 0.8 + (m.x_rage ? 0.4 : 0)), row('連射速度', 'fireRate', 0.4), row('吸血', 'lifesteal', 0.08 + (m.x_blood ? 0.06 : 0)), row('移動速度', 'moveSpeed', 0.2)];
+      case 'ult_armory': return [row('連射速度', 'fireRate', m.x_rate ? 1.2 : 0.8)];
+      case 'ult_shadow': return [row('会心率', 'critChance', 0.6), row('会心ダメージ', 'critMul', m.x_lethal ? 1 : 0.5)];
+      case 'ult_titan': return [row('最大HP', 'maxHpPct', 0.8), row('近接ダメージ', 'meleeDmg', 1.5), row('パイルドライバー威力', 'pileDmg', 1), row('被ダメ軽減', 'armor', m.x_iron ? 0.4 : 0.25)];
+      case 'ult_overcharge': return [['スキルのCT短縮', 70, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L))), '%']];
+      case 'ult_timestop': return [['敵の速さ（残り）', 5, 5, '%', 0, true]];
+      case 'ult_sanctuary': { const h = m.x_heal ? 7 : 4; return [['毎秒回復（最大HP比）', h, h * k, '%', 1]]; }
+      case 'berserk': return [row('与ダメ', 'dmg', m.x_fury ? 0.8 : 0.5), row('連射速度', 'fireRate', 0.3), row('吸血', 'lifesteal', 0.05)];
+      case 'haste': return [row('移動速度', 'moveSpeed', 0.6), row('ジャンプ力', 'jumpPower', m.x_jump ? 0.6 : 0.3)];
+      case 'overdrive': return [row('連射速度', 'fireRate', m.x_rate ? 0.9 : 0.6)];
+      case 'thornarmor': return [row('被ダメ軽減', 'armor', m.x_harden ? 0.5 : 0.35), ['反射ダメージ', m.x_reflect ? 200 : 100, (m.x_reflect ? 200 : 100) * k, '%']];
+      case 'healaura': return [row('被ダメ軽減', 'armor', m.x_armor ? 0.35 : 0.2)];
+      case 'warcry': return [row('与ダメ', 'dmg', m.x_rally ? 0.45 : 0.25)];
+      case 'cloak': return [['最初の一撃の会心倍率', 2.5, 1 + 1.5 * k, '倍', 2]];
+      case 'chrono': { const b = pc(m.x_deep ? 0.2 : 0.4); return [['敵の速さ（残り）', b, pc(Math.max(0.08, (m.x_deep ? 0.2 : 0.4) * Math.pow(0.93, L))), '%', 0, true]]; }
+      case 'mark': return [['受けるダメージ', 160, 100 + 60 * (1 + 0.5 * (k - 1)), '%']];
+      case 'rewind': return [['巻き戻り時の回復（最大HP比）', 0, 2 * L, '%']];
+      case 'flight': return [['上昇の勢い', 100, 100 * (1 + 0.02 * L), '%']];
+      case 'dash': case 'dash2': return [['突進の距離', 100, 100 * (1 + 0.03 * L), '%']];
+      case 'ricostorm': return [['跳弾のダメージ', 100, 100 * (1 + 0.06 * L), '%']];
+    }
+    return [];
+  };
   A.isUlt = (sk) => !!(sk && sk.def && sk.def.ult);
   A.MAXLV = 15;
   A.ready = (sk) => sk && (sk.maxCharges ? sk.charges > 0 : sk.cd <= 0);

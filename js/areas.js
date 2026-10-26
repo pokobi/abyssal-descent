@@ -68,7 +68,7 @@
       ex.light.on = true; ex.light.intensity = 30; ex.light.color = T.color;
       if (ex.glow) ex.glow.material.color.set(T.color);
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(T), transparent: true, depthWrite: false }));
-      ex.labelY = w.strata ? 12.8 : 10.4; // the stacked-storey fields burn the ledge under the sign: hang it higher
+      ex.labelY = w.strata ? 12.8 : 11.5; // hang the sign clear of the flames on the gate lintel
       sp.scale.set(5.6, 2.4, 1); sp.position.set(ex.x, ex.labelY, 1.2);
       w.group.add(sp); ex.label = sp;
     });

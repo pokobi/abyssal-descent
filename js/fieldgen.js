@@ -148,6 +148,14 @@
     occ.mark(0, 0, W, 2, 2); occ.mark(0, D - 2, W, D, 2); occ.mark(0, 0, 2, D, 2); occ.mark(W - 2, 0, W, D, 2);
   }
   function finish(w, rng, occ, W, D, area, kind, extraChests) {
+    w.fireRects = w.fireRects || [];
+    for (const [gx, z0, z1, lz] of [...(w.exits || []).map((e) => [e.x, 0, 1.45, 0.8]), [W / 2, D - 1.45, D, D - 0.8]]) {
+      const x0 = gx - 4.6, x1 = gx + 4.6, yT = 8.9;
+      w.batch.box('iron', x0, yT, z0, x1, yT + 0.16, z1, { tint: [0.13, 0.12, 0.12], grad: false });
+      w.batch.box('glow', x0 + 0.1, yT + 0.16, z0 + 0.1, x1 - 0.1, yT + 0.18, z1 - 0.1, { tint: [1, 0.3, 0.05], grad: false });
+      w.fireRects.push({ x0, x1, z0, z1, y: yT + 0.18, acc: 0, low: true, blue: false });
+      w.addLight(gx, yT + 1.4, lz, { flame: 0, emit: false, intensity: 8, range: 10, color: '#ff5a18', prio: 0.55 });
+    }
     if (G.Fields) G.Fields.place(w, rng, occ, W, D, area);
     if (G.Graves) G.Graves.scatter(w, rng, occ, W, D, w.biome === 'grave' ? 1 : 2);
     H.placeChests(w, rng, occ, (kind === 'vault' ? 6 : (area <= 4 ? 2 : rng.chance(0.75) ? 1 : 0) + (rng.chance(0.25) ? 1 : 0)) + (extraChests || 0), area);

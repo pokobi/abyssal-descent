@@ -694,7 +694,7 @@
       G.sfx.drink(); setTimeout(() => G.sfx.heal(), 300);
     }
     if (d.maxHp) { P.permMaxHp += d.maxHp; P.recalc(); }
-    if (d.os) { C.overshield(d.os, 200); G.sfx.mech('cell'); G.fx.bubble(P.chestPos(), 1.2, 0xa8d0ff); }
+    if (d.os) { C.overshield(d.os); G.sfx.mech('cell'); G.fx.bubble(P.chestPos(), 1.2, 0xa8d0ff); }
     if (d.cleanse) { P.st = {}; }
     if (d.resist) C.temp('item_resist', d.resist, { statusRes: 0.7, dotRes: 0.5 }, it.icon, '状態異常耐性'); // status time -70%, burn / poison damage -50% (see player.js updateStatuses)
     if (d.temp) C.temp('item_' + u.id, d.dur, d.temp, it.icon);

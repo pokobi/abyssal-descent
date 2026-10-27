@@ -955,6 +955,17 @@
     hl.ring.scale.setScalar(1 + 0.1 * Math.sin(GM.time * 3)); hl.beam.rotation.y += dt * 0.6;
     if (!want && hl.k < 0.01) { w.group.remove(hl.g); hl.beam.geometry.dispose(); hl.ring.geometry.dispose(); hl.outline.material.dispose(); S.healHl = null; }
   }
+  // small reminder under the crosshair while a double jump is available in mid-air (needs the 二段ジャンプ perk)
+  let airJumpEl = null, airJumpT = 0, airJumpKey = null;
+  function updateAirJumpHint(dt) {
+    const can = P.stats.maxJumps > 1 && !P.dead && GM.state === 'playing' && !P.grounded && P.coyote <= 0 && P.jumps < P.stats.maxJumps && P.grapple.state !== 'attached' && !P.pileState && !P.mantle && !(P.dragT > 0);
+    airJumpT = can ? airJumpT + dt : 0;
+    const on = airJumpT > 0.25; // not while merely stepping off a ledge
+    if (!airJumpEl) { if (!on) return; airJumpEl = document.createElement('div'); airJumpEl.id = 'airjump-hint'; (G.ui.el && G.ui.el.hud || document.body).appendChild(airJumpEl); }
+    const key = G.K('jump');
+    if (key !== airJumpKey) { airJumpKey = key; airJumpEl.innerHTML = `<kbd>${U.esc(key)}</kbd>でダブルジャンプ`; }
+    airJumpEl.classList.toggle('on', on);
+  }
   function updateObjective(dt) {
     sweepCleared();
     const O = GM.objective;
@@ -2068,6 +2079,7 @@
     // chests
     for (const it of w.interactables) if (it.type === 'chest' && it.opened && it.lid && it.openAnim < 1) { it.openAnim = Math.min(1, it.openAnim + dt * 2.5); it.lid.rotation.x = -it.openAnim * 1.9; }
     updateHealHint(dt);
+    updateAirJumpHint(dt);
     // once the area is cleared, unopened chests get a faint pulsing highlight (visible through walls) so they aren't forgotten
     for (const it of w.interactables) {
       if (it.type !== 'chest' || !it.mesh) continue;

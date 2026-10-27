@@ -66,7 +66,7 @@ html.m #bossbar { top: calc(var(--u) * 8); width: min(46vw, 560px); zoom: 0.72; 
 html.m #toasts { top: 16%; zoom: 0.72; }
 html.m #banner { zoom: 0.7; }
 html.m #item-cards, html.m #gain-host, html.m #anom-alert { zoom: 0.66; }
-html.m #pile-ind, html.m #gren-hint { zoom: 0.7; }
+html.m #pile-ind, html.m #gren-hint, html.m #airjump-hint { zoom: 0.7; }
 html.m #hp-wrap { padding: 6px 10px; }
 
 /* ---------- menus, shops, pop-ups: scaled so they fit a phone-sized landscape screen ---------- */

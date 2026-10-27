@@ -104,7 +104,13 @@
     ]);
   }
 
-  // ---------------- the counter: categories, one row per thing, bulk sale of valuables ----------------
+  function confirmArmor(it, n) {
+    const d = G.ARMOR_BY_ID[it.id], v = G.Inv.value(Object.assign({}, it, { n: 1 })) * n;
+    GM().modal('⚠ エンチャント付きの防具を売却しますか？', `<b style="color:${R(d.rarity)}">${G.armorIcon(d)} ${U.esc(d.name)}${n > 1 ? ` ×${n}` : ''}</b> を売却します。<br>付与されているエンチャント：${it.ench.map((e) => U.esc(G.enchantText(e))).join('、')}<br>売った防具は戻ってきません。`, [
+      { icon: '💰', label: `売る（+${fmt(v)}🪙）`, onPick: () => { sellInst(it, n); again(); } },
+      { icon: '↩', label: 'やめる', onPick: again },
+    ]);
+  }  // ---------------- the counter: categories, one row per thing, bulk sale of valuables ----------------
   PW.tab = 'all';
   const CATS = [['all', '全て'], ['weapon', '🔫 武器'], ['melee', '🗡️ 近接'], ['att', '🔩 アタッチメント'], ['item', '🧪 消耗品'], ['grenade', '💣 投擲物'], ['skill', '🔮 スキル'], ['armor', '🛡️ 防具'], ['valuable', '💰 金品']];
   function sellInst(it, n) {
@@ -130,9 +136,9 @@
     for (const it of IV.pcs(p).flatMap((c) => c.items).sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))) {
       const d = IV.def(it); if (!d) continue;
       const cat = it.type === 'item' ? (d.cat === 'grenade' ? 'grenade' : 'item') : it.type;
-      const unit = IV.value(Object.assign({}, it, { n: 1 }));
+      const unit = IV.value(Object.assign({}, it, { n: 1 })), ask = it.type === 'armor' && !!(it.ench && it.ench.length); // enchanted armour is confirmed first
       const sub = it.type === 'armor' ? `${G.ARMOR_SLOT_BY_ID[d.slot].name}防具・防御力${d.def}${it.ench && it.ench.length ? '・' + it.ench.map(G.enchantText).join(' ') : ''}` : it.type === 'valuable' ? '金品（売却専用）' : it.type === 'att' ? 'アタッチメント（インベントリ）' : d.passive ? '所持品（常時効果）' : cat === 'grenade' ? '投擲物' : '消耗品';
-      out.push({ cat, icon: it.type === 'armor' ? G.armorIcon(d) : d.icon, rc: d.rarity, name: d.name + (it.n > 1 ? ` ×${it.n}` : ''), sub, v: unit, n: it.n, act: () => { sellInst(it, 1); PW.open(); }, actAll: it.n > 1 ? () => { sellInst(it, it.n); PW.open(); } : null });
+      out.push({ cat, icon: it.type === 'armor' ? G.armorIcon(d) : d.icon, rc: d.rarity, name: d.name + (it.n > 1 ? ` ×${it.n}` : ''), sub, v: unit, n: it.n, act: () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, 1), 0); } else { sellInst(it, 1); PW.open(); } }, actAll: it.n > 1 ? () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, it.n), 0); } else { sellInst(it, it.n); PW.open(); } } : null });
     }
     return out;
   }

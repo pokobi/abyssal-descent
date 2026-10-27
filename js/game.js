@@ -2080,7 +2080,7 @@
     for (const it of w.interactables) if (it.type === 'chest' && it.opened && it.lid && it.openAnim < 1) { it.openAnim = Math.min(1, it.openAnim + dt * 2.5); it.lid.rotation.x = -it.openAnim * 1.9; }
     updateHealHint(dt);
     updateAirJumpHint(dt);
-    // once the area is cleared, unopened chests get a faint pulsing highlight (visible through walls) so they aren't forgotten
+    // once the area is cleared, unopened chests get a pulsing beam, ring and ripple (visible through walls) so they aren't forgotten
     for (const it of w.interactables) {
       if (it.type !== 'chest' || !it.mesh) continue;
       const want = GM.areaCleared && !it.opened;
@@ -2088,23 +2088,25 @@
         const col = it.tier >= 3 ? 0xff68d8 : it.tier >= 2 ? 0xffc040 : it.tier ? 0x80c0ff : 0xffe0a0;
         const g = new THREE.Group(); g.position.copy(it.pos).setY(it.pos.y - 0.5);
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
-        glow.scale.set(2.4, 1.6, 1); glow.position.y = 0.5; glow.renderOrder = 5; g.add(glow);
-        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.45, 7, 12, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-        beam.position.y = 3.5; g.add(beam);
-        const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.9, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; g.add(ring);
-        w.group.add(g); it.hl = { g, glow, beam, ring, k: 0 };
+        glow.scale.set(3.6, 2.4, 1); glow.position.y = 0.5; glow.renderOrder = 5; g.add(glow);
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 11, 12, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false }));
+        beam.position.y = 5.5; beam.renderOrder = 5; g.add(beam);
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; ring.renderOrder = 5; g.add(ring);
+        const rip = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide })); // a ripple that spreads outwards from the chest
+        rip.rotation.x = -Math.PI / 2; rip.position.y = 0.05; rip.renderOrder = 5; g.add(rip);
+        w.group.add(g); it.hl = { g, glow, beam, ring, rip, k: 0 };
       }
       if (it.hl) {
         const h = it.hl;
         h.k = U.damp(h.k, want ? 1 : 0, want ? 1.5 : 6, dt);
-        const pulse = 0.75 + 0.25 * Math.sin(GM.time * 2.4 + it.pos.x);
-        h.glow.material.opacity = 0.32 * h.k * pulse;
-        h.beam.material.opacity = 0.12 * h.k * pulse;
-        h.ring.material.opacity = 0.45 * h.k * pulse;
+        const pulse = 0.7 + 0.3 * Math.sin(GM.time * 3.2 + it.pos.x), rp = (GM.time * 0.7 + it.pos.x * 0.37) % 1;
+        h.glow.material.opacity = 0.6 * h.k * pulse;
+        h.beam.material.opacity = 0.28 * h.k * pulse;
+        h.ring.material.opacity = 0.8 * h.k * pulse; h.rip.material.opacity = 0.7 * h.k * (1 - rp); h.rip.scale.setScalar(1 + rp * 2.2);
         h.ring.scale.setScalar(1 + 0.08 * Math.sin(GM.time * 2.4));
         h.beam.rotation.y += dt * 0.5;
-        if (!want && h.k < 0.01) { w.group.remove(h.g); h.beam.geometry.dispose(); h.ring.geometry.dispose(); it.hl = null; }
+        if (!want && h.k < 0.01) { w.group.remove(h.g); h.beam.geometry.dispose(); h.ring.geometry.dispose(); h.rip.geometry.dispose(); it.hl = null; }
       }
     }
     // spike traps

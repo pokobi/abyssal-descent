@@ -1613,10 +1613,10 @@
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;
       const n = c.cont.items.length;
-      G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `死体を漁る — ${GM.searchDur(2).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? (n ? '中身を確認できる' : '何も残っていない') : '一度押すと漁り始める。', action: c.searched ? (n ? '開く' : null) : S ? '漁っている…' : '漁る' });
+      G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `死体を漁る — ${GM.searchDur(1).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? (n ? '中身を確認できる' : '何も残っていない') : '一度押すと漁り始める。', action: c.searched ? (n ? '開く' : null) : S ? '漁っている…' : '漁る' });
       if (I.hit('interact') && !S) {
         if (c.searched) { if (n) G.InvUI.open(c.cont, c); }
-        else GM.startSearch(c, (c.box ? c.box.getCenter(V()) : e.pos.clone().setY(e.pos.y + 0.45)), 2, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '死体を漁っている…');
+        else GM.startSearch(c, (c.box ? c.box.getCenter(V()) : e.pos.clone().setY(e.pos.y + 0.45)), 1, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '死体を漁っている…');
       }
       return;
     } else if (best.type === 'loot') {
@@ -1638,22 +1638,22 @@
       return;
     } else if (best.type === 'celldoor') {
       // a prison cell's iron gate (strata fields): one press, keep looking at it for 2 s
-      const it = best.it, closing = it.door.state === 'open', tgt = closing ? (it.closer || (it.closer = { door: it.door })) : it, S = GM.search && GM.search.it === tgt ? GM.search : null, dur = GM.searchDur(2);
+      const it = best.it, closing = it.door.state === 'open', tgt = closing ? (it.closer || (it.closer = { door: it.door })) : it, S = GM.search && GM.search.it === tgt ? GM.search : null, dur = GM.searchDur(1);
       if (closing) { // an open gate can be shut again: the same hold, and only when nobody stands in the doorway
         G.ui.showInteract({ key: 'cdoorc' + (S ? 's' : ''), icon: '🔒', name: '鉄格子の扉', rc: '#9aa4b0', cat: `閉める — ${dur.toFixed(1)}秒`, desc: S ? '閉めている… 視点を大きく外したり離れると最初からやり直し' : '一度押して、そのまま扉を見続ける', action: '閉める' });
-        if (I.hit('interact') && !S) GM.startSearch(tgt, it.pos, 2, '🔒', () => { if (!G.Strata.closeDoor(it.door)) G.ui.toastSmall('🚪 扉の前に誰かいて閉められない'); }, '扉を閉めている…');
+        if (I.hit('interact') && !S) GM.startSearch(tgt, it.pos, 1, '🔒', () => { if (!G.Strata.closeDoor(it.door)) G.ui.toastSmall('🚪 扉の前に誰かいて閉められない'); }, '扉を閉めている…');
         return;
       }
       G.ui.showInteract({ key: 'cdoor' + (S ? 's' : ''), icon: '🔓', name: '鉄格子の扉', rc: '#9aa4b0', cat: `開ける — ${dur.toFixed(1)}秒`, desc: S ? '開けている… 視点を大きく外したり離れると最初からやり直し' : '一度押すと開け始める。終わるまで扉から目を離さないこと。', action: S ? '開けている…' : '開ける' });
-      if (I.hit('interact') && !S) GM.startSearch(it, it.pos, 2, '🔓', () => G.Strata.openDoor(it.door), '扉を開けている…');
+      if (I.hit('interact') && !S) GM.startSearch(it, it.pos, 1, '🔓', () => G.Strata.openDoor(it.door), '扉を開けている…');
       return;
     }
     if (I.hit('interact')) doInteract(best);
   }
   // ---------------- timed search (chests, corpses): one press, keep looking at it ----------------
-  GM.CHEST_SEARCH = [1, 2, 4, 4];
+  GM.CHEST_SEARCH = [1, 1, 2, 2];
   GM.CHEST_NAMES = ['古びた宝箱', '上等な宝箱', '装飾された宝箱', '守護者の秘宝箱'];
-  GM.searchDur = (base) => base / Math.max(0.2, 1 + (P.stats.opSpeed || 0));
+  GM.searchDur = (base) => base;
   GM.search = null;
   GM.startSearch = function (it, pos, base, icon, onDone, label) {
     GM.search = { it, pos: pos.clone(), t: 0, dur: GM.searchDur(base), icon, onDone, label: label || '探索中…', pryT: 0 };

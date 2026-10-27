@@ -52,7 +52,7 @@
     moveB: { desc: 'ジャンプ力+15%', mods: { jumpPower: 0.15 } },
     moveC: { desc: 'スライディングの加速+25%', mods: { slideBoost: 0.25 } },
     moveD: { desc: '空中での制御+40%', mods: { airControl: 0.4 } },
-    handA: { desc: '操作速度+20%', mods: { opSpeed: 0.2 } },
+    handA: { desc: 'リロード速度+20%', mods: { reloadSpeed: 0.2 } },
     handB: { desc: '近接攻撃の間隔-20%', mods: { meleeCd: 0.2 } },
     handC: { desc: 'リロード速度+12%', mods: { reloadSpeed: 0.12 } },
     handD: { desc: '反動-15%', mods: { recoil: -0.15 } },
@@ -90,7 +90,7 @@
     { id: 'crit', name: '会心率', min: 0.5, max: 5, stat: 'critChance' },
     { id: 'critd', name: '会心ダメ', min: 1, max: 10, stat: 'critMul' },
     { id: 'move', name: '移動速度', min: 1, max: 10, stat: 'moveSpeed' },
-    { id: 'op', name: '操作速度', min: 1, max: 10, stat: 'opSpeed' },
+    { id: 'reload', name: 'リロード速度', min: 1, max: 10, stat: 'reloadSpeed' },
     { id: 'luck', name: '幸運', min: 1, max: 10, stat: 'luck' },              // +0.01 .. +0.10 luck (a 幸運 boon is +0.35)
     { id: 'skill', name: 'スキルダメ', min: 1, max: 10, stat: 'skillDmg' },
     { id: 'melee', name: '近接ダメ', min: 1, max: 10, stat: 'meleeDmg' },
@@ -101,6 +101,7 @@
     { id: 'vamp', name: '吸血', min: 0.5, max: 3, stat: 'lifesteal' },
   ];
   G.ENCHANT_BY_ID = Object.fromEntries(G.ENCHANTS.map((e) => [e.id, e]));
+  G.ENCHANT_BY_ID.op = G.ENCHANT_BY_ID.reload; // saves from before 操作速度 became リロード速度 still carry id 'op'
   // ---------------- durability ----------------
   // every piece has a total durability by rarity; hits you take wear the pieces you are wearing; at 0 the piece breaks and is gone for good.
   // (an item with no 'dur' field is brand new: shop stock, older saves)

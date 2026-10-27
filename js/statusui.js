@@ -160,7 +160,7 @@
   const GROUPS = [
     ['攻撃', ['dmg', 'fireRate', 'reloadSpeed', 'critChance', 'critMul', 'headMul', 'skillDmg', 'explosionDmg', 'shieldDmg']],
     ['生存', ['maxHp', 'defense', 'armor', 'dodge', 'hpRegen', 'lifesteal']],
-    ['機動・その他', ['moveSpeed', 'weight', 'opSpeed', 'maxJumps', 'grappleRange', 'cdr', 'coinMul', 'luck']],
+    ['機動・その他', ['moveSpeed', 'weight', 'maxJumps', 'grappleRange', 'cdr', 'coinMul', 'luck']],
   ];
   function statRow(k) {
     const st = P.stats, B = G.PLAYER_BASE, def = G.STAT_NAMES[k]; if (!def) return '';

@@ -44,18 +44,20 @@
     const r = new THREE.Group(), l = new THREE.Group();
     root.add(r, l);
     const mk = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 2.4; return m; };
-    const blade = mk({ color: 0xc8ccd2, metalness: 0.95, roughness: 0.18 });
-    const dark = mk({ color: 0x2a2420, roughness: 0.8 });
+    const blade = mk({ color: 0xdce2ec, metalness: 0.52, roughness: 0.18, emissive: 0x242a34, emissiveIntensity: 0.25 });
+    const dark = mk({ color: 0x241e1c, metalness: 0.3, roughness: 0.62 });
     const wrap = mk({ color: 0x3a1a14, roughness: 0.9, map: G.Tex.tex.cloth.map });
-    const gold = mk({ color: 0xd8b060, metalness: 1, roughness: 0.25 });
+    const gold = mk({ color: 0xffcf40, metalness: 0.45, roughness: 0.20, emissive: 0x7a4c08, emissiveIntensity: 0.50 });
+    const goldBr = mk({ color: 0xfff0a0, metalness: 0.50, roughness: 0.12, emissive: 0xb88214, emissiveIntensity: 0.72 });
     let bladeM = blade;
-    if (def.model === 'frostknife') bladeM = mk({ color: 0xbfe8ff, metalness: 0.3, roughness: 0.05, emissive: 0x2a6a9a, emissiveIntensity: 0.9, transparent: true, opacity: 0.92 });
-    if (def.model === 'emberblade') bladeM = mk({ color: 0x401008, metalness: 0.6, roughness: 0.3, emissive: 0xff5a10, emissiveIntensity: 1.6 });
-    if (def.model === 'holy') bladeM = mk({ color: 0xfff6e0, metalness: 0.9, roughness: 0.1, emissive: 0xffe0a0, emissiveIntensity: 0.9 });
-    if (def.model === 'twin') bladeM = mk({ color: 0x6a8a3a, metalness: 0.7, roughness: 0.25, emissive: 0x1a3a00, emissiveIntensity: 0.8 });
+    if (def.model === 'frostknife') bladeM = mk({ color: 0xbfe8ff, metalness: 0.3, roughness: 0.05, emissive: 0x3898ff, emissiveIntensity: 1.15, transparent: true, opacity: 0.94 });
+    if (def.model === 'emberblade') bladeM = mk({ color: 0xff6018, metalness: 0.35, roughness: 0.18, emissive: 0xff4808, emissiveIntensity: 1.8 });
+    if (def.model === 'holy') bladeM = mk({ color: 0xfff8e8, metalness: 0.45, roughness: 0.10, emissive: 0xffdf80, emissiveIntensity: 1.1 });
+    if (def.model === 'twin') bladeM = mk({ color: 0x68f040, metalness: 0.4, roughness: 0.18, emissive: 0x28b810, emissiveIntensity: 1.2 });
     const box = (p, w, h, d, x, y, z, m, rx, ry, rz) => { const o = new THREE.Mesh(PG.box, m); o.scale.set(w, h, d); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); p.add(o); return o; };
     const cyl = (p, rad, len, x, y, z, m) => { const o = new THREE.Mesh(PG.cyl8, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); p.add(o); return o; };
     const cone = (p, rad, len, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); o.rotation.x = rx || 0; p.add(o); return o; };
+    const flatTip = (p, w, len, d, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(w * 0.58, len, d * 0.58); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, Math.PI / 4, 0); p.add(o); return o; };
     const isMidas = def.id === 'm_midas' || def.trait === 'midas';
     const gDeep = isMidas ? mk({ color: 0xd89218, metalness: 0.42, roughness: 0.28, emissive: 0x523004, emissiveIntensity: 0.45 }) : null;
     const gGold = isMidas ? mk({ color: 0xffcf40, metalness: 0.45, roughness: 0.22, emissive: 0x7a4c08, emissiveIntensity: 0.52 }) : null;
@@ -126,50 +128,247 @@
     // weapon pivot = grip, local +Y = blade direction
     const wg = new THREE.Group(); r.add(wg);
     let tipY = 0.3, glow = null;
-    const knife = (p, len, m) => { cyl(p, 0.016, 0.11, 0, 0, 0, dark); box(p, 0.03, 0.012, 0.06, 0, 0.06, 0, mats.steel); box(p, 0.006, len, 0.03, 0, 0.066 + len / 2, 0, m); cone(p, 0.016, 0.04, 0, 0.066 + len + 0.02, 0, m); return 0.066 + len + 0.04; };
+    const gemM = (col, em) => mk({ color: col, metalness: 0.15, roughness: 0.08, emissive: em || col, emissiveIntensity: 2.0 });
+    const knife = (p, len, m) => {
+      cyl(p, 0.015, 0.11, 0, 0, 0, dark); box(p, 0.022, 0.018, 0.024, 0, -0.06, 0, mats.steel);
+      for (let i = 0; i < 3; i++) box(p, 0.032, 0.006, 0.028, 0, -0.032 + i * 0.028, 0, mats.steel);
+      box(p, 0.028, 0.014, 0.072, 0, 0.06, 0, mats.steel);
+      box(p, 0.007, len, 0.034, 0, 0.067 + len / 2, -0.002, m);
+      box(p, 0.009, len * 0.85, 0.010, 0, 0.065 + len * 0.44, 0.012, dark);
+      flatTip(p, 0.007, 0.055, 0.034, 0, 0.067 + len + 0.027, -0.002, m);
+      return 0.067 + len + 0.055;
+    };
     switch (def.model) {
       case 'fists': if (isMidas) glow = 0xffd040; break;
       case 'knife': tipY = knife(wg, 0.18, bladeM); break;
       case 'sknife': {
-        cyl(wg, 0.018, 0.12, 0, 0, 0, wrap); box(wg, 0.022, 0.02, 0.022, 0, -0.065, 0, mats.steel);
-        box(wg, 0.034, 0.012, 0.075, 0, 0.065, 0, mats.steel);
-        box(wg, 0.007, 0.17, 0.034, 0, 0.155, -0.002, bladeM);
-        box(wg, 0.009, 0.15, 0.008, 0, 0.15, 0.018, dark);
-        cone(wg, 0.018, 0.045, 0, 0.262, -0.004, bladeM);
-        tipY = 0.285; break;
+        cyl(wg, 0.017, 0.12, 0, 0, 0, wrap); box(wg, 0.024, 0.02, 0.026, 0, -0.065, 0, mats.steel);
+        box(wg, 0.030, 0.014, 0.078, 0, 0.065, 0, mats.steel);
+        box(wg, 0.007, 0.18, 0.036, 0, 0.16, -0.003, bladeM);
+        box(wg, 0.009, 0.16, 0.010, 0, 0.15, 0.014, dark);
+        flatTip(wg, 0.007, 0.055, 0.036, 0, 0.277, -0.003, bladeM);
+        tipY = 0.30; break;
       }
-      case 'frostknife': tipY = knife(wg, 0.2, bladeM); glow = 0x80d0ff; break;
-      case 'twin': { tipY = knife(wg, 0.17, bladeM); const lg = new THREE.Group(); l.add(lg); knife(lg, 0.17, bladeM); lg.rotation.set(-0.9, 0, -0.2); l.userData.knife = lg; break; }
-      case 'kukri': { cyl(wg, 0.017, 0.12, 0, 0, 0, mats.wood); box(wg, 0.007, 0.16, 0.045, 0, 0.14, -0.01, bladeM, -0.25); box(wg, 0.007, 0.12, 0.05, 0, 0.27, -0.05, bladeM, 0.35); tipY = 0.33; break; }
-      case 'machete': { cyl(wg, 0.018, 0.13, 0, 0, 0, dark); box(wg, 0.006, 0.4, 0.055, 0, 0.27, -0.005, bladeM); box(wg, 0.007, 0.06, 0.06, 0, 0.47, -0.01, bladeM, 0.4); tipY = 0.5; break; }
-      case 'katana': case 'emberblade': case 'holy': {
-        const h = def.model === 'holy';
-        cyl(wg, 0.017, 0.2, 0, 0, 0, h ? gold : wrap);
-        if (h) box(wg, 0.035, 0.025, 0.16, 0, 0.11, 0, gold); else cyl(wg, 0.042, 0.01, 0, 0.105, 0, gold);
-        const bl = box(wg, 0.006, 0.66, h ? 0.04 : 0.03, 0, 0.44, 0, bladeM, h ? 0 : 0.03);
-        cone(wg, h ? 0.022 : 0.016, 0.06, 0, 0.8, h ? 0 : -0.012, bladeM);
-        tipY = 0.82; if (def.model === 'emberblade') glow = 0xff6a20; if (h) glow = 0xfff0c0; bl.userData.glow = true; break;
+      case 'frostknife': {
+        const iceGem = gemM(0x70e8ff, 0x30b8ff), iceHil = mk({ color: 0x385878, metalness: 0.5, roughness: 0.25, emissive: 0x102840, emissiveIntensity: 0.4 });
+        cyl(wg, 0.015, 0.11, 0, 0, 0, iceHil);
+        for (const y of [-0.03, 0, 0.03]) box(wg, 0.032, 0.006, 0.032, 0, y, 0, goldBr);
+        const pm = new THREE.Mesh(PG.oct3, iceGem); pm.scale.set(0.014, 0.022, 0.014); pm.position.set(0, -0.068, 0); wg.add(pm);
+        box(wg, 0.026, 0.016, 0.044, 0, 0.062, 0, goldBr);
+        for (const sz of [-1, 1]) box(wg, 0.014, 0.012, 0.045, 0, 0.070, sz * 0.032, bladeM, sz * 0.42, 0, 0);
+        box(wg, 0.007, 0.20, 0.038, 0, 0.17, 0, bladeM);
+        box(wg, 0.010, 0.17, 0.010, 0, 0.16, 0, iceGem);
+        flatTip(wg, 0.008, 0.065, 0.038, 0, 0.30, 0, bladeM);
+        tipY = 0.33; glow = 0x80d0ff; break;
       }
-      case 'rapier': { cyl(wg, 0.014, 0.12, 0, 0, 0, dark); const cup = new THREE.Mesh(PG.sph, gold); cup.scale.set(0.05, 0.025, 0.05); cup.position.y = 0.075; wg.add(cup); box(wg, 0.004, 0.78, 0.008, 0, 0.47, 0, bladeM); tipY = 0.86; break; }
-      case 'axe': { cyl(wg, 0.018, 0.6, 0, 0.18, 0, mats.wood); box(wg, 0.014, 0.15, 0.17, 0, 0.42, -0.08, bladeM); box(wg, 0.02, 0.06, 0.06, 0, 0.44, 0.04, mats.steel); tipY = 0.48; break; }
-      case 'hammer': case 'thunder': {
-        const th = def.model === 'thunder';
-        cyl(wg, 0.02, 0.62, 0, 0.2, 0, th ? wrap : mats.wood);
-        box(wg, 0.11, 0.11, 0.2, 0, 0.5, 0, th ? mk({ color: 0x5a5e66, metalness: 0.85, roughness: 0.3 }) : mats.steel);
-        if (th) { for (const z of [-0.06, 0.06]) { const c = new THREE.Mesh(PG.torus, W.mats.coil); c.scale.set(0.06, 0.06, 0.06); c.position.set(0, 0.5, z); wg.add(c); } glow = 0xc8d8ff; }
-        tipY = 0.55; break;
+      case 'twin': {
+        const vGem = gemM(0x50ff30, 0x30e818), vObs = mk({ color: 0x142214, metalness: 0.4, roughness: 0.35, emissive: 0x061204, emissiveIntensity: 0.3 });
+        const buildVenom = (p) => {
+          cyl(p, 0.015, 0.11, 0, 0, 0, vObs);
+          for (const y of [-0.032, 0, 0.032]) box(p, 0.031, 0.006, 0.031, 0, y, 0, gold);
+          const pm = new THREE.Mesh(PG.oct3, vGem); pm.scale.set(0.014, 0.022, 0.014); pm.position.set(0, -0.068, 0); p.add(pm);
+          box(p, 0.026, 0.018, 0.046, 0, 0.062, 0, gold);
+          const cg = new THREE.Mesh(PG.oct3, vGem); cg.scale.set(0.016, 0.012, 0.012); cg.position.set(0, 0.064, 0); p.add(cg);
+          for (const sz of [-1, 1]) {
+            box(p, 0.014, 0.012, 0.046, 0, 0.072, sz * 0.034, goldBr, sz * 0.48, 0, 0);
+            box(p, 0.009, 0.028, 0.016, 0, 0.135, sz * 0.022, bladeM, -sz * 0.38, 0, 0);
+          }
+          box(p, 0.008, 0.18, 0.036, 0, 0.16, 0, vObs);
+          box(p, 0.006, 0.18, 0.042, 0, 0.16, 0, bladeM);
+          box(p, 0.011, 0.15, 0.009, 0, 0.15, 0, vGem);
+          flatTip(p, 0.008, 0.065, 0.042, 0, 0.28, 0, bladeM);
+          return 0.31;
+        };
+        tipY = buildVenom(wg);
+        const lg = new THREE.Group(); l.add(lg); buildVenom(lg); lg.rotation.set(-0.9, 0, -0.2); l.userData.knife = lg;
+        glow = 0x50ff30; break;
       }
-      case 'spear': { cyl(wg, 0.016, 1.35, 0, 0.3, 0, mats.wood); box(wg, 0.035, 0.03, 0.035, 0, 0.98, 0, mats.steel); cone(wg, 0.03, 0.2, 0, 1.1, 0, bladeM); tipY = 1.2; break; }
+      case 'kukri': {
+        cyl(wg, 0.016, 0.12, 0, 0, 0, mats.wood); box(wg, 0.026, 0.016, 0.034, 0, -0.065, 0, gold); box(wg, 0.028, 0.018, 0.052, 0, 0.065, 0, gold);
+        box(wg, 0.007, 0.14, 0.042, 0, 0.135, -0.008, bladeM, -0.14); box(wg, 0.009, 0.14, 0.010, 0, 0.135, 0.012, dark, -0.14);
+        box(wg, 0.007, 0.15, 0.058, 0, 0.265, -0.024, bladeM, 0.16); box(wg, 0.009, 0.15, 0.012, 0, 0.265, 0.000, dark, 0.16);
+        flatTip(wg, 0.007, 0.065, 0.056, 0, 0.365, -0.012, bladeM, 0.16);
+        tipY = 0.39; break;
+      }
+      case 'machete': {
+        cyl(wg, 0.017, 0.13, 0, 0, 0, dark); box(wg, 0.026, 0.022, 0.036, 0, -0.07, 0, mats.steel); box(wg, 0.028, 0.014, 0.068, 0, 0.068, 0, mats.steel);
+        box(wg, 0.006, 0.38, 0.054, 0, 0.265, -0.006, bladeM); box(wg, 0.009, 0.38, 0.014, 0, 0.265, 0.016, dark);
+        flatTip(wg, 0.007, 0.07, 0.054, 0, 0.485, -0.006, bladeM);
+        tipY = 0.52; break;
+      }
+      case 'katana': case 'emberblade': {
+        const em = def.model === 'emberblade';
+        const spineM = em ? mk({ color: 0x1a0806, metalness: 0.45, roughness: 0.35, emissive: 0x280600, emissiveIntensity: 0.4 }) : dark;
+        const fGem = em ? gemM(0xff3810, 0xff5010) : null;
+        cyl(wg, 0.016, 0.22, 0, -0.01, 0, wrap);
+        box(wg, 0.026, 0.018, 0.032, 0, -0.125, 0, gold);
+        for (let i = 0; i < 5; i++) box(wg, 0.034, 0.008, 0.028, 0, -0.09 + i * 0.038, 0, em ? gold : dark, 0.35);
+        const tsuba = new THREE.Mesh(PG.oct, gold); tsuba.scale.set(0.038, 0.010, 0.044); tsuba.position.set(0, 0.105, 0); wg.add(tsuba);
+        if (em) {
+          for (const sz of [-1, 1]) box(wg, 0.016, 0.012, 0.052, 0, 0.112, sz * 0.038, goldBr, sz * 0.38, 0, 0);
+          const cg = new THREE.Mesh(PG.oct3, fGem); cg.scale.set(0.016, 0.016, 0.016); cg.position.set(0, 0.132, 0); wg.add(cg);
+        }
+        box(wg, 0.014, 0.032, 0.036, 0, 0.126, 0, goldBr);
+        const bl = box(wg, 0.006, 0.62, 0.034, 0, 0.45, -0.006, bladeM, 0.03);
+        box(wg, 0.009, 0.62, 0.012, 0, 0.45, 0.008, spineM, 0.03);
+        if (em) for (let i = 0; i < 3; i++) box(wg, 0.008, 0.045, 0.018, 0, 0.28 + i * 0.16, 0.016, bladeM, -0.45);
+        flatTip(wg, 0.007, 0.075, 0.034, 0, 0.79, -0.016, bladeM, 0.05);
+        tipY = 0.83; if (em) glow = 0xff6a20; bl.userData.glow = true; break;
+      }
+      case 'holy': {
+        const hGem = gemM(0xff3018, 0xff4818), hSun = gemM(0xfff8b0, 0xffd850);
+        const hTrim = mk({ color: 0x381018, metalness: 0.35, roughness: 0.4, emissive: 0x180408, emissiveIntensity: 0.3 });
+        // royal pommel with sun-ruby core & golden wings
+        const pBez = new THREE.Mesh(PG.oct, goldBr); pBez.scale.set(0.022, 0.016, 0.022); pBez.position.set(0, -0.125, 0); pBez.rotation.z = Math.PI / 2; wg.add(pBez);
+        const pGem = new THREE.Mesh(PG.oct3, hGem); pGem.scale.set(0.016, 0.024, 0.016); pGem.position.set(0, -0.132, 0); wg.add(pGem);
+        cyl(wg, 0.016, 0.21, 0, -0.01, 0, hTrim);
+        for (let i = 0; i < 5; i++) box(wg, 0.034, 0.007, 0.034, 0, -0.085 + i * 0.038, 0, goldBr);
+        // multi-layered winged golden sun-crossguard + central medallion
+        box(wg, 0.032, 0.032, 0.085, 0, 0.112, 0, gold);
+        for (const sz of [-1, 1]) {
+          box(wg, 0.024, 0.020, 0.11, 0, 0.122, sz * 0.068, goldBr, sz * 0.32, 0, 0);
+          box(wg, 0.016, 0.014, 0.085, 0, 0.142, sz * 0.082, gold, sz * 0.52, 0, 0);
+          box(wg, 0.012, 0.026, 0.024, 0, 0.215, sz * 0.036, goldBr, -sz * 0.45, 0, 0);
+        }
+        const cBez = new THREE.Mesh(PG.oct, goldBr); cBez.scale.set(0.026, 0.038, 0.026); cBez.position.set(0, 0.118, 0); cBez.rotation.z = Math.PI / 2; wg.add(cBez);
+        const cGem = new THREE.Mesh(PG.oct3, hGem); cGem.scale.set(0.022, 0.022, 0.022); cGem.position.set(0, 0.118, 0); wg.add(cGem);
+        // ornate golden ricasso collar + broad luminous sacred blade with radiant fuller
+        box(wg, 0.016, 0.09, 0.056, 0, 0.175, 0, gold);
+        box(wg, 0.019, 0.07, 0.032, 0, 0.175, 0, hTrim);
+        const bl = box(wg, 0.008, 0.62, 0.050, 0, 0.48, 0, bladeM);
+        box(wg, 0.012, 0.56, 0.018, 0, 0.46, 0, gold);
+        box(wg, 0.015, 0.50, 0.008, 0, 0.44, 0, hSun);
+        flatTip(wg, 0.009, 0.095, 0.050, 0, 0.835, 0, bladeM);
+        tipY = 0.88; glow = 0xfff0c0; bl.userData.glow = true; break;
+      }
+      case 'rapier': {
+        cyl(wg, 0.014, 0.13, 0, -0.005, 0, dark);
+        const pm = new THREE.Mesh(PG.oct3, goldBr); pm.scale.set(0.016, 0.022, 0.016); pm.position.set(0, -0.08, 0); wg.add(pm);
+        const cup = new THREE.Mesh(PG.sph, gold); cup.scale.set(0.048, 0.028, 0.048); cup.position.y = 0.075; wg.add(cup);
+        const ring = new THREE.Mesh(PG.torus, goldBr); ring.scale.set(0.048, 0.048, 0.06); ring.position.set(0, 0.075, 0); ring.rotation.x = Math.PI / 2; wg.add(ring);
+        box(wg, 0.012, 0.010, 0.16, 0, 0.065, 0, goldBr);
+        box(wg, 0.010, 0.11, 0.012, 0, 0.01, -0.052, goldBr, 0.25);
+        box(wg, 0.007, 0.74, 0.018, 0, 0.46, 0, bladeM);
+        box(wg, 0.010, 0.22, 0.008, 0, 0.20, 0, gold);
+        flatTip(wg, 0.007, 0.07, 0.018, 0, 0.86, 0, bladeM);
+        tipY = 0.89; break;
+      }
+      case 'axe': {
+        cyl(wg, 0.018, 0.62, 0, 0.18, 0, mats.wood);
+        for (const y of [-0.10, 0.10, 0.32, 0.48]) box(wg, 0.040, 0.016, 0.040, 0, y, 0, mats.steel);
+        box(wg, 0.026, 0.12, 0.08, 0, 0.42, 0, dark);
+        box(wg, 0.014, 0.19, 0.13, 0, 0.41, -0.07, dark);
+        box(wg, 0.009, 0.22, 0.05, 0, 0.40, -0.135, bladeM, 0.12);
+        flatTip(wg, 0.014, 0.09, 0.045, 0, 0.43, 0.075, bladeM, Math.PI / 2);
+        flatTip(wg, 0.014, 0.07, 0.032, 0, 0.53, 0, bladeM);
+        tipY = 0.56; break;
+      }
+      case 'hammer': {
+        cyl(wg, 0.020, 0.62, 0, 0.20, 0, mats.wood);
+        for (const y of [-0.09, 0.12, 0.38]) box(wg, 0.044, 0.018, 0.044, 0, y, 0, mats.steel);
+        box(wg, 0.09, 0.09, 0.18, 0, 0.49, -0.01, dark);
+        box(wg, 0.105, 0.105, 0.05, 0, 0.49, -0.09, mats.steel);
+        const face = new THREE.Mesh(PG.oct, bladeM); face.scale.set(0.052, 0.024, 0.052); face.rotation.x = Math.PI / 2; face.position.set(0, 0.49, -0.12); wg.add(face);
+        flatTip(wg, 0.036, 0.09, 0.036, 0, 0.49, 0.12, bladeM, Math.PI / 2);
+        flatTip(wg, 0.028, 0.06, 0.028, 0, 0.57, 0, mats.steel);
+        tipY = 0.58; break;
+      }
+      case 'thunder': {
+        const tGem = gemM(0x60f0ff, 0x30c8ff), tSteel = mk({ color: 0x262c38, metalness: 0.48, roughness: 0.28, emissive: 0x0a1424, emissiveIntensity: 0.35 });
+        // braided obsidian-and-gold haft + storm-crystal pommel & flared golden collar
+        cyl(wg, 0.020, 0.64, 0, 0.19, 0, tSteel);
+        for (const y of [-0.08, 0.04, 0.16, 0.28, 0.38]) box(wg, 0.046, 0.016, 0.046, 0, y, 0, gold);
+        box(wg, 0.056, 0.026, 0.056, 0, -0.12, 0, goldBr);
+        const pGem = new THREE.Mesh(PG.oct3, tGem); pGem.scale.set(0.020, 0.030, 0.020); pGem.position.set(0, -0.15, 0); wg.add(pGem);
+        box(wg, 0.068, 0.036, 0.082, 0, 0.41, 0, gold);
+        // massive Raijin warhammer head: dark-titanium & royal-gold beveled armor
+        box(wg, 0.115, 0.115, 0.23, 0, 0.50, 0, tSteel);
+        box(wg, 0.124, 0.028, 0.24, 0, 0.55, 0, gold);
+        box(wg, 0.124, 0.024, 0.24, 0, 0.45, 0, gold);
+        box(wg, 0.036, 0.132, 0.25, 0, 0.50, 0, goldBr);
+        // front & rear octagonal golden striking rams + blazing cyan plasma coils
+        for (const sz of [-1, 1]) {
+          const ram = new THREE.Mesh(PG.oct, goldBr); ram.scale.set(0.058, 0.028, 0.058); ram.rotation.x = Math.PI / 2; ram.position.set(0, 0.50, sz * 0.128); wg.add(ram);
+          const coil = new THREE.Mesh(PG.torus, tGem); coil.scale.set(0.056, 0.056, 0.09); coil.position.set(0, 0.50, sz * 0.095); wg.add(coil);
+          const core = new THREE.Mesh(PG.oct, tGem); core.scale.set(0.032, 0.012, 0.032); core.rotation.x = Math.PI / 2; core.position.set(0, 0.50, sz * 0.142); wg.add(core);
+        }
+        // left & right Raijin thunder-drum medallions + swept golden lightning wings
+        for (const sx of [-1, 1]) {
+          const drum = new THREE.Mesh(PG.oct, goldBr); drum.scale.set(0.044, 0.016, 0.044); drum.rotation.z = Math.PI / 2; drum.position.set(sx * 0.062, 0.50, 0); wg.add(drum);
+          const dGem = new THREE.Mesh(PG.oct3, tGem); dGem.scale.set(0.018, 0.024, 0.024); dGem.position.set(sx * 0.068, 0.50, 0); wg.add(dGem);
+          box(wg, 0.016, 0.022, 0.14, sx * 0.064, 0.54, 0, goldBr, 0, sx * 0.18, 0);
+        }
+        // top lightning-spire crown
+        const crB = new THREE.Mesh(PG.oct, goldBr); crB.scale.set(0.028, 0.020, 0.028); crB.position.set(0, 0.57, 0); wg.add(crB);
+        const crS = new THREE.Mesh(PG.oct3, tGem); crS.scale.set(0.020, 0.042, 0.020); crS.position.set(0, 0.60, 0); wg.add(crS);
+        tipY = 0.62; glow = 0x70e8ff; break;
+      }
+      case 'spear': {
+        cyl(wg, 0.016, 1.32, 0, 0.30, 0, mats.wood);
+        for (const y of [-0.20, 0.25, 0.65, 0.90]) box(wg, 0.038, 0.018, 0.038, 0, y, 0, gold);
+        box(wg, 0.032, 0.05, 0.048, 0, 0.96, 0, gold);
+        for (const sz of [-1, 1]) box(wg, 0.014, 0.018, 0.065, 0, 0.98, sz * 0.042, goldBr, sz * 0.45, 0, 0);
+        box(wg, 0.008, 0.16, 0.046, 0, 1.07, 0, bladeM);
+        box(wg, 0.012, 0.15, 0.014, 0, 1.06, 0, gold);
+        flatTip(wg, 0.009, 0.11, 0.046, 0, 1.20, 0, bladeM);
+        tipY = 1.25; break;
+      }
       case 'scythe': {
-        cyl(wg, 0.018, 1.15, 0, 0.32, 0, mats.wood);
+        const isDev = def.id === 'm_devour' || def.trait === 'devour';
+        if (isDev) {
+          const sGem = gemM(0xff1868, 0xff2080), sVoid = mk({ color: 0x1c0818, metalness: 0.45, roughness: 0.3, emissive: 0x180214, emissiveIntensity: 0.4 });
+          const sEdge = mk({ color: 0xff3888, metalness: 0.35, roughness: 0.12, emissive: 0xe01868, emissiveIntensity: 1.75 });
+          // armored obsidian-and-gold snath + abyssal soul-crystal pommel
+          cyl(wg, 0.019, 1.18, 0, 0.32, 0, sVoid);
+          for (let i = 0; i < 6; i++) box(wg, 0.044, 0.018, 0.044, 0, -0.14 + i * 0.20, 0, gold);
+          const pGem = new THREE.Mesh(PG.oct3, sGem); pGem.scale.set(0.022, 0.042, 0.022); pGem.position.set(0, -0.28, 0); wg.add(pGem);
+          // demonic golden-and-obsidian maw collar + floating crimson-violet Soul Core & golden halo
+          const bg = new THREE.Group(); bg.position.set(0, 0.88, 0); wg.add(bg);
+          box(bg, 0.048, 0.085, 0.11, 0, 0.0, 0.01, sVoid);
+          box(bg, 0.054, 0.032, 0.13, 0, 0.032, 0.01, gold);
+          box(bg, 0.054, 0.024, 0.11, 0, -0.032, 0.01, gold);
+          const halo = new THREE.Mesh(PG.torus, goldBr); halo.scale.set(0.058, 0.058, 0.08); halo.rotation.y = Math.PI / 2; halo.position.set(0, 0.01, -0.02); bg.add(halo);
+          const core = new THREE.Mesh(PG.oct3, sGem); core.scale.set(0.032, 0.032, 0.032); core.position.set(0, 0.01, -0.02); bg.add(core);
+          // swept rear counter-horns + top crown spike
+          flatTip(bg, 0.024, 0.11, 0.038, 0, 0.02, 0.11, goldBr, Math.PI / 2 + 0.25);
+          flatTip(bg, 0.018, 0.08, 0.028, 0, -0.02, 0.09, sEdge, Math.PI / 2 - 0.25);
+          flatTip(bg, 0.022, 0.08, 0.036, 0, 0.08, 0.01, goldBr);
+          // massive sweeping crescent soul-blade: royal-gold dorsal spine + blazing crimson-magenta plasma edge
+          let cy = 0.02, cz = -0.02;
+          for (let i = 0; i < 6; i++) {
+            const w = 0.088 - i * 0.010, step = 0.105, rx = -0.06 - i * 0.115;
+            const my = cy + Math.sin(rx) * step * 0.5, mz = cz - Math.cos(rx) * step * 0.5;
+            box(bg, 0.015, w * 0.42, step + 0.025, 0, my + Math.cos(rx) * w * 0.28, mz + Math.sin(rx) * w * 0.28, i % 2 === 0 ? gold : sVoid, rx);
+            box(bg, 0.008, w * 0.78, step + 0.025, 0, my - Math.cos(rx) * w * 0.16, mz - Math.sin(rx) * w * 0.16, sEdge, rx);
+            cy += Math.sin(rx) * step; cz -= Math.cos(rx) * step;
+          }
+          // inner soul-ripper hook
+          flatTip(bg, 0.014, 0.09, 0.036, 0, -0.055, -0.18, goldBr, -2.4);
+          tipY = 0.95; glow = 0xff2078; break;
+        }
+        const boneM = mk({ color: 0xd8ceb8, metalness: 0.25, roughness: 0.4, emissive: 0x241e18, emissiveIntensity: 0.25 });
+        const rGem = gemM(0xff2030, 0xff1020);
+        cyl(wg, 0.018, 1.15, 0, 0.32, 0, dark);
+        for (const y of [-0.15, 0.15, 0.45, 0.72]) box(wg, 0.038, 0.018, 0.038, 0, y, 0, boneM);
         const bg = new THREE.Group(); bg.position.set(0, 0.88, 0); wg.add(bg);
-        for (let i = 0; i < 5; i++) box(bg, 0.006, 0.05 - i * 0.006, 0.12, 0, -i * 0.022, -0.06 - i * 0.11, mk({ color: 0x8a8c90, metalness: 0.9, roughness: 0.3, emissive: 0x200810 }), -0.18 * i);
-        tipY = 0.9; glow = 0x9a2040; break;
+        box(bg, 0.042, 0.068, 0.095, 0, 0, 0.01, boneM);
+        const eye = new THREE.Mesh(PG.oct3, rGem); eye.scale.set(0.024, 0.020, 0.020); eye.position.set(0, 0.005, -0.01); bg.add(eye);
+        flatTip(bg, 0.018, 0.09, 0.032, 0, 0.01, 0.09, boneM, Math.PI / 2 + 0.15);
+        let cy = 0.015, cz = -0.02;
+        for (let i = 0; i < 5; i++) {
+          const w = 0.076 - i * 0.009, step = 0.11, rx = -0.06 - i * 0.12;
+          const my = cy + Math.sin(rx) * step * 0.5, mz = cz - Math.cos(rx) * step * 0.5;
+          box(bg, 0.013, w * 0.38, step + 0.025, 0, my + Math.cos(rx) * w * 0.25, mz + Math.sin(rx) * w * 0.25, dark, rx);
+          box(bg, 0.007, w * 0.74, step + 0.025, 0, my - Math.cos(rx) * w * 0.15, mz - Math.sin(rx) * w * 0.15, bladeM, rx);
+          cy += Math.sin(rx) * step; cz -= Math.cos(rx) * step;
+        }
+        tipY = 0.92; glow = 0xd02040; break;
       }
     }
     fist(r, true);
     if (def.model === 'fists' || def.model === 'twin') fist(l, false);
     else l.visible = false;
+    wg.rotation.order = 'ZXY';
     wg.rotation.set(0, 0, 0);
     root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
     return { group: root, r, l, wg, tipY, glow, def };
@@ -184,8 +383,19 @@
       m.l.visible = true;
       return m.group;
     }
-    m.r.children.filter((o) => o !== m.wg).forEach((o) => o.visible = false); m.l.visible = false;
-    m.wg.rotation.set(0, 0, Math.PI / 2.4);
+    if (def.model === 'twin') {
+      const k2 = m.l.userData.knife;
+      m.r.children.filter((o) => o !== m.wg).forEach((o) => m.r.remove(o));
+      m.l.children.filter((o) => o !== k2).forEach((o) => m.l.remove(o));
+      m.wg.rotation.order = 'ZXY'; m.r.position.set(0.042, -0.01, 0.015); m.wg.rotation.set(0.18, 1.35, Math.PI / 3.4);
+      if (k2) { k2.rotation.order = 'ZXY'; m.l.position.set(-0.042, 0.01, -0.015); k2.rotation.set(-0.18, -1.35, -Math.PI / 3.4); }
+      m.l.visible = true;
+      return m.group;
+    }
+    m.r.children.filter((o) => o !== m.wg).forEach((o) => m.r.remove(o));
+    m.group.remove(m.l);
+    m.wg.rotation.order = 'ZXY';
+    m.wg.rotation.set(0.18, 1.38, Math.PI / 3.1);
     return m.group;
   };
 
@@ -453,7 +663,8 @@
     const def = mm.def, kind = W.meleeKind(def);
     const fist = def.model === 'fists', twin = def.model === 'twin';
     // rest poses: [x, y, z, rx, ry, rz]
-    const REST = fist ? [0.19, -0.13, -0.36, 0.62, 0.36, 0.24] : kind === 'thrust' ? [0.2, -0.22, -0.32, -1.25, 0, 0.12] : [0.21, -0.24, -0.4, -0.95, 0, 0.25];
+    const isScythe = def.model === 'scythe';
+    const REST = fist ? [0.19, -0.13, -0.36, 0.62, 0.36, 0.24] : kind === 'thrust' ? [0.2, -0.22, -0.32, -1.25, 0.55, 0.12] : isScythe ? [0.26, -0.24, -0.42, -0.72, 1.12, 0.32] : [0.22, -0.23, -0.39, -0.88, 0.68, 0.26];
     const LREST = fist ? [-0.19, -0.13, -0.36, 0.62, -0.36, -0.24] : [-0.17, -0.2, -0.36, 0, 0, 0];
     let R = REST.slice(), Lp = LREST.slice();
     const t = ms.t, sd = ms.side;

@@ -149,13 +149,21 @@
   W.setEnv = function (env) { if (vmScene) vmScene.environment = env; };
   W.resize = function (a) { if (vmCam) { vmCam.aspect = a; vmCam.updateProjectionMatrix(); } };
 
-  const FIN = { black: [0x45484e, 0x2a2b2e], tan: [0x45484e, 0x8a7a5a], steel: [0x9a9da2, 0x333333], wood: [0x45484e, null], brass: [0xa88850, 0x5a3a24], gold: [0xd0a850, 0x2a1e14], bone: [0xc8bca0, 0x3a3028], rust: [0x6a4a36, 0x3a2a20] };
+  const FIN = { black: [0x45484e, 0x2a2b2e], tan: [0x45484e, 0x8a7a5a], steel: [0x9a9da2, 0x333333], wood: [0x45484e, null], brass: [0xa88850, 0x5a3a24], gold: [0xffcf40, 0x2c1016], bone: [0xc8bca0, 0x3a3028], rust: [0x6a4a36, 0x3a2a20] };
   function buildGun(def, atts, showHands) {
     const g = new THREE.Group();
+    const isLeg = def.rarity === 'legendary' || !!def.mythic;
     const fin = FIN[def.finish] || FIN.black;
-    const metal = mats.gun.clone(); metal.color.setHex(fin[0]); if (def.finish === 'gold') { metal.metalness = 1; metal.roughness = 0.25; }
+    const metal = mats.gun.clone(); metal.color.setHex(fin[0]);
     const poly = fin[1] === null ? mats.wood : mats.poly.clone(); if (fin[1] !== null) poly.color.setHex(fin[1]);
-    const woodOr = def.finish === 'wood' || def.arch === 'shotgun' || def.arch === 'crossbow' || def.arch === 'dmr' ? mats.wood : poly;
+    if (def.finish === 'gold' || isLeg) {
+      metal.map = null; metal.metalness = 0.46; metal.roughness = 0.20;
+      if (def.id === 'y_maw') { metal.color.setHex(0x281832); metal.emissive.setHex(0x180624); metal.emissiveIntensity = 0.45; poly.color.setHex(0xd8a840); }
+      else if (def.id === 'y_storm') { metal.color.setHex(0xe8f4ff); metal.emissive.setHex(0x286898); metal.emissiveIntensity = 0.48; poly.color.setHex(0xc89a38); }
+      else if (def.id === 'm_hell') { metal.color.setHex(0xd88828); metal.emissive.setHex(0x581c04); metal.emissiveIntensity = 0.48; poly.color.setHex(0x220c0a); }
+      else { metal.color.setHex(0xffcf40); metal.emissive.setHex(0x7a4c08); metal.emissiveIntensity = 0.50; poly.color.setHex(0x321016); poly.emissive.setHex(0x140408); poly.emissiveIntensity = 0.25; }
+    }
+    const woodOr = isLeg ? poly : (def.finish === 'wood' || def.arch === 'shotgun' || def.arch === 'crossbow' || def.arch === 'dmr' ? mats.wood : poly);
     const PG = G.Props.PG;
     const box = (w, h, d, x, y, z, m, rx, ry, rz, parent) => { const o = new THREE.Mesh(PG.box, m || metal); o.scale.set(w, h, d); o.position.set(x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); (parent || g).add(o); return o; };
     const cyl = (r, len, x, y, z, m, seg, parent) => { const o = new THREE.Mesh(seg === 8 ? PG.cyl8 : PG.cyl, m || metal); o.scale.set(r, len, r); o.rotation.x = Math.PI / 2; o.position.set(x, y, z); (parent || g).add(o); return o; };
@@ -322,6 +330,216 @@
         box(0.034, 0.1, 0.045, 0, -0.08, 0.12, poly, 0.3); box(0.04, 0.07, 0.2, 0, 0.0, 0.3, poly);
         M.muzzle.set(0, 0.03, -0.48); M.sightY = 0.09; M.ironY = 0.09; M.railY = 0.065; M.fore.set(0, -0.05, -0.25); M.grip.set(0, -0.07, 0.12);
         break;
+      }
+    }
+    if (isLeg) {
+      const gBright = new THREE.MeshStandardMaterial({ color: 0xfff0a0, metalness: 0.5, roughness: 0.12, emissive: 0xb88214, emissiveIntensity: 0.72 });
+      const gRoyal = new THREE.MeshStandardMaterial({ color: 0xffcf40, metalness: 0.46, roughness: 0.20, emissive: 0x7a4c08, emissiveIntensity: 0.52 });
+      const cHex = def.id === 'y_maw' ? 0xe830ff : def.id === 'y_echo' ? 0x58f8ff : (def.id === 'y_storm' || def.trait === 'shock' || def.trait === 'chainHit') ? 0x50e4ff : (def.trait === 'incendiary' || def.trait === 'explosiveRounds' || def.trait === 'cluster') ? 0xff4014 : def.trait === 'lifesteal' ? 0xff1840 : def.id === 'c_sylv' ? 0x40ff88 : 0xff2818;
+      const gCore = new THREE.MeshStandardMaterial({ color: cHex, metalness: 0.15, roughness: 0.08, emissive: cHex, emissiveIntensity: 2.1 });
+      const crest = (x, y, z, sc) => {
+        const bz = new THREE.Mesh(PG.oct, gBright); bz.scale.set(0.018 * sc, 0.008 * sc, 0.018 * sc); bz.rotation.z = Math.PI / 2; bz.position.set(x, y, z); g.add(bz);
+        const gm = new THREE.Mesh(PG.oct3, gCore); gm.scale.set(0.010 * sc, 0.013 * sc, 0.013 * sc); gm.position.set(x, y, z); g.add(gm);
+      };
+      const fang = (x, y, z, r, len, rx, ry, rz, m) => { const c = new THREE.Mesh(PG.cone, m || gBright); c.scale.set(r, len, r); c.position.set(x, y, z); c.rotation.set(rx || 0, ry || 0, rz || 0); g.add(c); return c; };
+      switch (def.arch) {
+        case 'pistol': {
+          box(0.036, 0.014, 0.18, 0, 0.014, -0.025, gBright);
+          box(0.028, 0.024, 0.075, 0, 0.008, -0.105, gRoyal);
+          for (const sx of [-1, 1]) {
+            box(0.007, 0.012, 0.16, sx * 0.019, 0.034, -0.025, gBright, 0, sx * 0.06, 0);
+            box(0.006, 0.010, 0.06, sx * 0.018, 0.010, -0.10, gCore);
+            crest(sx * 0.017, -0.05, 0.045, 0.85);
+          }
+          break;
+        }
+        case 'revolver': {
+          box(0.026, 0.032, 0.21, 0, 0.024, -0.13, gRoyal);
+          box(0.018, 0.014, 0.22, 0, 0.060, -0.12, gBright);
+          for (const sx of [-1, 1]) {
+            box(0.008, 0.016, 0.19, sx * 0.016, 0.038, -0.13, gBright, 0, sx * 0.06, 0);
+            box(0.006, 0.010, 0.15, sx * 0.016, 0.022, -0.13, gCore);
+            crest(sx * 0.018, 0.03, 0.035, def.mythic ? 1.15 : 0.9);
+          }
+          for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; cyl(0.007, 0.054, Math.cos(a) * 0.028, 0.03 + Math.sin(a) * 0.028, 0, gBright, 8, M.bolt ? M.bolt.parent : g); }
+          if (def.id === 'y_midas') {
+            fang(0, 0.012, -0.25, 0.010, 0.055, -Math.PI / 2, 0, 0, gBright);
+            for (const sx of [-1, 1]) for (const z of [-0.08, -0.15, -0.21]) box(0.010, 0.012, 0.018, sx * 0.018, 0.048, z, gBright, -0.35, 0, -sx * 0.35);
+          }
+          break;
+        }
+        case 'smg': {
+          for (const sx of [-1, 1]) {
+            box(0.012, 0.032, 0.28, sx * 0.028, 0.024, -0.08, gBright, 0, sx * 0.08, 0);
+            box(0.14, 0.012, 0.036, sx * 0.075, 0.045, -0.04, gBright, 0.15, sx * 0.38, sx * 0.28);
+            box(0.11, 0.008, 0.022, sx * 0.09, 0.052, -0.01, gCore, 0.18, sx * 0.45, sx * 0.32);
+            box(0.008, 0.014, 0.18, sx * 0.030, 0.018, -0.14, gCore);
+            crest(sx * 0.026, 0.018, 0.02, 1.05);
+          }
+          box(0.036, 0.028, 0.18, 0, -0.016, -0.21, gBright, 0.15, 0, 0);
+          fang(0, 0.02, -0.37, 0.016, 0.08, -Math.PI / 2, 0, 0, gCore);
+          fang(0, -0.01, -0.35, 0.012, 0.08, -Math.PI / 2, 0, 0, gBright);
+          break;
+        }
+        case 'rifle': case 'burst': case 'dmr': {
+          const long = def.arch === 'dmr';
+          for (const sx of [-1, 1]) {
+            box(0.014, 0.034, 0.38, sx * 0.030, 0.022, -0.12, gBright, 0, sx * 0.06, 0);
+            box(0.012, 0.022, 0.30, sx * 0.036, 0.048, -0.10, gRoyal, 0.12, sx * 0.14, sx * 0.38);
+            box(0.010, 0.016, 0.28, sx * 0.033, 0.018, -0.24, gCore);
+            crest(sx * 0.030, 0.016, 0.02, 1.25);
+          }
+          box(0.038, 0.032, 0.24, 0, -0.022, -0.26, gRoyal, 0.14, 0, 0);
+          box(0.050, 0.026, 0.22, 0, 0.022, 0.30, gBright, -0.08, 0, 0);
+          box(0.048, 0.024, 0.20, 0, -0.022, 0.30, gRoyal);
+          if (def.id === 'a_oath') {
+            // Sword of the Oath: winged golden crossguard & broad luminous sword-bayonet beneath the barrel
+            box(0.14, 0.018, 0.026, 0, -0.010, -0.38, gBright);
+            box(0.010, 0.032, 0.32, 0, -0.018, -0.52, new THREE.MeshStandardMaterial({ color: 0xfff8e0, metalness: 0.45, roughness: 0.10, emissive: 0xffdf80, emissiveIntensity: 1.1 }));
+            fang(0, -0.018, -0.71, 0.016, 0.09, -Math.PI / 2, 0, 0, gBright);
+          } else if (def.id === 'b_tempest') {
+            // Tempest: crackling storm-coils & swept thunder-fins
+            for (let i = 0; i < 4; i++) { const r = new THREE.Mesh(PG.torus, i % 2 ? gCore : gBright); r.scale.set(0.046, 0.046, 0.06); r.position.set(0, 0.020, -0.28 - i * 0.085); g.add(r); }
+            for (const sx of [-1, 1]) box(0.18, 0.014, 0.034, sx * 0.09, 0.032, -0.26, gCore, 0, sx * 0.38, sx * 0.18);
+          } else if (def.id === 'd_saint') {
+            // Saint's Judgement: floating golden cathedral halo & seraph wings
+            const halo = new THREE.Mesh(PG.torus, gBright); halo.scale.set(0.052, 0.052, 0.065); halo.position.set(0, 0.012, -0.28); g.add(halo);
+            for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(PG.torus, i === 1 ? gCore : gBright); r.scale.set(0.032, 0.032, 0.05); r.position.set(0, 0.018, -0.42 - i * 0.11); g.add(r); }
+            for (const sx of [-1, 1]) box(0.20, 0.016, 0.036, sx * 0.10, 0.034, -0.22, gBright, 0, sx * 0.34, sx * 0.22);
+          } else if (def.id === 'y_echo') {
+            // Mythic Aria of Echoes: twin cantilevered golden tuning-fork blades & spectral harmonic rings
+            for (const sx of [-1, 1]) {
+              box(0.014, 0.014, 0.46, sx * 0.024, 0.046, -0.44, gBright);
+              box(0.010, 0.010, 0.40, sx * 0.020, 0.040, -0.46, gCore);
+            }
+            box(0.022, 0.014, 0.46, 0, -0.020, -0.44, gBright);
+            for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(PG.torus, gCore); r.scale.set(0.044, 0.044, 0.055); r.position.set(0, 0.016, -0.34 - i * 0.12); g.add(r); }
+          }
+          break;
+        }
+        case 'sniper': {
+          for (const sx of [-1, 1]) {
+            box(0.014, 0.034, 0.46, sx * 0.032, 0.014, -0.14, gBright, 0, sx * 0.05, 0);
+            box(0.012, 0.022, 0.34, sx * 0.038, 0.038, -0.12, gRoyal, 0.10, sx * 0.12, sx * 0.35);
+            box(0.010, 0.016, 0.36, sx * 0.035, 0.014, -0.22, gCore);
+            crest(sx * 0.034, 0.008, 0.0, 1.3);
+          }
+          box(0.042, 0.030, 0.28, 0, -0.028, -0.24, gRoyal, 0.12, 0, 0);
+          box(0.052, 0.028, 0.24, 0, 0.020, 0.30, gBright, -0.08, 0, 0);
+          for (let i = 0; i < 4; i++) { const r = new THREE.Mesh(PG.torus, i % 2 ? gCore : gBright); r.scale.set(0.032, 0.032, 0.045); r.position.set(0, 0.025, -0.38 - i * 0.095); g.add(r); }
+          if (def.id === 'y_storm') {
+            for (const sx of [-1, 1]) {
+              box(0.34, 0.020, 0.038, sx * 0.17, 0.022, -0.34, gBright, 0, sx * 0.32, sx * 0.14);
+              box(0.26, 0.014, 0.024, sx * 0.26, 0.036, -0.28, gCore, 0, sx * 0.48, sx * 0.20);
+              box(0.30, 0.007, 0.007, sx * 0.18, 0.025, -0.16, gCore, 0, -sx * 0.38, 0);
+            }
+          } else {
+            for (const sx of [-1, 1]) fang(sx * 0.028, 0.025, -0.78, 0.014, 0.11, -Math.PI / 2, sx * 0.22, 0, gBright);
+            fang(0, -0.005, -0.76, 0.014, 0.12, -Math.PI / 2, 0, 0, gCore);
+          }
+          break;
+        }
+        case 'shotgun': case 'autoshotgun': {
+          for (const sx of [-1, 1]) {
+            box(0.014, 0.034, 0.40, sx * 0.030, 0.024, -0.16, gBright, 0, sx * 0.05, 0);
+            box(0.012, 0.022, 0.32, sx * 0.036, 0.046, -0.14, gRoyal, 0.12, sx * 0.14, sx * 0.36);
+            box(0.010, 0.016, 0.30, sx * 0.033, 0.020, -0.22, gCore);
+            crest(sx * 0.032, 0.018, 0.0, 1.25);
+          }
+          box(0.050, 0.026, 0.22, 0, 0.020, 0.28, gBright, -0.08, 0, 0);
+          if (def.id === 'y_maw') {
+            const ring = new THREE.Mesh(PG.torus, gCore); ring.scale.set(0.038, 0.038, 0.06); ring.position.set(0, 0.020, -0.56); g.add(ring);
+            for (let i = 0; i < 6; i++) {
+              const a = i / 6 * Math.PI * 2 + Math.PI / 6;
+              fang(Math.cos(a) * 0.042, 0.022 + Math.sin(a) * 0.038, -0.62, 0.014, 0.12, -Math.PI / 2 + Math.sin(a) * 0.24, -Math.cos(a) * 0.24, 0, gBright);
+            }
+            for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) fang(sx * 0.028, 0.052, -0.10 - i * 0.11, 0.011, 0.052, -0.50, 0, -sx * 0.42, gCore);
+          } else {
+            for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(PG.torus, gCore); r.scale.set(0.036, 0.036, 0.055); r.position.set(0, 0.025, -0.34 - i * 0.095); g.add(r); }
+            for (const sx of [-1, 1]) fang(sx * 0.026, 0.01, -0.62, 0.013, 0.10, -Math.PI / 2, sx * 0.12, 0, gBright);
+          }
+          break;
+        }
+        case 'lmg': {
+          for (const sx of [-1, 1]) {
+            box(0.016, 0.038, 0.42, sx * 0.038, 0.026, -0.18, gBright, 0, sx * 0.06, 0);
+            box(0.012, 0.020, 0.32, sx * 0.042, 0.026, -0.24, gCore);
+            box(0.24, 0.018, 0.038, sx * 0.12, 0.028, -0.44, gBright, 0, sx * 0.35, sx * 0.12);
+            box(0.20, 0.012, 0.022, sx * 0.16, 0.038, -0.40, gCore, 0, sx * 0.45, sx * 0.18);
+            crest(sx * 0.040, 0.02, 0.02, 1.35);
+          }
+          box(0.054, 0.028, 0.22, 0, 0.025, 0.32, gBright, -0.08, 0, 0);
+          break;
+        }
+        case 'minigun': {
+          for (const z of [-0.28, -0.14, 0.0]) {
+            const c = new THREE.Mesh(PG.torus, gCore); c.scale.set(0.066, 0.066, 0.09); c.position.set(0, 0, z); (barrels || g).add(c);
+          }
+          const sh = new THREE.Mesh(PG.oct, gBright); sh.scale.set(0.086, 0.20, 0.086); sh.rotation.x = Math.PI / 2; sh.position.set(0, 0, 0.02); g.add(sh);
+          for (let i = 0; i < 6; i++) {
+            const a = i / 6 * Math.PI * 2;
+            fang(Math.cos(a) * 0.078, Math.sin(a) * 0.078, -0.09, 0.015, 0.10, -Math.PI / 2, 0, 0, gBright);
+          }
+          break;
+        }
+        case 'crossbow': {
+          for (const sx of [-1, 1]) {
+            box(0.40, 0.024, 0.038, sx * 0.19, 0.026, -0.35, gBright, 0, sx * 0.28, sx * 0.10);
+            box(0.32, 0.016, 0.026, sx * 0.24, 0.038, -0.29, gCore, 0, sx * 0.38, sx * 0.16);
+            crest(sx * 0.026, 0.01, -0.08, 1.2);
+          }
+          box(0.022, 0.016, 0.54, 0, 0.034, -0.15, gCore);
+          box(0.048, 0.024, 0.20, 0, 0.018, 0.28, gBright);
+          break;
+        }
+        case 'rocket': {
+          for (const z of [-0.52, -0.30, -0.05, 0.20]) {
+            const r = new THREE.Mesh(PG.torus, z === -0.30 ? gCore : gBright); r.scale.set(0.076, 0.076, 0.09); r.position.set(0, 0.03, z); g.add(r);
+          }
+          for (let i = 0; i < 4; i++) {
+            const a = i / 4 * Math.PI * 2 + Math.PI / 4;
+            box(0.014, 0.052, 0.30, Math.cos(a) * 0.074, 0.03 + Math.sin(a) * 0.074, -0.42, gBright, 0, 0, -a);
+          }
+          if (M.bolt) M.bolt.material = gCore;
+          break;
+        }
+        case 'gl': {
+          for (let i = 0; i < 6; i++) {
+            const a = i / 6 * Math.PI * 2;
+            cyl(0.016, 0.13, Math.cos(a) * 0.060, Math.sin(a) * 0.060, -0.03, i % 2 ? gBright : gCore);
+          }
+          const cRing = new THREE.Mesh(PG.torus, gBright); cRing.scale.set(0.076, 0.076, 0.08); cRing.position.set(0, 0, -0.03); g.add(cRing);
+          for (const z of [-0.22, -0.35]) { const r = new THREE.Mesh(PG.torus, z === -0.35 ? gCore : gBright); r.scale.set(0.042, 0.042, 0.06); r.position.set(0, 0.03, z); g.add(r); }
+          for (const sx of [-1, 1]) {
+            box(0.014, 0.032, 0.26, sx * 0.036, 0.032, -0.24, gBright);
+            crest(sx * 0.030, 0.04, 0.06, 1.25);
+          }
+          box(0.046, 0.026, 0.18, 0, 0.020, 0.30, gBright, -0.08, 0, 0);
+          break;
+        }
+        case 'flame': {
+          for (const sx of [-1, 1]) {
+            box(0.016, 0.044, 0.38, sx * 0.038, 0.034, -0.12, gBright, 0.15, sx * 0.16, sx * 0.28);
+            box(0.012, 0.028, 0.30, sx * 0.048, 0.052, -0.08, gCore, 0.22, sx * 0.24, sx * 0.38);
+          }
+          for (const z of [-0.22, -0.12, -0.02]) {
+            const r = new THREE.Mesh(PG.torus, z === -0.12 ? gCore : gBright); r.scale.set(0.056, 0.056, 0.08); r.position.set(0, -0.07, z); g.add(r);
+          }
+          fang(0, 0.056, -0.54, 0.018, 0.09, -Math.PI / 2 + 0.2, 0, 0, gBright);
+          break;
+        }
+        case 'rail': case 'tesla': {
+          for (const sx of [-1, 1]) {
+            box(0.016, 0.034, 0.40, sx * 0.040, 0.026, -0.18, gBright, 0, sx * 0.08, 0);
+            box(0.012, 0.020, 0.34, sx * 0.046, 0.042, -0.16, gRoyal, 0.12, sx * 0.14, sx * 0.35);
+            box(0.010, 0.016, 0.34, sx * 0.044, 0.024, -0.22, gCore);
+            crest(sx * 0.038, 0.02, 0.02, 1.25);
+          }
+          for (let i = 0; i < 4; i++) {
+            const r = new THREE.Mesh(PG.torus, i % 2 ? gCore : gBright); r.scale.set(0.056, 0.056, 0.08); r.position.set(0, 0.025, -0.22 - i * 0.09); g.add(r);
+          }
+          break;
+        }
       }
     }
     // ---- per-gun mount points: [y, z] of the rear of the body (stock), whether the gun has a stock of its own, half-width of the receiver,
@@ -595,7 +813,7 @@
   }
   W.buildGun = buildGun;
   // display model for shop / codex (no hands)
-  W.displayModel = function (def, atts) { if (!mats) return new THREE.Group(); const m = buildGun(def, atts || {}, false); return m.group; };
+  W.displayModel = function (def, atts) { if (!mats) return new THREE.Group(); const m = buildGun(def, atts || {}, false); m.group.rotation.order = 'ZXY'; m.group.rotation.set(0.18, Math.PI * 0.56, 0.38); return m.group; };
 
   W.equip = function (immediate) {
     const w = P.weapon;

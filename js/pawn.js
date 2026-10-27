@@ -133,7 +133,7 @@
     for (const w of guns) for (const sl in w.atts) { const id = w.atts[sl], a = G.ATT_BY_ID[id]; if (a) out.push({ cat: 'att', icon: a.icon, rc: a.rarity, name: a.name, sub: `${w.def.name}に装着中`, v: PW.attValue(id), act: () => { GM()._keepModal = true; setTimeout(() => confirmAtt(id, w), 0); } }); }
     p.skills.forEach((sk, i) => { if (!sk) return; const def = sk.id === G.DEFAULT_ULT; out.push({ cat: 'skill', icon: sk.def.icon, rc: sk.def.rarity, name: `[${G.input.skillKey(i)}] ${sk.def.name}${G.abilities.lvText(sk) ? ' ' + G.abilities.lvText(sk) : ''}`, sub: def ? '初期装備のアルティメットは売れません' : sk.def.ult ? 'アルティメット' : 'スキル', v: def ? 0 : PW.skillValue(sk), no: def, act: () => { GM()._keepModal = true; setTimeout(() => confirmSkill(i), 0); } }); });
     // everything in the bag
-    for (const it of IV.pcs(p).flatMap((c) => c.items).sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))) {
+    for (const it of IV.pcs(p).flatMap((c) => c.items).sort((a, b) => (a.type || '').localeCompare(b.type || '') || (a.id || '').localeCompare(b.id || ''))) {
       const d = IV.def(it); if (!d) continue;
       const cat = it.type === 'item' ? (d.cat === 'grenade' ? 'grenade' : 'item') : it.type;
       const unit = IV.value(Object.assign({}, it, { n: 1 })), ask = it.type === 'armor' && !!(it.ench && it.ench.length); // enchanted armour is confirmed first
@@ -142,28 +142,133 @@
     }
     return out;
   }
+  function getBulk(tab) {
+    const p = P(), IV = G.Inv;
+    if (tab === 'valuable' || tab === 'all') {
+      const items = p.bag.items.filter((o) => o.type === 'valuable');
+      const sum = items.reduce((s, o) => s + IV.value(o), 0);
+      return {
+        label: `💰 金品を一括売却（${items.length}点 +${fmt(sum)}🪙）`,
+        count: items.length,
+        primary: true,
+        act: () => {
+          if (!items.length) return;
+          for (const o of items) IV.remove(p.bag, o);
+          pay(sum, `金品${items.length}点`);
+          PW.open();
+        },
+      };
+    }
+    if (tab === 'armor') {
+      const armors = p.bag.items.filter((o) => o.type === 'armor');
+      const count = armors.reduce((n, o) => n + (o.n || 1), 0);
+      const sum = armors.reduce((s, o) => s + IV.value(o), 0);
+      const ench = armors.filter((o) => o.ench && o.ench.length);
+      const epics = armors.filter((o) => { const d = IV.def(o); return d && G.RARITY[d.rarity]?.tier >= 3; });
+      return {
+        label: `🛡️ 未装備の防具を一括売却（${count}点 +${fmt(sum)}🪙）`,
+        count,
+        primary: false,
+        act: () => {
+          if (!armors.length) return;
+          const doSell = () => {
+            for (const o of armors.slice()) IV.remove(p.bag, o);
+            pay(sum, `防具${count}点`);
+            G.ui.toast(`🛡️ 未装備の防具 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+            PW.open();
+          };
+          if (ench.length || epics.length) {
+            GM()._keepModal = true;
+            const w = [];
+            if (ench.length) w.push(`エンチャント付き <b>${ench.length}点</b>`);
+            if (epics.length) w.push(`エピック以上 <b>${epics.length}点</b>`);
+            GM().modal('🛡️ 防具を一括売却しますか？', `未装備の防具 <b>${count}点（+${fmt(sum)}🪙）</b> を売却します。<br><span style="color:#e080ff">⚠️ ${w.join('、')} が含まれています。</span>`, [
+              { icon: '💰', label: `すべて売る（+${fmt(sum)}🪙）`, onPick: doSell },
+              { icon: '↩', label: 'やめる', onPick: again },
+            ]);
+          } else doSell();
+        },
+      };
+    }
+    if (tab === 'att') {
+      const atts = p.bag.items.filter((o) => o.type === 'att');
+      const count = atts.reduce((n, o) => n + (o.n || 1), 0);
+      const sum = atts.reduce((s, o) => s + IV.value(o), 0);
+      return {
+        label: `🔩 未装着アタッチメントを一括売却（${count}点 +${fmt(sum)}🪙）`,
+        count,
+        primary: false,
+        act: () => {
+          if (!atts.length) return;
+          for (const o of atts.slice()) IV.remove(p.bag, o);
+          pay(sum, `アタッチメント${count}点`);
+          G.ui.toast(`🔩 未装着アタッチメント ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+          PW.open();
+        },
+      };
+    }
+    if (tab === 'item') {
+      const items = IV.pcs(p).flatMap((c) => c.items).filter((o) => o.type === 'item' && G.ITEM_BY_ID[o.id] && G.ITEM_BY_ID[o.id].cat !== 'grenade');
+      const count = items.reduce((n, o) => n + (o.n || 1), 0);
+      const sum = items.reduce((s, o) => s + IV.value(o), 0);
+      return {
+        label: `🧪 消耗品を一括売却（${count}点 +${fmt(sum)}🪙）`,
+        count,
+        primary: false,
+        act: () => {
+          if (!items.length) return;
+          for (const o of items.slice()) {
+            const home = IV.pcs(p).find((c) => c.items.includes(o)) || p.bag;
+            IV.remove(home, o);
+          }
+          pay(sum, `消耗品${count}点`);
+          G.ui.toast(`🧪 消耗品 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+          PW.open();
+        },
+      };
+    }
+    if (tab === 'grenade') {
+      const grens = IV.pcs(p).flatMap((c) => c.items).filter((o) => o.type === 'item' && G.ITEM_BY_ID[o.id] && G.ITEM_BY_ID[o.id].cat === 'grenade');
+      const count = grens.reduce((n, o) => n + (o.n || 1), 0);
+      const sum = grens.reduce((s, o) => s + IV.value(o), 0);
+      return {
+        label: `💣 投擲物を一括売却（${count}点 +${fmt(sum)}🪙）`,
+        count,
+        primary: false,
+        act: () => {
+          if (!grens.length) return;
+          for (const o of grens.slice()) {
+            const home = IV.pcs(p).find((c) => c.items.includes(o)) || p.bag;
+            IV.remove(home, o);
+          }
+          if (G.GrenHold && G.GrenHold.active()) G.GrenHold.putAway(true);
+          pay(sum, `投擲物${count}点`);
+          G.ui.toast(`💣 投擲物 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+          PW.open();
+        },
+      };
+    }
+    return null;
+  }
   PW.open = function () {
     const p = P(), IV = G.Inv;
     const all = rows();
     const list = all.filter((r) => PW.tab === 'all' || r.cat === PW.tab);
-    const vals = p.bag.items.filter((o) => o.type === 'valuable');
-    const valSum = vals.reduce((s, o) => s + IV.value(o), 0);
+    const bulk = getBulk(PW.tab);
     GM().state = 'modal'; G.input.exitLock();
     const s = G.ui.screen(`<div class="panel pw-panel" style="width:min(940px,96vw)">
       <div class="pw-head"><h2>⚖️ 買取屋</h2><span>買値の<b>${Math.round(PW.RATE * 100)}%</b>で買い取る（金品は満額）</span>${G.ui.coinBox()}</div>
       <div class="pw-tabs">${CATS.map(([k, n]) => { const c = k === 'all' ? all.length : all.filter((r) => r.cat === k).length; return `<span class="pw-tab${PW.tab === k ? ' on' : ''}${c ? '' : ' none'}" data-t="${k}">${n} <small>${c}</small></span>`; }).join('')}</div>
-      <div class="pw-bulk"><button class="btn${vals.length ? ' primary' : ''}" id="pw-vals" ${vals.length ? '' : 'disabled'}>💰 金品を一括売却（${vals.length}点 +${fmt(valSum)}🪙）</button></div>
+      <div class="pw-bulk">${bulk ? `<button class="btn${bulk.primary && bulk.count ? ' primary' : ''}" id="pw-bulk-btn" ${bulk.count ? '' : 'disabled'}>${bulk.label}</button>` : ''}</div>
       <div class="pw-list">${list.length ? list.map((r, i) => `<div class="pw-row${r.no ? ' no' : ''}" style="--rc:${R(r.rc || 'common')}"><span class="pw-ic">${r.icon}</span><div class="pw-t"><b>${U.esc(r.name)}</b><small>${U.esc(r.sub)}</small></div><span class="pw-v">${r.no ? '—' : '+' + fmt(r.v) + '🪙' + (r.n > 1 ? '<small>/1個</small>' : '')}</span>${r.no ? '' : `<button class="btn small" data-s="${i}">売る</button>`}${r.actAll ? `<button class="btn small" data-a="${i}">すべて（+${fmt(r.v * r.n)}）</button>` : ''}</div>`).join('') : '<div class="pw-none">売れるものがない</div>'}</div>
       <div style="text-align:right;margin-top:10px"><button class="btn" id="pw-close">🚶 取引を終える</button></div></div>`, 'dim');
     s.querySelectorAll('.pw-tab').forEach((t) => t.onclick = () => { PW.tab = t.dataset.t; G.sfx.ui('click'); PW.open(); });
     s.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => list[+b.dataset.s].act());
     s.querySelectorAll('[data-a]').forEach((b) => b.onclick = () => list[+b.dataset.a].actAll());
-    s.querySelector('#pw-vals').onclick = () => {
-      if (!vals.length) return;
-      for (const o of vals) IV.remove(p.bag, o);
-      pay(valSum, `金品${vals.length}点`);
-      PW.open();
-    };
+    if (bulk) {
+      const b = s.querySelector('#pw-bulk-btn');
+      if (b) b.onclick = bulk.act;
+    }
     s.querySelector('#pw-close').onclick = () => { G.sfx.ui('click'); GM()._keepModal = false; GM().resume(); };
   };
 

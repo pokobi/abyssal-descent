@@ -56,10 +56,70 @@
     const box = (p, w, h, d, x, y, z, m, rx, ry, rz) => { const o = new THREE.Mesh(PG.box, m); o.scale.set(w, h, d); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); p.add(o); return o; };
     const cyl = (p, rad, len, x, y, z, m) => { const o = new THREE.Mesh(PG.cyl8, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); p.add(o); return o; };
     const cone = (p, rad, len, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); o.rotation.x = rx || 0; p.add(o); return o; };
+    const isMidas = def.id === 'm_midas' || def.trait === 'midas';
+    const gDeep = isMidas ? mk({ color: 0xd89218, metalness: 0.42, roughness: 0.28, emissive: 0x523004, emissiveIntensity: 0.45 }) : null;
+    const gGold = isMidas ? mk({ color: 0xffcf40, metalness: 0.45, roughness: 0.22, emissive: 0x7a4c08, emissiveIntensity: 0.52 }) : null;
+    const gBright = isMidas ? mk({ color: 0xffe878, metalness: 0.48, roughness: 0.16, emissive: 0x9a6810, emissiveIntensity: 0.62 }) : null;
+    const gSpike = isMidas ? mk({ color: 0xfff8c0, metalness: 0.52, roughness: 0.10, emissive: 0xc88e18, emissiveIntensity: 0.82 }) : null;
+    const gTrim = isMidas ? mk({ color: 0x3a1014, metalness: 0.35, roughness: 0.45, emissive: 0x1a0406, emissiveIntensity: 0.25 }) : null;
+    const gGem = isMidas ? mk({ color: 0xff2414, metalness: 0.15, roughness: 0.08, emissive: 0xff3c14, emissiveIntensity: 2.1 }) : null;
     const fist = (p, right) => {
+      const s = right ? 1 : -1;
+      if (isMidas) {
+        // sculpted golden armored fist core + continuous tapered side cheek-guards
+        const palm = box(p, 0.056, 0.042, 0.064, 0, -0.001, 0.000, gDeep);
+        box(p, 0.012, 0.036, 0.096, s * 0.028, 0.002, 0.014, gGold, -0.12, -s * 0.08, -s * 0.25);
+        box(p, 0.011, 0.032, 0.088, -s * 0.027, 0.002, 0.012, gGold, -0.12, s * 0.07, s * 0.22);
+        // overlapping dorsal carapace lames + crimson-obsidian inlay + flared gothic cuff
+        box(p, 0.060, 0.013, 0.062, 0, 0.020, -0.002, gGold, -0.10, 0, 0);
+        box(p, 0.044, 0.008, 0.046, 0, 0.025, -0.001, gTrim, -0.10, 0, 0);
+        box(p, 0.054, 0.012, 0.034, 0, 0.017, 0.036, gBright, -0.15, 0, 0);
+        box(p, 0.052, 0.012, 0.042, 0, 0.013, 0.062, gGold, -0.18, 0, 0);
+        box(p, 0.034, 0.010, 0.034, 0, 0.010, 0.080, gBright, -0.18, Math.PI / 4, 0);
+        box(p, 0.048, 0.028, 0.054, 0, -0.004, 0.052, gDeep, -0.16, 0, 0);
+        box(p, 0.046, 0.010, 0.048, 0, -0.017, 0.052, gGold, -0.16, 0, 0);
+        // twin V-shaped golden chevron wings + continuous central spine + octagonal sun-crest & diamond ruby
+        for (const [dz, w] of [[-0.014, 0.025], [0.012, 0.021], [0.038, 0.023]]) {
+          const dy = dz > 0.02 ? 0.023 : 0.028;
+          box(p, w, 0.007, 0.008, s * 0.011, dy, dz, gBright, -0.12, s * 0.42, 0);
+          box(p, w, 0.007, 0.008, -s * 0.011, dy, dz, gBright, -0.12, -s * 0.42, 0);
+        }
+        box(p, 0.008, 0.009, 0.086, 0, 0.025, 0.018, gSpike, -0.14, 0, 0);
+        const bez = new THREE.Mesh(PG.oct, gSpike); bez.scale.set(0.016, 0.007, 0.016); bez.position.set(0, 0.029, -0.002); bez.rotation.x = -0.10; p.add(bez);
+        const gem = new THREE.Mesh(PG.oct3, gGem); gem.scale.set(0.011, 0.009, 0.014); gem.position.set(0, 0.032, -0.002); gem.rotation.x = -0.10; p.add(gem);
+        // heavy cestus knuckle-duster bridge
+        box(p, 0.070, 0.024, 0.022, 0, 0.008, -0.035, gGold);
+        box(p, 0.068, 0.010, 0.024, 0, 0.019, -0.032, gBright, -0.35, 0, 0);
+        box(p, 0.066, 0.008, 0.018, 0, -0.005, -0.036, gTrim);
+        // 4 individual knuckle sockets, finger rings, faceted golden spikes & curled armored phalanges
+        for (let i = 0; i < 4; i++) {
+          const fx = (i - 1.5) * 0.016 * s;
+          const archZ = [0.005, 0.008, 0.004, -0.001][i];
+          const archY = [0.003, 0.006, 0.003, -0.001][i];
+          const spkLen = [0.030, 0.036, 0.031, 0.025][i];
+          box(p, 0.0135, 0.025, 0.018, fx, 0.008 + archY, -0.037 - archZ, gBright);
+          const ring = new THREE.Mesh(PG.torus, gSpike); ring.scale.set(0.0074, 0.0074, 0.015); ring.rotation.x = 1.15; ring.position.set(fx, -0.002 + archY, -0.043 - archZ); p.add(ring);
+          const spk = cone(p, 0.0054, spkLen, fx, 0.009 + archY, -0.045 - archZ - spkLen * 0.45, gSpike, -Math.PI / 2); spk.rotation.z = Math.PI / 4;
+          box(p, 0.013, 0.020, 0.016, fx, -0.011 + archY, -0.038 - archZ * 0.6, gGold, 0.55, 0, 0);
+          box(p, 0.012, 0.015, 0.022, fx, -0.021 + archY * 0.5, -0.022 - archZ * 0.3, gBright, 0.15, 0, 0);
+          box(p, 0.011, 0.012, 0.016, fx, -0.020 + archY * 0.3, -0.006, gGold, -0.35, 0, 0);
+        }
+        // sculpted cestus palm-grip bar & ventral wrist buckle clasp (for 360-degree view)
+        box(p, 0.062, 0.012, 0.014, 0, -0.016, -0.012, gSpike);
+        box(p, 0.052, 0.008, 0.024, 0, -0.021, 0.012, gTrim);
+        box(p, 0.026, 0.010, 0.022, 0, -0.022, 0.046, gBright, -0.16, 0, 0);
+        // outer & inner wing guards + side spikes
+        box(p, 0.012, 0.026, 0.034, s * 0.035, 0.007, -0.026, gBright, 0, s * 0.25, 0);
+        const ws = cone(p, 0.0048, 0.022, s * 0.039, 0.008, -0.038, gSpike, -Math.PI / 2); ws.rotation.z = -s * 0.42;
+        // articulated golden thumb locked across inner front
+        box(p, 0.017, 0.022, 0.036, -s * 0.031, 0.000, -0.006, gGold, 0.28, s * 0.32, s * 0.22);
+        box(p, 0.028, 0.016, 0.018, -s * 0.018, -0.015, -0.026, gBright, 0, s * 0.18, -s * 0.12);
+        const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.022, 0.34, 0.022); arm.rotation.x = Math.PI / 2 - 0.22; arm.position.set(s * 0.014, -0.048, 0.21); arm.userData.sleeve = true; p.add(arm);
+        return palm;
+      }
       const palm = box(p, 0.06, 0.08, 0.08, 0, 0, 0, mats.glove);
       box(p, 0.065, 0.04, 0.06, right ? -0.01 : 0.01, 0.035, -0.02, mats.glove);
-      const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); p.add(arm);
+      const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); arm.userData.sleeve = true; p.add(arm);
       const cuff = new THREE.Mesh(PG.cyl8, mats.glove); cuff.scale.set(0.036, 0.05, 0.036); cuff.rotation.x = Math.PI / 2 - 0.25; cuff.position.set(0, -0.015, 0.05); p.add(cuff);
       return palm;
     };
@@ -68,7 +128,7 @@
     let tipY = 0.3, glow = null;
     const knife = (p, len, m) => { cyl(p, 0.016, 0.11, 0, 0, 0, dark); box(p, 0.03, 0.012, 0.06, 0, 0.06, 0, mats.steel); box(p, 0.006, len, 0.03, 0, 0.066 + len / 2, 0, m); cone(p, 0.016, 0.04, 0, 0.066 + len + 0.02, 0, m); return 0.066 + len + 0.04; };
     switch (def.model) {
-      case 'fists': break;
+      case 'fists': if (isMidas) glow = 0xffd040; break;
       case 'knife': tipY = knife(wg, 0.18, bladeM); break;
       case 'sknife': {
         cyl(wg, 0.018, 0.12, 0, 0, 0, wrap); box(wg, 0.022, 0.02, 0.022, 0, -0.065, 0, mats.steel);
@@ -117,7 +177,13 @@
   W.meleeDisplayModel = function (def) {
     if (!W.mats) return new THREE.Group();
     const m = buildMelee(def);
-    if (def.model === 'fists') { m.r.children.slice(-4).forEach((o) => { if (o.geometry === G.Props.PG.cyl8 && o.scale.y > 0.3) o.visible = false; }); m.l.visible = false; return m.group; }
+    if (def.model === 'fists') {
+      for (const h of [m.r, m.l]) h.children.filter((o) => o.userData && o.userData.sleeve).forEach((o) => h.remove(o));
+      m.r.rotation.order = 'YXZ'; m.r.position.set(0.064, 0.014, 0.016); m.r.rotation.set(0.78, 2.55, -0.22);
+      m.l.rotation.order = 'YXZ'; m.l.position.set(-0.064, -0.012, -0.016); m.l.rotation.set(0.72, -0.35, 0.24);
+      m.l.visible = true;
+      return m.group;
+    }
     m.r.children.filter((o) => o !== m.wg).forEach((o) => o.visible = false); m.l.visible = false;
     m.wg.rotation.set(0, 0, Math.PI / 2.4);
     return m.group;
@@ -387,8 +453,8 @@
     const def = mm.def, kind = W.meleeKind(def);
     const fist = def.model === 'fists', twin = def.model === 'twin';
     // rest poses: [x, y, z, rx, ry, rz]
-    const REST = fist ? [0.17, -0.2, -0.36, 0, 0, 0] : kind === 'thrust' ? [0.2, -0.22, -0.32, -1.25, 0, 0.12] : [0.21, -0.24, -0.4, -0.95, 0, 0.25];
-    const LREST = [-0.17, -0.2, -0.36, 0, 0, 0];
+    const REST = fist ? [0.19, -0.13, -0.36, 0.62, 0.36, 0.24] : kind === 'thrust' ? [0.2, -0.22, -0.32, -1.25, 0, 0.12] : [0.21, -0.24, -0.4, -0.95, 0, 0.25];
+    const LREST = fist ? [-0.19, -0.13, -0.36, 0.62, -0.36, -0.24] : [-0.17, -0.2, -0.36, 0, 0, 0];
     let R = REST.slice(), Lp = LREST.slice();
     const t = ms.t, sd = ms.side;
     let striking = false;
@@ -409,7 +475,7 @@
         // jabs / twin daggers: alternate hands
         const right = sd > 0 || !(fist || twin);
         const base = right ? REST : LREST;
-        const E = right ? [0.04, -0.1, -0.72, fist ? 0 : -1.5, 0, fist ? 0 : 0.3] : [-0.04, -0.1, -0.72, twin ? -1.5 : 0, 0, twin ? -0.3 : 0];
+        const E = right ? [0.03, -0.08, -0.68, fist ? 0.18 : -1.5, fist ? -0.12 : 0, fist ? -0.15 : 0.3] : [-0.03, -0.08, -0.68, twin ? -1.5 : (fist ? 0.18 : 0), fist ? 0.12 : 0, twin ? -0.3 : (fist ? 0.15 : 0)];
         const S = right ? [base[0] + 0.03, base[1] - 0.03, base[2] + 0.08, base[3], base[4], base[5]] : [base[0] - 0.03, base[1] - 0.03, base[2] + 0.08, base[3], base[4], base[5]];
         let P6;
         if (k < 0.15) P6 = lerp6(base, S, k / 0.15);
@@ -511,7 +577,7 @@
     mm.r.rotation.set(fist ? R[3] - 0.25 * spr : 0, R[4], fist ? R[5] : 0);
     if (!fist) { mm.wg.rotation.set(R[3] - 0.2 * spr - 0.6 * sw + spinX, R[4], R[5] + 0.3 * spr + spinZ); mm.wg.position.y = tossY; mm.wg.position.z = tossZ; mm.r.rotation.set(0, 0, 0); }
     mm.l.position.set(Lp[0] + ox - 0.03 * spr, Lp[1] + oy - 0.04 * spr - 0.3 * sw, Lp[2]);
-    mm.l.rotation.set(0, Lp[4], 0);
+    mm.l.rotation.set(fist ? Lp[3] - 0.25 * spr : 0, Lp[4], fist ? Lp[5] : 0);
     if (twin && mm.l.userData.knife) mm.l.userData.knife.rotation.set(Lp[3] || -0.95, 0, Lp[5] || -0.25);
     if (twin && ms.ph === 'idle') { mm.l.userData.knife.rotation.set(-0.95 + spinX, 0, -0.25); mm.l.userData.knife.position.y = tossY; }
     // slash trail

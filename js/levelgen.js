@@ -1510,11 +1510,15 @@
         const rim = new THREE.Mesh(PG.torus, w.mats.gold); rim.rotation.x = Math.PI / 2; rim.scale.set(0.72, 0.72, 0.55); rim.position.y = 0.96; g.add(rim);
         const brew = new THREE.Mesh(PG.cyl, new THREE.MeshBasicMaterial({ color: 0x48ff98, transparent: true, opacity: 0.82, blending: THREE.AdditiveBlending, depthWrite: false }));
         brew.scale.set(0.66, 0.03, 0.66); brew.position.y = 0.94; g.add(brew);
+        const rings = [];
         for (const [r0, r1, sp] of [[1.55, 1.7, 0.45], [2.05, 2.18, -0.3]]) {
           const rn = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 24), new THREE.MeshBasicMaterial({ color: 0x58ff98, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
           rn.rotation.x = -Math.PI / 2; rn.position.y = 0.02; g.add(rn);
-          w.animated.push({ kind: 'spin', m: rn, sp, axis: 'z' });
+          const anim = { kind: 'spin', m: rn, sp, axis: 'z' };
+          w.animated.push(anim);
+          rings.push({ m: rn, anim });
         }
+        w.cauldronVis = { brew, rings };
         grp.add(g);
       });
       P().rug(w, W / 2, cz + 2, 0, 10, 6, [0.1, 0.32, 0.22]);

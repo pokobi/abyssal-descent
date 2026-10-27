@@ -17,7 +17,7 @@
     window.addEventListener('pagehide', () => MS.tick(true));
     window.addEventListener('beforeunload', () => MS.tick(true));
   };
-  MS.canSave = () => GM && !GM.tutorial && G.world && GM.run && GM.area && !GM.transitioning && !P.dead && ['playing', 'paused', 'resuming', 'modal', 'inv'].includes(GM.state) && GM.stage && GM.stage !== 'title' && !GM._restoring;
+  MS.canSave = () => GM && !GM.tutorial && G.world && GM.run && !GM.run.dev && !(G.Dev && G.Dev.on()) && GM.area && !GM.transitioning && !P.dead && ['playing', 'paused', 'resuming', 'modal', 'inv'].includes(GM.state) && GM.stage && GM.stage !== 'title' && !GM._restoring;
   MS.tick = function () {
     if (!MS.canSave()) return;
     try {

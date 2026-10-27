@@ -506,7 +506,7 @@
     };
   };
   GM.saveRun = function (n, kind) {
-    if (!GM.slot) return;
+    if (!GM.slot || (GM.run && GM.run.dev) || (G.Dev && G.Dev.on())) return;
     try {
       const d = Object.assign({ v: 1, t: Date.now(), seed: GM.seed, area: n, kind, route: GM.route || [], run: GM.run }, GM.playerSnap());
       localStorage.setItem(GM.runKey(), JSON.stringify(d));

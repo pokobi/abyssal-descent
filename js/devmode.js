@@ -13,7 +13,8 @@
   let live = false;
   D.keep = false;
   D.on = () => live;
-  D.enable = function () { live = true; document.body.classList.add('dev-on'); G.sfx.ui('rare'); };
+  const stripSave = () => { if (GM && GM.run) { GM.run.dev = true; if (GM.slot) { GM.clearRun(); GM.slot = null; } } };
+  D.enable = function () { live = true; document.body.classList.add('dev-on'); stripSave(); G.sfx.ui('rare'); };
   D.disable = function () { live = false; document.body.classList.remove('dev-on'); };
   D.init = function () {
     GM = G.game; P = G.player; I = G.input;
@@ -55,7 +56,7 @@
     if (GM.run && GM.state === 'modal' && !G.ui.el.screens.firstChild) GM.resume();
   };
   const inRun = () => !!(GM.run && P.weapons && G.world && GM.state !== 'title');
-  const after = () => { G.ui.refreshWeapon && G.ui.refreshWeapon(); G.ui.refreshItems && G.ui.refreshItems(); G.ui.buildAbilityRow && G.ui.buildAbilityRow(); G.ui._itemsDirty = true; if (GM.run) GM.run.dev = true; if (panel && inRun() && GM.state === 'playing') GM.state = 'modal'; };
+  const after = () => { G.ui.refreshWeapon && G.ui.refreshWeapon(); G.ui.refreshItems && G.ui.refreshItems(); G.ui.buildAbilityRow && G.ui.buildAbilityRow(); G.ui._itemsDirty = true; stripSave(); if (panel && inRun() && GM.state === 'playing') GM.state = 'modal'; };
   const act = (fn) => () => { try { fn(); } catch (e) { console.error(e); G.ui.toast('⚠ ' + e.message, 'warn'); } after(); render(); };
   const toast = (t) => G.ui.toastSmall('🛠 ' + t);
 
@@ -270,8 +271,8 @@
   }
   function wire() {
     panel.querySelectorAll('[data-act]').forEach((el) => { const f = ACT[el.dataset.act]; if (f) el.onclick = act(f); });
-    panel.querySelectorAll('[data-tog]').forEach((el) => el.onchange = () => { GM.dev[el.dataset.tog] = el.checked; if (GM.run) GM.run.dev = true; });
-    panel.querySelectorAll('[data-speed]').forEach((el) => el.onclick = () => { GM.dev.speed = +el.dataset.speed; render(); });
+    panel.querySelectorAll('[data-tog]').forEach((el) => el.onchange = () => { GM.dev[el.dataset.tog] = el.checked; stripSave(); });
+    panel.querySelectorAll('[data-speed]').forEach((el) => el.onclick = () => { GM.dev.speed = +el.dataset.speed; stripSave(); render(); });
     panel.querySelectorAll('[data-q]').forEach((el) => {
       el.oninput = () => { query[el.dataset.q] = el.value; const pos = el.selectionStart; render(); const n = panel.querySelector(`[data-q="${el.dataset.q}"]`); if (n) { n.focus(); n.setSelectionRange(pos, pos); } };
     });

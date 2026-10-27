@@ -161,7 +161,7 @@
 
   // ---------- mobility ----------
   add('m_dj', '二段ジャンプ', '🪽', 'rare', 'mobility', '空中でもう1回ジャンプできる（重ねると三段）。', { mods: { maxJumps: 1 }, max: 2 });
-  add('m_airdash', '空中ダッシュ', '💨', 'rare', 'mobility', '空中でスプリントキーを押すと視線方向へダッシュ（着地で回復）。', { flag: true });
+
   add('m_bunny', '慣性の達人', '🐇', 'uncommon', 'mobility', '着地時の減速がなくなり、空中制御+60%。', { mods: { airControl: 0.6 }, flag: true });
   add('m_slidereload', '滑りながら装填', '♻️', 'uncommon', 'mobility', 'スライディング開始時、リロード中なら即座に完了する。', { hooks: { onSlide() { C.finishReload(); } } });
   add('m_slideshield', '滑走の盾', '🛡️', 'uncommon', 'defense', 'スライディング中の被ダメ-50%。', { hooks: { preDamaged(c) { if (P.sliding) c.red += 0.5; } } });

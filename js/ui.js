@@ -709,7 +709,7 @@
     const s = UI.screen(`<div class="panel" style="width:min(820px,94vw)"><h2>🎮 操作方法</h2>
       <div class="keys">
         ${k(['forward', 'left', 'back', 'right'].map(G.K).join(' '), '移動')}${k(G.K('jump'), 'ジャンプ（段差の前で押し続けるとよじ登り）')}${k('空中で' + G.K('crouch'), 'パイルドライバー（標準装備・強化で成長）')}
-        ${k(G.K('sprint'), '歩く（標準は常に走る・設定で変更可／空中ダッシュは加護で解放）')}${k(G.BIND.crouch.map(G.input.codeName).filter((v, i, a) => a.indexOf(v) === i).join(' / '), 'しゃがみ（スプリント中でスライディング）')}
+        ${k(G.K('sprint'), '歩く（標準は常に走る・設定で変更可）')}${k(G.BIND.crouch.map(G.input.codeName).filter((v, i, a) => a.indexOf(v) === i).join(' / '), 'しゃがみ（スプリント中でスライディング）')}
         ${k('左クリック', '射撃 ／ 近接武器時は連撃')}${k('右クリック', 'ADS（照準） ／ 近接武器時は重撃（隙大）')}
         ${k(G.K('reload'), 'リロード')}${k(G.K('w3'), `近接武器に持ち替え（${G.K('w3')}は近接武器の固定枠・持っている間は移動が速い）`)}
         ${k(G.K('grapple'), `グラップル（押し続けて巻き取り / 離すと解除 / ${G.K('jump')}で跳躍解除）`)}${k(G.K('interact'), 'インタラクト（購入・宝箱・出口）')}

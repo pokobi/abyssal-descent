@@ -240,7 +240,7 @@
         }
       }
       // air dash (buff): sprint pressed in air
-      if (!this.grounded && I.hit('sprint') && this.has('m_airdash') && !this.airDashUsed && !this.pileState && this.grapple.state !== 'attached') {
+      if (false && !this.grounded && I.hit('sprint') && this.has('m_airdash') && !this.airDashUsed && !this.pileState && this.grapple.state !== 'attached') {
         this.airDashUsed = true;
         const f = this.forward(); f.y = Math.max(-0.2, f.y * 0.5); f.normalize();
         this.vel.copy(f.multiplyScalar(19)); this.vel.y = Math.max(this.vel.y, 2);

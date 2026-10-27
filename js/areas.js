@@ -285,7 +285,25 @@
     { id: 'ghost_smith', npc: '亡霊の鍛冶師', icon: '⚒️', text: '「その武器、鍛え直してやろう。代価は…お前の運だ」',
       opts: () => [{ icon: '⚒️', label: '鍛えてもらう', sub: `${P.weapon.def.name} の強化値+2 ／ ランダムな呪い`, disabled: (P.weapon.lv || 0) >= AR.FORGE_MAX, run: () => { P.weapon.lv = Math.min(AR.FORGE_MAX, (P.weapon.lv || 0) + 2); P.weapon.ver++; G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${P.weapon.def.name} +${P.weapon.lv}`, 'good'); AR.addCurse(); } }] },
     { id: 'peddler', npc: '怪しい行商人', icon: '🎁', text: '「中身は開けてのお楽しみさ。損はさせない…たぶんね」',
-      opts: () => [{ icon: '🎁', label: `謎の箱を買う（${cost(160)}🪙）`, sub: '武器／スキル／アイテム／呪い のどれか', disabled: GM.run.coins < cost(160), run: () => { GM.run.coins -= cost(160); const r = Math.random(); if (r < 0.25) { const wd = U.pick(G.WEAPONS.filter((x) => G.RARITY[x.rarity].tier >= 2)); GM.giveWeapon(wd.id); } else if (r < 0.42) { const sk = U.pick(G.SKILLS.filter((x) => !P.skills.some((s) => s && s.id === x.id))); GM.giveSkill(sk.id); } else if (r < 0.82) { for (let i = 0; i < 2; i++) { const it = U.pick(G.ITEMS.filter((x) => G.RARITY[x.rarity].tier >= 1)); P.addItem(it.id, 1); } } else AR.addCurse(); } }] },
+      opts: () => [{ icon: '🎁', label: `謎の箱を買う（${cost(160)}🪙）`, sub: '武器／スキル／アイテム／呪い のどれか', disabled: GM.run.coins < cost(160), run: () => {
+        GM.run.coins -= cost(160);
+        const r = Math.random();
+        if (r < 0.20) {
+          const rw = Math.random();
+          const tier = rw < 0.05 ? 4 : rw < 0.30 ? 3 : 2;
+          const pool = G.WEAPONS.filter((x) => G.RARITY[x.rarity].tier === tier);
+          const wd = U.pick(pool.length ? pool : G.WEAPONS.filter((x) => G.RARITY[x.rarity].tier >= 2));
+          GM.giveWeapon(wd.id);
+        } else if (r < 0.40) {
+          const sk = U.pick(G.SKILLS.filter((x) => !P.skills.some((s) => s && s.id === x.id)));
+          GM.giveSkill(sk.id);
+        } else if (r < 0.70) {
+          const it = U.pick(G.ITEMS.filter((x) => G.RARITY[x.rarity].tier >= 1));
+          P.addItem(it.id, 1);
+        } else {
+          AR.addCurse();
+        }
+      } }] },
     { id: 'ambush', npc: '物乞いの老人', icon: '🧓', text: '「…近う寄れ…」\n（どこか様子がおかしい）',
       opts: () => [{ icon: '⚔️', label: '近づく', sub: '???', run: () => { G.ui.toast('罠だ！ 魔物が現れた！', 'warn'); for (let i = 0; i < 2 + Math.floor(GM.area / G.Run.CYCLE); i++) GM.spawnEnemy({ elite: true, near: true }); GM.ambushReward = true; } }] },
     { id: 'spirit', npc: '囚われた精霊', icon: '🧚', text: '「封印を解いて…あなたの力を少しだけ分けて…」',

@@ -635,7 +635,7 @@
   // ---------------- enemy entity ----------------
   const TINT = new THREE.Color(), FLASH = new THREE.Color(), AURA_C = new THREE.Color(), MUTC = new THREE.Color();
   const ELITE_MODS = [
-    { id: 'fast', name: '俊足', icon: '💨' }, { id: 'regen', name: '再生', icon: '💚' }, { id: 'bomb', name: '爆死', icon: '💥' },
+    { id: 'fast', name: '俊足', icon: '💨' }, { id: 'bomb', name: '爆死', icon: '💥' },
     { id: 'vamp', name: '吸血', icon: '🩸' }, { id: 'armored', name: '鉄壁', icon: '🛡️' }, { id: 'rage', name: '狂暴', icon: '😡' },
   ];
   class Enemy {
@@ -752,7 +752,7 @@
       if (this.mut) G.Depth.tickEnemy(this, sdt);
       this.flinch = Math.max(0, this.flinch - sdt * 3);
       this.atkCd -= sdt; this.dodgeCd -= sdt; this.stateT -= sdt;
-      if ((this.eliteMod && this.eliteMod.id === 'regen' || this.eliteMod2 && this.eliteMod2.id === 'regen') && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.02 * sdt);
+
       // spawn rise
       if (this.state === 'spawn') {
         const k = 1 - Math.max(0, this.stateT) / this.spawnT;
@@ -946,7 +946,7 @@
       const l = distH || 1;
       const dirx = toT.x / l, dirz = toT.z / l;
       const end = (cd) => { this.attackState = null; this.atk = 0; this.wind = 0; this.atkCd = (cd ?? def.cd) * (this.eliteMod && this.eliteMod.id === 'rage' ? 0.7 : 1) * (P.has('pact_fury') ? 0.8 : 1) * U.rand(0.85, 1.2); if (this.tele) { G.fx.endTelegraph(this.tele); this.tele = null; } };
-      const hitPlayer = (dmg, src) => { if (tgt.decoy) { tgt.decoy.t -= 1; return; } if (tgt.ally) { tgt.ally.hurt(dmg); return; } const dealtP = C.damagePlayer(dmg, { src: src || 'melee', attacker: this, pos: this.pos.clone(), elem: def.elem }); if (this.mut && dealtP > 0) G.Depth.onPlayerHit(this, dealtP); if (this.eliteMod && this.eliteMod.id === 'vamp') this.hp = Math.min(this.maxHp, this.hp + dmg); if (P.temps.has('thornarmor') && (src || 'melee') === 'melee') C.damageEnemy(this, dmg * 1.2 + C.scale(8), { src: 'skill', proc: true }); };
+      const hitPlayer = (dmg, src) => { if (tgt.decoy) { tgt.decoy.t -= 1; return; } if (tgt.ally) { tgt.ally.hurt(dmg); return; } const dealtP = C.damagePlayer(dmg, { src: src || 'melee', attacker: this, pos: this.pos.clone(), elem: def.elem }); if (this.mut && dealtP > 0) G.Depth.onPlayerHit(this, dealtP); if (this.eliteMod && this.eliteMod.id === 'vamp') this.hp = Math.min(this.maxHp, this.hp + dmg * 0.35); if (P.temps.has('thornarmor') && (src || 'melee') === 'melee') C.damageEnemy(this, dmg * 1.2 + C.scale(8), { src: 'skill', proc: true }); };
       const inWind = A.t < A.wind;
       this.wind = inWind ? A.t / A.wind : 0;
       switch (A.kind) {
@@ -1071,8 +1071,8 @@
             for (const o of E.list) { if (o === this || !o.alive || o.boss || o.pos.distanceTo(this.pos) > 15) continue; const k = o.hp / o.maxHp - (o.shield > 0 ? 0.3 : 0); if (k < bk) { bk = k; best = o; } }
             if (best) {
               G.fx.beam(this.centerPos(), best.centerPos(), 0x9fd8ff, 0.05, 0.5);
-              if (best.hp < best.maxHp * 0.95) { best.hp = Math.min(best.maxHp, best.hp + best.maxHp * 0.3); G.fx.dmgNum(best.centerPos(), '+回復', 'heal'); }
-              else { best.maxShield = Math.max(best.maxShield, best.maxHp * 0.4); best.shield = Math.min(best.maxShield, best.shield + best.maxHp * 0.4); G.fx.bubble(best.centerPos(), best.radius * 1.6, 0xbfe2ff); }
+              if (best.hp < best.maxHp * 0.95) { best.hp = Math.min(best.maxHp, best.hp + best.maxHp * 0.1); G.fx.dmgNum(best.centerPos(), '+回復', 'heal'); }
+              else { best.maxShield = Math.max(best.maxShield, best.maxHp * 0.2); best.shield = Math.min(best.maxShield, best.shield + best.maxHp * 0.15); G.fx.bubble(best.centerPos(), best.radius * 1.6, 0xbfe2ff); }
               G.sfx.magic(this.pos);
             } else if (this.hasLOS) this.spit('orb', tgt, 10, 0, { homing: 1.4, life: 5 });
           }

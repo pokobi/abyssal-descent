@@ -827,7 +827,7 @@
     if (mods.cursed || P.stats.enemyDmg > 0 || P.stats.enemyHp > 0) { e.cursed = true; e.makeCurseRing(0x9a30ff); }
     if (mods.cursed && GM.stage === 'cursed') e.speed *= 1.12; // the arena's curse also quickens them
     if (opts.champion) { e.champion = true; e.makeCurseRing(0xff3018); }
-    if (opts.champion) { e.eliteMod2 = U.pick([{ id: 'regen', icon: '💚' }, { id: 'rage', icon: '😡' }, { id: 'fast', icon: '💨' }]); if (e.eliteMod2.id === 'fast') e.speed *= 1.25; e.def = Object.assign({}, e.def, { name: '覇者・' + e.def.name }); }
+    if (opts.champion) { e.eliteMod2 = U.pick([{ id: 'rage', icon: '😡' }, { id: 'fast', icon: '💨' }]); if (e.eliteMod2.id === 'fast') e.speed *= 1.25; e.def = Object.assign({}, e.def, { name: '覇者・' + e.def.name }); }
     if (opts.mark) { e.marked = true; e.markTarget && e.markTarget(!!opts.champion); }
     if (opts.grave) { e.graveSpawn = true; e.ignoreCount = true; } // raised by a spawn grave: outside the cap, the waves and the kill target
     G.Depth.onSpawn(e, opts);

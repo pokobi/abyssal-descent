@@ -20,7 +20,7 @@
     { id: 'volatile', name: '爆裂', icon: '💥', col: 0xff7020, desc: '倒されると少し遅れて爆発する。離れて倒せ。' },
     { id: 'undying', name: '不屈', icon: '♻️', col: 0xe0e0a0, desc: '一度だけHP40%で蘇る。' },
     { id: 'haste', name: '疾風', icon: '💨', col: 0x80ffb0, desc: '自分と周囲の仲間の移動速度を上げる。' },
-    { id: 'leech', name: '吸魂', icon: '🩸', col: 0xc01030, desc: '攻撃を当てると大きく回復する。' },
+    { id: 'leech', name: '吸魂', icon: '🩸', col: 0xc01030, desc: '攻撃を当てると少し回復する。' },
     { id: 'gravity', name: '重力', icon: '🧲', col: 0x9060ff, desc: '定期的にプレイヤーを引き寄せる。' },
     { id: 'mirror', name: '鏡面', icon: '🪞', col: 0xd0e8ff, desc: '数秒ごとに青く光る。光っている間（約2秒）に銃で撃つと、一部が自分に跳ね返る。' },
     { id: 'splitter', name: '分裂', icon: '🧬', col: 0xa0e040, desc: '倒されると小さな分身を2体生む。' },
@@ -54,10 +54,10 @@
     const m = e.mut;
     e.mutT -= dt;
     if (m.warden) {
-      if (Math.random() < dt * 3) for (const o of G.enemies.inRadius(e.pos, 8)) {
-        if (o === e || o.boss || !o.alive) continue;
-        if (!o.maxShield) { o.maxShield = Math.round(o.maxHp * 0.3); }
-        o.shield = Math.min(o.maxShield, (o.shield || 0) + o.maxHp * 0.06);
+      if (Math.random() < dt * 1.2) for (const o of G.enemies.inRadius(e.pos, 8)) {
+        if (o === e || o.boss || !o.alive || (o.mut && o.mut.warden) || GM.time - (o.lastHitT || -10) < 2.5) continue;
+        if (!o.maxShield) { o.maxShield = Math.round(o.maxHp * 0.2); }
+        o.shield = Math.min(o.maxShield, (o.shield || 0) + o.maxHp * 0.02);
         if (Math.random() < 0.3) G.fx.tracer(e.centerPos(), o.centerPos(), 0x80d0ff, 0.02, 0.15);
       }
     }
@@ -155,7 +155,7 @@
       }
     }
   };
-  D.onPlayerHit = function (e, dmg) { if (e.mut && e.mut.leech) { e.hp = Math.min(e.maxHp, e.hp + dmg * 3 + e.maxHp * 0.05); G.fx.tracer(P.chestPos(), e.centerPos(), 0xc01030, 0.03, 0.2); } };
+  D.onPlayerHit = function (e, dmg) { if (e.mut && e.mut.leech) { e.hp = Math.min(e.maxHp, e.hp + dmg * 0.5 + e.maxHp * 0.01); G.fx.tracer(P.chestPos(), e.centerPos(), 0xc01030, 0.03, 0.2); } };
   D.speedMul = (e) => (e.hasteT > 0 ? 1.3 : 1) * (e.mut && e.mut.frenzy && e.hp < e.maxHp * 0.4 ? 1.4 : 1);
 
   // ---------------------------------------------------------------- anomalies

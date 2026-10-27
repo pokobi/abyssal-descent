@@ -1606,7 +1606,7 @@
     } else if (best.type === 'anvil') {
       G.ui.showInteract({ key: 'anvil' + coins, icon: '⚒️', name: '鍛冶の金床', rc: '#e08040', cat: '武器・スキルの強化', desc: `${P.weapon.def.name} +${P.weapon.lv || 0}（最大+${G.Areas.FORGE_MAX}）`, action: '鍛える' });
     } else if (best.type === 'cauldron') {
-      G.ui.showInteract({ key: 'cauldron', icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: '防具・武器・アタッチメント・アイテムの練成', desc: '同じ種類の素材を2つ掛け合わせ、より上位の品へと練成する。（何度でも利用可能）', action: '練成する' });
+      G.ui.showInteract({ key: 'cauldron', icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: '防具・武器・アタッチメント・アイテムの練成', desc: '同じ種類の素材を2つ掛け合わせ、より上位の品へと練成する。（1つの練成所で2回まで）', action: '練成する' });
     } else if (best.type === 'corpse') {
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;

@@ -315,6 +315,8 @@
     });
   };
   // ---------------- transmutation hall (練成所) ----------------
+  const ALCH_MAX = 2; // transmutations allowed per hall
+  const alchCauldron = () => G.world && G.world.interactables.find((i) => i.type === 'cauldron');
   AR.setupAlchemy = function () {
     const w = G.world;
     const m = G.enemies.buildModel(G.ENEMY_BY_ID.shaman_normal, {});
@@ -322,7 +324,7 @@
     w.interactables.push({ type: 'cauldron', pos: w.cauldronPos.clone(), used: 0, model: m });
     w.lightSources.push({ pos: w.cauldronPos.clone().add(V(0, 1.1, 0)), color: '#58ff98', intensity: 9, range: 10, flame: 0, emit: false, ph: 0, prio: 3, steady: true });
   };
-  function alchFx() {
+  function alchFx() { const cz = alchCauldron(); if (cz) cz.used = (cz.used || 0) + 1;
     const p = (G.world && G.world.cauldronPos) ? G.world.cauldronPos.clone() : P.pos.clone().add(V(0, 1, 0));
     G.sfx.magic && G.sfx.magic(p, 'holy'); G.sfx.ui('rare');
     G.fx.sparks(p.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 32, 0x58ff98, 7);
@@ -553,7 +555,7 @@
     };
     pickFirst();
   };
-  AR.useAlchemy = function () {
+  AR.useAlchemy = function () { const cz = alchCauldron(), left = ALCH_MAX - (cz ? cz.used || 0 : 0); if (left <= 0) { G.ui.toast('⚗️ 練成の釜はもう冷めている（この練成所での練成は2回まで）', 'warn'); return; }
     const nArmor = armorList().length;
     const nItem = G.Inv.pcs(P).reduce((s, c) => s + c.items.reduce((a, o) => a + (o.type === 'item' ? o.n : 0), 0), 0);
     const nAtt = attList().length;
@@ -568,7 +570,7 @@
       { icon: '💎', label: `金品を2つ練成（所持 ${nVal}点）`, sub: '金品2つを溶かし合わせ、防具・アタッチメント・アイテムのいずれか1つに練成する', disabled: nVal < 2, onPick: () => keep(AR.alchemyValuable) },
       { icon: '🚶', label: '立ち去る', onPick: () => {} },
     ];
-    GM.modal('⚗️ 練成所', '翠色の炎が揺らめく練成釜だ。同じ種類の素材を2つ投じれば、より上位の品へと作り変えられる。（何度でも利用可能）', opts);
+    GM.modal('⚗️ 練成所', `翠色の炎が揺らめく練成釜だ。同じ種類の素材を2つ投じれば、より上位の品へと作り変えられる。（残り ${left} 回 / 全${ALCH_MAX}回）`, opts);
   };
   AR.runEvent = function (it) {
     AR._alchIt = it;

@@ -53,6 +53,18 @@
     if (n) { G.sfx.mech('magIn', 0, 0.9); if (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen()) IV.onChange && IV.onChange(); }
     return n;
   };
+  // repair kit (u_repair): +150 durability on one armour piece, dropped on it in the inventory screen. returns the points restored, or -1 when the piece is not worn down
+  IV.isKit = (it) => !!it && it.type === 'item' && !!(G.ITEM_BY_ID[it.id] && G.ITEM_BY_ID[it.id].kit);
+  IV.kitPower = (it) => (G.ITEM_BY_ID[it.id] && G.ITEM_BY_ID[it.id].data.repair) || 150;
+  IV.kitGain = (kit, piece) => (IV.durFrac(piece) >= 0.995 ? 0 : Math.min(IV.kitPower(kit), IV.durMax(piece) - IV.durOf(piece)));
+  IV.useKit = function (P, kit, from, piece) {
+    if (!IV.isKit(kit) || !piece || piece.type !== 'armor') return -1;
+    const gain = IV.kitGain(kit, piece); if (gain <= 0) return -1;
+    piece.dur = IV.durOf(piece) + gain;
+    kit.n--; if (kit.n <= 0 && from) IV.remove(from, kit); else if (from) IV.changed(from);
+    G.sfx.mech('magIn', 0, 0.9); setTimeout(() => G.sfx.mech('magOut', 0, 0.8), 110);
+    return gain;
+  };
   IV.def = function (it) {
     if (!it) return null;
     if (it.type === 'item') return G.ITEM_BY_ID[it.id];
@@ -68,13 +80,14 @@
     if (!d) return [1, 1];
     if (it.type === 'armor' || it.type === 'valuable') return d.size;
     if (it.type === 'att') return d.slot === 'barrel' || d.slot === 'stock' || d.slot === 'under' ? [2, 1] : [1, 1];
+    if (it.type === 'item' && d.size) return d.size;
     return [1, 1];
   };
   IV.size = function (it) { const [w, h] = IV.baseSize(it); return it.rot ? [h, w] : [w, h]; };
   IV.maxStack = function (it) {
     if (it.type !== 'item') return 1;
     const d = IV.def(it);
-    if (d && d.passive) return 3;
+    if (d && (d.passive || d.kit)) return 3;
     return 50; // consumables and grenades stack up to 50 in one cell; relic-like passives keep their small stacks
   };
   IV.enchMul = (it) => (it && it.ench && it.ench.length ? 1.65 + it.ench.reduce((s, e) => { const E = G.ENCHANT_BY_ID[e.id], q = E && E.max > E.min ? U.clamp((e.v - E.min) / (E.max - E.min), 0, 1) : 0.5; return s + 0.35 + 0.35 * q; }, 0) : 1);
@@ -119,7 +132,11 @@
         Object.assign(part, s); c.items.push(part); it.n -= cap;
       }
     }
-    if ((c.kind === 'bag' || c.kind === 'spec') && G.save) G.save.mark('items', it.id);
+    if ((c.kind === 'bag' || c.kind === 'spec') && G.save) {
+      // the first repair kit ever picked up: one quiet line on how it is used (the item card keeps its short hint)
+      if (it.type === 'item' && it.id === 'u_repair' && !G.save.data.codex.items.u_repair && G.ui && G.ui.toastSmall) G.ui.toastSmall('🛠️ 名工の補修具：インベントリで防具にドラッグして耐久を修復');
+      G.save.mark('items', it.id);
+    }
     if (it.n <= 0) { IV.changed(c); return 0; }
     const s = IV.findSpot(c, it);
     if (!s) { IV.changed(c); return it.n; }
@@ -174,7 +191,7 @@
   ];
   IV.specOf = function (it) {
     if (!it || it.type !== 'item') return null;
-    const d = G.ITEM_BY_ID[it.id]; if (!d || d.passive) return null;
+    const d = G.ITEM_BY_ID[it.id]; if (!d || d.passive || d.kit) return null;
     return d.slot === 'g' ? 'g' : 'c';
   };
   IV.pcs = (P) => (P.spec ? [P.spec.g, P.spec.c1, P.spec.c2] : []).concat(P.bag ? [P.bag] : []);

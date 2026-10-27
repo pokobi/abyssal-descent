@@ -1726,7 +1726,7 @@
       cat = `${G.ITEM_CAT[ob.cat].icon} ${G.ITEM_CAT[ob.cat].name}`;
       if (!P.canAddItem(ob.id)) note = '⚠ 持ち物がいっぱいで持てない';
       const have = ob.cat === 'grenade' ? P.grenades[ob.id] || 0 : P.itemCount(ob.id);
-      if (ob.slot === 'c') cat += `　[${G.K('item1')} / ${G.K('item2')}キー: 消耗品]`; else if (ob.passive) cat += '　[常時：持っているだけで発動]';
+      if (ob.slot === 'c') cat += `　[${G.K('item1')} / ${G.K('item2')}キー: 消耗品]`; else if (ob.passive) cat += '　[常時：持っているだけで発動]'; else if (ob.kit) cat += '　[持ち物画面で防具へドラッグして修復]';
       if (have) note += ` 所持 ×${have}`;
     } else if (o.kind === 'ult') {
       cat = `🌟 アルティメット（${G.input.skillKey(0)}） · CT ${ob.cd}秒`;

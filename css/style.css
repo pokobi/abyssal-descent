@@ -1307,6 +1307,13 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 /* armour durability bar (inventory cells and equipment slots) */
 .iv-dur { position: absolute; left: 6%; right: 6%; bottom: 3%; height: max(3px, 7%); background: rgba(0,0,0,0.7); border-radius: 2px; overflow: hidden; pointer-events: none; z-index: 3; }
 .iv-dur::after { content: ''; display: block; height: 100%; width: calc(var(--f) * 100%); background: var(--dc, #6ee06a); box-shadow: 0 0 4px var(--dc, #6ee06a); }
+/* repair kit held over a piece: the part that would be restored pulses behind the real bar, with a small tag */
+@keyframes ivmend { from { opacity: 0.45; } to { opacity: 1; } }
+.iv-dur.iv-mend { height: max(5px, 11%); }
+.iv-dur.iv-mend::before { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: calc(var(--pf) * 100%); background: #7fe8ff; box-shadow: 0 0 6px #7fe8ff; animation: ivmend 0.5s ease-in-out infinite alternate; }
+.iv-dur.iv-mend::after { position: relative; }
+.iv-kitnote { position: absolute; left: 50%; top: 4%; transform: translateX(-50%); z-index: 4; padding: 0 0.4em; border-radius: 0.3em; font-size: 0.66em; font-weight: 800; line-height: 1.5; white-space: nowrap; pointer-events: none; background: rgba(8,40,48,0.94); color: #8ff0ff; }
+.iv-kitnote.no { background: rgba(40,10,6,0.94); color: #ffb0a0; }
 
 /* armour cells: the defence number sits clear of the durability bar */
 .iv-eq .iv-def { bottom: calc(max(3px, 7%) + 0.45em); }

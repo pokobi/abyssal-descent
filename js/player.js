@@ -150,7 +150,7 @@
       const pocket = it.cat === 'grenade' || it.passive ? null : G.ITEM_SLOTS.find((S) => this.slotItems(S.id).includes(id));
       if (pocket && !this.slotItems(pocket.id).includes(this.isel[pocket.id])) this.isel[pocket.id] = id;
       if (G.game.state === 'playing' || G.game.state === 'modal') {
-        G.ui.itemCard(it, it.cat === 'grenade' ? `[${G.K('grenade')} で構え→クリックで投擲・長押しで選択]` : it.passive ? '[常時：持っているだけで自動発動]' : pocket ? `[${G.K('item' + (G.ITEM_SLOTS.indexOf(pocket) + 1))} で使用・長押しで選択]` : '[持ち物画面から使用（消耗品枠が満杯）]');
+        G.ui.itemCard(it, it.cat === 'grenade' ? `[${G.K('grenade')} で構え→クリックで投擲・長押しで選択]` : it.passive ? '[常時：持っているだけで自動発動]' : it.kit ? '[持ち物画面で防具へドラッグして修復]' : pocket ? `[${G.K('item' + (G.ITEM_SLOTS.indexOf(pocket) + 1))} で使用・長押しで選択]` : '[持ち物画面から使用（消耗品枠が満杯）]');
       }
       G.ui.refreshItems && G.ui.refreshItems();
       return true;

@@ -272,7 +272,22 @@
       else if (kind === 's' && el.dataset.sk !== 'pile' && el.dataset.sk !== '0' && !el.classList.contains('empty')) startDrag({ sk: +el.dataset.sk }, el, e);
     });
   }
-  function usable(it) { const d = IV.def(it); return it.type === 'item' && d && !d.passive && d.cat !== 'grenade'; }
+  function usable(it) { const d = IV.def(it); return it.type === 'item' && d && !d.passive && !d.kit && d.cat !== 'grenade'; }
+  // repair kit: the piece it would mend most urgently (the worn piece with the lowest durability share), if any is worn down
+  function worstWorn() { let best = null; for (const k in P.equip) { const p = P.equip[k]; if (p && IV.durFrac(p) < 0.995 && (!best || IV.durFrac(p) < IV.durFrac(best))) best = p; } return best; }
+  // the armour piece under a held kit: a worn piece (equipment slot) or a piece lying in the bag under the cell it is dropped on
+  function kitPiece(t, it, rot) {
+    if (!t) return null;
+    if (t.eq) return P.equip[t.eq] || null;
+    if (t.grid && t.key === 'bag') { const [bw, bh] = IV.baseSize(it), [w, h] = rot ? [bh, bw] : [bw, bh]; return overlapping(P.bag, it, t.cx, t.cy, w, h).find((o) => o.type === 'armor') || null; }
+    return null;
+  }
+  function mend(f, it, piece) {
+    const d = G.ARMOR_BY_ID[piece.id], gain = IV.useKit(P, it, f.from, piece);
+    if (gain < 0) { G.sfx.ui('deny'); G.ui.toastSmall(`🛠️ ${d.name} は傷んでいない（耐久は最大）`); }
+    else G.ui.toastSmall(`🛠️ ${d.name} の耐久を +${Math.round(gain)} 修復した（${Math.ceil(IV.durOf(piece))} / ${IV.durMax(piece)}）`);
+    render();
+  }
   function primary(f) {
     const it = f.it;
     if (f.eq) { IV.unequip(P, f.eq); render(); return; }
@@ -280,6 +295,7 @@
     if (it.type === 'armor') { IV.equip(P, it, f.from); render(); return; } // from the bag or straight out of a chest / corpse
     if (it.type === 'att' && isMine(f.from)) { equipAtt(it); return; }
     if (!isMine(f.from)) { quickMove(f); return; }
+    if (IV.isKit(it)) { const w = worstWorn(); if (w) mend(f, it, w); else { G.sfx.ui('deny'); G.ui.toastSmall('🛠️ 修復が必要な防具は装備していない（防具へドラッグで袋の中の防具も直せる）'); } return; }
     if (usable(it)) { UIV.close(); G.abilities.useItemId(it.id); return; }
     if (IV.openCont) quickMove(f);
   }
@@ -356,11 +372,24 @@
     if (f.wslot !== undefined) { add(`.iv-wbox[data-wslot]:not([data-wslot="${f.wslot}"])`); return; }
     if (f.sk !== undefined) { for (const k of [1, 2, 3]) if (k !== f.sk) add(`.iv-sk[data-sk="${k}"]`); return; }
     const it = f.it; if (!it) return;
+    if (IV.isKit(it)) { // a repair kit: only the pieces that are actually worn down light up (worn ones and the ones lying in the bag)
+      for (const k in P.equip) { const p = P.equip[k]; if (p && IV.durFrac(p) < 0.995) add(`.iv-eq[data-eq="${k}"]`); }
+      for (const p of P.bag.items) if (p.type === 'armor' && IV.durFrac(p) < 0.995) add(`.iv-it[data-where="bag"][data-uid="${p.uid}"]`);
+      return;
+    }
     if (it.type === 'armor') add(`.iv-eq[data-eq="${G.ARMOR_BY_ID[it.id].slot}"]`);
     else if (it.type === 'att') {
       const a = G.ATT_BY_ID[it.id], guns = G.weapons.gunsInOrder();
       root.querySelectorAll('.iv-as').forEach((n) => { const [i, sl] = n.dataset.as.split(':'); const w = guns[+i]; if (w && sl === a.slot && a.compat(w.def)) n.classList.add('iv-glow'); });
     } else { const k = IV.specOf(it); if (k === 'g') add('.iv-spec[data-spec="g"]'); else if (k) add('.iv-spec[data-spec="c1"],.iv-spec[data-spec="c2"]'); }
+  }
+  // repair kit held over a piece: the bar shows the part that would come back (pulsing cyan) and a small "+150" / "最大" tag
+  function previewKit(piece, kit) {
+    const el = root.querySelector(`.iv-it[data-uid="${piece.uid}"]`); if (!el) return;
+    const gain = IV.kitGain(kit, piece), m = IV.durMax(piece);
+    const note = document.createElement('b'); note.className = 'iv-kitnote' + (gain > 0 ? '' : ' no'); note.textContent = gain > 0 ? `+${Math.round(gain)}` : '耐久最大';
+    el.appendChild(note);
+    const bar = el.querySelector('.iv-dur'); if (bar && gain > 0) { bar.classList.add('iv-mend'); bar.style.setProperty('--pf', ((IV.durOf(piece) + gain) / m).toFixed(3)); }
   }
   function dims() { const [w, h] = IV.baseSize(drag.f.it); return drag.rot ? [h, w] : [w, h]; }
   function moveGhost(x, y) {
@@ -372,7 +401,11 @@
     root.querySelectorAll('.iv-hl').forEach((n) => n.remove());
     const t = target(x, y);
     drag.ghost.classList.toggle('iv-out', !!(t && t.ground && (drag.f.it || drag.f.wslot !== undefined || drag.f.melee) && !drag.f.as));
-    if (t && t.grid && drag.f.it) {
+    root.querySelectorAll('.iv-kitnote').forEach((n) => n.remove());
+    root.querySelectorAll('.iv-dur.iv-mend').forEach((n) => { n.classList.remove('iv-mend'); n.style.removeProperty('--pf'); });
+    const kp = IV.isKit(drag.f.it) ? kitPiece(t, drag.f.it, drag.rot) : null; // a repair kit over an armour piece: preview what it would restore instead of the cell highlight
+    if (kp) previewKit(kp, drag.f.it);
+    if (t && t.grid && drag.f.it && !kp) {
       const ok = canDrop(t);
       const [gw, gh] = dims();
       const hl = document.createElement('div'); hl.className = 'iv-hl' + (ok ? '' : ' bad');
@@ -470,6 +503,7 @@
       G.sfx.ui('deny'); render(); return;
     }
     if (t.sk !== undefined) { G.sfx.ui('deny'); render(); return; }
+    if (IV.isKit(it) && (t.eq || t.grid)) { const kp = kitPiece(t, it, rot); if (kp) { mend(f, it, kp); return; } } // a repair kit dropped on an armour piece mends it instead of moving
     if (t.as) {
       const [wi, sl] = t.as.split(':'), w = G.weapons.gunsInOrder()[+wi];
       const a = it.type === 'att' && G.ATT_BY_ID[it.id];
@@ -524,6 +558,7 @@
     else if (it.type === 'att' && isMine(f.from)) for (const w of G.weapons.gunsInOrder()) if (G.ATT_BY_ID[it.id].compat(w.def)) opts.push([`🔩 装着: ${G.weapons.keyLabel(w)}${w.def.name}`, () => equipAtt(it, w)]);
     if (f.as) { popMenu(opts, e); return; }
     if (isMine(f.from) && usable(it)) opts.push(['🍶 使う', () => { UIV.close(); G.abilities.useItemId(it.id); }]);
+    if (isMine(f.from) && IV.isKit(it)) { const w = worstWorn(), wd = w && G.ARMOR_BY_ID[w.id]; if (w) opts.push([`🛠️ 最も傷んだ防具を修復：${wd.name} ${Math.ceil(IV.durOf(w))}/${IV.durMax(w)}`, () => mend(f, it, w)]); }
     if (it.type === 'armor' && !f.eq) opts.push(['🛡️ 装備する', () => { IV.equip(P, it, f.from); render(); }]);
     if (f.eq) opts.push(['📥 外す', () => { IV.unequip(P, f.eq); render(); }]);
     if (IV.openCont && !f.eq) opts.push([isMine(f.from) ? '📤 箱へ移す' : '📥 インベントリへ', () => quickMove(f)]);
@@ -544,7 +579,7 @@
   UIV.describe = function (it) {
     const d = IV.def(it); if (!d) return '';
     const rar = G.RARITY[d.rarity];
-    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
+    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? '補修具（防具へドラッグして使う）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
     if (it.type === 'armor') {
       const M = G.ARMOR_MAT_BY_ID[d.mat], S = G.ARMOR_SLOT_BY_ID[d.slot];
       body += `<div class="ivt-r">部位 <b>${S.name}</b>　素材 <b>${M.name}</b></div><div class="ivt-r">🛡️ 防御力 <b>${d.def}</b>　⚖️ 重さ <b>${d.weight || 'なし'}</b></div>`;

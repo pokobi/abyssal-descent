@@ -40,6 +40,8 @@
     ['u_battery', 'util', '魔力電池', '🔋', 'rare', 190, 'オーバーシールド+80。', { os: 80 }],
     ['u_iron', 'util', '鉄皮の薬', '🪨', 'uncommon', 130, '10秒間、被ダメ-50%。', { temp: { armor: 0.5 }, dur: 10 }],
     ['u_invis', 'util', '透明薬', '👻', 'rare', 190, '8秒間透明になり、敵に狙われなくなる。', { invis: 8 }],
+    // repair kit: not a pocket item - it is dragged onto an armour piece on the inventory screen (see js/invui.js)
+    ['u_repair', 'util', '名工の補修具', '🛠️', 'epic', 380, '名工が遺した携帯用の補修具。インベントリで防具へドラッグ＆ドロップして使う。対象の防具の耐久を+150修復する（最大値まで）。', { repair: 150 }],
   ];
   G.ITEMS = IT.map(([id, cat, name, icon, rarity, price, desc, data]) => ({ id, cat, name, icon, rarity, price, desc, data, kind: 'item' }));
   G.ITEM_BY_ID = Object.fromEntries(G.ITEMS.map((i) => [i.id, i]));
@@ -70,6 +72,8 @@
   for (const it of G.ITEMS) { it.sub = it.cat === 'grenade' ? 'g' : it.cat === 'heal' ? 'heal' : GUARD.includes(it.id) ? 'guard' : TOOL.includes(it.id) ? 'tool' : 'boost'; it.slot = it.cat === 'grenade' ? 'g' : 'c'; }
   // items that work just by being carried (e.g. the fairy bottle) take no key slot at all
   for (const it of G.ITEMS) if (it.data && it.data.revive) { it.passive = true; it.slot = 'passive'; }
+  // the repair kit takes no key slot either: it stays in the bag (1x2 cells) and is used by dropping it on an armour piece
+  for (const it of G.ITEMS) if (it.data && it.data.repair) { it.kit = true; it.slot = 'kit'; it.sub = 'tool'; it.size = [1, 2]; }
   G.passiveItems = (P) => Object.keys(P.inv).filter((id) => P.inv[id] > 0 && G.ITEM_BY_ID[id] && G.ITEM_BY_ID[id].passive);
   G.ITEM_CAP = 9;
 

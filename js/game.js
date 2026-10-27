@@ -64,7 +64,7 @@
       // (a boon pick is a forced choice and stays as it is; the key-binding screen keeps Esc for cancelling a key capture)
       if (e.code === 'Escape' && !e.repeat && GM.state !== 'playing' && GM.state !== 'resuming' && GM.state !== 'buff' && !document.querySelector('#screens .kc-btn.wait')) {
         // every screen has one button that leaves it (cancel / back / end the deal / resume): Esc presses it
-        const cancel = document.querySelector('#screens :is(#c-cancel, #pw-close, #cx-back, #h-back, #s-back, #rs-back, #rs-no, #kc-back, #st-back, #df-back, #p-resume)') || document.querySelector('#dv-close');
+        const cancel = document.querySelector('#screens :is(#c-cancel, #pw-close, #alch-close, #cx-back, #h-back, #s-back, #rs-back, #rs-no, #kc-back, #st-back, #df-back, #p-resume)') || document.querySelector('#dv-close');
         if (cancel) { e.preventDefault(); GM.escCloseT = performance.now(); cancel.click(); }
       }
       // I = pause menu toggle (Esc sometimes gets swallowed by the browser while the pointer is locked)

@@ -94,6 +94,7 @@
     if (G.Strata && G.Strata.doors.length) S.doors = G.Strata.saveDoors();
     if (G.Graves && (w.graves || []).length) S.graves = G.Graves.save();
     S.npcs = w.interactables.filter((i) => i.type === 'npc' || i.type === 'shrine').map((i) => !!i.used);
+    { const cz = w.interactables.find((i) => i.type === 'cauldron'); if (cz && cz.used) S.cauldron = cz.used; }
     if (GM.shop) {
       const sh = GM.shop, slots = sh.mini ? w.miniSlots : w.shopSlots;
       S.shop = { mini: !!sh.mini, healUsed: !!sh.healUsed, rerolls: sh.rerolls || 0, offers: sh.offers.map((o) => ({ kind: o.kind, id: objKey(o.kind, o.obj), price: o.price, sold: !!o.sold, lv: o.lv || 0, free: !!o.free, ench: o.inst ? o.inst.ench : null, si: slots ? slots.indexOf(o.slot) : -1 })) };
@@ -146,6 +147,7 @@
       // NPCs / shrine already used
       const npcs = w.interactables.filter((i) => i.type === 'npc' || i.type === 'shrine');
       (S.npcs || []).forEach((u, i) => { if (npcs[i]) npcs[i].used = u; });
+      if (S.cauldron) { const cz = w.interactables.find((i) => i.type === 'cauldron'); if (cz) { cz.used = S.cauldron; if (cz.used >= 2 && G.Areas && G.Areas.extinguishAlchemy) G.Areas.extinguishAlchemy(cz); } }
       if (S.rooms && G.Rooms2) { G.Rooms2.offerN = S.rooms.offerN || 0; if (S.rooms.lots && G.Rooms2.lots) S.rooms.lots.forEach((l, i) => { if (G.Rooms2.lots[i]) Object.assign(G.Rooms2.lots[i], l); }); }
       // anomalies
       G.Depth.endArea();

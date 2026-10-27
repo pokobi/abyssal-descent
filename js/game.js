@@ -622,7 +622,7 @@
       if (kind === 'shrine') { G.Areas.setupShrine(); GM.objective = { icon: '⛩️', text: () => `祭壇で祈れ（${G.K('interact')}）`, done: true }; }
       if (G.Rooms2.KINDS.includes(kind)) G.Rooms2.setup(kind);
       if (kind === 'forge') { G.Areas.setupForge(); GM.objective = { icon: '⚒️', text: () => `金床で武器を鍛えろ（${G.K('interact')}）`, done: true }; }
-      if (kind === 'alchemy') { G.Areas.setupAlchemy(); GM.objective = { icon: '⚗️', text: () => `練成釜で装備や持ち物を練成しろ（${G.K('interact')}）`, done: true }; }
+      if (kind === 'alchemy') { G.Areas.setupAlchemy(); GM.objective = { icon: '⚗️', text: () => { const cz = G.world && G.world.interactables.find((i) => i.type === 'cauldron'), left = Math.max(0, 2 - (cz && cz.used || 0)); return left > 0 ? `練成釜で装備や持ち物を練成しろ（残り${left}回 · ${G.K('interact')}）` : '練成を終えたら次の門へ進め'; }, done: true }; }
       G.Areas.openGates(true); GM.areaCleared = true;
       G.ui.banner(T.name, `— ${T.hint} —`);
     } else if (kind === 'trial') {

@@ -343,6 +343,7 @@
     const p = (G.world && G.world.cauldronPos) ? G.world.cauldronPos.clone() : P.pos.clone().add(V(0, 1, 0));
     G.fx.smoke && G.fx.smoke(p.clone().add(V(0, 0.9, 0)), 14, 0x3b4440);
   }
+  AR.extinguishAlchemy = alchExtinguish;
   function alchFx() {
     const cz = alchCauldron();
     if (cz) { cz.used = (cz.used || 0) + 1; if (cz.used >= ALCH_MAX) alchExtinguish(cz); }
@@ -538,13 +539,17 @@
       alchChoiceModal(`💎 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts);
     }
   }
-  AR.useAlchemy = function () {
+  const ALCH_CAT_ORDER = { armor: 0, weapon: 1, att: 2, item: 3, valuable: 4 };
+  function alchDurBar(it) {
+    const f = G.Inv.durFrac(it), col = f > 0.5 ? '#6ee06a' : f > 0.2 ? '#f0b040' : '#ff4a3a';
+    return `<i class="iv-dur" style="--f:${f.toFixed(3)};--dc:${col}"></i>`;
+  }
+  AR.useAlchemy = function (arg) {
     const cz = alchCauldron(), used = cz ? cz.used || 0 : 0, left = ALCH_MAX - used;
     if (left <= 0) { G.ui.toast('⚗️ 練成の釜はもう冷え切っている（この練成所での練成は2回まで）', 'warn'); return; }
+    const keepState = arg && arg.keep ? arg : null;
     GM.state = 'modal';
     G.input.exitLock();
-    const s = G.ui.screen(`<div class="panel alch-panel"></div>`, 'dim');
-    const m = s.querySelector('.alch-panel');
     const items = alchAllItems();
     const pairableUids = new Set();
     for (let i = 0; i < items.length; i++) {
@@ -555,22 +560,34 @@
         }
       }
     }
-    let tab = 'all', sel = [];
-    const render = () => {
+    let tab = keepState ? keepState.tab : 'all';
+    let sel = keepState && keepState.selUids ? keepState.selUids.map((u) => items.find((x) => x.uid === u)).filter(Boolean) : [];
+    const dots = Array.from({ length: ALCH_MAX }, (_, i) => `<i class="alch-dot ${i < left ? 'on' : 'off'}"></i>`).join('');
+    const s = G.ui.screen(`<div class="panel alch-panel">
+      <div class="alch-head">
+        <div>
+          <h2 class="alch-title">⚗️ 練成所 — 同レアリティ合成</h2>
+          <div class="alch-desc">同じ種類・同じレア度の素材を2つ掛け合わせ、<b>1段階上のレア度</b>の品を練成する。</div>
+        </div>
+        <div class="alch-uses"><span>釜の魔力</span><div class="alch-dots">${dots}</div><b>残り ${left}/${ALCH_MAX}回</b></div>
+      </div>
+      <div class="alch-tabs"></div>
+      <div class="alch-body">
+        <div class="alch-inv"><div class="alch-grid"></div></div>
+        <div class="alch-work"></div>
+      </div>
+    </div>`, 'dim');
+    const m = s.querySelector('.alch-panel');
+    const tabsEl = m.querySelector('.alch-tabs');
+    const invEl = m.querySelector('.alch-inv');
+    const gridEl = m.querySelector('.alch-grid');
+    const workEl = m.querySelector('.alch-work');
+
+    const syncSelection = () => {
       const s1 = sel[0] || null, s2 = sel[1] || null;
-      const shown = items.filter((x) => tab === 'all' || x.cat === tab).sort((a, b) => {
-        const pA = pairableUids.has(a.uid) ? 0 : 1, pB = pairableUids.has(b.uid) ? 0 : 1;
-        if (pA !== pB) return pA - pB;
-        if (a.cat !== b.cat) return a.cat.localeCompare(b.cat);
-        return b.tier - a.tier;
-      });
-      const dots = Array.from({ length: ALCH_MAX }, (_, i) => `<i class="alch-dot ${i < left ? 'on' : 'off'}"></i>`).join('');
-      const tabsHtml = [['all', 'すべて'], ['armor', '🛡️ 防具'], ['weapon', '🔫 武器'], ['att', '🔩 パーツ'], ['item', '🧪 道具'], ['valuable', '💎 金品']]
-        .map(([k, lbl]) => {
-          const cnt = k === 'all' ? items.length : items.filter((x) => x.cat === k).length;
-          return `<button class="alch-tab ${tab === k ? 'on' : ''}" data-tab="${k}">${lbl} <small>${cnt}</small></button>`;
-        }).join('');
-      const gridHtml = shown.length ? shown.map((x) => {
+      gridEl.querySelectorAll('.alch-item').forEach((b) => {
+        const x = items.find((it) => it.uid === b.dataset.uid);
+        if (!x) return;
         const idx = sel.indexOf(x);
         const isSel = idx >= 0;
         let state = '';
@@ -580,26 +597,23 @@
           state = ok ? 'match' : 'dim';
         } else if (s1 && s2) state = 'dim';
         else if (!pairableUids.has(x.uid)) state = 'dim no-pair';
-        const rc = G.RARITY[x.rarity].color;
-        return `<button class="alch-item ${state}" data-uid="${x.uid}" style="--rc:${rc}">
-          ${isSel ? `<span class="ai-num">${idx + 1}</span>` : ''}
-          ${x.badge ? `<span class="ai-badge">${x.badge}</span>` : ''}
-          <div class="ai-ic">${x.icon}</div>
-          <div class="ai-nm">${x.name}</div>
-          <div class="ai-rar" style="color:${rc}">${G.RARITY[x.rarity].name} · ${ALCH_CATS[x.cat].short}</div>
-          <div class="ai-sub">${x.sub}</div>
-        </button>`;
-      }).join('') : `<div class="alch-empty">該当するアイテムがありません</div>`;
-      const slotHtml = (s, n) => {
-        if (!s) return `<div class="alch-slot empty"><span class="as-num">素材 ${n}</span><div class="as-ph">${n === 1 ? '左の一覧から1つ目をタップ' : s1 ? `同じ【${G.RARITY[s1.rarity].name}・${ALCH_CATS[s1.cat].short}】をタップ` : '2つ目の素材'}</div></div>`;
-        const rc = G.RARITY[s.rarity].color;
+        b.className = 'alch-item' + (state ? ' ' + state : '');
+        const numEl = b.querySelector('.ai-num');
+        if (numEl) {
+          if (isSel) { numEl.textContent = String(idx + 1); numEl.style.display = ''; }
+          else numEl.style.display = 'none';
+        }
+      });
+      const slotHtml = (st, n) => {
+        if (!st) return `<div class="alch-slot empty"><span class="as-num">素材 ${n}</span><div class="as-ph">${n === 1 ? '左の一覧から1つ目をタップ' : s1 ? `同じ【${G.RARITY[s1.rarity].name}・${ALCH_CATS[s1.cat].short}】をタップ` : '2つ目の素材'}</div></div>`;
+        const rc = G.RARITY[st.rarity].color;
         return `<button class="alch-slot filled" data-unel="${n - 1}" style="--rc:${rc}" title="タップで選択解除">
           <span class="as-num">${n}</span>
           <span class="as-rm">× 解除</span>
-          <div class="as-ic">${s.icon}</div>
+          <div class="as-ic">${st.icon}</div>
           <div class="as-info">
-            <div class="as-nm">${s.name}</div>
-            <div class="as-rar" style="color:${rc}">${G.RARITY[s.rarity].name} · ${ALCH_CATS[s.cat].short}</div>
+            <div class="as-nm">${U.esc(st.name)}</div>
+            <div class="as-rar" style="color:${rc}">${G.RARITY[st.rarity].name} · ${ALCH_CATS[st.cat].short}</div>
           </div>
         </button>`;
       };
@@ -618,40 +632,82 @@
           </div>
         </div>`;
       }
-      m.innerHTML = `<div class="alch-head">
-          <div>
-            <h2 class="alch-title">⚗️ 練成所 — 同レアリティ合成</h2>
-            <div class="alch-desc">同じ種類・同じレア度の素材を2つ掛け合わせ、<b>1段階上のレア度</b>の品を練成する。</div>
-          </div>
-          <div class="alch-uses"><span>釜の魔力</span><div class="alch-dots">${dots}</div><b>残り ${left}/${ALCH_MAX}回</b></div>
-        </div>
-        <div class="alch-tabs">${tabsHtml}</div>
-        <div class="alch-body">
-          <div class="alch-inv">
-            <div class="alch-grid">${gridHtml}</div>
-          </div>
-          <div class="alch-work">
-            ${slotHtml(s1, 1)}
-            <div class="alch-op">＋</div>
-            ${slotHtml(s2, 2)}
-            <div class="alch-op">⬇</div>
-            ${prevHtml}
-            <button class="btn alch-go" id="alch-go" ${s1 && s2 ? '' : 'disabled'}>⚗️ 練成を実行する（3候補から選択）</button>
-            <button class="btn small alch-close" id="alch-close">🚶 立ち去る</button>
-          </div>
-        </div>`;
-      m.querySelectorAll('.alch-tab').forEach((b) => {
-        b.onclick = () => { G.sfx.ui('click'); tab = b.dataset.tab; render(); };
+      workEl.innerHTML = `${slotHtml(s1, 1)}
+        <div class="alch-op">＋</div>
+        ${slotHtml(s2, 2)}
+        <div class="alch-op">⬇</div>
+        ${prevHtml}
+        <button class="btn alch-go" id="alch-go" ${s1 && s2 ? '' : 'disabled'}>⚗️ 練成を実行する（3候補から選択）</button>
+        <button class="btn small alch-close" id="alch-close">🚶 立ち去る</button>`;
+      workEl.querySelectorAll('button').forEach((b) => b.addEventListener('mouseenter', () => G.sfx.ui('hover')));
+      workEl.querySelectorAll('[data-unel]').forEach((b) => {
+        b.onclick = () => { G.sfx.ui('click'); sel.splice(+b.dataset.unel, 1); syncSelection(); };
       });
-      m.querySelectorAll('.alch-item').forEach((b) => {
+      const goBtn = workEl.querySelector('#alch-go');
+      if (goBtn) goBtn.onclick = () => {
+        if (sel.length < 2) return;
+        const [a, b] = sel;
+        if (a.tier >= 4) {
+          const snap = { keep: true, tab, scrollTop: invEl.scrollTop, selUids: sel.map((x) => x.uid) };
+          alchChoiceModal('⚠️ レジェンダリー同士の練成確認', `これ以上レアリティは上昇しません。<br>【${U.esc(a.name)}】と【${U.esc(b.name)}】を消費し、同じレジェンダリー帯の別アイテム（3候補）へ作り変えます。よろしいですか？`, [
+            { icon: '⚗️', label: '練成を実行する（リロール）', sub: '素材2つを消費してレジェンダリー3候補を開く', onPick: () => { GM._keepModal = true; alchOpenResult(a, b); } },
+            { icon: '↩', label: 'やめて素材選択へ戻る', onPick: () => { GM._keepModal = true; AR.useAlchemy(snap); } },
+          ]);
+          return;
+        }
+        G.sfx.ui('select');
+        alchOpenResult(a, b);
+      };
+      const clBtn = workEl.querySelector('#alch-close');
+      if (clBtn) clBtn.onclick = () => { G.sfx.ui('click'); GM.resume(); };
+    };
+
+    const renderGrid = (resetScroll) => {
+      tabsEl.innerHTML = [['all', 'すべて'], ['armor', '🛡️ 防具'], ['weapon', '🔫 武器'], ['att', '🔩 パーツ'], ['item', '🧪 道具'], ['valuable', '💎 金品']]
+        .map(([k, lbl]) => {
+          const cnt = k === 'all' ? items.length : items.filter((x) => x.cat === k).length;
+          return `<button class="alch-tab ${tab === k ? 'on' : ''}" data-tab="${k}">${lbl} <small>${cnt}</small></button>`;
+        }).join('');
+      tabsEl.querySelectorAll('.alch-tab').forEach((b) => {
+        b.addEventListener('mouseenter', () => G.sfx.ui('hover'));
+        b.onclick = () => {
+          if (tab === b.dataset.tab) return;
+          G.sfx.ui('click');
+          tab = b.dataset.tab;
+          renderGrid(true);
+        };
+      });
+      const shown = items.filter((x) => tab === 'all' || x.cat === tab).sort((a, b) => {
+        const pA = pairableUids.has(a.uid) ? 0 : 1, pB = pairableUids.has(b.uid) ? 0 : 1;
+        if (pA !== pB) return pA - pB;
+        const cA = ALCH_CAT_ORDER[a.cat] ?? 9, cB = ALCH_CAT_ORDER[b.cat] ?? 9;
+        if (cA !== cB) return cA - cB;
+        if (b.tier !== a.tier) return b.tier - a.tier;
+        return String(a.d.id || a.name).localeCompare(String(b.d.id || b.name));
+      });
+      gridEl.innerHTML = shown.length ? shown.map((x) => {
+        const rc = G.RARITY[x.rarity].color;
+        const dur = x.cat === 'armor' && x.it ? alchDurBar(x.it) : '';
+        return `<button class="alch-item" data-uid="${x.uid}" style="--rc:${rc}">
+          <span class="ai-num" style="display:none"></span>
+          ${x.badge ? `<span class="ai-badge">${x.badge}</span>` : ''}
+          <div class="ai-ic">${x.icon}</div>
+          <div class="ai-nm">${U.esc(x.name)}</div>
+          <div class="ai-rar" style="color:${rc}">${G.RARITY[x.rarity].name} · ${ALCH_CATS[x.cat].short}</div>
+          <div class="ai-sub">${U.esc(x.sub)}</div>
+          ${dur}
+        </button>`;
+      }).join('') : `<div class="alch-empty">該当するアイテムがありません</div>`;
+      gridEl.querySelectorAll('.alch-item').forEach((b) => {
+        b.addEventListener('mouseenter', () => G.sfx.ui('hover'));
         b.onclick = () => {
           const it = items.find((x) => x.uid === b.dataset.uid);
           if (!it) return;
           const idx = sel.indexOf(it);
-          if (idx >= 0) { G.sfx.ui('click'); sel.splice(idx, 1); render(); return; }
+          if (idx >= 0) { G.sfx.ui('click'); sel.splice(idx, 1); syncSelection(); return; }
           if (sel.length === 0) {
             if (!pairableUids.has(it.uid)) { G.sfx.ui('deny'); G.ui.toast('同じ種類・同じレア度のもう1つの素材がありません', 'warn'); return; }
-            G.sfx.ui('click'); sel.push(it); render(); return;
+            G.sfx.ui('click'); sel.push(it); syncSelection(); return;
           }
           if (sel.length === 1) {
             const first = sel[0];
@@ -665,32 +721,16 @@
               G.ui.toast('銃がすべて失われる組み合わせは選べません', 'warn');
               return;
             }
-            G.sfx.ui('click'); sel.push(it); render();
+            G.sfx.ui('click'); sel.push(it); syncSelection();
           }
         };
       });
-      m.querySelectorAll('[data-unel]').forEach((b) => {
-        b.onclick = () => { G.sfx.ui('click'); sel.splice(+b.dataset.unel, 1); render(); };
-      });
-      const goBtn = m.querySelector('#alch-go');
-      if (goBtn) goBtn.onclick = () => {
-        if (sel.length < 2) return;
-        const [a, b] = sel;
-        if (a.tier >= 4) {
-          GM._keepModal = true;
-          alchChoiceModal('⚠️ レジェンダリー同士の練成確認', `これ以上レアリティは上昇しません。<br>【${a.name}】と【${b.name}】を消費し、同じレジェンダリー帯の別アイテム（3候補）へ作り変えます。よろしいですか？`, [
-            { icon: '⚗️', label: '練成を実行する（リロール）', sub: '素材2つを消費してレジェンダリー3候補を開く', onPick: () => { GM._keepModal = true; setTimeout(() => alchOpenResult(a, b), 0); } },
-            { icon: '↩', label: 'やめて素材選択へ戻る', onPick: () => { GM._keepModal = true; setTimeout(() => AR.useAlchemy(), 0); } },
-          ]);
-          return;
-        }
-        G.sfx.ui('select');
-        alchOpenResult(a, b);
-      };
-      const clBtn = m.querySelector('#alch-close');
-      if (clBtn) clBtn.onclick = () => { G.sfx.ui('click'); GM.resume(); };
+      if (resetScroll) invEl.scrollTop = 0;
+      syncSelection();
     };
-    render();
+
+    renderGrid(false);
+    if (keepState && keepState.scrollTop) invEl.scrollTop = keepState.scrollTop;
   };
   AR.runEvent = function (it) {
     AR._alchIt = it;

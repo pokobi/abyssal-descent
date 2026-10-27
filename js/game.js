@@ -198,6 +198,7 @@
     shrine: { c: '#2aa898', k: 0.32, fog: 0.85, amb: 1.1, vig: 'rgba(10,80,70,0.35)', p: [0.5, 1, 0.9] },
     event: { c: '#7048b0', k: 0.25, fog: 1.0, amb: 0.95, vig: 'rgba(50,20,90,0.4)', p: [0.75, 0.6, 1] },
     forge: { c: '#d05010', k: 0.32, fog: 1.05, amb: 1.0, vig: 'rgba(120,40,0,0.45)', p: [1, 0.5, 0.15] },
+    alchemy: { c: '#28a868', k: 0.28, fog: 0.95, amb: 1.05, vig: 'rgba(10,75,45,0.4)', p: [0.4, 1, 0.7] },
   };
   GM.applyMood = function (kind) {
     GM.sceneTint = null; GM._skyBase = null;
@@ -621,6 +622,7 @@
       if (kind === 'shrine') { G.Areas.setupShrine(); GM.objective = { icon: '⛩️', text: () => `祭壇で祈れ（${G.K('interact')}）`, done: true }; }
       if (G.Rooms2.KINDS.includes(kind)) G.Rooms2.setup(kind);
       if (kind === 'forge') { G.Areas.setupForge(); GM.objective = { icon: '⚒️', text: () => `金床で武器を鍛えろ（${G.K('interact')}）`, done: true }; }
+      if (kind === 'alchemy') { G.Areas.setupAlchemy(); GM.objective = { icon: '⚗️', text: () => `練成釜で装備や持ち物を練成しろ（${G.K('interact')}）`, done: true }; }
       G.Areas.openGates(true); GM.areaCleared = true;
       G.ui.banner(T.name, `— ${T.hint} —`);
     } else if (kind === 'trial') {
@@ -1149,17 +1151,17 @@
       setTimeout(() => GM.victory(), 3800);
     }
     const c = G.world.arenaCenter, lastOne = G.Run.isLast(GM.area); // the last guardian ends the run: no chest, no road onward
-    if (!lastOne) G.Props.chest(G.world, c.x, c.z, 0, 0, 2);
+    if (!lastOne) G.Props.chest(G.world, c.x, c.z, 0, 0, 3);
     if (boss && boss.baseDef && G.BOSS_BY_ID[boss.baseDef.id] && G.BOSS_BY_ID[boss.baseDef.id].final) {
       // the Abyss King: a hoard worthy of the deepest throne
-      G.Props.chest(G.world, c.x - 5, c.z + 2, 0, 0.4, 2); G.Props.chest(G.world, c.x + 5, c.z + 2, 0, -0.4, 2);
+      G.Props.chest(G.world, c.x - 5, c.z + 2, 0, 0.4, 3); G.Props.chest(G.world, c.x + 5, c.z + 2, 0, -0.4, 3);
       P.revives += 2; G.combat.coins(3000 + GM.area * 60, c.clone().setY(1.5), '深淵の王');
       GM.run.kingsSlain = (GM.run.kingsSlain || 0) + 1;
       GM.startDawn();
       setTimeout(() => { G.ui.toast('🪔🪔 魂の灯火が二つ灯った', 'good'); G.ui.banner(`第${GM.run.kingsSlain}の深淵を踏破`, '— だが、深淵はさらに深く続いている —'); }, 2500);
     }
     G.world.flushDeferred();
-    if (!lastOne) G.ui.toast('👑 装飾された宝箱が現れた！', 'good');
+    if (!lastOne) G.ui.toast('🏆 守護者の秘宝箱が現れた！', 'good');
     clearArea({ boss: true });
   };
   GM.spawnChestNear = function (tier) {
@@ -1573,6 +1575,7 @@
       else if (it.type === 'npc' && !it.used) consider(it.pos, 1.0, { type: 'npc', it }, 4);
       else if (it.type === 'shrine' && !it.used) consider(it.pos, 1.2, { type: 'shrine', it }, 4);
       else if (it.type === 'anvil') consider(it.pos, 1.2, { type: 'anvil', it }, 4);
+      else if (it.type === 'cauldron') consider(it.pos, 1.3, { type: 'cauldron', it }, 4);
       else if (it.type === 'celldoor' && it.door.state !== 'broken') consider(it.pos, 1.0, { type: 'celldoor', it }, 3.4);
     }
     lookTarget = best;
@@ -1602,6 +1605,8 @@
       G.ui.showInteract({ key: 'shrine', icon: '⛩️', name: '祈りの祭壇', rc: '#60d0c0', cat: '全回復＋強化を一つ', desc: '一度だけ祈ることができる。', action: '祈る' });
     } else if (best.type === 'anvil') {
       G.ui.showInteract({ key: 'anvil' + coins, icon: '⚒️', name: '鍛冶の金床', rc: '#e08040', cat: '武器・スキルの強化', desc: `${P.weapon.def.name} +${P.weapon.lv || 0}（最大+${G.Areas.FORGE_MAX}）`, action: '鍛える' });
+    } else if (best.type === 'cauldron') {
+      G.ui.showInteract({ key: 'cauldron', icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: '防具・武器・アタッチメント・アイテムの練成', desc: '同じ種類の素材を2つ掛け合わせ、より上位の品へと練成する。（何度でも利用可能）', action: '練成する' });
     } else if (best.type === 'corpse') {
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;
@@ -1619,14 +1624,14 @@
       return;
     } else if (best.type === 'chestOpen') {
       const it = best.it;
-      G.ui.showInteract({ key: 'chesto' + it.cont.items.length, icon: it.icon, name: GM.CHEST_NAMES[it.tier], rc: ['#b8b2a7', '#4d9be6', '#f0a030'][it.tier], cat: `中身 ${it.cont.items.length}個`, desc: '', action: '開く' });
+      G.ui.showInteract({ key: 'chesto' + it.cont.items.length, icon: it.icon, name: GM.CHEST_NAMES[it.tier], rc: ['#b8b2a7', '#4d9be6', '#f0a030', '#ff68d8'][it.tier], cat: `中身 ${it.cont.items.length}個`, desc: '', action: '開く' });
       if (I.hit('interact')) G.InvUI.open(it.cont, it);
       return;
     } else if (best.type === 'chest') {
       const it = best.it;
       const S = GM.search && GM.search.it === it ? GM.search : null;
       const dur = GM.searchDur(GM.CHEST_SEARCH[it.tier]);
-      G.ui.showInteract({ key: 'chest' + it.tier + (S ? 's' : ''), icon: it.icon, name: GM.CHEST_NAMES[it.tier], rc: ['#b8b2a7', '#4d9be6', '#f0a030'][it.tier], cat: `宝箱 — 探索 ${dur.toFixed(1)}秒`, desc: S ? '探索中… 視点を大きく外したり離れると最初からやり直し' : '一度押すと探索を始める。終わるまで宝箱から目を離さないこと。', action: S ? '探索中…' : '探す' });
+      G.ui.showInteract({ key: 'chest' + it.tier + (S ? 's' : ''), icon: it.icon, name: GM.CHEST_NAMES[it.tier], rc: ['#b8b2a7', '#4d9be6', '#f0a030', '#ff68d8'][it.tier], cat: `宝箱 — 探索 ${dur.toFixed(1)}秒`, desc: S ? '探索中… 視点を大きく外したり離れると最初からやり直し' : '一度押すと探索を始める。終わるまで宝箱から目を離さないこと。', action: S ? '探索中…' : '探す' });
       if (I.hit('interact') && !S) GM.startSearch(it, it.pos, GM.CHEST_SEARCH[it.tier], it.icon, () => { G.sfx.chestUnlock && G.sfx.chestUnlock(it.pos); doInteract(best); });
       return;
     } else if (best.type === 'celldoor') {
@@ -1644,8 +1649,8 @@
     if (I.hit('interact')) doInteract(best);
   }
   // ---------------- timed search (chests, corpses): one press, keep looking at it ----------------
-  GM.CHEST_SEARCH = [1, 2, 4];
-  GM.CHEST_NAMES = ['古びた宝箱', '上等な宝箱', '装飾された宝箱'];
+  GM.CHEST_SEARCH = [1, 2, 4, 4];
+  GM.CHEST_NAMES = ['古びた宝箱', '上等な宝箱', '装飾された宝箱', '守護者の秘宝箱'];
   GM.searchDur = (base) => base / Math.max(0.2, 1 + (P.stats.opSpeed || 0));
   GM.search = null;
   GM.startSearch = function (it, pos, base, icon, onDone, label) {
@@ -1749,6 +1754,7 @@
     if (t.type === 'npc') return G.Areas.runEvent(t.it);
     if (t.type === 'shrine') return G.Areas.useShrine(t.it);
     if (t.type === 'anvil') return G.Areas.useForge(t.it);
+    if (t.type === 'cauldron') return G.Areas.useAlchemy(t.it);
     if (t.type === 'sell') return G.Pawn.open();
     if (t.type === 'miniheal') { const c = G.Areas.miniHealCost(); if (P.hp >= P.stats.maxHp) return deny('❤️ HPは満タン'); if (run.coins < c) return deny('🪙 コインが足りない'); run.coins -= c; GM.shop.healUsed = true; G.combat.heal(P.stats.maxHp * 0.5); G.sfx.heal(); G.sfx.ui('buy'); G.ui.showInteract(null); return; }
     if (t.type === 'reroll') {
@@ -1824,16 +1830,17 @@
     { common: 55, uncommon: 35, rare: 10 },
     { uncommon: 38, rare: 42, epic: 17, legendary: 3 },
     { rare: 30, epic: 48, legendary: 22 },
+    { epic: 40, legendary: 60 },
   ];
   GM.chestLoot = function (tier, pos) {
-    const chance = [0.1, 0.5, 1][tier];
+    const chance = [0.1, 0.5, 1, 1][tier] ?? 1;
     if (Math.random() >= chance) return null;
     // an ornate chest sometimes holds an attachment for the gun in your hands instead
     if (tier >= 2 && Math.random() < 0.35) {
       const comp = G.ATTACHMENTS.filter((a) => a.compat(P.weapon.def) && !P.weapon.atts[a.slot]);
       if (comp.length) { const a = U.pick(comp); P.weapon.atts[a.slot] = a.id; P.weapon.ver++; G.weapons.equip(true); G.ui.toast(`${a.icon} ${a.name} を装着した！`, 'good'); return a; }
     }
-    const W = GM.CHEST_RARITY[tier], ord = G.RARITY_ORDER;
+    const W = GM.CHEST_RARITY[tier] || GM.CHEST_RARITY[2], ord = G.RARITY_ORDER;
     let rar = U.weighted(Object.keys(W), (k) => W[k]);
     // luck nudges the roll up one grade now and then
     if (P.stats.luck > 0 && Math.random() < Math.min(0.3, P.stats.luck * 0.15)) rar = ord[Math.min(ord.length - 1, ord.indexOf(rar) + 1)];
@@ -1852,14 +1859,14 @@
     const tier = it.tier;
     G.sfx.mech('boltBack'); G.sfx.stoneGrind(it.pos, 0.4);
     const n = GM.area;
-    let coins = Math.round((40 + n * 9) * [1, 2.2, 4][tier] * (1 + P.stats.chestBonus));
+    let coins = Math.round((40 + n * 9) * ([1, 2.2, 4, 7][tier] || 4) * (1 + P.stats.chestBonus));
     setTimeout(() => {
       G.combat.coins(coins, it.pos.clone().add(V(0, 0.6, 0)));
-      G.fx.sparks(it.pos.clone().add(V(0, 0.6, 0)), V(0, 1, 0), 30, 0xffd070, 6);
-      G.fx.flash(it.pos, 0xffd070, 40, 0.4, 8);
+      G.fx.sparks(it.pos.clone().add(V(0, 0.6, 0)), V(0, 1, 0), 30, tier >= 3 ? 0xff78e8 : 0xffd070, 6);
+      G.fx.flash(it.pos, tier >= 3 ? 0xff78e8 : 0xffd070, 40, 0.4, 8);
       G.sfx.coins(8);
       // health orbs sometimes spill out (instead of the old near-guaranteed consumables)
-      if (Math.random() < [0.5, 0.6, 0.7][tier]) { const k = tier >= 2 ? U.randi(2, 3) : U.randi(1, 2); for (let i = 0; i < k; i++) C_orb(it.pos.clone().add(V(U.rand(-0.4, 0.4), 0.7, U.rand(-0.4, 0.4)))); }
+      if (Math.random() < ([0.5, 0.6, 0.7, 1.0][tier] || 0.7)) { const k = tier >= 3 ? U.randi(4, 6) : tier >= 2 ? U.randi(2, 3) : U.randi(1, 2); for (let i = 0; i < k; i++) C_orb(it.pos.clone().add(V(U.rand(-0.4, 0.4), 0.7, U.rand(-0.4, 0.4)))); }
       G.buffs.emit('onChest', {});
     }, 350);
     // what a chest holds is fixed by the run seed, the area and the chest's place: restarting the area (a soul lantern) opens the same contents
@@ -2064,7 +2071,7 @@
       if (it.type !== 'chest' || !it.mesh) continue;
       const want = GM.areaCleared && !it.opened;
       if (want && !it.hl) {
-        const col = it.tier >= 2 ? 0xffc040 : it.tier ? 0x80c0ff : 0xffe0a0;
+        const col = it.tier >= 3 ? 0xff68d8 : it.tier >= 2 ? 0xffc040 : it.tier ? 0x80c0ff : 0xffe0a0;
         const g = new THREE.Group(); g.position.copy(it.pos).setY(it.pos.y - 0.5);
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
         glow.scale.set(2.4, 1.6, 1); glow.position.y = 0.5; glow.renderOrder = 5; g.add(glow);

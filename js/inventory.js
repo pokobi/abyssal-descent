@@ -308,8 +308,11 @@
   };
 
   // ---------------- loot tables ----------------
-  const pickR = (W) => { let t = 0; for (const k in W) t += W[k]; let x = Math.random() * t; for (const k in W) { x -= W[k]; if (x <= 0) return k; } return Object.keys(W)[0]; };
-  const rarityW = (luck, floor) => Object.fromEntries(G.RARITY_ORDER.map((r) => [r, G.RARITY[r].tier < (floor || 0) ? 0 : G.rarityWeightD(r, G.Run ? G.Run.lootDepth(G.game.area) : G.game.area, luck)]));
+  const pickR = (W) => { let t = 0; for (const k in W) t += W[k]; if (t <= 0) { const ks = Object.keys(W); return ks[ks.length - 1]; } let x = Math.random() * t; for (const k in W) { x -= W[k]; if (x <= 0) return k; } return Object.keys(W)[0]; };
+  const rarityW = (luck, floor, depthBonus) => {
+    const d = Math.max((G.Run ? G.Run.lootDepth(G.game.area) : G.game.area) + (depthBonus || 0), (floor || 0) >= 4 ? 18 : (floor || 0) >= 3 ? 10 : 1);
+    return Object.fromEntries(G.RARITY_ORDER.map((r) => [r, G.RARITY[r].tier < (floor || 0) ? 0 : G.rarityWeightD(r, d, luck)]));
+  };
   const pickOf = (arr, r) => { let c = arr.filter((o) => o.rarity === r); if (!c.length) c = arr; return G.thinFairy(() => c[Math.floor(Math.random() * c.length)]); };
   // one random thing of a kind
   IV.rollThing = function (kind, luck, floor) {
@@ -326,12 +329,27 @@
     for (let i = 0; i < n; i++) { const kw = Object.assign({}, KIND_W[src]); if (G.Run) kw.valuable *= G.Run.valuableShare(); const it = IV.rollThing(pickR(kw), luck, i === 0 ? floor : 0); IV.put(c, it); }
     return c;
   };
-  // chests: plain 4x3 / fine 5x4 / ornate 6x5; contents grow with the grade and depth
+  // chests: plain 4x3 / fine 5x4 / ornate 6x5 / guardian reliquary 8x6; contents grow with the grade and depth
   IV.chestLoot = function (tier) {
     const P = G.player, luck = (P.stats.luck || 0) + (P.stats.chestBonus || 0);
-    const c = IV.container([4, 5, 6][tier], [3, 4, 5][tier], ['古びた宝箱', '上等な宝箱', '装飾された宝箱'][tier], 'chest');
-    const n = [U.randi(1, 3), U.randi(2, 4), U.randi(4, 6)][tier];
-    return IV.fill(c, n, 'chest', luck, [0, 1, 2][tier]);
+    const c = IV.container([4, 5, 6, 8][tier] || 6, [3, 4, 5, 6][tier] || 5, ['古びた宝箱', '上等な宝箱', '装飾された宝箱', '守護者の秘宝箱'][tier] || '宝箱', 'chest');
+    const n = ([U.randi(1, 3), U.randi(2, 4), U.randi(4, 6), U.randi(6, 8)][tier]) || 5;
+    if (tier >= 3) {
+      const gk = pickR({ armor: 55, att: 25, item: 20 });
+      const g1 = IV.rollThing(gk, luck + 5, 4);
+      if (g1.type === 'armor') delete g1.dur;
+      IV.put(c, g1);
+      const g2 = IV.makeArmor(pickOf(G.ARMOR, pickR(rarityW(luck + 1.8, 3, 14))).id);
+      IV.put(c, g2);
+      const bkw = { armor: 26, att: 20, item: 30, grenade: 8, valuable: 16 * (G.Run ? G.Run.valuableShare() : 1) };
+      for (let i = 2; i < n; i++) {
+        const it = IV.rollThing(pickR(bkw), luck + 2.2, i === 2 ? 3 : 2);
+        if (it.type === 'armor') delete it.dur; // boss chest armour is pristine
+        IV.put(c, it);
+      }
+      return c;
+    }
+    return IV.fill(c, n, 'chest', luck, [0, 1, 2][tier] || 0);
   };
   // corpses: the stronger / higher-level the foe, the more and rarer the loot (always at least one thing)
   IV.corpseLoot = function (e) {

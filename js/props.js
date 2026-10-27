@@ -409,53 +409,71 @@
     CHM.ruby = new THREE.MeshStandardMaterial({ color: 0xff2040, emissive: 0x800010, emissiveIntensity: 0.8, roughness: 0.1, metalness: 0.2 });
     CHM.sapph = new THREE.MeshStandardMaterial({ color: 0x3060ff, emissive: 0x0a2080, emissiveIntensity: 0.8, roughness: 0.1, metalness: 0.2 });
     CHM.emer = new THREE.MeshStandardMaterial({ color: 0x20d060, emissive: 0x086020, emissiveIntensity: 0.8, roughness: 0.1, metalness: 0.2 });
+    CHM.obsidian = new THREE.MeshStandardMaterial({ color: 0x241634, metalness: 0.55, roughness: 0.22, emissive: 0x180828, emissiveIntensity: 0.65 });
+    CHM.bossGold = new THREE.MeshStandardMaterial({ color: 0xffdf70, metalness: 0.48, roughness: 0.14, emissive: 0x6a4408, emissiveIntensity: 0.55 });
+    CHM.royalVelvet = new THREE.MeshStandardMaterial({ color: 0x5a0838, roughness: 0.7, emissive: 0x240014, emissiveIntensity: 0.4 });
+    CHM.amethyst = new THREE.MeshStandardMaterial({ color: 0xe058ff, emissive: 0x9018c8, emissiveIntensity: 0.95, roughness: 0.08, metalness: 0.2 });
   };
   P.chest = function (w, x, z, y, ry, tier) {
     if (!CHM.ruby) P.initChestMats();
-    const it = { type: 'chest', pos: new THREE.Vector3(x, y + 0.5, z), r: 2.6, tier: tier || 0, opened: false, label: '宝箱を開ける', icon: tier >= 2 ? '👑' : tier ? '💎' : '📦' };
+    const it = { type: 'chest', pos: new THREE.Vector3(x, y + 0.5, z), r: 2.6, tier: tier || 0, opened: false, label: '宝箱を開ける', icon: tier >= 3 ? '🏆' : tier >= 2 ? '👑' : tier ? '💎' : '📦' };
     w.deferred.push((grp) => {
       const g = new THREE.Group();
       const add = (parent, geo, m, sx, sy, sz, px, py, pz, rx, ry2, rz) => { const o = new THREE.Mesh(geo, m); o.scale.set(sx, sy, sz); o.position.set(px || 0, py || 0, pz || 0); o.rotation.set(rx || 0, ry2 || 0, rz || 0); parent.add(o); return o; };
       const T = tier || 0;
-      // tier 0: weathered wood · tier 1: stained wood, steel caps, studs & a sapphire lock · tier 2: ornate gilded royal chest
-      const bodyM = T >= 2 ? w.mats.gold : T === 1 ? w.mats.woodDark : w.mats.wood;
-      const bandM = T >= 2 ? CHM.velvet : T === 1 ? w.mats.iron : w.mats.iron;
-      const sc = T >= 2 ? 1.22 : T === 1 ? 1.08 : 1;
+      // tier 0: weathered wood · tier 1: stained wood & steel · tier 2: ornate gilded royal chest · tier 3: boss-exclusive guardian reliquary
+      const bodyM = T >= 3 ? CHM.obsidian : T >= 2 ? w.mats.gold : T === 1 ? w.mats.woodDark : w.mats.wood;
+      const bandM = T >= 3 ? CHM.bossGold : T >= 2 ? CHM.velvet : w.mats.iron;
+      const goldM = T >= 3 ? CHM.bossGold : w.mats.gold;
+      const sc = T >= 3 ? 1.38 : T >= 2 ? 1.22 : T === 1 ? 1.08 : 1;
       const inner = new THREE.Group(); inner.scale.setScalar(sc); g.add(inner);
       add(inner, PG.box, bodyM, 1.1, 0.55, 0.7, 0, 0.275, 0);
       const lidG = new THREE.Group(); lidG.position.set(0, 0.55, -0.35); inner.add(lidG);
-      const lid = add(lidG, PG.cyl, bodyM, 0.35, 1.1, 0.35, 0, 0, 0.35, 0, 0, Math.PI / 2);
+      add(lidG, PG.cyl, bodyM, 0.35, 1.1, 0.35, 0, 0, 0.35, 0, 0, Math.PI / 2);
       add(lidG, PG.box, bodyM, 1.1, 0.02, 0.7, 0, 0, 0.35);
       for (const bx of [-0.4, 0.4]) { add(inner, PG.box, bandM, 0.08, 0.57, 0.72, bx, 0.28, 0); add(lidG, PG.cyl, bandM, 0.36, 0.08, 0.36, bx, 0, 0.35, 0, 0, Math.PI / 2); }
       if (T >= 1) {
         // corner caps & studs
-        const capM = T >= 2 ? w.mats.gold : CHM.steel;
+        const capM = T >= 2 ? goldM : CHM.steel;
         for (const cx of [-0.53, 0.53]) for (const cz of [-0.33, 0.33]) add(inner, PG.box, capM, 0.09, 0.57, 0.09, cx, 0.28, cz);
         for (let i = 0; i < 5; i++) add(inner, PG.sph, capM, 0.025, 0.025, 0.025, -0.3 + i * 0.15, 0.08, 0.36);
       }
       if (T >= 2) {
         // gilded trims, velvet stripe, crown & jewels
-        add(inner, PG.box, CHM.velvet, 1.12, 0.08, 0.72, 0, 0.5, 0);
-        add(inner, PG.box, w.mats.gold, 1.2, 0.06, 0.78, 0, 0.03, 0);
+        add(inner, PG.box, T >= 3 ? CHM.royalVelvet : CHM.velvet, 1.12, 0.08, 0.72, 0, 0.5, 0);
+        add(inner, PG.box, goldM, 1.2, 0.06, 0.78, 0, 0.03, 0);
         const crown = new THREE.Group(); crown.position.set(0, 0.36, 0.35); lidG.add(crown);
-        add(crown, PG.cyl8, w.mats.gold, 0.16, 0.08, 0.16);
-        for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; add(crown, PG.cone, w.mats.gold, 0.035, 0.14, 0.035, Math.cos(a) * 0.13, 0.1, Math.sin(a) * 0.13); }
-        const jewels = [CHM.ruby, CHM.sapph, CHM.emer, CHM.ruby];
+        const crSc = T >= 3 ? 1.32 : 1, spN = T >= 3 ? 7 : 5;
+        add(crown, PG.cyl8, goldM, 0.16 * crSc, 0.08 * crSc, 0.16 * crSc);
+        for (let i = 0; i < spN; i++) { const a = i / spN * Math.PI * 2; add(crown, PG.cone, goldM, 0.035 * crSc, (T >= 3 ? 0.2 : 0.14), 0.035 * crSc, Math.cos(a) * 0.13 * crSc, 0.1 * crSc, Math.sin(a) * 0.13 * crSc); }
+        const jewels = T >= 3 ? [CHM.amethyst, CHM.ruby, CHM.amethyst, CHM.ruby] : [CHM.ruby, CHM.sapph, CHM.emer, CHM.ruby];
         jewels.forEach((m, i) => add(inner, PG.oct, m, 0.05, 0.065, 0.03, -0.36 + i * 0.24, 0.3, 0.37));
-        add(lidG, PG.oct, CHM.ruby, 0.07, 0.09, 0.04, 0, 0.2, 0.72);
-        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xffc860, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
-        halo.scale.set(2.4, 1.6, 1); halo.position.y = 0.55; g.add(halo); it.halo = halo;
+        add(lidG, PG.oct, T >= 3 ? CHM.amethyst : CHM.ruby, 0.07, 0.09, 0.04, 0, 0.2, 0.72);
+        if (T >= 3) {
+          add(inner, PG.box, CHM.obsidian, 1.34, 0.05, 0.9, 0, -0.02, 0);
+          add(inner, PG.box, goldM, 0.1, 0.57, 0.73, 0, 0.28, 0);
+          add(lidG, PG.cyl, goldM, 0.365, 0.1, 0.365, 0, 0, 0.35, 0, 0, Math.PI / 2);
+          for (const cx of [-0.55, 0.55]) for (const cz of [-0.35, 0.35]) {
+            add(inner, PG.cone, goldM, 0.06, 0.22, 0.06, cx * 1.06, 0.62, cz * 1.06, cz * 0.4, 0, -cx * 0.4);
+          }
+          add(crown, PG.oct, CHM.amethyst, 0.09, 0.15, 0.09, 0, 0.2, 0);
+          add(crown, PG.torus, goldM, 0.16, 0.16, 0.08, 0, 0.2, 0, 0.8, 0.4, 0);
+          for (const sx of [-0.56, 0.56]) add(inner, PG.oct, CHM.amethyst, 0.03, 0.08, 0.08, sx, 0.3, 0);
+        }
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: T >= 3 ? 0xff78e8 : 0xffc860, transparent: true, opacity: T >= 3 ? 0.5 : 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+        halo.scale.set(T >= 3 ? 3.2 : 2.4, T >= 3 ? 2.2 : 1.6, 1); halo.position.y = T >= 3 ? 0.68 : 0.55; g.add(halo); it.halo = halo;
       }
-      const lockM = T >= 2 ? w.mats.gold : T === 1 ? CHM.steel : w.mats.brass;
+      const lockM = T >= 2 ? goldM : T === 1 ? CHM.steel : w.mats.brass;
       add(inner, PG.box, lockM, 0.14, 0.18, 0.06, 0, 0.5, 0.37);
-      if (T === 1) add(inner, PG.oct, CHM.sapph, 0.04, 0.05, 0.03, 0, 0.5, 0.41);
+      if (T >= 3) add(inner, PG.oct, CHM.amethyst, 0.055, 0.07, 0.04, 0, 0.5, 0.41);
+      else if (T === 1) add(inner, PG.oct, CHM.sapph, 0.04, 0.05, 0.03, 0, 0.5, 0.41);
       g.position.set(x, y, z); g.rotation.y = ry;
       g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
       grp.add(g); it.mesh = g; it.lid = lidG;
       // subtle glint light
-      w.lightSources.push({ pos: new THREE.Vector3(x, y + 0.9, z), color: tier >= 2 ? '#ffd070' : tier === 1 ? '#a0c0ff' : '#ffc890', intensity: tier >= 2 ? 5 : 3, range: tier >= 2 ? 6 : 5, flame: 0, emit: false, ph: 0, prio: 0.8, steady: true, chest: it });
+      w.lightSources.push({ pos: new THREE.Vector3(x, y + 0.9, z), color: tier >= 3 ? '#ff88e8' : tier >= 2 ? '#ffd070' : tier === 1 ? '#a0c0ff' : '#ffc890', intensity: tier >= 3 ? 8 : tier >= 2 ? 5 : 3, range: tier >= 3 ? 8 : tier >= 2 ? 6 : 5, flame: 0, emit: false, ph: 0, prio: tier >= 3 ? 1.4 : 0.8, steady: true, chest: it });
     });
-    const cs = tier >= 2 ? 1.22 : tier === 1 ? 1.08 : 1;
+    const cs = tier >= 3 ? 1.38 : tier >= 2 ? 1.22 : tier === 1 ? 1.08 : 1;
     w.addCollider(x - 0.55 * cs, y, z - 0.55 * cs, x + 0.55 * cs, y + 0.75 * cs, z + 0.55 * cs, { surf: tier >= 2 ? 'metal' : 'wood' });
     w.interactables.push(it);
     return it;

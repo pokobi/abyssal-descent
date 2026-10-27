@@ -79,7 +79,7 @@
   const R = (r) => G.ui.R(r || 'common');
   const ACT = {}; // data-act id -> fn
 
-  const AREA_KINDS = ['combat', 'elite', 'cursed', 'vault', 'trial', 'shop', 'event', 'shrine', 'forge', 'casino', 'bank', 'auction', 'merc', 'offering', 'boss'];
+  const AREA_KINDS = ['combat', 'elite', 'cursed', 'vault', 'trial', 'shop', 'event', 'shrine', 'forge', 'alchemy', 'casino', 'bank', 'auction', 'merc', 'offering', 'boss'];
   function body() {
     for (const k in ACT) delete ACT[k];
     const T = G.Areas.TYPES;

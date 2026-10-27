@@ -1498,6 +1498,34 @@
       P().weaponRack(w, 1, cz, 0, false); P().weaponRack(w, W - 1, cz, 0, false);
       for (let i = 0; i < 3; i++) P().barrel(w, W / 2 + 6 + i, cz + 3, 0, rng);
       w.npcSpots.push(new THREE.Vector3(W / 2, 0, cz - 2));
+    } else if (kind === 'alchemy') {
+      w.solid('trim', W / 2 - 2.4, 0, cz - 2.4, W / 2 + 2.4, 0.2, cz + 2.4, { uv: 2 });
+      w.addCollider(W / 2 - 0.85, 0.2, cz - 0.85, W / 2 + 0.85, 1.25, cz + 0.85, { surf: 'metal' });
+      w.cauldronPos = new THREE.Vector3(W / 2, 1.15, cz);
+      w.deferred.push((grp) => {
+        const g = new THREE.Group(); g.position.set(W / 2, 0.2, cz);
+        const PG = G.Props.PG;
+        const base = new THREE.Mesh(PG.oct, w.mats.iron); base.scale.set(0.85, 0.35, 0.85); base.position.y = 0.175; g.add(base);
+        const pot = new THREE.Mesh(PG.sph, w.mats.iron); pot.scale.set(0.78, 0.62, 0.78); pot.position.y = 0.62; g.add(pot);
+        const rim = new THREE.Mesh(PG.torus, w.mats.gold); rim.rotation.x = Math.PI / 2; rim.scale.set(0.72, 0.72, 0.55); rim.position.y = 0.96; g.add(rim);
+        const brew = new THREE.Mesh(PG.cyl, new THREE.MeshBasicMaterial({ color: 0x48ff98, transparent: true, opacity: 0.82, blending: THREE.AdditiveBlending, depthWrite: false }));
+        brew.scale.set(0.66, 0.03, 0.66); brew.position.y = 0.94; g.add(brew);
+        for (const [r0, r1, sp] of [[1.55, 1.7, 0.45], [2.05, 2.18, -0.3]]) {
+          const rn = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 24), new THREE.MeshBasicMaterial({ color: 0x58ff98, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+          rn.rotation.x = -Math.PI / 2; rn.position.y = 0.02; g.add(rn);
+          w.animated.push({ kind: 'spin', m: rn, sp, axis: 'z' });
+        }
+        grp.add(g);
+      });
+      P().rug(w, W / 2, cz + 2, 0, 10, 6, [0.1, 0.32, 0.22]);
+      for (const sx of [-1, 1]) {
+        P().table(w, W / 2 + sx * 5.5, cz, 0, false, rng);
+        P().candles(w, W / 2 + sx * 5.5, 0.86, cz, rng, true);
+        P().bookshelf(w, sx < 0 ? 1 : W - 1, cz - 2, 0, false, rng);
+        P().bookshelf(w, sx < 0 ? 1 : W - 1, cz + 2, 0, false, rng);
+        P().crystals(w, W / 2 + sx * 4.2, 0, cz - 3.2, rng, 0.75);
+      }
+      w.npcSpots.push(new THREE.Vector3(W / 2, 0, cz - 2.2));
     } else if (kind === 'trial') {
       // shooting gallery: nothing in the way. A firing line near the entrance, lamps (no decorative targets: they were mistaken for real ones).
       w.visual('trim', 4, 0, D - 9.2, W - 4, 0.03, D - 8.8, { uv: 1, grad: false });

@@ -471,7 +471,7 @@
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
   };
   // the whole run as a strip of nodes grouped by field: visited areas show what they were, the guardians are marked, "you are here" glows
-  const ROUTE_ICON = { combat: '⚔', elite: '💀', cursed: '☠', vault: '🗝', trial: '🎯', shop: '🛒', boss: '👑', event: '？', shrine: '⛩', forge: '⚒', casino: '🎰', bank: '🏦', auction: '🔨', merc: '🗡', offering: '🕯' };
+  const ROUTE_ICON = { combat: '⚔', elite: '💀', cursed: '☠', vault: '🗝', trial: '🎯', shop: '🛒', boss: '👑', event: '？', shrine: '⛩', forge: '⚒', alchemy: '⚗', casino: '🎰', bank: '🏦', auction: '🔨', merc: '🗡', offering: '🕯' };
   UI.routeHTML = function () {
     const R = G.Run, GM = G.game, n = GM.area || 1, tot = R.areas();
     if (!GM.run) return '';

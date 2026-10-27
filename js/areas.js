@@ -744,7 +744,7 @@
       // keep the dialog open for repeat purchases (no mouse-lock round trip)
       if (res.reopen) { GM._keepModal = true; setTimeout(() => AR.runEvent(it), 0); }
       if (res.sub) { GM._keepModal = true; setTimeout(() => res.sub(() => AR.runEvent(it)), 0); } // a sub-menu of this dialog; its back button reopens the dialog
-      if (res.offer) setTimeout(() => GM.offerBuffs(true, { filter: res.offer, title: 'OFFERING', sub: '捧げた分の加護 — 一つを選べ', after: () => setTimeout(() => AR.runEvent(it), 120) }), 60);
+      if (res.offer) setTimeout(() => GM.offerBuffs(true, { filter: res.offer, title: 'OFFERING', sub: '捧げた分の加護 — 一つを選べ', onPicked: (b) => G.ui.itemCard(b, '[献納]', { now: true }), after: () => setTimeout(() => AR.runEvent(it), 120) }), 60);
       if (res.boon === 'boost') setTimeout(() => GM.offerBuffs(true), 50);
       else if (res.boon === 'pile') setTimeout(() => GM.offerBuffs(false, { filter: G.isTech, title: 'SKILL TRAINING', sub: 'スキル・アルティメットの強化を一つ選べ' }), 50);
     } }));

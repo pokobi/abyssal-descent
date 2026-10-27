@@ -1038,12 +1038,12 @@
   // big centre-screen "you got X" panel for things that arrive without you choosing a card (events, shrines, chests, gifts);
   // queued so several gains never overlap, non-blocking (the game keeps running underneath)
   const gainQ = []; let gainBusy = false; const gainSeen = new Map();
-  UI.gain = function (o, hint) {
+  UI.gain = function (o, hint, opts) {
     if (!o || (G.game && (G.game._buying || (G.game.quietUntil || 0) > performance.now()))) return; // nothing big in the middle of the screen after a purchase
     const key = (o.kind || '') + ':' + (o.id || o.name), now = performance.now();
     if (gainQ.some((q) => q.key === key) || now - (gainSeen.get(key) || -1e9) < 2500) return;
     gainSeen.set(key, now);
-    gainQ.push({ o, hint, key }); if (!gainBusy) gainNext();
+    gainQ.push({ o, hint, key, now: !!(opts && opts.now) }); if (!gainBusy) gainNext(); // now: show over an open dialog instead of waiting for it to close
   };
   function gainKind(o) {
     // [style, tag, family label]: boons (permanent blessings) and gear (things you carry / use) look clearly different
@@ -1056,7 +1056,7 @@
     return ['gear', '獲得', ''];
   }
   function gainNext() {
-    if (gainQ.length && UI.el.screens.firstChild) { gainBusy = true; setTimeout(gainNext, 300); return; } // a card / shop screen is up: wait for it
+    if (gainQ.length && UI.el.screens.firstChild && !gainQ[0].now) { gainBusy = true; setTimeout(gainNext, 300); return; } // a card / shop screen is up: wait for it
     const q = gainQ.shift();
     if (!q) { gainBusy = false; return; }
     gainBusy = true;
@@ -1104,7 +1104,7 @@
   };
   UI.itemCard = function (o, keyHint, opts) {
     if (!o) return;
-    if (!(opts && opts.noBanner)) UI.gain(o, keyHint);
+    if (!(opts && opts.noBanner)) UI.gain(o, keyHint, opts);
     let host = document.getElementById('item-cards');
     if (!host) { host = document.createElement('div'); host.id = 'item-cards'; UI.el.hud.appendChild(host); }
     const d = document.createElement('div'); d.className = 'icard'; d.style.setProperty('--rc', R(o.rarity));

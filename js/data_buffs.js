@@ -212,7 +212,7 @@
   add('e_interest', '利子', '🏦', 'rare', 'economy', 'エリア開始時、所持コインの8%（最大120）を得る。', { max: 2, hooks: { onAreaStart(c, n) { const v = Math.min(120 * n, Math.floor(G.game.run.coins * 0.08 * n)); if (v > 0) C.coins(v, null, '利子'); } } });
   add('e_discount', '値切り上手', '🏷️', 'uncommon', 'economy', 'ショップの価格-12%。', { mods: { shopDiscount: 0.12 }, max: 3 });
   add('e_choice', '選択肢', '🃏', 'epic', 'economy', '加護選択の選択肢+1。', { mods: { buffChoices: 1 }, max: 2 });
-  add('e_reroll', '運命の再配', '🎲', 'uncommon', 'economy', 'エリアを3つクリアするごとに、使った無料リロールが1回回復する（最大3回まで）。', { flag: true, max: 1 });
+  add('e_reroll', '運命の再配', '🎲', 'uncommon', 'economy', '加護選択時の無料リロールが毎回2回まで可能になる。', { flag: true, max: 1 });
   add('e_luck', '幸運', '🍀', 'uncommon', 'economy', '高レアリティの加護・商品が出やすくなる。', { mods: { luck: 0.35 }, max: 3 });
   add('e_treasure', '宝探し', '🗺️', 'uncommon', 'economy', '各エリアに宝箱が1つ追加される。', { mods: { extraChests: 1 }, max: 3 });
   add('e_chestbonus', '宝箱の主', '📦', 'common', 'economy', '宝箱から得られるコイン+50%、中身も高レアリティになりやすい（宝箱のみ・幸運+0.5相当）。', { mods: { chestBonus: 0.5 }, max: 3 });

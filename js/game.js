@@ -1087,11 +1087,6 @@
     // the abyss hardens the survivor: a little permanent max HP per cleared area
     P.permMaxHp = (P.permMaxHp || 0) + 4; P.recalc();
     G.Rooms2.onAreaClear();
-    // Fate Redeal: every 3 cleared areas one used free reroll comes back (progress waits while the pool is full)
-    if (P.has('e_reroll')) {
-      const run = GM.run; run.rerollTick = Math.min(3, (run.rerollTick || 0) + 1);
-      if (run.rerollTick >= 3 && (run.rerollUsed || 0) > 0) { run.rerollUsed--; run.rerollTick = 0; G.ui.toast('🎲 無料リロールが1回回復した', 'good'); }
-    }
     // a guardian's fall teaches every skill and ultimate you carry: +1 level (the normal level, not mastery; Lv 15 is the cap)
     if (bossKill) {
       const A = G.abilities, up = [];
@@ -1266,11 +1261,7 @@
     }
     return out;
   };
-  // rerolls: a free pool for the whole run (3; Fate Redeal gives one back every 3 cleared areas), then coins at a price that doubles with every paid reroll
-  GM.rerollInfo = function () {
-    const run = GM.run, free = Math.max(0, 3 - (run.rerollUsed || 0));
-    return { free, cost: GM.price(1000 * Math.pow(2, run.rerollPaid || 0)) };
-  };
+  // rerolls: 1 free reroll per screen (2 with Fate Redeal), then doubling coin price: 200, 400, 800...
   GM.offerBuffs = function (boost, o) {
     o = o || {};
     GM.state = 'buff';
@@ -1278,20 +1269,31 @@
     I.exitLock();
     const seen = new Set(); // what this screen has already shown: a reroll never brings it back
     const done = () => { GM.rewardPending = null; GM.resume(); if (o.after) o.after(); };
+    let rolls = 0;
+    const getReroll = () => {
+      const freeMax = P.has('e_reroll') ? 2 : 1;
+      const free = Math.max(0, freeMax - rolls);
+      const paidIndex = Math.max(0, rolls - freeMax);
+      const cost = Math.round(200 * Math.pow(2, paidIndex));
+      return { free, cost, afford: free > 0 || GM.run.coins >= cost };
+    };
     const render = (choices) => {
       for (const b of choices) seen.add(b.id);
-      const ri = GM.rerollInfo();
+      const ri = getReroll();
       G.ui.buffSelect(choices, {
         title: o.title || (boost ? 'ROYAL BOON' : 'CHOOSE A BOON'), sub: o.sub || (boost ? '強大な加護 — 一つを選べ' : undefined),
-        reroll: o.noReroll ? null : { free: ri.free, cost: ri.cost, afford: ri.free > 0 || GM.run.coins >= ri.cost },
+        reroll: o.noReroll ? null : { free: ri.free, cost: ri.cost, afford: ri.afford },
         onPick: (b) => { P.addBuff(b.id); if (o.onPicked) o.onPicked(b); G.ui.toast(`${b.icon} ${b.name} を${b.cat === 'pact' ? '結んだ' : '獲得'}`, b.cat === 'pact' ? 'warn' : 'good'); done(); },
         onReroll: () => {
-          const ri2 = GM.rerollInfo();
-          if (ri2.free <= 0 && GM.run.coins < ri2.cost) { G.sfx.ui('deny'); return; }
+          const state = getReroll();
+          if (!state.afford) { G.sfx.ui('deny'); return; }
           const next = GM.rollBuffs(Math.max(2, P.stats.buffChoices), boost, o.filter, seen);
           if (!next.length) { G.sfx.ui('deny'); G.ui.toastSmall('🎲 もう出せる候補がない'); return; }
-          if (ri2.free > 0) GM.run.rerollUsed = (GM.run.rerollUsed || 0) + 1;
-          else { GM.run.coins -= ri2.cost; GM.run.rerollPaid = (GM.run.rerollPaid || 0) + 1; G.sfx.coins(3); }
+          if (state.free <= 0) {
+            GM.run.coins -= state.cost;
+            G.sfx.coins(3);
+          }
+          rolls++;
           render(next);
         },
       });

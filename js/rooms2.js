@@ -80,14 +80,28 @@
 
   // ---------------- casino ----------------
   R2.setup_casino = function (c) {
+    let lotsLeft = 2;
     npc(G.ENEMY_BY_ID.skeleton_bone, c, {
       id: 'casino', npc: '骨の胴元', icon: '🎰', repeat: true,
       get text() { return `「さぁ張った張った！ 深淵では運も実力のうちさ」<br>所持 🪙${fmt(coins())}`; },
       opts: () => {
-        const bet = Math.max(100, Math.round(coins() * 0.25 / 10) * 10), lot = GM.price(400), slot = GM.price(150);
+        const bet = Math.max(100, Math.round(coins() * 0.25 / 10) * 10), lot = GM.price(500), slot = GM.price(150);
         return [
           { icon: '🎲', label: `倍か無か（${fmt(bet)}🪙）`, sub: '所持の25%を賭ける。47%で倍になる', disabled: coins() < bet, run: () => { pay(bet); if (Math.random() < 0.47) { gain(bet * 2, '倍!'); G.ui.toast(`🎲 当たり！ +${fmt(bet * 2)}`, 'good'); G.sfx.ui('rare'); } else { G.ui.toast('🎲 外れ…', 'warn'); G.sfx.ui('deny'); } return { reopen: true }; } },
-          { icon: '📦', label: `宝箱くじ（${fmt(lot)}🪙）`, sub: '古びた50%・上等30%・装飾12%・ミミック8%', disabled: coins() < lot, run: () => { pay(lot); const r = Math.random(); if (r < 0.08) { G.ui.toast('😱 ミミックだ！', 'warn'); for (let i = 0; i < 2; i++) GM.spawnEnemy({ elite: true, near: true }); return {}; } const tier = r < 0.2 ? 2 : r < 0.5 ? 1 : 0; GM.spawnChestNear(tier); G.ui.toast(['📦 古びた宝箱', '💎 上等な宝箱', '👑 装飾された宝箱！'][tier], 'good'); return { reopen: true }; } },
+          { icon: '📦', label: lotsLeft > 0 ? `宝箱くじ（${fmt(lot)}🪙） 残り${lotsLeft}回` : '宝箱くじ（売り切れ）', sub: lotsLeft > 0 ? '古びた55%・上等30%・装飾8%・ミミック7%' : 'この部屋の分は売り切れた', disabled: lotsLeft <= 0 || coins() < lot, run: () => {
+            lotsLeft--;
+            pay(lot);
+            const r = Math.random();
+            if (r < 0.07) {
+              G.ui.toast('😱 ミミックだ！', 'warn');
+              for (let i = 0; i < 2; i++) GM.spawnEnemy({ elite: true, near: true });
+              return {};
+            }
+            const tier = r < 0.15 ? 2 : r < 0.45 ? 1 : 0;
+            GM.spawnChestNear(tier);
+            G.ui.toast(['📦 古びた宝箱', '💎 上等な宝箱', '👑 装飾された宝箱！'][tier], 'good');
+            return { reopen: true };
+          } },
           { icon: '🎰', label: `スロット（${fmt(slot)}🪙）`, sub: '2倍25%・5倍10%・15倍4%・大当たり50倍1%', disabled: coins() < slot, run: () => {
             pay(slot); const r = Math.random(); const sym = ['🍒', '💎', '💀', '👑', '🔔'];
             let mul = 0; if (r < 0.01) mul = 50; else if (r < 0.05) mul = 15; else if (r < 0.15) mul = 5; else if (r < 0.4) mul = 2;

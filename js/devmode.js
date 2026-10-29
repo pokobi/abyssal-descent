@@ -103,7 +103,7 @@
       ACT.codex = () => { const c = G.save.data.codex; for (const e of G.ENEMIES) c.enemies[e.id] = 1; for (const b of G.BOSSES) c.bosses[b.id] = 1; for (const b of G.BUFFS) c.buffs[b.id] = 1; for (const a of [].concat(G.WEAPONS, G.MELEE, G.ATTACHMENTS, G.ITEMS, G.SKILLS)) c.items[a.id] = 1; G.save.data.records.bestArea = Math.max(G.save.data.records.bestArea || 0, 300); G.save.write(); toast('図鑑を全開放'); };
       ACT.tut = () => { if (panel) panel.remove(); panel = null; back = null; G.Tutorial && G.Tutorial.start ? G.Tutorial.start() : toast('チュートリアルなし'); };
       ACT.off = () => { D.disable(); D.close(); G.ui.toast('🛠 デバッグモードを終了しました', 'good'); };
-      const bosses = G.BOSSES.map((b) => `<option value="${b.id}">${b.icon || '👿'} ${esc(b.name)}</option>`).join('');
+      const bosses = G.BOSSES.filter((b) => !b.codexOnly).map((b) => `<option value="${b.id}">${b.icon || '👿'} ${esc(b.name)}</option>`).join('');
       return `${sec('ラン')}
         <div class="dv-row">難易度 <select id="dv-diff">${['easy', 'normal', 'hard'].map((k) => `<option value="${k}:0" ${G.Run.cur.id === k ? 'selected' : ''}>${G.Run.DIFFS[k].name}</option>`).join('')}${Array.from({ length: 10 }, (_, i) => `<option value="extra:${i + 1}" ${G.Run.cur.id === 'extra' && G.Run.cur.lv === i + 1 ? 'selected' : ''}>エクストラ${i + 1}</option>`).join('')}</select></div>
         <div class="dv-row">${btn('start', '▶ 新しいランを開始')}</div>

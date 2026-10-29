@@ -138,14 +138,13 @@
       this.form = 1;
       this.maxHp = Math.round(HP1 * this.hpScale); this.hp = this.maxHp;
       this.hp2 = Math.round(HP2 * this.hpScale);
-      this.totalHp = this.maxHp + this.hp2;
       this.bloodColor = 0x6a0a3a;
       this.tempo = BS.tempo ? BS.tempo() : 1;
       this.speedK = 1;
       this.home = world.bossHome ? world.bossHome.clone() : V(world.arenaCenter.x, 0, world.arenaCenter.z - 50);
       this.pos.copy(this.home);
       this.root.position.copy(this.home);
-      this.constructs = []; this.cols = []; this.stage2 = false; this.yawB = 0; TR.stage = null;
+      this.constructs = []; this.cols = []; this.stage2 = false; this.yawB = 0; if (world.tiles) TR.stage = null; // (the codex builds this model too, on a stand-in world: leave a live fight's stage alone)
       this.noDmgT = 0; this.conT = 30; this.conCd = 0; this.tearT = 10; this.lastHp = this.hp; this.last = null;
       this.build();
       const body = this.J.body;
@@ -166,7 +165,14 @@
       });
       this.state = 'intro'; this.introT = 0;
       body.position.y = this.world.tiles ? -46 : 0;
+      if (def.id === 'sovereign2') { this.avatarLook(); this.maxHp = this.hp2; this.hp = this.maxHp; }
       this.pose(0);
+    }
+    // what the crown breaking leaves: no crown or breastplate, the void core bared, horns, the gravity rings, violet light
+    avatarLook() {
+      const J = this.J;
+      J.crown.visible = false; J.plates.forEach((m) => { m.visible = false; }); J.core.visible = true; J.horns.visible = true; J.grav.forEach((g) => { g.visible = true; });
+      for (const m of this.glows) m.emissive.set(m === this.M.eye ? 0xe0c0ff : VIO);
     }
     // ---------------------------------------------------------------- the model (everything under root; root faces +z, towards the tiles)
     build() {
@@ -768,11 +774,11 @@
       if (T >= 2.4 && !this._broke) {
         this._broke = true;
         const cp = J.crown.getWorldPosition(V());
-        J.crown.visible = false; J.plates.forEach((m) => { m.visible = false; }); J.core.visible = true; J.horns.visible = true; J.grav.forEach((g) => { g.visible = true; });
+        this.avatarLook();
+        G.save.mark('bosses', 'sovereign2'); // the codex learns of the second half only now
         G.fx.explosion(cp, 7, 0xffffff, { decal: false }); G.fx.debris(cp, this.M.glow, 16, 1.2, 14);
         G.fx.explosion(J.core.getWorldPosition(V()), 9, VIO, { decal: false }); G.fx.debris(J.core.getWorldPosition(V()), this.M.armor, 18, 1.6, 16);
         G.fx.flash(cp, 0xd080ff, 200, 0.6, 120);
-        for (const m of this.glows) m.emissive.set(m === this.M.eye ? 0xe0c0ff : VIO);
         G.sfx.explosion(P.pos.clone().lerp(cp, 0.5), 2.4); if (G.sfx.shieldBreak) G.sfx.shieldBreak(P.pos); this.roar(0.25, 1.8); P.addShake(1.2);
         G.ui.banner('虚無の化身', '— 王冠は砕け、重力が裏返る —', true);
         // the weak point moves from the crowned head to the core
@@ -1134,9 +1140,11 @@
   }
 
   // ---------------- registration ----------------
-  G.BOSSES.push({ id: 'sovereign', name: '虚無の君主', title: 'CRIMSON SOVEREIGN', icon: '🌑', desc: '深淵の最奥、紅い月の下、奈落の向こう岸にそびえる巨人。こちらからは決して届かない場所から、床を剥がし、巨大な手で叩き潰し、薙ぎ払う。王冠が砕けると重力が裏返り、星々の只中で「虚無の化身」として立ちはだかる。', mech: ['エクストラの最終エリアに必ず現れる。戦いが始まると入口の足場は閉ざされる', '床が定期的に崩れて奈落になる（赤く光ってから約2秒）。落ちると最大HPの約40%のダメージを受け、近くの無事な床へ戻される', '叩きつけた手はしばらく床に残り、攻撃できる（ダメージ1.5倍）。薙ぎ払いは大きく吹き飛ばす', 'しばらくダメージが入らないと、こちら側に「虚晶の造物」が現れる。砕くと君主に大ダメージ', '王冠が砕けると「虚無の化身」となり、重力が裏返って天空の円い足場へと舞台が移る。床は崩れないが、縁から落ちると大ダメージ',
-  '虚無の化身は足場の周りを巡りながら、星の環・天の裂け目・彗星の槍・掌の檻で攻めてくる。胸の虚無核が弱点。閉じた両手は攻撃できる',
-  '紫の紋章に入ると重力が反転し、高く打ち上げられてから叩きつけられる（最大HPの50%）。虚無の渦は強く引き寄せる（走れば逃げられる）'], field: true, ending: true });
+  // (the second half is a secret: the first entry says nothing of it, and the second stays hidden in the codex until the crown has broken once)
+  G.BOSSES.push(
+    { id: 'sovereign', name: '虚無の君主', title: 'CRIMSON SOVEREIGN', icon: '🌑', rarity: 'legendary', desc: '深淵の最奥、紅い月の下、奈落の向こう岸にそびえる巨人。こちらからは決して届かない場所から、床を剥がし、巨大な手で叩き潰し、薙ぎ払う。', mech: ['エクストラの最終エリアに必ず現れる。戦いが始まると入口の足場は閉ざされる', '床が定期的に崩れて奈落になる（赤く光ってから約2秒）。落ちると最大HPの約40%のダメージを受け、近くの無事な床へ戻される', '叩きつけた手はしばらく床に残り、攻撃できる（ダメージ1.5倍）。薙ぎ払いは大きく吹き飛ばす', 'しばらくダメージが入らないと、こちら側に「虚晶の造物」が現れる。砕くと君主に大ダメージ'], field: true, ending: true },
+    { id: 'sovereign2', name: '虚無の化身', title: 'AVATAR OF THE VOID', icon: '🌌', rarity: 'legendary', codexOnly: true, desc: '王冠が砕けた君主の、真の姿。重力を裏返して戦う者を星々の只中へと引きずり上げ、天空の円い足場の周りを巡りながら攻め立てる。', mech: ['虚無の君主の王冠が砕けると現れる。重力が裏返り、天空の円い足場へと舞台が移る', '足場は崩れないが、縁から落ちると大ダメージを受けて足場へ戻される', '星の環・天の裂け目・彗星の槍・掌の檻で攻めてくる。胸の虚無核が弱点。閉じた両手は攻撃できる（ダメージ1.5倍）', '紫の紋章に入ると重力が反転し、高く打ち上げられてから叩きつけられる（最大HPの50%）', '虚無の渦は強く引き寄せる（走れば逃げられる）'], field: true },
+  );
   G.BOSS_BY_ID = Object.fromEntries(G.BOSSES.map((b) => [b.id, b]));
-  BS.CLS.sovereign = Sovereign;
+  BS.CLS.sovereign = Sovereign; BS.CLS.sovereign2 = Sovereign; // (sovereign2: only ever built by the codex)
 })();

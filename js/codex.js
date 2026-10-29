@@ -62,8 +62,9 @@
   function renderGrid() {
     const g = document.getElementById('cx-grid'); if (!g) return;
     const a = list();
+    // (an unmet entry shows nothing but its rarity colour)
     g.innerHTML = a.map((o, i) => secret(tab, o)
-      ? `<div class="cx-item undisc ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:#5a5248"><span class="ci">❔</span><span class="cn">？？？</span></div>`
+      ? `<div class="cx-item undisc ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">❔</span><span class="cn">？？？</span></div>`
       : `<div class="cx-item ${disc(tab, o) ? '' : 'undisc'} ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">${o.mat ? G.armorIcon(o) : o.icon}${o.vicon ? '<small style="font-size:11px">' + o.vicon + '</small>' : ''}</span><span class="cn">${U.esc(o.name)}</span></div>`).join('');
     g.querySelectorAll('.cx-item').forEach((el) => el.onclick = () => { sel = a[+el.dataset.i]; G.sfx.ui('click'); g.querySelectorAll('.cx-item').forEach((x) => x.classList.remove('sel')); el.classList.add('sel'); renderDetail(); });
     if (!sel && a.length) sel = a[0];
@@ -75,7 +76,7 @@
     const o = sel;
     if (secret(tab, o)) {
       // a monster / guardian not met yet: nothing but the bare fact
-      d.innerHTML = '<div style="--rc:#5a5248"><div class="cd-icon">❔</div><div class="cd-name">？？？</div><div class="cd-cat">❔ 未発見</div><div class="cd-desc">まだ出会っていない。出会うまで、詳細は分からない。</div></div>';
+      d.innerHTML = `<div style="--rc:${G.ui.R(o.rarity || 'epic')}"><div class="cd-icon">❔</div><div class="cd-name">？？？</div><div class="cd-cat">❔ 未発見</div><div class="cd-desc">まだ出会っていない。出会うまで、詳細は分からない。</div></div>`;
       return;
     }
     const rc = G.ui.R(o.rarity || 'epic');
@@ -121,7 +122,7 @@
         html += '<div style="margin-top:4px;font-size:12px;color:var(--dim)">基準：ノーマル・エリア7の守護者（難易度やエリアで変わります）</div>';
         if (st.weak.length) html += `<div style="margin-top:6px"><span class="tag">🎯 部位: ${st.weak.map(U.esc).join(' / ')}</span></div>`;
       }
-      html += `<div style="margin-top:6px">${o.mech.map((m) => `<div style="padding:4px 0">◆ ${m}</div>`).join('')}</div><div style="margin-top:8px"><span class="tag">⚔ 出現: ${o.id === 'sovereign' ? 'エクストラの最終エリア（専用のフィールド）' : (Object.keys(G.Run.BOSS_POOLS).filter((f) => G.Run.BOSS_POOLS[f].includes(o.id)).map((f) => G.Run.FIELD_NAME[f]).join('・') || '—') + 'の守護者'}</span></div>`;
+      html += `<div style="margin-top:6px">${o.mech.map((m) => `<div style="padding:4px 0">◆ ${m}</div>`).join('')}</div><div style="margin-top:8px"><span class="tag">⚔ 出現: ${o.id === 'sovereign' ? 'エクストラの最終エリア（専用のフィールド）' : o.id === 'sovereign2' ? '虚無の君主の王冠が砕けた後' : (Object.keys(G.Run.BOSS_POOLS).filter((f) => G.Run.BOSS_POOLS[f].includes(o.id)).map((f) => G.Run.FIELD_NAME[f]).join('・') || '—') + 'の守護者'}</span></div>`;
     } else if (tab === 'stage') {
       html += stageDetail(o);
     } else if (tab === 'attachment') {
@@ -206,10 +207,10 @@
     R.cur = { id: 'normal', lv: 0 }; GM.area = BOSS_REF;
     try {
       const m = G.bosses.buildModelOnly(o.id, BOSS_REF); if (!m) return null;
-      const b = m.boss; // (b.totalHp: a guardian with two forms reports both bars together)
+      const b = m.boss;
       const box = new THREE.Box3().setFromObject(m.root);
       const names = [...new Set(b.parts.map((p) => p.def && p.def.name).filter((n) => n && n !== o.name))].slice(0, 5);
-      return (bossCache[o.id] = { hp: Math.round(b.totalHp || b.maxHp), dmg: b.dmgScale, size: box.max.y - box.min.y, weak: names });
+      return (bossCache[o.id] = { hp: Math.round(b.maxHp), dmg: b.dmgScale, size: box.max.y - box.min.y, weak: names });
     } finally { R.cur = keepRun; GM.area = keepArea; }
   }
   function bossHpMax() {

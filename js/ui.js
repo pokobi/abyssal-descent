@@ -910,6 +910,45 @@
   };
   window.addEventListener('keydown', (e) => { if (G.game && G.game.state === 'buff' && UI._buffKeys) UI._buffKeys(e.code); });
 
+  // ---------------- a forced pick among a few cards, shown like the boon choice (the transmutation result) ----------------
+  // options: { icon, label, sub, rar, onPick }; opts: { title, sub, side (html for the left panel), onPick (after the card's own) }
+  UI.cardSelect = function (options, opts) {
+    opts = opts || {};
+    const cards = options.map((o, i) => {
+      const rr = G.RARITY[o.rar] ? o.rar : 'common';
+      return `<div class="card" data-i="${i}" style="--rc:${R(rr)};animation-delay:${i * 0.12}s"><span class="c-key">${i + 1}</span><div class="c-rar">${o.rarName || G.RARITY[rr].name}</div><div class="c-icon">${o.icon}</div><div class="c-name">${U.esc(o.label)}</div>${o.cat ? `<div class="c-cat">${o.cat}</div>` : ''}<div class="c-desc">${o.sub || ''}</div></div>`;
+    }).join('');
+    const s = UI.screen(`<div class="bs-wrap">
+      ${opts.side ? `<div class="side-info">${opts.side}</div>` : ''}
+      <div class="bs-title">${opts.title || 'CHOOSE ONE'}</div>
+      <div class="bs-sub">${opts.sub || ''}　<span class="bs-keys">クリック／1〜${options.length}：選択 ／ ←→：切替 → Enter：決定</span></div>
+      <div class="bs-cards" data-n="${options.length}">${cards}</div>
+    </div>`, 'dim');
+    const els = [...s.querySelectorAll('.card')];
+    let picked = false, hl = 0;
+    const paint = () => els.forEach((el, k) => el.classList.toggle('hl', k === hl));
+    const onKey = (e) => {
+      if (!document.body.contains(s)) { window.removeEventListener('keydown', onKey, true); return; }
+      if (picked) return;
+      const n = /^Digit([1-9])$/.exec(e.code);
+      if (n && +n[1] <= options.length) { e.preventDefault(); e.stopImmediatePropagation(); pick(+n[1] - 1); }
+      else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { e.preventDefault(); hl = (hl + (e.code === 'ArrowLeft' ? -1 : 1) + options.length) % options.length; paint(); G.sfx.ui('click'); }
+      else if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); e.stopImmediatePropagation(); pick(hl); }
+    };
+    const pick = (i) => {
+      if (picked) return; picked = true;
+      window.removeEventListener('keydown', onKey, true);
+      els.forEach((el, k) => el.classList.add(k === i ? 'picked' : 'unpicked'));
+      G.sfx.ui(G.RARITY[options[i].rar] && G.RARITY[options[i].rar].tier >= 3 ? 'rare' : 'select');
+      setTimeout(() => { options[i].onPick(); if (opts.onPick) opts.onPick(options[i]); }, 420);
+    };
+    els.forEach((el, k) => { el.onclick = () => pick(k); el.addEventListener('mouseenter', () => { if (!picked) { hl = k; paint(); } }); });
+    paint();
+    window.addEventListener('keydown', onKey, true);
+    setTimeout(() => G.sfx.ui('card'), 100); setTimeout(() => G.sfx.ui('card'), 220); setTimeout(() => G.sfx.ui('card'), 340);
+    return s;
+  };
+
   // ---- difficulty select (new run) ----
   UI.difficulty = function (onPick, back) {
     const R = G.Run, D = R.DIFFS, rec = R.rec();

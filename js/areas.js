@@ -446,11 +446,18 @@
     }
     return out;
   }
-  function alchChoiceModal(title, desc, opts) {
+  // the result is picked on cards like a boon (the two materials on the left); a label's trailing （rarity） becomes the card's rarity line
+  function alchChoiceModal(title, desc, opts, rar, a, b) {
     GM.state = 'modal';
     G.input.exitLock();
-    const wrap = opts.map((o) => Object.assign({}, o, { onPick: () => { o.onPick(); if (GM._keepModal) { GM._keepModal = false; return; } GM.resume(); } }));
-    G.ui.choice(title, desc, wrap, null);
+    if (!rar) { G.ui.choice(title, desc, opts.map((o) => Object.assign({}, o, { onPick: () => { o.onPick(); if (GM._keepModal) { GM._keepModal = false; return; } GM.resume(); } })), null); return; } // a plain confirmation
+    const wrap = opts.map((o) => {
+      const m = /^(.*)（([^（）]*)）$/.exec(o.label);
+      return Object.assign({}, o, { label: m ? m[1] : o.label, rar: o.rar || rar, rarName: m ? m[2] : null, onPick: () => { o.onPick(); if (GM._keepModal) { GM._keepModal = false; return; } GM.resume(); } });
+    });
+    const mat = (x) => { const r = RAR_BY_TIER[x.tier] || 'common'; return `<div class="si-stat"><span>${x.d.icon} ${U.esc(x.d.name)}</span><b style="color:${G.ui.R(r)}">${G.RARITY[r].name}</b></div>`; };
+    const side = a && b ? `<h3 style="margin-top:0">⚗️ 練成の素材</h3>${mat(a)}${mat(b)}<div style="margin-top:10px;font-size:12px;color:var(--dim);line-height:1.6">${desc}</div>` : '';
+    G.ui.cardSelect(wrap, { title: 'TRANSMUTATION', sub: title, side });
   }
   function alchOpenResult(a, b) {
     const tA = a.tier, targetTier = Math.min(4, tA + 1), rarName = G.RARITY[RAR_BY_TIER[targetTier]].name;
@@ -481,7 +488,7 @@
           alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[防具練成]');
         } };
       });
-      alchChoiceModal(`🛡️ 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts);
+      alchChoiceModal(`🛡️ 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
     if (a.cat === 'weapon') {
@@ -506,7 +513,7 @@
         G.weapons.order(); G.ui.refreshWeapon(); G.ui.refreshItems(); P.recalc();
         alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}${newLv ? ' +' + newLv : ''}`, 'good'); G.ui.itemCard(d, '[武器練成]');
       } }));
-      alchChoiceModal(`🔫 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する${newLv ? `（強化値 +${newLv} を継承）` : ''}。`, opts);
+      alchChoiceModal(`🔫 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する${newLv ? `（強化値 +${newLv} を継承）` : ''}。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
     if (a.cat === 'att') {
@@ -522,7 +529,7 @@
         G.Inv.give(P, 'att', d.id, 1); G.ui.refreshWeapon(); G.ui.refreshItems();
         alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[パーツ練成]');
       } }));
-      alchChoiceModal(`🔩 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts);
+      alchChoiceModal(`🔩 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
     if (a.cat === 'item') {
@@ -538,7 +545,7 @@
         P.addItem(d.id, 1); G.ui.refreshItems();
         alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[道具練成]');
       } }));
-      alchChoiceModal(`🧪 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts);
+      alchChoiceModal(`🧪 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
     if (a.cat === 'valuable') {
@@ -554,7 +561,7 @@
         { icon: attD.icon, label: `【パーツ】${attD.name}（${G.RARITY[attD.rarity].name}）`, sub: `${G.ATT_SLOTS[attD.slot].name} — ${attD.desc}`, onPick: () => { consumeBoth(); G.Inv.give(P, 'att', attD.id, 1); G.ui.refreshWeapon(); G.ui.refreshItems(); alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${attD.icon} ${attD.name}`, 'good'); G.ui.itemCard(attD, '[練成した]'); } },
         { icon: itD.icon, label: `【道具】${itD.name}（${G.RARITY[itD.rarity].name}）`, sub: itD.desc || '', onPick: () => { consumeBoth(); P.addItem(itD.id, 1); G.ui.refreshItems(); alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${itD.icon} ${itD.name}`, 'good'); G.ui.itemCard(itD, '[練成した]'); } },
       ];
-      alchChoiceModal(`💎 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts);
+      alchChoiceModal(`💎 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
     }
   }
   const ALCH_CAT_ORDER = { armor: 0, weapon: 1, att: 2, item: 3, valuable: 4 };

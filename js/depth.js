@@ -52,6 +52,7 @@
   };
   D.tickEnemy = function (e, dt) {
     const m = e.mut;
+    if (e.state === 'undying') return; // lying down: no auras, no blinking
     e.mutT -= dt;
     if (m.warden) {
       if (Math.random() < dt * 1.2) for (const o of G.enemies.inRadius(e.pos, 8)) {
@@ -130,13 +131,52 @@
       if (c) { G.fx.smoke(e.centerPos(), 8, 1, 0x3050a0, 0.5, 0.6); e.pos.set(c.x, c.y + (e.flyer ? 2.5 : 0), c.z); e.vel.set(0, 0, 0); G.fx.smoke(e.centerPos(), 8, 1, 0x3050a0, 0.5, 0.6); G.sfx.whoosh(0.3, 1.4); }
     }
   };
+  // undying: 0.5 s falling, lying there while golden motes gather, then the rise (the last 0.7 s)
+  D.UNDYING_T = 2.4;
+  D.undyingTick = function (e, dt) {
+    const T = D.UNDYING_T, t = T - e.stateT, mi = e.model.inner, side = e.yaw > 0 ? 1 : -1;
+    const fall = Math.min(1, t / 0.5), rise = U.clamp((t - (T - 0.7)) / 0.7, 0, 1);
+    const k = fall * (1 - rise * rise * (3 - 2 * rise));
+    mi.rotation.z = k * 1.45 * side;
+    mi.position.y = -k * e.radius * 0.4;
+    const c = e.centerPos();
+    // motes drift in towards the body, faster and denser as the rise nears
+    if (t > 0.5 && rise <= 0) {
+      const n = Math.random() < dt * (12 + t * 14) ? 1 : 0;
+      for (let i = 0; i < n + (Math.random() < 0.5 ? 1 : 0); i++) {
+        const a = Math.random() * Math.PI * 2, r = 1.2 + Math.random() * 1.4;
+        G.fx.add.spawn(c.x + Math.cos(a) * r, c.y + U.rand(-0.3, 1.2), c.z + Math.sin(a) * r, -Math.cos(a) * r * 1.6, U.rand(0.2, 1), -Math.sin(a) * r * 1.6, 0.6, 0.12, 0.03, 1.6, 1.45, 0.8, 1, 0, 0.5);
+      }
+    }
+    if (t > 1.0 && !e.undyTele) { e.undyTele = true; G.fx.ring(e.pos.clone(), 1.6, 0xffe9a0, 1.0, { start: 0.9 }); G.sfx.magic(e.pos, 'holy'); }
+    if (rise > 0 && !e.risen) {
+      e.risen = true;
+      // the moment it gets up: a pillar of light, a burst of motes, a ring and a roar
+      const top = e.pos.clone().add(new THREE.Vector3(0, 7, 0));
+      G.fx.beam(e.pos.clone(), top, 0xfff0c0, Math.max(0.5, e.radius * 1.2), 0.55);
+      G.fx.beam(e.pos.clone(), top, 0xffffff, Math.max(0.2, e.radius * 0.45), 0.4);
+      G.fx.flash(c, 0xfff0c0, 60, 0.4, 12);
+      G.fx.ring(e.pos.clone(), 3.2, 0xffe9a0, 0.7);
+      for (let i = 0; i < 26; i++) G.fx.add.spawn(c.x, c.y, c.z, U.rand(-4, 4), U.rand(2, 7), U.rand(-4, 4), 0.9, 0.16, 0.02, 1.6, 1.4, 0.75, 1, 6, 1);
+      G.sfx.monster(e.pos, 'roar', e.def.pitch * 1.15, 0.9);
+      G.sfx.heal && G.sfx.heal();
+      G.ui.feed(`♻️ ${e.def.name} が不屈の力で蘇った`);
+    }
+    if (e.stateT <= 0) {
+      e.hp = e.maxHp * 0.4; e.state = 'chase'; e.stateT = 0; e.atkCd = Math.max(e.atkCd, 0.6);
+      e.untargetable = false; e.dyingVisual = false; e.undyTele = false;
+      mi.rotation.z = 0; mi.position.y = 0;
+    }
+  };
   // returns false to cancel the death (undying)
   D.onDie = function (e, info) {
     const m = e.mut;
     if (m.undying && !e.mutRevived) {
-      e.mutRevived = true; e.hp = e.maxHp * 0.4;
-      G.fx.ring(e.pos.clone(), 2.5, 0xe0e0a0, 0.6); G.fx.flash(e.centerPos(), 0xfff0c0, 30, 0.3, 8); G.sfx.magic(e.pos, 'holy');
-      G.ui.feed(`♻️ ${e.def.name} が不屈の力で蘇った`);
+      // it really goes down first (untouchable while it lies there), then gathers light and gets back up: see the 'undying' state in enemies.js
+      e.mutRevived = true; e.hp = 1;
+      e.state = 'undying'; e.stateT = D.UNDYING_T; e.untargetable = true; e.dyingVisual = true; e.risen = false;
+      G.sfx.monsterDie(e.pos, e.def.sound, e.def.pitch);
+      G.fx.blood(e.centerPos(), null, e.bloodColor, 10);
       return false;
     }
     return true;

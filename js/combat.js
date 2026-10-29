@@ -162,7 +162,7 @@
   // ---------------- damage to enemies ----------------
   const SHIELD_BASE = { bullet: 0.6, melee: 0.6, explosion: 0.9, skill: 1.0, buff: 0.7, dot: 0.3, ally: 0.6 };
   C.damageEnemy = function (e, amount, info) {
-    if (!e || !e.alive || e.dying) return 0;
+    if (!e || !e.alive || e.dying || e.state === 'undying') return 0; // an undying foe lying down before it rises takes nothing
     info = info || {};
     const src = info.src || 'bullet';
     const st = P.stats;

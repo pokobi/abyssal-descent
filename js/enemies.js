@@ -763,6 +763,12 @@
         this.updateHits();
         return;
       }
+      if (this.state === 'undying') {
+        G.Depth.undyingTick(this, sdt);
+        this.physics(sdt, 0, 0, 0);
+        this.updateHits();
+        return;
+      }
       if (this.state === 'revive') {
         this.model.inner.rotation.z = Math.min(1.4, this.model.inner.rotation.z + dt * 4);
         if (this.stateT <= 0) { this.hp = this.maxHp * 0.45; this.state = 'chase'; this.model.inner.rotation.z = 0; this.dyingVisual = false; G.fx.smoke(this.pos, 8, 1, 0x3a5a4a, 1, 1); G.sfx.monster(this.pos, 'roar', def.pitch * 1.3, 0.6); }

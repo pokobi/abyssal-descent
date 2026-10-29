@@ -827,6 +827,7 @@
         <button class="btn" id="p-help">🎮 操作方法</button>
         ${G.Dev && G.Dev.on() ? '<button class="btn" id="p-dev">🛠 デバッグ（F9）</button>' : ''}
         ${G.Tutorial.active ? '<button class="btn" id="p-tutend">📘 チュートリアルを終了して本編へ</button>' : ''}
+        ${G.game.canSuspend() ? '<button class="btn" id="p-susp">🏠 タイトルへ（中断）<small style="display:block;font-size:11px;color:var(--dim);margin-top:2px">ランはこのまま残り、タイトルの「続きから」で再開できます</small></button>' : ''}
         <button class="btn" id="p-quit">🏳 諦めてタイトルへ</button>
       </div><div style="margin-top:12px;font-size:12px;color:var(--dim)">エリア ${G.game.area}</div></div>`, 'dim');
     s.querySelector('#p-resume').onclick = () => G.game.resume();
@@ -844,6 +845,7 @@
     s.querySelector('#p-help').onclick = () => { G.sfx.ui('open'); UI.help(() => UI.pause()); };
     { const d = s.querySelector('#p-dev'); if (d) d.onclick = () => { G.sfx.ui('open'); G.ui.clearScreen(); G.Dev.open(() => UI.pause()); }; }
     const te = s.querySelector('#p-tutend'); if (te) te.onclick = () => { G.sfx.ui('select'); G.Tutorial.finish(); };
+    { const b = s.querySelector('#p-susp'); if (b) b.onclick = () => { G.sfx.ui('click'); G.game.suspend(); }; }
     s.querySelector('#p-quit').onclick = () => { G.sfx.ui('click'); UI.choice('本当に諦めますか？', 'このランの進行は失われます（記録は保存されます）。', [{ icon: '🏳', label: '諦める', onPick: () => G.game.abandon() }], () => UI.pause()); };
   };
   UI.clickToResume = function () {

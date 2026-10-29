@@ -1943,6 +1943,13 @@
     setTimeout(() => { if (GM.state === 'resuming' && !I.locked) G.ui.clickToResume(); }, 400);
   };
   GM.abandon = function () { GM.clearRun(); recordRun(); GM.toTitle(); };
+  // leave for the title and keep the run: the slot keeps it, and the mid-area snapshot (taken right now) lets 続きから pick up where you stood
+  GM.canSuspend = () => !!(GM.run && GM.slot && !GM.run.dev && !GM.tutorial && !G.Tutorial.active && !(G.Dev && G.Dev.on()) && GM.loadRun());
+  GM.suspend = function () {
+    if (!GM.canSuspend()) return;
+    G.MidSave.tick();
+    GM.toTitle();
+  };
   GM.playerDied = function () {
     GM.state = 'dead';
     G.sfx.death();

@@ -1042,6 +1042,7 @@
       // distance falloff: full damage up close, fading towards the weapon's range (long-range arms such as snipers / marksman rifles keep full damage)
       const FP = W.FALLOFF[w.def.arch];
       if (FP) fall = Math.min(fall, 1 - (1 - FP[1]) * U.clamp((dist / s.range - FP[0]) / (1 - FP[0]), 0, 1));
+      if (h.e.noFalloff) fall = 1; // the last guardian stands across the void: every gun has to reach it
       const info = {
         src: 'bullet', head: h.part === 'head', part: h.part, headMul: s.headMul, weapon: w, dir: dir.clone(), pos: hp,
         elem: s.elem, elemChance: s.elemChance, shieldMul: s.shieldMul, critBonus: s.critChance, eliteBonus: s.eliteDmg || 0,

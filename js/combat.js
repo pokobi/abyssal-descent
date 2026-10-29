@@ -536,17 +536,20 @@
     if (!P || P.dead || (G.game.state !== 'playing' && G.game.state !== 'inv')) return 0;
     info = info || {};
     if (P.invulnT > 0 || (G.game.dev && G.game.dev.god)) return 0;
-    amount *= 1 + P.stats.enemyDmg;
-    if (G.game.enrage && G.game.enrage.lv && info.src !== 'fall' && info.src !== 'dot') amount *= G.game.enrage.dmg; // a fight that drags on (see game.js updateEnrage)
-    // defence (from armour) is its own reduction, applied before the percentage ones
-    amount *= C.ENEMY_DMG * C.defMul(P.stats.defense);
-    if ((info.src === 'explosion' || info.src === 'aoe') && P.stats.blastRes) amount *= Math.max(0.2, 1 - P.stats.blastRes);
-    if (Math.random() < Math.min(0.75, P.stats.dodge)) { G.ui.toastSmall('回避!'); G.sfx.whoosh(0.2, 0.4); return 0; }
+    // info.fixed: an exact share of max HP (the last guardian's gravity crash): no scaling, defence, armour or dodge; shields and guard buffs still count
+    if (!info.fixed) {
+      amount *= 1 + P.stats.enemyDmg;
+      if (G.game.enrage && G.game.enrage.lv && info.src !== 'fall' && info.src !== 'dot') amount *= G.game.enrage.dmg; // a fight that drags on (see game.js updateEnrage)
+      // defence (from armour) is its own reduction, applied before the percentage ones
+      amount *= C.ENEMY_DMG * C.defMul(P.stats.defense);
+      if ((info.src === 'explosion' || info.src === 'aoe') && P.stats.blastRes) amount *= Math.max(0.2, 1 - P.stats.blastRes);
+      if (Math.random() < Math.min(0.75, P.stats.dodge)) { G.ui.toastSmall('回避!'); G.sfx.whoosh(0.2, 0.4); return 0; }
+    }
     const ctx = { amount, red: 0, src: info.src || 'melee', attacker: info.attacker, elem: info.elem };
     G.buffs.emit('preDamaged', ctx);
     if (ctx.block) return 0;
     if (P.pileState === 'charge') ctx.red += 0.5;
-    let armor = U.clamp(P.stats.armor + ctx.red, -1, 0.85);
+    let armor = info.fixed ? 0 : U.clamp(P.stats.armor + ctx.red, -1, 0.85);
     let dmg = amount * (1 - armor);
     if (P.has('d_iron')) dmg = Math.min(dmg, P.stats.maxHp * 0.25);
     if (dmg <= 0) return 0;

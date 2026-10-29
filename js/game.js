@@ -341,7 +341,7 @@
     // fog only tints slightly (keep the road readable); darkness and colour do the work
     const DC = GM.bossDef && GM.bossDef.final ? DREAD_F : DREAD;
     scene.fog.color.copy(b.fog).lerp(DC, k * 0.45);
-    scene.fog.density = b.fogD * (1 + k * 0.45);
+    scene.fog.density = b.fogD * (1 + k * 0.45) * (GM.bossEngaged && w.fogK ? w.fogK : 1);
     if (scene.background && scene.background.isColor && b.bg) scene.background.copy(b.bg).lerp(DC, k * 0.55);
     // lightning flash brightens everything for a moment
     GM._flashK = Math.max(0, (GM._flashK || 0) - dt * 3.5);
@@ -395,8 +395,10 @@
       }
       if (k > 0.7) { GM._hbT = (GM._hbT || 0) - dt; if (GM._hbT <= 0) { GM._hbT = 1.15 - (k - 0.7) * 1.3; G.sfx.heartbeat(0.4 + (k - 0.7) * 2); GM._pulse = Math.max(GM._pulse, 0.6 + (k - 0.7)); } }
       // crossing the gate: the portcullis slams shut and the guardian awakens
-      if (P.pos.z < w.arenaD - 3 && !P.dead) {
+      // (the last field: the fight starts once you step off the entrance ledge onto the tiles, and the ledge is sealed behind you)
+      if (P.pos.z < (w.ledgeZ ? w.ledgeZ - 1.5 : w.arenaD - 3) && !P.dead && (!w.ledgeZ || P.grounded)) {
         GM.bossEngaged = true;
+        if (w.ledgeZ) G.bosses.terrain.seal(w);
         const g = w.bossGate;
         w.addCollider(g.x - g.w / 2, 0, g.z0, g.x + g.w / 2, 7, g.z1 + 0.2, { surf: 'metal', noGrapple: true });
         GM.gateDrop = 0.0001;

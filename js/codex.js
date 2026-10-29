@@ -121,7 +121,7 @@
         html += '<div style="margin-top:4px;font-size:12px;color:var(--dim)">基準：ノーマル・エリア7の守護者（難易度やエリアで変わります）</div>';
         if (st.weak.length) html += `<div style="margin-top:6px"><span class="tag">🎯 部位: ${st.weak.map(U.esc).join(' / ')}</span></div>`;
       }
-      html += `<div style="margin-top:6px">${o.mech.map((m) => `<div style="padding:4px 0">◆ ${m}</div>`).join('')}</div><div style="margin-top:8px"><span class="tag">⚔ 出現: ${o.id === 'sovereign' ? 'エクストラのエリア18（専用のフィールド）' : (Object.keys(G.Run.BOSS_POOLS).filter((f) => G.Run.BOSS_POOLS[f].includes(o.id)).map((f) => G.Run.FIELD_NAME[f]).join('・') || '—') + 'の守護者'}</span></div>`;
+      html += `<div style="margin-top:6px">${o.mech.map((m) => `<div style="padding:4px 0">◆ ${m}</div>`).join('')}</div><div style="margin-top:8px"><span class="tag">⚔ 出現: ${o.id === 'sovereign' ? 'エクストラの最終エリア（専用のフィールド）' : (Object.keys(G.Run.BOSS_POOLS).filter((f) => G.Run.BOSS_POOLS[f].includes(o.id)).map((f) => G.Run.FIELD_NAME[f]).join('・') || '—') + 'の守護者'}</span></div>`;
     } else if (tab === 'stage') {
       html += stageDetail(o);
     } else if (tab === 'attachment') {
@@ -209,7 +209,7 @@
       const b = m.boss;
       const box = new THREE.Box3().setFromObject(m.root);
       const names = [...new Set(b.parts.map((p) => p.def && p.def.name).filter((n) => n && n !== o.name))].slice(0, 5);
-      return (bossCache[o.id] = { hp: Math.round(b.maxHp), dmg: b.dmgScale, size: box.max.y - box.min.y, weak: names });
+      return (bossCache[o.id] = { hp: Math.round(b.totalHp || b.maxHp), // (a guardian with two forms reports both bars together) dmg: b.dmgScale, size: box.max.y - box.min.y, weak: names });
     } finally { R.cur = keepRun; GM.area = keepArea; }
   }
   function bossHpMax() {

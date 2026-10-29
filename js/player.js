@@ -232,7 +232,7 @@
       this.dragT = Math.max(0, (this.dragT || 0) - dt); // reeled in by a chain / hook: no control of your own
       if (this.pullT > 0) { this.pullT -= dt; this.vel.x = this.pullDir.x * this.pullSpd; this.vel.z = this.pullDir.z * this.pullSpd; } // the gravity pull of an ordinary foe (depth.js): a fixed, short glide
       if (this.grounded && this.pileFree && !this.pileState && this._pileBounced && this.vel.y <= 0) { this.pileFree = false; this._pileBounced = false; }
-      if (crouchHit && !this.grounded && !this.pileState && !this.mantle) {
+      if (crouchHit && !this.grounded && !this.pileState && !this.mantle && this.liftVy == null) {
         const below = w.groundAt(this.pos, this.hw, 60);
         if (this.pos.y - below > 1.3 || below === -Infinity) {
           if (this.pileReady()) this.startPile();
@@ -327,7 +327,8 @@
         if (wl === 0 && !this.has('m_bunny')) { this.vel.x *= Math.exp(-0.6 * dt); this.vel.z *= Math.exp(-0.6 * dt); }
       }
       // vertical
-      if (this.pileState !== 'charge') {
+      if (this.liftVy != null) this.vel.y = this.liftVy; // held by the last guardian's gravity reversal (bosses6.js)
+      else if (this.pileState !== 'charge') {
         if (this.grapple.state === 'attached') this.vel.y -= g * 0.6 * dt;
         else this.vel.y -= g * dt;
       }
@@ -434,7 +435,7 @@
     fellInPit() {
       const wf = G.world.fallFrac || 0.15;
       let dmg = this.has('m_feather') ? 0 : Math.round(this.stats.maxHp * wf);
-      if (G.world.fallSpot) { dmg = Math.min(dmg, Math.max(0, Math.floor(this.hp) - 1)); this.pos.copy(G.world.fallSpot); } // the last field: a heavy fall that never kills, then back to the entrance ledge
+      if (G.world.fallSpot) { dmg = Math.min(dmg, Math.max(0, Math.floor(this.hp) - 1)); this.pos.copy(G.world.fallSpotAt ? G.world.fallSpotAt(this.pos) : G.world.fallSpot); } // the last field: a heavy fall that never kills, then back on the nearest whole tile
       else this.pos.copy(this.lastSafe);
       this.pos.y += 0.05;
       this.vel.set(0, 0, 0);

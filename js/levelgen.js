@@ -238,13 +238,14 @@
     // south wall (z = D..D+T) — the sky island is open on the south/east/west edges
     if (OUT !== 'sky') wallBlock('S', -WALL_T, W + WALL_T, 0, H);
     // north wall with one or more exit openings
+    // (opts.openNorth: the last guardian's field has no north wall at all: the void runs on to the giant across it)
     let wx = -WALL_T;
     for (const gx of gxs) {
       wallBlock('N', wx, gx - 2.5, 0, H);
       wallBlock('N', gx - 2.5, gx + 2.5, gh, H);
       wx = gx + 2.5;
     }
-    wallBlock('N', wx, W + WALL_T, 0, H);
+    if (!opts.openNorth) wallBlock('N', wx, W + WALL_T, 0, H);
     // west / east (a void arena only keeps them along the road)
     const sideZ0 = opts.voidArena ? opts.arenaD : 0;
     if (OUT !== 'sky') {
@@ -263,7 +264,7 @@
     } else if (OUT === 'ruins') {
       // crenellated city walls under an open sky
       const mer = (x0, z0, x1, z1) => w.solid('block', x0, H, z0, x1, H + 1.0, z1, { uv: 2, noGrapple: true });
-      for (let x = -WALL_T + 0.3; x < W + WALL_T - 1; x += 1.8) { mer(x, -WALL_T, x + 0.9, -WALL_T + 0.7); mer(x, D + WALL_T - 0.7, x + 0.9, D + WALL_T); }
+      for (let x = -WALL_T + 0.3; x < W + WALL_T - 1; x += 1.8) { if (!opts.openNorth) mer(x, -WALL_T, x + 0.9, -WALL_T + 0.7); mer(x, D + WALL_T - 0.7, x + 0.9, D + WALL_T); }
       for (let z = 0.3; z < D - 1; z += 1.8) { mer(-WALL_T, z, -WALL_T + 0.7, z + 0.9); mer(W + WALL_T - 0.7, z, W + WALL_T, z + 0.9); }
     } else {
       // sky island: the temple facade on the north gets a golden crest
@@ -282,7 +283,7 @@
       w.visual('trim', -0.06, 0, sideZ0, 0, 0.5, D, { uv: 1 }); w.visual('trim', W, 0, sideZ0, W + 0.06, 0.5, D, { uv: 1 });
       w.visual('trim', 0, 0, D, W, 0.5, D + 0.06, { uv: 1 });
     }
-    w.visual('trim', 0, H - 0.6, -0.02, W, H, 0, { uv: 1 });
+    if (!opts.openNorth) w.visual('trim', 0, H - 0.6, -0.02, W, H, 0, { uv: 1 });
     // buttresses + torches
     const butt = (x, z, side) => {
       const bw = 0.7, bd = 0.9, bh = H - 2.5;
@@ -306,9 +307,9 @@
     for (let x = sp; x < W - 2; x += sp) {
       const notched = (side, xx, r) => nts.some((n) => n.side === side && xx + r > n.a0 && xx - r < n.a1); // strata: no buttress or torch where a room is dug into the wall
       if (Math.abs(x - W / 2) > 5 && OUT !== 'sky' && !notched('S', x, 0.8)) butt(x, 0, 'S');
-      if (gxs.every((g) => Math.abs(x - g) > 5.2) && !notched('N', x, 0.8)) butt(x, 0, 'N');
+      if (gxs.every((g) => Math.abs(x - g) > 5.2) && !notched('N', x, 0.8) && !opts.openNorth) butt(x, 0, 'N');
       if (Math.abs(x - sp / 2 - W / 2) > 4 && OUT !== 'sky' && !notched('S', x - sp / 2, 0.3)) P().torch(w, x - sp / 2, 3.3 + (opts.southY || 0), D, 'nz');
-      if (gxs.every((g) => Math.abs(x - sp / 2 - g) > 4.8) && !notched('N', x - sp / 2, 0.3)) P().torch(w, x - sp / 2, 3.3, 0, 'pz');
+      if (gxs.every((g) => Math.abs(x - sp / 2 - g) > 4.8) && !notched('N', x - sp / 2, 0.3) && !opts.openNorth) P().torch(w, x - sp / 2, 3.3, 0, 'pz');
     }
     // entrance gate (decorative, closed portcullis on the south wall)
     // the entrance gate sits on whatever ground the south end has (boss roads start far below)

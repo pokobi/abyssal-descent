@@ -450,7 +450,7 @@
     return obj;
   };
 
-  // ---------------------------------------------------------------- the last guardian's field (extra, area 18)
+  // ---------------------------------------------------------------- the last guardian's field (extra, the last area)
   // A floating arena of 7x7 stone tiles over a bottomless dark, under a crimson sky. The guardian tears tiles away and raises them again
   // (see bosses6.js); whoever falls takes a heavy hit and is put back on the ledge at the entrance.
   F.TILE_N = 7; F.TILE_S = 8;
@@ -466,7 +466,7 @@
     const pit = new Uint8Array(W * (AD + 3));
     for (let z = 0; z < LEDGE; z++) for (let x = 0; x < W; x++) pit[z * W + x] = 1;
     H.floors(w, W, AD + 3, pit, 'cobble');
-    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, noExits: true, voidArena: true, arenaD: AD, h: 8 });
+    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, noExits: true, voidArena: true, arenaD: AD, h: 8, openNorth: true });
     const nook = roadHall(w, rng, W, AD, D, true);
     const vx = nook.nx, vz = nook.nz;
     w.stoneVendor = F.stoneVendor(w, vx - 0.6, vz, 0, 1);
@@ -479,6 +479,11 @@
     w.arenaCenter = V(cx, 0, cz);
     w.bossPillars = [];
     w.fallFrac = 0.32; w.fallSpot = V(cx, 0.1, AD - 4); // a fall costs 32% x the enemy-damage factor (1.25) = about 40% of max HP
+    // once the fight is on you come back on the whole tile nearest to where you fell (the ledge is sealed then, see bosses6.js TR.seal)
+    w.fallSpotAt = (p) => { const t = G.bosses.terrain.nearestSafe(p); return t && G.game.bossEngaged ? V(t.cx, 0.1, t.cz) : w.fallSpot; };
+    w.ledgeZ = LEDGE;
+    w.bossHome = V(cx, 0, -16); // the guardian stands across the void, north of the tiles, out of reach
+    w.fogK = 0.5; // thinner fog during the fight: the giant must be readable 30-80 m away
     // the tiles: one slab + one collider each, so a tile can be taken away and given back
     w.tiles = [];
     const x0 = cx - N * S / 2, z0 = cz - N * S / 2;
@@ -492,7 +497,7 @@
       w.tiles.push({ i, j, x0: tx0, z0: tz0, x1: tx0 + S, z1: tz0 + S, cx: tx0 + S / 2, cz: tz0 + S / 2, mesh: m, col, state: 'up', timer: 0, dy: 0, vy: 0 });
     }
     // the dark below, glowing violet-red far down
-    w.visual('voidglow', 0, -16, 0, W, -15.9, LEDGE, { uv: 6, grad: false });
+    w.visual('voidglow', -40, -16, -60, W + 40, -15.9, LEDGE, { uv: 6, grad: false }); // (on past the open north side, under the guardian)
     for (let z = 8; z < LEDGE; z += 18) for (let x = 8; x < W; x += 20) w.addLight(x, -9, z, { flame: 0, intensity: 14, range: 20, color: '#ff3a8a', emit: false, prio: 0.6, steady: true });
     // the entrance ledge: braziers and a low parapet
     for (const sx of [-1, 1]) { P().brazier(w, cx + sx * 12, 0, LEDGE + 3, 1.2); P().pillarSquare(w, cx + sx * 20, LEDGE + 2, 0, 9, 1.4); }

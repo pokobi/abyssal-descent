@@ -122,7 +122,7 @@
       <span class="iv-eql">${S.name}</span>${it ? `<div class="iv-it t-armor" data-uid="${it.uid}" data-where="eq:${S.id}" style="--rc:${R(d.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.95)}">${G.armorIcon(d)}</span><em class="iv-def">🛡${d.def}</em>${it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : ''}${durBar(it)}</div>` : `<span class="iv-ghosticon">${S.icon}</span>`}</div>`;
   }
   function weaponBoxes() {
-    const W = G.weapons, guns = W.gunsInOrder(), A = G.ATT_BY_ID;
+    const W = G.weapons, guns = W.gunSlots(), A = G.ATT_BY_ID;
     const out = [0, 1].map((i) => {
       const w = guns[i];
       if (!w) return `<div class="iv-wbox empty" data-wslot="${i}"><div class="iv-wh"><kbd>${G.K('w' + (i + 1))}</kbd><span class="wnm"><b class="dim">— 武器スロット —</b></span></div></div>`;
@@ -238,7 +238,7 @@
   function findIt(el) {
     const uid = +el.dataset.uid, where = el.dataset.where;
     if (where.startsWith('eq:')) { const s = where.slice(3); return { it: P.equip[s], from: null, eq: s }; }
-    if (where.startsWith('as:')) { const [, i, sl] = where.split(':'); const w = G.weapons.gunsInOrder()[+i], id = w && w.atts[sl]; return { it: id ? IV.make('att', id, 1) : null, from: null, as: { w, sl } }; }
+    if (where.startsWith('as:')) { const [, i, sl] = where.split(':'); const w = G.weapons.gunSlots()[+i], id = w && w.atts[sl]; return { it: id ? IV.make('att', id, 1) : null, from: null, as: { w, sl } }; }
     const c = contOf(where); return { it: c && c.items.find((o) => o.uid === uid), from: c, eq: null };
   }
 
@@ -267,7 +267,7 @@
     const html = () => {
       const SU = G.StatusUI;
       if (kind === 'm') return SU.meleeTip();
-      if (kind === 'w') { const w = G.weapons.gunsInOrder()[+el.dataset.wslot]; return w ? SU.gunTip(w) : ''; }
+      if (kind === 'w') { const w = G.weapons.gunSlots()[+el.dataset.wslot]; return w ? SU.gunTip(w) : ''; }
       const k = el.dataset.sk; if (k === 'pile') return SU.pileTip();
       const sk = P.skills[+k]; return sk ? SU.skillTip(sk, G.input.skillKey(+k)) : '';
     };
@@ -279,7 +279,7 @@
       // right click on a gun: its menu (the last gun cannot be thrown away)
       if (e.button === 2 && kind === 'w' && !el.classList.contains('empty') && !e.target.closest('.iv-as')) {
         e.preventDefault(); closeMenu(); hideTip();
-        const w = G.weapons.gunsInOrder()[+el.dataset.wslot]; if (!w) return;
+        const w = G.weapons.gunSlots()[+el.dataset.wslot]; if (!w) return;
         popMenu([
           ['📥 インベントリにしまう', () => { if (GM.stowGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🎒 ${w.def.name} をしまった`); } else { G.sfx.ui('deny'); G.ui.toastSmall('🎒 インベントリに空きがない'); } render(); }],
           ['🗑️ 捨てる', () => { if (GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else G.sfx.ui('deny'); render(); }],
@@ -411,7 +411,7 @@
     }
     if (it.type === 'armor') add(`.iv-eq[data-eq="${G.ARMOR_BY_ID[it.id].slot}"]`);
     else if (it.type === 'att') {
-      const a = G.ATT_BY_ID[it.id], guns = G.weapons.gunsInOrder();
+      const a = G.ATT_BY_ID[it.id], guns = G.weapons.gunSlots();
       root.querySelectorAll('.iv-as').forEach((n) => { const [i, sl] = n.dataset.as.split(':'); const w = guns[+i]; if (w && sl === a.slot && a.compat(w.def)) n.classList.add('iv-glow'); });
     } else { const k = IV.specOf(it); if (k === 'g') add('.iv-spec[data-spec="g"]'); else if (k) add('.iv-spec[data-spec="c1"],.iv-spec[data-spec="c2"]'); }
   }
@@ -521,12 +521,12 @@
       render(); return;
     }
     if (f.wslot !== undefined && t && t.ground) {
-      const w = G.weapons.gunsInOrder()[f.wslot];
+      const w = G.weapons.gunSlots()[f.wslot];
       if (w && GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else G.sfx.ui('deny');
       render(); return;
     }
     if (f.wslot !== undefined && t && t.grid && t.key === 'bag') {
-      const w = G.weapons.gunsInOrder()[f.wslot];
+      const w = G.weapons.gunSlots()[f.wslot];
       if (w && GM.stowGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🎒 ${w.def.name} をしまった`); } else { G.sfx.ui('deny'); G.ui.toastSmall('🎒 インベントリに空きがない'); }
       render(); return;
     }
@@ -535,10 +535,10 @@
     if (!t) { render(); return; }
     if (t.ground) { if (f.as) { render(); return; } discard(f); return; }
     // a part dropped anywhere on a gun's box (even on the wrong little socket) goes into the socket it belongs to
-    if (t.as && it.type === 'att' && G.ATT_BY_ID[it.id] && !(f.as && f.as.w === G.weapons.gunsInOrder()[+t.as.split(':')[0]])) t = { wslot: +t.as.split(':')[0] };
+    if (t.as && it.type === 'att' && G.ATT_BY_ID[it.id] && !(f.as && f.as.w === G.weapons.gunSlots()[+t.as.split(':')[0]])) t = { wslot: +t.as.split(':')[0] };
     if (t.melee) { if (it.type === 'melee' && GM.equipArm(it, f.from)) G.sfx.mech('switch'); else { G.sfx.ui('deny'); if (it.type !== 'melee') G.ui.toastSmall('そこには近接武器しか持てない'); } render(); return; }
     if (t.wslot !== undefined) {
-      const w = G.weapons.gunsInOrder()[t.wslot];
+      const w = G.weapons.gunSlots()[t.wslot];
       if (it.type === 'gun') { if (GM.equipArm(it, f.from, w)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); return; }
       if (it.type === 'att' && w) { if (f.as) { if (f.as.w !== w && GM.moveAtt(it.id, f.as.w, w)) G.sfx.mech('magIn'); else G.sfx.ui('deny'); render(); } else if (isMine(f.from)) equipAtt(it, w); else { G.sfx.ui('deny'); render(); } return; }
       G.sfx.ui('deny'); render(); return;
@@ -546,7 +546,7 @@
     if (t.sk !== undefined) { G.sfx.ui('deny'); render(); return; }
     if (IV.isKit(it) && (t.eq || t.grid)) { const kp = kitPiece(t, it, rot); if (kp) { mend(f, it, kp); return; } } // a repair kit dropped on an armour piece mends it instead of moving
     if (t.as) {
-      const [wi, sl] = t.as.split(':'), w = G.weapons.gunsInOrder()[+wi];
+      const [wi, sl] = t.as.split(':'), w = G.weapons.gunSlots()[+wi];
       const a = it.type === 'att' && G.ATT_BY_ID[it.id];
       if (!a || !w) { G.sfx.ui('deny'); G.ui.toastSmall('そこにはアタッチメントしか付けられない'); }
       else if (a.slot !== sl) { G.sfx.ui('deny'); G.ui.toastSmall(`${a.name} は ${G.ATT_SLOTS[a.slot].icon}${G.ATT_SLOTS[a.slot].name} スロット用`); }

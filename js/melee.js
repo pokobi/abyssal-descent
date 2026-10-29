@@ -457,6 +457,8 @@
   W.orderList = () => W.order().filter(Boolean);
   // guns in key order, and a "[1] " style prefix for menus (forge, attachments, shop swaps follow the key layout)
   W.gunsInOrder = () => W.orderList().filter((t) => t !== 'm');
+  // the two gun keys exactly as bound, an empty key staying null (what the inventory screen draws: slot i is key i + 1)
+  W.gunSlots = () => { const o = W.order(); return [o[0] || null, o[1] || null]; };
   W.keyLabel = (t) => { const i = W.order().indexOf(t); return i < 0 ? '' : i < 3 ? `[${i + 1}] ` : '[⇕] '; };
   W.curTok = () => (G.player.meleeMode ? 'm' : G.player.weapon);
   W.selectTok = function (t) { if (t === 'm') W.setMelee(); else if (t) W.switchTo(G.player.weapons.indexOf(t)); };

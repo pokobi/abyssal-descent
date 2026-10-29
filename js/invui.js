@@ -70,6 +70,15 @@
     G.sfx.ui('click');
   };
   UIV.toggle = () => (root ? UIV.close() : UIV.open(null));
+  // walking (or being knocked) away from the corpse / chest you are looting closes it: a body's middle lies a metre or two off its feet, so it gets more room
+  UIV.tick = function () {
+    if (!root || !IV.openCont || !IV.openSrc || drag) return;
+    const s = IV.openSrc, at = s.e ? s.e.pos : s.pos; if (!at || !P) return;
+    if (Math.hypot(P.pos.x - at.x, P.pos.z - at.z) > (s.e ? 5.5 : 4.5) || Math.abs(P.pos.y - at.y) > 3.5) {
+      UIV.close();
+      G.ui.toastSmall(s.e ? '💀 亡骸から離れた' : '📦 宝箱から離れた');
+    }
+  };
   IV.onChange = () => { if (root && !drag) render(); };
 
   // ---------------- render ----------------

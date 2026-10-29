@@ -2153,6 +2153,7 @@
         for (const k of Object.keys(I.pressed)) if (!mv.has(k)) delete I.pressed[k];
         I.mouse = [false, false, false, false, false]; I.mpressed = [false, false, false, false, false]; I.wheel = 0;
         update(dt);
+        if (G.InvUI.tick) G.InvUI.tick();
       }
       else if (GM.state === 'buff') {
         // the boon choice is an overlay: the world keeps running and WASD still moves while the cursor picks a card;

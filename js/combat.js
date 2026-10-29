@@ -620,6 +620,7 @@
       case 'web': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.9 }), 0.16, 0.16, 0.16); break;
       case 'spore': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x8aa040, emissive: 0x1a2a00, roughness: 0.9, transparent: true, opacity: 0.8 }), 0.25, 0.25, 0.25); break;
       case 'boulder': add(PG.dode, mats.rock, 0.6, 0.55, 0.6); break;
+      case 'rock': { const sp = new THREE.Group(); g.add(sp); g.userData.spin = sp; const st = new THREE.Mesh(PG.dode, mats.rock); st.scale.setScalar(0.26); sp.add(st); break; } // a tumbling stone: scale = the held one, radius = what hits
       case 'frostorb': glow(0xbfe8ff, 1.0); glow(0xffffff, 0.3); break;
       case 'darkorb': add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x1a0820 }), 0.25, 0.25, 0.25); glow(0xa040ff, 1.1); break;
       default: glow(0xffffff, 0.4);
@@ -664,6 +665,7 @@
       case 'orb': case 'darkorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.25, 0.02, 0.6, 0.3, 1.0, 0.8, 0, 1); break;
       case 'soul': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.5, 0.8, 1.0, 0.8, 0, 1); break;
       case 'frostorb': case 'icespear': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.2, 0.02, 0.7, 0.9, 1.0, 0.8, 0, 1); break;
+      case 'rock': { const sp = p.mesh.userData.spin; if (sp) { sp.rotation.x += dt * 11; sp.rotation.z += dt * 6; } if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.2, 0.2), U.rand(-0.1, 0.3), U.rand(-0.2, 0.2), 0.45, 0.06, 0.16, 0.55, 0.52, 0.47, 0.5, -0.1, 1); break; }
       case 'acid': case 'spit': if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, -1, 0, 0.5, 0.08, 0.04, 0.5, 0.7, 0.1, 0.9, 5, 0); break;
       case 'bolt': case 'harpoon': case 'spear': case 'arrow': if (Math.random() < 0.4) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.04, 0.08, 0.7, 0.7, 0.7, 0.25, 0, 0); break;
     }
@@ -787,7 +789,7 @@
     return false;
   }
   // how big an enemy shot looks (the bright core / the solid part, not its soft glow): a shot only hits you with what you can see of it
-  const SHOT_VIS = { soul: 0.28, orb: 0.32, darkorb: 0.34, frostorb: 0.38, fireball: 0.46, bigfire: 0.95, acid: 0.34, web: 0.2, spit: 0.16, spore: 0.27, boulder: 0.62, icespear: 0.16 };
+  const SHOT_VIS = { soul: 0.28, orb: 0.32, darkorb: 0.34, frostorb: 0.38, fireball: 0.46, bigfire: 0.95, acid: 0.34, web: 0.2, spit: 0.16, spore: 0.27, boulder: 0.62, icespear: 0.16, rock: 0.26 };
   function hitPlayer(p, step) {
     const pl = G.player, rad = Math.min(p.radius, SHOT_VIS[p.kind] ?? p.radius);
     // segment vs vertical capsule

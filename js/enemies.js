@@ -297,7 +297,7 @@
       },
     };
   };
-  // gargoyle: a crouching stone fiend held aloft by heavy wings; its gaze is the beam
+  // gargoyle: a crouching stone fiend held aloft by heavy wings; it picks up a stone and throws it
   B.gargoyle = function (root, M) {
     const body = joint(root, 0, 0.2, 0);
     mesh(body, PG.box, M.skin, 0.5, 0.55, 0.42, 0, 0.1, 0, 0.35);
@@ -317,10 +317,13 @@
     }
     const arms = [];
     for (const s of [-1, 1]) { const a = joint(body, s * 0.28, 0.2, 0.15); mesh(a, PG.box, M.skin, 0.1, 0.38, 0.1, 0, -0.18, 0.05, 0.4); arms.push(a); }
+    // the stone in its right hand: the very model the thrown one uses (same scale, so what you see is what hits)
+    const rock = mesh(arms[1], PG.dode, G.world.mats.rock, 0.26, 0.26, 0.26, 0, -0.42, 0.1); rock.visible = false;
+    let relT = null; // when the throw was released (the arm swings through from there)
     const L = [leg(body, M, -0.14, -0.2, 0, 0.35, 0.06), leg(body, M, 0.14, -0.2, 0, 0.35, 0.06)];
     const tail = joint(body, 0, -0.1, -0.25); for (let i = 0; i < 3; i++) mesh(tail, PG.box, M.sec, 0.05, 0.05, 0.25, 0, -i * 0.06, -0.12 - i * 0.22, 0.3);
     return {
-      J: { body, head, wings }, h: 1.4, r: 0.6, fly: true,
+      J: { body, head, wings, rock }, h: 1.4, r: 0.6, fly: true,
       hits: [{ n: head, r: 0.2, part: 'head' }, { n: body, r: 0.38, part: 'body', o: V(0, 0.1, 0) }, { n: wings[0].sh, r: 0.25, part: 'body', o: V(-0.4, 0, -0.2) }, { n: wings[1].sh, r: 0.25, part: 'body', o: V(0.4, 0, -0.2) }],
       orn: { head, back: body, backZ: [-0.2, 0.1], backY: 0.35 },
       animate(a) {
@@ -328,6 +331,9 @@
         for (const wg of wings) { wg.sh.rotation.z = wg.s * (f * 0.7 + 0.15); wg.tip.rotation.z = wg.s * f * 0.45; }
         head.rotation.x = -a.wind * 0.4 + a.flinch * 0.5;
         arms.forEach((ar, i) => { ar.rotation.x = -0.3 - a.atk * 0.8 + Math.sin(a.t * 3 + i) * 0.1; });
+        // the right arm cocks the stone back over its shoulder while it winds up, then whips it forward at the release
+        if (a.wind > 0.02) { rock.visible = true; rock.scale.setScalar(0.26 * Math.min(1, a.wind * 3)); arms[1].rotation.x = -0.3 - Math.min(1, a.wind * 1.15) * 3.0; relT = null; }
+        else { rock.visible = false; if (a.atk >= 1 && relT === null) relT = a.t; if (a.atk <= 0) relT = null; if (relT !== null) arms[1].rotation.x = -3.3 + Math.min(1, (a.t - relT) / 0.12) * 2.9; }
         body.position.y = 0.2 + Math.sin(a.t * 3.5) * 0.08;
       },
     };
@@ -937,7 +943,7 @@
         case 'throw': if (distH < def.range) begin(0.55); break;
         case 'orb': if (distH < def.range) begin(0.6); break;
         case 'spore': if (distH < def.range) begin(0.8); break;
-        case 'beam': if (distH < def.range) begin(1.3, { lockYaw: false }); break;
+        case 'rockthrow': if (distH < def.range) begin(1.0, { lockYaw: false }); break;
         case 'charge': if (distH > 4 && distH < def.range && Math.abs(dy) < 1.5) begin(0.75, { lockYaw: true }); else if (distH < 3) begin(0.4, { bite: true }); break;
         case 'boulder': if (distH > 7 && distH < def.range) begin(0.9, { throwing: true }); else if (distH < 4.2 + this.radius * 0.5 && Math.abs(dy) < 2.5) begin(0.9, { slam: true }); break;
         case 'dashslash': if (distH < def.range) { this.setCloak(false); begin(0.35); } break;
@@ -1017,45 +1023,17 @@
           if (A.t - A.wind > 0.3) end();
           return { x: 0, z: 0 };
         }
-        case 'beam': {
-          // the petrifying gaze: the eyes kindle and the aim line thickens while it tracks you; for the last 0.3 s the aim is locked,
-          // the line flashes white and a ring marks where it will land; then a thick amber beam with a burst of stone chips where it hits
-          const eye = this.centerPos();
+        case 'rockthrow': {
+          // it lifts a stone (shown in its hand, growing), cocks the arm back and throws it: a plain arcing shot you can sidestep
           if (inWind) {
-            if (!A.aim) A.aim = tgt.eye.clone();
-            const lock = A.t >= A.wind - 0.3, k = U.clamp(A.t / A.wind, 0, 1);
-            if (!lock) A.aim.lerp(tgt.eye, Math.min(1, dt * 4));
-            else if (!A.locked) { A.locked = true; G.sfx.zap && G.sfx.zap(eye); }
-            const d = A.aim.clone().sub(eye).normalize();
-            const wh = G.world.raycast(eye, d, 40), L = wh ? wh.t : 40, endp = eye.clone().addScaledVector(d, L);
-            const blink = lock && Math.sin(A.t * 70) > 0;
-            G.fx.beam(eye, endp, lock ? (blink ? 0xffffff : 0xffc040) : 0xff7a20, lock ? 0.05 : 0.014 + k * 0.025, 0.05);
-            // glowing eyes, growing with the charge, and motes drawn into them
-            G.fx.add.spawn(eye.x, eye.y, eye.z, 0, 0, 0, 0.06, 0.4 + k * 0.9, 0.4 + k * 0.9, 1.7, 1.2, 0.45, 1, 0, 0);
-            if (A.t - (A.lightT || -1) > 0.12) { A.lightT = A.t; G.fx.flash(eye, 0xffa030, 10 + k * 30, 0.14, 7); }
-            if (Math.random() < 0.6) { const o = V(U.rand(-1, 1), U.rand(-0.6, 1), U.rand(-1, 1)).normalize().multiplyScalar(1.4); G.fx.add.spawn(eye.x + o.x, eye.y + o.y, eye.z + o.z, -o.x * 3.2, -o.y * 3.2, -o.z * 3.2, 0.3, 0.09, 0.02, 1.7, 1.3, 0.5, 1, 0, 0); }
-            if (lock && wh && !A.mark) { A.mark = true; G.fx.ring(wh.point, 1.1, 0xffd060, 0.3, { start: 0.9 }); }
+            if (Math.random() < dt * 14) { const h = this.model.J.rock.getWorldPosition(V()); G.fx.dust(h, V(0, -1, 0), 0x8a8070, 1); }
             return { x: 0, z: 0 };
           }
-          if (!A.fired) {
-            A.fired = true;
-            const d = A.aim.clone().sub(eye).normalize();
-            const wh = G.world.raycast(eye, d, 60);
-            const L = wh ? wh.t : 60;
-            const endp = eye.clone().addScaledVector(d, L);
-            G.fx.beam(eye, endp, 0xff9a30, 0.32, 0.4); G.fx.beam(eye, endp, 0xffe080, 0.13, 0.35); G.fx.beam(eye, endp, 0xffffff, 0.05, 0.3);
-            G.sfx.fire(eye, true); G.fx.flash(eye, 0xffb040, 40, 0.15, 8); G.fx.flash(endp, 0xff9a30, 50, 0.2, 10);
-            G.fx.sparks(endp, wh ? wh.normal : null, 14, 0xffc060, 8); G.fx.dust(endp, wh ? wh.normal : null, 0x8a8070, 8);
-            if (wh) G.fx.ring(wh.point, 1.4, 0xffb040, 0.35);
-            this.vel.addScaledVector(d, -3); // the recoil of the gaze
-            // distance from player chest to the beam segment
-            const pc = tgt.eye.clone().sub(eye); const tt = U.clamp(pc.dot(d), 0, L);
-            const closest = eye.clone().addScaledVector(d, tt);
-            if (closest.distanceTo(tgt.eye) < 0.75) hitPlayer(this.dmg * 1.4, 'ranged');
-            if (wh) G.fx.decal(wh.point, wh.normal, 'scorch', 0.8);
+          if (!A.done) {
+            A.done = true; this.atk = 1;
+            this.spit('rock', tgt, 21, 0.45, { dmgMul: 1.2, life: 4, from: this.model.J.rock.getWorldPosition(V()) });
           }
-          this.atk = 1;
-          if (A.t - A.wind > 0.4) end();
+          if (A.t - A.wind > 0.45) end();
           return { x: 0, z: 0 };
         }
         case 'charge': {
@@ -1105,20 +1083,24 @@
     }
     spit(kind, tgt, speed, arc, o) {
       o = o || {};
-      const from = this.centerPos(); from.y += this.height * 0.15;
+      const from = o.from || this.centerPos(); if (!o.from) from.y += this.height * 0.15;
       const to = tgt.eye.clone();
       const dist = from.distanceTo(to);
       const t = dist / speed;
       to.addScaledVector(tgt.vel, t * 0.6 * Math.random());
       const grav = arc ? 9 * arc : 0;
       const vel = to.clone().sub(from).divideScalar(t); vel.y += 0.5 * grav * t;
-      const pr = { kind, pos: from, vel, grav, owner: 'enemy', dmg: this.dmg * (o.dmgMul || 1), radius: kind === 'boulder' ? 0.6 : 0.25, life: o.life || 6, attacker: this, elem: this.def.elem || (kind === 'web' ? 'web' : kind === 'spore' ? 'poison' : null) };
+      const pr = { kind, pos: from, vel, grav, owner: 'enemy', dmg: this.dmg * (o.dmgMul || 1), radius: kind === 'boulder' ? 0.6 : kind === 'rock' ? 0.26 : 0.25, life: o.life || 6, attacker: this, elem: this.def.elem || (kind === 'web' ? 'web' : kind === 'spore' ? 'poison' : null) };
       if (o.explode) { pr.explode = o.explode; pr.info = { elem: pr.elem }; }
       if (o.homing) pr.homing = o.homing;
+      if (kind === 'rock') { // shatters on whatever it hits
+        const crumble = (p) => { G.fx.debris(p, G.world.mats.rock, 7, 0.07, 6); G.fx.dust(p, V(0, 1, 0), 0x8a8070, 5); G.sfx.breakObj(p, 'stone'); };
+        pr.onHitPlayer = (q) => crumble(q); pr.onHitWorld = (wh) => crumble(wh.point);
+      }
       if (kind === 'web') pr.onHitPlayer = () => { P.st.slow = 3; G.ui.tint('web', 1.5); };
       if (o.zone) pr.onEnd = (p) => { if (p.life > 0 || true) C.zone(V(p.pos.x, G.world.floorBelow(p.pos.x, p.pos.y + 0.5, p.pos.z), p.pos.z), 3, 5, 'acid', this.dmg * 0.6, { enemy: true, elem: 'poison' }); };
       C.spawnProjectile(pr);
-      if (kind === 'fireball' || kind === 'bigfire') G.sfx.fire(from); else if (kind === 'orb' || kind === 'frostorb') G.sfx.magic(from, 'dark'); else G.sfx.spit(from);
+      if (kind === 'rock') G.sfx.whoosh(0.22, 0.9); else if (kind === 'fireball' || kind === 'bigfire') G.sfx.fire(from); else if (kind === 'orb' || kind === 'frostorb') G.sfx.magic(from, 'dark'); else G.sfx.spit(from);
     }
     blink(dir, d) {
       const np = this.pos.clone().addScaledVector(dir, d);

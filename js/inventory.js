@@ -341,7 +341,7 @@
     const cons = G.ITEMS.filter((i) => i.cat !== 'grenade' && !i.noLoot && !(i.data && i.data.chest));
     return IV.make('item', pickOf(cons, r).id, 1);
   };
-  const KIND_W = { chest: { item: 30, grenade: 10, valuable: 32, armor: 18, att: 10 }, corpse: { item: 32, grenade: 10, valuable: 40, armor: 18 } };
+  const KIND_W = { chest: { item: 30, grenade: 10, valuable: 32, armor: 18, att: 10 }, corpse: { item: 32, grenade: 10, valuable: 40, armor: 18 }, corpseTiny: { item: 40, grenade: 12, valuable: 40 } };
   IV.fill = function (c, n, src, luck, floor) {
     for (let i = 0; i < n; i++) { const kw = Object.assign({}, KIND_W[src]); if (G.Run) kw.valuable *= G.Run.valuableShare(); const it = IV.rollThing(pickR(kw), luck, i === 0 ? floor : 0); IV.put(c, it); }
     return c;
@@ -368,13 +368,22 @@
     }
     return IV.fill(c, n, 'chest', luck, [0, 1, 2][tier] || 0);
   };
-  // corpses: the stronger / higher-level the foe, the more and rarer the loot (always at least one thing)
+  // how big the body is (radius² × height): 0 tiny (imp, bat) · 1 small (hound, skeleton, spider) · 2 medium (slime, gargoyle) · 3 large (beetle, mantis, worm) · 4 huge (ogre, golem)
+  IV.bodyClass = function (e) {
+    const v = (e.radius || 0.5) * (e.radius || 0.5) * (e.height || 1.5);
+    return v < 0.15 ? 0 : v < 0.36 ? 1 : v < 0.6 ? 2 : v < 1.6 ? 3 : 4;
+  };
+  const BODY_GRID = [[3, 2], [4, 2], [4, 3], [5, 3], [6, 4]];
+  // corpses: the bigger the body, the bigger its pack; the stronger / higher-level the foe, the more and rarer the loot (always at least one thing).
+  // a tiny thing carries no armour
   IV.corpseLoot = function (e) {
     const P = G.player, luck = P.stats.luck || 0;
     const worth = (e.champion ? 3 : e.elite ? 2 : e.def.hp >= 200 ? 1 : 0) + (e.marked ? 1 : 0);
-    const c = IV.container(worth >= 2 ? 5 : 4, worth >= 2 ? 4 : 3, e.def.name, 'corpse');
-    const n = Math.max(1, U.randi(1, 2) + worth + (Math.random() < 0.25 ? 1 : 0));
-    return IV.fill(c, n, 'corpse', luck + worth * 0.4, worth >= 3 ? 2 : worth >= 2 ? 1 : 0);
+    const bc = IV.bodyClass(e), [gw, gh] = BODY_GRID[bc], up = worth >= 2 ? 1 : 0;
+    const c = IV.container(gw + up, gh + up, e.def.name, 'corpse');
+    const base = [1, U.randi(1, 2), U.randi(1, 2), U.randi(2, 3), U.randi(2, 4)][bc];
+    const n = Math.min(Math.max(1, base + worth + (bc >= 1 && Math.random() < 0.25 ? 1 : 0)), [2, 3, 5, 6, 9][bc] + up * 2);
+    return IV.fill(c, n, bc === 0 ? 'corpseTiny' : 'corpse', luck + worth * 0.4, worth >= 3 ? 2 : worth >= 2 ? 1 : 0);
   };
 
   // ---------------- corpses ----------------

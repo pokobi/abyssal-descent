@@ -206,10 +206,10 @@
     R.cur = { id: 'normal', lv: 0 }; GM.area = BOSS_REF;
     try {
       const m = G.bosses.buildModelOnly(o.id, BOSS_REF); if (!m) return null;
-      const b = m.boss;
+      const b = m.boss; // (b.totalHp: a guardian with two forms reports both bars together)
       const box = new THREE.Box3().setFromObject(m.root);
       const names = [...new Set(b.parts.map((p) => p.def && p.def.name).filter((n) => n && n !== o.name))].slice(0, 5);
-      return (bossCache[o.id] = { hp: Math.round(b.totalHp || b.maxHp), // (a guardian with two forms reports both bars together) dmg: b.dmgScale, size: box.max.y - box.min.y, weak: names });
+      return (bossCache[o.id] = { hp: Math.round(b.totalHp || b.maxHp), dmg: b.dmgScale, size: box.max.y - box.min.y, weak: names });
     } finally { R.cur = keepRun; GM.area = keepArea; }
   }
   function bossHpMax() {

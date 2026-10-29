@@ -962,7 +962,7 @@
   function updateAirJumpHint(dt) {
     const can = P.stats.maxJumps > 1 && !P.dead && GM.state === 'playing' && !P.grounded && P.coyote <= 0 && P.jumps < P.stats.maxJumps && P.grapple.state !== 'attached' && !P.pileState && !P.mantle && !(P.dragT > 0);
     airJumpT = can ? airJumpT + dt : 0;
-    const on = airJumpT > 0.25; // not while merely stepping off a ledge
+    const on = airJumpT > (P.jumps >= 1 ? 0.04 : 0.25); // right after a jump of your own; a little later when you merely step off a ledge
     if (!airJumpEl) { if (!on) return; airJumpEl = document.createElement('div'); airJumpEl.id = 'airjump-hint'; (G.ui.el && G.ui.el.hud || document.body).appendChild(airJumpEl); }
     const key = G.K('jump');
     if (key !== airJumpKey) { airJumpKey = key; airJumpEl.innerHTML = `<kbd>${U.esc(key)}</kbd>でダブルジャンプ`; }

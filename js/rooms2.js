@@ -316,6 +316,16 @@
       dispose() { G.scene.remove(tag); G.scene.remove(ring); tagT.dispose(); if (el) el.remove(); },
     };
   }
+  // the guardian's gate falls shut behind you (and the last field's entrance ledge is sealed): a mercenary left on the far side is brought in next to you
+  R2.mercFetch = function (a) {
+    const w = G.world; if (!a || !w || GM.stage !== 'boss' || !GM.bossEngaged || P.dead) return;
+    const lim = w.ledgeZ ? w.ledgeZ - 1 : w.arenaD ? w.arenaD - 2 : Infinity, e = a.ent;
+    if (e.pos.z < lim) return;
+    e.pos.set(P.pos.x + 1.5, P.pos.y, P.pos.z - 1.5);
+    const gy = w.groundAt(V(e.pos.x, P.pos.y + 0.8, e.pos.z), 0.2, 12);
+    if (gy > -Infinity) e.pos.y = gy; else e.pos.set(P.pos.x, P.pos.y, P.pos.z);
+    G.fx.smoke(e.pos, 6, 1, 0x8080a0, 1, 1);
+  };
   // spawned at the start of each area while the contract lasts
   R2.spawnMerc = function () {
     const m = GM.run.merc; if (!m || m.left <= 0 || !G.world) return;
@@ -470,7 +480,7 @@
     });
     const fx = allyFx(mdl, d, m);
     const u0 = ally.update, r0 = ally.remove;
-    ally.update = function (dt) { u0.call(this, dt); fx.update(dt, this); };
+    ally.update = function (dt) { u0.call(this, dt); R2.mercFetch(this); fx.update(dt, this); };
     ally.remove = function () { r0.call(this); fx.dispose(); };
     return ally;
   };

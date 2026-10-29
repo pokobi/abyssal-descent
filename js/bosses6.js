@@ -581,6 +581,7 @@
     }
     startLift() {
       const P = Pl();
+      if (BS.swapMerc) { BS.hurtMerc(BS.swapMerc, 1e9); G.fx.ring(P.pos.clone().setY(P.pos.y + 0.2), 4, VIO, 0.5); return; } // aimed at the mercenary: it is simply smashed (capped at half its health)
       this.lift = { ph: 'up', t: 0, top: Math.max(0, P.pos.y) + TOP, hold: 1.5 };
       P.grapple.state = 'none'; P.pileState = null; P.grounded = false;
       G.ui.toast('🌀 重力が反転した！', 'warn'); G.sfx.magic(P.pos, 'dark'); P.addShake(0.4);

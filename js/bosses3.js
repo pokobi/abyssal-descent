@@ -895,6 +895,7 @@
     kill() {
       this.dead = true; this.deathT = 0;
       for (const p of this.parts) p.alive = false;
+      if (G.Rooms2 && G.Rooms2.mercXp && G.game.run && G.game.run.merc) G.Rooms2.mercXp(20);
       G.bosses.purgeHazards(this);
       G.ui.bossBar(null);
       G.sfx.monster(this.pos, 'roar', 0.25, 2);

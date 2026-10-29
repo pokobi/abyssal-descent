@@ -92,6 +92,7 @@
   IV.maxStack = function (it) {
     if (it.type !== 'item') return 1;
     const d = IV.def(it);
+    if (d && d.data && d.data.revive) return 1; // the fairy bottle: one to a slot
     if (d && (d.passive || d.kit)) return 3;
     return 50; // consumables and grenades stack up to 50 in one cell; relic-like passives keep their small stacks
   };

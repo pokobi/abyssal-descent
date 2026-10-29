@@ -84,11 +84,20 @@
     }
     // getting back up from a down / stun: no attack for a moment (k = the boss itself or one of its bodies)
     recover(t, k) { const o = k || this; o.act = null; o.cd = Math.max(o.cd || 0, t); this.graceT = t; G.ui.toastSmall('⏳ 体勢を立て直している…'); }
-    hurtPlayer(dmg, src, pos, elem) { if (this.dead) return; C.damagePlayer(dmg * this.dmgScale, { src: src || 'melee', attacker: this.parts[0], pos: pos || this.pos.clone(), elem }); }
+    // a blow that lands on "the player". While the guardian is aiming at the mercenary (BS.update swaps their positions) it lands on the mercenary instead;
+    // an area blow that hits you also catches a mercenary standing within BS.SPLASH_R of its centre
+    hurtPlayer(dmg, src, pos, elem) {
+      if (this.dead) return;
+      if (BS.swapMerc) { BS.hurtMerc(BS.swapMerc, dmg * this.dmgScale); return; }
+      C.damagePlayer(dmg * this.dmgScale, { src: src || 'melee', attacker: this.parts[0], pos: pos || this.pos.clone(), elem });
+      const mc = (src === 'aoe' || src === 'explosion') && pos && BS.mercOf();
+      if (mc && Math.hypot(mc.ent.pos.x - pos.x, mc.ent.pos.z - pos.z) < BS.SPLASH_R && Math.abs(mc.ent.pos.y - pos.y) < 4) BS.hurtMerc(mc, dmg * this.dmgScale * 0.6);
+    }
     playerDistH() { return Math.hypot(P.pos.x - this.pos.x, P.pos.z - this.pos.z); }
     kill() {
       this.dead = true; this.deathT = 0;
       for (const p of this.parts) p.alive = false;
+      if (G.Rooms2 && G.Rooms2.mercXp && G.game.run && G.game.run.merc) G.Rooms2.mercXp(20); // the guardian's parts carry no reward of their own, so its XP is paid out here, once
       BS.purgeHazards(this);
       G.sfx.monster(this.pos, 'roar', 0.5, 1.2);
       G.ui.bossBar(null);
@@ -900,7 +909,27 @@
     G.player.addShake(0.5);
     return b;
   };
-  BS.update = function (dt) { if (BS.active) BS.active.update(dt); };
+  // ---- the mercenary and the guardians ----
+  // A guardian goes for you about nine times in ten; once in ten it picks the mercenary for a whole attack. Guardians aim with the player's position, so while one is
+  // aiming at the mercenary the player's position / velocity are swapped for the mercenary's for the length of that update, and the blows (hurtPlayer) land on it.
+  BS.SPLASH_R = 5;
+  BS.MERC_P = 0.1;
+  BS.mercOf = () => { const mc = G.Rooms2 && G.Rooms2.mercAlly; return mc && !mc.dead && mc.targetable && mc.targetable() ? mc : null; };
+  BS.hurtMerc = function (mc, v) { const m = G.game.run && G.game.run.merc; const cap = m ? G.Rooms2.mercStats(m).cap : v; mc.hurt(Math.min(v, cap * 0.5)); };
+  BS.update = function (dt) {
+    const b = BS.active; if (!b) return;
+    if (b.dead) { b.update(dt); return; }
+    // the choice is made once per attack, when it begins
+    const has = !!b.act;
+    if (has && !b._hadAct) b.onMerc = !!BS.mercOf() && Math.random() < BS.MERC_P;
+    if (!has) b.onMerc = false;
+    b._hadAct = has;
+    const mc = b.onMerc && BS.mercOf();
+    if (!mc) { BS.swapMerc = null; b.update(dt); return; }
+    const P = G.player, p0 = P.pos.clone(), v0 = P.vel.clone();
+    P.pos.copy(mc.ent.pos); P.vel.set(0, 0, 0); BS.swapMerc = mc;
+    try { b.update(dt); } finally { BS.swapMerc = null; P.pos.copy(p0); P.vel.copy(v0); }
+  };
   // the moment a guardian falls: its creations, fields, shots, warnings and summoned minions go with it
   BS.purgeHazards = function (b) {
     C.purgeHostile();

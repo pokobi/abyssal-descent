@@ -71,7 +71,7 @@
     if (it.type === 'armor') return G.ARMOR_BY_ID[it.id];
     if (it.type === 'valuable') return G.VALUABLE_BY_ID[it.id];
     if (it.type === 'att') return G.ATT_BY_ID[it.id];
-    if (it.type === 'gun') return G.WEAPON_BY_ID[it.id]; // a gun lying on the ground (only ever on the ground)
+    if (it.type === 'gun') return G.WEAPON_BY_ID[it.id]; // a gun out of your hands: on the ground or in a bag / box (its attachments, level and ammo ride along in it.gun)
     if (it.type === 'melee') return G.MELEE_BY_ID[it.id];
     return null;
   };
@@ -81,8 +81,13 @@
     if (it.type === 'armor' || it.type === 'valuable') return d.size;
     if (it.type === 'att') return d.slot === 'barrel' || d.slot === 'stock' || d.slot === 'under' ? [2, 1] : [1, 1];
     if (it.type === 'item' && d.size) return d.size;
+    if (it.type === 'gun') return IV.gunSize(d);
+    if (it.type === 'melee') return d.mcat === 'knife' ? [1, 2] : d.mcat === 'fist' ? [2, 1] : [1, 3];
     return [1, 1];
   };
+  // guns lie flat: sidearms are short, long guns long
+  IV.gunSize = (d) => (/ハンドガン|リボルバー|ネイルガン|雷管銃/.test(d.cat) ? [2, 1] : /サブマシンガン|クロスボウ/.test(d.cat) ? [3, 1] : [4, 1]);
+  IV.isArm = (it) => !!it && (it.type === 'gun' || it.type === 'melee');
   IV.size = function (it) { const [w, h] = IV.baseSize(it); return it.rot ? [h, w] : [w, h]; };
   IV.maxStack = function (it) {
     if (it.type !== 'item') return 1;
@@ -96,6 +101,11 @@
     const R = G.Pawn ? G.Pawn.RATE : 0.4;
     if (it.type === 'valuable') return Math.max(1, Math.round(d.value * it.n * (G.Run ? G.Run.valuableMul() : 1)));
     if (it.type === 'armor') return Math.max(5, Math.round(d.price * R * IV.enchMul(it) * (0.2 + 0.8 * IV.durFrac(it)) / 5) * 5); // the more worn, the less it sells for
+    if (IV.isArm(it)) { // like the one in your hands: level and any attachments on it count
+      const lv = (it.gun && it.gun.lv) || 0, base = d.price ? Math.max(5, Math.round(d.price * R * (1 + 0.2 * lv) / 5) * 5) : lv * 60;
+      const atts = it.type === 'gun' && it.gun && it.gun.atts ? Object.values(it.gun.atts).filter((a) => G.ATT_BY_ID[a]) : [];
+      return base + atts.reduce((sum, a) => sum + (G.Pawn ? G.Pawn.attValue(a) : 0), 0);
+    }
     return Math.max(1, Math.round((d.price || 0) * R / 5) * 5) * it.n;
   };
 
@@ -428,9 +438,14 @@
   };
   IV.pickUp = function (gr) {
     const P = G.player;
-    if (gr.it.type === 'melee') { G.game.takeMelee(gr.it); G.world.group.remove(gr.g); IV.ground.splice(IV.ground.indexOf(gr), 1); G.sfx.ui('select'); return true; }
-    if (gr.it.type === 'gun') {
-      if (!G.game.takeGun(gr.it)) { G.ui.toastSmall('🔫 武器スロットがいっぱい — 先に別の銃を捨てる'); G.sfx.ui('deny'); return false; }
+    // a weapon goes into your hands when they are free (a gun slot open / only fists), otherwise into the bag
+    if (IV.isArm(gr.it)) {
+      const free = gr.it.type === 'gun' ? P.weapons.length < P.stats.weaponSlots : !P.melee || P.melee.id === (G.BARE_MELEE || 'fists');
+      if (free) { if (gr.it.type === 'gun') G.game.takeGun(gr.it); else G.game.takeMelee(gr.it); }
+      else {
+        if (IV.stow(P, gr.it) > 0) { G.ui.toastSmall('🎒 インベントリに空きがない'); G.sfx.ui('deny'); return false; }
+        const d = IV.def(gr.it); G.ui.toastSmall(`🎒 ${d.icon} ${d.name} をインベントリにしまった`);
+      }
       G.world.group.remove(gr.g); IV.ground.splice(IV.ground.indexOf(gr), 1); G.sfx.ui('select');
       return true;
     }

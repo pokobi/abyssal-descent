@@ -135,9 +135,9 @@
     // everything in the bag
     for (const it of IV.pcs(p).flatMap((c) => c.items).sort((a, b) => (a.type || '').localeCompare(b.type || '') || (a.id || '').localeCompare(b.id || ''))) {
       const d = IV.def(it); if (!d) continue;
-      const cat = it.type === 'item' ? (d.cat === 'grenade' ? 'grenade' : 'item') : it.type;
+      const cat = it.type === 'item' ? (d.cat === 'grenade' ? 'grenade' : 'item') : it.type === 'gun' ? 'weapon' : it.type;
       const unit = IV.value(Object.assign({}, it, { n: 1 })), ask = it.type === 'armor' && !!(it.ench && it.ench.length); // enchanted armour is confirmed first
-      const sub = it.type === 'armor' ? `${G.ARMOR_SLOT_BY_ID[d.slot].name}防具・防御力${d.def}${it.ench && it.ench.length ? '・' + it.ench.map(G.enchantText).join(' ') : ''}` : it.type === 'valuable' ? '金品（売却専用）' : it.type === 'att' ? 'アタッチメント（インベントリ）' : d.passive ? '所持品（常時効果）' : cat === 'grenade' ? '投擲物' : '消耗品';
+      const sub = it.type === 'armor' ? `${G.ARMOR_SLOT_BY_ID[d.slot].name}防具・防御力${d.def}${it.ench && it.ench.length ? '・' + it.ench.map(G.enchantText).join(' ') : ''}` : it.type === 'valuable' ? '金品（売却専用）' : it.type === 'att' ? 'アタッチメント（インベントリ）' : IV.isArm(it) ? `${it.type === 'gun' ? '銃' : '近接武器'}（インベントリ）${it.gun && it.gun.lv ? '・強化+' + it.gun.lv : ''}` : d.passive ? '所持品（常時効果）' : cat === 'grenade' ? '投擲物' : '消耗品';
       out.push({ cat, icon: it.type === 'armor' ? G.armorIcon(d) : d.icon, rc: d.rarity, name: d.name + (it.n > 1 ? ` ×${it.n}` : ''), sub, v: unit, n: it.n, act: () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, 1), 0); } else { sellInst(it, 1); PW.open(); } }, actAll: it.n > 1 ? () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, it.n), 0); } else { sellInst(it, it.n); PW.open(); } } : null });
     }
     return out;

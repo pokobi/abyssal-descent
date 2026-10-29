@@ -817,6 +817,7 @@
 
   W.equip = function (immediate) {
     const w = P.weapon;
+    if (!w && !P.meleeMode) P.meleeMode = true; // no gun at all: the melee weapon (or bare fists) it is
     if (P.meleeMode) { if (model) model.group.visible = false; W.melee.equip(immediate); return; }
     if (model) vmRoot.remove(model.group);
     model = buildGun(w.def, w.atts, true);
@@ -847,7 +848,12 @@
   W.update = function (dt) {
     G.ItemAnim.update(dt);
     if (W.dirty) { W.ver++; W.dirty = false; }
-    const w = P.weapon; if (!w) return;
+    const w = P.weapon;
+    if (!w) { // every gun put away: melee only (1 / 2 / the wheel have nothing else to switch to)
+      if (!P.meleeMode) W.setMelee();
+      W.handleSwitch();
+      return W.updateMeleeMode(dt);
+    }
     const s = W.curStats = W.stats(w);
     const t = G.game.time;
     // switching: 1/2 = guns, 3 = melee, wheel cycles through everything (incl. a holstered 3rd gun)

@@ -280,13 +280,20 @@
       if (e.button === 2 && kind === 'w' && !el.classList.contains('empty') && !e.target.closest('.iv-as')) {
         e.preventDefault(); closeMenu(); hideTip();
         const w = G.weapons.gunsInOrder()[+el.dataset.wslot]; if (!w) return;
-        popMenu([['🗑️ 捨てる', () => { if (GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else { G.sfx.ui('deny'); G.ui.toastSmall('最後の銃は捨てられない'); } render(); }]], e);
+        popMenu([
+          ['📥 インベントリにしまう', () => { if (GM.stowGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🎒 ${w.def.name} をしまった`); } else { G.sfx.ui('deny'); G.ui.toastSmall('🎒 インベントリに空きがない'); } render(); }],
+          ['🗑️ 捨てる', () => { if (GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else G.sfx.ui('deny'); render(); }],
+        ], e);
         return;
       }
       if (e.button === 2 && kind === 'm') {
         e.preventDefault(); closeMenu(); hideTip();
         const m = P.melee; if (!m) return;
-        popMenu([['🗑️ 捨てる', () => { if (GM.dropMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${m.def.name} を捨てた（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('素手は捨てられない'); } render(); }]], e);
+        if (m.id === (G.BARE_MELEE || 'fists')) { G.sfx.ui('deny'); G.ui.toastSmall('素手はしまえない'); return; }
+        popMenu([
+          ['📥 インベントリにしまう', () => { if (GM.stowMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🎒 ${m.def.name} をしまった（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('🎒 インベントリに空きがない'); } render(); }],
+          ['🗑️ 捨てる', () => { if (GM.dropMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${m.def.name} を捨てた（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('素手は捨てられない'); } render(); }],
+        ], e);
         return;
       }
       if (e.button !== 0 || e.target.closest('.iv-as')) return;
@@ -317,6 +324,7 @@
     if (f.eq) { IV.unequip(P, f.eq); render(); return; }
     if (f.as) { unequipAtt(f.as); return; }
     if (it.type === 'armor') { IV.equip(P, it, f.from); render(); return; } // from the bag or straight out of a chest / corpse
+    if (IV.isArm(it)) { if (GM.equipArm(it, f.from)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); return; }
     if (it.type === 'att' && isMine(f.from)) { equipAtt(it); return; }
     if (!isMine(f.from)) { quickMove(f); return; }
     if (IV.isKit(it)) { const w = worstWorn(); if (w) mend(f, it, w); else { G.sfx.ui('deny'); G.ui.toastSmall('🛠️ 修復が必要な防具は装備していない（防具へドラッグで袋の中の防具も直せる）'); } return; }
@@ -450,9 +458,10 @@
     const as = el.closest('[data-as]'); if (as) return { as: as.dataset.as };
     const ws = el.closest('[data-wslot]'); if (ws) return { wslot: +ws.dataset.wslot };
     const sk = el.closest('[data-sk]'); if (sk) return { sk: sk.dataset.sk };
-    if (el.closest('[data-melee]')) return null;
+    if (el.closest('[data-melee]')) return drag.f.it ? { melee: true } : null;
     if (el.closest('#status-overlay')) return null;
     const grid = el.closest('[data-grid]');
+    if (grid && !drag.f.it && (drag.f.wslot !== undefined || drag.f.melee)) return { grid, key: grid.dataset.grid, whole: true }; // a weapon put away: any free cell
     if (grid && drag.f.it) {
       const r = grid.getBoundingClientRect(), [w, h] = dims(), cs = +grid.dataset.cs || CS;
       const gl = x - Math.min(drag.gx, w * cs - 10), gt = y - Math.min(drag.gy, h * cs - 10);
@@ -507,12 +516,18 @@
     const rot = drag.rot; drag = null;
     // guns / skills onto each other
     if (f.melee) {
+      if (t && t.grid && t.key === 'bag') { const m = P.melee; if (GM.stowMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🎒 ${m.def.name} をしまった（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('🎒 インベントリに空きがない'); } render(); return; }
       if (t && t.ground) { const m = P.melee; if (m && GM.dropMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${m.def.name} を捨てた（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('素手は捨てられない'); } }
       render(); return;
     }
     if (f.wslot !== undefined && t && t.ground) {
       const w = G.weapons.gunsInOrder()[f.wslot];
-      if (w && GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else { G.sfx.ui('deny'); G.ui.toastSmall('最後の銃は捨てられない'); }
+      if (w && GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else G.sfx.ui('deny');
+      render(); return;
+    }
+    if (f.wslot !== undefined && t && t.grid && t.key === 'bag') {
+      const w = G.weapons.gunsInOrder()[f.wslot];
+      if (w && GM.stowGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🎒 ${w.def.name} をしまった`); } else { G.sfx.ui('deny'); G.ui.toastSmall('🎒 インベントリに空きがない'); }
       render(); return;
     }
     if (f.wslot !== undefined) { if (t && t.wslot !== undefined && t.wslot !== f.wslot) swapGuns(); render(); return; }
@@ -521,8 +536,10 @@
     if (t.ground) { if (f.as) { render(); return; } discard(f); return; }
     // a part dropped anywhere on a gun's box (even on the wrong little socket) goes into the socket it belongs to
     if (t.as && it.type === 'att' && G.ATT_BY_ID[it.id] && !(f.as && f.as.w === G.weapons.gunsInOrder()[+t.as.split(':')[0]])) t = { wslot: +t.as.split(':')[0] };
+    if (t.melee) { if (it.type === 'melee' && GM.equipArm(it, f.from)) G.sfx.mech('switch'); else { G.sfx.ui('deny'); if (it.type !== 'melee') G.ui.toastSmall('そこには近接武器しか持てない'); } render(); return; }
     if (t.wslot !== undefined) {
       const w = G.weapons.gunsInOrder()[t.wslot];
+      if (it.type === 'gun') { if (GM.equipArm(it, f.from, w)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); return; }
       if (it.type === 'att' && w) { if (f.as) { if (f.as.w !== w && GM.moveAtt(it.id, f.as.w, w)) G.sfx.mech('magIn'); else G.sfx.ui('deny'); render(); } else if (isMine(f.from)) equipAtt(it, w); else { G.sfx.ui('deny'); render(); } return; }
       G.sfx.ui('deny'); render(); return;
     }
@@ -585,6 +602,7 @@
     if (isMine(f.from) && usable(it) && P.itemCount(it.id) > 1) { const n = P.itemCount(it.id); opts.push([`🍶 まとめて使う（×${n}）`, () => { UIV.close(); G.abilities.queueUse(it.id, n); }]); }
     if (isMine(f.from) && IV.isKit(it)) { const w = worstWorn(), wd = w && G.ARMOR_BY_ID[w.id]; if (w) opts.push([`🛠️ 最も傷んだ防具を修復：${wd.name} ${Math.ceil(IV.durOf(w))}/${IV.durMax(w)}`, () => mend(f, it, w)]); }
     if (it.type === 'armor' && !f.eq) opts.push(['🛡️ 装備する', () => { IV.equip(P, it, f.from); render(); }]);
+    if (IV.isArm(it)) opts.push([`${it.type === 'gun' ? '🔫' : '🗡️'} 装備する${it.type === 'gun' && P.weapons.length >= P.stats.weaponSlots ? '（持っている銃と入れ替え）' : it.type === 'melee' && P.melee && P.melee.id !== (G.BARE_MELEE || 'fists') ? '（今の近接武器と入れ替え）' : ''}`, () => { if (GM.equipArm(it, f.from)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); }]);
     if (f.eq) opts.push(['📥 外す', () => { IV.unequip(P, f.eq); render(); }]);
     if (IV.openCont && !f.eq) opts.push([isMine(f.from) ? '📤 箱へ移す' : '📥 インベントリへ', () => quickMove(f)]);
     if (it.type === 'item' && it.n > 1 && !f.eq) opts.push(['✂️ 半分に分ける', () => { const k = Math.floor(it.n / 2); const part = IV.make(it.type, it.id, k); const s = IV.findSpot(f.from, part); if (!s) { G.sfx.ui('deny'); return; } it.n -= k; Object.assign(part, s); f.from.items.push(part); IV.changed(f.from); render(); }]);
@@ -603,6 +621,11 @@
   // ---------------- hover cards ----------------
   UIV.describe = function (it) {
     const d = IV.def(it); if (!d) return '';
+    if (it && it.type === 'gun') { // the same card as a gun in your hands
+      const x = it.gun || {}, w = G.weapons.make(it.id);
+      w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0;
+      return G.StatusUI.gunTip(w) + `<div class="ivt-v">ダブルクリック／武器枠へドラッグで装備　売値 ${U.fmt(IV.value(it))}🪙</div>`;
+    }
     const rar = G.RARITY[d.rarity];
     let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? '補修具（防具へドラッグして使う）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
     if (it.type === 'armor') {
@@ -613,6 +636,7 @@
       { const f = IV.durFrac(it), col = f > 0.5 ? '#6ee06a' : f > 0.2 ? '#f0b040' : '#ff4a3a';
         body += `<div class="ivt-r">🔧 耐久 <b style="color:${col}">${Math.ceil(IV.durOf(it))} / ${IV.durMax(it)}</b>（${Math.round(f * 100)}%）</div>`; }
     } else body += `<div class="ivt-d">${U.esc(d.desc || '')}</div>`;
+    if (it.type === 'melee') body += `<div class="ivt-r">⚒️ 強化 <b>+${(it.gun && it.gun.lv) || 0}</b>　ダブルクリック／近接枠へドラッグで装備</div>`;
     body += `<div class="ivt-v">売値 ${U.fmt(IV.value(it))}🪙</div>`;
     return body;
   };

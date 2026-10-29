@@ -547,8 +547,8 @@
     P.recalc();
     P.phoenixUsed = !!d.phoenixUsed;
     P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; w.ver++; w.mag = x.mag ?? w.mag; return w; });
-    if (!P.weapons.length) P.weapons = [G.weapons.make('starter')];
-    P.wIdx = Math.min(d.wIdx || 0, P.weapons.length - 1);
+    if (!P.weapons.length && !Array.isArray(d.weapons)) P.weapons = [G.weapons.make('starter')]; // (a run saved with every gun put away keeps none)
+    P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));
     if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; }
     P.skills = [0, 1, 2, 3].map((i) => { if (!(d.skills && d.skills[i] && G.SKILL_BY_ID[d.skills[i]])) return null; const s = G.abilities.makeSlot(d.skills[i]); s.lv = (d.skillLv && d.skillLv[i]) || 0; return s; });
@@ -1187,25 +1187,87 @@
     G.ui.itemCard(wd, '[武器]'); G.ui.refreshWeapon();
   };
   // a gun thrown away from the inventory screen becomes a pickup on the ground that keeps its upgrades, parts and ammo
-  GM.dropGun = function (w) {
-    if (!w || P.weapons.length < 2) return false; // the last gun can not go: there would be nothing to shoot with
+  // a gun out of your hands as an inventory thing (attachments, level, ammo and kills ride along)
+  GM.gunItem = (w) => G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, mag: w.mag, kills: w.kills || 0 } });
+  GM.meleeItem = (m) => G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0 } });
+  // take a gun out of your hands (every gun can go: with none left you fight with the melee weapon / fists)
+  GM.releaseGun = function (w) {
+    if (!w || !P.weapons.includes(w)) return null;
     const cur = P.weapons[P.wIdx];
     G.weapons.order(); // makes sure the key layout refers to guns that still exist
     P.weapons.splice(P.weapons.indexOf(w), 1);
     P.wOrder = (P.wOrder || []).map((t) => (t === w ? null : t));
-    if (cur === w) { P.wIdx = 0; G.weapons.equip(false); } else P.wIdx = P.weapons.indexOf(cur);
     w.reloading = false;
-    const it = G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, mag: w.mag, kills: w.kills || 0 } });
-    G.Inv.dropToGround(it, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(P.forward().setY(0).normalize(), 0.9));
+    if (!P.weapons.length) { P.wIdx = 0; if (!P.meleeMode) G.weapons.setMelee(); }
+    else if (cur === w) { P.wIdx = 0; G.weapons.equip(false); } else P.wIdx = P.weapons.indexOf(cur);
     G.weapons.order(); G.ui.refreshWeapon(); P.recalc();
+    return GM.gunItem(w);
+  };
+  GM.dropGun = function (w) {
+    const it = GM.releaseGun(w); if (!it) return false;
+    G.Inv.dropToGround(it, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(P.forward().setY(0).normalize(), 0.9));
     return true;
   };
-  GM.takeGun = function (it) {
+  // into the bag (at a given cell when it was dragged there); false when there is no room
+  GM.stowGun = function (w, c, x, y, rot) {
+    if (!w) return false;
+    const probe = GM.gunItem(w);
+    const spot = c ? (fitAt(c, probe, x, y, rot) ? { x, y, rot: !!rot } : null) : G.Inv.findSpot(P.bag, probe);
+    if (!spot) return false;
+    const it = GM.releaseGun(w);
+    Object.assign(it, spot); (c || P.bag).items.push(it); G.Inv.changed(c || P.bag);
+    return true;
+  };
+  GM.stowMelee = function (c, x, y, rot) {
+    const m = P.melee; if (!m || m.id === (G.BARE_MELEE || 'fists')) return false;
+    const it = GM.meleeItem(m);
+    const spot = c ? (fitAt(c, it, x, y, rot) ? { x, y, rot: !!rot } : null) : G.Inv.findSpot(P.bag, it);
+    if (!spot) return false;
+    Object.assign(it, spot); (c || P.bag).items.push(it); G.Inv.changed(c || P.bag);
+    P.melee = G.weapons.makeMelee(G.BARE_MELEE || 'fists');
+    if (P.meleeMode) G.weapons.melee.equip(false);
+    G.ui.refreshWeapon(); P.recalc();
+    return true;
+  };
+  // a weapon in a bag / box into your hands; when the hands are full the one it replaces goes where it lay (the current gun / melee weapon)
+  GM.equipArm = function (it, from, slotGun) {
+    const IV = G.Inv;
+    if (!IV.isArm(it) || !from || !from.items.includes(it)) return false;
+    const at = { x: it.x, y: it.y };
+    if (it.type === 'gun') {
+      let out = null;
+      if (P.weapons.length >= P.stats.weaponSlots) out = slotGun || (!P.meleeMode && P.weapon) || G.weapons.gunsInOrder()[0];
+      IV.remove(from, it);
+      if (out) {
+        const back = GM.gunItem(out), s = spotAt(from, back, at);
+        if (!s) { IV.put(from, Object.assign(it, at)); G.ui.toastSmall('🎒 持ち替える銃をしまう場所がない'); return false; }
+        GM.releaseGun(out); Object.assign(back, s); from.items.push(back); // its key is left empty, and the new gun takes it
+      }
+      GM.takeGun(it, true);
+      IV.changed(from); G.ui.refreshWeapon();
+      return true;
+    }
+    const prev = P.melee;
+    IV.remove(from, it);
+    if (prev && prev.id !== (G.BARE_MELEE || 'fists')) {
+      const back = GM.meleeItem(prev), s = spotAt(from, back, at);
+      if (!s) { IV.put(from, Object.assign(it, at)); G.ui.toastSmall('🎒 持ち替える武器をしまう場所がない'); return false; }
+      Object.assign(back, s); from.items.push(back);
+      P.melee = G.weapons.makeMelee(G.BARE_MELEE || 'fists'); // (already put away: takeMelee must not drop it as well)
+    }
+    GM.takeMelee(it, true);
+    IV.changed(from);
+    return true;
+  };
+  // where a swapped-out weapon goes: the cell the new one came from when it fits there, else any free cell
+  const spotAt = (c, it, at) => { const [w, h] = G.Inv.baseSize(it); return G.Inv.fits(c, w, h, at.x, at.y) ? { x: at.x, y: at.y, rot: false } : G.Inv.fits(c, h, w, at.x, at.y) ? { x: at.x, y: at.y, rot: true } : G.Inv.findSpot(c, it); };
+  const fitAt = (c, it, x, y, rot) => { const [w, h] = G.Inv.baseSize(it); return rot ? G.Inv.fits(c, h, w, x, y) : G.Inv.fits(c, w, h, x, y); };
+  GM.takeGun = function (it, quiet) {
     if (P.weapons.length >= P.stats.weaponSlots) return false;
     const x = it.gun || {}, w = G.weapons.make(it.id);
     w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; w.ver++; w.mag = x.mag ?? w.mag;
     P.weapons.push(w); G.weapons.switchTo(P.weapons.length - 1); G.ui.refreshWeapon(); P.recalc();
-    const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を拾った`);
+    const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を${quiet ? '装備した' : '拾った'}`);
     return true;
   };
   GM.dropMelee = function () {
@@ -1218,7 +1280,7 @@
     G.ui.refreshWeapon(); P.recalc();
     return true;
   };
-  GM.takeMelee = function (it) {
+  GM.takeMelee = function (it, quiet) {
     const prev = P.melee;
     if (prev && prev.id !== (G.BARE_MELEE || 'fists')) {
       const old = G.Inv.make('melee', prev.id, 1, { gun: { lv: prev.lv || 0 } });
@@ -1229,7 +1291,7 @@
     P.melee = m;
     if (P.meleeMode) G.weapons.melee.equip(false);
     G.ui.refreshWeapon(); P.recalc();
-    const d = G.MELEE_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name}${m.lv ? ' +' + m.lv : ''} を拾った`);
+    const d = G.MELEE_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name}${m.lv ? ' +' + m.lv : ''} を${quiet ? '装備した' : '拾った'}`);
     return true;
   };
   GM.giveSkill = function (id) {
@@ -1411,7 +1473,6 @@
     if (GM.area >= 8) kinds[kinds.length - 1] = 'relic';
     const used = new Set();
     const offers = [];
-    const curW = P.weapon.def;
     let meleeN = 0;
     kinds.forEach((k, i) => {
       // weapon pedestals are fully random between guns and melee, but never more than one melee weapon
@@ -1617,7 +1678,7 @@
     } else if (best.type === 'shrine') {
       G.ui.showInteract({ key: 'shrine', icon: '⛩️', name: '祈りの祭壇', rc: '#60d0c0', cat: '全回復＋強化を一つ', desc: '一度だけ祈ることができる。', action: '祈る' });
     } else if (best.type === 'anvil') {
-      G.ui.showInteract({ key: 'anvil' + coins, icon: '⚒️', name: '鍛冶の金床', rc: '#e08040', cat: '武器・スキルの強化', desc: `${P.weapon.def.name} +${P.weapon.lv || 0}（最大+${G.Areas.FORGE_MAX}）`, action: '鍛える' });
+      G.ui.showInteract({ key: 'anvil' + coins, icon: '⚒️', name: '鍛冶の金床', rc: '#e08040', cat: '武器・スキルの強化', desc: P.weapon ? `${P.weapon.def.name} +${P.weapon.lv || 0}（最大+${G.Areas.FORGE_MAX}）` : '近接武器・スキルを鍛える', action: '鍛える' });
     } else if (best.type === 'cauldron') {
       const left = Math.max(0, 2 - (best.it.used || 0));
       if (left <= 0) G.ui.showInteract({ key: 'cauldron0', icon: '⚗️', name: '練成の釜（火は消え、冷え切っている）', rc: '#7a8480', cat: '練成終了（残り 0 / 2回）', desc: '「釜の火は消え去った。深淵の恵みはここまでだ…」', action: null });
@@ -1709,7 +1770,7 @@
     }
     if (o.kind === 'weapon') {
       cat = `${ob.mythic ? '✴️ 神器 · ' : '🔫 '}${ob.cat} · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
-      const cur = G.weapons.stats(P.weapon);
+      const cur = P.weapon ? G.weapons.stats(P.weapon) : { dmg: 0, pellets: 1, rpm: 0, mag: 0, reload: 0, spread: 0 }; // no gun in hand: everything is a gain
       const cmp = (label, a, b, fmt, better) => { const up = better === 'low' ? a < b : a > b; const cls = Math.abs(a - b) < 1e-6 ? '' : up ? 'up' : 'down'; return `<div>${label} <b class="${cls}">${fmt(a)}</b> <span style="opacity:.6">(${fmt(b)})</span></div>`; };
       const nd = ob.dmg * (ob.pellets || 1), cd = cur.dmg * (cur.pellets || 1);
       stats = cmp('💥ダメージ', nd, cd, (v) => Math.round(v)) + cmp('🔁連射', ob.rpm, cur.rpm, (v) => Math.round(v)) + cmp('📊DPS', nd * ob.rpm / 60, cd * cur.rpm / 60, (v) => Math.round(v)) + cmp('📦装弾数', ob.mag, cur.mag, (v) => v) + cmp('♻️リロード', ob.reload, cur.reload, (v) => v.toFixed(1) + 's', 'low') + cmp('🎯拡散', ob.spread, cur.spread, (v) => v.toFixed(1) + '°', 'low');
@@ -1852,7 +1913,7 @@
     if (Math.random() >= chance) return null;
     // an ornate chest sometimes holds an attachment for the gun in your hands instead
     if (tier >= 2 && Math.random() < 0.35) {
-      const comp = G.ATTACHMENTS.filter((a) => a.compat(P.weapon.def) && !P.weapon.atts[a.slot]);
+      const comp = P.weapon ? G.ATTACHMENTS.filter((a) => a.compat(P.weapon.def) && !P.weapon.atts[a.slot]) : [];
       if (comp.length) { const a = U.pick(comp); P.weapon.atts[a.slot] = a.id; P.weapon.ver++; G.weapons.equip(true); G.ui.toast(`${a.icon} ${a.name} を装着した！`, 'good'); return a; }
     }
     const W = GM.CHEST_RARITY[tier] || GM.CHEST_RARITY[2], ord = G.RARITY_ORDER;

@@ -283,7 +283,7 @@
       opts: () => [{ icon: '🪙', label: `${cost(80)}🪙 施す`, sub: 'レア以上の加護を一つ得る', disabled: GM.run.coins < cost(80), run: () => { GM.run.coins -= cost(80); AR.randomGoodBuff(2); } },
         { icon: '🗡️', label: '魂を斬り払う', sub: '+' + cost(150) + '🪙 ／ 呪い「狩られる者」', run: () => { G.combat.coins(cost(150), null, '魂の残り香'); AR.addCurse('c_hunted'); } }] },
     { id: 'ghost_smith', npc: '亡霊の鍛冶師', icon: '⚒️', text: '「その武器、鍛え直してやろう。代価は…お前の運だ」',
-      opts: () => [{ icon: '⚒️', label: '鍛えてもらう', sub: `${P.weapon.def.name} の強化値+2 ／ ランダムな呪い`, disabled: (P.weapon.lv || 0) >= AR.FORGE_MAX, run: () => { P.weapon.lv = Math.min(AR.FORGE_MAX, (P.weapon.lv || 0) + 2); P.weapon.ver++; G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${P.weapon.def.name} +${P.weapon.lv}`, 'good'); AR.addCurse(); } }] },
+      opts: () => [{ icon: '⚒️', label: '鍛えてもらう', sub: P.weapon ? `${P.weapon.def.name} の強化値+2 ／ ランダムな呪い` : '銃を持っていない', disabled: !P.weapon || (P.weapon.lv || 0) >= AR.FORGE_MAX, run: () => { P.weapon.lv = Math.min(AR.FORGE_MAX, (P.weapon.lv || 0) + 2); P.weapon.ver++; G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${P.weapon.def.name} +${P.weapon.lv}`, 'good'); AR.addCurse(); } }] },
     { id: 'peddler', npc: '怪しい行商人', icon: '🎁', text: '「中身は開けてのお楽しみさ。損はさせない…たぶんね」',
       opts: () => [{ icon: '🎁', label: `謎の箱を買う（${cost(160)}🪙）`, sub: '武器／スキル／アイテム／呪い のどれか', disabled: GM.run.coins < cost(160), run: () => {
         GM.run.coins -= cost(160);

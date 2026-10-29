@@ -159,8 +159,9 @@
 
   // ---------------- HUD refresh ----------------
   UI.refreshWeapon = function () {
-    const w = P.weapon; if (!w) return;
+    const w = P.weapon;
     const md = P.melee && P.melee.def;
+    if (!w && !(P.meleeMode && md)) return;
     if (P.meleeMode && md) {
       UI.el.wName.innerHTML = `<span style="color:${R(md.rarity)}">${md.icon} ${U.esc(md.name)}${P.melee.lv ? ' +' + P.melee.lv : ''}</span> <span style="font-size:11px;color:var(--dim)">左:連撃 右:重撃</span>`;
       UI.el.wAtts.innerHTML = '';
@@ -332,7 +333,7 @@
     if (hpk < 0.3 && !P.dead) { UI._hb = (UI._hb || 0) - dt; if (UI._hb <= 0) { UI._hb = 0.5 + hpk * 2; G.sfx.heartbeat(1 - hpk / 0.3); } }
     // ammo
     const w = P.weapon, ws = G.weapons.curStats;
-    if (w && ws && P.meleeMode) {
+    if (P.meleeMode || !w) {
       sText(e.ammoMag, '⚔'); sText(e.ammoMax, '近接');
       sClass(e.ammo, 'low', false); sStyle(e.reloadBar, 'opacity', 0);
       const ch = e.crosshair.children;

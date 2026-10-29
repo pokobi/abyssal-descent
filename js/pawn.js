@@ -142,6 +142,14 @@
     }
     return out;
   }
+  // tab bulk sales (all but valuables) always ask first: what goes, for how much, and any piece worth a second look
+  function confirmBulk(title, what, sum, warn, doSell) {
+    GM()._keepModal = true;
+    setTimeout(() => GM().modal(title, `${what} <b>（+${fmt(sum)}🪙）</b> を売却します。${warn ? `<br><span style="color:#e080ff">⚠️ ${warn} が含まれています。</span>` : ''}`, [
+      { icon: '💰', label: `すべて売る（+${fmt(sum)}🪙）`, onPick: () => { doSell(); again(); } },
+      { icon: '↩', label: 'やめる', onPick: again },
+    ]), 0);
+  }
   function getBulk(tab) {
     const p = P(), IV = G.Inv;
     if (tab === 'valuable' || tab === 'all') {
@@ -171,22 +179,14 @@
         primary: false,
         act: () => {
           if (!armors.length) return;
-          const doSell = () => {
+          const w = [];
+          if (ench.length) w.push(`エンチャント付き <b>${ench.length}点</b>`);
+          if (epics.length) w.push(`エピック以上 <b>${epics.length}点</b>`);
+          confirmBulk('🛡️ 防具を一括売却しますか？', `未装備の防具 <b>${count}点</b>`, sum, w.join('、'), () => {
             for (const o of armors.slice()) IV.remove(p.bag, o);
             pay(sum, `防具${count}点`);
             G.ui.toast(`🛡️ 未装備の防具 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
-            PW.open();
-          };
-          if (ench.length || epics.length) {
-            GM()._keepModal = true;
-            const w = [];
-            if (ench.length) w.push(`エンチャント付き <b>${ench.length}点</b>`);
-            if (epics.length) w.push(`エピック以上 <b>${epics.length}点</b>`);
-            GM().modal('🛡️ 防具を一括売却しますか？', `未装備の防具 <b>${count}点（+${fmt(sum)}🪙）</b> を売却します。<br><span style="color:#e080ff">⚠️ ${w.join('、')} が含まれています。</span>`, [
-              { icon: '💰', label: `すべて売る（+${fmt(sum)}🪙）`, onPick: doSell },
-              { icon: '↩', label: 'やめる', onPick: again },
-            ]);
-          } else doSell();
+          });
         },
       };
     }
@@ -200,10 +200,12 @@
         primary: false,
         act: () => {
           if (!atts.length) return;
-          for (const o of atts.slice()) IV.remove(p.bag, o);
-          pay(sum, `アタッチメント${count}点`);
-          G.ui.toast(`🔩 未装着アタッチメント ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
-          PW.open();
+          const rare = atts.filter((o) => G.RARITY[G.ATT_BY_ID[o.id].rarity]?.tier >= 3).length;
+          confirmBulk('🔩 アタッチメントを一括売却しますか？', `未装着のアタッチメント <b>${count}点</b>`, sum, rare ? `エピック以上 <b>${rare}点</b>` : '', () => {
+            for (const o of atts.slice()) IV.remove(p.bag, o);
+            pay(sum, `アタッチメント${count}点`);
+            G.ui.toast(`🔩 未装着アタッチメント ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+          });
         },
       };
     }
@@ -217,13 +219,15 @@
         primary: false,
         act: () => {
           if (!items.length) return;
-          for (const o of items.slice()) {
-            const home = IV.pcs(p).find((c) => c.items.includes(o)) || p.bag;
-            IV.remove(home, o);
-          }
-          pay(sum, `消耗品${count}点`);
-          G.ui.toast(`🧪 消耗品 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
-          PW.open();
+          const rare = items.filter((o) => G.RARITY[G.ITEM_BY_ID[o.id].rarity]?.tier >= 3).reduce((n, o) => n + (o.n || 1), 0);
+          confirmBulk('🧪 消耗品を一括売却しますか？', `消耗品 <b>${count}点</b>`, sum, rare ? `エピック以上 <b>${rare}点</b>` : '', () => {
+            for (const o of items.slice()) {
+              const home = IV.pcs(p).find((c) => c.items.includes(o)) || p.bag;
+              IV.remove(home, o);
+            }
+            pay(sum, `消耗品${count}点`);
+            G.ui.toast(`🧪 消耗品 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+          });
         },
       };
     }
@@ -237,14 +241,16 @@
         primary: false,
         act: () => {
           if (!grens.length) return;
-          for (const o of grens.slice()) {
-            const home = IV.pcs(p).find((c) => c.items.includes(o)) || p.bag;
-            IV.remove(home, o);
-          }
-          if (G.GrenHold && G.GrenHold.active()) G.GrenHold.putAway(true);
-          pay(sum, `投擲物${count}点`);
-          G.ui.toast(`💣 投擲物 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
-          PW.open();
+          const rare = grens.filter((o) => G.RARITY[G.ITEM_BY_ID[o.id].rarity]?.tier >= 3).reduce((n, o) => n + (o.n || 1), 0);
+          confirmBulk('💣 投擲物を一括売却しますか？', `投擲物 <b>${count}点</b>`, sum, rare ? `エピック以上 <b>${rare}点</b>` : '', () => {
+            for (const o of grens.slice()) {
+              const home = IV.pcs(p).find((c) => c.items.includes(o)) || p.bag;
+              IV.remove(home, o);
+            }
+            if (G.GrenHold && G.GrenHold.active()) G.GrenHold.putAway(true);
+            pay(sum, `投擲物${count}点`);
+            G.ui.toast(`💣 投擲物 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+          });
         },
       };
     }

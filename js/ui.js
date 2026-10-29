@@ -881,7 +881,8 @@
       <div class="bs-title">${opts.title || 'CHOOSE A BOON'}</div>
       <div class="bs-sub">${opts.sub || '加護を一つ選べ'}　<span class="bs-keys">クリック：選択 ／ ホイール：切替 → Enter：決定${opts.reroll ? ' ／ R：リロール' : ''} ／ 選択中も${['forward', 'left', 'back', 'right'].map(G.K).join('')}で移動可能</span></div>
       <div class="bs-cards" data-n="${choices.length}">${cards}</div>
-      <div class="bs-actions">${opts.reroll ? `<button class="btn" ${opts.reroll.afford ? '' : 'disabled'} id="bs-reroll">🎲 リロール（${opts.reroll.free > 0 ? `無料 残り${opts.reroll.free}` : `${U.fmt(opts.reroll.cost)}🪙`}）</button>` : ''}${UI.peekBtn()}</div>
+      <div class="bs-actions">${opts.reroll ? `<button class="btn" ${opts.reroll.afford ? '' : 'disabled'} id="bs-reroll">🎲 リロール（${opts.reroll.free > 0 ? `無料 残り${opts.reroll.free}` : `${U.fmt(opts.reroll.cost)}🪙`}）</button>` : ''}</div>
+      ${UI.peekBtn()}
     </div>`, 'live');
     let picked = false;
     const pick = (i) => {
@@ -914,7 +915,7 @@
 
   // ---------------- a look at the inventory from a forced choice (boon pick, transmutation result) ----------------
   // the choice screen is only hidden meanwhile (its cards, rerolls and materials stay exactly as they were); Tab / I open it too
-  UI.peekBtn = () => (window.G_MOBILE ? '' : `<button class="btn" id="bs-inv">🎒 インベントリを見る（${G.K('status')}）</button>`);
+  UI.peekBtn = () => (window.G_MOBILE ? '' : `<div class="bs-peek"><button class="btn" id="bs-inv">🎒 インベントリを見る（${G.K('status')}）</button></div>`);
   UI.wirePeek = function (s, done) {
     const b = s.querySelector('#bs-inv'); if (!b) return;
     b.onclick = () => {
@@ -944,7 +945,7 @@
       <div class="bs-title">${opts.title || 'CHOOSE ONE'}</div>
       <div class="bs-sub">${opts.sub || ''}　<span class="bs-keys">クリック／1〜${options.length}：選択 ／ ←→：切替 → Enter：決定</span></div>
       <div class="bs-cards" data-n="${options.length}">${cards}</div>
-      <div class="bs-actions">${UI.peekBtn()}</div>
+      ${UI.peekBtn()}
     </div>`, 'dim');
     const els = [...s.querySelectorAll('.card')];
     let picked = false, hl = 0;

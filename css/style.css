@@ -287,6 +287,7 @@ button { font-family: inherit; }
 .si-stat { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .side-info .si-buffs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 8px; }
 .bs-actions { margin-top: 24px; display: flex; gap: 12px; }
+.bs-peek { position: absolute; right: 24px; top: 120px; }
 
 @media (max-width: 1400px) { .side-info { width: 220px; font-size: 12px; padding: 10px; } .bs-wrap { padding-left: 230px; } .card { width: 205px; min-height: 300px; padding: 16px 12px; } .card .c-icon { width: 76px; height: 76px; font-size: 42px; } .bs-cards { gap: 14px; } }
 /* tooltip */

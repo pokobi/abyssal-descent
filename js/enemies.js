@@ -1018,12 +1018,23 @@
           return { x: 0, z: 0 };
         }
         case 'beam': {
+          // the petrifying gaze: the eyes kindle and the aim line thickens while it tracks you; for the last 0.3 s the aim is locked,
+          // the line flashes white and a ring marks where it will land; then a thick amber beam with a burst of stone chips where it hits
           const eye = this.centerPos();
           if (inWind) {
-            // aim lags behind the player, locks shortly before firing
             if (!A.aim) A.aim = tgt.eye.clone();
-            if (A.t < A.wind - 0.3) A.aim.lerp(tgt.eye, Math.min(1, dt * 4));
-            G.fx.beam(eye, eye.clone().add(A.aim.clone().sub(eye).normalize().multiplyScalar(40)), 0xff3020, 0.012, 0.05);
+            const lock = A.t >= A.wind - 0.3, k = U.clamp(A.t / A.wind, 0, 1);
+            if (!lock) A.aim.lerp(tgt.eye, Math.min(1, dt * 4));
+            else if (!A.locked) { A.locked = true; G.sfx.zap && G.sfx.zap(eye); }
+            const d = A.aim.clone().sub(eye).normalize();
+            const wh = G.world.raycast(eye, d, 40), L = wh ? wh.t : 40, endp = eye.clone().addScaledVector(d, L);
+            const blink = lock && Math.sin(A.t * 70) > 0;
+            G.fx.beam(eye, endp, lock ? (blink ? 0xffffff : 0xffc040) : 0xff7a20, lock ? 0.05 : 0.014 + k * 0.025, 0.05);
+            // glowing eyes, growing with the charge, and motes drawn into them
+            G.fx.add.spawn(eye.x, eye.y, eye.z, 0, 0, 0, 0.06, 0.4 + k * 0.9, 0.4 + k * 0.9, 1.7, 1.2, 0.45, 1, 0, 0);
+            if (A.t - (A.lightT || -1) > 0.12) { A.lightT = A.t; G.fx.flash(eye, 0xffa030, 10 + k * 30, 0.14, 7); }
+            if (Math.random() < 0.6) { const o = V(U.rand(-1, 1), U.rand(-0.6, 1), U.rand(-1, 1)).normalize().multiplyScalar(1.4); G.fx.add.spawn(eye.x + o.x, eye.y + o.y, eye.z + o.z, -o.x * 3.2, -o.y * 3.2, -o.z * 3.2, 0.3, 0.09, 0.02, 1.7, 1.3, 0.5, 1, 0, 0); }
+            if (lock && wh && !A.mark) { A.mark = true; G.fx.ring(wh.point, 1.1, 0xffd060, 0.3, { start: 0.9 }); }
             return { x: 0, z: 0 };
           }
           if (!A.fired) {
@@ -1032,8 +1043,11 @@
             const wh = G.world.raycast(eye, d, 60);
             const L = wh ? wh.t : 60;
             const endp = eye.clone().addScaledVector(d, L);
-            G.fx.beam(eye, endp, 0xff6030, 0.12, 0.35); G.fx.beam(eye, endp, 0xffe0c0, 0.04, 0.3);
-            G.sfx.fire(eye, true); G.fx.flash(endp, 0xff6030, 30, 0.15, 8);
+            G.fx.beam(eye, endp, 0xff9a30, 0.32, 0.4); G.fx.beam(eye, endp, 0xffe080, 0.13, 0.35); G.fx.beam(eye, endp, 0xffffff, 0.05, 0.3);
+            G.sfx.fire(eye, true); G.fx.flash(eye, 0xffb040, 40, 0.15, 8); G.fx.flash(endp, 0xff9a30, 50, 0.2, 10);
+            G.fx.sparks(endp, wh ? wh.normal : null, 14, 0xffc060, 8); G.fx.dust(endp, wh ? wh.normal : null, 0x8a8070, 8);
+            if (wh) G.fx.ring(wh.point, 1.4, 0xffb040, 0.35);
+            this.vel.addScaledVector(d, -3); // the recoil of the gaze
             // distance from player chest to the beam segment
             const pc = tgt.eye.clone().sub(eye); const tt = U.clamp(pc.dot(d), 0, L);
             const closest = eye.clone().addScaledVector(d, tt);

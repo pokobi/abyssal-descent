@@ -75,7 +75,7 @@
       if (!hg.total && left > 0) hg.total = left;
       hg.total = Math.max(hg.total || 0, left, 0.05);
       if (P.dead || left <= 0) { P.healGauge = null; if (!G.game.search) G.ui.holdRing(-1); }
-      else if (!(G.game.chestHold > 0) && !G.game.search) { hg.k = Math.max(hg.k || 0, Math.min(0.999, 1 - left / hg.total)); G.ui.holdRing(hg.k, 'pry', { center: hg.icon, label: '使用中…', cls: 'heal' }); }
+      else if (!(G.game.chestHold > 0) && !G.game.search) { hg.k = Math.max(hg.k || 0, Math.min(0.999, 1 - left / hg.total)); const q = G.abilities.useQueue; G.ui.holdRing(hg.k, 'pry', { center: hg.icon, label: q && q.id === hg.id && q.left > 0 ? `使用中…（あと${q.left}個）` : '使用中…', cls: 'heal' }); }
     }
     // ---- invulnerability (every frame: it is short-lived) ----
     const inv = P.invulnT || 0;

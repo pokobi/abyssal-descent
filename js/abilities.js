@@ -88,6 +88,7 @@
   };
   A.update = function (dt) {
     A.updateUltAuras && A.updateUltAuras(dt);
+    A.tickUseQueue();
     for (let i = 0; i < 4; i++) {
       const sk = P.skills[i]; if (!sk) continue;
       // charges: the skill's own + 多重充填 (charge skills only) + this skill's charge augments
@@ -669,8 +670,29 @@
     G.GrenHold.putAway(true);
     A.useItemId(id);
   };
+  // ---------------- use all: every one of a kind queued, used one after another (each with its own motion) ----------------
+  A.useQueue = null; // { id, left }
+  A.queueUse = function (id, n) {
+    const it = G.ITEM_BY_ID[id]; if (!it || n < 1) return;
+    A.useQueue = { id, left: n };
+    G.ui.toastSmall(`${it.icon} ${it.name} を${n}個まとめて使う（撃つ・他の道具で中止）`);
+  };
+  A.cancelUseQueue = function (why) { if (!A.useQueue) return; A.useQueue = null; if (why) G.ui.toastSmall(why); };
+  A.tickUseQueue = function () {
+    const q = A.useQueue; if (!q) return;
+    if (P.dead || !G.game.run) { A.useQueue = null; return; }
+    if (I.mpressed[0] && G.game.state === 'playing') { A.cancelUseQueue('🍶 まとめて使うのを中止した'); return; }
+    if (G.ItemAnim.busy() || G.game.state !== 'playing') return;
+    const have = P.itemCount(q.id);
+    if (q.left <= 0 || !have) { A.useQueue = null; return; }
+    A.useItemId(q.id, true);
+    if (P.itemCount(q.id) < have) q.left--;
+    else A.useQueue = null; // refused (HP already full, no room to set it down ...): its own message says why
+    if (q.left <= 0) A.useQueue = null;
+  };
   // ---------------- utility items ----------------
-  A.useItemId = function (id) {
+  A.useItemId = function (id, fromQueue) {
+    if (!fromQueue && A.useQueue) A.useQueue = null; // using anything by hand ends a queue
     const it = G.ITEM_BY_ID[id], d = it.data;
     if (d.revive) { G.ui.toastSmall('🧚 所持しているだけで効果を発揮'); return; }
     if (d.heal && P.hp >= P.stats.maxHp && !d.temp && !d.maxHp && !d.os && !d.cleanse) { G.ui.toastSmall('❤️ HPは満タン'); G.sfx.ui('deny'); return; }

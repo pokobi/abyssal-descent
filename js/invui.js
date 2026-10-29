@@ -567,6 +567,7 @@
     else if (it.type === 'att' && isMine(f.from)) for (const w of G.weapons.gunsInOrder()) if (G.ATT_BY_ID[it.id].compat(w.def)) opts.push([`🔩 装着: ${G.weapons.keyLabel(w)}${w.def.name}`, () => equipAtt(it, w)]);
     if (f.as) { popMenu(opts, e); return; }
     if (isMine(f.from) && usable(it)) opts.push(['🍶 使う', () => { UIV.close(); G.abilities.useItemId(it.id); }]);
+    if (isMine(f.from) && usable(it) && P.itemCount(it.id) > 1) { const n = P.itemCount(it.id); opts.push([`🍶 まとめて使う（×${n}）`, () => { UIV.close(); G.abilities.queueUse(it.id, n); }]); }
     if (isMine(f.from) && IV.isKit(it)) { const w = worstWorn(), wd = w && G.ARMOR_BY_ID[w.id]; if (w) opts.push([`🛠️ 最も傷んだ防具を修復：${wd.name} ${Math.ceil(IV.durOf(w))}/${IV.durMax(w)}`, () => mend(f, it, w)]); }
     if (it.type === 'armor' && !f.eq) opts.push(['🛡️ 装備する', () => { IV.equip(P, it, f.from); render(); }]);
     if (f.eq) opts.push(['📥 外す', () => { IV.unequip(P, f.eq); render(); }]);

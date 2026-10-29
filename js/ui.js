@@ -467,7 +467,11 @@
       else bar = `<div class="ob-bar"><div style="width:${Math.round(U.clamp(sg[0] ? sg[0].k : 0, 0, 1) * 100)}%"></div></div>`;
     } else if (o.progress) bar = `<div class="ob-bar"><div style="width:${Math.round(o.progress() * 100)}%"></div></div>`;
     const sub = !o.done && o.sub ? o.sub() : o.done && o.kind ? '✅ 目標達成' : '';
-    const html = `<div class="ob-row"><span class="ob-ic">${o.icon}</span><span>${o.text()}</span></div>${sub ? `<div class="ob-sub">${sub}</div>` : ''}${an ? `<div class="ob-row" style="color:#ff9a7a;font-size:12px">⚠ 異変: ${an}</div>` : ''}${UI.enrageGauge()}${bar}`;
+    // chests still shut in this area (a sprung mimic counts as opened)
+    const chs = G.world ? G.world.interactables.filter((it) => it.type === 'chest') : [];
+    const chLeft = chs.filter((it) => !it.opened).length;
+    const chest = chs.length ? `<div class="ob-chest${chLeft ? '' : ' none'}"><span class="ob-ic">📦</span>残りの宝箱 <b>${chLeft}</b><small> / ${chs.length}</small></div>` : '';
+    const html = `<div class="ob-row"><span class="ob-ic">${o.icon}</span><span>${o.text()}</span></div>${sub ? `<div class="ob-sub">${sub}</div>` : ''}${an ? `<div class="ob-row" style="color:#ff9a7a;font-size:12px">⚠ 異変: ${an}</div>` : ''}${chest}${UI.enrageGauge()}${bar}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
   };
   // the whole run as a strip of nodes grouped by field: visited areas show what they were, the guardians are marked, "you are here" glows

@@ -2165,7 +2165,7 @@
       else if (GM.state === 'buff') {
         // the boon choice is an overlay: the world keeps running and WASD still moves while the cursor picks a card;
         // number keys do nothing here (cards are picked with the mouse / wheel + Enter) and E/skills/items stay idle
-        const api = G.ui._buffApi;
+        const api = G.InvUI.isOpen() ? null : G.ui._buffApi; // looking at the inventory: the cards behind it don't react
         if (api) {
           if (I.wheel) api.move(Math.sign(I.wheel));
           if (I.pressed.Enter || (I.locked && I.mpressed[0])) api.confirm();

@@ -68,8 +68,18 @@
     IV.openCont = null; IV.openSrc = null;
     if (G.game.state === 'inv') G.game.resume();
     G.sfx.ui('click');
+    if (UIV.viewOnly) { const back = UIV._peekBack; UIV.viewOnly = false; UIV._peekBack = null; document.body.classList.remove('inv-view'); if (back) back(); }
   };
   UIV.toggle = () => (root ? UIV.close() : UIV.open(null));
+  // look-only inventory over a forced choice (a boon pick, a transmutation result): nothing can be moved, used, equipped or dropped,
+  // so going back and forth never changes what is on offer or what the choice will consume; closing it calls onBack
+  UIV.viewOnly = false;
+  UIV.peek = function (onBack) {
+    if (root) return;
+    UIV.viewOnly = true; UIV._peekBack = onBack || null;
+    UIV.open(null);
+    if (!root) { UIV.viewOnly = false; UIV._peekBack = null; if (onBack) onBack(); }
+  };
   // walking (or being knocked) away from the corpse / chest you are looting closes it: a body's middle lies a metre or two off its feet, so it gets more room
   UIV.tick = function () {
     if (!root || !IV.openCont || !IV.openSrc || drag) return;
@@ -170,7 +180,7 @@
     const valTotal = P.bag.items.filter((o) => o.type === 'valuable').reduce((s, o) => s + IV.value(o), 0);
     const specs = IV.SPEC.map((S) => `<div class="iv-spec" data-spec="${S.id}"><div class="iv-sph"><span>${S.icon} ${S.name}</span><kbd>${G.K(S.key)}</kbd></div>${gridEl(P.spec[S.id], 'spec:' + S.id)}</div>`).join('');
     const help = `<div class="iv-hs"><span>🛡 防御 <b>${Math.round(def)}</b></span><span>⚖ 重さ <b>${(st.weight || 0).toFixed(1)}</b></span></div>`;
-    const foot = `<div class="iv-foot">ドラッグで移動・入れ替え　<b>R</b> 回転　<b>右クリック</b> メニュー　<b>ダブルクリック</b> 使う／装備　<b>Shift+クリック</b> 反対側へ　枠の外へドラッグ＝捨てる　<b>${G.K('status')}</b>・<b>Esc</b> 閉じる</div>`;
+    const foot = UIV.viewOnly ? `<div class="iv-foot"><b>👁 確認のみ</b>（ここでは移動・使用・装備はできません）　<b>${G.K('status')}</b>・<b>Esc</b>・<button class="btn small" id="iv-peekback">↩ 選択画面に戻る</button></div>` : `<div class="iv-foot">ドラッグで移動・入れ替え　<b>R</b> 回転　<b>右クリック</b> メニュー　<b>ダブルクリック</b> 使う／装備　<b>Shift+クリック</b> 反対側へ　枠の外へドラッグ＝捨てる　<b>${G.K('status')}</b>・<b>Esc</b> 閉じる</div>`;
     const left = loot
       ? `<div class="iv-panel iv-contp"><div class="iv-ph"><b>${C.kind === 'corpse' ? '💀 ' + U.esc(C.name) + 'の亡骸' : '📦 ' + U.esc(C.name)}</b><button class="btn small" id="iv-all">すべて取る</button></div><div class="iv-contbody">${gridEl(C, 'cont', Math.round(CS * 1.3))}</div></div>`
       : '';
@@ -189,8 +199,11 @@
       <div class="iv-skillrow">${eqBox(SL.hands, 'hand')}<div class="iv-sks">${skillBoxes()}</div></div>
       ${invPanel}
     </div>`;
+    document.body.classList.toggle('inv-view', UIV.viewOnly);
+    const pb = root.querySelector('#iv-peekback'); if (pb) pb.onclick = () => UIV.close();
     const srt = root.querySelector('#iv-sort');
-    if (srt) srt.onclick = () => { closeMenu(); IV.acts = (IV.acts || 0) + 1; const ok = IV.sortContainer(P.bag); G.sfx.ui(ok ? 'select' : 'deny'); if (!ok) G.ui.toastSmall('🎒 並べ替えできなかった'); render(); };
+    if (srt && UIV.viewOnly) srt.remove();
+    else if (srt) srt.onclick = () => { closeMenu(); IV.acts = (IV.acts || 0) + 1; const ok = IV.sortContainer(P.bag); G.sfx.ui(ok ? 'select' : 'deny'); if (!ok) G.ui.toastSmall('🎒 並べ替えできなかった'); render(); };
     const all = root.querySelector('#iv-all');
     if (all) all.onclick = () => { takeAll(); };
     root.querySelectorAll('.iv-it').forEach((el) => wire(el));
@@ -233,6 +246,7 @@
   let lastDown = { key: '', t: 0 };
   function wire(el) {
     el.addEventListener('pointerdown', (e) => {
+      if (UIV.viewOnly) { e.preventDefault(); return; }
       if (e.button === 2) { e.preventDefault(); openMenu(el, e); return; }
       if (e.button !== 0) return;
       closeMenu();
@@ -261,6 +275,7 @@
     el.addEventListener('mousemove', (e) => { if (!drag && tip) placeTip(e); });
     el.addEventListener('mouseleave', hideTip);
     el.addEventListener('pointerdown', (e) => {
+      if (UIV.viewOnly) { e.preventDefault(); return; }
       // right click on a gun: its menu (the last gun cannot be thrown away)
       if (e.button === 2 && kind === 'w' && !el.classList.contains('empty') && !e.target.closest('.iv-as')) {
         e.preventDefault(); closeMenu(); hideTip();

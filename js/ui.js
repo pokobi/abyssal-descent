@@ -880,7 +880,7 @@
       <div class="bs-title">${opts.title || 'CHOOSE A BOON'}</div>
       <div class="bs-sub">${opts.sub || '加護を一つ選べ'}　<span class="bs-keys">クリック：選択 ／ ホイール：切替 → Enter：決定${opts.reroll ? ' ／ R：リロール' : ''} ／ 選択中も${['forward', 'left', 'back', 'right'].map(G.K).join('')}で移動可能</span></div>
       <div class="bs-cards" data-n="${choices.length}">${cards}</div>
-      <div class="bs-actions">${opts.reroll ? `<button class="btn" ${opts.reroll.afford ? '' : 'disabled'} id="bs-reroll">🎲 リロール（${opts.reroll.free > 0 ? `無料 残り${opts.reroll.free}` : `${U.fmt(opts.reroll.cost)}🪙`}）</button>` : ''}</div>
+      <div class="bs-actions">${opts.reroll ? `<button class="btn" ${opts.reroll.afford ? '' : 'disabled'} id="bs-reroll">🎲 リロール（${opts.reroll.free > 0 ? `無料 残り${opts.reroll.free}` : `${U.fmt(opts.reroll.cost)}🪙`}）</button>` : ''}${UI.peekBtn()}</div>
     </div>`, 'live');
     let picked = false;
     const pick = (i) => {
@@ -893,6 +893,7 @@
     };
     s.querySelectorAll('.card').forEach((el) => { el.onclick = () => pick(+el.dataset.i); });
     const rr = s.querySelector('#bs-reroll'); if (rr) rr.onclick = () => { if (picked) return; G.sfx.ui('card'); opts.onReroll(); };
+    UI.wirePeek(s, () => picked);
     // keyboard / wheel / click control while the mouse stays locked
     let hl = 0;
     const els = [...s.querySelectorAll('.card')];
@@ -910,6 +911,25 @@
   };
   window.addEventListener('keydown', (e) => { if (G.game && G.game.state === 'buff' && UI._buffKeys) UI._buffKeys(e.code); });
 
+  // ---------------- a look at the inventory from a forced choice (boon pick, transmutation result) ----------------
+  // the choice screen is only hidden meanwhile (its cards, rerolls and materials stay exactly as they were); Tab / I open it too
+  UI.peekBtn = () => (window.G_MOBILE ? '' : `<button class="btn" id="bs-inv">🎒 インベントリを見る（${G.K('status')}）</button>`);
+  UI.wirePeek = function (s, done) {
+    const b = s.querySelector('#bs-inv'); if (!b) return;
+    b.onclick = () => {
+      if (done() || G.InvUI.isOpen()) return;
+      G.sfx.ui('open');
+      s.style.visibility = 'hidden';
+      G.InvUI.peek(() => { if (document.body.contains(s)) s.style.visibility = ''; });
+    };
+  };
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat || !G.game || !['buff', 'modal'].includes(G.game.state) || G.InvUI.isOpen()) return;
+    if (!(G.BIND.status.includes(e.code) || (G.BIND.inventory && G.BIND.inventory.includes(e.code)))) return;
+    const b = document.querySelector('#screens #bs-inv'); if (!b) return;
+    e.preventDefault(); e.stopImmediatePropagation(); b.click();
+  }, true);
+
   // ---------------- a forced pick among a few cards, shown like the boon choice (the transmutation result) ----------------
   // options: { icon, label, sub, rar, onPick }; opts: { title, sub, side (html for the left panel), onPick (after the card's own) }
   UI.cardSelect = function (options, opts) {
@@ -923,13 +943,14 @@
       <div class="bs-title">${opts.title || 'CHOOSE ONE'}</div>
       <div class="bs-sub">${opts.sub || ''}　<span class="bs-keys">クリック／1〜${options.length}：選択 ／ ←→：切替 → Enter：決定</span></div>
       <div class="bs-cards" data-n="${options.length}">${cards}</div>
+      <div class="bs-actions">${UI.peekBtn()}</div>
     </div>`, 'dim');
     const els = [...s.querySelectorAll('.card')];
     let picked = false, hl = 0;
     const paint = () => els.forEach((el, k) => el.classList.toggle('hl', k === hl));
     const onKey = (e) => {
       if (!document.body.contains(s)) { window.removeEventListener('keydown', onKey, true); return; }
-      if (picked) return;
+      if (picked || G.InvUI.isOpen()) return;
       const n = /^Digit([1-9])$/.exec(e.code);
       if (n && +n[1] <= options.length) { e.preventDefault(); e.stopImmediatePropagation(); pick(+n[1] - 1); }
       else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { e.preventDefault(); hl = (hl + (e.code === 'ArrowLeft' ? -1 : 1) + options.length) % options.length; paint(); G.sfx.ui('click'); }
@@ -945,6 +966,7 @@
     els.forEach((el, k) => { el.onclick = () => pick(k); el.addEventListener('mouseenter', () => { if (!picked) { hl = k; paint(); } }); });
     paint();
     window.addEventListener('keydown', onKey, true);
+    UI.wirePeek(s, () => picked);
     setTimeout(() => G.sfx.ui('card'), 100); setTimeout(() => G.sfx.ui('card'), 220); setTimeout(() => G.sfx.ui('card'), 340);
     return s;
   };

@@ -475,12 +475,12 @@
     w.miniHeal = V(vx + 1.6, 0, vz + 4.2);
     w.road = { z0: AD + 7, z1: D - 4 };
     w.npcSpots = [];
-    w.killY = -12;
+    w.killY = -24; // deep: you watch yourself fall a while before the void takes you
     w.arenaCenter = V(cx, 0, cz);
     w.bossPillars = [];
     w.fallFrac = 0.32; w.fallSpot = V(cx, 0.1, AD - 4); // a fall costs 32% x the enemy-damage factor (1.25) = about 40% of max HP
     // once the fight is on you come back on the whole tile nearest to where you fell (the ledge is sealed then, see bosses6.js TR.seal)
-    w.fallSpotAt = (p) => { const t = G.bosses.terrain.nearestSafe(p); return t && G.game.bossEngaged ? V(t.cx, 0.1, t.cz) : w.fallSpot; };
+    w.fallSpotAt = (p) => { const TR = G.bosses.terrain; if (TR.stage) return TR.stageSpot(p); const t = TR.nearestSafe(p); return t && G.game.bossEngaged ? V(t.cx, 0.1, t.cz) : w.fallSpot; };
     w.ledgeZ = LEDGE;
     w.bossHome = V(cx, 0, -16); // the guardian stands across the void, north of the tiles, out of reach
     w.fogK = 0.5; // thinner fog during the fight: the giant must be readable 30-80 m away
@@ -497,8 +497,8 @@
       w.tiles.push({ i, j, x0: tx0, z0: tz0, x1: tx0 + S, z1: tz0 + S, cx: tx0 + S / 2, cz: tz0 + S / 2, mesh: m, col, state: 'up', timer: 0, dy: 0, vy: 0 });
     }
     // the dark below, glowing violet-red far down
-    w.visual('voidglow', -40, -16, -60, W + 40, -15.9, LEDGE, { uv: 6, grad: false }); // (on past the open north side, under the guardian)
-    for (let z = 8; z < LEDGE; z += 18) for (let x = 8; x < W; x += 20) w.addLight(x, -9, z, { flame: 0, intensity: 14, range: 20, color: '#ff3a8a', emit: false, prio: 0.6, steady: true });
+    w.visual('voidglow', -40, -34, -60, W + 40, -33.9, LEDGE, { uv: 6, grad: false }); // (on past the open north side, under the guardian)
+    for (let z = 8; z < LEDGE; z += 18) for (let x = 8; x < W; x += 20) w.addLight(x, -20, z, { flame: 0, intensity: 14, range: 20, color: '#ff3a8a', emit: false, prio: 0.6, steady: true });
     // the entrance ledge: braziers and a low parapet
     for (const sx of [-1, 1]) { P().brazier(w, cx + sx * 12, 0, LEDGE + 3, 1.2); P().pillarSquare(w, cx + sx * 20, LEDGE + 2, 0, 9, 1.4); }
     w.visual('trim', 4, 0, LEDGE - 0.3, W - 4, 0.3, LEDGE, { uv: 1 });

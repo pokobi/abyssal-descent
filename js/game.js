@@ -240,6 +240,19 @@
     if (skyDome) { if (!GM._skyBase) GM._skyBase = ['top', 'mid', 'hor'].map((u) => skyDome.material.uniforms[u].value.clone()); for (const u of ['top', 'mid', 'hor']) skyDome.material.uniforms[u].value.lerp(c, k); }
     hemi.color.lerp(c, k * 0.8);
   };
+  // the last guardian's sky stage: k 0..1 turns the whole scene into deep space (black sky, almost no fog, cold light); the guardian's own
+  // star sphere does the stars (bosses6.js). Reset when a new area starts.
+  GM.setSpace = function (k) { GM.spaceK = k; };
+  const SPACE = { fog: new THREE.Color('#06030c'), bg: new THREE.Color('#020106'), hemi: new THREE.Color('#9a86d0'), moon: new THREE.Color('#d8c8ff') };
+  function applySpace() {
+    const k = GM.spaceK || 0;
+    if (skyDome) skyDome.visible = k < 0.85;
+    if (k <= 0) return;
+    scene.fog.color.lerp(SPACE.fog, k); scene.fog.density = U.lerp(scene.fog.density, 0.0028, k);
+    if (scene.background && scene.background.isColor) scene.background.lerp(SPACE.bg, k);
+    hemi.color.lerp(SPACE.hemi, k * 0.8); hemi.intensity = U.lerp(hemi.intensity, 0.85, k);
+    moon.color.lerp(SPACE.moon, k); moon.intensity = U.lerp(moon.intensity, 1.6, k); amb.intensity = U.lerp(amb.intensity, 0.55, k);
+  }
   function applySceneTint() {
     const T = GM.sceneTint; if (!T) return;
     // colour, not darkness: the fight must stay readable
@@ -349,6 +362,7 @@
     hemi.intensity = b.hemiI * (1 - k * 0.3) + fl * 1.2; amb.intensity = b.amb * (1 - k * 0.3) + fl * 0.8;
     moon.intensity = b.moonI * (1 - k * 0.35) + fl * 4; moon.color.copy(b.moon).lerp(tmpC.set(GM.bossDef && GM.bossDef.final ? '#b060ff' : '#ff5038'), Math.min(1, k * 0.55 + fl));
     applySceneTint();
+    applySpace();
     G.fx.setFog(scene.fog.color, scene.fog.density);
     // pulsing blood-red vignette (beats with the heart near the gate)
     const vig = document.getElementById('mood-vig');
@@ -583,6 +597,7 @@
     GM.saveRun(n, kind);
     GM.area = n;
     GM.stage = kind;
+    GM.spaceK = 0;
     GM.route = GM.route || []; GM.route.push(kind);
     const gates = G.Run.isBoss(n + 1) || G.Run.isPrep(n + 1) ? 1 : 3;
     const seed = (GM.seed ^ U.hashStr('area' + n + kind)) >>> 0;

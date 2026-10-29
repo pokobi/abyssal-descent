@@ -320,7 +320,8 @@
   R2.mercFetch = function (a) {
     const w = G.world; if (!a || !w || GM.stage !== 'boss' || !GM.bossEngaged || P.dead) return;
     const lim = w.ledgeZ ? w.ledgeZ - 1 : w.arenaD ? w.arenaD - 2 : Infinity, e = a.ent;
-    if (e.pos.z < lim) return;
+    const sky = G.bosses.terrain && G.bosses.terrain.stage; // the last guardian's sky stage: brought up with you
+    if (sky ? Math.abs(e.pos.y - P.pos.y) < 6 || !P.grounded : e.pos.z < lim) return;
     e.pos.set(P.pos.x + 1.5, P.pos.y, P.pos.z - 1.5);
     const gy = w.groundAt(V(e.pos.x, P.pos.y + 0.8, e.pos.z), 0.2, 12);
     if (gy > -Infinity) e.pos.y = gy; else e.pos.set(P.pos.x, P.pos.y, P.pos.z);

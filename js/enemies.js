@@ -1498,11 +1498,13 @@
         if (wanted.length) G.world.updateAirFlow(tp.x, tp.z, tp.y, wanted);
       }
     }
+    // (a foe leaving the list gives its health bar back here: updateBars only walks the list, so a bar left behind would stay on screen)
+    const drop = (i) => { const e = E.list[i]; if (e.bar) { e.bar.el.style.display = 'none'; if (e.bar.el._s) e.bar.el._s.display = 'none'; e.bar.used = false; e.bar = null; } E.list.splice(i, 1); };
     for (let i = E.list.length - 1; i >= 0; i--) {
       const e = E.list[i];
-      if (e.custom) { e.update(dt); if (e.removed) E.list.splice(i, 1); continue; }
+      if (e.custom) { e.update(dt); if (e.removed) drop(i); continue; }
       e.update(dt);
-      if (e.removed) E.list.splice(i, 1);
+      if (e.removed) drop(i);
     }
     E.updateBars();
   };

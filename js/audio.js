@@ -824,6 +824,121 @@
     [1046, 784, 587, 392].forEach((f, i) => tn({ t: t + i * 0.06, f0: f, f1: f * 0.9, d: 0.35, g: 0.12, to: out, type: 'triangle', lp: 3000 }));
     nz({ t, buf: 'white', f: [['bandpass', 3500, 6]], g: 0.18, d: 0.12, to: out });
   };
+  // ---- the last guardian's sky (bosses6.js): gravity turning over, the climb into the dark, the new attacks ----
+  // the warning: a low chord that bends upward with a reversed cymbal swelling into it
+  A.gravWarn = function (dur) {
+    if (!ctx || !voice(dur + 0.3)) return;
+    const t = ctx.currentTime, out = dest(null, 0.9); out.gain.value = 0.75;
+    [55, 82.5, 110].forEach((f, i) => tn({ t, f0: f, f1: f * 2, fd: dur, d: dur, a: dur * 0.6, g: 0.22 - i * 0.04, to: out, type: i ? 'sine' : 'triangle', lp: 900 }));
+    nz({ t, buf: 'pink', f: [['highpass', 1500], ['bandpass', 3000, 0.6, 9000, dur]], g: 0.3, a: dur * 0.95, d: 0.05, to: out });
+    tn({ t: t + dur * 0.5, f0: 1760, f1: 3520, d: dur * 0.5, a: dur * 0.45, g: 0.04, to: out, type: 'sine' });
+  };
+  // torn off the ground: a thump, a rush of air going up, a rising whistle
+  A.gravLift = function () {
+    if (!ctx || !voice(1.6)) return;
+    const t = ctx.currentTime, out = dest(null, 0.6); out.gain.value = 0.9;
+    tn({ t, f0: 120, f1: 40, d: 0.25, g: 0.6, to: out, type: 'sine' });
+    nz({ t, buf: 'pink', f: [['bandpass', 300, 0.8, 4200, 1.2]], g: 0.55, a: 0.05, d: 1.3, to: out });
+    tn({ t: t + 0.05, f0: 220, f1: 1300, d: 1.2, g: 0.12, to: out, type: 'triangle', lp: 2500 });
+  };
+  // hanging in the air: a thin wind and a slow, unsettling throb (call every frame while it lasts; it fades by itself once the calls stop)
+  let gfl = null;
+  A.gravFloat = function (k) {
+    if (!ctx) return;
+    if (!gfl) {
+      const out = dest(null, 0.6); out.gain.value = 0.0001;
+      const src = ctx.createBufferSource(); src.buffer = pink; src.loop = true;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 1.4;
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 52;
+      const og = ctx.createGain(); og.gain.value = 0.35;
+      src.connect(bp); bp.connect(out); o.connect(og); og.connect(out); src.start(); o.start();
+      gfl = { out, bp, o, t: 0, w: 0, src };
+    }
+    const now = ctx.currentTime; gfl.t = performance.now();
+    gfl.out.gain.setTargetAtTime(0.18 + 0.2 * k, now, 0.1); gfl.bp.frequency.setTargetAtTime(700 + 900 * k, now, 0.2); gfl.o.frequency.setTargetAtTime(52 - 14 * k, now, 0.2);
+    if (!gfl.w) gfl.w = setInterval(() => { if (performance.now() - gfl.t > 250) { gfl.out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15); clearInterval(gfl.w); gfl.w = 0; } }, 100);
+  };
+  // the creak just before the fall: a stretched, cracking tone
+  A.gravCreak = function () {
+    if (!ctx || !voice(0.8)) return;
+    const t = ctx.currentTime, out = dest(null, 0.5); out.gain.value = 0.7;
+    tn({ t, f0: 180, f1: 95, d: 0.7, g: 0.25, to: out, type: 'sawtooth', lp: 700 });
+    for (let i = 0; i < 5; i++) nz({ t: t + i * 0.11, f: [['bandpass', 1800 + i * 300, 5]], g: 0.2, d: 0.04, to: out });
+  };
+  // the drop: a falling whistle and air tearing past
+  A.gravDrop = function () {
+    if (!ctx || !voice(1.1)) return;
+    const t = ctx.currentTime, out = dest(null, 0.5); out.gain.value = 0.85;
+    tn({ t, f0: 1500, f1: 160, d: 0.9, g: 0.16, to: out, type: 'sine' });
+    tn({ t, f0: 1520, f1: 170, d: 0.9, g: 0.08, to: out, type: 'triangle' });
+    nz({ t, buf: 'pink', f: [['bandpass', 4000, 0.7, 500, 0.9]], g: 0.5, a: 0.1, d: 0.85, to: out });
+  };
+  // smashed into the floor: a very low hit, a crack and stone falling apart
+  A.gravCrash = function () {
+    if (!ctx || !voice(1.6)) return;
+    const t = ctx.currentTime, out = dest(null, 0.8); out.gain.value = 1.0;
+    tn({ t, f0: 90, f1: 24, d: 0.9, g: 0.9, to: out, type: 'sine' });
+    nz({ t, buf: 'brown', f: [['lowpass', 900, 0.7, 120, 1.2]], g: 0.9, d: 1.3, to: out });
+    nz({ t, f: [['bandpass', 2400, 1.2]], g: 0.45, d: 0.08, to: out });
+    for (let i = 0; i < 6; i++) nz({ t: t + 0.12 + i * 0.07, f: [['bandpass', 600 + Math.random() * 900, 3]], g: 0.18, d: 0.06, to: out });
+  };
+  // the climb into the dark between the forms: a long swell of a rising chord over a rushing wind
+  A.ascend = function (dur) {
+    if (!ctx || !voice(dur + 0.5)) return;
+    const t = ctx.currentTime, out = dest(null, 1.2); out.gain.value = 0.8;
+    [65.4, 98, 130.8, 196, 261.6].forEach((f, i) => tn({ t: t + i * 0.25, f0: f, f1: f * 1.5, fd: dur, d: dur - i * 0.25, a: dur * 0.5, g: 0.12, to: out, type: i % 2 ? 'sine' : 'triangle', lp: 1800 }));
+    nz({ t, buf: 'pink', f: [['bandpass', 250, 0.6, 5000, dur]], g: 0.45, a: dur * 0.7, d: dur * 0.35, to: out });
+    tn({ t: t + dur * 0.85, f0: 523, f1: 1046, d: 1.6, g: 0.1, to: out, type: 'sine' });
+  };
+  // star shards gathering into a ring: glassy chimes falling into place
+  A.starRing = function () {
+    if (!ctx || !voice(1.4)) return;
+    const t = ctx.currentTime, out = dest(null, 1.0); out.gain.value = 0.5;
+    [1318, 1568, 1976, 2349, 2637].forEach((f, i) => tn({ t: t + i * 0.07, f0: f, f1: f * 0.98, d: 1.1, g: 0.08, to: out, type: 'sine' }));
+    nz({ t, buf: 'pink', f: [['highpass', 4000]], g: 0.15, a: 0.3, d: 0.8, to: out });
+  };
+  A.starBurst = function () {
+    if (!ctx || !voice(0.9)) return;
+    const t = ctx.currentTime, out = dest(null, 0.8); out.gain.value = 0.6;
+    for (let i = 0; i < 8; i++) tn({ t: t + i * 0.02, f0: 2000 + Math.random() * 1500, f1: 700, d: 0.5, g: 0.05, to: out, type: 'sine' });
+    nz({ t, f: [['bandpass', 3500, 1]], g: 0.3, d: 0.25, to: out });
+  };
+  // a rift opening in the air, then the curtain of light coming down on it
+  A.riftOpen = function () {
+    if (!ctx || !voice(1)) return;
+    const t = ctx.currentTime, out = dest(null, 0.6); out.gain.value = 0.55;
+    nz({ t, f: [['bandpass', 800, 4, 3000, 0.9]], g: 0.25, a: 0.6, d: 0.3, to: out });
+    tn({ t, f0: 440, f1: 466, d: 0.9, a: 0.5, g: 0.05, to: out, type: 'sawtooth', lp: 1500 });
+  };
+  A.riftFall = function () {
+    if (!ctx || !voice(0.9)) return;
+    const t = ctx.currentTime, out = dest(null, 0.7); out.gain.value = 0.8;
+    nz({ t, buf: 'white', f: [['highpass', 600]], g: 0.6, d: 0.35, to: out });
+    tn({ t, f0: 2600, f1: 300, d: 0.3, g: 0.12, to: out, type: 'square', lp: 4000 });
+    tn({ t, f0: 75, f1: 40, d: 0.5, g: 0.5, to: out, type: 'sine' });
+  };
+  // the lance of light: a rising charge, and its strike
+  A.lanceCharge = function (dur) {
+    if (!ctx || !voice(dur + 0.2)) return;
+    const t = ctx.currentTime, out = dest(null, 0.6); out.gain.value = 0.5;
+    tn({ t, f0: 200, f1: 1600, fd: dur, d: dur, a: dur * 0.9, g: 0.12, to: out, type: 'sawtooth', lp: 3000 });
+    tn({ t, f0: 100, f1: 800, fd: dur, d: dur, a: dur * 0.9, g: 0.12, to: out, type: 'sine' });
+  };
+  A.lanceHit = function (pos) {
+    if (!ctx || !voice(1.2)) return;
+    const t = ctx.currentTime, out = dest(pos, 0.8); out.gain.value = 1;
+    tn({ t, f0: 300, f1: 40, d: 0.6, g: 0.6, to: out, type: 'sine' });
+    nz({ t, f: [['bandpass', 1500, 0.8, 300, 0.8]], g: 0.7, d: 0.9, to: out });
+    tn({ t, f0: 1760, f1: 880, d: 0.7, g: 0.1, to: out, type: 'triangle' });
+  };
+  // two giant hands meeting: a vast clap and the boom that follows
+  A.clap = function () {
+    if (!ctx || !voice(1.4)) return;
+    const t = ctx.currentTime, out = dest(null, 1.0); out.gain.value = 1;
+    nz({ t, f: [['bandpass', 1200, 0.9]], g: 0.95, d: 0.12, to: out });
+    nz({ t, buf: 'brown', f: [['lowpass', 500, 0.7, 80, 1]], g: 0.8, d: 1.1, to: out });
+    tn({ t, f0: 110, f1: 30, d: 0.8, g: 0.6, to: out, type: 'sine' });
+  };
   // the golden barrier going up, and absorbing a hit
   A.shieldUp = function () {
     if (!ctx || smp('shield_up', null, 0.5, 1, 0.7)) return;

@@ -61,6 +61,7 @@
     const tmp = new THREE.Group(); tmp.position.set(0, -800, 0);
     const seen = new Set();
     for (const d of G.ENEMIES) { const k = d.plan + '|' + d.variant; if (seen.has(k)) continue; seen.add(k); try { tmp.add(G.enemies.buildModel(d, { scale: 1 }).group); } catch (e) { /* ignore */ } }
+    if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id)); } catch (e) { /* ignore */ } } // every throwable's materials, so the first throw doesn't stall
     sc.add(tmp);
     return tmp;
   };
@@ -87,6 +88,7 @@
       for (const d of guns) if (d) { try { tmp.add(Wp.displayModel(d, { optic: 'o_4x', muzzle: 'm_supp', under: 'u_laser' })); } catch (e) { /* ignore */ } }
       if (G.MELEE && G.MELEE[0]) { try { tmp.add(Wp.meleeDisplayModel(G.MELEE[0])); } catch (e) { /* ignore */ } }
       if (G.ItemAnim) for (const k of ['throw', 'bandage', 'drink', 'inject', 'eat', 'plate', 'device']) { try { tmp.add(G.ItemAnim.build(k, null)); } catch (e) { /* ignore */ } }
+      if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id, 0.42)); } catch (e) { /* ignore */ } }
       if (G.ItemAnim) { try { const h = new THREE.Group(); G.ItemAnim.hand(h, true); tmp.add(h); } catch (e) { /* ignore */ } }
       Wp.vmScene.updateMatrixWorld(true);
       r.compile(Wp.vmScene, Wp.vmCam);

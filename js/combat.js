@@ -596,6 +596,7 @@
     const mats = G.world.mats;
     const PG = G.Props.PG;
     let g;
+    if (kind.startsWith('gl_')) { g = G.GrenFX.build(kind.slice(3)); g.userData.kind = kind; G.scene.add(g); return g; } // a throwable's own model
     const add = (geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const mm = new THREE.Mesh(geo, mat); mm.scale.set(sx, sy, sz); mm.position.set(x || 0, y || 0, z || 0); mm.rotation.set(rx || 0, ry || 0, rz || 0); g.add(mm); return mm; };
     g = new THREE.Group();
     const glow = (c, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.setScalar(s); g.add(sp); return sp; };
@@ -650,12 +651,13 @@
       for (const k of ['onDetonate', 'onHitEnemy', 'onEnd']) if (p[k]) p[k] = G.abilities.withSk(p.info.sk, p[k]);
     }
     if (p.owner === 'enemy' && P.has('pact_fang')) p.vel.multiplyScalar(1.25);
-    p.mesh = projMesh(o.kind);
+    p.mesh = projMesh(o.look || o.kind);
     p.mesh.position.copy(p.pos);
     C.projectiles.push(p);
     return p;
   };
   function trail(p, dt) {
+    if (p.look) { G.GrenFX.trail(p, dt); return; }
     switch (p.kind) {
       case 'rocket': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(0, 0.5), U.rand(-0.3, 0.3), 1.2, 0.2, 1.0, 0.5, 0.48, 0.45, 0.5, -0.3, 1); G.fx.flame.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.08, 0.35, 0.1, 1.5, 0.9, 0.4, 1, 0, 0); break;
       case 'fireball': case 'bigfire': G.fx.flameLick(p.pos.x, p.pos.y - 0.1, p.pos.z, p.kind === 'bigfire' ? 2.5 : 1.0); break;

@@ -57,7 +57,8 @@
     const liq = LIQ[id] || 0x80ff80;
     if (kind === 'throw') {
       const gid = id || 'g_frag';
-      if (gid === 'g_molotov' || gid === 'g_holy') { cyl(g, M.glass, 0.03, 0.12); cyl(g, new THREE.MeshBasicMaterial({ color: gid === 'g_holy' ? 0x80c8ff : 0xff8020 }), 0.026, 0.07, 0, -0.02); cyl(g, M.cloth, 0.012, 0.06, 0, 0.09); }
+      if (G.GrenFX && G.ITEM_BY_ID[gid]) g.add(G.GrenFX.build(gid, 0.42)); // the same model as the one that flies
+      else if (gid === 'g_molotov' || gid === 'g_holy') { cyl(g, M.glass, 0.03, 0.12); cyl(g, new THREE.MeshBasicMaterial({ color: gid === 'g_holy' ? 0x80c8ff : 0xff8020 }), 0.026, 0.07, 0, -0.02); cyl(g, M.cloth, 0.012, 0.06, 0, 0.09); }
       else if (gid === 'g_dyna') { for (let i = 0; i < 3; i++) cyl(g, M.red, 0.016, 0.14, (i - 1) * 0.034, 0); }
       else if (gid === 'g_mine') { cyl(g, M.gun, 0.07, 0.03); sph(g, M.red, 0.012, 0.012, 0.012, 0, 0.02, 0); }
       else { sph(g, M.gun, 0.035, 0.045, 0.035); cyl(g, M.steel, 0.012, 0.03, 0, 0.045); box(g, M.steel, 0.006, 0.05, 0.012, 0.02, 0.03, 0, 0, 0, -0.3); }

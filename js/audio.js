@@ -697,6 +697,19 @@
       for (let i = 0; i < 8; i++) nz({ t: t + 0.05 + Math.random() * 0.3, f: [['bandpass', vr(1500, 0.5), 2]], g: 0.15, d: 0.05, to: out });
     }
   };
+  // a small bright bell (the decoy bell, holy water)
+  A.chime = function (pos) {
+    if (!ctx || !voice(0.4)) return;
+    const t = ctx.currentTime, out = dest(pos, 0.5); out.gain.value = 0.5;
+    [[1, 0.35], [2.76, 0.16], [5.4, 0.07]].forEach(([m, g]) => tn({ t, f0: 990 * m, d: 1.3 - m * 0.15, g, to: out, type: 'sine' }));
+    nz({ t, f: [['bandpass', 4000, 3]], g: 0.15, d: 0.02, to: out });
+  };
+  // gas escaping (smoke, poison gas, burning thermite)
+  A.hiss = function (pos, dur) {
+    if (!ctx || !voice(Math.min(1.5, dur || 1))) return;
+    const t = ctx.currentTime, out = dest(pos, 0.5); out.gain.value = 0.45;
+    nz({ t, buf: 'pink', f: [['highpass', 2200], ['lowpass', 7000]], g: 0.5, a: 0.04, d: dur || 1, to: out });
+  };
   // ---------- pickups / ui ----------
   A.coin = function (n) {
     if (!ctx || !voice(0.3)) return;

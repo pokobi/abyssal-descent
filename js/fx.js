@@ -227,6 +227,7 @@
     for (const s of [FX.add, FX.flame, FX.norm]) { s.mat.uniforms.uFogD.value = density; s.mat.uniforms.uFogC.value.set(color); }
   };
   FX.clear = function () {
+    if (G.GrenFX) G.GrenFX.clear();
     FX.add.clear(); FX.flame.clear(); FX.norm.clear();
     for (const d of pools.decal) d.m.visible = false;
     for (const t of pools.tele) { t.outer.visible = t.inner.visible = false; t.active = false; }
@@ -501,6 +502,7 @@
 
   // ---------------- update ----------------
   FX.update = function (dt, cam, renderer) {
+    if (G.GrenFX) G.GrenFX.update(dt);
     const h = renderer.domElement.height;
     const sc = h * 0.5 / Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5);
     const sys = FX._sys || (FX._sys = [FX.add, FX.flame, FX.norm]);

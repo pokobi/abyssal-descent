@@ -597,6 +597,7 @@
     else if (d.impact) { pr.explode = d.r; }
     else { pr.fuse = d.fuse; pr.bounce = true; pr.explode = d.r; }
     if (d.sticky) { pr.sticky = true; pr.bounce = false; }
+    pr.look = 'gl_' + id; // its own model and trail (grenfx.js)
     pr.onDetonate = (p) => A.grenadeEffect(id, p.pos.clone(), dmg);
     if (d.mine) pr.onDetonate = null;
     C.spawnProjectile(pr);
@@ -609,12 +610,13 @@
     const fl = G.world.floorBelow(pos.x, pos.y + 0.3, pos.z);
     const ground = V(pos.x, fl > -50 ? fl : pos.y, pos.z);
     const info = { src: 'explosion', grenade: true, shieldMul: d.shieldMul || 1, emp: !!d.emp, elem: d.elem, stacks: d.stacks };
+    if (G.GrenFX) G.GrenFX.boom(id, pos, ground, d); // what this one looks and sounds like on top of the shared blast below
     if (d.blackhole) {
       C.zone(ground, d.r, d.blackhole, 'gravity', 0, { onEnd: () => C.explode(ground.clone().add(V(0, 1, 0)), d.r * 0.7, dmg, Object.assign({}, info, { color: 0xa070ff })) });
       G.sfx.magic(pos, 'dark'); G.sfx.rumble(d.blackhole, 0.6);
       return;
     }
-    if (d.decoy) { C.addDecoy(ground, d.decoy, 0); return; }
+    if (d.decoy) { const dc = C.addDecoy(ground, d.decoy, 0); if (G.GrenFX) G.GrenFX.bell(dc); return; }
     if (d.zone === 'smoke') { C.zone(ground, d.r, d.dur, 'smoke', 0); G.sfx.whoosh(0.6, 0.6); G.fx.smoke(pos, 16, 2, 0x8a8a8a, 0.8, 3); return; }
     if (d.stun) {
       G.fx.flash(pos, 0xffffff, 120, 0.3, 30); G.fx.add.spawn(pos.x, pos.y, pos.z, 0, 0, 0, 0.3, 6, 10, 2, 2, 2, 1, 0, 0);

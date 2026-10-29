@@ -46,7 +46,7 @@
     const d = w.def, s = G.weapons.stats(w), st = P.stats, cur = w === P.weapon && !P.meleeMode;
     const trait = d.trait ? G.WEAPON_TRAITS[d.trait] : null;
     const crit = st.critChance + (s.critChance || 0), B = G.PLAYER_BASE;
-    const dmgMul = Math.max(0.1, 1 + (st.dmg || 0)); // 与ダメ (boons, enchantments ...) counts in the shown damage and DPS
+    const dmgMul = G.weapons.dmgMul(); // 与ダメ (boons, enchantments ...) counts in the shown damage and DPS
     const s0 = bareStats(w); // the weapon with its +n level only
     const tiles = [
       tile('ダメージ', dv(s.dmg * dmgMul, d.dmg, { mid: s0.dmg }) + (s.pellets > 1 ? `<span class="sx">×${s.pellets}</span>` : '')),
@@ -66,7 +66,7 @@
         <div class="wc-info">
           <div class="nm">${esc(d.name)}${w.lv ? `<b class="lv">+${w.lv}</b>` : ''}</div>
           <div class="cat">${esc(d.cat || '')}・${G.RARITY[d.rarity].name}</div>
-          <div class="dps"><b>${Math.round(G.weapons.dps(s) * dmgMul)}</b><span>DPS</span></div>
+          <div class="dps"><b>${Math.round(G.weapons.gunDps(w))}</b><span>DPS</span></div>
           ${trait ? `<div class="tr">${trait.icon} ${esc(trait.name)}</div>` : ''}
         </div>
       </div>
@@ -75,8 +75,8 @@
   }
   function meleeCard() {
     const m = P.melee, d = m.def, s = G.weapons.meleeStats(m), st = P.stats, B = G.PLAYER_BASE;
-    const dmgMul = Math.max(0.1, 1 + (st.dmg || 0) + (st.meleeDmg || 0)); // 与ダメ + 近接ダメージ (both always apply to a melee weapon) count in the shown damage and DPS
-    const crit = st.critChance + (s.critChance || 0), dps = s.dmg * dmgMul / s.swing, dps0 = d.dmg / d.swing;
+    const dmgMul = G.weapons.meleeDmgMul(); // 与ダメ + 近接ダメージ (both always apply to a melee weapon) count in the shown damage and DPS
+    const crit = st.critChance + (s.critChance || 0), dps = G.weapons.meleeDps(m), dps0 = d.dmg / d.swing;
     const tiles = [
       tile('ダメージ', dv(s.dmg * dmgMul, d.dmg, { mid: d.dmg * Math.pow(1.13, m.lv || 0) })),
       tile('攻撃間隔', dv(s.swing, d.swing, { unit: '秒', lowerBetter: true, mid: d.swing })),

@@ -131,11 +131,11 @@
         const wantsOne = !a && [...P.bag.items, ...(IV.openCont ? IV.openCont.items : [])].some((q) => { const qa = q.type === 'att' && A[q.id]; return qa && qa.slot === sl && qa.compat(w.def); });
         return `<div class="iv-as${a ? ' on' : ''}${wantsOne ? ' iv-fitslot' : ''}" data-as="${i}:${sl}" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:${i}:${sl}" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div>`;
       }).join('');
-      const dps = Math.round(W.dps(W.stats(w)));
+      const dps = Math.round(W.gunDps(w)); // (same number as the status screen: 与ダメ included)
       return `<div class="iv-wbox" data-wslot="${i}" style="--rc:${R(w.def.rarity)}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b style="color:${R(w.def.rarity)}">${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</b><small>${U.esc(w.def.cat || '')}</small></span><span class="wdps"><b>${dps}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('gun', w.def, w.atts)}</div><div class="iv-asg">${cells}</div></div>`;
     });
     const m = P.melee, md = m.def, ms = W.meleeStats(m), mfx = W.meleeFx ? W.meleeFx(md) : [];
-    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}</b><small>${U.esc(md.cat || '')}${md.id === (G.BARE_MELEE || 'fists') ? '・素手' : mfx.length ? ' · ' + U.esc(mfx[0]) : ''}</small></span><span class="wdps"><b>${Math.round(ms.dmg / ms.swing)}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>
+    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}</b><small>${U.esc(md.cat || '')}${md.id === (G.BARE_MELEE || 'fists') ? '・素手' : mfx.length ? ' · ' + U.esc(mfx[0]) : ''}</small></span><span class="wdps"><b>${Math.round(W.meleeDps(m))}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>
       <div class="iv-mst"><div><small>ダメージ</small><b>${Math.round(ms.dmg)}</b></div><div><small>間隔</small><b>${ms.swing.toFixed(2)}s</b></div><div><small>リーチ</small><b>${ms.range}m</b></div></div></div>`);
     return out.join('');
   }

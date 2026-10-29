@@ -7,6 +7,11 @@
   const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   const esc = (s) => U.esc(String(s ?? ''));
   let GM, P, I, panel = null, tab = 'run', back = null, query = {}, aim = null;
+  const scrollMem = {}; // tab -> { body, lists: [...] }
+  const saveScroll = () => {
+    const b = panel && panel.querySelector('.dv-body'); if (!b || !panel.dataset.tab) return;
+    scrollMem[panel.dataset.tab] = { body: b.scrollTop, lists: [...b.querySelectorAll('.dv-list')].map((l) => l.scrollTop) };
+  };
   const S = () => G.save.data.settings;
 
   // dev mode lasts only until the next new game: it is never saved, and has to be switched on again from the codex
@@ -50,7 +55,7 @@
     render();
   };
   D.close = function () {
-    if (panel) { panel.remove(); panel = null; }
+    if (panel) { saveScroll(); panel.remove(); panel = null; }
     if (back) { const b = back; back = null; b(); return; }
     // only resume what the panel itself paused (a boon choice / shop screen underneath stays as it was)
     if (GM.run && GM.state === 'modal' && !G.ui.el.screens.firstChild) GM.resume();
@@ -63,13 +68,15 @@
   const TABS = [['run', '🎮 ラン'], ['stat', '🧍 能力値'], ['gear', '🔫 武器'], ['skill', '🔮 スキル'], ['buff', '🌟 加護'], ['item', '🧪 アイテム'], ['spawn', '👹 出現'], ['world', '🌀 異変・他']];
   function render() {
     if (!panel) return;
-    const keepScroll = panel.querySelector('.dv-body') ? panel.querySelector('.dv-body').scrollTop : 0;
+    saveScroll();
     const tabs = TABS.filter(([k]) => inRun() || k === 'run').map(([k, n]) => `<span class="dv-tab${k === tab ? ' on' : ''}" data-t="${k}">${n}</span>`).join('');
     panel.innerHTML = `<div class="dv-head"><b>🛠 DEBUG</b>${tabs}<span class="dv-x" id="dv-close">✕ 閉じる（F9）</span></div><div class="dv-body">${body()}</div>`;
     panel.querySelectorAll('.dv-tab').forEach((el) => el.onclick = () => { tab = el.dataset.t; render(); });
     panel.querySelector('#dv-close').onclick = () => D.close();
+    panel.dataset.tab = tab;
     wire();
-    panel.querySelector('.dv-body').scrollTop = keepScroll;
+    const m = scrollMem[tab], b = panel.querySelector('.dv-body');
+    if (m) { b.scrollTop = m.body; b.querySelectorAll('.dv-list').forEach((l, i) => { l.scrollTop = m.lists[i] || 0; }); }
   }
   const btn = (id, label, cls) => `<button class="dv-b${cls ? ' ' + cls : ''}" data-act="${id}">${label}</button>`;
   const num = (id, val, step) => `<input class="dv-n" type="number" id="${id}" value="${val}" step="${step || 1}">`;
@@ -93,8 +100,12 @@
         D.bossOverride = k === 'boss' && b ? b : null; D.bossArea = n;
         GM.area = n; GM.enterArea(n, k); toast(`AREA ${n} ${kindName(k)} へ移動`);
       };
+      const toFinal = () => { const n = G.Run.areas(); D.bossOverride = 'sovereign'; D.bossArea = n; GM.area = n; GM.enterArea(n, 'boss'); toast(`AREA ${n} ラスボス（虚無の君主）へ移動`); };
+      ACT.final = toFinal;
+      ACT.startFinal = () => { ACT.start(); setTimeout(() => { toFinal(); }, 400); };
+      ACT.skipHalf = () => { const b = G.bosses.active; if (!b || b.def.id !== 'sovereign' || b.form !== 1 || b.state !== 'fight') return toast('前半の虚無の君主と戦っていない'); b.hp = 0; b.onPartDeath(b.main); };
       ACT.clear = () => { if (!GM.areaCleared) GM.clearArea(); };
-      ACT.bossNow = () => { const w = G.world; if (GM.stage !== 'boss' || !w.arenaCenter) return toast('ボスエリアではない'); P.pos.set(w.arenaCenter.x, (w.roadFloorY ? 0 : P.pos.y) + 0.1, w.arenaD - 6); P.vel.set(0, 0, 0); };
+      ACT.bossNow = () => { const w = G.world; if (GM.stage !== 'boss' || !w.arenaCenter) return toast('ボスエリアではない'); P.pos.set(w.arenaCenter.x, (w.roadFloorY ? 0 : P.pos.y) + 0.1, w.ledgeZ ? w.ledgeZ - 4 : w.arenaD - 6); P.vel.set(0, 0, 0); }; // (the last field starts once you are on the tiles, past its ledge)
       ACT.gates = () => { G.Areas.openGates(true); GM.areaCleared = true; };
       ACT.next = () => { const n = GM.area + 1; GM.area = n; GM.enterArea(n, n % 5 === 0 ? 'boss' : 'combat'); };
       ACT.heal = () => { P.dead = false; P.hp = P.stats.maxHp; P.st = {}; };
@@ -106,11 +117,12 @@
       const bosses = G.BOSSES.filter((b) => !b.codexOnly).map((b) => `<option value="${b.id}">${b.icon || '👿'} ${esc(b.name)}</option>`).join('');
       return `${sec('ラン')}
         <div class="dv-row">難易度 <select id="dv-diff">${['easy', 'normal', 'hard'].map((k) => `<option value="${k}:0" ${G.Run.cur.id === k ? 'selected' : ''}>${G.Run.DIFFS[k].name}</option>`).join('')}${Array.from({ length: 10 }, (_, i) => `<option value="extra:${i + 1}" ${G.Run.cur.id === 'extra' && G.Run.cur.lv === i + 1 ? 'selected' : ''}>エクストラ${i + 1}</option>`).join('')}</select></div>
-        <div class="dv-row">${btn('start', '▶ 新しいランを開始')}</div>
+        <div class="dv-row">${btn('start', '▶ 新しいランを開始')}${btn('startFinal', '🌑 新しいランでラスボスへ')}</div>
         ${inRun() ? `${sec('エリア移動')}
         <div class="dv-row">エリア ${num('dv-area', GM.area || 1)} 種類 <select id="dv-kind">${AREA_KINDS.map((k) => `<option value="${k}" ${k === GM.stage ? 'selected' : ''}>${kindName(k)}</option>`).join('')}</select></div>
         <div class="dv-row">ボス <select id="dv-boss"><option value="">（エリア番号どおり）</option>${bosses}</select> ${btn('go', '🚪 移動', 'pri')}</div>
         <div class="dv-row">${btn('next', '⏭ 次のエリア')}${GM.stage === 'boss' ? btn('bossNow', '⚔ ボス戦を開始') : ''}${btn('clear', '✅ エリアクリア')}${btn('gates', '🚪 門を開く')}</div>
+        <div class="dv-row">${btn('final', '🌑 ラスボスへ（最終エリア）', 'pri')}${G.bosses.active && G.bosses.active.def.id === 'sovereign' && G.bosses.active.form === 1 ? btn('skipHalf', '🌌 後半（天空）へ飛ばす') : ''}</div>
         ${sec('戦闘')}
         <div class="dv-row">${btn('heal', '❤️ 全回復・状態異常解除')}${btn('kill', '💀 敵を全滅')}${btn('killBoss', '👑 ボスを倒す')}</div>
         <div class="dv-row">${tog('god', '無敵')}${tog('oneHit', '一撃必殺')}${tog('noCd', 'クールタイムなし')}${tog('freeze', '敵を停止')}</div>
@@ -211,18 +223,20 @@
         <div class="dv-list tall">${rows}</div>`;
     }
     if (tab === 'item') {
+      const cnt = () => { const el = panel && panel.querySelector('#dv-icount'); const v = Math.max(1, Math.min(999, +(el ? el.value : query.icount) | 0 || 1)); query.icount = v; return v; };
       const rows = G.ITEMS.filter((o) => match('i', o)).map((o) => {
         const n = o.cat === 'grenade' ? P.grenades[o.id] || 0 : P.itemCount(o.id);
         ACT['i1-' + o.id] = () => P.addItem(o.id, 1);
-        ACT['i5-' + o.id] = () => { for (let k = 0; k < 5; k++) P.addItem(o.id, 1); };
+        ACT['i5-' + o.id] = () => { const k = cnt(); for (let j = 0; j < k; j++) P.addItem(o.id, 1); toast(`${o.name} ×${k}`); };
         ACT['i0-' + o.id] = () => { { let g = 99; while (P.itemCount(o.id) > 0 && g-- > 0) P.takeItem(o.id); } };
-        return `<div class="dv-it" style="--rc:${R(o.rarity)}" title="${esc(o.desc)}"><span>${o.icon} ${esc(o.name)} <small>${esc(o.cat || '')}</small>${n ? ` <b>×${n}</b>` : ''}</span>${btn('i1-' + o.id, '+1')}${btn('i5-' + o.id, '+5')}${n ? btn('i0-' + o.id, '0', 'warn') : ''}</div>`;
+        return `<div class="dv-it" style="--rc:${R(o.rarity)}" title="${esc(o.desc)}"><span>${o.icon} ${esc(o.name)} <small>${esc(o.cat || '')}</small>${n ? ` <b>×${n}</b>` : ''}</span>${btn('i1-' + o.id, '+1')}${btn('i5-' + o.id, '+個数')}${n ? btn('i0-' + o.id, '0', 'warn') : ''}</div>`;
       }).join('');
       const ar = G.ARMOR.filter((o) => match('i', o)).map((o) => { ACT['ar-' + o.id] = () => G.Inv.give(P, 'armor', o.id, 1); ACT['are-' + o.id] = () => { const it = G.Inv.makeArmor(o.id); G.Inv.equip(P, it, null); }; return `<div class="dv-it" style="--rc:${R(o.rarity)}" title="${esc(o.desc)}"><span>${o.icon} ${esc(o.name)} <small>🛡${o.def} ⚖${o.weight}</small></span>${btn('ar-' + o.id, 'インベントリへ')}${btn('are-' + o.id, '装備')}</div>`; }).join('');
-      const vl = G.VALUABLES.filter((o) => match('i', o)).map((o) => { ACT['vl-' + o.id] = () => G.Inv.give(P, 'valuable', o.id, 1); return `<div class="dv-it" style="--rc:${R(o.rarity)}"><span>${o.icon} ${esc(o.name)} <small>${o.value}🪙</small></span>${btn('vl-' + o.id, '+1')}</div>`; }).join('');
+      const vl = G.VALUABLES.filter((o) => match('i', o)).map((o) => { ACT['vl-' + o.id] = () => G.Inv.give(P, 'valuable', o.id, cnt()); return `<div class="dv-it" style="--rc:${R(o.rarity)}"><span>${o.icon} ${esc(o.name)} <small>${o.value}🪙</small></span>${btn('vl-' + o.id, '+個数')}</div>`; }).join('');
       ACT.clearBag = () => { P.bag.items = []; for (const k in P.spec || {}) P.spec[k].items = []; G.Inv.changed(P.bag); };
       ACT.openInv = () => { D.close(); setTimeout(() => G.InvUI.open(null), 50); };
       return `${sec('インベントリ')}<div class="dv-row">${btn('openInv', '🎒 インベントリを開く')}${btn('clearBag', 'インベントリを空にする', 'warn')}</div>${search('i', 'アイテム・防具・金品を検索')}
+        <div class="dv-row">個数 ${num('dv-icount', query.icount || 10)}<span class="dv-note">「+個数」はこの数だけ入る（アイテム・金品。入りきらない分は入らない）</span></div>
         ${sec('アイテム')}<div class="dv-list">${rows}</div>${sec('防具（125種）')}<div class="dv-list">${ar}</div>${sec('金品')}<div class="dv-list">${vl}</div>`;
     }
     if (tab === 'spawn') {
@@ -274,8 +288,13 @@
     panel.querySelectorAll('[data-tog]').forEach((el) => el.onchange = () => { GM.dev[el.dataset.tog] = el.checked; stripSave(); });
     panel.querySelectorAll('[data-speed]').forEach((el) => el.onclick = () => { GM.dev.speed = +el.dataset.speed; stripSave(); render(); });
     panel.querySelectorAll('[data-q]').forEach((el) => {
-      el.oninput = () => { query[el.dataset.q] = el.value; const pos = el.selectionStart; render(); const n = panel.querySelector(`[data-q="${el.dataset.q}"]`); if (n) { n.focus(); n.setSelectionRange(pos, pos); } };
+      const apply = () => { query[el.dataset.q] = el.value; const pos = el.selectionStart; render(); const n = panel && panel.querySelector(`[data-q="${el.dataset.q}"]`); if (n) { n.focus(); n.setSelectionRange(pos, pos); } };
+      // (while a word is still being composed, wait: rebuild only once it is confirmed)
+      el.addEventListener('compositionstart', () => { el._ime = true; });
+      el.addEventListener('compositionend', () => { el._ime = false; apply(); });
+      el.oninput = (e) => { if (el._ime || (e && e.isComposing)) return; apply(); };
     });
+    const ic = panel.querySelector('#dv-icount'); if (ic) ic.onchange = () => { query.icount = Math.max(1, Math.min(999, +ic.value | 0 || 1)); };
     const bc = panel.querySelector('#dv-bcat'); if (bc) bc.onchange = () => { query.bcat = bc.value; render(); };
     const en = panel.querySelector('#dv-en'); if (en) en.onchange = () => { query.en = en.value; };
     // typing in the panel must not drive the game

@@ -19,7 +19,10 @@
   // [fraction of the range with full damage, damage multiplier at the range]; arms not listed (dmr / sniper / crossbow / rail ...) do not fall off
   W.FALLOFF = { pistol: [0.4, 0.7], revolver: [0.5, 0.78], smg: [0.3, 0.55], rifle: [0.55, 0.8], burst: [0.55, 0.8], lmg: [0.5, 0.75], minigun: [0.4, 0.6], shotgun: [0.2, 0.35], autoshotgun: [0.2, 0.3], nail: [0.5, 0.75], tesla: [0.4, 0.7] };
   W.stats = function (w) {
-    if (w._sc && w._sc.ver === w.ver && w._sc.gv === W.ver) return w._sc.s;
+    // (a change of your stats marks W.dirty; it used to be picked up only by W.update, i.e. not while the game is paused / in a menu)
+    if (W.dirty) { W.ver++; W.dirty = false; }
+    const dyn = G.player.dynFireRate || 0; // 連射狂: changes shot by shot without a recalc
+    if (w._sc && w._sc.ver === w.ver && w._sc.gv === W.ver && w._sc.dyn === dyn) return w._sc.s;
     const d = w.def, st = G.player.stats, pl = G.player;
     const s = Object.assign({}, d);
     s.shieldMul = d.shieldMul || 1; s.critChance = 0; s.pierce = d.pierce || 0; s.ricochet = 0; s.lifesteal = 0; s.explo = 0; s.moveSpread = 0; s.crouchRecoil = 0; s.melee = 0; s.ammoSave = 0; s.eliteDmg = 0;
@@ -57,10 +60,15 @@
     const lv = w.lv || 0;
     // forge levels are the main way guns keep up with depth (multiplicative, up to +15)
     if (lv) { s.dmg *= Math.pow(1.13, lv); s.rpm *= 1 + 0.02 * Math.min(lv, 10); s.mag = Math.max(1, Math.round(s.mag * (1 + 0.05 * Math.min(lv, 10)))); }
-    w._sc = { ver: w.ver, gv: W.ver, s };
+    w._sc = { ver: w.ver, gv: W.ver, dyn, s };
     return s;
   };
   W.dps = function (s) { return s.dmg * (s.pellets || 1) * s.rpm / 60; };
+  // the DPS every screen shows (status, inventory): the gun's own numbers x 与ダメ; a melee weapon also takes 近接ダメージ
+  W.dmgMul = () => Math.max(0.1, 1 + (G.player.stats.dmg || 0));
+  W.gunDps = (w) => W.dps(W.stats(w)) * W.dmgMul();
+  W.meleeDmgMul = () => { const st = G.player.stats; return Math.max(0.1, 1 + (st.dmg || 0) + (st.meleeDmg || 0)); };
+  W.meleeDps = (m) => { const s = W.meleeStats(m); return s.dmg * W.meleeDmgMul() / s.swing; };
 
   // ---------------- scope lens ----------------
   // No second render of the world: the screen is rendered once (zoomed a little), and the central square of that finished frame is copied

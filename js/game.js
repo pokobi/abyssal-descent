@@ -1624,8 +1624,10 @@
     // a corpse lies on its side, so its body is metres away from where the foe stood: aim at the body itself (a ray against its bounding box),
     // the nearest one you are looking at wins; a near miss on the centre still counts a little further down
     // when several bodies lie in line, the one whose middle is nearest the crosshair (relative to its size) is the one you mean
-    let cBest = null, cScore = Infinity, cT = 0;
+    // a body that has been searched and emptied is never a target (it only dims on the ground): it can't cover a full body or a chest behind it
+    let cBest = null, cScore = Infinity, cT = 0, nearBest = null;
     for (const c of G.Inv.corpses) {
+      if (c.searched && !c.cont.items.length) continue;
       const e = c.e; if (!e || e.removed || Math.hypot(e.pos.x - eye.x, e.pos.z - eye.z) > 9) continue;
       const b = corpseBox(c); if (!b) continue;
       _cbx.copy(b).expandByScalar(0.3);
@@ -1633,11 +1635,10 @@
       if (_cbx.containsPoint(eye)) t = 0; else { _cray.set(eye, f); const hp = _cray.intersectBox(_cbx, _chit); if (hp) t = eye.distanceTo(hp); }
       const ctr = b.getCenter(_cctr), sz = b.getSize(_csz), half = Math.max(0.5, Math.max(sz.x, sz.y, sz.z) / 2);
       const along = _cdv.copy(ctr).sub(eye).dot(f), perp = Math.sqrt(Math.max(0, ctr.distanceToSquared(eye) - along * along));
-      let score;
-      if (t <= 4.4) score = perp / half;                                              // the crosshair is on the body
-      else if (along > 0 && perp < Math.min(1.3, Math.max(0.7, Math.max(sz.x, sz.z) * 0.4)) && ctr.distanceTo(eye) <= 4.4) { score = 2 + perp; t = ctr.distanceTo(eye); } // a near miss on the middle
-      else continue;
-      if (score < cScore) { cScore = score; cBest = { type: 'corpse', c }; cT = t; }
+      if (t <= 4.4) { const score = perp / half; if (score < cScore) { cScore = score; cBest = { type: 'corpse', c }; cT = t; } } // the crosshair is on the body
+      else if (along > 0 && perp < Math.min(1.3, Math.max(0.7, Math.max(sz.x, sz.z) * 0.4)) && ctr.distanceTo(eye) <= 4.4) { // a near miss on the middle: only when nothing else is aimed at (below)
+        if (!nearBest || perp < nearBest.perp) nearBest = { type: 'corpse', c, perp };
+      }
     }
     if (cBest && cT < bd) { bd = cT; best = cBest; }
     for (const g of G.Inv.ground) consider(g.pos, 0.6, { type: 'loot', g }, 3.2);
@@ -1650,6 +1651,7 @@
       else if (it.type === 'cauldron') consider(it.pos, 1.3, { type: 'cauldron', it }, 4);
       else if (it.type === 'celldoor' && it.door.state !== 'broken') consider(it.pos, 1.0, { type: 'celldoor', it }, 3.4);
     }
+    if (!best && nearBest) best = nearBest;
     lookTarget = best;
     G.ui.holdRing(-1); // shown again below while a search is running
     updateSearch(dt);

@@ -677,7 +677,7 @@
   A.queueUse = function (id, n) {
     const it = G.ITEM_BY_ID[id]; if (!it || n < 1) return;
     A.useQueue = { id, left: n };
-    G.ui.toastSmall(`${it.icon} ${it.name} を${n}個まとめて使う（撃つ・他の道具で中止）`);
+    G.ui.toastSmall(`${it.icon} ${it.name} を${n}個まとめて使う（撃つ・他の消耗品を使うと中止）`);
   };
   A.cancelUseQueue = function (why) { if (!A.useQueue) return; A.useQueue = null; if (why) G.ui.toastSmall(why); };
   A.tickUseQueue = function () {

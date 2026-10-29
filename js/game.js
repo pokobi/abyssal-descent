@@ -1333,10 +1333,8 @@
     const done = () => { GM.rewardPending = null; GM.resume(); if (o.after) o.after(); };
     let rolls = 0;
     const getReroll = () => {
-      const freeMax = P.has('e_reroll') ? 2 : 1;
-      const free = Math.max(0, freeMax - rolls);
-      const paidIndex = Math.max(0, rolls - freeMax);
-      const cost = Math.round(200 * Math.pow(2, paidIndex));
+      const freeMax = P.has('e_reroll') ? 2 : 1, free = Math.max(0, freeMax - rolls);
+      const cost = GM.price(200 * Math.pow(2, Math.max(0, rolls - freeMax))); // priced like the shop (discounts, depth)
       return { free, cost, afford: free > 0 || GM.run.coins >= cost };
     };
     const render = (choices) => {
@@ -1682,7 +1680,7 @@
     } else if (best.type === 'cauldron') {
       const left = Math.max(0, 2 - (best.it.used || 0));
       if (left <= 0) G.ui.showInteract({ key: 'cauldron0', icon: '⚗️', name: '練成の釜（火は消え、冷え切っている）', rc: '#7a8480', cat: '練成終了（残り 0 / 2回）', desc: '「釜の火は消え去った。深淵の恵みはここまでだ…」', action: null });
-      else G.ui.showInteract({ key: 'cauldron' + left, icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: `防具・武器・パーツ・道具・金品の練成（残り ${left} / 2回）`, desc: '同種・同レアリティの品を2つ掛け合わせ、1段階上位の品へと練成する。', action: '練成する' });
+      else G.ui.showInteract({ key: 'cauldron' + left, icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: `防具・武器・アタッチメント・消耗品・金品の練成（残り ${left} / 2回）`, desc: '同種・同レアリティの品を2つ掛け合わせ、1段階上位の品へと練成する。', action: '練成する' });
     } else if (best.type === 'corpse') {
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;

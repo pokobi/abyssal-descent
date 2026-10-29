@@ -327,7 +327,7 @@
     if (IV.isArm(it)) { if (GM.equipArm(it, f.from)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); return; }
     if (it.type === 'att' && isMine(f.from)) { equipAtt(it); return; }
     if (!isMine(f.from)) { quickMove(f); return; }
-    if (IV.isKit(it)) { const w = worstWorn(); if (w) mend(f, it, w); else { G.sfx.ui('deny'); G.ui.toastSmall('🛠️ 修復が必要な防具は装備していない（防具へドラッグで袋の中の防具も直せる）'); } return; }
+    if (IV.isKit(it)) { const w = worstWorn(); if (w) mend(f, it, w); else { G.sfx.ui('deny'); G.ui.toastSmall('🛠️ 修復が必要な防具は装備していない（インベントリの防具にもドラッグで使える）'); } return; }
     if (usable(it)) { UIV.close(); G.abilities.useItemId(it.id); return; }
     if (IV.openCont) quickMove(f);
   }

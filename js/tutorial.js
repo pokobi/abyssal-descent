@@ -65,7 +65,7 @@
     { title: 'アタッチメント', body: () => ul('インベントリに<b>レッドドットサイト</b>を入れました', `${k(G.K('status'))} で開き、銃の枠へ<b>ドラッグ</b>（付く場所が光る）`, 'ダブルクリックでも自動で付く'), goal: 'レッドドットを銃に付ける',
       setup: () => { if (!P.weapons.some((w) => w.atts.optic === 'o_reddot') && !P.attStash.includes('o_reddot')) { G.Inv.noAuto = true; P.attStash.push('o_reddot'); G.Inv.noAuto = false; } },
       check: () => (P.weapons.some((w) => w.atts.optic === 'o_reddot') ? 1 : 0) },
-    { title: '加護（永続の強化）', body: () => ul('エリアの<b>目標</b>（殲滅・生存・狩猟・儀式）を達成すると、<b>加護</b>を1つ選べる', '加護は<b>その周回の間ずっと続く強化</b>（攻撃力・HP・移動・スキルなど）。取るほど強くなる', '色はレア度。気に入らなければ<b>リロール</b>（無料3回）'),
+    { title: '加護（永続の強化）', body: () => ul('エリアの<b>目標</b>（殲滅・生存・狩猟・儀式）を達成すると、<b>加護</b>を1つ選べる', '加護は<b>その周回の間ずっと続く強化</b>（攻撃力・HP・移動・スキルなど）。取るほど強くなる', '色はレアリティ。気に入らなければ<b>リロール</b>（毎回1回まで無料、以降はコイン）'),
       vis: (s) => tiles((s.sample || []).map((b) => [b.icon, b.name, RAR[b.rarity] || b.rarity, `var(--c-${b.rarity})`])),
       get goal() { return `${k('Enter')} で加護の選択画面を開き、1つ選ぶ`; },
       setup: (s) => { s.sample = GM.rollBuffs(3); },

@@ -294,12 +294,11 @@
           const pool = G.WEAPONS.filter((x) => G.RARITY[x.rarity].tier === tier);
           const wd = U.pick(pool.length ? pool : G.WEAPONS.filter((x) => G.RARITY[x.rarity].tier >= 2));
           GM.giveWeapon(wd.id);
-        } else if (r < 0.40) {
-          const sk = U.pick(G.SKILLS.filter((x) => !P.skills.some((s) => s && s.id === x.id)));
-          GM.giveSkill(sk.id);
         } else if (r < 0.70) {
-          const it = U.pick(G.ITEMS.filter((x) => G.RARITY[x.rarity].tier >= 1));
-          P.addItem(it.id, 1);
+          // a skill you don't have yet (an item once you have them all)
+          const sk = r < 0.40 && U.pick(G.SKILLS.filter((x) => !x.ult && !P.skills.some((s) => s && s.id === x.id)));
+          if (sk) GM.giveSkill(sk.id);
+          else { const it = U.pick(G.ITEMS.filter((x) => !x.noLoot && G.RARITY[x.rarity].tier >= 1)); P.addItem(it.id, 1); G.ui.itemCard(it, '[謎の箱]'); }
         } else {
           AR.addCurse();
         }
@@ -359,23 +358,23 @@
       for (const r of vis.rings || []) { r.sp = 0; if (r.m) r.m.visible = false; }
     }
     const p = (G.world && G.world.cauldronPos) ? G.world.cauldronPos.clone() : P.pos.clone().add(V(0, 1, 0));
-    G.fx.smoke && G.fx.smoke(p.clone().add(V(0, 0.9, 0)), 14, 0x3b4440);
+    G.fx.smoke(p.clone().add(V(0, 0.9, 0)), 14, 1.2, 0x3b4440, 0.6, 2);
   }
   AR.extinguishAlchemy = alchExtinguish;
   function alchFx() {
     const cz = alchCauldron();
     if (cz) { cz.used = (cz.used || 0) + 1; if (cz.used >= ALCH_MAX) alchExtinguish(cz); }
     const p = (G.world && G.world.cauldronPos) ? G.world.cauldronPos.clone() : P.pos.clone().add(V(0, 1, 0));
-    G.sfx.magic && G.sfx.magic(p, 'holy'); G.sfx.ui('rare');
+    G.sfx.magic(p, 'holy'); G.sfx.ui('rare');
     G.fx.sparks(p.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 32, 0x58ff98, 7);
     G.fx.ring(p.clone(), 2.2, 0x58ff98, 0.55);
   }
   const ALCH_CATS = {
     armor: { name: '🛡️ 防具', short: '防具' },
     weapon: { name: '🔫 武器', short: '武器' },
-    att: { name: '🔩 パーツ', short: 'アタッチメント' },
-    item: { name: '🧪 道具', short: 'アイテム' },
-    valuable: { name: '💎 金品', short: '金品（実用変換）' },
+    att: { name: '🔩 アタッチメント', short: 'アタッチメント' },
+    item: { name: '🧪 消耗品', short: '消耗品' },
+    valuable: { name: '💎 金品', short: '金品' },
   };
   const RAR_BY_TIER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
   function alchAllItems() {
@@ -387,7 +386,7 @@
       const S = G.ARMOR_SLOT_BY_ID[d.slot], M = G.ARMOR_MAT_BY_ID[d.mat], dur = Math.round(G.Inv.durFrac(it) * 100);
       const fx = d.fixed.map((f) => '◆' + f.desc).concat((it.ench || []).map((e) => '✦' + G.enchantText(e))).join(' ');
       out.push({ uid: 'eq:' + sl.id, cat: 'armor', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: G.armorIcon(d), name: d.name, badge: '装備中',
-        sub: `${S.name}（${M.name}） 防御${d.def} 耐久${dur}%${fx ? ' · ' + fx : ''}`, d, it, eq: sl.id,
+        sub: `${S.name}（${M.name}）・防御力${d.def}・耐久${dur}%${fx ? ' — ' + fx : ''}`, d, it, eq: sl.id,
         consume: () => { if (P.equip[sl.id] === it) P.equip[sl.id] = null; } });
     }
     for (const it of (P.bag ? P.bag.items : [])) {
@@ -395,7 +394,7 @@
         const d = G.ARMOR_BY_ID[it.id], S = G.ARMOR_SLOT_BY_ID[d.slot], M = G.ARMOR_MAT_BY_ID[d.mat], dur = Math.round(G.Inv.durFrac(it) * 100);
         const fx = d.fixed.map((f) => '◆' + f.desc).concat((it.ench || []).map((e) => '✦' + G.enchantText(e))).join(' ');
         out.push({ uid: 'bag:' + it.uid, cat: 'armor', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: G.armorIcon(d), name: d.name, badge: '',
-          sub: `${S.name}（${M.name}） 防御${d.def} 耐久${dur}%${fx ? ' · ' + fx : ''}`, d, it, eq: null,
+          sub: `${S.name}（${M.name}）・防御力${d.def}・耐久${dur}%${fx ? ' — ' + fx : ''}`, d, it, eq: null,
           consume: () => { G.Inv.remove(P.bag, it); } });
       }
     }
@@ -403,7 +402,17 @@
       const d = pw.def, lv = pw.lv || 0;
       out.push({ uid: 'wep:' + P.weapons.indexOf(pw), cat: 'weapon', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: `${d.name}${lv ? ' +' + lv : ''}`, badge: '装備中',
         sub: `${d.mythic ? '✴️ 神器 · ' : ''}銃（${d.cat}）${lv ? ' · 強化+' + lv : ''}`, d, w: pw, gun: true, lv,
-        consume: () => { GM.stashAtts(pw); const idx = P.weapons.indexOf(pw); if (idx >= 0) P.weapons.splice(idx, 1); P.wOrder = (P.wOrder || []).map((t) => (t === pw ? null : t)); } });
+        consume: () => { GM.stashAtts(pw); GM.releaseGun(pw); } });
+    }
+    for (const it of (P.bag ? P.bag.items : [])) {
+      if (!G.Inv.isArm(it) || !G.Inv.def(it)) continue;
+      const d = G.Inv.def(it), gun = it.type === 'gun', lv = (it.gun && it.gun.lv) || 0;
+      out.push({ uid: 'bagw:' + it.uid, cat: 'weapon', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: `${d.name}${lv ? ' +' + lv : ''}`, badge: '',
+        sub: `${d.mythic ? '✴️ 神器 · ' : ''}${gun ? `銃（${d.cat}）` : '近接武器'}${lv ? ' · 強化+' + lv : ''}`, d, it, gun, lv,
+        consume: () => {
+          G.Inv.remove(P.bag, it);
+          for (const a of Object.values((gun && it.gun && it.gun.atts) || {})) if (G.ATT_BY_ID[a]) G.Inv.give(P, 'att', a, 1); // its attachments come off into the bag first
+        } });
     }
     if (P.melee && P.melee.id !== (G.BARE_MELEE || 'fists')) {
       const d = P.melee.def, lv = P.melee.lv || 0;
@@ -493,22 +502,23 @@
     }
     if (a.cat === 'weapon') {
       const newLv = Math.max(a.lv || 0, b.lv || 0);
-      const gunsLeft = P.weapons.length - (a.gun ? 1 : 0) - (b.gun ? 1 : 0);
       const allowMythic = tA >= 4;
       let gunPool = G.WEAPONS.filter((x) => x.id !== 'starter' && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || G.RARITY[x.rarity].tier === 4) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
       if (!gunPool.length) gunPool = G.WEAPONS.filter((x) => x.id !== 'starter' && !x.mythic && G.RARITY[x.rarity].tier === targetTier);
-      const meleePool = gunsLeft > 0 ? G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || G.RARITY[x.rarity].tier === 4) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier))) : [];
+      const meleePool = G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || G.RARITY[x.rarity].tier === 4) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
       const pool = (!a.gun || !b.gun) && meleePool.length ? gunPool.concat(meleePool) : gunPool;
       const cands = U.shuffle(pool.slice()).slice(0, 3);
       const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}${newLv ? ' +' + newLv : ''}（${d.mythic ? '★神器' : G.RARITY[d.rarity].name}）`, sub: `${d.kind === 'melee' ? '🗡️ 近接武器' : '🔫 ' + d.cat} — ${d.traitDesc || (d.trait && G.WEAPON_TRAITS[d.trait] ? G.WEAPON_TRAITS[d.trait].desc : d.desc || '')}`, onPick: () => {
         consumeBoth();
+        const stash = (it) => { if (G.Inv.stow(P, it) > 0) { G.Inv.dropToGround(it, P.pos.clone().add(V(0, 0.4, 0))); G.ui.toastSmall('🎒 インベントリに空きがないので足元に置いた'); } };
         if (d.kind === 'melee') {
+          if (P.melee && P.melee.id !== (G.BARE_MELEE || 'fists')) stash(GM.meleeItem(P.melee)); // the one in hand was not a material: it goes into the bag
           P.melee = G.weapons.makeMelee(d.id); P.melee.lv = newLv;
-          if (P.wIdx >= P.weapons.length) P.wIdx = Math.max(0, P.weapons.length - 1);
-          if (P.meleeMode) G.weapons.melee.equip(false); else G.weapons.equip(false);
+          if (P.meleeMode) G.weapons.melee.equip(false);
         } else {
           const nw = G.weapons.make(d.id); nw.lv = newLv; nw.ver++; nw.mag = G.weapons.stats(nw).mag;
-          P.weapons.push(nw); G.weapons.switchTo(P.weapons.length - 1);
+          if (P.weapons.length < P.stats.weaponSlots) { P.weapons.push(nw); G.weapons.switchTo(P.weapons.length - 1); }
+          else stash(GM.gunItem(nw));
         }
         G.weapons.order(); G.ui.refreshWeapon(); G.ui.refreshItems(); P.recalc();
         alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}${newLv ? ' +' + newLv : ''}`, 'good'); G.ui.itemCard(d, '[武器練成]');
@@ -527,7 +537,7 @@
       const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: `${G.ATT_SLOTS[d.slot].name} — ${d.desc}`, onPick: () => {
         consumeBoth();
         G.Inv.give(P, 'att', d.id, 1); G.ui.refreshWeapon(); G.ui.refreshItems();
-        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[パーツ練成]');
+        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[アタッチメント練成]');
       } }));
       alchChoiceModal(`🔩 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
@@ -543,7 +553,7 @@
       const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: d.desc || '', onPick: () => {
         consumeBoth();
         P.addItem(d.id, 1); G.ui.refreshItems();
-        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[道具練成]');
+        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[消耗品練成]');
       } }));
       alchChoiceModal(`🧪 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
@@ -558,8 +568,8 @@
       const S = G.ARMOR_SLOT_BY_ID[arD.slot], M = G.ARMOR_MAT_BY_ID[arD.mat], fx = arD.fixed.map((f) => '◆' + f.desc).concat((arInst.ench || []).map((e) => '✦' + G.enchantText(e))).join(' ／ ');
       const opts = [
         { icon: G.armorIcon(arD), label: `【防具】${arD.name}（${G.RARITY[arD.rarity].name}）`, sub: `${S.name}（${M.name}）・防御力${arD.def}・新品${fx ? ' — ' + fx : ''}`, onPick: () => { consumeBoth(); G.Inv.give(P, 'armor', arD.id, 1, { ench: arInst.ench }); G.ui.refreshItems(); alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${arD.icon} ${arD.name}`, 'good'); G.ui.itemCard(arD, '[練成した]'); } },
-        { icon: attD.icon, label: `【パーツ】${attD.name}（${G.RARITY[attD.rarity].name}）`, sub: `${G.ATT_SLOTS[attD.slot].name} — ${attD.desc}`, onPick: () => { consumeBoth(); G.Inv.give(P, 'att', attD.id, 1); G.ui.refreshWeapon(); G.ui.refreshItems(); alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${attD.icon} ${attD.name}`, 'good'); G.ui.itemCard(attD, '[練成した]'); } },
-        { icon: itD.icon, label: `【道具】${itD.name}（${G.RARITY[itD.rarity].name}）`, sub: itD.desc || '', onPick: () => { consumeBoth(); P.addItem(itD.id, 1); G.ui.refreshItems(); alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${itD.icon} ${itD.name}`, 'good'); G.ui.itemCard(itD, '[練成した]'); } },
+        { icon: attD.icon, label: `【アタッチメント】${attD.name}（${G.RARITY[attD.rarity].name}）`, sub: `${G.ATT_SLOTS[attD.slot].name} — ${attD.desc}`, onPick: () => { consumeBoth(); G.Inv.give(P, 'att', attD.id, 1); G.ui.refreshWeapon(); G.ui.refreshItems(); alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${attD.icon} ${attD.name}`, 'good'); G.ui.itemCard(attD, '[練成した]'); } },
+        { icon: itD.icon, label: `【消耗品】${itD.name}（${G.RARITY[itD.rarity].name}）`, sub: itD.desc || '', onPick: () => { consumeBoth(); P.addItem(itD.id, 1); G.ui.refreshItems(); alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${itD.icon} ${itD.name}`, 'good'); G.ui.itemCard(itD, '[練成した]'); } },
       ];
       alchChoiceModal(`💎 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
     }
@@ -580,7 +590,6 @@
     for (let i = 0; i < items.length; i++) {
       for (let j = i + 1; j < items.length; j++) {
         if (items[i].cat === items[j].cat && items[i].rarity === items[j].rarity) {
-          if (items[i].cat === 'weapon' && items[i].gun && items[j].gun && P.weapons.length < 2) continue;
           pairableUids.add(items[i].uid); pairableUids.add(items[j].uid);
         }
       }
@@ -590,13 +599,10 @@
     const dots = Array.from({ length: ALCH_MAX }, (_, i) => `<i class="alch-dot ${i < left ? 'on' : 'off'}"></i>`).join('');
     const s = G.ui.screen(`<div class="panel alch-panel">
       <div class="alch-head">
-        <div>
-          <h2 class="alch-title">⚗️ 練成所 — 同レアリティ合成</h2>
-          <div class="alch-desc">同じ種類・同じレア度の素材を2つ掛け合わせ、<b>1段階上のレア度</b>の品を練成する。</div>
-        </div>
-        <div class="alch-uses"><span>釜の魔力</span><div class="alch-dots">${dots}</div><b>残り ${left}/${ALCH_MAX}回</b></div>
+        <h2>⚗️ 練成所</h2><span>同じ種類・同じレアリティの素材を2つ掛け合わせ、<b>1段階上のレアリティ</b>の品を練成する</span>
+        <div class="alch-uses"><span>釜の魔力</span><div class="alch-dots">${dots}</div><b>残り ${left} / ${ALCH_MAX}回</b></div>
       </div>
-      <div class="alch-tabs"></div>
+      <div class="pw-tabs alch-tabs"></div>
       <div class="alch-body">
         <div class="alch-inv"><div class="alch-grid"></div></div>
         <div class="alch-work"></div>
@@ -618,7 +624,7 @@
         let state = '';
         if (isSel) state = 'sel';
         else if (s1 && !s2) {
-          const ok = x.cat === s1.cat && x.rarity === s1.rarity && !(x.cat === 'weapon' && s1.gun && x.gun && P.weapons.length < 2);
+          const ok = x.cat === s1.cat && x.rarity === s1.rarity;
           state = ok ? 'match' : 'dim';
         } else if (s1 && s2) state = 'dim';
         else if (!pairableUids.has(x.uid)) state = 'dim no-pair';
@@ -630,9 +636,9 @@
         }
       });
       const slotHtml = (st, n) => {
-        if (!st) return `<div class="alch-slot empty"><span class="as-num">素材 ${n}</span><div class="as-ph">${n === 1 ? '左の一覧から1つ目をタップ' : s1 ? `同じ【${G.RARITY[s1.rarity].name}・${ALCH_CATS[s1.cat].short}】をタップ` : '2つ目の素材'}</div></div>`;
-        const rc = G.RARITY[st.rarity].color;
-        return `<button class="alch-slot filled" data-unel="${n - 1}" style="--rc:${rc}" title="タップで選択解除">
+        if (!st) return `<div class="alch-slot empty"><span class="as-num">素材 ${n}</span><div class="as-ph">${n === 1 ? '左の一覧から1つ目をクリック' : s1 ? `同じ【${G.RARITY[s1.rarity].name}・${ALCH_CATS[s1.cat].short}】をタップ` : '2つ目の素材'}</div></div>`;
+        const rc = G.ui.R(st.rarity);
+        return `<button class="alch-slot filled" data-unel="${n - 1}" style="--rc:${rc}" title="クリックで選択解除">
           <span class="as-num">${n}</span>
           <span class="as-rm">× 解除</span>
           <div class="as-ic">${st.icon}</div>
@@ -642,18 +648,18 @@
           </div>
         </button>`;
       };
-      let prevHtml = `<div class="alch-prev wait"><div class="ap-ic">？</div><div class="ap-txt">同じ種類・同じレア度の素材を2つ選ぶと<br><b>1段階上のレア度</b>の3候補から選べます</div></div>`;
+      let prevHtml = `<div class="alch-prev wait"><div class="ap-ic">？</div><div class="ap-txt">同じ種類・同じレアリティの素材を2つ選ぶと<br><b>1段階上のレアリティ</b>の3候補から選べます</div></div>`;
       if (s1 && s2) {
         const isReroll = s1.tier >= 4;
         const tTier = Math.min(4, s1.tier + 1);
         const tRar = G.RARITY[RAR_BY_TIER[tTier]];
-        const catLabel = s1.cat === 'valuable' ? '防具 / パーツ / 道具' : ALCH_CATS[s1.cat].short;
-        prevHtml = `<div class="alch-prev ready ${isReroll ? 'reroll' : ''}" style="--rc:${tRar.color}">
+        const catLabel = s1.cat === 'valuable' ? '防具・アタッチメント・消耗品' : ALCH_CATS[s1.cat].short;
+        prevHtml = `<div class="alch-prev ready ${isReroll ? 'reroll' : ''}" style="--rc:${G.ui.R(RAR_BY_TIER[tTier])}">
           <div class="ap-ic">？</div>
           <div class="ap-info">
             <div class="ap-tag">${isReroll ? '⚠️ 同ランク再練成（リロール）' : '✦ レアリティ +1 確定'}</div>
-            <div class="ap-main" style="color:${tRar.color}">【${tRar.name}】の${catLabel}</div>
-            <div class="ap-sub">${isReroll ? 'レジェンダリーが上限のためレア度は上がらず、別の新品候補（3択）へ作り変えます' : '3つの候補の中から好きな1つを選んで獲得できます（耐久100%・新品）'}</div>
+            <div class="ap-main" style="color:${G.ui.R(RAR_BY_TIER[tTier])}">【${tRar.name}】の${catLabel}</div>
+            <div class="ap-sub">${isReroll ? 'レジェンダリーが上限のためレアリティは上がらず、別の新品候補（3択）へ作り変えます' : '3つの候補の中から好きな1つを選んで獲得できます（耐久100%・新品）'}</div>
           </div>
         </div>`;
       }
@@ -662,7 +668,7 @@
         ${slotHtml(s2, 2)}
         <div class="alch-op">⬇</div>
         ${prevHtml}
-        <button class="btn alch-go" id="alch-go" ${s1 && s2 ? '' : 'disabled'}>⚗️ 練成を実行する（3候補から選択）</button>
+        <button class="btn primary alch-go" id="alch-go" ${s1 && s2 ? '' : 'disabled'}>⚗️ 練成を実行する（3候補から選択）</button>
         <button class="btn small alch-close" id="alch-close">🚶 立ち去る</button>`;
       workEl.querySelectorAll('button').forEach((b) => b.addEventListener('mouseenter', () => G.sfx.ui('hover')));
       workEl.querySelectorAll('[data-unel]').forEach((b) => {
@@ -688,12 +694,12 @@
     };
 
     const renderGrid = (resetScroll) => {
-      tabsEl.innerHTML = [['all', 'すべて'], ['armor', '🛡️ 防具'], ['weapon', '🔫 武器'], ['att', '🔩 パーツ'], ['item', '🧪 道具'], ['valuable', '💎 金品']]
+      tabsEl.innerHTML = [['all', '全て']].concat(Object.entries(ALCH_CATS).map(([k, c]) => [k, c.name]))
         .map(([k, lbl]) => {
           const cnt = k === 'all' ? items.length : items.filter((x) => x.cat === k).length;
-          return `<button class="alch-tab ${tab === k ? 'on' : ''}" data-tab="${k}">${lbl} <small>${cnt}</small></button>`;
+          return `<span class="pw-tab${tab === k ? ' on' : ''}${cnt ? '' : ' none'}" data-tab="${k}">${lbl} <small>${cnt}</small></span>`;
         }).join('');
-      tabsEl.querySelectorAll('.alch-tab').forEach((b) => {
+      tabsEl.querySelectorAll('.pw-tab').forEach((b) => {
         b.addEventListener('mouseenter', () => G.sfx.ui('hover'));
         b.onclick = () => {
           if (tab === b.dataset.tab) return;
@@ -711,7 +717,7 @@
         return String(a.d.id || a.name).localeCompare(String(b.d.id || b.name));
       });
       gridEl.innerHTML = shown.length ? shown.map((x) => {
-        const rc = G.RARITY[x.rarity].color;
+        const rc = G.ui.R(x.rarity);
         const dur = x.cat === 'armor' && x.it ? alchDurBar(x.it) : '';
         return `<button class="alch-item" data-uid="${x.uid}" style="--rc:${rc}">
           <span class="ai-num" style="display:none"></span>
@@ -722,7 +728,7 @@
           <div class="ai-sub">${U.esc(x.sub)}</div>
           ${dur}
         </button>`;
-      }).join('') : `<div class="alch-empty">該当するアイテムがありません</div>`;
+      }).join('') : `<div class="alch-empty">練成できる持ち物がない</div>`;
       gridEl.querySelectorAll('.alch-item').forEach((b) => {
         b.addEventListener('mouseenter', () => G.sfx.ui('hover'));
         b.onclick = () => {
@@ -731,19 +737,14 @@
           const idx = sel.indexOf(it);
           if (idx >= 0) { G.sfx.ui('click'); sel.splice(idx, 1); syncSelection(); return; }
           if (sel.length === 0) {
-            if (!pairableUids.has(it.uid)) { G.sfx.ui('deny'); G.ui.toast('同じ種類・同じレア度のもう1つの素材がありません', 'warn'); return; }
+            if (!pairableUids.has(it.uid)) { G.sfx.ui('deny'); G.ui.toast('⚗️ 同じ種類・同じレアリティの素材がもう1つ必要', 'warn'); return; }
             G.sfx.ui('click'); sel.push(it); syncSelection(); return;
           }
           if (sel.length === 1) {
             const first = sel[0];
             if (it.cat !== first.cat || it.rarity !== first.rarity) {
               G.sfx.ui('deny');
-              G.ui.toast(`1つ目と同じ【${G.RARITY[first.rarity].name}・${ALCH_CATS[first.cat].short}】のみ選べます`, 'warn');
-              return;
-            }
-            if (it.cat === 'weapon' && first.gun && it.gun && P.weapons.length < 2) {
-              G.sfx.ui('deny');
-              G.ui.toast('銃がすべて失われる組み合わせは選べません', 'warn');
+              G.ui.toast(`⚗️ 1つ目と同じ【${G.RARITY[first.rarity].name}・${ALCH_CATS[first.cat].short}】しか選べない`, 'warn');
               return;
             }
             G.sfx.ui('click'); sel.push(it); syncSelection();

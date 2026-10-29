@@ -45,7 +45,11 @@
   // the sky stage (second half): set while it exists; a fall from it puts you back on it, on the side you went over
   TR.stage = null;
   TR.stageSpot = function (p) {
-    const S = TR.stage, dx = p.x - S.c.x, dz = p.z - S.c.z, d = Math.hypot(dx, dz) || 1, r = Math.min(d, S.R - 3);
+    const S = TR.stage;
+    let best = null, bd = 1e9;
+    for (const g of S.segs || []) { if (g.state !== 'up') continue; const d = Math.hypot(g.cx - p.x, g.cz - p.z); if (d < bd) { bd = d; best = g; } }
+    if (best) return V(best.cx, Y2 + 0.1, best.cz);
+    const dx = p.x - S.c.x, dz = p.z - S.c.z, d = Math.hypot(dx, dz) || 1, r = Math.min(d, S.R - 3);
     return V(S.c.x + dx / d * r, Y2 + 0.1, S.c.z + dz / d * r);
   };
   // once the fight starts the entrance ledge is closed off by a wall of crimson light (no safe spot outside the tiles)
@@ -124,7 +128,9 @@
   const PINK = 0xff4a9a, VIO = 0xb070ff;
   const HP1 = 10000, HP2 = 6000; // the crowned giant, then the Avatar of the Void (together the old single bar of 16000)
   // the sky stage the Avatar fights on: a round platform Y2 m above the tiles, PR m across, the Avatar circling it ORB m out
-  const Y2 = 150, PR = 21, ORB = 46;
+  const Y2 = 150, PR = 28, ORB = 56;
+  // the sky platform is cut into rings of segments that fall on their own: a disc in the middle, then 8, 12 and 16 sectors outwards
+  const RINGS = [[0, 7, 1], [7, 15, 8], [15, 22, 12], [22, PR, 16]];
   const TOP = 24; // how high the gravity reversal throws you
   // the open hand, palm to claw tips, runs from -2.6 to +8.9 m along its fingers: 11.5 m long, centred 3.15 m ahead of the palm
   const HAND_L = 11.5, HAND_C = 3.15;
@@ -326,7 +332,7 @@
       this.t += dt;
       const P = Pl();
       TR.tick(this, dt);
-      if (this.stage2) this.orbit(dt);
+      if (this.stage2) { this.orbit(dt); this.segTick(dt); this.updateHoles(dt); }
       if (this.stg && this.stg.stars) { this.stg.stars.position.copy(G.camera.position); this.stg.spin.rotation.y += dt * 0.05; }
       if (this.hp < this.lastHp) this.noDmgT = 0; else this.noDmgT += dt;
       this.lastHp = this.hp;
@@ -387,7 +393,7 @@
     // ---------------------------------------------------------------- choosing
     choose() {
       const f2 = this.form === 2, P = Pl();
-      const list = f2 ? [['starring', 2.2], ['rift', 2.2], ['lance', 2], ['clap', 2], ['gravity', this.lift ? 0 : 2.4], ['singularity', 1.3]]
+      const list = f2 ? [['starring', 2.2], ['rift', 2.2], ['lance', 2], ['clap', 2], ['gravity', this.lift ? 0 : 3.8]]
         : [['slam', 3], ['sweep', 2.2], ['volley', 1.8], ['meteors', 1.4], ['hurl', 1.4]];
       if (!f2 && this.tearT <= 0) list.push(['tear', 6]);
       const ok = list.filter(([k, w]) => w > 0 && k !== this.last);
@@ -582,6 +588,7 @@
     // (its warning is a seal of its own, not the round warning every other attack uses: rotating runes, a hexagram, six pillars of light)
     a_gravity(a, dt) {
       const P = Pl(), W = 1.7, R = 8.5, fl = this.floorY();
+      if (this.lift) a.t = Math.max(a.t, W); // (the lift can outlast the attack clock: keep the gesture going)
       if (!a.zones) {
         a.zones = [this.clampFloor(P.pos.clone())];
         if (this.phase >= 4 && this.stage2) { const o = this.stagePt(4, PR - 4); if (o.distanceTo(a.zones[0]) > 14) a.zones.push(o); }
@@ -589,7 +596,14 @@
         a.sig = a.zones.map((z) => gravSeal(a.g, z, R));
         G.ui.toastSmall('⚠ 紫の紋章 — 重力が反転する！ 紋章の外へ'); if (G.sfx.gravWarn) G.sfx.gravWarn(W / this.atkRate()); this.roar(0.3, 0.9);
       }
-      for (const h of this.hands) { h.busy = true; this.moveHand(h, this.home.clone().add(this.rotL(h.sx * 21, 12 + a.t * 4, 14)), dt, 3); this.aimHand(h, dt, 0, Math.PI, 0.6); }
+      // the gesture: palms up low while it charges, flung up as it goes off and held there, then slammed down as you fall
+      const L = this.lift, down = L && L.ph === 'down', up = a.done && !down;
+      for (const h of this.hands) {
+        h.busy = true;
+        const y = down ? -14 : up ? 30 : 2 - a.t * 4;
+        this.moveHand(h, this.home.clone().add(this.rotL(h.sx * 21, y, 14)), dt, down ? 12 : up ? 7 : 3);
+        this.aimHand(h, dt, down ? 0.6 : -0.4, down ? 0 : Math.PI, down ? 0.05 : 0.6, down ? 12 : 6);
+      }
       const k = Math.min(1, a.t / W);
       for (const sg of a.sig) sg.tick(dt, k, a.done ? a.t - W : -1);
       if (a.t < W) {
@@ -603,7 +617,7 @@
         const inZ = a.zones.find((z) => Math.hypot(P.pos.x - z.x, P.pos.z - z.z) < R);
         if (inZ && P.pos.y < fl + 5 && !this.lift && !P.dead) this.startLift();
       }
-      return a.t > W + 0.9;
+      return a.t > W + 0.9 && !this.lift; // (nothing else begins until you are back on the floor)
     }
     startLift() {
       const P = Pl();
@@ -642,53 +656,25 @@
       }
     }
     endLift() { const P = Pl(); this.lift = null; if (P) { P.liftVy = null; P.dragT = 0; } }
-    // singularity (second form): a black star opens over the void at the edge and drags everything towards it
-    a_singularity(a, dt) {
-      const P = Pl(), DUR = 3.6;
-      if (!a.c) {
-        if (this.stage2) { const S = this.stg, d = this.home.clone().sub(S.c).setY(0).normalize(); a.c = S.c.clone().addScaledVector(d, PR + 5); a.c.y = Y2 + 3; }
-        else a.c = V(U.clamp(P.pos.x, 14, (this.world.W || 76) - 14), 3, 2);
-        const g = new THREE.Group(); g.position.copy(a.c);
-        mesh(g, PG().sph, new THREE.MeshBasicMaterial({ color: 0x000000 }), 2.2, 2.2, 2.2);
-        a.ring = mesh(g, PG().torus, new THREE.MeshBasicMaterial({ color: VIO, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }), 4.2, 4.2, 6, 0, 0, 0, 1.3);
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xd080ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(16, 16, 1); g.add(sp);
-        g.scale.setScalar(0.01); G.scene.add(g); a.g = g;
-        G.ui.toastSmall('⚠ 虚無の渦 — 強く引き寄せられる！ 走って逆へ'); G.sfx.rumble && G.sfx.rumble(1.4, 1.2); this.roar(0.32, 1);
-      }
-      const k = Math.min(1, a.t / 0.8); a.g.scale.setScalar(0.01 + k); a.ring.rotation.z += dt * 3;
-      for (const h of this.hands) { h.busy = true; this.moveHand(h, a.c.clone().add(this.rotL(h.sx * 7, 2, -3)), dt, 3); this.aimHand(h, dt, 0, -h.sx * 1.2, 0.7); }
-      if (Math.random() < dt * 60) { const an = Math.random() * 6.28, r = U.rand(8, 16); G.fx.add.spawn(a.c.x + Math.cos(an) * r, a.c.y + U.rand(-2, 2), a.c.z + Math.sin(an) * r, -Math.cos(an) * r * 0.9, 0, -Math.sin(an) * r * 0.9, 1, 0.25, 0.05, 0.7, 0.4, 1.2, 0.9, 0, 0); }
-      if (a.t > 0.6 && a.t < DUR && !this.lift) {
-        const to = a.c.clone().sub(P.pos).setY(0), l = to.length();
-        // up to 7 m/s: walking (6.2) is not enough, a run (9.7) gets you out
-        if (l > 1) { const spd = U.lerp(3, 7, Math.min(1, (a.t - 0.6) / 1.3)); P.pos.addScaledVector(to.divideScalar(l), spd * dt); }
-        P.addShake(dt * 0.15);
-      }
-      if (a.t >= DUR && !a.done) {
-        a.done = true; G.scene.remove(a.g);
-        G.fx.explosion(a.c.clone(), 4, VIO, { decal: false }); G.sfx.explosion(a.c, 1.2);
-        const base = this.stage2 ? Math.atan2(this.stg.c.x - a.c.x, this.stg.c.z - a.c.z) : 0; // a fan back over the floor
-        for (let i = 0; i < 14; i++) { const an = base + i / 13 * 2.4 - 1.2; C().spawnProjectile({ kind: 'darkorb', pos: a.c.clone().setY(this.floorY() + 1.4), vel: V(Math.sin(an), 0, Math.cos(an)).multiplyScalar(13), owner: 'enemy', dmg: 14 * this.dmgScale, radius: 0.55, life: 5, attacker: this.main }); }
-      }
-      return a.done && a.t > DUR + 0.5;
-    }
     col() { return this.form === 2 ? VIO : PINK; }
     // ---------------------------------------------------------------- the constructs (something to break for builds that cannot shoot across)
     updateConstructs(dt) {
       const cap = this.form === 2 ? 2 : 1;
       this.conCd -= dt; this.conT -= dt;
-      if (this.constructs.length < cap && this.conCd <= 0 && (this.noDmgT > 9 || this.conT <= 0)) this.spawnConstruct();
+      const busy = this.gravBusy();
+      if (!busy && this.constructs.length < cap && this.conCd <= 0 && (this.noDmgT > 9 || this.conT <= 0)) this.spawnConstruct();
       const P = Pl();
       for (const c of this.constructs) {
         c.t += dt;
         const tile = c.tile, fl = this.floorY();
         if (tile && (tile.state === 'fall' || tile.state === 'down')) this.moveConstruct(c);
+        if (c.seg && c.seg.state !== 'up') { const g = U.pick(this.stg.segs.filter((s) => s.state === 'up' && s.r0 >= 4 || s.state === 'up' && s.ri === 0)); if (g) { G.fx.smoke(c.pos, 6, 1, this.col(), 1, 1); c.seg = g; c.pos.set(g.cx, c.pos.y, g.cz); } }
         c.pos.y = fl + 1.9 + Math.sin(c.t * 2) * 0.25;
         c.g.position.copy(c.pos); c.p.hitW[0].w.copy(c.pos); c.p.pos.copy(c.pos).setY(fl); c.p.centerRef.copy(c.pos);
         c.spin.rotation.y += dt * 1.6; c.ring.rotation.z += dt * 0.8;
         G.fx.beam(c.pos, this.J.chest.getWorldPosition(V()).add(V(0, 10, 0)), this.col(), 0.06, 0.05);
         // a crimson pulse: jump it, or step back out of it
-        c.pulse -= dt;
+        if (!busy) c.pulse -= dt;
         if (c.pulse < 1.0 && !c.tele) c.tele = G.fx.telegraph(c.pos.clone().setY(fl), 4.6, 1.0, this.col());
         if (c.pulse <= 0) {
           c.pulse = 4.8; c.tele = null;
@@ -700,7 +686,8 @@
     spawnConstruct() {
       const P = Pl();
       let tile = null, pos;
-      if (this.stage2) { pos = this.stagePt(5, PR - 4); for (let i = 0; i < 8 && pos.distanceTo(P.pos.clone().setY(Y2)) < 7; i++) pos = this.stagePt(5, PR - 4); pos.y = Y2 + 1.9; }
+      let seg = null;
+      if (this.stage2) { const ok = this.stg.segs.filter((g) => g.state === 'up' && Math.hypot(g.cx - P.pos.x, g.cz - P.pos.z) > 7); seg = U.pick(ok.length ? ok : this.stg.segs.filter((g) => g.state === 'up')); if (!seg) return; pos = V(seg.cx, Y2 + 1.9, seg.cz); }
       else {
         const free = ups().filter((t) => !this.constructs.some((c) => c.tile === t) && !this.hands.some((h) => h.planted && Math.hypot(h.pos.x - t.cx, h.pos.z - t.cz) < 6));
         if (!free.length) return;
@@ -718,7 +705,7 @@
       const hp = Math.round((this.form === 2 ? 700 : 520) * this.hpScale);
       const p = this.part({ name: '虚晶の造物', shared: false, hp, maxHp: hp, hitW: [{ r: 1.2, part: 'body', w: pos.clone() }], radius: 1.2, height: 2.4, showBar: true, blood: col });
       p.noFalloff = true;
-      const c = { g, spin, ring, p, tile, pos, t: 0, pulse: 3.5 };
+      const c = { g, spin, ring, p, tile, seg, pos, t: 0, pulse: 3.5 };
       p.die = () => { if (!p.alive) return false; p.alive = false; this.constructBroken(c); return true; };
       this.constructs.push(c);
       this.conCd = 10; this.conT = 38;
@@ -827,12 +814,23 @@
       stars.renderOrder = -8; stars.frustumCulled = false; grp.add(stars); S.stars = stars;
       const spin = new THREE.Group(); spin.position.copy(S.c); spin.visible = false; grp.add(spin); S.spin = spin;
       const plat = new THREE.Group(); plat.position.copy(S.c); plat.visible = false; plat.scale.setScalar(0.001); grp.add(plat); S.plat = plat;
-      const stone = new THREE.MeshStandardMaterial({ color: 0x2c2440, roughness: 0.5, metalness: 0.35, emissive: 0x160c2c, emissiveIntensity: 1, map: tex().ashlar ? tex().ashlar.map : null });
+      const floorM = new THREE.MeshStandardMaterial({ color: 0x0c0a12, roughness: 0.55, metalness: 0.3, emissive: 0x000000 });
       const dark = new THREE.MeshStandardMaterial({ color: 0x120c1c, roughness: 0.8, metalness: 0.2, emissive: 0x0a0414, emissiveIntensity: 1 });
-      const slab = new THREE.Mesh(new THREE.CylinderGeometry(PR, PR * 0.93, 2.4, 72), stone); slab.position.y = -1.2; slab.receiveShadow = true; plat.add(slab);
-      const under = new THREE.Mesh(new THREE.ConeGeometry(PR * 0.9, 28, 14), dark); under.rotation.x = Math.PI; under.position.y = -16.4; plat.add(under);
+      S.segs = [];
+      RINGS.forEach(([r0, r1, n], ri) => {
+        for (let k = 0; k < n; k++) {
+          const off = ri * 0.21, a0 = off + k / n * Math.PI * 2, a1 = a0 + Math.PI * 2 / n, gap = 0.07;
+          const sh = new THREE.Shape();
+          if (r0 === 0) sh.absarc(0, 0, r1 - gap, 0, Math.PI * 2, false);
+          else { const g0 = gap / r0, g1 = gap / r1; sh.moveTo(Math.cos(a0 + g0) * (r0 + gap), Math.sin(a0 + g0) * (r0 + gap)); sh.absarc(0, 0, r1 - gap, a0 + g1, a1 - g1, false); sh.absarc(0, 0, r0 + gap, a1 - g0, a0 + g0, true); }
+          const geo = new THREE.ExtrudeGeometry(sh, { depth: 2.4, bevelEnabled: false, curveSegments: r0 === 0 ? 32 : 6 }); geo.rotateX(Math.PI / 2); // flat: shape x / y -> world x / z, 2.4 m thick below the top
+          const m = new THREE.Mesh(geo, floorM.clone()); m.receiveShadow = true; plat.add(m);
+          const am = (a0 + a1) / 2, rm = r0 === 0 ? 0 : (r0 + r1) / 2;
+          S.segs.push({ ri, k, r0, r1, a0, a1, n, mesh: m, cols: [], state: 'up', timer: 0, dy: 0, vy: 0, rot: 1, cx: S.c.x + Math.cos(am) * rm, cz: S.c.z + Math.sin(am) * rm, am });
+        }
+      });
+      const under = new THREE.Mesh(new THREE.ConeGeometry(PR * 0.9, 34, 16), dark); under.rotation.x = Math.PI; under.position.y = -19.4; plat.add(under);
       for (let i = 0; i < 12; i++) { const an = i / 12 * Math.PI * 2 + 0.3, r = U.rand(4, PR * 0.75); const m = new THREE.Mesh(PG().cone, glowM(VIO, 1.8)); m.scale.set(0.55, U.rand(3, 7), 0.55); m.rotation.x = Math.PI; m.position.set(Math.cos(an) * r, U.rand(-14, -5), Math.sin(an) * r); plat.add(m); }
-      const inlay = new THREE.Mesh(new THREE.CircleGeometry(PR - 0.6, 72), addM(0xb070ff, 0.3, sigilTex())); inlay.rotation.x = -Math.PI / 2; inlay.position.y = 0.03; plat.add(inlay); S.inlay = inlay;
       const rim = new THREE.Mesh(new THREE.TorusGeometry(PR, 0.16, 6, 96), glowM(0xc890ff, 2.2)); rim.rotation.x = Math.PI / 2; rim.position.y = 0.05; plat.add(rim);
       const rim2 = new THREE.Mesh(new THREE.TorusGeometry(PR * 0.93, 0.1, 6, 96), glowM(VIO, 1.6)); rim2.rotation.x = Math.PI / 2; rim2.position.y = -2.4; plat.add(rim2);
       for (let i = 0; i < 28; i++) { const an = Math.random() * 6.28, r = U.rand(PR + 5, PR + 17); const m = new THREE.Mesh(U.pick([PG().dode, PG().oct3]), dark); m.scale.setScalar(U.rand(0.5, 2.4)); m.position.set(Math.cos(an) * r, U.rand(-9, 3), Math.sin(an) * r); m.rotation.set(Math.random() * 3, Math.random() * 3, 0); spin.add(m); }
@@ -840,19 +838,125 @@
     }
     // the platform turns solid (a stack of strips inside the circle), the lights come on, a fall now comes back up here
     solidSky() {
-      const w = this.world, S = this.stg, st = 1.5;
-      for (let z = -PR; z < PR; z += st) { const zf = Math.max(Math.abs(z), Math.abs(z + st)), hw = Math.sqrt(Math.max(0, PR * PR - zf * zf)); if (hw < 0.6) continue; w.addCollider(S.c.x - hw, Y2 - 2.4, S.c.z + z, S.c.x + hw, Y2, S.c.z + z + st, { surf: 'stone' }); }
-      w.killY = Y2 - 30; TR.stage = S;
-      for (const [x, z] of [[0, 0], [12, 0], [-12, 0], [0, 12], [0, -12]]) w.lightSources.push({ pos: V(S.c.x + x, Y2 + 6, S.c.z + z), color: '#c0a8ff', intensity: x || z ? 6 : 10, range: 18, flame: 0, emit: false, ph: 0, prio: 4, steady: true });
+      const w = this.world, S = this.stg;
+      for (let z = -PR; z < PR; z += 1) {
+        let run = null;
+        const flush = (x1) => { if (run) { run.seg.cols.push(w.addCollider(S.c.x + run.x0, Y2 - 2.4, S.c.z + z, S.c.x + x1, Y2, S.c.z + z + 1, { surf: 'stone' })); run = null; } };
+        for (let x = -PR; x < PR; x += 0.5) {
+          const seg = this.segAt(S.c.x + x + 0.25, S.c.z + z + 0.5);
+          if (!run || run.seg !== seg) { flush(x); if (seg) run = { seg, x0: x }; }
+        }
+        flush(PR);
+      }
+      w.killY = Y2 - 30; TR.stage = S; this.segT = 9;
+      for (const [x, z] of [[0, 0], [16, 0], [-16, 0], [0, 16], [0, -16]]) w.lightSources.push({ pos: V(S.c.x + x, Y2 + 6, S.c.z + z), color: '#c0a8ff', intensity: x || z ? 6 : 10, range: 18, flame: 0, emit: false, ph: 0, prio: 4, steady: true });
+    }
+    // which floor segment a point is on (null: off the platform)
+    segAt(x, z) {
+      const S = this.stg, dx = x - S.c.x, dz = z - S.c.z, r = Math.hypot(dx, dz);
+      if (r > PR) return null;
+      const ri = RINGS.findIndex(([r0, r1]) => r >= r0 && r < r1); if (ri < 0) return null;
+      const [, , n] = RINGS[ri]; if (n === 1) return S.segs.find((g) => g.ri === ri);
+      let a = Math.atan2(dz, dx) - ri * 0.21; a = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const k = Math.floor(a / (Math.PI * 2 / n)) % n;
+      return S.segs.find((g) => g.ri === ri && g.k === k);
     }
     orbitPos(an) { const S = this.stg; return V(S.c.x + Math.cos(an) * ORB, Y2 - 13 + Math.sin(this.t * 0.6) * 1.5, S.c.z + Math.sin(an) * ORB); }
     // up there it circles the platform for the rest of the fight, facing it
     orbit(dt) {
-      if (this.state === 'fight') this.orbA += dt * 0.11;
+      if (this.state === 'fight') this.orbA += dt * (this.phase >= 4 ? 0.24 : 0.2);
       const to = this.orbitPos(this.orbA); this.home.copy(to); this.pos.copy(to); this.root.position.copy(to);
       this.yawB = Math.atan2(this.stg.c.x - to.x, this.stg.c.z - to.z);
       for (const h of this.hands) h.rest = this.home.clone().add(this.rotL(h.sx * 22, 14, 10));
-      this.stg.inlay.rotation.z += dt * 0.04;
+    }
+    // gravity reversal is a set piece of its own: while it charges and while you hang in the air, nothing else starts or goes off
+    gravBusy() { return !!(this.lift || (this.act && this.act.k === 'gravity')); }
+    // ---- the sky floor crumbling: its own shapes (wedges, spirals, a ring, a half), back after a while
+    segTick(dt) {
+      const S = this.stg, gt = G.game.time;
+      for (const g of S.segs) {
+        const m = g.mesh;
+        if (g.state === 'warn') {
+          g.timer -= dt; const k = 1 - g.timer / g.warn, pulse = 0.55 + 0.45 * Math.sin(gt * 16 + g.k);
+          m.material.emissive.setRGB((0.25 + 0.45 * k) * pulse, 0.05 * pulse, (0.4 + 0.6 * k) * pulse); m.position.y = Math.sin(gt * 40 + g.k * 2) * 0.03 * k;
+          if (Math.random() < dt * 6) { const r = U.rand(Math.max(0.5, g.r0), g.r1), an = g.r0 === 0 ? Math.random() * 6.28 : U.rand(g.a0, g.a1); G.fx.add.spawn(S.c.x + Math.cos(an) * r, Y2 + 0.1, S.c.z + Math.sin(an) * r, 0, U.rand(1, 3), 0, 0.8, 0.12, 0.02, 0.6, 0.4, 1.2, 0.9, -0.2, 0.3); }
+          if (g.timer <= 0) { g.state = 'fall'; g.vy = 0.5; for (const c of g.cols) this.world.removeCollider(c); m.material.emissive.setRGB(0.3, 0.1, 0.5); }
+        } else if (g.state === 'fall') {
+          g.vy += 26 * dt; g.dy -= g.vy * dt; m.position.y = g.dy; m.rotation.y += dt * 0.25 * g.rot;
+          if (g.dy < -40) { g.state = 'down'; m.visible = false; }
+        } else if (g.state === 'wait') {
+          g.timer -= dt; if (g.timer <= 0) { g.state = 'rise'; g.dy = -14; m.visible = true; m.rotation.y = 0; m.material.emissive.setRGB(0.15, 0.05, 0.3); m.position.y = g.dy; }
+        } else if (g.state === 'rise') {
+          g.dy += 12 * dt; m.position.y = Math.min(0, g.dy);
+          if (g.dy >= 0) { g.dy = 0; g.state = 'up'; m.position.y = 0; m.material.emissive.setRGB(0, 0, 0); for (const c of g.cols) c.alive = true; }
+        }
+      }
+      if (this._segQ) { for (const q of this._segQ) { q.t -= dt; if (q.t <= 0) { for (const g of q.list) if (g.state === 'down' || g.state === 'fall') { g.state = 'wait'; g.timer = Math.random() * 0.8; } q.done = true; } } this._segQ = this._segQ.filter((q) => !q.done); }
+      if (this.state !== 'fight' || this.gravBusy()) return;
+      this.segT -= dt;
+      if (this.segT <= 0) { this.segT = (this.phase >= 4 ? 9 : 12) + Math.random() * 3; this.segRun(); }
+    }
+    segRun() {
+      const S = this.stg, P = Pl(), up = S.segs.filter((g) => g.state === 'up');
+      if (up.length < S.segs.length * 0.8) return; // never more than about a third down at once
+      const pa = Math.atan2(P.pos.z - S.c.z, P.pos.x - S.c.x), wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+      const pats = {
+        // three spokes from the middle out, turned so that one runs under you
+        spokes: () => up.filter((g) => g.ri > 0 && [0, 1, 2].some((i) => Math.abs(wrap(g.am - (pa + i * Math.PI * 2 / 3))) < Math.PI / (g.n * 0.9))),
+        // a spiral arm: further out, further round
+        spiral: () => { const a0 = pa + Math.random() * 0.6; return up.filter((g) => g.ri > 0 && Math.abs(wrap(g.am - (a0 + g.ri * 0.9))) < 0.5) .concat(up.filter((g) => g.ri > 0 && Math.abs(wrap(g.am - (a0 + Math.PI + g.ri * 0.9))) < 0.5)); },
+        // the rim: the outer ring goes all the way round, every other one
+        rim: () => up.filter((g) => g.ri === 3 && g.k % 2 === (Math.random() < 0.5 ? 0 : 1)).concat(up.filter((g) => g.ri === 2 && g.k % 3 === 0)),
+        // the half you stand on, middle rings only
+        half: () => up.filter((g) => (g.ri === 1 || g.ri === 2) && Math.abs(wrap(g.am - pa)) < Math.PI / 2),
+        // the heart: the middle disc and every other sector round it
+        heart: () => up.filter((g) => g.ri === 0 || (g.ri === 1 && g.k % 2 === 0)),
+      };
+      const names = Object.keys(pats), pick = names[Math.floor(Math.random() * names.length)];
+      let list = pats[pick]();
+      if (list.length > 12) list = list.filter((g, i) => i % 2 === 0); // (a third of the floor at most: a big shape is thinned, not cut short)
+      if (!list.length) return;
+      const warn = this.phase >= 4 ? 1.7 : 2.0;
+      for (const g of list) { g.state = 'warn'; g.warn = g.timer = warn + Math.random() * 0.2; g.rot = Math.random() < 0.5 ? 1 : -1; }
+      (this._segQ = this._segQ || []).push({ list, t: warn + 0.6 + 6 });
+      G.ui.toastSmall('⚠ 足場が紫に光る — 崩れる！'); if (G.sfx.rumble) G.sfx.rumble(1, 0.8);
+    }
+    // ---- black holes: a hazard of their own, on their own clock; they may open anywhere (on the platform or off it) and overlap any attack
+    updateHoles(dt) {
+      if (!this.holes) this.holes = [];
+      const busy = this.gravBusy(), P = Pl();
+      if (this.state === 'fight' && !busy) {
+        this.bhT = (this.bhT ?? 8) - dt;
+        if (this.bhT <= 0 && this.holes.length < (this.phase >= 4 ? 2 : 1)) { this.bhT = U.rand(12, 17) * (this.phase >= 4 ? 0.7 : 1); this.spawnHole(); }
+      }
+      for (const h of this.holes.slice()) {
+        if (!busy) h.t += dt;
+        const k = Math.min(1, h.t / 0.8); h.g.scale.setScalar(0.01 + k); h.ring.rotation.z += dt * 3;
+        if (Math.random() < dt * 50) { const an = Math.random() * 6.28, r = U.rand(7, 14); G.fx.add.spawn(h.c.x + Math.cos(an) * r, h.c.y + U.rand(-2, 2), h.c.z + Math.sin(an) * r, -Math.cos(an) * r * 0.9, 0, -Math.sin(an) * r * 0.9, 1, 0.25, 0.05, 0.7, 0.4, 1.2, 0.9, 0, 0); }
+        if (!busy && h.t > 0.6 && h.t < h.dur && !this.lift && !P.dead) {
+          // up to 7 m/s: walking (6.2) is not enough, a run (9.7) gets you out
+          const to = h.c.clone().sub(P.pos).setY(0), l = to.length();
+          if (l > 0.8 && l < 40) { const spd = U.lerp(3, 7, Math.min(1, (h.t - 0.6) / 1.3)) * Math.min(1, 1.6 - l / 40); P.pos.addScaledVector(to.divideScalar(l), spd * dt); }
+          if (l < 2.4 && P.pos.y < h.c.y + 2) { h.hitCd = (h.hitCd || 0) - dt; if (h.hitCd <= 0) { h.hitCd = 0.8; this.hurtPlayer(16, 'aoe', h.c.clone()); } }
+          P.addShake(dt * 0.12);
+        }
+        if (h.t >= h.dur) {
+          G.scene.remove(h.g); this.holes.splice(this.holes.indexOf(h), 1);
+          G.fx.explosion(h.c.clone(), 4, VIO, { decal: false }); G.sfx.explosion(h.c, 1.2);
+          for (let i = 0; i < 14; i++) { const an = i / 14 * Math.PI * 2; C().spawnProjectile({ kind: 'darkorb', pos: h.c.clone().setY(Y2 + 1.4), vel: V(Math.sin(an), 0, Math.cos(an)).multiplyScalar(12), owner: 'enemy', dmg: 14 * this.dmgScale, radius: 0.55, life: 5, attacker: this.main }); }
+        }
+      }
+    }
+    spawnHole() {
+      const S = this.stg, an = Math.random() * Math.PI * 2, on = Math.random() < 0.6, r = on ? U.rand(5, PR - 5) : PR + 4;
+      const c = V(S.c.x + Math.cos(an) * r, Y2 + 2.6, S.c.z + Math.sin(an) * r);
+      const g = new THREE.Group(); g.position.copy(c);
+      mesh(g, PG().sph, new THREE.MeshBasicMaterial({ color: 0x000000 }), 2.2, 2.2, 2.2);
+      const ring = mesh(g, PG().torus, new THREE.MeshBasicMaterial({ color: VIO, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }), 4.2, 4.2, 6, 0, 0, 0, 1.3);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xd080ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(16, 16, 1); g.add(sp);
+      g.scale.setScalar(0.01); G.scene.add(g);
+      this.holes.push({ c, g, ring, t: 0, dur: 4.2 });
+      G.ui.toastSmall('⚠ 虚無の渦 — 強く引き寄せられる！ 走って逆へ'); if (G.sfx.rumble) G.sfx.rumble(1.4, 1.2);
     }
     rotL(x, y, z) { const c = Math.cos(this.yawB), s = Math.sin(this.yawB); return V(x * c + z * s, y, -x * s + z * c); } // a point in the body's own frame (it only ever turns about y)
     floorY() { return this.stage2 ? Y2 : 0; }
@@ -862,7 +966,7 @@
     // ---------------------------------------------------------------- the Avatar's attacks (the sky stage)
     // star ring: shards gather from its hands into a ring round the platform and close in, turning; slip out through a gap
     a_starring(a, dt) {
-      const S = this.stg, P = Pl(), K = this.phase >= 4 ? 16 : 13, W = 1.1, SPD = 4.4, H = 1.15;
+      const S = this.stg, P = Pl(), K = this.phase >= 4 ? 18 : 15, W = 1.1, SPD = 5.6, H = 1.15;
       if (!a.sh) {
         a.r = PR + 4; a.ang = Math.random() * 6.28; a.spin = (Math.random() < 0.5 ? 1 : -1) * 0.5;
         a.g = new THREE.Group(); G.scene.add(a.g);
@@ -1072,6 +1176,7 @@
       if (this.act && this.act.lance) G.scene.remove(this.act.lance);
       for (const wv of (this.act && this.act.waves) || []) if (wv.sr && !wv.dead) wv.sr.dispose();
       const P = Pl(); if (P && P.liftVy != null) { P.liftVy = null; P.dragT = 0; }
+      for (const h of this.holes || []) G.scene.remove(h.g); this.holes = [];
     }
   }
   // keep a planned spot on the floor (never over the void around it)
@@ -1143,7 +1248,7 @@
   // (the second half is a secret: the first entry says nothing of it, and the second stays hidden in the codex until the crown has broken once)
   G.BOSSES.push(
     { id: 'sovereign', name: '虚無の君主', title: 'CRIMSON SOVEREIGN', icon: '🌑', rarity: 'legendary', desc: '深淵の最奥、紅い月の下、奈落の向こう岸にそびえる巨人。こちらからは決して届かない場所から、床を剥がし、巨大な手で叩き潰し、薙ぎ払う。', mech: ['エクストラの最終エリアに必ず現れる。戦いが始まると入口の足場は閉ざされる', '床が定期的に崩れて奈落になる（赤く光ってから約2秒）。落ちると最大HPの約40%のダメージを受け、近くの無事な床へ戻される', '叩きつけた手はしばらく床に残り、攻撃できる（ダメージ1.5倍）。薙ぎ払いは大きく吹き飛ばす', 'しばらくダメージが入らないと、こちら側に「虚晶の造物」が現れる。砕くと君主に大ダメージ'], field: true, ending: true },
-    { id: 'sovereign2', name: '虚無の化身', title: 'AVATAR OF THE VOID', icon: '🌌', rarity: 'legendary', codexOnly: true, desc: '王冠が砕けた君主の、真の姿。重力を裏返して戦う者を星々の只中へと引きずり上げ、天空の円い足場の周りを巡りながら攻め立てる。', mech: ['虚無の君主の王冠が砕けると現れる。重力が裏返り、天空の円い足場へと舞台が移る', '足場は崩れないが、縁から落ちると大ダメージを受けて足場へ戻される', '星の環・天の裂け目・彗星の槍・掌の檻で攻めてくる。胸の虚無核が弱点。閉じた両手は攻撃できる（ダメージ1.5倍）', '紫の紋章に入ると重力が反転し、高く打ち上げられてから叩きつけられる（最大HPの50%）', '虚無の渦は強く引き寄せる（走れば逃げられる）'], field: true },
+    { id: 'sovereign2', name: '虚無の化身', title: 'AVATAR OF THE VOID', icon: '🌌', rarity: 'legendary', codexOnly: true, desc: '王冠が砕けた君主の、真の姿。重力を裏返して戦う者を星々の只中へと引きずり上げ、天空の円い足場の周りを巡りながら攻め立てる。', mech: ['虚無の君主の王冠が砕けると現れる。重力が裏返り、天空の円い足場へと舞台が移る', '足場は扇形や渦巻き状に崩れ、しばらくすると戻る。落ちると大ダメージを受けて無事な足場へ戻される', '星の環・天の裂け目・彗星の槍・掌の檻で攻めてくる。胸の虚無核が弱点。閉じた両手は攻撃できる（ダメージ1.5倍）', '紫の紋章に入ると重力が反転し、高く打ち上げられてから叩きつけられる（最大HPの50%）', '虚無の渦はどこにでも開き、ほかの攻撃と重なることもある。強く引き寄せる（走れば逃げられる）'], field: true },
   );
   G.BOSS_BY_ID = Object.fromEntries(G.BOSSES.map((b) => [b.id, b]));
   BS.CLS.sovereign = Sovereign; BS.CLS.sovereign2 = Sovereign; // (sovereign2: only ever built by the codex)

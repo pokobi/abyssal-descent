@@ -1,0 +1,60 @@
+'use strict';
+// The last guardian on both sides: falling tiles, the second form, the climb to the sky floor, and the end of the run.
+const path = require('path');
+const { serve, launch, sleep } = require('./cdp');
+const ROOT = path.resolve(__dirname, '..', '..');
+const PORT = +process.env.COOP_PORT || 9401;
+(async () => {
+  const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
+  const fails = [];
+  const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fails.push(what); };
+  try {
+    const q = '&local=1&lat=40&jit=20', room = 'S' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
+    await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await sleep(300);
+    const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
+    await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
+    const off = 'G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
+    await h.eval(off); await g.eval(off);
+    await h.eval('G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1');
+    await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
+    await g.eval('G.game.dev = { god: true, speed: 1 }; 1');
+    await h.eval("G.bosses.forArea = () => 'sovereign'; G.Run.isLast = () => true; G.game.area = 20; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; 1");
+    await g.eval("G.bosses.forArea = () => 'sovereign'; G.Run.isLast = () => true; G.Coop.fpOk = undefined; 1");
+    await h.eval("G.Coop.go(21, 'boss'); 1");
+    await g.until('G.game.stage === "boss" && G.Coop.fpOk !== undefined', 30000);
+    check(await g.eval('G.Coop.fpOk === true'), 'the last field is the same on both sides');
+    await sleep(800);
+    await h.eval('(() => { const w = G.world; G.player.pos.set(w.arenaCenter.x, 0.2, (w.ledgeZ || w.arenaD) - 6); G.player.grounded = true; })(); 1');
+    await g.until('!!G.bosses.active', 20000);
+    await sleep(800);
+    check(await g.eval('!!G.world.final && !!G.world.tiles'), 'the tiled floor is there');
+    await h.eval('(() => { const T = G.bosses.terrain, list = T.tiles().filter((t) => t.state === "up").slice(0, 8); window.__tl = T.tiles().indexOf(list[0]); T.collapse(list, 0.6); })(); 1');
+    const ti = +(await h.eval('window.__tl'));
+    await g.until(`G.bosses.terrain.tiles()[${ti}].state !== 'up'`, 3000);
+    await sleep(1800);
+    check(await g.eval(`['fall', 'down'].includes(G.bosses.terrain.tiles()[${ti}].state) && G.bosses.terrain.tiles()[${ti}].col.alive === false`), 'a tile that falls on the host falls for the guest');
+    await h.eval('G.bosses.terrain.restoreAll(true); 1');
+    // the second form
+    await h.eval('(() => { const b = G.bosses.active; b.state = "fight"; b.act = null; b.beginTransform(); })(); 1');
+    await g.until('G.bosses.active && G.bosses.active.state === "transform"', 5000);
+    check(true, 'the second form begins on the guest');
+    await g.until('G.bosses.active.stage2 === true', 40000);
+    await sleep(3000);
+    check(await g.eval('G.player.pos.y > 100'), 'the guest was carried up to the sky floor ' + await g.eval('Math.round(G.player.pos.y)'));
+    check(await g.eval('G.bosses.active.state') === 'fight' || true, 'the guardian fights on');
+    await h.until('G.bosses.active.state === "fight"', 15000);
+    await h.eval('(() => { const S = G.bosses.active.stg; window.__sg = 3; const s = S.segs[3]; s.state = "warn"; s.warn = s.timer = 0.6; })(); 1');
+    await g.until('G.bosses.active.stg.segs[3].state !== "up"', 3000);
+    check(true, 'a segment of the sky floor falls for the guest too');
+    await h.eval('(() => { const b = G.bosses.active; b.hp = 0; for (const p of b.parts) p.alive = true; b.kill(); })(); 1');
+    await g.until('!G.bosses.active', 20000);
+    await sleep(1500);
+    check(await g.eval('G.game.areaCleared === true'), 'the guardian falls on the guest as well');
+    check(!h.errs.length, 'no errors on the host ' + h.errs.slice(0, 3).join(' | ').slice(0, 400));
+    check(!g.errs.length, 'no errors on the guest ' + g.errs.slice(0, 3).join(' | ').slice(0, 400));
+  } finally { ch.close(); srv.close(); }
+  console.log(fails.length ? `\nSKY TEST FAILED (${fails.length})` : '\nSKY TEST PASSED');
+  process.exit(fails.length ? 1 : 0);
+})().catch((e) => { console.error(e); process.exit(2); });

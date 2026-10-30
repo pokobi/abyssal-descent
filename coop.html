@@ -11,7 +11,7 @@
 /* The co-op page is the solo page itself plus the scripts in js/coop/: index.html is fetched as it is and the extra tags are added at its end,
    so the two can never drift apart and index.html itself never loads any of this. The version both sides must share is a hash of every script text. */
 (function () {
-  var FILES = ['net', 'core', 'host', 'client', 'body', 'sync', 'fxsync'];
+  var FILES = ['net', 'core', 'host', 'client', 'body', 'sync', 'fxsync', 'team'];
   // The solo save is never written from here: co-op runs write under a key of their own. The first load starts from a copy of the solo save (settings and key
   // bindings carry over); on every load the solo clears are copied in again, so what the solo game has unlocked decides the difficulties on offer here, and
   // never the other way round (records, codex and unlocks earned in co-op stay in the co-op key).

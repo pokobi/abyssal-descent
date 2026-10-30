@@ -128,6 +128,9 @@
         e.bossSpawn = !!(fl & 4); e.cursed = !!(fl & 8); e.champion = !!(fl & 16); e.marked = !!(fl & 32);
         if (name !== def.name) e.def = Object.assign({}, e.def, { name });
         e.revived = true; e.eliteMod = null; e.split = false; e.state = 'chase';
+        if (e.cursed && e.makeCurseRing) e.makeCurseRing(0x9a30ff);
+        if (e.champion && e.makeCurseRing) e.makeCurseRing(0xff3018);
+        if (e.marked && e.markTarget) e.markTarget(e.champion);
         e._n = { pos: V(x, y, z), yaw, atk: 0, wind: 0, mv: 0, fl: 0 };
         e.update = repUpdate;
         e.model.inner.position.y = 0; e.model.group.scale.setScalar(1);
@@ -140,7 +143,7 @@
         const e = reps.get(a[0]); if (!e || !e.alive) continue;
         const n = e._n; n.pos.set(a[1], a[2], a[3]); n.yaw = a[4]; n.fl = a[7]; n.atk = a[8]; n.wind = a[9]; n.mv = a[10]; n.sb = a[11] | 0; n.sx = a[12];
         // your own last hits are ahead of what the host has seen yet
-        if (!(e._hitT > now - 400)) { e.hp = a[5]; e.shield = a[6]; }
+        if (!(e._hitT > now - 400)) { if (a[5] < e.hp - 0.5) { e.lastHitT = GM.time; e.flinch = Math.min(1, e.flinch + 0.2); } e.hp = a[5]; e.shield = a[6]; }
       }
     };
     K.handlers.ed = function (m) {
@@ -186,6 +189,18 @@
       if (m.n && P.dead) GM.lastCause = m.n;
     };
     K.handlers.kick = function (m) { P.vel.x += m.v[0]; P.vel.y += m.v[1]; P.vel.z += m.v[2]; };
+    // what a foe did to you besides the damage: grabs, pulls, slows, being thrown off a grapple
+    K.handlers.pfx = function (m) {
+      const o = m.o;
+      for (const k of ['dragT', 'pullT', 'pullSpd', 'gravFreeAt', 'mirTip']) if (k in o) P[k] = o[k];
+      if ('invulnT' in o) P.invulnT = Math.max(P.invulnT || 0, o.invulnT || 0);
+      if (o.slow) P.st.slow = Math.max(P.st.slow || 0, o.slow);
+      if (o.shock) P.st.shock = Math.max(P.st.shock || 0, o.shock);
+      if (o.gr) P.grapple.state = 'none';
+      if (o.pile) P.pileState = null;
+      if (o.pd) P.pullDir = V(...o.pd);
+      if (o.dp) { P.pos.x += o.dp[0]; P.pos.y += o.dp[1]; P.pos.z += o.dp[2]; G.world.depenetrate(P.pos, P.hw, P.height); }
+    };
     const wrapNet = (fn) => { net = true; try { fn(); } finally { net = false; } };
     K.handlers.pj = function (m) { const o = K.unplain(m.o); if (!o.pos || !o.vel) return; wrapNet(() => C.spawnProjectile(o)); };
     K.handlers.zn = function (m) { const [p, r, dur, kind, dps] = m.a; wrapNet(() => C.zone(V(...p), r, dur, kind, dps, K.unplain(m.o))); };
@@ -211,9 +226,6 @@
       K.msg('仲間が守護者の間へ入った');
     };
     K.handlers.wipe = function () { K.ended('全滅', `エリア ${GM.area} で倒れた`); };
-    const vic = GM.victory;
-    GM.victory = function () { const was = GM.won; vic.call(GM); if (!was && GM.won) K.send({ t: 'won' }); };
-    K.handlers.won = function () { vic.call(GM); };
     // ---------------- the guardian as a puppet ----------------
     const bs = BS.start, bu = BS.update;
     BS.start = function () { return undefined; };
@@ -231,6 +243,10 @@
       const now = performance.now();
       if (!(b._hitT > now - 400)) b.hp = m.hp;
       b.shield = m.sh; b.maxShield = m.mxs; b.pos.set(...m.pos); b.yaw = m.yaw; b._ph = m.ph;
+      // the last guardian's second form: the same set piece runs here (the fall of the crown, the climb to the sky floor), carried by its own code
+      if (m.st === 'transform' && b.state !== 'transform' && !b._bT && b.beginTransform) { b._bT = true; b.beginTransform(); }
+      if (m.tl) for (const [i, s, tm] of m.tl) applyFloor(BS.terrain.tiles()[i], s, tm, -0.5);
+      if (m.sg && b.stg) for (const [i, s, tm] of m.sg) applyFloor(b.stg.segs[i], s, tm, 0);
       for (const a of m.nodes) K._pose[a[0]] = a;
       b.parts.forEach((p, i) => {
         const s = m.parts[i]; if (!s) return;
@@ -240,8 +256,18 @@
       });
     };
     K.handlers.bdead = function () { const b = BS.active; if (b && !b.dead) { b.hp = 0; b.kill(); } };
+    function applyFloor(t, s, tm, y0) {
+      if (!t) return;
+      if (s === 'warn') { t.state = 'warn'; t.warn = t.timer = Math.max(0.1, tm); t.rot = t.rot || 1; }
+      else if (s === 'wait') { t.state = 'wait'; t.timer = tm; }
+      else if (s === 'up') { t.state = 'up'; t.dy = 0; t.mesh.visible = true; t.mesh.position.y = y0; t.mesh.material.emissive.setRGB(0, 0, 0); if (t.col) t.col.alive = true; for (const c of t.cols || []) c.alive = true; }
+    }
     function puppet(dt) {
       const b = BS.active, k = Math.min(1, dt * 14);
+      if (b.state === 'transform' && b.updateTransform) { try { b.trT = b.trT || 0; b.updateTransform(dt); } catch (e) { console.error(e); } }
+      if (G.world.final && G.world.tiles && BS.terrain) BS.terrain.update(dt);
+      if (b.stage2 && b.segTick) { try { b.segTick(dt); } catch (e) { console.error(e); } }
+      if (b.stg && b.stg.stars) { b.stg.stars.position.copy(G.camera.position); b.stg.spin.rotation.y += dt * 0.05; }
       const q = new THREE.Quaternion(), T = V();
       K.bossNodes.forEach((n, i) => {
         const a = K._pose[i]; if (!a) return;

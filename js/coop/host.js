@@ -41,17 +41,30 @@
     const known = new Map();
     const alivePlayers = () => [...K.players.values()].filter((p) => p.id !== 0 && !p.dead);
     const tv0 = V(), tv1 = V();
-    // run fn as if guest rp were the player
+    // run fn as if guest rp were the player. Whatever the foe does to "the player" meanwhile (a grab, a slow, a pull) is not the host's: it is taken back and sent to the guest
+    const SW = ['dragT', 'pullT', 'pullSpd', 'liftVy', 'liftLock', 'gravFreeAt', 'invulnT', 'mirTip'];
+    const s0 = new Array(SW.length);
     function withTarget(rp, fn) {
       tv0.copy(P.pos); tv1.copy(P.vel);
-      const d0 = P.dead, w = G.world, nd = w.ndist;
-      P.pos.copy(rp.to); P.vel.copy(rp.vel); P.dead = false; K.swap = rp;
+      const d0 = P.dead, w = G.world, nd = w.ndist, smk = P.smokeT, inv = P.stats.invis, gr = P.grapple.state, pile = P.pileState, gnd = P.grounded, stS = P.st.slow, stK = P.st.shock, pd = P.pullDir;
+      SW.forEach((k, i) => { s0[i] = P[k]; });
+      P.pos.copy(rp.to); P.vel.copy(rp.vel); P.dead = false; K.swap = rp; P.smokeT = rp.ps & 16 ? 1 : 0; P.stats.invis = 0; P.grounded = !!rp.gnd;
       if (rp.field && rp.field.length === nd.length) w.ndist = rp.field;
-      const vx = P.vel.x, vy = P.vel.y, vz = P.vel.z;
+      const vx = P.vel.x, vy = P.vel.y, vz = P.vel.z, px = P.pos.x, py = P.pos.y, pz = P.pos.z;
       try { return fn(); } finally {
         const dx = P.vel.x - vx, dy = P.vel.y - vy, dz = P.vel.z - vz;
         if (dx * dx + dy * dy + dz * dz > 1) K.send({ t: 'kick', v: [r2(dx), r2(dy), r2(dz)] }, rp.id);
-        K.swap = null; w.ndist = nd; P.pos.copy(tv0); P.vel.copy(tv1); P.dead = d0;
+        let o = null;
+        const put = (k, v) => { (o || (o = {}))[k] = v; };
+        SW.forEach((k, i) => { if (P[k] !== s0[i]) { put(k, P[k] === undefined ? null : P[k]); P[k] = s0[i]; } });
+        if (P.st.slow !== stS) { put('slow', P.st.slow); P.st.slow = stS; }
+        if (P.st.shock !== stK) { put('shock', P.st.shock); P.st.shock = stK; }
+        if (P.grapple.state !== gr) { put('gr', 1); P.grapple.state = gr; }
+        if (P.pileState !== pile) { put('pile', 1); P.pileState = pile; }
+        if (P.pullDir !== pd) { if (P.pullDir && P.pullDir.isVector3) put('pd', K.vec(P.pullDir)); P.pullDir = pd; }
+        if (Math.abs(P.pos.x - px) + Math.abs(P.pos.y - py) + Math.abs(P.pos.z - pz) > 0.05) put('dp', [r2(P.pos.x - px), r2(P.pos.y - py), r2(P.pos.z - pz)]);
+        if (o) K.send({ t: 'pfx', o }, rp.id);
+        K.swap = null; w.ndist = nd; P.pos.copy(tv0); P.vel.copy(tv1); P.dead = d0; P.smokeT = smk; P.stats.invis = inv; P.grounded = gnd;
       }
     }
     // ---------------- foes go for whoever is nearest (a little stickiness so they do not flip between two) ----------------
@@ -106,7 +119,9 @@
       if (!has) { const near = alivePlayers(); let bi = P.dead ? -1 : 0, bd = P.dead ? 1e9 : b.pos.distanceTo(P.pos); for (const p of near) { const d = b.pos.distanceTo(p.to); if (d < bd) { bd = d; bi = p.id; } } b._cpT = bi; }
       b._cpHad = has;
       const rp = b._cpT > 0 && K.players.get(b._cpT);
-      return rp && !rp.dead ? withTarget(rp, () => bu.call(BS, dt)) : bu.call(BS, dt);
+      // (the last guardian's gravity reversal holds its victim for seconds, with a landing of its own: it stays on the host's character)
+      const held = b.gravBusy && b.gravBusy() && !P.dead;
+      return rp && !rp.dead && !held ? withTarget(rp, () => bu.call(BS, dt)) : bu.call(BS, dt);
     };
     const hp = BS.Boss.prototype.hurtPlayer;
     BS.Boss.prototype.hurtPlayer = function (dmg, src, pos, elem) {
@@ -200,6 +215,7 @@
           // the guest's machine already worked out armour, marks and shields: this is the plain result
           const mul = e.dmgMul, sh = e.shield, mk = e.st.mark; e.dmgMul = null; e.shield = 0; e.st.mark = 0;
           try { dm.call(C, e, dh, { src: 'dot', silent: true, noBuffs: true, remote: from, proc: true, noSkOn: true }); } finally { if (e.alive) { e.dmgMul = mul; e.shield = sh; e.st.mark = mk; } }
+          G.fx.blood(e.centerPos(), null, e.bloodColor, 3);
         }
         if (kn && !e.boss && e.knockback) e.knockback(V(kn[0], 0, kn[1]), kn[2]);
       }
@@ -265,7 +281,19 @@
         if (last[i] !== key) { last[i] = key; nodes.push([i].concat(a)); }
       });
       const parts = b.parts.map((p) => [p.alive ? 1 : 0, p.untargetable ? 1 : 0, p.invuln || (p.isInvuln && p.isInvuln({ src: 'bullet' })) ? 1 : 0, Math.round(p.hp), Math.round(p.maxHp), Math.round(p.shield || 0)]);
-      K.send({ t: 'b', hp: Math.round(b.hp), sh: Math.round(b.shield || 0), mxs: Math.round(b.maxShield || 0), pos: K.vec(b.pos), yaw: r2(b.yaw), ph: b.phaseText ? b.phaseText() : '', nodes, parts });
+      // the floor that falls away in the last field: only what starts a change is sent, the rest runs on the same clock there
+      const scan = (list) => {
+        const out = [];
+        (list || []).forEach((t, i) => {
+          if (t._ns === t.state) return;
+          const was = t._ns; t._ns = t.state;
+          if (was === undefined && t.state === 'up') return;
+          if (t.state === 'warn' || t.state === 'wait' || (t.state === 'up' && was === 'warn')) out.push([i, t.state, r2(t.timer || 0)]);
+        });
+        return out.length ? out : undefined;
+      };
+      K.send({ t: 'b', hp: Math.round(b.hp), sh: Math.round(b.shield || 0), mxs: Math.round(b.maxShield || 0), pos: K.vec(b.pos), yaw: r2(b.yaw), ph: b.phaseText ? b.phaseText() : '', nodes, parts,
+        st: typeof b.state === 'string' ? b.state : '', tl: BS.terrain && G.world.final ? scan(BS.terrain.tiles()) : undefined, sg: b.stg ? scan(b.stg.segs) : undefined });
     };
     function sendObjective() {
       const O = GM.objective; if (!O) return;

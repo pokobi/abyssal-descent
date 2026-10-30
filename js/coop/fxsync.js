@@ -76,6 +76,13 @@
       if (d < m.r) C.damagePlayer(m.d * 0.2 / ((C.ENEMY_DMG || 1) * Math.max(0.1, 1 + P.stats.enemyDmg)), { src: 'explosion', pos: V(...m.p) });
     };
 
+    // a decoy draws the foes, whoever set it down (the foes are the host's)
+    const ad = C.addDecoy;
+    C.addDecoy = function (pos, dur, x) {
+      const r = ad.call(C, pos, dur, x);
+      if (K.live && !K._net) push(['d', { p: K.vec(pos), dur: r2(dur) }]);
+      return r;
+    };
     // ---------------- zones ----------------
     const zn = C.zone, vz = [];
     C.zone = function (pos, r, dur, kind, dps, opts) {
@@ -129,6 +136,50 @@
       } else if (a.k === 'stomp') { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 1.5; FX.ring(c.clone(), a.r, 0xffb060, 0.5); } }
     };
 
+    // ---------------- allies and mines: pictures on the others' screens ----------------
+    const myAllies = [], theirAllies = new Map(), theirMines = new Map();
+    const bm = G.enemies.buildModel;
+    G.enemies.buildModel = function (def, opts) {
+      const m = bm.call(G.enemies, def, opts);
+      if (K.live && opts && opts.ally && !K._net) myAllies.push({ m, id: K.id + '-' + Math.random().toString(36).slice(2, 7), did: def.id, walk: 0, lp: m.group.position.clone() });
+      return m;
+    };
+    const sendAllies = () => {
+      for (let i = myAllies.length - 1; i >= 0; i--) {
+        const a = myAllies[i], g = a.m.group;
+        if (!g.parent) { myAllies.splice(i, 1); push(['ax', a.id]); continue; }
+        push(['al', { id: a.id, d: a.did, p: K.vec(g.position), y: r2(g.rotation.y) }]);
+      }
+      const seen = new Set();
+      for (const m of C.mines) {
+        if (!m._mid) { m._mid = K.id + '-' + Math.random().toString(36).slice(2, 7); push(['mn', { id: m._mid, p: K.vec(m.pos) }]); }
+        seen.add(m._mid);
+      }
+      for (const id of K._myM || []) if (!seen.has(id)) push(['mx', id]);
+      K._myM = seen;
+    };
+    const putAlly = (a) => {
+      let t = theirAllies.get(a.id);
+      if (!t) {
+        const def = G.ENEMY_BY_ID[a.d]; if (!def) return;
+        K._net = true; let m; try { m = bm.call(G.enemies, def, { ally: true }); } finally { K._net = false; }
+        G.scene.add(m.group); t = { m, walk: 0, to: V(...a.p), yaw: a.y, seen: 0 }; m.group.position.copy(t.to); theirAllies.set(a.id, t);
+      }
+      t.to.set(...a.p); t.yaw = a.y; t.seen = 0;
+    };
+    const dropAlly = (id) => { const t = theirAllies.get(id); if (t) { G.scene.remove(t.m.group); theirAllies.delete(id); } };
+    const mineMesh = () => { const m = new THREE.Mesh(G.Props.PG.cyl, new THREE.MeshStandardMaterial({ color: 0x3a3c40, emissive: 0x401008, roughness: 0.5 })); m.scale.set(0.2, 0.06, 0.2); return m; };
+    const tickViz = (dt) => {
+      for (const [id, t] of theirAllies) {
+        t.seen += dt; if (t.seen > 1.2) { dropAlly(id); continue; }
+        const g = t.m.group, px = g.position.x, pz = g.position.z;
+        g.position.lerp(t.to, Math.min(1, dt * 12)); g.rotation.y = t.yaw;
+        const sp = Math.hypot(g.position.x - px, g.position.z - pz) / (dt || 1);
+        t.walk += sp > 0.3 ? dt * 9 : 0;
+        if (t.m.animate) t.m.animate({ walk: t.walk, moving: sp > 0.3, atk: 0, t: GM.time, flinch: 0, state: 'chase' });
+      }
+    };
+
     // ---------------- sending and receiving ----------------
     const base = K.onFrame;
     let sendT = 0;
@@ -143,8 +194,10 @@
       if (sendT <= 0) {
         sendT = 0.05;
         if (A.auras.some((a) => a.kind === 'beam')) { K._bT = (K._bT || 0) + 1; if (K._bT % 3 === 0) beamUpdates(); }
+        K._alT = (K._alT || 0) + 1; if (K._alT % 2 === 0) sendAllies();
         if (q.length) { K.send({ t: 'fx', e: q.splice(0, 60) }); }
       }
+      tickViz(dt);
       for (let i = vz.length - 1; i >= 0; i--) {
         const z = vz[i]; z.t += dt;
         const rp = K.players.get(z.who); if (z.fol && rp) z.pos.copy(rp.pos);
@@ -163,6 +216,11 @@
           if (kind === 'f') { K._fxNet = true; try { FX[a](...b.map(dec)); } finally { K._fxNet = false; } if (a === 'explosion' && b[0] && b[0].$v) G.sfx.explosion(V(...b[0].$v), (b[1] || 4) / 4); }
           else if (kind === 'p') putProjectile(a);
           else if (kind === 'x') friendly(a);
+          else if (kind === 'al') putAlly(a);
+          else if (kind === 'ax') dropAlly(a);
+          else if (kind === 'mn') { const m = mineMesh(); m.position.set(...a.p); m.position.y += 0.05; G.scene.add(m); theirMines.set(a.id, m); }
+          else if (kind === 'mx') { const m = theirMines.get(a); if (m) { G.scene.remove(m); theirMines.delete(a); } }
+          else if (kind === 'd') { K._net = true; try { ad.call(C, V(...a.p), a.dur, 0); } finally { K._net = false; } }
           else if (kind === 'z') vz.push({ pos: V(...a.p), r: a.r, dur: a.dur, t: 0, kind: a.k, who: a.who, fol: a.fol });
           else if (kind === 'a') vAuras.push({ id: a.id, k: a.k, t: a.t, r: a.r, col: a.col, fol: a.fol, who: a.who, c: a.c ? V(...a.c) : null, pt: a.pt ? V(...a.pt) : null, age: 0 });
           else if (kind === 'b') { const v = vAuras.find((x) => x.id === a.id); if (v) { if (!v.pt) v.pt = V(...a.pt); else v.pt.lerp(V(...a.pt), 0.5); } }
@@ -172,6 +230,6 @@
     };
     K.handlers.cr = function (m) { if (K.role === 'host') { GM.chronoT = Math.max(GM.chronoT || 0, m.d); GM.chronoSlow = Math.max(GM.chronoSlow || 0, m.s); G.ui.toastSmall('⌛ 仲間が時間を操った'); } };
     K.vizCount = () => vz.length + vAuras.length;
-    K.clearViz = function () { vz.length = 0; for (const a of vAuras) if (a.ring) G.scene.remove(a.ring); vAuras.length = 0; };
+    K.clearViz = function () { for (const id of [...theirAllies.keys()]) dropAlly(id); for (const m of theirMines.values()) G.scene.remove(m); theirMines.clear(); myAllies.length = 0; vz.length = 0; for (const a of vAuras) if (a.ring) G.scene.remove(a.ring); vAuras.length = 0; };
   };
 })();

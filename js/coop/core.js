@@ -139,11 +139,12 @@
   K.onDown = function () {
     const P = G.player;
     G.sfx.death();
+    G.weapons.hidden(true);
     K.sendSelf();
     if (P.revives > 0) {
       K.msg(`倒れた — 魂の灯火で復活する（残り ${P.revives}灯）`);
       setTimeout(() => { if (P.dead && K.live) K.rise(P.pos, P.stats.maxHp, true); }, 3000);
-    } else K.msg('倒れた — 次のエリアで復帰する');
+    } else K.msg('倒れた — 仲間に起こしてもらうか、次のエリアで復帰する');
   };
   K.rise = function (pos, hp, lantern) {
     const P = G.player;
@@ -151,6 +152,7 @@
     P.dead = false; P.deathT = 0; P.pos.copy(pos); P.pos.y += 0.05; P.vel.set(0, 0, 0); G.world.depenetrate(P.pos, P.hw, P.height);
     P.hp = hp; P.invulnT = 3; P.st = {}; P.grapple.state = 'none'; P.pileState = null;
     GM().state = 'playing'; GM().deathFrozen = false;
+    G.weapons.hidden(false);
     G.sfx.heal(); G.ui.showHud(true);
   };
   K.ended = function (title, sub) {
@@ -158,7 +160,7 @@
     const g = GM();
     g.state = 'modal'; G.input.exitLock();
     const b = K.backEl; b.style.display = 'flex'; b.onclick = null;
-    b.innerHTML = `<div class="cb-box"><b style="font-size:20px;color:#ffd27a">${title}</b><div>${sub || ''}</div><button id="coop-quit">部屋を出る</button></div>`;
+    b.innerHTML = `<div class="cb-box"><b style="font-size:20px;color:#ffd27a">${title}</b><div>${sub || ''}</div>${K.statsHTML ? K.statsHTML() : ''}<button id="coop-quit">部屋を出る</button></div>`;
     document.getElementById('coop-quit').onclick = () => K.quit();
   };
   // leaving the room: the page is simply reloaded (the browser's "leave this page?" question is for solo runs, so it is switched off first)
@@ -236,11 +238,12 @@
     const box = el('div', 'coop-lobby', `<div class="cl-box"><h2>CO-OP</h2><div id="cl-body"></div><div class="cl-err" id="cl-err"></div></div>`);
     K.lobbyEl = box;
     const body = box.querySelector('#cl-body'), err = (t) => { box.querySelector('#cl-err').textContent = t || ''; };
+    const join = (qs.get('join') || '').toUpperCase();
     const name0 = (() => { try { return localStorage.getItem('abyss_coop_name') || ''; } catch (e) { return ''; } })();
     body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px">
       <label>名前<input id="cl-name" maxlength="12" value="${G.U.esc(name0)}" placeholder="名前"></label>
       <button id="cl-host">部屋を作る</button>
-      <div class="cl-row"><input id="cl-code" maxlength="5" placeholder="部屋コード" style="text-transform:uppercase"><button id="cl-join">参加する</button></div>
+      <div class="cl-row"><input id="cl-code" maxlength="5" placeholder="部屋コード" value="${G.U.esc(join)}" style="text-transform:uppercase"><button id="cl-join">参加する</button></div>
       <div class="cl-note">最大${K.MAX}人。ホストのPCで世界が動きます。ソロのセーブデータとは別に動き、途中保存はありません。</div></div>`;
     const nm = () => { const v = (body.querySelector('#cl-name').value || '').trim() || 'プレイヤー'; try { localStorage.setItem('abyss_coop_name', v); } catch (e) { /* no storage */ } return v; };
     body.querySelector('#cl-host').onclick = () => K.open(N().code(), true, nm());
@@ -259,10 +262,12 @@
       ? `<div class="cl-note">難易度</div><div class="cl-diff" style="grid-template-columns:repeat(${ids.length},1fr)">${ids.map((id) => `<button data-d="${id}" class="${K.diff.id === id ? 'on' : ''}" style="--dc:${R.DIFFS[id].col}">${R.DIFFS[id].icon} ${R.DIFFS[id].name}</button>`).join('')}</div>`
         + (K.diff.id === 'extra' ? `<div class="cl-xl"><button data-x="-1">◀</button><b>エクストラ ${K.diff.lv}</b><button data-x="1">▶</button></div>` : '')
       : `<div class="cl-note">難易度: <b style="color:${R.DIFFS[K.diff.id].col}">${diffName(K.diff)}</b>（ホストが選びます）</div>`;
-    body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="cl-note">部屋コード</div><div class="cl-code">${K.code}</div><div>${names}</div>${dif}`
+    body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="cl-note">部屋コード</div><div class="cl-code">${K.code}</div>${host ? '<button id="cl-link">招待リンクをコピー</button>' : ''}<div>${names}</div>${dif}`
       + (host ? `<button id="cl-start"${K.players.size < 2 && !qs.has('solo') ? ' disabled' : ''}>開始する</button>` : '<div class="cl-note">ホストの開始を待っています…</div>') + '</div>';
     const b = body.querySelector('#cl-start');
     if (b) b.onclick = () => K.begin();
+    const lk = body.querySelector('#cl-link');
+    if (lk) lk.onclick = () => { const u = location.origin + location.pathname + '?join=' + K.code; const done = () => { lk.textContent = 'コピーしました'; setTimeout(() => { lk.textContent = '招待リンクをコピー'; }, 1500); }; if (navigator.clipboard) navigator.clipboard.writeText(u).then(done, () => { lk.textContent = u; }); else lk.textContent = u; };
     body.querySelectorAll('[data-d]').forEach((e) => { e.onclick = () => { K.diff = { id: e.dataset.d, lv: e.dataset.d === 'extra' ? Math.max(1, Math.min(K.diff.lv || R.maxExtra(), R.maxExtra())) : 0 }; K.send({ t: 'diff', d: K.diff }); roomScreen(); }; });
     body.querySelectorAll('[data-x]').forEach((e) => { e.onclick = () => { const n = K.diff.lv + (+e.dataset.x); if (n >= 1 && n <= R.maxExtra()) { K.diff = { id: 'extra', lv: n }; K.send({ t: 'diff', d: K.diff }); roomScreen(); } }; });
   }
@@ -286,6 +291,7 @@
     }
     K.installSync();
     K.installFx();
+    K.installTeam();
   };
   K.handlers.hi = function (m, from) {
     const rp = K.players.get(from); if (!rp) return;
@@ -343,7 +349,7 @@
       return dp.call(G.combat, a, i);
     };
     const up = G.ui.pause;
-    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。</div>'); };
+    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。</div>' + (K.statsHTML ? K.statsHTML() : '')); };
     const pu = G.player.update;
     G.player.update = function (dt) { if (this.dead) clearKeys(); return pu.call(this, dt); };
     lobby();

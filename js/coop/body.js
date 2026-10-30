@@ -109,7 +109,15 @@
     const J = B.J, k = Math.min(1, dt * 12), t = G.game.time;
     const sp = Math.hypot(rp.vel.x, rp.vel.z), amp = Math.min(1, sp / 5.5), air = !rp.gnd && Math.abs(rp.vel.y) > 0.5;
     holdModel(B, rp);
-    if (rp.sw && B.sw === 0) { B.sw = 1; B.swT = 0; } else if (!rp.sw) B.sw = 0;
+    if (rp.sw && B.sw === 0) {
+      B.sw = 1; B.swT = 0;
+      // the swing itself: a short arc in front of them
+      const y = rp.yaw, fx = -Math.sin(y), fz = -Math.cos(y), o = rp.pos;
+      for (let i = 0; i < 4; i++) {
+        const a0 = -0.9 + i * 0.5, a1 = a0 + 0.5, c = (a) => V(o.x + (fx * Math.cos(a) - fz * Math.sin(a)) * 1.5, o.y + 1.3 - i * 0.05, o.z + (fz * Math.cos(a) + fx * Math.sin(a)) * 1.5);
+        G.fx.seg(c(a0), c(a1), 0xfff0d0, 0.035, 0.12);
+      }
+    } else if (!rp.sw) B.sw = 0;
     B.swT += dt;
     B.ph += dt * (2.2 + sp * 1.15) * (rp.cr ? 0.7 : 1);
     const pitch = U.clamp(rp.pitch || 0, -1.2, 1.2);

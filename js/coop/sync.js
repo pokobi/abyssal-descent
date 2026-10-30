@@ -131,6 +131,68 @@
       if (K.role === 'host') K.relay(m, from);
     };
 
+    // ---------------- doors, breakable things, trapped chests ----------------
+    const S = G.Strata, C = G.combat;
+    const doorIdx = (d) => (S.doors || []).indexOf(d);
+    const dOpen = S.openDoor, dClose = S.closeDoor, dBreak = S.breakDoor;
+    const sendDoor = (d) => { if (K.live && !K._net) K.send({ t: 'dr', i: doorIdx(d), s: d.state, a: GM.area }); };
+    S.openDoor = function (d) { const was = d.state, r = dOpen.call(S, d); if (d.state !== was) sendDoor(d); return r; };
+    S.breakDoor = function (d) { const was = d.state, r = dBreak.call(S, d); if (d.state !== was) sendDoor(d); return r; };
+    S.closeDoor = function (d) {
+      // (nobody may stand in the doorway, on anyone's screen)
+      for (const rp of K.players.values()) if (rp.id !== K.id && !rp.dead && Math.abs(rp.to.x - d.plane) < 1.4 && rp.to.z > d.lo - 0.7 && rp.to.z < d.hi + 0.7 && rp.to.y > d.y - 1.5 && rp.to.y < d.y + d.h) return false;
+      const was = d.state, r = dClose.call(S, d);
+      if (d.state !== was) sendDoor(d);
+      return r;
+    };
+    K.handlers.dr = function (m, from) {
+      if (K.role === 'host') K.relay(m, from);
+      if (m.a !== GM.area) return;
+      const d = (S.doors || [])[m.i]; if (!d || d.state === m.s) return;
+      K._net = true;
+      try {
+        if (m.s === 'open') dOpen.call(S, d);
+        else if (m.s === 'broken') dBreak.call(S, d);
+        else { d.state = 'closed'; d.col.alive = true; d.it.opened = false; if (G.sfx.chain) G.sfx.chain(0.35, 0.3); }
+      } finally { K._net = false; }
+    };
+    // how battered a gate is follows the host (only foes batter them)
+    K.handlers.dh = function (m) { const d = (S.doors || [])[m.i]; if (d && m.a === GM.area) { d.hp = m.hp; d.shake = 1; if (d.g) S.paintDoor(d); } };
+    const bd = C.breakDestructible;
+    C.breakDestructible = function (d) {
+      const was = d.alive, r = bd.call(C, d);
+      if (was && K.live && !K._net) { const i = G.world.destructibles.indexOf(d); if (i >= 0) K.send({ t: 'ds', i, a: GM.area }); }
+      return r;
+    };
+    K.handlers.ds = function (m, from) {
+      if (K.role === 'host') K.relay(m, from);
+      if (m.a !== GM.area) return;
+      const d = G.world.destructibles[m.i]; if (!d || !d.alive) return;
+      const mats = G.world.mats;
+      C.removeDestructibleSilent(d);
+      G.fx.debris(d.pos, d.mat === 'ceramic' ? mats.ceramic : mats.wood, d.type === 'urn' ? 10 : 12, d.type === 'urn' ? 0.12 : 0.2, 6);
+      G.fx.dust(d.pos, null, 0x7a6a50, 6);
+      G.sfx.breakObj(d.pos, d.mat);
+      if (d.explosive) { const dd = P.pos.distanceTo(d.pos); if (dd < 4) C.damagePlayer(25 * (1 - dd / 4), { src: 'explosion', pos: d.pos }); }
+    };
+    const trap = G.Areas.springTrap;
+    G.Areas.springTrap = function (it) { const i = G.world.interactables.indexOf(it); if (K.live && i >= 0) K.send({ t: 'co', i, a: GM.area }); return trap.call(G.Areas, it); };
+    K.handlers.co = function (m, from) {
+      if (K.role === 'host') K.relay(m, from);
+      if (m.a !== GM.area) return;
+      const it = G.world.interactables[m.i]; if (it) { it.opened = true; if (it.openAnim === undefined) it.openAnim = 0; }
+    };
+
+    // ---------------- the end of the run: the first through the rift takes everyone along ----------------
+    const vic = GM.victory;
+    GM.victory = function () { const was = GM.won; vic.call(GM); if (!was && GM.won && K.live) K.send({ t: 'won' }); };
+    K.handlers.won = function (m, from) {
+      if (K.role === 'host') K.relay(m, from);
+      if (GM.won) return;
+      if (P.dead) K.rise(P.pos, P.stats.maxHp * 0.4, false);
+      vic.call(GM);
+    };
+
     // ---------------- the gates ----------------
     // The game's own check would take whoever steps into an open gate on alone, so its boxes are emptied here and kept aside; the check is done below for everyone.
     const prep = () => {
@@ -178,6 +240,10 @@
         at = want; if (me) me.at = at;
         K.send({ t: 'at', k: at });
         if (K.role === 'host' && me) announce(me);
+      }
+      if (K.role === 'host') {
+        K._dhT = (K._dhT || 0) + 1;
+        if (K._dhT % 20 === 0) (S.doors || []).forEach((d, i) => { if (d.state === 'closed' && d._shp !== d.hp) { if (d._shp !== undefined) K.send({ t: 'dh', i, hp: Math.round(d.hp), a: GM.area }); d._shp = d.hp; } });
       }
       if (K.role === 'host' && !GM.transitioning) {
         const live = standing();

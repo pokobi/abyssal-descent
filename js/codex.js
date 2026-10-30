@@ -85,7 +85,7 @@
     const want3d = tab === 'weapon' || tab === 'enemy' || tab === 'melee' || tab === 'boss';
     if (want3d) html += `<div id="cx-3d"></div>`; else html += `<div class="cd-icon">${o.mat ? G.armorIcon(o) : o.icon}</div>`;
     html += `<div class="cd-name">${U.esc(o.name)}</div><div class="cd-cat">${rar ? rar.name + ' · ' : ''}${catText(o)}${disc(tab, o) ? ' · ✅ 発見済み' : ' · ❔ 未発見'}</div>`;
-    html += `<div class="cd-desc">${U.esc(o.desc || '').replace(/\n/g, '<br>')}</div><div class="cd-stats">`;
+    html += `<div class="cd-desc">${U.descHTML(o.desc)}</div><div class="cd-stats">`;
     if (tab === 'weapon') {
       const s = o;
       html += bar('💥', 'ダメージ', s.dmg * (s.pellets || 1), 320, Math.round(s.dmg) + (s.pellets > 1 ? '×' + s.pellets : ''));

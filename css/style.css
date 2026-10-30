@@ -1567,3 +1567,10 @@ body.inv-open #tut .tut-tip { display: none; }
 /* a small button at the right end of a choice row (the trash can on a save slot) */
 .choice-aside { pointer-events: auto; cursor: pointer; flex: none; width: 38px; height: 38px; font-size: 18px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.14); color: inherit; transition: all .12s; }
 .choice-aside:hover { border-color: #ff6a50; background: rgba(255,80,60,0.18); box-shadow: 0 0 10px rgba(255,80,60,0.35); }
+/* pact text: the cost stands out in red, the reward in green */
+.cost-line, .reward-line { display: block; margin: 3px 0; line-height: 1.5; }
+.cost-line { color: #ffb3a6; }
+.reward-line { color: #c6f0bc; }
+.cost-tag, .reward-tag { display: inline-block; margin-right: 6px; padding: 0 7px; border-radius: 4px; font-size: 0.86em; font-weight: 900; letter-spacing: 1px; }
+.cost-tag { color: #fff0ec; background: linear-gradient(180deg, #d4402e, #8e1e14); box-shadow: 0 0 8px rgba(255,70,50,0.45); }
+.reward-tag { color: #0e2a0c; background: linear-gradient(180deg, #9ee08e, #5aa84a); }

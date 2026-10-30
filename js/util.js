@@ -23,6 +23,10 @@ window.G = window.G || {};
     for (const a of arr) { r -= Math.max(0, wf(a)); if (r <= 0) return a; }
     return arr[arr.length - 1];
   };
+  // a description with a 【代償】 (cost) and 【報酬】 (reward) part: each on its own line, the cost in a red warning tag, the reward in a green one
+  U.descHTML = (s) => U.esc(s || '').split(String.fromCharCode(10)).map((l) => l
+    .replace(/^【代償】(.*)$/, '<span class="cost-line"><b class="cost-tag">⚠ 代償</b>$1</span>')
+    .replace(/^【報酬】(.*)$/, '<span class="reward-line"><b class="reward-tag">✦ 報酬</b>$1</span>')).join('<br>');
   U.esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   class RNG {

@@ -1,6 +1,6 @@
 'use strict';
 // Hands-on tutorial: played in a real first area with no waves. Each step explains one thing and waits until you have done it
-// (or press the wheel / the interact key on explanation pages: both hands stay where they are; Enter works too). Backspace skips a step. At the end a fresh run starts.
+// (or press the wheel / the interact key on explanation pages: both hands stay where they are; Enter works too). Holding the wheel (or Backspace) skips a step. At the end a fresh run starts.
 // The panel sits at the top left, where the route bar and the objective would be (both hidden meanwhile), so the view stays clear.
 (function () {
   const T = (G.Tutorial = { active: false });
@@ -12,6 +12,8 @@
   // what moves the tutorial on: keys the hands are already on
   const NEXT = () => `${k('ホイールクリック')} か ${K('interact')}`;
   const nextHit = () => I.mpressed[1] || I.hit('interact') || I.pressed.Enter || I.pressed.NumpadEnter;
+  // on a step you have to do, a short wheel click does nothing and holding it skips the step
+  const SKIP_HOLD = 0.6;
   const nextEat = () => { I.mpressed[1] = false; delete I.pressed.Enter; delete I.pressed.NumpadEnter; for (const c of G.BIND.interact) delete I.pressed[c]; };
 
   // ---------------------------------------------------------------- helpers
@@ -34,7 +36,7 @@
   const CH = ['📘 はじめに', '🏃 動き', '⚔️ 戦い', '🎒 道具と持ち物', '🌟 成長と進行'];
   const STEPS = [
     { ch: 0, title: 'ようこそ、深淵へ', info: true,
-      body: () => ul('実際に操作しながら、基本を覚えます（5分ほど）。', 'ここでは<b>倒されません</b>。HPが減っても自動で戻ります。', `${NEXT()} 次へ　${k('Backspace')} この手順を飛ばす`, `${k('Esc')} ポーズ（チュートリアルの終了もここから）`) },
+      body: () => ul('実際に操作しながら、基本を覚えます（5分ほど）。', 'ここでは<b>倒されません</b>。HPが減っても自動で戻ります。', `${NEXT()} 次へ　${k('ホイール長押し')} この手順を飛ばす`, `${k('Esc')} ポーズ（チュートリアルの終了もここから）`) },
 
     { ch: 1, title: '見回す・歩く・走る',
       body: () => ul(`${k('マウス')} 見回す　${WASD()} 歩く`, G.save.data.settings.autoSprint ? `普段は<b>自動で走る</b>（${K('sprint')} を押している間は歩き）` : `${K('sprint')} を一度押すと<b>走る</b>（止まる・撃つ・覗くまで続く）`),
@@ -102,7 +104,7 @@
       goal: (s) => (s.opened ? '好きな加護を1つ選ぶ' : `<span>${NEXT()} で加護の選択画面を開く</span>`),
       setup: (s) => { s.sample = GM.rollBuffs(3); },
       check: (s) => {
-        if (!s.opened && nextHit()) {
+        if (!s.opened && (s.tap || I.hit('interact') || I.pressed.Enter || I.pressed.NumpadEnter)) { // (the wheel counts when it is let go: held, it skips the step)
           nextEat(); s.opened = true;
           GM.offerBuffs(false, { title: 'CHOOSE A BOON', sub: '練習：好きな加護を1つ選ぼう（選ぶとこの周回ずっと有効）', onPicked: () => { s.picked = true; } });
         }
@@ -202,8 +204,8 @@
     const pct = Math.round((st.prog || 0) * 100);
     const html = `<div class="tut-h"><span>${CH[s.ch]}</span><b>${idx + 1} / ${STEPS.length}</b></div>
       <div class="tut-t">${s.title}</div><div class="tut-b">${s.body()}</div>${s.vis ? s.vis(st) : ''}${s.tip ? `<div class="tut-tip">💡 ${s.tip()}</div>` : ''}
-      ${s.info ? `<div class="tut-foot"><span>${NEXT()} ${s.finish ? '本編へ' : '次へ'}</span><span>${k('Backspace')} 飛ばす</span></div>`
-        : `<div class="tut-goal">${goal}</div><div class="tut-bar"><div style="width:${pct}%"></div></div><div class="tut-foot"><span>やってみよう</span><span>${k('Backspace')} 飛ばす</span></div>`}`;
+      ${s.info ? `<div class="tut-foot"><span>${NEXT()} ${s.finish ? '本編へ' : '次へ'}</span></div>`
+        : `<div class="tut-goal">${goal}</div><div class="tut-bar"><div style="width:${pct}%"></div></div><div class="tut-foot"><span>やってみよう</span><span class="tut-skip" style="--p:${Math.round(Math.min(1, (st.holdT || 0) / SKIP_HOLD) * 100)}%">${k('ホイール長押し')} 飛ばす</span></div>`}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
     el.classList.add('on');
     if (fresh) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
@@ -222,6 +224,15 @@
     if (P.hp < P.stats.maxHp * 0.35) { P.hp = P.stats.maxHp * 0.7; G.ui.toastSmall('📘 チュートリアル中なのでHPを回復しました'); }
     for (const k2 in P.st) if (P.st[k2] > 4) P.st[k2] = 4;
     if (I.pressed.Backspace) { delete I.pressed.Backspace; return next(true); }
+    if (!s.info) {
+      // the hold has to begin on this step: a wheel still down from the page before does not count
+      if (I.mpressed[1]) st.holdT = 1e-4;
+      st.tap = false;
+      if (st.holdT) {
+        if (I.mouse[1]) { st.holdT += dt; if (st.holdT >= SKIP_HOLD) return next(true); }
+        else { st.tap = true; st.holdT = 0; }
+      }
+    }
     if (s.info) { if (nextHit()) { nextEat(); next(false); return; } render(); return; }
     let p = 0;
     try { p = s.check(st, dt); } catch (e) { console.error(e); p = 1; }

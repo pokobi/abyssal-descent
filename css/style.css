@@ -1555,3 +1555,5 @@ body.inv-open #tut .tut-tip { display: none; }
 #iv-dropring { position: fixed; width: 58px; height: 58px; margin: -29px 0 0 -29px; z-index: 9999; pointer-events: none; display: flex; align-items: center; justify-content: center; }
 #iv-dropring i { position: absolute; inset: 0; border-radius: 50%; --p: 0; background: conic-gradient(#ff5a40 calc(var(--p) * 1turn), rgba(255,255,255,0.16) 0); -webkit-mask: radial-gradient(farthest-side, transparent 68%, #000 71%); mask: radial-gradient(farthest-side, transparent 68%, #000 71%); }
 #iv-dropring span { font-size: 18px; filter: drop-shadow(0 0 3px #000); }
+/* the skip hint fills while the wheel is held */
+#tut .tut-skip { --p: 0%; padding: 1px 4px; border-radius: 4px; background: linear-gradient(90deg, rgba(255,224,140,0.45) var(--p), transparent var(--p)); }

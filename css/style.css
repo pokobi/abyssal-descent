@@ -1557,3 +1557,6 @@ body.inv-open #tut .tut-tip { display: none; }
 #iv-dropring span { font-size: 18px; filter: drop-shadow(0 0 3px #000); }
 /* the skip hint fills while the wheel is held */
 #tut .tut-skip { --p: 0%; padding: 1px 4px; border-radius: 4px; background: linear-gradient(90deg, rgba(255,224,140,0.45) var(--p), transparent var(--p)); }
+/* the guard can only be raised above this line */
+#guard-gauge u { position: absolute; left: -4px; right: -4px; bottom: 25%; height: 2px; background: rgba(255,60,40,0.75); z-index: 1; text-decoration: none; }
+#guard-gauge.low i { background: linear-gradient(0deg, #8a2a1c, #e0705a); }

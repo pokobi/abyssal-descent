@@ -30,10 +30,11 @@
 
   // ---------------- guard (hold reload with a melee weapon) ----------------
   // While held: walk only, no attacks. Hits from in front (within the weapon's arc) lose part of their damage; what was cut drains the gauge.
-  // An empty gauge cuts nothing (the guard stays up). After a short rest the gauge refills by itself.
-  const gd = { on: false, k: 0, g: 1, rest: 9, lastT: 0, flash: 0, kick: 0 };
+  // An empty gauge drops the guard (no stun). A guard can only be raised with at least GUARD_MIN of the gauge; one already up holds below that until it runs out.
+  // After a drop or a refused start the key has to be let go and pressed again. After a short rest the gauge refills by itself.
+  const gd = { on: false, lock: false, k: 0, g: 1, rest: 9, lastT: 0, flash: 0, kick: 0 };
   W.gd = gd;
-  const GUARD_REST = 1.6, GUARD_REGEN = 0.09; // seconds without a blocked hit before it refills; share of the gauge per second (the same for every weapon)
+  const GUARD_MIN = 0.25, GUARD_REST = 1.6, GUARD_REGEN = 0.09; // seconds without a blocked hit before it refills; share of the gauge per second (the same for every weapon)
   W.guarding = () => !!(gd.on && P && P.meleeMode);
   function guardTick(dt, blocked) {
     const g = P.melee.def.guard;
@@ -41,7 +42,10 @@
     const el = Math.min(5, Math.max(0, G.game.time - (gd.lastT || G.game.time))); gd.lastT = G.game.time;
     gd.rest += el;
     if (gd.rest > GUARD_REST && gd.g < 1) gd.g = Math.min(1, gd.g + el * GUARD_REGEN);
-    const want = !!g && I.down('reload') && !blocked && ms.ph === 'idle' && !P.dead;
+    if (!I.down('reload')) gd.lock = false;
+    const held = !!g && I.down('reload') && !blocked && ms.ph === 'idle' && !P.dead;
+    if (held && !gd.on && !gd.lock && gd.g < GUARD_MIN) { gd.lock = true; gd.flash = 1; G.sfx.ui('deny'); }
+    const want = held && !gd.lock;
     if (want && !gd.on) G.sfx.mech('boltBack', 0, 0.5);
     gd.on = want;
     gd.k = U.damp(gd.k, gd.on ? 1 : 0, 16, dt);
@@ -59,7 +63,6 @@
     if (d < 0.35) return dmg; // something on top of you (a puddle, a field) has no front
     const f = P.forward(); const fl = Math.hypot(f.x, f.z) || 1;
     if ((dx * f.x + dz * f.z) / (d * fl) < Math.cos(g[2] * Math.PI / 180)) return dmg;
-    if (gd.g <= 0) { gd.flash = Math.max(gd.flash, 0.3); G.sfx.ui('deny'); return dmg; }
     const pool = g[1], cut = Math.min(dmg * g[0], gd.g * pool);
     gd.g = Math.max(0, gd.g - cut / pool); gd.rest = 0; gd.flash = 1; gd.kick = 1;
     const fw = P.forward();
@@ -67,17 +70,18 @@
     G.fx.sparks(at, fw.clone().negate(), 10, 0xffe0a0, 6);
     G.sfx.impact(at, 'metal'); G.sfx.mech('boltFwd', 0, 0.6);
     P.addShake(0.12);
-    if (gd.g <= 0) { G.ui.toastSmall('🛡️ 防御の耐久が尽きた'); if (G.sfx.shieldBreak) G.sfx.shieldBreak(at); }
+    if (gd.g <= 0) { gd.on = false; gd.lock = true; G.ui.toastSmall('🛡️ 防御の耐久が尽きた'); if (G.sfx.shieldBreak) G.sfx.shieldBreak(at); }
     return dmg - cut;
   };
   let gEl = null;
   function guardUI() {
     const g = P.melee && P.melee.def.guard;
-    if (!gEl) { gEl = document.createElement('div'); gEl.id = 'guard-gauge'; gEl.innerHTML = '<i></i><span>🛡️</span>'; G.ui.el.hud.appendChild(gEl); }
+    if (!gEl) { gEl = document.createElement('div'); gEl.id = 'guard-gauge'; gEl.innerHTML = '<i></i><u></u><span>🛡️</span>'; G.ui.el.hud.appendChild(gEl); }
     const show = !!g && P.meleeMode && (gd.on || gd.g < 0.999);
     gEl.classList.toggle('on', show);
     gEl.classList.toggle('active', gd.on);
     gEl.classList.toggle('empty', gd.g <= 0);
+    gEl.classList.toggle('low', gd.g < GUARD_MIN);
     gEl.classList.toggle('hit', gd.flash > 0.5);
     gEl.firstChild.style.height = (gd.g * 100).toFixed(1) + '%';
   }

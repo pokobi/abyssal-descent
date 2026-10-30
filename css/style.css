@@ -1593,3 +1593,15 @@ html.m *::-webkit-scrollbar { width: 6px; height: 6px; }
 .cx-sort + input { margin-left: 0; }
 /* inside the inventory / status / alchemy screens icons carry no drop-shadow filter (one filter layer per icon is costly with dozens of tiles) */
 #inv-ui .gx svg, #status-overlay .gx svg, .alch-panel .gx svg { filter: none; }
+/* text colours shared by the cards and hover texts: numbers in gold, an item's extra effects in gold, enchantments in purple (as in the inventory's hover card) */
+.cd-n { color: #ffd27a; font-weight: 800; }
+.cd-line { display: block; margin: 3px 0; line-height: 1.5; }
+.cd-fx { color: #ffd890; }
+.cd-en { color: #c9a0ff; }
+.cd-dim { color: #a99d88; font-size: 0.92em; }
+.cd-good { color: #6ee06a; font-weight: 800; }
+.card .c-desc .cd-line:first-child { margin-top: 0; }
+.card .c-desc.curse { color: #ffb3a6; }
+.card .c-desc.curse .cd-n { color: #ffd0c4; }
+.cost-line .cd-n, .reward-line .cd-n { color: #fff; }
+.alch-item .ai-sub .cd-fx, .alch-item .ai-sub .cd-en { font-weight: 700; }

@@ -23,10 +23,25 @@ window.G = window.G || {};
     for (const a of arr) { r -= Math.max(0, wf(a)); if (r <= 0) return a; }
     return arr[arr.length - 1];
   };
-  // a description with a 【代償】 (cost) and 【報酬】 (reward) part: each on its own line, the cost in a red warning tag, the reward in a green one
-  U.descHTML = (s) => U.esc(s || '').split(String.fromCharCode(10)).map((l) => l
-    .replace(/^【代償】(.*)$/, '<span class="cost-line"><b class="cost-tag">⚠ 代償</b>$1</span>')
-    .replace(/^【報酬】(.*)$/, '<span class="reward-line"><b class="reward-tag">✦ 報酬</b>$1</span>')).join('<br>');
+  // a description for cards and hover texts: the numbers are picked out (bold gold), every sentence and every effect of a list (A+10%・B-5%) goes
+  // on its own line, and a 【代償】 (cost) / 【報酬】 (reward) line gets a red / green tag
+  const NL = String.fromCharCode(10);
+  const NUM = /([+\-−＋]?\d+(?:\.\d+)?(?:%|％|秒|m|体|個|本|倍|回|発|枚|エリア)?)/g;
+  U.descHTML = (s) => {
+    const lines = [];
+    for (const raw of U.esc(s || '').split(NL)) {
+      const m = /^【(代償|報酬)】(.*)$/.exec(raw), kind = m && m[1], body = m ? m[2] : raw;
+      // sentences, then effects of a list when both neighbours carry a number
+      const parts = body.replace(/。(?=.)/g, '。' + NL).split(NL).flatMap((t) => { const seg = t.split('・'); const out = [seg[0]]; for (let k = 1; k < seg.length; k++) { if (/\d/.test(out[out.length - 1]) && /\d/.test(seg[k])) out.push(seg[k]); else out[out.length - 1] += '・' + seg[k]; } return out; });
+      parts.forEach((t, k) => {
+        const h = t.replace(NUM, '<b class="cd-n">$1</b>');
+        if (kind === '代償') lines.push(`<span class="cost-line">${k === 0 ? '<b class="cost-tag">⚠ 代償</b>' : ''}${h}</span>`);
+        else if (kind === '報酬') lines.push(`<span class="reward-line">${k === 0 ? '<b class="reward-tag">✦ 報酬</b>' : ''}${h}</span>`);
+        else lines.push(h);
+      });
+    }
+    return lines.join('<br>');
+  };
   U.esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   class RNG {

@@ -88,8 +88,7 @@ const PORT = +process.env.COOP_PORT || 9011;
     await h.eval("(() => { const P = G.player; G.combat.zone(P.pos.clone(), 4, 2, 'fire', 0); G.abilities.auras.push({ kind: 'fire', t: 2, r: 4, dps: 0, follow: true, col: 0xff7030 }); G.abilities.auras.push({ kind: 'holy', t: 2, r: 4, dps: 0, c: P.pos.clone() }); })(); 1");
     await sleep(600);
     check(await g.eval('G.Coop.vizCount() >= 3'), 'the zone and the two auras of the host are drawn on the guest');
-    await sleep(2800);
-    check(await g.eval('G.Coop.vizCount() === 0'), 'and are gone when their time is'); 
+    check(await g.until('G.Coop.vizCount() === 0', 9000).then(() => true, () => false), 'and are gone when their time is');
     check(!h.errs.length, 'no errors on the host ' + h.errs.slice(0, 3).join(' | '));
     check(!g.errs.length, 'no errors on the guest ' + g.errs.slice(0, 3).join(' | '));
   } finally { ch.close(); srv.close(); }

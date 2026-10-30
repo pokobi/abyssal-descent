@@ -239,7 +239,9 @@
       const O = GM.objective; if (!O) return;
       if (GM.bossEngaged) return;
       O.text = () => m.x; O.sub = m.s ? () => m.s : null; if (m.ic) O.icon = m.ic;
-      O.segs = null; if (m.p !== null && m.p !== undefined) O.progress = () => m.p;
+      O.segs = m.sg ? () => m.sg : null; if (m.p !== null && m.p !== undefined) O.progress = () => m.p;
+      // the ritual circles fill as the host sees them
+      if (m.al && O.altars) m.al.forEach(([p, done], i) => { const a = O.altars[i]; if (!a) return; a.p = p; if (a.fill) a.fill.scale.setScalar(Math.max(0.01, p)); if (done && !a.done) GM.altarDone(a); });
     };
     // a fight that drags on grows frantic for everyone (the host keeps the clock)
     K.handlers.en = function (m) { const E0 = GM.enrage; if (m.lv > E0.lv) G.ui.toast(`🔥 戦いが長引いている — 敵が激化した（激化 Lv${m.lv}）`, 'warn'); E0.lv = m.lv; E0.dmg = m.d; E0.tm = m.tm; };
@@ -258,6 +260,7 @@
       const b = K.seeded(m.seed, () => bs.call(BS, m.id, m.level, G.world));
       b.maxHp = m.mx; b.hp = m.hp;
       b.parts.forEach((p, i) => { p._nid = -(i + 1); });
+      b.phaseText = () => b._ph || '';
       K.bossNodes = K.nodesOf(b);
       K._pose = K.bossNodes.map(() => null);
       if (K.bossNodes.length !== m.n) console.error('coop: guardian differs from the host', K.bossNodes.length, m.n);
@@ -312,6 +315,7 @@
     K.onNet = function () {
       if (hits.length) { K.send({ t: 'hit', h: hits }); hits = []; }
       K.flushStatus();
+      { const O = GM.objective; if (O && O.altars && !GM.areaCleared) GM.ritualMarkers(O); }
       if (!GM.run || !G.world) return;
       if (GM.bossEngaged && !K._engaged) { K._engaged = true; K.send({ t: 'engage' }); }
       for (const e of E.list) if (e._stray) { e._stray = false; e.alive = false; e.remove(); e.removed = true; }

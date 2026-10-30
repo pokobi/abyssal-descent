@@ -13,7 +13,7 @@
   K.installFx = function () {
     const C = G.combat, FX = G.fx, A = G.abilities, P = G.player, GM = G.game;
     K.own = 0;
-    const own = () => K.live && !K._fxNet && (K.own > 0 || !!C.curSk);
+    const own = () => K.live && !K._fxNet && !K._noMirror && (K.own > 0 || !!C.curSk);
     const withOwn = (fn) => function () { K.own++; try { return fn.apply(this, arguments); } finally { K.own--; } };
     const enc = (v) => {
       if (v && v.isVector3) return { $v: [r2(v.x), r2(v.y), r2(v.z)] };
@@ -26,12 +26,32 @@
     const push = (m) => { if (q.length < 60) q.push(m); };
 
     // ---------------- effects ----------------
-    for (const fn of ['explosion', 'ring', 'flash', 'beam', 'lightning', 'bubble', 'smoke', 'fireBurst']) {
+    for (const fn of ['explosion', 'ring', 'flash', 'beam', 'lightning', 'bubble', 'smoke', 'fireBurst', 'dust', 'sparks']) {
       const f = FX[fn];
       FX[fn] = function () {
         if (own()) push(['f', fn, Array.prototype.map.call(arguments, enc)]);
         return f.apply(FX, arguments);
       };
+    }
+    // sounds go the same way, a few at a time: skills, the guardian's attacks, and on the host the foes' growls and swings (the guests' foes are puppets and make none)
+    let sndN = 0;
+    for (const fn of ['monster', 'magic', 'whoosh', 'attackWind', 'rumble', 'mech', 'shieldBreak', 'thunder', 'bell', 'chain', 'zap', 'fire', 'stoneGrind', 'swing', 'impact', 'spit', 'ice']) {
+      const f = G.sfx[fn]; if (!f) continue;
+      G.sfx[fn] = function () {
+        if ((own() || (K.ownS > 0 && !K._fxNet)) && sndN < 10) { sndN++; push(['s', fn, Array.prototype.map.call(arguments, enc)]); }
+        return f.apply(G.sfx, arguments);
+      };
+    }
+    // what the guardian does happens only on the host: its effects are sent, as for a skill (its fall and the last guardian's change of form run on every machine)
+    const bu = G.bosses.update;
+    G.bosses.update = function (dt) {
+      const b = G.bosses.active;
+      if (!(K.role === 'host' && K.live && b && !b.dead && b.state !== 'transform')) return bu.call(G.bosses, dt);
+      K.own++; try { return bu.call(G.bosses, dt); } finally { K.own--; }
+    };
+    if (K.role === 'host') {
+      const Ep = G.enemies.Enemy.prototype, up = Ep.update;
+      Ep.update = function (dt) { K.ownS = (K.ownS || 0) + 1; try { return up.call(this, dt); } finally { K.ownS--; } };
     }
     // ---------------- throwables and skills: the scopes that are not skills ----------------
     A.releaseGrenade = withOwn(A.releaseGrenade);
@@ -62,7 +82,9 @@
     const ex = C.explode;
     C.explode = function (pos, r, dmg, info) {
       if (info && info.remoteViz) return; // a picture of someone else's shot: the real blast is theirs
-      if (!K.live || (info && info.enemy)) return ex.call(C, pos, r, dmg, info);
+      if (!K.live) return ex.call(C, pos, r, dmg, info);
+      // (a foe's blast is sent on its own: not twice)
+      if (info && info.enemy) { K._noMirror = (K._noMirror || 0) + 1; try { return ex.call(C, pos, r, dmg, info); } finally { K._noMirror--; } }
       K.own++;
       try {
         if (info && info.grenade && !info.isCluster && !info.noSelf) push(['x', { p: K.vec(pos), r: r2(r * (1 + P.stats.explosionRadius)), d: r2(dmg), who: K.id }]);
@@ -189,6 +211,7 @@
       if (base) base(dt);
       if (!K.live) return;
       sendT -= dt;
+      sndN = 0;
       scanAuras();
       // time slowed or stopped by a guest's ultimate must slow the real foes: the host is told
       if (K.role === 'guest' && GM.chronoT > 0 && !(K._chT > 0)) K.send({ t: 'cr', d: r2(GM.chronoT), s: GM.chronoSlow });
@@ -218,6 +241,7 @@
       for (const [kind, a, b] of m.e) {
         try {
           if (kind === 'f') { K._fxNet = true; try { FX[a](...b.map(dec)); } finally { K._fxNet = false; } if (a === 'explosion' && b[0] && b[0].$v) G.sfx.explosion(V(...b[0].$v), (b[1] || 4) / 4); }
+          else if (kind === 's') { K._fxNet = true; try { G.sfx[a](...b.map(dec)); } finally { K._fxNet = false; } }
           else if (kind === 'p') putProjectile(a);
           else if (kind === 'x') friendly(a);
           else if (kind === 'al') putAlly(a);

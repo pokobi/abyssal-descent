@@ -316,12 +316,13 @@
     };
     function sendObjective() {
       const O = GM.objective; if (!O) return;
-      let text = '', sub = '', prog = null;
-      try { text = O.text ? O.text() : ''; sub = !O.done && O.sub ? O.sub() : ''; prog = O.segs ? null : O.progress ? O.progress() : null; } catch (e) { return; }
-      const key = text + '|' + sub + '|' + (prog === null ? '' : Math.round(prog * 50));
+      let text = '', sub = '', prog = null, segs = null;
+      try { text = O.text ? O.text() : ''; sub = !O.done && O.sub ? O.sub() : ''; segs = O.segs ? O.segs().map((x) => ({ w: x.w, k: r2(x.k), cur: x.cur ? 1 : 0, ticks: x.ticks || 0 })) : null; prog = O.segs ? null : O.progress ? O.progress() : null; } catch (e) { return; }
+      const al = O.altars ? O.altars.map((a) => [r2(a.p), a.done ? 1 : 0]) : null;
+      const key = text + '|' + sub + '|' + (prog === null ? '' : Math.round(prog * 50)) + JSON.stringify(segs) + JSON.stringify(al);
       if (key === K._objKey) return;
       K._objKey = key;
-      K.send({ t: 'o', x: text, s: sub, p: prog, ic: O.icon });
+      K.send({ t: 'o', x: text, s: sub, p: prog, ic: O.icon, sg: segs, al });
     }
     // a guest standing in a ritual circle chants too
     function helpAltars(dt) {

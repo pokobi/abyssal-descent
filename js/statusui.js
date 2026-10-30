@@ -163,6 +163,7 @@
     ['生存', ['maxHp', 'defense', 'armor', 'dodge', 'hpRegen', 'lifesteal']],
     ['機動・その他', ['moveSpeed', 'weight', 'maxJumps', 'grappleRange', 'cdr', 'coinMul', 'luck']],
   ];
+  const LOWER_STATS = new Set(['weight']);
   function statRow(k) {
     const st = P.stats, B = G.PLAYER_BASE, def = G.STAT_NAMES[k]; if (!def) return '';
     const [ic, nm, t] = def, v = st[k] ?? 0, b = B[k] ?? 0;
@@ -172,7 +173,9 @@
     else if (t === 'x') txt = '×' + v.toFixed(2);
     else txt = String(Math.round(v * 10) / 10);
     const diff = Math.abs(v - b) > 1e-6;
-    return `<div class="sg"><span>${ic} ${nm}</span><b class="sv ${diff ? (v > b ? 'up' : 'dn') : ''}">${txt}</b></div>`;
+    // more of a stat is a gain, except the ones where less is better (the weight of the armour)
+    const gain = LOWER_STATS.has(k) ? v < b : v > b;
+    return `<div class="sg"><span>${ic} ${nm}</span><b class="sv ${diff ? (gain ? 'up' : 'dn') : ''}">${txt}</b></div>`;
   }
   const statsBody = () => GROUPS.map(([title, keys]) => `<div class="sgh">${title}</div><div class="sgrid">${keys.map(statRow).join('')}</div>`).join('');
   function perksBody() {

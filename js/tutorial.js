@@ -27,8 +27,18 @@
   const RAR = { common: 'コモン', uncommon: 'アンコモン', rare: 'レア', epic: 'エピック', legendary: 'レジェンダリー' };
   const AT = (id) => G.Areas.TYPES[id];
   const invOpen = () => (G.ui.statusOpen && G.ui.statusOpen()) || (G.InvUI && G.InvUI.isOpen());
-  // a chest right in front of you (on the floor, facing you)
-  const putChest = (tier) => { const f = P.forward().setY(0).normalize(); const p = P.pos.clone().addScaledVector(f, 3); const w = G.world; if (!(w.boxFree(p.x - 0.7, p.y + 0.05, p.z - 0.7, p.x + 0.7, p.y + 1, p.z + 0.7))) p.copy(P.pos).add(V(0, 0, -2)); const y = w.floorBelow(p.x, P.pos.y + 1, p.z); const c = G.Props.chest(w, p.x, p.z, y > -50 ? y : P.pos.y, Math.atan2(-f.x, -f.z), tier); w.flushDeferred(); G.fx.ring(p.clone().setY(P.pos.y + 0.1), 1.5, 0xffd070, 0.6); return c; };
+  // a free spot on the floor in front of you, `ang` to one side (turning further round when something stands there)
+  const spotAhead = (ang, d) => {
+    const f = P.forward().setY(0).normalize(), w = G.world;
+    for (let k = 0; k < 8; k++) {
+      const p = P.pos.clone().addScaledVector(f.clone().applyAxisAngle(V(0, 1, 0), ang + k * Math.sign(ang) * Math.PI / 4), d);
+      if (w.boxFree(p.x - 0.7, p.y + 0.05, p.z - 0.7, p.x + 0.7, p.y + 1, p.z + 0.7)) { const y = w.floorBelow(p.x, P.pos.y + 1, p.z); p.y = y > -50 ? y : P.pos.y; return p; }
+    }
+    return null;
+  };
+  const putChest = (tier, ang) => { const f = P.forward().setY(0).normalize(), w = G.world, p = spotAhead(ang, 3) || P.pos.clone().add(V(0, 0, -2)); const c = G.Props.chest(w, p.x, p.z, p.y, Math.atan2(-f.x, -f.z), tier); w.flushDeferred(); G.fx.ring(p.clone().setY(p.y + 0.1), 1.5, 0xffd070, 0.6); return c; };
+  // a body lying right there, with something on it
+  const putCorpse = (ang) => { const p = spotAhead(ang, 3); if (!p) return; const e = GM.spawnEnemy({ at: p, def: G.ENEMY_BY_ID.skeleton_normal, noMut: true }); if (e) { e.noReward = false; e.hp = 0; G.combat.killEnemy(e, { src: 'bullet' }, 0); } };
   const top = (id, n) => { const h = P.itemCount(id); if (h < n) P.addItem(id, n - h); };
 
   // ---------------------------------------------------------------- steps
@@ -71,14 +81,15 @@
 
     { ch: 3, title: '漁る（亡骸・宝箱）',
       body: () => ul(`亡骸や宝箱の前で ${K('interact')}：調べ始める（終わるまで見続ける）`, '中身の画面で<b>「すべて取る」</b>：一度に回収（ドラッグで1つずつも）', '空になった亡骸・宝箱は、暗くなる'),
-      tip: () => '目の前に宝箱を置きました。',
-      goal: (s) => parts([['亡骸を空にする', s.c1], ['宝箱を開ける', s.c2]]),
+      tip: () => '目の前に亡骸と宝箱を置きました。どちらからでも大丈夫です。',
+      goal: (s) => parts([['亡骸を調べる', s.c1], ['宝箱を開ける', s.c2]]),
       setup: (s) => {
-        // the fight leaves bodies; if none is left to search (it fell somewhere), one more foe drops right here
-        if (!G.Inv.corpses.some((c) => !c.searched && c.cont.items.length)) { const e = GM.spawnEnemy({ near: true, noMut: true }); if (e) { e.noReward = false; e.hp = 0; G.combat.killEnemy(e, { src: 'bullet' }, 0); } }
-        s.chest = putChest(0);
+        // the fight may have ended far away: a body and a chest are put side by side in front of you, and whichever you open first is fine
+        s.bodies0 = new Set(G.Inv.corpses.filter((c) => c.searched));
+        s.chests0 = new Set(G.world.interactables.filter((i) => i.type === 'chest' && i.opened));
+        putCorpse(-0.5); putChest(0, 0.5);
       },
-      check: (s) => { if (G.Inv.corpses.some((c) => c.searched && !c.cont.items.length)) s.c1 = true; if (s.chest && s.chest.opened) s.c2 = true; return (s.c1 ? 0.5 : 0) + (s.c2 ? 0.5 : 0); } },
+      check: (s) => { if (G.Inv.corpses.some((c) => c.searched && !s.bodies0.has(c))) s.c1 = true; if (G.world.interactables.some((i) => i.type === 'chest' && i.opened && !s.chests0.has(i))) s.c2 = true; return (s.c1 ? 0.5 : 0) + (s.c2 ? 0.5 : 0); } },
     { ch: 3, title: '消耗品・投擲物',
       body: () => ul(`${K('item1')} ${K('item2')}：消耗品を使う（<b>長押し</b>で種類を選ぶ）`, `${K('grenade')}：投擲物を構える → ${k('左クリック')} 投げる／${k('右クリック')} 転がす`, `投擲物の種類は ${K('grenade')} 長押し、または ${K('cycleGrenade')}`),
       tip: () => '回復薬と手榴弾を渡しました。所持数は画面下中央。',
@@ -201,11 +212,12 @@
   function render(fresh) {
     const s = STEPS[idx];
     const goal = typeof s.goal === 'function' ? s.goal(st) : s.goal;
+    const wait = !s.info && st.prog >= 1 && invOpen() ? '<span class="tut-wait">閉じると次へ進みます</span>' : '';
     const pct = Math.round((st.prog || 0) * 100);
     const html = `<div class="tut-h"><span>${CH[s.ch]}</span><b>${idx + 1} / ${STEPS.length}</b></div>
       <div class="tut-t">${s.title}</div><div class="tut-b">${s.body()}</div>${s.vis ? s.vis(st) : ''}${s.tip ? `<div class="tut-tip">💡 ${s.tip()}</div>` : ''}
       ${s.info ? `<div class="tut-foot"><span>${NEXT()} ${s.finish ? '本編へ' : '次へ'}</span></div>`
-        : `<div class="tut-goal">${goal}</div><div class="tut-bar"><div style="width:${pct}%"></div></div><div class="tut-foot"><span>やってみよう</span><span class="tut-skip" style="--p:${Math.round(Math.min(1, (st.holdT || 0) / SKIP_HOLD) * 100)}%">${k('ホイール長押し')} 飛ばす</span></div>`}`;
+        : `<div class="tut-goal">${goal}${wait}</div><div class="tut-bar"><div style="width:${pct}%"></div></div><div class="tut-foot"><span>やってみよう</span><span class="tut-skip" style="--p:${Math.round(Math.min(1, (st.holdT || 0) / SKIP_HOLD) * 100)}%">${k('ホイール長押し')} 飛ばす</span></div>`}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
     el.classList.add('on');
     if (fresh) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
@@ -238,7 +250,7 @@
     try { p = s.check(st, dt); } catch (e) { console.error(e); p = 1; }
     st.prog = p === true ? 1 : U.clamp(+p || 0, 0, 1);
     render();
-    if (st.prog >= 1 && !st.doneT) { st.doneT = G.game.time; el.classList.add('done'); }
+    if (st.prog >= 1 && !st.doneT && !invOpen()) { st.doneT = G.game.time; el.classList.add('done'); }
     if (st.doneT && G.game.time - st.doneT > 0.8) { el.classList.remove('done'); next(false); }
   };
 })();

@@ -598,8 +598,8 @@
     let sel = keepState && keepState.selUids ? keepState.selUids.map((u) => items.find((x) => x.uid === u)).filter(Boolean) : [];
     const dots = Array.from({ length: ALCH_MAX }, (_, i) => `<i class="alch-dot ${i < left ? 'on' : 'off'}"></i>`).join('');
     const s = G.ui.screen(`<div class="panel alch-panel">
-      <div class="alch-head">
-        <h2>⚗️ 練成所</h2><span>同じ種類・同じレアリティの素材を2つ掛け合わせ、<b>1段階上のレアリティ</b>の品を練成する</span>
+      <div class="alch-ph">
+        <b>⚗️ 練成所</b><span>同じ種類・同じレアリティの素材を2つ掛け合わせ、<b>1段階上のレアリティ</b>の品を練成する</span>
         <div class="alch-uses"><span>釜の魔力</span><div class="alch-dots">${dots}</div><b>残り ${left} / ${ALCH_MAX}回</b></div>
       </div>
       <div class="pw-tabs alch-tabs"></div>
@@ -722,11 +722,12 @@
         return `<button class="alch-item" data-uid="${x.uid}" style="--rc:${rc}">
           <span class="ai-num" style="display:none"></span>
           ${x.badge ? `<span class="ai-badge">${x.badge}</span>` : ''}
-          <div class="ai-ic">${x.icon}</div>
-          <div class="ai-nm">${U.esc(x.name)}</div>
-          <div class="ai-rar" style="color:${rc}">${G.RARITY[x.rarity].name} · ${ALCH_CATS[x.cat].short}</div>
-          <div class="ai-sub">${U.esc(x.sub)}</div>
-          ${dur}
+          <div class="ai-ic">${x.icon}${dur}</div>
+          <div class="ai-tx">
+            <div class="ai-nm">${U.esc(x.name)}</div>
+            <div class="ai-rar" style="color:${rc}">${G.RARITY[x.rarity].name} · ${ALCH_CATS[x.cat].short}</div>
+            <div class="ai-sub">${U.esc(x.sub)}</div>
+          </div>
         </button>`;
       }).join('') : `<div class="alch-empty">練成できる持ち物がない</div>`;
       gridEl.querySelectorAll('.alch-item').forEach((b) => {

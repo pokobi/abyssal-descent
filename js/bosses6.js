@@ -946,14 +946,16 @@
       }
       for (const h of this.holes.slice()) {
         if (!busy) h.t += dt;
-        const k = Math.min(1, h.t / 0.8); h.g.scale.setScalar(0.01 + k); h.ring.rotation.z += dt * 3;
+        const k = Math.min(1, h.t / 0.8), out = h.t > h.dur - 0.35 ? Math.max(0.01, (h.dur - h.t) / 0.35) : 1;
+        h.g.scale.setScalar((0.01 + k) * out);
+        this.tickHoleLook(h, dt, k);
         const pulling = !busy && h.t > 0.6 && h.t < h.dur;
         // streams of light spiralling in from all round it, along the floor
         if (pulling) for (let i = 0; i < 3; i++) if (Math.random() < dt * 40) { const an = Math.random() * 6.28, r = U.rand(6, 24), sp = r * 1.1; G.fx.add.spawn(h.c.x + Math.cos(an) * r, Y2 + U.rand(0.2, 2.5), h.c.z + Math.sin(an) * r, -Math.cos(an + 0.35) * sp, 0, -Math.sin(an + 0.35) * sp, 0.9, 0.18, 0.03, 0.75, 0.45, 1.25, 0.9, 0, 0); }
         // rings on the floor closing in on it
         h.ringT -= dt;
-        if (pulling && h.ringT <= 0) { h.ringT = 0.45; const m = new THREE.Mesh(new THREE.RingGeometry(0.96, 1, 64), addM(0xc898ff, 0.5)); m.rotation.x = -Math.PI / 2; m.position.set(h.c.x, Y2 + 0.06, h.c.z); G.scene.add(m); h.rings.push({ m, r: 14 }); }
-        for (const rg of h.rings.slice()) { rg.r -= dt * 16; rg.m.scale.setScalar(Math.max(0.3, rg.r)); rg.m.material.opacity = 0.5 * Math.min(1, rg.r / 4); if (rg.r <= 0.4) { G.scene.remove(rg.m); rg.m.geometry.dispose(); rg.m.material.dispose(); h.rings.splice(h.rings.indexOf(rg), 1); } }
+        if (pulling && h.ringT <= 0) { h.ringT = 0.45; const m = new THREE.Mesh(new THREE.RingGeometry(0.96, 1, 64), addM(0xc898ff, 0.3)); m.rotation.x = -Math.PI / 2; m.position.set(h.c.x, Y2 + 0.06, h.c.z); G.scene.add(m); h.rings.push({ m, r: 14 }); }
+        for (const rg of h.rings.slice()) { rg.r -= dt * 16; rg.m.scale.setScalar(Math.max(0.3, rg.r)); rg.m.material.opacity = 0.3 * Math.min(1, rg.r / 4); if (rg.r <= 0.4) { G.scene.remove(rg.m); rg.m.geometry.dispose(); rg.m.material.dispose(); h.rings.splice(h.rings.indexOf(rg), 1); } }
         // at your feet: arrows towards it, and the air around you streaming its way
         { const to = h.c.clone().sub(P.pos).setY(0), l = to.length(), on = pulling && l > 1 && l < 40 && !P.dead;
           h.arrows.visible = on;
@@ -977,6 +979,29 @@
         }
       }
     }
+    tickHoleLook(h, dt, k) {
+      const t = (h.look = (h.look || 0) + dt);
+      h.disk.material.uniforms.uT.value = t; h.disk.material.uniforms.uA.value = k;
+      h.lens.quaternion.copy(G.camera.quaternion); h.lens.material.uniforms.uT.value = t; h.lens.material.uniforms.uA.value = k;
+      { const toCam = G.camera.position.clone().sub(h.c).normalize(), n = V(0, 0.55, 0).addScaledVector(toCam, 0.85).normalize(); h.tilt.quaternion.slerp(new THREE.Quaternion().setFromUnitVectors(Y, n), h.look < 0.05 ? 1 : Math.min(1, dt * 3)); }
+      const pa = h.pts.geometry.attributes.position, ca = h.pts.geometry.attributes.color;
+      h.mote.forEach((m, i) => {
+        // falls faster and turns faster the closer it gets; swallowed at the horizon and fed in again at the rim
+        m.r -= dt * (0.8 + 9 / m.r); m.a += dt * (1.2 + 14 / (m.r * m.r + 1));
+        if (m.r < BH.rIn * 0.9) { m.r = BH.rOut + U.rand(0, 4); m.a = Math.random() * 6.28; m.y = U.rand(-0.35, 0.35); }
+        const yy = m.y * Math.min(1, (m.r - BH.rIn) / 3);
+        pa.setXYZ(i, Math.cos(m.a) * m.r, yy, Math.sin(m.a) * m.r);
+        const b = Math.min(1.4, 0.15 + 3.2 / m.r);
+        ca.setXYZ(i, 0.75 * b, 0.45 * b, 1.1 * b);
+      });
+      pa.needsUpdate = true; ca.needsUpdate = true;
+      for (const q of h.rocks) {
+        q.r -= dt * (0.5 + 5 / q.r); q.a += dt * (0.8 + 9 / (q.r * q.r + 1));
+        if (q.r < BH.rIn) { q.r = BH.rOut + U.rand(0, 3); q.a = Math.random() * 6.28; }
+        q.m.position.set(Math.cos(q.a) * q.r, q.y * Math.min(1, q.r / 4), Math.sin(q.a) * q.r);
+        q.m.scale.setScalar(q.s * Math.min(1, (q.r - BH.rIn) / 2.5 + 0.2)); q.m.rotation.x += dt * 3; q.m.rotation.y += dt * 2;
+      }
+    }
     dropHole(h) {
       dropG(h.g); dropG(h.arrows);
       for (const rg of h.rings) { G.scene.remove(rg.m); rg.m.geometry.dispose(); rg.m.material.dispose(); }
@@ -986,16 +1011,25 @@
       const S = this.stg, an = Math.random() * Math.PI * 2, on = Math.random() < 0.6, r = on ? U.rand(5, PR - 5) : PR + 4;
       const c = V(S.c.x + Math.cos(an) * r, Y2 + 2.6, S.c.z + Math.sin(an) * r);
       const g = new THREE.Group(); g.position.copy(c);
-      mesh(g, PG().sph, new THREE.MeshBasicMaterial({ color: 0x000000 }), 1.0, 1.0, 1.0);
-      const ring = mesh(g, PG().torus, new THREE.MeshBasicMaterial({ color: VIO, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }), 1.8, 1.8, 2.5, 0, 0, 0, 1.3);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xd080ff, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(6, 6, 1); g.add(sp);
+      mesh(g, PG().sph, new THREE.MeshBasicMaterial({ color: 0x000000 }), 0.9, 0.9, 0.9);
+      // the disk lies a little tilted; everything that falls in moves in its plane
+      const tilt = new THREE.Group(); g.add(tilt); // (turned every frame to show you the disk at about three quarters: see tickHoleLook)
+      const disk = new THREE.Mesh(new THREE.RingGeometry(BH.rIn, BH.rOut, 96, 4), bhDiskMat()); disk.rotation.x = -Math.PI / 2; tilt.add(disk);
+      const lens = new THREE.Mesh(PL, bhLensMat()); lens.scale.set(BH.lens * 2, BH.lens * 2, 1); g.add(lens);
+      // matter spiralling in: a cloud of glowing motes and a handful of rocks
+      const N = 170, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), mote = [];
+      for (let i = 0; i < N; i++) mote.push({ r: U.rand(BH.rIn, BH.rOut + 4), a: Math.random() * 6.28, y: U.rand(-0.35, 0.35) });
+      const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); pg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      const pts = new THREE.Points(pg, new THREE.PointsMaterial({ map: G.Tex.spr.soft, size: 0.7, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      pts.frustumCulled = false; tilt.add(pts);
+      const rocks = [], rockM = this.M.rock.clone(); for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(PG().dode, rockM); m.scale.setScalar(U.rand(0.18, 0.45)); tilt.add(m); rocks.push({ m, r: U.rand(4, BH.rOut + 3), a: Math.random() * 6.28, y: U.rand(-0.6, 0.6), s: m.scale.x }); }
       g.scale.setScalar(0.01); G.scene.add(g);
       // arrows at your feet pointing to it while it pulls (three chevrons), and rings on the floor closing in on it
       const arrows = new THREE.Group(); arrows.visible = false; G.scene.add(arrows);
       const chev = new THREE.Shape(); chev.moveTo(-0.45, 0); chev.lineTo(0, 0.42); chev.lineTo(0.45, 0); chev.lineTo(0.45, 0.16); chev.lineTo(0, 0.58); chev.lineTo(-0.45, 0.16); chev.closePath();
       const cg = new THREE.ShapeGeometry(chev); cg.rotateX(-Math.PI / 2); // points along -z, flat on the floor
       for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(cg, addM(0xe0c0ff, 0.7)); m.position.z = -1.2 - i * 0.7; arrows.add(m); }
-      this.holes.push({ c, g, ring, t: 0, dur: 4.2, arrows, rings: [], ringT: 0 });
+      this.holes.push({ c, g, tilt, disk, lens, pts, mote, rocks, t: 0, dur: 4.2, arrows, rings: [], ringT: 0 });
       G.ui.toastSmall('⚠ 虚無の渦 — 強く引き寄せられる！ 走って逆へ'); if (G.sfx.rumble) G.sfx.rumble(1.4, 1.2);
     }
     rotL(x, y, z) { const c = Math.cos(this.yawB), s = Math.sin(this.yawB); return V(x * c + z * s, y, -x * s + z * c); } // a point in the body's own frame (it only ever turns about y)
@@ -1261,6 +1295,42 @@
     for (const [cx, cy, r, col] of [[400, 380, 420, 'rgba(120,50,200,0.22)'], [1300, 600, 520, 'rgba(60,70,190,0.16)'], [1750, 300, 360, 'rgba(200,60,150,0.14)'], [900, 760, 300, 'rgba(90,40,160,0.18)']]) { const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); }
     for (let i = 0; i < 3200; i++) { const b = Math.random(), r = b > 0.985 ? 1.8 : b > 0.9 ? 1.1 : 0.6; x.fillStyle = `rgba(${220 + Math.random() * 35 | 0},${210 + Math.random() * 45 | 0},255,${0.35 + b * 0.65})`; x.beginPath(); x.arc(Math.random() * w, Math.random() * h, r, 0, Math.PI * 2); x.fill(); }
   }));
+  // the black hole: sizes, the accretion disk (spiral arms winding in, hotter and brighter inwards, dark at the horizon) and the lensing ring
+  const BH = { rIn: 1.1, rOut: 10, lens: 4 };
+  const BH_VS = 'varying vec2 vP; varying vec2 vU; void main() { vP = position.xy; vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  const bhDiskMat = () => new THREE.ShaderMaterial({
+    uniforms: { uT: { value: 0 }, uA: { value: 0 }, uIn: { value: BH.rIn }, uOut: { value: BH.rOut } },
+    vertexShader: BH_VS,
+    fragmentShader: `uniform float uT, uA, uIn, uOut; varying vec2 vP;
+      void main() {
+        float r = length(vP), a = atan(vP.y, vP.x);
+        float k = clamp((uOut - r) / (uOut - uIn), 0.0, 1.0);
+        float sw = a - uT * (1.2 + 2.5 * k);
+        float arms = 0.5 + 0.5 * sin(3.0 * sw + 7.0 * log(r));
+        float fine = 0.5 + 0.5 * sin(13.0 * sw + 23.0 * log(r));
+        float lum = pow(k, 1.1) * (0.3 + 0.7 * arms) * (0.75 + 0.25 * fine); // (the outer arms carry more of the light)
+        float al = 1.3 * lum * smoothstep(uIn, uIn + 0.45, r) * smoothstep(uOut, uOut - 2.5, r) * uA;
+        if (al < 0.01) discard;
+        vec3 c = mix(vec3(0.38, 0.14, 0.8), vec3(0.88, 0.66, 1.0), pow(k, 2.0)); // (violet throughout: the centre does not shout)
+        gl_FragColor = vec4(c * (0.75 + 0.75 * pow(k, 2.0)), al * (1.0 - 0.35 * pow(k, 4.0)));
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
+  });
+  const bhLensMat = () => new THREE.ShaderMaterial({
+    uniforms: { uT: { value: 0 }, uA: { value: 0 }, uR: { value: 1.25 / BH.lens } },
+    vertexShader: BH_VS,
+    fragmentShader: `uniform float uT, uA, uR; varying vec2 vU;
+      void main() {
+        vec2 p = vU * 2.0 - 1.0; float r = length(p);
+        float ring = exp(-pow((r - uR) / 0.03, 2.0));
+        float halo = r > uR ? exp(-(r - uR) * 5.0) * 0.35 : 0.0;
+        float flick = 0.85 + 0.15 * sin(atan(p.y, p.x) * 5.0 + uT * 4.0);
+        float al = (ring * 1.1 + halo) * flick * uA * smoothstep(1.0, 0.8, r);
+        if (al < 0.01) discard;
+        gl_FragColor = vec4(mix(vec3(0.75, 0.5, 1.0), vec3(1.0, 0.95, 1.0), ring), al);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+  });
   // the gravity seal: a rune disc turning faster as it charges, a hexagram disc turning the other way, a rim, a curtain rising round it, six pillars of light
   function gravSeal(parent, c, R) {
     const g = new THREE.Group(); g.position.set(c.x, c.y + 0.07, c.z); parent.add(g);

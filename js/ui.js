@@ -36,10 +36,12 @@
   };
 
   // ---------------- small helpers ----------------
+  // the category of a boon as a label; the trade-off ("代償") and curse categories are marked as warnings so the player notices them
+  UI.catLabel = (cat, suffix) => { const c = G.BUFF_CAT[cat]; if (!c) return ''; const t = `${c.icon} ${c.name}${suffix || ''}`; return cat === 'trade' || cat === 'curse' ? `<b class="cat-warn">${t}</b>` : t; };
   UI.tipFor = function (o, extra) {
     if (!o) return '';
     const rar = G.RARITY[o.rarity];
-    const cat = o.kind === 'buff' ? (G.BUFF_CAT[o.cat] ? G.BUFF_CAT[o.cat].icon + ' ' + G.BUFF_CAT[o.cat].name + '加護' : '加護') : o.kind === 'weapon' ? '🔫 ' + o.cat : o.kind === 'attachment' ? G.ATT_SLOTS[o.slot].icon + ' アタッチメント / ' + G.ATT_SLOTS[o.slot].name : o.kind === 'skill' ? '🔮 スキル（CT ' + o.cd + '秒）' : o.kind === 'item' ? G.ITEM_CAT[o.cat].icon + ' ' + G.ITEM_CAT[o.cat].name : '';
+    const cat = o.kind === 'buff' ? (G.BUFF_CAT[o.cat] ? UI.catLabel(o.cat, '加護') : '加護') : o.kind === 'weapon' ? '🔫 ' + o.cat : o.kind === 'attachment' ? G.ATT_SLOTS[o.slot].icon + ' アタッチメント / ' + G.ATT_SLOTS[o.slot].name : o.kind === 'skill' ? '🔮 スキル（CT ' + o.cd + '秒）' : o.kind === 'item' ? G.ITEM_CAT[o.cat].icon + ' ' + G.ITEM_CAT[o.cat].name : '';
     return `<div class="tt-name">${o.icon || ''} ${U.esc(o.name)}</div><div class="tt-cat">${rar ? rar.name + ' · ' : ''}${cat}</div><div style="margin-top:6px">${U.descHTML(o.desc)}</div>${extra || ''}`;
   };
   UI.tipAttr = (o, extra) => `data-tip="${UI.tipFor(o, extra).replace(/"/g, '&quot;')}" data-rc="${R(o.rarity)}"`;
@@ -873,7 +875,7 @@
     const sideBuffs = [...P.buffs].map(([id, n]) => { const b = G.BUFF_BY_ID[id]; return `<div class="bicon" style="--rc:${R(b.rarity)}" ${UI.tipAttr(b)}>${b.icon}${n > 1 ? `<span class="st">${n}</span>` : ''}</div>`; }).join('');
     const cards = choices.map((b, i) => {
       const n = P.buffs.get(b.id) || 0;
-      return `<div class="card" data-i="${i}" style="--rc:${R(b.rarity)};animation-delay:${i * 0.12}s"><div class="c-rar">${G.RARITY[b.rarity].name}</div><div class="c-icon">${b.icon}</div><div class="c-name">${U.esc(b.name)}</div><div class="c-cat">${G.BUFF_CAT[b.cat].icon} ${G.BUFF_CAT[b.cat].name}${b.skill ? ` · <span class="c-own">${G.SKILL_BY_ID[b.skill].icon} ${G.SKILL_BY_ID[b.skill].name}専用</span>` : b.cat === 'pile' ? ' · <span class="c-own">🔨 パイルドライバー専用</span>' : ''}</div><div class="c-desc${b.cat === 'curse' ? ' curse' : ''}">${U.descHTML(b.desc)}</div><div class="c-stack">${n ? `所持 ${n} → ${n + 1}${b.max > 1 ? ' / 最大' + b.max : ''}` : b.max > 1 ? `最大 ${b.max} 重ね` : '固有効果'}</div></div>`;
+      return `<div class="card" data-i="${i}" style="--rc:${R(b.rarity)};animation-delay:${i * 0.12}s"><div class="c-rar">${G.RARITY[b.rarity].name}</div><div class="c-icon">${b.icon}</div><div class="c-name">${U.esc(b.name)}</div><div class="c-cat">${UI.catLabel(b.cat)}${b.skill ? ` · <span class="c-own">${G.SKILL_BY_ID[b.skill].icon} ${G.SKILL_BY_ID[b.skill].name}専用</span>` : b.cat === 'pile' ? ' · <span class="c-own">🔨 パイルドライバー専用</span>' : ''}</div><div class="c-desc${b.cat === 'curse' ? ' curse' : ''}">${U.descHTML(b.desc)}</div><div class="c-stack">${n ? `所持 ${n} → ${n + 1}${b.max > 1 ? ' / 最大' + b.max : ''}` : b.max > 1 ? `最大 ${b.max} 重ね` : '固有効果'}</div></div>`;
     }).join('');
     const s = UI.screen(`<div class="bs-wrap">
       <div class="side-info"><h3 style="margin-top:0">❤️ HP <b style="float:right">${Math.ceil(P.hp)} / ${st.maxHp}</b></h3><div class="si-stat"><span>🪙 コイン</span><b>${U.fmt(G.game.run.coins)}</b></div><div class="si-stat"><span>🗺️ エリア</span><b>${G.game.area}</b></div>${UI.statsTable()}<h3>🌟 所持加護（${P.buffs.size}）</h3><div class="si-buffs">${sideBuffs || '<span style="color:var(--dim);font-size:12px;grid-column:1/-1">なし</span>'}</div></div>

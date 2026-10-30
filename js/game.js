@@ -1836,7 +1836,7 @@
       else note = `空きスロット ${G.input.skillKey(free)} に装備`;
     } else {
       const n = P.buffs.get(ob.id) || 0;
-      cat = `🌟 加護 · ${G.BUFF_CAT[ob.cat].name}${ob.skill ? ` · ${G.SKILL_BY_ID[ob.skill].icon} ${G.SKILL_BY_ID[ob.skill].name}専用` : ob.cat === 'pile' ? ' · 🔨 パイルドライバー専用' : ''}`;
+      cat = `🌟 加護 · ${ob.cat === 'trade' || ob.cat === 'curse' ? `<b class="cat-warn">${G.BUFF_CAT[ob.cat].name}</b>` : G.BUFF_CAT[ob.cat].name}${ob.skill ? ` · ${G.SKILL_BY_ID[ob.skill].icon} ${G.SKILL_BY_ID[ob.skill].name}専用` : ob.cat === 'pile' ? ' · 🔨 パイルドライバー専用' : ''}`;
       if (n) note = `所持 ${n} → ${n + 1}`;
     }
     if (o.free) note = '🎁 常連客特典：無料！ ' + note;

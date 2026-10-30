@@ -219,7 +219,7 @@
       html += bar('⏳', 'クールタイム', o.cd, 35, o.cd + '秒');
       html += `<div><span class="tag">🔑 ${[0, 1, 2, 3].map((i) => G.input.skillKey(i)).join(' / ')}</span>${o.p.charges ? `<span class="tag">🔋 チャージ ${o.p.charges}</span>` : ''}<span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
     } else if (tab === 'buff') {
-      html += `<div><span class="tag">${G.BUFF_CAT[o.cat].icon} ${G.BUFF_CAT[o.cat].name}</span><span class="tag">${o.max > 1 ? '📚 最大' + o.max + '重ね' : '✨ 固有'}</span></div>`;
+      html += `<div><span class="tag">${G.ui.catLabel(o.cat)}</span><span class="tag">${o.max > 1 ? '📚 最大' + o.max + '重ね' : '✨ 固有'}</span></div>`;
     }
     html += '</div></div>';
     d.innerHTML = html;

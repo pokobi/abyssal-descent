@@ -1608,3 +1608,6 @@ html.m *::-webkit-scrollbar { width: 6px; height: 6px; }
 .cd-n.up { color: #7fe38a; }
 .cd-n.dn { color: #ff8a78; }
 #status-overlay .cd-n { font-weight: 800; }
+/* the trade-off ("代償") and curse category of a boon: a red warning label wherever the category is named */
+.cat-warn { display: inline-block; padding: 0 7px; border-radius: 4px; font-weight: 900; letter-spacing: 1px; color: #ffe2dc; background: linear-gradient(180deg, #c8402e, #86201a); box-shadow: 0 0 8px rgba(255,70,50,0.4); }
+.card .c-cat .cat-warn { font-size: 1.05em; }

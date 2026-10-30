@@ -806,11 +806,11 @@
     const MAXLV = G.abilities.MAXLV, out = [];
     const fx = () => { G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7); };
     const pl = P.pileLevel(), pc = AR.skillLvCost(pl);
-    out.push({ icon: '🔨', label: `[${G.input.keyName('crouch')}] パイルドライバー Lv${pl} → Lv${pl + 1}（${pc}🪙）`, sub: pl >= MAXLV ? '最大レベル' : '威力+60%', disabled: pl >= MAXLV || GM.run.coins < pc, onPick: () => { GM.run.coins -= pc; P.pileTome = (P.pileTome || 0) + 1; fx(); G.ui.toast(`⚒️ パイルドライバー Lv${P.pileLevel()}`, 'good'); } });
+    out.push({ icon: '🔨', label: `[${G.input.keyName('crouch')}] パイルドライバー Lv${pl + 1}${pl >= MAXLV ? '（最大）' : ` → Lv${pl + 2}（${pc}🪙）`}`, sub: pl >= MAXLV ? '最大レベル' : '威力+60%', disabled: pl >= MAXLV || GM.run.coins < pc, onPick: () => { GM.run.coins -= pc; P.pileTome = (P.pileTome || 0) + 1; fx(); G.ui.toast(`⚒️ パイルドライバー Lv${P.pileLevel() + 1}`, 'good'); } });
     P.skills.forEach((s, i) => {
       if (!s) return;
       const lv = s.lv || 0, c = AR.skillLvCost(lv), mx = lv >= MAXLV, ult = !!s.def.ult;
-      out.push({ icon: s.def.icon, label: `[${G.input.skillKey(i)}]${ult ? '（ULT）' : ''} ${s.def.name} Lv${lv} → Lv${lv + 1}（${c}🪙）`, sub: mx ? '最大レベル' : '効果量UP・クールタイム-2%', disabled: mx || GM.run.coins < c, onPick: () => { GM.run.coins -= c; s.lv = lv + 1; fx(); G.ui.toast(`⚒️ ${s.def.name} Lv${s.lv}`, 'good'); } });
+      out.push({ icon: s.def.icon, label: `[${G.input.skillKey(i)}]${ult ? '（ULT）' : ''} ${s.def.name} Lv${lv + 1}${mx ? '（最大）' : ` → Lv${lv + 2}（${c}🪙）`}`, sub: mx ? '最大レベル' : '効果量UP・クールタイム-2%', disabled: mx || GM.run.coins < c, onPick: () => { GM.run.coins -= c; s.lv = lv + 1; fx(); G.ui.toast(`⚒️ ${s.def.name} Lv${s.lv + 1}`, 'good'); } });
     });
     out.push({ icon: '↩', label: '戻る', onPick: () => { GM._keepModal = true; setTimeout(() => AR.useForge(), 0); } });
     GM.modal('⚒️ スキルを Lv+1', 'どのスキルを鍛える？（価格は、そのスキルの今の Lv で決まる）', out);

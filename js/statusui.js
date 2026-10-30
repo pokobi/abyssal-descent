@@ -151,7 +151,7 @@
     const pi = P.pileInfo(), pk = 1 + (P.stats.dmg || 0) + (P.stats.skillDmg || 0); // the shockwave is a skill hit: 与ダメ + スキルダメージ apply
     pi.dmg *= pk; pi.dmgMax *= pk;
     return `<div class="sc" style="--rc:var(--gold2)">
-      <div class="sc-h"><span class="key">${G.input.keyName('crouch')}</span><span class="ic">🔨</span><span class="nm">パイルドライバー${pi.lvl ? `<b class="lv">Lv${pi.lvl}</b>` : ''}</span><span class="st ${P.pileReady() ? 'ok' : ''}">${P.pileReady() ? 'READY' : Math.ceil(P.pileCd) + '秒'}</span></div>
+      <div class="sc-h"><span class="key">${G.input.keyName('crouch')}</span><span class="ic">🔨</span><span class="nm">パイルドライバー<b class="lv">Lv${pi.lvl + 1}</b></span><span class="st ${P.pileReady() ? 'ok' : ''}">${P.pileReady() ? 'READY' : Math.ceil(P.pileCd) + '秒'}</span></div>
       <div class="sc-l"><span><label>クールタイム</label>${dv(pi.cd, 8, { unit: '秒', lowerBetter: true })}</span><span><label>威力</label>${dv(pi.dmg, 120, { dec: 0 })}</span><span><label>範囲</label>${dv(pi.radius, 5.5, { unit: 'm' })}</span></div>
       <div class="sc-d">空中で <b class="sv">${G.input.keyName('crouch')}</b>：真下へ急降下して叩きつける。高所から落ちるほど威力が上がる（10mごとに${dv(pi.heightPer10, 100, { unit: '%', dec: 0 })}、最大 ${dv(pi.dmgMax, 120 * 2.5, { dec: 0 })}）。シールドへ ×<b class="sv">${pi.shieldMul}</b></div>
       ${pi.fx.length ? `<div class="sc-x">${pi.fx.join('　')}</div>` : ''}</div>`;

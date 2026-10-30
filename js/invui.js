@@ -148,7 +148,7 @@
       out.push(`<div class="iv-sk${i === 0 ? ' ult' : ''}" data-sk="${i}" style="--rc:${R(sk.def.rarity)}"><kbd>${key}</kbd><span class="sic">${sk.def.icon}</span><span class="snm">${U.esc(sk.def.name)}</span><span class="sst${ready ? ' ok' : ''}">${A.lvHTML(sk) ? A.lvHTML(sk) + ' · ' : ''}${st}</span></div>`);
     });
     const pi = P.pileInfo();
-    out.push(`<div class="iv-sk fixed" data-sk="pile" style="--rc:var(--gold2)"><kbd>${G.input.keyName('crouch')}</kbd><span class="sic">🔨</span><span class="snm">パイルドライバー</span><span class="sst${P.pileReady() ? ' ok' : ''}">${pi.lvl ? 'Lv' + pi.lvl + ' · ' : ''}${P.pileReady() ? 'READY' : Math.ceil(P.pileCd) + 's'}</span></div>`);
+    out.push(`<div class="iv-sk fixed" data-sk="pile" style="--rc:var(--gold2)"><kbd>${G.input.keyName('crouch')}</kbd><span class="sic">🔨</span><span class="snm">パイルドライバー</span><span class="sst${P.pileReady() ? ' ok' : ''}">Lv${pi.lvl + 1} · ${P.pileReady() ? 'READY' : Math.ceil(P.pileCd) + 's'}</span></div>`);
     return out.join('');
   }
   // the contracted mercenary under the armour column: Lv, HP (with the locked part), XP. Hover for the full numbers.

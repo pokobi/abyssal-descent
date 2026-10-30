@@ -492,10 +492,10 @@
     const out = list.map((x) => {
       const cost = Math.round(GM.price(1500 * Math.pow(1.25, x.lv)) * k / 10) * 10;
       const d = x.pile ? { icon: '🔨', name: 'パイルドライバー', key: G.input.keyName('crouch') } : { icon: x.s.def.icon, name: x.s.def.name, key: G.input.skillKey(x.i) };
-      return { icon: d.icon, label: `[${d.key}]${!x.pile && x.s.def.ult ? '（ULT）' : ''} ${d.name} Lv${x.lv} → Lv${x.lv + 1}（${fmt(cost)}🪙）`, disabled: coins() < cost, onPick: () => {
+      return { icon: d.icon, label: `[${d.key}]${!x.pile && x.s.def.ult ? '（ULT）' : ''} ${d.name} Lv${x.lv + 1} → Lv${x.lv + 2}（${fmt(cost)}🪙）`, disabled: coins() < cost, onPick: () => {
         pay(cost); R2.offerN = (R2.offerN || 0) + 1; G.fx.ring(P.pos.clone(), 3, 0xffd070, 0.6); G.sfx.bell();
         if (x.pile) P.pileTome = (P.pileTome || 0) + 1; else { x.s.lv = x.lv + 1; x.s.maxCd = G.abilities.cdOf(x.s); }
-        G.ui.toast(`📘 ${d.name} Lv${x.lv + 1}`, 'good');
+        G.ui.toast(`📘 ${d.name} Lv${x.lv + 2}`, 'good');
         GM._keepModal = true; setTimeout(back, 0);
       } };
     });

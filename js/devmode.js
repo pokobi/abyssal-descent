@@ -195,7 +195,7 @@
         ACT['sl-' + i] = () => { if (P.skills[i]) P.skills[i].lv = Math.max(0, (P.skills[i].lv || 0) - 1); };
         ACT['sx' + i] = () => { if (i > 0) P.skills[i] = null; };
         ACT['sc' + i] = () => { if (P.skills[i]) { P.skills[i].cd = 0; if (P.skills[i].maxCharges) P.skills[i].charges = P.skills[i].maxCharges; } };
-        return `<div class="dv-it"><span><b>[${key}]</b> ${sk ? sk.def.icon + ' ' + esc(sk.def.name) + ` <b>Lv${sk.lv || 0}</b>` : '— 空き —'}</span>${sk ? btn('sl-' + i, '−') + btn('sl+' + i, '+') + btn('sc' + i, 'CT解除') : ''}${i > 0 && sk ? btn('sx' + i, '外す', 'warn') : ''}</div>`;
+        return `<div class="dv-it"><span><b>[${key}]</b> ${sk ? sk.def.icon + ' ' + esc(sk.def.name) + ` <b>Lv${(sk.lv || 0) + 1}</b>` : '— 空き —'}</span>${sk ? btn('sl-' + i, '−') + btn('sl+' + i, '+') + btn('sc' + i, 'CT解除') : ''}${i > 0 && sk ? btn('sx' + i, '外す', 'warn') : ''}</div>`;
       };
       const list = (arr, isUlt) => arr.filter((o) => match('s', o)).map((o) => {
         if (isUlt) { ACT['su-' + o.id] = () => { P.skills[0] = G.abilities.makeSlot(o.id); }; return `<div class="dv-it" style="--rc:${R(o.rarity)}"><span>${o.icon} ${esc(o.name)}</span>${btn('su-' + o.id, '[' + G.input.skillKey(0) + '] に装備')}</div>`; }

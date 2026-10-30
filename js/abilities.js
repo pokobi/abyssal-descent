@@ -19,8 +19,10 @@
   // Mastery boons add levels in a separate layer: shown as Lv(base+mastery), and the numbers use the total (so Lv 15 can be passed, up to 15+3)
   A.mastery = (sk) => { const p = G.player; return sk && p && p.buffs ? p.buffs.get('sk_' + sk.id + '_mastery') || 0 : 0; };
   A.totalLv = (sk) => ((sk && sk.lv) || 0) + A.mastery(sk);
-  A.lvHTML = (sk) => { const b = (sk && sk.lv) || 0, m = A.mastery(sk); return m ? `<span class="lv-m"><i class="sdw">Lv${b}</i><i class="sdb">+${m}</i></span>` : b ? `<span class="sdw">Lv${b}</span>` : ''; };
-  A.lvText = (sk) => { const b = (sk && sk.lv) || 0, m = A.mastery(sk); return m ? `Lv${b + m}(${b}+${m})` : b ? 'Lv' + b : ''; };
+  // the level in a skill is stored from 0 (the numbers use it as is); the player sees it from 1, so every Lv shown is the stored level + 1 (and the cap, 14 stored, shows as Lv15)
+  A.dispLv = (n) => (n || 0) + 1;
+  A.lvHTML = (sk) => { const b = A.dispLv(sk && sk.lv), m = A.mastery(sk); return m ? `<span class="lv-m"><i class="sdw">Lv${b}</i><i class="sdb">+${m}</i></span>` : `<span class="sdw">Lv${b}</span>`; };
+  A.lvText = (sk) => { const b = A.dispLv(sk && sk.lv), m = A.mastery(sk); return m ? `Lv${b + m}(${b}+${m})` : 'Lv' + b; };
   A.cdOf = (sk, bare) => {
     const L = bare ? (sk && sk.lv) || 0 : A.totalLv(sk), lvK = 1 - Math.min(0.36, 0.02 * L);
     if (bare) return sk.def.cd * (sk.def.ult ? 1 : A.SKILL_CD_MUL) * lvK;
@@ -73,7 +75,7 @@
     return [];
   };
   A.isUlt = (sk) => !!(sk && sk.def && sk.def.ult);
-  A.MAXLV = 15;
+  A.MAXLV = 14; // stored; shown as Lv15
   A.ready = (sk) => sk && (sk.maxCharges ? sk.charges > 0 : sk.cd <= 0);
   A.consume = function (sk) {
     G.buffs.emit('onSkill', { skill: sk });

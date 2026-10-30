@@ -568,7 +568,7 @@
     P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));
     if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; }
-    P.skills = [0, 1, 2, 3].map((i) => { if (!(d.skills && d.skills[i] && G.SKILL_BY_ID[d.skills[i]])) return null; const s = G.abilities.makeSlot(d.skills[i]); s.lv = (d.skillLv && d.skillLv[i]) || 0; return s; });
+    P.skills = [0, 1, 2, 3].map((i) => { if (!(d.skills && d.skills[i] && G.SKILL_BY_ID[d.skills[i]])) return null; const s = G.abilities.makeSlot(d.skills[i]); s.lv = Math.min(G.abilities.MAXLV, (d.skillLv && d.skillLv[i]) || 0); return s; });
     P.pileTome = d.pileTome || 0;
     if (P.skills[0] && !P.skills[0].def.ult) { const s = P.skills[0]; const free = [1, 2, 3].find((i) => !P.skills[i]); if (free) P.skills[free] = s; P.skills[0] = null; }
     if (!P.skills[0]) P.skills[0] = G.abilities.makeSlot(G.DEFAULT_ULT);
@@ -1809,7 +1809,7 @@
     } else if (o.kind === 'forge') {
       cat = '⚒️ 強化サービス'; note = `購入時に強化する武器を選ぶ（上限+${G.Areas.FORGE_MAX}）・価格は武器の強化値で変わる`;
     } else if (o.kind === 'tome') {
-      cat = '📘 スキル強化'; note = '購入時に強化するスキルを選ぶ・価格はそのスキルの Lv で変わる：' + P.skills.filter((s) => s).map((s) => `${s.def.icon}Lv${s.lv || 0}`).join(' ');
+      cat = '📘 スキル強化'; note = '購入時に強化するスキルを選ぶ・価格はそのスキルの Lv で変わる：' + P.skills.filter((s) => s).map((s) => `${s.def.icon}Lv${(s.lv || 0) + 1}`).join(' ');
     } else if (o.kind === 'relic') {
       cat = '🏺 遺物（常時効果・最大3つ）'; note = `所持遺物 ${GM.relicCount()}/3` + (GM.relicCount() >= 3 ? '　⚠ 購入時に手持ちの遺物と入れ替え' : '');
     } else if (o.kind === 'revive') {
@@ -1887,7 +1887,7 @@
         if (!list.length) return deny('全て最大レベル');
         return modal('📘 どのスキルを強化する？', 'レベル+1（スキル・アルティメット：効果量UP・クールタイム-2%／パイルドライバー：威力+60%）　価格は、そのスキルの今の Lv で決まる', list.map((x) => {
           const d = x.pile ? { icon: '🔨', name: 'パイルドライバー', key: G.input.keyName('crouch') } : { icon: x.s.def.icon, name: x.s.def.name, key: G.input.skillKey(x.i) };
-          return { icon: d.icon, label: `[${d.key}]${!x.pile && x.s.def.ult ? '（ULT）' : ''} ${d.name} Lv${x.lv} → Lv${x.lv + 1}（${U.fmt(x.cost)}🪙）`, disabled: run.coins < x.cost, onPick: () => {
+          return { icon: d.icon, label: `[${d.key}]${!x.pile && x.s.def.ult ? '（ULT）' : ''} ${d.name} Lv${x.lv + 1} → Lv${x.lv + 2}（${U.fmt(x.cost)}🪙）`, disabled: run.coins < x.cost, onPick: () => {
             o.price = x.cost;
             if (x.pile) { P.pileTome = (P.pileTome || 0) + 1; G.sfx.ui('rare'); done(); }
             else { x.s.lv = x.lv + 1; x.s.maxCd = G.abilities.cdOf(x.s); done(); G.sfx.magic(P.pos, 'holy'); }

@@ -375,7 +375,7 @@
     const pmax = P.pileCdMax();
     setCd(UI.pileEl, P.pileFree ? 0 : (P.pileCd || 0) / pmax, P.pileFree ? 0 : P.pileCd || 0, P.pileReady());
     sClass(UI.pileEl, 'active-on', !!P.pileState);
-    const lv = P.pileLevel(); sText(UI.pileEl._cnt || (UI.pileEl._cnt = UI.pileEl.querySelector('.cnt')), lv ? 'Lv' + lv : '');
+    const lv = P.pileLevel(); sText(UI.pileEl._cnt || (UI.pileEl._cnt = UI.pileEl.querySelector('.cnt')), 'Lv' + (lv + 1));
     // items (throttled)
     slowT -= dt;
     if (slowT <= 0 || UI._itemsDirty) {

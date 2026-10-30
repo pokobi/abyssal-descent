@@ -431,7 +431,7 @@
     // slam: a hand hangs over you, follows you, stops, and comes down. It stays on the floor for a moment: strike it.
     // the open hand's footprint (palm + fingers) is centred HAND_C ahead of the palm; the warning circle sits on that centre and covers it
     a_slam(a, dt) {
-      const P = Pl(), W = 1.6, DROP = 0.16, PLANT = 2.2, UP = 0.55, R = 5.9; // (R: the hand reaches 5.85 m from the centre, so the circle still covers it)
+      const P = Pl(), W = 1.9, DROP = 0.18, PLANT = 2.2, UP = 0.55, R = 5.9; // (R: the hand reaches 5.85 m from the centre, so the circle still covers it)
       if (!a.hs) {
         a.hs = a.both ? [this.hands[0], this.hands[1]] : [this.hands[(a.i + (Math.random() < 0.5 ? 0 : 1)) % 2]];
         a.hs.forEach((h, j) => { h.busy = true; h.slam = { off: j ? V(U.rand(-1, 1), 0, U.rand(-1, 1)).normalize().multiplyScalar(U.rand(9, 13)) : V(), c: null, at: null, tele: null, done: false }; });
@@ -440,7 +440,7 @@
       for (const h of a.hs) {
         const S = h.slam;
         if (a.t < W) {
-          const lock = a.t > W - 0.42;
+          const lock = a.t > W - 0.65; // (the spot is fixed 0.65 s before it lands: enough to walk out of the circle)
           if (!lock) { S.c = clampTiles(P.pos.clone().add(S.off).setY(0)); const sh = this.J.sh[h.i].getWorldPosition(V()); S.yaw = Math.atan2(S.c.x - sh.x, S.c.z - sh.z); S.at = S.c.clone().add(V(Math.sin(S.yaw), 0, Math.cos(S.yaw)).multiplyScalar(-HAND_C)); }
           this.moveHand(h, S.at.clone().setY(12 + Math.sin(a.t * 6) * 0.3), dt, lock ? 10 : 4);
           this.aimHand(h, dt, 0.15, 0, 0.1);
@@ -455,7 +455,7 @@
             G.fx.explosion(S.c.clone().setY(0.6), 3.4, this.col(), { decal: false, noSmoke: true }); G.fx.ring(S.c.clone().setY(0.15), R, this.col(), 0.5); G.fx.dust(S.c.clone().setY(0.3), V(0, 1, 0), 0x6a3a5a, 26);
             G.fx.decal(S.c.clone().setY(0.03), V(0, 1, 0), 'crack', 8, true);
             G.sfx.explosion(S.c, 1.6); P.addShake(0.75); G.sfx.rumble && G.sfx.rumble(0.8, 0.6);
-            if (Math.hypot(P.pos.x - S.c.x, P.pos.z - S.c.z) < R && P.pos.y < 3.4) { this.hit(36, 'aoe', S.c.clone()); const kd = P.pos.clone().sub(S.c).setY(0); if (kd.lengthSq() < 0.01) kd.set(1, 0, 0); kd.normalize(); P.vel.addScaledVector(kd, 15); P.vel.y = Math.max(P.vel.y, 6); }
+            if (Math.hypot(P.pos.x - S.c.x, P.pos.z - S.c.z) < R && P.pos.y < 3.4) { this.hit(30, 'aoe', S.c.clone()); const kd = P.pos.clone().sub(S.c).setY(0); if (kd.lengthSq() < 0.01) kd.set(1, 0, 0); kd.normalize(); P.vel.addScaledVector(kd, 12); P.vel.y = Math.max(P.vel.y, 6); }
             this.plant(h);
             if (!this.slamTip) { this.slamTip = true; G.ui.toastSmall('✋ 床を叩いた手は、しばらくの間攻撃できる（ダメージ1.5倍）'); }
             if (this.phase >= 2 && Math.random() < 0.5) { const t = TR.at(S.c.x, S.c.z); if (t) a.crack = (a.crack || []).concat([t]); }
@@ -468,7 +468,7 @@
       if (a.t > W + DROP + PLANT + UP) {
         if (a.crack) { TR.collapse(a.crack, 1.0); this._restoreQ = (this._restoreQ || []).concat([{ list: a.crack, t: 7 }]); }
         a.i++;
-        if (a.i < a.n) { for (const h of a.hs) { h.busy = false; this.unplant(h); } a.hs = null; a.t = 0.35; a.crack = null; return false; }
+        if (a.i < a.n) { for (const h of a.hs) { h.busy = false; this.unplant(h); } a.hs = null; a.t = 0.1; a.crack = null; return false; } // (the second slam starts at 0.1 s, so its warning is a full 1.8 s)
         return true;
       }
       return false;

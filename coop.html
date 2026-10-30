@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ABYSSAL DESCENT — CO-OP</title>
+</head>
+<body style="background:#0a0806;color:#e8d6b0;font-family:sans-serif">
+<p id="boot">読み込み中…</p>
+<script>
+/* The co-op page is the solo page itself plus the scripts in js/coop/: index.html is fetched as it is and the extra tags are added at its end,
+   so the two can never drift apart and index.html itself never loads any of this. The hash of the text is the version both sides must share. */
+(function () {
+  var FILES = ['net', 'core', 'host', 'client'];
+  // the solo save is never written from here: records, codex and unlocks of co-op runs live under a key of their own (the first load starts from a copy, so settings and keys carry over)
+  var KEY = 'abyssal_descent_save_v1', OWN = 'abyssal_descent_coop_v1', SP = Storage.prototype, g0 = SP.getItem, s0 = SP.setItem, r0 = SP.removeItem;
+  SP.getItem = function (k) { if (k === KEY) { var c = g0.call(this, OWN); return c !== null ? c : g0.call(this, KEY); } return g0.call(this, k); };
+  SP.setItem = function (k, v) { return s0.call(this, k === KEY ? OWN : k, v); };
+  SP.removeItem = function (k) { return r0.call(this, k === KEY ? OWN : k); };
+  fetch('index.html', { cache: 'no-cache' }).then(function (r) { return r.text(); }).then(function (h) {
+    var v = 0; for (var i = 0; i < h.length; i++) v = (v * 31 + h.charCodeAt(i)) | 0;
+    var cb = '?v=' + (v >>> 0).toString(36);
+    var tags = '<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/script>'
+      + FILES.map(function (f) { return '<script src="js/coop/' + f + '.js' + cb + '"><\/script>'; }).join('');
+    window.COOP_VER = (v >>> 0).toString(36);
+    document.open(); document.write(h.replace('</body>', tags + '</body>')); document.close();
+  }).catch(function (e) { document.getElementById('boot').textContent = '読み込みに失敗しました: ' + e; });
+})();
+</script>
+</body>
+</html>

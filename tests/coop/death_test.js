@@ -1,0 +1,50 @@
+'use strict';
+// Falling in co-op: lantern -> up again where you stood; no lantern -> out until the next area; everyone out -> the run ends for all.
+const path = require('path');
+const { serve, launch, sleep } = require('./cdp');
+const ROOT = path.resolve(__dirname, '..', '..');
+const PORT = +process.env.COOP_PORT || 8831;
+(async () => {
+  const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
+  const fails = [];
+  const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fails.push(what); };
+  try {
+    const q = '&local=1&lat=40&jit=20', room = 'D' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
+    await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await sleep(300);
+    const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
+    await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
+    const off = 'G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
+    await h.eval(off); await g.eval(off);
+    await h.eval('G.Coop.begin(); 1');
+    await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
+    await sleep(1500);
+    const hit = "G.game.rewardPending = null; G.ui.clearScreen(); G.game.state = 'playing'; G.player.invulnT = 0; G.player.buffs.clear && 0; G.player.stats.dodge = 0; G.player.os = 0; G.player.hp = 1; G.combat.damagePlayer(99999, { src: 'melee', fixed: true }); 1";
+    await g.eval(`G.player.revives = 1; ${hit}`);
+    check(await g.eval('G.player.dead === true && G.game.state === "playing"'), 'the guest fell and the world goes on');
+    await h.until('G.Coop.players.get(1).dead === true', 4000);
+    await g.until('G.player.dead === false', 8000);
+    check(await g.eval('G.player.revives === 0 && G.player.hp > 1'), 'a lantern brought the guest back where they stood');
+    await sleep(3400);
+    await g.eval(hit);
+    await sleep(4000);
+    check(await g.eval('G.player.dead === true'), 'without a lantern the guest stays down');
+    await h.eval("for (const e of G.enemies.list) if (e.alive) { e.noReward = true; e.hp = 0; G.combat.killEnemy(e, { src: 'clear' }, 0); } G.game.clearArea(); G.ui.clearScreen(); G.game.state = 'playing'; 1");
+    await sleep(800);
+    await h.eval("G.Coop.go(2, 'combat'); 1");
+    await g.until('G.game.area === 2', 15000);
+    check(await g.eval('G.player.dead === false && G.player.hp > 1'), 'the next area brings the guest back');
+    await sleep(3400);
+    await h.eval(`G.player.revives = 0; ${hit}`);
+    await g.eval(`G.player.revives = 0; ${hit}`);
+    await g.until("document.getElementById('coop-back').textContent.includes('全滅')", 8000);
+    await h.until("document.getElementById('coop-back').textContent.includes('全滅')", 8000);
+    check(true, 'everyone down ends the run on both sides');
+    check(!h.errs.length, 'no errors on the host ' + h.errs.slice(0, 3).join(' | '));
+    check(!g.errs.length, 'no errors on the guest ' + g.errs.slice(0, 3).join(' | '));
+    check(await g.eval("localStorage.getItem('abyssal_descent_coop_v1') !== null"), 'co-op wrote its own save key');
+  } finally { ch.close(); srv.close(); }
+  console.log(fails.length ? `\nDEATH TEST FAILED (${fails.length})` : '\nDEATH TEST PASSED');
+  process.exit(fails.length ? 1 : 0);
+})().catch((e) => { console.error(e); process.exit(2); });

@@ -14,12 +14,20 @@
     ['valuable', '💰 金品', () => G.VALUABLES],
     ['skill', '🔮 スキル', () => G.SKILLS],
     ['ult', '🌟 アルティメット', () => G.ULTS],
-    ['enemy', '👹 モンスター', () => G.ENEMIES],
-    ['boss', '👑 ボス', () => G.BOSSES.filter((b) => !(G.RETIRED_BOSSES || []).includes(b.id))],
+    ['enemy', '👹 モンスター', () => G.ENEMIES.filter((e) => !extraHidden('enemy', e))],
+    ['boss', '👑 ボス', () => G.BOSSES.filter((b) => !(G.RETIRED_BOSSES || []).includes(b.id) && !extraHidden('boss', b))],
     ['stage', '🗺️ フィールド', () => stages()],
     ['depth', '🌀 深淵', () => G.Depth.CODEX],
   ];
   let tab = 'buff', sel = null, query = '', backFn = null;
+  // The hidden top difficulty (エクストラ) does not exist for a player who has not cleared Hard: what only belongs to it (the abyssal variants of the
+  // monsters, the last guardian and its avatar) is left out of the lists altogether, and no text names the mode. A foe that was met anyway stays listed.
+  const extraOpen = () => G.Run.unlocked('extra', 1);
+  function extraHidden(kind, o) {
+    if (extraOpen()) return false;
+    const only = (kind === 'boss' && (o.id === 'sovereign' || o.id === 'sovereign2')) || (kind === 'enemy' && o.variant === 'abyss');
+    return only && !disc(kind, o);
+  }
   // sorting: the way the list is ordered is chosen in the header (kept between visits). A tab offers the modes that mean something for it.
   const SORTS = {
     rarity: ['レアリティ順（低い順）', '低いレアリティを上に。同じなら種類・名前の順'],
@@ -110,7 +118,7 @@
     if (o.unlockK === undefined) return o.minArea ? `エリア${o.minArea}〜` : '特定の場所';
     const R = G.Run, keep = R.cur, out = [];
     try {
-      for (const [id, lv, label] of [['easy', 0, 'イージー'], ['normal', 0, 'ノーマル'], ['hard', 0, 'ハード'], ['extra', 1, 'エクストラ1']]) {
+      for (const [id, lv, label] of [['easy', 0, 'イージー'], ['normal', 0, 'ノーマル'], ['hard', 0, 'ハード'], ['extra', 1, 'エクストラ1']].filter((d) => d[0] !== 'extra' || extraOpen())) {
         R.cur = { id, lv };
         let first = 0;
         for (let n = 1; n <= R.areas() && !first; n++) if (!R.isBoss(n) && !R.isPrep(n) && Math.floor((Math.max(1, R.depthArea(n)) - 1) / 5) >= o.unlockK) first = n;
@@ -245,7 +253,7 @@
     STAGES = Object.keys(FIELD_INFO).map((key, i) => {
       const B = G.Tex.BIOMES[key], F = FIELD_INFO[key];
       const where = [];
-      for (const d of ['easy', 'normal', 'hard', 'extra']) R.DIFFS[d].segs.forEach(([f], k) => { if (f === key) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
+      for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (f === key) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
       return { id: 'stage_' + key, key, idx: i, name: B.name, icon: F.icon, rarity: F.rarity, desc: F.desc, where };
     });
     return STAGES;

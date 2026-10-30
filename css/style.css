@@ -1603,5 +1603,8 @@ html.m *::-webkit-scrollbar { width: 6px; height: 6px; }
 .card .c-desc .cd-line:first-child { margin-top: 0; }
 .card .c-desc.curse { color: #ffb3a6; }
 .card .c-desc.curse .cd-n { color: #ffd0c4; }
-.cost-line .cd-n, .reward-line .cd-n { color: #fff; }
 .alch-item .ai-sub .cd-fx, .alch-item .ai-sub .cd-en { font-weight: 700; }
+/* signed numbers: green for a gain, red for a loss (judged in util.js numTone); an unsigned number stays gold */
+.cd-n.up { color: #7fe38a; }
+.cd-n.dn { color: #ff8a78; }
+#status-overlay .cd-n { font-weight: 800; }

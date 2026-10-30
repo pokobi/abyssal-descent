@@ -181,7 +181,7 @@
     return `<div class="pgrid">${list.map(([id, n]) => {
       const b = G.BUFF_BY_ID[id]; if (!b) return '';
       const cnt = b.counter ? ` <span class="cnt">[${b.counter(P.buffState[id] || {})}]</span>` : '';
-      return `<div class="bf" style="--rc:${R(b.rarity)}"><div class="bicon" style="--rc:${R(b.rarity)}">${b.icon}${n > 1 ? `<span class="st">${n}</span>` : ''}</div><div class="bt"><b>${esc(b.name)}</b>${cnt}<div>${/【代償】/.test(b.desc) ? U.descHTML(b.desc) : b.desc.replace(/([+\-−]?\d+(?:\.\d+)?(?:%|秒|m|体)?)/g, '<b class="sv">$1</b>')}</div></div></div>`;
+      return `<div class="bf" style="--rc:${R(b.rarity)}"><div class="bicon" style="--rc:${R(b.rarity)}">${b.icon}${n > 1 ? `<span class="st">${n}</span>` : ''}</div><div class="bt"><b>${esc(b.name)}</b>${cnt}<div>${U.descHTML(b.desc, { inline: true })}</div></div></div>`;
     }).join('')}</div>`;
   }
   function itemsBody() {

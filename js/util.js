@@ -23,24 +23,54 @@ window.G = window.G || {};
     for (const a of arr) { r -= Math.max(0, wf(a)); if (r <= 0) return a; }
     return arr[arr.length - 1];
   };
-  // a description for cards and hover texts: the numbers are picked out (bold gold), every sentence and every effect of a list (A+10%・B-5%) goes
-  // on its own line, and a 【代償】 (cost) / 【報酬】 (reward) line gets a red / green tag
+  // A description for cards and hover texts: every sentence and every effect of a list (A+10%・B-5%) goes on its own line, a 【代償】 (cost) / 【報酬】
+  // (reward) line gets a red / green tag, and the numbers are picked out: a signed number is GREEN when the change is good for the player and RED when it
+  // is bad, judged from the words in front of it (the clause it sits in). "クールタイム-40%" is good, "被ダメ+10%" and "敵の攻撃力+15%" are bad, "最大HP-15%" is
+  // bad, "与ダメ+22%" is good. A number without a sign stays gold.
   const NL = String.fromCharCode(10);
   const NUM = /([+\-−＋]?\d+(?:\.\d+)?(?:%|％|秒|m|体|個|本|倍|回|発|枚|エリア)?)/g;
-  U.descHTML = (s) => {
-    const lines = [];
-    for (const raw of U.esc(s || '').split(NL)) {
+  // stats where a HIGHER value is worse for whoever has it (so a minus is the good direction)
+  const LOWER_BETTER = /(クールタイム|CT|被ダメ|被弾|反動|拡散|ブレ|リロード時間|装填時間|間隔|消費|コスト|価格|費用|待機|チャージ時間|回転開始時間|ディレイ|状態異常の持続|落下ダメージ|重さ|重量|発動までの時間|隙|硬直|詠唱時間|発動時間|溜め時間|準備時間)/;
+  // words just before the number that turn it round: "CT短縮+8%" is a gain, "被ダメ軽減+10%" too
+  const REDUCER = /(短縮|軽減|減少|低減|カット|耐性|削減)$/;
+  const SEP = /[・、。,，\n]/;
+  U.numTone = (before, whole) => {
+    const clause = before.split(SEP).pop();
+    const near = clause.slice(-10);
+    // a foe's own stat: "敵の" followed straight by the stat name (not "敵の状態異常ごとに与ダメ+10%", not "敵が3体以下で与ダメ+40%")
+    const enemy = /敵(の|全体の)[^、・。]{0,10}$/.test(clause) && !/与ダメ|へのダメージ/.test(clause);
+    if (/(落ちる|遅くな|下がる|低下|減る)/.test(clause)) return 'bad';
+    let lower = LOWER_BETTER.test(clause);
+    if (REDUCER.test(near.replace(/[\s:：]+$/, ''))) return 'up'; // reducing a bad thing (as a gain) written "+"
+    // "受けるダメージ" on a foe (a mark, a weakness) is a gain; on the player it is a loss
+    const foeTakes = /受けるダメージ/.test(clause) && /(敵|刻印|弱点)/.test(whole);
+    if (foeTakes) lower = false;
+    // for a foe's own stat a higher value is worse for the player, except the rate at which it acts (interval / cooldown), where lower is worse
+    if (enemy && !foeTakes) lower = !lower;
+    return lower ? 'lower' : 'higher';
+  };
+  U.descHTML = (s, opt) => {
+    const whole = String(s || ''), lines = [];
+    for (const raw of U.esc(whole).split(NL)) {
       const m = /^【(代償|報酬)】(.*)$/.exec(raw), kind = m && m[1], body = m ? m[2] : raw;
-      // sentences, then effects of a list when both neighbours carry a number
-      const parts = body.replace(/。(?=.)/g, '。' + NL).split(NL).flatMap((t) => { const seg = t.split('・'); const out = [seg[0]]; for (let k = 1; k < seg.length; k++) { if (/\d/.test(out[out.length - 1]) && /\d/.test(seg[k])) out.push(seg[k]); else out[out.length - 1] += '・' + seg[k]; } return out; });
+      const parts = body.replace(/。(?=.)/g, '。' + NL).split(NL).flatMap((t) => { const tok = t.split(/([・、])/); const out = [tok[0]]; for (let k = 2; k < tok.length; k += 2) { if (/\d/.test(out[out.length - 1]) && /\d/.test(tok[k])) out.push(tok[k]); else out[out.length - 1] += tok[k - 1] + tok[k]; } return out; });
       parts.forEach((t, k) => {
-        const h = t.replace(NUM, '<b class="cd-n">$1</b>');
-        if (kind === '代償') lines.push(`<span class="cost-line">${k === 0 ? '<b class="cost-tag">⚠ 代償</b>' : ''}${h}</span>`);
+        const h = t.replace(NUM, (all, g, off) => {
+          const sign = /^[+＋]/.test(g) ? 1 : /^[\-−]/.test(g) ? -1 : 0;
+          let cls = 'cd-n';
+          if (sign) {
+            const tone = kind === '代償' ? 'bad' : kind === '報酬' ? 'good' : (() => { const t2 = U.numTone(t.slice(0, off), whole); return t2 === 'bad' ? 'bad' : t2 === 'up' ? (sign > 0 ? 'good' : 'bad') : (sign > 0) === (t2 === 'higher') ? 'good' : 'bad'; })();
+            cls += tone === 'good' ? ' up' : ' dn';
+          }
+          return `<b class="${cls}">${g}</b>`;
+        });
+        if (opt && opt.inline) lines.push(kind ? `<b class="${kind === '代償' ? 'cost-tag' : 'reward-tag'}">${kind === '代償' ? '⚠ 代償' : '✦ 報酬'}</b>${h}` : h);
+        else if (kind === '代償') lines.push(`<span class="cost-line">${k === 0 ? '<b class="cost-tag">⚠ 代償</b>' : ''}${h}</span>`);
         else if (kind === '報酬') lines.push(`<span class="reward-line">${k === 0 ? '<b class="reward-tag">✦ 報酬</b>' : ''}${h}</span>`);
         else lines.push(h);
       });
     }
-    return lines.join('<br>');
+    return lines.join(opt && opt.inline ? ' ' : '<br>');
   };
   U.esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 

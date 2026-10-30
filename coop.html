@@ -9,20 +9,35 @@
 <p id="boot">読み込み中…</p>
 <script>
 /* The co-op page is the solo page itself plus the scripts in js/coop/: index.html is fetched as it is and the extra tags are added at its end,
-   so the two can never drift apart and index.html itself never loads any of this. The hash of the text is the version both sides must share. */
+   so the two can never drift apart and index.html itself never loads any of this. The version both sides must share is a hash of every script text. */
 (function () {
-  var FILES = ['net', 'core', 'host', 'client'];
-  // the solo save is never written from here: records, codex and unlocks of co-op runs live under a key of their own (the first load starts from a copy, so settings and keys carry over)
+  var FILES = ['net', 'core', 'host', 'client', 'body', 'sync'];
+  // The solo save is never written from here: co-op runs write under a key of their own. The first load starts from a copy of the solo save (settings and key
+  // bindings carry over); on every load the solo clears are copied in again, so what the solo game has unlocked decides the difficulties on offer here, and
+  // never the other way round (records, codex and unlocks earned in co-op stay in the co-op key).
   var KEY = 'abyssal_descent_save_v1', OWN = 'abyssal_descent_coop_v1', SP = Storage.prototype, g0 = SP.getItem, s0 = SP.setItem, r0 = SP.removeItem;
-  SP.getItem = function (k) { if (k === KEY) { var c = g0.call(this, OWN); return c !== null ? c : g0.call(this, KEY); } return g0.call(this, k); };
+  SP.getItem = function (k) {
+    if (k !== KEY) return g0.call(this, k);
+    var solo = g0.call(this, KEY), own = g0.call(this, OWN);
+    if (own === null) return solo;
+    try {
+      var o = JSON.parse(own), so = solo ? JSON.parse(solo) : null;
+      if (so && so.records) { o.records = o.records || {}; o.records.clears = so.records.clears || {}; }
+      return JSON.stringify(o);
+    } catch (e) { return own; }
+  };
   SP.setItem = function (k, v) { return s0.call(this, k === KEY ? OWN : k, v); };
   SP.removeItem = function (k) { return r0.call(this, k === KEY ? OWN : k); };
+  var hash = function (texts) { var v = 0; for (var j = 0; j < texts.length; j++) { var h = texts[j]; for (var i = 0; i < h.length; i++) v = (v * 31 + h.charCodeAt(i)) | 0; } return (v >>> 0).toString(36); };
   fetch('index.html', { cache: 'no-cache' }).then(function (r) { return r.text(); }).then(function (h) {
-    var v = 0; for (var i = 0; i < h.length; i++) v = (v * 31 + h.charCodeAt(i)) | 0;
-    var cb = '?v=' + (v >>> 0).toString(36);
+    var srcs = []; h.replace(/<script src="(js\/[^"]+)"/g, function (m, s) { srcs.push(s); });
+    var all = srcs.concat(FILES.map(function (f) { return 'js/coop/' + f + '.js'; }));
+    return Promise.all(all.map(function (s) { return fetch(s, { cache: 'no-cache' }).then(function (r) { return r.text(); }).catch(function () { return ''; }); })).then(function (t) { return [h, hash([h].concat(t))]; });
+  }).then(function (a) {
+    var h = a[0], v = a[1], cb = '?v=' + v;
     var tags = '<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/script>'
       + FILES.map(function (f) { return '<script src="js/coop/' + f + '.js' + cb + '"><\/script>'; }).join('');
-    window.COOP_VER = (v >>> 0).toString(36);
+    window.COOP_VER = v;
     document.open(); document.write(h.replace('</body>', tags + '</body>')); document.close();
   }).catch(function (e) { document.getElementById('boot').textContent = '読み込みに失敗しました: ' + e; });
 })();

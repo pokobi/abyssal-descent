@@ -1,0 +1,193 @@
+'use strict';
+// Co-op: what the players share on the ground of an area.
+//  - chests and bodies: the one who opens a chest or searches a body holds it while the screen is up (the others are told it is busy); everything taken or moved is
+//    sent as it happens, so the rest stay where the others left them and what is left can still be taken. Contents are the host's: a body or chest is filled once.
+//  - things dropped on the ground are seen by everyone and gone for everyone once picked up.
+//  - the gates: the way on opens only when everyone who is up stands in the same gate; the others are told who has arrived.
+(function () {
+  const K = G.Coop;
+  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const U = G.U;
+
+  K.installSync = function () {
+    const IV = G.Inv, UIV = G.InvUI, GM = G.game, P = G.player;
+    const locks = {};
+    let hold = null, pending = null, lastArea = -1, lastWorld = null, gateEl = null, at = null;
+
+    // ---------------- chests and bodies ----------------
+    const cidOf = (src) => {
+      if (!src || !G.world) return null;
+      if (src.e) return src.e._nid ? 'b' + src.e._nid : null;
+      if (src.type === 'chest' && src.tier !== undefined) { const i = G.world.interactables.indexOf(src); return i >= 0 ? 'c' + i : null; }
+      return null;
+    };
+    const find = (id) => {
+      if (id[0] === 'c') { const it = G.world.interactables[+id.slice(1)]; return it && it.type === 'chest' ? it : null; }
+      const n = +id.slice(1);
+      return IV.corpses.find((c) => c.e && c.e._nid === n) || null;
+    };
+    const snap = (c) => ({ cols: c.cols, rows: c.rows, name: c.name, k: c.kind, it: c.items.map(IV.ser) });
+    const apply = (src, id, d) => {
+      const c = IV.container(d.cols, d.rows, d.name, d.k);
+      c.items = d.it.map(IV.de);
+      src.cont = c;
+      if (id[0] === 'c') { src.opened = true; if (src.openAnim === undefined) src.openAnim = 0; }
+      else { src.searched = true; if (src.e && src.e.clearTarget) src.e.clearTarget(); }
+      IV.ver++;
+    };
+    // the host fills a chest (the same seeded contents the game itself would roll) or marks a body searched
+    const ensure = (src, id) => {
+      if (id[0] === 'c') {
+        if (!src.cont) src.cont = K.seeded((GM.seed ^ U.hashStr('chest' + GM.area + ':' + Math.round(src.pos.x) + ',' + Math.round(src.pos.z))) >>> 0, () => IV.chestLoot(src.tier));
+        src.opened = true; if (src.openAnim === undefined) src.openAnim = 0;
+      } else { src.searched = true; if (src.e && src.e.clearTarget) src.e.clearTarget(); }
+    };
+    const release = () => { if (!hold) return; const h = hold; hold = null; if (K.role === 'host') delete locks[h.id]; else K.send({ t: 'cclose', id: h.id }); };
+
+    const open0 = UIV.open, close0 = UIV.close;
+    UIV.open = function (cont, src) {
+      const id = K.live && cont && !K._real ? cidOf(src) : null;
+      if (!id) return open0.call(UIV, cont, src);
+      if (K.role === 'host') {
+        if (locks[id] !== undefined) { K.msg('他の人が漁っています'); return; }
+        locks[id] = 0; hold = { id, cont, src };
+        K.send({ t: 'cs', id, d: snap(cont) });
+        open0.call(UIV, cont, src);
+        if (!UIV.isOpen()) release();
+        return;
+      }
+      pending = { id, src };
+      K.send({ t: 'copen', id });
+    };
+    UIV.close = function () { const was = UIV.isOpen(); const r = close0.apply(UIV, arguments); if (was) release(); return r; };
+    K.handlers.copen = function (m, from) {
+      const src = find(m.id);
+      if (!src) { K.send({ t: 'cdata', id: m.id, gone: 1 }, from); return; }
+      ensure(src, m.id);
+      if (locks[m.id] !== undefined) { K.send({ t: 'cdata', id: m.id, ok: 0, d: snap(src.cont) }, from); return; }
+      locks[m.id] = from;
+      const d = snap(src.cont);
+      K.send({ t: 'cdata', id: m.id, ok: 1, d }, from);
+      for (const o of K.players.keys()) if (o && o !== from) K.send({ t: 'cs', id: m.id, d }, o);
+    };
+    K.handlers.cdata = function (m) {
+      const pd = pending; pending = null;
+      if (!pd || pd.id !== m.id) return;
+      const src = find(m.id) || pd.src;
+      if (m.gone) { apply(src, m.id, { cols: 3, rows: 2, name: '', k: 'corpse', it: [] }); K.msg('中身はもう残っていない'); return; }
+      apply(src, m.id, m.d);
+      if (!m.ok) { K.msg('他の人が漁っています'); return; }
+      hold = { id: m.id, cont: src.cont, src };
+      K._real = true;
+      try { open0.call(UIV, src.cont, src); } finally { K._real = false; }
+      if (!UIV.isOpen()) release();
+    };
+    // what the one holding it did, and the state of a container somebody opened
+    K.handlers.cs = K.handlers.cset = function (m, from) {
+      if (!(hold && hold.id === m.id)) { const src = find(m.id); if (src) apply(src, m.id, m.d); }
+      if (K.role === 'host') K.relay(m, from);
+    };
+    K.handlers.cclose = function (m, from) { if (locks[m.id] === from) delete locks[m.id]; };
+    const ch = IV.changed;
+    IV.changed = function (c) {
+      const r = ch.apply(IV, arguments);
+      if (K.live && hold && c === hold.cont) K.send({ t: 'cset', id: hold.id, d: snap(hold.cont) });
+      return r;
+    };
+    const ol = K.onLeave;
+    K.onLeave = function (rp) { for (const id of Object.keys(locks)) if (locks[id] === rp.id) delete locks[id]; if (ol) ol(rp); };
+
+    // ---------------- things on the ground ----------------
+    const dg = IV.dropToGround, pu = IV.pickUp;
+    let gidN = 1;
+    IV.dropToGround = function (it, pos) {
+      const n = IV.ground.length;
+      const r = dg.call(IV, it, pos);
+      if (K.live && !K._net && IV.ground.length > n) {
+        const gr = IV.ground[IV.ground.length - 1];
+        gr.gid = K.id * 1e6 + gidN++;
+        K.send({ t: 'gd', gid: gr.gid, it: IV.ser(gr.it), p: K.vec(gr.g.position) });
+      }
+      return r;
+    };
+    IV.pickUp = function (gr) {
+      const gid = gr.gid, ok = pu.call(IV, gr);
+      if (ok && gid && K.live) K.send({ t: 'gp', gid });
+      return ok;
+    };
+    K.handlers.gd = function (m, from) {
+      if (!G.world) return;
+      K._net = true;
+      try {
+        dg.call(IV, IV.de(m.it), V(...m.p));
+        const gr = IV.ground[IV.ground.length - 1];
+        gr.gid = m.gid; gr.g.position.set(...m.p); gr.pos = gr.g.position.clone().add(V(0, 0.3, 0));
+      } finally { K._net = false; }
+      if (K.role === 'host') K.relay(m, from);
+    };
+    K.handlers.gp = function (m, from) {
+      const i = IV.ground.findIndex((g) => g.gid === m.gid);
+      if (i >= 0) { G.world.group.remove(IV.ground[i].g); IV.ground.splice(i, 1); }
+      if (K.role === 'host') K.relay(m, from);
+    };
+
+    // ---------------- the gates ----------------
+    // The game's own check would take whoever steps into an open gate on alone, so its boxes are emptied here and kept aside; the check is done below for everyone.
+    const prep = () => {
+      for (const t of G.world.triggers) if (t.kind === 'exit' && !t._r) { t._r = { x0: t.x0, x1: t.x1, z0: t.z0, z1: t.z1 }; t.x0 = 1e9; t.x1 = -1e9; }
+    };
+    const gateAt = (p) => {
+      for (const t of G.world.triggers) {
+        const r = t._r; if (!r || !t.exit || !t.exit.open) continue;
+        if (p.x > r.x0 && p.x < r.x1 && p.z > r.z0 && p.z < r.z1) return t.exit.type || 'combat';
+      }
+      return null;
+    };
+    const kindName = (k) => { const T = G.Areas.TYPES[k]; return T ? `${T.icon} ${T.name}` : k; };
+    const standing = () => [...K.players.values()].filter((p) => !p.dead);
+    K.handlers.at = function (m, from) {
+      const rp = K.players.get(from); if (!rp) return;
+      rp.at = m.k;
+      if (K.role === 'host') { K.relay({ t: 'at', k: m.k, i: from }, from); announce(rp); }
+    };
+    // a relayed presence carries who it is about
+    const at0 = K.handlers.at;
+    K.handlers.at = function (m, from) { if (m.i !== undefined && K.role === 'guest') { const rp = K.players.get(m.i); if (rp) rp.at = m.k; return; } at0(m, from); };
+    K.handlers.gn = function (m) { K.msg(m.x); };
+    const announce = (rp) => {
+      const live = standing(), n = live.filter((p) => p.at).length;
+      const x = rp.at ? `${rp.name} が ${kindName(rp.at)} の門に入った（${n}/${live.length}）` : `${rp.name} が門から離れた`;
+      K.msg(x); K.send({ t: 'gn', x });
+    };
+    const banner = () => {
+      if (!gateEl) { gateEl = document.createElement('div'); gateEl.id = 'coop-gate'; document.body.appendChild(gateEl); }
+      const live = standing(), n = live.filter((p) => p.at).length, mine = at;
+      const kinds = new Set(live.filter((p) => p.at).map((p) => p.at));
+      let h = '';
+      if (mine && n < live.length) h = `⏳ 全員が門に集まるのを待っています（${n}/${live.length}）<small>全員が同じ門に入ると次のエリアへ進みます</small>`;
+      if (mine && kinds.size > 1) h = `⚠ 別々の門にいます<small>行き先をそろえてください（${[...kinds].map(kindName).join(' / ')}）</small>`;
+      if (gateEl._h !== h) { gateEl._h = h; gateEl.innerHTML = h; gateEl.style.display = h ? 'block' : 'none'; }
+    };
+    K.onFrame = function () {
+      if (!G.world || !GM.run) return;
+      if (G.world !== lastWorld) { lastWorld = G.world; prep(); at = null; for (const p of K.players.values()) p.at = null; }
+      if (GM.area !== lastArea) { lastArea = GM.area; for (const id of Object.keys(locks)) delete locks[id]; hold = null; pending = null; }
+      const me = K.players.get(K.id);
+      const want = !P.dead && !GM.transitioning ? gateAt(P.pos) : null;
+      if (want !== at) {
+        at = want; if (me) me.at = at;
+        K.send({ t: 'at', k: at });
+        if (K.role === 'host' && me) announce(me);
+      }
+      if (K.role === 'host' && !GM.transitioning) {
+        const live = standing();
+        if (live.length && live.every((p) => p.at) && new Set(live.map((p) => p.at)).size === 1) {
+          const kind = live[0].at;
+          K.msg('全員そろった — 次のエリアへ'); K.send({ t: 'gn', x: '全員そろった — 次のエリアへ' });
+          K.go(GM.area + 1, kind);
+        }
+      }
+      banner();
+    };
+  };
+})();

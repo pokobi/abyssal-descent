@@ -19,9 +19,28 @@
   #coop-lobby .cl-note{font-size:12px;color:#a99d88;line-height:1.5}
   #coop-lobby .cl-err{font-size:13px;color:#ff8a70;min-height:18px}
   #coop-lobby .cl-row{display:flex;gap:8px}#coop-lobby .cl-row>*{flex:1}
-  #coop-hud{position:fixed;left:14px;bottom:200px;z-index:800;display:flex;flex-direction:column;gap:5px;pointer-events:none;font:700 12px 'Noto Sans JP',sans-serif;color:#f2e6cc;text-shadow:0 1px 2px #000}
-  #coop-hud .ch-p{width:150px}#coop-hud .ch-b{height:5px;background:rgba(0,0,0,.6);border:1px solid rgba(220,190,130,.3);border-radius:2px;overflow:hidden;margin-top:2px}
-  #coop-hud .ch-b i{display:block;height:100%;background:#6fd06f}#coop-hud .ch-p.down{color:#ff7a60}#coop-hud .ch-p.down i{background:#ff5a40}
+  #coop-hud{position:fixed;left:14px;bottom:215px;z-index:800;display:flex;flex-direction:column;gap:7px;pointer-events:none;font:700 12px 'Noto Sans JP',sans-serif;color:#f2e6cc;text-shadow:0 1px 2px #000}
+  #coop-hud .ch-p{width:218px;padding:6px 9px 7px;background:linear-gradient(160deg,rgba(32,24,14,.92),rgba(12,9,6,.94));border:1px solid rgba(220,190,130,.42);border-left:3px solid var(--pc,#ffd27a);border-radius:4px;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  #coop-hud .ch-top{display:flex;align-items:center;gap:6px}
+  #coop-hud .ch-ic{width:20px;height:20px;border-radius:50%;background:var(--pc,#ffd27a);color:#1a1206;display:flex;align-items:center;justify-content:center;font:900 12px 'Noto Sans JP',sans-serif;flex:none;text-shadow:none}
+  #coop-hud .ch-nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;color:#ffe6b0}
+  #coop-hud .ch-ping{font-size:10px;color:#8f8472;font-weight:600}
+  #coop-hud .ch-b{position:relative;height:11px;margin-top:5px;background:rgba(0,0,0,.65);border:1px solid rgba(220,190,130,.3);border-radius:2px;overflow:hidden}
+  #coop-hud .ch-b i{display:block;height:100%;background:linear-gradient(180deg,#8be08b,#3f9a3f);transition:width .15s}
+  #coop-hud .ch-b b{position:absolute;inset:0;text-align:center;font-size:9.5px;line-height:11px;color:#fff}
+  #coop-hud .ch-row{display:flex;gap:8px;align-items:center;margin-top:4px;font-size:11px;color:#b9ad96;font-weight:600}
+  #coop-hud .ch-row span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #coop-hud .ch-tag{padding:0 5px;border-radius:3px;border:1px solid rgba(220,190,130,.4);font-size:10px;color:#ffd27a;background:rgba(255,210,122,.1)}
+  #coop-hud .ch-p.low .ch-b i{background:linear-gradient(180deg,#ffb070,#d0502a)}
+  #coop-hud .ch-p.down{border-color:rgba(255,90,60,.6);filter:grayscale(.5)}
+  #coop-hud .ch-p.down .ch-b i{background:#7a2a20}#coop-hud .ch-p.down .ch-nm{color:#ff9a80}
+  #coop-gate{position:fixed;left:50%;bottom:23%;transform:translateX(-50%);z-index:8300;padding:9px 20px;background:rgba(14,11,8,.92);border:1px solid rgba(255,200,80,.55);border-radius:4px;font:700 15px 'Noto Sans JP',sans-serif;color:#ffe2a0;display:none;pointer-events:none;text-align:center;line-height:1.5}
+  #coop-gate small{display:block;font-size:11px;color:#a99d88;font-weight:500}
+  #coop-lobby .cl-diff{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  #coop-lobby .cl-diff button{padding:7px 4px;font-size:12px;background:rgba(14,11,8,.96);border:1px solid rgba(220,190,130,.3);color:#c9bda6}
+  #coop-lobby .cl-diff button.on{border-color:var(--dc,#ffd27a);color:#fff0c4;background:linear-gradient(180deg,rgba(255,200,80,.22),rgba(14,11,8,.96));box-shadow:0 0 0 1px var(--dc,#ffd27a)}
+  #coop-lobby .cl-xl{display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px}
+  #coop-lobby .cl-xl button{padding:3px 10px}
   #coop-back{position:fixed;inset:0;z-index:8500;display:none;align-items:center;justify-content:center;background:rgba(8,6,4,.55);font-family:'Noto Sans JP',sans-serif;color:#f2e6cc;cursor:pointer}
   #coop-back .cb-box{display:flex;flex-direction:column;gap:10px;align-items:center;padding:18px 26px;background:rgba(14,11,8,.95);border:1px solid rgba(220,190,130,.34);border-radius:6px}
   #coop-back button{padding:7px 14px;border-radius:4px;font:inherit;cursor:pointer;background:rgba(14,11,8,.96);border:1px solid rgba(220,190,130,.34);color:#e8d6b0}
@@ -49,52 +68,58 @@
 
   // ---------------- the people in the room ----------------
   K.addPlayer = function (id, name) {
-    const rp = { id, name, pos: V(), vel: V(), to: V(), yaw: 0, hp: 1, maxHp: 1, dead: false, rev: 0, seen: performance.now(), body: null, shot: 0 };
+    const rp = { id, name, pos: V(), vel: V(), to: V(), yaw: 0, pitch: 0, hp: 1, maxHp: 1, dead: false, rev: 0, seen: performance.now(), body: null, w: '', mm: 0, gnd: 1, cr: 0, sp: 0, ads: 0, rl: 0, sw: 0, gd: 0, pl: 0, gr: 0, at: null, rtt: 0 };
     K.players.set(id, rp);
     return rp;
   };
   function roster() { return [...K.players.values()].map((p) => [p.id, p.name]); }
-  // the third-person model of the solo game (only ever shown in grapple moments there), one copy per remote player, with the name above it
-  function bodyFor(rp) {
-    if (rp.body) { if (rp.body.parent !== G.scene) G.scene.add(rp.body); return rp.body; }
-    const b = G.avatar.root.clone(true); b.visible = true; b.traverse((o) => { o.visible = true; o.frustumCulled = false; });
-    const c = document.createElement('canvas'); c.width = 256; c.height = 48;
-    const x = c.getContext('2d'); x.font = '700 28px sans-serif'; x.textAlign = 'center'; x.lineWidth = 5; x.strokeStyle = '#000'; x.strokeText(rp.name, 128, 34); x.fillStyle = '#ffe2a0'; x.fillText(rp.name, 128, 34);
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));
-    s.scale.set(1.6, 0.3, 1); s.position.y = 2.05; s.renderOrder = 6; b.add(s);
-    G.scene.add(b); rp.body = b;
-    return b;
-  }
+  const COLS = ['#ffd27a', '#7ad0ff', '#ff9ab0', '#9aef8a'];
   function updateBodies(dt) {
     for (const rp of K.players.values()) {
       if (rp.id === K.id) continue;
       rp.pos.lerp(rp.to, Math.min(1, dt * 14));
-      const b = bodyFor(rp);
-      b.position.copy(rp.pos);
-      b.rotation.set(rp.dead ? -1.4 : 0, rp.yaw + Math.PI, 0);
-      b.visible = !!G.world;
+      if (!rp.body) { rp.body = K.buildBody(rp.name); G.scene.add(rp.body.root); }
+      else if (rp.body.root.parent !== G.scene) G.scene.add(rp.body.root);
+      const b = rp.body;
+      b.root.position.copy(rp.pos);
+      b.root.rotation.y = rp.yaw + Math.PI;
+      b.root.visible = !!G.world;
+      K.animBody(b, rp, dt);
     }
   }
+  const wname = (rp) => { const d = rp.mm ? G.MELEE_BY_ID[rp.w] : G.WEAPON_BY_ID[rp.w]; return d ? `${d.icon || '🗡'} ${d.name}` : ''; };
   function hud() {
     if (!K.hudEl) return;
-    const P = G.player;
     let h = '';
     for (const rp of K.players.values()) {
-      const me = rp.id === K.id, hp = me ? P.hp : rp.hp, mx = me ? P.stats.maxHp : rp.maxHp, dead = me ? P.dead : rp.dead;
-      h += `<div class="ch-p${dead ? ' down' : ''}">${G.U.esc(rp.name)}${dead ? ' — 戦闘不能' : ''}<div class="ch-b"><i style="width:${Math.round(Math.max(0, hp / (mx || 1)) * 100)}%"></i></div></div>`;
+      if (rp.id === K.id) continue;
+      const pct = Math.round(Math.max(0, Math.min(1, rp.hp / (rp.maxHp || 1))) * 100), col = COLS[rp.id % COLS.length];
+      const tags = (rp.dead ? '<span class="ch-tag" style="color:#ff9a80;border-color:#ff7a60">戦闘不能</span>' : '') + (rp.at ? '<span class="ch-tag">🚪 門で待機</span>' : '');
+      h += `<div class="ch-p${rp.dead ? ' down' : pct < 30 ? ' low' : ''}" style="--pc:${col}"><div class="ch-top"><div class="ch-ic">${G.U.esc((rp.name || '?').slice(0, 1))}</div><div class="ch-nm">${G.U.esc(rp.name)}</div><div class="ch-ping">${rp.rtt ? rp.rtt + 'ms' : ''}</div></div>`
+        + `<div class="ch-b"><i style="width:${pct}%"></i><b>${Math.max(0, Math.round(rp.hp))} / ${Math.round(rp.maxHp)}</b></div>`
+        + `<div class="ch-row"><span>${G.U.esc(wname(rp))}</span><span>🪔×${Math.max(0, rp.rev)}</span>${tags}</div></div>`;
     }
     if (K.hudEl._h !== h) { K.hudEl.innerHTML = h; K.hudEl._h = h; }
   }
   K.sendSelf = function () {
-    const P = G.player;
-    K.send({ t: 'p', i: K.id, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), vx: +P.vel.x.toFixed(1), vy: +P.vel.y.toFixed(1), vz: +P.vel.z.toFixed(1), yaw: +P.yaw.toFixed(2), hp: Math.round(P.hp), mx: Math.round(P.stats.maxHp), d: P.dead ? 1 : 0, r: P.revives });
+    const P = G.player, W = G.weapons, f = (v) => +v.toFixed(2);
+    const mm = P.meleeMode && P.melee, w = mm ? P.melee.id : P.weapon ? P.weapon.id : '';
+    K.send({ t: 'p', i: K.id, x: f(P.pos.x), y: f(P.pos.y), z: f(P.pos.z), vx: +P.vel.x.toFixed(1), vy: +P.vel.y.toFixed(1), vz: +P.vel.z.toFixed(1), yaw: f(P.yaw), pt: f(P.pitch || 0),
+      hp: Math.round(P.hp), mx: Math.round(P.stats.maxHp), d: P.dead ? 1 : 0, r: P.revives,
+      g: P.grounded ? 1 : 0, c: P.crouching || P.sliding ? 1 : 0, s: P.sprinting ? 1 : 0, a: Math.round((W.adsT || 0) * 10), w, m: mm ? 1 : 0,
+      rl: !mm && P.weapon && P.weapon.reloading ? 1 : 0, sw: mm && W.meleeBusy && W.meleeBusy() ? 1 : 0, gd: mm && W.guarding && W.guarding() ? 1 : 0,
+      pl: P.pileState === 'charge' ? 1 : P.pileState === 'fall' ? 2 : 0, gr: P.grapple && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? 1 : 0 });
   };
   K.handlers.p = function (m) {
     const rp = K.players.get(m.i); if (!rp || m.i === K.id) return;
-    rp.to.set(m.x, m.y, m.z); rp.vel.set(m.vx, m.vy, m.vz); rp.yaw = m.yaw; rp.hp = m.hp; rp.maxHp = m.mx; rp.dead = !!m.d; rp.rev = m.r;
+    rp.to.set(m.x, m.y, m.z); rp.vel.set(m.vx, m.vy, m.vz); rp.yaw = m.yaw; rp.pitch = m.pt; rp.hp = m.hp; rp.maxHp = m.mx; rp.dead = !!m.d; rp.rev = m.r;
+    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr;
     if (rp.first === undefined) { rp.first = 1; rp.pos.copy(rp.to); }
     if (K.role === 'host') for (const o of K.players.keys()) if (o && o !== m.i) K.net.send(o, m);
   };
+  // a round trip now and then, shown beside each name
+  K.handlers.pg = function (m, from) { K.send({ t: 'pn', ts: m.ts }, from); };
+  K.handlers.pn = function (m, from) { const rp = K.players.get(from); if (rp) rp.rtt = Math.round(performance.now() - m.ts); };
 
   K.handlers.sh = function (m) {
     if (m.i !== K.id) G.fx.tracer(V(...m.a), V(...m.b), 0xffd080, 0.03, 0.09);
@@ -126,8 +151,10 @@
     g.state = 'modal'; G.input.exitLock();
     const b = K.backEl; b.style.display = 'flex'; b.onclick = null;
     b.innerHTML = `<div class="cb-box"><b style="font-size:20px;color:#ffd27a">${title}</b><div>${sub || ''}</div><button id="coop-quit">部屋を出る</button></div>`;
-    document.getElementById('coop-quit').onclick = () => location.reload();
+    document.getElementById('coop-quit').onclick = () => K.quit();
   };
+  // leaving the room: the page is simply reloaded (the browser's "leave this page?" question is for solo runs, so it is switched off first)
+  K.quit = function () { GM().debug = true; location.reload(); };
 
   // ---------------- the loop around the game's own ----------------
   // the solo game stops while a menu is open; here the others are still fighting, so the world goes on (without your keys)
@@ -158,7 +185,7 @@
       hud();
       updateBack();
       seenT -= dt;
-      if (seenT <= 0) { seenT = 1; watchPeers(); }
+      if (seenT <= 0) { seenT = 1; watchPeers(); K._pgT = (K._pgT || 0) + 1; if (K._pgT % 2 === 0) K.send({ t: 'pg', ts: performance.now() }); }
     } catch (e) { console.error(e); }
   }
   function loop(now) { requestAnimationFrame(loop); tick(now); }
@@ -178,7 +205,7 @@
     if (want && b.style.display !== 'flex') {
       b.innerHTML = '<div class="cb-box"><b>クリックで戦闘に戻る</b><button id="coop-quit">部屋を出る</button></div>';
       b.style.display = 'flex';
-      b.onclick = (e) => { if (e.target.id === 'coop-quit') { location.reload(); return; } b.style.display = 'none'; I.requestLock(); };
+      b.onclick = (e) => { if (e.target.id === 'coop-quit') { K.quit(); return; } b.style.display = 'none'; I.requestLock(); };
     } else if (!want && b.style.display === 'flex' && K.live) b.style.display = 'none';
   }
   function watchPeers() {
@@ -188,13 +215,13 @@
   K.drop = function (id) {
     const rp = K.players.get(id); if (!rp) return;
     K.players.delete(id);
-    if (rp.body) G.scene.remove(rp.body);
+    if (rp.body) G.scene.remove(rp.body.root);
     if (K.role === 'guest') { if (K.live) K.ended('ホストとの接続が切れました', 'ランは終了します'); return; }
     K.msg(`${rp.name} が抜けた`);
     if (K.onLeave) K.onLeave(rp);
     K.send({ t: 'left', i: id, r: roster() });
   };
-  K.handlers.left = function (m) { const rp = K.players.get(m.i); if (rp) { K.players.delete(m.i); if (rp.body) G.scene.remove(rp.body); K.msg(`${rp.name} が抜けた`); } };
+  K.handlers.left = function (m) { const rp = K.players.get(m.i); if (rp) { K.players.delete(m.i); if (rp.body) G.scene.remove(rp.body.root); K.msg(`${rp.name} が抜けた`); } };
 
   // ---------------- lobby ----------------
   function lobby() {
@@ -213,14 +240,25 @@
     K.lobbyErr = err;
   }
   const N = () => window.CoopNet;
+  // the difficulties on offer are the ones the solo save has unlocked (the host picks; the others see the choice)
+  K.diff = { id: 'normal', lv: 0 };
+  const diffName = (d) => (d.id === 'extra' ? G.Run.DIFFS.extra.name + d.lv : G.Run.DIFFS[d.id].name);
   function roomScreen() {
-    const body = K.lobbyEl.querySelector('#cl-body');
+    const body = K.lobbyEl.querySelector('#cl-body'), R = G.Run, host = K.role === 'host';
     const names = [...K.players.values()].map((p) => `<div>・${G.U.esc(p.name)}${p.id === 0 ? '（ホスト）' : ''}</div>`).join('');
-    body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="cl-note">部屋コード</div><div class="cl-code">${K.code}</div><div>${names}</div>`
-      + (K.role === 'host' ? `<button id="cl-start"${K.players.size < 2 && !qs.has('solo') ? ' disabled' : ''}>開始する</button>` : '<div class="cl-note">ホストの開始を待っています…</div>') + '</div>';
+    const ids = ['easy', 'normal', 'hard'].concat(R.unlocked('extra', 1) ? ['extra'] : []);
+    const dif = host
+      ? `<div class="cl-note">難易度</div><div class="cl-diff" style="grid-template-columns:repeat(${ids.length},1fr)">${ids.map((id) => `<button data-d="${id}" class="${K.diff.id === id ? 'on' : ''}" style="--dc:${R.DIFFS[id].col}">${R.DIFFS[id].icon} ${R.DIFFS[id].name}</button>`).join('')}</div>`
+        + (K.diff.id === 'extra' ? `<div class="cl-xl"><button data-x="-1">◀</button><b>エクストラ ${K.diff.lv}</b><button data-x="1">▶</button></div>` : '')
+      : `<div class="cl-note">難易度: <b style="color:${R.DIFFS[K.diff.id].col}">${diffName(K.diff)}</b>（ホストが選びます）</div>`;
+    body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="cl-note">部屋コード</div><div class="cl-code">${K.code}</div><div>${names}</div>${dif}`
+      + (host ? `<button id="cl-start"${K.players.size < 2 && !qs.has('solo') ? ' disabled' : ''}>開始する</button>` : '<div class="cl-note">ホストの開始を待っています…</div>') + '</div>';
     const b = body.querySelector('#cl-start');
     if (b) b.onclick = () => K.begin();
+    body.querySelectorAll('[data-d]').forEach((e) => { e.onclick = () => { K.diff = { id: e.dataset.d, lv: e.dataset.d === 'extra' ? Math.max(1, Math.min(K.diff.lv || R.maxExtra(), R.maxExtra())) : 0 }; K.send({ t: 'diff', d: K.diff }); roomScreen(); }; });
+    body.querySelectorAll('[data-x]').forEach((e) => { e.onclick = () => { const n = K.diff.lv + (+e.dataset.x); if (n >= 1 && n <= R.maxExtra()) { K.diff = { id: 'extra', lv: n }; K.send({ t: 'diff', d: K.diff }); roomScreen(); } }; });
   }
+  K.handlers.diff = function (m) { K.diff = m.d; roomScreen(); };
   K.open = function (code, isHost, name) {
     K.code = code; K.name = name; K.role = isHost ? 'host' : 'guest';
     const lat = +qs.get('lat') || 0, jit = +qs.get('jit') || 0;
@@ -238,18 +276,21 @@
       K.lobbyErr('接続中…');
       K.installGuest();
     }
+    K.installSync();
   };
   K.handlers.hi = function (m, from) {
     const rp = K.players.get(from); if (!rp) return;
     if (m.v !== window.COOP_VER) { K.send({ t: 'no', why: 'ゲームのバージョンが違います。ページを再読み込みしてください' }, from); K.players.delete(from); return; }
     if (K.players.size > K.MAX || K.live) { K.send({ t: 'no', why: K.live ? 'もう始まっています' : '部屋が満員です' }, from); K.players.delete(from); return; }
     rp.name = m.name;
-    K.send({ t: 'room', id: from, r: roster() });
+    for (const o of K.players.keys()) if (o && o !== from) K.send({ t: 'roster', r: roster() }, o);
+    K.send({ t: 'room', id: from, r: roster(), d: K.diff }, from);
     roomScreen();
   };
+  K.handlers.roster = function (m) { K.players.clear(); for (const [id, nm] of m.r) K.addPlayer(id, nm); roomScreen(); };
   K.handlers.no = function (m) { K.lobbyErr(m.why); K.net.close(); K.net = null; };
   K.handlers.room = function (m) {
-    K.id = m.id;
+    K.id = m.id; K.diff = m.d || K.diff;
     K.players.clear();
     for (const [id, nm] of m.r) K.addPlayer(id, nm);
     K.lobbyErr('');
@@ -267,11 +308,10 @@
     K.hudEl = el('div', 'coop-hud'); K.hudEl.style.display = 'none';
     K.backEl = el('div', 'coop-back');
     K.msgEl = el('div', 'coop-msg');
-    GM().debug = true;
     // your own falling: the world must not stop behind a death screen
     GM().playerDied = function () { K.onDown(); };
     // the title screens have no place here: back to the title means back to the lobby
-    GM().toTitle = function () { K.live = false; location.reload(); };
+    GM().toTitle = function () { K.live = false; K.quit(); };
     // your shots are drawn on the others' screens (a line from you along your aim, a few per second at most)
     const sh = G.weapons.shoot;
     let shotT = 0;
@@ -284,6 +324,15 @@
       }
       return r;
     };
+    // a menu does not freeze the others: the game's own refusal to hurt you while a screen is up is lifted
+    const dp = G.combat.damagePlayer;
+    G.combat.damagePlayer = function (a, i) {
+      const g = GM(), s0 = g.state;
+      if (K.live && (s0 === 'paused' || s0 === 'buff' || s0 === 'resuming' || s0 === 'modal')) { g.state = 'playing'; try { return dp.call(G.combat, a, i); } finally { if (g.state === 'playing') g.state = s0; } }
+      return dp.call(G.combat, a, i);
+    };
+    const up = G.ui.pause;
+    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。</div>'); };
     const pu = G.player.update;
     G.player.update = function (dt) { if (this.dead) clearKeys(); return pu.call(this, dt); };
     lobby();

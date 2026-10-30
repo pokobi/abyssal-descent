@@ -239,41 +239,10 @@
       if (hits.length) { K.send({ t: 'hit', h: hits }); hits = []; }
       if (!GM.run || !G.world) return;
       if (GM.bossEngaged && !K._engaged) { K._engaged = true; K.send({ t: 'engage' }); }
-      K.scanChests();
       for (const e of E.list) if (e._stray) { e._stray = false; e.alive = false; e.remove(); e.removed = true; }
     };
   };
 
-  // ---------------- both sides: a chest opened or a body searched is gone for the others ----------------
-  K.scanChests = function () {
-    const w = G.world;
-    w.interactables.forEach((it, i) => {
-      if (it.type !== 'chest' || it._cs || !it.opened) return;
-      it._cs = true;
-      K.send({ t: 'chest', i, a: G.game.area });
-    });
-    for (const c of G.Inv.corpses) {
-      if (!c.e || !c.e._nid || c._cs || !(c.searched || c.looted)) continue;
-      c._cs = true;
-      K.send({ t: 'body', id: c.e._nid });
-    }
-  };
-  K.handlers.chest = function (m, from) {
-    if (K.role === 'host') K.relay(m, from);
-    if (m.a !== G.game.area) return;
-    const it = G.world.interactables[m.i];
-    if (!it || it.type !== 'chest' || it.opened) return;
-    it.opened = true; it._cs = true; it.openAnim = it.openAnim || 0;
-    if (G.game.objective) G.ui.updateObjective();
-  };
-  K.handlers.body = function (m, from) {
-    if (K.role === 'host') K.relay(m, from);
-    const I = G.Inv, i = I.corpses.findIndex((c) => c.e && c.e._nid === m.id);
-    if (i < 0) return;
-    const c = I.corpses[i];
-    if (I.openCont === c.cont) return;
-    I.corpses.splice(i, 1);
-    if (c.e) c.e.corpse = null;
-  };
+  // sent on to everyone but the one it came from (the host is the hub)
   K.relay = function (m, from) { for (const id of K.players.keys()) if (id && id !== from) K.net.send(id, m); };
 })();

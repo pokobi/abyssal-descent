@@ -40,10 +40,10 @@ const PORT = +process.env.COOP_PORT || 8791;
       await h.eval('G.player.hp = G.player.stats.maxHp; 1');
       check(await g.eval('G.Coop.bossNodes.length > 0'), 'the guardian appeared for the guest');
     }
-    { const d = boss ? 6 : 14; await h.eval(`window.__cbDmg = ${d}; 1`); await g.eval(`window.__cbDmg = ${d}; 1`); }
+    { const d = boss ? 6 : 7; await h.eval(`window.__cbDmg = ${d}; 1`); await g.eval(`window.__cbDmg = ${d}; 1`); }
     await h.eval(`window.__cb = __coopbot(${secs * 1000}); 1`);
     await g.eval(`window.__cb = __coopbot(${secs * 1000}); 1`);
-    const stat = async (p) => JSON.parse(await p.eval(`JSON.stringify({ area: G.game.area, stage: G.game.stage, st: G.game.state, foes: G.enemies.list.filter((e) => e.alive).length, hp: Math.round(G.player.hp), dead: G.player.dead, boss: G.bosses.active ? Math.round(G.bosses.active.hp) : null, kills: G.game.run.kills, coins: G.game.run.coins, dealt: Math.round(G.game.run.dmgDealt || 0), taken: Math.round(G.game.run.dmgTaken), fps: G.Coop.fps || 0, hid: document.hidden, list: G.enemies.list.filter((e) => e.alive).slice(0, 4).map((e) => [e._nid, e.def.id, Math.round(e.hp), Math.round(e.shield || 0), e.state, !!e.invuln, !!e.untargetable, !!e.burrowed, Math.round(e.pos.x), Math.round(e.pos.z)]), me: [Math.round(G.player.pos.x), Math.round(G.player.pos.z)], stat: window.__cbs })`));
+    const stat = async (p) => JSON.parse(await p.eval(`JSON.stringify({ area: G.game.area, stage: G.game.stage, st: G.game.state, foes: G.enemies.list.filter((e) => e.alive).length, hp: Math.round(G.player.hp), dead: G.player.dead, boss: G.bosses.active ? Math.round(G.bosses.active.hp) : null, kills: G.game.run.kills, coins: G.game.run.coins, dealt: Math.round(G.game.run.dmgDealt || 0), taken: Math.round(G.game.run.dmgTaken), fps: G.Coop.fps || 0, gate: [[...G.Coop.players.values()].map((p) => p.at), G.game.transitioning, G.game.areaCleared, G.game.state, G.world.exits.map((x) => x.open)], hid: document.hidden, list: G.enemies.list.filter((e) => e.alive).slice(0, 4).map((e) => [e._nid, e.def.id, Math.round(e.hp), Math.round(e.shield || 0), e.state, !!e.invuln, !!e.untargetable, !!e.burrowed, Math.round(e.pos.x), Math.round(e.pos.z)]), me: [Math.round(G.player.pos.x), Math.round(G.player.pos.z)], stat: window.__cbs })`));
     let maxFoes = 0, sawHit = false, sawDamage = false;
     const t0 = Date.now();
     while (Date.now() - t0 < secs * 1000) {

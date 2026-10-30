@@ -180,7 +180,7 @@
     K.begin = function () {
       K.started();
       K.send({ t: 'go' });
-      GM.startRun({ id: 'normal', lv: 0 }, 0);
+      GM.startRun(K.diff, 0);
     };
     // ---------------- what the guests did ----------------
     const dm = C.damageEnemy, ke = C.killEnemy;
@@ -225,7 +225,6 @@
       if (objT <= 0) { objT = 0.4; sendObjective(); checkWipe(); helpAltars(0.4); }
       if (GM.areaCleared && !K._cleared) { K._cleared = true; K.send({ t: 'clear', boss: GM.stage === 'boss' ? 1 : 0 }); }
       if (GM.bossEngaged && !K._engaged) { K._engaged = true; K.send({ t: 'engage' }); }
-      K.scanChests();
     };
     K.sendEnemies = function () {
       const add = [], snap = [];

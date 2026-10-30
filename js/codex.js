@@ -20,6 +20,46 @@
     ['depth', '🌀 深淵', () => G.Depth.CODEX],
   ];
   let tab = 'buff', sel = null, query = '', backFn = null;
+  // sorting: the way the list is ordered is chosen in the header (kept between visits). A tab offers the modes that mean something for it.
+  const SORTS = {
+    rarity: ['レアリティ順（高い順）', '高いレアリティを上に。同じなら種類・名前の順'],
+    cat: ['種類順', '種類ごとにまとめ、その中はレアリティの高い順'],
+    name: ['名前順（あいうえお）', ''],
+    area: ['出現エリア順', '早いエリアから出る順'],
+    disc: ['未発見を先に', '未発見のものを上に集める'],
+    def: ['標準の並び', ''],
+  };
+  const TAB_SORTS = { enemy: ['area', 'name', 'disc', 'def'], boss: ['def', 'name', 'disc'], stage: [], depth: [] };
+  const sortsOf = (t) => TAB_SORTS[t] || ['rarity', 'cat', 'name', 'disc', 'def'];
+  const sortMode = () => { const m = G.save.data.settings.cxSort, ok = sortsOf(tab); return ok.includes(m) ? m : ok[0]; };
+  const tierOf = (o) => (G.RARITY[o.rarity] ? G.RARITY[o.rarity].tier : -1);
+  const catOf = (t, o) => {
+    if (t === 'armor') return String((G.ARMOR_SLOTS.findIndex((x) => x.id === o.slot) + 100)) + (o.mat || '');
+    if (t === 'attachment') return String(Object.keys(G.ATT_SLOTS).indexOf(o.slot) + 100);
+    if (t === 'buff') return String(Object.keys(G.BUFF_CAT).indexOf(o.cat) + 100);
+    return String(o.cat || o.mcat || o.slot || '');
+  };
+  const ja = new Intl.Collator('ja');
+  function sorted(a) {
+    const m = sortMode(); if (m === 'def') return a;
+    const idx = new Map(a.map((o, i) => [o, i]));
+    const hidden = (o) => secret(tab, o);
+    // a leading emoji does not decide the place of a name
+    const plain = (o) => String(o.name || '').replace(/^[^\p{L}\p{N}]+/u, '');
+    const byName = (x, y) => ja.compare(plain(x), plain(y));
+    const cmp = {
+      rarity: (x, y) => tierOf(y) - tierOf(x) || catOf(tab, x).localeCompare(catOf(tab, y)) || byName(x, y),
+      cat: (x, y) => catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || tierOf(y) - tierOf(x) || byName(x, y),
+      name: byName,
+      area: (x, y) => (x.minArea || 0) - (y.minArea || 0) || byName(x, y),
+      disc: (x, y) => (disc(tab, x) ? 1 : 0) - (disc(tab, y) ? 1 : 0) || tierOf(y) - tierOf(x) || idx.get(x) - idx.get(y),
+    }[m];
+    // an unmet monster / guardian shows no name, so it is never placed by its name: it keeps its own order after the known ones (before them when "未発見を先に")
+    const known = a.filter((o) => !hidden(o)), unk = a.filter(hidden);
+    if (m === 'disc') return unk.concat(known.sort(cmp));
+    if (m === 'area') return known.concat(unk).sort((x, y) => (x.minArea || 0) - (y.minArea || 0) || (hidden(x) - hidden(y)) || (hidden(x) ? idx.get(x) - idx.get(y) : byName(x, y)));
+    return known.sort(cmp).concat(unk);
+  }
   const disc = (kind, o) => {
     const c = G.save.data.codex;
     if (kind === 'enemy') return !!c.enemies[o.id];
@@ -35,9 +75,11 @@
     backFn = back;
     const total = TABS.reduce((a, t) => a + t[2]().length, 0);
     const found = TABS.reduce((a, t) => a + t[2]().filter((o) => disc(t[0], o)).length, 0);
-    const s = G.ui.screen(`<div class="codex"><div class="cx-head"><h2>📖 深淵図鑑</h2>${TABS.map((t) => `<span class="cx-tab ${t[0] === tab ? 'on' : ''}" data-t="${t[0]}">${t[1]} <span class="cx-count">${t[2]().length}</span></span>`).join('')}<span class="cx-count" style="margin-left:8px">発見 ${found}/${total}</span><input id="cx-q" placeholder="🔍 検索" value="${U.esc(query)}"><button class="btn small" id="cx-back">↩ 戻る</button></div><div class="cx-body"><div class="cx-grid" id="cx-grid"></div><div class="cx-detail" id="cx-detail"></div></div></div>`, 'dim');
+    const s = G.ui.screen(`<div class="codex"><div class="cx-head"><h2>📖 深淵図鑑</h2>${TABS.map((t) => `<span class="cx-tab ${t[0] === tab ? 'on' : ''}" data-t="${t[0]}">${t[1]} <span class="cx-count">${t[2]().length}</span></span>`).join('')}<span class="cx-count" style="margin-left:8px">発見 ${found}/${total}</span>${sortsOf(tab).length > 1 ? `<label class="cx-sort">並び順 <select id="cx-sort">${sortsOf(tab).map((k) => `<option value="${k}"${k === sortMode() ? ' selected' : ''}>${SORTS[k][0]}</option>`).join('')}</select></label>` : ''}<input id="cx-q" placeholder="🔍 検索" value="${U.esc(query)}"><button class="btn small" id="cx-back">↩ 戻る</button></div><div class="cx-body"><div class="cx-grid" id="cx-grid"></div><div class="cx-detail" id="cx-detail"></div></div></div>`, 'dim');
     s.querySelectorAll('.cx-tab').forEach((el) => el.onclick = () => { tab = el.dataset.t; sel = null; G.sfx.ui('click'); G.ui._noKeep = true; CX.open(back); });
     s.querySelector('#cx-back').onclick = () => { G.sfx.ui('click'); CX.close(); back(); };
+    const sq = s.querySelector('#cx-sort');
+    if (sq) sq.onchange = () => { G.save.data.settings.cxSort = sq.value; G.save.write(); G.sfx.ui('click'); renderGrid(); };
     const q = s.querySelector('#cx-q');
     q.oninput = () => { query = q.value; renderGrid(); };
     // hidden: "dev" + Enter switches the debug mode on and opens its panel
@@ -57,7 +99,7 @@
       const q = query.toLowerCase();
       a = a.filter((o) => !secret(tab, o) && (o.name + (o.desc || '') + (o.cat || '')).toLowerCase().includes(q)); // a hidden monster / guardian is never found by search
     }
-    return a;
+    return sorted(a);
   }
   function renderGrid() {
     const g = document.getElementById('cx-grid'); if (!g) return;

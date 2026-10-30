@@ -64,7 +64,7 @@
       case 'warcry': return [row('与ダメ', 'dmg', 0.25, m.x_rally ? 0.45 : 0.25)];
       case 'cloak': return [['最初の一撃の会心倍率', 2.5, 1 + 1.5 * k, '倍', 2, false, 1 + 1.5 * k0]];
       case 'chrono': { const b = m.x_deep ? 0.2 : 0.4; return [['敵を遅くする割合', 60, pc(1 - Math.max(0.08, b * Math.pow(0.93, L))), '%', 0, false, pc(1 - Math.max(0.08, 0.4 * Math.pow(0.93, L0)))]]; }
-      case 'mark': return [['受けるダメージ増加', 60, 60 * (1 + 0.5 * (k - 1)), '%', 0, false, 60 * (1 + 0.5 * (k0 - 1))]];
+      case 'mark': return [['受けるダメージ増加', 40, 40 * (1 + 0.5 * (k - 1)), '%', 0, false, 40 * (1 + 0.5 * (k0 - 1))]];
       case 'rewind': return [['巻き戻り時の回復（最大HP比）', 0, 2 * L, '%', 0, false, 2 * L0]];
       case 'flight': return [['上昇の勢い', 100, 100 * (1 + 0.02 * L), '%', 0, false, 100 * (1 + 0.02 * L0)]];
       case 'dash': case 'dash2': return [['突進の距離', 100, 100 * (1 + 0.03 * L), '%', 0, false, 100 * (1 + 0.03 * L0)]];
@@ -445,7 +445,7 @@
         const a = aim(60, true); if (!a.e) { G.ui.toastSmall('🎯 対象がいない'); ok = false; break; }
         const targets = [a.e];
         if (m.x_multi) for (const e of G.enemies.inRadius(a.e.pos, 10)) { if (targets.length >= 3) break; if (!targets.includes(e)) targets.push(e); }
-        for (const e of targets) { C.status(e, 'mark', p.dur); e.st.markMul = 1 + 0.6 * (1 + 0.5 * (ek - 1)); e.st.markKillReset = true; G.fx.ring(e.pos, 1.2, 0xff4030, 0.6); }
+        for (const e of targets) { C.status(e, 'mark', p.dur); e.st.markMul = 1 + 0.4 * (1 + 0.5 * (ek - 1)); e.st.markKillReset = true; G.fx.ring(e.pos, 1.2, 0xff4030, 0.6); }
         G.sfx.magic(a.e.pos, 'dark'); break;
       }
       case 'toxic': { const a = aim(40); C.zone(a.floorPt, p.r, p.dur, 'poison', sc(18), { stacks: m.x_virulent ? 2 : 1 }); G.sfx.spit(a.floorPt); break; }

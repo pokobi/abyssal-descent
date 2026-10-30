@@ -170,6 +170,7 @@
 
   A.cast = function (sk) {
     if (!sk || P.dead) return;
+    if (P.liftLock) { G.sfx.ui('deny'); G.ui.abilityDeny(sk); return; } // held up by the last guardian's gravity reversal (bosses6.js)
     if (!A.ready(sk)) { G.sfx.ui('deny'); G.ui.abilityDeny(sk); return; }
     if (A.isUlt(sk)) return A.castUlt(sk);
     const id = sk.id, prev = C.curSk;

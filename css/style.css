@@ -154,6 +154,9 @@ button { font-family: inherit; }
 .ab.ready { border-color: var(--gold); box-shadow: 0 0 10px rgba(217,180,106,0.25), inset 0 0 10px rgba(217,180,106,0.15); }
 .ab.flash { animation: abflash .45s; }
 .ab.empty { opacity: 0.35; }
+/* locked (the last guardian's gravity reversal): a red ring with a bar across */
+.ab.locked { filter: grayscale(0.8) brightness(0.7); animation: none !important; }
+.ab.locked::after { content: ''; position: absolute; inset: 6px; border: 3px solid rgba(255,70,60,0.9); border-radius: 50%; z-index: 4; background: linear-gradient(45deg, transparent calc(50% - 2px), rgba(255,70,60,0.9) calc(50% - 2px), rgba(255,70,60,0.9) calc(50% + 2px), transparent calc(50% + 2px)); pointer-events: none; }
 .ab.active-on { border-color: #ffd36a; box-shadow: 0 0 14px rgba(255,200,90,0.6); }
 .ab .bar { position: absolute; left: 0; bottom: 0; height: 3px; background: #ffd36a; z-index: 3; }
 

@@ -175,6 +175,15 @@
       this.pose(0);
     }
     // what the crown breaking leaves: no crown or breastplate, the void core bared, horns, the gravity rings, violet light
+    // the weak point moves from the crowned head to the core: the head becomes body, the chest sphere sits behind the core (the breastplate is gone),
+    // and the core's own sphere is the black sphere itself (2.9 m in body units, at the core's centre)
+    coreHits() {
+      const hw = this.main.hitW, J = this.J;
+      if (hw.some((h) => h.n === J.core)) return;
+      hw[4].part = 'body';
+      hw[0].r = 6.8 * SC; hw[0].o.set(0, 10, -2.8);
+      hw.push({ n: J.core, r: 2.9 * SC, part: 'head', o: V(0, 0, 0), w: V() });
+    }
     avatarLook() {
       const J = this.J;
       J.crown.visible = false; J.plates.forEach((m) => { m.visible = false; }); J.core.visible = true; J.horns.visible = true; J.grav.forEach((g) => { g.visible = true; });
@@ -393,7 +402,7 @@
     // ---------------------------------------------------------------- choosing
     choose() {
       const f2 = this.form === 2, P = Pl();
-      const list = f2 ? [['starring', 2.2], ['rift', 2.2], ['lance', 2], ['clap', 2], ['gravity', this.lift ? 0 : 3.8]]
+      const list = f2 ? [['starring', 2.2], ['rift', 2.2], ['lance', 2], ['clap', 2], ['gravity', this.lift ? 0 : 3.0]]
         : [['slam', 3], ['sweep', 2.2], ['volley', 1.8], ['meteors', 1.4], ['hurl', 1.4]];
       if (!f2 && this.tearT <= 0) list.push(['tear', 6]);
       const ok = list.filter(([k, w]) => w > 0 && k !== this.last);
@@ -587,7 +596,7 @@
     // gravity reversal (second form): a violet circle; whoever stands in it when it goes off is thrown high, held, and smashed down
     // (its warning is a seal of its own, not the round warning every other attack uses: rotating runes, a hexagram, six pillars of light)
     a_gravity(a, dt) {
-      const P = Pl(), W = 1.7, R = 8.5, fl = this.floorY();
+      const P = Pl(), W = 2.0, R = 8.5, fl = this.floorY();
       if (this.lift) a.t = Math.max(a.t, W); // (the lift can outlast the attack clock: keep the gesture going)
       if (!a.zones) {
         a.zones = [this.clampFloor(P.pos.clone())];
@@ -623,15 +632,16 @@
       const P = Pl();
       if (BS.swapMerc) { BS.hurtMerc(BS.swapMerc, 1e9); G.fx.ring(P.pos.clone().setY(P.pos.y + 0.2), 4, VIO, 0.5); return; } // aimed at the mercenary: it is simply smashed (capped at half its health)
       this.lift = { ph: 'up', t: 0, top: Math.max(this.floorY(), P.pos.y) + TOP, hold: 1.5 };
-      P.grapple.state = 'none'; P.pileState = null; P.grounded = false;
-      G.ui.toast('🌀 重力が反転した！', 'warn'); if (G.sfx.gravLift) G.sfx.gravLift(); else G.sfx.magic(P.pos, 'dark'); P.addShake(0.5);
+      P.grapple.state = 'none'; P.pileState = null; P.grounded = false; this.lockSkills(true);
+      G.ui.toast('🌀 重力が反転した！ — スキル・ULT・グラップルは使えない', 'warn'); if (G.sfx.gravLift) G.sfx.gravLift(); else G.sfx.magic(P.pos, 'dark'); P.addShake(0.5);
     }
     updateLift(dt) {
       const L = this.lift, P = Pl(); if (!L) return;
       if (P.dead || G.game.state !== 'playing' && G.game.state !== 'inv') { if (P.dead) this.endLift(); return; }
       L.t += dt;
-      P.grapple.state = 'none'; P.pileState = null; P.dragT = Math.max(P.dragT || 0, 0.12);
-      P.vel.x *= Math.exp(-3 * dt); P.vel.z *= Math.exp(-3 * dt);
+      P.grapple.state = 'none'; P.pileState = null; this.lockSkills(true);
+      // just a little air control: you can drift, not run
+      { const hv = Math.hypot(P.vel.x, P.vel.z), cap = 1.8; if (hv > cap) { P.vel.x *= cap / hv; P.vel.z *= cap / hv; } }
       if (Math.random() < dt * 30) G.fx.add.spawn(P.pos.x + U.rand(-0.6, 0.6), P.pos.y + U.rand(0, 1.6), P.pos.z + U.rand(-0.6, 0.6), 0, L.ph === 'down' ? 8 : -3, 0, 0.6, 0.15, 0.02, 0.7, 0.4, 1.2, 0.9, 0, 0.3);
       if (L.ph === 'up') {
         P.liftVy = Math.min(34, (L.top - P.pos.y) * 3.2 + 3);
@@ -655,7 +665,12 @@
         } else if (P.pos.y < this.floorY() - 2) this.endLift(); // no floor under you: the void takes over
       }
     }
-    endLift() { const P = Pl(); this.lift = null; if (P) { P.liftVy = null; P.dragT = 0; } }
+    endLift() { const P = Pl(); this.lift = null; if (P) { P.liftVy = null; P.dragT = 0; } this.lockSkills(false); }
+    lockSkills(on) {
+      const P = Pl(); if (!P || (!on && !P.liftLock)) return;
+      P.liftLock = on;
+      const UI = G.ui; for (const el of [...(UI.abEls || []), UI.grEl, UI.pileEl]) if (el) el.classList.toggle('locked', on);
+    }
     col() { return this.form === 2 ? VIO : PINK; }
     // ---------------------------------------------------------------- the constructs (something to break for builds that cannot shoot across)
     updateConstructs(dt) {
@@ -769,7 +784,7 @@
         G.sfx.explosion(P.pos.clone().lerp(cp, 0.5), 2.4); if (G.sfx.shieldBreak) G.sfx.shieldBreak(P.pos); this.roar(0.25, 1.8); P.addShake(1.2);
         G.ui.banner('虚無の化身', '— 王冠は砕け、重力が裏返る —', true);
         // the weak point moves from the crowned head to the core
-        const hw = this.main.hitW; hw[4].part = 'body'; hw.push({ n: J.core, r: 3.4 * SC, part: 'head', o: V(0, 0, 0.8), w: V() });
+        this.coreHits();
         this.maxHp = this.hp2; this.hp = 1;
       }
       if (T >= 3.0 && !this.asc) {
@@ -932,7 +947,22 @@
       for (const h of this.holes.slice()) {
         if (!busy) h.t += dt;
         const k = Math.min(1, h.t / 0.8); h.g.scale.setScalar(0.01 + k); h.ring.rotation.z += dt * 3;
-        if (Math.random() < dt * 50) { const an = Math.random() * 6.28, r = U.rand(7, 14); G.fx.add.spawn(h.c.x + Math.cos(an) * r, h.c.y + U.rand(-2, 2), h.c.z + Math.sin(an) * r, -Math.cos(an) * r * 0.9, 0, -Math.sin(an) * r * 0.9, 1, 0.25, 0.05, 0.7, 0.4, 1.2, 0.9, 0, 0); }
+        const pulling = !busy && h.t > 0.6 && h.t < h.dur;
+        // streams of light spiralling in from all round it, along the floor
+        if (pulling) for (let i = 0; i < 3; i++) if (Math.random() < dt * 40) { const an = Math.random() * 6.28, r = U.rand(6, 24), sp = r * 1.1; G.fx.add.spawn(h.c.x + Math.cos(an) * r, Y2 + U.rand(0.2, 2.5), h.c.z + Math.sin(an) * r, -Math.cos(an + 0.35) * sp, 0, -Math.sin(an + 0.35) * sp, 0.9, 0.18, 0.03, 0.75, 0.45, 1.25, 0.9, 0, 0); }
+        // rings on the floor closing in on it
+        h.ringT -= dt;
+        if (pulling && h.ringT <= 0) { h.ringT = 0.45; const m = new THREE.Mesh(new THREE.RingGeometry(0.96, 1, 64), addM(0xc898ff, 0.5)); m.rotation.x = -Math.PI / 2; m.position.set(h.c.x, Y2 + 0.06, h.c.z); G.scene.add(m); h.rings.push({ m, r: 14 }); }
+        for (const rg of h.rings.slice()) { rg.r -= dt * 16; rg.m.scale.setScalar(Math.max(0.3, rg.r)); rg.m.material.opacity = 0.5 * Math.min(1, rg.r / 4); if (rg.r <= 0.4) { G.scene.remove(rg.m); rg.m.geometry.dispose(); rg.m.material.dispose(); h.rings.splice(h.rings.indexOf(rg), 1); } }
+        // at your feet: arrows towards it, and the air around you streaming its way
+        { const to = h.c.clone().sub(P.pos).setY(0), l = to.length(), on = pulling && l > 1 && l < 40 && !P.dead;
+          h.arrows.visible = on;
+          if (on) {
+            h.arrows.position.set(P.pos.x, P.pos.y + 0.06, P.pos.z); h.arrows.rotation.y = Math.atan2(-to.x, -to.z);
+            h.arrows.children.forEach((m, i) => { m.material.opacity = 0.35 + 0.45 * Math.max(0, Math.sin(G.game.time * 9 - i * 1.1)); });
+            const d = to.clone().normalize(), sp = 9 + Math.min(1, (h.t - 0.6) / 1.3) * 7;
+            for (let i = 0; i < 2; i++) if (Math.random() < dt * 30) { const q = P.pos.clone().add(V(U.rand(-3, 3), U.rand(0.2, 2.4), U.rand(-3, 3))).addScaledVector(d, -U.rand(0, 3)); G.fx.add.spawn(q.x, q.y, q.z, d.x * sp, 0, d.z * sp, 0.35, 0.1, 0.02, 0.85, 0.6, 1.3, 0.85, 0, 0); }
+          } }
         if (!busy && h.t > 0.6 && h.t < h.dur && !this.lift && !P.dead) {
           // up to 7 m/s: walking (6.2) is not enough, a run (9.7) gets you out
           const to = h.c.clone().sub(P.pos).setY(0), l = to.length();
@@ -941,21 +971,31 @@
           P.addShake(dt * 0.12);
         }
         if (h.t >= h.dur) {
-          G.scene.remove(h.g); this.holes.splice(this.holes.indexOf(h), 1);
+          this.dropHole(h);
           G.fx.explosion(h.c.clone(), 4, VIO, { decal: false }); G.sfx.explosion(h.c, 1.2);
           for (let i = 0; i < 14; i++) { const an = i / 14 * Math.PI * 2; C().spawnProjectile({ kind: 'darkorb', pos: h.c.clone().setY(Y2 + 1.4), vel: V(Math.sin(an), 0, Math.cos(an)).multiplyScalar(12), owner: 'enemy', dmg: 14 * this.dmgScale, radius: 0.55, life: 5, attacker: this.main }); }
         }
       }
     }
+    dropHole(h) {
+      dropG(h.g); dropG(h.arrows);
+      for (const rg of h.rings) { G.scene.remove(rg.m); rg.m.geometry.dispose(); rg.m.material.dispose(); }
+      const i = this.holes.indexOf(h); if (i >= 0) this.holes.splice(i, 1);
+    }
     spawnHole() {
       const S = this.stg, an = Math.random() * Math.PI * 2, on = Math.random() < 0.6, r = on ? U.rand(5, PR - 5) : PR + 4;
       const c = V(S.c.x + Math.cos(an) * r, Y2 + 2.6, S.c.z + Math.sin(an) * r);
       const g = new THREE.Group(); g.position.copy(c);
-      mesh(g, PG().sph, new THREE.MeshBasicMaterial({ color: 0x000000 }), 2.2, 2.2, 2.2);
-      const ring = mesh(g, PG().torus, new THREE.MeshBasicMaterial({ color: VIO, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }), 4.2, 4.2, 6, 0, 0, 0, 1.3);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xd080ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(16, 16, 1); g.add(sp);
+      mesh(g, PG().sph, new THREE.MeshBasicMaterial({ color: 0x000000 }), 1.0, 1.0, 1.0);
+      const ring = mesh(g, PG().torus, new THREE.MeshBasicMaterial({ color: VIO, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }), 1.8, 1.8, 2.5, 0, 0, 0, 1.3);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xd080ff, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(6, 6, 1); g.add(sp);
       g.scale.setScalar(0.01); G.scene.add(g);
-      this.holes.push({ c, g, ring, t: 0, dur: 4.2 });
+      // arrows at your feet pointing to it while it pulls (three chevrons), and rings on the floor closing in on it
+      const arrows = new THREE.Group(); arrows.visible = false; G.scene.add(arrows);
+      const chev = new THREE.Shape(); chev.moveTo(-0.45, 0); chev.lineTo(0, 0.42); chev.lineTo(0.45, 0); chev.lineTo(0.45, 0.16); chev.lineTo(0, 0.58); chev.lineTo(-0.45, 0.16); chev.closePath();
+      const cg = new THREE.ShapeGeometry(chev); cg.rotateX(-Math.PI / 2); // points along -z, flat on the floor
+      for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(cg, addM(0xe0c0ff, 0.7)); m.position.z = -1.2 - i * 0.7; arrows.add(m); }
+      this.holes.push({ c, g, ring, t: 0, dur: 4.2, arrows, rings: [], ringT: 0 });
       G.ui.toastSmall('⚠ 虚無の渦 — 強く引き寄せられる！ 走って逆へ'); if (G.sfx.rumble) G.sfx.rumble(1.4, 1.2);
     }
     rotL(x, y, z) { const c = Math.cos(this.yawB), s = Math.sin(this.yawB); return V(x * c + z * s, y, -x * s + z * c); } // a point in the body's own frame (it only ever turns about y)
@@ -1043,55 +1083,51 @@
       return a.t > a.rs[a.rs.length - 1].t0 + W + LIVE + 0.2;
     }
     // comet lance: a spear of light forms in its hand, a reticle marks where it lands; the strike throws out a ring you jump over
+    // (the disc on the floor is exactly the strike: R across; it fills in as the lance comes, a pillar of light marks it from anywhere)
     a_lance(a, dt) {
-      const P = Pl(), n = this.phase >= 4 ? 4 : 3, AIM = 1.05, FLY = 0.3, CYC = 1.7, R = 3.2;
+      const P = Pl(), n = this.phase >= 4 ? 3 : 2, AIM = 1.45, LOCK = 0.5, FLY = 0.45, CYC = 2.3, R = 3.2;
       const h = this.hands[0]; h.busy = true;
-      if (!a.g) { a.g = new THREE.Group(); G.scene.add(a.g); a.waves = []; a.i = 0; G.ui.toastSmall('⚠ 彗星の槍 — 着弾点から光の輪が広がる（ジャンプで越えられる）'); }
+      if (!a.g) { a.g = new THREE.Group(); G.scene.add(a.g); a.i = 0; G.ui.toastSmall('⚠ 彗星の槍 — 光の柱の円から離れろ'); }
       const lt = a.t - a.i * CYC;
       if (a.i < n && lt >= 0) {
         if (!a.cur) {
           const L = new THREE.Group(); a.g.add(L);
-          const core = new THREE.Mesh(PG().cyl8, addM(0xffffff, 1)); core.scale.set(0.22, 10, 0.22); core.rotation.x = Math.PI / 2; L.add(core);
-          const glow = new THREE.Mesh(PG().cyl8, addM(VIO, 0.55)); glow.scale.set(0.6, 10.5, 0.6); glow.rotation.x = Math.PI / 2; L.add(glow);
-          const tip = new THREE.Mesh(PG().cone, addM(0xf0e0ff, 1)); tip.scale.set(0.6, 2.4, 0.6); tip.rotation.x = Math.PI / 2; tip.position.z = 6; L.add(tip);
+          const core = new THREE.Mesh(PG().cyl8, addM(0xffffff, 1)); core.scale.set(0.3, 11, 0.3); core.rotation.x = Math.PI / 2; L.add(core);
+          const glow = new THREE.Mesh(PG().cyl8, addM(VIO, 0.6)); glow.scale.set(0.8, 11.5, 0.8); glow.rotation.x = Math.PI / 2; L.add(glow);
+          const tip = new THREE.Mesh(PG().cone, addM(0xf0e0ff, 1)); tip.scale.set(0.8, 3, 0.8); tip.rotation.x = Math.PI / 2; tip.position.z = 7; L.add(tip);
           const ret = new THREE.Group(); a.g.add(ret);
-          const o1 = new THREE.Mesh(new THREE.RingGeometry(R - 0.14, R, 64), addM(0xe0c8ff, 0)); o1.rotation.x = -Math.PI / 2; ret.add(o1);
-          const o2 = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), addM(0xffffff, 0)); o2.rotation.x = -Math.PI / 2; ret.add(o2);
-          const cr = [0, 1].map((i) => { const m = new THREE.Mesh(PL, addM(0xe0c8ff, 0)); m.rotation.x = -Math.PI / 2; m.rotation.z = i * Math.PI / 2; m.scale.set(0.08, R * 2 + 1.6, 1); ret.add(m); return m; });
+          const rim = new THREE.Mesh(new THREE.RingGeometry(R - 0.16, R, 64), addM(0xf0e0ff, 0)); rim.rotation.x = -Math.PI / 2; ret.add(rim);
+          const fill = new THREE.Mesh(new THREE.CircleGeometry(1, 48), addM(VIO, 0)); fill.rotation.x = -Math.PI / 2; fill.position.y = 0.01; ret.add(fill);
+          const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1, 12, 1, true), addM(0xe8d0ff, 0, gradTex())); ret.add(pil);
           const line = new THREE.Mesh(PG().box, addM(VIO, 0)); a.g.add(line);
-          a.cur = { L, ret, o1, o2, cr, line, tgt: null };
+          a.cur = { L, ret, rim, fill, pil, line, tgt: null };
           if (G.sfx.lanceCharge) G.sfx.lanceCharge(AIM / this.atkRate());
         }
         const c = a.cur, handP = h.pos.clone().add(V(0, 3, 0));
+        if (lt < AIM + FLY) {
+          if (lt < AIM - LOCK || !c.tgt) c.tgt = this.clampStage(P.pos.clone().add(P.vel.clone().setY(0).multiplyScalar(0.35)), 1.5);
+          const k = Math.min(1, lt / (AIM + FLY)); // the fill reaches the rim as it lands
+          c.ret.position.copy(c.tgt).setY(Y2 + 0.08);
+          c.rim.material.opacity = 0.55 + 0.4 * k; c.fill.scale.setScalar(Math.max(0.05, R * k)); c.fill.material.opacity = 0.18 + 0.25 * k;
+          c.pil.scale.set(1, 26, 1); c.pil.position.y = 13; c.pil.material.opacity = 0.25 + 0.35 * k;
+        }
         if (lt < AIM) {
           this.moveHand(h, this.home.clone().add(this.rotL(-18, 30, 14)), dt, 4); this.aimHand(h, dt, -0.8, 0, 0.9);
-          if (lt < AIM - 0.25 || !c.tgt) c.tgt = this.clampStage(P.pos.clone().add(P.vel.clone().setY(0).multiplyScalar(0.45)), 1.5);
           const k = lt / AIM;
           c.L.position.copy(handP); c.L.lookAt(c.tgt); c.L.scale.setScalar(0.3 + 0.7 * k);
-          c.ret.position.copy(c.tgt).setY(Y2 + 0.08); c.ret.rotation.y += dt * 2;
-          c.o1.material.opacity = 0.45 + 0.5 * k; c.o2.scale.setScalar(Math.max(0.2, R * (1 - k))); c.o2.material.opacity = 0.85; c.cr.forEach((m) => { m.material.opacity = 0.35 + 0.4 * k; });
-          const len = handP.distanceTo(c.tgt); c.line.position.copy(handP).lerp(c.tgt, 0.5); c.line.lookAt(c.tgt); c.line.scale.set(0.06, 0.06, len); c.line.material.opacity = 0.12 + 0.3 * k;
+          const len = handP.distanceTo(c.tgt); c.line.position.copy(handP).lerp(c.tgt, 0.5); c.line.lookAt(c.tgt); c.line.scale.set(0.06, 0.06, len); c.line.material.opacity = 0.1 + 0.25 * k;
         } else if (lt < AIM + FLY) {
           if (!c.from) { c.from = c.L.position.clone(); G.sfx.whoosh(0.5, 1.4); c.line.visible = false; }
           c.L.position.lerpVectors(c.from, c.tgt, (lt - AIM) / FLY);
           for (let i = 0; i < 3; i++) G.fx.add.spawn(c.L.position.x, c.L.position.y, c.L.position.z, U.rand(-1, 1), U.rand(-1, 1), U.rand(-1, 1), 0.4, 0.5, 0.05, 0.9, 0.7, 1.4, 1, 0, 0.5);
         } else {
-          G.fx.explosion(c.tgt.clone().setY(Y2 + 0.6), 2.6, VIO, { decal: false, noSmoke: true }); G.fx.flash(c.tgt.clone().setY(Y2 + 2), 0xe0c8ff, 120, 0.3, 30);
-          if (G.sfx.lanceHit) G.sfx.lanceHit(c.tgt); P.addShake(0.45);
-          if (Math.hypot(P.pos.x - c.tgt.x, P.pos.z - c.tgt.z) < R + 0.4 && P.pos.y < Y2 + 4) this.hit(28, 'aoe', c.tgt.clone());
-          // the ring: drawn band = tested band (0.55 m either side of its radius)
-          a.waves.push({ c: c.tgt.clone(), r: 0.5, sr: G.fx.shockRing(c.tgt.clone().setY(Y2), 0xe8d0ff, 0.55, PR * 2 + 6), hit: false });
+          G.fx.explosion(c.tgt.clone().setY(Y2 + 0.6), 2.2, VIO, { decal: false, noSmoke: true }); G.fx.flash(c.tgt.clone().setY(Y2 + 2), 0xe0c8ff, 100, 0.3, 25);
+          if (G.sfx.lanceHit) G.sfx.lanceHit(c.tgt); P.addShake(0.35);
+          if (Math.hypot(P.pos.x - c.tgt.x, P.pos.z - c.tgt.z) < R + 0.4 && P.pos.y < Y2 + 3) this.hit(18, 'aoe', c.tgt.clone());
           a.g.remove(c.L); a.g.remove(c.ret); a.g.remove(c.line); a.cur = null; a.i++;
         }
       } else if (a.i >= n) this.restHand(h, dt);
-      for (const wv of a.waves) {
-        if (wv.dead) continue;
-        wv.r += 15 * dt; wv.sr.set(wv.r, Math.max(0.2, 1 - wv.r / (PR * 2 + 6)));
-        const d = Math.hypot(P.pos.x - wv.c.x, P.pos.z - wv.c.z);
-        if (!wv.hit && Math.abs(d - wv.r) < 0.55 + 0.4 && P.pos.y < Y2 + 0.7) { wv.hit = true; this.hit(14, 'aoe', wv.c.clone()); P.vel.y = Math.max(P.vel.y, 4); }
-        if (wv.r > PR * 2 + 4) { wv.dead = true; wv.sr.dispose(); }
-      }
-      return a.i >= n && a.waves.every((w) => w.dead);
+      return a.i >= n && a.t > n * CYC - 0.2;
     }
     // the cage of palms: both hands stand on edge at either end of a band of light round you, then clap shut down its length.
     // The band is exactly as wide as the hands are long; step out of it sideways. The hands stay where they met for a moment: strike them.
@@ -1141,6 +1177,8 @@
       for (const h of this.hands) this.unplant(h);
       super.kill();
       TR.restoreAll(false); this._restoreQ = [];
+      // the sky floor is whole again at once (it stops being updated with the Avatar, so nothing may stay half-fallen)
+      if (this.stg && this.stg.segs) { for (const g of this.stg.segs) { g.state = 'up'; g.dy = 0; g.mesh.visible = true; g.mesh.position.y = 0; g.mesh.rotation.y = 0; g.mesh.material.emissive.setRGB(0, 0, 0); for (const c of g.cols) c.alive = true; } this._segQ = []; }
     }
     updateDeath(dt) {
       this.deathT += dt;
@@ -1176,7 +1214,7 @@
       if (this.act && this.act.lance) G.scene.remove(this.act.lance);
       for (const wv of (this.act && this.act.waves) || []) if (wv.sr && !wv.dead) wv.sr.dispose();
       const P = Pl(); if (P && P.liftVy != null) { P.liftVy = null; P.dragT = 0; }
-      for (const h of this.holes || []) G.scene.remove(h.g); this.holes = [];
+      for (const h of (this.holes || []).slice()) this.dropHole(h); this.holes = [];
     }
   }
   // keep a planned spot on the floor (never over the void around it)
@@ -1248,7 +1286,7 @@
   // (the second half is a secret: the first entry says nothing of it, and the second stays hidden in the codex until the crown has broken once)
   G.BOSSES.push(
     { id: 'sovereign', name: '虚無の君主', title: 'CRIMSON SOVEREIGN', icon: '🌑', rarity: 'legendary', desc: '深淵の最奥、紅い月の下、奈落の向こう岸にそびえる巨人。こちらからは決して届かない場所から、床を剥がし、巨大な手で叩き潰し、薙ぎ払う。', mech: ['エクストラの最終エリアに必ず現れる。戦いが始まると入口の足場は閉ざされる', '床が定期的に崩れて奈落になる（赤く光ってから約2秒）。落ちると最大HPの約40%のダメージを受け、近くの無事な床へ戻される', '叩きつけた手はしばらく床に残り、攻撃できる（ダメージ1.5倍）。薙ぎ払いは大きく吹き飛ばす', 'しばらくダメージが入らないと、こちら側に「虚晶の造物」が現れる。砕くと君主に大ダメージ'], field: true, ending: true },
-    { id: 'sovereign2', name: '虚無の化身', title: 'AVATAR OF THE VOID', icon: '🌌', rarity: 'legendary', codexOnly: true, desc: '王冠が砕けた君主の、真の姿。重力を裏返して戦う者を星々の只中へと引きずり上げ、天空の円い足場の周りを巡りながら攻め立てる。', mech: ['虚無の君主の王冠が砕けると現れる。重力が裏返り、天空の円い足場へと舞台が移る', '足場は扇形や渦巻き状に崩れ、しばらくすると戻る。落ちると大ダメージを受けて無事な足場へ戻される', '星の環・天の裂け目・彗星の槍・掌の檻で攻めてくる。胸の虚無核が弱点。閉じた両手は攻撃できる（ダメージ1.5倍）', '紫の紋章に入ると重力が反転し、高く打ち上げられてから叩きつけられる（最大HPの50%）', '虚無の渦はどこにでも開き、ほかの攻撃と重なることもある。強く引き寄せる（走れば逃げられる）'], field: true },
+    { id: 'sovereign2', name: '虚無の化身', title: 'AVATAR OF THE VOID', icon: '🌌', rarity: 'legendary', codexOnly: true, desc: '王冠が砕けた君主の、真の姿。重力を裏返して戦う者を星々の只中へと引きずり上げ、天空の円い足場の周りを巡りながら攻め立てる。', mech: ['虚無の君主の王冠が砕けると現れる。重力が裏返り、天空の円い足場へと舞台が移る', '足場は扇形や渦巻き状に崩れ、しばらくすると戻る。落ちると大ダメージを受けて無事な足場へ戻される', '星の環・天の裂け目・彗星の槍・掌の檻で攻めてくる。胸の虚無核が弱点。閉じた両手は攻撃できる（ダメージ1.5倍）', '紫の紋章に入ると重力が反転し、高く打ち上げられてから叩きつけられる（最大HPの50%）。空中では少しだけ動け、射撃はできるが、スキル・ULT・グラップルは使えない', '虚無の渦はどこにでも開き、ほかの攻撃と重なることもある。強く引き寄せる（走れば逃げられる）'], field: true },
   );
   G.BOSS_BY_ID = Object.fromEntries(G.BOSSES.map((b) => [b.id, b]));
   BS.CLS.sovereign = Sovereign; BS.CLS.sovereign2 = Sovereign; // (sovereign2: only ever built by the codex)

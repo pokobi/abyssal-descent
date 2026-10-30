@@ -333,7 +333,7 @@
         else this.vel.y -= g * dt;
       }
       // jump
-      if (this.jumpBuf > 0 && !this.pileState && !(this.dragT > 0)) {
+      if (this.jumpBuf > 0 && !this.pileState && !(this.dragT > 0) && this.liftVy == null) {
         if (this.grounded || this.coyote > 0) {
           this.vel.y = 7.6 * (1 + st.jumpPower) * (this.fieldJump || 1);
           if (this.sliding) { const run = this._slideRun; this.endSlide(); if (run) this._sjRun = true; const hs = Math.hypot(this.vel.x, this.vel.z); if (hs > 0) { const k = Math.min(1.08, 15 / hs); this.vel.x *= k; this.vel.z *= k; } }
@@ -630,7 +630,7 @@
         if (h) this.grapplePreview = { point: h.point, normal: h.normal, ok: h.t <= range && !h.c.noGrapple, dist: h.t };
         if (this.has('m_grapenemy')) { const eh = G.enemies.raycast(o, d, Math.min(range, h ? h.t : range), 0.3); if (eh && !eh.e.boss) this.grapplePreview = { point: o.clone().addScaledVector(d, eh.t), normal: d.clone().negate(), ok: true, dist: eh.t, enemy: eh.e }; }
       }
-      if (I.hit('grapple') && !this.pileState) {
+      if (I.hit('grapple') && !this.pileState && !this.liftLock) {
         if (gr.state === 'attached' || gr.state === 'firing') this.detachGrapple(false);
         else if (gr.state === 'none' && this.grappleCd <= 0) {
           const pv = this.grapplePreview;

@@ -171,7 +171,7 @@
     K.onFrame = function () {
       if (!G.world || !GM.run) return;
       if (G.world !== lastWorld) { lastWorld = G.world; prep(); at = null; for (const p of K.players.values()) p.at = null; }
-      if (GM.area !== lastArea) { lastArea = GM.area; for (const id of Object.keys(locks)) delete locks[id]; hold = null; pending = null; }
+      if (GM.area !== lastArea) { lastArea = GM.area; for (const id of Object.keys(locks)) delete locks[id]; hold = null; pending = null; if (K.clearViz) K.clearViz(); }
       const me = K.players.get(K.id);
       const want = !P.dead && !GM.transitioning ? gateAt(P.pos) : null;
       if (want !== at) {

@@ -68,7 +68,7 @@
 
   // ---------------- the people in the room ----------------
   K.addPlayer = function (id, name) {
-    const rp = { id, name, pos: V(), vel: V(), to: V(), yaw: 0, pitch: 0, hp: 1, maxHp: 1, dead: false, rev: 0, seen: performance.now(), body: null, w: '', mm: 0, gnd: 1, cr: 0, sp: 0, ads: 0, rl: 0, sw: 0, gd: 0, pl: 0, gr: 0, at: null, rtt: 0 };
+    const rp = { id, name, pos: V(), vel: V(), to: V(), yaw: 0, pitch: 0, hp: 1, maxHp: 1, dead: false, rev: 0, seen: performance.now(), body: null, w: '', ps: 0, tb: '', mm: 0, gnd: 1, cr: 0, sp: 0, ads: 0, rl: 0, sw: 0, gd: 0, pl: 0, gr: 0, at: null, rtt: 0 };
     K.players.set(id, rp);
     return rp;
   };
@@ -108,12 +108,14 @@
       hp: Math.round(P.hp), mx: Math.round(P.stats.maxHp), d: P.dead ? 1 : 0, r: P.revives,
       g: P.grounded ? 1 : 0, c: P.crouching || P.sliding ? 1 : 0, s: P.sprinting ? 1 : 0, a: Math.round((W.adsT || 0) * 10), w, m: mm ? 1 : 0,
       rl: !mm && P.weapon && P.weapon.reloading ? 1 : 0, sw: mm && W.meleeBusy && W.meleeBusy() ? 1 : 0, gd: mm && W.guarding && W.guarding() ? 1 : 0,
-      pl: P.pileState === 'charge' ? 1 : P.pileState === 'fall' ? 2 : 0, gr: P.grapple && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? 1 : 0 });
+      pl: P.pileState === 'charge' ? 1 : P.pileState === 'fall' ? 2 : 0, gr: P.grapple && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? 1 : 0,
+      ps: (P.st.burn > 0 ? 1 : 0) | (P.st.poison > 0 ? 2 : 0) | (P.st.shock > 0 ? 4 : 0) | (P.st.slow > 0 ? 8 : 0) | (P.invisT > 0 || P.smokeT > 0 ? 16 : 0) | (P.wardT > 0 ? 32 : 0),
+      tb: [...P.temps.values()].filter((t) => t.icon).slice(0, 4).map((t) => t.icon).join('') });
   };
   K.handlers.p = function (m) {
     const rp = K.players.get(m.i); if (!rp || m.i === K.id) return;
     rp.to.set(m.x, m.y, m.z); rp.vel.set(m.vx, m.vy, m.vz); rp.yaw = m.yaw; rp.pitch = m.pt; rp.hp = m.hp; rp.maxHp = m.mx; rp.dead = !!m.d; rp.rev = m.r;
-    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr;
+    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr; rp.ps = m.ps | 0; rp.tb = m.tb || '';
     if (rp.first === undefined) { rp.first = 1; rp.pos.copy(rp.to); }
     if (K.role === 'host') for (const o of K.players.keys()) if (o && o !== m.i) K.net.send(o, m);
   };
@@ -122,7 +124,13 @@
   K.handlers.pn = function (m, from) { const rp = K.players.get(from); if (rp) rp.rtt = Math.round(performance.now() - m.ts); };
 
   K.handlers.sh = function (m) {
-    if (m.i !== K.id) G.fx.tracer(V(...m.a), V(...m.b), 0xffd080, 0.03, 0.09);
+    if (m.i !== K.id) {
+      G.fx.tracer(V(...m.a), V(...m.b), 0xffd080, 0.03, 0.09);
+      try {
+        const d = G.player.pos.distanceTo(V(...m.a)), vol = Math.max(0.05, 0.8 - d / 80);
+        if (m.snd) { if (m.pj) G.sfx.launcher(m.snd); else G.sfx.gun(m.snd, { vol }); }
+      } catch (e) { /* a sound that cannot be played is not worth an error */ }
+    }
     if (K.role === 'host') for (const o of K.players.keys()) if (o && o !== m.i) K.net.send(o, m);
   };
 
@@ -277,6 +285,7 @@
       K.installGuest();
     }
     K.installSync();
+    K.installFx();
   };
   K.handlers.hi = function (m, from) {
     const rp = K.players.get(from); if (!rp) return;
@@ -316,11 +325,13 @@
     const sh = G.weapons.shoot;
     let shotT = 0;
     G.weapons.shoot = function (w, st) {
-      const r = sh.call(G.weapons, w, st), now = performance.now();
+      K.own++;
+      let r; try { r = sh.call(G.weapons, w, st); } finally { K.own--; }
+      const now = performance.now();
       if (K.live && now - shotT > 110) {
         shotT = now;
-        const P = G.player, c = G.camera, d = V(0, 0, -1).applyQuaternion(c.quaternion), a = P.chestPos().add(d.clone().multiplyScalar(0.6)), b = a.clone().addScaledVector(d, 45);
-        K.send({ t: 'sh', i: K.id, a: K.vec(a), b: K.vec(b) });
+        const P = G.player, c = G.camera, d = V(0, 0, -1).applyQuaternion(c.quaternion), a = P.chestPos().add(d.clone().multiplyScalar(0.6)), b = a.clone().addScaledVector(d, st && st.proj ? 12 : 45);
+        K.send({ t: 'sh', i: K.id, a: K.vec(a), b: K.vec(b), snd: st && st.sound || '', pj: st && st.proj ? 1 : 0 });
       }
       return r;
     };

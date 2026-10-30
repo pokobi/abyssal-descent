@@ -188,7 +188,7 @@
     K.quietKill = K.makeQuietKill(ke);
     C.killEnemy = function (e, info, ov) {
       if (info && info.remote !== undefined) { e._killer = info.remote; return K.quietKill(e, info); }
-      if (e._nid) e._killer = 0;
+      if (e._nid) e._killer = info && info.src === 'dot' && e._dotBy ? e._dotBy : 0;
       return ke.call(C, e, info, ov);
     };
     const find = (id) => (id < 0 ? BS.active && BS.active.parts[-id - 1] : known.get(id));
@@ -201,9 +201,17 @@
           const mul = e.dmgMul, sh = e.shield, mk = e.st.mark; e.dmgMul = null; e.shield = 0; e.st.mark = 0;
           try { dm.call(C, e, dh, { src: 'dot', silent: true, noBuffs: true, remote: from, proc: true, noSkOn: true }); } finally { if (e.alive) { e.dmgMul = mul; e.shield = sh; e.st.mark = mk; } }
         }
-        if (cc === 1) C.status(e, 'frost', 1);
-        if (cc > 1) C.stun(e, cc - 1);
         if (kn && !e.boss && e.knockback) e.knockback(V(kn[0], 0, kn[1]), kn[2]);
+      }
+    };
+    // what the guests are told of a foe's statuses (shown there), and what a guest puts on a foe (merged in here, where it ticks)
+    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark'];
+    K.statusBits = (e) => { let b = 0; SB.forEach((k, i) => { if (e.st[k] > 0) b |= 1 << i; }); return b; };
+    K.handlers.ss = function (m, from) {
+      for (const [id, o] of m.a) {
+        const e = find(id); if (!e || !e.alive || e.dying) continue;
+        for (const k in o) e.st[k] = Math.max(+e.st[k] || 0, o[k]);
+        e._dotBy = from;
       }
     };
     K.handlers.trap = function (m) { const d = G.ENEMY_BY_ID.mimic_trap; if (d) GM.spawnEnemy({ def: d, at: { x: m.p[0], y: m.p[1], z: m.p[2] } }); };
@@ -236,7 +244,7 @@
           add.push([e._nid, e.def.id, e.level, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), e.maxHp, Math.round(e.shield), e.maxShield, e.elite ? 1 : 0, r2(e.model.scale / (e.elite ? 1.15 : 1)), e.def.name, (e.noReward ? 1 : 0) | (e.noLoot ? 2 : 0) | (e.bossSpawn ? 4 : 0) | (e.cursed ? 8 : 0) | (e.champion ? 16 : 0) | (e.marked ? 32 : 0)]);
         }
         const fl = (e.burrowed ? 1 : 0) | (e.untargetable ? 2 : 0) | (e.invuln ? 4 : 0) | (e.st.stun > 0 ? 8 : 0) | (e.st.frozen > 0 ? 16 : 0) | (e.state === 'spawn' ? 32 : 0) | (e.model.group.visible ? 0 : 64);
-        snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0)]);
+        snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0), K.statusBits(e), [e.st.poisonStacks | 0, e.st.frostStacks | 0, e.st.burnLv | 0, e.st.markMul || 0]]);
       }
       if (add.length) K.send({ t: 'es', a: add });
       for (const [id, e] of known) {

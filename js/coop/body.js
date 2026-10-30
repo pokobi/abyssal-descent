@@ -50,8 +50,14 @@
     const x = c.getContext('2d'); x.font = '700 28px sans-serif'; x.textAlign = 'center'; x.lineWidth = 5; x.strokeStyle = '#000'; x.strokeText(name, 128, 34); x.fillStyle = '#ffe2a0'; x.fillText(name, 128, 34);
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));
     tag.scale.set(1.6, 0.3, 1); tag.position.y = 2.1; tag.renderOrder = 6; root.add(tag);
+    // the effects running on them (icons of the ultimate / skill buffs), a soft glow while any is up
+    const bc = document.createElement('canvas'); bc.width = 256; bc.height = 48;
+    const badge = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(bc), transparent: true, depthTest: false }));
+    badge.scale.set(1.6, 0.3, 1); badge.position.y = 2.38; badge.renderOrder = 6; badge.visible = false; root.add(badge);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xffd27a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.scale.set(2.2, 2.8, 1); glow.position.y = 1.0; root.add(glow);
     root.traverse((o) => { o.frustumCulled = false; });
-    return { root, J, ph: 0, sw: 0, swT: 9, holdKey: '', hold: null, tag };
+    return { root, J, ph: 0, sw: 0, swT: 9, holdKey: '', hold: null, tag, badge, bc, glow, tbKey: null };
   };
 
   // what is in the hand: the same display model the shop uses, turned so the barrel (or the blade) points where the figure looks
@@ -75,7 +81,31 @@
     B.hold = w; B.J.hold.add(w);
   }
 
+  const PSC = [[1, 0xff7a20], [2, 0x6ad040], [4, 0xffe060], [8, 0x70b0ff], [32, 0xd0b0ff]];
+  function effects(B, rp, dt) {
+    const key = rp.tb || '';
+    if (B.tbKey !== key) {
+      B.tbKey = key;
+      const x = B.bc.getContext('2d'); x.clearRect(0, 0, 256, 48); x.font = '30px sans-serif'; x.textAlign = 'center';
+      if (key) x.fillText(key, 128, 36);
+      B.badge.material.map.needsUpdate = true; B.badge.visible = !!key;
+    }
+    let col = 0, k = 0;
+    for (const [bit, c] of PSC) if (rp.ps & bit) { col = c; k = 0.4; }
+    if (rp.tb) { col = col || 0xffd27a; k = Math.max(k, 0.35); }
+    B.glow.material.opacity += ((rp.dead ? 0 : k) - B.glow.material.opacity) * Math.min(1, dt * 6);
+    if (col) B.glow.material.color.setHex(col);
+    const p = rp.pos, R = Math.random;
+    if ((rp.ps & 1) && R() < dt * 14) G.fx.flameLick(p.x + U.rand(-0.3, 0.3), p.y + U.rand(0.2, 1.6), p.z + U.rand(-0.3, 0.3), 0.8);
+    if ((rp.ps & 2) && R() < dt * 6) G.fx.norm.spawn(p.x, p.y + 1.2, p.z, U.rand(-0.3, 0.3), -0.5, U.rand(-0.3, 0.3), 0.8, 0.12, 0.3, 0.4, 0.8, 0.1, 0.7, 0, 0);
+    if ((rp.ps & 4) && R() < dt * 8) G.fx.sparks(V(p.x, p.y + 1.1, p.z), null, 2, 0xfff0a0, 3);
+    const inv = !!(rp.ps & 16);
+    if (inv || B.inv) B.root.traverse((o) => { if (o.isMesh) o.visible = !inv || ((G.game.time * 6) % 1) < 0.35; });
+    B.inv = inv;
+  }
+
   K.animBody = function (B, rp, dt) {
+    effects(B, rp, dt);
     const J = B.J, k = Math.min(1, dt * 12), t = G.game.time;
     const sp = Math.hypot(rp.vel.x, rp.vel.z), amp = Math.min(1, sp / 5.5), air = !rp.gnd && Math.abs(rp.vel.y) > 0.5;
     holdModel(B, rp);

@@ -82,7 +82,6 @@
     // ---------------- foes ----------------
     function repUpdate(dt) {
       if (this.dying) return this.updateDeath(dt);
-      C.updateStatus(this, dt);
       if (!this.alive) return;
       const k = Math.min(1, dt * 12), n = this._n;
       const px = this.pos.x, pz = this.pos.z;
@@ -93,12 +92,31 @@
       this.walk += sp2 * dt * 1.2;
       this.flinch = Math.max(0, this.flinch - dt * 3);
       this.atk = n.atk; this.wind = n.wind;
-      this.st.stun = n.fl & 8 ? 1 : 0; this.st.frozen = n.fl & 16 ? 1 : 0;
+      K.mirrorStatus(this, n, dt);
       this.burrowed = !!(n.fl & 1); this.untargetable = !!(n.fl & 2); this.invuln = !!(n.fl & 4);
       this.model.group.visible = !(n.fl & 64);
       this.animate(dt);
       this.updateHits();
     }
+    // The host's statuses are what a foe really has: they are shown from its snapshots (and tick there). A status you put on it yourself shows at once and is
+    // sent to the host (C.status / C.stun below); nothing ticks damage here, so one burn is never counted twice.
+    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark'];
+    K.mirrorStatus = function (e, n, dt) {
+      const s = e.st, mine = e._ssT > performance.now() - 600;
+      SB.forEach((k, i) => {
+        if (n.sb & (1 << i)) s[k] = Math.max(s[k] || 0, 0.5);
+        else if (!mine && s[k] > 0) s[k] = 0;
+        else if (s[k] > 0) s[k] -= dt;
+      });
+      if (n.sx) { s.poisonStacks = n.sx[0]; s.frostStacks = n.sx[1]; s.burnLv = n.sx[2]; s.markMul = n.sx[3] || s.markMul; s.bleedLv = 1; s.shockLv = 1; }
+      // the particles of each (the damage that goes with them is the host's)
+      const c = e.centerPos(), R = Math.random;
+      if (s.burn > 0 && R() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8);
+      if (s.poison > 0 && R() < dt * 5) G.fx.norm.spawn(e.pos.x, e.pos.y + e.height * 0.6, e.pos.z, U.rand(-0.3, 0.3), -0.5, U.rand(-0.3, 0.3), 0.8, 0.12, 0.3, 0.4, 0.8, 0.1, 0.7, 0, 0);
+      if (s.bleed > 0 && R() < dt * 6) G.fx.blood(c, null, e.bloodColor, 1);
+      if (s.shock > 0 && R() < dt * 8) G.fx.sparks(c, null, 2, 0xfff0a0, 3);
+    };
+    const U = G.U;
     K.handlers.es = function (m) {
       for (const a of m.a) {
         const [id, did, lvl, x, y, z, yaw, hp, mx, sh, msh, el, sc, name, fl] = a;
@@ -120,7 +138,7 @@
       const now = performance.now();
       for (const a of m.e) {
         const e = reps.get(a[0]); if (!e || !e.alive) continue;
-        const n = e._n; n.pos.set(a[1], a[2], a[3]); n.yaw = a[4]; n.fl = a[7]; n.atk = a[8]; n.wind = a[9]; n.mv = a[10];
+        const n = e._n; n.pos.set(a[1], a[2], a[3]); n.yaw = a[4]; n.fl = a[7]; n.atk = a[8]; n.wind = a[9]; n.mv = a[10]; n.sb = a[11] | 0; n.sx = a[12];
         // your own last hits are ahead of what the host has seen yet
         if (!(e._hitT > now - 400)) { e.hp = a[5]; e.shield = a[6]; }
       }
@@ -146,17 +164,22 @@
       const r = dm.call(C, e, amount, info);
       const dh = h0 - e.hp, ds = s0 - (e.shield || 0);
       if (dh > 0 || ds > 0) { e._hitT = performance.now(); e._pk = info || e._pk; pushHit(e, dh, ds); }
+      // (the real kill is the host's: until its word comes the foe stands at 1)
       if (e.hp <= 0 && e.alive) e.hp = 1;
       return r;
     };
     function pushHit(e, dh, ds, cc, kn) { hits.push([e._nid, r2(Math.max(0, dh)), r2(Math.max(0, ds)), cc || 0, kn || 0]); }
     C.killEnemy = function (e, info, ov) {
-      if (!net && remoteOf(e) && !(info && info.src === 'clear')) { if (e.alive) e.hp = Math.max(1, e.hp); return; }
+      if (!net && remoteOf(e) && !(info && info.src === 'clear')) return; // (health is read back by C.damageEnemy above, after this: clamping it here would swallow the blow that kills)
       return ke.call(C, e, info, ov);
     };
-    // a freeze and a stun must stop the real foe: they travel with the hits
-    C.status = function (e, kind, stacks) { const r = st0.call(C, e, kind, stacks); if (kind === 'frost' && remoteOf(e)) pushHit(e, 0, 0, 1); return r; };
-    C.stun = function (e, t) { const r = stun0.call(C, e, t); if (remoteOf(e)) pushHit(e, 0, 0, 1 + t); return r; };
+    // a status you put on a foe is worked out here with your build, then handed to the host in full (it ticks the damage there)
+    const SS = ['burn', 'burnPow', 'burnLv', 'burnDps', 'poison', 'poisonPow', 'poisonStacks', 'bleed', 'bleedDps', 'bleedLv', 'frost', 'frostStacks', 'frozen', 'shock', 'shockLv', 'stun', 'slow', 'root', 'fear', 'mark', 'markMul', 'markKillReset'];
+    const ssOut = new Map();
+    const sendStatus = (e) => { e._ssT = performance.now(); const o = {}; for (const k of SS) if (e.st[k]) o[k] = e.st[k] === true ? 1 : +(+e.st[k]).toFixed(2); ssOut.set(e._nid, o); };
+    C.status = function (e, kind, stacks) { const r = st0.call(C, e, kind, stacks); if (remoteOf(e)) sendStatus(e); return r; };
+    C.stun = function (e, t) { const r = stun0.call(C, e, t); if (remoteOf(e)) sendStatus(e); return r; };
+    K.flushStatus = function () { if (ssOut.size) { K.send({ t: 'ss', a: [...ssOut] }); ssOut.clear(); } };
     // ---------------- what comes down the wire and hurts ----------------
     K.handlers.dmg = function (m) {
       C.damagePlayer(m.a, { src: m.s, elem: m.e, fixed: !!m.f, pos: m.p ? V(...m.p) : null });
@@ -237,6 +260,7 @@
     // ---------------- once per net beat ----------------
     K.onNet = function () {
       if (hits.length) { K.send({ t: 'hit', h: hits }); hits = []; }
+      K.flushStatus();
       if (!GM.run || !G.world) return;
       if (GM.bossEngaged && !K._engaged) { K._engaged = true; K.send({ t: 'engage' }); }
       for (const e of E.list) if (e._stray) { e._stray = false; e.alive = false; e.remove(); e.removed = true; }

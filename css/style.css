@@ -1579,3 +1579,17 @@ body.inv-open #tut .tut-tip { display: none; }
 .cost-tag, .reward-tag { display: inline-block; margin-right: 6px; padding: 0 7px; border-radius: 4px; font-size: 0.86em; font-weight: 900; letter-spacing: 1px; }
 .cost-tag { color: #fff0ec; background: linear-gradient(180deg, #d4402e, #8e1e14); box-shadow: 0 0 8px rgba(255,70,50,0.45); }
 .reward-tag { color: #0e2a0c; background: linear-gradient(180deg, #9ee08e, #5aa84a); }
+/* ---------------- scrollbars: the game's own, in place of the browser's grey ones (every scrollable area) ---------------- */
+/* a dark groove with a thin gold edge; a thumb in the same gold-grey as the panel frames, brighter under the cursor and while dragged */
+* { --sb-thumb: rgba(220,190,130,0.38); --sb-thumb-hi: rgba(255,210,122,0.78); }
+*::-webkit-scrollbar { width: 11px; height: 11px; background: transparent; }
+*::-webkit-scrollbar-track { background: rgba(8,7,6,0.85); border-left: 1px solid rgba(220,190,130,0.16); border-radius: 0; }
+*::-webkit-scrollbar-track:horizontal { border-left: 0; border-top: 1px solid rgba(220,190,130,0.16); }
+*::-webkit-scrollbar-thumb { background: var(--sb-thumb); background-clip: padding-box; border: 2px solid transparent; border-radius: 6px; min-height: 36px; min-width: 36px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hi); background-clip: padding-box; border: 2px solid transparent; }
+*::-webkit-scrollbar-thumb:active { background: #ffd27a; background-clip: padding-box; border: 2px solid transparent; }
+*::-webkit-scrollbar-corner { background: rgba(8,7,6,0.85); }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+/* browsers without the webkit pieces (Firefox): the same colours through the standard properties */
+@supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: rgba(220,190,130,0.45) rgba(8,7,6,0.85); } }
+html.m *::-webkit-scrollbar { width: 6px; height: 6px; }

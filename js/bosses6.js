@@ -1222,6 +1222,8 @@
       // the sky floor is whole again at once (it stops being updated with the Avatar, so nothing may stay half-fallen)
       if (this.stg && this.stg.segs) { for (const g of this.stg.segs) { g.state = 'up'; g.dy = 0; g.mesh.visible = true; g.mesh.position.y = 0; g.mesh.rotation.y = 0; g.mesh.material.emissive.setRGB(0, 0, 0); for (const c of g.cols) c.alive = true; } this._segQ = []; }
     }
+    // where the rift of light opens when it falls: the middle of the sky floor
+    riftSpot() { return this.stg ? this.stg.c.clone().setY(Y2) : this.world.arenaCenter.clone().setY(0); }
     updateDeath(dt) {
       this.deathT += dt;
       const T = this.deathT, J = this.J, P = Pl();

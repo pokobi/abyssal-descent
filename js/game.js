@@ -438,6 +438,7 @@
   };
   GM.toTitle = function () {
     if (G.Tutorial.active) G.Tutorial.stop();
+    G.Rift.clear();
     GM.state = 'title';
     GM.mood = null; GM.stage = 'title'; GM.stopDread(); G.Depth.endArea(); const mv = document.getElementById('mood-vig'); if (mv) mv.style.opacity = 0;
     I.exitLock();
@@ -1127,7 +1128,7 @@
     const flawless = GM.areaDamage <= 0;
     if (flawless && stage !== 'trial') { const b = Math.round((80 + n * 10) * (P.has('e_flawless') ? 2 : 1)); setTimeout(() => { G.combat.coins(b, null, '無傷'); G.ui.feed(`🏅 無傷ボーナス +${b}`, 'big'); }, 900); }
     G.buffs.emit('onAreaClear', { flawless, time: t });
-    if (stage !== 'trial') G.ui.banner(bossKill && G.Run.isLast(GM.area) ? 'THE END' : 'AREA CLEAR', bossKill ? (G.Run.isLast(GM.area) ? '— 最後の守護者は倒れた —' : '— 守護者は倒れた —') : '— 次の道を選べ —');
+    if (stage !== 'trial') G.ui.banner(bossKill && G.Run.isLast(GM.area) ? 'FALLEN' : 'AREA CLEAR', bossKill ? (G.Run.isLast(GM.area) ? '— 最後の守護者は倒れた —' : '— 守護者は倒れた —') : '— 次の道を選べ —');
     G.sfx.ui('clear');
     if (!(bossKill && G.Run.isLast(GM.area))) G.Areas.openGates(); // the last guardian ends the run: no road onward
     if (stage !== 'boss') setTimeout(() => G.Areas.spawnMiniShop(), 600);
@@ -1135,7 +1136,7 @@
     G.save.write();
     const reward = opts.reward || (bossKill || stage === 'elite' ? 'boost' : stage === 'cursed' ? 'double' : stage === 'vault' ? 'none' : 'buff');
     if (reward === 'none') { setTimeout(() => GM.healNotice(), 2600); return; }
-    if (bossKill && G.Run.isLast(n)) return; // the run is over: the clear screen follows
+    if (bossKill && G.Run.isLast(n)) return; // the run is over: the rift of light leads to the clear screen
     GM.rewardPending = { reward, boss: bossKill, n };
     setTimeout(() => GM.giveReward(GM.rewardPending), 1600);
   }
@@ -1170,8 +1171,9 @@
   };
   GM.onBossDefeated = function (boss) {
     if (G.Run.isLast(GM.area)) {
-      G.ui.banner('深淵を制した', `— ${G.Run.label()} クリア —`, true);
-      setTimeout(() => GM.victory(), 3800);
+      // the run ends through the rift of light that opens now (rift.js), not by itself
+      const spot = boss && boss.riftSpot ? boss.riftSpot() : G.world.arenaCenter.clone().setY(0);
+      setTimeout(() => { if (GM.stage === 'boss' && !P.dead) G.Rift.open(spot, !!(boss && boss.def.id === 'sovereign')); }, 1800);
     }
     const c = G.world.arenaCenter, lastOne = G.Run.isLast(GM.area); // the last guardian ends the run: no chest, no road onward
     if (!lastOne) G.Props.chest(G.world, c.x, c.z, 0, 0, 3);
@@ -1629,6 +1631,7 @@
       const perp = Math.sqrt(Math.max(0, d * d - t * t));
       if (perp < r && d < bd) { bd = d; best = data; }
     };
+    if (G.Rift.active()) { const q = G.Rift.reach(); consider(G.Rift.target(), q.r, { type: 'rift' }, q.d); }
     if (GM.shop) {
       for (const o of GM.shop.offers) if (!o.sold) consider(o.pos, 0.6, { type: 'offer', o });
       if (GM.stage === 'shop') {
@@ -1700,6 +1703,8 @@
       const left = Math.max(0, 2 - (best.it.used || 0));
       if (left <= 0) G.ui.showInteract({ key: 'cauldron0', icon: '⚗️', name: '練成の釜（火は消え、冷え切っている）', rc: '#7a8480', cat: '練成終了（残り 0 / 2回）', desc: '「釜の火は消え去った。深淵の恵みはここまでだ…」', action: null });
       else G.ui.showInteract({ key: 'cauldron' + left, icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: `防具・武器・アタッチメント・消耗品・金品の練成（残り ${left} / 2回）`, desc: '同種・同レアリティの品を2つ掛け合わせ、1段階上位の品へと練成する。', action: '練成する' });
+    } else if (best.type === 'rift') {
+      G.ui.showInteract({ key: 'rift', icon: '✨', name: '光の裂け目', rc: '#ffe6a8', cat: 'この先に、深淵の外の光が見える', desc: '', action: '入る' });
     } else if (best.type === 'corpse') {
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;
@@ -1843,6 +1848,7 @@
   function deny(msg) { G.sfx.ui('error'); G.ui.shakeInteract(); if (msg) G.ui.toastSmall(msg); }
   function doInteract(t) {
     const run = GM.run;
+    if (t.type === 'rift') return G.Rift.enter();
     if (t.type === 'chest') { if (t.it.trap) { t.it.opened = true; G.ui.showInteract(null); return G.Areas.springTrap(t.it); } return openChest(t.it); }
     if (t.type === 'npc') return G.Areas.runEvent(t.it);
     if (t.type === 'shrine') return G.Areas.useShrine(t.it);
@@ -2299,6 +2305,7 @@
     G.Depth.update(gdt);
     G.PStatus.update(gdt);
     G.HudX.update(gdt);
+    G.Rift.update(gdt);
     if (GM.stage === 'boss' && GM.bossStartT > 0) { GM.bossStartT -= gdt; if (GM.bossStartT <= 0) G.bosses.start(G.bosses.forArea(GM.area), GM.area, G.world); }
     updateInteraction(gdt);
     G.Inv.tick(gdt);

@@ -680,7 +680,9 @@
     const GM = G.game, opts = [];
     for (let i = 1; i <= GM.SLOTS; i++) {
       const d = GM.loadRun(i), tx = slotText(i);
+      // every slot always has its row (an empty one is greyed out), so the rows never move however many records there are
       if (d) opts.push({ icon: '▶', label: tx.label, sub: tx.sub, onPick: () => GM.continueRun(i), aside: { icon: '🗑', tip: 'この記録を消す', onPick: () => UI.slotConfirmDelete(i, back) } });
+      else opts.push({ icon: '・', label: tx.label, sub: '記録なし', disabled: true, aside: { icon: '🗑', hidden: true } });
     }
     UI.choice('▶ 続きから', 'どの記録から再開しますか？（右端の🗑で消せます）', opts, back);
   };
@@ -853,8 +855,8 @@
   // the player's money in a bold framed box (merchant, pawn shop, vending stone, gambling ...)
   UI.coinBox = (cls) => `<div class="coinbox ${cls || ''}"><span>🪙</span><b>${U.fmt((G.game.run && G.game.run.coins) || 0)}</b><small>所持金</small></div>`;
   UI.choice = function (title, desc, options, cancel) {
-    const s = UI.screen(`<div class="panel" style="width:min(520px,94vw);position:relative">${/所持 🪙/.test(desc || '') ? UI.coinBox('float') : ''}<h2>${title}</h2><div style="font-size:13.5px;color:#ddd3c0;line-height:1.6">${desc || ''}</div><div class="choice-list">${options.map((o, i) => `<div class="choice${o.disabled ? ' disabled' : ''}" data-i="${i}" ${o.tip ? o.tip : ''}><span class="ci">${o.icon}</span><div style="flex:1"><b>${U.esc(o.label)}</b>${o.sub ? `<div style="font-size:12px;color:var(--dim)">${o.sub}</div>` : ''}</div>${o.aside ? `<button class="choice-aside" data-i="${i}" title="${U.esc(o.aside.tip || '')}">${o.aside.icon}</button>` : ''}</div>`).join('')}</div>${cancel ? '<div style="margin-top:14px;text-align:right"><button class="btn small" id="c-cancel">キャンセル</button></div>' : ''}</div>`, 'dim');
-    s.querySelectorAll('.choice-aside').forEach((el) => el.onclick = (ev) => { ev.stopPropagation(); G.sfx.ui('click'); options[+el.dataset.i].aside.onPick(); });
+    const s = UI.screen(`<div class="panel" style="width:min(520px,94vw);position:relative">${/所持 🪙/.test(desc || '') ? UI.coinBox('float') : ''}<h2>${title}</h2><div style="font-size:13.5px;color:#ddd3c0;line-height:1.6">${desc || ''}</div><div class="choice-list">${options.map((o, i) => `<div class="choice${o.disabled ? ' disabled' : ''}" data-i="${i}" ${o.tip ? o.tip : ''}><span class="ci">${o.icon}</span><div style="flex:1"><b>${U.esc(o.label)}</b>${o.sub ? `<div style="font-size:12px;color:var(--dim)">${o.sub}</div>` : ''}</div>${o.aside ? `<button class="choice-aside" data-i="${i}" title="${U.esc(o.aside.tip || '')}"${o.aside.hidden ? ' style="visibility:hidden" tabindex="-1"' : ''}>${o.aside.icon}</button>` : ''}</div>`).join('')}</div>${cancel ? '<div style="margin-top:14px;text-align:right"><button class="btn small" id="c-cancel">キャンセル</button></div>' : ''}</div>`, 'dim');
+    s.querySelectorAll('.choice-aside').forEach((el) => el.onclick = (ev) => { ev.stopPropagation(); G.sfx.ui('click'); const a = options[+el.dataset.i].aside; if (a && a.onPick) a.onPick(); });
     s.querySelectorAll('.choice').forEach((el) => el.onclick = () => {
       const o = options[+el.dataset.i];
       // unaffordable / unavailable options are greyed out and simply don't respond

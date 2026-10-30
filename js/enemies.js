@@ -1431,13 +1431,15 @@
     for (const b of E.bars) { b.el.style.display = 'none'; b.used = false; }
   };
   E.aliveCount = function () { let n = 0; for (const e of E.list) if (e.alive && !e.ally && !e.ignoreCount) n++; return n; };
+  const SHIELD_K = 1.6; // the shield bubble is drawn at this many body radii
+  E.shieldK = SHIELD_K;
   E.inRadius = function (pos, r) {
     const out = [];
     for (const e of E.list) {
       if (!e.alive || e.burrowed || e.untargetable) continue;
       if (e.hitW && e.multiPart) { if (e.hitW.some((h) => h.w.distanceTo(pos) < r + h.r)) out.push(e); continue; }
       const c = e.centerRef || e.pos;
-      if (c.distanceTo(pos) < r + e.radius) out.push(e);
+      if (c.distanceTo(pos) < r + e.radius * (e.shield > 0 ? SHIELD_K : 1)) out.push(e);
     }
     return out;
   };
@@ -1465,6 +1467,12 @@
       for (const h of e.hitW) {
         const t = raySphere(o, d, h.w, h.r + pad);
         if (t >= 0 && t < best) { best = t; part = h.part; }
+      }
+      // a foe wearing a shield is hit all over the bubble (the size the bubble is drawn at, see combat.js) and has no weak spot until it breaks
+      if (e.shield > 0 && e.radius) {
+        const c = e.centerRef || e.pos, t = raySphere(o, d, c, e.radius * SHIELD_K + pad);
+        if (t >= 0 && t < best) best = t;
+        if (best < Infinity) part = 'body';
       }
       if (best < maxT) out.push({ e, t: best, part, key: best + (e.isInvuln && e.isInvuln({}) ? 1.6 : 0) });
     }

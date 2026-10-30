@@ -164,6 +164,8 @@
   C.damageEnemy = function (e, amount, info) {
     if (!e || !e.alive || e.dying || e.state === 'undying') return 0; // an undying foe lying down before it rises takes nothing
     info = info || {};
+    // no weak spot while a shield holds (the shot is an ordinary hit; see also enemies.js raycastAll)
+    if (info.head && e.shield > 0) info = Object.assign({}, info, { head: false, part: 'body' });
     const src = info.src || 'bullet';
     const st = P.stats;
     const pos = info.pos || e.centerPos();
@@ -217,7 +219,7 @@
         shieldDealt = e.shield;
         dmg = (sd - e.shield) / eff;
         e.shield = 0;
-        G.fx.bubble(e.centerPos(), e.radius * 1.7, 0xd8eeff);
+        G.fx.bubble(e.centerPos(), e.radius * G.enemies.shieldK * 1.06, 0xd8eeff);
         G.fx.sparks(e.centerPos(), null, 26, 0xcfe8ff, 9);
         G.sfx.shieldBreak(e.pos);
         G.fx.dmgNum(pos, 'BREAK', 'shield');
@@ -228,7 +230,7 @@
         e.shield -= sd; shieldDealt = sd;
         dmg = P.has('o_shieldpierce') ? dmg * 0.25 : 0;
         if (src !== 'dot' && !info.silent) {
-          if (!e._bubT || G.game.time - e._bubT > 0.08) { e._bubT = G.game.time; G.fx.bubble(e.centerPos(), e.radius * 1.6, 0xbfe2ff, e.centerRef); }
+          if (!e._bubT || G.game.time - e._bubT > 0.08) { e._bubT = G.game.time; G.fx.bubble(e.centerPos(), e.radius * G.enemies.shieldK, 0xbfe2ff, e.centerRef); }
           if (src === 'bullet') { G.fx.sparks(pos, null, 7, 0xcfe8ff, 6); G.sfx.hitShield(pos); }
         }
       }

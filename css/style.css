@@ -1541,3 +1541,13 @@ body.inv-open #feed { display: none; }
 body.inv-open #tut.on { max-height: 92vh; background: rgba(14,10,6,0.97); }
 body.inv-open #tut .tut-tip { display: none; }
 #tut-map .tut-box span.r { left: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+/* melee guard gauge: a thin upright bar just right of the crosshair; it drains as blocked damage is cut and refills after a rest */
+#guard-gauge { position: absolute; left: calc(50% + 64px); top: 50%; width: 9px; height: 118px; transform: translateY(-50%); border-radius: 5px; background: rgba(10,8,6,0.55); border: 1px solid rgba(220,200,160,0.45); box-shadow: 0 0 8px rgba(0,0,0,0.5); opacity: 0; transition: opacity .25s; pointer-events: none; }
+#guard-gauge.on { opacity: 0.55; }
+#guard-gauge.on.active { opacity: 1; border-color: rgba(255,226,150,0.9); }
+#guard-gauge i { position: absolute; left: 1px; right: 1px; bottom: 1px; border-radius: 4px; background: linear-gradient(0deg, #b58a3a, #ffe8a8); transition: height .08s; max-height: calc(100% - 2px); }
+#guard-gauge span { position: absolute; left: 50%; top: calc(100% + 4px); transform: translateX(-50%); font-size: 13px; filter: drop-shadow(0 0 3px #000); }
+#guard-gauge.hit { box-shadow: 0 0 14px rgba(255,220,140,0.9); }
+#guard-gauge.hit i { background: #fff6d8; }
+#guard-gauge.empty { border-color: rgba(255,90,70,0.9); }
+#guard-gauge.empty span { filter: grayscale(1) drop-shadow(0 0 3px #000); }

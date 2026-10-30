@@ -867,6 +867,7 @@
     // switching: 1/2 = guns, 3 = melee, wheel cycles through everything (incl. a holstered 3rd gun)
     if (W.handleSwitch()) return;
     if (P.meleeMode) return W.updateMeleeMode(dt);
+    if (W.gd && W.gd.k) W.hideGuardUI();
     if (W.switchT > 0) { W.switchT -= dt; }
     // ADS
     const wantAds = I.mouse[2] && !G.GrenHold.active() && W.switchT <= 0 && anim.melee <= 0 && !P.mantle;

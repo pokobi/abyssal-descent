@@ -20,7 +20,7 @@
   const DEF = JSON.parse(JSON.stringify(B)); I.DEFAULT_BIND = DEF;
   I.BIND_LIST = [
     ['skill1', '🌟 アルティメット'], ['skill2', '✨ スキル1'], ['skill3', '✨ スキル2'], ['skill4', '✨ スキル3'],
-    ['crouch', '🧎 しゃがみ／🔨 パイルドライバー（空中）'], ['grapple', '⚓ グラップル'], ['interact', '✋ インタラクト'], ['reload', '🔄 リロード'],
+    ['crouch', '🧎 しゃがみ／🔨 パイルドライバー（空中）'], ['grapple', '⚓ グラップル'], ['interact', '✋ インタラクト'], ['reload', '🔄 リロード／🛡️ 防御（近接武器・押している間）'],
     ['grenade', '💣 投擲物'], ['cycleGrenade', '🔁 投擲物の切替'],
     ['item1', '🧪 消耗品（枠1）'], ['item2', '🧪 消耗品（枠2）'],
     ['jump', '⤴️ ジャンプ'], ['sprint', '🏃 スプリント／歩き'], ['forward', '⬆ 前進'], ['back', '⬇ 後退'], ['left', '⬅ 左'], ['right', '➡ 右'],

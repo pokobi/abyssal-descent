@@ -22,9 +22,64 @@
   W.meleeMoveMul = function () {
     if (!P || !P.meleeMode || !P.melee) return null;
     const heavy = ms.ph === 'hwind' || ms.ph === 'hrec';
-    return P.melee.def.moveMul * (1 + (P.stats.meleeMove || 0)) * (heavy ? 0.45 : 1);
+    return P.melee.def.moveMul * (1 + (P.stats.meleeMove || 0)) * (heavy ? 0.45 : 1) * (gd.on ? 0.6 : 1);
   };
   W.meleeBusy = () => ms.ph !== 'idle';
+
+  // ---------------- guard (hold reload with a melee weapon) ----------------
+  // While held: walk only, no attacks. Hits from in front (within the weapon's arc) lose part of their damage; what was cut drains the gauge.
+  // An empty gauge cuts nothing (the guard stays up). After a short rest the gauge refills by itself.
+  const gd = { on: false, k: 0, g: 1, rest: 9, lastT: 0, flash: 0, kick: 0 };
+  W.gd = gd;
+  const GUARD_REST = 1.6, GUARD_REGEN = 0.22; // seconds without a blocked hit before it refills; share of the gauge per second
+  W.guarding = () => !!(gd.on && P && P.meleeMode);
+  function guardTick(dt, blocked) {
+    const g = P.melee.def.guard;
+    // the gauge refills even while the melee weapon is put away (measured by game time since the last tick)
+    const el = Math.min(5, Math.max(0, G.game.time - (gd.lastT || G.game.time))); gd.lastT = G.game.time;
+    gd.rest += el;
+    if (gd.rest > GUARD_REST && gd.g < 1) gd.g = Math.min(1, gd.g + el * GUARD_REGEN);
+    const want = !!g && I.down('reload') && !blocked && ms.ph === 'idle' && !P.dead;
+    if (want && !gd.on) G.sfx.mech('boltBack', 0, 0.5);
+    gd.on = want;
+    gd.k = U.damp(gd.k, gd.on ? 1 : 0, 16, dt);
+    gd.flash = Math.max(0, gd.flash - dt * 3); gd.kick = Math.max(0, gd.kick - dt * 6);
+    if (gd.on) { P.sprinting = false; P.sprintToggle = false; }
+    guardUI();
+  }
+  // called by damagePlayer with the damage left after armour: returns what still gets through
+  W.guardAbsorb = function (dmg, info) {
+    P = G.player;
+    if (!W.guarding() || info.fixed || info.src === 'dot' || info.src === 'fall') return dmg;
+    const g = P.melee.def.guard; if (!g) return dmg;
+    const from = info.pos || (info.attacker && info.attacker.pos); if (!from) return dmg;
+    const dx = from.x - P.pos.x, dz = from.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (d < 0.35) return dmg; // something on top of you (a puddle, a field) has no front
+    const f = P.forward(); const fl = Math.hypot(f.x, f.z) || 1;
+    if ((dx * f.x + dz * f.z) / (d * fl) < Math.cos(g[2] * Math.PI / 180)) return dmg;
+    if (gd.g <= 0) { gd.flash = Math.max(gd.flash, 0.3); G.sfx.ui('deny'); return dmg; }
+    const pool = g[1] * P.stats.maxHp, cut = Math.min(dmg * g[0], gd.g * pool);
+    gd.g = Math.max(0, gd.g - cut / pool); gd.rest = 0; gd.flash = 1; gd.kick = 1;
+    const fw = P.forward();
+    const at = G.camera.position.clone().addScaledVector(fw, 0.9).add(V(0, -0.15, 0));
+    G.fx.sparks(at, fw.clone().negate(), 10, 0xffe0a0, 6);
+    G.sfx.impact(at, 'metal'); G.sfx.mech('boltFwd', 0, 0.6);
+    P.addShake(0.12);
+    if (gd.g <= 0) { G.ui.toastSmall('🛡️ 防御の耐久が尽きた'); if (G.sfx.shieldBreak) G.sfx.shieldBreak(at); }
+    return dmg - cut;
+  };
+  let gEl = null;
+  function guardUI() {
+    const g = P.melee && P.melee.def.guard;
+    if (!gEl) { gEl = document.createElement('div'); gEl.id = 'guard-gauge'; gEl.innerHTML = '<i></i><span>🛡️</span>'; G.ui.el.hud.appendChild(gEl); }
+    const show = !!g && P.meleeMode && (gd.on || gd.g < 0.999);
+    gEl.classList.toggle('on', show);
+    gEl.classList.toggle('active', gd.on);
+    gEl.classList.toggle('empty', gd.g <= 0);
+    gEl.classList.toggle('hit', gd.flash > 0.5);
+    gEl.firstChild.style.height = (gd.g * 100).toFixed(1) + '%';
+  }
+  W.hideGuardUI = () => { if (gEl) gEl.classList.remove('on'); gd.on = false; gd.k = 0; };
   const MELEM = { bleed: ['🩸', '出血'], frost: ['❄️', '冷気'], burn: ['🔥', '炎上'], poison: ['☠️', '毒'], shock: ['⚡', '感電'] };
   W.meleeFx = function (d) {
     const out = [];
@@ -32,6 +87,7 @@
     if (d.elem && MELEM[d.elem]) out.push(`${MELEM[d.elem][0]} ${MELEM[d.elem][1]}付与 ${Math.round((d.elemChance || 0) * 100)}%（重撃100%）`);
     if (d.shieldMul && d.shieldMul > 1) out.push(`🛡️ シールド特効 +${Math.round((d.shieldMul - 1) * 100)}%`);
     if (d.lifesteal) out.push(`🩸 吸血 ${Math.round(d.lifesteal * 100)}%`);
+    if (d.id !== 'fists') out.push(d.guard ? `🛡️ 防御 軽減${Math.round(d.guard[0] * 100)}%・耐久 最大HPの${Math.round(d.guard[1] * 100)}%・正面±${d.guard[2]}°` : '🛡️ 防御できない');
     if (d.critChance) out.push(`🎯 会心率 +${Math.round(d.critChance * 100)}%`);
     if (d.headMul && d.headMul > 1.55) out.push(`💀 頭部 ×${d.headMul}`);
     return out;
@@ -263,6 +319,22 @@
         flatTip(wg, 0.014, 0.07, 0.032, 0, 0.53, 0, bladeM);
         tipY = 0.56; break;
       }
+      case 'buckler': {
+        // an arming sword: leather grip, a plain crossguard, a straight double-edged blade with a fuller
+        cyl(wg, 0.016, 0.12, 0, 0, 0, wrap); box(wg, 0.03, 0.03, 0.03, 0, -0.07, 0, mats.steel);
+        box(wg, 0.022, 0.022, 0.15, 0, 0.07, 0, mats.steel);
+        box(wg, 0.007, 0.36, 0.044, 0, 0.26, 0, bladeM); box(wg, 0.009, 0.32, 0.012, 0, 0.25, 0, dark);
+        flatTip(wg, 0.007, 0.07, 0.044, 0, 0.475, 0, bladeM);
+        tipY = 0.51; break;
+      }
+      case 'tower': {
+        // a short war hammer for the right hand
+        cyl(wg, 0.018, 0.34, 0, 0.08, 0, mats.wood);
+        for (const y of [-0.06, 0.12]) box(wg, 0.04, 0.016, 0.04, 0, y, 0, mats.steel);
+        box(wg, 0.075, 0.075, 0.15, 0, 0.27, -0.01, dark); box(wg, 0.088, 0.088, 0.04, 0, 0.27, -0.08, mats.steel);
+        flatTip(wg, 0.03, 0.07, 0.03, 0, 0.27, 0.1, bladeM, Math.PI / 2);
+        tipY = 0.33; break;
+      }
       case 'hammer': {
         cyl(wg, 0.020, 0.62, 0, 0.20, 0, mats.wood);
         for (const y of [-0.09, 0.12, 0.38]) box(wg, 0.044, 0.018, 0.044, 0, y, 0, mats.steel);
@@ -367,15 +439,47 @@
     }
     fist(r, true);
     if (def.model === 'fists' || def.model === 'twin') fist(l, false);
+    else if (SHIELDS[def.model]) buildShield(l, def.model, mk, mats, PG, box, gold, dark);
     else l.visible = false;
     wg.rotation.order = 'ZXY';
     wg.rotation.set(0, 0, 0);
     root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
     return { group: root, r, l, wg, tipY, glow, def };
   }
+  // the shield on the left arm (its face looks away from you, along -z)
+  const SHIELDS = { buckler: 1, tower: 1 };
+  W.isShield = (def) => !!(def && SHIELDS[def.model]);
+  function buildShield(l, kind, mk, mats, PG, box, gold, dark) {
+    const sg = new THREE.Group(); l.add(sg); l.userData.shield = sg;
+    sg.scale.setScalar(kind === 'buckler' ? 0.5 : 0.52); sg.rotation.y = 0.35; // held a little turned, its face towards the middle of the view
+    if (kind === 'buckler') {
+      const face = mk({ color: 0x6a2a20, metalness: 0.25, roughness: 0.55, map: G.Tex.tex.cloth.map });
+      const disk = new THREE.Mesh(PG.cyl, face); disk.scale.set(0.2, 0.03, 0.2); disk.rotation.x = Math.PI / 2; sg.add(disk);
+      const rim = new THREE.Mesh(PG.torus, mats.steel); rim.scale.set(0.2, 0.2, 0.25); sg.add(rim);
+      const boss = new THREE.Mesh(PG.sph, mats.steel); boss.scale.set(0.055, 0.055, 0.04); boss.position.z = -0.02; sg.add(boss);
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; box(sg, 0.02, 0.15, 0.012, Math.cos(a) * 0.1, Math.sin(a) * 0.1, -0.018, gold, 0, 0, a + Math.PI / 2); }
+      for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; const rv = new THREE.Mesh(PG.sph, mats.steel); rv.scale.setScalar(0.01); rv.position.set(Math.cos(a) * 0.175, Math.sin(a) * 0.175, -0.02); sg.add(rv); }
+    } else {
+      const face = mk({ color: 0x3c3f48, metalness: 0.6, roughness: 0.38 });
+      box(sg, 0.36, 0.56, 0.03, 0, 0, 0, face);
+      for (const y of [-0.27, 0.27]) box(sg, 0.38, 0.03, 0.045, 0, y, -0.004, dark);
+      for (const x of [-0.175, 0.175]) box(sg, 0.03, 0.58, 0.045, x, 0, -0.004, dark);
+      box(sg, 0.05, 0.5, 0.02, 0, 0, -0.022, mats.steel); box(sg, 0.3, 0.05, 0.02, 0, 0.07, -0.022, mats.steel);
+      const boss = new THREE.Mesh(PG.oct, gold); boss.scale.set(0.05, 0.03, 0.05); boss.rotation.x = Math.PI / 2; boss.position.set(0, 0.07, -0.04); sg.add(boss);
+      for (const x of [-0.15, 0.15]) for (const y of [-0.24, 0, 0.24]) { const rv = new THREE.Mesh(PG.sph, mats.steel); rv.scale.setScalar(0.013); rv.position.set(x, y, -0.03); sg.add(rv); }
+    }
+    return sg;
+  }
   W.meleeDisplayModel = function (def) {
     if (!W.mats) return new THREE.Group();
     const m = buildMelee(def);
+    if (SHIELDS[def.model]) {
+      m.r.children.filter((o) => o !== m.wg).forEach((o) => m.r.remove(o));
+      m.l.children.filter((o) => o !== m.l.userData.shield).forEach((o) => m.l.remove(o));
+      m.wg.rotation.order = 'ZXY'; m.wg.rotation.set(0.18, 1.38, Math.PI / 3.1); m.r.position.set(0.05, -0.05, 0.06);
+      m.l.position.set(-0.03, 0.03, -0.04); m.l.rotation.set(0, 1.0, 0); m.l.visible = true;
+      return m.group;
+    }
     if (def.model === 'fists') {
       for (const h of [m.r, m.l]) h.children.filter((o) => o.userData && o.userData.sleeve).forEach((o) => h.remove(o));
       m.r.rotation.order = 'YXZ'; m.r.position.set(0.064, 0.014, 0.016); m.r.rotation.set(0.78, 2.55, -0.22);
@@ -487,10 +591,11 @@
     if (W.switchT > 0) W.switchT -= dt;
     if (ms.draw && ms.draw.t > ms.draw.dur * 0.5 && (I.mpressed[0] || I.mpressed[2])) ms.draw = null;
     const blocked = !!ms.draw || W.switchT > 0 || P.mantle || P.pileState || W.anim.throwT > 0 || G.ItemAnim.busy() || G.GrenHold.active() || G.abilities.wheelOpen();
-    if (ms.ph === 'idle' && !blocked) {
+    guardTick(dt, blocked);
+    if (ms.ph === 'idle' && !blocked && !gd.on) {
       if (I.mpressed[2]) startHeavy(s);
       else if (I.mouse[0]) startLight(s);
-    } else if (ms.ph === 'light' && !blocked && ms.t >= ms.dur * 0.8 && (I.mouse[0] || I.mpressed[0])) {
+    } else if (ms.ph === 'light' && !blocked && !gd.on && ms.t >= ms.dur * 0.8 && (I.mouse[0] || I.mpressed[0])) {
       if (I.mpressed[2]) startHeavy(s); else startLight(s);
     }
     if ((I.mouse[0] || I.mouse[2]) && P.sprinting) { P.sprinting = false; P.lastShotT = G.game.time - 0.1; }
@@ -576,7 +681,7 @@
       let d = dmg;
       if (heavy && s.trait === 'reap' && !e.boss && e.hp < e.maxHp * 0.25) { d = e.hp + e.shield + 1; info.forceCrit = true; }
       C.damageEnemy(e, d, info);
-      if (heavy) C.stun(e, s.trait === 'quake' ? 1.2 : 0.5);
+      if (heavy) C.stun(e, s.trait === 'quake' ? 1.2 : s.trait === 'bash' ? 1.4 : 0.5);
       if (s.trait === 'thunder' && (heavy || Math.random() < 0.4)) { C.chain(e, 2, d * 0.35, 8, { src: 'melee', proc: true }); G.fx.strike(e.centerPos(), 0xcfe0ff, heavy); }
       G.fx.blood(e.centerPos(), f, e.bloodColor || 0x6a0a0a, heavy ? 10 : 5);
       if (def.trait === 'midas' && !e.boss) C.coins(heavy ? 6 : 2, e.centerPos());
@@ -709,6 +814,26 @@
       if (t < ks) { R = lerp6(H, E, easeOut(t / ks)); striking = true; }
       else R = lerp6(E, REST, ease(Math.min(1, (t - ks) / Math.max(0.05, ms.dur - ks))));
       if (twin) Lp = t < ks ? lerp6([-0.26, 0.08, -0.16, 0.45, -0.15, 0.35], [-0.02, -0.38, -0.62, -1.9, 0, -0.25], easeOut(t / ks)) : lerp6([-0.02, -0.38, -0.62, -1.9, 0, -0.25], LREST, ease(Math.min(1, (t - ks) / Math.max(0.05, ms.dur - ks))));
+    }
+    // ---- shield: the heavy blow is a punch with the shield arm; the right hand only cocks back ----
+    const shield = !!SHIELDS[def.model];
+    if (shield) {
+      Lp = [-0.2, -0.2, -0.4, 0, 0, 0];
+      if (ms.ph === 'hwind' || ms.ph === 'hrec') {
+        R = REST.slice();
+        const H = [-0.16, -0.2, -0.24, 0, 0, 0], E = [-0.04, -0.12, -0.78, 0, 0, 0];
+        if (ms.ph === 'hwind') { Lp = lerp6(Lp, H, ease(Math.min(1, t / ms.dur))); R[2] += 0.06 * ease(Math.min(1, t / ms.dur)); }
+        else { const ks = 0.1; Lp = t < ks ? lerp6(H, E, easeOut(t / ks)) : lerp6(E, Lp, ease(Math.min(1, (t - ks) / Math.max(0.05, ms.dur - ks)))); }
+        striking = false;
+      }
+    }
+    // ---- guard: the weapon comes across in front (a shield is lifted to the middle) and is knocked back a little by each blocked hit ----
+    if (gd.k > 0.001) {
+      const k = ease(Math.min(1, gd.k)), kb = gd.kick * 0.05;
+      const GR = shield ? [0.28, -0.32, -0.34, -1.05, 0.6, 0.35] : fist ? [0.1, -0.06, -0.3, 1.15, 0.25, 0.1] : [0.12, -0.12, -0.42, -0.2, 0.25, 1.35];
+      const GL = shield ? [-0.1, -0.13, -0.4, 0, 0, 0] : fist ? [-0.1, -0.06, -0.3, 1.15, -0.25, -0.1] : Lp;
+      R = lerp6(R, GR, k); Lp = lerp6(Lp, GL, k);
+      R[2] += kb; Lp[2] += kb; R[1] += kb * 0.4; Lp[1] += kb * 0.4;
     }
     // ---- draw flourish ----
     let spinX = 0, spinZ = 0, tossY = 0, tossZ = 0;

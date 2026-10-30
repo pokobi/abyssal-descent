@@ -73,11 +73,14 @@
 
   // ---- guardians: each field has its own pool; one is drawn at random (equal odds) ----
   R.BOSS_POOLS = {
-    grave: ['houndlord', 'boneking', 'broodmother', 'wyrm', 'colossus'],
-    gate: ['warlock', 'boneking', 'cerberus', 'madman', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur'],
-    halls: ['warlock', 'boneking', 'cerberus', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur'],
-    ruin: ['ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver', 'warden', 'arbiter', 'minotaur', 'cinderpriest', 'ashdrake'],
+    grave: ['houndlord', 'boneking', 'broodmother', 'wyrm', 'colossus', 'oboro', 'foxfire', 'stormimp'],
+    gate: ['warlock', 'boneking', 'cerberus', 'madman', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur', 'oboro', 'karakuri', 'stormimp'],
+    halls: ['warlock', 'boneking', 'cerberus', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur', 'oboro', 'karakuri', 'foxfire'],
+    ruin: ['ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver', 'warden', 'arbiter', 'minotaur', 'cinderpriest', 'ashdrake', 'foxfire', 'karakuri', 'stormimp'],
   };
+  // the small, quick guardians (bosses7.js) make up about a third of every field's draw, however many big ones the field has
+  R.SMALL_SHARE = 1 / 3;
+  const isSmall = (id) => !!(G.BOSS_BY_ID[id] && G.BOSS_BY_ID[id].small);
   // a run never meets the same guardian twice: the earlier guardians of the run are drawn first (drawn from the run's own random key, so a restarted area meets the same one), then excluded
   R.bossFor = function (n) {
     if (R.cur.id === 'extra' && R.isLast(n)) return 'sovereign'; // extra: the last guardian is always the Crimson Sovereign, on its own field
@@ -86,7 +89,11 @@
       if (!pool.length) return null;
       const fresh = pool.filter((id) => !used.has(id)), c = fresh.length ? fresh : pool;
       const rng = new G.RNG(((G.game.seed || 1) ^ G.U.hashStr('boss' + m)) >>> 0);
-      const id = c[Math.floor(rng.next() * c.length)]; used.add(id); return id;
+      const ns = c.filter(isSmall).length, nb = c.length - ns;
+      const ws = ns && nb ? R.SMALL_SHARE * nb / ((1 - R.SMALL_SHARE) * ns) : 1, wt = (id) => (isSmall(id) ? ws : 1);
+      let x = rng.next() * c.reduce((s, id) => s + wt(id), 0), id = c[c.length - 1];
+      for (const k of c) { x -= wt(k); if (x <= 0) { id = k; break; } }
+      used.add(id); return id;
     };
     for (let m = R.CYCLE; m < n; m += R.CYCLE) draw(m);
     return draw(n);

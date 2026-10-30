@@ -185,6 +185,7 @@
     if (P.adsActive && src === 'bullet') add += st.adsDmg;
     if (src === 'dot') add = 0;
     let dmg = amount * Math.max(0.1, 1 + add);
+    const baseHit = dmg; // what a status this hit applies is measured by (no crit, head or mark: those would make it swing wildly)
     if (G.game.dev && G.game.dev.oneHit && src !== 'dot') dmg = Math.max(dmg, (e.hp + (e.shield || 0)) * 4 + 1e5);
     if (info.elem === 'shock' && e.wetUntil > G.game.time) dmg *= 1.5; // wet from shallow water
     // pile driver vs. shock-resistant foes (and flyers hovering above the shockwave)
@@ -260,8 +261,11 @@
     if ((src === 'bullet' || src === 'melee') && !info.noMarker) G.ui.hitMarker(e.hp <= 0 ? 'kill' : info.head ? 'head' : shieldDealt > 0 && dmg <= 0 ? 'shield' : '');
     // ---- statuses ----
     if (src !== 'dot') {
-      if (info.elem && Math.random() < (info.elemChance ?? 1)) C.status(e, info.elem, info.stacks || 1);
-      if (st.elemChance > 0 && !info.proc && Math.random() < st.elemChance) C.status(e, info.elem || U.pick(['burn', 'frost', 'poison', 'shock', 'bleed']), 1);
+      const hit0 = C._hit; C._hit = baseHit;
+      try {
+        if (info.elem && Math.random() < (info.elemChance ?? 1)) C.status(e, info.elem, info.stacks || 1);
+        if (st.elemChance > 0 && !info.proc && Math.random() < st.elemChance) C.status(e, info.elem || U.pick(['burn', 'frost', 'poison', 'shock', 'bleed']), 1);
+      } finally { C._hit = hit0; }
       if (info.knock && !e.boss) e.knockback(info.dir || e.pos.clone().sub(P.pos).setY(0).normalize(), info.knock);
     }
     ctx.dmg = dealt + shieldDealt; ctx.pos = pos;
@@ -320,6 +324,17 @@
   };
 
   // ---------------- statuses ----------------
+  // How hard a status bites follows the hit that applied it (C._hit, set by damageEnemy): a stronger weapon or build makes stronger statuses.
+  // A status applied by something else (a skill zone, an augment, a spreading fire) measures itself by what your weapon in hand would hit for.
+  // The area-scaled old value stays as a floor. The power of a running status is the strongest that fed it, until it runs out.
+  const DOT_K = { burn: 0.25, bleed: 0.22, poison: 0.05, shock: 0.3 };
+  C.refHit = function () {
+    const W = G.weapons;
+    if (P.meleeMode && P.melee) return W.meleeStats(P.melee).dmg * W.meleeDmgMul();
+    if (P.weapon) { const s = W.stats(P.weapon); return s.dmg * (s.pellets || 1) * W.dmgMul(); }
+    return 0;
+  };
+  const dotPow = (kind, floor) => Math.max(floor, (C._hit || C.refHit() * 0.6) * DOT_K[kind]);
   C.status = function (e, kind, stacks) {
     if (!e || !e.alive || (e.mut && e.mut.nullify)) return;
     const s = e.st; stacks = stacks || 1;
@@ -327,7 +342,8 @@
     const dotMul = 1 + (st.dotDmg || 0);
     switch (kind) {
       case 'fire': case 'burn':
-        s.burnLv = Math.min(5, (s.burn > 0 ? s.burnLv || 1 : 0) + stacks); s.burn = 4; s.burnDps = C.scale(7) * (1 + st.burnDmg) * dotMul * (0.7 + s.burnLv * 0.3); break;
+        s.burnPow = Math.max(s.burn > 0 ? s.burnPow || 0 : 0, dotPow('burn', C.scale(7)));
+        s.burnLv = Math.min(5, (s.burn > 0 ? s.burnLv || 1 : 0) + stacks); s.burn = 4; s.burnDps = s.burnPow * (1 + st.burnDmg) * dotMul * (0.7 + s.burnLv * 0.3); break;
       case 'frost':
         if (s.frozen > 0) break;
         s.frostStacks = (s.frostStacks || 0) + stacks; s.frost = 4;
@@ -337,6 +353,7 @@
         break;
       case 'poison': {
         const max = 8 + (st.poisonStacks || 0);
+        s.poisonPow = Math.max(s.poison > 0 ? s.poisonPow || 0 : 0, dotPow('poison', C.scale(2.4)));
         s.poisonStacks = Math.min(max, (s.poisonStacks || 0) + stacks); s.poison = 5;
         if (P.has('x_toxburst') && s.poisonStacks >= 5) {
           s.poisonStacks = 0;
@@ -350,13 +367,15 @@
         if (!C.stunImmune(e)) s.stun = Math.max(s.stun || 0, 0.18);
         if (!s._shockLock) {
           s._shockLock = true;
-          C.damageEnemy(e, C.scale(8), { src: 'dot', elem: 'shock', silent: false, shieldMul: 3 });
+          C.damageEnemy(e, dotPow('shock', C.scale(8)) * dotMul, { src: 'dot', elem: 'shock', silent: false, shieldMul: 3 });
           if (P.has('h_overcurrent')) { const t = C.nearest(e.pos, 8, e); if (t) { G.fx.lightning(e.centerPos(), t.centerPos()); C.status(t, 'shock', 1); } }
           s._shockLock = false;
         }
         G.fx.sparks(e.centerPos(), null, 5, 0xfff0a0, 4);
         break;
-      case 'bleed': s.bleedLv = Math.min(5, (s.bleed > 0 ? s.bleedLv || 1 : 0) + stacks); s.bleed = 5; s.bleedDps = C.scale(6) * dotMul * (0.7 + s.bleedLv * 0.3); break;
+      case 'bleed':
+        s.bleedPow = Math.max(s.bleed > 0 ? s.bleedPow || 0 : 0, dotPow('bleed', C.scale(6)));
+        s.bleedLv = Math.min(5, (s.bleed > 0 ? s.bleedLv || 1 : 0) + stacks); s.bleed = 5; s.bleedDps = s.bleedPow * dotMul * (0.7 + s.bleedLv * 0.3); break;
       case 'slow': s.slow = 4; break;
       case 'mark': s.mark = stacks; break;
       case 'root': s.root = stacks; break;
@@ -374,7 +393,7 @@
         G.fx.flameLick(e.pos.x, e.pos.y + e.height * 0.5, e.pos.z, 1.2);
         if (P.has('x_spread') && Math.random() < 0.35) { const t = C.nearest(e.pos, 4, e); if (t && !(t.st.burn > 0)) C.status(t, 'burn', 1); }
       }
-      if (s.poison > 0 && s.poisonStacks > 0) C.damageEnemy(e, C.scale(2.4) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
+      if (s.poison > 0 && s.poisonStacks > 0) C.damageEnemy(e, (s.poisonPow || C.scale(2.4)) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
       if (s.bleed > 0) C.damageEnemy(e, s.bleedDps * 0.5, { src: 'dot', elem: 'bleed' });
     }
     if (s.burn > 0) { s.burn -= dt; if (s.burn <= 0) s.burnLv = 0; if (Math.random() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8); }
@@ -551,6 +570,7 @@
     if (P.pileState === 'charge') ctx.red += 0.5;
     let armor = info.fixed ? 0 : U.clamp(P.stats.armor + ctx.red, -1, 0.85);
     let dmg = amount * (1 - armor);
+    if (G.weapons.guardAbsorb) dmg = G.weapons.guardAbsorb(dmg, info); // a melee guard held up towards the hit
     if (P.has('d_iron')) dmg = Math.min(dmg, P.stats.maxHp * 0.25);
     if (dmg <= 0) return 0;
     let osHit = 0;

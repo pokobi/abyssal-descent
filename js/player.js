@@ -223,7 +223,7 @@
       const ads = G.weapons.adsT > 0.3;
       const canSprintAfterShot = t - this.lastShotT > (G.weapons.curStats && G.weapons.curStats.sprintFire ? 0.05 : 0.22);
       if (this._sjRun && this.grounded) this._sjRun = false; // a slide-jump keeps the run through the air (even with crouch still held); landing ends that
-      this.sprinting = this.sprintToggle && fwdIn > 0 && !ads && (!this.crouching || this._sjRun) && canSprintAfterShot && !G.weapons.reloadBlocksSprint() && !(this.st.shock > 0);
+      this.sprinting = this.sprintToggle && fwdIn > 0 && !ads && (!this.crouching || this._sjRun) && canSprintAfterShot && !G.weapons.reloadBlocksSprint() && !(this.st.shock > 0) && !(G.weapons.guarding && G.weapons.guarding());
       if (!this.sprinting && !S.autoSprint && !I.down('sprint') && this.sprintToggle && !this.sliding && !this._sjRun) this.sprintToggle = false; // the run broke: it does not resume by itself
 
       // pile driver trigger: crouch in air

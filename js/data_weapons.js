@@ -233,34 +233,38 @@
   // ---------- melee weapons (slot 3) ----------
   // dmg: light swing, swing: seconds per light swing, range: reach (m), arc: min dot to hit (lower = wider),
   // heavy: [dmg multiplier, wind-up s, recovery s], moveMul: movement while wielded, model: viewmodel shape
+  // guard: [share of damage cut, how much it can cut (x max HP) before it runs dry, half-angle of the front it covers (deg)]; none = cannot guard
   const MPRICE = { common: 700, uncommon: 1000, rare: 1500, epic: 2200, legendary: 3200 };
   const MCAT = { fist: '格闘', knife: 'ナイフ', blade: '刀剣', axe: '斧', blunt: '打撃', spear: '長柄', scythe: '大鎌' };
   const ML = [
     // the starting melee weapon. Same overall strength as the old bare fists (light DPS ~67, heavy ~73/s, same move speed):
     // a little more reach and faster swings, but a narrower arc, lighter knockback and smaller hits
-    ['m_basic', 'サバイバルナイフ', '🔪', 'common', 'knife', { dmg: 20, swing: 0.3, range: 2.5, arc: 0.66, heavy: [2.75, 0.34, 0.41], moveMul: 1.12, knock: 3 }, null, 'sknife', '最初から持っている頑丈なナイフ。素早い連撃と少し長いリーチ。右クリックで深く突き刺す。'],
+    ['m_basic', 'サバイバルナイフ', '🔪', 'common', 'knife', { guard: [0.4, 0.35, 50], dmg: 20, swing: 0.3, range: 2.5, arc: 0.66, heavy: [2.75, 0.34, 0.41], moveMul: 1.12, knock: 3 }, null, 'sknife', '最初から持っている頑丈なナイフ。素早い連撃と少し長いリーチ。右クリックで深く突き刺す。'],
     // bare hands when no melee weapon is held (weaker than the starting knife)
     ['fists', '素手', '👊', 'common', 'fist', { dmg: 12, swing: 0.38, range: 2.0, arc: 0.6, heavy: [2.2, 0.38, 0.45], moveMul: 1.12, knock: 3 }, null, 'fists', '近接武器を持たない素手の状態。リーチが短く威力も控えめだが、右クリックでストレートを放てる。'],
-    ['m_knife', 'コンバットナイフ', '🔪', 'common', 'knife', { dmg: 36, swing: 0.3, range: 2.5, arc: 0.62, heavy: [2.8, 0.32, 0.4], moveMul: 1.16, knock: 3, critChance: 0.1 }, null, 'knife', '軍用の頑丈なナイフ。最速の連撃と高い機動力。'],
-    ['m_kukri', 'ククリ', '🗡️', 'uncommon', 'knife', { dmg: 46, swing: 0.36, range: 2.6, arc: 0.55, heavy: [2.8, 0.36, 0.45], moveMul: 1.14, knock: 4, elem: 'bleed', elemChance: 0.45 }, null, 'kukri', '湾曲した刃が肉を裂き、出血を付与する。'],
-    ['m_machete', 'マチェーテ', '🗡️', 'common', 'blade', { dmg: 50, swing: 0.44, range: 2.8, arc: 0.35, heavy: [2.6, 0.42, 0.5], moveMul: 1.12, knock: 5 }, 'sweep', 'machete', '幅広の山刀。横薙ぎで複数の敵を巻き込む。'],
-    ['m_katana', '打刀「時雨」', '⚔️', 'rare', 'blade', { dmg: 66, swing: 0.4, range: 3.0, arc: 0.5, heavy: [3.0, 0.3, 0.55], moveMul: 1.14, knock: 4, critChance: 0.12 }, 'lunge', 'katana', '重撃は踏み込みの居合。一瞬で間合いを詰めて斬り抜ける。'],
-    ['m_rapier', 'レイピア', '🤺', 'rare', 'blade', { dmg: 42, swing: 0.27, range: 3.2, arc: 0.75, heavy: [3.2, 0.3, 0.4], moveMul: 1.15, knock: 2, critChance: 0.3, headMul: 2.2 }, null, 'rapier', '細身の刺突剣。会心率+30%、頭部への突きは2.2倍。'],
-    ['m_axe', '戦斧', '🪓', 'uncommon', 'axe', { dmg: 78, swing: 0.62, range: 2.8, arc: 0.45, heavy: [3.0, 0.55, 0.65], moveMul: 1.08, knock: 9, shieldMul: 1.8 }, null, 'axe', '重い斧刃でシールドを叩き割る（シールドへ+80%）。'],
-    ['m_hammer', '戦鎚', '🔨', 'rare', 'blunt', { dmg: 92, swing: 0.72, range: 2.7, arc: 0.4, heavy: [2.6, 0.62, 0.7], moveMul: 1.05, knock: 14, shieldMul: 1.4 }, 'quake', 'hammer', '重撃で地面を叩き、周囲に衝撃波とスタンを起こす。'],
-    ['m_spear', '長槍', '🔱', 'uncommon', 'spear', { dmg: 58, swing: 0.5, range: 4.3, arc: 0.82, heavy: [2.7, 0.45, 0.5], moveMul: 1.1, knock: 7 }, 'pierceLine', 'spear', '長いリーチの刺突。直線上の敵をまとめて貫く。'],
-    ['m_frost', '氷牙の短剣', '❄️', 'rare', 'knife', { dmg: 40, swing: 0.3, range: 2.5, arc: 0.6, heavy: [2.8, 0.32, 0.4], moveMul: 1.16, knock: 3, elem: 'frost', elemChance: 0.6 }, null, 'frostknife', '冷気の刃。斬るたびに敵を凍てつかせる。'],
-    ['m_ember', '焔刃「緋桜」', '🔥', 'epic', 'blade', { dmg: 72, swing: 0.42, range: 3.0, arc: 0.45, heavy: [2.8, 0.42, 0.5], moveMul: 1.13, knock: 5, elem: 'burn', elemChance: 0.7 }, 'flameWave', 'emberblade', '燃え盛る刀身。重撃は前方へ炎の斬撃波を放つ。'],
+    ['m_knife', 'コンバットナイフ', '🔪', 'common', 'knife', { guard: [0.3, 0.3, 45], dmg: 36, swing: 0.3, range: 2.5, arc: 0.62, heavy: [2.8, 0.32, 0.4], moveMul: 1.16, knock: 3, critChance: 0.1 }, null, 'knife', '軍用の頑丈なナイフ。最速の連撃と高い機動力。'],
+    ['m_kukri', 'ククリ', '🗡️', 'uncommon', 'knife', { guard: [0.4, 0.35, 50], dmg: 46, swing: 0.36, range: 2.6, arc: 0.55, heavy: [2.8, 0.36, 0.45], moveMul: 1.14, knock: 4, elem: 'bleed', elemChance: 0.45 }, null, 'kukri', '湾曲した刃が肉を裂き、出血を付与する。'],
+    ['m_machete', 'マチェーテ', '🗡️', 'common', 'blade', { guard: [0.5, 0.5, 60], dmg: 50, swing: 0.44, range: 2.8, arc: 0.35, heavy: [2.6, 0.42, 0.5], moveMul: 1.12, knock: 5 }, 'sweep', 'machete', '幅広の山刀。横薙ぎで複数の敵を巻き込む。'],
+    ['m_katana', '打刀「時雨」', '⚔️', 'rare', 'blade', { guard: [0.65, 0.5, 55], dmg: 66, swing: 0.4, range: 3.0, arc: 0.5, heavy: [3.0, 0.3, 0.55], moveMul: 1.14, knock: 4, critChance: 0.12 }, 'lunge', 'katana', '重撃は踏み込みの居合。一瞬で間合いを詰めて斬り抜ける。'],
+    ['m_rapier', 'レイピア', '🤺', 'rare', 'blade', { guard: [0.45, 0.4, 40], dmg: 42, swing: 0.27, range: 3.2, arc: 0.75, heavy: [3.2, 0.3, 0.4], moveMul: 1.15, knock: 2, critChance: 0.3, headMul: 2.2 }, null, 'rapier', '細身の刺突剣。会心率+30%、頭部への突きは2.2倍。'],
+    ['m_axe', '戦斧', '🪓', 'uncommon', 'axe', { guard: [0.55, 0.75, 60], dmg: 78, swing: 0.62, range: 2.8, arc: 0.45, heavy: [3.0, 0.55, 0.65], moveMul: 1.08, knock: 9, shieldMul: 1.8 }, null, 'axe', '重い斧刃でシールドを叩き割る（シールドへ+80%）。'],
+    ['m_hammer', '戦鎚', '🔨', 'rare', 'blunt', { guard: [0.6, 1.0, 65], dmg: 92, swing: 0.72, range: 2.7, arc: 0.4, heavy: [2.6, 0.62, 0.7], moveMul: 1.05, knock: 14, shieldMul: 1.4 }, 'quake', 'hammer', '重撃で地面を叩き、周囲に衝撃波とスタンを起こす。'],
+    ['m_spear', '長槍', '🔱', 'uncommon', 'spear', { guard: [0.5, 0.6, 50], dmg: 58, swing: 0.5, range: 4.3, arc: 0.82, heavy: [2.7, 0.45, 0.5], moveMul: 1.1, knock: 7 }, 'pierceLine', 'spear', '長いリーチの刺突。直線上の敵をまとめて貫く。'],
+    ['m_frost', '氷牙の短剣', '❄️', 'rare', 'knife', { guard: [0.3, 0.3, 45], dmg: 40, swing: 0.3, range: 2.5, arc: 0.6, heavy: [2.8, 0.32, 0.4], moveMul: 1.16, knock: 3, elem: 'frost', elemChance: 0.6 }, null, 'frostknife', '冷気の刃。斬るたびに敵を凍てつかせる。'],
+    ['m_ember', '焔刃「緋桜」', '🔥', 'epic', 'blade', { guard: [0.5, 0.5, 55], dmg: 72, swing: 0.42, range: 3.0, arc: 0.45, heavy: [2.8, 0.42, 0.5], moveMul: 1.13, knock: 5, elem: 'burn', elemChance: 0.7 }, 'flameWave', 'emberblade', '燃え盛る刀身。重撃は前方へ炎の斬撃波を放つ。'],
     ['m_venom', '毒蛇の双短剣', '🐍', 'epic', 'knife', { dmg: 30, swing: 0.2, range: 2.4, arc: 0.6, heavy: [3.4, 0.28, 0.35], moveMul: 1.18, knock: 2, elem: 'poison', elemChance: 0.8 }, null, 'twin', '左右交互の超高速連撃。猛毒を重ねる。'],
-    ['m_scythe', '死神の大鎌', '💀', 'epic', 'scythe', { dmg: 84, swing: 0.6, range: 3.4, arc: -0.1, heavy: [2.6, 0.5, 0.6], moveMul: 1.08, knock: 6, lifesteal: 0.06 }, 'reap', 'scythe', '周囲ほぼ全方位を刈り取る。与ダメの6%を吸収。重撃は処刑の一閃。'],
-    ['m_thunder', '雷槌「鳴神」', '⚡', 'legendary', 'blunt', { dmg: 105, swing: 0.68, range: 2.9, arc: 0.4, heavy: [2.8, 0.55, 0.6], moveMul: 1.07, knock: 12, elem: 'shock', elemChance: 0.6, shieldMul: 2.0 }, 'thunder', 'thunder', '雷を纏う戦鎚。命中で雷撃が連鎖し、重撃は落雷を呼ぶ。'],
-    ['m_devour', '神器「喰魂の大鎌」', '🌑', 'legendary', 'scythe', { dmg: 95, swing: 0.55, range: 3.6, arc: -0.15, heavy: [2.8, 0.45, 0.55], moveMul: 1.1, knock: 6, lifesteal: 0.04 }, 'devour', 'scythe', '変異した敵を喰らうほど強くなる（エリア内で最大10重・1重につき+8%、HP5%回復）。'],
-    ['m_midas', '神器「黄金の拳」', '🥇', 'legendary', 'fist', { dmg: 60, swing: 0.3, range: 2.5, arc: 0.6, heavy: [3.0, 0.35, 0.4], moveMul: 1.15, knock: 8, critChance: 0.15 }, 'midas', 'fists', '殴るたびにコインがこぼれる。重撃はコイン50枚を込めて威力3倍。'],
-    ['m_holy', '聖剣「黎明」', '✨', 'legendary', 'blade', { dmg: 88, swing: 0.4, range: 3.2, arc: 0.45, heavy: [2.6, 0.38, 0.45], moveMul: 1.14, knock: 6, critChance: 0.1 }, 'beam', 'holy', '光の聖剣。重撃で貫通する光の斬撃を飛ばす。'],
+    ['m_scythe', '死神の大鎌', '💀', 'epic', 'scythe', { guard: [0.4, 0.55, 75], dmg: 84, swing: 0.6, range: 3.4, arc: -0.1, heavy: [2.6, 0.5, 0.6], moveMul: 1.08, knock: 6, lifesteal: 0.06 }, 'reap', 'scythe', '周囲ほぼ全方位を刈り取る。与ダメの6%を吸収。重撃は処刑の一閃。'],
+    ['m_thunder', '雷槌「鳴神」', '⚡', 'legendary', 'blunt', { guard: [0.55, 0.8, 60], dmg: 105, swing: 0.68, range: 2.9, arc: 0.4, heavy: [2.8, 0.55, 0.6], moveMul: 1.07, knock: 12, elem: 'shock', elemChance: 0.6, shieldMul: 2.0 }, 'thunder', 'thunder', '雷を纏う戦鎚。命中で雷撃が連鎖し、重撃は落雷を呼ぶ。'],
+    ['m_devour', '神器「喰魂の大鎌」', '🌑', 'legendary', 'scythe', { guard: [0.35, 0.45, 75], dmg: 95, swing: 0.55, range: 3.6, arc: -0.15, heavy: [2.8, 0.45, 0.55], moveMul: 1.1, knock: 6, lifesteal: 0.04 }, 'devour', 'scythe', '変異した敵を喰らうほど強くなる（エリア内で最大10重・1重につき+8%、HP5%回復）。'],
+    ['m_midas', '神器「黄金の拳」', '🥇', 'legendary', 'fist', { guard: [0.7, 0.5, 50], dmg: 60, swing: 0.3, range: 2.5, arc: 0.6, heavy: [3.0, 0.35, 0.4], moveMul: 1.15, knock: 8, critChance: 0.15 }, 'midas', 'fists', '殴るたびにコインがこぼれる。重撃はコイン50枚を込めて威力3倍。'],
+    // shields: the left hand holds a shield, the right a short weapon. Built to hold the line; their attacks are modest
+    ['m_buckler', '騎士の円盾', '🛡️', 'uncommon', 'blade', { guard: [0.8, 1.3, 80], dmg: 40, swing: 0.42, range: 2.6, arc: 0.5, heavy: [2.4, 0.4, 0.5], moveMul: 1.08, knock: 6 }, 'bash', 'buckler', '小ぶりな円盾と片手剣。広い角度を受け止め、重撃は盾で殴りつけて怯ませる。'],
+    ['m_tower', '城壁の大盾', '🧱', 'rare', 'blunt', { guard: [0.92, 2.0, 70], dmg: 62, swing: 0.7, range: 2.6, arc: 0.4, heavy: [2.6, 0.6, 0.65], moveMul: 1.0, knock: 12, shieldMul: 1.3 }, 'bash', 'tower', '身の丈ほどの鉄の大盾と短い戦鎚。ほとんどの攻撃を受け止めるが、振りは重い。重撃は盾の体当たり。'],
+    ['m_holy', '聖剣「黎明」', '✨', 'legendary', 'blade', { guard: [0.55, 0.65, 60], dmg: 88, swing: 0.4, range: 3.2, arc: 0.45, heavy: [2.6, 0.38, 0.45], moveMul: 1.14, knock: 6, critChance: 0.1 }, 'beam', 'holy', '光の聖剣。重撃で貫通する光の斬撃を飛ばす。'],
   ];
   const MTRAIT = {
     sweep: '横薙ぎ：攻撃範囲が広い', lunge: '居合：重撃で前方へ踏み込む', quake: '地震：重撃で周囲に衝撃波＋スタン', pierceLine: '貫通：直線上の敵をまとめて貫く',
-    flameWave: '炎波：重撃で炎の斬撃波を放つ', devour: '喰魂：変異体を倒すほど強化', midas: '黄金：殴るとコイン、重撃でコインを消費して威力3倍', reap: '刈取：ほぼ全方位攻撃・吸血', thunder: '落雷：連鎖雷、重撃で落雷', beam: '光刃：重撃で貫通する光の斬撃',
+    flameWave: '炎波：重撃で炎の斬撃波を放つ', bash: '盾撃：重撃で盾を叩きつけ、長く怯ませる', devour: '喰魂：変異体を倒すほど強化', midas: '黄金：殴るとコイン、重撃でコインを消費して威力3倍', reap: '刈取：ほぼ全方位攻撃・吸血', thunder: '落雷：連鎖雷、重撃で落雷', beam: '光刃：重撃で貫通する光の斬撃',
   };
   G.MELEE = ML.map(([id, name, icon, rarity, mcat, s, trait, model, desc]) => Object.assign({ id, name, icon, rarity, mcat, cat: MCAT[mcat], trait, traitDesc: trait ? MTRAIT[trait] : null, model, desc, kind: 'melee', price: id === 'fists' || id === 'm_basic' ? 0 : MPRICE[rarity] + Math.round(s.dmg / s.swing / 10) * 10, critChance: 0, headMul: 1.5, shieldMul: 1, lifesteal: 0, elem: null, elemChance: 0 }, s));
   for (const m of G.MELEE) if (m.id === 'm_devour' || m.id === 'm_midas') { m.mythic = true; m.price = m.id === 'm_devour' ? 9500 : 6500; }

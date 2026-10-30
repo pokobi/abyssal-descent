@@ -210,7 +210,7 @@
   function genGrave(area, seed, extraChests, gates, kind) {
     const { rng, W, D, w, occ } = base(area, seed, 'grave');
     reserve(occ, W, D, gates);
-    const pit = area >= 4 && rng.chance(0.2) ? F.chasmMask(rng, W, D, occ) : null; // now and then a chasm cuts the graveyard in two
+    const pit = area >= 4 && rng.chance(0.3) ? F.chasmMask(rng, W, D, occ) : null; // now and then a chasm cuts the graveyard in two
     H.floors(w, W, D, pit, 'floor');
     H.perimeter(w, rng, W, D, { gates, h: 4.6 });
     if (pit) F.chasmDress(w, rng, W, D, pit, '#6a8ae8');
@@ -284,7 +284,7 @@
     // barred windows high in both side walls (between the buttresses)
     const wins = [];
     for (let z = 16; z < D - 12; z += 16) wins.push([z + 0.6, z + 3.6, 6.2, 12.4]);
-    const pit = area >= 4 && rng.chance(0.15) ? F.chasmMask(rng, W, D, occ) : null;
+    const pit = area >= 4 && rng.chance(0.3) ? F.chasmMask(rng, W, D, occ) : null;
     H.floors(w, W, D, pit, rng.chance(0.5) ? 'cobble' : 'floor');
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0, windows: wins });
     if (pit) F.chasmDress(w, rng, W, D, pit, '#7a60d8');

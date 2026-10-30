@@ -22,15 +22,16 @@
   let tab = 'buff', sel = null, query = '', backFn = null;
   // sorting: the way the list is ordered is chosen in the header (kept between visits). A tab offers the modes that mean something for it.
   const SORTS = {
-    rarity: ['レアリティ順（高い順）', '高いレアリティを上に。同じなら種類・名前の順'],
+    rarity: ['レアリティ順（低い順）', '低いレアリティを上に。同じなら種類・名前の順'],
+    rarityHi: ['レアリティ順（高い順）', '高いレアリティを上に。同じなら種類・名前の順'],
     cat: ['種類順', '種類ごとにまとめ、その中はレアリティの高い順'],
     name: ['名前順（あいうえお）', ''],
-    area: ['出現エリア順', '早いエリアから出る順'],
+    area: ['出現が早い順', '早い段階から出る魔物を上に'],
     disc: ['未発見を先に', '未発見のものを上に集める'],
     def: ['標準の並び', ''],
   };
   const TAB_SORTS = { enemy: ['area', 'name', 'disc', 'def'], boss: ['def', 'name', 'disc'], stage: [], depth: [] };
-  const sortsOf = (t) => TAB_SORTS[t] || ['rarity', 'cat', 'name', 'disc', 'def'];
+  const sortsOf = (t) => TAB_SORTS[t] || ['rarity', 'rarityHi', 'cat', 'name', 'disc', 'def'];
   const sortMode = () => { const m = G.save.data.settings.cxSort, ok = sortsOf(tab); return ok.includes(m) ? m : ok[0]; };
   const tierOf = (o) => (G.RARITY[o.rarity] ? G.RARITY[o.rarity].tier : -1);
   const catOf = (t, o) => {
@@ -48,16 +49,17 @@
     const plain = (o) => String(o.name || '').replace(/^[^\p{L}\p{N}]+/u, '');
     const byName = (x, y) => ja.compare(plain(x), plain(y));
     const cmp = {
-      rarity: (x, y) => tierOf(y) - tierOf(x) || catOf(tab, x).localeCompare(catOf(tab, y)) || byName(x, y),
+      rarity: (x, y) => tierOf(x) - tierOf(y) || catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || byName(x, y),
+      rarityHi: (x, y) => tierOf(y) - tierOf(x) || catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || byName(x, y),
       cat: (x, y) => catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || tierOf(y) - tierOf(x) || byName(x, y),
       name: byName,
-      area: (x, y) => (x.minArea || 0) - (y.minArea || 0) || byName(x, y),
+      area: (x, y) => (x.unlockK ?? 9) - (y.unlockK ?? 9) || byName(x, y),
       disc: (x, y) => (disc(tab, x) ? 1 : 0) - (disc(tab, y) ? 1 : 0) || tierOf(y) - tierOf(x) || idx.get(x) - idx.get(y),
     }[m];
     // an unmet monster / guardian shows no name, so it is never placed by its name: it keeps its own order after the known ones (before them when "未発見を先に")
     const known = a.filter((o) => !hidden(o)), unk = a.filter(hidden);
     if (m === 'disc') return unk.concat(known.sort(cmp));
-    if (m === 'area') return known.concat(unk).sort((x, y) => (x.minArea || 0) - (y.minArea || 0) || (hidden(x) - hidden(y)) || (hidden(x) ? idx.get(x) - idx.get(y) : byName(x, y)));
+    if (m === 'area') return known.concat(unk).sort((x, y) => (x.unlockK ?? 9) - (y.unlockK ?? 9) || (hidden(x) - hidden(y)) || (hidden(x) ? idx.get(x) - idx.get(y) : byName(x, y)));
     return known.sort(cmp).concat(unk);
   }
   const disc = (kind, o) => {
@@ -101,6 +103,23 @@
     }
     return sorted(a);
   }
+  // Where a monster first shows up, per difficulty, in the area numbers the player sees (a run has 14 or 21 areas). The old text printed the internal
+  // "depth" (area + the difficulty's depth offset), which runs past 40; the pool of foes is chosen from that depth (game.js enemyPool): a kind is in
+  // from depth 5 * unlockK + 1. Extra grows with its level (+2 depth per level): shown for Extra 1.
+  const firstSeen = (o) => {
+    if (o.unlockK === undefined) return o.minArea ? `エリア${o.minArea}〜` : '特定の場所';
+    const R = G.Run, keep = R.cur, out = [];
+    try {
+      for (const [id, lv, label] of [['easy', 0, 'イージー'], ['normal', 0, 'ノーマル'], ['hard', 0, 'ハード'], ['extra', 1, 'エクストラ1']]) {
+        R.cur = { id, lv };
+        let first = 0;
+        for (let n = 1; n <= R.areas() && !first; n++) if (!R.isBoss(n) && !R.isPrep(n) && Math.floor((Math.max(1, R.depthArea(n)) - 1) / 5) >= o.unlockK) first = n;
+        out.push(first ? `${label} エリア${first}〜` : null);
+      }
+    } finally { R.cur = keep; }
+    const seen = out.filter(Boolean);
+    return seen.length ? seen.join(' / ') : '—';
+  };
   function renderGrid() {
     const g = document.getElementById('cx-grid'); if (!g) return;
     const a = list();
@@ -153,7 +172,7 @@
       html += bar('⚔️', '攻撃 (Lv.1)', o.dmg, 60);
       html += bar('👟', '移動速度', o.speed, 12, o.speed.toFixed(1));
       html += bar('📐', 'サイズ', o.size, 1.6, '×' + o.size.toFixed(2));
-      html += `<div style="margin-top:8px"><span class="tag">⚔️ 攻撃: ${ATK[o.attack] || '-'}</span><span class="tag">🧠 ${AI[o.ai] || o.ai}</span>${o.shield ? `<span class="tag">💠 シールド ${Math.round(o.shield * 100)}%</span>` : ''}${o.flyer ? '<span class="tag">🦇 飛行</span>' : ''}${o.elem ? `<span class="tag">${{ fire: '🔥', frost: '❄️', poison: '☠️', shock: '⚡' }[o.elem]} 属性攻撃</span>` : ''}${o.revive ? '<span class="tag">☠ 復活</span>' : ''}${o.dodge ? '<span class="tag">🌫️ 回避</span>' : ''}${o.frontArmor ? '<span class="tag">🛡 前面装甲</span>' : ''}${o.undead ? '<span class="tag">💀 不死</span>' : ''}<span class="tag">🗺️ 出現 エリア${o.minArea}〜</span><span class="tag">☠ 撃破 ${G.save.data.codex.kills[o.id] || 0}</span></div>`;
+      html += `<div style="margin-top:8px"><span class="tag">⚔️ 攻撃: ${ATK[o.attack] || '-'}</span><span class="tag">🧠 ${AI[o.ai] || o.ai}</span>${o.shield ? `<span class="tag">💠 シールド ${Math.round(o.shield * 100)}%</span>` : ''}${o.flyer ? '<span class="tag">🦇 飛行</span>' : ''}${o.elem ? `<span class="tag">${{ fire: '🔥', frost: '❄️', poison: '☠️', shock: '⚡' }[o.elem]} 属性攻撃</span>` : ''}${o.revive ? '<span class="tag">☠ 復活</span>' : ''}${o.dodge ? '<span class="tag">🌫️ 回避</span>' : ''}${o.frontArmor ? '<span class="tag">🛡 前面装甲</span>' : ''}${o.undead ? '<span class="tag">💀 不死</span>' : ''}<span class="tag">🗺️ 出現 ${firstSeen(o)}</span><span class="tag">☠ 撃破 ${G.save.data.codex.kills[o.id] || 0}</span></div>`;
     } else if (tab === 'boss') {
       // stats from a real instance at its first appearance (same numbers the fight uses)
       const st = bossStats(o);

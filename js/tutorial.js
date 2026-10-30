@@ -1,6 +1,6 @@
 'use strict';
 // Hands-on tutorial: played in a real first area with no waves. Each step explains one thing and waits until you have done it
-// (or press Enter on explanation pages). Backspace skips a step. At the end a fresh run starts.
+// (or press the wheel / the interact key on explanation pages: both hands stay where they are; Enter works too). Backspace skips a step. At the end a fresh run starts.
 // The panel sits at the top left, where the route bar and the objective would be (both hidden meanwhile), so the view stays clear.
 (function () {
   const T = (G.Tutorial = { active: false });
@@ -9,6 +9,10 @@
   let P, GM, el, map = null, st = null, idx = 0;
   const k = (s) => `<kbd>${s}</kbd>`;
   const K = (a) => k(G.K(a));
+  // what moves the tutorial on: keys the hands are already on
+  const NEXT = () => `${k('ホイールクリック')} か ${K('interact')}`;
+  const nextHit = () => I.mpressed[1] || I.hit('interact') || I.pressed.Enter || I.pressed.NumpadEnter;
+  const nextEat = () => { I.mpressed[1] = false; delete I.pressed.Enter; delete I.pressed.NumpadEnter; for (const c of G.BIND.interact) delete I.pressed[c]; };
 
   // ---------------------------------------------------------------- helpers
   const ul = (...a) => `<ul>${a.filter(Boolean).map((x) => `<li>${x}</li>`).join('')}</ul>`;
@@ -30,7 +34,7 @@
   const CH = ['📘 はじめに', '🏃 動き', '⚔️ 戦い', '🎒 道具と持ち物', '🌟 成長と進行'];
   const STEPS = [
     { ch: 0, title: 'ようこそ、深淵へ', info: true,
-      body: () => ul('実際に操作しながら、基本を覚えます（5分ほど）。', 'ここでは<b>倒されません</b>。HPが減っても自動で戻ります。', `${k('Enter')} 次へ　${k('Backspace')} この手順を飛ばす`, `${k('Esc')} ポーズ（チュートリアルの終了もここから）`) },
+      body: () => ul('実際に操作しながら、基本を覚えます（5分ほど）。', 'ここでは<b>倒されません</b>。HPが減っても自動で戻ります。', `${NEXT()} 次へ　${k('Backspace')} この手順を飛ばす`, `${k('Esc')} ポーズ（チュートリアルの終了もここから）`) },
 
     { ch: 1, title: '見回す・歩く・走る',
       body: () => ul(`${k('マウス')} 見回す　${WASD()} 歩く`, G.save.data.settings.autoSprint ? `普段は<b>自動で走る</b>（${K('sprint')} を押している間は歩き）` : `${K('sprint')} を一度押すと<b>走る</b>（止まる・撃つ・覗くまで続く）`),
@@ -86,7 +90,7 @@
       setup: (s) => { P.skills[1] = G.abilities.makeSlot('dash'); if (G.ui.buildAbilityRow) G.ui.buildAbilityRow(); s.ch = P.skills[1].charges; const u = P.skills[0]; if (u) u.cd = 0; },
       check: (s) => { const sk = P.skills[1], u = P.skills[0]; if (sk && (sk.cd > 0 || sk.charges < s.ch)) s.a = true; if (u && u.cd > 0) s.b = true; return (s.a ? 0.5 : 0) + (s.b ? 0.5 : 0); } },
     { ch: 3, title: '持ち物・アタッチメント',
-      body: () => ul(`${K('status')} 持ち物を開く／閉じる（${k('Esc')} でも閉じる）`, `<b>ドラッグ</b>で動かす　${k('R')} 回転　${k('右クリック')} メニュー　${k('ダブルクリック')} 使う・装備`, '枠の外へドラッグで捨てる　<b>⇅ 整理</b>で並べ替え', '<b>レッドドット</b>を渡しました。銃の枠へドラッグ（付く場所が光る）'),
+      body: () => ul(`${K('status')} 持ち物を開く／閉じる（${k('Esc')} でも閉じる）`, `<b>ドラッグ</b>で動かす　${k('R')} 回転　${k('右クリック')} メニュー（武器は長押しで捨てる）　${k('ダブルクリック')} 使う・装備`, '枠の外へドラッグで捨てる　<b>⇅ 整理</b>で並べ替え', '<b>レッドドット</b>を渡しました。銃の枠へドラッグ（付く場所が光る）'),
       tip: () => '開いている間も、ゲームは止まりません。',
       goal: (s) => parts([['持ち物を開く', s.o], ['レッドドットを銃に付ける', P.weapons.some((w) => w.atts.optic === 'o_reddot')]]),
       setup: () => { if (!P.weapons.some((w) => w.atts.optic === 'o_reddot') && !P.attStash.includes('o_reddot')) { G.Inv.noAuto = true; P.attStash.push('o_reddot'); G.Inv.noAuto = false; } },
@@ -95,11 +99,11 @@
     { ch: 4, title: '加護（その周回の強化）',
       body: () => ul('エリアの<b>目標</b>を達成すると、<b>加護</b>を1つ選べる', '加護は、その周回の間ずっと続く強化。取るほど強くなる', '枠の色がレアリティ。気に入らなければ<b>リロール</b>'),
       vis: (s) => tiles((s.sample || []).map((b) => [b.icon, b.name, RAR[b.rarity] || b.rarity, `var(--c-${b.rarity})`])),
-      goal: (s) => (s.opened ? '好きな加護を1つ選ぶ' : `${k('Enter')} で加護の選択画面を開く`),
+      goal: (s) => (s.opened ? '好きな加護を1つ選ぶ' : `<span>${NEXT()} で加護の選択画面を開く</span>`),
       setup: (s) => { s.sample = GM.rollBuffs(3); },
       check: (s) => {
-        if (!s.opened && (I.pressed.Enter || I.pressed.NumpadEnter)) {
-          delete I.pressed.Enter; delete I.pressed.NumpadEnter; s.opened = true;
+        if (!s.opened && nextHit()) {
+          nextEat(); s.opened = true;
           GM.offerBuffs(false, { title: 'CHOOSE A BOON', sub: '練習：好きな加護を1つ選ぼう（選ぶとこの周回ずっと有効）', onPicked: () => { s.picked = true; } });
         }
         return s.picked ? 1 : s.opened ? 0.5 : 0;
@@ -198,7 +202,7 @@
     const pct = Math.round((st.prog || 0) * 100);
     const html = `<div class="tut-h"><span>${CH[s.ch]}</span><b>${idx + 1} / ${STEPS.length}</b></div>
       <div class="tut-t">${s.title}</div><div class="tut-b">${s.body()}</div>${s.vis ? s.vis(st) : ''}${s.tip ? `<div class="tut-tip">💡 ${s.tip()}</div>` : ''}
-      ${s.info ? `<div class="tut-foot"><span>${k('Enter')} ${s.finish ? '本編へ' : '次へ'}</span><span>${k('Backspace')} 飛ばす</span></div>`
+      ${s.info ? `<div class="tut-foot"><span>${NEXT()} ${s.finish ? '本編へ' : '次へ'}</span><span>${k('Backspace')} 飛ばす</span></div>`
         : `<div class="tut-goal">${goal}</div><div class="tut-bar"><div style="width:${pct}%"></div></div><div class="tut-foot"><span>やってみよう</span><span>${k('Backspace')} 飛ばす</span></div>`}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
     el.classList.add('on');
@@ -218,7 +222,7 @@
     if (P.hp < P.stats.maxHp * 0.35) { P.hp = P.stats.maxHp * 0.7; G.ui.toastSmall('📘 チュートリアル中なのでHPを回復しました'); }
     for (const k2 in P.st) if (P.st[k2] > 4) P.st[k2] = 4;
     if (I.pressed.Backspace) { delete I.pressed.Backspace; return next(true); }
-    if (s.info) { if (I.pressed.Enter || I.pressed.NumpadEnter || I.mpressed[1]) { delete I.pressed.Enter; delete I.pressed.NumpadEnter; I.mpressed[1] = false; next(false); return; } render(); return; }
+    if (s.info) { if (nextHit()) { nextEat(); next(false); return; } render(); return; }
     let p = 0;
     try { p = s.check(st, dt); } catch (e) { console.error(e); p = 1; }
     st.prog = p === true ? 1 : U.clamp(+p || 0, 0, 1);

@@ -180,7 +180,7 @@
     const valTotal = P.bag.items.filter((o) => o.type === 'valuable').reduce((s, o) => s + IV.value(o), 0);
     const specs = IV.SPEC.map((S) => `<div class="iv-spec" data-spec="${S.id}"><div class="iv-sph"><span>${S.icon} ${S.name}</span><kbd>${G.K(S.key)}</kbd></div>${gridEl(P.spec[S.id], 'spec:' + S.id)}</div>`).join('');
     const help = `<div class="iv-hs"><span>🛡 防御 <b>${Math.round(def)}</b></span><span>⚖ 重さ <b>${(st.weight || 0).toFixed(1)}</b></span></div>`;
-    const foot = UIV.viewOnly ? `<div class="iv-foot"><b>👁 確認のみ</b>（ここでは移動・使用・装備はできません）　<b>${G.K('status')}</b>・<b>Esc</b>・<button class="btn small" id="iv-peekback">↩ 選択画面に戻る</button></div>` : `<div class="iv-foot">ドラッグで移動・入れ替え　<b>R</b> 回転　<b>右クリック</b> メニュー　<b>ダブルクリック</b> 使う／装備　<b>Shift+クリック</b> 反対側へ　枠の外へドラッグ＝捨てる　<b>${G.K('status')}</b>・<b>Esc</b> 閉じる</div>`;
+    const foot = UIV.viewOnly ? `<div class="iv-foot"><b>👁 確認のみ</b>（ここでは移動・使用・装備はできません）　<b>${G.K('status')}</b>・<b>Esc</b>・<button class="btn small" id="iv-peekback">↩ 選択画面に戻る</button></div>` : `<div class="iv-foot">ドラッグで移動・入れ替え　<b>R</b> 回転　<b>右クリック</b> メニュー（武器は長押しで捨てる）　<b>ダブルクリック</b> 使う／装備　<b>Shift+クリック</b> 反対側へ　枠の外へドラッグ＝捨てる　<b>${G.K('status')}</b>・<b>Esc</b> 閉じる</div>`;
     const left = loot
       ? `<div class="iv-panel iv-contp"><div class="iv-ph"><b>${C.kind === 'corpse' ? '💀 ' + U.esc(C.name) + 'の亡骸' : '📦 ' + U.esc(C.name)}</b><button class="btn small" id="iv-all">すべて取る</button></div><div class="iv-contbody">${gridEl(C, 'cont', Math.round(CS * 1.3))}</div></div>`
       : '';
@@ -247,7 +247,12 @@
   function wire(el) {
     el.addEventListener('pointerdown', (e) => {
       if (UIV.viewOnly) { e.preventDefault(); return; }
-      if (e.button === 2) { e.preventDefault(); openMenu(el, e); return; }
+      if (e.button === 2) {
+        e.preventDefault();
+        const w = findIt(el);
+        if (w.it && w.from && IV.isArm(w.it)) { closeMenu(); hideTip(); holdDrop(e, () => openMenu(el, e), () => { if (w.from.items.includes(w.it)) { const nm = IV.def(w.it).name; discard(w); G.ui.toastSmall(`🗑️ ${nm} を捨てた`); } }); return; }
+        openMenu(el, e); return;
+      }
       if (e.button !== 0) return;
       closeMenu();
       const f = findIt(el); if (!f.it) return;
@@ -280,20 +285,22 @@
       if (e.button === 2 && kind === 'w' && !el.classList.contains('empty') && !e.target.closest('.iv-as')) {
         e.preventDefault(); closeMenu(); hideTip();
         const w = G.weapons.gunSlots()[+el.dataset.wslot]; if (!w) return;
-        popMenu([
+        const drop = () => { if (P.weapons.includes(w) && GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else G.sfx.ui('deny'); render(); };
+        holdDrop(e, () => popMenu([
           ['📥 インベントリにしまう', () => { if (GM.stowGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🎒 ${w.def.name} をしまった`); } else { G.sfx.ui('deny'); G.ui.toastSmall('🎒 インベントリに空きがない'); } render(); }],
-          ['🗑️ 捨てる', () => { if (GM.dropGun(w)) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${w.def.name} を捨てた`); } else G.sfx.ui('deny'); render(); }],
-        ], e);
+          ['🗑️ 捨てる', drop],
+        ], e), drop);
         return;
       }
       if (e.button === 2 && kind === 'm') {
         e.preventDefault(); closeMenu(); hideTip();
         const m = P.melee; if (!m) return;
         if (m.id === (G.BARE_MELEE || 'fists')) { G.sfx.ui('deny'); G.ui.toastSmall('素手はしまえない'); return; }
-        popMenu([
+        const drop = () => { if (P.melee === m && GM.dropMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${m.def.name} を捨てた（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('素手は捨てられない'); } render(); };
+        holdDrop(e, () => popMenu([
           ['📥 インベントリにしまう', () => { if (GM.stowMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🎒 ${m.def.name} をしまった（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('🎒 インベントリに空きがない'); } render(); }],
-          ['🗑️ 捨てる', () => { if (GM.dropMelee()) { G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${m.def.name} を捨てた（素手になった）`); } else { G.sfx.ui('deny'); G.ui.toastSmall('素手は捨てられない'); } render(); }],
-        ], e);
+          ['🗑️ 捨てる', drop],
+        ], e), drop);
         return;
       }
       if (e.button !== 0 || e.target.closest('.iv-as')) return;
@@ -589,6 +596,26 @@
     if (e.code === 'Escape' || G.BIND.status.includes(e.code) || (G.BIND.inventory && G.BIND.inventory.includes(e.code)) || (IV.openCont && G.BIND.interact.includes(e.code))) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) { if (e.code === 'Escape') G.game.escCloseT = performance.now(); UIV.close(); } }
   }, true);
 
+  // ---------------- right click on a weapon ----------------
+  // a quick click opens its menu; held for a second (a ring fills at the cursor) it is thrown away. Letting go late or moving off cancels.
+  const HOLD_DROP = 1, HOLD_TAP = 0.3, HOLD_MOVE = 24;
+  function holdDrop(e, onTap, onDone) {
+    const x0 = e.clientX, y0 = e.clientY, t0 = performance.now();
+    const ring = document.createElement('div'); ring.id = 'iv-dropring'; ring.innerHTML = '<i></i><span>🗑️</span>';
+    ring.style.left = x0 + 'px'; ring.style.top = y0 + 'px'; document.body.appendChild(ring);
+    let iv = 0;
+    const stop = () => { clearInterval(iv); ring.remove(); window.removeEventListener('pointerup', up, true); window.removeEventListener('pointermove', move, true); window.removeEventListener('blur', stop); };
+    const age = () => (performance.now() - t0) / 1000;
+    const up = (ev) => { if (ev.button !== 2) return; const quick = age() < HOLD_TAP; stop(); if (quick) onTap(); };
+    const move = (ev) => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > HOLD_MOVE) stop(); };
+    window.addEventListener('pointerup', up, true); window.addEventListener('pointermove', move, true); window.addEventListener('blur', stop);
+    iv = setInterval(() => {
+      if (!UIV.isOpen()) { stop(); return; }
+      const k = Math.min(1, age() / HOLD_DROP); ring.firstChild.style.setProperty('--p', k.toFixed(3));
+      if (k >= 1) { stop(); onDone(); }
+    }, 30);
+  }
+
   // ---------------- context menu ----------------
   function closeMenu() { if (menu) { menu.remove(); menu = null; } }
   function openMenu(el, e) {
@@ -636,7 +663,7 @@
       { const f = IV.durFrac(it), col = f > 0.5 ? '#6ee06a' : f > 0.2 ? '#f0b040' : '#ff4a3a';
         body += `<div class="ivt-r">🔧 耐久 <b style="color:${col}">${Math.ceil(IV.durOf(it))} / ${IV.durMax(it)}</b>（${Math.round(f * 100)}%）</div>`; }
     } else body += `<div class="ivt-d">${U.esc(d.desc || '')}</div>`;
-    if (it.type === 'melee') body += `<div class="ivt-r">⚒️ 強化 <b>+${(it.gun && it.gun.lv) || 0}</b>　ダブルクリック／近接枠へドラッグで装備</div>`;
+    if (it.type === 'melee') body += `<div class="ivt-r">${G.weapons.guardStats(d).map(([k, v]) => `${k} <b>${v}</b>`).join('　')}</div><div class="ivt-r">⚒️ 強化 <b>+${(it.gun && it.gun.lv) || 0}</b>　ダブルクリック／近接枠へドラッグで装備</div>`;
     body += `<div class="ivt-v">売値 ${U.fmt(IV.value(it))}🪙</div>`;
     return body;
   };

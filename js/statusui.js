@@ -86,6 +86,7 @@
       tile('会心ダメージ', dv((st.critMul - 1) * 100, (B.critMul - 1) * 100, { unit: '%', dec: 0, abs: true, mid: (B.critMul - 1) * 100 })),
       tile('ヘッドショット', `<b class="sv">${num(d.headMul || 1)}倍</b>`),
       tile('移動', `<b class="sv">×${num(d.moveMul)}</b>`),
+      ...G.weapons.guardStats(d).map(([k, v]) => tile(k, `<b class="sv">${v}</b>`)),
     ].join('');
     const fxLines = G.weapons.meleeFx ? G.weapons.meleeFx(d) : (d.traitDesc ? ['✦ ' + d.traitDesc] : []);
     return `<div class="wc ${P.meleeMode ? 'cur' : ''}" style="--rc:${R(d.rarity)}">

@@ -25,13 +25,15 @@
     return P.melee.def.moveMul * (1 + (P.stats.meleeMove || 0)) * (heavy ? 0.45 : 1) * (gd.on ? 0.6 : 1);
   };
   W.meleeBusy = () => ms.ph !== 'idle';
+  // the guard numbers shown on a weapon's hover card: [label, value]
+  W.guardStats = (d) => (d.guard ? [['ガード率', Math.round(d.guard[0] * 100) + '%'], ['ガード耐久', '' + d.guard[1]], ['ガード範囲', d.guard[2] * 2 + '°']] : [['ガード', '不可']]);
 
   // ---------------- guard (hold reload with a melee weapon) ----------------
   // While held: walk only, no attacks. Hits from in front (within the weapon's arc) lose part of their damage; what was cut drains the gauge.
   // An empty gauge cuts nothing (the guard stays up). After a short rest the gauge refills by itself.
   const gd = { on: false, k: 0, g: 1, rest: 9, lastT: 0, flash: 0, kick: 0 };
   W.gd = gd;
-  const GUARD_REST = 1.6, GUARD_REGEN = 0.22; // seconds without a blocked hit before it refills; share of the gauge per second
+  const GUARD_REST = 1.6, GUARD_REGEN = 0.09; // seconds without a blocked hit before it refills; share of the gauge per second (the same for every weapon)
   W.guarding = () => !!(gd.on && P && P.meleeMode);
   function guardTick(dt, blocked) {
     const g = P.melee.def.guard;
@@ -58,7 +60,7 @@
     const f = P.forward(); const fl = Math.hypot(f.x, f.z) || 1;
     if ((dx * f.x + dz * f.z) / (d * fl) < Math.cos(g[2] * Math.PI / 180)) return dmg;
     if (gd.g <= 0) { gd.flash = Math.max(gd.flash, 0.3); G.sfx.ui('deny'); return dmg; }
-    const pool = g[1] * P.stats.maxHp, cut = Math.min(dmg * g[0], gd.g * pool);
+    const pool = g[1], cut = Math.min(dmg * g[0], gd.g * pool);
     gd.g = Math.max(0, gd.g - cut / pool); gd.rest = 0; gd.flash = 1; gd.kick = 1;
     const fw = P.forward();
     const at = G.camera.position.clone().addScaledVector(fw, 0.9).add(V(0, -0.15, 0));
@@ -87,7 +89,6 @@
     if (d.elem && MELEM[d.elem]) out.push(`${MELEM[d.elem][0]} ${MELEM[d.elem][1]}付与 ${Math.round((d.elemChance || 0) * 100)}%（重撃100%）`);
     if (d.shieldMul && d.shieldMul > 1) out.push(`🛡️ シールド特効 +${Math.round((d.shieldMul - 1) * 100)}%`);
     if (d.lifesteal) out.push(`🩸 吸血 ${Math.round(d.lifesteal * 100)}%`);
-    if (d.id !== 'fists') out.push(d.guard ? `🛡️ 防御 軽減${Math.round(d.guard[0] * 100)}%・耐久 最大HPの${Math.round(d.guard[1] * 100)}%・正面±${d.guard[2]}°` : '🛡️ 防御できない');
     if (d.critChance) out.push(`🎯 会心率 +${Math.round(d.critChance * 100)}%`);
     if (d.headMul && d.headMul > 1.55) out.push(`💀 頭部 ×${d.headMul}`);
     return out;

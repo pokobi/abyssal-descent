@@ -35,7 +35,7 @@ exports.launch = async function (port) {
       const send = (method, params) => new Promise((r) => { const i = ++id; wait.set(i, r); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
       await send('Runtime.enable'); await send('Page.enable'); await send('Emulation.setFocusEmulationEnabled', { enabled: true });
       if (process.env.COOP_W) await send('Emulation.setDeviceMetricsOverride', { width: +process.env.COOP_W, height: +process.env.COOP_H, deviceScaleFactor: 1, mobile: false });
-      await send('Page.addScriptToEvaluateOnNewDocument', { source: "try{const k='abyssal_descent_save_v1';const d=JSON.parse(localStorage.getItem(k)||'{}');d.settings=Object.assign(d.settings||{},{volume:0});localStorage.setItem(k,JSON.stringify(d));}catch(e){}" });
+      await send('Page.addScriptToEvaluateOnNewDocument', { source: "try{const k='abyssal_descent_save_v1';const d=JSON.parse(localStorage.getItem(k)||'{}');d.settings=Object.assign(d.settings||{},{volume:0});"+(process.env.COOP_HARD?"d.records=d.records||{};d.records.clears={hard:1};":"")+"localStorage.setItem(k,JSON.stringify(d));}catch(e){}" });
       await send('Page.navigate', { url });
       return {
         errs,

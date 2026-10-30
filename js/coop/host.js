@@ -31,6 +31,7 @@
     for (const it of w.interactables) { add(it.pos ? it.pos.x : 0); add(it.pos ? it.pos.z : 0); }
     return h;
   };
+  K.fpInfo = () => `${(G.world.colliders || []).length}/${G.world.interactables.length}`;
   K.hpScale = () => 1 + 0.6 * (K.players.size - 1);
 
   K.installHost = function () {
@@ -166,7 +167,7 @@
       if (P.dead) K.rise(P.pos, P.stats.maxHp * 0.5, false);
       ea.call(GM, n, kind);
       GM.areaMods.hp *= K.hpScale();
-      K.send({ t: 'area', n, kind, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, fp: K.fingerprint() });
+      K.send({ t: 'area', n, kind, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, fp: K.fingerprint(), fi: K.fpInfo() });
     };
     K.go = function (n, kind) {
       if (GM.transitioning || n !== GM.area + 1) return;

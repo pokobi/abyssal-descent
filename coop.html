@@ -34,7 +34,7 @@
     var all = srcs.concat(FILES.map(function (f) { return 'js/coop/' + f + '.js'; }));
     return Promise.all(all.map(function (s) { return fetch(s, { cache: 'no-cache' }).then(function (r) { return r.text(); }).catch(function () { return ''; }); })).then(function (t) { return [h, hash([h].concat(t))]; });
   }).then(function (a) {
-    var h = a[0], v = a[1], cb = '?v=' + v;
+    var cb = '?v=' + a[1], h = a[0].replace(/(<script src="js\/[^"]+?)"/g, '$1' + cb + '"'), v = a[1];
     var tags = '<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/script>'
       + FILES.map(function (f) { return '<script src="js/coop/' + f + '.js' + cb + '"><\/script>'; }).join('');
     window.COOP_VER = v;

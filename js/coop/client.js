@@ -77,7 +77,7 @@
       } finally { fromHost = false; }
       const fp = K.fingerprint();
       K.fpOk = fp === m.fp;
-      if (!K.fpOk) { console.error('coop: world differs from the host', fp, m.fp); K.msg('⚠ ホストと地形が一致していません'); }
+      if (!K.fpOk) { console.error('coop: world differs from the host', fp, m.fp, K.fpInfo(), m.fi); K.fpMsg = `ホストと地形が一致していません（${K.fpInfo()} / ${m.fi}）。両方のページを Ctrl+F5 で再読み込みしてください`; K.msg('⚠ ' + K.fpMsg); K.fail = true; }
     };
     // ---------------- foes ----------------
     function repUpdate(dt) {

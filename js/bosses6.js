@@ -341,7 +341,7 @@
       this.t += dt;
       const P = Pl();
       TR.tick(this, dt);
-      if (this.stage2) { this.orbit(dt); this.segTick(dt); this.updateHoles(dt); }
+      if (this.stage2) { this.orbit(dt); this.guard('seg', () => this.segTick(dt)); this.guard('holes', () => this.updateHoles(dt)); }
       if (this.stg && this.stg.stars) { this.stg.stars.position.copy(G.camera.position); this.stg.spin.rotation.y += dt * 0.05; }
       if (this.hp < this.lastHp) this.noDmgT = 0; else this.noDmgT += dt;
       this.lastHp = this.hp;
@@ -360,7 +360,7 @@
           for (const h of this.hands) if (!h.busy) this.restHand(h, dt);
           if (this.cd <= 0) this.choose();
         }
-        this.updateConstructs(dt);
+        this.guard('cons', () => this.updateConstructs(dt));
       }
       this.updateLift(dt);
       // mist where the body meets the dark, embers off the crown
@@ -425,7 +425,10 @@
     runAct(dt) {
       const a = this.act; a.t += dt * this.atkRate();
       const fn = this['a_' + a.k];
-      if (!fn || fn.call(this, a, dt)) this.end();
+      // (a fault inside one attack must never freeze the fight: it is logged once and that attack is dropped)
+      let over = true;
+      try { over = !fn || fn.call(this, a, dt); } catch (err) { console.error(err); }
+      if (over) this.end();
     }
     // ---------------------------------------------------------------- attacks
     // slam: a hand hangs over you, follows you, stops, and comes down. It stays on the floor for a moment: strike it.
@@ -884,6 +887,8 @@
       this.yawB = Math.atan2(this.stg.c.x - to.x, this.stg.c.z - to.z);
       for (const h of this.hands) h.rest = this.home.clone().add(this.rotL(h.sx * 22, 14, 10));
     }
+    // run one of the fight's systems so that a fault in it is logged once and does not stop the rest (the fight must never freeze)
+    guard(key, fn) { try { fn(); } catch (err) { this._faults = this._faults || {}; if (!this._faults[key]) { this._faults[key] = true; console.error(err); } } }
     // gravity reversal is a set piece of its own: while it charges and while you hang in the air, nothing else starts or goes off
     gravBusy() { return !!(this.lift || (this.act && this.act.k === 'gravity')); }
     // ---- the sky floor crumbling: its own shapes (wedges, spirals, a ring, a half), back after a while
@@ -1040,12 +1045,14 @@
     // ---------------------------------------------------------------- the Avatar's attacks (the sky stage)
     // star ring: shards gather from its hands into a ring round the platform and close in, turning; slip out through a gap
     a_starring(a, dt) {
-      const S = this.stg, P = Pl(), K = this.phase >= 4 ? 18 : 15, W = 1.1, SPD = 5.6, H = 1.15;
+      const S = this.stg, P = Pl(), W = 1.1, SPD = 5.6, H = 1.15;
+      // (the count is fixed when the ring forms: the Avatar may rage halfway through, and the shards that exist are the ones to move)
       if (!a.sh) {
+        a.K = this.phase >= 4 ? 18 : 15;
         a.r = PR + 4; a.ang = Math.random() * 6.28; a.spin = (Math.random() < 0.5 ? 1 : -1) * 0.5;
         a.g = new THREE.Group(); G.scene.add(a.g);
         const core = glowM(0xd8b8ff, 3);
-        a.sh = []; for (let i = 0; i < K; i++) { const sh = new THREE.Group(); mesh(sh, PG().oct3, core, 0.5, 1.1, 0.5).castShadow = false; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: VIO, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(2.6, 3.6, 1); sh.add(sp); a.g.add(sh); a.sh.push(sh); }
+        a.sh = []; for (let i = 0; i < a.K; i++) { const sh = new THREE.Group(); mesh(sh, PG().oct3, core, 0.5, 1.1, 0.5).castShadow = false; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: VIO, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(2.6, 3.6, 1); sh.add(sp); a.g.add(sh); a.sh.push(sh); }
         a.ring = new THREE.Mesh(new THREE.RingGeometry(0.985, 1, 128), addM(VIO, 0)); a.ring.rotation.x = -Math.PI / 2; a.ring.position.set(S.c.x, Y2 + 0.06, S.c.z); a.g.add(a.ring);
         a.from = this.hands.map((h) => h.pos.clone());
         if (G.sfx.starRing) G.sfx.starRing(); G.ui.toastSmall('⚠ 星環 — 迫る星の輪の隙間を抜けて外へ');
@@ -1054,6 +1061,7 @@
       const k = Math.min(1, a.t / W);
       if (k >= 1) { a.r -= SPD * dt * this.atkRate(); a.ang += a.spin * dt; }
       a.ring.scale.setScalar(Math.max(0.1, a.r)); a.ring.material.opacity = 0.2 + 0.4 * k;
+      const K = a.sh.length;
       for (let i = 0; i < K && !a.done; i++) {
         const an = a.ang + i / K * Math.PI * 2, tgt = V(S.c.x + Math.cos(an) * a.r, Y2 + H, S.c.z + Math.sin(an) * a.r), sh = a.sh[i];
         if (k < 1) sh.position.lerpVectors(a.from[i % 2], tgt, k * k * (3 - 2 * k)); else sh.position.copy(tgt);

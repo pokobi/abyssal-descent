@@ -11,6 +11,8 @@ window.__coopbot = async function (ms) {
     if (window.__cbRun) {
       // a whole run: walk into the guardian's hall, shoot it for a share of its health, leave by the rift
       if (G.Rift.active && G.Rift.active()) { G.Rift.enter(); continue; }
+      const hid = G.enemies.list.find((e) => e.alive && !e.custom && e.burrowed);
+      if (hid && !G.enemies.list.some((e) => e.alive && !e.custom && !e.burrowed)) { P.pos.set(hid.pos.x + 3, hid.pos.y + 0.2, hid.pos.z); P.vel.set(0, 0, 0); G.world.depenetrate(P.pos, P.hw, P.height); }
       const al = GM.objective && GM.objective.altars && GM.objective.altars.find((x) => !x.done);
       if (al && !GM.areaCleared && !G.enemies.list.some((e) => e.alive && !e.custom)) { P.pos.set(al.x, al.y + 0.1, al.z); P.vel.set(0, 0, 0); continue; }
       if (GM.stage === 'boss' && !GM.bossEngaged && G.world.arenaCenter) { const w0 = G.world; P.pos.set(w0.arenaCenter.x, 0.2, (w0.ledgeZ || w0.arenaD) - 6); P.vel.set(0, 0, 0); P.grounded = true; }

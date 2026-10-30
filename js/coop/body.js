@@ -76,7 +76,9 @@
     const w = new THREE.Group();
     g.rotation.set(0, 0, 0); g.position.set(0, 0, 0);
     w.add(g);
-    w.rotation.set(0, rp.mm ? Math.PI : Math.PI, 0);
+    // the hand's -y runs along the forearm and its +z is the back of the hand: the barrel (the model's -z) lies along the forearm, the top of the gun upwards
+    if (rp.mm) w.rotation.set(Math.PI, 0, 0);
+    else w.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(V(-1, 0, 0), V(0, 0, 1), V(0, 1, 0)));
     w.scale.setScalar(rp.mm ? 0.9 : 1);
     B.hold = w; B.J.hold.add(w);
   }

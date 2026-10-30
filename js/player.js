@@ -234,7 +234,7 @@
       if (this.grounded && this.pileFree && !this.pileState && this._pileBounced && this.vel.y <= 0) { this.pileFree = false; this._pileBounced = false; }
       if (crouchHit && !this.grounded && !this.pileState && !this.mantle && this.liftVy == null) {
         const below = w.groundAt(this.pos, this.hw, 60);
-        if (this.pos.y - below > 1.3 || below === -Infinity) {
+        if (this.pos.y - below > (G.Tutorial && G.Tutorial.active ? 0.8 : 1.3) || below === -Infinity) {
           if (this.pileReady()) this.startPile();
           else { G.ui.toastSmall(`🔨 パイルドライバー CT ${this.pileCd.toFixed(1)}秒`); G.sfx.ui('deny'); }
         }

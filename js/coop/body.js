@@ -7,7 +7,7 @@
   const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   const rot = (o, x, y, z, k) => { o.rotation.x += (x - o.rotation.x) * k; o.rotation.y += (y - o.rotation.y) * k; o.rotation.z += (z - o.rotation.z) * k; };
 
-  K.buildBody = function (name) {
+  K.buildBody = function (name, col) {
     const PG = G.Props.PG, M = G.avatar.mats || [], leather = M[0], plate = M[1], cloth = M[2], dark = M[3];
     const m = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); parent.add(o); return o; };
     const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
@@ -47,7 +47,7 @@
       J.legs.push({ hip, kn });
     }
     const c = document.createElement('canvas'); c.width = 256; c.height = 48;
-    const x = c.getContext('2d'); x.font = '700 28px sans-serif'; x.textAlign = 'center'; x.lineWidth = 5; x.strokeStyle = '#000'; x.strokeText(name, 128, 34); x.fillStyle = '#ffe2a0'; x.fillText(name, 128, 34);
+    const x = c.getContext('2d'); x.font = '700 28px sans-serif'; x.textAlign = 'center'; x.lineWidth = 5; x.strokeStyle = '#000'; x.strokeText(name, 128, 34); x.fillStyle = col || '#ffe2a0'; x.fillText(name, 128, 34);
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));
     tag.scale.set(1.6, 0.3, 1); tag.position.y = 2.1; tag.renderOrder = 6; root.add(tag);
     // the effects running on them (icons of the ultimate / skill buffs), a soft glow while any is up

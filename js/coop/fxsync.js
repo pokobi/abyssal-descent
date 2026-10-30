@@ -87,7 +87,7 @@
     const zn = C.zone, vz = [];
     C.zone = function (pos, r, dur, kind, dps, opts) {
       const z = zn.call(C, pos, r, dur, kind, dps, opts);
-      if (K.live && !(opts && opts.enemy) && !K._net) push(['z', { p: K.vec(pos), r: r2(r), dur: r2(dur), k: kind, who: K.id, fol: opts && opts.follow ? 1 : 0 }]);
+      if (K.live && !(opts && opts.enemy) && !K._net) push(['z', { p: K.vec(pos), r: r2(r), dur: r2(dur), k: kind, who: K.id, fol: opts && opts.follow ? 1 : 0, hps: (opts && opts.hps) || 0 }]);
       return z;
     };
     const zoneVisual = (z, dt) => {
@@ -113,7 +113,7 @@
       for (const a of A.auras) {
         if (sentAura.has(a)) continue;
         sentAura.add(a);
-        const m = { id: Math.random().toString(36).slice(2, 8), k: a.kind, t: r2(a.t), r: r2(a.r || 3), col: a.col || 0, fol: a.follow ? 1 : 0, who: K.id };
+        const m = { id: Math.random().toString(36).slice(2, 8), k: a.kind, t: r2(a.t), r: r2(a.r || 3), col: a.col || 0, fol: a.follow ? 1 : 0, who: K.id, heal: a.heal || 0 };
         if (a.c) m.c = K.vec(a.c);
         if (a.pt) m.pt = K.vec(a.pt);
         a._cid = m.id;
@@ -133,6 +133,8 @@
         if (!a.ring) { a.ring = new THREE.Mesh(new THREE.RingGeometry(a.r - 0.3, a.r, 48), new THREE.MeshBasicMaterial({ color: 0xffe8a0, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); a.ring.rotation.x = -Math.PI / 2; G.scene.add(a.ring); }
         a.ring.position.set(c.x, c.y + 0.05, c.z); a.ring.material.opacity = 0.45 + 0.15 * Math.sin(a.age * 4);
         if (R() < dt * 12) FX.add.spawn(c.x + U.rand(-a.r, a.r), c.y + 0.1, c.z + U.rand(-a.r, a.r), 0, 1.4, 0, 1, 0.12, 0.02, 1.2, 1.0, 0.5, 0.8, -0.3, 0.5);
+        // the sanctuary heals everyone inside it
+        if (a.heal && !P.dead && Math.hypot(P.pos.x - c.x, P.pos.z - c.z) < a.r) C.heal(P.stats.maxHp * a.heal * dt, true);
       } else if (a.k === 'stomp') { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 1.5; FX.ring(c.clone(), a.r, 0xffb060, 0.5); } }
     };
 
@@ -202,6 +204,8 @@
         const z = vz[i]; z.t += dt;
         const rp = K.players.get(z.who); if (z.fol && rp) z.pos.copy(rp.pos);
         zoneVisual(z, dt);
+        // a healing field heals whoever stands in it
+        if (z.hps && !P.dead && Math.hypot(P.pos.x - z.pos.x, P.pos.z - z.pos.z) < z.r) C.heal(z.hps * dt, true);
         if (z.t >= z.dur) vz.splice(i, 1);
       }
       for (let i = vAuras.length - 1; i >= 0; i--) {
@@ -221,8 +225,12 @@
           else if (kind === 'mn') { const m = mineMesh(); m.position.set(...a.p); m.position.y += 0.05; G.scene.add(m); theirMines.set(a.id, m); }
           else if (kind === 'mx') { const m = theirMines.get(a); if (m) { G.scene.remove(m); theirMines.delete(a); } }
           else if (kind === 'd') { K._net = true; try { ad.call(C, V(...a.p), a.dur, 0); } finally { K._net = false; } }
-          else if (kind === 'z') vz.push({ pos: V(...a.p), r: a.r, dur: a.dur, t: 0, kind: a.k, who: a.who, fol: a.fol });
-          else if (kind === 'a') vAuras.push({ id: a.id, k: a.k, t: a.t, r: a.r, col: a.col, fol: a.fol, who: a.who, c: a.c ? V(...a.c) : null, pt: a.pt ? V(...a.pt) : null, age: 0 });
+          else if (kind === 'z') {
+            vz.push({ pos: V(...a.p), r: a.r, dur: a.dur, t: 0, kind: a.k, who: a.who, fol: a.fol, hps: a.hps });
+            // what pulls or blinds has to work on the real foes
+            if (K.role === 'host' && (a.k === 'gravity' || a.k === 'smoke')) { K._net = true; try { zn.call(C, V(...a.p), a.r, a.dur, a.k, 0, {}); } finally { K._net = false; } }
+          }
+          else if (kind === 'a') vAuras.push({ id: a.id, k: a.k, t: a.t, r: a.r, col: a.col, fol: a.fol, who: a.who, heal: a.heal, c: a.c ? V(...a.c) : null, pt: a.pt ? V(...a.pt) : null, age: 0 });
           else if (kind === 'b') { const v = vAuras.find((x) => x.id === a.id); if (v) { if (!v.pt) v.pt = V(...a.pt); else v.pt.lerp(V(...a.pt), 0.5); } }
         } catch (e) { console.error(e); }
       }

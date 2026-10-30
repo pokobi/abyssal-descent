@@ -30,6 +30,7 @@ exports.launch = async function (port) {
         const m = JSON.parse(ev.data);
         if (m.id && wait.has(m.id)) { wait.get(m.id)(m); wait.delete(m.id); }
         if (m.method === 'Runtime.exceptionThrown') { const d = m.params.exceptionDetails; errs.push((d.exception && d.exception.description || d.text).slice(0, 400)); }
+        if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'warning' && process.env.COOP_WARN) console.log('WARN', m.params.args.map((a) => a.value || '').join(' ').slice(0, 400));
         if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') errs.push(m.params.args.map((a) => a.value || a.description || '').join(' ').slice(0, 400));
       };
       const send = (method, params) => new Promise((r) => { const i = ++id; wait.set(i, r); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });

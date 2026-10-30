@@ -78,7 +78,7 @@
     for (const rp of K.players.values()) {
       if (rp.id === K.id) continue;
       rp.pos.lerp(rp.to, Math.min(1, dt * 14));
-      if (!rp.body) { rp.body = K.buildBody(rp.name); G.scene.add(rp.body.root); }
+      if (!rp.body) { rp.body = K.buildBody(rp.name, COLS[rp.id % COLS.length]); G.scene.add(rp.body.root); }
       else if (rp.body.root.parent !== G.scene) G.scene.add(rp.body.root);
       const b = rp.body;
       b.root.position.copy(rp.pos);
@@ -97,7 +97,7 @@
       const tags = (rp.dead ? '<span class="ch-tag" style="color:#ff9a80;border-color:#ff7a60">戦闘不能</span>' : '') + (rp.at ? '<span class="ch-tag">🚪 門で待機</span>' : '');
       h += `<div class="ch-p${rp.dead ? ' down' : pct < 30 ? ' low' : ''}" style="--pc:${col}"><div class="ch-top"><div class="ch-ic">${G.U.esc((rp.name || '?').slice(0, 1))}</div><div class="ch-nm">${G.U.esc(rp.name)}</div><div class="ch-ping">${rp.rtt ? rp.rtt + 'ms' : ''}</div></div>`
         + `<div class="ch-b"><i style="width:${pct}%"></i><b>${Math.max(0, Math.round(rp.hp))} / ${Math.round(rp.maxHp)}</b></div>`
-        + `<div class="ch-row"><span>${G.U.esc(wname(rp))}</span><span>🪔×${Math.max(0, rp.rev)}</span>${tags}</div></div>`;
+        + `<div class="ch-row"><span style="flex:1;min-width:0">${G.U.esc(wname(rp))}</span><span>🪔×${Math.max(0, rp.rev)}</span></div>${tags ? `<div class="ch-row">${tags}</div>` : ''}</div>`;
     }
     if (K.hudEl._h !== h) { K.hudEl.innerHTML = h; K.hudEl._h = h; }
   }
@@ -184,6 +184,13 @@
     const g = GM();
     try {
       if (!g._warming && g.run && stopped(g.state)) { clearKeys(); g.step(Math.min(0.05, dt)); }
+      // a position gone wrong must not take the player out of the run: back to the last safe ground
+      { const P = G.player;
+        if (g.run && !Number.isFinite(P.pos.x + P.pos.y + P.pos.z + P.vel.x + P.vel.y + P.vel.z)) {
+          console.warn('coop: player position lost', JSON.stringify({ pos: P.pos, vel: P.vel, pullT: P.pullT, pullSpd: P.pullSpd, pullDir: P.pullDir, dragT: P.dragT, liftVy: P.liftVy, safe: P.lastSafe, stage: g.stage, area: g.area }));
+          K.lostPos = (K.lostPos || 0) + 1;
+          P.pos.copy(Number.isFinite(P.lastSafe.x + P.lastSafe.y + P.lastSafe.z) ? P.lastSafe : G.world.spawn || V(0, 1, 0)); P.vel.set(0, 0, 0);
+        } }
       updateBodies(dt);
       netT -= dt;
       if (netT <= 0) {
@@ -220,13 +227,14 @@
   }
   function watchPeers() {
     const now = performance.now();
-    for (const rp of [...K.players.values()]) if (rp.id !== K.id && now - rp.seen > 8000) K.drop(rp.id);
+    // (a guest only hears the host directly: the other guests come and go by the host's word)
+    for (const rp of [...K.players.values()]) if (rp.id !== K.id && (K.role === 'host' || rp.id === 0) && now - rp.seen > 8000) K.drop(rp.id);
   }
   K.drop = function (id) {
     const rp = K.players.get(id); if (!rp) return;
     K.players.delete(id);
     if (rp.body) G.scene.remove(rp.body.root);
-    if (K.role === 'guest') { if (K.live) K.ended('ホストとの接続が切れました', 'ランは終了します'); return; }
+    if (K.role === 'guest') { if (K.live) K.ended('ホストとの接続が切れました', 'ランは終了します'); else K.lobbyErr('ホストとの接続が切れました'); return; }
     K.msg(`${rp.name} が抜けた`);
     if (K.onLeave) K.onLeave(rp);
     K.send({ t: 'left', i: id, r: roster() });
@@ -296,13 +304,16 @@
   K.handlers.hi = function (m, from) {
     const rp = K.players.get(from); if (!rp) return;
     if (m.v !== window.COOP_VER) { K.send({ t: 'no', why: 'ゲームのバージョンが違います。ページを再読み込みしてください' }, from); K.players.delete(from); return; }
-    if (K.players.size > K.MAX || K.live) { K.send({ t: 'no', why: K.live ? 'もう始まっています' : '部屋が満員です' }, from); K.players.delete(from); return; }
+    if (K.players.size > K.MAX) { K.send({ t: 'no', why: '部屋が満員です' }, from); K.players.delete(from); return; }
     rp.name = m.name;
     for (const o of K.players.keys()) if (o && o !== from) K.send({ t: 'roster', r: roster() }, o);
     K.send({ t: 'room', id: from, r: roster(), d: K.diff }, from);
-    roomScreen();
+    if (K.live) { K.feed(`${G.U.esc(m.name)} が参加した`, true); K.lateJoin(from, m.name); } else roomScreen();
   };
-  K.handlers.roster = function (m) { K.players.clear(); for (const [id, nm] of m.r) K.addPlayer(id, nm); roomScreen(); };
+  K.handlers.roster = function (m) {
+    if (K.live) { for (const [id, nm] of m.r) if (!K.players.has(id)) { K.addPlayer(id, nm); K.feed(`${G.U.esc(nm)} が参加した`, true); } return; }
+    K.players.clear(); for (const [id, nm] of m.r) K.addPlayer(id, nm); roomScreen();
+  };
   K.handlers.no = function (m) { K.lobbyErr(m.why); K.net.close(); K.net = null; };
   K.handlers.room = function (m) {
     K.id = m.id; K.diff = m.d || K.diff;
@@ -316,6 +327,7 @@
     K.lobbyEl.style.display = 'none'; K.live = true;
     for (const rp of K.players.values()) rp.seen = performance.now();
     K.hudEl.style.display = '';
+    K.feed && K.feed('H: ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす', true);
   };
 
   function start() {
@@ -349,7 +361,7 @@
       return dp.call(G.combat, a, i);
     };
     const up = G.ui.pause;
-    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。</div>' + (K.statsHTML ? K.statsHTML() : '')); };
+    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); const q = document.querySelector('#p-quit'); if (q) q.textContent = '🚪 部屋を出る'; if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。<br>H: ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす</div>' + (K.statsHTML ? K.statsHTML() : '')); };
     const pu = G.player.update;
     G.player.update = function (dt) { if (this.dead) clearKeys(); return pu.call(this, dt); };
     lobby();

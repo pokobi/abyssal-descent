@@ -97,6 +97,13 @@
     const ol = K.onLeave;
     K.onLeave = function (rp) { for (const id of Object.keys(locks)) if (locks[id] === rp.id) delete locks[id]; if (ol) ol(rp); };
 
+    // a newcomer is told how the area stands
+    K.catchUp = function (to) {
+      G.world.interactables.forEach((it, i) => { if (it.type === 'chest' && it.opened && it.cont) K.send({ t: 'cs', id: 'c' + i, d: snap(it.cont) }, to); });
+      for (const gr of IV.ground) if (gr.gid) K.send({ t: 'gd', gid: gr.gid, it: IV.ser(gr.it), p: K.vec(gr.g.position) }, to);
+      (G.Strata.doors || []).forEach((d, i) => { if (d.state !== 'closed') K.send({ t: 'dr', i, s: d.state, a: GM.area }, to); });
+      G.world.destructibles.forEach((d, i) => { if (!d.alive) K.send({ t: 'ds', i, a: GM.area }, to); });
+    };
     // ---------------- things on the ground ----------------
     const dg = IV.dropToGround, pu = IV.pickUp;
     let gidN = 1;

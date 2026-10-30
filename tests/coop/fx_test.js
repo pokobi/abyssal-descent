@@ -31,6 +31,17 @@ const PORT = +process.env.COOP_PORT || 9011;
     check(await h.eval(`!G.enemies.list.some((x) => x._nid === ${id} && x.alive)`), `the foe the guest hit was killed on the host (${hp0} hp)`);
     check(await g.eval(`!G.enemies.list.some((x) => x._nid === ${id} && x.alive)`), 'and is dead on the guest');
     check(await g.eval('G.game.run.kills >= 1'), 'the kill counts for the guest');
+    // ---- a real shot: the guest aims at a foe with the camera and fires the gun in hand
+    await g.until(`${foes}.length >= 1`, 20000);
+    await g.eval(`(() => { const P = G.player, e = ${foes}[0], c = e.centerPos(); window.__s = e._nid; window.__sh = e.hp + (e.shield || 0); const dx = c.x - P.pos.x, dz = c.z - P.pos.z, L = Math.hypot(dx, dz) || 1; P.pos.x = c.x - dx / L * 5; P.pos.z = c.z - dz / L * 5; P.pos.y = e.pos.y; P.vel.set(0, 0, 0); })(); 1`);
+    await sleep(200);
+    await g.eval(`(() => { const P = G.player, e = G.enemies.list.find((x) => x._nid === window.__s), c = e.centerPos(), o = G.camera.position; const dx = c.x - o.x, dy = c.y - o.y, dz = c.z - o.z; P.yaw = Math.atan2(-dx, -dz); P.pitch = Math.atan2(dy, Math.hypot(dx, dz)); })(); 1`);
+    await sleep(150);
+    await g.eval(`(() => { const W = G.weapons, P = G.player, w = P.weapon; w.mag = 20; w.reloading = false; G.ui.clearScreen(); G.game.state = 'playing'; const e = G.enemies.list.find((x) => x._nid === window.__s), c = e.centerPos(), o = G.camera.position; const dx = c.x - o.x, dy = c.y - o.y, dz = c.z - o.z; P.yaw = Math.atan2(-dx, -dz); P.pitch = Math.atan2(dy, Math.hypot(dx, dz)); G.camera.rotation.set(P.pitch, P.yaw, 0, 'YXZ'); G.camera.updateMatrixWorld(true); W.shoot(w, W.stats(w)); })(); 1`);
+    await sleep(600);
+    const sid = +(await g.eval('window.__s')), sh = +(await g.eval('window.__sh'));
+    const after = await h.eval(`(() => { const e = G.enemies.list.find((x) => x._nid === ${sid}); return e && e.alive ? e.hp + (e.shield || 0) : -1; })()`);
+    check(after < sh, `a real shot of the guest took health off the host's foe (${Math.round(sh)} -> ${Math.round(after)})`);
     // ---- a status the guest puts on a foe ticks on the host; one the host puts on shows on the guest
     await g.until(`${foes}.length >= 1`, 20000);
     await g.eval(`(() => { const e = ${foes}[0]; window.__b = e._nid; G.combat.status(e, 'burn', 2); })(); 1`);

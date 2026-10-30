@@ -61,7 +61,7 @@
         if (P.st.shock !== stK) { put('shock', P.st.shock); P.st.shock = stK; }
         if (P.grapple.state !== gr) { put('gr', 1); P.grapple.state = gr; }
         if (P.pileState !== pile) { put('pile', 1); P.pileState = pile; }
-        if (P.pullDir !== pd) { if (P.pullDir && P.pullDir.isVector3) put('pd', K.vec(P.pullDir)); P.pullDir = pd; }
+        if (P.pullDir !== pd) { if (P.pullDir) put('pd', [r2(P.pullDir.x), r2(P.pullDir.y || 0), r2(P.pullDir.z)]); P.pullDir = pd; }
         if (Math.abs(P.pos.x - px) + Math.abs(P.pos.y - py) + Math.abs(P.pos.z - pz) > 0.05) put('dp', [r2(P.pos.x - px), r2(P.pos.y - py), r2(P.pos.z - pz)]);
         if (o) K.send({ t: 'pfx', o }, rp.id);
         K.swap = null; w.ndist = nd; P.pos.copy(tv0); P.vel.copy(tv1); P.dead = d0; P.smokeT = smk; P.stats.invis = inv; P.grounded = gnd;
@@ -149,12 +149,14 @@
       b.parts.forEach((p, i) => { p._nid = -(i + 1); });
       K.bossNodes = K.nodesOf(b);
       K._bossLast = [];
-      K.send({ t: 'bstart', id, level, seed, hp: b.hp, mx: b.maxHp, n: K.bossNodes.length });
+      K._bs = { t: 'bstart', id, level, seed, hp: b.hp, mx: b.maxHp, n: K.bossNodes.length };
+      K.send(K._bs);
       return b;
     };
     // ---------------- things the foes make: every player's own copy flies and hits on its own machine ----------------
     const sp = C.spawnProjectile;
     C.spawnProjectile = function (o) {
+      if (K.live && o.owner === 'enemy' && o.explode) o.info = Object.assign({}, o.info, { pjx: 1 });
       const p = sp.call(C, o);
       if (K.live && o.owner === 'enemy') K.send({ t: 'pj', o: K.plain(o) });
       return p;
@@ -168,7 +170,7 @@
     const ex = C.explode;
     C.explode = function (pos, r, dmg, info) {
       const res = ex.call(C, pos, r, dmg, info);
-      if (K.live && info && info.enemy) K.send({ t: 'bm', a: [K.vec(pos), r, dmg], o: K.plain(info), h: K.swap ? 0 : 1 });
+      if (K.live && info && info.enemy && !info.pjx) K.send({ t: 'bm', a: [K.vec(pos), r, dmg], o: K.plain(info), h: K.swap ? 0 : 1 });
       return res;
     };
     const tg = FX.telegraph, tl = FX.teleLine;
@@ -208,7 +210,7 @@
     };
     const find = (id) => (id < 0 ? BS.active && BS.active.parts[-id - 1] : known.get(id));
     K.handlers.hit = function (m, from) {
-      for (const [id, dh, ds, cc, kn] of m.h) {
+      for (const [id, dh, ds, kn] of m.h) {
         const e = find(id); if (!e || !e.alive || e.dying) continue;
         if (ds && e.shield > 0) { e.shield = Math.max(0, e.shield - ds); if (e.shield <= 0 && e.onShieldBreak) e.onShieldBreak(); }
         if (dh > 0) {
@@ -248,8 +250,25 @@
       if (snapT <= 0) { snapT = 0.066; K.sendEnemies(); K.sendBoss(); }
       objT -= dt;
       if (objT <= 0) { objT = 0.4; sendObjective(); checkWipe(); helpAltars(0.4); }
+      if (GM.enrage.lv !== K._enLv) { K._enLv = GM.enrage.lv; K.send({ t: 'en', lv: GM.enrage.lv, d: GM.enrage.dmg, tm: GM.enrage.tm }); }
       if (GM.areaCleared && !K._cleared) { K._cleared = true; K.send({ t: 'clear', boss: GM.stage === 'boss' ? 1 : 0 }); }
       if (GM.bossEngaged && !K._engaged) { K._engaged = true; K.send({ t: 'engage' }); }
+    };
+    // one foe as a newcomer is told of it
+    const esRow = (e) => [e._nid, e.def.id, e.level, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), e.maxHp, Math.round(e.shield), e.maxShield, e.elite ? 1 : 0, r2(e.model.scale / (e.elite ? 1.15 : 1)), e.def.name, (e.noReward ? 1 : 0) | (e.noLoot ? 2 : 0) | (e.bossSpawn ? 4 : 0) | (e.cursed ? 8 : 0) | (e.champion ? 16 : 0) | (e.marked ? 32 : 0), e.mut ? e.mutCol || 0xffffff : 0];
+    // ---------------- someone joins a run under way (or comes back after losing the connection, with what they carried when last seen) ----------------
+    K.saved = {};
+    K.handlers.sv = function (m, from) { const rp = K.players.get(from); if (rp) K.saved[rp.name] = m.d; };
+    K.lateJoin = function (to, name) {
+      K.send({ t: 'late', n: GM.area, kind: GM.stage, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, fp: K.fingerprint(), fi: K.fpInfo(), route: GM.route, snap: K.saved[name] || null }, to);
+    };
+    K.handlers.ready = function (m, from) {
+      const list = [...known.values()].filter((e) => e.alive).map(esRow);
+      if (list.length) K.send({ t: 'es', a: list }, from);
+      if (BS.active && !BS.active.dead && K._bs) { K.send(K._bs, from); K._bossLast = []; }
+      if (GM.bossEngaged) K.send({ t: 'engage' }, from);
+      if (GM.areaCleared) K.send({ t: 'clear', boss: GM.stage === 'boss' ? 1 : 0 }, from);
+      K.catchUp(from);
     };
     K.sendEnemies = function () {
       const add = [], snap = [];
@@ -257,7 +276,7 @@
         if (e.custom || e.ally || !e.isEnemy || !e.alive) continue;
         if (!e._nid) {
           e._nid = nextId++; known.set(e._nid, e);
-          add.push([e._nid, e.def.id, e.level, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), e.maxHp, Math.round(e.shield), e.maxShield, e.elite ? 1 : 0, r2(e.model.scale / (e.elite ? 1.15 : 1)), e.def.name, (e.noReward ? 1 : 0) | (e.noLoot ? 2 : 0) | (e.bossSpawn ? 4 : 0) | (e.cursed ? 8 : 0) | (e.champion ? 16 : 0) | (e.marked ? 32 : 0)]);
+          add.push(esRow(e));
         }
         const fl = (e.burrowed ? 1 : 0) | (e.untargetable ? 2 : 0) | (e.invuln ? 4 : 0) | (e.st.stun > 0 ? 8 : 0) | (e.st.frozen > 0 ? 16 : 0) | (e.state === 'spawn' ? 32 : 0) | (e.model.group.visible ? 0 : 64);
         snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0), K.statusBits(e), [e.st.poisonStacks | 0, e.st.frostStacks | 0, e.st.burnLv | 0, e.st.markMul || 0]]);

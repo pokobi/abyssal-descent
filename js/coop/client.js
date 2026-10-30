@@ -40,7 +40,7 @@
     const sp = C.spawnProjectile, zn = C.zone, ex = C.explode;
     C.spawnProjectile = function (o) { if (o.owner === 'enemy' && !net) return Object.assign({}, o, { dead: true }); return sp.call(C, o); };
     C.zone = function (pos, r, dur, kind, dps, opts) { if (opts && opts.enemy && !net) return Object.assign({ pos: pos.clone(), r, dur, t: dur, kind }, opts); return zn.call(C, pos, r, dur, kind, dps, opts); };
-    C.explode = function (pos, r, dmg, info) { if (info && info.enemy && !net) return; return ex.call(C, pos, r, dmg, info); };
+    C.explode = function (pos, r, dmg, info) { if (info && info.enemy && !net && !info.pjx) return; return ex.call(C, pos, r, dmg, info); };
     const es = E.spawn;
     let spawning = false;
     E.spawn = function (def, level, pos, opts) { const e = es.call(E, def, level, pos, opts); if (!spawning) e._stray = true; return e; };
@@ -56,6 +56,8 @@
     const ea = GM.enterArea, sr = GM.startRun;
     GM.enterArea = function (n, kind) {
       if (!fromHost) { K.send({ t: 'gate', n, kind }); return; }
+      // joining a run under way: the first area is the one the others are in
+      if (K.late) { n = K.late.n; kind = K.late.kind; GM.route = (K.late.route || []).slice(0, -1); K.late = null; }
       GM.seed = seed0;
       for (const e of reps.values()) e.alive = false;
       reps.clear();
@@ -68,6 +70,22 @@
       for (const e of E.list) if (!e.custom && !e._rep) { e.alive = false; e.remove(); e.removed = true; }
     };
     K.handlers.go = function () { K.started(); };
+    K.handlers.late = function (m) {
+      K.late = m; seed0 = m.seed; fromHost = true;
+      try { K.started(); G.Run.set(m.diff, m.lv); sr.call(GM, { id: m.diff, lv: m.lv }, 0); } finally { fromHost = false; }
+      if (m.snap) {
+        GM.applyPlayerSnap(m.snap);
+        if (m.snap.coins !== undefined) GM.run.coins = m.snap.coins;
+        G.weapons.dirty = true; G.weapons.equip(true); G.ui.refreshWeapon(); G.ui.refreshItems();
+        K.msg('🔗 復帰した — 持ち物は最後の状態に戻っている');
+      }
+      const fp = K.fingerprint();
+      K.fpOk = fp === m.fp;
+      K.send({ t: 'ready' });
+    };
+    // what you carry goes to the host now and then: if your connection drops, you come back with it
+    const saveMe = () => { if (GM.run && !P.dead) K.send({ t: 'sv', d: Object.assign(GM.playerSnap(), { coins: GM.run.coins }) }); };
+    setInterval(() => { if (K.live) saveMe(); }, 20000);
     K.handlers.area = function (m) {
       seed0 = m.seed;
       fromHost = true;
@@ -131,6 +149,7 @@
         if (e.cursed && e.makeCurseRing) e.makeCurseRing(0x9a30ff);
         if (e.champion && e.makeCurseRing) e.makeCurseRing(0xff3018);
         if (e.marked && e.markTarget) e.markTarget(e.champion);
+        if (a[15] && e.makeCurseRing) e.makeCurseRing(a[15]);
         e._n = { pos: V(x, y, z), yaw, atk: 0, wind: 0, mv: 0, fl: 0 };
         e.update = repUpdate;
         e.model.inner.position.y = 0; e.model.group.scale.setScalar(1);
@@ -166,12 +185,15 @@
       const h0 = e.hp, s0 = e.shield || 0;
       const r = dm.call(C, e, amount, info);
       const dh = h0 - e.hp, ds = s0 - (e.shield || 0);
-      if (dh > 0 || ds > 0) { e._hitT = performance.now(); e._pk = info || e._pk; pushHit(e, dh, ds); }
+      // a blow that throws the foe back must throw the real one
+      let kn = 0;
+      if (info && info.knock && !e.boss) { const d = info.dir || e.pos.clone().sub(P.pos).setY(0).normalize(); kn = [r2(d.x), r2(d.z), r2(info.knock)]; }
+      if (dh > 0 || ds > 0) { e._hitT = performance.now(); e._pk = info || e._pk; pushHit(e, dh, ds, kn); }
       // (the real kill is the host's: until its word comes the foe stands at 1)
       if (e.hp <= 0 && e.alive) e.hp = 1;
       return r;
     };
-    function pushHit(e, dh, ds, cc, kn) { hits.push([e._nid, r2(Math.max(0, dh)), r2(Math.max(0, ds)), cc || 0, kn || 0]); }
+    function pushHit(e, dh, ds, kn) { hits.push([e._nid, r2(Math.max(0, dh)), r2(Math.max(0, ds)), kn || 0]); }
     C.killEnemy = function (e, info, ov) {
       if (!net && remoteOf(e) && !(info && info.src === 'clear')) return; // (health is read back by C.damageEnemy above, after this: clamping it here would swallow the blow that kills)
       return ke.call(C, e, info, ov);
@@ -199,10 +221,11 @@
       if (o.gr) P.grapple.state = 'none';
       if (o.pile) P.pileState = null;
       if (o.pd) P.pullDir = V(...o.pd);
+      if (o.pullT > 0 && !P.pullDir) P.pullT = 0;
       if (o.dp) { P.pos.x += o.dp[0]; P.pos.y += o.dp[1]; P.pos.z += o.dp[2]; G.world.depenetrate(P.pos, P.hw, P.height); }
     };
     const wrapNet = (fn) => { net = true; try { fn(); } finally { net = false; } };
-    K.handlers.pj = function (m) { const o = K.unplain(m.o); if (!o.pos || !o.vel) return; wrapNet(() => C.spawnProjectile(o)); };
+    K.handlers.pj = function (m) { const o = K.unplain(m.o); if (!o.pos || !o.vel) return; if (o.explode) o.info = { pjx: 1 }; wrapNet(() => C.spawnProjectile(o)); };
     K.handlers.zn = function (m) { const [p, r, dur, kind, dps] = m.a; wrapNet(() => C.zone(V(...p), r, dur, kind, dps, K.unplain(m.o))); };
     K.handlers.bm = function (m) {
       const [p, r, dmg] = m.a, o = K.unplain(m.o);
@@ -218,6 +241,8 @@
       O.text = () => m.x; O.sub = m.s ? () => m.s : null; if (m.ic) O.icon = m.ic;
       O.segs = null; if (m.p !== null && m.p !== undefined) O.progress = () => m.p;
     };
+    // a fight that drags on grows frantic for everyone (the host keeps the clock)
+    K.handlers.en = function (m) { const E0 = GM.enrage; if (m.lv > E0.lv) G.ui.toast(`🔥 戦いが長引いている — 敵が激化した（激化 Lv${m.lv}）`, 'warn'); E0.lv = m.lv; E0.dmg = m.d; E0.tm = m.tm; };
     K.handlers.clear = function (m) { if (!GM.areaCleared) GM.clearArea(m.boss ? { boss: true } : {}); };
     K.handlers.engage = function () {
       const w = G.world;

@@ -15,10 +15,10 @@
   #coop-rv div{height:5px;margin-top:5px;background:rgba(0,0,0,.6);border-radius:2px;overflow:hidden}#coop-rv div i{display:block;height:100%;width:0;background:#6fe08a}
   #coop-spec{position:fixed;left:50%;top:12%;transform:translateX(-50%);z-index:8300;padding:7px 18px;background:rgba(14,11,8,.9);border:1px solid rgba(220,190,130,.4);border-radius:4px;font:700 14px 'Noto Sans JP',sans-serif;color:#ffe2a0;display:none;pointer-events:none;text-align:center}
   #coop-spec small{display:block;font-size:11px;font-weight:500;color:#a99d88}
-  #coop-chat{position:fixed;left:14px;bottom:92px;z-index:790;width:330px;display:flex;flex-direction:column;gap:2px;pointer-events:none;font:600 13px 'Noto Sans JP',sans-serif;color:#f2e6cc;text-shadow:0 1px 2px #000}
+  #coop-chat{position:fixed;right:14px;bottom:175px;z-index:790;width:330px;display:flex;flex-direction:column;align-items:flex-end;gap:2px;pointer-events:none;font:600 13px 'Noto Sans JP',sans-serif;color:#f2e6cc;text-shadow:0 1px 2px #000}
   #coop-chat div{padding:1px 6px;background:rgba(10,8,6,.5);border-radius:3px;transition:opacity .5s}
   #coop-chat div.sys{color:#c9bda6;font-size:12px}#coop-chat b{color:var(--pc,#ffd27a)}
-  #coop-chatin{position:fixed;left:14px;bottom:62px;z-index:9100;width:330px;padding:6px 9px;background:#0c0a08;border:1px solid rgba(255,200,80,.6);border-radius:4px;color:#f2e6cc;font:600 13px 'Noto Sans JP',sans-serif;display:none;outline:none}
+  #coop-chatin{position:fixed;right:14px;bottom:145px;z-index:9100;width:330px;padding:6px 9px;background:#0c0a08;border:1px solid rgba(255,200,80,.6);border-radius:4px;color:#f2e6cc;font:600 13px 'Noto Sans JP',sans-serif;display:none;outline:none}
   .coop-stats{margin:10px auto 0;border-collapse:collapse;font:600 12px 'Noto Sans JP',sans-serif;color:#e8d6b0}
   .coop-stats th{font-size:11px;color:#a99d88;font-weight:600;padding:2px 9px;border-bottom:1px solid rgba(220,190,130,.3)}
   .coop-stats td{padding:2px 9px;text-align:right}.coop-stats td:first-child{text-align:left;color:#ffd27a}
@@ -52,6 +52,7 @@
       if (!K.live) return;
       if (K.chatting) {
         e.stopImmediatePropagation();
+        if (e.isComposing) return; // (Enter that settles a Japanese conversion is not "send")
         if (e.code === 'Enter') {
           e.preventDefault();
           const x = input.value.trim();
@@ -127,7 +128,7 @@
         m.children[0].textContent = rp.dead ? '💀' : '▼';
         m.children[2].textContent = Math.round(d) + 'm';
         const near = d < 16 && !rp.dead;
-        place(m, v.clone().copy(rp.pos).setY(rp.pos.y + 2.6), !near);
+        place(m, v.clone().copy(rp.pos).setY(rp.pos.y + (rp.dead ? 0.7 : 2.6)), !near);
         // (a teammate's fall and return are announced once)
         if (rp._wd !== rp.dead) { if (rp._wd !== undefined) K.feed(`${U.esc(rp.name)} ${rp.dead ? 'が倒れた' : 'が起き上がった'}`, true); rp._wd = rp.dead; }
       }

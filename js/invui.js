@@ -597,13 +597,13 @@
   }, true);
 
   // ---------------- right click on a weapon ----------------
-  // a quick click opens its menu; held for a second (a ring fills at the cursor) it is thrown away. Letting go late or moving off cancels.
-  const HOLD_DROP = 1, HOLD_TAP = 0.3, HOLD_MOVE = 24;
+  // a quick click opens its menu; held for 0.7 s (a ring fills at the cursor, ticking higher as it fills) it is thrown away. Letting go late or moving off cancels.
+  const HOLD_DROP = 0.7, HOLD_TAP = 0.3, HOLD_MOVE = 24, HOLD_TICK = 0.1;
   function holdDrop(e, onTap, onDone) {
     const x0 = e.clientX, y0 = e.clientY, t0 = performance.now();
     const ring = document.createElement('div'); ring.id = 'iv-dropring'; ring.innerHTML = '<i></i><span>🗑️</span>';
     ring.style.left = x0 + 'px'; ring.style.top = y0 + 'px'; document.body.appendChild(ring);
-    let iv = 0;
+    let iv = 0, ticks = 0;
     const stop = () => { clearInterval(iv); ring.remove(); window.removeEventListener('pointerup', up, true); window.removeEventListener('pointermove', move, true); window.removeEventListener('blur', stop); };
     const age = () => (performance.now() - t0) / 1000;
     const up = (ev) => { if (ev.button !== 2) return; const quick = age() < HOLD_TAP; stop(); if (quick) onTap(); };
@@ -612,6 +612,7 @@
     iv = setInterval(() => {
       if (!UIV.isOpen()) { stop(); return; }
       const k = Math.min(1, age() / HOLD_DROP); ring.firstChild.style.setProperty('--p', k.toFixed(3));
+      if (k < 1 && age() >= (ticks + 1) * HOLD_TICK) { ticks++; G.sfx.tick(1, 5 - ticks * 0.7); }
       if (k >= 1) { stop(); onDone(); }
     }, 30);
   }

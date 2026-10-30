@@ -34,11 +34,12 @@
     rarityHi: ['レアリティ順（高い順）', '高いレアリティを上に。同じなら種類・名前の順'],
     cat: ['種類順', '種類ごとにまとめ、その中はレアリティの高い順'],
     name: ['名前順（あいうえお）', ''],
+    kind: ['種類順（種類→レアリティ）', '魔物の種類ごとにまとめ、その中は低いレアリティから'],
     area: ['出現が早い順', '早い段階から出る魔物を上に'],
     disc: ['未発見を先に', '未発見のものを上に集める'],
     def: ['標準の並び', ''],
   };
-  const TAB_SORTS = { enemy: ['area', 'name', 'disc', 'def'], boss: ['def', 'name', 'disc'], stage: [], depth: [] };
+  const TAB_SORTS = { enemy: ['kind', 'area', 'name', 'disc', 'def'], boss: ['def', 'name', 'disc'], stage: [], depth: [] };
   const sortsOf = (t) => TAB_SORTS[t] || ['rarity', 'rarityHi', 'cat', 'name', 'disc', 'def'];
   const sortMode = () => { const m = G.save.data.settings.cxSort, ok = sortsOf(tab); return ok.includes(m) ? m : ok[0]; };
   const tierOf = (o) => (G.RARITY[o.rarity] ? G.RARITY[o.rarity].tier : -1);
@@ -56,7 +57,10 @@
     // a leading emoji does not decide the place of a name
     const plain = (o) => String(o.name || '').replace(/^[^\p{L}\p{N}]+/u, '');
     const byName = (x, y) => ja.compare(plain(x), plain(y));
+    // monsters: grouped by kind (hound, skeleton ...) in the order the kinds are written in, each group from the lowest rarity up
+    const kindIdx = new Map(); for (const e of G.ENEMIES) if (!kindIdx.has(e.plan)) kindIdx.set(e.plan, kindIdx.size);
     const cmp = {
+      kind: (x, y) => (kindIdx.get(x.plan) ?? 99) - (kindIdx.get(y.plan) ?? 99) || tierOf(x) - tierOf(y) || (x.unlockK ?? 0) - (y.unlockK ?? 0) || byName(x, y),
       rarity: (x, y) => tierOf(x) - tierOf(y) || catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || byName(x, y),
       rarityHi: (x, y) => tierOf(y) - tierOf(x) || catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || byName(x, y),
       cat: (x, y) => catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || tierOf(y) - tierOf(x) || byName(x, y),

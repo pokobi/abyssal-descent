@@ -333,7 +333,7 @@
     K.lobbyEl.style.display = 'none'; K.live = true;
     for (const rp of K.players.values()) rp.seen = performance.now();
     K.hudEl.style.display = '';
-    K.feed && K.feed('H: ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす', true);
+    K.feed && K.feed(G.K('ping') + ': ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす', true);
   };
 
   function start() {
@@ -367,7 +367,7 @@
       return dp.call(G.combat, a, i);
     };
     const up = G.ui.pause;
-    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); const q = document.querySelector('#p-quit'); if (q) q.textContent = '🚪 部屋を出る'; if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。<br>H: ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす</div>' + (K.statsHTML ? K.statsHTML() : '')); };
+    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); const q = document.querySelector('#p-quit'); if (q) q.textContent = '🚪 部屋を出る'; if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。<br>' + G.K('ping') + ': ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす</div>' + (K.statsHTML ? K.statsHTML() : '')); };
     const pu = G.player.update;
     G.player.update = function (dt) { if (this.dead) clearKeys(); return pu.call(this, dt); };
     // the item wheel slows the foes in solo; here the foes are everyone's, so it does not

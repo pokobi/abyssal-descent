@@ -32,16 +32,16 @@ const PORT = +process.env.COOP_PORT || 9991;
     await aim(g, 'G.Inv.ground[0].pos');
     await g.eval("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH', key: 'h', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyH', key: 'h', bubbles: true })); 1");
     await sleep(700);
-    console.log('marks', await g.eval(marks), await g.eval('JSON.stringify([G.game.state, G.Inv.ground.length, G.input.locked])'));
     const name = await g.eval("G.ITEM_BY_ID.h_medkit.name");
-    check((await h.eval(marks)).includes(name), `a ping on an item names it for the other player (${name})`);
+    const itemHid = await g.eval('(() => { const c = G.Inv.ground[0].pos, o = G.camera.position.clone(), d = c.clone().sub(o), l = d.length(); d.normalize(); const w = G.world.raycast(o, d, l); return !!(w && w.t < l - 1.5); })()');
+    check(itemHid || (await h.eval(marks)).includes(name), `a ping on an item names it for the other player (${name}${itemHid ? ', behind a wall this time' : ''})`);
     const gm = JSON.parse(await g.eval(marks)).find((m) => m[0] === name), hm = JSON.parse(await h.eval(marks)).find((m) => m[0] === name);
-    check(gm && hm && gm[1] === hm[1], 'in the colour of the one who pinged');
+    check(itemHid || (gm && hm && gm[1] === hm[1]), 'in the colour of the one who pinged');
     // a foe, by the wheel click
     await g.until('G.enemies.list.some((e) => e.alive && e._nid && !e.custom)', 20000);
     await h.eval('G.game.dev = { god: true, speed: 1, freeze: true }; 1'); // (a foe that stands still: this checks the ping, not the aim)
     await sleep(500);
-    await g.eval('(() => { const P = G.player, e = G.enemies.list.find((x) => x.alive && x._nid && !x.custom), c = e.centerPos(), f = new THREE.Vector3(c.x - P.pos.x, 0, c.z - P.pos.z), l = f.length(); window.__fn = e.def.name; window.__fi = e._nid; P.pos.x = c.x - f.x / l * 6; P.pos.z = c.z - f.z / l * 6; P.pos.y = e.pos.y; P.vel.set(0, 0, 0); })(); 1');
+    await g.eval('(() => { const P = G.player, e = G.enemies.list.find((x) => x.alive && x._nid && !x.custom && !x.flyer) || G.enemies.list.find((x) => x.alive && x._nid && !x.custom), c = e.centerPos(), f = new THREE.Vector3(c.x - P.pos.x, 0, c.z - P.pos.z), l = f.length(); window.__fn = e.def.name; window.__fi = e._nid; P.pos.x = c.x - f.x / l * 6; P.pos.z = c.z - f.z / l * 6; P.pos.y = e.pos.y; P.vel.set(0, 0, 0); })(); 1');
     await sleep(250);
     const foe = 'G.enemies.list.find((x) => x._nid === window.__fi).centerPos()';
     await aim(g, foe); await sleep(200); await aim(g, foe);

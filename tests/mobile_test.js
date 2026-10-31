@@ -98,6 +98,23 @@ const PORT = +process.env.COOP_PORT || 9981;
     await sleep(500);
     check(await p.eval('!!G.game.search || G.world.interactables.find((x) => x.type === "chest").opened'), 'a tap on a chest starts searching it ' + await p.eval('JSON.stringify([G.game.state, G.player.dead, G.input.locked, G.world.interactables.find((x) => x.type === "chest").pos.distanceTo(G.camera.position), G.player.yaw, G.player.pitch])'));
     await p.eval('G.game.cancelSearch && G.game.cancelSearch(); 1');
+    // a melee weapon's guard stays up as long as the reload button is held, and drops when it is let go
+    await p.eval('G.game.dev.freeze = false; G.game.state = "playing"; G.ui.clearScreen(); window.__mobile.tapKey(G.BIND.w3[0]); 1');
+    await sleep(700);
+    const rl = await p.eval('(() => { const r = document.querySelector("[data-id=reload]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
+    check(await p.eval('G.player.meleeMode === true'), 'the melee weapon is in hand');
+    await touch('touchStart', [[8, rl[0], rl[1]]]);
+    await sleep(900);
+    check(await p.eval('G.weapons.guarding() === true'), 'holding the reload button keeps the guard up');
+    await touch('touchEnd', []);
+    await sleep(400);
+    check(await p.eval('G.weapons.guarding() === false'), 'and it drops when the finger lifts');
+    await p.eval('window.__mobile.tapKey(G.BIND.w1[0]); 1');
+    await sleep(500);
+    const mag0 = await p.eval('G.player.weapon.mag = Math.max(0, G.player.weapon.mag - 5); G.player.weapon.mag');
+    await touch('touchStart', [[9, rl[0], rl[1]]]); await touch('touchEnd', []);
+    await sleep(300);
+    check(await p.eval('G.player.meleeMode === false && !!G.player.weapon.reloading'), 'a gun still reloads from a tap on the same button');
     // the layout editor
     await p.eval('G.game.state = "modal"; G.ui.settings(() => {}); 1');
     await sleep(300);
@@ -114,6 +131,40 @@ const PORT = +process.env.COOP_PORT || 9981;
     const jr = await p.eval('(() => { const e = document.querySelector("[data-id=jump]"); return parseFloat(e.style.left) + parseFloat(e.style.width) / 2; })()');
     check(Math.abs(jr - (b[0] - 90)) < 12, `and stands where it was put (${Math.round(jr)} / ${Math.round(b[0] - 90)})`);
     check(!p.errs.length, 'no errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 500));
+    await p.close();
+    // the tutorial on a phone: the panel has its own buttons and names the on-screen buttons, not keys and a mouse
+    const t = await ch.page(`http://127.0.0.1:${PORT}/index.html?mobile=1`);
+    await t.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+    await t.send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: false });
+    await t.until("window.G && G.game && G.game.state === 'title' && window.__mobile", 90000);
+    await t.eval('G.renderer.compile = () => {}; G.Warm = null; G.Tutorial.start(); 1');
+    await t.until("G.game.state === 'playing' && !!document.querySelector('#tut.on [data-a]')", 30000);
+    await sleep(500);
+    const tap = async (sel) => {
+      const pt = await t.eval(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+      if (!pt) return false;
+      await t.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 21, x: pt[0], y: pt[1] }] });
+      await t.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      return true;
+    };
+    const seen = [], badWords = /ホイール|マウス|クリック|Esc|Enter|WASD/;
+    let last = '', bad = [], noBtn = 0;
+    for (let i = 0; i < 30; i++) {
+      await sleep(350);
+      const txt = await t.eval("document.querySelector('#tut').textContent");
+      const step = (txt.match(/(\d+) \/ 15/) || [])[1];
+      if (step === '15') { seen.push(step); break; }
+      if (!seen.includes(step)) seen.push(step);
+      if (badWords.test(txt)) bad.push(step + ': ' + (txt.match(badWords) || [])[0]);
+      const ok = (await tap('#tut [data-a=next]')) || (await tap('#tut [data-a=skip]'));
+      if (!ok) noBtn++;
+      for (let j = 0; j < 12 && last === step; j++) { await sleep(150); const x = await t.eval("(document.querySelector('#tut').textContent.match(/(\\d+) \\/ 15/) || [])[1]"); if (x !== step) break; }
+      last = step;
+    }
+    check(seen.includes('15'), 'a phone can tap its way through all of the tutorial (' + seen.join(',') + ')');
+    check(noBtn === 0, 'every step has a button to tap');
+    check(!bad.length, 'no step names a mouse or a key a phone does not have ' + bad.join(' | '));
+    check(!t.errs.length, 'no errors in the tutorial ' + t.errs.slice(0, 3).join(' | ').slice(0, 500));
   } finally { ch.close(); srv.close(); }
   console.log(fails.length ? `\nMOBILE TEST FAILED (${fails.length})` : '\nMOBILE TEST PASSED');
   process.exit(fails.length ? 1 : 0);

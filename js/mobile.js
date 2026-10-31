@@ -92,7 +92,7 @@
     { id: 'ads', lbl: '🎯', t: '構え', s: 54, side: 'r', x: 160, by: 50, cls: 'ads', d: () => { const P = G.player; if (P && P.meleeMode) { mouseEv('mousedown', 2); setTimeout(() => mouseEv('mouseup', 2), 70); } else setAds(!adsOn); }, tog: 'ads' },
     { id: 'jump', lbl: '⤴', t: 'ジャンプ', s: 54, side: 'r', x: 58, by: 176, d: () => kd(bind('jump')), u: () => ku(bind('jump')) },
     { id: 'crouch', lbl: '⤵', t: 'しゃがみ', s: 46, side: 'r', x: 134, by: 138, d: () => kd(bind('crouch')), u: () => ku(bind('crouch')) },
-    { id: 'reload', lbl: '🔄', t: 'リロード', s: 42, side: 'r', x: 214, by: 92, d: () => tapKey(bind('reload')) },
+    { id: 'reload', lbl: '🔄', t: 'リロード', s: 42, side: 'r', x: 214, by: 92, d: () => { const P = G.player; if (P && P.meleeMode) kd(bind('reload')); else tapKey(bind('reload')); }, u: () => ku(bind('reload')) },
     { id: 'use', lbl: '✋', t: '調べる', s: 46, side: 'r', x: 210, by: 150, d: () => kd(bind('interact')), u: () => ku(bind('interact')) },
     { id: 'pause', lbl: '⏸', t: '', s: 34, side: 'r', x: 24, ty: 24, cls: 'sys', d: () => tapKey('KeyI') },
     { id: 'bag', lbl: '🎒', t: '', s: 34, side: 'r', x: 66, ty: 24, cls: 'sys', d: () => tapKey(bind('status') || 'Tab') },

@@ -10,11 +10,14 @@
   const k = (s) => `<kbd>${s}</kbd>`;
   const K = (a) => k(G.K(a));
   // what moves the tutorial on: keys the hands are already on
-  const NEXT = () => `${k('ホイールクリック')} か ${K('interact')}`;
-  const nextHit = () => I.mpressed[1] || I.hit('interact') || I.pressed.Enter || I.pressed.NumpadEnter;
+  // on a phone there is no wheel, no keys and no mouse: the panel carries real buttons ("次へ" / "飛ばす") and the texts name the on-screen buttons
+  const M = () => document.documentElement.classList.contains('m');
+  const pc = (a, b) => (M() ? b : a);
+  const NEXT = () => pc(`${k('ホイールクリック')} か ${K('interact')}`, k('次へ'));
+  const nextHit = () => (st && st.mNext) || I.mpressed[1] || I.hit('interact') || I.pressed.Enter || I.pressed.NumpadEnter;
   // on a step you have to do, a short wheel click does nothing and holding it skips the step
   const SKIP_HOLD = 0.6;
-  const nextEat = () => { I.mpressed[1] = false; delete I.pressed.Enter; delete I.pressed.NumpadEnter; for (const c of G.BIND.interact) delete I.pressed[c]; };
+  const nextEat = () => { if (st) st.mNext = false; I.mpressed[1] = false; delete I.pressed.Enter; delete I.pressed.NumpadEnter; for (const c of G.BIND.interact) delete I.pressed[c]; };
 
   // ---------------------------------------------------------------- helpers
   const ul = (...a) => `<ul>${a.filter(Boolean).map((x) => `<li>${x}</li>`).join('')}</ul>`;
@@ -46,15 +49,15 @@
   const CH = ['📘 はじめに', '🏃 動き', '⚔️ 戦い', '🎒 道具と持ち物', '🌟 成長と進行'];
   const STEPS = [
     { ch: 0, title: 'ようこそ、深淵へ', info: true,
-      body: () => ul('実際に操作しながら、基本を覚えます（5分ほど）。', 'ここでは<b>倒されません</b>。HPが減っても自動で戻ります。', `${NEXT()} 次へ　${k('ホイール長押し')} この手順を飛ばす`, `${k('Esc')} ポーズ（チュートリアルの終了もここから）`) },
+      body: () => ul('実際に操作しながら、基本を覚えます（5分ほど）。', 'ここでは<b>倒されません</b>。HPが減っても自動で戻ります。', pc(`${NEXT()} 次へ　${k('ホイール長押し')} この手順を飛ばす`, `${k('次へ')} で進む　${k('飛ばす')} でその手順を飛ばす（パネルのボタン）`), pc(`${k('Esc')} ポーズ（チュートリアルの終了もここから）`, `${k('⏸')} ポーズ（チュートリアルの終了もここから）`)) },
 
     { ch: 1, title: '見回す・歩く・走る',
-      body: () => ul(`${k('マウス')} 見回す　${WASD()} 歩く`, G.save.data.settings.autoSprint ? `普段は<b>自動で走る</b>（${K('sprint')} を押している間は歩き）` : `${K('sprint')} を一度押すと<b>走る</b>（止まる・撃つ・覗くまで続く）`),
-      tip: () => 'マウスが効かない時は、画面を一度クリック。',
+      body: () => ul(pc(`${k('マウス')} 見回す　${WASD()} 歩く`, `${k('画面の右側をドラッグ')} 見回す　${k('左のスティック')} 歩く`), G.save.data.settings.autoSprint ? pc(`普段は<b>自動で走る</b>（${K('sprint')} を押している間は歩き）`, '普段は<b>自動で走る</b>') : pc(`${K('sprint')} を一度押すと<b>走る</b>（止まる・撃つ・覗くまで続く）`, `${K('sprint')} で<b>走る</b>（止まる・撃つ・覗くまで続く）`)),
+      tip: () => pc('マウスが効かない時は、画面を一度クリック。', ''),
       goal: (s) => `20m 進む（${Math.min(20, Math.floor(s.dist))} / 20m）`,
       check: (s) => Math.min(1, s.dist / 20) },
     { ch: 1, title: 'ジャンプ・スライディング',
-      body: () => ul(`${K('jump')} ジャンプ（段差の前で<b>押し続ける</b>と、よじ登る）`, `${CROUCH()} しゃがむ（低い攻撃をくぐれる）`, `<b>走りながら</b> ${k(G.input.keyName('crouch'))}：スライディング`),
+      body: () => ul(`${K('jump')} ジャンプ（段差の前で<b>押し続ける</b>と、よじ登る）`, `${pc(CROUCH(), k('しゃがみ'))} しゃがむ（低い攻撃をくぐれる）`, `<b>走りながら</b> ${k(G.input.keyName('crouch'))}：スライディング`),
       goal: (s) => parts([['ジャンプ', s.jumps > 0], ['スライディング', s.sl]]),
       check: (s) => { if (P.sliding) s.sl = true; return (s.jumps > 0 ? 0.5 : 0) + (s.sl ? 0.5 : 0); } },
     { ch: 1, title: 'パイルドライバー・グラップル',
@@ -64,13 +67,13 @@
       check: (s) => { P.pileCd = Math.min(P.pileCd || 0, 0.5); P.grappleCd = Math.min(P.grappleCd || 0, 0.5); if (P.pileState) s.p = true; if (P.grapple && P.grapple.state === 'attached') s.g = true; return (s.p ? 0.5 : 0) + (s.g ? 0.5 : 0); } },
 
     { ch: 2, title: '撃つ・覗く・リロード',
-      body: () => ul(`${k('左クリック')} 撃つ`, `${k('右クリック')} 押している間 覗き込む（狙いが安定する）`, `${K('reload')} リロード（空になると自動でも）`, '頭に当てると大ダメージ（ヘッドショット）'),
-      tip: () => '残りの弾は画面右下。',
+      body: () => ul(`${k(pc('左クリック', '射撃'))} 撃つ`, pc(`${k('右クリック')} 押している間 覗き込む（狙いが安定する）`, `${k('構え')} 覗き込む（押すたびに入／切。狙いが安定する）`), `${K('reload')} リロード（空になると自動でも）`, '頭に当てると大ダメージ（ヘッドショット）'),
+      tip: () => pc('残りの弾は画面右下。', '残りの弾は画面の右上。'),
       goal: (s) => parts([[`撃つ ${Math.min(5, s.shots || 0)}/5`, (s.shots || 0) >= 5], ['覗く', s.ads], ['リロード', s.rl]]),
       setup: (s) => { s.mag = P.weapon ? P.weapon.mag : 0; },
       check: (s) => { const w = P.weapon; if (w && !P.meleeMode) { if (w.mag < s.mag) s.shots = (s.shots || 0) + (s.mag - w.mag); s.mag = w.mag; if (w.reloading) s.rl = true; } if (G.weapons.adsT > 0.9) s.ads = true; return Math.min(1, (s.shots || 0) / 5) * 0.6 + (s.ads ? 0.2 : 0) + (s.rl ? 0.2 : 0); } },
     { ch: 2, title: '近接武器',
-      body: () => ul(`${K('w3')} 近接武器に持ち替え（${K('w1')}${K('w2')} で銃へ戻る・${k('ホイール')} でも切替）`, `${k('左クリック')} 連撃　${k('右クリック')} 重撃（遅いが強い）`, `${K('reload')} を押している間：<b>防御</b>（正面からの攻撃を軽減。照準の右のゲージが減る）`, '持っている間は、移動が少し速い'),
+      body: () => ul(pc(`${K('w3')} 近接武器に持ち替え（${K('w1')}${K('w2')} で銃へ戻る・${k('ホイール')} でも切替）`, `${K('w3')} 近接武器に持ち替え（${K('w1')}${K('w2')} で銃へ戻る）`), pc(`${k('左クリック')} 連撃　${k('右クリック')} 重撃（遅いが強い）`, `${k('射撃')} 連撃　${k('構え')} 重撃（遅いが強い）`), pc(`${K('reload')} を押している間：<b>防御</b>（正面からの攻撃を軽減。照準の右のゲージが減る）`, `${K('reload')} を<b>押し続けている間</b>：<b>防御</b>（正面からの攻撃を軽減。照準の右のゲージが減る）`), '持っている間は、移動が少し速い'),
       goal: (s) => parts([['持ち替え', s.m], ['連撃', s.l], ['重撃', s.h], ['防御', s.gd]]),
       check: (s) => { const ms = G.weapons.ms; if (P.meleeMode) { s.m = true; if (ms && ms.ph === 'light') s.l = true; if (ms && (ms.ph === 'hwind' || ms.ph === 'hrec')) s.h = true; if (G.weapons.guarding()) s.gd = true; } return (s.m ? 0.25 : 0) + (s.l ? 0.25 : 0) + (s.h ? 0.25 : 0) + (s.gd ? 0.25 : 0); } },
     { ch: 2, title: '実戦',
@@ -80,7 +83,7 @@
       check: (s) => { const n = s.spawned.length; s.kills = s.spawned.filter((e) => !e.alive).length; return n ? s.kills / n : 1; } },
 
     { ch: 3, title: '漁る（亡骸・宝箱）',
-      body: () => ul(`亡骸や宝箱の前で ${K('interact')}：調べ始める（終わるまで見続ける）`, '中身の画面で<b>「すべて取る」</b>：一度に回収（ドラッグで1つずつも）', '空になった亡骸・宝箱は、暗くなる'),
+      body: () => ul(pc(`亡骸や宝箱の前で ${K('interact')}：調べ始める（終わるまで見続ける）`, `亡骸や宝箱を ${k('タップ')}：調べ始める（終わるまで画面の真ん中に映す）`), '中身の画面で<b>「すべて取る」</b>：一度に回収（ドラッグで1つずつも）', '空になった亡骸・宝箱は、暗くなる'),
       tip: () => '目の前に亡骸と宝箱を置きました。どちらからでも大丈夫です。',
       goal: (s) => parts([['亡骸を調べる', s.c1], ['宝箱を開ける', s.c2]]),
       setup: (s) => {
@@ -91,7 +94,7 @@
       },
       check: (s) => { if (G.Inv.corpses.some((c) => c.searched && !s.bodies0.has(c))) s.c1 = true; if (G.world.interactables.some((i) => i.type === 'chest' && i.opened && !s.chests0.has(i))) s.c2 = true; return (s.c1 ? 0.5 : 0) + (s.c2 ? 0.5 : 0); } },
     { ch: 3, title: '消耗品・投擲物',
-      body: () => ul(`${K('item1')} ${K('item2')}：消耗品を使う（<b>長押し</b>で種類を選ぶ）`, `${K('grenade')}：投擲物を構える → ${k('左クリック')} 投げる／${k('右クリック')} 転がす`, `投擲物の種類は ${K('grenade')} 長押し、または ${K('cycleGrenade')}`),
+      body: () => ul(`${K('item1')} ${K('item2')}：消耗品を使う（<b>長押し</b>で種類を選ぶ）`, `${K('grenade')}：投擲物を構える → ${k(pc('左クリック', '射撃'))} 投げる／${k(pc('右クリック', '構え'))} 転がす`, pc(`投擲物の種類は ${K('grenade')} 長押し、または ${K('cycleGrenade')}`, `投擲物の種類は ${K('grenade')} を長押し`)),
       tip: () => '回復薬と手榴弾を渡しました。所持数は画面下中央。',
       goal: (s) => parts([[`${G.K('item1')} で回復する`, s.a], ['投擲物を投げる', (s.thrown || 0) > 0]]),
       setup: () => { P.hp = Math.min(P.hp, P.stats.maxHp * 0.6); top('h_bandage', 2); top('h_medkit', 1); top('g_frag', 2); top('g_fire', 1); G.ui.refreshItems(); },
@@ -103,7 +106,7 @@
       setup: (s) => { P.skills[1] = G.abilities.makeSlot('dash'); if (G.ui.buildAbilityRow) G.ui.buildAbilityRow(); s.ch = P.skills[1].charges; const u = P.skills[0]; if (u) u.cd = 0; },
       check: (s) => { const sk = P.skills[1], u = P.skills[0]; if (sk && (sk.cd > 0 || sk.charges < s.ch)) s.a = true; if (u && u.cd > 0) s.b = true; return (s.a ? 0.5 : 0) + (s.b ? 0.5 : 0); } },
     { ch: 3, title: '持ち物・アタッチメント',
-      body: () => ul(`${K('status')} 持ち物を開く／閉じる（${k('Esc')} でも閉じる）`, `<b>ドラッグ</b>で動かす　${k('R')} 回転　${k('右クリック')} メニュー（武器は長押しで捨てる）　${k('ダブルクリック')} 使う・装備`, '枠の外へドラッグで捨てる　<b>⇅ 整理</b>で並べ替え', '<b>レッドドット</b>を渡しました。銃の枠へドラッグ（付く場所が光る）'),
+      body: () => ul(pc(`${K('status')} 持ち物を開く／閉じる（${k('Esc')} でも閉じる）`, `${K('status')} 持ち物を開く／画面の ${k('✕ 閉じる')} で閉じる`), pc(`<b>ドラッグ</b>で動かす　${k('R')} 回転　${k('右クリック')} メニュー（武器は長押しで捨てる）　${k('ダブルクリック')} 使う・装備`, `<b>ドラッグ</b>で動かす　<b>長押し</b>でメニュー　<b>ダブルタップ</b>で使う・装備`), '枠の外へドラッグで捨てる　<b>⇅ 整理</b>で並べ替え', '<b>レッドドット</b>を渡しました。銃の枠へドラッグ（付く場所が光る）'),
       tip: () => '開いている間も、ゲームは止まりません。',
       goal: (s) => parts([['持ち物を開く', s.o], ['レッドドットを銃に付ける', P.weapons.some((w) => w.atts.optic === 'o_reddot')]]),
       setup: () => { if (!P.weapons.some((w) => w.atts.optic === 'o_reddot') && !P.attStash.includes('o_reddot')) { G.Inv.noAuto = true; P.attStash.push('o_reddot'); G.Inv.noAuto = false; } },
@@ -112,10 +115,10 @@
     { ch: 4, title: '加護（その周回の強化）',
       body: () => ul('エリアの<b>目標</b>を達成すると、<b>加護</b>を1つ選べる', '加護は、その周回の間ずっと続く強化。取るほど強くなる', '枠の色がレアリティ。気に入らなければ<b>リロール</b>'),
       vis: (s) => tiles((s.sample || []).map((b) => [b.icon, b.name, RAR[b.rarity] || b.rarity, `var(--c-${b.rarity})`])),
-      goal: (s) => (s.opened ? '好きな加護を1つ選ぶ' : `<span>${NEXT()} で加護の選択画面を開く</span>`),
+      goal: (s) => (s.opened ? '好きな加護を1つ選ぶ' : pc(`<span>${NEXT()} で加護の選択画面を開く</span>`, '<button class="tut-btn" data-a="next">加護の選択画面を開く ▶</button>')),
       setup: (s) => { s.sample = GM.rollBuffs(3); },
       check: (s) => {
-        if (!s.opened && (s.tap || I.hit('interact') || I.pressed.Enter || I.pressed.NumpadEnter)) { // (the wheel counts when it is let go: held, it skips the step)
+        if (!s.opened && (s.tap || s.mNext || I.hit('interact') || I.pressed.Enter || I.pressed.NumpadEnter)) { // (the wheel counts when it is let go: held, it skips the step)
           nextEat(); s.opened = true;
           GM.offerBuffs(false, { title: 'CHOOSE A BOON', sub: '練習：好きな加護を1つ選ぼう（選ぶとこの周回ずっと有効）', onPicked: () => { s.picked = true; } });
         }
@@ -131,7 +134,7 @@
     { ch: 4, title: '画面の見方', info: true, hud: true,
       body: () => ul('光っている枠が、それぞれの表示です。', '🪔 魂の灯火：倒れた時に1つ使って、そのエリアの最初から復活') },
     { ch: 4, title: '準備完了！', info: true, finish: true,
-      body: () => ul('<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は商人だけの<b>準備の間</b>', `進行は自動で保存。操作は ${k('Esc')} →「操作方法」でいつでも確認できます`) },
+      body: () => ul('<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は商人だけの<b>準備の間</b>', `進行は自動で保存。操作は ${pc(k('Esc'), k('⏸'))} →「操作方法」でいつでも確認できます`) },
   ];
   // the screen regions the "画面の見方" step outlines: [selector(s), label, where the label goes (default: below / above)]
   const HUD_MAP = [
@@ -174,6 +177,12 @@
     if (el) return;
     el = document.createElement('div'); el.id = 'tut';
     G.ui.el.hud.appendChild(el);
+    // the phone's buttons (the panel itself lets touches through; only these take them)
+    el.addEventListener('pointerdown', (e) => {
+      const b = e.target.closest && e.target.closest('[data-a]'); if (!b || !st) return;
+      e.preventDefault(); e.stopPropagation();
+      if (b.dataset.a === 'next') st.mNext = true; else st.mSkip = true;
+    });
     // menus (pause, settings, the boon choice...) hide the panel; the small 'click to resume' prompt does not
     const scr = document.getElementById('screens');
     if (scr) new MutationObserver(() => { const m = [...scr.children].some((c) => c.classList.contains('screen') && !c.querySelector('.clicklock')); document.body.classList.toggle('tut-menu', m); }).observe(scr, { childList: true, subtree: true });
@@ -214,10 +223,15 @@
     const goal = typeof s.goal === 'function' ? s.goal(st) : s.goal;
     const wait = !s.info && st.prog >= 1 && invOpen() ? '<span class="tut-wait">閉じると次へ進みます</span>' : '';
     const pct = Math.round((st.prog || 0) * 100);
+    const tip = s.tip ? s.tip() : '', phone = M();
+    const foot = s.info
+      ? (phone ? `<div class="tut-foot"><button class="tut-btn" data-a="next">${s.finish ? '本編へ ▶' : '次へ ▶'}</button></div>` : `<div class="tut-foot"><span>${NEXT()} ${s.finish ? '本編へ' : '次へ'}</span></div>`)
+      : `<div class="tut-goal">${goal}${wait}</div><div class="tut-bar"><div style="width:${pct}%"></div></div>`
+        + (phone ? '<div class="tut-foot"><span>やってみよう</span><button class="tut-btn sub" data-a="skip">飛ばす ▶</button></div>'
+          : `<div class="tut-foot"><span>やってみよう</span><span class="tut-skip" style="--p:${Math.round(Math.min(1, (st.holdT || 0) / SKIP_HOLD) * 100)}%">${k('ホイール長押し')} 飛ばす</span></div>`);
     const html = `<div class="tut-h"><span>${CH[s.ch]}</span><b>${idx + 1} / ${STEPS.length}</b></div>
-      <div class="tut-t">${s.title}</div><div class="tut-b">${s.body()}</div>${s.vis ? s.vis(st) : ''}${s.tip ? `<div class="tut-tip">💡 ${s.tip()}</div>` : ''}
-      ${s.info ? `<div class="tut-foot"><span>${NEXT()} ${s.finish ? '本編へ' : '次へ'}</span></div>`
-        : `<div class="tut-goal">${goal}${wait}</div><div class="tut-bar"><div style="width:${pct}%"></div></div><div class="tut-foot"><span>やってみよう</span><span class="tut-skip" style="--p:${Math.round(Math.min(1, (st.holdT || 0) / SKIP_HOLD) * 100)}%">${k('ホイール長押し')} 飛ばす</span></div>`}`;
+      <div class="tut-t">${s.title}</div><div class="tut-b">${s.body()}</div>${s.vis ? s.vis(st) : ''}${tip ? `<div class="tut-tip">💡 ${tip}</div>` : ''}
+      ${foot}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
     el.classList.add('on');
     if (fresh) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
@@ -236,6 +250,7 @@
     if (P.hp < P.stats.maxHp * 0.35) { P.hp = P.stats.maxHp * 0.7; G.ui.toastSmall('📘 チュートリアル中なのでHPを回復しました'); }
     for (const k2 in P.st) if (P.st[k2] > 4) P.st[k2] = 4;
     if (I.pressed.Backspace) { delete I.pressed.Backspace; return next(true); }
+    if (st.mSkip && !s.info) return next(true);
     if (!s.info) {
       // the hold has to begin on this step: a wheel still down from the page before does not count
       if (I.mpressed[1]) st.holdT = 1e-4;

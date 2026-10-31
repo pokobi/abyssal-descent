@@ -191,7 +191,7 @@
       GM.transitioning = true;
       G.sfx.whoosh(0.8, 0.8);
       document.getElementById('fade').classList.add('on');
-      setTimeout(() => { GM.enterArea(n, kind); (GM._warmP || Promise.resolve()).then(() => { GM.transitioning = false; document.getElementById('fade').classList.remove('on'); }); }, 650);
+      setTimeout(() => { try { GM.enterArea(n, kind); } catch (e) { console.error(e); } (GM._warmP || Promise.resolve()).then(() => { GM.transitioning = false; document.getElementById('fade').classList.remove('on'); }); }, 650);
     };
     K.handlers.gate = (m) => K.go(m.n, m.kind);
     K.handlers.engage = () => { if (!GM.bossEngaged && !P.dead && G.world.arenaCenter) { P.pos.z = Math.min(P.pos.z, (G.world.ledgeZ ? G.world.ledgeZ : G.world.arenaD) - 4); P.pos.x = G.world.arenaCenter.x; K.msg('仲間が守護者の間へ入った'); } };

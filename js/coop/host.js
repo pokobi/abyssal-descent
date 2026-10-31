@@ -264,6 +264,7 @@
     K.lateJoin = function (to, name) {
       K.send({ t: 'late', n: GM.area, kind: GM.stage, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, fp: K.fingerprint(), fi: K.fpInfo(), route: GM.route, snap: K.saved[name] || null }, to);
     };
+    K.handlers.need = function (m, from) { const e = known.get(m.id); if (e && e.alive) K.send({ t: 'es', a: [esRow(e)] }, from); };
     K.handlers.ready = function (m, from) {
       const list = [...known.values()].filter((e) => e.alive).map(esRow);
       if (list.length) K.send({ t: 'es', a: list }, from);
@@ -276,6 +277,8 @@
       const add = [], snap = [];
       for (const e of E.list) {
         if (e.custom || e.ally || !e.isEnemy || !e.alive) continue;
+        // (a foe the game brought back after it was reported gone is simply announced again)
+        if (e._nid && !known.has(e._nid)) { known.set(e._nid, e); add.push(esRow(e)); }
         if (!e._nid) {
           e._nid = nextId++; known.set(e._nid, e);
           add.push(esRow(e));

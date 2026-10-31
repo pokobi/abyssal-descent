@@ -139,6 +139,7 @@
       for (const a of m.a) {
         const [id, did, lvl, x, y, z, yaw, hp, mx, sh, msh, el, sc, name, fl] = a;
         const def = G.ENEMY_BY_ID[did]; if (!def || reps.has(id)) continue;
+        if (K._miss) delete K._miss[id];
         spawning = true;
         let e;
         try { e = E.spawn(def, lvl, V(x, y, z), { elite: !!el, scale: sc, noSplit: true, noReward: !!(fl & 1), noLoot: !!(fl & 2) }); } finally { spawning = false; }
@@ -159,7 +160,9 @@
     K.handlers.s = function (m) {
       const now = performance.now();
       for (const a of m.e) {
-        const e = reps.get(a[0]); if (!e || !e.alive) continue;
+        const e = reps.get(a[0]);
+        // a foe the host still has and this side lost: ask for it again
+        if (!e || !e.alive) { (K._miss = K._miss || {})[a[0]] = (K._miss[a[0]] || 0) + 1; if (K._miss[a[0]] === 30) K.send({ t: 'need', id: a[0] }); if (e && !e.alive) reps.delete(a[0]); continue; }
         const n = e._n; n.pos.set(a[1], a[2], a[3]); n.yaw = a[4]; n.fl = a[7]; n.atk = a[8]; n.wind = a[9]; n.mv = a[10]; n.sb = a[11] | 0; n.sx = a[12];
         // your own last hits are ahead of what the host has seen yet
         if (!(e._hitT > now - 400)) { if (a[5] < e.hp - 0.5) { e.lastHitT = GM.time; e.flinch = Math.min(1, e.flinch + 0.2); } e.hp = a[5]; e.shield = a[6]; }

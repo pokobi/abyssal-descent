@@ -53,6 +53,9 @@
       const Ep = G.enemies.Enemy.prototype, up = Ep.update;
       Ep.update = function (dt) { K.ownS = (K.ownS || 0) + 1; try { return up.call(this, dt); } finally { K.ownS--; } };
     }
+    // a melee weapon's sparks and swings
+    const wu = G.weapons.update;
+    G.weapons.update = function (dt) { const m = P.meleeMode && G.weapons.meleeBusy && G.weapons.meleeBusy(); if (m) K.own++; try { return wu.call(G.weapons, dt); } finally { if (m) K.own--; } };
     // ---------------- throwables and skills: the scopes that are not skills ----------------
     A.releaseGrenade = withOwn(A.releaseGrenade);
     A.grenadeEffect = withOwn(A.grenadeEffect);
@@ -93,7 +96,7 @@
     };
     // a grenade of someone else: a fifth of its damage, as for its own thrower
     const friendly = (m) => {
-      if (P.dead || GM.state === 'dead' || !G.world) return;
+      if (!K.ff || P.dead || GM.state === 'dead' || !G.world) return;
       const d = P.pos.distanceTo(V(...m.p));
       if (d < m.r) C.damagePlayer(m.d * 0.2 / ((C.ENEMY_DMG || 1) * Math.max(0.1, 1 + P.stats.enemyDmg)), { src: 'explosion', pos: V(...m.p) });
     };
@@ -105,6 +108,25 @@
       if (K.live && !K._net) push(['d', { p: K.vec(pos), dur: r2(dur) }]);
       return r;
     };
+    // ---------------- things a skill sets down: walls (they stop everyone), the bolt turret ----------------
+    const Wp = G.world.constructor.prototype, ac = Wp.addCollider;
+    let lastCol = null;
+    Wp.addCollider = function () { const c = ac.apply(this, arguments); if (K.live && C.curSk && !K._net) lastCol = c; return c; };
+    C.walls.push = function (o) {
+      const r = Array.prototype.push.call(this, o);
+      if (K.live && lastCol && !K._net) { const c = lastCol; push(['wl', { b: [c.x0, c.y0, c.z0, c.x1, c.y1, c.z1].map(r2), t: r2(o.t) }]); }
+      lastCol = null;
+      return r;
+    };
+    const putWall = (a) => {
+      const [x0, y0, z0, x1, y1, z1] = a.b, w = G.world, col = ac.call(w, x0, y0, z0, x1, y1, z1, { surf: 'stone' });
+      const mesh = new THREE.Mesh(G.Props.PG.box, w.mats.block); mesh.scale.set(x1 - x0, y1 - y0, z1 - z0); mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); G.scene.add(mesh);
+      G.fx.dust(V((x0 + x1) / 2, y0, (z0 + z1) / 2), V(0, 1, 0), 0x8a8070, 12);
+      Array.prototype.push.call(C.walls, { t: a.t, remove() { col.alive = false; G.scene.remove(mesh); G.fx.debris(V((x0 + x1) / 2, y0 + 1, (z0 + z1) / 2), G.world.mats.block, 10, 0.3, 4); } });
+    };
+    const tu = C.spawnTurret;
+    C.spawnTurret = function (pos, dur, dmg) { const r = tu.call(C, pos, dur, dmg); if (K.live && !K._net) push(['tu', { p: K.vec(pos), t: r2(dur) }]); return r; };
+    const putTurret = (a) => { K._net = true; let r; try { r = tu.call(C, V(...a.p), a.t, 0); } finally { K._net = false; } if (r) { r.update = function () {}; r.info = () => null; } };
     // ---------------- zones ----------------
     const zn = C.zone, vz = [];
     C.zone = function (pos, r, dur, kind, dps, opts) {
@@ -172,7 +194,8 @@
       for (let i = myAllies.length - 1; i >= 0; i--) {
         const a = myAllies[i], g = a.m.group;
         if (!g.parent) { myAllies.splice(i, 1); push(['ax', a.id]); continue; }
-        push(['al', { id: a.id, d: a.did, p: K.vec(g.position), y: r2(g.rotation.y) }]);
+        const mc = G.Rooms2.mercAlly;
+        push(['al', { id: a.id, d: a.did, p: K.vec(g.position), y: r2(g.rotation.y), mc: mc && !mc.dead && mc.ent && mc.ent.pos.distanceTo(g.position) < 0.6 ? 1 : 0, who: K.id }]);
       }
       const seen = new Set();
       for (const m of C.mines) {
@@ -189,8 +212,21 @@
         K._net = true; let m; try { m = bm.call(G.enemies, def, { ally: true }); } finally { K._net = false; }
         G.scene.add(m.group); t = { m, walk: 0, to: V(...a.p), yaw: a.y, seen: 0 }; m.group.position.copy(t.to); theirAllies.set(a.id, t);
       }
-      t.to.set(...a.p); t.yaw = a.y; t.seen = 0;
+      t.to.set(...a.p); t.yaw = a.y; t.seen = 0; t.mc = a.mc; t.who = a.who; t.id = a.id;
     };
+    // a guest's mercenary is one more target for the host's foes; its wounds go back to its owner
+    if (K.role === 'host') {
+      const Ep = G.enemies.Enemy.prototype, tg = Ep.target;
+      Ep.target = function () {
+        const r = tg.call(this);
+        if (!K.live || !r.isPlayer) return r;
+        let best = null, bd = this.pos.distanceTo(r.pos) * 0.85;
+        for (const t of theirAllies.values()) { if (!t.mc) continue; const d = t.to.distanceTo(this.pos); if (d < bd) { bd = d; best = t; } }
+        if (!best) return r;
+        const t = best;
+        return { pos: t.to, eye: V(t.to.x, t.to.y + 1.3, t.to.z), vel: V(), invisible: false, isPlayer: false, ally: { hurt(v) { K.send({ t: 'fx', e: [['ah', t.id, r2(v)]] }, t.who); } } };
+      };
+    }
     const dropAlly = (id) => { const t = theirAllies.get(id); if (t) { G.scene.remove(t.m.group); theirAllies.delete(id); } };
     const mineMesh = () => { const m = new THREE.Mesh(G.Props.PG.cyl, new THREE.MeshStandardMaterial({ color: 0x3a3c40, emissive: 0x401008, roughness: 0.5 })); m.scale.set(0.2, 0.06, 0.2); return m; };
     const tickViz = (dt) => {
@@ -244,6 +280,9 @@
           else if (kind === 's') { K._fxNet = true; try { G.sfx[a](...b.map(dec)); } finally { K._fxNet = false; } }
           else if (kind === 'p') putProjectile(a);
           else if (kind === 'x') friendly(a);
+          else if (kind === 'wl') putWall(a);
+          else if (kind === 'tu') putTurret(a);
+          else if (kind === 'ah') { const mc = G.Rooms2.mercAlly; if (mc && !mc.dead && mc.hurt) mc.hurt(b); }
           else if (kind === 'al') putAlly(a);
           else if (kind === 'ax') dropAlly(a);
           else if (kind === 'mn') { const m = mineMesh(); m.position.set(...a.p); m.position.y += 0.05; G.scene.add(m); theirMines.set(a.id, m); }

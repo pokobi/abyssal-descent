@@ -200,6 +200,19 @@
       vic.call(GM);
     };
 
+    // ---------------- the aim trial: everyone shoots at their own targets, the round ends for all at once, and the scores are shown ----------------
+    const ft = G.Areas.finishTrial;
+    G.Areas.finishTrial = function () {
+      const O = GM.objective, r = ft.call(G.Areas);
+      if (K.live && O) { K.feed(`🎯 ${U.esc(K.name)}: RANK ${O.rank || '-'}（${U.fmt(O.score || 0)}）`, true); if (!K._net) K.send({ t: 'trd', n: K.name, s: O.score, r: O.rank }); }
+      return r;
+    };
+    K.handlers.trd = function (m, from) {
+      if (K.role === 'host') K.relay(m, from);
+      K.feed(`🎯 ${U.esc(m.n)}: RANK ${m.r || '-'}（${U.fmt(m.s || 0)}）`, true);
+      if (GM.stage === 'trial' && !GM.areaCleared) { K._net = true; try { G.Areas.finishTrial(); } finally { K._net = false; } }
+    };
+
     // ---------------- the gates ----------------
     // The game's own check would take whoever steps into an open gate on alone, so its boxes are emptied here and kept aside; the check is done below for everyone.
     const prep = () => {
@@ -210,10 +223,21 @@
         const r = t._r; if (!r || !t.exit || !t.exit.open) continue;
         if (p.x > r.x0 && p.x < r.x1 && p.z > r.z0 && p.z < r.z1) return t.exit.type || 'combat';
       }
+      const w = G.world;
+      if (w._hall && p.z > hallZ(w) && p.z - hallZ(w) < 10) return 'hall';
       return null;
     };
-    const kindName = (k) => { const T = G.Areas.TYPES[k]; return T ? `${T.icon} ${T.name}` : k; };
+    const kindName = (k) => { if (k === 'hall') return '👑 守護者の間'; const T = G.Areas.TYPES[k]; return T ? `${T.icon} ${T.name}` : k; };
     const standing = () => [...K.players.values()].filter((p) => !p.dead);
+    // the guardian's hall opens the same way: everyone in front of its door first (an unseen wall until then)
+    const hallZ = (w) => (w.ledgeZ ? w.ledgeZ - 1 : w.arenaD - 2);
+    const hallDoor = (w) => {
+      if (GM.stage !== 'boss' || !w.arenaD || GM.bossEngaged || w._hall) return;
+      const z = hallZ(w);
+      w._hall = w.addCollider(0, -40, z - 0.3, w.W, 80, z + 0.3, { surf: 'metal', noGrapple: true, navIgnore: true });
+    };
+    const hallOpen = (w) => { if (w._hall) { w._hall.alive = false; w._hall = null; } };
+    K.handlers.hall = function () { if (G.world) hallOpen(G.world); };
     K.handlers.at = function (m, from) {
       const rp = K.players.get(from); if (!rp) return;
       rp.at = m.k;
@@ -233,13 +257,15 @@
       const live = standing(), n = live.filter((p) => p.at).length, mine = at;
       const kinds = new Set(live.filter((p) => p.at).map((p) => p.at));
       let h = '';
-      if (mine && n < live.length) h = `⏳ 全員が門に集まるのを待っています（${n}/${live.length}）<small>全員が同じ門に入ると次のエリアへ進みます</small>`;
+      if (mine && n < live.length) h = mine === 'hall' ? `⏳ 全員が扉の前に集まると開きます（${n}/${live.length}）` : `⏳ 全員が門に集まるのを待っています（${n}/${live.length}）<small>全員が同じ門に入ると次のエリアへ進みます</small>`;
       if (mine && kinds.size > 1) h = `⚠ 別々の門にいます<small>行き先をそろえてください（${[...kinds].map(kindName).join(' / ')}）</small>`;
       if (gateEl._h !== h) { gateEl._h = h; gateEl.innerHTML = h; gateEl.style.display = h ? 'block' : 'none'; }
     };
-    K.onFrame = function () {
+    K.onFrame = function (dt) {
       if (!G.world || !GM.run) return;
       if (G.world !== lastWorld) { lastWorld = G.world; prep(); at = null; for (const p of K.players.values()) p.at = null; }
+      hallDoor(G.world);
+      if (GM.bossEngaged) hallOpen(G.world);
       if (GM.area !== lastArea) { lastArea = GM.area; for (const id of Object.keys(locks)) delete locks[id]; hold = null; pending = null; if (K.clearViz) K.clearViz(); }
       const me = K.players.get(K.id);
       const want = !P.dead && !GM.transitioning ? gateAt(P.pos) : null;
@@ -256,9 +282,11 @@
         const live = standing();
         if (live.length && live.every((p) => p.at) && new Set(live.map((p) => p.at)).size === 1) {
           const kind = live[0].at;
-          K.msg('全員そろった — 次のエリアへ'); K.send({ t: 'gn', x: '全員そろった — 次のエリアへ' });
-          K.go(GM.area + 1, kind);
-        }
+          if (kind === 'hall') { hallOpen(G.world); K.send({ t: 'hall' }); K.msg('守護者の間の扉が開く'); K.send({ t: 'gn', x: '守護者の間の扉が開く' }); }
+          else if (!(K._goT > 0)) { K._goT = 1.5; const x = live.length > 1 ? '全員そろった — まもなく出発' : '次のエリアへ'; K.msg(x); K.send({ t: 'gn', x }); }
+          K._goT -= dt;
+          if (kind !== 'hall' && K._goT <= 0) { K._goT = 0; K.go(GM.area + 1, kind); }
+        } else K._goT = 0;
       }
       banner();
     };

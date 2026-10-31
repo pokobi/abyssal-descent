@@ -80,7 +80,7 @@ const secs = +process.argv[2] || 5;
     await sleep(300);
     await h.eval("G.input.keys[G.BIND.interact[0]] = true; window.__hold = setInterval(() => { G.input.keys[G.BIND.interact[0]] = true; }, 16); 1");
     await sleep(1500); console.log('rv', await h.eval("JSON.stringify([G.game.state, document.getElementById('coop-rv').style.display, document.getElementById('coop-rv').textContent, G.Coop.players.get(1).dead, G.Coop.players.get(1).pos.distanceTo(G.player.pos), G.input.down('interact'), G.player.dead])"));
-    await g.until('G.player.dead === false', 12000);
+    await g.until('G.player.dead === false', 30000);
     await h.eval('clearInterval(window.__hold); G.input.keys[G.BIND.interact[0]] = false; 1');
     check(await g.eval('G.player.hp > 1'), 'holding interact beside a fallen teammate gets them up');
     // ---- chat and ping

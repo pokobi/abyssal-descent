@@ -222,7 +222,7 @@
       if (o.pile) P.pileState = null;
       if (o.pd) P.pullDir = V(...o.pd);
       if (o.pullT > 0 && !P.pullDir) P.pullT = 0;
-      if (o.dp) { P.pos.x += o.dp[0]; P.pos.y += o.dp[1]; P.pos.z += o.dp[2]; G.world.depenetrate(P.pos, P.hw, P.height); }
+      if (o.dp && !(BS.active && BS.active.holes && BS.active.holes.length)) { P.pos.x += o.dp[0]; P.pos.y += o.dp[1]; P.pos.z += o.dp[2]; G.world.depenetrate(P.pos, P.hw, P.height); }
     };
     const wrapNet = (fn) => { net = true; try { fn(); } finally { net = false; } };
     K.handlers.pj = function (m) { const o = K.unplain(m.o); if (!o.pos || !o.vel) return; if (o.explode) o.info = { pjx: 1 }; wrapNet(() => C.spawnProjectile(o)); };
@@ -236,7 +236,7 @@
     K.handlers.tl = function (m) { const [a, b, w, dur, col] = m.a; FX.teleLine(V(...a), V(...b), w, dur, col); };
     // ---------------- the state of the area ----------------
     K.handlers.o = function (m) {
-      const O = GM.objective; if (!O) return;
+      const O = GM.objective; if (!O || O.kind === 'trial') return;
       if (GM.bossEngaged) return;
       O.text = () => m.x; O.sub = m.s ? () => m.s : null; if (m.ic) O.icon = m.ic;
       O.segs = m.sg ? () => m.sg : null; if (m.p !== null && m.p !== undefined) O.progress = () => m.p;
@@ -245,7 +245,7 @@
     };
     // a fight that drags on grows frantic for everyone (the host keeps the clock)
     K.handlers.en = function (m) { const E0 = GM.enrage; if (m.lv > E0.lv) G.ui.toast(`🔥 戦いが長引いている — 敵が激化した（激化 Lv${m.lv}）`, 'warn'); E0.lv = m.lv; E0.dmg = m.d; E0.tm = m.tm; };
-    K.handlers.clear = function (m) { if (!GM.areaCleared) GM.clearArea(m.boss ? { boss: true } : {}); };
+    K.handlers.clear = function (m) { if (GM.stage === 'trial') { if (!GM.areaCleared) { K._net = true; try { G.Areas.finishTrial(); } finally { K._net = false; } } return; } if (!GM.areaCleared) GM.clearArea(m.boss ? { boss: true } : {}); };
     K.handlers.engage = function () {
       const w = G.world;
       if (GM.bossEngaged || P.dead || !w.arenaCenter) return;
@@ -271,6 +271,8 @@
       const now = performance.now();
       if (!(b._hitT > now - 400)) b.hp = m.hp;
       b.shield = m.sh; b.maxShield = m.mxs; b.pos.set(...m.pos); b.yaw = m.yaw; b._ph = m.ph;
+      if (m.pa) b.phase = m.pa;
+      if (m.cs && b.constructs) for (const [pi, x, y, z] of m.cs) { const c = b.constructs.find((q) => q.p === b.parts[pi]); if (c) c.pos.set(x, y, z); }
       // the last guardian's second form: the same set piece runs here (the fall of the crown, the climb to the sky floor), carried by its own code
       if (m.st === 'transform' && b.state !== 'transform' && !b._bT && b.beginTransform) { b._bT = true; b.beginTransform(); }
       if (m.tl) for (const [i, s, tm] of m.tl) applyFloor(BS.terrain.tiles()[i], s, tm, -0.5);
@@ -278,10 +280,34 @@
       for (const a of m.nodes) K._pose[a[0]] = a;
       b.parts.forEach((p, i) => {
         const s = m.parts[i]; if (!s) return;
+        if (p.alive && !s[0] && b.constructs) { const c = b.constructs.find((q) => q.p === p); if (c) { try { b.constructBroken(c); } catch (e) { console.error(e); } } }
         p.alive = !!s[0]; p.untargetable = !!s[1]; const inv = !!s[2]; p.isInvuln = () => inv; p.invuln = false;
         if (p.shield !== undefined) p.shield = s[5];
         if (Object.getOwnPropertyDescriptor(p, 'hp').writable) { p.hp = s[3]; p.maxHp = s[4]; }
       });
+    };
+    // the last guardian's set pieces run from its own code here, on your own character, where the host says they happen
+    K.handlers.bg = function (m) {
+      const b = BS.active; if (!b || b.dead || !b.a_gravity || b.state === 'transform') return;
+      const zs = m.z.map((v) => V(...v)), a = { k: 'gravity', t: 0 }, cf = b.clampFloor, sp = b.stagePt;
+      if (b.act) b.end(0);
+      b.act = a;
+      b.clampFloor = () => zs[0].clone(); b.stagePt = () => (zs[1] || zs[0]).clone();
+      try { b.a_gravity(a, 0.001); } catch (e) { console.error(e); } finally { b.clampFloor = cf; b.stagePt = sp; }
+      K._gact = a;
+    };
+    K.handlers.bcn = function (m) {
+      const b = BS.active; if (!b || b.dead || !b.spawnConstruct) return;
+      const tgt = m.tile >= 0 ? BS.terrain.tiles()[m.tile] : b.stg && b.stg.segs[m.seg]; if (!tgt) return;
+      const U0 = G.U, pk = U0.pick, n0 = b.parts.length;
+      U0.pick = () => tgt;
+      try { b.spawnConstruct(); } catch (e) { console.error(e); } finally { U0.pick = pk; }
+      if (b.parts.length > n0) { b.parts[b.parts.length - 1]._nid = -(m.pi + 1); while (b.parts.length <= m.pi) b.parts.splice(b.parts.length - 1, 0, { alive: false, hitW: [], shield: 0 }); }
+    };
+    K.handlers.bhl = function (m) {
+      const b = BS.active; if (!b || b.dead || !b.spawnHole) return;
+      b.holes = b.holes || [];
+      try { b.spawnHole(); const h = b.holes[b.holes.length - 1]; h.c.set(...m.c); h.g.position.copy(h.c); } catch (e) { console.error(e); }
     };
     K.handlers.bdead = function () { const b = BS.active; if (b && !b.dead) { b.hp = 0; b.kill(); } };
     function applyFloor(t, s, tm, y0) {
@@ -295,6 +321,14 @@
       if (b.state === 'transform' && b.updateTransform) { try { b.trT = b.trT || 0; b.updateTransform(dt); } catch (e) { console.error(e); } }
       if (G.world.final && G.world.tiles && BS.terrain) BS.terrain.update(dt);
       if (b.stage2 && b.segTick) { try { b.segTick(dt); } catch (e) { console.error(e); } }
+      if (b.stage2 && b.updateHoles) { b.bhT = 1e9; try { b.updateHoles(dt); } catch (e) { console.error(e); } }
+      if (K._gact && b.act === K._gact) {
+        const a = b.act; a.t += dt * (b.atkRate ? b.atkRate() : 1);
+        let over = true; try { over = b.a_gravity(a, dt); } catch (e) { console.error(e); }
+        if (over) { K._gact = null; b.end(0); }
+      }
+      if (b.updateLift) { try { b.updateLift(dt); } catch (e) { console.error(e); } }
+      if (b.constructs) for (const c of b.constructs) { c.t += dt; c.spin.rotation.y += dt * 1.6; c.ring.rotation.z += dt * 0.8; c.g.position.copy(c.pos); c.p.hitW[0].w.copy(c.pos); c.p.pos.copy(c.pos); c.p.centerRef.copy(c.pos); }
       if (b.stg && b.stg.stars) { b.stg.stars.position.copy(G.camera.position); b.stg.spin.rotation.y += dt * 0.05; }
       const q = new THREE.Quaternion(), T = V();
       K.bossNodes.forEach((n, i) => {

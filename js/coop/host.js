@@ -149,6 +149,8 @@
       b.parts.forEach((p, i) => { p._nid = -(i + 1); });
       K.bossNodes = K.nodesOf(b);
       K._bossLast = [];
+      // (a guest's gravity reversal runs on the guest's own machine)
+      if (b.startLift) { const s = b.startLift; b.startLift = function () { if (!K.swap) return s.call(b); }; }
       K._bs = { t: 'bstart', id, level, seed, hp: b.hp, mx: b.maxHp, n: K.bossNodes.length };
       K.send(K._bs);
       return b;
@@ -311,7 +313,11 @@
         });
         return out.length ? out : undefined;
       };
-      K.send({ t: 'b', hp: Math.round(b.hp), sh: Math.round(b.shield || 0), mxs: Math.round(b.maxShield || 0), pos: K.vec(b.pos), yaw: r2(b.yaw), ph: b.phaseText ? b.phaseText() : '', nodes, parts,
+      // the last guardian's set pieces: each is announced once, and runs from its own code on the guests' machines
+      if (b.act && b.act.k === 'gravity' && b.act.zones && K._gaSent !== b.act) { K._gaSent = b.act; K.send({ t: 'bg', z: b.act.zones.map(K.vec) }); }
+      if (b.constructs) for (const c of b.constructs) if (!c._sent) { c._sent = true; K.send({ t: 'bcn', pi: b.parts.indexOf(c.p), tile: c.tile ? BS.terrain.tiles().indexOf(c.tile) : -1, seg: c.seg ? b.stg.segs.indexOf(c.seg) : -1 }); }
+      if (b.holes) for (const h of b.holes) if (!h._sent) { h._sent = true; K.send({ t: 'bhl', c: K.vec(h.c) }); }
+      K.send({ t: 'b', pa: b.phase, cs: b.constructs ? b.constructs.map((c) => [b.parts.indexOf(c.p), r2(c.pos.x), r2(c.pos.y), r2(c.pos.z)]) : undefined, hp: Math.round(b.hp), sh: Math.round(b.shield || 0), mxs: Math.round(b.maxShield || 0), pos: K.vec(b.pos), yaw: r2(b.yaw), ph: b.phaseText ? b.phaseText() : '', nodes, parts,
         st: typeof b.state === 'string' ? b.state : '', tl: BS.terrain && G.world.final ? scan(BS.terrain.tiles()) : undefined, sg: b.stg ? scan(b.stg.segs) : undefined });
     };
     function sendObjective() {

@@ -94,7 +94,7 @@
     for (const rp of K.players.values()) {
       if (rp.id === K.id) continue;
       const pct = Math.round(Math.max(0, Math.min(1, rp.hp / (rp.maxHp || 1))) * 100), col = COLS[rp.id % COLS.length];
-      const tags = (rp.dead ? '<span class="ch-tag" style="color:#ff9a80;border-color:#ff7a60">戦闘不能</span>' : '') + (rp.at ? '<span class="ch-tag">🚪 門で待機</span>' : '');
+      const tags = (rp.dead ? '<span class="ch-tag" style="color:#ff9a80;border-color:#ff7a60">戦闘不能</span>' : '') + (rp.at ? '<span class="ch-tag">🚪 門で待機</span>' : '') + (rp.stats && rp.stats.tr !== undefined ? `<span class="ch-tag">🎯 ${rp.stats.tr}</span>` : '');
       h += `<div class="ch-p${rp.dead ? ' down' : pct < 30 ? ' low' : ''}" style="--pc:${col}"><div class="ch-top"><div class="ch-ic">${G.U.esc((rp.name || '?').slice(0, 1))}</div><div class="ch-nm">${G.U.esc(rp.name)}</div><div class="ch-ping">${rp.rtt ? rp.rtt + 'ms' : ''}</div></div>`
         + `<div class="ch-b"><i style="width:${pct}%"></i><b>${Math.max(0, Math.round(rp.hp))} / ${Math.round(rp.maxHp)}</b></div>`
         + `<div class="ch-row"><span style="flex:1;min-width:0">${G.U.esc(wname(rp))}</span><span>🪔×${Math.max(0, rp.rev)}</span></div>${tags ? `<div class="ch-row">${tags}</div>` : ''}</div>`;
@@ -109,13 +109,15 @@
       g: P.grounded ? 1 : 0, c: P.crouching || P.sliding ? 1 : 0, s: P.sprinting ? 1 : 0, a: Math.round((W.adsT || 0) * 10), w, m: mm ? 1 : 0,
       rl: !mm && P.weapon && P.weapon.reloading ? 1 : 0, sw: mm && W.meleeBusy && W.meleeBusy() ? 1 : 0, gd: mm && W.guarding && W.guarding() ? 1 : 0,
       pl: P.pileState === 'charge' ? 1 : P.pileState === 'fall' ? 2 : 0, gr: P.grapple && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? 1 : 0,
+      bl: (P.buffs.get('z_blades') || 0) * 2 + (P.bladesT > 0 ? P.bladesN || 6 : 0),
+      hk: P.grapple && P.grapple.hook && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? [f(P.grapple.hook.x), f(P.grapple.hook.y), f(P.grapple.hook.z)] : 0,
       ps: (P.st.burn > 0 ? 1 : 0) | (P.st.poison > 0 ? 2 : 0) | (P.st.shock > 0 ? 4 : 0) | (P.st.slow > 0 ? 8 : 0) | (P.invisT > 0 || P.smokeT > 0 ? 16 : 0) | (P.wardT > 0 ? 32 : 0),
       tb: [...P.temps.values()].filter((t) => t.icon).slice(0, 4).map((t) => t.icon).join('') });
   };
   K.handlers.p = function (m) {
     const rp = K.players.get(m.i); if (!rp || m.i === K.id) return;
     rp.to.set(m.x, m.y, m.z); rp.vel.set(m.vx, m.vy, m.vz); rp.yaw = m.yaw; rp.pitch = m.pt; rp.hp = m.hp; rp.maxHp = m.mx; rp.dead = !!m.d; rp.rev = m.r;
-    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr; rp.ps = m.ps | 0; rp.tb = m.tb || '';
+    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr; rp.ps = m.ps | 0; rp.tb = m.tb || ''; rp.hk = m.hk; rp.bl = m.bl | 0;
     if (rp.first === undefined) { rp.first = 1; rp.pos.copy(rp.to); }
     if (K.role === 'host') for (const o of K.players.keys()) if (o && o !== m.i) K.net.send(o, m);
   };
@@ -261,25 +263,29 @@
   const N = () => window.CoopNet;
   // the difficulties on offer are the ones the solo save has unlocked (the host picks; the others see the choice)
   K.diff = { id: 'normal', lv: 0 };
+  K.ff = true;
   const diffName = (d) => (d.id === 'extra' ? G.Run.DIFFS.extra.name + d.lv : G.Run.DIFFS[d.id].name);
   function roomScreen() {
     const body = K.lobbyEl.querySelector('#cl-body'), R = G.Run, host = K.role === 'host';
     const names = [...K.players.values()].map((p) => `<div>・${G.U.esc(p.name)}${p.id === 0 ? '（ホスト）' : ''}</div>`).join('');
     const ids = ['easy', 'normal', 'hard'].concat(R.unlocked('extra', 1) ? ['extra'] : []);
+    const ffBox = host ? `<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cl-ff"${K.ff ? ' checked' : ''}>仲間のグレネードでダメージを受ける</label>` : `<div class="cl-note">仲間のグレネードのダメージ: ${K.ff ? 'あり' : 'なし'}</div>`;
     const dif = host
       ? `<div class="cl-note">難易度</div><div class="cl-diff" style="grid-template-columns:repeat(${ids.length},1fr)">${ids.map((id) => `<button data-d="${id}" class="${K.diff.id === id ? 'on' : ''}" style="--dc:${R.DIFFS[id].col}">${R.DIFFS[id].icon} ${R.DIFFS[id].name}</button>`).join('')}</div>`
         + (K.diff.id === 'extra' ? `<div class="cl-xl"><button data-x="-1">◀</button><b>エクストラ ${K.diff.lv}</b><button data-x="1">▶</button></div>` : '')
       : `<div class="cl-note">難易度: <b style="color:${R.DIFFS[K.diff.id].col}">${diffName(K.diff)}</b>（ホストが選びます）</div>`;
-    body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="cl-note">部屋コード</div><div class="cl-code">${K.code}</div>${host ? '<button id="cl-link">招待リンクをコピー</button>' : ''}<div>${names}</div>${dif}`
+    body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="cl-note">部屋コード</div><div class="cl-code">${K.code}</div>${host ? '<button id="cl-link">招待リンクをコピー</button>' : ''}<div>${names}</div>${dif}${ffBox}`
       + (host ? `<button id="cl-start"${K.players.size < 2 && !qs.has('solo') ? ' disabled' : ''}>開始する</button>` : '<div class="cl-note">ホストの開始を待っています…</div>') + '</div>';
     const b = body.querySelector('#cl-start');
     if (b) b.onclick = () => K.begin();
+    const fb = body.querySelector('#cl-ff');
+    if (fb) fb.onchange = () => { K.ff = fb.checked; K.send({ t: 'diff', d: K.diff, ff: K.ff }); };
     const lk = body.querySelector('#cl-link');
     if (lk) lk.onclick = () => { const u = location.origin + location.pathname + '?join=' + K.code; const done = () => { lk.textContent = 'コピーしました'; setTimeout(() => { lk.textContent = '招待リンクをコピー'; }, 1500); }; if (navigator.clipboard) navigator.clipboard.writeText(u).then(done, () => { lk.textContent = u; }); else lk.textContent = u; };
-    body.querySelectorAll('[data-d]').forEach((e) => { e.onclick = () => { K.diff = { id: e.dataset.d, lv: e.dataset.d === 'extra' ? Math.max(1, Math.min(K.diff.lv || R.maxExtra(), R.maxExtra())) : 0 }; K.send({ t: 'diff', d: K.diff }); roomScreen(); }; });
-    body.querySelectorAll('[data-x]').forEach((e) => { e.onclick = () => { const n = K.diff.lv + (+e.dataset.x); if (n >= 1 && n <= R.maxExtra()) { K.diff = { id: 'extra', lv: n }; K.send({ t: 'diff', d: K.diff }); roomScreen(); } }; });
+    body.querySelectorAll('[data-d]').forEach((e) => { e.onclick = () => { K.diff = { id: e.dataset.d, lv: e.dataset.d === 'extra' ? Math.max(1, Math.min(K.diff.lv || R.maxExtra(), R.maxExtra())) : 0 }; K.send({ t: 'diff', d: K.diff, ff: K.ff }); roomScreen(); }; });
+    body.querySelectorAll('[data-x]').forEach((e) => { e.onclick = () => { const n = K.diff.lv + (+e.dataset.x); if (n >= 1 && n <= R.maxExtra()) { K.diff = { id: 'extra', lv: n }; K.send({ t: 'diff', d: K.diff, ff: K.ff }); roomScreen(); } }; });
   }
-  K.handlers.diff = function (m) { K.diff = m.d; roomScreen(); };
+  K.handlers.diff = function (m) { K.diff = m.d; if (m.ff !== undefined) K.ff = m.ff; roomScreen(); };
   K.open = function (code, isHost, name) {
     K.code = code; K.name = name; K.role = isHost ? 'host' : 'guest';
     const lat = +qs.get('lat') || 0, jit = +qs.get('jit') || 0;
@@ -307,7 +313,7 @@
     if (K.players.size > K.MAX) { K.send({ t: 'no', why: '部屋が満員です' }, from); K.players.delete(from); return; }
     rp.name = m.name;
     for (const o of K.players.keys()) if (o && o !== from) K.send({ t: 'roster', r: roster() }, o);
-    K.send({ t: 'room', id: from, r: roster(), d: K.diff }, from);
+    K.send({ t: 'room', id: from, r: roster(), d: K.diff, ff: K.ff }, from);
     if (K.live) { K.feed(`${G.U.esc(m.name)} が参加した`, true); K.lateJoin(from, m.name); } else roomScreen();
   };
   K.handlers.roster = function (m) {
@@ -316,7 +322,7 @@
   };
   K.handlers.no = function (m) { K.lobbyErr(m.why); K.net.close(); K.net = null; };
   K.handlers.room = function (m) {
-    K.id = m.id; K.diff = m.d || K.diff;
+    K.id = m.id; K.diff = m.d || K.diff; if (m.ff !== undefined) K.ff = m.ff;
     K.players.clear();
     for (const [id, nm] of m.r) K.addPlayer(id, nm);
     K.lobbyErr('');
@@ -364,6 +370,13 @@
     G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); const q = document.querySelector('#p-quit'); if (q) q.textContent = '🚪 部屋を出る'; if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。<br>H: ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす</div>' + (K.statsHTML ? K.statsHTML() : '')); };
     const pu = G.player.update;
     G.player.update = function (dt) { if (this.dead) clearKeys(); return pu.call(this, dt); };
+    // the item wheel slows the foes in solo; here the foes are everyone's, so it does not
+    const tf = G.ui.timeFx;
+    G.ui.timeFx = function (k, dt) {
+      const g = GM();
+      if (K.live && G.abilities.wheelOpen && G.abilities.wheelOpen()) { const slow = g.chronoT > 0 ? g.chronoSlow || 0 : 0; g.enemyTimeScale = 1 - slow; }
+      return tf.call(G.ui, k, dt);
+    };
     lobby();
     last = performance.now();
     requestAnimationFrame(loop);

@@ -56,8 +56,11 @@
     badge.scale.set(1.6, 0.3, 1); badge.position.y = 2.38; badge.renderOrder = 6; badge.visible = false; root.add(badge);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xffd27a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
     glow.scale.set(2.2, 2.8, 1); glow.position.y = 1.0; root.add(glow);
+    // a small health bar under the name
+    const mk = (c, o) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ color: c, transparent: true, opacity: o, depthTest: false })); s.position.y = 1.93; s.renderOrder = 7; root.add(s); return s; };
+    const hpBg = mk(0x000000, 0.65), hpFg = mk(0x6fd06f, 1); hpBg.scale.set(0.84, 0.075, 1); hpFg.scale.set(0.8, 0.045, 1);
     root.traverse((o) => { o.frustumCulled = false; });
-    return { root, J, ph: 0, sw: 0, swT: 9, holdKey: '', hold: null, tag, badge, bc, glow, tbKey: null };
+    return { root, J, ph: 0, sw: 0, swT: 9, holdKey: '', hold: null, tag, badge, bc, glow, tbKey: null, hpFg, hpBg };
   };
 
   // what is in the hand: the same display model the shop uses, turned so the barrel (or the blade) points where the figure looks
@@ -83,8 +86,21 @@
     B.hold = w; B.J.hold.add(w);
   }
 
+  let bladeM = null;
+  const BLADE = () => bladeM || (bladeM = new THREE.MeshStandardMaterial({ color: 0xd8e0ff, metalness: 1, roughness: 0.2, emissive: 0x404a70 }));
   const PSC = [[1, 0xff7a20], [2, 0x6ad040], [4, 0xffe060], [8, 0x70b0ff], [32, 0xd0b0ff]];
   function effects(B, rp, dt) {
+    const hk = Math.max(0.001, Math.min(1, rp.hp / (rp.maxHp || 1)));
+    B.hpFg.scale.x = 0.8 * hk; B.hpFg.material.color.setHex(hk < 0.3 ? 0xff5a40 : hk < 0.6 ? 0xffc040 : 0x6fd06f); B.hpFg.visible = B.hpBg.visible = !rp.dead;
+    // the grapple line
+    if (rp.hk) G.fx.seg(V(rp.pos.x, rp.pos.y + 1.2, rp.pos.z), V(rp.hk[0], rp.hk[1], rp.hk[2]), 0xc0b090, 0.03, 0.05);
+    // orbiting blades
+    if ((rp.bl || 0) !== (B.blN || 0)) {
+      for (const m of B.blades || []) B.root.remove(m);
+      B.blades = []; B.blN = rp.bl || 0;
+      for (let i = 0; i < B.blN; i++) { const m = new THREE.Mesh(G.Props.PG.box, BLADE()); m.scale.set(0.06, 0.04, 0.7); B.root.add(m); B.blades.push(m); }
+    }
+    if (B.blades) B.blades.forEach((m, i) => { const a = G.game.time * 3 + i / B.blades.length * 6.283; m.position.set(Math.cos(a) * 1.4, 1.1, Math.sin(a) * 1.4); m.rotation.y = -a; });
     const key = rp.tb || '';
     if (B.tbKey !== key) {
       B.tbKey = key;

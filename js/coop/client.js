@@ -59,6 +59,7 @@
       // joining a run under way: the first area is the one the others are in
       if (K.late) { n = K.late.n; kind = K.late.kind; GM.route = (K.late.route || []).slice(0, -1); K.late = null; }
       GM.seed = seed0;
+      K.clearBossObjs();
       for (const e of reps.values()) e.alive = false;
       reps.clear();
       if (P.dead) K.rise(P.pos, P.stats.maxHp * 0.5, false);
@@ -282,11 +283,11 @@
       if (m.sg && b.stg) for (const [i, s, tm] of m.sg) applyFloor(b.stg.segs[i], s, tm, 0);
       for (const a of m.nodes) K._pose[a[0]] = a;
       b.parts.forEach((p, i) => {
-        const s = m.parts[i]; if (!s) return;
+        const s = m.parts[i]; if (!s || p.isGap) return;
         if (p.alive && !s[0] && b.constructs) { const c = b.constructs.find((q) => q.p === p); if (c) { try { b.constructBroken(c); } catch (e) { console.error(e); } } }
         p.alive = !!s[0]; p.untargetable = !!s[1]; const inv = !!s[2]; p.isInvuln = () => inv; p.invuln = false;
         if (p.shield !== undefined) p.shield = s[5];
-        if (Object.getOwnPropertyDescriptor(p, 'hp').writable) { p.hp = s[3]; p.maxHp = s[4]; }
+        { const d = Object.getOwnPropertyDescriptor(p, 'hp'); if (d && d.writable) { p.hp = s[3]; p.maxHp = s[4]; } }
       });
     };
     // the last guardian's set pieces run from its own code here, on your own character, where the host says they happen
@@ -312,7 +313,7 @@
       b.holes = b.holes || [];
       try { b.spawnHole(); const h = b.holes[b.holes.length - 1]; h.c.set(...m.c); h.g.position.copy(h.c); } catch (e) { console.error(e); }
     };
-    K.handlers.bdead = function () { const b = BS.active; if (b && !b.dead) { b.hp = 0; b.kill(); } };
+    K.handlers.bdead = function () { const b = BS.active; K.clearBossObjs(); if (b && !b.dead) { b.hp = 0; b.kill(); } };
     function applyFloor(t, s, tm, y0) {
       if (!t) return;
       if (s === 'warn') { t.state = 'warn'; t.warn = t.timer = Math.max(0.1, tm); t.rot = t.rot || 1; }
@@ -340,6 +341,7 @@
         q.set(a[4] / 1000, a[5] / 1000, a[6] / 1000, a[7] / 1000).normalize(); n.quaternion.slerp(q, k);
         n.visible = !!a[8]; n.scale.setScalar === undefined || (Math.abs(n.scale.x - a[9]) > 0.001 && n.scale.multiplyScalar(a[9] / (n.scale.x || 1)));
       });
+      K.poseBossObjs(dt);
       b.updateHits();
       b.bar();
     }

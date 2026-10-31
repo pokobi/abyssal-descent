@@ -61,6 +61,8 @@
         } else if (e.code === 'Escape') closeChat();
         return;
       }
+      // a boon choice stays up while the others go on: its inventory button also answers to the usual key
+      if (GM.state === 'buff' && !e.repeat && (G.BIND.status.includes(e.code) || G.BIND.inventory.includes(e.code))) { const b = document.querySelector('#bs-inv'); if (b) { e.preventDefault(); b.click(); } return; }
       if (e.repeat || GM.state !== 'playing') return;
       if (e.code === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); K.clearKeys(); K.chatting = true; input.style.display = 'block'; input.focus(); }
     }, true);

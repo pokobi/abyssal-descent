@@ -149,6 +149,7 @@
       b.parts.forEach((p, i) => { p._nid = -(i + 1); });
       K.bossNodes = K.nodesOf(b);
       K._bossLast = [];
+      K.bossReady(b);
       // (a guest's gravity reversal runs on the guest's own machine)
       if (b.startLift) { const s = b.startLift; b.startLift = function () { if (!K.swap) return s.call(b); }; }
       K._bs = { t: 'bstart', id, level, seed, hp: b.hp, mx: b.maxHp, n: K.bossNodes.length };
@@ -186,6 +187,7 @@
       if (P.dead) K.rise(P.pos, P.stats.maxHp * 0.5, false);
       ea.call(GM, n, kind);
       GM.areaMods.hp *= K.hpScale();
+      K.clearBossObjsHost();
       K.send({ t: 'area', n, kind, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, fp: K.fingerprint(), fi: K.fpInfo() });
     };
     K.go = function (n, kind) {
@@ -268,7 +270,7 @@
     K.handlers.ready = function (m, from) {
       const list = [...known.values()].filter((e) => e.alive).map(esRow);
       if (list.length) K.send({ t: 'es', a: list }, from);
-      if (BS.active && !BS.active.dead && K._bs) { K.send(K._bs, from); K._bossLast = []; }
+      if (BS.active && !BS.active.dead && K._bs) { K.send(K._bs, from); K._bossLast = []; K.resendBossObjs(from); }
       if (GM.bossEngaged) K.send({ t: 'engage' }, from);
       if (GM.areaCleared) K.send({ t: 'clear', boss: GM.stage === 'boss' ? 1 : 0 }, from);
       K.catchUp(from);
@@ -297,6 +299,7 @@
     K.sendBoss = function () {
       const b = BS.active;
       if (!b || !K.bossNodes) return;
+      K.sendBossObjs();
       if (b.dead) { if (!b._cpSent) { b._cpSent = true; K.send({ t: 'bdead' }); } return; }
       const nodes = [], last = K._bossLast;
       K.bossNodes.forEach((n, i) => {

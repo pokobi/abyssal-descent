@@ -78,6 +78,7 @@ const secs = +process.argv[2] || 5;
     await h.until('G.Coop.players.get(1).dead === true', 4000);
     await h.eval("(() => { G.game.rewardPending = null; G.ui.clearScreen(); G.game.state = 'playing'; const t = G.Coop.players.get(1); G.player.pos.copy(t.to); G.player.vel.set(0, 0, 0); })(); 1");
     await sleep(300);
+    await h.send('Page.bringToFront');
     await h.eval("G.input.keys[G.BIND.interact[0]] = true; window.__hold = setInterval(() => { G.input.keys[G.BIND.interact[0]] = true; }, 16); 1");
     await sleep(1500); console.log('rv', await h.eval("JSON.stringify([G.game.state, document.getElementById('coop-rv').style.display, document.getElementById('coop-rv').textContent, G.Coop.players.get(1).dead, G.Coop.players.get(1).pos.distanceTo(G.player.pos), G.input.down('interact'), G.player.dead])"));
     await g.until('G.player.dead === false', 30000);

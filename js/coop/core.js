@@ -36,6 +36,11 @@
   #coop-hud .ch-p.down .ch-b i{background:#7a2a20}#coop-hud .ch-p.down .ch-nm{color:#ff9a80}
   #coop-gate{position:fixed;left:50%;bottom:23%;transform:translateX(-50%);z-index:8300;padding:9px 20px;background:rgba(14,11,8,.92);border:1px solid rgba(255,200,80,.55);border-radius:4px;font:700 15px 'Noto Sans JP',sans-serif;color:#ffe2a0;display:none;pointer-events:none;text-align:center;line-height:1.5}
   #coop-gate small{display:block;font-size:11px;color:#a99d88;font-weight:500}
+  html.m #coop-hud{left:50%;right:auto;bottom:auto;top:calc(var(--u)*30);transform:translateX(-50%);flex-direction:row;gap:4px;zoom:.62}
+  html.m #coop-hud .ch-p{width:128px;padding:3px 6px 4px}html.m #coop-hud .ch-ic{display:none}html.m #coop-hud .ch-ping{display:none}html.m #coop-hud .ch-row:not(.ch-t){display:none}
+  html.m #coop-hud .ch-nm{font-size:12px}html.m #coop-hud .ch-b{margin-top:2px}
+  html.m #coop-marks{zoom:.66}html.m #coop-gate,html.m #coop-rv,html.m #coop-msg,html.m #coop-spec{zoom:.7}
+  html.m #coop-chat{right:auto;left:50%;transform:translateX(-50%);bottom:auto;top:calc(var(--u)*62);width:48vw;align-items:center;zoom:.7}
   #coop-lobby .cl-diff{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
   #coop-lobby .cl-diff button{padding:7px 4px;font-size:12px;background:rgba(14,11,8,.96);border:1px solid rgba(220,190,130,.3);color:#c9bda6}
   #coop-lobby .cl-diff button.on{border-color:var(--dc,#ffd27a);color:#fff0c4;background:linear-gradient(180deg,rgba(255,200,80,.22),rgba(14,11,8,.96));box-shadow:0 0 0 1px var(--dc,#ffd27a)}
@@ -97,7 +102,7 @@
       const tags = (rp.dead ? '<span class="ch-tag" style="color:#ff9a80;border-color:#ff7a60">戦闘不能</span>' : '') + (rp.at ? '<span class="ch-tag">🚪 門で待機</span>' : '') + (rp.stats && rp.stats.tr !== undefined ? `<span class="ch-tag">🎯 ${rp.stats.tr}</span>` : '');
       h += `<div class="ch-p${rp.dead ? ' down' : pct < 30 ? ' low' : ''}" style="--pc:${col}"><div class="ch-top"><div class="ch-ic">${G.U.esc((rp.name || '?').slice(0, 1))}</div><div class="ch-nm">${G.U.esc(rp.name)}</div><div class="ch-ping">${rp.rtt ? rp.rtt + 'ms' : ''}</div></div>`
         + `<div class="ch-b"><i style="width:${pct}%"></i><b>${Math.max(0, Math.round(rp.hp))} / ${Math.round(rp.maxHp)}</b></div>`
-        + `<div class="ch-row"><span style="flex:1;min-width:0">${G.U.esc(wname(rp))}</span><span>🪔×${Math.max(0, rp.rev)}</span></div>${tags ? `<div class="ch-row">${tags}</div>` : ''}</div>`;
+        + `<div class="ch-row"><span style="flex:1;min-width:0">${G.U.esc(wname(rp))}</span><span>🪔×${Math.max(0, rp.rev)}</span></div>${tags ? `<div class="ch-row ch-t">${tags}</div>` : ''}</div>`;
     }
     if (K.hudEl._h !== h) { K.hudEl.innerHTML = h; K.hudEl._h = h; }
   }
@@ -203,10 +208,22 @@
       if (K.onFrame) K.onFrame(dt);
       hud();
       updateBack();
+      unstick(dt);
       seenT -= dt;
       if (seenT <= 0) { seenT = 1; watchPeers(); K._pgT = (K._pgT || 0) + 1; if (K._pgT % 2 === 0) K.send({ t: 'pg', ts: performance.now() }); }
     } catch (e) { console.error(e); }
   }
+  // Another player can take the area on while a screen of yours is up, so the game's state can end up saying "a screen is open" with nothing on the screen, and then no
+  // menu or inventory will open. Whatever the cause, that state does not last.
+  let lostT = 0;
+  function unstick(dt) {
+    const g = GM(), scr = document.querySelector('#screens > *');
+    const lost = (g.state === 'buff' && !document.querySelector('#screens .card') && !G.InvUI.isOpen()) || (g.state === 'inv' && !G.InvUI.isOpen()) || ((g.state === 'modal' || g.state === 'paused') && !scr);
+    lostT = lost ? lostT + dt : 0;
+    if (lostT > 0.8) { lostT = 0; g.state = 'playing'; G.ui.clearScreen(); g.resume(); }
+  }
+  // (a phone has neither of those keys)
+  const coopHint = () => (document.documentElement.classList.contains('m') ? '' : G.K('ping') + ': ピン　Enter: チャット　') + '倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす';
   function loop(now) { requestAnimationFrame(loop); tick(now); }
   // a tab that is not on screen gets no animation frames: the host still has to run the world for the others
   setInterval(() => {
@@ -300,10 +317,12 @@
       t.onopen = () => roomScreen();
       t.onpeer = (id) => { K.addPlayer(id, '…'); };
       K.installHost();
+      K.installBossObjHost();
     } else {
       t.onpeer = () => K.send({ t: 'hi', v: window.COOP_VER, name });
       K.lobbyErr('接続中…');
       K.installGuest();
+      K.installBossObjGuest();
     }
     K.installSync();
     K.installFx();
@@ -335,7 +354,7 @@
     K.lobbyEl.style.display = 'none'; K.live = true;
     for (const rp of K.players.values()) rp.seen = performance.now();
     K.hudEl.style.display = '';
-    K.feed && K.feed(G.K('ping') + ': ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす', true);
+    K.feed && K.feed(coopHint(), true);
   };
 
   function start() {
@@ -369,7 +388,7 @@
       return dp.call(G.combat, a, i);
     };
     const up = G.ui.pause;
-    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); const q = document.querySelector('#p-quit'); if (q) q.textContent = '🚪 部屋を出る'; if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。<br>' + G.K('ping') + ': ピン　Enter: チャット　倒れた仲間の横で ' + G.K('interact') + ' 長押し: 起こす</div>' + (K.statsHTML ? K.statsHTML() : '')); };
+    G.ui.pause = function () { up.call(G.ui); const p = document.querySelector('#screens .panel'); const q = document.querySelector('#p-quit'); if (q) q.textContent = '🚪 部屋を出る'; if (p) p.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;font-size:11px;color:#c9a070">協力プレイ中は時間が止まりません。<br>メニューを開いている間も敵は襲ってきます。<br>' + coopHint() + '</div>' + (K.statsHTML ? K.statsHTML() : '')); };
     const pu = G.player.update;
     G.player.update = function (dt) { if (this.dead) clearKeys(); return pu.call(this, dt); };
     // the item wheel slows the foes in solo; here the foes are everyone's, so it does not

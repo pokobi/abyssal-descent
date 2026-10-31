@@ -34,7 +34,7 @@
     const fights = keys.filter((k) => k === 'combat' || k === 'elite' || k === 'cursed');
     out.push(U.weighted(fights, (k) => AR.TYPES[k].w, r));
     while (out.length < 3) {
-      const k = U.weighted(keys.filter((x) => !out.includes(x)), (k) => AR.TYPES[k].w * (k === 'combat' ? 0.8 : 1), r);
+      const k = U.weighted(keys.filter((x) => !out.includes(x)), (k) => (k === 'bank' ? AR.TYPES.bank.w + 0.3 * ((GM.run && GM.run.bankUp) || 0) : AR.TYPES[k].w) * (k === 'combat' ? 0.8 : 1), r);
       out.push(k);
     }
     return U.shuffle(out, r);

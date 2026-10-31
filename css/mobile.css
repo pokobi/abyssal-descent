@@ -34,6 +34,25 @@ html.m-inv #m-close { display: block; }
 #m-rotate .mr-s { font-size: 13px; opacity: 0.7; margin-top: 6px; }
 @keyframes mrrot { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 
+#m-tiles { position: absolute; inset: 0; pointer-events: none; }
+#m-tiles .ab { position: absolute; margin: 0; pointer-events: auto; touch-action: none; border-radius: 9px; }
+#m-tiles .ab .cdt { font-size: 0.6em; }
+#m-tiles .ab.ult { border-color: #ffd070; box-shadow: 0 0 12px rgba(255,208,112,0.45); background: radial-gradient(circle at 50% 35%, rgba(90,60,10,0.95), rgba(20,14,6,0.95)); }
+#m-tiles .ab.ult.ready { animation: ultReady 1.4s ease-in-out infinite; }
+#m-tiles .ab .ulttag { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); font-size: 8px; font-weight: 900; letter-spacing: 1px; padding: 0 4px; border-radius: 3px; background: rgba(60,40,10,0.95); color: #ffd070; z-index: 3; }
+#m-tiles .ab .cnt { font-size: 10px; }
+html.m #hud-bc { pointer-events: none; }
+/* the layout editor */
+#m-edit { position: fixed; inset: 0; z-index: 600; background: rgba(6,5,4,0.72); touch-action: none; font-family: 'Noto Sans JP', sans-serif; color: #e8d6b0; }
+#me-bar { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); transition: opacity .15s; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: center; width: min(62vw, 560px); padding: 5px 8px; background: rgba(14,11,8,0.94); border: 1px solid rgba(220,190,130,0.34); border-radius: 6px; font-size: 11px; z-index: 2; }
+#me-bar b { min-width: 7em; color: #ffd27a; font-size: 12px; }
+#me-bar label { display: flex; align-items: center; gap: 4px; }
+#me-bar input[type=range] { width: 74px; }
+#me-bar button { padding: 4px 10px; border-radius: 4px; font: inherit; font-weight: 700; background: linear-gradient(180deg, rgba(255,200,80,0.2), rgba(14,11,8,0.96)); border: 1px solid rgba(255,200,80,0.55); color: #ffe2a0; }
+.me-b { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.05; border-radius: 50%; background: rgba(255,255,255,0.14); border: 2px solid rgba(255,255,255,0.5); color: #fff; touch-action: none; font-weight: 700; }
+.me-b.tile { border-radius: 9px; }
+#m-edit.drag #me-bar { opacity: 0.15; pointer-events: none; }
+.me-b.sel { border-color: #ffd27a; background: rgba(255,210,122,0.28); }
 /* ---------- HUD: smaller, and out of the thumbs' way ---------- */
 html.m #crosshair { transform: scale(1.1); }
 html.m #compass, html.m #area-sub, html.m #run-meta, html.m #hud-buffs .bicon:nth-child(n+9), html.m #weapon-atts, html.m #grapple-ind, html.m #feed { display: none !important; }
@@ -54,9 +73,6 @@ html.m #weapon-info { min-width: 0; padding: 6px 10px; }
 html.m #ammo { font-size: 30px; }
 html.m .wslot { pointer-events: auto; padding: 8px 12px; touch-action: none; }
 /* skills / items along the bottom */
-html.m #hud-bc { bottom: calc(var(--u) * 5); transform: translateX(-50%); gap: calc(var(--u) * 4); }
-html.m #hud-bc .ab { pointer-events: auto; touch-action: none; width: calc(var(--u) * 40); height: calc(var(--u) * 40); font-size: calc(var(--u) * 20); border-radius: 9px; }
-html.m #hud-bc .ab.small { width: calc(var(--u) * 34); height: calc(var(--u) * 34); font-size: calc(var(--u) * 17); }
 html.m #ability-row, html.m #item-row { gap: calc(var(--u) * 6); }
 html.m .ab .key { display: none; }
 html.m .ab .cdt { font-size: calc(var(--u) * 14); }

@@ -122,11 +122,13 @@
       opts: () => [
         { icon: '📥', label: '全額預ける', sub: `🪙${fmt(coins())} を預金`, disabled: coins() < 1, run: () => { GM.run.bank = (GM.run.bank || 0) + coins(); GM.run.coins = 0; G.sfx.coins(5); return { reopen: true }; } },
         { icon: '📥', label: '半分預ける', sub: `🪙${fmt(Math.floor(coins() / 2))} を預金`, disabled: coins() < 2, run: () => { const v = Math.floor(coins() / 2); GM.run.bank = (GM.run.bank || 0) + v; GM.run.coins -= v; G.sfx.coins(3); return { reopen: true }; } },
-        { icon: '📤', label: '全額引き出す', sub: `🏦${fmt(GM.run.bank || 0)} を受け取る`, disabled: !(GM.run.bank > 0), run: () => { gain(GM.run.bank, '払い戻し'); GM.run.bank = 0; return { reopen: true }; } },
+        { icon: '📤', label: '全額引き出す', sub: `🏦${fmt(GM.run.bank || 0)} を受け取る`, disabled: !(GM.run.bank > 0), run: () => { gain(GM.run.bank, '払い戻し'); GM.run.bank = 0; GM.run.bankUp = 0; return { reopen: true }; } },
       ],
     }, '#80e0c0');
   };
   R2.onAreaClear = function () {
+    // money left in the bank draws you back: every area its door gets a little likelier (no limit), until you take the money out
+    if (GM.run.bank > 0) GM.run.bankUp = (GM.run.bankUp || 0) + 1;
     if (GM.run.bank > 0) { const it = Math.round(GM.run.bank * 0.08); GM.run.bank += it; G.ui.feed(`🏦 利息 +${fmt(it)}（預金 ${fmt(GM.run.bank)}）`); }
     if (GM.run.merc && GM.run.merc.left > 0) { GM.run.merc.left--; if (GM.run.merc.left <= 0) { const m = GM.run.merc; rosterSave(m); G.ui.toast(`🛡️ 傭兵の契約が満了した（Lv${m.lv} は名簿に残る）`, 'warn'); GM.run.merc = null; } }
   };

@@ -214,6 +214,13 @@
     };
 
     // ---------------- the gates ----------------
+    // which doors appear can depend on a player's own bank: everyone takes the host's
+    const rg = G.Areas.rollGates;
+    G.Areas.rollGates = function (n) {
+      if (K.role === 'host') { const l = rg.call(G.Areas, n); if (K.live) K.send({ t: 'gt', n, l }); return l; }
+      return K._gates && K._gates.n === n ? K._gates.l : rg.call(G.Areas, n);
+    };
+    K.handlers.gt = function (m) { K._gates = m; };
     // The game's own check would take whoever steps into an open gate on alone, so its boxes are emptied here and kept aside; the check is done below for everyone.
     const prep = () => {
       for (const t of G.world.triggers) if (t.kind === 'exit' && !t._r) { t._r = { x0: t.x0, x1: t.x1, z0: t.z0, z1: t.z1 }; t.x0 = 1e9; t.x1 = -1e9; }

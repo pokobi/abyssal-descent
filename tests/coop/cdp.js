@@ -39,7 +39,7 @@ exports.launch = async function (port) {
       await send('Page.addScriptToEvaluateOnNewDocument', { source: "try{const k='abyssal_descent_save_v1';const d=JSON.parse(localStorage.getItem(k)||'{}');d.settings=Object.assign(d.settings||{},{volume:0});"+(process.env.COOP_HARD?"d.records=d.records||{};d.records.clears={hard:1};":"")+"localStorage.setItem(k,JSON.stringify(d));}catch(e){}" });
       await send('Page.navigate', { url });
       return {
-        errs,
+        errs, send,
         async eval(expr) {
           const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true, allowUnsafeEvalBlockedByCSP: true });
           if (r.result.exceptionDetails) throw new Error((r.result.exceptionDetails.exception && r.result.exceptionDetails.exception.description) || r.result.exceptionDetails.text);

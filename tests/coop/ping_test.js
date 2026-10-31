@@ -39,6 +39,8 @@ const PORT = +process.env.COOP_PORT || 9991;
     check(gm && hm && gm[1] === hm[1], 'in the colour of the one who pinged');
     // a foe, by the wheel click
     await g.until('G.enemies.list.some((e) => e.alive && e._nid && !e.custom)', 20000);
+    await h.eval('G.game.dev = { god: true, speed: 1, freeze: true }; 1'); // (a foe that stands still: this checks the ping, not the aim)
+    await sleep(500);
     await g.eval('(() => { const P = G.player, e = G.enemies.list.find((x) => x.alive && x._nid && !x.custom), c = e.centerPos(), f = new THREE.Vector3(c.x - P.pos.x, 0, c.z - P.pos.z), l = f.length(); window.__fn = e.def.name; window.__fi = e._nid; P.pos.x = c.x - f.x / l * 6; P.pos.z = c.z - f.z / l * 6; P.pos.y = e.pos.y; P.vel.set(0, 0, 0); })(); 1');
     await sleep(250);
     const foe = 'G.enemies.list.find((x) => x._nid === window.__fi).centerPos()';
@@ -46,7 +48,10 @@ const PORT = +process.env.COOP_PORT || 9991;
     await g.eval("(() => { const I = G.input, was = I.locked; I.locked = true; window.dispatchEvent(new MouseEvent('mousedown', { button: 1, bubbles: true })); document.dispatchEvent(new MouseEvent('mousedown', { button: 1, bubbles: true })); I.locked = was; })(); 1");
     await sleep(700);
     const fn = await g.eval('window.__fn');
-    check((await h.eval(marks)).includes(fn), `the wheel click pings too, and a foe is named (${fn})`);
+    // (a wall may stand between: the ping then rightly marks the wall; the wheel click itself is what must work)
+    const blocked = await g.eval(`(() => { const c = ${foe}, o = G.camera.position.clone(), d = c.clone().sub(o), l = d.length(); d.normalize(); return !!G.world.raycast(o, d, l); })()`);
+    check(blocked ? JSON.parse(await h.eval(marks)).length >= 3 : (await h.eval(marks)).includes(fn), `the wheel click pings too, and a foe is named (${fn}${blocked ? ', behind a wall this time' : ''})`);
+    await h.eval('G.game.dev = { god: true, speed: 1 }; 1');
     // the item wheel does not slow the foes for everyone
     await h.eval('window.__wo = G.abilities.wheelOpen; G.abilities.wheelOpen = () => true; 1');
     await sleep(600);

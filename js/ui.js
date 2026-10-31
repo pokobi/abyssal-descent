@@ -635,6 +635,7 @@
       <div class="title-menu">
         ${G.game.slotsUsed() ? `<button class="btn primary" id="t-cont">▶ 続きから${G.game.slotsUsed() > 1 ? `（${G.game.slotsUsed()}件の記録）` : `（エリア ${G.game.loadRun(UI.firstUsedSlot()).area}）`}</button>` : ''}
         <button class="btn ${G.game.slotsUsed() ? '' : 'primary'}" id="t-start">⚔️ 深淵へ潜る${G.game.slotsUsed() ? '（新しく始める）' : ''}</button>
+        <button class="btn" id="t-mp">👥 協力プレイ（ベータ版）</button>
         <button class="btn" id="t-tut">📘 チュートリアル</button>
         <button class="btn" id="t-codex">📖 図鑑</button>
         <button class="btn" id="t-settings">⚙️ 設定</button>
@@ -662,6 +663,7 @@
       ], () => UI.title());
     };
     s.querySelector('#t-start').onclick = () => slotThen(newRun);
+    s.querySelector('#t-mp').onclick = () => { location.href = 'coop.html'; }; // its own page: nothing of it is loaded here
     const ct = s.querySelector('#t-cont'); if (ct) ct.onclick = () => { G.sfx.init(); G.sfx.ui('select'); UI.slotMenu(() => UI.title()); };
     s.querySelector('#t-codex').onclick = () => { G.sfx.init(); G.sfx.ui('open'); G.codex.open(() => UI.title()); };
     s.querySelector('#t-tut').onclick = () => tut();

@@ -254,8 +254,10 @@
       <label>名前<input id="cl-name" maxlength="12" value="${G.U.esc(name0)}" placeholder="名前"></label>
       <button id="cl-host">部屋を作る</button>
       <div class="cl-row"><input id="cl-code" maxlength="5" placeholder="部屋コード" value="${G.U.esc(join)}" style="text-transform:uppercase"><button id="cl-join">参加する</button></div>
-      <div class="cl-note">最大${K.MAX}人。ホストのPCで世界が動きます。ソロのセーブデータとは別に動き、途中保存はありません。</div></div>`;
+      <div class="cl-note">最大${K.MAX}人。ホストのPCで世界が動きます。ソロのセーブデータとは別に動き、途中保存はありません。</div>
+      <button id="cl-solo">↩ ソロのタイトルへ戻る</button></div>`;
     const nm = () => { const v = (body.querySelector('#cl-name').value || '').trim() || 'プレイヤー'; try { localStorage.setItem('abyss_coop_name', v); } catch (e) { /* no storage */ } return v; };
+    body.querySelector('#cl-solo').onclick = () => { location.href = 'index.html'; };
     body.querySelector('#cl-host').onclick = () => K.open(N().code(), true, nm());
     body.querySelector('#cl-join').onclick = () => { const c = body.querySelector('#cl-code').value.trim().toUpperCase(); if (c.length !== 5) { err('5文字の部屋コードを入れてください'); return; } K.open(c, false, nm()); };
     K.lobbyErr = err;

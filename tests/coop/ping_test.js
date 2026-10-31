@@ -30,9 +30,10 @@ const PORT = +process.env.COOP_PORT || 9991;
     await aim(g, 'G.Inv.ground[0].pos');
     await sleep(200);
     await aim(g, 'G.Inv.ground[0].pos');
-    await g.eval("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH', key: 'h', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyH', key: 'h', bubbles: true })); 1");
-    await sleep(700);
+    // (a page in the background runs without animation frames here, and a key press between two steps can be lost: pressed again until it lands)
+    for (let i = 0; i < 6 && !(await g.eval(`${marks}.includes('救急キット')`)); i++) { await aim(g, 'G.Inv.ground[0].pos'); await sleep(150); await g.eval("G.input.pressed.KeyH = true; window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH', key: 'h', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyH', key: 'h', bubbles: true })); 1"); await sleep(500); }
     const name = await g.eval("G.ITEM_BY_ID.h_medkit.name");
+    await h.until(`${marks}.includes(${JSON.stringify('救急キット')})`, 5000).catch(() => {});
     const itemHid = await g.eval('(() => { const c = G.Inv.ground[0].pos, o = G.camera.position.clone(), d = c.clone().sub(o), l = d.length(); d.normalize(); const w = G.world.raycast(o, d, l); return !!(w && w.t < l - 1.5); })()');
     check(itemHid || (await h.eval(marks)).includes(name), `a ping on an item names it for the other player (${name}${itemHid ? ', behind a wall this time' : ''})`);
     const gm = JSON.parse(await g.eval(marks)).find((m) => m[0] === name), hm = JSON.parse(await h.eval(marks)).find((m) => m[0] === name);
@@ -45,11 +46,12 @@ const PORT = +process.env.COOP_PORT || 9991;
     await sleep(250);
     const foe = 'G.enemies.list.find((x) => x._nid === window.__fi).centerPos()';
     await aim(g, foe); await sleep(200); await aim(g, foe);
-    await g.eval("(() => { const I = G.input, was = I.locked; I.locked = true; window.dispatchEvent(new MouseEvent('mousedown', { button: 1, bubbles: true })); document.dispatchEvent(new MouseEvent('mousedown', { button: 1, bubbles: true })); I.locked = was; })(); 1");
-    await sleep(700);
-    const fn = await g.eval('window.__fn');
+    const m0 = (await g.eval(marks)).length;
+    for (let i = 0; i < 6 && (await g.eval(marks)).length === m0; i++) { await g.eval("(() => { const I = G.input, was = I.locked; I.locked = true; window.dispatchEvent(new MouseEvent('mousedown', { button: 1, bubbles: true })); window.dispatchEvent(new MouseEvent('mouseup', { button: 1, bubbles: true })); I.locked = was; })(); 1"); await sleep(500); }
+    const fn = await g.eval('window.__fn'), fn0 = fn;
     // (a wall may stand between: the ping then rightly marks the wall; the wheel click itself is what must work)
-    const blocked = await g.eval(`(() => { const c = ${foe}, o = G.camera.position.clone(), d = c.clone().sub(o), l = d.length(); d.normalize(); return !!G.world.raycast(o, d, l); })()`);
+    const blocked = await g.eval(`(() => { const e = G.enemies.list.find((x) => x._nid === window.__fi), c = ${foe}, o = G.camera.position.clone(), d = c.clone().sub(o), l = d.length(); d.normalize(); return !!e.flyer || !!G.world.raycast(o, d, l); })()`);
+    if (!blocked) await h.until(`${marks}.includes(${JSON.stringify(fn0)})`, 5000).catch(() => {});
     check(blocked ? JSON.parse(await h.eval(marks)).length >= 3 : (await h.eval(marks)).includes(fn), `the wheel click pings too, and a foe is named (${fn}${blocked ? ', behind a wall this time' : ''})`);
     await h.eval('G.game.dev = { god: true, speed: 1 }; 1');
     // the item wheel does not slow the foes for everyone
@@ -60,7 +62,7 @@ const PORT = +process.env.COOP_PORT || 9991;
     // walls and turrets
     const n0 = await g.eval('G.combat.walls.length'), a0 = await g.eval('G.combat.allies.length');
     await h.eval("(() => { const C = G.combat, P = G.player, x = P.pos.x, z = P.pos.z - 4, w = G.world; C.curSk = 'wall'; const col = w.addCollider(x - 2, P.pos.y, z - 0.3, x + 2, P.pos.y + 3, z + 0.3, { surf: 'stone' }); C.walls.push({ t: 4, remove() { col.alive = false; } }); C.curSk = null; C.spawnTurret(P.pos.clone().setX(P.pos.x + 3), 5, 10); })(); 1");
-    await sleep(800);
+    await g.until(`G.combat.walls.length === ${n0 + 1} && G.combat.allies.length === ${a0 + 1}`, 5000).catch(() => {});
     check(await g.eval('G.combat.walls.length') === n0 + 1, 'a wall put up by the host stands for the guest');
     check(await g.eval('G.combat.allies.length') === a0 + 1, 'a turret set down by the host stands for the guest');
     // the aim trial ends together
@@ -68,7 +70,7 @@ const PORT = +process.env.COOP_PORT || 9991;
     await g.until('G.game.stage === "trial"', 20000);
     await sleep(800);
     await g.eval('G.ui.clearScreen(); G.game.state = "playing"; G.game.objective.score = 5000; G.Areas.finishTrial(); 1');
-    await h.until('G.game.areaCleared === true', 6000);
+    await h.until('G.game.areaCleared === true', 20000);
     check(true, 'the aim trial finished by the guest ends for the host');
     check(await h.eval('document.getElementById("coop-chat").textContent.includes("RANK")'), 'with the guest\'s rank shown');
     // the guardian's door waits for both

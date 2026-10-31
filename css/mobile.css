@@ -42,6 +42,11 @@ html.m-inv #m-close { display: block; }
 #m-tiles .ab .ulttag { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); font-size: 8px; font-weight: 900; letter-spacing: 1px; padding: 0 4px; border-radius: 3px; background: rgba(60,40,10,0.95); color: #ffd070; z-index: 3; }
 #m-tiles .ab .cnt { font-size: 10px; }
 html.m #hud-bc { pointer-events: none; }
+/* the iPhone's "add to home screen" note */
+#m-hometip { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 400; width: min(86vw, 560px); display: flex; flex-direction: column; gap: 4px; padding: 7px 12px; background: rgba(14,11,8,0.95); border: 1px solid rgba(255,200,80,0.55); border-radius: 6px; font: 500 12px/1.45 'Noto Sans JP', sans-serif; color: #e8d6b0; }
+#m-hometip b { color: #ffd27a; font-size: 13px; }
+#m-hometip div { display: flex; gap: 8px; justify-content: flex-end; }
+#m-hometip button { padding: 4px 12px; border-radius: 4px; font: inherit; font-weight: 700; background: rgba(14,11,8,0.96); border: 1px solid rgba(220,190,130,0.4); color: #ffe2a0; }
 /* the layout editor */
 #m-edit { position: fixed; inset: 0; z-index: 600; background: rgba(6,5,4,0.72); touch-action: none; font-family: 'Noto Sans JP', sans-serif; color: #e8d6b0; }
 #me-bar { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); transition: opacity .15s; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: center; width: min(62vw, 560px); padding: 5px 8px; background: rgba(14,11,8,0.94); border: 1px solid rgba(220,190,130,0.34); border-radius: 6px; font-size: 11px; z-index: 2; }

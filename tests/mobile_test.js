@@ -11,8 +11,23 @@ const PORT = +process.env.COOP_PORT || 9981;
   try {
     const pc = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await pc.until("window.G && G.game && G.game.state === 'title'", 90000);
+    check(await pc.eval('!document.getElementById("m-hometip")'), 'a PC page shows no iPhone note');
     check(await pc.eval('!document.getElementById("m-ui") && !window.__mobile && !document.getElementById("m-tiles")'), 'a PC page has none of the phone layer');
     await pc.close();
+    // iPhone: the page declares itself a home-screen app, and Safari is told how to get there
+    const ip = await ch.page('about:blank');
+    await ip.send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
+    await ip.send('Page.navigate', { url: `http://127.0.0.1:${PORT}/index.html` });
+    await ip.until("window.G && G.game && G.game.state === 'title' && window.__mobile", 90000);
+    await ip.until('!!document.getElementById("m-hometip")', 5000).catch(() => {});
+    check(await ip.eval('!!document.getElementById("m-hometip") && document.getElementById("m-hometip").textContent.includes("ホーム画面に追加")'), 'iPhone Safari is told how to play fullscreen');
+    check(await ip.eval('!!document.querySelector("link[rel=manifest]") && document.querySelector("meta[name=apple-mobile-web-app-capable]").content === "yes"'), 'the page can run as a home-screen app');
+    check((await ip.eval('fetch("manifest.webmanifest").then((r) => r.json()).then((m) => m.display)')) === 'fullscreen', 'the app manifest is served');
+    check((await ip.eval('fetch("icons/icon-180.png").then((r) => r.status)')) === 200, 'with its icon');
+    await ip.eval('document.querySelector("#m-hometip [data-a=never]").click(); 1');
+    await sleep(800);
+    check(await ip.eval('!document.getElementById("m-hometip") && G.save.data.settings.mNoHomeTip === 1'), 'and it stays away once dismissed');
+    await ip.close();
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?mobile=1`);
     await p.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await p.until("window.G && G.game && G.game.state === 'title' && window.__mobile", 90000);

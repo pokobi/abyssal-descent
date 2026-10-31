@@ -366,5 +366,19 @@
     p.insertAdjacentHTML('afterend', '<button class="btn" id="m-layout" style="width:100%;margin-bottom:8px">📱 ボタン配置・UIサイズ</button>');
     doc.getElementById('m-layout').onclick = () => editor(() => G.ui.settings(back));
   };
+  // ---- iPhone: Safari cannot go fullscreen, an app added to the home screen can. Said once on the title screen, until dismissed ----
+  const isIPhone = /iPhone|iPod/.test(navigator.userAgent), standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
+  let tip = null;
+  function homeTip() {
+    if (!isIPhone || standalone) return;
+    const S = opts(), on = GMr() && GMr().state === 'title' && !S.mNoHomeTip && !doc.querySelector('#screens .panel');
+    if (on && !tip) {
+      tip = doc.createElement('div'); tip.id = 'm-hometip';
+      tip.innerHTML = '<b>全画面で遊ぶには</b><span>Safariの共有ボタン（□↑）→「ホーム画面に追加」→ 追加したアイコンから起動。<br>Safariとは記録が別になることがあります。</span><div><button data-a="later">閉じる</button><button data-a="never">今後表示しない</button></div>';
+      tip.addEventListener('click', (e) => { const a = e.target.dataset && e.target.dataset.a; if (!a) return; if (a === 'never') { S.mNoHomeTip = 1; G.save.write(); } tip.remove(); tip = 0; });
+      doc.body.appendChild(tip);
+    } else if (!on && tip) { tip.remove(); tip = null; }
+  }
+  setInterval(homeTip, 500);
   window.__mobile = { kd, ku, tapKey, releaseAll, layout, editor };
 })();

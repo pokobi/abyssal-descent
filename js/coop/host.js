@@ -198,7 +198,7 @@
       setTimeout(() => { try { GM.enterArea(n, kind); } catch (e) { console.error(e); } (GM._warmP || Promise.resolve()).then(() => { GM.transitioning = false; document.getElementById('fade').classList.remove('on'); }); }, 650);
     };
     K.handlers.gate = (m) => K.go(m.n, m.kind);
-    K.handlers.engage = () => { if (!GM.bossEngaged && !P.dead && G.world.arenaCenter) { P.pos.z = Math.min(P.pos.z, (G.world.ledgeZ ? G.world.ledgeZ : G.world.arenaD) - 4); P.pos.x = G.world.arenaCenter.x; K.msg('仲間が守護者の間へ入った'); } };
+    K.handlers.engage = () => K.toHall();
     K.begin = function () {
       K.started();
       K.send({ t: 'go' });
@@ -259,7 +259,7 @@
       if (GM.bossEngaged && !K._engaged) { K._engaged = true; K.send({ t: 'engage' }); }
     };
     // one foe as a newcomer is told of it
-    const esRow = (e) => [e._nid, e.def.id, e.level, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), e.maxHp, Math.round(e.shield), e.maxShield, e.elite ? 1 : 0, r2(e.model.scale / (e.elite ? 1.15 : 1)), e.def.name, (e.noReward ? 1 : 0) | (e.noLoot ? 2 : 0) | (e.bossSpawn ? 4 : 0) | (e.cursed ? 8 : 0) | (e.champion ? 16 : 0) | (e.marked ? 32 : 0), e.mut ? e.mutCol || 0xffffff : 0];
+    const esRow = (e) => [e._nid, e.def.id, e.level, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), e.maxHp, Math.round(e.shield), e.maxShield, e.elite ? 1 : 0, r2(e.model.scale / (e.elite ? 1.15 : 1)), e.def.name, (e.noReward ? 1 : 0) | (e.noLoot ? 2 : 0) | (e.bossSpawn ? 4 : 0) | (e.cursed ? 8 : 0) | (e.champion ? 16 : 0) | (e.marked ? 32 : 0) | (e.graveSpawn ? 64 : 0), e.mut ? e.mutCol || 0xffffff : 0];
     // ---------------- someone joins a run under way (or comes back after losing the connection, with what they carried when last seen) ----------------
     K.saved = {};
     K.handlers.sv = function (m, from) { const rp = K.players.get(from); if (rp) K.saved[rp.name] = m.d; };
@@ -272,6 +272,7 @@
       if (list.length) K.send({ t: 'es', a: list }, from);
       if (BS.active && !BS.active.dead && K._bs) { K.send(K._bs, from); K._bossLast = []; K.resendBossObjs(from); }
       if (GM.bossEngaged) K.send({ t: 'engage' }, from);
+      else if (G.world._hallOpen) K.send({ t: 'hall' }, from);
       if (GM.areaCleared) K.send({ t: 'clear', boss: GM.stage === 'boss' ? 1 : 0 }, from);
       K.catchUp(from);
     };

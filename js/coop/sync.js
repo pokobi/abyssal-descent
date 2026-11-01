@@ -203,6 +203,8 @@
     // ---------------- the aim trial: everyone shoots at their own targets, the round ends for all at once, and the scores are shown ----------------
     const ft = G.Areas.finishTrial;
     G.Areas.finishTrial = function () {
+      // (the game takes its clock down only when your own time runs out; here the round can end because someone else's did)
+      G.ui.trialClock(-1);
       const O = GM.objective, r = ft.call(G.Areas);
       if (K.live && O) { K.feed(`🎯 ${U.esc(K.name)}: RANK ${O.rank || '-'}（${U.fmt(O.score || 0)}）`, true); if (!K._net) K.send({ t: 'trd', n: K.name, s: O.score, r: O.rank }); }
       return r;
@@ -211,6 +213,16 @@
       if (K.role === 'host') K.relay(m, from);
       K.feed(`🎯 ${U.esc(m.n)}: RANK ${m.r || '-'}（${U.fmt(m.s || 0)}）`, true);
       if (GM.stage === 'trial' && !GM.areaCleared) { K._net = true; try { G.Areas.finishTrial(); } finally { K._net = false; } }
+    };
+
+    // ---------------- graves: whoever wakes one, the foe is the host's to raise, and the grave is gone for everyone ----------------
+    const gt0 = G.Graves.trigger;
+    G.Graves.trigger = function (o) { gt0.call(G.Graves, o); if (K.live && !K._net) K.send({ t: 'grv', i: o.i, a: GM.area }); };
+    K.handlers.grv = function (m, from) {
+      if (K.role === 'host') K.relay(m, from);
+      if (m.a !== GM.area) return;
+      const o = G.Graves.list.find((q) => q.i === m.i && !q.used); if (!o) return;
+      K._net = true; try { G.Graves.trigger(o); } finally { K._net = false; }
     };
 
     // ---------------- the gates ----------------
@@ -239,11 +251,24 @@
     // the guardian's hall opens the same way: everyone in front of its door first (an unseen wall until then)
     const hallZ = (w) => (w.ledgeZ ? w.ledgeZ - 1 : w.arenaD - 2);
     const hallDoor = (w) => {
-      if (GM.stage !== 'boss' || !w.arenaD || GM.bossEngaged || w._hall) return;
+      if (GM.stage !== 'boss' || !w.arenaD || GM.bossEngaged || w._hall || w._hallOpen) return;
       const z = hallZ(w);
       w._hall = w.addCollider(0, -40, z - 0.3, w.W, 80, z + 0.3, { surf: 'metal', noGrapple: true, navIgnore: true });
     };
-    const hallOpen = (w) => { if (w._hall) { w._hall.alive = false; w._hall = null; } };
+    const hallOpen = (w) => { w._hallOpen = true; if (w._hall) { w._hall.alive = false; w._hall = null; } }; // (for good: a wall put back around people walking through traps them inside it)
+    // Someone else stepped in first: you are brought along, onto real floor with nothing in the way (the road runs far below the arena, so moving you only sideways would leave you inside the ground).
+    K.toHall = function () {
+      const w = G.world;
+      if (GM.bossEngaged || P.dead || !w.arenaCenter) return;
+      const x0 = w.arenaCenter.x, z0 = (w.ledgeZ ? w.ledgeZ : w.arenaD) - 4;
+      let at = null;
+      for (let d = 0; d < 24 && !at; d += 2) for (const dx of [0, -2, 2, -4, 4]) {
+        const x = x0 + dx, z = z0 - d, y = w.floorBelow(x, 3, z);
+        if (y > -1.5 && w.boxFree(x - 0.6, y + 0.05, z - 0.6, x + 0.6, y + 2, z + 0.6)) { at = [x, y, z]; break; }
+      }
+      P.pos.set(...(at || [x0, 0.2, z0])); P.vel.set(0, 0, 0); P.grounded = true;
+      K.msg('仲間が守護者の間へ入った');
+    };
     K.handlers.hall = function () { if (G.world) hallOpen(G.world); };
     K.handlers.at = function (m, from) {
       const rp = K.players.get(from); if (!rp) return;
@@ -273,7 +298,7 @@
       if (G.world !== lastWorld) { lastWorld = G.world; prep(); at = null; for (const p of K.players.values()) p.at = null; }
       hallDoor(G.world);
       if (GM.bossEngaged) hallOpen(G.world);
-      if (GM.area !== lastArea) { lastArea = GM.area; for (const id of Object.keys(locks)) delete locks[id]; hold = null; pending = null; if (K.clearViz) K.clearViz(); }
+      if (GM.area !== lastArea) { lastArea = GM.area; for (const id of Object.keys(locks)) delete locks[id]; hold = null; pending = null; G.ui.trialClock(-1); if (K.clearViz) K.clearViz(); }
       const me = K.players.get(K.id);
       const want = !P.dead && !GM.transitioning ? gateAt(P.pos) : null;
       if (want !== at) {

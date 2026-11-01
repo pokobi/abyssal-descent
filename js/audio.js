@@ -78,6 +78,8 @@
   function dest(pos, wet, bus) {
     const g = ctx.createGain();
     let out = g;
+    // (a position that is not a number must not take the whole frame down: the sound just plays unplaced)
+    if (pos && !Number.isFinite(pos.x + pos.y + pos.z + A.listener.x + A.listener.y + A.listener.z)) pos = null;
     if (pos) {
       const L = A.listener;
       const dx = pos.x - L.x, dy = pos.y - L.y, dz = pos.z - L.z;

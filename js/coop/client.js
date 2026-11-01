@@ -145,7 +145,7 @@
         let e;
         try { e = E.spawn(def, lvl, V(x, y, z), { elite: !!el, scale: sc, noSplit: true, noReward: !!(fl & 1), noLoot: !!(fl & 2) }); } finally { spawning = false; }
         e._rep = true; e._nid = id; e.yaw = yaw; e.hp = hp; e.maxHp = mx; e.shield = sh; e.maxShield = msh;
-        e.bossSpawn = !!(fl & 4); e.cursed = !!(fl & 8); e.champion = !!(fl & 16); e.marked = !!(fl & 32);
+        e.bossSpawn = !!(fl & 4); e.cursed = !!(fl & 8); e.champion = !!(fl & 16); e.marked = !!(fl & 32); e.graveSpawn = !!(fl & 64);
         if (name !== def.name) e.def = Object.assign({}, e.def, { name });
         e.revived = true; e.eliteMod = null; e.split = false; e.state = 'chase';
         if (e.cursed && e.makeCurseRing) e.makeCurseRing(0x9a30ff);
@@ -250,12 +250,7 @@
     // a fight that drags on grows frantic for everyone (the host keeps the clock)
     K.handlers.en = function (m) { const E0 = GM.enrage; if (m.lv > E0.lv) G.ui.toast(`🔥 戦いが長引いている — 敵が激化した（激化 Lv${m.lv}）`, 'warn'); E0.lv = m.lv; E0.dmg = m.d; E0.tm = m.tm; };
     K.handlers.clear = function (m) { if (GM.stage === 'trial') { if (!GM.areaCleared) { K._net = true; try { G.Areas.finishTrial(); } finally { K._net = false; } } return; } if (!GM.areaCleared) GM.clearArea(m.boss ? { boss: true } : {}); };
-    K.handlers.engage = function () {
-      const w = G.world;
-      if (GM.bossEngaged || P.dead || !w.arenaCenter) return;
-      P.pos.z = (w.ledgeZ ? w.ledgeZ : w.arenaD) - 4; P.pos.x = w.arenaCenter.x; P.vel.set(0, 0, 0);
-      K.msg('仲間が守護者の間へ入った');
-    };
+    K.handlers.engage = () => K.toHall();
     K.handlers.wipe = function () { K.ended('全滅', `エリア ${GM.area} で倒れた`); };
     // ---------------- the guardian as a puppet ----------------
     const bs = BS.start, bu = BS.update;

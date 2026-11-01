@@ -884,7 +884,7 @@
     GM.areaKills++;
     const O = GM.objective;
     if (e.def.id === 'mimic_gold') {
-      const v = 160 + GM.area * 25;
+      const v = Math.round(G.Run.income(160 + GM.area * 25));
       G.combat.coins(v, e.centerPos());
       G.ui.feed(`💰 黄金のミミック撃破！ +${v}`, 'big');
       if (Math.random() < 0.6) { const it = U.pick(G.ITEMS.filter((i) => i.rarity !== 'legendary')); if (P.addItem(it.id, 1)) { G.ui.toast(`${it.icon} ${it.name} を手に入れた`, 'good'); G.ui.gain(it); } }
@@ -1121,12 +1121,12 @@
       let base = bossKill ? 420 + n * 45 : 110 + n * 18;
       if (stage === 'cursed') base *= 2;
       if (stage === 'elite') base *= 1.4;
-      G.combat.coins(Math.round(base), null, 'エリアクリア');
+      G.combat.coins(Math.round(G.Run.income(base)), null, 'エリアクリア');
     }
     const par = 45 + (O && O.total ? O.total * 3 : 40);
-    if (!bossKill && stage !== 'trial' && t < par) { const b = Math.round((60 + n * 8) * (P.has('e_speedrun') ? 2 : 1)); setTimeout(() => { G.combat.coins(b, null, '速攻'); G.ui.feed(`⏱ 速攻ボーナス +${b}`, 'big'); }, 500); }
+    if (!bossKill && stage !== 'trial' && t < par) { const b = Math.round(G.Run.income((60 + n * 8) * (P.has('e_speedrun') ? 2 : 1))); setTimeout(() => { G.combat.coins(b, null, '速攻'); G.ui.feed(`⏱ 速攻ボーナス +${b}`, 'big'); }, 500); }
     const flawless = GM.areaDamage <= 0;
-    if (flawless && stage !== 'trial') { const b = Math.round((80 + n * 10) * (P.has('e_flawless') ? 2 : 1)); setTimeout(() => { G.combat.coins(b, null, '無傷'); G.ui.feed(`🏅 無傷ボーナス +${b}`, 'big'); }, 900); }
+    if (flawless && stage !== 'trial') { const b = Math.round(G.Run.income((80 + n * 10) * (P.has('e_flawless') ? 2 : 1))); setTimeout(() => { G.combat.coins(b, null, '無傷'); G.ui.feed(`🏅 無傷ボーナス +${b}`, 'big'); }, 900); }
     G.buffs.emit('onAreaClear', { flawless, time: t });
     if (stage !== 'trial') G.ui.banner(bossKill && G.Run.isLast(GM.area) ? 'FALLEN' : 'AREA CLEAR', bossKill ? (G.Run.isLast(GM.area) ? '— 最後の守護者は倒れた —' : '— 守護者は倒れた —') : '— 次の道を選べ —');
     G.sfx.ui('clear');
@@ -1197,7 +1197,7 @@
       const g = w.groundAt(V(pt.x, pt.y + 0.5, pt.z), 0.4, 2);
       if (g > -Infinity && w.boxFree(pt.x - 0.7, g + 0.05, pt.z - 0.7, pt.x + 0.7, g + 1, pt.z + 0.7)) { G.Props.chest(w, pt.x, pt.z, g, P.yaw, tier); w.flushDeferred(); G.fx.smoke(pt, 8, 1, 0x8a7a50, 0.5, 1); G.sfx.coins(4); return true; }
     }
-    G.combat.coins(150 + GM.area * 20, null, '宝'); return false;
+    G.combat.coins(Math.round(G.Run.income(150 + GM.area * 20)), null, '宝'); return false;
   };
   GM.giveWeapon = function (id) {
     const wd = G.WEAPON_BY_ID[id];
@@ -1386,7 +1386,9 @@
   const BUFF_PRICE = { common: 260, uncommon: 380, rare: 560, epic: 820, legendary: 1200 };
   // prices creep up with depth (income does too) so late coins don't pile up unspent
   GM.price = function (base) { return Math.max(0, Math.round(base * Math.max(0.3, 1 - P.stats.shopDiscount) * (1 + GM.run.shopVisits * 0.05) * (1 + 0.03 * Math.max(0, (GM.area || 1) - 1)) / 10) * 10); };
-  function rollRarity(r, luck) { return r.weighted(G.RARITY_ORDER, (k) => G.rarityWeight(k, GM.area, luck)); }
+  // while a shop is being stocked its rarity is judged a few areas deeper (easy / normal, the early fields: see Run.shopRarityBonus); drops and chests are not
+  GM._rb = 0;
+  function rollRarity(r, luck) { return GM._rb ? r.weighted(G.RARITY_ORDER, (k) => G.rarityWeightD(k, G.Run.depthArea(GM.area) + GM._rb, luck)) : r.weighted(G.RARITY_ORDER, (k) => G.rarityWeight(k, GM.area, luck)); }
   function pickBy(r, arr, luck) {
     const rar = rollRarity(r, luck);
     let c = arr.filter((o) => o.rarity === rar);
@@ -1472,7 +1474,8 @@
     const fr = S.offers.find((o) => o.free);
     if (fr) setTimeout(() => { if (GM.shop === S && !fr.sold) { G.ui.toast(`🎁 常連客特典：${fr.obj.icon} ${fr.obj.name} が無料！ 緑に光る台を探せ`, 'good'); G.sfx.ui('rare'); } }, 2400);
   };
-  GM.fillShop = function () {
+  GM.fillShop = function () { GM._rb = G.Run.shopRarityBonus(GM.area); try { fillShopBody(); } finally { GM._rb = 0; } };
+  function fillShopBody() {
     const S = GM.shop, w = S.w;
     const r = new G.RNG((GM.seed ^ U.hashStr('shop' + GM.area + ':' + S.rerolls)) >>> 0);
     const luck = P.stats.luck;
@@ -1510,7 +1513,7 @@
     if (G.Run.revivesAllowed() && r.chance(0.16 + Math.min(0.1, GM.area * 0.004))) { const o = offers.find((x) => x.kind === 'buff' && x.obj.cat !== 'pile'); if (o) { o.kind = 'revive'; o.obj = GM.REVIVE; o.price = GM.revivePrice(); o.free = false; } }
     S.offers = offers;
     for (const o of offers) buildPedestal(o, w);
-  };
+  }
   GM.buildPedestal = buildPedestal;
   function buildPedestal(o, w) {
     const g = new THREE.Group();
@@ -1958,7 +1961,7 @@
     const tier = it.tier;
     G.sfx.mech('boltBack'); G.sfx.stoneGrind(it.pos, 0.4);
     const n = GM.area;
-    let coins = Math.round((40 + n * 9) * ([1, 2.2, 4, 7][tier] || 4) * (1 + P.stats.chestBonus));
+    let coins = Math.round(G.Run.income((40 + n * 9) * ([1, 2.2, 4, 7][tier] || 4) * (1 + P.stats.chestBonus)));
     setTimeout(() => {
       G.combat.coins(coins, it.pos.clone().add(V(0, 0.6, 0)));
       G.fx.sparks(it.pos.clone().add(V(0, 0.6, 0)), V(0, 1, 0), 30, tier >= 3 ? 0xff78e8 : 0xffd070, 6);

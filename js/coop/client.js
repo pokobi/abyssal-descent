@@ -308,7 +308,7 @@
       b.holes = b.holes || [];
       try { b.spawnHole(); const h = b.holes[b.holes.length - 1]; h.c.set(...m.c); h.g.position.copy(h.c); } catch (e) { console.error(e); }
     };
-    K.handlers.bdead = function () { const b = BS.active; K.clearBossObjs(); if (b && !b.dead) { b.hp = 0; b.kill(); } };
+    K.handlers.bdead = function (m) { const b = BS.active; K.clearBossObjs(); K._bossIds = m && m.ids; if (b && !b.dead) { b.hp = 0; b.kill(); } };
     function applyFloor(t, s, tm, y0) {
       if (!t) return;
       if (s === 'warn') { t.state = 'warn'; t.warn = t.timer = Math.max(0.1, tm); t.rot = t.rot || 1; }

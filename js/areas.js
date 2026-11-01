@@ -233,7 +233,7 @@
     O.rank = rank;
     const coins = Math.round(Math.min(O.score / 45, 260 + GM.area * 35));
     G.ui.banner(`RANK ${rank}`, `スコア ${U.fmt(O.score)} ／ 命中 ${O.hits} ／ 最大コンボ ${O.best}`, false, true);
-    G.combat.coins(coins, null, '射的報酬');
+    G.combat.coins(Math.round(G.Run.income(coins)), null, '射的報酬');
     if (rank === 'B') { const it = U.pick(G.ITEMS.filter((x) => G.RARITY[x.rarity].tier <= 2)); if (P.addItem(it.id, 1)) { G.ui.toast(`${it.icon} ${it.name} を手に入れた`, 'good'); G.ui.gain(it); } }
     GM.clearArea({ reward: rank === 'S' ? 'boost' : rank === 'A' ? 'buff' : 'none', noBase: true });
   };

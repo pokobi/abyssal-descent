@@ -24,14 +24,50 @@
   R.isPrep = (n) => n % R.CYCLE === R.CYCLE - 1;
   R.isLast = (n) => n >= R.areas();
   R.field = (n) => R.def().segs[R.seg(n)][0];
-  R.cap = (n) => R.def().segs[R.seg(n)][1];
+  // A number that differs from segment to segment (the foe cap, the strength exponent, the depth offset) is eased in over the 5 foe areas that follow a boundary
+  // instead of jumping at it. Only areas that bring ordinary foes count (the preparation area and the guardian that close a segment are not steps on the way:
+  // after the guardian the next area is the very next step), so the first 5 areas of a run, and the last of each segment, are never touched.
+  const ease = (t) => { t = Math.max(0, Math.min(1, t)); return 0.5 * t + 0.5 * t * t * (3 - 2 * t); }; // (half straight, half S-curve: steady steps, without a hard start)
+  R.foePos = function (n) {
+    n = Math.max(1, n);
+    if (R.isBoss(n)) n -= 2; else if (R.isPrep(n)) n -= 1; // (these stand where the last ordinary area of their segment stood)
+    return n - 2 * Math.min(R.def().segs.length - 1, Math.floor((n - 1) / R.CYCLE));
+  };
+  R.blend = function (n, vals) {
+    const p = R.foePos(n);
+    let v = vals[0];
+    for (let j = 1; j < vals.length; j++) v += (vals[j] - vals[j - 1]) * ease((p - 5 * j) / 5);
+    return v;
+  };
+  R.cap = (n) => R.blend(n, R.def().segs.map((s) => s[1]));
   // overall strength multiplier; extra n = 3 x 1.5^(n-1)
   R.baseMul = () => (R.cur.id === 'extra' ? 3 * Math.pow(1.5, R.cur.lv - 1) : R.def().mul);
-  // the first segment is never brutal: the multiplier is softened there, and comes in fully from segment 2 on
+  // the first segment is never brutal: the multiplier is softened there, and comes in fully from segment 2 on (eased in over the boundary)
+  const MUL_EXP = [0.35, 0.85, 1];
   R.mul = function (n) {
-    const m = R.baseMul(), s = R.seg(n);
+    const m = R.baseMul();
     if (m <= 1) return m;
-    return Math.pow(m, s === 0 ? 0.35 : s === 1 ? 0.85 : 1);
+    return Math.pow(m, R.blend(n, MUL_EXP));
+  };
+  // (the guardians keep the plain per-segment step: they are tuned one by one)
+  R.stepMul = function (n) {
+    const m = R.baseMul();
+    if (m <= 1) return m;
+    return Math.pow(m, MUL_EXP[Math.min(MUL_EXP.length - 1, R.seg(n))]);
+  };
+  // ---- the coin income: lean early (so a shop in the first fields can sell something good), back to 1x where drops (gold items) are rich on their own ----
+  // easy / normal 1.8x at area 1 down to 1.2x at area 14; hard 1.5x down to 1x by area 7 (its gold items turn rich from the second segment); extra 1x
+  R.incomeMul = function (n) {
+    n = Math.max(1, n || 1);
+    if (R.cur.id === 'extra') return 1;
+    if (R.cur.id === 'hard') return 1 + 0.5 * Math.max(0, 1 - (n - 1) / 6);
+    return 1.2 + 0.6 * Math.max(0, 1 - (n - 1) / 13);
+  };
+  R.income = (v) => v * R.incomeMul(G.game ? G.game.area : 1);
+  // the shops judge rarity as if deeper (epics show up from the early fields, legendaries stay late): easy / normal only, fading out by area 16
+  R.shopRarityBonus = function (n) {
+    if (R.cur.id !== 'easy' && R.cur.id !== 'normal') return 0;
+    return Math.max(0, Math.min(10, 10 * (1 - (n - 6) / 10)));
   };
   // enemy level: deeper difficulties start (and stay) at higher levels. Level already scales HP / damage, so the multipliers
   // below are divided by what the level offset adds, which keeps the overall toughness exactly as tuned.
@@ -40,8 +76,8 @@
   R.enemyLv = (n) => Math.max(1, n + R.lvOff());
   const fHp = (L) => (1 + 0.11 * L) * Math.pow(1.015, L), fDmg = (L) => 1 + 0.04 * L;
   // guardians keep their own level curve (area based), so they use the plain multipliers
-  R.bossHpMul = (n) => R.mul(n);
-  R.bossDmgMul = (n) => Math.pow(R.mul(n), 0.8);
+  R.bossHpMul = (n) => R.stepMul(n);
+  R.bossDmgMul = (n) => Math.pow(R.stepMul(n), 0.8);
   R.hpMul = (n) => Math.max(0.15, R.mul(n) * fHp(n - 1) / fHp(n - 1 + R.lvOff()));
   R.dmgMul = (n) => Math.max(0.15, Math.pow(R.mul(n), 0.8) * fDmg(n - 1) / fDmg(n - 1 + R.lvOff())); // damage climbs a little slower than toughness
   // the depth that decides the RARITY of drops (chests, corpses): hard / extra push their mutation depth far ahead of the area number,
@@ -57,7 +93,7 @@
   R.depthArea = function (n) {
     const D = R.def(), s = R.seg(n);
     if (R.cur.id === 'easy') return Math.floor(n * 0.6);
-    return n + (D.depth[s] || 0) + (R.cur.id === 'extra' ? 2 * R.cur.lv : 0);
+    return n + Math.round(R.blend(n, D.depth)) + (R.cur.id === 'extra' ? 2 * R.cur.lv : 0);
   };
 
   // ---- unlocks (saved): hard clear opens extra 1; extra n clear opens extra n+1 ----

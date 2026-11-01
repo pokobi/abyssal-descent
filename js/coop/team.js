@@ -25,6 +25,7 @@
   `;
   const el = (tag, id) => { const e = document.createElement(tag); if (id) e.id = id; document.body.appendChild(e); return e; };
   const colOf = (id) => COLS[id % COLS.length];
+  K.colOf = colOf;
 
   K.installTeam = function () {
     const GM = G.game, P = G.player, I = G.input, FX = G.fx;

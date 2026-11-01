@@ -1154,13 +1154,14 @@
     P().crate(w, pcx - 3.1, pz + 0.9, 0, rng); P().urn && P().urn(w, pcx + 3.0, pz + 0.9, 0, rng);
     w.sellPos = new THREE.Vector3(pcx, 1.2, pz - 1.4);
     w.pawnNpc = { x: pcx, z: pz + 0.8, ry: Math.PI };
-    // re-stock altar by the east wall, close to the door and well clear of the armour stall
-    const rcx = W - 3.5, rcz = D - 6.5;
+    // re-stock altar in the middle of the hall, beside the carpet a few steps in from the door (it used to sit in the far corner by the east wall)
+    const rcx = W / 2 + 6, rcz = D - 15.5;
     w.rerollPos = new THREE.Vector3(rcx, 0, rcz);
     w.solid('trim', rcx - 1, 0, rcz - 1, rcx + 1, 0.3, rcz + 1, { uv: 1 });
     w.solid('block', rcx - 0.6, 0.3, rcz - 0.6, rcx + 0.6, 1.0, rcz + 0.6, { uv: 1 });
     P().candles(w, rcx + 0.3, 1.0, rcz, rng, true);
-    P().label(w, '🔄 品揃えの入れ替え', rcx, 2.6, rcz, -Math.PI / 2, 3.6, { color: '#ffd8a0', size: 78 });
+    P().label(w, '🔄 品揃えの入れ替え', rcx - 0.3, 2.6, rcz + 0.5, -0.55, 3.6, { color: '#ffd8a0', size: 78 }); // (turned towards the door and the carpet, so it reads from both)
+    w.addLight(rcx, 3.2, rcz, { flame: 0, emit: false, intensity: 6, range: 7, color: '#ffd0a0', prio: 1.0, steady: true });
     // healing fountain by the west wall, close to the door and well clear of the parts stall
     const fxp = 3.4, fzp = D - 6.5;
     w.fountainPos = new THREE.Vector3(fxp, 0, fzp);

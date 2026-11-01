@@ -303,12 +303,12 @@
       if (e.elite && P.has('e_bounty')) base *= 2;
       if (P.has('k_combo')) base *= 1 + Math.min(1, (run.combo - 1) * 0.1);
       if (info.head) base += 3;
-      C.coins(Math.round(base), e.centerPos());
+      C.coins(Math.round(G.Run.income(base)), e.centerPos());
       if (Math.random() < 0.09 + P.stats.healDrop) C.spawnPickup('orb', e.centerPos(), 15);
       if (run.multi >= 2) {
         const bonus = Math.round(run.multi * 6 * (P.has('k_multi') ? 2 : 1));
         G.ui.feed(`マルチキル ×${run.multi}  +${bonus}`, 'big');
-        C.coins(bonus, null);
+        C.coins(Math.round(G.Run.income(bonus)), null);
       }
       if (info.head) G.ui.feed('ヘッドショット', 'hs');
       if (e.elite) G.ui.feed(`精鋭撃破 ${e.def.name}`, 'big');
@@ -545,7 +545,7 @@
       // barrels also hurt the player if close
       const dd = P.pos.distanceTo(d.pos);
       if (dd < 4) C.damagePlayer(25 * (1 - dd / 4), { src: 'explosion', pos: d.pos });
-    } else if (Math.random() < 0.55) C.coins(Math.round(U.randi(d.coins[0], d.coins[1]) * mul * (1 + C.area() * 0.08)), d.pos);
+    } else if (Math.random() < 0.55) C.coins(Math.round(G.Run.income(U.randi(d.coins[0], d.coins[1]) * mul * (1 + C.area() * 0.08))), d.pos);
     if (P.has('e_destroy') && Math.random() < 0.08) C.spawnPickup('orb', d.pos, 15);
     G.game.run.destroyed++;
   };

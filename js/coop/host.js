@@ -32,7 +32,8 @@
     return h;
   };
   K.fpInfo = () => `${(G.world.colliders || []).length}/${G.world.interactables.length}`;
-  K.hpScale = () => 1 + 0.6 * (K.players.size - 1);
+  K.hpScale = () => 1 + 0.6 * (K.players.size - 1); // (the guardians: one body cannot be made more numerous)
+  K.foeExtra = () => 0.6 * Math.max(0, K.players.size - 1); // (the foes of an ordinary area: each player brings 60% more of them, not tougher ones)
 
   K.installHost = function () {
     const GM = G.game, P = G.player, E = G.enemies, C = G.combat, BS = G.bosses, FX = G.fx, Ep = E.Enemy.prototype;
@@ -185,10 +186,51 @@
     GM.enterArea = function (n, kind) {
       known.clear(); K._cleared = false; K._engaged = false; K._objKey = '';
       if (P.dead) K.rise(P.pos, P.stats.maxHp * 0.5, false);
+      K._svT = undefined;
       ea.call(GM, n, kind);
-      GM.areaMods.hp *= K.hpScale();
+      scaleFoes();
       K.clearBossObjsHost();
       K.send({ t: 'area', n, kind, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, fp: K.fingerprint(), fi: K.fpInfo() });
+    };
+    // ---------------- more players, more foes (not tougher ones) ----------------
+    // Each wave grows by the same share for every player beyond the first. The extra foes are drawn from the area's own pool with a stream of their own, so the seeded rolls
+    // the guests make while they build the area (altars, doors ...) stay exactly what the host's are. Past the ceiling the rest becomes toughness, as it does for one player.
+    function scaleFoes() {
+      const O = GM.objective, x = K.foeExtra();
+      if (!O || !O.waves || !(x > 0)) return;
+      const total0 = O.waves.reduce((s, w) => s + w.n, 0);
+      if (!total0) return;
+      const pool = GM.enemyPool(GM.area), rng = new G.RNG((GM.seed ^ G.U.hashStr('coopfoes' + GM.area)) >>> 0);
+      const want = Math.round(total0 * (1 + x)), ceil = Math.max(total0, GM.FOE_MAX + 6 * (K.players.size - 1));
+      const add = Math.max(0, Math.min(want, ceil) - total0);
+      let left = add;
+      O.waves.forEach((wv, i) => {
+        const e = i === O.waves.length - 1 ? left : Math.min(left, Math.round(add * wv.n / total0));
+        for (let k = 0; k < e; k++) wv.defs.push(rng.weighted(pool, (p) => p[1])[0]);
+        wv.n += e; left -= e;
+      });
+      O.total = total0 + add;
+      if (want > total0 + add) GM.areaMods.hp *= Math.min(2, want / (total0 + add));
+    }
+    // the steady stream of a survival area grows the same way
+    function surviveStream(dt) {
+      const O = GM.objective, x = K.foeExtra();
+      if (!O || O.kind !== 'survive' || !(x > 0) || GM.areaCleared || !(O.wave > 0) || O.t >= O.dur - 0.5) return;
+      K._svT = (K._svT === undefined ? 2.5 : K._svT) - dt;
+      if (K._svT > 0) return;
+      K._svT = Math.max(1.6, 3.6 - GM.area * 0.03) / x;
+      const hostile = E.list.filter((e) => e.alive && !e.boss && !e.ignoreCount && e.def.id !== 'mimic_gold').length;
+      if (hostile < 28 + 8 * (K.players.size - 1)) { const e = GM.spawnEnemy({ wave: true }); if (e) { e.waveFoe = true; O.spawned++; } }
+    }
+    // foes appear around a player picked at random, not only around the host (an area is big: a guest on the far side would otherwise meet none)
+    const se = GM.spawnEnemy;
+    GM.spawnEnemy = function (opts) {
+      opts = opts || {};
+      const near = K.live && !opts.at ? alivePlayers() : [];
+      const k = near.length ? Math.floor(Math.random() * (near.length + (P.dead ? 0 : 1))) : -1;
+      if (k < 0 || k >= near.length) return se.call(GM, opts);
+      const p0 = P.pos.clone(); P.pos.copy(near[k].to);
+      try { return se.call(GM, opts); } finally { P.pos.copy(p0); }
     };
     K.go = function (n, kind) {
       if (GM.transitioning || n !== GM.area + 1) return;
@@ -250,6 +292,7 @@
     K.onNet = function (dt) {
       if (!GM.run || !G.world) return;
       updateFields(dt);
+      surviveStream(dt);
       snapT -= dt;
       if (snapT <= 0) { snapT = 0.066; K.sendEnemies(); K.sendBoss(); }
       objT -= dt;
@@ -301,7 +344,7 @@
       const b = BS.active;
       if (!b || !K.bossNodes) return;
       K.sendBossObjs();
-      if (b.dead) { if (!b._cpSent) { b._cpSent = true; K.send({ t: 'bdead' }); } return; }
+      if (b.dead) { if (!b._cpSent) { b._cpSent = true; K.send({ t: 'bdead', ids: [...K.players.keys()].sort((a, c) => a - c) }); } return; }
       const nodes = [], last = K._bossLast;
       K.bossNodes.forEach((n, i) => {
         const a = [r2(n.position.x), r2(n.position.y), r2(n.position.z), Math.round(n.quaternion.x * 1000), Math.round(n.quaternion.y * 1000), Math.round(n.quaternion.z * 1000), Math.round(n.quaternion.w * 1000), n.visible ? 1 : 0, r2(n.scale.x)];

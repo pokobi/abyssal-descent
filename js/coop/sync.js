@@ -225,6 +225,60 @@
       K._net = true; try { G.Graves.trigger(o); } finally { K._net = false; }
     };
 
+    // ---------------- the guardian's chest: one for each player, each with contents of its own, and the colour of the one it is for ----------------
+    // (the chest the game makes at the centre is the first; both sides lay out the rest the same way, from the players listed when the guardian fell)
+    const obd = GM.onBossDefeated;
+    GM.onBossDefeated = function (boss) {
+      const r = obd.call(GM, boss);
+      try { K.bossChests(boss); } catch (e) { console.error(e); }
+      return r;
+    };
+    const nameTag = (text, col) => {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
+      g.font = '700 34px "Noto Sans JP", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 7; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(text, 128, 34); g.fillStyle = col; g.fillText(text, 128, 34);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); s.scale.set(3.4, 0.85, 1); return s;
+    };
+    K.bossChests = function (boss) {
+      const w = G.world, c = w.arenaCenter;
+      if (!K.live || !c || G.Run.isLast(GM.area)) return;
+      const bd = boss && boss.baseDef && G.BOSS_BY_ID[boss.baseDef.id];
+      if (bd && bd.final) return; // (the deepest throne's own hoard stays as it is)
+      const ids = (K.role === 'host' ? [...K.players.keys()] : K._bossIds || [...K.players.keys()]).slice().sort((a, b) => a - b);
+      const first = w.interactables.filter((it) => it.type === 'chest' && it.tier === 3 && Math.abs(it.pos.x - c.x) < 0.01 && Math.abs(it.pos.z - c.z) < 0.01).pop();
+      if (!first || ids.length < 1) return;
+      const y = first.pos.y - 0.5, chests = [first], n = ids.length;
+      for (let i = 1; i < n; i++) {
+        for (const R of [4.4, 6, 7.6, 9.2]) {
+          const a = 0.5 * Math.PI + (i - 1) / Math.max(1, n - 1) * 2 * Math.PI + (R - 4.4) * 0.08;
+          const x = c.x + Math.cos(a) * R, z = c.z + Math.sin(a) * R;
+          if (!w.boxFree(x - 0.95, y + 0.05, z - 0.95, x + 0.95, y + 1.5, z + 0.95)) continue;
+          chests.push(G.Props.chest(w, x, z, y, Math.atan2(c.x - x, c.z - z), 3));
+          break;
+        }
+      }
+      w.flushDeferred();
+      K._owned = chests;
+      chests.forEach((it, i) => {
+        const id = ids[i]; if (id === undefined) return;
+        const rp = K.players.get(id), col = K.colOf(id), hex = parseInt(col.slice(1), 16);
+        it.owner = id; it._deadT = 0;
+        const ring = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.9, 40), new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+        ring.rotation.x = -Math.PI / 2; ring.position.set(it.pos.x, y + 0.07, it.pos.z); w.group.add(ring);
+        const tag = nameTag(rp ? rp.name : '', col); tag.position.set(it.pos.x, y + 3.2, it.pos.z); w.group.add(tag);
+        w.lightSources.push({ pos: new THREE.Vector3(it.pos.x, y + 1.4, it.pos.z), color: col, intensity: 7, range: 8, flame: 0, emit: false, ph: 0, prio: 1.4, steady: true });
+      });
+    };
+    // only its owner opens it (the others are told whose it is); one whose owner is gone, or has been down for half a minute, is anybody's
+    const ss = GM.startSearch;
+    GM.startSearch = function (it) {
+      if (K.live && it && it.type === 'chest' && it.owner !== undefined && it.owner !== K.id) {
+        const rp = K.players.get(it.owner);
+        if (rp && !(rp.dead && (it._deadT || 0) > 30)) { G.ui.toastSmall(`🔒 ${rp.name} の宝箱です（自分の色の宝箱を開けよう）`); G.sfx.ui('deny'); return; }
+      }
+      return ss.apply(GM, arguments);
+    };
+
     // ---------------- the gates ----------------
     // which doors appear can depend on a player's own bank: everyone takes the host's
     const rg = G.Areas.rollGates;
@@ -295,9 +349,10 @@
     };
     K.onFrame = function (dt) {
       if (!G.world || !GM.run) return;
-      if (G.world !== lastWorld) { lastWorld = G.world; prep(); at = null; for (const p of K.players.values()) p.at = null; }
+      if (G.world !== lastWorld) { lastWorld = G.world; K._owned = []; prep(); at = null; for (const p of K.players.values()) p.at = null; }
       hallDoor(G.world);
       if (GM.bossEngaged) hallOpen(G.world);
+      for (const it of K._owned || []) { const rp = K.players.get(it.owner); it._deadT = rp && rp.dead ? (it._deadT || 0) + dt : 0; }
       if (GM.area !== lastArea) { lastArea = GM.area; for (const id of Object.keys(locks)) delete locks[id]; hold = null; pending = null; G.ui.trialClock(-1); if (K.clearViz) K.clearViz(); }
       const me = K.players.get(K.id);
       const want = !P.dead && !GM.transitioning ? gateAt(P.pos) : null;

@@ -1508,7 +1508,8 @@
       const inst = kind === 'armor' ? G.Inv.makeArmor(obj.id, () => r.next()) : null; // armour: enchantments are rolled when the shelf is stocked
       offers.push({ kind, obj, inst, price: Math.round(GM.offerPrice(kind, obj) * (inst ? G.Inv.enchMul(inst) : 1) / 10) * 10, sold: false, slot: w.shopSlots[i], lv: (kind === 'weapon' || kind === 'melee') && !obj.mythic ? GM.shopLv() : 0 });
     });
-    if (P.has('e_free') && GM.run.freeArea !== GM.area) { const g = offers.filter((o) => o.kind !== 'buff'); if (g.length) { const f = r.pick(g); f.price = 0; f.free = true; GM.run.freeArea = GM.area; } }
+    // (the forge and the tome only count while there is something they can raise)
+    if (P.has('e_free') && GM.run.freeArea !== GM.area) { const g = offers.filter((o) => o.kind !== 'buff' && !(o.kind === 'forge' && !GM.forgeTargets().length) && !(o.kind === 'tome' && !GM.tomeTargets().length)); if (g.length) { const f = r.pick(g); f.price = 0; f.free = true; GM.run.freeArea = GM.area; } }
     // rare: a revive charm for a fortune
     if (G.Run.revivesAllowed() && r.chance(0.16 + Math.min(0.1, GM.area * 0.004))) { const o = offers.find((x) => x.kind === 'buff' && x.obj.cat !== 'pile'); if (o) { o.kind = 'revive'; o.obj = GM.REVIVE; o.price = GM.revivePrice(); o.free = false; } }
     S.offers = offers;
@@ -1683,7 +1684,7 @@
     if (best.type === 'offer') {
       const o = best.o, ob = o.obj;
       const info = describeOffer(o);
-      G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: o.kind === 'forge' && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= (o.kind === 'forge' && !o.free ? GM.forgeRange()[0] : o.price), action: info.action || '購入' });
+      G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
     } else if (best.type === 'sell') {
       G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・防具・アイテム・投擲物を売却できる。', action: '売る' });
     } else if (best.type === 'reroll') {
@@ -1872,8 +1873,7 @@
     if (t.type === 'offer') {
       GM._buying = true; setTimeout(() => { GM._buying = false; }, 0);
       const o = t.o, ob = o.obj;
-      if (o.kind === 'forge' && !o.free) o.price = GM.forgeRange()[0];
-      if (o.kind === 'tome') o.price = GM.tomeRange()[0];
+      if (!o.free) { if (o.kind === 'forge') o.price = GM.forgeRange()[0]; if (o.kind === 'tome') o.price = GM.tomeRange()[0]; } // (a free one stays free)
       if (run.coins < o.price) return deny('🪙 コインが足りない');
       const done = () => { run.coins -= o.price; o.sold = true; GM.quietUntil = performance.now() + 1200; G.sfx.ui('buy'); G.fx.sparks(o.pos, null, 20, 0xffd070, 4); G.fx.ring(o.pos.clone().setY(o.slot.y), 0.8, 0xffd070, 0.5); o.mesh.visible = false; G.ui.showInteract(null); G.ui.toast(`${ob.icon} ${ob.name} を購入`, 'good'); if (o.kind !== 'item' && o.kind !== 'forge' && o.kind !== 'tome') G.ui.itemCard(ob, o.kind === 'skill' ? '[スキル]' : o.kind === 'ult' ? `[${G.input.skillKey(0)} アルティメット]` : o.kind === 'weapon' ? '[武器]' : o.kind === 'melee' ? `[近接:${G.K('w3')}]` : o.kind === 'revive' ? '[魂の灯火]' : o.kind === 'attachment' ? '[装着]' : '[加護]'); G.ui.refreshWeapon(); G.ui.refreshItems(); if (o.kind !== 'revive' && o.kind !== 'forge' && o.kind !== 'tome') G.save.mark(o.kind === 'buff' ? 'buffs' : 'items', ob.id); };
       if (o.kind === 'buff') { P.addBuff(ob.id); return done(); }
@@ -1890,8 +1890,9 @@
         if (!list.length) return deny('全て最大レベル');
         return modal('📘 どのスキルを強化する？', 'レベル+1（スキル・アルティメット：効果量UP・クールタイム-2%／パイルドライバー：威力+60%）　価格は、そのスキルの今の Lv で決まる', list.map((x) => {
           const d = x.pile ? { icon: '🔨', name: 'パイルドライバー', key: G.input.keyName('crouch') } : { icon: x.s.def.icon, name: x.s.def.name, key: G.input.skillKey(x.i) };
-          return { icon: d.icon, label: `[${d.key}]${!x.pile && x.s.def.ult ? '（ULT）' : ''} ${d.name} Lv${x.lv + 1} → Lv${x.lv + 2}（${U.fmt(x.cost)}🪙）`, disabled: run.coins < x.cost, onPick: () => {
-            o.price = x.cost;
+          const cost = o.free ? 0 : x.cost;
+          return { icon: d.icon, label: `[${d.key}]${!x.pile && x.s.def.ult ? '（ULT）' : ''} ${d.name} Lv${x.lv + 1} → Lv${x.lv + 2}（${o.free ? '無料' : U.fmt(cost) + '🪙'}）`, disabled: run.coins < cost, onPick: () => {
+            o.price = cost;
             if (x.pile) { P.pileTome = (P.pileTome || 0) + 1; G.sfx.ui('rare'); done(); }
             else { x.s.lv = x.lv + 1; x.s.maxCd = G.abilities.cdOf(x.s); done(); G.sfx.magic(P.pos, 'holy'); }
           } };

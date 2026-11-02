@@ -56,6 +56,8 @@ html.m #hud-bc { pointer-events: none; }
 #me-bar button { padding: 4px 10px; border-radius: 4px; font: inherit; font-weight: 700; background: linear-gradient(180deg, rgba(255,200,80,0.2), rgba(14,11,8,0.96)); border: 1px solid rgba(255,200,80,0.55); color: #ffe2a0; }
 .me-b { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.05; border-radius: 50%; background: rgba(255,255,255,0.14); border: 2px solid rgba(255,255,255,0.5); color: #fff; touch-action: none; font-weight: 700; }
 .me-b.tile { border-radius: 9px; }
+.me-b.panel { border-radius: 6px; border-style: dashed; background: rgba(120,170,255,0.12); border-color: rgba(150,190,255,0.7); font-size: 11px; z-index: -1; }
+.me-b.panel.sel { border-color: #ffd27a; background: rgba(255,210,122,0.2); }
 #m-edit.drag #me-bar { opacity: 0.15; pointer-events: none; }
 .me-b.sel { border-color: #ffd27a; background: rgba(255,210,122,0.28); }
 /* ---------- HUD: smaller, and out of the thumbs' way ---------- */

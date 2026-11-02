@@ -59,6 +59,8 @@
     for (const a of ['forward', 'back', 'left', 'right']) ku(bind(a));
     ku(bind('sprint'));
     for (const b of btnEls) b.classList.remove('press');
+    for (const b of BTN) b.pid = null;
+    tiles.clear();
   }
 
   // holding the fire button keeps a semi-auto / burst gun shooting as fast as it can (a phone has no fast clicking finger)
@@ -94,35 +96,52 @@
     { id: 'crouch', lbl: '⤵', t: 'しゃがみ', s: 46, side: 'r', x: 134, by: 138, d: () => kd(bind('crouch')), u: () => ku(bind('crouch')) },
     { id: 'reload', lbl: '🔄', t: 'リロード', s: 42, side: 'r', x: 214, by: 92, d: () => { const P = G.player; if (P && P.meleeMode) kd(bind('reload')); else tapKey(bind('reload')); }, u: () => ku(bind('reload')) },
     { id: 'use', lbl: '✋', t: '調べる', s: 46, side: 'r', x: 210, by: 150, d: () => kd(bind('interact')), u: () => ku(bind('interact')) },
-    { id: 'pause', lbl: '⏸', t: '', s: 34, side: 'r', x: 24, ty: 24, cls: 'sys', d: () => tapKey('KeyI') },
-    { id: 'bag', lbl: '🎒', t: '', s: 34, side: 'r', x: 66, ty: 24, cls: 'sys', d: () => tapKey(bind('status') || 'Tab') },
+    { id: 'pause', lbl: '⏸', t: '', s: 34, side: 'r', x: 24, ty: 24, cls: 'sys', d: () => { asPlaying(); tapKey('KeyI'); } },
+    { id: 'bag', lbl: '🎒', t: '', s: 34, side: 'r', x: 66, ty: 24, cls: 'sys', d: () => { asPlaying(); if (G.InvUI && G.InvUI.isOpen()) G.InvUI.close(); else tapKey(bind('status') || 'Tab'); } },
   ];
+  // (the game's keys only answer in the state they expect: a button on screen means the state is "playing" even if the game was left in "resuming")
+  function asPlaying() { const GM = GMr(); if (GM && GM.state === 'resuming') { GM.state = 'playing'; G.ui.clearScreen(); } }
   const btnEls = [];
   for (const b of BTN) {
     const el = doc.createElement('div'); el.className = 'mb ' + (b.cls || ''); el.dataset.id = b.id;
     el.innerHTML = `<span class="mi">${b.lbl}</span>${b.t && b.s >= 46 ? `<span class="mt">${b.t}</span>` : ''}`;
-    btnLayer.appendChild(el); btnEls.push(el); b.el = el;
-    let pid = null;
+    btnLayer.appendChild(el); btnEls.push(el); b.el = el; b.pid = null;
+    // A press ends when its own pointer lets go, wherever that is heard: the pause and bag buttons vanish under the finger the moment the menu opens, and a pointerup that
+    // never reaches a hidden button used to leave it "held" for good (its next taps were ignored).
+    b.end = (e) => { if (b.pid === null || (e && e.pointerId !== b.pid)) return; const id = b.pid; b.pid = null; lastTouch = performance.now(); if (b.look) aimEnd({ pointerId: id }); el.classList.remove('press'); if (b.u) b.u(); };
     el.addEventListener('pointerdown', (e) => {
-      if (pid !== null) return;
-      pid = e.pointerId; lastTouch = performance.now();
+      if (b.pid !== null) b.end();
+      b.pid = e.pointerId; lastTouch = performance.now();
       if (b.look) aimAdd(e, false);
-      try { el.setPointerCapture(pid); } catch (er) { /* ignore */ }
+      try { el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
       e.preventDefault(); el.classList.add('press');
       if (b.tog) el.classList.toggle('lit', !adsOn); // ads toggles on / off
       if (b.d) b.d();
       if (navigator.vibrate) { try { navigator.vibrate(8); } catch (er) { /* ignore */ } }
     });
     el.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== pid || !b.look) return;
+      if (e.pointerId !== b.pid || !b.look) return;
       aimMove(e);
     });
-    const end = (e) => { if (e.pointerId !== pid) return; pid = null; lastTouch = performance.now(); if (b.look) aimEnd(e); el.classList.remove('press'); if (b.u) b.u(); };
-    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    el.addEventListener('pointerup', b.end); el.addEventListener('pointercancel', b.end); el.addEventListener('lostpointercapture', b.end);
   }
+  // the same for anything that ended somewhere else: every finger that lifts lets go of what it held (after the elements' own handlers have run)
+  const liftAll = (e) => {
+    for (const b of BTN) b.end(e);
+    if (e.pointerId === stick.id) stickEnd(e);
+    if (aimers.some((a) => a.id === e.pointerId)) aimEnd(e);
+    if (tiles.has(e.pointerId)) tileEnd(e);
+  };
+  window.addEventListener('pointerup', liftAll); window.addEventListener('pointercancel', liftAll);
   // the extra "inventory close" button while the bag is open
   const closeBtn = doc.createElement('div'); closeBtn.id = 'm-close'; closeBtn.textContent = '✕ 閉じる';
-  closeBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); tapKey(bind('status') || 'Tab'); });
+  closeBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const GM = GMr();
+    if (G.InvUI && G.InvUI.isOpen()) G.InvUI.close(); // (the bag itself closes, whatever state the game thinks it is in)
+    else if (GM && GM.state === 'inv') GM.resume();
+    else tapKey(bind('status') || 'Tab');
+  });
   app.insertBefore(closeBtn, $('screens'));
 
   // ---- look ----
@@ -252,6 +271,29 @@
     { id: 'it2', t: '消耗品2', s: 30, x: 164, get: () => G.ui.itEls && G.ui.itEls[1] },
   ].map((t) => Object.assign(t, { side: 'c', by: 22, lbl: t.t, tile: true }));
   const adopt = () => { for (const t of TILES) { const el = t.get(); if (el && el.parentNode !== tileLayer) { tileLayer.appendChild(el); t.el = el; place(t); } else if (el) t.el = el; } };
+  // The HUD's information panels can be placed too: S.mLayout[id] = { x, y (the panel's top left corner, 0..1 of the screen), s (size factor) }.
+  // def: where it sits (in u) until it is moved, only used to draw its frame in the editor while the HUD is not on screen.
+  const PANELS = [
+    { id: 'i_tl', t: 'エリア・目標', sel: '#hud-tl', def: (W, H, u) => ({ x: 10 * u, y: 6 * u, w: 150 * u, h: 50 * u }) },
+    { id: 'i_tr', t: 'コイン・時間', sel: '#hud-tr', def: (W, H, u) => ({ x: W - 92 * u - 84 * u, y: 6 * u, w: 84 * u, h: 22 * u }) },
+    { id: 'i_br', t: '武器・弾', sel: '#hud-br', def: (W, H, u) => ({ x: W - 10 * u - 110 * u, y: 50 * u, w: 110 * u, h: 58 * u }) },
+    { id: 'i_bl', t: 'HP・状態', sel: '#hud-bl', def: (W, H, u) => ({ x: 8 * u, y: H - 6 * u - 40 * u, w: 170 * u, h: 40 * u }) },
+    { id: 'i_bf', t: '加護アイコン', sel: '#hud-buffs', def: (W, H, u) => ({ x: 10 * u, y: 78 * u, w: 90 * u, h: 40 * u }) },
+  ].map((p) => Object.assign(p, { panel: true }));
+  const panelEl = (p) => doc.querySelector(p.sel);
+  const factor = (id) => { const o = opts().mLayout[id]; return (o && o.s) || 1; };
+  function placePanels() {
+    const W = window.innerWidth, H = window.innerHeight;
+    for (const p of PANELS) {
+      const el = panelEl(p); if (!el) continue;
+      const o = opts().mLayout[p.id];
+      if (!(o && o.x !== undefined)) { el.style.left = el.style.top = el.style.right = el.style.bottom = ''; continue; }
+      el.style.left = o.x * W + 'px'; el.style.top = o.y * H + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
+      // (a screen of another shape must not push it out of sight)
+      const r = el.getBoundingClientRect();
+      if (r.width) { if (r.right > W) el.style.left = Math.max(0, W - r.width) + 'px'; if (r.bottom > H) el.style.top = Math.max(0, H - r.height) + 'px'; }
+    }
+  }
   // what the player has chosen: S.mLayout = { id: { x, y (centre, 0..1 of the screen), s (size factor) } }, S.mHud, S.mOpacity, S.mStick, S.mUseBtn
   const opts = () => { const S = G.save.data.settings; if (!S.mLayout) S.mLayout = {}; return S; };
   const ITEMS = BTN.concat(TILES);
@@ -270,11 +312,12 @@
   // the HUD's size: every panel scales together (1 = the default, already smaller than before)
   const hudCss = doc.createElement('style'); doc.head.appendChild(hudCss);
   function hudScale() {
-    const S = opts(), k = 0.8 * (S.mHud || 1), z = (v) => (v * k).toFixed(3);
-    hudCss.textContent = `html.m #hud-tl > *, html.m #hud-tr > *, html.m #hud-br > *, html.m #hud-buffs { zoom: ${z(0.62)}; } html.m #hud-bl > *, html.m #pstatus { zoom: ${z(0.6)}; }
+    const S = opts(), k = 0.8 * (S.mHud || 1), z = (v, id) => (v * k * (id ? factor(id) : 1)).toFixed(3), fb = factor('i_bl');
+    hudCss.textContent = `html.m #hud-tl > * { zoom: ${z(0.62, 'i_tl')}; } html.m #hud-tr > * { zoom: ${z(0.62, 'i_tr')}; } html.m #hud-br > * { zoom: ${z(0.62, 'i_br')}; } html.m #hud-buffs { zoom: ${z(0.62, 'i_bf')}; }
+      html.m #hud-bl > *, html.m #pstatus { zoom: ${z(0.6, 'i_bl')}; }
       html.m #interact-panel { zoom: ${z(0.62)}; } html.m #bossbar { zoom: ${z(0.72)}; } html.m #toasts { zoom: ${z(0.72)}; } html.m #banner { zoom: ${z(0.7)}; }
       html.m #item-cards, html.m #gain-host, html.m #anom-alert { zoom: ${z(0.66)}; } html.m #pile-ind, html.m #gren-hint, html.m #airjump-hint { zoom: ${z(0.7)}; }
-      html.m #hp-bars { width: calc(var(--u) * 170 / ${z(0.6)} * ${k.toFixed(3)}); }`;
+      html.m #hp-bars { width: calc(var(--u) * 170 / ${z(0.6, 'i_bl')} * ${(k * fb).toFixed(3)}); }`;
     const op = S.mOpacity === undefined ? 1 : S.mOpacity;
     btnLayer.style.opacity = op; tileLayer.style.opacity = op;
   }
@@ -286,6 +329,7 @@
     for (const b of ITEMS) place(b);
     stickEl.style.setProperty('--r', stickR() + 'px');
     hudScale();
+    placePanels();
   }
   window.addEventListener('resize', layout); window.addEventListener('orientationchange', () => setTimeout(layout, 120));
   layout();
@@ -298,6 +342,27 @@
   let fsTried = 0;
   window.addEventListener('pointerdown', () => { if (fsTried < 2 && !doc.fullscreenElement) { fsTried++; I.fullscreen(); } }, true);
 
+  // Whatever the cause, a state that nothing on the screen can answer does not last: left in it, no button would do anything.
+  //  - "a bag is open" with no bag, "resuming" while the view is already locked, a pause with no menu: back to playing
+  let sickK = '', sickT = 0;
+  function unstick() {
+    const GM = GMr();
+    if (!GM || !GM.run || GM.transitioning || GM._warming) { sickK = ''; return; }
+    const st = GM.state, inv = !!(G.InvUI && G.InvUI.isOpen()), scr = doc.querySelector('#screens > *');
+    let k = '';
+    if (st === 'inv' && !inv) k = 'inv';
+    else if (st === 'resuming' && I.locked) k = 'resuming';
+    else if (st === 'paused' && !scr && !inv) k = 'paused';
+    else if (st === 'playing' && !I.locked && !tap && !inv) k = 'unlocked';
+    if (!k) { sickK = ''; return; }
+    const now = performance.now();
+    if (k !== sickK) { sickK = k; sickT = now; return; }
+    if (now - sickT < 700) return;
+    sickK = ''; sickT = 0;
+    if (k === 'inv' || k === 'paused') GM.resume();
+    else if (k === 'resuming') { GM.state = 'playing'; G.ui.clearScreen(); }
+    else I.requestLock();
+  }
   let wasOn = false;
   function tick() {
     const GM = GMr(), st = GM && GM.state;
@@ -309,6 +374,7 @@
     root.classList.toggle('m-inv', st === 'inv');
     if (wasOn && !play) releaseAll();
     wasOn = play;
+    unstick();
     adopt();
     // the interact button, for those who keep it, shows only when there is something to use; a fallen teammate needs it held
     { const use = BTN.find((b) => b.id === 'use'), rv = doc.getElementById('coop-rv'); use.el.style.display = rv && rv.style.display === 'block' || (opts().mUseBtn && lastUse) ? '' : 'none'; }
@@ -324,7 +390,7 @@
   function editor(back) {
     const S = opts(), ed = doc.createElement('div'); ed.id = 'm-edit';
     ed.innerHTML = `<div id="me-bar">
-      <b id="me-name">ボタンを動かす／タップで選択</b>
+      <b id="me-name">ボタン・情報パネルを動かす／タップで選択</b>
       <label>大きさ<input type="range" id="me-size" min="0.5" max="2" step="0.05" value="1"></label>
       <label>UI全体<input type="range" id="me-hud" min="0.6" max="1.4" step="0.05" value="${S.mHud || 1}"></label>
       <label>濃さ<input type="range" id="me-op" min="0.25" max="1" step="0.05" value="${S.mOpacity === undefined ? 1 : S.mOpacity}"></label>
@@ -334,8 +400,13 @@
     doc.body.appendChild(ed);
     let sel = null;
     const ps = new Map();
-    const draw = (b) => { const p = ps.get(b), s = sizeOf(b), [cx, cy] = centre(b); p.style.width = p.style.height = s + 'px'; p.style.left = cx - s / 2 + 'px'; p.style.top = cy - s / 2 + 'px'; p.style.fontSize = Math.max(9, s * 0.2) + 'px'; };
+    const draw = (b) => {
+      const p = ps.get(b);
+      if (b.panel) { const s = factor(b.id), o = S.mLayout[b.id]; p.style.width = b.bw * s + 'px'; p.style.height = b.bh * s + 'px'; p.style.left = (o && o.x !== undefined ? o.x * window.innerWidth : b.x0) + 'px'; p.style.top = (o && o.x !== undefined ? o.y * window.innerHeight : b.y0) + 'px'; p.style.fontSize = '11px'; return; }
+      const s = sizeOf(b), [cx, cy] = centre(b); p.style.width = p.style.height = s + 'px'; p.style.left = cx - s / 2 + 'px'; p.style.top = cy - s / 2 + 'px'; p.style.fontSize = Math.max(9, s * 0.2) + 'px';
+    };
     const pick = (b) => { sel = b; for (const [q, p] of ps) p.classList.toggle('sel', q === b); ed.querySelector('#me-name').textContent = b.t || b.lbl; ed.querySelector('#me-size').value = (S.mLayout[b.id] && S.mLayout[b.id].s) || 1; };
+    // (the frames of the information panels are drawn first so that a button lying over one stays reachable)
     for (const b of ITEMS) {
       if (b.id === 'use' && !S.mUseBtn) continue;
       const p = doc.createElement('div'); p.className = 'me-b' + (b.tile ? ' tile' : ''); p.textContent = b.tile ? b.t : b.lbl + (b.t ? ' ' + b.t : '');
@@ -351,7 +422,24 @@
       const up = (e) => { if (e.pointerId === pid) { pid = null; ed.classList.remove('drag'); } };
       p.addEventListener('pointerup', up); p.addEventListener('pointercancel', up);
     }
-    ed.querySelector('#me-size').oninput = (e) => { if (!sel) return; (S.mLayout[sel.id] || (S.mLayout[sel.id] = {})).s = +e.target.value; draw(sel); };
+    // the information panels: a frame the size of the real panel (or of its usual size while the HUD is not up), dragged by its top left corner
+    for (const b of PANELS) {
+      const el = panelEl(b), r = el ? el.getBoundingClientRect() : null, d = b.def(window.innerWidth, window.innerHeight, unit()), real = r && r.width > 6 && r.height > 6, s0 = factor(b.id);
+      b.bw = (real ? r.width : d.w) / s0; b.bh = (real ? r.height : d.h) / s0; b.x0 = real ? r.left : d.x; b.y0 = real ? r.top : d.y;
+      const p = doc.createElement('div'); p.className = 'me-b panel'; p.textContent = b.t;
+      ed.appendChild(p); ps.set(b, p); draw(b);
+      let pid = null, ox = 0, oy = 0;
+      p.addEventListener('pointerdown', (e) => { e.preventDefault(); pid = e.pointerId; try { p.setPointerCapture(pid); } catch (er) { /* ignore */ } const bx = p.getBoundingClientRect(); ox = e.clientX - bx.left; oy = e.clientY - bx.top; pick(b); ed.classList.add('drag'); });
+      p.addEventListener('pointermove', (e) => {
+        if (e.pointerId !== pid) return;
+        const W = window.innerWidth, H = window.innerHeight, w = b.bw * factor(b.id), h = b.bh * factor(b.id), o = S.mLayout[b.id] || (S.mLayout[b.id] = {});
+        o.x = Math.max(0, Math.min(1 - w / W, (e.clientX - ox) / W)); o.y = Math.max(0, Math.min(1 - h / H, (e.clientY - oy) / H));
+        draw(b); placePanels();
+      });
+      const up = (e) => { if (e.pointerId === pid) { pid = null; ed.classList.remove('drag'); } };
+      p.addEventListener('pointerup', up); p.addEventListener('pointercancel', up);
+    }
+    ed.querySelector('#me-size').oninput = (e) => { if (!sel) return; const o = S.mLayout[sel.id] || (S.mLayout[sel.id] = {}); o.s = +e.target.value; if (sel.panel && o.x === undefined) { o.x = sel.x0 / window.innerWidth; o.y = sel.y0 / window.innerHeight; } draw(sel); if (sel.panel) { hudScale(); placePanels(); } };
     ed.querySelector('#me-hud').oninput = (e) => { S.mHud = +e.target.value; hudScale(); };
     ed.querySelector('#me-op').oninput = (e) => { S.mOpacity = +e.target.value; hudScale(); };
     ed.querySelector('#me-stick').oninput = (e) => { S.mStick = +e.target.value; };

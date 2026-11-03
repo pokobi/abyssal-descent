@@ -57,7 +57,7 @@
     window.addEventListener('keydown', (e) => {
       // Tab and B open the same screen: gear, bag, weapons + attachments and the full status sheet side by side
       // (also right after closing it: the "click to resume" wait must not swallow the key)
-      const invReady = () => GM.state === 'playing' || GM.state === 'resuming' || (GM.state === 'paused' && !!document.querySelector('#screens .clicklock'));
+      const invReady = () => !(G.player && G.player.duelLock) && GM.state === 'playing' || GM.state === 'resuming' || (GM.state === 'paused' && !!document.querySelector('#screens .clicklock'));
       if ((G.BIND.status.includes(e.code) || G.BIND.inventory.includes(e.code)) && invReady()) { e.preventDefault(); if (!e.repeat && G.InvUI && !G.InvUI.isOpen()) { if (GM.state !== 'playing') { GM.state = 'playing'; G.ui.clearScreen(); } G.InvUI.open(null); } return; }
       if (e.code === 'Escape' && (GM.state === 'buff')) e.preventDefault();
       // Esc on a menu that can simply be left (a choice / shop / event panel, or the pause menu) goes back to the game
@@ -2281,7 +2281,7 @@
   }
   function update(dt) {
     const S = G.save.data.settings;
-    GM.timeScale = P.has('x_slowtime') && G.weapons.adsT > 0.5 ? 0.75 : 1;
+    GM.timeScale = (P.has('x_slowtime') && G.weapons.adsT > 0.5 ? 0.75 : 1) * (G.Duel ? G.Duel.timeK() : 1); // a parry slows the world for a moment (duel.js)
     const gdt = dt * GM.timeScale * (GM.dev ? GM.dev.speed : 1);
     GM.time += gdt;
     if (GM.run && GM.state !== 'title') GM.run.playT = (GM.run.playT || 0) + gdt; // total play time of the run (kept through reloads with the checkpoint)

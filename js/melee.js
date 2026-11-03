@@ -37,6 +37,14 @@
   const GUARD_MIN = 0.25, GUARD_REST = 1.6, GUARD_REGEN = 0.09; // seconds without a blocked hit before it refills; share of the gauge per second (the same for every weapon)
   W.guarding = () => !!(gd.on && P && P.meleeMode);
   function guardTick(dt, blocked) {
+    // in a duel (duel.js) the key only parries: no guard is raised, a press shows a quick parry stance
+    if (G.Duel && G.Duel.mine()) {
+      const dn = I.down('reload'); if (dn && !gd.pdn && !P.dead) G.Duel.press(); gd.pdn = dn;
+      gd.on = false; gd.k = U.damp(gd.k, gd.pk > 0 ? 1 : 0, 22, dt); gd.pk = Math.max(0, (gd.pk || 0) - dt);
+      gd.kick = Math.max(0, gd.kick - dt * 6); gd.flash = 0; if (gEl) gEl.classList.remove('on');
+      return;
+    }
+    gd.pdn = I.down('reload');
     const g = P.melee.def.guard;
     // the gauge refills even while the melee weapon is put away (measured by game time since the last tick)
     const el = Math.min(5, Math.max(0, G.game.time - (gd.lastT || G.game.time))); gd.lastT = G.game.time;
@@ -578,6 +586,7 @@
   // 1/2/3 switch straight to that slot (which gun sits on 1 or 2 is changed by drag & drop in the Tab screen)
   W.handleSwitch = function () {
     P = G.player;
+    if (P.duelLock) return false; // a duel (duel.js) keeps the melee weapon in hand
     const o = W.order();
     for (let k = 0; k < 3; k++) if (I.hit('w' + (k + 1)) && o[k]) W.selectTok(o[k]);
     if (I.wheel) {
@@ -597,7 +606,7 @@
     if (ms.draw && ms.draw.t > ms.draw.dur * 0.5 && (I.mpressed[0] || I.mpressed[2])) ms.draw = null;
     const blocked = !!ms.draw || W.switchT > 0 || P.mantle || P.pileState || W.anim.throwT > 0 || G.ItemAnim.busy() || G.GrenHold.active() || G.abilities.wheelOpen();
     guardTick(dt, blocked);
-    if (ms.ph === 'idle' && !blocked && !gd.on) {
+    if (P.duelLock) { /* no attacks in a duel (duel.js) */ } else if (ms.ph === 'idle' && !blocked && !gd.on) {
       if (I.mpressed[2]) startHeavy(s);
       else if (I.mouse[0]) startLight(s);
     } else if (ms.ph === 'light' && !blocked && !gd.on && ms.t >= ms.dur * 0.8 && (I.mouse[0] || I.mpressed[0])) {

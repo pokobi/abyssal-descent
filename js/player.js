@@ -235,7 +235,7 @@
       if (crouchHit && !this.grounded && !this.pileState && !this.mantle && this.liftVy == null) {
         const below = w.groundAt(this.pos, this.hw, 60);
         if (this.pos.y - below > (G.Tutorial && G.Tutorial.active ? 0.8 : 1.3) || below === -Infinity) {
-          if (this.pileReady()) this.startPile();
+          if (this.pileReady() && !this.duelLock) this.startPile();
           else { G.ui.toastSmall(`🔨 パイルドライバー CT ${this.pileCd.toFixed(1)}秒`); G.sfx.ui('deny'); }
         }
       }
@@ -630,7 +630,7 @@
         if (h) this.grapplePreview = { point: h.point, normal: h.normal, ok: h.t <= range && !h.c.noGrapple, dist: h.t };
         if (this.has('m_grapenemy')) { const eh = G.enemies.raycast(o, d, Math.min(range, h ? h.t : range), 0.3); if (eh && !eh.e.boss) this.grapplePreview = { point: o.clone().addScaledVector(d, eh.t), normal: d.clone().negate(), ok: true, dist: eh.t, enemy: eh.e }; }
       }
-      if (I.hit('grapple') && !this.pileState && !this.liftLock) {
+      if (I.hit('grapple') && !this.pileState && !this.liftLock && !this.duelLock) {
         if (gr.state === 'attached' || gr.state === 'firing') this.detachGrapple(false);
         else if (gr.state === 'none' && this.grappleCd <= 0) {
           const pv = this.grapplePreview;

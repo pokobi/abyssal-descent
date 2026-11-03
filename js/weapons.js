@@ -840,6 +840,7 @@
     G.ui.refreshWeapon();
   };
   W.switchTo = function (i) {
+    if (G.player && G.player.duelLock) return; // a duel (duel.js) keeps the melee weapon in hand
     if (P.meleeMode && P.weapons[i]) { P.meleeMode = false; if (W.melee) W.melee.show(false); if (i === P.wIdx) { G.sfx.mech('switch'); W.equip(false); return; } }
     if (i === P.wIdx || !P.weapons[i]) return;
     const old = P.weapon; if (old) { old.reloading = false; old.charge = 0; old.spin = 0; old.burstQ = 0; }

@@ -109,8 +109,7 @@
       if (I.hit('skill' + (i + 1))) A.cast(sk);
     }
     // consumables
-    A.updateItemKeys(dt);
-    G.GrenHold.update(dt);
+    if (!P.duelLock) { A.updateItemKeys(dt); G.GrenHold.update(dt); } // a duel (duel.js) seals items and throwables
     // ongoing effects
     if (P.leap) {
       P.leap.t += dt;
@@ -172,7 +171,7 @@
 
   A.cast = function (sk) {
     if (!sk || P.dead) return;
-    if (P.liftLock) { G.sfx.ui('deny'); G.ui.abilityDeny(sk); return; } // held up by the last guardian's gravity reversal (bosses6.js)
+    if (P.liftLock || P.duelLock) { G.sfx.ui('deny'); G.ui.abilityDeny(sk); return; } // held up by the last guardian's gravity reversal (bosses6.js) / in a duel (duel.js)
     if (!A.ready(sk)) { G.sfx.ui('deny'); G.ui.abilityDeny(sk); return; }
     if (A.isUlt(sk)) return A.castUlt(sk);
     const id = sk.id, prev = C.curSk;
@@ -697,6 +696,7 @@
   };
   // ---------------- utility items ----------------
   A.useItemId = function (id, fromQueue) {
+    if (P.duelLock) { G.sfx.ui('deny'); return; } // sealed in a duel (duel.js)
     if (!fromQueue && A.useQueue) A.useQueue = null; // using anything by hand ends a queue
     const it = G.ITEM_BY_ID[id], d = it.data;
     if (d.revive) { G.ui.toastSmall('🧚 所持しているだけで効果を発揮'); return; }

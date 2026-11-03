@@ -73,6 +73,7 @@
     if (it.type === 'att') return G.ATT_BY_ID[it.id];
     if (it.type === 'gun') return G.WEAPON_BY_ID[it.id]; // a gun out of your hands: on the ground or in a bag / box (its attachments, level and ammo ride along in it.gun)
     if (it.type === 'melee') return G.MELEE_BY_ID[it.id];
+    if (it.type === 'part') return G.PART_BY_ID ? G.PART_BY_ID[it.id] : null; // weapon parts (parts.js): three of a kind make a weapon at a workbench
     return null;
   };
   IV.baseSize = function (it) {
@@ -89,7 +90,9 @@
   IV.gunSize = (d) => (/ハンドガン|リボルバー|ネイルガン|雷管銃/.test(d.cat) ? [2, 1] : /サブマシンガン|クロスボウ/.test(d.cat) ? [3, 1] : [4, 1]);
   IV.isArm = (it) => !!it && (it.type === 'gun' || it.type === 'melee');
   IV.size = function (it) { const [w, h] = IV.baseSize(it); return it.rot ? [h, w] : [w, h]; };
+  IV.stacks = (it) => it.type === 'item' || it.type === 'part';
   IV.maxStack = function (it) {
+    if (it.type === 'part') return 10;
     if (it.type !== 'item') return 1;
     const d = IV.def(it);
     if (d && d.data && d.data.revive) return 1; // the fairy bottle: one to a slot
@@ -101,6 +104,7 @@
     const d = IV.def(it); if (!d) return 0;
     const R = G.Pawn ? G.Pawn.RATE : 0.4;
     if (it.type === 'valuable') return Math.max(1, Math.round(d.value * it.n * (G.Run ? G.Run.valuableMul() : 1)));
+    if (it.type === 'part') return Math.max(5, Math.round(d.value / 5) * 5) * it.n;
     if (it.type === 'armor') return Math.max(5, Math.round(d.price * R * IV.enchMul(it) * (0.2 + 0.8 * IV.durFrac(it)) / 5) * 5); // the more worn, the less it sells for
     if (IV.isArm(it)) { // like the one in your hands: level and any attachments on it count
       const lv = (it.gun && it.gun.lv) || 0, base = d.price ? Math.max(5, Math.round(d.price * R * (1 + 0.2 * lv) / 5) * 5) : lv * 60;
@@ -131,7 +135,7 @@
   // put an item in: tops up existing stacks first, then takes a free spot. returns how many did NOT fit.
   IV.put = function (c, it) {
     if (c.accept && !c.accept(it)) return it.n; // the special slots only take their own kind
-    if (it.type === 'item') {
+    if (IV.stacks(it)) {
       const cap = IV.maxStack(it);
       for (const o of c.items) {
         if (it.n <= 0) break;
@@ -158,14 +162,14 @@
   IV.canPut = function (c, type, id, n) { const tmp = { cols: c.cols, rows: c.rows, items: c.items.map((o) => Object.assign({}, o)) }; return IV.put(tmp, IV.make(type, id, n || 1)) === 0; };
   // tidy a container: same-kind stacks merged, then ordered by kind (armour, attachments, consumables, valuables) and, within a kind, by rarity
   // (best first), packed from the top left. Returns false (nothing changed) if the new arrangement would not fit.
-  const KIND_RANK = { armor: 0, att: 1, item: 2, valuable: 3 };
+  const KIND_RANK = { armor: 0, att: 1, item: 2, part: 2.5, valuable: 3 };
   const ITEM_CAT = { heal: 0, util: 1, grenade: 2 };
   IV.sortContainer = function (c) {
     const items = c.items.slice(), merged = [], snap = items.map((o) => [o, o.n, o.x, o.y, o.rot]);
     const byId = {};
     for (const it of items) {
-      if (it.type !== 'item') { merged.push(it); continue; }
-      (byId[it.id] = byId[it.id] || []).push(it);
+      if (!IV.stacks(it)) { merged.push(it); continue; }
+      (byId[it.type + ':' + it.id] = byId[it.type + ':' + it.id] || []).push(it);
     }
     for (const id in byId) {
       const list = byId[id], cap = IV.maxStack(list[0]); let total = list.reduce((n, o) => n + o.n, 0);

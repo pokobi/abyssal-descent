@@ -1666,6 +1666,7 @@
     }
     if (cBest && cT < bd) { bd = cT; best = cBest; }
     for (const g of G.Inv.ground) consider(g.pos, 0.6, { type: 'loot', g }, 3.2);
+    if (w.benchPos && G.Parts) consider(w.benchPos, 1.0, { type: 'partbench' }, 3.6);
     for (const it of w.interactables) {
       if (it.type === 'chest' && it.opened && it.cont && it.cont.items.length) consider(it.pos, 0.9, { type: 'chestOpen', it }, 3.2);
       if (it.type === 'chest' && !it.opened) consider(it.pos, 0.9, { type: 'chest', it }, 3.2);
@@ -1707,6 +1708,9 @@
       const left = Math.max(0, 2 - (best.it.used || 0));
       if (left <= 0) G.ui.showInteract({ key: 'cauldron0', icon: '⚗️', name: '練成の釜（火は消え、冷え切っている）', rc: '#7a8480', cat: '練成終了（残り 0 / 2回）', desc: '「釜の火は消え去った。深淵の恵みはここまでだ…」', action: null });
       else G.ui.showInteract({ key: 'cauldron' + left, icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: `防具・武器・アタッチメント・消耗品・金品の練成（残り ${left} / 2回）`, desc: '同種・同レアリティの品を2つ掛け合わせ、1段階上位の品へと練成する。', action: '練成する' });
+    } else if (best.type === 'partbench') {
+      const inf = G.Parts.benchInfo(!!w.benchFree);
+      G.ui.showInteract(Object.assign({ key: 'bench' + coins + G.Inv.ver }, inf));
     } else if (best.type === 'rift') {
       G.ui.showInteract({ key: 'rift', icon: '✨', name: '光の裂け目', rc: '#ffe6a8', cat: 'この先に、深淵の外の光が見える', desc: '', action: '入る' });
     } else if (best.type === 'corpse') {
@@ -1858,6 +1862,7 @@
     if (t.type === 'shrine') return G.Areas.useShrine(t.it);
     if (t.type === 'anvil') return G.Areas.useForge(t.it);
     if (t.type === 'cauldron') return G.Areas.useAlchemy(t.it);
+    if (t.type === 'partbench') return G.Parts.open(!!(G.world && G.world.benchFree));
     if (t.type === 'sell') return G.Pawn.open();
     if (t.type === 'miniheal') { const c = G.Areas.miniHealCost(); if (P.hp >= P.stats.maxHp) return deny('❤️ HPは満タン'); if (run.coins < c) return deny('🪙 コインが足りない'); run.coins -= c; GM.shop.healUsed = true; G.combat.heal(P.stats.maxHp * 0.5); G.sfx.heal(); G.sfx.ui('buy'); G.ui.showInteract(null); return; }
     if (t.type === 'reroll') {

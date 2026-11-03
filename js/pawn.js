@@ -112,7 +112,7 @@
     ]);
   }  // ---------------- the counter: categories, one row per thing, bulk sale of valuables ----------------
   PW.tab = 'all';
-  const CATS = [['all', '全て'], ['weapon', '🔫 武器'], ['melee', '🗡️ 近接'], ['att', '🔩 アタッチメント'], ['item', '🧪 消耗品'], ['grenade', '💣 投擲物'], ['skill', '🔮 スキル'], ['armor', '🛡️ 防具'], ['valuable', '💰 金品']];
+  const CATS = [['all', '全て'], ['weapon', '🔫 武器'], ['melee', '🗡️ 近接'], ['att', '🔩 アタッチメント'], ['item', '🧪 消耗品'], ['grenade', '💣 投擲物'], ['skill', '🔮 スキル'], ['armor', '🛡️ 防具'], ['part', '⚙️ 武器パーツ'], ['valuable', '💰 金品']];
   function sellInst(it, n) {
     const p = P(), IV = G.Inv; n = Math.min(n || 1, it.n);
     const unit = IV.value(Object.assign({}, it, { n: 1 }));

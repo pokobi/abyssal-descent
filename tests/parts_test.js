@@ -1,0 +1,118 @@
+'use strict';
+// Weapon parts: the kinds, the drops, the workbenches (free in the transmutation hall, paid in the shop), the making and the raising,
+// and shift + click out of a loot container (fills an empty slot, never swaps out what is worn).
+const path = require('path');
+const { serve, launch, sleep } = require('./coop/cdp');
+const ROOT = path.resolve(__dirname, '..');
+const PORT = +process.env.COOP_PORT || 9991;
+(async () => {
+  const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
+  const fails = [];
+  const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fails.push(what); };
+  try {
+    const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
+    await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.eval("G.save.data.settings.volume = 0; G.save.write(); G.sfx.setVolume && G.sfx.setVolume(0); G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; G.game.startRun({ id: 'normal', lv: 0 }, 0); G.game.dev = { god: true, speed: 1 }; 1");
+    await p.until("!!G.game.run && !!G.world", 30000);
+    await sleep(600);
+    // ---- the kinds
+    const fams = await p.eval("JSON.stringify(G.Parts.FAMS.map((f) => f.id))");
+    check(JSON.parse(fams).length === 8, 'eight kinds of part ' + fams);
+    const cover = await p.eval("(() => { const a = new Set(G.Parts.FAMS.flatMap((f) => f.arch || [])); return Object.keys(G.WEAPON_ARCH).filter((k) => !a.has(k)).join(','); })()");
+    check(cover === '', 'every gun archetype belongs to a kind (' + cover + ')');
+    const empty = await p.eval("G.PARTS.filter((d) => !G.Parts.pool(d.fam, d.rarity).length).length");
+    check(empty === 0 && (await p.eval('G.PARTS.length')) > 20, 'every part can become a weapon (' + (await p.eval('G.PARTS.length')) + ' parts)');
+    check(await p.eval("G.PARTS.every((d) => G.Parts.pool(d.fam, d.rarity).every((w) => !w.mythic && w.id !== 'starter' && w.id !== 'fists' && w.id !== 'm_basic'))"), 'no mythic / starting weapon is ever made');
+    // ---- drops
+    const boss = await p.eval("(() => { let n = 0; for (let i = 0; i < 20; i++) n += G.Inv.chestLoot(3).items.filter((o) => o.type === 'part').reduce((s, o) => s + o.n, 0); return n; })()");
+    check(boss === 40, 'a guardian chest always holds two parts (' + boss + ' in 20)');
+    const rate = await p.eval("(() => { const e = { def: { name: 'x', hp: 60 }, radius: 0.5, height: 1.6 }; let n = 0; for (let i = 0; i < 3000; i++) if (G.Inv.corpseLoot(e).items.some((o) => o.type === 'part')) n++; return n / 3000; })()");
+    check(rate > 0.06 && rate < 0.1, 'a plain corpse holds a part about 8% of the time (' + rate.toFixed(3) + ')');
+    const erate = await p.eval("(() => { const e = { def: { name: 'x', hp: 60 }, radius: 0.5, height: 1.6, elite: true }; let n = 0; for (let i = 0; i < 2000; i++) if (G.Inv.corpseLoot(e).items.some((o) => o.type === 'part')) n++; return n / 2000; })()");
+    check(erate > 0.21 && erate < 0.29, 'an elite about 25% (' + erate.toFixed(3) + ')');
+    // ---- stacking, value
+    await p.eval("G.player.bag.items = []; G.Inv.changed(G.player.bag); for (let i = 0; i < 4; i++) G.Inv.stow(G.player, G.Inv.make('part', 'pt_sg_common', 1)); 1");
+    check(await p.eval("G.player.bag.items.filter((o) => o.type === 'part').length === 1 && G.Parts.count('pt_sg_common') === 4"), 'parts stack in one cell');
+    check(await p.eval("G.Inv.value(G.Inv.make('part', 'pt_sg_common', 1)) > 0"), 'a part sells for a little');
+    // ---- the shop bench: paid
+    await p.eval("G.game.run.freeArea = -1; G.game.rewardPending = null; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.enterArea(6, 'shop'); 1");
+    await p.until("G.game.stage === 'shop' && !!G.world.benchPos", 20000);
+    await sleep(400);
+    check(await p.eval('G.world.benchFree === false'), 'the shop has a paid bench');
+    const face = async () => p.eval(`(() => { const P = G.player, b = G.world.benchPos; G.ui.clearScreen(); G.game.state = 'playing'; const x = b.x + 0, z = b.z + 2.0; P.pos.set(x, 0.01, z); P.vel.set(0, 0, 0); const eye = new THREE.Vector3(x, P.pos.y + 1.6, z), v = b.clone().sub(eye).normalize(); P.yaw = Math.atan2(-v.x, -v.z); P.pitch = Math.asin(v.y); return 1; })()`);
+    const use = async () => { for (let i = 0; i < 30; i++) { await p.eval('G.input.pressed[G.BIND.interact[0]] = true; 1'); await sleep(120); if (await p.eval("!!document.querySelector('#screens .choice')")) return true; } return false; };
+    await face();
+    check(await use(), 'the bench opens when used');
+    const opts = await p.eval("[...document.querySelectorAll('#screens .choice')].map((e) => e.textContent.replace(/\\s+/g, ' ')).join(' | ')");
+    console.log('      ' + opts.slice(0, 300));
+    check(/組み立て/.test(opts) && /繰り上げ/.test(opts) && /🪙/.test(opts), 'it offers making and raising, at a price');
+    // make a shotgun from three commons
+    await p.eval("G.game.run.coins = 5000; G.player.weapons.length = 1; 1");
+    await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; 1");
+    await face(); await use();
+    const coins0 = await p.eval('G.game.run.coins');
+    await p.eval("[...document.querySelectorAll('#screens .choice')].find((e) => /組み立て/.test(e.textContent)).click(); 1");
+    await sleep(300);
+    const wopts = await p.eval("document.querySelectorAll('#screens .choice').length");
+    check(wopts >= 2, 'then three weapons to choose from (' + (wopts - 1) + ')');
+    const nw0 = await p.eval('G.player.weapons.length');
+    await p.eval("document.querySelector('#screens .choice').click(); 1");
+    await sleep(300);
+    const got = await p.eval("JSON.stringify({ n: G.player.weapons.length, arch: G.player.weapons[G.player.weapons.length - 1].def.arch, parts: G.Parts.count('pt_sg_common'), coins: G.game.run.coins })");
+    console.log('      ' + got);
+    const g = JSON.parse(got);
+    check(g.n === nw0 + 1 && /shotgun/.test(g.arch) && g.parts === 1, 'a shotgun is made from three shotgun parts, one part is left');
+    check(coins0 - g.coins === (await p.eval("G.game.price(G.Parts.MAKE_COST.common)")), 'and the price is paid (' + (coins0 - g.coins) + ')');
+    // raising, paid
+    await p.eval("G.Inv.stow(G.player, G.Inv.make('part', 'pt_sg_common', 2)); G.ui.clearScreen(); G.game.state = 'playing'; 1");
+    await face(); await use();
+    const c1 = await p.eval('G.game.run.coins');
+    await p.eval("[...document.querySelectorAll('#screens .choice')].find((e) => /繰り上げ/.test(e.textContent)).click(); 1");
+    await sleep(300);
+    check(await p.eval("G.Parts.count('pt_sg_common') === 0 && G.Parts.count('pt_sg_uncommon') === 1"), 'three commons raise into one uncommon');
+    check(c1 - (await p.eval('G.game.run.coins')) === (await p.eval("G.game.price(G.Parts.UP_COST.uncommon)")), 'and that is paid for too');
+    // too poor: refused
+    await p.eval("G.Inv.stow(G.player, G.Inv.make('part', 'pt_ar_rare', 3)); G.game.run.coins = 0; G.ui.clearScreen(); G.game.state = 'playing'; 1");
+    await face(); await use();
+    await p.eval("[...document.querySelectorAll('#screens .choice')].find((e) => /アサルト/.test(e.textContent) && /組み立て/.test(e.textContent)).click(); 1");
+    await sleep(300);
+    check(await p.eval("G.Parts.count('pt_ar_rare') === 3"), 'with no coins the shop bench makes nothing');
+    // ---- the transmutation hall: free
+    await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.game.transitioning = false; G.game.enterArea(4, 'alchemy'); 1");
+    await p.until("G.game.stage === 'alchemy' && !!G.world.benchPos", 20000).catch(() => {});
+    const st = await p.eval("G.game.stage + ' ' + !!(G.world && G.world.benchPos) + ' ' + (G.world && G.world.benchFree)");
+    check(/true true$/.test(st), 'the transmutation hall has a free bench (' + st + ')');
+    await sleep(400);
+    await p.eval("G.game.run.coins = 0; G.ui.clearScreen(); G.game.state = 'playing'; 1");
+    await face();
+    check(await use(), 'it opens');
+    const fo = await p.eval("[...document.querySelectorAll('#screens .choice')].map((e) => e.textContent.replace(/\\s+/g, ' ')).join(' | ')");
+    check(/無料/.test(fo) && !/\d🪙/.test(fo.replace(/所持.*$/, '')), 'everything there is free');
+    await p.eval("[...document.querySelectorAll('#screens .choice')].find((e) => /アサルト/.test(e.textContent) && /組み立て/.test(e.textContent)).click(); 1");
+    await sleep(300);
+    const nw1 = await p.eval('G.player.weapons.length + G.player.bag.items.filter((o) => o.type === "gun").length');
+    await p.eval("document.querySelector('#screens .choice').click(); 1");
+    await sleep(300);
+    check(await p.eval("G.Parts.count('pt_ar_rare') === 0") && (await p.eval('G.player.weapons.length + G.player.bag.items.filter((o) => o.type === "gun").length')) === nw1 + 1 && (await p.eval('G.game.run.coins')) === 0, 'a rare assault weapon is made there with no coins at all');
+    // ---- shift + click out of a container
+    await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; 1");
+    const shift = async (setup) => {
+      await p.eval(`(() => { const IV = G.Inv, P = G.player; ${setup}; const c = IV.container(6, 4, 'test', 'corpse'); window.__c = c; window.__it = IV.makeArmor(window.__aid); IV.put(c, window.__it); G.InvUI.open(c, null); return 1; })()`);
+      await sleep(250);
+      await p.eval("(() => { const el = document.querySelector(`.iv-it[data-uid=\"${window.__it.uid}\"]`); el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, shiftKey: true, pointerId: 1 })); return 1; })()");
+      await sleep(200);
+      const r = await p.eval("JSON.stringify({ worn: !!Object.values(G.player.equip).includes(window.__it), inBag: G.player.bag.items.includes(window.__it), inC: window.__c.items.includes(window.__it), old: window.__old ? Object.values(G.player.equip).includes(window.__old) : null })");
+      await p.eval('G.InvUI.close(); 1');
+      return JSON.parse(r);
+    };
+    // the slot is bare: it goes on
+    let r = await shift("const a = G.ARMOR.find((x) => x.slot === 'head'); window.__aid = a.id; P.equip.head = null; P.bag.items = []; window.__old = null");
+    check(r.worn && !r.inC, 'shift + click: armour for a bare part goes on (' + JSON.stringify(r) + ')');
+    // the slot is taken: into the bag, nothing swapped (even the same piece with more durability)
+    r = await shift("const a = G.ARMOR.find((x) => x.slot === 'head'); window.__aid = a.id; window.__old = IV.makeArmor(a.id, null, true); window.__old.dur = 1; P.equip.head = window.__old; P.bag.items = []");
+    check(!r.worn && r.inBag && r.old === true, 'shift + click: with the part already covered it goes into the bag and what is worn stays (' + JSON.stringify(r) + ')');
+    check(!p.errs.length, 'no errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 500));
+  } finally { ch.close(); srv.close(); }
+  console.log(fails.length ? `\nPARTS TEST FAILED (${fails.length})` : '\nPARTS TEST PASSED');
+  process.exit(fails.length ? 1 : 0);
+})().catch((e) => { console.error(e); process.exit(2); });

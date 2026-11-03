@@ -1162,6 +1162,8 @@
     P().candles(w, rcx + 0.3, 1.0, rcz, rng, true);
     P().label(w, '🔄 品揃えの入れ替え', rcx - 0.3, 2.6, rcz + 0.5, -0.55, 3.6, { color: '#ffd8a0', size: 78 }); // (turned towards the door and the carpet, so it reads from both)
     w.addLight(rcx, 3.2, rcz, { flame: 0, emit: false, intensity: 6, range: 7, color: '#ffd0a0', prio: 1.0, steady: true });
+    // the weapon-parts workbench mirrors the re-stock altar on the other side of the carpet (paid here)
+    partBench(w, W / 2 - 6.5, D - 15.5, 0.55, false, rng);
     // healing fountain by the west wall, close to the door and well clear of the parts stall
     const fxp = 3.4, fzp = D - 6.5;
     w.fountainPos = new THREE.Vector3(fxp, 0, fzp);
@@ -1173,6 +1175,21 @@
     validate(w);
     return w;
   };
+
+
+  // the weapon-parts workbench: a heavy table with a vice, a few gears and a lamp; world.benchPos is where it is used from
+  function partBench(w, x, z, ry, free, rng) {
+    const c = Math.cos(ry), s = Math.sin(ry), at = (u, v) => [x + u * c + v * s, z - u * s + v * c];
+    const box = (u0, u1, v0, v1, y0, y1, mat, solid) => { const p = at(u0, v0), q = at(u1, v1); (solid ? w.solid : w.visual).call(w, mat, Math.min(p[0], q[0]), y0, Math.min(p[1], q[1]), Math.max(p[0], q[0]), y1, Math.max(p[1], q[1]), { uv: 1 }); };
+    box(-1.1, 1.1, -0.55, 0.55, 0, 0.92, 'woodDark', true);
+    box(-1.2, 1.2, -0.62, 0.62, 0.92, 1.02, 'wood', true);
+    box(0.55, 0.95, -0.2, 0.2, 1.02, 1.3, 'iron', false);
+    box(-0.9, -0.5, -0.3, 0.1, 1.02, 1.12, 'iron', false);
+    P().candles(w, x - 0.6 * c, 1.02, z + 0.6 * s, rng, true);
+    P().label(w, free ? '🔧 部品の作業台（無料）' : '🔧 部品の作業台', x, 2.55, z, ry, 3.4, { color: '#f0d8a8', size: 72 });
+    w.addLight(x, 2.8, z, { flame: 0, emit: false, intensity: 6, range: 7, color: '#ffd8a0', prio: 1.0, steady: true });
+    w.benchPos = new THREE.Vector3(x, 1.05, z); w.benchFree = !!free;
+  }
 
   // ---------------- small rooms (event / shrine / forge) ----------------
 
@@ -1525,8 +1542,9 @@
       });
       P().rug(w, W / 2, cz + 2, 0, 10, 6, [0.1, 0.32, 0.22]);
       for (const sx of [-1, 1]) {
-        P().table(w, W / 2 + sx * 5.5, cz, 0, false, rng);
-        P().candles(w, W / 2 + sx * 5.5, 0.86, cz, rng, true);
+        // the east table is the weapon-parts workbench (free here)
+        if (sx > 0) partBench(w, W / 2 + 5.5, cz, 0, true, rng);
+        else { P().table(w, W / 2 + sx * 5.5, cz, 0, false, rng); P().candles(w, W / 2 + sx * 5.5, 0.86, cz, rng, true); }
         P().bookshelf(w, sx < 0 ? 1 : W - 1, cz - 2, 0, false, rng);
         P().bookshelf(w, sx < 0 ? 1 : W - 1, cz + 2, 0, false, rng);
         P().crystals(w, W / 2 + sx * 4.2, 0, cz - 3.2, rng, 0.75);

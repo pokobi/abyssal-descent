@@ -103,7 +103,7 @@
     const fit = it.type === 'att' && attFits(it);
     const dur = it.type === 'armor' ? durBar(it) : '';
     return `<div class="iv-it t-${it.type}${fit ? ' iv-fit' : ''}" data-uid="${it.uid}" data-where="${where}" style="--rc:${R(d.rarity)};left:${it.x * cell}px;top:${it.y * cell}px;width:${w * cell - 3}px;height:${h * cell - 3}px">
-      <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
+      <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : it.type === 'part' ? '<em class="iv-def">🔩</em>' : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
   }
   // armour durability: a thin bar along the bottom of the cell (green > amber > red)
   function durBar(it) {
@@ -342,7 +342,15 @@
     const it = f.it;
     if (f.as) { unequipAtt(f.as); return; }
     if (f.eq) { if (!IV.unequip(P, f.eq, P.bag)) G.sfx.ui('deny'); render(); return; }
-    if (it.type === 'armor' && !f.eq && IV.openCont && !isMine(f.from)) { IV.equip(P, it, f.from); render(); return; }
+    // from what you are looting: armour goes on only when that part is bare; nothing you already wear is ever swapped out (it goes into the bag instead)
+    if (it.type === 'armor' && !f.eq && IV.openCont && !isMine(f.from)) {
+      const d = G.ARMOR_BY_ID[it.id];
+      if (d && P.equip && !P.equip[d.slot]) { IV.equip(P, it, f.from); render(); return; }
+      IV.remove(f.from, it); IV.noAuto = true;
+      let left; try { left = IV.stow(P, it); } finally { IV.noAuto = false; }
+      if (left > 0) { it.n = left; IV.put(f.from, it); G.sfx.ui('deny'); G.ui.toastSmall('入りきらない'); } else G.sfx.ui('click');
+      render(); return;
+    }
     if (isMine(f.from)) {
       const to = IV.openCont;
       if (!to) { if (it.type === 'armor') { IV.equip(P, it, f.from); render(); } return; }
@@ -483,7 +491,7 @@
     const [w, h] = dims();
     if (IV.fits(c, w, h, t.cx, t.cy, c === drag.f.from ? it : null)) return true;
     const over = overlapping(c, it, t.cx, t.cy, w, h);
-    if (over.length === 1) { const o = over[0]; if (o.type === 'item' && it.type === 'item' && o.id === it.id && o.n < IV.maxStack(o)) return true; return !!drag.f.from; }
+    if (over.length === 1) { const o = over[0]; if (IV.stacks(o) && o.type === it.type && o.id === it.id && o.n < IV.maxStack(o)) return true; return !!drag.f.from; }
     return false;
   }
   function overlapping(c, it, cx, cy, w, h) {
@@ -583,7 +591,7 @@
       } else {
         const over = overlapping(c, it, t.cx, t.cy, w, h);
         const o = over.length === 1 ? over[0] : null;
-        if (o && o.type === 'item' && it.type === 'item' && o.id === it.id && o.n < IV.maxStack(o)) { const k = Math.min(IV.maxStack(o) - o.n, it.n); o.n += k; it.n -= k; if (it.n <= 0) IV.remove(f.from, it); IV.changed(c); G.sfx.ui('click'); }
+        if (o && IV.stacks(o) && o.type === it.type && o.id === it.id && o.n < IV.maxStack(o)) { const k = Math.min(IV.maxStack(o) - o.n, it.n); o.n += k; it.n -= k; if (it.n <= 0) IV.remove(f.from, it); IV.changed(c); G.sfx.ui('click'); }
         else if (o && !f.eq && f.from && trySwap(f, it, c, t.cx, t.cy, rot, o)) G.sfx.ui('select');
         else G.sfx.ui('deny');
       }
@@ -633,7 +641,7 @@
     if (IV.isArm(it)) opts.push([`${it.type === 'gun' ? '🔫' : '🗡️'} 装備する${it.type === 'gun' && P.weapons.length >= P.stats.weaponSlots ? '（持っている銃と入れ替え）' : it.type === 'melee' && P.melee && P.melee.id !== (G.BARE_MELEE || 'fists') ? '（今の近接武器と入れ替え）' : ''}`, () => { if (GM.equipArm(it, f.from)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); }]);
     if (f.eq) opts.push(['📥 外す', () => { IV.unequip(P, f.eq); render(); }]);
     if (IV.openCont && !f.eq) opts.push([isMine(f.from) ? '📤 箱へ移す' : '📥 インベントリへ', () => quickMove(f)]);
-    if (it.type === 'item' && it.n > 1 && !f.eq) opts.push(['✂️ 半分に分ける', () => { const k = Math.floor(it.n / 2); const part = IV.make(it.type, it.id, k); const s = IV.findSpot(f.from, part); if (!s) { G.sfx.ui('deny'); return; } it.n -= k; Object.assign(part, s); f.from.items.push(part); IV.changed(f.from); render(); }]);
+    if (IV.stacks(it) && it.n > 1 && !f.eq) opts.push(['✂️ 半分に分ける', () => { const k = Math.floor(it.n / 2); const part = IV.make(it.type, it.id, k); const s = IV.findSpot(f.from, part); if (!s) { G.sfx.ui('deny'); return; } it.n -= k; Object.assign(part, s); f.from.items.push(part); IV.changed(f.from); render(); }]);
     if (!f.eq) opts.push(['↻ 回転', () => { const [w, h] = IV.baseSize(it); const nr = !it.rot; const [ww, hh] = nr ? [h, w] : [w, h]; if (IV.fits(f.from, ww, hh, it.x, it.y, it)) { it.rot = nr; IV.changed(f.from); render(); } else G.sfx.ui('deny'); }]);
     opts.push(['🗑️ 捨てる', () => discard(f)]);
     popMenu(opts, e);
@@ -655,7 +663,7 @@
       return G.StatusUI.gunTip(w) + `<div class="ivt-v">ダブルクリック／武器枠へドラッグで装備　売値 ${U.fmt(IV.value(it))}🪙</div>`;
     }
     const rar = G.RARITY[d.rarity];
-    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? '補修具（防具へドラッグして使う）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
+    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? '補修具（防具へドラッグして使う）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント', part: '武器パーツ（作業台で3つ合成）' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
     if (it.type === 'armor') {
       const M = G.ARMOR_MAT_BY_ID[d.mat], S = G.ARMOR_SLOT_BY_ID[d.slot];
       body += `<div class="ivt-r">部位 <b>${S.name}</b>　素材 <b>${M.name}</b></div><div class="ivt-r">🛡️ 防御力 <b>${d.def}</b>　⚖️ 重さ <b>${d.weight || 'なし'}</b></div>`;

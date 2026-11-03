@@ -383,6 +383,7 @@
   const armorCard = (d, ench) => `<span class="cd-line cd-dim">${U.esc(G.ARMOR_SLOT_BY_ID[d.slot].name)}（${U.esc(G.ARMOR_MAT_BY_ID[d.mat].name)}）</span><span class="cd-line">🛡️ 防御力 <b class="cd-n">${d.def}</b></span><span class="cd-line">🔧 耐久 <b class="cd-good">100%</b>（新品）</span>${fxLine(d, ench)}`;
   const r1 = (v) => Math.round(v * 10) / 10;
   const gunCard = (d) => { const tr = d.trait && G.WEAPON_TRAITS[d.trait]; return `<span class="cd-line cd-dim">🔫 ${U.esc(d.cat || '')}</span><span class="cd-line">ダメージ <b class="cd-n">${r1(d.dmg)}</b></span><span class="cd-line">連射 <b class="cd-n">${r1(d.rpm)}</b>　装弾 <b class="cd-n">${r1(d.mag)}</b></span>${tr ? `<span class="cd-line cd-fx">◆ ${U.esc(tr.name)}：${U.esc(tr.desc)}</span>` : ''}${d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : ''}`; };
+  AR.gunCard = (d) => gunCard(d); AR.meleeCard = (d) => meleeCard(d);
   const meleeCard = (d) => `<span class="cd-line cd-dim">🗡️ 近接武器（${U.esc(d.cat || '')}）</span><span class="cd-line">ダメージ <b class="cd-n">${r1(d.dmg)}</b></span><span class="cd-line">間隔 <b class="cd-n">${r1(d.swing)}</b>秒　リーチ <b class="cd-n">${r1(d.range)}</b>m</span>${d.traitDesc ? `<span class="cd-line cd-fx">◆ ${U.esc(d.traitDesc)}</span>` : ''}${d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : ''}`;
   // "A+15%、B+8%、C-15%。" -> one gold line per effect
   const effLines = (txt) => String(txt || '').split(/[、。]/).map((t) => t.trim()).filter(Boolean).map((t) => `<span class="cd-line cd-fx">◆ ${U.esc(t)}</span>`).join('');

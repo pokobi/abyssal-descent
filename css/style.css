@@ -1142,7 +1142,7 @@ body.boss-on #objective { display: none; }
 .iv-as .iv-it { border: none; background: none; }
 .iv-asl { display: flex; flex-direction: column; align-items: center; font-size: 1.1em; opacity: 0.4; line-height: 1.1; }
 .iv-asl small { font-size: 0.62em; margin-top: 0.1em; }
-.iv-mst { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.3em; align-items: stretch; }
+.iv-mst { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.3em; align-items: stretch; }
 .iv-mst div { display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.05); border-radius: 0.3em; }
 .iv-mst small { font-size: 0.8em; color: #a99d88; } .iv-mst b { font-size: 1.3em; color: #fff; }
 /* skills */
@@ -1270,6 +1270,8 @@ body.inv-loot #status-overlay { display: none !important; }
 .iv-wpv { flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; margin: 0.1em 0 0.4em; background: radial-gradient(ellipse at 50% 60%, rgba(255,255,255,0.07), transparent 70%); }
 .iv-wpv canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; pointer-events: none; }
 .iv-asg { flex: none; grid-template-rows: repeat(2, calc(var(--hw) * 0.125)); }
+/* the melee weapon's one socket (属性コア): one row, the size of a gun's socket */
+.iv-asg.iv-masg { grid-template-rows: calc(var(--hw) * 0.125); }
 .iv-mst { flex: none; height: calc(var(--hw) * 0.2); }
 
 /* looting: only the inventory, big, in the middle (bag next to the chest / corpse) */
@@ -1789,3 +1791,17 @@ html.m .pb-title { font-size: 16px; }
 .cls-skill .sc-d { margin-top: 4px; font-size: 12px; line-height: 1.55; color: #c8bca4; }
 .cls-skill .sv { color: #f0dcae; }
 .cls-skill .sd, .cls-skill .wc-legend, .cls-skill .sc-a, .cls-skill .sc-x, .cls-skill .sc-h .lv { display: none; }
+
+/* the element mark: a small ring in the colour of the element, in the lower-left corner of an icon (element.js EL.badge) */
+.elb { position: absolute; left: 2px; bottom: 2px; z-index: 4; width: 1.3em; height: 1.3em; font-size: 13px; font-style: normal; line-height: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--ec) 35%, #0a0806) 0%, #0a0806 100%); box-shadow: 0 0 0 1.5px var(--ec), 0 0 0 3px rgba(0,0,0,0.9), 0 0 7px color-mix(in srgb, var(--ec) 80%, transparent); pointer-events: none; }
+.elb.in { position: relative; left: auto; bottom: auto; display: inline-flex; vertical-align: middle; margin-left: 0.35em; font-size: 0.75em; }
+.ab > .elb { font-size: 13px; left: 1px; bottom: 1px; }
+.ab.small > .elb { font-size: 9px; }
+.card .c-icon, #interact-panel .ip-icon, .icard .ic-i, .pw-row .pw-ic, .sc-h .ic, .it .ic, .iv-sk .sic { position: relative; }
+.card .c-icon > .elb { font-size: 22px; left: 0; bottom: 0; }
+#interact-panel .ip-icon > .elb { font-size: 13px; left: -4px; bottom: -4px; }
+.icard .ic-i > .elb { font-size: 11px; left: -4px; bottom: -3px; }
+.cx-item .ci > .elb, .pw-row .pw-ic > .elb, .sc-h .ic > .elb, .it .ic > .elb, .iv-sk .sic > .elb { font-size: 10px; left: -5px; bottom: -3px; }
+.iv-sk .sic > .elb { font-size: 0.3em; }
+.alch-item .ai-ic > .elb { font-size: 12px; }
+.elchip { display: inline-block; padding: 0 0.5em; border-radius: 0.8em; border: 1px solid var(--ec); color: var(--ec); font-size: 12px; line-height: 1.6; font-weight: 700; background: color-mix(in srgb, var(--ec) 14%, transparent); white-space: nowrap; }

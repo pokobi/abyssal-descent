@@ -103,7 +103,7 @@
     const fit = it.type === 'att' && attFits(it);
     const dur = it.type === 'armor' ? durBar(it) : '';
     return `<div class="iv-it t-${it.type}${fit ? ' iv-fit' : ''}" data-uid="${it.uid}" data-where="${where}" style="--rc:${R(d.rarity)};left:${it.x * cell}px;top:${it.y * cell}px;width:${w * cell - 3}px;height:${h * cell - 3}px">
-      <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : it.type === 'part' ? '<em class="iv-def">🔩</em>' : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
+      <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${G.Elem.badge(G.Elem.itemTag(it))}${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : it.type === 'part' ? '<em class="iv-def">🔩</em>' : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
   }
   // armour durability: a thin bar along the bottom of the cell (green > amber > red)
   function durBar(it) {
@@ -111,7 +111,10 @@
     return `<i class="iv-dur" style="--f:${f.toFixed(3)};--dc:${col}"></i>`;
   }
   // an attachment that would be a free upgrade: some gun has its socket empty and can take it
-  function attFits(it) { const a = G.ATT_BY_ID[it.id]; return !!a && G.weapons.gunsInOrder().some((w) => !w.atts[a.slot] && G.attOk(a, w)); }
+  // the weapon behind a socket key: '0' / '1' = the guns, 'm' = the melee weapon (its 属性コア socket)
+  const slotW = (i) => (i === 'm' ? P.melee : G.weapons.gunSlots()[+i]);
+  const armsAll = () => [...G.weapons.gunsInOrder(), P.melee].filter(Boolean);
+  function attFits(it) { const a = G.ATT_BY_ID[it.id]; return !!a && armsAll().some((w) => !w.atts[a.slot] && G.attOk(a, w)); }
   function gridEl(c, key, cell) {
     cell = cell || CS;
     return `<div class="iv-grid" data-grid="${key}" data-cs="${cell}" style="width:${c.cols * cell}px;height:${c.rows * cell}px;--cs:${cell}px">${c.items.map((it) => itemEl(it, key, cell)).join('')}</div>`;
@@ -120,6 +123,14 @@
     const it = P.equip[S.id], d = it && IV.def(it);
     return `<div class="iv-eq ${cls || ''}${it ? ' on' : ''}" data-eq="${S.id}" style="--rc:${d ? R(d.rarity) : '#3a332a'}">
       <span class="iv-eql">${S.name}</span>${it ? `<div class="iv-it t-armor" data-uid="${it.uid}" data-where="eq:${S.id}" style="--rc:${R(d.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.95)}">${G.armorIcon(d)}</span><em class="iv-def">🛡${d.def}</em>${it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : ''}${durBar(it)}</div>` : `<span class="iv-ghosticon">${S.icon}</span>`}</div>`;
+  }
+  // the melee weapon's one socket: the 属性コア (closed on a weapon with an element of its own, absent on bare hands)
+  function meleeCore(m) {
+    if (!m || m.id === (G.BARE_MELEE || 'fists')) return '';
+    const A = G.ATT_BY_ID, S = G.ATT_SLOTS.core, id = m.atts && m.atts.core, a = id && A[id];
+    if (!a && G.ownEl(m)) { const E = G.Elem.BY[m.def.el]; return `<div class="iv-asg iv-masg"><div class="iv-as iv-lock" data-as="m:core" title="${E.name}属性を持つ武器なので、属性コアは付けられない" style="--rc:${E.col}"><span class="iv-asl">${E.icon}</span></div></div>`; }
+    const wantsOne = !a && [...P.bag.items, ...(IV.openCont ? IV.openCont.items : [])].some((q) => { const qa = q.type === 'att' && A[q.id]; return qa && qa.slot === 'core' && G.attOk(qa, m); });
+    return `<div class="iv-asg iv-masg"><div class="iv-as${a ? ' on' : ''}${wantsOne ? ' iv-fitslot' : ''}" data-as="m:core" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:m:core" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div></div>`;
   }
   function weaponBoxes() {
     const W = G.weapons, guns = W.gunSlots(), A = G.ATT_BY_ID;
@@ -134,11 +145,11 @@
         return `<div class="iv-as${a ? ' on' : ''}${wantsOne ? ' iv-fitslot' : ''}" data-as="${i}:${sl}" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:${i}:${sl}" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div>`;
       }).join('');
       const dps = Math.round(W.gunDps(w)); // (same number as the status screen: 与ダメ included)
-      return `<div class="iv-wbox" data-wslot="${i}" style="--rc:${R(w.def.rarity)}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b style="color:${R(w.def.rarity)}">${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</b><small>${U.esc(w.def.cat || '')}</small></span><span class="wdps"><b>${dps}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('gun', w.def, w.atts)}</div><div class="iv-asg">${cells}</div></div>`;
+      return `<div class="iv-wbox" data-wslot="${i}" style="--rc:${R(w.def.rarity)}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b style="color:${R(w.def.rarity)}">${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}${G.Elem.badge(w, 'in')}</b><small>${U.esc(w.def.cat || '')}</small></span><span class="wdps"><b>${dps}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('gun', w.def, w.atts)}</div><div class="iv-asg">${cells}</div></div>`;
     });
     const m = P.melee, md = m.def, ms = W.meleeStats(m), mfx = W.meleeFx ? W.meleeFx(md) : [];
-    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}</b><small>${U.esc(md.cat || '')}${md.id === (G.BARE_MELEE || 'fists') ? '・素手' : mfx.length ? ' · ' + U.esc(mfx[0]) : ''}</small></span><span class="wdps"><b>${Math.round(W.meleeDps(m))}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>
-      <div class="iv-mst"><div><small>ダメージ</small><b>${Math.round(ms.dmg)}</b></div><div><small>間隔</small><b>${ms.swing.toFixed(2)}s</b></div><div><small>リーチ</small><b>${ms.range}m</b></div></div></div>`);
+    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}${G.Elem.badge(m, 'in')}</b><small>${U.esc(md.cat || '')}${md.id === (G.BARE_MELEE || 'fists') ? '・素手' : mfx.length ? ' · ' + U.esc(mfx[0]) : ''}</small></span><span class="wdps"><b>${Math.round(W.meleeDps(m))}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>${meleeCore(m)}
+      <div class="iv-mst"><div><small>ダメージ</small><b>${Math.round(ms.dmg * W.meleeDmgMul())}</b></div><div><small>重撃</small><b>${Math.round(ms.dmg * W.meleeDmgMul() * ms.heavy[0])}</b></div><div><small>間隔</small><b>${ms.swing.toFixed(2)}s</b></div><div><small>リーチ</small><b>${ms.range}m</b></div></div></div>`);
     return out.join('');
   }
   function skillBoxes() {
@@ -147,7 +158,7 @@
       const key = G.input.skillKey(i);
       if (!sk) { out.push(`<div class="iv-sk empty${i === 0 ? ' ult' : ''}" data-sk="${i}"><kbd>${key}</kbd><span class="snm dim">— 空き —</span></div>`); return; }
       const ready = A.ready(sk), st = sk.maxCharges ? `${sk.charges}/${sk.maxCharges}` : ready ? 'READY' : `${Math.ceil(sk.cd)}s`;
-      out.push(`<div class="iv-sk${i === 0 ? ' ult' : ''}" data-sk="${i}" style="--rc:${R(sk.def.rarity)}"><kbd>${key}</kbd><span class="sic">${sk.def.icon}</span><span class="snm">${U.esc(sk.def.name)}</span><span class="sst${ready ? ' ok' : ''}">${A.lvHTML(sk) ? A.lvHTML(sk) + ' · ' : ''}${st}</span></div>`);
+      out.push(`<div class="iv-sk${i === 0 ? ' ult' : ''}" data-sk="${i}" style="--rc:${R(sk.def.rarity)}"><kbd>${key}</kbd><span class="sic">${sk.def.icon}${G.Elem.badge(sk.def)}</span><span class="snm">${U.esc(sk.def.name)}</span><span class="sst${ready ? ' ok' : ''}">${A.lvHTML(sk) ? A.lvHTML(sk) + ' · ' : ''}${st}</span></div>`);
     });
     const pi = P.pileInfo();
     out.push(`<div class="iv-sk fixed" data-sk="pile" style="--rc:var(--gold2)"><kbd>${G.input.keyName('crouch')}</kbd><span class="sic">🔨</span><span class="snm">パイルドライバー</span><span class="sst${P.pileReady() ? ' ok' : ''}">Lv${pi.lvl + 1} · ${P.pileReady() ? 'READY' : Math.ceil(P.pileCd) + 's'}</span></div>`);
@@ -240,7 +251,7 @@
   function findIt(el) {
     const uid = +el.dataset.uid, where = el.dataset.where;
     if (where.startsWith('eq:')) { const s = where.slice(3); return { it: P.equip[s], from: null, eq: s }; }
-    if (where.startsWith('as:')) { const [, i, sl] = where.split(':'); const w = G.weapons.gunSlots()[+i], id = w && w.atts[sl]; return { it: id ? IV.make('att', id, 1) : null, from: null, as: { w, sl } }; }
+    if (where.startsWith('as:')) { const [, i, sl] = where.split(':'); const w = slotW(i), id = w && w.atts[sl]; return { it: id ? IV.make('att', id, 1) : null, from: null, as: { w, sl } }; }
     const c = contOf(where); return { it: c && c.items.find((o) => o.uid === uid), from: c, eq: null };
   }
 
@@ -368,10 +379,10 @@
   }
   // attachments: bag <-> gun sockets
   function equipAtt(it, gun) {
-    const a = G.ATT_BY_ID[it.id], guns = G.weapons.gunsInOrder().filter((w) => G.attOk(a, w));
+    const a = G.ATT_BY_ID[it.id], guns = armsAll().filter((w) => G.attOk(a, w));
     const w = gun || (guns.includes(P.weapon) ? P.weapon : guns[0]);
-    if (!w) { G.sfx.ui('deny'); G.ui.toastSmall('付けられる銃がない'); return false; }
-    if (!GM.moveAtt(it.id, 'stash', w)) { G.sfx.ui('deny'); G.ui.toastSmall('この銃には付けられない'); return false; }
+    if (!w) { G.sfx.ui('deny'); G.ui.toastSmall('付けられる武器がない'); return false; }
+    if (!GM.moveAtt(it.id, 'stash', w)) { G.sfx.ui('deny'); G.ui.toastSmall('この武器には付けられない'); return false; }
     G.sfx.mech('magIn'); render(); return true;
   }
   function unequipAtt(as) {
@@ -428,8 +439,8 @@
     }
     if (it.type === 'armor') add(`.iv-eq[data-eq="${G.ARMOR_BY_ID[it.id].slot}"]`);
     else if (it.type === 'att') {
-      const a = G.ATT_BY_ID[it.id], guns = G.weapons.gunSlots();
-      root.querySelectorAll('.iv-as').forEach((n) => { const [i, sl] = n.dataset.as.split(':'); const w = guns[+i]; if (w && sl === a.slot && G.attOk(a, w)) n.classList.add('iv-glow'); });
+      const a = G.ATT_BY_ID[it.id];
+      root.querySelectorAll('.iv-as').forEach((n) => { const [i, sl] = n.dataset.as.split(':'); const w = slotW(i); if (w && sl === a.slot && G.attOk(a, w)) n.classList.add('iv-glow'); });
     } else { const k = IV.specOf(it); if (k === 'g') add('.iv-spec[data-spec="g"]'); else if (k) add('.iv-spec[data-spec="c1"],.iv-spec[data-spec="c2"]'); }
   }
   // repair kit held over a piece: the bar shows the part that would come back (pulsing cyan) and a small "+150" / "最大" tag
@@ -552,7 +563,8 @@
     if (!t) { render(); return; }
     if (t.ground) { if (f.as) { render(); return; } discard(f); return; }
     // a part dropped anywhere on a gun's box (even on the wrong little socket) goes into the socket it belongs to
-    if (t.as && it.type === 'att' && G.ATT_BY_ID[it.id] && !(f.as && f.as.w === G.weapons.gunSlots()[+t.as.split(':')[0]])) t = { wslot: +t.as.split(':')[0] };
+    if (t.as && t.as[0] !== 'm' && it.type === 'att' && G.ATT_BY_ID[it.id] && !(f.as && f.as.w === G.weapons.gunSlots()[+t.as.split(':')[0]])) t = { wslot: +t.as.split(':')[0] };
+    if (t.melee && it.type === 'att') t = { as: 'm:core' }; // (a part dropped on the melee weapon's box goes to its core socket)
     if (t.melee) { if (it.type === 'melee' && GM.equipArm(it, f.from)) G.sfx.mech('switch'); else { G.sfx.ui('deny'); if (it.type !== 'melee') G.ui.toastSmall('そこには近接武器しか持てない'); } render(); return; }
     if (t.wslot !== undefined) {
       const w = G.weapons.gunSlots()[t.wslot];
@@ -563,7 +575,7 @@
     if (t.sk !== undefined) { G.sfx.ui('deny'); render(); return; }
     if (IV.isKit(it) && (t.eq || t.grid)) { const kp = kitPiece(t, it, rot); if (kp) { mend(f, it, kp); return; } } // a repair kit dropped on an armour piece mends it instead of moving
     if (t.as) {
-      const [wi, sl] = t.as.split(':'), w = G.weapons.gunSlots()[+wi];
+      const [wi, sl] = t.as.split(':'), w = slotW(wi);
       const a = it.type === 'att' && G.ATT_BY_ID[it.id];
       if (!a || !w) { G.sfx.ui('deny'); G.ui.toastSmall('そこにはアタッチメントしか付けられない'); }
       else if (a.slot !== sl) { G.sfx.ui('deny'); G.ui.toastSmall(`${a.name} は ${G.ATT_SLOTS[a.slot].icon}${G.ATT_SLOTS[a.slot].name} スロット用`); }
@@ -634,7 +646,7 @@
     const f = findIt(el); if (!f.it) return;
     const it = f.it, opts = [];
     if (f.as) opts.push(['📥 外してインベントリへ', () => unequipAtt(f.as)]);
-    else if (it.type === 'att' && isMine(f.from)) for (const w of G.weapons.gunsInOrder()) if (G.attOk(G.ATT_BY_ID[it.id], w)) opts.push([`🔩 装着: ${G.weapons.keyLabel(w)}${w.def.name}`, () => equipAtt(it, w)]);
+    else if (it.type === 'att' && isMine(f.from)) for (const w of armsAll()) if (G.attOk(G.ATT_BY_ID[it.id], w)) opts.push([`🔩 装着: ${w === P.melee ? '' : G.weapons.keyLabel(w)}${w.def.name}`, () => equipAtt(it, w)]);
     if (f.as) { popMenu(opts, e); return; }
     if (isMine(f.from) && usable(it)) opts.push(['🍶 使う', () => { UIV.close(); G.abilities.useItemId(it.id); }]);
     if (isMine(f.from) && usable(it) && P.itemCount(it.id) > 1) { const n = P.itemCount(it.id); opts.push([`🍶 まとめて使う（×${n}）`, () => { UIV.close(); G.abilities.queueUse(it.id, n); }]); }
@@ -666,6 +678,8 @@
     }
     const rar = G.RARITY[d.rarity];
     let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? '補修具（防具へドラッグして使う）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント', part: '武器パーツ（作業台で3つ合成）' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
+    { const tg = G.Elem.itemTag(it), core = it.gun && it.gun.atts && it.gun.atts.core && G.ATT_BY_ID[it.gun.atts.core];
+      if (tg) body += `<div class="ivt-r">${G.Elem.chip(tg)} <span style="color:var(--dim)">${core && !d.el ? `${core.icon} ${U.esc(core.name)}を装着中` : it.type === 'item' ? '当たった敵に付く' : it.type === 'att' && d.slot === 'core' ? '装着した武器の攻撃に付く' : it.type === 'att' ? '状態異常と一緒に付く' : '攻撃に付く'}</span></div>`; }
     if (it.type === 'armor') {
       const M = G.ARMOR_MAT_BY_ID[d.mat], S = G.ARMOR_SLOT_BY_ID[d.slot];
       body += `<div class="ivt-r">部位 <b>${S.name}</b>　素材 <b>${M.name}</b></div><div class="ivt-r">🛡️ 防御力 <b>${d.def}</b>　⚖️ 重さ <b>${d.weight || 'なし'}</b></div>`;

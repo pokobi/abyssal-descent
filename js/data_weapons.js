@@ -230,24 +230,25 @@
     ['g_fuel', 'mag', '大型燃料タンク', '🛢️', 'uncommon', 280, { mag: 1.6 }, 'tank', '燃料容量+60%。', (w) => !!w.flame],
     ['m_nozzle', 'muzzle', '拡散ノズル', '🌬️', 'uncommon', 260, { range: 1.35, dmg: 1.1 }, 'nozzle', '火炎射程+35%、ダメージ+10%。', (w) => !!w.flame],
     // 属性コア (element.js): the gun's hits carry the element. Not on a gun born with one
-    ['c_fire', 'core', '炎の属性コア', '🔥', 'uncommon', 340, { el: 'fire' }, null, '銃の攻撃が炎属性になる。', NOEL],
-    ['c_water', 'core', '水の属性コア', '💧', 'uncommon', 340, { el: 'water' }, null, '銃の攻撃が水属性になる。', NOEL],
-    ['c_ice', 'core', '氷の属性コア', '❄️', 'uncommon', 340, { el: 'ice' }, null, '銃の攻撃が氷属性になる。', NOEL],
-    ['c_volt', 'core', '雷の属性コア', '⚡', 'uncommon', 340, { el: 'volt' }, null, '銃の攻撃が雷属性になる。', NOEL],
-    ['c_wind', 'core', '風の属性コア', '🌪️', 'uncommon', 340, { el: 'wind' }, null, '銃の攻撃が風属性になる（敵に付いた属性を周囲へ広げる）。', NOEL],
-    ['c_earth', 'core', '地の属性コア', '🪨', 'uncommon', 340, { el: 'earth' }, null, '銃の攻撃が地属性になる（敵に付いた属性で結晶を作る）。', NOEL],
+    ['c_fire', 'core', '炎の属性コア', '🔥', 'epic', 520, { el: 'fire' }, null, '武器（銃・近接）の攻撃が炎属性になる。', NOEL],
+    ['c_water', 'core', '水の属性コア', '💧', 'epic', 520, { el: 'water' }, null, '武器（銃・近接）の攻撃が水属性になる。', NOEL],
+    ['c_ice', 'core', '氷の属性コア', '❄️', 'epic', 520, { el: 'ice' }, null, '武器（銃・近接）の攻撃が氷属性になる。', NOEL],
+    ['c_volt', 'core', '雷の属性コア', '⚡', 'epic', 520, { el: 'volt' }, null, '武器（銃・近接）の攻撃が雷属性になる。', NOEL],
+    ['c_wind', 'core', '風の属性コア', '🌪️', 'epic', 520, { el: 'wind' }, null, '武器（銃・近接）の攻撃が風属性になる（敵に付いた属性を周囲へ広げる）。', NOEL],
+    ['c_earth', 'core', '地の属性コア', '🪨', 'epic', 520, { el: 'earth' }, null, '武器（銃・近接）の攻撃が地属性になる（敵に付いた属性で結晶を作る）。', NOEL],
     ['b_blast', 'barrel', '高圧発射筒', '🎇', 'rare', 380, { 'explodeR+': 1.2, dmg: 1.1 }, null, '爆発半径+1.2m、ダメージ+10%。', (w) => !!(w.proj && w.proj.explode)],
   ];
   const ATTACHMENTS = AT.map(([id, slot, name, icon, rarity, price, mods, visual, desc, compat]) => ({ id, slot, name, icon, rarity, price, mods, visual, desc, compat, kind: 'attachment' }));
   G.ATT_SLOTS = SLOT;
   G.ATTACHMENTS = ATTACHMENTS;
   G.ATT_BY_ID = Object.fromEntries(ATTACHMENTS.map((a) => [a.id, a]));
-  // does this attachment fit this weapon? (the kind of gun, and the weapon itself: one that carries an element of its own,
+  // does this attachment fit this weapon? (the kind of gun; a melee weapon takes a 属性コア only, and the weapon itself: one that carries an element of its own,
   // born with it or made from parts with one, takes no 属性コア). Takes a weapon or a weapon definition.
   G.ownEl = (w) => !!w && !!(w.el || (w.def && w.def.el));
   G.attOk = function (a, w) {
     if (!a || !w) return false;
     const d = w.def || w;
+    if (d.kind === 'melee' && (a.slot !== 'core' || d.id === (G.BARE_MELEE || 'fists'))) return false; // (a melee weapon has the 属性コア socket only; bare hands have none)
     if (!a.compat(d)) return false;
     if (a.slot === 'core' && (w.el || d.el)) return false;
     return true;

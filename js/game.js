@@ -502,6 +502,7 @@
     }
     G.weapons.dirty = true;
     if (!P.meleeMode && (from === P.weapon || to === P.weapon)) G.weapons.equip(true);
+    if (from === P.melee || to === P.melee) G.weapons.melee.rebuild(); // (the element skin of the blade)
     G.ui.refreshWeapon();
     return true;
   }
@@ -518,7 +519,7 @@
       buffs: [...P.buffs], buffState: P.buffState,
       weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined })), wIdx: P.wIdx, kitAtts: P.kitAtts || [],
       wOrder: G.weapons.order().map((t) => (t === 'm' ? 'm' : t ? P.weapons.indexOf(t) : null)),
-      melee: { id: P.melee.id, lv: P.melee.lv || 0, kit: P.melee.kit ? 1 : undefined },
+      melee: { id: P.melee.id, lv: P.melee.lv || 0, kit: P.melee.kit ? 1 : undefined, atts: P.melee.atts && P.melee.atts.core ? { core: P.melee.atts.core } : undefined },
       skills: P.skills.map((s) => (s ? s.id : null)), skillLv: P.skills.map((s) => (s ? s.lv || 0 : 0)), skillKit: P.skills.map((s) => (s && s.kit ? 1 : 0)), pileTome: P.pileTome || 0,
       grenadeSel: P.grenadeSel, isel: P.isel, invGrid: G.Inv.snap(P),
     };
@@ -572,7 +573,7 @@
     if (!P.weapons.length && !Array.isArray(d.weapons)) P.weapons = [G.weapons.make('starter')]; // (a run saved with every gun put away keeps none)
     P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));
-    if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; if (d.melee.kit) P.melee.kit = true; }
+    if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; if (d.melee.kit) P.melee.kit = true; const c = d.melee.atts && d.melee.atts.core; if (c && G.ATT_BY_ID[c]) { if (G.attOk(G.ATT_BY_ID[c], P.melee)) P.melee.atts.core = c; else coresBack.push(c); } }
     P.kitAtts = (d.kitAtts || []).slice();
     P.skills = [0, 1, 2, 3].map((i) => { if (!(d.skills && d.skills[i] && G.SKILL_BY_ID[d.skills[i]])) return null; const s = G.abilities.makeSlot(d.skills[i]); s.lv = Math.min(G.abilities.MAXLV, (d.skillLv && d.skillLv[i]) || 0); if (d.skillKit && d.skillKit[i]) s.kit = true; return s; });
     P.pileTome = d.pileTome || 0;
@@ -1218,7 +1219,7 @@
   // a gun thrown away from the inventory screen becomes a pickup on the ground that keeps its upgrades, parts and ammo
   // a gun out of your hands as an inventory thing (attachments, level, ammo and kills ride along)
   GM.gunItem = (w) => G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined } }); // (its own element and the kit mark ride along)
-  GM.meleeItem = (m) => G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0, kit: m.kit ? 1 : undefined } });
+  GM.meleeItem = (m) => G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0, kit: m.kit ? 1 : undefined, atts: m.atts && m.atts.core ? { core: m.atts.core } : undefined } }); // (its 属性コア rides along)
   // take a gun out of your hands (every gun can go: with none left you fight with the melee weapon / fists)
   GM.releaseGun = function (w) {
     if (!w || !P.weapons.includes(w)) return null;
@@ -1302,7 +1303,7 @@
   GM.dropMelee = function () {
     const m = P.melee;
     if (!m || m.id === (G.BARE_MELEE || 'fists')) return false;
-    const it = G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0 } });
+    const it = GM.meleeItem(m);
     G.Inv.dropToGround(it, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(P.forward().setY(0).normalize(), 0.9));
     P.melee = G.weapons.makeMelee(G.BARE_MELEE || 'fists');
     if (P.meleeMode) G.weapons.melee.equip(false);
@@ -1312,11 +1313,12 @@
   GM.takeMelee = function (it, quiet) {
     const prev = P.melee;
     if (prev && prev.id !== (G.BARE_MELEE || 'fists')) {
-      const old = G.Inv.make('melee', prev.id, 1, { gun: { lv: prev.lv || 0, kit: prev.kit ? 1 : undefined } });
+      const old = GM.meleeItem(prev);
       G.Inv.dropToGround(old, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)));
     }
     const m = G.weapons.makeMelee(it.id);
     m.lv = (it.gun && it.gun.lv) || 0; if (it.gun && it.gun.kit) m.kit = true;
+    const core = it.gun && it.gun.atts && it.gun.atts.core; if (core && G.ATT_BY_ID[core]) { if (G.attOk(G.ATT_BY_ID[core], m)) m.atts.core = core; else P.attStash.push(core); }
     P.melee = m;
     if (P.meleeMode) G.weapons.melee.equip(false);
     G.ui.refreshWeapon(); P.recalc();
@@ -1426,7 +1428,7 @@
       else if (k === 'forge') c = GM.SVC_FORGE;
       else if (k === 'tome') c = P.skills.some((s) => s && (s.lv || 0) < G.abilities.MAXLV) ? GM.SVC_TOME : null;
       else if (k === 'skill') c = pickBy(r, G.SKILLS.filter((x) => !P.skills.some((s) => s && s.id === x.id)), luck);
-      else if (k === 'attachment') { const comp = G.ATTACHMENTS.filter((a) => P.weapons.some((pw) => G.attOk(a, pw))); c = pickBy(r, comp.length ? comp : G.ATTACHMENTS, luck); }
+      else if (k === 'attachment') { const comp = G.ATTACHMENTS.filter((a) => [...P.weapons, P.melee].some((pw) => G.attOk(a, pw))); c = pickBy(r, comp.length ? comp : G.ATTACHMENTS, luck); }
       else if (k === 'grenade') c = pickBy(r, G.ITEMS.filter((x) => x.cat === 'grenade'), luck);
       else if (k === 'armor') c = pickArmor(r, luck);
       else if (k === 'util') c = pickBy(r, G.ITEMS.filter((x) => x.cat !== 'grenade'), luck);
@@ -1696,7 +1698,7 @@
     if (best.type === 'offer') {
       const o = best.o, ob = o.obj;
       const info = describeOffer(o);
-      G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
+      G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, el: G.Elem.tagOf(ob), name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
     } else if (best.type === 'sell') {
       G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・防具・アイテム・投擲物を売却できる。', action: '売る' });
     } else if (best.type === 'reroll') {
@@ -1736,7 +1738,7 @@
       return;
     } else if (best.type === 'loot') {
       const g = best.g, d = G.Inv.def(g.it);
-      G.ui.showInteract({ key: 'loot' + g.it.uid, icon: d.icon, name: d.name + (g.it.n > 1 ? ` ×${g.it.n}` : ''), rc: G.ui.R(d.rarity), cat: '地面に落ちている', desc: '', action: '拾う' });
+      G.ui.showInteract({ key: 'loot' + g.it.uid, icon: d.icon, el: G.Elem.itemTag(g.it), name: d.name + (g.it.n > 1 ? ` ×${g.it.n}` : ''), rc: G.ui.R(d.rarity), cat: '地面に落ちている', desc: '', action: '拾う' });
       if (I.hit('interact')) G.Inv.pickUp(g);
       return;
     } else if (best.type === 'chestOpen') {

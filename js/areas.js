@@ -651,7 +651,7 @@
         const extra = G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier >= Math.max(2, targetTier - 1) && !pool.includes(x) && x.id !== a.d.id && x.id !== b.d.id);
         pool = pool.concat(U.shuffle(extra));
       }
-      const comp = pool.filter((x) => P.weapons.some((pw) => G.attOk(x, pw)));
+      const comp = pool.filter((x) => [...P.weapons, P.melee].some((pw) => G.attOk(x, pw)));
       const cands = U.shuffle((comp.length >= 3 ? comp : pool).slice()).slice(0, 3);
       const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: attCard(d), onPick: () => {
         consumeBoth();
@@ -681,7 +681,7 @@
       const arD = U.pick(G.ARMOR.filter((x) => G.RARITY[x.rarity].tier === targetTier)) || U.pick(G.ARMOR.filter((x) => G.RARITY[x.rarity].tier >= 2));
       const arInst = G.Inv.makeArmor(arD.id);
       if (targetTier >= 4 && (!arInst.ench || arInst.ench.length < 2)) arInst.ench = G.rollEnchants('legendary');
-      const attPool = G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier === targetTier && P.weapons.some((pw) => G.attOk(x, pw)));
+      const attPool = G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier === targetTier && [...P.weapons, P.melee].some((pw) => G.attOk(x, pw)));
       const attD = U.pick(attPool.length ? attPool : G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier >= Math.max(2, targetTier - 1)));
       const itD = U.pick(G.ITEMS.filter((x) => x.cat !== 'grenade' && !x.noLoot && G.RARITY[x.rarity].tier === targetTier)) || U.pick(G.ITEMS.filter((x) => x.cat !== 'grenade' && !x.noLoot && G.RARITY[x.rarity].tier >= Math.max(2, targetTier - 1)));
       const opts = [
@@ -840,7 +840,7 @@
         return `<button class="alch-item" data-uid="${x.uid}" style="--rc:${rc}">
           <span class="ai-num" style="display:none"></span>
           ${x.badge ? `<span class="ai-badge">${x.badge}</span>` : ''}
-          <div class="ai-ic">${x.icon}${dur}</div>
+          <div class="ai-ic">${x.icon}${dur}${G.Elem.badge(x.w ? x.w : x.it ? G.Elem.itemTag(x.it) : x.d)}</div>
           <div class="ai-tx">
             <div class="ai-nm">${U.esc(x.name)}</div>
             <div class="ai-rar" style="color:${rc}">${G.RARITY[x.rarity].name} · ${ALCH_CATS[x.cat].short}</div>

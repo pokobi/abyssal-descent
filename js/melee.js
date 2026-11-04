@@ -7,7 +7,7 @@
   const ms = { ph: 'idle', t: 0, dur: 0, hitAt: 0, hitDone: false, side: 1, combo: 0, lungeT: 0 };
   W.ms = ms;
 
-  W.makeMelee = function (id) { if (id !== 'fists') G.save.mark('items', id); return { id, def: G.MELEE_BY_ID[id], lv: 0 }; };
+  W.makeMelee = function (id) { if (id !== 'fists') G.save.mark('items', id); return { id, def: G.MELEE_BY_ID[id], lv: 0, atts: {}, ver: 0 }; }; // (atts: its 属性コア socket)
   W.meleeStats = function (m) {
     const d = m.def, st = G.player.stats;
     const s = Object.assign({}, d);

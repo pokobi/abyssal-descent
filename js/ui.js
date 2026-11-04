@@ -43,7 +43,8 @@
     const rar = G.RARITY[o.rarity];
     const cat = o.kind === 'buff' ? (G.BUFF_CAT[o.cat] ? UI.catLabel(o.cat, '加護') : '加護') : o.kind === 'weapon' ? '🔫 ' + o.cat : o.kind === 'attachment' ? G.ATT_SLOTS[o.slot].icon + ' アタッチメント / ' + G.ATT_SLOTS[o.slot].name : o.kind === 'skill' ? '🔮 スキル（CT ' + o.cd + '秒）' : o.kind === 'item' ? G.ITEM_CAT[o.cat].icon + ' ' + G.ITEM_CAT[o.cat].name : '';
     const elL = (o.kind === 'weapon' || o.kind === 'melee') && o.el && G.Elem && G.Elem.BY[o.el] ? `<div style="margin-top:4px;color:${G.Elem.BY[o.el].col}">${G.Elem.BY[o.el].icon} ${G.Elem.BY[o.el].name}属性（攻撃が${G.Elem.BY[o.el].name}属性になる）</div>` : '';
-    return `<div class="tt-name">${o.icon || ''} ${U.esc(o.name)}</div><div class="tt-cat">${rar ? rar.name + ' · ' : ''}${cat}</div>${elL}<div style="margin-top:6px">${U.descHTML(o.desc)}</div>${extra || ''}`;
+    const tg = !elL && G.Elem && G.Elem.tagOf(o), tgL = tg ? `<div style="margin-top:4px">${G.Elem.chip(tg)} <span style="color:var(--dim);font-size:12px">${o.kind === 'attachment' && o.slot === 'core' ? '装着した武器の攻撃に付く' : o.kind === 'attachment' || o.kind === 'weapon' ? '状態異常と一緒に付く' : '当たった敵に付く'}</span></div>` : '';
+    return `<div class="tt-name">${o.icon || ''} ${U.esc(o.name)}</div><div class="tt-cat">${rar ? rar.name + ' · ' : ''}${cat}</div>${elL}${tgL}<div style="margin-top:6px">${U.descHTML(o.desc)}</div>${extra || ''}`;
   };
   UI.tipAttr = (o, extra) => `data-tip="${UI.tipFor(o, extra).replace(/"/g, '&quot;')}" data-rc="${R(o.rarity)}"`;
   UI.toast = function (text, cls) {
@@ -166,10 +167,10 @@
     const md = P.melee && P.melee.def;
     if (!w && !(P.meleeMode && md)) return;
     if (P.meleeMode && md) {
-      UI.el.wName.innerHTML = `<span style="color:${R(md.rarity)}">${md.icon} ${U.esc(md.name)}${P.melee.lv ? ' +' + P.melee.lv : ''}</span> <span style="font-size:11px;color:var(--dim)">左:連撃 右:重撃</span>`;
+      UI.el.wName.innerHTML = `<span style="color:${R(md.rarity)}">${md.icon} ${U.esc(md.name)}${P.melee.lv ? ' +' + P.melee.lv : ''}</span>${G.Elem.badge(P.melee, 'in')} <span style="font-size:11px;color:var(--dim)">左:連撃 右:重撃</span>`;
       UI.el.wAtts.innerHTML = '';
     } else {
-      UI.el.wName.innerHTML = `<span style="color:${R(w.def.rarity)}">${w.def.icon} ${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</span>${w.def.trait ? ' <span title="">' + G.WEAPON_TRAITS[w.def.trait].icon + '</span>' : ''}`;
+      UI.el.wName.innerHTML = `<span style="color:${R(w.def.rarity)}">${w.def.icon} ${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</span>${G.Elem.badge(w, 'in')}${w.def.trait ? ' <span title="">' + G.WEAPON_TRAITS[w.def.trait].icon + '</span>' : ''}`;
       UI.el.wAtts.innerHTML = Object.keys(G.ATT_SLOTS).map((s) => w.atts[s] ? G.ATT_BY_ID[w.atts[s]].icon : '').join('');
     }
     UI.el.wSlots.innerHTML = '';
@@ -181,13 +182,15 @@
     let free = Math.max(0, n - P.weapons.length);
     o.forEach((t, i) => {
       if (!t) { if (free > 0) { free--; slot(i + 1, empty, false); } return; }
-      const lab = t === 'm' ? (md ? md.icon + ' ' + U.esc(md.name) : '') : t.def.icon + ' ' + U.esc(t.def.name);
+      const lab = t === 'm' ? (md ? md.icon + ' ' + U.esc(md.name) + G.Elem.badge(P.melee, 'in') : '') : t.def.icon + ' ' + U.esc(t.def.name) + G.Elem.badge(t, 'in');
       slot(i < 3 ? i + 1 : '⇕', lab, t === 'm' ? P.meleeMode : !P.meleeMode && t === P.weapon);
     });
     for (; free > 0; free--) slot('⇕', empty, false);
   };
   // tile icons: only touch the DOM when the icon really changes (the icon layer swaps characters for drawings)
   UI.setIc = (el, v) => { const ic = el.querySelector('.ic'); v = String(v); if (ic._v !== v) { ic._v = v; ic.textContent = v; } };
+  // the element mark in a tile's corner (o: a skill / grenade / weapon, or null)
+  UI.setEl = (el, o) => { const e = (o && G.Elem && G.Elem.tagOf(o)) || null; if (el._elT === e) return; el._elT = e; const b = el.querySelector(':scope > .elb'); if (b) b.remove(); if (e) el.insertAdjacentHTML('beforeend', G.Elem.badge(e)); };
   UI.buildAbilityRow = function () {
     const row = UI.el.abilityRow; row.innerHTML = '';
     UI.abEls = [];
@@ -363,9 +366,9 @@
     // abilities
     for (let i = 0; i < 4; i++) {
       const sk = P.skills[i], el = UI.abEls[i];
-      if (!sk) { sClass(el, 'empty', true); UI.setIc(el, '·'); setCd(el, 0, 0, false); sText(el._cnt || (el._cnt = el.querySelector('.cnt')), ''); if (el.hasAttribute('data-tip')) el.removeAttribute('data-tip'); continue; }
+      if (!sk) { sClass(el, 'empty', true); UI.setIc(el, '·'); UI.setEl(el, null); setCd(el, 0, 0, false); sText(el._cnt || (el._cnt = el.querySelector('.cnt')), ''); if (el.hasAttribute('data-tip')) el.removeAttribute('data-tip'); continue; }
       sClass(el, 'empty', false);
-      UI.setIc(el, sk.def.icon);
+      UI.setIc(el, sk.def.icon); UI.setEl(el, sk.def);
       const ready = G.abilities.ready(sk);
       const frac = sk.maxCharges ? (sk.charges > 0 ? 0 : sk.cd / Math.max(0.01, sk.maxCd)) : sk.cd / Math.max(0.01, sk.maxCd);
       setCd(el, Math.max(0, Math.min(1, frac)), sk.maxCharges && sk.charges > 0 ? 0 : sk.cd, ready);
@@ -385,7 +388,7 @@
       slowT = 0.2; UI._itemsDirty = false;
       const gid = P.grenadeSel, gn = P.grenades[gid] || 0;
       const gi = G.ITEM_BY_ID[gid];
-      UI.setIc(UI.gnEl, gi && gn ? gi.icon : '💣');
+      UI.setIc(UI.gnEl, gi && gn ? gi.icon : '💣'); UI.setEl(UI.gnEl, gi && gn ? gi : null);
       UI.gnEl.querySelector('.cnt').textContent = gn ? '×' + gn : '';
       UI.gnEl.classList.toggle('empty', !gn);
       const types = Object.keys(P.grenades).filter((k) => P.grenades[k] > 0).length;
@@ -549,7 +552,7 @@
     UI._ikey = o.key;
     p.classList.remove('hidden');
     p.style.setProperty('--rc', o.rc || 'var(--line)');
-    p.innerHTML = `<div class="ip-head"><div class="ip-icon">${o.icon}</div><div><div class="ip-name">${U.esc(o.name)}</div><div class="ip-cat">${o.cat || ''}</div></div></div>${o.desc ? `<div class="ip-desc">${o.desc}</div>` : ''}${o.stats ? `<div class="ip-stats">${o.stats}</div>` : ''}${o.note ? `<div class="ip-note">${o.note}</div>` : ''}<div class="ip-foot"><div class="ip-price ${o.afford === false ? 'no' : ''}">${o.price !== undefined ? '🪙 ' + (typeof o.price === 'string' ? o.price : U.fmt(o.price)) : ''}</div>${o.action === null ? '' : `<div class="ip-key">${G.K('interact')} ${o.action || '購入'}</div>`}</div>`;
+    p.innerHTML = `<div class="ip-head"><div class="ip-icon">${o.icon}${G.Elem.badge(o.el)}</div><div><div class="ip-name">${U.esc(o.name)}</div><div class="ip-cat">${o.cat || ''}${o.el ? ' ' + G.Elem.chip(o.el) : ''}</div></div></div>${o.desc ? `<div class="ip-desc">${o.desc}</div>` : ''}${o.stats ? `<div class="ip-stats">${o.stats}</div>` : ''}${o.note ? `<div class="ip-note">${o.note}</div>` : ''}<div class="ip-foot"><div class="ip-price ${o.afford === false ? 'no' : ''}">${o.price !== undefined ? '🪙 ' + (typeof o.price === 'string' ? o.price : U.fmt(o.price)) : ''}</div>${o.action === null ? '' : `<div class="ip-key">${G.K('interact')} ${o.action || '購入'}</div>`}</div>`;
   };
   // ---- centre-screen hold gauge (ornate chests) ----
   UI.holdRing = function (k, mode, o) {
@@ -883,7 +886,7 @@
     const sideBuffs = [...P.buffs].map(([id, n]) => { const b = G.BUFF_BY_ID[id]; return `<div class="bicon" style="--rc:${R(b.rarity)}" ${UI.tipAttr(b)}>${b.icon}${n > 1 ? `<span class="st">${n}</span>` : ''}</div>`; }).join('');
     const cards = choices.map((b, i) => {
       const n = P.buffs.get(b.id) || 0;
-      return `<div class="card" data-i="${i}" style="--rc:${R(b.rarity)};animation-delay:${i * 0.12}s"><div class="c-rar">${G.RARITY[b.rarity].name}</div><div class="c-icon">${b.icon}</div><div class="c-name">${U.esc(b.name)}</div><div class="c-cat">${UI.catLabel(b.cat)}${b.skill ? ` · <span class="c-own">${G.SKILL_BY_ID[b.skill].icon} ${G.SKILL_BY_ID[b.skill].name}専用</span>` : b.cat === 'pile' ? ' · <span class="c-own">🔨 パイルドライバー専用</span>' : ''}</div><div class="c-desc${b.cat === 'curse' ? ' curse' : ''}">${U.descHTML(b.desc)}</div><div class="c-stack">${n ? `所持 ${n} → ${n + 1}${b.max > 1 ? ' / 最大' + b.max : ''}` : b.max > 1 ? `最大 ${b.max} 重ね` : '固有効果'}</div></div>`;
+      return `<div class="card" data-i="${i}" style="--rc:${R(b.rarity)};animation-delay:${i * 0.12}s"><div class="c-rar">${G.RARITY[b.rarity].name}</div><div class="c-icon">${b.icon}${G.Elem.badge(b)}</div><div class="c-name">${U.esc(b.name)}</div><div class="c-cat">${UI.catLabel(b.cat)}${b.skill ? ` · <span class="c-own">${G.SKILL_BY_ID[b.skill].icon} ${G.SKILL_BY_ID[b.skill].name}専用</span>` : b.cat === 'pile' ? ' · <span class="c-own">🔨 パイルドライバー専用</span>' : ''}</div><div class="c-desc${b.cat === 'curse' ? ' curse' : ''}">${U.descHTML(b.desc)}</div><div class="c-stack">${n ? `所持 ${n} → ${n + 1}${b.max > 1 ? ' / 最大' + b.max : ''}` : b.max > 1 ? `最大 ${b.max} 重ね` : '固有効果'}</div></div>`;
     }).join('');
     const s = UI.screen(`<div class="bs-wrap">
       <div class="side-info"><h3 style="margin-top:0">❤️ HP <b style="float:right">${Math.ceil(P.hp)} / ${st.maxHp}</b></h3><div class="si-stat"><span>🪙 コイン</span><b>${U.fmt(G.game.run.coins)}</b></div><div class="si-stat"><span>🗺️ エリア</span><b>${G.game.area}</b></div>${UI.statsTable()}<h3>🌟 所持加護（${P.buffs.size}）</h3><div class="si-buffs">${sideBuffs || '<span style="color:var(--dim);font-size:12px;grid-column:1/-1">なし</span>'}</div></div>
@@ -947,7 +950,7 @@
     opts = opts || {};
     const cards = options.map((o, i) => {
       const rr = G.RARITY[o.rar] ? o.rar : 'common';
-      return `<div class="card" data-i="${i}" style="--rc:${R(rr)};animation-delay:${i * 0.12}s"><span class="c-key">${i + 1}</span><div class="c-rar">${o.rarName || G.RARITY[rr].name}</div><div class="c-icon">${o.icon}</div><div class="c-name">${U.esc(o.label)}</div>${o.cat ? `<div class="c-cat">${o.cat}</div>` : ''}<div class="c-desc">${o.sub || ''}</div></div>`;
+      return `<div class="card" data-i="${i}" style="--rc:${R(rr)};animation-delay:${i * 0.12}s"><span class="c-key">${i + 1}</span><div class="c-rar">${o.rarName || G.RARITY[rr].name}</div><div class="c-icon">${o.icon}${G.Elem.badge(o.el)}</div><div class="c-name">${U.esc(o.label)}</div>${o.cat ? `<div class="c-cat">${o.cat}</div>` : ''}<div class="c-desc">${o.sub || ''}</div></div>`;
     }).join('');
     const s = UI.screen(`<div class="bs-wrap">
       ${opts.side ? `<div class="side-info">${opts.side}</div>` : ''}
@@ -1186,7 +1189,7 @@
     let host = document.getElementById('item-cards');
     if (!host) { host = document.createElement('div'); host.id = 'item-cards'; UI.el.hud.appendChild(host); }
     const d = document.createElement('div'); d.className = 'icard'; d.style.setProperty('--rc', R(o.rarity));
-    d.innerHTML = `<div class="ic-i">${o.icon}</div><div><div class="ic-n">${U.esc(o.name)} <span class="ic-k">${keyHint || ''}</span></div><div class="ic-d">${U.esc(o.desc || '')}</div></div>`;
+    d.innerHTML = `<div class="ic-i">${o.icon}${G.Elem.badge(o)}</div><div><div class="ic-n">${U.esc(o.name)} <span class="ic-k">${keyHint || ''}</span></div><div class="ic-d">${U.esc(o.desc || '')}</div></div>`;
     host.appendChild(d);
     while (host.children.length > 3) host.firstChild.remove();
     setTimeout(() => d.remove(), 6500);

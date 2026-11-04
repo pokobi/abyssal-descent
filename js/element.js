@@ -86,6 +86,47 @@
   // grenades
   EL.GREN = { g_fire: 'fire', g_molotov: 'fire', g_thermite: 'fire', g_cryo: 'ice', g_shock: 'volt', g_emp: 'volt', g_nail: 'earth', g_water: 'water' };
 
+  // ---------------------------------------------------------------- the element mark on icons
+  // which element does this thing leave? (a gun / melee weapon / its definition, an attachment, a skill, a grenade). Burning, chilling
+  // and shocking count, since they leave fire / ice / volt too. null = none.
+  const TRAIT_EL = { incendiary: 'fire', cryo: 'ice', shock: 'volt' };
+  EL.tagOf = function (o) {
+    if (!o) return null;
+    if (o.def && o.def !== o) { // a weapon in hand / in a bag: its own element, its 属性コア, its rounds, then what the kind is born with
+      const e = EL.wEl(o); if (e) return e;
+      if (o.def.kind === 'weapon' && G.weapons && G.weapons.stats) { const s = G.weapons.stats(o); if (s && EL.STATUS_EL[s.elem]) return EL.STATUS_EL[s.elem]; }
+      return EL.tagOf(o.def);
+    }
+    switch (o.kind) {
+      case 'weapon': return o.el || EL.STATUS_EL[o.element] || TRAIT_EL[o.trait] || null;
+      case 'melee': return o.el || EL.STATUS_EL[o.elem] || null;
+      case 'attachment': return (o.mods && (o.mods.el || EL.STATUS_EL[o.mods.elem])) || null;
+      case 'skill': return EL.skEl(o.id);
+      case 'item': return EL.GREN[o.id] || null;
+    }
+    return null;
+  };
+  EL.itemTag = function (it) {
+    if (!it) return null;
+    const d = G.Inv && G.Inv.def(it); if (!d) return null;
+    const g = it.gun || {};
+    if (d.el) return d.el;
+    if (g.el) return g.el;
+    for (const id of Object.values(g.atts || {})) { const a = G.ATT_BY_ID[id]; if (a && a.slot === 'core' && a.mods.el) return a.mods.el; }
+    for (const id of Object.values(g.atts || {})) { const t = EL.tagOf(G.ATT_BY_ID[id]); if (t) return t; }
+    return EL.tagOf(d);
+  };
+  // a small round mark in the corner of an icon (the box it sits in must be position: relative / absolute)
+  EL.badge = function (o, cls) {
+    const L = EL.BY[typeof o === 'string' ? o : EL.tagOf(o)]; if (!L) return '';
+    return `<i class="elb${cls ? ' ' + cls : ''}" style="--ec:${L.col}" title="${L.name}属性">${L.icon}</i>`;
+  };
+  // the same as words, for a tooltip / card head: "🔥 炎属性"
+  EL.chip = function (o) {
+    const L = EL.BY[typeof o === 'string' ? o : EL.tagOf(o)]; if (!L) return '';
+    return `<span class="elchip" style="--ec:${L.col}">${L.icon} ${L.name}属性</span>`;
+  };
+
   // ---------------------------------------------------------------- numbers
   EL.mastery = () => Math.max(0, (P && P.stats.elMastery) || 0);
   EL.effK = (M) => 2.5 * M / (M + 400);

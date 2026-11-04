@@ -139,7 +139,7 @@
     // (an unmet entry shows nothing but its rarity colour)
     g.innerHTML = a.map((o, i) => secret(tab, o)
       ? `<div class="cx-item undisc ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">❔</span><span class="cn">？？？</span></div>`
-      : `<div class="cx-item ${disc(tab, o) ? '' : 'undisc'} ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">${o.mat ? G.armorIcon(o) : o.icon}${o.vicon ? '<small style="font-size:11px">' + o.vicon + '</small>' : ''}</span><span class="cn">${U.esc(o.name)}</span></div>`).join('');
+      : `<div class="cx-item ${disc(tab, o) ? '' : 'undisc'} ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">${o.mat ? G.armorIcon(o) : o.icon}${disc(tab, o) ? G.Elem.badge(o) : ''}${o.vicon ? '<small style="font-size:11px">' + o.vicon + '</small>' : ''}</span><span class="cn">${U.esc(o.name)}</span></div>`).join('');
     g.querySelectorAll('.cx-item').forEach((el) => el.onclick = () => { sel = a[+el.dataset.i]; G.sfx.ui('click'); g.querySelectorAll('.cx-item').forEach((x) => x.classList.remove('sel')); el.classList.add('sel'); renderDetail(); });
     if (!sel && a.length) sel = a[0];
     renderDetail();
@@ -158,7 +158,7 @@
     let html = `<div style="--rc:${rc}">`;
     const want3d = tab === 'weapon' || tab === 'enemy' || tab === 'melee' || tab === 'boss';
     if (want3d) html += `<div id="cx-3d"></div>`; else html += `<div class="cd-icon">${o.mat ? G.armorIcon(o) : o.icon}</div>`;
-    html += `<div class="cd-name">${U.esc(o.name)}</div><div class="cd-cat">${rar ? rar.name + ' · ' : ''}${catText(o)}${disc(tab, o) ? ' · ✅ 発見済み' : ' · ❔ 未発見'}</div>`;
+    html += `<div class="cd-name">${U.esc(o.name)}</div><div class="cd-cat">${rar ? rar.name + ' · ' : ''}${catText(o)}${disc(tab, o) ? ' · ✅ 発見済み' : ' · ❔ 未発見'}</div>${G.Elem.tagOf(o) ? `<div style="text-align:center;margin-top:4px">${G.Elem.chip(o)}</div>` : ''}`;
     html += `<div class="cd-desc">${U.descHTML(o.desc)}</div><div class="cd-stats">`;
     if (tab === 'weapon') {
       const s = o;
@@ -176,6 +176,7 @@
       html += bar('⚡', '攻撃間隔', 1 / o.swing, 5, o.swing.toFixed(2) + 's');
       html += bar('📊', 'DPS', o.dmg / o.swing, 200);
       html += bar('📏', 'リーチ', o.range, 4.5, o.range + 'm');
+      html += bar('🔨', '重撃ダメージ', o.dmg * o.heavy[0], 320, String(Math.round(o.dmg * o.heavy[0])));
       html += bar('🔨', '重撃倍率', o.heavy[0], 3.5, '×' + o.heavy[0]);
       html += bar('👟', '移動速度', o.moveMul - 1, 0.2, '+' + Math.round((o.moveMul - 1) * 100) + '%');
       html += `<div style="margin-top:8px"><span class="tag">🔑 ${G.K('w3')} で持ち替え / 左:連撃 / 右:重撃</span>${o.traitDesc ? `<span class="tag">✦ ${o.traitDesc}</span>` : ''}${o.el && G.Elem.BY[o.el] ? `<span class="tag" style="color:${G.Elem.BY[o.el].col}">${G.Elem.BY[o.el].icon} ${G.Elem.BY[o.el].name}属性</span>` : ''}${o.elem ? `<span class="tag">${{ burn: '🔥 炎上', frost: '❄️ 冷気', poison: '☠️ 毒', shock: '⚡ 電撃' }[o.elem]} ${Math.round(o.elemChance * 100)}%</span>` : ''}${o.critChance ? `<span class="tag">💢 会心+${Math.round(o.critChance * 100)}%</span>` : ''}${o.lifesteal ? `<span class="tag">🩸 吸血${Math.round(o.lifesteal * 100)}%</span>` : ''}<span class="tag">🪙 ${o.price ? U.fmt(o.price) : '初期装備'}</span></div>`;

@@ -82,7 +82,8 @@
       tile('ダメージ', dv(s.dmg * dmgMul, d.dmg, { mid: d.dmg * Math.pow(1.13, m.lv || 0) })),
       tile('攻撃間隔', dv(s.swing, d.swing, { unit: '秒', lowerBetter: true, mid: d.swing })),
       tile('リーチ', dv(s.range, d.range, { unit: 'm', mid: d.range })),
-      tile('重撃', `<b class="sv">×${s.heavy[0]}</b>`),
+      tile('重撃ダメージ', dv(s.dmg * dmgMul * s.heavy[0], d.dmg * d.heavy[0], { mid: d.dmg * Math.pow(1.13, m.lv || 0) * d.heavy[0] })),
+      tile('重撃倍率', `<b class="sv">×${s.heavy[0]}</b>`),
       tile('会心率', dv(crit * 100, (d.critChance || 0) * 100 + B.critChance * 100, { unit: '%', dec: 0, abs: true, mid: ((d.critChance || 0) + B.critChance) * 100 })),
       tile('会心ダメージ', dv((st.critMul - 1) * 100, (B.critMul - 1) * 100, { unit: '%', dec: 0, abs: true, mid: (B.critMul - 1) * 100 })),
       tile('ヘッドショット', `<b class="sv">${num(d.headMul || 1)}倍</b>`),
@@ -98,6 +99,7 @@
           <div class="cat">${esc(d.cat)}・${G.RARITY[d.rarity].name}</div>
           <div class="dps"><b>${Math.round(dps)}</b><span>DPS</span>${Math.abs(dps - dps0) > dps0 * 0.005 ? `<span class="sd ${dps > dps0 ? 'up' : 'dn'}">(${dps > dps0 ? '+' : ''}${Math.round((dps / dps0 - 1) * 100)}%)</span>` : ''}</div>
           ${fxLines.map((x) => `<div class="tr">${esc(x)}</div>`).join('')}
+          ${(() => { const a = m.atts && m.atts.core && G.ATT_BY_ID[m.atts.core], L = a && G.Elem.BY[a.mods.el]; return L ? `<div class="tr" style="color:${L.col}" ${UI.tipAttr(a)}>${a.icon} ${esc(a.name)}（${L.name}属性）</div>` : ''; })()}
         </div>
       </div>
       <div class="wc-grid">${tiles}</div>${legend}${d.desc ? `<div class="wc-attd"><div><span>🗡️ 特徴</span>${esc(d.desc)}</div></div>` : ''}</div>`;
@@ -120,9 +122,7 @@
     const baseCd = ult ? d.cd : d.cd * A.SKILL_CD_MUL, cd = A.cdOf(sk), cdMid = A.cdOf(sk, true);
     const powBase = ult ? 1 : A.SKILL_POW_MUL, powMid = ult ? A.ultPower(sk, true) : A.power(sk, true);
     const pow = (ult ? A.ultPower(sk) : A.power(sk)) * (1 + st.dmg + st.skillDmg + (ult ? st.ultDmg || 0 : 0)); // 与ダメ and スキルダメージ add up, as in C.damageEnemy
-    const hasPow = ['dmg', 'dps'].some((k) => p0[k] != null) || (!A.effInfo(sk).length && !['heal', 'hps'].some((k) => p0[k] != null) && /ダメージ|焼|撃|爆/.test(d.desc));
     const line = [`<span><label>クールタイム</label>${dv(cd, baseCd, { unit: '秒', lowerBetter: true, mid: cdMid })}</span>`];
-    if (hasPow) line.push(`<span><label>威力</label>${dv(pow * 100, powBase * 100, { unit: '%', dec: 0, mid: powMid * 100 })}</span>`);
     // the actual numbers (what one hit / one second / one heal really amounts to with the current level and bonuses)
     const ek = A.effK(sk), ekMid = A.effK(sk, true); // heals grow with the effect factor, damage with the power factor
     for (const [k, lab] of [['dmg', 'ダメージ'], ['dps', '毎秒ダメージ']]) if (p0[k] != null && p0[k] > 0) { const f = pow; line.push(`<span><label>${lab}</label>${dv(p0[k] * f, p0[k] * (k === 'heal' || k === 'hps' ? 1 : powBase), { dec: 0, mid: p0[k] * powMid })}</span>`); }
@@ -150,7 +150,7 @@
     const augs = [...P.buffs].filter(([id]) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].skill === sk.id);
     const ready = A.ready(sk), left = sk.maxCharges ? `${sk.charges}/${sk.maxCharges}` : ready ? 'READY' : `${Math.ceil(sk.cd)}秒`;
     return `<div class="sc ${ult ? 'ult' : ''}" style="--rc:${R(d.rarity)}">
-      <div class="sc-h"><span class="key">${key}</span><span class="ic">${d.icon}</span><span class="nm">${esc(d.name)}${A.lvHTML(sk) ? `<b class="lv">${A.lvHTML(sk)}</b>` : ''}${ult ? '<em class="tag">ULT</em>' : ''}</span><span class="st ${ready ? 'ok' : ''}">${left}</span></div>
+      <div class="sc-h"><span class="key">${key}</span><span class="ic">${d.icon}${G.Elem.badge(d)}</span><span class="nm">${esc(d.name)}${A.lvHTML(sk) ? `<b class="lv">${A.lvHTML(sk)}</b>` : ''}${ult ? '<em class="tag">ULT</em>' : ''}</span><span class="st ${ready ? 'ok' : ''}">${left}</span></div>
       <div class="sc-l">${line.concat(eff.filter((z) => !z.used).map((z) => `<span><label>${z.e[0]}</label>${effDv(z)}</span>`)).join('')}</div>
       <div class="sc-d">${desc}</div>${skLegend}
       ${augs.length ? `<div class="sc-a">${augs.map(([id, n]) => { const b = G.BUFF_BY_ID[id]; return `<span ${UI.tipAttr(b)} style="--rc:${R(b.rarity)}">${b.icon}${n > 1 ? `<sub>${n}</sub>` : ''}</span>`; }).join('')}</div>` : ''}</div>`;
@@ -197,7 +197,7 @@
     }).join('')}</div>`;
   }
   function itemsBody() {
-    const row = (it, title, sub) => `<div class="it" style="--rc:${R(it.rarity)}" ${UI.tipAttr(it)}><span class="ic">${it.icon}</span><span class="nm">${title}</span><span class="sub">${sub || ''}</span>${it.desc ? `<span class="ds">${esc(it.desc)}</span>` : ''}</div>`;
+    const row = (it, title, sub) => `<div class="it" style="--rc:${R(it.rarity)}" ${UI.tipAttr(it)}><span class="ic">${it.icon}${G.Elem.badge(it)}</span><span class="nm">${title}</span><span class="sub">${sub || ''}</span>${it.desc ? `<span class="ds">${esc(it.desc)}</span>` : ''}</div>`;
     const g = Object.keys(P.grenades).filter((k) => P.grenades[k] > 0).map((k) => row(G.ITEM_BY_ID[k], `${G.ITEM_BY_ID[k].name} ×${P.grenades[k]}`, k === P.grenadeSel ? '◀ G' : 'G'));
     const u = G.ITEM_SLOTS.map((S) => P.slotItems(S.id).map((id) => row(G.ITEM_BY_ID[id], `${G.ITEM_BY_ID[id].name} ×${P.itemCount(id)}`, (id === P.selItem(S.id) ? '◀ ' : '') + S.key)).join('')).filter(Boolean);
     const pv = G.passiveItems(P).map((id) => row(G.ITEM_BY_ID[id], `${G.ITEM_BY_ID[id].name} ×${P.itemCount(id)}`, '常時'));

@@ -526,11 +526,22 @@
     if (m === 'spear' || m === 'scythe') return 'baton';
     return 'twirl';
   };
+  // a melee weapon with an element: a thin glowing skin of its colour over the weapon (pulsing), and the slash trail in that colour
+  function elFilm(m, el) {
+    if (!m || !el || !G.Elem.BY[el]) return;
+    const hex = G.Elem.BY[el].hex;
+    m.glow = hex; m.el = el;
+    const mat = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false });
+    const meshes = []; m.wg.traverse((o) => { if (o.isMesh) meshes.push(o); });
+    for (const o of meshes) { const f = new THREE.Mesh(o.geometry, mat); f.scale.setScalar(1.05); f.renderOrder = 2; o.add(f); }
+    m.film = mat;
+  }
   W.melee = {
     equip(immediate) {
       P = G.player;
       if (mm) W.vmRoot.remove(mm.group);
       mm = buildMelee(P.melee.def);
+      elFilm(mm, G.Elem.wEl(P.melee));
       W.vmRoot.add(mm.group);
       W.switchT = 0;
       ms.ph = 'idle'; ms.t = 0;
@@ -937,9 +948,11 @@
       const tp = tipWorld();
       // the draw flourish leaves only a faint, short-lived streak (a full slash trail would smear across the screen)
       if (prevTip && prevTip.distanceTo(tp) > 0.02) { if (spinX || spinZ || tossY) { if (prevTip.distanceTo(tp) < 0.6) G.fx.tracer(prevTip, tp, mm.glow || 0xb8c4d8, 0.008, 0.05); } else G.fx.tracer(prevTip, tp, mm.glow || 0xe8eef8, ms.ph === 'hrec' ? 0.05 : 0.03, 0.14); }
+      if (mm.el && prevTip && prevTip.distanceTo(tp) > 0.02 && !(spinX || spinZ || tossY)) { G.fx.tracer(prevTip, tp, mm.glow, 0.03, 0.16); spawnGlow(mm.glow, 0.7); } // (an element: a wide afterimage of its colour)
       prevTip = tp;
     } else prevTip = null;
-    if (mm.glow && Math.random() < dt * 6) spawnGlow(mm.glow, 0.4);
+    if (mm.glow && Math.random() < dt * (mm.el ? 14 : 6)) spawnGlow(mm.glow, mm.el ? 0.55 : 0.4);
+    if (mm.film) mm.film.opacity = 0.12 + Math.sin(G.game.time * 5) * 0.05 + (striking ? 0.12 : 0);
     W.isScoped = false;
     W.vmRoot.visible = G.game.state !== 'dead' && G.avatar.tpK < (G.avatar.returning ? 0.55 : 0.3);
     G.ui.scope(false);

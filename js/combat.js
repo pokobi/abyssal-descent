@@ -281,7 +281,9 @@
     if (src !== 'dot') {
       const hit0 = C._hit; C._hit = baseHit;
       try {
-        if (info.elem && Math.random() < (info.elemChance ?? 1)) C.status(e, info.elem, info.stacks || 1);
+        // (a blow whose element was just spent in a reaction does not put that element's status back on: the reaction stops it)
+        const spent = er && er.rx && er.el && G.Elem.STATUS_EL[info.elem] === er.el;
+        if (info.elem && !spent && Math.random() < (info.elemChance ?? 1)) C.status(e, info.elem, info.stacks || 1);
         if (st.elemChance > 0 && !info.proc && Math.random() < st.elemChance) C.status(e, info.elem || U.pick(['burn', 'frost', 'poison', 'shock']), 1);
       } finally { C._hit = hit0; }
       if (info.knock && !e.boss) e.knockback(info.dir || e.pos.clone().sub(P.pos).setY(0).normalize(), info.knock);
@@ -365,13 +367,16 @@
     switch (kind) {
       case 'fire': case 'burn':
         s.burnPow = Math.max(s.burn > 0 ? s.burnPow || 0 : 0, dotPow('burn', C.scale(7)));
-        s.burnLv = Math.min(5, (s.burn > 0 ? s.burnLv || 1 : 0) + stacks); s.burn = 4; s.burnDps = s.burnPow * (1 + st.burnDmg) * dotMul * (0.7 + s.burnLv * 0.3); break;
+        s.burnLv = Math.min(5, (s.burn > 0 ? s.burnLv || 1 : 0) + stacks); s.burn = 4; s.burnDps = s.burnPow * (1 + st.burnDmg) * dotMul * (0.7 + s.burnLv * 0.3);
+        if (G.Elem) G.Elem.fromStatus(e, 'fire'); // (burning leaves fire on the foe: element.js)
+        break;
       case 'frost':
         if (s.frozen > 0) break;
-        s.frostStacks = (s.frostStacks || 0) + stacks + (G.Elem && G.Elem.auraOf(e) === 'ice' ? 1 + (P.has('rx_iceHeart') ? 1 : 0) : 0); s.frost = 4;
+        s.frostStacks = (s.frostStacks || 0) + stacks; s.frost = 4;
         // freezing follows the same rule: bosses only get slowed, and a thawed foe can't be refrozen right away
         if (s.frostStacks >= 5 && (e.boss || G.game.time < (e.freezeImmuneUntil || 0))) { s.frostStacks = 4; break; }
         if (s.frostStacks >= 5) { s.frozen = 2.0; e.freezeImmuneUntil = G.game.time + 2.0 + 4; s.frostStacks = 0; G.sfx.ice(e.pos); G.fx.sparks(e.centerPos(), null, 14, 0xd0f0ff, 5); }
+        if (G.Elem) G.Elem.fromStatus(e, 'ice'); // (chilling leaves ice on the foe)
         break;
       case 'poison': {
         const max = 8 + (st.poisonStacks || 0);
@@ -389,11 +394,12 @@
         if (!C.stunImmune(e)) s.stun = Math.max(s.stun || 0, 0.18);
         if (!s._shockLock) {
           s._shockLock = true;
-          C.damageEnemy(e, dotPow('shock', C.scale(8)) * dotMul * (G.Elem && G.Elem.auraOf(e) === 'volt' ? 1.3 + (P.has('rx_voltHeart') ? 0.5 : 0) : 1), { src: 'dot', elem: 'shock', silent: false, shieldMul: 3 });
+          C.damageEnemy(e, dotPow('shock', C.scale(8)) * dotMul, { src: 'dot', elem: 'shock', silent: false, shieldMul: 3 });
           if (P.has('h_overcurrent')) { const t = C.nearest(e.pos, 8, e); if (t) { G.fx.lightning(e.centerPos(), t.centerPos()); C.status(t, 'shock', 1); } }
           s._shockLock = false;
         }
         G.fx.sparks(e.centerPos(), null, 5, 0xfff0a0, 4);
+        if (G.Elem) G.Elem.fromStatus(e, 'volt'); // (shock leaves volt on the foe)
         break;
       case 'slow': s.slow = 4; break;
       case 'mark': s.mark = stacks; break;
@@ -410,7 +416,7 @@
     if (s.tick <= 0) {
       s.tick = 0.5;
       if (s.burn > 0) {
-        C.damageEnemy(e, s.burnDps * 0.5 * (G.Elem && G.Elem.auraOf(e) === 'fire' ? 1.3 + (P.has('rx_fireHeart') ? 0.3 : 0) : 1), { src: 'dot', elem: 'fire' });
+        C.damageEnemy(e, s.burnDps * 0.5, { src: 'dot', elem: 'fire' });
         G.fx.flameLick(e.pos.x, e.pos.y + e.height * 0.5, e.pos.z, 1.2);
         if (P.has('x_spread') && Math.random() < 0.35) { const t = C.nearest(e.pos, 4, e); if (t && !(t.st.burn > 0)) C.status(t, 'burn', 1); }
       }
@@ -714,6 +720,8 @@
   };
   function trail(p, dt) {
     if (p.look) { G.GrenFX.trail(p, dt); return; }
+    // a player's projectile with an element leaves a trail of its colour
+    if (p.owner === 'player' && p.info && p.info.el && G.Elem && G.Elem.BY[p.info.el] && Math.random() < 0.8) { const c = new THREE.Color(G.Elem.BY[p.info.el].hex); G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.32, 0.22, 0.02, c.r, c.g, c.b, 0.9, 0, 1); }
     switch (p.kind) {
       case 'rocket': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(0, 0.5), U.rand(-0.3, 0.3), 1.2, 0.2, 1.0, 0.5, 0.48, 0.45, 0.5, -0.3, 1); G.fx.flame.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.08, 0.35, 0.1, 1.5, 0.9, 0.4, 1, 0, 0); break;
       case 'fireball': case 'bigfire': G.fx.flameLick(p.pos.x, p.pos.y - 0.1, p.pos.z, p.kind === 'bigfire' ? 2.5 : 1.0); break;

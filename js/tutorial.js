@@ -101,7 +101,7 @@
       check: (s) => { if (G.ItemAnim.busy()) s.a = true; return (s.a ? 0.5 : 0) + ((s.thrown || 0) > 0 ? 0.5 : 0); } },
     { ch: 3, title: 'スキル・アルティメット',
       body: () => ul(`${k(G.input.skillKey(1))}${k(G.input.skillKey(2))}${k(G.input.skillKey(3))}：スキル（商人やイベントで手に入る）。練習用に「ダッシュ」を入れました`, `${k(G.input.skillKey(0))}：アルティメット（下中央の金色の枠）。とても強いが、再使用まで長い（100秒前後）`),
-      tip: () => '最初のアルティメットは「不屈の城塞」（10秒間、被ダメージ60%減＋毎秒回復）。',
+      tip: () => 'チュートリアルの兵士のアルティメットは「無限兵装」（15秒間、弾薬無限・連射速度+80%）。本編ではクラスごとに違う。',
       goal: (s) => parts([[`${G.input.skillKey(1)} でスキル`, s.a], [`${G.input.skillKey(0)} でアルティメット`, s.b]]),
       setup: (s) => { P.skills[1] = G.abilities.makeSlot('dash'); if (G.ui.buildAbilityRow) G.ui.buildAbilityRow(); s.ch = P.skills[1].charges; const u = P.skills[0]; if (u) u.cd = 0; },
       check: (s) => { const sk = P.skills[1], u = P.skills[0]; if (sk && (sk.cd > 0 || sk.charges < s.ch)) s.a = true; if (u && u.cd > 0) s.b = true; return (s.a ? 0.5 : 0) + (s.b ? 0.5 : 0); } },
@@ -112,6 +112,8 @@
       setup: () => { if (!P.weapons.some((w) => w.atts.optic === 'o_reddot') && !P.attStash.includes('o_reddot')) { G.Inv.noAuto = true; P.attStash.push('o_reddot'); G.Inv.noAuto = false; } },
       check: (s) => { if (invOpen()) s.o = true; const att = P.weapons.some((w) => w.atts.optic === 'o_reddot'); return (s.o ? 0.4 : 0) + (att ? 0.6 : 0); } },
 
+    { ch: 3, title: '属性', info: true,
+      body: () => ul('🔥炎・💧水・❄️氷・⚡雷は、当たった敵に<b>8秒間残る</b>（HPバーの左に出る）', '違う属性が当たると<b>反応</b>が起きる（例：水の敵に炎 → 沸騰でダメージ2倍、水＋氷 → 凍結）', '🌪️風と🪨地は残らず、付いている属性に作用する', '炎上・冷気・電撃を付けても、炎・氷・雷が付く。反応が起きると、その属性と状態異常は消える', 'ダメージ数字の色が属性。図鑑の「属性反応」に一覧がある') },
     { ch: 4, title: '加護（その周回の強化）',
       body: () => ul('エリアの<b>目標</b>を達成すると、<b>加護</b>を1つ選べる', '加護は、その周回の間ずっと続く強化。取るほど強くなる', '枠の色がレアリティ。気に入らなければ<b>リロール</b>'),
       vis: (s) => tiles((s.sample || []).map((b) => [b.icon, b.name, RAR[b.rarity] || b.rarity, `var(--c-${b.rarity})`])),

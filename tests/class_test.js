@@ -87,6 +87,9 @@ const PORT = +process.env.COOP_PORT || 9995;
       return JSON.stringify(out); })()`).then((s) => { console.log('      ' + s); return JSON.parse(s).every((r) => r[1] && r[2]); }), 'class screen: HP, speed, grapple and both cooldowns equal what the run starts with');
     // ---- the tutorial is played as the soldier
     check(await p.eval("(() => { G.save.data.settings.lastClass = 'mage'; G.Tutorial.start(); const c = G.player.cls, w = G.player.weapons[0].id; return c === 'soldier' && w === 'a_ranger' && G.Classes.last() === 'mage'; })()"), 'the tutorial starts as the soldier, and the chosen class is left as it was');
+    // ---- the common guns to one standard (no class: the assault adds nothing to a gun)
+    check(await p.eval(`(() => { const P = G.player; P.cls = 'assault'; P.resetRun(); const W = G.weapons; const d = {}; for (const id of ['p_viper', 's_wasp', 'a_ranger', 't_rivet', 'g_breacher', 'n_scout']) d[id] = Math.round(W.gunDps(W.make(id))); P.cls = 'soldier'; P.resetRun(); return JSON.stringify(d); })()`).then((s) => { console.log('      ' + s); const d = JSON.parse(s); const near = (v, t) => Math.abs(v - t) <= t * 0.04; return near(d.p_viper, 150) && near(d.s_wasp, 150) && near(d.a_ranger, 150) && near(d.t_rivet, 150) && near(d.g_breacher, 170) && near(d.n_scout, 120); }), 'common guns: 150 DPS (the shotgun 170 with every pellet, the sniper rifle 120 on the body)');
+    check(await p.eval("fetch('js/tutorial.js').then((r) => r.text()).then((t) => /title: '属性'/.test(t))"), 'the tutorial has a step on elements');
     check(!p.errs.length, 'no errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 500));
   } catch (e) { console.error(e); fails.push(String(e)); }
   finally { await ch.close(); srv.close(); }

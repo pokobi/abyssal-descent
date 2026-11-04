@@ -1089,10 +1089,11 @@
     }
     // tracer
     if (muzzle && (pellets <= 1 || Math.random() < 0.35)) {
-      const col = s.goldShot ? 0xffd040 : s.elem === 'fire' ? 0xffa060 : s.elem === 'frost' ? 0xbfe8ff : s.elem === 'shock' || s.sound === 'tesla' ? 0xe0e8ff : s.elem === 'poison' ? 0xb0e070 : 0xffd8a0;
+      const wel = G.Elem.wEl(w);
+      const col = s.goldShot ? 0xffd040 : wel ? G.Elem.BY[wel].hex : s.elem === 'fire' ? 0xffa060 : s.elem === 'frost' ? 0xbfe8ff : s.elem === 'shock' || s.sound === 'tesla' ? 0xe0e8ff : s.elem === 'poison' ? 0xb0e070 : 0xffd8a0;
       if (s.sound === 'tesla') G.fx.lightning(muzzle, end, 0xd8e4ff);
       else if (s.sound === 'rail') { G.fx.beam(muzzle, end, 0xa0c8ff, 0.06, 0.4); G.fx.beam(muzzle, end, 0xffffff, 0.02, 0.25); }
-      else G.fx.tracer(muzzle, end, col, pellets > 1 ? 0.012 : 0.02, 0.05);
+      else { G.fx.tracer(muzzle, end, col, pellets > 1 ? 0.012 : 0.02, 0.05); if (wel) G.fx.tracer(muzzle, end, col, pellets > 1 ? 0.03 : 0.05, 0.08); } // (an element: a wider glow of its colour around the shot)
     }
     if (!stopped && wh) {
       const surf = wh.c.surf;

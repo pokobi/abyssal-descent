@@ -45,11 +45,13 @@
   D.onSpawn = function (e, opts) {
     const n = G.Run.depthArea(GM.area);
     if (opts && opts.noMut) return;
-    // an elite always carries one mutation (what the old elite traits were), on top of the ordinary draw deeper down
+    // from the depth where mutations begin (area 12) an elite always carries one (what the old elite traits were), on top of the ordinary draw;
+    // before that an elite is the plain tougher kind
     const rolled = Math.random() < D.mutChance(n) || (P.has('pact_merciless') && n >= 12);
-    if (!rolled && !e.elite) return;
+    const eliteMut = e.elite && n >= 12;
+    if (!rolled && !eliteMut) return;
     const pool = U.shuffle(D.MUTS.slice());
-    const k = Math.min(pool.length, (rolled ? D.mutCount(n) : 0) + (e.elite ? 1 : 0));
+    const k = Math.min(pool.length, (rolled ? D.mutCount(n) : 0) + (eliteMut ? 1 : 0));
     e.mut = {};
     for (let i = 0; i < k; i++) { e.mut[pool[i].id] = true; G.save.mark('items', 'mut_' + pool[i].id); }
     e.mutT = U.rand(2, 5);

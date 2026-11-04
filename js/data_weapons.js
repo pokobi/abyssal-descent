@@ -27,7 +27,7 @@
   // [id, arch, name, rarity, mods, trait, finish, desc]
   const V = [
     ['starter', 'pistol', 'P9 サービスピストル', 'common', { dmg: 0.88, rpm: 0.9 }, null, 'black', '探索者に支給される標準拳銃。信頼性だけが取り柄。'],
-    ['p_viper', 'pistol', 'ヴァイパー .45', 'common', { dmg: 1.25, rpm: 0.85, mag: 0.85 }, null, 'steel', '大口径の半自動拳銃。一発の重みがある。'],
+    ['p_viper', 'pistol', 'ヴァイパー .45', 'common', { dmg: 1.1, rpm: 0.85, mag: 0.85 }, null, 'steel', '大口径の半自動拳銃。一発の重みがある。'],
     ['p_hornet', 'pistol', 'ホーネット M9A', 'uncommon', { auto: true, rpm: 1.5, dmg: 0.8, mag: 1.4 }, null, 'black', 'フルオート化された機関拳銃。'],
     ['p_ember', 'pistol', '残り火のデリンジャー', 'rare', { dmg: 1.4, mag: 0.6 }, 'incendiary', 'brass', '命中した敵を燃やす装飾拳銃。'],
     ['p_mercy', 'pistol', '慈悲の一撃', 'epic', { dmg: 1.3, headMul: 1.3 }, 'execute', 'bone', '体力20%以下の敵を即座に処刑する。'],
@@ -36,12 +36,12 @@
     ['r_thunder', 'revolver', '雷鳴のマグナム', 'rare', { dmg: 1.15 }, 'shock', 'black', '電撃弾。シールドを焼き切る。'],
     ['r_reaper', 'revolver', '死神のシックスシューター', 'epic', { dmg: 1.25, headMul: 1.25 }, 'killReload', 'bone', 'キルすると即座に全弾装填される。'],
     ['r_sun', 'revolver', '落日', 'legendary', { dmg: 1.5, rpm: 1.2 }, 'explosiveRounds', 'gold', '着弾時に小爆発を起こす伝説の拳銃。'],
-    ['s_wasp', 'smg', 'ワスプ SMG', 'common', {}, null, 'black', '軽量で取り回しの良い短機関銃。'],
+    ['s_wasp', 'smg', 'ワスプ SMG', 'common', { dmg: 0.69 }, null, 'black', '軽量で取り回しの良い短機関銃。'],
     ['s_vector', 'smg', 'ヴェクター K', 'uncommon', { rpm: 1.25, recoil: 0.8 }, null, 'tan', '反動抑制機構付きの高速連射SMG。'],
     ['s_frost', 'smg', '霜噛み', 'rare', { mag: 1.2 }, 'cryo', 'steel', '冷気弾で敵の動きを鈍らせる。'],
     ['s_viper', 'smg', 'ブラッドヴァイパー', 'epic', { dmg: 1.2, rpm: 1.1 }, 'lifesteal', 'rust', '与ダメの4%を回復する。'],
     ['s_swarm', 'smg', '群蜂', 'legendary', { rpm: 1.35, mag: 1.6, dmg: 1.15 }, 'ricochet', 'gold', '弾丸が近くの敵へ跳弾する。'],
-    ['a_ranger', 'rifle', 'レンジャー AR', 'common', {}, null, 'black', '汎用性の高い突撃銃。'],
+    ['a_ranger', 'rifle', 'レンジャー AR', 'common', { dmg: 0.65 }, null, 'black', '汎用性の高い突撃銃。'],
     ['a_warden', 'rifle', 'ウォーデン AR-7', 'uncommon', { dmg: 1.1, spread: 0.85 }, null, 'tan', '精度を高めた改良型ライフル。'],
     ['a_crusader', 'rifle', 'クルセイダー', 'rare', { dmg: 1.2, mag: 1.15 }, 'pierce', 'steel', '弾丸が敵を1体貫通する。'],
     ['a_inferno', 'rifle', 'インフェルノ', 'rare', { rpm: 1.05 }, 'incendiary', 'rust', '焼夷弾仕様のライフル。'],
@@ -54,11 +54,11 @@
     ['d_hawk', 'dmr', 'ホークアイ', 'rare', { dmg: 1.15, headMul: 1.15 }, null, 'black', '鷹の目のような精度。'],
     ['d_glacier', 'dmr', '氷河', 'epic', { dmg: 1.25 }, 'cryo', 'steel', '冷気弾で敵を凍結させる。'],
     ['d_saint', 'dmr', '聖者の裁定', 'legendary', { dmg: 1.4, rpm: 1.2 }, 'pierce', 'gold', '全てを貫く聖なる弾丸。'],
-    ['n_scout', 'sniper', 'スカウト SR', 'common', { dmg: 0.8, rpm: 1.15 }, null, 'tan', '軽量なボルトアクション式の狙撃銃。威力は控えめだが扱いやすい。'],
+    ['n_scout', 'sniper', 'スカウト SR', 'common', { dmg: 0.82, rpm: 1.15 }, null, 'tan', '軽量なボルトアクション式の狙撃銃。威力は控えめだが扱いやすい。'],
     ['n_longbow', 'sniper', 'ロングボウ SR', 'rare', {}, null, 'tan', 'ボルトアクション式の大口径狙撃銃。'],
     ['n_widow', 'sniper', 'ウィドウメイカー', 'epic', { dmg: 1.2, headMul: 1.2 }, 'execute', 'black', '弱った獲物を確実に仕留める。'],
     ['n_dragon', 'sniper', '竜殺し', 'legendary', { dmg: 1.5, rpm: 1.3, mag: 1.4 }, 'explosiveRounds', 'gold', '竜の鱗をも砕く炸裂弾。'],
-    ['g_breacher', 'shotgun', 'ブリーチャー 12G', 'common', {}, null, 'black', '近距離制圧用ポンプショットガン。'],
+    ['g_breacher', 'shotgun', 'ブリーチャー 12G', 'common', { dmg: 1.31 }, null, 'black', '近距離制圧用ポンプショットガン。'],
     ['g_brute', 'shotgun', 'ブルート', 'uncommon', { dmg: 1.15, pellets: 1.1 }, null, 'rust', '散弾を増量した重量級。'],
     ['g_dragon', 'shotgun', 'ドラゴンブレス', 'rare', {}, 'incendiary', 'steel', '焼夷散弾で敵を炎に包む。'],
     ['g_reaver', 'shotgun', 'リーヴァー', 'epic', { dmg: 1.2, rpm: 1.3 }, 'knockback', 'bone', '敵を大きく吹き飛ばす。'],
@@ -84,7 +84,7 @@
     ['f_phoenix', 'flame', '不死鳥の吐息', 'legendary', { dmg: 1.4, range: 1.3 }, 'lifesteal', 'gold', '炎が生命力を奪う。'],
     ['v_lance', 'rail', 'ランス RG', 'epic', {}, null, 'steel', '全てを貫く電磁投射砲。'],
     ['v_judgement', 'rail', '雷罰', 'legendary', { dmg: 1.3, charge: 0.7 }, 'chainHit', 'gold', '貫いた全ての敵から雷撃が連鎖。'],
-    ['t_rivet', 'nail', 'リベッター', 'common', {}, null, 'rust', '工業用ネイルガンを改造した物。当たった釘は刺さったまま残り、敵の被ダメを上げる（1本+3%・最大5本）。'],
+    ['t_rivet', 'nail', 'リベッター', 'common', { dmg: 0.7 }, null, 'rust', '工業用ネイルガンを改造した物。当たった釘は刺さったまま残り、敵の被ダメを上げる（1本+3%・最大5本）。'],
     ['t_impaler', 'nail', 'インペイラー', 'rare', { dmg: 1.25 }, 'pierce', 'black', '釘が敵を串刺しにする。'],
     ['h_whaler', 'harpoon', 'ホエーラー', 'uncommon', {}, null, 'wood', '敵を引き寄せる銛撃ち銃。'],
     ['h_leviathan', 'harpoon', 'リヴァイアサン', 'epic', { dmg: 1.4, mag: 3 }, 'shock', 'steel', '3連装の電撃銛。'],
@@ -143,6 +143,7 @@
     WEAPONS.push(w);
   }
   // weapons born with an element (element.js): no 属性コア fits them
+  // (the common guns are set to one standard: about 150 sustained DPS; a shotgun 170 with every pellet, a sniper rifle 120 on the body)
   const INNATE = { p_cinder: 'fire', n_dragon: 'fire', y_storm: 'volt' };
   for (const w of WEAPONS) { const el = INNATE[w.id] || (w.arch === 'flame' ? 'fire' : w.arch === 'tesla' ? 'volt' : null); if (el) w.el = el; }
   const MYTH = { y_midas: 7000, y_echo: 8000, y_maw: 9000, y_storm: 12000 };
@@ -292,6 +293,8 @@
   G.MELEE = ML.map(([id, name, icon, rarity, mcat, s, trait, model, desc]) => Object.assign({ id, name, icon, rarity, mcat, cat: MCAT[mcat], trait, traitDesc: trait ? MTRAIT[trait] : null, model, desc, kind: 'melee', price: id === 'fists' || id === 'm_basic' ? 0 : MPRICE[rarity] + Math.round(s.dmg / s.swing / 10) * 10, critChance: 0, headMul: 1.5, shieldMul: 1, lifesteal: 0, elem: null, elemChance: 0 }, s));
   for (const m of G.MELEE) if (m.id === 'm_devour' || m.id === 'm_midas') { m.mythic = true; m.price = m.id === 'm_devour' ? 9500 : 6500; }
   G.MELEE_BY_ID = Object.fromEntries(G.MELEE.map((m) => [m.id, m]));
+  // melee weapons born with an element (element.js): 焔刃 fire, 氷牙 ice, 鳴神 volt
+  for (const [id, el] of [['m_ember', 'fire'], ['m_frost', 'ice'], ['m_thunder', 'volt']]) if (G.MELEE_BY_ID[id]) G.MELEE_BY_ID[id].el = el;
   G.DEFAULT_MELEE = 'm_basic';
   G.BARE_MELEE = 'fists';
   G.MELEE_BY_ID.fists.legacy = true;

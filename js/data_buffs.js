@@ -260,9 +260,9 @@
   add('rx_meltpt', '融点', '🌡️', 'rare', 'attr', '熱融の倍率+0.3。', { mods: { rx_thaw: 0.3 } });
   add('rx_brittle', '脆き鎧', '💔', 'rare', 'attr', '脆化の被ダメ増加+10%（25%→35%）。', { mods: { rxBrittle: 0.1 } });
   add('rx_eye', '嵐の目', '🌪️', 'rare', 'attr', '旋風の範囲+4m。旋風で広げた属性の時間+3秒。', { mods: { rxSwirlR: 4, rxSwirlT: 3 } });
-  add('rx_fireHeart', '燃え盛る心', '❤️‍🔥', 'rare', 'attr', '炎属性が付いた敵の炎上ダメージ、さらに+30%。', { flag: true });
-  add('rx_iceHeart', '氷の心臓', '❄️', 'rare', 'attr', '氷属性が付いた敵へ冷気を付けると、スタックがさらに+1。', { flag: true });
-  add('rx_voltHeart', '雷の心臓', '🌩️', 'rare', 'attr', '雷属性が付いた敵への電撃ダメージ、さらに+50%。', { flag: true });
+  add('rx_fireHeart', '燃え盛る心', '❤️‍🔥', 'rare', 'attr', '炎属性が付いた敵への与ダメ+15%。', { hooks: { preHit(c) { if (G.Elem.auraOf(c.e) === 'fire') c.bonus += 0.15; } } });
+  add('rx_iceHeart', '氷の心臓', '❄️', 'rare', 'attr', '氷属性が付いた敵への与ダメ+15%。', { hooks: { preHit(c) { if (G.Elem.auraOf(c.e) === 'ice') c.bonus += 0.15; } } });
+  add('rx_voltHeart', '雷の心臓', '🌩️', 'rare', 'attr', '雷属性が付いた敵への与ダメ+15%。', { hooks: { preHit(c) { if (G.Elem.auraOf(c.e) === 'volt') c.bonus += 0.15; } } });
   add('rx_echo', '共鳴', '🔔', 'epic', 'attr', '反応が起きると、一番近い敵1体にも同じ反応を起こす（共鳴から共鳴は起きない）。', { flag: true });
   add('rx_master', '反応の極意', '📜', 'legendary', 'attr', 'すべての効果型反応（爆轟・漏電など）のダメージ+40%、倍率型反応（沸騰・熱融）の倍率+0.2。', { mods: { reactDmg: 0.4, reactMul: 0.2 } });
   add('x_slowtime', '刹那', '⌛', 'epic', 'offense', 'ADS中、時間の流れが25%遅くなる。', { flag: true });

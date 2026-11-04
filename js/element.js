@@ -19,7 +19,7 @@
     { id: 'earth', name: '地', icon: '🪨', col: '#e0a640', hex: 0xe0a640, aura: false },
   ];
   EL.IDS = EL.LIST.map((x) => x.id);
-  EL.LIST.forEach((x) => { x.desc = { fire: '炎上とよく合う。水が付いた敵に当てると沸騰（×2.0）、氷が付いた敵に当てると熱融（×1.5）。', water: '他の属性の下地。炎で沸騰、氷で凍結、雷で漏電。炎上中の敵に当てると炎上が消える。', ice: '冷気とよく合う。水で凍結、炎が付いた敵に当てると熱融（×2.0）、雷で脆化。', volt: '電撃とよく合う。炎で爆轟、水で漏電、氷で脆化。', wind: '敵に残らない。付いている属性を周囲6mの敵へ広げる（旋風）。', earth: '敵に残らない。付いている属性で結晶を作る（晶壁）。凍結中の敵を砕く（粉砕）。' }[x.id]; });
+  EL.LIST.forEach((x) => { x.desc = { fire: '炎上を付けると炎も付く。水が付いた敵に当てると沸騰（×2.0）、氷が付いた敵に当てると熱融（×1.5）。', water: '他の属性の下地。炎で沸騰、氷で凍結、雷で漏電。炎上中の敵に当てると炎上が消える。', ice: '冷気を付けると氷も付く。水で凍結、炎が付いた敵に当てると熱融（×2.0）、雷で脆化。', volt: '電撃を付けると雷も付く。炎で爆轟、水で漏電、氷で脆化。', wind: '敵に残らない。付いている属性を周囲6mの敵へ広げる（旋風）。', earth: '敵に残らない。付いている属性で結晶を作る（晶壁）。凍結中の敵を砕く（粉砕）。' }[x.id]; });
   EL.BY = Object.fromEntries(EL.LIST.map((x) => [x.id, x]));
   EL.idx = (id) => EL.IDS.indexOf(id) + 1; // 0 = none (wire format)
   EL.of = (i) => EL.IDS[i - 1] || null;
@@ -29,7 +29,7 @@
     thaw: { name: '熱融', col: '#ffb0c8', desc: '炎と氷。炎が付いた敵に氷で×2.0、氷が付いた敵に炎で×1.5。' },
     freeze: { name: '凍結', col: '#9fe0ff', desc: '水と氷。通常の敵は3秒、精鋭は1.5秒凍る。ボスは凍らず3秒間60%鈍化。' },
     shatter: { name: '粉砕', col: '#e8f8ff', desc: '凍結中の敵に地属性・近接の重撃・パイルドライバー。凍結を割って大ダメージ。' },
-    blast: { name: '爆轟', col: '#ff6aa8', desc: '炎と雷。半径4mの爆発と吹き飛ばし。炎上を付ける。' },
+    blast: { name: '爆轟', col: '#ff6aa8', desc: '炎と雷。半径4mの爆発と吹き飛ばし。' },
     leak: { name: '漏電', col: '#7aa8ff', desc: '水と雷。4秒間0.5秒ごとにダメージ。近くの水が付いた敵にも移る。電撃を付ける。' },
     brittle: { name: '脆化', col: '#d0b8ff', desc: '氷と雷。8秒間その敵の被ダメ+25%（ボスは+15%）。' },
     swirl: { name: '旋風', col: '#4fd8c0', desc: '風と炎・水・氷・雷。周囲6mの敵に同じ属性をばらまく。' },
@@ -38,10 +38,24 @@
 
   // the codex page (js/codex.js): the elements are always shown, a reaction once you have set it off
   EL.CODEX = [
-    { id: 'el_about', name: '属性について', icon: '🌈', rarity: 'common', cat: '属性', always: true, desc: '炎・水・氷・雷は当たった敵に8秒間残る（自分にも6秒）。違う属性が当たると反応が起き、どちらも消える。風と地は残らず、付いている属性に作用するだけ。\n銃は同じ敵へ2.5秒に1回、近接は1秒に1回だけ属性を残す。スキル・アルティメット・グレネードは毎回。\n常に属性を帯びた敵は上書きされず、他の属性で必ず反応する（同じ敵では1秒に1回）。\n属性熟練：反応が強くなる。属性耐性：その属性から受けるダメージが減る。' },
+    { id: 'el_about', name: '属性について', icon: '🌈', rarity: 'common', cat: '属性', always: true, desc: '炎・水・氷・雷は当たった敵に8秒間残る（自分にも6秒）。炎上・冷気・電撃を付けると、炎・氷・雷も付く。反応が起きると、使われた属性とその状態異常（炎上・冷気・電撃）は消える。違う属性が当たると反応が起き、どちらも消える。風と地は残らず、付いている属性に作用するだけ。\n銃は同じ敵へ2.5秒に1回、近接は1秒に1回だけ属性を残す。スキル・アルティメット・グレネードは毎回。\n常に属性を帯びた敵は上書きされず、他の属性で必ず反応する（同じ敵では1秒に1回）。\n属性熟練：反応が強くなる。属性耐性：その属性から受けるダメージが減る。' },
     ...['fire', 'water', 'ice', 'volt', 'wind', 'earth'].map((id) => ({ id: 'el_' + id, always: true, cat: '属性' })),
     ...Object.entries({ boil: '♨️', thaw: '🌡️', freeze: '🧊', shatter: '💎', blast: '💥', leak: '🔌', brittle: '💔', swirl: '🌀', crystal: '💠' }).map(([id, icon]) => ({ id: 'rx_' + id, icon, rarity: 'rare', cat: '反応' })),
   ];
+  // does the player have any way to leave an element? (the element boons are offered only then)
+  // an element on a gun / melee weapon, an elemental skill or ultimate, an elemental grenade in the bag, or anything that burns / chills / shocks
+  // (since burn, frost and shock leave fire / ice / volt too)
+  EL.STATUS_EL = { fire: 'fire', burn: 'fire', frost: 'ice', shock: 'volt' };
+  EL.hasSource = function (P) {
+    if (!P) return false;
+    for (const w of P.weapons || []) { if (EL.wEl(w)) return true; const s = G.weapons.stats(w); if (s.elem && EL.STATUS_EL[s.elem]) return true; }
+    if (P.melee && (EL.wEl(P.melee) || (P.melee.def.elem && EL.STATUS_EL[P.melee.def.elem]))) return true;
+    for (const s of P.skills || []) if (s && EL.skEl(s.id)) return true;
+    for (const id of Object.keys(P.grenades || {})) if (P.grenades[id] > 0 && (EL.GREN[id] || (G.ITEM_BY_ID[id] && G.ITEM_BY_ID[id].data && EL.STATUS_EL[G.ITEM_BY_ID[id].data.elem]))) return true;
+    for (const id of ['h_burn', 'h_frost', 'h_shock', 'k_ash', 'k_icegrave', 'k_chain', 'h_chain', 'h_critchain', 'm_trail', 'x_frostaura', 'o_thunderjump', 'p_fire', 'p_frost', 'p_shock']) if (P.has(id)) return true;
+    return false;
+  };
+  EL.isElementBoon = (b) => !!b && (b.cat === 'attr' || /^s_elMastery_/.test(b.id));
   EL.AURA_T = 8;
   for (const c of EL.CODEX) { const k = c.id.slice(3); if (c.id.startsWith('el_') && EL.BY[k]) Object.assign(c, { name: EL.BY[k].name + '属性', icon: EL.BY[k].icon, rarity: 'common', desc: EL.BY[k].desc }); if (c.id.startsWith('rx_')) Object.assign(c, { name: EL.RX[k].name, desc: EL.RX[k].desc }); }
   EL.SELF_T = 6;
@@ -162,7 +176,8 @@
     if (cur === el) { if (!e.auFix) EL.setAura(e, el, dur); return out; }
     const r = pair(cur, el);
     if (!r) return out;
-    if (e.auFix) { if ((e._rxCd || 0) > now) return out; e._rxCd = now + 1; } else EL.setAura(e, null);
+    if (e.auFix) { if ((e._rxCd || 0) > now) return out; e._rxCd = now + 1; } else { EL.setAura(e, null); EL.stopStatus(e, cur); }
+    EL.stopStatus(e, el);
     out.rx = r.id; out.rxWith = r.with || null;
     if (r.amp) out.mul *= EL.ampMul(r.id, r.amp);
     return out;
@@ -179,11 +194,22 @@
     const r = pair(cur, el);
     if (!r) return null;
     const now = G.game.time;
-    if (e.auFix) { if ((e._rxCd || 0) > now) return null; e._rxCd = now + 1; } else EL.setAura(e, null);
+    if (e.auFix) { if ((e._rxCd || 0) > now) return null; e._rxCd = now + 1; } else { EL.setAura(e, null); EL.stopStatus(e, cur); }
+    EL.stopStatus(e, el);
     EL.after(e, r.id, r.with, opts);
     return r.id;
   };
 
+  // a status (burn / frost / shock) leaves its element: every time, with no cool-down; a reaction can follow
+  EL._inRx = 0;
+  EL.fromStatus = function (e, el) { if (EL._inRx > 0 || !e || !e.alive) return; EL.give(e, el, { status: true }); };
+  // a reaction spends the elements in it, and the statuses that go with them stop (fire: burn, ice: frost, volt: shock)
+  EL.stopStatus = function (e, el) {
+    const s = e && e.st; if (!s) return;
+    if (el === 'fire') { s.burn = 0; s.burnLv = 0; }
+    else if (el === 'ice') { s.frost = 0; s.frostStacks = 0; }
+    else if (el === 'volt') { s.shock = 0; s.shockLv = 0; }
+  };
   // ---------------------------------------------------------------- what a reaction does (after the blow)
   EL._depth = 0;
   const rxHit = (o, amt, id, extra) => C.damageEnemy(o, amt, Object.assign({ src: 'react', rx: id, proc: true, noBuffs: true, noMarker: true, el: null }, extra || {}));
@@ -196,7 +222,7 @@
     if (!e || !id) return;
     opts = opts || {};
     if (EL._depth > 3) return;
-    EL._depth++;
+    EL._depth++; EL._inRx++;
     try {
       EL.label(e, id);
       if (G.save && G.save.mark) G.save.mark('items', 'rx_' + id);
@@ -232,7 +258,6 @@
           for (const o of G.enemies.inRadius(e.pos, r)) {
             const d = o.pos.clone().sub(e.pos).setY(0); if (d.lengthSq() < 0.01) d.set(1, 0, 0);
             rxHit(o, dmg, 'blast', { shieldMul: 2, knock: 8, dir: d.normalize() });
-            if (o.alive) C.status(o, 'burn', 1);
           }
           break;
         }
@@ -274,7 +299,7 @@
           else EL.after(best, id, withEl, { echo: true });
         }
       }
-    } finally { EL._depth--; }
+    } finally { EL._depth--; EL._inRx--; }
   };
 
   // ---------------------------------------------------------------- ticking (called from C.updateStatus)
@@ -294,7 +319,7 @@
         for (const o of G.enemies.inRadius(e.pos, r)) {
           if (o === e || !o.alive || o.st.leak > 0 || EL.auraOf(o) !== 'water') continue;
           if (!o.auFix) EL.setAura(o, null);
-          o.st.leak = 4; o.st.leakK = s.leakK; o.st.leakT = 0.25; C.status(o, 'shock', 1);
+          o.st.leak = 4; o.st.leakK = s.leakK; o.st.leakT = 0.25; EL._inRx++; try { C.status(o, 'shock', 1); } finally { EL._inRx--; }
           if (G.fx.lightning) G.fx.lightning(e.centerPos(), o.centerPos());
           EL.label(o, 'leak');
         }

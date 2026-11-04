@@ -224,7 +224,7 @@
     const b = d.b, st = b.duelSt;
     const at = tipPos(b);
     G.fx.sparks(at, null, 30, 0xffd860, 10); G.fx.sparks(at, null, 12, 0xffffff, 6);
-    G.sfx.impact(at, 'metal'); G.sfx.mech && G.sfx.mech('boltFwd', 0, 1.4); G.sfx.ui && G.sfx.ui('rare');
+    if (G.sfx.clang) G.sfx.clang(D.mine() ? null : at); else G.sfx.impact(at, 'metal');
     if (local !== false && D.mine()) {
       D._stopUntil = performance.now() + 80; D._slowUntil = performance.now() + 330;
       G.player.addShake(0.25);

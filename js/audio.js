@@ -797,6 +797,15 @@
     [[3300, 0.24, 0.5], [4950, 0.17, 0.4], [6600, 0.11, 0.3], [8250, 0.06, 0.22]].forEach(([f, g, d]) => tn({ t: t + 0.04, f0: f, f1: f * 1.004, d, g, to: out, type: 'sine' }));
     nz({ t: t + 0.04, f: [['bandpass', 7400, 7]], g: 0.16, d: 0.2, to: out });
   };
+  // a parry: two blades meeting hard, "kakiin!" (a sharp crack, a short thud, then struck-steel partials ringing out); pos = null for your own
+  A.clang = function (pos) {
+    if (!ctx) return;
+    const t = ctx.currentTime, out = dest(pos || null, 0.6); out.gain.value = 0.75;
+    nz({ t, f: [['highpass', 1800, 0.7], ['bandpass', 3600, 1.4]], g: 0.75, a: 0.001, d: 0.05, to: out });
+    tn({ t, f0: 520, f1: 240, d: 0.09, g: 0.35, to: out, type: 'triangle' });
+    [[1240, 0.32, 0.95], [2010, 0.26, 0.82], [2870, 0.2, 0.7], [3960, 0.14, 0.55], [5230, 0.09, 0.42]].forEach(([f, g, d]) => tn({ t: t + 0.004, f0: f * 1.025, f1: f, fd: 0.03, d, g, to: out, type: 'sine' }));
+    nz({ t: t + 0.01, f: [['bandpass', 4300, 9]], g: 0.18, d: 0.36, to: out });
+  };
   A.bell = function () {
     // deep bronze bell for boss/portal moments
     if (!ctx || smp('bell', null, 0.5, 0.75, 1.0)) return;

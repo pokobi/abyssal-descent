@@ -32,11 +32,22 @@
   }
 
   // ================================================================ the shared framework
+  // The small guardians carry less health than the big ones they are drawn with: 70% of the average of the big guardians of the field they are met
+  // on (their differences among themselves kept: S.hp / 4500). The big ones' base health: the spec guardians' own numbers, the four with classes of their own.
+  BS.SMALL_HP = 0.7;
+  const CLASS_HP = { colossus: 4200, wyrm: 3800, executioner: 4600, broodmother: 3900 };
+  const bigHp = (id) => CLASS_HP[id] || (BS.SPECS && BS.SPECS[id] && BS.SPECS[id].hp) || 0;
+  BS.smallBase = function (S) {
+    const R = G.Run, n = G.game.area || 1, pool = (R && R.BOSS_POOLS && R.BOSS_POOLS[R.field(n)]) || [];
+    const big = pool.filter((id) => !(G.BOSS_BY_ID[id] && G.BOSS_BY_ID[id].small)).map(bigHp).filter((v) => v > 0);
+    const avg = big.length ? big.reduce((a, v) => a + v, 0) / big.length : 4500;
+    return avg * BS.SMALL_HP * (S.hp / 4500);
+  };
   class Agile extends BS.Boss {
     constructor(def, level, world) {
       super(def, level, world);
       const S = (this.S = SPECS[def.id]);
-      this.maxHp = Math.round(S.hp * this.hpScale); this.hp = this.maxHp;
+      this.maxHp = Math.round(BS.smallBase(S) * this.hpScale); this.hp = this.maxHp;
       this.bloodColor = S.blood;
       this.J = S.build(this);
       this.main = this.part({ name: def.name, hitW: this.J.hits, blood: this.bloodColor, radius: S.radius, height: this.J.height });

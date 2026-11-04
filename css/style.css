@@ -1878,3 +1878,5 @@ html.m .cls-foot .btn { font-size: 22px; padding: 14px 30px; }
 .cls-pas td:first-child { width: 42%; }
 /* aiming down the sights: lower, near the bottom of the scope, a little see-through (out of the way of the reticle) */
 #focus-bar.ads { top: calc(50% + 25vh); left: calc(50% - 40px); width: 80px; height: 5px; opacity: 0.85; }
+/* the status sheet takes the mouse (its tooltips: stats, boons, class effect); it sits in the HUD layer, which lets clicks through */
+#status-overlay { pointer-events: auto; }

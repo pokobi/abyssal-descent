@@ -112,6 +112,8 @@
   });
   window.addEventListener('wheel', (e) => {
     // while the Tab status sheet is open the wheel scrolls it instead of switching weapons
+    // (over the sheet itself the browser scrolls it: the sheet takes the mouse now, for its tooltips)
+    if (G.ui && G.ui.statusOpen && G.ui.statusOpen() && e.target && e.target.closest && e.target.closest('#status-overlay')) return;
     if (G.ui && G.ui.statusOpen && G.ui.statusOpen()) { G.ui.statusScroll(e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1)); return; }
     // a wheel direction that is bound to an action no longer switches weapons
     if ((I.locked && !bound.has(e.deltaY < 0 ? 'WheelUp' : 'WheelDown')) || (G.game && G.game.state === 'buff')) { I.wheel += Math.sign(e.deltaY); }

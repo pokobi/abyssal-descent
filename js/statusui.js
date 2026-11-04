@@ -215,12 +215,12 @@
       <div class="sh-t">STATUS<span>ホイールでスクロール</span></div>
       <div class="sh-c"><span>エリア <b>${G.game.area}</b></span><span>❤ <b>${Math.ceil(P.hp)}</b>/${st.maxHp}</span>${P.os > 0.5 ? `<span class="os">🛡 <b>+${Math.ceil(P.os)}</b></span>` : ''}<span>🪙 <b>${U.fmt(run.coins || 0)}</b></span><span>🪔 <b>${P.revives || 0}</b></span><span>撃破 <b>${run.kills || 0}</b></span></div></div>`;
     const empty = Math.max(0, st.weaponSlots - P.weapons.length);
-    if (compact) return `<div class="sw cp">${head}<div class="scols"><div class="col">${panel('ROUTE', '道程', UI.routeHTML())}${panel('STATS', '能力値', statsBody())}</div></div><div class="srow">${panel(`PERKS・${P.buffs.size}`, '加護', perksBody(), 'perks')}</div></div>`;
+    const CLS = G.Classes, cl = CLS && CLS.of(P.cls);
+    const clsP = cl && cl.pas ? panel('CLASS', `${cl.icon} ${cl.name}`, `<div style="--cc:${cl.col}">${CLS.pasHTML(cl, CLS.lv())}<div class="cls-pas-n">▼ 短所：${esc(cl.minus)}</div></div>`) : '';
+    if (compact) return `<div class="sw cp">${head}<div class="scols"><div class="col">${panel('ROUTE', '道程', UI.routeHTML())}${clsP}${panel('STATS', '能力値', statsBody())}</div></div><div class="srow">${panel(`PERKS・${P.buffs.size}`, '加護', perksBody(), 'perks')}</div></div>`;
     const loadout = panel('LOADOUT', '武器', G.weapons.gunsInOrder().map(gunCard).join('') + Array.from({ length: empty }, () => `<div class="wc empty"><div class="wc-h0"><span class="key">＋</span><span class="nm">武器スロット：空き</span></div></div>`).join('') + meleeCard());
     const abil = panel('ABILITIES', 'スキル', P.skills.map((sk, i) => (sk ? skillCard(sk, G.input.skillKey(i)) : `<div class="sc empty"><div class="sc-h"><span class="key">${G.input.skillKey(i)}</span><span class="nm">— 空き —</span></div></div>`)).join('') + pileCard());
     const armorBody = () => G.ARMOR_SLOTS.map((S) => { const it = P.equip[S.id], d = it && G.ARMOR_BY_ID[it.id]; return d ? `<div class="it" style="--rc:${R(d.rarity)}"><span class="ic">${d.icon}</span><span class="nm">${esc(d.name)}</span><span class="sub">🛡${d.def}　🔧${Math.round(G.Inv.durFrac(it) * 100)}%</span><span class="ds">${[...d.fixed.map((f) => '◆' + f.desc), ...(it.ench || []).map((e) => '✦' + G.enchantText(e))].join('　') || esc(S.name + '防具')}</span></div>` : `<div class="it" style="--rc:#3a332a;opacity:.45"><span class="ic">${S.icon}</span><span class="nm">${S.name} — 空き</span><span class="sub"></span></div>`; }).join('');
-    const CLS = G.Classes, cl = CLS && CLS.of(P.cls);
-    const clsP = cl && cl.pas ? panel('CLASS', `${cl.icon} ${cl.name}`, `<div style="--cc:${cl.col}">${CLS.pasHTML(cl, CLS.lv())}<div class="cls-pas-n">▼ 短所：${esc(cl.minus)}</div></div>`) : '';
     const right = clsP + panel('STATS', '能力値', statsBody()) + panel('ITEMS', '所持アイテム', `<div class="igrid">${itemsBody()}</div>`);
     const perks = panel(`PERKS・${P.buffs.size}`, '加護', perksBody(), 'perks');
     return `<div class="sw">${head}<div class="scols"><div class="col">${loadout}</div><div class="col">${abil}</div><div class="col">${right}</div></div><div class="srow">${perks}</div></div>`;

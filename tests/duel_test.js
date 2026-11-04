@@ -23,7 +23,7 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
     await p.eval("window.__hits = []; const d0 = G.combat.damagePlayer; G.combat.damagePlayer = function (dmg, info) { if (info && info.attacker && info.attacker.boss) { __hits.push({ t: G.Duel.cur ? G.Duel.cur.t : -1, dmg }); return 0; } return d0.apply(this, arguments); }; 1");
     // a press of the guard key, as melee.js passes it on
     // the bot rides on the game's own frame (a background tab gives requestAnimationFrame no time): the key goes down the frame a blow flashes, up two frames later
-    await p.eval("window.__auto = null; window.__up = 0; const u0 = G.bosses.update; G.bosses.update = function (dt) { const r = u0.apply(this, arguments); const d = G.Duel.cur, k = G.BIND.reload[0]; if (window.__up > 0 && --window.__up === 0) G.input.keys[k] = false; if (d && d.combo && window.__auto === 'ok') for (const s of d.combo.list) if (s.flashed && !s.done && !s.parried && !s._p) { s._p = true; G.input.keys[k] = true; window.__up = 2; } return r; }; 1");
+    await p.eval("window.__auto = null; window.__up = 0; const u0 = G.bosses.update; G.bosses.update = function (dt) { const r = u0.apply(this, arguments); const d = G.Duel.cur, k = G.BIND.reload[0]; if (window.__up > 0 && --window.__up === 0) G.input.keys[k] = false; if (d && d.combo && window.__auto === 'ok') for (const s of d.combo.list) if (s.flashed && !s.done && !s.parried && !s._p) { s._p = true; G.input.keys[k] = true; G.Duel._kt = performance.now(); window.__up = 2; } return r; }; 1");
     const press = () => p.eval("G.input.keys[G.BIND.reload[0]] = true; 1").then(() => sleep(60)).then(() => p.eval("G.input.keys[G.BIND.reload[0]] = false; 1"));
     for (const id of IDS) {
       console.log(`--- ${id}`);
@@ -55,7 +55,7 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
       await p.until('G.Duel.cur && G.Duel.cur.combo', 8000);
       const hb = await p.eval('__hits.length');
       await p.until('!G.Duel.cur || !G.Duel.cur.combo', 12000);
-      const missed = (await p.eval('__hits.length')) - hb;
+      const missed = (await p.eval('__hits.length')) - h0;
       check(missed > 0, `blows not parried land (${missed})`);
       check(await p.eval('G.bosses.active.duelSt.wg / G.bosses.active.maxHp > 0.119'), 'and take nothing off the gauge');
       // parry: wait for each flash and press inside the window
@@ -103,7 +103,7 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
       await p.eval("(() => { const b = G.bosses.active; b.hp = b.maxHp * 0.34; return 1; })()");
       await p.until('!!G.Duel.cur', 5000).catch(() => {});
       check(await p.eval('!!G.Duel.cur && G.bosses.active.duelSt.n === 2'), 'the second duel comes at 35%');
-      await p.eval('G.Duel.cur.t = G.Duel.INTRO + G.Duel.READ + G.Duel.LIMIT - 0.5; 1');
+      await p.eval('G.Duel.cur.t = Math.max(G.Duel.cur.t, G.Duel.cur.readUntil); G.Duel.cur.fightT = G.Duel.limit() - 0.5; 1');
       await p.until('!G.Duel.cur', 5000);
       const sh = JSON.parse(await p.eval("JSON.stringify({ wg: G.bosses.active.duelSt.wg, max: G.bosses.active.duelSt.wgMax, hp: G.bosses.active.hp, lbl: document.getElementById('boss-duel').className })"));
       check(sh.wg === sh.max && /on/.test(sh.lbl), 'time ran out: the white gauge stays (and is shown)');

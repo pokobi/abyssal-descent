@@ -327,6 +327,7 @@
     K.installSync();
     K.installFx();
     K.installTeam();
+    if (K.installDuel) K.installDuel();
   };
   K.handlers.hi = function (m, from) {
     const rp = K.players.get(from); if (!rp) return;

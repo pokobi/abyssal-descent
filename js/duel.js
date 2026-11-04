@@ -98,7 +98,7 @@
     if (b.dead) { bar(null); return up0(dt); }
     if (D.cur) { tick(dt); bar(b); return; }
     if (s.stunT > 0) { stunTick(b, dt); bar(b); return; }
-    if (D.authority && s.wg <= 0 && s.n < D.AT.length && b.hp / b.maxHp <= D.AT[s.n]) { D.begin(b); bar(b); return; }
+    if (D.authority && s.wg <= 0 && s.n < D.AT.length && b.hp / b.maxHp <= D.AT[s.n]) { D.want(b); bar(b); return; }
     up0(dt);
     bar(b);
     outside(dt);
@@ -107,27 +107,44 @@
   BS.clear = function () { D.abort(); bar(null); return clear0.apply(this, arguments); };
 
   // ---------------------------------------------------------------- start / end
+  D.want = (b) => D.begin(b); // (co-op starts it outside the guardian's update)
   D.begin = function (b, who, ring) {
     const s = b.duelSt;
     s.n++; s.wgMax = b.maxHp * D.GAUGE; s.wg = s.wgMax;
-    stopBoss(b);
-    // what is on the field goes: shots, fields, warnings, everything summoned
+    if (D.authority) stopBoss(b);
+    // what is on the field goes: shots, fields, warnings, everything summoned (the foes themselves only where they are owned)
     G.combat.purgeHostile(); G.fx.clearTelegraphs();
-    for (const e of G.enemies.list) if (e.alive && !e.boss && e.def.id !== 'mimic_gold') { G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1); e.noReward = true; e.hp = 0; G.combat.killEnemy(e, { src: 'clear', proc: true }, 0); }
+    if (D.authority) for (const e of G.enemies.list) if (e.alive && !e.boss && e.def.id !== 'mimic_gold') { G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1); e.noReward = true; e.hp = 0; G.combat.killEnemy(e, { src: 'clear', proc: true }, 0); }
     const w = b.world, R = D.RING;
     const c = ring ? V(ring.x, 0, ring.z) : V(U.clamp(b.pos.x, R + 1, w.W - R - 1), 0, U.clamp(b.pos.z, R + 1, (w.arenaD || w.D) - R - 1));
     c.y = b.pos.y || 0;
-    const d = (D.cur = { b, who: who ?? D.pickFirst(b), t: 0, c, R, combo: null, cd: 1.2, lockUntil: -9, st: 'intro', fx: [], t0: performance.now() });
+    const d = (D.cur = { b, who: who ?? D.pickFirst(b), t: 0, c, R, combo: null, cd: 1.2, lockUntil: -9, st: 'intro', fx: [], readUntil: D.INTRO + D.READ, fightT: 0, slotT: 0, note: '' });
     // the guardian steps to the centre, the duellist comes inside the ring
-    b.pos.x = c.x; b.pos.z = c.z;
+    if (D.authority) { b.pos.x = c.x; b.pos.z = c.z; }
     buildRing(d);
     G.sfx.monster(b.pos, 'roar', 0.6, 1.3); G.sfx.bell && G.sfx.bell(); G.player.addShake(0.4);
     D.onBegin(d);
-    if (D.mine()) enterMe(d);
-    else G.ui.toast(`⚔ 決闘 — ${D.nameOf(d.who)} が ${b.def.name} と一騎打ち`, 'warn');
+    D.syncMe(d);
+    if (!D.mine()) G.ui.toast(`⚔ 決闘 — ${D.nameOf(d.who)} が ${b.def.name} と一騎打ち`, 'warn');
     return d;
   };
-  D.onBegin = () => {}; D.onEnd = () => {}; // co-op hooks
+  D.onBegin = () => {}; D.onEnd = () => {}; D.onCombo = () => {}; D.onParry = () => {}; D.onSwitch = () => {}; // co-op hooks
+  // the duellist changes (co-op): the new one gets the rules and the reading time again
+  D.switchTo = function (id) {
+    const d = D.cur; if (!d || d.who === id) return;
+    d.who = id; d.readUntil = d.t + D.READ; d.combo = null; d.cd = 1.0; d.slotT = 0; d.lockUntil = -9; d.lastHit = undefined;
+    D.onSwitch(d);
+    D.syncMe(d);
+    if (!D.mine()) G.ui.toastSmall(`⚔ 決闘の相手が ${D.nameOf(id)} に代わった`);
+  };
+  // each machine puts its own player in or out of the duel as the duellist changes
+  D.syncMe = function (d) {
+    const P = G.player; if (!P) return;
+    const mine = D.mine();
+    if (mine && !P.duelLock && !P.dead) enterMe(d);
+    else if (!mine && P.duelLock) { leaveMe(); P.invulnT = Math.max(P.invulnT || 0, 1); }
+    if (!mine) { ov(); if (!/watch/.test(OV.className)) OV.className = 'watch'; }
+  };
   D.nameOf = () => 'あなた';
   function stopBoss(b) {
     b.act = null; b.hYbase = 0; b.hY = 0; b.root.visible = true; if (b.main) b.main.invuln = false;
@@ -139,9 +156,9 @@
     const b = d.b, me = D.mine();
     D.cur = null;
     dropRing(d);
-    if (me) leaveMe(d);
-    stopBoss(b);
-    if (b.recover && !broke) b.recover(1.5);
+    leaveMe(d);
+    if (me) G.player.invulnT = Math.max(G.player.invulnT || 0, 1);
+    if (D.authority) { stopBoss(b); if (b.recover && !broke) b.recover(1.5); }
     if (!broke && b.duelSt.wg > 0) G.ui.toast('⏳ 決闘の時間切れ — 白いゲージが盾として残った（削り切るまで本体は無傷）', 'warn');
     D.onEnd(d, broke);
   };
@@ -162,7 +179,7 @@
     P.pos.x = d.c.x + ux * r; P.pos.z = d.c.z + uz * r; P.vel.set(0, 0, 0);
     P.yaw = Math.atan2(-(b.pos.x - P.pos.x), -(b.pos.z - P.pos.z)); P.pitch = 0.12;
     lockHud(true);
-    ov(); OV.classList.add('on'); OV.classList.remove('read');
+    ov(); OV.className = 'on';
     banner(`⚔ 決闘`, `${b.def.name}との一騎打ち`);
     guide(d);
   }
@@ -194,19 +211,24 @@
   }
 
   // a press of the guard key (melee.js calls this in a duel); on the co-op guest the result is sent to the host
+  // the moment the key really went down (a slow frame must not make a press late: it is dated back to its keydown, a quarter second at most)
+  D._kt = 0;
+  window.addEventListener('keydown', (e) => { if (!e.repeat && G.BIND && G.BIND.reload && G.BIND.reload.includes(e.code)) D._kt = performance.now(); }, true);
   D.press = function () {
     const d = D.cur; if (!d || !D.mine()) return;
     if (G.weapons.gd) G.weapons.gd.pk = 0.2; // the quick parry stance
-    D.tryParry(d.t, true);
+    const ago = D._kt ? (performance.now() - D._kt) / 1000 : 0, fresh = ago > 0 && ago < 0.25;
+    D.tryParry(d.t - (fresh ? ago * D.timeK() : 0), true, fresh ? D._kt : 0);
   };
-  // judged on the duellist's own machine, by the duel clock
-  D.tryParry = function (now, local) {
+  // judged on the duellist's own machine, by the duel clock. kt = when the key went down (performance.now): it counts from the moment the flash appeared
+  D.tryParry = function (now, local, kt) {
     const d = D.cur; if (!d || !d.combo) { if (d) d.lockUntil = now + D.LOCK; return false; }
     const w = D.win(), t0 = d.combo.t0;
-    const s = d.combo.list.find((x) => !x.done && !x.parried && now >= t0 + x.at - w && now <= t0 + x.at + D.LATE);
+    const s = d.combo.list.find((x) => !x.done && !x.parried && now <= t0 + x.at + D.LATE && (kt && x.flashed ? kt >= x.flashReal : now >= t0 + x.at - w));
     if (!s || s.fail || now < d.lockUntil) { d.lockUntil = now + D.LOCK; if (s) s.fail = true; return false; }
     s.parried = true;
     D.parried(d, s, local);
+    D.onParry(d, d.combo.list.indexOf(s));
     return true;
   };
   D.parried = function (d, s, local) {
@@ -222,10 +244,10 @@
       pop('PARRY!');
     }
     // the guardian is knocked back a step and reels
-    const P = D.posOf(d.who), dx = b.pos.x - P.x, dz = b.pos.z - P.z, l = Math.hypot(dx, dz) || 1;
-    b.pos.x += dx / l * 0.9; b.pos.z += dz / l * 0.9;
     d.recoil = 0.3;
     if (D.authority) {
+      const P = D.posOf(d.who), dx = b.pos.x - P.x, dz = b.pos.z - P.z, l = Math.hypot(dx, dz) || 1;
+      b.pos.x += dx / l * 0.9; b.pos.z += dz / l * 0.9;
       st.wg = Math.max(0, st.wg - st.wgMax * D.PARRY);
       if (st.wg <= 1e-6) D.breakIt();
     }
@@ -239,11 +261,12 @@
     D._stopUntil = performance.now() + 140; D._slowUntil = performance.now() + 600;
     G.fx.dmgNum && G.fx.dmgNum(b.main.centerPos(), 'BREAK ' + dmg, 'crit');
     G.fx.sparks(b.main.centerPos(), null, 40, 0xffffff, 12); G.sfx.shieldBreak && G.sfx.shieldBreak(b.pos); G.sfx.explosion && G.sfx.explosion(b.pos, 0.8);
-    flashScreen('break'); pop('BREAK', true);
+    D.breakFx(b);
     G.ui.toast(`💥 ブレイク！ ${b.def.name}が崩れた — ${D.STUN}秒間 総攻撃（被ダメージ×${D.STUN_MUL}）`, 'good');
     D.finish(true);
     if (!b.dead) { st.stunT = D.STUN; stopBoss(b); }
   };
+  D.breakFx = function (b) { ov(); flashScreen('break'); pop('BREAK', true); G.player.addShake(0.5); };
   D.dealBreak = function (b, dmg) {
     const s = b.duelSt, keep = s.wg; s.wg = 0;
     b.hp = Math.max(0, b.hp - dmg);
@@ -253,16 +276,18 @@
 
   // ---------------------------------------------------------------- the duel's clock and the guardian's blows
   function tick(dt) {
-    const d = D.cur, b = d.b, st = b.duelStyle, P = D.posOf(d.who);
+    const d = D.cur, b = d.b, st = b.duelStyle, P = D.posOf(d.who), A = D.authority;
     d.t += dt;
-    const lim = D.INTRO + D.READ + D.limit();
-    if (d.t < D.INTRO) d.st = 'intro'; else if (d.t < D.INTRO + D.READ) d.st = 'read'; else d.st = 'fight';
+    const lim = D.limit();
+    if (d.t < D.INTRO) d.st = 'intro'; else if (d.t < d.readUntil) d.st = 'read'; else d.st = 'fight';
+    if (d.st === 'fight') { d.fightT += dt; d.slotT += dt; }
+    D.syncMe(d);
     if (D.mine() && d.st === 'fight' && OV.classList.contains('read')) OV.classList.remove('read');
     const dh = Math.hypot(P.x - b.pos.x, P.z - b.pos.z);
-    b.t += dt;
-    b.mv = 0;
+    if (A) { b.t += dt; b.mv = 0; }
     if (d.recoil > 0) d.recoil -= dt;
-    if (d.st !== 'fight') { b.face(P, dt, 6); pose(b, 'idle'); }
+    if (!A) { if (d.combo) combo(d, dt, P); }
+    else if (d.st !== 'fight') { b.face(P, dt, 6); pose(b, 'idle'); }
     else if (!d.combo) {
       b.face(P, dt, 8);
       d.cd -= dt;
@@ -270,40 +295,42 @@
       else pose(b, 'idle');
       if (d.cd <= 0 && dh < reachOf(b) + 1.2 && D.authority) D.startCombo(makeCombo(st));
     } else combo(d, dt, P);
-    // the two stay inside the ring
-    const bx = b.pos.x - d.c.x, bz = b.pos.z - d.c.z, bl = Math.hypot(bx, bz);
-    if (bl > d.R - 1) { b.pos.x = d.c.x + bx / bl * (d.R - 1); b.pos.z = d.c.z + bz / bl * (d.R - 1); }
+    // the two stay inside the ring (everyone else outside it)
+    if (A) { const bx = b.pos.x - d.c.x, bz = b.pos.z - d.c.z, bl = Math.hypot(bx, bz); if (bl > d.R - 1) { b.pos.x = d.c.x + bx / bl * (d.R - 1); b.pos.z = d.c.z + bz / bl * (d.R - 1); } }
     if (D.mine()) keepIn(d); else keepOut(d);
-    place(b, dt);
+    if (A) place(b, dt);
     tickFx(d, dt);
     hud(d, lim);
-    if (D.authority && d.t >= lim) D.finish(false);
+    if (A && d.fightT >= lim) D.finish(false);
   }
-  D.startCombo = function (list, t0) { const d = D.cur; if (!d) return; d.combo = { t: 0, t0: t0 ?? d.t, list }; D.onCombo(d); };
-  D.onCombo = () => {};
+  D.tick = tick;
+  D.startCombo = function (list, t0) { const d = D.cur; if (!d) return; d.combo = { t: 0, t0: t0 ?? d.t, list, id: (d.comboN = (d.comboN || 0) + 1) }; D.onCombo(d); };
   function combo(d, dt, P) {
     const b = d.b, cb = d.combo, w = D.win();
     cb.t = d.t - cb.t0;
     const ct = cb.t;
     const s = cb.list.find((x) => !x.done) || null;
+    const A = D.authority;
     if (s) {
       // wind-up, then the lunge that closes in so running away does not help
       const wind = Math.max(0.15, s.at - s.from - s.hold), k = U.clamp((ct - s.from) / wind, 0, 1);
-      if (ct < s.at - 0.22) b.face(P, dt, 10);
+      if (!A) { /* the guardian itself moves on the host */ } else if (ct < s.at - 0.22) b.face(P, dt, 10);
       else {
         const dx = P.x - b.pos.x, dz = P.z - b.pos.z, l = Math.hypot(dx, dz) || 1, want = near(b);
         if (l > want) { const m = Math.min(l - want, dt * 40); b.groundMove(dx / l, dz / l, m / Math.max(dt, 1e-4), dt, (b.S && b.S.radius) || 1.2); }
         b.face(P, dt, 20);
       }
-      if (d.recoil > 0) pose(b, 'recoil'); else pose(b, 'wind', k);
-      if (!s.flashed && ct >= s.at - w) { s.flashed = true; goldFlash(d); if (D.mine() && G.input.down('reload')) s.fail = true; } // held from before the flash: no parry this time
-      if (ct >= s.at + D.LATE) {
+      if (A) { if (d.recoil > 0) pose(b, 'recoil'); else pose(b, 'wind', k); }
+      if (!s.flashed && ct >= s.at - w) { s.flashed = true; s.flashReal = performance.now(); goldFlash(d); if (D.mine() && G.input.down('reload')) s.fail = true; } // held from before the flash: no parry this time
+      // a blow not parried lands one frame after its window closes (a press already on its way in that frame still counts)
+      if (ct >= s.at + D.LATE && !s.due) s.due = true;
+      else if (s.due) {
         s.done = true;
-        if (!s.parried && D.authority) D.strike(d, s);
+        if (!s.parried) D.strike(d, s); // (the blow is felt only on the duellist's own machine: D.hurt)
         d.lastHit = ct;
       }
     }
-    if (d.lastHit !== undefined && ct - d.lastHit < 0.22 && d.recoil <= 0) pose(b, 'strike', (ct - d.lastHit) / 0.22);
+    if (A && d.lastHit !== undefined && ct - d.lastHit < 0.22 && d.recoil <= 0) pose(b, 'strike', (ct - d.lastHit) / 0.22);
     if (!s && ct > cb.list[cb.list.length - 1].at + 0.55) { d.combo = null; d.cd = U.rand(...b.duelStyle.rest); d.lastHit = undefined; }
   }
   // a blow that was not parried
@@ -436,6 +463,8 @@
 #duel-ov { position: fixed; inset: 0; pointer-events: none; z-index: 40; display: none; }
 #duel-ov.on, #duel-ov.fx { display: block; }
 #duel-ov.fx > :not(.dv-flash):not(.dv-pop):not(.dv-banner) { display: none; }
+#duel-ov.watch { display: block; } #duel-ov.watch > :not(.dv-low):not(.dv-pop):not(.dv-flash) { display: none; }
+#duel-ov.watch .dv-low { bottom: 120px; color: #ffe8b0; }
 #duel-ov .dv-bar { position: absolute; left: 0; right: 0; height: 7vh; background: #000; opacity: 0.85; transition: transform .4s; }
 #duel-ov .dv-bar.t { top: 0; } #duel-ov .dv-bar.b { bottom: 0; }
 #duel-ov .dv-frame { position: absolute; inset: 0; box-shadow: inset 0 0 0 3px rgba(255,200,80,0.55), inset 0 0 90px rgba(255,180,40,0.28); }
@@ -483,14 +512,16 @@ html.duel-me .mb:not([data-id="reload"]):not([data-id="pause"]):not([data-id="ju
   function pop(t, big) { const el = ov().querySelector('.dv-pop'); el.textContent = t; el.className = 'dv-pop'; void el.offsetWidth; el.className = 'dv-pop show' + (big ? ' big' : ''); }
   D.flashScreen = flashScreen; D.pop = pop;
   function hud(d, lim) {
-    if (!D.mine()) return;
-    const left = Math.max(0, lim - d.t), fight = d.st === 'fight';
+    ov();
+    const left = Math.max(0, lim - d.fightT), fight = d.st === 'fight', wait = Math.max(0, Math.ceil(d.readUntil - d.t));
     const lt = OV.querySelector('.dv-lt'), tm = OV.querySelector('.dv-time i');
-    const txt = fight ? `⚔ 決闘中 — 金色に光ったら ${U.esc(D.keyName())}　残り ${Math.ceil(left)}秒` : `⚔ 決闘開始まで ${Math.ceil(D.INTRO + D.READ - d.t)}秒`;
+    const txt = !D.mine() ? `⚔ ${U.esc(D.nameOf(d.who))} が決闘中（残り ${Math.ceil(left)}秒）${d.note ? '　' + U.esc(d.note) : ''}`
+      : fight ? `⚔ 決闘中 — 金色に光ったら ${U.esc(D.keyName())}　残り ${Math.ceil(left)}秒${d.note ? '　' + U.esc(d.note) : ''}` : `⚔ 決闘開始まで ${wait}秒`;
     if (lt._t !== txt) { lt.innerHTML = txt; lt._t = txt; }
-    tm.style.width = (fight ? left / D.limit() * 100 : 100).toFixed(1) + '%';
+    tm.style.width = (fight || !D.mine() ? left / lim * 100 : 100).toFixed(1) + '%';
+    if (!D.mine()) return;
     const g = OV.querySelector('.dv-guide');
-    if (!fight) { let c = g.querySelector('.dv-cnt'); if (!c) { c = document.createElement('span'); c.className = 'dv-cnt'; g.prepend(c); } c.textContent = `${Math.ceil(D.INTRO + D.READ - d.t)}`; }
+    if (!fight) { let c = g.querySelector('.dv-cnt'); if (!c) { c = document.createElement('span'); c.className = 'dv-cnt'; g.prepend(c); } c.textContent = `${wait}`; }
   }
   // the white gauge under the guardian's health bar
   let wEl = null, wLbl = null;

@@ -45,7 +45,7 @@
   // a part is added to what the corpse / chest already holds (it never takes the place of anything); its rarity follows the loot depth and luck
   PT.roll = function (luck) {
     const fams = PT.FAMS.slice();
-    const f = fams[Math.floor(Math.random() * fams.length)];
+    const f = U.weighted(fams, (x) => (G.Classes ? G.Classes.partW(x.id) : 1), Math.random); // (the class's kinds of part turn up more often)
     const area = G.game ? G.game.area : 1, d = G.Run ? G.Run.lootDepth(area) : area;
     const rs = ORD.filter((r) => PT.has(f.id, r)), w = rs.map((r) => G.rarityWeightD(r, d, luck || 0));
     let x = Math.random() * w.reduce((s, v) => s + v, 0), r = rs[rs.length - 1];
@@ -114,7 +114,8 @@
     const d = G.PART_BY_ID[id], cost = PT.makeCost(d.rarity, free), run = GM().run;
     if (PT.count(id) < PT.NEED) return false;
     if (run.coins < cost) return false;
-    const cands = U.shuffle(PT.pool(d.fam, d.rarity).slice()).slice(0, 3);
+    const pool = PT.pool(d.fam, d.rarity).slice(), cands = [];
+    while (cands.length < 3 && pool.length) { const w = U.weighted(pool, (x) => (G.Classes ? G.Classes.weight(x) : 1), Math.random); cands.push(w); pool.splice(pool.indexOf(w), 1); } // (the class's favourites x1.3)
     return { cands, pick: (w) => {
       if (PT.count(id) < PT.NEED || run.coins < cost) return false;
       PT.take(id, PT.NEED); run.coins -= cost;

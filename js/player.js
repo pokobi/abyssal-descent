@@ -320,12 +320,13 @@
         const g0 = w.groundAt(this.pos, this.hw, 60); const c = V(this.pos.x, g0 > -Infinity ? g0 : this.pos.y, this.pos.z);
         for (const e of G.enemies.inRadius(c, 10)) { if (e.boss) continue; const d = c.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 1) e.pos.addScaledVector(d.normalize(), Math.min(l, 16 * dt)); }
       }
+      if (this._knockSnap) { const k = this._knockSnap; this._knockSnap = null; if (Math.hypot(this.vel.x, this.vel.z) > Math.hypot(k.x, k.z) + 0.5) { this.vel.x = k.x; this.vel.z = k.z; } if (this.vel.y > Math.max(k.y, 0) + 0.5) this.vel.y = Math.max(k.y, 0); } // 鉄壁 (重装兵): not knocked away
       // ---- speed target ----
       const spd = this.walkSpeed();
       let targetSpeed = spd;
       // armour: speed builds up the longer you keep sprinting (+x per second, up to 3 steps)
       this.sprintT = this.sprinting ? (this.sprintT || 0) + dt : 0;
-      if (this.sprinting) targetSpeed = 9.7 * (1 + st.moveSpeed + Math.min(3, Math.floor(this.sprintT)) * (st.sprintRamp || 0)) * this.moveMul();
+      if (this.sprinting) targetSpeed = 9.7 * (1 + st.moveSpeed + this.clsMove() + Math.min(3, Math.floor(this.sprintT)) * (st.sprintRamp || 0)) * this.moveMul();
       if (this.crouching && !this.sliding && !this._sjRun) targetSpeed = 3.3 * (1 + st.moveSpeed * 0.5) * this.moveMul();
       if (G.weapons.adsT > 0.5) targetSpeed *= 0.62;
       if (this.st.slow > 0) targetSpeed *= Math.max(0.4, 0.7 - 0.1 * ((this.st.slowLv || 1) - 1));
@@ -397,7 +398,8 @@
       this.updateGrapple(dt);
       this.postMove(dt, wl, false);
     }
-    walkSpeed() { return 6.2 * (1 + this.stats.moveSpeed) * this.moveMul(); }
+    walkSpeed() { return 6.2 * (1 + this.stats.moveSpeed + this.clsMove()) * this.moveMul(); }
+    clsMove() { return G.Classes ? G.Classes.moveAdd() : 0; } // 勢い (突撃兵) / 連斬 (剣士)
     moveMul() { const mm = G.weapons.meleeMoveMul(); if (mm) return mm; const cs = G.weapons.curStats; return cs ? cs.moveMul : 1; }
 
     physics(dt) {

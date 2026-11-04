@@ -336,6 +336,7 @@
     }
     C._noCoins = !!e.bossSpawn; // kill hooks (bounties, midas...) pay nothing for boss adds either
     try { G.buffs.emit('onKill', { e, pos: e.centerPos(), head: !!info.head, src: info.src, overkill: overkill || 0, weapon: info.weapon, proc: info.proc }); } finally { C._noCoins = false; }
+    if (G.Classes) G.Classes.onKill(e, info); // (the class's own effect: 勢い, 一点集中)
     if (info.weapon && info.weapon.trait === 'killReload') { info.weapon.mag = G.weapons.stats(info.weapon).mag; info.weapon.reloading = false; }
     if (e.st.markKillReset) {
       const sk = P.skills.find((s) => s && s.id === 'mark'); if (sk) sk.cd = 0;
@@ -599,16 +600,20 @@
       if (atkEl && G.Elem) amount *= G.Elem.onPlayerHit(atkEl);
       if (P.elBrittle > 0) amount *= 1.15;
       if (G.Classes && G.Classes.allyGuard()) amount *= 0.75;
+      if (G.Classes) amount *= G.Classes.hurtMul();
     }
     const ctx = { amount, red: 0, src: info.src || 'melee', attacker: info.attacker, elem: info.elem };
     G.buffs.emit('preDamaged', ctx);
     if (ctx.block) return 0;
     if (P.pileState === 'charge') ctx.red += 0.5;
     let armor = info.fixed ? 0 : U.clamp(P.stats.armor + ctx.red, -1, 0.85);
+    const iron = !info.fixed && G.Classes ? G.Classes.ironRed() : 0; // 鉄壁 (重装兵): its own factor, the total still at most 85%
+    if (iron > 0) { if (!P._knockSnap) P._knockSnap = P.vel.clone(); armor = Math.min(0.85, 1 - (1 - armor) * (1 - iron)); }
     let dmg = amount * (1 - armor);
     if (G.weapons.guardAbsorb) dmg = G.weapons.guardAbsorb(dmg, info); // a melee guard held up towards the hit
     if (P.has('d_iron')) dmg = Math.min(dmg, P.stats.maxHp * 0.25);
     if (dmg <= 0) return 0;
+    if (G.Classes && !info.fixed) G.Classes.onHurt();
     let osHit = 0;
     if (P.os > 0) { osHit = Math.min(P.os, dmg); P.os -= osHit; dmg -= osHit; }
     // lethal-blow protection (buffs: 踏みとどまり / 不死身): from high HP a single hit can't kill you outright

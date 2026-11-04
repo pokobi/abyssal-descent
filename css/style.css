@@ -1806,3 +1806,41 @@ html.m .pb-title { font-size: 16px; }
 .iv-sk .sic > .elb { font-size: 0.3em; }
 .alch-item .ai-ic > .elb { font-size: 12px; }
 .elchip { display: inline-block; padding: 0 0.5em; border-radius: 0.8em; border: 1px solid var(--ec); color: var(--ec); font-size: 12px; line-height: 1.6; font-weight: 700; background: color-mix(in srgb, var(--ec) 14%, transparent); white-space: nowrap; }
+
+/* the class's own effect on the HUD (classes.js / UI.clsHud) */
+#cls-ind { display: none; margin-bottom: 6px; padding: 3px 10px; width: max-content; font-size: 13px; font-weight: 800; color: #ffe2a0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+#cls-ind.on { display: block; }
+#hp-wrap.iron { border-color: #f0c050; box-shadow: 0 0 0 1px #f0c050, 0 0 14px rgba(240,192,80,0.55); }
+#focus-bar { position: absolute; left: -26px; top: 26px; width: 52px; height: 4px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; overflow: hidden; display: none; }
+#focus-bar.on { display: block; }
+#focus-bar i { display: block; height: 100%; width: 0; background: #9fe0a0; }
+#focus-bar.full { border-color: #ffe27a; box-shadow: 0 0 8px #ffe27a; }
+#focus-bar.full i { background: #ffe27a; }
+/* the class screen / status screen: the effect's table */
+.cls-pas { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 7px 9px; margin-bottom: 6px; font-size: 12px; }
+.cls-pas-h { font-size: 14px; margin-bottom: 4px; } .cls-pas-h em { font-style: normal; margin-left: 8px; color: var(--cc, #ffd27a); font-weight: 800; }
+.cls-pas table { width: 100%; border-collapse: collapse; }
+.cls-pas th, .cls-pas td { padding: 2px 3px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.cls-pas td:first-child { text-align: left; color: #cfc4b0; }
+.cls-pas th { color: #a99d88; font-weight: 700; }
+.cls-pas .on { color: #ffe2a0; font-weight: 800; background: rgba(255,210,122,0.1); }
+.cls-pas-n { margin-top: 4px; color: #cfc4b0; line-height: 1.5; } .cls-pas-n.dim { color: #8f8574; }
+/* the boon screen with more than four cards: two rows */
+.bs-cards[data-rows="2"] { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 210px)); justify-content: center; gap: 12px 14px; margin-top: 16px; }
+.bs-cards[data-rows="2"] .card { width: auto; min-height: 0; padding: 10px 10px 12px; }
+.bs-cards[data-rows="2"] .card .c-icon { width: 54px; height: 54px; font-size: 30px; margin: 6px auto 6px; }
+.bs-cards[data-rows="2"] .card .c-name { font-size: 15px; }
+.bs-cards[data-rows="2"] .card .c-desc { font-size: 12px; line-height: 1.45; margin-top: 6px; }
+.bs-wrap:has(.bs-cards[data-rows="2"]) { overflow-y: auto; justify-content: safe center; }
+html.m .bs-cards[data-rows="2"] { grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+html.m .bs-cards[data-rows="2"] .card { padding: 5px 5px 6px; }
+html.m .bs-cards[data-rows="2"] .card .c-icon { width: 30px; height: 30px; font-size: 18px; margin: 2px auto; }
+html.m .bs-cards[data-rows="2"] .card .c-name { font-size: 12px; }
+html.m .bs-cards[data-rows="2"] .card .c-desc { font-size: 10.5px; line-height: 1.35; margin-top: 2px; }
+@media (max-height: 760px) {
+  .bs-cards[data-rows="2"] { gap: 8px 10px; margin-top: 8px; }
+  .bs-cards[data-rows="2"] .card { padding: 6px 8px 8px; }
+  .bs-cards[data-rows="2"] .card .c-icon { width: 38px; height: 38px; font-size: 22px; margin: 3px auto; }
+  .bs-cards[data-rows="2"] .card .c-name { font-size: 13.5px; }
+  .bs-cards[data-rows="2"] .card .c-desc { font-size: 11px; line-height: 1.35; margin-top: 3px; }
+}

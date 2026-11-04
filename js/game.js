@@ -1108,7 +1108,9 @@
     if (opts === true) opts = { boss: true };
     opts = opts || {};
     const stage = GM.stage, bossKill = !!opts.boss;
+    const clsLv0 = G.Classes ? G.Classes.lv() : 1;
     GM.areaCleared = true; GM.clearSweep = true;
+    if (bossKill && G.Classes) G.Classes.afterGuardian(clsLv0);
     G.Depth.liftDarkness();
     GM.clearMarkers();
     GM.run.areasCleared++;
@@ -1345,7 +1347,7 @@
       const cands = pool.filter((b) => b.rarity === rar && !out.includes(b));
       if (!cands.length) continue;
       // prefer mechanics over plain stats a bit
-      const b = U.weighted(cands, (b) => (b.skill ? 10 : b.cat === 'stat' ? 0.7 : 1.2), r);
+      const b = U.weighted(cands, (b) => (b.skill ? 10 : b.cat === 'stat' ? 0.7 : 1.2) * (G.Classes ? G.Classes.boonW(b) : 1), r); // (boons that suit the class: x1.3 - x2)
       out.push(b);
     }
     // keep survivability on the table: most offers include at least one defence boon
@@ -1365,7 +1367,7 @@
     const done = () => { GM.rewardPending = null; GM.resume(); if (o.after) o.after(); };
     let rolls = 0;
     const getReroll = () => {
-      const freeMax = P.has('e_reroll') ? 2 : 1, free = Math.max(0, freeMax - rolls);
+      const freeMax = (P.has('e_reroll') ? 2 : 1) + (G.Classes ? G.Classes.freeRerolls() : 0), free = Math.max(0, freeMax - rolls); // (目利き of the 兵士: one more)
       const cost = GM.price(200 * Math.pow(2, Math.max(0, rolls - freeMax))); // priced like the shop (discounts, depth)
       return { free, cost, afford: free > 0 || GM.run.coins >= cost };
     };
@@ -2316,6 +2318,7 @@
     if (G.bosses.active) for (const p of G.bosses.active.parts) if (p.alive && !p.removed) G.combat.updateStatus(p, gdt);
     G.combat.update(gdt);
     G.buffs.emit('tick', gdt);
+    if (G.Classes) G.Classes.tick(gdt);
     updateObjective(gdt);
     GM.updateEnrage(gdt);
     updateHighFire(gdt);

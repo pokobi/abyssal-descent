@@ -6,24 +6,41 @@
   const CL = (G.Classes = {});
   CL.LIST = [
     { id: 'soldier', name: '兵士', icon: '🪖', col: '#9ab070', gun: 'a_ranger', melee: 'm_basic', skill: 'spear', ult: 'ult_armory', grapple: 18,
-      mods: { reloadSpeed: 0.15, magSize: 0.15 }, plus: 'リロード速度+15%、装弾数+15%', minus: 'なし', favName: 'なし', fav: null,
+      mods: { buffChoices: 1 }, minus: 'なし', favName: 'なし', fav: null,
       look: 'オリーブ色の戦闘服とヘルメット', role: '何でもこなす基準のクラス' },
     { id: 'assault', name: '突撃兵', icon: '💨', col: '#ff6a50', gun: 's_wasp', melee: 'm_basic', skill: 'dash', ult: 'ult_berserk', grapple: 15,
-      mods: { moveSpeed: 0.05 }, near: 0.15, far: -0.15, plus: '10m以内の敵への与ダメ+15%、移動速度+5%', minus: '20m以上の敵への与ダメ-15%', favName: 'SMG・ショットガン',
+      mods: {}, minus: '20m以上の敵への与ダメ-20%', favName: 'SMG・ショットガン（銃と部品）、機動・連射・装填の加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun' || o.arch === 'autoshotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
     { id: 'sniper', name: '狙撃手', icon: '🎯', col: '#7ac070', gun: 'n_scout', melee: 'm_basic', skill: 'decoy', ult: 'ult_shadow', grapple: 18,
-      mods: { headMul: 0.3, maxHp: -10 }, plus: 'ヘッドショット倍率+30%', minus: '最大HP-10', favName: '狙撃銃・DMR',
+      mods: {}, minus: '覗き込まずに撃つと拡散+40%', favName: '狙撃銃・DMR（銃と部品）、会心・ヘッドショットの加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'sniper' || o.arch === 'dmr'), look: '緑のフード付きマントとマスク', role: '遠くから急所を撃つ' },
     { id: 'blade', name: '剣士', icon: '⚔️', col: '#c4a0f0', gun: 'p_viper', melee: 'm_machete', skill: 'haste', ult: 'ult_bladestorm', grapple: 15,
-      mods: { meleeDmg: 0.2, guardHp: 0.3, magSize: -0.25 }, plus: '近接与ダメ+20%、ガードの耐久+30%', minus: '銃の装弾数-25%', favName: '近接武器',
+      mods: { magSize: -0.25 }, minus: '銃の装弾数-25%', favName: '近接武器（武器と部品）、近接の加護',
       fav: (o) => o.kind === 'melee', look: '羽織と袴、鉢巻、背中に鞘', role: '近接で斬り込む' },
     { id: 'heavy', name: '重装兵', icon: '🛡️', col: '#e0b050', gun: 'g_breacher', melee: 'm_woodshield', skill: 'thornarmor', ult: 'ult_bastion', grapple: 28,
-      mods: { maxHp: 30, armor: 0.1, moveSpeed: -0.08 }, plus: '最大HP+30、被ダメ-10%', minus: '移動速度-8%', favName: '防具・盾',
+      mods: { armor: 0.1, moveSpeed: -0.12, slideBoost: -0.4 }, minus: '移動速度-12%、スライディングの距離-40%', favName: '防具・盾、近接の部品、防御の加護',
       fav: (o) => o.kind === 'armor' || (o.kind === 'melee' && !!o.guard && o.guard[0] >= 0.75), look: '板金の鎧と大きな肩当て、顔まで覆う兜', role: '前に立って受け止める' },
     { id: 'mage', name: '術士', icon: '🔮', col: '#7a9aff', gun: 't_rivet', atts: { core: 'c_water' }, melee: 'm_basic', skill: 'fireball', ult: 'ult_tsunami', grapple: 20,
-      mods: { elMastery: 80, elIcd: 0.4, maxHp: -15 }, plus: '属性熟練+80、武器の属性付与の間隔1.5秒', minus: '最大HP-15', favName: '属性コア・属性のスキル',
+      mods: { elIcd: 0.4, maxHp: -15 }, minus: '最大HP-15', favName: '属性コア・属性のスキル、属性・状態異常・スキル強化の加護',
       fav: (o) => (o.kind === 'attachment' && o.slot === 'core') || (o.kind === 'skill' && G.Elem && !!G.Elem.skEl(o.id)), look: 'フード付きのローブ。まわりに属性の光球が浮く', role: '属性反応で崩す' },
   ];
+  // ---------------- the class's own effect (固有効果): Lv1 -> Lv3 as the guardians fall ----------------
+  // rows: [what, Lv1, Lv2, Lv3]; notes: the rest of the rule in words
+  const PAS = {
+    soldier: { name: '目利き', icon: '🃏', rows: [['加護の選択肢', '+1枚', '+1枚', '+1枚'], ['加護の無料リロール', '+1回', '+1回', '+1回']],
+      notes: ['加護「選択肢」「運命の再配」とは別に数える。'] },
+    assault: { name: '突貫', icon: '💨', rows: [['近い敵への与ダメ（0mで最大、12mで0）', '+30%', '+40%', '+50%'], ['勢い1つにつき 移動速度・連射速度', '+6%', '+8%', '+10%']],
+      notes: ['8m以内の敵を倒すと「勢い」が1つ（4秒、最大3つ）。勢い1つにつき被ダメ-4%。'] },
+    sniper: { name: '一点集中', icon: '🎯', rows: [['満タンの1発のダメージ（1体貫通）', '+25%', '+40%', '+55%'], ['ヘッドショットで倒したとき', 'ゲージ半分', 'ゲージ半分・弾1', 'ゲージ半分・弾1']],
+      notes: ['覗き込んでいる間、ゲージがたまる（1.5秒で満タン）。撃つと0、覗き込みをやめると1秒で半分減る。'] },
+    blade: { name: '連斬', icon: '⚔️', rows: [['近接を当てるとたまる層の上限', '5層', '6層', '7層']],
+      notes: ['1層につき近接の攻撃速度+5%・移動速度+3%（銃には効かない）。', '7.5秒続き、当てるたびに7.5秒に戻る。切れると全部なくなる。'] },
+    heavy: { name: '鉄壁', icon: '🛡️', rows: [['ダメージを受けた後3秒間の被ダメ', '-30%', '-40%', '-50%'], ['いつでも被ダメ', '-10%', '-10%', '-10%']],
+      notes: ['3秒の間にまた受けると、そこからさらに3秒。効いている間は吹き飛ばされない。'] },
+    mage: { name: '反応強化', icon: '🔮', rows: [['反応のダメージ（凍結の時間なども）', '+20%', '+30%', '+40%'], ['沸騰・熱融の倍率', '+0.1', '+0.15', '+0.2']],
+      notes: ['属性熟練・反応の加護とは別の枠で掛かる。武器の属性付与の間隔は1.5秒。'] },
+  };
+  for (const c of CL.LIST) c.pas = PAS[c.id];
   CL.BY = Object.fromEntries(CL.LIST.map((c) => [c.id, c]));
   CL.DEFAULT = 'soldier';
   CL.of = (id) => CL.BY[id] || CL.BY[CL.DEFAULT];
@@ -40,18 +57,102 @@
     P.skills = [G.abilities.makeSlot(c.ult), G.abilities.makeSlot(c.skill), null, null];
     P.skills[0].kit = true; P.skills[1].kit = true;
     P.kitAtts = Object.values(c.atts || {}); // (the mage's water core sells for nothing, once)
+    P._cs = null; // (the class effect's stacks and gauges)
   };
   // the class's strength / weakness as stats (folded in by Player.recalc), the grapple's own cooldown
   CL.mods = function (P) { const c = CL.of(P.cls); return Object.assign({ grappleBase: c.grapple }, c.mods); };
-  // 突撃兵: near / far
+  // the Lv of the class's own effect: 1 at the start, 3 by the last guardian (easy: 2 guardians, so the first one takes it to 3)
+  CL.lv = function () {
+    const GM = G.game, R = G.Run;
+    if (!GM || !R || !GM.area || GM.tutorial) return 1;
+    let done = Math.floor((GM.area - 1) / R.CYCLE);
+    if (R.isBoss(GM.area) && GM.areaCleared) done++;
+    const total = Math.max(2, Math.floor(R.areas() / R.CYCLE));
+    return 1 + Math.min(2, Math.floor(done * 2 / (total - 1)));
+  };
+  const V = (a) => a[CL.lv() - 1];
+  const is = (id) => !!G.player && G.player.cls === id;
+  const now = () => (G.game ? G.game.time : 0);
+  // the running state (stacks, gauges), kept on the player and cleared with the kit
+  const S = () => { const P = G.player; return P._cs || (P._cs = { mom: [], blade: 0, bladeT: 0, focus: 0, ironT: 0 }); };
+  CL.state = S;
+  // 突撃兵: close range (smooth, 0 m best, 12 m nothing), far away a little less
   CL.dmgAdd = function (P, dist) {
-    const c = CL.of(P.cls);
-    if (c.near && dist <= 10) return c.near;
-    if (c.far && dist >= 20) return c.far;
-    return 0;
+    if (!is('assault')) return 0;
+    if (dist >= 20) return -0.2;
+    return Math.max(0, 1 - dist / 12) * V([0.3, 0.4, 0.5]);
+  };
+  CL.mom = () => { if (!is('assault')) return 0; const t = now(), m = S().mom; while (m.length && m[0] <= t) m.shift(); return m.length; };
+  CL.fireAdd = () => CL.mom() * V([0.06, 0.08, 0.1]);
+  CL.moveAdd = () => (is('assault') ? CL.mom() * V([0.06, 0.08, 0.1]) : 0) + (is('blade') ? CL.blade() * 0.03 : 0);
+  // 剣士: stacks on every melee swing that lands
+  CL.bladeMax = () => V([5, 6, 7]);
+  CL.blade = () => { if (!is('blade')) return 0; const s = S(); if (s.blade && s.bladeT <= now()) s.blade = 0; return s.blade; };
+  CL.onMeleeHit = function () { if (!is('blade')) return; const s = S(); s.blade = Math.min(CL.bladeMax(), CL.blade() + 1); s.bladeT = now() + 7.5; };
+  CL.meleeSpeed = () => 1 + CL.blade() * 0.05;
+  // 狙撃手: the focus gauge (filled while aiming down the sights)
+  CL.focus = () => (is('sniper') ? S().focus : 0);
+  CL.spreadMul = (ads) => (is('sniper') ? 1 + 0.4 * (1 - ads) : 1);
+  CL.shot = function (s) {
+    if (!is('sniper')) return s;
+    const st = S(), full = st.focus >= 1 && G.weapons.adsT > 0.6;
+    st.focus = 0;
+    return full ? Object.assign({}, s, { dmg: s.dmg * (1 + V([0.25, 0.4, 0.55])), pierce: (s.pierce || 0) + 1, focusShot: true }) : s;
+  };
+  // 重装兵: a hit opens 3 s of 鉄壁
+  CL.ironOn = () => is('heavy') && S().ironT > now();
+  CL.ironRed = () => (CL.ironOn() ? V([0.3, 0.4, 0.5]) : 0);
+  CL.onHurt = function () { if (is('heavy')) S().ironT = now() + 3; };
+  CL.hurtMul = () => (is('assault') ? 1 - 0.04 * CL.mom() : 1);
+  // 術士: reactions
+  CL.rxMul = () => (is('mage') ? V([0.2, 0.3, 0.4]) : 0);
+  CL.ampAdd = () => (is('mage') ? V([0.1, 0.15, 0.2]) : 0);
+  // 兵士: one more free reroll on every boon screen
+  CL.freeRerolls = () => (is('soldier') ? 1 : 0);
+  // a kill by the player (C.killEnemy)
+  CL.onKill = function (e, info) {
+    const P = G.player; if (!P || !e || (info && (info.enemy || info.remote))) return;
+    if (is('assault') && e.pos.distanceTo(P.pos) <= 8) { const m = S().mom; CL.mom(); if (m.length >= 3) m.shift(); m.push(now() + 4); }
+    if (is('sniper') && info && info.head && (info.src === 'bullet' || info.src === 'explosion')) {
+      const st = S(); st.focus = Math.min(1, st.focus + 0.5);
+      const w = P.weapon; if (CL.lv() >= 2 && w && !P.meleeMode) w.mag = Math.min(G.weapons.stats(w).mag, w.mag + 1);
+    }
+  };
+  // every frame (game.js, next to the boons' tick)
+  CL.tick = function (dt) {
+    if (!is('sniper')) return;
+    const P = G.player, st = S();
+    if (!P.meleeMode && G.weapons.adsT > 0.9) st.focus = Math.min(1, st.focus + dt / 1.5);
+    else if (st.focus > 0) st.focus = Math.max(0, st.focus - dt * 0.5);
+  };
+  // a guardian has fallen: say so when the Lv went up
+  CL.afterGuardian = function (lv0) {
+    const c = G.player && CL.of(G.player.cls), lv = CL.lv();
+    if (c && c.pas && lv > lv0) setTimeout(() => G.ui.toast(`${c.pas.icon} 固有効果「${c.pas.name}」が Lv${lv} になった`, 'good'), 2400);
+  };
+  // the effect as a table (class screen, status screen); lv: the column to light up
+  CL.pasHTML = function (c, lv) {
+    const p = c.pas; if (!p) return '';
+    return `<div class="cls-pas"><div class="cls-pas-h">${p.icon} <b>${esc(p.name)}</b>${lv ? `<em>Lv${lv}</em>` : ''}</div>
+      <table><tr><th></th>${[1, 2, 3].map((k) => `<th class="${lv === k ? 'on' : ''}">Lv${k}</th>`).join('')}</tr>${p.rows.map((r) => `<tr><td>${esc(r[0])}</td>${[1, 2, 3].map((k) => `<td class="${lv === k ? 'on' : ''}">${esc(r[k])}</td>`).join('')}</tr>`).join('')}</table>
+      ${p.notes.map((n) => `<div class="cls-pas-n">${esc(n)}</div>`).join('')}<div class="cls-pas-n dim">守護者を倒すたびに Lv が上がる（最大 Lv3）。</div></div>`;
   };
   // what turns up more often for the class (x1.3)
   CL.weight = function (o) { const c = G.player && CL.of(G.player.cls); return c && c.fav && o && c.fav(o) ? 1.3 : 1; };
+  // boons that suit the class turn up more often within their rarity (the rarity itself is not touched): [weight, test]
+  const M = (b, ks) => !!b.mods && ks.some((k) => (b.mods[k] || 0) > 0);
+  const BOON = {
+    assault: [1.5, (b) => b.cat === 'mobility' || M(b, ['fireRate', 'reloadSpeed', 'magSize', 'moveSpeed'])],
+    sniper: [2, (b) => M(b, ['headMul', 'critChance', 'critMul', 'range', 'adsSpeed'])],
+    blade: [1.5, (b) => b.cat === 'melee' || M(b, ['meleeDmg', 'meleeCd', 'meleeRange', 'meleeRecover', 'guardHp'])],
+    heavy: [1.3, (b) => b.cat === 'defense' || M(b, ['maxHp', 'armor', 'maxHpPct', 'guardHp'])],
+    mage: [1.3, (b) => b.cat === 'attr' || b.cat === 'element' || b.cat === 'skill' || M(b, ['elMastery', 'skillDmg', 'skillCd'])],
+  };
+  CL.boonFav = (b, cls) => { const x = BOON[cls || (G.player && G.player.cls)]; return !!x && !!b && b.cat !== 'curse' && !b.skill && x[1](b); };
+  CL.boonW = (b) => (CL.boonFav(b) ? BOON[G.player.cls][0] : 1);
+  // weapon parts: the kinds of part that drop more often (parts.js)
+  const PART = { assault: { smg: 1.5, sg: 1.5 }, sniper: { sr: 2 }, blade: { ml: 2 }, heavy: { ml: 1.5 } };
+  CL.partW = (fam) => { const x = G.player && PART[G.player.cls]; return (x && x[fam]) || 1; };
   CL.pick = function (r, list) { if (!list.length) return undefined; if (list.every((o) => CL.weight(o) === 1)) return r.pick(list); return r.weighted(list, (o) => CL.weight(o)); };
   // the 不屈の城塞 of a team-mate near you takes a quarter off what you suffer (co-op hooks this in)
   CL.allyGuard = () => false;
@@ -95,8 +196,8 @@
           ${skRow('アルティメット', c.ult, true)}
         </div>
         <div class="cls-col">
-          <div class="cls-sec">特性</div>
-          <div class="cls-trait up"><span>▲ 長所</span>${esc(c.plus)}</div>
+          <div class="cls-sec">固有効果</div>
+          ${CL.pasHTML(c, 0)}
           <div class="cls-trait dn"><span>▼ 短所</span>${esc(c.minus)}</div>
           <div class="cls-sec">能力</div>
           ${bar('最大HP', n.hp, 70, 140, n.hp, n.hp >= BASE_HP)}

@@ -659,7 +659,8 @@
       const fams = [...new Set([a.d.fam, b.d.fam])];
       let mine = fams.filter((f) => PT.has(f, r)).map((f) => G.PART_BY_ID[PT.id(f, r)]);
       if (tA >= 4) mine = mine.filter((x) => x.id !== a.d.id && x.id !== b.d.id); // (legendary with legendary: never the same part back)
-      const others = U.shuffle(PT.FAMS.filter((f) => !fams.includes(f.id) && PT.has(f.id, r)).map((f) => G.PART_BY_ID[PT.id(f.id, r)]));
+      const rest = PT.FAMS.filter((f) => !fams.includes(f.id) && PT.has(f.id, r)), others = [];
+      while (others.length < 3 && rest.length) { const f = U.weighted(rest, (x) => (G.Classes ? G.Classes.partW(x.id) : 1), Math.random); others.push(G.PART_BY_ID[PT.id(f.id, r)]); rest.splice(rest.indexOf(f), 1); } // (the class's kinds of part x1.5 - x2)
       const cands = mine.concat(others).slice(0, 3);
       const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: `<span class="cd-line">${U.esc(d.desc || '')}</span>`, onPick: () => {
         consumeBoth();

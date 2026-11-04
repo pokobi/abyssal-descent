@@ -133,9 +133,11 @@
   EL.mulK = (M) => 0.75 * M / (M + 400);
   const sx = (k) => (P && P.stats[k]) || 0;
   // effect reactions: base x (1 + mastery curve) x (1 + reaction boons): two separate factors
-  EL.effMul = (id) => (1 + EL.effK(EL.mastery())) * (1 + sx('reactDmg') + sx('rx_' + id));
+  // 反応強化 (術士): a third factor of its own
+  const cls = () => 1 + (G.Classes ? G.Classes.rxMul() : 0);
+  EL.effMul = (id) => (1 + EL.effK(EL.mastery())) * (1 + sx('reactDmg') + sx('rx_' + id)) * cls();
   // amplifying reactions: the base factor plus mastery plus boons, added up
-  EL.ampMul = (id, base) => base + EL.mulK(EL.mastery()) + sx('reactMul') + sx('rx_' + id);
+  EL.ampMul = (id, base) => base + EL.mulK(EL.mastery()) + sx('reactMul') + sx('rx_' + id) + (G.Classes ? G.Classes.ampAdd() : 0);
   EL.scale = (v) => (C ? C.scale(v) : v);
   // a foe's resistance to an element (0.7 = 70% less, negative = weak to it)
   EL.resOf = (e, el) => { const r = e && e.elRes && e.elRes[el]; return r ? Math.max(-1, Math.min(0.9, r)) : 0; };
@@ -282,7 +284,7 @@
           break;
         case 'freeze': {
           const s = e.st, now = G.game.time;
-          const k = 1 + EL.effK(EL.mastery()) * 0.5;
+          const k = (1 + EL.effK(EL.mastery()) * 0.5) * cls();
           if (e.boss) { s.elSlow = Math.max(s.elSlow || 0, (3 + sx('rxFreezeT')) * k); }
           else if (now >= (e.freezeImmuneUntil || 0)) {
             const t = ((e.elite ? 1.5 : 3) + sx('rxFreezeT')) * k;
@@ -317,7 +319,7 @@
         }
         case 'brittle': {
           const s = e.st;
-          s.brittle = 8; s.brittleK = (e.boss ? 0.15 : 0.25) * (1 + EL.effK(EL.mastery()) * 0.5) + sx('rxBrittle');
+          s.brittle = 8; s.brittleK = (e.boss ? 0.15 : 0.25) * (1 + EL.effK(EL.mastery()) * 0.5) * cls() + sx('rxBrittle');
           G.fx.sparks(pos, null, 12, 0xd8c8ff, 5);
           break;
         }

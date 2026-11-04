@@ -305,6 +305,24 @@
   UI.refreshItems = function () { UI._itemsDirty = true; };
   // change-only DOM writes: the HUD is refreshed every frame, but a write that changes nothing still costs (garbage, style work)
   const sText = (el, v) => { v = String(v); if (el._t !== v) { el._t = v; el.textContent = v; } };
+  // the class's own effect on the HUD: 勢い / 連斬 as a chip over the HP, 鉄壁 as a gold rim on the HP, 一点集中 as a bar under the crosshair
+  UI.clsHud = function () {
+    const CL = G.Classes; if (!CL || !P) return;
+    let el = UI._clsEl;
+    if (!el || !el.isConnected) { const bl = document.getElementById('hud-bl'); if (!bl) return; el = UI._clsEl = document.createElement('div'); el.id = 'cls-ind'; bl.prepend(el); }
+    let txt = '';
+    if (P.cls === 'assault') { const n = CL.mom(); if (n) txt = `💨 勢い ×${n}`; }
+    else if (P.cls === 'blade') { const n = CL.blade(); if (n) txt = `⚔️ 連斬 ${n} / ${CL.bladeMax()}`; }
+    else if (P.cls === 'heavy' && CL.ironOn()) txt = '🛡️ 鉄壁';
+    sText(el, txt); el.classList.toggle('on', !!txt);
+    const hw = document.getElementById('hp-wrap'); if (hw) hw.classList.toggle('iron', P.cls === 'heavy' && CL.ironOn());
+    let fb = UI._focusEl;
+    if (P.cls === 'sniper') {
+      if (!fb || !fb.isConnected) { const ch = document.getElementById('crosshair'); if (!ch) return; fb = UI._focusEl = document.createElement('div'); fb.id = 'focus-bar'; fb.innerHTML = '<i></i>'; ch.appendChild(fb); }
+      const f = CL.focus();
+      sStyle(fb.firstChild, 'width', (f * 100).toFixed(1) + '%'); fb.classList.toggle('full', f >= 1); fb.classList.toggle('on', f > 0.01);
+    } else if (fb) fb.classList.remove('on');
+  };
   const sStyle = (el, k, v) => { const c = el._s || (el._s = {}); if (c[k] !== v) { c[k] = v; el.style[k] = v; } };
   const sClass = (el, k, on) => { on = !!on; const c = el._c || (el._c = {}); if (c[k] !== on) { c[k] = on; el.classList.toggle(k, on); } };
   const sHtml = (el, v) => { if (el._h !== v) { el._h = v; el.innerHTML = v; } };
@@ -320,6 +338,7 @@
     const e = UI.el;
     if (!P || !P.weapons) return;
     const st = P.stats;
+    UI.clsHud();
     // HP
     const hpk = Math.max(0, P.hp) / st.maxHp;
     sStyle(e.hpFill, 'width', (hpk * 100).toFixed(2) + '%');
@@ -886,13 +905,13 @@
     const sideBuffs = [...P.buffs].map(([id, n]) => { const b = G.BUFF_BY_ID[id]; return `<div class="bicon" style="--rc:${R(b.rarity)}" ${UI.tipAttr(b)}>${b.icon}${n > 1 ? `<span class="st">${n}</span>` : ''}</div>`; }).join('');
     const cards = choices.map((b, i) => {
       const n = P.buffs.get(b.id) || 0;
-      return `<div class="card" data-i="${i}" style="--rc:${R(b.rarity)};animation-delay:${i * 0.12}s"><div class="c-rar">${G.RARITY[b.rarity].name}</div><div class="c-icon">${b.icon}${G.Elem.badge(b)}</div><div class="c-name">${U.esc(b.name)}</div><div class="c-cat">${UI.catLabel(b.cat)}${b.skill ? ` · <span class="c-own">${G.SKILL_BY_ID[b.skill].icon} ${G.SKILL_BY_ID[b.skill].name}専用</span>` : b.cat === 'pile' ? ' · <span class="c-own">🔨 パイルドライバー専用</span>' : ''}</div><div class="c-desc${b.cat === 'curse' ? ' curse' : ''}">${U.descHTML(b.desc)}</div><div class="c-stack">${n ? `所持 ${n} → ${n + 1}${b.max > 1 ? ' / 最大' + b.max : ''}` : b.max > 1 ? `最大 ${b.max} 重ね` : '固有効果'}</div></div>`;
+      return `<div class="card" data-i="${i}" style="--rc:${R(b.rarity)};animation-delay:${i * 0.12}s"><div class="c-rar">${G.RARITY[b.rarity].name}</div><div class="c-icon">${b.icon}${G.Elem.badge(b)}</div><div class="c-name">${U.esc(b.name)}</div><div class="c-cat">${UI.catLabel(b.cat)}${b.skill ? ` · <span class="c-own">${G.SKILL_BY_ID[b.skill].icon} ${G.SKILL_BY_ID[b.skill].name}専用</span>` : b.cat === 'pile' ? ' · <span class="c-own">🔨 パイルドライバー専用</span>' : ''}</div><div class="c-desc${b.cat === 'curse' ? ' curse' : ''}">${U.descHTML(b.desc)}</div><div class="c-stack">${n ? `所持 ${n} → ${n + 1}${b.max > 1 ? ' / 最大' + b.max : ''}` : b.max > 1 ? `最大 ${b.max} 重ね` : '重ねられない'}</div></div>`;
     }).join('');
     const s = UI.screen(`<div class="bs-wrap">
       <div class="side-info"><h3 style="margin-top:0">❤️ HP <b style="float:right">${Math.ceil(P.hp)} / ${st.maxHp}</b></h3><div class="si-stat"><span>🪙 コイン</span><b>${U.fmt(G.game.run.coins)}</b></div><div class="si-stat"><span>🗺️ エリア</span><b>${G.game.area}</b></div>${UI.statsTable()}<h3>🌟 所持加護（${P.buffs.size}）</h3><div class="si-buffs">${sideBuffs || '<span style="color:var(--dim);font-size:12px;grid-column:1/-1">なし</span>'}</div></div>
       <div class="bs-title">${opts.title || 'CHOOSE A BOON'}</div>
       <div class="bs-sub">${opts.sub || '加護を一つ選べ'}　<span class="bs-keys">クリック：選択 ／ ホイール：切替 → Enter：決定${opts.reroll ? ' ／ R：リロール' : ''} ／ 選択中も${['forward', 'left', 'back', 'right'].map(G.K).join('')}で移動可能</span></div>
-      <div class="bs-cards" data-n="${choices.length}">${cards}</div>
+      <div class="bs-cards" data-n="${choices.length}"${choices.length > 4 ? ` data-rows="2" style="--cols:${Math.ceil(choices.length / 2)}"` : ''}>${cards}</div>
       <div class="bs-actions">${opts.reroll ? `<button class="btn" ${opts.reroll.afford ? '' : 'disabled'} id="bs-reroll">🎲 リロール（${opts.reroll.free > 0 ? `無料 残り${opts.reroll.free}` : `${U.fmt(opts.reroll.cost)}🪙`}）</button>` : ''}</div>
       ${UI.peekBtn()}
     </div>`, 'live');

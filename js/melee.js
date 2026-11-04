@@ -13,7 +13,7 @@
     const s = Object.assign({}, d);
     // 連射速度 counts at half for the light swings (and slows them at half when it is negative); with 近接攻撃の間隔 at most -50% in all
     W.meleeCut = Math.min(0.5, (st.meleeCd || 0) + 0.5 * ((st.fireRate || 0) + ((G.player && G.player.dynFireRate) || 0)));
-    s.swing = d.swing * (1 - W.meleeCut);
+    s.swing = d.swing * (1 - W.meleeCut) / (G.Classes ? G.Classes.meleeSpeed() : 1); // (連斬 of the 剣士: its own factor, past the -50% cap)
     s.dmg = d.dmg * Math.pow(1.13, m.lv || 0);
     s.critChance = (d.critChance || 0);
     s.range = d.range + (st.meleeRange || 0);
@@ -700,6 +700,7 @@
       targets.set(e, false);
     }
     let hit = false;
+    if (targets.size && G.Classes) G.Classes.onMeleeHit(); // 連斬 (剣士): a swing that lands
     for (const [e, head] of targets) {
       hit = true;
       // attacking from behind: the enemy faces away from us

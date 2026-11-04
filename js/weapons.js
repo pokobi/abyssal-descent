@@ -21,7 +21,7 @@
   W.stats = function (w) {
     // (a change of your stats marks W.dirty; it used to be picked up only by W.update, i.e. not while the game is paused / in a menu)
     if (W.dirty) { W.ver++; W.dirty = false; }
-    const dyn = G.player.dynFireRate || 0; // 連射狂: changes shot by shot without a recalc
+    const dyn = (G.player.dynFireRate || 0) + (G.Classes ? G.Classes.fireAdd() : 0); // 連射狂 / 勢い (突撃兵): change shot by shot without a recalc
     if (w._sc && w._sc.ver === w.ver && w._sc.gv === W.ver && w._sc.dyn === dyn) return w._sc.s;
     const d = w.def, st = G.player.stats, pl = G.player;
     const s = Object.assign({}, d);
@@ -44,7 +44,7 @@
     if (s.auto) s.auto = true;
     if (s.explodeR && s.proj && s.proj.explode) s.proj = Object.assign({}, s.proj, { explode: s.proj.explode + s.explodeR });
     // player stats
-    s.rpm *= Math.max(0.2, 1 + st.fireRate + (pl.dynFireRate || 0));
+    s.rpm *= Math.max(0.2, 1 + st.fireRate + dyn);
     s.mag = Math.max(1, Math.round(s.mag * Math.max(0.2, 1 + st.magSize)));
     s.reload = s.reload / Math.max(0.3, 1 + st.reloadSpeed);
     s.spread *= Math.max(0.15, 1 + st.spread); s.adsSpread *= Math.max(0.15, 1 + st.spread);
@@ -975,6 +975,7 @@
     if (!P.grounded) sp *= 1.6;
     if (P.crouching && P.grounded) sp *= 0.75;
     if (P.has('h_still') && P.speedH < 0.5) sp *= 0.7;
+    if (G.Classes) sp *= G.Classes.spreadMul(ads); // (狙撃手: from the hip it scatters)
     sp += P.weapon.bloom * (1 - ads * 0.5);
     return sp;
   };
@@ -987,6 +988,7 @@
     const o = G.camera.position.clone();
     const fwd = P.forward();
     const spreadDeg = W.currentSpread(s);
+    if (G.Classes) s = G.Classes.shot(s); // 一点集中 (狙撃手): a full gauge makes this shot hit harder and pierce one
     const pellets = s.pellets || 1;
     const muzzle = W.muzzleWorld();
     const doubled = Math.random() < s.doubleShot;

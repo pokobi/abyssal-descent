@@ -26,14 +26,15 @@ const PORT = +process.env.COOP_PORT || 9995;
     await p.eval("document.querySelector('#t-start').click(); 1"); await sleep(500);
     await p.eval("(() => { const b = document.querySelector('.slot-new, [data-slot]'); if (b) b.click(); return 1; })()"); await sleep(400);
     await p.eval("(() => { const c = document.querySelector('.df-card[data-id=\"normal\"]'); if (c) c.click(); return 1; })()"); await sleep(500);
-    check(await p.eval("document.querySelectorAll('.cls-card').length === 6"), 'after the difficulty: the six class cards');
-    const card = await p.eval("document.querySelector('.cls-card[data-c=\"mage\"]').textContent.replace(/\\s+/g, ' ')");
+    check(await p.eval("document.querySelectorAll('.cls-item').length === 6 && !!document.querySelector('.cls-host canvas, .cls-noview')"), 'after the difficulty: the list of six on the left, the preview (a 3D figure) on the right');
+    await p.eval("document.querySelector('.cls-item[data-c=\"mage\"]').click(); 1"); await sleep(200);
+    const card = await p.eval("document.querySelector('.cls-detail').textContent.replace(/\\s+/g, ' ')");
     console.log('      ' + card.slice(0, 260));
-    check(/火球/.test(card) && /大海嘯/.test(card) && /長所/.test(card) && /短所/.test(card) && /CT20秒/.test(card), 'a card names the skill and the ultimate with what they do, the strength, the weakness, the grapple');
-    await p.eval("document.querySelector('.cls-card[data-c=\"mage\"]').click(); 1"); await sleep(200);
+    check(/火球/.test(card) && /大海嘯/.test(card) && /長所/.test(card) && /短所/.test(card) && /CT 20秒/.test(card) && /リベッター/.test(card), 'a card names the skill and the ultimate with what they do, the strength, the weakness, the grapple');
     await p.eval("document.querySelector('#cls-go').click(); 1");
     await p.until('!!G.game.run && !!G.world', 30000); await sleep(800);
     check(await p.eval("G.save.data.settings.lastClass === 'mage' && G.player.cls === 'mage' && G.game.run.cls === 'mage'"), 'the choice starts the run and is remembered');
+    check(await p.eval("(() => { G.game.saveRun(G.game.area, G.game.stage); const r = G.game.loadRun(G.game.slot); G.ui.title(); const b = document.querySelector('#t-cont'); const t = b ? b.textContent : ''; G.ui.slotMenu(() => {}); const menu = document.querySelector('#screens').textContent; G.ui.clearScreen(); G.game.state = 'playing'; return !!r && r.cls === 'mage' && /術士/.test(t + menu); })()"), 'the saved run records its class, and the continue button / slot list name it');
     // ---- each kit
     for (const id of ['soldier', 'assault', 'sniper', 'blade', 'heavy', 'mage']) {
       const r = JSON.parse(await p.eval(`(() => { const P = G.player; P.cls = '${id}'; P.resetRun(); const c = G.Classes.BY['${id}']; return JSON.stringify({ w: P.weapons[0].id, m: P.melee.id, s0: P.skills[0].id, s1: P.skills[1].id, cd: G.grappleCdOf(P.stats), hp: P.stats.maxHp, ok: P.weapons[0].id === c.gun && P.melee.id === c.melee && P.skills[0].id === c.ult && P.skills[1].id === c.skill && P.hp === P.stats.maxHp }); })()`));

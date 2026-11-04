@@ -637,7 +637,7 @@
       <div class="title-logo">ABYSSAL DESCENT</div>
       <div class="title-jp">深 淵 降 下</div>
       <div class="title-menu">
-        ${G.game.slotsUsed() ? `<button class="btn primary" id="t-cont">▶ 続きから${G.game.slotsUsed() > 1 ? `（${G.game.slotsUsed()}件の記録）` : `（エリア ${G.game.loadRun(UI.firstUsedSlot()).area}）`}</button>` : ''}
+        ${G.game.slotsUsed() ? `<button class="btn primary" id="t-cont">▶ 続きから${G.game.slotsUsed() > 1 ? `（${G.game.slotsUsed()}件の記録）` : (() => { const d = G.game.loadRun(UI.firstUsedSlot()), cl = G.Classes && G.Classes.BY[d.cls || (d.run && d.run.cls)]; return `（${cl ? cl.icon + cl.name + '・' : ''}エリア ${d.area}）`; })()}</button>` : ''}
         <button class="btn ${G.game.slotsUsed() ? '' : 'primary'}" id="t-start">⚔️ 深淵へ潜る${G.game.slotsUsed() ? '（新しく始める）' : ''}</button>
         <button class="btn" id="t-mp">👥 協力プレイ（ベータ版）</button>
         <button class="btn" id="t-tut">📘 チュートリアル</button>
@@ -681,7 +681,8 @@
     if (!d) return { label: `${n}　（空き）`, sub: '' };
     const df = d.run && d.run.diff && G.Run.DIFFS[d.run.diff.id], t = new Date(d.t);
     const p2 = (v) => String(v).padStart(2, '0');
-    return { label: `${n}　エリア ${d.area}${df ? '・' + df.name : ''}`, sub: `最終保存 ${t.getMonth() + 1}/${t.getDate()} ${p2(t.getHours())}:${p2(t.getMinutes())}` };
+    const cl = G.Classes && G.Classes.BY[d.cls || (d.run && d.run.cls)];
+    return { label: `${n}　${cl ? cl.icon + ' ' + cl.name + '・' : ''}エリア ${d.area}${df ? '・' + df.name : ''}`, sub: `最終保存 ${t.getMonth() + 1}/${t.getDate()} ${p2(t.getHours())}:${p2(t.getMinutes())}`, cls: cl };
   };
   // pick a record to continue (or delete)
   UI.slotMenu = function (back) {

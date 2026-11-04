@@ -104,7 +104,8 @@ const PORT = +process.env.COOP_PORT || 9981;
     const rl = await p.eval('(() => { const r = document.querySelector("[data-id=reload]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
     check(await p.eval('G.player.meleeMode === true'), 'the melee weapon is in hand');
     await touch('touchStart', [[8, rl[0], rl[1]]]);
-    await sleep(900);
+    // (the headless game runs slowly: give the guard up to 3 s of real time to come up)
+    for (let i = 0; i < 30 && !(await p.eval('G.weapons.guarding() === true')); i++) await sleep(100);
     check(await p.eval('G.weapons.guarding() === true'), 'holding the reload button keeps the guard up');
     await touch('touchEnd', []);
     await sleep(400);

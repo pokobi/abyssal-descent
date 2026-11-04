@@ -6,17 +6,12 @@
   const U = G.U;
   let root, J = {};
 
-  AV.init = function (scene) {
-    const t = G.Tex.tex, PG = G.Props.PG;
-    const leather = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 0.8, map: t.skin.map, normalMap: t.skin.normalMap });
-    const plate = new THREE.MeshStandardMaterial({ color: 0x7a7c80, roughness: 0.35, metalness: 0.8, map: t.metal.map, normalMap: t.metal.normalMap });
-    const cloth = new THREE.MeshStandardMaterial({ color: 0x3a2a24, roughness: 0.95, map: t.cloth.map, side: THREE.DoubleSide });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x1c1a18, roughness: 0.7 });
-    const gun = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.4, metalness: 0.6 });
+  // the common figure (body, head with its hood, arms, legs) on its own root: the third-person avatar, and the class screen's preview (classes.js)
+  AV.buildFigure = function () {
+    const PG = G.Props.PG, M = AV.mats, leather = M[0], plate = M[1], cloth = M[2], dark = M[3];
     const m = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
     const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
-    AV.mats = [leather, plate, cloth, dark];
-    root = new THREE.Group();
+    const root = new THREE.Group(), J = {};
     J.body = j(root, 0, 0.95, 0);                   // pelvis pivot
     m(J.body, PG.box, leather, 0.34, 0.2, 0.22, 0, 0.02, 0);
     J.chest = j(J.body, 0, 0.12, 0);
@@ -40,13 +35,6 @@
       m(hand, PG.box, dark, 0.07, 0.09, 0.07);
       J.arms.push({ sh, el, hand });
     }
-    // sidearm in the right hand (a blade instead in a duel)
-    J.gun = m(J.arms[1].hand, PG.box, gun, 0.04, 0.06, 0.32, 0, -0.02, 0.12);
-    J.blade = new THREE.Group(); J.arms[1].hand.add(J.blade);
-    m(J.blade, PG.box, dark, 0.035, 0.045, 0.16, 0, -0.02, 0.06);
-    m(J.blade, PG.box, plate, 0.14, 0.03, 0.03, 0, -0.02, 0.15);
-    m(J.blade, PG.box, new THREE.MeshStandardMaterial({ color: 0xd8dce6, roughness: 0.2, metalness: 0.95 }), 0.02, 0.06, 0.62, 0, -0.02, 0.46);
-    J.blade.visible = false;
     J.legs = [];
     for (const s of [-1, 1]) {
       const hip = j(J.body, s * 0.1, -0.06, 0);
@@ -57,6 +45,26 @@
       m(kn, PG.sph, plate, 0.07, 0.06, 0.06, 0, 0, 0.04);               // knee guard
       J.legs.push({ hip, kn });
     }
+    return { root, J };
+  };
+  AV.init = function (scene) {
+    const t = G.Tex.tex, PG = G.Props.PG;
+    const leather = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 0.8, map: t.skin.map, normalMap: t.skin.normalMap });
+    const plate = new THREE.MeshStandardMaterial({ color: 0x7a7c80, roughness: 0.35, metalness: 0.8, map: t.metal.map, normalMap: t.metal.normalMap });
+    const cloth = new THREE.MeshStandardMaterial({ color: 0x3a2a24, roughness: 0.95, map: t.cloth.map, side: THREE.DoubleSide });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1c1a18, roughness: 0.7 });
+    const gun = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.4, metalness: 0.6 });
+    const m = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
+    const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
+    AV.mats = [leather, plate, cloth, dark];
+    { const F = AV.buildFigure(); root = F.root; J = F.J; }
+    // sidearm in the right hand (a blade instead in a duel)
+    J.gun = m(J.arms[1].hand, PG.box, gun, 0.04, 0.06, 0.32, 0, -0.02, 0.12);
+    J.blade = new THREE.Group(); J.arms[1].hand.add(J.blade);
+    m(J.blade, PG.box, dark, 0.035, 0.045, 0.16, 0, -0.02, 0.06);
+    m(J.blade, PG.box, plate, 0.14, 0.03, 0.03, 0, -0.02, 0.15);
+    m(J.blade, PG.box, new THREE.MeshStandardMaterial({ color: 0xd8dce6, roughness: 0.2, metalness: 0.95 }), 0.02, 0.06, 0.62, 0, -0.02, 0.46);
+    J.blade.visible = false;
     root.visible = false;
     scene.add(root);
     AV.root = root;
@@ -107,7 +115,7 @@
         add(H, PG.cyl8, wh, 0.132, 0.03, 0.132, 0, 0.21, 0); add(H, PG.box, wh, 0.02, 0.12, 0.04, 0, 0.17, -0.14, 0.5);
         add(Ch, PG.box, hao, 0.46, 0.6, 0.27, 0, 0.22, 0);
         for (const A of J.arms) add(A.sh, PG.box, hao, 0.13, 0.26, 0.14, 0, -0.14, 0);
-        add(B, PG.cone, hak, 0.22, 0.5, 0.18, 0, -0.3, 0, Math.PI);
+        add(B, PG.cone, hak, 0.22, 0.5, 0.18, 0, -0.3, 0);
         add(Ch, PG.cyl8, dark, 0.03, 0.85, 0.03, 0.05, 0.3, -0.17, 0, 0, 0.6); add(Ch, PG.cyl8, wh, 0.035, 0.05, 0.035, 0.27, 0.62, -0.17, 0, 0, 0.6);
         break;
       }
@@ -125,8 +133,8 @@
         const robe = dmat('robe', 0x26368a), gold = dmat('sash', 0xc8a050, { roughness: 0.4, metalness: 0.6 });
         J.hood.visible = false;
         add(H, PG.cone, robe, 0.19, 0.38, 0.19, 0, 0.17, -0.02);
-        add(Ch, PG.box, robe, 0.42, 0.5, 0.26, 0, 0.27, 0); add(Ch, PG.box, gold, 0.43, 0.05, 0.27, 0, 0.08, 0);
-        add(B, PG.cone, robe, 0.3, 0.85, 0.26, 0, -0.42, 0, Math.PI);
+        add(Ch, PG.box, robe, 0.45, 0.52, 0.29, 0, 0.27, 0); add(Ch, PG.box, gold, 0.46, 0.05, 0.3, 0, 0.08, 0);
+        add(B, PG.cone, robe, 0.3, 0.85, 0.26, 0, -0.42, 0);
         const g = new THREE.Group(); g.position.set(0, 0.55, 0); B.add(g); J.dressed.push(g); J.orbs = g;
         for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2; const o = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: 0x7a9aff })); o.scale.setScalar(0.05); o.position.set(Math.cos(a) * 0.5, Math.sin(a * 2) * 0.1, Math.sin(a) * 0.5); o.frustumCulled = false; g.add(o); }
         break;

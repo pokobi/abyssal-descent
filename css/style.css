@@ -1905,3 +1905,4 @@ html.m .cls-merit b { font-size: 26px; } html.m .cls-merit small { font-size: 16
 #blade-bar .bb-time i { background: linear-gradient(90deg, #a878e8, #f0e0ff); }
 @keyframes bbPulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
 html.m #blade-bar { transform: scale(0.85); }
+#blade-bar { top: calc(50% + 72px); } /* (further below the crosshair) */

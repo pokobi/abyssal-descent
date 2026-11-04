@@ -128,6 +128,16 @@ const PORT = +process.env.COOP_PORT || 9991;
     // the slot is taken: into the bag, nothing swapped (even the same piece with more durability)
     r = await shift("const a = G.ARMOR.find((x) => x.slot === 'head'); window.__aid = a.id; window.__old = IV.makeArmor(a.id, null, true); window.__old.dur = 1; P.equip.head = window.__old; P.bag.items = []");
     check(!r.worn && r.inBag && r.old === true, 'shift + click: with the part already covered it goes into the bag and what is worn stays (' + JSON.stringify(r) + ')');
+    // ---- the transmutation cauldron takes weapon parts: two of a rarity -> one of the next; the kinds of both are certain, the rest another kind
+    check(await p.eval(`(async () => { const P = G.player, IV = G.Inv; G.ui.clearScreen && G.ui.clearScreen(); G.game.state = 'playing'; for (const c of IV.pcs(P)) c.items = c.items.filter((o) => o.type !== 'part'); IV.give(P, 'part', 'pt_smg_common', 1); IV.give(P, 'part', 'pt_sr_common', 1);
+      G.Areas.useAlchemy(); await new Promise((r) => setTimeout(r, 200));
+      const tab = !!document.querySelector('.pw-tab[data-tab="part"]');
+      const its = [...document.querySelectorAll('.alch-item')].filter((b) => /^prt:/.test(b.dataset.uid)); its.forEach((b) => b.click()); await new Promise((r) => setTimeout(r, 100));
+      document.getElementById('alch-go').click(); await new Promise((r) => setTimeout(r, 300));
+      const names = [...document.querySelectorAll('.card .c-name')].map((x) => x.textContent);
+      const first = document.querySelector('.card'); first && first.click(); await new Promise((r) => setTimeout(r, 900));
+      const parts = IV.pcs(P).flatMap((c) => c.items).filter((o) => o.type === 'part').map((o) => o.id);
+      return JSON.stringify({ tab, n: its.length, names, parts }); })()`).then((r) => { console.log('      ' + r); const o = JSON.parse(r); return o.tab && o.n === 2 && o.names.length === 3 && o.names.some((x) => /SMG/.test(x)) && o.names.some((x) => /狙撃/.test(x)) && o.parts.length === 1 && /_uncommon$/.test(o.parts[0]) && /pt_(smg|sr)_/.test(o.parts[0]); }), 'the cauldron makes one part a rarity up from two, both kinds among the three');
     check(!p.errs.length, 'no errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 500));
   } finally { ch.close(); srv.close(); }
   console.log(fails.length ? `\nPARTS TEST FAILED (${fails.length})` : '\nPARTS TEST PASSED');

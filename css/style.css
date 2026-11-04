@@ -260,6 +260,7 @@ button { font-family: inherit; }
 /* ===== Screens ===== */
 #screens > .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; animation: fadein .3s; }
 .screen.dim { background: rgba(5,4,3,0.84); }
+.screen.solid { background: radial-gradient(ellipse at 50% 35%, #1c1712, #080605 75%); }
 .btn { pointer-events: auto; cursor: pointer; padding: 11px 26px; background: linear-gradient(180deg, rgba(60,48,32,0.9), rgba(30,24,16,0.9)); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font-size: 16px; font-weight: 700; letter-spacing: 1px; transition: all .15s; display: inline-flex; align-items: center; gap: 10px; justify-content: center; }
 .btn:hover { border-color: var(--gold); color: var(--gold2); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(217,180,106,0.2); }
 .btn.primary { background: linear-gradient(180deg, #c99a4a, #8a6224); color: #1a1208; border-color: #f1d79b; }

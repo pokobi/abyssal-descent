@@ -188,7 +188,7 @@
     const s = UI.screen(`<div class="cls-wrap"><h2 class="df-title">クラスを選択</h2>
       <div class="cls-main"><div class="cls-list"></div>
         <div class="cls-view"><div class="cls-model"><div class="cls-host"></div><div class="cls-hint">ドラッグで回転</div></div><div class="cls-detail"></div></div></div>
-      <div class="cls-foot"><span class="cls-note">始めの装備と方向性が決まります。拾った物はどのクラスでも使えます。</span><span><button class="btn" id="cls-back">↩ 戻る</button> <button class="btn primary" id="cls-go"></button></span></div></div>`);
+      <div class="cls-foot"><span class="cls-note">始めの装備と方向性が決まります。拾った物はどのクラスでも使えます。</span><span><button class="btn" id="cls-back">↩ 戻る</button> <button class="btn primary" id="cls-go"></button></span></div></div>`, G.game.state === 'title' ? '' : 'solid'); // (from the end of the tutorial: over the game, not see-through)
     const wrap = s.querySelector('.cls-wrap'), list = s.querySelector('.cls-list'), det = s.querySelector('.cls-detail'), host = s.querySelector('.cls-host');
     list.innerHTML = CL.LIST.map((c) => `<button class="cls-item" data-c="${c.id}" style="--cc:${c.col}"><span class="cls-iic">${c.icon}</span><span class="cls-in"><b>${c.name}</b><small>${esc(c.role)}</small></span></button>`).join('');
     const show = () => {

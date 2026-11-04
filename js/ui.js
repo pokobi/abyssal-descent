@@ -665,7 +665,7 @@
       if (S.askTutorial === false) return go();
       G.sfx.init(); G.sfx.ui('open');
       UI.choice('📘 チュートリアルを受けますか？', '基本操作（移動・射撃・近接・グラップル・パイルドライバー）、アイテムや投擲物の使い方とホイール、エリアの流れまで、実際に体を動かしながら学べます（約5〜8分）。<br>チュートリアルが終わると、そのまま本編が始まります。', [
-        { icon: '📘', label: 'チュートリアルを受ける', sub: 'はじめての方におすすめ', onPick: () => { G.sfx.ui('select'); G.Tutorial.start(); } },
+        { icon: '📘', label: 'チュートリアルを受ける', sub: 'はじめての方におすすめ', onPick: () => { G.sfx.ui('select'); G.Tutorial.start({ diff: diffPick, slot: slotPick }); } },
         { icon: '⚔️', label: 'すぐに本編を始める', onPick: () => { G.sfx.ui('select'); G.game.startRun(diffPick, slotPick); } },
         { icon: '🚫', label: '今後は聞かずに本編を始める', sub: '設定からいつでも戻せます', onPick: () => { S.askTutorial = false; G.save.write(); G.sfx.ui('select'); G.game.startRun(diffPick, slotPick); } },
       ], () => UI.title());
@@ -1005,7 +1005,7 @@
       </div>`;
     };
     const s = UI.screen(`<div class="df-wrap"><h2 class="df-title">難易度を選択</h2><div class="df-cards"></div>
-      <div style="text-align:center;margin-top:22px"><button class="btn" id="df-back">↩ 戻る</button></div></div>`);
+      <div style="text-align:center;margin-top:22px"><button class="btn" id="df-back">↩ 戻る</button></div></div>`, G.game.state === 'title' ? '' : 'solid');
     const cardsEl = s.querySelector('.df-cards'), wrap = s.querySelector('.df-wrap');
     const stopDrone = (restore) => { if (drone) { drone.stop(); drone = null; } if (watch) { clearInterval(watch); watch = null; } if (restore && G.game.titleWorld) G.game.titleWorld(false); };
     // the backdrop of the hidden mode is the blue-flame ruin of field 4 (the title scene's world is swapped, and swapped back)

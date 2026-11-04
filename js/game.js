@@ -1720,7 +1720,7 @@
     } else if (best.type === 'cauldron') {
       const left = Math.max(0, 2 - (best.it.used || 0));
       if (left <= 0) G.ui.showInteract({ key: 'cauldron0', icon: '⚗️', name: '練成の釜（火は消え、冷え切っている）', rc: '#7a8480', cat: '練成終了（残り 0 / 2回）', desc: '「釜の火は消え去った。深淵の恵みはここまでだ…」', action: null });
-      else G.ui.showInteract({ key: 'cauldron' + left, icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: `防具・武器・アタッチメント・消耗品・金品の練成（残り ${left} / 2回）`, desc: '同種・同レアリティの品を2つ掛け合わせ、1段階上位の品へと練成する。', action: '練成する' });
+      else G.ui.showInteract({ key: 'cauldron' + left, icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: `防具・武器・武器パーツ・アタッチメント・消耗品・金品の練成（残り ${left} / 2回）`, desc: '同種・同レアリティの品を2つ掛け合わせ、1段階上位の品へと練成する。', action: '練成する' });
     } else if (best.type === 'partbench') {
       const inf = G.Parts.benchInfo(!!w.benchFree);
       G.ui.showInteract(Object.assign({ key: 'bench' + coins + G.Inv.ver }, inf));

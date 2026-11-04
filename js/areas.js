@@ -481,6 +481,7 @@
   const ALCH_CATS = {
     armor: { name: '🛡️ 防具', short: '防具' },
     weapon: { name: '🔫 武器', short: '武器' },
+    part: { name: '🔧 武器パーツ', short: '武器パーツ' },
     att: { name: '🔩 アタッチメント', short: 'アタッチメント' },
     item: { name: '🧪 消耗品', short: '消耗品' },
     valuable: { name: '💎 金品', short: '金品' },
@@ -557,6 +558,14 @@
       }
     }
     for (const c of G.Inv.pcs(P)) for (const o of c.items) {
+      if (o.type === 'part' && G.PART_BY_ID && G.PART_BY_ID[o.id]) {
+        const d = G.PART_BY_ID[o.id];
+        for (let k = 0; k < (o.n || 1); k++) {
+          out.push({ uid: `prt:${o.uid}:${k}`, cat: 'part', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: d.name, badge: '',
+            sub: d.desc || '', d, it: o,
+            consume: () => { if (o.n > 1) { o.n--; G.Inv.changed(c); } else G.Inv.remove(c, o); } });
+        }
+      }
       if (o.type === 'item' && G.ITEM_BY_ID[o.id]) {
         const d = G.ITEM_BY_ID[o.id];
         for (let k = 0; k < (o.n || 1); k++) {
@@ -645,6 +654,21 @@
       alchChoiceModal(`🔫 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する${newLv ? `（強化値 +${newLv} を継承）` : ''}。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
+    if (a.cat === 'part') {
+      const PT = G.Parts, r = RAR_BY_TIER[targetTier];
+      const fams = [...new Set([a.d.fam, b.d.fam])];
+      let mine = fams.filter((f) => PT.has(f, r)).map((f) => G.PART_BY_ID[PT.id(f, r)]);
+      if (tA >= 4) mine = mine.filter((x) => x.id !== a.d.id && x.id !== b.d.id); // (legendary with legendary: never the same part back)
+      const others = U.shuffle(PT.FAMS.filter((f) => !fams.includes(f.id) && PT.has(f.id, r)).map((f) => G.PART_BY_ID[PT.id(f.id, r)]));
+      const cands = mine.concat(others).slice(0, 3);
+      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: `<span class="cd-line">${U.esc(d.desc || '')}</span>`, onPick: () => {
+        consumeBoth();
+        G.Inv.give(P, 'part', d.id, 1); G.ui.refreshItems();
+        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}（${G.RARITY[d.rarity].name}）`, 'good'); G.ui.itemCard(d, '[武器パーツ練成]');
+      } }));
+      alchChoiceModal(`🔧 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
+      return;
+    }
     if (a.cat === 'att') {
       let pool = G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier === targetTier && (tA < 4 || (x.id !== a.d.id && x.id !== b.d.id)));
       if (pool.length < 3) {
@@ -692,7 +716,7 @@
       alchChoiceModal(`💎 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
     }
   }
-  const ALCH_CAT_ORDER = { armor: 0, weapon: 1, att: 2, item: 3, valuable: 4 };
+  const ALCH_CAT_ORDER = { armor: 0, weapon: 1, part: 1.5, att: 2, item: 3, valuable: 4 };
   function alchDurBar(it) {
     const f = G.Inv.durFrac(it), col = f > 0.5 ? '#6ee06a' : f > 0.2 ? '#f0b040' : '#ff4a3a';
     return `<i class="iv-dur" style="--f:${f.toFixed(3)};--dc:${col}"></i>`;

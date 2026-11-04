@@ -112,8 +112,40 @@
       setup: () => { if (!P.weapons.some((w) => w.atts.optic === 'o_reddot') && !P.attStash.includes('o_reddot')) { G.Inv.noAuto = true; P.attStash.push('o_reddot'); G.Inv.noAuto = false; } },
       check: (s) => { if (invOpen()) s.o = true; const att = P.weapons.some((w) => w.atts.optic === 'o_reddot'); return (s.o ? 0.4 : 0) + (att ? 0.6 : 0); } },
 
-    { ch: 3, title: '属性', info: true,
-      body: () => ul('🔥炎・💧水・❄️氷・⚡雷は敵に<b>8秒残る</b>（HPバーの左）。炎上・冷気・電撃でも付く', '違う属性が当たると<b>反応</b>（水の敵に炎 → 沸騰で2倍、水＋氷 → 凍結）。反応で属性と状態異常は消える', '🌪️風・🪨地は残らず、付いた属性に作用する。一覧は図鑑の「属性反応」') },
+    { ch: 3, title: '属性のしくみ', info: true,
+      body: () => pc(ul('🔥炎・💧水・❄️氷・⚡雷は、当たった敵に<b>8秒残る</b>（敵のHPバーの左に印）。炎上・冷気・電撃を付けても付く',
+        '属性が残っている敵に<b>別の属性</b>を当てると<b>反応</b>が起き、両方の属性が消える',
+        '🌪️風・🪨地は残らない。風は付いた属性を周りへ広げ、地は結晶にする',
+        '属性が付く物は、アイコンの左下に<b>色の丸い印</b>'),
+        ul('炎・水・氷・雷は敵に<b>8秒残る</b>（HPバーの左に印）', '残った属性に<b>別の属性</b>で<b>反応</b>（水＋炎で沸騰2倍、水＋氷で凍結）', '属性が付く物は、アイコンの左下に<b>色の丸い印</b>')),
+      vis: () => M() ? '' : (() => { const E = G.Elem; const t = (a, b, id, sm) => [E.BY[a].icon + E.BY[b].icon, E.RX[id].name, sm, E.RX[id].col]; return tiles([t('water', 'fire', 'boil', 'ダメージ2倍'), t('water', 'ice', 'freeze', '凍らせる'), t('fire', 'volt', 'blast', '爆発'), t('water', 'volt', 'leak', '連続ダメージ')]); })() },
+    { ch: 3, title: '属性反応を起こす',
+      body: () => ul('目の前に<b>💧水のスライム</b>（いつも水属性。反応しても消えない）',
+        '銃に<b>🔥炎の属性コア</b>を付けた。撃つと水に炎で<b>沸騰</b>（2倍）',
+        `<b>❄️冷凍手榴弾</b>を ${K('grenade')} で投げると、水に氷で<b>凍結</b>`),
+      tip: () => pc('反応の名前は、敵の上に大きな文字で出ます。種類と効果は図鑑の「属性反応」。', ''),
+      goal: (s) => parts([['沸騰を起こす', s.boil], ['凍結を起こす', s.freeze]]),
+      setup: (s) => {
+        const rx = (GM.run && GM.run.rx) || {}; s.rx0 = { boil: rx.boil || 0, freeze: rx.freeze || 0 };
+        const w = P.weapon || G.weapons.gunsInOrder()[0];
+        if (w && G.attOk(G.ATT_BY_ID.c_fire, w)) { s.core = { w, prev: w.atts.core || null }; w.atts.core = 'c_fire'; w.ver++; if (!P.meleeMode && w === P.weapon) G.weapons.equip(true); G.ui.refreshWeapon(); }
+        else top('g_fire', 2); // (a gun with an element of its own: the fire comes from incendiary grenades instead)
+        top('g_cryo', 2); P.grenadeSel = 'g_cryo'; G.ui.refreshItems();
+        if (P.weapon) P.weapon.mag = G.weapons.stats(P.weapon).mag;
+        s.spawned = [];
+        const at = spotAhead(0, 8) || spotAhead(0.6, 6);
+        const e = GM.spawnEnemy(Object.assign({ def: G.ENEMY_BY_ID.slime_elwater, noMut: true }, at ? { at } : { near: true }));
+        if (e) { e.noSplit = true; e.maxHp = e.hp = Math.max(e.hp, 4000); e.noReward = true; s.spawned.push(e); }
+      },
+      check: (s) => {
+        const rx = (GM.run && GM.run.rx) || {};
+        if ((rx.boil || 0) > s.rx0.boil) s.boil = true;
+        if ((rx.freeze || 0) > s.rx0.freeze) s.freeze = true;
+        if (P.grenades.g_cryo < 1 && !s.freeze) top('g_cryo', 1);
+        if (s.spawned[0] && !s.spawned[0].alive && !(s.boil && s.freeze)) { const e = GM.spawnEnemy({ def: G.ENEMY_BY_ID.slime_elwater, noMut: true, near: true }); if (e) { e.noSplit = true; e.maxHp = e.hp = Math.max(e.hp, 4000); e.noReward = true; s.spawned[0] = e; } }
+        return (s.boil ? 0.5 : 0) + (s.freeze ? 0.5 : 0);
+      },
+      done: (s) => { if (s.core) { const { w, prev } = s.core; if (prev) w.atts.core = prev; else delete w.atts.core; w.ver++; if (!P.meleeMode && w === P.weapon) G.weapons.equip(true); G.ui.refreshWeapon(); } } },
     { ch: 4, title: '加護（その周回の強化）',
       body: () => ul('エリアの<b>目標</b>を達成すると、<b>加護</b>を1つ選べる', '加護は、その周回の間ずっと続く強化。取るほど強くなる', '枠の色がレアリティ。気に入らなければ<b>リロール</b>'),
       vis: (s) => tiles((s.sample || []).map((b) => [b.icon, b.name, RAR[b.rarity] || b.rarity, `var(--c-${b.rarity})`])),
@@ -149,8 +181,9 @@
   ];
 
   // ---------------------------------------------------------------- lifecycle
-  T.start = function () {
-    GM = G.game; P = G.player;
+  // opts: { diff, slot } when the tutorial was chosen on the way into a new run (difficulty, slot and class already picked)
+  T.start = function (opts) {
+    GM = G.game; P = G.player; T.next = opts || null;
     GM.tutorialRun = true; // (played as the soldier, whatever class was chosen last)
     GM.startRun(undefined, null); // the tutorial never saves
     G.save.data.records.runs = Math.max(0, G.save.data.records.runs - 1); G.save.write();
@@ -165,6 +198,9 @@
     // count grenades for the grenade step
     if (!T._wrapped) { T._wrapped = true; const r0 = G.abilities.releaseGrenade; G.abilities.releaseGrenade = function (...a) { if (T.active && st) st.thrown = (st.thrown || 0) + 1; return r0.apply(this, a); }; }
   };
+  // (for the tests: the steps, and jumping to one)
+  T.STEPS = STEPS; T.goto = (i) => { if (!T.active) return; if (st && STEPS[idx].done) { try { STEPS[idx].done(st); } catch (e) { console.error(e); } } idx = Math.max(0, Math.min(STEPS.length - 1, i)); begin(); };
+  T.state = () => st;
   T.stop = function () {
     T.active = false; if (GM) GM.tutorial = false; document.body.classList.remove('tut-on');
     if (el) el.classList.remove('on');
@@ -174,7 +210,12 @@
   T.finish = function () {
     T.stop();
     G.ui.toast('⚔️ 本編を開始します', 'good');
-    G.ui.slotForNew((s) => G.game.startRun(undefined, s), () => G.game.toTitle());
+    // the class is chosen here (the tutorial itself is always the soldier); from the title menu the slot and the difficulty are asked first
+    const o = T.next || {}; T.next = null;
+    const back = () => G.game.toTitle();
+    const pickClass = (diff, slot) => { G.input.exitLock(); GM.state = 'modal'; G.Classes.select(() => G.game.startRun(diff, slot), back); };
+    if (o.slot) pickClass(o.diff, o.slot);
+    else G.ui.slotForNew((s) => { G.input.exitLock(); GM.state = 'modal'; G.ui.difficulty((d) => pickClass(d, s), back); }, back);
   };
   function ensureEl() {
     if (el) return;
@@ -202,6 +243,7 @@
     if (!skipped && !s.info) { G.sfx.ui('level'); G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), 2, 0x80ff90, 0.5); }
     else G.sfx.ui('click');
     // a skipped fight leaves no foes roaming the later steps
+    if (s.done && st) { try { s.done(st); } catch (e) { console.error(e); } }
     if (st && st.spawned) for (const e of st.spawned) if (e.alive) { e.noReward = true; e.alive = false; if (e.remove) e.remove(); }
     if (s.finish) return T.finish();
     idx = Math.min(STEPS.length - 1, idx + 1);

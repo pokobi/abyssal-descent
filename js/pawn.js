@@ -209,6 +209,26 @@
         },
       };
     }
+    if (tab === 'part') {
+      const parts = p.bag.items.filter((o) => o.type === 'part');
+      const count = parts.reduce((n, o) => n + (o.n || 1), 0);
+      const sum = parts.reduce((s, o) => s + IV.value(o), 0);
+      return {
+        label: `⚙️ 武器パーツを一括売却（${count}点 +${fmt(sum)}🪙）`,
+        count,
+        primary: false,
+        act: () => {
+          if (!parts.length) return;
+          // (a set of three is a weapon at the workbench: worth a second look before it goes for a few coins)
+          const sets = parts.filter((o) => (o.n || 1) >= 3).length;
+          confirmBulk('⚙️ 武器パーツを一括売却しますか？', `武器パーツ <b>${count}点</b>`, sum, sets ? `3つ揃って組み立てられる部品 <b>${sets}種</b>` : '', () => {
+            for (const o of parts.slice()) IV.remove(p.bag, o);
+            pay(sum, `武器パーツ${count}点`);
+            G.ui.toast(`⚙️ 武器パーツ ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+          });
+        },
+      };
+    }
     if (tab === 'item') {
       const items = IV.pcs(p).flatMap((c) => c.items).filter((o) => o.type === 'item' && G.ITEM_BY_ID[o.id] && G.ITEM_BY_ID[o.id].cat !== 'grenade');
       const count = items.reduce((n, o) => n + (o.n || 1), 0);

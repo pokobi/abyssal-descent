@@ -227,10 +227,9 @@
     if (G.sfx.clang) G.sfx.clang(D.mine() ? null : at); else G.sfx.impact(at, 'metal');
     if (local !== false && D.mine()) {
       D._stopUntil = performance.now() + 80; D._slowUntil = performance.now() + 330;
-      G.player.addShake(0.25);
+      G.player.addShake(0.7); // a short jolt of the screen
       if (G.weapons.gd) G.weapons.gd.kick = 1;
       flashScreen('parry');
-      pop('PARRY!');
     }
     // the guardian is knocked back a step and reels
     d.recoil = 0.3;

@@ -94,6 +94,16 @@ const PORT = +process.env.COOP_PORT || 9991;
     await p.eval("document.querySelector('#screens .choice').click(); 1");
     await sleep(300);
     check(await p.eval("G.Parts.count('pt_ar_rare') === 0") && (await p.eval('G.player.weapons.length + G.player.bag.items.filter((o) => o.type === "gun").length')) === nw1 + 1 && (await p.eval('G.game.run.coins')) === 0, 'a rare assault weapon is made there with no coins at all');
+    // ---- the pawn: all the parts at once
+    await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.player.bag.items = G.player.bag.items.filter((o) => o.type !== 'part'); G.Inv.stow(G.player, G.Inv.make('part', 'pt_sg_common', 4)); G.Inv.stow(G.player, G.Inv.make('part', 'pt_ml_rare', 2)); G.game.run.coins = 0; G.Pawn.tab = 'part'; G.Pawn.open(); 1");
+    await sleep(300);
+    const bl = await p.eval("(document.getElementById('pw-bulk-btn') || {}).textContent || ''");
+    console.log('      ' + bl);
+    check(/武器パーツを一括売却（6点/.test(bl), 'the pawn has a bulk sale for weapon parts');
+    await p.eval("document.getElementById('pw-bulk-btn').click(); 1"); await sleep(300);
+    await p.eval("[...document.querySelectorAll('#screens .choice')].find((e) => /すべて売る/.test(e.textContent)).click(); 1"); await sleep(300);
+    check((await p.eval("G.player.bag.items.filter((o) => o.type === 'part').length")) === 0 && (await p.eval('G.game.run.coins')) > 0, 'and it sells them all');
+    await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; 1");
     // ---- shift + click out of a container
     await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; 1");
     const shift = async (setup) => {

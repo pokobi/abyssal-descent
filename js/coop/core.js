@@ -139,7 +139,7 @@
       G.fx.tracer(V(...m.a), V(...m.b), 0xffd080, 0.03, 0.09);
       try {
         const d = G.player.pos.distanceTo(V(...m.a)), vol = Math.max(0.05, 0.8 - d / 80);
-        if (m.snd) { if (m.pj) G.sfx.launcher(m.snd); else G.sfx.gun(m.snd, { vol }); }
+        if (m.snd) { if (m.pj && m.snd !== 'nail') G.sfx.launcher(m.snd); else G.sfx.gun(m.snd, { vol }); }
       } catch (e) { /* a sound that cannot be played is not worth an error */ }
     }
     if (K.role === 'host') for (const o of K.players.keys()) if (o && o !== m.i) K.net.send(o, m);

@@ -60,6 +60,9 @@ const PORT = +process.env.COOP_PORT || 9995;
     check(await p.eval("(() => { const P = G.player; P.cls = 'mage'; G.avatar.update(0.016, P); const J = G.avatar.root; let orbs = 0; J.traverse((o) => { if (o.material && o.material.isMeshBasicMaterial && o.scale.x === 0.05) orbs++; }); return orbs === 3; })()"), 'the mage has three orbs around it');
     // ---- 不屈の城塞 draws foes in
     check(await p.eval("(() => { const P = G.player; const e = G.enemies.spawn(G.ENEMY_BY_ID.brute_normal, 5, new THREE.Vector3(P.pos.x, P.pos.y, P.pos.z - 6), { noSplit: true }); e.update = () => {}; const dec = { pos: P.pos.clone().add(new THREE.Vector3(3, 0, 0)), t: 9 }; const gd = G.combat.getDecoy; G.combat.getDecoy = () => dec; const a = !!e.target().decoy; P.temps.set('ult_bastion', { t: 5, max: 10, mods: {} }); const b = !e.target().decoy; P.temps.delete('ult_bastion'); G.combat.getDecoy = gd; e.alive = false; e.remove(); return a && b; })()"), '不屈の城塞: a foe within 15 m leaves the decoy for you');
+    // ---- the nail guns make a sound when they fire (they shoot projectiles, but have a gun voice of their own); blink waits longer
+    check(await p.eval("(() => { const P = G.player; P.cls = 'mage'; P.resetRun(); G.game.state = 'playing'; const got = []; const g0 = G.sfx.gun, l0 = G.sfx.launcher; G.sfx.gun = (k) => got.push('gun:' + k); G.sfx.launcher = (k) => got.push('launcher:' + k); try { const w = P.weapons[0]; G.weapons.shoot(w, G.weapons.stats(w)); } finally { G.sfx.gun = g0; G.sfx.launcher = l0; } return got.includes('gun:nail') && !got.includes('launcher:nail'); })()"), 'the rivet gun (a nail gun) sounds when it fires');
+    check(await p.eval("G.SKILL_BY_ID.blink.cd === 11"), 'blink: 11 s before the skill multiplier and levels (was 6 s)');
     check(!p.errs.length, 'no errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 500));
   } catch (e) { console.error(e); fails.push(String(e)); }
   finally { await ch.close(); srv.close(); }

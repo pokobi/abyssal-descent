@@ -318,9 +318,10 @@
     const hw = document.getElementById('hp-wrap'); if (hw) hw.classList.toggle('iron', P.cls === 'heavy' && CL.ironOn());
     let fb = UI._focusEl;
     if (P.cls === 'sniper') {
-      if (!fb || !fb.isConnected) { const ch = document.getElementById('crosshair'); if (!ch) return; fb = UI._focusEl = document.createElement('div'); fb.id = 'focus-bar'; fb.innerHTML = '<i></i>'; ch.appendChild(fb); }
+      // (its own element on the HUD, not in the crosshair: the crosshair is hidden while aiming down a scope)
+      if (!fb || !fb.isConnected) { const hud = document.getElementById('hud'); if (!hud) return; fb = UI._focusEl = document.createElement('div'); fb.id = 'focus-bar'; fb.innerHTML = '<i></i>'; hud.appendChild(fb); }
       const f = CL.focus();
-      sStyle(fb.firstChild, 'width', (f * 100).toFixed(1) + '%'); fb.classList.toggle('full', f >= 1); fb.classList.toggle('on', f > 0.01);
+      sStyle(fb.firstChild, 'width', (f * 100).toFixed(1) + '%'); fb.classList.toggle('full', f >= 1); fb.classList.toggle('on', f > 0.01 && !P.meleeMode); fb.classList.toggle('ads', G.weapons.adsT > 0.5);
     } else if (fb) fb.classList.remove('on');
   };
   const sStyle = (el, k, v) => { const c = el._s || (el._s = {}); if (c[k] !== v) { c[k] = v; el.style[k] = v; } };

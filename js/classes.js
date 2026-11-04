@@ -122,8 +122,11 @@
   CL.tick = function (dt) {
     if (!is('sniper')) return;
     const P = G.player, st = S();
+    const q0 = Math.floor(st.focus * 4 + 1e-6);
     if (!P.meleeMode && G.weapons.adsT > 0.9) st.focus = Math.min(1, st.focus + dt / 1.5);
     else if (st.focus > 0) st.focus = Math.max(0, st.focus - dt * 0.5);
+    const q = Math.floor(st.focus * 4 + 1e-6);
+    if (q > q0 && G.sfx && G.sfx.focus) G.sfx.focus(q); // (a quiet blip each quarter, a chime when full)
   };
   // a guardian has fallen: say so when the Lv went up
   CL.afterGuardian = function (lv0) {

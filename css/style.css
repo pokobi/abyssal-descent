@@ -1796,7 +1796,7 @@ html.m .pb-title { font-size: 16px; }
 #cls-ind { display: none; margin-bottom: 6px; padding: 3px 10px; width: max-content; font-size: 13px; font-weight: 800; color: #ffe2a0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
 #cls-ind.on { display: block; }
 #hp-wrap.iron { border-color: #f0c050; box-shadow: 0 0 0 1px #f0c050, 0 0 14px rgba(240,192,80,0.55); }
-#focus-bar { position: absolute; left: -26px; top: 26px; width: 52px; height: 4px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; overflow: hidden; display: none; }
+#focus-bar { position: absolute; left: calc(50% - 26px); top: calc(50% + 26px); width: 52px; height: 4px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; overflow: hidden; display: none; }
 #focus-bar.on { display: block; }
 #focus-bar i { display: block; height: 100%; width: 0; background: #9fe0a0; }
 #focus-bar.full { border-color: #ffe27a; box-shadow: 0 0 8px #ffe27a; }
@@ -1876,3 +1876,5 @@ html.m .cls-note, html.m .cls-hint { display: none; }
 html.m .cls-foot { margin-top: 8px; justify-content: flex-end; }
 html.m .cls-foot .btn { font-size: 22px; padding: 14px 30px; }
 .cls-pas td:first-child { width: 42%; }
+/* aiming down the sights: lower, near the bottom of the scope, a little see-through (out of the way of the reticle) */
+#focus-bar.ads { top: calc(50% + 25vh); left: calc(50% - 40px); width: 80px; height: 5px; opacity: 0.85; }

@@ -1198,6 +1198,13 @@
     tn({ t: t + 0.02, f0: 150, f1: 55, d: 0.28, g: 0.7, to: out });
     for (let i = 0; i < 3; i++) tn({ t: t + 0.09 + i * 0.07, f0: 1500 + i * 450, d: 0.5, g: 0.07, to: out });
   };
+  // 一点集中 (狙撃手): k = 1..3 a soft rising blip as the gauge fills, 4 = full (a small two-note chime)
+  A.focus = function (k) {
+    if (!ctx) return;
+    const t = ctx.currentTime, out = dest(null, 0.05);
+    if (k < 4) { out.gain.value = 0.2; tn({ t, f0: 640 + k * 170, d: 0.05, g: 0.25, to: out, type: 'sine' }); }
+    else { out.gain.value = 0.3; tn({ t, f0: 1180, d: 0.16, g: 0.22, to: out, type: 'triangle' }); tn({ t: t + 0.07, f0: 1770, d: 0.24, g: 0.18, to: out, type: 'triangle' }); }
+  };
   // clock tick for timed challenges: 0 = normal, 1 = urgent (higher, louder), 2 = half-second tock in the last seconds
   A.tick = function (lvl, sec) {
     if (!ctx || smp('tick', null, lvl === 2 ? 0.35 : lvl === 1 ? 0.95 : 0.6, lvl === 1 ? 1.3 : lvl === 2 ? 0.8 : 1, 0.05)) return;

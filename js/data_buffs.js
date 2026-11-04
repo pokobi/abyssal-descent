@@ -39,7 +39,6 @@
     ['grappleCd', '鉤縄習熟', '⚓', [0.12, 0.2, 0.3], (v) => `グラップルのクールタイム-${Math.round(v * 100)}%`],
     ['elemChance', '属性親和', '🌈', [0.05, 0.08, 0.12], (v) => `全攻撃に${Math.round(v * 100)}%で属性付与（武器属性/ランダム）`],
     ['pickupRange', '磁力', '🧲', [2, 3.5, 5], (v) => `コイン・回復の取得範囲+${v}m`],
-    ['dodge', '回避', '🌫️', [0.04, 0.07, 0.1], (v) => `${Math.round(v * 100)}%で攻撃を回避`],
     ['bossDmg', '英雄', '👑', [0.1, 0.18, 0.28], (v) => `ボスへのダメージ+${Math.round(v * 100)}%`],
     ['range', '射程', '📏', [0.15, 0.25, 0.4], (v) => `有効射程+${Math.round(v * 100)}%`],
     ['meleeDmg', '剛腕', '👊', [0.3, 0.5, 0.8], (v) => `近接ダメージ+${Math.round(v * 100)}%`],
@@ -184,7 +183,7 @@
   add('m_sprintreload', '走行装填', '🏃', 'uncommon', 'mobility', 'スプリント中もリロードでき、リロード速度+25%。', { mods: { reloadSpeed: 0.25 }, flag: true });
   add('m_skillhaste', '詠唱疾走', '⚡', 'uncommon', 'mobility', 'スキル使用時、3秒間移動速度+30%。', { hooks: { onSkill() { C.temp('m_skillhaste', 3, { moveSpeed: 0.3 }, '⚡'); } } });
   add('m_pileup', '隕撃', '🔨', 'rare', 'pile', 'パイルドライバーの範囲+40%、ダメージ+40%。', { flag: true, max: 2 });
-  add('m_dashdodge', '回避本能', '🌫️', 'uncommon', 'defense', 'ダッシュ/スライディング後1秒間、回避率+50%。', { hooks: { onSlide() { C.temp('m_dashdodge', 1, { dodge: 0.5 }, '🌫️'); }, onDash() { C.temp('m_dashdodge', 1, { dodge: 0.5 }, '🌫️'); } } });
+  add('m_dashdodge', '回避本能', '💨', 'uncommon', 'defense', 'ダッシュ/スライディング後1秒間、被ダメ-50%。', { hooks: { onSlide() { C.temp('m_dashdodge', 1, { armor: 0.5 }, '💨'); }, onDash() { C.temp('m_dashdodge', 1, { armor: 0.5 }, '💨'); } } });
   add('m_trail', '炎の足跡', '👣', 'rare', 'element', 'スプリント中、足跡に炎を残す。', { hooks: { tick(dt, n, s) { if (P.sprinting && P.grounded) { s.t = (s.t || 0) - dt; if (s.t <= 0) { s.t = 0.25; C.zone(P.pos.clone(), 1.6, 2.5, 'fire', sc(14), { proc: true }); } } } } });
 
   // ---------- defense ----------
@@ -250,22 +249,22 @@
   add('x_overload', '過負荷', '⚡', 'rare', 'element', '電撃状態の敵へのシールドダメージ+100%。', { hooks: { preHit(c) { if (c.e.st && c.e.st.shock > 0) c.shieldBonus = (c.shieldBonus || 0) + 1; } } });
   add('x_frostaura', '冷気の衣', '🥶', 'rare', 'element', '周囲5mの敵に継続的に冷気を付与。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.8; for (const e of C.inRadius(P.pos, 5)) C.status(e, 'frost', 1); } } });
   // ---------- elements (element.js): leaving them, and the reactions. A reaction boon is its own factor, apart from 属性熟練 ----------
-  add('rx_linger', '残り香', '🌫️', 'common', 'attr', '敵に付けた属性の時間+3秒。', { mods: { elAuraT: 3 }, max: 2 });
-  add('rx_sigil', '刻印の手', '✋', 'uncommon', 'attr', '武器の属性付与の間隔-40%（銃なら2.5秒→1.5秒）。', { mods: { elIcd: 0.4 } });
-  add('rx_permafrost', '永久凍土', '🧊', 'uncommon', 'attr', '凍結時間+1秒（ボスへの鈍化も+1秒）。', { mods: { rxFreezeT: 1 } });
-  add('rx_chainblast', '連爆', '💥', 'uncommon', 'attr', '爆轟の範囲+50%。', { mods: { rxBlastR: 0.5 } });
+  add('rx_linger', '残り香', '⌛', 'common', 'attr', '敵に付けた属性の時間+3秒。', { mods: { elAuraT: 3 }, max: 2 });
+  add('rx_sigil', '刻印の手', '🖐️', 'uncommon', 'attr', '武器の属性付与の間隔-40%（銃なら2.5秒→1.5秒）。', { mods: { elIcd: 0.4 } });
+  add('rx_permafrost', '永久凍土', '🥶', 'uncommon', 'attr', '凍結時間+1秒（ボスへの鈍化も+1秒）。', { mods: { rxFreezeT: 1 } });
+  add('rx_chainblast', '連爆', '🎆', 'uncommon', 'attr', '爆轟の範囲+50%。', { mods: { rxBlastR: 0.5 } });
   add('rx_leakR', '導電', '🔌', 'uncommon', 'attr', '漏電が移る距離+3m、漏電のダメージ+30%。', { mods: { rxLeak: 0.3 } });
-  add('rx_crystalPull', '晶の守り', '💠', 'uncommon', 'attr', '晶壁のシールド+50%。結晶が自分に引き寄せられる。', { mods: { rxCrystal: 0.5 } });
-  add('rx_ward', '元素の加護', '🛡️', 'uncommon', 'attr', '自分に付く属性の時間-50%、自分の身で起きた反応の被ダメ-30%。', { mods: { elSelfT: 0.5, elSelfRes: 0.3 } });
+  add('rx_crystalPull', '晶の守り', '💎', 'uncommon', 'attr', '晶壁のシールド+50%。結晶が自分に引き寄せられる。', { mods: { rxCrystal: 0.5 } });
+  add('rx_ward', '元素の加護', '🧿', 'uncommon', 'attr', '自分に付く属性の時間-50%、自分の身で起きた反応の被ダメ-30%。', { mods: { elSelfT: 0.5, elSelfRes: 0.3 } });
   add('rx_boilpt', '沸点', '♨️', 'rare', 'attr', '沸騰の倍率+0.3。', { mods: { rx_boil: 0.3 } });
   add('rx_meltpt', '融点', '🌡️', 'rare', 'attr', '熱融の倍率+0.3。', { mods: { rx_thaw: 0.3 } });
   add('rx_brittle', '脆き鎧', '💔', 'rare', 'attr', '脆化の被ダメ増加+10%（25%→35%）。', { mods: { rxBrittle: 0.1 } });
-  add('rx_eye', '嵐の目', '🌀', 'rare', 'attr', '旋風の範囲+4m。旋風で広げた属性の時間+3秒。', { mods: { rxSwirlR: 4, rxSwirlT: 3 } });
+  add('rx_eye', '嵐の目', '🌪️', 'rare', 'attr', '旋風の範囲+4m。旋風で広げた属性の時間+3秒。', { mods: { rxSwirlR: 4, rxSwirlT: 3 } });
   add('rx_fireHeart', '燃え盛る心', '❤️‍🔥', 'rare', 'attr', '炎属性が付いた敵の炎上ダメージ、さらに+30%。', { flag: true });
-  add('rx_iceHeart', '氷の心臓', '🫀', 'rare', 'attr', '氷属性が付いた敵へ冷気を付けると、スタックがさらに+1。', { flag: true });
-  add('rx_voltHeart', '雷の心臓', '⚡', 'rare', 'attr', '雷属性が付いた敵への電撃ダメージ、さらに+50%。', { flag: true });
+  add('rx_iceHeart', '氷の心臓', '❄️', 'rare', 'attr', '氷属性が付いた敵へ冷気を付けると、スタックがさらに+1。', { flag: true });
+  add('rx_voltHeart', '雷の心臓', '🌩️', 'rare', 'attr', '雷属性が付いた敵への電撃ダメージ、さらに+50%。', { flag: true });
   add('rx_echo', '共鳴', '🔔', 'epic', 'attr', '反応が起きると、一番近い敵1体にも同じ反応を起こす（共鳴から共鳴は起きない）。', { flag: true });
-  add('rx_master', '反応の極意', '🌈', 'legendary', 'attr', 'すべての効果型反応（爆轟・漏電など）のダメージ+40%、倍率型反応（沸騰・熱融）の倍率+0.2。', { mods: { reactDmg: 0.4, reactMul: 0.2 } });
+  add('rx_master', '反応の極意', '📜', 'legendary', 'attr', 'すべての効果型反応（爆轟・漏電など）のダメージ+40%、倍率型反応（沸騰・熱融）の倍率+0.2。', { mods: { reactDmg: 0.4, reactMul: 0.2 } });
   add('x_slowtime', '刹那', '⌛', 'epic', 'offense', 'ADS中、時間の流れが25%遅くなる。', { flag: true });
   add('x_curse', '呪詛', '🕯️', 'rare', 'offense', '敵の最大HP-10%。', { mods: { enemyHp: -0.1 }, max: 2 });
   add('x_weaken', '弱体化の呪い', '🧿', 'uncommon', 'defense', '敵の攻撃力-8%。', { mods: { enemyDmg: -0.08 }, max: 3 });
@@ -306,7 +305,7 @@
   add('d_healboost', '治癒の才', '🩹', 'common', 'defense', '回復量+30%。', { mods: { healMul: 0.3 }, max: 3 });
   add('d_plate', '板金鎧', '🛡️', 'uncommon', 'defense', '被ダメ-8%。', { mods: { armor: 0.08 }, max: 3 });
   add('d_bloodpact', '溢れる生命', '🫀', 'uncommon', 'defense', '最大HP+25%。', { mods: { maxHpPct: 0.25 }, max: 2 });
-  add('d_light', '身軽', '🍃', 'uncommon', 'defense', '回避率+8%。', { mods: { dodge: 0.08 }, max: 3 });
+  add('d_light', '身軽', '🍃', 'uncommon', 'defense', 'スプリント中とスライディング中、被ダメ-15%。', { hooks: { preDamaged(c) { if (P.sprinting || P.sliding) c.red += 0.15; } } });
   add('d_ward', '守りの護符', '🧿', 'uncommon', 'defense', 'エリア開始時と各WAVE開始時にオーバーシールド+35。', { hooks: { onAreaStart() { C.overshield(35, 35); }, onWave() { C.overshield(35, 35); } } });
   add('d_spring', '生命の泉', '⛲', 'uncommon', 'defense', '3秒間被弾しないと、毎秒最大HPの2.5%を回復する。', { hooks: { tick(dt) { if (G.game.time - P.lastHurtT > 3 && P.hp < P.stats.maxHp) C.heal(P.stats.maxHp * 0.025 * dt, true); } } });
   add('d_resolve', '不退転', '🪨', 'uncommon', 'defense', '被弾する度に5秒間、被ダメ-6%（最大5重）。', { hooks: { onDamaged(c, n, s) { s.v = Math.min(5, (s.v || 0) + 1); s.t = 5; }, preDamaged(c, n, s) { c.red += (s.v || 0) * 0.06; }, tick(dt, n, s) { if (s.t > 0) { s.t -= dt; if (s.t <= 0) s.v = 0; } } }, counter: (s) => (s.v || 0) + '重' });

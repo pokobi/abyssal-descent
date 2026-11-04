@@ -594,7 +594,6 @@
       if (atkEl && G.Elem) amount *= G.Elem.onPlayerHit(atkEl);
       if (P.elBrittle > 0) amount *= 1.15;
       if (G.Classes && G.Classes.allyGuard()) amount *= 0.75;
-      if (Math.random() < Math.min(0.75, P.stats.dodge)) { G.ui.toastSmall('回避!'); G.sfx.whoosh(0.2, 0.4); return 0; }
     }
     const ctx = { amount, red: 0, src: info.src || 'melee', attacker: info.attacker, elem: info.elem };
     G.buffs.emit('preDamaged', ctx);

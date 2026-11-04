@@ -16,6 +16,8 @@
     { id: 'sp', name: '特殊・爆発', icon: '🚀', arch: ['rocket', 'gl', 'flame', 'rail', 'nail', 'harpoon', 'tesla', 'crossbow'] },
     { id: 'ml', name: '近接', icon: '🗡️', melee: true },
   ];
+  // each kind shows the drawn icon of its first archetype (icons.js has already given the archetypes theirs); melee shows a blade
+  for (const f of PT.FAMS) { const ic = f.melee ? G.MELEE_BY_ID.m_katana && G.MELEE_BY_ID.m_katana.icon : G.WEAPON_ARCH[f.arch[0]] && G.WEAPON_ARCH[f.arch[0]].icon; if (ic) f.icon = ic; }
   PT.FAM_BY_ID = Object.fromEntries(PT.FAMS.map((f) => [f.id, f]));
   const ORD = G.RARITY_ORDER;
   // what a set of parts can become: never a mythic weapon, the starting gun, the starting knife or bare hands
@@ -141,30 +143,64 @@
     return { icon: '🔧', name: free ? '部品の作業台（無料）' : '部品の作業台', rc: '#c8a878', cat: free ? '武器パーツの組み立て・繰り上げ（無料・何度でも）' : '武器パーツの組み立て・繰り上げ（有料）',
       desc: have ? `所持パーツ ${have}個 — 組み立てられる組 ${ready}` : '武器パーツを持っていない。死体や宝箱から見つかる。', action: '使う' };
   };
+  // the bench: a table of kind x rarity (how many of each part you hold), the chosen cell on the right with what it can become
+  const esc = (t) => U.esc(String(t == null ? '' : t));
+  let sel = null, cands = null;
   PT.open = function (free) {
-    const gm = GM(), again = () => { gm._keepModal = true; setTimeout(() => PT.open(free), 0); };
-    const { make, up } = PT.recipes(), coins = gm.run.coins, opts = [];
-    for (const m of make) {
-      const c = PT.makeCost(m.d.rarity, free), n = PT.pool(m.d.fam, m.d.rarity).length;
-      opts.push({ icon: m.d.famIcon, label: `組み立て：${m.d.name}（${G.RARITY[m.d.rarity].name}） ${Math.min(m.n, 99)}/${PT.NEED}`, sub: `${G.RARITY[m.d.rarity].name}の${PT.FAM_BY_ID[m.d.fam].name}武器を${n > 1 ? `${Math.min(3, n)}つから1つ選んで作る` : "1つ作る"} — ${costTxt(c)}`,
-        disabled: !m.ok || coins < c, onPick: () => {
-          const r = PT.make(m.d.id, free, null); if (!r) return;
-          gm._keepModal = true;
-          setTimeout(() => {
-            const wo = r.cands.map((w) => ({ icon: w.icon, label: `${w.name}（${G.RARITY[w.rarity].name}）`, sub: w.kind === 'melee' ? G.Areas.meleeCard(w) : G.Areas.gunCard(w), onPick: () => { if (!r.pick(w)) G.sfx.ui('deny'); else G.sfx.ui('select'); } }));
-            wo.push({ icon: '↩', label: 'やめる', onPick: again });
-            gm.modal(`🔧 どれを組み立てますか？（${G.RARITY[m.d.rarity].name}）`, `${m.d.name}×${PT.NEED}${c ? `と ${U.fmt(c)}🪙` : ''}を使って、次のうち1つを組み立てる。`, wo);
-          }, 0);
-        } });
-    }
-    for (const u of up) {
-      const c = PT.upCost(u.to.rarity, free);
-      opts.push({ icon: '⏫', label: `繰り上げ：${u.d.name}（${G.RARITY[u.d.rarity].name}）×${PT.NEED} → ${G.RARITY[u.to.rarity].name}`, sub: `所持 ${u.n}個 — ${costTxt(c)}`,
-        disabled: !u.ok || coins < c, onPick: () => { if (PT.up(u.d.id, free)) { G.sfx.ui('select'); again(); } else G.sfx.ui('deny'); } });
-    }
-    opts.push({ icon: '↩', label: '閉じる', onPick: () => {} });
-    const list = make.length ? make.map((m) => `${m.d.famIcon} ${U.esc(m.d.name)} ${RN(m.d.rarity)} ×${m.n}`).join('　') : '武器パーツを持っていない。';
-    gm.modal(free ? '🔧 部品の作業台（無料）' : '🔧 部品の作業台', `同じ部品3つで武器を1つ組み立てる。下のレアリティの部品3つで、1つ上のレアリティの部品にもできる。${free ? '<br>ここでは無料で何度でも使える。' : ''}<br><span style="font-size:12.5px">${list}</span><br>所持 🪙 ${U.fmt(coins)}`, opts);
+    const gm = GM(), UI = G.ui;
+    gm.state = 'modal'; G.input.exitLock();
+    const s = UI.screen('<div class="pb-wrap"></div>');
+    const wrap = s.querySelector('.pb-wrap');
+    const close = () => { cands = null; UI.clearScreen(); gm.resume(); };
+    const firstPick = () => {
+      const { make } = PT.recipes();
+      const ready = make.find((m) => m.ok); if (ready) return ready.d.id;
+      const any = make[0]; return any ? any.d.id : null;
+    };
+    if (!sel || !G.PART_BY_ID[sel] || !PT.count(sel)) sel = firstPick();
+    const render = () => {
+      const coins = gm.run.coins;
+      const head = `<div class="pb-head"><div class="pb-title">🔧 部品の作業台 <span class="pb-tag ${free ? 'free' : ''}">${free ? '無料・何度でも' : '有料'}</span></div><div class="pb-coins">🪙 ${U.fmt(coins)}</div></div>
+        <div class="pb-rule">同じ部品3つで武器を1つ組み立てる（3つの候補から選ぶ）。下のレアリティの部品3つで、1つ上のレアリティの部品にもできる。</div>`;
+      const cols = ORD.map((r) => `<div class="pb-ch" style="--rc:${G.ui.R(r)}">${G.RARITY[r].name}</div>`).join('');
+      const rows = PT.FAMS.map((f) => {
+        const cells = ORD.map((r) => {
+          const id = PT.id(f.id, r), d = G.PART_BY_ID[id];
+          if (!d) return '<div class="pb-c none">—</div>';
+          const n = PT.count(id), ok = n >= PT.NEED;
+          return `<button class="pb-c${n ? ' have' : ''}${ok ? ' ok' : ''}${sel === id ? ' sel' : ''}" data-p="${id}" style="--rc:${G.ui.R(r)}"><b>${n}</b><i>/${PT.NEED}</i><span class="pb-dots">${[0, 1, 2].map((k) => `<em class="${k < Math.min(n, 3) ? 'on' : ''}"></em>`).join('')}</span></button>`;
+        }).join('');
+        return `<div class="pb-rh"><span class="pb-fi">${f.icon}</span>${esc(f.name)}</div>${cells}`;
+      }).join('');
+      const grid = `<div class="pb-grid"><div class="pb-corner"></div>${cols}${rows}</div>`;
+      wrap.innerHTML = `${head}<div class="pb-main">${grid}<div class="pb-side">${side(coins)}</div></div><div class="pb-foot"><button class="btn" id="pb-close">閉じる</button></div>`;
+      wrap.querySelectorAll('[data-p]').forEach((b) => { b.onclick = () => { sel = b.dataset.p; cands = null; G.sfx.ui('click'); render(); }; });
+      wrap.querySelector('#pb-close').onclick = () => { G.sfx.ui('back'); close(); };
+      const mk = wrap.querySelector('#pb-make'); if (mk) mk.onclick = () => { const r = PT.make(sel, free, null); if (!r) { G.sfx.ui('deny'); return; } cands = r; G.sfx.ui('select'); render(); };
+      const up = wrap.querySelector('#pb-up'); if (up) up.onclick = () => { if (PT.up(sel, free)) { G.sfx.ui('select'); const to = PT.id(G.PART_BY_ID[sel].fam, ORD[ORD.indexOf(G.PART_BY_ID[sel].rarity) + 1]); if (!PT.count(sel)) sel = to; render(); } else G.sfx.ui('deny'); };
+      wrap.querySelectorAll('[data-w]').forEach((b) => { b.onclick = () => { const w = cands && cands.cands[+b.dataset.w]; if (!w || !cands.pick(w)) { G.sfx.ui('deny'); return; } cands = null; G.sfx.ui('select'); if (!PT.count(sel)) sel = firstPick(); render(); }; });
+      const back = wrap.querySelector('#pb-cback'); if (back) back.onclick = () => { cands = null; G.sfx.ui('back'); render(); };
+    };
+    const side = (coins) => {
+      const d = sel && G.PART_BY_ID[sel];
+      if (!d) return '<div class="pb-empty">武器パーツを持っていない。<br>死体や宝箱から見つかる。</div>';
+      const f = PT.FAM_BY_ID[d.fam], n = PT.count(d.id), ri = ORD.indexOf(d.rarity), next = ORD[ri + 1], to = next && G.PART_BY_ID[PT.id(d.fam, next)];
+      const mc = PT.makeCost(d.rarity, free), uc = to ? PT.upCost(to.rarity, free) : 0;
+      const pool = PT.pool(d.fam, d.rarity);
+      const top = `<div class="pb-sel" style="--rc:${G.ui.R(d.rarity)}"><span class="pb-big">${f.icon}</span><div><div class="pb-nm">${esc(f.name)}の部品</div><div>${RN(d.rarity)}　所持 <b>${n}</b> / ${PT.NEED}</div></div></div>`;
+      if (cands) {
+        return `${top}<div class="pb-sec">どれを組み立てますか？</div><div class="pb-cands">${cands.cands.map((w, i) => `<button class="pb-cand" data-w="${i}" style="--rc:${G.ui.R(w.rarity)}"><span class="pb-ci">${w.icon}</span><div><b>${esc(w.name)}</b><small>${esc(w.cat || '')}</small><div class="pb-cs">${w.kind === 'melee' ? G.Areas.meleeCard(w) : G.Areas.gunCard(w)}</div></div></button>`).join('')}</div>
+          <div class="pb-note">部品${PT.NEED}つ${mc ? `と ${U.fmt(mc)}🪙` : ''}は、選んだときに使う。</div><button class="btn" id="pb-cback">↩ やめる</button>`;
+      }
+      const canMake = n >= PT.NEED && coins >= mc, canUp = !!to && n >= PT.NEED && coins >= uc;
+      const actions = `<div class="pb-acts">
+        <button class="btn primary" id="pb-make"${canMake ? '' : ' disabled'}><span>🔧 組み立てる</span><small>部品×${PT.NEED}・${costTxt(mc)}</small></button>
+        ${to ? `<button class="btn" id="pb-up"${canUp ? '' : ' disabled'}><span>⏫ 繰り上げ → ${G.RARITY[to.rarity].name}</span><small>部品×${PT.NEED}・${costTxt(uc)}</small></button>` : '<div class="pb-note">これより上のレアリティはない。</div>'}
+      </div>${n < PT.NEED ? `<div class="pb-note">あと ${PT.NEED - n} 個で使える。</div>` : coins < Math.min(mc, to ? uc : mc) ? '<div class="pb-note">コインが足りない。</div>' : ''}`;
+      const chips = pool.slice(0, 18).map((w) => `<span class="pb-chip" title="${esc(w.name)}">${w.icon}<em>${esc(w.name)}</em></span>`).join('') + (pool.length > 18 ? `<span class="pb-chip more">ほか${pool.length - 18}種</span>` : '');
+      return `${top}${actions}<div class="pb-sec">組み立てで出る武器（${pool.length}種から3つが候補になる）</div><div class="pb-chips">${chips}</div>`;
+    };
+    render();
   };
   // where the bench stands in this area (the levels set world.benchPos / world.benchFree)
   PT.benchPos = () => (G.world && G.world.benchPos) || null;

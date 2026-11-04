@@ -68,7 +68,7 @@
           <div class="cat">${esc(d.cat || '')}・${G.RARITY[d.rarity].name}</div>
           <div class="dps"><b>${Math.round(G.weapons.gunDps(w))}</b><span>DPS</span></div>
           ${trait ? `<div class="tr">${trait.icon} ${esc(trait.name)}</div>` : ''}
-          ${(() => { const el = G.Elem.wEl(w); return el ? `<div class="tr" style="color:${G.Elem.BY[el].col}">${G.Elem.BY[el].icon} ${G.Elem.BY[el].name}属性${w.oil && w.oil.t > G.game.time ? '（油）' : ''}</div>` : ''; })()}
+          ${(() => { const el = G.Elem.wEl(w); return el ? `<div class="tr" style="color:${G.Elem.BY[el].col}">${G.Elem.BY[el].icon} ${G.Elem.BY[el].name}属性</div>` : ''; })()}
         </div>
       </div>
       <div class="wc-grid">${tiles}</div>${legend}
@@ -161,7 +161,7 @@
   // ---------------- stats, items, perks ----------------
   const GROUPS = [
     ['攻撃', ['dmg', 'fireRate', 'reloadSpeed', 'critChance', 'critMul', 'headMul', 'skillDmg', 'explosionDmg', 'shieldDmg']],
-    ['生存', ['maxHp', 'defense', 'armor', 'dodge', 'hpRegen', 'lifesteal']],
+    ['生存', ['maxHp', 'defense', 'armor', 'hpRegen', 'lifesteal']],
     ['属性', ['elMastery', 'elRes_fire', 'elRes_water', 'elRes_ice', 'elRes_volt', 'elRes_wind', 'elRes_earth']],
     ['機動・その他', ['moveSpeed', 'weight', 'maxJumps', 'grappleRange', 'cdr', 'coinMul', 'luck']],
   ];
@@ -171,13 +171,13 @@
     const [ic, nm, t] = def, v = st[k] ?? 0, b = B[k] ?? 0;
     let txt;
     if (t === 'cd') txt = Math.round((v - 1) * 100) + '%';
-    else if (t === 'p') { const isAbs = ['critChance', 'dodge', 'lifesteal', 'armor', 'cdr', 'luck'].includes(k) || k.startsWith('elRes_'); txt = (isAbs ? Math.round(v * 100) : (v >= 0 ? '+' : '') + Math.round(v * 100)) + '%'; }
+    else if (t === 'p') { const isAbs = ['critChance', 'lifesteal', 'armor', 'cdr', 'luck'].includes(k) || k.startsWith('elRes_'); txt = (isAbs ? Math.round(v * 100) : (v >= 0 ? '+' : '') + Math.round(v * 100)) + '%'; }
     else if (t === 'x') txt = '×' + v.toFixed(2);
     else txt = String(Math.round(v * 10) / 10);
     const diff = Math.abs(v - b) > 1e-6;
     // more of a stat is a gain, except the ones where less is better (the weight of the armour)
     const gain = LOWER_STATS.has(k) ? v < b : v > b;
-    return `<div class="sg"><span>${ic} ${nm}</span><b class="sv ${diff ? (gain ? 'up' : 'dn') : ''}">${txt}</b></div>`;
+    return `<div class="sg" ${G.statTip(k)}><span>${ic} ${nm}</span><b class="sv ${diff ? (gain ? 'up' : 'dn') : ''}">${txt}</b></div>`;
   }
   const statsBody = () => GROUPS.map(([title, keys]) => `<div class="sgh">${title}</div><div class="sgrid">${keys.map(statRow).join('')}</div>`).join('');
   function perksBody() {

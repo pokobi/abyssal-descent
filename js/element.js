@@ -58,10 +58,9 @@
     spikes: 'earth', quake: 'earth', groundpound: 'earth', meteor: 'earth', ult_meteor: 'earth',
   };
   EL.skEl = (id) => (id && EL.SK[id]) || null;
-  // the element a gun / melee weapon carries right now: 属性の油 first, then what it was born with, then its 属性コア
+  // the element a gun / melee weapon carries: what it was born with, then one of its own (made from parts), then its 属性コア
   EL.wEl = function (w) {
     if (!w || !w.def) return null;
-    if (w.oil && w.oil.t > G.game.time) return w.oil.el;
     if (w.def.el) return w.def.el;
     if (w.el) return w.el; // (made from parts with an element of its own)
     const a = w.atts && w.atts.core && G.ATT_BY_ID[w.atts.core];

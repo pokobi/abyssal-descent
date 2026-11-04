@@ -602,11 +602,11 @@
     const st = P.stats;
     const rows = Object.entries(G.STAT_NAMES).map(([k, [ic, nm, t]]) => {
       let v = st[k];
-      if (t === 'p') v = (k === 'critChance' || k === 'dodge' || k === 'lifesteal' || k === 'armor' || k === 'cdr') ? Math.round(v * 100) + '%' : U.pct(v);
+      if (t === 'p') v = (k === 'critChance' || k === 'lifesteal' || k === 'armor' || k === 'cdr') ? Math.round(v * 100) + '%' : U.pct(v);
       else if (t === 'x') v = '×' + v.toFixed(2);
       else if (t === 'cd') v = Math.round((v - 1) * 100) + '%';
       else v = Math.round(v * 10) / 10;
-      return `<div class="si-stat"><span>${ic} ${nm}</span><b>${v}</b></div>`;
+      return `<div class="si-stat" ${G.statTip(k)}><span>${ic} ${nm}</span><b>${v}</b></div>`;
     });
     return rows.join('');
   };

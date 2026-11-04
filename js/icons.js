@@ -728,6 +728,10 @@
   const MATCOL = { cloth: '#d8c8a4', leather: '#b57a48', scale: '#76b088', chain: '#b4bec8', plate: '#e0e6ee' };
 
   // give the game's data its icons (data files are loaded before this one)
+  // the element cores (element.js): a cut gem in the element's colour with the element's mark
+  for (const [k, col, b] of [['fire', '#ff6a3a', 'flame'], ['water', '#3f9dff', 'water-drop'], ['ice', '#a8ecff', 'snowflake-2'], ['volt', '#b88cff', 'power-lightning'], ['wind', '#4fd8c0', 'tornado'], ['earth', '#e0a640', 'rock']]) {
+    if (PATHS['cut-diamond'] && PATHS[b]) ATT['c_' + k] = [big('cut-diamond', col), badge(b, col)];
+  }
   IC.applyData = function () {
     IC.def('ui:os', OS());
     for (const [k, layers] of Object.entries(ATT)) IC.def('att:' + k, layers);

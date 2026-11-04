@@ -33,11 +33,13 @@
   // the starting kit (called by Player.resetRun)
   CL.kit = function (P) {
     const c = CL.of(P.cls);
-    const w = G.weapons.make(c.gun);
+    const w = G.weapons.make(c.gun); w.kit = true;
     if (c.atts) { Object.assign(w.atts, c.atts); w.ver++; w.mag = G.weapons.stats(w).mag; }
     P.weapons = [w];
-    P.melee = G.weapons.makeMelee(c.melee);
+    P.melee = G.weapons.makeMelee(c.melee); P.melee.kit = true;
     P.skills = [G.abilities.makeSlot(c.ult), G.abilities.makeSlot(c.skill), null, null];
+    P.skills[0].kit = true; P.skills[1].kit = true;
+    P.kitAtts = Object.values(c.atts || {}); // (the mage's water core sells for nothing, once)
   };
   // the class's strength / weakness as stats (folded in by Player.recalc), the grapple's own cooldown
   CL.mods = function (P) { const c = CL.of(P.cls); return Object.assign({ grappleBase: c.grapple }, c.mods); };

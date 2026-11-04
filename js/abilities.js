@@ -748,11 +748,6 @@
     if (d.turret) { const a = aim(5); C.spawnTurret(a.floorPt, d.turret, C.scale(26)); }
     if (d.decoy) { const a = aim(6); C.addDecoy(a.floorPt, d.decoy, 0); }
     if (d.grapple) P.grappleCd = 0;
-    if (d.oil) {
-      // 属性の油: the weapon in hand (gun or melee) carries the element for 30 s, over what it had
-      const w = P.meleeMode || !P.weapon ? P.melee : P.weapon;
-      if (w) { w.oil = { el: d.oil, t: G.game.time + d.dur }; const E = G.Elem.BY[d.oil]; G.ui.toastSmall(`${E.icon} ${w.def.name} が${d.dur}秒間 ${E.name}属性に`); G.sfx.magic(P.pos); }
-    }
     if (d.invis) { C.temp('invis_item', d.invis, { invis: 1 }, '👻'); }
     if (d.ward) { P.wardT = d.ward; G.fx.bubble(P.chestPos(), 3.2, 0xd0b0ff); G.sfx.magic(P.pos); }
     if (d.refill) { for (const w of P.weapons) w.mag = G.weapons.stats(w).mag; G.sfx.mech('magIn'); }

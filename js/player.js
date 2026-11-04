@@ -20,11 +20,43 @@
     pileDmg: 0, pileRadius: 0, pileCd: 0, pileFast: 0, pileFire: 0, pileShock: 0, pileFrost: 0, pileStun: 0, pileVacuum: 0, pileBounce: 0, pileShield: 0, pileHeal: 0, pileHeight: 0, pileShieldMul: 0, pileMeteor: 0,
   };
   G.PLAYER_BASE = BASE;
+  // what each stat does (the tooltip on its name in the status / inventory screens)
+  G.STAT_DESC = {
+    elMastery: '属性反応の強さ。爆轟・漏電などのダメージと、沸騰・熱融の倍率が上がる。値が大きいほど伸びはゆるやかになる（100で効果型+50%・倍率+0.15）。反応を強くする加護とは別にかかる。',
+    elRes_fire: '炎属性の攻撃から受けるダメージを減らす（最大70%）。炎が付いている時間は変わらない。',
+    elRes_water: '水属性の攻撃から受けるダメージを減らす（最大70%）。水が付いている時間は変わらない。',
+    elRes_ice: '氷属性の攻撃から受けるダメージを減らす（最大70%）。氷が付いている時間は変わらない。',
+    elRes_volt: '雷属性の攻撃から受けるダメージを減らす（最大70%）。雷が付いている時間は変わらない。',
+    elRes_wind: '風属性の攻撃から受けるダメージを減らす（最大70%）。',
+    elRes_earth: '地属性の攻撃から受けるダメージを減らす（最大70%）。',
+    maxHp: '体力の上限。',
+    armor: '受けるダメージを割合で減らす（最大85%）。防御力の後にかかる。',
+    dmg: '与えるダメージ全体が増える（銃・近接・スキル・爆発）。',
+    fireRate: '銃の連射の速さ。',
+    reloadSpeed: 'リロードの速さ。',
+    critChance: '会心が出る確率。会心のダメージ数字には「!!」が付く。',
+    critMul: '会心が出たときのダメージ倍率。',
+    headMul: 'ヘッドショットのダメージ倍率への上乗せ。',
+    moveSpeed: '移動の速さ。防具の重さで下がる。',
+    hpRegen: '毎秒回復する体力。',
+    lifesteal: '与えたダメージのうち、体力として戻る割合。',
+    cdr: 'スキルのクールタイムを短くする（最大60%。アルティメットには半分だけ効く）。',
+    coinMul: '手に入るコインが増える。',
+    skillDmg: 'スキルとアルティメットのダメージが増える。',
+    explosionDmg: '爆発のダメージが増える（グレネード・爆発する弾・スキルの爆発）。',
+    defense: '防具の防御力。受けるダメージが ×100÷(100＋防御力) になる。',
+    weight: '防具の重さ。重いほど移動が遅くなる（布の防具は重さ0）。',
+    shieldDmg: '敵のシールドに与えるダメージが増える。',
+    maxJumps: '空中も含めて続けて跳べる回数。',
+    grappleRange: 'グラップルが届く距離。',
+    luck: 'レアリティの高い物が出やすくなる。',
+  };
+  G.statTip = (k) => { const n = G.STAT_NAMES[k], d = G.STAT_DESC[k]; return n && d ? `data-tip="${('<b>' + n[0] + ' ' + n[1] + '</b><br>' + d).replace(/"/g, '&quot;')}"` : ''; };
   G.STAT_NAMES = {
     elMastery: ['🔮', '属性熟練', 'n'], elRes_fire: ['🔥', '炎耐性', 'p'], elRes_water: ['💧', '水耐性', 'p'], elRes_ice: ['❄️', '氷耐性', 'p'], elRes_volt: ['⚡', '雷耐性', 'p'], elRes_wind: ['🌪️', '風耐性', 'p'], elRes_earth: ['🪨', '地耐性', 'p'],
     maxHp: ['❤️', '最大HP', 'n'], armor: ['🛡️', '被ダメ軽減', 'p'], dmg: ['💪', '与ダメ', 'p'], fireRate: ['🔁', '連射', 'p'], reloadSpeed: ['♻️', 'リロード', 'p'],
     critChance: ['💢', '会心率', 'p'], critMul: ['💥', '会心ダメージ', 'cd'], headMul: ['🎯', 'HS倍率', 'p'], moveSpeed: ['👟', '移動', 'p'], hpRegen: ['💚', '再生/秒', 'n'],
-    lifesteal: ['🩸', '吸血', 'p'], cdr: ['⏳', 'CT短縮', 'p'], coinMul: ['🪙', 'コイン獲得', 'p'], dodge: ['🌫️', '回避', 'p'], skillDmg: ['🔮', 'スキル', 'p'],
+    lifesteal: ['🩸', '吸血', 'p'], cdr: ['⏳', 'CT短縮', 'p'], coinMul: ['🪙', 'コイン獲得', 'p'], skillDmg: ['🔮', 'スキル', 'p'],
     explosionDmg: ['💣', '爆発', 'p'], defense: ['🛡️', '防御力', 'n'], weight: ['⚖️', '重さ', 'n'], shieldDmg: ['🔨', '対シールド', 'p'], maxJumps: ['🪽', 'ジャンプ回数', 'n'], grappleRange: ['⚓', 'グラップル射程', 'n'], luck: ['🍀', '幸運', 'p'],
   };
 

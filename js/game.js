@@ -516,10 +516,10 @@
     return {
       cls: P.cls, hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
       buffs: [...P.buffs], buffState: P.buffState,
-      weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, mag: w.mag, kills: w.kills || 0, el: w.el || undefined })), wIdx: P.wIdx,
+      weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined })), wIdx: P.wIdx, kitAtts: P.kitAtts || [],
       wOrder: G.weapons.order().map((t) => (t === 'm' ? 'm' : t ? P.weapons.indexOf(t) : null)),
-      melee: { id: P.melee.id, lv: P.melee.lv || 0 },
-      skills: P.skills.map((s) => (s ? s.id : null)), skillLv: P.skills.map((s) => (s ? s.lv || 0 : 0)), pileTome: P.pileTome || 0,
+      melee: { id: P.melee.id, lv: P.melee.lv || 0, kit: P.melee.kit ? 1 : undefined },
+      skills: P.skills.map((s) => (s ? s.id : null)), skillLv: P.skills.map((s) => (s ? s.lv || 0 : 0)), skillKit: P.skills.map((s) => (s && s.kit ? 1 : 0)), pileTome: P.pileTome || 0,
       grenadeSel: P.grenadeSel, isel: P.isel, invGrid: G.Inv.snap(P),
     };
   };
@@ -562,21 +562,22 @@
     P.resetRun();
     P.buffs = new Map((d.buffs || []).filter(([id]) => G.BUFF_BY_ID[id]));
     // 鋸刃 (the bleeding boon) was removed with bleeding: a run saved with it is paid back in coins
-    { const gone = (d.buffs || []).reduce((n, [id, c]) => n + (id === 'h_bleed' ? c || 1 : 0), 0); if (gone && GM.run) { GM.run.coins += gone * 150; setTimeout(() => G.ui.toast(`🪙 廃止された加護「鋸刃」を ${gone * 150} コインで返却しました`, 'good'), 1500); } }
+    { const RET = { h_bleed: 150, s_dodge_1: 150, s_dodge_2: 250, s_dodge_3: 400 }; const gone = (d.buffs || []).reduce((n, [id, c]) => n + (RET[id] ? RET[id] * (c || 1) : 0), 0); if (gone && GM.run) { GM.run.coins += gone; setTimeout(() => G.ui.toast(`🪙 廃止された加護を ${gone} コインで返却しました`, 'good'), 1500); } }
     P.buffState = d.buffState || {};
     P.permMaxHp = d.permMaxHp || 0;
     P.recalc();
     P.phoenixUsed = !!d.phoenixUsed;
-    P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; w.ver++; w.mag = x.mag ?? w.mag; return w; });
+    P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag; return w; });
     const coresBack = []; for (const w of P.weapons) if (G.ownEl(w) && w.atts.core) { coresBack.push(w.atts.core); delete w.atts.core; w.ver++; }
     if (!P.weapons.length && !Array.isArray(d.weapons)) P.weapons = [G.weapons.make('starter')]; // (a run saved with every gun put away keeps none)
     P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));
-    if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; }
-    P.skills = [0, 1, 2, 3].map((i) => { if (!(d.skills && d.skills[i] && G.SKILL_BY_ID[d.skills[i]])) return null; const s = G.abilities.makeSlot(d.skills[i]); s.lv = Math.min(G.abilities.MAXLV, (d.skillLv && d.skillLv[i]) || 0); return s; });
+    if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; if (d.melee.kit) P.melee.kit = true; }
+    P.kitAtts = (d.kitAtts || []).slice();
+    P.skills = [0, 1, 2, 3].map((i) => { if (!(d.skills && d.skills[i] && G.SKILL_BY_ID[d.skills[i]])) return null; const s = G.abilities.makeSlot(d.skills[i]); s.lv = Math.min(G.abilities.MAXLV, (d.skillLv && d.skillLv[i]) || 0); if (d.skillKit && d.skillKit[i]) s.kit = true; return s; });
     P.pileTome = d.pileTome || 0;
     if (P.skills[0] && !P.skills[0].def.ult) { const s = P.skills[0]; const free = [1, 2, 3].find((i) => !P.skills[i]); if (free) P.skills[free] = s; P.skills[0] = null; }
-    if (!P.skills[0]) P.skills[0] = G.abilities.makeSlot(G.DEFAULT_ULT);
+    if (!P.skills[0]) { P.skills[0] = G.abilities.makeSlot(G.Classes ? G.Classes.of(P.cls).ult : G.DEFAULT_ULT); P.skills[0].kit = true; }
     P.retiredCoins = 0;
     if (d.invGrid) G.Inv.load(P, d.invGrid);
     else {
@@ -1430,7 +1431,7 @@
       else if (k === 'util') c = pickBy(r, G.ITEMS.filter((x) => x.cat !== 'grenade'), luck);
       else if (k === 'item') c = pickBy(r, G.ITEMS, luck);
       else if (k === 'pile' || k === 'tech') c = GM.rollBuffs(1, false, G.isTech)[0];
-      else if (k === 'ult') c = pickBy(r, G.ULTS.filter((x) => !(P.skills[0] && P.skills[0].id === x.id) && x.id !== G.DEFAULT_ULT), luck);
+      else if (k === 'ult') c = pickBy(r, G.ULTS.filter((x) => !(P.skills[0] && P.skills[0].id === x.id)), luck);
       else c = GM.rollBuffs(1)[0];
       if (c && !(used && used.has(c.id))) return c;
     }

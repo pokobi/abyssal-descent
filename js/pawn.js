@@ -9,10 +9,12 @@
   const fmt = (n) => U.fmt(n);
   const R = (r) => G.ui.R(r);
 
-  PW.weaponValue = (w) => w.def.price ? Math.max(5, Math.round(w.def.price * PW.RATE * (1 + 0.2 * (w.lv || 0)) / 5) * 5) : (w.lv || 0) * 60;
-  PW.meleeValue = (m) => m.def.price ? Math.max(5, Math.round(m.def.price * PW.RATE * (1 + 0.2 * (m.lv || 0)) / 5) * 5) : (m.lv || 0) * 60;
-  PW.attValue = (id) => { const a = G.ATT_BY_ID[id]; return a ? Math.max(1, Math.round((a.price || 0) * PW.RATE / 5) * 5) : 0; };
-  PW.skillValue = (sk) => Math.max(1, Math.round((sk.def.price || 0) * PW.RATE * (1 + 0.2 * (sk.lv || 0)) / 5) * 5);
+  // the class's starting kit (classes.js) is worth only what was put into it (its upgrades), like the old starting pistol; its ultimate can't be sold
+  PW.weaponValue = (w) => w.def.price && !w.kit ? Math.max(5, Math.round(w.def.price * PW.RATE * (1 + 0.2 * (w.lv || 0)) / 5) * 5) : (w.lv || 0) * 60;
+  PW.meleeValue = (m) => m.def.price && !m.kit ? Math.max(5, Math.round(m.def.price * PW.RATE * (1 + 0.2 * (m.lv || 0)) / 5) * 5) : (m.lv || 0) * 60;
+  PW.attValue = (id) => { const a = G.ATT_BY_ID[id]; if (!a) return 0; if ((G.player.kitAtts || []).includes(id)) return 0; return Math.max(1, Math.round((a.price || 0) * PW.RATE / 5) * 5); };
+  const spendKitAtt = (id) => { const k = G.player.kitAtts || [], i = k.indexOf(id); if (i >= 0) k.splice(i, 1); };
+  PW.skillValue = (sk) => (sk.kit ? Math.round((sk.def.price || 0) * PW.RATE * 0.2 * (sk.lv || 0) / 5) * 5 : Math.max(1, Math.round((sk.def.price || 0) * PW.RATE * (1 + 0.2 * (sk.lv || 0)) / 5) * 5));
   PW.itemValue = (id) => { const it = G.ITEM_BY_ID[id]; return it ? Math.max(1, Math.round((it.price || 0) * PW.RATE / 5) * 5) : 0; };
 
   function pay(v, what) {
@@ -30,7 +32,7 @@
     const p = P(), i = p.weapons.indexOf(w); if (i < 0) return;
     let v = PW.weaponValue(w);
     const atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]);
-    if (withAtts) v += atts.reduce((s, a) => s + PW.attValue(a), 0); else for (const a of atts) p.attStash.push(a);
+    if (withAtts) { v += atts.reduce((s, a) => s + PW.attValue(a), 0); for (const a of atts) spendKitAtt(a); } else for (const a of atts) p.attStash.push(a);
     w.atts = {};
     const wasCur = p.weapon === w;
     p.weapons.splice(i, 1);
@@ -51,7 +53,8 @@
     const p = P();
     if (from === 'stash') { const k = p.attStash.indexOf(id); if (k < 0) return; p.attStash.splice(k, 1); }
     else { const a = G.ATT_BY_ID[id]; delete from.atts[a.slot]; from.ver++; G.weapons.dirty = true; if (!p.meleeMode && from === p.weapon) G.weapons.equip(true); }
-    pay(PW.attValue(id), G.ATT_BY_ID[id].name);
+    const av = PW.attValue(id); spendKitAtt(id);
+    pay(av, G.ATT_BY_ID[id].name);
   }
   function sellItem(id, grenade) {
     const p = P();
@@ -63,8 +66,9 @@
   function sellSkill(i) {
     const p = P(), sk = p.skills[i]; if (!sk) return;
     const v = PW.skillValue(sk);
-    // Q is never empty: selling an ultimate puts the default one back
-    p.skills[i] = sk.def.ult ? Object.assign(G.abilities.makeSlot(G.DEFAULT_ULT), { cd: 30 }) : null;
+    if (sk.def.ult && sk.kit) return; // (the class's own ultimate is never sold)
+    // Q is never empty: selling an ultimate puts the class's starting one back (still unsellable, on a 30 s cooldown)
+    p.skills[i] = sk.def.ult ? Object.assign(G.abilities.makeSlot(G.Classes ? G.Classes.of(p.cls).ult : G.DEFAULT_ULT), { cd: 30, kit: true }) : null;
     G.ui.buildAbilityRow && G.ui.buildAbilityRow();
     pay(v, sk.def.name);
   }
@@ -126,12 +130,12 @@
     const p = P(), IV = G.Inv, out = [];
     const guns = G.weapons.gunsInOrder();
     for (const w of guns) {
-      const start = w.id === 'starter', last = p.weapons.length <= 1, atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]);
+      const start = w.id === 'starter' || !!w.kit, last = p.weapons.length <= 1, atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]);
       out.push({ cat: 'weapon', icon: w.def.icon, rc: w.def.rarity, name: `${G.weapons.keyLabel(w)}${w.def.name}${w.lv ? ' +' + w.lv : ''}`, sub: last ? '最後の銃は売れません' : `${start ? '初期装備' : '銃'}${w.lv ? `・強化+${w.lv}` : start ? '（未強化は0🪙）' : ''}${atts.length ? `・アタッチメント${atts.length}個装着中` : ''}`, v: last ? 0 : PW.weaponValue(w), no: last, act: () => { GM()._keepModal = true; setTimeout(() => confirmGun(w), 0); } });
     }
-    if (p.melee && p.melee.id !== (G.BARE_MELEE || 'fists')) { const startM = p.melee.id === G.DEFAULT_MELEE; out.push({ cat: 'melee', icon: p.melee.def.icon, rc: p.melee.def.rarity, name: p.melee.def.name + (p.melee.lv ? ' +' + p.melee.lv : ''), sub: `${startM ? '初期近接武器' : '近接武器'}${p.melee.lv ? `・強化+${p.melee.lv}` : startM ? '（未強化は0🪙）' : ''}（売ると素手になる）`, v: PW.meleeValue(p.melee), act: () => { GM()._keepModal = true; setTimeout(() => confirmMelee(), 0); } }); }
+    if (p.melee && p.melee.id !== (G.BARE_MELEE || 'fists')) { const startM = p.melee.id === G.DEFAULT_MELEE || !!p.melee.kit; out.push({ cat: 'melee', icon: p.melee.def.icon, rc: p.melee.def.rarity, name: p.melee.def.name + (p.melee.lv ? ' +' + p.melee.lv : ''), sub: `${startM ? '初期近接武器' : '近接武器'}${p.melee.lv ? `・強化+${p.melee.lv}` : startM ? '（未強化は0🪙）' : ''}（売ると素手になる）`, v: PW.meleeValue(p.melee), act: () => { GM()._keepModal = true; setTimeout(() => confirmMelee(), 0); } }); }
     for (const w of guns) for (const sl in w.atts) { const id = w.atts[sl], a = G.ATT_BY_ID[id]; if (a) out.push({ cat: 'att', icon: a.icon, rc: a.rarity, name: a.name, sub: `${w.def.name}に装着中`, v: PW.attValue(id), act: () => { GM()._keepModal = true; setTimeout(() => confirmAtt(id, w), 0); } }); }
-    p.skills.forEach((sk, i) => { if (!sk) return; const def = sk.id === G.DEFAULT_ULT; out.push({ cat: 'skill', icon: sk.def.icon, rc: sk.def.rarity, name: `[${G.input.skillKey(i)}] ${sk.def.name}${G.abilities.lvText(sk) ? ' ' + G.abilities.lvText(sk) : ''}`, sub: def ? '初期装備のアルティメットは売れません' : sk.def.ult ? 'アルティメット' : 'スキル', v: def ? 0 : PW.skillValue(sk), no: def, act: () => { GM()._keepModal = true; setTimeout(() => confirmSkill(i), 0); } }); });
+    p.skills.forEach((sk, i) => { if (!sk) return; const def = !!(sk.kit && sk.def.ult); out.push({ cat: 'skill', icon: sk.def.icon, rc: sk.def.rarity, name: `[${G.input.skillKey(i)}] ${sk.def.name}${G.abilities.lvText(sk) ? ' ' + G.abilities.lvText(sk) : ''}`, sub: def ? '初期装備のアルティメットは売れません' : sk.def.ult ? 'アルティメット' : sk.kit ? `初期装備のスキル${sk.lv ? '' : '（未強化は0🪙）'}` : 'スキル', v: def ? 0 : PW.skillValue(sk), no: def, act: () => { GM()._keepModal = true; setTimeout(() => confirmSkill(i), 0); } }); });
     // everything in the bag
     for (const it of IV.pcs(p).flatMap((c) => c.items).sort((a, b) => (a.type || '').localeCompare(b.type || '') || (a.id || '').localeCompare(b.id || ''))) {
       const d = IV.def(it); if (!d) continue;

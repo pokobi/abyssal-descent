@@ -312,10 +312,20 @@
     if (!el || !el.isConnected) { const bl = document.getElementById('hud-bl'); if (!bl) return; el = UI._clsEl = document.createElement('div'); el.id = 'cls-ind'; bl.prepend(el); }
     let txt = '';
     if (P.cls === 'assault') { const n = CL.mom(); if (n) txt = `💨 勢い ×${n}`; }
-    else if (P.cls === 'blade') { const n = CL.blade(); if (n) txt = `⚔️ 連斬 ${n} / ${CL.bladeMax()}`; }
     else if (P.cls === 'heavy' && CL.ironOn()) txt = '🛡️ 鉄壁';
     sText(el, txt); el.classList.toggle('on', !!txt);
     const hw = document.getElementById('hp-wrap'); if (hw) hw.classList.toggle('iron', P.cls === 'heavy' && CL.ironOn());
+    // 連斬 (剣士): the stacks as segments (5 / 6 / 7) and the time left as one long bar, under the crosshair like the sniper's gauge
+    let bb = UI._bladeEl;
+    if (P.cls === 'blade') {
+      if (!bb || !bb.isConnected) { const hud = document.getElementById('hud'); if (!hud) return; bb = UI._bladeEl = document.createElement('div'); bb.id = 'blade-bar'; bb.innerHTML = '<div class="bb-seg"></div><div class="bb-time"><i></i></div>'; hud.appendChild(bb); bb._max = 0; }
+      const n = CL.blade(), mx = CL.bladeMax(), seg = bb.firstChild;
+      if (bb._max !== mx) { bb._max = mx; seg.innerHTML = '<i></i>'.repeat(mx); bb._n = -1; }
+      if (bb._n !== n) { bb._n = n; [...seg.children].forEach((x, i) => x.classList.toggle('on', i < n)); bb.classList.toggle('full', n >= mx); }
+      const left = n ? Math.max(0, CL.state().bladeT - G.game.time) / 7.5 : 0;
+      sStyle(bb.lastChild.firstChild, 'width', (left * 100).toFixed(1) + '%');
+      bb.classList.toggle('on', n > 0);
+    } else if (bb) bb.classList.remove('on');
     let fb = UI._focusEl;
     if (P.cls === 'sniper') {
       // (its own element on the HUD, not in the crosshair: the crosshair is hidden while aiming down a scope)

@@ -27,17 +27,17 @@
   // ---------------- the class's own effect (固有効果): Lv1 -> Lv3 as the guardians fall ----------------
   // rows: [what, Lv1, Lv2, Lv3]; notes: the rest of the rule in words
   const PAS = {
-    soldier: { name: '目利き', icon: '🃏', rows: [['加護の選択肢', '+1枚', '+1枚', '+1枚'], ['加護の無料リロール', '+1回', '+1回', '+1回']],
+    soldier: { name: '目利き', icon: '🃏', short: '加護の選択肢が1枚多く、無料リロールも1回多い', rows: [['加護の選択肢', '+1枚', '+1枚', '+1枚'], ['加護の無料リロール', '+1回', '+1回', '+1回']],
       notes: ['加護「選択肢」「運命の再配」とは別に数える。'] },
-    assault: { name: '突貫', icon: '💨', rows: [['近い敵への与ダメ（0mで最大、12mで0）', '+30%', '+40%', '+50%'], ['勢い1つにつき 移動速度・連射速度', '+6%', '+8%', '+10%']],
+    assault: { name: '突貫', icon: '💨', short: '近い敵ほど大ダメージ。近くで倒すと速くなる', rows: [['近い敵への与ダメ（0mで最大、12mで0）', '+30%', '+40%', '+50%'], ['勢い1つにつき 移動速度・連射速度', '+6%', '+8%', '+10%']],
       notes: ['8m以内の敵を倒すと「勢い」が1つ（4秒、最大3つ）。勢い1つにつき被ダメ-4%。'] },
-    sniper: { name: '一点集中', icon: '🎯', rows: [['満タンの1発のダメージ（1体貫通）', '+25%', '+40%', '+55%'], ['ヘッドショットで倒したとき', 'ゲージ半分', 'ゲージ半分・弾1', 'ゲージ半分・弾1']],
+    sniper: { name: '一点集中', icon: '🎯', short: '覗き込んでためた1発が強く、敵を貫く', rows: [['満タンの1発のダメージ（1体貫通）', '+25%', '+40%', '+55%'], ['ヘッドショットで倒したとき', 'ゲージ半分', 'ゲージ半分・弾1', 'ゲージ半分・弾1']],
       notes: ['覗き込んでいる間、ゲージがたまる（1.5秒で満タン）。撃つと0、覗き込みをやめると1秒で半分減る。'] },
-    blade: { name: '連斬', icon: '⚔️', rows: [['近接を当てるとたまる層の上限', '5層', '6層', '7層']],
+    blade: { name: '連斬', icon: '⚔️', short: '近接を当て続けるほど、攻撃も移動も速くなる', rows: [['近接を当てるとたまる層の上限', '5層', '6層', '7層']],
       notes: ['1層につき近接の攻撃速度+5%・移動速度+3%（銃には効かない）。', '7.5秒続き、当てるたびに7.5秒に戻る。切れると全部なくなる。'] },
-    heavy: { name: '鉄壁', icon: '🛡️', rows: [['ダメージを受けた後3秒間の被ダメ', '-30%', '-40%', '-50%'], ['いつでも被ダメ', '-10%', '-10%', '-10%']],
+    heavy: { name: '鉄壁', icon: '🛡️', short: '攻撃を受けると、しばらく硬くなる', rows: [['ダメージを受けた後3秒間の被ダメ', '-30%', '-40%', '-50%'], ['いつでも被ダメ', '-10%', '-10%', '-10%']],
       notes: ['3秒の間にまた受けると、そこからさらに3秒。効いている間は吹き飛ばされない。'] },
-    mage: { name: '反応強化', icon: '🔮', rows: [['反応のダメージ（凍結の時間なども）', '+20%', '+30%', '+40%'], ['沸騰・熱融の倍率', '+0.1', '+0.15', '+0.2']],
+    mage: { name: '反応強化', icon: '🔮', short: '属性反応のダメージが大きい', rows: [['反応のダメージ（凍結の時間なども）', '+20%', '+30%', '+40%'], ['沸騰・熱融の倍率', '+0.1', '+0.15', '+0.2']],
       notes: ['属性熟練・反応の加護とは別の枠で掛かる。武器の属性付与の間隔は1.5秒。'] },
   };
   for (const c of CL.LIST) c.pas = PAS[c.id];
@@ -189,6 +189,7 @@
     const st = CL.stats(c);
     const skRow = (tag, id, ult) => { let card = ''; try { card = G.StatusUI.previewSkill(id, st); } catch (e) { const d = sk(id); card = `<div class="sc"><div class="sc-d">${esc(d.desc)}</div></div>`; } return `<div class="cls-skill${ult ? ' ult' : ''}"><span class="cls-tag">${tag}</span>${card}</div>`; };
     return `<div class="cls-head"><span class="cls-big">${c.icon}</span><div><div class="cls-title">${c.name}</div><div class="cls-sub">${esc(c.role)}</div></div></div>
+      ${c.pas ? `<div class="cls-merit"><span class="cls-merit-ic">${c.pas.icon}</span><div><small>固有効果「${esc(c.pas.name)}」</small><b>${esc(c.pas.short)}</b></div></div>` : ''}
       <div class="cls-cols">
         <div class="cls-col">
           <div class="cls-sec">装備</div>

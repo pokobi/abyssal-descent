@@ -18,6 +18,7 @@
     ['boss', '👑 ボス', () => G.BOSSES.filter((b) => !(G.RETIRED_BOSSES || []).includes(b.id) && !extraHidden('boss', b))],
     ['stage', '🗺️ フィールド', () => stages()],
     ['depth', '🌀 深淵', () => G.Depth.CODEX],
+    ['rx', '🌈 属性反応', () => G.Elem.CODEX],
   ];
   let tab = 'buff', sel = null, query = '', backFn = null;
   // The hidden top difficulty (エクストラ) does not exist for a player who has not cleared Hard: what only belongs to it (the abyssal variants of the
@@ -39,7 +40,7 @@
     disc: ['未発見を先に', '未発見のものを上に集める'],
     def: ['標準の並び', ''],
   };
-  const TAB_SORTS = { enemy: ['kind', 'area', 'name', 'disc', 'def'], boss: ['def', 'name', 'disc'], stage: [], depth: [] };
+  const TAB_SORTS = { enemy: ['kind', 'area', 'name', 'disc', 'def'], boss: ['def', 'name', 'disc'], stage: [], depth: [], rx: [] };
   const sortsOf = (t) => TAB_SORTS[t] || ['rarity', 'rarityHi', 'cat', 'name', 'disc', 'def'];
   const sortMode = () => { const m = G.save.data.settings.cxSort, ok = sortsOf(tab); return ok.includes(m) ? m : ok[0]; };
   const tierOf = (o) => (G.RARITY[o.rarity] ? G.RARITY[o.rarity].tier : -1);
@@ -177,7 +178,7 @@
       html += bar('📏', 'リーチ', o.range, 4.5, o.range + 'm');
       html += bar('🔨', '重撃倍率', o.heavy[0], 3.5, '×' + o.heavy[0]);
       html += bar('👟', '移動速度', o.moveMul - 1, 0.2, '+' + Math.round((o.moveMul - 1) * 100) + '%');
-      html += `<div style="margin-top:8px"><span class="tag">🔑 ${G.K('w3')} で持ち替え / 左:連撃 / 右:重撃</span>${o.traitDesc ? `<span class="tag">✦ ${o.traitDesc}</span>` : ''}${o.elem ? `<span class="tag">${{ burn: '🔥 炎上', frost: '❄️ 冷気', poison: '☠️ 毒', shock: '⚡ 電撃', bleed: '🩸 出血' }[o.elem]} ${Math.round(o.elemChance * 100)}%</span>` : ''}${o.critChance ? `<span class="tag">💢 会心+${Math.round(o.critChance * 100)}%</span>` : ''}${o.lifesteal ? `<span class="tag">🩸 吸血${Math.round(o.lifesteal * 100)}%</span>` : ''}<span class="tag">🪙 ${o.price ? U.fmt(o.price) : '初期装備'}</span></div>`;
+      html += `<div style="margin-top:8px"><span class="tag">🔑 ${G.K('w3')} で持ち替え / 左:連撃 / 右:重撃</span>${o.traitDesc ? `<span class="tag">✦ ${o.traitDesc}</span>` : ''}${o.elem ? `<span class="tag">${{ burn: '🔥 炎上', frost: '❄️ 冷気', poison: '☠️ 毒', shock: '⚡ 電撃' }[o.elem]} ${Math.round(o.elemChance * 100)}%</span>` : ''}${o.critChance ? `<span class="tag">💢 会心+${Math.round(o.critChance * 100)}%</span>` : ''}${o.lifesteal ? `<span class="tag">🩸 吸血${Math.round(o.lifesteal * 100)}%</span>` : ''}<span class="tag">🪙 ${o.price ? U.fmt(o.price) : '初期装備'}</span></div>`;
     } else if (tab === 'enemy') {
       const lv = Math.max(1, o.minArea);
       html += bar('❤️', '体力 (Lv.1)', o.hp, 900);
@@ -239,7 +240,7 @@
     if (tab === 'boss') return 'ボス';
     if (tab === 'armor') return '防具（' + G.ARMOR_SLOT_BY_ID[o.slot].name + '・' + G.ARMOR_MAT_BY_ID[o.mat].name + '）';
     if (tab === 'valuable') return '金品';
-    if (tab === 'depth') return o.cat;
+    if (tab === 'depth' || tab === 'rx') return o.cat;
     if (tab === 'stage') return o.where.length ? o.where[0] + (o.where.length > 1 ? ' ほか' : '') : '';
     return '';
   }

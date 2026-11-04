@@ -56,11 +56,12 @@
     handB: { desc: '近接攻撃の間隔-20%', mods: { meleeCd: 0.2 } },
     handC: { desc: 'リロード速度+12%', mods: { reloadSpeed: 0.12 } },
     handD: { desc: '反動-15%', mods: { recoil: -0.15 } },
+    toughF: { desc: '全属性耐性+10%', mods: { elRes_fire: 0.1, elRes_water: 0.1, elRes_ice: 0.1, elRes_volt: 0.1, elRes_wind: 0.1, elRes_earth: 0.1 } },
   };
   const FX_FOR = {
     head: { epic: 'toughA', legendary: ['toughA', 'toughC'] },
     chest: { epic: 'toughD', legendary: ['toughD', 'toughB'] },
-    legs: { epic: 'moveB', legendary: ['toughE', 'moveA'] },
+    legs: { epic: 'toughF', legendary: ['toughE', 'moveA'] },
     hands: { epic: 'handC', legendary: ['handA', 'handB'] },
     feet: { epic: 'moveC', legendary: ['moveA', 'moveD'] },
   };
@@ -99,6 +100,9 @@
     { id: 'grapple', name: 'グラップルCT短縮', min: 1, max: 10, stat: 'grappleCd' },
     { id: 'coin', name: 'コイン獲得', min: 1, max: 10, stat: 'coinMul' },
     { id: 'vamp', name: '吸血', min: 0.5, max: 3, stat: 'lifesteal' },
+    // elements (element.js): 属性熟練 is a plain number, 属性耐性 is drawn for one element
+    { id: 'elm', name: '属性熟練', min: 4, max: 30, stat: 'elMastery', flat: true },
+    { id: 'elres', name: '属性耐性', min: 2, max: 15, stat: 'elRes_', perEl: true },
   ];
   G.ENCHANT_BY_ID = Object.fromEntries(G.ENCHANTS.map((e) => [e.id, e]));
   G.ENCHANT_BY_ID.op = G.ENCHANT_BY_ID.reload; // saves from before 操作速度 became リロード速度 still carry id 'op'
@@ -117,11 +121,14 @@
     for (let i = 0; i < n && pool.length; i++) {
       const e = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
       const steps = Math.round((e.max - e.min) * 10); // every 0.1 step from min to max is equally likely
-      out.push({ id: e.id, v: Math.round((e.min + Math.floor(rnd() * (steps + 1)) / 10) * 10) / 10 });
+      const o = { id: e.id, v: Math.round((e.min + Math.floor(rnd() * (steps + 1)) / 10) * 10) / 10 };
+      if (e.flat) o.v = Math.round(o.v);
+      if (e.perEl) o.el = ['fire', 'water', 'ice', 'volt', 'wind', 'earth'][Math.floor(rnd() * 6)];
+      out.push(o);
     }
     return out;
   };
-  G.enchantText = (e) => `${G.ENCHANT_BY_ID[e.id].name}+${e.v}%`;
+  G.enchantText = (e) => { const E = G.ENCHANT_BY_ID[e.id]; if (E.perEl) { const L = G.Elem && G.Elem.BY[e.el]; return `${L ? L.icon + L.name : ''}耐性+${e.v}%`; } return E.flat ? `${E.name}+${e.v}` : `${E.name}+${e.v}%`; };
 
   // ---------------- valuables (no effect: worth coins at a merchant) ----------------
   // [id, name, icon, rarity, value, w, h, desc]

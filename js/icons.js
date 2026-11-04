@@ -637,7 +637,7 @@
     a_silver: P.round('#eef2f6', '#c8d0d8'),
     a_slug: [L(R(176, 64, 160, 318, 18), '#c83a30'), L(R(170, 362, 172, 102, 12), C.brass), L(R(176, 64, 160, 26, 10), '#e05a48'), L(R(166, 450, 180, 22, 6), '#a07a30')],
     a_pierce: [...P.round('#c8d0d8'), badge('arrowhead', '#c9d2dc')],
-    a_bleed: [...P.round('#c02030'), L(PG(222, 116, 206, 134, 222, 150), '#c02030'), L(PG(290, 116, 306, 134, 290, 150), '#c02030'), badge('drop', C.blood)],
+    a_bleed: [...P.round('#8a8f98'), L(PG(222, 116, 206, 134, 222, 150), '#8a8f98'), L(PG(290, 116, 306, 134, 290, 150), '#8a8f98'), badge('gears', '#c8ccd2')], // 破砕弾 (it was 鋸歯弾, the bleeding round)
     a_vamp: [...P.round('#8a1a2a'), badge('bat', '#c060a0')],
     a_tracer: [L(PG(150, 470, 200, 470, 236, 300, 216, 300), '#ff7a30', { o: 0.75 }), ...P.round('#ff5030').map((l) => Object.assign({}, l, { s: 0.86, x: 60, y: 10 }))],
     a_hunter: [...P.round('#a07a50'), badge('bullseye', C.red)],

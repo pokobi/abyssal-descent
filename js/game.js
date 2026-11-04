@@ -464,6 +464,7 @@
     GM.run = { coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 };
     GM.run.diff = Object.assign({}, G.Run.cur); GM.won = false;
     G.save.data.records.runs++; G.save.write();
+    P.cls = G.Classes ? G.Classes.last() : 'soldier'; GM.run.cls = P.cls;
     P.resetRun();
     G.abilities.clearUltAuras && G.abilities.clearUltAuras();
     G.weapons.dirty = true;
@@ -513,9 +514,9 @@
   GM.slotsUsed = () => { let n = 0; for (let i = 1; i <= GM.SLOTS; i++) if (GM.loadRun(i)) n++; return n; };
   GM.playerSnap = function () {
     return {
-      hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
+      cls: P.cls, hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
       buffs: [...P.buffs], buffState: P.buffState,
-      weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, mag: w.mag, kills: w.kills || 0 })), wIdx: P.wIdx,
+      weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, mag: w.mag, kills: w.kills || 0, el: w.el || undefined })), wIdx: P.wIdx,
       wOrder: G.weapons.order().map((t) => (t === 'm' ? 'm' : t ? P.weapons.indexOf(t) : null)),
       melee: { id: P.melee.id, lv: P.melee.lv || 0 },
       skills: P.skills.map((s) => (s ? s.id : null)), skillLv: P.skills.map((s) => (s ? s.lv || 0 : 0)), pileTome: P.pileTome || 0,
@@ -557,13 +558,16 @@
     } else G.ui.toast(`💾 エリア ${d.area} の入口から再開`, 'good');
   };
   GM.applyPlayerSnap = function (d) {
+    P.cls = d.cls || (GM.run && GM.run.cls) || 'soldier';
     P.resetRun();
     P.buffs = new Map((d.buffs || []).filter(([id]) => G.BUFF_BY_ID[id]));
+    // 鋸刃 (the bleeding boon) was removed with bleeding: a run saved with it is paid back in coins
+    { const gone = (d.buffs || []).reduce((n, [id, c]) => n + (id === 'h_bleed' ? c || 1 : 0), 0); if (gone && GM.run) { GM.run.coins += gone * 150; setTimeout(() => G.ui.toast(`🪙 廃止された加護「鋸刃」を ${gone * 150} コインで返却しました`, 'good'), 1500); } }
     P.buffState = d.buffState || {};
     P.permMaxHp = d.permMaxHp || 0;
     P.recalc();
     P.phoenixUsed = !!d.phoenixUsed;
-    P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; w.ver++; w.mag = x.mag ?? w.mag; return w; });
+    P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; w.ver++; w.mag = x.mag ?? w.mag; return w; });
     if (!P.weapons.length && !Array.isArray(d.weapons)) P.weapons = [G.weapons.make('starter')]; // (a run saved with every gun put away keeps none)
     P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));
@@ -824,7 +828,8 @@
     const B = biomeKey || G.world.biome;
     const fav = { grave: ['skeleton', 'hound', 'bat', 'wraith', 'gargoyle'], gate: ['skeleton', 'imp', 'spider', 'shaman', 'gargoyle'], halls: ['golem', 'mantis', 'brute', 'shaman', 'spider'], ruin: ['wraith', 'golem', 'worm', 'mantis', 'brute'], abyss: ['wraith', 'shaman', 'golem', 'mantis'], catacombs: ['skeleton', 'bat', 'wraith'], flooded: ['slime', 'worm', 'spider'], forge: ['imp', 'golem', 'brute'], frozen: ['wraith', 'gargoyle', 'golem'], temple: ['spider', 'mantis', 'mushroom'], ruins: ['brute', 'mantis', 'skeleton', 'worm'], sky: ['gargoyle', 'bat', 'wraith', 'golem'], void: ['wraith', 'gargoyle', 'imp', 'slime'], bloodmoon: ['skeleton', 'bat', 'brute', 'wraith'] }[B] || [];
     const k = Math.floor((Math.max(1, G.Run.depthArea(n)) - 1) / 5); // which foes have appeared by this depth
-    return G.ENEMIES.filter((e) => !e.special && (e.unlockK ?? 0) <= k).map((e) => [e, (e.variant === 'normal' ? 3 : e.variant === 'abyss' ? 0.5 : 1.4) * (fav.includes(e.plan) ? 2 : 1) * ((e.unlockK ?? 0) === k && k > 0 ? 1.5 : 1)]);
+    const dn = Math.max(1, G.Run.depthArea(n));
+    return G.ENEMIES.filter((e) => !e.special && (e.unlockK ?? 0) <= k && !(e.fromArea > dn)).map((e) => [e, (e.variant === 'normal' ? 3 : e.variant === 'abyss' ? 0.5 : 1.4) * (fav.includes(e.plan) ? 2 : 1) * ((e.unlockK ?? 0) === k && k > 0 ? 1.5 : 1)]);
   }
   GM.enemyPool = function (n, biomeKey) { return enemyPool(n, biomeKey);
   }
@@ -1134,6 +1139,7 @@
     if (!(bossKill && G.Run.isLast(GM.area))) G.Areas.openGates(); // the last guardian ends the run: no road onward
     if (stage !== 'boss') setTimeout(() => G.Areas.spawnMiniShop(), 600);
     if (G.save.data.records.bestArea < n) G.save.data.records.bestArea = n;
+    { const R = G.save.data.records, k = P.cls || 'soldier'; R.byClass = R.byClass || {}; const c = R.byClass[k] || (R.byClass[k] = { bestArea: 0, clears: {} }); if (c.bestArea < n) c.bestArea = n; } // the best per class too
     G.save.write();
     const reward = opts.reward || (bossKill || stage === 'elite' ? 'boost' : stage === 'cursed' ? 'double' : stage === 'vault' ? 'none' : 'buff');
     if (reward === 'none') { setTimeout(() => GM.healNotice(), 2600); return; }
@@ -1394,7 +1400,7 @@
     const rar = rollRarity(r, luck);
     let c = arr.filter((o) => o.rarity === rar);
     if (!c.length) c = arr;
-    return G.thinFairy(() => r.pick(c));
+    return G.thinFairy(() => (G.Classes ? G.Classes.pick(r, c) : r.pick(c))); // (a class's favourites turn up x1.3)
   }
   // the armour shelf is where gear is bought: mostly epic / legendary (a little less of the legendary in the first few areas)
   function pickArmor(r, luck) {

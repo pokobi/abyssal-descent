@@ -27,7 +27,7 @@
     m(J.chest, PG.box, cloth, 0.42, 0.65, 0.03, 0, 0.25, -0.15, 0.12); // cloak
     J.head = j(J.chest, 0, 0.58, 0);
     m(J.head, PG.sph, leather, 0.12, 0.14, 0.13, 0, 0.12, 0);
-    m(J.head, PG.cone, cloth, 0.17, 0.32, 0.17, 0, 0.16, -0.02);      // hood
+    J.hood = m(J.head, PG.cone, cloth, 0.17, 0.32, 0.17, 0, 0.16, -0.02);      // hood
     m(J.head, PG.box, dark, 0.16, 0.05, 0.02, 0, 0.12, 0.12);         // face shadow
     J.arms = [];
     for (const s of [-1, 1]) {
@@ -61,12 +61,93 @@
     scene.add(root);
     AV.root = root;
   };
+  // ---- the class's clothes over the common figure (also used for the bodies of team-mates in co-op)
+  const DM = {};
+  const dmat = (k, col, o) => DM[k] || (DM[k] = new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.85 }, o || {})));
+  AV.dress = function (J, cls) {
+    for (const o of J.dressed || []) if (o.parent) o.parent.remove(o);
+    J.dressed = []; J.orbs = null; J.dressCls = cls;
+    if (J.hood) J.hood.visible = true;
+    J.chest.scale.setScalar(1);
+    const PG = G.Props.PG, C = G.Classes && G.Classes.BY[cls]; if (!C) return;
+    const add = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; o.frustumCulled = false; parent.add(o); J.dressed.push(o); return o; };
+    const steel = dmat('steel', 0x9aa0a8, { roughness: 0.35, metalness: 0.8 }), dark = dmat('dark', 0x1c1a18, { roughness: 0.7 });
+    const H = J.head, Ch = J.chest, B = J.body;
+    switch (cls) {
+      case 'soldier': {
+        const ol = dmat('olive', 0x5a6a3a), ol2 = dmat('olive2', 0x434f2c);
+        J.hood.visible = false;
+        add(H, PG.sph, ol, 0.155, 0.11, 0.16, 0, 0.19, 0); add(H, PG.box, ol2, 0.3, 0.02, 0.32, 0, 0.15, 0.01);
+        add(Ch, PG.box, ol, 0.44, 0.34, 0.28, 0, 0.3, 0);
+        for (const x of [-0.12, 0, 0.12]) add(Ch, PG.box, ol2, 0.09, 0.08, 0.05, x, 0.2, 0.15);
+        for (const L of J.legs) add(L.hip, PG.cyl8, ol2, 0.075, 0.3, 0.075, 0, -0.2, 0);
+        break;
+      }
+      case 'assault': {
+        const red = dmat('red', 0xb02a24), redD = dmat('redD', 0x5a1a14), lens = dmat('lens', 0xffc040, { emissive: 0x6a4000, roughness: 0.2 });
+        J.hood.visible = false;
+        add(H, PG.cyl8, red, 0.135, 0.05, 0.135, 0, 0.2, 0);
+        add(H, PG.box, red, 0.03, 0.14, 0.05, 0.03, 0.15, -0.14, 0.5, 0, 0.2); add(H, PG.box, red, 0.03, 0.12, 0.05, -0.03, 0.15, -0.14, 0.6, 0, -0.25);
+        add(H, PG.box, dark, 0.22, 0.05, 0.05, 0, 0.27, 0.1); for (const x of [-0.05, 0.05]) add(H, PG.sph, lens, 0.032, 0.026, 0.02, x, 0.27, 0.13);
+        add(Ch, PG.box, redD, 0.41, 0.26, 0.26, 0, 0.33, 0);
+        break;
+      }
+      case 'sniper': {
+        const gr = dmat('green', 0x3a5a30), grD = dmat('greenD', 0x24381c);
+        J.hood.visible = false;
+        add(H, PG.cone, gr, 0.19, 0.36, 0.19, 0, 0.17, -0.02); add(H, PG.box, grD, 0.17, 0.08, 0.03, 0, 0.06, 0.12);
+        add(Ch, PG.box, gr, 0.52, 0.9, 0.03, 0, 0.05, -0.17, 0.14);
+        for (let i = 0; i < 6; i++) add(Ch, PG.box, i % 2 ? grD : gr, 0.07, 0.22, 0.02, -0.2 + i * 0.08, -0.45, -0.24 - (i % 3) * 0.01, 0.2, 0, (i - 2.5) * 0.08);
+        for (const s of [-1, 1]) add(Ch, PG.box, grD, 0.16, 0.12, 0.27, s * 0.22, 0.5, 0);
+        break;
+      }
+      case 'blade': {
+        const hao = dmat('haori', 0x5a3a8a), hak = dmat('hakama', 0x3a3a56), wh = dmat('white', 0xe8e4dc);
+        J.hood.visible = false;
+        add(H, PG.cyl8, wh, 0.132, 0.03, 0.132, 0, 0.21, 0); add(H, PG.box, wh, 0.02, 0.12, 0.04, 0, 0.17, -0.14, 0.5);
+        add(Ch, PG.box, hao, 0.46, 0.6, 0.27, 0, 0.22, 0);
+        for (const A of J.arms) add(A.sh, PG.box, hao, 0.13, 0.26, 0.14, 0, -0.14, 0);
+        add(B, PG.cone, hak, 0.22, 0.5, 0.18, 0, -0.3, 0, Math.PI);
+        add(Ch, PG.cyl8, dark, 0.03, 0.85, 0.03, 0.05, 0.3, -0.17, 0, 0, 0.6); add(Ch, PG.cyl8, wh, 0.035, 0.05, 0.035, 0.27, 0.62, -0.17, 0, 0, 0.6);
+        break;
+      }
+      case 'heavy': {
+        const gold = dmat('gold', 0xc8a050, { roughness: 0.3, metalness: 0.9 });
+        J.hood.visible = false;
+        add(H, PG.box, steel, 0.26, 0.3, 0.27, 0, 0.13, 0); add(H, PG.box, dark, 0.2, 0.025, 0.02, 0, 0.15, 0.14); add(H, PG.box, gold, 0.03, 0.08, 0.22, 0, 0.31, 0);
+        for (const s of [-1, 1]) { add(Ch, PG.sph, steel, 0.2, 0.14, 0.2, s * 0.3, 0.52, 0); add(Ch, PG.box, gold, 0.22, 0.02, 0.22, s * 0.3, 0.46, 0); }
+        add(Ch, PG.box, steel, 0.46, 0.38, 0.3, 0, 0.34, 0); add(Ch, PG.box, gold, 0.06, 0.3, 0.02, 0, 0.36, 0.16);
+        for (const L of J.legs) add(L.kn, PG.box, steel, 0.13, 0.3, 0.13, 0, -0.2, 0.01);
+        J.chest.scale.setScalar(1.1);
+        break;
+      }
+      case 'mage': {
+        const robe = dmat('robe', 0x26368a), gold = dmat('sash', 0xc8a050, { roughness: 0.4, metalness: 0.6 });
+        J.hood.visible = false;
+        add(H, PG.cone, robe, 0.19, 0.38, 0.19, 0, 0.17, -0.02);
+        add(Ch, PG.box, robe, 0.42, 0.5, 0.26, 0, 0.27, 0); add(Ch, PG.box, gold, 0.43, 0.05, 0.27, 0, 0.08, 0);
+        add(B, PG.cone, robe, 0.3, 0.85, 0.26, 0, -0.42, 0, Math.PI);
+        const g = new THREE.Group(); g.position.set(0, 0.55, 0); B.add(g); J.dressed.push(g); J.orbs = g;
+        for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2; const o = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: 0x7a9aff })); o.scale.setScalar(0.05); o.position.set(Math.cos(a) * 0.5, Math.sin(a * 2) * 0.1, Math.sin(a) * 0.5); o.frustumCulled = false; g.add(o); }
+        break;
+      }
+    }
+  };
+  // the mage's orbs turn and take the colour of the element in hand
+  AV.orbTick = function (J, dt, el) {
+    if (!J.orbs) return;
+    J.orbs.rotation.y += dt * 2.2;
+    const c = el && G.Elem && G.Elem.BY[el] ? G.Elem.BY[el].hex : 0x7a9aff;
+    for (const o of J.orbs.children) o.material.color.setHex(c);
+  };
   AV.reattach = function (scene) { if (root && root.parent !== scene) scene.add(root); };
 
   const rot = (o, x, y, z, k) => { o.rotation.x = U.lerp(o.rotation.x, x, k); o.rotation.y = U.lerp(o.rotation.y, y, k); o.rotation.z = U.lerp(o.rotation.z, z, k); };
   AV.handWorld = function () { root.updateMatrixWorld(true); return J.arms[0].hand.getWorldPosition(V()); };
 
   AV.update = function (dt, P) {
+    if (J.chest && J.dressCls !== P.cls) AV.dress(J, P.cls);
+    if (J.orbs) AV.orbTick(J, dt, G.Elem && G.Elem.wEl(P.meleeMode ? P.melee : P.weapon));
     if (!root) return;
     // while easing back to first person, hide the body before the camera can pass through it
     root.visible = !P.dead && (AV.returning ? AV.tpK > 0.55 : AV.tpK > 0.03);

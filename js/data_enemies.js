@@ -22,10 +22,11 @@
   const VARIANTS = [
     { key: 'normal', prefix: '', icon: '', minAdd: 0, hp: 1, dmg: 1, spd: 1, size: 1, desc: '', color: null },
     { key: 'elder', prefix: '古き', icon: '🦴', minAdd: 5, hp: 1.9, dmg: 1.3, spd: 0.92, size: 1.28, desc: '長い年月を生きた大型個体。角と装甲を持つ。', orn: 'horns', shield: 0.15 },
-    { key: 'fire', prefix: '炎獄の', icon: '🔥', minAdd: 2, hp: 1.1, dmg: 1.15, spd: 1.05, size: 1, elem: 'fire', desc: '攻撃が炎上を付与する。体が燻り続けている。', orn: 'ember', color: '#5a2a1a', eye: '#ffb050' },
-    { key: 'frost', prefix: '氷結の', icon: '❄️', minAdd: 3, hp: 1.2, dmg: 1.05, spd: 0.95, size: 1.05, elem: 'frost', desc: '攻撃が冷気を付与し、動きを鈍らせる。', orn: 'ice', color: '#8aa8c0', eye: '#d0f0ff' },
+    { key: 'fire', prefix: '炎獄の', icon: '🔥', minAdd: 2, hp: 1.1, dmg: 1.15, spd: 1.05, size: 1, elem: 'fire', el: 'fire', desc: '攻撃が炎上を付与する。体が燻り続けている。', orn: 'ember', color: '#5a2a1a', eye: '#ffb050' },
+    { key: 'frost', prefix: '氷結の', icon: '❄️', minAdd: 3, hp: 1.2, dmg: 1.05, spd: 0.95, size: 1.05, elem: 'frost', el: 'ice', desc: '攻撃が冷気を付与し、動きを鈍らせる。', orn: 'ice', color: '#8aa8c0', eye: '#d0f0ff' },
     { key: 'venom', prefix: '猛毒の', icon: '☠️', minAdd: 3, hp: 1.1, dmg: 1.1, spd: 1.05, size: 1, elem: 'poison', desc: '攻撃が毒を付与する。毒は重なるほど危険。', orn: 'spikes', color: '#4a5a2a', eye: '#b0f060' },
-    { key: 'storm', prefix: '雷鳴の', icon: '⚡', minAdd: 4, hp: 1.05, dmg: 1.1, spd: 1.22, size: 0.95, elem: 'shock', desc: '素早く、攻撃が電撃を伴う。', orn: 'sparks', color: '#4a4a5a', eye: '#ffe880' },
+    { key: 'storm', prefix: '雷鳴の', icon: '⚡', minAdd: 4, hp: 1.05, dmg: 1.1, spd: 1.22, size: 0.95, elem: 'shock', el: 'volt', desc: '素早く、攻撃が電撃を伴う。', orn: 'sparks', color: '#4a4a5a', eye: '#ffe880' },
+    { key: 'tide', prefix: '水禍の', icon: '💧', minAdd: 3, hp: 1.15, dmg: 1.1, spd: 1.0, size: 1, el: 'water', desc: '攻撃が水属性を伴う。体から絶えず水が滴っている。', orn: 'wisps', color: '#2a4a6a', eye: '#80c8ff' },
     { key: 'shadow', prefix: '影の', icon: '🌑', minAdd: 6, hp: 1.15, dmg: 1.2, spd: 1.15, size: 1, desc: '照準を感知して回避し、短距離を瞬間移動する。', orn: 'wisps', color: '#1a1820', eye: '#c060ff', dodge: true },
     { key: 'bone', prefix: '屍骨の', icon: '☠', minAdd: 7, hp: 1.3, dmg: 1.15, spd: 0.95, size: 1.05, desc: '一度倒しても数秒後に蘇る。骨の鎧を纏う。', orn: 'bones', color: '#c8bca0', eye: '#80ffd0', revive: true, undead: true },
     { key: 'crystal', prefix: '晶殻の', icon: '💎', minAdd: 9, hp: 1.3, dmg: 1.2, spd: 0.95, size: 1.1, desc: '結晶の殻が強固なシールドとなる。EMPや電撃で砕け。', orn: 'crystal', color: '#4a5a7a', eye: '#a0e0ff', shield: 0.8 },
@@ -48,6 +49,8 @@
         flyer: !!p.flyer, hover: !!p.hover, h: p.h * v.size,
         big: !!p.big || v.size > 1.25,
         elem: v.elem || (p.key === 'imp' ? 'fire' : null),
+        // elements (element.js): a foe that wields one strikes with it and resists it a little
+        el: v.el || (p.key === 'imp' ? 'fire' : null), elRes: v.el || p.key === 'imp' ? { [v.el || 'fire']: 0.25 } : null,
         shield: Math.max(p.shield || 0, v.shield || 0),
         revive: !!v.revive, dodge: !!v.dodge || p.key === 'mantis', aura: !!v.aura,
         undead: !!p.undead || !!v.undead,
@@ -78,8 +81,19 @@
   // the bestiary unlocks one stage (5 areas) at a time, so a stage keeps the same faces throughout;
   // status-inflicting kinds (fire, webs, poison...) only show up from the 2nd-3rd stage on
   const PLAN_K = { hound: 0, skeleton: 0, slime: 0, bat: 0, imp: 1, spider: 1, brute: 1, eye: 2, beetle: 2, wraith: 2, mushroom: 3, golem: 3, shaman: 4, mantis: 4, worm: 5 };
-  const VAR_K = { normal: 0, elder: 1, fire: 2, frost: 2, venom: 3, storm: 3, shadow: 4, bone: 5, crystal: 6, abyss: 8 };
+  const VAR_K = { normal: 0, elder: 1, fire: 2, frost: 2, tide: 2, venom: 3, storm: 3, shadow: 4, bone: 5, crystal: 6, abyss: 8 };
   for (const e of ENEMIES) if (!e.special) { e.unlockK = Math.max(PLAN_K[e.plan] ?? 0, VAR_K[e.variant] ?? 0); e.minArea = e.unlockK * 5 + 1; }
+  // foes born with an element (element.js): it is always on them and never replaced; every other element sets off a reaction; their own does little (x0.3)
+  const ELN = { fire: '炎', water: '水', ice: '氷', volt: '雷' };
+  const ELC = { fire: ['#c0441a', '#ffd080'], water: ['#2a6ad0', '#c0e8ff'], ice: ['#a8d8f0', '#ffffff'], volt: ['#7a50d0', '#f0e0ff'] };
+  const born = (base, id, name, el, o) => { const b = ENEMIES.find((e) => e.id === base); const d = Object.assign({}, b, { id, variant: 'el_' + el, name, vicon: '', auFix: el, el, elRes: { [el]: 0.7 }, color: ELC[el][0], eye: ELC[el][1] }, o); d.desc = d.desc.split('\n')[0] + `\n【${ELN[el]}】常に${ELN[el]}属性を帯びている。上書きされず、他の属性を当てると必ず反応する。${ELN[el]}属性はほとんど効かない。`; ENEMIES.push(d); return d; };
+  for (const el of ['fire', 'water', 'ice', 'volt']) {
+    born('slime_normal', 'slime_el' + el, ELN[el] + 'のスライム', el, { unlockK: 0, fromArea: 3, rarity: 'uncommon' });
+    born('wraith_normal', 'core_' + el, ELN[el] + 'の元素核', el, { plan: 'wraith', hp: 90, dmg: 10, size: 0.8, h: 2.1 * 0.8, orn: 'crystal', undead: false, blink: false, attack: 'orb', range: 26, cd: 2.4, unlockK: 1, coreBurst: true, rarity: 'uncommon', desc: '宙に浮く結晶の核。まわりを属性が渦巻き、遠くから属性の弾を撃つ。倒すと周囲5mの敵にその属性をばらまく。' });
+  }
+  born('golem_normal', 'golem_lava', '溶岩ゴーレム', 'fire', { hp: Math.round(380 * 1.6), unlockK: 3, rarity: 'rare', big: true });
+  born('golem_normal', 'golem_glacier', '氷河ゴーレム', 'ice', { hp: Math.round(380 * 1.6), unlockK: 3, rarity: 'rare', big: true });
+  for (const e of ENEMIES) if (e.auFix) e.minArea = Math.max(e.fromArea || 1, e.unlockK * 5 + 1);
   G.ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
 
   G.BOSSES = [

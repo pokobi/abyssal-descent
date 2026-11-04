@@ -21,7 +21,7 @@
     ['g_molotov', 'grenade', '火炎瓶', '🍾', 'common', 90, '着弾で割れて火の海を作る。', { dmg: 30, r: 4, impact: true, zone: 'fire', dur: 5 }],
     ['g_mine', 'grenade', '対魔地雷', '⚙️', 'rare', 170, '設置後、敵が近づくと爆発する。', { dmg: 260, r: 4.5, mine: true }],
     ['g_smoke', 'grenade', '煙幕弾', '🌫️', 'common', 70, '煙の中では敵がこちらを見失う。', { dmg: 0, r: 6, fuse: 1.0, zone: 'smoke', dur: 8 }],
-    ['g_nail', 'grenade', '釘爆弾', '📌', 'uncommon', 140, '爆発で釘を撒き散らし、出血を付与。', { dmg: 100, r: 6, fuse: 1.4, elem: 'bleed', stacks: 3 }],
+    ['g_nail', 'grenade', '礫弾', '🪨', 'uncommon', 140, '炸裂して石礫を撒き散らす地属性の爆弾（半径3.75m・110ダメージ）。', { dmg: 110, r: 3.75, fuse: 1.4 }],
     ['g_thermite', 'grenade', 'テルミット', '🔶', 'rare', 200, '小範囲を高熱で溶かす。シールドに大ダメージ。', { dmg: 160, r: 3.2, fuse: 1.3, zone: 'fire', dur: 4, shieldMul: 5 }],
     ['g_shatter', 'grenade', 'シールド粉砕弾', '💠', 'epic', 280, 'シールドに×20の破壊的ダメージ。', { dmg: 60, r: 7, fuse: 1.2, shieldMul: 20, emp: true }],
     ['g_dyna', 'grenade', 'ダイナマイト束', '🧨', 'rare', 230, '長い導火線の後、超大爆発。', { dmg: 420, r: 7.5, fuse: 2.6 }],

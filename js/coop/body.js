@@ -7,7 +7,7 @@
   const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   const rot = (o, x, y, z, k) => { o.rotation.x += (x - o.rotation.x) * k; o.rotation.y += (y - o.rotation.y) * k; o.rotation.z += (z - o.rotation.z) * k; };
 
-  K.buildBody = function (name, col) {
+  K.buildBody = function (name, col, cls) {
     const PG = G.Props.PG, M = G.avatar.mats || [], leather = M[0], plate = M[1], cloth = M[2], dark = M[3];
     const m = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); parent.add(o); return o; };
     const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
@@ -22,7 +22,7 @@
     m(J.chest, PG.box, cloth, 0.42, 0.65, 0.03, 0, 0.25, -0.15, 0.12);
     J.head = j(J.chest, 0, 0.58, 0);
     m(J.head, PG.sph, leather, 0.12, 0.14, 0.13, 0, 0.12, 0);
-    m(J.head, PG.cone, cloth, 0.17, 0.32, 0.17, 0, 0.16, -0.02);
+    J.hood = m(J.head, PG.cone, cloth, 0.17, 0.32, 0.17, 0, 0.16, -0.02);
     m(J.head, PG.box, dark, 0.16, 0.05, 0.02, 0, 0.12, 0.12);
     J.arms = [];
     for (const s of [-1, 1]) {
@@ -59,8 +59,9 @@
     // a small health bar under the name
     const mk = (c, o) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ color: c, transparent: true, opacity: o, depthTest: false })); s.position.y = 1.93; s.renderOrder = 7; root.add(s); return s; };
     const hpBg = mk(0x000000, 0.65), hpFg = mk(0x6fd06f, 1); hpBg.scale.set(0.84, 0.075, 1); hpFg.scale.set(0.8, 0.045, 1);
+    if (cls && G.avatar.dress) G.avatar.dress(J, cls);
     root.traverse((o) => { o.frustumCulled = false; });
-    return { root, J, ph: 0, sw: 0, swT: 9, holdKey: '', hold: null, tag, badge, bc, glow, tbKey: null, hpFg, hpBg };
+    return { root, J, cls, ph: 0, sw: 0, swT: 9, holdKey: '', hold: null, tag, badge, bc, glow, tbKey: null, hpFg, hpBg };
   };
 
   // what is in the hand: the same display model the shop uses, turned so the barrel (or the blade) points where the figure looks
@@ -123,6 +124,7 @@
   }
 
   K.animBody = function (B, rp, dt) {
+    if (B.J.orbs) G.avatar.orbTick(B.J, dt, null); // (a mage's orbs keep turning)
     effects(B, rp, dt);
     const J = B.J, k = Math.min(1, dt * 12), t = G.game.time;
     const sp = Math.hypot(rp.vel.x, rp.vel.z), amp = Math.min(1, sp / 5.5), air = !rp.gnd && Math.abs(rp.vel.y) > 0.5;

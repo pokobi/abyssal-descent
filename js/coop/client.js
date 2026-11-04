@@ -119,7 +119,7 @@
     }
     // The host's statuses are what a foe really has: they are shown from its snapshots (and tick there). A status you put on it yourself shows at once and is
     // sent to the host (C.status / C.stun below); nothing ticks damage here, so one burn is never counted twice.
-    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark', 'brittle', 'elSlow', 'leak'];
+    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark', 'brittle', 'elSlow', 'leak', 'vuln'];
     K.mirrorStatus = function (e, n, dt) {
       const s = e.st, mine = e._ssT > performance.now() - 600;
       SB.forEach((k, i) => {
@@ -127,12 +127,11 @@
         else if (!mine && s[k] > 0) s[k] = 0;
         else if (s[k] > 0) s[k] -= dt;
       });
-      if (n.sx) { s.poisonStacks = n.sx[0]; s.frostStacks = n.sx[1]; s.burnLv = n.sx[2]; s.markMul = n.sx[3] || s.markMul; s.bleedLv = 1; s.shockLv = 1; }
+      if (n.sx) { s.poisonStacks = n.sx[0]; s.frostStacks = n.sx[1]; s.burnLv = n.sx[2]; s.markMul = n.sx[3] || s.markMul; s.shockLv = 1; }
       // the particles of each (the damage that goes with them is the host's)
       const c = e.centerPos(), R = Math.random;
       if (s.burn > 0 && R() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8);
       if (s.poison > 0 && R() < dt * 5) G.fx.norm.spawn(e.pos.x, e.pos.y + e.height * 0.6, e.pos.z, U.rand(-0.3, 0.3), -0.5, U.rand(-0.3, 0.3), 0.8, 0.12, 0.3, 0.4, 0.8, 0.1, 0.7, 0, 0);
-      if (s.bleed > 0 && R() < dt * 6) G.fx.blood(c, null, e.bloodColor, 1);
       if (s.shock > 0 && R() < dt * 8) G.fx.sparks(c, null, 2, 0xfff0a0, 3);
     };
     const U = G.U;
@@ -207,7 +206,7 @@
       return ke.call(C, e, info, ov);
     };
     // a status you put on a foe is worked out here with your build, then handed to the host in full (it ticks the damage there)
-    const SS = ['burn', 'burnPow', 'burnLv', 'burnDps', 'poison', 'poisonPow', 'poisonStacks', 'bleed', 'bleedDps', 'bleedLv', 'frost', 'frostStacks', 'frozen', 'shock', 'shockLv', 'stun', 'slow', 'root', 'fear', 'mark', 'markMul', 'markKillReset', 'brittle', 'brittleK', 'elSlow', 'leak', 'leakK'];
+    const SS = ['burn', 'burnPow', 'burnLv', 'burnDps', 'poison', 'poisonPow', 'poisonStacks', 'frost', 'frostStacks', 'frozen', 'shock', 'shockLv', 'stun', 'slow', 'root', 'fear', 'mark', 'markMul', 'markKillReset', 'brittle', 'brittleK', 'elSlow', 'leak', 'leakK', 'vuln'];
     const ssOut = new Map();
     const sendStatus = (e) => { e._ssT = performance.now(); const o = {}; for (const k of SS) if (e.st[k]) o[k] = e.st[k] === true ? 1 : +(+e.st[k]).toFixed(2); ssOut.set(e._nid, o); };
     C.status = function (e, kind, stacks) { const r = st0.call(C, e, kind, stacks); if (remoteOf(e)) sendStatus(e); return r; };

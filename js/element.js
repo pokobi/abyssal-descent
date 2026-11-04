@@ -8,7 +8,7 @@
   const EL = (G.Elem = {});
   const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   let P = null, C = null;
-  EL.init = function () { P = G.player; C = G.combat; EL.crystals.length = 0; };
+  EL.init = function () { P = G.player; C = G.combat; EL.crystals.length = 0; if (G.save && G.save.mark) for (const c of EL.CODEX) if (c.always) G.save.mark('items', c.id); };
 
   EL.LIST = [
     { id: 'fire', name: '炎', icon: '🔥', col: '#ff6a3a', hex: 0xff6a3a, aura: true },
@@ -19,6 +19,7 @@
     { id: 'earth', name: '地', icon: '🪨', col: '#e0a640', hex: 0xe0a640, aura: false },
   ];
   EL.IDS = EL.LIST.map((x) => x.id);
+  EL.LIST.forEach((x) => { x.desc = { fire: '炎上とよく合う。水が付いた敵に当てると沸騰（×2.0）、氷が付いた敵に当てると熱融（×1.5）。', water: '他の属性の下地。炎で沸騰、氷で凍結、雷で漏電。炎上中の敵に当てると炎上が消える。', ice: '冷気とよく合う。水で凍結、炎が付いた敵に当てると熱融（×2.0）、雷で脆化。', volt: '電撃とよく合う。炎で爆轟、水で漏電、氷で脆化。', wind: '敵に残らない。付いている属性を周囲6mの敵へ広げる（旋風）。', earth: '敵に残らない。付いている属性で結晶を作る（晶壁）。凍結中の敵を砕く（粉砕）。' }[x.id]; });
   EL.BY = Object.fromEntries(EL.LIST.map((x) => [x.id, x]));
   EL.idx = (id) => EL.IDS.indexOf(id) + 1; // 0 = none (wire format)
   EL.of = (i) => EL.IDS[i - 1] || null;
@@ -35,7 +36,14 @@
     crystal: { name: '晶壁', col: '#e0a640', desc: '地と炎・水・氷・雷。結晶が落ち、拾うとシールドとその属性の耐性を得る。' },
   };
 
+  // the codex page (js/codex.js): the elements are always shown, a reaction once you have set it off
+  EL.CODEX = [
+    { id: 'el_about', name: '属性について', icon: '🌈', rarity: 'common', cat: '属性', always: true, desc: '炎・水・氷・雷は当たった敵に8秒間残る（自分にも6秒）。違う属性が当たると反応が起き、どちらも消える。風と地は残らず、付いている属性に作用するだけ。\n銃は同じ敵へ2.5秒に1回、近接は1秒に1回だけ属性を残す。スキル・アルティメット・グレネードは毎回。\n常に属性を帯びた敵は上書きされず、他の属性で必ず反応する（同じ敵では1秒に1回）。\n属性熟練：反応が強くなる。属性耐性：その属性から受けるダメージが減る。' },
+    ...['fire', 'water', 'ice', 'volt', 'wind', 'earth'].map((id) => ({ id: 'el_' + id, always: true, cat: '属性' })),
+    ...Object.entries({ boil: '♨️', thaw: '🌡️', freeze: '🧊', shatter: '💎', blast: '💥', leak: '🔌', brittle: '💔', swirl: '🌀', crystal: '💠' }).map(([id, icon]) => ({ id: 'rx_' + id, icon, rarity: 'rare', cat: '反応' })),
+  ];
   EL.AURA_T = 8;
+  for (const c of EL.CODEX) { const k = c.id.slice(3); if (c.id.startsWith('el_') && EL.BY[k]) Object.assign(c, { name: EL.BY[k].name + '属性', icon: EL.BY[k].icon, rarity: 'common', desc: EL.BY[k].desc }); if (c.id.startsWith('rx_')) Object.assign(c, { name: EL.RX[k].name, desc: EL.RX[k].desc }); }
   EL.SELF_T = 6;
   // how often one source can leave its element on the same foe (s): guns per weapon, melee, boon procs. Skills, ultimates, grenades, the pile driver: every time.
   EL.ICD = { bullet: 2.5, melee: 1.0, buff: 2.5 };
@@ -55,6 +63,7 @@
     if (!w || !w.def) return null;
     if (w.oil && w.oil.t > G.game.time) return w.oil.el;
     if (w.def.el) return w.def.el;
+    if (w.el) return w.el; // (made from parts with an element of its own)
     const a = w.atts && w.atts.core && G.ATT_BY_ID[w.atts.core];
     return (a && a.mods && a.mods.el) || null;
   };
@@ -148,7 +157,8 @@
     if (el === 'water' && e.st && e.st.burn > 0) { e.st.burn = 0; e.st.burnLv = 0; }
     if (out.rx === 'shatter') return out;
     const cur = EL.auraOf(e);
-    const dur = EL.AURA_T + sx('elAuraT') + (info.auraT || 0);
+    const skId = (src === 'skill' || src === 'explosion') && (info.sk || C.curSk);
+    const dur = EL.AURA_T + sx('elAuraT') + (info.auraT || 0) + (skId && G.abilities.skm(skId).x_elT ? 4 : 0);
     if (!cur) { if (EL.BY[el].aura) EL.setAura(e, el, dur); return out; }
     if (cur === el) { if (!e.auFix) EL.setAura(e, el, dur); return out; }
     const r = pair(cur, el);
@@ -253,6 +263,8 @@
         case 'crystal': EL.dropCrystal(e.pos.clone(), withEl); break;
       }
       EL.netAura(e); if (EL.onNetStatus) EL.onNetStatus(e);
+      // 反応充填: the skill that set it off gets 1 s back (once a second)
+      { const sk = opts.sk || ((opts.src === 'skill' || opts.src === 'explosion') && C.curSk); const now = G.game.time; if (sk && !opts.echo && G.abilities.skm(sk).x_elCd && (EL._cdT || 0) <= now) { EL._cdT = now + 1; const s = P.skills.find((x) => x && x.id === sk); if (s) s.cd = Math.max(0, (s.cd || 0) - 1); } }
       // 共鳴: the nearest other foe suffers the same reaction (never from an echo; the damage-only reactions just echo their burst)
       if (!opts.echo && P.has('rx_echo') && id !== 'crystal') {
         let best = null, bd = 12;
@@ -291,6 +303,37 @@
     }
   };
 
+  // ---------------------------------------------------------------- guardians
+  // [element it wields, element it is weak to]: own element 25% resisted, the weak one -25%. None of them is born with an element.
+  EL.BOSS = {
+    houndlord: ['fire', 'water'], cerberus: ['fire', 'water'], cinderpriest: ['fire', 'water'], ashdrake: ['fire', 'ice'], foxfire: ['fire', 'water'], sovereign: ['fire', 'water'],
+    boneking: ['ice', 'fire'], lich: ['ice', 'fire'], hollowknight: ['ice', 'fire'],
+    warlock: ['volt', 'earth'], arbiter: ['volt', 'earth'], stormimp: ['volt', 'earth'], karakuri: ['volt', 'water'], archon: ['volt', 'earth'],
+    colossus: ['earth', 'volt'], ossuary: ['earth', 'fire'], behemoth: ['earth', 'volt'], warden: ['earth', 'volt'], minotaur: ['earth', 'ice'], executioner: ['earth', 'fire'],
+    wyrm: ['water', 'volt'], weaver: ['water', 'fire'],
+    drake: ['wind', 'ice'], hunter: ['wind', 'earth'], oboro: ['wind', 'volt'],
+    broodmother: [null, 'fire'],
+  };
+  EL.KING = [['fire', 'water'], ['ice', 'fire'], ['volt', 'earth']]; // 深淵の王: by phase
+  const resFor = (el, weak) => { const r = {}; if (el) r[el] = 0.25; if (weak) r[weak] = -0.25; return r; };
+  EL.bossInit = function (b, id) {
+    const parts = b.parts || [b];
+    let spec = EL.BOSS[id] || null;
+    if (id === 'twins') { parts.forEach((p, i) => { const el = i % 2 ? 'ice' : 'fire'; p.elAtk = el; p.elRes = resFor(el, i % 2 ? 'fire' : 'ice'); }); b.elAtk = 'fire'; return; }
+    if (id === 'abyssking') spec = EL.KING[0];
+    if (!spec) return;
+    b.elAtk = spec[0];
+    for (const p of parts) { p.elAtk = spec[0]; p.elRes = resFor(spec[0], spec[1]); }
+  };
+  EL.bossTick = function () {
+    const b = G.bosses && G.bosses.active; if (!b || b.dead || b.def.id !== 'abyssking') return;
+    const s = EL.KING[Math.max(0, Math.min(2, (b.phase || 1) - 1))];
+    if (b.elAtk === s[0]) return;
+    b.elAtk = s[0];
+    for (const p of b.parts || []) { p.elAtk = s[0]; p.elRes = resFor(s[0], s[1]); }
+    G.ui.toastSmall(`${EL.BY[s[0]].icon} 深淵の王が${EL.BY[s[0]].name}属性を纏った`);
+  };
+
   // ---------------------------------------------------------------- crystals (晶壁)
   EL.crystals = [];
   EL.dropCrystal = function (pos, el) {
@@ -324,6 +367,7 @@
       if (c.t <= 0) { G.scene.remove(c.m); c.m.geometry.dispose(); c.m.material.dispose(); EL.crystals.splice(i, 1); }
     }
     EL.tickPlayer(dt);
+    EL.bossTick();
   };
   EL.clear = function () { for (const c of EL.crystals) { if (G.scene) G.scene.remove(c.m); } EL.crystals.length = 0; if (P) { P.au = null; P.elFrozen = 0; P.elLeak = 0; P.elBrittle = 0; } };
 

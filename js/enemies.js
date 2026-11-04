@@ -652,6 +652,8 @@
       this.noLoot = !!opts.noLoot; // minions called by a guardian leave nothing to search
       this.elite = !!opts.elite;
       this.eliteMod = null; // (the old elite traits are mutations now: an elite always carries one, see depth.js)
+      // elements (element.js): what its blows carry, what it was born with, what it resists
+      this.elAtk = def.el || def.auFix || null; this.auFix = def.auFix || null; this.elRes = def.elRes ? Object.assign({}, def.elRes) : null;
       const st = P.stats;
       const L = level - 1;
       const hpScale = (1 + 0.11 * L) * Math.pow(1.015, L) * Math.max(0.3, 1 + st.enemyHp) * (opts.hpMul || 1);
@@ -692,6 +694,8 @@
       this.lastHitT = -10;
       this.hitW = this.model.hits;
       if (def.cloak) for (const m of this.model.M.all) m.transparent = true;
+      // born with an element: the body glows with it
+      if (def.auFix && G.Elem) { const c = new THREE.Color(G.Elem.BY[def.auFix].hex).multiplyScalar(0.35); for (const m of this.model.M.all) if (m.emissive) m.emissive.add(c); }
       if (this.elite) {
         const ring = new THREE.Mesh(new THREE.RingGeometry(this.radius * 1.1, this.radius * 1.35, 32), new THREE.MeshBasicMaterial({ color: 0xffc040, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
         ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; this.model.group.add(ring); this.ring = ring;
@@ -716,6 +720,8 @@
     die(info) {
       if (!this.alive) return false;
       const cleared = !!(info && info.src === 'clear');
+      // an elemental core bursts: its element on every foe within 5 m
+      if (this.def.coreBurst && !cleared && G.Elem) { for (const o of E.inRadius(this.pos, 5)) if (o !== this) G.Elem.give(o, this.auFix); if (G.fx.ring) G.fx.ring(this.pos.clone(), 5, G.Elem.BY[this.auFix].hex, 0.5); }
       // bone variant revives once
       if (this.def.revive && !this.revived && !cleared && !(info && info.src === 'explosion')) {
         this.revived = true;
@@ -842,11 +848,13 @@
     }
     target() {
       const d = C.getDecoy();
-      if (d && d.pos.distanceTo(this.pos) < 40) return { pos: d.pos, eye: V(d.pos.x, d.pos.y + 1.4, d.pos.z), vel: V(), invisible: false, isPlayer: false, decoy: d };
+      // 不屈の城塞 draws every foe within 15 m to you (over a decoy or the mercenary)
+      const taunted = P.temps && P.temps.has('ult_bastion') && !P.dead && this.pos.distanceTo(P.pos) < 15;
+      if (d && !taunted && d.pos.distanceTo(this.pos) < 40) return { pos: d.pos, eye: V(d.pos.x, d.pos.y + 1.4, d.pos.z), vel: V(), invisible: false, isPlayer: false, decoy: d };
       // the mercenary draws aggro like you do: every foe goes for whichever of you is nearer
       // (a little hysteresis so it doesn't flip back and forth between two equally distant targets)
       const mc = G.Rooms2 && G.Rooms2.mercAlly;
-      if (mc && !mc.dead && mc.targetable && mc.targetable() && !this.stalker) {
+      if (mc && !taunted && !mc.dead && mc.targetable && mc.targetable() && !this.stalker) {
         const dm = mc.ent.pos.distanceTo(this.pos), dp = this.pos.distanceTo(P.pos);
         const pInvis = P.stats.invis > 0 || P.smokeT > 0;
         const wantM = (mc.taunt && dm < mc.taunt) || (pInvis ? dm < 30 : this.aggroM ? dm < dp * 1.2 : dm < dp * 0.85); // a shield bearer pulls every foe within its taunt range
@@ -1270,7 +1278,6 @@
       if (this.tgtFx) { const k = 0.6 + 0.4 * Math.sin(gt * 6 + ph); this.tgtFx.om.color.setHex(this.tgtFx.col).multiplyScalar(0.7 + 0.6 * k); this.tgtFx.beam.material.opacity = 0.22 + 0.25 * k; }
       if (S.burn > 0) { addT(0.55, 0.2, 0.0, pulse); want(0xff6a10, 0.9); }
       if (S.poison > 0) { addT(0.08, 0.38, 0.0, pulse * Math.min(1, 0.4 + (S.poisonStacks || 1) * 0.12)); want(0x70e020, 0.8); }
-      if (S.bleed > 0) { addT(0.42, 0.0, 0.03, pulse); want(0xff1020, 0.75); }
       if (S.frozen > 0) { addT(0.2, 0.4, 0.6, 1); want(0xa0e0ff, 1); }
       else if (S.frost > 0) { addT(0.05, 0.16, 0.3, Math.min(1, 0.3 + (S.frostStacks || 0) * 0.15)); want(0x80c8ff, 0.7); }
       if (S.shock > 0) { addT(0.35, 0.35, 0.15, Math.random()); want(0xfff0a0, 0.85); }
@@ -1576,7 +1583,7 @@
       sty(b.sb, 'display', e.maxShield > 0 ? '' : 'none');
       if (e.maxShield > 0) sty(b.sfl, 'width', (e.shield / e.maxShield * 100).toFixed(1) + '%');
       const s = e.st, R = (n) => ['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ', 'Ⅺ', 'Ⅻ', 'XIII'][Math.min(13, Math.max(1, n || 1))] || 'Ⅰ'; let icons = '';
-      if (s.burn > 0) icons += '🔥' + R(s.burnLv || 1) + ' '; if (s.frost > 0 || s.frozen > 0) icons += (s.frozen > 0 ? '🧊' : '❄️' + R(s.frostStacks || 1)) + ' '; if (s.poison > 0) icons += '☠️' + R(s.poisonStacks || 1) + ' '; if (s.shock > 0) icons += '⚡' + R(s.shockLv || 1) + ' '; if (s.bleed > 0) icons += '🩸' + R(s.bleedLv || 1) + ' '; if (s.stun > 0) icons += '💫'; if (!e.boss && G.game.time < (e.stunImmuneUntil || 0)) icons += '🛡️'; if (s.slow > 0) icons += '🐌'; if (s.mark > 0) icons += '🎯'; if (s.fear > 0) icons += '😱';
+      if (s.burn > 0) icons += '🔥' + R(s.burnLv || 1) + ' '; if (s.frost > 0 || s.frozen > 0) icons += (s.frozen > 0 ? '🧊' : '❄️' + R(s.frostStacks || 1)) + ' '; if (s.poison > 0) icons += '☠️' + R(s.poisonStacks || 1) + ' '; if (s.shock > 0) icons += '⚡' + R(s.shockLv || 1) + ' '; if (s.stun > 0) icons += '💫'; if (!e.boss && G.game.time < (e.stunImmuneUntil || 0)) icons += '🛡️'; if (s.slow > 0) icons += '🐌'; if (s.mark > 0) icons += '🎯'; if (s.fear > 0) icons += '😱';
       if (b.icons !== icons) { b.icons = icons; b.st.textContent = icons; }
       // the element on it (element.js): an icon with a ring for the time left; one it was born with gets a double ring and colours the bar's frame
       { const EL = G.Elem, au = EL && EL.auraOf(e); const key = au ? au + (e.auFix ? '!' : '') : '';

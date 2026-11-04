@@ -72,7 +72,7 @@
   C.inRadius = (pos, r) => G.enemies.inRadius(pos, r);
   C.nearest = (pos, r, excl) => G.enemies.nearest(pos, r, excl);
   C.randomEnemy = function (r) { const a = G.enemies.inRadius(P.pos, r); return a.length ? a[Math.floor(Math.random() * a.length)] : null; };
-  C.statusCount = function (e) { const s = e.st; if (!s) return 0; let n = 0; for (const k of ['burn', 'frost', 'poison', 'shock', 'bleed']) if (s[k] > 0) n++; return n; };
+  C.statusCount = function (e) { const s = e.st; if (!s) return 0; let n = 0; for (const k of ['burn', 'frost', 'poison', 'shock']) if (s[k] > 0) n++; return n; };
   // stun with diminishing returns: repeated stuns get shorter, then the foe shrugs them off for a few seconds.
   // Bosses are immune outright.
   C.stunImmune = (e) => e.boss || (e.mut && e.mut.nullify) || G.game.time < (e.stunImmuneUntil || 0);
@@ -185,6 +185,7 @@
     if (e.boss) add += st.bossDmg;
     if (e.elite || e.boss) add += st.eliteDmg + (info.eliteBonus || 0);
     if (P.adsActive && src === 'bullet') add += st.adsDmg;
+    if (G.Classes && !info.enemy && src !== 'dot' && src !== 'react') add += G.Classes.dmgAdd(P, dist);
     if (src === 'dot' || src === 'react') add = 0; // (a reaction's strength is its own: 属性熟練 and the reaction boons, see element.js)
     let dmg = amount * Math.max(0.1, 1 + add);
     const baseHit = dmg; // what a status this hit applies is measured by (no crit, head or mark: those would make it swing wildly)
@@ -205,6 +206,15 @@
     const er = G.Elem && src !== 'dot' ? G.Elem.onEnemyHit(e, info, src) : null;
     if (er) dmg *= er.mul;
     if (e.st.brittle > 0) dmg *= 1 + (e.st.brittleK || 0.25);
+    if (e.st.vuln > 0) dmg *= 1.15;
+    // nails left in the foe (nail guns): +3% damage taken each, up to 5, for 8 s
+    if (e.st.nails > 0) dmg *= 1 + 0.03 * e.st.nails;
+    // 破砕弾: the same gun on the same foe without a break of 1.5 s grows +3% a round (up to +30%)
+    if (src === 'bullet' && info.weapon && info.weapon.def && G.weapons.stats(info.weapon).shred) {
+      const sh = e._shred, now = G.game.time;
+      if (sh && sh.w === info.weapon && now - sh.t < 1.5) { sh.n = Math.min(10, sh.n + 1); sh.t = now; } else e._shred = { w: info.weapon, n: 0, t: now };
+      dmg *= 1 + 0.03 * e._shred.n;
+    }
     if (e.dmgMul) dmg *= e.dmgMul(info, ctx);
     // front armour (beetles etc.)
     let armored = false;
@@ -272,7 +282,7 @@
       const hit0 = C._hit; C._hit = baseHit;
       try {
         if (info.elem && Math.random() < (info.elemChance ?? 1)) C.status(e, info.elem, info.stacks || 1);
-        if (st.elemChance > 0 && !info.proc && Math.random() < st.elemChance) C.status(e, info.elem || U.pick(['burn', 'frost', 'poison', 'shock', 'bleed']), 1);
+        if (st.elemChance > 0 && !info.proc && Math.random() < st.elemChance) C.status(e, info.elem || U.pick(['burn', 'frost', 'poison', 'shock']), 1);
       } finally { C._hit = hit0; }
       if (info.knock && !e.boss) e.knockback(info.dir || e.pos.clone().sub(P.pos).setY(0).normalize(), info.knock);
     }
@@ -282,6 +292,9 @@
     if (e.mut) G.Depth.onHurt(e, info, dealt + shieldDealt);
     if (e.hp <= 0) C.killEnemy(e, info, overkill);
     if (er && er.rx) G.Elem.after(e, er.rx, er.rxWith, info);
+    if (src === 'bullet' && info.weapon && info.weapon.def && info.weapon.def.arch === 'nail' && e.alive) { e.st.nails = Math.min(5, (e.st.nails || 0) + 1); e.st.nailT = 8; }
+    // ククリ: a crit cuts once more for half
+    if (crit && src === 'melee' && info.critSlash && e.alive && !info.proc) C.damageEnemy(e, amount * info.critSlash, { src: 'melee', proc: true, noBuffs: true, noMarker: true, pos: info.pos });
     if (src === 'skill' && !info.proc && !info.noTech && dealt + shieldDealt > 0) C.techOnHit(e, dealt + shieldDealt, info);
     { const skId = info.sk || ((src === 'skill' || src === 'explosion') && C.curSk); if (skId && !info.noSkOn && dealt + shieldDealt > 0 && C.skOnHit) C.skOnHit(e, dealt + shieldDealt, skId, info); }
     if (G.game.run && !e.ally && !info.ally) G.game.run.dmgDealt = (G.game.run.dmgDealt || 0) + dealt + shieldDealt; // the run's total damage (result screen)
@@ -336,7 +349,7 @@
   // How hard a status bites follows the hit that applied it (C._hit, set by damageEnemy): a stronger weapon or build makes stronger statuses.
   // A status applied by something else (a skill zone, an augment, a spreading fire) measures itself by what your weapon in hand would hit for.
   // The area-scaled old value stays as a floor. The power of a running status is the strongest that fed it, until it runs out.
-  const DOT_K = { burn: 0.25, bleed: 0.22, poison: 0.05, shock: 0.3 };
+  const DOT_K = { burn: 0.25, poison: 0.05, shock: 0.3 };
   C.refHit = function () {
     const W = G.weapons;
     if (P.meleeMode && P.melee) return W.meleeStats(P.melee).dmg * W.meleeDmgMul();
@@ -382,9 +395,6 @@
         }
         G.fx.sparks(e.centerPos(), null, 5, 0xfff0a0, 4);
         break;
-      case 'bleed':
-        s.bleedPow = Math.max(s.bleed > 0 ? s.bleedPow || 0 : 0, dotPow('bleed', C.scale(6)));
-        s.bleedLv = Math.min(5, (s.bleed > 0 ? s.bleedLv || 1 : 0) + stacks); s.bleed = 5; s.bleedDps = s.bleedPow * dotMul * (0.7 + s.bleedLv * 0.3); break;
       case 'slow': s.slow = 4; break;
       case 'mark': s.mark = stacks; break;
       case 'root': s.root = stacks; break;
@@ -393,8 +403,9 @@
   C.updateStatus = function (e, dt) {
     const s = e.st;
     if (G.Elem) G.Elem.tick(e, dt);
-    for (const k of ['stun', 'fear', 'root', 'slow', 'mark', 'frozen', 'shock']) if (s[k] > 0) s[k] -= dt;
+    for (const k of ['stun', 'fear', 'root', 'slow', 'mark', 'frozen', 'shock', 'vuln']) if (s[k] > 0) s[k] -= dt;
     if (s.frost > 0) { s.frost -= dt; if (s.frost <= 0) s.frostStacks = 0; }
+    if (s.nailT > 0) { s.nailT -= dt; if (s.nailT <= 0) s.nails = 0; }
     s.tick = (s.tick || 0) - dt;
     if (s.tick <= 0) {
       s.tick = 0.5;
@@ -404,11 +415,9 @@
         if (P.has('x_spread') && Math.random() < 0.35) { const t = C.nearest(e.pos, 4, e); if (t && !(t.st.burn > 0)) C.status(t, 'burn', 1); }
       }
       if (s.poison > 0 && s.poisonStacks > 0) C.damageEnemy(e, (s.poisonPow || C.scale(2.4)) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
-      if (s.bleed > 0) C.damageEnemy(e, s.bleedDps * 0.5, { src: 'dot', elem: 'bleed' });
     }
     if (s.burn > 0) { s.burn -= dt; if (s.burn <= 0) s.burnLv = 0; if (Math.random() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8); }
     if (s.poison > 0) { s.poison -= dt; if (s.poison <= 0) s.poisonStacks = 0; if (Math.random() < dt * 5) G.fx.norm.spawn(e.pos.x, e.pos.y + e.height * 0.6, e.pos.z, U.rand(-0.3, 0.3), -0.5, U.rand(-0.3, 0.3), 0.8, 0.12, 0.3, 0.45, 0.7, 0.15, 0.7, 2, 0.5); }
-    if (s.bleed > 0) { s.bleed -= dt; if (s.bleed <= 0) s.bleedLv = 0; if (Math.random() < dt * 6) G.fx.blood(e.centerPos(), null, e.bloodColor, 1); }
     if (s.shock > 0 && Math.random() < dt * 8) G.fx.sparks(e.centerPos(), null, 2, 0xfff0a0, 3);
     if (s.shock <= 0) s.shockLv = 0;
   };
@@ -422,7 +431,14 @@
     if (G.game.enemyTimeScale < 1) m *= 1;
     return m * (1 + P.stats.enemySpeed) * G.Depth.speedMul(e);
   };
-  C.burstBleed = function (e) { const s = e.st; if (s.bleed > 0) { const d = s.bleedDps * s.bleed; s.bleed = 0; C.damageEnemy(e, d, { src: 'dot', elem: 'bleed' }); G.fx.blood(e.centerPos(), null, e.bloodColor, 20); } };
+  // 毒抜き: a headshot on a poisoned foe spends every stack at once for what the poison had left to do
+  C.burstPoison = function (e) {
+    const s = e.st; if (!(s.poison > 0 && s.poisonStacks > 0)) return;
+    const d = (s.poisonPow || C.scale(2.4)) * s.poisonStacks * s.poison * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0));
+    s.poison = 0; s.poisonStacks = 0;
+    C.damageEnemy(e, d, { src: 'dot', elem: 'poison' });
+    G.fx.smoke(e.centerPos(), 10, 1.4, 0x6a9a2a, 0.5, 1.0);
+  };
   C.spreadStatus = function (e, r) {
     const s = e.st;
     for (const o of C.inRadius(e.pos, r)) {
@@ -430,7 +446,6 @@
       if (s.burn > 0) C.status(o, 'burn', 1);
       if (s.poisonStacks > 0) C.status(o, 'poison', Math.ceil(s.poisonStacks / 2));
       if (s.frost > 0) C.status(o, 'frost', 2);
-      if (s.bleed > 0) C.status(o, 'bleed', 1);
     }
   };
 
@@ -507,7 +522,8 @@
     for (let i = 0; i < 3; i++) G.fx.tracer(p.clone().add(V(U.rand(-0.8, 0.8), 0.8, U.rand(-0.8, 0.8))), p.clone().add(V(U.rand(-0.5, 0.5), -0.4, U.rand(-0.5, 0.5))), 0xbfd8ff, 0.05, 0.2);
     G.fx.sparks(p, null, 10, 0xbfd8ff, 5);
     G.sfx.monster(p, 'snarl', 1.3, 0.6);
-    C.damageEnemy(e, dmg, { src: 'skill', proc: true, elem: 'bleed' });
+    C.damageEnemy(e, dmg, { src: 'skill', proc: true });
+    if (e.alive) e.st.vuln = Math.max(e.st.vuln || 0, 8); // the spirit wolf's bite: 8 s of +15% damage taken
   };
   C.damageDestructible = function (d, dmg, pos) {
     if (!d.alive) return;
@@ -574,8 +590,10 @@
       amount *= C.ENEMY_DMG * C.defMul(P.stats.defense);
       if ((info.src === 'explosion' || info.src === 'aoe') && P.stats.blastRes) amount *= Math.max(0.2, 1 - P.stats.blastRes);
       // an element on the blow: resistance, the element left on you, a reaction (element.js); 脆化 on you makes everything land harder
-      if (info.el && G.Elem) amount *= G.Elem.onPlayerHit(info.el);
+      const atkEl = info.el || (info.src !== 'dot' && info.src !== 'react' && info.src !== 'fall' && info.attacker && info.attacker.elAtk) || null;
+      if (atkEl && G.Elem) amount *= G.Elem.onPlayerHit(atkEl);
       if (P.elBrittle > 0) amount *= 1.15;
+      if (G.Classes && G.Classes.allyGuard()) amount *= 0.75;
       if (Math.random() < Math.min(0.75, P.stats.dodge)) { G.ui.toastSmall('回避!'); G.sfx.whoosh(0.2, 0.4); return 0; }
     }
     const ctx = { amount, red: 0, src: info.src || 'melee', attacker: info.attacker, elem: info.elem };
@@ -1025,7 +1043,7 @@
       for (const e of G.enemies.inRadius(m.position, 0.9 + 0.3)) {
         if ((e._bladeT || 0) > t) continue;
         e._bladeT = t + 0.35;
-        C.damageEnemy(e, i < nb * 2 ? C.scale(14) : C.scale(pl.bladesDps * 0.35), { src: 'skill', sk: i < nb * 2 ? null : pl.bladesSk, ult: i >= nb * 2 && pl.bladesUlt, proc: true, noMarker: true, elem: 'bleed', elemChance: 0.3 });
+        C.damageEnemy(e, i < nb * 2 ? C.scale(14) : C.scale(pl.bladesDps * 0.35), { src: 'skill', sk: i < nb * 2 ? null : pl.bladesSk, ult: i >= nb * 2 && pl.bladesUlt, proc: true, noMarker: true });
         G.fx.sparks(m.position, null, 4, 0xe0e8ff, 4);
       }
     }

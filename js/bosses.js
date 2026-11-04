@@ -904,6 +904,7 @@
     const def = G.BOSS_BY_ID[id];
     const b = new CLS[id](def, level, world);
     BS.active = b;
+    if (G.Elem) G.Elem.bossInit(b, id);
     G.save.mark('bosses', id);
     G.sfx.monster(b.pos, 'roar', 0.45, 1.4); G.sfx.bell();
     G.player.addShake(0.5);

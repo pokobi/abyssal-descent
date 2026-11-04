@@ -150,6 +150,7 @@
     if (p.r || p.len || p.range || p.w || ['blades', 'ult_bladestorm'].includes(s.id)) mk('area', '範囲拡張', '⭕', 'uncommon', { area: 0.25 }, '範囲・射程+25%。', 2);
     if (p.dur) mk('dur', '持続延長', '⌛', 'uncommon', { dur: 0.3 }, '効果時間+30%。', 2);
     for (const [key, name, icon, rarity, sm, desc] of UQ[s.id] || []) mk(key, name, icon, rarity, sm, desc, key === 'charges' ? 2 : 1);
+    { const el = G.Elem && G.Elem.skEl(s.id); if (el) { const E = G.Elem.BY[el]; mk('elT', '残留' + E.name, E.icon, 'uncommon', { x_elT: 1 }, `付ける${E.name}属性の時間+4秒。`); mk('elCd', '反応充填', '🔄', 'rare', { x_elCd: 1 }, 'この技で属性反応が起きると、クールタイム-1秒（1秒に1回まで）。'); } }
   }
   for (const b of list) { G.BUFFS.push(b); G.BUFF_BY_ID[b.id] = b; }
   G.SKILL_AUGS = list;

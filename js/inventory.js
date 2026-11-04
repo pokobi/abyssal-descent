@@ -300,7 +300,7 @@
       const d = G.ARMOR_BY_ID[it.id]; if (!d) continue;
       def += d.def; wt += d.weight;
       for (const f of d.fixed) for (const m in f.mods) s[m] = (s[m] || 0) + f.mods[m];
-      for (const e of it.ench || []) { const E = G.ENCHANT_BY_ID[e.id]; s[E.stat] = (s[E.stat] || 0) + e.v / 100; }
+      for (const e of it.ench || []) { const E = G.ENCHANT_BY_ID[e.id]; if (!E) continue; const k = E.perEl ? E.stat + (e.el || 'fire') : E.stat; s[k] = (s[k] || 0) + (E.flat ? e.v : e.v / 100); }
     }
     s.defense = (s.defense || 0) + def;
     s.weight = wt;

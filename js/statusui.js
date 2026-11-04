@@ -68,6 +68,7 @@
           <div class="cat">${esc(d.cat || '')}・${G.RARITY[d.rarity].name}</div>
           <div class="dps"><b>${Math.round(G.weapons.gunDps(w))}</b><span>DPS</span></div>
           ${trait ? `<div class="tr">${trait.icon} ${esc(trait.name)}</div>` : ''}
+          ${(() => { const el = G.Elem.wEl(w); return el ? `<div class="tr" style="color:${G.Elem.BY[el].col}">${G.Elem.BY[el].icon} ${G.Elem.BY[el].name}属性${w.oil && w.oil.t > G.game.time ? '（油）' : ''}</div>` : ''; })()}
         </div>
       </div>
       <div class="wc-grid">${tiles}</div>${legend}
@@ -161,6 +162,7 @@
   const GROUPS = [
     ['攻撃', ['dmg', 'fireRate', 'reloadSpeed', 'critChance', 'critMul', 'headMul', 'skillDmg', 'explosionDmg', 'shieldDmg']],
     ['生存', ['maxHp', 'defense', 'armor', 'dodge', 'hpRegen', 'lifesteal']],
+    ['属性', ['elMastery', 'elRes_fire', 'elRes_water', 'elRes_ice', 'elRes_volt', 'elRes_wind', 'elRes_earth']],
     ['機動・その他', ['moveSpeed', 'weight', 'maxJumps', 'grappleRange', 'cdr', 'coinMul', 'luck']],
   ];
   const LOWER_STATS = new Set(['weight']);
@@ -169,7 +171,7 @@
     const [ic, nm, t] = def, v = st[k] ?? 0, b = B[k] ?? 0;
     let txt;
     if (t === 'cd') txt = Math.round((v - 1) * 100) + '%';
-    else if (t === 'p') { const isAbs = ['critChance', 'dodge', 'lifesteal', 'armor', 'cdr', 'luck'].includes(k); txt = (isAbs ? Math.round(v * 100) : (v >= 0 ? '+' : '') + Math.round(v * 100)) + '%'; }
+    else if (t === 'p') { const isAbs = ['critChance', 'dodge', 'lifesteal', 'armor', 'cdr', 'luck'].includes(k) || k.startsWith('elRes_'); txt = (isAbs ? Math.round(v * 100) : (v >= 0 ? '+' : '') + Math.round(v * 100)) + '%'; }
     else if (t === 'x') txt = '×' + v.toFixed(2);
     else txt = String(Math.round(v * 10) / 10);
     const diff = Math.abs(v - b) > 1e-6;

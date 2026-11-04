@@ -3,7 +3,7 @@
 (function () {
   // the grapple's cooldown: 15 s, shortened by the grapple-cooldown stat (never below 15% of that)
   G.GRAPPLE_CD = 15;
-  G.grappleCdOf = (st) => G.GRAPPLE_CD * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0)));
+  G.grappleCdOf = (st) => (st.grappleBase || G.GRAPPLE_CD) * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0))); // (the class sets the base: 15-28 s, see classes.js)
   const U = G.U, I = G.input;
   const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   const BASE = {
@@ -14,13 +14,14 @@
     bossDmg: 0, eliteDmg: 0, pierce: 0, ricochet: 0, doubleShot: 0, knock: 0, shopDiscount: 0, buffChoices: 3, buffRerolls: 0, weaponSlots: 2, ammoSave: 0,
     healMul: 0, enemyDmg: 0, enemySpeed: 0, enemyHp: 0, infAmmo: 0, lowGrav: 0, soulLantern: 0, adsDmg: 0, hipSpread: 0, extraChests: 0, chestBonus: 0,
     healDrop: 0, throwPow: 0, invis: 0, extraEnemies: 0, defense: 0, weight: 0, statusRes: 0, dotRes: 0, blastRes: 0, sprintRamp: 0,
-    elMastery: 0, elRes_fire: 0, elRes_water: 0, elRes_ice: 0, elRes_volt: 0, elRes_wind: 0, elRes_earth: 0, reactDmg: 0, reactMul: 0,
+    grappleBase: 0, guardHp: 0, elMastery: 0, elRes_fire: 0, elRes_water: 0, elRes_ice: 0, elRes_volt: 0, elRes_wind: 0, elRes_earth: 0, reactDmg: 0, reactMul: 0,
     skillCd: 0, skillRad: 0, skillDur: 0, skillCharges: 0, techBurn: 0, techFrost: 0, techShock: 0, techStun: 0, techVamp: 0, techShield: 0,
     ultDmg: 0, ultCd: 0, ultDur: 0, ultCharge: 0, ultHeal: 0, ultShield: 0, ultOver: 0, ultEcho: 0, ultTech: 0,
     pileDmg: 0, pileRadius: 0, pileCd: 0, pileFast: 0, pileFire: 0, pileShock: 0, pileFrost: 0, pileStun: 0, pileVacuum: 0, pileBounce: 0, pileShield: 0, pileHeal: 0, pileHeight: 0, pileShieldMul: 0, pileMeteor: 0,
   };
   G.PLAYER_BASE = BASE;
   G.STAT_NAMES = {
+    elMastery: ['🔮', '属性熟練', 'n'], elRes_fire: ['🔥', '炎耐性', 'p'], elRes_water: ['💧', '水耐性', 'p'], elRes_ice: ['❄️', '氷耐性', 'p'], elRes_volt: ['⚡', '雷耐性', 'p'], elRes_wind: ['🌪️', '風耐性', 'p'], elRes_earth: ['🪨', '地耐性', 'p'],
     maxHp: ['❤️', '最大HP', 'n'], armor: ['🛡️', '被ダメ軽減', 'p'], dmg: ['💪', '与ダメ', 'p'], fireRate: ['🔁', '連射', 'p'], reloadSpeed: ['♻️', 'リロード', 'p'],
     critChance: ['💢', '会心率', 'p'], critMul: ['💥', '会心ダメージ', 'cd'], headMul: ['🎯', 'HS倍率', 'p'], moveSpeed: ['👟', '移動', 'p'], hpRegen: ['💚', '再生/秒', 'n'],
     lifesteal: ['🩸', '吸血', 'p'], cdr: ['⏳', 'CT短縮', 'p'], coinMul: ['🪙', 'コイン獲得', 'p'], dodge: ['🌫️', '回避', 'p'], skillDmg: ['🔮', 'スキル', 'p'],
@@ -69,11 +70,13 @@
       this.wIdx = 0;
       this.wOrder = [];
       this.melee = G.weapons.makeMelee(G.DEFAULT_MELEE);
+      this.cls = this.cls || (G.Classes ? G.Classes.last() : 'soldier');
       this.attStash = []; // detached attachments (kept when moving parts around or swapping a weapon out)
       this.meleeMode = false;
       this.revives = G.Run ? G.Run.startRevives() : 3;
       // Q = ultimate (everyone starts with 不屈の城塞), X / Z / V = skills
       this.skills = [G.abilities.makeSlot(G.DEFAULT_ULT || 'ult_bastion'), null, null, null];
+      if (G.Classes) { G.Classes.kit(this); this.recalc(); this.hp = this.stats.maxHp; } // the class's gun, melee weapon, skill and ultimate (classes.js)
       this.grenades = { g_frag: 2 };
       this.grenadeSel = 'g_frag';
       this.inv = { h_bandage: 3, h_medkit: 1 };
@@ -105,6 +108,7 @@
       const apply = (mods, n) => { for (const k in mods) { if (typeof mods[k] === 'number') s[k] = (s[k] || 0) + mods[k] * n; } };
       for (const [id, n] of this.buffs) { const b = G.BUFF_BY_ID[id]; if (b && b.mods) apply(b.mods, n); }
       for (const [, t] of this.temps) apply(t.mods, 1);
+      if (G.Classes) apply(G.Classes.mods(this), 1);
       if (this.devMods) apply(this.devMods, 1);
       G.Inv.applyArmor(this, s);
       s.maxHp = Math.max(10, Math.round((s.maxHp + (this.permMaxHp || 0)) * Math.max(0.2, 1 + s.maxHpPct)));

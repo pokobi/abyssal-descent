@@ -241,7 +241,7 @@ button { font-family: inherit; }
 .ebar.far .ch { visibility: hidden; }
 .ebar.boss-weak .hb { width: 50px; }
 .dnum { position: absolute; font-weight: 900; font-size: 18px; color: #fff; text-shadow: 0 0 3px #000, 0 2px 2px #000; transform: translate(-50%,-50%); animation: dnum .8s ease-out forwards; white-space: nowrap; }
-.dnum.head { font-size: 23px; text-shadow: 2px 0 #ffd34a, -2px 0 #ffd34a, 0 2px #ffd34a, 0 -2px #ffd34a, 1.5px 1.5px #ffd34a, -1.5px -1.5px #ffd34a, 1.5px -1.5px #ffd34a, -1.5px 1.5px #ffd34a, 0 0 5px #000; }
+.dnum.head { font-size: 23px; text-shadow: 0 0 0 #000, 1.5px 0 #000, -1.5px 0 #000, 0 1.5px #000, 0 -1.5px #000, 3px 0 #ffd34a, -3px 0 #ffd34a, 0 3px #ffd34a, 0 -3px #ffd34a, 2.2px 2.2px #ffd34a, -2.2px -2.2px #ffd34a, 2.2px -2.2px #ffd34a, -2.2px 2.2px #ffd34a; }
 /* the colour of a number is the element of the hit (element.js); a headshot is the yellow outline above, a crit the '!!' after it */
 .dnum.el-fire { color: #ff6a3a; } .dnum.el-water { color: #3f9dff; } .dnum.el-ice { color: #a8ecff; } .dnum.el-volt { color: #b88cff; } .dnum.el-wind { color: #4fd8c0; } .dnum.el-earth { color: #e0a640; }
 .dnum.rxn { font-size: 25px; }
@@ -1652,3 +1652,28 @@ html.m *::-webkit-scrollbar { width: 6px; height: 6px; }
 /* the trade-off ("代償") and curse category of a boon: a red warning label wherever the category is named */
 .cat-warn { display: inline-block; padding: 0 7px; border-radius: 4px; font-weight: 900; letter-spacing: 1px; color: #ffe2dc; background: linear-gradient(180deg, #c8402e, #86201a); box-shadow: 0 0 8px rgba(255,70,50,0.4); }
 .card .c-cat .cat-warn { font-size: 1.05em; }
+
+/* the guardian bar: the element it wields (left of the name) and the one on it now (right) */
+#boss-name .boss-el, #boss-name .boss-au { display: inline-block; width: 20px; height: 20px; line-height: 20px; margin: 0 6px; font-size: 12px; text-align: center; border-radius: 50%; vertical-align: 1px; background: rgba(10,10,14,0.85); box-shadow: 0 0 0 1.5px var(--ec); }
+#boss-name .boss-au { box-shadow: 0 0 0 1.5px var(--ec), 0 0 8px var(--ec); }
+
+/* class choice (classes.js) */
+.cls-wrap { width: min(1180px, 96vw); margin: 0 auto; }
+.cls-note { text-align: center; color: #a99d88; font-size: 13px; margin: -6px 0 14px; }
+.cls-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.cls-card { padding: 12px 14px; background: rgba(14,11,8,0.92); border: 1px solid rgba(220,190,130,0.25); border-top: 3px solid var(--cc); border-radius: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #d8ccb4; transition: transform .12s, box-shadow .12s; }
+.cls-card:hover { transform: translateY(-2px); }
+.cls-card.on { box-shadow: 0 0 0 2px var(--cc), 0 0 18px color-mix(in srgb, var(--cc) 45%, transparent); background: rgba(24,19,13,0.96); }
+.cls-top { display: flex; align-items: center; gap: 10px; }
+.cls-ic { font-size: 30px; }
+.cls-nm { font-size: 19px; font-weight: 900; color: var(--cc); }
+.cls-role { font-size: 11px; color: #a99d88; }
+.cls-row b, .cls-sk b { color: #f0dcae; margin-right: 6px; }
+.cls-sk { display: flex; flex-direction: column; gap: 1px; padding: 5px 7px; background: rgba(255,255,255,0.04); border-radius: 4px; }
+.cls-sk span { color: #b8ac94; font-size: 11px; line-height: 1.45; }
+.cls-sk.ult b { color: #ffd27a; }
+.cls-row.up b { color: #8fe08a; } .cls-row.dn b { color: #ff9a80; }
+html.m .cls-cards { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+html.m .cls-card { padding: 7px 8px; font-size: 10px; gap: 3px; }
+html.m .cls-sk span { font-size: 9px; }
+@media (max-width: 760px) { .cls-cards { grid-template-columns: 1fr 1fr; } }

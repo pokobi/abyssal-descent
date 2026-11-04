@@ -514,7 +514,11 @@
     if (!o) { e.boss.classList.add('hidden'); document.body.classList.remove('boss-on'); return; }
     e.boss.classList.remove('hidden'); document.body.classList.add('boss-on');
     // guardians wear a higher level than the area (display only; their stats are unchanged)
-    const nm = `${o.lv ? `<span class="boss-lv">Lv.${UI.bossLv(o.lv)}</span>` : ''}${U.esc(o.name)}  —  ${U.esc(o.title)}`;
+    const bA = G.bosses && G.bosses.active, EL = G.Elem, p0 = bA && bA.parts && bA.parts[0];
+    const ew = bA && bA.elAtk && EL ? `<span class="boss-el" style="--ec:${EL.BY[bA.elAtk].col}" title="扱う属性">${EL.BY[bA.elAtk].icon}</span>` : '';
+    const au = p0 && EL ? EL.auraOf(p0) : null;
+    const ea = au ? `<span class="boss-au" style="--ec:${EL.BY[au].col}" title="付いている属性">${EL.BY[au].icon}</span>` : '';
+    const nm = `${o.lv ? `<span class="boss-lv">Lv.${UI.bossLv(o.lv)}</span>` : ''}${ew}${U.esc(o.name)}  —  ${U.esc(o.title)}${ea}`;
     if (e.bossName._h !== nm) { e.bossName.innerHTML = nm; e.bossName._h = nm; }
     // multi-boss fights (the twins): one bar per boss, side by side
     let sp = document.getElementById('boss-split');
@@ -650,7 +654,7 @@
     // a new run first asks whether you want the tutorial (can be turned off)
     // a new run goes into the first free slot; with all three taken you choose which record to replace
     let slotPick;
-    const newRun = () => UI.difficulty((d) => { diffPick = d; askTut(); }, () => UI.title());
+    const newRun = () => UI.difficulty((d) => { diffPick = d; G.Classes.select(() => askTut(), newRun); }, () => UI.title());
     const slotThen = (fn) => UI.slotForNew((s) => { slotPick = s; fn(); }, () => UI.title());
     const askTut = () => {
       const S = G.save.data.settings;

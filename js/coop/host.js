@@ -72,8 +72,9 @@
     function pick(e) {
       let best = P.dead ? null : 0, bd = P.dead ? 1e9 : e.pos.distanceTo(P.pos);
       if (e._cp === 0) bd *= 0.8;
+      if (!P.dead && bd < 15 && P.temps.has('ult_bastion')) bd *= 0.01; // (不屈の城塞 draws them in)
       for (const rp of alivePlayers()) {
-        let d = e.pos.distanceTo(rp.to); if (e._cp === rp.id) d *= 0.8;
+        let d = e.pos.distanceTo(rp.to); if (e._cp === rp.id) d *= 0.8; if (rp.bz && d < 15) d *= 0.01;
         if (d < bd) { bd = d; best = rp.id; }
       }
       e._cp = best;
@@ -104,7 +105,7 @@
       const rp = K.swap;
       if (!rp) return dp.call(C, amount, info);
       const i = info || {}, a = i.attacker;
-      K.send({ t: 'dmg', a: r2(amount), s: i.src, e: i.elem, l: i.el || undefined, f: i.fixed ? 1 : 0, p: i.pos ? [r2(i.pos.x), r2(i.pos.y), r2(i.pos.z)] : null, n: a && a.def ? a.def.name : null }, rp.id);
+      K.send({ t: 'dmg', a: r2(amount), s: i.src, e: i.elem, l: i.el || (i.src !== 'dot' && i.src !== 'react' && a && a.elAtk) || undefined, f: i.fixed ? 1 : 0, p: i.pos ? [r2(i.pos.x), r2(i.pos.y), r2(i.pos.z)] : null, n: a && a.def ? a.def.name : null }, rp.id);
       return amount;
     };
     // the guardian: one player per attack, as with the mercenary; an area blow also catches whoever stands near its centre
@@ -116,6 +117,7 @@
       if (has && !b._cpHad) {
         const all = alivePlayers().map((p) => p.id); if (!P.dead) all.push(0);
         b._cpT = all.length ? all[Math.floor(Math.random() * all.length)] : 0;
+        { const tz = alivePlayers().find((p) => p.bz && b.pos.distanceTo(p.to) < 15); if (!P.dead && P.temps.has('ult_bastion') && b.pos.distanceTo(P.pos) < 15) b._cpT = 0; else if (tz) b._cpT = tz.id; }
       }
       if (!has) { const near = alivePlayers(); let bi = P.dead ? -1 : 0, bd = P.dead ? 1e9 : b.pos.distanceTo(P.pos); for (const p of near) { const d = b.pos.distanceTo(p.to); if (d < bd) { bd = d; bi = p.id; } } b._cpT = bi; }
       b._cpHad = has;
@@ -269,7 +271,7 @@
       }
     };
     // what the guests are told of a foe's statuses (shown there), and what a guest puts on a foe (merged in here, where it ticks)
-    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark', 'brittle', 'elSlow', 'leak'];
+    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark', 'brittle', 'elSlow', 'leak', 'vuln'];
     K.statusBits = (e) => { let b = 0; SB.forEach((k, i) => { if (e.st[k] > 0) b |= 1 << i; }); return b; };
     K.handlers.ss = function (m, from) {
       for (const [id, o] of m.a) {

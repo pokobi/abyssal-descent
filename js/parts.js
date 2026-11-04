@@ -100,6 +100,7 @@
       if (p.meleeMode) G.weapons.melee.equip(false);
     } else {
       const nw = G.weapons.make(d.id); nw.mag = G.weapons.stats(nw).mag;
+      if (!d.el && Math.random() < 0.1) { nw.el = ['fire', 'water', 'ice', 'volt', 'wind', 'earth'][Math.floor(Math.random() * 6)]; const E = G.Elem.BY[nw.el]; setTimeout(() => G.ui.toast(`${E.icon} ${d.name} は${E.name}属性を帯びて組み上がった`, 'good'), 300); }
       if (p.weapons.length < p.stats.weaponSlots) { p.weapons.push(nw); G.weapons.switchTo(p.weapons.length - 1); }
       else stash(GM().gunItem(nw));
     }

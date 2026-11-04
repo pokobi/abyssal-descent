@@ -115,7 +115,6 @@ window.G = window.G || {};
     frost: { name: '冷気', icon: '❄️', color: '#a8dcff' },
     shock: { name: '雷', icon: '⚡', color: '#ffe36b' },
     poison: { name: '毒', icon: '☠️', color: '#9be05a' },
-    bleed: { name: '出血', icon: '🩸', color: '#d03030' },
     explosive: { name: '爆発', icon: '💥', color: '#ffb050' },
   };
 

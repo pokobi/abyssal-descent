@@ -83,7 +83,9 @@
     for (const rp of K.players.values()) {
       if (rp.id === K.id) continue;
       rp.pos.lerp(rp.to, Math.min(1, dt * 14));
-      if (!rp.body) { rp.body = K.buildBody(rp.name, COLS[rp.id % COLS.length]); G.scene.add(rp.body.root); }
+      // (a body is dressed for its class: built again when the class becomes known / changes)
+      if (rp.body && rp.cls && rp.body.cls !== rp.cls) { G.scene.remove(rp.body.root); rp.body = null; }
+      if (!rp.body) { const C = G.Classes.BY[rp.cls]; rp.body = K.buildBody((C ? C.icon + ' ' : '') + rp.name, C ? C.col : COLS[rp.id % COLS.length], rp.cls); G.scene.add(rp.body.root); }
       else if (rp.body.root.parent !== G.scene) G.scene.add(rp.body.root);
       const b = rp.body;
       b.root.position.copy(rp.pos);
@@ -106,6 +108,8 @@
     }
     if (K.hudEl._h !== h) { K.hudEl.innerHTML = h; K.hudEl._h = h; }
   }
+  // 不屈の城塞 on a team-mate within 8 m: a quarter off what you suffer (G.Classes.allyGuard, read by C.damagePlayer)
+  G.Classes.allyGuard = function () { if (!K.live && !K.players.size) return false; for (const rp of K.players.values()) { if (rp.id === K.id || rp.dead || !rp.bz) continue; if (rp.to.distanceTo(G.player.pos) < 8) return true; } return false; };
   K.sendSelf = function () {
     const P = G.player, W = G.weapons, f = (v) => +v.toFixed(2);
     const mm = P.meleeMode && P.melee, w = mm ? P.melee.id : P.weapon ? P.weapon.id : '';
@@ -117,12 +121,12 @@
       bl: (P.buffs.get('z_blades') || 0) * 2 + (P.bladesT > 0 ? P.bladesN || 6 : 0),
       hk: P.grapple && P.grapple.hook && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? [f(P.grapple.hook.x), f(P.grapple.hook.y), f(P.grapple.hook.z)] : 0,
       ps: (P.st.burn > 0 ? 1 : 0) | (P.st.poison > 0 ? 2 : 0) | (P.st.shock > 0 ? 4 : 0) | (P.st.slow > 0 ? 8 : 0) | (P.invisT > 0 || P.smokeT > 0 ? 16 : 0) | (P.wardT > 0 ? 32 : 0),
-      tb: [...P.temps.values()].filter((t) => t.icon).slice(0, 4).map((t) => t.icon).join('') });
+      tb: [...P.temps.values()].filter((t) => t.icon).slice(0, 4).map((t) => t.icon).join(''), k: P.cls, bz: P.temps.has('ult_bastion') ? 1 : 0 });
   };
   K.handlers.p = function (m) {
     const rp = K.players.get(m.i); if (!rp || m.i === K.id) return;
     rp.to.set(m.x, m.y, m.z); rp.vel.set(m.vx, m.vy, m.vz); rp.yaw = m.yaw; rp.pitch = m.pt; rp.hp = m.hp; rp.maxHp = m.mx; rp.dead = !!m.d; rp.rev = m.r;
-    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr; rp.ps = m.ps | 0; rp.tb = m.tb || ''; rp.hk = m.hk; rp.bl = m.bl | 0;
+    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr; rp.ps = m.ps | 0; rp.tb = m.tb || ''; rp.hk = m.hk; rp.bl = m.bl | 0; rp.cls = m.k || rp.cls; rp.bz = m.bz | 0;
     if (rp.first === undefined) { rp.first = 1; rp.pos.copy(rp.to); }
     if (K.role === 'host') for (const o of K.players.keys()) if (o && o !== m.i) K.net.send(o, m);
   };
@@ -293,7 +297,7 @@
       ? `<div class="cl-note">難易度</div><div class="cl-diff" style="grid-template-columns:repeat(${ids.length},1fr)">${ids.map((id) => `<button data-d="${id}" class="${K.diff.id === id ? 'on' : ''}" style="--dc:${R.DIFFS[id].col}">${R.DIFFS[id].icon} ${R.DIFFS[id].name}</button>`).join('')}</div>`
         + (K.diff.id === 'extra' ? `<div class="cl-xl"><button data-x="-1">◀</button><b>エクストラ ${K.diff.lv}</b><button data-x="1">▶</button></div>` : '')
       : `<div class="cl-note">難易度: <b style="color:${R.DIFFS[K.diff.id].col}">${diffName(K.diff)}</b>（ホストが選びます）</div>`;
-    body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="cl-note">部屋コード</div><div class="cl-code">${K.code}</div>${host ? '<button id="cl-link">招待リンクをコピー</button>' : ''}<div>${names}</div>${dif}${ffBox}`
+    body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="cl-note">部屋コード</div><div class="cl-code">${K.code}</div>${host ? '<button id="cl-link">招待リンクをコピー</button>' : ''}<div>${names}</div>${dif}${ffBox}<div class="cl-note">クラス（自分で選びます）</div><div class="cl-diff" style="grid-template-columns:repeat(3,1fr)">${G.Classes.LIST.map((c) => `<button data-k="${c.id}" class="${G.Classes.last() === c.id ? 'on' : ''}" style="--dc:${c.col}">${c.icon} ${c.name}</button>`).join('')}</div>`
       + (host ? `<button id="cl-start"${K.players.size < 2 && !qs.has('solo') ? ' disabled' : ''}>開始する</button>` : '<div class="cl-note">ホストの開始を待っています…</div>') + '</div>';
     const b = body.querySelector('#cl-start');
     if (b) b.onclick = () => K.begin();
@@ -301,6 +305,7 @@
     if (fb) fb.onchange = () => { K.ff = fb.checked; K.send({ t: 'diff', d: K.diff, ff: K.ff }); };
     const lk = body.querySelector('#cl-link');
     if (lk) lk.onclick = () => { const u = location.origin + location.pathname + '?join=' + K.code; const done = () => { lk.textContent = 'コピーしました'; setTimeout(() => { lk.textContent = '招待リンクをコピー'; }, 1500); }; if (navigator.clipboard) navigator.clipboard.writeText(u).then(done, () => { lk.textContent = u; }); else lk.textContent = u; };
+    body.querySelectorAll('[data-k]').forEach((e) => { e.onclick = () => { G.Classes.remember(e.dataset.k); roomScreen(); }; });
     body.querySelectorAll('[data-d]').forEach((e) => { e.onclick = () => { K.diff = { id: e.dataset.d, lv: e.dataset.d === 'extra' ? Math.max(1, Math.min(K.diff.lv || R.maxExtra(), R.maxExtra())) : 0 }; K.send({ t: 'diff', d: K.diff, ff: K.ff }); roomScreen(); }; });
     body.querySelectorAll('[data-x]').forEach((e) => { e.onclick = () => { const n = K.diff.lv + (+e.dataset.x); if (n >= 1 && n <= R.maxExtra()) { K.diff = { id: 'extra', lv: n }; K.send({ t: 'diff', d: K.diff, ff: K.ff }); roomScreen(); } }; });
   }

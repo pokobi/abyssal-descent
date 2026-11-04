@@ -6,7 +6,7 @@
   G.bindBuffs = () => { C = G.combat; P = G.player; };
   const CAT = {
     stat: { name: '能力', icon: '📈' }, pile: { name: 'パイルドライバー強化', icon: '🔨' }, curse: { name: '呪い', icon: '🕯️' }, trade: { name: '代償', icon: '⚖️' }, offense: { name: '攻撃', icon: '⚔️' }, defense: { name: '防御', icon: '🛡️' },
-    mobility: { name: '機動', icon: '👟' }, economy: { name: '経済', icon: '🪙' }, element: { name: '属性', icon: '🌈' }, summon: { name: '召喚', icon: '👻' }, skill: { name: 'スキル強化', icon: '🔮' }, ult: { name: 'アルティメット強化', icon: '🌟' }, melee: { name: '近接', icon: '🗡️' }, pact: { name: '契約', icon: '📜' }, relic: { name: '遺物', icon: '🏺' },
+    mobility: { name: '機動', icon: '👟' }, economy: { name: '経済', icon: '🪙' }, element: { name: '状態異常', icon: '☣️' }, attr: { name: '属性', icon: '🌈' }, summon: { name: '召喚', icon: '👻' }, skill: { name: 'スキル強化', icon: '🔮' }, ult: { name: 'アルティメット強化', icon: '🌟' }, melee: { name: '近接', icon: '🗡️' }, pact: { name: '契約', icon: '📜' }, relic: { name: '遺物', icon: '🏺' },
   };
   G.BUFF_CAT = CAT;
   function add(id, name, icon, rarity, cat, desc, def) {
@@ -28,6 +28,7 @@
     ['hpRegen', '再生', '💚', [0.6, 1.0, 1.6], (v) => `毎秒HP+${v}回復`],
     ['lifesteal', '吸血', '🩸', [0.02, 0.03, 0.045], (v) => `与ダメの${(v * 100).toFixed(1)}%を回復`],
     ['cdr', '瞑想', '⏳', [0.06, 0.1, 0.15], (v) => `スキルのクールタイム-${Math.round(v * 100)}%`],
+    ['elMastery', '属性熟練', '🔮', [20, 35, 55], (v) => `属性熟練+${v}（属性反応が強くなる）`],
     ['coinMul', '強欲', '🪙', [0.1, 0.18, 0.28], (v) => `コイン獲得量+${Math.round(v * 100)}%`],
     ['skillDmg', '魔力', '🔮', [0.08, 0.12, 0.18], (v) => `スキルダメージ+${Math.round(v * 100)}%`],
     ['explosionDmg', '爆破', '💣', [0.12, 0.2, 0.32], (v) => `爆発ダメージ+${Math.round(v * 100)}%`],
@@ -115,7 +116,6 @@
   procElem('h_frost', '霜の指先', '❄️', 'common', 'frost', 0.1, '命中時10%で冷気を付与（蓄積で凍結）。');
   procElem('h_poison', '毒塗り', '☠️', 'common', 'poison', 0.12, '命中時12%で毒を付与（蓄積）。');
   procElem('h_shock', '帯電', '⚡', 'common', 'shock', 0.08, '命中時8%で電撃を付与。');
-  procElem('h_bleed', '鋸刃', '🩸', 'common', 'bleed', 0.12, '命中時12%で出血を付与。');
   add('h_chain', '雷鎖', '⛓️', 'rare', 'element', '命中時15%で2体に雷撃が連鎖（ダメージ50%）。', { max: 2, hooks: { onHit(c, n) { if (!c.proc && Math.random() < 0.15 * n) C.chain(c.e, 2, c.dmg * 0.5 + 5, 10, { src: 'buff', proc: true, elem: 'shock' }); } } });
   add('h_focus', '弱点看破', '🔍', 'uncommon', 'offense', '同じ敵に連続命中するたび与ダメ+2%（最大+20%）。', {
     hooks: { preHit(c, n, s) { if (s.e === c.e) c.bonus += Math.min(0.2, (s.k || 0) * 0.02); }, onHit(c, n, s) { if (c.proc) return; if (s.e === c.e) s.k = (s.k || 0) + 1; else { s.e = c.e; s.k = 0; } } },
@@ -128,7 +128,7 @@
   add('h_shatter', '砕氷', '🧊', 'rare', 'element', '凍結中の敵へのダメージ+50%。', { hooks: { preHit(c) { if (c.e.st && c.e.st.frozen > 0) c.bonus += 0.5; } } });
   add('h_corrode', '腐食毒', '🧪', 'uncommon', 'element', '毒の最大スタック+5、毒ダメージ+30%。', { mods: { poisonDmg: 0.3, poisonStacks: 5 }, max: 2 });
   add('h_overcurrent', '過電流', '🔌', 'uncommon', 'element', '電撃付与時、追加で近くの敵1体にも電撃が伝播。', { flag: true });
-  add('h_hemorrhage', '失血', '💉', 'rare', 'element', '出血中の敵へのヘッドショットで、残りの出血ダメージを一括で与える。', { hooks: { onHit(c) { if (c.head && !c.proc) C.burstBleed(c.e); } } });
+  add('h_hemorrhage', '毒抜き', '💉', 'rare', 'element', '毒の敵にヘッドショットすると、毒のスタックを全部使い、残りの毒ダメージを一度に与える。', { hooks: { onHit(c) { if (c.head && !c.proc) C.burstPoison(c.e); } } });
   add('h_critheal', '会心の癒し', '💖', 'uncommon', 'defense', '会心時にHP+2。', { max: 3, hooks: { onHit(c, n) { if (c.crit && !c.proc) C.heal(2 * n); } } });
   add('h_critcd', '冴え', '💫', 'rare', 'skill', '会心時、スキルのクールタイム-0.3秒。', { hooks: { onHit(c) { if (c.crit && !c.proc) C.cdReduce(0.3); } } });
   add('h_hsammo', '精密射撃', '🎯', 'uncommon', 'offense', 'ヘッドショット時30%で弾を1発返却。', { hooks: { onHit(c) { if (c.head && isWeapon(c) && Math.random() < 0.3) C.refillN(1); } } });
@@ -243,12 +243,29 @@
   add('s_bullethell', '弾の嵐', '🌧️', 'epic', 'offense', '連射速度+25%、装弾数+25%。', { mods: { fireRate: 0.25, magSize: 0.25 } });
 
   // ---------- elemental mastery ----------
-  add('x_master', '元素の王', '👑', 'legendary', 'element', '属性付与率+15%、状態異常ダメージ+50%。', { mods: { elemChance: 0.15, burnDmg: 0.5, poisonDmg: 0.5, dotDmg: 0.5 } });
+  add('x_master', '元素の王', '👑', 'legendary', 'element', '状態異常付与率+15%、状態異常ダメージ+50%。', { mods: { elemChance: 0.15, burnDmg: 0.5, poisonDmg: 0.5, dotDmg: 0.5 } });
   add('x_spread', '延焼', '🔥', 'rare', 'element', '炎上中の敵が近くの敵に燃え移る。', { flag: true });
   add('x_shatter', '凍結破砕', '❄️', 'rare', 'element', '凍結中の敵を倒すと氷片が飛び散り範囲ダメージ＋冷気。', { hooks: { onKill(c) { if (c.e.st && c.e.st.frozen > 0) { C.explode(c.pos, 4, sc(40), { src: 'buff', proc: true, color: 0xbfe8ff, small: true }); for (const e of C.inRadius(c.pos, 4)) C.status(e, 'frost', 3); } } } });
   add('x_toxburst', '毒爆', '☠️', 'rare', 'element', '毒が5スタック以上の敵は破裂し、周囲に毒を撒く。', { flag: true });
   add('x_overload', '過負荷', '⚡', 'rare', 'element', '電撃状態の敵へのシールドダメージ+100%。', { hooks: { preHit(c) { if (c.e.st && c.e.st.shock > 0) c.shieldBonus = (c.shieldBonus || 0) + 1; } } });
   add('x_frostaura', '冷気の衣', '🥶', 'rare', 'element', '周囲5mの敵に継続的に冷気を付与。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.8; for (const e of C.inRadius(P.pos, 5)) C.status(e, 'frost', 1); } } });
+  // ---------- elements (element.js): leaving them, and the reactions. A reaction boon is its own factor, apart from 属性熟練 ----------
+  add('rx_linger', '残り香', '🌫️', 'common', 'attr', '敵に付けた属性の時間+3秒。', { mods: { elAuraT: 3 }, max: 2 });
+  add('rx_sigil', '刻印の手', '✋', 'uncommon', 'attr', '武器の属性付与の間隔-40%（銃なら2.5秒→1.5秒）。', { mods: { elIcd: 0.4 } });
+  add('rx_permafrost', '永久凍土', '🧊', 'uncommon', 'attr', '凍結時間+1秒（ボスへの鈍化も+1秒）。', { mods: { rxFreezeT: 1 } });
+  add('rx_chainblast', '連爆', '💥', 'uncommon', 'attr', '爆轟の範囲+50%。', { mods: { rxBlastR: 0.5 } });
+  add('rx_leakR', '導電', '🔌', 'uncommon', 'attr', '漏電が移る距離+3m、漏電のダメージ+30%。', { mods: { rxLeak: 0.3 } });
+  add('rx_crystalPull', '晶の守り', '💠', 'uncommon', 'attr', '晶壁のシールド+50%。結晶が自分に引き寄せられる。', { mods: { rxCrystal: 0.5 } });
+  add('rx_ward', '元素の加護', '🛡️', 'uncommon', 'attr', '自分に付く属性の時間-50%、自分の身で起きた反応の被ダメ-30%。', { mods: { elSelfT: 0.5, elSelfRes: 0.3 } });
+  add('rx_boilpt', '沸点', '♨️', 'rare', 'attr', '沸騰の倍率+0.3。', { mods: { rx_boil: 0.3 } });
+  add('rx_meltpt', '融点', '🌡️', 'rare', 'attr', '熱融の倍率+0.3。', { mods: { rx_thaw: 0.3 } });
+  add('rx_brittle', '脆き鎧', '💔', 'rare', 'attr', '脆化の被ダメ増加+10%（25%→35%）。', { mods: { rxBrittle: 0.1 } });
+  add('rx_eye', '嵐の目', '🌀', 'rare', 'attr', '旋風の範囲+4m。旋風で広げた属性の時間+3秒。', { mods: { rxSwirlR: 4, rxSwirlT: 3 } });
+  add('rx_fireHeart', '燃え盛る心', '❤️‍🔥', 'rare', 'attr', '炎属性が付いた敵の炎上ダメージ、さらに+30%。', { flag: true });
+  add('rx_iceHeart', '氷の心臓', '🫀', 'rare', 'attr', '氷属性が付いた敵へ冷気を付けると、スタックがさらに+1。', { flag: true });
+  add('rx_voltHeart', '雷の心臓', '⚡', 'rare', 'attr', '雷属性が付いた敵への電撃ダメージ、さらに+50%。', { flag: true });
+  add('rx_echo', '共鳴', '🔔', 'epic', 'attr', '反応が起きると、一番近い敵1体にも同じ反応を起こす（共鳴から共鳴は起きない）。', { flag: true });
+  add('rx_master', '反応の極意', '🌈', 'legendary', 'attr', 'すべての効果型反応（爆轟・漏電など）のダメージ+40%、倍率型反応（沸騰・熱融）の倍率+0.2。', { mods: { reactDmg: 0.4, reactMul: 0.2 } });
   add('x_slowtime', '刹那', '⌛', 'epic', 'offense', 'ADS中、時間の流れが25%遅くなる。', { flag: true });
   add('x_curse', '呪詛', '🕯️', 'rare', 'offense', '敵の最大HP-10%。', { mods: { enemyHp: -0.1 }, max: 2 });
   add('x_weaken', '弱体化の呪い', '🧿', 'uncommon', 'defense', '敵の攻撃力-8%。', { mods: { enemyDmg: -0.08 }, max: 3 });
@@ -256,7 +273,7 @@
 
   // ---------- summons / auras ----------
   add('z_blades', '周回する刃', '🌀', 'epic', 'summon', '周囲を2本の霊刃が回転し、触れた敵を切り裂く。', { max: 3, flag: true });
-  add('z_wolf', '霊狼の加護', '🐺', 'legendary', 'summon', '霊狼が2秒ごとに近くの敵へ噛み付き、大ダメージ＋出血。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 2 / n; const e = C.nearest(P.pos, 18); if (e) C.spiritBite(e, sc(55)); } } });
+  add('z_wolf', '霊狼の加護', '🐺', 'legendary', 'summon', '霊狼が2秒ごとに近くの敵へ噛み付き、大ダメージ＋8秒間被ダメ+15%。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 2 / n; const e = C.nearest(P.pos, 18); if (e) C.spiritBite(e, sc(55)); } } });
   add('z_owl', '使い魔の梟', '🦉', 'epic', 'summon', '3秒ごとに近くの敵へ追尾魔弾を放つ。', { max: 2, hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 3 / n; const e = C.nearest(P.pos, 30); if (e) C.soulBolt(P.eyePos().add(new THREE.Vector3(0, 0.6, 0)), sc(35), e); } } });
   add('z_storm', '雷雲', '🌩️', 'legendary', 'summon', '4秒ごとにランダムな敵へ落雷（電撃付与）。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 4 / n; const e = C.randomEnemy(35); if (e) C.lightningStrike(e, sc(80)); } } });
   add('z_orbs', '守護の宝珠', '🔮', 'epic', 'summon', '3つの宝珠が周囲を回り、敵の投射物を相殺する。', { flag: true });
@@ -268,7 +285,7 @@
   add('o_vengeance', '報復', '😤', 'uncommon', 'offense', '被弾後4秒間、与ダメ+30%。', { hooks: { onDamaged() { C.temp('o_vengeance', 4, { dmg: 0.3 }, '😤'); } } });
   add('o_opening', '開幕の号砲', '📯', 'uncommon', 'offense', 'エリア開始から10秒間、与ダメ+50%・連射速度+25%。', { hooks: { onAreaStart() { C.temp('o_opening', 10, { dmg: 0.5, fireRate: 0.25 }, '📯'); } } });
   add('o_closer', '幕引き', '🎬', 'rare', 'offense', '残り敵が3体以下になると与ダメ+40%。', { hooks: { preHit(c) { if (G.enemies.aliveCount() <= 3) c.bonus += 0.4; } } });
-  add('o_bloodlust', '血の渇望', '🧛', 'rare', 'defense', '出血中の敵へのダメージで与ダメの6%を回復。', { hooks: { onHit(c) { if (c.e.st && c.e.st.bleed > 0 && !c.proc) C.heal(c.dmg * 0.06); } } });
+  add('o_bloodlust', '血の渇望', '🧛', 'rare', 'defense', '状態異常が1つでも付いた敵への与ダメの4%を回復。', { hooks: { onHit(c) { if (c.e.st && C.statusCount(c.e) > 0 && !c.proc) C.heal(c.dmg * 0.04); } } });
   add('o_meleeshock', '雷拳', '🤜', 'uncommon', 'offense', '近接攻撃が雷撃を伴い、周囲に連鎖する。', { hooks: { onHit(c) { if (c.src === 'melee') C.chain(c.e, 3, c.dmg * 0.5, 8, { src: 'buff', proc: true, elem: 'shock' }); } } });
   add('o_meleecd', '格闘術', '🥋', 'uncommon', 'offense', '近接攻撃の間隔-40%、近接ダメージ+40%。', { mods: { meleeDmg: 0.4, meleeCd: 0.4 } });
   add('o_grenadecd', '投擲の名手', '🎯', 'uncommon', 'offense', '投擲物の飛距離+35%、ダメージ+20%。', { mods: { grenadeDmg: 0.2, throwPow: 0.35 } });
@@ -323,10 +340,10 @@
   add('k_fury', '闘志', '🔥', 'rare', 'melee', '近接を当てる度に近接ダメージ+5%（最大10重・3秒当てないと消える）。', { hooks: { onHit(c, n, s) { if (isM(c)) { s.v = Math.min(10, (s.v || 0) + 1); s.t = 3; } }, preHit(c, n, s) { if (isM(c)) c.bonus += (s.v || 0) * 0.05; }, tick(dt, n, s) { if (s.t > 0) { s.t -= dt; if (s.t <= 0) s.v = 0; } } }, counter: (s) => (s.v || 0) + '重' });
   add('k_guard', '構え', '🛡️', 'uncommon', 'melee', '近接武器を持っている間、被ダメ-15%。', { hooks: { preDamaged(c) { if (P.meleeMode) c.red += 0.15; } } });
   add('k_quickdraw', '抜刀術', '⚡', 'uncommon', 'melee', '近接武器に持ち替えて2秒以内の最初の一撃が与ダメ+100%。持ち替えが一瞬になる。', { flag: true, hooks: { preHit(c) { if (isM(c) && G.game.time - (G.weapons.meleeDrawT || -9) < 2 && !G.weapons.quickUsed) { c.bonus += 1.0; G.weapons.quickUsed = true; } } } });
-  add('k_laceration', '裂傷', '🩹', 'common', 'melee', '近接攻撃が50%で出血を付与する。', { hooks: { onHit(c) { if (isM(c) && Math.random() < 0.5) C.status(c.e, 'bleed', 1); } } });
+  add('k_laceration', '裂傷', '🩹', 'common', 'melee', '近接攻撃が50%で毒を付与する。', { hooks: { onHit(c) { if (isM(c) && Math.random() < 0.5) C.status(c.e, 'poison', 1); } } });
   add('k_quake', '大地の怒り', '🌋', 'epic', 'melee', '重撃が必ず周囲3.5mに衝撃波（与ダメ45%・スタン）を起こす。', { flag: true });
   add('k_vigor', '闘気', '💪', 'uncommon', 'melee', '近接で倒すとHP+6回復。', { hooks: { onKill(c) { if (c.src === 'melee') C.heal(6); } }, max: 2 });
-  add('k_throw', '投げ短剣', '🔪', 'rare', 'melee', '近接の通常攻撃3回毎に、狙った先へ短剣を投げる（貫通・出血）。', { flag: true });
+  add('k_throw', '投げ短剣', '🔪', 'rare', 'melee', '近接の通常攻撃3回毎に、狙った先へ短剣を投げる（貫通・手持ちの近接武器の属性）。', { flag: true });
   add('k_master', '剣聖', '⚔️', 'legendary', 'melee', '近接ダメージ+60%・近接攻撃の間隔-20%・重撃の隙-40%。', { mods: { meleeDmg: 0.6, meleeCd: 0.2, meleeRecover: 0.4 } });
 
   // ---------- abyssal pacts (offered after every boss from area 25: a lasting hardship + a lasting reward) ----------

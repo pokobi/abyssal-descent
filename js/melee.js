@@ -71,7 +71,7 @@
     if (d < 0.35) return dmg; // something on top of you (a puddle, a field) has no front
     const f = P.forward(); const fl = Math.hypot(f.x, f.z) || 1;
     if ((dx * f.x + dz * f.z) / (d * fl) < Math.cos(g[2] * Math.PI / 180)) return dmg;
-    const pool = g[1], cut = Math.min(dmg * g[0], gd.g * pool);
+    const pool = g[1] * (1 + (P.stats.guardHp || 0)), cut = Math.min(dmg * g[0], gd.g * pool); // (剣士: +30% guard)
     gd.g = Math.max(0, gd.g - cut / pool); gd.rest = 0; gd.flash = 1; gd.kick = 1;
     const fw = P.forward();
     const at = G.camera.position.clone().addScaledVector(fw, 0.9).add(V(0, -0.15, 0));
@@ -94,7 +94,7 @@
     gEl.firstChild.style.height = (gd.g * 100).toFixed(1) + '%';
   }
   W.hideGuardUI = () => { if (gEl) gEl.classList.remove('on'); gd.on = false; gd.k = 0; };
-  const MELEM = { bleed: ['🩸', '出血'], frost: ['❄️', '冷気'], burn: ['🔥', '炎上'], poison: ['☠️', '毒'], shock: ['⚡', '感電'] };
+  const MELEM = { frost: ['❄️', '冷気'], burn: ['🔥', '炎上'], poison: ['☠️', '毒'], shock: ['⚡', '感電'] };
   W.meleeFx = function (d) {
     const out = [];
     if (d.traitDesc) out.push('✦ ' + d.traitDesc);
@@ -691,7 +691,7 @@
       // attacking from behind: the enemy faces away from us
       const ef = V(Math.sin(e.yaw || 0), 0, Math.cos(e.yaw || 0)), toMe = P.pos.clone().sub(e.pos).setY(0).normalize();
       const backstab = !e.boss && ef.dot(toMe) < -0.3;
-      const info = { src: 'melee', heavy, backstab, head, headMul: s.headMul, part: head ? 'head' : 'body', dir: f.clone(), knock: s.knock * (heavy ? 1.8 : 1), pos: e.centerPos(), elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(P.melee), shieldMul: s.shieldMul, critBonus: s.critChance, lifesteal: s.lifesteal };
+      const info = { src: 'melee', heavy, backstab, head, headMul: s.headMul, part: head ? 'head' : 'body', dir: f.clone(), knock: s.knock * (heavy ? 1.8 : 1), pos: e.centerPos(), elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(P.melee), critSlash: s.critSlash || 0, shieldMul: s.shieldMul, critBonus: s.critChance, lifesteal: s.lifesteal };
       let d = dmg;
       if (heavy && s.trait === 'reap' && !e.boss && e.hp < e.maxHp * 0.25) { d = e.hp + e.shield + 1; info.forceCrit = true; }
       C.damageEnemy(e, d, info);
@@ -767,7 +767,7 @@
   function throwDagger(s) {
     if (!P.meleeMode) return;
     const o = G.camera.position.clone(), f = P.forward();
-    const p = G.combat.spawnProjectile({ kind: 'nail', pos: o.clone().addScaledVector(f, 0.6), vel: f.clone().multiplyScalar(70), grav: 4, owner: 'player', dmg: s.dmg * 0.8, radius: 0.12, pierce: 3, life: 3, headMul: 2, info: { src: 'melee', elem: 'bleed', elemChance: 1 } });
+    const p = G.combat.spawnProjectile({ kind: 'nail', pos: o.clone().addScaledVector(f, 0.6), vel: f.clone().multiplyScalar(70), grav: 4, owner: 'player', dmg: s.dmg * 0.8, radius: 0.12, pierce: 3, life: 3, headMul: 2, info: { src: 'melee', el: G.Elem.wEl(P.melee) } });
     G.sfx.swing(false, 'knife');
     return p;
   }

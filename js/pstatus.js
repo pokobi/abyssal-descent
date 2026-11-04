@@ -290,6 +290,12 @@
       // (heal-over-time is shown on the HP bar only: no ring)
       const ROMAN = ['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ'];
       for (const k of act) { const d = PS.DEFS[k], lv = Math.min(10, Math.max(1, k === 'poison' ? s.poisonStacks || 1 : s[k + 'Lv'] || 1)), rm = ROMAN[lv] || 'Ⅰ'; want.push({ key: k, cls: 'bad st-' + k, col: d.col, icon: d.icon, name: d.name + rm, frac: U.clamp(s[k] / (max[k] || 1), 0, 1), badge: rm, t: s[k] }); }
+      // the element on you and what a reaction left on you (element.js)
+      { const EL = G.Elem, au = EL && EL.playerAura();
+        if (au) { const left = Math.max(0, P.au.t - G.game.time), D = EL.BY[au]; want.push({ key: 'el', cls: 'bad st-el', icon: D.icon, name: D.name + '属性', col: D.col, frac: Math.min(1, left / EL.SELF_T), t: left, badge: '' }); }
+        if (P.elFrozen > 0) want.push({ key: 'elfz', cls: 'bad st-el', icon: '🧊', name: '凍結', col: '#9fe0ff', frac: Math.min(1, P.elFrozen), t: P.elFrozen, badge: '' });
+        if (P.elLeak > 0) want.push({ key: 'ellk', cls: 'bad st-el', icon: '⚡', name: '漏電', col: '#7aa8ff', frac: Math.min(1, P.elLeak / 3), t: P.elLeak, badge: '' });
+        if (P.elBrittle > 0) want.push({ key: 'elbr', cls: 'bad st-el', icon: '💔', name: '脆化', col: '#d0b8ff', frac: Math.min(1, P.elBrittle / 5), t: P.elBrittle, badge: '' }); }
       const keep = new Set(want.map((w) => w.key));
       for (const [key, el] of PS.els) if (!keep.has(key)) { el.classList.add('out'); PS.els.delete(key); setTimeout(() => el.remove(), 220); }
       want.forEach((w, i) => {

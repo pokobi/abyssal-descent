@@ -160,7 +160,7 @@
   }
 
   // ---------------- damage to enemies ----------------
-  const SHIELD_BASE = { bullet: 0.6, melee: 0.6, explosion: 0.9, skill: 1.0, buff: 0.7, dot: 0.3, ally: 0.6 };
+  const SHIELD_BASE = { bullet: 0.6, melee: 0.6, explosion: 0.9, skill: 1.0, buff: 0.7, dot: 0.3, ally: 0.6, react: 1.0 };
   C.damageEnemy = function (e, amount, info) {
     if (!e || !e.alive || e.dying || e.state === 'undying') return 0; // an undying foe lying down before it rises takes nothing
     info = info || {};
@@ -185,7 +185,7 @@
     if (e.boss) add += st.bossDmg;
     if (e.elite || e.boss) add += st.eliteDmg + (info.eliteBonus || 0);
     if (P.adsActive && src === 'bullet') add += st.adsDmg;
-    if (src === 'dot') add = 0;
+    if (src === 'dot' || src === 'react') add = 0; // (a reaction's strength is its own: 属性熟練 and the reaction boons, see element.js)
     let dmg = amount * Math.max(0.1, 1 + add);
     const baseHit = dmg; // what a status this hit applies is measured by (no crit, head or mark: those would make it swing wildly)
     if (G.game.dev && G.game.dev.oneHit && src !== 'dot') dmg = Math.max(dmg, (e.hp + (e.shield || 0)) * 4 + 1e5);
@@ -201,6 +201,10 @@
     }
     ctx.crit = crit;
     if (e.st.mark > 0) dmg *= e.st.markMul || 1.6; // 'mark' skill levels raise it
+    // elements (element.js): resistance, the element left on the foe, an amplifying reaction; 脆化 makes every blow land harder
+    const er = G.Elem && src !== 'dot' ? G.Elem.onEnemyHit(e, info, src) : null;
+    if (er) dmg *= er.mul;
+    if (e.st.brittle > 0) dmg *= 1 + (e.st.brittleK || 0.25);
     if (e.dmgMul) dmg *= e.dmgMul(info, ctx);
     // front armour (beetles etc.)
     let armored = false;
@@ -234,7 +238,7 @@
           if (src === 'bullet') { G.fx.sparks(pos, null, 7, 0xcfe8ff, 6); G.sfx.hitShield(pos); }
         }
       }
-      if (shieldDealt > 0 && !info.silent && src !== 'dot') G.fx.dmgNum(pos, shieldDealt, 'shield');
+      if (shieldDealt > 0 && !info.silent && src !== 'dot') G.fx.dmgNum(pos, '⬡' + Math.max(1, Math.round(shieldDealt)), 'shield');
     }
     // ---- health ----
     let dealt = 0, overkill = 0;
@@ -245,7 +249,9 @@
       e.lastHitT = G.game.time;
       e.flinch = Math.min(1, e.flinch + (src === 'dot' ? 0.05 : 0.35));
       if (!info.silent) {
-        G.fx.dmgNum(pos, crit && src !== 'dot' ? Math.max(1, Math.round(dmg)) + '!!' : dmg, src === 'dot' ? (info.elem === 'poison' ? 'poison' : 'dot') : info.head ? 'head' : ''); // a crit is marked with '!!' after the number (any colour)
+        // colour = the element of the hit (white: none), a yellow outline = a headshot, '!!' after the number = a crit, a reaction's damage in its own colour
+        const ncls = src === 'dot' ? (info.elem === 'poison' ? 'poison' : info.elem === 'shock' ? 'dot dshock' : 'dot') : src === 'react' ? 'rxn rx-' + (info.rx || 'blast') : (info.head ? 'head ' : '') + (er && er.el ? 'el-' + er.el : '') + (er && er.rx ? ' rxn' : '');
+        G.fx.dmgNum(pos, crit && src !== 'dot' ? Math.max(1, Math.round(dmg)) + '!!' : dmg, ncls);
         if (src === 'bullet' || src === 'melee') {
           G.fx.blood(pos, info.dir ? info.dir.clone() : null, e.bloodColor, info.head ? 12 : 6);
           G.sfx.hitFlesh(pos, false, dmg > 60);
@@ -275,6 +281,7 @@
     G.enemies.onDamaged(e, info);
     if (e.mut) G.Depth.onHurt(e, info, dealt + shieldDealt);
     if (e.hp <= 0) C.killEnemy(e, info, overkill);
+    if (er && er.rx) G.Elem.after(e, er.rx, er.rxWith, info);
     if (src === 'skill' && !info.proc && !info.noTech && dealt + shieldDealt > 0) C.techOnHit(e, dealt + shieldDealt, info);
     { const skId = info.sk || ((src === 'skill' || src === 'explosion') && C.curSk); if (skId && !info.noSkOn && dealt + shieldDealt > 0 && C.skOnHit) C.skOnHit(e, dealt + shieldDealt, skId, info); }
     if (G.game.run && !e.ally && !info.ally) G.game.run.dmgDealt = (G.game.run.dmgDealt || 0) + dealt + shieldDealt; // the run's total damage (result screen)
@@ -348,7 +355,7 @@
         s.burnLv = Math.min(5, (s.burn > 0 ? s.burnLv || 1 : 0) + stacks); s.burn = 4; s.burnDps = s.burnPow * (1 + st.burnDmg) * dotMul * (0.7 + s.burnLv * 0.3); break;
       case 'frost':
         if (s.frozen > 0) break;
-        s.frostStacks = (s.frostStacks || 0) + stacks; s.frost = 4;
+        s.frostStacks = (s.frostStacks || 0) + stacks + (G.Elem && G.Elem.auraOf(e) === 'ice' ? 1 + (P.has('rx_iceHeart') ? 1 : 0) : 0); s.frost = 4;
         // freezing follows the same rule: bosses only get slowed, and a thawed foe can't be refrozen right away
         if (s.frostStacks >= 5 && (e.boss || G.game.time < (e.freezeImmuneUntil || 0))) { s.frostStacks = 4; break; }
         if (s.frostStacks >= 5) { s.frozen = 2.0; e.freezeImmuneUntil = G.game.time + 2.0 + 4; s.frostStacks = 0; G.sfx.ice(e.pos); G.fx.sparks(e.centerPos(), null, 14, 0xd0f0ff, 5); }
@@ -369,7 +376,7 @@
         if (!C.stunImmune(e)) s.stun = Math.max(s.stun || 0, 0.18);
         if (!s._shockLock) {
           s._shockLock = true;
-          C.damageEnemy(e, dotPow('shock', C.scale(8)) * dotMul, { src: 'dot', elem: 'shock', silent: false, shieldMul: 3 });
+          C.damageEnemy(e, dotPow('shock', C.scale(8)) * dotMul * (G.Elem && G.Elem.auraOf(e) === 'volt' ? 1.3 + (P.has('rx_voltHeart') ? 0.5 : 0) : 1), { src: 'dot', elem: 'shock', silent: false, shieldMul: 3 });
           if (P.has('h_overcurrent')) { const t = C.nearest(e.pos, 8, e); if (t) { G.fx.lightning(e.centerPos(), t.centerPos()); C.status(t, 'shock', 1); } }
           s._shockLock = false;
         }
@@ -385,13 +392,14 @@
   };
   C.updateStatus = function (e, dt) {
     const s = e.st;
+    if (G.Elem) G.Elem.tick(e, dt);
     for (const k of ['stun', 'fear', 'root', 'slow', 'mark', 'frozen', 'shock']) if (s[k] > 0) s[k] -= dt;
     if (s.frost > 0) { s.frost -= dt; if (s.frost <= 0) s.frostStacks = 0; }
     s.tick = (s.tick || 0) - dt;
     if (s.tick <= 0) {
       s.tick = 0.5;
       if (s.burn > 0) {
-        C.damageEnemy(e, s.burnDps * 0.5, { src: 'dot', elem: 'fire' });
+        C.damageEnemy(e, s.burnDps * 0.5 * (G.Elem && G.Elem.auraOf(e) === 'fire' ? 1.3 + (P.has('rx_fireHeart') ? 0.3 : 0) : 1), { src: 'dot', elem: 'fire' });
         G.fx.flameLick(e.pos.x, e.pos.y + e.height * 0.5, e.pos.z, 1.2);
         if (P.has('x_spread') && Math.random() < 0.35) { const t = C.nearest(e.pos, 4, e); if (t && !(t.st.burn > 0)) C.status(t, 'burn', 1); }
       }
@@ -410,6 +418,7 @@
     let m = 1;
     if (s.frost > 0) m *= 1 - Math.min(0.5, (s.frostStacks || 0) * 0.1 + 0.1);
     if (s.slow > 0) m *= 0.7;
+    if (s.elSlow > 0) m *= 0.4; // a guardian caught in 凍結 (element.js)
     if (G.game.enemyTimeScale < 1) m *= 1;
     return m * (1 + P.stats.enemySpeed) * G.Depth.speedMul(e);
   };
@@ -564,6 +573,9 @@
       // defence (from armour) is its own reduction, applied before the percentage ones
       amount *= C.ENEMY_DMG * C.defMul(P.stats.defense);
       if ((info.src === 'explosion' || info.src === 'aoe') && P.stats.blastRes) amount *= Math.max(0.2, 1 - P.stats.blastRes);
+      // an element on the blow: resistance, the element left on you, a reaction (element.js); 脆化 on you makes everything land harder
+      if (info.el && G.Elem) amount *= G.Elem.onPlayerHit(info.el);
+      if (P.elBrittle > 0) amount *= 1.15;
       if (Math.random() < Math.min(0.75, P.stats.dodge)) { G.ui.toastSmall('回避!'); G.sfx.whoosh(0.2, 0.4); return 0; }
     }
     const ctx = { amount, red: 0, src: info.src || 'melee', attacker: info.attacker, elem: info.elem };
@@ -647,6 +659,7 @@
       case 'boulder': add(PG.dode, mats.rock, 0.6, 0.55, 0.6); break;
       case 'rock': { const sp = new THREE.Group(); g.add(sp); g.userData.spin = sp; const st = new THREE.Mesh(PG.dode, mats.rock); st.scale.setScalar(0.26); sp.add(st); break; } // a tumbling stone: scale = the held one, radius = what hits
       case 'frostorb': glow(0xbfe8ff, 1.0); glow(0xffffff, 0.3); break;
+      case 'waterorb': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x3f9dff, emissive: 0x0a3a80, roughness: 0.1, transparent: true, opacity: 0.85 }), 0.22, 0.22, 0.22); glow(0x5fb0ff, 0.9); break;
       case 'darkorb': add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x1a0820 }), 0.25, 0.25, 0.25); glow(0xa040ff, 1.1); break;
       default: glow(0xffffff, 0.4);
     }
@@ -689,6 +702,7 @@
       case 'fireball': case 'bigfire': G.fx.flameLick(p.pos.x, p.pos.y - 0.1, p.pos.z, p.kind === 'bigfire' ? 2.5 : 1.0); break;
       case 'orb': case 'darkorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.25, 0.02, 0.6, 0.3, 1.0, 0.8, 0, 1); break;
       case 'soul': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.5, 0.8, 1.0, 0.8, 0, 1); break;
+      case 'waterorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.4, 0.4), U.rand(-0.6, 0), U.rand(-0.4, 0.4), 0.35, 0.18, 0.02, 0.25, 0.6, 1.0, 0.8, 4, 1); break;
       case 'frostorb': case 'icespear': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.2, 0.02, 0.7, 0.9, 1.0, 0.8, 0, 1); break;
       case 'rock': { const sp = p.mesh.userData.spin; if (sp) { sp.rotation.x += dt * 11; sp.rotation.z += dt * 6; } if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.2, 0.2), U.rand(-0.1, 0.3), U.rand(-0.2, 0.2), 0.45, 0.06, 0.16, 0.55, 0.52, 0.47, 0.5, -0.1, 1); break; }
       case 'acid': case 'spit': if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, -1, 0, 0.5, 0.08, 0.04, 0.5, 0.7, 0.1, 0.9, 5, 0); break;
@@ -875,6 +889,7 @@
         case 'arrowrain': if (Math.random() < dt * 30) { const [x, zz] = rnd(); const a = V(x + 1, p.y + 10, zz); const b = V(x, p.y, zz); G.fx.tracer(a, b, 0xcfc0a0, 0.02, 0.12); if (Math.random() < 0.3) G.fx.dust(b, V(0, 1, 0), 0x8a8070, 1); } break;
         case 'grasp': if (Math.random() < dt * 10) { const [x, zz] = rnd(); G.fx.norm.spawn(x, p.y + 0.1, zz, 0, 1.5, 0, 0.8, 0.3, 0.1, 0.08, 0.02, 0.1, 0.8, 0, 1); } break;
         case 'blades': break;
+        case 'whirl': for (let n = 0; n < 3; n++) { const a = z.t * 5 + n * 2.1 + Math.random() * 0.5; const d = r * (0.25 + Math.random() * 0.75); G.fx.add.spawn(p.x + Math.cos(a) * d, p.y + 0.15 + Math.random() * 0.6, p.z + Math.sin(a) * d, -Math.sin(a) * 3, 0.2, Math.cos(a) * 3, 0.5, 0.25, 0.04, 0.25, 0.6, 1.0, 0.7 * k, 0, 1); } break;
       }
       if (z.tick <= 0) {
         z.tick = z.interval || 0.5;
@@ -889,17 +904,19 @@
           const list = G.enemies.inRadius(p, r);
           for (const e of list) {
             if (Math.abs(e.pos.y - p.y) > 3 && !e.def.flyer) continue;
-            if (z.kind === 'fire') { C.damageEnemy(e, dmg, { src: 'skill', sk: z.sk, silent: false, proc: true, noMarker: true }); C.status(e, 'burn', 1); }
+            if (z.kind === 'fire') { C.damageEnemy(e, dmg, { src: 'skill', sk: z.sk, el: z.el, silent: false, proc: true, noMarker: true }); C.status(e, 'burn', 1); }
             else if (z.kind === 'poison') { C.status(e, 'poison', z.stacks || 1); if (dmg) C.damageEnemy(e, dmg, { src: 'skill', sk: z.sk, proc: true, noMarker: true }); }
-            else if (z.kind === 'frost') C.status(e, 'frost', 1);
+            else if (z.kind === 'frost') { C.status(e, 'frost', 1); if (G.Elem) G.Elem.give(e, z.el || G.Elem.skEl(z.sk) || 'ice'); }
             else if (z.kind === 'smoke') e.blindT = 1;
             else if (z.kind === 'gravity') { /* pull handled continuously below */ }
+            else if (z.kind === 'whirl') C.damageEnemy(e, dmg, { src: 'skill', sk: z.sk, proc: true, noMarker: true });
             else if (z.kind === 'arrowrain' || z.kind === 'grasp' || z.kind === 'holy') { C.damageEnemy(e, dmg * (z.kind === 'holy' && e.def.undead ? 3 : 1), { src: 'skill', sk: z.sk, proc: true, noMarker: true }); if (z.kind === 'grasp') e.st.root = Math.max(e.st.root || 0, 0.6); }
           }
           if (z.kind === 'heal' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) { C.heal(z.hps * z.tick, true); pl.healZoneT = 0.6; }
           if (z.kind === 'smoke' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) pl.smokeT = 0.6;
         }
       }
+      if (z.kind === 'whirl') { for (const e of G.enemies.inRadius(p, r)) { if (e.boss || e.def.big) continue; const d = p.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 0.8) e.pos.addScaledVector(d.normalize(), Math.min(l, 2.5 * dt)); } }
       if (z.kind === 'gravity') {
         for (const e of G.enemies.inRadius(p, r * 1.2)) { if (e.boss) continue; const d = p.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 0.5) e.pos.addScaledVector(d.normalize(), Math.min(l, 9 * dt)); e.st.stun = Math.max(e.st.stun || 0, 0.1); }
       }
@@ -1037,6 +1054,7 @@
   };
 
   C.update = function (dt) {
+    if (G.Elem) G.Elem.update(dt);
     updateProjectiles(dt);
     updateZones(dt);
     updatePickups(dt);

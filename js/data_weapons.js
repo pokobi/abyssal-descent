@@ -141,6 +141,9 @@
     w.price = id === 'starter' ? 0 : Math.round((RPRICE[rarity] + A.price) / 50) * 50;
     WEAPONS.push(w);
   }
+  // weapons born with an element (element.js): no 属性コア fits them
+  const INNATE = { p_cinder: 'fire', n_dragon: 'fire', y_storm: 'volt' };
+  for (const w of WEAPONS) { const el = INNATE[w.id] || (w.arch === 'flame' ? 'fire' : w.arch === 'tesla' ? 'volt' : null); if (el) w.el = el; }
   const MYTH = { y_midas: 7000, y_echo: 8000, y_maw: 9000, y_storm: 12000 };
   for (const w of WEAPONS) if (MYTH[w.id]) { w.mythic = true; w.price = MYTH[w.id]; w.name = w.name; }
   G.WEAPON_ARCH = ARCH;
@@ -151,9 +154,10 @@
   // ---------- attachments ----------
   // slot: optic, muzzle, barrel, mag, under, stock, ammo, trigger
   // mods are multiplicative (x) unless key ends with '+' (additive)
-  const SLOT = { optic: { name: '光学', icon: '🔭' }, muzzle: { name: 'マズル', icon: '🔇' }, barrel: { name: 'バレル', icon: '📏' }, mag: { name: 'マガジン', icon: '📦' }, under: { name: 'アンダー', icon: '✊' }, stock: { name: 'ストック', icon: '🪵' }, ammo: { name: '弾薬', icon: '🔸' }, trigger: { name: 'トリガー', icon: '☝️' } };
+  const SLOT = { optic: { name: '光学', icon: '🔭' }, muzzle: { name: 'マズル', icon: '🔇' }, barrel: { name: 'バレル', icon: '📏' }, mag: { name: 'マガジン', icon: '📦' }, under: { name: 'アンダー', icon: '✊' }, stock: { name: 'ストック', icon: '🪵' }, ammo: { name: '弾薬', icon: '🔸' }, trigger: { name: 'トリガー', icon: '☝️' }, core: { name: '属性コア', icon: '🔮' } };
   const NOT_PROJ = (w) => !w.proj && !w.flame;
   const GUNLIKE = (w) => !w.flame;
+  const NOEL = (w) => !w.el;
   const SHOTGUN = (w) => (w.pellets || 1) > 1;
   // high-magnification optics: not on handguns or shotguns
   const LONGGUN = (w) => NOT_PROJ(w) && !SHOTGUN(w) && w.arch !== 'pistol' && w.arch !== 'revolver';
@@ -223,6 +227,13 @@
     ['t_spin', 'trigger', 'プレスピンモーター', '🌀', 'rare', 360, { spinup: 0.4 }, null, '回転開始時間-60%。', (w) => !!w.spinup],
     ['g_fuel', 'mag', '大型燃料タンク', '🛢️', 'uncommon', 280, { mag: 1.6 }, 'tank', '燃料容量+60%。', (w) => !!w.flame],
     ['m_nozzle', 'muzzle', '拡散ノズル', '🌬️', 'uncommon', 260, { range: 1.35, dmg: 1.1 }, 'nozzle', '火炎射程+35%、ダメージ+10%。', (w) => !!w.flame],
+    // 属性コア (element.js): the gun's hits carry the element. Not on a gun born with one
+    ['c_fire', 'core', '炎の属性コア', '🔥', 'uncommon', 340, { el: 'fire' }, null, '銃の攻撃が炎属性になる。', NOEL],
+    ['c_water', 'core', '水の属性コア', '💧', 'uncommon', 340, { el: 'water' }, null, '銃の攻撃が水属性になる。', NOEL],
+    ['c_ice', 'core', '氷の属性コア', '❄️', 'uncommon', 340, { el: 'ice' }, null, '銃の攻撃が氷属性になる。', NOEL],
+    ['c_volt', 'core', '雷の属性コア', '⚡', 'uncommon', 340, { el: 'volt' }, null, '銃の攻撃が雷属性になる。', NOEL],
+    ['c_wind', 'core', '風の属性コア', '🌪️', 'uncommon', 340, { el: 'wind' }, null, '銃の攻撃が風属性になる（敵に付いた属性を周囲へ広げる）。', NOEL],
+    ['c_earth', 'core', '地の属性コア', '🪨', 'uncommon', 340, { el: 'earth' }, null, '銃の攻撃が地属性になる（敵に付いた属性で結晶を作る）。', NOEL],
     ['b_blast', 'barrel', '高圧発射筒', '🎇', 'rare', 380, { 'explodeR+': 1.2, dmg: 1.1 }, null, '爆発半径+1.2m、ダメージ+10%。', (w) => !!(w.proj && w.proj.explode)],
   ];
   const ATTACHMENTS = AT.map(([id, slot, name, icon, rarity, price, mods, visual, desc, compat]) => ({ id, slot, name, icon, rarity, price, mods, visual, desc, compat, kind: 'attachment' }));

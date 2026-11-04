@@ -45,7 +45,7 @@
     G.fx.init(scene, camera);
     G.weapons.init(renderer); G.weapons.setEnv(G.envTex);
     G.avatar.init(scene);
-    G.combat.init(); G.enemies.init(); G.Areas.init(); G.Depth.init(); G.Rooms2.init(); G.MidSave.init(); Object.assign(G.Areas.TYPES, G.Rooms2.TYPES); G.abilities.init(); G.bosses.init(); G.ui.init(); G.bindBuffs(); G.Dev && G.Dev.init();
+    G.combat.init(); G.Elem.init(); G.enemies.init(); G.Areas.init(); G.Depth.init(); G.Rooms2.init(); G.MidSave.init(); Object.assign(G.Areas.TYPES, G.Rooms2.TYPES); G.abilities.init(); G.bosses.init(); G.ui.init(); G.bindBuffs(); G.Dev && G.Dev.init();
     I.el = renderer.domElement;
     renderer.domElement.addEventListener('click', () => { if (GM.state === 'playing' && !I.locked) I.requestLock(); });
     G.on('lockchange', onLock);
@@ -596,6 +596,7 @@
   };
   GM.enterArea = function (n, kind) {
     GM.saveRun(n, kind);
+    if (G.Elem) G.Elem.clear();
     GM.area = n;
     GM.stage = kind;
     GM.spaceK = 0;

@@ -25,8 +25,12 @@
     { id: 'mirror', name: '鏡面', icon: '🪞', col: 0xd0e8ff, desc: '数秒ごとに青く光る。光っている間（約2秒）に銃で撃つと、一部が自分に跳ね返る。' },
     { id: 'splitter', name: '分裂', icon: '🧬', col: 0xa0e040, desc: '倒されると小さな分身を2体生む。' },
     { id: 'frenzy', name: '狂乱', icon: '😈', col: 0xff3030, desc: 'HPが40%を切ると速く、攻撃間隔も短くなる。' },
-    { id: 'nullify', name: '無効化', icon: '🚫', col: 0xb0b0b0, desc: '状態異常とスタンを一切受けない。' },
+    { id: 'nullify', name: '無効化', icon: '🚫', col: 0xb0b0b0, desc: '状態異常・属性とスタンを一切受けない。' },
+    { id: 'hardshell', name: '硬殻', icon: '🐚', col: 0xc8b89a, desc: '最大HPの60%にあたる硬いシールドを纏っている。' },
   ];
+  // the one-character chip each shows on the HP bar (enemies.js)
+  const CHIP = { blink: '瞬', warden: '守', volatile: '爆', undying: '不', haste: '疾', leech: '吸', gravity: '重', mirror: '鏡', splitter: '分', frenzy: '狂', nullify: '無', hardshell: '硬' };
+  for (const m of D.MUTS) m.ch = CHIP[m.id];
   D.MUT_BY_ID = Object.fromEntries(D.MUTS.map((m) => [m.id, m]));
 
   D.mutChance = function (n) {
@@ -41,14 +45,17 @@
   D.onSpawn = function (e, opts) {
     const n = G.Run.depthArea(GM.area);
     if (opts && opts.noMut) return;
-    if (!(Math.random() < D.mutChance(n) || (P.has('pact_merciless') && n >= 12))) return;
+    // an elite always carries one mutation (what the old elite traits were), on top of the ordinary draw deeper down
+    const rolled = Math.random() < D.mutChance(n) || (P.has('pact_merciless') && n >= 12);
+    if (!rolled && !e.elite) return;
     const pool = U.shuffle(D.MUTS.slice());
-    const k = Math.min(pool.length, D.mutCount(n));
+    const k = Math.min(pool.length, (rolled ? D.mutCount(n) : 0) + (e.elite ? 1 : 0));
     e.mut = {};
     for (let i = 0; i < k; i++) { e.mut[pool[i].id] = true; G.save.mark('items', 'mut_' + pool[i].id); }
     e.mutT = U.rand(2, 5);
     e.mutIcons = Object.keys(e.mut).map((id) => D.MUT_BY_ID[id].icon).join('');
     e.mutCol = D.MUT_BY_ID[Object.keys(e.mut)[0]].col;
+    if (e.mut.hardshell) { e.maxShield = Math.max(e.maxShield || 0, Math.round(e.maxHp * 0.6)); e.shield = e.maxShield; }
   };
   D.tickEnemy = function (e, dt) {
     const m = e.mut;

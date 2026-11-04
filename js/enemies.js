@@ -651,7 +651,7 @@
       this.def = def; this.level = level;
       this.noLoot = !!opts.noLoot; // minions called by a guardian leave nothing to search
       this.elite = !!opts.elite;
-      this.eliteMod = this.elite ? U.pick(ELITE_MODS) : null;
+      this.eliteMod = null; // (the old elite traits are mutations now: an elite always carries one, see depth.js)
       const st = P.stats;
       const L = level - 1;
       const hpScale = (1 + 0.11 * L) * Math.pow(1.015, L) * Math.max(0.3, 1 + st.enemyHp) * (opts.hpMul || 1);
@@ -1522,9 +1522,10 @@
     let b = E.bars.find((x) => !x.used);
     if (!b) {
       const el = document.createElement('div'); el.className = 'ebar';
-      el.innerHTML = '<div class="en"><span class="lv"></span><span class="nm"></span></div><div class="hb"><div class="tr"></div><div class="fl"></div></div><div class="sb"><div class="fl"></div></div><div class="st"></div>';
+      // name row (rank by colour + a small 精鋭 tag), then: element badge | health | trait chips, the shield, the full trait names (the foe you aim at), statuses
+      el.innerHTML = '<div class="en"><span class="rk">精鋭</span><span class="lv"></span><span class="nm"></span></div><div class="hrow"><span class="eb"></span><div class="hb"><div class="tr"></div><div class="fl"></div></div><span class="ch"></span></div><div class="sb"><div class="fl"></div></div><div class="xn"></div><div class="st"></div>';
       E.barRoot.appendChild(el);
-      b = { el, lv: el.querySelector('.lv'), nm: el.querySelector('.nm'), tr: el.querySelector('.hb .tr'), fl: el.querySelector('.hb .fl'), sb: el.querySelector('.sb'), sfl: el.querySelector('.sb .fl'), st: el.querySelector('.st'), used: false };
+      b = { el, lv: el.querySelector('.lv'), nm: el.querySelector('.nm'), tr: el.querySelector('.hb .tr'), fl: el.querySelector('.hb .fl'), sb: el.querySelector('.sb'), sfl: el.querySelector('.sb .fl'), st: el.querySelector('.st'), eb: el.querySelector('.eb'), ch: el.querySelector('.ch'), xn: el.querySelector('.xn'), used: false };
       E.bars.push(b);
     }
     b.used = true; b.key = null; b.el.style.display = ''; if (b.el._s) b.el._s.display = '';
@@ -1536,6 +1537,7 @@
   const sty = (el, k, v) => { const c = el._s || (el._s = {}); if (c[k] !== v) { c[k] = v; el.style[k] = v; } };
   E.updateBars = function () {
     const cam = G.camera;
+    let aimBar = null, aimD2 = 70 * 70;
     const sharp = P.has('o_sharp');
     for (const e of E.list) {
       if (e.noBar || e.boss && !e.showBar) { continue; }
@@ -1550,11 +1552,21 @@
       sty(b.el, 'left', Math.round(scr.x * 2) / 2 + 'px'); sty(b.el, 'top', Math.round(scr.y * 2) / 2 + 'px');
       const ke = !!e.elite, kc = !!e.cursed, km = !!e.marked;
       const kg = !!e.graveSpawn;
-      if (b.kl !== e.level || b.kn !== e.def.name || b.ke !== ke || b.kc !== kc || b.kmi !== e.mutIcons || b.kp !== e.pileRes || b.km !== km || b.kg !== kg || b.key === null) {
-        b.kl = e.level; b.kn = e.def.name; b.ke = ke; b.kc = kc; b.kmi = e.mutIcons; b.kp = e.pileRes; b.km = km; b.kg = kg; b.key = 1;
-        b.el.classList.toggle('grave', kg);
+      // the foe nearest the crosshair (within ~70px) shows its traits by name
+      { const dx = scr.x - innerWidth / 2, dy = scr.y - innerHeight / 2, d2 = dx * dx + dy * dy; if (d2 < aimD2 && e.hasLOS !== false) { aimD2 = d2; aimBar = b; } }
+      if (b.kl !== e.level || b.kn !== e.def.name || b.ke !== ke || b.kc !== kc || b.kmi !== (e.mutIcons || e.mutView) || b.kp !== e.pileRes || b.km !== km || b.kg !== kg || b.key === null) {
+        b.kl = e.level; b.kn = e.def.name; b.ke = ke; b.kc = kc; b.kmi = e.mutIcons || e.mutView; b.kp = e.pileRes; b.km = km; b.kg = kg; b.key = 1;
+        b.el.classList.toggle('grave', kg); b.el.classList.toggle('cursed', kc && !kg);
         b.lv.textContent = e.boss ? '' : 'Lv.' + e.level;
-        b.nm.textContent = (e.pileRes ? '🪨' + ['', 'Ⅰ', 'Ⅱ', 'Ⅲ'][e.pileRes] + ' ' : '') + (e.mutIcons ? e.mutIcons + ' ' : '') + (e.cursed ? '😈' : '') + (e.graveSpawn ? '⚰️ ' : '') + (e.elite ? '★' + (e.eliteMod ? e.eliteMod.icon : '') + ' ' : '') + (e.def.vicon && !e.boss ? e.def.vicon + ' ' : '') + e.def.name;
+        b.nm.textContent = e.def.name;
+        // traits as chips: mutations, a champion's trait, shock resistance against the pile driver (at most 4, then "+n")
+        const chips = [], names = [];
+        for (const id of e.mut ? Object.keys(e.mut) : e.mutView || []) { const m = G.Depth.MUT_BY_ID[id]; if (m) { chips.push([m.ch || m.name[0], '#' + m.col.toString(16).padStart(6, '0')]); names.push(m.name); } }
+        if (e.eliteMod2) { chips.push([e.eliteMod2.id === 'fast' ? '疾' : e.eliteMod2.id === 'rage' ? '狂' : '再', '#ff6040']); names.push(e.eliteMod2.id === 'fast' ? '俊足' : e.eliteMod2.id === 'rage' ? '狂暴' : '再生'); }
+        if (e.pileRes) { chips.push(['衝' + ['', 'Ⅰ', 'Ⅱ', 'Ⅲ'][e.pileRes], '#b0a090']); names.push('衝撃耐性' + ['', 'Ⅰ', 'Ⅱ', 'Ⅲ'][e.pileRes]); }
+        const shown = chips.slice(0, 4).map(([t, c]) => `<i style="--c:${c}">${t}</i>`).join('') + (chips.length > 4 ? `<i class="more">+${chips.length - 4}</i>` : '');
+        b.ch.innerHTML = shown; b.xn.textContent = names.join('・');
+        // (rank: colour of the name + the 精鋭 tag; no emoji prefixes)
         b.el.classList.toggle('elite', !!e.elite);
         b.el.classList.toggle('target', !!e.marked); b.el.classList.toggle('champ', !!(e.marked && e.champion));
         let tg = b.el.querySelector('.tg');
@@ -1566,9 +1578,15 @@
       const s = e.st, R = (n) => ['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ', 'Ⅺ', 'Ⅻ', 'XIII'][Math.min(13, Math.max(1, n || 1))] || 'Ⅰ'; let icons = '';
       if (s.burn > 0) icons += '🔥' + R(s.burnLv || 1) + ' '; if (s.frost > 0 || s.frozen > 0) icons += (s.frozen > 0 ? '🧊' : '❄️' + R(s.frostStacks || 1)) + ' '; if (s.poison > 0) icons += '☠️' + R(s.poisonStacks || 1) + ' '; if (s.shock > 0) icons += '⚡' + R(s.shockLv || 1) + ' '; if (s.bleed > 0) icons += '🩸' + R(s.bleedLv || 1) + ' '; if (s.stun > 0) icons += '💫'; if (!e.boss && G.game.time < (e.stunImmuneUntil || 0)) icons += '🛡️'; if (s.slow > 0) icons += '🐌'; if (s.mark > 0) icons += '🎯'; if (s.fear > 0) icons += '😱';
       if (b.icons !== icons) { b.icons = icons; b.st.textContent = icons; }
+      // the element on it (element.js): an icon with a ring for the time left; one it was born with gets a double ring and colours the bar's frame
+      { const EL = G.Elem, au = EL && EL.auraOf(e); const key = au ? au + (e.auFix ? '!' : '') : '';
+        if (b.ek !== key) { b.ek = key; b.eb.textContent = au ? EL.BY[au].icon : ''; b.eb.className = 'eb' + (au ? ' on' : '') + (e.auFix ? ' fix' : ''); b.el.style.setProperty('--ec', au ? EL.BY[au].col : 'transparent'); b.el.classList.toggle('elfix', !!e.auFix); }
+        if (au && !e.auFix) { const pv = Math.round(EL.auraLeft(e) / EL.AURA_T * 20) * 5 + '%'; if (b.ep !== pv) { b.ep = pv; b.eb.style.setProperty('--p', pv); } } }
       const dist = e.pos.distanceTo(P.pos);
+      b.el.classList.toggle('far', dist > 40 && !e.marked);
       sty(b.el, 'opacity', dist > 40 && !e.marked ? 0.6 : 1);
     }
+    for (const b of E.bars) if (b.used) b.el.classList.toggle('aim', b === aimBar);
     for (const [e, m] of E.marks) if (!e.alive || !E.list.includes(e)) { m.remove(); E.marks.delete(e); }
   };
   // off-screen pointer at the screen edge toward a living hunt target

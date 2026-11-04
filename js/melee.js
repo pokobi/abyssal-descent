@@ -691,7 +691,7 @@
       // attacking from behind: the enemy faces away from us
       const ef = V(Math.sin(e.yaw || 0), 0, Math.cos(e.yaw || 0)), toMe = P.pos.clone().sub(e.pos).setY(0).normalize();
       const backstab = !e.boss && ef.dot(toMe) < -0.3;
-      const info = { src: 'melee', heavy, backstab, head, headMul: s.headMul, part: head ? 'head' : 'body', dir: f.clone(), knock: s.knock * (heavy ? 1.8 : 1), pos: e.centerPos(), elem: s.elem, elemChance: s.elemChance, shieldMul: s.shieldMul, critBonus: s.critChance, lifesteal: s.lifesteal };
+      const info = { src: 'melee', heavy, backstab, head, headMul: s.headMul, part: head ? 'head' : 'body', dir: f.clone(), knock: s.knock * (heavy ? 1.8 : 1), pos: e.centerPos(), elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(P.melee), shieldMul: s.shieldMul, critBonus: s.critChance, lifesteal: s.lifesteal };
       let d = dmg;
       if (heavy && s.trait === 'reap' && !e.boss && e.hp < e.maxHp * 0.25) { d = e.hp + e.shield + 1; info.forceCrit = true; }
       C.damageEnemy(e, d, info);

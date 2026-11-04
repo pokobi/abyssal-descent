@@ -104,7 +104,7 @@
       const rp = K.swap;
       if (!rp) return dp.call(C, amount, info);
       const i = info || {}, a = i.attacker;
-      K.send({ t: 'dmg', a: r2(amount), s: i.src, e: i.elem, f: i.fixed ? 1 : 0, p: i.pos ? [r2(i.pos.x), r2(i.pos.y), r2(i.pos.z)] : null, n: a && a.def ? a.def.name : null }, rp.id);
+      K.send({ t: 'dmg', a: r2(amount), s: i.src, e: i.elem, l: i.el || undefined, f: i.fixed ? 1 : 0, p: i.pos ? [r2(i.pos.x), r2(i.pos.y), r2(i.pos.z)] : null, n: a && a.def ? a.def.name : null }, rp.id);
       return amount;
     };
     // the guardian: one player per attack, as with the mercenary; an area blow also catches whoever stands near its centre
@@ -269,13 +269,21 @@
       }
     };
     // what the guests are told of a foe's statuses (shown there), and what a guest puts on a foe (merged in here, where it ticks)
-    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark'];
+    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark', 'brittle', 'elSlow', 'leak'];
     K.statusBits = (e) => { let b = 0; SB.forEach((k, i) => { if (e.st[k] > 0) b |= 1 << i; }); return b; };
     K.handlers.ss = function (m, from) {
       for (const [id, o] of m.a) {
         const e = find(id); if (!e || !e.alive || e.dying) continue;
         for (const k in o) e.st[k] = Math.max(+e.st[k] || 0, o[k]);
         e._dotBy = from;
+      }
+    };
+    // the element a guest left on a foe, or spent in a reaction (element.js): taken as it is
+    K.handlers.ax = function (m) {
+      for (const [id, ix, left, fz] of m.a) {
+        const e = find(id); if (!e || !e.alive || e.auFix) continue;
+        e.au = ix ? { el: G.Elem.of(ix), t: GM.time + left } : null;
+        if (fz !== undefined) e._elFrozen = !!fz;
       }
     };
     K.handlers.trap = function (m) { const d = G.ENEMY_BY_ID.mimic_trap; if (d) GM.spawnEnemy({ def: d, at: { x: m.p[0], y: m.p[1], z: m.p[2] } }); };
@@ -302,7 +310,7 @@
       if (GM.bossEngaged && !K._engaged) { K._engaged = true; K.send({ t: 'engage' }); }
     };
     // one foe as a newcomer is told of it
-    const esRow = (e) => [e._nid, e.def.id, e.level, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), e.maxHp, Math.round(e.shield), e.maxShield, e.elite ? 1 : 0, r2(e.model.scale / (e.elite ? 1.15 : 1)), e.def.name, (e.noReward ? 1 : 0) | (e.noLoot ? 2 : 0) | (e.bossSpawn ? 4 : 0) | (e.cursed ? 8 : 0) | (e.champion ? 16 : 0) | (e.marked ? 32 : 0) | (e.graveSpawn ? 64 : 0), e.mut ? e.mutCol || 0xffffff : 0];
+    const esRow = (e) => [e._nid, e.def.id, e.level, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), e.maxHp, Math.round(e.shield), e.maxShield, e.elite ? 1 : 0, r2(e.model.scale / (e.elite ? 1.15 : 1)), e.def.name, (e.noReward ? 1 : 0) | (e.noLoot ? 2 : 0) | (e.bossSpawn ? 4 : 0) | (e.cursed ? 8 : 0) | (e.champion ? 16 : 0) | (e.marked ? 32 : 0) | (e.graveSpawn ? 64 : 0), e.mut ? e.mutCol || 0xffffff : 0, e.mut ? Object.keys(e.mut).join(',') : ''];
     // ---------------- someone joins a run under way (or comes back after losing the connection, with what they carried when last seen) ----------------
     K.saved = {};
     K.handlers.sv = function (m, from) { const rp = K.players.get(from); if (rp) K.saved[rp.name] = m.d; };
@@ -329,8 +337,8 @@
           e._nid = nextId++; known.set(e._nid, e);
           add.push(esRow(e));
         }
-        const fl = (e.burrowed ? 1 : 0) | (e.untargetable ? 2 : 0) | (e.invuln ? 4 : 0) | (e.st.stun > 0 ? 8 : 0) | (e.st.frozen > 0 ? 16 : 0) | (e.state === 'spawn' ? 32 : 0) | (e.model.group.visible ? 0 : 64);
-        snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0), K.statusBits(e), [e.st.poisonStacks | 0, e.st.frostStacks | 0, e.st.burnLv | 0, e.st.markMul || 0]]);
+        const fl = (e.burrowed ? 1 : 0) | (e.untargetable ? 2 : 0) | (e.invuln ? 4 : 0) | (e.st.stun > 0 ? 8 : 0) | (e.st.frozen > 0 ? 16 : 0) | (e.state === 'spawn' ? 32 : 0) | (e.model.group.visible ? 0 : 64) | (e._elFrozen ? 128 : 0);
+        snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0), K.statusBits(e), [e.st.poisonStacks | 0, e.st.frostStacks | 0, e.st.burnLv | 0, e.st.markMul || 0], e.auFix ? 0 : G.Elem.idx(G.Elem.auraOf(e)), r2(G.Elem.auraLeft(e)), r2(e.st.brittleK || 0)]);
       }
       if (add.length) K.send({ t: 'es', a: add });
       for (const [id, e] of known) {

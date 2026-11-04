@@ -34,6 +34,7 @@
       for (const k in a.mods) {
         const v = a.mods[k];
         if (k === 'elem') { s.elem = v; continue; }
+        if (k === 'el') continue; // (属性コア: read at the shot, see G.Elem.wEl)
         if (k.endsWith('+')) { const kk = k.slice(0, -1); s[kk] = (s[kk] || 0) + v; continue; }
         if (k === 'critChance') { s.critChance += v; continue; }
         s[k] = (s[k] === undefined ? 1 : s[k]) * v;
@@ -1055,7 +1056,7 @@
       if (h.e.noFalloff) fall = 1; // the last guardian stands across the void: every gun has to reach it
       const info = {
         src: 'bullet', head: h.part === 'head', part: h.part, headMul: s.headMul, weapon: w, dir: dir.clone(), pos: hp,
-        elem: s.elem, elemChance: s.elemChance, shieldMul: s.shieldMul, critBonus: s.critChance, eliteBonus: s.eliteDmg || 0,
+        elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), shieldMul: s.shieldMul, critBonus: s.critChance, eliteBonus: s.eliteDmg || 0,
         knock: (s.trait === 'knockback' || w.def.trait === 'knockback' ? 8 : 0) + (P.stats.knock ? 3 : 0) + (pellets > 1 ? 0.6 : 0.3),
         lowHit: hp.y < h.e.pos.y + h.e.height * 0.35, lifesteal: s.lifesteal || 0,
       };
@@ -1125,9 +1126,9 @@
     const base = {
       kind: pj.kind, pos: muzzle.clone(), vel: d.multiplyScalar(speed), grav: pj.grav, owner: 'player', dmg: s.dmg, radius: pj.kind === 'rocket' ? 0.25 : 0.12, weapon: w,
       headMul: s.headMul, pierce: s.pierce || 0, life: 6,
-      info: { src: 'bullet', weapon: w, elem: s.elem, elemChance: s.elemChance, shieldMul: s.shieldMul, critBonus: s.critChance, headMul: s.headMul },
+      info: { src: 'bullet', weapon: w, elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), shieldMul: s.shieldMul, critBonus: s.critChance, headMul: s.headMul },
     };
-    if (pj.explode) { base.explode = pj.explode; base.info = { src: 'explosion', weapon: w, elem: s.elem, elemChance: s.elemChance, shieldMul: s.shieldMul }; if (w.def.trait === 'cluster') base.cluster = 4; }
+    if (pj.explode) { base.explode = pj.explode; base.info = { src: 'explosion', weapon: w, elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), icd: 2.5, icdKey: 'w:' + w.def.id, shieldMul: s.shieldMul }; if (w.def.trait === 'cluster') base.cluster = 4; }
     if (pj.fuse) { base.fuse = pj.fuse; base.bounce = !!pj.bounce; }
     if (w.def.trait === 'homing') { base.homing = 5; }
     if (pj.kind === 'grenade') base.onHitEnemyExplode = true;
@@ -1156,7 +1157,7 @@
     for (const e of G.enemies.inRadius(o, reach + 1.5)) {
       const to = e.centerPos().sub(o); const dist = to.length(); to.divideScalar(dist);
       if (to.dot(f) < 0.88 - (1 - dist / reach) * 0.15) continue;
-      G.combat.damageEnemy(e, s.dmg, { src: 'bullet', weapon: w, elem: 'fire', elemChance: 0.5, noMarker: Math.random() < 0.7, shieldMul: s.shieldMul * 1.2 });
+      G.combat.damageEnemy(e, s.dmg, { src: 'bullet', weapon: w, elem: 'fire', elemChance: 0.5, el: G.Elem.wEl(w), noMarker: Math.random() < 0.7, shieldMul: s.shieldMul * 1.2 });
     }
     for (const d of G.world.destructibles) if (d.alive && d.pos.distanceTo(o) < reach) { const to = d.pos.clone().sub(o).normalize(); if (to.dot(f) > 0.85) G.combat.damageDestructible(d, s.dmg, d.pos); }
     if (wh && Math.random() < 0.2) G.fx.decal(wh.point, wh.normal, 'scorch', 0.6);

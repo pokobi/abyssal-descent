@@ -14,6 +14,7 @@
     ['g_toxic', 'grenade', '毒ガス弾', '☠️', 'uncommon', 120, '8秒間残る毒ガスを発生させる。', { dmg: 20, r: 5, fuse: 1.2, zone: 'poison', dur: 8 }],
     ['g_cluster', 'grenade', 'クラスター爆弾', '🎆', 'rare', 210, '爆発後に5つの子爆弾をばら撒く。', { dmg: 110, r: 4.5, fuse: 1.5, cluster: 5 }],
     ['g_sticky', 'grenade', '粘着爆弾', '🧲', 'uncommon', 150, '敵や壁に貼り付き、強力な爆発を起こす。', { dmg: 230, r: 3.8, fuse: 1.4, sticky: true }],
+    ['g_water', 'grenade', '水風船爆弾', '🎈', 'common', 90, '割れて半径3.75mの敵を水浸しにし、水属性を付ける。', { dmg: 40, r: 3.75, fuse: 1.2, color: 0x3f9dff }],
     ['g_flash', 'grenade', '閃光弾', '✨', 'common', 80, '半径10mの敵を2.5秒間スタンさせる。', { dmg: 5, r: 10, fuse: 1.0, stun: 2.5 }],
     ['g_hole', 'grenade', '重力子爆弾', '🕳️', 'epic', 320, '3秒間敵を吸い寄せ、最後に爆発する。', { dmg: 260, r: 8, fuse: 1.0, blackhole: 3 }],
     ['g_holy', 'grenade', '聖水瓶', '💧', 'uncommon', 120, '不死の魔物（骸骨・怨霊・屍骨）に3倍ダメージ。範囲内の自分も回復。', { dmg: 90, r: 5, impact: true, holy: true }],
@@ -39,6 +40,11 @@
     ['u_plate', 'util', '鎧板', '🛡️', 'uncommon', 120, 'オーバーシールド+35。', { os: 35 }],
     ['u_battery', 'util', '魔力電池', '🔋', 'rare', 190, 'オーバーシールド+80。', { os: 80 }],
     ['u_iron', 'util', '鉄皮の薬', '🪨', 'uncommon', 130, '10秒間、被ダメ-50%。', { temp: { armor: 0.5 }, dur: 10 }],
+    // 属性の油 (element.js): the weapon in hand takes the element for 30 s
+    ['u_oil_fire', 'util', '炎の油', '🔥', 'rare', 190, '手に持っている武器（銃・近接）が30秒間炎属性になる。', { oil: 'fire', dur: 30 }],
+    ['u_oil_water', 'util', '水の油', '💧', 'rare', 190, '手に持っている武器（銃・近接）が30秒間水属性になる。', { oil: 'water', dur: 30 }],
+    ['u_oil_ice', 'util', '氷の油', '❄️', 'rare', 190, '手に持っている武器（銃・近接）が30秒間氷属性になる。', { oil: 'ice', dur: 30 }],
+    ['u_oil_volt', 'util', '雷の油', '⚡', 'rare', 190, '手に持っている武器（銃・近接）が30秒間雷属性になる。', { oil: 'volt', dur: 30 }],
     ['u_invis', 'util', '透明薬', '👻', 'rare', 190, '8秒間透明になり、敵に狙われなくなる。', { invis: 8 }],
     // repair kit: not a pocket item - it is dragged onto an armour piece on the inventory screen (see js/invui.js)
     ['u_repair', 'util', '名工の補修具', '🛠️', 'epic', 380, '名工が遺した携帯用の補修具。インベントリで防具へドラッグ＆ドロップして使う。対象の防具の耐久を+150修復する（最大値まで）。', { repair: 150 }],
@@ -120,6 +126,8 @@
     ['arrowrain', '矢の雨', '☔', 'epic', 4200, 20, '照準地点に5秒間矢の雨を降らせる。', { r: 7, dur: 5, dps: 60 }],
     ['quake', '地震', '🌋', 'epic', 4400, 18, '地上にいる周囲20mの全ての敵にダメージ＋2秒スタン。', { r: 20, dmg: 110 }],
     ['icespear', '氷槍', '🧊', 'uncommon', 3000, 8, '貫通する氷の槍を放ち、命中した敵を凍結させる。', { dmg: 150 }],
+    ['waterbolt', '水弾', '💧', 'uncommon', 3000, 7, '水の弾を撃つ。当たると半径3mで弾け、ダメージと水属性を与える。', { dmg: 120, r: 3 }],
+    ['whirlpool', '渦潮', '🌀', 'rare', 3200, 14, '照準地点に5秒間の渦を作る。範囲の敵に水属性を付け続け、ダメージを与え、中心へ弱く引き寄せる。', { r: 4.5, dur: 5, dmg: 25 }],
     ['fireball', '火球', '🌞', 'uncommon', 3200, 7, '爆発する火球を放ち、敵を炎上させる。', { dmg: 170, r: 4.5 }],
     ['thornarmor', '茨の鎧', '🌵', 'uncommon', 2800, 20, '8秒間、被ダメ-35%、近接攻撃してきた敵へ反射。', { dur: 8 }],
     ['groundpound', '地裂掌', '✋', 'rare', 3100, 9, '地面を叩き、前方扇状に衝撃の亀裂を走らせる。パイルドライバーのクールタイムを2秒短縮。', { dmg: 120, r: 12 }],

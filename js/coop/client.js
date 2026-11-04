@@ -119,7 +119,7 @@
     }
     // The host's statuses are what a foe really has: they are shown from its snapshots (and tick there). A status you put on it yourself shows at once and is
     // sent to the host (C.status / C.stun below); nothing ticks damage here, so one burn is never counted twice.
-    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark'];
+    const SB = ['burn', 'poison', 'bleed', 'frozen', 'frost', 'shock', 'stun', 'slow', 'root', 'fear', 'mark', 'brittle', 'elSlow', 'leak'];
     K.mirrorStatus = function (e, n, dt) {
       const s = e.st, mine = e._ssT > performance.now() - 600;
       SB.forEach((k, i) => {
@@ -152,6 +152,7 @@
         if (e.champion && e.makeCurseRing) e.makeCurseRing(0xff3018);
         if (e.marked && e.markTarget) e.markTarget(e.champion);
         if (a[15] && e.makeCurseRing) e.makeCurseRing(a[15]);
+        if (a[16]) e.mutView = a[16].split(','); // (shown on the bar only: what the mutations do is the host's)
         e._n = { pos: V(x, y, z), yaw, atk: 0, wind: 0, mv: 0, fl: 0 };
         e.update = repUpdate;
         e.model.inner.position.y = 0; e.model.group.scale.setScalar(1);
@@ -165,6 +166,9 @@
         // a foe the host still has and this side lost: ask for it again
         if (!e || !e.alive) { (K._miss = K._miss || {})[a[0]] = (K._miss[a[0]] || 0) + 1; if (K._miss[a[0]] === 30) K.send({ t: 'need', id: a[0] }); if (e && !e.alive) reps.delete(a[0]); continue; }
         const n = e._n; n.pos.set(a[1], a[2], a[3]); n.yaw = a[4]; n.fl = a[7]; n.atk = a[8]; n.wind = a[9]; n.mv = a[10]; n.sb = a[11] | 0; n.sx = a[12];
+        // the element on it (yours shows at once and is sent up; the host's word wins otherwise)
+        if (!e.auFix && !(e._auT > now - 500)) e.au = a[13] ? { el: G.Elem.of(a[13]), t: GM.time + (a[14] || 0) } : null;
+        e._elFrozen = !!(a[7] & 128); if (a[15]) e.st.brittleK = a[15];
         // your own last hits are ahead of what the host has seen yet
         if (!(e._hitT > now - 400)) { if (a[5] < e.hp - 0.5) { e.lastHitT = GM.time; e.flinch = Math.min(1, e.flinch + 0.2); } e.hp = a[5]; e.shield = a[6]; }
       }
@@ -203,15 +207,19 @@
       return ke.call(C, e, info, ov);
     };
     // a status you put on a foe is worked out here with your build, then handed to the host in full (it ticks the damage there)
-    const SS = ['burn', 'burnPow', 'burnLv', 'burnDps', 'poison', 'poisonPow', 'poisonStacks', 'bleed', 'bleedDps', 'bleedLv', 'frost', 'frostStacks', 'frozen', 'shock', 'shockLv', 'stun', 'slow', 'root', 'fear', 'mark', 'markMul', 'markKillReset'];
+    const SS = ['burn', 'burnPow', 'burnLv', 'burnDps', 'poison', 'poisonPow', 'poisonStacks', 'bleed', 'bleedDps', 'bleedLv', 'frost', 'frostStacks', 'frozen', 'shock', 'shockLv', 'stun', 'slow', 'root', 'fear', 'mark', 'markMul', 'markKillReset', 'brittle', 'brittleK', 'elSlow', 'leak', 'leakK'];
     const ssOut = new Map();
     const sendStatus = (e) => { e._ssT = performance.now(); const o = {}; for (const k of SS) if (e.st[k]) o[k] = e.st[k] === true ? 1 : +(+e.st[k]).toFixed(2); ssOut.set(e._nid, o); };
     C.status = function (e, kind, stacks) { const r = st0.call(C, e, kind, stacks); if (remoteOf(e)) sendStatus(e); return r; };
     C.stun = function (e, t) { const r = stun0.call(C, e, t); if (remoteOf(e)) sendStatus(e); return r; };
-    K.flushStatus = function () { if (ssOut.size) { K.send({ t: 'ss', a: [...ssOut] }); ssOut.clear(); } };
+    // the element you leave on a foe (or spend in a reaction) goes up as it is; a reaction's lasting effects go up with the statuses
+    const axOut = new Map();
+    G.Elem.onNetAura = function (e) { if (!remoteOf(e)) return; e._auT = performance.now(); axOut.set(e._nid, [e._nid, e.auFix ? 0 : G.Elem.idx(G.Elem.auraOf(e)), +G.Elem.auraLeft(e).toFixed(2), e._elFrozen ? 1 : 0]); };
+    G.Elem.onNetStatus = function (e) { if (remoteOf(e)) sendStatus(e); };
+    K.flushStatus = function () { if (ssOut.size) { K.send({ t: 'ss', a: [...ssOut] }); ssOut.clear(); } if (axOut.size) { K.send({ t: 'ax', a: [...axOut.values()] }); axOut.clear(); } };
     // ---------------- what comes down the wire and hurts ----------------
     K.handlers.dmg = function (m) {
-      C.damagePlayer(m.a, { src: m.s, elem: m.e, fixed: !!m.f, pos: m.p ? V(...m.p) : null });
+      C.damagePlayer(m.a, { src: m.s, elem: m.e, el: m.l || undefined, fixed: !!m.f, pos: m.p ? V(...m.p) : null });
       if (m.n && P.dead) GM.lastCause = m.n;
     };
     K.handlers.kick = function (m) { P.vel.x += m.v[0]; P.vel.y += m.v[1]; P.vel.z += m.v[2]; };

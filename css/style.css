@@ -221,13 +221,37 @@ button { font-family: inherit; }
 .ebar .hb .fl { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #e94a38, #9a2218); }
 .ebar .sb { width: 76px; height: 4px; margin: 1px auto 0; background: rgba(0,0,0,0.65); border: 1px solid rgba(0,0,0,0.9); }
 .ebar .sb .fl { height: 100%; background: linear-gradient(90deg, #9cc9ea, #f0f8ff); }
-.ebar .st { font-size: 11px; height: 13px; }
+.ebar .st { font-size: 9px; height: 11px; }
+/* the name row: rank by colour (精鋭 gold with its tag, curse violet, grave-raised grey); then element badge | health | trait chips */
+.ebar .en .rk { display: none; font-size: 9px; line-height: 12px; padding: 0 4px; margin-right: 4px; border-radius: 2px; background: #ffd34a; color: #2a1a00; text-shadow: none; vertical-align: 1px; }
+.ebar.elite .en .rk { display: inline-block; }
+.ebar.cursed .en { color: #d8a8ff; }
+.ebar .hrow { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.ebar .hrow .hb { margin: 0; }
+.ebar .eb { width: 14px; height: 14px; flex: none; font-size: 8px; line-height: 14px; border-radius: 50%; visibility: hidden; text-shadow: none; }
+.ebar .eb.on { visibility: visible; background: radial-gradient(circle, rgba(10,10,14,0.85) 56%, transparent 58%), conic-gradient(var(--ec) var(--p, 100%), rgba(255,255,255,0.18) 0); }
+.ebar .eb.fix { background: rgba(10,10,14,0.85); box-shadow: 0 0 0 1.5px var(--ec), 0 0 0 3px rgba(0,0,0,0.85), 0 0 0 4.5px var(--ec); }
+.ebar.elfix .hb { border-color: var(--ec); box-shadow: 0 0 4px var(--ec); }
+.ebar .ch { min-width: 14px; flex: none; display: inline-flex; gap: 1px; text-align: left; }
+.ebar .ch i { font-style: normal; font-size: 9px; font-weight: 900; line-height: 12px; min-width: 12px; padding: 0 1px; border-radius: 6px; color: #141414; background: var(--c); text-align: center; text-shadow: none; }
+.ebar .ch i.more { background: #c8c8c8; }
+.ebar .xn { display: none; font-size: 10px; font-weight: 700; color: #ffe9c0; text-shadow: 0 0 3px #000, 0 0 2px #000; }
+.ebar.aim .xn:not(:empty) { display: block; }
+.ebar.far .en, .ebar.far .st, .ebar.far .xn { display: none; }
+.ebar.far .ch { visibility: hidden; }
 .ebar.boss-weak .hb { width: 50px; }
 .dnum { position: absolute; font-weight: 900; font-size: 18px; color: #fff; text-shadow: 0 0 3px #000, 0 2px 2px #000; transform: translate(-50%,-50%); animation: dnum .8s ease-out forwards; white-space: nowrap; }
-.dnum.head { color: #ffd34a; font-size: 23px; }
+.dnum.head { font-size: 23px; text-shadow: 2px 0 #ffd34a, -2px 0 #ffd34a, 0 2px #ffd34a, 0 -2px #ffd34a, 1.5px 1.5px #ffd34a, -1.5px -1.5px #ffd34a, 1.5px -1.5px #ffd34a, -1.5px 1.5px #ffd34a, 0 0 5px #000; }
+/* the colour of a number is the element of the hit (element.js); a headshot is the yellow outline above, a crit the '!!' after it */
+.dnum.el-fire { color: #ff6a3a; } .dnum.el-water { color: #3f9dff; } .dnum.el-ice { color: #a8ecff; } .dnum.el-volt { color: #b88cff; } .dnum.el-wind { color: #4fd8c0; } .dnum.el-earth { color: #e0a640; }
+.dnum.rxn { font-size: 25px; }
+.dnum.rxl { font-size: 15px; letter-spacing: 0.08em; }
+.dnum.rx-boil { color: #ff9a5a; } .dnum.rx-thaw { color: #ffb0c8; } .dnum.rx-freeze { color: #9fe0ff; } .dnum.rx-shatter { color: #e8f8ff; } .dnum.rx-blast { color: #ff6aa8; }
+.dnum.rx-leak { color: #7aa8ff; } .dnum.rx-brittle { color: #d0b8ff; } .dnum.rx-swirl { color: #4fd8c0; } .dnum.rx-crystal { color: #e0a640; }
 .dnum.crit { color: #ff8a3a; font-size: 24px; }
-.dnum.shield { color: #bfe2ff; }
-.dnum.dot { font-size: 13px; color: #ffb37a; }
+.dnum.shield { color: #c8d0dc; }
+.dnum.dot { font-size: 13px; color: #ffb37a; opacity: 0.8; }
+.dnum.dot.dshock { color: #f0e070; }
 .dnum.immune { color: #999; font-size: 14px; }
 .dnum.heal { color: #7ed36a; }
 .dnum.poison { color: #a6e06a; font-size: 13px; }
@@ -1405,7 +1429,7 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 .exit-mark em { font-style: normal; font-size: 12px; color: var(--c, #fff); letter-spacing: 1px; }
 .exit-mark b { font-size: 11px; color: #e8e0d0; font-weight: normal; }
 .exit-mark.edge { opacity: 0.7; }
-.ebar.grave .en { color: #cdb4ff; }
+.ebar.grave .en { color: #b4b4b4; }
 .ebar.grave .hb { border-color: #6a3cc0; box-shadow: 0 0 5px rgba(150,90,255,0.55); }
 .iw-it.empty { opacity: 0.28; }
 .iv-ph span .iv-sort { margin-left: 0.9em; padding: 0.15em 0.7em; font: inherit; font-size: 1em; color: #e8d6b0; background: rgba(60,46,28,0.85); border: 1px solid rgba(220,190,130,0.45); border-radius: 0.3em; cursor: pointer; pointer-events: auto; }

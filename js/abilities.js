@@ -379,6 +379,24 @@
         G.sfx.whoosh(0.3, 0.8); if (id === 'fireball') G.sfx.fire(o); if (id === 'icespear') G.sfx.ice(o);
         break;
       }
+      case 'waterbolt': {
+        // 水弾: a ball of water that bursts on what it hits and soaks everything around (element.js)
+        const o = P.handPos(); const a = aim(80); const tgt = a.e ? a.e.centerPos() : a.wh ? a.wh.point : a.o.clone().addScaledVector(a.d, 80);
+        const d0 = tgt.sub(o).normalize();
+        for (const ang of fan(m.x_triple)) {
+          const d = d0.clone().applyAxisAngle(V(0, 1, 0), ang), k = ang ? 0.7 : 1;
+          C.spawnProjectile({ kind: 'waterorb', pos: o.clone(), vel: d.multiplyScalar(48), grav: 2, owner: 'player', dmg: sc(p.dmg) * k, radius: 0.25, pierce: 0, life: 4, explode: p.r, info: { src: 'skill', color: 0x3f9dff, small: true } });
+        }
+        G.sfx.whoosh(0.3, 1.1);
+        break;
+      }
+      case 'whirlpool': {
+        // 渦潮: a whirl of water on the floor: it soaks, hurts and draws the small ones in
+        const a = aim(40); const pt = a.floorPt.clone();
+        C.zone(pt, p.r * (m.x_wide ? 1.3 : 1), p.dur, 'whirl', sc(p.dmg));
+        G.sfx.whoosh(0.8, 0.5);
+        break;
+      }
       case 'spikes': {
         const f0 = P.forward(); f0.y = 0; f0.normalize();
         const start = P.pos.clone();
@@ -611,7 +629,7 @@
     const d = G.ITEM_BY_ID[id].data;
     const fl = G.world.floorBelow(pos.x, pos.y + 0.3, pos.z);
     const ground = V(pos.x, fl > -50 ? fl : pos.y, pos.z);
-    const info = { src: 'explosion', grenade: true, shieldMul: d.shieldMul || 1, emp: !!d.emp, elem: d.elem, stacks: d.stacks };
+    const info = { src: 'explosion', grenade: true, shieldMul: d.shieldMul || 1, emp: !!d.emp, elem: d.elem, stacks: d.stacks, el: G.Elem.GREN[id] || null };
     if (G.GrenFX) G.GrenFX.boom(id, pos, ground, d); // what this one looks and sounds like on top of the shared blast below
     if (d.blackhole) {
       C.zone(ground, d.r, d.blackhole, 'gravity', 0, { onEnd: () => C.explode(ground.clone().add(V(0, 1, 0)), d.r * 0.7, dmg, Object.assign({}, info, { color: 0xa070ff })) });
@@ -634,9 +652,9 @@
       for (let i = 0; i < 30; i++) G.fx.add.spawn(pos.x, pos.y, pos.z, U.rand(-4, 4), U.rand(1, 5), U.rand(-4, 4), 0.8, 0.15, 0.02, 1.3, 1.2, 0.8, 1, 6, 1);
       return;
     }
-    if (id === 'g_molotov') { G.sfx.breakObj(pos, 'ceramic'); G.sfx.fire(pos, true); G.fx.fireBurst(ground, d.r); C.zone(ground, d.r, d.dur, 'fire', C.scale(22)); for (const e of G.enemies.inRadius(pos, d.r)) C.damageEnemy(e, dmg, info); return; }
+    if (id === 'g_molotov') { G.sfx.breakObj(pos, 'ceramic'); G.sfx.fire(pos, true); G.fx.fireBurst(ground, d.r); C.zone(ground, d.r, d.dur, 'fire', C.scale(22), { el: 'fire' }); for (const e of G.enemies.inRadius(pos, d.r)) C.damageEnemy(e, dmg, info); return; }
     C.explode(pos, d.r, dmg, Object.assign({}, info, { color: d.elem === 'frost' ? 0xbfe8ff : d.emp ? 0xa8d0ff : d.elem === 'shock' ? 0xe0e8ff : undefined }));
-    if (d.zone) C.zone(ground, d.r, d.dur, d.zone, C.scale(d.zone === 'fire' ? 26 : 16));
+    if (d.zone) C.zone(ground, d.r, d.dur, d.zone, C.scale(d.zone === 'fire' ? 26 : 16), { el: G.Elem.GREN[id] || undefined });
     if (d.elem === 'shock') for (const e of G.enemies.inRadius(pos, d.r)) C.chain(e, 2, dmg * 0.3, 8, { src: 'explosion' });
     if (d.cluster) for (let i = 0; i < d.cluster; i++) C.spawnProjectile({ kind: 'grenade', pos: pos.clone().add(V(0, 0.4, 0)), vel: V(U.rand(-6, 6), U.rand(5, 9), U.rand(-6, 6)), grav: 18, owner: 'player', dmg: dmg * 0.4, explode: d.r * 0.6, fuse: U.rand(0.5, 1.0), bounce: true, info: { src: 'explosion', grenade: true, small: true, isCluster: true } });
     if (d.emp) { G.fx.ring(ground, d.r, 0xa8d0ff, 0.5); G.sfx.zap(pos); if (G.bosses.active && G.bosses.active.emp) G.bosses.active.emp(pos, d.r); }
@@ -730,6 +748,11 @@
     if (d.turret) { const a = aim(5); C.spawnTurret(a.floorPt, d.turret, C.scale(26)); }
     if (d.decoy) { const a = aim(6); C.addDecoy(a.floorPt, d.decoy, 0); }
     if (d.grapple) P.grappleCd = 0;
+    if (d.oil) {
+      // 属性の油: the weapon in hand (gun or melee) carries the element for 30 s, over what it had
+      const w = P.meleeMode || !P.weapon ? P.melee : P.weapon;
+      if (w) { w.oil = { el: d.oil, t: G.game.time + d.dur }; const E = G.Elem.BY[d.oil]; G.ui.toastSmall(`${E.icon} ${w.def.name} が${d.dur}秒間 ${E.name}属性に`); G.sfx.magic(P.pos); }
+    }
     if (d.invis) { C.temp('invis_item', d.invis, { invis: 1 }, '👻'); }
     if (d.ward) { P.wardT = d.ward; G.fx.bubble(P.chestPos(), 3.2, 0xd0b0ff); G.sfx.magic(P.pos); }
     if (d.refill) { for (const w of P.weapons) w.mag = G.weapons.stats(w).mag; G.sfx.mech('magIn'); }

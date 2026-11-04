@@ -14,6 +14,7 @@
     bossDmg: 0, eliteDmg: 0, pierce: 0, ricochet: 0, doubleShot: 0, knock: 0, shopDiscount: 0, buffChoices: 3, buffRerolls: 0, weaponSlots: 2, ammoSave: 0,
     healMul: 0, enemyDmg: 0, enemySpeed: 0, enemyHp: 0, infAmmo: 0, lowGrav: 0, soulLantern: 0, adsDmg: 0, hipSpread: 0, extraChests: 0, chestBonus: 0,
     healDrop: 0, throwPow: 0, invis: 0, extraEnemies: 0, defense: 0, weight: 0, statusRes: 0, dotRes: 0, blastRes: 0, sprintRamp: 0,
+    elMastery: 0, elRes_fire: 0, elRes_water: 0, elRes_ice: 0, elRes_volt: 0, elRes_wind: 0, elRes_earth: 0, reactDmg: 0, reactMul: 0,
     skillCd: 0, skillRad: 0, skillDur: 0, skillCharges: 0, techBurn: 0, techFrost: 0, techShock: 0, techStun: 0, techVamp: 0, techShield: 0,
     ultDmg: 0, ultCd: 0, ultDur: 0, ultCharge: 0, ultHeal: 0, ultShield: 0, ultOver: 0, ultEcho: 0, ultTech: 0,
     pileDmg: 0, pileRadius: 0, pileCd: 0, pileFast: 0, pileFire: 0, pileShock: 0, pileFrost: 0, pileStun: 0, pileVacuum: 0, pileBounce: 0, pileShield: 0, pileHeal: 0, pileHeight: 0, pileShieldMul: 0, pileMeteor: 0,
@@ -292,6 +293,7 @@
       if (this.crouching && !this.sliding && !this._sjRun) targetSpeed = 3.3 * (1 + st.moveSpeed * 0.5) * this.moveMul();
       if (G.weapons.adsT > 0.5) targetSpeed *= 0.62;
       if (this.st.slow > 0) targetSpeed *= Math.max(0.4, 0.7 - 0.1 * ((this.st.slowLv || 1) - 1));
+      if (this.elFrozen > 0) targetSpeed = 0; // 凍結 on you (element.js)
       if (this.inWater) targetSpeed *= 0.9;
       targetSpeed *= this.fieldSpeed || 1;
 

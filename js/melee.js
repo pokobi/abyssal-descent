@@ -94,10 +94,11 @@
     gEl.firstChild.style.height = (gd.g * 100).toFixed(1) + '%';
   }
   W.hideGuardUI = () => { if (gEl) gEl.classList.remove('on'); gd.on = false; gd.k = 0; };
-  const MELEM = { frost: ['❄️', '冷気'], burn: ['🔥', '炎上'], poison: ['☠️', '毒'], shock: ['⚡', '感電'] };
+  const MELEM = { frost: ['❄️', '冷気'], burn: ['🔥', '炎上'], poison: ['☠️', '毒'], shock: ['⚡', '電撃'] };
   W.meleeFx = function (d) {
     const out = [];
     if (d.traitDesc) out.push('✦ ' + d.traitDesc);
+    if (d.el && G.Elem && G.Elem.BY[d.el]) out.push(`${G.Elem.BY[d.el].icon} ${G.Elem.BY[d.el].name}属性`);
     if (d.elem && MELEM[d.elem]) out.push(`${MELEM[d.elem][0]} ${MELEM[d.elem][1]}付与 ${Math.round((d.elemChance || 0) * 100)}%（重撃100%）`);
     if (d.shieldMul && d.shieldMul > 1) out.push(`🛡️ シールド特効 +${Math.round((d.shieldMul - 1) * 100)}%`);
     if (d.lifesteal) out.push(`🩸 吸血 ${Math.round(d.lifesteal * 100)}%`);

@@ -106,7 +106,7 @@
       this.attStash = []; // detached attachments (kept when moving parts around or swapping a weapon out)
       this.meleeMode = false;
       this.revives = G.Run ? G.Run.startRevives() : 3;
-      // Q = ultimate (everyone starts with 不屈の城塞), X / Z / V = skills
+      // Q = ultimate, X / Z / V = skills (the class's own kit is put in by G.Classes.kit below)
       this.skills = [G.abilities.makeSlot(G.DEFAULT_ULT || 'ult_bastion'), null, null, null];
       if (G.Classes) { G.Classes.kit(this); this.recalc(); this.hp = this.stats.maxHp; } // the class's gun, melee weapon, skill and ultimate (classes.js)
       this.grenades = { g_frag: 2 };

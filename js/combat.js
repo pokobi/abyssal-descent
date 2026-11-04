@@ -190,7 +190,6 @@
     let dmg = amount * Math.max(0.1, 1 + add);
     const baseHit = dmg; // what a status this hit applies is measured by (no crit, head or mark: those would make it swing wildly)
     if (G.game.dev && G.game.dev.oneHit && src !== 'dot') dmg = Math.max(dmg, (e.hp + (e.shield || 0)) * 4 + 1e5);
-    if (info.elem === 'shock' && e.wetUntil > G.game.time) dmg *= 1.5; // wet from shallow water
     // pile driver vs. shock-resistant foes (and flyers hovering above the shockwave)
     if (info.pile) { if (e.pileRes) dmg *= [1, 0.7, 0.45, 0.25][e.pileRes]; if (e.flyer && e.pos.y - P.pos.y > 2.2) dmg *= 0.5; if (e.boss) dmg *= 0.5; } // guardians brace against the shockwave
     if (info.head) dmg *= info.headMul || 2;
@@ -284,7 +283,7 @@
         // (a blow whose element was just spent in a reaction does not put that element's status back on: the reaction stops it)
         const spent = er && er.rx && er.el && G.Elem.STATUS_EL[info.elem] === er.el;
         if (info.elem && !spent && Math.random() < (info.elemChance ?? 1)) C.status(e, info.elem, info.stacks || 1);
-        if (st.elemChance > 0 && !info.proc && Math.random() < st.elemChance) C.status(e, info.elem || U.pick(['burn', 'frost', 'poison', 'shock']), 1);
+        if (st.elemChance > 0 && !info.proc && Math.random() < st.elemChance) { const k = info.elem || U.pick(['burn', 'frost', 'poison', 'shock']); if (!(er && er.rx && er.el && G.Elem.STATUS_EL[k] === er.el)) C.status(e, k, 1); }
       } finally { C._hit = hit0; }
       if (info.knock && !e.boss) e.knockback(info.dir || e.pos.clone().sub(P.pos).setY(0).normalize(), info.knock);
     }

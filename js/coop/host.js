@@ -280,6 +280,8 @@
         e._dotBy = from;
       }
     };
+    // a status a guest's reaction stopped (element.js): stopped here too, where it ticks
+    K.handlers.xs = function (m) { for (const [id, el] of m.a) { const e = find(id); if (e && e.alive) G.Elem.stopStatus(e, el); } };
     // the element a guest left on a foe, or spent in a reaction (element.js): taken as it is
     K.handlers.ax = function (m) {
       for (const [id, ix, left, fz] of m.a) {

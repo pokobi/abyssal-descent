@@ -1217,8 +1217,8 @@
   };
   // a gun thrown away from the inventory screen becomes a pickup on the ground that keeps its upgrades, parts and ammo
   // a gun out of your hands as an inventory thing (attachments, level, ammo and kills ride along)
-  GM.gunItem = (w) => G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, mag: w.mag, kills: w.kills || 0 } });
-  GM.meleeItem = (m) => G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0 } });
+  GM.gunItem = (w) => G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined } }); // (its own element and the kit mark ride along)
+  GM.meleeItem = (m) => G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0, kit: m.kit ? 1 : undefined } });
   // take a gun out of your hands (every gun can go: with none left you fight with the melee weapon / fists)
   GM.releaseGun = function (w) {
     if (!w || !P.weapons.includes(w)) return null;
@@ -1294,7 +1294,7 @@
   GM.takeGun = function (it, quiet) {
     if (P.weapons.length >= P.stats.weaponSlots) return false;
     const x = it.gun || {}, w = G.weapons.make(it.id);
-    w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; w.ver++; w.mag = x.mag ?? w.mag;
+    w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag;
     P.weapons.push(w); G.weapons.switchTo(P.weapons.length - 1); G.ui.refreshWeapon(); P.recalc();
     const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を${quiet ? '装備した' : '拾った'}`);
     return true;
@@ -1312,11 +1312,11 @@
   GM.takeMelee = function (it, quiet) {
     const prev = P.melee;
     if (prev && prev.id !== (G.BARE_MELEE || 'fists')) {
-      const old = G.Inv.make('melee', prev.id, 1, { gun: { lv: prev.lv || 0 } });
+      const old = G.Inv.make('melee', prev.id, 1, { gun: { lv: prev.lv || 0, kit: prev.kit ? 1 : undefined } });
       G.Inv.dropToGround(old, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)));
     }
     const m = G.weapons.makeMelee(it.id);
-    m.lv = (it.gun && it.gun.lv) || 0;
+    m.lv = (it.gun && it.gun.lv) || 0; if (it.gun && it.gun.kit) m.kit = true;
     P.melee = m;
     if (P.meleeMode) G.weapons.melee.equip(false);
     G.ui.refreshWeapon(); P.recalc();

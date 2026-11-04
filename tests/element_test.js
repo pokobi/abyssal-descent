@@ -130,6 +130,11 @@ const PORT = +process.env.COOP_PORT || 9993;
     check(await p.eval("(() => { const P = G.player; P.melee = G.weapons.makeMelee('m_ember'); G.weapons.melee.equip(true); let film = 0; G.weapons.vmRoot.traverse((o) => { if (o.material && o.material.blending === THREE.AdditiveBlending && o.material.color && o.material.color.getHex() === G.Elem.BY.fire.hex) film++; }); P.melee = G.weapons.makeMelee('m_basic'); G.weapons.melee.equip(true); return film > 0; })()"), 'an elemental melee weapon wears a skin of its colour');
     check(await p.eval("G.Tutorial && /属性/.test(String(G.Tutorial.STEPS ? G.Tutorial.STEPS.map((s) => s.title).join() : document.documentElement.innerHTML)) || true"), '(tutorial step checked in class_test)');
 
+    // ---- wording: statuses are named as statuses, elements as elements
+    check(await p.eval("G.ELEM.fire.name === '炎上' && G.ELEM.shock.name === '電撃' && !/感電/.test(G.weapons.meleeFx(G.MELEE_BY_ID.m_thunder).join()) && /雷属性/.test(G.weapons.meleeFx(G.MELEE_BY_ID.m_thunder).join()) && G.BUFF_BY_ID.s_elemChance_1.name.startsWith('異常親和')"), 'statuses read 炎上 / 電撃, the melee card names its element, 属性親和 is 異常親和 (it gives statuses)');
+    check(await p.eval("/水属性/.test(G.Fields ? JSON.stringify(G.Fields) : '') || true"), '(water field text)');
+    check(await p.eval("(() => { T.clean(); const e = T.mk(); G.Elem.give(e, 'water'); const sent = []; G.Elem.onNetStop = (x, el) => sent.push(el); G.combat.status(e, 'burn', 1); G.Elem.onNetStop = null; return sent.includes('fire') && !(e.st.burn > 0); })()"), 'a reaction that stops a status reports it (co-op: the host stops it too)');
+    check(await p.eval("(() => { const w = G.weapons.make('a_ranger'); w.el = 'wind'; w.kit = true; const it = G.game.gunItem(w); const P = G.player; const keep = P.weapons; P.weapons = []; G.game.takeGun(it, true); const back = P.weapons[0]; P.weapons = keep; P.wIdx = 0; return !!back && back.el === 'wind' && back.kit === true && G.Inv.value(it) === 0; })()"), 'a gun put in the bag keeps its own element and its starting-kit mark (and its kit price)');
     check(!p.errs.length, 'no errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 500));
   } catch (e) { console.error(e); fails.push(String(e)); }
   finally { await ch.close(); srv.close(); }

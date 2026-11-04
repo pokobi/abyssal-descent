@@ -661,7 +661,7 @@
     const d = IV.def(it); if (!d) return '';
     if (it && it.type === 'gun') { // the same card as a gun in your hands
       const x = it.gun || {}, w = G.weapons.make(it.id);
-      w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0;
+      w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true;
       return G.StatusUI.gunTip(w) + `<div class="ivt-v">ダブルクリック／武器枠へドラッグで装備　売値 ${U.fmt(IV.value(it))}🪙</div>`;
     }
     const rar = G.RARITY[d.rarity];

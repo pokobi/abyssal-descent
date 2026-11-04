@@ -206,20 +206,20 @@ const PORT = +process.env.COOP_PORT || 9981;
       return true;
     };
     const seen = [], badWords = /ホイール|マウス|クリック|Esc|Enter|WASD/;
-    let last = '', bad = [], noBtn = 0;
-    for (let i = 0; i < 30; i++) {
+    let last = '', bad = [], noBtn = 0, total = '';
+    for (let i = 0; i < 60; i++) {
       await sleep(350);
       const txt = await t.eval("document.querySelector('#tut').textContent");
-      const step = (txt.match(/(\d+) \/ 15/) || [])[1];
-      if (step === '15') { seen.push(step); break; }
+      const mm = txt.match(/(\d+) \/ (\d+)/) || [], step = mm[1]; if (mm[2]) total = mm[2]; // (the number of steps is read off the screen)
+      if (step && step === total) { seen.push(step); break; }
       if (!seen.includes(step)) seen.push(step);
       if (badWords.test(txt)) bad.push(step + ': ' + (txt.match(badWords) || [])[0]);
       const ok = (await tap('#tut [data-a=next]')) || (await tap('#tut [data-a=skip]'));
       if (!ok) noBtn++;
-      for (let j = 0; j < 12 && last === step; j++) { await sleep(150); const x = await t.eval("(document.querySelector('#tut').textContent.match(/(\\d+) \\/ 15/) || [])[1]"); if (x !== step) break; }
+      for (let j = 0; j < 12 && last === step; j++) { await sleep(150); const x = await t.eval("(document.querySelector('#tut').textContent.match(/(\\d+) \\/ \\d+/) || [])[1]"); if (x !== step) break; }
       last = step;
     }
-    check(seen.includes('15'), 'a phone can tap its way through all of the tutorial (' + seen.join(',') + ')');
+    check(!!total && seen.includes(total), 'a phone can tap its way through all of the tutorial (' + seen.join(',') + ' of ' + total + ')');
     check(noBtn === 0, 'every step has a button to tap');
     check(!bad.length, 'no step names a mouse or a key a phone does not have ' + bad.join(' | '));
     check(!t.errs.length, 'no errors in the tutorial ' + t.errs.slice(0, 3).join(' | ').slice(0, 500));

@@ -111,9 +111,9 @@ window.G = window.G || {};
     return G.RARITY[r].w * Math.pow(1 + prog * 1.6 + (luck || 0) * 0.5, t) * gate;
   };
   G.ELEM = {
-    fire: { name: '炎', icon: '🔥', color: '#ff8a3a' },
+    fire: { name: '炎上', icon: '🔥', color: '#ff8a3a' }, // (statuses: the elements of element.js are their own thing)
     frost: { name: '冷気', icon: '❄️', color: '#a8dcff' },
-    shock: { name: '雷', icon: '⚡', color: '#ffe36b' },
+    shock: { name: '電撃', icon: '⚡', color: '#ffe36b' },
     poison: { name: '毒', icon: '☠️', color: '#9be05a' },
     explosive: { name: '爆発', icon: '💥', color: '#ffb050' },
   };

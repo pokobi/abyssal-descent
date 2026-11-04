@@ -52,7 +52,10 @@
     if (P.melee && (EL.wEl(P.melee) || (P.melee.def.elem && EL.STATUS_EL[P.melee.def.elem]))) return true;
     for (const s of P.skills || []) if (s && EL.skEl(s.id)) return true;
     for (const id of Object.keys(P.grenades || {})) if (P.grenades[id] > 0 && (EL.GREN[id] || (G.ITEM_BY_ID[id] && G.ITEM_BY_ID[id].data && EL.STATUS_EL[G.ITEM_BY_ID[id].data.elem]))) return true;
-    for (const id of ['h_burn', 'h_frost', 'h_shock', 'k_ash', 'k_icegrave', 'k_chain', 'h_chain', 'h_critchain', 'm_trail', 'x_frostaura', 'o_thunderjump', 'p_fire', 'p_frost', 'p_shock']) if (P.has(id)) return true;
+    for (const id of ['h_burn', 'h_frost', 'h_shock', 'k_ash', 'k_icegrave', 'k_chain', 'h_chain', 'h_critchain', 'm_trail', 'x_frostaura', 'o_thunderjump', 'p_fire', 'p_frost', 'p_shock', 'z_storm']) if (P.has(id)) return true;
+    const st = P.stats || {};
+    if (st.techBurn > 0 || st.techFrost > 0 || st.techShock > 0 || st.elemChance > 0) return true;
+    for (const id of P.buffs ? P.buffs.keys() : []) if (/_(oh_burn|oh_frost|oh_shock|x_fire|x_frost)$/.test(id)) return true;
     return false;
   };
   EL.isElementBoon = (b) => !!b && (b.cat === 'attr' || /^s_elMastery_/.test(b.id));
@@ -206,6 +209,7 @@
   // a reaction spends the elements in it, and the statuses that go with them stop (fire: burn, ice: frost, volt: shock)
   EL.stopStatus = function (e, el) {
     const s = e && e.st; if (!s) return;
+    if (EL.onNetStop) EL.onNetStop(e, el); // (co-op: a guest's reaction stops the status where it ticks, on the host)
     if (el === 'fire') { s.burn = 0; s.burnLv = 0; }
     else if (el === 'ice') { s.frost = 0; s.frostStacks = 0; }
     else if (el === 'volt') { s.shock = 0; s.shockLv = 0; }
@@ -215,6 +219,8 @@
   const rxHit = (o, amt, id, extra) => C.damageEnemy(o, amt, Object.assign({ src: 'react', rx: id, proc: true, noBuffs: true, noMarker: true, el: null }, extra || {}));
   EL.label = function (e, id) {
     if (!G.fx || !G.fx.dmgNum) return;
+    // (the same reaction on the same foe is named once a second at most: a foe standing in water inside a fire would otherwise flicker with it)
+    const lt = e._rxLab || (e._rxLab = {}), now = G.game.time; if ((lt[id] || -9) > now) return; lt[id] = now + 1;
     const p = e.centerPos(); p.y += (e.height || 1.6) * 0.45 + 0.35;
     G.fx.dmgNum(p, EL.RX[id].name, 'rxl rx-' + id);
   };

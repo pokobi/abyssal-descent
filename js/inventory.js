@@ -107,7 +107,7 @@
     if (it.type === 'part') return Math.max(5, Math.round(d.value / 5) * 5) * it.n;
     if (it.type === 'armor') return Math.max(5, Math.round(d.price * R * IV.enchMul(it) * (0.2 + 0.8 * IV.durFrac(it)) / 5) * 5); // the more worn, the less it sells for
     if (IV.isArm(it)) { // like the one in your hands: level and any attachments on it count
-      const lv = (it.gun && it.gun.lv) || 0, base = d.price ? Math.max(5, Math.round(d.price * R * (1 + 0.2 * lv) / 5) * 5) : lv * 60;
+      const lv = (it.gun && it.gun.lv) || 0, base = d.price && !(it.gun && it.gun.kit) ? Math.max(5, Math.round(d.price * R * (1 + 0.2 * lv) / 5) * 5) : lv * 60;
       const atts = it.type === 'gun' && it.gun && it.gun.atts ? Object.values(it.gun.atts).filter((a) => G.ATT_BY_ID[a]) : [];
       return base + atts.reduce((sum, a) => sum + (G.Pawn ? G.Pawn.attValue(a) : 0), 0);
     }

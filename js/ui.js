@@ -42,7 +42,8 @@
     if (!o) return '';
     const rar = G.RARITY[o.rarity];
     const cat = o.kind === 'buff' ? (G.BUFF_CAT[o.cat] ? UI.catLabel(o.cat, '加護') : '加護') : o.kind === 'weapon' ? '🔫 ' + o.cat : o.kind === 'attachment' ? G.ATT_SLOTS[o.slot].icon + ' アタッチメント / ' + G.ATT_SLOTS[o.slot].name : o.kind === 'skill' ? '🔮 スキル（CT ' + o.cd + '秒）' : o.kind === 'item' ? G.ITEM_CAT[o.cat].icon + ' ' + G.ITEM_CAT[o.cat].name : '';
-    return `<div class="tt-name">${o.icon || ''} ${U.esc(o.name)}</div><div class="tt-cat">${rar ? rar.name + ' · ' : ''}${cat}</div><div style="margin-top:6px">${U.descHTML(o.desc)}</div>${extra || ''}`;
+    const elL = (o.kind === 'weapon' || o.kind === 'melee') && o.el && G.Elem && G.Elem.BY[o.el] ? `<div style="margin-top:4px;color:${G.Elem.BY[o.el].col}">${G.Elem.BY[o.el].icon} ${G.Elem.BY[o.el].name}属性（攻撃が${G.Elem.BY[o.el].name}属性になる）</div>` : '';
+    return `<div class="tt-name">${o.icon || ''} ${U.esc(o.name)}</div><div class="tt-cat">${rar ? rar.name + ' · ' : ''}${cat}</div>${elL}<div style="margin-top:6px">${U.descHTML(o.desc)}</div>${extra || ''}`;
   };
   UI.tipAttr = (o, extra) => `data-tip="${UI.tipFor(o, extra).replace(/"/g, '&quot;')}" data-rc="${R(o.rarity)}"`;
   UI.toast = function (text, cls) {

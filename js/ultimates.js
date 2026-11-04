@@ -1,5 +1,5 @@
 'use strict';
-// ULTIMATES: the Q slot. Very strong, very long cooldowns (~95-150 s). Everyone starts with 不屈の城塞;
+// ULTIMATES: the Q slot. Very strong, very long cooldowns (~95-150 s). Each class starts with its own (classes.js);
 // others are found in shops / events like skills. They count as skills for damage (src 'skill', info.ult).
 (function () {
   const U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);

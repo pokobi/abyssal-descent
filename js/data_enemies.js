@@ -26,13 +26,14 @@
     { key: 'frost', prefix: '氷結の', icon: '❄️', minAdd: 3, hp: 1.2, dmg: 1.05, spd: 0.95, size: 1.05, elem: 'frost', el: 'ice', desc: '攻撃が冷気を付与し、動きを鈍らせる。', orn: 'ice', color: '#8aa8c0', eye: '#d0f0ff' },
     { key: 'venom', prefix: '猛毒の', icon: '☠️', minAdd: 3, hp: 1.1, dmg: 1.1, spd: 1.05, size: 1, elem: 'poison', desc: '攻撃が毒を付与する。毒は重なるほど危険。', orn: 'spikes', color: '#4a5a2a', eye: '#b0f060' },
     { key: 'storm', prefix: '雷鳴の', icon: '⚡', minAdd: 4, hp: 1.05, dmg: 1.1, spd: 1.22, size: 0.95, elem: 'shock', el: 'volt', desc: '素早く、攻撃が電撃を伴う。', orn: 'sparks', color: '#4a4a5a', eye: '#ffe880' },
-    { key: 'tide', prefix: '水禍の', icon: '💧', minAdd: 3, hp: 1.15, dmg: 1.1, spd: 1.0, size: 1, el: 'water', desc: '攻撃が水属性を伴う。体から絶えず水が滴っている。', orn: 'wisps', color: '#2a4a6a', eye: '#80c8ff' },
+    { key: 'tide', prefix: '水禍の', icon: '💧', minAdd: 3, hp: 1.15, dmg: 1.1, spd: 1.0, size: 1, el: 'water', desc: '体から絶えず水が滴っている。', orn: 'wisps', color: '#2a4a6a', eye: '#80c8ff' },
     { key: 'shadow', prefix: '影の', icon: '🌑', minAdd: 6, hp: 1.15, dmg: 1.2, spd: 1.15, size: 1, desc: '照準を感知して回避し、短距離を瞬間移動する。', orn: 'wisps', color: '#1a1820', eye: '#c060ff', dodge: true },
     { key: 'bone', prefix: '屍骨の', icon: '☠', minAdd: 7, hp: 1.3, dmg: 1.15, spd: 0.95, size: 1.05, desc: '一度倒しても数秒後に蘇る。骨の鎧を纏う。', orn: 'bones', color: '#c8bca0', eye: '#80ffd0', revive: true, undead: true },
     { key: 'crystal', prefix: '晶殻の', icon: '💎', minAdd: 9, hp: 1.3, dmg: 1.2, spd: 0.95, size: 1.1, desc: '結晶の殻が強固なシールドとなる。EMPや電撃で砕け。', orn: 'crystal', color: '#4a5a7a', eye: '#a0e0ff', shield: 0.8 },
     { key: 'abyss', prefix: '深淵の', icon: '🕳️', minAdd: 13, hp: 2.3, dmg: 1.45, spd: 1.08, size: 1.35, desc: '深淵から這い出た最上位種。シールドと威圧のオーラを持つ。', orn: 'abyss', color: '#140c18', eye: '#ff3040', shield: 0.6, aura: true },
   ];
   const ENEMIES = [];
+  const ELN0 = { fire: '炎', water: '水', ice: '氷', volt: '雷' };
   for (const p of PLANS) {
     for (const v of VARIANTS) {
       const id = p.key + '_' + v.key;
@@ -58,7 +59,7 @@
         minArea: p.minArea + v.minAdd,
         sound: p.sound, pitch: p.pitch / Math.sqrt(v.size),
         color: v.color, eye: v.eye, orn: v.orn,
-        desc: p.desc + (v.desc ? '\n【' + (v.prefix.replace('の', '') || v.key) + '】' + v.desc : ''),
+        desc: p.desc + (v.desc ? '\n【' + (v.prefix.replace('の', '') || v.key) + '】' + v.desc : '') + (v.el || p.key === 'imp' ? `\n攻撃が${ELN0[v.el || 'fire']}属性を伴う。${ELN0[v.el || 'fire']}属性に少し強い（25%）。` : ''),
         rarity: v.key === 'abyss' ? 'legendary' : v.key === 'crystal' || v.key === 'elder' ? 'epic' : v.key === 'normal' ? 'common' : v.key === 'bone' || v.key === 'shadow' ? 'rare' : 'uncommon',
       };
       ENEMIES.push(e);

@@ -14,7 +14,7 @@
   const F = (G.Fields = {});
   const U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   F.KINDS = {
-    water: { name: '浅瀬', icon: '💧', tip: '浅瀬：少し遅くなる・炎上が消える・濡れた敵は電撃に弱い' },
+    water: { name: '浅瀬', icon: '💧', tip: '浅瀬：少し遅くなる・炎上が消える・中の敵に水属性が付く' },
     lava: { name: '溶岩', icon: '🌋', tip: '溶岩：踏むと激しく燃える' },
     // (a blue-flame patch is a 'lava' field with blue = true: the same burning, in the ruined depths)
     moss: { name: '苔', icon: '🌿', tip: '苔：足が滑る・スライディングが伸びる' },
@@ -177,7 +177,7 @@
       for (const e of G.enemies.inRadius(V(cx, f.y, cz), Math.hypot(f.x1 - f.x0, f.z1 - f.z0) / 2 + 1)) {
         if (e.boss || !inside(f, e.pos) || e.pos.y > f.y + (f.kind === 'vent' ? 1 : 0.5) || e.pos.y < f.y - 0.5 || (e.def.flyer && f.kind !== 'vent')) continue;
         switch (f.kind) {
-          case 'water': e.wetUntil = G.game.time + 2; if (e.st.burn) e.st.burn = 0; break;
+          case 'water': if (G.Elem) G.Elem.give(e, 'water'); if (e.st.burn) { e.st.burn = 0; e.st.burnLv = 0; } break; // (in water a foe is wet: water, element.js)
           // lava does not hurt monsters (burning from the player's own weapons and skills works as usual)
           case 'mud': e.st.slow = Math.max(e.st.slow || 0, 0.5); break;
           case 'poison': C.status(e, 'poison', 1); break;

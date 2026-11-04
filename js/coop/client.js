@@ -215,7 +215,9 @@
     const axOut = new Map();
     G.Elem.onNetAura = function (e) { if (!remoteOf(e)) return; e._auT = performance.now(); axOut.set(e._nid, [e._nid, e.auFix ? 0 : G.Elem.idx(G.Elem.auraOf(e)), +G.Elem.auraLeft(e).toFixed(2), e._elFrozen ? 1 : 0]); };
     G.Elem.onNetStatus = function (e) { if (remoteOf(e)) sendStatus(e); };
-    K.flushStatus = function () { if (ssOut.size) { K.send({ t: 'ss', a: [...ssOut] }); ssOut.clear(); } if (axOut.size) { K.send({ t: 'ax', a: [...axOut.values()] }); axOut.clear(); } };
+    const xsOut = [];
+    G.Elem.onNetStop = function (e, el) { if (remoteOf(e)) xsOut.push([e._nid, el]); };
+    K.flushStatus = function () { if (ssOut.size) { K.send({ t: 'ss', a: [...ssOut] }); ssOut.clear(); } if (axOut.size) { K.send({ t: 'ax', a: [...axOut.values()] }); axOut.clear(); } if (xsOut.length) { K.send({ t: 'xs', a: xsOut.splice(0) }); } };
     // ---------------- what comes down the wire and hurts ----------------
     K.handlers.dmg = function (m) {
       C.damagePlayer(m.a, { src: m.s, elem: m.e, el: m.l || undefined, fixed: !!m.f, pos: m.p ? V(...m.p) : null });

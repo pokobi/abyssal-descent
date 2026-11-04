@@ -788,6 +788,15 @@
     tdr.out.gain.setTargetAtTime(0.05 + 0.1 * k, now, 0.15); tdr.o1.frequency.setTargetAtTime(46 - 14 * k, now, 0.3);
     if (!tdr.w) tdr.w = setInterval(() => { if (performance.now() - tdr.t > 300) { tdr.out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.12); clearInterval(tdr.w); tdr.w = 0; } }, 120);
   };
+  // the duel's warning flash: a bright, high blade-ring "shing!" (a scrape sweeping up into inharmonic steel partials that hang a moment)
+  A.shing = function () {
+    if (!ctx) return;
+    const t = ctx.currentTime, out = dest(null, 0.4); out.gain.value = 0.6;
+    nz({ t, f: [['highpass', 2800, 0.7], ['bandpass', 4200, 2.5, 9500, 0.08]], g: 0.5, a: 0.003, d: 0.085, to: out });
+    tn({ t, f0: 2000, f1: 4600, fd: 0.045, d: 0.07, g: 0.2, to: out, type: 'triangle' });
+    [[3300, 0.24, 0.5], [4950, 0.17, 0.4], [6600, 0.11, 0.3], [8250, 0.06, 0.22]].forEach(([f, g, d]) => tn({ t: t + 0.04, f0: f, f1: f * 1.004, d, g, to: out, type: 'sine' }));
+    nz({ t: t + 0.04, f: [['bandpass', 7400, 7]], g: 0.16, d: 0.2, to: out });
+  };
   A.bell = function () {
     // deep bronze bell for boss/portal moments
     if (!ctx || smp('bell', null, 0.5, 0.75, 1.0)) return;

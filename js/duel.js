@@ -17,7 +17,8 @@
   D.AFTER_EFF = 0.5; // a gauge left after the duel: ordinary damage wears it down at this rate
   D.INTRO = 1.5; D.READ = 4; D.LIMIT = 35;
   D.WIN = 0.3; D.WIN_M = 0.38; D.LATE = 0.05; D.LOCK = 0.6;
-  D.RING = 8;
+  D.RING = 8; // the smallest ring; it is normally half the stage across (see ringR)
+  D.ringR = (w) => Math.max(D.RING, Math.min(w.W, w.arenaD || w.D) * 0.25);
   D.authority = true; // who judges the gauge and the clock: the solo game, or the co-op host (the guests' copies only show it)
   D.cur = null;
   const isM = () => !!(window.G_MOBILE || document.documentElement.classList.contains('m'));
@@ -115,7 +116,7 @@
     // what is on the field goes: shots, fields, warnings, everything summoned (the foes themselves only where they are owned)
     G.combat.purgeHostile(); G.fx.clearTelegraphs();
     if (D.authority) for (const e of G.enemies.list) if (e.alive && !e.boss && e.def.id !== 'mimic_gold') { G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1); e.noReward = true; e.hp = 0; G.combat.killEnemy(e, { src: 'clear', proc: true }, 0); }
-    const w = b.world, R = D.RING;
+    const w = b.world, R = D.ringR(w);
     const c = ring ? V(ring.x, 0, ring.z) : V(U.clamp(b.pos.x, R + 1, w.W - R - 1), 0, U.clamp(b.pos.z, R + 1, (w.arenaD || w.D) - R - 1));
     c.y = b.pos.y || 0;
     const d = (D.cur = { b, who: who ?? D.pickFirst(b), t: 0, c, R, combo: null, cd: 1.2, lockUntil: -9, st: 'intro', fx: [], readUntil: D.INTRO + D.READ, fightT: 0, slotT: 0, note: '' });
@@ -181,7 +182,7 @@
     lockHud(true);
     ov(); OV.className = 'on';
     banner(`⚔ 決闘`, `${b.def.name}との一騎打ち`);
-    guide(d);
+    G.ui.toast(`⚔ 決闘！ 金色に光った瞬間に ${D.keyName()} でパリィ`, 'warn');
   }
   function leaveMe() {
     const P = G.player;
@@ -199,18 +200,6 @@
   }
   // the key that parries
   D.keyName = () => (isM() ? '構えボタン（🔄）' : G.K ? G.K('reload') : 'R');
-  function guide(d) {
-    const g = OV.querySelector('.dv-guide');
-    g.innerHTML = `<b>⚔ 決闘のルール</b>
-      <p>${U.esc(d.b.def.name)}の武器が<b class="gold">金色に光った瞬間</b>に <b class="key">${U.esc(D.keyName())}</b> を押してパリィ！</p>
-      <p>・光る前に押す／押しっぱなし／押さない → 失敗して攻撃を受ける</p>
-      <p>・パリィ成功でボスの<b>白いゲージ</b>が削れる。削り切ると<b>ブレイク</b>（大ダメージ＋スタン）</p>
-      <p>・決闘中は攻撃・銃・スキル・アイテムは使えない（逃げても斬撃は届く）</p>
-      <p class="dim">時間内に削り切れないと、白いゲージは盾として残る</p>`;
-    OV.classList.add('read');
-  }
-
-  // a press of the guard key (melee.js calls this in a duel); on the co-op guest the result is sent to the host
   // the moment the key really went down (a slow frame must not make a press late: it is dated back to its keydown, a quarter second at most)
   D._kt = 0;
   window.addEventListener('keydown', (e) => { if (!e.repeat && G.BIND && G.BIND.reload && G.BIND.reload.includes(e.code)) D._kt = performance.now(); }, true);
@@ -297,7 +286,7 @@
     } else combo(d, dt, P);
     // the two stay inside the ring (everyone else outside it)
     if (A) { const bx = b.pos.x - d.c.x, bz = b.pos.z - d.c.z, bl = Math.hypot(bx, bz); if (bl > d.R - 1) { b.pos.x = d.c.x + bx / bl * (d.R - 1); b.pos.z = d.c.z + bz / bl * (d.R - 1); } }
-    if (D.mine()) keepIn(d); else keepOut(d);
+    if (D.mine()) { keepIn(d); lockOn(d, dt); } else keepOut(d);
     if (A) place(b, dt);
     tickFx(d, dt);
     hud(d, lim);
@@ -314,10 +303,13 @@
     if (s) {
       // wind-up, then the lunge that closes in so running away does not help
       const wind = Math.max(0.15, s.at - s.from - s.hold), k = U.clamp((ct - s.from) / wind, 0, 1);
-      if (!A) { /* the guardian itself moves on the host */ } else if (ct < s.at - 0.22) b.face(P, dt, 10);
-      else {
+      if (!A) { /* the guardian itself moves on the host */ } else if (ct < s.at - 0.22) {
+        b.face(P, dt, 10);
+        const dx = P.x - b.pos.x, dz = P.z - b.pos.z, l = Math.hypot(dx, dz) || 1;
+        if (l > reachOf(b) + 1) b.groundMove(dx / l, dz / l, b.duelStyle.speed * 1.2, dt, (b.S && b.S.radius) || 1.2);
+      } else {
         const dx = P.x - b.pos.x, dz = P.z - b.pos.z, l = Math.hypot(dx, dz) || 1, want = near(b);
-        if (l > want) { const m = Math.min(l - want, dt * 40); b.groundMove(dx / l, dz / l, m / Math.max(dt, 1e-4), dt, (b.S && b.S.radius) || 1.2); }
+        if (l > want) { const m = Math.min(l - want, dt * 70); b.groundMove(dx / l, dz / l, m / Math.max(dt, 1e-4), dt, (b.S && b.S.radius) || 1.2); }
         b.face(P, dt, 20);
       }
       if (A) { if (d.recoil > 0) pose(b, 'recoil'); else pose(b, 'wind', k); }
@@ -351,6 +343,11 @@
   function keepIn(d) {
     const P = G.player, x = P.pos.x - d.c.x, z = P.pos.z - d.c.z, l = Math.hypot(x, z);
     if (l > d.R - 0.5) { P.pos.x = d.c.x + x / l * (d.R - 0.5); P.pos.z = d.c.z + z / l * (d.R - 0.5); const vr = (P.vel.x * x + P.vel.z * z) / l; if (vr > 0) { P.vel.x -= x / l * vr; P.vel.z -= z / l * vr; } }
+  }
+  function lockOn(d, dt) {
+    const P = G.player, b = d.b; if (P.dead) return;
+    const want = Math.atan2(-(b.pos.x - P.pos.x), -(b.pos.z - P.pos.z));
+    P.yaw += U.wrapAngle(want - P.yaw) * Math.min(1, dt * 3.5);
   }
   function keepOut(d) {
     const P = G.player; if (!P || P.dead) return;
@@ -422,7 +419,7 @@
     const sp2 = new THREE.Sprite(sp.material.clone()); sp2.renderOrder = 999; G.scene.add(sp2);
     d.fx.push({ sp: sp2, t: 0, life: 0.42, body: true, k: 0.75 });
     G.fx.sparks(at, null, 10, 0xffe080, 5);
-    G.sfx.ui && G.sfx.ui('select'); G.sfx.mech && G.sfx.mech('boltBack', 0, 1.8);
+    if (G.sfx.shing) G.sfx.shing(); else if (G.sfx.ui) G.sfx.ui('select');
     if (D.mine()) flashScreen('gold');
   }
   function tickFx(d, dt) {
@@ -478,11 +475,6 @@
 #duel-ov .dv-banner b { display: block; font-size: 64px; letter-spacing: 0.25em; font-weight: 900; }
 #duel-ov .dv-banner span { font-size: 18px; letter-spacing: 0.1em; }
 @keyframes dvBan { 0% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
-#duel-ov .dv-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, 90vw); padding: 16px 20px; background: rgba(12,9,4,0.86); border: 1px solid rgba(255,200,90,0.7); border-radius: 10px; color: #f2e4c4; font-size: 15px; line-height: 1.55; display: none; }
-#duel-ov.read .dv-guide { display: block; }
-#duel-ov .dv-guide b { color: #ffd77a; } #duel-ov .dv-guide b.gold { color: #ffd040; text-shadow: 0 0 8px rgba(255,190,40,0.8); } #duel-ov .dv-guide b.key { background: #3a2a10; padding: 1px 8px; border-radius: 4px; border: 1px solid #c8a050; }
-#duel-ov .dv-guide p { margin: 6px 0 0; } #duel-ov .dv-guide .dim { color: #b8a888; font-size: 13px; }
-#duel-ov .dv-guide .dv-cnt { float: right; color: #ffd77a; font-weight: 700; }
 #duel-ov .dv-low { position: absolute; left: 50%; bottom: calc(7vh + 18px); transform: translateX(-50%); width: min(420px, 70vw); text-align: center; color: #ffe2a0; font-size: 13px; text-shadow: 0 1px 2px #000; }
 #duel-ov .dv-time { height: 6px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,200,90,0.6); border-radius: 3px; overflow: hidden; margin-top: 4px; }
 #duel-ov .dv-time i { display: block; height: 100%; background: linear-gradient(90deg, #ffb030, #ffe080); }
@@ -502,7 +494,7 @@ html.duel-me .mb:not([data-id="reload"]):not([data-id="pause"]):not([data-id="ju
     }
     if (!OV) {
       OV = document.createElement('div'); OV.id = 'duel-ov';
-      OV.innerHTML = '<div class="dv-frame"></div><div class="dv-bar t"></div><div class="dv-bar b"></div><div class="dv-flash"></div><div class="dv-banner"></div><div class="dv-guide"></div><div class="dv-pop"></div><div class="dv-low"><div class="dv-lt"></div><div class="dv-time"><i></i></div></div>';
+      OV.innerHTML = '<div class="dv-frame"></div><div class="dv-bar t"></div><div class="dv-bar b"></div><div class="dv-flash"></div><div class="dv-banner"></div><div class="dv-pop"></div><div class="dv-low"><div class="dv-lt"></div><div class="dv-time"><i></i></div></div>';
       document.body.appendChild(OV);
     }
     return OV;
@@ -519,9 +511,6 @@ html.duel-me .mb:not([data-id="reload"]):not([data-id="pause"]):not([data-id="ju
       : fight ? `⚔ 決闘中 — 金色に光ったら ${U.esc(D.keyName())}　残り ${Math.ceil(left)}秒${d.note ? '　' + U.esc(d.note) : ''}` : `⚔ 決闘開始まで ${wait}秒`;
     if (lt._t !== txt) { lt.innerHTML = txt; lt._t = txt; }
     tm.style.width = (fight || !D.mine() ? left / lim * 100 : 100).toFixed(1) + '%';
-    if (!D.mine()) return;
-    const g = OV.querySelector('.dv-guide');
-    if (!fight) { let c = g.querySelector('.dv-cnt'); if (!c) { c = document.createElement('span'); c.className = 'dv-cnt'; g.prepend(c); } c.textContent = `${wait}`; }
   }
   // the white gauge under the guardian's health bar
   let wEl = null, wLbl = null;

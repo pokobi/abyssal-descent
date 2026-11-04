@@ -40,8 +40,13 @@
       m(hand, PG.box, dark, 0.07, 0.09, 0.07);
       J.arms.push({ sh, el, hand });
     }
-    // sidearm in the right hand
-    m(J.arms[1].hand, PG.box, gun, 0.04, 0.06, 0.32, 0, -0.02, 0.12);
+    // sidearm in the right hand (a blade instead in a duel)
+    J.gun = m(J.arms[1].hand, PG.box, gun, 0.04, 0.06, 0.32, 0, -0.02, 0.12);
+    J.blade = new THREE.Group(); J.arms[1].hand.add(J.blade);
+    m(J.blade, PG.box, dark, 0.035, 0.045, 0.16, 0, -0.02, 0.06);
+    m(J.blade, PG.box, plate, 0.14, 0.03, 0.03, 0, -0.02, 0.15);
+    m(J.blade, PG.box, new THREE.MeshStandardMaterial({ color: 0xd8dce6, roughness: 0.2, metalness: 0.95 }), 0.02, 0.06, 0.62, 0, -0.02, 0.46);
+    J.blade.visible = false;
     J.legs = [];
     for (const s of [-1, 1]) {
       const hip = j(J.body, s * 0.1, -0.06, 0);
@@ -71,7 +76,22 @@
     const k = Math.min(1, dt * 12);
     const t = G.game.time;
     const gr = P.grapple;
-    if (P.pileState === 'charge') {
+    const duel = !!P.duelLock;
+    J.gun.visible = !duel;
+    J.blade.visible = duel && !!P.melee && P.melee.id !== (G.BARE_MELEE || 'fists');
+    if (duel) {
+      // a duel: a low guard stance, the legs walking with your speed; a parry snaps the blade up across the body
+      root.rotation.x = 0; J.spin = 0;
+      J.body.position.y = U.lerp(J.body.position.y, 0.9, k);
+      const gd = G.weapons.gd || {}, par = Math.max(gd.pk > 0 ? 1 : 0, gd.kick || 0), sp = Math.min(1, (P.speedH || 0) / 6);
+      J.walk = (J.walk || 0) + dt * (4 + (P.speedH || 0) * 1.6);
+      const sw = Math.sin(J.walk) * sp;
+      rot(J.body, 0.12, 0, 0, k); rot(J.chest, 0.15, 0, 0, k);
+      if (par > 0.2) { rot(J.arms[1].sh, -1.9, 0, -0.6, 0.6); rot(J.arms[1].el, -0.7, 0, 0, 0.6); rot(J.arms[0].sh, -1.3, 0, 0.5, 0.6); rot(J.arms[0].el, -1.1, 0, 0, 0.6); }
+      else { rot(J.arms[1].sh, -0.9, 0, 0.15, k); rot(J.arms[1].el, -0.9, 0, 0, k); rot(J.arms[0].sh, -0.7, 0, -0.2, k); rot(J.arms[0].el, -1.2, 0, 0, k); }
+      rot(J.legs[0].hip, -0.15 + sw * 0.7, 0, 0, k); rot(J.legs[0].kn, 0.3 + Math.max(0, -sw) * 0.8, 0, 0, k);
+      rot(J.legs[1].hip, 0.15 - sw * 0.7, 0, 0, k); rot(J.legs[1].kn, 0.3 + Math.max(0, sw) * 0.8, 0, 0, k);
+    } else if (P.pileState === 'charge') {
       // tucked into a ball, spinning forward
       root.rotation.x = 0;
       J.spin = (J.spin || 0) + dt * 14;

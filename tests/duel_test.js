@@ -1,5 +1,5 @@
 'use strict';
-// Duels (js/duel.js), solo: for each duelling guardian (or the ids given): the duel starts at 70%, the ring / lock / guide are up, the guardian holds off
+// Duels (js/duel.js), solo: for each duelling guardian (or the ids given): the duel starts at 70%, the ring (half the stage across) / lock / a short toast with the rule are up, the guardian holds off
 // for the reading time, every blow flashes gold first, a press in the window parries (no damage, gauge down), a press too early or a held key fails
 // (damage taken), the gauge emptied by parries breaks (12% of health, stagger), and a duel that runs out leaves the gauge as a shield that ordinary
 // damage wears down at half rate before health can fall; the second duel comes at 35%.
@@ -36,12 +36,16 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
       // a gun in hand, then the guardian is brought to 69%
       await p.eval("G.weapons.switchTo(0); 1");
       await sleep(300);
+      await p.eval('(() => { window.__toasts = []; if (!G.ui.__tw) { const t0 = G.ui.toast; G.ui.toast = function (m) { (window.__toasts = window.__toasts || []).push(String(m)); return t0.apply(this, arguments); }; G.ui.__tw = 1; } return 1; })()');
       await p.eval("(() => { const b = G.bosses.active; b.hp = b.maxHp * 0.69; return 1; })()");
       await p.until('!!G.Duel.cur', 5000).catch(() => {});
-      const st = JSON.parse(await p.eval("JSON.stringify({ on: !!G.Duel.cur, lock: !!G.player.duelLock, melee: !!G.player.meleeMode, ring: !!(G.Duel.cur && G.Duel.cur.ring), ov: document.getElementById('duel-ov').className, guide: document.querySelector('#duel-ov .dv-guide').textContent.length, wg: G.bosses.active.duelSt.wg / G.bosses.active.maxHp, foes: G.enemies.list.filter((e) => e.alive && !e.boss).length })"));
+      const st = JSON.parse(await p.eval("JSON.stringify({ on: !!G.Duel.cur, lock: !!G.player.duelLock, melee: !!G.player.meleeMode, ring: !!(G.Duel.cur && G.Duel.cur.ring), ov: document.getElementById('duel-ov').className, toast: __toasts.some((t) => /金色に光った瞬間/.test(t) && t.length < 60), R: G.Duel.cur && G.Duel.cur.R, half: Math.min(G.world.W, G.world.arenaD || G.world.D) / 2, cam: G.avatar.tpK, wg: G.bosses.active.duelSt.wg / G.bosses.active.maxHp, foes: G.enemies.list.filter((e) => e.alive && !e.boss).length })"));
       console.log('     ', JSON.stringify(st));
       check(st.on && st.lock && st.melee && st.ring, 'at 70% a duel starts: the melee weapon in hand, locked, a ring');
-      check(/on/.test(st.ov) && /read/.test(st.ov) && st.guide > 60, 'the rules are shown as it starts');
+      check(/on/.test(st.ov) && st.toast, 'the rule is shown as a short toast');
+      check(Math.abs(st.R * 2 - st.half) < 0.5, `the ring is half the stage across (${st.R * 2} of ${st.half * 2})`);
+      await p.until('G.avatar.tpK > 0.9', 8000).catch(() => {});
+      check((await p.eval('G.avatar.tpK')) > 0.9 && (await p.eval('G.avatar.root.visible')), 'the camera goes third person, the body is shown');
       check(Math.abs(st.wg - 0.12) < 0.001, 'a white gauge of 12% of its health');
       check(st.foes === 0, 'nothing else is left on the field');
       // sealed: skills, items, the bag, a gun

@@ -495,7 +495,7 @@
       cam.rotation.set(this.pitch + shp + this.hurtKick * 0.03, this.yaw + shy, this.roll + shr, 'YXZ');
       // third-person camera for grapple swings and the pile driver
       const gs = this.grapple.state;
-      const wantTP = gs === 'firing' || gs === 'attached' || gs === 'reelEnemy' || !!this.pileState || (this.pileLandT || 0) > 0;
+      const wantTP = gs === 'firing' || gs === 'attached' || gs === 'reelEnemy' || !!this.pileState || (this.pileLandT || 0) > 0 || !!this.duelLock; // (a duel, duel.js: third person all through)
       this.tpHold = wantTP ? 0.3 : Math.max(0, (this.tpHold || 0) - dt);
       const AV = G.avatar;
       const goingTP = wantTP || this.tpHold > 0;
@@ -505,7 +505,8 @@
       if (AV.tpK > 0.001) {
         const head = V(this.pos.x, this.pos.y + this.height * 0.85, this.pos.z);
         const f = this.forward();
-        const desired = head.clone().addScaledVector(f, -4.4).add(V(Math.cos(this.yaw) * 0.75, 0.9, -Math.sin(this.yaw) * 0.75));
+        const dl = !!this.duelLock, fh = dl ? V(f.x, 0, f.z).normalize() : f; // (a duel: further back and higher, level with the ground, so you and the guardian both fit)
+        const desired = head.clone().addScaledVector(fh, dl ? -5.2 : -4.4).add(V(Math.cos(this.yaw) * 0.75, dl ? 0.75 : 0.9, -Math.sin(this.yaw) * 0.75));
         const dir = desired.clone().sub(head); const L = dir.length(); dir.divideScalar(L);
         const hit = w.raycast(head, dir, L + 0.3);
         const dist = hit ? Math.max(0.4, hit.t - 0.35) : L;

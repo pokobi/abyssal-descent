@@ -275,7 +275,7 @@
   CL.pvFrame = function (t) {
     const w = PV.cv.clientWidth || 300, h = PV.cv.clientHeight || 400, pr = PV.r.getPixelRatio();
     if (PV.cv.width !== Math.round(w * pr) || PV.cv.height !== Math.round(h * pr)) { PV.r.setSize(w, h, false); PV.cam.aspect = w / h; PV.cam.updateProjectionMatrix(); }
-    if (!PV.drag) PV.yaw += 0.006;
+    if (!PV.drag) PV.yaw += 0.0016; // (a slow turn)
     const F = PV.fig; if (!F) return;
     t = t || performance.now();
     F.root.rotation.y = PV.yaw;

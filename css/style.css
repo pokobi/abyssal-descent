@@ -1707,21 +1707,6 @@ html.m *::-webkit-scrollbar { width: 6px; height: 6px; }
 .cls-kv { display: flex; gap: 8px; font-size: 12px; } .cls-kv span { flex: none; width: 70px; color: #a99d88; } .cls-kv b { color: #e0d4bc; font-weight: 500; }
 .cls-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
 .cls-note { font-size: 12px; color: #a99d88; }
-html.m .cls-wrap { height: 94vh; }
-html.m .cls-main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; gap: 6px; }
-html.m .cls-list { flex-direction: row; overflow-x: auto; }
-html.m .cls-item { flex: none; padding: 5px 8px; gap: 6px; }
-html.m .cls-iic { width: 28px; height: 28px; font-size: 16px; }
-html.m .cls-in small { display: none; }
-html.m .cls-view { grid-template-columns: 30% 1fr; padding: 6px; gap: 8px; }
-html.m .cls-wrap .df-title { margin-bottom: 4px; font-size: 18px; }
-html.m .cls-foot { margin-top: 6px; }
-html.m .cls-head { padding-bottom: 4px; }
-html.m .cls-kit, html.m .cls-skill, html.m .cls-trait { padding: 4px 6px; }
-html.m .cls-kit b, html.m .cls-skh b { font-size: 12px; }
-html.m .cls-cols { grid-template-columns: 1fr; gap: 6px; }
-html.m .cls-title { font-size: 20px; } html.m .cls-big { font-size: 28px; }
-html.m .cls-skill p { font-size: 10px; } html.m .cls-note { display: none; }
 @media (max-width: 900px) { html:not(.m) .cls-main { grid-template-columns: 180px 1fr; } html:not(.m) .cls-view { grid-template-columns: 1fr; grid-template-rows: 260px minmax(0, 1fr); } html:not(.m) .cls-cols { grid-template-columns: 1fr; } }
 
 /* a weapon with an element of its own: the 属性コア slot is closed */
@@ -1844,3 +1829,50 @@ html.m .bs-cards[data-rows="2"] .card .c-desc { font-size: 10.5px; line-height: 
   .bs-cards[data-rows="2"] .card .c-name { font-size: 13.5px; }
   .bs-cards[data-rows="2"] .card .c-desc { font-size: 11px; line-height: 1.35; margin-top: 3px; }
 }
+/* the class screen: larger type and room (PC and phone alike; a phone draws #screens at 0.66, so it gets the room that leaves) */
+.cls-wrap { width: min(1500px, 97vw); height: min(940px, 94vh); }
+.cls-wrap .df-title { font-size: 34px; margin-bottom: 14px; }
+.cls-main { grid-template-columns: 290px 1fr; gap: 16px; }
+.cls-list { gap: 8px; }
+.cls-item { padding: 14px 14px; gap: 14px; }
+.cls-iic { width: 52px; height: 52px; font-size: 30px; }
+.cls-in b { font-size: 21px; }
+.cls-in small { font-size: 13px; }
+.cls-big { font-size: 52px; }
+.cls-title { font-size: 36px; }
+.cls-sub { font-size: 15px; }
+.cls-sec { font-size: 13px; }
+.cls-tag { font-size: 12px; padding: 2px 7px; }
+.cls-kit { padding: 9px 11px; gap: 10px; }
+.cls-kit b { font-size: 16px; } .cls-kit small { font-size: 13px; }
+.cls-kic { font-size: 24px; }
+.cls-skill { padding: 9px 11px; }
+.cls-skill .sc-h .ic { font-size: 22px; }
+.cls-skill .sc-h .nm { font-size: 16px; }
+.cls-skill .sc-l { font-size: 14px; }
+.cls-skill .sc-d { font-size: 14px; }
+.cls-trait { font-size: 15px; padding: 8px 11px; } .cls-trait span { font-size: 13px; }
+.cls-pas { font-size: 14px; padding: 9px 11px; }
+.cls-pas-h { font-size: 17px; }
+.cls-pas th, .cls-pas td { padding: 3px 4px; }
+.cls-bar { font-size: 14px; grid-template-columns: 84px 1fr 74px; } .cls-bar i { height: 10px; }
+.cls-kv { font-size: 14px; } .cls-kv span { width: 84px; }
+.cls-note { font-size: 14px; }
+.cls-hint { font-size: 12px; }
+.cls-foot .btn { font-size: 18px; padding: 12px 28px; }
+@media (max-height: 760px) { html:not(.m) .cls-wrap .df-title { font-size: 26px; margin-bottom: 8px; } .cls-item { padding: 9px 12px; } html:not(.m) .cls-iic { width: 44px; height: 44px; font-size: 25px; } }
+html.m .cls-wrap { width: calc(100vw / 0.66 - 28px); height: calc(100vh / 0.66 - 20px); }
+html.m .cls-wrap .df-title { font-size: 30px; margin-bottom: 8px; }
+html.m .cls-main { grid-template-columns: 250px 1fr; gap: 12px; }
+html.m .cls-item { padding: 10px 12px; }
+html.m .cls-in b { font-size: 24px; } html.m .cls-in small { font-size: 15px; }
+html.m .cls-view { grid-template-columns: 30% 1fr; padding: 8px; }
+html.m .cls-title { font-size: 34px; } html.m .cls-sub { font-size: 17px; }
+html.m .cls-sec { font-size: 16px; }
+html.m .cls-kit b, html.m .cls-skill .sc-h .nm, html.m .cls-pas-h { font-size: 19px; }
+html.m .cls-kit small, html.m .cls-skill .sc-l, html.m .cls-skill .sc-d, html.m .cls-pas, html.m .cls-trait, html.m .cls-bar, html.m .cls-kv { font-size: 17px; }
+html.m .cls-cols { grid-template-columns: 1fr; gap: 10px; }
+html.m .cls-note, html.m .cls-hint { display: none; }
+html.m .cls-foot { margin-top: 8px; justify-content: flex-end; }
+html.m .cls-foot .btn { font-size: 22px; padding: 14px 30px; }
+.cls-pas td:first-child { width: 42%; }

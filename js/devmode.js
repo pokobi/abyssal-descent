@@ -177,7 +177,7 @@
       const wl = G.WEAPONS.filter((o) => match('w', o)).map((o) => { ACT['gw-' + o.id] = () => GM.giveWeapon(o.id); return `<div class="dv-it" style="--rc:${R(o.rarity)}"><span>${o.icon} ${esc(o.name)} <small>${esc(o.cat || '')}</small></span>${btn('gw-' + o.id, '入手')}</div>`; }).join('');
       const ml = G.MELEE.filter((o) => match('m', o)).map((o) => { ACT['gm-' + o.id] = () => { G.Pawn.tradeIn(P.melee, true); P.melee = G.weapons.makeMelee(o.id); if (P.meleeMode) G.weapons.melee.equip(false); }; return `<div class="dv-it" style="--rc:${R(o.rarity)}"><span>${o.icon} ${esc(o.name)}</span>${btn('gm-' + o.id, '装備')}</div>`; }).join('');
       const al = G.ATTACHMENTS.filter((o) => match('a', o)).map((o) => {
-        ACT['ga-' + o.id] = () => { const w = P.weapon; if (w && o.compat(w.def)) { if (w.atts[o.slot]) P.attStash.push(w.atts[o.slot]); w.atts[o.slot] = o.id; w.ver++; G.weapons.equip(true); } else toast('今の武器には付かない'); };
+        ACT['ga-' + o.id] = () => { const w = P.weapon; if (w && G.attOk(o, w)) { if (w.atts[o.slot]) P.attStash.push(w.atts[o.slot]); w.atts[o.slot] = o.id; w.ver++; G.weapons.equip(true); } else toast('今の武器には付かない'); };
         ACT['gs-' + o.id] = () => P.attStash.push(o.id);
         return `<div class="dv-it" style="--rc:${R(o.rarity)}"><span>${o.icon} ${esc(o.name)} <small>${G.ATT_SLOTS[o.slot].name}</small></span>${btn('ga-' + o.id, '装着')}${btn('gs-' + o.id, 'インベントリ')}</div>`;
       }).join('');

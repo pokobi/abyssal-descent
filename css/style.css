@@ -1677,3 +1677,7 @@ html.m .cls-cards { grid-template-columns: repeat(2, 1fr); gap: 6px; }
 html.m .cls-card { padding: 7px 8px; font-size: 10px; gap: 3px; }
 html.m .cls-sk span { font-size: 9px; }
 @media (max-width: 760px) { .cls-cards { grid-template-columns: 1fr 1fr; } }
+
+/* a weapon with an element of its own: the 属性コア slot is closed */
+.iv-as.iv-lock { opacity: 0.55; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.35) 0 4px, transparent 4px 8px); box-shadow: inset 0 0 0 1px var(--rc); cursor: not-allowed; }
+.att.lock { opacity: 0.6; }

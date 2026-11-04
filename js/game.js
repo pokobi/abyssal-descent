@@ -487,7 +487,7 @@
   };
   function moveAtt0(id, from, to) {
     const a = G.ATT_BY_ID[id]; if (!a || from === to) return false;
-    if (to !== 'stash' && !a.compat(to.def)) return false;
+    if (to !== 'stash' && !G.attOk(a, to)) return false;
     if (from === 'stash') { const i = P.attStash.indexOf(id); if (i < 0) return false; P.attStash.splice(i, 1); }
     else { delete from.atts[a.slot]; from.ver++; }
     if (to === 'stash') P.attStash.push(id);
@@ -496,7 +496,7 @@
       to.atts[a.slot] = id; to.ver++;
       if (prev) {
         // the displaced part goes back where the new one came from if it fits there, else to the stash
-        if (from !== 'stash' && G.ATT_BY_ID[prev].compat(from.def) && !from.atts[a.slot]) { from.atts[a.slot] = prev; from.ver++; }
+        if (from !== 'stash' && G.attOk(G.ATT_BY_ID[prev], from) && !from.atts[a.slot]) { from.atts[a.slot] = prev; from.ver++; }
         else P.attStash.push(prev);
       }
     }
@@ -568,6 +568,7 @@
     P.recalc();
     P.phoenixUsed = !!d.phoenixUsed;
     P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; w.ver++; w.mag = x.mag ?? w.mag; return w; });
+    const coresBack = []; for (const w of P.weapons) if (G.ownEl(w) && w.atts.core) { coresBack.push(w.atts.core); delete w.atts.core; w.ver++; }
     if (!P.weapons.length && !Array.isArray(d.weapons)) P.weapons = [G.weapons.make('starter')]; // (a run saved with every gun put away keeps none)
     P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));
@@ -596,6 +597,7 @@
     P.recalc();
     P.hp = Math.min(P.stats.maxHp, d.hp || P.stats.maxHp); P.os = d.os || 0;
     P.miserArea = d.miserArea;
+    for (const id of coresBack) P.attStash.push(id); // (cores taken off weapons that carry an element of their own go to the stash)
     G.weapons.dirty = true;
   };
   GM.enterArea = function (n, kind) {
@@ -1422,7 +1424,7 @@
       else if (k === 'forge') c = GM.SVC_FORGE;
       else if (k === 'tome') c = P.skills.some((s) => s && (s.lv || 0) < G.abilities.MAXLV) ? GM.SVC_TOME : null;
       else if (k === 'skill') c = pickBy(r, G.SKILLS.filter((x) => !P.skills.some((s) => s && s.id === x.id)), luck);
-      else if (k === 'attachment') { const comp = G.ATTACHMENTS.filter((a) => P.weapons.some((pw) => a.compat(pw.def))); c = pickBy(r, comp.length ? comp : G.ATTACHMENTS, luck); }
+      else if (k === 'attachment') { const comp = G.ATTACHMENTS.filter((a) => P.weapons.some((pw) => G.attOk(a, pw))); c = pickBy(r, comp.length ? comp : G.ATTACHMENTS, luck); }
       else if (k === 'grenade') c = pickBy(r, G.ITEMS.filter((x) => x.cat === 'grenade'), luck);
       else if (k === 'armor') c = pickArmor(r, luck);
       else if (k === 'util') c = pickBy(r, G.ITEMS.filter((x) => x.cat !== 'grenade'), luck);
@@ -1831,7 +1833,7 @@
       cat = '🪔 魂の灯火 · 伝説'; note = `灯火 ${P.revives} → ${P.revives + 1}`;
     } else if (o.kind === 'attachment') {
       cat = `${G.ATT_SLOTS[ob.slot].icon} アタッチメント（${G.ATT_SLOTS[ob.slot].name}）`;
-      const ok = P.weapons.filter((pw) => ob.compat(pw.def));
+      const ok = P.weapons.filter((pw) => G.attOk(ob, pw));
       if (!ok.length) note = '⚠ 今の武器には装着できない（インベントリに入る）';
       else if (ok.length === 1) { note = `装着先: ${ok[0].def.icon} ${ok[0].def.name}`; if (ok[0].atts[ob.slot]) note += `（${G.ATT_BY_ID[ok[0].atts[ob.slot]].name} と交換・外したものはインベントリへ）`; }
       else note = '購入時に装着する武器を選択';
@@ -1924,7 +1926,7 @@
         return modal('交換するスキルスロットを選択', `${ob.icon} <b>${ob.name}</b> を装備するスロットを選んでください（${G.input.skillKey(0)}はアルティメット専用）。`, P.skills.map((s, i) => [s, i]).filter(([, i]) => i > 0).map(([s, i]) => ({ icon: s.def.icon, label: G.input.skillKey(i) + ': ' + s.def.name, sub: '交換すると失われます', onPick: () => { P.skills[i] = G.abilities.makeSlot(ob.id); done(); } })));
       }
       if (o.kind === 'attachment') {
-        const ok = G.weapons.gunsInOrder().map((pw) => [pw, P.weapons.indexOf(pw)]).filter(([pw]) => ob.compat(pw.def));
+        const ok = G.weapons.gunsInOrder().map((pw) => [pw, P.weapons.indexOf(pw)]).filter(([pw]) => G.attOk(ob, pw));
         if (!ok.length) { P.attStash.push(ob.id); done(); G.ui.toastSmall('🔩 インベントリに入れた（持ち物画面で装着）'); return; }
         const apply = (pw) => { const prev = pw.atts[ob.slot]; if (prev && prev !== ob.id) { P.attStash.push(prev); setTimeout(() => G.ui.toastSmall(`🗃️ 外した ${G.ATT_BY_ID[prev].icon} ${G.ATT_BY_ID[prev].name} はインベントリへ`), 400); } pw.atts[ob.slot] = ob.id; pw.ver++; if (pw === P.weapon) G.weapons.equip(true); done(); };
         if (ok.length === 1) return apply(ok[0][0]);
@@ -1952,7 +1954,7 @@
     if (Math.random() >= chance) return null;
     // an ornate chest sometimes holds an attachment for the gun in your hands instead
     if (tier >= 2 && Math.random() < 0.35) {
-      const comp = P.weapon ? G.ATTACHMENTS.filter((a) => a.compat(P.weapon.def) && !P.weapon.atts[a.slot]) : [];
+      const comp = P.weapon ? G.ATTACHMENTS.filter((a) => G.attOk(a, P.weapon) && !P.weapon.atts[a.slot]) : [];
       if (comp.length) { const a = U.pick(comp); P.weapon.atts[a.slot] = a.id; P.weapon.ver++; G.weapons.equip(true); G.ui.toast(`${a.icon} ${a.name} を装着した！`, 'good'); return a; }
     }
     const W = GM.CHEST_RARITY[tier] || GM.CHEST_RARITY[2], ord = G.RARITY_ORDER;

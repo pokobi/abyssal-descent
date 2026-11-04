@@ -111,7 +111,7 @@
     return `<i class="iv-dur" style="--f:${f.toFixed(3)};--dc:${col}"></i>`;
   }
   // an attachment that would be a free upgrade: some gun has its socket empty and can take it
-  function attFits(it) { const a = G.ATT_BY_ID[it.id]; return !!a && G.weapons.gunsInOrder().some((w) => !w.atts[a.slot] && a.compat(w.def)); }
+  function attFits(it) { const a = G.ATT_BY_ID[it.id]; return !!a && G.weapons.gunsInOrder().some((w) => !w.atts[a.slot] && G.attOk(a, w)); }
   function gridEl(c, key, cell) {
     cell = cell || CS;
     return `<div class="iv-grid" data-grid="${key}" data-cs="${cell}" style="width:${c.cols * cell}px;height:${c.rows * cell}px;--cs:${cell}px">${c.items.map((it) => itemEl(it, key, cell)).join('')}</div>`;
@@ -128,7 +128,9 @@
       if (!w) return `<div class="iv-wbox empty" data-wslot="${i}"><div class="iv-wh"><kbd>${G.K('w' + (i + 1))}</kbd><span class="wnm"><b class="dim">— 武器スロット —</b></span></div></div>`;
       const cells = Object.keys(G.ATT_SLOTS).map((sl) => {
         const id = w.atts[sl], a = id && A[id], S = G.ATT_SLOTS[sl];
-        const wantsOne = !a && [...P.bag.items, ...(IV.openCont ? IV.openCont.items : [])].some((q) => { const qa = q.type === 'att' && A[q.id]; return qa && qa.slot === sl && qa.compat(w.def); });
+        // a weapon with an element of its own: its 属性コア slot is closed
+        if (sl === 'core' && !a && G.ownEl(w)) { const E = G.Elem.BY[w.el || w.def.el]; return `<div class="iv-as iv-lock" data-as="${i}:${sl}" title="${E.name}属性を持つ武器なので、属性コアは付けられない" style="--rc:${E.col}"><span class="iv-asl">${E.icon}</span></div>`; }
+        const wantsOne = !a && [...P.bag.items, ...(IV.openCont ? IV.openCont.items : [])].some((q) => { const qa = q.type === 'att' && A[q.id]; return qa && qa.slot === sl && G.attOk(qa, w); });
         return `<div class="iv-as${a ? ' on' : ''}${wantsOne ? ' iv-fitslot' : ''}" data-as="${i}:${sl}" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:${i}:${sl}" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div>`;
       }).join('');
       const dps = Math.round(W.gunDps(w)); // (same number as the status screen: 与ダメ included)
@@ -366,7 +368,7 @@
   }
   // attachments: bag <-> gun sockets
   function equipAtt(it, gun) {
-    const a = G.ATT_BY_ID[it.id], guns = G.weapons.gunsInOrder().filter((w) => a.compat(w.def));
+    const a = G.ATT_BY_ID[it.id], guns = G.weapons.gunsInOrder().filter((w) => G.attOk(a, w));
     const w = gun || (guns.includes(P.weapon) ? P.weapon : guns[0]);
     if (!w) { G.sfx.ui('deny'); G.ui.toastSmall('付けられる銃がない'); return false; }
     if (!GM.moveAtt(it.id, 'stash', w)) { G.sfx.ui('deny'); G.ui.toastSmall('この銃には付けられない'); return false; }
@@ -427,7 +429,7 @@
     if (it.type === 'armor') add(`.iv-eq[data-eq="${G.ARMOR_BY_ID[it.id].slot}"]`);
     else if (it.type === 'att') {
       const a = G.ATT_BY_ID[it.id], guns = G.weapons.gunSlots();
-      root.querySelectorAll('.iv-as').forEach((n) => { const [i, sl] = n.dataset.as.split(':'); const w = guns[+i]; if (w && sl === a.slot && a.compat(w.def)) n.classList.add('iv-glow'); });
+      root.querySelectorAll('.iv-as').forEach((n) => { const [i, sl] = n.dataset.as.split(':'); const w = guns[+i]; if (w && sl === a.slot && G.attOk(a, w)) n.classList.add('iv-glow'); });
     } else { const k = IV.specOf(it); if (k === 'g') add('.iv-spec[data-spec="g"]'); else if (k) add('.iv-spec[data-spec="c1"],.iv-spec[data-spec="c2"]'); }
   }
   // repair kit held over a piece: the bar shows the part that would come back (pulsing cyan) and a small "+150" / "最大" tag
@@ -565,7 +567,7 @@
       const a = it.type === 'att' && G.ATT_BY_ID[it.id];
       if (!a || !w) { G.sfx.ui('deny'); G.ui.toastSmall('そこにはアタッチメントしか付けられない'); }
       else if (a.slot !== sl) { G.sfx.ui('deny'); G.ui.toastSmall(`${a.name} は ${G.ATT_SLOTS[a.slot].icon}${G.ATT_SLOTS[a.slot].name} スロット用`); }
-      else if (!a.compat(w.def)) { G.sfx.ui('deny'); G.ui.toastSmall('この武器には付けられない'); }
+      else if (!G.attOk(a, w)) { G.sfx.ui('deny'); G.ui.toastSmall(a.slot === 'core' && G.ownEl(w) ? 'この武器は自分の属性を持っているので、属性コアは付けられない' : 'この武器には付けられない'); }
       else if (f.as) { if (f.as.w !== w && GM.moveAtt(it.id, f.as.w, w)) G.sfx.mech('magIn'); }
       else if (isMine(f.from)) { equipAtt(it, w); return; }
       else {
@@ -632,7 +634,7 @@
     const f = findIt(el); if (!f.it) return;
     const it = f.it, opts = [];
     if (f.as) opts.push(['📥 外してインベントリへ', () => unequipAtt(f.as)]);
-    else if (it.type === 'att' && isMine(f.from)) for (const w of G.weapons.gunsInOrder()) if (G.ATT_BY_ID[it.id].compat(w.def)) opts.push([`🔩 装着: ${G.weapons.keyLabel(w)}${w.def.name}`, () => equipAtt(it, w)]);
+    else if (it.type === 'att' && isMine(f.from)) for (const w of G.weapons.gunsInOrder()) if (G.attOk(G.ATT_BY_ID[it.id], w)) opts.push([`🔩 装着: ${G.weapons.keyLabel(w)}${w.def.name}`, () => equipAtt(it, w)]);
     if (f.as) { popMenu(opts, e); return; }
     if (isMine(f.from) && usable(it)) opts.push(['🍶 使う', () => { UIV.close(); G.abilities.useItemId(it.id); }]);
     if (isMine(f.from) && usable(it) && P.itemCount(it.id) > 1) { const n = P.itemCount(it.id); opts.push([`🍶 まとめて使う（×${n}）`, () => { UIV.close(); G.abilities.queueUse(it.id, n); }]); }

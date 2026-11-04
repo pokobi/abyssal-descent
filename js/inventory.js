@@ -244,7 +244,7 @@
   IV.autoAtt = function (P, it) {
     if (IV.noAuto || !G.weapons || !G.game || !G.game.moveAtt || !P.weapons || !P.weapons.length) return false;
     const a = G.ATT_BY_ID[it.id]; if (!a) return false;
-    const w = G.weapons.gunsInOrder().find((g) => a.compat(g.def) && !g.atts[a.slot]);
+    const w = G.weapons.gunsInOrder().find((g) => G.attOk(a, g) && !g.atts[a.slot]);
     if (!w || !G.game.moveAtt(it.id, 'stash', w)) return false;
     G.ui.toastSmall(`🔩 ${a.icon} ${a.name} を ${w.def.name} に装着した`);
     return true;

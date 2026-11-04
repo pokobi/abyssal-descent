@@ -651,7 +651,7 @@
         const extra = G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier >= Math.max(2, targetTier - 1) && !pool.includes(x) && x.id !== a.d.id && x.id !== b.d.id);
         pool = pool.concat(U.shuffle(extra));
       }
-      const comp = pool.filter((x) => P.weapons.some((pw) => x.compat(pw.def)));
+      const comp = pool.filter((x) => P.weapons.some((pw) => G.attOk(x, pw)));
       const cands = U.shuffle((comp.length >= 3 ? comp : pool).slice()).slice(0, 3);
       const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: attCard(d), onPick: () => {
         consumeBoth();
@@ -681,7 +681,7 @@
       const arD = U.pick(G.ARMOR.filter((x) => G.RARITY[x.rarity].tier === targetTier)) || U.pick(G.ARMOR.filter((x) => G.RARITY[x.rarity].tier >= 2));
       const arInst = G.Inv.makeArmor(arD.id);
       if (targetTier >= 4 && (!arInst.ench || arInst.ench.length < 2)) arInst.ench = G.rollEnchants('legendary');
-      const attPool = G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier === targetTier && P.weapons.some((pw) => x.compat(pw.def)));
+      const attPool = G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier === targetTier && P.weapons.some((pw) => G.attOk(x, pw)));
       const attD = U.pick(attPool.length ? attPool : G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier >= Math.max(2, targetTier - 1)));
       const itD = U.pick(G.ITEMS.filter((x) => x.cat !== 'grenade' && !x.noLoot && G.RARITY[x.rarity].tier === targetTier)) || U.pick(G.ITEMS.filter((x) => x.cat !== 'grenade' && !x.noLoot && G.RARITY[x.rarity].tier >= Math.max(2, targetTier - 1)));
       const opts = [

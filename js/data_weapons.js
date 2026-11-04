@@ -241,6 +241,16 @@
   G.ATT_SLOTS = SLOT;
   G.ATTACHMENTS = ATTACHMENTS;
   G.ATT_BY_ID = Object.fromEntries(ATTACHMENTS.map((a) => [a.id, a]));
+  // does this attachment fit this weapon? (the kind of gun, and the weapon itself: one that carries an element of its own,
+  // born with it or made from parts with one, takes no 属性コア). Takes a weapon or a weapon definition.
+  G.ownEl = (w) => !!w && !!(w.el || (w.def && w.def.el));
+  G.attOk = function (a, w) {
+    if (!a || !w) return false;
+    const d = w.def || w;
+    if (!a.compat(d)) return false;
+    if (a.slot === 'core' && (w.el || d.el)) return false;
+    return true;
+  };
 
   // ---------- melee weapons (slot 3) ----------
   // dmg: light swing, swing: seconds per light swing, range: reach (m), arc: min dot to hit (lower = wider),

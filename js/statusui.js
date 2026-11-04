@@ -59,7 +59,7 @@
       tile('ヘッドショット', dv(s.headMul, d.headMul, { unit: '倍', mid: s0.headMul })),
     ].join('');
     const attDesc = (() => { const on = Object.keys(G.ATT_SLOTS).map((sl) => w.atts[sl] && G.ATT_BY_ID[w.atts[sl]]).filter(Boolean); return on.length ? `<div class="wc-attd">${on.map((a) => `<div><span>${a.icon} ${esc(a.name)}</span>${esc(a.desc || '')}</div>`).join('')}</div>` : ''; })();
-    const atts = Object.keys(G.ATT_SLOTS).map((sl) => { const a = w.atts[sl] && G.ATT_BY_ID[w.atts[sl]]; return a ? `<span class="att on" ${UI.tipAttr(a)}>${a.icon}<em>${esc(a.name)}</em></span>` : `<span class="att" title="${G.ATT_SLOTS[sl].name}">${G.ATT_SLOTS[sl].icon}</span>`; }).join('');
+    const atts = Object.keys(G.ATT_SLOTS).map((sl) => { const a = w.atts[sl] && G.ATT_BY_ID[w.atts[sl]]; return a ? `<span class="att on" ${UI.tipAttr(a)}>${a.icon}<em>${esc(a.name)}</em></span>` : sl === 'core' && G.ownEl(w) ? `<span class="att lock" title="自分の属性を持つ武器なので、属性コアは付けられない">🚫</span>` : `<span class="att" title="${G.ATT_SLOTS[sl].name}">${G.ATT_SLOTS[sl].icon}</span>`; }).join('');
     return `<div class="wc ${cur ? 'cur' : ''}" style="--rc:${R(d.rarity)}">
       <div class="wc-top">
         <div class="wc-pv">${preview('gun', d, w.atts)}<span class="key">${G.weapons.keyLabel(w).replace(/[\[\]]/g, '') || '·'}</span></div>

@@ -107,6 +107,13 @@
   const skLegend = '<div class="wc-legend"><span class="sdw">■ スキル強化 Lv（固定値）</span><span class="sdb">■ 加護・専用強化・能力値（%）</span></div>';
   const AREA_K = ['r', 'len', 'range', 'w'];
   const POW_K = ['dmg', 'dps', 'heal', 'hps'];
+  // the class screen's preview (classes.js): the same card as here, for a level-0 skill, with the stats the class starts with
+  SU.previewSkill = function (id, stats) {
+    const pl = G.player; P = pl;
+    const keep = [pl.stats, pl.buffs, pl.temps, pl._skm];
+    try { pl.stats = stats; pl.buffs = new Map(); pl.temps = new Map(); pl._skm = null; return skillCard(G.abilities.makeSlot(id), ''); }
+    finally { pl.stats = keep[0]; pl.buffs = keep[1]; pl.temps = keep[2]; pl._skm = null; }
+  };
   function skillCard(sk, key) {
     const A = G.abilities, st = P.stats, d = sk.def, ult = !!d.ult;
     const p0 = d.p, p = A.scaleP(sk), pMid = A.scaleP(sk, true);

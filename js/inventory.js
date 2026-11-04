@@ -345,7 +345,8 @@
     const d = Math.max((G.Run ? G.Run.lootDepth(G.game.area) : G.game.area) + (depthBonus || 0), (floor || 0) >= 4 ? 18 : (floor || 0) >= 3 ? 10 : 1);
     return Object.fromEntries(G.RARITY_ORDER.map((r) => [r, G.RARITY[r].tier < (floor || 0) ? 0 : G.rarityWeightD(r, d, luck)]));
   };
-  const pickOf = (arr, r) => { let c = arr.filter((o) => o.rarity === r); if (!c.length) c = arr; return G.thinFairy(() => c[Math.floor(Math.random() * c.length)]); };
+  // (a class's favourites turn up x1.3 here too: armour for the heavy, element cores for the mage)
+  const pickOf = (arr, r) => { let c = arr.filter((o) => o.rarity === r); if (!c.length) c = arr; return G.thinFairy(() => (G.Classes && G.player ? G.Classes.pick({ pick: (l) => l[Math.floor(Math.random() * l.length)], weighted: (l, f) => U.weighted(l, f) }, c) : c[Math.floor(Math.random() * c.length)])); };
   // one random thing of a kind
   IV.rollThing = function (kind, luck, floor) {
     const r = pickR(rarityW(luck, floor));

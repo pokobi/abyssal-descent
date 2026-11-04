@@ -10,7 +10,7 @@
       look: 'オリーブ色の戦闘服とヘルメット', role: '何でもこなす基準のクラス' },
     { id: 'assault', name: '突撃兵', icon: '💨', col: '#ff6a50', gun: 's_wasp', melee: 'm_basic', skill: 'dash', ult: 'ult_berserk', grapple: 15,
       mods: { moveSpeed: 0.05 }, near: 0.15, far: -0.15, plus: '10m以内の敵への与ダメ+15%、移動速度+5%', minus: '20m以上の敵への与ダメ-15%', favName: 'SMG・ショットガン',
-      fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
+      fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun' || o.arch === 'autoshotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
     { id: 'sniper', name: '狙撃手', icon: '🎯', col: '#7ac070', gun: 'n_scout', melee: 'm_basic', skill: 'decoy', ult: 'ult_shadow', grapple: 18,
       mods: { headMul: 0.3, maxHp: -10 }, plus: 'ヘッドショット倍率+30%', minus: '最大HP-10', favName: '狙撃銃・DMR',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'sniper' || o.arch === 'dmr'), look: '緑のフード付きマントとマスク', role: '遠くから急所を撃つ' },
@@ -60,21 +60,30 @@
   const U = G.U;
   const esc = (t) => U.esc(String(t == null ? '' : t));
   const BASE_HP = 100;
-  // a class's numbers as they come out of its mods (the same Player.recalc runs in the game)
+  // the stats a class starts a run with: the player's base stats with the class folded in the way Player.recalc does it (no gear, no boons)
+  CL.stats = function (c) {
+    const s = Object.assign({}, G.PLAYER_BASE), m = CL.mods({ cls: c.id });
+    for (const k in m) if (typeof m[k] === 'number') s[k] = (s[k] || 0) + m[k];
+    s.maxHp = Math.max(10, Math.round(s.maxHp * Math.max(0.2, 1 + (s.maxHpPct || 0))));
+    return s;
+  };
+  // the numbers on the class screen come from the same functions the game uses
   CL.numbers = function (c) {
-    const m = c.mods || {};
-    return { hp: BASE_HP + (m.maxHp || 0), move: Math.round((1 + (m.moveSpeed || 0)) * 100), grapple: c.grapple };
+    const s = CL.stats(c);
+    return { hp: s.maxHp, move: Math.round((1 + (s.moveSpeed || 0)) * 100), grapple: Math.round(G.grappleCdOf(s) * 10) / 10 };
   };
   const wDef = (id) => G.WEAPON_BY_ID[id] || G.MELEE_BY_ID[id];
   const sk = (id) => G.SKILL_BY_ID[id] || (G.ULTS || []).find((u) => u.id === id) || { name: id, icon: '', desc: '' };
   const rec = (c) => { const r = G.save && G.save.data.records.byClass && G.save.data.records.byClass[c.id]; if (!r) return '—'; const cl = Object.keys(r.clears || {}).filter((k) => G.Run.DIFFS[k]).map((k) => G.Run.DIFFS[k].name).join('・'); return `最深エリア ${r.bestArea}${cl ? `／クリア ${cl}` : ''}`; };
   const bar = (label, v, lo, hi, txt, good) => { const k = Math.max(0.04, Math.min(1, (v - lo) / (hi - lo))); return `<div class="cls-bar"><span>${label}</span><i><b style="width:${(k * 100).toFixed(0)}%;background:${good ? 'var(--cc)' : '#c06050'}"></b></i><em>${txt}</em></div>`; };
   CL.detailHTML = function (c) {
-    const n = CL.numbers(c), g = wDef(c.gun), mel = wDef(c.melee), s1 = sk(c.skill), ul = sk(c.ult);
+    const n = CL.numbers(c), g = wDef(c.gun), mel = wDef(c.melee);
     const core = c.atts && c.atts.core && G.ATT_BY_ID[c.atts.core];
     const R = (r) => (G.RARITY[r] ? G.RARITY[r].color : '#ccc');
     const kitRow = (tag, icon, name, rar, sub) => `<div class="cls-kit"><span class="cls-tag">${tag}</span><span class="cls-kic">${icon}</span><div><b style="color:${R(rar)}">${esc(name)}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
-    const skRow = (tag, d, ult) => `<div class="cls-skill${ult ? ' ult' : ''}"><div class="cls-skh"><span class="cls-tag">${tag}</span><span class="cls-kic">${d.icon}</span><b>${esc(d.name)}</b>${d.cd ? `<em>CT ${d.cd}秒</em>` : ''}</div><p>${esc(d.desc)}</p></div>`;
+    // the skill and the ultimate: the status screen's own card for them (its cooldown, damage, range and the numbers in the text are the game's)
+    const st = CL.stats(c);
+    const skRow = (tag, id, ult) => { let card = ''; try { card = G.StatusUI.previewSkill(id, st); } catch (e) { const d = sk(id); card = `<div class="sc"><div class="sc-d">${esc(d.desc)}</div></div>`; } return `<div class="cls-skill${ult ? ' ult' : ''}"><span class="cls-tag">${tag}</span>${card}</div>`; };
     return `<div class="cls-head"><span class="cls-big">${c.icon}</span><div><div class="cls-title">${c.name}</div><div class="cls-sub">${esc(c.role)}</div></div></div>
       <div class="cls-cols">
         <div class="cls-col">
@@ -82,8 +91,8 @@
           ${kitRow('銃', g.icon || '🔫', g.name, g.rarity, esc(g.cat || '') + (core ? `・${core.icon}${core.name}付き` : ''))}
           ${kitRow('近接', mel.icon || '🗡️', mel.name, mel.rarity, esc(mel.cat || ''))}
           <div class="cls-sec">スキル</div>
-          ${skRow('スキル', s1, false)}
-          ${skRow('アルティメット', ul, true)}
+          ${skRow('スキル', c.skill, false)}
+          ${skRow('アルティメット', c.ult, true)}
         </div>
         <div class="cls-col">
           <div class="cls-sec">特性</div>

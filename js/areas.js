@@ -138,11 +138,11 @@
   // factor (0.7 + 0.3 x hits per shot). With no gun left in your hands you are lent a pistol for the round.
   const TR = (AR.TRIAL = {
     DUR: 25, COUNT: 3,
-    LIFE: 2.7, LIFE_SMALL: 2.1, WARN: 0.75, // seconds a target stays; it flashes red for the last WARN
-    MAX_ALIVE: [3, 3, 4, 5], // targets up at once, by quarter of the round
+    LIFE: 3.4, LIFE_SMALL: 2.7, WARN: 0.75, // seconds a target stays; it flashes red for the last WARN
+    MAX_ALIVE: [2, 3, 3, 4], // targets up at once, by quarter of the round
     GAP: [0.22, 0.45], // seconds between targets
     // the final score needed (C below). Set from simulated rounds (tests/trial_test.js): a beginner lands C-B, an average player B-A, a good one A-S, an expert S
-    RANKS: [['S', 46000], ['A', 20000], ['B', 10000]],
+    RANKS: [['S', 40000], ['A', 15000], ['B', 6000]],
     NEED_RATE: 4.5, WF_MAX: 4, // shots per second the round asks for; a gun's factor = NEED_RATE / its sustained rate (1 .. WF_MAX)
     ACC_BASE: 0.7,
   });

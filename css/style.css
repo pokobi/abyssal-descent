@@ -1773,3 +1773,19 @@ html.m .pb-grid { grid-template-columns: 82px repeat(5, 1fr); gap: 3px; }
 html.m .pb-rh { font-size: 10px; gap: 3px; } html.m .pb-fi { width: 20px; height: 20px; font-size: 14px; }
 html.m .pb-c { height: 32px; padding-top: 2px; } html.m .pb-c b { font-size: 13px; }
 html.m .pb-title { font-size: 16px; }
+
+/* the class screen shows the status screen's skill cards (statusui.js): their parts, styled for this panel */
+.cls-skill { position: relative; }
+.cls-skill > .cls-tag { position: absolute; right: 8px; top: 8px; z-index: 1; }
+.cls-skill .sc { padding: 0; background: none; border: 0; }
+.cls-skill .sc-h { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; padding-right: 90px; }
+.cls-skill .sc-h .key, .cls-skill .sc-h .st, .cls-skill .sc-h .cd { display: none; }
+.cls-skill .sc-h .ic { font-size: 18px; }
+.cls-skill .sc-h .nm { font-size: 14px; font-weight: 700; color: #f0dcae; }
+.cls-skill.ult .sc-h .nm { color: #ffd27a; }
+.cls-skill .sc-h .tag { display: none; }
+.cls-skill .sc-l { display: flex; flex-wrap: wrap; gap: 0.15em 1em; font-size: 12px; color: #e8dcc4; }
+.cls-skill .sc-l label { margin-right: 0.4em; font-size: 0.85em; color: #a99d88; }
+.cls-skill .sc-d { margin-top: 4px; font-size: 12px; line-height: 1.55; color: #c8bca4; }
+.cls-skill .sv { color: #f0dcae; }
+.cls-skill .sd, .cls-skill .wc-legend, .cls-skill .sc-a, .cls-skill .sc-x, .cls-skill .sc-h .lv { display: none; }

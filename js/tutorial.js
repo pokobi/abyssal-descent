@@ -149,6 +149,7 @@
   // ---------------------------------------------------------------- lifecycle
   T.start = function () {
     GM = G.game; P = G.player;
+    GM.tutorialRun = true; // (played as the soldier, whatever class was chosen last)
     GM.startRun(undefined, null); // the tutorial never saves
     G.save.data.records.runs = Math.max(0, G.save.data.records.runs - 1); G.save.write();
     T.active = true; GM.tutorial = true; document.body.classList.add('tut-on');

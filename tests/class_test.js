@@ -77,6 +77,16 @@ const PORT = +process.env.COOP_PORT || 9995;
     // ---- one drawing per thing: consumables, skills + ultimates, the kinds of part
     check(await p.eval(`(() => { const sil = (o) => { const t = document.createElement('div'); t.textContent = o.icon; return o.icon; }; const dup = (l) => { const m = {}; for (const o of l) { const k = (o.icon || '').replace(/\uFE0F/g, ''); (m[k] = m[k] || []).push(o.name); } return Object.values(m).filter((v) => v.length > 1).map((v) => v.join('/')); };
       return JSON.stringify({ items: dup(G.ITEMS), skills: dup([...G.SKILLS, ...G.ULTS]), parts: dup(G.Parts.FAMS) }); })()`).then((s) => { console.log('      ' + s); const r = JSON.parse(s); return !r.items.length && !r.skills.length && !r.parts.length; }), 'no two consumables, skills / ultimates or kinds of part share an icon');
+    // ---- the class screen's numbers are the game's own
+    check(await p.eval(`(() => { const out = []; for (const c of G.Classes.LIST) {
+        const P = G.player; P.cls = c.id; P.resetRun(); const A = G.abilities;
+        const game = { hp: P.stats.maxHp, move: Math.round((1 + P.stats.moveSpeed) * 100), grapple: Math.round(G.grappleCdOf(P.stats) * 10) / 10, cd1: Math.round(A.cdOf(P.skills[1]) * 10) / 10, cd0: Math.round(A.cdOf(P.skills[0]) * 10) / 10 };
+        const n = G.Classes.numbers(c); const html = G.Classes.detailHTML(c);
+        const cds = html.split('クールタイム</label>').slice(1).map((x) => parseFloat(x.slice(x.indexOf('>') + 1)));
+        const r1 = (v) => Math.round(v * 10) / 10; out.push([c.id, game.hp === n.hp && game.move === n.move && game.grapple === n.grapple, r1(cds[0]) === game.cd1 && r1(cds[1]) === game.cd0, cds.join('/'), game.cd1 + '/' + game.cd0]); }
+      return JSON.stringify(out); })()`).then((s) => { console.log('      ' + s); return JSON.parse(s).every((r) => r[1] && r[2]); }), 'class screen: HP, speed, grapple and both cooldowns equal what the run starts with');
+    // ---- the tutorial is played as the soldier
+    check(await p.eval("(() => { G.save.data.settings.lastClass = 'mage'; G.Tutorial.start(); const c = G.player.cls, w = G.player.weapons[0].id; return c === 'soldier' && w === 'a_ranger' && G.Classes.last() === 'mage'; })()"), 'the tutorial starts as the soldier, and the chosen class is left as it was');
     check(!p.errs.length, 'no errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 500));
   } catch (e) { console.error(e); fails.push(String(e)); }
   finally { await ch.close(); srv.close(); }

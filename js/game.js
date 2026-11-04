@@ -464,7 +464,7 @@
     GM.run = { coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 };
     GM.run.diff = Object.assign({}, G.Run.cur); GM.won = false;
     G.save.data.records.runs++; G.save.write();
-    P.cls = G.Classes ? G.Classes.last() : 'soldier'; GM.run.cls = P.cls;
+    P.cls = G.Classes && !GM.tutorialRun ? G.Classes.last() : 'soldier'; GM.run.cls = P.cls; GM.tutorialRun = false; // (the tutorial is always the soldier)
     P.resetRun();
     G.abilities.clearUltAuras && G.abilities.clearUltAuras();
     G.weapons.dirty = true;
@@ -1411,7 +1411,7 @@
     const W = { common: 3, uncommon: 9, rare: 28, epic: 38 * lk, legendary: 22 * ramp * lk };
     const rar = r.weighted(G.RARITY_ORDER.filter((k) => W[k] !== undefined), (k) => W[k]);
     const c = G.ARMOR.filter((o) => o.rarity === rar);
-    return r.pick(c.length ? c : G.ARMOR);
+    return G.Classes ? G.Classes.pick(r, c.length ? c : G.ARMOR) : r.pick(c.length ? c : G.ARMOR); // (the heavy's favourites: x1.3)
   }
   GM.pickOffer = function (k, used, r) {
     r = r || new G.RNG((Math.random() * 1e9) >>> 0);

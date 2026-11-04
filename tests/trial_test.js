@@ -58,7 +58,7 @@ const SIM_ONLY = process.argv[2] === 'sim';
       await enter(4);
       await p.until('G.game.objective.countdown <= 0', 8000);
       const inView = [];
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 40; i++) {
         await sleep(250);
         inView.push(...JSON.parse(await p.eval("JSON.stringify(G.Areas.targets.filter((t) => t.alive && t.maxLife - t.life < 0.3).map((t) => { const v = t.pos.clone().project(G.camera); return v.z < 1 && Math.abs(v.x) < 0.95 && Math.abs(v.y) < 0.95; }))")));
       }

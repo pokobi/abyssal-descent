@@ -132,87 +132,151 @@
   AR.miniHealCost = () => GM.price(70 + GM.area * 9);
 
   // ---------------- aim trial ----------------
+  // 25 s of targets after a 3 s count. Every target appears inside your view (never behind you or above the screen) and flashes red for its last
+  // moments; one that escapes breaks the combo, nothing else does. A hit scores (base + centre + speed + small + moving) x combo multiplier (up to x3)
+  // x the gun's fire-rate factor (a slow gun scores more per hit, so every gun can reach every rank). The final score is that total x the accuracy
+  // factor (0.7 + 0.3 x hits per shot). With no gun left in your hands you are lent a pistol for the round.
+  const TR = (AR.TRIAL = {
+    DUR: 25, COUNT: 3,
+    LIFE: 2.7, LIFE_SMALL: 2.1, WARN: 0.75, // seconds a target stays; it flashes red for the last WARN
+    MAX_ALIVE: [3, 3, 4, 5], // targets up at once, by quarter of the round
+    GAP: [0.22, 0.45], // seconds between targets
+    // the final score needed (C below). Set from simulated rounds (tests/trial_test.js): a beginner lands C-B, an average player B-A, a good one A-S, an expert S
+    RANKS: [['S', 46000], ['A', 20000], ['B', 10000]],
+    NEED_RATE: 4.5, WF_MAX: 4, // shots per second the round asks for; a gun's factor = NEED_RATE / its sustained rate (1 .. WF_MAX)
+    ACC_BASE: 0.7,
+  });
+  TR.rankOf = (s) => { for (const [r, v] of TR.RANKS) if (s >= v) return r; return 'C'; };
+  TR.nextOf = (s) => { const up = TR.RANKS.slice().reverse().find(([, v]) => s < v); return up || null; };
+  // the shots per second a gun keeps up (a burst counts as its rounds, a charge adds to every shot; the trial's magazine never runs dry)
+  TR.sustained = function (w) {
+    if (!w) return TR.NEED_RATE;
+    const s = G.weapons.stats(w);
+    if (s.flame) return TR.NEED_RATE;
+    let per = 60 / Math.max(1, s.rpm) + (s.charge || 0);
+    if (s.burst > 1) per = (s.burst * 60 / Math.max(1, s.rpm) + (s.burstDelay || 0)) / s.burst;
+    return 1 / per;
+  };
+  TR.factor = (w) => U.clamp(TR.NEED_RATE / Math.max(0.05, TR.sustained(w)), 1, TR.WF_MAX);
+  TR.accF = (O) => TR.ACC_BASE + (1 - TR.ACC_BASE) * (O.shots ? Math.min(1, O.gunHits / O.shots) : 1);
+  TR.final = (O) => Math.round(O.score * TR.accF(O));
+
   AR.setupTrial = function () {
-    const O = GM.objective = { kind: 'trial', t: 0, dur: 25, score: 0, combo: 0, best: 0, hits: 0, misses: 0, spawnT: 1.2, started: false, countdown: 3 };
+    const O = GM.objective = { kind: 'trial', t: 0, dur: TR.DUR, score: 0, combo: 0, best: 0, hits: 0, misses: 0, shots: 0, gunHits: 0, spawnT: 1.0, started: false, countdown: TR.COUNT };
     O.title = '射的の試練'; O.icon = '🎯';
-    O.text = () => O.countdown > 0 ? `構えろ… <b>${Math.ceil(O.countdown)}</b>` : `スコア <b>${U.fmt(O.score)}</b>　残り <b>${Math.ceil(Math.max(0, O.dur - O.t))}</b>秒　コンボ ×<b>${O.combo}</b>`;
+    O.text = () => O.countdown > 0 ? `構えろ… <b>${Math.ceil(O.countdown)}</b>` : `スコア <b>${U.fmt(TR.final(O))}</b>　ランク <b>${TR.rankOf(TR.final(O))}</b>　コンボ ×<b>${O.combo}</b>`;
     O.progress = () => O.t / O.dur;
     AR.targets = [];
-    G.ui.toast('🎯 浮遊する的を撃ち抜け！ 中心ほど高得点・連続で倍率UP', 'good');
+    // nothing to shoot with: a pistol is lent for the round (taken back at the end)
+    if (!P.weapons.length) { const w = G.weapons.make('starter'); w.mag = G.weapons.stats(w).mag; w.trialLoan = true; P.weapons.push(w); G.weapons.switchTo(P.weapons.length - 1); G.weapons.order(); G.ui.refreshWeapon(); G.ui.toastSmall('🔫 試練の間、拳銃を貸し出す'); }
+    else if (P.meleeMode) G.weapons.switchTo(P.wIdx);
+    for (const w of P.weapons) { w.reloading = false; w.mag = Math.max(w.mag, G.weapons.stats(w).mag); } // (every gun full: no reloading in the round)
+    G.ui.toast('🎯 的を撃ち抜け！ 中心ほど高得点・連続で倍率UP・的を逃すとコンボが途切れる（試練中は弾が減らない）', 'good');
+    AR.trialHud(O);
   };
-  function makeTarget() {
-    const w = G.world;
-    const f = P.forward(); f.y = 0; f.normalize();
-    for (let k = 0; k < 20; k++) {
-      const ang = U.rand(-1.1, 1.1);
-      const d = f.clone().applyAxisAngle(V(0, 1, 0), ang);
-      const dist = U.rand(9, 30);
-      const p = P.pos.clone().addScaledVector(d, dist); p.y = P.pos.y + U.rand(1.0, 6.5);
-      if (p.x < 2 || p.z < 2 || p.x > w.W - 2 || p.z > w.D - 2) continue;
-      if (!w.los(G.camera.position, p) || !w.boxFree(p.x - 0.7, p.y - 0.7, p.z - 0.7, p.x + 0.7, p.y + 0.7, p.z + 0.7)) continue;
-      const small = Math.random() < 0.25, moving = Math.random() < 0.35 + GM.area * 0.01;
-      const s = small ? 0.65 : 1;
-      const g = new THREE.Group();
-      const ringM = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.4, emissive: c, emissiveIntensity: 0.25 });
-      const disc = (r, c, z) => { const m = new THREE.Mesh(G.Props.PG.cyl, ringM(c)); m.scale.set(r, 0.05, r); m.rotation.x = Math.PI / 2; m.position.z = z; g.add(m); };
-      disc(0.6 * s, 0x8a6a3a, 0); disc(0.42 * s, 0xe8dcc0, 0.02); disc(0.26 * s, 0xa02818, 0.04); disc(0.12 * s, 0xffd060, 0.06);
-      g.position.copy(p); g.lookAt(G.camera.position);
-      g.scale.setScalar(0.01);
-      G.scene.add(g);
-      G.fx.sparks(p, null, 8, 0xffd070, 3);
-      const T = {
-        isEnemy: true, custom: true, alive: true, noBar: true, ignoreCount: true, noReward: true, isTarget: true,
-        def: { id: 'target', name: '的', plan: 'target' }, st: {}, level: 1, hp: 1, maxHp: 1, shield: 0, maxShield: 0, radius: 0.6 * s, height: 1, pos: p.clone(), centerRef: p.clone(),
-        hitW: [{ w: p.clone(), r: 0.6 * s, part: 'body' }, { w: p.clone(), r: 0.16 * s, part: 'head' }], bloodColor: 0xd0a040, lastHitT: -10, flinch: 0,
-        life: small ? 2.0 : 2.8, maxLife: small ? 2.0 : 2.8, base: p.clone(), ph: Math.random() * 6, moving, small, mesh: g,
-        centerPos() { return this.centerRef.clone(); }, knockback() {},
-        update(dt) {
-          this.life -= dt;
-          const k = Math.min(1, (this.maxLife - this.life) * 6);
-          this.mesh.scale.setScalar(Math.max(0.01, k * Math.min(1, this.life * 2)));
-          if (this.moving) { this.pos.copy(this.base); this.pos.x += Math.sin(G.game.time * 2.2 + this.ph) * 2.5; this.pos.y += Math.sin(G.game.time * 3.1 + this.ph) * 0.6; }
-          this.mesh.position.copy(this.pos); this.mesh.lookAt(G.camera.position);
-          this.centerRef.copy(this.pos); for (const h of this.hitW) h.w.copy(this.pos);
-          if (this.life <= 0 && this.alive) { this.alive = false; this.removeMesh(); AR.onTargetMiss(this); }
-        },
-        removeMesh() { G.scene.remove(this.mesh); this.removed = true; },
-        remove() { this.removeMesh(); },
-        die(info) { if (!this.alive) return false; this.alive = false; AR.onTargetHit(this, info); this.removeMesh(); return false; },
-      };
-      G.enemies.add(T); AR.targets.push(T);
-      return T;
+  // shots fired in the round (for the accuracy; a flamethrower's stream is not counted), and the magazine never runs dry in the round (a reload would
+  // only punish the guns with small magazines)
+  const trialOn = () => { const O = GM && GM.objective; return !!(O && O.kind === 'trial' && !GM.areaCleared && G.game.stage === 'trial'); };
+  const shoot0 = G.weapons.shoot;
+  G.weapons.shoot = function (w, s) {
+    const O = GM.objective, on = trialOn(), m = w && w.mag;
+    if (on && O.countdown <= 0 && !(s && s.flame)) O.shots++;
+    try { return shoot0.apply(this, arguments); } finally { if (on && w) w.mag = Math.max(w.mag, m); }
+  };
+  const flame0 = G.weapons.fireFlame;
+  if (flame0) G.weapons.fireFlame = function (w) { const on = trialOn(), m = w && w.mag; try { return flame0.apply(this, arguments); } finally { if (on && w) w.mag = Math.max(w.mag, m); } };
+  // where a new target may go: inside the view (a margin from its edges, room for a moving one's swing), in the open, in sight
+  function spawnSpot() {
+    const w = G.world, cam = G.camera, eye = cam.position;
+    const vh = THREE.MathUtils.degToRad(cam.fov) / 2, hh = Math.atan(Math.tan(vh) * cam.aspect);
+    const fl = w.floorBelow ? w.floorBelow(P.pos.x, P.pos.y + 1, P.pos.z) : P.pos.y;
+    const ok = (p) => p.x > 2 && p.z > 2 && p.x < w.W - 2 && p.z < w.D - 2 && p.y > fl + 0.8 && p.y < fl + 8.5 && w.los(eye, p) && w.boxFree(p.x - 0.7, p.y - 0.7, p.z - 0.7, p.x + 0.7, p.y + 0.7, p.z + 0.7);
+    for (let k = 0; k < 24; k++) {
+      const yaw = P.yaw + U.rand(-1, 1) * Math.min(0.6, hh * 0.55), pitch = U.clamp(P.pitch + U.rand(-1, 1) * Math.min(0.3, vh * 0.5), -0.25, 0.55);
+      const d = V(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+      const p = eye.clone().addScaledVector(d, U.rand(10, 26));
+      if (ok(p)) return p;
     }
+    // looking at a wall: somewhere over the middle of the hall instead (the arrow at the edge of the screen shows where)
+    for (let k = 0; k < 16; k++) { const p = V(U.rand(6, w.W - 6), fl + U.rand(1.5, 6), U.rand(6, w.D - 10)); if (ok(p) && p.distanceTo(eye) > 8) return p; }
     return null;
+  }
+  function makeTarget() {
+    const p = spawnSpot(); if (!p) return null;
+    const small = Math.random() < 0.25, moving = Math.random() < Math.min(0.6, 0.35 + GM.area * 0.01);
+    const s = small ? 0.65 : 1;
+    const g = new THREE.Group();
+    const ringM = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.4, emissive: c, emissiveIntensity: 0.25 });
+    const disc = (r, c, z) => { const m = new THREE.Mesh(G.Props.PG.cyl, ringM(c)); m.scale.set(r, 0.05, r); m.rotation.x = Math.PI / 2; m.position.z = z; g.add(m); return m; };
+    disc(0.6 * s, 0x8a6a3a, 0); disc(0.42 * s, 0xe8dcc0, 0.02); disc(0.26 * s, 0xa02818, 0.04); disc(0.12 * s, 0xffd060, 0.06);
+    // the warning: a red halo behind it that blinks in its last moments
+    const halo = new THREE.Mesh(G.Props.PG.cyl, new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.scale.set(0.8 * s, 0.03, 0.8 * s); halo.rotation.x = Math.PI / 2; halo.position.z = -0.03; halo.visible = false; g.add(halo);
+    g.position.copy(p); g.lookAt(G.camera.position);
+    g.scale.setScalar(0.01);
+    G.scene.add(g);
+    G.fx.sparks(p, null, 8, 0xffd070, 3);
+    const life = small ? TR.LIFE_SMALL : TR.LIFE;
+    const T = {
+      isEnemy: true, custom: true, alive: true, noBar: true, ignoreCount: true, noReward: true, isTarget: true,
+      def: { id: 'target', name: '的', plan: 'target' }, st: {}, level: 1, hp: 1, maxHp: 1, shield: 0, maxShield: 0, radius: 0.6 * s, height: 1, pos: p.clone(), centerRef: p.clone(),
+      hitW: [{ w: p.clone(), r: 0.6 * s, part: 'body' }, { w: p.clone(), r: 0.16 * s, part: 'head' }], bloodColor: 0xd0a040, lastHitT: -10, flinch: 0,
+      life, maxLife: life, base: p.clone(), ph: Math.random() * 6, moving, small, mesh: g, halo,
+      centerPos() { return this.centerRef.clone(); }, knockback() {},
+      update(dt) {
+        this.life -= dt;
+        const k = Math.min(1, (this.maxLife - this.life) * 6);
+        const warn = this.life < TR.WARN;
+        this.mesh.scale.setScalar(Math.max(0.01, k * Math.min(1, 0.55 + this.life * 0.6)));
+        this.halo.visible = warn && Math.floor(this.life * 10) % 2 === 0;
+        if (this.moving) { this.pos.copy(this.base); this.pos.x += Math.sin(G.game.time * 2.2 + this.ph) * 2.2; this.pos.y += Math.sin(G.game.time * 3.1 + this.ph) * 0.6; }
+        this.mesh.position.copy(this.pos); this.mesh.lookAt(G.camera.position);
+        this.centerRef.copy(this.pos); for (const h of this.hitW) h.w.copy(this.pos);
+        if (this.life <= 0 && this.alive) { this.alive = false; this.removeMesh(); AR.onTargetMiss(this); }
+      },
+      removeMesh() { G.scene.remove(this.mesh); this.removed = true; },
+      remove() { this.removeMesh(); },
+      die(info) { if (!this.alive) return false; this.alive = false; AR.onTargetHit(this, info); this.removeMesh(); return false; },
+    };
+    G.enemies.add(T); AR.targets.push(T);
+    return T;
   }
   AR.onTargetHit = function (T, info) {
     const O = GM.objective;
-    if (!O || O.kind !== 'trial') return;
+    if (!O || O.kind !== 'trial' || GM.areaCleared) return;
     const speed = Math.max(0, T.life / T.maxLife);
     const center = info && info.head;
+    const gun = info && (info.src === 'bullet' || info.weapon) && P.weapon && !P.meleeMode;
     O.combo++; O.best = Math.max(O.best, O.combo); O.hits++;
-    const mult = Math.min(3, 1 + O.combo * 0.1);
-    const pts = Math.round((100 + (center ? 120 : 0) + speed * 120 + (T.small ? 80 : 0) + (T.moving ? 60 : 0)) * mult);
+    if (gun) O.gunHits++;
+    const wf = gun ? TR.factor(P.weapon) : 1, mult = TR.mult(O.combo);
+    const pts = Math.round((100 + (center ? 120 : 0) + speed * 120 + (T.small ? 80 : 0) + (T.moving ? 60 : 0)) * mult * wf);
     O.score += pts;
     G.fx.dmgNum(T.pos.clone().add(V(0, 0.6, 0)), '+' + pts, center ? 'head' : 'crit');
     G.fx.sparks(T.pos, null, 18, center ? 0xffe070 : 0xffb050, 6);
     G.fx.debris(T.pos, G.world.mats.wood, 6, 0.12, 5);
     G.sfx.breakObj(T.pos, 'wood'); if (center) G.sfx.ui('ready');
     if (O.combo % 10 === 0) G.ui.feed(`🎯 ${O.combo} コンボ！`, 'big');
+    // a rank reached in the round is announced
+    const r = TR.rankOf(TR.final(O));
+    if (r !== 'C' && r !== O.rankNow) { O.rankNow = r; G.ui.feed(`🏅 ランク ${r} 到達！`, 'big'); G.sfx.ui('rare'); }
   };
   AR.onTargetMiss = function () {
-    const O = GM.objective; if (!O || O.kind !== 'trial') return;
-    if (O.combo >= 5) G.ui.toastSmall('コンボが途切れた…');
+    const O = GM.objective; if (!O || O.kind !== 'trial' || GM.areaCleared) return;
+    if (O.combo >= 3) G.ui.toastSmall(`的を逃した — コンボ ${O.combo} が途切れた`);
     O.combo = 0; O.misses++;
   };
   AR.updateTrial = function (dt) {
     const O = GM.objective;
     if (!O || O.kind !== 'trial' || GM.areaCleared) return;
-    if (O.countdown > 0) { const prev = Math.ceil(O.countdown); O.countdown -= dt; if (Math.ceil(O.countdown) !== prev) G.sfx.ui(O.countdown <= 0 ? 'select' : 'click'); return; }
+    if (O.countdown > 0) { const prev = Math.ceil(O.countdown); O.countdown -= dt; if (Math.ceil(O.countdown) !== prev) G.sfx.ui(O.countdown <= 0 ? 'select' : 'click'); AR.trialHud(O); return; }
     O.t += dt;
     O.spawnT -= dt;
     const alive = AR.targets.filter((t) => t.alive).length;
-    const maxAlive = 2 + Math.min(3, Math.floor(O.t / 7));
-    if (O.spawnT <= 0 && alive < maxAlive) { makeTarget(); O.spawnT = U.rand(0.25, 0.6); }
+    // (a slow gun's targets come only somewhat slower, by the square root of its factor: it still has to hurry)
+    const pace = Math.sqrt(TR.pace());
+    const maxAlive = Math.max(1, Math.round(TR.MAX_ALIVE[Math.min(TR.MAX_ALIVE.length - 1, Math.floor(O.t / O.dur * TR.MAX_ALIVE.length))] / pace));
+    if (O.spawnT <= 0 && alive < maxAlive) { const T = makeTarget(); if (T) { T.life = T.maxLife = T.maxLife * pace; } O.spawnT = U.rand(...TR.GAP) * pace; }
     AR.targets = AR.targets.filter((t) => t.alive);
     // the clock: ticks in the last 10 seconds, faster and higher in the last 5, a gong at the end
     const left = O.dur - O.t, sec = Math.ceil(left);
@@ -223,16 +287,61 @@
     const half = Math.floor(left * 2);
     if (left <= 5 && left > 0 && half !== O.lastHalf) { O.lastHalf = half; if (half % 2 === 1 && G.sfx.tick) G.sfx.tick(2, sec); }
     G.ui.trialClock && G.ui.trialClock(left, O.dur);
+    AR.trialHud(O);
     if (O.t >= O.dur) { G.sfx.bell(); G.ui.trialClock && G.ui.trialClock(-1); AR.finishTrial(); }
+  };
+  // a slow gun gets the round at its own pace: fewer targets up at once, more time between them and on each (and more per hit: TR.factor),
+  // so it can hold a combo as a quick gun can
+  TR.pace = () => (P.weapon && !P.meleeMode ? TR.factor(P.weapon) : 1);
+  // the combo multiplier: +0.1 a hit (faster with a slow gun, which lands fewer), x3 at most
+  TR.mult = (combo) => Math.min(3, 1 + combo * 0.1 * TR.pace());
+  // ---- the round's panel: the score, a bar with the ranks on it and how far the next one is, combo / accuracy / the gun's factor; arrows to targets off screen
+  let tHud = null, tArrows = null;
+  AR.trialHud = function (O) {
+    if (!O) { if (tHud) tHud.remove(); if (tArrows) tArrows.remove(); tHud = tArrows = null; return; }
+    if (!tHud) {
+      tHud = document.createElement('div'); tHud.id = 'trial-hud';
+      tHud.innerHTML = '<div class="th-top"><span class="th-rank"></span><b class="th-score"></b></div><div class="th-bar"><i></i></div><div class="th-next"></div><div class="th-row"></div>';
+      const bar = tHud.querySelector('.th-bar'), top = TR.RANKS[0][1] * 1.15;
+      for (const [r, v] of TR.RANKS) { const m = document.createElement('u'); m.style.left = (v / top * 100).toFixed(1) + '%'; m.textContent = r; bar.appendChild(m); }
+      G.ui.el.hud.appendChild(tHud);
+      tArrows = document.createElement('div'); tArrows.id = 'trial-arrows'; G.ui.el.hud.appendChild(tArrows);
+    }
+    const fin = TR.final(O), rank = TR.rankOf(fin), nx = TR.nextOf(fin), top = TR.RANKS[0][1] * 1.15;
+    const set = (sel, html) => { const el = tHud.querySelector(sel); if (el._h !== html) { el.innerHTML = html; el._h = html; } };
+    set('.th-rank', rank); tHud.querySelector('.th-rank').dataset.r = rank;
+    set('.th-score', U.fmt(fin));
+    tHud.querySelector('.th-bar i').style.width = Math.min(100, fin / top * 100).toFixed(1) + '%';
+    tHud.querySelector('.th-bar i').dataset.r = rank;
+    set('.th-next', nx ? `次のランク <b>${nx[0]}</b> まで あと <b>${U.fmt(nx[1] - fin)}</b>` : '<b>最高ランク S！</b>');
+    const acc = O.shots ? Math.round(Math.min(1, O.gunHits / O.shots) * 100) : 100, wf = P.weapon && !P.meleeMode ? TR.factor(P.weapon) : 1;
+    set('.th-row', `コンボ <b>${O.combo}</b>（×${TR.mult(O.combo).toFixed(1)}）　命中率 <b>${acc}%</b>${wf > 1.01 ? `　連射補正 <b>×${wf.toFixed(1)}</b>` : ''}`);
+    // arrows for targets that are not on the screen
+    const cam = G.camera, live = AR.targets.filter((t) => t.alive), html = [];
+    if (live.length) cam.updateMatrixWorld(); // (the view as it is this frame, not as it was last drawn)
+    for (const t of live) {
+      const behind = t.pos.clone().applyMatrix4(cam.matrixWorldInverse).z > 0, v = t.pos.clone().project(cam); // (behind the eye: judged in the camera's own space, the depth after projection is no use with a far view)
+      if (!behind && Math.abs(v.x) < 0.95 && Math.abs(v.y) < 0.9) continue;
+      let x = behind ? -v.x : v.x, y = behind ? -v.y : v.y; const m = Math.max(Math.abs(x), Math.abs(y)) || 1; x /= m; y /= m;
+      const ang = Math.atan2(-y, x) * 180 / Math.PI, warn = t.life < TR.WARN;
+      html.push(`<i class="${warn ? 'w' : ''}" style="left:${(50 + x * 45).toFixed(1)}%;top:${(50 - y * 42).toFixed(1)}%;transform:translate(-50%,-50%) rotate(${ang.toFixed(0)}deg)">➤</i>`);
+    }
+    const h = html.join(''); if (tArrows._h !== h) { tArrows.innerHTML = h; tArrows._h = h; }
   };
   AR.finishTrial = function () {
     const O = GM.objective;
     for (const t of AR.targets) if (t.alive) { t.alive = false; t.removeMesh(); }
     AR.targets = [];
-    const rank = O.score >= 15500 ? 'S' : O.score >= 9500 ? 'A' : O.score >= 4500 ? 'B' : 'C';
+    AR.trialHud(null);
+    // the lent pistol goes back
+    const loan = P.weapons.find((w) => w.trialLoan);
+    if (loan) { P.weapons.splice(P.weapons.indexOf(loan), 1); P.wIdx = Math.max(0, Math.min(P.wIdx, P.weapons.length - 1)); if (!P.weapons.length) G.weapons.setMelee(); G.weapons.order(); G.ui.refreshWeapon(); }
+    const raw = O.score, acc = O.shots ? Math.min(1, O.gunHits / O.shots) : 1;
+    O.raw = raw; O.score = TR.final(O);
+    const rank = TR.rankOf(O.score);
     O.rank = rank;
-    const coins = Math.round(Math.min(O.score / 45, 260 + GM.area * 35));
-    G.ui.banner(`RANK ${rank}`, `スコア ${U.fmt(O.score)} ／ 命中 ${O.hits} ／ 最大コンボ ${O.best}`, false, true);
+    const coins = Math.round(Math.min(O.score / 150, 260 + GM.area * 35)); // (about the same coins as before the scores grew with the denser round)
+    G.ui.banner(`RANK ${rank}`, `スコア ${U.fmt(O.score)}（${U.fmt(raw)} × 命中率 ${Math.round(acc * 100)}%）／ 命中 ${O.hits} ／ 最大コンボ ${O.best}`, false, true);
     G.combat.coins(Math.round(G.Run.income(coins)), null, '射的報酬');
     if (rank === 'B') { const it = U.pick(G.ITEMS.filter((x) => G.RARITY[x.rarity].tier <= 2)); if (P.addItem(it.id, 1)) { G.ui.toast(`${it.icon} ${it.name} を手に入れた`, 'good'); G.ui.gain(it); } }
     GM.clearArea({ reward: rank === 'S' ? 'boost' : rank === 'A' ? 'buff' : 'none', noBase: true });

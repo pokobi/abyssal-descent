@@ -11,7 +11,9 @@
   W.meleeStats = function (m) {
     const d = m.def, st = G.player.stats;
     const s = Object.assign({}, d);
-    s.swing = d.swing * (1 - Math.min(0.5, st.meleeCd || 0));
+    // 連射速度 counts at half for the light swings (and slows them at half when it is negative); with 近接攻撃の間隔 at most -50% in all
+    W.meleeCut = Math.min(0.5, (st.meleeCd || 0) + 0.5 * ((st.fireRate || 0) + ((G.player && G.player.dynFireRate) || 0)));
+    s.swing = d.swing * (1 - W.meleeCut);
     s.dmg = d.dmg * Math.pow(1.13, m.lv || 0);
     s.critChance = (d.critChance || 0);
     s.range = d.range + (st.meleeRange || 0);

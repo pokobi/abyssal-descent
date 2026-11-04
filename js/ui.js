@@ -325,6 +325,7 @@
       const left = n ? Math.max(0, CL.state().bladeT - G.game.time) / 7.5 : 0;
       sStyle(bb.lastChild.firstChild, 'width', (left * 100).toFixed(1) + '%');
       bb.classList.toggle('on', n > 0);
+      bb.classList.toggle('dim', n > 0 && 7.5 - left * 7.5 > 1.5); // (full strength for 1.5 s after a hit, faint after that)
     } else if (bb) bb.classList.remove('on');
     let fb = UI._focusEl;
     if (P.cls === 'sniper') {

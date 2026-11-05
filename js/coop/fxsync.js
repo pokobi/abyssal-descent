@@ -3,7 +3,7 @@
 //  - the big effects (explosions, rings, flashes, beams, lightning, bubbles, smoke) made by your own actions are replayed on their screens;
 //  - your projectiles (grenades, rockets, arrows, orbs ...) fly on their screens too, as pictures only: the damage is worked out where they are thrown;
 //  - zones and ultimate auras you leave on the ground are drawn on their screens (their damage is yours);
-//  - a grenade that goes off beside someone else's character hurts them as it would hurt its thrower (a fifth of its damage).
+//  - a grenade that goes off beside someone else's character hurts them as it would hurt its thrower (G.GRENADE_SELF: 2% of its damage).
 (function () {
   const K = G.Coop;
   const V = G.U.V;
@@ -106,11 +106,11 @@
         return ex.call(C, pos, r, dmg, info);
       } finally { K.own--; }
     };
-    // a grenade of someone else: a fifth of its damage, as for its own thrower
+    // a grenade of someone else: 2% of its damage (G.GRENADE_SELF), as for its own thrower
     const friendly = (m) => {
       if (!K.ff || P.dead || GM.state === 'dead' || !G.world) return;
       const d = P.pos.distanceTo(V(...m.p));
-      if (d < m.r) C.damagePlayer(m.d * 0.2 / ((C.ENEMY_DMG || 1) * Math.max(0.1, 1 + P.stats.enemyDmg)), { src: 'explosion', pos: V(...m.p) });
+      if (d < m.r) C.damagePlayer(m.d * G.GRENADE_SELF / ((C.ENEMY_DMG || 1) * Math.max(0.1, 1 + P.stats.enemyDmg)), { src: 'explosion', pos: V(...m.p) });
     };
 
     // a decoy draws the foes, whoever set it down (the foes are the host's)

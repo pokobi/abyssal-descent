@@ -53,6 +53,7 @@
   const TOOL = [];
   // grenades: a much bigger blast and far more damage to enemy shields (the descriptions follow the numbers)
   G.GRENADE_RADIUS_MUL = 1.6; G.GRENADE_SHIELD_MUL = 3;
+  G.GRENADE_SELF = 0.02; // what your own grenade (and a teammate's) does to you inside its blast: 2% of its damage (combat.js, coop/fxsync.js)
   for (const it of G.ITEMS) {
     if (it.cat !== 'grenade' || !it.data) continue;
     const d = it.data;

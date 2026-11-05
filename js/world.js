@@ -647,8 +647,100 @@
     finalize(scene, quality) {
       for (const f of this.deferred) f(this.group);
       this.deferred = [];
+      this.mergeStatic();
       this.batch.build(this.mats, this.group, quality !== 'low');
       scene.add(this.group);
+    }
+    // Draw calls: the props, trees, rocks ... the generators add as single meshes are merged, per material, into one mesh each
+    // (same geometry, material, position and shadows, so they look the same; ~600 draw calls an area become a few dozen).
+    // Left alone: anything the world keeps a reference to (doors, chests, destructibles, animated things, light fixtures ...)
+    // and everything under it, transparent / skinned / instanced meshes, and meshes with children or their own userData.
+    // A floating islet bobs as a whole, so its contents are merged inside it.
+    mergeStatic() {
+      const keep = new Set(), seen = new Set();
+      const scan = (v, d) => {
+        if (!v || typeof v !== 'object' || seen.has(v)) return;
+        seen.add(v);
+        if (v.isObject3D) { keep.add(v); return; }
+        if (d >= 4 || v.isMaterial || v.isTexture || v.isBufferGeometry || v.isBufferAttribute || v.isVector3 || v.isColor || ArrayBuffer.isView(v)) return;
+        if (v instanceof Map || v instanceof Set) { for (const x of v.values()) scan(x, d + 1); return; }
+        if (Array.isArray(v)) { if (v.length && (typeof v[0] !== 'object' || v[0] === null)) return; for (const x of v) scan(x, d + 1); return; }
+        for (const k in v) scan(v[k], d + 1);
+      };
+      for (const k in this) if (k !== 'group' && k !== 'mats' && k !== 'batch') scan(this[k], 0);
+      // things that only ever move, shake or vanish as a whole: their insides are merged within them (a chest's lid stays its own)
+      const units = [this.group];
+      const unit = (o) => { if (o && o.isObject3D && o.children.length && !units.includes(o)) units.push(o); };
+      for (const a of this.animated) if (a.kind === 'islet') unit(a.m);
+      for (const d of this.destructibles) unit(d.mesh);
+      for (const ex of this.exits || []) unit(ex.portcullis);
+      for (const it of this.interactables) if (it.type === 'chest') unit(it.mesh);
+      if (this.bossGate) unit(this.bossGate.pc);
+      this.group.updateMatrixWorld(true);
+      const plainBefore = THREE.Object3D.prototype.onBeforeRender;
+      const OK_ATTR = { position: 1, normal: 1, uv: 1, uv1: 1, uv2: 1, color: 1 };
+      const sig = (g) => { const k = Object.keys(g.attributes).sort(); for (const n of k) if (!OK_ATTR[n]) return null; return k.map((n) => n + g.attributes[n].itemSize).join(','); };
+      const mergeable = (c) => {
+        const g = c.geometry, m = c.material;
+        if (c.isInstancedMesh || c.isSkinnedMesh || !g || !g.isBufferGeometry || !m || Array.isArray(m)) return null;
+        if (m.transparent || m.opacity < 1 || c.children.length || c.renderOrder || !c.frustumCulled || c.onBeforeRender !== plainBefore || c.layers.mask !== 1) return null;
+        if (Object.keys(c.userData).length || !g.attributes.position || !g.attributes.normal || g.morphAttributes.position || g.drawRange.start || g.drawRange.count !== Infinity) return null;
+        const s = sig(g); if (!s) return null;
+        return m.uuid + '|' + s + '|' + (c.castShadow ? 1 : 0) + (c.receiveShadow ? 1 : 0);
+      };
+      const inv = new THREE.Matrix4(), rel = new THREE.Matrix4(), nm = new THREE.Matrix3(), v = new THREE.Vector3();
+      for (const root of units) {
+        const bins = new Map(), emptied = new Set();
+        const walk = (o) => {
+          for (const c of o.children) {
+            if (keep.has(c) || !c.visible) continue;
+            if (c.isMesh) { const k = mergeable(c); if (k) { (bins.get(k) || bins.set(k, []).get(k)).push(c); continue; } }
+            else if (c.type !== 'Group' && c.type !== 'Object3D') continue; // lights, sprites, points ...
+            if (c.children.length) walk(c);
+          }
+        };
+        walk(root);
+        inv.copy(root.matrixWorld).invert();
+        for (const list of bins.values()) {
+          if (list.length < 2) continue;
+          let nv = 0, ni = 0;
+          for (const c of list) { const g = c.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+          const g0 = list[0].geometry, names = Object.keys(g0.attributes), out = {};
+          for (const n of names) out[n] = new Float32Array(nv * g0.attributes[n].itemSize);
+          const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+          let vo = 0, io = 0;
+          for (const c of list) {
+            const g = c.geometry, cnt = g.attributes.position.count;
+            rel.multiplyMatrices(inv, c.matrixWorld); nm.getNormalMatrix(rel);
+            for (const n of names) {
+              const a = g.attributes[n], sz = a.itemSize, dst = out[n];
+              for (let i = 0; i < cnt; i++) {
+                const o = (vo + i) * sz;
+                if (n === 'position') { v.fromBufferAttribute(a, i).applyMatrix4(rel); dst[o] = v.x; dst[o + 1] = v.y; dst[o + 2] = v.z; }
+                else if (n === 'normal') { v.fromBufferAttribute(a, i).applyMatrix3(nm).normalize(); dst[o] = v.x; dst[o + 1] = v.y; dst[o + 2] = v.z; }
+                else { dst[o] = a.getX(i); if (sz > 1) dst[o + 1] = a.getY(i); if (sz > 2) dst[o + 2] = a.getZ(i); if (sz > 3) dst[o + 3] = a.getW(i); }
+              }
+            }
+            const flip = rel.determinant() < 0; // a mirrored mesh: keep its faces facing out
+            const n = g.index ? g.index.count : cnt;
+            for (let t = 0; t < n; t += 3) {
+              const a = g.index ? g.index.getX(t) : t, b = g.index ? g.index.getX(t + 1) : t + 1, d = g.index ? g.index.getX(t + 2) : t + 2;
+              idx[io++] = vo + a; idx[io++] = vo + (flip ? d : b); idx[io++] = vo + (flip ? b : d);
+            }
+            vo += cnt;
+            emptied.add(c.parent); c.parent.remove(c);
+          }
+          const geo = new THREE.BufferGeometry();
+          for (const n of names) geo.setAttribute(n, new THREE.BufferAttribute(out[n], g0.attributes[n].itemSize));
+          geo.setIndex(new THREE.BufferAttribute(idx, 1));
+          geo.computeBoundingSphere(); geo.computeBoundingBox();
+          const m = new THREE.Mesh(geo, list[0].material);
+          m.castShadow = list[0].castShadow; m.receiveShadow = list[0].receiveShadow;
+          m.matrixAutoUpdate = false; root.add(m); m.updateMatrixWorld(true);
+        }
+        // the groups the merge emptied go too (fewer objects to walk every frame)
+        for (let o of emptied) while (o && o !== root && !keep.has(o) && !o.children.length && (o.type === 'Group' || o.type === 'Object3D') && o.parent) { const p = o.parent; p.remove(o); o = p; }
+      }
     }
     dispose(scene) {
       scene.remove(this.group);

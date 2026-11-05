@@ -393,7 +393,7 @@
       this.postMove(dt, wl, false);
     }
     walkSpeed() { return 6.2 * (1 + this.stats.moveSpeed + this.clsMove()) * this.moveMul(); }
-    clsMove() { return G.Classes ? G.Classes.moveAdd() : 0; } // 勢い (突撃兵) / 連斬 (剣士)
+    clsMove() { return G.Classes ? G.Classes.moveAdd() : 0; } // 連斬 (剣士)
     moveMul() { const mm = G.weapons.meleeMoveMul(); if (mm) return mm; const cs = G.weapons.curStats; return cs ? cs.moveMul : 1; }
 
     physics(dt) {

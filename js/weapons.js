@@ -21,7 +21,7 @@
   W.stats = function (w) {
     // (a change of your stats marks W.dirty; it used to be picked up only by W.update, i.e. not while the game is paused / in a menu)
     if (W.dirty) { W.ver++; W.dirty = false; }
-    const dyn = (G.player.dynFireRate || 0) + (G.Classes ? G.Classes.fireAdd() : 0); // 連射狂 / 勢い (突撃兵): change shot by shot without a recalc
+    const dyn = (G.player.dynFireRate || 0) + (G.Classes ? G.Classes.fireAdd() : 0); // 連射狂: changes shot by shot without a recalc
     if (w._sc && w._sc.ver === w.ver && w._sc.gv === W.ver && w._sc.dyn === dyn) return w._sc.s;
     const d = w.def, st = G.player.stats, pl = G.player;
     const s = Object.assign({}, d);

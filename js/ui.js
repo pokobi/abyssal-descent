@@ -305,14 +305,13 @@
   UI.refreshItems = function () { UI._itemsDirty = true; };
   // change-only DOM writes: the HUD is refreshed every frame, but a write that changes nothing still costs (garbage, style work)
   const sText = (el, v) => { v = String(v); if (el._t !== v) { el._t = v; el.textContent = v; } };
-  // the class's own effect on the HUD: 勢い / 連斬 as a chip over the HP, 鉄壁 as a gold rim on the HP, 一点集中 as a bar under the crosshair
+  // the class's own effect on the HUD: 鉄壁 as a chip over the HP, 鉄壁 as a gold rim on the HP, 一点集中 as a bar under the crosshair
   UI.clsHud = function () {
     const CL = G.Classes; if (!CL || !P) return;
     let el = UI._clsEl;
     if (!el || !el.isConnected) { const bl = document.getElementById('hud-bl'); if (!bl) return; el = UI._clsEl = document.createElement('div'); el.id = 'cls-ind'; bl.prepend(el); }
     let txt = '';
-    if (P.cls === 'assault') { const n = CL.mom(); if (n) txt = `💨 勢い ×${n}`; }
-    else if (P.cls === 'heavy' && CL.ironOn()) txt = '🛡️ 鉄壁';
+    if (P.cls === 'heavy' && CL.ironOn()) txt = '🛡️ 鉄壁';
     sText(el, txt); el.classList.toggle('on', !!txt);
     const hw = document.getElementById('hp-wrap'); if (hw) hw.classList.toggle('iron', P.cls === 'heavy' && CL.ironOn());
     // 連斬 (剣士): the stacks as segments (5 / 6 / 7) and the time left as one long bar, under the crosshair like the sniper's gauge

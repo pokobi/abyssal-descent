@@ -9,13 +9,13 @@
       mods: { buffChoices: 1 }, minus: 'なし', favName: 'なし', fav: null,
       look: 'オリーブ色の戦闘服とヘルメット', role: '何でもこなす基準のクラス' },
     { id: 'assault', name: '突撃兵', icon: '💨', col: '#ff6a50', gun: 's_wasp', melee: 'm_basic', skill: 'dash', ult: 'ult_berserk', grapple: 15,
-      mods: {}, minus: '20m以上の敵への与ダメ-20%', favName: 'SMG・ショットガン（銃と部品）、機動・連射・装填の加護',
+      mods: { moveSpeed: 0.1 }, minus: '20m以上の敵への与ダメ-20%', favName: 'SMG・ショットガン（銃と部品）、機動・連射・装填の加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun' || o.arch === 'autoshotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
     { id: 'sniper', name: '狙撃手', icon: '🎯', col: '#7ac070', gun: 'n_scout', melee: 'm_basic', skill: 'decoy', ult: 'ult_shadow', grapple: 18,
       mods: {}, minus: 'ADSせずに撃つ（腰だめ）と拡散+40%', favName: '狙撃銃・DMR（銃と部品）、会心・ヘッドショットの加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'sniper' || o.arch === 'dmr'), look: '緑のフード付きマントとマスク', role: '遠くから急所を撃つ' },
     { id: 'blade', name: '剣士', icon: '⚔️', col: '#c4a0f0', gun: 'p_viper', melee: 'm_machete', skill: 'haste', ult: 'ult_bladestorm', grapple: 15,
-      mods: { magSize: -0.25 }, minus: '銃の装弾数-25%', favName: '近接武器（武器と部品）、近接の加護',
+      mods: { magSize: -0.25, moveSpeed: 0.1 }, minus: '銃の装弾数-25%', favName: '近接武器（武器と部品）、近接の加護',
       fav: (o) => o.kind === 'melee', look: '羽織と袴、鉢巻、背中に鞘', role: '近接で斬り込む' },
     { id: 'heavy', name: '重装兵', icon: '🛡️', col: '#e0b050', gun: 'g_breacher', melee: 'm_woodshield', skill: 'thornarmor', ult: 'ult_bastion', grapple: 28,
       mods: { armor: 0.1, moveSpeed: -0.12, slideBoost: -0.4 }, minus: '移動速度-12%、スライディングの距離-40%', favName: '防具・盾、近接の部品、防御の加護',
@@ -29,8 +29,8 @@
   const PAS = {
     soldier: { name: '目利き', icon: '🃏', short: '加護の選択肢が1枚多く、無料リロールも1回多い', rows: [['加護の選択肢', '+1枚', '+1枚', '+1枚'], ['加護の無料リロール', '+1回', '+1回', '+1回']],
       notes: ['加護「選択肢」「運命の再配」とは別に数える。'] },
-    assault: { name: '突貫', icon: '💨', short: '近い敵ほど大ダメージ。近くで倒すと速くなる', rows: [['近い敵への与ダメ（0mで最大、12mで0）', '+30%', '+40%', '+50%'], ['勢い1つにつき 移動速度・連射速度', '+6%', '+8%', '+10%']],
-      notes: ['8m以内の敵を倒すと「勢い」が1つ（4秒、最大3つ）。勢い1つにつき被ダメ-4%。'] },
+    assault: { name: '突貫', icon: '💨', short: '近い敵ほど大ダメージ', rows: [['近い敵への与ダメ（0mで最大、12mで0）', '+30%', '+40%', '+50%']],
+      notes: ['距離に応じてなめらかに減る（6mなら半分）。'] },
     sniper: { name: '一点集中', icon: '🎯', short: 'ADSでためた1発が強く、敵を貫く', rows: [['満タンの1発のダメージ（1体貫通）', '+25%', '+40%', '+55%'], ['ヘッドショットで倒したとき', 'ゲージ半分', 'ゲージ半分・弾1', 'ゲージ半分・弾1']],
       notes: ['ADS中にゲージがたまる（1.5秒で満タン）。撃つと0になり、ADSをやめると1秒で半分減る。'] },
     blade: { name: '連斬', icon: '⚔️', short: '近接を当て続けるほど、攻撃も移動も速くなる', rows: [['近接を当てるとたまる層の上限', '5層', '6層', '7層']],
@@ -74,7 +74,7 @@
   const is = (id) => !!G.player && G.player.cls === id;
   const now = () => (G.game ? G.game.time : 0);
   // the running state (stacks, gauges), kept on the player and cleared with the kit
-  const S = () => { const P = G.player; return P._cs || (P._cs = { mom: [], blade: 0, bladeT: 0, focus: 0, ironT: 0 }); };
+  const S = () => { const P = G.player; return P._cs || (P._cs = { blade: 0, bladeT: 0, focus: 0, ironT: 0 }); };
   CL.state = S;
   // 突撃兵: close range (smooth, 0 m best, 12 m nothing), far away a little less
   CL.dmgAdd = function (P, dist) {
@@ -82,9 +82,8 @@
     if (dist >= 20) return -0.2;
     return Math.max(0, 1 - dist / 12) * V([0.3, 0.4, 0.5]);
   };
-  CL.mom = () => { if (!is('assault')) return 0; const t = now(), m = S().mom; while (m.length && m[0] <= t) m.shift(); return m.length; };
-  CL.fireAdd = () => CL.mom() * V([0.06, 0.08, 0.1]);
-  CL.moveAdd = () => (is('assault') ? CL.mom() * V([0.06, 0.08, 0.1]) : 0) + (is('blade') ? CL.blade() * 0.03 : 0);
+  CL.fireAdd = () => 0; // (突撃兵's 勢い was removed: its speed is now a flat +10% move)
+  CL.moveAdd = () => (is('blade') ? CL.blade() * 0.03 : 0);
   // 剣士: stacks on every melee swing that lands
   CL.bladeMax = () => V([5, 6, 7]);
   CL.blade = () => { if (!is('blade')) return 0; const s = S(); if (s.blade && s.bladeT <= now()) s.blade = 0; return s.blade; };
@@ -103,7 +102,7 @@
   CL.ironOn = () => is('heavy') && S().ironT > now();
   CL.ironRed = () => (CL.ironOn() ? V([0.3, 0.4, 0.5]) : 0);
   CL.onHurt = function () { if (is('heavy')) S().ironT = now() + 3; };
-  CL.hurtMul = () => (is('assault') ? 1 - 0.04 * CL.mom() : 1);
+  CL.hurtMul = () => 1;
   // 術士: reactions
   CL.rxMul = () => (is('mage') ? V([0.2, 0.3, 0.4]) : 0);
   CL.ampAdd = () => (is('mage') ? V([0.1, 0.15, 0.2]) : 0);
@@ -112,7 +111,6 @@
   // a kill by the player (C.killEnemy)
   CL.onKill = function (e, info) {
     const P = G.player; if (!P || !e || (info && (info.enemy || info.remote))) return;
-    if (is('assault') && e.pos.distanceTo(P.pos) <= 8) { const m = S().mom; CL.mom(); if (m.length >= 3) m.shift(); m.push(now() + 4); }
     if (is('sniper') && info && info.head && (info.src === 'bullet' || info.src === 'explosion')) {
       const st = S(); st.focus = Math.min(1, st.focus + 0.5);
       const w = P.weapon; if (CL.lv() >= 2 && w && !P.meleeMode) w.mag = Math.min(G.weapons.stats(w).mag, w.mag + 1);

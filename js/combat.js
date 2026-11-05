@@ -334,7 +334,7 @@
     }
     C._noCoins = !!e.bossSpawn; // kill hooks (bounties, midas...) pay nothing for boss adds either
     try { G.buffs.emit('onKill', { e, pos: e.centerPos(), head: !!info.head, src: info.src, overkill: overkill || 0, weapon: info.weapon, proc: info.proc }); } finally { C._noCoins = false; }
-    if (G.Classes) G.Classes.onKill(e, info); // (the class's own effect: 勢い, 一点集中)
+    if (G.Classes) G.Classes.onKill(e, info); // (the class's own effect: 一点集中)
     if (G.weapons && G.weapons.onKillTrait) G.weapons.onKillTrait(e, info); // (a crowned foe passes its crown on: 王権)
     if (info.weapon && info.weapon.trait === 'killReload') { info.weapon.mag = G.weapons.stats(info.weapon).mag; info.weapon.reloading = false; }
     if (e.st.markKillReset) {

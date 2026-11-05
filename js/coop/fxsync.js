@@ -17,11 +17,13 @@
     const withOwn = (fn) => function () { K.own++; try { return fn.apply(this, arguments); } finally { K.own--; } };
     const enc = (v) => {
       if (v && v.isVector3) return { $v: [r2(v.x), r2(v.y), r2(v.z)] };
+      if (v && v === G.player) return { $p: K.id }; // (an effect that follows its caster follows his figure on the other screens)
+      if (Array.isArray(v)) return { $a: v.map(enc) };
       if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v;
       if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) return K.plain(v);
       return null;
     };
-    const dec = (v) => (v && v.$v ? V(...v.$v) : v && typeof v === 'object' ? K.unplain(v) : v);
+    const dec = (v) => (v && v.$v ? V(...v.$v) : v && v.$p !== undefined ? (K.players.get(v.$p) || { pos: V(0, -999, 0) }) : v && v.$a ? v.$a.map(dec) : v && typeof v === 'object' ? K.unplain(v) : v);
     const q = [];
     const push = (m) => { if (q.length < 60) q.push(m); };
 
@@ -29,8 +31,18 @@
     for (const fn of ['explosion', 'ring', 'flash', 'beam', 'lightning', 'bubble', 'smoke', 'fireBurst', 'dust', 'sparks']) {
       const f = FX[fn];
       FX[fn] = function () {
-        if (own()) push(['f', fn, Array.prototype.map.call(arguments, enc)]);
+        if (own() && !(K._vxDepth > 0)) push(['f', fn, Array.prototype.map.call(arguments, enc)]);
         return f.apply(FX, arguments);
+      };
+    }
+    // the mesh effects (vfx.js) go the same way; what one of them makes on its own (a nova's spikes, its bolts) is not sent again
+    const VX = G.vfx;
+    for (const fn of ['nova', 'wave', 'pillar', 'slash', 'spikes', 'meteor', 'bell', 'shield', 'motes', 'area', 'wall']) {
+      const f = VX[fn]; if (!f) continue;
+      VX[fn] = function () {
+        if (own() && !(K._vxDepth > 0)) push(['v', fn, Array.prototype.map.call(arguments, enc)]);
+        K._vxDepth = (K._vxDepth || 0) + 1;
+        try { return f.apply(VX, arguments); } finally { K._vxDepth--; }
       };
     }
     // sounds go the same way, a few at a time: skills, the guardian's attacks, and on the host the foes' growls and swings (the guests' foes are puppets and make none)
@@ -134,21 +146,7 @@
       if (K.live && !(opts && opts.enemy) && !K._net) push(['z', { p: K.vec(pos), r: r2(r), dur: r2(dur), k: kind, who: K.id, fol: opts && opts.follow ? 1 : 0, hps: (opts && opts.hps) || 0 }]);
       return z;
     };
-    const zoneVisual = (z, dt) => {
-      const p = z.pos, r = z.r, k = Math.min(1, (z.dur - z.t) * 2), R = Math.random;
-      const rnd = () => { const a = R() * 6.28, d = Math.sqrt(R()) * r; return [p.x + Math.cos(a) * d, p.z + Math.sin(a) * d]; };
-      switch (z.kind) {
-        case 'fire': for (let n = 0; n < r * r * dt * 6 * k; n++) { const [x, zz] = rnd(); FX.flameLick(x, p.y + 0.05, zz, 1.4 + R()); } break;
-        case 'poison': case 'acid': if (R() < dt * r * 4) { const [x, zz] = rnd(); FX.norm.spawn(x, p.y + 0.3, zz, 0, 0.3, 0, 1.6, 0.6, 2.2, 0.35, 0.5, 0.12, 0.35 * k, -0.05, 0.5); } break;
-        case 'smoke': if (R() < dt * r * 6) { const [x, zz] = rnd(); FX.norm.spawn(x, p.y + 0.5, zz, 0, 0.2, 0, 2.5, 1.5, 4, 0.5, 0.5, 0.5, 0.6 * k, -0.02, 0.3); } break;
-        case 'heal': case 'holy': if (R() < dt * 14) { const [x, zz] = rnd(); FX.add.spawn(x, p.y + 0.1, zz, 0, 1.2, 0, 1.0, 0.12, 0.02, 0.4, 1.0, 0.5, 0.8, -0.3, 0.5); } break;
-        case 'frost': if (R() < dt * r * 5) { const [x, zz] = rnd(); FX.norm.spawn(x, p.y + 0.2, zz, 0, 0.3, 0, 1.4, 0.4, 1.6, 0.8, 0.9, 1.0, 0.3 * k, -0.05, 0.5); } break;
-        case 'gravity': for (let n = 0; n < 3; n++) { const a = R() * 6.28, d = r * (0.6 + R() * 0.4); FX.add.spawn(p.x + Math.cos(a) * d, p.y + 0.5 + R() * 2, p.z + Math.sin(a) * d, -Math.cos(a) * d * 2, 0, -Math.sin(a) * d * 2, 0.5, 0.1, 0.02, 0.6, 0.3, 1.0, 0.9, 0, 1); } break;
-        case 'arrowrain': if (R() < dt * 30) { const [x, zz] = rnd(); FX.tracer(V(x + 1, p.y + 10, zz), V(x, p.y, zz), 0xcfc0a0, 0.02, 0.12); } break;
-        case 'grasp': if (R() < dt * 10) { const [x, zz] = rnd(); FX.norm.spawn(x, p.y + 0.1, zz, 0, 1.5, 0, 0.8, 0.3, 0.1, 0.08, 0.02, 0.1, 0.8, 0, 1); } break;
-        default: break;
-      }
-    };
+    const zoneVisual = (z, dt) => { G.vfx.zoneTick(z, dt); };
 
     // ---------------- ultimate auras ----------------
     const sentAura = new WeakSet(), vAuras = [];
@@ -169,17 +167,11 @@
       for (const a of A.auras) if (a.kind === 'beam' && a._cid) push(['b', { id: a._cid, pt: K.vec(a.pt) }]);
     };
     const auraVisual = (a, dt) => {
-      const rp = K.players.get(a.who), c = a.fol && rp ? rp.pos : a.c ? a.c : rp ? rp.pos : P.pos, R = Math.random;
-      if (a.k === 'fire' && R() < dt * 40) { const an = R() * 6.28, d = R() * a.r; FX.flameLick(c.x + Math.cos(an) * d, c.y + 0.1, c.z + Math.sin(an) * d, 1.6, a.col); }
-      else if (a.k === 'drain' && R() < dt * 20) FX.norm.spawn(c.x + U.rand(-a.r, a.r), c.y + U.rand(0.3, 2), c.z + U.rand(-a.r, a.r), 0, 0.5, 0, 0.8, 0.12, 0.25, 0.7, 0.05, 0.1, 0.8, 0, 1);
-      else if (a.k === 'beam' && a.pt) FX.beam(a.pt.clone().add(V(0, 40, 0)), a.pt.clone().setY(a.pt.y + 0.1), 0xfff0c0, a.r * 0.4, 0.05);
-      else if (a.k === 'holy') {
-        if (!a.ring) { a.ring = new THREE.Mesh(new THREE.RingGeometry(a.r - 0.3, a.r, 48), new THREE.MeshBasicMaterial({ color: 0xffe8a0, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); a.ring.rotation.x = -Math.PI / 2; G.scene.add(a.ring); }
-        a.ring.position.set(c.x, c.y + 0.05, c.z); a.ring.material.opacity = 0.45 + 0.15 * Math.sin(a.age * 4);
-        if (R() < dt * 12) FX.add.spawn(c.x + U.rand(-a.r, a.r), c.y + 0.1, c.z + U.rand(-a.r, a.r), 0, 1.4, 0, 1, 0.12, 0.02, 1.2, 1.0, 0.5, 0.8, -0.3, 0.5);
-        // the sanctuary heals everyone inside it
-        if (a.heal && !P.dead && Math.hypot(P.pos.x - c.x, P.pos.z - c.z) < a.r) C.heal(P.stats.maxHp * a.heal * dt, true);
-      } else if (a.k === 'stomp') { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 1.5; FX.ring(c.clone(), a.r, 0xffb060, 0.5); } }
+      const rp = K.players.get(a.who), c = a.k === 'beam' && a.pt ? a.pt : a.fol && rp ? rp.pos : a.c ? a.c : rp ? rp.pos : P.pos;
+      G.vfx.auraTick(a, c, dt); // (the same look as the caster's own: vfx.js)
+      // the sanctuary heals everyone inside it
+      if (a.k === 'holy' && a.heal && !P.dead && Math.hypot(P.pos.x - c.x, P.pos.z - c.z) < a.r) C.heal(P.stats.maxHp * a.heal * dt, true);
+      if (a.k === 'stomp') { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 1.5; G.vfx.nova(c.clone(), a.r, 0.25, { style: 'shock', dome: false }); } }
     };
 
     // ---------------- allies and mines: pictures on the others' screens ----------------
@@ -265,18 +257,19 @@
         zoneVisual(z, dt);
         // a healing field heals whoever stands in it
         if (z.hps && !P.dead && Math.hypot(P.pos.x - z.pos.x, P.pos.z - z.pos.z) < z.r) C.heal(z.hps * dt, true);
-        if (z.t >= z.dur) vz.splice(i, 1);
+        if (z.t >= z.dur) { G.vfx.zoneEnd(z); vz.splice(i, 1); }
       }
       for (let i = vAuras.length - 1; i >= 0; i--) {
         const a = vAuras[i]; a.t -= dt; a.age += dt;
         auraVisual(a, dt);
-        if (a.t <= 0) { if (a.ring) G.scene.remove(a.ring); vAuras.splice(i, 1); }
+        if (a.t <= 0) { G.vfx.auraEnd(a); vAuras.splice(i, 1); }
       }
     };
     K.handlers.fx = function (m, from) {
       for (const [kind, a, b] of m.e) {
         try {
           if (kind === 'f') { K._fxNet = true; try { FX[a](...b.map(dec)); } finally { K._fxNet = false; } if (a === 'explosion' && b[0] && b[0].$v) G.sfx.explosion(V(...b[0].$v), (b[1] || 4) / 4); }
+          else if (kind === 'v') { K._fxNet = true; try { if (G.vfx[a]) G.vfx[a](...b.map(dec)); } finally { K._fxNet = false; } }
           else if (kind === 's') { K._fxNet = true; try { G.sfx[a](...b.map(dec)); } finally { K._fxNet = false; } }
           else if (kind === 'p') putProjectile(a);
           else if (kind === 'x') friendly(a);
@@ -301,6 +294,6 @@
     };
     K.handlers.cr = function (m) { if (K.role === 'host') { GM.chronoT = Math.max(GM.chronoT || 0, m.d); GM.chronoSlow = Math.max(GM.chronoSlow || 0, m.s); G.ui.toastSmall('⌛ 仲間が時間を操った'); } };
     K.vizCount = () => vz.length + vAuras.length;
-    K.clearViz = function () { for (const id of [...theirAllies.keys()]) dropAlly(id); for (const m of theirMines.values()) G.scene.remove(m); theirMines.clear(); myAllies.length = 0; vz.length = 0; for (const a of vAuras) if (a.ring) G.scene.remove(a.ring); vAuras.length = 0; };
+    K.clearViz = function () { for (const id of [...theirAllies.keys()]) dropAlly(id); for (const m of theirMines.values()) G.scene.remove(m); theirMines.clear(); myAllies.length = 0; for (const z of vz) G.vfx.zoneEnd(z); vz.length = 0; for (const a of vAuras) G.vfx.auraEnd(a); vAuras.length = 0; };
   };
 })();

@@ -11,6 +11,30 @@
   // ---- the skill that is currently dealing damage (set while casting; stamped onto zones / projectiles / allies) ----
   A.withSk = function (id, fn) { return function () { env(); const o = C.curSk; C.curSk = id; try { return fn.apply(this, arguments); } finally { C.curSk = o; } }; };
   A.later = (id, fn, ms) => setTimeout(A.withSk(id, fn), ms);
+  // ---- steps on game time (they pause with the game): a hit that has to land when its picture (G.vfx) says it does ----
+  A.tasks = [];
+  A.task = function (fn, sec, id) { env(); A.tasks.push({ t: sec || 0, fn: A.withSk(id === undefined ? C.curSk || null : id, fn) }); };
+  // a step run every frame until it returns false (a hit that follows a moving picture: the wave's front)
+  A.flows = [];
+  A.flow = function (fn, id) { env(); A.flows.push(A.withSk(id === undefined ? C.curSk || null : id, fn)); };
+  A.tickTasks = function (dt) {
+    for (let i = 0; i < A.flows.length; i++) { let go = false; try { go = A.flows[i](dt); } catch (e) { console.error(e); } if (!go) A.flows.splice(i--, 1); }
+    for (let i = 0; i < A.tasks.length; i++) { const t = A.tasks[i]; t.t -= dt; if (t.t <= 0) { A.tasks.splice(i--, 1); try { t.fn(); } catch (e) { console.error(e); } } }
+  };
+  // a front that swells from c out to r in dur (the same curve as G.vfx.nova): every foe inside r is hit at the moment the front reaches his body.
+  // fn(e, d) runs for each; filter(e) may leave some out. Returns how many will be hit.
+  A.radial = function (c, r, dur, fn, filter) {
+    env();
+    if (G.vfx.debug) G.vfx.dbgCircle(c, r, 0xff00ff);
+    let n = 0;
+    for (const e of G.enemies.inRadius(c, r)) {
+      if (filter && !filter(e)) continue;
+      const d = Math.max(0, Math.hypot(e.pos.x - c.x, e.pos.z - c.z) - (e.radius || 0.5));
+      n++;
+      A.task(() => { if (e.alive) fn(e, d); }, G.vfx.novaTime(d, r, dur));
+    }
+    return n;
+  };
 
   // ---- aggregated per-skill modifiers (cached until the next recalc) ----
   const ZERO = { get: (o, k) => (typeof k === 'string' ? o[k] || 0 : undefined) };

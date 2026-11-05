@@ -122,7 +122,7 @@
     // tracers
     pools.tracer = [];
     const tg = new THREE.BoxGeometry(1, 1, 1); tg.translate(0, 0, -0.5);
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 240; i++) {
       const m = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: 0xffd8a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false; m.frustumCulled = false; scene.add(m); pools.tracer.push({ m, t: 0, ml: 0 });
     }
@@ -216,7 +216,9 @@
     if (pools.bubble[0]) show(pools.bubble[0].m);
     if (pools.debris[0]) show(pools.debris[0].m, (G.world && G.world.mats && G.world.mats.rock) || FX.dmats.hole);
     const sr = FX.shockRing(new THREE.Vector3(0, -500, 0), 0xffa040, 0.8, 10);
+    const vxBack = G.vfx && G.vfx.warmShow ? G.vfx.warmShow() : null;
     try { return fn(); } finally {
+      if (vxBack) vxBack();
       sr.dispose();
       const idx = FX.shocks.indexOf(sr); if (idx >= 0) FX.shocks.splice(idx, 1);
       for (const [m, vis, mat, fc] of saved) { m.visible = vis; m.material = mat; m.frustumCulled = fc; }
@@ -225,9 +227,11 @@
 
   FX.setFog = function (color, density) {
     for (const s of [FX.add, FX.flame, FX.norm]) { s.mat.uniforms.uFogD.value = density; s.mat.uniforms.uFogC.value.set(color); }
+    if (G.vfx && G.vfx.setFog) G.vfx.setFog(color, density);
   };
   FX.clear = function () {
     if (G.GrenFX) G.GrenFX.clear();
+    if (G.vfx && G.vfx.clear) G.vfx.clear();
     FX.add.clear(); FX.flame.clear(); FX.norm.clear();
     for (const d of pools.decal) d.m.visible = false;
     for (const t of pools.tele) { t.outer.visible = t.inner.visible = false; t.active = false; }
@@ -293,6 +297,8 @@
     opts = opts || {};
     const c = rgb(color || 0xff9a40);
     const k = Math.max(0.4, r / 4);
+    // the blast itself as a body: a boiling fireball (fire colours) or a burst of light (any other colour), 0.85 of the blast radius at most
+    if (G.vfx && G.vfx.fireball) { if (c.r > c.b * 1.4 && c.r >= c.g * 0.9) G.vfx.fireball(p, r, color || 0xffffff); else G.vfx.burst(p, r * 0.85, color); }
     // core flash & fireball
     for (let i = 0; i < 28 * k; i++) {
       const dir = new THREE.Vector3(rs(1), rs(1) * 0.7 + 0.3, rs(1)).normalize();
@@ -308,7 +314,7 @@
     }
     // sparks/embers
     FX.sparks(p, null, Math.floor(20 * k), 0xffa050, 14 * k);
-    FX.ring(p, r * 1.1, color || 0xffa060, 0.35);
+    FX.ring(p, r, color || 0xffa060, 0.35); // (the edge of the blast: what it hurts)
     FX.flash(p, color || 0xff9a40, 60 * k, 0.25, r * 4);
     if (opts.decal !== false) FX.decal(new THREE.Vector3(p.x, p.y - 0.1, p.z), new THREE.Vector3(0, 1, 0), 'scorch', r * 1.4, true);
   };
@@ -330,19 +336,29 @@
   };
   // a tracer that covers exactly the stretch a -> b (FX.tracer's box grows from its first point AWAY from the second one)
   FX.seg = function (a, b, color, width, life) { FX.tracer(b, b.clone().multiplyScalar(2).sub(a), color, width, life); };
+  // a bolt from a to b: a white-hot core inside a coloured glow, jagged (most in the middle), with a forked branch or two, and a second
+  // flicker a moment later along a fresh path
   FX.lightning = function (a, b, color) {
-    const segs = 7;
-    let prev = a.clone();
-    const dir = b.clone().sub(a);
-    const len = dir.length();
-    for (let i = 1; i <= segs; i++) {
-      const p = a.clone().addScaledVector(dir, i / segs);
-      if (i < segs) { p.x += rs(len * 0.07); p.y += rs(len * 0.07); p.z += rs(len * 0.07); }
-      FX.seg(prev, p, color || 0xcfe0ff, 0.045, 0.12);
-      prev = p;
-    }
-    FX.flash(b, color || 0xbfd8ff, 25, 0.1, 8);
-    FX.sparks(b, null, 6, color || 0xcfe0ff, 6);
+    const col = color || 0xcfe0ff;
+    const dir = b.clone().sub(a), len = dir.length() || 0.01;
+    const n1 = new THREE.Vector3(rs(1), rs(1), rs(1)).cross(dir).normalize(), n2 = n1.clone().cross(dir).normalize();
+    const bolt = (life, w) => {
+      const segs = Math.max(6, Math.min(14, Math.round(len / 1.4)));
+      let prev = a.clone();
+      for (let i = 1; i <= segs; i++) {
+        const k = i / segs, j = Math.sin(k * Math.PI) * len * 0.09;
+        const p = a.clone().addScaledVector(dir, k);
+        if (i < segs) p.addScaledVector(n1, rs(j)).addScaledVector(n2, rs(j));
+        FX.seg(prev, p, 0xffffff, 0.04 * w, life);
+        FX.seg(prev, p, col, 0.15 * w, life * 1.3);
+        if (i > 1 && i < segs - 1 && Math.random() < 0.22) { const br = p.clone().addScaledVector(dir, 0.12 + Math.random() * 0.12).addScaledVector(n1, rs(len * 0.18)).addScaledVector(n2, rs(len * 0.18)); FX.seg(p, br, col, 0.06 * w, life); }
+        prev = p;
+      }
+    };
+    bolt(0.12, 1);
+    if (G.vfx && G.vfx.after) G.vfx.after(() => bolt(0.08, 0.7), 60);
+    FX.flash(b, col, 30, 0.12, 9);
+    FX.sparks(b, null, 8, col, 7);
   };
   // a lightning bolt that comes down from the sky onto `p` (electric weapons): jagged main bolt with a side branch, flash, shock ring, sparks.
   // limited to a few per second so a rapid-fire arc gun does not turn the screen white
@@ -503,6 +519,7 @@
   // ---------------- update ----------------
   FX.update = function (dt, cam, renderer) {
     if (G.GrenFX) G.GrenFX.update(dt);
+    if (G.vfx && G.vfx.update) G.vfx.update(dt);
     const h = renderer.domElement.height;
     const sc = h * 0.5 / Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5);
     const sys = FX._sys || (FX._sys = [FX.add, FX.flame, FX.norm]);

@@ -43,6 +43,7 @@
     GM.lights = { hemi, amb, moon };
     P = G.player = new G.Player();
     G.fx.init(scene, camera);
+    G.vfx.init(scene); // (meshes and shaders: areas, waves, domes, pillars, slashes, spikes, fireballs)
     G.weapons.init(renderer); G.weapons.setEnv(G.envTex);
     G.avatar.init(scene);
     G.combat.init(); G.Elem.init(); G.enemies.init(); G.Areas.init(); G.Depth.init(); G.Rooms2.init(); G.MidSave.init(); Object.assign(G.Areas.TYPES, G.Rooms2.TYPES); G.abilities.init(); G.bosses.init(); G.ui.init(); G.bindBuffs(); G.Dev && G.Dev.init();
@@ -2392,6 +2393,7 @@
   }
   function render() {
     renderer.clear();
+    if (GM.camHook) { GM.camHook(camera); renderer.render(scene, camera); return; } // (development: a camera placed by hand, to look at effects from any side)
     renderer.render(scene, camera);
     if (GM.state !== 'title' && GM.state !== 'dead') G.weapons.render(renderer);
   }

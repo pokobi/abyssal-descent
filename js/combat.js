@@ -708,7 +708,7 @@
   C.purgeHostile = function () {
     C.muteHostileUntil = G.game.time + 4;
     for (let i = C.projectiles.length - 1; i >= 0; i--) { const p = C.projectiles[i]; if (p.owner !== 'player') { releaseMesh(p.mesh); C.projectiles.splice(i, 1); } }
-    for (let i = C.zones.length - 1; i >= 0; i--) { const z = C.zones[i]; if (z.enemy) { if (z.pos) G.fx.smoke(z.pos.clone().setY(z.pos.y + 0.3), 4, 1, 0x1a1412, 1, 1); C.zones.splice(i, 1); } }
+    for (let i = C.zones.length - 1; i >= 0; i--) { const z = C.zones[i]; if (z.enemy) { if (z.pos) G.fx.smoke(z.pos.clone().setY(z.pos.y + 0.3), 4, 1, 0x1a1412, 1, 1); G.vfx.zoneEnd(z); C.zones.splice(i, 1); } }
   };
   // can the pile shockwave reach this foe? (a wall in between blocks it; checked low and high so a waist-high ledge doesn't)
   C.pileLos = function (pos, e) {
@@ -915,21 +915,7 @@
       z.t += dt; z.tick -= dt;
       if (z.follow) z.pos.set(pl.pos.x, pl.pos.y, pl.pos.z);
       const p = z.pos, r = z.r;
-      const rnd = () => { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * r; return [p.x + Math.cos(a) * d, p.z + Math.sin(a) * d]; };
-      const k = Math.min(1, (z.dur - z.t) * 2);
-      switch (z.kind) {
-        case 'fire': for (let n = 0; n < r * r * dt * 6 * k; n++) { const [x, zz] = rnd(); G.fx.flameLick(x, p.y + 0.05, zz, 1.4 + Math.random()); } break;
-        case 'poison': case 'acid': if (Math.random() < dt * r * 4) { const [x, zz] = rnd(); G.fx.norm.spawn(x, p.y + 0.3, zz, 0, 0.3, 0, 1.6, 0.6, 2.2, 0.35, 0.5, 0.12, 0.35 * k, -0.05, 0.5); } break;
-        case 'smoke': if (Math.random() < dt * r * 6) { const [x, zz] = rnd(); G.fx.norm.spawn(x, p.y + 0.5, zz, 0, 0.2, 0, 2.5, 1.5, 4, 0.5, 0.5, 0.5, 0.6 * k, -0.02, 0.3); } break;
-        case 'heal': case 'holy': if (Math.random() < dt * 14) { const [x, zz] = rnd(); G.fx.add.spawn(x, p.y + 0.1, zz, 0, 1.2, 0, 1.0, 0.12, 0.02, 0.4, 1.0, 0.5, 0.8, -0.3, 0.5); } if (z.tick <= 0.01 && z.t % 1 < dt) G.fx.ring(p, r, 0x6ad06a, 0.8); break;
-        case 'frost': if (Math.random() < dt * r * 5) { const [x, zz] = rnd(); G.fx.norm.spawn(x, p.y + 0.2, zz, 0, 0.3, 0, 1.4, 0.4, 1.6, 0.8, 0.9, 1.0, 0.3 * k, -0.05, 0.5); } break;
-        case 'web': break;
-        case 'gravity': for (let n = 0; n < 3; n++) { const a = Math.random() * 6.28; const d = r * (0.6 + Math.random() * 0.4); G.fx.add.spawn(p.x + Math.cos(a) * d, p.y + 0.5 + Math.random() * 2, p.z + Math.sin(a) * d, -Math.cos(a) * d * 2, 0, -Math.sin(a) * d * 2, 0.5, 0.12, 0.02, 0.6, 0.4, 1.0, 0.8, 0, 0); } break;
-        case 'arrowrain': if (Math.random() < dt * 30) { const [x, zz] = rnd(); const a = V(x + 1, p.y + 10, zz); const b = V(x, p.y, zz); G.fx.tracer(a, b, 0xcfc0a0, 0.02, 0.12); if (Math.random() < 0.3) G.fx.dust(b, V(0, 1, 0), 0x8a8070, 1); } break;
-        case 'grasp': if (Math.random() < dt * 10) { const [x, zz] = rnd(); G.fx.norm.spawn(x, p.y + 0.1, zz, 0, 1.5, 0, 0.8, 0.3, 0.1, 0.08, 0.02, 0.1, 0.8, 0, 1); } break;
-        case 'blades': break;
-        case 'whirl': for (let n = 0; n < 3; n++) { const a = z.t * 5 + n * 2.1 + Math.random() * 0.5; const d = r * (0.25 + Math.random() * 0.75); G.fx.add.spawn(p.x + Math.cos(a) * d, p.y + 0.15 + Math.random() * 0.6, p.z + Math.sin(a) * d, -Math.sin(a) * 3, 0.2, Math.cos(a) * 3, 0.5, 0.25, 0.04, 0.25, 0.6, 1.0, 0.7 * k, 0, 1); } break;
-      }
+      G.vfx.zoneTick(z, dt); // (its look: a ground area drawn exactly to r, and what rises from it: vfx.js, shared with the co-op pictures)
       if (z.tick <= 0) {
         z.tick = z.interval || 0.5;
         const dmg = z.dps * z.tick;
@@ -959,7 +945,7 @@
       if (z.kind === 'gravity') {
         for (const e of G.enemies.inRadius(p, r * 1.2)) { if (e.boss) continue; const d = p.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 0.5) e.pos.addScaledVector(d.normalize(), Math.min(l, 9 * dt)); e.st.stun = Math.max(e.st.stun || 0, 0.1); }
       }
-      if (z.t >= z.dur) { if (z.onEnd) G.abilities.withSk(z.sk || null, z.onEnd)(z); C.zones.splice(i, 1); }
+      if (z.t >= z.dur) { G.vfx.zoneEnd(z); if (z.onEnd) G.abilities.withSk(z.sk || null, z.onEnd)(z); C.zones.splice(i, 1); }
     }
   }
 
@@ -1050,14 +1036,19 @@
     const skillBlades = pl.bladesT > 0 ? pl.bladesN || 6 : 0;
     const total = nb * 2 + skillBlades;
     while (bladeMeshes.length < total) {
-      const m = new THREE.Mesh(G.Props.PG.box, new THREE.MeshStandardMaterial({ color: 0xd8e0ff, metalness: 1, roughness: 0.2, emissive: 0x404a70 }));
-      m.scale.set(0.06, 0.04, 0.7); G.scene.add(m); bladeMeshes.push(m);
+      // a blade: a long double-edged leaf of steel with a faint glow, lying along its path
+      const m = new THREE.Mesh(G.Props.PG.oct3, new THREE.MeshStandardMaterial({ color: 0xe0e8ff, metalness: 1, roughness: 0.18, emissive: 0x5068a8, emissiveIntensity: 0.8 }));
+      m.scale.set(0.09, 0.025, 0.55); G.scene.add(m); bladeMeshes.push(m);
     }
     for (let i = 0; i < bladeMeshes.length; i++) bladeMeshes[i].visible = i < total;
-    const t = G.game.time;
+    const t = G.game.time, nB = nb * 2;
+    // each ring of blades is evenly spaced on its own; the band they sweep (their reach either side, 1.2 m) is drawn behind them
+    if (!C._spinA) { C._spinA = G.vfx.spinRing(); C._spinB = G.vfx.spinRing(); }
+    C._spinA.set(pl.pos, pl.pos.y + 1.0, 2.0, 1.2, Math.max(1, nB), t * 3.2, nB ? 0.75 : 0, 0xd0dcff);
+    C._spinB.set(pl.pos, pl.pos.y + 1.0, pl.bladesR || 3.0, 1.2, Math.max(1, skillBlades), t * 3.2 + 0.3, skillBlades ? 0.9 : 0, pl.bladesUlt ? 0xe0c8ff : 0xc0d8ff);
     for (let i = 0; i < total; i++) {
-      const a = t * 3.2 + i / total * Math.PI * 2;
-      const r = i < nb * 2 ? 2.0 : pl.bladesR || 3.0;
+      const own = i < nB, a = own ? t * 3.2 + i / nB * Math.PI * 2 : t * 3.2 + 0.3 + (i - nB) / skillBlades * Math.PI * 2;
+      const r = own ? 2.0 : pl.bladesR || 3.0;
       const m = bladeMeshes[i];
       m.position.set(pl.pos.x + Math.cos(a) * r, pl.pos.y + 1.0, pl.pos.z + Math.sin(a) * r);
       m.rotation.set(0, -a, 0);

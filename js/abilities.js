@@ -126,6 +126,7 @@
     }
   };
   A.update = function (dt) {
+    A.tickTasks(dt);
     A.updateUltAuras && A.updateUltAuras(dt);
     A.riftTick(dt); A.shadowTick(dt);
     if (P.temps && P.temps.has('ult_godfall')) for (const sk of P.skills) if (sk && !(sk.def && sk.def.ult) && sk.cd > 0) sk.cd = 0; // (神降ろし: no cooldowns)
@@ -635,9 +636,12 @@
     const sk = C.curSk;
     const def = G.ENEMY_BY_ID.skeleton_bone;
     const m = G.enemies.buildModel(def, { ally: true });
+    { const fl = G.world.floorBelow(pos.x, pos.y + 1.5, pos.z); if (fl > -50) pos.y = fl; }
     m.group.position.copy(pos);
     G.scene.add(m.group);
-    G.fx.smoke(pos, 8, 1, 0x3a4a5a, 1, 1);
+    // it climbs out of a dark circle in the floor, through a burst of bone
+    G.vfx.area(pos.clone(), 1.3, 'dark', 1.5, { col: [0x3a1a5a, 0x9a70ff] }); G.vfx.spikes([pos.clone()], { kind: 'bone', r: 1.4, h: 0.8, n: 5, dur: 0.45 });
+    G.fx.smoke(pos.clone().add(V(0, 0.3, 0)), 8, 1, 0x3a2a4a, 1, 1);
     const ent = { pos: pos.clone(), vel: V(), yaw: 0, radius: 0.4, height: 1.8, def, anim: m, cd: 0, walk: 0, atk: 0 };
     C.addAlly({
       t: dur,

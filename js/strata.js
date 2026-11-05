@@ -515,19 +515,24 @@
       w.group.add(im);
       S.ropes.push({ r, L, n, im, bob: 0, bobV: 0, load: 0, tp: 0.5, on: false });
     }
-    // cell gates: bars of old, dull bronze hung on a hinge (a warmer brown than the grey iron bars around them), braced, with a lock plate;
+    // cell gates: thick bars of blackened iron (the same metal texture as the bars around them, darker), riveted rails, a cross brace and a brass lock plate;
     // a plain dark-iron frame marks the doorway and stays when the gate swings open or falls. Nothing glows: it should belong to the dungeon. The bars tint towards rust as they are battered.
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x3e352c, metalness: 0.55, roughness: 0.8 }); // (blackened iron)
+    const im = w.mats.iron, ironTex = { map: im.map || null, normalMap: im.normalMap || null };
+    const frameMat = new THREE.MeshStandardMaterial(Object.assign({ color: 0x3a3836, metalness: 0.8, roughness: 0.6 }, ironTex)); // (blackened iron)
     const plateMat = new THREE.MeshStandardMaterial({ color: 0x8a6c38, metalness: 0.75, roughness: 0.55 }); // (worn brass: the lock and its ring)
     const holeMat = new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 1 });
     for (const d of S.doors) {
       const g = new THREE.Group(), wd = d.hi - d.lo;
-      const mat = new THREE.MeshStandardMaterial({ color: 0x5a4430, metalness: 0.6, roughness: 0.72 });
+      const mat = new THREE.MeshStandardMaterial(Object.assign({ color: 0x5e5a55, metalness: 0.85, roughness: 0.48 }, ironTex)); // (dark iron with a sheen: darker than the bars around)
       g.rotation.order = 'YXZ'; d.sg = d.hinge ? -1 : 1; d.hz = d.hinge ? d.hi : d.lo;
       g.position.set(d.plane, d.y, d.hz);
       const bars = [];
       for (let x = 0.12; x < wd - 0.05; x += 0.22) { const m = new THREE.Mesh(boxG, mat); m.scale.set(0.075, d.h - 0.06, 0.075); m.position.set(d.sg * x, d.h / 2, 0); m.castShadow = true; g.add(m); bars.push({ m, x: d.sg * x, bend: (Math.random() - 0.5) * 2 }); }
-      for (const yy of [0.12, d.h / 2, d.h - 0.1]) { const m = new THREE.Mesh(boxG, mat); m.scale.set(wd - 0.04, 0.12, 0.1); m.position.set(d.sg * wd / 2, yy, 0); g.add(m); }
+      for (const yy of [0.12, d.h / 2, d.h - 0.1]) {
+        const m = new THREE.Mesh(boxG, mat); m.scale.set(wd - 0.04, 0.12, 0.1); m.position.set(d.sg * wd / 2, yy, 0); g.add(m);
+        // rivets along the rail, on both faces
+        for (let x = 0.12; x < wd - 0.05; x += 0.22) for (const z of [0.055, -0.055]) { const r = new THREE.Mesh(boxG, frameMat); r.scale.set(0.045, 0.045, 0.02); r.rotation.z = Math.PI / 4; r.position.set(d.sg * x, yy, z); g.add(r); }
+      }
       // a cross brace in each half: the gate reads as a door, not more bars
       for (const [y0, y1] of [[0.12, d.h / 2], [d.h / 2, d.h - 0.1]]) {
         const len = Math.hypot(wd - 0.1, y1 - y0), ang = Math.atan2(y1 - y0, wd - 0.1);

@@ -18,14 +18,14 @@
     { id: 'earth', name: '地', icon: '🪨', col: '#e0a640', hex: 0xe0a640, aura: false },
   ];
   EL.IDS = EL.LIST.map((x) => x.id);
-  EL.LIST.forEach((x) => { x.desc = { fire: '炎上を付けると炎も付く。水が付いた敵に当てると沸騰（×2.0）、氷が付いた敵に当てると熱融（×1.5）。', water: '他の属性の下地。炎で沸騰、氷で凍結、雷で漏電。炎上中の敵に当てると炎上が消える。', ice: '冷気を付けると氷も付く。水で凍結、炎が付いた敵に当てると熱融（×2.0）、雷で脆化。', volt: '電撃を付けると雷も付く。炎で爆轟、水で漏電、氷で脆化。', wind: '敵に残らない。付いている属性を周囲6mの敵へ広げる（旋風）。', earth: '敵に残らない。付いている属性で結晶を作る（晶壁）。凍結中の敵を砕く（粉砕）。' }[x.id]; });
+  EL.LIST.forEach((x) => { x.desc = { fire: '炎上を付けると炎も付く。水が付いた敵に当てると沸騰（×1.5）、氷が付いた敵に当てると熱融（×2.0）。', water: '他の属性の下地。炎で沸騰、氷で凍結、雷で漏電。炎上中の敵に当てると炎上が消える。', ice: '冷気を付けると氷も付く。水で凍結、炎が付いた敵に当てると熱融（×1.5）、雷で脆化。', volt: '電撃を付けると雷も付く。炎で爆轟、水で漏電、氷で脆化。', wind: '敵に残らない。付いている属性を周囲6mの敵へ広げる（旋風）。', earth: '敵に残らない。付いている属性で結晶を作る（晶壁）。凍結中の敵を砕く（粉砕）。' }[x.id]; });
   EL.BY = Object.fromEntries(EL.LIST.map((x) => [x.id, x]));
   EL.idx = (id) => EL.IDS.indexOf(id) + 1; // 0 = none (wire format)
   EL.of = (i) => EL.IDS[i - 1] || null;
 
   EL.RX = {
-    boil: { name: '沸騰', col: '#ff9a5a', desc: '炎と水。炎が付いた敵に水で×1.5、水が付いた敵に炎で×2.0。' },
-    thaw: { name: '熱融', col: '#ffb0c8', desc: '炎と氷。炎が付いた敵に氷で×2.0、氷が付いた敵に炎で×1.5。' },
+    boil: { name: '沸騰', col: '#ff9a5a', desc: '炎と水。炎が付いた敵に水で×2.0、水が付いた敵に炎で×1.5。' },
+    thaw: { name: '熱融', col: '#ffb0c8', desc: '炎と氷。炎が付いた敵に氷で×1.5、氷が付いた敵に炎で×2.0。' },
     freeze: { name: '凍結', col: '#9fe0ff', desc: '水と氷。通常の敵は3秒、精鋭は1.5秒凍る。ボスは凍らず3秒間60%鈍化。' },
     shatter: { name: '粉砕', col: '#e8f8ff', desc: '凍結中の敵に地属性・近接の重撃・パイルドライバー。凍結を割って大ダメージ。' },
     blast: { name: '爆轟', col: '#ff6aa8', desc: '炎と雷。半径4mの爆発と吹き飛ばし。' },
@@ -168,8 +168,8 @@
     if (b === 'earth') return EL.BY[a].aura ? { id: 'crystal', with: a } : null;
     const k = [a, b].sort().join('+');
     switch (k) {
-      case 'fire+water': return { id: 'boil', amp: a === 'fire' ? 1.5 : 2.0 };
-      case 'fire+ice': return { id: 'thaw', amp: a === 'fire' ? 2.0 : 1.5 };
+      case 'fire+water': return { id: 'boil', amp: a === 'fire' ? 2.0 : 1.5 };
+      case 'fire+ice': return { id: 'thaw', amp: a === 'fire' ? 1.5 : 2.0 };
       case 'ice+water': return { id: 'freeze' };
       case 'fire+volt': return { id: 'blast' };
       case 'volt+water': return { id: 'leak' };

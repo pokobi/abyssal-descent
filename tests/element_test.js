@@ -36,10 +36,10 @@ const PORT = +process.env.COOP_PORT || 9993;
     // ---- amplifying reactions and their order
     const amp = async (a, b) => p.eval(`(() => { T.clean(); const e = T.mk(); const base = T.hit(e, null, 100); T.hit(e, '${a}', 1); const d = T.hit(e, '${b}', 100); return Math.round(d / base * 100) / 100 + ':' + (G.Elem.auraOf(e) || '-'); })()`);
     let r;
-    r = await amp('fire', 'water'); check(r === '1.5:-', 'fire, then water: 沸騰 ×1.5 and both are spent (' + r + ')');
-    r = await amp('water', 'fire'); check(r === '2:-', 'water, then fire: 沸騰 ×2.0 (' + r + ')');
-    r = await amp('fire', 'ice'); check(r === '2:-', 'fire, then ice: 熱融 ×2.0 (' + r + ')');
-    r = await amp('ice', 'fire'); check(r === '1.5:-', 'ice, then fire: 熱融 ×1.5 (' + r + ')');
+    r = await amp('fire', 'water'); check(r === '2:-', 'fire, then water: 沸騰 ×2.0 and both are spent (' + r + ')');
+    r = await amp('water', 'fire'); check(r === '1.5:-', 'water, then fire: 沸騰 ×1.5 (' + r + ')');
+    r = await amp('fire', 'ice'); check(r === '1.5:-', 'fire, then ice: 熱融 ×1.5 (' + r + ')');
+    r = await amp('ice', 'fire'); check(r === '2:-', 'ice, then fire: 熱融 ×2.0 (' + r + ')');
     check(await p.eval("T.nums.some(([v, c]) => v === '沸騰' && /rx-boil/.test(c)) && !T.nums.some(([v]) => /×/.test(v))"), 'the reaction is named over the number, without its factor');
     // ---- the other reactions
     check(await p.eval("(() => { T.clean(); const e = T.mk(); T.hit(e, 'water'); T.hit(e, 'ice'); return e.st.frozen > 2.9 && e.st.frozen <= 3.01; })()"), '水＋氷 = 凍結: an ordinary foe is frozen 3 s');
@@ -58,7 +58,7 @@ const PORT = +process.env.COOP_PORT || 9993;
     check(await p.eval("(() => { T.clean(); const e = T.mk(); T.hit(e, 'fire', 10, { src: 'skill' }); T.hit(e, 'fire', 10, { src: 'skill' }); T.hit(e, 'water', 10, { src: 'skill' }); return G.Elem.auraOf(e) === null; })()"), 'skills always do');
     // ---- foes born with an element
     r = await p.eval("(() => { T.clean(); const e = T.mk(); e.auFix = 'water'; e.elRes = { water: 0.7 }; const base = T.hit(e, null, 100); const w = T.hit(e, 'water', 100); const f = T.hit(e, 'fire', 100); const f2 = T.hit(e, 'fire', 100); return [Math.round(w / base * 100) / 100, Math.round(f / base * 100) / 100, Math.round(f2 / base * 100) / 100, G.Elem.auraOf(e)].join(':'); })()");
-    check(r === '0.3:2:1:water', 'born with water: water ×0.3, fire reacts (×2.0) and the water stays; then 1 s before the next (' + r + ')');
+    check(r === '0.3:1.5:1:water', 'born with water: water ×0.3, fire reacts (×1.5) and the water stays; then 1 s before the next (' + r + ')');
     // ---- 属性熟練 and the reaction boons: separate factors
     r = await p.eval(`(() => { T.clean(); const P = G.player; const blast = () => { T.clean(); const e = T.mk(); const o = T.mk(2, -6); const h = o.hp; T.hit(e, 'fire', 1); T.hit(e, 'volt', 1); return h - o.hp - 1; };
       const b0 = blast(); P.stats.elMastery = 100; const b1 = blast(); P.stats.reactDmg = 0.4; const b2 = blast(); P.stats.elMastery = 0; P.stats.reactDmg = 0;
@@ -66,7 +66,7 @@ const PORT = +process.env.COOP_PORT || 9993;
     { const [x, y] = r.split(':').map(Number); r = Math.abs(x - 1.5) < 0.02 && Math.abs(y - 2.1) < 0.03 ? 'ok' : r; }
     check(r === 'ok', '属性熟練 100 = ×1.5 on 爆轟; with 反応の極意 (+40%) ×1.5 × 1.4 = ×2.1 (' + r + ')');
     r = await p.eval("(() => { const P = G.player; P.stats.elMastery = 100; T.clean(); const e = T.mk(); const base = T.hit(e, null, 100); T.hit(e, 'water', 1); const d = T.hit(e, 'fire', 100); P.stats.elMastery = 0; return Math.round(d / base * 100) / 100; })()");
-    check(r === 2.15, 'and +0.15 on the factor of 沸騰 (2.0 -> ' + r + ')');
+    check(r === 1.65, 'and +0.15 on the factor of 沸騰 (1.5 -> ' + r + ')');
     // ---- the player's side (the page of a test runs in the background, where the game pauses itself)
     await p.eval("G.game.state = 'playing'; 1");
     check(await p.eval("(() => { const P = G.player; G.game.dev.god = false; P.invulnT = 0; P.hp = P.stats.maxHp; P.au = null; P.invulnT = 0; G.combat.damagePlayer(5, { src: 'melee', el: 'water' }); const a = G.Elem.playerAura(); P.invulnT = 0; G.combat.damagePlayer(5, { src: 'melee', el: 'ice' }); const f = P.elFrozen; G.game.dev.god = true; P.hp = P.stats.maxHp; return a === 'water' && f > 0.9 && !G.Elem.playerAura(); })()"), 'on you: water stays, ice on it freezes you for 1 s');

@@ -745,9 +745,9 @@
       w.icon = IC.ch(key, w.icon);
     }
     if (G.MELEE) for (const m of G.MELEE) {
-      const n = MELEE[m.mcat]; if (!n || !PATHS[n]) continue;
-      const col = m.rarity === 'mythic' ? '#ff7a4a' : m.rarity === 'legendary' ? '#ffd34a' : m.rarity === 'epic' ? '#d8b0ff' : '#c9d2dc';
-      const key = 'melee:' + m.mcat + ':' + col;
+      const n = m.id === 'fists' ? 'fist' : MELEE[m.mcat]; if (!n || !PATHS[n]) continue; // (bare hands: a fist, not the knuckle-duster of the fist weapons)
+      const col = m.id === 'fists' ? '#e8c0a0' : m.rarity === 'mythic' ? '#ff7a4a' : m.rarity === 'legendary' ? '#ffd34a' : m.rarity === 'epic' ? '#d8b0ff' : '#c9d2dc';
+      const key = 'melee:' + (m.id === 'fists' ? 'bare' : m.mcat) + ':' + col;
       if (!SPEC[key]) IC.def(key, [big(n, col)]);
       m.icon = IC.ch(key, m.icon);
     }

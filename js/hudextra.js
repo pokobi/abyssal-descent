@@ -131,4 +131,9 @@
     G.player && G.player.addShake && G.player.addShake(0.35);
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 600); }, 6200);
   };
+  // leaving a run: the golden screen edge of invulnerability goes out (and its closing chime does not play at the next start)
+  HX.clearFx = function () {
+    if (invVig) invVig.style.opacity = 0;
+    HX._invOn = false; lastInv = 0;
+  };
 })();

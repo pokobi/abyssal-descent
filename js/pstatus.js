@@ -369,4 +369,12 @@
       else if (k === 'slow') G.fx.norm.spawn(base.x, base.y, base.z, 0, -0.1, 0, 1.0, tp ? 0.08 : 0.03, tp ? 0.12 : 0.05, 0.75, 0.88, 1, 0.6, 0, 1);
     }
   };
+  // leaving a run (title, the clear screen): the update stops there, so the screen looks it drives are put out here
+  PS.clearFx = function () {
+    for (const el of [vig, bvig, ghostVig]) if (el) el.style.opacity = 0;
+    if (vig) vig.dataset.st = '';
+    if (bubble) { bubble.visible = false; shards.visible = false; }
+    const gp = document.getElementById('guard-pop'); if (gp) gp.classList.remove('on');
+    guardT = 0; endId = null; ghostK = 0;
+  };
 })();

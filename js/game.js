@@ -436,7 +436,16 @@
     setWorld(w);
     GM.titleT = 0;
   };
+  // the screen looks of a run (invulnerability, buffs, statuses, low HP, the trial clock ...) are driven by the update while you play:
+  // on the way out of a run they are put out, or they would stay frozen over the title / clear screen
+  GM.clearScreenFx = function () {
+    if (G.PStatus && G.PStatus.clearFx) G.PStatus.clearFx();
+    if (G.HudX && G.HudX.clearFx) G.HudX.clearFx();
+    for (const id of ['lowhp', 'dmg-flash', 'status-tint', 'trial-vig', 'mood-vig']) { const el = document.getElementById(id); if (el) { el.style.opacity = 0; delete el._s; } }
+    G.ui.tintT = 0;
+  };
   GM.toTitle = function () {
+    GM.clearScreenFx();
     if (G.Tutorial.active) G.Tutorial.stop();
     G.Rift.clear();
     GM.state = 'title';
@@ -1177,7 +1186,7 @@
     const R = G.Run, first = GM.run.dev ? false : R.markClear();
     const unlock = first && R.cur.id === 'hard' ? 'エクストラ1' : first && R.cur.id === 'extra' && R.cur.lv < 10 ? 'エクストラ' + (R.cur.lv + 1) : null;
     GM.clearRun(); recordRun();
-    GM.state = 'modal'; I.exitLock(); G.ui.showHud(false); G.ui.bossBar(null);
+    GM.state = 'modal'; I.exitLock(); G.ui.showHud(false); G.ui.bossBar(null); GM.clearScreenFx();
     G.sfx.bell && G.sfx.bell(); G.sfx.ui('rare');
     G.ui.victory({ first, unlock });
   };
@@ -1931,9 +1940,9 @@
         return modal('交換するスキルスロットを選択', `${ob.icon} <b>${ob.name}</b> を装備するスロットを選んでください（${G.input.skillKey(0)}はアルティメット専用）。`, P.skills.map((s, i) => [s, i]).filter(([, i]) => i > 0).map(([s, i]) => ({ icon: s.def.icon, label: G.input.skillKey(i) + ': ' + s.def.name, sub: '交換すると失われます', onPick: () => { P.skills[i] = G.abilities.makeSlot(ob.id); done(); } })));
       }
       if (o.kind === 'attachment') {
-        const ok = G.weapons.gunsInOrder().map((pw) => [pw, P.weapons.indexOf(pw)]).filter(([pw]) => G.attOk(ob, pw));
+        const ok = G.weapons.gunsInOrder().concat(ob.slot === 'core' && P.melee ? [P.melee] : []).map((pw) => [pw, P.weapons.indexOf(pw)]).filter(([pw]) => G.attOk(ob, pw)); // (a 属性コア fits the melee weapon too)
         if (!ok.length) { P.attStash.push(ob.id); done(); G.ui.toastSmall('🔩 インベントリに入れた（持ち物画面で装着）'); return; }
-        const apply = (pw) => { const prev = pw.atts[ob.slot]; if (prev && prev !== ob.id) { P.attStash.push(prev); setTimeout(() => G.ui.toastSmall(`🗃️ 外した ${G.ATT_BY_ID[prev].icon} ${G.ATT_BY_ID[prev].name} はインベントリへ`), 400); } pw.atts[ob.slot] = ob.id; pw.ver++; if (pw === P.weapon) G.weapons.equip(true); done(); };
+        const apply = (pw) => { const prev = pw.atts[ob.slot]; if (prev && prev !== ob.id) { P.attStash.push(prev); setTimeout(() => G.ui.toastSmall(`🗃️ 外した ${G.ATT_BY_ID[prev].icon} ${G.ATT_BY_ID[prev].name} はインベントリへ`), 400); } pw.atts[ob.slot] = ob.id; pw.ver++; G.weapons.dirty = true; if (pw === P.weapon) G.weapons.equip(true); if (pw === P.melee) G.weapons.melee.rebuild(); done(); };
         if (ok.length === 1) return apply(ok[0][0]);
         return modal('装着する武器を選択', `${ob.icon} <b>${ob.name}</b>（${G.ATT_SLOTS[ob.slot].name}）`, ok.map(([pw]) => ({ icon: pw.def.icon, label: G.weapons.keyLabel(pw) + pw.def.name, sub: pw.atts[ob.slot] ? '交換: ' + G.ATT_BY_ID[pw.atts[ob.slot]].name + '（外したものはインベントリへ）' : '空きスロット', onPick: () => apply(pw) })));
       }

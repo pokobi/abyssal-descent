@@ -65,6 +65,8 @@ for (const name of ['WEAPONS', 'MELEE', 'ATTACHMENTS', 'ITEMS', 'SKILLS', 'ULTS'
   const by = new Map();
   for (const o of G[name] || []) { if (by.has(o.name)) fail(`${name}: "${o.name}" is the name of both ${by.get(o.name)} and ${o.id}`); else by.set(o.name, o.id); }
 }
+// two consumables, or two skills / ultimates, with the same icon (they sit side by side on the item bar / skill row)
+for (const list of [G.ITEMS || [], (G.SKILLS || []).concat(G.ULTS || [])]) { const by = new Map(); for (const o of list) { if (by.has(o.icon)) fail(`icon ${o.icon} is used by both ${by.get(o.icon)} and ${o.id}`); else by.set(o.icon, o.id); } }
 // retired items are gone from the item table
 for (const id in G.RETIRED_ITEMS || {}) if (G.ITEM_BY_ID[id]) fail(`RETIRED_ITEMS ${id}: still defined in ITEMS`);
 // element tables point at things that exist

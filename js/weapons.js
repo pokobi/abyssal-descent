@@ -59,7 +59,7 @@
     s.doubleShot = (st.doubleShot || 0) + (d.trait === 'double' ? 0.25 : 0);
     s.sprintFire = !!s.sprintFire;
     const lv = w.lv || 0;
-    // forge levels are the main way guns keep up with depth (multiplicative, up to +15)
+    // forge levels are the main way guns keep up with depth (multiplicative; the cap depends on the rarity, areas.js FORGE_CAP)
     if (lv) { s.dmg *= Math.pow(1.13, lv); s.rpm *= 1 + 0.02 * Math.min(lv, 10); s.mag = Math.max(1, Math.round(s.mag * (1 + 0.05 * Math.min(lv, 10)))); }
     w._sc = { ver: w.ver, gv: W.ver, dyn, s };
     return s;

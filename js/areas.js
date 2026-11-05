@@ -97,7 +97,7 @@
       used.add(obj.id);
       const slot = w.miniSlots[i];
       buildStand(w, slot.x, slot.z, (slot.y || 1.15) - 1.15);
-      S.offers.push({ kind: k === 'pile' || k === 'tech' ? 'buff' : k, obj, price: GM.offerPrice(k === 'pile' || k === 'tech' ? 'buff' : k, obj), sold: false, slot, lv: k === 'weapon' || k === 'melee' ? GM.shopLv() : 0 });
+      S.offers.push({ kind: k === 'pile' || k === 'tech' ? 'buff' : k, obj, price: GM.offerPrice(k === 'pile' || k === 'tech' ? 'buff' : k, obj), sold: false, slot, lv: k === 'weapon' || k === 'melee' ? GM.shopLvOf(obj) : 0 });
     });
     // very rarely the travelling merchant carries a revive charm
     if (Math.random() < 0.05) { const o = S.offers.find((x) => x.kind !== 'weapon'); if (o) { o.kind = 'revive'; o.obj = GM.REVIVE; o.price = Math.round(GM.revivePrice() * 1.1 / 10) * 10; } }
@@ -392,7 +392,7 @@
       opts: () => [{ icon: '🪙', label: `${cost(80)}🪙 施す`, sub: 'レア以上の加護を一つ得る', disabled: GM.run.coins < cost(80), run: () => { GM.run.coins -= cost(80); AR.randomGoodBuff(2); } },
         { icon: '🗡️', label: '魂を斬り払う', sub: '+' + cost(150) + '🪙 ／ 呪い「狩られる者」', run: () => { G.combat.coins(cost(150), null, '魂の残り香'); AR.addCurse('c_hunted'); } }] },
     { id: 'ghost_smith', npc: '亡霊の鍛冶師', icon: '⚒️', text: '「その武器、鍛え直してやろう。代価は…お前の運だ」',
-      opts: () => [{ icon: '⚒️', label: '鍛えてもらう', sub: P.weapon ? `${P.weapon.def.name} の強化値+2 ／ ランダムな呪い` : '銃を持っていない', disabled: !P.weapon || (P.weapon.lv || 0) >= AR.FORGE_MAX, run: () => { P.weapon.lv = Math.min(AR.FORGE_MAX, (P.weapon.lv || 0) + 2); P.weapon.ver++; G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${P.weapon.def.name} +${P.weapon.lv}`, 'good'); AR.addCurse(); } }] },
+      opts: () => [{ icon: '⚒️', label: '鍛えてもらう', sub: P.weapon ? `${P.weapon.def.name} の強化値+2 ／ ランダムな呪い` : '銃を持っていない', disabled: !P.weapon || (P.weapon.lv || 0) >= AR.forgeCap(P.weapon), run: () => { P.weapon.lv = Math.min(AR.forgeCap(P.weapon), (P.weapon.lv || 0) + 2); P.weapon.ver++; G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${P.weapon.def.name} +${P.weapon.lv}`, 'good'); AR.addCurse(); } }] },
     { id: 'peddler', npc: '怪しい行商人', icon: '🎁', text: '「中身は開けてのお楽しみさ。損はさせない…たぶんね」',
       opts: () => [{ icon: '🎁', label: `謎の箱を買う（${cost(160)}🪙）`, sub: '武器／スキル／アイテム／呪い のどれか', disabled: GM.run.coins < cost(160), run: () => {
         GM.run.coins -= cost(160);
@@ -523,14 +523,14 @@
     for (const pw of G.weapons.gunsInOrder()) {
       const d = pw.def, lv = pw.lv || 0;
       out.push({ uid: 'wep:' + P.weapons.indexOf(pw), cat: 'weapon', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: `${d.name}${lv ? ' +' + lv : ''}`, badge: '装備中',
-        sub: `${d.mythic ? '✴️ 神器 · ' : ''}銃（${d.cat}）${lv ? ' · 強化+' + lv : ''}`, d, w: pw, gun: true, lv,
+        sub: `${d.mythic ? '✴️ 神器 · ' : ''}銃（${d.cat}）${lv ? ' · 強化+' + lv : ''}`, d, w: pw, gun: true, lv, forge: pw.forge || 0,
         consume: () => { GM.stashAtts(pw); GM.releaseGun(pw); } });
     }
     for (const it of (P.bag ? P.bag.items : [])) {
       if (!G.Inv.isArm(it) || !G.Inv.def(it)) continue;
-      const d = G.Inv.def(it), gun = it.type === 'gun', lv = (it.gun && it.gun.lv) || 0;
+      const d = G.Inv.def(it), gun = it.type === 'gun', lv = (it.gun && it.gun.lv) || 0, forge = (it.gun && it.gun.forge) || 0;
       out.push({ uid: 'bagw:' + it.uid, cat: 'weapon', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: `${d.name}${lv ? ' +' + lv : ''}`, badge: '',
-        sub: `${d.mythic ? '✴️ 神器 · ' : ''}${gun ? `銃（${d.cat}）` : '近接武器'}${lv ? ' · 強化+' + lv : ''}`, d, it, gun, lv,
+        sub: `${d.mythic ? '✴️ 神器 · ' : ''}${gun ? `銃（${d.cat}）` : '近接武器'}${lv ? ' · 強化+' + lv : ''}`, d, it, gun, lv, forge,
         consume: () => {
           G.Inv.remove(P.bag, it);
           for (const a of Object.values((gun && it.gun && it.gun.atts) || {})) if (G.ATT_BY_ID[a]) G.Inv.give(P, 'att', a, 1); // its attachments come off into the bag first
@@ -539,7 +539,7 @@
     if (P.melee && P.melee.id !== (G.BARE_MELEE || 'fists')) {
       const d = P.melee.def, lv = P.melee.lv || 0;
       out.push({ uid: 'wep:melee', cat: 'weapon', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: `${d.name}${lv ? ' +' + lv : ''}`, badge: '装備中',
-        sub: `${d.mythic ? '✴️ 神器 · ' : ''}近接武器${lv ? ' · 強化+' + lv : ''}`, d, w: P.melee, gun: false, lv,
+        sub: `${d.mythic ? '✴️ 神器 · ' : ''}近接武器${lv ? ' · 強化+' + lv : ''}`, d, w: P.melee, gun: false, lv, forge: P.melee.forge || 0,
         consume: () => { P.melee = G.weapons.makeMelee(G.BARE_MELEE || 'fists'); } });
     }
     for (const pw of G.weapons.gunsInOrder()) for (const sl in pw.atts) {
@@ -629,29 +629,30 @@
       return;
     }
     if (a.cat === 'weapon') {
-      const newLv = Math.max(a.lv || 0, b.lv || 0);
+      const newLv0 = Math.max(a.lv || 0, b.lv || 0), newForge = (a.lv || 0) >= (b.lv || 0) ? a.forge || 0 : b.forge || 0;
+      const capLv = (d) => Math.min(newLv0, AR.forgeCap(d)), newLv = newLv0;
       const allowMythic = tA >= 4;
       let gunPool = G.WEAPONS.filter((x) => x.id !== 'starter' && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || G.RARITY[x.rarity].tier === 4) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
       if (!gunPool.length) gunPool = G.WEAPONS.filter((x) => x.id !== 'starter' && !x.mythic && G.RARITY[x.rarity].tier === targetTier);
       const meleePool = G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || G.RARITY[x.rarity].tier === 4) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
       const pool = (!a.gun || !b.gun) && meleePool.length ? gunPool.concat(meleePool) : gunPool;
       const cands = U.shuffle(pool.slice()).slice(0, 3);
-      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}${newLv ? ' +' + newLv : ''}（${d.mythic ? '★神器' : G.RARITY[d.rarity].name}）`, sub: d.kind === 'melee' ? meleeCard(d) : gunCard(d), onPick: () => {
+      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}${capLv(d) ? ' +' + capLv(d) : ''}（${d.mythic ? '★神器' : G.RARITY[d.rarity].name}）`, sub: d.kind === 'melee' ? meleeCard(d) : gunCard(d), onPick: () => {
         consumeBoth();
         const stash = (it) => { if (G.Inv.stow(P, it) > 0) { G.Inv.dropToGround(it, P.pos.clone().add(V(0, 0.4, 0))); G.ui.toastSmall('🎒 インベントリに空きがないので足元に置いた'); } };
         if (d.kind === 'melee') {
           if (P.melee && P.melee.id !== (G.BARE_MELEE || 'fists')) stash(GM.meleeItem(P.melee)); // the one in hand was not a material: it goes into the bag
-          P.melee = G.weapons.makeMelee(d.id); P.melee.lv = newLv;
+          P.melee = G.weapons.makeMelee(d.id); P.melee.lv = capLv(d); P.melee.forge = newForge;
           if (P.meleeMode) G.weapons.melee.equip(false);
         } else {
-          const nw = G.weapons.make(d.id); nw.lv = newLv; nw.ver++; nw.mag = G.weapons.stats(nw).mag;
+          const nw = G.weapons.make(d.id); nw.lv = capLv(d); nw.forge = newForge; nw.ver++; nw.mag = G.weapons.stats(nw).mag;
           if (P.weapons.length < P.stats.weaponSlots) { P.weapons.push(nw); G.weapons.switchTo(P.weapons.length - 1); }
           else stash(GM.gunItem(nw));
         }
         G.weapons.order(); G.ui.refreshWeapon(); G.ui.refreshItems(); P.recalc();
-        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}${newLv ? ' +' + newLv : ''}`, 'good'); G.ui.itemCard(d, '[武器練成]');
+        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}${capLv(d) ? ' +' + capLv(d) : ''}`, 'good'); G.ui.itemCard(d, '[武器練成]');
       } }));
-      alchChoiceModal(`🔫 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する${newLv ? `（強化値 +${newLv} を継承）` : ''}。`, opts, RAR_BY_TIER[targetTier], a, b);
+      alchChoiceModal(`🔫 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する${newLv ? `（強化値 +${newLv} を継承・武器の上限まで）` : ''}。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
     if (a.cat === 'part') {
@@ -942,6 +943,11 @@
     w.interactables.push({ type: 'anvil', pos: w.anvilPos.clone(), used: 0, model: m });
   };
   AR.FORGE_MAX = 15;
+  // how far a weapon can be forged depends on its rarity (a cheap weapon tops out early; 神器 go all the way)
+  AR.FORGE_CAP = { common: 6, uncommon: 8, rare: 10, epic: 12, legendary: 15 };
+  AR.forgeCap = (w) => { const d = w && (w.def || w); return !d || d.mythic ? AR.FORGE_MAX : AR.FORGE_CAP[d.rarity] ?? AR.FORGE_MAX; };
+  AR.capText = () => Object.entries(AR.FORGE_CAP).map(([r, n]) => G.RARITY[r].name + '+' + n).join('・');
+  AR.FORGE_REFUND = 0.5; // the coins paid for forging: this share comes back when the weapon is sold or traded in (pawn.js)
   AR.forgeCost = (w) => GM.price(300 * Math.pow(1.27, w.lv || 0) + GM.area * 15);
   // skill levels at the forge: +1 for a chosen skill / ultimate / the pile driver; the price follows that skill's own level
   AR.skillLvCost = (lv) => GM.price(900 * Math.pow(1.25, lv));
@@ -960,18 +966,18 @@
   };
   AR.useForge = function () {
     const opts = G.weapons.gunsInOrder().map((pw) => {
-      const lv = pw.lv || 0, c = AR.forgeCost(pw);
-      const mx = lv >= AR.FORGE_MAX;
-      return { _tok: pw, icon: pw.def.icon, label: `${G.weapons.keyLabel(pw)}${pw.def.name} +${lv} → +${lv + 1}（${c}🪙）`, sub: mx ? '最大強化' : `ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}）`, disabled: mx || GM.run.coins < c, onPick: () => {
-        GM.run.coins -= c; pw.lv = lv + 1; pw.ver++; G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7);
+      const lv = pw.lv || 0, c = AR.forgeCost(pw), cap = AR.forgeCap(pw);
+      const mx = lv >= cap;
+      return { _tok: pw, icon: pw.def.icon, label: `${G.weapons.keyLabel(pw)}${pw.def.name} +${lv}${mx ? '' : ` → +${lv + 1}（${c}🪙）`}`, sub: mx ? `最大強化（${G.RARITY[pw.def.rarity] ? G.RARITY[pw.def.rarity].name + 'は' : ''}+${cap}まで）` : `ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}・上限+${cap}）`, disabled: mx || GM.run.coins < c, onPick: () => {
+        GM.run.coins -= c; pw.lv = lv + 1; pw.forge = (pw.forge || 0) + c; pw.ver++; G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7);
         if (pw === P.weapon) G.weapons.equip(true); G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${pw.def.name} +${pw.lv}`, 'good');
       } };
     });
     {
-      const mw = P.melee, lv = mw.lv || 0, c = AR.forgeCost(mw);
-      const mx = lv >= AR.FORGE_MAX;
-      if (mw.id !== (G.BARE_MELEE || 'fists')) opts.push({ _tok: 'm', icon: mw.def.icon, label: `${G.weapons.keyLabel('m')}${mw.def.name} +${lv} → +${lv + 1}（${c}🪙）`, sub: mx ? '最大強化' : `近接ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}）`, disabled: mx || GM.run.coins < c, onPick: () => {
-        GM.run.coins -= c; mw.lv = lv + 1; G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7);
+      const mw = P.melee, lv = mw.lv || 0, c = AR.forgeCost(mw), cap = AR.forgeCap(mw);
+      const mx = lv >= cap;
+      if (mw.id !== (G.BARE_MELEE || 'fists')) opts.push({ _tok: 'm', icon: mw.def.icon, label: `${G.weapons.keyLabel('m')}${mw.def.name} +${lv}${mx ? '' : ` → +${lv + 1}（${c}🪙）`}`, sub: mx ? `最大強化（${G.RARITY[mw.def.rarity] ? G.RARITY[mw.def.rarity].name + 'は' : ''}+${cap}まで）` : `近接ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}・上限+${cap}）`, disabled: mx || GM.run.coins < c, onPick: () => {
+        GM.run.coins -= c; mw.lv = lv + 1; mw.forge = (mw.forge || 0) + c; G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7);
         G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${mw.def.name} +${mw.lv}`, 'good');
       } });
     }

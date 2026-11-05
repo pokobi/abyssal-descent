@@ -10,8 +10,10 @@
   const R = (r) => G.ui.R(r);
 
   // the class's starting kit (classes.js) is worth only what was put into it (its upgrades), like the old starting pistol; its ultimate can't be sold
-  PW.weaponValue = (w) => w.def.price && !w.kit ? Math.max(5, Math.round(w.def.price * PW.RATE * (1 + 0.2 * (w.lv || 0)) / 5) * 5) : (w.lv || 0) * 60;
-  PW.meleeValue = (m) => m.def.price && !m.kit ? Math.max(5, Math.round(m.def.price * PW.RATE * (1 + 0.2 * (m.lv || 0)) / 5) * 5) : (m.lv || 0) * 60;
+  // plus a share of the coins paid for forging it (areas.js FORGE_REFUND): a well-forged weapon is not thrown away for a newer one
+  PW.forgeBack = (w) => Math.round((w.forge || 0) * G.Areas.FORGE_REFUND / 5) * 5;
+  PW.weaponValue = (w) => (w.def.price && !w.kit ? Math.max(5, Math.round(w.def.price * PW.RATE * (1 + 0.2 * (w.lv || 0)) / 5) * 5) : (w.lv || 0) * 60) + PW.forgeBack(w);
+  PW.meleeValue = (m) => (m.def.price && !m.kit ? Math.max(5, Math.round(m.def.price * PW.RATE * (1 + 0.2 * (m.lv || 0)) / 5) * 5) : (m.lv || 0) * 60) + PW.forgeBack(m);
   PW.attValue = (id) => { const a = G.ATT_BY_ID[id]; if (!a) return 0; if ((G.player.kitAtts || []).includes(id)) return 0; return Math.max(1, Math.round((a.price || 0) * PW.RATE / 5) * 5); };
   const spendKitAtt = (id) => { const k = G.player.kitAtts || [], i = k.indexOf(id); if (i >= 0) k.splice(i, 1); };
   PW.skillValue = (sk) => (sk.kit ? Math.round((sk.def.price || 0) * PW.RATE * 0.2 * (sk.lv || 0) / 5) * 5 : Math.max(1, Math.round((sk.def.price || 0) * PW.RATE * (1 + 0.2 * (sk.lv || 0)) / 5) * 5));
@@ -281,7 +283,7 @@
     const bulk = getBulk(PW.tab);
     GM().state = 'modal'; G.input.exitLock();
     const s = G.ui.screen(`<div class="panel pw-panel" style="width:min(940px,96vw)">
-      <div class="pw-head"><h2>⚖️ 買取屋</h2><span>買値の<b>${Math.round(PW.RATE * 100)}%</b>で買い取る（金品は満額）</span>${G.ui.coinBox()}</div>
+      <div class="pw-head"><h2>⚖️ 買取屋</h2><span>買値の<b>${Math.round(PW.RATE * 100)}%</b>で買い取る（金品は満額・武器は強化に使ったコインの${Math.round(G.Areas.FORGE_REFUND * 100)}%を上乗せ）</span>${G.ui.coinBox()}</div>
       <div class="pw-tabs">${CATS.map(([k, n]) => { const c = k === 'all' ? all.length : all.filter((r) => r.cat === k).length; return `<span class="pw-tab${PW.tab === k ? ' on' : ''}${c ? '' : ' none'}" data-t="${k}">${n} <small>${c}</small></span>`; }).join('')}</div>
       <div class="pw-bulk">${bulk ? `<button class="btn${bulk.primary && bulk.count ? ' primary' : ''}" id="pw-bulk-btn" ${bulk.count ? '' : 'disabled'}>${bulk.label}</button>` : ''}</div>
       <div class="pw-list">${list.length ? list.map((r, i) => `<div class="pw-row${r.no ? ' no' : ''}" style="--rc:${R(r.rc || 'common')}"><span class="pw-ic">${r.icon}${G.Elem.badge(r.el)}</span><div class="pw-t"><b>${U.esc(r.name)}</b><small>${U.esc(r.sub)}</small></div><span class="pw-v">${r.no ? '—' : '+' + fmt(r.v) + '🪙' + (r.n > 1 ? '<small>/1個</small>' : '')}</span>${r.no ? '' : `<button class="btn small" data-s="${i}">売る</button>`}${r.actAll ? `<button class="btn small" data-a="${i}">すべて（+${fmt(r.v * r.n)}）</button>` : ''}</div>`).join('') : '<div class="pw-none">売れるものがない</div>'}</div>

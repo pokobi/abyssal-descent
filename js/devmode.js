@@ -171,11 +171,11 @@
     if (tab === 'gear') {
       const cur = P.weapons;
       cur.forEach((w, i) => {
-        ACT['wl+' + i] = () => { w.lv = Math.min(G.Areas.FORGE_MAX, (w.lv || 0) + 1); w.ver++; G.weapons.dirty = true; };
+        ACT['wl+' + i] = () => { w.lv = Math.min(G.Areas.forgeCap(w), (w.lv || 0) + 1); w.ver++; G.weapons.dirty = true; };
         ACT['wl-' + i] = () => { w.lv = Math.max(0, (w.lv || 0) - 1); w.ver++; G.weapons.dirty = true; };
         ACT['wx' + i] = () => { if (P.weapons.length > 1) { GM.stashAtts(w); P.weapons.splice(i, 1); P.wIdx = 0; G.weapons.equip(false); } };
       });
-      ACT['ml+'] = () => { P.melee.lv = Math.min(G.Areas.FORGE_MAX, (P.melee.lv || 0) + 1); G.weapons.dirty = true; };
+      ACT['ml+'] = () => { P.melee.lv = Math.min(G.Areas.forgeCap(P.melee), (P.melee.lv || 0) + 1); G.weapons.dirty = true; };
       ACT['ml-'] = () => { P.melee.lv = Math.max(0, (P.melee.lv || 0) - 1); G.weapons.dirty = true; };
       const wl = G.WEAPONS.filter((o) => match('w', o)).map((o) => { ACT['gw-' + o.id] = () => GM.giveWeapon(o.id); return `<div class="dv-it" style="--rc:${R(o.rarity)}"><span>${o.icon} ${esc(o.name)} <small>${esc(o.cat || '')}</small></span>${btn('gw-' + o.id, '入手')}</div>`; }).join('');
       const ml = G.MELEE.filter((o) => match('m', o)).map((o) => { ACT['gm-' + o.id] = () => { G.Pawn.tradeIn(P.melee, true); P.melee = G.weapons.makeMelee(o.id); if (P.meleeMode) G.weapons.melee.equip(false); }; return `<div class="dv-it" style="--rc:${R(o.rarity)}"><span>${o.icon} ${esc(o.name)}</span>${btn('gm-' + o.id, '装備')}</div>`; }).join('');

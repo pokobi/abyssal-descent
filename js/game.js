@@ -526,9 +526,9 @@
     return {
       cls: P.cls, hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
       buffs: [...P.buffs], buffState: P.buffState,
-      weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined })), wIdx: P.wIdx, kitAtts: P.kitAtts || [],
+      weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, forge: w.forge || undefined, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined })), wIdx: P.wIdx, kitAtts: P.kitAtts || [],
       wOrder: G.weapons.order().map((t) => (t === 'm' ? 'm' : t ? P.weapons.indexOf(t) : null)),
-      melee: { id: P.melee.id, lv: P.melee.lv || 0, kit: P.melee.kit ? 1 : undefined, atts: P.melee.atts && P.melee.atts.core ? { core: P.melee.atts.core } : undefined },
+      melee: { id: P.melee.id, lv: P.melee.lv || 0, forge: P.melee.forge || undefined, kit: P.melee.kit ? 1 : undefined, atts: P.melee.atts && P.melee.atts.core ? { core: P.melee.atts.core } : undefined },
       skills: P.skills.map((s) => (s ? s.id : null)), skillLv: P.skills.map((s) => (s ? s.lv || 0 : 0)), skillKit: P.skills.map((s) => (s && s.kit ? 1 : 0)), pileTome: P.pileTome || 0,
       grenadeSel: P.grenadeSel, isel: P.isel, invGrid: G.Inv.snap(P),
     };
@@ -577,12 +577,12 @@
     P.permMaxHp = d.permMaxHp || 0;
     P.recalc();
     P.phoenixUsed = !!d.phoenixUsed;
-    P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag; return w; });
+    P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag; return w; });
     const coresBack = []; for (const w of P.weapons) if (G.ownEl(w) && w.atts.core) { coresBack.push(w.atts.core); delete w.atts.core; w.ver++; }
     if (!P.weapons.length && !Array.isArray(d.weapons)) P.weapons = [G.weapons.make('starter')]; // (a run saved with every gun put away keeps none)
     P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));
-    if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; if (d.melee.kit) P.melee.kit = true; const c = d.melee.atts && d.melee.atts.core; if (c && G.ATT_BY_ID[c]) { if (G.attOk(G.ATT_BY_ID[c], P.melee)) P.melee.atts.core = c; else coresBack.push(c); } }
+    if (d.melee && G.MELEE_BY_ID[d.melee.id]) { P.melee = G.weapons.makeMelee(d.melee.id); P.melee.lv = d.melee.lv || 0; P.melee.forge = d.melee.forge || 0; if (d.melee.kit) P.melee.kit = true; const c = d.melee.atts && d.melee.atts.core; if (c && G.ATT_BY_ID[c]) { if (G.attOk(G.ATT_BY_ID[c], P.melee)) P.melee.atts.core = c; else coresBack.push(c); } }
     P.kitAtts = (d.kitAtts || []).slice();
     P.skills = [0, 1, 2, 3].map((i) => { if (!(d.skills && d.skills[i] && G.SKILL_BY_ID[d.skills[i]])) return null; const s = G.abilities.makeSlot(d.skills[i]); s.lv = Math.min(G.abilities.MAXLV, (d.skillLv && d.skillLv[i]) || 0); if (d.skillKit && d.skillKit[i]) s.kit = true; return s; });
     P.pileTome = d.pileTome || 0;
@@ -1228,8 +1228,8 @@
   };
   // a gun thrown away from the inventory screen becomes a pickup on the ground that keeps its upgrades, parts and ammo
   // a gun out of your hands as an inventory thing (attachments, level, ammo and kills ride along)
-  GM.gunItem = (w) => G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined } }); // (its own element and the kit mark ride along)
-  GM.meleeItem = (m) => G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0, kit: m.kit ? 1 : undefined, atts: m.atts && m.atts.core ? { core: m.atts.core } : undefined } }); // (its 属性コア rides along)
+  GM.gunItem = (w) => G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, forge: w.forge || undefined, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined } }); // (its own element and the kit mark ride along)
+  GM.meleeItem = (m) => G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0, forge: m.forge || undefined, kit: m.kit ? 1 : undefined, atts: m.atts && m.atts.core ? { core: m.atts.core } : undefined } }); // (its 属性コア rides along)
   // take a gun out of your hands (every gun can go: with none left you fight with the melee weapon / fists)
   GM.releaseGun = function (w) {
     if (!w || !P.weapons.includes(w)) return null;
@@ -1305,7 +1305,7 @@
   GM.takeGun = function (it, quiet) {
     if (P.weapons.length >= P.stats.weaponSlots) return false;
     const x = it.gun || {}, w = G.weapons.make(it.id);
-    w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag;
+    w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag;
     P.weapons.push(w); G.weapons.switchTo(P.weapons.length - 1); G.ui.refreshWeapon(); P.recalc();
     const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を${quiet ? '装備した' : '拾った'}`);
     return true;
@@ -1327,7 +1327,7 @@
       G.Inv.dropToGround(old, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)));
     }
     const m = G.weapons.makeMelee(it.id);
-    m.lv = (it.gun && it.gun.lv) || 0; if (it.gun && it.gun.kit) m.kit = true;
+    m.lv = (it.gun && it.gun.lv) || 0; m.forge = (it.gun && it.gun.forge) || 0; if (it.gun && it.gun.kit) m.kit = true;
     const core = it.gun && it.gun.atts && it.gun.atts.core; if (core && G.ATT_BY_ID[core]) { if (G.attOk(G.ATT_BY_ID[core], m)) m.atts.core = core; else P.attStash.push(core); }
     P.melee = m;
     if (P.meleeMode) G.weapons.melee.equip(false);
@@ -1478,13 +1478,14 @@
   GM.relicCount = () => [...P.buffs.keys()].filter((id) => G.BUFF_BY_ID[id] && G.BUFF_BY_ID[id].cat === 'relic').length;
   // deeper shops stock weapons that are already forged (you pay for it)
   GM.shopLv = () => Math.min(10, Math.floor((G.Run.depthArea(GM.area) - 1) / 5));
-  GM.forgeTargets = () => G.weapons.orderList().map((t) => (t === 'm' ? { w: P.melee, gun: false, t } : { w: t, gun: true, t })).filter((x) => x.w.id !== (G.BARE_MELEE || 'fists') && (x.w.lv || 0) < G.Areas.FORGE_MAX);
+  GM.shopLvOf = (obj) => Math.min(GM.shopLv(), G.Areas.forgeCap(obj)); // (never past the weapon's own forge cap)
+  GM.forgeTargets = () => G.weapons.orderList().map((t) => (t === 'm' ? { w: P.melee, gun: false, t } : { w: t, gun: true, t })).filter((x) => x.w.id !== (G.BARE_MELEE || 'fists') && (x.w.lv || 0) < G.Areas.forgeCap(x.w));
   GM.forgeRange = function () { const c = GM.forgeTargets().map((x) => G.Areas.forgeCost(x.w)); return c.length ? [Math.min(...c), Math.max(...c)] : [0, 0]; };
   GM.priceLabel = (o) => (o.free ? '無料!' : o.kind === 'forge' || o.kind === 'tome' ? (() => { const [a, b] = o.kind === 'forge' ? GM.forgeRange() : GM.tomeRange(); return a === b ? U.fmt(a) : `${U.fmt(a)}~${U.fmt(b)}`; })() : U.fmt(o.price));
   GM.offerPrice = function (kind, obj) {
     if (kind === 'forge') return GM.forgeRange()[0];
     if (kind === 'tome') return GM.tomePrice();
-    if ((kind === 'weapon' || kind === 'melee') && !obj.mythic) return GM.price(obj.price * (1 + 0.2 * GM.shopLv()));
+    if ((kind === 'weapon' || kind === 'melee') && !obj.mythic) return GM.price(obj.price * (1 + 0.2 * GM.shopLvOf(obj)));
     return GM.price(kind === 'buff' ? BUFF_PRICE[obj.rarity] * (G.isTech(obj) ? 1.2 : 1) : obj.price);
   };
   GM.setupShop = function (w) {
@@ -1529,7 +1530,7 @@
       used.add(obj.id);
       const kind = k === 'pile' || k === 'tech' ? 'buff' : k === 'mythic' ? (obj.kind === 'melee' ? 'melee' : 'weapon') : k;
       const inst = kind === 'armor' ? G.Inv.makeArmor(obj.id, () => r.next()) : null; // armour: enchantments are rolled when the shelf is stocked
-      offers.push({ kind, obj, inst, price: Math.round(GM.offerPrice(kind, obj) * (inst ? G.Inv.enchMul(inst) : 1) / 10) * 10, sold: false, slot: w.shopSlots[i], lv: (kind === 'weapon' || kind === 'melee') && !obj.mythic ? GM.shopLv() : 0 });
+      offers.push({ kind, obj, inst, price: Math.round(GM.offerPrice(kind, obj) * (inst ? G.Inv.enchMul(inst) : 1) / 10) * 10, sold: false, slot: w.shopSlots[i], lv: (kind === 'weapon' || kind === 'melee') && !obj.mythic ? GM.shopLvOf(obj) : 0 });
     });
     // (the forge and the tome only count while there is something they can raise)
     if (P.has('e_free') && GM.run.freeArea !== GM.area) { const g = offers.filter((o) => o.kind !== 'buff' && !(o.kind === 'forge' && !GM.forgeTargets().length) && !(o.kind === 'tome' && !GM.tomeTargets().length)); if (g.length) { const f = r.pick(g); f.price = 0; f.free = true; GM.run.freeArea = GM.area; } }
@@ -1726,7 +1727,7 @@
     } else if (best.type === 'shrine') {
       G.ui.showInteract({ key: 'shrine', icon: '⛩️', name: '祈りの祭壇', rc: '#60d0c0', cat: '全回復＋強化を一つ', desc: '一度だけ祈ることができる。', action: '祈る' });
     } else if (best.type === 'anvil') {
-      G.ui.showInteract({ key: 'anvil' + coins, icon: '⚒️', name: '鍛冶の金床', rc: '#e08040', cat: '武器・スキルの強化', desc: P.weapon ? `${P.weapon.def.name} +${P.weapon.lv || 0}（最大+${G.Areas.FORGE_MAX}）` : '近接武器・スキルを鍛える', action: '鍛える' });
+      G.ui.showInteract({ key: 'anvil' + coins, icon: '⚒️', name: '鍛冶の金床', rc: '#e08040', cat: '武器・スキルの強化', desc: P.weapon ? `${P.weapon.def.name} +${P.weapon.lv || 0}（最大+${G.Areas.forgeCap(P.weapon)}）` : '近接武器・スキルを鍛える', action: '鍛える' });
     } else if (best.type === 'cauldron') {
       const left = Math.max(0, 2 - (best.it.used || 0));
       if (left <= 0) G.ui.showInteract({ key: 'cauldron0', icon: '⚗️', name: '練成の釜（火は消え、冷え切っている）', rc: '#7a8480', cat: '練成終了（残り 0 / 2回）', desc: '「釜の火は消え去った。深淵の恵みはここまでだ…」', action: null });
@@ -1838,7 +1839,7 @@
       { const tv = G.Pawn.tradeValue(P.melee, true); if (tv > 0) note += `♻️ 今の${P.melee.def.name}は下取り +${U.fmt(tv)}🪙　`; }
       note += `⚠ 現在の ${cur.icon}${cur.name} と交換（${G.K('w3')}）`;
     } else if (o.kind === 'forge') {
-      cat = '⚒️ 強化サービス'; note = `購入時に強化する武器を選ぶ（上限+${G.Areas.FORGE_MAX}）・価格は武器の強化値で変わる`;
+      cat = '⚒️ 強化サービス'; note = `購入時に強化する武器を選ぶ（上限はレア度で決まる: ${G.Areas.capText()}）・価格は武器の強化値で変わる`;
     } else if (o.kind === 'tome') {
       cat = '📘 スキル強化'; note = '購入時に強化するスキルを選ぶ・価格はそのスキルの Lv で変わる：' + P.skills.filter((s) => s).map((s) => `${s.def.icon}Lv${(s.lv || 0) + 1}`).join(' ');
     } else if (o.kind === 'relic') {
@@ -1911,7 +1912,7 @@
       if (o.kind === 'forge') {
         const list = GM.forgeTargets();
         if (!list.length) return deny('全て最大強化');
-        return modal('⚒️ どれを鍛える？', `強化値+1（ダメージ×1.13）・強化値が高いほど高くなる`, list.map((x) => { const c = o.free ? 0 : G.Areas.forgeCost(x.w); return { icon: x.w.def.icon, label: `${G.weapons.keyLabel(x.t)}${x.w.def.name} +${x.w.lv || 0} → +${(x.w.lv || 0) + 1}（${o.free ? '無料' : U.fmt(c) + '🪙'}）`, disabled: run.coins < c, onPick: () => { o.price = c; x.w.lv = (x.w.lv || 0) + 1; if (x.gun) { x.w.ver++; if (x.w === P.weapon) G.weapons.equip(true); } done(); G.sfx.mech('magIn'); G.ui.toast(`⚒️ ${x.w.def.name} を +${x.w.lv} に強化した`, 'good'); } }; }));
+        return modal('⚒️ どれを鍛える？', `強化値+1（ダメージ×1.13）・強化値が高いほど高くなる・上限はレア度で決まる（${G.Areas.capText()}）`, list.map((x) => { const c = o.free ? 0 : G.Areas.forgeCost(x.w); return { icon: x.w.def.icon, label: `${G.weapons.keyLabel(x.t)}${x.w.def.name} +${x.w.lv || 0} → +${(x.w.lv || 0) + 1}（${o.free ? '無料' : U.fmt(c) + '🪙'}）`, disabled: run.coins < c, onPick: () => { o.price = c; x.w.lv = (x.w.lv || 0) + 1; x.w.forge = (x.w.forge || 0) + c; if (x.gun) { x.w.ver++; if (x.w === P.weapon) G.weapons.equip(true); } done(); G.sfx.mech('magIn'); G.ui.toast(`⚒️ ${x.w.def.name} を +${x.w.lv} に強化した`, 'good'); } }; }));
       }
       if (o.kind === 'tome') {
         const list = GM.tomeTargets();
@@ -1931,7 +1932,7 @@
       if (o.kind === 'weapon') {
         const mkW = () => { const nw = G.weapons.make(ob.id); nw.lv = o.lv || 0; nw.ver++; nw.mag = G.weapons.stats(nw).mag; return nw; };
         if (P.weapons.length < P.stats.weaponSlots) { P.weapons.push(mkW()); done(); G.weapons.switchTo(P.weapons.length - 1); return; }
-        return modal('交換する武器を選択', `${ob.icon} <b>${ob.name}</b> と交換する武器を選んでください。手放す武器は<b>下取り</b>されます（買値の${Math.round(G.Pawn.RATE * 100)}%${P.has('e_salvage') ? '＋鉄屑回収30%' : ''}・初期装備は0）。`, G.weapons.gunsInOrder().map((pw) => [pw, P.weapons.indexOf(pw)]).map(([pw, i]) => ({ icon: pw.def.icon, label: `${G.weapons.keyLabel(pw)}${pw.def.name}${pw.lv ? ' +' + pw.lv : ''}　→ 下取り +${U.fmt(G.Pawn.tradeValue(pw))}🪙`, sub: G.RARITY[pw.def.rarity].name + (Object.keys(pw.atts).length ? ' · アタッチメント' + Object.keys(pw.atts).length + '個（インベントリへ移動）' : ''), onPick: () => { G.Pawn.tradeIn(pw); GM.stashAtts(pw); P.weapons[i] = mkW(); P.wIdx = i; done(); G.weapons.equip(false); } })));
+        return modal('交換する武器を選択', `${ob.icon} <b>${ob.name}</b> と交換する武器を選んでください。手放す武器は<b>下取り</b>されます（買値の${Math.round(G.Pawn.RATE * 100)}%${P.has('e_salvage') ? '＋鉄屑回収30%' : ''}＋強化に使ったコインの${Math.round(G.Areas.FORGE_REFUND * 100)}%・初期装備は強化分のみ）。`, G.weapons.gunsInOrder().map((pw) => [pw, P.weapons.indexOf(pw)]).map(([pw, i]) => ({ icon: pw.def.icon, label: `${G.weapons.keyLabel(pw)}${pw.def.name}${pw.lv ? ' +' + pw.lv : ''}　→ 下取り +${U.fmt(G.Pawn.tradeValue(pw))}🪙`, sub: G.RARITY[pw.def.rarity].name + (Object.keys(pw.atts).length ? ' · アタッチメント' + Object.keys(pw.atts).length + '個（インベントリへ移動）' : ''), onPick: () => { G.Pawn.tradeIn(pw); GM.stashAtts(pw); P.weapons[i] = mkW(); P.wIdx = i; done(); G.weapons.equip(false); } })));
       }
       if (o.kind === 'ult') { P.skills[0] = G.abilities.makeSlot(ob.id); P.skills[0].cd = 20; G.ui.buildAbilityRow && G.ui.buildAbilityRow(); return done(); }
       if (o.kind === 'skill') {

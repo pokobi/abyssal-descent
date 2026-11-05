@@ -151,10 +151,12 @@
     const m = new THREE.Mesh(areaGeo, areaMat(kind)); m.frustumCulled = false; m.renderOrder = 3;
     if (o.col) { m.material.uniforms.uC1.value.set(o.col[0]); m.material.uniforms.uC2.value.set(o.col[1] ?? o.col[0]); }
     scene.add(m);
-    const h = { pos: c.clone(), r, t: 0, dur: dur ?? Infinity, fade: 0.35, dead: false, m, lift: o.lift ?? 0.05, follow: o.follow || null, a0: o.alpha ?? 1, fadeIn: o.fadeIn ?? 0.15, grow: o.grow || 0,
+    const h = { pos: c.clone(), r, t: 0, dur: dur ?? Infinity, fade: 0.35, dead: false, m, lift: o.lift ?? 0.05, follow: o.follow || null, a0: o.alpha ?? 1, fadeIn: o.fadeIn ?? 0.15, grow: o.grow || 0, lease: o.lease || 0,
       end(f) { if (this.dur > this.t + (f ?? 0.35)) { this.dur = this.t + (f ?? 0.35); this.fade = f ?? 0.35; } },
+      touch() { this.seen = this.t; },
       update(dt) {
         this.t += dt;
+        if (this.lease && this.t - (this.seen || 0) > this.lease) this.end(0.2); // (held by a zone / an aura: gone soon after they stop holding it)
         if (this.follow) { const p = this.follow.pos || this.follow; this.pos.set(p.x, p.y, p.z); }
         const R = this.grow ? this.r * ease(Math.min(1, this.t / this.grow)) : this.r; // (grow: it spreads with a nova's front, on the same curve)
         const S = R + 0.7, u = m.material.uniforms;
@@ -219,6 +221,7 @@
     water: { c1: 0x2a80d0, c2: 0xd0f0ff, shell: 'energy', ground: 0x9ad8ff, hk: 0.35 },
     shout: { c1: 0xff9040, c2: 0xffe0a0, shell: 'energy', ground: 0xffc070, hk: 0.4 },
     time: { c1: 0x7a98c0, c2: 0xf0f8ff, shell: 'energy', ground: 0xd0e4ff, hk: 0.3 },
+    heal: { c1: 0x40d060, c2: 0xd0ffd8, shell: 'energy', ground: 0xa0ffb0, hk: 0.4 },
   };
   // c: centre (on the floor), r: radius (the hit radius), dur: time to reach it. o: { style, dome (false: ground only), hk (dome height / r), arc: [dir, half angle] for a cone }
   VX.nova = function (c, r, dur, o) {
@@ -253,14 +256,14 @@
   // ================================================================ pillars / beams of light
   const BEAM_VS = `varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vDepth;
     void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vDepth = -mv.z; gl_Position = projectionMatrix * mv; }`;
-  const BEAM_FS = `uniform float uT; uniform float uA; uniform vec3 uC; uniform vec3 uC2; uniform float uSeed; uniform float uSpeed; ${FOG_U}
+  const BEAM_FS = `uniform float uT; uniform float uA; uniform vec3 uC; uniform vec3 uC2; uniform float uSeed; uniform float uSpeed; uniform float uEnds; ${FOG_U}
     varying vec2 vUv; varying vec3 vN; varying vec3 vV;
     ${NOISE}
     void main() {
       float facing = abs(dot(normalize(vN), normalize(vV)));
       float core = pow(facing, 3.0);                                  // bright through the middle, thin at the edges
       float streak = fbm(vec2(vUv.x * 8.0 + uSeed * 5.0, vUv.y * 3.0 - uT * uSpeed));
-      float ends = smoothstep(0.0, 0.06, vUv.y) * (1.0 - smoothstep(0.7, 1.0, vUv.y));
+      float ends = uEnds > 0.5 ? smoothstep(0.0, 0.1, vUv.y) * (1.0 - smoothstep(0.9, 1.0, vUv.y)) : smoothstep(0.0, 0.06, vUv.y) * (1.0 - smoothstep(0.7, 1.0, vUv.y));
       vec3 col = mix(uC, uC2, core * 0.55 + streak * 0.2);
       float a = (core * 0.55 + facing * 0.12 + streak * 0.3 * facing) * ends * uA;
       ${fogAdd}
@@ -268,7 +271,7 @@
       gl_FragColor = vec4(col * fogv, clamp(a, 0.0, 1.0));
     }`;
   function beamMat(c1, c2, speed) {
-    return mk(BEAM_VS, BEAM_FS, { uA: { value: 1 }, uC: { value: col3(c1) }, uC2: { value: col3(c2 ?? 0xffffff) }, uSeed: { value: Math.random() }, uSpeed: { value: speed ?? 2 } },
+    return mk(BEAM_VS, BEAM_FS, { uA: { value: 1 }, uC: { value: col3(c1) }, uC2: { value: col3(c2 ?? 0xffffff) }, uSeed: { value: Math.random() }, uSpeed: { value: speed ?? 2 }, uEnds: { value: 0 } },
       { blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
   }
   // a column of light standing on c: r = its radius (the hit radius when it hurts), h = its height. o: { delay, follow, ground (a glow on the floor), c2, grow }
@@ -279,10 +282,12 @@
     const inner = new THREE.Mesh(cylGeo, beamMat(0xffffff, 0xffffff, (o.speed ?? 3) * 1.5)); inner.frustumCulled = false; inner.renderOrder = 8; inner.visible = false; scene.add(inner);
     const ground = o.ground === false ? null : VX.area(c, r, o.groundKind || 'holy', Infinity, { col: [col, o.c2 ?? 0xffffff], alpha: 0.7, follow: null });
     if (ground) ground.m.visible = false;
-    const h0 = { pos: c.clone(), r, t: -(o.delay || 0), dur, dead: false,
+    const h0 = { pos: c.clone(), r, t: -(o.delay || 0), dur, dead: false, lease: o.lease || 0, seen: -(o.delay || 0),
       end(f) { this.dur = Math.min(this.dur, Math.max(0, this.t) + (f ?? 0.25)); },
+      touch() { this.seen = this.t; },
       update(dt) {
         this.t += dt;
+        if (this.lease && this.t - this.seen > this.lease) this.end(0.2);
         if (this.t < 0) return true;
         if (o.follow) this.pos.copy(o.follow.pos || o.follow);
         const left = this.dur - this.t, k = Math.min(1, this.t / 0.12), fade = Math.min(1, left / 0.25);
@@ -355,7 +360,7 @@
     else if (kind === 'bone') mat = new THREE.MeshStandardMaterial({ color: 0xe0d6c0, roughness: 0.7 });
     else if (kind === 'blood') mat = new THREE.MeshStandardMaterial({ color: 0x7a0612, emissive: 0x3a0006, roughness: 0.3 });
     else if (kind === 'dark') mat = new THREE.MeshStandardMaterial({ color: 0x1a0c24, emissive: 0x4a1a70, emissiveIntensity: 0.7, roughness: 0.4 });
-    else mat = new THREE.MeshStandardMaterial({ color: 0x6a5e50, roughness: 0.95, flatShading: true });
+    else mat = new THREE.MeshStandardMaterial({ color: 0x8c7c68, roughness: 0.92, flatShading: true, emissive: 0x1a120a });
     const geo = new THREE.ConeGeometry(1, 1, kind === 'ice' ? 5 : 6, 1); geo.translate(0, 0.5, 0);
     const mesh = new THREE.InstancedMesh(geo, mat, SPIKE_MAX); mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = kind !== 'ice';
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -542,7 +547,7 @@
       gl_FragColor = vec4(col * fogv * 1.6, clamp(a, 0.0, 1.0));
     }`;
   function fireMat(tint) { return mk(FIRE_VS, FIRE_FS, { uA: { value: 1 }, uHeat: { value: 1 }, uSeed: { value: Math.random() }, uTint: { value: col3(tint ?? 0xffffff) } }, { blending: THREE.AdditiveBlending }); }
-  VX.fireMat = fireMat;
+  VX.fireMat = fireMat; VX.shellMat = (c1, c2, style) => shellMat(c1, c2, style);
   // a fireball for a blast: swells to 0.85 r (the blast hurts out to r), then cools and rises. tint: a colour the flame is multiplied by (white = plain fire)
   const fbPool = [];
   VX.fireball = function (p, r, tint) {
@@ -597,10 +602,12 @@
     o = o || {};
     const m = new THREE.Mesh(cylGeo, mk(WALL_VS, WALL_FS, { uA: { value: 0 }, uC: { value: col3(col) } }, { blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     m.frustumCulled = false; m.renderOrder = 7; scene.add(m);
-    const hd = { pos: c.clone(), r, t: 0, dur: dur ?? Infinity, fade: 0.35, follow: o.follow || null, a0: o.alpha ?? 0.8,
+    const hd = { pos: c.clone(), r, t: 0, dur: dur ?? Infinity, fade: 0.35, follow: o.follow || null, a0: o.alpha ?? 0.8, lease: o.lease || 0,
       end(f) { if (this.dur > this.t + (f ?? 0.35)) { this.dur = this.t + (f ?? 0.35); this.fade = f ?? 0.35; } },
+      touch() { this.seen = this.t; },
       update(dt) {
         this.t += dt;
+        if (this.lease && this.t - (this.seen || 0) > this.lease) this.end(0.2);
         if (this.follow) this.pos.copy(this.follow.pos || this.follow);
         m.scale.set(this.r, h, this.r); m.position.set(this.pos.x, this.pos.y + h / 2, this.pos.z);
         m.material.uniforms.uA.value = this.a0 * Math.min(1, this.t / 0.25) * Math.min(1, (this.dur - this.t) / this.fade);
@@ -680,10 +687,12 @@
     const core = new THREE.Mesh(sphGeo, new THREE.MeshBasicMaterial({ color: 0x000000 })); g.add(core);
     const rim = new THREE.Mesh(sphGeo, shellMat(0x9040ff, 0xffd0ff, 'spiral')); g.add(rim);
     const disk = new THREE.Mesh(areaGeo, areaMat('gravity')); disk.renderOrder = 6; g.add(disk);
-    const hd = { pos: c.clone(), r, t: 0, dur: dur ?? Infinity, dead: false,
+    const hd = { pos: c.clone(), r, t: 0, dur: dur ?? Infinity, dead: false, lease: 0.3,
       end(f) { this.dur = Math.min(this.dur, this.t + (f ?? 0.3)); },
+      touch() { this.seen = this.t; },
       update(dt) {
         this.t += dt;
+        if (this.t - (this.seen || 0) > this.lease) this.end(0.2);
         const left = this.dur - this.t, k = Math.min(1, this.t / 0.4), f = Math.min(1, left / 0.3), R = Math.max(0.5, this.r * 0.12);
         g.position.set(this.pos.x, this.pos.y + 1.2 + R, this.pos.z);
         core.scale.setScalar(R * 0.8 * k); rim.scale.setScalar(R * 1.15 * k); rim.material.uniforms.uA.value = 1.2 * f;
@@ -735,10 +744,10 @@
   VX.zoneTick = function (z, dt) {
     const p = z.pos, r = z.r, left = z.dur - z.t, k = Math.min(1, left * 2), R = Math.random;
     const kind = ZONE_AREA[z.kind];
-    if (kind && (!z.vx || z.vx.dead)) z.vx = VX.area(p, r, kind, Infinity, { alpha: z.enemy ? 0.92 : 1 });
-    if (z.vx) { z.vx.pos.copy(p); z.vx.r = r; if (left < 0.35) z.vx.end(Math.max(0.05, left)); }
+    if (kind && (!z.vx || z.vx.dead)) z.vx = VX.area(p, r, kind, Infinity, { alpha: z.enemy ? 0.92 : 1, lease: 0.3 });
+    if (z.vx) { z.vx.touch(); z.vx.pos.copy(p); z.vx.r = r; if (left < 0.35) z.vx.end(Math.max(0.05, left)); }
     if (z.kind === 'gravity' && r >= 3 && (!z.vxCore || z.vxCore.dead)) z.vxCore = VX.vortex(p, r, Infinity);
-    if (z.vxCore) { z.vxCore.pos.copy(p); if (left < 0.35) z.vxCore.end(Math.max(0.05, left)); }
+    if (z.vxCore) { z.vxCore.touch(); z.vxCore.pos.copy(p); if (left < 0.35) z.vxCore.end(Math.max(0.05, left)); }
     const rp = () => { const a = R() * 6.28, d = Math.sqrt(R()) * r; return [p.x + Math.cos(a) * d, p.z + Math.sin(a) * d]; };
     switch (z.kind) {
       case 'fire': for (let n = 0; n < r * r * dt * 2.4 * k; n++) { const [x, zz] = rp(); G.fx.flameLick(x, p.y + 0.05, zz, 1.3 + R()); } break;
@@ -747,7 +756,7 @@
       case 'heal': case 'holy': if (R() < dt * 12) { const [x, zz] = rp(); const c = z.kind === 'heal' ? [0.4, 1.0, 0.5] : [1.0, 0.9, 0.5]; G.fx.add.spawn(x, p.y + 0.1, zz, 0, 1.3, 0, 1.0, 0.12, 0.02, c[0], c[1], c[2], 0.8, -0.3, 0.5); } break;
       case 'frost': if (R() < dt * r * 3) { const [x, zz] = rp(); G.fx.norm.spawn(x, p.y + 0.2, zz, 0, 0.3, 0, 1.4, 0.4, 1.6, 0.8, 0.9, 1.0, 0.25 * k, -0.05, 0.5); } break;
       case 'arrowrain': if (R() < dt * 30) { const [x, zz] = rp(); G.fx.tracer(V(x + 1, p.y + 10, zz), V(x, p.y, zz), 0xcfc0a0, 0.02, 0.12); if (R() < 0.3) G.fx.dust(V(x, p.y, zz), V(0, 1, 0), 0x8a8070, 1); } break;
-      case 'grasp': if (R() < dt * 8) { const [x, zz] = rp(); G.fx.norm.spawn(x, p.y + 0.1, zz, 0, 1.5, 0, 0.8, 0.3, 0.1, 0.08, 0.02, 0.1, 0.8, 0, 1); } break;
+      case 'grasp': if (R() < dt * 8) { const [x, zz] = rp(); G.fx.norm.spawn(x, p.y + 0.1, zz, 0, 1.5, 0, 0.8, 0.3, 0.1, 0.08, 0.02, 0.1, 0.8, 0, 1); } if (R() < dt * 5 * k) { const [x, zz] = rp(); VX.spikes([V(x, p.y, zz)], { kind: 'dark', r: 0.6, h: 1.1, n: 2, dur: 0.45, rise: 0.12 }); } break; // (dark hands clutch up out of it)
       case 'whirl': for (let n = 0; n < 2; n++) { const a = z.t * 5 + n * 3.1 + R() * 0.5, d = r * (0.3 + R() * 0.7); G.fx.norm.spawn(p.x + Math.cos(a) * d, p.y + 0.2 + R() * 0.5, p.z + Math.sin(a) * d, -Math.sin(a) * 3, 0.6, Math.cos(a) * 3, 0.5, 0.25, 0.6, 0.8, 0.92, 1.0, 0.6 * k, 2, 1); } break;
       default: break;
     }
@@ -757,13 +766,13 @@
   VX.auraTick = function (a, c, dt) {
     const k = a.kind || a.k, R = Math.random;
     if (!a.vx || a.vx.dead) {
-      if (k === 'fire') a.vx = VX.area(c, a.r, 'fire', Infinity);
-      else if (k === 'drain') a.vx = VX.area(c, a.r, 'blood', Infinity);
-      else if (k === 'holy') { a.vx = VX.area(c, a.r, 'holy', Infinity); a.vx2 = VX.wall(c, a.r, 2.6, 0xffe8a0, Infinity, { alpha: 0.55 }); }
-      else if (k === 'beam') a.vx = VX.pillar(c, a.r, 45, 0xffe8b0, Infinity, { c2: 0xffffff, groundKind: 'fire', speed: 5 });
+      if (k === 'fire') a.vx = VX.area(c, a.r, 'fire', Infinity, { lease: 0.3 });
+      else if (k === 'drain') a.vx = VX.area(c, a.r, 'blood', Infinity, { lease: 0.3 });
+      else if (k === 'holy') { a.vx = VX.area(c, a.r, 'holy', Infinity, { lease: 0.3 }); a.vx2 = VX.wall(c, a.r, 2.6, 0xffe8a0, Infinity, { alpha: 0.55, lease: 0.3 }); }
+      else if (k === 'beam') a.vx = VX.pillar(c, a.r, 45, 0xffe8b0, Infinity, { c2: 0xffffff, groundKind: 'fire', speed: 5, lease: 0.3 });
     }
-    if (a.vx) a.vx.pos.copy(c);
-    if (a.vx2) a.vx2.pos.copy(c);
+    if (a.vx) { a.vx.touch && a.vx.touch(); a.vx.pos.copy(c); }
+    if (a.vx2) { a.vx2.touch && a.vx2.touch(); a.vx2.pos.copy(c); }
     if (k === 'fire' && R() < dt * 24) { const an = R() * 6.28, d = Math.sqrt(R()) * a.r; G.fx.flameLick(c.x + Math.cos(an) * d, c.y + 0.1, c.z + Math.sin(an) * d, 1.8, a.col); }
     else if (k === 'drain' && R() < dt * 22) { const an = R() * 6.28, d = a.r * (0.5 + R() * 0.5); G.fx.norm.spawn(c.x + Math.cos(an) * d, c.y + 0.3, c.z + Math.sin(an) * d, -Math.cos(an) * d * 0.9, rnd(1, 2.5), -Math.sin(an) * d * 0.9, 0.9, 0.16, 0.05, 0.75, 0.04, 0.08, 0.9, 0, 0.6); }
     else if (k === 'holy' && R() < dt * 16) G.fx.add.spawn(c.x + rnd(-a.r, a.r) * 0.7, c.y + 0.1, c.z + rnd(-a.r, a.r) * 0.7, 0, 1.4, 0, 1, 0.12, 0.02, 1.2, 1.0, 0.5, 0.8, -0.3, 0.5);
@@ -786,6 +795,76 @@
       },
       dispose() {},
     });
+  };
+
+  // ================================================================ a tube of light between two points (a dimensional tear, a dash's streak): r = its reach
+  VX.tube = function (a, b, r, col, dur, o) {
+    o = o || {};
+    const m = new THREE.Mesh(cylGeo, beamMat(col, o.c2 ?? 0xffffff, o.speed ?? 3)); m.frustumCulled = false; m.renderOrder = 8; scene.add(m);
+    m.material.uniforms.uEnds.value = 1;
+    const inner = o.core === false ? null : new THREE.Mesh(cylGeo, beamMat(o.c2 ?? 0xffffff, 0xffffff, (o.speed ?? 3) * 1.6));
+    if (inner) { inner.frustumCulled = false; inner.renderOrder = 8; inner.material.uniforms.uEnds.value = 1; scene.add(inner); }
+    const d = b.clone().sub(a), len = d.length() || 0.01, q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), d.clone().normalize());
+    let t = 0;
+    live.push({
+      update(dt) {
+        t += dt; const k = Math.min(1, t / 0.08), f = Math.min(1, (dur - t) / Math.min(0.3, dur * 0.5));
+        m.position.copy(a).addScaledVector(d, 0.5); m.quaternion.copy(q); m.scale.set(r * (0.5 + 0.5 * k), len, r * (0.5 + 0.5 * k));
+        m.material.uniforms.uA.value = f * (o.alpha ?? 1) * (0.85 + 0.15 * Math.sin(t * 37));
+        if (inner) { inner.position.copy(m.position); inner.quaternion.copy(q); inner.scale.set(r * 0.22, len, r * 0.22); inner.material.uniforms.uA.value = f * 0.8; }
+        return t < dur;
+      },
+      dispose() { scene.remove(m); m.material.dispose(); if (inner) { scene.remove(inner); inner.material.dispose(); } },
+    });
+  };
+
+  // ================================================================ a fan-shaped shock running out over the floor (a cone attack): the band is the front, the fan its reach
+  const FAN_VS = `uniform float uS; varying vec2 vP; varying float vDepth;
+    void main() { vP = position.xz * uS; vec4 mv = modelViewMatrix * vec4(position, 1.0); vDepth = -mv.z; gl_Position = projectionMatrix * mv; }`;
+  const FAN_FS = `uniform float uT; uniform float uR; uniform float uRmax; uniform float uHalf; uniform float uDir; uniform float uNear; uniform float uA; uniform vec3 uC; ${FOG_U} varying vec2 vP;
+    ${NOISE}
+    void main() {
+      float d = length(vP);
+      if (d > uRmax + 0.05) discard;
+      float ang = atan(vP.y, vP.x), da = abs(mod(ang - uDir + 3.14159265, 6.2831853) - 3.14159265);
+      float inFan = 1.0 - smoothstep(uHalf - 0.05, uHalf + 0.02, da);
+      float near = 1.0 - smoothstep(uNear - 0.1, uNear, d);
+      float m = max(inFan, near);
+      if (m < 0.01) discard;
+      float e = abs(d - uR);
+      float band = exp(-e * 2.6) * (d <= uR + 0.6 ? 1.0 : 0.0);
+      float trail = d < uR ? exp(-(uR - d) * 0.35) * 0.45 : 0.0;
+      float edge = inFan * (1.0 - smoothstep(0.0, 0.08, abs(da - uHalf))) * (d < uR ? 0.5 : 0.0); // the two sides of the fan, lit where the front has been
+      float n = fbm(vP * 0.6 + uT * 0.5);
+      float a = (band * (0.8 + 0.4 * n) + trail * (0.6 + 0.6 * n) + edge) * m * uA;
+      ${fogAdd}
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(mix(uC, vec3(1.0), band * 0.6) * fogv, clamp(a, 0.0, 1.0));
+    }`;
+  // c: the apex on the floor, f: the middle of the fan, r: its reach, half: its half angle (radians), dur: the time its front takes to reach r
+  // (the same curve as a nova: abilities time the hits with VX.novaTime). o: { near: a full circle of this radius around the apex that is hit too, col }
+  VX.fan = function (c, f, r, half, dur, o) {
+    o = o || {};
+    const m = new THREE.Mesh(areaGeo, mk(FAN_VS, FAN_FS, { uS: { value: r + 1 }, uR: { value: 0 }, uRmax: { value: r }, uHalf: { value: half }, uDir: { value: Math.atan2(f.z, f.x) }, uNear: { value: o.near || 0 }, uA: { value: 1 }, uC: { value: col3(o.col ?? 0xe0d0b0) } },
+      { blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.frustumCulled = false; m.renderOrder = 4; m.scale.set(r + 1, 1, r + 1); m.position.set(c.x, c.y + 0.06, c.z); scene.add(m);
+    const life = dur + 0.4; let t = 0;
+    live.push({
+      update(dt) {
+        t += dt; const k = Math.min(1, t / dur), u = m.material.uniforms;
+        u.uR.value = r * ease(k); u.uA.value = t < dur ? 1 : Math.max(0, 1 - (t - dur) / 0.4);
+        return t < life;
+      },
+      dispose() { scene.remove(m); m.material.dispose(); },
+    });
+    // dust thrown out along the fan
+    for (let i = 0; i < 24; i++) { const a = Math.atan2(f.z, f.x) + (Math.random() * 2 - 1) * half, s = rnd(0.6, 1) * r / dur * 0.85, d0 = 1.6; G.fx.norm.spawn(c.x + Math.cos(a) * d0, c.y + 0.15, c.z + Math.sin(a) * d0, Math.cos(a) * s, rnd(0.2, 1.2), Math.sin(a) * s, dur * 1.1, 0.25, 1.0, 0.72, 0.68, 0.62, 0.4, 0, 1.5); } // (low, and starting clear of the caster's eyes)
+  };
+
+  // ================================================================ something that rises out of the floor (a stone wall): its mesh grows to full height
+  VX.rise = function (mesh, h, y0, dur) {
+    let t = 0; const sx = mesh.scale.x, sz = mesh.scale.z;
+    live.push({ update(dt) { t += dt; const k = Math.min(1, t / (dur || 0.18)), e = 1 - (1 - k) * (1 - k); mesh.scale.set(sx, Math.max(0.02, h * e), sz); mesh.position.y = y0 + h * e / 2; return k < 1; }, dispose() {} });
   };
 
   // ================================================================ timing on game time (for the effects' own steps)

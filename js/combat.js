@@ -683,20 +683,21 @@
       case 'nail': add(PG.box, mats.iron, 0.012, 0.012, 0.12); break;
       case 'harpoon': add(PG.box, mats.iron, 0.03, 0.03, 1.0); add(PG.cone, mats.iron, 0.06, 0.2, 0.06, 0, 0, -0.55, -Math.PI / 2); break;
       case 'spear': add(PG.cyl8, mats.woodDark, 0.03, 1.8, 0.03, 0, 0, 0, Math.PI / 2); add(PG.cone, mats.iron, 0.07, 0.35, 0.07, 0, 0, -1.05, -Math.PI / 2); glow(0xffe0a0, 0.5).position.z = -1; break;
-      case 'icespear': add(PG.oct3, mats.ice, 0.12, 0.12, 0.9); glow(0xbfe8ff, 1.0); break;
-      case 'orb': glow(0xc070ff, 0.8); glow(0xffffff, 0.25); break;
-      case 'soul': glow(0x9fd8ff, 0.7); glow(0xffffff, 0.22); break;
-      case 'fireball': glow(0xff8a30, 1.2); glow(0xffe0a0, 0.45); break;
-      case 'bigfire': glow(0xff7a20, 2.6); glow(0xffe0a0, 1.0); break;
+      // the magic ones: a body you can see (boiling fire, a fresnel shell, a crystal) inside the glow; the hit size is SHOT_VIS below
+      case 'icespear': { add(PG.oct3, new THREE.MeshStandardMaterial({ color: 0xd0f0ff, emissive: 0x4a90c0, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.9 }), 0.14, 0.14, 1.0); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0.05, 0.05, 0.7); glow(0xbfe8ff, 1.0); break; }
+      case 'orb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0xb060ff, 0xffd0ff, 'energy')); sh.scale.setScalar(0.32); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0xffe8ff }), 0.12, 0.12, 0.12); glow(0xc070ff, 0.8); break; }
+      case 'soul': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6ab8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.28); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0xf0f8ff }), 0.1, 0.1, 0.1); glow(0x9fd8ff, 0.6); break; }
+      case 'fireball': { const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.42); g.add(fb); glow(0xff8a30, 1.3); glow(0xffe0a0, 0.4); break; }
+      case 'bigfire': { add(PG.dode, new THREE.MeshStandardMaterial({ color: 0x2a1a12, emissive: 0x801800, emissiveIntensity: 0.9, roughness: 0.9, flatShading: true }), 0.55, 0.55, 0.55); const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.95); g.add(fb); glow(0xff7a20, 2.6); glow(0xffe0a0, 0.9); break; }
       case 'spit': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x6a9a20, emissive: 0x2a4a00, roughness: 0.2 }), 0.14, 0.14, 0.14); break;
       case 'acid': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x9ac020, emissive: 0x4a6a00, roughness: 0.2 }), 0.3, 0.3, 0.3); glow(0x9ad040, 1.0); break;
       case 'web': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.9 }), 0.16, 0.16, 0.16); break;
       case 'spore': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x8aa040, emissive: 0x1a2a00, roughness: 0.9, transparent: true, opacity: 0.8 }), 0.25, 0.25, 0.25); break;
       case 'boulder': add(PG.dode, mats.rock, 0.6, 0.55, 0.6); break;
       case 'rock': { const sp = new THREE.Group(); g.add(sp); g.userData.spin = sp; const st = new THREE.Mesh(PG.dode, mats.rock); st.scale.setScalar(0.26); sp.add(st); break; } // a tumbling stone: scale = the held one, radius = what hits
-      case 'frostorb': glow(0xbfe8ff, 1.0); glow(0xffffff, 0.3); break;
-      case 'waterorb': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x3f9dff, emissive: 0x0a3a80, roughness: 0.1, transparent: true, opacity: 0.85 }), 0.22, 0.22, 0.22); glow(0x5fb0ff, 0.9); break;
-      case 'darkorb': add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x1a0820 }), 0.25, 0.25, 0.25); glow(0xa040ff, 1.1); break;
+      case 'frostorb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x9ad8ff, 0xffffff, 'ice')); sh.scale.setScalar(0.38); g.add(sh); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xe8f8ff }), 0.14, 0.14, 0.14); glow(0xbfe8ff, 1.0); break; }
+      case 'waterorb': { add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x2f8dff, emissive: 0x0a3a80, roughness: 0.05, transparent: true, opacity: 0.8 }), 0.22, 0.22, 0.22); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4aa8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.26); g.add(sh); glow(0x5fb0ff, 0.9); break; }
+      case 'darkorb': { add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x0a0410 }), 0.24, 0.24, 0.24); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x8a30ff, 0xe0b0ff, 'spiral')); sh.scale.setScalar(0.34); g.add(sh); glow(0xa040ff, 1.1); break; }
       default: glow(0xffffff, 0.4);
     }
     g.userData.kind = kind;

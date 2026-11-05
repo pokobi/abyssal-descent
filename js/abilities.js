@@ -157,7 +157,7 @@
         const pos = P.pos.clone(); pos.y += 0.3;
         C.explode(pos, P.leap.r, P.leap.dmg, { src: 'skill', sk: P.leap.sk, elem: P.leap.sk === 'flight' ? undefined : 'shock', color: P.leap.sk === 'flight' ? 0xffd0a0 : 0xbfd8ff, knock: 10 });
         if (P.leap.sk !== 'flight') for (const e of C.inRadius(pos, P.leap.r)) C.status(e, 'shock', 1);
-        G.fx.ring(P.pos, P.leap.r, 0xcfe0ff, 0.45); G.sfx.zap(pos);
+        G.vfx.nova(P.pos.clone(), P.leap.r * (1 + (P.stats.explosionRadius || 0)), 0.12, { style: P.leap.sk === 'flight' ? 'gold' : 'emp', dome: false }); G.sfx.zap(pos);
         P.leap = null;
       } else if (P.leap.t > (P.leap.maxT || 4)) P.leap = null;
     }
@@ -171,7 +171,8 @@
         G.world.depenetrate(P.pos, P.hw, P.height);
         if (L.e.alive) {
           const d = C.damageEnemy(L.e, L.dmg, { src: 'skill', sk: L.sk, head: false, forceCrit: false, pos: L.e.centerPos() }); C.heal(d * (L.vamp || 0.3)); G.fx.blood(L.e.centerPos(), null, L.e.bloodColor, 20);
-          if (L.cleave) for (const e of G.enemies.inRadius(L.e.pos, 4)) if (e !== L.e) C.damageEnemy(e, L.dmg * 0.6, { src: 'skill', sk: L.sk });
+          G.vfx.slash(L.e.centerPos(), L.e.pos.clone().sub(L.from).setY(0).normalize(), 1.9, 2.4, 0xff3050, { tilt: 0.7, dur: 0.14 });
+          if (L.cleave) { G.vfx.nova(L.e.pos.clone(), 4, 0.12, { style: 'blood', dome: false }); for (const e of G.enemies.inRadius(L.e.pos, 4)) if (e !== L.e) C.damageEnemy(e, L.dmg * 0.6, { src: 'skill', sk: L.sk }); }
           if (L.reset && !L.e.alive && L.slot) { L.slot.cd = 0; G.ui.toastSmall('🔁 連撃：クールタイムリセット'); }
         }
         G.sfx.melee(true); P.addShake(0.4);
@@ -243,14 +244,14 @@
     const fan = (n) => (n ? [0, -0.18, 0.18] : [0]);
     switch (id) {
       case 'groundpound': {
+        // a shock runs out over the floor (a fan of ±66°, a full ring with 全周) and hits each foe as its front reaches him; rock bursts up along it
         const f = P.forward(); f.y = 0; f.normalize();
-        for (const e of G.enemies.inRadius(P.pos, p.r)) {
-          const to = e.pos.clone().sub(P.pos).setY(0); const l = to.length(); if (!m.x_full && l > 0.5 && to.divideScalar(l).dot(f) < 0.4) continue;
-          to.normalize();
-          C.damageEnemy(e, sc(p.dmg), { src: 'skill', knock: 10, dir: to.clone().setY(0.5) }); C.stun(e, m.x_stun ? 2 : 0.8);
-        }
-        const dirs = m.x_full ? [0, 1, 2, 3, 4, 5, 6, 7].map((k) => f.clone().applyAxisAngle(V(0, 1, 0), k * Math.PI / 4)) : [f];
-        for (const df of dirs) for (let i = 1; i <= 10; i++) { const pt = P.pos.clone().addScaledVector(df, i * p.r / 10); setTimeout(() => { G.fx.dust(pt, V(0, 1, 0), 0x7a6a50, 3); G.fx.debris(pt, G.world.mats.rock, 2, 0.25, 5); }, i * 30); }
+        const c = P.pos.clone(), dur = 0.3;
+        if (m.x_full) G.vfx.nova(c, p.r, dur, { style: 'shock', dome: false }); else G.vfx.fan(c, f, p.r, Math.acos(0.4), dur, { near: 0.5, col: 0xe8c890 });
+        A.radial(c, p.r, dur, (e) => { const to = e.pos.clone().sub(c).setY(0).normalize(); C.damageEnemy(e, sc(p.dmg), { src: 'skill', knock: 10, dir: to.clone().setY(0.5) }); C.stun(e, m.x_stun ? 2 : 0.8); },
+          (e) => { if (m.x_full) return true; const to = e.pos.clone().sub(c).setY(0); const l = to.length(); return !(l > 0.5 && to.divideScalar(l).dot(f) < 0.4); });
+        const dirs = m.x_full ? [0, 1, 2, 3, 4, 5, 6, 7].map((k) => f.clone().applyAxisAngle(V(0, 1, 0), k * Math.PI / 4)) : [f, f.clone().applyAxisAngle(V(0, 1, 0), 0.5), f.clone().applyAxisAngle(V(0, 1, 0), -0.5)];
+        for (const df of dirs) for (let i = 1; i <= 10; i++) { const d = i * p.r / 10, pt = c.clone().addScaledVector(df, d); const fl = G.world.floorBelow(pt.x, pt.y + 1.5, pt.z); if (fl > -50) pt.y = fl; G.vfx.spikes([pt], { kind: 'rock', r: 0.7, h: 0.7 + 0.5 * (1 - i / 10), n: 2, dur: 0.45, delay: G.vfx.novaTime(d, p.r, dur) }); }
         P.pileCd = Math.max(0, (P.pileCd || 0) - (m.x_pile ? 5 : 2));
         G.sfx.explosion(P.pos, 0.8); P.addShake(0.4);
         break;
@@ -272,6 +273,8 @@
         const dpw = p.power * (1 + 0.03 * A.totalLv(sk)); P.vel.set(dx * dpw, P.grounded ? 2.5 : Math.max(P.vel.y, 1.5), dz * dpw);
         P.grounded = false; P.invulnT = 0.18; P.fovKick = 12;
         G.sfx.whoosh(0.35, 0.9);
+        G.vfx.tube(from.clone().add(V(0, 1.1, 0)), to.clone().add(V(0, 1.1, 0)), id === 'dash2' ? 0.8 : 0.45, id === 'dash2' ? 0x8ac0ff : 0xd8e0e8, 0.3, { core: id === 'dash2', alpha: 0.65, speed: 9 });
+        if (id === 'dash2' || m.x_hit) G.vfx.area(from.clone().lerp(to, 0.5), 5, 'shock', 0.35);
         for (let i = 0; i < 16; i++) G.fx.norm.spawn(P.pos.x, P.pos.y + 0.8, P.pos.z, -dx * U.rand(2, 6) + U.rand(-1, 1), U.rand(0, 1), -dz * U.rand(2, 6) + U.rand(-1, 1), 0.5, 0.3, 0.9, 0.7, 0.7, 0.72, 0.35, 0, 2);
         if (id === 'dash2' || m.x_hit) {
           for (const e of G.enemies.inRadius(from.clone().lerp(to, 0.5), 5)) { C.damageEnemy(e, sc(id === 'dash2' ? p.dmg : 60), { src: 'skill', elem: id === 'dash2' ? 'shock' : undefined, knock: m.x_hit ? 10 : 0, dir: V(dx, 0.4, dz) }); if (id === 'dash2') G.fx.lightning(P.chestPos(), e.centerPos()); }
@@ -293,6 +296,7 @@
         P.pos.copy(target); G.world.depenetrate(P.pos, P.hw, P.height);
         P.vel.multiplyScalar(0.4); P.grounded = false;
         G.fx.smoke(from, 10, 0.8, 0x6a5a8a, 0.5, 0.8); G.fx.sparks(P.chestPos(), null, 14, 0xc0a0ff, 5);
+        G.vfx.burst(from, 1.1, 0xa070ff); G.vfx.burst(P.chestPos(), 0.9, 0xd0b0ff); G.vfx.tube(from, P.chestPos(), 0.35, 0x9a70ff, 0.25, { alpha: 0.55, speed: 10 });
         G.sfx.magic(P.pos); G.sfx.whoosh(0.2, 0.7);
         if (m.x_arrive) C.explode(P.pos.clone().add(V(0, 1, 0)), 4, sc(100), { src: 'skill', color: 0xc0a0ff, knock: 8 });
         if (m.x_frost) C.zone(fromFeet, 4, 4, 'frost', 0);
@@ -302,28 +306,28 @@
       case 'chrono':
         G.game.chronoT = p.dur; G.game.chronoSlow = 1 - Math.max(0.08, (m.x_deep ? 0.2 : p.slow) * Math.pow(0.93, A.totalLv(sk))); // p.slow = the speed that is left; levels leave less of it
         if (m.x_self || m.x_vuln) tmp('chrono_fx', p.dur, { moveSpeed: m.x_self ? 0.2 : 0, fireRate: m.x_self ? 0.2 : 0, dmg: m.x_vuln ? 0.25 : 0 }, '⏳');
+        G.vfx.nova(P.pos.clone(), 30, 0.6, { style: 'time', hk: 0.25 });
         G.sfx.magic(P.pos, 'dark'); G.sfx.rumble(0.8, 0.5); G.ui.tint('chrono', p.dur); break;
       case 'shockwave': {
         const wave = (k) => {
-          const o = P.chestPos(), f = P.forward(); f.y = 0; f.normalize();
-          for (const e of G.enemies.inRadius(o, p.r)) {
-            const to = e.pos.clone().sub(P.pos).setY(0); const l = to.length(); to.divideScalar(l || 1);
-            if (!m.x_full && to.dot(f) < 0.35 && l > 2) continue;
-            C.damageEnemy(e, sc(p.dmg) * k, { src: 'skill', shieldMul: p.shieldMul, knock: 18 * k, dir: to.clone().setY(0.4), emp: true });
-          }
-          for (let i = 0; i < 40; i++) { const a = m.x_full ? Math.random() * 6.28 : (Math.random() - 0.5) * 1.6; const dd = f.clone().applyAxisAngle(V(0, 1, 0), a); G.fx.norm.spawn(o.x, o.y - 0.6, o.z, dd.x * U.rand(10, 20), U.rand(0, 2), dd.z * U.rand(10, 20), 0.6, 0.3, 1.5, 0.75, 0.72, 0.68, 0.45, 0, 2.5); }
+          const o = P.chestPos(), c = P.pos.clone(), f = P.forward(); f.y = 0; f.normalize();
+          const dur = 0.25;
+          if (m.x_full) G.vfx.nova(c, p.r, dur, { style: 'shock', dome: false }); else G.vfx.fan(c, f, p.r, Math.acos(0.35), dur, { near: 2, col: 0xe8dcc0 });
+          A.radial(o, p.r, dur, (e) => { const to = e.pos.clone().sub(c).setY(0).normalize(); C.damageEnemy(e, sc(p.dmg) * k, { src: 'skill', shieldMul: p.shieldMul, knock: 18 * k, dir: to.clone().setY(0.4), emp: true }); },
+            (e) => { if (m.x_full) return true; const to = e.pos.clone().sub(c).setY(0); const l = to.length(); to.divideScalar(l || 1); return !(to.dot(f) < 0.35 && l > 2); });
           G.sfx.whoosh(0.4, 1.0); G.sfx.explosion(o, 0.4); P.addShake(0.3);
         };
         wave(1);
-        if (m.x_double) later(() => wave(0.7), 400);
+        if (m.x_double) A.task(() => wave(0.7), 0.4);
         break;
       }
       case 'emp': {
-        const o = P.chestPos(); let n = 0;
-        for (const e of G.enemies.inRadius(o, p.r)) { const had = e.shield > 0; C.damageEnemy(e, sc(p.dmg), { src: 'skill', shieldMul: p.shieldMul, emp: true }); n++; if (had) C.stun(e, 3); else if (m.x_stunall && !e.boss) C.stun(e, 1.2); }
+        const o = P.chestPos(), dur = 0.3;
+        G.vfx.nova(P.pos.clone(), p.r, dur, { style: 'emp' });
+        const n = A.radial(o, p.r, dur, (e) => { const had = e.shield > 0; C.damageEnemy(e, sc(p.dmg), { src: 'skill', shieldMul: p.shieldMul, emp: true }); if (had) C.stun(e, 3); else if (m.x_stunall && !e.boss) C.stun(e, 1.2); });
         if (m.x_absorb && n) C.timedShield(Math.min(60, 6 * n), 8, 150);
         if (G.bosses.active && G.bosses.active.emp) G.bosses.active.emp(o, p.r);
-        G.fx.ring(P.pos, p.r, 0xa8d0ff, 0.5); G.fx.ring(P.pos, p.r * 0.6, 0xffffff, 0.35); G.fx.flash(o, 0xa8d0ff, 60, 0.2, 20);
+        G.fx.flash(o, 0xa8d0ff, 60, 0.2, 20);
         G.sfx.zap(o); G.sfx.shieldBreak(o);
         break;
       }
@@ -337,18 +341,18 @@
         break;
       }
       case 'firestorm': {
-        const a = aim(40); C.zone(a.floorPt, p.r, p.dur, 'fire', sc(p.dps));
+        const a = aim(40); C.zone(a.floorPt, p.r, p.dur, 'fire', sc(p.dps)); G.vfx.nova(a.floorPt.clone(), p.r, 0.3, { style: 'fire', dome: false }); G.fx.fireBurst(a.floorPt.clone(), p.r * 0.6);
         if (m.x_pull) C.zone(a.floorPt, p.r, p.dur * 0.6, 'gravity', 0);
         if (m.x_twin) C.zone(P.pos.clone(), p.r * 0.6, p.dur, 'fire', sc(p.dps) * 0.6);
         G.sfx.fire(a.floorPt, true); handFx(0xff9a40); break;
       }
       case 'frostnova': {
-        const o = P.chestPos(), hit = G.enemies.inRadius(o, p.r);
-        for (const e of hit) { C.damageEnemy(e, sc(p.dmg), { src: 'skill' }); C.status(e, 'frost', 5); }
-        if (m.x_shatter) later(() => { for (const e of hit) if (e.alive && e.st && (e.st.frozen > 0 || e.st.frost > 0)) { C.damageEnemy(e, sc(p.dmg), { src: 'skill', elem: 'frost' }); G.fx.sparks(e.centerPos(), null, 10, 0xd8f0ff, 5); } G.sfx.ice(P.pos); }, 1200);
+        const o = P.chestPos(), dur = 0.3, hit = [];
+        G.vfx.nova(P.pos.clone(), p.r, dur, { style: 'ice' });
+        A.radial(o, p.r, dur, (e) => { hit.push(e); C.damageEnemy(e, sc(p.dmg), { src: 'skill' }); C.status(e, 'frost', 5); });
+        if (m.x_shatter) A.task(() => { for (const e of hit) if (e.alive && e.st && (e.st.frozen > 0 || e.st.frost > 0)) { C.damageEnemy(e, sc(p.dmg), { src: 'skill', elem: 'frost' }); G.fx.sparks(e.centerPos(), null, 10, 0xd8f0ff, 5); G.vfx.spikes([e.pos.clone()], { kind: 'ice', r: 1, h: 1.3, n: 3, dur: 0.45 }); } G.sfx.ice(P.pos); }, 1.2);
         if (m.x_armor) tmp('frost_armor', 5, { armor: 0.25 }, '🛡️');
-        G.fx.ring(P.pos, p.r, 0xcfefff, 0.5);
-        for (let i = 0; i < 60; i++) { const an = Math.random() * 6.28; G.fx.norm.spawn(P.pos.x, P.pos.y + 0.3, P.pos.z, Math.cos(an) * U.rand(6, 14), U.rand(0, 2), Math.sin(an) * U.rand(6, 14), 0.7, 0.3, 1.0, 0.85, 0.93, 1.0, 0.6, 0, 3); }
+        for (let i = 0; i < 30; i++) { const an = Math.random() * 6.28; G.fx.norm.spawn(P.pos.x, P.pos.y + 0.3, P.pos.z, Math.cos(an) * U.rand(6, 14), U.rand(0, 2), Math.sin(an) * U.rand(6, 14), 0.7, 0.3, 1.0, 0.85, 0.93, 1.0, 0.6, 0, 3); }
         G.sfx.ice(o); C.zone(P.pos.clone(), p.r * (m.x_zone ? 1 : 0.7), m.x_zone ? 8 : 3, 'frost', 0);
         break;
       }
@@ -357,7 +361,7 @@
         const ck = m.x_crush ? 1.6 : 1, rk = m.x_crush ? 1.4 : 1;
         C.zone(pt, p.r, p.dur, 'gravity', 0, { onEnd: () => C.explode(pt.clone().add(V(0, 1, 0)), p.r * 0.6 * rk, sc(p.dmg) * ck, { src: 'skill', color: 0xa070ff }) });
         if (m.x_tear) C.zone(pt, p.r, p.dur, 'grasp', sc(40), { interval: 0.5 });
-        G.sfx.magic(pt, 'dark'); G.sfx.rumble(p.dur, 0.6);
+        G.vfx.burst(pt.clone().add(V(0, 1.5, 0)), 1.6, 0xa070ff); G.sfx.magic(pt, 'dark'); G.sfx.rumble(p.dur, 0.6);
         break;
       }
       case 'healaura': {
@@ -365,12 +369,14 @@
         if (m.x_follow) z.follow = true;
         tmp('healaura', p.dur, { armor: m.x_armor ? 0.35 : 0.2 }, '💚');
         if (m.x_purge) { P.st = {}; G.ui.toastSmall('✨ 状態異常を浄化'); }
+        G.vfx.nova(P.pos.clone(), p.r, 0.3, { style: 'heal', dome: false });
         G.sfx.heal(); break;
       }
       case 'drain': {
         let tot = 0;
         for (const e of G.enemies.inRadius(P.pos, p.r)) { tot += C.damageEnemy(e, sc(p.dmg), { src: 'skill' }); G.fx.beam(e.centerPos(), P.chestPos(), 0xc02030, 0.05, 0.4); }
         if (tot <= 0) { G.ui.toastSmall('🩸 範囲内に敵がいない'); ok = false; break; }
+        G.vfx.area(P.pos.clone(), p.r, 'blood', 0.6);
         const h = tot * (m.x_heal ? 0.8 : 0.5), room = P.stats.maxHp - P.hp;
         C.heal(h); if (m.x_over && h > room) C.timedShield(Math.min(80, h - room), 8, 150);
         G.sfx.magic(P.pos, 'dark');
@@ -399,7 +405,7 @@
         const f = P.forward(), o = P.chestPos().addScaledVector(f, 1.2);
         const cuts = [[o.clone(), o.clone().addScaledVector(f, len)]];
         if (m.x_twin) { const side = V(-f.z, 0, f.x).normalize(), mid = o.clone().addScaledVector(f, len / 2); cuts.push([mid.clone().addScaledVector(side, -len / 2), mid.clone().addScaledVector(side, len / 2)]); }
-        for (const [a, b] of cuts) { G.fx.beam(a, b, 0x9a6aff, 0.5, dur); G.fx.beam(a, b, 0xe8d8ff, 0.12, dur); }
+        for (const [a, b] of cuts) G.vfx.tube(a, b, 1.1, 0x7a40ff, dur, { c2: 0xf0e0ff, speed: 6 });
         A.rifts.push({ cuts, t: dur, dmg: sc(p.dmg), hit: new Map(), area: G.game.area });
         G.sfx.magic(P.pos, 'dark'); G.sfx.whoosh(0.8, 1.6);
         break;
@@ -426,7 +432,7 @@
         const dur = p.dur + (m.x_long ? 3 : 0);
         tmp('sk_scale', dur, {}, '⚖️', '天秤の祈り');
         A.scale = { r: p.r + (m.x_wide ? 6 : 0), heal: !!m.x_heal };
-        G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), A.scale.r, 0xffe090, 0.8); G.sfx.magic(P.pos, 'holy');
+        G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), A.scale.r, 0xffe090, 0.8); G.vfx.area(P.pos.clone(), A.scale.r, 'holy', dur, { follow: P, alpha: 0.5 }); G.sfx.magic(P.pos, 'holy');
         break;
       }
       case 'meteor': {
@@ -434,7 +440,7 @@
         const drop = (q, r, dmg, delay) => {
           const tg = G.fx.telegraph(q, r, 1.2 + delay, 0xff7020);
           const start = q.clone().add(V(8, 30, -6));
-          later(() => C.spawnProjectile({ kind: 'bigfire', pos: start, vel: q.clone().sub(start).divideScalar(1.2), owner: 'player', dmg, explode: r, life: 1.25, radius: 0.5, info: { src: 'skill', color: 0xff7020 }, onEnd: () => { G.fx.endTelegraph(tg); if (m.x_crater) C.zone(q, r * 0.7, 5, 'fire', sc(30)); } }), delay * 1000);
+          later(() => C.spawnProjectile({ kind: 'bigfire', pos: start, vel: q.clone().sub(start).divideScalar(1.2), owner: 'player', dmg, explode: r, life: 1.25, radius: 0.5, info: { src: 'skill', color: 0xff7020 }, onEnd: () => { G.fx.endTelegraph(tg); G.vfx.nova(q.clone(), r * (1 + (P.stats.explosionRadius || 0)), 0.25, { style: 'fire', dome: false }); G.fx.debris(q.clone().add(V(0, 0.5, 0)), G.world.mats.rock, 6, 0.3, 7); if (m.x_crater) C.zone(q, r * 0.7, 5, 'fire', sc(30)); } }), delay * 1000);
         };
         drop(pt, p.r, sc(p.dmg), 0);
         if (m.x_shower) for (let i = 0; i < 2; i++) drop(pt.clone().add(V(U.rand(-p.r, p.r), 0, U.rand(-p.r, p.r))), p.r * 0.6, sc(p.dmg) * 0.5, 0.35 + i * 0.3);
@@ -480,19 +486,21 @@
         for (const ang of fan(m.x_triple).map((x) => x * 2)) {
           const f = f0.clone().applyAxisAngle(V(0, 1, 0), ang);
           for (let i = 1; i <= 12; i++) {
-            later(() => {
+            A.task(() => {
               const pt = start.clone().addScaledVector(f, i * p.len / 12);
               const fl = G.world.floorBelow(pt.x, pt.y + 1.5, pt.z); pt.y = fl > -50 ? fl : pt.y;
-              G.fx.debris(pt, G.world.mats.rock, 3, 0.35, 5); G.fx.dust(pt, V(0, 1, 0), 0x7a6a50, 3);
+              G.vfx.spikes([pt], { kind: 'rock', r: 2.0, h: 1.9, n: 4, dur: 0.6 });
+              G.fx.debris(pt, G.world.mats.rock, 2, 0.35, 5); G.fx.dust(pt, V(0, 1, 0), 0x7a6a50, 3);
+              if (G.vfx.debug) G.vfx.dbgCircle(pt, 2.0);
               if (i % 3 === 0) G.sfx.breakObj(pt, 'stone');
               for (const e of G.enemies.inRadius(pt, 2.0)) { if (hitSet.has(e)) continue; hitSet.add(e); C.damageEnemy(e, sc(p.dmg), { src: 'skill', knock: 4, dir: V(0, 1, 0) }); if (!e.boss) e.vel.y = 9; }
-            }, i * 40);
+            }, i * 0.04);
           }
         }
         P.addShake(0.2);
         break;
       }
-      case 'berserk': tmp('berserk', p.dur, { dmg: m.x_fury ? 0.8 : 0.5, fireRate: 0.3, lifesteal: 0.05, armor: m.x_guard ? 0.2 : 0, moveSpeed: m.x_speed ? 0.25 : 0 }, '😡'); G.sfx.monster(null, 'roar', 1.6, 0.4); G.ui.tint('rage', p.dur); break;
+      case 'berserk': tmp('berserk', p.dur, { dmg: m.x_fury ? 0.8 : 0.5, fireRate: 0.3, lifesteal: 0.05, armor: m.x_guard ? 0.2 : 0, moveSpeed: m.x_speed ? 0.25 : 0 }, '😡'); G.vfx.nova(P.pos.clone(), 4, 0.25, { style: 'blood' }); G.vfx.motes(P, 0xff3020, p.dur, 14); G.sfx.monster(null, 'roar', 1.6, 0.4); G.ui.tint('rage', p.dur); break;
       case 'barrier': {
         const f = P.forward(); f.y = 0; f.normalize();
         const c = P.pos.clone().addScaledVector(f, 2.6);
@@ -504,8 +512,8 @@
         if (!G.world.boxFree(x0, y0 + 0.05, z0, x1, y0 + h, z1)) { G.ui.toastSmall('🛡️ 設置できない'); ok = false; break; }
         const col = G.world.addCollider(x0, y0, z0, x1, y0 + h, z1, { surf: 'stone' });
         const mesh = new THREE.Mesh(G.Props.PG.box, G.world.mats.block); mesh.scale.set(x1 - x0, h, z1 - z0); mesh.position.set(c.x, y0 + h / 2, c.z); mesh.castShadow = true; mesh.receiveShadow = true;
-        G.scene.add(mesh);
-        G.fx.dust(V(c.x, y0, c.z), V(0, 1, 0), 0x8a8070, 12); G.sfx.stoneGrind(c, 0.5);
+        G.scene.add(mesh); G.vfx.rise(mesh, h, y0, 0.18);
+        G.fx.dust(V(c.x, y0, c.z), V(0, 1, 0), 0x8a8070, 12); G.fx.debris(V(c.x, y0 + 0.3, c.z), G.world.mats.rock, 6, 0.25, 5); G.sfx.stoneGrind(c, 0.5);
         if (m.x_spikes) C.zone(V(c.x, y0, c.z), hw + 3, p.dur, 'grasp', sc(40), { interval: 0.5 });
         if (m.x_heal) C.zone(V(c.x, y0, c.z), hw + 3, p.dur, 'heal', 0, { hps: 6, interval: 0.5 });
         C.walls.push({ t: p.dur, remove() { col.alive = false; G.scene.remove(mesh); G.fx.debris(V(c.x, y0 + 1, c.z), G.world.mats.block, 10, 0.3, 4); G.sfx.breakObj(c, 'stone'); } });
@@ -514,7 +522,7 @@
       case 'decoy': {
         const a = aim(8);
         const mk = (pt) => { const d = C.addDecoy(pt, p.dur, sc(p.dmg) * (m.x_nova ? 1.5 : 1)); if (d && m.x_nova) d.explodeR = 8; };
-        mk(a.floorPt);
+        mk(a.floorPt); G.vfx.burst(a.floorPt.clone().add(V(0, 1, 0)), 1.2, 0x90a8c0);
         if (m.x_twin) { const f = P.forward(); f.y = 0; f.normalize(); mk(a.floorPt.clone().add(V(-f.z * 3, 0, f.x * 3))); }
         if (m.x_cloak) { tmp('decoy_cloak', 2.5, { invis: 1 }, '👻'); }
         break;
@@ -522,17 +530,19 @@
       case 'cloak':
         tmp('cloak', p.dur, { invis: 1, critMul: m.x_assassin ? 1.0 : 0, moveSpeed: m.x_speed ? 0.3 : 0, hpRegen: m.x_heal ? P.stats.maxHp * 0.04 : 0 }, '👻'); G.weapons._cloakUsed = false; G.weapons._cloakMul = 1 + 1.5 * ek;
         if (m.x_smoke) C.zone(P.pos.clone(), 5, 6, 'smoke', 0);
+        G.vfx.nova(P.pos.clone(), 3, 0.25, { style: 'dark', dome: false }); G.fx.smoke(P.pos.clone().add(V(0, 0.8, 0)), 12, 1, 0x1a1024, 0.4, 1.1);
         G.sfx.magic(P.pos, 'dark'); break;
       case 'overdrive':
         tmp('overdrive', p.dur, { infAmmo: 1, fireRate: m.x_rate ? 0.9 : 0.6, dmg: m.x_dmg ? 0.2 : 0 }, '🔫');
         if (m.x_reload) for (const w of P.weapons) if (w && w.mag !== undefined) w.mag = G.weapons.stats(w).mag;
-        G.sfx.mech('boltBack'); break;
+        G.vfx.motes(P, 0xffc060, p.dur, 10); G.sfx.mech('boltBack'); break;
       case 'blades': P.bladesT = p.dur; P.bladesDps = sc(p.dps); P.bladesN = 6 + (m.x_more ? 3 : 0); P.bladesR = 3 + (m.x_wide ? 1.5 : 0) + m.area * 3; P.bladesSk = id; P.bladesUlt = false; G.sfx.whoosh(0.5, 0.8); break;
       case 'leap': {
         const f = P.forward(); f.y = 0; f.normalize();
         const k = m.x_far ? 1.4 : 1;
         P.vel.set(f.x * 16 * k, 11, f.z * 16 * k); P.grounded = false;
         P.leap = { t: 0, r: p.r, dmg: sc(p.dmg), sk: id };
+        G.vfx.nova(P.pos.clone(), 2.5, 0.2, { style: 'emp', dome: false });
         G.sfx.whoosh(0.5, 1.0, true); G.sfx.zap(P.pos);
         break;
       }
@@ -540,23 +550,24 @@
         const a = aim(60, true); if (!a.e) { G.ui.toastSmall('🎯 対象がいない'); ok = false; break; }
         const targets = [a.e];
         if (m.x_multi) for (const e of G.enemies.inRadius(a.e.pos, 10)) { if (targets.length >= 3) break; if (!targets.includes(e)) targets.push(e); }
-        for (const e of targets) { C.status(e, 'mark', p.dur); e.st.markMul = 1 + 0.4 * (1 + 0.5 * (ek - 1)); e.st.markKillReset = true; G.fx.ring(e.pos, 1.2, 0xff4030, 0.6); }
+        for (const e of targets) { C.status(e, 'mark', p.dur); e.st.markMul = 1 + 0.4 * (1 + 0.5 * (ek - 1)); e.st.markKillReset = true; G.vfx.area(e.pos.clone(), 1.2, 'blood', p.dur, { follow: e, col: [0xff3a2a, 0xff9070], alpha: 0.85 }); }
         G.sfx.magic(a.e.pos, 'dark'); break;
       }
       case 'toxic': { const a = aim(40); C.zone(a.floorPt, p.r, p.dur, 'poison', sc(18), { stacks: m.x_virulent ? 2 : 1 }); G.sfx.spit(a.floorPt); break; }
-      case 'ricostorm': G.weapons._ricoMul = 1 + 0.06 * A.totalLv(sk); tmp('ricostorm', p.dur, { dmg: m.x_dmg ? 0.2 : 0, fireRate: m.x_rate ? 0.25 : 0 }, '↪️'); break;
+      case 'ricostorm': G.vfx.motes(P, 0xffe0a0, p.dur, 10); G.weapons._ricoMul = 1 + 0.06 * A.totalLv(sk); tmp('ricostorm', p.dur, { dmg: m.x_dmg ? 0.2 : 0, fireRate: m.x_rate ? 0.25 : 0 }, '↪️'); break;
       case 'grasp': {
         const a = aim(40), pt = a.floorPt.clone();
         C.zone(pt, p.r, p.dur, 'grasp', sc(p.dps), { interval: 0.25, onEnd: m.x_crush ? () => C.explode(pt.clone().add(V(0, 1, 0)), p.r * 0.7, sc(150), { src: 'skill', color: 0x6a2080 }) : null });
         G.sfx.magic(a.floorPt, 'dark'); break;
       }
       case 'holynova': {
-        const o = P.chestPos();
-        for (const e of G.enemies.inRadius(o, p.r)) C.damageEnemy(e, sc(p.dmg) * (e.def.undead ? 3 : 1), { src: 'skill', knock: 6 });
+        const o = P.chestPos(), dur = 0.3;
+        G.vfx.nova(P.pos.clone(), p.r, dur, { style: 'holy' });
+        A.radial(o, p.r, dur, (e) => C.damageEnemy(e, sc(p.dmg) * (e.def.undead ? 3 : 1), { src: 'skill', knock: 6 }));
         C.heal(p.heal * ek * (m.x_heal ? 2 : 1));
         if (m.x_sanct) C.zone(P.pos.clone(), p.r * 0.6, 5, 'holy', sc(30), { interval: 0.5 });
-        G.fx.ring(P.pos, p.r, 0xffe8a0, 0.6); G.fx.flash(o, 0xffe8a0, 70, 0.3, 25);
-        for (let i = 0; i < 50; i++) { const an = Math.random() * 6.28; G.fx.add.spawn(P.pos.x, P.pos.y + 1, P.pos.z, Math.cos(an) * U.rand(5, 12), U.rand(-1, 3), Math.sin(an) * U.rand(5, 12), 0.7, 0.2, 0.02, 1.4, 1.2, 0.7, 1, 0, 2); }
+        G.fx.flash(o, 0xffe8a0, 70, 0.3, 25);
+        for (let i = 0; i < 30; i++) { const an = Math.random() * 6.28; G.fx.add.spawn(P.pos.x, P.pos.y + 1, P.pos.z, Math.cos(an) * U.rand(5, 12), U.rand(-1, 3), Math.sin(an) * U.rand(5, 12), 0.7, 0.2, 0.02, 1.4, 1.2, 0.7, 1, 0, 2); }
         G.sfx.bell();
         break;
       }
@@ -569,6 +580,7 @@
           C.damageEnemy(e, e.hp + e.shield + 1, { src: 'skill' }); n++;
         }
         if (!n) { G.ui.toastSmall('⚰️ 収穫できる魂がない'); ok = false; break; }
+        G.vfx.area(P.pos.clone(), p.r, 'dark', 0.6, { col: [0x2a4a6a, 0x9fd8ff] });
         C.heal((m.x_heal ? 12 : 5) * n * ek); G.sfx.magic(P.pos, 'dark'); G.ui.feed(`魂の収穫 ×${n}`, 'big');
         if (m.x_reset && n >= 3) sk.halfCd = true;
         break;
@@ -583,19 +595,19 @@
         } });
         break;
       }
-      case 'haste': tmp('haste', p.dur, { moveSpeed: 0.6, jumpPower: m.x_jump ? 0.6 : 0.3, armor: m.x_dodge ? 0.15 : 0, reloadSpeed: m.x_reload ? 0.5 : 0, fireRate: m.x_reload ? 0.15 : 0 }, '🏃'); G.sfx.whoosh(0.4, 0.8, true); break;
+      case 'haste': tmp('haste', p.dur, { moveSpeed: 0.6, jumpPower: m.x_jump ? 0.6 : 0.3, armor: m.x_dodge ? 0.15 : 0, reloadSpeed: m.x_reload ? 0.5 : 0, fireRate: m.x_reload ? 0.15 : 0 }, '🏃'); G.vfx.motes(P, 0x80e0ff, p.dur, 10); G.vfx.nova(P.pos.clone(), 2.5, 0.2, { style: 'shock', dome: false }); G.sfx.whoosh(0.4, 0.8, true); break;
       case 'rewind': {
         const t0 = G.game.time - p.t - (m.x_time ? 2 : 0);
         let h = P.history[0];
         for (const e of P.history) if (e.t <= t0) h = e;
         if (!h) { ok = false; break; }
         const from = P.pos.clone();
-        G.fx.smoke(P.chestPos(), 8, 0.8, 0x4a6a8a, 0.4, 0.8);
+        G.fx.smoke(P.chestPos(), 8, 0.8, 0x4a6a8a, 0.4, 0.8); G.vfx.burst(P.chestPos(), 1.0, 0x80b0ff);
         P.pos.copy(h.p); P.vel.set(0, 0, 0); P.hp = Math.max(P.hp, h.hp); G.world.depenetrate(P.pos, P.hw, P.height);
         { const hl = 0.02 * A.totalLv(sk); if (hl > 0) C.heal(P.stats.maxHp * hl); } // each level: +2% max HP healed on the way back
         if (m.x_heal) C.heal(P.stats.maxHp * 0.2);
         if (m.x_nova) C.explode(from.add(V(0, 1, 0)), 5, sc(120), { src: 'skill', color: 0x80b0ff });
-        G.sfx.magic(P.pos); G.ui.tint('rewind', 0.5); P.fovKick = 12;
+        G.vfx.nova(P.pos.clone(), 3, 0.25, { style: 'time' }); G.sfx.magic(P.pos); G.ui.tint('rewind', 0.5); P.fovKick = 12;
         break;
       }
       case 'lunge': {
@@ -607,24 +619,27 @@
         P.invulnT = 0.3; G.sfx.whoosh(0.2, 1.0); P.fovKick = 16;
         break;
       }
-      case 'warcry': for (const e of G.enemies.inRadius(P.pos, p.r)) C.fear(e, m.x_long ? 5 : 3); tmp('warcry', 8, { dmg: m.x_rally ? 0.45 : 0.25 }, '📯'); G.sfx.monster(null, 'roar', 1.5, 0.5); G.fx.ring(P.pos, p.r, 0xffc070, 0.6); break;
+      case 'warcry': { const c = P.pos.clone(), dur = 0.35; G.vfx.nova(c, p.r, dur, { style: 'shout' }); A.radial(c, p.r, dur, (e) => C.fear(e, m.x_long ? 5 : 3)); tmp('warcry', 8, { dmg: m.x_rally ? 0.45 : 0.25 }, '📯'); G.sfx.monster(null, 'roar', 1.5, 0.5); break; }
       case 'arrowrain': { const a = aim(45); C.zone(a.floorPt, p.r, p.dur, 'arrowrain', sc(p.dps), { interval: 0.25 }); G.sfx.whoosh(0.8, 0.6); break; }
       case 'quake': {
         const shake = (k) => {
-          for (const e of G.enemies.inRadius(P.pos, p.r)) { if (e.def.flyer && !e.grounded) continue; C.damageEnemy(e, sc(p.dmg) * k, { src: 'skill' }); C.stun(e, (m.x_long ? 3.5 : 2) * k); }
+          const c = P.pos.clone(), dur = 0.35;
+          G.vfx.nova(c, p.r, dur, { style: 'shock', dome: false });
+          for (let i = 0, n = Math.round(p.r * 2.2 * k); i < n; i++) { const an = Math.random() * 6.28, d = Math.sqrt(Math.random()) * p.r * 0.95, q = V(c.x + Math.cos(an) * d, c.y, c.z + Math.sin(an) * d); const fl = G.world.floorBelow(q.x, q.y + 2, q.z); if (fl > -50) q.y = fl; G.vfx.spikes([q], { kind: 'rock', r: 0.8, h: 0.9, n: 2, dur: 0.5, delay: G.vfx.novaTime(d, p.r, dur) }); }
+          A.radial(c, p.r, dur, (e) => { C.damageEnemy(e, sc(p.dmg) * k, { src: 'skill' }); C.stun(e, (m.x_long ? 3.5 : 2) * k); }, (e) => !(e.def.flyer && !e.grounded));
           P.addShake(k); G.sfx.rumble(1.2, 1.2 * k); G.sfx.explosion(P.pos, 1.2 * k);
-          for (let i = 0; i < 40; i++) { const an = Math.random() * 6.28, d = Math.random() * p.r; G.fx.dust(V(P.pos.x + Math.cos(an) * d, P.pos.y + 0.1, P.pos.z + Math.sin(an) * d), V(0, 1, 0), 0x7a6a50, 2); }
-          G.fx.ring(P.pos, p.r, 0xb09060, 0.8);
+          for (let i = 0; i < 20; i++) { const an = Math.random() * 6.28, d = Math.random() * p.r; G.fx.dust(V(c.x + Math.cos(an) * d, c.y + 0.1, c.z + Math.sin(an) * d), V(0, 1, 0), 0x7a6a50, 2); }
         };
         shake(1);
-        if (m.x_after) later(() => shake(0.5), 1000);
+        if (m.x_after) A.task(() => shake(0.5), 1.0);
         break;
       }
-      case 'thornarmor': tmp('thornarmor', p.dur, { armor: m.x_harden ? 0.5 : 0.35, hpRegen: m.x_heal ? 3 : 0 }, '🌵'); G.sfx.mech('grab'); break;
+      case 'thornarmor': tmp('thornarmor', p.dur, { armor: m.x_harden ? 0.5 : 0.35, hpRegen: m.x_heal ? 3 : 0 }, '🌵'); G.vfx.spikes(G.vfx.ringPts(P.pos.clone(), 1.3, 12), { kind: 'rock', r: 0.4, h: 0.8, n: 1, dur: 0.5 }); G.vfx.motes(P, 0x90d060, p.dur, 6); G.sfx.mech('grab'); break;
       case 'flight':
         P.vel.y = 17 * (1 + 0.02 * A.totalLv(sk)); P.grounded = false; P.glideT = p.dur + 1.5;
         if (m.x_sky) tmp('flight_sky', p.dur + 1.5, { dmg: 0.25 }, '🎯');
         if (m.x_dive) P.leap = { t: -0.6, r: 6 * (1 + m.area), dmg: sc(140), sk: id, maxT: p.dur + 6 };
+        G.vfx.nova(P.pos.clone(), 3, 0.25, { style: 'shock', dome: false });
         G.sfx.whoosh(0.6, 1.0, true); P.fovKick = 12; for (let i = 0; i < 20; i++) G.fx.norm.spawn(P.pos.x, P.pos.y, P.pos.z, U.rand(-3, 3), U.rand(-1, 0), U.rand(-3, 3), 0.6, 0.3, 1.2, 0.8, 0.8, 0.8, 0.4, 0, 2); break;
       default: ok = false;
     }

@@ -18,7 +18,7 @@
       mods: { magSize: -0.25, moveSpeed: 0.1 }, minus: '銃の装弾数-25%', favName: '近接武器（武器と部品）、近接の加護',
       fav: (o) => o.kind === 'melee', look: '羽織と袴、鉢巻、背中に鞘', role: '近接で斬り込む' },
     { id: 'heavy', name: '重装兵', icon: '🛡️', col: '#e0b050', gun: 'g_breacher', melee: 'm_woodshield', skill: 'thornarmor', ult: 'ult_bastion', grapple: 28,
-      mods: { armor: 0.1, moveSpeed: -0.12, slideBoost: -0.4 }, minus: '移動速度-12%、スライディングの距離-40%', favName: '防具・盾、近接の部品、防御の加護',
+      mods: { armor: 0.1, maxHp: 20, moveSpeed: -0.12, slideBoost: -0.4 }, minus: '移動速度-12%、スライディングの距離-40%', favName: '防具・盾、近接の部品、防御の加護',
       fav: (o) => o.kind === 'armor' || (o.kind === 'melee' && !!o.guard && o.guard[0] >= 0.75), look: '板金の鎧と大きな肩当て、顔まで覆う兜', role: '前に立って受け止める' },
     { id: 'mage', name: '術士', icon: '🔮', col: '#7a9aff', gun: 't_rivet', atts: { core: 'c_water' }, melee: 'm_basic', skill: 'fireball', ult: 'ult_tsunami', grapple: 20,
       mods: { elIcd: 0.4, maxHp: -15 }, minus: '最大HP-15', favName: '属性コア・属性のスキル、属性・状態異常・スキル強化の加護',
@@ -35,7 +35,7 @@
       notes: ['ADS中にゲージがたまる（1.5秒で満タン）。撃つと0になり、ADSをやめると1秒で半分減る。'] },
     blade: { name: '連斬', icon: '⚔️', short: '近接を当て続けるほど、攻撃も移動も速くなる', rows: [['近接を当てるとたまる層の上限', '5層', '6層', '7層']],
       notes: ['1層につき近接の攻撃速度+5%・移動速度+3%（銃には効かない）。', '7.5秒続き、当てるたびに7.5秒に戻る。切れると全部なくなる。'] },
-    heavy: { name: '鉄壁', icon: '🛡️', short: '攻撃を受けると、しばらく硬くなる', rows: [['ダメージを受けた後3秒間の被ダメ', '-30%', '-40%', '-50%'], ['いつでも被ダメ', '-10%', '-10%', '-10%']],
+    heavy: { name: '鉄壁', icon: '🛡️', short: '攻撃を受けると、しばらく硬くなる', rows: [['ダメージを受けた後3秒間の被ダメ', '-10%', '-15%', '-20%'], ['いつでも被ダメ', '-10%', '-10%', '-10%']],
       notes: ['3秒の間にまた受けると、そこからさらに3秒。効いている間は吹き飛ばされない。'] },
     mage: { name: '反応強化', icon: '🔮', short: '属性反応のダメージが大きい', rows: [['反応のダメージ（凍結の時間なども）', '+20%', '+30%', '+40%'], ['沸騰・熱融の倍率', '+0.1', '+0.15', '+0.2']],
       notes: ['属性熟練・反応の加護とは別の枠で掛かる。銃の属性付与の間隔が2.5秒から1.5秒になる。'] },
@@ -100,7 +100,7 @@
   };
   // 重装兵: a hit opens 3 s of 鉄壁
   CL.ironOn = () => is('heavy') && S().ironT > now();
-  CL.ironRed = () => (CL.ironOn() ? V([0.3, 0.4, 0.5]) : 0);
+  CL.ironRed = () => (CL.ironOn() ? V([0.1, 0.15, 0.2]) : 0);
   CL.onHurt = function () { if (is('heavy')) S().ironT = now() + 3; };
   CL.hurtMul = () => 1;
   // 術士: reactions

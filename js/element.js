@@ -75,6 +75,15 @@
   };
   EL.skEl = (id) => (id && EL.SK[id]) || null;
   // the element a gun / melee weapon carries: what it was born with, then one of its own (made from parts), then its 属性コア
+  EL.isChaos = (w) => !!(w && w.atts && w.atts.core === 'c_chaos');
+  EL.chaosFor = function (e) {
+    const a = EL.auraOf(e);
+    if (a === 'fire') return 'water'; // 沸騰 (×2.0)
+    if (a === 'ice') return 'fire'; // 熱融 (×2.0)
+    if (a === 'water') return 'volt'; // 漏電
+    if (a === 'volt') return 'fire'; // 爆轟
+    EL._chaosI = ((EL._chaosI || 0) + 1) % 4; return ['fire', 'water', 'ice', 'volt'][EL._chaosI]; // nothing on it yet: lay one down
+  };
   EL.wEl = function (w) {
     if (!w || !w.def) return null;
     if (w.def.el) return w.def.el;
@@ -197,6 +206,8 @@
     if (e.st && e.st.frozen > 0 && e._elFrozen && ownHit(info, src) && src !== 'react' && (info.heavy || info.pile || EL.hitEl(info, src) === 'earth')) {
       out.rx = 'shatter';
     }
+    // 混沌の属性コア: the hit takes whichever element reacts with what this foe carries
+    if (ownHit(info, src) && (src === 'bullet' || src === 'melee')) { const w = info.weapon || (src === 'melee' ? P && P.melee : null); if (EL.isChaos(w)) info.el = EL.chaosFor(e); }
     const el = EL.hitEl(info, src);
     if (!el) return out.rx ? out : null;
     if (e.mut && e.mut.nullify) return out.rx ? out : null;

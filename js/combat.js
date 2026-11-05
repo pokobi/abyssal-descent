@@ -197,7 +197,7 @@
       let cc = st.critChance + (info.critBonus || 0);
       if (info.forceCrit || ctx.forceCrit || Math.random() < cc) { crit = true; dmg *= info.forceCrit ? Math.max(info.cloakMul || 2.5, st.critMul) : st.critMul; }
     }
-    ctx.crit = crit;
+    ctx.crit = crit; info.wasCrit = crit; // (read back by the gun that fired: 月影)
     if (e.st.mark > 0) dmg *= e.st.markMul || 1.6; // 'mark' skill levels raise it
     // elements (element.js): resistance, the element left on the foe, an amplifying reaction; 脆化 makes every blow land harder
     const er = G.Elem && src !== 'dot' ? G.Elem.onEnemyHit(e, info, src) : null;
@@ -335,6 +335,7 @@
     C._noCoins = !!e.bossSpawn; // kill hooks (bounties, midas...) pay nothing for boss adds either
     try { G.buffs.emit('onKill', { e, pos: e.centerPos(), head: !!info.head, src: info.src, overkill: overkill || 0, weapon: info.weapon, proc: info.proc }); } finally { C._noCoins = false; }
     if (G.Classes) G.Classes.onKill(e, info); // (the class's own effect: 勢い, 一点集中)
+    if (G.weapons && G.weapons.onKillTrait) G.weapons.onKillTrait(e, info); // (a crowned foe passes its crown on: 王権)
     if (info.weapon && info.weapon.trait === 'killReload') { info.weapon.mag = G.weapons.stats(info.weapon).mag; info.weapon.reloading = false; }
     if (e.st.markKillReset) {
       const sk = P.skills.find((s) => s && s.id === 'mark'); if (sk) sk.cd = 0;

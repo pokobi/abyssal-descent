@@ -675,6 +675,42 @@
     return G.camera.localToWorld(p);
   }
 
+  // 深淵の槍: a heavy blow throws it (a gravity well where it sticks); the next heavy blow calls it back through everything on the way
+  W.spear = null;
+  W.spearClear = function () { if (W.spear && W.spear.mesh) G.scene.remove(W.spear.mesh); W.spear = null; };
+  W.abyssSpear = function (o, f, dmg) {
+    const C = G.combat;
+    if (W.spear && W.spear.area === G.game.area) {
+      // the recall: from where it stuck to your hand, piercing every foe on the line
+      const from = W.spear.pos.clone(), to = P.chestPos(), d = to.clone().sub(from), L = d.length(); d.normalize();
+      for (const e of G.enemies.inRadius(from.clone().addScaledVector(d, L / 2), L / 2 + 1.5)) {
+        if (!e.alive || e.ally) continue;
+        const c = e.centerPos(), t = c.clone().sub(from).dot(d); if (t < 0 || t > L) continue;
+        if (c.clone().sub(from.clone().addScaledVector(d, t)).length() > 1.5 + e.radius) continue;
+        C.damageEnemy(e, dmg * 1.4, { src: 'melee', pos: c, dir: d.clone(), knock: 6, shieldMul: 1.5 });
+      }
+      G.fx.beam(from, to, 0x9a6aff, 0.3, 0.35); G.fx.beam(from, to, 0xe0d0ff, 0.08, 0.25); G.sfx.whoosh(0.6, 1.2); G.sfx.chain && G.sfx.chain(0.4, 0.5);
+      W.spearClear();
+      return;
+    }
+    W.spearClear();
+    // the throw: up to 25 m, stopped by a wall or the first foe in the way
+    const wh = G.world.raycast(o, f, 25), eh = G.enemies.raycast(o, f, wh ? wh.t : 25, 0.4);
+    const L = eh ? eh.t : wh ? wh.t : 25, pos = o.clone().addScaledVector(f, Math.max(1, L - 0.2));
+    G.fx.beam(o.clone().addScaledVector(f, 0.6), pos, 0x9a6aff, 0.12, 0.3);
+    for (const e of G.enemies.inRadius(pos, 2.5)) if (e.alive && !e.ally) C.damageEnemy(e, dmg * 1.2, { src: 'melee', pos: e.centerPos(), dir: f.clone(), knock: 5 });
+    const fl = G.world.floorBelow(pos.x, pos.y + 0.3, pos.z), ground = V(pos.x, fl > -50 ? fl : pos.y, pos.z);
+    C.zone(ground, 4.5, 6, 'gravity', 0);
+    const m = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0x2a1840, emissive: 0x6a30c0, emissiveIntensity: 0.8, metalness: 0.6, roughness: 0.35 }));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.45, 6), new THREE.MeshStandardMaterial({ color: 0xd8c8ff, emissive: 0x9a6aff, emissiveIntensity: 1.4, metalness: 0.9, roughness: 0.2 }));
+    tip.position.y = -1.3; tip.rotation.x = Math.PI; m.add(shaft); m.add(tip);
+    m.position.copy(pos); m.quaternion.setFromUnitVectors(V(0, -1, 0), f.clone().normalize());
+    G.scene.add(m);
+    W.spear = { pos: pos.clone(), mesh: m, area: G.game.area, t: 8 };
+    G.sfx.magic(pos, 'dark'); G.fx.ring(ground.clone().add(V(0, 0.1, 0)), 4.5, 0x9a6aff, 0.5);
+  };
+  W.spearTick = function (dt) { if (!W.spear) return; if (W.spear.area !== G.game.area) return W.spearClear(); W.spear.t -= dt; if (W.spear.t <= 0) { G.fx.sparks(W.spear.pos, null, 10, 0x9a6aff, 4); W.spearClear(); } };
   function doHit(s, heavy) {
     const C = G.combat;
     const o = G.camera.position.clone(), f = P.forward();
@@ -748,6 +784,22 @@
         }
         if (tr === 'flameWave') { G.fx.beam(from, to, 0xff7a20, 0.35, 0.3); for (let i = 0; i < 18; i++) { const p = from.clone().lerp(to, i / 18); G.fx.flameLick(p.x, p.y - 0.3, p.z, 1.2); } G.sfx.whoosh(0.5, 0.8); }
         else { G.fx.beam(from, to, 0xffe8a0, 0.4, 0.35); G.fx.beam(from, to, 0xffffff, 0.12, 0.25); G.fx.flash(from, 0xffe0a0, 30, 0.2, 10); G.sfx.launcher('rail'); }
+      } else if (tr === 'iai') {
+        // 居合: everything on a 20 m line in front is cut through at once; the cuts land together 0.6 s later
+        const len = 20, wh = G.world.raycast(o, f, len), L = wh ? wh.t : len, to = o.clone().addScaledVector(f, L), hit = [];
+        for (const e of G.enemies.inRadius(o.clone().addScaledVector(f, L / 2), L / 2 + 1.6)) {
+          if (!e.alive || e.ally) continue;
+          const c = e.centerPos(), t = c.clone().sub(o).dot(f); if (t < 0 || t > L) continue;
+          if (c.clone().sub(o.clone().addScaledVector(f, t)).length() > 1.6 + e.radius) continue;
+          hit.push(e); G.fx.sparks(c, null, 6, 0xe8f0ff, 3);
+        }
+        G.fx.beam(o.clone().addScaledVector(f, 0.6), to, 0xe8f0ff, 0.08, 0.5); G.fx.beam(o.clone().addScaledVector(f, 0.6), to, 0x9ab8ff, 0.25, 0.35); G.sfx.whoosh(0.7, 1.4);
+        setTimeout(() => {
+          for (const e of hit) if (e.alive) { const c = e.centerPos(); C.damageEnemy(e, dmg * 1.6, { src: 'melee', pos: c, dir: f.clone(), knock: 5, noMarker: false, shieldMul: 1.6 }); G.fx.sparks(c, null, 12, 0xffffff, 6); }
+          if (hit.length) { G.sfx.impact && G.sfx.impact(P.pos, 'metal'); P.addShake(0.35); }
+        }, 600);
+      } else if (tr === 'abyssSpear') {
+        W.abyssSpear(o, f, dmg);
       } else if (tr === 'thunder') {
         let n = 0;
         for (const e of G.enemies.inRadius(o.clone().addScaledVector(f, 5), 7)) {

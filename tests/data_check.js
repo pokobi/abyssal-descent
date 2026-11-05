@@ -27,6 +27,8 @@ for (const f of FILES) {
   catch (e) { loadFails.push(`js/${f}.js: ${e.message.slice(0, 120)}`); }
 }
 const G = ctx.G;
+// a table that did not load (a script that throws) is a failure, not a crash of this check
+for (const k of ['WEAPON_BY_ID', 'MELEE_BY_ID', 'ATT_BY_ID', 'ITEM_BY_ID', 'SKILL_BY_ID', 'BUFF_BY_ID', 'ARMOR_BY_ID']) if (!G[k]) G[k] = {};
 
 // ---- checks ----
 const fails = [];
@@ -83,7 +85,7 @@ const CAT = G.BUFF_CAT || {};
 for (const b of G.BUFFS || []) if (!CAT[b.cat]) fail(`BUFFS ${b.id}: category "${b.cat}" does not exist`);
 for (const a of G.SKILL_AUGS || []) if (!skOrUlt(a.skill)) fail(`SKILL_AUGS ${a.id}: skill ${a.skill} does not exist`);
 
-for (const l of loadFails) console.log('WARN could not load ' + l + ' (its tables are not checked)');
+for (const l of loadFails) fail('could not load ' + l);
 for (const f of fails) console.log('FAIL ' + f);
 console.log(`${total} entries in ${tables.length} tables checked`);
 console.log(fails.length ? `\nDATA CHECK FAILED (${fails.length})` : '\nDATA CHECK PASSED');

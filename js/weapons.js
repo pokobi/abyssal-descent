@@ -855,10 +855,74 @@
   // ---------------- update / firing ----------------
   const anim = { kick: 0, kickR: 0, swayX: 0, swayY: 0, reload: 0, melee: 0, throwT: 0, inspect: 0, flash: 0, spinA: 0 };
   W.anim = anim;
+  // ---- the ミシック guns' lasting effects ----
+  // 蜂群 (hive): each bee sits on a foe and every 3 s hops to the nearest other foe within 10 m and stings it
+  W.bees = [];
+  W.traitTick = function (dt) {
+    for (let i = W.bees.length - 1; i >= 0; i--) {
+      const b = W.bees[i];
+      if (b.area !== G.game.area) { W.bees.splice(i, 1); continue; }
+      b.t -= dt;
+      if (b.e && b.e.alive) b.pos = b.e.centerPos();
+      if (b.t > 0 && b.e && b.e.alive) continue;
+      let best = null, bd = 10;
+      for (const e of G.enemies.inRadius(b.pos, 10)) { if (!e.alive || e.ally || e === b.e) continue; const d = e.centerPos().distanceTo(b.pos); if (d < bd) { bd = d; best = e; } }
+      if (!best) { if (b.e && b.e.alive) b.t = 1; else W.bees.splice(i, 1); continue; }
+      const to = best.centerPos();
+      G.fx.tracer(b.pos, to, 0xffd23a, 0.03, 0.18); G.fx.sparks(to, null, 4, 0xffd23a, 2);
+      G.combat.damageEnemy(best, b.dmg, { src: 'bullet', weapon: b.w, proc: true, noMarker: true });
+      b.e = best; b.pos = to; b.t = 3;
+    }
+  };
+  // 王権 (crown): a crowned foe takes more damage; when it falls the crown jumps to every foe within 10 m
+  W.crown = function (e) {
+    if (!e || !e.alive || e._crown) return;
+    e._crown = true; G.combat.status(e, 'mark', 10);
+    const c = e.centerPos(); G.fx.ring(c.clone().add(V(0, 0.8, 0)), 0.6, 0xffd040, 0.5); G.fx.sparks(c, null, 8, 0xffd040, 3);
+  };
+  W.onKillTrait = function (e, info) {
+    const w = info && info.weapon;
+    if (w && w.def && w.def.kind !== 'melee' && (info.src === 'bullet' || info.src === 'explosion')) {
+      const s = W.stats(w);
+      if (s.soulAmmo) { if (w.soulArea !== G.game.area) { w.soul = (w.soul || 0) / 2; w.soulArea = G.game.area; } w.soul = Math.min(0.4, (w.soul || 0) + 0.01); }
+      if (s.chainKill && !info.proc && e) {
+        const c = e.centerPos(); let best = null, bd = 12;
+        for (const o of G.enemies.inRadius(c, 12)) { if (!o.alive || o.ally || o === e) continue; const d = o.centerPos().distanceTo(c); if (d < bd) { bd = d; best = o; } }
+        if (best) { G.fx.tracer(c, best.centerPos(), 0xffe0a0, 0.03, 0.15); G.combat.damageEnemy(best, s.dmg, { src: 'bullet', weapon: w, proc: true, noMarker: true }); }
+      }
+    }
+    if (!e || !e._crown) return;
+    const c = e.centerPos();
+    for (const o of G.enemies.inRadius(c, 10)) if (o.alive && !o.ally && !o._crown) { G.fx.beam(c, o.centerPos(), 0xffd040, 0.06, 0.3); W.crown(o); }
+  };
+  let xrMat = null, gxMat = null, xrOn = false, gxOn = false;
+  W.sightFx = function (s) {
+    const ads = P.adsActive && !P.meleeMode;
+    const xr = !!(ads && s && s.xray), gx = !!(ads && s && s.godEye);
+    if (!xr && !xrOn && !gx && !gxOn) return;
+    if (!xrMat) xrMat = new THREE.MeshBasicMaterial({ color: 0xff6a3a, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false });
+    if (!gxMat) gxMat = new THREE.SpriteMaterial({ color: 0xffd860, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false });
+    for (const e of G.enemies.list) {
+      if (!e.alive || !e.model || !e.model.group) continue;
+      const near = e.pos.distanceTo(P.pos) < 70;
+      if (xr && near && !e._xr) { e._xr = []; const ms = []; e.model.group.traverse((o) => { if (o.isMesh && o.geometry && !o.userData.tgtHull && !o.userData.xr && o.visible) ms.push(o); }); for (const o of ms) { const x = new THREE.Mesh(o.geometry, xrMat); x.userData.xr = true; x.renderOrder = 998; x.raycast = () => {}; o.add(x); e._xr.push(x); } } // (collected first: adding while walking the tree would walk into the new ones)
+      if (e._xr) for (const x of e._xr) x.visible = xr && near;
+      if (gx && near && !e._gx) { const hd = (e.hitW || []).find((h) => h.part === 'head'); if (hd && hd.n) { const sp = new THREE.Sprite(gxMat); sp.scale.setScalar(0.45); sp.renderOrder = 999; sp.raycast = () => {}; hd.n.add(sp); e._gx = sp; } }
+      if (e._gx) e._gx.visible = gx && near;
+    }
+    xrOn = xr; gxOn = gx;
+  };
   W.update = function (dt) {
     G.ItemAnim.update(dt);
+    W.traitTick(dt); if (W.spearTick) W.spearTick(dt);
     if (W.dirty) { W.ver++; W.dirty = false; }
     const w = P.weapon;
+    if (w) {
+      const s0 = W.stats(w);
+      W.sightFx(s0);
+      // 永劫の弾倉: no reloads; the rounds come back by themselves
+      if (s0.noReload && w.mag < s0.mag) { w.regenAcc = (w.regenAcc || 0) + s0.mag * 0.15 * dt; while (w.regenAcc >= 1 && w.mag < s0.mag) { w.mag++; w.regenAcc -= 1; } }
+    } else W.sightFx(null);
     if (!w) { // every gun put away: melee only (1 / 2 / the wheel have nothing else to switch to)
       if (!P.meleeMode) W.setMelee();
       W.handleSwitch();
@@ -885,7 +949,7 @@
       w.reloadT -= dt;
       W.reloadSounds(w, s);
       if (w.reloadT <= 0) {
-        w.reloading = false; w.mag = s.mag;
+        w.reloading = false; w.mag = s.mag; w.contT = 0; w.etOn = false;
         G.buffs.emit('onReloadEnd', { weapon: w });
       }
     }
@@ -933,7 +997,7 @@
   };
 
   W.startReload = function (w, s) {
-    if (w.reloading || w.mag >= s.mag) return;
+    if (w.reloading || w.mag >= s.mag || s.noReload) return; // (永劫の弾倉: never)
     let dur = s.reload;
     if (w.mag === 0 && P.has('s_tactical')) dur *= 0.6;
     w.reloading = true; w.reloadT = dur; w.reloadDur = dur; w.reloadEvents = 0;
@@ -974,6 +1038,7 @@
     sp *= 1 + mv * 0.8 * (1 + (s.moveSpread || 0)) * (1 - ads * 0.6);
     if (!P.grounded) sp *= 1.6;
     if (P.crouching && P.grounded) sp *= 0.75;
+    if (s.galeFire && (P.sliding || P.speedH > 13)) sp = Math.min(sp, s.adsSpread * 0.2); // (疾風の銃床: no spread on the move at a dash or a slide)
     if (P.has('h_still') && P.speedH < 0.5) sp *= 0.7;
     if (G.Classes) sp *= G.Classes.spreadMul(ads); // (狙撃手: from the hip it scatters)
     sp += P.weapon.bloom * (1 - ads * 0.5);
@@ -982,7 +1047,13 @@
   W.shoot = function (w, s) {
     const st = P.stats, t = G.game.time;
     // ammo
-    const save = st.infAmmo > 0 || Math.random() < s.ammoSave;
+    // 無尽 (eternal): after 4 s of unbroken fire the rounds stop running out until the next reload
+    if (w.def.trait === 'eternal') {
+      w.contT = t - (w.lastFireT ?? -9) < 0.45 ? (w.contT || 0) + (t - w.lastFireT) : 0; w.lastFireT = t;
+      if (w.contT >= 4 && !w.etOn) { w.etOn = true; G.ui.toastSmall('♾️ 無尽：リロードまで弾が減らない'); G.sfx.magic && G.sfx.magic(null, 'holy'); }
+      if (w.contT < 4) w.etOn = false;
+    }
+    const save = st.infAmmo > 0 || Math.random() < s.ammoSave || !!w.etOn || (!!s.noReload && false);
     if (!save) w.mag--;
     P.lastShotT = t;
     const o = G.camera.position.clone();
@@ -994,14 +1065,33 @@
     const doubled = Math.random() < s.doubleShot;
     // 黄金律: load coins into the round
     if (w.def.trait === 'goldrush') { const run = G.game.run; if (run.coins >= 3) { run.coins -= 3; s = Object.assign({}, s, { dmg: s.dmg * 2.2, goldShot: true }); } }
+    // 月影 (moon): every 6th round is a sure crit that pierces two and chills
+    if (w.def.trait === 'moon') { w.moonN = (w.moonN || 0) + 1; if (w.moonN >= 6) { w.moonN = 0; s = Object.assign({}, s, { pierce: (s.pierce || 0) + 2, moonShot: true, elem: 'frost', elemChance: 1 }); G.fx.flash(muzzle, 0xbfd8ff, 60, 0.12, 14); } }
+    // 魔弾の引鉄: a crit leaves the next shot a sure crit
+    if (s.critChain && w.critNext) { w.critNext = false; s = Object.assign({}, s, { forceCrit: true }); }
+    // 蒼海 (tide): aimed at a foe with water on it, every pellet goes to the centre
+    let tideLock = false;
+    if (w.def.trait === 'tide') { const th = G.enemies.raycast(o, fwd, 45, 0.3); if (th && G.Elem.auraOf(th.e) === 'water') tideLock = true; }
     const sets = doubled ? 2 : 1;
     for (let k = 0; k < sets; k++) for (let i = 0; i < pellets; i++) {
-      const dir = coneDir(fwd, THREE.MathUtils.degToRad(spreadDeg + (k ? 0.6 : 0)));
+      const dir = tideLock ? coneDir(fwd, THREE.MathUtils.degToRad(0.4)) : coneDir(fwd, THREE.MathUtils.degToRad(spreadDeg + (k ? 0.6 : 0)));
       if (s.proj) W.fireProjectile(w, s, muzzle, o, dir);
       else W.traceShot(w, s, o, dir, muzzle, pellets);
+      // 時穿ちの引鉄: the same round again along the same line, 0.5 s later
+      if (s.echoShot) { const o2 = o.clone(), d2 = dir.clone(), m2 = muzzle.clone(), s2 = Object.assign({}, s, { dmg: s.dmg * 0.6, echoShot: 0, critChain: 0 }), area = G.game.area; setTimeout(() => { if (!G.game || G.game.area !== area || P.dead) return; if (s2.proj) W.fireProjectile(w, s2, m2, o2, d2); else W.traceShot(w, s2, o2, d2, m2, pellets); G.fx.flash(m2, 0xb0a0ff, 20, 0.06, 6); }, 500); }
+    }
+    // 双撃の銃架: every 10th shot, a small grenade goes out towards the aim point
+    if (s.underGL) {
+      w.ugN = (w.ugN || 0) + 1;
+      if (w.ugN >= 10) {
+        w.ugN = 0;
+        const v = fwd.clone().multiplyScalar(30); v.y += 3;
+        G.combat.spawnProjectile({ kind: 'grenade', pos: muzzle.clone(), vel: v, grav: 14, owner: 'player', dmg: Math.max(40, s.dmg * 2.2), radius: 0.1, explode: 3.2, life: 3, weapon: w, onHitEnemyExplode: true, info: { src: 'explosion', weapon: w } });
+        G.sfx.launcher && G.sfx.launcher('gl'); G.fx.flash(muzzle, 0xffb060, 30, 0.08, 8);
+      }
     }
     // feedback
-    const silent = model && model.suppressed || w.def.trait === 'silent';
+    const silent = model && model.suppressed || w.def.trait === 'silent' || !!s.hush;
     if (s.proj && s.sound !== 'nail') G.sfx.launcher(s.sound); else if (s.sound === 'tesla') { G.sfx.zap(null); G.sfx.gun('nail', { vol: 0.5 }); } else if (s.sound === 'rail') G.sfx.launcher('rail'); else G.sfx.gun(s.sound, { suppressed: silent, auto: s.auto || s.autoShot, id: w.def.id, trait: w.def.trait, rar: w.def.rarity });
     if (!silent) G.fx.flash(muzzle, 0xffb060, s.sound === 'shotgun' ? 45 : 25, 0.06, 10);
     anim.flash = silent ? 0.02 : 0.05;
@@ -1055,7 +1145,7 @@
       // distance falloff: full damage up close, fading towards the weapon's range (long-range arms such as snipers / marksman rifles keep full damage)
       const FP = W.FALLOFF[w.def.arch];
       if (FP) fall = Math.min(fall, 1 - (1 - FP[1]) * U.clamp((dist / s.range - FP[0]) / (1 - FP[0]), 0, 1));
-      if (h.e.noFalloff) fall = 1; // the last guardian stands across the void: every gun has to reach it
+      if (h.e.noFalloff || s.noFall) fall = 1; // the last guardian stands across the void: every gun has to reach it (星鉄の銃身: always)
       const info = {
         src: 'bullet', head: h.part === 'head', part: h.part, headMul: s.headMul, weapon: w, dir: dir.clone(), pos: hp,
         elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), shieldMul: s.shieldMul, critBonus: s.critChance, eliteBonus: s.eliteDmg || 0,
@@ -1063,9 +1153,15 @@
         lowHit: hp.y < h.e.pos.y + h.e.height * 0.35, lifesteal: s.lifesteal || 0,
       };
       if (w.def.trait === 'execute' && !h.e.boss && h.e.hp < h.e.maxHp * 0.2) info.forceExecute = true;
-      let dmg = s.dmg * fall * pmul;
+      if (s.soulAmmo && w.soulArea !== G.game.area) { w.soul = (w.soul || 0) / 2; w.soulArea = G.game.area; } // (魂喰らい: half of it carries into a new area)
+      let dmg = s.dmg * fall * pmul * (info.hushMul || 1) * (1 + (s.soulAmmo ? w.soul || 0 : 0));
       if (info.forceExecute) dmg = h.e.hp + h.e.shield + 1;
       if (P.temps.has('cloak') && !W._cloakUsed) { info.forceCrit = true; info.cloakMul = W._cloakMul; W._cloakUsed = true; G.combat.untemp('cloak'); }
+      if (s.moonShot || s.forceCrit) { info.forceCrit = true; info.cloakMul = 1; }
+      // 神の眼: aiming down the sights, a hit on the weak point (the head) is a sure crit
+      if (s.godEye && P.adsActive && info.head) { info.forceCrit = true; info.cloakMul = 1; }
+      // 消音の極意: a foe that is not on to you (cannot see you, or is after a decoy) takes more
+      if (s.hush && (!h.e.hasLOS || (G.combat.getDecoy && G.combat.getDecoy()))) info.hushMul = 1 + s.hush;
       G.combat.damageEnemy(h.e, dmg, info);
       if (s.explo || w.def.trait === 'explosiveRounds') G.combat.explode(hp, 1.6, s.dmg * 0.6 * fall, { src: 'explosion', small: true, proc: true });
       if (w.def.trait === 'chainHit' && Math.random() < 0.5) { G.combat.chain(h.e, 2, s.dmg * 0.5, 9, { src: 'bullet', proc: true }); G.fx.strike(h.e.centerPos()); }
@@ -1073,6 +1169,10 @@
       if (w.def.trait === 'shock' && Math.random() < 0.2) G.fx.strike(h.e.centerPos());
       if (w.def.trait === 'headhunter' && info.head) G.combat.refillN(2);
       if (w.def.trait === 'voidmaw' && h.e.alive && !h.e.boss) { const to = P.pos.clone().sub(h.e.pos).setY(0); if (to.lengthSq() > 4) h.e.knockback(to.normalize(), 3.5); G.combat.status(h.e, 'mark', 3); }
+      if (w.def.trait === 'hive' && W.bees.length < 12 && h.e.alive) W.bees.push({ e: h.e, pos: hp.clone(), t: 3, dmg: s.dmg * 0.6, w, area: G.game.area });
+      if (w.def.trait === 'crown' && info.head) W.crown(h.e);
+      if (w.def.trait === 'moon' && info.wasCrit && !h.e.alive) w.moonN = Math.min(5, (w.moonN || 0) + 2);
+      if (s.critChain) { if (info.wasCrit) { w.critRun = (w.critRun || 0) + 1; if (w.critRun <= s.critChain) w.critNext = true; else { w.critRun = 0; w.critNext = false; } } else if (!s.forceCrit) w.critRun = 0; }
       if (w.def.trait === 'stormcall' && info.head) { G.fx.strike(hp, 0xd0e0ff, true); G.combat.chain(h.e, 5, s.dmg * 1.2, 14, { src: 'bullet', proc: true }); G.sfx.zap(hp); }
       if (w.def.pull || s.pull) { /* projectile only */ }
       // ricochet to another enemy
@@ -1135,6 +1235,16 @@
     if (pj.explode) { base.explode = pj.explode; base.info = { src: 'explosion', weapon: w, elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), icd: 2.5, icdKey: 'w:' + w.def.id, shieldMul: s.shieldMul }; if (w.def.trait === 'cluster') base.cluster = 4; }
     if (pj.fuse) { base.fuse = pj.fuse; base.bounce = !!pj.bounce; }
     if (w.def.trait === 'homing') { base.homing = 5; }
+    // 終末 (ruin): the blast leaves a black hole for 3 s, which goes off again at the end
+    if (w.def.trait === 'ruin' && base.explode) {
+      const inf = base.info;
+      base.onDetonate = (p) => {
+        G.combat.explode(p.pos, p.explode, p.dmg, inf);
+        const fl = G.world.floorBelow(p.pos.x, p.pos.y + 0.3, p.pos.z), g = V(p.pos.x, fl > -50 ? fl : p.pos.y, p.pos.z);
+        G.combat.zone(g, 4.5, 3, 'gravity', 0, { onEnd: () => G.combat.explode(g.clone().add(V(0, 1, 0)), 4, p.dmg * 0.8, Object.assign({}, inf, { color: 0xa070ff })) });
+        G.sfx.magic(p.pos, 'dark'); G.fx.ring(g.clone().add(V(0, 0.1, 0)), 4.5, 0xa070ff, 0.6);
+      };
+    }
     if (pj.kind === 'grenade') base.onHitEnemyExplode = true;
     if (s.pull || w.def.pull) {
       base.onHitEnemy = (e) => { if (!e.boss) { const toMe = P.pos.clone().sub(e.pos).setY(0); e.knockback(toMe.normalize(), Math.min(22, toMe.length() * 2.2)); G.combat.stun(e, 0.8); } G.sfx.chain(0.4, 0.4); };

@@ -100,6 +100,12 @@
     ['y_midas', 'revolver', '神器「黄金律」', 'mythic', { dmg: 1.4, rpm: 1.2 }, 'goldrush', 'gold', '撃つたびにコインを3枚弾丸に込める。コインがある限り威力2.2倍。'],
     ['y_echo', 'rifle', '神器「残響のアリア」', 'mythic', { dmg: 1.3, rpm: 1.1, mag: 1.3 }, 'echo', 'gold', '4発ごとに、周囲の敵3体へ亡霊の弾が追撃する。'],
     ['y_maw', 'shotgun', '神器「虚喰らい」', 'mythic', { dmg: 1.35, pellets: 1.2 }, 'voidmaw', 'black', '命中した敵を手元へ引き寄せ、受けるダメージ+60%の刻印を刻む。'],
+    ['y_hive', 'smg', '神器「女王蜂の羽音」', 'mythic', { dmg: 1.25, rpm: 1.1, mag: 1.5 }, 'hive', 'gold', '撃ち込んだ弾が敵に「蜂」を残す。蜂は3秒ごとに近くの別の敵へ飛び移って刺す（同時に最大12匹）。'],
+    ['y_ruin', 'rocket', '神器「終末の砲声」', 'mythic', { dmg: 1.5 }, 'ruin', 'black', '着弾点に3秒間ブラックホールを残し、敵を吸い寄せて最後に再び爆発する。'],
+    ['y_eternal', 'lmg', '神器「無尽の連弾」', 'mythic', { dmg: 1.3, rpm: 1.1 }, 'eternal', 'gold', '撃ち続けて4秒たつと、リロードするまで弾が減らなくなる。'],
+    ['y_moon', 'pistol', '神器「月影の短筒」', 'mythic', { dmg: 1.6, rpm: 1.1, mag: 1.5 }, 'moon', 'steel', '6発目ごとに必ず会心・2体貫通・冷気を付与する弾になる。会心で倒すと、6発目までのカウントが2進む。'],
+    ['y_crown', 'dmr', '神器「王権の裁定」', 'mythic', { dmg: 1.45, rpm: 1.15 }, 'crown', 'gold', 'ヘッドショットした敵に「王印」（受けるダメージ増加）。王印の敵が倒れると、周囲10mの敵全員に王印が移る。'],
+    ['y_tide', 'shotgun', '神器「蒼海の咆哮」', 'mythic', { dmg: 1.35, pellets: 1.2 }, 'tide', 'steel', '水属性の散弾。水が付いた敵を狙うと、散弾が全弾中心に収束する。'],
     ['y_storm', 'sniper', '神器「天雷の弓」', 'mythic', { dmg: 1.5, rpm: 1.25, mag: 1.4 }, 'stormcall', 'steel', 'ヘッドショットで天から雷が落ち、周囲5体へ連鎖する。'],
   ];
   const WEAPONS = [];
@@ -126,6 +132,12 @@
     echo: { icon: '👻', name: '残響', desc: '4発ごとに周囲3体へ追撃' },
     voidmaw: { icon: '🕳️', name: '虚喰らい', desc: '命中で引き寄せ＋受けるダメージ+60%の刻印' },
     stormcall: { icon: '🌩️', name: '天雷', desc: 'ヘッドショットで落雷が5体へ連鎖' },
+    hive: { icon: '🐝', name: '蜂群', desc: '命中した敵に蜂を残し、3秒ごとに別の敵へ飛び移って刺す（最大12匹）' },
+    ruin: { icon: '🌀', name: '終末', desc: '着弾点に3秒間ブラックホールを残し、最後に再爆発' },
+    eternal: { icon: '♾️', name: '無尽', desc: '撃ち続けて4秒たつと、リロードまで弾が減らない' },
+    moon: { icon: '🌙', name: '月影', desc: '6発目ごとに確定会心・2体貫通・冷気。会心で倒すとカウント+2' },
+    crown: { icon: '👑', name: '王権', desc: 'ヘッドショットで王印。王印の敵が倒れると周囲10mの敵へ移る' },
+    tide: { icon: '🌊', name: '蒼海', desc: '水属性。水が付いた敵には散弾が全弾収束' },
   };
   for (const [id, arch, name, rarity, mods, trait, finish, desc] of V) {
     const A = ARCH[arch];
@@ -144,9 +156,9 @@
   }
   // weapons born with an element (element.js): no 属性コア fits them
   // (the common guns are set to one standard: about 150 sustained DPS; a shotgun 170 with every pellet, a sniper rifle 120 on the body)
-  const INNATE = { p_cinder: 'fire', n_dragon: 'fire', y_storm: 'volt' };
+  const INNATE = { p_cinder: 'fire', n_dragon: 'fire', y_storm: 'volt', y_tide: 'water' };
   for (const w of WEAPONS) { const el = INNATE[w.id] || (w.arch === 'flame' ? 'fire' : w.arch === 'tesla' ? 'volt' : null); if (el) w.el = el; }
-  const MYTH = { y_midas: 7000, y_echo: 8000, y_maw: 9000, y_storm: 12000 };
+  const MYTH = { y_midas: 7000, y_echo: 8000, y_maw: 9000, y_storm: 12000, y_hive: 8000, y_ruin: 10000, y_eternal: 9000, y_moon: 7500, y_crown: 10000, y_tide: 9000 };
   for (const w of WEAPONS) if (MYTH[w.id]) w.price = MYTH[w.id];
   for (const w of WEAPONS) if (w.rarity === 'mythic') w.mythic = true; // (ミシック: the shop's 神器 shelf, alchemy and the parts read this flag)
   G.WEAPON_ARCH = ARCH;
@@ -238,6 +250,20 @@
     ['c_wind', 'core', '風の属性コア', '🌪️', 'epic', 520, { el: 'wind' }, null, '武器（銃・近接）の攻撃が風属性になる（敵に付いた属性を周囲へ広げる）。', NOEL],
     ['c_earth', 'core', '地の属性コア', '🪨', 'epic', 520, { el: 'earth' }, null, '武器（銃・近接）の攻撃が地属性になる（敵に付いた属性で結晶を作る）。', NOEL],
     ['b_blast', 'barrel', '高圧発射筒', '🎇', 'rare', 380, { 'explodeR+': 1.2, dmg: 1.1 }, null, '爆発半径+1.2m、ダメージ+10%。', (w) => !!(w.proj && w.proj.explode)],
+    // レジェンダリー: each slot gets one (2026-11)
+    ['o_seer', 'optic', '千里眼', '👁️', 'legendary', 680, { zoom: 1.4, critChance: 0.08, 'xray+': 1 }, 'holo', 'ADS中、壁越しに敵の姿が光って見える。会心率+8%。', GUNLIKE],
+    ['m_hush', 'muzzle', '消音の極意', '🤐', 'legendary', 650, { recoil: 0.85, 'hush+': 0.4 }, 'supp2', '撃っても敵に気づかれにくい（発砲の音と光がない）。自分に気づいていない敵（こちらが見えていない敵・囮や味方を狙っている敵）への与ダメ+40%。', NOT_PROJ],
+    ['b_star', 'barrel', '星鉄の銃身', '🌠', 'legendary', 680, { dmg: 1.2, range: 1.3, 'noFall+': 1 }, null, 'ダメージ+20%、射程+30%。距離によるダメージの減衰がなくなる。', NOT_PROJ],
+    ['u_twin', 'under', '双撃の銃架', '🎯', 'legendary', 650, { 'underGL+': 1 }, 'gyro', '10発撃つごとに、照準の先へ小型の擲弾を自動で撃ち出す。', GUNLIKE],
+    ['k_gale', 'stock', '疾風の銃床', '💨', 'legendary', 620, { 'galeFire+': 1, moveMul: 1.05 }, 'skel', 'ダッシュ・スライディング中も撃て、その間は弾が拡散しない。移動速度+5%。', GUNLIKE],
+    ['a_chain', 'ammo', '連鎖弾', '🔗', 'legendary', 650, { 'chainKill+': 1 }, null, '敵を倒すと、その敵から近くの敵（12m以内）へ弾が1発跳ぶ。', NOT_PROJ],
+    ['t_magic', 'trigger', '魔弾の引鉄', '🔮', 'legendary', 650, { 'critChain+': 3 }, null, '会心が出ると、次の射撃も必ず会心になる（続くのは最大3回）。', GUNLIKE],
+    // ミシック
+    ['c_chaos', 'core', '混沌の属性コア', '🌈', 'mythic', 1400, { 'chaos+': 1 }, null, '武器（銃・近接）の攻撃の属性が、当たるたびに、敵に付いている属性と反応する属性へ自動で切り替わる（反応を起こし続ける）。', NOEL],
+    ['g_eternal', 'mag', '永劫の弾倉', '🔄', 'mythic', 1400, { 'noReload+': 1 }, 'infdrum', 'リロードがなくなる。弾は毎秒、装弾数の15%ずつ自動で補充される。', GUNLIKE],
+    ['a_soul', 'ammo', '魂喰らいの弾', '👻', 'mythic', 1400, { 'soulAmmo+': 1 }, null, 'この武器で倒すたびに、そのエリアの間ずっと与ダメ+1%（最大+40%）。次のエリアには半分を持ち越す。', GUNLIKE],
+    ['o_god', 'optic', '神の眼', '🌟', 'mythic', 1400, { zoom: 1.3, adsTime: 0.77, 'godEye+': 1 }, 'holo', 'ADS中、敵の弱点（頭）が光って見える。ADS中の弱点への命中は必ず会心。ADS速度+30%。', GUNLIKE],
+    ['t_time', 'trigger', '時穿ちの引鉄', '⏳', 'mythic', 1400, { 'echoShot+': 1 }, null, '撃った弾が0.5秒後に同じ軌道でもう一度飛ぶ（ダメージ60%）。', GUNLIKE],
   ];
   const ATTACHMENTS = AT.map(([id, slot, name, icon, rarity, price, mods, visual, desc, compat]) => ({ id, slot, name, icon, rarity, price, mods, visual, desc, compat, kind: 'attachment' }));
   G.ATT_SLOTS = SLOT;
@@ -286,14 +312,18 @@
     ['m_woodshield', '木の円盾', '🛡️', 'common', 'blade', { guard: [0.64, 104, 64], dmg: 32, swing: 0.42, range: 2.5, arc: 0.5, heavy: [2.2, 0.4, 0.5], moveMul: 1.08, knock: 5 }, null, 'buckler', '木の板を張り合わせた小ぶりの盾。騎士の円盾には劣るが、しっかり受け止める。'],
     ['m_buckler', '騎士の円盾', '🛡️', 'uncommon', 'blade', { guard: [0.8, 130, 80], dmg: 40, swing: 0.42, range: 2.6, arc: 0.5, heavy: [2.4, 0.4, 0.5], moveMul: 1.08, knock: 6 }, 'bash', 'buckler', '小ぶりな円盾と片手剣。広い角度を受け止め、重撃は盾で殴りつけて怯ませる。'],
     ['m_tower', '城壁の大盾', '🧱', 'rare', 'blunt', { guard: [0.92, 200, 70], dmg: 62, swing: 0.7, range: 2.6, arc: 0.4, heavy: [2.6, 0.6, 0.65], moveMul: 1.0, knock: 12, shieldMul: 1.3 }, 'bash', 'tower', '身の丈ほどの鉄の大盾と短い戦鎚。ほとんどの攻撃を受け止めるが、振りは重い。重撃は盾の体当たり。'],
+    ['m_kusanagi', '神器「天叢雲」', '🌀', 'mythic', 'blade', { guard: [0.6, 60, 60], dmg: 88, swing: 0.38, range: 3.2, arc: 0.5, heavy: [3.2, 0.5, 0.5], moveMul: 1.15, knock: 5, critChance: 0.15 }, 'iai', 'katana', '雲を裂いたと伝わる神剣。重撃は居合：前方20mの敵を一瞬で斬り抜け、0.6秒後にまとめて大ダメージを与える。'],
+    ['m_abyss', '神器「深淵の槍」', '🔱', 'mythic', 'spear', { guard: [0.5, 60, 50], dmg: 80, swing: 0.5, range: 4.4, arc: 0.82, heavy: [2.6, 0.45, 0.5], moveMul: 1.1, knock: 7 }, 'abyssSpear', 'spear', '深淵の底で鍛えられた投げ槍。重撃で投げると刺さった場所に重力場ができる。もう一度重撃で手元へ呼び戻し、通り道の敵を貫く。'],
     ['m_holy', '聖剣「黎明」', '✨', 'legendary', 'blade', { guard: [0.55, 65, 60], dmg: 88, swing: 0.4, range: 3.2, arc: 0.45, heavy: [2.6, 0.38, 0.45], moveMul: 1.14, knock: 6, critChance: 0.1 }, 'beam', 'holy', '光の聖剣。重撃で貫通する光の斬撃を飛ばす。'],
   ];
   const MTRAIT = {
     sweep: '横薙ぎ：攻撃範囲が広い', lunge: '居合：重撃で前方へ踏み込む', quake: '地震：重撃で周囲に衝撃波＋スタン', pierceLine: '貫通：直線上の敵をまとめて貫く',
     flameWave: '炎波：重撃で炎の斬撃波を放つ', bash: '盾撃：重撃で盾を叩きつけ、長く怯ませる', devour: '喰魂：変異体を倒すほど強化', midas: '黄金：殴るとコイン、重撃でコインを消費して威力3倍', reap: '刈取：ほぼ全方位攻撃・吸血', thunder: '落雷：連鎖雷、重撃で落雷', beam: '光刃：重撃で貫通する光の斬撃',
+    iai: '居合：重撃で前方20mを斬り抜け、0.6秒後にまとめて大ダメージ', abyssSpear: '深淵の槍：重撃で投げて重力場、もう一度重撃で呼び戻して貫く',
   };
   G.MELEE = ML.map(([id, name, icon, rarity, mcat, s, trait, model, desc]) => Object.assign({ id, name, icon, rarity, mcat, cat: MCAT[mcat], trait, traitDesc: trait ? MTRAIT[trait] : null, model, desc, kind: 'melee', price: id === 'fists' || id === 'm_basic' ? 0 : MPRICE[rarity] + Math.round(s.dmg / s.swing / 10) * 10, critChance: 0, headMul: 1.5, shieldMul: 1, lifesteal: 0, elem: null, elemChance: 0 }, s));
-  for (const m of G.MELEE) if (m.id === 'm_devour' || m.id === 'm_midas') m.price = m.id === 'm_devour' ? 9500 : 6500;
+  const MYTHM = { m_devour: 9500, m_midas: 6500, m_kusanagi: 9000, m_abyss: 9500 };
+  for (const m of G.MELEE) if (MYTHM[m.id]) m.price = MYTHM[m.id];
   for (const m of G.MELEE) if (m.rarity === 'mythic') m.mythic = true;
   G.MELEE_BY_ID = Object.fromEntries(G.MELEE.map((m) => [m.id, m]));
   // melee weapons born with an element (element.js): 焔刃 fire, 氷牙 ice, 鳴神 volt

@@ -897,6 +897,16 @@
     s.onclick = () => G.game.resume();
   };
   // the player's money in a bold framed box (merchant, pawn shop, vending stone, gambling ...)
+  // a weapon's forge level against its cap (the cap follows the rarity): one notch per level up to the cap, gold up to the level,
+  // the levels about to be added pulsing cyan. 'thin' = a bare strip along the bottom of a weapon lying in the bag.
+  UI.forgeCap = (w) => (G.Areas ? G.Areas.forgeCap(w && (w.def || w)) : 15);
+  UI.forgeBar = function (lv, cap, add, cls) {
+    lv = Math.min(lv || 0, cap); add = Math.max(0, Math.min(add || 0, cap - lv));
+    let n = ''; for (let i = 1; i <= cap; i++) n += `<i class="${i <= lv ? 'on' : i <= lv + add ? 'add' : ''}"></i>`;
+    const max = lv + add >= cap;
+    const txt = cls === 'thin' ? '' : `<em>${add ? `+${lv}→<b>+${lv + add}</b>` : '+' + lv}<small>/${cap}${max ? ' 最大' : ''}</small></em>`;
+    return `<span class="fgb${cls ? ' ' + cls : ''}${max ? ' max' : ''}" title="強化 +${lv}（このレア度の上限 +${cap}）"><span class="fgb-n">${n}</span>${txt}</span>`;
+  };
   UI.coinBox = (cls) => `<div class="coinbox ${cls || ''}"><span>🪙</span><b>${U.fmt((G.game.run && G.game.run.coins) || 0)}</b><small>所持金</small></div>`;
   UI.choice = function (title, desc, options, cancel) {
     const s = UI.screen(`<div class="panel" style="width:min(520px,94vw);position:relative">${/所持 🪙/.test(desc || '') ? UI.coinBox('float') : ''}<h2>${title}</h2><div style="font-size:13.5px;color:#ddd3c0;line-height:1.6">${desc || ''}</div><div class="choice-list">${options.map((o, i) => `<div class="choice${o.disabled ? ' disabled' : ''}" data-i="${i}" ${o.tip ? o.tip : ''}><span class="ci">${o.icon}</span><div style="flex:1"><b>${U.esc(o.label)}</b>${o.sub ? `<div style="font-size:12px;color:var(--dim)">${o.sub}</div>` : ''}</div>${o.aside ? `<button class="choice-aside" data-i="${i}" title="${U.esc(o.aside.tip || '')}"${o.aside.hidden ? ' style="visibility:hidden" tabindex="-1"' : ''}>${o.aside.icon}</button>` : ''}</div>`).join('')}</div>${cancel ? '<div style="margin-top:14px;text-align:right"><button class="btn small" id="c-cancel">キャンセル</button></div>' : ''}</div>`, 'dim');

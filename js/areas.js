@@ -971,7 +971,7 @@
     const opts = G.weapons.gunsInOrder().map((pw) => {
       const lv = pw.lv || 0, c = AR.forgeCost(pw), cap = AR.forgeCap(pw);
       const mx = lv >= cap;
-      return { _tok: pw, icon: pw.def.icon, label: `${G.weapons.keyLabel(pw)}${pw.def.name} +${lv}${mx ? '' : ` → +${lv + 1}（${c}🪙）`}`, sub: mx ? `最大強化（${G.RARITY[pw.def.rarity] ? G.RARITY[pw.def.rarity].name + 'は' : ''}+${cap}まで）` : `ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}・上限+${cap}）`, disabled: mx || GM.run.coins < c, onPick: () => {
+      return { _tok: pw, icon: pw.def.icon, label: `${G.weapons.keyLabel(pw)}${pw.def.name} +${lv}${mx ? '' : ` → +${lv + 1}（${c}🪙）`}`, sub: G.ui.forgeBar(lv, cap, mx ? 0 : 1) + ' ' + (mx ? `最大強化（${G.RARITY[pw.def.rarity] ? G.RARITY[pw.def.rarity].name + 'は' : ''}+${cap}まで）` : `ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}）`), disabled: mx || GM.run.coins < c, onPick: () => {
         GM.run.coins -= c; pw.lv = lv + 1; pw.forge = (pw.forge || 0) + c; pw.ver++; G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7);
         if (pw === P.weapon) G.weapons.equip(true); G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${pw.def.name} +${pw.lv}`, 'good');
       } };
@@ -979,7 +979,7 @@
     {
       const mw = P.melee, lv = mw.lv || 0, c = AR.forgeCost(mw), cap = AR.forgeCap(mw);
       const mx = lv >= cap;
-      if (mw.id !== (G.BARE_MELEE || 'fists')) opts.push({ _tok: 'm', icon: mw.def.icon, label: `${G.weapons.keyLabel('m')}${mw.def.name} +${lv}${mx ? '' : ` → +${lv + 1}（${c}🪙）`}`, sub: mx ? `最大強化（${G.RARITY[mw.def.rarity] ? G.RARITY[mw.def.rarity].name + 'は' : ''}+${cap}まで）` : `近接ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}・上限+${cap}）`, disabled: mx || GM.run.coins < c, onPick: () => {
+      if (mw.id !== (G.BARE_MELEE || 'fists')) opts.push({ _tok: 'm', icon: mw.def.icon, label: `${G.weapons.keyLabel('m')}${mw.def.name} +${lv}${mx ? '' : ` → +${lv + 1}（${c}🪙）`}`, sub: G.ui.forgeBar(lv, cap, mx ? 0 : 1) + ' ' + (mx ? `最大強化（${G.RARITY[mw.def.rarity] ? G.RARITY[mw.def.rarity].name + 'は' : ''}+${cap}まで）` : `近接ダメージ×1.13（現在 ×${Math.pow(1.13, lv).toFixed(2)}）`), disabled: mx || GM.run.coins < c, onPick: () => {
         GM.run.coins -= c; mw.lv = lv + 1; mw.forge = (mw.forge || 0) + c; G.sfx.mech('magIn'); G.sfx.explosion(G.world.anvilPos, 0.3); G.fx.sparks(G.world.anvilPos.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 30, 0xffb060, 7);
         G.ui.refreshWeapon(); G.ui.toast(`⚒️ ${mw.def.name} +${mw.lv}`, 'good');
       } });

@@ -66,6 +66,7 @@
         <div class="wc-info">
           <div class="nm">${esc(d.name)}${w.lv ? `<b class="lv">+${w.lv}</b>` : ''}</div>
           <div class="cat">${esc(d.cat || '')}・${G.RARITY[d.rarity].name}</div>
+          <div class="fg">${G.ui.forgeBar(w.lv, G.ui.forgeCap(w))}</div>
           <div class="dps"><b>${Math.round(G.weapons.gunDps(w))}</b><span>DPS</span></div>
           ${trait ? `<div class="tr">${trait.icon} ${esc(trait.name)}</div>` : ''}
           ${(() => { const el = G.Elem.wEl(w); return el ? `<div class="tr" style="color:${G.Elem.BY[el].col}">${G.Elem.BY[el].icon} ${G.Elem.BY[el].name}属性</div>` : ''; })()}
@@ -97,6 +98,7 @@
         <div class="wc-info">
           <div class="nm">${esc(d.name)}${m.lv ? `<b class="lv">+${m.lv}</b>` : ''}</div>
           <div class="cat">${esc(d.cat)}・${G.RARITY[d.rarity].name}</div>
+          ${d.id === (G.BARE_MELEE || 'fists') ? '' : `<div class="fg">${G.ui.forgeBar(m.lv, G.ui.forgeCap(m))}</div>`}
           <div class="dps"><b>${Math.round(dps)}</b><span>DPS</span>${Math.abs(dps - dps0) > dps0 * 0.005 ? `<span class="sd ${dps > dps0 ? 'up' : 'dn'}">(${dps > dps0 ? '+' : ''}${Math.round((dps / dps0 - 1) * 100)}%)</span>` : ''}</div>
           ${fxLines.map((x) => `<div class="tr">${esc(x)}</div>`).join('')}
           ${(() => { const a = m.atts && m.atts.core && G.ATT_BY_ID[m.atts.core], L = a && G.Elem.BY[a.mods.el]; return L ? `<div class="tr" style="color:${L.col}" ${UI.tipAttr(a)}>${a.icon} ${esc(a.name)}（${L.name}属性）</div>` : ''; })()}

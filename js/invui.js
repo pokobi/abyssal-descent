@@ -101,7 +101,7 @@
     const big = Math.min(w, h);
     const ench = it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : '';
     const fit = it.type === 'att' && attFits(it);
-    const dur = it.type === 'armor' ? durBar(it) : '';
+    const dur = it.type === 'armor' ? durBar(it) : IV.isArm(it) ? G.ui.forgeBar((it.gun && it.gun.lv) || 0, G.ui.forgeCap(d), 0, 'thin') : ''; // (a weapon: its forge level against the cap)
     return `<div class="iv-it t-${it.type}${fit ? ' iv-fit' : ''}" data-uid="${it.uid}" data-where="${where}" style="--rc:${R(d.rarity)};left:${it.x * cell}px;top:${it.y * cell}px;width:${w * cell - 3}px;height:${h * cell - 3}px">
       <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${G.Elem.badge(G.Elem.itemTag(it))}${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : it.type === 'part' ? '<em class="iv-def">🔩</em>' : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
   }
@@ -145,10 +145,10 @@
         return `<div class="iv-as${a ? ' on' : ''}${wantsOne ? ' iv-fitslot' : ''}" data-as="${i}:${sl}" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:${i}:${sl}" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div>`;
       }).join('');
       const dps = Math.round(W.gunDps(w)); // (same number as the status screen: 与ダメ included)
-      return `<div class="iv-wbox" data-wslot="${i}" style="--rc:${R(w.def.rarity)}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b style="color:${R(w.def.rarity)}">${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}${G.Elem.badge(w, 'in')}</b><small>${U.esc(w.def.cat || '')}</small></span><span class="wdps"><b>${dps}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('gun', w.def, w.atts)}</div><div class="iv-asg">${cells}</div></div>`;
+      return `<div class="iv-wbox" data-wslot="${i}" style="--rc:${R(w.def.rarity)}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b style="color:${R(w.def.rarity)}">${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}${G.Elem.badge(w, 'in')}</b><small>${U.esc(w.def.cat || '')}</small>${G.ui.forgeBar(w.lv, G.ui.forgeCap(w))}</span><span class="wdps"><b>${dps}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('gun', w.def, w.atts)}</div><div class="iv-asg">${cells}</div></div>`;
     });
     const m = P.melee, md = m.def, ms = W.meleeStats(m), mfx = W.meleeFx ? W.meleeFx(md) : [];
-    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}${G.Elem.badge(m, 'in')}</b><small>${U.esc(md.cat || '')}${md.id === (G.BARE_MELEE || 'fists') ? '・素手' : mfx.length ? ' · ' + U.esc(mfx[0]) : ''}</small></span><span class="wdps"><b>${Math.round(W.meleeDps(m))}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>${meleeCore(m)}
+    out.push(`<div class="iv-wbox mel" data-melee="1" style="--rc:${R(md.rarity)}"><div class="iv-wh"><kbd>${G.K('w3')}</kbd><span class="wnm"><b style="color:${R(md.rarity)}">${U.esc(md.name)}${m.lv ? ' +' + m.lv : ''}${G.Elem.badge(m, 'in')}</b><small>${U.esc(md.cat || '')}${md.id === (G.BARE_MELEE || 'fists') ? '・素手' : mfx.length ? ' · ' + U.esc(mfx[0]) : ''}</small>${md.id === (G.BARE_MELEE || 'fists') ? '' : G.ui.forgeBar(m.lv, G.ui.forgeCap(m))}</span><span class="wdps"><b>${Math.round(W.meleeDps(m))}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('melee', md)}</div>${meleeCore(m)}
       <div class="iv-mst"><div><small>ダメージ</small><b>${Math.round(ms.dmg * W.meleeDmgMul())}</b></div><div><small>重撃</small><b>${Math.round(ms.dmg * W.meleeDmgMul() * ms.heavy[0])}</b></div><div><small>間隔</small><b>${ms.swing.toFixed(2)}s</b></div><div><small>リーチ</small><b>${ms.range}m</b></div></div></div>`);
     return out.join('');
   }
@@ -484,7 +484,7 @@
     const el = IV.isArm(w) ? root.querySelector(`.iv-it[data-uid="${w.uid}"]`) : w === P.melee ? root.querySelector('.iv-wbox[data-melee]') : i >= 0 ? root.querySelector(`.iv-wbox[data-wslot="${i}"]`) : null;
     if (!el) return;
     const k = IV.forgeGain(kit, w), lv = IV.forgeLv(w);
-    const note = document.createElement('b'); note.className = 'iv-kitnote forge' + (k > 0 ? '' : ' no'); note.textContent = k > 0 ? `⚒ +${lv} → +${lv + k}` : w.id === (G.BARE_MELEE || 'fists') ? '素手は不可' : '強化上限';
+    const note = document.createElement('b'); note.className = 'iv-kitnote forge' + (k > 0 ? '' : ' no'); if (k > 0) note.innerHTML = G.ui.forgeBar(lv, G.ui.forgeCap(armDef(w)), k); else note.textContent = w.id === (G.BARE_MELEE || 'fists') ? '素手は不可' : `強化上限（+${G.ui.forgeCap(armDef(w))}）`;
     el.appendChild(note);
   }
   // a bag tool in hand: one line beside the cursor on where it goes (or that there is nothing to use it on)
@@ -739,7 +739,7 @@
       { const f = IV.durFrac(it), col = f > 0.5 ? '#6ee06a' : f > 0.2 ? '#f0b040' : '#ff4a3a';
         body += `<div class="ivt-r">🔧 耐久 <b style="color:${col}">${Math.ceil(IV.durOf(it))} / ${IV.durMax(it)}</b>（${Math.round(f * 100)}%）</div>`; }
     } else body += `<div class="ivt-d">${U.esc(d.desc || '')}</div>`;
-    if (it.type === 'melee') body += `<div class="ivt-r">${G.weapons.guardStats(d).map(([k, v]) => `${k} <b>${v}</b>`).join('　')}</div><div class="ivt-r">⚒️ 強化 <b>+${(it.gun && it.gun.lv) || 0}</b>　ダブルクリック／近接枠へドラッグで装備</div>`;
+    if (it.type === 'melee') body += `<div class="ivt-r">${G.weapons.guardStats(d).map(([k, v]) => `${k} <b>${v}</b>`).join('　')}</div><div class="ivt-r">⚒️ 強化 ${G.ui.forgeBar((it.gun && it.gun.lv) || 0, G.ui.forgeCap(d))}　ダブルクリック／近接枠へドラッグで装備</div>`;
     body += `<div class="ivt-v">売値 ${U.fmt(IV.value(it))}🪙</div>`;
     return body;
   };

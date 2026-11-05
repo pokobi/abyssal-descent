@@ -1089,6 +1089,7 @@
       end = hp;
       if (pierce-- <= 0) { stopped = true; break; }
     }
+    if (G.Strata.doors.length) for (const [dr] of G.Strata.doorsOnRay(o, dir, o.distanceTo(end))) G.Strata.hitDoor(dr, s.dmg, 'bullet');
     // tracer
     if (muzzle && (pellets <= 1 || Math.random() < 0.35)) {
       const wel = G.Elem.wEl(w);
@@ -1163,6 +1164,7 @@
       G.combat.damageEnemy(e, s.dmg, { src: 'bullet', weapon: w, elem: 'fire', elemChance: 0.5, el: G.Elem.wEl(w), noMarker: Math.random() < 0.7, shieldMul: s.shieldMul * 1.2 });
     }
     for (const d of G.world.destructibles) if (d.alive && d.pos.distanceTo(o) < reach) { const to = d.pos.clone().sub(o).normalize(); if (to.dot(f) > 0.85) G.combat.damageDestructible(d, s.dmg, d.pos); }
+    if (G.Strata.doors.length) for (const dr of G.Strata.doorsNear(o, reach, f, 0.85)) G.Strata.hitDoor(dr, s.dmg, 'bullet');
     if (wh && Math.random() < 0.2) G.fx.decal(wh.point, wh.normal, 'scorch', 0.6);
     P.addRecoil(0.0004, (Math.random() - 0.5) * 0.0008);
     anim.kick = Math.min(0.4, anim.kick + 0.05);

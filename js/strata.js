@@ -100,7 +100,7 @@
         const c = bar(da + 0.02, y, db - 0.02, y + dh, false); c.navIgnore = true; // monsters plan their way through it (and batter it down)
         const door = { axis: 'z', plane: xf, lo: da, hi: db, y, h: dh, hinge: rng.chance(0.5) ? 0 : 1, face: s === 'W' ? 1 : -1, col: c, hp: 100, state: 'closed' };
         const it = { type: 'celldoor', pos: V(xf, y + 1.2, (da + db) / 2), door };
-        door.it = it; w.doors.push(door); w.interactables.push(it);
+        door.it = it; c.door = door; w.doors.push(door); w.interactables.push(it);
       }
       // inside: straw, shackles on the back wall, bones, crates and barrels, a table, cobwebs, torches, chests and graves
       const big = Math.max(1, Math.round(cw * d / 45)), items = [];
@@ -650,6 +650,40 @@
       if (v[0] === 'open') { free(d, 'open'); d.ang = 1.75; } else if (v[0] === 'broken') { free(d, 'broken'); d.fall = 1; }
     });
     S.update(0);
+  };
+  // your own blows on a shut gate (the bars are tough: a bullet does a tenth of its damage, a blow or a blast a quarter)
+  S.DOOR_K = { bullet: 0.1, melee: 0.25, explosion: 0.25 };
+  S.hitDoor = function (d, dmg, kind, pos) {
+    if (!d || d.state !== 'closed' || !(dmg > 0)) return false;
+    d.hp -= dmg * (S.DOOR_K[kind] || 0.1);
+    d.shake = 1;
+    if (d.hp <= 0) S.breakDoor(d);
+    else { S.paintDoor(d); if (kind !== 'bullet') { const p = pos || doorPos(d); G.sfx.hitShield(p); G.fx.debris(p, G.world.mats.iron, 3, 0.05, 3); } }
+    return true;
+  };
+  // a shot passes between the bars (world.raycast lets it through), but grazes the gate it crosses: the shut gates its path goes through
+  S.doorsOnRay = function (o, dir, len) {
+    const out = [];
+    if (!dir.x) return out;
+    for (const d of S.doors) {
+      if (d.state !== 'closed') continue;
+      const t = (d.plane - o.x) / dir.x; if (t < 0 || t > len) continue;
+      const z = o.z + dir.z * t, y = o.y + dir.y * t;
+      if (z >= d.lo && z <= d.hi && y >= d.y && y <= d.y + d.h) out.push([d, o.clone().addScaledVector(dir, t)]);
+    }
+    return out;
+  };
+  // a blast or a swing reaching a gate (its centre within reach)
+  S.doorsNear = function (pos, r, f, cosMin) {
+    const out = [];
+    for (const d of S.doors) {
+      if (d.state !== 'closed') continue;
+      const c = doorPos(d), to = c.clone().sub(pos), dist = to.length();
+      if (dist > r + (d.hi - d.lo) / 2) continue;
+      if (f && dist > 0.01 && to.divideScalar(dist).dot(f) < cosMin) continue;
+      out.push(d);
+    }
+    return out;
   };
   // enemies.js: a monster pressed against a shut gate on its way batters it; the stronger it is, the sooner the gate gives
   S.bash = function (e, dt) {

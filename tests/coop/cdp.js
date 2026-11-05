@@ -14,9 +14,14 @@ exports.serve = function (root, port) {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 exports.sleep = sleep;
+// Drawing: on the real GPU by default. The game moves its clock at most 0.05 s a frame, so on the CPU renderer (SwiftShader,
+// about one frame a second with a whole area on screen) game time crawled at a sixteenth of real time and every test that waits
+// on the game (a fight, an area, a trial) took many minutes. If the GPU cannot be used, Chrome falls back to SwiftShader by itself
+// (--enable-unsafe-swiftshader); ABYSS_SWIFTSHADER=1 forces it (the old behaviour).
+const GPU_ARGS = process.env.ABYSS_SWIFTSHADER ? ['--use-angle=swiftshader'] : process.platform === 'win32' ? ['--use-angle=d3d11', '--enable-gpu'] : ['--enable-gpu'];
 exports.launch = async function (port) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'abyss-cdp-'));
-  const ch = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--mute-audio', '--no-first-run', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--window-size=480,300', 'about:blank'], { stdio: 'ignore' });
+  const ch = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--mute-audio', '--no-first-run', ...GPU_ARGS, '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--window-size=480,300', 'about:blank'], { stdio: 'ignore' });
   let ver = null;
   for (let i = 0; i < 60 && !ver; i++) { await sleep(250); try { ver = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json(); } catch (e) { /* still starting */ } }
   if (!ver) throw new Error('chrome did not start');

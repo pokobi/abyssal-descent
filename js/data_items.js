@@ -20,7 +20,7 @@
     // heals (4-7 utility belt)
     ['h_bandage', 'heal', '包帯', '🩹', 'common', 60, '2秒かけてHPを30回復。', { heal: 30, over: 2 }],
     ['h_medkit', 'heal', '救急キット', '🧰', 'uncommon', 120, 'HPを70即時回復。', { heal: 70 }],
-    ['h_elixir', 'heal', '生命の霊薬', '🧪', 'rare', 260, 'HPを全回復する。', { heal: 9999 }],
+    ['h_elixir', 'heal', '生命の霊薬', '🧪', 'epic', 380, 'HPを全回復する。', { heal: 9999 }],
     ['h_regen', 'heal', '再生の薬', '💉', 'uncommon', 110, '10秒間、毎秒HP9回復。', { heal: 90, over: 10 }],
     ['h_troll', 'heal', 'トロールの心臓', '🫀', 'legendary', 320, '最大HP+15（永続）、HP40回復。', { heal: 40, maxHp: 15 }],
     ['h_apple', 'heal', '黄金の林檎', '🍎', 'epic', 320, 'HP50回復＋オーバーシールド40。', { heal: 50, os: 40 }],
@@ -28,7 +28,7 @@
     ['h_ambrosia', 'heal', '神酒', '🍶', 'legendary', 900, 'HPを全回復する。さらに10秒間、受けたダメージの半分をすぐに回復する。', { heal: 9999, ambrosia: 10 }],
     ['h_water', 'heal', '清めの水', '⚗️', 'rare', 180, '状態異常を解除してHP10回復。さらに90秒間、状態異常の持続時間-70%・継続ダメージ-50%。', { heal: 10, cleanse: true, resist: 90 }],
     // utilities
-    ['u_plate', 'util', '鎧板', '🛡️', 'rare', 190, 'オーバーシールド+50。', { os: 50 }],
+    ['u_plate', 'util', '鎧板', '🛡️', 'epic', 280, 'オーバーシールド+50。', { os: 50 }],
     ['u_hammer', 'util', '鍛冶神の槌', '🔨', 'legendary', 1200, '使うと、手に持っている武器（銃か近接武器）の強化値+2（武器の上限まで）。', { forge: 2 }],
     ['u_iron', 'util', '鉄皮の薬', '🪨', 'uncommon', 130, '10秒間、被ダメ-50%。', { temp: { armor: 0.5 }, dur: 10 }],
     ['u_invis', 'util', '透明薬', '👻', 'rare', 190, '8秒間透明になり、敵に狙われなくなる。', { invis: 8 }],

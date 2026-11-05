@@ -228,7 +228,7 @@
         if (ph.fn) ph.fn(this);
       }
       // shield (totems up)
-      if (this.totems.length) { this.totems = this.totems.filter((t) => t.p.alive); this.main.invuln = this.totems.length > 0; if (!this.main.invuln) { G.ui.toast(S.shieldDown || '守りが崩れた — 今だ！', 'good'); G.sfx.explosion(this.pos, 0.8); } for (const t of this.totems) { t.g.rotation.y += dt; t.g.position.y = t.y + Math.sin(this.t * 2 + t.ph) * 0.3; t.p.pos.copy(t.g.position); t.p.centerRef.copy(t.g.position); t.p.hitW[0].w.copy(t.g.position); } }
+      if (this.totems.length) { this.totems = this.totems.filter((t) => t.p.alive); this.main.invuln = this.totems.length > 0; if (!this.main.invuln) { this.gimmickClear(this.totemName || '結晶'); G.ui.toast(S.shieldDown || '守りが崩れた — 今だ！', 'good'); G.sfx.explosion(this.pos, 0.8); } for (const t of this.totems) { t.g.rotation.y += dt; t.g.position.y = t.y + Math.sin(this.t * 2 + t.ph) * 0.3; t.p.pos.copy(t.g.position); t.p.centerRef.copy(t.g.position); t.p.hitW[0].w.copy(t.g.position); } }
       this.minions = this.minions.filter((e) => e.alive);
       const dh = this.playerDistH();
       this.cd -= dt * this.speedK * this.tempo;
@@ -459,7 +459,7 @@
       G.ui.toast(`💫 ${this.def.name}が怯んだ！ 好機だ`, 'good'); G.sfx.monster(this.pos, 'roar', this.S.pitch || 0.5, 1);
     }
     raiseTotems(a) {
-      const n = a.n || 3, w = this.world;
+      const n = a.n || 3, w = this.world; this.totemName = a.totem || '守りの結晶';
       for (let i = 0; i < n; i++) {
         const an = (i / n) * Math.PI * 2 + Math.random(), R = U.rand(10, 15);
         const x = U.clamp(this.pos.x + Math.cos(an) * R, 5, w.W - 5), z = U.clamp(this.pos.z + Math.sin(an) * R, 5, (w.arenaD || w.D) - 5), y = 2.2;

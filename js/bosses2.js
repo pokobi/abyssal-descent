@@ -531,7 +531,7 @@
         const cl = { g, J, pos: this.pos.clone().add(V(i ? 4 : -4, 0, 0)), yaw: 0, cd: U.rand(1, 3), alive: true, walk: 0 };
         const part = this.part({ name: '影の分身', shared: false, hitW: [{ n: J.torso, r: 0.7, part: 'body', o: V(0, 0.5, 0) }, { n: J.head, r: 0.4, part: 'head' }], radius: 0.7, height: 2.8, showBar: true, blood: 0x300818 });
         part.maxHp = Math.round(this.maxHp * 0.05); part.hp = part.maxHp;
-        part.die = () => { cl.alive = false; part.alive = false; G.scene.remove(g); G.fx.smoke(cl.pos.clone().setY(1.4), 12, 1.3, 0x100810, 0.6, 0.8); return false; };
+        part.die = () => { cl.alive = false; part.alive = false; G.scene.remove(g); G.fx.smoke(cl.pos.clone().setY(1.4), 12, 1.3, 0x100810, 0.6, 0.8); if (!this.clones.some((c) => c.alive)) this.gimmickClear('影の分身', null, 0xff4060); return false; };
         part.barPos = () => part.centerRef.clone().add(V(0, 1.6, 0));
         cl.part = part;
         this.clones.push(cl);

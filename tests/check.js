@@ -32,7 +32,7 @@ const T = {
   mobile: ['tests/mobile_test.js'], trial: ['tests/trial_test.js'], boss_hp: ['tests/boss_hp_test.js'],
   skill: ['tests/coop/skill_test.js'], coop: ['tests/coop/coop_test.js'], world: ['tests/coop/world_test.js'], sky: ['tests/coop/sky_test.js'],
   run: ['tests/coop/run_test.js', 'normal', '5'], coop_duel: ['tests/coop/duel_test.js'], bossobj: ['tests/coop/bossobj_test.js'],
-  loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'],
+  loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'],
 };
 // game file (regex on the path) -> tests. The guardians are handled apart: only the ones defined in the changed files are fought.
 const MAP = [
@@ -52,6 +52,7 @@ const MAP = [
   [/^js\/(world|levelgen|fieldgen|strata|props|graves|fields)\.js$/, ['solo_smoke', 'world']],
   [/^js\/(areas|rooms2|midsave)\.js$/, ['solo_smoke', 'room', 'give']],
   [/^js\/bosses7\.js$/, ['boss_hp']],
+  [/^js\/bosses\d?\.js$/, ['gimmick']], // (a guardian's gimmicks cleared: a share of its health)
   [/^js\/(fx|statusui|pstatus|hudextra|ui|codex|devmode|perfmon|audio|textures|icons|icondata|avatar|warmup|util|smoothscroll)\.js$/, ['solo_smoke']],
   [/^js\/coop\//, ['coop', 'world', 'run']],
   [/^(index|coop)\.html$|^css\//, ['mobile']],

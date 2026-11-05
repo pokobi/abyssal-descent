@@ -658,7 +658,7 @@
         const ring = new THREE.Mesh(PG.torus, mat('#000', { emissive: 0x8040ff, emissiveIntensity: 2 })); ring.scale.set(1.4, 1.4, 1.4); ring.rotation.x = Math.PI / 2; ring.position.y = 0.3; holder.add(ring);
         const an = this.part({ name: '深淵の楔', shared: false, hitW: [{ n: holder, r: 1.1, part: 'body', o: V(0, 2.4, 0) }], radius: 1.1, height: 4.5, showBar: true, blood: 0xc060ff });
         an.maxHp = Math.round(this.maxHp * 0.025); an.hp = an.maxHp; an.holder = holder;
-        an.die = () => { an.alive = false; G.scene.remove(holder); G.fx.explosion(an.centerRef.clone(), 2.5, 0xc060ff); G.sfx.shieldBreak(an.centerRef); if (!this.anchors.some((x) => x.alive)) { this.anchorT = this.form === 3 ? 16 : 20; G.ui.toast(`💥 帳が破れた！ ${this.anchorT}秒間、核を撃ち放題！`, 'good'); G.sfx.bell(); } return false; };
+        an.die = () => { an.alive = false; G.scene.remove(holder); G.fx.explosion(an.centerRef.clone(), 2.5, 0xc060ff); G.sfx.shieldBreak(an.centerRef); if (!this.anchors.some((x) => x.alive)) { this.gimmickClear('深淵の楔', null, 0xc060ff); this.anchorT = this.form === 3 ? 16 : 20; G.ui.toast(`💥 帳が破れた！ ${this.anchorT}秒間、核を撃ち放題！`, 'good'); G.sfx.bell(); } return false; };
         an.barPos = () => an.centerRef.clone().add(V(0, 2.8, 0));
         this.anchors.push(an);
         G.fx.lightning(p.clone().setY(30), p.clone().setY(0.1), 0xc060ff);

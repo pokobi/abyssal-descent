@@ -2,6 +2,7 @@
 // Bosses: each has unique mechanics (weak points, invulnerable phases, terrain interaction) instead of scaled-up stats.
 (function () {
   const BS = (G.bosses = { active: null });
+  BS.GIMMICK_PCT = 0.08; // (see Boss.gimmickClear)
   const U = G.U;
   const V = G.U.V;
   let P, C, PG;
@@ -94,6 +95,19 @@
       if (mc && Math.hypot(mc.ent.pos.x - pos.x, mc.ent.pos.z - pos.z) < BS.SPLASH_R && Math.abs(mc.ent.pos.y - pos.y) < 4) BS.hurtMerc(mc, dmg * this.dmgScale * 0.6);
     }
     playerDistH() { return Math.hypot(P.pos.x - this.pos.x, P.pos.z - this.pos.z); }
+    // every summoned gimmick of one batch broken by the player (ward-eyes, egg sacs, shadow clones, abyss wedges, crystals...): the guardian itself
+    // loses GIMMICK_PCT of its max health. It never finishes the guardian off (that stays with the player's own blows, so phase changes keep working).
+    // Gimmicks that already hurt it piece by piece (the colossus's cores, the heart's pylons, the drake's wings, the king's echoes, the sovereign's constructs) keep their own rule.
+    gimmickClear(what, at, col) {
+      if (this.dead || !(this.hp > 1)) return;
+      const v = Math.min(this.hp - 1, this.maxHp * BS.GIMMICK_PCT);
+      this.hp -= v;
+      const p = at || (this.main && this.main.centerRef ? this.main.centerRef.clone() : this.pos.clone().setY(2));
+      G.fx.explosion(p, 3, col || 0xffc060, { decal: false }); G.sfx.shieldBreak && G.sfx.shieldBreak(p);
+      if (G.fx.dmgNum) G.fx.dmgNum(p, Math.round(v), 'crit');
+      G.ui.toast(`💥 ${what}を全て壊した！ ${this.def.name}に大ダメージ（最大HPの${Math.round(BS.GIMMICK_PCT * 100)}%）`, 'good');
+      this.bar && this.bar();
+    }
     kill() {
       this.dead = true; this.deathT = 0;
       for (const p of this.parts) p.alive = false;
@@ -481,7 +495,7 @@
         mesh(holder, PG.sph, mat('#000', { emissive: 0xc070ff, emissiveIntensity: 2 }), 0.22, 0.22, 0.1, 0, 0, 0.5);
         const w = this.part({ name: '護符眼', shared: false, hitW: [{ n: holder, r: 0.75, part: 'head' }], radius: 0.7, height: 1.2, showBar: true });
         w.hp = hpEach; w.maxHp = hpEach; w.m = holder; w.idx = i;
-        w.die = () => { w.alive = false; holder.visible = false; G.fx.explosion(w.centerRef.clone(), 1.6, 0xc070ff, { decal: false }); G.sfx.shieldBreak(w.centerRef); G.ui.feed('👁 護符眼を破壊'); if (!this.wards.some((x) => x.alive)) { this.vulnT = 12; G.ui.toast('結界が消えた！ 本体を撃て！', 'good'); G.sfx.bell(); } return false; };
+        w.die = () => { w.alive = false; holder.visible = false; G.fx.explosion(w.centerRef.clone(), 1.6, 0xc070ff, { decal: false }); G.sfx.shieldBreak(w.centerRef); G.ui.feed('👁 護符眼を破壊'); if (!this.wards.some((x) => x.alive)) { this.gimmickClear('護符眼', null, 0xc070ff); this.vulnT = 12; G.ui.toast('結界が消えた！ 本体を撃て！', 'good'); G.sfx.bell(); } return false; };
         w.barPos = () => w.centerRef.clone().add(V(0, 1.0, 0));
         this.wards.push(w);
       }
@@ -868,7 +882,7 @@
     }
     layEggs() {
       const n = 3 + this.phase + (this.loop ? 1 : 0);
-      const c = this.world.arenaCenter;
+      const c = this.world.arenaCenter, batch = []; // (this nest's sacs: all of them broken pays out, a hatched one spoils it)
       const sac = mat('#d8d0b8', { roughness: 0.6, emissive: 0x302810, transparent: true, opacity: 0.92 });
       for (let i = 0; i < n; i++) {
         const an = i / n * Math.PI * 2 + Math.random();
@@ -879,7 +893,8 @@
         const hp = Math.round(this.maxHp * 0.03);
         const egg = this.part({ name: '卵嚢', shared: false, hitW: [{ n: holder, r: 0.95, part: 'body', o: V(0, 0.9, 0) }], radius: 0.9, height: 1.8, showBar: true, blood: 0x8aa040, def: { id: 'boss_egg', name: '卵嚢', plan: 'boss', big: false, flyer: false } });
         egg.hp = hp; egg.maxHp = hp; egg.holder = holder; egg.idx = i; egg.hatchT = 10 + i * 0.5;
-        egg.die = () => { egg.alive = false; holder.parent && holder.parent.remove(holder); G.fx.blood(egg.centerRef.clone(), null, 0x8aa040, 20); G.sfx.monster(egg.centerRef, 'gurgle', 1.2, 1); return false; };
+        egg.die = () => { egg.alive = false; egg.broken = true; holder.parent && holder.parent.remove(holder); G.fx.blood(egg.centerRef.clone(), null, 0x8aa040, 20); G.sfx.monster(egg.centerRef, 'gurgle', 1.2, 1); if (batch.every((x) => x.broken)) this.gimmickClear('卵嚢', null, 0x8aa040); return false; };
+        batch.push(egg);
         egg.barPos = () => egg.centerRef.clone().add(V(0, 1.2, 0));
         this.eggs.push(egg);
         G.fx.smoke(p, 6, 1, 0x5a5040, 0.5, 1);

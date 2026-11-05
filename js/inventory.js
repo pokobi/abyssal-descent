@@ -244,7 +244,9 @@
   IV.autoAtt = function (P, it) {
     if (IV.noAuto || !G.weapons || !G.game || !G.game.moveAtt || !P.weapons || !P.weapons.length) return false;
     const a = G.ATT_BY_ID[it.id]; if (!a) return false;
-    const w = G.weapons.gunsInOrder().find((g) => G.attOk(a, g) && !g.atts[a.slot]);
+    // a 属性コア also goes into the melee weapon's socket when no gun has a free one
+    const cand = G.weapons.gunsInOrder().concat(a.slot === 'core' && P.melee ? [P.melee] : []);
+    const w = cand.find((g) => G.attOk(a, g) && !g.atts[a.slot]);
     if (!w || !G.game.moveAtt(it.id, 'stash', w)) return false;
     G.ui.toastSmall(`🔩 ${a.icon} ${a.name} を ${w.def.name} に装着した`);
     return true;

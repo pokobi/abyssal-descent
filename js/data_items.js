@@ -26,10 +26,10 @@
     ['h_apple', 'heal', '黄金の林檎', '🍎', 'epic', 320, 'HP50回復＋オーバーシールド40。', { heal: 50, os: 40 }],
     ['h_fairy', 'heal', '妖精の小瓶', '🧚', 'mythic', 7500, '所持していると、死亡時に自動で使用されHP全快で復活する。', { revive: true }],
     ['h_ambrosia', 'heal', '神酒', '🍶', 'legendary', 900, 'HPを全回復する。さらに10秒間、受けたダメージの半分をすぐに回復する。', { heal: 9999, ambrosia: 10 }],
-    ['h_water', 'heal', '清めの水', '⚗️', 'rare', 180, '状態異常を解除してHP10回復。さらに90秒間、状態異常の持続時間-70%・継続ダメージ-50%。', { heal: 10, cleanse: true, resist: 90 }],
+    ['h_water', 'heal', '清めの水', '⚗️', 'rare', 180, '状態異常を解除してHP10回復。さらに90秒間、状態異常の持続時間-70%・炎上と毒の被ダメ-50%。', { heal: 10, cleanse: true, resist: 90 }],
     // utilities
     ['u_plate', 'util', '鎧板', '🛡️', 'epic', 280, 'オーバーシールド+50。', { os: 50 }],
-    ['u_hammer', 'util', '鍛冶神の槌', '🔨', 'legendary', 1200, '使うと、手に持っている武器（銃か近接武器）の強化値+2（武器の上限まで）。', { forge: 2 }],
+    ['u_hammer', 'util', '鍛冶神の槌', '🔨', 'legendary', 1200, '鍛冶の神が振るったと伝わる槌。インベントリで武器へドラッグ＆ドロップして使う。対象の武器（銃か近接武器）の強化値+2（武器の上限まで）。', { forge: 2 }],
     ['u_iron', 'util', '鉄皮の薬', '🪨', 'uncommon', 130, '10秒間、被ダメ-50%。', { temp: { armor: 0.5 }, dur: 10 }],
     ['u_invis', 'util', '透明薬', '👻', 'rare', 190, '8秒間透明になり、敵に狙われなくなる。', { invis: 8 }],
     // repair kit: not a pocket item - it is dragged onto an armour piece on the inventory screen (see js/invui.js)
@@ -64,8 +64,9 @@
   for (const it of G.ITEMS) { it.sub = it.cat === 'grenade' ? 'g' : it.cat === 'heal' ? 'heal' : GUARD.includes(it.id) ? 'guard' : TOOL.includes(it.id) ? 'tool' : 'boost'; it.slot = it.cat === 'grenade' ? 'g' : 'c'; }
   // items that work just by being carried (e.g. the fairy bottle) take no key slot at all
   for (const it of G.ITEMS) if (it.data && it.data.revive) { it.passive = true; it.slot = 'passive'; }
-  // the repair kit takes no key slot either: it stays in the bag (1x2 cells) and is used by dropping it on an armour piece
-  for (const it of G.ITEMS) if (it.data && it.data.repair) { it.kit = true; it.slot = 'kit'; it.sub = 'tool'; it.size = [1, 2]; }
+  // the bag tools take no key slot either: they stay in the bag (1x2 cells) and are used by dropping them on what they work on
+  // (the repair kit on an armour piece, the forge hammer on a weapon: js/invui.js)
+  for (const it of G.ITEMS) if (it.data && (it.data.repair || it.data.forge)) { it.kit = true; it.slot = 'kit'; it.sub = 'tool'; it.size = [1, 2]; }
   G.passiveItems = (P) => Object.keys(P.inv).filter((id) => P.inv[id] > 0 && G.ITEM_BY_ID[id] && G.ITEM_BY_ID[id].passive);
   G.ITEM_CAP = 9;
 

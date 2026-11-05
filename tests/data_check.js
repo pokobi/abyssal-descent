@@ -87,6 +87,27 @@ const CAT = G.BUFF_CAT || {};
 for (const b of G.BUFFS || []) if (!CAT[b.cat]) fail(`BUFFS ${b.id}: category "${b.cat}" does not exist`);
 for (const a of G.SKILL_AUGS || []) if (!skOrUlt(a.skill)) fail(`SKILL_AUGS ${a.id}: skill ${a.skill} does not exist`);
 
+// the bag tools (repair kit, forge hammer) take no consumable pocket: they stay in the bag and are dropped on what they work on
+for (const id of ['u_repair', 'u_hammer']) { const d = G.ITEM_BY_ID[id]; if (!d || !d.kit || d.slot !== 'kit') fail(`ITEMS ${id}: should be a bag tool (kit), not a pocket consumable`); }
+
+// green / red numbers in descriptions (U.descHTML): gains must not show red, losses must not show green
+if (G.U && G.U.descHTML) {
+  const tones = (s) => [...G.U.descHTML(s).matchAll(/<b class="cd-n (up|dn)">([^<]*)<\/b>/g)].map((m) => m[1]).join(' ');
+  const TONE = [
+    ['脆化した敵の被ダメ増加+10%（25%→35%）。', 'up'],
+    ['8秒間その敵の被ダメ+25%（ボスは+15%）', 'up up'],
+    ['自分に付く属性の時間-50%、自分の身で起きた反応の被ダメ-30%。', 'up up'],
+    ['ナイフ：攻撃の間隔-15%／斧：重撃の範囲+50%／格闘：近接ダメージ+30%。', 'up up up'],
+    ['炎上と毒の被ダメ-30%', 'up'],
+    ['大ダメージを与え、8秒間その敵の被ダメ+15%。', 'up'],
+    ['与ダメ+40%・最大HP-30%', 'up dn'],
+    ['ダメージ+12%（シールドへは-40%）', 'up dn'],
+    ['⚠ 代償：敵の攻撃間隔-20%', 'dn'],
+    ['被ダメ+10%', 'dn'],
+  ];
+  for (const [s, want] of TONE) { const got = tones(s); if (got !== want) fail(`descHTML colours "${s}" as ${got}, expected ${want}`); }
+}
+
 for (const l of loadFails) fail('could not load ' + l);
 for (const f of fails) console.log('FAIL ' + f);
 console.log(`${total} entries in ${tables.length} tables checked`);

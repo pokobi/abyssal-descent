@@ -258,7 +258,7 @@
   add('rx_ward', '属性の守り', '🧿', 'uncommon', 'attr', '自分に付く属性の時間-50%、自分の身で起きた反応の被ダメ-30%。', { mods: { elSelfT: 0.5, elSelfRes: 0.3 } });
   add('rx_boilpt', '沸点', '♨️', 'rare', 'attr', '沸騰の倍率+0.3。', { mods: { rx_boil: 0.3 } });
   add('rx_meltpt', '融点', '🌡️', 'rare', 'attr', '熱融の倍率+0.3。', { mods: { rx_thaw: 0.3 } });
-  add('rx_brittle', '脆き鎧', '💔', 'rare', 'attr', '脆化の被ダメ増加+10%（25%→35%）。', { mods: { rxBrittle: 0.1 } });
+  add('rx_brittle', '脆き鎧', '💔', 'rare', 'attr', '脆化した敵の被ダメ増加+10%（25%→35%）。', { mods: { rxBrittle: 0.1 } });
   add('rx_eye', '嵐の目', '🌪️', 'rare', 'attr', '旋風の範囲+4m。旋風で広げた属性の時間+3秒。', { mods: { rxSwirlR: 4, rxSwirlT: 3 } });
   add('rx_fireHeart', '燃え盛る心', '❤️‍🔥', 'rare', 'attr', '炎属性が付いた敵への与ダメ+15%。', { hooks: { preHit(c) { if (G.Elem.auraOf(c.e) === 'fire') c.bonus += 0.15; } } });
   add('rx_iceHeart', '氷の心臓', '❄️', 'rare', 'attr', '氷属性が付いた敵への与ダメ+15%。', { hooks: { preHit(c) { if (G.Elem.auraOf(c.e) === 'ice') c.bonus += 0.15; } } });
@@ -272,7 +272,7 @@
 
   // ---------- summons / auras ----------
   add('z_blades', '周回する刃', '🌀', 'epic', 'summon', '周囲を2本の霊刃が回転し、触れた敵を切り裂く。', { max: 3, flag: true });
-  add('z_wolf', '霊狼の加護', '🐺', 'legendary', 'summon', '霊狼が2秒ごとに近くの敵へ噛み付き、大ダメージ＋8秒間被ダメ+15%。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 2 / n; const e = C.nearest(P.pos, 18); if (e) C.spiritBite(e, sc(55)); } } });
+  add('z_wolf', '霊狼の加護', '🐺', 'legendary', 'summon', '霊狼が2秒ごとに近くの敵へ噛み付いて大ダメージを与え、8秒間その敵の被ダメ+15%。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 2 / n; const e = C.nearest(P.pos, 18); if (e) C.spiritBite(e, sc(55)); } } });
   add('z_owl', '使い魔の梟', '🦉', 'epic', 'summon', '3秒ごとに近くの敵へ追尾魔弾を放つ。', { max: 2, hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 3 / n; const e = C.nearest(P.pos, 30); if (e) C.soulBolt(P.eyePos().add(new THREE.Vector3(0, 0.6, 0)), sc(35), e); } } });
   add('z_storm', '雷雲', '🌩️', 'legendary', 'summon', '4秒ごとにランダムな敵へ落雷（電撃付与）。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 4 / n; const e = C.randomEnemy(35); if (e) C.lightningStrike(e, sc(80)); } } });
   add('z_orbs', '守護の宝珠', '🔮', 'epic', 'summon', '3つの宝珠が周囲を回り、敵の投射物を相殺する。', { flag: true });

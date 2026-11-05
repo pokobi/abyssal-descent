@@ -52,7 +52,7 @@
   // head / chest / legs: toughness, legs / feet: movement, hands: weapons and handling
   const FX = {
     toughA: { desc: '状態異常の持続時間-20%', mods: { statusRes: 0.2 } },
-    toughB: { desc: '炎上・毒のダメージ-30%', mods: { dotRes: 0.3 } },
+    toughB: { desc: '炎上と毒の被ダメ-30%', mods: { dotRes: 0.3 } },
     toughC: { desc: '爆発・範囲攻撃の被ダメ-20%', mods: { blastRes: 0.2 } },
     toughD: { desc: '最大HP+25', mods: { maxHp: 25 } },
     toughE: { desc: '毎秒HP+0.6回復', mods: { hpRegen: 0.6 } },
@@ -70,7 +70,7 @@
     mToughC: { desc: '爆発・範囲攻撃の被ダメ-30%', mods: { blastRes: 0.3 } },
     mToughF: { desc: '全属性耐性+15%', mods: { elRes_fire: 0.15, elRes_water: 0.15, elRes_ice: 0.15, elRes_volt: 0.15, elRes_wind: 0.15, elRes_earth: 0.15 } },
     mToughD: { desc: '最大HP+40', mods: { maxHp: 40 } },
-    mToughB: { desc: '炎上・毒のダメージ-45%', mods: { dotRes: 0.45 } },
+    mToughB: { desc: '炎上と毒の被ダメ-45%', mods: { dotRes: 0.45 } },
     mToughE: { desc: '毎秒HP+0.9回復', mods: { hpRegen: 0.9 } },
     mMoveA: { desc: 'スプリント開始から1秒ごとに移動速度+7.5%（最大+22.5%）', mods: { sprintRamp: 0.075 } },
     mMoveD: { desc: '空中での制御+60%', mods: { airControl: 0.6 } },

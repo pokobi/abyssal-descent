@@ -30,12 +30,13 @@ window.G = window.G || {};
   const NL = String.fromCharCode(10);
   const NUM = /([+\-−＋]?\d+(?:\.\d+)?(?:%|％|秒|m|体|個|本|倍|回|発|枚|エリア)?)/g;
   // stats where a HIGHER value is worse for whoever has it (so a minus is the good direction)
-  const LOWER_BETTER = /(クールタイム|CT|被ダメ|被弾|反動|拡散|ブレ|リロード時間|装填時間|間隔|消費|コスト|価格|費用|待機|チャージ時間|回転開始時間|ディレイ|状態異常の持続|落下ダメージ|重さ|重量|発動までの時間|隙|硬直|詠唱時間|発動時間|溜め時間|準備時間)/;
+  const LOWER_BETTER = /(クールタイム|CT|被ダメ|被弾|反動|拡散|ブレ|リロード時間|装填時間|間隔|消費|コスト|価格|費用|待機|チャージ時間|回転開始時間|ディレイ|状態異常の持続|落下ダメージ|自分に付く|重さ|重量|発動までの時間|隙|硬直|詠唱時間|発動時間|溜め時間|準備時間)/;
   // words just before the number that turn it round: "CT短縮+8%" is a gain, "被ダメ軽減+10%" too
   const REDUCER = /(短縮|軽減|減少|低減|カット|耐性|削減)$/;
-  const SEP = /[・、。,，\n]/;
+  const SEP = /[・、。,，／\n]/; // (／ splits "ナイフ：攻撃の間隔-15%／斧：重撃の範囲+50%")
   U.numTone = (before, whole) => {
-    const clause = before.split(SEP).pop();
+    // a number in brackets right after another one ("被ダメ+25%（ボスは+15%）") reads like that one: drop the earlier number and the bracket
+    const clause = before.split(SEP).pop().replace(/[+\-−＋]?\d+(?:\.\d+)?\S*?（[^）]*$/, '');
     const near = clause.slice(-10);
     // a foe's own stat: "敵の" followed straight by the stat name (not "敵の状態異常ごとに与ダメ+10%", not "敵が3体以下で与ダメ+40%")
     const enemy = /敵(の|全体の)[^、・。]{0,10}$/.test(clause) && !/与ダメ|へのダメージ/.test(clause);

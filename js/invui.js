@@ -333,6 +333,25 @@
     if (t.grid && t.key === 'bag') { const [bw, bh] = IV.baseSize(it), [w, h] = rot ? [bh, bw] : [bw, bh]; return overlapping(P.bag, it, t.cx, t.cy, w, h).find((o) => o.type === 'armor') || null; }
     return null;
   }
+  // the forge hammer (a bag tool like the repair kit): the weapon under it - a gun box (or one of its sockets), the melee box, or a gun / melee item in the bag
+  const isRepair = (it) => IV.isKit(it) && !IV.isForgeKit(it);
+  function forgeTarget(t, it, rot) {
+    if (!t) return null;
+    if (t.wslot !== undefined) return G.weapons.gunSlots()[t.wslot] || null;
+    if (t.as) return slotW(t.as.split(':')[0]) || null;
+    if (t.melee) return P.melee || null;
+    if (t.grid && t.key === 'bag') { const [bw, bh] = IV.baseSize(it), [w, h] = rot ? [bh, bw] : [bw, bh]; return overlapping(P.bag, it, t.cx, t.cy, w, h).find((o) => IV.isArm(o)) || null; }
+    return null;
+  }
+  const armDef = (w) => (IV.isArm(w) ? IV.def(w) : w.def);
+  // the weapons it can still raise: the one in hand first, then the other weapons held
+  function forgeables(it) { const held = P.meleeMode || !P.weapon ? P.melee : P.weapon; return [held, ...armsAll()].filter((w, i, a) => w && a.indexOf(w) === i && IV.forgeGain(it, w) > 0); }
+  function forge(f, it, w) {
+    const d = armDef(w), lv = IV.forgeLv(w), k = IV.useForgeKit(P, it, f.from, w);
+    if (k < 0) { G.sfx.ui('deny'); G.ui.toastSmall(w.id === (G.BARE_MELEE || 'fists') ? '🔨 素手は強化できない' : `🔨 ${d.name} は強化上限（+${G.Areas.forgeCap(d)}）に達している`); }
+    else G.ui.toastSmall(`🔨 ${d.name} の強化値 +${lv} → +${lv + k}`);
+    render();
+  }
   function mend(f, it, piece) {
     const d = G.ARMOR_BY_ID[piece.id], gain = IV.useKit(P, it, f.from, piece);
     if (gain < 0) { G.sfx.ui('deny'); G.ui.toastSmall(`🛠️ ${d.name} は傷んでいない（耐久は最大）`); }
@@ -347,7 +366,8 @@
     if (IV.isArm(it)) { if (GM.equipArm(it, f.from)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); return; }
     if (it.type === 'att' && isMine(f.from)) { equipAtt(it); return; }
     if (!isMine(f.from)) { quickMove(f); return; }
-    if (IV.isKit(it)) { const w = worstWorn(); if (w) mend(f, it, w); else { G.sfx.ui('deny'); G.ui.toastSmall('🛠️ 修復が必要な防具は装備していない（インベントリの防具にもドラッグで使える）'); } return; }
+    if (IV.isForgeKit(it)) { const w = forgeables(it)[0]; if (w) forge(f, it, w); else { G.sfx.ui('deny'); G.ui.toastSmall('🔨 強化できる武器を持っていない（どれも上限）'); } return; }
+    if (isRepair(it)) { const w = worstWorn(); if (w) mend(f, it, w); else { G.sfx.ui('deny'); G.ui.toastSmall('🛠️ 修復が必要な防具は装備していない（インベントリの防具にもドラッグで使える）'); } return; }
     if (usable(it)) { UIV.close(); G.abilities.useItemId(it.id); return; }
     if (IV.openCont) quickMove(f);
   }
@@ -422,6 +442,7 @@
     drag = { f, el, ghost, gx: e.clientX - r.left, gy: e.clientY - r.top, rot: !!(f.it && f.it.rot), x: e.clientX, y: e.clientY, w0: r.width, h0: r.height };
     el.classList.add('iv-dragging');
     glow(f);
+    if (IV.isKit(f.it)) drag.guide = kitGuide(f.it);
     moveGhost(e.clientX, e.clientY);
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -432,6 +453,12 @@
     if (f.wslot !== undefined) { add(`.iv-wbox[data-wslot]:not([data-wslot="${f.wslot}"])`); return; }
     if (f.sk !== undefined) { for (const k of [1, 2, 3]) if (k !== f.sk) add(`.iv-sk[data-sk="${k}"]`); return; }
     const it = f.it; if (!it) return;
+    if (IV.isForgeKit(it)) { // the forge hammer: the weapons it can still raise (in hand and in the bag)
+      G.weapons.gunSlots().forEach((w, i) => { if (w && IV.forgeGain(it, w) > 0) add(`.iv-wbox[data-wslot="${i}"]`); });
+      if (P.melee && IV.forgeGain(it, P.melee) > 0) add('.iv-wbox[data-melee]');
+      for (const p of P.bag.items) if (IV.isArm(p) && IV.forgeGain(it, p) > 0) add(`.iv-it[data-where="bag"][data-uid="${p.uid}"]`);
+      return;
+    }
     if (IV.isKit(it)) { // a repair kit: only the pieces that are actually worn down light up (worn ones and the ones lying in the bag)
       for (const k in P.equip) { const p = P.equip[k]; if (p && IV.durFrac(p) < 0.995) add(`.iv-eq[data-eq="${k}"]`); }
       for (const p of P.bag.items) if (p.type === 'armor' && IV.durFrac(p) < 0.995) add(`.iv-it[data-where="bag"][data-uid="${p.uid}"]`);
@@ -451,6 +478,23 @@
     el.appendChild(note);
     const bar = el.querySelector('.iv-dur'); if (bar && gain > 0) { bar.classList.add('iv-mend'); bar.style.setProperty('--pf', ((IV.durOf(piece) + gain) / m).toFixed(3)); }
   }
+  // the forge hammer held over a weapon: "+3 → +5" on it (or "強化上限")
+  function previewForge(w, kit) {
+    const i = G.weapons.gunSlots().indexOf(w);
+    const el = IV.isArm(w) ? root.querySelector(`.iv-it[data-uid="${w.uid}"]`) : w === P.melee ? root.querySelector('.iv-wbox[data-melee]') : i >= 0 ? root.querySelector(`.iv-wbox[data-wslot="${i}"]`) : null;
+    if (!el) return;
+    const k = IV.forgeGain(kit, w), lv = IV.forgeLv(w);
+    const note = document.createElement('b'); note.className = 'iv-kitnote forge' + (k > 0 ? '' : ' no'); note.textContent = k > 0 ? `⚒ +${lv} → +${lv + k}` : w.id === (G.BARE_MELEE || 'fists') ? '素手は不可' : '強化上限';
+    el.appendChild(note);
+  }
+  // a bag tool in hand: one line beside the cursor on where it goes (or that there is nothing to use it on)
+  function kitGuide(it) {
+    const n = root.querySelectorAll('.iv-glow').length, g = document.createElement('div'); g.className = 'iv-kitguide';
+    if (IV.isForgeKit(it)) g.innerHTML = n ? `<span>🔨 光っている武器へ落とすと<b>強化値+${G.ITEM_BY_ID[it.id].data.forge}</b></span>${IV.openCont ? '<small>手に持っている武器はダブルクリックで強化</small>' : ''}` : '<span>🔨 強化できる武器がない（どれも上限）</span>';
+    else g.innerHTML = n ? `<span>🛠️ 光っている防具へ落とすと<b>耐久+${IV.kitPower(it)}</b></span>` : '<span>🛠️ 傷んでいる防具がない</span>';
+    if (!n) g.classList.add('no');
+    document.body.appendChild(g); return g;
+  }
   function dims() { const [w, h] = IV.baseSize(drag.f.it); return drag.rot ? [h, w] : [w, h]; }
   function moveGhost(x, y) {
     drag.x = x; drag.y = y;
@@ -463,9 +507,13 @@
     drag.ghost.classList.toggle('iv-out', !!(t && t.ground && (drag.f.it || drag.f.wslot !== undefined || drag.f.melee) && !drag.f.as));
     root.querySelectorAll('.iv-kitnote').forEach((n) => n.remove());
     root.querySelectorAll('.iv-dur.iv-mend').forEach((n) => { n.classList.remove('iv-mend'); n.style.removeProperty('--pf'); });
-    const kp = IV.isKit(drag.f.it) ? kitPiece(t, drag.f.it, drag.rot) : null; // a repair kit over an armour piece: preview what it would restore instead of the cell highlight
+    const kp = isRepair(drag.f.it) ? kitPiece(t, drag.f.it, drag.rot) : null; // a repair kit over an armour piece: preview what it would restore instead of the cell highlight
     if (kp) previewKit(kp, drag.f.it);
-    if (t && t.grid && drag.f.it && !kp) {
+    const fw = IV.isForgeKit(drag.f.it) ? forgeTarget(t, drag.f.it, drag.rot) : null; // the forge hammer over a weapon: the levels it would add
+    if (fw) previewForge(fw, drag.f.it);
+    if (drag.guide) { drag.guide.style.left = drag.ghost.style.left; drag.guide.style.top = parseFloat(drag.ghost.style.top) + h + 8 + 'px'; // (just under the held item)
+      drag.guide.style.display = kp || fw ? 'none' : ''; }
+    if (t && t.grid && drag.f.it && !kp && !fw) {
       const ok = canDrop(t);
       const [gw, gh] = dims();
       const hl = document.createElement('div'); hl.className = 'iv-hl' + (ok ? '' : ' bad');
@@ -540,7 +588,7 @@
     if (!drag) return;
     IV.acts = (IV.acts || 0) + 1; // something was dragged and dropped (the tutorial watches this)
     const { f, ghost, el } = drag; const it = f.it;
-    ghost.remove(); el.classList.remove('iv-dragging');
+    ghost.remove(); el.classList.remove('iv-dragging'); if (drag.guide) drag.guide.remove();
     const rot = drag.rot; drag = null;
     // guns / skills onto each other
     if (f.melee) {
@@ -562,6 +610,8 @@
     if (f.sk !== undefined) { if (t && t.sk !== undefined && +t.sk !== f.sk) swapSkills(f.sk, +t.sk); render(); return; }
     if (!t) { render(); return; }
     if (t.ground) { if (f.as) { render(); return; } discard(f); return; }
+    // the forge hammer dropped on a weapon (its box, a socket of it, or a weapon in the bag) raises it instead of moving
+    if (IV.isForgeKit(it)) { const w = forgeTarget(t, it, rot); if (w) { forge(f, it, w); return; } if (t.eq || t.sk !== undefined) { G.sfx.ui('deny'); render(); return; } }
     // a part dropped anywhere on a gun's box (even on the wrong little socket) goes into the socket it belongs to
     if (t.as && t.as[0] !== 'm' && it.type === 'att' && G.ATT_BY_ID[it.id] && !(f.as && f.as.w === G.weapons.gunSlots()[+t.as.split(':')[0]])) t = { wslot: +t.as.split(':')[0] };
     if (t.melee && it.type === 'att') t = { as: 'm:core' }; // (a part dropped on the melee weapon's box goes to its core socket)
@@ -573,7 +623,7 @@
       G.sfx.ui('deny'); render(); return;
     }
     if (t.sk !== undefined) { G.sfx.ui('deny'); render(); return; }
-    if (IV.isKit(it) && (t.eq || t.grid)) { const kp = kitPiece(t, it, rot); if (kp) { mend(f, it, kp); return; } } // a repair kit dropped on an armour piece mends it instead of moving
+    if (isRepair(it) && (t.eq || t.grid)) { const kp = kitPiece(t, it, rot); if (kp) { mend(f, it, kp); return; } } // a repair kit dropped on an armour piece mends it instead of moving
     if (t.as) {
       const [wi, sl] = t.as.split(':'), w = slotW(wi);
       const a = it.type === 'att' && G.ATT_BY_ID[it.id];
@@ -650,7 +700,8 @@
     if (f.as) { popMenu(opts, e); return; }
     if (isMine(f.from) && usable(it)) opts.push(['🍶 使う', () => { UIV.close(); G.abilities.useItemId(it.id); }]);
     if (isMine(f.from) && usable(it) && P.itemCount(it.id) > 1) { const n = P.itemCount(it.id); opts.push([`🍶 まとめて使う（×${n}）`, () => { UIV.close(); G.abilities.queueUse(it.id, n); }]); }
-    if (isMine(f.from) && IV.isKit(it)) { const w = worstWorn(), wd = w && G.ARMOR_BY_ID[w.id]; if (w) opts.push([`🛠️ 最も傷んだ防具を修復：${wd.name} ${Math.ceil(IV.durOf(w))}/${IV.durMax(w)}`, () => mend(f, it, w)]); }
+    if (isMine(f.from) && IV.isForgeKit(it)) for (const w of forgeables(it)) { const lv = IV.forgeLv(w); opts.push([`🔨 強化：${armDef(w).name} +${lv} → +${lv + IV.forgeGain(it, w)}`, () => forge(f, it, w)]); }
+    if (isMine(f.from) && isRepair(it)) { const w = worstWorn(), wd = w && G.ARMOR_BY_ID[w.id]; if (w) opts.push([`🛠️ 最も傷んだ防具を修復：${wd.name} ${Math.ceil(IV.durOf(w))}/${IV.durMax(w)}`, () => mend(f, it, w)]); }
     if (it.type === 'armor' && !f.eq) opts.push(['🛡️ 装備する', () => { IV.equip(P, it, f.from); render(); }]);
     if (IV.isArm(it)) opts.push([`${it.type === 'gun' ? '🔫' : '🗡️'} 装備する${it.type === 'gun' && P.weapons.length >= P.stats.weaponSlots ? '（持っている銃と入れ替え）' : it.type === 'melee' && P.melee && P.melee.id !== (G.BARE_MELEE || 'fists') ? '（今の近接武器と入れ替え）' : ''}`, () => { if (GM.equipArm(it, f.from)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); }]);
     if (f.eq) opts.push(['📥 外す', () => { IV.unequip(P, f.eq); render(); }]);
@@ -677,7 +728,7 @@
       return G.StatusUI.gunTip(w) + `<div class="ivt-v">ダブルクリック／武器枠へドラッグで装備　売値 ${U.fmt(IV.value(it))}🪙</div>`;
     }
     const rar = G.RARITY[d.rarity];
-    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? '補修具（防具へドラッグして使う）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント', part: '部品（作業台で3つ組み立て）' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
+    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? (d.data.forge ? '道具（武器へドラッグして使う）' : '補修具（防具へドラッグして使う）') : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント', part: '部品（作業台で3つ組み立て）' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
     { const tg = G.Elem.itemTag(it), core = it.gun && it.gun.atts && it.gun.atts.core && G.ATT_BY_ID[it.gun.atts.core];
       if (tg) body += `<div class="ivt-r">${G.Elem.chip(tg)} <span style="color:var(--dim)">${core && !d.el ? `${core.icon} ${U.esc(core.name)}を装着中` : it.type === 'item' ? '当たった敵に付く' : it.type === 'att' && d.slot === 'core' ? '装着した武器の攻撃に付く' : it.type === 'att' ? '状態異常と一緒に付く' : '攻撃に付く'}</span></div>`; }
     if (it.type === 'armor') {

@@ -214,7 +214,7 @@
     } else if (tab === 'valuable') {
       html += `<div style="margin-top:8px"><span class="tag">💰 売値 ${U.fmt(o.value)}🪙</span><span class="tag">📐 大きさ ${o.size[0]}×${o.size[1]}</span><span class="tag">⚖️ 商人で売却専用</span></div>`;
     } else if (tab === 'item') {
-      html += `<div><span class="tag">${G.ITEM_CAT[o.cat].icon} ${G.ITEM_CAT[o.cat].name}</span><span class="tag">🔑 ${o.cat === 'grenade' ? `${G.K('grenade')} で構え→左クリック投擲/右クリック下投げ` : (o.passive ? '常時：持っているだけで発動' : o.kit ? '持ち物画面で防具へドラッグ' : `${G.K('item1')} / ${G.K('item2')} で使用`)}</span><span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
+      html += `<div><span class="tag">${G.ITEM_CAT[o.cat].icon} ${G.ITEM_CAT[o.cat].name}</span><span class="tag">🔑 ${o.cat === 'grenade' ? `${G.K('grenade')} で構え→左クリック投擲/右クリック下投げ` : (o.passive ? '常時：持っているだけで発動' : o.kit ? (o.data.forge ? '持ち物画面で武器へドラッグ' : '持ち物画面で防具へドラッグ') : `${G.K('item1')} / ${G.K('item2')} で使用`)}</span><span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
     } else if (tab === 'ult') {
       html += bar('⏳', 'クールタイム', o.cd, 160, o.cd + '秒');
       html += `<div><span class="tag">🔑 ${G.input.skillKey(0)}（アルティメット専用枠）</span>${(() => { const c = G.Classes && G.Classes.LIST.find((x) => x.ult === o.id); return c ? `<span class="tag">🎁 ${c.icon}${c.name}の初期装備</span><span class="tag">🪙 ${U.fmt(o.price)}</span>` : `<span class="tag">🪙 ${U.fmt(o.price)}</span>`; })()}</div>`;

@@ -65,6 +65,25 @@
     G.sfx.mech('magIn', 0, 0.9); setTimeout(() => G.sfx.mech('magOut', 0, 0.8), 110);
     return gain;
   };
+  // forge kit (u_hammer, the same kind of bag tool): +2 forge levels on one weapon, dropped on it in the inventory screen.
+  // the target is a weapon in hand (a gun object / the melee weapon) or a gun / melee item lying in the bag
+  IV.isForgeKit = (it) => IV.isKit(it) && !!G.ITEM_BY_ID[it.id].data.forge;
+  const armLv = (t) => (t.type === 'gun' || t.type === 'melee' ? (t.gun && t.gun.lv) || 0 : t.lv || 0);
+  const armDef = (t) => (t.type === 'gun' ? G.WEAPON_BY_ID[t.id] : t.type === 'melee' ? G.MELEE_BY_ID[t.id] : t.def);
+  IV.forgeLv = armLv;
+  IV.forgeGain = function (kit, t) {
+    if (!t || t.id === (G.BARE_MELEE || 'fists') || !armDef(t) || !G.Areas) return 0;
+    return Math.max(0, Math.min(G.ITEM_BY_ID[kit.id].data.forge || 2, G.Areas.forgeCap(armDef(t)) - armLv(t)));
+  };
+  IV.useForgeKit = function (P, kit, from, t) {
+    if (!IV.isForgeKit(kit)) return -1;
+    const k = IV.forgeGain(kit, t); if (k <= 0) return -1;
+    if (t.type === 'gun' || t.type === 'melee') { t.gun = t.gun || {}; t.gun.lv = armLv(t) + k; IV.changed(P.bag); }
+    else { t.lv = (t.lv || 0) + k; t.ver = (t.ver || 0) + 1; G.weapons.dirty = true; if (t === P.weapon) G.weapons.equip(true); if (G.ui.refreshWeapon) G.ui.refreshWeapon(); P.recalc && P.recalc(); }
+    kit.n--; if (kit.n <= 0 && from) IV.remove(from, kit); else if (from) IV.changed(from);
+    G.sfx.mech('magIn', 0, 0.7); setTimeout(() => G.sfx.mech('magIn', 0, 0.6), 140);
+    return k;
+  };
   IV.def = function (it) {
     if (!it) return null;
     if (it.type === 'item') return G.ITEM_BY_ID[it.id];
@@ -151,6 +170,7 @@
     if ((c.kind === 'bag' || c.kind === 'spec') && G.save) {
       // the first repair kit ever picked up: one quiet line on how it is used (the item card keeps its short hint)
       if (it.type === 'item' && it.id === 'u_repair' && !G.save.data.codex.items.u_repair && G.ui && G.ui.toastSmall) G.ui.toastSmall('🛠️ 名工の補修具：インベントリで防具にドラッグして耐久を修復');
+      if (it.type === 'item' && it.id === 'u_hammer' && !G.save.data.codex.items.u_hammer && G.ui && G.ui.toastSmall) G.ui.toastSmall('🔨 鍛冶神の槌：インベントリで武器にドラッグして強化値+2');
       G.save.mark('items', it.id);
     }
     if (it.n <= 0) { IV.changed(c); return 0; }
@@ -336,7 +356,7 @@
     if (d && d.bag) {
       const retired = (o) => { const pr = o.t === 'item' && G.RETIRED_ITEMS && G.RETIRED_ITEMS[o.id]; if (pr) P.retiredCoins = (P.retiredCoins || 0) + Math.round(pr * 0.5) * (o.n || 1); };
       for (const o of d.bag) { if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (IV.fits(P.bag, ...IV.size(it), it.x, it.y)) P.bag.items.push(it); else IV.put(P.bag, it); }
-      for (const k in d.spec || {}) for (const o of d.spec[k]) { if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (P.spec[k] && IV.fits(P.spec[k], ...IV.size(it), it.x, it.y)) P.spec[k].items.push(it); else IV.stow(P, it); }
+      for (const k in d.spec || {}) for (const o of d.spec[k]) { if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (P.spec[k] && (!P.spec[k].accept || P.spec[k].accept(it)) && IV.fits(P.spec[k], ...IV.size(it), it.x, it.y)) P.spec[k].items.push(it); else IV.stow(P, it); } // (a thing that no longer belongs in that slot, e.g. the forge hammer turned bag tool, goes to the bag)
       for (const k in d.equip || {}) if (d.equip[k] && G.ARMOR_BY_ID[d.equip[k].id]) P.equip[k] = IV.de(d.equip[k]);
       IV.changed(P.bag);
     }

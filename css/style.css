@@ -1376,6 +1376,14 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 .iv-dur.iv-mend::after { position: relative; }
 .iv-kitnote { position: absolute; left: 50%; top: 4%; transform: translateX(-50%); z-index: 4; padding: 0 0.4em; border-radius: 0.3em; font-size: 0.66em; font-weight: 800; line-height: 1.5; white-space: nowrap; pointer-events: none; background: rgba(8,40,48,0.94); color: #8ff0ff; }
 .iv-kitnote.no { background: rgba(40,10,6,0.94); color: #ffb0a0; }
+.iv-kitnote.forge { background: rgba(48,26,6,0.95); color: #ffd27a; font-size: 0.8em; top: 0.3em; box-shadow: 0 0 8px rgba(255,170,60,0.6); }
+.iv-wbox > .iv-kitnote.forge { top: 40%; font-size: 1.15em; padding: 0.1em 0.6em; }
+.iv-kitnote.forge.no { background: rgba(40,10,6,0.94); color: #ffb0a0; box-shadow: none; }
+/* a bag tool in hand (repair kit / forge hammer): where it goes, beside the cursor */
+.iv-kitguide { position: fixed; z-index: 81; pointer-events: none; display: flex; flex-direction: column; gap: 0.1em; padding: 0.3em 0.7em; border-radius: 0.4em; border: 1px solid rgba(255,200,110,0.55); background: rgba(14,10,6,0.94); color: #f4e4c0; font-size: calc(16px * var(--s, 1)); white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.6); }
+.iv-kitguide b { color: #ffd27a; margin-left: 0.2em; }
+.iv-kitguide small { color: #b8a888; font-size: 0.82em; }
+.iv-kitguide.no { border-color: rgba(255,120,100,0.5); color: #ffb0a0; }
 
 /* armour cells: the defence number sits clear of the durability bar */
 .iv-eq .iv-def { bottom: calc(max(3px, 7%) + 0.45em); }

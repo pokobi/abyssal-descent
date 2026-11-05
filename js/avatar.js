@@ -2,7 +2,7 @@
 // Player character model, shown only in third-person moments (grapple / pile driver).
 (function () {
   const AV = (G.avatar = { tpK: 0 });
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const U = G.U;
   let root, J = {};
 
@@ -148,7 +148,6 @@
     const c = el && G.Elem && G.Elem.BY[el] ? G.Elem.BY[el].hex : 0x7a9aff;
     for (const o of J.orbs.children) o.material.color.setHex(c);
   };
-  AV.reattach = function (scene) { if (root && root.parent !== scene) scene.add(root); };
 
   const rot = (o, x, y, z, k) => { o.rotation.x = U.lerp(o.rotation.x, x, k); o.rotation.y = U.lerp(o.rotation.y, y, k); o.rotation.z = U.lerp(o.rotation.z, z, k); };
   AV.handWorld = function () { root.updateMatrixWorld(true); return J.arms[0].hand.getWorldPosition(V()); };

@@ -3,7 +3,7 @@
 (function () {
   const BS = (G.bosses = { active: null });
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P, C, PG;
   BS.init = function () { P = G.player; C = G.combat; PG = G.Props.PG; };
 

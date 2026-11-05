@@ -4,7 +4,7 @@
   const E = (G.enemies = { list: [] });
   const U = G.U;
   const w0 = () => G.world;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P, C, PG;
 
   // ---------------- materials ----------------
@@ -642,7 +642,7 @@
   const TINT = new THREE.Color(), FLASH = new THREE.Color(), AURA_C = new THREE.Color(), MUTC = new THREE.Color();
   const ELITE_MODS = [
     { id: 'fast', name: '俊足', icon: '💨' }, { id: 'bomb', name: '爆死', icon: '💥' },
-    { id: 'vamp', name: '吸血', icon: '🩸' }, { id: 'armored', name: '鉄壁', icon: '🛡️' }, { id: 'rage', name: '狂暴', icon: '😡' },
+    { id: 'vamp', name: '吸血', icon: '🩸' }, { id: 'armored', name: '装甲', icon: '🛡️' }, { id: 'rage', name: '狂暴', icon: '😡' },
   ];
   class Enemy {
     constructor(def, level, pos, opts) {

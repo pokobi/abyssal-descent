@@ -677,7 +677,7 @@
       return G.StatusUI.gunTip(w) + `<div class="ivt-v">ダブルクリック／武器枠へドラッグで装備　売値 ${U.fmt(IV.value(it))}🪙</div>`;
     }
     const rar = G.RARITY[d.rarity];
-    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? '補修具（防具へドラッグして使う）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント', part: '武器パーツ（作業台で3つ合成）' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
+    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? '補修具（防具へドラッグして使う）' : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント', part: '部品（作業台で3つ組み立て）' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
     { const tg = G.Elem.itemTag(it), core = it.gun && it.gun.atts && it.gun.atts.core && G.ATT_BY_ID[it.gun.atts.core];
       if (tg) body += `<div class="ivt-r">${G.Elem.chip(tg)} <span style="color:var(--dim)">${core && !d.el ? `${core.icon} ${U.esc(core.name)}を装着中` : it.type === 'item' ? '当たった敵に付く' : it.type === 'att' && d.slot === 'core' ? '装着した武器の攻撃に付く' : it.type === 'att' ? '状態異常と一緒に付く' : '攻撃に付く'}</span></div>`; }
     if (it.type === 'armor') {

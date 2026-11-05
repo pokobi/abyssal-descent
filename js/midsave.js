@@ -5,7 +5,7 @@
 (function () {
   const MS = (G.MidSave = {});
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let GM, P;
   const r2 = (v) => Math.round(v * 100) / 100;
   const vec = (p) => [r2(p.x), r2(p.y), r2(p.z)];

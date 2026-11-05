@@ -3,7 +3,7 @@
 (function () {
   const AR = (G.Areas = {});
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P, GM;
   AR.init = function () { P = G.player; GM = G.game; };
 
@@ -481,7 +481,7 @@
   const ALCH_CATS = {
     armor: { name: '🛡️ 防具', short: '防具' },
     weapon: { name: '🔫 武器', short: '武器' },
-    part: { name: '🔧 武器パーツ', short: '武器パーツ' },
+    part: { name: '🔧 部品', short: '部品' },
     att: { name: '🔩 アタッチメント', short: 'アタッチメント' },
     item: { name: '🧪 消耗品', short: '消耗品' },
     valuable: { name: '💎 金品', short: '金品' },
@@ -665,7 +665,7 @@
       const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: `<span class="cd-line">${U.esc(d.desc || '')}</span>`, onPick: () => {
         consumeBoth();
         G.Inv.give(P, 'part', d.id, 1); G.ui.refreshItems();
-        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}（${G.RARITY[d.rarity].name}）`, 'good'); G.ui.itemCard(d, '[武器パーツ練成]');
+        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}（${G.RARITY[d.rarity].name}）`, 'good'); G.ui.itemCard(d, '[部品練成]');
       } }));
       alchChoiceModal(`🔧 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
@@ -1026,7 +1026,6 @@
       if (ex.markDv !== d) { ex.markDv = d; ex.markD.textContent = d + 'm'; }
     }
   };
-  AR.clearExitMarks = function (w) { for (const ex of (w && w.exits) || []) if (ex.mark) { ex.mark.remove(); ex.mark = null; } };
 
   // ---------------- per-frame ----------------
   AR.update = function (dt) {

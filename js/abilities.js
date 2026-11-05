@@ -3,7 +3,7 @@
 (function () {
   const A = (G.abilities = {});
   const U = G.U, I = G.input;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P, C;
   A.init = function () { P = G.player; C = G.combat; buildRope(); };
 
@@ -56,7 +56,7 @@
       case 'ult_armory': return [row('連射速度', 'fireRate', 0.8, m.x_rate ? 1.2 : 0.8)];
       case 'ult_shadow': return [row('会心率', 'critChance', 0.6), row('会心ダメージ', 'critMul', 0.5, m.x_lethal ? 1 : 0.5)];
       case 'ult_titan': return [row('最大HP', 'maxHpPct', 0.8), row('近接ダメージ', 'meleeDmg', 1.5), row('パイルドライバー威力', 'pileDmg', 1), row('被ダメ軽減', 'armor', 0.25, m.x_iron ? 0.4 : 0.25)];
-      case 'ult_overcharge': return [['スキルのCT短縮', 70, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L))), '%', 0, false, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L0)))]];
+      case 'ult_overcharge': return [['スキルのクールタイム短縮', 70, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L))), '%', 0, false, pc(1 - Math.max(0.12, 0.3 * Math.pow(0.95, L0)))]];
       case 'ult_sanctuary': { const h = m.x_heal ? 7 : 4; return [['毎秒回復（最大HP比）', 4, h * k, '%', 1, false, 4 * k0]]; }
       case 'berserk': return [row('与ダメ', 'dmg', 0.5, m.x_fury ? 0.8 : 0.5), row('連射速度', 'fireRate', 0.3), row('吸血', 'lifesteal', 0.05)];
       case 'haste': return [row('移動速度', 'moveSpeed', 0.6), row('ジャンプ力', 'jumpPower', 0.3, m.x_jump ? 0.6 : 0.3)];
@@ -598,15 +598,6 @@
     G.sfx.ui('click');
     G.ui.refreshItems();
   };
-  A.throwGrenade = function () {
-    let id = P.grenadeSel;
-    if (!P.grenades[id]) { const o = Object.keys(P.grenades).find((k) => P.grenades[k] > 0); if (!o) { G.ui.toastSmall('💣 投擲物がない'); G.sfx.ui('deny'); return; } id = P.grenadeSel = o; }
-    if (G.ItemAnim.busy()) return;
-    const it = G.ITEM_BY_ID[id];
-    if (!(P.has('g_refund') && Math.random() < 0.3)) P.takeItem(id);
-    G.ui.refreshItems();
-    G.ItemAnim.play('throw', id, () => A.releaseGrenade(id));
-  };
   A.releaseGrenade = function (id, under) {
     const it = G.ITEM_BY_ID[id], d = it.data;
     const { o, vel } = G.GrenHold.launch(under);
@@ -664,7 +655,6 @@
   const SLOTKEYS = [['grenade', 'g'], ['item1', 'c1'], ['item2', 'c2']];
   A.press = null;
   A.wheelOpen = () => !!(A.press && A.press.wheel);
-  const grenadeList = () => Object.keys(P.grenades).filter((k) => P.grenades[k] > 0);
   A.updateItemKeys = function (dt) {
     if (I.hit('cycleGrenade')) A.cycleGrenade();
     if (!A.press) for (const [act, slot] of SLOTKEYS) if (I.hit(act)) { A.press = { act, slot, t: 0 }; break; }
@@ -789,13 +779,7 @@
     const t = G.game.time;
     // aim preview marker
     const pv = pl.grapplePreview;
-    if (false) {
-      marker.visible = true;
-      marker.position.copy(pv.point).addScaledVector(pv.normal, 0.03);
-      marker.lookAt(pv.point.clone().add(pv.normal));
-      const s = Math.max(0.6, pv.dist * 0.04) * (1 + 0.1 * Math.sin(t * 8));
-      marker.scale.setScalar(s);
-    } else marker.visible = false;
+    marker.visible = false; // (the aim preview marker is off: the HUD hint below shows the target)
     G.ui.grappleHint(pv, gr.state, pl.grappleCd);
     if (gr.state === 'none') { rope.visible = hook.visible = anchorMk.visible = false; return; }
     const a = pl.handPos(), b = gr.hook;

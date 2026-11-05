@@ -3,7 +3,7 @@
 (function () {
   const PS = (G.PStatus = {});
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   PS.DEFS = {
     burn: { icon: '🔥', name: '炎上', col: '#ff7a20', rgb: [1, 0.45, 0.1] },
     poison: { icon: '☠️', name: '毒', col: '#6ad040', rgb: [0.35, 0.85, 0.2] },
@@ -178,19 +178,6 @@
     if (!look.shield) { if (bubble) { bubble.visible = false; shards.visible = false; } return; }
     // the barrier around your body (third person) and golden plates orbiting you (visible at the view edges)
     ensureBubble();
-    if (false) {
-      bubble = new THREE.Group();
-      const add = (geo, o) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial(Object.assign({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }, o)));
-      const m1 = add(new THREE.SphereGeometry(1.15, 24, 16), { opacity: 0.12, side: THREE.DoubleSide });
-      const m2 = add(new THREE.IcosahedronGeometry(1.2, 1), { wireframe: true, opacity: 0.35 });
-      const m3 = add(new THREE.IcosahedronGeometry(1.32, 2), { wireframe: true, opacity: 0.3 });
-      const halo = add(new THREE.TorusGeometry(1.45, 0.05, 8, 64), { opacity: 0.8 }); halo.rotation.x = Math.PI / 2;
-      bubble.add(m1, m2, m3, halo); bubble.userData = { m1, m2, m3, halo };
-      shards = new THREE.Group();
-      const sm = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-      for (let i = 0; i < 8; i++) { const h = new THREE.Mesh(i < 4 ? new THREE.CircleGeometry(0.2, 6) : new THREE.OctahedronGeometry(0.16, 0), sm); h.userData.a = (i % 4) / 4 * Math.PI * 2 + (i >= 4 ? Math.PI / 4 : 0); h.userData.hi = i >= 4; shards.add(h); }
-      shards.userData.mat = sm;
-    }
     if (bubble.parent !== G.scene) { G.scene.add(bubble); G.scene.add(shards); }
     const U2 = bubble.userData, inv = !!look.inv;
     U2.m1.material.color.set(look.hex); U2.m2.material.color.set(look.hex2); U2.m3.material.color.set(look.hex); U2.halo.material.color.set(look.hex2); shards.userData.mat.color.set(inv ? 0xc8f4ff : look.hex);

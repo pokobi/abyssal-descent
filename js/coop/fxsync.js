@@ -6,7 +6,7 @@
 //  - a grenade that goes off beside someone else's character hurts them as it would hurt its thrower (a fifth of its damage).
 (function () {
   const K = G.Coop;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const U = G.U;
   const r2 = (v) => Math.round(v * 100) / 100;
 

@@ -15,7 +15,6 @@
   PW.attValue = (id) => { const a = G.ATT_BY_ID[id]; if (!a) return 0; if ((G.player.kitAtts || []).includes(id)) return 0; return Math.max(1, Math.round((a.price || 0) * PW.RATE / 5) * 5); };
   const spendKitAtt = (id) => { const k = G.player.kitAtts || [], i = k.indexOf(id); if (i >= 0) k.splice(i, 1); };
   PW.skillValue = (sk) => (sk.kit ? Math.round((sk.def.price || 0) * PW.RATE * 0.2 * (sk.lv || 0) / 5) * 5 : Math.max(1, Math.round((sk.def.price || 0) * PW.RATE * (1 + 0.2 * (sk.lv || 0)) / 5) * 5));
-  PW.itemValue = (id) => { const it = G.ITEM_BY_ID[id]; return it ? Math.max(1, Math.round((it.price || 0) * PW.RATE / 5) * 5) : 0; };
 
   function pay(v, what) {
     GM().run.coins += v;
@@ -56,12 +55,6 @@
     else { const a = G.ATT_BY_ID[id]; delete from.atts[a.slot]; from.ver++; G.weapons.dirty = true; if (!p.meleeMode && from === p.weapon) G.weapons.equip(true); }
     const av = PW.attValue(id); spendKitAtt(id);
     pay(av, G.ATT_BY_ID[id].name);
-  }
-  function sellItem(id, grenade) {
-    const p = P();
-    if (grenade) { if (!p.itemCount(id)) return; p.takeItem(id); if (G.GrenHold && G.GrenHold.active()) G.GrenHold.putAway(true); }
-    else if (!p.takeItem(id)) return;
-    pay(PW.itemValue(id), G.ITEM_BY_ID[id].name);
   }
 
   function sellSkill(i) {
@@ -117,7 +110,7 @@
     ]);
   }  // ---------------- the counter: categories, one row per thing, bulk sale of valuables ----------------
   PW.tab = 'all';
-  const CATS = [['all', '全て'], ['weapon', '🔫 武器'], ['melee', '🗡️ 近接'], ['att', '🔩 アタッチメント'], ['item', '🧪 消耗品'], ['grenade', '💣 投擲物'], ['skill', '🔮 スキル'], ['armor', '🛡️ 防具'], ['part', '⚙️ 武器パーツ'], ['valuable', '💰 金品']];
+  const CATS = [['all', '全て'], ['weapon', '🔫 武器'], ['melee', '🗡️ 近接'], ['att', '🔩 アタッチメント'], ['item', '🧪 消耗品'], ['grenade', '💣 投擲物'], ['skill', '🔮 スキル'], ['armor', '🛡️ 防具'], ['part', '🔧 部品'], ['valuable', '💰 金品']];
   function sellInst(it, n) {
     const p = P(), IV = G.Inv; n = Math.min(n || 1, it.n);
     const unit = IV.value(Object.assign({}, it, { n: 1 }));
@@ -219,17 +212,17 @@
       const count = parts.reduce((n, o) => n + (o.n || 1), 0);
       const sum = parts.reduce((s, o) => s + IV.value(o), 0);
       return {
-        label: `⚙️ 武器パーツを一括売却（${count}点 +${fmt(sum)}🪙）`,
+        label: `🔧 部品を一括売却（${count}点 +${fmt(sum)}🪙）`,
         count,
         primary: false,
         act: () => {
           if (!parts.length) return;
           // (a set of three is a weapon at the workbench: worth a second look before it goes for a few coins)
           const sets = parts.filter((o) => (o.n || 1) >= 3).length;
-          confirmBulk('⚙️ 武器パーツを一括売却しますか？', `武器パーツ <b>${count}点</b>`, sum, sets ? `3つ揃って組み立てられる部品 <b>${sets}種</b>` : '', () => {
+          confirmBulk('🔧 部品を一括売却しますか？', `部品 <b>${count}点</b>`, sum, sets ? `3つ揃って組み立てられる部品 <b>${sets}種</b>` : '', () => {
             for (const o of parts.slice()) IV.remove(p.bag, o);
-            pay(sum, `武器パーツ${count}点`);
-            G.ui.toast(`⚙️ 武器パーツ ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
+            pay(sum, `部品${count}点`);
+            G.ui.toast(`🔧 部品 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
           });
         },
       };

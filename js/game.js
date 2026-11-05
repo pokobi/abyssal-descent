@@ -3,7 +3,7 @@
 (function () {
   const GM = (G.game = { state: 'loading', time: 0, timeScale: 1, enemyTimeScale: 1, area: 1, seed: 0, run: null, objective: null, chronoT: 0, chronoSlow: 0.4 });
   const U = G.U, I = G.input;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const LIGHT_K = 6;
   let renderer, scene, camera, hemi, amb, moon, P;
   let last = performance.now(), fpsAcc = 0, fpsN = 0;
@@ -825,7 +825,7 @@
     }
     if (O.wave > 1) G.buffs.emit('onWave', { wave: O.wave });
     if (O.kind === 'ritual') { if (O.wave > 1) { G.ui.feed('🕯️ 儀式に呼応し、魔物が這い出た', 'big'); G.ui.banner('増援', '— 儀式に呼応し、魔物が這い出る —'); } }
-    else if (O.waves.length > 1) { G.ui.feed(`⚔️ WAVE ${O.wave}/${O.waves.length}`, 'big'); if (O.wave > 1) G.ui.banner(`WAVE ${O.wave} / ${O.waves.length}`, O.wave === O.waves.length ? '— 最終ウェーブ —' : '— 増援が現れた —'); }
+    else if (O.waves.length > 1) { G.ui.feed(`⚔️ WAVE ${O.wave}/${O.waves.length}`, 'big'); if (O.wave > 1) G.ui.banner(`WAVE ${O.wave} / ${O.waves.length}`, O.wave === O.waves.length ? '— 最終WAVE —' : '— 増援が現れた —'); }
     G.sfx.bell && G.sfx.bell();
   };
   function enemyPool(n, biomeKey) {
@@ -888,7 +888,6 @@
     child.waveNo = parent.waveNo;
     if (parent.waveNo === O.wave) O.waveSize = (O.waveSize || 0) + 1;
   };
-  GM.extraSpawned = function () { /* summoned / split foes no longer raise the kill target; waves only end when everything hostile is down */ };
   GM.onEnemyKilled = function (e) {
     if (e.boss || e.graveSpawn) return;
     GM.areaKills++;
@@ -991,7 +990,7 @@
     const on = airJumpT > (P.jumps >= 1 ? 0.04 : 0.25); // right after a jump of your own; a little later when you merely step off a ledge
     if (!airJumpEl) { if (!on) return; airJumpEl = document.createElement('div'); airJumpEl.id = 'airjump-hint'; (G.ui.el && G.ui.el.hud || document.body).appendChild(airJumpEl); }
     const key = G.K('jump');
-    if (key !== airJumpKey) { airJumpKey = key; airJumpEl.innerHTML = `<kbd>${U.esc(key)}</kbd>でダブルジャンプ`; }
+    if (key !== airJumpKey) { airJumpKey = key; airJumpEl.innerHTML = `<kbd>${U.esc(key)}</kbd>で二段ジャンプ`; }
     airJumpEl.classList.toggle('on', on);
   }
   function updateObjective(dt) {
@@ -1445,7 +1444,7 @@
   GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、そのエリアに入った最初から再開する（持ち物・加護・敵はその時点に戻り、HP全快・クールタイムはリセット）。' };
   GM.revivePrice = () => GM.price(4200 + GM.area * 160);
   GM.SVC_FORGE = { id: 'svc_forge', name: '鍛冶屋の出張', icon: '⚒️', rarity: 'rare', desc: '所持している銃か近接武器を1つ選んで強化値+1（ダメージ×1.13）。' };
-  GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（効果量UP・CT-2%）。価格は、選んだスキルの今の Lv で決まる。' };
+  GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（効果量UP・クールタイム-2%）。価格は、選んだスキルの今の Lv で決まる。' };
   // what the tome can raise right now, each with its own price (the same rule as the forge: 900 x 1.25^that skill's Lv)
   GM.tomeTargets = function () {
     const MAXLV = G.abilities.MAXLV, out = [], AR = G.Areas;
@@ -1702,7 +1701,7 @@
       const info = describeOffer(o);
       G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, el: G.Elem.tagOf(ob), name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
     } else if (best.type === 'sell') {
-      G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・防具・アイテム・投擲物を売却できる。', action: '売る' });
+      G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・部品・防具・消耗品・投擲物・スキル・金品を売却できる。', action: '売る' });
     } else if (best.type === 'reroll') {
       const cost = GM.rerollCost();
       G.ui.showInteract({ key: 'reroll' + coins, icon: '🎲', name: '運命の祭壇', cat: 'ショップの品揃えを入れ替える', desc: '売れ残った商品を全て新しいものに入れ替えます。使う度に価格が上がります。', price: cost, afford: coins >= cost, action: 'リロール' });
@@ -1722,7 +1721,7 @@
     } else if (best.type === 'cauldron') {
       const left = Math.max(0, 2 - (best.it.used || 0));
       if (left <= 0) G.ui.showInteract({ key: 'cauldron0', icon: '⚗️', name: '練成の釜（火は消え、冷え切っている）', rc: '#7a8480', cat: '練成終了（残り 0 / 2回）', desc: '「釜の火は消え去った。深淵の恵みはここまでだ…」', action: null });
-      else G.ui.showInteract({ key: 'cauldron' + left, icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: `防具・武器・武器パーツ・アタッチメント・消耗品・金品の練成（残り ${left} / 2回）`, desc: '同種・同レアリティの品を2つ掛け合わせ、1段階上位の品へと練成する。', action: '練成する' });
+      else G.ui.showInteract({ key: 'cauldron' + left, icon: '⚗️', name: '練成の釜', rc: '#58d898', cat: `防具・武器・部品・アタッチメント・消耗品・金品の練成（残り ${left} / 2回）`, desc: '同種・同レアリティの品を2つ掛け合わせ、1段階上位の品へと練成する。', action: '練成する' });
     } else if (best.type === 'partbench') {
       const inf = G.Parts.benchInfo(!!w.benchFree);
       G.ui.showInteract(Object.assign({ key: 'bench' + coins + G.Inv.ver }, inf));
@@ -1836,7 +1835,7 @@
     } else if (o.kind === 'relic') {
       cat = '🏺 遺物（常時効果・最大3つ）'; note = `所持遺物 ${GM.relicCount()}/3` + (GM.relicCount() >= 3 ? '　⚠ 購入時に手持ちの遺物と入れ替え' : '');
     } else if (o.kind === 'revive') {
-      cat = '🪔 魂の灯火 · 伝説'; note = `灯火 ${P.revives} → ${P.revives + 1}`;
+      cat = '🪔 魂の灯火 · レジェンダリー'; note = `灯火 ${P.revives} → ${P.revives + 1}`;
     } else if (o.kind === 'attachment') {
       cat = `${G.ATT_SLOTS[ob.slot].icon} アタッチメント（${G.ATT_SLOTS[ob.slot].name}）`;
       const ok = P.weapons.filter((pw) => G.attOk(ob, pw));

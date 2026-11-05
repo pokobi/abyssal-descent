@@ -10,7 +10,7 @@
 (function () {
   const LG = G.LevelGen, H = LG._, FG = G.FieldGen, U = G.U;
   const P = () => G.Props;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const S = (G.Strata = { ropes: [], ladders: [], doors: [], onRope: false });
   const NS = 18, SS = 10;           // the floor left north / south of the chasm (the exits and the mini shop / the spawn)
   const _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _v = new THREE.Vector3(), _s = new THREE.Vector3();

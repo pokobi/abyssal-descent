@@ -6,7 +6,6 @@
 // Reaction strength: 属性熟練 (elMastery) on its own curve, times the reaction boons (reactDmg / rx_*) as a separate factor.
 (function () {
   const EL = (G.Elem = {});
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   let P = null, C = null;
   EL.init = function () { P = G.player; C = G.combat; EL.crystals.length = 0; if (G.save && G.save.mark) for (const c of EL.CODEX) if (c.always) G.save.mark('items', c.id); };
 
@@ -38,7 +37,7 @@
 
   // the codex page (js/codex.js): the elements are always shown, a reaction once you have set it off
   EL.CODEX = [
-    { id: 'el_about', name: '属性について', icon: '🌈', rarity: 'common', cat: '属性', always: true, desc: '炎・水・氷・雷は当たった敵に8秒間残る（自分にも6秒）。炎上・冷気・電撃を付けると、炎・氷・雷も付く。反応が起きると、使われた属性とその状態異常（炎上・冷気・電撃）は消える。違う属性が当たると反応が起き、どちらも消える。風と地は残らず、付いている属性に作用するだけ。\n銃は同じ敵へ2.5秒に1回、近接は1秒に1回だけ属性を残す。スキル・アルティメット・グレネードは毎回。\n常に属性を帯びた敵は上書きされず、他の属性で必ず反応する（同じ敵では1秒に1回）。\n属性熟練：反応が強くなる。属性耐性：その属性から受けるダメージが減る。' },
+    { id: 'el_about', name: '属性について', icon: '🌈', rarity: 'common', cat: '属性', always: true, desc: '炎・水・氷・雷は当たった敵に8秒間残る（自分にも6秒）。炎上・冷気・電撃を付けると、炎・氷・雷も付く。属性が残っている敵に違う属性が当たると反応が起き、どちらの属性も、それに伴う状態異常（炎上・冷気・電撃）も消える。風と地は残らず、付いている属性に作用するだけ。\n銃は同じ敵へ2.5秒に1回、近接は1秒に1回だけ属性を残す。スキル・アルティメット・投擲物は毎回。\n常に属性を帯びた敵は上書きされず、他の属性で必ず反応する（同じ敵では1秒に1回）。\n属性熟練：反応が強くなる。属性耐性：その属性から受けるダメージが減る。' },
     ...['fire', 'water', 'ice', 'volt', 'wind', 'earth'].map((id) => ({ id: 'el_' + id, always: true, cat: '属性' })),
     ...Object.entries({ boil: '♨️', thaw: '🌡️', freeze: '🧊', shatter: '💎', blast: '💥', leak: '🔌', brittle: '💔', swirl: '🌀', crystal: '💠' }).map(([id, icon]) => ({ id: 'rx_' + id, icon, rarity: 'rare', cat: '反応' })),
   ];

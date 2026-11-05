@@ -5,7 +5,7 @@
 (function () {
   const GH = (G.GrenHold = {});
   const U = G.U, I = G.input;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const P = () => G.player;
   let h = null, grp = null, guide = null, hint = null;
 

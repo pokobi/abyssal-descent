@@ -120,7 +120,7 @@
       if (PT.count(id) < PT.NEED || run.coins < cost) return false;
       PT.take(id, PT.NEED); run.coins -= cost;
       PT.give(w);
-      G.ui.toast(`🔩 ${d.name}×3 → ${w.icon} ${w.name}`, 'good'); G.ui.itemCard(w, '[部品から組み立て]');
+      G.ui.toast(`🔧 ${d.name}×3 → ${w.icon} ${w.name}`, 'good'); G.ui.itemCard(w, '[部品から組み立て]');
       if (done) done();
       return true;
     } };
@@ -141,11 +141,11 @@
   const costTxt = (c) => (c ? `${U.fmt(c)}🪙` : '無料');
   PT.benchInfo = function (free) {
     const { make } = PT.recipes(), ready = make.filter((m) => m.ok).length, have = make.reduce((s, m) => s + m.n, 0);
-    return { icon: '🔧', name: free ? '部品の作業台（無料）' : '部品の作業台', rc: '#c8a878', cat: free ? '武器パーツの組み立て・繰り上げ（無料・何度でも）' : '武器パーツの組み立て・繰り上げ（有料）',
-      desc: have ? `所持パーツ ${have}個 — 組み立てられる組 ${ready}` : '武器パーツを持っていない。死体や宝箱から見つかる。', action: '使う' };
+    return { icon: '🔧', name: free ? '部品の作業台（無料）' : '部品の作業台', rc: '#c8a878', cat: free ? '部品の組み立て・繰り上げ（無料・何度でも）' : '部品の組み立て・繰り上げ（有料）',
+      desc: have ? `所持している部品 ${have}個 — 組み立てられる組 ${ready}` : '部品を持っていない。死体や宝箱から見つかる。', action: '使う' };
   };
   // the bench: a table of kind x rarity (how many of each part you hold), the chosen cell on the right with what it can become
-  const esc = (t) => U.esc(String(t == null ? '' : t));
+  const esc = U.esc;
   let sel = null, cands = null;
   PT.open = function (free) {
     const gm = GM(), UI = G.ui;
@@ -184,7 +184,7 @@
     };
     const side = (coins) => {
       const d = sel && G.PART_BY_ID[sel];
-      if (!d) return '<div class="pb-empty">武器パーツを持っていない。<br>死体や宝箱から見つかる。</div>';
+      if (!d) return '<div class="pb-empty">部品を持っていない。<br>死体や宝箱から見つかる。</div>';
       const f = PT.FAM_BY_ID[d.fam], n = PT.count(d.id), ri = ORD.indexOf(d.rarity), next = ORD[ri + 1], to = next && G.PART_BY_ID[PT.id(d.fam, next)];
       const mc = PT.makeCost(d.rarity, free), uc = to ? PT.upCost(to.rarity, free) : 0;
       const pool = PT.pool(d.fam, d.rarity);

@@ -9,7 +9,7 @@
 (function () {
   const LG = G.LevelGen, H = LG._, U = G.U;
   const P = () => G.Props;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const PG = () => G.Props.PG;
   const Mx = (x, y, z, sx, sy, sz, rx, ry, rz) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)), V(sx, sy, sz));
   const F = (G.FieldGen = {});

@@ -7,7 +7,7 @@
 // Rare on the first two fields, fairly common on the third (mostly inside the barred rooms), a little more on the fourth (strata.js).
 (function () {
   const Gr = (G.Graves = { list: [], TRIGGER: 7.5, DWELL: 3 });
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let sph = null, box = null, cyl = null, ringTex = null, outMats = {};
 
   // ---- generation: only a record on the world; the meshes are made when the world is set up ----

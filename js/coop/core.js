@@ -4,7 +4,7 @@
 // One host runs the real game; guests run their own player and a puppet of the host's enemies and guardians (see host.js, client.js).
 (function () {
   const K = (G.Coop = { role: null, id: 0, name: '', players: new Map(), swap: null, live: false, MAX: 3 });
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const GM = () => G.game;
   const qs = new URLSearchParams(location.search);
   const CSS = `
@@ -292,7 +292,7 @@
     const body = K.lobbyEl.querySelector('#cl-body'), R = G.Run, host = K.role === 'host';
     const names = [...K.players.values()].map((p) => `<div>・${G.U.esc(p.name)}${p.id === 0 ? '（ホスト）' : ''}</div>`).join('');
     const ids = ['easy', 'normal', 'hard'].concat(R.unlocked('extra', 1) ? ['extra'] : []);
-    const ffBox = host ? `<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cl-ff"${K.ff ? ' checked' : ''}>仲間のグレネードでダメージを受ける</label>` : `<div class="cl-note">仲間のグレネードのダメージ: ${K.ff ? 'あり' : 'なし'}</div>`;
+    const ffBox = host ? `<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cl-ff"${K.ff ? ' checked' : ''}>仲間の投擲物でダメージを受ける</label>` : `<div class="cl-note">仲間の投擲物のダメージ: ${K.ff ? 'あり' : 'なし'}</div>`;
     const dif = host
       ? `<div class="cl-note">難易度</div><div class="cl-diff" style="grid-template-columns:repeat(${ids.length},1fr)">${ids.map((id) => `<button data-d="${id}" class="${K.diff.id === id ? 'on' : ''}" style="--dc:${R.DIFFS[id].col}">${R.DIFFS[id].icon} ${R.DIFFS[id].name}</button>`).join('')}</div>`
         + (K.diff.id === 'extra' ? `<div class="cl-xl"><button data-x="-1">◀</button><b>エクストラ ${K.diff.lv}</b><button data-x="1">▶</button></div>` : '')

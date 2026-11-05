@@ -8,7 +8,6 @@
 //   duellist -> host: dpr (parried blow i of combo k)
 (function () {
   const K = G.Coop;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   const r2 = (v) => Math.round(v * 100) / 100;
   K.installDuel = function () {
     const D = G.Duel, BS = G.bosses;

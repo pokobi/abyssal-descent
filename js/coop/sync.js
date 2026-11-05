@@ -6,7 +6,7 @@
 //  - the gates: the way on opens only when everyone who is up stands in the same gate; the others are told who has arrived.
 (function () {
   const K = G.Coop;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const U = G.U;
 
   K.installSync = function () {

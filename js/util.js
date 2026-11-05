@@ -72,7 +72,8 @@ window.G = window.G || {};
     }
     return lines.join(opt && opt.inline ? ' ' : '<br>');
   };
-  U.esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  U.V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0); // (the short Vector3 every module uses)
+  U.esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   class RNG {
     constructor(seed) { this.s = (seed >>> 0) || 0x9e3779b9; }

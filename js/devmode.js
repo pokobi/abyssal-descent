@@ -4,8 +4,8 @@
 (function () {
   const D = (G.Dev = {});
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
-  const esc = (s) => U.esc(String(s ?? ''));
+  const V = G.U.V;
+  const esc = U.esc;
   let GM, P, I, panel = null, tab = 'run', back = null, query = {}, aim = null;
   const scrollMem = {}; // tab -> { body, lists: [...] }
   const saveScroll = () => {
@@ -107,7 +107,9 @@
       ACT.clear = () => { if (!GM.areaCleared) GM.clearArea(); };
       ACT.bossNow = () => { const w = G.world; if (GM.stage !== 'boss' || !w.arenaCenter) return toast('ボスエリアではない'); P.pos.set(w.arenaCenter.x, (w.roadFloorY ? 0 : P.pos.y) + 0.1, w.ledgeZ ? w.ledgeZ - 4 : w.arenaD - 6); P.vel.set(0, 0, 0); }; // (the last field starts once you are on the tiles, past its ledge)
       ACT.gates = () => { G.Areas.openGates(true); GM.areaCleared = true; };
-      ACT.next = () => { const n = GM.area + 1; GM.area = n; GM.enterArea(n, n % 5 === 0 ? 'boss' : 'combat'); };
+      ACT.next = () => { const n = GM.area + 1; GM.area = n; GM.enterArea(n, G.Run.isBoss(n) ? 'boss' : 'combat'); };
+      // the class (its own effect and strengths; the gear in hand stays)
+      for (const c of G.Classes ? G.Classes.LIST : []) ACT['cls_' + c.id] = () => { P.cls = c.id; GM.run.cls = c.id; P._cs = null; P.recalc(); P.hp = Math.min(P.hp, P.stats.maxHp); toast(`${c.icon} ${c.name}に変更（固有効果 Lv${G.Classes.lv()}）`); };
       ACT.heal = () => { P.dead = false; P.hp = P.stats.maxHp; P.st = {}; };
       ACT.kill = () => { for (const e of G.enemies.list) if (e.alive && !e.boss) { e.hp = 0; G.combat.killEnemy(e, { src: 'clear', proc: true }, 0); } };
       ACT.killBoss = () => { const b = G.bosses.active; if (b && !b.dead) { if (b.parts) for (const p of b.parts) p.hp = 0; b.hp = 0; b.kill(); } };
@@ -126,6 +128,7 @@
         ${sec('戦闘')}
         <div class="dv-row">${btn('heal', '❤️ 全回復・状態異常解除')}${btn('kill', '💀 敵を全滅')}${btn('killBoss', '👑 ボスを倒す')}</div>
         <div class="dv-row">${tog('god', '無敵')}${tog('oneHit', '一撃必殺')}${tog('noCd', 'クールタイムなし')}${tog('freeze', '敵を停止')}</div>
+        <div class="dv-row">クラス ${(G.Classes ? G.Classes.LIST : []).map((c) => btn('cls_' + c.id, c.icon + ' ' + c.name, P.cls === c.id ? 'pri' : '')).join('')}</div>
         <div class="dv-row">ゲーム速度 ${[0.25, 0.5, 1, 2, 4].map((v) => `<button class="dv-b${GM.dev.speed === v ? ' pri' : ''}" data-speed="${v}">×${v}</button>`).join('')}</div>` : '<div class="dv-note">ランを開始すると、エリア移動・能力値・装備などのタブが使えます。</div>'}
         ${sec('その他')}
         <div class="dv-row">${btn('codex', '📖 図鑑を全開放')}${btn('unlockAll', '🔓 全難易度を解放')}${btn('off', '⏏ デバッグモード終了', 'warn')}</div>

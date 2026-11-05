@@ -2,7 +2,7 @@
 // Melee weapon slot (key 3): viewmodels, light combo (LMB), heavy blow (RMB), hit detection and special traits.
 (function () {
   const W = G.weapons, U = G.U, I = G.input;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P, mm = null; // current melee viewmodel {group, r, l, tip, def}
   const ms = { ph: 'idle', t: 0, dur: 0, hitAt: 0, hitDone: false, side: 1, combo: 0, lungeT: 0 };
   W.ms = ms;
@@ -464,7 +464,6 @@
   }
   // the shield on the left arm (its face looks away from you, along -z)
   const SHIELDS = { buckler: 1, tower: 1 };
-  W.isShield = (def) => !!(def && SHIELDS[def.model]);
   function buildShield(l, kind, mk, mats, PG, box, gold, dark) {
     const sg = new THREE.Group(); l.add(sg); l.userData.shield = sg;
     sg.scale.setScalar(kind === 'buckler' ? 0.5 : 0.52); sg.rotation.y = 0.35; // held a little turned, its face towards the middle of the view
@@ -714,7 +713,7 @@
       if (s.trait === 'thunder' && (heavy || Math.random() < 0.4)) { C.chain(e, 2, d * 0.35, 8, { src: 'melee', proc: true }); G.fx.strike(e.centerPos(), 0xcfe0ff, heavy); }
       G.fx.blood(e.centerPos(), f, e.bloodColor || 0x6a0a0a, heavy ? 10 : 5);
       if (def.trait === 'midas' && !e.boss) C.coins(heavy ? 6 : 2, e.centerPos());
-      if (def.trait === 'devour' && !e.alive && e.mut) { W.devour = Math.min(10, (W.devour || 0) + 1); C.heal(P.stats.maxHp * 0.05); G.ui.toastSmall(`🌑 魂を喰らった（${W.devour}重）`); }
+      if (def.trait === 'devour' && !e.alive && e.mut) { W.devour = Math.min(10, (W.devour || 0) + 1); C.heal(P.stats.maxHp * 0.05); G.ui.toastSmall(`🌑 魂を喰らった（${W.devour}層）`); }
     }
     // destructibles
     for (const ds of G.world.destructibles) if (ds.alive && ds.pos.distanceTo(o) < range + 0.3) { const to = ds.pos.clone().sub(o).normalize(); if (to.dot(f) > 0.45) { C.damageDestructible(ds, 999, ds.pos); hit = true; } }

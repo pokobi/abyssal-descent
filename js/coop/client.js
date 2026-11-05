@@ -3,7 +3,7 @@
 // A hit is worked out here with your own build (numbers, crits, boons) and the result goes to the host, which owns every foe's health.
 (function () {
   const K = G.Coop;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const r2 = (v) => Math.round(v * 100) / 100;
   K.vec = (v) => [r2(v.x), r2(v.y), r2(v.z)];
   // numbers, strings and vectors only: callbacks and object references stay home

@@ -182,7 +182,7 @@
       html += `<div style="margin-top:8px"><span class="tag">🔑 ${G.K('w3')} で持ち替え / 左:連撃 / 右:重撃</span>${o.traitDesc ? `<span class="tag">✦ ${o.traitDesc}</span>` : ''}${o.el && G.Elem.BY[o.el] ? `<span class="tag" style="color:${G.Elem.BY[o.el].col}">${G.Elem.BY[o.el].icon} ${G.Elem.BY[o.el].name}属性</span>` : ''}${o.elem ? `<span class="tag">${{ burn: '🔥 炎上', frost: '❄️ 冷気', poison: '☠️ 毒', shock: '⚡ 電撃' }[o.elem]} ${Math.round(o.elemChance * 100)}%</span>` : ''}${o.critChance ? `<span class="tag">💢 会心+${Math.round(o.critChance * 100)}%</span>` : ''}${o.lifesteal ? `<span class="tag">🩸 吸血${Math.round(o.lifesteal * 100)}%</span>` : ''}<span class="tag">🪙 ${o.price ? U.fmt(o.price) : '初期装備'}</span></div>`;
     } else if (tab === 'enemy') {
       const lv = Math.max(1, o.minArea);
-      html += bar('❤️', '体力 (Lv.1)', o.hp, 900);
+      html += bar('❤️', 'HP (Lv.1)', o.hp, 900);
       html += bar('⚔️', '攻撃 (Lv.1)', o.dmg, 60);
       html += bar('👟', '移動速度', o.speed, 12, o.speed.toFixed(1));
       html += bar('📐', 'サイズ', o.size, 1.6, '×' + o.size.toFixed(2));
@@ -191,7 +191,7 @@
       // stats from a real instance at its first appearance (same numbers the fight uses)
       const st = bossStats(o);
       if (st) {
-        html += bar('❤️', '体力', st.hp, bossHpMax(), U.fmt(st.hp));
+        html += bar('❤️', 'HP', st.hp, bossHpMax(), U.fmt(st.hp));
         html += bar('⚔️', '攻撃倍率', st.dmg, 3, '×' + st.dmg.toFixed(2));
         html += bar('📐', 'サイズ', st.size, 14, st.size.toFixed(1) + 'm');
         html += '<div style="margin-top:4px;font-size:12px;color:var(--dim)">基準：ノーマル・エリア7の守護者（難易度やエリアで変わります）</div>';
@@ -265,7 +265,6 @@
     });
     return STAGES;
   }
-  const pct = (v) => (v * 100 >= 10 ? Math.round(v * 100) : (v * 100).toFixed(1)) + '%';
   function stageDetail(o) {
     const pool = (G.Run.BOSS_POOLS[o.key] || []).map((id) => G.BOSS_BY_ID[id]).filter(Boolean);
     let h = `<div style="margin-top:8px;font-weight:700">🗺️ 登場する難易度・区分</div><div style="font-size:12.5px;line-height:1.7;color:#cfc4b0">${o.where.join('　/　') || '—'}</div>`;

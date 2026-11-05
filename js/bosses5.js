@@ -5,7 +5,7 @@
 //  * every existing guardian gets 2-3 of them; the old attacks are a little tighter (shorter wind-ups, one more combo hit / volley in hard+)
 (function () {
   const BS = G.bosses, U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const Pl = () => G.player;
   const C = () => G.combat;
   const FX = () => G.fx;

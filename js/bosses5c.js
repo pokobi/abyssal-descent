@@ -4,7 +4,7 @@
 (function () {
   const BS = G.bosses, U = G.U;
   const { mat, mesh, joint } = BS.h;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const PG = () => G.Props.PG;
   const tex = () => G.Tex.tex;
   const glowM = (c, k) => mat('#000', { emissive: c, emissiveIntensity: k || 2.2 });

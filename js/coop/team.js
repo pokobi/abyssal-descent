@@ -3,7 +3,7 @@
 // a ping (H) to point at something, chat (Enter), and the team's numbers on the pause menu and the end screens.
 (function () {
   const K = G.Coop;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const U = G.U;
   const COLS = ['#ffd27a', '#7ad0ff', '#ff9ab0', '#9aef8a'];
   const CSS = `

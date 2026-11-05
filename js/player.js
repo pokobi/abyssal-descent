@@ -5,7 +5,7 @@
   G.GRAPPLE_CD = 15;
   G.grappleCdOf = (st) => (st.grappleBase || G.GRAPPLE_CD) * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0))); // (the class sets the base: 15-28 s, see classes.js)
   const U = G.U, I = G.input;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const BASE = {
     maxHp: 100, maxHpPct: 0, hpRegen: 0, armor: 0, moveSpeed: 0, jumpPower: 0, maxJumps: 1, airControl: 0,
     dmg: 0, headMul: 0, critChance: 0.05, critMul: 1.5, fireRate: 0, reloadSpeed: 0, magSize: 0, spread: 0, recoil: 0, adsSpeed: 0, range: 0,
@@ -15,6 +15,7 @@
     healMul: 0, enemyDmg: 0, enemySpeed: 0, enemyHp: 0, infAmmo: 0, lowGrav: 0, soulLantern: 0, adsDmg: 0, hipSpread: 0, extraChests: 0, chestBonus: 0,
     healDrop: 0, throwPow: 0, invis: 0, extraEnemies: 0, defense: 0, weight: 0, statusRes: 0, dotRes: 0, blastRes: 0, sprintRamp: 0,
     grappleBase: 0, guardHp: 0, elMastery: 0, elRes_fire: 0, elRes_water: 0, elRes_ice: 0, elRes_volt: 0, elRes_wind: 0, elRes_earth: 0, reactDmg: 0, reactMul: 0,
+    elIcd: 0, elAuraT: 0, elSelfT: 0, elSelfRes: 0, rxFreezeT: 0, rxBlastR: 0, rxLeak: 0, rxCrystal: 0, rxBrittle: 0, rxSwirlR: 0, rxSwirlT: 0, // (the element boons: element.js)
     skillCd: 0, skillRad: 0, skillDur: 0, skillCharges: 0, techBurn: 0, techFrost: 0, techShock: 0, techStun: 0, techVamp: 0, techShield: 0,
     ultDmg: 0, ultCd: 0, ultDur: 0, ultCharge: 0, ultHeal: 0, ultShield: 0, ultOver: 0, ultEcho: 0, ultTech: 0,
     pileDmg: 0, pileRadius: 0, pileCd: 0, pileFast: 0, pileFire: 0, pileShock: 0, pileFrost: 0, pileStun: 0, pileVacuum: 0, pileBounce: 0, pileShield: 0, pileHeal: 0, pileHeight: 0, pileShieldMul: 0, pileMeteor: 0,
@@ -22,14 +23,14 @@
   G.PLAYER_BASE = BASE;
   // what each stat does (the tooltip on its name in the status / inventory screens)
   G.STAT_DESC = {
-    elMastery: '属性反応の強さ。爆轟・漏電などのダメージと、沸騰・熱融の倍率が上がる。値が大きいほど伸びはゆるやかになる（100で効果型+50%・倍率+0.15）。反応を強くする加護とは別にかかる。',
+    elMastery: '属性反応の強さ。爆轟・漏電などのダメージと、沸騰・熱融の倍率が上がる。値が大きいほど伸びはゆるやかになる（100で爆轟・漏電などのダメージ+50%、沸騰・熱融の倍率+0.15）。反応を強くする加護とは別にかかる。',
     elRes_fire: '炎属性の攻撃から受けるダメージを減らす（最大70%）。炎が付いている時間は変わらない。',
     elRes_water: '水属性の攻撃から受けるダメージを減らす（最大70%）。水が付いている時間は変わらない。',
     elRes_ice: '氷属性の攻撃から受けるダメージを減らす（最大70%）。氷が付いている時間は変わらない。',
     elRes_volt: '雷属性の攻撃から受けるダメージを減らす（最大70%）。雷が付いている時間は変わらない。',
     elRes_wind: '風属性の攻撃から受けるダメージを減らす（最大70%）。',
     elRes_earth: '地属性の攻撃から受けるダメージを減らす（最大70%）。',
-    maxHp: '体力の上限。',
+    maxHp: 'HPの上限。',
     armor: '受けるダメージを割合で減らす（最大85%）。防御力の後にかかる。',
     dmg: '与えるダメージ全体が増える（銃・近接・スキル・爆発）。',
     fireRate: '銃の連射の速さ。近接武器の連撃の間隔にも半分だけ効く（近接攻撃の間隔と合わせて最大-50%）。',
@@ -38,12 +39,12 @@
     critMul: '会心が出たときのダメージ倍率。',
     headMul: 'ヘッドショットのダメージ倍率への上乗せ。',
     moveSpeed: '移動の速さ。防具の重さで下がる。',
-    hpRegen: '毎秒回復する体力。',
-    lifesteal: '与えたダメージのうち、体力として戻る割合。',
+    hpRegen: '毎秒回復するHP。',
+    lifesteal: '与えたダメージのうち、HPとして戻る割合。',
     cdr: 'スキルのクールタイムを短くする（最大60%。アルティメットには半分だけ効く）。',
     coinMul: '手に入るコインが増える。',
     skillDmg: 'スキルとアルティメットのダメージが増える。',
-    explosionDmg: '爆発のダメージが増える（グレネード・爆発する弾・スキルの爆発）。',
+    explosionDmg: '爆発のダメージが増える（投擲物・爆発する弾・スキルの爆発）。',
     defense: '防具の防御力。受けるダメージが ×100÷(100＋防御力) になる。',
     weight: '防具の重さ。重いほど移動が遅くなる（布の防具は重さ0）。',
     shieldDmg: '敵のシールドに与えるダメージが増える。',
@@ -275,13 +276,6 @@
           if (this.pileReady() && !this.duelLock) this.startPile();
           else { G.ui.toastSmall(`🔨 パイルドライバー CT ${this.pileCd.toFixed(1)}秒`); G.sfx.ui('deny'); }
         }
-      }
-      // air dash (buff): sprint pressed in air
-      if (false && !this.grounded && I.hit('sprint') && this.has('m_airdash') && !this.airDashUsed && !this.pileState && this.grapple.state !== 'attached') {
-        this.airDashUsed = true;
-        const f = this.forward(); f.y = Math.max(-0.2, f.y * 0.5); f.normalize();
-        this.vel.copy(f.multiplyScalar(19)); this.vel.y = Math.max(this.vel.y, 2);
-        G.sfx.whoosh(0.3, 0.8); this.fovKick = 10; G.buffs.emit('onDash', {});
       }
 
       // ---- slide ----

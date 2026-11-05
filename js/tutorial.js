@@ -5,7 +5,7 @@
 (function () {
   const T = (G.Tutorial = { active: false });
   const U = G.U, I = G.input;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P, GM, el, map = null, st = null, idx = 0;
   const k = (s) => `<kbd>${s}</kbd>`;
   const K = (a) => k(G.K(a));
@@ -52,7 +52,7 @@
       body: () => ul('実際に操作しながら、基本を覚えます（5分ほど）。', 'ここでは<b>倒されません</b>。HPが減っても自動で戻ります。', pc(`${NEXT()} 次へ　${k('ホイール長押し')} この手順を飛ばす`, `${k('次へ')} で進む　${k('飛ばす')} でその手順を飛ばす（パネルのボタン）`), pc(`${k('Esc')} ポーズ（チュートリアルの終了もここから）`, `${k('⏸')} ポーズ（チュートリアルの終了もここから）`)) },
 
     { ch: 1, title: '見回す・歩く・走る',
-      body: () => ul(pc(`${k('マウス')} 見回す　${WASD()} 歩く`, `${k('画面の右側をドラッグ')} 見回す　${k('左のスティック')} 歩く`), G.save.data.settings.autoSprint ? pc(`普段は<b>自動で走る</b>（${K('sprint')} を押している間は歩き）`, '普段は<b>自動で走る</b>') : pc(`${K('sprint')} を一度押すと<b>走る</b>（止まる・撃つ・覗くまで続く）`, `${K('sprint')} で<b>走る</b>（止まる・撃つ・覗くまで続く）`)),
+      body: () => ul(pc(`${k('マウス')} 見回す　${WASD()} 歩く`, `${k('画面の右側をドラッグ')} 見回す　${k('左のスティック')} 歩く`), G.save.data.settings.autoSprint ? pc(`普段は<b>自動で走る</b>（${K('sprint')} を押している間は歩き）`, '普段は<b>自動で走る</b>') : pc(`${K('sprint')} を一度押すと<b>走る</b>（止まる・撃つ・ADSまで続く）`, `${K('sprint')} で<b>走る</b>（止まる・撃つ・ADSまで続く）`)),
       tip: () => pc('マウスが効かない時は、画面を一度クリック。', ''),
       goal: (s) => `20m 進む（${Math.min(20, Math.floor(s.dist))} / 20m）`,
       check: (s) => Math.min(1, s.dist / 20) },
@@ -66,10 +66,10 @@
       goal: (s) => parts([['パイルドライバー', s.p], ['グラップル', s.g]]),
       check: (s) => { P.pileCd = Math.min(P.pileCd || 0, 0.5); P.grappleCd = Math.min(P.grappleCd || 0, 0.5); if (P.pileState) s.p = true; if (P.grapple && P.grapple.state === 'attached') s.g = true; return (s.p ? 0.5 : 0) + (s.g ? 0.5 : 0); } },
 
-    { ch: 2, title: '撃つ・覗く・リロード',
-      body: () => ul(`${k(pc('左クリック', '射撃'))} 撃つ`, pc(`${k('右クリック')} 押している間 覗き込む（狙いが安定する）`, `${k('構え')} 覗き込む（押すたびに入／切。狙いが安定する）`), `${K('reload')} リロード（空になると自動でも）`, '頭に当てると大ダメージ（ヘッドショット）'),
+    { ch: 2, title: '撃つ・ADS・リロード',
+      body: () => ul(`${k(pc('左クリック', '射撃'))} 撃つ`, pc(`${k('右クリック')} 押している間 ADS（覗き込む。狙いが安定する）`, `${k('構え')} ADS（覗き込む。押すたびに入／切。狙いが安定する）`), `${K('reload')} リロード（空になると自動でも）`, '頭に当てると大ダメージ（ヘッドショット）'),
       tip: () => pc('残りの弾は画面右下。', '残りの弾は画面の右上。'),
-      goal: (s) => parts([[`撃つ ${Math.min(5, s.shots || 0)}/5`, (s.shots || 0) >= 5], ['覗く', s.ads], ['リロード', s.rl]]),
+      goal: (s) => parts([[`撃つ ${Math.min(5, s.shots || 0)}/5`, (s.shots || 0) >= 5], ['ADS', s.ads], ['リロード', s.rl]]),
       setup: (s) => { s.mag = P.weapon ? P.weapon.mag : 0; },
       check: (s) => { const w = P.weapon; if (w && !P.meleeMode) { if (w.mag < s.mag) s.shots = (s.shots || 0) + (s.mag - w.mag); s.mag = w.mag; if (w.reloading) s.rl = true; } if (G.weapons.adsT > 0.9) s.ads = true; return Math.min(1, (s.shots || 0) / 5) * 0.6 + (s.ads ? 0.2 : 0) + (s.rl ? 0.2 : 0); } },
     { ch: 2, title: '近接武器',
@@ -95,7 +95,7 @@
       check: (s) => { if (G.Inv.corpses.some((c) => c.searched && !s.bodies0.has(c))) s.c1 = true; if (G.world.interactables.some((i) => i.type === 'chest' && i.opened && !s.chests0.has(i))) s.c2 = true; return (s.c1 ? 0.5 : 0) + (s.c2 ? 0.5 : 0); } },
     { ch: 3, title: '消耗品・投擲物',
       body: () => ul(`${K('item1')} ${K('item2')}：消耗品を使う（<b>長押し</b>で種類を選ぶ）`, `${K('grenade')}：投擲物を構える → ${k(pc('左クリック', '射撃'))} 投げる／${k(pc('右クリック', '構え'))} 転がす`, pc(`投擲物の種類は ${K('grenade')} 長押し、または ${K('cycleGrenade')}`, `投擲物の種類は ${K('grenade')} を長押し`)),
-      tip: () => '回復薬と手榴弾を渡しました。所持数は画面下中央。',
+      tip: () => '回復薬と破片手榴弾を渡しました。所持数は画面下中央。',
       goal: (s) => parts([[`${G.K('item1')} で回復する`, s.a], ['投擲物を投げる', (s.thrown || 0) > 0]]),
       setup: () => { P.hp = Math.min(P.hp, P.stats.maxHp * 0.6); top('h_bandage', 2); top('h_medkit', 1); top('g_frag', 2); top('g_fire', 1); G.ui.refreshItems(); },
       check: (s) => { if (G.ItemAnim.busy()) s.a = true; return (s.a ? 0.5 : 0) + ((s.thrown || 0) > 0 ? 0.5 : 0); } },

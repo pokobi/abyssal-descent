@@ -782,7 +782,7 @@
         if (a.n >= N && a.t > a.next + 0.6) end();
       } else if (a.k === 'pull') {
         if (!a.vx) {
-          a.vx = true; G.ui.toastSmall('⚠ 深淵の渦 — 中心から離れろ！（ダッシュ）'); G.sfx.magic(c, 'dark');
+          a.vx = true; G.ui.toastSmall('⚠ 深淵の渦 — 中心から離れろ！（スプリント）'); G.sfx.magic(c, 'dark');
           const m = a.ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 4.5, 48), new THREE.MeshBasicMaterial({ color: 0x8030ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
           m.rotation.x = -Math.PI / 2; m.position.set(this.pos.x, 0.08, this.pos.z); this.own(m);
         }
@@ -961,7 +961,6 @@
     }
     return { root: b.root, boss: b };
   };
-  BS.firstArea = (id) => (id === 'abyssking' ? 50 : (BS.order.indexOf(id) + 1) * 5);
   BS.order.push('drake');
   G.BOSSES.push(
     { id: 'drake', name: '嵐翼の竜', title: 'TEMPEST DRAKE', icon: '🐉', desc: '嵐を纏う飛竜。空を旋回している間は胴体がとても硬い。両翼を撃ち抜くと墜落し、しばらく頭部が無防備になる。HP50%で雷を纏い、落雷を呼ぶ。', mech: ['飛行中は胴体ダメージ大幅軽減', '両翼の破壊で墜落（頭部が弱点）', '火炎の息（帯状）・火球・急降下', '尾の薙ぎ払い（ジャンプ）・咆哮', 'HP50%で落雷'] },
@@ -970,14 +969,7 @@
   G.BOSS_BY_ID = Object.fromEntries(G.BOSSES.map((b) => [b.id, b]));
 
   // ---------------- the cycle ----------------
-  // a guardian every 5 areas, the Abyss King every 50; after 50 the same cycle repeats with "deeper" variants
-  BS.forArea = function (area) {
-    const k = Math.floor(area / 5);
-    if (k <= 0) return BS.order[0];
-    const i = (k - 1) % 10;
-    if (i === 9) return 'abyssking';
-    return BS.order[i % BS.order.length];
-  };
+  // (which guardian an area meets is drawn from the field's pool: G.Run.bossFor, wrapped in below; bosses.js keeps a plain fallback)
   BS.cycleOf = (area) => Math.floor((Math.max(1, area) - 1) / 50);
   const CYCLE_NAMES = ['', '深淵の', '虚無の', '終焉の', '原初の'];
   const CYCLE_HUE = [0, 0.62, 0.33, 0.85, 0.15];

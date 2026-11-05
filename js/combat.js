@@ -2,7 +2,7 @@
 // Central combat: damage pipeline (shields, crits, headshots, statuses), explosions, projectiles, zones, pickups, allies, buff event bus.
 (function () {
   const C = (G.combat = { projectiles: [], zones: [], pickups: [], mines: [], allies: [], decoys: [], walls: [] });
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P = null;
   const U = G.U;
 
@@ -22,7 +22,6 @@
   C.init = function () { P = G.player; };
   C.area = () => (G.game && G.game.area) || 1;
   C.scale = (v) => v * (1 + 0.14 * (C.area() - 1));
-  C.gunScale = () => 1 + 0.07 * (C.area() - 1);
 
   // ---------------- player-side helpers used by buffs/skills ----------------
   // life drain is paid out of a refilling pool tied to max HP: damage grows far faster than HP over a run,
@@ -38,7 +37,6 @@
   C.heal = function (amount, silent) {
     if (!P || P.dead || amount <= 0) return;
     amount *= Math.max(0, 1 + P.stats.healMul);
-    if (P.has('t_blood') && false) return;
     const max = P.stats.maxHp;
     const over = P.hp + amount - max;
     P.hp = Math.min(max, P.hp + amount);

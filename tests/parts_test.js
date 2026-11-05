@@ -106,7 +106,7 @@ const PORT = +process.env.COOP_PORT || 9991;
     await sleep(300);
     const bl = await p.eval("(document.getElementById('pw-bulk-btn') || {}).textContent || ''");
     console.log('      ' + bl);
-    check(/武器パーツを一括売却（6点/.test(bl), 'the pawn has a bulk sale for weapon parts');
+    check(/部品を一括売却（6点/.test(bl), 'the pawn has a bulk sale for weapon parts');
     await p.eval("document.getElementById('pw-bulk-btn').click(); 1"); await sleep(300);
     await p.eval("[...document.querySelectorAll('#screens .choice')].find((e) => /すべて売る/.test(e.textContent)).click(); 1"); await sleep(300);
     check((await p.eval("G.player.bag.items.filter((o) => o.type === 'part').length")) === 0 && (await p.eval('G.game.run.coins')) > 0, 'and it sells them all');

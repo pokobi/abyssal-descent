@@ -3,7 +3,7 @@
 (function () {
   const W = (G.weapons = { adsT: 0, dirty: true, ver: 0, curStats: null });
   const U = G.U, I = G.input;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let vmScene, vmCam, vmRoot, vmLight, flashSprite, flashSprite2, mats, P;
   let model = null; // current viewmodel {group, muzzle, sightY, mag, bolt, ...}
 
@@ -1283,6 +1283,5 @@
     renderer.clearDepth();
     renderer.render(vmScene, vmCam);
   };
-  W.setLightLevel = function (k) { if (W.vmKey) W.vmKey.intensity = 1.2 * k; };
   W.hidden = function (h) { if (vmRoot) vmRoot.visible = !h; };
 })();

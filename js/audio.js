@@ -276,7 +276,6 @@
       stop(fade) { g.gain.setTargetAtTime(0.0001, ctx.currentTime, fade || 0.06); setTimeout(() => { try { src.stop(); } catch (e) {} }, (fade || 0.06) * 7000); },
     };
   }
-  A._loopKey = (key, lv) => smpLoop(key, lv, 0.2);
   A.loop = function (kind) {
     if (!ctx) return { stop() {}, set() {} };
     if (kind === 'flame') { const l = smpLoop('loop_flame', 0.45, 0.4); if (l) return l; }
@@ -1058,7 +1057,6 @@
     if (amb) amb.g.gain.setTargetAtTime(0.12 * v * (beds.length ? 0.55 : 1), ctx.currentTime, 0.5);
   }
   A.setAmbience = function (v) { bedV = v; if (amb) setBeds(v); };
-  A.refreshAmbience = () => { bedKey = null; if (amb) setBeds(bedV); };
   A.drip = function (pos) {
     if (!ctx || smp('drip', pos, 0.25, 1, 1.2) || !voice(0.5)) return;
     const t = ctx.currentTime, out = dest(pos, 1.2); out.gain.value = 0.25;

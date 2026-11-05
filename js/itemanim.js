@@ -4,7 +4,6 @@
 (function () {
   const IA = (G.ItemAnim = { lower: 0 });
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   let root = null, cur = null, M = null;
 
   // which animation each item uses
@@ -99,7 +98,6 @@
 
   // ------------------------------------------------ playback
   IA.busy = () => !!cur;
-  IA.curDur = () => (cur ? cur.dur : 0);
   // what is still left of the current motion: [seconds until the effect lands (0 once applied), seconds until the motion ends]
   IA.left = (id) => (cur && (!id || cur.id === id) ? [cur.applied ? 0 : Math.max(0, APPLY[cur.kind] * cur.dur - cur.t), Math.max(0, cur.dur - cur.t)] : null);
   IA.build = (kind, id) => { mats(); return buildItem(kind, id); };

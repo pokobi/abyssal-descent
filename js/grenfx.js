@@ -5,7 +5,7 @@
 (function () {
   const GF = (G.GrenFX = {});
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
 
   // ---------------- materials ----------------
   let M = null;

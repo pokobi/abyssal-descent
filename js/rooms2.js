@@ -3,7 +3,7 @@
 (function () {
   const R2 = (G.Rooms2 = {});
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P, GM, C, AR;
   R2.init = function () { P = G.player; GM = G.game; C = G.combat; AR = G.Areas; };
 
@@ -151,7 +151,7 @@
       get text() { return `「さぁ本日の目玉だ。競り相手は手強いぞ…」<br>所持 🪙${fmt(coins())}`; },
       opts: () => lots.filter((l) => !l.sold).map((l) => {
         const bid = Math.round(l.price * 1.15 / 10) * 10;
-        return { icon: l.obj.icon, label: `${l.obj.name}　入札 ${fmt(bid)}🪙`, sub: `${l.kind === 'relic' ? '🏺 遺物' : l.kind === 'buff' ? '🌟 伝説の加護' : '✴️ 神器'} · 現在値 ${fmt(l.price)}　— ${U.esc(l.obj.desc || '')}`, disabled: coins() < bid || (l.kind === 'relic' && GM.relicCount() >= 3), run: () => {
+        return { icon: l.obj.icon, label: `${l.obj.name}　入札 ${fmt(bid)}🪙`, sub: `${l.kind === 'relic' ? '🏺 遺物' : l.kind === 'buff' ? '🌟 レジェンダリーの加護' : '✴️ 神器'} · 現在値 ${fmt(l.price)}　— ${U.esc(l.obj.desc || '')}`, disabled: coins() < bid || (l.kind === 'relic' && GM.relicCount() >= 3), run: () => {
           if (bid > l.rival || Math.random() < 0.18) {
             pay(bid); l.sold = true; G.ui.toast(`🔨 落札！ ${l.obj.icon} ${l.obj.name}`, 'good'); G.sfx.ui('rare'); G.sfx.bell();
             // a 4th relic: close the auction and ask which one to give up
@@ -176,9 +176,9 @@
   const MERCS = {
     sword: { name: '傭兵剣士', icon: '🗡️', def: 'brute_normal', base: 1400, role: '前衛', hp: 420, dmg: 45, cd: 0.8, range: 1.4, ranged: false, desc: '敵に斬り込む前衛。' },
     bow: { name: '傭兵弓兵', icon: '🏹', def: 'skeleton_bone', base: 1700, role: '後衛', hp: 260, dmg: 36, cd: 1.1, range: 16, ranged: true, desc: '後方から矢を射る。' },
-    shield: { name: '傭兵盾兵', icon: '🛡️', def: 'skeleton_elder', base: 1600, role: '壁役', hp: 780, dmg: 28, cd: 1.0, range: 1.4, ranged: false, reduce: 0.3, taunt: 14, desc: '被ダメージ−30%。14m以内の敵はあなたより盾兵を優先して狙う。' },
-    mage: { name: '傭兵魔術師', icon: '🔮', def: 'shaman_normal', base: 2000, role: '後衛', hp: 220, dmg: 30, cd: 1.6, range: 18, ranged: true, splash: 3.5, desc: '着弾点の半径3.5mに範囲ダメージ（外側は半分）。体力が低い。' },
-    medic: { name: '傭兵衛生兵', icon: '➕', def: 'skeleton_crystal', base: 1800, role: '支援', hp: 300, dmg: 14, cd: 1.4, range: 10, ranged: true, heal: 0.06, healCd: 4, desc: '4秒ごとにあなたの最大体力の6%を回復（体力90%以下のとき）。攻撃は弱い。' },
+    shield: { name: '傭兵盾兵', icon: '🛡️', def: 'skeleton_elder', base: 1600, role: '壁役', hp: 780, dmg: 28, cd: 1.0, range: 1.4, ranged: false, reduce: 0.3, taunt: 14, desc: '被ダメ-30%。14m以内の敵はあなたより盾兵を優先して狙う。' },
+    mage: { name: '傭兵魔術師', icon: '🔮', def: 'shaman_normal', base: 2000, role: '後衛', hp: 220, dmg: 30, cd: 1.6, range: 18, ranged: true, splash: 3.5, desc: '着弾点の半径3.5mに範囲ダメージ（外側は半分）。HPが低い。' },
+    medic: { name: '傭兵衛生兵', icon: '➕', def: 'skeleton_crystal', base: 1800, role: '支援', hp: 300, dmg: 14, cd: 1.4, range: 10, ranged: true, heal: 0.06, healCd: 4, desc: '4秒ごとにあなたの最大HPの6%を回復（HP90%以下のとき）。攻撃は弱い。' },
   };
   R2.MERCS = MERCS;
   // contract / growth / down rules (see mercStats and spawnMerc)
@@ -222,11 +222,11 @@
     const m = GM.run && GM.run.merc; if (!m || m.left <= 0) return '';
     const s = R2.mercStats(m), d = s.d, a = R2.mercAlly, hp = a ? a.hp : s.cap, need = m.lv >= MERC.cap ? 0 : mercNeed(m.lv);
     const row = (k, v) => `<div class="ivt-r">${k}　<b>${v}</b></div>`;
-    const lockTxt = s.downs >= MERC.downMax ? '<b style="color:#ff9090">戦闘不能（このエリアでは復帰しない）</b>' : s.downs ? `${s.downs}/${MERC.downMax}回　最大体力 ${100 - MERC.lock * 100 * s.downs}%（このエリアのみ）` : 'なし（4ダウンで復帰不可）';
-    const sp = [d.reduce ? `被ダメージ −${d.reduce * 100}%` : '', d.taunt ? `${d.taunt}m以内の敵を引きつける` : '', d.splash ? `範囲 半径${d.splash}m（外側は半分）` : '', d.heal ? `${d.healCd}秒ごとに最大体力の${(s.healPct * 100).toFixed(1)}%を回復` : ''].filter(Boolean);
+    const lockTxt = s.downs >= MERC.downMax ? '<b style="color:#ff9090">戦闘不能（このエリアでは復帰しない）</b>' : s.downs ? `${s.downs}/${MERC.downMax}回　最大HP ${100 - MERC.lock * 100 * s.downs}%（このエリアのみ）` : 'なし（4ダウンで復帰不可）';
+    const sp = [d.reduce ? `被ダメ-${d.reduce * 100}%` : '', d.taunt ? `${d.taunt}m以内の敵を引きつける` : '', d.splash ? `範囲 半径${d.splash}m（外側は半分）` : '', d.heal ? `${d.healCd}秒ごとに最大HPの${(s.healPct * 100).toFixed(1)}%を回復` : ''].filter(Boolean);
     return `<div class="ivt-h">${d.icon} ${U.esc(d.name)} <b style="color:#ffd890">Lv${m.lv}</b></div><div class="ivt-s">${d.role}・契約 残り${m.left}エリア</div>`
       + row('経験値', need ? `${m.xp || 0} / ${need}` : 'MAX')
-      + row('体力', `${Math.ceil(hp)} / ${s.cap}（最大 ${s.full}）`)
+      + row('HP', `${Math.ceil(hp)} / ${s.cap}（最大 ${s.full}）`)
       + row('攻撃力', `${Math.round(s.dmg)}${d.splash ? '（範囲）' : ''}`)
       + row('攻撃間隔', `${s.cd.toFixed(1)}秒`)
       + row('DPS', Math.round(s.dps))
@@ -247,7 +247,7 @@
         });
         if (m) {
           const up = GM.price(900 * Math.pow(1.35, m.lv)), ext = GM.price(MERCS[m.type].base * 0.6), cap = m.lv >= MERC.cap;
-          out.push({ icon: '⬆️', label: cap ? `鍛える（Lv${MERC.cap} が上限）` : `鍛える Lv${m.lv}→${m.lv + 1}（${fmt(up)}🪙）`, sub: `火力・体力×${MERC.grow}　経験値 ${m.xp || 0}/${cap ? '—' : mercNeed(m.lv)}`, disabled: cap || coins() < up, run: () => { pay(up); mercSetLv(m, m.lv + 1); if (m.lv >= MERC.cap) m.xp = 0; rosterSave(m); return { reopen: true }; } });
+          out.push({ icon: '⬆️', label: cap ? `鍛える（Lv${MERC.cap} が上限）` : `鍛える Lv${m.lv}→${m.lv + 1}（${fmt(up)}🪙）`, sub: `火力・HP×${MERC.grow}　経験値 ${m.xp || 0}/${cap ? '—' : mercNeed(m.lv)}`, disabled: cap || coins() < up, run: () => { pay(up); mercSetLv(m, m.lv + 1); if (m.lv >= MERC.cap) m.xp = 0; rosterSave(m); return { reopen: true }; } });
           out.push({ icon: '📜', label: `契約延長 +${MERC.ext}エリア（${fmt(ext)}🪙）`, sub: `残り${m.left} → ${m.left + MERC.ext}`, disabled: coins() < ext, run: () => { pay(ext); m.left += MERC.ext; return { reopen: true }; } });
         }
         return out;
@@ -431,7 +431,7 @@
         if (this.hp <= 0) {
           this.hp = 0; m.downs = (m.downs || 0) + 1; G.fx.smoke(ent.pos, 6, 1, 0x606070, 1, 1);
           if (m.downs >= MERC.downMax) { this.down = Infinity; G.ui.toast(`${d.icon} ${d.name}は戦闘不能になった（このエリアでは復帰しない）`, 'bad'); }
-          else { this.down = MERC.downT; G.ui.toast(`${d.icon} ${d.name}がダウンした（${MERC.downT}秒後に復帰・最大体力 ${Math.round(100 - MERC.lock * 100 * m.downs)}%）`, 'warn'); }
+          else { this.down = MERC.downT; G.ui.toast(`${d.icon} ${d.name}がダウンした（${MERC.downT}秒後に復帰・最大HP ${Math.round(100 - MERC.lock * 100 * m.downs)}%）`, 'warn'); }
         }
       },
       update(dt) {
@@ -518,7 +518,7 @@
         return [
           { icon: '🪙', label: `小献納（${fmt(t1)}🪙）`, sub: 'レア以上の加護をランダムに1つ', disabled: coins() < t1, run: () => { pay(t1); after(); const b = U.pick(G.BUFFS.filter((x) => G.RARITY[x.rarity] && G.RARITY[x.rarity].tier >= 2 && !x.relic && !x.pact && x.cat !== 'curse' && (P.buffs.get(x.id) || 0) < x.max && (!x.skill || P.skills.some((s) => s && s.id === x.skill)))); if (b) { P.addBuff(b.id); G.ui.itemCard(b, '[献納]', { now: true }); } return { reopen: true }; } },
           { icon: '💰', label: `大献納（${fmt(t2)}🪙）`, sub: 'エピック以上の加護を3つから選ぶ', disabled: coins() < t2, run: () => { pay(t2); after(); return { offer: (x) => G.RARITY[x.rarity] && G.RARITY[x.rarity].tier >= 3 && x.cat !== 'pact' && x.cat !== 'relic' }; } },
-          { icon: '👑', label: `至高の献納（${fmt(t3)}🪙）`, sub: '伝説の加護を3つから選ぶ', disabled: coins() < t3, run: () => { pay(t3); after(); return { offer: (x) => x.rarity === 'legendary' && x.cat !== 'pact' && x.cat !== 'relic' }; } },
+          { icon: '👑', label: `至高の献納（${fmt(t3)}🪙）`, sub: 'レジェンダリーの加護を3つから選ぶ', disabled: coins() < t3, run: () => { pay(t3); after(); return { offer: (x) => x.rarity === 'legendary' && x.cat !== 'pact' && x.cat !== 'relic' }; } },
           // coins into a skill level: pick the skill (or the ultimate / the pile driver); the price follows that skill's own Lv and the altar's rising factor
           (() => {
             const costs = GM.tomeTargets().map((x) => Math.round(GM.price(1500 * Math.pow(1.25, x.lv)) * k / 10) * 10), lo = costs.length ? Math.min(...costs) : 0;

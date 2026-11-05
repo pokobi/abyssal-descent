@@ -12,7 +12,7 @@
       mods: {}, minus: '20m以上の敵への与ダメ-20%', favName: 'SMG・ショットガン（銃と部品）、機動・連射・装填の加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun' || o.arch === 'autoshotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
     { id: 'sniper', name: '狙撃手', icon: '🎯', col: '#7ac070', gun: 'n_scout', melee: 'm_basic', skill: 'decoy', ult: 'ult_shadow', grapple: 18,
-      mods: {}, minus: '覗き込まずに撃つと拡散+40%', favName: '狙撃銃・DMR（銃と部品）、会心・ヘッドショットの加護',
+      mods: {}, minus: 'ADSせずに撃つ（腰だめ）と拡散+40%', favName: '狙撃銃・DMR（銃と部品）、会心・ヘッドショットの加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'sniper' || o.arch === 'dmr'), look: '緑のフード付きマントとマスク', role: '遠くから急所を撃つ' },
     { id: 'blade', name: '剣士', icon: '⚔️', col: '#c4a0f0', gun: 'p_viper', melee: 'm_machete', skill: 'haste', ult: 'ult_bladestorm', grapple: 15,
       mods: { magSize: -0.25 }, minus: '銃の装弾数-25%', favName: '近接武器（武器と部品）、近接の加護',
@@ -31,14 +31,14 @@
       notes: ['加護「選択肢」「運命の再配」とは別に数える。'] },
     assault: { name: '突貫', icon: '💨', short: '近い敵ほど大ダメージ。近くで倒すと速くなる', rows: [['近い敵への与ダメ（0mで最大、12mで0）', '+30%', '+40%', '+50%'], ['勢い1つにつき 移動速度・連射速度', '+6%', '+8%', '+10%']],
       notes: ['8m以内の敵を倒すと「勢い」が1つ（4秒、最大3つ）。勢い1つにつき被ダメ-4%。'] },
-    sniper: { name: '一点集中', icon: '🎯', short: '覗き込んでためた1発が強く、敵を貫く', rows: [['満タンの1発のダメージ（1体貫通）', '+25%', '+40%', '+55%'], ['ヘッドショットで倒したとき', 'ゲージ半分', 'ゲージ半分・弾1', 'ゲージ半分・弾1']],
-      notes: ['覗き込んでいる間、ゲージがたまる（1.5秒で満タン）。撃つと0、覗き込みをやめると1秒で半分減る。'] },
+    sniper: { name: '一点集中', icon: '🎯', short: 'ADSでためた1発が強く、敵を貫く', rows: [['満タンの1発のダメージ（1体貫通）', '+25%', '+40%', '+55%'], ['ヘッドショットで倒したとき', 'ゲージ半分', 'ゲージ半分・弾1', 'ゲージ半分・弾1']],
+      notes: ['ADS中にゲージがたまる（1.5秒で満タン）。撃つと0になり、ADSをやめると1秒で半分減る。'] },
     blade: { name: '連斬', icon: '⚔️', short: '近接を当て続けるほど、攻撃も移動も速くなる', rows: [['近接を当てるとたまる層の上限', '5層', '6層', '7層']],
       notes: ['1層につき近接の攻撃速度+5%・移動速度+3%（銃には効かない）。', '7.5秒続き、当てるたびに7.5秒に戻る。切れると全部なくなる。'] },
     heavy: { name: '鉄壁', icon: '🛡️', short: '攻撃を受けると、しばらく硬くなる', rows: [['ダメージを受けた後3秒間の被ダメ', '-30%', '-40%', '-50%'], ['いつでも被ダメ', '-10%', '-10%', '-10%']],
       notes: ['3秒の間にまた受けると、そこからさらに3秒。効いている間は吹き飛ばされない。'] },
     mage: { name: '反応強化', icon: '🔮', short: '属性反応のダメージが大きい', rows: [['反応のダメージ（凍結の時間なども）', '+20%', '+30%', '+40%'], ['沸騰・熱融の倍率', '+0.1', '+0.15', '+0.2']],
-      notes: ['属性熟練・反応の加護とは別の枠で掛かる。武器の属性付与の間隔は1.5秒。'] },
+      notes: ['属性熟練・反応の加護とは別の枠で掛かる。銃の属性付与の間隔が2.5秒から1.5秒になる。'] },
   };
   for (const c of CL.LIST) c.pas = PAS[c.id];
   CL.BY = Object.fromEntries(CL.LIST.map((c) => [c.id, c]));
@@ -162,7 +162,7 @@
 
   // ---------------- the choice: a list on the left, the chosen class on the right (a turning 3D figure, its kit, its numbers) ----------------
   const U = G.U;
-  const esc = (t) => U.esc(String(t == null ? '' : t));
+  const esc = U.esc;
   const BASE_HP = 100;
   // the stats a class starts a run with: the player's base stats with the class folded in the way Player.recalc does it (no gear, no boons)
   CL.stats = function (c) {

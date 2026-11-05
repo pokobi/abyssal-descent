@@ -3,7 +3,7 @@
 // position and velocity are swapped for the guest's, and a blow that lands on "the player" goes down the wire instead. Foes, their shots and the guardian's body are sent out.
 (function () {
   const K = G.Coop;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const r2 = (v) => Math.round(v * 100) / 100;
   // the same random numbers on both sides while something both must build alike is built (levels, guardians)
   K.seeded = function (seed, fn) {

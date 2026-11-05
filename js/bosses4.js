@@ -5,7 +5,7 @@
 (function () {
   const BS = G.bosses, U = G.U;
   const { mat, mesh, joint } = BS.h;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   const PG = () => G.Props.PG;
   const Pl = () => G.player;
   const C = () => G.combat;

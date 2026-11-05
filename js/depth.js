@@ -4,13 +4,12 @@
 (function () {
   const D = (G.Depth = {});
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let P, C, GM;
   D.init = function () { P = G.player; C = G.combat; GM = G.game; };
 
   D.TIERS = [{ name: '上層', from: 1 }, { name: '深層', from: 26 }, { name: '奈落', from: 51 }];
   D.tier = (n) => (n >= 51 ? 2 : n >= 26 ? 1 : 0);
-  D.tierName = (n) => D.TIERS[D.tier(n)].name;
 
   // ---------------------------------------------------------------- mutations
   // Each mutation changes how a foe behaves. Shown as icons on the HP bar and as a coloured aura.

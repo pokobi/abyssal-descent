@@ -4,7 +4,7 @@
 (function () {
   const R = (G.Rift = {});
   const U = G.U;
-  const V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
+  const V = G.U.V;
   let cur = null;
   const VS = 'varying vec2 vU; void main() { vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
   // a bright jagged seam, its edges flickering, a soft glow and thin rays leaking out of it

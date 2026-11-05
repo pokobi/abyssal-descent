@@ -712,9 +712,9 @@
     const fl = G.world.floorBelow(pos.x, pos.y + 0.3, pos.z);
     const ground = V(pos.x, fl > -50 ? fl : pos.y, pos.z);
     const info = { src: 'explosion', grenade: true, shieldMul: d.shieldMul || 1, emp: !!d.emp, elem: d.elem, stacks: d.stacks, el: G.Elem.GREN[id] || null };
-    if (G.GrenFX) G.GrenFX.boom(id, pos, ground, d); // what this one looks and sounds like on top of the shared blast below
+    if (G.GrenFX) G.GrenFX.boom(id, pos, ground, Object.assign({}, d, { rb: (d.r || 4) * (1 + (P.stats.explosionRadius || 0)) })); // what this one looks and sounds like on top of the shared blast below (rb: the blast's real radius)
     if (d.blackhole) {
-      C.zone(ground, d.r, d.blackhole, 'gravity', 0, { onEnd: () => C.explode(ground.clone().add(V(0, 1, 0)), d.r * 0.7, dmg, Object.assign({}, info, { color: 0xa070ff })) });
+      C.zone(ground, d.r, d.blackhole, 'gravity', 0, { noCore: true, onEnd: () => C.explode(ground.clone().add(V(0, 1, 0)), d.r * 0.7, dmg, Object.assign({}, info, { color: 0xa070ff })) });
       G.sfx.magic(pos, 'dark'); G.sfx.rumble(d.blackhole, 0.6);
       return;
     }

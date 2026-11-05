@@ -288,7 +288,7 @@
           if (!a.done) {
             a.done = true; G.sfx.whoosh(0.7, 0.6);
             if (Math.hypot(P.pos.x - sc.x, P.pos.z - sc.z) < a.r * 0.6 + 0.4 && P.pos.y < (a.h || 4)) { this.hit(a.dmg, 'melee', this.pos.clone(), a.elem); P.vel.addScaledVector(fwd, a.knock || 8); P.vel.y = Math.max(P.vel.y, 3); }
-            G.fx.ring(this.pos.clone().addScaledVector(fwd, a.r * 0.5).setY(0.2), a.r * 0.7, a.col || 0xffa060, 0.3);
+            G.vfx.nova(sc, a.r * 0.6, 0.1, { style: 'shock', dome: false, ground: a.col || 0xffa060 }); G.vfx.slash(this.pos.clone().setY((this.J && this.J.height ? this.J.height : 3) * 0.45), fwd, a.r * 1.15, 2.4, a.col || 0xffc090, { tilt: (Math.random() - 0.5) * 0.9, dur: 0.14, r0: a.r * 0.3, cw: Math.random() < 0.5 });
             if (a.combo && (a.n = (a.n || 1)) < Math.min(3, a.combo + (BS.diffRank && BS.diffRank() >= 2 ? 1 : 0))) { a.n++; a.t = wind * 0.45; a.done = false; a.tele = null; this.pose.hit = 0; break; }
           }
           if (a.t > wind + (a.rec || 0.5)) this.end();
@@ -300,7 +300,7 @@
           this.pose.hit = 1;
           if (!a.done) {
             a.done = true; this.hY = 0;
-            G.fx.explosion(a.c.clone().setY(0.4), a.r * 0.6, a.col || 0xffa060, { decal: false }); G.fx.ring(a.c.clone().setY(0.15), a.r, a.col || 0xffc080, 0.5); G.fx.dust(a.c, V(0, 1, 0), 0x7a6a50, 18);
+            G.fx.explosion(a.c.clone().setY(0.4), a.r * 0.6, a.col || 0xffa060, { decal: false }); G.vfx.nova(a.c.clone(), a.r, 0.14, { style: 'shock', dome: false, ground: a.col || 0xffc080 }); G.vfx.spikes(G.vfx.ringPts(a.c.clone(), a.r * 0.6, 8), { kind: 'rock', r: 0.6, h: 0.8, n: 1, dur: 0.5 }); G.fx.dust(a.c, V(0, 1, 0), 0x7a6a50, 18);
             G.sfx.explosion(a.c, 1.1); P.addShake(0.5);
             if (Math.hypot(P.pos.x - a.c.x, P.pos.z - a.c.z) < a.r && P.pos.y < (a.jumpable ? 0.9 : 3)) { this.hit(a.dmg, 'aoe', a.c, a.elem); const kd = P.pos.clone().sub(a.c).setY(0).normalize(); P.vel.addScaledVector(kd, a.knock || 10); P.vel.y = Math.max(P.vel.y, 5); }
             if (a.zone) C().zone(a.c.clone(), a.r * 0.8, a.zone.dur || 5, a.zone.kind, a.zone.dps * this.dmgScale, { enemy: true, elem: a.zone.elem });
@@ -326,7 +326,7 @@
           this.hYbase = Math.sin(f * Math.PI) * (a.height || 7);
           if (f >= 1 && !a.done) {
             a.done = true; this.hYbase = 0;
-            G.fx.explosion(a.c.clone().setY(0.4), a.r * 0.6, 0xffa060, { decal: false }); G.fx.ring(a.c.clone().setY(0.15), a.r, 0xffc080, 0.5); G.sfx.explosion(a.c, 1.3); P.addShake(0.7);
+            G.fx.explosion(a.c.clone().setY(0.4), a.r * 0.6, 0xffa060, { decal: false }); G.vfx.nova(a.c.clone(), a.r, 0.14, { style: 'shock', dome: false }); G.fx.debris(a.c.clone().setY(0.4), G.world.mats.rock, 8, 0.3, 8); G.sfx.explosion(a.c, 1.3); P.addShake(0.7);
             if (this.playerDistH() < a.r && P.pos.y < 1.2) { this.hit(a.dmg, 'aoe', a.c, a.elem); const kd = P.pos.clone().sub(a.c).setY(0).normalize(); P.vel.addScaledVector(kd, 12); P.vel.y = 6; }
             if (a.zone) C().zone(a.c.clone(), a.r * 0.7, a.zone.dur || 5, a.zone.kind, a.zone.dps * this.dmgScale, { enemy: true });
           }
@@ -370,7 +370,7 @@
           }
           for (const p of a.pts) if (!p.done && a.t >= p.t) {
             p.done = true;
-            G.fx.explosion(p.c.clone().setY(0.5), (a.r || 2.6) * 0.7, a.col || 0xa060ff, { decal: false }); G.sfx.explosion(p.c, 0.6);
+            G.fx.explosion(p.c.clone().setY(0.5), (a.r || 2.6) * 0.7, a.col || 0xa060ff, { decal: false }); G.vfx.nova(p.c.clone(), a.r || 2.6, 0.1, { style: 'shock', dome: false, ground: a.col || 0xc090ff }); G.sfx.explosion(p.c, 0.6);
             if (Math.hypot(P.pos.x - p.c.x, P.pos.z - p.c.z) < (a.r || 2.6) && P.pos.y < 3.5) this.hit(a.dmg, 'aoe', p.c, a.elem);
             if (a.zone) C().zone(p.c.clone(), (a.r || 2.6) * 0.8, a.zone.dur || 4, a.zone.kind, a.zone.dps * this.dmgScale, { enemy: true });
           }
@@ -404,7 +404,7 @@
               const def = G.ENEMY_BY_ID[U.pick(ids)]; if (!def) continue;
               const e = G.enemies.spawn(def, Math.max(1, this.level - 1), p, { hpMul: G.Run.bossHpMul(G.game.area || 1), noLoot: true });
               if (!e) continue; e.noLoot = true; e.state = 'chase'; this.minions.push(e);
-              G.fx.smoke(p.clone().setY(0.6), 8, 1.2, a.smoke || 0x2a1a30, 0.6, 1.2);
+              G.fx.smoke(p.clone().setY(0.6), 8, 1.2, a.smoke || 0x2a1a30, 0.6, 1.2); G.vfx.area(p.clone(), 1.4, 'dark', 1.2);
             }
             G.ui.toastSmall(a.msg || `${this.def.name}が手下を呼んだ`);
           }

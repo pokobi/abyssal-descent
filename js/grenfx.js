@@ -151,13 +151,13 @@
   }
   // what each throwable adds on top of the shared logic; pos = where it went off, ground = the floor under it, d = its data
   GF.boom = function (id, pos, ground, d) {
-    const S = G.sfx, FX = G.fx, r = d.r || 4, c = pos.clone().add(V(0, 0.3, 0));
-    // every one shows how far it reaches: a ring at its radius
-    const edge = (col, a) => FX.ring(ground, r, col, a || 0.45);
+    const S = G.sfx, FX = G.fx, VX = G.vfx, r = d.r || 4, rb = d.rb || r, c = pos.clone().add(V(0, 0.3, 0));
+    // every one shows how far it reaches: a ring at its blast radius (rb: the blast as it really is, with the explosion-radius bonuses; r: its lasting zone)
+    const edge = (col, a) => FX.ring(ground, rb, col, a || 0.45);
     switch (id) {
       case 'g_frag': // flash, shock ring, metal shards, a scorch mark
         FX.flash(c, 0xffd090, 110, 0.22, r * 3); burst(c, 30, 16, [1.6, 1.1, 0.5], 0.35, 0.05, 10); FX.debris && FX.debris(c, G.world.mats.iron, 10, 0.06, 10);
-        edge(0xffd0a0); FX.decal && FX.decal(ground, V(0, 1, 0), 'scorch', r * 0.5, true); P0().addShake && P0().addShake(0.25); break;
+        edge(0xffd0a0); VX.nova(ground, rb, 0.14, { style: 'shock', dome: false }); FX.decal && FX.decal(ground, V(0, 1, 0), 'scorch', r * 0.5, true); P0().addShake && P0().addShake(0.25); break;
       case 'g_sticky': // a sharp, close blast and a lot of goo
         FX.flash(c, 0xff3020, 90, 0.18, r * 2.5); burst(c, 22, 10, [0.6, 1.4, 0.3], 0.5, 0.07, 10); burst(c, 18, 14, [1.7, 0.9, 0.4], 0.3, 0.05, 8);
         edge(0xff8060); FX.decal && FX.decal(ground, V(0, 1, 0), 'splat', r * 0.4, true, 0x6a9a30); break;
@@ -170,15 +170,14 @@
       case 'g_water': // the balloon bursts: a splash, ripples and a puddle that dries up
         S.breakObj && S.breakObj(pos, 'ceramic'); S.drip && S.drip(pos);
         for (let i = 0; i < 46; i++) { const dd = V(U.rand(-1, 1), U.rand(0.2, 1.4), U.rand(-1, 1)).normalize().multiplyScalar(U.rand(3, 9)); add(c.x, c.y, c.z, dd.x, dd.y, dd.z, U.rand(0.5, 0.9), 0.07, 0.01, 0.55, 0.85, 1.5, 0.95, 14, 1); }
-        FX.ring(ground, r, 0x60b0ff, 0.6); later(140, () => FX.ring(ground, r * 0.66, 0xa0d8ff, 0.5)); later(280, () => FX.ring(ground, r * 0.33, 0xffffff, 0.4));
+        FX.ring(ground, rb, 0x60b0ff, 0.6); VX.nova(ground, rb, 0.2, { style: 'water' }); VX.area(ground, rb, 'water', 2.4, { grow: 0.2 });
         FX.decal && FX.decal(ground, V(0, 1, 0), 'splat', r * 0.8, true, 0x3f7fd0); break;
       case 'g_cryo': // a burst of cold, a frost film on the ground, ice crystals that thaw away
-        FX.ring(ground, r, 0xbfe8ff, 0.6); FX.ring(ground, r * 0.6, 0xffffff, 0.4); burst(c, 40, 10, [0.7, 0.95, 1.2], 0.8, 0.08, 4);
-        puff(ground, 14, r * 0.8, [0.75, 0.88, 1.0], 0.5, 2);
-        live.push({ kind: 'frost', ground: ground.clone(), r, t: 0, dur: 3.5, g: frostPatch(ground, r) });
+        VX.nova(ground, rb, 0.2, { style: 'ice' }); VX.area(ground, rb, 'frost', 3.5, { grow: 0.2 }); burst(c, 40, 10, [0.7, 0.95, 1.2], 0.8, 0.08, 4);
+        puff(ground, 14, rb * 0.8, [0.75, 0.88, 1.0], 0.5, 2);
         S.ice(pos); S.whoosh(0.5, 0.6); break;
       case 'g_shock': { // a lightning strike, then a bolt from the centre to every foe in reach, one after another
-        FX.strike(ground, 0xe0e8ff, true); burst(c, 24, 14, [1.6, 1.5, 0.6], 0.25, 0.05, 0); edge(0xfff2a0);
+        FX.strike(ground, 0xe0e8ff, true); burst(c, 24, 14, [1.6, 1.5, 0.6], 0.25, 0.05, 0); edge(0xfff2a0); VX.area(ground, rb, 'shock', 0.5);
         const foes = G.enemies.inRadius(pos, r).filter((e) => e.alive).slice(0, 8);
         foes.forEach((e, i) => later(60 + i * 70, () => { if (e.alive || e.dying) { G.fx.lightning(c.clone(), e.centerPos(), 0xfff2a0); S.zap(e.pos); } }));
         if (!foes.length) arcs(c, r, 7, 0xfff2a0);
@@ -186,10 +185,10 @@
       }
       case 'g_nail': // the clod bursts: flying rocks, a cloud of dust and a crack in the ground
         FX.debris && FX.debris(c, G.world.mats.rock, 18, 0.1, 11); burst(c, 20, 12, [1.2, 1.0, 0.7], 0.3, 0.05, 10);
-        puff(ground, 18, r * 0.7, [0.5, 0.4, 0.28], 0.6, 2.2); edge(0xc89048);
+        puff(ground, 18, rb * 0.7, [0.5, 0.4, 0.28], 0.6, 2.2); edge(0xc89048); { const pts = []; for (let i = 0; i < 9; i++) { const a = Math.random() * 6.28, dd = Math.sqrt(Math.random()) * rb * 0.9; pts.push(ground.clone().add(V(Math.cos(a) * dd, 0, Math.sin(a) * dd))); } VX.spikes(pts, { kind: 'rock', r: 0.7, h: 0.9, n: 2, dur: 0.6 }); }
         FX.decal && FX.decal(ground, V(0, 1, 0), 'hole', r * 0.35, true); S.stoneGrind && S.stoneGrind(pos); S.explosion(pos, 0.4); break;
       case 'g_flash': // a blinding white flash; stars over the heads of those it stunned
-        FX.flash(c, 0xffffff, 260, 0.35, r * 3); FX.ring(ground, r, 0xffffff, 0.35); burst(c, 50, 18, [2, 2, 2], 0.2, 0.06, 0); S.zap(pos);
+        FX.flash(c, 0xffffff, 260, 0.35, r * 3); FX.ring(ground, r, 0xffffff, 0.35); VX.burst(c, r * 0.85, 0xffffff); burst(c, 50, 18, [2, 2, 2], 0.2, 0.06, 0); S.zap(pos);
         for (const e of G.enemies.inRadius(pos, r)) { if (!e.alive) continue; const h = e.centerPos().add(V(0, (e.height || 1.6) * 0.6, 0)); for (let k = 0; k < 5; k++) { const a = k / 5 * 6.28; add(h.x + Math.cos(a) * 0.35, h.y, h.z + Math.sin(a) * 0.35, -Math.sin(a) * 1.5, 0.2, Math.cos(a) * 1.5, 1.6, 0.07, 0.03, 1.8, 1.7, 0.6, 1, 0, 0); } }
         break;
       case 'g_hole': GF.blackhole(ground, r, d.blackhole || 3); break;
@@ -198,16 +197,16 @@
         live.push({ kind: 'edge', ground: ground.clone(), r, col: 0x80e040, t: 0, dur: d.dur || 8, next: 0, bubbles: true });
         S.hiss ? S.hiss(pos, 1.6) : S.whoosh(0.8, 0.5); break;
       case 'g_shatter': // the shield-breaker: glass shards fly, crystal spikes, a cyan shock ring
-        FX.ring(ground, r, 0x80f0ff, 0.45); FX.flash(c, 0xa0f8ff, 100, 0.2, r * 2.5);
+        FX.ring(ground, rb, 0x80f0ff, 0.45); FX.flash(c, 0xa0f8ff, 100, 0.2, rb * 2.5); VX.spikes(VX.ringPts(ground, rb * 0.55, 10), { kind: 'ice', r: 0.5, h: 1.2, n: 2, dur: 0.7 });
         for (let i = 0; i < 44; i++) { const dd = V(U.rand(-1, 1), U.rand(0, 1), U.rand(-1, 1)).normalize().multiplyScalar(U.rand(5, 14)); add(c.x, c.y, c.z, dd.x, dd.y, dd.z, 0.6, 0.09, 0.03, 0.6, 1.5, 1.7, 1, 8, 1); }
-        live.push({ kind: 'frost', ground: ground.clone(), r: r * 0.5, t: 0, dur: 1.6, g: frostPatch(ground, r * 0.5, 0x80f0ff) });
+        VX.area(ground, rb * 0.5, 'frost', 1.6, { grow: 0.15, col: [0x80f0ff, 0xd0ffff] });
         S.breakObj(pos, 'ceramic'); S.ice(pos); S.zap(pos); S.shieldBreak && S.shieldBreak(pos); break;
       case 'g_dyna': {
         // the big one: a second and third blast, a column of smoke, debris and a long rumble
         FX.flash(c, 0xffc070, 200, 0.4, r * 4); burst(c, 50, 20, [1.8, 1.1, 0.4], 0.5, 0.08, 10); FX.debris && FX.debris(c, G.world.mats.rock, 14, 0.12, 12);
         for (let i = 0; i < 2; i++) { const o = V(U.rand(-2, 2), 0.4, U.rand(-2, 2)); later(140 + i * 140, () => { FX.explosion(pos.clone().add(o), r * 0.55, 0xffa040); S.explosion(pos, 1.5); }); }
         for (let i = 0; i < 24; i++) norm(ground.x + U.rand(-1, 1), ground.y + 0.5 + i * 0.25, ground.z + U.rand(-1, 1), U.rand(-0.4, 0.4), U.rand(2, 4), U.rand(-0.4, 0.4), 3.5, 1.2, 3.5, 0.28, 0.25, 0.22, 0.75, -0.3, 0.7);
-        FX.ring(ground, r * 1.4, 0xffd0a0, 0.6); FX.decal && FX.decal(ground, V(0, 1, 0), 'scorch', r * 0.8, true); S.rumble(1.6, 1); if (G.player) G.player.addShake(0.6); break;
+        FX.ring(ground, rb, 0xffd0a0, 0.6); VX.nova(ground, rb, 0.2, { style: 'fire', dome: false }); FX.decal && FX.decal(ground, V(0, 1, 0), 'scorch', r * 0.8, true); S.rumble(1.6, 1); if (G.player) G.player.addShake(0.6); break;
       }
     }
   };

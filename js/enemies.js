@@ -978,14 +978,14 @@
           if (inWind) return { x: 0, z: 0 };
           if (!A.leapt) { A.leapt = true; const sp = A.kind === 'pounce' ? 13 : 12; const lead = Math.min(1, distH / sp); this.vel.x = (toT.x + tgt.vel.x * lead * 0.5) / Math.max(l, 1) * sp; this.vel.z = (toT.z + tgt.vel.z * lead * 0.5) / Math.max(l, 1) * sp; this.vel.y = 5.5; this.grounded = false; G.sfx.monster(this.pos, def.sound, def.pitch, 0.8); }
           this.atk = Math.min(1, (A.t - A.wind) * 4);
-          if (!A.hit && this.centerPos().distanceTo(tgt.eye) < this.radius + 1.0) { A.hit = true; hitPlayer(this.dmg); }
+          if (!A.hit && this.centerPos().distanceTo(tgt.eye) < this.radius + 1.0) { A.hit = true; hitPlayer(this.dmg); G.vfx.slash(this.centerPos(), V(Math.sin(this.yaw), 0, Math.cos(this.yaw)), this.radius + 1.0, 1.7, 0xff7060, { tilt: 1.0, dur: 0.1, r0: this.radius * 0.5 }); }
           if (A.t - A.wind > 0.25 && this.grounded || A.t > 2) end();
           return { x: 0, z: 0, speed: 0 };
         }
         case 'slash': {
           if (inWind) return { x: dirx, z: dirz, speed: this.speed * 0.2 };
           this.atk = Math.min(1, (A.t - A.wind) / 0.18);
-          if (!A.hit && A.t - A.wind > 0.1) { A.hit = true; const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw); if (distH < def.range + this.radius + 0.4 && (fx * dirx + fz * dirz) > 0.3 && Math.abs(toT.y) < 2) { hitPlayer(this.dmg); } G.sfx.melee(false); }
+          if (!A.hit && A.t - A.wind > 0.1) { A.hit = true; const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw); G.vfx.slash(this.pos.clone().setY(this.pos.y + this.height * 0.5), V(fx, 0, fz), def.range + this.radius + 0.4, 2 * Math.acos(0.3), this.elite ? 0xffb080 : 0xffe8d8, { tilt: (Math.random() - 0.5) * 0.8, dur: 0.12, r0: this.radius * 0.6, cw: Math.random() < 0.5 }); if (distH < def.range + this.radius + 0.4 && (fx * dirx + fz * dirz) > 0.3 && Math.abs(toT.y) < 2) { hitPlayer(this.dmg); } G.sfx.melee(false); }
           if (A.t - A.wind > 0.45) end();
           return { x: 0, z: 0 };
         }
@@ -995,7 +995,7 @@
           this.atk = Math.min(1, (A.t - A.wind) / 0.15);
           if (!A.hit) {
             A.hit = true; this.tele = null;
-            G.fx.ring(A.c, def.range * 1.1, 0xc0a080, 0.4); G.fx.dust(A.c, V(0, 1, 0), 0x8a7a60, 14); G.fx.decal(A.c.clone().setY(A.c.y + 0.02), V(0, 1, 0), 'crack', def.range * 1.4, true);
+            G.vfx.nova(A.c, def.range, 0.12, { style: 'shock', dome: false }); G.fx.debris(A.c.clone().add(V(0, 0.3, 0)), G.world.mats.rock, 6, 0.2, 6); G.fx.dust(A.c, V(0, 1, 0), 0x8a7a60, 14); G.fx.decal(A.c.clone().setY(A.c.y + 0.02), V(0, 1, 0), 'crack', def.range * 1.4, true);
             G.sfx.explosion(A.c, 0.5); P.addShake(Math.max(0, 0.6 - P.pos.distanceTo(A.c) * 0.04));
             const d = Math.hypot(tgt.pos.x - A.c.x, tgt.pos.z - A.c.z);
             if (d < def.range && tgt.pos.y - A.c.y < 0.9 && tgt.pos.y - A.c.y > -1.5) hitPlayer(this.dmg, 'aoe');
@@ -1007,7 +1007,7 @@
           if (inWind) return { x: 0, z: 0 };
           if (!A.leapt) { A.leapt = true; const t = 0.7; this.vel.x = toT.x / t; this.vel.z = toT.z / t; this.vel.y = 7; this.grounded = false; G.sfx.monster(this.pos, 'slosh', def.pitch, 0.8); }
           this.atk = 0.5;
-          if (A.t - A.wind > 0.2 && this.grounded && !A.hit) { A.hit = true; G.fx.ring(this.pos, 2.4, 0x6aa040, 0.35); G.sfx.monster(this.pos, 'slosh', def.pitch * 0.8, 1); if (Math.hypot(tgt.pos.x - this.pos.x, tgt.pos.z - this.pos.z) < 2.4 + this.radius && Math.abs(tgt.pos.y - this.pos.y) < 1.5) hitPlayer(this.dmg, 'aoe'); }
+          if (A.t - A.wind > 0.2 && this.grounded && !A.hit) { A.hit = true; G.fx.ring(this.pos, 2.4 + this.radius, 0x6aa040, 0.35); G.vfx.area(this.pos.clone(), 2.4 + this.radius, 'acid', 0.4); G.sfx.monster(this.pos, 'slosh', def.pitch * 0.8, 1); if (Math.hypot(tgt.pos.x - this.pos.x, tgt.pos.z - this.pos.z) < 2.4 + this.radius && Math.abs(tgt.pos.y - this.pos.y) < 1.5) hitPlayer(this.dmg, 'aoe'); }
           if (A.hit || A.t > 2.5) end();
           return { x: 0, z: 0, speed: 0 };
         }
@@ -1065,7 +1065,7 @@
           if (inWind) return { x: 0, z: 0 };
           if (!A.dir) { A.dir = V(dirx, 0, dirz); G.sfx.monster(this.pos, 'hiss', def.pitch, 0.9); G.sfx.whoosh(0.25, 0.6); }
           this.atk = Math.min(1, (A.t - A.wind) * 4);
-          if (!A.hit && distH < this.radius + 1.6) { A.hit = true; hitPlayer(this.dmg); }
+          if (!A.hit && distH < this.radius + 1.6) { A.hit = true; hitPlayer(this.dmg); G.vfx.slash(this.centerPos(), A.dir, this.radius + 1.6, 2.2, 0xd0b0ff, { tilt: -0.6, dur: 0.1 }); }
           if (A.hit || A.t - A.wind > 0.5) end();
           return { x: A.dir.x, z: A.dir.z, speed: 19 };
         }
@@ -1076,7 +1076,7 @@
             let best = null, bk = 1;
             for (const o of E.list) { if (o === this || !o.alive || o.boss || o.pos.distanceTo(this.pos) > 15) continue; const k = o.hp / o.maxHp - (o.shield > 0 ? 0.3 : 0); if (k < bk) { bk = k; best = o; } }
             if (best) {
-              G.fx.beam(this.centerPos(), best.centerPos(), 0x9fd8ff, 0.05, 0.5);
+              G.vfx.tube(this.centerPos(), best.centerPos(), 0.22, 0x7ac8ff, 0.5, { alpha: 0.7, speed: 6 });
               if (best.hp < best.maxHp * 0.95) { best.hp = Math.min(best.maxHp, best.hp + best.maxHp * 0.1); G.fx.dmgNum(best.centerPos(), '+回復', 'heal'); }
               else { best.maxShield = Math.max(best.maxShield, best.maxHp * 0.2); best.shield = Math.min(best.maxShield, best.shield + best.maxHp * 0.15); G.fx.bubble(best.centerPos(), best.radius * 1.6, 0xbfe2ff); }
               G.sfx.magic(this.pos);

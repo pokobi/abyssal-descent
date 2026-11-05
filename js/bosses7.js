@@ -388,7 +388,7 @@
     if (!a.up) {
       a.up = true; this.root.visible = true; this.main.invuln = false; this.shade.visible = false;
       this.face(P.pos, 1, 99); this.pose = 'rise';
-      G.fx.explosion(a.c.clone().setY(0.6), 2.2, 0x6020a0, { decal: false }); G.fx.ring(a.c.clone().setY(0.15), 2.8, 0xff3050, 0.4);
+      G.fx.explosion(a.c.clone().setY(0.6), 2.2, 0x6020a0, { decal: false }); G.fx.ring(a.c.clone().setY(0.15), 2.6, 0xff3050, 0.4); // (= the warning circle and the hit)
       G.fx.beam(a.c.clone().setY(0.2), a.c.clone().setY(4.5), 0xe0e6ff, 0.12, 0.35); G.sfx.swing(true, 'blade'); G.sfx.explosion(a.c, 0.6);
       if (Math.hypot(P.pos.x - a.c.x, P.pos.z - a.c.z) < 2.6 && P.pos.y < 3) { this.hit(26, 'aoe', a.c); P.vel.y = Math.max(P.vel.y, 10); }
     }
@@ -946,7 +946,7 @@
       if (f < 1) return false;
       a.down = true; this.diving = false; this.wantY = 0.6; this.y = 0.6;
       G.fx.explosion(a.c.clone().setY(0.4), 2.6, 0x80c8ff, { decal: false }); G.fx.ring(a.c.clone().setY(0.15), 3.8, 0xc0e8ff, 0.4); G.fx.flash(a.c.clone().setY(1), 0xa0d8ff, 70, 0.25, 16);
-      for (let i = 0; i < 5; i++) { const an = i / 5 * Math.PI * 2; G.fx.lightning(a.c.clone().setY(0.3), a.c.clone().add(V(Math.cos(an) * 4, 0.2, Math.sin(an) * 4)), 0xc0e8ff); }
+      for (let i = 0; i < 5; i++) { const an = i / 5 * Math.PI * 2; G.fx.lightning(a.c.clone().setY(0.3), a.c.clone().add(V(Math.cos(an) * 3.8, 0.2, Math.sin(an) * 3.8)), 0xc0e8ff); } // (out to the 3.8 m it hurts)
       G.sfx.explosion(a.c, 1); G.sfx.zap(a.c); P.addShake(0.5);
       if (Math.hypot(P.pos.x - a.c.x, P.pos.z - a.c.z) < 3.8 && P.pos.y < 2) { this.hit(24, 'aoe', a.c, 'shock'); const k = flat(P.pos.clone().sub(a.c)); P.vel.addScaledVector(k, 10); P.vel.y = Math.max(P.vel.y, 6); }
       a.t1 = a.t;

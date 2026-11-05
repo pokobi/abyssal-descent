@@ -48,7 +48,11 @@ process.env.COOP_W = process.env.COOP_W || '1280'; process.env.COOP_H = process.
         const cam = kind === 'side' ? V(c.x + 26, c.y + 8, c.z - 4) : V(c.x + 12, c.y + 24, c.z - 22);
         G.game.camHook = (k) => { k.position.copy(cam); k.lookAt(at.x, at.y + 0.5, at.z); k.fov = 62; k.updateProjectionMatrix(); };
       };
-      window.__cast = (id) => { const A = G.abilities, P = G.player, def = G.SKILL_BY_ID[id]; const i = def.ult ? 0 : 1; P.skills[i] = A.makeSlot(id); P.skills[i].cd = 0; if (P.skills[i].maxCharges) P.skills[i].charges = P.skills[i].maxCharges; A.cast(P.skills[i]); };
+      // (VFX_LOG: every hit, with its distance from where the cast was centred)
+      window.__log = []; window.__c0 = null;
+      if (!window.__dmWrapped) { window.__dmWrapped = true; const C = G.combat, dm = C.damageEnemy, ex = C.explode; C.explode = function (pos, r) { window.__blast = [pos.clone(), r]; return ex.apply(this, arguments); }; C.damageEnemy = function (e, d, info) { const c0 = (window.__blast && info && info.src === 'explosion' ? window.__blast[0] : null) || __c0 || G.player.pos; const dd = Math.hypot(e.pos.x - c0.x, e.pos.z - c0.z); __log.push([Math.round(dd * 10) / 10, Math.round(e.radius * 10) / 10, Math.round(d), (info && info.src) || '', (info && (info.elem || info.el)) || '', info && info.proc ? 'proc' : '', Math.round(e.centerPos().distanceTo(c0) * 10) / 10, dd > 6 ? (new Error().stack || '').split(String.fromCharCode(10)).slice(2, 7).map((l) => l.trim().split('/js/').pop()).join(' < ') : '']); return dm.apply(this, arguments); }; }
+      window.__cast = (id) => { __log.length = 0; if (/^g_/.test(id)) { const P = G.player, f = P.forward().setY(0).normalize(), q = P.pos.clone().addScaledVector(f, 9); q.y = G.world.floorBelow(q.x, q.y + 2, q.z) + 0.3; __c0 = q.clone(); G.combat.curSk = null; G.abilities.grenadeEffect(id, q, 200); return; } __c0 = G.player.pos.clone(); __castSk(id); };
+      window.__castSk = (id) => { const A = G.abilities, P = G.player, def = G.SKILL_BY_ID[id]; const i = def.ult ? 0 : 1; P.skills[i] = A.makeSlot(id); P.skills[i].cd = 0; if (P.skills[i].maxCharges) P.skills[i].charges = P.skills[i].maxCharges; A.cast(P.skills[i]); };
       window.__hits = () => G.enemies.list.filter((e) => e.alive && e.hp < 1e7).length;
     })(); 1`);
     for (const item of items) {
@@ -64,6 +68,10 @@ process.env.COOP_W = process.env.COOP_W || '1280'; process.env.COOP_H = process.
       await p.shot(file);
       await sleep(Math.max(0, 1800 - ms));
       res[id] = { hits: await p.eval('__hits()'), errs: p.errs.slice(e0).map((s) => s.slice(0, 160)), file };
+      if (process.env.VFX_LOG) res[id].log = await p.eval('JSON.stringify(__log.slice(0, 40))');
+      if (process.env.VFX_LOG) res[id].blast = await p.eval("JSON.stringify(window.__blast ? [window.__blast[1], Math.round(window.__blast[0].distanceTo(__c0 || G.player.pos) * 10) / 10] : null)");
+      if (process.env.VFX_LOG) res[id].stats = await p.eval("JSON.stringify({ expR: G.player.stats.explosionRadius, cls: G.player.cls, buffs: [...G.player.buffs.keys()] })");
+      if (process.env.VFX_LOG) res[id].refs = await p.eval("JSON.stringify(G.enemies.list.filter((e) => e.alive).slice(0, 6).map((e) => [e.centerRef ? Math.round(e.centerRef.distanceTo(e.centerPos()) * 100) / 100 : 'none', Math.round(e.pos.y * 100) / 100, e.multiPart ? 'mp' : '', e.hitW ? e.hitW.length : 0]))");
       console.log(id, JSON.stringify(res[id]));
     }
   } catch (e) { console.log('crashed', e && e.message || e); }

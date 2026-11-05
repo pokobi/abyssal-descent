@@ -746,7 +746,7 @@
     const kind = ZONE_AREA[z.kind];
     if (kind && (!z.vx || z.vx.dead)) z.vx = VX.area(p, r, kind, Infinity, { alpha: z.enemy ? 0.92 : 1, lease: 0.3 });
     if (z.vx) { z.vx.touch(); z.vx.pos.copy(p); z.vx.r = r; if (left < 0.35) z.vx.end(Math.max(0.05, left)); }
-    if (z.kind === 'gravity' && r >= 3 && (!z.vxCore || z.vxCore.dead)) z.vxCore = VX.vortex(p, r, Infinity);
+    if (z.kind === 'gravity' && r >= 3 && !z.noCore && (!z.vxCore || z.vxCore.dead)) z.vxCore = VX.vortex(p, r, Infinity);
     if (z.vxCore) { z.vxCore.touch(); z.vxCore.pos.copy(p); if (left < 0.35) z.vxCore.end(Math.max(0.05, left)); }
     const rp = () => { const a = R() * 6.28, d = Math.sqrt(R()) * r; return [p.x + Math.cos(a) * d, p.z + Math.sin(a) * d]; };
     switch (z.kind) {

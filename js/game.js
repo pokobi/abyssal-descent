@@ -1434,7 +1434,10 @@
       let c;
       if (k === 'melee') c = pickBy(r, G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && x.id !== P.melee.id), luck);
       else if (k === 'weapon') c = pickBy(r, G.WEAPONS.filter((x) => x.id !== 'starter' && !P.weapons.some((pw) => pw.id === x.id)), luck);
-      else if (k === 'mythic' || k === 'mythicGun') { const pool = [...G.WEAPONS.filter((x) => x.mythic && !P.weapons.some((pw) => pw.id === x.id)), ...(k === 'mythic' ? G.MELEE.filter((x) => x.mythic && x.id !== P.melee.id) : [])]; c = pool.length ? r.pick(pool) : null; }
+      else if (k === 'mythic' || k === 'mythicGun') { const pool = [...G.WEAPONS.filter((x) => x.mythic && !P.weapons.some((pw) => pw.id === x.id)), ...(k === 'mythic' ? G.MELEE.filter((x) => x.mythic && x.id !== P.melee.id) : []),
+          // (every other kind of ミシック: attachments, skills, ultimates, relics, armour)
+          ...G.ATTACHMENTS.filter((x) => x.rarity === 'mythic'), ...G.SKILLS.filter((x) => x.rarity === 'mythic' && !P.skills.some((s) => s && s.id === x.id)), ...(G.ULTS || []).filter((x) => x.rarity === 'mythic' && !(P.skills[0] && P.skills[0].id === x.id)),
+          ...G.BUFFS.filter((b) => b.relic && b.rarity === 'mythic' && !P.has(b.id)), ...(r.next() < 0.3 ? G.ARMOR.filter((x) => x.rarity === 'mythic') : [])]; c = pool.length ? r.pick(pool) : null; }
       else if (k === 'relic') { const pool = G.BUFFS.filter((b) => b.cat === 'relic' && !P.has(b.id)); c = pool.length ? r.pick(pool) : null; }
       else if (k === 'forge') c = GM.SVC_FORGE;
       else if (k === 'tome') c = P.skills.some((s) => s && (s.lv || 0) < G.abilities.MAXLV) ? GM.SVC_TOME : null;
@@ -1529,7 +1532,7 @@
       if (!obj && (k === 'mythic' || k === 'relic' || k === 'tome')) { k = k === 'mythic' ? 'weapon' : k === 'tome' ? 'skill' : 'buff'; obj = GM.pickOffer(k, used, r); }
       if (!obj) return;
       used.add(obj.id);
-      const kind = k === 'pile' || k === 'tech' ? 'buff' : k === 'mythic' ? (obj.kind === 'melee' ? 'melee' : 'weapon') : k;
+      const kind = k === 'pile' || k === 'tech' ? 'buff' : k === 'mythic' ? (obj.relic ? 'relic' : obj.kind === 'melee' || obj.kind === 'attachment' || obj.kind === 'skill' || obj.kind === 'ult' || obj.kind === 'armor' ? obj.kind : 'weapon') : k;
       const inst = kind === 'armor' ? G.Inv.makeArmor(obj.id, () => r.next()) : null; // armour: enchantments are rolled when the shelf is stocked
       offers.push({ kind, obj, inst, price: Math.round(GM.offerPrice(kind, obj) * (inst ? G.Inv.enchMul(inst) : 1) / 10) * 10, sold: false, slot: w.shopSlots[i], lv: kind === 'weapon' || kind === 'melee' ? GM.shopLvOf(obj) : 0 });
     });

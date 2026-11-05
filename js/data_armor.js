@@ -171,6 +171,8 @@
     ['v_casket', '宝石箱', '🧰', 'epic', 860, 2, 2, '宝石が詰まった小箱。'],
     ['v_crown', '堕ちた王冠', '👑', 'legendary', 1600, 2, 2, '深淵に呑まれた王の冠。'],
     ['v_icon', '古の聖像画', '🖼️', 'legendary', 1800, 2, 3, '失われた聖堂の祭壇画。'],
+    ['v_heart', '深淵の心核', '❤️‍🔥', 'mythic', 4000, 2, 2, '深淵の底で脈打ち続ける、赤熱した結晶。'],
+    ['v_relic', '原初の聖遺物', '🏺', 'mythic', 5000, 2, 3, '世界が生まれた頃の神々の器と伝わる壺。'],
   ];
   G.VALUABLES = VL.map(([id, name, icon, rarity, value, w, h, desc]) => ({ id, kind: 'valuable', name, icon, rarity, value, price: value, size: [w, h], desc }));
   G.VALUABLE_BY_ID = Object.fromEntries(G.VALUABLES.map((v) => [v.id, v]));

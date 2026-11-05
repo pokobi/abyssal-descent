@@ -377,6 +377,12 @@
       IV.put(c, g1);
       const g2 = IV.makeArmor(pickOf(G.ARMOR, pickR(rarityW(luck + 1.8, 3, 14))).id);
       IV.put(c, g2);
+      // ミシック: 10% (more with luck) from the second guardian on: a weapon, an attachment or a piece of armour
+      if (G.game && G.Run && G.game.area > G.Run.CYCLE && Math.random() < 0.1 * (1 + Math.max(0, luck) * 0.2)) {
+        const GM = G.game, pool = [...G.WEAPONS.filter((x) => x.rarity === 'mythic').map((x) => () => GM.gunItem(G.weapons.make(x.id))), ...G.MELEE.filter((x) => x.rarity === 'mythic').map((x) => () => GM.meleeItem(G.weapons.makeMelee(x.id))),
+          ...G.ATTACHMENTS.filter((x) => x.rarity === 'mythic').map((x) => () => IV.make('att', x.id, 1)), ...G.ARMOR.filter((x) => x.rarity === 'mythic').map((x) => () => IV.makeArmor(x.id))];
+        if (pool.length) { const it = pool[Math.floor(Math.random() * pool.length)](); if (it) IV.put(c, it); }
+      }
       const bkw = { armor: 26, att: 20, item: 30, grenade: 8, valuable: 16 * (G.Run ? G.Run.valuableShare() : 1) };
       for (let i = 2; i < n; i++) {
         const it = IV.rollThing(pickR(bkw), luck + 2.2, i === 2 ? 3 : 2);

@@ -513,12 +513,13 @@
       get text() { return `「捧げよ。捧げた分だけ、深淵は応えよう」<br>所持 🪙${fmt(coins())}`; },
       opts: () => {
         const k = Math.pow(1.5, R2.offerN || 0);
-        const t1 = GM.price(1500 * k), t2 = GM.price(4000 * k), t3 = GM.price(10000 * k);
+        const t1 = GM.price(1500 * k), t2 = GM.price(4000 * k), t3 = GM.price(10000 * k), t4 = GM.price(25000 * k);
         const after = () => { R2.offerN = (R2.offerN || 0) + 1; G.fx.ring(P.pos.clone(), 3, 0xffd070, 0.6); G.sfx.bell(); };
         return [
           { icon: '🪙', label: `小献納（${fmt(t1)}🪙）`, sub: 'レア以上の加護をランダムに1つ', disabled: coins() < t1, run: () => { pay(t1); after(); const b = U.pick(G.BUFFS.filter((x) => G.RARITY[x.rarity] && G.RARITY[x.rarity].tier >= 2 && G.RARITY[x.rarity].tier <= 4 && !x.relic && !x.pact && x.cat !== 'curse' && (P.buffs.get(x.id) || 0) < x.max && (!x.skill || P.skills.some((s) => s && s.id === x.skill)))); if (b) { P.addBuff(b.id); G.ui.itemCard(b, '[献納]', { now: true }); } return { reopen: true }; } },
           { icon: '💰', label: `大献納（${fmt(t2)}🪙）`, sub: 'エピック以上の加護を3つから選ぶ', disabled: coins() < t2, run: () => { pay(t2); after(); return { offer: (x) => G.RARITY[x.rarity] && G.RARITY[x.rarity].tier >= 3 && G.RARITY[x.rarity].tier <= 4 && x.cat !== 'pact' && x.cat !== 'relic' }; } },
           { icon: '👑', label: `至高の献納（${fmt(t3)}🪙）`, sub: 'レジェンダリーの加護を3つから選ぶ', disabled: coins() < t3, run: () => { pay(t3); after(); return { offer: (x) => x.rarity === 'legendary' && x.cat !== 'pact' && x.cat !== 'relic' }; } },
+          { icon: '🌟', label: `神域の献納（${fmt(t4)}🪙）`, sub: 'ミシックの加護を選ぶ', disabled: coins() < t4, run: () => { pay(t4); after(); return { offer: (x) => x.rarity === 'mythic' && x.cat !== 'pact' && x.cat !== 'relic' && !x.skill }; } },
           // coins into a skill level: pick the skill (or the ultimate / the pile driver); the price follows that skill's own Lv and the altar's rising factor
           (() => {
             const costs = GM.tomeTargets().map((x) => Math.round(GM.price(1500 * Math.pow(1.25, x.lv)) * k / 10) * 10), lo = costs.length ? Math.min(...costs) : 0;

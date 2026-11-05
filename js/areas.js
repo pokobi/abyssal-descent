@@ -473,6 +473,8 @@
   function alchFx() {
     const cz = alchCauldron();
     if (cz) { cz.used = (cz.used || 0) + 1; if (cz.used >= ALCH_MAX) alchExtinguish(cz); }
+    // one more left: the transmutation panel comes straight back (the second use was easy to miss)
+    if (cz && cz.used < ALCH_MAX) { GM._keepModal = true; setTimeout(() => { if (GM.stage !== 'title' && !P.dead) AR.useAlchemy(); }, 350); }
     const p = (G.world && G.world.cauldronPos) ? G.world.cauldronPos.clone() : P.pos.clone().add(V(0, 1, 0));
     G.sfx.magic(p, 'holy'); G.sfx.ui('rare');
     G.fx.sparks(p.clone().add(V(0, 0.3, 0)), V(0, 1, 0), 32, 0x58ff98, 7);

@@ -88,6 +88,10 @@ button { font-family: inherit; }
 #objective .ob-chest small { color: #9a917f; }
 #objective .ob-chest.none { opacity: 0.5; }
 #objective .ob-chest.none b { color: #cfc4b0; }
+/* one box per chest of the area: a lit one still shut, a dim grey one opened */
+#objective .ob-chs { display: inline-flex; gap: 3px; margin-left: 4px; }
+#objective .ob-chs i { font-style: normal; font-size: 15px; line-height: 1; filter: drop-shadow(0 0 4px rgba(255,200,90,0.75)); }
+#objective .ob-chs i.op { filter: grayscale(1) brightness(0.55); opacity: 0.45; }
 
 #hud-tr { position: absolute; right: 22px; top: 18px; text-align: right; }
 #coins { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; font-size: 22px; font-weight: 900; color: var(--gold2); }
@@ -230,7 +234,7 @@ button { font-family: inherit; }
 .ebar .hrow { display: flex; align-items: center; justify-content: center; gap: 3px; }
 .ebar .hrow .hb { margin: 0; }
 .ebar .eb { width: 14px; height: 14px; flex: none; font-size: 8px; line-height: 14px; border-radius: 50%; visibility: hidden; text-shadow: none; }
-.ebar .eb.on { visibility: visible; background: radial-gradient(circle, rgba(10,10,14,0.85) 56%, transparent 58%), conic-gradient(var(--ec) var(--p, 100%), rgba(255,255,255,0.18) 0); }
+.ebar .eb.on { visibility: visible; background: radial-gradient(circle, rgba(10,10,14,0.85) 56%, transparent 58%), conic-gradient(var(--ec) var(--p, 100%), rgba(255,255,255,0.18) 0); box-shadow: 0 0 0 1.5px var(--ec), 0 0 0 3px rgba(0,0,0,0.85), 0 0 0 4.5px var(--ec), 0 0 6px var(--ec); }
 .ebar .eb.fix { background: rgba(10,10,14,0.85); box-shadow: 0 0 0 1.5px var(--ec), 0 0 0 3px rgba(0,0,0,0.85), 0 0 0 4.5px var(--ec); }
 .ebar.elfix .hb { border-color: var(--ec); box-shadow: 0 0 4px var(--ec); }
 .ebar .ch { min-width: 14px; flex: none; display: inline-flex; gap: 1px; text-align: left; }

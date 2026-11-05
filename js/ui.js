@@ -508,7 +508,8 @@
     // chests still shut in this area (a sprung mimic counts as opened)
     const chs = G.world ? G.world.interactables.filter((it) => it.type === 'chest') : [];
     const chLeft = chs.filter((it) => !it.opened).length;
-    const chest = chs.length ? `<div class="ob-chest${chLeft ? '' : ' none'}"><span class="ob-ic">📦</span>残りの宝箱 <b>${chLeft}</b><small> / ${chs.length}</small></div>` : '';
+    const chIcons = chs.length <= 10 ? `<span class="ob-chs">${chs.map((it) => `<i class="${it.opened ? 'op' : ''}">📦</i>`).join('')}</span>` : '';
+    const chest = chs.length ? `<div class="ob-chest${chLeft ? '' : ' none'}"><span class="ob-ic">📦</span>残りの宝箱 <b>${chLeft}</b><small> / ${chs.length}</small>${chIcons}</div>` : '';
     const html = `<div class="ob-row"><span class="ob-ic">${o.icon}</span><span>${o.text()}</span></div>${sub ? `<div class="ob-sub">${sub}</div>` : ''}${an ? `<div class="ob-row" style="color:#ff9a7a;font-size:12px">⚠ 異変: ${an}</div>` : ''}${chest}${UI.enrageGauge()}${bar}`;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
   };

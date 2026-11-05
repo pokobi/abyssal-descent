@@ -37,10 +37,13 @@
     w.atts = {};
     const wasCur = p.weapon === w;
     p.weapons.splice(i, 1);
+    p.wOrder = (p.wOrder || []).map((t) => (t === w ? null : t));
     if (p.wIdx >= p.weapons.length || wasCur) p.wIdx = 0;
     else if (i < p.wIdx) p.wIdx--;
     G.weapons.dirty = true;
-    if (!p.meleeMode) G.weapons.equip(false);
+    if (!p.weapons.length) { if (!p.meleeMode) G.weapons.setMelee(); } // (the last gun: on with the melee weapon / fists)
+    else if (!p.meleeMode) G.weapons.equip(false);
+    G.weapons.order();
     pay(v, w.def.name + (withAtts && atts.length ? '（アタッチメント込み）' : ''));
     if (!withAtts && atts.length) G.ui.toastSmall(`🗃️ アタッチメント${atts.length}個をインベントリへ移した`);
   }
@@ -87,7 +90,7 @@
       opts.push({ icon: '💰', label: `アタッチメントごと売る（+${fmt(base + extra)}🪙）`, sub: 'アタッチメントも一緒に手放します', onPick: () => { sellGun(w, true); again(); } });
     } else opts.push({ icon: '💰', label: `売る（+${fmt(base)}🪙）`, onPick: () => { sellGun(w, false); again(); } });
     opts.push({ icon: '↩', label: 'やめる', onPick: again });
-    GM().modal('⚠ 武器を売却しますか？', `<b style="color:${R(w.def.rarity)}">${G.weapons.keyLabel(w)}${w.def.icon} ${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</b> を売却します。売った武器は戻ってきません。${w.lv ? `<br>⚒️ 鍛冶の強化（+${w.lv}）も失われます。` : ''}${attTxt}`, opts);
+    GM().modal('⚠ 武器を売却しますか？', `<b style="color:${R(w.def.rarity)}">${G.weapons.keyLabel(w)}${w.def.icon} ${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}</b> を売却します。売った武器は戻ってきません。${w.lv ? `<br>⚒️ 鍛冶の強化（+${w.lv}）も失われます。` : ''}${attTxt}${P().weapons.length <= 1 ? `<br><b style="color:#ff8a70">⚠ これが最後の銃です。売ると銃が無くなり、${P().melee && P().melee.id !== (G.BARE_MELEE || 'fists') ? '近接武器' : '素手'}だけで戦うことになります。</b>` : ''}`, opts);
   }
   function confirmMelee() {
     const m = P().melee;
@@ -126,8 +129,8 @@
     const p = P(), IV = G.Inv, out = [];
     const guns = G.weapons.gunsInOrder();
     for (const w of guns) {
-      const start = w.id === 'starter' || !!w.kit, last = p.weapons.length <= 1, atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]);
-      out.push({ cat: 'weapon', icon: w.def.icon, el: G.Elem.tagOf(w), rc: w.def.rarity, name: `${G.weapons.keyLabel(w)}${w.def.name}${w.lv ? ' +' + w.lv : ''}`, sub: last ? '最後の銃は売れません' : `${start ? '初期装備' : '銃'}${w.lv ? `・強化+${w.lv}` : start ? '（未強化は0🪙）' : ''}${atts.length ? `・アタッチメント${atts.length}個装着中` : ''}`, v: last ? 0 : PW.weaponValue(w), no: last, act: () => { GM()._keepModal = true; setTimeout(() => confirmGun(w), 0); } });
+      const start = w.id === 'starter' || !!w.kit, last = p.weapons.length <= 1, atts = Object.values(w.atts || {}).filter((a) => G.ATT_BY_ID[a]); // (the last gun sells too, after a warning)
+      out.push({ cat: 'weapon', icon: w.def.icon, el: G.Elem.tagOf(w), rc: w.def.rarity, name: `${G.weapons.keyLabel(w)}${w.def.name}${w.lv ? ' +' + w.lv : ''}`, sub: `${last ? '⚠ 最後の銃・' : ''}${start ? '初期装備' : '銃'}${w.lv ? `・強化+${w.lv}` : start ? '（未強化は0🪙）' : ''}${atts.length ? `・アタッチメント${atts.length}個装着中` : ''}`, v: PW.weaponValue(w), act: () => { GM()._keepModal = true; setTimeout(() => confirmGun(w), 0); } });
     }
     if (p.melee && p.melee.id !== (G.BARE_MELEE || 'fists')) { const startM = p.melee.id === G.DEFAULT_MELEE || !!p.melee.kit; out.push({ cat: 'melee', icon: p.melee.def.icon, el: G.Elem.tagOf(p.melee), rc: p.melee.def.rarity, name: p.melee.def.name + (p.melee.lv ? ' +' + p.melee.lv : ''), sub: `${startM ? '初期近接武器' : '近接武器'}${p.melee.lv ? `・強化+${p.melee.lv}` : startM ? '（未強化は0🪙）' : ''}（売ると素手になる）`, v: PW.meleeValue(p.melee), act: () => { GM()._keepModal = true; setTimeout(() => confirmMelee(), 0); } }); }
     for (const w of guns) for (const sl in w.atts) { const id = w.atts[sl], a = G.ATT_BY_ID[id]; if (a) out.push({ cat: 'att', icon: a.icon, el: G.Elem.tagOf(a), rc: a.rarity, name: a.name, sub: `${w.def.name}に装着中`, v: PW.attValue(id), act: () => { GM()._keepModal = true; setTimeout(() => confirmAtt(id, w), 0); } }); }

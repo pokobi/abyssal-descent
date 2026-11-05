@@ -1420,7 +1420,8 @@
   // ---------------- shop ----------------
   const BUFF_PRICE = { common: 260, uncommon: 380, rare: 560, epic: 820, legendary: 1200, mythic: 2000 };
   // prices creep up with depth (income does too) so late coins don't pile up unspent
-  GM.price = function (base) { return Math.max(0, Math.round(base * Math.max(0.3, 1 - P.stats.shopDiscount) * (1 + GM.run.shopVisits * 0.05) * (1 + 0.03 * Math.max(0, (GM.area || 1) - 1)) / 10) * 10); };
+  // noVisits: weapons skip the +5% per shop visit (with the per-area rise on top it priced them out of reach deep down)
+  GM.price = function (base, noVisits) { return Math.max(0, Math.round(base * Math.max(0.3, 1 - P.stats.shopDiscount) * (noVisits ? 1 : 1 + GM.run.shopVisits * 0.05) * (1 + 0.03 * Math.max(0, (GM.area || 1) - 1)) / 10) * 10); };
   // while a shop is being stocked its rarity is judged a few areas deeper (easy / normal, the early fields: see Run.shopRarityBonus); drops and chests are not
   GM._rb = 0;
   function rollRarity(r, luck) { return GM._rb ? r.weighted(G.RARITY_ORDER, (k) => G.rarityWeightD(k, G.Run.depthArea(GM.area) + GM._rb, luck)) : r.weighted(G.RARITY_ORDER, (k) => G.rarityWeight(k, GM.area, luck)); }
@@ -1501,7 +1502,7 @@
   GM.offerPrice = function (kind, obj) {
     if (kind === 'forge') return GM.forgeRange()[0];
     if (kind === 'tome') return GM.tomePrice();
-    if (kind === 'weapon' || kind === 'melee') return GM.price(obj.price * (1 + 0.2 * GM.shopLvOf(obj))); // (ミシック too: forged with depth, priced with it)
+    if (kind === 'weapon' || kind === 'melee') return GM.price(obj.price * (1 + 0.1 * GM.shopLvOf(obj)), true); // (ミシック too: forged with depth, +10% a level; no per-visit rise)
     return GM.price(kind === 'buff' ? BUFF_PRICE[obj.rarity] * (G.isTech(obj) ? 1.2 : 1) : obj.price);
   };
   GM.setupShop = function (w) {
@@ -1529,18 +1530,26 @@
       'armor', 'armor', 'armor', 'armor', 'armor',
       'buff', 'buff', 'buff', 'buff', 'tech'];
     const item0 = kinds.indexOf('item');
-    if (GM.area >= 15 && r.chance(0.6)) { kinds[2] = kinds[0]; kinds[0] = 'mythic'; }
     if (GM.area >= 8) kinds[kinds.length - 1] = 'relic';
+    // ミシック (from area 15, 60%): one of any kind, set out on the stall of its own kind - a gun / melee weapon on the weapons island,
+    // armour among the armour, a skill among the skills ... (it used to always take the first weapon pedestal, whatever it was)
+    let mythAt = -1, mythObj = null;
+    if (GM.area >= 15 && r.chance(0.6)) {
+      mythObj = GM.pickOffer('mythic', new Set(), r);
+      if (mythObj) {
+        const mk = mythObj.relic ? 'relic' : ['attachment', 'skill', 'ult', 'armor'].includes(mythObj.kind) ? mythObj.kind : 'arms';
+        mythAt = mk === 'relic' ? kinds.lastIndexOf('relic') : kinds.indexOf(mk);
+        if (mythAt < 0) mythObj = null;
+      }
+    }
     const used = new Set();
     const offers = [];
-    let meleeN = 0;
+    let meleeN = mythObj && mythObj.kind === 'melee' ? 1 : 0; // never two melee weapons on the shelves
     kinds.forEach((k, i) => {
+      if (i === mythAt) k = 'mythic';
       // weapon pedestals are fully random between guns and melee, but never more than one melee weapon
       if (k === 'arms') { k = meleeN === 0 && r.chance(G.MELEE.length / (G.MELEE.length + G.WEAPONS.length) * 1.3) ? 'melee' : 'weapon'; if (k === 'melee') meleeN++; }
-      if (k === 'mythic' && meleeN > 0) k = 'mythicGun'; // never two melee weapons on the shelves
-      let obj = GM.pickOffer(k === 'item' ? (i === item0 ? 'grenade' : 'util') : k, used, r);
-      if (obj && k === 'mythic' && obj.kind === 'melee') meleeN++;
-      if (k === 'mythicGun') k = 'mythic';
+      let obj = k === 'mythic' ? mythObj : GM.pickOffer(k === 'item' ? (i === item0 ? 'grenade' : 'util') : k, used, r);
       if (!obj && (k === 'mythic' || k === 'relic' || k === 'tome')) { k = k === 'mythic' ? 'weapon' : k === 'tome' ? 'skill' : 'buff'; obj = GM.pickOffer(k, used, r); }
       if (!obj) return;
       used.add(obj.id);

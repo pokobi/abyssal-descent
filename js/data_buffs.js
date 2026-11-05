@@ -439,6 +439,82 @@
   add('ua_echo', '奇跡の残響', '🔁', 'epic', 'ult', 'アルティメット使用時、20%でクールタイムが半分になる。', { mods: { ultEcho: 1 } });
   add('ua_tech', '奥義連携', '🔗', 'legendary', 'ult', 'アルティメット使用時、全スキルのクールタイムをリセット。', { mods: { ultTech: 1 } });
   add('ua_quick', '先手必勝', '🏁', 'uncommon', 'ult', 'エリア開始時、アルティメットのクールタイム-30秒。', { max: 2, hooks: { onAreaStart(c, n) { C.ultReduce(30 * n); } } });
+  // ---------- 2026-11: ミシック and the melee additions ----------
+  const now = () => G.game.time;
+  // ミシック (8)
+  add('o_myth', '神殺し', '🗡️', 'mythic', 'offense', 'ボス・精鋭への与ダメ+50%。ボスの部位を壊すたびに、さらに+5%（最大+30%。エリアごとに戻る）。', { hooks: {
+    tick(dt, n, s) { const b = G.bosses.active; if (s.area !== G.game.area) { s.area = G.game.area; s.k = 0; s.alive = -1; } if (!b || !b.parts) return; const a = b.parts.filter((p) => p.alive).length; if (s.alive >= 0 && a < s.alive) s.k = Math.min(6, (s.k || 0) + (s.alive - a)); s.alive = a; },
+    preHit(c, n, s) { if (c.e && (c.e.boss || c.e.elite)) c.bonus += 0.5 + 0.05 * (s.k || 0); } } });
+  add('h_myth', '導きの弾道', '🧭', 'mythic', 'offense', '敵に当たらなかった弾が、0.4秒後に一番近い敵（20m以内）へ向きを変えて飛ぶ（ダメージ70%）。', { flag: true });
+  add('d_myth', '反転の鎧', '🪞', 'mythic', 'defense', '状態異常（炎上・毒・電撃・鈍化）を受けると、自分のその状態異常は消え、周囲8mの敵へ同じ状態異常を移す（6秒に1回）。', { hooks: {
+    tick(dt, n, s) {
+      s.cd = Math.max(0, (s.cd || 0) - dt); if (s.cd > 0 || !P.st) return;
+      const k = ['burn', 'poison', 'shock', 'slow'].find((x) => P.st[x] > 0); if (!k) return;
+      P.st[k] = 0; s.cd = 6;
+      const tgt = { burn: 'burn', poison: 'poison', shock: 'shock', slow: 'frost' }[k];
+      for (const e of G.enemies.inRadius(P.pos, 8)) if (e.alive && !e.ally) C.status(e, tgt, 3);
+      G.fx.ring(P.pos.clone().setY(P.pos.y + 0.2), 8, 0xc0e8ff, 0.5); G.ui.toastSmall('🪞 反転の鎧：状態異常を跳ね返した');
+    } } });
+  add('m_myth', '疾風の理', '🍃', 'mythic', 'mobility', '移動が速いほど、スキルとグラップルのクールタイムが速く減る（スプリント中は1.5倍、スライディング・グラップル中は2倍）。', { hooks: {
+    tick(dt) { const g = P.grapple && P.grapple.state && P.grapple.state !== 'none'; const k = P.sliding || g ? 1 : P.sprinting ? 0.5 : 0; if (!k) return;
+      for (const sk of P.skills) if (sk && !(sk.def && sk.def.ult) && sk.cd > 0) sk.cd = Math.max(0, sk.cd - dt * k);
+      if (P.grappleCd > 0) P.grappleCd = Math.max(0, P.grappleCd - dt * k); } } });
+  add('x_myth', '元素の支配者', '🌐', 'mythic', 'attr', 'すべての属性反応のダメージ+60%。反応が起きると、その反応の属性を持つスキルのクールタイム-1秒。', { mods: { reactDmg: 0.6 } });
+  add('z_myth', '竜の契約', '🐉', 'mythic', 'summon', '小さな竜が付き従い、近くの敵（14m以内）へ炎を吐き続ける（炎上を付与）。', { hooks: {
+    tick(dt, n, s) {
+      const w = G.world; if (!w || !w.group || P.dead) return;
+      if (!s.m || s.area !== G.game.area || !s.m.parent) {
+        s.area = G.game.area;
+        const m = new THREE.Group(), red = new THREE.MeshStandardMaterial({ color: 0xc8301e, emissive: 0x801808, emissiveIntensity: 0.6, roughness: 0.5 });
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), red); body.scale.set(1, 0.8, 1.6); m.add(body);
+        const head = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.24, 8), red); head.rotation.x = -Math.PI / 2; head.position.set(0, 0.06, -0.3); m.add(head);
+        const wmat = new THREE.MeshStandardMaterial({ color: 0xe0603a, emissive: 0x902010, emissiveIntensity: 0.5, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+        s.wl = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.22), wmat); s.wl.position.set(-0.22, 0.05, 0); m.add(s.wl);
+        s.wr = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.22), wmat); s.wr.position.set(0.22, 0.05, 0); m.add(s.wr);
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 6), red); tail.rotation.x = Math.PI / 2; tail.position.set(0, 0, 0.32); m.add(tail);
+        m.traverse((o) => { if (o.isMesh) o.raycast = () => {}; });
+        w.group.add(m); s.m = m; s.t = 0;
+      }
+      const T = now(), m = s.m, f = P.forward().setY(0).normalize();
+      const want = P.pos.clone().add(new THREE.Vector3(-f.z * 0.9, 2.1 + Math.sin(T * 2.4) * 0.12, f.x * 0.9)).addScaledVector(f, -0.4);
+      m.position.lerp(want, Math.min(1, dt * 6));
+      s.wl.rotation.z = Math.sin(T * 12) * 0.6; s.wr.rotation.z = -Math.sin(T * 12) * 0.6;
+      s.t -= dt; if (s.t > 0) return; s.t = 0.5;
+      let best = null, bd = 14; for (const e of G.enemies.inRadius(m.position, 14)) { if (!e.alive || e.ally) continue; const d = e.centerPos().distanceTo(m.position); if (d < bd) { bd = d; best = e; } }
+      if (!best) return;
+      const c = best.centerPos(); m.lookAt(c); m.rotateY(Math.PI);
+      for (let i = 0; i < 8; i++) { const p = m.position.clone().lerp(c, i / 8); G.fx.flame.spawn(p.x, p.y, p.z, 0, 0.3, 0, 0.25, 0.12, 0.4, 1.5, 0.7, 0.25, 0.9, -0.5, 1); }
+      C.damageEnemy(best, sc(16) * n, { src: 'buff', proc: true, noMarker: true, elem: 'burn', elemChance: 0.6, el: 'fire' });
+    } } });
+  add('p_myth', '天墜', '☄️', 'mythic', 'pile', 'パイルドライバーの落下中は無敵。着地の範囲+100%。', { mods: { pileRadius: 1 }, hooks: { preDamaged(c) { if (P.pileState) c.block = true; } } });
+  add('k_myth', '千刃', '🌸', 'mythic', 'melee', '近接攻撃が当たるたびに、その敵に刃の印（最大5）。5つたまると印が弾け、その一撃の近接ダメージの300%を与える。', { hooks: {
+    onHit(c) { if (c.src !== 'melee' || !c.e || !c.e.alive) return; const e = c.e; e._blades = (e._blades || 0) + 1; G.fx.sparks(c.pos || e.centerPos(), null, 3, 0xffb0d0, 2);
+      if (e._blades >= 5) { e._blades = 0; const p = e.centerPos(); G.fx.ring(p, 1.4, 0xffb0d0, 0.4); G.fx.sparks(p, null, 24, 0xffd0e8, 7); G.sfx.impact && G.sfx.impact(p, 'metal'); C.damageEnemy(e, (c.dmg || 0) * 3, { src: 'melee', proc: true, pos: p }); } } } });
+  // ミシック relics (2)
+  relic('r_myth1', '時計仕掛けの心臓', '⚙️', 7000, '10秒ごとに、その10秒間に受けたダメージの40%を回復する。', { rarity: 'mythic', hooks: {
+    onDamaged(c, n, s) { s.acc = (s.acc || 0) + (c.amount || 0); },
+    tick(dt, n, s) { s.t = (s.t || 0) + dt; if (s.t < 10) return; s.t = 0; if (s.acc > 0 && !P.dead) { C.heal(s.acc * 0.4); G.fx.ring(P.pos.clone().setY(P.pos.y + 1), 1.2, 0xffe0a0, 0.4); } s.acc = 0; } } });
+  relic('r_myth2', '終わらぬ夜', '🌌', 8000, 'エリアをクリアするたびに、ランダムな加護（エピック以下）を1つ得る。', { rarity: 'mythic', hooks: {
+    onAreaClear() { const pool = G.BUFFS.filter((b) => G.RARITY[b.rarity] && G.RARITY[b.rarity].tier <= 3 && b.cat !== 'curse' && b.cat !== 'pact' && b.cat !== 'relic' && !b.skill && (P.buffs.get(b.id) || 0) < b.max && b.rarity !== 'cursed');
+      if (!pool.length) return; const b = pool[Math.floor(Math.random() * pool.length)]; P.addBuff(b.id); G.ui.toast(`🌌 終わらぬ夜：${b.icon} ${b.name} を得た`, 'good'); } } });
+  // 近接 (8)
+  add('k_parryhit', '受け流し', '🗡️', 'rare', 'melee', 'ガードで攻撃を受けると、3秒以内の次の近接攻撃が必ず会心になる。', { hooks: {
+    onGuard(c, n, s) { s.until = now() + 3; }, preHit(c, n, s) { if (isM(c) && now() < (s.until || 0)) { c.forceCrit = true; s.until = 0; } } } });
+  add('k_shieldbash', '盾打ち', '🛡️', 'rare', 'melee', 'ガードを解いた直後（0.5秒以内）の近接の通常攻撃が、敵を1秒スタンさせる。', { hooks: {
+    onHit(c) { if (c.src === 'melee' && !c.heavy && c.e && c.e.alive && now() - (G.weapons.guardEndT ?? -9) < 0.5) C.stun(c.e, 1); } } });
+  add('k_chainheavy', '溜め返し', '🔁', 'rare', 'melee', '重撃を当てると、4秒以内の次の重撃の溜め時間-50%。', { hooks: { onMeleeHit(c) { if (c.heavy) G.weapons.fastHeavyUntil = now() + 4; } } });
+  add('k_steel', '斬鉄', '⚔️', 'rare', 'melee', '近接攻撃が、前面の装甲による軽減を無視し、精鋭の「装甲」のシールドに2倍のダメージを与える。', { hooks: { preHit(c) { if (isM(c) && c.e && c.e.eliteMod && c.e.eliteMod.id === 'armored') c.shieldBonus += 1; } } });
+  add('k_weaponway', '武器の真髄', '📜', 'epic', 'melee', '持っている近接武器の種類で効果が変わる。刀剣：会心率+20%／打撃：重撃のスタン時間+100%／長柄：リーチ+1m／大鎌：与ダメの3%を吸収／ナイフ：攻撃の間隔-15%／斧：重撃の範囲+50%／格闘：近接ダメージ+30%。', { hooks: {
+    preHit(c) { if (!isM(c)) return; const k = P.melee && P.melee.def.mcat; if (k === 'blade' && Math.random() < 0.2) c.forceCrit = true; if (k === 'fist') c.bonus += 0.3; },
+    onHit(c) { if (c.src !== 'melee' || c.proc || !c.e) return; const k = P.melee && P.melee.def.mcat; if (k === 'scythe') C.leech(c.dmg || 0, 0.03); if (k === 'blunt' && c.heavy && c.e.alive) C.stun(c.e, 1.2); } } });
+  add('k_zanshin', '残心', '🧘', 'epic', 'melee', '近接で敵を倒すと、近接武器のガードが全回復し、2秒間被ダメ-40%。', { hooks: {
+    onKill(c, n, s) { if (c.src !== 'melee') return; if (G.weapons.guardRefill) G.weapons.guardRefill(); s.until = now() + 2; },
+    preDamaged(c, n, s) { if (now() < (s.until || 0)) c.red += 0.4; } } });
+  add('k_kongo', '金剛', '🗿', 'legendary', 'melee', 'ガード中の被ダメ-80%。ガードで受けたダメージの50%を溜め、次の近接攻撃に上乗せする。', { hooks: {
+    preDamaged(c) { if (G.weapons.guarding && G.weapons.guarding()) c.red += 0.8; },
+    onGuard(c, n, s) { s.store = Math.min(2000, (s.store || 0) + (c.cut || 0) * 0.5 + (c.amount || 0) * 0.5); },
+    onHit(c, n, s) { if (c.src !== 'melee' || c.proc || !c.e || !(s.store > 0)) return; const v = s.store; s.store = 0; if (c.e.alive) { C.damageEnemy(c.e, v, { src: 'melee', proc: true, pos: c.e.centerPos() }); G.fx.sparks(c.e.centerPos(), null, 12, 0xffe090, 5); } } } });
+  add('k_demon', '剣鬼', '👹', 'legendary', 'melee', '近接の通常攻撃の4回目が、溜めなしの重撃になる。近接ダメージ+30%。', { mods: { meleeDmg: 0.3 } });
   G.isTech = (b) => b.cat === 'pile' || b.cat === 'skill' || b.cat === 'ult';
   G.BUFFS = BUFFS;
   G.BUFF_BY_ID = Object.fromEntries(BUFFS.map((b) => [b.id, b]));

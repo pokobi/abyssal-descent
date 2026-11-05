@@ -215,7 +215,7 @@
     if (e.dmgMul) dmg *= e.dmgMul(info, ctx);
     // front armour (beetles etc.)
     let armored = false;
-    if (e.def.frontArmor && src !== 'dot' && !e.st.stun) {
+    if (e.def.frontArmor && src !== 'dot' && !e.st.stun && !(src === 'melee' && P.has('k_steel'))) { // (斬鉄: melee ignores front armour)
       const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw);
       const tx = P.pos.x - e.pos.x, tz = P.pos.z - e.pos.z, tl = Math.hypot(tx, tz) || 1;
       if ((fx * tx + fz * tz) / tl > 0.45) { dmg *= 1 - e.def.frontArmor; armored = true; }
@@ -612,6 +612,15 @@
     let dmg = amount * (1 - armor);
     if (G.weapons.guardAbsorb) dmg = G.weapons.guardAbsorb(dmg, info); // a melee guard held up towards the hit
     if (P.has('d_iron')) dmg = Math.min(dmg, P.stats.maxHp * 0.25);
+    // 天秤の祈り: the foes around you take the blow instead (x3: their health runs on a bigger scale)
+    if (dmg > 0 && P.temps.has('sk_scale') && G.abilities.scale && !info.fall) {
+      const A = G.abilities, r = A.scale.r, foes = G.enemies.inRadius(P.pos, r).filter((e) => e.alive && !e.ally).slice(0, 3);
+      for (const e of foes) { G.fx.beam(P.chestPos(), e.centerPos(), 0xffe090, 0.05, 0.25); C.damageEnemy(e, dmg * 3, { src: 'skill', sk: 'sk_scale', proc: true, noMarker: true }); }
+      if (A.scale.heal) C.heal(dmg * 0.2, true);
+      G.fx.ring(P.pos.clone().setY(P.pos.y + 1), 1, 0xffe090, 0.25);
+      return 0;
+    }
+    if (dmg > 0 && P.temps.has('ambrosia')) setTimeout(() => { if (!P.dead) C.heal(dmg * 0.5, true); }, 0); // (神酒)
     if (dmg <= 0) return 0;
     if (G.Classes && !info.fixed) G.Classes.onHurt();
     let osHit = 0;

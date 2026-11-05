@@ -1108,6 +1108,7 @@
       G.fx.debris(ej, G.world.mats.brass, 1, 0.025, 2.5);
     }
     G.buffs.emit('onShoot', { weapon: w });
+    if (G.abilities.shadows) G.abilities.shadowCopy(s.dmg * (s.pellets || 1) * 0.5, false); // (影分身: the shadows fire with you)
     // 残響: every 4th shot, phantom rounds chase nearby foes
     if (w.def.trait === 'echo') {
       w.echoN = (w.echoN || 0) + 1;
@@ -1134,6 +1135,8 @@
     const wh = G.world.raycast(o, dir, maxD);
     const limit = wh ? wh.t : maxD;
     const hits = G.enemies.raycastAll(o, dir, limit, exclude);
+    // 導きの弾道: a round that hits no foe turns, 0.4 s later, towards the nearest one within 20 m (70%)
+    if (!hits.length && depth === 0 && !s.guided && P.has('h_myth')) { const end0 = wh ? wh.point.clone() : o.clone().addScaledVector(dir, 40), area = G.game.area, dd = s.dmg * 0.7; setTimeout(() => { if (G.game.area !== area || P.dead) return; let best = null, bd = 20; for (const e of G.enemies.inRadius(end0, 20)) { if (!e.alive || e.ally) continue; const d = e.centerPos().distanceTo(end0); if (d < bd) { bd = d; best = e; } } if (!best) return; G.fx.tracer(end0, best.centerPos(), 0xa0e0ff, 0.025, 0.2); G.combat.damageEnemy(best, dd, { src: 'bullet', weapon: w, proc: true, noMarker: true }); }, 400); }
     let pierce = s.pierce || 0;
     let end = wh ? wh.point : o.clone().addScaledVector(dir, maxD);
     let stopped = false;

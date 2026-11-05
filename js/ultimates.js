@@ -25,6 +25,8 @@
     ['ult_titan', '巨人化', '🗿', 'epic', 8600, 140, '12秒間、最大HP+80%・近接ダメージ+150%・パイルドライバー威力+100%・被ダメ-25%。', { dur: 12 }],
     ['ult_bladestorm', '剣の嵐', '🤺', 'epic', 8200, 120, '10秒間、周囲を刃が高速回転し、触れた敵を切り刻む。', { dur: 10, dps: 240 }],
     ['ult_execution', '断罪', '⚖️', 'mythic', 9600, 135, '周囲30mの敵に刻印し、2秒後に最大HPの25%（ボス6%）のダメージ。HP20%以下の通常敵は即死。', { r: 30 }],
+    ['ult_bell', '終焉の鐘', '🔔', 'mythic', 10000, 150, '鐘を3回鳴らす。1回ごとに、見えている全ての敵（60m以内）に最大HPの10%（ボスは3%）のダメージと2秒のスタン（ボスはスタンしない）。', { n: 3 }],
+    ['ult_godfall', '神降ろし', '🌟', 'mythic', 10000, 160, '15秒間、与ダメ・連射速度・リロード速度・移動速度・近接ダメージ・スキルダメージ+50%、被ダメ-50%、スキルのクールタイムなし。', { dur: 15 }],
   ];
   G.ULTS = UL.map(([id, name, icon, rarity, price, cd, desc, p]) => ({ id, name, icon, rarity, price, cd, desc, p, kind: 'ult', ult: true }));
   for (const u of G.ULTS) G.SKILL_BY_ID[u.id] = u;
@@ -67,6 +69,29 @@
           }, i * 450);
         }
         G.sfx.rumble(3, 1); break;
+      }
+      case 'ult_bell': {
+        const n = p.n + (m.x_four ? 1 : 0);
+        for (let i = 0; i < n; i++) later(() => {
+          G.sfx.bell(); G.fx.ring(P.pos.clone().setY(P.pos.y + 0.2), 30, 0xffe0a0, 1.2); G.fx.flash(P.chestPos(), 0xffe8b0, 90, 0.3, 30); P.addShake(0.3);
+          const eye = G.camera.position;
+          for (const e of G.enemies.list) {
+            if (!e.alive || e.ally || e.pos.distanceTo(P.pos) > 60) continue;
+            if (!G.world.los(eye, e.centerPos())) continue;
+            C.damageEnemy(e, e.maxHp * (e.boss ? 0.03 : 0.1), Object.assign({ noMarker: true, fixed: true }, info));
+            if (!e.boss) C.stun(e, 2);
+            G.fx.sparks(e.centerPos(), null, 6, 0xffe0a0, 3);
+          }
+          if (m.x_heal) C.heal(st.maxHp * 0.05);
+        }, i * 900);
+        break;
+      }
+      case 'ult_godfall': {
+        const dur = p.dur + (m.x_long ? 5 : 0);
+        tmp('ult_godfall', dur, { dmg: 0.5, fireRate: 0.5, reloadSpeed: 0.5, moveSpeed: 0.5, meleeDmg: 0.5, skillDmg: 0.5, armor: 0.5 }, '🌟', '神降ろし');
+        if (m.x_nova) for (const e of G.enemies.inRadius(P.pos, 15)) C.damageEnemy(e, sc(600), Object.assign({ noMarker: true }, info));
+        G.fx.beam(P.pos.clone(), P.pos.clone().add(V(0, 30, 0)), 0xfff0b0, 1.2, 0.8); G.fx.flash(P.chestPos(), 0xfff0c0, 120, 0.5, 30); G.sfx.magic(P.pos, 'holy'); G.sfx.bell();
+        break;
       }
       case 'ult_timestop':
         G.game.chronoT = p.dur; G.game.chronoSlow = 0.95; // enemies keep 5% of their speed

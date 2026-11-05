@@ -88,8 +88,47 @@
     sk.maxCd = A.cdOf(sk);
     G.ui.abilityFlash(sk);
   };
+  // ---- 次元斬 / 影分身 / 天秤の祈り / 神降ろし: what lasts after the cast ----
+  A.rifts = [];
+  const segDist = (p, a, b) => { const ab = b.clone().sub(a), t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / ab.lengthSq())); return p.distanceTo(a.clone().addScaledVector(ab, t)); };
+  A.riftTick = function (dt) {
+    for (let i = A.rifts.length - 1; i >= 0; i--) {
+      const r = A.rifts[i]; r.t -= dt;
+      if (r.t <= 0 || r.area !== G.game.area) { A.rifts.splice(i, 1); continue; }
+      for (const e of G.enemies.list) {
+        if (!e.alive || e.ally) continue;
+        const c = e.centerPos(); if (!r.cuts.some(([a, b]) => segDist(c, a, b) < 1.1 + (e.radius || 0.5))) continue;
+        if (e.boss || e.elite) { const t0 = r.hit.get(e) || 0; if (G.game.time - t0 < 1) continue; r.hit.set(e, G.game.time); C.damageEnemy(e, r.dmg, { src: 'skill', sk: 'sk_rift', noMarker: false }); }
+        else { G.fx.sparks(c, null, 14, 0xb08aff, 5); C.damageEnemy(e, e.hp + (e.shield || 0) + 1, { src: 'skill', sk: 'sk_rift', fixed: true, noMarker: true }); }
+      }
+      for (const p of C.projectiles || []) if (p.owner === 'enemy' && p.pos && r.cuts.some(([a, b]) => segDist(p.pos, a, b) < 1.2)) { p.life = 0; p.dead = true; }
+    }
+  };
+  A.shadows = null;
+  A.shadowEnd = function () { if (!A.shadows) return; for (const s of A.shadows.list) { G.scene.remove(s.g); G.fx.smoke(s.g.position, 6, 0.8, 0x2a1a40, 0.5, 1); } A.shadows = null; };
+  A.shadowTick = function (dt) {
+    const S = A.shadows; if (!S) return;
+    S.t -= dt; if (S.t <= 0 || S.area !== G.game.area || P.dead) return A.shadowEnd();
+    const f = P.forward().setY(0).normalize(), side = V(-f.z, 0, f.x);
+    for (const s of S.list) { const want = P.pos.clone().addScaledVector(side, s.side).addScaledVector(f, -s.back); s.g.position.lerp(want, Math.min(1, dt * 12 || 1)); s.g.rotation.y = P.yaw; }
+  };
+  // the shadows copy a shot / a blow: from where each one stands, at what you are aiming at
+  A.shadowCopy = function (dmg, isMelee) {
+    const S = A.shadows; if (!S || !(dmg > 0)) return;
+    const a = A.aim(isMelee ? 4 : 80);
+    for (const s of S.list) {
+      const from = s.g.position.clone().add(V(0, 1.3, 0));
+      let e = a.e;
+      if (isMelee) { e = null; let bd = 3.2; for (const o of G.enemies.inRadius(s.g.position, 3.2)) { if (!o.alive || o.ally) continue; const d = o.pos.distanceTo(s.g.position); if (d < bd) { bd = d; e = o; } } }
+      if (!e || !e.alive) continue;
+      G.fx.tracer(from, e.centerPos(), 0x9a6aff, 0.025, 0.12);
+      C.damageEnemy(e, dmg * S.k, { src: isMelee ? 'melee' : 'bullet', proc: true, noMarker: true });
+    }
+  };
   A.update = function (dt) {
     A.updateUltAuras && A.updateUltAuras(dt);
+    A.riftTick(dt); A.shadowTick(dt);
+    if (P.temps && P.temps.has('ult_godfall')) for (const sk of P.skills) if (sk && !(sk.def && sk.def.ult) && sk.cd > 0) sk.cd = 0; // (神降ろし: no cooldowns)
     A.tickUseQueue();
     for (let i = 0; i < 4; i++) {
       const sk = P.skills[i]; if (!sk) continue;
@@ -351,6 +390,42 @@
           C.spawnProjectile(pr);
         }
         G.sfx.throwG();
+        break;
+      }
+      case 'sk_rift': {
+        // 次元斬: a 12 m tear along the aim, at chest height; touching it erases plain foes and enemy shots, elites / guardians take heavy damage
+        const len = p.len * (m.x_long ? 1.5 : 1), dur = p.dur + (m.x_linger ? 3 : 0);
+        const f = P.forward(), o = P.chestPos().addScaledVector(f, 1.2);
+        const cuts = [[o.clone(), o.clone().addScaledVector(f, len)]];
+        if (m.x_twin) { const side = V(-f.z, 0, f.x).normalize(), mid = o.clone().addScaledVector(f, len / 2); cuts.push([mid.clone().addScaledVector(side, -len / 2), mid.clone().addScaledVector(side, len / 2)]); }
+        for (const [a, b] of cuts) { G.fx.beam(a, b, 0x9a6aff, 0.5, dur); G.fx.beam(a, b, 0xe8d8ff, 0.12, dur); }
+        A.rifts.push({ cuts, t: dur, dmg: sc(p.dmg), hit: new Map(), area: G.game.area });
+        G.sfx.magic(P.pos, 'dark'); G.sfx.whoosh(0.8, 1.6);
+        break;
+      }
+      case 'sk_shadow': {
+        // 影分身: two (three) shadows stand beside you, move with you and copy your attacks at half strength
+        A.shadowEnd();
+        const n = p.n + (m.x_three ? 1 : 0), dur = p.dur + (m.x_long ? 5 : 0);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x1a1030, emissive: 0x4a2a8a, emissiveIntensity: 0.6, transparent: true, opacity: 0.7, roughness: 0.6 });
+        A.shadows = { list: [], t: dur, k: m.x_strong ? 0.75 : 0.5, area: G.game.area };
+        for (let i = 0; i < n; i++) {
+          const g = new THREE.Group();
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.22, 1.1, 10), mat); body.position.y = 0.95; g.add(body);
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), mat); head.position.y = 1.7; g.add(head);
+          const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.12, 0.6, 8), mat); legs.position.y = 0.3; g.add(legs);
+          g.traverse((o) => { if (o.isMesh) o.raycast = () => {}; });
+          const side = n === 2 ? (i ? 1 : -1) * 1.6 : (i - 1) * 1.6, back = n === 2 ? 0.4 : (i === 1 ? 1.2 : 0.4);
+          G.scene.add(g); A.shadows.list.push({ g, side, back });
+        }
+        A.shadowTick(0); G.fx.smoke(P.pos, 10, 1.2, 0x2a1a40, 0.6, 1.2); G.sfx.magic(P.pos, 'dark');
+        break;
+      }
+      case 'sk_scale': {
+        const dur = p.dur + (m.x_long ? 3 : 0);
+        tmp('sk_scale', dur, {}, '⚖️', '天秤の祈り');
+        A.scale = { r: p.r + (m.x_wide ? 6 : 0), heal: !!m.x_heal };
+        G.fx.ring(P.pos.clone().setY(P.pos.y + 0.1), A.scale.r, 0xffe090, 0.8); G.sfx.magic(P.pos, 'holy');
         break;
       }
       case 'meteor': {
@@ -694,7 +769,8 @@
     if (!fromQueue && A.useQueue) A.useQueue = null; // using anything by hand ends a queue
     const it = G.ITEM_BY_ID[id], d = it.data;
     if (d.revive) { G.ui.toastSmall('🧚 所持しているだけで効果を発揮'); return; }
-    if (d.heal && P.hp >= P.stats.maxHp && !d.temp && !d.maxHp && !d.os && !d.cleanse) { G.ui.toastSmall('❤️ HPは満タン'); G.sfx.ui('deny'); return; }
+    if (d.heal && P.hp >= P.stats.maxHp && !d.temp && !d.maxHp && !d.os && !d.cleanse && !d.ambrosia) { G.ui.toastSmall('❤️ HPは満タン'); G.sfx.ui('deny'); return; }
+    if (d.forge) { const w = P.meleeMode || !P.weapon ? P.melee : P.weapon; if (!w || w.id === (G.BARE_MELEE || 'fists') || (w.lv || 0) >= G.Areas.forgeCap(w)) { G.ui.toastSmall('🔨 強化できる武器を持っていない（上限に達している）'); G.sfx.ui('deny'); return; } }
     if (G.ItemAnim.busy()) return;
     if (d.chest) {
       const w = G.world; const f = P.forward(); f.y = 0; f.normalize(); const pt = P.pos.clone().addScaledVector(f, 2.5);
@@ -715,6 +791,8 @@
       G.sfx.drink(); setTimeout(() => G.sfx.heal(), 300);
     }
     if (d.maxHp) { P.permMaxHp += d.maxHp; P.recalc(); }
+    if (d.ambrosia) C.temp('ambrosia', d.ambrosia, {}, it.icon, '神酒'); // (combat.js: half of each hit taken comes straight back)
+    if (d.forge) { const w = P.meleeMode || !P.weapon ? P.melee : P.weapon; if (w) { const cap = G.Areas.forgeCap(w); w.lv = Math.min(cap, (w.lv || 0) + d.forge); w.ver = (w.ver || 0) + 1; G.weapons.dirty = true; if (w === P.weapon) G.weapons.equip(true); G.ui.refreshWeapon && G.ui.refreshWeapon(); G.ui.toast(`🔨 ${w.def.name} +${w.lv}`, 'good'); G.sfx.mech('magIn'); G.fx.sparks(P.handPos(), null, 20, 0xffb060, 6); } }
     if (d.os) { C.overshield(d.os); G.sfx.mech('cell'); G.fx.bubble(P.chestPos(), 1.2, 0xa8d0ff); }
     if (d.cleanse) { P.st = {}; }
     if (d.resist) C.temp('item_resist', d.resist, { statusRes: 0.7, dotRes: 0.5 }, it.icon, '状態異常耐性'); // status time -70%, burn / poison damage -50% (see player.js updateStatuses)

@@ -17,6 +17,7 @@
     s.dmg = d.dmg * Math.pow(1.13, m.lv || 0);
     s.critChance = (d.critChance || 0);
     s.range = d.range + (st.meleeRange || 0);
+    if (G.player && G.player.has && G.player.has('k_weaponway')) { if (d.mcat === 'spear') s.range += 1; if (d.mcat === 'knife') s.swing *= 0.85; } // (武器の真髄)
     s.heavy = [d.heavy[0], d.heavy[1] * (1 - Math.min(0.5, (st.meleeRecover || 0) * 0.5)), d.heavy[2] * (1 - Math.min(0.6, st.meleeRecover || 0))];
     return s;
   };
@@ -57,6 +58,7 @@
     if (held && !gd.on && !gd.lock && gd.g < GUARD_MIN) { gd.lock = true; gd.flash = 1; G.sfx.ui('deny'); }
     const want = held && !gd.lock;
     if (want && !gd.on) G.sfx.mech('boltBack', 0, 0.5);
+    if (gd.on && !want) W.guardEndT = G.game.time; // (盾打ち: the moment the guard comes down)
     gd.on = want;
     gd.k = U.damp(gd.k, gd.on ? 1 : 0, 16, dt);
     gd.flash = Math.max(0, gd.flash - dt * 3); gd.kick = Math.max(0, gd.kick - dt * 6);
@@ -75,6 +77,7 @@
     if ((dx * f.x + dz * f.z) / (d * fl) < Math.cos(g[2] * Math.PI / 180)) return dmg;
     const pool = g[1] * (1 + (P.stats.guardHp || 0)), cut = Math.min(dmg * g[0], gd.g * pool); // (剣士: +30% guard)
     gd.g = Math.max(0, gd.g - cut / pool); gd.rest = 0; gd.flash = 1; gd.kick = 1;
+    G.buffs.emit('onGuard', { cut, amount: dmg }); // (受け流し, 金剛)
     const fw = P.forward();
     const at = G.camera.position.clone().addScaledVector(fw, 0.9).add(V(0, -0.15, 0));
     G.fx.sparks(at, fw.clone().negate(), 10, 0xffe0a0, 6);
@@ -95,6 +98,7 @@
     gEl.classList.toggle('hit', gd.flash > 0.5);
     gEl.firstChild.style.height = (gd.g * 100).toFixed(1) + '%';
   }
+  W.guardRefill = () => { gd.g = 1; gd.lock = false; gd.flash = 1; }; // (残心)
   W.hideGuardUI = () => { if (gEl) gEl.classList.remove('on'); gd.on = false; gd.k = 0; };
   const MELEM = { frost: ['❄️', '冷気'], burn: ['🔥', '炎上'], poison: ['☠️', '毒'], shock: ['⚡', '電撃'] };
   W.meleeFx = function (d) {
@@ -649,6 +653,8 @@
     animateMelee(dt, s);
   };
   function startLight(s) {
+    // 剣鬼: every 4th light blow comes out as a heavy one, with no wind-up
+    if (P.has('k_demon')) { W.demonN = (W.demonN || 0) + 1; if (W.demonN >= 4) { W.demonN = 0; startHeavy(s); ms.dur = 0.01; G.fx.sparks(G.camera.position.clone().addScaledVector(P.forward(), 1.2), null, 10, 0xff6a5a, 4); return; } }
     const kind = W.meleeKind(P.melee.def);
     ms.ph = 'light'; ms.t = 0; ms.dur = s.swing; ms.hitDone = false; ms.combo++;
     ms.side = ms.combo % 2 ? 1 : -1;
@@ -659,6 +665,7 @@
   }
   function startHeavy(s) {
     ms.ph = 'hwind'; ms.t = 0; ms.dur = s.heavy[1]; ms.hitDone = false; ms.parried = false;
+    if (G.game.time < (W.fastHeavyUntil || 0)) { ms.dur *= 0.5; W.fastHeavyUntil = 0; } // (溜め返し)
     G.sfx.mech('boltBack', 0, 0.35);
   }
   function spawnGlow(col, k) {
@@ -717,6 +724,7 @@
     const def = P.melee.def;
     const cleave = heavy && P.has('k_cleave');
     let range = s.range + (heavy ? 0.6 : 0) + (cleave ? 0.8 : 0);
+    if (heavy && def.mcat === 'axe' && P.has('k_weaponway')) range *= 1.5; // (武器の真髄: the axe's heavy blow)
     const arc = cleave ? -1.1 : heavy ? s.arc - 0.12 : s.arc;
     let dmg = s.dmg * (heavy ? s.heavy[0] : 1) * (1 + 0.08 * (W.devour || 0));
     if (def.trait === 'midas' && heavy && G.game.run.coins >= 50) { G.game.run.coins -= 50; dmg *= 3; G.fx.sparks(o.clone().addScaledVector(f, 1.5), null, 20, 0xffd040, 6); G.sfx.coins(5); }
@@ -815,6 +823,7 @@
     if (hit) {
       P.addShake(heavy ? 0.45 : 0.18);
       G.buffs.emit('onMeleeHit', { heavy });
+      if (G.abilities.shadows) G.abilities.shadowCopy(dmg, true); // (影分身: and strike with you)
     }
   }
 

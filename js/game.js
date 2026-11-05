@@ -593,7 +593,7 @@
     else {
       // older saves: rebuild the bag from the item counts
       G.Inv.setupPlayer(P);
-      P.grenades = d.grenades || {};
+      P.grenades = Object.fromEntries(Object.entries(d.grenades || {}).filter(([id]) => G.ITEM_BY_ID[id])); // (retired ones are dropped)
       const inv = {};
       if (d.inv) for (const [id, n] of Object.entries(d.inv)) { if (G.ITEM_BY_ID[id] && n > 0) inv[id] = n; }
       else for (const u of d.utils || []) if (u && G.ITEM_BY_ID[u.id]) inv[u.id] = (inv[u.id] || 0) + u.n;

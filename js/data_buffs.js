@@ -204,7 +204,7 @@
   add('d_laststand', '最後の抵抗', '⚔️', 'rare', 'defense', 'HP25%以下で被ダメ-35%。', { hooks: { preDamaged(c) { if (P.hp < P.stats.maxHp * 0.25) c.red += 0.35; } } });
   add('d_phoenix', '不死鳥', '🐦', 'legendary', 'defense', 'ラン中1回だけ、死亡時にHP全快で復活し周囲に大爆発を起こす。', { flag: true });
   add('d_vampaura', '吸血の霧', '🌫️', 'epic', 'defense', '周囲6mの敵から毎秒生命力を吸収する。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.5; let tot = 0; for (const e of C.inRadius(P.pos, 6)) { C.damageEnemy(e, sc(4) * n, { src: 'buff', proc: true, silent: true }); tot += Math.max(1.2, G.player.stats.maxHp * 0.003); } if (tot) C.heal(tot * n, true); } } });
-  add('d_iron', '鉄の皮膚', '🪖', 'uncommon', 'defense', '1回の被ダメが最大HPの25%を超えなくなる。', { flag: true });
+  add('d_iron', '鉄の皮膚', '🪖', 'legendary', 'defense', '1回の被ダメが最大HPの25%を超えなくなる。', { flag: true });
   add('d_cleanse', '浄化の加護', '✨', 'uncommon', 'defense', '状態異常の持続時間-60%。', { flag: true });
 
   // ---------- economy & meta ----------
@@ -286,7 +286,7 @@
   add('o_closer', '幕引き', '🎬', 'rare', 'offense', '残り敵が3体以下になると与ダメ+40%。', { hooks: { preHit(c) { if (G.enemies.aliveCount() <= 3) c.bonus += 0.4; } } });
   add('o_bloodlust', '血の渇望', '🧛', 'rare', 'defense', '状態異常が1つでも付いた敵への与ダメの4%を回復。', { hooks: { onHit(c) { if (c.e.st && C.statusCount(c.e) > 0 && !c.proc) C.heal(c.dmg * 0.04); } } });
   add('o_meleeshock', '雷拳', '🤜', 'uncommon', 'offense', '近接攻撃が雷撃を伴い、周囲に連鎖する。', { hooks: { onHit(c) { if (c.src === 'melee') C.chain(c.e, 3, c.dmg * 0.5, 8, { src: 'buff', proc: true, elem: 'shock' }); } } });
-  add('o_meleecd', '格闘術', '🥋', 'uncommon', 'offense', '近接攻撃の間隔-40%、近接ダメージ+40%。', { mods: { meleeDmg: 0.4, meleeCd: 0.4 } });
+  add('o_meleecd', '格闘術', '🥋', 'uncommon', 'melee', '近接攻撃の間隔-15%、近接ダメージ+15%。', { mods: { meleeDmg: 0.15, meleeCd: 0.15 } });
   add('o_grenadecd', '投擲の名手', '🎯', 'uncommon', 'offense', '投擲物の飛距離+35%、ダメージ+20%。', { mods: { grenadeDmg: 0.2, throwPow: 0.35 } });
   add('o_scavenger', '漁り屋', '🦝', 'common', 'economy', '敵が稀に回復の雫を落とすようになる（+8%）。', { mods: { healDrop: 0.08 }, max: 3 });
   add('o_magnetism', '黄金の引力', '🧲', 'common', 'economy', 'コインの取得範囲+4m、コイン+5%。', { mods: { pickupRange: 4, coinMul: 0.05 } });

@@ -602,15 +602,12 @@
     const it = G.ITEM_BY_ID[id], d = it.data;
     const { o, vel } = G.GrenHold.launch(under);
     const dmg = C.scale(d.dmg);
-    const kind = id === 'g_molotov' || id === 'g_holy' ? 'bottle' : id === 'g_dyna' ? 'dyna' : id === 'g_mine' ? 'mine' : 'grenade';
+    const kind = id === 'g_dyna' ? 'dyna' : 'grenade';
     const pr = { kind, pos: o, vel, grav: 18, owner: 'player', dmg, radius: 0.12, life: 10, info: { src: 'explosion', grenade: true, shieldMul: d.shieldMul || 1, emp: !!d.emp } };
-    if (d.mine) { pr.mine = true; pr.explode = d.r; }
-    else if (d.impact) { pr.explode = d.r; }
-    else { pr.fuse = d.fuse; pr.bounce = true; pr.explode = d.r; }
+    pr.fuse = d.fuse; pr.bounce = true; pr.explode = d.r;
     if (d.sticky) { pr.sticky = true; pr.bounce = false; }
     pr.look = 'gl_' + id; // its own model and trail (grenfx.js)
     pr.onDetonate = (p) => A.grenadeEffect(id, p.pos.clone(), dmg);
-    if (d.mine) pr.onDetonate = null;
     C.spawnProjectile(pr);
     G.sfx.throwG();
     G.buffs.emit('onGrenade', { id });
@@ -627,8 +624,6 @@
       G.sfx.magic(pos, 'dark'); G.sfx.rumble(d.blackhole, 0.6);
       return;
     }
-    if (d.decoy) { const dc = C.addDecoy(ground, d.decoy, 0); if (G.GrenFX) G.GrenFX.bell(dc); return; }
-    if (d.zone === 'smoke') { C.zone(ground, d.r, d.dur, 'smoke', 0); G.sfx.whoosh(0.6, 0.6); G.fx.smoke(pos, 16, 2, 0x8a8a8a, 0.8, 3); return; }
     if (d.stun) {
       G.fx.flash(pos, 0xffffff, 120, 0.3, 30); G.fx.add.spawn(pos.x, pos.y, pos.z, 0, 0, 0, 0.3, 6, 10, 2, 2, 2, 1, 0, 0);
       for (const e of G.enemies.inRadius(pos, d.r)) C.stun(e, d.stun);
@@ -636,18 +631,9 @@
       const dp = P.pos.distanceTo(pos); if (dp < 12 && G.world.los(G.camera.position, pos)) G.ui.whiteFlash(1 - dp / 12);
       return;
     }
-    if (d.holy) {
-      for (const e of G.enemies.inRadius(pos, d.r)) C.damageEnemy(e, dmg * (e.def.undead ? 3 : 1), { src: 'explosion', grenade: true, knock: 3 });
-      if (P.pos.distanceTo(pos) < d.r + 1) C.heal(25);
-      G.fx.ring(ground, d.r, 0xffe8a0, 0.5); G.fx.flash(pos, 0xffe8a0, 40, 0.2, 14); G.sfx.breakObj(pos, 'ceramic'); G.sfx.heal();
-      for (let i = 0; i < 30; i++) G.fx.add.spawn(pos.x, pos.y, pos.z, U.rand(-4, 4), U.rand(1, 5), U.rand(-4, 4), 0.8, 0.15, 0.02, 1.3, 1.2, 0.8, 1, 6, 1);
-      return;
-    }
-    if (id === 'g_molotov') { G.sfx.breakObj(pos, 'ceramic'); G.sfx.fire(pos, true); G.fx.fireBurst(ground, d.r); C.zone(ground, d.r, d.dur, 'fire', C.scale(22), { el: 'fire' }); for (const e of G.enemies.inRadius(pos, d.r)) C.damageEnemy(e, dmg, info); return; }
     C.explode(pos, d.r, dmg, Object.assign({}, info, { color: d.elem === 'frost' ? 0xbfe8ff : d.emp ? 0xa8d0ff : d.elem === 'shock' ? 0xe0e8ff : undefined }));
     if (d.zone) C.zone(ground, d.r, d.dur, d.zone, C.scale(d.zone === 'fire' ? 26 : 16), { el: G.Elem.GREN[id] || undefined });
     if (d.elem === 'shock') for (const e of G.enemies.inRadius(pos, d.r)) C.chain(e, 2, dmg * 0.3, 8, { src: 'explosion' });
-    if (d.cluster) for (let i = 0; i < d.cluster; i++) C.spawnProjectile({ kind: 'grenade', pos: pos.clone().add(V(0, 0.4, 0)), vel: V(U.rand(-6, 6), U.rand(5, 9), U.rand(-6, 6)), grav: 18, owner: 'player', dmg: dmg * 0.4, explode: d.r * 0.6, fuse: U.rand(0.5, 1.0), bounce: true, info: { src: 'explosion', grenade: true, small: true, isCluster: true } });
     if (d.emp) { G.fx.ring(ground, d.r, 0xa8d0ff, 0.5); G.sfx.zap(pos); if (G.bosses.active && G.bosses.active.emp) G.bosses.active.emp(pos, d.r); }
   };
 

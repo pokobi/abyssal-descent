@@ -83,7 +83,7 @@
     return (a && a.mods && a.mods.el) || null;
   };
   // grenades
-  EL.GREN = { g_fire: 'fire', g_molotov: 'fire', g_thermite: 'fire', g_cryo: 'ice', g_shock: 'volt', g_emp: 'volt', g_nail: 'earth', g_water: 'water' };
+  EL.GREN = { g_fire: 'fire', g_cryo: 'ice', g_shock: 'volt', g_nail: 'earth', g_water: 'water' };
 
   // ---------------------------------------------------------------- the element mark on icons
   // which element does this thing leave? (a gun / melee weapon / its definition, an attachment, a skill, a grenade). Burning, chilling

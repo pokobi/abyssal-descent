@@ -9,14 +9,14 @@
   // which animation each item uses
   const KIND = {
     h_bandage: 'bandage', h_medkit: 'inject', h_regen: 'inject', u_adren: 'inject',
-    h_elixir: 'drink', h_blood: 'drink', h_water: 'drink', u_rage: 'drink', u_iron: 'drink', u_focus: 'drink', u_invis: 'drink', h_fairy: 'drink',
+    h_elixir: 'drink', h_water: 'drink', u_rage: 'drink', u_iron: 'drink', u_focus: 'drink', u_invis: 'drink', h_fairy: 'drink',
     h_apple: 'eat', h_troll: 'eat', h_herb: 'eat', u_berserk: 'eat',
-    u_plate: 'plate', u_battery: 'plate',
+    u_plate: 'plate',
   };
   IA.kindOf = (id) => KIND[id] || 'device';
   const DUR = { throw: 0.5, bandage: 1.15, drink: 0.85, inject: 0.75, eat: 0.8, plate: 0.75, device: 0.62 };
   const APPLY = { throw: 0.42, bandage: 0.82, drink: 0.62, inject: 0.55, eat: 0.6, plate: 0.68, device: 0.5 };
-  const LIQ = { h_elixir: 0xff3a5a, h_blood: 0x8a0010, h_water: 0x80c8ff, u_rage: 0xff5a10, u_iron: 0x8a8a90, u_focus: 0x60a0ff, u_invis: 0xc0e0ff, h_fairy: 0xffe0ff, h_regen: 0x60ff90, u_adren: 0xffd040, h_medkit: 0xff4040 };
+  const LIQ = { h_elixir: 0xff3a5a, h_water: 0x80c8ff, u_rage: 0xff5a10, u_iron: 0x8a8a90, u_focus: 0x60a0ff, u_invis: 0xc0e0ff, h_fairy: 0xffe0ff, h_regen: 0x60ff90, u_adren: 0xffd040, h_medkit: 0xff4040 };
 
   function mats() {
     if (M) return M;
@@ -57,9 +57,7 @@
     if (kind === 'throw') {
       const gid = id || 'g_frag';
       if (G.GrenFX && G.ITEM_BY_ID[gid]) g.add(G.GrenFX.build(gid, 0.42)); // the same model as the one that flies
-      else if (gid === 'g_molotov' || gid === 'g_holy') { cyl(g, M.glass, 0.03, 0.12); cyl(g, new THREE.MeshBasicMaterial({ color: gid === 'g_holy' ? 0x80c8ff : 0xff8020 }), 0.026, 0.07, 0, -0.02); cyl(g, M.cloth, 0.012, 0.06, 0, 0.09); }
       else if (gid === 'g_dyna') { for (let i = 0; i < 3; i++) cyl(g, M.red, 0.016, 0.14, (i - 1) * 0.034, 0); }
-      else if (gid === 'g_mine') { cyl(g, M.gun, 0.07, 0.03); sph(g, M.red, 0.012, 0.012, 0.012, 0, 0.02, 0); }
       else { sph(g, M.gun, 0.035, 0.045, 0.035); cyl(g, M.steel, 0.012, 0.03, 0, 0.045); box(g, M.steel, 0.006, 0.05, 0.012, 0.02, 0.03, 0, 0, 0, -0.3); }
     } else if (kind === 'bandage') {
       const roll = new THREE.Group(); g.add(roll); cyl(roll, M.cloth, 0.03, 0.06, 0, 0, 0, 0, 0, Math.PI / 2); g.userData.roll = roll;
@@ -77,8 +75,7 @@
       else if (id === 'u_berserk') { const c = sph(g, M.shroom, 0.05, 0.03, 0.05, 0, 0.03); cyl(g, M.stem, 0.016, 0.05, 0, -0.005); g.userData.cap = c; }
       else { for (let i = 0; i < 5; i++) { const lf = new THREE.Mesh(PGg().plane, M.green); lf.scale.set(0.03, 0.08, 1); lf.position.set(U.rand(-0.015, 0.015), 0.03, 0); lf.rotation.set(0, i, U.rand(-0.6, 0.6)); g.add(lf); } }
     } else if (kind === 'plate') {
-      if (id === 'u_battery') { cyl(g, M.steel, 0.025, 0.1); cyl(g, M.cell, 0.02, 0.07); }
-      else { box(g, M.plate, 0.14, 0.16, 0.012); box(g, M.steel, 0.15, 0.015, 0.014, 0, 0.07); }
+      box(g, M.plate, 0.14, 0.16, 0.012); box(g, M.steel, 0.15, 0.015, 0.014, 0, 0.07);
     } else {
       // gadgets
       if (id === 'u_map') { const p = new THREE.Mesh(PGg().plane, M.paper); p.scale.set(0.16, 0.12, 1); g.add(p); }

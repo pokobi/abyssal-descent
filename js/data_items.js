@@ -6,39 +6,28 @@
   const IT = [
     // grenades (G to throw, T to cycle)
     ['g_frag', 'grenade', '破片手榴弾', '💣', 'common', 90, '半径5mに爆発ダメージ。', { dmg: 120, r: 5, fuse: 1.6 }],
-    ['g_frag2', 'grenade', '高性能破片手榴弾', '💥', 'uncommon', 150, '半径6mに強力な爆発ダメージ。', { dmg: 210, r: 6, fuse: 1.5 }],
     ['g_fire', 'grenade', '焼夷手榴弾', '🔥', 'uncommon', 130, '着弾地点を6秒間炎上させる。', { dmg: 60, r: 4.5, fuse: 1.2, zone: 'fire', dur: 6 }],
     ['g_cryo', 'grenade', '冷凍手榴弾', '❄️', 'uncommon', 130, '半径5mの敵を凍結させる。', { dmg: 50, r: 5, fuse: 1.4, elem: 'frost', stacks: 6 }],
-    ['g_emp', 'grenade', 'EMPグレネード', '📡', 'rare', 170, 'シールドに極大ダメージ（×12）を与え、シールド持ちをスタンさせる。', { dmg: 45, r: 7, fuse: 1.3, shieldMul: 12, emp: true }],
     ['g_shock', 'grenade', '電撃手榴弾', '⚡', 'uncommon', 130, '爆発後、範囲内の敵へ雷撃が連鎖。', { dmg: 80, r: 5, fuse: 1.4, elem: 'shock', stacks: 3, shieldMul: 2.5 }],
     ['g_toxic', 'grenade', '毒ガス弾', '☠️', 'uncommon', 120, '8秒間残る毒ガスを発生させる。', { dmg: 20, r: 5, fuse: 1.2, zone: 'poison', dur: 8 }],
-    ['g_cluster', 'grenade', 'クラスター爆弾', '🎆', 'rare', 210, '爆発後に5つの子爆弾をばら撒く。', { dmg: 110, r: 4.5, fuse: 1.5, cluster: 5 }],
     ['g_sticky', 'grenade', '粘着爆弾', '🧲', 'uncommon', 150, '敵や壁に貼り付き、強力な爆発を起こす。', { dmg: 230, r: 3.8, fuse: 1.4, sticky: true }],
     ['g_water', 'grenade', '水風船爆弾', '💧', 'common', 90, '割れて半径3.75mの敵を水浸しにし、水属性を付ける。', { dmg: 40, r: 3.75, fuse: 1.2, color: 0x3f9dff }],
     ['g_flash', 'grenade', '閃光弾', '✨', 'common', 80, '半径10mの敵を2.5秒間スタンさせる。', { dmg: 5, r: 10, fuse: 1.0, stun: 2.5 }],
     ['g_hole', 'grenade', '重力子爆弾', '🕳️', 'epic', 320, '3秒間敵を吸い寄せ、最後に爆発する。', { dmg: 260, r: 8, fuse: 1.0, blackhole: 3 }],
-    ['g_holy', 'grenade', '聖水瓶', '🫙', 'uncommon', 120, '不死の魔物（骸骨・怨霊・屍骨）に3倍ダメージ。範囲内の自分も回復。', { dmg: 90, r: 5, impact: true, holy: true }],
-    ['g_molotov', 'grenade', '火炎瓶', '🍾', 'common', 90, '着弾で割れて火の海を作る。', { dmg: 30, r: 4, impact: true, zone: 'fire', dur: 5 }],
-    ['g_mine', 'grenade', '対魔地雷', '⚙️', 'rare', 170, '設置後、敵が近づくと爆発する。', { dmg: 260, r: 4.5, mine: true }],
-    ['g_smoke', 'grenade', '煙幕弾', '🌫️', 'common', 70, '煙の中では敵がこちらを見失う。', { dmg: 0, r: 6, fuse: 1.0, zone: 'smoke', dur: 8 }],
     ['g_nail', 'grenade', '礫弾', '⛰️', 'uncommon', 140, '炸裂して石礫を撒き散らす地属性の爆弾（半径3.75m・110ダメージ）。', { dmg: 110, r: 3.75, fuse: 1.4 }],
-    ['g_thermite', 'grenade', 'テルミット', '🔶', 'rare', 200, '小範囲を高熱で溶かす。シールドに大ダメージ。', { dmg: 160, r: 3.2, fuse: 1.3, zone: 'fire', dur: 4, shieldMul: 5 }],
     ['g_shatter', 'grenade', 'シールド粉砕弾', '💠', 'epic', 280, 'シールドに×20の破壊的ダメージ。', { dmg: 60, r: 7, fuse: 1.2, shieldMul: 20, emp: true }],
     ['g_dyna', 'grenade', 'ダイナマイト束', '🧨', 'rare', 230, '長い導火線の後、超大爆発。', { dmg: 420, r: 7.5, fuse: 2.6 }],
-    ['g_decoy', 'grenade', '囮の鈴', '🔔', 'rare', 160, '着弾地点で鳴り続け、8秒間敵を引き付ける。', { dmg: 0, r: 1, fuse: 0.8, decoy: 8 }],
     // heals (4-7 utility belt)
     ['h_bandage', 'heal', '包帯', '🩹', 'common', 60, '2秒かけてHPを30回復。', { heal: 30, over: 2 }],
     ['h_medkit', 'heal', '救急キット', '🧰', 'uncommon', 120, 'HPを70即時回復。', { heal: 70 }],
     ['h_elixir', 'heal', '生命の霊薬', '🧪', 'rare', 260, 'HPを全回復する。', { heal: 9999 }],
     ['h_regen', 'heal', '再生の薬', '💉', 'uncommon', 110, '10秒間、毎秒HP9回復。', { heal: 90, over: 10 }],
-    ['h_blood', 'heal', '血の小瓶', '🩸', 'uncommon', 110, 'HP40回復＋10秒間与ダメ+15%。', { heal: 40, temp: { dmg: 0.15 }, dur: 10 }],
     ['h_troll', 'heal', 'トロールの心臓', '🫀', 'epic', 320, '最大HP+15（永続）、HP40回復。', { heal: 40, maxHp: 15 }],
-    ['h_apple', 'heal', '黄金の林檎', '🍎', 'rare', 220, 'HP50回復＋オーバーシールド40。', { heal: 50, os: 40 }],
+    ['h_apple', 'heal', '黄金の林檎', '🍎', 'epic', 320, 'HP50回復＋オーバーシールド40。', { heal: 50, os: 40 }],
     ['h_fairy', 'heal', '妖精の小瓶', '🧚', 'legendary', 7500, '所持していると、死亡時に自動で使用されHP全快で復活する。', { revive: true }],
     ['h_water', 'heal', '清めの水', '⚗️', 'rare', 180, '状態異常を解除してHP10回復。さらに90秒間、状態異常の持続時間-70%・継続ダメージ-50%。', { heal: 10, cleanse: true, resist: 90 }],
     // utilities
-    ['u_plate', 'util', '鎧板', '🛡️', 'uncommon', 120, 'オーバーシールド+35。', { os: 35 }],
-    ['u_battery', 'util', '魔力電池', '🔋', 'rare', 190, 'オーバーシールド+80。', { os: 80 }],
+    ['u_plate', 'util', '鎧板', '🛡️', 'rare', 190, 'オーバーシールド+50。', { os: 50 }],
     ['u_iron', 'util', '鉄皮の薬', '🪨', 'uncommon', 130, '10秒間、被ダメ-50%。', { temp: { armor: 0.5 }, dur: 10 }],
     ['u_invis', 'util', '透明薬', '👻', 'rare', 190, '8秒間透明になり、敵に狙われなくなる。', { invis: 8 }],
     // repair kit: not a pocket item - it is dragged onto an armour piece on the inventory screen (see js/invui.js)
@@ -46,8 +35,8 @@
   ];
   G.ITEMS = IT.map(([id, cat, name, icon, rarity, price, desc, data]) => ({ id, cat, name, icon, rarity, price, desc, data, kind: 'item' }));
   G.ITEM_BY_ID = Object.fromEntries(G.ITEMS.map((i) => [i.id, i]));
-  // consumables that were retired (the kit was cut down to what gets used): a held one is turned into coins when a saved run loads (inventory.js IV.load)
-  G.RETIRED_ITEMS = {'u_oil_fire': 60, 'u_oil_water': 60, 'u_oil_ice': 60, 'u_oil_volt': 60, 'h_herb': 45, 'u_adren': 120, 'u_rage': 130, 'u_focus': 170, 'u_infinite': 170, 'u_sand': 230, 'u_turret': 210, 'u_doll': 120, 'u_wind': 110, 'u_lucky': 180, 'u_map': 150, 'u_feather': 60, 'u_ward': 210, 'u_ammo': 40, 'u_berserk': 260, 'u_lantern': 280, 'u_whet': 70};
+  // consumables that were retired (the kit was cut down to what gets used; 2026-11: the grenades 21 -> 12, 鎧板 took in 魔力電池): a held one is turned into coins when a saved run loads (inventory.js IV.load)
+  G.RETIRED_ITEMS = {'g_frag2': 150, 'g_emp': 170, 'g_cluster': 210, 'g_holy': 120, 'g_molotov': 90, 'g_mine': 170, 'g_smoke': 70, 'g_thermite': 200, 'g_decoy': 160, 'h_blood': 110, 'u_battery': 190, 'u_oil_fire': 60, 'u_oil_water': 60, 'u_oil_ice': 60, 'u_oil_volt': 60, 'h_herb': 45, 'u_adren': 120, 'u_rage': 130, 'u_focus': 170, 'u_infinite': 170, 'u_sand': 230, 'u_turret': 210, 'u_doll': 120, 'u_wind': 110, 'u_lucky': 180, 'u_map': 150, 'u_feather': 60, 'u_ward': 210, 'u_ammo': 40, 'u_berserk': 260, 'u_lantern': 280, 'u_whet': 70};
   G.ITEM_CAT = { grenade: { name: '投擲物', icon: '💣' }, heal: { name: '回復', icon: '❤️' }, util: { name: '補助', icon: '🧰' } };
   // fixed keys by category: 4 = heal, 5 = guard, 6 = boost, 7 = tools (G = grenades). Hold the key for a selection wheel.
   // keys 4 and 5 are two identical consumable pockets: any item except grenades goes into either (G = grenades only)
@@ -58,7 +47,7 @@
     { id: 'c1', key: '4', name: '消耗品', icon: '🧪' },
     { id: 'c2', key: '5', name: '消耗品', icon: '🧪' },
   ];
-  const GUARD = ['u_plate', 'u_battery', 'u_iron', 'u_invis'];
+  const GUARD = ['u_plate', 'u_iron', 'u_invis'];
   const TOOL = [];
   // grenades: a much bigger blast and far more damage to enemy shields (the descriptions follow the numbers)
   G.GRENADE_RADIUS_MUL = 1.6; G.GRENADE_SHIELD_MUL = 3;

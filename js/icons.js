@@ -758,7 +758,7 @@
       d.icon = IC.ch(key, d.icon);
     }
     // a few items whose emoji is shared with something else get their own drawing
-    const ITEMX = { h_medkit: ['medical-pack', '#e8484a'], g_molotov: ['fire-bottle', '#ff8a3a'], v_casket: ['locked-chest', '#ffd34a'] };
+    const ITEMX = { h_medkit: ['medical-pack', '#e8484a'], v_casket: ['locked-chest', '#ffd34a'] };
     for (const list of [G.ITEMS, G.VALUABLES]) if (list) for (const it of list) { const x = ITEMX[it.id]; if (x && PATHS[x[0]]) { IC.def('item:' + it.id, [big(x[0], x[1])]); it.icon = IC.ch('item:' + it.id, it.icon); } }
     if (G.ARMOR_SLOTS) for (const s of G.ARMOR_SLOTS) { const n = ARMOR[s.id] && ARMOR[s.id].plate; if (n) { IC.def('aslot:' + s.id, [big(n, '#9a8a70')]); s.icon = IC.ch('aslot:' + s.id, s.icon); } }
   };

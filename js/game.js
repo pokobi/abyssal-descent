@@ -1220,11 +1220,23 @@
     }
     G.combat.coins(Math.round(G.Run.income(150 + GM.area * 20)), null, '宝'); return false;
   };
+  // a weapon handed over for free (the peddler's mystery box, an auction won): it never pushes out a weapon you hold.
+  // with every gun slot taken (or a melee weapon already in hand) it goes into the bag, and with the bag full it is set down at your feet.
+  const keepNew = (it, d) => {
+    if (G.Inv.stow(P, it) > 0) { G.Inv.dropToGround(it, P.pos.clone().add(V(0, 0.4, 0)).addScaledVector(P.forward().setY(0).normalize(), 0.9)); G.ui.toast(`🎒 インベントリに空きがないので ${d.icon} ${d.name} を足元に置いた`, 'warn'); }
+    else G.ui.toast(`🎒 武器の枠がいっぱいなので ${d.icon} ${d.name} をインベントリに入れた`, 'good');
+  };
   GM.giveWeapon = function (id) {
     const wd = G.WEAPON_BY_ID[id];
     if (P.weapons.length < P.stats.weaponSlots) { P.weapons.push(G.weapons.make(id)); G.weapons.switchTo(P.weapons.length - 1); }
-    else { const old = P.weapons[P.wIdx]; G.Pawn.tradeIn(old); GM.stashAtts(old); P.weapons[P.wIdx] = G.weapons.make(id); G.weapons.equip(false); }
+    else keepNew(GM.gunItem(G.weapons.make(id)), wd);
     G.ui.itemCard(wd, '[武器]'); G.ui.refreshWeapon();
+  };
+  GM.giveMelee = function (id) {
+    const md = G.MELEE_BY_ID[id];
+    if (!P.melee || P.melee.id === (G.BARE_MELEE || 'fists')) { P.melee = G.weapons.makeMelee(id); if (P.meleeMode) G.weapons.melee.equip(false); }
+    else keepNew(GM.meleeItem(G.weapons.makeMelee(id)), md);
+    G.ui.itemCard(md, `[近接:${G.K('w3')}]`); G.ui.refreshWeapon(); P.recalc();
   };
   // a gun thrown away from the inventory screen becomes a pickup on the ground that keeps its upgrades, parts and ammo
   // a gun out of your hands as an inventory thing (attachments, level, ammo and kills ride along)

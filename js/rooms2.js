@@ -168,7 +168,7 @@
   };
   R2.grant = function (l) {
     if (l.kind === 'weapon') GM.giveWeapon(l.obj.id);
-    else if (l.kind === 'melee') { G.Pawn.tradeIn(P.melee, true); P.melee = G.weapons.makeMelee(l.obj.id); if (P.meleeMode) G.weapons.melee.equip(false); G.ui.itemCard(l.obj, `[近接:${G.K('w3')}]`); G.ui.refreshWeapon(); }
+    else if (l.kind === 'melee') GM.giveMelee(l.obj.id); // (the one in hand stays: the new one goes into the bag)
     else { P.addBuff(l.obj.id); G.ui.itemCard(l.obj, l.kind === 'relic' ? '[遺物]' : '[加護]'); }
   };
 

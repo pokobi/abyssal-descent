@@ -905,7 +905,7 @@
       const v = Math.round(G.Run.income(160 + GM.area * 25));
       G.combat.coins(v, e.centerPos());
       G.ui.feed(`💰 黄金のミミック撃破！ +${v}`, 'big');
-      if (Math.random() < 0.6) { const it = U.pick(G.ITEMS.filter((i) => i.rarity !== 'legendary')); if (P.addItem(it.id, 1)) { G.ui.toast(`${it.icon} ${it.name} を手に入れた`, 'good'); G.ui.gain(it); } }
+      if (Math.random() < 0.6) { const it = U.pick(G.ITEMS.filter((i) => i.rarity !== 'legendary' && i.rarity !== 'mythic')); if (P.addItem(it.id, 1)) { G.ui.toast(`${it.icon} ${it.name} を手に入れた`, 'good'); G.ui.gain(it); } }
       return;
     }
     if (!O || GM.areaCleared) return;
@@ -1406,7 +1406,7 @@
   };
 
   // ---------------- shop ----------------
-  const BUFF_PRICE = { common: 260, uncommon: 380, rare: 560, epic: 820, legendary: 1200 };
+  const BUFF_PRICE = { common: 260, uncommon: 380, rare: 560, epic: 820, legendary: 1200, mythic: 2000 };
   // prices creep up with depth (income does too) so late coins don't pile up unspent
   GM.price = function (base) { return Math.max(0, Math.round(base * Math.max(0.3, 1 - P.stats.shopDiscount) * (1 + GM.run.shopVisits * 0.05) * (1 + 0.03 * Math.max(0, (GM.area || 1) - 1)) / 10) * 10); };
   // while a shop is being stocked its rarity is judged a few areas deeper (easy / normal, the early fields: see Run.shopRarityBonus); drops and chests are not
@@ -1421,7 +1421,8 @@
   // the armour shelf is where gear is bought: mostly epic / legendary (a little less of the legendary in the first few areas)
   function pickArmor(r, luck) {
     const ramp = 0.45 + 0.55 * Math.min(1, (GM.area || 1) / 8), lk = 1 + Math.max(0, luck) * 0.5;
-    const W = { common: 3, uncommon: 9, rare: 28, epic: 38 * lk, legendary: 22 * ramp * lk };
+    const deep = Math.max(0, Math.min(1, ((G.Run ? G.Run.depthArea(GM.area || 1) : GM.area || 1) - 30) / 20)); // ミシック: from depth 30, fully at 50
+    const W = { common: 3, uncommon: 9, rare: 28, epic: 38 * lk, legendary: 22 * ramp * lk, mythic: 4 * deep * lk };
     const rar = r.weighted(G.RARITY_ORDER.filter((k) => W[k] !== undefined), (k) => W[k]);
     const c = G.ARMOR.filter((o) => o.rarity === rar);
     return G.Classes ? G.Classes.pick(r, c.length ? c : G.ARMOR) : r.pick(c.length ? c : G.ARMOR); // (the heavy's favourites: x1.3)
@@ -1431,8 +1432,8 @@
     const luck = P.stats.luck;
     for (let t = 0; t < 14; t++) {
       let c;
-      if (k === 'melee') c = pickBy(r, G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && !x.mythic && x.id !== P.melee.id), luck);
-      else if (k === 'weapon') c = pickBy(r, G.WEAPONS.filter((x) => x.id !== 'starter' && !x.mythic && !P.weapons.some((pw) => pw.id === x.id)), luck);
+      if (k === 'melee') c = pickBy(r, G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && x.id !== P.melee.id), luck);
+      else if (k === 'weapon') c = pickBy(r, G.WEAPONS.filter((x) => x.id !== 'starter' && !P.weapons.some((pw) => pw.id === x.id)), luck);
       else if (k === 'mythic' || k === 'mythicGun') { const pool = [...G.WEAPONS.filter((x) => x.mythic && !P.weapons.some((pw) => pw.id === x.id)), ...(k === 'mythic' ? G.MELEE.filter((x) => x.mythic && x.id !== P.melee.id) : [])]; c = pool.length ? r.pick(pool) : null; }
       else if (k === 'relic') { const pool = G.BUFFS.filter((b) => b.cat === 'relic' && !P.has(b.id)); c = pool.length ? r.pick(pool) : null; }
       else if (k === 'forge') c = GM.SVC_FORGE;
@@ -1485,7 +1486,7 @@
   GM.offerPrice = function (kind, obj) {
     if (kind === 'forge') return GM.forgeRange()[0];
     if (kind === 'tome') return GM.tomePrice();
-    if ((kind === 'weapon' || kind === 'melee') && !obj.mythic) return GM.price(obj.price * (1 + 0.2 * GM.shopLvOf(obj)));
+    if (kind === 'weapon' || kind === 'melee') return GM.price(obj.price * (1 + 0.2 * GM.shopLvOf(obj))); // (ミシック too: forged with depth, priced with it)
     return GM.price(kind === 'buff' ? BUFF_PRICE[obj.rarity] * (G.isTech(obj) ? 1.2 : 1) : obj.price);
   };
   GM.setupShop = function (w) {
@@ -1530,7 +1531,7 @@
       used.add(obj.id);
       const kind = k === 'pile' || k === 'tech' ? 'buff' : k === 'mythic' ? (obj.kind === 'melee' ? 'melee' : 'weapon') : k;
       const inst = kind === 'armor' ? G.Inv.makeArmor(obj.id, () => r.next()) : null; // armour: enchantments are rolled when the shelf is stocked
-      offers.push({ kind, obj, inst, price: Math.round(GM.offerPrice(kind, obj) * (inst ? G.Inv.enchMul(inst) : 1) / 10) * 10, sold: false, slot: w.shopSlots[i], lv: (kind === 'weapon' || kind === 'melee') && !obj.mythic ? GM.shopLvOf(obj) : 0 });
+      offers.push({ kind, obj, inst, price: Math.round(GM.offerPrice(kind, obj) * (inst ? G.Inv.enchMul(inst) : 1) / 10) * 10, sold: false, slot: w.shopSlots[i], lv: kind === 'weapon' || kind === 'melee' ? GM.shopLvOf(obj) : 0 });
     });
     // (the forge and the tome only count while there is something they can raise)
     if (P.has('e_free') && GM.run.freeArea !== GM.area) { const g = offers.filter((o) => o.kind !== 'buff' && !(o.kind === 'forge' && !GM.forgeTargets().length) && !(o.kind === 'tome' && !GM.tomeTargets().length)); if (g.length) { const f = r.pick(g); f.price = 0; f.free = true; GM.run.freeArea = GM.area; } }
@@ -1823,7 +1824,7 @@
       return { cat, stats, note, action };
     }
     if (o.kind === 'weapon') {
-      cat = `${ob.mythic ? '✴️ 神器 · ' : '🔫 '}${ob.cat} · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
+      cat = `🔫 ${ob.cat} · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
       const cur = P.weapon ? G.weapons.stats(P.weapon) : { dmg: 0, pellets: 1, rpm: 0, mag: 0, reload: 0, spread: 0 }; // no gun in hand: everything is a gain
       const cmp = (label, a, b, fmt, better) => { const up = better === 'low' ? a < b : a > b; const cls = Math.abs(a - b) < 1e-6 ? '' : up ? 'up' : 'down'; return `<div>${label} <b class="${cls}">${fmt(a)}</b> <span style="opacity:.6">(${fmt(b)})</span></div>`; };
       const nd = ob.dmg * (ob.pellets || 1), cd = cur.dmg * (cur.pellets || 1);
@@ -1831,7 +1832,7 @@
       if (ob.trait) note += `${G.WEAPON_TRAITS[ob.trait].icon} ${G.WEAPON_TRAITS[ob.trait].name}: ${G.WEAPON_TRAITS[ob.trait].desc}　`;
       if (P.weapons.length >= P.stats.weaponSlots) note += '⚠ 武器スロット満杯：購入時に交換する武器を選択（旧武器は下取り）';
     } else if (o.kind === 'melee') {
-      cat = `${ob.mythic ? '✴️ 神器 · ' : '🗡️ '}近接武器（${ob.cat}） · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
+      cat = `🗡️ 近接武器（${ob.cat}） · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
       const cur = P.melee.def;
       const cmp = (label, a, b, fmt, better) => { const up = better === 'low' ? a < b : a > b; const cls = Math.abs(a - b) < 1e-6 ? '' : up ? 'up' : 'down'; return `<div>${label} <b class="${cls}">${fmt(a)}</b> <span style="opacity:.6">(${fmt(b)})</span></div>`; };
       stats = cmp('💥ダメージ', ob.dmg, cur.dmg, (v) => Math.round(v)) + cmp('⚡攻撃間隔', ob.swing, cur.swing, (v) => v.toFixed(2) + 's', 'low') + cmp('📊DPS', ob.dmg / ob.swing, cur.dmg / cur.swing, (v) => Math.round(v)) + cmp('📏リーチ', ob.range, cur.range, (v) => v + 'm') + cmp('🔨重撃', ob.heavy[0], cur.heavy[0], (v) => '×' + v) + cmp('👟移動', ob.moveMul, cur.moveMul, (v) => '×' + v.toFixed(2));

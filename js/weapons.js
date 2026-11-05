@@ -161,7 +161,7 @@
   const FIN = { black: [0x45484e, 0x2a2b2e], tan: [0x45484e, 0x8a7a5a], steel: [0x9a9da2, 0x333333], wood: [0x45484e, null], brass: [0xa88850, 0x5a3a24], gold: [0xffcf40, 0x2c1016], bone: [0xc8bca0, 0x3a3028], rust: [0x6a4a36, 0x3a2a20] };
   function buildGun(def, atts, showHands) {
     const g = new THREE.Group();
-    const isLeg = def.rarity === 'legendary' || !!def.mythic;
+    const isLeg = def.rarity === 'legendary' || def.rarity === 'mythic' || !!def.mythic;
     const fin = FIN[def.finish] || FIN.black;
     const metal = mats.gun.clone(); metal.color.setHex(fin[0]);
     const poly = fin[1] === null ? mats.wood : mats.poly.clone(); if (fin[1] !== null) poly.color.setHex(fin[1]);

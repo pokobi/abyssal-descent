@@ -27,7 +27,7 @@
     return G.WEAPONS.filter((w) => w.rarity === rarity && !w.mythic && w.id !== 'starter' && f.arch.includes(w.arch));
   };
   // what one finished weapon of the rarity costs in the shop (the guns' base price table); a part sells for 3% of it
-  const WPRICE = { common: 900, uncommon: 1350, rare: 2000, epic: 2900, legendary: 4100 };
+  const WPRICE = { common: 900, uncommon: 1350, rare: 2000, epic: 2900, legendary: 4100, mythic: 7000 };
   PT.MAKE_COST = { common: 270, uncommon: 400, rare: 600, epic: 870, legendary: 1230 }; // the shop bench: three parts -> a weapon
   PT.UP_COST = { uncommon: 135, rare: 200, epic: 290, legendary: 410 }; // the shop bench: three parts -> one of this rarity
   PT.NEED = 3;
@@ -38,6 +38,7 @@
       desc: `${f.name}の武器を組み立てるための部品。同じ部品を3つ集めると、作業台で${G.RARITY[r].name}の${f.name}武器を1つ作れる（3択）。下のレアリティの部品3つで、1つ上のレアリティの部品にもできる。` });
   }
   G.PART_BY_ID = Object.fromEntries(G.PARTS.map((p) => [p.id, p]));
+  const ORD_T = ORD.filter((r) => G.PARTS.some((p) => p.rarity === r)); // the bench's columns: only rarities that have parts (no ミシック parts)
   PT.id = (fam, r) => `pt_${fam}_${r}`;
   PT.has = (fam, r) => !!G.PART_BY_ID[PT.id(fam, r)];
 
@@ -163,9 +164,9 @@
       const coins = gm.run.coins;
       const head = `<div class="pb-head"><div class="pb-title">🔧 部品の作業台 <span class="pb-tag ${free ? 'free' : ''}">${free ? '無料・何度でも' : '有料'}</span></div><div class="pb-coins">🪙 ${U.fmt(coins)}</div></div>
         <div class="pb-rule">同じ部品3つで武器を1つ組み立てる（3つの候補から選ぶ）。下のレアリティの部品3つで、1つ上のレアリティの部品にもできる。</div>`;
-      const cols = ORD.map((r) => `<div class="pb-ch" style="--rc:${G.ui.R(r)}">${G.RARITY[r].name}</div>`).join('');
+      const cols = ORD_T.map((r) => `<div class="pb-ch" style="--rc:${G.ui.R(r)}">${G.RARITY[r].name}</div>`).join('');
       const rows = PT.FAMS.map((f) => {
-        const cells = ORD.map((r) => {
+        const cells = ORD_T.map((r) => {
           const id = PT.id(f.id, r), d = G.PART_BY_ID[id];
           if (!d) return '<div class="pb-c none">—</div>';
           const n = PT.count(id), ok = n >= PT.NEED;

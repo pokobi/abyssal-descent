@@ -746,7 +746,7 @@
     }
     if (G.MELEE) for (const m of G.MELEE) {
       const n = MELEE[m.mcat]; if (!n || !PATHS[n]) continue;
-      const col = m.rarity === 'legendary' ? '#ffd34a' : m.rarity === 'epic' ? '#d8b0ff' : '#c9d2dc';
+      const col = m.rarity === 'mythic' ? '#ff7a4a' : m.rarity === 'legendary' ? '#ffd34a' : m.rarity === 'epic' ? '#d8b0ff' : '#c9d2dc';
       const key = 'melee:' + m.mcat + ':' + col;
       if (!SPEC[key]) IC.def(key, [big(n, col)]);
       m.icon = IC.ch(key, m.icon);

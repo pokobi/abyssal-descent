@@ -210,7 +210,7 @@
       html += `<div style="margin-top:8px"><span class="tag">${S.icon} 部位: ${S.name}</span><span class="tag">🧵 素材: ${M.name}</span><span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
       if (o.fixed.length) html += `<div style="margin-top:6px">${o.fixed.map((f) => `<div style="padding:3px 0;color:#ffd890">◆ ${f.desc}</div>`).join('')}</div>`;
       html += `<div style="margin-top:6px;font-size:12px;color:var(--dim)">🔧 総耐久 <b style="color:var(--text)">${G.armorMaxDur(o)}</b>（被弾で減り、0で壊れて消える。拾った物は0〜90%削れている／ショップは新品）</div>`;
-      html += `<div style="margin-top:6px;font-size:12px;color:var(--dim)">${{ rare: 'まれにエンチャントが1つ付く（10%）。', epic: 'エンチャントが付くことが多い（1つ70%・2つ10%）。', legendary: 'エンチャントが必ず付く（1つ20%・2つ70%・3つ10%）。' }[o.rarity] || 'エンチャントは付かない。'}</div>`;
+      html += `<div style="margin-top:6px;font-size:12px;color:var(--dim)">${{ rare: 'まれにエンチャントが1つ付く（10%）。', epic: 'エンチャントが付くことが多い（1つ70%・2つ10%）。', legendary: 'エンチャントが必ず付く（1つ20%・2つ70%・3つ10%）。', mythic: 'エンチャントが必ず2つ以上付く（2つ60%・3つ40%）。数値は高い方の半分から選ばれる。' }[o.rarity] || 'エンチャントは付かない。'}</div>`;
     } else if (tab === 'valuable') {
       html += `<div style="margin-top:8px"><span class="tag">💰 売値 ${U.fmt(o.value)}🪙</span><span class="tag">📐 大きさ ${o.size[0]}×${o.size[1]}</span><span class="tag">⚖️ 商人で売却専用</span></div>`;
     } else if (tab === 'item') {

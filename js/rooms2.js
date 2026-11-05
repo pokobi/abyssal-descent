@@ -139,7 +139,7 @@
     for (const w of G.WEAPONS) if (w.mythic && !P.weapons.some((pw) => pw.id === w.id)) pool.push({ kind: 'weapon', obj: w, value: w.price });
     for (const m of G.MELEE) if (m.mythic && P.melee.id !== m.id) pool.push({ kind: 'melee', obj: m, value: m.price });
     for (const b of G.BUFFS) if (b.cat === 'relic' && !P.has(b.id)) pool.push({ kind: 'relic', obj: b, value: b.price });
-    for (const b of G.BUFFS) if (b.rarity === 'legendary' && !b.relic && !b.pact && b.cat !== 'curse' && (P.buffs.get(b.id) || 0) < b.max) pool.push({ kind: 'buff', obj: b, value: 2600 });
+    for (const b of G.BUFFS) if ((b.rarity === 'legendary' || b.rarity === 'mythic') && !b.relic && !b.pact && b.cat !== 'curse' && !b.skill && (P.buffs.get(b.id) || 0) < b.max) pool.push({ kind: 'buff', obj: b, value: b.rarity === 'mythic' ? 5200 : 2600 });
     return pool;
   }
   R2.setup_auction = function (c) {
@@ -516,8 +516,8 @@
         const t1 = GM.price(1500 * k), t2 = GM.price(4000 * k), t3 = GM.price(10000 * k);
         const after = () => { R2.offerN = (R2.offerN || 0) + 1; G.fx.ring(P.pos.clone(), 3, 0xffd070, 0.6); G.sfx.bell(); };
         return [
-          { icon: '🪙', label: `小献納（${fmt(t1)}🪙）`, sub: 'レア以上の加護をランダムに1つ', disabled: coins() < t1, run: () => { pay(t1); after(); const b = U.pick(G.BUFFS.filter((x) => G.RARITY[x.rarity] && G.RARITY[x.rarity].tier >= 2 && !x.relic && !x.pact && x.cat !== 'curse' && (P.buffs.get(x.id) || 0) < x.max && (!x.skill || P.skills.some((s) => s && s.id === x.skill)))); if (b) { P.addBuff(b.id); G.ui.itemCard(b, '[献納]', { now: true }); } return { reopen: true }; } },
-          { icon: '💰', label: `大献納（${fmt(t2)}🪙）`, sub: 'エピック以上の加護を3つから選ぶ', disabled: coins() < t2, run: () => { pay(t2); after(); return { offer: (x) => G.RARITY[x.rarity] && G.RARITY[x.rarity].tier >= 3 && x.cat !== 'pact' && x.cat !== 'relic' }; } },
+          { icon: '🪙', label: `小献納（${fmt(t1)}🪙）`, sub: 'レア以上の加護をランダムに1つ', disabled: coins() < t1, run: () => { pay(t1); after(); const b = U.pick(G.BUFFS.filter((x) => G.RARITY[x.rarity] && G.RARITY[x.rarity].tier >= 2 && G.RARITY[x.rarity].tier <= 4 && !x.relic && !x.pact && x.cat !== 'curse' && (P.buffs.get(x.id) || 0) < x.max && (!x.skill || P.skills.some((s) => s && s.id === x.skill)))); if (b) { P.addBuff(b.id); G.ui.itemCard(b, '[献納]', { now: true }); } return { reopen: true }; } },
+          { icon: '💰', label: `大献納（${fmt(t2)}🪙）`, sub: 'エピック以上の加護を3つから選ぶ', disabled: coins() < t2, run: () => { pay(t2); after(); return { offer: (x) => G.RARITY[x.rarity] && G.RARITY[x.rarity].tier >= 3 && G.RARITY[x.rarity].tier <= 4 && x.cat !== 'pact' && x.cat !== 'relic' }; } },
           { icon: '👑', label: `至高の献納（${fmt(t3)}🪙）`, sub: 'レジェンダリーの加護を3つから選ぶ', disabled: coins() < t3, run: () => { pay(t3); after(); return { offer: (x) => x.rarity === 'legendary' && x.cat !== 'pact' && x.cat !== 'relic' }; } },
           // coins into a skill level: pick the skill (or the ultimate / the pile driver); the price follows that skill's own Lv and the altar's rising factor
           (() => {

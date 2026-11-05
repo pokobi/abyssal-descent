@@ -178,7 +178,7 @@
     const h = hs(o.id), p = Object.assign({}, base), pit = 0.78 + hr(h, 1) * 0.52;
     p.thump = [base.thump[0] * pit, base.thump[1] * pit];
     p.body = base.body * (0.75 + hr(h, 2) * 0.55);
-    p.tail = base.tail * (0.75 + hr(h, 4) * 0.8) * (o.rar === 'legendary' ? 1.3 : 1);
+    p.tail = base.tail * (0.75 + hr(h, 4) * 0.8) * (o.rar === 'mythic' ? 1.5 : o.rar === 'legendary' ? 1.3 : 1);
     p.tg = base.tg * (0.85 + hr(h, 5) * 0.4);
     p.bd = base.bd * (0.8 + hr(h, 6) * 0.5);
     const c = CHAR[Math.floor(hr(h, 7) * CHAR.length)];

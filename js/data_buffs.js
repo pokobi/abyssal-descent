@@ -121,7 +121,7 @@
   });
   add('h_first', '先制の一撃', '🗡️', 'uncommon', 'offense', 'HP満タンの敵へのダメージ+40%。', { hooks: { preHit(c) { if (c.e.hp >= c.e.maxHp && c.e.shield <= 0) c.bonus += 0.4; } } });
   add('h_low', '処刑人', '⚰️', 'rare', 'offense', 'HP30%以下の敵へのダメージ+35%。', { hooks: { preHit(c) { if (c.e.hp < c.e.maxHp * 0.3) c.bonus += 0.35; } } });
-  add('h_execute', '慈悲なき刃', '💀', 'epic', 'offense', 'HP12%以下の通常の敵を即死させる。', { hooks: { preHit(c) { if (!c.e.boss && c.e.hp < c.e.maxHp * 0.12) c.execute = true; } } });
+  add('h_execute', '慈悲なき刃', '💀', 'legendary', 'offense', 'HP12%以下の通常の敵を即死させる。', { hooks: { preHit(c) { if (!c.e.boss && c.e.hp < c.e.maxHp * 0.12) c.execute = true; } } });
   add('h_synergy', '相乗効果', '🌈', 'rare', 'element', '敵の状態異常1種につき与ダメ+10%。', { hooks: { preHit(c) { c.bonus += 0.1 * C.statusCount(c.e); } } });
   add('h_inferno', '業火', '🔥', 'uncommon', 'element', '炎上ダメージ+60%。', { mods: { burnDmg: 0.6 }, max: 3 });
   add('h_shatter', '砕氷', '🧊', 'rare', 'element', '凍結中の敵へのダメージ+50%。', { hooks: { preHit(c) { if (c.e.st && c.e.st.frozen > 0) c.bonus += 0.5; } } });
@@ -187,7 +187,7 @@
   add('m_trail', '炎の足跡', '👣', 'rare', 'element', 'スプリント中、足跡に炎を残す。', { hooks: { tick(dt, n, s) { if (P.sprinting && P.grounded) { s.t = (s.t || 0) - dt; if (s.t <= 0) { s.t = 0.25; C.zone(P.pos.clone(), 1.6, 2.5, 'fire', sc(14), { proc: true }); } } } } });
 
   // ---------- defense ----------
-  add('d_secondwind', '不屈', '💗', 'epic', 'defense', '致死ダメージを1回だけ耐え、HP50%で復活する（エリア毎に再使用可）。', { hooks: { onAreaStart(c, n, s) { s.used = 0; } }, flag: true });
+  add('d_secondwind', '不屈', '💗', 'legendary', 'defense', '致死ダメージを1回だけ耐え、HP50%で復活する（エリア毎に再使用可）。', { hooks: { onAreaStart(c, n, s) { s.used = 0; } }, flag: true });
   add('d_thorns', '茨', '🌵', 'uncommon', 'defense', '近接攻撃してきた敵へ被ダメの150%を反射。', { max: 3, hooks: { onDamaged(c, n) { if (c.src === 'melee' && c.attacker && c.attacker.alive) C.damageEnemy(c.attacker, c.raw * 1.5 * n + sc(5), { src: 'buff', proc: true }); } } });
   add('d_adren', '窮地の加速', '🫀', 'uncommon', 'defense', 'HP30%以下の時、移動速度+25%・連射速度+20%。', { hooks: { tick(dt, n, s) { const low = P.hp < P.stats.maxHp * 0.3; if (low !== !!s.on) { s.on = low; if (low) C.temp('d_adren', 9999, { moveSpeed: 0.25, fireRate: 0.2 }, '🫀'); else C.untemp('d_adren'); } } } });
   add('d_rest', '休息', '🛌', 'common', 'defense', 'エリア開始時にHPを25%回復。', { max: 2, hooks: { onAreaStart(c, n) { C.heal(P.stats.maxHp * 0.25 * n); } } });
@@ -202,7 +202,7 @@
   add('d_melee', '堅牢', '🧱', 'uncommon', 'defense', '近接攻撃の被ダメ-20%。', { max: 2, hooks: { preDamaged(c, n) { if (c.src === 'melee') c.red += 0.2 * n; } } });
   add('d_blast', '爆風耐性', '💣', 'common', 'defense', '爆発・範囲攻撃の被ダメ-50%。', { hooks: { preDamaged(c) { if (c.src === 'explosion' || c.src === 'aoe') c.red += 0.5; } } });
   add('d_laststand', '最後の抵抗', '⚔️', 'rare', 'defense', 'HP25%以下で被ダメ-35%。', { hooks: { preDamaged(c) { if (P.hp < P.stats.maxHp * 0.25) c.red += 0.35; } } });
-  add('d_phoenix', '不死鳥', '🐦', 'legendary', 'defense', 'ラン中1回だけ、死亡時にHP全快で復活し周囲に大爆発を起こす。', { flag: true });
+  add('d_phoenix', '不死鳥', '🐦', 'mythic', 'defense', 'ラン中1回だけ、死亡時にHP全快で復活し周囲に大爆発を起こす。', { flag: true });
   add('d_vampaura', '吸血の霧', '🌫️', 'epic', 'defense', '周囲6mの敵から毎秒生命力を吸収する。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.5; let tot = 0; for (const e of C.inRadius(P.pos, 6)) { C.damageEnemy(e, sc(4) * n, { src: 'buff', proc: true, silent: true }); tot += Math.max(1.2, G.player.stats.maxHp * 0.003); } if (tot) C.heal(tot * n, true); } } });
   add('d_iron', '鉄の皮膚', '🪖', 'legendary', 'defense', '1回の被ダメが最大HPの25%を超えなくなる。', { flag: true });
   add('d_cleanse', '浄化の加護', '✨', 'uncommon', 'defense', '状態異常の持続時間-60%。', { flag: true });
@@ -210,7 +210,7 @@
   // ---------- economy & meta ----------
   add('e_interest', '利子', '🏦', 'rare', 'economy', 'エリア開始時、所持コインの8%（最大120）を得る。', { max: 2, hooks: { onAreaStart(c, n) { const v = Math.min(120 * n, Math.floor(G.game.run.coins * 0.08 * n)); if (v > 0) C.coins(v, null, '利子'); } } });
   add('e_discount', '値切り上手', '🏷️', 'uncommon', 'economy', 'ショップの価格-12%。', { mods: { shopDiscount: 0.12 }, max: 3 });
-  add('e_choice', '選択肢', '🃏', 'epic', 'economy', '加護選択の選択肢+1。', { mods: { buffChoices: 1 }, max: 2 });
+  add('e_choice', '選択肢', '🃏', 'legendary', 'economy', '加護選択の選択肢+1。', { mods: { buffChoices: 1 }, max: 2 });
   add('e_reroll', '運命の再配', '🎲', 'uncommon', 'economy', '加護を選ぶたびに、無料リロールが2回になる（通常1回）。', { flag: true, max: 1 });
   add('e_luck', '幸運', '🍀', 'uncommon', 'economy', '高レアリティの加護・商品が出やすくなる。', { mods: { luck: 0.35 }, max: 3 });
   add('e_treasure', '宝探し', '🗺️', 'uncommon', 'economy', '各エリアに宝箱が1つ追加される。', { mods: { extraChests: 1 }, max: 3 });
@@ -232,7 +232,7 @@
   add('g_cluster', '散開手榴弾', '🎆', 'rare', 'offense', '投擲物の爆発時に子爆弾3個を撒く。', { flag: true });
   add('g_refund', '再利用', '♻️', 'rare', 'offense', '投擲物の使用時30%で消費しない。', { flag: true });
   add('g_radius', '爆風拡大', '🌋', 'uncommon', 'offense', '爆発半径+25%。', { mods: { explosionRadius: 0.25 }, max: 3 });
-  add('s_echo', '残響詠唱', '🔁', 'legendary', 'skill', 'スキル使用時25%でクールタイムが発生しない。', { flag: true });
+  add('s_echo', '残響詠唱', '🔁', 'mythic', 'skill', 'スキル使用時25%でクールタイムが発生しない。', { flag: true });
   add('s_after', '詠唱の余韻', '✨', 'uncommon', 'skill', 'スキル使用後4秒間、与ダメ+20%。', { hooks: { onSkill() { C.temp('s_after', 4, { dmg: 0.2 }, '✨'); } } });
   add('s_heal', '魔力循環', '💚', 'uncommon', 'skill', 'スキル使用時、HP+8。', { max: 3, hooks: { onSkill(c, n) { C.heal(8 * n); } } });
   add('s_ammo', '自動装填', '🔄', 'rare', 'offense', '3秒間撃たないと、マガジンが毎秒15%ずつ自動回復。', { hooks: { tick(dt) { if (G.game.time - P.lastShotT > 3 && P.weapon && !P.weapon.reloading) C.refill(0.15 * dt, true); } } });
@@ -343,7 +343,7 @@
   add('k_quake', '大地の怒り', '🌋', 'epic', 'melee', '重撃が必ず周囲3.5mに衝撃波（与ダメ45%・スタン）を起こす。', { flag: true });
   add('k_vigor', '闘気', '💪', 'uncommon', 'melee', '近接で倒すとHP+6回復。', { hooks: { onKill(c) { if (c.src === 'melee') C.heal(6); } }, max: 2 });
   add('k_throw', '投げ短剣', '🔪', 'rare', 'melee', '近接の通常攻撃3回毎に、狙った先へ短剣を投げる（貫通・手持ちの近接武器の属性）。', { flag: true });
-  add('k_master', '剣聖', '⚔️', 'legendary', 'melee', '近接ダメージ+60%・近接攻撃の間隔-20%・重撃の隙-40%。', { mods: { meleeDmg: 0.6, meleeCd: 0.2, meleeRecover: 0.4 } });
+  add('k_master', '剣聖', '⚔️', 'mythic', 'melee', '近接ダメージ+60%・近接攻撃の間隔-20%・重撃の隙-40%。', { mods: { meleeDmg: 0.6, meleeCd: 0.2, meleeRecover: 0.4 } });
 
   // ---------- abyssal pacts (offered after every boss from area 25: a lasting hardship + a lasting reward) ----------
   const pact = (id, name, icon, desc, def) => add(id, name, icon, 'epic', 'pact', desc, Object.assign({ pact: true }, def));
@@ -361,15 +361,15 @@
   pact('pact_fury', '激昂の誓い', '😤', '【代償】敵の攻撃間隔-20%\n【報酬】連射速度+12%', { mods: { fireRate: 0.12 } });
 
   // ---------- relics: expensive passive artefacts sold in shops (max 3) ----------
-  const relic = (id, name, icon, price, desc, def) => add(id, name, icon, 'legendary', 'relic', desc, Object.assign({ relic: true, price }, def));
-  relic('r_hourglass', '時の砂時計', '⌛', 6000, 'グラップルで張り付いている間、周囲の時間が40%遅くなる。', { hooks: { tick() { if (P.grapple && P.grapple.state === 'attached') { G.game.chronoT = Math.max(G.game.chronoT || 0, 0.12); G.game.chronoSlow = 0.4; } } } });
+  const relic = (id, name, icon, price, desc, def) => add(id, name, icon, (def && def.rarity) || 'legendary', 'relic', desc, Object.assign({ relic: true, price }, def));
+  relic('r_hourglass', '時の砂時計', '⌛', 6000, 'グラップルで張り付いている間、周囲の時間が40%遅くなる。', { rarity: 'mythic', hooks: { tick() { if (P.grapple && P.grapple.state === 'attached') { G.game.chronoT = Math.max(G.game.chronoT || 0, 0.12); G.game.chronoSlow = 0.4; } } } });
   relic('r_thunder', '雷槌の欠片', '🌩️', 5000, 'パイルドライバー着地時、周囲18mの敵6体に落雷（パイルドライバーの威力の60%）。', { hooks: { onPile(c) { const es = G.enemies.inRadius(c.pos, 18).filter((e) => !e.ally).slice(0, 6); for (const e of es) { const p = e.centerPos(); G.fx.lightning(p.clone().add(V(0, 14, 0)), p, 0xd0e0ff); C.damageEnemy(e, c.dmg * 0.6, { src: 'skill', proc: true, elem: 'shock', pos: p }); } if (es.length) G.sfx.zap(c.pos); } } });
   relic('r_crown', '亡者の王冠', '👑', 4500, '敵を倒すと25%でHP+4%回復し、スキルのクールタイムが1秒縮む。', { hooks: { onKill() { if (Math.random() < 0.25) { C.heal(P.stats.maxHp * 0.04, true); C.cdReduce(1); } } } });
   relic('r_mirror', '鏡の盾', '🪞', 4000, '被ダメ-10%。受けたダメージの60%を攻撃者へ跳ね返す。', { mods: { armor: 0.1 }, hooks: { onDamaged(c) { if (c.attacker && c.attacker.alive && !c.attacker.boss) C.damageEnemy(c.attacker, c.raw * 0.6, { src: 'buff', proc: true }); } } });
   relic('r_chalice', '血盟の杯', '🍷', 4500, 'HP50%以下の間、与ダメ+40%・与ダメの3%を回復。', { hooks: { preHit(c) { if (P.hp < P.stats.maxHp * 0.5) c.bonus += 0.4; }, onHit(c) { if (P.hp < P.stats.maxHp * 0.5 && !c.proc) C.heal(c.dmg * 0.03, true); } } });
   relic('r_compass', '異変の羅針盤', '🧭', 3500, '異変の起きているエリアでは与ダメ+20%。異変エリアのクリア時にコイン+（300＋エリア×25）。', { hooks: { preHit(c) { if (G.Depth.cur && G.Depth.cur.list.length) c.bonus += 0.2; }, onAreaClear() { if (G.Depth.cur && G.Depth.cur.list.length) C.coins(300 + G.game.area * 25, null, '羅針盤'); } } });
   relic('r_gravity', '重力核', '🕳️', 5500, 'パイルドライバーが落下中に周囲の敵を吸い寄せ、ダメージ+50%。', { mods: { pileVacuum: 1, pileDmg: 0.5 } });
-  relic('r_engine', '永久機関', '⚙️', 6500, 'スキルのクールタイム-20%、グラップルのクールタイム-25%。', { mods: { cdr: 0.2, grappleCd: 0.25 } });
+  relic('r_engine', '永久機関', '⚙️', 6500, 'スキルのクールタイム-20%、グラップルのクールタイム-25%。', { rarity: 'mythic', mods: { cdr: 0.2, grappleCd: 0.25 } });
 
   // ---------- hoarding: boons that reward keeping coins ----------
   const coins = () => G.game.run.coins;
@@ -437,7 +437,7 @@
   add('ua_shield', '守護の光輪', '🛡️', 'uncommon', 'ult', 'アルティメット使用時、10秒間だけ持続するシールド+40。', { mods: { ultShield: 0.5 }, max: 2 });
   add('ua_over', '覚醒', '⚡', 'rare', 'ult', 'アルティメット使用後8秒間、与ダメ+15%・連射速度+10%。', { mods: { ultOver: 1 } });
   add('ua_echo', '奇跡の残響', '🔁', 'epic', 'ult', 'アルティメット使用時、20%でクールタイムが半分になる。', { mods: { ultEcho: 1 } });
-  add('ua_tech', '奥義連携', '🔗', 'epic', 'ult', 'アルティメット使用時、全スキルのクールタイムをリセット。', { mods: { ultTech: 1 } });
+  add('ua_tech', '奥義連携', '🔗', 'legendary', 'ult', 'アルティメット使用時、全スキルのクールタイムをリセット。', { mods: { ultTech: 1 } });
   add('ua_quick', '先手必勝', '🏁', 'uncommon', 'ult', 'エリア開始時、アルティメットのクールタイム-30秒。', { max: 2, hooks: { onAreaStart(c, n) { C.ultReduce(30 * n); } } });
   G.isTech = (b) => b.cat === 'pile' || b.cat === 'skill' || b.cat === 'ult';
   G.BUFFS = BUFFS;

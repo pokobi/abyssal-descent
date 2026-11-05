@@ -486,7 +486,7 @@
     item: { name: '🧪 消耗品', short: '消耗品' },
     valuable: { name: '💎 金品', short: '金品' },
   };
-  const RAR_BY_TIER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+  const RAR_BY_TIER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
   // what an item has, as the inventory's hover card shows it: extra effects in gold (◆), enchantments in purple (✦), one per line
   const fxLine = (d, ench) => d.fixed.map((f) => `<span class="cd-line cd-fx">◆ ${U.esc(f.desc)}</span>`).concat((ench || []).map((e) => `<span class="cd-line cd-en">✦ ${U.esc(G.enchantText(e))}</span>`)).join('');
   const fxInline = (d, ench) => d.fixed.map((f) => `<span class="cd-fx">◆${U.esc(f.desc)}</span>`).concat((ench || []).map((e) => `<span class="cd-en">✦${U.esc(G.enchantText(e))}</span>`)).join(' ');
@@ -523,14 +523,14 @@
     for (const pw of G.weapons.gunsInOrder()) {
       const d = pw.def, lv = pw.lv || 0;
       out.push({ uid: 'wep:' + P.weapons.indexOf(pw), cat: 'weapon', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: `${d.name}${lv ? ' +' + lv : ''}`, badge: '装備中',
-        sub: `${d.mythic ? '✴️ 神器 · ' : ''}銃（${d.cat}）${lv ? ' · 強化+' + lv : ''}`, d, w: pw, gun: true, lv, forge: pw.forge || 0,
+        sub: `銃（${d.cat}）${lv ? ' · 強化+' + lv : ''}`, d, w: pw, gun: true, lv, forge: pw.forge || 0,
         consume: () => { GM.stashAtts(pw); GM.releaseGun(pw); } });
     }
     for (const it of (P.bag ? P.bag.items : [])) {
       if (!G.Inv.isArm(it) || !G.Inv.def(it)) continue;
       const d = G.Inv.def(it), gun = it.type === 'gun', lv = (it.gun && it.gun.lv) || 0, forge = (it.gun && it.gun.forge) || 0;
       out.push({ uid: 'bagw:' + it.uid, cat: 'weapon', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: `${d.name}${lv ? ' +' + lv : ''}`, badge: '',
-        sub: `${d.mythic ? '✴️ 神器 · ' : ''}${gun ? `銃（${d.cat}）` : '近接武器'}${lv ? ' · 強化+' + lv : ''}`, d, it, gun, lv, forge,
+        sub: `${gun ? `銃（${d.cat}）` : '近接武器'}${lv ? ' · 強化+' + lv : ''}`, d, it, gun, lv, forge,
         consume: () => {
           G.Inv.remove(P.bag, it);
           for (const a of Object.values((gun && it.gun && it.gun.atts) || {})) if (G.ATT_BY_ID[a]) G.Inv.give(P, 'att', a, 1); // its attachments come off into the bag first
@@ -539,7 +539,7 @@
     if (P.melee && P.melee.id !== (G.BARE_MELEE || 'fists')) {
       const d = P.melee.def, lv = P.melee.lv || 0;
       out.push({ uid: 'wep:melee', cat: 'weapon', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: `${d.name}${lv ? ' +' + lv : ''}`, badge: '装備中',
-        sub: `${d.mythic ? '✴️ 神器 · ' : ''}近接武器${lv ? ' · 強化+' + lv : ''}`, d, w: P.melee, gun: false, lv, forge: P.melee.forge || 0,
+        sub: `近接武器${lv ? ' · 強化+' + lv : ''}`, d, w: P.melee, gun: false, lv, forge: P.melee.forge || 0,
         consume: () => { P.melee = G.weapons.makeMelee(G.BARE_MELEE || 'fists'); } });
     }
     for (const pw of G.weapons.gunsInOrder()) for (const sl in pw.atts) {
@@ -599,10 +599,10 @@
     G.ui.cardSelect(wrap, { title: 'TRANSMUTATION', sub: title, side });
   }
   function alchOpenResult(a, b) {
-    const tA = a.tier, targetTier = Math.min(4, tA + 1), rarName = G.RARITY[RAR_BY_TIER[targetTier]].name;
+    const tA = a.tier, targetTier = tA >= 4 ? tA : tA + 1, rarName = G.RARITY[RAR_BY_TIER[targetTier]].name; // (legendary + legendary: a legendary reroll with ミシック among the weapons / armour; mythic + mythic: a mythic reroll)
     const consumeBoth = () => { a.consume(); b.consume(); };
     if (a.cat === 'armor') {
-      let pool = G.ARMOR.filter((x) => G.RARITY[x.rarity].tier === targetTier && (tA < 4 || (x.id !== a.d.id && x.id !== b.d.id)));
+      let pool = G.ARMOR.filter((x) => (G.RARITY[x.rarity].tier === targetTier || (tA === 4 && x.rarity === 'mythic' && Math.random() < 0.3)) && (tA < 4 || (x.id !== a.d.id && x.id !== b.d.id)));
       if (!pool.length) pool = G.ARMOR.filter((x) => G.RARITY[x.rarity].tier === targetTier);
       const cands = [];
       const sameSlot = pool.filter((x) => x.slot === a.d.slot || x.slot === b.d.slot);
@@ -613,7 +613,7 @@
       for (const x of U.shuffle(pool.slice())) { if (cands.length >= 3) break; if (!cands.includes(x)) cands.push(x); }
       const built = cands.map((d) => {
         const inst = G.Inv.makeArmor(d.id);
-        if (targetTier >= 4 && (!inst.ench || inst.ench.length < 2)) inst.ench = G.rollEnchants('legendary');
+        if (targetTier >= 4 && (!inst.ench || inst.ench.length < 2)) inst.ench = G.rollEnchants(d.rarity === 'mythic' ? 'mythic' : 'legendary');
         return { d, inst };
       });
       const opts = built.map(({ d, inst }) => {
@@ -632,12 +632,12 @@
       const newLv0 = Math.max(a.lv || 0, b.lv || 0), newForge = (a.lv || 0) >= (b.lv || 0) ? a.forge || 0 : b.forge || 0;
       const capLv = (d) => Math.min(newLv0, AR.forgeCap(d)), newLv = newLv0;
       const allowMythic = tA >= 4;
-      let gunPool = G.WEAPONS.filter((x) => x.id !== 'starter' && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || G.RARITY[x.rarity].tier === 4) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
+      let gunPool = G.WEAPONS.filter((x) => x.id !== 'starter' && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || (tA === 4 && G.RARITY[x.rarity].tier === 4)) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
       if (!gunPool.length) gunPool = G.WEAPONS.filter((x) => x.id !== 'starter' && !x.mythic && G.RARITY[x.rarity].tier === targetTier);
-      const meleePool = G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || G.RARITY[x.rarity].tier === 4) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
+      const meleePool = G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || (tA === 4 && G.RARITY[x.rarity].tier === 4)) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
       const pool = (!a.gun || !b.gun) && meleePool.length ? gunPool.concat(meleePool) : gunPool;
       const cands = U.shuffle(pool.slice()).slice(0, 3);
-      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}${capLv(d) ? ' +' + capLv(d) : ''}（${d.mythic ? '★神器' : G.RARITY[d.rarity].name}）`, sub: d.kind === 'melee' ? meleeCard(d) : gunCard(d), onPick: () => {
+      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}${capLv(d) ? ' +' + capLv(d) : ''}（${G.RARITY[d.rarity].name}）`, sub: d.kind === 'melee' ? meleeCard(d) : gunCard(d), onPick: () => {
         consumeBoth();
         const stash = (it) => { if (G.Inv.stow(P, it) > 0) { G.Inv.dropToGround(it, P.pos.clone().add(V(0, 0.4, 0))); G.ui.toastSmall('🎒 インベントリに空きがないので足元に置いた'); } };
         if (d.kind === 'melee') {
@@ -706,7 +706,7 @@
     if (a.cat === 'valuable') {
       const arD = U.pick(G.ARMOR.filter((x) => G.RARITY[x.rarity].tier === targetTier)) || U.pick(G.ARMOR.filter((x) => G.RARITY[x.rarity].tier >= 2));
       const arInst = G.Inv.makeArmor(arD.id);
-      if (targetTier >= 4 && (!arInst.ench || arInst.ench.length < 2)) arInst.ench = G.rollEnchants('legendary');
+      if (targetTier >= 4 && (!arInst.ench || arInst.ench.length < 2)) arInst.ench = G.rollEnchants(RAR_BY_TIER[targetTier]);
       const attPool = G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier === targetTier && [...P.weapons, P.melee].some((pw) => G.attOk(x, pw)));
       const attD = U.pick(attPool.length ? attPool : G.ATTACHMENTS.filter((x) => G.RARITY[x.rarity].tier >= Math.max(2, targetTier - 1)));
       const itD = U.pick(G.ITEMS.filter((x) => x.cat !== 'grenade' && !x.noLoot && G.RARITY[x.rarity].tier === targetTier)) || U.pick(G.ITEMS.filter((x) => x.cat !== 'grenade' && !x.noLoot && G.RARITY[x.rarity].tier >= Math.max(2, targetTier - 1)));
@@ -795,7 +795,7 @@
       let prevHtml = `<div class="alch-prev wait"><div class="ap-ic">？</div><div class="ap-txt">同じ種類・同じレアリティの素材を2つ選ぶと<br><b>1段階上のレアリティ</b>の3候補から選べます</div></div>`;
       if (s1 && s2) {
         const isReroll = s1.tier >= 4;
-        const tTier = Math.min(4, s1.tier + 1);
+        const tTier = s1.tier >= 4 ? s1.tier : s1.tier + 1;
         const tRar = G.RARITY[RAR_BY_TIER[tTier]];
         const catLabel = s1.cat === 'valuable' ? '防具・アタッチメント・消耗品' : ALCH_CATS[s1.cat].short;
         prevHtml = `<div class="alch-prev ready ${isReroll ? 'reroll' : ''}" style="--rc:${G.ui.R(RAR_BY_TIER[tTier])}">
@@ -803,7 +803,7 @@
           <div class="ap-info">
             <div class="ap-tag">${isReroll ? '⚠️ 同ランク再練成（リロール）' : '✦ レアリティ +1 確定'}</div>
             <div class="ap-main" style="color:${G.ui.R(RAR_BY_TIER[tTier])}">【${tRar.name}】の${catLabel}</div>
-            <div class="ap-sub">${isReroll ? 'レジェンダリーが上限のためレアリティは上がらず、別の新品候補（3択）へ作り変えます' : '3つの候補の中から好きな1つを選んで獲得できます（耐久100%・新品）'}</div>
+            <div class="ap-sub">${isReroll ? `${G.RARITY[RAR_BY_TIER[s1.tier]].name}同士ではレアリティは上がらず、別の新品候補（3択）へ作り変えます${s1.tier === 4 && (s1.cat === 'weapon' || s1.cat === 'armor') ? '（ミシックが候補に入ることがある）' : ''}` : '3つの候補の中から好きな1つを選んで獲得できます（耐久100%・新品）'}</div>
           </div>
         </div>`;
       }
@@ -824,8 +824,9 @@
         const [a, b] = sel;
         if (a.tier >= 4) {
           const snap = { keep: true, tab, scrollTop: invEl.scrollTop, selUids: sel.map((x) => x.uid) };
-          alchChoiceModal('⚠️ レジェンダリー同士の練成確認', `これ以上レアリティは上昇しません。<br>【${U.esc(a.name)}】と【${U.esc(b.name)}】を消費し、同じレジェンダリー帯の別アイテム（3候補）へ作り変えます。よろしいですか？`, [
-            { icon: '⚗️', label: '練成を実行する（リロール）', sub: '素材2つを消費してレジェンダリー3候補を開く', onPick: () => { GM._keepModal = true; alchOpenResult(a, b); } },
+          const rn = G.RARITY[RAR_BY_TIER[a.tier]].name;
+          alchChoiceModal(`⚠️ ${rn}同士の練成確認`, `これ以上レアリティは上昇しません。<br>【${U.esc(a.name)}】と【${U.esc(b.name)}】を消費し、同じ${rn}帯の別アイテム（3候補）へ作り変えます。よろしいですか？`, [
+            { icon: '⚗️', label: '練成を実行する（リロール）', sub: `素材2つを消費して${rn}3候補を開く`, onPick: () => { GM._keepModal = true; alchOpenResult(a, b); } },
             { icon: '↩', label: 'やめて素材選択へ戻る', onPick: () => { GM._keepModal = true; AR.useAlchemy(snap); } },
           ]);
           return;
@@ -944,7 +945,7 @@
   };
   AR.FORGE_MAX = 15;
   // how far a weapon can be forged depends on its rarity (a cheap weapon tops out early; 神器 go all the way)
-  AR.FORGE_CAP = { common: 6, uncommon: 8, rare: 10, epic: 12, legendary: 15 };
+  AR.FORGE_CAP = { common: 6, uncommon: 8, rare: 10, epic: 12, legendary: 15, mythic: 15 };
   AR.forgeCap = (w) => { const d = w && (w.def || w); return !d || d.mythic ? AR.FORGE_MAX : AR.FORGE_CAP[d.rarity] ?? AR.FORGE_MAX; };
   AR.capText = () => Object.entries(AR.FORGE_CAP).map(([r, n]) => G.RARITY[r].name + '+' + n).join('・');
   AR.FORGE_REFUND = 0.5; // the coins paid for forging: this share comes back when the weapon is sold or traded in (pawn.js)

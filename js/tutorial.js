@@ -27,7 +27,7 @@
   const parts = (a) => a.map(([t, ok]) => `<span class="tut-part${ok ? ' ok' : ''}">${ok ? '✅' : '⬜'} ${t}</span>`).join('');
   // little picture tiles under the text: [icon, name, small line, colour]
   const tiles = (a) => `<div class="tut-vis">${a.map((t) => `<div class="tut-tile" style="--tc:${t[3]}"><i>${t[0]}</i><b>${t[1]}</b><small>${t[2]}</small></div>`).join('')}</div>`;
-  const RAR = { common: 'コモン', uncommon: 'アンコモン', rare: 'レア', epic: 'エピック', legendary: 'レジェンダリー' };
+  const RAR = { common: 'コモン', uncommon: 'アンコモン', rare: 'レア', epic: 'エピック', legendary: 'レジェンダリー', mythic: 'ミシック' };
   const AT = (id) => G.Areas.TYPES[id];
   const invOpen = () => (G.ui.statusOpen && G.ui.statusOpen()) || (G.InvUI && G.InvUI.isOpen());
   // a free spot on the floor in front of you, `ang` to one side (turning further round when something stands there)

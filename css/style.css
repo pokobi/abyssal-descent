@@ -16,6 +16,7 @@
   --c-rare: #4d9be6;
   --c-epic: #b06be0;
   --c-legendary: #f0a030;
+  --c-mythic: #ff4a1a;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: var(--text);
@@ -1383,6 +1384,9 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 :is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf, .it)[style*="--rc:#f0a030"] { box-shadow: 0 0 0 1px color-mix(in srgb, #f0a030 70%, transparent); }
 .card[style*="--rc:#b06be0"] { box-shadow: 0 0 0 1px color-mix(in srgb, #b06be0 55%, transparent), 0 10px 24px rgba(0,0,0,0.5); }
 .card[style*="--rc:#f0a030"] { box-shadow: 0 0 0 1px color-mix(in srgb, #f0a030 75%, transparent), 0 10px 24px rgba(0,0,0,0.5); }
+/* mythic: a double ring, red-orange inside and deep red outside (static, like the others: nothing animated) */
+:is(.iv-it, .iv-eq.on, .iv-as.on, .iv-wbox, .iv-sk, .bicon, .wc, .sc, .bf, .it)[style*="--rc:#ff4a1a"] { box-shadow: 0 0 0 1px #ff4a1a, 0 0 0 2px color-mix(in srgb, #c81e14 80%, transparent); }
+.card[style*="--rc:#ff4a1a"] { box-shadow: 0 0 0 1px #ff4a1a, 0 0 0 3px color-mix(in srgb, #c81e14 70%, transparent), 0 10px 24px rgba(0,0,0,0.5); background-image: linear-gradient(180deg, rgba(255,74,26,0.10), rgba(200,30,20,0.04)); }
 
 /* ---- difficulty cards: bigger; the hidden "extra" mode replaces hard once it is unlocked ---- */
 .df-wrap { width: min(1280px, 97vw); }

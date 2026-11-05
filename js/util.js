@@ -97,18 +97,19 @@ window.G = window.G || {};
     rare: { name: 'レア', color: '#4d9be6', w: 15, tier: 2 },
     epic: { name: 'エピック', color: '#b06be0', w: 6, tier: 3 },
     legendary: { name: 'レジェンダリー', color: '#f0a030', w: 2, tier: 4 },
+    mythic: { name: 'ミシック', color: '#ff4a1a', w: 0.3, tier: 5 }, // above legendary: a red-orange, set apart from legendary's yellow-orange
     cursed: { name: '呪い', color: '#d0405a', w: 0, tier: 0 },
   };
-  G.RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+  G.RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
   // rarity weight scaled by progress & luck
   G.rarityWeight = (r, area, luck) => G.rarityWeightD(r, G.Run && G.game && G.game.run ? G.Run.depthArea(area || 1) : (area || 1), luck);
   // the same, for an explicit depth (drops use their own "loot depth", see runplan.js)
   G.rarityWeightD = (r, d, luck) => {
     const t = G.RARITY[r].tier;
     const prog = Math.min(1, d / 30);
-    // epic and legendary only show up deep down: epic from about depth 7 (fully open at 22), legendary from 15 (fully open at 34)
+    // epic and legendary only show up deep down: epic from about depth 7 (fully open at 22), legendary from 15 (fully open at 34), mythic from 30 (fully open at 50)
     const ramp = (a, b) => Math.max(0, Math.min(1, (d - a) / (b - a)));
-    const gate = t === 3 ? ramp(7, 22) : t >= 4 ? ramp(15, 34) : 1;
+    const gate = t === 3 ? ramp(7, 22) : t === 4 ? ramp(15, 34) : t >= 5 ? ramp(30, 50) : 1;
     return G.RARITY[r].w * Math.pow(1 + prog * 1.6 + (luck || 0) * 0.5, t) * gate;
   };
   G.ELEM = {

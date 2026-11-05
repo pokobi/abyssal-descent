@@ -23,8 +23,8 @@
   // the material shows at a glance: the piece sits on a disc of the material's colour with a small tag naming the body part (頭 胴 脚 手 足)
   const MAT_TAG = { cloth: '布', leather: '革', scale: '鱗', chain: '鎖', plate: '板' };
   G.armorIcon = (d) => { const m = d && G.ARMOR_MAT_BY_ID[d.mat]; return m ? `<span class="amat mat-${m.id}" style="--mc:${m.col}"><span>${d.icon}</span><i>${(G.ARMOR_SLOT_BY_ID[d.slot] || {}).name || MAT_TAG[m.id]}</i></span>` : (d ? d.icon : ''); };
-  const RMUL = { common: 1, uncommon: 1.3, rare: 1.65, epic: 2.05, legendary: 2.5 };
-  const RPRICE = { common: 120, uncommon: 220, rare: 420, epic: 800, legendary: 1500 };
+  const RMUL = { common: 1, uncommon: 1.3, rare: 1.65, epic: 2.05, legendary: 2.5, mythic: 3.0 };
+  const RPRICE = { common: 120, uncommon: 220, rare: 420, epic: 800, legendary: 1500, mythic: 2800 };
   const NOUN = {
     head: { cloth: '布の頭巾', leather: '革の帽子', scale: '鱗の兜', chain: '鎖の頭巾', plate: '鋼の大兜' },
     chest: { cloth: '布の外套', leather: '革の鎧', scale: '鱗の鎧', chain: '鎖帷子', plate: '鋼の胸甲' },
@@ -39,6 +39,14 @@
     legs: { cloth: '霧渡りの脚衣', leather: '影走りの脚衣', scale: '大蛇の脚甲', chain: '守護者の鎖の脚衣', plate: '城壁の腿甲' },
     hands: { cloth: '錬金術師の手袋', leather: '盗賊王の革手袋', scale: '竜爪の籠手', chain: '処刑人の手甲', plate: '鍛冶神の籠手' },
     feet: { cloth: '風歩きの布靴', leather: '韋駄天の長靴', scale: '水蛇の靴', chain: '巡礼者の脚絆', plate: '踏破者の鉄靴' },
+  };
+  // ミシック: names of their own
+  const MYTHN = {
+    head: { cloth: '天啓の聖冠布', leather: '神狩りの角兜', scale: '星竜の宝冠', chain: '天軍の聖頭巾', plate: '深淵王の大兜' },
+    chest: { cloth: '天の羽衣', leather: '神狩りの狩衣', scale: '星竜の逆鱗鎧', chain: '天軍の聖鎖帷子', plate: '深淵王の胸甲' },
+    legs: { cloth: '天翔の袴', leather: '神狩りの脚衣', scale: '星竜の脚甲', chain: '天軍の鎖の脚衣', plate: '深淵王の腿甲' },
+    hands: { cloth: '神織りの手袋', leather: '神狩りの手甲', scale: '星竜の爪籠手', chain: '天軍の聖手甲', plate: '深淵王の籠手' },
+    feet: { cloth: '天翔の沓', leather: '神狩りの長靴', scale: '星竜の鱗靴', chain: '天軍の脚絆', plate: '深淵王の鉄靴' },
   };
   // fixed (non-random) effects on high-rarity pieces, listed in the codex.
   // head / chest / legs: toughness, legs / feet: movement, hands: weapons and handling
@@ -57,19 +65,30 @@
     handC: { desc: 'リロード速度+12%', mods: { reloadSpeed: 0.12 } },
     handD: { desc: '反動-15%', mods: { recoil: -0.15 } },
     toughF: { desc: '全属性耐性+10%', mods: { elRes_fire: 0.1, elRes_water: 0.1, elRes_ice: 0.1, elRes_volt: 0.1, elRes_wind: 0.1, elRes_earth: 0.1 } },
+    // ミシック: the legendary pair at x1.5 and one more of the same family (no new mechanics)
+    mToughA: { desc: '状態異常の持続時間-30%', mods: { statusRes: 0.3 } },
+    mToughC: { desc: '爆発・範囲攻撃の被ダメ-30%', mods: { blastRes: 0.3 } },
+    mToughF: { desc: '全属性耐性+15%', mods: { elRes_fire: 0.15, elRes_water: 0.15, elRes_ice: 0.15, elRes_volt: 0.15, elRes_wind: 0.15, elRes_earth: 0.15 } },
+    mToughD: { desc: '最大HP+40', mods: { maxHp: 40 } },
+    mToughB: { desc: '炎上・毒のダメージ-45%', mods: { dotRes: 0.45 } },
+    mToughE: { desc: '毎秒HP+0.9回復', mods: { hpRegen: 0.9 } },
+    mMoveA: { desc: 'スプリント開始から1秒ごとに移動速度+7.5%（最大+22.5%）', mods: { sprintRamp: 0.075 } },
+    mMoveD: { desc: '空中での制御+60%', mods: { airControl: 0.6 } },
+    mHandA: { desc: 'リロード速度+30%', mods: { reloadSpeed: 0.3 } },
+    mHandB: { desc: '近接攻撃の間隔-30%', mods: { meleeCd: 0.3 } },
   };
   const FX_FOR = {
-    head: { epic: 'toughA', legendary: ['toughA', 'toughC'] },
-    chest: { epic: 'toughD', legendary: ['toughD', 'toughB'] },
-    legs: { epic: 'toughF', legendary: ['toughE', 'moveA'] },
-    hands: { epic: 'handC', legendary: ['handA', 'handB'] },
-    feet: { epic: 'moveC', legendary: ['moveA', 'moveD'] },
+    head: { epic: 'toughA', legendary: ['toughA', 'toughC'], mythic: ['mToughA', 'mToughC', 'mToughF'] },
+    chest: { epic: 'toughD', legendary: ['toughD', 'toughB'], mythic: ['mToughD', 'mToughB', 'toughE'] },
+    legs: { epic: 'toughF', legendary: ['toughE', 'moveA'], mythic: ['mToughE', 'mMoveA', 'moveC'] },
+    hands: { epic: 'handC', legendary: ['handA', 'handB'], mythic: ['mHandA', 'mHandB', 'handD'] },
+    feet: { epic: 'moveC', legendary: ['moveA', 'moveD'], mythic: ['mMoveA', 'mMoveD', 'moveB'] },
   };
   // the leather / cloth epics of the hands and feet lean towards handling and speed
   const FX_ALT = { hands: { cloth: { epic: 'handA' }, leather: { epic: 'handD' } }, feet: { cloth: { epic: 'moveD' }, leather: { epic: 'moveA' } } };
   G.ARMOR = [];
   for (const S of G.ARMOR_SLOTS) for (const M of G.ARMOR_MATS) for (const r of G.RARITY_ORDER) {
-    const name = r === 'legendary' ? LEGEND[S.id][M.id] : PREFIX[r] + NOUN[S.id][M.id];
+    const name = r === 'mythic' ? MYTHN[S.id][M.id] : r === 'legendary' ? LEGEND[S.id][M.id] : PREFIX[r] + NOUN[S.id][M.id];
     let fx = (FX_ALT[S.id] && FX_ALT[S.id][M.id] && FX_ALT[S.id][M.id][r]) || FX_FOR[S.id][r] || null;
     if (fx && !Array.isArray(fx)) fx = [fx];
     const def = Math.max(1, Math.round(S.def * M.def * RMUL[r]));
@@ -109,9 +128,9 @@
   // ---------------- durability ----------------
   // every piece has a total durability by rarity; hits you take wear the pieces you are wearing; at 0 the piece breaks and is gone for good.
   // (an item with no 'dur' field is brand new: shop stock, older saves)
-  G.ARMOR_DUR = { common: 100, uncommon: 150, rare: 220, epic: 320, legendary: 450 };
+  G.ARMOR_DUR = { common: 100, uncommon: 150, rare: 220, epic: 320, legendary: 450, mythic: 650 };
   G.armorMaxDur = (d) => (d ? G.ARMOR_DUR[d.rarity] || 100 : 0);
-  const ENCH_COUNT = { common: [[0, 100]], uncommon: [[0, 100]], rare: [[0, 90], [1, 10]], epic: [[0, 20], [1, 70], [2, 10]], legendary: [[1, 20], [2, 70], [3, 10]] };
+  const ENCH_COUNT = { common: [[0, 100]], uncommon: [[0, 100]], rare: [[0, 90], [1, 10]], epic: [[0, 20], [1, 70], [2, 10]], legendary: [[1, 20], [2, 70], [3, 10]], mythic: [[2, 60], [3, 40]] };
   G.rollEnchants = function (rarity, rnd) {
     rnd = rnd || Math.random;
     const t = ENCH_COUNT[rarity] || ENCH_COUNT.common;
@@ -120,8 +139,9 @@
     const pool = G.ENCHANTS.slice(), out = [];
     for (let i = 0; i < n && pool.length; i++) {
       const e = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
-      const steps = Math.round((e.max - e.min) * 10); // every 0.1 step from min to max is equally likely
-      const o = { id: e.id, v: Math.round((e.min + Math.floor(rnd() * (steps + 1)) / 10) * 10) / 10 };
+      // every 0.1 step from min to max is equally likely (ミシック: only the upper half)
+      const lo = rarity === 'mythic' ? (e.min + e.max) / 2 : e.min, steps = Math.round((e.max - lo) * 10);
+      const o = { id: e.id, v: Math.round((lo + Math.floor(rnd() * (steps + 1)) / 10) * 10) / 10 };
       if (e.flat) o.v = Math.round(o.v);
       if (e.perEl) o.el = ['fire', 'water', 'ice', 'volt', 'wind', 'earth'][Math.floor(rnd() * 6)];
       out.push(o);

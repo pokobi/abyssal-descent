@@ -22,7 +22,7 @@
     harpoon: { cat: 'ハープーンガン', icon: '🪝', dmg: 110, rpm: 90, mag: 1, reload: 1.1, auto: false, spread: 1, adsSpread: 0.1, recoil: 3, zoom: 1.6, range: 70, headMul: 2.0, adsTime: 0.2, moveMul: 0.95, proj: { kind: 'harpoon', speed: 85, grav: 4 }, pull: true, sound: 'harpoon', reloadSeq: 'bolt', price: 700 },
     tesla: { cat: '雷管銃', icon: '⚡', dmg: 15, rpm: 500, mag: 40, reload: 2.4, auto: true, spread: 1.0, adsSpread: 0.4, recoil: 0.5, zoom: 1.3, range: 28, headMul: 1.3, adsTime: 0.2, moveMul: 0.95, chain: 3, element: 'shock', elemChance: 0.35, shieldMul: 1.6, sound: 'tesla', reloadSeq: 'cell', price: 1000 },
   };
-  const RPRICE = { common: 900, uncommon: 1350, rare: 2000, epic: 2900, legendary: 4100 };
+  const RPRICE = { common: 900, uncommon: 1350, rare: 2000, epic: 2900, legendary: 4100, mythic: 7000 };
 
   // [id, arch, name, rarity, mods, trait, finish, desc]
   const V = [
@@ -97,10 +97,10 @@
     ['g_widow', 'shotgun', 'ダブルバレル', 'uncommon', { dmg: 1.35, rpm: 2.2, mag: 0.34 }, null, 'wood', '2連発の水平二連銃。'],
     ['p_cinder', 'pistol', 'シンダー', 'uncommon', { dmg: 1.1 }, 'incendiary', 'rust', '小型焼夷拳銃。'],
     // 神器 (mythic, deep shops / auctions only)
-    ['y_midas', 'revolver', '神器「黄金律」', 'legendary', { dmg: 1.4, rpm: 1.2 }, 'goldrush', 'gold', '撃つたびにコインを3枚弾丸に込める。コインがある限り威力2.2倍。'],
-    ['y_echo', 'rifle', '神器「残響のアリア」', 'legendary', { dmg: 1.3, rpm: 1.1, mag: 1.3 }, 'echo', 'gold', '4発ごとに、周囲の敵3体へ亡霊の弾が追撃する。'],
-    ['y_maw', 'shotgun', '神器「虚喰らい」', 'legendary', { dmg: 1.35, pellets: 1.2 }, 'voidmaw', 'black', '命中した敵を手元へ引き寄せ、受けるダメージ+60%の刻印を刻む。'],
-    ['y_storm', 'sniper', '神器「天雷の弓」', 'legendary', { dmg: 1.5, rpm: 1.25, mag: 1.4 }, 'stormcall', 'steel', 'ヘッドショットで天から雷が落ち、周囲5体へ連鎖する。'],
+    ['y_midas', 'revolver', '神器「黄金律」', 'mythic', { dmg: 1.4, rpm: 1.2 }, 'goldrush', 'gold', '撃つたびにコインを3枚弾丸に込める。コインがある限り威力2.2倍。'],
+    ['y_echo', 'rifle', '神器「残響のアリア」', 'mythic', { dmg: 1.3, rpm: 1.1, mag: 1.3 }, 'echo', 'gold', '4発ごとに、周囲の敵3体へ亡霊の弾が追撃する。'],
+    ['y_maw', 'shotgun', '神器「虚喰らい」', 'mythic', { dmg: 1.35, pellets: 1.2 }, 'voidmaw', 'black', '命中した敵を手元へ引き寄せ、受けるダメージ+60%の刻印を刻む。'],
+    ['y_storm', 'sniper', '神器「天雷の弓」', 'mythic', { dmg: 1.5, rpm: 1.25, mag: 1.4 }, 'stormcall', 'steel', 'ヘッドショットで天から雷が落ち、周囲5体へ連鎖する。'],
   ];
   const WEAPONS = [];
   const TRAITS = {
@@ -147,7 +147,8 @@
   const INNATE = { p_cinder: 'fire', n_dragon: 'fire', y_storm: 'volt' };
   for (const w of WEAPONS) { const el = INNATE[w.id] || (w.arch === 'flame' ? 'fire' : w.arch === 'tesla' ? 'volt' : null); if (el) w.el = el; }
   const MYTH = { y_midas: 7000, y_echo: 8000, y_maw: 9000, y_storm: 12000 };
-  for (const w of WEAPONS) if (MYTH[w.id]) { w.mythic = true; w.price = MYTH[w.id]; w.name = w.name; }
+  for (const w of WEAPONS) if (MYTH[w.id]) w.price = MYTH[w.id];
+  for (const w of WEAPONS) if (w.rarity === 'mythic') w.mythic = true; // (ミシック: the shop's 神器 shelf, alchemy and the parts read this flag)
   G.WEAPON_ARCH = ARCH;
   G.WEAPONS = WEAPONS;
   G.WEAPON_BY_ID = Object.fromEntries(WEAPONS.map((w) => [w.id, w]));
@@ -258,7 +259,7 @@
   // dmg: light swing, swing: seconds per light swing, range: reach (m), arc: min dot to hit (lower = wider),
   // heavy: [dmg multiplier, wind-up s, recovery s], moveMul: movement while wielded, model: viewmodel shape
   // guard: [share of damage cut, how much damage it can cut before it runs dry (its own number, whatever your HP), half-angle of the front it covers (deg)]; none = cannot guard
-  const MPRICE = { common: 700, uncommon: 1000, rare: 1500, epic: 2200, legendary: 3200 };
+  const MPRICE = { common: 700, uncommon: 1000, rare: 1500, epic: 2200, legendary: 3200, mythic: 6500 };
   const MCAT = { fist: '格闘', knife: 'ナイフ', blade: '刀剣', axe: '斧', blunt: '打撃', spear: '長柄', scythe: '大鎌' };
   const ML = [
     // the starting melee weapon. Same overall strength as the old bare fists (light DPS ~67, heavy ~73/s, same move speed):
@@ -279,8 +280,8 @@
     ['m_venom', '毒蛇の双短剣', '🐍', 'epic', 'knife', { dmg: 30, swing: 0.2, range: 2.4, arc: 0.6, heavy: [3.4, 0.28, 0.35], moveMul: 1.18, knock: 2, elem: 'poison', elemChance: 0.8 }, null, 'twin', '左右交互の超高速連撃。猛毒を重ねる。'],
     ['m_scythe', '死神の大鎌', '💀', 'epic', 'scythe', { guard: [0.4, 55, 75], dmg: 84, swing: 0.6, range: 3.4, arc: -0.1, heavy: [2.6, 0.5, 0.6], moveMul: 1.08, knock: 6, lifesteal: 0.06 }, 'reap', 'scythe', '周囲ほぼ全方位を刈り取る。与ダメの6%を吸収。重撃は処刑の一閃。'],
     ['m_thunder', '雷槌「鳴神」', '⚡', 'legendary', 'blunt', { guard: [0.55, 80, 60], dmg: 105, swing: 0.68, range: 2.9, arc: 0.4, heavy: [2.8, 0.55, 0.6], moveMul: 1.07, knock: 12, elem: 'shock', elemChance: 0.6, shieldMul: 2.0 }, 'thunder', 'thunder', '雷を纏う戦鎚。命中で雷撃が連鎖し、重撃は落雷を呼ぶ。'],
-    ['m_devour', '神器「喰魂の大鎌」', '🌑', 'legendary', 'scythe', { guard: [0.35, 45, 75], dmg: 95, swing: 0.55, range: 3.6, arc: -0.15, heavy: [2.8, 0.45, 0.55], moveMul: 1.1, knock: 6, lifesteal: 0.04 }, 'devour', 'scythe', '変異した敵を喰らうほど強くなる（エリア内で最大10層・1層につき+8%、HP5%回復）。'],
-    ['m_midas', '神器「黄金の拳」', '🥇', 'legendary', 'fist', { guard: [0.7, 50, 50], dmg: 60, swing: 0.3, range: 2.5, arc: 0.6, heavy: [3.0, 0.35, 0.4], moveMul: 1.15, knock: 8, critChance: 0.15 }, 'midas', 'fists', '殴るたびにコインがこぼれる。重撃はコイン50枚を込めて威力3倍。'],
+    ['m_devour', '神器「喰魂の大鎌」', '🌑', 'mythic', 'scythe', { guard: [0.35, 45, 75], dmg: 95, swing: 0.55, range: 3.6, arc: -0.15, heavy: [2.8, 0.45, 0.55], moveMul: 1.1, knock: 6, lifesteal: 0.04 }, 'devour', 'scythe', '変異した敵を喰らうほど強くなる（エリア内で最大10層・1層につき+8%、HP5%回復）。'],
+    ['m_midas', '神器「黄金の拳」', '🥇', 'mythic', 'fist', { guard: [0.7, 50, 50], dmg: 60, swing: 0.3, range: 2.5, arc: 0.6, heavy: [3.0, 0.35, 0.4], moveMul: 1.15, knock: 8, critChance: 0.15 }, 'midas', 'fists', '殴るたびにコインがこぼれる。重撃はコイン50枚を込めて威力3倍。'],
     // shields: the left hand holds a shield, the right a short weapon. Built to hold the line; their attacks are modest
     ['m_woodshield', '木の円盾', '🛡️', 'common', 'blade', { guard: [0.64, 104, 64], dmg: 32, swing: 0.42, range: 2.5, arc: 0.5, heavy: [2.2, 0.4, 0.5], moveMul: 1.08, knock: 5 }, null, 'buckler', '木の板を張り合わせた小ぶりの盾。騎士の円盾には劣るが、しっかり受け止める。'],
     ['m_buckler', '騎士の円盾', '🛡️', 'uncommon', 'blade', { guard: [0.8, 130, 80], dmg: 40, swing: 0.42, range: 2.6, arc: 0.5, heavy: [2.4, 0.4, 0.5], moveMul: 1.08, knock: 6 }, 'bash', 'buckler', '小ぶりな円盾と片手剣。広い角度を受け止め、重撃は盾で殴りつけて怯ませる。'],
@@ -292,7 +293,8 @@
     flameWave: '炎波：重撃で炎の斬撃波を放つ', bash: '盾撃：重撃で盾を叩きつけ、長く怯ませる', devour: '喰魂：変異体を倒すほど強化', midas: '黄金：殴るとコイン、重撃でコインを消費して威力3倍', reap: '刈取：ほぼ全方位攻撃・吸血', thunder: '落雷：連鎖雷、重撃で落雷', beam: '光刃：重撃で貫通する光の斬撃',
   };
   G.MELEE = ML.map(([id, name, icon, rarity, mcat, s, trait, model, desc]) => Object.assign({ id, name, icon, rarity, mcat, cat: MCAT[mcat], trait, traitDesc: trait ? MTRAIT[trait] : null, model, desc, kind: 'melee', price: id === 'fists' || id === 'm_basic' ? 0 : MPRICE[rarity] + Math.round(s.dmg / s.swing / 10) * 10, critChance: 0, headMul: 1.5, shieldMul: 1, lifesteal: 0, elem: null, elemChance: 0 }, s));
-  for (const m of G.MELEE) if (m.id === 'm_devour' || m.id === 'm_midas') { m.mythic = true; m.price = m.id === 'm_devour' ? 9500 : 6500; }
+  for (const m of G.MELEE) if (m.id === 'm_devour' || m.id === 'm_midas') m.price = m.id === 'm_devour' ? 9500 : 6500;
+  for (const m of G.MELEE) if (m.rarity === 'mythic') m.mythic = true;
   G.MELEE_BY_ID = Object.fromEntries(G.MELEE.map((m) => [m.id, m]));
   // melee weapons born with an element (element.js): 焔刃 fire, 氷牙 ice, 鳴神 volt
   for (const [id, el] of [['m_ember', 'fire'], ['m_frost', 'ice'], ['m_thunder', 'volt']]) if (G.MELEE_BY_ID[id]) G.MELEE_BY_ID[id].el = el;

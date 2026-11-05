@@ -35,7 +35,7 @@
   for (const f of PT.FAMS) for (const r of ORD) {
     if (!PT.pool(f.id, r).length) continue; // a kind with no weapon of that rarity has no part of it either
     G.PARTS.push({ id: `pt_${f.id}_${r}`, kind: 'part', fam: f.id, rarity: r, name: `${f.name}の部品`, icon: f.icon, famIcon: f.icon, value: Math.round(WPRICE[r] * 0.03),
-      desc: `${f.name}の武器を組み立てるための部品。同じ部品を3つ集めると、作業台で${G.RARITY[r].name}の${f.name}武器を1つ作れる（3択）。下のレアリティの部品3つで、1つ上のレアリティの部品にもできる。` });
+      desc: `${f.name}の武器を組み立てるための部品。同じ部品を3つ集めると、作業台で${G.RARITY[r].name}の${f.name}武器を1つ作れる（その種類の武器から好きなものを選べる）。下のレアリティの部品3つで、1つ上のレアリティの部品にもできる。` });
   }
   G.PART_BY_ID = Object.fromEntries(G.PARTS.map((p) => [p.id, p]));
   const ORD_T = ORD.filter((r) => G.PARTS.some((p) => p.rarity === r)); // the bench's columns: only rarities that have parts (no ミシック parts)
@@ -110,13 +110,15 @@
     G.weapons.order(); G.ui.refreshWeapon(); G.ui.refreshItems(); p.recalc();
     G.save.mark('items', d.id);
   };
-  // three parts -> three weapons to choose from (the parts and the price are taken only when one is picked)
+  // three parts -> any weapon of that kind and rarity (the parts and the price are taken only when one is picked).
+  // every one is offered, so backing out and asking again changes nothing (it used to be a random three: backing out re-rolled them).
+  // the class's favourites come first.
   PT.make = function (id, free, done) {
     const d = G.PART_BY_ID[id], cost = PT.makeCost(d.rarity, free), run = GM().run;
     if (PT.count(id) < PT.NEED) return false;
     if (run.coins < cost) return false;
-    const pool = PT.pool(d.fam, d.rarity).slice(), cands = [];
-    while (cands.length < 3 && pool.length) { const w = U.weighted(pool, (x) => (G.Classes ? G.Classes.weight(x) : 1), Math.random); cands.push(w); pool.splice(pool.indexOf(w), 1); } // (the class's favourites x1.3)
+    const wt = (x) => (G.Classes ? G.Classes.weight(x) : 1);
+    const cands = PT.pool(d.fam, d.rarity).map((w, i) => [w, i]).sort((a, b) => wt(b[0]) - wt(a[0]) || a[1] - b[1]).map(([w]) => w);
     return { cands, pick: (w) => {
       if (PT.count(id) < PT.NEED || run.coins < cost) return false;
       PT.take(id, PT.NEED); run.coins -= cost;
@@ -191,7 +193,7 @@
       const pool = PT.pool(d.fam, d.rarity);
       const top = `<div class="pb-sel" style="--rc:${G.ui.R(d.rarity)}"><span class="pb-big">${f.icon}</span><div><div class="pb-nm">${esc(f.name)}の部品</div><div>${RN(d.rarity)}　所持 <b>${n}</b> / ${PT.NEED}</div></div></div>`;
       if (cands) {
-        return `${top}<div class="pb-sec">どれを組み立てますか？</div><div class="pb-cands">${cands.cands.map((w, i) => `<button class="pb-cand" data-w="${i}" style="--rc:${G.ui.R(w.rarity)}"><span class="pb-ci">${w.icon}</span><div><b>${esc(w.name)}</b><small>${esc(w.cat || '')}</small><div class="pb-cs">${w.kind === 'melee' ? G.Areas.meleeCard(w) : G.Areas.gunCard(w)}</div></div></button>`).join('')}</div>
+        return `${top}<div class="pb-sec">どれを組み立てますか？<small>（${esc(PT.FAM_BY_ID[d.fam].name)}・${RN(d.rarity)}の全${cands.cands.length}種）</small></div><div class="pb-cands${cands.cands.length > 3 ? ' many' : ''}">${cands.cands.map((w, i) => `<button class="pb-cand" data-w="${i}" style="--rc:${G.ui.R(w.rarity)}"><span class="pb-ci">${w.icon}</span><div><b>${esc(w.name)}</b><small>${esc(w.cat || '')}</small><div class="pb-cs">${w.kind === 'melee' ? G.Areas.meleeCard(w) : G.Areas.gunCard(w)}</div></div></button>`).join('')}</div>
           <div class="pb-note">部品${PT.NEED}つ${mc ? `と ${U.fmt(mc)}🪙` : ''}は、選んだときに使う。</div><button class="btn" id="pb-cback">↩ やめる</button>`;
       }
       const canMake = n >= PT.NEED && coins >= mc, canUp = !!to && n >= PT.NEED && coins >= uc;

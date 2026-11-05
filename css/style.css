@@ -1944,3 +1944,7 @@ html.m #blade-bar { transform: scale(0.85); }
 .fgb.thin .fgb-n { flex: 1; gap: 1px; }
 .fgb.thin .fgb-n i { flex: 1; width: auto; height: max(3px, calc(var(--cs, 56px) * 0.085)); transform: none; border-width: 0; background: rgba(10,7,4,0.85); box-shadow: inset 0 0 0 1px rgba(255,210,140,0.28); }
 .fgb.thin .fgb-n i.on { background: linear-gradient(#ffe7a6, #d5952a); }
+
+/* the workbench offering every weapon of the kind: more than three side by side in two columns */
+.pb-cands.many { display: grid; grid-template-columns: 1fr 1fr; }
+.pb-sec small { margin-left: 0.5em; font-size: 0.8em; font-weight: 600; color: #a99d88; }

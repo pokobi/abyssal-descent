@@ -83,6 +83,13 @@ const PORT = +process.env.COOP_PORT || 9991;
     await p.eval("G.Inv.stow(G.player, G.Inv.make('part', 'pt_ar_rare', 3)); G.game.run.coins = 0; G.ui.clearScreen(); G.game.state = 'playing'; 1");
     await face(); await use(); await pick('pt_ar_rare');
     check(!(await click('#pb-make')) && (await p.eval("G.Parts.count('pt_ar_rare') === 3")), 'with no coins the shop bench makes nothing');
+    // every weapon of the kind and rarity is offered, the same each time: backing out and asking again cannot re-roll them
+    check(await p.eval(`(() => { G.game.run.coins = 99999; const P = G.Parts; let ok = true;
+      for (const f of P.FAMS) for (const r of ['common', 'uncommon', 'rare', 'epic', 'legendary']) { const id = P.id(f.id, r); if (!G.PART_BY_ID[id]) continue;
+        G.Inv.stow(G.player, G.Inv.make('part', id, 3)); const a = P.make(id, true, null), b = P.make(id, true, null), pool = P.pool(f.id, r);
+        if (!a || a.cands.length !== pool.length || a.cands.some((w) => !pool.includes(w)) || a.cands.map((w) => w.id).join() !== b.cands.map((w) => w.id).join()) ok = false;
+        P.take(id, 3); }
+      return ok; })()`), 'the bench offers every weapon of the kind and rarity, the same list each time (no re-rolling by backing out)');
     // ---- the transmutation hall: free
     await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.game.transitioning = false; G.game.enterArea(4, 'alchemy'); 1");
     await p.until("G.game.stage === 'alchemy' && !!G.world.benchPos", 20000).catch(() => {});

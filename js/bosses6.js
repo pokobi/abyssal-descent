@@ -455,7 +455,7 @@
         } else {
           if (!S.done) {
             S.done = true; h.pos.set(S.at.x, 0.85, S.at.z); h.yaw = S.yaw; h.pitch = 0; h.curl = 0;
-            G.fx.explosion(S.c.clone().setY(0.6), 3.4, this.col(), { decal: false, noSmoke: true }); G.fx.ring(S.c.clone().setY(0.15), R, this.col(), 0.5); G.fx.dust(S.c.clone().setY(0.3), V(0, 1, 0), 0x6a3a5a, 26);
+            G.fx.explosion(S.c.clone().setY(0.6), 3.4, this.col(), { decal: false, noSmoke: true, noRing: true }); G.vfx.nova(S.c.clone().setY(0), R, 0.12, { style: 'dark', dome: false, ground: this.col() }); // (the shock ring = R, what it hurts) G.fx.dust(S.c.clone().setY(0.3), V(0, 1, 0), 0x6a3a5a, 26);
             G.fx.decal(S.c.clone().setY(0.03), V(0, 1, 0), 'crack', 8, true);
             G.sfx.explosion(S.c, 1.6); P.addShake(0.75); G.sfx.rumble && G.sfx.rumble(0.8, 0.6);
             if (Math.hypot(P.pos.x - S.c.x, P.pos.z - S.c.z) < R && P.pos.y < 3.4) { this.hit(30, 'aoe', S.c.clone()); const kd = P.pos.clone().sub(S.c).setY(0); if (kd.lengthSq() < 0.01) kd.set(1, 0, 0); kd.normalize(); P.vel.addScaledVector(kd, 12); P.vel.y = Math.max(P.vel.y, 6); }
@@ -554,7 +554,7 @@
         if (k > 0 && k < 1) { const q = p.sky.clone().lerp(p.c, k); G.fx.add.spawn(q.x, q.y, q.z, 0, 0, 0, 0.12, 1.2, 0.6, 1.6, 0.5, 1.0, 1, 0, 0); G.fx.add.spawn(q.x, q.y, q.z, U.rand(-1, 1), 2, U.rand(-1, 1), 0.5, 0.5, 0.05, 1, 0.3, 0.6, 0.8, 0, 0.3); }
         if (a.t >= p.T) {
           p.done = true;
-          G.fx.explosion(p.c.clone().setY(0.5), R * 0.7, this.col(), { decal: false }); G.sfx.explosion(p.c, 0.7);
+          G.fx.explosion(p.c.clone().setY(0.5), R * 0.7, this.col(), { decal: false, noRing: true }); G.vfx.nova(p.c.clone().setY(0), R, 0.1, { style: 'shock', dome: false, ground: this.col() }); G.sfx.explosion(p.c, 0.7);
           if (Math.hypot(P.pos.x - p.c.x, P.pos.z - p.c.z) < R && P.pos.y < 3.5) this.hit(26, 'aoe', p.c.clone());
         }
       }
@@ -581,7 +581,7 @@
       this.moveHand(h, h.rest, dt, 2); this.aimHand(h, dt, 0.3, 0, 0.45);
       if (k >= 1 && !a.done) {
         a.done = true; G.scene.remove(r.m);
-        G.fx.explosion(r.to.clone().setY(0.8), R * 0.75, 0xff7ab8); G.fx.debris(r.to.clone().setY(1), this.M.rock, 10, 0.7, 9); G.fx.dust(r.to, V(0, 1, 0), 0x6a3a5a, 20);
+        G.fx.explosion(r.to.clone().setY(0.8), R * 0.75, 0xff7ab8, { noRing: true }); G.vfx.nova(r.to.clone().setY(0), R, 0.12, { style: 'shock', dome: false, ground: 0xff7ab8 }); G.fx.debris(r.to.clone().setY(1), this.M.rock, 10, 0.7, 9); G.fx.dust(r.to, V(0, 1, 0), 0x6a3a5a, 20);
         G.sfx.explosion(r.to, 1.4); P.addShake(0.5);
         if (Math.hypot(P.pos.x - r.to.x, P.pos.z - r.to.z) < R && P.pos.y < 4) { this.hit(32, 'explosion', r.to.clone()); const kd = P.pos.clone().sub(r.to).setY(0).normalize(); P.vel.addScaledVector(kd, 10); P.vel.y = Math.max(P.vel.y, 6); }
       }
@@ -696,7 +696,7 @@
         if (c.pulse < 1.0 && !c.tele) c.tele = G.fx.telegraph(c.pos.clone().setY(fl), 4.6, 1.0, this.col());
         if (c.pulse <= 0) {
           c.pulse = 4.8; c.tele = null;
-          G.fx.ring(c.pos.clone().setY(fl + 0.2), 4.6, this.col(), 0.4); G.sfx.magic(c.pos, 'dark');
+          G.vfx.nova(c.pos.clone().setY(fl), 4.6, 0.12, { style: 'dark', dome: false, ground: this.col() }); G.sfx.magic(c.pos, 'dark');
           if (Math.hypot(P.pos.x - c.pos.x, P.pos.z - c.pos.z) < 4.6 && P.pos.y < fl + 1.2) { this.hurtPlayer(14, 'aoe', c.pos.clone()); const kd = P.pos.clone().sub(c.pos).setY(0).normalize(); P.vel.addScaledVector(kd, 9); P.vel.y = Math.max(P.vel.y, 4); }
         }
       }
@@ -979,7 +979,7 @@
         }
         if (h.t >= h.dur) {
           this.dropHole(h);
-          G.fx.explosion(h.c.clone(), 4, VIO, { decal: false }); G.sfx.explosion(h.c, 1.2);
+          G.fx.explosion(h.c.clone(), 4, VIO, { decal: false, noRing: true }); G.sfx.explosion(h.c, 1.2); // (no ring: the blast itself hurts nobody, its orbs do)
           for (let i = 0; i < 14; i++) { const an = i / 14 * Math.PI * 2; C().spawnProjectile({ kind: 'darkorb', pos: h.c.clone().setY(Y2 + 1.4), vel: V(Math.sin(an), 0, Math.cos(an)).multiplyScalar(12), owner: 'enemy', dmg: 14 * this.dmgScale, radius: 0.55, life: 5, attacker: this.main }); }
         }
       }
@@ -1163,7 +1163,7 @@
           c.L.position.lerpVectors(c.from, c.tgt, (lt - AIM) / FLY);
           for (let i = 0; i < 3; i++) G.fx.add.spawn(c.L.position.x, c.L.position.y, c.L.position.z, U.rand(-1, 1), U.rand(-1, 1), U.rand(-1, 1), 0.4, 0.5, 0.05, 0.9, 0.7, 1.4, 1, 0, 0.5);
         } else {
-          G.fx.explosion(c.tgt.clone().setY(Y2 + 0.6), 2.2, VIO, { decal: false, noSmoke: true }); G.fx.flash(c.tgt.clone().setY(Y2 + 2), 0xe0c8ff, 100, 0.3, 25);
+          G.fx.explosion(c.tgt.clone().setY(Y2 + 0.6), 2.2, VIO, { decal: false, noSmoke: true, noRing: true }); G.vfx.nova(c.tgt.clone().setY(Y2), R, 0.1, { style: 'dark', dome: false, ground: VIO }); // (the reticle's ring: touching it hurts) G.fx.flash(c.tgt.clone().setY(Y2 + 2), 0xe0c8ff, 100, 0.3, 25);
           if (G.sfx.lanceHit) G.sfx.lanceHit(c.tgt); P.addShake(0.35);
           if (Math.hypot(P.pos.x - c.tgt.x, P.pos.z - c.tgt.z) < R + 0.4 && P.pos.y < Y2 + 3) this.hit(18, 'aoe', c.tgt.clone());
           a.g.remove(c.L); a.g.remove(c.ret); a.g.remove(c.line); a.cur = null; a.i++;

@@ -37,7 +37,7 @@
     }
     // the mesh effects (vfx.js) go the same way; what one of them makes on its own (a nova's spikes, its bolts) is not sent again
     const VX = G.vfx;
-    for (const fn of ['nova', 'wave', 'pillar', 'slash', 'spikes', 'meteor', 'bell', 'shield', 'motes', 'area', 'wall']) {
+    for (const fn of ['nova', 'wave', 'pillar', 'slash', 'spikes', 'meteor', 'bell', 'shield', 'motes', 'area', 'wall', 'tube', 'fan', 'vortex']) {
       const f = VX[fn]; if (!f) continue;
       VX[fn] = function () {
         if (own() && !(K._vxDepth > 0)) push(['v', fn, Array.prototype.map.call(arguments, enc)]);
@@ -45,6 +45,28 @@
         try { return f.apply(VX, arguments); } finally { K._vxDepth--; }
       };
     }
+    // a held beam (a guardian's sweeping laser): its position goes out 20 times a second and the other screens hold their own copy
+    const vray = VX.ray, rays = new Map(); let rid = 0;
+    VX.ray = function (col, c2, al) {
+      const h = vray.call(VX, col, c2, al);
+      if (own() && !(K._vxDepth > 0)) {
+        const id = K.id + '-' + (++rid), set0 = h.set; let last = 0;
+        h.set = function (a, b, r, rv) { set0.call(h, a, b, r, rv); const now = performance.now(); if (now - last > 45) { last = now; push(['vr', { id, a: K.vec(a), b: K.vec(b), r: r2(r), rv: rv == null ? null : r2(rv), c: col, c2: c2 ?? null, al: al ?? null }]); } };
+      }
+      return h;
+    };
+    // the same for an upright sheet of light
+    const vcurt = VX.curtain, curts = new Map();
+    VX.curtain = function (col) {
+      const h = vcurt.call(VX, col);
+      if (own() && !(K._vxDepth > 0)) {
+        const id = K.id + '-k' + (++rid), set0 = h.set; let last = 0;
+        h.set = function (a, b, ha, hb) { set0.call(h, a, b, ha, hb); const now = performance.now(); if (now - last > 45) { last = now; push(['vk', { id, a: K.vec(a), b: K.vec(b), ha: r2(ha), hb: r2(hb), c: col }]); } };
+      }
+      return h;
+    };
+    const putCurtain = (m) => { let h = curts.get(m.id); if (!h || h.gone) { K._fxNet = true; try { h = vcurt.call(VX, m.c); } finally { K._fxNet = false; } curts.set(m.id, h); } h.set(V(...m.a), V(...m.b), m.ha, m.hb); if (curts.size > 40) for (const [k, v] of curts) if (v.gone) curts.delete(k); };
+    const putRay = (m) => { let h = rays.get(m.id); if (!h || h.gone) { K._fxNet = true; try { h = vray.call(VX, m.c, m.c2 ?? undefined, m.al ?? undefined); } finally { K._fxNet = false; } rays.set(m.id, h); } h.set(V(...m.a), V(...m.b), m.r, m.rv ?? undefined); if (rays.size > 40) for (const [k, v] of rays) if (v.gone) rays.delete(k); };
     // sounds go the same way, a few at a time: skills, the guardian's attacks, and on the host the foes' growls and swings (the guests' foes are puppets and make none)
     let sndN = 0;
     for (const fn of ['monster', 'magic', 'whoosh', 'attackWind', 'rumble', 'mech', 'shieldBreak', 'thunder', 'bell', 'chain', 'zap', 'fire', 'stoneGrind', 'swing', 'impact', 'spit', 'ice']) {
@@ -270,6 +292,8 @@
         try {
           if (kind === 'f') { K._fxNet = true; try { FX[a](...b.map(dec)); } finally { K._fxNet = false; } if (a === 'explosion' && b[0] && b[0].$v) G.sfx.explosion(V(...b[0].$v), (b[1] || 4) / 4); }
           else if (kind === 'v') { K._fxNet = true; try { if (G.vfx[a]) G.vfx[a](...b.map(dec)); } finally { K._fxNet = false; } }
+          else if (kind === 'vr') putRay(a);
+          else if (kind === 'vk') putCurtain(a);
           else if (kind === 's') { K._fxNet = true; try { G.sfx[a](...b.map(dec)); } finally { K._fxNet = false; } }
           else if (kind === 'p') putProjectile(a);
           else if (kind === 'x') friendly(a);

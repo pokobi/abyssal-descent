@@ -280,7 +280,7 @@
       } else if (a.k === 'roar') {
         this.mouthOpen = true;
         if (a.t > 0.5 && !a.hit) {
-          a.hit = true; G.sfx.monster(this.pos, 'roar', 0.4, 1.5); P.addShake(0.5); G.fx.ring(this.pos.clone().setY(0.3), 10, 0x9fd8ff, 0.5);
+          a.hit = true; G.sfx.monster(this.pos, 'roar', 0.4, 1.5); P.addShake(0.5); G.vfx.nova(this.pos.clone().setY(0), 10, 0.12, { style: 'shout', ground: 0x9fd8ff }); // (as far as it throws you)
           if (this.playerDistH() < 10) { const d = P.pos.clone().sub(this.pos).setY(0).normalize(); P.vel.x += d.x * 16; P.vel.z += d.z * 16; P.vel.y = 4; this.hurtPlayer(12, 'aoe'); }
         }
         if (a.t > 1.3) end();
@@ -728,22 +728,37 @@
         const from = eye();
         const warm = a.t < 1.2;
         if (!warm) a.ang += a.dir * dt * 0.55;
+        a.rays = a.rays || []; a.curt = a.curt || []; a.track = a.track || [];
+        const fy = c.y || 0, o0 = V(from.x, fy, from.z);
+        let hurt = false;
         for (let i = 0; i < n; i++) {
           const an = a.ang + i / n * Math.PI * 2;
-          const to = V(c.x + Math.sin(an) * 34, 0, c.z + Math.cos(an) * 34);
+          const to = V(c.x + Math.sin(an) * 34, fy, c.z + Math.cos(an) * 34);
           const dir = to.clone().sub(from).normalize(), L = from.distanceTo(to);
           const wh = G.world.raycast(from, dir, L); const hitP = wh ? wh.point : to;
-          G.fx.beam(from, hitP, warm ? 0xc060ff : 0xff40c0, warm ? 0.04 : 0.45, 0.05);
-          if (!warm) {
-            // the beam's ground track: hurts only if nothing stands between the avatar's eye and you
-            const pa = Math.atan2(P.pos.x - c.x, P.pos.z - c.z);
-            if (Math.abs(U.wrapAngle(pa - an)) < 0.07 && P.pos.y < 3) {
-              const pc = P.chestPos(), d2 = pc.clone().sub(from), l2 = d2.length();
-              if (!G.world.raycast(from, d2.divideScalar(l2), l2 - 0.5)) { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 0.35; this.hurtPlayer(20, 'aoe', from); } }
-            }
-            if (Math.random() < dt * 20) G.fx.flameLick(hitP.x, hitP.y + 0.1, hitP.z, 1.5, 0xc060ff);
+          if (warm) { G.fx.beam(from, hitP, 0xc060ff, 0.04, 0.05); continue; }
+          // the sweeping blade: the beam from the eye to the floor and an upright sheet of light under it, along the floor as far as the eye
+          // can see (a pillar cuts it off). The sheet is what hurts: 0.55 m thick (+ the body's 0.35), as high as the beam above it.
+          const dh = V(to.x - from.x, 0, to.z - from.z), full = dh.length() || 1; dh.divideScalar(full);
+          const hAt = (s) => Math.max(0, (from.y - fy) * (1 - s / full));
+          let Lc = Math.hypot(hitP.x - from.x, hitP.z - from.z);
+          for (let s = 2; s < Lc; s += 1.2) {
+            const q = o0.clone().addScaledVector(dh, s); q.y += 1.1;
+            const d2 = q.sub(from), l2 = d2.length();
+            if (G.world.raycast(from, d2.divideScalar(l2), l2 - 0.3)) { Lc = Math.max(0, s - 0.6); break; }
           }
+          a.rays[i] = G.vfx.hold(a.rays[i], 0xff40c0, 0xffd0f0); a.rays[i].set(from, hitP, 0.45);
+          if (Lc > 0.5) {
+            const fb = o0.clone().addScaledVector(dh, Lc);
+            a.curt[i] = G.vfx.holdCurtain(a.curt[i], 0xff40c0); a.curt[i].set(o0, fb, hAt(0), hAt(Lc));
+            a.track[i] = G.vfx.hold(a.track[i], 0xff40c0, 0xffc0e8); a.track[i].set(o0.clone().setY(fy + 0.04), fb.clone().setY(fy + 0.04), 0.55);
+            if (G.vfx.debug && Math.random() < dt * 4) G.vfx.dbgLane(o0, dh, Lc, 1.8);
+          }
+          const rx = P.pos.x - o0.x, rz = P.pos.z - o0.z, s = rx * dh.x + rz * dh.z, perp = Math.abs(rx * dh.z - rz * dh.x);
+          if (s > 0 && s < Lc && perp < 0.55 + 0.35 && P.pos.y - fy < hAt(s)) hurt = true;
+          if (Math.random() < dt * 20) G.fx.flameLick(hitP.x, hitP.y + 0.1, hitP.z, 1.5, 0xc060ff);
         }
+        if (hurt) { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 0.35; this.hurtPlayer(20, 'aoe', from); } }
         if (a.t > 1.2 + 4.2) end();
       } else if (a.k === 'meteor') {
         if (!a.pts) {
@@ -775,7 +790,7 @@
             const k = (performance.now() - h0) / 1000;
             if (this.dead || k > 2.2) { clearInterval(iv); G.scene.remove(hand); return; }
             if (k < 0.85) hand.position.y = 22 - k * 4; else if (k < 1.0) hand.position.y = Math.max(0.5, 18.6 - (k - 0.85) * 120);
-            else if (!hand.userData.hit) { hand.userData.hit = true; hand.position.y = 0.5; G.sfx.explosion(q, 1.5); G.fx.dust(q, V(0, 1, 0), 0x3a2a4a, 24); P.addShake(0.5); if (distH(P.pos, q) < 3.8 && P.pos.y < 3) this.hurtPlayer(32, 'aoe', q); if (this.form === 3) shockwave(this, q, 14, 14, 16, 0xff3080); }
+            else if (!hand.userData.hit) { hand.userData.hit = true; hand.position.y = 0.5; G.sfx.explosion(q, 1.5); G.fx.dust(q, V(0, 1, 0), 0x3a2a4a, 24); G.vfx.nova(q.clone(), 3.8, 0.1, { style: 'dark', dome: false, ground: 0xff3080 }); P.addShake(0.5); if (distH(P.pos, q) < 3.8 && P.pos.y < 3) this.hurtPlayer(32, 'aoe', q); if (this.form === 3) shockwave(this, q, 14, 14, 16, 0xff3080); }
             else hand.position.y += 0.4;
           }, 16);
         }
@@ -877,7 +892,8 @@
           case 'colossus': shockwave(this, e.pos.clone().setY(0), 15, 24, 24, 0xb040ff); G.sfx.explosion(e.pos, 1.2); P.addShake(0.4); break;
           case 'wyrm': case 'heart': for (const p of e.pts) { G.fx.explosion(p.clone().setY(0.6), e.id === 'wyrm' ? 3.4 : 2.4, 0xc050ff, { decal: false }); if (distH(pp, p) < (e.id === 'wyrm' ? 3.4 : 2.4) && pp.y < 3) { this.hurtPlayer(e.id === 'wyrm' ? 30 : 20, 'aoe', p); if (e.id === 'wyrm') P.vel.y = 10; } } G.sfx.explosion(e.pts[0], 1); break;
           case 'executioner': case 'drake': case 'twins':
-            for (const [a, b] of e.lines) { for (let i = 0; i < 6; i++) G.fx.flameLick(a.x + (b.x - a.x) * i / 6, 0.2, a.z + (b.z - a.z) * i / 6, 2.4, 0xc050ff); if (segDist(pp, a, b) < (e.id === 'drake' ? 2.6 : 2.0) && pp.y < 3) { this.hurtPlayer(e.id === 'executioner' ? 32 : 24, 'melee', a); break; } }
+            for (const [a, b] of e.lines) { const w = e.id === 'drake' ? 2.6 : 2.0, pts = []; for (let i = 0, n = Math.round(a.distanceTo(b) / 1.8); i <= n; i++) pts.push(a.clone().lerp(b, i / n).setY(0)); G.vfx.spikes(pts, { kind: 'dark', r: w, h: 2.2, n: 3, dur: 0.7, step: 0.01 }); for (let i = 0; i < 6; i++) G.fx.flameLick(a.x + (b.x - a.x) * i / 6, 0.2, a.z + (b.z - a.z) * i / 6, 2.4, 0xc050ff); // (thorns as wide as the hit)
+              if (segDist(pp, a, b) < (e.id === 'drake' ? 2.6 : 2.0) && pp.y < 3) { this.hurtPlayer(e.id === 'executioner' ? 32 : 24, 'melee', a); break; } }
             G.sfx.whoosh(0.8, 0.6); break;
           case 'hunter': {
             const m = e.pos.clone().setY(e.h * 0.7), dir = e.aim.clone().sub(m).normalize();

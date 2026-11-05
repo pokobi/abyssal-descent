@@ -300,7 +300,7 @@
           this.pose.hit = 1;
           if (!a.done) {
             a.done = true; this.hY = 0;
-            G.fx.explosion(a.c.clone().setY(0.4), a.r * 0.6, a.col || 0xffa060, { decal: false }); G.vfx.nova(a.c.clone(), a.r, 0.14, { style: 'shock', dome: false, ground: a.col || 0xffc080 }); G.vfx.spikes(G.vfx.ringPts(a.c.clone(), a.r * 0.6, 8), { kind: 'rock', r: 0.6, h: 0.8, n: 1, dur: 0.5 }); G.fx.dust(a.c, V(0, 1, 0), 0x7a6a50, 18);
+            G.fx.explosion(a.c.clone().setY(0.4), a.r * 0.6, a.col || 0xffa060, { decal: false, noRing: true }); G.vfx.nova(a.c.clone(), a.r, 0.14, { style: 'shock', dome: false, ground: a.col || 0xffc080 }); G.vfx.spikes(G.vfx.ringPts(a.c.clone(), a.r * 0.6, 8), { kind: 'rock', r: 0.6, h: 0.8, n: 1, dur: 0.5 }); G.fx.dust(a.c, V(0, 1, 0), 0x7a6a50, 18);
             G.sfx.explosion(a.c, 1.1); P.addShake(0.5);
             if (Math.hypot(P.pos.x - a.c.x, P.pos.z - a.c.z) < a.r && P.pos.y < (a.jumpable ? 0.9 : 3)) { this.hit(a.dmg, 'aoe', a.c, a.elem); const kd = P.pos.clone().sub(a.c).setY(0).normalize(); P.vel.addScaledVector(kd, a.knock || 10); P.vel.y = Math.max(P.vel.y, 5); }
             if (a.zone) C().zone(a.c.clone(), a.r * 0.8, a.zone.dur || 5, a.zone.kind, a.zone.dps * this.dmgScale, { enemy: true, elem: a.zone.elem });
@@ -326,7 +326,7 @@
           this.hYbase = Math.sin(f * Math.PI) * (a.height || 7);
           if (f >= 1 && !a.done) {
             a.done = true; this.hYbase = 0;
-            G.fx.explosion(a.c.clone().setY(0.4), a.r * 0.6, 0xffa060, { decal: false }); G.vfx.nova(a.c.clone(), a.r, 0.14, { style: 'shock', dome: false }); G.fx.debris(a.c.clone().setY(0.4), G.world.mats.rock, 8, 0.3, 8); G.sfx.explosion(a.c, 1.3); P.addShake(0.7);
+            G.fx.explosion(a.c.clone().setY(0.4), a.r * 0.6, 0xffa060, { decal: false, noRing: true }); G.vfx.nova(a.c.clone(), a.r, 0.14, { style: 'shock', dome: false }); G.fx.debris(a.c.clone().setY(0.4), G.world.mats.rock, 8, 0.3, 8); G.sfx.explosion(a.c, 1.3); P.addShake(0.7);
             if (this.playerDistH() < a.r && P.pos.y < 1.2) { this.hit(a.dmg, 'aoe', a.c, a.elem); const kd = P.pos.clone().sub(a.c).setY(0).normalize(); P.vel.addScaledVector(kd, 12); P.vel.y = 6; }
             if (a.zone) C().zone(a.c.clone(), a.r * 0.7, a.zone.dur || 5, a.zone.kind, a.zone.dps * this.dmgScale, { enemy: true });
           }
@@ -370,7 +370,7 @@
           }
           for (const p of a.pts) if (!p.done && a.t >= p.t) {
             p.done = true;
-            G.fx.explosion(p.c.clone().setY(0.5), (a.r || 2.6) * 0.7, a.col || 0xa060ff, { decal: false }); G.vfx.nova(p.c.clone(), a.r || 2.6, 0.1, { style: 'shock', dome: false, ground: a.col || 0xc090ff }); G.sfx.explosion(p.c, 0.6);
+            G.fx.explosion(p.c.clone().setY(0.5), (a.r || 2.6) * 0.7, a.col || 0xa060ff, { decal: false, noRing: true }); G.vfx.nova(p.c.clone(), a.r || 2.6, 0.1, { style: 'shock', dome: false, ground: a.col || 0xc090ff }); G.sfx.explosion(p.c, 0.6);
             if (Math.hypot(P.pos.x - p.c.x, P.pos.z - p.c.z) < (a.r || 2.6) && P.pos.y < 3.5) this.hit(a.dmg, 'aoe', p.c, a.elem);
             if (a.zone) C().zone(p.c.clone(), (a.r || 2.6) * 0.8, a.zone.dur || 4, a.zone.kind, a.zone.dps * this.dmgScale, { enemy: true });
           }

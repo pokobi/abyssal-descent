@@ -26,7 +26,7 @@
   const arenaClamp = (b, p) => { const w = b.world; p.x = U.clamp(p.x, 4, w.W - 4); p.z = U.clamp(p.z, 4, (w.arenaD || w.D) - 4); return p; };
   const pose = (b, k) => { if (b.pose) b.pose.k = Math.max(b.pose.k, k); };
   const sfxCast = (b, a) => { if (!a.sw) { a.sw = true; G.sfx.magic(b.pos, a.snd || 'dark'); } };
-  const boom = (c, r, col, dmgFn) => { FX().explosion(c.clone().setY(0.4), r * 0.55, col, { decal: false }); FX().ring(c.clone().setY(0.15), r, col, 0.4); G.sfx.explosion(c, 0.7); if (dmgFn) dmgFn(); };
+  const boom = (c, r, col, dmgFn) => { FX().explosion(c.clone().setY(0.4), r * 0.55, col, { decal: false, noRing: true }); G.vfx.nova(c.clone().setY(0), r, 0.12, { style: 'shock', dome: false, ground: col }); G.sfx.explosion(c, 0.7); if (dmgFn) dmgFn(); }; // (the ring = the hit radius)
 
   // ================================================================ fairness floors
   // applied to every attack a guardian picks, whatever its spec says: wind-ups you can read (in real seconds, after the guardian's
@@ -73,7 +73,9 @@
       a.done = true; G.sfx.explosion(this.pos, 1); P.addShake(0.5);
       for (const l of a.L) {
         FX().endTeleLine(l.tele);
-        for (let i = 1; i <= 9; i++) { const p = l.o.clone().lerp(l.e, i / 9); FX().explosion(p.clone().setY(0.3), 1.6, col, { decal: false }); FX().dust(p, V(0, 1, 0), 0x6a5a48, 4); }
+        const pts = []; for (let i = 1, n = Math.round(len / 2); i <= n; i++) pts.push(l.o.clone().lerp(l.e, i / n));
+        G.vfx.spikes(pts, { kind: 'rock', r: wid / 2 + 0.2, h: 1.9, n: 3, dur: 0.6, step: 0.012 }); // (the lane's full width: what hurts)
+        for (let i = 1; i <= 4; i++) { const p = l.o.clone().lerp(l.e, i / 4.5); FX().explosion(p.clone().setY(0.3), 1.6, col, { decal: false }); FX().dust(p, V(0, 1, 0), 0x6a5a48, 4); }
         const s = segDist(P.pos.x, P.pos.z, l.o, l.e);
         if (s.d < wid / 2 + 0.4 && P.pos.y < 1.8) { this.hurtPlayer(a.dmg || 30, 'aoe', l.o, a.elem); P.vel.y = Math.max(P.vel.y, 5); }
         if (a.zone) for (let i = 2; i <= 8; i += 3) C().zone(l.o.clone().lerp(l.e, i / 9), 1.8, a.zone.dur || 4, a.zone.kind, (a.zone.dps || 8) * this.dmgScale, { enemy: true });
@@ -100,7 +102,7 @@
     for (let k = 0; k < a.arms; k++) {
       const an = a.ang + k * Math.PI * 2 / a.arms, dir = V(Math.sin(an), 0, Math.cos(an));
       const wh = G.world.raycast(o, dir, len), end = o.clone().addScaledVector(dir, wh ? wh.t : len); // cut short by the first pillar / wall: the drawn beam is the hit beam
-      FX().beam(o, end, col, wid * 0.45, 0.07);
+      a.rays = a.rays || []; a.rays[k] = G.vfx.hold(a.rays[k], col, 0xffe0e8); a.rays[k].set(o, end, wid / 2, a.low ? Math.max(0.15, 1.4 - o.y) : undefined); // (radius = the half-width it hurts; a low one is a flat band whose top is the height you clear it at)
       if (Math.random() < 0.7) FX().sparks(end.clone().setY(0.2), null, 2, col, 4);
       if (a.tick <= 0) { const s = segDist(P.pos.x, P.pos.z, o, end); if (s.d < wid / 2 + 0.35 && (!a.low || P.pos.y < 1.3)) this.hurtPlayer(a.dmg || 9, 'aoe', o, a.elem); }
     }
@@ -122,11 +124,12 @@
       }
     }
     let all = true;
+    const rate = this.atkRate ? this.atkRate() : 1;
     for (const p of a.pts) {
       if (p.done) continue;
+      if (!p.fall && a.t >= p.t - 0.45 * rate) { p.fall = true; G.vfx.meteor(V(p.c.x + 6, 34, p.c.z + 3), p.c.clone().setY(0.6), Math.max(0.05, (p.t - a.t) / rate), Math.min(1.6, r * 0.4)); }
       if (a.t < p.t) { all = false; continue; }
       p.done = true;
-      FX().seg(V(p.c.x + 5, 46, p.c.z + 2), p.c.clone().setY(0.3), col, 0.35, 0.25);
       boom(p.c, r, col, () => { if (hd(P.pos, p.c) < r && P.pos.y < 3.5) this.hurtPlayer(a.dmg || 26, 'aoe', p.c, a.elem); });
       if (a.zone) C().zone(p.c.clone(), r * 0.7, a.zone.dur || 3, a.zone.kind, (a.zone.dps || 8) * this.dmgScale, { enemy: true });
     }
@@ -203,7 +206,7 @@
       if (a.t < w.t0) { live = true; continue; }
       const d = (a.t - w.t0) * speed; if (d > len) continue; live = true;
       const c = w.o.clone().addScaledVector(w.dir, d);
-      { const a0 = c.clone().addScaledVector(w.perp, wid / 2).setY(0.3), b0 = c.clone().addScaledVector(w.perp, -wid / 2).setY(0.3); FX().beam(a0, b0, 0xffffff, 0.12, 0.09); FX().beam(a0, b0, col, 0.4, 0.09); } // a solid bar of light along the front: the hit test is the same width, 1 m deep
+      { const a0 = c.clone().addScaledVector(w.perp, wid / 2).setY(0.35), b0 = c.clone().addScaledVector(w.perp, -wid / 2).setY(0.35); w.ray = G.vfx.hold(w.ray, col, 0xffffff); w.ray.set(a0, b0, 0.6); } // a bar of light along the front: the hit test is the same width, about 1 m deep
       if (Math.random() < 0.6) FX().dust(c.clone().addScaledVector(w.perp, U.rand(-wid / 2, wid / 2)), V(0, 1, 0), 0x8a8a8a, 1);
       const rel = P.pos.clone().sub(w.o), along = rel.dot(w.dir), across = Math.abs(rel.dot(w.perp));
       if (!w.hit && Math.abs(along - d) < 0.9 && across < wid / 2 + 0.1 && P.pos.y < 0.6) { w.hit = true; this.hurtPlayer(a.dmg || 28, 'aoe', c, a.elem); P.vel.y = Math.max(P.vel.y, 5); P.vel.addScaledVector(w.dir, 6); }
@@ -242,7 +245,7 @@
     for (const p of a.pts) {
       if (p.done) continue;
       if (a.t < p.t) { all = false; continue; }
-      p.done = true; FX().strike(p.c.clone().setY(0.1), col, true);
+      p.done = true; FX().strike(p.c.clone().setY(0.1), col, true); G.vfx.area(p.c.clone(), r, 'shock', 0.35);
       if (hd(P.pos, p.c) < r && P.pos.y < 4) this.hurtPlayer(a.dmg || 24, 'aoe', p.c, 'shock');
     }
     return all && a.t > a.pts[a.pts.length - 1].t + 0.4;
@@ -275,7 +278,7 @@
   // an inward pull that ends in a crushing burst
   atk.gravity = function (a, dt) {
     const P = Pl(), W = a.wind || 0.8, dur = a.dur || 1.7, R = a.r || 7, col = a.col || 0x9a50ff;
-    if (!a.c) { a.c = this.pos.clone().setY(0); a.tele = FX().telegraph(a.c, R, W + dur, col); sfxCast(this, a); pose(this, 1); }
+    if (!a.c) { a.c = this.pos.clone().setY(0); a.tele = FX().telegraph(a.c, R, W + dur, col); sfxCast(this, a); pose(this, 1); const rate = this.atkRate ? this.atkRate() : 1; G.vfx.area(a.c.clone(), R, 'gravity', (W + dur) / rate, { alpha: 0.75 }); G.vfx.vortex(a.c.clone(), R, (W + dur) / rate); }
     if (a.t < W) return false;
     const e = a.t - W;
     if (e < dur) {

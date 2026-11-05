@@ -314,7 +314,7 @@
     }
     // sparks/embers
     FX.sparks(p, null, Math.floor(20 * k), 0xffa050, 14 * k);
-    FX.ring(p, r, color || 0xffa060, 0.35); // (the edge of the blast: what it hurts)
+    if (!opts.noRing) FX.ring(p, r, color || 0xffa060, 0.35); // (the edge of the blast: what it hurts. noRing: the blast is only the body of a wider hit that draws its own edge)
     FX.flash(p, color || 0xff9a40, 60 * k, 0.25, r * 4);
     if (opts.decal !== false) FX.decal(new THREE.Vector3(p.x, p.y - 0.1, p.z), new THREE.Vector3(0, 1, 0), 'scorch', r * 1.4, true);
   };

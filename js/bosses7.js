@@ -335,6 +335,7 @@
       if (a.go >= a.len - 0.01 || blocked) {
         G.fx.endTeleLine(a.lane); a.lane = null;
         const y = 1.25; G.fx.beam(a.from.clone().setY(y), this.pos.clone().setY(y), 0xe8eeff, 0.06, 0.4); G.fx.beam(a.from.clone().setY(y), this.pos.clone().setY(y), 0xff2040, 0.02, 0.6);
+        G.vfx.ray(0xc8d0ff, 0xffffff, 0.4).set(a.from.clone().setY(1.3), this.pos.clone().setY(1.3), 1.0, 1.3); // (the wake: as wide as the cut, 1.0 + the body's 0.35, and up to 2.6)
         G.fx.sparks(this.pos.clone().setY(1), null, 10, 0xd0d8ff, 7); G.sfx.meleeHit(true, 'blade', true);
         a.k++;
         if (a.k < a.n) { a.st = 'aim'; a.t0 = a.t; } else { a.st = 'rec'; a.t0 = a.t; G.sfx.mech('magIn', 0, 0.6); }
@@ -388,7 +389,7 @@
     if (!a.up) {
       a.up = true; this.root.visible = true; this.main.invuln = false; this.shade.visible = false;
       this.face(P.pos, 1, 99); this.pose = 'rise';
-      G.fx.explosion(a.c.clone().setY(0.6), 2.2, 0x6020a0, { decal: false }); G.fx.ring(a.c.clone().setY(0.15), 2.6, 0xff3050, 0.4); // (= the warning circle and the hit)
+      G.fx.explosion(a.c.clone().setY(0.6), 2.2, 0x6020a0, { decal: false, noRing: true }); G.vfx.nova(a.c.clone(), 2.6, 0.08, { style: 'blood', dome: false, ground: 0xff3050 }); // (= the warning circle and the hit)
       G.fx.beam(a.c.clone().setY(0.2), a.c.clone().setY(4.5), 0xe0e6ff, 0.12, 0.35); G.sfx.swing(true, 'blade'); G.sfx.explosion(a.c, 0.6);
       if (Math.hypot(P.pos.x - a.c.x, P.pos.z - a.c.z) < 2.6 && P.pos.y < 3) { this.hit(26, 'aoe', a.c); P.vel.y = Math.max(P.vel.y, 10); }
     }
@@ -443,7 +444,7 @@
         x.prev.copy(x.pos);
         if (x.go >= x.len - 0.01) {
           x.st = 'done'; G.fx.endTeleLine(x.lane);
-          G.fx.beam(x.from.clone().setY(1.2), x.pos.clone().setY(1.2), x.self ? 0xe8eeff : 0xa080ff, 0.05, 0.4);
+          G.fx.beam(x.from.clone().setY(1.2), x.pos.clone().setY(1.2), x.self ? 0xe8eeff : 0xa080ff, 0.05, 0.4); G.vfx.ray(x.self ? 0xc8d0ff : 0xa080ff, 0xffffff, 0.4).set(x.from.clone().setY(1.3), x.pos.clone().setY(1.3), 0.95, 1.3);
           if (!x.self) { G.fx.smoke(x.pos.clone().setY(1), 12, 1, 0x1a0830, 0.6, 0.8); if (x.o.parent) x.o.parent.remove(x.o); x.o.userData.m.dispose(); }
         }
       }
@@ -987,7 +988,7 @@
     }
     for (const L of a.legs) if (!L.done && a.t >= L.t) {
       L.done = true; G.fx.endTeleLine(L.tele);
-      G.fx.lightning(L.a.clone().setY(0.6), L.b.clone().setY(0.6), 0xd0f0ff); G.fx.beam(L.a.clone().setY(0.4), L.b.clone().setY(0.4), 0x90d8ff, 0.12, 0.3); G.sfx.zap(L.b);
+      G.fx.lightning(L.a.clone().setY(0.6), L.b.clone().setY(0.6), 0xd0f0ff); G.fx.lightning(L.a.clone().setY(1.6), L.b.clone().setY(1.6), 0xb0e0ff); G.vfx.ray(0x90d8ff, 0xe8f8ff, 0.7).set(L.a.clone().setY(1.25), L.b.clone().setY(1.25), 1.0, 1.25); G.sfx.zap(L.b);
       if (segDist(P.pos, L.a, L.b) < 1.0 + 0.4 && P.pos.y < 2.5) this.hit(14, 'aoe', this.pos.clone(), 'shock');
     }
     const done = a.k >= legs && a.legs.every((L) => L.done);

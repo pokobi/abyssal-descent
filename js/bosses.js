@@ -568,7 +568,7 @@
         const wh = G.world.raycast(eye, d, 70);
         const L = wh ? wh.t : 70;
         const end = eye.clone().addScaledVector(d, L);
-        G.fx.beam(eye, end, 0xff6030, 0.35, 0.06); G.fx.beam(eye, end, 0xffe8c0, 0.12, 0.05);
+        a.ray = G.vfx.hold(a.ray, 0xff6030, 0xffe8c0); a.ray.set(eye, end, 0.65); // (radius 0.65 + the body's 0.35 = the 1 m the hit test reaches)
         if (wh && Math.random() < 0.6) { G.fx.sparks(wh.point, wh.normal, 3, 0xffa060, 6); if (Math.random() < 0.2) G.fx.decal(wh.point, wh.normal, 'scorch', 1.2); }
         // player hit test: distance from chest to beam segment
         const pc = P.chestPos().sub(eye); const tt = U.clamp(pc.dot(d), 0, L);

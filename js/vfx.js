@@ -682,17 +682,18 @@
   };
 
   // ================================================================ the heart of a gravity well: a black core, a glowing rim and a turning disk
-  VX.vortex = function (c, r, dur) {
+  VX.vortex = function (c, r, dur, o) {
+    o = o || {};
     const g = new THREE.Group(); scene.add(g);
     const core = new THREE.Mesh(sphGeo, new THREE.MeshBasicMaterial({ color: 0x000000 })); g.add(core);
     const rim = new THREE.Mesh(sphGeo, shellMat(0x9040ff, 0xffd0ff, 'spiral')); g.add(rim);
     const disk = new THREE.Mesh(areaGeo, areaMat('gravity')); disk.renderOrder = 6; g.add(disk);
-    const hd = { pos: c.clone(), r, t: 0, dur: dur ?? Infinity, dead: false, lease: 0.3,
+    const hd = { pos: c.clone(), r, t: 0, dur: dur ?? Infinity, dead: false, lease: o.lease || 0,
       end(f) { this.dur = Math.min(this.dur, this.t + (f ?? 0.3)); },
       touch() { this.seen = this.t; },
       update(dt) {
         this.t += dt;
-        if (this.t - (this.seen || 0) > this.lease) this.end(0.2);
+        if (this.lease && this.t - (this.seen || 0) > this.lease) this.end(0.2);
         const left = this.dur - this.t, k = Math.min(1, this.t / 0.4), f = Math.min(1, left / 0.3), R = Math.max(0.5, this.r * 0.12);
         g.position.set(this.pos.x, this.pos.y + 1.2 + R, this.pos.z);
         core.scale.setScalar(R * 0.8 * k); rim.scale.setScalar(R * 1.15 * k); rim.material.uniforms.uA.value = 1.2 * f;
@@ -746,7 +747,7 @@
     const kind = ZONE_AREA[z.kind];
     if (kind && (!z.vx || z.vx.dead)) z.vx = VX.area(p, r, kind, Infinity, { alpha: z.enemy ? 0.92 : 1, lease: 0.3 });
     if (z.vx) { z.vx.touch(); z.vx.pos.copy(p); z.vx.r = r; if (left < 0.35) z.vx.end(Math.max(0.05, left)); }
-    if (z.kind === 'gravity' && r >= 3 && !z.noCore && (!z.vxCore || z.vxCore.dead)) z.vxCore = VX.vortex(p, r, Infinity);
+    if (z.kind === 'gravity' && r >= 3 && !z.noCore && (!z.vxCore || z.vxCore.dead)) z.vxCore = VX.vortex(p, r, Infinity, { lease: 0.3 });
     if (z.vxCore) { z.vxCore.touch(); z.vxCore.pos.copy(p); if (left < 0.35) z.vxCore.end(Math.max(0.05, left)); }
     const rp = () => { const a = R() * 6.28, d = Math.sqrt(R()) * r; return [p.x + Math.cos(a) * d, p.z + Math.sin(a) * d]; };
     switch (z.kind) {
@@ -817,6 +818,77 @@
       dispose() { scene.remove(m); m.material.dispose(); if (inner) { scene.remove(inner); inner.material.dispose(); } },
     });
   };
+
+  // ================================================================ a beam held from frame to frame (a sweeping laser, a wall of force)
+  // set(a, b, r, rv) every frame: r is its radius, the reach of its hit test; rv (optional) a flatter height for a low beam you jump over.
+  // It fades away a moment after it stops being set.
+  const UP = V(0, 1, 0), _bx = V(), _bz = V(), _bm = new THREE.Matrix4();
+  VX.ray = function (col, c2, alpha) { // (alpha: fainter, for a wake that marks where something passed)
+    const m = new THREE.Mesh(cylGeo, beamMat(col, c2 ?? 0xffffff, 7)); m.frustumCulled = false; m.renderOrder = 8; m.material.uniforms.uEnds.value = 1; scene.add(m);
+    const inner = new THREE.Mesh(cylGeo, beamMat(c2 ?? 0xffffff, 0xffffff, 9)); inner.frustumCulled = false; inner.renderOrder = 8; inner.material.uniforms.uEnds.value = 1; scene.add(inner);
+    const h = { t: 0, seen: 0, gone: false, al: alpha ?? 1,
+      set(a, b, r, rv) {
+        const d = b.clone().sub(a), len = d.length() || 0.01; d.divideScalar(len);
+        m.position.copy(a).addScaledVector(d, len * 0.5);
+        _bx.crossVectors(d, UP);
+        if (rv == null || _bx.lengthSq() < 1e-4) { m.quaternion.setFromUnitVectors(UP, d); rv = r; }
+        else { _bx.normalize(); _bz.crossVectors(_bx, d); m.quaternion.setFromRotationMatrix(_bm.makeBasis(_bx, d, _bz)); } // (x across, level; z upright)
+        m.scale.set(r, len, rv);
+        inner.position.copy(m.position); inner.quaternion.copy(m.quaternion); inner.scale.set(r * 0.28, len, rv * 0.28);
+        this.seen = this.t;
+      },
+      update(dt) {
+        this.t += dt; const age = this.t - this.seen, f = age < 0.07 ? 1 : Math.max(0, 1 - (age - 0.07) / 0.2);
+        m.material.uniforms.uA.value = f * this.al * (0.85 + 0.15 * Math.sin(this.t * 41)); inner.material.uniforms.uA.value = f * this.al * 0.85;
+        return f > 0;
+      },
+      dispose() { scene.remove(m); scene.remove(inner); m.material.dispose(); inner.material.dispose(); this.gone = true; },
+    };
+    live.push(h); return h;
+  };
+  // (a held beam: make one the first time, or again once the last one has faded)
+  VX.hold = (h, col, c2) => (h && !h.gone ? h : VX.ray(col, c2));
+
+  // ================================================================ a held upright sheet of light (the blade under a sweeping beam)
+  // set(a, b, ha, hb) every frame: a, b = its foot on the floor, ha, hb = its height above a and above b. Bright along the floor and the top edge.
+  const CURT_VS = `varying vec2 vUv; varying float vDepth;
+    void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vDepth = -mv.z; gl_Position = projectionMatrix * mv; }`;
+  const CURT_FS = `uniform float uT; uniform float uA; uniform vec3 uC; uniform float uLen; ${FOG_U} varying vec2 vUv;
+    ${NOISE}
+    void main() {
+      float y = vUv.y, foot = pow(1.0 - y, 5.0), top = pow(y, 8.0);
+      float streak = fbm(vec2(vUv.x * uLen * 0.6, y * 2.5 - uT * 2.2));
+      float ends = smoothstep(0.0, 0.04, vUv.x) * (1.0 - smoothstep(0.9, 1.0, vUv.x));
+      float a = (0.1 + 0.75 * foot + 0.5 * top) * (0.45 + 0.75 * streak) * ends * uA;
+      ${fogAdd}
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(mix(uC, vec3(1.0), foot * 0.45 + top * 0.3) * fogv, clamp(a, 0.0, 1.0));
+    }`;
+  function curtMat(col) { return mk(CURT_VS, CURT_FS, { uA: { value: 1 }, uC: { value: col3(col) }, uLen: { value: 10 } }, { blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); }
+  VX.curtain = function (col) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    const m = new THREE.Mesh(g, curtMat(col)); m.frustumCulled = false; m.renderOrder = 7; scene.add(m);
+    const h = { t: 0, seen: 0, gone: false,
+      set(a, b, ha, hb) {
+        const p = g.attributes.position.array;
+        p[0] = a.x; p[1] = a.y; p[2] = a.z; p[3] = b.x; p[4] = b.y; p[5] = b.z;
+        p[6] = b.x; p[7] = b.y + hb; p[8] = b.z; p[9] = a.x; p[10] = a.y + ha; p[11] = a.z;
+        g.attributes.position.needsUpdate = true; m.material.uniforms.uLen.value = Math.max(1, a.distanceTo(b));
+        this.seen = this.t;
+      },
+      update(dt) {
+        this.t += dt; const age = this.t - this.seen, f = age < 0.07 ? 1 : Math.max(0, 1 - (age - 0.07) / 0.2);
+        m.material.uniforms.uA.value = f * (0.85 + 0.15 * Math.sin(this.t * 33));
+        return f > 0;
+      },
+      dispose() { scene.remove(m); g.dispose(); m.material.dispose(); this.gone = true; },
+    };
+    live.push(h); return h;
+  };
+  VX.holdCurtain = (h, col) => (h && !h.gone ? h : VX.curtain(col));
 
   // ================================================================ a fan-shaped shock running out over the floor (a cone attack): the band is the front, the fan its reach
   const FAN_VS = `uniform float uS; varying vec2 vP; varying float vDepth;
@@ -902,7 +974,7 @@
     const add = (m) => { m.visible = false; m.frustumCulled = false; scene.add(m); warmMeshes.push(m); };
     add(new THREE.Mesh(areaGeo, areaMat('fire'))); add(new THREE.Mesh(areaGeo, areaMat('poison')));
     add(new THREE.Mesh(domeGeo, shellMat(0xffffff, 0xffffff, 'energy')));
-    add(new THREE.Mesh(cylGeo, beamMat(0xffffff)));
+    add(new THREE.Mesh(cylGeo, beamMat(0xffffff))); add(new THREE.Mesh(areaGeo, curtMat(0xffffff)));
     add(new THREE.Mesh(sphGeo, fireMat()));
     add(new THREE.Mesh(arcGeo(0.5, 1, 1, 4), mk(SLASH_VS, SLASH_FS, { uP: { value: 0 }, uA: { value: 0 }, uC: { value: col3(0xffffff) }, uTail: { value: 0.5 } }, { blending: THREE.AdditiveBlending, side: THREE.DoubleSide })));
     add(new THREE.Mesh(waveGeo(4, 2), mk(WAVE_VS, WAVE_FS, { uA: { value: 0 }, uHalf: { value: 2 } }, { side: THREE.DoubleSide })));

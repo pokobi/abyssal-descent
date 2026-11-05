@@ -184,7 +184,8 @@
         J.arms[1].sh.rotation.x = -2.8;
         if (a.t >= 1.2 && !a.hit) {
           a.hit = true;
-          for (const p of a.pts) { G.fx.beam(p.clone(), p.clone().setY(18), 0xfff0b0, 1.1, 0.4); G.fx.flash(p.clone().setY(2), 0xffe0a0, 30, 0.2, 8); if (distH(P.pos, p) < 2.3 && P.pos.y < 6) this.hurtPlayer(24, 'aoe', p); }
+          for (const p of a.pts) { G.vfx.pillar(p.clone().setY(0), 2.3, 18, 0xfff0b0, 0.55, { c2: 0xffffff }); // (a column as wide as what it hurts)
+            G.fx.flash(p.clone().setY(2), 0xffe0a0, 30, 0.2, 8); if (distH(P.pos, p) < 2.3 && P.pos.y < 6) this.hurtPlayer(24, 'aoe', p); }
           G.sfx.zap(k.pos);
         }
         if (a.t > 1.6) end();
@@ -375,10 +376,11 @@
         if (!a.ang) { a.ang = Math.atan2(P.pos.x - c.x, P.pos.z - c.z) - 1.2; a.dir = Math.random() < 0.5 ? 1 : -1; if (a.dir < 0) a.ang += 2.4; G.ui.toastSmall('⚠ 血の薙ぎ払い — ジャンプで越えろ！'); }
         if (a.t < 0.8) { const to = c.clone().add(V(Math.sin(a.ang) * 24, 0.8, Math.cos(a.ang) * 24)); G.fx.beam(c.clone().setY(0.8), to, 0xff3050, 0.06, 0.05); return; }
         a.ang += a.dir * dt * 1.0 * sp;
-        const to = c.clone().add(V(Math.sin(a.ang) * 24, 0.8, Math.cos(a.ang) * 24));
-        G.fx.beam(c.clone().setY(0.8), to, 0xff2040, 0.35, 0.05);
-        const pa = Math.atan2(P.pos.x - c.x, P.pos.z - c.z);
-        if (Math.abs(U.wrapAngle(pa - a.ang)) < 0.06 && distH(P.pos, c) < 24 && P.pos.y < 1.2) { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 0.4; this.hurtPlayer(18, 'aoe', c); } }
+        const dx = Math.sin(a.ang), dz = Math.cos(a.ang), BY = 0.6, BR = 0.45;
+        a.ray = G.vfx.hold(a.ray, 0xff2040, 0xffc0c8); a.ray.set(c.clone().setY(BY), c.clone().add(V(dx * 24, 0, dz * 24)).setY(BY), BR);
+        if (G.vfx.debug && Math.random() < dt * 4) G.vfx.dbgLane(c.clone().setY(0), V(dx, 0, dz), 24, (BR + 0.35) * 2);
+        const rx = P.pos.x - c.x, rz = P.pos.z - c.z, s = rx * dx + rz * dz;
+        if (s > 0 && s < 24 && Math.abs(rx * dz - rz * dx) < BR + 0.35 && P.pos.y < BY + BR) { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 0.4; this.hurtPlayer(18, 'aoe', c); } }
         if (a.t > 0.8 + 2.4 / sp) end();
       }
     }
@@ -516,7 +518,7 @@
       this.pos.y -= dt * 46;
       if (this.pos.y <= 0) {
         this.pos.y = 0; this.state = 'ground'; this.cd = U.rand(1.4, 2.2);
-        G.fx.ring(this.pos.clone().setY(0.1), 4.6, 0xff4050, 0.5); G.fx.dust(this.pos, V(0, 1, 0), 0x3a2a3a, 26); G.fx.decal(this.pos.clone().setY(0.03), V(0, 1, 0), 'crack', 6, true);
+        G.vfx.nova(this.pos.clone().setY(0), 4.6, 0.12, { style: 'shock', dome: false, ground: 0xff4050 }); G.fx.dust(this.pos, V(0, 1, 0), 0x3a2a3a, 26); G.fx.decal(this.pos.clone().setY(0.03), V(0, 1, 0), 'crack', 6, true);
         G.sfx.explosion(this.pos, 1.3); P.addShake(0.6);
         if (distH(P.pos, this.pos) < 4.6 && P.pos.y < 2) { this.hurtPlayer(34, 'aoe', this.pos); P.vel.y = 8; }
       }

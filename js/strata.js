@@ -515,13 +515,14 @@
       w.group.add(im);
       S.ropes.push({ r, L, n, im, bob: 0, bobV: 0, load: 0, tp: 0.5, on: false });
     }
-    // cell gates: bronze bars hung on a hinge (set apart from the grey iron bars around them), braced, with a lock that glows;
-    // a brass frame with a glowing strip marks the doorway itself and stays when the gate swings open or falls. The bars tint towards rust as they are battered.
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0xb08a3a, metalness: 0.85, roughness: 0.35 });
-    const glowMat = new THREE.MeshStandardMaterial({ color: 0xffb040, emissive: 0xff9020, emissiveIntensity: 1.6, roughness: 0.4 });
+    // cell gates: bars of old, dull bronze hung on a hinge (a warmer brown than the grey iron bars around them), braced, with a lock plate;
+    // a plain dark-iron frame marks the doorway and stays when the gate swings open or falls. Nothing glows: it should belong to the dungeon. The bars tint towards rust as they are battered.
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x3e352c, metalness: 0.55, roughness: 0.8 }); // (blackened iron)
+    const plateMat = new THREE.MeshStandardMaterial({ color: 0x8a6c38, metalness: 0.75, roughness: 0.55 }); // (worn brass: the lock and its ring)
+    const holeMat = new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 1 });
     for (const d of S.doors) {
       const g = new THREE.Group(), wd = d.hi - d.lo;
-      const mat = new THREE.MeshStandardMaterial({ color: 0x9a6a32, metalness: 0.8, roughness: 0.4 });
+      const mat = new THREE.MeshStandardMaterial({ color: 0x5a4430, metalness: 0.6, roughness: 0.72 });
       g.rotation.order = 'YXZ'; d.sg = d.hinge ? -1 : 1; d.hz = d.hinge ? d.hi : d.lo;
       g.position.set(d.plane, d.y, d.hz);
       const bars = [];
@@ -532,19 +533,17 @@
         const len = Math.hypot(wd - 0.1, y1 - y0), ang = Math.atan2(y1 - y0, wd - 0.1);
         for (const sgn of [1, -1]) { const m = new THREE.Mesh(boxG, mat); m.scale.set(len, 0.07, 0.06); m.position.set(d.sg * wd / 2, (y0 + y1) / 2, 0.01 * sgn); m.rotation.z = d.sg * ang * sgn; g.add(m); }
       }
-      // the lock: a broad plate with a keyhole that glows amber, and a ring handle
-      const lock = new THREE.Mesh(boxG, frameMat); lock.scale.set(0.3, 0.36, 0.14); lock.position.set(d.sg * (wd - 0.2), 1.1, 0); g.add(lock);
-      for (const z of [0.075, -0.075]) { const kh = new THREE.Mesh(boxG, glowMat); kh.scale.set(0.05, 0.12, 0.01); kh.position.set(d.sg * (wd - 0.2), 1.08, z); g.add(kh); }
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.015, 6, 14), frameMat); ring.position.set(d.sg * (wd - 0.42), 1.05, 0.08); g.add(ring);
+      // the lock: a broad plate with a dark keyhole, and a ring handle
+      const lock = new THREE.Mesh(boxG, plateMat); lock.scale.set(0.3, 0.36, 0.14); lock.position.set(d.sg * (wd - 0.2), 1.1, 0); g.add(lock);
+      for (const z of [0.075, -0.075]) { const kh = new THREE.Mesh(boxG, holeMat); kh.scale.set(0.05, 0.12, 0.01); kh.position.set(d.sg * (wd - 0.2), 1.08, z); g.add(kh); }
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.015, 6, 14), plateMat); ring.position.set(d.sg * (wd - 0.42), 1.05, 0.08); g.add(ring);
       w.group.add(g);
-      // the doorway's frame: posts and a lintel in brass with a glowing strip down the inner edge (does not move)
+      // the doorway's frame: posts and a lintel of blackened iron (does not move)
       const fr = new THREE.Group(); fr.position.set(d.plane, d.y, 0);
       for (const z of [d.lo, d.hi]) {
-        const post = new THREE.Mesh(boxG, frameMat); post.scale.set(0.24, d.h + 0.2, 0.16); post.position.set(0, (d.h + 0.2) / 2, z); fr.add(post);
-        const strip = new THREE.Mesh(boxG, glowMat); strip.scale.set(0.26, d.h - 0.3, 0.025); strip.position.set(0, d.h / 2, z + (z === d.lo ? 0.09 : -0.09)); fr.add(strip);
+        const post = new THREE.Mesh(boxG, frameMat); post.scale.set(0.2, d.h + 0.2, 0.14); post.position.set(0, (d.h + 0.2) / 2, z); fr.add(post);
       }
-      const lint = new THREE.Mesh(boxG, frameMat); lint.scale.set(0.26, 0.2, wd + 0.3); lint.position.set(0, d.h + 0.1, (d.lo + d.hi) / 2); fr.add(lint);
-      const lstrip = new THREE.Mesh(boxG, glowMat); lstrip.scale.set(0.28, 0.03, wd - 0.2); lstrip.position.set(0, d.h - 0.02, (d.lo + d.hi) / 2); fr.add(lstrip);
+      const lint = new THREE.Mesh(boxG, frameMat); lint.scale.set(0.22, 0.18, wd + 0.3); lint.position.set(0, d.h + 0.1, (d.lo + d.hi) / 2); fr.add(lint);
       fr.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.raycast = () => {}; } });
       w.group.add(fr);
       Object.assign(d, { g, mat, bars, base: mat.color.clone(), ang: 0, fall: 0, shake: 0 });

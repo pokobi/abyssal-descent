@@ -1,11 +1,13 @@
 'use strict';
-// Every guardian in turn in one session, a host and a guest fighting each with weak shots: tests/coop/boss_sweep.js [seconds each, default 14] [ids...]
+// Every guardian in turn in one session, a host and a guest fighting each with weak shots: tests/coop/boss_sweep.js [seconds of game time each, default 14] [ids...]
 const fs = require('fs'), path = require('path');
 const { serve, launch, sleep } = require('./cdp');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PORT = +process.env.COOP_PORT || 8841;
 const ALL = 'colossus wyrm archon executioner broodmother twins heart hunter drake abyssking sovereign sovereign2 houndlord boneking warlock cerberus madman ossuary hollowknight lich behemoth weaver warden arbiter minotaur cinderpriest ashdrake oboro foxfire karakuri stormimp'.split(' ');
-const secs = +process.argv[2] || 14, ids = process.argv.slice(3).length ? process.argv.slice(3) : ALL;
+// The game runs SPEED times as fast (G.game.dev.speed, default 3; TEST_SPEED=1 for the old pace): the same game time in a third of the wait.
+const SPEED = Math.max(1, +process.env.TEST_SPEED || 3);
+const secs = (+process.argv[2] || 14) / SPEED, ids = process.argv.slice(3).length ? process.argv.slice(3) : ALL;
 (async () => {
   const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
   const rows = [];
@@ -21,8 +23,9 @@ const secs = +process.argv[2] || 14, ids = process.argv.slice(3).length ? proces
     const bot = fs.readFileSync(path.join(__dirname, 'coopbot.js'), 'utf8');
     await h.eval(`(0, eval)(${JSON.stringify(bot)}); window.__cbDmg = 5; 1`);
     await g.eval(`(0, eval)(${JSON.stringify(bot)}); window.__cbDmg = 5; 1`);
-    await h.eval('G.Coop.stat = true; G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1');
+    await h.eval('G.Coop.stat = true; G.Coop.begin(); G.game.dev = { god: true, speed: ' + SPEED + ' }; 1');
     await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
+    await g.eval('G.game.dev = { speed: ' + SPEED + ' }; 1'); // (the guest keeps taking damage: that the guardians' blows reach it is part of the check)
     for (const id of ids) {
       const e0 = h.errs.length + g.errs.length, row = { id };
       try {

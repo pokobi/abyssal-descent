@@ -1,11 +1,13 @@
 'use strict';
 // A whole run by two bots: every gate, every guardian, the rift at the end. Watches for errors, worlds that differ and a run that stops moving.
-//   node tests/coop/run_test.js [difficulty id, default normal] [minutes, default 9]
+//   node tests/coop/run_test.js [difficulty id, default normal] [minutes of game time, default 9]
 const fs = require('fs'), path = require('path');
 const { serve, launch, sleep } = require('./cdp');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PORT = +process.env.COOP_PORT || 9501;
-const diff = process.argv[2] || 'normal', mins = +process.argv[3] || 9;
+// The game runs SPEED times as fast (G.game.dev.speed, default 3; TEST_SPEED=1 for the old pace): the same game time in a third of the wait.
+const SPEED = Math.max(1, +process.env.TEST_SPEED || 3);
+const diff = process.argv[2] || 'normal', mins = (+process.argv[3] || 9) / SPEED; // (minutes of game time -> of waiting)
 (async () => {
   const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
   let bad = 0;
@@ -21,9 +23,9 @@ const diff = process.argv[2] || 'normal', mins = +process.argv[3] || 9;
     const bot = fs.readFileSync(path.join(__dirname, 'coopbot.js'), 'utf8');
     await h.eval(`(0, eval)(${JSON.stringify(bot)}); window.__cbRun = true; 1`);
     await g.eval(`(0, eval)(${JSON.stringify(bot)}); window.__cbRun = true; 1`);
-    await h.eval(`G.Coop.diff = { id: '${diff}', lv: ${diff === 'extra' ? 1 : 0} }; G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1`);
+    await h.eval(`G.Coop.diff = { id: '${diff}', lv: ${diff === 'extra' ? 1 : 0} }; G.Coop.begin(); G.game.dev = { god: true, speed: ${SPEED} }; 1`);
     await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
-    await g.eval('G.game.dev = { god: true, speed: 1 }; 1');
+    await g.eval(`G.game.dev = { god: true, speed: ${SPEED} }; 1`);
     await h.eval(`window.__cb = __coopbot(${mins * 60000}); 1`); await g.eval(`window.__cb = __coopbot(${mins * 60000}); 1`);
     const t0 = Date.now();
     let lastArea = 0, lastT = Date.now(), seen = new Set();
@@ -35,7 +37,7 @@ const diff = process.argv[2] || 'normal', mins = +process.argv[3] || 9;
       if (a.a !== lastArea) { lastArea = a.a; lastT = Date.now(); console.log(`${Math.round((Date.now() - t0) / 1000)}s area ${a.a} ${a.k} (guest ${b.a} ${b.k}) world ${b.f}`); }
       if (b.f === false && !seen.has(a.a)) { seen.add(a.a); bad++; console.log('WORLD DIFFERS at', a.a, a.k); }
       if (a.won && b.won) { console.log('both reached the end'); break; }
-      if (Date.now() - lastT > 75000) { console.log('STUCK', JSON.stringify(a), JSON.stringify(b)); console.log('foes', await h.eval('JSON.stringify(G.enemies.list.filter((e) => e.alive).slice(0, 5).map((e) => ({ d: e.def.id, hp: Math.round(e.hp), mx: e.maxHp, sh: Math.round(e.shield || 0), st: e.state, inv: !!e.invuln, unt: !!e.untargetable, bur: !!e.burrowed, mut: e.mut && e.mut.id, cu: !!e.custom, tgt: !!e.isTarget, pos: [Math.round(e.pos.x), Math.round(e.pos.y), Math.round(e.pos.z)], clo: !!e.cloaked, ii: e.isInvuln ? e.isInvuln({ src: "bullet" }) : null })))')); console.log('gfoes', await g.eval('JSON.stringify(G.enemies.list.filter((e) => e.alive).slice(0, 5).map((e) => [e._nid, e.def.id, Math.round(e.hp), e.state, !!e.invuln, !!e.untargetable, !!e.burrowed]))')); bad++; lastT = Date.now(); await h.eval('window.__cbStuck = (window.__cbStuck || 0) + 1; 1'); }
+      if (Date.now() - lastT > Math.max(30000, 75000 / SPEED)) { console.log('STUCK', JSON.stringify(a), JSON.stringify(b)); console.log('foes', await h.eval('JSON.stringify(G.enemies.list.filter((e) => e.alive).slice(0, 5).map((e) => ({ d: e.def.id, hp: Math.round(e.hp), mx: e.maxHp, sh: Math.round(e.shield || 0), st: e.state, inv: !!e.invuln, unt: !!e.untargetable, bur: !!e.burrowed, mut: e.mut && e.mut.id, cu: !!e.custom, tgt: !!e.isTarget, pos: [Math.round(e.pos.x), Math.round(e.pos.y), Math.round(e.pos.z)], clo: !!e.cloaked, ii: e.isInvuln ? e.isInvuln({ src: "bullet" }) : null })))')); console.log('gfoes', await g.eval('JSON.stringify(G.enemies.list.filter((e) => e.alive).slice(0, 5).map((e) => [e._nid, e.def.id, Math.round(e.hp), e.state, !!e.invuln, !!e.untargetable, !!e.burrowed]))')); bad++; lastT = Date.now(); await h.eval('window.__cbStuck = (window.__cbStuck || 0) + 1; 1'); }
       if (h.errs.length + g.errs.length > 0 && !seen.has('e')) { seen.add('e'); bad++; console.log('ERRORS', h.errs.concat(g.errs).slice(0, 4).join(' || ').slice(0, 700)); }
     }
     console.log('errors', h.errs.length, g.errs.length, JSON.stringify(h.errs.concat(g.errs).slice(0, 6)).slice(0, 900));

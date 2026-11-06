@@ -154,6 +154,8 @@
   F.update = function (dt) {
     const w = G.world, P = G.player, C = G.combat;
     P.fieldSpeed = 1; P.fieldSlip = 1; P.fieldJump = 1; P.fieldSlide = 1;
+    // standing on a block of ice (the frozen hall's glacier ridges and the like): as slick as an ice sheet underfoot
+    if (w && P.grounded && !P.dead && P.surfaceBelow && P.surfaceBelow() === 'ice') { P.fieldSlip = 0.12; P.fieldSlide = 1.8; }
     if (!seen || seen.run !== G.game.run) seen = { run: G.game.run, k: {} };
     envTick(dt);
     if (!w || !w.fields || !w.fields.length || P.dead) { if (G.sfx.boilBed) G.sfx.boilBed(0); return; }

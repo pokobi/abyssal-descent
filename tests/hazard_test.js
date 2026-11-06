@@ -24,9 +24,11 @@ const PORT = +process.env.COOP_PORT || 9993;
     // helpers in the page: enter an area of a field (with a mood), cells next to the void, a walker / flyer of the area's level
     await p.eval(`(() => {
       const H = window.__H = {};
-      H.sl = (ms) => new Promise((res) => setTimeout(res, ms));
+      // (waits run on the game's own clock: right after an area is built, or under load, it runs behind the wall clock)
+      H.sl = (ms) => new Promise((res) => { const g0 = G.game.time, r0 = performance.now(); const tick = () => { if (G.game.time - g0 >= ms / 1000 || performance.now() - r0 > ms * 8 + 4000) res(); else setTimeout(tick, 15); }; tick(); });
       H.enter = (field, mood) => { const R = G.Run, GM = G.game; R._f0 = R._f0 || R.field; R.field = () => field; G.Sky.force = mood || ((G.Sky.V[field] || [])[0] || {}).id;
-        G.enemies.clear(); GM.transitioning = false; G.ui.clearScreen(); GM.state = 'playing'; GM.enterArea(9, 'combat'); G.enemies.clear(); GM.objective = null; GM.waves = null; GM.dev = { speed: 1 }; GM.areaCleared = false; };
+        G.enemies.clear(); GM.transitioning = false; G.ui.clearScreen(); GM.state = 'playing'; GM.enterArea(9, 'combat'); G.enemies.clear(); GM.objective = null; GM.waves = null; GM.dev = { speed: 1 }; GM.areaCleared = false;
+        if (G.Warm && G.Warm.world) G.Warm.world(); }; // (its shaders compiled now, as the game does behind the fade between areas)
       H.edgeCells = () => { const w = G.world, out = [];
         for (let z = 2; z < w.Dn - 2; z++) for (let x = 2; x < w.Wn - 2; x++) { const i = z * w.Wn + x; if (w.nb[i] || w.nf[i] < -0.5 || w.nf[i] > 0.5 || w.npen[i] > 0.36 || (w.reachMask && !w.reachMask[i])) continue;
           const px = x - w.xo + 0.5, pz = z - w.zo + 0.5; let v = null;

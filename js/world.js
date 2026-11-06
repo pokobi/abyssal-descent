@@ -130,7 +130,7 @@
       o = o || {};
       if (x1 - x0 < 0.001 || y1 - y0 < 0.001 || z1 - z0 < 0.001) return null;
       this.batch.box(mk, x0, y0, z0, x1, y1, z1, o);
-      return this.addCollider(x0, y0, z0, x1, y1, z1, { surf: o.surf || (mk.startsWith('wood') ? 'wood' : mk === 'iron' ? 'metal' : 'stone'), noGrapple: o.noGrapple, tag: o.tag });
+      return this.addCollider(x0, y0, z0, x1, y1, z1, { surf: o.surf || (mk.startsWith('wood') ? 'wood' : mk === 'iron' ? 'metal' : mk === 'ice' ? 'ice' : 'stone'), noGrapple: o.noGrapple, tag: o.tag });
     }
     visual(mk, x0, y0, z0, x1, y1, z1, o) { this.batch.box(mk, x0, y0, z0, x1, y1, z1, o); }
     query(x0, y0, z0, x1, y1, z1, out) {

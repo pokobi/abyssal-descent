@@ -243,6 +243,22 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
       check(await ev('return G.Strata.doors[0].state === "broken"'), 'gate: blasts batter it down');
       check(await ev('const it = G.Strata.doors[1].it; return it.type === "celldoor" && G.world.interactables.includes(it)'), 'gate: the key works it (it is a cell gate)');
     }
+    // the frozen hall's glacier: its ice ridges are as slick as an ice sheet, the stone floor beside them is not
+    {
+      const r = await ev(`for (let n = 2; n < 40; n++) { const w = T.enter('frozen', n); if (w.layout === 'glacier') break; } const w = G.world;
+        const c = w.colliders.find((c) => c.alive && c.surf === 'ice' && c.y1 > 1); if (!c) return null; return { x: (c.x0 + c.x1) / 2, z: (c.z0 + c.z1) / 2, y: c.y1 };`);
+      check(!!r, 'ice: the glacier has its ridges of ice');
+      if (r) {
+        await ev(`const P = G.player; P.pos.set(${r.x}, ${r.y} + 0.02, ${r.z}); P.vel.set(0, 0, 0); return 1`);
+        await wait(0.3);
+        const on = await ev('return { slip: G.player.fieldSlip, slide: G.player.fieldSlide, y: G.player.pos.y, g: G.player.grounded }');
+        await ev(`const w = G.world, s = w.spawn; G.player.pos.set(s.x, 0.05, s.z); G.player.vel.set(0, 0, 0); return 1`);
+        await wait(0.3);
+        const off = await ev('return { slip: G.player.fieldSlip }');
+        check(on.g && on.slip <= 0.12 && on.slide >= 1.8, `ice: standing on a ridge of ice is slick (${JSON.stringify(on)})`);
+        check(off.slip === 1, 'ice: the stone floor is not');
+      }
+    }
     // the gale and the bell by the key, a projectile at the bell
     {
       await ev("T.enter('hamlet', 3); return 1");

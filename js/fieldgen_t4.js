@@ -2,7 +2,7 @@
 // The deep tier's new fields (runplan.js R.TIERS[3]): drawn instead of the blue-fire ruin for a segment.
 //   frozen  - 凍てつく霊廟: a mausoleum frozen solid. Pillars sheathed in ice, crystal growths, frozen statues, slick ice underfoot,
 //             and icicles that break from the vault: a shadow on the floor, then the fall.
-//   sanctum - 天空の聖域 (below): a sanctuary floating in a false sky at the bottom of the abyss; islands of white stone and narrow bridges
+//   sanctum - 天空の聖域 (below): a sanctuary floating in a false sky at the bottom of the abyss; broad islands of white stone and wide bridges
 //             over clouds with darkness under them.
 (function () {
   const LG = G.LevelGen, H = LG._, F = G.FieldGen, FB = F._, U = G.U, V = U.V;
@@ -120,23 +120,38 @@
   };
 
   // ---------------------------------------------------------------- 天空の聖域
-  // white stone islands over a sea of clouds: the floor exists only on the islands and the bridges between them
+  // white stone islands over a sea of clouds: the floor exists only on the islands and the bridges between them.
+  // The sky fields are laid out wider than the others (most of the area is sky): a great island in the middle, broad islands round it
+  // (each a round body with a lobe or two) and bridges wide enough to fight on, so the floor comes near what the other fields of the
+  // depth give you.
   function genSanctum(area, seed, extraChests, gates, kind) {
-    const { rng, W, D, w, occ } = FB.base(area, seed, 'sanctum');
+    const { rng, W, D, w, occ } = FB.base(area, seed, 'sanctum', Math.min(96, 82 + Math.floor(area / 3) * 2 + ((seed >>> 0) % 3) * 4));
     FB.reserve(occ, W, D, gates);
     const pit = new Uint8Array(W * D).fill(1);
     const fill = (x0, z0, x1, z1) => { for (let z = Math.max(0, Math.floor(z0)); z < Math.min(D, Math.ceil(z1)); z++) for (let x = Math.max(0, Math.floor(x0)); x < Math.min(W, Math.ceil(x1)); x++) pit[z * W + x] = 0; };
     const disc = (cx, cz, r) => { for (let z = Math.floor(cz - r); z <= Math.ceil(cz + r); z++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) if (x >= 0 && z >= 0 && x < W && z < D && Math.hypot(x + 0.5 - cx, z + 0.5 - cz) <= r) pit[z * W + x] = 0; };
     // the gate terrace (exits, the post-clear stall) and the landing you arrive on
-    fill(0, 0, W, 18); fill(W / 2 - 10, D - 15, W / 2 + 10, D);
-    const isl = [{ x: W / 2, z: 10, r: 0, fixed: true }, { x: W / 2, z: D - 8, r: 0, fixed: true }];
-    const nI = 4 + rng.int(0, 2);
-    for (let t = 0; t < 200 && isl.length < nI + 2; t++) {
-      const r = rng.range(6, 9.5), x = rng.range(r + 3, W - r - 3), z = rng.range(24 + r * 0.5, D - 20 - r * 0.5);
-      if (isl.some((q) => Math.hypot(q.x - x, q.z - z) < (q.r || 9) + r + 4)) continue;
-      isl.push({ x, z, r }); disc(x, z, r);
+    const TD = 18, LW = 14, LD = 18, GAP = 3; // (GAP: the sky kept between two islands, and round the terrace and the landing)
+    fill(0, 0, W, TD); fill(W / 2 - LW, D - LD, W / 2 + LW, D);
+    const isl = [{ x: W / 2, z: TD / 2, r: 0, discs: [] }, { x: W / 2, z: D - LD / 2, r: 0, discs: [] }];
+    const fits = ([x, z, r]) => z - r >= TD + GAP && x - r >= 2 && x + r <= W - 2 && z + r <= D - 3
+      && !(z + r > D - LD - GAP && x + r > W / 2 - LW - GAP && x - r < W / 2 + LW + GAP)
+      && isl.every((q) => q.discs.every(([a, b, s]) => Math.hypot(a - x, b - z) >= s + r + GAP));
+    // the great island in the middle: the open heart of the sanctuary (a shrine at its centre, a wide ring of columns, room to fight)
+    {
+      const r = Math.min(17, (D - LD - TD) / 2 - GAP - 3), body = [W / 2 + rng.range(-6, 6), (TD + D - LD) / 2 + rng.range(-3, 3), r];
+      isl.push({ x: body[0], z: body[1], r, discs: [body], great: true }); disc(...body);
     }
-    // bridges: a tree joining every island (nearest first), and one more for a loop
+    // broad islands first, then smaller ones into the sky left between them
+    const nI = 10 + rng.int(0, 2);
+    for (let t = 0; t < 1400 && isl.length < nI + 3; t++) {
+      const r = t < 700 ? rng.range(9, 13) : rng.range(6.5, 9), body = [rng.range(r + 2, W - r - 2), rng.range(TD + GAP + r, D - 3 - r), r];
+      if (!fits(body)) continue;
+      const discs = [body];
+      for (let k = rng.int(1, 3); k > 0; k--) { const a = rng.range(0, 6.28), d = r * rng.range(0.6, 0.85), lobe = [body[0] + Math.cos(a) * d, body[1] + Math.sin(a) * d, r * rng.range(0.5, 0.7)]; if (fits(lobe)) discs.push(lobe); }
+      isl.push({ x: body[0], z: body[1], r, discs }); for (const [a, b, s] of discs) disc(a, b, s);
+    }
+    // bridges: a tree joining every island (nearest first), and two more for loops
     const bridge = (a, b, hw) => { const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) * 2); for (let i = 0; i <= n; i++) { const k = i / n; disc(a.x + (b.x - a.x) * k, a.z + (b.z - a.z) * k, hw); } };
     const linked = [0], links = [];
     while (linked.length < isl.length) {
@@ -144,8 +159,8 @@
       for (const i of linked) for (let j = 0; j < isl.length; j++) if (!linked.includes(j)) { const d = Math.hypot(isl[i].x - isl[j].x, isl[i].z - isl[j].z); if (!best || d < best.d) best = { i, j, d }; }
       linked.push(best.j); links.push([best.i, best.j]);
     }
-    for (const [i, j] of links) bridge(isl[i], isl[j], 1.5);
-    { const a = rng.int(2, isl.length - 1), b = rng.int(0, isl.length - 1); if (a !== b && !links.some(([i, j]) => (i === a && j === b) || (i === b && j === a))) bridge(isl[a], isl[b], 1.3); }
+    for (const [i, j] of links) bridge(isl[i], isl[j], 2.4);
+    for (let k = 0; k < 2 && isl.length > 3; k++) { const a = rng.int(2, isl.length - 1), b = rng.int(0, isl.length - 1); if (a !== b && !links.some(([i, j]) => (i === a && j === b) || (i === b && j === a))) { bridge(isl[a], isl[b], 2.0); links.push([a, b]); } }
     for (let i = 0; i < W * D; i++) if (pit[i]) occ.a[i] = 1;
     H.floors(w, W, D, pit, 'floor');
     H.perimeter(w, rng, W, D, { gates, h: 9, noBal: true });
@@ -153,26 +168,27 @@
     w.killY = -12; w.noRim = true;
     // the islands' undersides: rock cones hanging into the clouds (visual)
     w.deferred.push((grp) => {
-      for (const q of isl) { if (!q.r) continue; const m = new THREE.Mesh(PG().cone, w.mats.rock); m.scale.set(q.r * 0.95, q.r * 1.6, q.r * 0.95); m.rotation.x = Math.PI; m.position.set(q.x, -q.r * 0.8 - 0.4, q.z); grp.add(m); }
-      for (const [x0, z0, x1, z1] of [[0, 0, W, 18], [W / 2 - 10, D - 15, W / 2 + 10, D]]) { const m = new THREE.Mesh(PG().box, w.mats.rock); m.scale.set(x1 - x0, 6, z1 - z0); m.position.set((x0 + x1) / 2, -3.4, (z0 + z1) / 2); grp.add(m); }
+      for (const q of isl) for (const [x, z, s] of q.discs) { const m = new THREE.Mesh(PG().cone, w.mats.rock); m.scale.set(s * 0.95, s * 1.6, s * 0.95); m.rotation.x = Math.PI; m.position.set(x, -s * 0.8 - 0.4, z); grp.add(m); }
+      for (const [x0, z0, x1, z1] of [[0, 0, W, TD], [W / 2 - LW, D - LD, W / 2 + LW, D]]) { const m = new THREE.Mesh(PG().box, w.mats.rock); m.scale.set(x1 - x0, 6, z1 - z0); m.position.set((x0 + x1) / 2, -3.4, (z0 + z1) / 2); grp.add(m); }
     });
     // on the islands: a ring of columns round a shrine, statues, golden braziers, a vent that throws you up to a floating slab
     let tops = 0;
     for (const q of isl) {
       if (!q.r) continue;
-      const kind2 = rng.pick(['ring', 'shrine', 'statues', 'garden']);
+      const big = q.r > 10.5;
+      const kind2 = q.great ? 'shrine' : rng.pick(['ring', 'shrine', 'statues', 'garden']);
       if (kind2 === 'ring' || kind2 === 'shrine') {
-        const n = 6, rr = q.r - 2;
+        const n = q.great ? 10 : big ? 8 : 6, rr = q.r - 2;
         for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + rng.range(-0.1, 0.1), x = q.x + Math.cos(a) * rr, z = q.z + Math.sin(a) * rr; if (occ.free(x - 0.8, z - 0.8, x + 0.8, z + 0.8)) { P().pillarRound(w, x, z, 0, rng.range(4, 7), 0.42, rng.chance(0.25), rng); occ.mark(x - 0.8, z - 0.8, x + 0.8, z + 0.8); } }
         if (kind2 === 'shrine') { w.solid('trim', q.x - 1.2, 0, q.z - 1.2, q.x + 1.2, 1.0, q.z + 1.2, { uv: 1 }); P().brazier(w, q.x, 1.0, q.z, 1.1); occ.mark(q.x - 1.8, q.z - 1.8, q.x + 1.8, q.z + 1.8); }
       } else if (kind2 === 'statues') {
-        for (let i = 0; i < 3; i++) { const a = rng.range(0, 6.28), d = rng.range(0, q.r - 3), x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d; if (occ.free(x - 1.4, z - 1.4, x + 1.4, z + 1.4)) { occ.mark(x - 1.4, z - 1.4, x + 1.4, z + 1.4); w.solid('block', x - 1, 0, z - 1, x + 1, 0.8, z + 1, { uv: 1 }); P().statue(w, x, z, 0.8, rng.range(0, 6), rng, 1); } }
+        for (let i = 0; i < (big ? 4 : 3); i++) { const a = rng.range(0, 6.28), d = rng.range(0, q.r - 3), x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d; if (occ.free(x - 1.4, z - 1.4, x + 1.4, z + 1.4)) { occ.mark(x - 1.4, z - 1.4, x + 1.4, z + 1.4); w.solid('block', x - 1, 0, z - 1, x + 1, 0.8, z + 1, { uv: 1 }); P().statue(w, x, z, 0.8, rng.range(0, 6), rng, 1); } }
       } else {
-        for (let i = 0; i < 4; i++) { const a = rng.range(0, 6.28), d = rng.range(1, q.r - 2), x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d; if (occ.free(x - 1, z - 1, x + 1, z + 1)) { occ.mark(x - 1, z - 1, x + 1, z + 1); const ts = rng.int(1, 1e9), sc = rng.range(0.7, 1.0); w.deferred.push((grp) => LG.tree(grp, w, x, 0, z, new G.RNG(ts), sc)); w.addCollider(x - 0.25, 0, z - 0.25, x + 0.25, 4, z + 0.25, { surf: 'wood' }); } }
+        for (let i = 0; i < (big ? 5 : 4); i++) { const a = rng.range(0, 6.28), d = rng.range(1, q.r - 2), x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d; if (occ.free(x - 1, z - 1, x + 1, z + 1)) { occ.mark(x - 1, z - 1, x + 1, z + 1); const ts = rng.int(1, 1e9), sc = rng.range(0.7, 1.0); w.deferred.push((grp) => LG.tree(grp, w, x, 0, z, new G.RNG(ts), sc)); w.addCollider(x - 0.25, 0, z - 0.25, x + 0.25, 4, z + 0.25, { surf: 'wood' }); } }
       }
       for (let i = 0; i < 2; i++) { const a = rng.range(0, 6.28), x = q.x + Math.cos(a) * (q.r - 1.2), z = q.z + Math.sin(a) * (q.r - 1.2); if (occ.free(x - 0.6, z - 0.6, x + 0.6, z + 0.6)) { P().brazier(w, x, 0, z, 0.9, true); occ.mark(x - 0.8, z - 0.8, x + 0.8, z + 0.8); } }
       // a floating slab above the island, reached by the updraft of a vent
-      if (G.Fields && tops < 3 && rng.chance(0.6)) {
+      if (G.Fields && tops < 4 && rng.chance(0.6)) {
         const a = rng.range(0, 6.28), d = rng.range(0, Math.max(0.5, q.r - 4)), x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d, y = rng.range(4.5, 6);
         if (occ.free(x - 2.5, z - 2.5, x + 2.5, z + 2.5)) {
           occ.mark(x - 2.5, z - 2.5, x + 2.5, z + 2.5);

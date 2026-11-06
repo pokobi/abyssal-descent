@@ -1,6 +1,6 @@
 'use strict';
 // The entrance tier's new fields (runplan.js R.TIERS[1]): drawn instead of the dungeon entrance for a segment.
-//   catacombs - 地下墓所: the burial maze under the graveyard. Narrow passages walled with bones, small burial chambers, a low vault.
+//   catacombs - 地下墓所: the burial maze under the graveyard. Passages walled with bones, small burial chambers, a low vault.
 //   castle    - 血月の古城 (below): the castle that guards the way down, its baileys under a blood moon.
 (function () {
   const LG = G.LevelGen, H = LG._, F = G.FieldGen, FB = F._, U = G.U, V = U.V;
@@ -29,8 +29,9 @@
     F.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, beamStep: 9 });
     const layout = rng.pick(['maze', 'galleries', 'crypts']);
     w.layout = layout;
-    // the maze: a grid of cells, walls between them, a corridor tree with a few loops, some cells merged into burial chambers
-    const CELL = layout === 'galleries' ? 8 : 7, WT = 1.4;
+    // the maze: a grid of cells, walls between them, a corridor tree with a few loops, some cells merged into burial chambers.
+    // The cells are big enough that a passage leaves room to fight and to get round a foe (the bone niches eat into it)
+    const CELL = layout === 'galleries' ? 10 : 9, WT = 1.4;
     const gx0 = 3, gz0 = 18, cols = Math.floor((W - 6) / CELL), rows = Math.floor((D - gz0 - 12) / CELL);
     const ox = gx0 + ((W - 6) - cols * CELL) / 2, oz = gz0;
     const id = (c, r) => r * cols + c, open = new Set(), key = (a, b) => (a < b ? a + ':' + b : b + ':' + a);

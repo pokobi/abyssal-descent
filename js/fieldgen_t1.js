@@ -333,11 +333,11 @@
     for (const gx of gxs) way(gx - 1.6, 0, gx + 1.6, 12);
     if (layout === 'avenue') {
       // the grand avenue: wide paving, colonnades both sides, an arch half way, statues on plinths
-      way(cx - 4, 9, cx + 4, D);
-      for (const sx of [-1, 1]) H.colonnade(w, rng, cx + sx * 6.2, 16, D - 30, false, rng.range(6, 7.5), true);
-      occ.mark(cx - 7.5, 14, cx + 7.5, D - 12);
-      arch(w, rng, cx, Math.round(D * 0.55), 8);
-      occ.mark(cx - 8.4, D * 0.55 - 2, cx + 8.4, D * 0.55 + 2);
+      way(cx - 5.5, 9, cx + 5.5, D);
+      for (const sx of [-1, 1]) H.colonnade(w, rng, cx + sx * 8, 16, D - 30, false, rng.range(6, 7.5), true);
+      occ.mark(cx - 9.3, 14, cx + 9.3, D - 12);
+      arch(w, rng, cx, Math.round(D * 0.55), 11.6);
+      occ.mark(cx - 10.2, D * 0.55 - 2, cx + 10.2, D * 0.55 + 2);
     } else if (layout === 'forum') {
       // the forum: a paved square, the temple on its podium at the north end, a dry fountain in the middle
       way(cx - 2.4, 9, cx + 2.4, D);
@@ -376,19 +376,19 @@
       const up = ruinBlock(w, rng, r, rng.pick([3, 3.5]));
       if (up) w.platTops.push(up);
     }
-    // low ruins, broken walls and colonnade fragments
-    for (let i = 0; i < 3; i++) { const r = occ.place(rng, rng.int(7, 9), rng.int(6, 8), 1.4, 20); if (r) H.house(w, rng, r, { ruined: 1, h: [3.2, 4.4] }); }
-    for (let i = 0; i < 3; i++) { const ax = rng.chance(0.5), len = rng.int(8, 14); const r = occ.place(rng, ax ? len + 2 : 3, ax ? 3 : len + 2, 1.5, 20); if (r) H.colonnade(w, rng, ax ? r.x0 + 1 : r.x0 + 1.5, ax ? r.z0 + 1.5 : r.z0 + 1, len, ax, rng.range(5, 7), true); }
-    for (let i = 0; i < 4; i++) { const ax = rng.chance(0.5), r = occ.place(rng, ax ? 7 : 2, ax ? 2 : 7, 1, 14); if (r) fallenColumn(w, rng, (r.x0 + r.x1) / 2 - (ax ? 0.6 : 0), (r.z0 + r.z1) / 2 - (ax ? 0 : 0.6), ax); }
-    for (let i = 0; i < 4; i++) { const ax = rng.chance(0.5), len = rng.int(3, 6); const r = occ.place(rng, ax ? len : 1, ax ? 1 : len, 1); if (r) H.lowWall(w, rng, ax ? r.x0 : r.x0 + 0.5, ax ? r.z0 + 0.5 : r.z0, len, ax); }
+    // low ruins, broken walls and colonnade fragments (kept few: the open paving between them is where the fights are)
+    for (let i = 0; i < 2; i++) { const r = occ.place(rng, rng.int(7, 9), rng.int(6, 8), 1.4, 20); if (r) H.house(w, rng, r, { ruined: 1, h: [3.2, 4.4] }); }
+    for (let i = 0; i < 2; i++) { const ax = rng.chance(0.5), len = rng.int(8, 14); const r = occ.place(rng, ax ? len + 2 : 3, ax ? 3 : len + 2, 1.5, 20); if (r) H.colonnade(w, rng, ax ? r.x0 + 1 : r.x0 + 1.5, ax ? r.z0 + 1.5 : r.z0 + 1, len, ax, rng.range(5, 7), true); }
+    for (let i = 0; i < 3; i++) { const ax = rng.chance(0.5), r = occ.place(rng, ax ? 7 : 2, ax ? 2 : 7, 1, 14); if (r) fallenColumn(w, rng, (r.x0 + r.x1) / 2 - (ax ? 0.6 : 0), (r.z0 + r.z1) / 2 - (ax ? 0 : 0.6), ax); }
+    for (let i = 0; i < 3; i++) { const ax = rng.chance(0.5), len = rng.int(3, 6); const r = occ.place(rng, ax ? len : 1, ax ? 1 : len, 1); if (r) H.lowWall(w, rng, ax ? r.x0 : r.x0 + 0.5, ax ? r.z0 + 0.5 : r.z0, len, ax); }
     // obelisks and statues on plinths, dry trees, tall dry grass
     for (let i = 0; i < 2; i++) { const r = occ.place(rng, 3, 3, 1.5, 16); if (!r) continue; const x = r.x0 + 1.5, z = r.z0 + 1.5; w.solid('block', x - 1.2, 0, z - 1.2, x + 1.2, 0.8, z + 1.2, { uv: 1 }); w.solid('block', x - 0.5, 0.8, z - 0.5, x + 0.5, 0.8 + rng.range(6, 9), z + 0.5, { uv: 2 }); }
-    for (let i = 0; i < 3; i++) { const r = occ.place(rng, 3, 3, 1.2, 14); if (r) { w.solid('block', r.x0 + 0.4, 0, r.z0 + 0.4, r.x1 - 0.4, 1.0, r.z1 - 0.4, { uv: 1 }); P().statue(w, r.x0 + 1.5, r.z0 + 1.5, 1.0, rng.range(0, 6), rng, 0.9); } }
+    for (let i = 0; i < 2; i++) { const r = occ.place(rng, 3, 3, 1.2, 14); if (r) { w.solid('block', r.x0 + 0.4, 0, r.z0 + 0.4, r.x1 - 0.4, 1.0, r.z1 - 0.4, { uv: 1 }); P().statue(w, r.x0 + 1.5, r.z0 + 1.5, 1.0, rng.range(0, 6), rng, 0.9); } }
     for (let i = 0; i < 4 + rng.int(0, 3); i++) { const r = occ.place(rng, 2, 2, 1.2, 12); if (r) F.deadTree(w, r.x0 + 1, r.z0 + 1, rng, rng.range(0.9, 1.3)); }
     for (let i = 0; i < 26; i++) { const x = rng.range(4, W - 4), z = rng.range(14, D - 6); if (!occ.free(x - 0.5, z - 0.5, x + 0.5, z + 0.5)) continue; for (let k = 0; k < 4; k++) w.batch.geo('leaf', PG().cone, Mx(x + rng.range(-0.5, 0.5), 0.35, z + rng.range(-0.5, 0.5), 0.05, 0.7, 0.05, rng.range(-0.3, 0.3), 0, rng.range(-0.3, 0.3)), { tint: [1.5, 1.25, 0.6] }); }
     for (let i = 0; i < 5; i++) { const r = occ.place(rng, 2, 2, 0.8, 10); if (r) { if (rng.chance(0.5)) P().urn(w, r.x0 + 1, r.z0 + 1, 0, rng); else P().rubble(w, r.x0 + 1, 0, r.z0 + 1, rng, rng.range(0.8, 1.4)); } }
     // braziers lit along the ways (the city is not quite empty)
-    for (let z = D - 16; z > 16; z -= 14) { P().brazier(w, cx - (layout === 'avenue' ? 4.6 : 3), 0, z, 0.9, true); if (rng.chance(0.6)) P().brazier(w, cx + (layout === 'avenue' ? 4.6 : 3), 0, z - 7, 0.9, true); }
+    for (let z = D - 16; z > 16; z -= 14) { P().brazier(w, cx - (layout === 'avenue' ? 6.4 : 3), 0, z, 0.9, true); if (rng.chance(0.6)) P().brazier(w, cx + (layout === 'avenue' ? 6.4 : 3), 0, z - 7, 0.9, true); }
     skyline(w, rng, W, D);
     return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
   }

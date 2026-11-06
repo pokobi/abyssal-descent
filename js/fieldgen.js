@@ -166,17 +166,17 @@
 
 
   // ---------------------------------------------------------------- a chasm across the area (not common)
-  // The floor is left out of a wide band across the middle; a few stone bridges cross it (the first one carries the main path).
+  // The floor is left out of a wide band across the middle; three broad stone bridges cross it (the middle one carries the main path,
+  // one on each side): wide enough to fight on, so the band does not choke the area.
   // Falling in costs 15% of your HP and puts you back on the last safe ground (see player.js fellInPit); foes that fall die.
   F.chasmMask = function (rng, W, D, occ) {
     const pit = new Uint8Array(W * D);
-    const z0 = Math.floor(D * 0.42), z1 = Math.floor(D * 0.57);
+    const z0 = Math.floor(D * 0.42), z1 = Math.floor(D * 0.57), HB = 2.5; // (HB: half a bridge's width)
     for (let z = z0; z < z1; z++) for (let x = 3; x < W - 3; x++) pit[z * W + x] = 1;
     occ.mark(0, z0 - 1, W, z1 + 1, 1);
-    const nb = rng.int(2, 3);
     {
-      const list = [[W / 2 - 1.6, W / 2 + 1.6, z0, z1]];
-      for (let i = 1; i < nb; i++) { const bx = rng.chance(0.5) ? rng.range(8, W / 2 - 9) : rng.range(W / 2 + 9, W - 8); list.push([bx - 1.6, bx + 1.6, z0, z1]); }
+      const list = [];
+      for (const bx of [W / 2, Math.round(rng.range(9, W / 2 - 10)), Math.round(rng.range(W / 2 + 10, W - 9))]) list.push([bx - HB, bx + HB, z0, z1]);
       pit.bridges = list; pit.band = { z0, z1 };
     }
     return pit;

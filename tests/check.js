@@ -49,7 +49,7 @@ const MAP = [
   [/^js\/(melee|weapons)\.js$/, ['solo_smoke', 'skill']],
   [/^js\/(combat|enemies|player|game|data_enemies|data_buffs|depth)\.js$/, ['solo_smoke', 'run']],
   [/^js\/(game|parts|pawn)\.js$/, ['give', 'shop']], // (weapons handed over: never pushing out the ones held)
-  [/^js\/(world|levelgen|fieldgen|strata|props|graves|fields)\.js$/, ['solo_smoke', 'world']],
+  [/^js\/(world|levelgen|fieldgen|fieldgen_t\d|strata|props|graves|fields)\.js$/, ['solo_smoke', 'world', 'run']], // (the new fields come up in co-op runs too)
   [/^js\/(levelgen|fieldgen|fieldgen_t\d|strata|props|fields|textures|skyvary|runplan)\.js$/, ['field']], // (every field builds; the per-segment draw; the sky moods)
   [/^js\/(areas|rooms2|midsave)\.js$/, ['solo_smoke', 'room', 'give']],
   [/^js\/bosses7\.js$/, ['boss_hp']],

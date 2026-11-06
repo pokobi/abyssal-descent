@@ -205,7 +205,10 @@
       K.handlers.gm = function (m, from) {
         if (K.role === 'host') K.relay(m, from);
         if (m.a !== GM.area) return;
-        const g = G.Gim.list[m.i]; if (!g || g.used) return;
+        const g = G.Gim.list[m.i]; if (!g) return;
+        // (one that gathers itself again may still be a moment from whole on this screen's clock: it is whole, since it went off there)
+        if (g.used && !g.run) G.Gim.ready(g);
+        if (g.used) return;
         K._net = true;
         try { GmT.call(G.Gim, g, { by: m.by, net: true }); } finally { K._net = false; }
       };

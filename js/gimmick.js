@@ -3,7 +3,8 @@
 //   霧の廃村 the chapel bell / 黄昏の廃都 the cracked great pillars / 血月の古城 the cauldrons of boiling oil on the wall walks /
 //   水没回廊 the sluice wheels / 溶鉱の深層 the hanging crucibles / 天空の聖域 the statues that breathe the wind
 //   (地下墓所's iron gates are strata.js's cell gates, built by fieldgen_t2.js).
-// Each one works once. The generators place them (G.Gim.add, with colliders that shots strike); this file builds their meshes when the
+// Each one works once, except a kind with K.cd (the wind statues): it gathers itself again and is ready cd seconds after it was set off
+// (K.charging(g, k) shows it filling, K.ready(g) when it is whole again). The generators place them (G.Gim.add, with colliders that shots strike); this file builds their meshes when the
 // area starts, routes shots, blows, blasts and the interact key to them, runs what they set off on game time, and saves which are spent.
 // What they do to monsters is done only to the ones this screen runs (not to e._rep copies); what they do to you, each screen does to its own player.
 // The kinds themselves are in gimmick_a.js / gimmick_b.js (G.Gim.K[kind]).
@@ -47,6 +48,7 @@
     const GM = G.game, S = GM.search;
     for (const g of Gm.list) {
       const K = Gm.K[g.kind]; if (!K) continue;
+      if (K.cd && g.used) { g.cdT = Math.max(0, (g.cdT || 0) - dt); if (!g.run) { if (g.cdT <= 0) Gm.ready(g); else if (K.charging) { try { K.charging(g, 1 - g.cdT / K.cd, dt); } catch (e) { console.error(e); } } } }
       if (!g.used && K.idle) K.idle(g, dt);
       if (!g.used && K.searching && g.it) K.searching(g, S && S.it === g.it ? Math.min(1, S.t / Math.max(0.01, S.dur)) : 0, dt);
       if (g.run) { g.t += dt; let go = false; try { go = K.run(g, dt); } catch (e) { console.error(e); } if (!go) g.run = false; }
@@ -61,10 +63,17 @@
   Gm.trigger = function (g, o) {
     if (!g || g.used) return false;
     const K = Gm.K[g.kind]; if (!K) return false;
-    g.used = true; g.run = true; g.t = 0;
+    g.used = true; g.run = true; g.t = 0; if (K.cd) g.cdT = K.cd;
     const GM = G.game;
     if (g.it && GM.search && GM.search.it === g.it) GM.cancelSearch();
     try { K.start(g, o || {}); } catch (e) { console.error(e); }
+    return true;
+  };
+  // one that gathers itself again (K.cd) is whole: it can be set off once more
+  Gm.ready = function (g) {
+    const K = Gm.K[g.kind]; if (!K || !K.cd || g.run) return false;
+    g.used = false; g.cdT = 0;
+    try { K.ready && K.ready(g); } catch (e) { console.error(e); }
     return true;
   };
   // a shot, a blow, a blast or a flame reached it: some go off at once, a pillar wants a few blows (K.hit)
@@ -98,6 +107,11 @@
   Gm.prompt = function (it, I) {
     const g = it.gim, K = Gm.K[g.kind], GM = G.game; if (!K) return;
     if (it.info || !K.interact) { G.ui.showInteract({ key: 'gim-' + g.kind, icon: K.icon, name: K.name, rc: K.rc, cat: K.cat, desc: K.desc, action: null }); return; }
+    if (g.used) { // (gathering itself again: how long until it can be used, nothing to press)
+      const n = Math.max(1, Math.ceil(g.cdT || 0));
+      G.ui.showInteract({ key: 'gim-' + g.kind + 'cd' + n, icon: K.icon, name: K.name, rc: K.rc, cat: `${K.recharge || '再使用まで'} — あと${n}秒`, desc: K.desc, action: null });
+      return;
+    }
     const S = GM.search && GM.search.it === it ? GM.search : null, A = K.interact, dur = GM.searchDur(A.dur);
     G.ui.showInteract({ key: 'gim-' + g.kind + (S ? 's' : ''), icon: K.icon, name: K.name, rc: K.rc, cat: `${A.verb} — ${dur.toFixed(1)}秒`, desc: S ? A.doing + ' 視点を大きく外したり離れると最初からやり直し' : K.desc, action: S ? A.doing : A.verb });
     if (I.hit('interact') && !S) GM.startSearch(it, it.pos, A.dur, K.icon, () => Gm.trigger(g, { by: 'use' }), A.doing);
@@ -293,7 +307,7 @@
   };
 
   // ---------------------------------------------------------------- the mid-area save (midsave.js)
-  Gm.save = () => Gm.list.map((g) => (g.used ? 1 : 0));
+  Gm.save = () => Gm.list.map((g) => (g.used && !(Gm.K[g.kind] && Gm.K[g.kind].cd) ? 1 : 0)); // (one that gathers itself again comes back ready)
   Gm.restore = function (arr) {
     (arr || []).forEach((v, i) => {
       const g = Gm.list[i]; if (!g || !v || g.used) return;

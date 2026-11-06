@@ -8,7 +8,7 @@
 //   gale     - 天空の聖域: a statue on an island's rim that breathes the wind. Wake it (the key, a shot, a blow): after a breath in, a gale
 //              blows across the island for 3 s (6 m wide): monsters in it are driven toward the edge, and over it (as by your own blow).
 //              You are carried too, slower than you walk: walk into the wind and you hold your ground (or step out of it); in the air
-//              it takes you farther.
+//              it takes you farther. It gathers itself again: ready once more 20 s after it was woken (the orb fills back up).
 (function () {
   const Gm = G.Gim, U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   const R = Math.random, rnd = (a, b) => a + R() * (b - a);
@@ -303,10 +303,11 @@
   Gm.CR = CR;
 
   // ================================================================ 天空の聖域: the statues that breathe the wind
-  const GA = { inhale: 1.0, blow: 3.0, hw: 3, speed: 28, push: 62, me: 4.6, meAir: 7.5 }; // (me / meAir: how fast it carries you, m/s; you walk at 6.2)
+  const GA = { inhale: 1.0, blow: 3.0, hw: 3, speed: 28, push: 62, me: 4.6, meAir: 7.5, cd: 20 }; // (me / meAir: how fast it carries you, m/s; you walk at 6.2. cd: ready again, s after it was woken)
   Gm.K.gale = {
     name: '風の像', icon: '🌬️', rc: '#bfe8ff', cat: '目覚めさせる — 調べる・撃つ・叩く',
-    desc: '息を吸い、島を横切る突風（幅6m）を3秒吹く。風の中の敵は奈落の方へ押し流される。自分も流されるが、風上へ歩けば踏みとどまれる（空中ではより大きく流される）。一度きり。',
+    desc: '息を吸い、島を横切る突風（幅6m）を3秒吹く。風の中の敵は奈落の方へ押し流される。自分も流されるが、風上へ歩けば踏みとどまれる（空中ではより大きく流される）。像ごとに、使ってから20秒で再び風が溜まる。',
+    cd: GA.cd, recharge: '風を溜めている',
     interact: { verb: '目覚めさせる', doing: '像に触れている…', dur: 1.0 },
     build(g, w) {
       const stone = w.mats.block, gold = w.mats.trim;
@@ -337,12 +338,14 @@
     idle(g, dt) {
       g.ph += dt;
       if (!g.orb) return;
-      const k = 0.5 + 0.5 * Math.sin(g.ph * 1.6);
-      g.orbM.emissiveIntensity = 0.9 + 0.5 * k; g.glow.material.opacity = 0.28 + 0.2 * k;
+      const k = 0.5 + 0.5 * Math.sin(g.ph * 1.6), fl = g.flash || 0;
+      g.orbM.emissiveIntensity = 0.9 + 0.5 * k + fl * 3; g.glow.material.opacity = 0.28 + 0.2 * k + fl * 0.5; g.glow.scale.setScalar(1.6 + fl * 1.2);
+      if (fl > 0) g.flash = Math.max(0, fl - dt * 1.4);
       if (R() < dt * 3) { const m = mouth(g); G.fx.add.spawn(m.x, m.y + rnd(-0.1, 0.1), m.z, g.dx * rnd(0.5, 1.5), rnd(-0.1, 0.3), g.dz * rnd(0.5, 1.5), rnd(0.8, 1.4), 0.08, 0.02, 0.8, 0.95, 1.0, 0.7, -0.05, 0.6); }
     },
     start(g) {
-      g.hitSet = new Set(); g.blowing = false; g.ringT = 0;
+      g.hitSet = new Set(); g.blowing = false; g.ringT = 0; g.flowEnd = false; g.meT = 0; g.meHit = false; g.flash = 0; // (it can be woken again and again)
+      if (g.glow) g.glow.visible = true;
       G.sfx.whoosh && G.sfx.whoosh(GA.inhale, 0.6, true); G.sfx.chime && G.sfx.chime(mouth(g));
       const a = V(g.x + g.dx * 1.0, 0, g.z + g.dz * 1.0), dir = V(g.dx, 0, g.dz);
       g.warn = Gm.warn({ c: a.clone().addScaledVector(dir, g.len / 2), yaw: Math.atan2(g.dx, g.dz), hx: GA.hw, hz: g.len / 2, dur: GA.inhale, hold: GA.blow, from: 'base', col: 0x2a90ff, alpha: 0.55 });
@@ -362,7 +365,10 @@
       const tb = t - GA.inhale, front = Math.min(g.len, tb * GA.speed), on = tb < GA.blow;
       if (!g.blowing) { g.blowing = true; G.sfx.whoosh && G.sfx.whoosh(GA.blow, 1.0); G.sfx.wind && G.sfx.wind(1); Gm.shake(m, 0.25, 20); }
       if (g.flow) g.flow.set(front, on ? 1 : 0);
-      if (g.orb) { g.orbM.emissiveIntensity = on ? 4 : Math.max(0.2, g.orbM.emissiveIntensity - dt * 3); g.glow.material.opacity = on ? 0.9 : Math.max(0, g.glow.material.opacity - dt); }
+      if (g.orb) {
+        g.orbM.emissiveIntensity = on ? 4 : Math.max(0.05, g.orbM.emissiveIntensity - dt * 3); g.glow.material.opacity = on ? 0.9 : Math.max(0, g.glow.material.opacity - dt);
+        if (!on) { const q = Math.min(1, dt * 2.5); g.orbM.color.lerp(ORB_DARK, q); g.orbM.emissive.lerp(ORB_DARK, q); } // (spent: it darkens as the wind dies)
+      }
       if (g.light) g.light.intensity = on ? 12 : Math.max(0, g.light.intensity - dt * 10);
       if (on) {
         // rings of wind leave the mouth and race down the lane, swelling; streaks and wisps fly with them
@@ -395,9 +401,29 @@
       if (!on && g.flow && !g.flowEnd) { g.flowEnd = true; g.flow.end(); }
       return tb < GA.blow + 1.2;
     },
+    // gathering itself again (k: 0 .. 1): the orb glows back up from dark, the air is drawn into its mouth, faster as it fills
+    charging(g, k, dt) {
+      if (!g.orb) return;
+      g.orbM.emissiveIntensity = 0.05 + k * k * 0.8; g.orbM.color.copy(ORB_DARK).lerp(ORB_LIT, k * k); g.orbM.emissive.copy(ORB_DARK).lerp(ORB_GLOW, k);
+      g.glow.visible = true; g.glow.material.opacity = k * k * 0.26; g.glow.scale.setScalar(1.0 + k * 0.6);
+      if (g.light) g.light.intensity = k * 3;
+      if (R() < dt * (1 + k * 6)) { const m = mouth(g), d = rnd(1.5, 4), a = rnd(-1, 1), s = V(m.x + g.dx * Math.cos(a) * d + g.dz * Math.sin(a) * d, m.y + rnd(-1, 1), m.z + g.dz * Math.cos(a) * d - g.dx * Math.sin(a) * d); G.fx.add.spawn(s.x, s.y, s.z, (m.x - s.x) * 1.4, (m.y - s.y) * 1.4, (m.z - s.z) * 1.4, 0.7, 0.05, 0.015, 0.8, 0.94, 1.0, 0.55, 0, 0); }
+    },
+    // whole again: the orb flares, a breath of wind rings out of its mouth, a chime
+    ready(g) {
+      g.flash = 1; g.ph = 0;
+      if (g.orb) { g.orbM.color.copy(ORB_LIT); g.orbM.emissive.copy(ORB_GLOW); }
+      if (g.light) g.light.intensity = 4;
+      if (g.glow) g.glow.visible = true;
+      const m = mouth(g);
+      G.sfx.chime && G.sfx.chime(m); // (where it stands: heard only near it)
+      for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2, ux = Math.cos(a), uy = Math.sin(a); G.fx.add.spawn(m.x + g.dx * 0.2, m.y, m.z + g.dz * 0.2, g.dx * 2 + g.dz * ux * 2.4, uy * 2.4, g.dz * 2 - g.dx * ux * 2.4, 0.5, 0.07, 0.02, 0.85, 0.96, 1.0, 0.85, 0, 0.6); }
+    },
     restore(g) { if (g.orb) { g.orbM.emissiveIntensity = 0.2; g.glow.visible = false; } if (g.light) g.light.intensity = 0; },
   };
   const mouth = (g) => V(g.x + g.dx * 0.85, 2.2, g.z + g.dz * 0.85);
+  // the orb lit, and spent (a dull grey-blue stone until the wind has gathered again)
+  const ORB_LIT = new THREE.Color(0x9ae8ff), ORB_GLOW = new THREE.Color(0x7adcff), ORB_DARK = new THREE.Color(0x1c262c);
   // a ring of wind: a pale band that leaves the mouth and races down the lane, growing and fading
   function windRing(g, m, dir) {
     const r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.045, 6, 40), new THREE.MeshBasicMaterial({ color: 0xe8f8ff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));

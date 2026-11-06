@@ -245,6 +245,23 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
       await ev('G.input.keys.KeyW = false; return 1');
       const held = (q1[0] - q0[0]) * g2.dx + (q1[1] - q0[1]) * g2.dz;
       check(held < 0.5 && held > -6, `gale: walking into the wind, you hold your ground, slowed by it (${held.toFixed(1)} m downwind in 1.5 s; unhindered you walk 9 m)`);
+      // it gathers itself again: once the wind has died it is dark and cannot be woken, looking at it says how long; then whole again
+      // (fast-forwarded), it blows once more
+      await wait(3.2);
+      const cg = await ev(`const g = G.Gim.list.find((g) => g.kind === 'gale'); const hit = G.Gim.hit(g, 10, 'bullet', g.hb[0].p.clone()); G.Gim.prompt(g.it, G.input); return { used: g.used, run: g.run, cdT: g.cdT, hit, orb: g.orbM.emissiveIntensity, key: G.ui._ikey }`);
+      check(cg.used && !cg.run && cg.cdT > 12 && cg.cdT < 16 && !cg.hit && cg.orb < 0.6, `gale: after it blows it gathers itself, dark, and nothing wakes it (${JSON.stringify(cg)})`);
+      check(/^gim-galecd1[2-6]$/.test(cg.key || ''), `gale: looking at it, it says how long until it is ready (${cg.key})`);
+      await ev("const g = G.Gim.list.find((g) => g.kind === 'gale'); g.cdT = 0.6; return 1");
+      await wait(1.0);
+      const rg = await ev("const g = G.Gim.list.find((g) => g.kind === 'gale'); return { used: g.used, flash: g.flash, orb: g.orbM.emissiveIntensity, light: g.light ? g.light.intensity : -1 }");
+      check(!rg.used && rg.orb > 1 && rg.light > 3, `gale: whole again, its orb alight (${JSON.stringify(rg)})`);
+      await ev(`window.F = T.foes([[${g2.x + g2.dx * 6}, 0, ${g2.z + g2.dz * 6}]]); T.me(${g2.x + g2.dx * 3 + g2.dz * 5}, 0, ${g2.z + g2.dz * 3 - g2.dx * 5}); return 1`);
+      const r0 = await ev('return T.st(F)');
+      check(await ev("const g = G.Gim.list.find((g) => g.kind === 'gale'); return G.Gim.trigger(g, { by: 'use' })"), 'gale: woken a second time');
+      await wait(3.2);
+      const r1 = await ev('return T.st(F)');
+      const al2 = (r1[0].x - r0[0].x) * g2.dx + (r1[0].z - r0[0].z) * g2.dz;
+      check(!r1[0].alive || al2 > 5, `gale: the second time, the monster in its way is driven off too (${r1[0].alive ? al2.toFixed(1) + ' m' : 'fell'})`);
     }
     // the crypt gates: shut, open again, not on someone, battered down
     {
@@ -309,6 +326,8 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
       check(u.length && u.every((g) => g.used && g.tip), `save: spilt crucibles hang spilt (${u.length})`);
       const b = await one('hamlet', 4, 0.5);
       check(b.length === 1 && b[0].used, 'save: a rung bell stays rung');
+      const gl = await one('sanctum', 2, 1.0);
+      check(gl.filter((g) => g.k === 'gale').length > 0 && gl.filter((g) => g.k === 'gale').every((g) => !g.used && !g.run), 'save: the wind statues come back ready (they gather themselves again anyway)');
       // a crypt gate shut before the save is shut after it
       await ev("T.enter('catacombs', 3); G.Strata.closeDoor(G.Strata.doors[1]); window.__S = G.MidSave.snapshot(); T.enter('catacombs', 3); G.MidSave.apply(window.__S); return 1");
       check(await ev('const d = G.Strata.doors[1]; return d.state === "closed" && d.col.alive && G.Strata.doors[0].state === "open"'), 'save: a crypt gate shut before the save is shut after it, the others open');

@@ -1737,7 +1737,7 @@
       else if (it.type === 'anvil') consider(it.pos, 1.2, { type: 'anvil', it }, 4);
       else if (it.type === 'cauldron') consider(it.pos, 1.3, { type: 'cauldron', it }, 4);
       else if (it.type === 'celldoor' && it.door.state !== 'broken') consider(it.pos, 1.0, { type: 'celldoor', it }, 3.4);
-      else if (it.type === 'gimmick' && !it.gim.used) consider(it.pos, it.r, { type: 'gimmick', it }, it.reach);
+      else if (it.type === 'gimmick' && (!it.gim.used || (G.Gim.K[it.gim.kind] || {}).cd)) consider(it.pos, it.r, { type: 'gimmick', it }, it.reach); // (one gathering itself again tells you how long)
     }
     if (!best && nearBest) best = nearBest;
     lookTarget = best;

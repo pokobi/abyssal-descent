@@ -105,6 +105,17 @@ const PORT = +process.env.COOP_PORT || 9441;
         let s2 = false; try { await g.until(`!!G.Gim.list[${n2}].used`, 3000); s2 = true; } catch (e) { /* */ }
         check(s2, `${c.field}: set off by the host, it goes off for the guest`);
       }
+      if (c.kind === 'gale') {
+        // it gathers itself again: whole on the host while the guest's clock is still a while behind, the host wakes it once more,
+        // and it blows for the guest too
+        await sleep(3500);
+        await h.eval(`G.Gim.list[${gm.i}].cdT = 0.3; 1`); await g.eval(`G.Gim.list[${gm.i}].cdT = 99; 1`);
+        let rd = false; try { await h.until(`!G.Gim.list[${gm.i}].used`, 4000); rd = true; } catch (e) { /* */ }
+        check(rd && await g.eval(`G.Gim.list[${gm.i}].used`), `${c.field}: whole again on the host (the guest's still gathering)`);
+        await h.eval(`G.Gim.trigger(G.Gim.list[${gm.i}], { by: 'use' }); 1`);
+        let again = false; try { await g.until(`G.Gim.list[${gm.i}].run && G.Gim.list[${gm.i}].t < 2`, 3000); again = true; } catch (e) { /* */ }
+        check(again, `${c.field}: woken again by the host, it blows for the guest too`);
+      }
       if (c.kind === 'pillar') {
         // (each falls on its own screen's clock: wait until both are down, as long as it takes under load)
         const lieJs = `(() => { const gs = G.Gim.list.filter((g) => g.kind === 'pillar' && g.used); return gs.length > 0 && gs.every((g) => g.lying && g.lying.alive && g.cols.filter((k) => k !== g.lying && k.alive).length === 0); })()`;

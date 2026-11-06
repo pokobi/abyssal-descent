@@ -2226,7 +2226,11 @@
       if (a.kind === 'cloud') { a.m.position.x += a.sp * dt; if (a.m.position.x > w.W / 2 + 330) a.m.position.x -= 660; }
       else if (a.kind === 'islet') a.m.position.y = a.y0 + Math.sin(GM.time * 0.3 + a.ph) * 1.5;
       else if (a.kind === 'spin') a.m.rotation[a.axis || 'y'] += dt * a.sp;
+      else if (a.kind === 'uvflow') { // (flowing water: the surface's ripples drift; the material gets its own copy of the texture first)
+        const m = a.mat; if (m && m.normalMap) { if (!m._flow) { m.normalMap = m.normalMap.clone(); m.normalMap.wrapS = m.normalMap.wrapT = THREE.RepeatWrapping; m.normalMap.needsUpdate = true; m._flow = true; } m.normalMap.offset.x += a.sp[0] * dt; m.normalMap.offset.y += a.sp[1] * dt; }
+      }
     }
+    if (w.icicles && G.FieldGen && G.FieldGen.tickIcicles) G.FieldGen.tickIcicles(w, dt); // (the frozen mausoleum's falling icicles)
     // ambient dust motes
     if (!OUT && Math.random() < dt * 20) G.fx.norm.spawn(cp.x + U.rand(-12, 12), cp.y + U.rand(-2, 5), cp.z + U.rand(-12, 12), U.rand(-0.1, 0.1), U.rand(-0.05, 0.05), U.rand(-0.1, 0.1), 6, 0.03, 0.03, 0.9, 0.85, 0.75, 0.5, 0, 0);
     for (const a of w.animated) if (a.kind === 'banner') { a.m.rotation.x = Math.sin(GM.time * 1.3 + a.ph) * 0.06; a.m.rotation.z = Math.sin(GM.time * 0.9 + a.ph) * 0.02; }

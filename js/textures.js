@@ -411,7 +411,11 @@
   // 中層: the old foundries, rivers of molten iron
   T.BIOMES.foundry = Object.assign({}, T.BIOMES.forge, { name: '溶鉱の深層', torch: '#ff7a30', flame: 0xff7a30, cloth: '#5a1a0a' });
   // 深層: a sanctuary floating in a false sky at the bottom of the abyss (pale stone, gold, a sky that is not quite right; darkness under the clouds)
-  T.BIOMES.sanctum = { name: '天空の聖域', stone: '#d8d2c8', stone2: '#c6bfb2', floor: '#d2ccc0', trim: '#cfae62', rock: '#8a8478', wood: '#8a7a64', fog: '#b4bad6', fogD: 0.006, hemiS: '#c8d0f0', hemiG: '#6a6478', amb: 0.72, moon: '#f4ecff', moonI: 2.4, torch: '#ffd090', cloth: '#3a3a7a', accent: 'clouds', outdoor: 'sky', marble: true, sky: ['#30305a', '#9aa6d4', '#e4e6f4'], sunDir: [0.3, 0.75, -0.4], sunCol: [0.85, 0.85, 1.0], cloudCol: 0xd0d0ea, isletGrass: 0x8a9a7a, leaf: 0x7a8a6a };
+  T.BIOMES.sanctum = { name: '天空の聖域', stone: '#d8d2c8', stone2: '#c6bfb2', floor: '#d2ccc0', trim: '#cfae62', rock: '#8a8478', wood: '#8a7a64', fog: '#b4bad6', fogD: 0.006, hemiS: '#c8d0f0', hemiG: '#6a6478', amb: 0.72, moon: '#f4ecff', moonI: 2.4, torch: '#ffd090', cloth: '#3a3a7a', accent: 'clouds', outdoor: 'sky', marble: true, sky: ['#30305a', '#9aa6d4', '#e4e6f4'], sunDir: [0.3, 0.75, -0.4], sunCol: [0.85, 0.85, 1.0], cloudCol: 0xd0d0ea, isletGrass: 0x8a9a7a, leaf: 0x7a8a6a, trimMetal: 0.3 };
+  // (the old tables of catacombs / flooded, lit up a little for play: they are fields now, not short stages)
+  Object.assign(T.BIOMES.catacombs, { amb: 0.42, fogD: 0.017, moonI: 0.9, hemiS: '#7a7686' });
+  Object.assign(T.BIOMES.flooded, { amb: 0.46, fogD: 0.016, moonI: 0.95, hemiS: '#7a9a96', hemiG: '#24302a' });
+  Object.assign(T.BIOMES.foundry, { amb: 0.6, fogD: 0.012, moonI: 0.95, hemiS: '#9a6448', hemiG: '#4a2410' });
   T.biomeFor = (area) => (G.Run ? G.Run.field(area) : 'grave');
 
   const matCache = {};
@@ -487,7 +491,7 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     if (B.marble) {
       M.floor = std(t.marble, B.floor, 0.35, 0, 0.8); M.cobble = std(t.marble, B.floor, 0.4, 0, 0.8);
       M.block = std(t.marble, B.stone2, 0.4, 0, 0.8); M.wall = std(t.ashlar, B.stone, 0.55, 0, 0.8);
-      M.trim = std(t.metal, B.trim, 0.32, 0.85, 0.4);
+      M.trim = std(t.metal, B.trim, 0.32, B.trimMetal ?? 0.85, 0.4); // (trimMetal: a less mirror-like gilt where there is little to reflect)
     }
     M.leaf = new THREE.MeshStandardMaterial({ color: B.leaf ?? (B.outdoor === 'sky' ? 0x8ab05a : 0x4f6a2a), roughness: 0.9, flatShading: true });
     M.cloud = new THREE.MeshBasicMaterial({ map: T.spr.cloud, color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, fog: false });

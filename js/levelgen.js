@@ -272,9 +272,13 @@
       // sky island: the temple facade on the north gets a golden crest
       w.solid('trim', -WALL_T, H, -WALL_T, W + WALL_T, H + 0.6, 0, { uv: 2, noGrapple: true });
       // open edges guarded by a low balustrade (the edge of the world is unmistakable)
+      // (opts.noBal: islands over the void keep no rail along the area's edge; opts.balD: the rail ends there — a guardian's island, its road a bridge)
       const bal = (x0, z0, x1, z1) => { w.solid('block', x0, 0, z0, x1, 0.95, z1, { uv: 1 }); w.visual('trim', x0 - 0.04, 0.95, z0 - 0.04, x1 + 0.04, 1.02, z1 + 0.04, { uv: 1 }); };
-      bal(0, 0, 0.4, D); bal(W - 0.4, 0, W, D); bal(0, D - 0.4, W / 2 - 4.4, D); bal(W / 2 + 4.4, D - 0.4, W, D);
-      for (let z = 4; z < D - 2; z += 4) { w.solid('block', -0.05, 0, z - 0.3, 0.45, 1.3, z + 0.3, { uv: 1 }); w.solid('block', W - 0.45, 0, z - 0.3, W + 0.05, 1.3, z + 0.3, { uv: 1 }); }
+      const bz = opts.balD ?? D;
+      if (!opts.noBal) {
+        bal(0, 0, 0.4, bz); bal(W - 0.4, 0, W, bz); if (!opts.balD) { bal(0, D - 0.4, W / 2 - 4.4, D); bal(W / 2 + 4.4, D - 0.4, W, D); }
+        for (let z = 4; z < bz - 2; z += 4) { w.solid('block', -0.05, 0, z - 0.3, 0.45, 1.3, z + 0.3, { uv: 1 }); w.solid('block', W - 0.45, 0, z - 0.3, W + 0.05, 1.3, z + 0.3, { uv: 1 }); }
+      }
     }
     if (OUT !== 'sky') {
       // flush cornice band
@@ -297,7 +301,7 @@
     const sp = 8;
     for (let z = sp; z < D - 2; z += sp) {
       if (opts.voidArena && z < opts.arenaD + 2) continue;
-      if (OUT === 'sky') { if (z % 16 === 0) { P().brazier(w, 1.4, 0, z, 1); P().brazier(w, W - 1.4, 0, z, 1); } continue; }
+      if (OUT === 'sky') { if (z % 16 === 0 && !opts.noBal && z < (opts.balD ?? D)) { P().brazier(w, 1.4, 0, z, 1); P().brazier(w, W - 1.4, 0, z, 1); } continue; }
       const sNot = (side, zz, r) => nts.some((n) => n.side === side && zz + r > n.a0 && zz - r < n.a1); // strata: no buttress / torch / banner where a room is dug into the wall
       if (!sNot('W', z, 0.8)) butt(0, z, 'W');
       if (!sNot('E', z, 0.8)) butt(0, z, 'E');
@@ -591,7 +595,7 @@
           grp.add(g); w.animated.push({ kind: 'islet', m: g, y0: g.position.y, ph: rng.range(0, 6) });
         }
         // the play area itself is an island: hang rock below its rim
-        const rim = new THREE.Mesh(PG.cone, rockM); rim.scale.set(Math.max(W, D) * 0.62, 34, Math.max(W, D) * 0.62); rim.rotation.x = Math.PI; rim.position.set(cx, -31, cz); grp.add(rim);
+        if (!w.noRim) { const rim = new THREE.Mesh(PG.cone, rockM); rim.scale.set(Math.max(W, D) * 0.62, 34, Math.max(W, D) * 0.62); rim.rotation.x = Math.PI; rim.position.set(cx, -31, cz); grp.add(rim); } // (noRim: islands each carry their own rock)
       }
     });
   }

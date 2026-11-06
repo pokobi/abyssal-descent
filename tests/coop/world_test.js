@@ -45,6 +45,8 @@ const secs = +process.argv[2] || 5;
       n = n >= 19 ? 2 : n + 1;
     }
     // ---- doors and breakable things, in whatever combat area has them
+    // (the doors live in the storeyed halls / ruin: this part runs on the run's old fields, not the per-segment draw; the guest follows the host's flag)
+    await h.eval('G.Run.legacy = true; 1');
     for (let a = 2; a <= 20 && (!doorDone || !destDone); a++) {
       await go(a, 'combat');
       await sleep(300);

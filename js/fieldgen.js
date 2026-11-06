@@ -547,7 +547,7 @@
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
     const cx = W / 2, cz = AD / 2 - 2;
     H.floors(w, W, AD + 3, null, style.arena === 'colosseum' ? 'floor' : 'cobble');
-    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, noExits: last, h: outdoor ? (SH.wallH || 3.2) : 16, top: outdoor ? undefined : 24 });
+    H.perimeter(w, rng, W, D, Object.assign({ beams: 0, gates: 3, noExits: last, h: outdoor ? (SH.wallH || 3.2) : 16, top: outdoor ? undefined : 24 }, SH.perim ? SH.perim(AD) : {}));
     SH.ring(w, rng, W, AD, last);
     const nook = SH.road(w, rng, W, AD, D);
     w.roadText = SH.text;

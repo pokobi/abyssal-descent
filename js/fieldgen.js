@@ -158,7 +158,7 @@
     }
     if (G.Fields) G.Fields.place(w, rng, occ, W, D, area);
     if (G.Graves) G.Graves.scatter(w, rng, occ, W, D, w.biome === 'grave' ? 1 : 2);
-    H.placeChests(w, rng, occ, (kind === 'vault' ? 6 : (area <= 4 ? 2 : rng.chance(0.75) ? 1 : 0) + (rng.chance(0.25) ? 1 : 0)) + (extraChests || 0), area);
+    H.placeChests(w, rng, occ, LG.chestCount(rng, area, kind, extraChests), area); // (one to three, by depth and difficulty: levelgen.js)
     w.miniSlots = [-6, -2, 2].map((dx) => ({ x: W / 2 + dx, y: 1.15, z: 12, face: 1 })); w.miniHeal = V(W / 2 + 6, 0, 12);
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
     return w;
@@ -339,6 +339,10 @@
   const gen0 = LG.generate;
   LG.generate = function (area, seed, opts) {
     opts = opts || {};
+    LG.chestMul = Math.max(1, opts.chestMul | 0);
+    try { return genField(area, seed, opts); } finally { LG.chestMul = 1; }
+  };
+  function genField(area, seed, opts) {
     const field = G.Run ? G.Run.field(area) : null, f = F.gen[field];
     if (!f) return gen0(area, seed, opts);
     for (let t = 0; t < 8; t++) {
@@ -346,7 +350,7 @@
       if (w && H.validate(w)) { w.seed = seed; w.field = field; H.fireTops(w, {}); return w; }
     }
     return gen0(area, seed, opts);
-  };
+  }
 
   // ---------------------------------------------------------------- guardian approach (flat; no stairs anywhere)
   function roadGrave(w, rng, W, AD, D) {

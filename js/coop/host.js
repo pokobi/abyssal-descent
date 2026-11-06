@@ -18,7 +18,7 @@
       const f = L[k];
       L[k] = function (...a) {
         const seed = a[1];
-        if (k === 'generate') a[2] = Object.assign({}, a[2], { extraChests: 0 });
+        if (k === 'generate') a[2] = Object.assign({}, a[2], { extraChests: 0, chestMul: K.chestMul ? K.chestMul() : 1 }); // (chests: as many again for each player)
         return K.seeded(seed ^ 0x5eed, () => f.apply(L, a));
       };
     }
@@ -33,6 +33,9 @@
   };
   K.fpInfo = () => `${(G.world.colliders || []).length}/${G.world.interactables.length}`;
   K.hpScale = () => 1 + 0.6 * (K.players.size - 1); // (the guardians: one body cannot be made more numerous)
+  // the chests of an area: as many again for every player. The host builds with the players it has (and remembers how many); a guest
+  // builds with the host's number, sent with the area (a newcomer: the number the area was built with)
+  K.chestMul = () => (K.role === 'host' ? (K._pcUsed = Math.max(1, K.players.size)) : Math.max(1, K._pcHost || K.players.size || 1));
   K.foeExtra = () => 0.6 * Math.max(0, K.players.size - 1); // (the foes of an ordinary area: each player brings 60% more of them, not tougher ones)
 
   K.installHost = function () {
@@ -192,7 +195,7 @@
       ea.call(GM, n, kind);
       scaleFoes();
       K.clearBossObjsHost();
-      K.send({ t: 'area', n, kind, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, of: G.Run.legacy ? 1 : 0, fp: K.fingerprint(), fi: K.fpInfo() });
+      K.send({ t: 'area', n, kind, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, of: G.Run.legacy ? 1 : 0, fp: K.fingerprint(), fi: K.fpInfo(), pc: K._pcUsed || 1 });
     };
     // ---------------- more players, more foes (not tougher ones) ----------------
     // Each wave grows by the same share for every player beyond the first. The extra foes are drawn from the area's own pool with a stream of their own, so the seeded rolls
@@ -319,7 +322,7 @@
     K.saved = {};
     K.handlers.sv = function (m, from) { const rp = K.players.get(from); if (rp) K.saved[rp.name] = m.d; };
     K.lateJoin = function (to, name) {
-      K.send({ t: 'late', n: GM.area, kind: GM.stage, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, of: G.Run.legacy ? 1 : 0, fp: K.fingerprint(), fi: K.fpInfo(), route: GM.route, snap: K.saved[name] || null }, to);
+      K.send({ t: 'late', pc: K._pcUsed || 1, n: GM.area, kind: GM.stage, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, of: G.Run.legacy ? 1 : 0, fp: K.fingerprint(), fi: K.fpInfo(), route: GM.route, snap: K.saved[name] || null }, to);
     };
     K.handlers.need = function (m, from) { const e = known.get(m.id); if (e && e.alive) K.send({ t: 'es', a: [esRow(e)] }, from); };
     K.handlers.ready = function (m, from) {

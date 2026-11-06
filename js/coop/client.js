@@ -72,7 +72,7 @@
     };
     K.handlers.go = function () { K.started(); };
     K.handlers.late = function (m) {
-      K.late = m; seed0 = m.seed; fromHost = true;
+      K.late = m; seed0 = m.seed; fromHost = true; K._pcHost = m.pc || 1;
       try { K.started(); G.Run.set(m.diff, m.lv); G.Run._nextLegacy = !!m.of; sr.call(GM, { id: m.diff, lv: m.lv }, 0); } finally { fromHost = false; }
       if (m.snap) {
         GM.applyPlayerSnap(m.snap);
@@ -88,7 +88,7 @@
     const saveMe = () => { if (GM.run && !P.dead) K.send({ t: 'sv', d: Object.assign(GM.playerSnap(), { coins: GM.run.coins }) }); };
     setInterval(() => { if (K.live) saveMe(); }, 20000);
     K.handlers.area = function (m) {
-      seed0 = m.seed;
+      seed0 = m.seed; K._pcHost = m.pc || 1; // (the area's chests: built for as many players as the host built it for)
       fromHost = true;
       try {
         if (!GM.run) { if (!K.live) K.started(); G.Run.set(m.diff, m.lv); G.Run._nextLegacy = !!m.of; sr.call(GM, { id: m.diff, lv: m.lv }, 0); }

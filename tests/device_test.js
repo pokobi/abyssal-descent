@@ -99,7 +99,14 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
 
     // ================================================================ 2. what each does, inside and outside
     // (waits are counted on the game's own clock: under load it runs behind the wall clock, and what the devices do follows it)
-    const wait = async (sec) => { const t0 = +(await p.eval('G.game.time')); await p.until(`G.game.time >= ${t0 + sec}`, sec * 6000 + 8000); };
+    const wait = async (sec) => {
+      const t0 = +(await p.eval('G.game.time'));
+      try { await p.until(`G.game.time >= ${t0 + sec}`, sec * 6000 + 8000); }
+      catch (e) { // (the clock stopped: say why)
+        console.log('     clock stopped:', await p.eval("JSON.stringify({ state: G.game.state, stage: G.game.stage, dead: G.player.dead, hidden: document.hidden, trans: G.game.transitioning, t: G.game.time, modal: !!(G.ui.modalOpen && G.ui.modalOpen()), errs: (window.__errs || []).slice(-2) })"));
+        throw e;
+      }
+    };
     // the bell: monsters out to 25 m stagger at each toll, one at 30 m does not; you are untouched
     {
       await ev("T.enter('hamlet', 2); return 1");

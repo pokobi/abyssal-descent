@@ -39,6 +39,10 @@ const PORT = +process.env.COOP_PORT || 9441;
     const fst = (i) => h.eval(`JSON.stringify((() => { const e = window.__F[${i}]; return { hp: e.alive ? e.hp / e.maxHp : 0, alive: e.alive, stun: e.st.stun || 0, x: e.pos.x, z: e.pos.z, au: G.Elem.auraOf(e), nid: e._nid }; })())`).then(JSON.parse);
     const used = (p, i) => p.eval(`!!(G.Gim.list[${i}] && G.Gim.list[${i}].used)`);
     const e0 = () => h.errs.length + g.errs.length;
+    // the chests of the area each side is in, and what one player alone would have found there (the same area built for one)
+    const chests = (p) => p.eval("G.world.interactables.filter((i) => i.type === 'chest').length");
+    const solo = (p) => p.eval(`(() => { const GM = G.game, n = GM.area, kind = GM.stage, seed = (GM.seed ^ G.U.hashStr('area' + n + kind)) >>> 0, f0 = G.Coop.chestMul; G.Coop.chestMul = () => 1;
+      try { const w = G.LevelGen.generate(n, seed, { gates: G.Run.isBoss(n + 1) || G.Run.isPrep(n + 1) ? 1 : 3, kind }); return w.interactables.filter((i) => i.type === 'chest').length; } finally { G.Coop.chestMul = f0; } })()`);
 
     const cases = [
       // field, area, what to check on the host's monster after the guest sets off device 0 (it, the monster's spot)
@@ -90,12 +94,21 @@ const PORT = +process.env.COOP_PORT || 9441;
         check(s2, `${c.field}: set off by the host, it goes off for the guest`);
       }
       if (c.kind === 'pillar') {
-        await sleep(2500);
-        const lie = (p) => p.eval(`(() => { const gs = G.Gim.list.filter((g) => g.kind === 'pillar' && g.used); return gs.length > 0 && gs.every((g) => g.lying && g.lying.alive && g.cols.filter((k) => k !== g.lying && k.alive).length === 0); })()`);
-        check(await lie(h) && await lie(g), 'dusk: the fallen pillars lie as walls on both sides');
+        // (each falls on its own screen's clock: wait until both are down, as long as it takes under load)
+        const lieJs = `(() => { const gs = G.Gim.list.filter((g) => g.kind === 'pillar' && g.used); return gs.length > 0 && gs.every((g) => g.lying && g.lying.alive && g.cols.filter((k) => k !== g.lying && k.alive).length === 0); })()`;
+        let down = false; try { await h.until(lieJs, 12000); await g.until(lieJs, 12000); down = true; } catch (e) { /* */ }
+        check(down, 'dusk: the fallen pillars lie as walls on both sides');
       }
       await sleep(600);
       check(e0() === before, `${c.field}: no errors` + (e0() > before ? ' ' + h.errs.concat(g.errs).slice(-2).join(' | ').slice(0, 300) : ''));
+    }
+    // ---- the chests: as many again for every player, the same on both sides
+    if (!only || only.includes('chests')) {
+      for (const [f, a] of [['grave', 3], ['halls', 9], ['flooded', 12]]) {
+        await go(f, a);
+        const [ch, cg, base] = [await chests(h), await chests(g), await solo(h)];
+        check(base >= 1 && ch === base * 2 && cg === ch, `chests (${f}): two players find twice what one would (${base} -> ${ch}, guest ${cg})`);
+      }
     }
     // ---- the crypt gates
     if (!only || only.includes('catacombs')) {
@@ -127,6 +140,13 @@ const PORT = +process.env.COOP_PORT || 9441;
         let spent = false; try { await t.until('G.Gim.list.length > 0 && G.Gim.list.every((g) => g.used)', 8000); spent = true; } catch (e) { /* */ }
         check(spent, 'late join: the devices already spent are spent for them');
         check(await t.eval('G.Gim.list.filter((g) => g.kind === "pillar").every((g) => g.lying && g.lying.alive && g.cols.filter((k) => k !== g.lying && k.alive).length === 0)'), 'late join: the pillars lie where they fell');
+        check(await chests(t) === await chests(h), 'late join: the newcomer finds the chests the area was built with');
+        // the next area is built for three
+        await t.eval("G.Run.field = () => 'gate'; G.Coop.fpOk = undefined; 1");
+        await go('gate', 6);
+        let t3 = false; try { await t.until("G.game.area === 6 && G.Coop.fpOk !== undefined", 25000); t3 = await t.eval('G.Coop.fpOk'); } catch (e) { /* */ }
+        const [c3, ct, b3] = [await chests(h), await chests(t), await solo(h)];
+        check(t3 && c3 === b3 * 3 && ct === c3 && await chests(g) === c3, `chests: three players find three times as many, the same on every side (${b3} -> ${c3})`);
         check(!t.errs.length, 'late join: no errors ' + t.errs.slice(0, 2).join(' | ').slice(0, 300));
       }
     }

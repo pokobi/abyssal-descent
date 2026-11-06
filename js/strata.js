@@ -381,17 +381,16 @@
       cover(w, rng, L.occ, y, k, r, ruined, k < NL - 1 ? SP - 0.75 : SP);
     }
 
-    // ---- chests: only in the barred rooms, four or five an area (a vault hall keeps its six, spread over the storeys) ----
+    // ---- chests: as many as in any field (levelgen.js chestCount: one to three by depth and difficulty; a vault hall keeps its six).
+    // They stand in the barred rooms; a vault hall's (and any the rooms have no room for) are spread over the storeys ----
     const tierOf = () => (rng.chance(0.08 + area * 0.004) ? 2 : rng.chance(0.3) ? 1 : 0);
     const rooms = ctx.rooms || [], order = rooms.map((_, i) => i).sort(() => rng.next() - 0.5);
-    if (kind === 'vault') {
-      for (let i = 0; i < 6 + (extraChests || 0); i++) for (let t = 0; t < 12; t++) {
-        const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 1), r = lv[s][k].occ.place(rng, 2, 2, 1); if (!r) continue;
-        if (LG.chestSpotFree(w, r.x0 + 1, Y[k], r.z0 + 1)) { P().chest(w, r.x0 + 1, r.z0 + 1, Y[k], rng.range(0, 6), tierOf()); break; }
-      }
-    } else {
-      const nChest = rng.int(4, 5) + (extraChests || 0);
-      for (let i = 0, placed = 0, guard = 0; placed < nChest && order.length && guard < nChest * 6; guard++, i++) if (rooms[order[i % order.length]].chest(tierOf())) placed++;
+    const nChest = LG.chestCount(rng, area, kind, extraChests);
+    let placed = 0;
+    if (kind !== 'vault') for (let i = 0, guard = 0; placed < nChest && order.length && guard < nChest * 6; guard++, i++) if (rooms[order[i % order.length]].chest(tierOf())) placed++;
+    for (; placed < nChest; placed++) for (let t = 0; t < 12; t++) {
+      const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 1), r = lv[s][k].occ.place(rng, 2, 2, 1); if (!r) continue;
+      if (LG.chestSpotFree(w, r.x0 + 1, Y[k], r.z0 + 1)) { P().chest(w, r.x0 + 1, r.z0 + 1, Y[k], rng.range(0, 6), tierOf()); break; }
     }
     // ---- spawn graves: about three on the third field, about five on the fourth; most stand in the rooms ----
     for (let i = 0, n = ruined ? rng.int(4, 6) : rng.int(2, 4); i < n; i++) {

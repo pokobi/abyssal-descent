@@ -860,6 +860,20 @@
     return !w.interactables.some((i) => i.type === 'chest' && Math.hypot(i.pos.x - x, i.pos.z - z) < 2.4 && Math.abs(i.pos.y - 0.5 - y) < 2.5);
   }
   LG.chestSpotFree = chestSpotFree;
+  // How many chests an area holds, the same in every field: one to three, more the further into the run and the harder the difficulty
+  // (the average: easy 1 at the start, 2 at the end; normal 1.25 -> 2.25; hard 1.5 -> 2.5; extra 1.75 -> 2.75). A treasure vault keeps its six.
+  // extra: the 宝探し boon (on top of it). LG.chestMul: how many players share the area (each brings the same again; 1 alone).
+  LG.CHEST_DIFF = { easy: 0, normal: 0.25, hard: 0.5, extra: 0.75 };
+  LG.chestMul = 1;
+  LG.chestCount = function (rng, area, kind, extra) {
+    const R = G.Run, id = R && R.cur ? R.cur.id : 'normal', N = Math.max(2, (R && R.areas && R.areas()) || 21);
+    let n = 6;
+    if (kind !== 'vault') {
+      const e = 1 + Math.min(1, Math.max(0, (area - 1) / (N - 1))) + (LG.CHEST_DIFF[id] ?? 0.25), b = Math.floor(e);
+      n = Math.min(3, Math.max(1, b + (rng.next() < e - b ? 1 : 0)));
+    }
+    return n * Math.max(1, LG.chestMul | 0) + (extra || 0);
+  };
   function placeChests(w, rng, occ, n, area) {
     const tops = w.platTops.slice();
     for (let i = 0; i < n; i++) {
@@ -1002,7 +1016,7 @@
     biomeExtras(w, rng, occ, W, D);
     if (G.Fields) G.Fields.place(w, rng, occ, W, D, area);
     scatter(w, rng, occ, W, D, 14 + Math.floor(W * D / 450));
-    placeChests(w, rng, occ, (kind === 'vault' ? 6 : (area <= 4 ? 2 : rng.chance(0.75) ? 1 : 0) + (rng.chance(0.25) ? 1 : 0)) + (extraChests || 0), area);
+    placeChests(w, rng, occ, LG.chestCount(rng, area, kind, extraChests), area);
     w.miniSlots = [-6, -2, 2].map((dx) => ({ x: W / 2 + dx, y: 1.15, z: 12, face: 1 })); w.miniHeal = new THREE.Vector3(W / 2 + 6, 0, 12);
     lightShafts(w, rng, W, D, rng.int(2, 4));
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };

@@ -431,6 +431,7 @@
           const k = Math.min(1, (fall - 3) / 14);
           this.landDip = -0.08 - k * 0.32;
           G.sfx.land(k, this.surfaceBelow());
+          if (this.inWater && G.Water) G.Water.splash(this.pos, 0.5 + k * 0.9, { silent: true });
           if (fall > 9) { this.addShake(k * 0.35); G.fx.dust(this.pos.clone().setY(this.pos.y + 0.05), V(0, 1, 0), 0x8a8070, 6); }
           G.buffs.emit('onLand', { speed: fall });
           if (!this.has('m_bunny') && !this.sliding && fall > 10) { this.vel.x *= 0.7; this.vel.z *= 0.7; }
@@ -501,7 +502,7 @@
         if (this.stepDist > stride) {
           this.stepDist = 0; this.footL = !this.footL;
           G.sfx.step(this.surfaceBelow(), this.crouching ? 0.4 : this.sprinting ? 1.1 : 0.75);
-          if (this.inWater) G.fx.norm.spawn(this.pos.x, this.pos.y + 0.05, this.pos.z, 0, 1.5, 0, 0.4, 0.1, 0.3, 0.6, 0.7, 0.75, 0.5, 6, 0);
+          if (this.inWater && G.Water) G.Water.step(this.pos, this.sprinting ? 1 : this.crouching ? 0.3 : 0.6); // (drops and a ring at your feet: water.js)
         }
         this.bobPhase += this.speedH * dt * (this.sprinting ? 1.25 : 1.45);
         this.bobAmt = U.damp(this.bobAmt, Math.min(1, this.speedH / 9), 8, dt);

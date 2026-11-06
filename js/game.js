@@ -139,6 +139,7 @@
     G.Strata.build(w);
     G.Graves.build(w);
     if (G.Gim) G.Gim.build(w); // (the field's own device: the chapel bell, the cracked pillars, ... gimmick.js)
+    if (G.Water) G.Water.build(w); // (its water: ripples, splashes, the current, the sound of it: water.js)
     document.querySelectorAll('.exit-mark').forEach((e) => e.remove()); // the last area's gate markers
     const B0 = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
     // the area's sky (skyvary.js): a mood of the field drawn from the run's seed, laid over its light and fog; what falls from it
@@ -2381,6 +2382,7 @@
     if (G.Weather) G.Weather.update(gdt); // (rain, snow, embers keep their element on everyone; lightning: weather.js)
     G.Strata.update(gdt);
     if (G.Gim) G.Gim.update(gdt);
+    if (G.Water) G.Water.update(gdt);
     G.Tex.lavaT.value = GM.time;
     G.Graves.update(gdt);
     G.Areas.update(gdt);

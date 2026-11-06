@@ -72,6 +72,8 @@
   A.suspend = () => { if (ctx && ctx.state === 'running') ctx.suspend(); };
   A.resume = () => { if (ctx && ctx.state === 'suspended') ctx.resume(); };
   A.now = () => (ctx ? ctx.currentTime : 0);
+  // (tests: a meter on everything before the master volume, so a muted game can still be measured)
+  A.tap = () => { if (!ctx) return null; if (!A._tap) { A._tap = ctx.createAnalyser(); A._tap.fftSize = 2048; dry.connect(A._tap); } return A._tap; };
 
   // ---------- routing helpers ----------
   // returns {node, wet} destination for a sound; positional when pos given
@@ -343,8 +345,12 @@
       tn({ t, f0: vr(130, 0.1), f1: 80, d: 0.06, g: 0.4, to: out });
       nz({ t: t + 0.01, f: [['bandpass', 1400, 4]], g: 0.08, d: 0.04, to: out });
     } else if (surface === 'water') {
-      nz({ t, f: [['bandpass', vr(1100, 0.2), 1.0, 600, 0.15]], g: 0.6, a: 0.01, d: 0.18, to: out });
-      nz({ t: t + 0.05, f: [['bandpass', 2400, 2]], g: 0.15, d: 0.1, to: out });
+      // the foot breaking the surface: a slap, the slosh of the water round the leg, a bubble or two, drops falling back
+      nz({ t, f: [['bandpass', vr(1150, 0.2), 1.0, 420, 0.11]], g: 0.55, a: 0.005, d: 0.11, to: out });
+      nz({ t: t + 0.015, buf: 'pink', f: [['lowpass', 1900], ['highpass', 180]], g: 0.32, a: 0.025, d: 0.24, to: out });
+      bubbles(t + 0.03, 1 + Math.floor(Math.random() * 3), out, 420, 1250, 0.05);
+      nz({ t: t + 0.06, f: [['highpass', 3600]], g: 0.05, a: 0.01, d: 0.12, to: out });
+      if (Math.random() < 0.6) { const f = vr(2600, 0.3); tn({ t: t + 0.14 + Math.random() * 0.12, f0: f, f1: f * 1.3, fd: 0.012, d: 0.02, g: 0.02, to: out }); }
     } else if (surface === 'metal') {
       nz({ t, f: [['bandpass', vr(900, 0.1), 3]], g: 0.4, d: 0.08, to: out });
       tn({ t, f0: vr(380, 0.05), d: 0.1, g: 0.08, to: out });
@@ -362,6 +368,7 @@
     nz({ t: t + 0.02, f: [['bandpass', 1500, 0.6, 600, 0.2]], g: 0.12, a: 0.03, d: 0.18, to: out });
   };
   A.land = function (intensity, surface) {
+    if (ctx && surface === 'water') { A.splash(null, 0.55 + Math.min(1, intensity) * 0.8); return; } // (a splash, with its own thump when it is a big one)
     if (!ctx || smp(surface === 'wood' ? 'land_wood' : 'land', null, Math.min(1.2, 0.3 + intensity * 0.9), 1.1 - Math.min(0.25, intensity * 0.25))) return;
     const t = ctx.currentTime, out = dest(null, 0.25);
     out.gain.value = Math.min(1.2, 0.3 + intensity * 0.9);
@@ -1063,7 +1070,82 @@
     const f = vr(1400, 0.3);
     tn({ t, f0: f, f1: f * 1.8, fd: 0.03, d: 0.06, g: 0.12, to: out });
     nz({ t, f: [['bandpass', f, 8]], g: 0.08, d: 0.04, to: out });
+    if (Math.random() < 0.5) tn({ t: t + 0.05 + Math.random() * 0.06, f0: f * 0.6, f1: f * 1.1, fd: 0.03, d: 0.05, g: 0.05, to: out }); // (the bubble the drop leaves)
   };
+  // ---------- water ----------
+  // A body breaking the surface: the slap of it, the hollow body of the splash, a hiss of spray, the drops falling back, and the
+  // bubbles it leaves behind. A real bubble rings as it forms (a short tone whose pitch climbs as it closes up), so each is a quick
+  // rising chirp, low for a big one, high for a small one.
+  function bubbles(t, n, to, f0, f1, g) {
+    for (let i = 0; i < n; i++) {
+      const tt = t + Math.random() * 0.14 * (1 + i * 0.25), f = vr(f0 + Math.random() * (f1 - f0), 0.08);
+      tn({ t: tt, f0: f, f1: f * (1.45 + Math.random() * 0.7), fd: 0.02 + Math.random() * 0.035, a: 0.002, d: 0.035 + Math.random() * 0.05, g: g * (0.45 + Math.random() * 0.7), to });
+    }
+  }
+  A.bubbles = (pos, n, gain) => { if (!ctx || !voice(0.3)) return; const out = dest(pos, 0.4); out.gain.value *= gain ?? 0.5; bubbles(ctx.currentTime, n || 2, out, 480, 1500, 0.06); };
+  // size 0 .. 1.5: a stray shot, a step, a landing, a body, a blast
+  A.splash = function (pos, size) {
+    if (!ctx || !voice(0.8)) return;
+    size = Math.max(0.1, Math.min(1.5, size ?? 0.6));
+    const t = ctx.currentTime, out = dest(pos, 0.3 + size * 0.15); out.gain.value *= 0.48 + size * 0.36; // (a big one stays well clear of clipping)
+    nz({ t, f: [['bandpass', vr(1500 - size * 450, 0.15), 0.9, 360, 0.1 + size * 0.08]], g: 0.5 + size * 0.3, a: 0.003, d: 0.08 + size * 0.12, to: out });
+    nz({ t: t + 0.008, buf: 'pink', f: [['lowpass', 2300 - size * 700], ['highpass', 160]], g: 0.22 + size * 0.28, a: 0.015, d: 0.2 + size * 0.38, to: out });
+    nz({ t: t + 0.03, f: [['highpass', 3400]], g: 0.06 + size * 0.07, a: 0.01, d: 0.16 + size * 0.24, to: out });
+    bubbles(t + 0.04, 2 + Math.round(size * 5), out, 360 - size * 120, 1300 - size * 350, 0.055 + size * 0.03);
+    if (size > 0.7) tn({ t, f0: 95, f1: 42, d: 0.22 + size * 0.1, g: 0.2 * size, to: out, lp: 260 });
+    for (let i = 0, n = 1 + Math.round(size * 3); i < n; i++) { const f = vr(2800, 0.3); tn({ t: t + 0.12 + Math.random() * (0.25 + size * 0.2), f0: f, f1: f * 1.3, fd: 0.012, d: 0.022, g: 0.022 + size * 0.01, to: out }); }
+  };
+  // the water falling a long way at once (a sluice bursting): a rushing roar that swells and dies over dur seconds
+  A.waterRush = function (pos, dur) {
+    if (!ctx || !voice(dur)) return;
+    const t = ctx.currentTime, out = dest(pos, 0.5); out.gain.value *= 0.9;
+    nz({ t, buf: 'brown', f: [['lowpass', 1300], ['highpass', 60]], g: 0.75, a: 0.35, d: dur, to: out });
+    nz({ t, buf: 'pink', f: [['bandpass', 1100, 0.6]], g: 0.35, a: 0.25, d: dur * 0.9, to: out });
+    nz({ t, f: [['highpass', 3800], ['lowpass', 9000]], g: 0.12, a: 0.3, d: dur * 0.8, to: out });
+    bubbles(t + 0.2, 10, out, 260, 900, 0.07);
+  };
+  // the beds of running water, kept going and only turned up and down (water.js sets them a few times a second):
+  //   wade - you moving through it: a swish; fall - the nearest fall from the walls: a deep roar and a hiss, on its side;
+  //   brook - the stream: a babble that wanders in pitch; lap - the still water round you: a low lap that comes and goes
+  let wb = null;
+  function waterBeds() {
+    if (wb || !ctx) return wb;
+    const bed = (buf, filters, pan, wet) => {
+      const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
+      let n = s; const fl = [];
+      for (const [type, f, q] of filters) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q || 0.7; n.connect(b); n = b; fl.push(b); }
+      const am = ctx.createGain(); am.gain.value = 1; n.connect(am);
+      const g = ctx.createGain(); g.gain.value = 0; am.connect(g);
+      let o = g, p = null; if (pan) { p = ctx.createStereoPanner(); g.connect(p); o = p; }
+      o.connect(dry); if (wet) { const w = ctx.createGain(); w.gain.value = wet; o.connect(w); w.connect(revSend); }
+      s.start(0, Math.random() * 1.5);
+      return { s, g, p, f: fl, am };
+    };
+    const lfo = (freq, depth, to) => { const o = ctx.createOscillator(); o.frequency.value = freq; const k = ctx.createGain(); k.gain.value = depth; o.connect(k); k.connect(to); o.start(); return o; };
+    wb = {
+      wade: bed(pink, [['bandpass', 850, 0.8], ['highpass', 200]], false, 0.15),
+      fall: bed(brown, [['lowpass', 1500], ['highpass', 45]], true, 0.45),
+      fallHiss: bed(white, [['highpass', 3200], ['lowpass', 8500]], true, 0.3),
+      brook: bed(pink, [['bandpass', 1500, 1.1], ['highpass', 350]], true, 0.3),
+      lap: bed(brown, [['lowpass', 420], ['highpass', 50]], true, 0.35),
+    };
+    // the brook's band wanders (a babble, not a hiss); the lap swells and ebbs
+    lfo(0.9, 520, wb.brook.f[0].frequency); lfo(2.3, 260, wb.brook.f[0].frequency);
+    wb.lap.am.gain.value = 0.6; lfo(0.31, 0.4, wb.lap.am.gain); lfo(0.53, 0.2, wb.lap.am.gain);
+    wb.wade.am.gain.value = 0.75; lfo(1.7, 0.25, wb.wade.am.gain);
+    return wb;
+  }
+  A.waterBed = function (o) {
+    const b = waterBeds(); if (!b) return;
+    const t = ctx.currentTime, set = (n, v, pan) => { n.g.gain.setTargetAtTime(Math.max(0, v), t, 0.18); if (n.p && pan !== undefined) n.p.pan.setTargetAtTime(pan, t, 0.2); };
+    set(b.wade, (o.wade || 0) * 0.55); set(b.fall, (o.fall || 0) * 0.55, o.fallPan); set(b.fallHiss, (o.fall || 0) * 0.09, o.fallPan);
+    set(b.brook, (o.brook || 0) * 0.55, o.brookPan); set(b.lap, (o.lap || 0) * 0.2, o.lapPan);
+    // (called about ten times a second) the stream's bubbles and gurgles, the odd plop in still water, the slosh of your legs
+    if (o.brook > 0.05 && Math.random() < o.brook * 0.6 && voice(0.3)) { const out = dest(null, 0.3); out.gain.value = 0.55 * o.brook; if (o.brookPan) { const p = ctx.createStereoPanner(); p.pan.value = o.brookPan; out.disconnect(); out.connect(p); p.connect(dry); } bubbles(t, 1 + (Math.random() < 0.45 ? 1 : 0), out, 520, 1700, 0.05); }
+    if (o.lap > 0.2 && Math.random() < o.lap * 0.06 && voice(0.3)) { const out = dest(null, 0.5); out.gain.value = 0.3 * o.lap; bubbles(t, 1, out, 300, 700, 0.06); }
+    if (o.wade > 0.2 && Math.random() < o.wade * 0.35 && voice(0.3)) { const out = dest(null, 0.2); out.gain.value = 0.5 * o.wade; bubbles(t, 1, out, 600, 1500, 0.04); nz({ t, buf: 'pink', f: [['bandpass', vr(1200, 0.3), 1.2]], g: 0.08 * o.wade, a: 0.03, d: 0.15, to: out }); }
+  };
+
   // ominous low drone for the boss approach: detuned sub tones + a breathing, filtered rumble
   A.drone = function () {
     if (!ctx) return { set() {}, stop() {} };

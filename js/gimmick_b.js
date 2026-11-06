@@ -83,7 +83,7 @@
       const tw = t - SL.wave;
       if (tw >= 0 && !g.waveAt) {
         g.waveAt = G.vfx.wave(V(g.wx + s * 0.4, 0.06, g.z), dir, g.len, g.hw * 2, SL.speed, { h: SL.H, start: 0.6 });
-        G.sfx.whoosh && G.sfx.whoosh(1.6, 0.9); Gm.shake(V(g.wx, 1, g.z), 0.35, 30);
+        G.sfx.whoosh && G.sfx.whoosh(1.6, 0.9); G.sfx.waterRush && G.sfx.waterRush(V(g.wx + s * 1.5, 1, g.z), SL.flow + 0.6); Gm.shake(V(g.wx, 1, g.z), 0.35, 30);
         for (let k = 0; k < 60; k++) G.fx.norm.spawn(g.wx + s * rnd(0.3, 1.2), rnd(0.2, 2.8), g.z + rnd(-2.4, 2.4), s * rnd(4, 9), rnd(0.5, 4), rnd(-1, 1), rnd(0.6, 1.2), 0.3, 1.4, 0.85, 0.95, 1.0, 0.8, 8, 0.8);
       }
       const front = tw < 0 ? 0 : Math.min(g.len, G.vfx.waveFront(tw, 0.6, SL.speed, g.len, SL.H));
@@ -100,7 +100,7 @@
           if (!g.hitSet.has(e)) { // the wave's front reached it: thrown along, soaked
             g.hitSet.add(e);
             e.knockback(dir, 10 * k); Gm.hurtFoe(e, 0.05, 'water');
-            G.fx.norm.spawn(e.pos.x, 0.6, e.pos.z, s * 3, 2.5, 0, 0.6, 0.4, 1.4, 0.86, 0.95, 1.0, 0.8, 8, 1);
+            if (G.Water) G.Water.splash(e.pos, 0.8); else G.fx.norm.spawn(e.pos.x, 0.6, e.pos.z, s * 3, 2.5, 0, 0.6, 0.4, 1.4, 0.86, 0.95, 1.0, 0.8, 8, 1);
           }
           // and swept on by the current behind it, slowed
           e.vel.x += s * 46 * k * dt; e.st.slow = Math.max(e.st.slow || 0, 0.6);

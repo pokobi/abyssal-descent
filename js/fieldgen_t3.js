@@ -19,6 +19,7 @@
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xc8e0e0, transparent: true, opacity: 0.35, depthWrite: false }));
       sp.scale.set(wd + 2.4, 1.6, 1); sp.position.set(x + ox * 3, 0.7, z + oz * 3); grp.add(sp);
     });
+    (w.waterfalls = w.waterfalls || []).push({ bx: x + ox * 1.6, bz: z + oz * 1.6, wd, ax: alongX ? 1 : 0, az: alongX ? 0 : 1, nx: alongX ? 0 : s, nz: alongX ? s : 0 }); // (where it lands: water.js)
     w.addLight(x + ox * 4, 1.2, z + oz * 4, { flame: 0, intensity: 3, range: 7, color: '#9fd8d0', emit: false, prio: 0.5, steady: true });
   }
   // a raised stone walkway (solid to the ground, a curb along its edges): ax = along x

@@ -134,6 +134,7 @@
       const z0 = cz - 2.2, z1 = cz + 2.2;
       w.visual('water', 3, 0.0, z0, W - 3, 0.04, z1, { uv: 3, grad: false, skip: { bottom: true } });
       w.waterZones.push({ x0: 3, z0, x1: W - 3, z1 });
+      w.streams = [{ x0: 3, z0, x1: W - 3, z1 }]; w.waterFlow = { x: (seed & 1 ? 0.55 : -0.55), z: 0 }; // (it runs across the village: water.js)
       w.visual('rock', 3, 0, z0 - 0.35, W - 3, 0.14, z0, { uv: 2, grad: false }); w.visual('rock', 3, 0, z1, W - 3, 0.14, z1 + 0.35, { uv: 2, grad: false });
       occ.mark(3, z0 - 1, W - 3, z1 + 1);
       const bx2 = rng.chance(0.5) ? rng.range(8, cx - 10) : rng.range(cx + 10, W - 8);

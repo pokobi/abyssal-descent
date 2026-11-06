@@ -422,6 +422,94 @@
   // boiling lava: the surface glows brighter where bubbles swell and pop (rings that grow and burst at pseudo-random spots), over a slow
   // churning swell. Only the look changes; time comes from T.lavaT (updated by the game loop).
   T.lavaT = { value: 0 };
+  // ---------------- water ----------------
+  // Every surface drawn with the 'water' material (the flooded halls, the village stream, puddles, shallows, the falls from the grates)
+  // is a living surface: swells and a chop that the area's current carries along (T.waterU.uFlow), the ripples a step, a shot or a foe
+  // makes (T.waterU.uRip, see water.js), a web of light playing on the bottom where it is lit, foam streaks in running water; seen
+  // from above it is clear and you see the floor, at a glancing angle it turns dark and mirrors the air (fresnel). A face that stands
+  // upright is falling water: white streaks race down it and foam boils where it lands. Only the look; time is T.lavaT (game time).
+  T.waterU = { uRip: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, 0, -99, 0)) }, uFlow: { value: new THREE.Vector2(0, 0) } };
+  function waterize(m) {
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = T.lavaT; sh.uniforms.uRip = T.waterU.uRip; sh.uniforms.uFlow = T.waterU.uFlow;
+      sh.vertexShader = `varying vec3 vWP; varying vec3 vWN;
+` + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);`);
+      sh.fragmentShader = `uniform float uTime; uniform vec4 uRip[16]; uniform vec2 uFlow; varying vec3 vWP; varying vec3 vWN;
+float wq(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float wn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(wq(i), wq(i + vec2(1.0, 0.0)), f.x), mix(wq(i + vec2(0.0, 1.0)), wq(i + vec2(1.0, 1.0)), f.x), f.y); }
+// the surface's height (metres): two long swells, a shorter one, a chop of noise; the current carries the pattern
+float wH(vec2 p, float t) {
+  vec2 q = p - uFlow * t;
+  float h = sin(dot(q, vec2(0.83, 0.56)) * 1.7 + t * 1.25) * 0.018 + sin(dot(q, vec2(-0.47, 0.88)) * 2.6 + t * 1.8) * 0.011
+          + sin(dot(q, vec2(0.97, -0.24)) * 4.3 + t * 2.6) * 0.005;
+  return h + (wn(q * 1.5 + t * 0.32) - 0.5) * 0.024 + (wn(q * 4.1 - t * 0.55) - 0.5) * 0.009;
+}
+float wFoam = 0.0, wFall = 0.0;
+` + sh.fragmentShader
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        vec3 wN0 = normalize(vWN);
+        if (wN0.y > 0.5) {
+          // a lying surface: the slope of the height field, plus the rings of the ripples
+          vec2 p = vWP.xz; float e = 0.06;
+          vec2 g = vec2(wH(p + vec2(e, 0.0), uTime) - wH(p - vec2(e, 0.0), uTime), wH(p + vec2(0.0, e), uTime) - wH(p - vec2(0.0, e), uTime)) / (2.0 * e);
+          float crest = 0.0;
+          for (int i = 0; i < 16; i++) {
+            vec4 r = uRip[i]; float age = uTime - r.z;
+            if (age <= 0.0 || age > 2.4) continue;
+            vec2 d = p - r.xy; float dist = length(d) + 1e-4, R = 0.25 + age * 1.5, x = dist - R;
+            float fade = (1.0 - age / 2.4); float env = exp(-x * x * 7.0) * r.w * fade * fade;
+            g += (d / dist) * env * cos(x * 13.0) * 0.16;
+            crest += env * pow(max(0.0, cos(x * 13.0)), 3.0) * smoothstep(0.9, 0.0, age);
+          }
+          vec3 nW = normalize(vec3(-g.x, 1.0, -g.y));
+          normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+          // running water: streaks of foam drawn out along the current
+          float sp = length(uFlow);
+          if (sp > 0.05) {
+            vec2 fd = uFlow / sp, fs = vec2(-fd.y, fd.x);
+            float u = dot(p, fs), v = dot(p, fd) - sp * uTime * 1.2;
+            float s = wn(vec2(u * 2.4, v * 0.35)) * 0.65 + wn(vec2(u * 5.0 + 7.0, v * 0.8)) * 0.35;
+            wFoam += smoothstep(0.66, 0.86, s) * min(1.0, sp * 1.6) * 0.55;
+          }
+          wFoam += min(0.55, crest * 0.5);
+          // a web of light on the bottom (it only shows where light falls: it brightens what the light shines on)
+          vec2 cq = p * 0.9 - uFlow * uTime;
+          float c1 = 1.0 - abs(wn(cq * 1.7 + uTime * 0.21) * 2.0 - 1.0), c2 = 1.0 - abs(wn(cq * 2.3 - uTime * 0.17 + 3.1) * 2.0 - 1.0);
+          float caus = (pow(c1, 8.0) + pow(c2, 8.0)) * (0.55 + 0.45 * wn(cq * 0.35 + 9.0));
+          diffuseColor.rgb += vec3(0.1, 0.19, 0.19) * caus;
+        } else {
+          // falling water: streaks racing down the sheet, a churn of white where it meets the pool
+          vec2 tg = normalize(vec2(-wN0.z, wN0.x) + 1e-4);
+          float u = dot(vWP.xz, tg), v = vWP.y + uTime * 3.4;
+          float s = wn(vec2(u * 5.5, v * 0.55)) * 0.6 + wn(vec2(u * 11.0, v * 1.3)) * 0.4;
+          wFall = 1.0;
+          wFoam = smoothstep(0.42, 0.78, s) * 0.85 + smoothstep(0.9, 0.0, vWP.y) * 0.9;
+          vec3 nW = normalize(wN0 + vec3(tg.x, 0.0, tg.y) * (s - 0.5) * 0.5 + vec3(0.0, (wn(vec2(u * 3.0, v * 0.9)) - 0.5) * 0.4, 0.0));
+          normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+        }
+        wFoam = clamp(wFoam, 0.0, 1.0);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.82, 0.88, 0.9), wFoam);
+        roughnessFactor = mix(roughnessFactor, 0.6, wFoam);
+      }`)
+        .replace('#include <opaque_fragment>', `
+      {
+        // fresnel: clear from above, a dark mirror of the air at a glancing angle; foam is opaque
+        vec3 wV = normalize(vViewPosition);
+        float fres = pow(1.0 - clamp(abs(dot(normal, wV)), 0.0, 1.0), 4.0);
+        vec3 refl = vec3(0.05, 0.08, 0.09);
+        #ifdef USE_FOG
+          refl = mix(refl, fogColor * 1.25, 0.7);
+        #endif
+        outgoingLight = mix(outgoingLight, refl + outgoingLight * 0.35, fres * 0.7 * (1.0 - wFoam));
+        diffuseColor.a = wFall > 0.5 ? mix(0.55, 0.92, max(wFoam, fres)) : clamp(mix(0.42, 0.93, fres) + wFoam * 0.5, 0.0, 1.0);
+      }
+      #include <opaque_fragment>`);
+    };
+    m.customProgramCacheKey = () => 'water2';
+  }
   function boil(m, blue) {
     m.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = T.lavaT;
@@ -495,8 +583,9 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     }
     M.leaf = new THREE.MeshStandardMaterial({ color: B.leaf ?? (B.outdoor === 'sky' ? 0x8ab05a : 0x4f6a2a), roughness: 0.9, flatShading: true });
     M.cloud = new THREE.MeshBasicMaterial({ map: T.spr.cloud, color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
-    M.water = new THREE.MeshStandardMaterial({ color: 0x1a2a26, roughness: 0.08, metalness: 0.35, transparent: true, opacity: 0.82, normalMap: t.cobble.normalMap });
-    M.water.normalScale.set(0.15, 0.15);
+    // (the look of water is all in its shader: waterize below; deep green-blue, glossy, its own alpha)
+    M.water = new THREE.MeshStandardMaterial({ color: 0x14363a, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 1 });
+    waterize(M.water);
     M.lava = new THREE.MeshStandardMaterial({ color: 0x2a0800, emissive: 0xff5a10, emissiveIntensity: 1.6, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     M.bluefire = new THREE.MeshStandardMaterial({ color: 0x06102a, emissive: 0x2a86ff, emissiveIntensity: 1.7, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     boil(M.lava, false); boil(M.bluefire, true);
@@ -517,6 +606,7 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     M.vc = {};
     for (const k in M) { const m = M[k]; if (m && m.isMaterial) { if (m.isMeshStandardMaterial) { const c = m.clone(); c.vertexColors = true; M.vc[k] = c; } else M.vc[k] = m; } }
     boil(M.vc.lava, false); boil(M.vc.bluefire, true); // the copies the world is actually drawn with
+    waterize(M.vc.water);
     M.biome = B;
     matCache[biomeKey] = M;
     return M;

@@ -491,6 +491,7 @@
     for (const ds of G.world.destructibles) if (ds.alive && ds.pos.distanceTo(pos) < r + 0.5) C.damageDestructible(ds, dmg, pos);
     if (G.Strata.doors.length) for (const dr of G.Strata.doorsNear(pos, r + 0.5)) G.Strata.hitDoor(dr, dmg, 'explosion');
     if (G.Gim && G.Gim.list.length) G.Gim.blast(pos, r); // (a field's device in the blast: gimmick.js)
+    if (G.Water) G.Water.blast(pos, r); // (the water under it thrown up: water.js)
     if (G.bosses.active) G.bosses.active.aoe && G.bosses.active.aoe(pos, r, dmg, info);
     if (!info.proc) G.buffs.emit('onExplode', { pos, radius: r });
     if (G.Fields) G.Fields.onExplode(pos, r);
@@ -824,8 +825,7 @@
         else {
           if (p.explode) detonate(p);
           else {
-            G.fx.sparks(wh.point, wh.normal, 5, 0xffd0a0, 4);
-            G.fx.dust(wh.point, wh.normal, 0x8a8070, 3);
+            if (!(G.Water && G.Water.shot(wh.point))) { G.fx.sparks(wh.point, wh.normal, 5, 0xffd0a0, 4); G.fx.dust(wh.point, wh.normal, 0x8a8070, 3); } // (into the water: a splash)
             if (p.onHitWorld) p.onHitWorld(wh);
             if (p.kind === 'bolt' || p.kind === 'harpoon' || p.kind === 'spear' || p.kind === 'arrow' || p.kind === 'nail') { p.stuck = true; p.life = Math.min(p.life, 4); p.mesh.position.copy(p.pos); continue; }
           }

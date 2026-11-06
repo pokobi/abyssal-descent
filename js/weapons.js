@@ -1206,7 +1206,8 @@
       if (wh.c.dest) G.combat.damageDestructible(wh.c.dest, s.dmg, wh.point);
       if (wh.c.gim && G.Gim) G.Gim.hit(wh.c.gim, s.dmg, 'bullet', wh.point, dir);
       if (G.bosses.active && G.bosses.active.onWorldHit) G.bosses.active.onWorldHit(wh);
-      if (surf === 'metal') { G.fx.sparks(wh.point, wh.normal, 8, 0xffd090, 6); }
+      if (G.Water && G.Water.shot(wh.point)) { /* (a splash: water.js) */ }
+      else if (surf === 'metal') { G.fx.sparks(wh.point, wh.normal, 8, 0xffd090, 6); }
       else if (surf === 'wood') { G.fx.dust(wh.point, wh.normal, 0x6a4a30, 3); }
       else { G.fx.dust(wh.point, wh.normal, 0x8a8070, 3); if (Math.random() < 0.5) G.fx.sparks(wh.point, wh.normal, 3, 0xffc080, 4); }
       G.fx.decal(wh.point, wh.normal, 'hole', s.sound === 'shotgun' ? 0.08 : 0.12);

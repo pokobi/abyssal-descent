@@ -140,9 +140,10 @@
     G.Graves.build(w);
     document.querySelectorAll('.exit-mark').forEach((e) => e.remove()); // the last area's gate markers
     const B0 = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
-    // the area's sky (skyvary.js): a mood of the field drawn from the run's seed, laid over its light and fog (looks only)
+    // the area's sky (skyvary.js): a mood of the field drawn from the run's seed, laid over its light and fog; what falls from it
+    // also counts in the fight (weather.js). A guardian's hall always has the field's own sky.
     const sv = G.Sky && GM.stage && GM.stage !== 'title' ? G.Sky.choose(w, GM.area, GM.stage) : null; w.sky = sv;
-    const B = G.Sky ? G.Sky.env(B0, sv, w.isBoss) : B0;
+    const B = G.Sky ? G.Sky.env(B0, sv) : B0;
     GM._fogBase = B.fogD; const qk = (QP[G.save.data.settings.quality] || QP.high);
     scene.fog.color.set(B.fog); scene.fog.density = B.fogD * qk.fogK;
     scene.background = new THREE.Color(B.fog);
@@ -156,7 +157,7 @@
     else moon.position.set(cx + 18, 60, cz + 26);
     moon.target.position.set(cx, 0, cz); moon.target.updateMatrixWorld();
     setSky(B);
-    if (G.Sky) G.Sky.start(scene, sv, w.isBoss);
+    if (G.Sky) G.Sky.start(scene, sv);
     if (G.Weather) G.Weather.reset();
     const sc = moon.shadow.camera; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.near = 10; sc.far = 140; sc.updateProjectionMatrix();
     G.abilities.rebuildVisuals();

@@ -3,7 +3,8 @@
 // a darker or a brighter night — from the run's seed (the same on a reload and on every co-op screen). Here: how the place looks
 // (the colour and thickness of the fog, the light, the sky dome and a field of falling / drifting particles around the camera).
 // What falls from the sky also counts in the fight (weather.js): `el` is the element it keeps on you and on the foes (rain: water,
-// snow: ice, embers: fire), `bolt` brings lightning down. The guardian's hall only gets the milder ones (never lightning).
+// snow: ice, embers: fire), `bolt` brings lightning down. A guardian's hall always has the field's own sky (the first of its moods):
+// no weather there, the fight with the guardian stays as it is.
 (function () {
   const S = (G.Sky = {});
   const U = G.U;
@@ -108,20 +109,20 @@
   S.choose = function (w, n, kind) {
     const list = S.V[w.biome] || S.V[w.field];
     if (!list || !G.game || !G.game.seed) return null;
+    if (w.isBoss || kind === 'boss') return list[0]; // (a guardian's hall: the field's own sky, never a weather)
     if (S.force) { const f = list.find((v) => v.id === S.force); if (f) return f; } // (development: G.Sky.force = 'rain' etc.)
     const rng = new G.RNG(((G.game.seed ^ U.hashStr('sky:' + n + ':' + kind)) >>> 0) || 1);
-    const pool = w.isBoss ? list.filter((v) => !v.flash) : list; // (no lightning over a guardian's hall: the fight must stay readable)
-    return rng.weighted(pool, (v) => v.w);
+    return rng.weighted(list, (v) => v.w);
   };
   const mixHex = (a, b, k) => { const c = new THREE.Color(a).lerp(new THREE.Color(b), k); return '#' + c.getHexString(); };
   // the field's light and fog with a mood laid over them (a copy: the field's own table is never changed)
-  S.env = function (B, v, mild) {
+  S.env = function (B, v) {
     if (!v) return B;
-    const o = Object.assign({}, B), k = v.k ?? 0.5, cap = (m) => (mild ? 1 + Math.min(0.25, Math.max(-0.2, m - 1)) : m);
+    const o = Object.assign({}, B), k = v.k ?? 0.5;
     if (v.fog) o.fog = mixHex(B.fog, v.fog, k);
-    if (v.fogD) o.fogD = B.fogD * cap(v.fogD);
-    if (v.amb) o.amb = B.amb * cap(v.amb);
-    if (v.moonI) o.moonI = B.moonI * cap(v.moonI);
+    if (v.fogD) o.fogD = B.fogD * v.fogD;
+    if (v.amb) o.amb = B.amb * v.amb;
+    if (v.moonI) o.moonI = B.moonI * v.moonI;
     if (v.hemiS) o.hemiS = mixHex(B.hemiS, v.hemiS, v.k2 ?? k);
     if (v.hemiG) o.hemiG = mixHex(B.hemiG, v.hemiG, k);
     if (v.moon) o.moon = mixHex(B.moon, v.moon, k);
@@ -184,10 +185,10 @@
     m.frustumCulled = false; m.renderOrder = 6;
     return m;
   }
-  S.start = function (sc, v, mild) {
+  S.start = function (sc, v) {
     S.stop(); scene = sc; cur = v || null;
     if (!v) return;
-    const q = (G.save && G.save.data.settings.quality) || 'high', k = (q === 'low' ? 0.35 : q === 'med' ? 0.65 : 1) * (mild ? 0.6 : 1) * (document.documentElement.classList.contains('m') ? 0.6 : 1);
+    const q = (G.save && G.save.data.settings.quality) || 'high', k = (q === 'low' ? 0.35 : q === 'med' ? 0.65 : 1) * (document.documentElement.classList.contains('m') ? 0.6 : 1);
     for (const spec of v.p || []) { const m = make(spec, k); scene.add(m); live.push(m); }
     flash = v.flash ? { next: 6 + Math.random() * 10, t: -1 } : null;
   };

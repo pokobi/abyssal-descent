@@ -127,9 +127,10 @@ const PORT = +process.env.COOP_PORT || 9993;
         const H = window.__H, P = G.player, EL = G.Elem; H.enter('flooded'); await H.sl(500);
         const w = G.world, out = {};
         G.game.dev.god = true;
-        // stand somewhere in the water that covers the floor (no field patch: the flooded halls' own water)
+        // stand somewhere in the water that covers the floor (no field patch: the flooded halls' own water), with nothing there to
+        // stand on (a crate or a slab out of the water is dry: it is not in the nav, so look at the colliders)
         const wz = w.waterZones[0];
-        let at = null; for (let k = 0; k < 400 && !at; k++) { const c = w.randomOpenCell(G.game.arng, (x, z, i) => (!w.reachMask || w.reachMask[i]) && Math.abs(w.nf[i]) < 0.1 && x > wz.x0 + 1 && x < wz.x1 - 1 && z > wz.z0 + 1 && z < wz.z1 - 1); if (c) at = c; }
+        let at = null; for (let k = 0; k < 400 && !at; k++) { const c = w.randomOpenCell(G.game.arng, (x, z, i) => (!w.reachMask || w.reachMask[i]) && Math.abs(w.nf[i]) < 0.1 && x > wz.x0 + 1 && x < wz.x1 - 1 && z > wz.z0 + 1 && z < wz.z1 - 1 && w.boxFree(x - 0.5, 0.05, z - 0.5, x + 0.5, 1.8, z + 0.5)); if (c) at = c; }
         if (!at) return JSON.stringify({ err: 'no water spot' });
         const place = async (x, y, z, kind) => {
           P.au = null; P.pos.set(x, y + 0.02, z); P.vel.set(0, 0, 0);
@@ -144,7 +145,7 @@ const PORT = +process.env.COOP_PORT || 9993;
         const F = G.Fields, spot = (dx) => [at.x + dx, at.z];
         for (const [kind, dx] of [['lava', 0], ['ice', 0], ['oil', 0]]) {
           // (a dry stretch of floor: the walkway or the landing)
-          let d = null; for (let k = 0; k < 400 && !d; k++) { const c = w.randomOpenCell(G.game.arng, (x, z, i) => (!w.reachMask || w.reachMask[i]) && !w.waterZones.some((q) => x > q.x0 - 3 && x < q.x1 + 3 && z > q.z0 - 3 && z < q.z1 + 3) && w.npen[i] < 0.1); if (c) d = c; }
+          let d = null; for (let k = 0; k < 400 && !d; k++) { const c = w.randomOpenCell(G.game.arng, (x, z, i) => (!w.reachMask || w.reachMask[i]) && !w.waterZones.some((q) => x > q.x0 - 3 && x < q.x1 + 3 && z > q.z0 - 3 && z < q.z1 + 3) && w.npen[i] < 0.1 && w.boxFree(x - 0.5, w.nf[i] + 0.05, z - 0.5, x + 0.5, w.nf[i] + 1.8, z + 0.5)); if (c) d = c; }
           if (!d) { out[kind] = { err: 'no dry spot' }; continue; }
           const f = F.add(w, kind, d.x - 2.5, d.z - 2.5, d.x + 2.5, d.z + 2.5, { y: d.y });
           if (kind === 'oil') F.ignite(f);
@@ -223,6 +224,25 @@ const PORT = +process.env.COOP_PORT || 9993;
         const res = { me: EL.playerAura(), foe: EL.auraOf(e) }; G.enemies.clear(); return JSON.stringify(res);
       })()`).then(JSON.parse);
       check(r.me === 'ice' && r.foe === 'ice', `a falling icicle leaves ice on you and on the foe it hits (${JSON.stringify(r)})`);
+    }
+    // ---------------- 5) a guardian's hall: always the field's own sky, no weather ----------------
+    {
+      const r = await p.eval(`(async () => {
+        const S = G.Sky, bad = [];
+        for (const k of Object.keys(S.V)) for (const n of [5, 10, 15, 20]) for (const f of [null, 'rain', 'snow', 'ember', 'storm']) {
+          S.force = f; const v = S.choose({ isBoss: true, field: k }, n, 'boss');
+          if (v !== S.V[k][0] || v.el || v.bolt || v.flash || (v.p && v.p.length)) bad.push(k + ':' + n + ':' + f + '->' + (v && v.id));
+        }
+        // and in a real one: the graveyard's guardian with the rain asked for
+        const H = window.__H, R = G.Run, GM = G.game, P = G.player; R._f0 = R._f0 || R.field; R.field = () => 'grave'; S.force = 'rain';
+        let n = 1; while (!R.isBoss(n)) n++;
+        G.enemies.clear(); GM.transitioning = false; G.ui.clearScreen(); GM.state = 'playing'; P.au = null; GM.enterArea(n, 'boss'); GM.dev = { speed: 1, god: true };
+        await H.sl(2500);
+        const w = G.world, res = { bad, isBoss: !!w.isBoss, mood: w.sky && w.sky.id, me: G.Elem.playerAura(), pending: G.Weather.pending(), strikes0: G.Weather.strikes };
+        GM.dev.god = false; S.force = null; return JSON.stringify(res);
+      })()`).then(JSON.parse);
+      check(!r.bad.length, `a guardian's hall always draws the field's own sky, whatever is asked (${r.bad.slice(0, 4).join(', ')})`);
+      check(r.isBoss && r.mood === 'clear' && !r.me && !r.pending, `the graveyard's guardian hall stays under the plain moon even with rain asked for: no element on you, no bolt (${JSON.stringify(r)})`);
     }
     check(p.errs.length === 0, `no page errors${p.errs.length ? ' — ' + p.errs.slice(0, 3).join(' | ').slice(0, 500) : ''}`);
   } catch (e) { console.log('crashed', e && e.message || e); fails.push('crashed'); }

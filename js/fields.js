@@ -1,28 +1,28 @@
 'use strict';
 // Field gimmicks: patches of ground that change how you (and the monsters) move and fight.
-//   water   — slows a little, puts out burning, wet foes take +50% shock damage
-//   lava    — sets the player alight (monsters are not hurt by it)
+//   water   — slows a little, puts out burning, leaves water on you and on the foes in it
+//   lava    — sets the player alight and leaves fire on you (monsters are not hurt by it, but they carry fire too)
 //   moss    — slippery footing, slides go faster
-//   ice     — very slippery
+//   ice     — very slippery, leaves ice on you and on the foes on it
 //   mud     — heavy: slow walking, weak jumps (foes are slowed too)
 //   poison  — poisons whatever wades through
 //   holy    — a sacred spring: heals you while you stand in it, until it runs dry
-//   oil     — harmless... until fire or an explosion touches it, then it burns for a while
+//   oil     — harmless... until fire or an explosion touches it, then it burns for a while (and leaves fire while it does)
 //   thorns  — cuts whoever pushes through (you only when moving), slows
 //   vent    — an updraft that throws you (and foes) high into the air
 (function () {
   const F = (G.Fields = {});
   const U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   F.KINDS = {
-    water: { name: '浅瀬', icon: '💧', tip: '浅瀬：少し遅くなる・炎上が消える・中の敵に水属性が付く' },
-    lava: { name: '溶岩', icon: '🌋', tip: '溶岩：踏むと激しく燃える' },
+    water: { name: '浅瀬', icon: '💧', tip: '浅瀬：少し遅くなる・炎上が消える・自分にも中の敵にも水属性が付く' },
+    lava: { name: '溶岩', icon: '🌋', tip: '溶岩：踏むと激しく燃え、炎属性が付く（敵は燃えないが炎属性が付く）' },
     // (a blue-flame patch is a 'lava' field with blue = true: the same burning, in the ruined depths)
     moss: { name: '苔', icon: '🌿', tip: '苔：足が滑る・スライディングが伸びる' },
-    ice: { name: '氷床', icon: '❄️', tip: '氷床：とても滑る' },
+    ice: { name: '氷床', icon: '❄️', tip: '氷床：とても滑る・自分にも上の敵にも氷属性が付く' },
     mud: { name: '泥沼', icon: '🟫', tip: '泥沼：移動とジャンプが重くなる（敵も遅くなる）' },
     poison: { name: '毒沼', icon: '☠️', tip: '毒沼：浸かると毒を受ける（敵も）' },
     holy: { name: '聖泉', icon: '✨', tip: '聖泉：立っている間HPが回復する（枯れるまで）' },
-    oil: { name: '油溜まり', icon: '🛢️', tip: '油溜まり：炎や爆発で引火し、しばらく燃え続ける' },
+    oil: { name: '油溜まり', icon: '🛢️', tip: '油溜まり：炎や爆発で引火し、しばらく燃え続ける（燃えている間は炎属性が付く）' },
     thorns: { name: '茨の茂み', icon: '🌵', tip: '茨：動くと傷つく・遅くなる（敵も傷つく）' },
     vent: { name: '上昇気流', icon: '🌀', tip: '上昇気流：乗ると高く打ち上げられる' },
   };
@@ -101,6 +101,39 @@
   };
   const rs = (a) => (Math.random() - 0.5) * 2 * a;
   let popT = 0;
+
+  // ---------------- the elements of the ground ----------------
+  // Every pool of water, lava and ice in the area (the patches above, but also the flooded halls' water, the village stream, the
+  // lava pools of the forge, the strata trench ...) and burning oil lay their element on you and on the foes standing in them.
+  // On a foe it can set off a reaction (a frozen foe in a puddle freezes: element.js give); on you it is only laid down (envPlayer).
+  const ZEL = { water: 'water', lava: 'fire', ice: 'ice', oil: 'fire' };
+  const ELTIP = { water: '💧 水に入ると、自分にも敵にも水属性が付く', fire: '🔥 溶岩や炎の上では、自分にも敵にも炎属性が付く', ice: '❄️ 氷の上では、自分にも敵にも氷属性が付く' };
+  let envT = 0;
+  const zoneAt = (z, p, up) => p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && p.y < (z.y || 0) + up && p.y > (z.y || 0) - 0.3;
+  function envTick(dt) {
+    const w = G.world, P = G.player, EL = G.Elem; if (!w || !EL) return;
+    envT -= dt; if (envT > 0) return; envT = 0.25;
+    const zones = [];
+    for (const z of w.waterZones) zones.push([z, 'water']);
+    for (const z of w.lavaZones) zones.push([z, 'fire']);
+    for (const f of w.fields || []) if (f.kind === 'ice' || (f.kind === 'oil' && f.burnT > 0)) zones.push([f, ZEL[f.kind]]);
+    if (!zones.length) return;
+    if (!P.dead) for (const [z, el] of zones) {
+      if (!zoneAt(z, P.pos, el === 'water' ? 0.25 : 0.2) || (el !== 'water' && !P.grounded)) continue;
+      if (el === 'water' && P.st.burn > 0) { P.st.burn = 0; G.fx.smoke && G.fx.smoke(P.pos.clone().setY(P.pos.y + 0.5), 6, 0.6, 0x9aa4aa, 0.5, 0.8); }
+      if (EL.envPlayer(el) && !seen.k['el:' + el]) { seen.k['el:' + el] = true; G.ui.toastSmall(ELTIP[el]); }
+      break;
+    }
+    for (const e of G.enemies.list) {
+      if (!e.alive || e._rep || e.custom || e.flyer || e.burrowed) continue;
+      for (const [z, el] of zones) {
+        if (!zoneAt(z, e.pos, 0.5)) continue;
+        EL.give(e, el);
+        if (el === 'water' && e.st && e.st.burn) { e.st.burn = 0; e.st.burnLv = 0; }
+        break;
+      }
+    }
+  }
   function boilLava(f, dt, dist) {
     const cam = G.camera.position, blue = !!f.blue, y = f.y + 0.05;
     const area = (f.x1 - f.x0) * (f.z1 - f.z0);
@@ -121,8 +154,9 @@
   F.update = function (dt) {
     const w = G.world, P = G.player, C = G.combat;
     P.fieldSpeed = 1; P.fieldSlip = 1; P.fieldJump = 1; P.fieldSlide = 1;
-    if (!w || !w.fields || !w.fields.length || P.dead) { if (G.sfx.boilBed) G.sfx.boilBed(0); return; }
     if (!seen || seen.run !== G.game.run) seen = { run: G.game.run, k: {} };
+    envTick(dt);
+    if (!w || !w.fields || !w.fields.length || P.dead) { if (G.sfx.boilBed) G.sfx.boilBed(0); return; }
     tick -= dt; hurtT -= dt;
     const doTick = tick <= 0; if (doTick) tick = 0.25;
     const feet = P.pos;
@@ -159,9 +193,8 @@
       const onGround = P.grounded && feet.y < f.y + 0.25 && feet.y > f.y - 0.3;
       const pin = inside(f, feet) && (f.kind === 'vent' ? feet.y < f.y + 1 && feet.y > f.y - 0.3 : onGround);
       if (pin) {
-        const tk = f.blue ? 'blue' : f.kind; if (!seen.k[tk]) { seen.k[tk] = true; G.ui.toastSmall(f.blue ? '🔵 蒼炎：踏むと激しく燃える' : `${F.KINDS[f.kind].icon} ${F.KINDS[f.kind].tip}`); }
+        const tk = f.blue ? 'blue' : f.kind; if (!seen.k[tk]) { seen.k[tk] = true; if (ZEL[f.kind]) seen.k['el:' + ZEL[f.kind]] = true; G.ui.toastSmall(f.blue ? '🔵 蒼炎：踏むと激しく燃え、炎属性が付く（敵は燃えないが炎属性が付く）' : `${F.KINDS[f.kind].icon} ${F.KINDS[f.kind].tip}`); }
         switch (f.kind) {
-          case 'water': if (P.st.burn > 0) { P.st.burn = 0; G.fx.smoke && G.fx.smoke(P.pos.clone().setY(0.5), 6, 0.6, 0x9aa4aa, 0.5, 0.8); } break;
           case 'moss': P.fieldSlip = 0.35; P.fieldSlide = 1.5; break;
           case 'ice': P.fieldSlip = 0.12; P.fieldSlide = 1.8; break;
           case 'mud': P.fieldSpeed = 0.62; P.fieldJump = 0.72; break;
@@ -177,7 +210,7 @@
       for (const e of G.enemies.inRadius(V(cx, f.y, cz), Math.hypot(f.x1 - f.x0, f.z1 - f.z0) / 2 + 1)) {
         if (e.boss || !inside(f, e.pos) || e.pos.y > f.y + (f.kind === 'vent' ? 1 : 0.5) || e.pos.y < f.y - 0.5 || (e.def.flyer && f.kind !== 'vent')) continue;
         switch (f.kind) {
-          case 'water': if (G.Elem) G.Elem.give(e, 'water'); if (e.st.burn) { e.st.burn = 0; e.st.burnLv = 0; } break; // (in water a foe is wet: water, element.js)
+          // (water, ice, lava and burning oil leave their element: envTick above)
           // lava does not hurt monsters (burning from the player's own weapons and skills works as usual)
           case 'mud': e.st.slow = Math.max(e.st.slow || 0, 0.5); break;
           case 'poison': C.status(e, 'poison', 1); break;

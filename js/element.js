@@ -256,6 +256,28 @@
     return r.id;
   };
 
+  // ---------------------------------------------------------------- the surroundings (fields.js: shallows, lava, ice sheets; weather.js: rain, snow, embers)
+  // They lay their element on whoever is in them and keep it up, but never set off a reaction on their own: a foe or a player that
+  // already carries another element keeps it (water is the one exception: it washes a fire off you).
+  // `wait`: a target that has just lost its element (spent in a reaction) is left bare that long before it is laid on again.
+  EL.envEnemy = function (e, el, wait) {
+    if (!e || !e.alive || e.auFix || !el || !EL.BY[el] || !EL.BY[el].aura || (e.mut && e.mut.nullify)) return false;
+    const cur = EL.auraOf(e), now = G.game.time;
+    if (cur && cur !== el) { e._envBare = 0; return false; }
+    if (!cur && wait) { if (!e._envBare) { e._envBare = now; return false; } if (now - e._envBare < wait) return false; }
+    e._envBare = 0;
+    if (!cur || EL.auraLeft(e) < EL.AURA_T - 1) EL.setAura(e, el, EL.AURA_T); // (kept topped up: re-sent to co-op screens once a second at most)
+    return true;
+  };
+  EL.envPlayer = function (el, wait) {
+    if (!P || P.dead || !el || !EL.BY[el] || !EL.BY[el].aura) return false;
+    const cur = EL.playerAura(), now = G.game.time, dur = EL.SELF_T * Math.max(0.1, 1 - sx('elSelfT'));
+    if (cur && cur !== el && !(el === 'water' && cur === 'fire')) { P._envBare = 0; return false; }
+    if (!cur && wait) { if (!P._envBare) { P._envBare = now; return false; } if (now - P._envBare < wait) return false; }
+    P._envBare = 0;
+    P.au = { el, t: now + dur };
+    return true;
+  };
   // a status (burn / frost / shock) leaves its element: every time, with no cool-down; a reaction can follow
   EL._inRx = 0;
   EL.fromStatus = function (e, el) { if (EL._inRx > 0 || !e || !e.alive) return; EL.give(e, el, { status: true }); };

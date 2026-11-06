@@ -77,7 +77,7 @@
   }
   F.gen.frozen = genFrozen;
   // the icicles that fall: while you fight in a frozen hall, every few seconds one breaks from the vault near you. A pale ring on the
-  // floor marks it a second before it lands; inside the ring it hurts (each player's own: they fall around whoever is there).
+  // floor marks it a second before it lands; inside the ring it hurts and leaves ice (each player's own: they fall around whoever is there).
   F.tickIcicles = function (w, dt) {
     const I = w.icicles, GM = G.game, Pl = G.player;
     if (!I || !Pl || Pl.dead || GM.state !== 'playing' || GM.areaCleared || GM.stage === 'boss' || !(G.enemies.list.length > 0)) return;
@@ -88,8 +88,8 @@
         G.fx.sparks(f.p.clone().setY(0.4), V(0, 1, 0), 18, 0xd8f0ff, 6); G.fx.debris && G.fx.debris(f.p.clone().setY(0.6), w.mats.ice, 6, 0.4, 6);
         if (G.vfx && G.vfx.spikes) G.vfx.spikes([f.p.clone()], { kind: 'ice', r: 0.6, h: 1.4, n: 2, dur: 0.5 });
         G.sfx.ice ? G.sfx.ice(f.p) : G.sfx.explosion(f.p, 0.3);
-        if (Math.hypot(Pl.pos.x - f.p.x, Pl.pos.z - f.p.z) < f.r && Pl.pos.y < 3) G.combat.damagePlayer(Pl.stats.maxHp * 0.07, { src: 'aoe', pos: f.p.clone(), elem: 'frost' });
-        for (const e of G.enemies.list) if (e.alive && !e._rep && !e.flyer && Math.hypot(e.pos.x - f.p.x, e.pos.z - f.p.z) < f.r + (e.radius || 0.5) * 0.5) G.combat.damageEnemy(e, e.maxHp * 0.05, { src: 'env' });
+        if (Math.hypot(Pl.pos.x - f.p.x, Pl.pos.z - f.p.z) < f.r && Pl.pos.y < 3) G.combat.damagePlayer(Pl.stats.maxHp * 0.07, { src: 'aoe', pos: f.p.clone(), elem: 'frost', el: 'ice' });
+        for (const e of G.enemies.list) if (e.alive && !e._rep && !e.flyer && Math.hypot(e.pos.x - f.p.x, e.pos.z - f.p.z) < f.r + (e.radius || 0.5) * 0.5) G.combat.damageEnemy(e, e.maxHp * 0.05, { src: 'env', el: 'ice' });
         if (f.mesh) { w.group.remove(f.mesh); f.mesh = null; }
       } else if (f.mesh) f.mesh.position.y = (I.y - 1.4) - (I.y - 2.6) * Math.pow(Math.max(0, (f.t - f.T + 0.4) / 0.4), 2); // (it hangs, shakes loose, then drops in the last 0.4 s)
     }

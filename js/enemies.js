@@ -716,6 +716,7 @@
       else if (this.big) f *= 0.5;
       this.vel.x += dir.x * f; this.vel.z += dir.z * f;
       if (!this.flyer) this.vel.y = Math.max(this.vel.y, Math.min(4, f * 0.25));
+      this.kbT = 0.5; // (thrown by your blow: for a moment it may go over an edge into the void, see physics)
     }
     die(info) {
       if (!this.alive) return false;
@@ -1164,6 +1165,7 @@
       // knockback decay
       const kd = Math.exp(-6 * dt);
       this.vel.x *= kd; this.vel.z *= kd;
+      if (this.kbT > 0) this.kbT -= dt;
       let dx = mx * speed + this.vel.x, dz = mz * speed + this.vel.z;
       // separation
       for (const o of E.list) {
@@ -1177,7 +1179,11 @@
       if (pd < pr && pd > 0.001 && Math.abs(this.pos.y - P.pos.y) < 1.8) { dx += px / pd * (pr - pd) * 10; dz += pz / pd * (pr - pd) * 10; }
       this.mv = U.damp(this.mv, Math.min(1, Math.hypot(mx, mz) * speed / Math.max(1, this.speed)), 8, dt);
       this.walk += Math.hypot(dx, dz) * dt * (3.2 / Math.max(0.6, this.model.scale));
-      if (this.burrowed) { this.pos.x += dx * dt; this.pos.z += dz * dt; const f = w.navFloor(this.pos.x, this.pos.z, this.pos.y); if (isFinite(f)) this.pos.y = f; this.clampBounds(); return; }
+      if (this.burrowed) {
+        if (!w.trench && dx && !w.edgeSafe(this.pos, this.pos.x + dx * dt, this.pos.z)) dx = 0; // (never tunnels out under the void)
+        if (!w.trench && dz && !w.edgeSafe(this.pos, this.pos.x, this.pos.z + dz * dt)) dz = 0;
+        this.pos.x += dx * dt; this.pos.z += dz * dt; const f = w.navFloor(this.pos.x, this.pos.z, this.pos.y); if (isFinite(f)) this.pos.y = f; this.clampBounds(); return;
+      }
       if (fly) {
         // 3D: maintain altitude above floor
         const fl = w.navFloor(this.pos.x, this.pos.z, this.pos.y);
@@ -1210,7 +1216,18 @@
           if (dz && !w.walkerSafe(this.pos, this.pos.x, this.pos.z + dz * dt + Math.sign(dz) * r)) { dz = 0; this.vel.z = 0; }
         }
       }
+      // the void (chasms, the gaps between the sky islands): a walker never steps, leaps or is jostled out over an edge on its own;
+      // only a blow of yours (knockback) can throw it off
+      const edge = !w.trench && !(this.kbT > 0), air = !this.grounded, sx = this.pos.x, sz = this.pos.z;
+      if (edge) {
+        const r = Math.min(this.radius, 0.6) + 0.15;
+        if (dx && !w.edgeSafe(this.pos, this.pos.x + dx * dt + Math.sign(dx) * r, this.pos.z, air)) { dx = 0; this.vel.x = 0; }
+        if (dz && !w.edgeSafe(this.pos, this.pos.x, this.pos.z + dz * dt + Math.sign(dz) * r, air)) { dz = 0; this.vel.z = 0; }
+        if (dx && dz && !w.edgeSafe(this.pos, this.pos.x + dx * dt + Math.sign(dx) * r * 0.7, this.pos.z + dz * dt + Math.sign(dz) * r * 0.7, air)) { if (Math.abs(dx) < Math.abs(dz)) dx = 0; else dz = 0; } // (round an outer corner of the edge)
+      }
       this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.6, this.pos.y + this.height);
+      // (nor is it shoved out over the edge by a wall it slid along: a railing's end, a pillar by the brink)
+      if (edge && (this.pos.x !== sx || this.pos.z !== sz) && !w.edgeSafe((this._eq || (this._eq = V())).set(sx, this.pos.y, sz), this.pos.x, this.pos.z, air)) { this.pos.x = sx; this.pos.z = sz; }
       if (this.hitWallFlag && G.Strata.doors.length && !this.boss) G.Strata.bash(this, dt);
       // vertical / ground
       this.vel.y -= 22 * dt;
@@ -1219,7 +1236,13 @@
       let top = -Infinity; for (const c of a) if (c.y1 <= this.pos.y + 0.86 && c.y1 > top) top = c.y1;
       if (top > -Infinity && ny <= top) { this.pos.y = U.damp(this.pos.y, top, 18, dt); if (top - this.pos.y < 0.02) this.pos.y = top; if (this.vel.y < 0) this.vel.y = 0; this.grounded = true; }
       else { this.pos.y = ny; this.grounded = false; }
-      if (this.pos.y < w.killY) { this.hp = 0; C.killEnemy(this, { src: 'fall' }, 0); }
+      if (this.grounded) this._lastGY = this.pos.y;
+      if (this.pos.y < w.killY) {
+        // thrown into the void: it dies, and its body is laid out on the nearest ground by the edge (so it can still be searched)
+        const g = !this.boss && !this.custom && w.nearestGround(this.pos.x, this._lastGY ?? 0, this.pos.z);
+        if (g) { this.pos.copy(g); this.vel.set(0, 0, 0); G.fx.smoke(this.pos.clone().setY(g.y + 0.4), 8, 1, 0x1a1412, 0.8, 1); }
+        this.hp = 0; C.killEnemy(this, { src: 'fall' }, 0);
+      }
       if (w.trench && this.grounded && !this.tramp && this.pos.y < w.trench.y + 0.6 && this.pos.z > w.trench.zN && this.pos.z < w.trench.zS && this.pos.x > w.trench.w[U.clamp(Math.floor(this.pos.z), 0, w.trench.w.length - 1)] && this.pos.x < w.trench.e[U.clamp(Math.floor(this.pos.z), 0, w.trench.w.length - 1)]) {
         const T = w.trench, zi = U.clamp(Math.floor(this.pos.z), 0, T.w.length - 1), wl = T.w[zi], er = T.e[zi];
         // the nearest way out: the west bank, the east bank, or round the north / south end
@@ -1402,7 +1425,8 @@
       const k = Math.min(1, this.deathT / 0.6);
       m.inner.rotation.z = k * 1.45 * (this.yaw > 0 ? 1 : -1);
       m.inner.position.y = -k * this.radius * 0.4;
-      if (this.flyer && this.pos.y > G.world.navFloor(this.pos.x, this.pos.z, this.pos.y) + 0.3) this.pos.y -= dt * 8;
+      if (!this.boss && !this.custom) this.settleBody(dt);
+      else if (this.flyer && this.pos.y > G.world.navFloor(this.pos.x, this.pos.z, this.pos.y) + 0.3) this.pos.y -= dt * 8;
       m.group.position.copy(this.pos);
       if (this.deathT > 1.6 && !this.corpse) {
         const s = Math.max(0.001, 1 - (this.deathT - 1.6) * 2.5);
@@ -1410,6 +1434,25 @@
         if (Math.random() < 0.3) G.fx.smoke(this.centerPos(), 1, 0.6, 0x1a1412, 0.6, 0.8);
       }
       if (this.deathT > 2.0 && !this.corpse) { this.remove(); }
+    }
+    // A body never hangs in the air: it drops on to the floor below it. One that died out over the void (thrown off an edge, a flyer
+    // shot down over a chasm) is laid out on the nearest ground instead, where it can still be searched.
+    settleBody(dt) {
+      const w = G.world;
+      if (!this._bodyChk) {
+        this._bodyChk = true;
+        if (w.voidBelow(this.pos.x, this.pos.y, this.pos.z)) {
+          const g = w.nearestGround(this.pos.x, this._lastGY ?? this.pos.y, this.pos.z);
+          if (g) {
+            G.fx.smoke(this.centerPos(), 6, 1, 0x1a1412, 0.8, 1);
+            this.pos.copy(g); if (this.flyer) this.pos.y += 1.2;
+            G.fx.smoke(this.pos.clone().setY(g.y + 0.4), 8, 1, 0x1a1412, 0.8, 1);
+            if (this.corpse && this.corpse.pos) this.corpse.pos.copy(g);
+          }
+        }
+        this._bodyFl = w.floorBelow(this.pos.x, this.pos.y + 0.3, this.pos.z) + (this.flyer ? 0.3 : 0);
+      }
+      if (this._bodyFl > -50 && this.pos.y > this._bodyFl + 0.01) this.pos.y = Math.max(this._bodyFl, this.pos.y - dt * 8);
     }
     remove() {
       this.removed = true;

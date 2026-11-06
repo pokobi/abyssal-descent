@@ -32,7 +32,7 @@ const T = {
   mobile: ['tests/mobile_test.js'], trial: ['tests/trial_test.js'], boss_hp: ['tests/boss_hp_test.js'],
   skill: ['tests/coop/skill_test.js'], coop: ['tests/coop/coop_test.js'], world: ['tests/coop/world_test.js'], sky: ['tests/coop/sky_test.js'],
   run: ['tests/coop/run_test.js', 'normal', '5'], field: ['tests/field_test.js'], foe: ['tests/foe_test.js'], coop_duel: ['tests/coop/duel_test.js'], bossobj: ['tests/coop/bossobj_test.js'],
-  loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'],
+  hazard: ['tests/hazard_test.js'], loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'],
 };
 // game file (regex on the path) -> tests. The guardians are handled apart: only the ones defined in the changed files are fought.
 const MAP = [
@@ -52,6 +52,8 @@ const MAP = [
   [/^js\/(world|levelgen|fieldgen|fieldgen_t\d|strata|props|graves|fields)\.js$/, ['solo_smoke', 'world', 'run']], // (the new fields come up in co-op runs too)
   [/^js\/(levelgen|fieldgen|fieldgen_t\d|strata|props|fields|textures|skyvary|runplan)\.js$/, ['field']], // (every field builds; the per-segment draw; the sky moods)
   [/^js\/(areas|rooms2|midsave)\.js$/, ['solo_smoke', 'room', 'give']],
+  [/^js\/(world|enemies|element|fields|skyvary|weather|fieldgen_t4)\.js$/, ['hazard']], // (the void's edge, bodies by it, the elements of the ground and the weather)
+  [/^js\/weather\.js$/, ['solo_smoke']],
   [/^js\/(fieldfoes|enemies|data_enemies)\.js$/, ['foe']], // (the new fields' own foes: drawn in their field, bodies, attacks)
   [/^js\/bosses7\.js$/, ['boss_hp']],
   [/^js\/bosses\d?\.js$/, ['gimmick']], // (a guardian's gimmicks cleared: a share of its health)

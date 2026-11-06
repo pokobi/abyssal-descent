@@ -1,8 +1,9 @@
 'use strict';
 // 空模様 (the sky of an area): every area of a field draws one of the field's moods — fog, rain, snow, falling ash, embers, wisps,
-// a darker or a brighter night — from the run's seed (the same on a reload and on every co-op screen). It changes only how the
-// place looks: the colour and thickness of the fog, the light, the sky dome and a field of falling / drifting particles around
-// the camera. Nothing in the game reads it (no slippery snow, no wet foes). The guardian's hall only gets the milder ones.
+// a darker or a brighter night — from the run's seed (the same on a reload and on every co-op screen). Here: how the place looks
+// (the colour and thickness of the fog, the light, the sky dome and a field of falling / drifting particles around the camera).
+// What falls from the sky also counts in the fight (weather.js): `el` is the element it keeps on you and on the foes (rain: water,
+// snow: ice, embers: fire), `bolt` brings lightning down. The guardian's hall only gets the milder ones (never lightning).
 (function () {
   const S = (G.Sky = {});
   const U = G.U;
@@ -31,22 +32,22 @@
     grave: [
       D('clear', '月夜', 4),
       D('mist', '濃霧', 2, { fogD: 3.0, fog: '#3a4452', k: 0.7, amb: 0.92, sunK: 0.4, stars: false }),
-      D('rain', '雨夜', 2, { fogD: 1.5, fog: '#10141c', k: 0.5, moonI: 0.55, amb: 0.88, sky: ['#05070c', '#0c1018', '#1a2230'], stars: false, sunK: 0.1, p: [P.rain], flash: true }),
+      D('rain', '雨夜', 2, { fogD: 1.5, fog: '#10141c', k: 0.5, moonI: 0.55, amb: 0.88, sky: ['#05070c', '#0c1018', '#1a2230'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true }),
       D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp] }),
-      D('snow', '雪夜', 1, { fogD: 1.8, fog: '#3a4250', k: 0.55, amb: 1.12, moonI: 0.85, sky: ['#0c1018', '#1c2430', '#3a4454'], stars: false, sunK: 0.3, p: [P.snow] }),
+      D('snow', '雪夜', 1, { fogD: 1.8, fog: '#3a4250', k: 0.55, amb: 1.12, moonI: 0.85, sky: ['#0c1018', '#1c2430', '#3a4454'], stars: false, sunK: 0.3, p: [P.snow], el: 'ice' }),
       D('redmoon', '赤い月', 1, { moon: '#ff8a70', k: 0.55, fog: '#2a1418', hemiS: '#a06070', sky: ['#060208', '#1e0a12', '#3a1420'], sunCol: [1.0, 0.32, 0.22] }),
     ],
     hamlet: [
       D('clear', '月夜', 4),
       D('mist', '濃霧', 3, { fogD: 3.0, fog: '#3c464c', k: 0.7, amb: 0.94, sunK: 0.4, stars: false }),
-      D('rain', '雨夜', 2, { fogD: 1.4, fog: '#0e1218', k: 0.5, moonI: 0.5, amb: 0.86, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true }),
-      D('fire', '遠い火の手', 1, { fog: '#3a1a10', k: 0.4, hemiS: '#b07050', sky: ['#05060c', '#1a1018', '#5a2410'], p: [P.ember] }),
+      D('rain', '雨夜', 2, { fogD: 1.4, fog: '#0e1218', k: 0.5, moonI: 0.5, amb: 0.86, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true }),
+      D('fire', '遠い火の手', 1, { fog: '#3a1a10', k: 0.4, hemiS: '#b07050', sky: ['#05060c', '#1a1018', '#5a2410'], p: [P.ember], el: 'fire' }),
       D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp] }),
     ],
     dusk: [
       D('clear', '黄昏', 4),
       D('ash', '灰の降る黄昏', 2, { fog: '#9a8478', k: 0.5, fogD: 1.5, amb: 0.9, sky: ['#3a3a4a', '#9a7466', '#c8a080'], sunK: 0.55, p: [P.ash] }),
-      D('storm', '雷雲', 2, { fog: '#4a4458', k: 0.6, fogD: 1.3, amb: 0.78, moonI: 0.55, sky: ['#1a1c2c', '#4a4454', '#8a6a5c'], sunK: 0.2, p: [P.drizzle], flash: true }),
+      D('storm', '雷雲', 2, { fog: '#4a4458', k: 0.6, fogD: 1.3, amb: 0.78, moonI: 0.55, sky: ['#1a1c2c', '#4a4454', '#8a6a5c'], sunK: 0.2, p: [P.drizzle], flash: true, el: 'water', bolt: true }),
       D('sand', '砂塵', 1, { fog: '#c89a68', k: 0.55, fogD: 2.4, sunK: 0.5, p: [P.dust] }),
     ],
     // 入口
@@ -63,35 +64,35 @@
     ],
     castle: [
       D('base', '血月', 4),
-      D('rain', '雨の城壁', 2, { fogD: 1.35, fog: '#1a0c10', k: 0.5, moonI: 0.6, amb: 0.88, sky: ['#060205', '#1a060c', '#3a0e14'], stars: false, sunK: 0.15, p: [P.rain], flash: true }),
+      D('rain', '雨の城壁', 2, { fogD: 1.35, fog: '#1a0c10', k: 0.5, moonI: 0.6, amb: 0.88, sky: ['#060205', '#1a060c', '#3a0e14'], stars: false, sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true }),
       D('mist', '霧の城', 2, { fogD: 2.8, fog: '#3a1c22', k: 0.6, sunK: 0.45 }),
-      D('ash', '火の粉の夜', 1, { p: [P.ember] }),
+      D('ash', '火の粉の夜', 1, { p: [P.ember], el: 'fire' }),
     ],
     // 中層
     halls: [
       D('base', '', 5),
-      D('ember', '火の粉', 2, { p: [P.ember] }),
+      D('ember', '火の粉', 2, { p: [P.ember], el: 'fire' }),
       D('dust', '塵の舞う', 2, { p: [P.dust] }),
     ],
     flooded: [
       D('base', '', 5),
       D('mist', '水煙', 2, { fogD: 1.8, fog: '#2a3a36', k: 0.55, amb: 1.05 }),
-      D('drip', '滴る天井', 2, { p: [P.drip, P.drizzle] }),
+      D('drip', '滴る天井', 2, { p: [P.drip, P.drizzle], el: 'water' }),
     ],
     foundry: [
       D('base', '', 5),
-      D('ember', '火の粉の嵐', 2, { hemiS: '#c07040', k: 0.3, p: [P.emberStorm] }),
+      D('ember', '火の粉の嵐', 2, { hemiS: '#c07040', k: 0.3, p: [P.emberStorm], el: 'fire' }),
       D('smoke', '煤煙', 2, { fog: '#1c120c', k: 0.6, fogD: 1.6, amb: 0.85, p: [P.ash] }),
     ],
     // 深層
     ruin: [
       D('base', '', 5),
       D('ash', '灰降る', 2, { fog: '#141824', k: 0.4, p: [P.ash] }),
-      D('blaze', '蒼炎の昂ぶり', 2, { hemiS: '#6a9cff', k: 0.4, amb: 1.15, p: [P.blueEmber] }),
+      D('blaze', '蒼炎の昂ぶり', 2, { hemiS: '#6a9cff', k: 0.4, amb: 1.15, p: [P.blueEmber], el: 'fire' }),
     ],
     frozen: [
       D('base', '', 5),
-      D('snow', '降りしきる霜', 2, { fogD: 1.3, fog: '#26303c', k: 0.4, p: [P.frost] }),
+      D('snow', '降りしきる霜', 2, { fogD: 1.3, fog: '#26303c', k: 0.4, p: [P.frost], el: 'ice' }),
       D('haze', '凍える靄', 2, { fogD: 1.9, fog: '#3a4654', k: 0.55, amb: 1.08 }),
       D('aurora', '極光', 1, { hemiS: '#6ad0b8', k: 0.45, hemiG: '#2a1a40', p: [P.wisp] }),
     ],
@@ -196,6 +197,8 @@
     if (flashEl) flashEl.style.opacity = 0;
   };
   S.current = () => cur;
+  // a bolt that strikes (weather.js): the pale flash over the screen right now, the ambient one put back
+  S.flashNow = function () { if (!flash) return; flash.t = 0; flash.next = Math.max(flash.next, 6 + Math.random() * 8); };
   S.update = function (dt, cam) {
     if (!live.length && !flash) return;
     for (const m of live) { const u = m.material.uniforms; u.uT.value += dt; u.uCam.value.copy(cam.position); }

@@ -157,6 +157,7 @@
     moon.target.position.set(cx, 0, cz); moon.target.updateMatrixWorld();
     setSky(B);
     if (G.Sky) G.Sky.start(scene, sv, w.isBoss);
+    if (G.Weather) G.Weather.reset();
     const sc = moon.shadow.camera; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.near = 10; sc.far = 140; sc.updateProjectionMatrix();
     G.abilities.rebuildVisuals();
   }
@@ -644,7 +645,7 @@
     G.ui.showHud(true);
     const B = w.mats.biome;
     const T = G.Areas.TYPES[kind];
-    G.ui.setArea(`AREA ${n}<small class="ar-of"> / ${G.Run.areas()}</small>`, `${T.icon} ${T.name} — ${B.name}${w.layout ? ' · ' + layoutName(w.layout) : ''}${w.sky && w.sky.name && w.sky.w < 4 ? ' · ' + w.sky.name : ''}`);
+    G.ui.setArea(`AREA ${n}<small class="ar-of"> / ${G.Run.areas()}</small>`, `${T.icon} ${T.name} — ${B.name}${w.layout ? ' · ' + layoutName(w.layout) : ''}${w.sky && w.sky.name && w.sky.w < 4 ? ' · ' + w.sky.name + (w.sky.el && G.Elem ? G.Elem.BY[w.sky.el].icon : '') + (w.sky.bolt ? '⚡' : '') : ''}`);
     if (kind === 'shop') {
       GM.setupShop(w);
       GM.objective = { icon: '🛒', text: () => '買い物を終えたら次の門を選べ', done: true };
@@ -2370,6 +2371,7 @@
     GM.updateEnrage(gdt);
     updateHighFire(gdt);
     G.Fields.update(gdt);
+    if (G.Weather) G.Weather.update(gdt); // (rain, snow, embers keep their element on everyone; lightning: weather.js)
     G.Strata.update(gdt);
     G.Tex.lavaT.value = GM.time;
     G.Graves.update(gdt);

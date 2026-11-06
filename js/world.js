@@ -626,6 +626,58 @@
       const b = this.land(a, cb);
       return b >= 0 && !this.nhz[b] && this.nf[b] >= this.nf[a] - 2.6;
     }
+    // over the void? (nothing to land on above the kill plane: a chasm, the gaps between the sky islands, the river of molten iron)
+    voidBelow(x, y, z) { return this.floorBelow(x, y + 0.5, z) < this.killY; }
+    // open void at (x, z) for something standing at y: nothing at all in the column from the kill plane up to body height
+    // (no floor to stand on, and no wall either: a wall with no floor under it is not a drop, it just stops you)
+    openVoid(x, y, z) { return !this.query(x - 0.01, this.killY, z - 0.01, x + 0.01, y + 1.6, z + 0.01).length; }
+    // single-storey areas: may a walker at p step on to (nx, nz) without walking off into the void? (one already in the air out over
+    // it, thrown there, may move as it likes: it is falling anyway. One still standing with its middle a little past the edge may not.)
+    edgeSafe(p, nx, nz, airborne) {
+      const b = this.navIdx(nx, nz);
+      if (b >= 0 && !this.nearVoid(b)) return true; // (far from any void: nothing to check)
+      if (!this.openVoid(nx, p.y, nz)) return true;
+      return !!airborne && this.openVoid(p.x, p.y, p.z);
+    }
+    // is nav cell i within 2 m of the void (at ground level)? Worked out once per area. Near it the ground under each step is looked up
+    // for real: the nav's 1 m cells are too coarse for it (a bridge's edge cuts a cell in two and its railing reads as floor; over a pit
+    // under a roof the nav's "floor" is the roof's top).
+    nearVoid(i) {
+      if (!this._vn) {
+        const W = this.Wn, D = this.Dn, v = new Uint8Array(W * D), m = new Uint8Array(W * D);
+        for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) if (this.openVoid(x - this.xo + 0.5, 0.2, z - this.zo + 0.5)) v[z * W + x] = 1;
+        for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+          if (!v[z * W + x]) continue;
+          for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const xx = x + dx, zz = z + dz; if (xx >= 0 && zz >= 0 && xx < W && zz < D) m[zz * W + xx] = 1; }
+        }
+        this._vn = m;
+      }
+      return this._vn[i % this.N] === 1;
+    }
+    // the nearest whole patch of ground to (x, y, z) a body can lie on and you can walk to (where a foe that fell into the void is
+    // laid out), or null. Prefers ground at about the same height.
+    nearestGround(x, y, z, maxR) {
+      const R = maxR || 24, W = this.Wn, N = this.N, L = this.L || 1;
+      const cx = Math.floor(x) + this.xo, cz = Math.floor(z) + this.zo;
+      let best = null, bs = Infinity;
+      for (const strict of [true, false]) {
+        for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+          const ix = cx + dx, iz = cz + dz; if (ix < 1 || iz < 1 || ix >= W - 1 || iz >= this.Dn - 1) continue;
+          for (let k = 0; k < L; k++) {
+            const n = k * N + iz * W + ix, f = this.nf[n];
+            if (f === -Infinity) break;
+            if (this.nb[n] || f < this.killY + 2 || f > y + 4) continue; // (not on a roof above a pit either)
+            if (strict && (this.npen[n] > 0.36 || (this.reachMask && !this.reachMask[n]))) continue;
+            const px = ix - this.xo + 0.5, pz = iz - this.zo + 0.5;
+            const s = Math.hypot(px - x, pz - z) + Math.max(0, Math.abs(f - y) - 1) * 0.6;
+            if (s >= bs || this.voidBelow(px, f + 0.2, pz)) continue;
+            bs = s; best = new THREE.Vector3(px, f, pz);
+          }
+        }
+        if (best) return best;
+      }
+      return null;
+    }
     randomOpenCell(rng, filter) {
       for (let k = 0; k < 400; k++) {
         const x = Math.floor(rng.next() * this.Wn), z = Math.floor(rng.next() * this.Dn);

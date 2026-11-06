@@ -213,20 +213,38 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
       check(await ev('return G.player.hp < G.player.stats.maxHp && G.player.st.burn > 0'), 'crucible: standing in the molten pool burns you');
       await ev('G.player.hp = G.player.stats.maxHp; G.player.st.burn = 0; return 1');
     }
-    // the gale: monsters in its way are driven to the edge (and over it), one beside it is not; you are not moved
+    // the gale: monsters in its way are driven to the edge (and over it), one beside it is not; you in it are carried toward the edge
+    // too (or over it), but walking into the wind holds you
     {
       await ev("T.enter('sanctum', 2); G.game.dev.god = true; return 1");
       const g = await ev("const g = G.Gim.list.find((g) => g.kind === 'gale'); return { x: g.x, z: g.z, dx: g.dx, dz: g.dz, len: g.len }");
       const at = (s, l) => [g.x + g.dx * s + g.dz * l, 0, g.z + g.dz * s - g.dx * l];
       await ev(`window.F = T.foes([${JSON.stringify(at(5, 0))}, ${JSON.stringify(at(8, 1.6))}, ${JSON.stringify(at(6, 5.5))}]); const m = ${JSON.stringify(at(4, -1))}; T.me(m[0], 0, m[2]); return 1`);
+      await ev('const P = G.player; P.__fell = 0; const f = Object.getPrototypeOf(P).fellInPit; P.fellInPit = function () { this.__fell++; return f.apply(this, arguments); }; return 1');
       const p0 = await ev('return { f: T.st(F), me: [G.player.pos.x, G.player.pos.z] }');
       await ev("const g = G.Gim.list.find((g) => g.kind === 'gale'); G.Gim.hit(g, 10, 'bullet', g.hb[0].p.clone()); return 1");
       await wait(3.2);
-      const p1 = await ev('return { f: T.st(F), me: [G.player.pos.x, G.player.pos.z] }');
+      const p1 = await ev('return { f: T.st(F), me: [G.player.pos.x, G.player.pos.z], fell: G.player.__fell }');
       const along = (i) => (p1.f[i].x - p0.f[i].x) * g.dx + (p1.f[i].z - p0.f[i].z) * g.dz;
       check([0, 1].every((i) => !p1.f[i].alive || along(i) > 5), `gale: the two in its way are driven off (${[0, 1].map((i) => p1.f[i].alive ? along(i).toFixed(1) + ' m' : 'fell').join(', ')})`);
       check(p1.f[2].alive && Math.abs(along(2)) < 0.3, 'gale: the one beside it is not moved');
-      check(Math.hypot(p1.me[0] - p0.me[0], p1.me[1] - p0.me[1]) < 0.2, 'gale: you are not moved');
+      const meAl = (p1.me[0] - p0.me[0]) * g.dx + (p1.me[1] - p0.me[1]) * g.dz;
+      check(p1.fell > 0 || meAl > 5, `gale: standing still in it, you are carried toward the edge (${p1.fell ? 'over it' : meAl.toFixed(1) + ' m'})`);
+      await ev('delete G.player.fellInPit; return 1');
+      // a fresh statue: you walk into its wind and hold your ground (you walk faster than it carries you)
+      await ev("T.enter('sanctum', 2); G.game.dev.god = true; return 1");
+      const g2 = await ev("const g = G.Gim.list.find((g) => g.kind === 'gale'); return { x: g.x, z: g.z, dx: g.dx, dz: g.dz, len: g.len }");
+      const m2 = [g2.x + g2.dx * 9, 0, g2.z + g2.dz * 9];
+      await ev(`T.me(${m2[0]}, 0, ${m2[2]}); G.player.yaw = Math.atan2(${g2.dx}, ${g2.dz}); G.player.pitch = 0; return 1`);
+      await ev("const g = G.Gim.list.find((g) => g.kind === 'gale'); G.Gim.hit(g, 10, 'bullet', g.hb[0].p.clone()); return 1");
+      await wait(1.0); // (the breath in)
+      const q0 = await ev('return [G.player.pos.x, G.player.pos.z]');
+      await ev("G.input.keys.KeyW = true; G.player.yaw = Math.atan2(" + g2.dx + ", " + g2.dz + "); return 1");
+      await wait(1.5);
+      const q1 = await ev('return [G.player.pos.x, G.player.pos.z]');
+      await ev('G.input.keys.KeyW = false; return 1');
+      const held = (q1[0] - q0[0]) * g2.dx + (q1[1] - q0[1]) * g2.dz;
+      check(held < 0.5 && held > -6, `gale: walking into the wind, you hold your ground, slowed by it (${held.toFixed(1)} m downwind in 1.5 s; unhindered you walk 9 m)`);
     }
     // the crypt gates: shut, open again, not on someone, battered down
     {

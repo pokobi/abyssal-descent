@@ -7,7 +7,8 @@
 //              crucible swings down and pours; where the iron lands (3 m round) it burns terribly, and the pool stays molten for 10 s.
 //   gale     - 天空の聖域: a statue on an island's rim that breathes the wind. Wake it (the key, a shot, a blow): after a breath in, a gale
 //              blows across the island for 3 s (6 m wide): monsters in it are driven toward the edge, and over it (as by your own blow).
-//              You are not moved.
+//              You are carried too, slower than you walk: walk into the wind and you hold your ground (or step out of it); in the air
+//              it takes you farther.
 (function () {
   const Gm = G.Gim, U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   const R = Math.random, rnd = (a, b) => a + R() * (b - a);
@@ -302,10 +303,10 @@
   Gm.CR = CR;
 
   // ================================================================ 天空の聖域: the statues that breathe the wind
-  const GA = { inhale: 1.0, blow: 3.0, hw: 3, speed: 28, push: 62 };
+  const GA = { inhale: 1.0, blow: 3.0, hw: 3, speed: 28, push: 62, me: 4.6, meAir: 7.5 }; // (me / meAir: how fast it carries you, m/s; you walk at 6.2)
   Gm.K.gale = {
     name: '風の像', icon: '🌬️', rc: '#bfe8ff', cat: '目覚めさせる — 調べる・撃つ・叩く',
-    desc: '息を吸い、島を横切る突風（幅6m）を3秒吹く。風の中の敵は奈落の方へ押し流される。自分は押されない。一度きり。',
+    desc: '息を吸い、島を横切る突風（幅6m）を3秒吹く。風の中の敵は奈落の方へ押し流される。自分も流されるが、風上へ歩けば踏みとどまれる（空中ではより大きく流される）。一度きり。',
     interact: { verb: '目覚めさせる', doing: '像に触れている…', dur: 1.0 },
     build(g, w) {
       const stone = w.mats.block, gold = w.mats.trim;
@@ -375,6 +376,20 @@
           const k = e.boss ? 0.3 : (e.def && e.def.plan === 'golem') ? 0.35 : e.big ? 0.55 : 1;
           e.vel.x += g.dx * GA.push * k * dt; e.vel.z += g.dz * GA.push * k * dt; e.kbT = 0.5;
           if (!g.hitSet.has(e)) { g.hitSet.add(e); G.fx.norm.spawn(e.pos.x, e.pos.y + 1, e.pos.z, g.dx * 6, 1, g.dz * 6, 0.5, 0.3, 1.2, 0.9, 0.95, 1.0, 0.6, 0, 1); }
+        }
+        // and you, if you stand in it (each player on their own screen): carried toward the edge, slower than you walk, so walking
+        // into it holds you; it builds as its front reaches you and dies away at the end; off the ground it takes you farther
+        const Pl = P();
+        if (Pl && !Pl.dead) {
+          const rx = Pl.pos.x - (g.x + g.dx), rz = Pl.pos.z - (g.z + g.dz), al = rx * g.dx + rz * g.dz, lat = Math.abs(rx * g.dz - rz * g.dx);
+          if (al >= 0 && al <= front && lat <= GA.hw + Pl.hw && Pl.pos.y < 6) {
+            g.meT = (g.meT || 0) + dt;
+            const sp = (Pl.grounded ? GA.me : GA.meAir) * Math.min(1, g.meT / 0.25) * Math.min(1, (GA.blow - tb) / 0.4);
+            carryMe(V(g.dx * sp, 0, g.dz * sp), dt);
+            if (!g.meHit) { g.meHit = true; Pl.addShake && Pl.addShake(0.12); }
+            // the gale tearing past you: streaks close by, at the height of your eyes
+            if (R() < dt * 30) { const l = rnd(-1.2, 1.2), b = rnd(-2, -0.5); G.fx.add.spawn(Pl.pos.x + g.dx * b + g.dz * l, Pl.pos.y + rnd(0.4, 2.0), Pl.pos.z + g.dz * b - g.dx * l, g.dx * rnd(16, 24), rnd(-0.3, 0.3), g.dz * rnd(16, 24), rnd(0.2, 0.35), 0.05, 0.02, 0.85, 0.95, 1.0, 0.6, 0, 0.2); }
+          } else g.meT = 0;
         }
       } else if (g.warn) { g.warn.end(); g.warn = null; }
       if (!on && g.flow && !g.flowEnd) { g.flowEnd = true; g.flow.end(); }

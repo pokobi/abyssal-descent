@@ -138,6 +138,7 @@
     w.finalize(scene, G.save.data.settings.quality);
     G.Strata.build(w);
     G.Graves.build(w);
+    if (G.Gim) G.Gim.build(w); // (the field's own device: the chapel bell, the cracked pillars, ... gimmick.js)
     document.querySelectorAll('.exit-mark').forEach((e) => e.remove()); // the last area's gate markers
     const B0 = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
     // the area's sky (skyvary.js): a mood of the field drawn from the run's seed, laid over its light and fog; what falls from it
@@ -1735,6 +1736,7 @@
       else if (it.type === 'anvil') consider(it.pos, 1.2, { type: 'anvil', it }, 4);
       else if (it.type === 'cauldron') consider(it.pos, 1.3, { type: 'cauldron', it }, 4);
       else if (it.type === 'celldoor' && it.door.state !== 'broken') consider(it.pos, 1.0, { type: 'celldoor', it }, 3.4);
+      else if (it.type === 'gimmick' && !it.gim.used) consider(it.pos, it.r, { type: 'gimmick', it }, it.reach);
     }
     if (!best && nearBest) best = nearBest;
     lookTarget = best;
@@ -1810,6 +1812,10 @@
       }
       G.ui.showInteract({ key: 'cdoor' + (S ? 's' : ''), icon: '🔓', name: '鉄格子の扉', rc: '#9aa4b0', cat: `開ける — ${dur.toFixed(1)}秒`, desc: S ? '開けている… 視点を大きく外したり離れると最初からやり直し' : '一度押すと開け始める。終わるまで扉から目を離さないこと。', action: S ? '開けている…' : '開ける' });
       if (I.hit('interact') && !S) GM.startSearch(it, it.pos, 1, '🔓', () => G.Strata.openDoor(it.door), '扉を開けている…');
+      return;
+    } else if (best.type === 'gimmick') {
+      // the field's device (gimmick.js): worked with the key (one press, keep looking at it), or only named when it is set off by shooting it
+      G.Gim.prompt(best.it, I);
       return;
     }
     if (I.hit('interact')) doInteract(best);
@@ -2374,6 +2380,7 @@
     G.Fields.update(gdt);
     if (G.Weather) G.Weather.update(gdt); // (rain, snow, embers keep their element on everyone; lightning: weather.js)
     G.Strata.update(gdt);
+    if (G.Gim) G.Gim.update(gdt);
     G.Tex.lavaT.value = GM.time;
     G.Graves.update(gdt);
     G.Areas.update(gdt);

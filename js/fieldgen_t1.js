@@ -89,13 +89,14 @@
     w.batch.geo('woodDark', PG().cone, Mx(x, 2.55, z, 0.42, 0.3, 0.42), { tint: [0.6, 0.55, 0.5] });
   }
   // the bell tower of the village chapel (solid; a landmark you can see over the roofs)
-  function belltower(w, rng, x, z, h) {
+  function belltower(w, rng, x, z, h, rx) {
     const s = 2.2;
     w.solid('wall', x - s, 0, z - s, x + s, h, z + s, { uv: 3 });
     w.solid('trim', x - s - 0.2, h, z - s - 0.2, x + s + 0.2, h + 0.4, z + s + 0.2, { uv: 2 });
     // the open belfry: four corner piers and the bell, then the steep roof
     for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) w.solid('trim', x + dx * (s - 0.35) - 0.35, h + 0.4, z + dz * (s - 0.35) - 0.35, x + dx * (s - 0.35) + 0.35, h + 3.2, z + dz * (s - 0.35) + 0.35, { uv: 1, noGrapple: true });
-    w.batch.geo('brass', PG().bowl, Mx(x, h + 2.4, z, 1.5, 2.6, 1.5, Math.PI, 0, 0)); // (the bell, mouth down)
+    if (G.Gim) G.Gim.bellTower(w, x, z, h, s, rx || 1); // (the bell: 弔いの鐘, gimmick_a.js; its rope hangs down the rx face)
+    else w.batch.geo('brass', PG().bowl, Mx(x, h + 2.4, z, 1.5, 2.6, 1.5, Math.PI, 0, 0)); // (the bell, mouth down)
     w.solid('trim', x - s - 0.3, h + 3.2, z - s - 0.3, x + s + 0.3, h + 3.55, z + s + 0.3, { uv: 2, noGrapple: true });
     w.batch.geo('woodDark', PG().cone, Mx(x, h + 5.4, z, s * 1.55, 3.7, s * 1.55, 0, Math.PI / 8, 0));
     w.addCollider(x - s, h + 3.55, z - s, x + s, h + 7, z + s, { noGrapple: true });
@@ -167,9 +168,8 @@
       if (!(layout === 'stream' && side > 0) && rng.chance(0.85)) tryHouse({ x0: x, z0: za, x1: x + len, z1: za + dep }, side < 0 ? 'S' : 'N');
       x += len + rng.int(2, 4);
     }
-    // a few more houses back from the streets
-    for (let i = 0; i < 3; i++) { const r = occ.place(rng, rng.int(7, 9), rng.int(6, 8), 1.5, 20); if (r) { H.house(w, rng, r, { ruined: 0.7, h: [3.4, 4.4] }); houses.push(r); } }
-    // the chapel and its bell tower, with a little churchyard
+    // the chapel and its bell tower, with a little churchyard (before the houses back from the streets: the village always keeps its bell)
+    let bell = false;
     {
       const r = occ.place(rng, 12, 15, 1.5);
       if (r) {
@@ -180,10 +180,16 @@
         P().statue(w, (x0 + x1) / 2, z0 + 1.2, 0, 0, rng, 0.9);
         P().candles(w, (x0 + x1) / 2 + 1.2, 0, z0 + 1.6, rng, true);
         for (let z = z0 + 5; z < z1 - 3; z += 2.2) for (const sx of [-1, 1]) w.solid('woodDark', (x0 + x1) / 2 + sx * 1.4 - (sx < 0 ? 2.8 : 0), 0, z, (x0 + x1) / 2 + sx * 1.4 + (sx > 0 ? 2.8 : 0), 0.5, z + 0.45, { uv: 1 });
-        belltower(w, rng, x1 - 2.2, z0 + 2.2, rng.range(9, 11.5));
+        belltower(w, rng, x1 - 2.2, z0 + 2.2, rng.range(9, 11.5), 1);
+        occ.mark(x1, z0 + 0.8, x1 + 2.4, z0 + 3.6); // (the bell rope hangs outside the east face: kept clear)
+        bell = true;
         for (let i = 0; i < 6; i++) { const q = occ.place(rng, 1, 2, 0.6, 16); if (q) P().gravestone(w, q.x0 + 0.5, q.z0 + 0.4, 0, rng.range(-0.3, 0.3), rng); }
       }
     }
+    // no room for the chapel: the bell tower stands on its own, its rope toward the main street
+    if (!bell) { const r = occ.place(rng, 6, 6, 1.0, 80); if (r) belltower(w, rng, r.x0 + 3, r.z0 + 3, rng.range(9, 10.5), r.x0 + 3 < cx ? 1 : -1); }
+    // a few more houses back from the streets
+    for (let i = 0; i < 3; i++) { const r = occ.place(rng, rng.int(7, 9), rng.int(6, 8), 1.5, 20); if (r) { H.house(w, rng, r, { ruined: 0.7, h: [3.4, 4.4] }); houses.push(r); } }
     // gardens: split-rail fences round rows of withered crops, a scarecrow
     for (let i = 0; i < 2 + rng.int(0, 2); i++) {
       const gw = rng.int(7, 10), gd = rng.int(6, 8);
@@ -375,6 +381,18 @@
       const r = occ.place(rng, bw, bd, 1.6, 30); if (!r) continue;
       const up = ruinBlock(w, rng, r, rng.pick([3, 3.5]));
       if (up) w.platTops.push(up);
+    }
+    // the cracked great pillars (崩れかけた大柱, gimmick_a.js): two or three, each leaning toward an open lane it will fall along
+    if (G.Gim) {
+      const want = 2 + (rng.chance(0.5) ? 1 : 0), dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]], L = G.Gim.PIL.laneL + 0.6;
+      for (let t = 0, n = 0; t < 160 && n < want; t++) {
+        const x = Math.round(rng.range(8, W - 8)) + 0.5, z = Math.round(rng.range(18, D - 14)) + 0.5, [dx, dz] = rng.pick(dirs);
+        if (!occ.free(x - 1.7, z - 1.7, x + 1.7, z + 1.7)) continue;
+        const lx0 = Math.min(x, x + dx * L) - (dx ? 0 : 1.9), lx1 = Math.max(x, x + dx * L) + (dx ? 0 : 1.9), lz0 = Math.min(z, z + dz * L) - (dz ? 0 : 1.9), lz1 = Math.max(z, z + dz * L) + (dz ? 0 : 1.9);
+        if (lx0 < 3 || lx1 > W - 3 || lz0 < 14 || lz1 > D - 10 || !occ.free(lx0, lz0, lx1, lz1)) continue;
+        occ.mark(x - 1.7, z - 1.7, x + 1.7, z + 1.7); occ.mark(lx0, lz0, lx1, lz1);
+        G.Gim.addPillar(w, x, z, dx, dz, rng.range(0, 100)); n++;
+      }
     }
     // low ruins, broken walls and colonnade fragments (kept few: the open paving between them is where the fights are)
     for (let i = 0; i < 2; i++) { const r = occ.place(rng, rng.int(7, 9), rng.int(6, 8), 1.4, 20); if (r) H.house(w, rng, r, { ruined: 1, h: [3.2, 4.4] }); }

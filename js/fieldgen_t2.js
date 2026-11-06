@@ -8,6 +8,28 @@
   const Mx = (x, y, z, sx, sy, sz, rx, ry, rz) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)), V(sx, sy, sz));
 
   // ---------------------------------------------------------------- 地下墓所
+  // a gate in a passage of the maze: the opening walled up with bones to an arch 3 m wide and 4 m high, a two-leaved iron gate in it
+  // (strata.js draws and works it), skulls over the arch and candles at its feet. It stands open; shut it behind you (the key) and the
+  // monsters must batter it down to follow.
+  function cryptGate(w, rng, x, zA, zB, HT, WT) {
+    const mid = (zA + zB) / 2, lo = Math.round(mid - 1.5), hi = lo + 3, dh = 4, T = WT / 2;
+    w.solid('wall', x - T, 0, zA, x + T, HT, lo - 0.1, { uv: 2.5 }); w.solid('wall', x - T, 0, hi + 0.1, x + T, HT, zB, { uv: 2.5 });
+    w.solid('wall', x - T, dh + 0.12, lo - 0.1, x + T, HT, hi + 0.1, { uv: 2.5 });
+    for (const f of [-1, 1]) {
+      ossuary(w, rng, zA, lo - 0.1, x + f * T, false, f, 0); ossuary(w, rng, hi + 0.1, zB, x + f * T, false, f, 0);
+      // the arch: a band of dressed stone round the opening, a skull for a keystone, candles either side
+      w.visual('trim', x + f * T - (f < 0 ? 0.12 : 0), dh + 0.12, lo - 0.45, x + f * T + (f > 0 ? 0.12 : 0), dh + 0.5, hi + 0.45, { uv: 1 });
+      for (const z of [lo - 0.45, hi + 0.1]) w.visual('trim', x + f * T - (f < 0 ? 0.12 : 0), 0, z, x + f * T + (f > 0 ? 0.12 : 0), dh + 0.12, z + 0.35, { uv: 1 });
+      P().skull(w, x + f * (T + 0.12), dh + 0.62, mid, f > 0 ? Math.PI / 2 : -Math.PI / 2, 1.5);
+      for (const z of [lo - 0.9, hi + 0.9]) P().candles(w, x + f * (T + 0.45), 0, z, rng, true);
+    }
+    w.doors = w.doors || [];
+    const c = w.addCollider(x - 0.06, 0, lo + 0.02, x + 0.06, dh, hi - 0.02, { surf: 'metal', noGrapple: true });
+    c.bars = true; c.navIgnore = true; c.alive = false; // (monsters plan their way through it; it starts open)
+    const door = { axis: 'z', plane: x, lo, hi, y: 0, h: dh, hinge: 0, face: rng.chance(0.5) ? 1 : -1, col: c, hp: 100, state: 'open', s0: 'open', leaves: 2 };
+    const it = { type: 'celldoor', pos: V(x, 1.2, (lo + hi) / 2), door, opened: true };
+    door.it = it; c.door = door; w.doors.push(door); w.interactables.push(it);
+  }
   // an ossuary wall face: rows of skulls in dark niches (visual, on a wall along x or z, facing dir)
   function ossuary(w, rng, a0, a1, c, alongX, face, y0) {
     for (let y = y0 + 0.9; y < y0 + 4.2; y += 1.1) {
@@ -87,6 +109,29 @@
     // the gaps between the maze and the outer walls on west / east are sealed (the maze is the way)
     if (ox > 3.5) { w.solid('wall', 0, 0, oz - WT / 2, ox - WT / 2, HT, oz + rows * CELL + WT / 2, { uv: 2.5 }); w.solid('wall', ox + cols * CELL + WT / 2, 0, oz - WT / 2, W, HT, oz + rows * CELL + WT / 2, { uv: 2.5 }); }
     occ.mark(0, oz - 1, ox, oz + rows * CELL + 1); occ.mark(ox + cols * CELL, oz - 1, W, oz + rows * CELL + 1);
+    // iron gates (鉄格子の扉: strata.js's cell gates, two leaves) in three or four of the maze's east-west openings, all standing open.
+    // Only openings on a loop (all of them shut, every cell can still be reached), never inside a burial chamber, not next to each other
+    if (G.Strata) {
+      const cand = [];
+      for (let r = 0; r < rows; r++) for (let c = 1; c < cols; c++) {
+        if (!open.has(key(id(c - 1, r), id(c, r)))) continue;
+        const ra = inRoom(c - 1, r), rb = inRoom(c, r); if (ra && ra === rb) continue;
+        cand.push([rng.next(), c, r]);
+      }
+      cand.sort((a, b) => a[0] - b[0]);
+      const whole = (cut) => {
+        const shut = new Set(cut.map(([c, r]) => key(id(c - 1, r), id(c, r)))), seen = new Uint8Array(cols * rows), q = [0]; seen[0] = 1; let n = 1;
+        while (q.length) { const i = q.pop(), c = i % cols, r = (i / cols) | 0; for (const [a, b] of [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]]) { if (a < 0 || b < 0 || a >= cols || b >= rows) continue; const j = id(a, b), k = key(i, j); if (seen[j] || !open.has(k) || shut.has(k)) continue; seen[j] = 1; n++; q.push(j); } }
+        return n === cols * rows;
+      };
+      const chosen = [], want = 3 + (rng.chance(0.5) ? 1 : 0);
+      for (const [, c, r] of cand) {
+        if (chosen.length >= want) break;
+        if (chosen.some(([a, b]) => Math.abs(a - c) + Math.abs(b - r) < 3) || !whole([...chosen, [c, r]])) continue;
+        chosen.push([c, r]);
+      }
+      for (const [c, r] of chosen) cryptGate(w, rng, ox + c * CELL, oz + r * CELL + WT / 2, oz + (r + 1) * CELL - WT / 2, HT, WT);
+    }
     // dressing: skull niches on the wall faces, candles and webs in the passages, sarcophagi and an altar in the chambers
     let lights = 0;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
@@ -138,7 +183,7 @@
   // ---------------------------------------------------------------- 血月の古城
   const RED = 0x5a0a0a;
   // a wall walk along the inside of the west or east curtain wall: a solid ledge with a stair at each end and a parapet toward the bailey
-  function wallWalk(w, rng, occ, x0, x1, z0, z1, h, side) {
+  function wallWalk(w, rng, occ, x0, x1, z0, z1, h, side, avoid) {
     const L = LG.stairsLen(h), sw = 2.2;
     w.solid('wall', x0, 0, z0 + L, x1, h - 0.25, z1 - L, { uv: 3 });
     w.solid('trim', x0 - 0.05, h - 0.25, z0 + L, x1 + 0.05, h, z1 - L, { uv: 2 });
@@ -150,6 +195,24 @@
     for (let z = z0 + L + 2; z < z1 - L - 1; z += 3) w.solid('block', ex - 0.05, h + 1.0, z, ex + 0.4, h + 1.45, z + 1.2, { uv: 1, noGrapple: true });
     occ.mark(x0 - 1, z0, x1 + 1, z1);
     for (let z = z0 + L + 4; z < z1 - L - 3; z += 10) { P().brazier(w, (x0 + x1) / 2, h, z, 0.8); P().banner(w, ex + (side < 0 ? 0.36 : -0.01), h - 0.3, z + 5, side < 0 ? 'px' : 'nx', 3, RED); }
+    // a cauldron of boiling oil (煮え油の大釜, gimmick_a.js) set in one of the crenels, over a patch of the bailey kept clear below it:
+    // not by a brazier or a banner, not where the inner curtain will cross (avoid)
+    if (G.Gim) {
+      const wall = side < 0 ? x1 : x0, sg = -side, out = [];
+      for (let z = z0 + L + 2; z + 3 < z1 - L - 1; z += 3) {
+        const zc = z + 2.1;
+        if (zc - 4 < 15 || zc + 4 > z1) continue;
+        let near = false; for (let b = z0 + L + 4; b < z1 - L - 3; b += 10) if (Math.abs(zc - b) < 2.6 || Math.abs(zc - (b + 5)) < 1.6) near = true;
+        if (near || (avoid && zc + 4 > avoid[0] && zc - 4 < avoid[1])) continue;
+        const ax0 = Math.min(wall + sg * 1.6, wall + sg * 4.6), ax1 = Math.max(wall + sg * 1.6, wall + sg * 4.6); // (the first metre and a half is the walk's own margin)
+        if (occ.free(ax0, zc - 4, ax1, zc + 4)) out.push(zc);
+      }
+      if (out.length) {
+        const zc = rng.pick(out), zx0 = Math.min(wall, wall + sg * 4), zx1 = Math.max(wall, wall + sg * 4);
+        occ.mark(Math.min(wall + sg * 1.6, wall + sg * 4.6), zc - 4, Math.max(wall + sg * 1.6, wall + sg * 4.6), zc + 4);
+        G.Gim.addOilPot(w, side, wall, h, zc, { x0: zx0, z0: zc - 3.5, x1: zx1, z1: zc + 3.5 });
+      }
+    }
     return { x0: x0 + 0.4, z0: z0 + L + 0.4, x1: x1 - 0.4, z1: z1 - L - 0.4, y: h, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2 };
   }
   // a square tower: solid, crenellated, banners, a lit arrow slit (a landmark at the corners of the bailey)
@@ -224,7 +287,7 @@
     for (const gx of gxs) way(gx - 1.6, 0, gx + 1.6, 12);
     // the wall walks along both curtain walls and the towers at the south corners
     for (const side of [-1, 1]) if (rng.chance(side < 0 ? 0.9 : 0.75)) {
-      const top = wallWalk(w, rng, occ, side < 0 ? 0 : W - 3.4, side < 0 ? 3.4 : W, 16, D - 12, 4, side);
+      const zw0 = Math.round(D * 0.45), top = wallWalk(w, rng, occ, side < 0 ? 0 : W - 3.4, side < 0 ? 3.4 : W, 16, D - 12, 4, side, layout === 'bailey' ? [zw0 - 3, zw0 + 3] : null);
       w.platTops.push(top);
     }
     for (const sx of [-1, 1]) { const x = sx < 0 ? 6 : W - 6, z = D - 6.5; if (occ.free(x - 4, z - 4, x + 4, z + 4)) { tower(w, rng, x, z, 3, 10.5); occ.mark(x - 4, z - 4, x + 4, z + 4); } }

@@ -171,12 +171,34 @@
       for (const q of isl) for (const [x, z, s] of q.discs) { const m = new THREE.Mesh(PG().cone, w.mats.rock); m.scale.set(s * 0.95, s * 1.6, s * 0.95); m.rotation.x = Math.PI; m.position.set(x, -s * 0.8 - 0.4, z); grp.add(m); }
       for (const [x0, z0, x1, z1] of [[0, 0, W, TD], [W / 2 - LW, D - LD, W / 2 + LW, D]]) { const m = new THREE.Mesh(PG().box, w.mats.rock); m.scale.set(x1 - x0, 6, z1 - z0); m.position.set((x0 + x1) / 2, -3.4, (z0 + z1) / 2); grp.add(m); }
     });
+    // the statues that breathe the wind (風の像, gimmick_b.js): on the rim of one or two broad islands, each blowing across its island
+    // toward open sky (never at a bridge, nor out over one); the lane is kept clear of the island's columns and trees
+    if (G.Gim) {
+      const HW = G.Gim.GA.hw, want = 1 + (rng.chance(0.5) ? 1 : 0), used = new Set();
+      const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+      const bridgeAng = (i) => links.filter(([a, b]) => a === i || b === i).map(([a, b]) => { const o = isl[a === i ? b : a]; return Math.atan2(o.z - isl[i].z, o.x - isl[i].x); });
+      for (let t = 0, n = 0; t < 40 && n < want && isl.length > 3; t++) {
+        const i = rng.int(2, isl.length - 1), q = isl[i];
+        if (used.has(i) || q.great || q.r < 9) continue;
+        const ba = bridgeAng(i), a0 = rng.range(0, 6.28);
+        for (let k = 0; k < 16; k++) {
+          const a = a0 + k * 0.39, sx = q.x + Math.cos(a) * (q.r - 1.7), sz = q.z + Math.sin(a) * (q.r - 1.7);
+          if (ba.some((b) => Math.abs(wrap(a - b)) < 0.75 || Math.abs(wrap(a + Math.PI - b)) < 0.6)) continue;
+          if (!occ.free(sx - 1.2, sz - 1.2, sx + 1.2, sz + 1.2)) continue;
+          const dx = -Math.cos(a), dz = -Math.sin(a), len = 2 * (q.r - 1.7) + 5;
+          occ.mark(sx - 1.2, sz - 1.2, sx + 1.2, sz + 1.2);
+          for (let s = 1.2; s < len; s += 0.6) for (let l = -HW - 0.5; l <= HW + 0.5; l += 0.6) { const x = sx + dx * s + dz * l, z = sz + dz * s - dx * l; if (x >= 0 && z >= 0 && x < W && z < D) occ.a[Math.floor(z) * W + Math.floor(x)] = 1; }
+          G.Gim.addGale(w, sx, sz, dx, dz, len); used.add(i); q.gale = true; n++; break;
+        }
+      }
+    }
     // on the islands: a ring of columns round a shrine, statues, golden braziers, a vent that throws you up to a floating slab
     let tops = 0;
     for (const q of isl) {
       if (!q.r) continue;
       const big = q.r > 10.5;
-      const kind2 = q.great ? 'shrine' : rng.pick(['ring', 'shrine', 'statues', 'garden']);
+      let kind2 = q.great ? 'shrine' : rng.pick(['ring', 'shrine', 'statues', 'garden']);
+      if (q.gale && kind2 === 'shrine') kind2 = 'ring'; // (no altar in the middle of the gale's way)
       if (kind2 === 'ring' || kind2 === 'shrine') {
         const n = q.great ? 10 : big ? 8 : 6, rr = q.r - 2;
         for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + rng.range(-0.1, 0.1), x = q.x + Math.cos(a) * rr, z = q.z + Math.sin(a) * rr; if (occ.free(x - 0.8, z - 0.8, x + 0.8, z + 0.8)) { P().pillarRound(w, x, z, 0, rng.range(4, 7), 0.42, rng.chance(0.25), rng); occ.mark(x - 0.8, z - 0.8, x + 0.8, z + 0.8); } }

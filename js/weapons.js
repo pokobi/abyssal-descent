@@ -1204,6 +1204,7 @@
     if (!stopped && wh) {
       const surf = wh.c.surf;
       if (wh.c.dest) G.combat.damageDestructible(wh.c.dest, s.dmg, wh.point);
+      if (wh.c.gim && G.Gim) G.Gim.hit(wh.c.gim, s.dmg, 'bullet', wh.point, dir);
       if (G.bosses.active && G.bosses.active.onWorldHit) G.bosses.active.onWorldHit(wh);
       if (surf === 'metal') { G.fx.sparks(wh.point, wh.normal, 8, 0xffd090, 6); }
       else if (surf === 'wood') { G.fx.dust(wh.point, wh.normal, 0x6a4a30, 3); }
@@ -1278,6 +1279,7 @@
     }
     for (const d of G.world.destructibles) if (d.alive && d.pos.distanceTo(o) < reach) { const to = d.pos.clone().sub(o).normalize(); if (to.dot(f) > 0.85) G.combat.damageDestructible(d, s.dmg, d.pos); }
     if (G.Strata.doors.length) for (const dr of G.Strata.doorsNear(o, reach, f, 0.85)) G.Strata.hitDoor(dr, s.dmg, 'bullet');
+    if (G.Gim && G.Gim.list.length) G.Gim.swing(o, reach, f, 0.85, 'flame');
     if (wh && Math.random() < 0.2) G.fx.decal(wh.point, wh.normal, 'scorch', 0.6);
     P.addRecoil(0.0004, (Math.random() - 0.5) * 0.0008);
     anim.kick = Math.min(0.4, anim.kick + 0.05);

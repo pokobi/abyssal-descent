@@ -101,7 +101,8 @@
     K.catchUp = function (to) {
       G.world.interactables.forEach((it, i) => { if (it.type === 'chest' && it.opened && it.cont) K.send({ t: 'cs', id: 'c' + i, d: snap(it.cont) }, to); });
       for (const gr of IV.ground) if (gr.gid) K.send({ t: 'gd', gid: gr.gid, it: IV.ser(gr.it), p: K.vec(gr.g.position) }, to);
-      (G.Strata.doors || []).forEach((d, i) => { if (d.state !== 'closed') K.send({ t: 'dr', i, s: d.state, a: GM.area }, to); });
+      (G.Strata.doors || []).forEach((d, i) => { if (d.state !== (d.s0 || 'closed')) K.send({ t: 'dr', i, s: d.state, a: GM.area }, to); }); // (a crypt gate starts open)
+      if (G.Gim && G.Gim.list.some((g) => g.used)) K.send({ t: 'gms', u: G.Gim.save(), a: GM.area }, to);
       G.world.destructibles.forEach((d, i) => { if (!d.alive) K.send({ t: 'ds', i, a: GM.area }, to); });
     };
     // ---------------- things on the ground ----------------
@@ -189,6 +190,28 @@
       if (m.a !== GM.area) return;
       const it = G.world.interactables[m.i]; if (it) { it.opened = true; if (it.openAnim === undefined) it.openAnim = 0; }
     };
+
+    // ---------------- the fields' devices (gimmick.js): whoever sets one off, it goes off on every screen ----------------
+    // Each screen runs it from the same moment: what it does to the monsters is done where they live (the host; the others only see it),
+    // what it does to a player each screen does to its own. Its own effects are not mirrored again by the effect relay (fxsync).
+    if (G.Gim) {
+      const GmT = G.Gim.trigger;
+      G.Gim.trigger = function (g, o) {
+        K._noMirror = (K._noMirror || 0) + 1;
+        let r; try { r = GmT.call(G.Gim, g, o); } finally { K._noMirror--; }
+        if (r && K.live && !K._net) K.send({ t: 'gm', i: g.i, a: GM.area, by: (o && o.by) || '' });
+        return r;
+      };
+      K.handlers.gm = function (m, from) {
+        if (K.role === 'host') K.relay(m, from);
+        if (m.a !== GM.area) return;
+        const g = G.Gim.list[m.i]; if (!g || g.used) return;
+        K._net = true;
+        try { GmT.call(G.Gim, g, { by: m.by, net: true }); } finally { K._net = false; }
+      };
+      // a newcomer: the ones already spent stand spent (a fallen pillar lies where it fell, a tipped pot hangs over)
+      K.handlers.gms = function (m) { if (m.a === GM.area) G.Gim.restore(m.u); };
+    }
 
     // ---------------- the end of the run: the first through the rift takes everyone along ----------------
     const vic = GM.victory;

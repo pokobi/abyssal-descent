@@ -217,8 +217,10 @@
     if (pools.debris[0]) show(pools.debris[0].m, (G.world && G.world.mats && G.world.mats.rock) || FX.dmats.hole);
     const sr = FX.shockRing(new THREE.Vector3(0, -500, 0), 0xffa040, 0.8, 10);
     const vxBack = G.vfx && G.vfx.warmShow ? G.vfx.warmShow() : null;
+    const gmBack = G.Gim && G.Gim.warmShow ? G.Gim.warmShow() : null; // (the fields' devices: gimmick.js)
     try { return fn(); } finally {
       if (vxBack) vxBack();
+      if (gmBack) gmBack();
       sr.dispose();
       const idx = FX.shocks.indexOf(sr); if (idx >= 0) FX.shocks.splice(idx, 1);
       for (const [m, vis, mat, fc] of saved) { m.visible = vis; m.material = mat; m.frustumCulled = fc; }

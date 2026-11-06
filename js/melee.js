@@ -762,6 +762,7 @@
     // destructibles
     for (const ds of G.world.destructibles) if (ds.alive && ds.pos.distanceTo(o) < range + 0.3) { const to = ds.pos.clone().sub(o).normalize(); if (to.dot(f) > 0.45) { C.damageDestructible(ds, 999, ds.pos); hit = true; } }
     if (G.Strata.doors.length) for (const dr of G.Strata.doorsNear(o, range + 0.3, f, 0.45)) { G.Strata.hitDoor(dr, dmg, 'melee'); hit = true; }
+    if (G.Gim && G.Gim.list.length && G.Gim.swing(o, range + 0.3, f, 0.45, 'melee')) hit = true; // (a field's device: gimmick.js)
     // wall impact sparks when hitting nothing
     if (!hit) { const wh = G.world.raycast(o, f, range * 0.9); if (wh) { G.fx.sparks(wh.point, wh.normal, def.mcat === 'fist' ? 0 : 6, 0xffd090, 4); G.fx.dust(wh.point, wh.normal, 0x8a8070, 2); G.sfx.impact(wh.point, wh.c.surf); } }
     // slash wave (buff): light attacks reach further

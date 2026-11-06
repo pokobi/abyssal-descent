@@ -522,27 +522,34 @@
     const plateMat = new THREE.MeshStandardMaterial({ color: 0x8a6c38, metalness: 0.75, roughness: 0.55 }); // (worn brass: the lock and its ring)
     const holeMat = new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 1 });
     for (const d of S.doors) {
-      const g = new THREE.Group(), wd = d.hi - d.lo;
       const mat = new THREE.MeshStandardMaterial(Object.assign({ color: 0x5e5a55, metalness: 0.85, roughness: 0.48 }, ironTex)); // (dark iron with a sheen: darker than the bars around)
-      g.rotation.order = 'YXZ'; d.sg = d.hinge ? -1 : 1; d.hz = d.hinge ? d.hi : d.lo;
-      g.position.set(d.plane, d.y, d.hz);
       const bars = [];
-      for (let x = 0.12; x < wd - 0.05; x += 0.22) { const m = new THREE.Mesh(boxG, mat); m.scale.set(0.075, d.h - 0.06, 0.075); m.position.set(d.sg * x, d.h / 2, 0); m.castShadow = true; g.add(m); bars.push({ m, x: d.sg * x, bend: (Math.random() - 0.5) * 2 }); }
-      for (const yy of [0.12, d.h / 2, d.h - 0.1]) {
-        const m = new THREE.Mesh(boxG, mat); m.scale.set(wd - 0.04, 0.12, 0.1); m.position.set(d.sg * wd / 2, yy, 0); g.add(m);
-        // rivets along the rail, on both faces
-        for (let x = 0.12; x < wd - 0.05; x += 0.22) for (const z of [0.055, -0.055]) { const r = new THREE.Mesh(boxG, frameMat); r.scale.set(0.045, 0.045, 0.02); r.rotation.z = Math.PI / 4; r.position.set(d.sg * x, yy, z); g.add(r); }
-      }
-      // a cross brace in each half: the gate reads as a door, not more bars
-      for (const [y0, y1] of [[0.12, d.h / 2], [d.h / 2, d.h - 0.1]]) {
-        const len = Math.hypot(wd - 0.1, y1 - y0), ang = Math.atan2(y1 - y0, wd - 0.1);
-        for (const sgn of [1, -1]) { const m = new THREE.Mesh(boxG, mat); m.scale.set(len, 0.07, 0.06); m.position.set(d.sg * wd / 2, (y0 + y1) / 2, 0.01 * sgn); m.rotation.z = d.sg * ang * sgn; g.add(m); }
-      }
-      // the lock: a broad plate with a dark keyhole, and a ring handle
-      const lock = new THREE.Mesh(boxG, plateMat); lock.scale.set(0.3, 0.36, 0.14); lock.position.set(d.sg * (wd - 0.2), 1.1, 0); g.add(lock);
-      for (const z of [0.075, -0.075]) { const kh = new THREE.Mesh(boxG, holeMat); kh.scale.set(0.05, 0.12, 0.01); kh.position.set(d.sg * (wd - 0.2), 1.08, z); g.add(kh); }
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.015, 6, 14), plateMat); ring.position.set(d.sg * (wd - 0.42), 1.05, 0.08); g.add(ring);
-      w.group.add(g);
+      // a leaf hung on its hinge at hz (sg: +1 it spans toward +z, -1 toward -z), wd wide; a crypt's wide gate has two (d.leaves 2), meeting in the middle
+      const leaf = (hz, sg, wd, lock) => {
+        const g = new THREE.Group(); g.rotation.order = 'YXZ'; g.position.set(d.plane, d.y, hz);
+        for (let x = 0.12; x < wd - 0.05; x += 0.22) { const m = new THREE.Mesh(boxG, mat); m.scale.set(0.075, d.h - 0.06, 0.075); m.position.set(sg * x, d.h / 2, 0); m.castShadow = true; g.add(m); bars.push({ m, x: sg * x, bend: (Math.random() - 0.5) * 2 }); }
+        for (const yy of [0.12, d.h / 2, d.h - 0.1]) {
+          const m = new THREE.Mesh(boxG, mat); m.scale.set(wd - 0.04, 0.12, 0.1); m.position.set(sg * wd / 2, yy, 0); g.add(m);
+          // rivets along the rail, on both faces
+          for (let x = 0.12; x < wd - 0.05; x += 0.22) for (const z of [0.055, -0.055]) { const r = new THREE.Mesh(boxG, frameMat); r.scale.set(0.045, 0.045, 0.02); r.rotation.z = Math.PI / 4; r.position.set(sg * x, yy, z); g.add(r); }
+        }
+        // a cross brace in each half: the gate reads as a door, not more bars
+        for (const [y0, y1] of [[0.12, d.h / 2], [d.h / 2, d.h - 0.1]]) {
+          const len = Math.hypot(wd - 0.1, y1 - y0), ang = Math.atan2(y1 - y0, wd - 0.1);
+          for (const sgn of [1, -1]) { const m = new THREE.Mesh(boxG, mat); m.scale.set(len, 0.07, 0.06); m.position.set(sg * wd / 2, (y0 + y1) / 2, 0.01 * sgn); m.rotation.z = sg * ang * sgn; g.add(m); }
+        }
+        // the lock: a broad plate with a dark keyhole, and a ring handle
+        const lockM = new THREE.Mesh(boxG, plateMat); lockM.scale.set(0.3, 0.36, 0.14); lockM.position.set(sg * (wd - 0.2), 1.1, 0); g.add(lockM);
+        const keyH = []; for (const z of [0.075, -0.075]) { const kh = new THREE.Mesh(boxG, holeMat); kh.scale.set(0.05, 0.12, 0.01); kh.position.set(sg * (wd - 0.2), 1.08, z); g.add(kh); keyH.push(kh); }
+        const ringM = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.015, 6, 14), plateMat); ringM.position.set(sg * (wd - 0.42), 1.05, 0.08); g.add(ringM);
+        if (!lock) { lockM.visible = false; for (const k of keyH) k.visible = false; ringM.visible = false; }
+        w.group.add(g);
+        return g;
+      };
+      d.sg = d.hinge ? -1 : 1; d.hz = d.hinge ? d.hi : d.lo;
+      const two = d.leaves === 2, wd = d.hi - d.lo;
+      const g = leaf(d.hz, d.sg, two ? wd / 2 : wd, true);
+      if (two) { d.g2 = leaf(d.hinge ? d.lo : d.hi, -d.sg, wd / 2, false); d.hz2 = d.hinge ? d.lo : d.hi; }
       // the doorway's frame: posts and a lintel of blackened iron (does not move)
       const fr = new THREE.Group(); fr.position.set(d.plane, d.y, 0);
       for (const z of [d.lo, d.hi]) {
@@ -551,7 +558,8 @@
       const lint = new THREE.Mesh(boxG, frameMat); lint.scale.set(0.22, 0.18, wd + 0.3); lint.position.set(0, d.h + 0.1, (d.lo + d.hi) / 2); fr.add(lint);
       fr.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.raycast = () => {}; } });
       w.group.add(fr);
-      Object.assign(d, { g, mat, bars, base: mat.color.clone(), ang: 0, fall: 0, shake: 0 });
+      // (a gate that starts open, or is restored open / broken, is drawn that way from the first frame)
+      Object.assign(d, { g, mat, bars, base: mat.color.clone(), ang: d.state === 'open' ? 1.75 : 0, fall: d.state === 'broken' ? 1 : 0, shake: 0 });
       S.paintDoor(d);
     }
     S.update(0);
@@ -593,6 +601,10 @@
       d.g.rotation.set(-d.face * d.fall * 1.45, -Math.PI / 2 + d.face * d.sg * d.ang, 0);
       d.g.position.x = d.plane + d.face * d.fall * 0.15;
       d.g.position.z = d.hz + (d.shake ? (Math.random() - 0.5) * 0.04 * d.shake : 0);
+      if (d.g2) {
+        d.g2.rotation.set(-d.face * d.fall * 1.45, -Math.PI / 2 - d.face * d.sg * d.ang, 0);
+        d.g2.position.x = d.g.position.x; d.g2.position.z = d.hz2 + (d.shake ? (Math.random() - 0.5) * 0.04 * d.shake : 0);
+      }
     }
   };
   // ---- tightropes: player.js physics stands you on one (sets grounded). It takes balance: the chain is as thin as a hand and it
@@ -674,6 +686,7 @@
       const d = S.doors[i]; if (!d || !v) return;
       d.hp = v[1]; if (d.g) S.paintDoor(d);
       if (v[0] === 'open') { free(d, 'open'); d.ang = 1.75; } else if (v[0] === 'broken') { free(d, 'broken'); d.fall = 1; }
+      else if (v[0] === 'closed' && d.state === 'open') { d.state = 'closed'; d.col.alive = true; d.it.opened = false; d.ang = 0; } // (a crypt gate stands open until someone shuts it)
     });
     S.update(0);
   };

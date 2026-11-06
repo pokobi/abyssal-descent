@@ -142,6 +142,7 @@
         for (const c of a) {
           if (c.st === this.stamp || !c.alive) continue; c.st = this.stamp;
           if (c.enemyOnly && this.pp) continue; // this.pp: set while the player moves
+          if (c.shotOnly) continue; // (something hanging in the air that only shots strike: a bell, a crucible; nobody walks into it)
           if (c.x1 > x0 && c.x0 < x1 && c.y1 > y0 && c.y0 < y1 && c.z1 > z0 && c.z0 < z1) out.push(c);
         }
       }
@@ -363,6 +364,40 @@
         const ra = new Int32Array(cnt[NL]), rd = new Uint8Array(cnt[NL]), fill = cnt.slice(0, NL);
         for (let a = 0; a < NL; a++) for (let d = 0; d < 8; d++) { const b = adj[a * 8 + d]; if (b >= 0) { const e = fill[b]++; ra[e] = a; rd[e] = d; } }
         this.nadj = adj; this.rs = cnt; this.ra = ra; this.rd = rd;
+      }
+    }
+    // the ground changed after the area was built (a pillar fell): the floor and the blocked cells in x0..x1, z0..z1 are worked out again
+    // exactly as buildNav does it, and the clearance penalty around them (single-storey areas only)
+    navPatch(x0, z0, x1, z1) {
+      if (!this.nf || this.L !== 1) return;
+      const W = this.Wn, D = this.Dn, xo = this.xo, zo = this.zo, tmp = [];
+      const ax = Math.max(0, Math.floor(x0) + xo), bx = Math.min(W - 1, Math.floor(x1) + xo), az = Math.max(0, Math.floor(z0) + zo), bz = Math.min(D - 1, Math.floor(z1) + zo);
+      for (let z = az; z <= bz; z++) for (let x = ax; x <= bx; x++) {
+        const i = z * W + x, cx = x - xo + 0.5, cz = z - zo + 0.5;
+        tmp.length = 0;
+        this.query(cx - 0.01, -60, cz - 0.01, cx + 0.01, 60, cz + 0.01, tmp);
+        tmp.sort((a, b) => a.y0 - b.y0);
+        let floor = -Infinity;
+        for (const c of tmp) {
+          if (c.dest || c.navIgnore) continue;
+          if (floor === -Infinity) { floor = c.y1; continue; }
+          if (c.y0 <= floor + 0.8) floor = Math.max(floor, c.y1);
+        }
+        this.nf[i] = floor;
+        if (floor === -Infinity) { this.nb[i] = 1; continue; }
+        tmp.length = 0;
+        this.query(cx - 0.32, floor + 0.85, cz - 0.32, cx + 0.32, floor + 1.9, cz + 0.32, tmp);
+        this.nb[i] = tmp.some((c) => !c.navIgnore) || (this.nbk && this.nbk[i]) ? 1 : 0;
+      }
+      for (let z = Math.max(0, az - 1); z <= Math.min(D - 1, bz + 1); z++) for (let x = Math.max(0, ax - 1); x <= Math.min(W - 1, bx + 1); x++) {
+        const n = z * W + x; if (this.nf[n] === -Infinity) continue;
+        let p = 0;
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, zz = z + dz;
+          if (xx < 0 || zz < 0 || xx >= W || zz >= D) { p += 0.35; continue; }
+          if (this.nf[zz * W + xx] === -Infinity || this.nb[zz * W + xx]) p += 0.35;
+        }
+        this.npen[n] = p;
       }
     }
     // the node you end up on stepping from node a into cell cb (the highest surface no more than a step above you); -1: none

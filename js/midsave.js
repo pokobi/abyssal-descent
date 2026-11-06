@@ -93,6 +93,7 @@
     S.exits = (w.exits || []).map((ex) => ({ type: ex.type || null, open: !!ex.open }));
     if (G.Strata && G.Strata.doors.length) S.doors = G.Strata.saveDoors();
     if (G.Graves && (w.graves || []).length) S.graves = G.Graves.save();
+    if (G.Gim && (w.gims || []).length) S.gims = G.Gim.save(); // (which of the field's devices are spent: gimmick.js)
     S.npcs = w.interactables.filter((i) => i.type === 'npc' || i.type === 'shrine').map((i) => !!i.used);
     { const cz = w.interactables.find((i) => i.type === 'cauldron'); if (cz && cz.used) S.cauldron = cz.used; }
     if (GM.shop) {
@@ -144,6 +145,7 @@
       restorePickups(S);
       if (S.doors) G.Strata.restoreDoors(S.doors);
       if (S.graves) G.Graves.restore(S.graves);
+      if (S.gims && G.Gim) G.Gim.restore(S.gims);
       // NPCs / shrine already used
       const npcs = w.interactables.filter((i) => i.type === 'npc' || i.type === 'shrine');
       (S.npcs || []).forEach((u, i) => { if (npcs[i]) npcs[i].used = u; });

@@ -69,6 +69,28 @@
       if (side === 'N' || side === 'S') { H.stairs(w, side, z, x, 2.4, 0, h, 'trim'); occ.mark(x - 1.6, side === 'N' ? z - L - 0.5 : z, x + 1.6, side === 'N' ? z : z + L + 0.5); }
       else { H.stairs(w, side, x, z, 2.4, 0, h, 'trim'); occ.mark(side === 'W' ? x - L - 0.5 : x, z - 1.6, side === 'W' ? x : x + L + 0.5, z + 1.6); }
     }
+    // the sluice gates (水門の車輪, gimmick_b.js): one or two in the side walls, each with its wheel on the walkway nearest its mouth.
+    // The surge runs straight across the hall (8 m wide): its lane stays clear of the crossings (and their landings) and of the pillars
+    const sluices = [];
+    if (G.Gim) {
+      const crossZ = walks.filter((k) => (k.x1 - k.x0) > (k.z1 - k.z0)).map((k) => (k.z0 + k.z1) / 2).sort((a, b) => a - b);
+      const want = 1 + (rng.chance(0.5) ? 1 : 0), ends = [wz0, ...crossZ, wz1], cands = [];
+      for (let k = 0; k + 1 < ends.length; k++) cands.push([rng.next(), (ends[k] + ends[k + 1]) / 2]); // (the middles between the crossings first, in a random order)
+      cands.sort((a, b) => a[0] - b[0]);
+      for (let t = 0; t < 12; t++) cands.push([1, rng.range(wz0 + 5, wz1 - 5)]);
+      for (const [, z] of cands) {
+        if (sluices.length >= want) break;
+        const sgn = rng.chance(0.5) ? 1 : -1, wx = sgn > 0 ? 0 : W;
+        const hw = Math.min(4, z - wz0 - 0.8, wz1 - z - 0.8, ...crossZ.map((cz) => Math.abs(cz - z) - 1.7));
+        if (hw < 3.3 || sluices.some((q) => Math.abs(q.z - z) < 12)) continue;
+        let best = null;
+        for (const k of walks) { const px = U.clamp(wx, k.x0 + 0.55, k.x1 - 0.55), pz = U.clamp(z, k.z0 + 0.55, k.z1 - 0.55), d = Math.hypot(px - wx, pz - z); if (!best || d < best.d) best = { d, px, pz }; }
+        if (!best || best.d > 28) continue;
+        sluices.push({ sgn, z });
+        occ.mark(1, z - hw - 0.6, W - 1, z + hw + 0.6);
+        G.Gim.addSluice(w, sgn, wx, z, W - 1.2, best.px, h, best.pz, hw);
+      }
+    }
     // braziers along the walkways (they hold no one up: no collider), lanterns on chains over the crossings
     for (const k of walks) { const ax = (k.x1 - k.x0) > (k.z1 - k.z0); for (let u = (ax ? k.x0 : k.z0) + 5; u < (ax ? k.x1 : k.z1) - 4; u += 13) P().brazier(w, ax ? u : (k.x0 + k.x1) / 2, h, ax ? (k.z0 + k.z1) / 2 : u, 0.7); }
     w.platTops.push(...walks.map((k) => ({ x0: k.x0 + 0.3, z0: k.z0 + 0.3, x1: k.x1 - 0.3, z1: k.z1 - 0.3, y: h, cx: (k.x0 + k.x1) / 2, cz: (k.z0 + k.z1) / 2 })));
@@ -80,7 +102,7 @@
     for (let i = 0; i < 4; i++) {
       const side = rng.pick(['W', 'E', 'S']); const y = rng.range(7, 10), wd = rng.range(1.4, 2.6);
       if (side === 'S') { const x = rng.range(6, W - 6); if (Math.abs(x - cx) < 8) continue; waterfall(w, x, D - 0.02, y, 'nz', wd); }
-      else { const z = rng.range(wz0 + 4, wz1 - 4); waterfall(w, side === 'W' ? 0.02 : W - 0.02, z, y, side === 'W' ? 'px' : 'nx', wd); }
+      else { const z = rng.range(wz0 + 4, wz1 - 4); if (sluices.some((q) => (q.sgn > 0) === (side === 'W') && Math.abs(q.z - z) < 5.5)) continue; waterfall(w, side === 'W' ? 0.02 : W - 0.02, z, y, side === 'W' ? 'px' : 'nx', wd); } // (not over a sluice gate)
     }
     for (let z = 10; z < D - 6; z += 9) { if (rng.chance(0.5)) P().vines(w, 0, rng.range(6, 11), z, 'px', rng.range(3, 6), rng); if (rng.chance(0.5)) P().vines(w, W, rng.range(6, 11), z + 4, 'nx', rng.range(3, 6), rng); }
     // floating debris, half-sunk crates and barrels, rubble islands
@@ -170,7 +192,7 @@
       const x = side === 'W' ? Math.min(r.x0 + 3.5, 6) : Math.max(r.x0 + 3.5, W - 6), z = r.z0 + 3.5;
       if (!occ.free(x - 3.5, z - 3.5, x + 3.5, z + 3.5) && Math.abs(x - (r.x0 + 3.5)) > 0.1) continue;
       furnace(w, rng, x, z, side === 'W' ? 'px' : 'nx', HT); occ.mark(x - 3.5, z - 3.5, x + 3.5, z + 3.5);
-      anvil(w, x + (side === 'W' ? 5 : -5), z + 1.5);
+      anvil(w, x + (side === 'W' ? 5 : -5), z + 1.5); occ.mark(x + (side === 'W' ? 5 : -5) - 1.2, z + 0.7, x + (side === 'W' ? 5 : -5) + 1.3, z + 2.3); // (nothing else on top of it)
     }
     // iron catwalks along the side walls (stairs up at each end)
     if (layout === 'catwalks' || rng.chance(0.5)) for (const side of [-1, 1]) {
@@ -195,7 +217,16 @@
       for (let x = r.x0 + 0.5; x < r.x1 - 0.6; x += 1.4) w.visual(rng.chance(0.5) ? 'lava' : 'dark', x, 0.45, r.z0 + 0.4, x + 1.0, 0.47, r.z1 - 0.4, { uv: 1, grad: false });
     }
     for (let i = 0; i < 4; i++) { const r = occ.place(rng, 2, 2, 1, 14); if (!r) continue; for (let k = 0; k < rng.int(3, 6); k++) w.solid(rng.chance(0.3) ? 'gold' : 'iron', r.x0 + 0.2, k * 0.22, r.z0 + 0.3 + (k % 2) * 0.4, r.x0 + 1.6, k * 0.22 + 0.2, r.z0 + 0.7 + (k % 2) * 0.4, { uv: 1 }); }
-    for (let i = 0; i < (layout === 'pour' ? 4 : 2); i++) crucible(w, rng.range(10, W - 10), rng.range(5, 8), rng.chance(0.5) ? rng.range(18, pit.band.z0 - 4) : rng.range(pit.band.z1 + 4, D - 14), HT);
+    // the crucibles: the first two that hang over open floor are live (吊りるつぼ, gimmick_b.js: shoot one and it pours where its lip ends up)
+    for (let i = 0, live = 0; i < (layout === 'pour' ? 4 : 2); i++) {
+      let x = rng.range(10, W - 10), y = rng.range(5, 8), z = rng.chance(0.5) ? rng.range(18, pit.band.z0 - 4) : rng.range(pit.band.z1 + 4, D - 14);
+      if (G.Gim && live < 2) {
+        const fit = (cx, cz) => occ.free(cx + 0.7 - 3.6, cz - 3.6, cx + 0.7 + 3.6, cz + 3.6) && occ.free(cx - 1.6, cz - 1.6, cx + 1.6, cz + 1.6);
+        for (let t = 0; t < 24 && !fit(x, z); t++) { x = rng.range(10, W - 10); z = rng.chance(0.5) ? rng.range(18, pit.band.z0 - 5) : rng.range(pit.band.z1 + 5, D - 14); }
+        if (fit(x, z)) { occ.mark(x + 0.7 - 3.6, z - 3.6, x + 0.7 + 3.6, z + 3.6); G.Gim.addCrucible(w, x, y, z, HT); live++; continue; }
+      }
+      crucible(w, x, y, z, HT);
+    }
     // steam vents in the floor, coal heaps, barrels, chains from the vault
     for (let i = 0; i < 2; i++) { const r = occ.place(rng, 3, 3, 2, 14); if (r && G.Fields) G.Fields.add(w, 'vent', r.x0 + 0.6, r.z0 + 0.6, r.x1 - 0.6, r.z1 - 0.6); }
     for (let i = 0; i < 3; i++) { const r = occ.place(rng, 3, 3, 1, 12); if (r) { w.batch.geo('rock', PG().cone, Mx(r.x0 + 1.5, 0.55, r.z0 + 1.5, 1.4, 1.1, 1.4), { tint: [0.25, 0.22, 0.2] }); w.addCollider(r.x0 + 0.5, 0, r.z0 + 0.5, r.x1 - 0.5, 0.9, r.z1 - 0.5, { surf: 'stone' }); } }

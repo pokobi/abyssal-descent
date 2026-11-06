@@ -251,22 +251,34 @@
     grave: { icon: '🪦', rarity: 'uncommon', desc: '月明かりの下の屋外の墓所。墓石と鉄柵、枯れ木、霊廟が並ぶ。守護者の待つ戦場は鉄柵に囲まれ、長い墓道の先にある。' },
     gate: { icon: '🚪', rarity: 'rare', desc: '迷宮の入口。天井は高いが閉ざされ、鉄格子の窓から夜空と月明かりが差し込む。守護者の間へは長い回廊を進み、自動で開く石の扉をくぐる（戻れない）。' },
     halls: { icon: '🏛️', rarity: 'epic', desc: '迷宮の中層。スポーン地点から出口へ向かって、溶岩の谷が南北に長く延び、西側と東側の3階建てに分ける。谷の両端には床があり、回り込める。同じ側は階段・木の坂・ハシゴで上下し、谷には板だけの橋（各階に1本以上）と、綱渡りの細い鎖が渡る。外壁には鉄格子の部屋が掘り込まれ、近づくと敵が1体だけ這い出る「湧き墓」が立つ。' },
+    hamlet: { icon: '🏚️', rarity: 'uncommon', desc: '霧に沈む、人の消えた村。崩れた家々が通りに並び、井戸の広場、鐘楼の礼拝堂、枯れた畑が残る。小川の流れる村もある。守護者は村外れの丸太の柵の向こうで待つ。' },
+    dusk: { icon: '🌇', rarity: 'uncommon', desc: '深淵の縁、夕日に沈む廃都。崩れた高い建物と列柱の大通りが続き、遠くまで見通せる。屋上へ登る階段も残る。' },
+    catacombs: { icon: '⚰️', rarity: 'rare', desc: '墓所の地下に広がる、迷路のような地下墓所。狭い通路と小さな埋葬室が入り組み、壁には頭蓋骨が並ぶ。' },
+    castle: { icon: '🏰', rarity: 'rare', desc: '深淵への道を守る、血の色の月の下の古城。城壁と塔に囲まれた中庭、屋根の落ちた大広間、城壁の上の歩廊。' },
+    flooded: { icon: '🌊', rarity: 'epic', desc: '地下水に沈んだ回廊。膝までの水路の上に石の通路と橋が渡り、壁からは水が流れ落ちる。' },
+    foundry: { icon: '🔥', rarity: 'epic', desc: '溶けた鉄が川となって流れる、古い溶鉱炉の深層。鉄の橋と炉、蒸気の噴き上がる床。' },
+    frozen: { icon: '❄️', rarity: 'legendary', desc: '凍りついた霊廟の大広間。氷の床と結晶の柱、凍った像。天井からは氷柱が落ちてくる。' },
+    sanctum: { icon: '☁️', rarity: 'legendary', desc: '深淵の底に広がる、偽りの空に浮かぶ聖域。白い石の島々を細い橋がつなぎ、雲の下は闇。' },
     ruin: { icon: '🕳️', rarity: 'legendary', desc: '迷宮の最奥、蒼い炎が燃える廃都。中層と同じ、南北に延びる谷で二分された3階建てで、谷底には蒼炎が流れる。崩落が進み、柱は折れ、各階の床の裂け目からも蒼炎が噴き出す（触れると高レベルの炎上）。「湧き墓」が中層より多く、鉄格子の部屋に多く立つ。' },
   };
   let STAGES = null;
   function stages() {
     if (STAGES) return STAGES;
     const R = G.Run;
-    STAGES = Object.keys(FIELD_INFO).map((key, i) => {
+    // (the new fields show once they are in the game; a tier's fields are drawn per segment, so each lists every segment of its tier)
+    const keys = Object.keys(FIELD_INFO).filter((k) => ['grave', 'gate', 'halls', 'ruin'].includes(k) || (R.ready && R.ready(k)));
+    keys.sort((a, b) => (R.tierOf ? R.tierOf(a) - R.tierOf(b) : 0));
+    STAGES = keys.map((key, i) => {
       const B = G.Tex.BIOMES[key], F = FIELD_INFO[key];
       const where = [];
-      for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (f === key) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
+      const same = (f) => (R.tierOf ? R.tierOf(f) === R.tierOf(key) : f === key);
+      for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (same(f)) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
       return { id: 'stage_' + key, key, idx: i, name: B.name, icon: F.icon, rarity: F.rarity, desc: F.desc, where };
     });
     return STAGES;
   }
   function stageDetail(o) {
-    const pool = (G.Run.BOSS_POOLS[o.key] || []).map((id) => G.BOSS_BY_ID[id]).filter(Boolean);
+    const pool = (G.Run.bossPool ? G.Run.bossPool(o.key) : G.Run.BOSS_POOLS[o.key] || []).map((id) => G.BOSS_BY_ID[id]).filter(Boolean);
     let h = `<div style="margin-top:8px;font-weight:700">🗺️ 登場する難易度・区分</div><div style="font-size:12.5px;line-height:1.7;color:#cfc4b0">${o.where.join('　/　') || '—'}</div>`;
     h += `<div style="margin-top:10px;font-weight:700">👑 守護者（この中から1体が等確率で現れる）</div><div style="margin-top:4px">${pool.map((b) => G.save.data.codex.bosses[b.id] ? `<span class="tag">${b.icon} ${U.esc(b.name)}</span>` : '<span class="tag">❔ ？？？</span>').join('')}</div>`;
     const pool2 = G.game.enemyPool(13, o.key).slice().sort((a, b) => b[1] - a[1]).slice(0, 8);

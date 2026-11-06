@@ -139,13 +139,16 @@
     G.Strata.build(w);
     G.Graves.build(w);
     document.querySelectorAll('.exit-mark').forEach((e) => e.remove()); // the last area's gate markers
-    const B = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
+    const B0 = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
+    // the area's sky (skyvary.js): a mood of the field drawn from the run's seed, laid over its light and fog (looks only)
+    const sv = G.Sky && GM.stage && GM.stage !== 'title' ? G.Sky.choose(w, GM.area, GM.stage) : null; w.sky = sv;
+    const B = G.Sky ? G.Sky.env(B0, sv, w.isBoss) : B0;
     GM._fogBase = B.fogD; const qk = (QP[G.save.data.settings.quality] || QP.high);
     scene.fog.color.set(B.fog); scene.fog.density = B.fogD * qk.fogK;
     scene.background = new THREE.Color(B.fog);
     G.fx.setFog(B.fog, B.fogD * qk.fogK);
     GM.qualityMaterials();
-    hemi.color.set(B.hemiS); hemi.groundColor.set(B.hemiG); hemi.intensity = 0.75 + B.amb * 0.6;
+    hemi.color.set(B.hemiS); hemi.groundColor.set(B.hemiG); hemi.intensity = (0.75 + B.amb * 0.6) * (B.hemiI || 1);
     amb.color.set(B.hemiS); amb.intensity = B.amb * 1.3;
     moon.color.set(B.moon); moon.intensity = 1.1 * B.moonI;
     const cx = w.W / 2, cz = w.D / 2, R = Math.max(w.W, w.D) * 0.62;
@@ -153,6 +156,7 @@
     else moon.position.set(cx + 18, 60, cz + 26);
     moon.target.position.set(cx, 0, cz); moon.target.updateMatrixWorld();
     setSky(B);
+    if (G.Sky) G.Sky.start(scene, sv, w.isBoss);
     const sc = moon.shadow.camera; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.near = 10; sc.far = 140; sc.updateProjectionMatrix();
     G.abilities.rebuildVisuals();
   }
@@ -450,7 +454,7 @@
     if (G.Tutorial.active) G.Tutorial.stop();
     G.Rift.clear();
     GM.state = 'title';
-    GM.mood = null; GM.stage = 'title'; GM.stopDread(); G.Depth.endArea(); const mv = document.getElementById('mood-vig'); if (mv) mv.style.opacity = 0;
+    GM.mood = null; GM.stage = 'title'; GM.stopDread(); G.Depth.endArea(); if (G.Sky) G.Sky.stop(); const mv = document.getElementById('mood-vig'); if (mv) mv.style.opacity = 0;
     I.exitLock();
     G.ui.showHud(false);
     G.ui.bossBar(null);
@@ -473,6 +477,7 @@
     GM.time = 0;
     GM.run = { coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 };
     GM.run.diff = Object.assign({}, G.Run.cur); GM.won = false;
+    G.Run.legacy = !!G.Run._nextLegacy; G.Run._nextLegacy = false; if (!G.Run.legacy) GM.run.fd = 1; // (fd: this run draws its fields; see runplan.js)
     G.save.data.records.runs++; G.save.write();
     P.cls = G.Classes && !GM.tutorialRun ? G.Classes.last() : 'soldier'; GM.run.cls = P.cls; GM.tutorialRun = false; // (the tutorial is always the soldier)
     P.resetRun();
@@ -551,6 +556,7 @@
     GM.time = 0;
     GM.run = Object.assign({ coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 }, d.run, { combo: 0, lastKillT: -10, multiT: -10, startT: 0 });
     G.Run.set((d.run && d.run.diff && d.run.diff.id) || 'normal', d.run && d.run.diff && d.run.diff.lv);
+    G.Run.legacy = !(d.run && d.run.fd); // (a run saved before the field draw keeps its old fields)
     GM.applyPlayerSnap(d);
     G.weapons.dirty = true;
     GM.area = d.area;
@@ -638,7 +644,7 @@
     G.ui.showHud(true);
     const B = w.mats.biome;
     const T = G.Areas.TYPES[kind];
-    G.ui.setArea(`AREA ${n}<small class="ar-of"> / ${G.Run.areas()}</small>`, `${T.icon} ${T.name} — ${B.name}${w.layout ? ' · ' + layoutName(w.layout) : ''}`);
+    G.ui.setArea(`AREA ${n}<small class="ar-of"> / ${G.Run.areas()}</small>`, `${T.icon} ${T.name} — ${B.name}${w.layout ? ' · ' + layoutName(w.layout) : ''}${w.sky && w.sky.name && w.sky.w < 4 ? ' · ' + w.sky.name : ''}`);
     if (kind === 'shop') {
       GM.setupShop(w);
       GM.objective = { icon: '🛒', text: () => '買い物を終えたら次の門を選べ', done: true };
@@ -649,9 +655,9 @@
       const bd0 = G.BOSS_BY_ID[bid], cyc = G.bosses.cycleOf(n);
       const bd = cyc > 0 ? Object.assign({}, bd0, { name: G.bosses.cyclePrefix(cyc) + bd0.name }) : bd0;
       GM.bossDef = bd; GM.bossEngaged = false; GM.bossStartT = 0;
-      const outdoorRoad = w.field === 'grave';
-      G.ui.banner(`AREA ${n}`, outdoorRoad ? '— 墓所の奥へ —' : '— 回廊の奥へ —');
-      GM.objective = { icon: outdoorRoad ? '⚰️' : '🚪', text: () => (outdoorRoad ? '墓所の奥へ進め — 鉄柵の門をくぐると戦いが始まる' : '回廊の奥へ進め — 石の扉をくぐると戦いが始まる'), done: false };
+      const RT = w.roadText || { sub: '— 回廊の奥へ —', icon: '🚪', obj: '回廊の奥へ進め — 石の扉をくぐると戦いが始まる' }; // (each field's approach, fieldgen.js F.SHELL)
+      G.ui.banner(`AREA ${n}`, RT.sub);
+      GM.objective = { icon: RT.icon, text: () => RT.obj, done: false };
       G.Areas.spawnMiniShop(true, true);
       G.Rooms2.setupRoadMerchant();
     } else if (G.Areas.ROOMS.includes(kind)) {
@@ -840,10 +846,11 @@
   };
   function enemyPool(n, biomeKey) {
     const B = biomeKey || G.world.biome;
-    const fav = { grave: ['skeleton', 'hound', 'bat', 'wraith', 'gargoyle'], gate: ['skeleton', 'imp', 'spider', 'shaman', 'gargoyle'], halls: ['golem', 'mantis', 'brute', 'shaman', 'spider'], ruin: ['wraith', 'golem', 'worm', 'mantis', 'brute'], abyss: ['wraith', 'shaman', 'golem', 'mantis'], catacombs: ['skeleton', 'bat', 'wraith'], flooded: ['slime', 'worm', 'spider'], forge: ['imp', 'golem', 'brute'], frozen: ['wraith', 'gargoyle', 'golem'], temple: ['spider', 'mantis', 'mushroom'], ruins: ['brute', 'mantis', 'skeleton', 'worm'], sky: ['gargoyle', 'bat', 'wraith', 'golem'], void: ['wraith', 'gargoyle', 'imp', 'slime'], bloodmoon: ['skeleton', 'bat', 'brute', 'wraith'] }[B] || [];
+    const fav = { grave: ['skeleton', 'hound', 'bat', 'wraith', 'gargoyle'], gate: ['skeleton', 'imp', 'spider', 'shaman', 'gargoyle'], halls: ['golem', 'mantis', 'brute', 'shaman', 'spider'], ruin: ['wraith', 'golem', 'worm', 'mantis', 'brute'], abyss: ['wraith', 'shaman', 'golem', 'mantis'], catacombs: ['skeleton', 'spider', 'wraith', 'slime', 'bat'], flooded: ['slime', 'worm', 'spider', 'mushroom', 'wraith'], forge: ['imp', 'golem', 'brute'], frozen: ['wraith', 'gargoyle', 'golem', 'mantis', 'skeleton'], temple: ['spider', 'mantis', 'mushroom'], ruins: ['brute', 'mantis', 'skeleton', 'worm'], sky: ['gargoyle', 'bat', 'wraith', 'golem'], void: ['wraith', 'gargoyle', 'imp', 'slime'], bloodmoon: ['skeleton', 'bat', 'brute', 'wraith'], hamlet: ['hound', 'skeleton', 'bat', 'slime', 'wraith'], dusk: ['gargoyle', 'imp', 'bat', 'beetle', 'skeleton'], castle: ['skeleton', 'gargoyle', 'brute', 'shaman', 'hound'], foundry: ['golem', 'imp', 'brute', 'beetle', 'gargoyle'], sanctum: ['gargoyle', 'wraith', 'shaman', 'mantis', 'bat'] }[B] || [];
+    const vfav = { frozen: 'frost', foundry: 'fire', flooded: 'tide', castle: 'shadow', sanctum: 'storm' }[B]; // (the new fields lean on one kind of the 10 variants)
     const k = Math.floor((Math.max(1, G.Run.depthArea(n)) - 1) / 5); // which foes have appeared by this depth
     const dn = Math.max(1, G.Run.depthArea(n));
-    return G.ENEMIES.filter((e) => !e.special && (e.unlockK ?? 0) <= k && !(e.fromArea > dn)).map((e) => [e, (e.variant === 'normal' ? 3 : e.variant === 'abyss' ? 0.5 : 1.4) * (fav.includes(e.plan) ? 2 : 1) * ((e.unlockK ?? 0) === k && k > 0 ? 1.5 : 1)]);
+    return G.ENEMIES.filter((e) => !e.special && (e.unlockK ?? 0) <= k && !(e.fromArea > dn)).map((e) => [e, (e.variant === 'normal' ? 3 : e.variant === 'abyss' ? 0.5 : 1.4) * (fav.includes(e.plan) ? 2 : 1) * (vfav && e.variant === vfav ? 1.8 : 1) * ((e.unlockK ?? 0) === k && k > 0 ? 1.5 : 1)]);
   }
   GM.enemyPool = function (n, biomeKey) { return enemyPool(n, biomeKey);
   }
@@ -2374,6 +2381,7 @@
     updateWorldFx(gdt);
     G.LightPool.update(gdt, G.world, camera.position, GM.time);
     G.fx.update(gdt, camera, renderer);
+    if (G.Sky) G.Sky.update(gdt, camera);
     G.ui.update(gdt);
     if (I.wheel === 0 && I.hit('status')) {}
   }

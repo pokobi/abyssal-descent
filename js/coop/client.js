@@ -73,7 +73,7 @@
     K.handlers.go = function () { K.started(); };
     K.handlers.late = function (m) {
       K.late = m; seed0 = m.seed; fromHost = true;
-      try { K.started(); G.Run.set(m.diff, m.lv); sr.call(GM, { id: m.diff, lv: m.lv }, 0); } finally { fromHost = false; }
+      try { K.started(); G.Run.set(m.diff, m.lv); G.Run._nextLegacy = !!m.of; sr.call(GM, { id: m.diff, lv: m.lv }, 0); } finally { fromHost = false; }
       if (m.snap) {
         GM.applyPlayerSnap(m.snap);
         if (m.snap.coins !== undefined) GM.run.coins = m.snap.coins;
@@ -91,8 +91,8 @@
       seed0 = m.seed;
       fromHost = true;
       try {
-        if (!GM.run) { if (!K.live) K.started(); G.Run.set(m.diff, m.lv); sr.call(GM, { id: m.diff, lv: m.lv }, 0); }
-        else GM.enterArea(m.n, m.kind);
+        if (!GM.run) { if (!K.live) K.started(); G.Run.set(m.diff, m.lv); G.Run._nextLegacy = !!m.of; sr.call(GM, { id: m.diff, lv: m.lv }, 0); }
+        else { G.Run.legacy = !!m.of; GM.enterArea(m.n, m.kind); } // (the host's runs and ours draw the same fields from the same seed)
       } finally { fromHost = false; }
       const fp = K.fingerprint();
       K.fpOk = fp === m.fp;

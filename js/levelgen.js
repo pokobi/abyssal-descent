@@ -103,11 +103,13 @@
     if (broken) P().rubble(w, alongX ? x + len * 0.47 : x, 0, alongX ? z : z + len * 0.47, rng, 0.9);
   }
 
-  function house(w, rng, R) {
+  // opts (the new fields): { door: 'N' | 'S' | 'E' | 'W' (the side that faces the street), ruined: chance, h: [min, max] }
+  function house(w, rng, R, opts) {
+    opts = opts || {};
     const x0 = R.x0 + 0.5, z0 = R.z0 + 0.5, x1 = R.x1 - 0.5, z1 = R.z1 - 0.5;
-    const H = rng.range(3.6, 4.8), T = 0.55;
-    const doorSide = rng.pick(['N', 'S', 'E', 'W']);
-    const ruined = rng.chance(0.7);
+    const H = rng.range(...(opts.h || [3.6, 4.8])), T = 0.55;
+    const doorSide = opts.door || rng.pick(['N', 'S', 'E', 'W']);
+    const ruined = rng.chance(opts.ruined ?? 0.7);
     // interior floor (wood planks)
     w.solid('wood', x0 + T, 0, z0 + T, x1 - T, 0.06, z1 - T, { uv: 2, grad: false });
     const wallSeg = (side) => {

@@ -331,6 +331,8 @@
     return finish(w, rng, occ, W, D, area, kind, extraChests);
   }
 
+  // (the new fields, fieldgen_t1..t4.js, build with the same plumbing)
+  F._ = { base, reserve, finish, roadGrave, roadHall };
   // ---------------------------------------------------------------- 3 / 4) the storeyed depths (and their ruin)
   F.gen = { grave: genGrave, gate: genGate, halls: (a, s, e, g, k) => G.Strata.gen(a, s, e, g, k, false), ruin: (a, s, e, g, k) => G.Strata.gen(a, s, e, g, k, true) };
   // route LevelGen.generate through the field generators
@@ -510,27 +512,45 @@
     return w;
   };
 
-  // ---------------------------------------------------------------- the guardian's field
+  // ---------------------------------------------------------------- the guardian's hall of each field
+  // Every field dresses the same 76 x 76 arena (whose layout belongs to the guardian, see levelgen ARENA) in its own way:
+  //   outdoor: open sky (no ceiling); wallH: the outer wall; ring(w, rng, W, AD, last): the arena's edge (fence / ceiling / ...);
+  //   road(w, rng, W, AD, D): the approach (returns the merchant's nook { nz, nx }); dress(w, rng, W, AD, cx, cz): the field's touch on the arena;
+  //   text: what the banner and the objective say on the way in. The fields of fieldgen_t*.js add their own.
+  F.SHELL = {
+    grave: {
+      outdoor: true, wallH: 3.2, road: (w, rng, W, AD, D) => roadGrave(w, rng, W, AD, D),
+      ring(w, rng, W, AD, last) {
+        // the guardian's field is ringed by a tall iron fence on the low cemetery wall
+        F.fence(w, 0.2, 0.2, W - 0.2, 0.2, 5.5, last ? [] : LG.gateXs(W, 3).map((g) => [g - 2.6, g + 2.6]));
+        F.fence(w, 0.2, 0.2, 0.2, AD, 5.5, []); F.fence(w, W - 0.2, 0.2, W - 0.2, AD, 5.5, []);
+      },
+      text: { sub: '— 墓所の奥へ —', icon: '⚰️', obj: '墓所の奥へ進め — 鉄柵の門をくぐると戦いが始まる' },
+    },
+    hall: {
+      outdoor: false, road: (w, rng, W, AD, D) => roadHall(w, rng, W, AD, D, w.field === 'ruin'),
+      ring(w, rng, W, AD) { F.ceiling(w, rng, 0, 0, W, AD, 24, { chandeliers: 2, ruined: w.field === 'ruin' }); },
+      text: { sub: '— 回廊の奥へ —', icon: '🚪', obj: '回廊の奥へ進め — 石の扉をくぐると戦いが始まる' },
+    },
+  };
+  F.shellOf = (field) => F.SHELL[field] || (field === 'grave' ? F.SHELL.grave : F.SHELL.hall);
   LG.boss = function (area, seed, bossId) {
     if (bossId === 'sovereign') return F.finalArena(area, seed);
     const rng = new G.RNG(seed);
     const style = LG.bossStyle(bossId, seed);
     if (style.arena === 'throne') style.arena = 'fortress';
     const field = G.Run ? G.Run.field(area) : 'gate';
-    const outdoor = field === 'grave';
+    const SH = F.shellOf(field), outdoor = !!SH.outdoor, last = !!(G.Run && G.Run.isLast(area));
     const W = 76, AD = 76, ROAD = 82, D = AD + ROAD;
     const w = new G.World(W, D, G.Tex.biomeFor(area));
     w.arenaD = AD; w.bossStyle = style; w.field = field;
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
     const cx = W / 2, cz = AD / 2 - 2;
     H.floors(w, W, AD + 3, null, style.arena === 'colosseum' ? 'floor' : 'cobble');
-    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, noExits: !!(G.Run && G.Run.isLast(area)), h: outdoor ? 3.2 : 16, top: outdoor ? undefined : 24 });
-    if (outdoor) {
-      // the guardian's field is ringed by a tall iron fence on the low cemetery wall
-      F.fence(w, 0.2, 0.2, W - 0.2, 0.2, 5.5, G.Run && G.Run.isLast(area) ? [] : LG.gateXs(W, 3).map((g) => [g - 2.6, g + 2.6]));
-      F.fence(w, 0.2, 0.2, 0.2, AD, 5.5, []); F.fence(w, W - 0.2, 0.2, W - 0.2, AD, 5.5, []);
-    } else F.ceiling(w, rng, 0, 0, W, AD, 24, { chandeliers: 2, ruined: field === 'ruin' });
-    const nook = outdoor ? roadGrave(w, rng, W, AD, D) : roadHall(w, rng, W, AD, D, field === 'ruin');
+    H.perimeter(w, rng, W, D, { beams: 0, gates: 3, noExits: last, h: outdoor ? (SH.wallH || 3.2) : 16, top: outdoor ? undefined : 24 });
+    SH.ring(w, rng, W, AD, last);
+    const nook = SH.road(w, rng, W, AD, D);
+    w.roadText = SH.text;
     // the stone vending machine + the paid basin
     const vx = nook.nx, vz = nook.nz;
     w.stoneVendor = F.stoneVendor(w, vx - 0.6, vz, 0, 1);
@@ -544,12 +564,13 @@
     w.bossPillars = [];
     (H.ARENA[style.arena] || H.ARENA.fortress)(w, rng, W, AD, cx, cz);
     H.arenaDressing(w, rng, W, AD, cx, cz);
+    if (SH.dress) SH.dress(w, rng, W, AD, cx, cz);
     w.nestPos = V(W - 4, 11, cz);
     if (bossId === 'broodmother') {
       w.solid('rock', W - 8, 9, cz - 7, W, 10.5, cz + 7, { uv: 4 });
       for (let i = 0; i < 6; i++) P().web(w, rng.range(W - 8, W - 1), rng.range(7, 13), cz + rng.range(-7, 7), Math.PI / 2, rng.range(3, 6));
     }
-    if (!outdoor) H.lightShafts(w, rng, W, AD, 3);
+    if (!outdoor && SH.shafts !== false) H.lightShafts(w, rng, W, AD, 3);
     H.fireTops(w, { boss: true, AD });
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
     w.isBoss = true;

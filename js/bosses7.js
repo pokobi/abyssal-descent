@@ -38,7 +38,7 @@
   const CLASS_HP = { colossus: 4200, wyrm: 3800, executioner: 4600, broodmother: 3900 };
   const bigHp = (id) => CLASS_HP[id] || (BS.SPECS && BS.SPECS[id] && BS.SPECS[id].hp) || 0;
   BS.smallBase = function (S) {
-    const R = G.Run, n = G.game.area || 1, pool = (R && R.BOSS_POOLS && R.BOSS_POOLS[R.field(n)]) || [];
+    const R = G.Run, n = G.game.area || 1, pool = (R && R.bossPool && R.bossPool(R.field(n))) || [];
     const big = pool.filter((id) => !(G.BOSS_BY_ID[id] && G.BOSS_BY_ID[id].small)).map(bigHp).filter((v) => v > 0);
     const avg = big.length ? big.reduce((a, v) => a + v, 0) / big.length : 4500;
     return avg * BS.SMALL_HP * (S.hp / 4500);

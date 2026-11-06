@@ -31,7 +31,7 @@ const T = {
   parts: ['tests/parts_test.js'], shop_free: ['tests/shop_free_test.js'], duel: ['tests/duel_test.js'], runplan: ['tests/runplan_test.js'],
   mobile: ['tests/mobile_test.js'], trial: ['tests/trial_test.js'], boss_hp: ['tests/boss_hp_test.js'],
   skill: ['tests/coop/skill_test.js'], coop: ['tests/coop/coop_test.js'], world: ['tests/coop/world_test.js'], sky: ['tests/coop/sky_test.js'],
-  run: ['tests/coop/run_test.js', 'normal', '5'], coop_duel: ['tests/coop/duel_test.js'], bossobj: ['tests/coop/bossobj_test.js'],
+  run: ['tests/coop/run_test.js', 'normal', '5'], field: ['tests/field_test.js'], coop_duel: ['tests/coop/duel_test.js'], bossobj: ['tests/coop/bossobj_test.js'],
   loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'],
 };
 // game file (regex on the path) -> tests. The guardians are handled apart: only the ones defined in the changed files are fought.
@@ -50,6 +50,7 @@ const MAP = [
   [/^js\/(combat|enemies|player|game|data_enemies|data_buffs|depth)\.js$/, ['solo_smoke', 'run']],
   [/^js\/(game|parts|pawn)\.js$/, ['give', 'shop']], // (weapons handed over: never pushing out the ones held)
   [/^js\/(world|levelgen|fieldgen|strata|props|graves|fields)\.js$/, ['solo_smoke', 'world']],
+  [/^js\/(levelgen|fieldgen|fieldgen_t\d|strata|props|fields|textures|skyvary|runplan)\.js$/, ['field']], // (every field builds; the per-segment draw; the sky moods)
   [/^js\/(areas|rooms2|midsave)\.js$/, ['solo_smoke', 'room', 'give']],
   [/^js\/bosses7\.js$/, ['boss_hp']],
   [/^js\/bosses\d?\.js$/, ['gimmick']], // (a guardian's gimmicks cleared: a share of its health)

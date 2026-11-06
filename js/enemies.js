@@ -1420,6 +1420,8 @@
     }
   }
   E.Enemy = Enemy;
+  // (the new fields' foes, fieldfoes.js, build their bodies with the same parts and colours)
+  E._ = { B, PLANCOL, mesh, joint, leg };
 
   // ---------------- manager ----------------
   E.init = function () { P = G.player; C = G.combat; PG = G.Props.PG; E.bars = []; E.barRoot = document.getElementById('worldui'); };

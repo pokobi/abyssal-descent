@@ -682,6 +682,7 @@
       case 'bolt': case 'arrow': add(PG.box, mats.woodDark, 0.025, 0.025, 0.7); add(PG.cone, mats.iron, 0.03, 0.1, 0.03, 0, 0, -0.38, -Math.PI / 2); add(PG.box, mats.cloth2, 0.005, 0.06, 0.12, 0, 0, 0.3); break;
       case 'nail': add(PG.box, mats.iron, 0.012, 0.012, 0.12); break;
       case 'harpoon': add(PG.box, mats.iron, 0.03, 0.03, 1.0); add(PG.cone, mats.iron, 0.06, 0.2, 0.06, 0, 0, -0.55, -Math.PI / 2); break;
+      case 'sickle': { if (!C._sickGeo) C._sickGeo = new THREE.TorusGeometry(0.42, 0.06, 4, 14, Math.PI * 1.25); const b = new THREE.Mesh(C._sickGeo, mats.iron); g.add(b); add(PG.box, mats.woodDark, 0.05, 0.42, 0.05, 0.42, -0.2, 0); glow(0xff8030, 0.5); break; } // (the scarecrow's: spun as it flies)
       case 'spear': add(PG.cyl8, mats.woodDark, 0.03, 1.8, 0.03, 0, 0, 0, Math.PI / 2); add(PG.cone, mats.iron, 0.07, 0.35, 0.07, 0, 0, -1.05, -Math.PI / 2); glow(0xffe0a0, 0.5).position.z = -1; break;
       // the magic ones: a body you can see (boiling fire, a fresnel shell, a crystal) inside the glow; the hit size is SHOT_VIS below
       case 'icespear': { add(PG.oct3, new THREE.MeshStandardMaterial({ color: 0xd0f0ff, emissive: 0x4a90c0, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.9 }), 0.14, 0.14, 1.0); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0.05, 0.05, 0.7); glow(0xbfe8ff, 1.0); break; }
@@ -833,6 +834,7 @@
         if (!p.rest && !bounced) p.pos.addScaledVector(tmpD, step);
         p.mesh.position.copy(p.pos);
         if (p.vel.lengthSq() > 0.01) p.mesh.lookAt(p.pos.x + p.vel.x, p.pos.y + p.vel.y, p.pos.z + p.vel.z);
+        if (p.look === 'sickle') p.mesh.rotateX(p.t * 16);
         trail(p, sdt);
         // ward / orbs / player-side interceptors
         if (p.owner === 'enemy' && interceptors(p)) done = true;

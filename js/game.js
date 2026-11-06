@@ -850,7 +850,8 @@
     const vfav = { frozen: 'frost', foundry: 'fire', flooded: 'tide', castle: 'shadow', sanctum: 'storm' }[B]; // (the new fields lean on one kind of the 10 variants)
     const k = Math.floor((Math.max(1, G.Run.depthArea(n)) - 1) / 5); // which foes have appeared by this depth
     const dn = Math.max(1, G.Run.depthArea(n));
-    return G.ENEMIES.filter((e) => !e.special && (e.unlockK ?? 0) <= k && !(e.fromArea > dn)).map((e) => [e, (e.variant === 'normal' ? 3 : e.variant === 'abyss' ? 0.5 : 1.4) * (fav.includes(e.plan) ? 2 : 1) * (vfav && e.variant === vfav ? 1.8 : 1) * ((e.unlockK ?? 0) === k && k > 0 ? 1.5 : 1)]);
+    // (a field's own foes, fieldfoes.js, come only in that field, and often)
+    return G.ENEMIES.filter((e) => !e.special && (!e.fields || e.fields.includes(B)) && (e.unlockK ?? 0) <= k && !(e.fromArea > dn)).map((e) => [e, (e.fields ? 5 : e.variant === 'normal' ? 3 : e.variant === 'abyss' ? 0.5 : 1.4) * (fav.includes(e.plan) ? 2 : 1) * (vfav && e.variant === vfav ? 1.8 : 1) * ((e.unlockK ?? 0) === k && k > 0 ? 1.5 : 1)]);
   }
   GM.enemyPool = function (n, biomeKey) { return enemyPool(n, biomeKey);
   }

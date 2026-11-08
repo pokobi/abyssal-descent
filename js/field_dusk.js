@@ -39,7 +39,7 @@
       for (const h of hs.sort((p, q) => p.x0 - q.x0)) { if (h.x0 > x) w.solid('floor', x, -DECK, a, h.x0, 0, b, { uv: 4 }); x = Math.max(x, h.x1); }
       if (dx1 > x) w.solid('floor', x, -DECK, a, dx1, 0, b, { uv: 4 });
     }
-    if (gap) { w.solid('trim', gap.bx - 0.6, -0.5, gap.z0 - 0.3, gap.bx + 0.6, 0, gap.z1 + 0.3, { uv: 1, tag: 'bridge' }); for (let k = 0; k < 4; k++) P().rubble(w, U.rand(dx0 + 2, dx1 - 2), LOW, U.rand(gap.z0, gap.z1), rng, rng.range(1, 1.6)); }
+    if (gap) { w.solid('trim', gap.bx - 0.6, -0.5, gap.z0 - 0.3, gap.bx + 0.6, 0, gap.z1 + 0.3, { uv: 1, tag: 'bridge' }); for (let k = 0; k < 4; k++) P().rubble(w, rng.range(dx0 + 2, dx1 - 2), LOW, rng.range(gap.z0, gap.z1), rng, rng.range(1, 1.6)); }
     // the body of the bridge under the deck (solid stone either side of the gallery), the piers going down into the dark
     w.solid('block', dx0, -16, ZN, gx - GW - 0.8, -DECK, ZS, { uv: 4 }); w.solid('block', gx + GW + 0.8, -16, ZN, dx1, -DECK, ZS, { uv: 4 });
     for (let z = ZN + 6; z < ZS - 4; z += 14) { w.visual('block', dx0 + 2, -60, z, dx1 - 2, -16, z + 6, { uv: 6 }); }

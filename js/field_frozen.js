@@ -48,7 +48,7 @@
       if (isl.some((r) => cx > r.x0 && cx < r.x1 && cz > r.z0 && cz < r.z1)) continue;
       if (chan && cx > chan.x0 && cx < chan.x1) continue;
       const col = w.addCollider(x0, -0.5, z0, x0 + TS, 0, z0 + TS, { surf: 'ice', noGrapple: true });
-      w.iceTiles.push({ x0, z0, x1: x0 + TS, z1: z0 + TS, col, hp: 2, t: 0, mesh: null, crack: null });
+      w.iceTiles.push({ k: w.iceTiles.length, x0, z0, x1: x0 + TS, z1: z0 + TS, col, hp: 2, t: 0, mesh: null, crack: null });
     }
     // the gaps round the ice (between the tile grid and the shore) are ice too, never breaking
     for (const [a, b, c, d] of [[lx0, lz0, lx1, iz0], [lx0, iz0 + nZ * TS, lx1, lz1], [lx0, iz0, ix0, iz0 + nZ * TS], [ix0 + nX * TS, iz0, lx1, iz0 + nZ * TS]]) if (c - a > 0.01 && d - b > 0.01) w.solid('ice', a, -0.5, b, c, 0, d, { uv: 3, grad: false });
@@ -102,33 +102,51 @@
     for (let k = 0; k < 4; k++) M.cm.setMatrixAt(t.i * 4 + k, s === 'crack' ? t.cm[k] : M.Z);
     M.im.instanceMatrix.needsUpdate = true; M.cm.instanceMatrix.needsUpdate = true;
   }
-  // a blow at (x, z) within r: each tile it reaches loses a point (2 to break); broken, the tile is gone (no collider, open water)
+  // a tile's state: 2 whole, 1 cracked, 0 broken (gone: no collider, open water). fx: the crack's sound, the break's shards and splash
+  function setTile(w, t, hp, fx) {
+    const was = t.hp; if (hp === was) return false;
+    const c = V((t.x0 + t.x1) / 2, 0, (t.z0 + t.z1) / 2);
+    t.hp = hp;
+    if (hp > 0) {
+      if (was <= 0) { t.col.alive = true; t.t = 0; w.navPatch(t.x0, t.z0, t.x1, t.z1); w._vn = null; }
+      iceLook(w, t, hp >= 2 ? 'whole' : 'crack');
+      if (fx && hp < was && G.sfx.ice) G.sfx.ice(c);
+      return true;
+    }
+    t.t = 0; t.col.alive = false;
+    iceLook(w, t, 'gone');
+    if (fx) {
+      G.fx.debris && G.fx.debris(c.clone().setY(0.2), w.mats.ice, 8, 0.35, 5);
+      if (G.Water) G.Water.splash(c.clone().setY(-1.2), 1.2, { silent: false });
+    }
+    w.navPatch(t.x0, t.z0, t.x1, t.z1); w._vn = null;
+    return true;
+  }
+  // a blow at (x, z) within r: each tile it reaches loses a point (2 to break). Returns the tiles it changed (their k)
   F.iceHit = function (w, x, z, r, n) {
-    if (!w || !w.iceTiles) return;
+    const hit = [];
+    if (!w || !w.iceTiles) return hit;
     for (const t of w.iceTiles) {
       if (t.hp <= 0) continue;
       const dx = Math.max(t.x0 - x, 0, x - t.x1), dz = Math.max(t.z0 - z, 0, z - t.z1);
       if (dx * dx + dz * dz > r * r) continue;
-      t.hp -= n || 1;
-      if (t.hp > 0) { iceLook(w, t, 'crack'); G.sfx.ice && G.sfx.ice(V((t.x0 + t.x1) / 2, 0, (t.z0 + t.z1) / 2)); continue; }
-      t.hp = 0; t.t = 0; t.col.alive = false;
-      iceLook(w, t, 'gone');
-      const c = V((t.x0 + t.x1) / 2, -0.3, (t.z0 + t.z1) / 2);
-      G.fx.debris && G.fx.debris(c.clone().setY(0.2), w.mats.ice, 8, 0.35, 5);
-      if (G.Water) G.Water.splash(c.clone().setY(-1.2), 1.2, { silent: false });
-      w.navPatch(t.x0, t.z0, t.x1, t.z1); w._vn = null;
+      if (setTile(w, t, Math.max(0, t.hp - (n || 1)), true)) hit.push(t.k);
     }
+    return hit;
   };
-  // broken ice freezes over again (only when nobody stands in its place)
+  // a tile set as it stands somewhere else (another screen's ice): true if it changed
+  F.iceSet = (w, k, hp) => { const t = w && w.iceTiles && w.iceTiles[k]; return t ? setTile(w, t, Math.max(0, Math.min(2, hp | 0)), true) : false; };
+  // nobody stands in a broken tile's place (it may freeze over)
+  F.iceClear = (w, t) => { const Pl = G.player; return !(Pl && Pl.pos.x > t.x0 - 0.4 && Pl.pos.x < t.x1 + 0.4 && Pl.pos.z > t.z0 - 0.4 && Pl.pos.z < t.z1 + 0.4 && Pl.pos.y < 0.5); };
+  // broken ice freezes over again (only when nobody stands in its place). Returns the tiles that froze (their k)
   F.tickIce = function (w, dt) {
-    const Pl = G.player;
+    const back = [];
     for (const t of w.iceTiles) {
       if (t.hp > 0) continue;
       t.t += dt;
-      if (t.t < REFREEZE) continue;
-      if (Pl && Pl.pos.x > t.x0 - 0.4 && Pl.pos.x < t.x1 + 0.4 && Pl.pos.z > t.z0 - 0.4 && Pl.pos.z < t.z1 + 0.4 && Pl.pos.y < 0.5) continue;
-      t.hp = 2; t.col.alive = true; iceLook(w, t, 'whole');
-      w.navPatch(t.x0, t.z0, t.x1, t.z1); w._vn = null;
+      if (t.t < REFREEZE || !F.iceClear(w, t)) continue;
+      setTile(w, t, 2, false); back.push(t.k);
     }
+    return back;
   };
 })();

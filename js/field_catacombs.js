@@ -89,7 +89,7 @@
     for (let z = kz0 + 0.5; z < kz1 - 1; z += 3.3) { CR().ossuary(w, rng, z, z + 3.2, kx0, false, 1, LOW); CR().ossuary(w, rng, z, z + 3.2, kx1, false, -1, LOW); }
     // in the crypt: rows of coffins, heaps of bones, candles of a cold light, an altar under each well
     for (let i = 0; i < 18; i++) {
-      const x = U.rand(kx0 + 2, kx1 - 2), z = U.rand(kz0 + 2, kz1 - 2);
+      const x = rng.range(kx0 + 2, kx1 - 2), z = rng.range(kz0 + 2, kz1 - 2);
       if (holeR.some((h) => x > h.x0 - 1.5 && x < h.x1 + 1.5 && z > h.z0 - 1.5 && z < h.z1 + 1.5)) continue;
       const t = rng.next();
       if (t < 0.4) P().sarcophagus(w, x, z, LOW, rng.chance(0.5), rng);
@@ -100,7 +100,7 @@
     // the wells: a stair down one side, the rim railed where the stair is not
     for (const h of holeR) {
       if (!h.well) {
-        for (let k = 0; k < 5; k++) P().rubble(w, U.rand(h.x0, h.x1), LOW, U.rand(h.z0, h.z1), rng, rng.range(0.8, 1.4), 'rock');
+        for (let k = 0; k < 5; k++) P().rubble(w, rng.range(h.x0, h.x1), LOW, rng.range(h.z0, h.z1), rng, rng.range(0.8, 1.4), 'rock');
         continue;
       }
       const sx = h.x0 + 1.3;
@@ -168,7 +168,7 @@
     let lights = 0;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const x0 = cx0(c) + WT / 2, z0 = cz0(r) + WT / 2, x1 = x0 + CELL - WT, z1 = z0 + CELL - WT;
-      if (holes.has(id(c, r))) { for (let k = 0; k < 3; k++) P().rubble(w, k % 2 ? x0 + 0.3 : x1 - 0.3, 0, U.rand(z0, z1), rng, 0.6, 'rock'); continue; }
+      if (holes.has(id(c, r))) { for (let k = 0; k < 3; k++) P().rubble(w, k % 2 ? x0 + 0.3 : x1 - 0.3, 0, rng.range(z0, z1), rng, 0.6, 'rock'); continue; }
       const room = inRoom(c, r);
       if (!room) {
         if (r > 0 && !open.has(key(id(c, r - 1), id(c, r))) && rng.chance(0.6)) CR().ossuary(w, rng, x0, x1, z0, true, 1, 0);

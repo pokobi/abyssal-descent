@@ -104,6 +104,7 @@
       (G.Strata.doors || []).forEach((d, i) => { if (d.state !== (d.s0 || 'closed')) K.send({ t: 'dr', i, s: d.state, a: GM.area }, to); }); // (a crypt gate starts open)
       if (G.Gim && G.Gim.list.some((g) => g.used)) K.send({ t: 'gms', u: G.Gim.save(), a: GM.area }, to);
       G.world.destructibles.forEach((d, i) => { if (!d.alive) K.send({ t: 'ds', i, a: GM.area }, to); });
+      if (K.groundSnap) K.groundSnap(to);
     };
     // ---------------- things on the ground ----------------
     const dg = IV.dropToGround, pu = IV.pickUp;
@@ -214,6 +215,94 @@
       };
       // a newcomer: the ones already spent stand spent (a fallen pillar lies where it fell, a tipped pot hangs over)
       K.handlers.gms = function (m) { if (m.a === GM.area) G.Gim.restore(m.u); };
+    }
+
+    // ---------------- ground that moves and breaks: the host's is everyone's ----------------
+    // The sea of pillars (field_pillars.js): a pillar starts to sink on the host's word (its own clock, or a 沈め手's stamp); the rest of
+    // its turn (warning, sinking, down, rising) each screen plays out from that moment, so no screen's clock drifts away from the host's.
+    // The frozen lake (field_frozen.js): the host keeps the ice. A blow seen only on a guest's screen (its own blast, the icicles that fall
+    // round it) goes to the host; a foe's blast, which every screen sets off on its own, counts on the host's alone. What changes is
+    // sent to everyone as it stands; broken ice freezes over on the host's word, when nobody, on any screen, stands in its place.
+    // A screen that comes into such an area asks how it stands (and a newcomer is told).
+    const FG = G.FieldGen;
+    if (FG && FG.tickPillars && FG.iceHit) {
+      const ST = ['up', 'warn', 'sink', 'down', 'rise'];
+      const r2 = (v) => Math.round(v * 100) / 100;
+      const tp = FG.tickPillars, ih = FG.iceHit, ti = FG.tickIce, ic = FG.iceClear;
+      let foeBlast = 0;
+      const ask = (w) => { if (!w._gq) { w._gq = true; K.send({ t: 'gq', a: GM.area }); } };
+      const iceSend = (w, ks, to) => { if (ks.length) K.send({ t: 'ice', a: GM.area, s: ks.map((k) => [k, w.iceTiles[k].hp]) }, to); };
+      K.groundSnap = function (to) {
+        const w = G.world; if (!w) return;
+        if (w.pillars && w.pillars.length) K.send({ t: 'pls', a: GM.area, s: w.pillars.map((p) => [ST.indexOf(p.st), r2(p.t)]) }, to);
+        if (w.iceTiles) K.send({ t: 'ice', a: GM.area, all: w.iceTiles.map((t) => t.hp).join('') }, to); // (every tile: one digit each)
+      };
+      FG.tickPillars = function (w, dt) {
+        if (!K.live) return tp.call(FG, w, dt);
+        if (K.role !== 'host') {
+          ask(w);
+          // (a pillar that stands waits for the host's word; one told while still rising goes as soon as it stands)
+          for (const p of w.pillars) if (p.st === 'up') { p.next = p.go ? 0 : 1e9; p.go = false; }
+          return tp.call(FG, w, dt);
+        }
+        for (const p of w.pillars) p._was = p.st;
+        const r = tp.call(FG, w, dt);
+        const go = [];
+        w.pillars.forEach((p, i) => { if (p._was === 'up' && p.st !== 'up') go.push(i); });
+        if (go.length) K.send({ t: 'pl', a: GM.area, i: go });
+        return r;
+      };
+      K.handlers.pl = function (m) {
+        const w = G.world; if (K.role === 'host' || m.a !== GM.area || !w || !w.pillars) return;
+        for (const i of m.i) if (w.pillars[i]) w.pillars[i].go = true;
+      };
+      K.handlers.pls = function (m) {
+        const w = G.world; if (K.role === 'host' || m.a !== GM.area || !w || !w.pillars) return;
+        m.s.forEach(([c, t], i) => {
+          const p = w.pillars[i], st = ST[c]; if (!p || !st) return;
+          p.go = false;
+          if (p.st === st && Math.abs(p.t - t) < 0.4) return;
+          p.st = st; p.t = t;
+          p.col.alive = st !== 'down';
+          const ign = st !== 'up';
+          if (!!p.col.navIgnore !== ign) { p.col.navIgnore = ign; w.navPatch(p.x0, p.z0, p.x1, p.z1); w._vn = null; }
+        });
+      };
+      // (a foe's blast on a guest's screen: the host has its own of it. combat.js lets no foe's blast reach the ice today; this keeps it once if one ever does)
+      const cx = C.explode;
+      C.explode = function (pos, r, dmg, info) {
+        if (!(K.live && K.role !== 'host' && info && (info.enemy || info.pjx))) return cx.call(C, pos, r, dmg, info);
+        foeBlast++;
+        try { return cx.call(C, pos, r, dmg, info); } finally { foeBlast--; }
+      };
+      FG.iceHit = function (w, x, z, r, n) {
+        if (!K.live) return ih.call(FG, w, x, z, r, n);
+        if (K.role === 'host') { const ks = ih.call(FG, w, x, z, r, n); iceSend(w, ks); return ks; }
+        if (!foeBlast && w && w.iceTiles) K.send({ t: 'ih', a: GM.area, p: [r2(x), r2(z), r2(r), n || 1] });
+        return [];
+      };
+      FG.tickIce = function (w, dt) {
+        if (!K.live) return ti.call(FG, w, dt);
+        if (K.role !== 'host') { ask(w); return []; }
+        const ks = ti.call(FG, w, dt);
+        iceSend(w, ks);
+        return ks;
+      };
+      FG.iceClear = function (w, t) {
+        if (!ic.call(FG, w, t)) return false;
+        if (K.live) for (const rp of K.players.values()) if (rp.id !== K.id && !rp.dead && rp.to && rp.to.x > t.x0 - 0.4 && rp.to.x < t.x1 + 0.4 && rp.to.z > t.z0 - 0.4 && rp.to.z < t.z1 + 0.4 && rp.to.y < 0.5) return false;
+        return true;
+      };
+      K.handlers.ih = function (m) {
+        const w = G.world; if (K.role !== 'host' || m.a !== GM.area || !w || !w.iceTiles) return;
+        const [x, z, r, n] = m.p; FG.iceHit(w, x, z, r, n);
+      };
+      K.handlers.ice = function (m) {
+        const w = G.world; if (K.role === 'host' || m.a !== GM.area || !w || !w.iceTiles) return;
+        if (m.all) for (let k = 0; k < m.all.length; k++) FG.iceSet(w, k, +m.all[k]);
+        else for (const [k, hp] of m.s) FG.iceSet(w, k, hp);
+      };
+      K.handlers.gq = function (m, from) { if (K.role === 'host' && m.a === GM.area) K.groundSnap(from); };
     }
 
     // ---------------- the end of the run: the first through the rift takes everyone along ----------------

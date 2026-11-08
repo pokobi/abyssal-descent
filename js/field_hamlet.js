@@ -151,7 +151,7 @@
     if (rng.chance(0.5) && free(ix1 - 1, iz1 - 1)) P().barrel(w, ix1 - 0.8, iz1 - 0.8, 0, rng);
     if (rng.chance(0.4)) P().bones(w, (ix0 + ix1) / 2 + 0.8, 0.02, (iz0 + iz1) / 2 - 1.2, rng);
     if (!ruin) w.addLight((ix0 + ix1) / 2, 2.3, (iz0 + iz1) / 2, { flame: 0.4, intensity: 3.5, range: 7, color: '#ffa860', prio: 0.45 });
-    if (ruin) { for (let k = 0; k < 3; k++) P().rubble(w, U.rand(ix0 + 1, ix1 - 1), 0, U.rand(iz0 + 1, iz1 - 1), rng, rng.range(0.8, 1.4)); return; }
+    if (ruin) { for (let k = 0; k < 3; k++) P().rubble(w, rng.range(ix0 + 1, ix1 - 1), 0, rng.range(iz0 + 1, iz1 - 1), rng, rng.range(0.8, 1.4)); return; }
     if (!twoUp) {
       // the flat roof (walkable), its edge a little proud of the walls
       w.solid('woodDark', x0 - 0.1, R1, z0 - 0.1, x1 + 0.1, R1 + 0.25, z1 + 0.1, { uv: 2 });

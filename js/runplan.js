@@ -143,7 +143,7 @@
     return (lv || 1) <= 1 || !!c['extra' + ((lv || 1) - 1)];
   };
   R.maxExtra = function () { const c = R.rec(); if (!c.hard) return 0; let k = 1; while (k < 10 && c['extra' + k]) k++; return k; };
-  R.markClear = function () { const c = R.rec(); const k = R.key(); const first = !c[k]; c[k] = (c[k] || 0) + 1; const r = G.save.data.records, ck = (G.player && G.player.cls) || 'soldier'; r.byClass = r.byClass || {}; const bc = r.byClass[ck] || (r.byClass[ck] = { bestArea: 0, clears: {} }); bc.clears[k] = (bc.clears[k] || 0) + 1; G.save.write(); return first; };
+  R.markClear = function () { const c = R.rec(); const k = R.key(); const first = !c[k]; c[k] = (c[k] || 0) + 1; if (first && R.cur.id === 'extra' && R.cur.lv < 10) G.save.data.extraLv = R.cur.lv + 1; /* (the highest extra level you could play is cleared: the next one, just opened, is the one picked next time, ui.js) */ const r = G.save.data.records, ck = (G.player && G.player.cls) || 'soldier'; r.byClass = r.byClass || {}; const bc = r.byClass[ck] || (r.byClass[ck] = { bestArea: 0, clears: {} }); bc.clears[k] = (bc.clears[k] || 0) + 1; G.save.write(); return first; };
 
   // ---- guardians: each field has its own pool; one is drawn at random (equal odds) ----
   R.BOSS_POOLS = {

@@ -1030,7 +1030,9 @@
   UI.difficulty = function (onPick, back) {
     const R = G.Run, D = R.DIFFS, rec = R.rec();
     const canExtra = R.unlocked('extra', 1); // extra stays hidden until hard has been cleared
-    let xlv = Math.max(1, R.maxExtra()), extra = false, drone = null;
+    // the extra level: the one you picked last time (save extraLv), or the one just opened when you cleared the highest you could play (runplan.js markClear)
+    const xmax = Math.max(1, R.maxExtra());
+    let xlv = Math.min(xmax, Math.max(1, (G.save.data.extraLv | 0) || xmax)), extra = false, drone = null;
     const lvK = () => (xlv - 1) / 9; // 0 .. 1 over extra 1 .. 10
     const card = (id) => {
       const d = D[id];
@@ -1062,7 +1064,9 @@
       s.querySelectorAll('[data-x]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const nx = xlv + (+b.dataset.x); if (nx >= 1 && nx <= R.maxExtra()) { xlv = nx; upd(); applyLevel(); G.sfx.ui('click'); if (G.sfx.hellSting) G.sfx.hellSting(lvK() * 0.8); if (drone) drone.set(lvK()); } else G.sfx.ui('deny'); });
       s.querySelectorAll('[data-sw]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); setExtra(b.dataset.sw === '1'); });
       cardsEl.querySelectorAll('.df-card').forEach((c) => c.onclick = () => {
-        const id = c.dataset.id; G.sfx.ui('select'); stopDrone(false); onPick({ id, lv: id === 'extra' ? xlv : 0 });
+        const id = c.dataset.id; G.sfx.ui('select'); stopDrone(false);
+        if (id === 'extra') { G.save.data.extraLv = xlv; G.save.write(); } // (picked again next time)
+        onPick({ id, lv: id === 'extra' ? xlv : 0 });
       });
     };
     // switching between hard and extra: the cards melt away (blur + shrink) while the world behind blurs and washes out, swap, then both focus back in

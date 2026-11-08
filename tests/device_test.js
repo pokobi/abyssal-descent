@@ -176,7 +176,8 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
       await ev("T.enter('flooded', 4); G.game.dev.god = true; return 1");
       const g = await ev("const g = G.Gim.list.find((g) => g.kind === 'sluice'); return { wx: g.wx, z: g.z, sgn: g.sgn, ux: g.ux, uy: g.uy, uz: g.uz }");
       const X = (d) => g.wx + g.sgn * d;
-      await ev(`window.F = T.foes([[${X(7)}, 0, ${g.z + 0.5}], [${X(12)}, 0, ${g.z - 2.6}], [${X(9)}, 0, ${g.z + 8}]]); T.me(${X(5)}, 0, ${g.z - 1.5}); return 1`);
+      // (each on whatever is under that spot: the water's bed in the street, a wall or a roof beside it)
+      await ev(`const fb = (x, z) => Math.max(-3, G.world.floorBelow(x, 2.5, z)) + 0.05; window.F = T.foes([[${X(7)}, fb(${X(7)}, ${g.z + 0.5}), ${g.z + 0.5}], [${X(12)}, fb(${X(12)}, ${g.z - 2.6}), ${g.z - 2.6}], [${X(9)}, fb(${X(9)}, ${g.z + 8}), ${g.z + 8}]]); T.me(${X(5)}, 0, ${g.z - 1.5}); return 1`);
       const p0 = await ev('return { f: T.st(F), me: G.player.pos.x }');
       // the wheel, turned with the key (one press, keep looking at it)
       await ev(`const g = G.Gim.list.find((g) => g.kind === 'sluice'), P = G.player; const me = { x: P.pos.x, z: P.pos.z }; P.pos.set(g.ux - g.fx * 1.6, g.uy, g.uz - g.fz * 1.6); P.vel.set(0, 0, 0);

@@ -31,7 +31,7 @@
   };
   // is p in the water (inside a pool, near its surface)? returns the pool
   Wt.at = function (p, below, above) {
-    for (const z of Wt.zones) if (p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && p.y < (z.y || 0) + (above ?? 0.35) && p.y > (z.y || 0) - (below ?? 0.45)) return z;
+    for (const z of Wt.zones) if (p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && p.y < (z.y || 0) + (above ?? 0.35) && p.y > (z.y || 0) - (below ?? 0.45) - (z.deep || 0)) return z; // (z.deep: water that deep over its bed)
     return null;
   };
   const surfY = (z) => (z && z.y ? z.y : 0) + 0.06;

@@ -92,7 +92,7 @@
 
   // ---------------- runtime ----------------
   const inside = (f, p, pad) => p.x > f.x0 - (pad || 0) && p.x < f.x1 + (pad || 0) && p.z > f.z0 - (pad || 0) && p.z < f.z1 + (pad || 0);
-  let tick = 0, hurtT = 0, seen = null;
+  let tick = 0, hurtT = 0, seen = null, deepT = 0;
   F.onExplode = function (pos, r) {
     const w = G.world; if (!w || !w.fields) return;
     for (const f of w.fields) if (f.kind === 'oil' && f.burnT <= 0 && pos.y < 3 && pos.x > f.x0 - r && pos.x < f.x1 + r && pos.z > f.z0 - r && pos.z < f.z1 + r) F.ignite(f);
@@ -112,7 +112,7 @@
   const ZEL = { water: 'water', lava: 'fire', ice: 'ice', oil: 'fire' };
   const ELTIP = { water: '💧 水に入ると、自分にも敵にも水属性が付く', fire: '🔥 溶岩や炎の上では、自分にも敵にも炎属性が付く', ice: '❄️ 氷の上では、自分にも敵にも氷属性が付く' };
   let envT = 0;
-  const zoneAt = (z, p, up) => p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && p.y < (z.y || 0) + up && p.y > (z.y || 0) - 0.3;
+  const zoneAt = (z, p, up) => p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && p.y < (z.y || 0) + up && p.y > (z.y || 0) - 0.3 - (z.deep || 0); // (z.deep: water that deep over its bed)
   function envTick(dt) {
     const w = G.world, P = G.player, EL = G.Elem; if (!w || !EL) return;
     envT -= dt; if (envT > 0) return; envT = 0.25;
@@ -159,6 +159,14 @@
     P.fieldSpeed = 1; P.fieldSlip = 1; P.fieldJump = 1; P.fieldSlide = 1;
     // standing on a block of ice (the frozen hall's glacier ridges and the like): as slick as an ice sheet underfoot
     if (w && P.grounded && !P.dead && P.surfaceBelow && P.surfaceBelow() === 'ice') { P.fieldSlip = 0.12; P.fieldSlide = 1.8; }
+    // deep water (w.deepWater, the drowned town): chest-deep you wade slowly and can hardly jump; the foes in it are slowed too,
+    // all but those of the water (and anything that flies)
+    if (w && w.deepWater) {
+      const deep = (p) => w.deepWater.some((d) => p.x > d.x0 && p.x < d.x1 && p.z > d.z0 && p.z < d.z1 && p.y < d.y - 0.9);
+      if (!P.dead && deep(P.pos)) { P.fieldSpeed = 0.5; P.fieldJump = 0.5; }
+      deepT -= dt;
+      if (deepT <= 0) { deepT = 0.25; for (const e of G.enemies.list) if (e.alive && !e.boss && !e._rep && !e.def.flyer && e.def.el !== 'water' && deep(e.pos)) e.st.slow = Math.max(e.st.slow || 0, 0.35); }
+    }
     if (!seen || seen.run !== G.game.run) seen = { run: G.game.run, k: {} };
     envTick(dt);
     if (!w || !w.fields || !w.fields.length || P.dead) { if (G.sfx.boilBed) G.sfx.boilBed(0); return; }

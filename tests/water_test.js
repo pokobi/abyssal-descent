@@ -49,7 +49,7 @@ const PORT = +process.env.COOP_PORT || 9969;
     check(!shaderErr.length, 'the water shader compiles ' + shaderErr.slice(0, 1).join(''));
     // a spot in the open water
     const spot = await ev(`const w = G.world, q = w.waterZones[0];
-      for (let k = 0; k < 400; k++) { const c = w.randomOpenCell(G.game.arng, (x, z, i) => Math.abs(w.nf[i]) < 0.1 && x > q.x0 + 2 && x < q.x1 - 2 && z > q.z0 + 2 && z < q.z1 - 2 && w.boxFree(x - 0.6, 0.05, z - 0.6, x + 0.6, 1.8, z + 0.6)); if (c) return { x: c.x, z: c.z }; } return null;`);
+      for (let k = 0; k < 400; k++) { const c = w.randomOpenCell(G.game.arng, (x, z, i) => Math.abs(w.nf[i] - ((q.y || 0) - (q.deep || 0))) < 0.1 && x > q.x0 + 2 && x < q.x1 - 2 && z > q.z0 + 2 && z < q.z1 - 2 && w.boxFree(x - 0.6, 0.05, z - 0.6, x + 0.6, 1.8, z + 0.6)); if (c) return { x: c.x, z: c.z }; } return null;`);
     check(!!spot, 'an open stretch of water');
     if (spot) {
       // your steps ring the water

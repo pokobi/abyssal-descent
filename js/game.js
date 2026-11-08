@@ -2242,6 +2242,7 @@
     }
     if (w.icicles && G.FieldGen && G.FieldGen.tickIcicles) G.FieldGen.tickIcicles(w, dt); // (the frozen mausoleum's falling icicles)
     if (w.pillars && G.FieldGen && G.FieldGen.tickPillars) G.FieldGen.tickPillars(w, dt); // (the sea of pillars: the ones that sink and rise)
+    if (w.movers && G.FieldGen && G.FieldGen.tickMovers) G.FieldGen.tickMovers(w, dt); // (the foundry's machines: carriages, lifts, belts)
     // ambient dust motes
     if (!OUT && Math.random() < dt * 20) G.fx.norm.spawn(cp.x + U.rand(-12, 12), cp.y + U.rand(-2, 5), cp.z + U.rand(-12, 12), U.rand(-0.1, 0.1), U.rand(-0.05, 0.05), U.rand(-0.1, 0.1), 6, 0.03, 0.03, 0.9, 0.85, 0.75, 0.5, 0, 0);
     for (const a of w.animated) if (a.kind === 'banner') { a.m.rotation.x = Math.sin(GM.time * 1.3 + a.ph) * 0.06; a.m.rotation.z = Math.sin(GM.time * 0.9 + a.ph) * 0.02; }

@@ -132,7 +132,7 @@ const PORT = +process.env.COOP_PORT || 9993;
         // stand somewhere in the water that covers the floor (no field patch: the flooded halls' own water), with nothing there to
         // stand on (a crate or a slab out of the water is dry: it is not in the nav, so look at the colliders)
         const wz = w.waterZones[0];
-        let at = null; for (let k = 0; k < 400 && !at; k++) { const c = w.randomOpenCell(G.game.arng, (x, z, i) => (!w.reachMask || w.reachMask[i]) && Math.abs(w.nf[i]) < 0.1 && x > wz.x0 + 1 && x < wz.x1 - 1 && z > wz.z0 + 1 && z < wz.z1 - 1 && w.boxFree(x - 0.5, 0.05, z - 0.5, x + 0.5, 1.8, z + 0.5)); if (c) at = c; }
+        let at = null; for (let k = 0; k < 400 && !at; k++) { const c = w.randomOpenCell(G.game.arng, (x, z, i) => (!w.reachMask || w.reachMask[i]) && Math.abs(w.nf[i] - ((wz.y || 0) - (wz.deep || 0))) < 0.1 && x > wz.x0 + 1 && x < wz.x1 - 1 && z > wz.z0 + 1 && z < wz.z1 - 1 && w.boxFree(x - 0.5, 0.05, z - 0.5, x + 0.5, 1.8, z + 0.5)); if (c) at = c; }
         if (!at) return JSON.stringify({ err: 'no water spot' });
         const place = async (x, y, z, kind) => {
           P.au = null; P.pos.set(x, y + 0.02, z); P.vel.set(0, 0, 0);

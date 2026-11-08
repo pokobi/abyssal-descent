@@ -68,8 +68,11 @@ const PORT = +process.env.COOP_PORT || 9871;
           if (e) {
             e.pos.set(sx, fs + 0.02, sz); e.vel.set(0, 0, 0); out.foeY0 = +e.pos.y.toFixed(2);
             e.state = 'chase'; e.spawnT = 0; GM.dev.freeze = false;
+            // (you stand back from the edge, as far as the wall's top goes (at most 2.2 m): right at the edge your body would shove it back into the water)
+            let stand = 1.2; for (let k = 1.4; k <= 2.2; k += 0.2) { const f = w.navFloor(edge.x + edge.dx * (k + 0.4), edge.z + edge.dz * (k + 0.4), edge.top + 0.5); if (Math.abs(f - edge.top) < 0.1) stand = k; else break; }
+            out.stand = +stand.toFixed(1);
             let wadeK = null, maxY = -99;
-            for (let i = 0; i < 240; i++) { P.vel.set(0, 0, 0); P.pos.set(edge.x + edge.dx * 1.2, edge.top + 0.02, edge.z + edge.dz * 1.2); GM.step(0.05, 1); if (wadeK == null && e.st && e.st.wade > 0) wadeK = G.combat.speedMul(e) / (1 + (P.stats.enemySpeed || 0)); maxY = Math.max(maxY, e.pos.y); if (window.__trace && i % 3 === 0) window.__trace.push([i, +e.pos.y.toFixed(2), e.hitWallFlag ? 1 : 0, e.attackState ? e.attackState.kind : '-', +(e.target().pos.y - e.pos.y).toFixed(2), +Math.hypot(e.target().pos.x - e.pos.x, e.target().pos.z - e.pos.z).toFixed(2)]); if (e.pos.y > edge.top - 0.15 && e.grounded) break; }
+            for (let i = 0; i < 240; i++) { P.vel.set(0, 0, 0); P.pos.set(edge.x + edge.dx * stand, edge.top + 0.02, edge.z + edge.dz * stand); if (i < 8) { e.pos.set(sx, fs + 0.02, sz); e.vel.set(0, 0, 0); } GM.step(0.05, 1); if (wadeK == null && e.st && e.st.wade > 0) wadeK = G.combat.speedMul(e) / (1 + (P.stats.enemySpeed || 0)); maxY = Math.max(maxY, e.pos.y); if (window.__trace && i % 3 === 0) window.__trace.push([i, +e.pos.y.toFixed(2), e.hitWallFlag ? 1 : 0, e.attackState ? e.attackState.kind : '-', +(e.target().pos.y - e.pos.y).toFixed(2), +Math.hypot(e.target().pos.x - e.pos.x, e.target().pos.z - e.pos.z).toFixed(2)]); if (e.pos.y > edge.top - 0.15 && e.grounded) break; }
             if (window.__trace) out.trace = window.__trace.slice(0, 60);
             out.foe = { wadeK: wadeK == null ? null : +wadeK.toFixed(2), y: +e.pos.y.toFixed(2), maxY: +maxY.toFixed(2), alive: e.alive };
           }

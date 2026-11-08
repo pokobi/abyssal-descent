@@ -66,6 +66,12 @@
       D('rain', '吹き込む雨', 1, { fogD: 1.4, fog: '#10141c', k: 0.5, moonI: 0.5, amb: 0.88, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true }),
       D('snow', '舞い込む雪', 1, { fogD: 1.6, fog: '#3a4250', k: 0.5, amb: 1.08, moonI: 0.85, stars: false, sunK: 0.3, p: [P.snow], el: 'ice' }),
     ],
+    mine: [
+      D('base', '', 5),
+      D('dim', '灯の乏しい坑', 2, { amb: 0.72, hemiI: 0.8, fogD: 1.15 }),
+      D('dust', '粉塵', 2, { fog: '#2a2218', k: 0.35, fogD: 1.4, p: [P.dust] }),
+      D('drip', '滴る坑', 1, { fog: '#141a1c', k: 0.3, p: [P.drip] }),
+    ],
     gate: [
       D('base', '', 5),
       D('dim', '灯の乏しい夜', 2, { amb: 0.74, hemiI: 0.82, fogD: 1.15 }),
@@ -110,6 +116,13 @@
       D('snow', '降りしきる霜', 2, { fogD: 1.3, fog: '#26303c', k: 0.4, p: [P.frost], el: 'ice' }),
       D('haze', '凍える靄', 2, { fogD: 1.9, fog: '#3a4654', k: 0.55, amb: 1.08 }),
       D('aurora', '極光', 1, { hemiS: '#6ad0b8', k: 0.45, hemiG: '#2a1a40', p: [P.wisp] }),
+    ],
+    pillars: [
+      D('clear', '闇夜', 4),
+      D('mist', '昇る靄', 2, { fogD: 2.2, fog: '#2a1a3a', k: 0.6, amb: 1.0 }),
+      D('wisp', '鬼火の群れ', 2, { hemiS: '#8a6aff', k: 0.4, p: [P.wisp] }),
+      D('ash', '灰の降る闇', 1, { fog: '#2a2430', k: 0.4, fogD: 1.3, p: [P.ash] }),
+      D('storm', '紫電', 1, { fog: '#1a1028', k: 0.5, moonI: 0.6, amb: 0.85, sky: ['#020106', '#0a0614', '#1c1030'], p: [P.drizzle], flash: true, el: 'water', bolt: true }),
     ],
     sanctum: [
       D('base', '偽りの空', 4),

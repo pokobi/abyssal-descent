@@ -449,7 +449,8 @@
         this._safeT = (this._safeT || 0) - dt;
         if (this._safeT <= 0) {
           this._safeT = 0.3;
-          const ok = [[-0.8, 0], [0.8, 0], [0, -0.8], [0, 0.8]].every(([ox, oz]) => w.groundAt(V(this.pos.x + ox, this.pos.y, this.pos.z + oz), 0.1, 0.4) > -Infinity);
+          const ok = [[-0.8, 0], [0.8, 0], [0, -0.8], [0, 0.8]].every(([ox, oz]) => w.groundAt(V(this.pos.x + ox, this.pos.y, this.pos.z + oz), 0.1, 0.4) > -Infinity)
+            && !(w.unsafeGround && w.unsafeGround(this.pos.x, this.pos.z)); // (ground that moves away, a pillar that sinks, is never the place to come back to)
           if (ok) this.lastSafe.copy(this.pos);
         }
       }
@@ -471,7 +472,11 @@
       const wf = G.world.fallFrac || 0.15;
       let dmg = this.has('m_feather') ? 0 : Math.round(this.stats.maxHp * wf);
       if (G.world.fallSpot) { dmg = Math.min(dmg, Math.max(0, Math.floor(this.hp) - 1)); this.pos.copy(G.world.fallSpotAt ? G.world.fallSpotAt(this.pos) : G.world.fallSpot); } // the last field: a heavy fall that never kills, then back on the nearest whole tile
-      else this.pos.copy(this.lastSafe);
+      else {
+        this.pos.copy(this.lastSafe);
+        // (the ground there has gone since: the nearest ground instead)
+        if (G.world.groundAt(V(this.pos.x, this.pos.y + 0.3, this.pos.z), 0.25, 0.8) === -Infinity && G.world.nearestGround) { const g = G.world.nearestGround(this.pos.x, this.pos.y, this.pos.z, 40); if (g) this.pos.set(g.x, g.y, g.z); }
+      }
       this.pos.y += 0.05;
       this.vel.set(0, 0, 0);
       G.world.depenetrate(this.pos, this.hw, this.height);

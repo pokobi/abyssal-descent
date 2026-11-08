@@ -10,6 +10,8 @@
 //   天空の聖域 虚空の使徒 (a column of light on a marked circle) 雲の守護像 (a gust that blows you back — mind the edge)
 //   古戦場の丘 亡霊の槍兵 (marks a lane, then charges down it) 屍肉の鴉 (a flock that swoops in turn)
 //   螺旋の大縦坑 鉤鎖の亡者 (a hooked chain down a lane: it reels you in) 落石の番人 (rocks fall on three marked circles)
+//   捨てられた坑道 坑夫の亡者 (rushes down a gallery, pick first)  鉱石喰らい (a beetle in a shell of ore: charges)
+//   沈む石柱の海 沈め手 (a stamp: the pillar under you starts to sink) 闇泳ぎのエイ (glides, a gust that blows you toward the dark)
 // New bodies are built here with the enemy builder's own parts (enemies.js E._); new attacks hook its attack switch.
 (function () {
   const E = G.enemies, X = E._, B = X.B, mesh = X.mesh, joint = X.joint, leg = X.leg;
@@ -278,6 +280,14 @@
     desc: '縦坑の昇降機に繋がれて死んだ坑夫の亡霊。足元に線を引き、その線の上へ鉤のついた鎖を投げて、掛かった獲物を手元まで引き寄せる。縁の近くでは特に危ない。' });
   add({ id: 'ff_rockwarden', fields: ['shaft'], plan: 'golem', name: '落石の番人', icon: '🪨', hp: 260, dmg: 22, speed: 3.2, size: 0.8, attack: 'rockfall', range: 26, cd: 4.0, ai: 'ranged', h: 2.4, shield: 0.3, sound: 'rumble', pitch: 0.9, unlockK: 1, rarity: 'uncommon', color: '#7a7064', eye: '#ffd070',
     desc: '縦坑の壁から削り出された石の番人。地を踏み鳴らすと、獲物の足元とその周りの三つの円に、縁から岩が降ってくる。円の外へ。' });
+  add({ id: 'ff_miner', fields: ['mine'], plan: 'villager', name: '坑夫の亡者', icon: '⛏️', hp: 120, dmg: 18, speed: 5.2, size: 1.05, attack: 'lancecharge', range: 14, cd: 3.2, ai: 'melee', h: 1.75, undead: true, sound: 'groan', pitch: 0.75, unlockK: 2, rarity: 'common', color: '#6a5a48', eye: '#ffd060',
+    desc: '落盤で坑道に閉じ込められた坑夫の亡霊。つるはしを構えて足元に線を引き、狭い坑道を一気に駆け抜けてくる。坑道の中では避ける場所が少ない。' });
+  add({ id: 'ff_orebeetle', fields: ['mine'], plan: 'beetle', name: '鉱石喰らい', icon: '🪲', hp: 170, dmg: 16, speed: 4.4, size: 1.15, attack: 'charge', range: 2.5, cd: 2.6, ai: 'melee', h: 1.0, shield: 0.55, sound: 'chitter', pitch: 0.7, unlockK: 2, rarity: 'uncommon', color: '#4a5a6a', eye: '#60e0ff', orn: 'crystal',
+    desc: '鉱石を食べて殻を鉱石で固めた大きな甲虫。硬い殻で弾を受け止め、角を低く構えて突進してくる。' });
+  add({ id: 'ff_sinker', fields: ['pillars'], plan: 'shaman', name: '沈め手', icon: '🌑', hp: 150, dmg: 18, speed: 4.4, size: 1.05, attack: 'quake', range: 22, cd: 4.6, ai: 'ranged', h: 2.0, undead: true, sound: 'groan', pitch: 0.6, unlockK: 4, rarity: 'uncommon', color: '#3a2a4a', eye: '#c890ff', orn: 'wisps',
+    desc: '石柱の海の底から来る影の祈祷師。杖で闇を叩くと、獲物の足元に輪が浮かび、そこが揺れて打ちのめす。足元が沈む柱なら、その柱がすぐに沈み始める。' });
+  add({ id: 'ff_voidray', fields: ['pillars'], plan: 'bat', name: '闇泳ぎのエイ', icon: '🦇', hp: 130, dmg: 10, speed: 7.5, size: 1.75, attack: 'gust', range: 14, cd: 3.4, ai: 'ranged', flyer: true, h: 1.0, sound: 'screech', pitch: 0.5, unlockK: 4, rarity: 'uncommon', color: '#2a2040', eye: '#e0a0ff',
+    desc: '柱の間の闇を泳ぐ大きなエイ。翼を打って突風を送り、獲物を柱の縁から闇へ押し出す。' });
   G.ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
 
   // ---------------------------------------------------------------- what happens when they spawn / die
@@ -591,6 +601,23 @@
           if (Math.hypot(tgt.pos.x - q.x, tgt.pos.z - q.z) < R && tgt.pos.y - q.y < 2) { hitP(e, tgt, e.dmg, 'aoe'); break; }
         }
         G.sfx.explosion(A.spots[0] || e.pos, 0.35);
+      }
+      if (A.t - A.wind > 0.4) endA(e);
+      return { x: 0, z: 0 };
+    },
+  };
+  // 沈め手: a ring under you, then the ground in it shakes; a sinking pillar under you starts going down at once (fieldgen: pillarAt)
+  K.quake = {
+    can: (e, tgt, toT, d) => (d < e.def.range ? 1.0 : null),
+    update(e, A, dt, tgt, toT, d, inWind) {
+      const R = 2.6;
+      if (!A.c) { A.c = tgt.pos.clone(); const fy = G.world.floorBelow(A.c.x, A.c.y + 1, A.c.z); if (isFinite(fy) && fy > -50) A.c.y = fy; e.tele = G.fx.telegraph(A.c.clone().setY(A.c.y + 0.03), R, A.wind + 0.15, 0xb070ff); }
+      if (inWind) { e.yaw = Math.atan2(toT.x, toT.z); return { x: 0, z: 0 }; }
+      if (!A.done) {
+        A.done = true; e.atk = 1; if (e.tele) { G.fx.endTelegraph(e.tele); e.tele = null; }
+        G.vfx.nova(A.c.clone(), R, 0.14, { style: 'shock', dome: false, ground: 0x9a70d0 }); G.fx.dust(A.c, V(0, 1, 0), 0x6a5a80, 10); G.sfx.stoneGrind(A.c, 0.7);
+        if (Math.hypot(tgt.pos.x - A.c.x, tgt.pos.z - A.c.z) < R && tgt.pos.y - A.c.y < 1.8) hitP(e, tgt, e.dmg, 'aoe');
+        const F = G.FieldGen, p = F && F.pillarAt && F.pillarAt(G.world, A.c.x, A.c.z); if (p && p.st === 'up' && !e._rep) F.sinkNow(G.world, p);
       }
       if (A.t - A.wind > 0.4) endA(e);
       return { x: 0, z: 0 };

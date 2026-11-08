@@ -575,6 +575,7 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
       ceramic: std(t.smooth, '#9a5a3a', 0.55, 0, 0.4),
       gold: std(t.metal, '#e0b050', 0.3, 1.0, 0.3),
     };
+    if (B.floorTex === 'earth') M.floor = std(t.rock, B.floor, 0.95, 0, 1.3); // (bare earth and stone: a mine's floor)
     if (B.floorTex === 'grass') { M.floor = std(t.grass, B.grassTint || '#ffffff', 0.95, 0, 1.2); M.cobble = std(t.cobble, '#a89c86', 0.9, 0, 1.2); }
     if (B.marble) {
       M.floor = std(t.marble, B.floor, 0.35, 0, 0.8); M.cobble = std(t.marble, B.floor, 0.4, 0, 0.8);

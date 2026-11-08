@@ -32,7 +32,7 @@ const T = {
   mobile: ['tests/mobile_test.js'], trial: ['tests/trial_test.js'], boss_hp: ['tests/boss_hp_test.js'],
   skill: ['tests/coop/skill_test.js'], coop: ['tests/coop/coop_test.js'], world: ['tests/coop/world_test.js'], sky: ['tests/coop/sky_test.js'],
   run: ['tests/coop/run_test.js', 'normal', '5'], field: ['tests/field_test.js'], foe: ['tests/foe_test.js'], coop_duel: ['tests/coop/duel_test.js'], bossobj: ['tests/coop/bossobj_test.js'],
-  hazard: ['tests/hazard_test.js'], device: ['tests/device_test.js'], chest: ['tests/chest_test.js'], water: ['tests/water_test.js'], coop_device: ['tests/coop/device_test.js'], loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'],
+  hazard: ['tests/hazard_test.js'], device: ['tests/device_test.js'], chest: ['tests/chest_test.js'], water: ['tests/water_test.js'], coop_device: ['tests/coop/device_test.js'], loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'], pillar: ['tests/pillar_test.js'],
 };
 // game file (regex on the path) -> tests. The guardians are handled apart: only the ones defined in the changed files are fought.
 const MAP = [
@@ -60,6 +60,7 @@ const MAP = [
   [/^js\/weather\.js$/, ['solo_smoke']],
   [/^js\/(water|textures|audio|fieldgen_t1|fieldgen_t3|gimmick_b)\.js$/, ['water']], // (the water: ripples, splashes, falls, the stream, their sounds)
   [/^js\/water\.js$/, ['solo_smoke']],
+  [/^js\/(field_pillars|terrain|player|world)\.js$|^tests\/pillar_test\.js$/, ['pillar']], // (the sea of pillars: a pillar sinks with you on it and comes back up)
   [/^js\/(fieldfoes|enemies|data_enemies)\.js$/, ['foe']], // (the new fields' own foes: drawn in their field, bodies, attacks)
   [/^js\/bosses7\.js$/, ['boss_hp']],
   [/^js\/bosses\d?\.js$/, ['gimmick']], // (a guardian's gimmicks cleared: a share of its health)

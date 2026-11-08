@@ -90,15 +90,37 @@ const PORT = +process.env.COOP_PORT || 9981;
     await touch('touchStart', [[5, W * 0.7, H * 0.4]]); await touch('touchEnd', []);
     await sleep(400);
     check(Math.abs(await p.eval('G.player.pitch') - 0.5) < 0.01 && Math.abs(await yaw() - y8) < 0.01, 'a tap on nothing leaves the view where it was');
-    await p.eval("(() => { const it = G.world.interactables.find((x) => x.type === 'chest'), P = G.player; P.pos.set(it.pos.x + 2, Math.max(0, it.pos.y - 0.8), it.pos.z); P.vel.set(0, 0, 0); P.yaw = Math.PI / 2 + 0.3; P.pitch = -0.55; G.game.dev.freeze = true; })(); 1");
+    // beside the chest, 2 m from it on the floor it stands on (a chest can stand below the entrance's level: the sunken market of the dusk city),
+    // on free ground, turned towards it and a little past it (so the tap is what turns the view onto it)
+    await p.eval(`(() => { const w = G.world, it = w.interactables.find((x) => x.type === 'chest'), P = G.player, fy = it.pos.y - 0.5;
+      let at = null;
+      for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2], [1.5, 1.5], [-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5]]) {
+        const x = it.pos.x + dx, z = it.pos.z + dz, f = w.navFloor(x, z, fy + 0.3);
+        if (!isFinite(f) || Math.abs(f - fy) > 0.9 || !w.boxFree(x - 0.4, f + 0.05, z - 0.4, x + 0.4, f + 1.85, z + 0.4)) continue;
+        at = [x, f, z]; break;
+      }
+      if (!at) at = [it.pos.x + 2, fy, it.pos.z];
+      P.pos.set(at[0], at[1] + 0.02, at[2]); P.vel.set(0, 0, 0); P.yaw = Math.atan2(-(it.pos.x - at[0]), -(it.pos.z - at[2])) + 0.3; P.pitch = -0.55; G.game.dev.freeze = true; })(); 1`);
     await sleep(400);
     const pt = await p.eval("(() => { const it = G.world.interactables.find((x) => x.type === 'chest'), v = it.pos.clone().project(G.camera); return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight]; })()");
     console.log('chest on screen at', pt.map(Math.round));
-    await touch('touchStart', [[6, pt[0], pt[1]]]); await touch('touchEnd', []);
-    await sleep(500);
-    check(await p.eval('!!G.game.search || G.world.interactables.find((x) => x.type === "chest").opened'), 'a tap on a chest starts searching it ' + await p.eval('JSON.stringify([G.game.state, G.player.dead, G.input.locked, G.world.interactables.find((x) => x.type === "chest").pos.distanceTo(G.camera.position), G.player.yaw, G.player.pitch])'));
+    // (a tap is a finger down and up within 280 ms, mobile.js; a slow frame of the headless browser can hold the two touch events further apart
+    // than that, and then no tap was made at all: it is made again, once. A tap that was made and found nothing still fails.)
+    await p.eval("window.__tapLog = []; (() => { const L = document.getElementById('m-look'); if (!L.__tl) { L.__tl = true; for (const t of ['pointerdown', 'pointerup']) L.addEventListener(t, () => window.__tapLog.push([t, performance.now()]), true); } })(); 1");
+    const tapChest = async (id) => {
+      await p.eval('window.__tapLog.length = 0; 1');
+      await touch('touchStart', [[id, pt[0], pt[1]]]); await touch('touchEnd', []);
+      await sleep(500);
+      const lg = await p.eval('JSON.stringify(window.__tapLog)').then(JSON.parse), d = lg.find((e) => e[0] === 'pointerdown'), u = lg.find((e) => e[0] === 'pointerup');
+      return d && u ? u[1] - d[1] : -1;
+    };
+    let gap = await tapChest(6);
+    if (!(await p.eval('!!G.game.search || G.world.interactables.find((x) => x.type === "chest").opened')) && !(gap >= 0 && gap < 270)) { console.log(`   (the finger was held ${Math.round(gap)} ms: no tap was made; tapping again)`); gap = await tapChest(7); }
+    check(await p.eval('!!G.game.search || G.world.interactables.find((x) => x.type === "chest").opened'), `a tap on a chest starts searching it (finger held ${Math.round(gap)} ms) ` + await p.eval('JSON.stringify([G.game.state, G.player.dead, G.input.locked, G.world.interactables.find((x) => x.type === "chest").pos.distanceTo(G.camera.position), G.player.yaw, G.player.pitch])'));
     await p.eval('G.game.cancelSearch && G.game.cancelSearch(); 1');
     // a melee weapon's guard stays up as long as the reload button is held, and drops when it is let go
+    await p.eval('if (G.InvUI.isOpen()) G.InvUI.close(); G.game.cancelSearch && G.game.cancelSearch(); 1'); // (the chest may have been searched to the end by now, its contents open on the screen: keys would go to them)
+    await sleep(150);
     await p.eval('G.game.dev.freeze = false; G.game.state = "playing"; G.ui.clearScreen(); window.__mobile.tapKey(G.BIND.w3[0]); 1');
     await sleep(700);
     const rl = await p.eval('(() => { const r = document.querySelector("[data-id=reload]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');

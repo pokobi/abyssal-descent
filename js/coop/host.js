@@ -195,7 +195,7 @@
       ea.call(GM, n, kind);
       scaleFoes();
       K.clearBossObjsHost();
-      K.send({ t: 'area', n, kind, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, of: G.Run.legacy ? 1 : 0, fp: K.fingerprint(), fi: K.fpInfo(), pc: K._pcUsed || 1 });
+      K.send({ t: 'area', n, kind, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, of: G.Run.legacy ? 1 : 0, fl: (GM.run && GM.run.fields) || null, fp: K.fingerprint(), fi: K.fpInfo(), pc: K._pcUsed || 1 });
     };
     // ---------------- more players, more foes (not tougher ones) ----------------
     // Each wave grows by the same share for every player beyond the first. The extra foes are drawn from the area's own pool with a stream of their own, so the seeded rolls
@@ -322,7 +322,7 @@
     K.saved = {};
     K.handlers.sv = function (m, from) { const rp = K.players.get(from); if (rp) K.saved[rp.name] = m.d; };
     K.lateJoin = function (to, name) {
-      K.send({ t: 'late', pc: K._pcUsed || 1, n: GM.area, kind: GM.stage, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, of: G.Run.legacy ? 1 : 0, fp: K.fingerprint(), fi: K.fpInfo(), route: GM.route, snap: K.saved[name] || null }, to);
+      K.send({ t: 'late', pc: K._pcUsed || 1, n: GM.area, kind: GM.stage, seed: GM.seed, diff: G.Run.cur.id, lv: G.Run.cur.lv, of: G.Run.legacy ? 1 : 0, fl: (GM.run && GM.run.fields) || null, fp: K.fingerprint(), fi: K.fpInfo(), route: GM.route, snap: K.saved[name] || null }, to);
     };
     K.handlers.need = function (m, from) { const e = known.get(m.id); if (e && e.alive) K.send({ t: 'es', a: [esRow(e)] }, from); };
     K.handlers.ready = function (m, from) {

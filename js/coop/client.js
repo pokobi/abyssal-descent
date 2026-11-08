@@ -73,7 +73,7 @@
     K.handlers.go = function () { K.started(); };
     K.handlers.late = function (m) {
       K.late = m; seed0 = m.seed; fromHost = true; K._pcHost = m.pc || 1;
-      try { K.started(); G.Run.set(m.diff, m.lv); G.Run._nextLegacy = !!m.of; sr.call(GM, { id: m.diff, lv: m.lv }, 0); } finally { fromHost = false; }
+      try { K.started(); G.Run.set(m.diff, m.lv); G.Run._nextLegacy = !!m.of; G.Run.nextFields = m.fl || null; sr.call(GM, { id: m.diff, lv: m.lv }, 0); } finally { fromHost = false; G.Run.nextFields = null; }
       if (m.snap) {
         GM.applyPlayerSnap(m.snap);
         if (m.snap.coins !== undefined) GM.run.coins = m.snap.coins;
@@ -91,8 +91,8 @@
       seed0 = m.seed; K._pcHost = m.pc || 1; // (the area's chests: built for as many players as the host built it for)
       fromHost = true;
       try {
-        if (!GM.run) { if (!K.live) K.started(); G.Run.set(m.diff, m.lv); G.Run._nextLegacy = !!m.of; sr.call(GM, { id: m.diff, lv: m.lv }, 0); }
-        else { G.Run.legacy = !!m.of; GM.enterArea(m.n, m.kind); } // (the host's runs and ours draw the same fields from the same seed)
+        if (!GM.run) { if (!K.live) K.started(); G.Run.set(m.diff, m.lv); G.Run._nextLegacy = !!m.of; G.Run.nextFields = m.fl || null; sr.call(GM, { id: m.diff, lv: m.lv }, 0); }
+        else { G.Run.legacy = !!m.of; if (m.fl) GM.run.fields = m.fl.slice(); GM.enterArea(m.n, m.kind); } // (the host's fields: its runs pass over the fields its last game went into)
       } finally { fromHost = false; }
       const fp = K.fingerprint();
       K.fpOk = fp === m.fp;

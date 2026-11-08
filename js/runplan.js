@@ -28,19 +28,24 @@
   // legacy: a run saved before the draw existed keeps the fields it was made with (its saved area is rebuilt from them)
   R.legacy = false; R._nextLegacy = false;
   R.drawOn = () => !R.legacy && !!(G.game && G.game.seed) && !(G.game.tutorial || (G.Tutorial && G.Tutorial.active));
-  R.fieldsFor = function (seed, d) {
-    const D = R.DIFFS[d.id] || R.DIFFS.normal, out = [], used = new Set();
+  // avoid: the fields you went into in your last game (any difficulty): passed over while the tier has another (a new game is a new place)
+  R.fieldsFor = function (seed, d, avoid) {
+    const D = R.DIFFS[d.id] || R.DIFFS.normal, out = [], used = new Set(), av = new Set(avoid || []);
     const rng = new G.RNG(((seed || 1) ^ G.U.hashStr('fields:' + d.id)) >>> 0);
     for (const [base] of D.segs) {
       const t = R.TIERS[R.tierOf(base)] || [base], cand = t.filter((f) => f === base || R.ready(f));
-      const fresh = cand.filter((f) => !used.has(f)), from = fresh.length ? fresh : cand;
+      const fresh = cand.filter((f) => !used.has(f)), pref = fresh.filter((f) => !av.has(f)), from = pref.length ? pref : fresh.length ? fresh : cand;
       const f = from[Math.floor(rng.next() * from.length) % from.length] || base;
       used.add(f); out.push(f);
     }
     return out;
   };
   let fieldsKey = '', fieldsVal = null;
+  // a run keeps the fields it drew when it began (game.js startRun: G.game.run.fields), so a reload, a resumed run and every screen of a
+  // shared game meet the same ones; a run without them (saved before this) draws them again from its seed, as it always did
+  R.nextFields = null; // (set just before a run begins: the fields the host of a shared game drew, used instead of drawing)
   R.runFields = function () {
+    const run = G.game.run; if (run && Array.isArray(run.fields) && run.fields.length === R.def().segs.length) return run.fields;
     const seed = G.game.seed, key = seed + '|' + R.key() + '|' + Object.keys((G.FieldGen && G.FieldGen.gen) || {}).length;
     if (key !== fieldsKey) { fieldsKey = key; fieldsVal = R.fieldsFor(seed, R.cur); }
     return fieldsVal;

@@ -482,6 +482,10 @@
     GM.run = { coins: 0, coinsTotal: 0, kills: 0, headshots: 0, combo: 0, lastKillT: -10, multi: 0, multiT: -10, dmgTaken: 0, destroyed: 0, startT: 0, areasCleared: 0, shopVisits: 0 };
     GM.run.diff = Object.assign({}, G.Run.cur); GM.won = false;
     G.Run.legacy = !!G.Run._nextLegacy; G.Run._nextLegacy = false; if (!G.Run.legacy) GM.run.fd = 1; // (fd: this run draws its fields; see runplan.js)
+    // the fields of this run, drawn now and kept with it: the fields you went into in your last game are passed over (save lastFields,
+    // any difficulty); a shared game takes the host's (G.Run.nextFields). From here the fields this game goes into are counted anew.
+    { const nf = G.Run.nextFields; G.Run.nextFields = null;
+      if (!G.Run.legacy && G.Run.drawOn()) { GM.run.fields = nf ? nf.slice() : G.Run.fieldsFor(seed, G.Run.cur, G.save.data.lastFields || []); G.save.data.lastFields = []; } }
     G.save.data.records.runs++; G.save.write();
     P.cls = G.Classes && !GM.tutorialRun ? G.Classes.last() : 'soldier'; GM.run.cls = P.cls; GM.tutorialRun = false; // (the tutorial is always the soldier)
     P.resetRun();
@@ -638,6 +642,7 @@
     else w = G.LevelGen.generate(n, seed, { extraChests: P.stats.extraChests, gates, kind });
     setWorld(w);
     if (w.field) G.save.mark('items', 'stage_' + w.field);
+    if (G.Run.drawOn()) { const f = G.Run.field(n), L = G.save.data.lastFields || (G.save.data.lastFields = []); if (f && !L.includes(f)) { L.push(f); G.save.write(); } } // (a field this game went into: passed over in the next game, runplan.js)
     P.spawnAt(w);
     G.weapons.equip(true);
     G.weapons.hidden(false);

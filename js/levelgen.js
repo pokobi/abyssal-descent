@@ -218,6 +218,9 @@
     const gh = 6;
     if (OUT) opts.beams = 0;
     const gxs = opts.noExits ? [] : LG.gateXs(W, opts.gates || 1); // noExits: the last area of a run has no door onward, just wall
+    // opts.walls === false: a field that draws its own bounds (cliffs, cave rock, the void) gets no walls round the area, only the entrance
+    // gate and the exits, each set in a short stretch of wall (opts.stub: how far it runs either side of the opening, default 4.5 m)
+    const bare = opts.walls === false, stub = opts.stub ?? 4.5;
     // opts.notches (strata fields): [{side: 'N' | 'S' | 'W' | 'E', a0, a1, y0, y1}] niches carved out of a wall, from its inner face to the outside
     // (a0..a1: the extent along the wall, x for N / S, z for W / E)
     const nts = opts.notches || [];
@@ -238,6 +241,15 @@
       }
     };
     // south wall (z = D..D+T) — the sky island is open on the south/east/west edges
+    if (bare) {
+      const sy = opts.southY || 0;
+      wallBlock('S', W / 2 - 4.6 - stub, W / 2 + 4.6 + stub, Math.min(0, sy) - 1, sy + H);
+      for (const gx of gxs) {
+        wallBlock('N', gx - 2.5 - stub, gx - 2.5, 0, H);
+        wallBlock('N', gx - 2.5, gx + 2.5, gh, H);
+        wallBlock('N', gx + 2.5, gx + 2.5 + stub, 0, H);
+      }
+    } else {
     if (OUT !== 'sky') wallBlock('S', -WALL_T, W + WALL_T, 0, H);
     // north wall with one or more exit openings
     // (opts.openNorth: the last guardian's field has no north wall at all: the void runs on to the giant across it)
@@ -317,6 +329,7 @@
       if (Math.abs(x - sp / 2 - W / 2) > 4 && OUT !== 'sky' && !notched('S', x - sp / 2, 0.3)) P().torch(w, x - sp / 2, 3.3 + (opts.southY || 0), D, 'nz');
       if (gxs.every((g) => Math.abs(x - sp / 2 - g) > 4.8) && !notched('N', x - sp / 2, 0.3) && !opts.openNorth) P().torch(w, x - sp / 2, 3.3, 0, 'pz');
     }
+    } // (end of the walls: a bare perimeter skips everything above)
     // entrance gate (decorative, closed portcullis on the south wall)
     // the entrance gate sits on whatever ground the south end has (boss roads start far below)
     w._gfY = opts.southY || 0; gateFrame(w, W / 2, D, 'S', opts.southY || 0); w._gfY = 0;
@@ -558,7 +571,7 @@
     w.deferred.push((grp) => {
       const PG = G.Props.PG;
       if (OUT === 'ruins') {
-        const mtn = new THREE.MeshStandardMaterial({ color: w.mats.biome.mtnCol ?? 0x8a7890, emissive: w.mats.biome.night ? 0x05070d : 0x3a2a3a, roughness: 1, flatShading: true, fog: false });
+        const mtn = new THREE.MeshStandardMaterial({ color: w.mats.biome.mtnCol ?? 0x8a7890, emissive: w.mats.biome.mtnEm ?? (w.mats.biome.night ? 0x05070d : 0x3a2a3a), roughness: 1, flatShading: true, fog: false });
         for (let i = 0; i < 26; i++) {
           const a = i / 26 * Math.PI * 2 + rng.range(-0.1, 0.1), r = rng.range(170, 230), h = rng.range(35, 90);
           const m = new THREE.Mesh(PG.cone, mtn); m.scale.set(rng.range(30, 60), h, rng.range(30, 60)); m.position.set(cx + Math.cos(a) * r, h / 2 - 8, cz + Math.sin(a) * r); grp.add(m);
@@ -568,7 +581,7 @@
           const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.75, Math.max(W, D) * 1.3);
           tree(grp, w, cx + Math.cos(a) * r, -0.5, cz + Math.sin(a) * r, rng, rng.range(1.2, 2.2));
         }
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ color: w.mats.biome.night ? 0x1c2416 : 0x3e4a26, roughness: 1 }));
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ color: w.mats.biome.groundCol ?? (w.mats.biome.night ? 0x1c2416 : 0x3e4a26), roughness: 1 }));
         ground.rotation.x = -Math.PI / 2; ground.position.set(cx, -0.6, cz); grp.add(ground);
       } else {
         // sea of clouds far below + floating islets
@@ -890,8 +903,8 @@
       // on the floor
       for (let k = 0; k < 10 && !done; k++) {
         const r = occ.place(rng, 2, 2, 1); if (!r) break;
-        const x = r.x0 + 1, z = r.z0 + 1;
-        if (chestSpotFree(w, x, 0, z)) { P().chest(w, x, z, 0, rng.range(0, 6), tier); done = true; }
+        const x = r.x0 + 1, z = r.z0 + 1, y = G.Terrain ? G.Terrain.flat(w, r.x0, r.z0, r.x1, r.z1, 0.3) : 0; // (on ground of its own, only where it lies flat)
+        if (y != null && chestSpotFree(w, x, y, z)) { P().chest(w, x, z, y, rng.range(0, 6), tier); done = true; }
       }
     }
   }

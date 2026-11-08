@@ -18,9 +18,10 @@ const only = process.argv.slice(2);
     await p.until('!!G.game.run && !!G.world', 30000);
     await sleep(600);
     const foes = await p.eval("JSON.stringify(G.ENEMIES.filter((e) => e.fields).map((e) => [e.id, e.fields[0], e.attack, e.name]))").then(JSON.parse);
-    check(foes.length === 16, `16 field foes (${foes.length})`);
+    const nf = await p.eval("G.Run.TIERS.flat().filter((f) => G.Run.ready(f) && !['grave', 'gate', 'halls', 'ruin'].includes(f)).length");
+    check(foes.length === nf * 2, `two foes for each of the ${nf} new fields (${foes.length})`);
     // the draw: each only in its field
-    const pool = await p.eval(`JSON.stringify((() => { const out = {}; for (const f of ['grave', 'hamlet', 'dusk', 'gate', 'catacombs', 'castle', 'halls', 'flooded', 'foundry', 'ruin', 'frozen', 'sanctum']) out[f] = G.game.enemyPool(40, f).filter(([e]) => e.fields).map(([e]) => e.id); return out; })())`).then(JSON.parse);
+    const pool = await p.eval(`JSON.stringify((() => { const out = {}; for (const f of G.Run.TIERS.flat()) out[f] = G.game.enemyPool(40, f).filter(([e]) => e.fields).map(([e]) => e.id); return out; })())`).then(JSON.parse);
     for (const [id, f] of foes) {
       const where = Object.keys(pool).filter((k) => pool[k].includes(id));
       check(where.length === 1 && where[0] === f, `${id} is drawn only in ${f} (${where.join(',') || 'nowhere'})`);

@@ -49,13 +49,13 @@ const MAP = [
   [/^js\/(melee|weapons)\.js$/, ['solo_smoke', 'skill']],
   [/^js\/(combat|enemies|player|game|data_enemies|data_buffs|depth)\.js$/, ['solo_smoke', 'run']],
   [/^js\/(game|parts|pawn)\.js$/, ['give', 'shop']], // (weapons handed over: never pushing out the ones held)
-  [/^js\/(world|levelgen|fieldgen|fieldgen_t\d|strata|props|graves|fields)\.js$/, ['solo_smoke', 'world', 'run']], // (the new fields come up in co-op runs too)
-  [/^js\/(levelgen|fieldgen|fieldgen_t\d|strata|props|fields|textures|skyvary|runplan)\.js$/, ['field']], // (every field builds; the per-segment draw; the sky moods)
+  [/^js\/(world|levelgen|fieldgen|fieldgen_t\d|field_\w+|terrain|strata|props|graves|fields)\.js$/, ['solo_smoke', 'world', 'run']], // (the new fields come up in co-op runs too)
+  [/^js\/(levelgen|fieldgen|fieldgen_t\d|field_\w+|terrain|strata|props|fields|textures|skyvary|runplan)\.js$/, ['field']], // (every field builds; the per-segment draw; the sky moods)
   [/^js\/(areas|rooms2|midsave)\.js$/, ['solo_smoke', 'room', 'give']],
   [/^js\/(world|enemies|element|fields|skyvary|weather|fieldgen_t4)\.js$/, ['hazard']], // (the void's edge, bodies by it, the elements of the ground and the weather)
-  [/^js\/(gimmick\w*|fieldgen_t\d|strata|midsave|world|fields)\.js$/, ['device']], // (the new fields' devices: built, reached, what they hit, saved)
+  [/^js\/(gimmick\w*|fieldgen_t\d|field_\w+|terrain|strata|midsave|world|fields)\.js$/, ['device']], // (the new fields' devices: built, reached, what they hit, saved)
   [/^js\/(gimmick\w*|strata)\.js$|^js\/coop\/(sync|host|client)\.js$/, ['coop_device']], // (the devices on two screens and for a late joiner; the chests for each player)
-  [/^js\/(levelgen|fieldgen|fieldgen_t\d|strata|data_buffs|runplan)\.js$/, ['chest']], // (one to three chests an area in every field, by depth and difficulty)
+  [/^js\/(levelgen|fieldgen|fieldgen_t\d|field_\w+|terrain|strata|data_buffs|runplan)\.js$/, ['chest']], // (one to three chests an area in every field, by depth and difficulty)
   [/^js\/gimmick\w*\.js$/, ['solo_smoke', 'field']],
   [/^js\/weather\.js$/, ['solo_smoke']],
   [/^js\/(water|textures|audio|fieldgen_t1|fieldgen_t3|gimmick_b)\.js$/, ['water']], // (the water: ripples, splashes, falls, the stream, their sounds)

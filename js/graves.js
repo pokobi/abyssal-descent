@@ -16,7 +16,7 @@
   Gr.scatter = function (w, rng, occ, W, D, tier) {
     if (!rng.chance(tier === 1 ? 0.2 : 0.25)) return;
     const n = rng.chance(0.15) ? 2 : 1;
-    for (let i = 0; i < n; i++) { const r = occ.place(rng, 2, 2, 1.5, 30); if (r) Gr.add(w, r.x0 + 1, 0, r.z0 + 1, rng.range(0, 6)); }
+    for (let i = 0; i < n; i++) { const r = occ.place(rng, 2, 2, 1.5, 30); if (!r) continue; const y = G.Terrain ? G.Terrain.flat(w, r.x0, r.z0, r.x1, r.z1, 0.3) : 0; if (y != null) Gr.add(w, r.x0 + 1, y, r.z0 + 1, rng.range(0, 6)); } // (on ground of its own, only where it lies flat)
   };
 
   // a soft ring on the ground (made once)

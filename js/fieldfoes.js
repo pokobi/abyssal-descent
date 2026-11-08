@@ -8,6 +8,7 @@
 //   溶鉱の深層 鉱滓の巨人 (a slam that leaves molten iron) 火吹き職工 (a stream of fire you must step out of)
 //   凍てつく霊廟 霜の亡霊 (three slow frost orbs)       氷晶の守り手 (a lane of ice spikes)
 //   天空の聖域 虚空の使徒 (a column of light on a marked circle) 雲の守護像 (a gust that blows you back — mind the edge)
+//   古戦場の丘 亡霊の槍兵 (marks a lane, then charges down it) 屍肉の鴉 (a flock that swoops in turn)
 // New bodies are built here with the enemy builder's own parts (enemies.js E._); new attacks hook its attack switch.
 (function () {
   const E = G.enemies, X = E._, B = X.B, mesh = X.mesh, joint = X.joint, leg = X.leg;
@@ -268,6 +269,10 @@
     desc: '偽りの空に仕える顔のない使徒。足元に光の輪を描き、そこへ天から光の柱を落とす。輪の外へ。' });
   add({ id: 'ff_cloudguard', fields: ['sanctum'], plan: 'gargoyle', name: '雲の守護像', icon: '🗽', hp: 125, dmg: 8, speed: 4.2, size: 1.05, attack: 'gust', range: 15, cd: 3.2, ai: 'ranged', flyer: true, h: 1.4, sound: 'screech', pitch: 0.6, unlockK: 4, rarity: 'uncommon', color: '#e8e4dc', eye: '#ffd090',
     desc: '聖域の縁に据えられた白い石像。翼を打って突風を起こし、獲物を吹き飛ばす。足場の縁では特に危ない。' });
+  add({ id: 'ff_pikeman', fields: ['battlefield'], plan: 'knight', name: '亡霊の槍兵', icon: '🔱', hp: 160, dmg: 22, speed: 4.6, size: 1.02, attack: 'charge', range: 16, cd: 3.6, ai: 'melee', h: 2.0, frontArmor: 0.35, undead: true, sound: 'groan', pitch: 0.8, unlockK: 0, rarity: 'common', color: '#6a6a62', eye: '#ff6a40',
+    desc: '丘で討たれた兵の亡霊。槍を構えて足元に一筋の線を引き、その線の上を一気に駆け抜ける。線の上から横へ外れろ。' });
+  add({ id: 'ff_crow', fields: ['battlefield'], plan: 'bat', name: '屍肉の鴉', icon: '🐦‍⬛', hp: 38, dmg: 7, speed: 11, size: 0.8, attack: 'swoop', range: 2.0, cd: 2.0, ai: 'flyer', flyer: true, h: 0.8, sound: 'screech', pitch: 1.1, unlockK: 0, rarity: 'common', pack: true, color: '#1c1a20', eye: '#ff3a2a',
+    desc: '戦場の屍をついばむ黒い鴉。群れで飛び回り、代わる代わる急降下してくる。一羽は脆い。' });
   G.ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
 
   // ---------------------------------------------------------------- what happens when they spawn / die
@@ -508,6 +513,30 @@
     },
   };
   // 雲の守護像: a gust down a fan in front of it: knocked back and off your feet
+  // 亡霊の槍兵: a lane marked before it, then the charge down it, spear first (through you once, with a shove)
+  K.charge = {
+    can: (e, tgt, toT, d) => (d < e.def.range && d > 3.5 ? 0.9 : null),
+    update(e, A, dt, tgt, toT, d, inWind) {
+      if (!A.lane) {
+        const dir = V(toT.x, 0, toT.z).normalize(), len = Math.min(e.def.range + 2, d + 4), a = e.pos.clone();
+        const fy = G.world.floorBelow(a.x, a.y + 1, a.z); if (isFinite(fy) && fy > -50) a.y = fy;
+        A.lane = { a, b: a.clone().addScaledVector(dir, len), dir, len };
+        A.tl = G.fx.teleLine(a, A.lane.b, 1.6, A.wind, 0xd06040);
+      }
+      const dir = A.lane.dir;
+      if (inWind) { e.yaw = Math.atan2(dir.x, dir.z); return { x: 0, z: 0, speed: 0 }; }
+      if (A.tl) { G.fx.endTeleLine(A.tl); A.tl = null; G.sfx.monster(e.pos, 'groan', 0.6, 1); }
+      e.atk = 1; e.yaw = Math.atan2(dir.x, dir.z);
+      const t = A.t - A.wind, SP = 15;
+      if (!A.hit && Math.hypot(tgt.pos.x - e.pos.x, tgt.pos.z - e.pos.z) < 1.5 && Math.abs(tgt.pos.y - e.pos.y) < 1.8) {
+        A.hit = true; hitP(e, tgt, e.dmg, 'melee');
+        if (tgt === Pl()) { const P = Pl(); P.vel.x += dir.x * 11; P.vel.z += dir.z * 11; P.vel.y = Math.max(P.vel.y, 4); P.grounded = false; }
+      }
+      if (Math.random() < dt * 30) G.fx.dust(e.pos.clone(), V(-dir.x, 0.6, -dir.z), 0x6a6050, 1);
+      if (t * SP >= A.lane.len || t > 1.6) endA(e);
+      return { x: dir.x, z: dir.z, speed: SP };
+    },
+  };
   K.gust = {
     can: (e, tgt, toT, d) => (d < e.def.range ? 0.85 : null),
     update(e, A, dt, tgt, toT, d, inWind) {

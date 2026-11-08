@@ -11,12 +11,12 @@
     hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 21, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
     extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#d0405a', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
   };
-  R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟', hamlet: '廃村', dusk: '黄昏の都', catacombs: '地下墓所', castle: '古城', flooded: '水没回廊', foundry: '溶鉱炉', frozen: '霊廟', sanctum: '聖域' };
+  R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟', hamlet: '廃村', dusk: '黄昏の都', catacombs: '地下墓所', castle: '古城', flooded: '水没回廊', foundry: '溶鉱炉', frozen: '霊廟', sanctum: '聖域', battlefield: '古戦場' };
   // ---- the fields of a run: four depth tiers of three fields each. A difficulty's segments name the tier (by its first field, as above);
   // every run draws one field of that tier per segment (never the same one twice in a run while there is another to take), so the
   // depth, foe numbers and strength of each segment stay exactly what they were and only the place changes.
   R.TIERS = [
-    ['grave', 'hamlet', 'dusk'],      // 地上
+    ['grave', 'hamlet', 'dusk', 'battlefield'], // 地上
     ['gate', 'catacombs', 'castle'],  // 入口
     ['halls', 'flooded', 'foundry'],  // 中層
     ['ruin', 'frozen', 'sanctum'],    // 深層

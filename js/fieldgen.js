@@ -128,6 +128,9 @@
     for (let i = 0; i < nch; i++) P().chandelier(w, rng.range(x0 + 10, x1 - 10), y - rng.range(4, 6), rng.range(z0 + 12, z1 - 12), y - 0.7);
   };
   // a wooden ramp: shallow plank steps, no rails (only the planks)
+  // the layout of an area: one of the field's list, drawn from its rng (F.forceLayout[field]: a fixed one, for tests and screenshots)
+  F.forceLayout = {};
+  F.pickLayout = function (rng, field, list) { const p = rng.pick(list), f = F.forceLayout[field]; return f && list.includes(f) ? f : p; };
   F.ramp = function (w, side, e, c, wd, h0, h1) {
     return H.stairs(w, side, e, c, wd, h0, h1, 'wood');
   };

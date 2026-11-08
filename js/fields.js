@@ -30,7 +30,7 @@
   const BIOME = {
     flooded: ['water', 'water', 'moss', 'mud'], forge: ['lava', 'oil', 'oil', 'vent'], frozen: ['ice', 'ice', 'water', 'vent'],
     temple: ['moss', 'thorns', 'water'], catacombs: ['poison', 'oil', 'mud'], ruins: ['moss', 'mud', 'thorns', 'water'],
-    bloodmoon: ['thorns', 'poison', 'mud', 'oil'], sky: ['vent', 'vent', 'moss'], hamlet: ['mud', 'water', 'thorns', 'moss'], dusk: ['moss', 'thorns', 'mud', 'oil'], castle: ['thorns', 'oil', 'poison', 'mud'], foundry: ['lava', 'oil', 'oil', 'vent'], sanctum: ['vent', 'vent', 'holy', 'moss'], void: ['poison', 'vent', 'ice'], abyss: ['poison', 'lava', 'vent'],
+    bloodmoon: ['thorns', 'poison', 'mud', 'oil'], sky: ['vent', 'vent', 'moss'], hamlet: ['mud', 'water', 'thorns', 'moss'], battlefield: ['mud', 'thorns', 'oil', 'mud'], dusk: ['moss', 'thorns', 'mud', 'oil'], castle: ['thorns', 'oil', 'poison', 'mud'], foundry: ['lava', 'oil', 'oil', 'vent'], sanctum: ['vent', 'vent', 'holy', 'moss'], void: ['poison', 'vent', 'ice'], abyss: ['poison', 'lava', 'vent'],
   };
   const ANY = ['water', 'moss', 'mud', 'poison', 'oil', 'thorns', 'vent', 'ice', 'lava'];
 
@@ -43,14 +43,17 @@
     const n = rng.chance(0.15) ? 2 : 1;
     for (let i = 0; i < n; i++) {
       let kind = rng.chance(0.75) ? rng.pick(pool) : rng.pick(ANY);
+      // (on ground of its own, w.groundTop, only where it lies flat: G.Terrain.flat)
       if (kind === 'vent') {
         const r = occ.place(rng, 3, 3, 2); if (!r) continue;
-        F.add(w, 'vent', r.x0 + 0.6, r.z0 + 0.6, r.x1 - 0.6, r.z1 - 0.6);
+        const y = G.Terrain ? G.Terrain.flat(w, r.x0, r.z0, r.x1, r.z1, 0.05) : 0; if (y == null) continue;
+        F.add(w, 'vent', r.x0 + 0.6, r.z0 + 0.6, r.x1 - 0.6, r.z1 - 0.6, { y });
         continue;
       }
       const fw = rng.int(4, 9), fd = rng.int(4, 9);
       const r = occ.place(rng, fw, fd, 1); if (!r) continue;
-      F.add(w, kind, r.x0, r.z0, r.x1, r.z1);
+      const y = G.Terrain ? G.Terrain.flat(w, r.x0, r.z0, r.x1, r.z1, 0.05) : 0; if (y == null) continue;
+      F.add(w, kind, r.x0, r.z0, r.x1, r.z1, { y });
     }
   };
   F.add = function (w, kind, x0, z0, x1, z1, opts) {
@@ -65,22 +68,22 @@
       case 'ice': flat('ice', 0.04); break;
       case 'moss': flat('moss', 0.025); break;
       case 'mud': flat('mud', 0.03); break;
-      case 'poison': flat('poison', 0.035); w.addLight(cx, 0.5, cz, { flame: 0, intensity: 4, range: 8, color: '#7adf30', prio: 0.5, emit: false }); break;
-      case 'holy': flat('holy', 0.035); f.light = w.lightSources[w.lightSources.push({ pos: V(cx, 0.8, cz), color: '#90e0ff', intensity: 7, range: 9, flame: 0, emit: false, ph: 0, prio: 0.9, steady: true }) - 1]; break;
+      case 'poison': flat('poison', 0.035); w.addLight(cx, f.y + 0.5, cz, { flame: 0, intensity: 4, range: 8, color: '#7adf30', prio: 0.5, emit: false }); break;
+      case 'holy': flat('holy', 0.035); f.light = w.lightSources[w.lightSources.push({ pos: V(cx, f.y + 0.8, cz), color: '#90e0ff', intensity: 7, range: 9, flame: 0, emit: false, ph: 0, prio: 0.9, steady: true }) - 1]; break;
       case 'oil': flat('oil', 0.02); break;
       case 'thorns': {
         flat('moss', 0.02, { tint: [0.45, 0.4, 0.3] });
         const rr = () => Math.random();
         for (let i = 0; i < (x1 - x0) * (z1 - z0) * 0.7; i++) {
           const x = x0 + 0.3 + rr() * (x1 - x0 - 0.6), z = z0 + 0.3 + rr() * (z1 - z0 - 0.6), h = 0.35 + rr() * 0.5;
-          w.batch.geo('vine', G.Props.PG.cone, new THREE.Matrix4().compose(V(x, h / 2, z), new THREE.Quaternion().setFromEuler(new THREE.Euler((rr() - 0.5) * 0.6, rr() * 6, (rr() - 0.5) * 0.6)), V(0.05, h, 0.05)));
+          w.batch.geo('vine', G.Props.PG.cone, new THREE.Matrix4().compose(V(x, f.y + h / 2, z), new THREE.Quaternion().setFromEuler(new THREE.Euler((rr() - 0.5) * 0.6, rr() * 6, (rr() - 0.5) * 0.6)), V(0.05, h, 0.05)));
         }
         break;
       }
       case 'vent': {
-        w.visual('iron', x0, 0, z0, x1, 0.08, z1, { uv: 1, grad: false });
-        for (let i = 0; i < 5; i++) { const t = x0 + (x1 - x0) * (i + 0.5) / 5; w.visual('dark', t - 0.06, 0.08, z0 + 0.1, t + 0.06, 0.09, z1 - 0.1, { uv: 1, grad: false }); }
-        w.addLight(cx, 0.6, cz, { flame: 0, intensity: 3, range: 6, color: '#bfe8ff', prio: 0.4, emit: false });
+        w.visual('iron', x0, f.y, z0, x1, f.y + 0.08, z1, { uv: 1, grad: false });
+        for (let i = 0; i < 5; i++) { const t = x0 + (x1 - x0) * (i + 0.5) / 5; w.visual('dark', t - 0.06, f.y + 0.08, z0 + 0.1, t + 0.06, f.y + 0.09, z1 - 0.1, { uv: 1, grad: false }); }
+        w.addLight(cx, f.y + 0.6, cz, { flame: 0, intensity: 3, range: 6, color: '#bfe8ff', prio: 0.4, emit: false });
         break;
       }
     }

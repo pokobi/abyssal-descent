@@ -38,7 +38,7 @@
   const CLASS_HP = { colossus: 4200, wyrm: 3800, executioner: 4600, broodmother: 3900 };
   const bigHp = (id) => CLASS_HP[id] || (BS.SPECS && BS.SPECS[id] && BS.SPECS[id].hp) || 0;
   BS.smallBase = function (S) {
-    const R = G.Run, n = G.game.area || 1, pool = (R && R.bossPool && R.bossPool(R.field(n))) || [];
+    const R = G.Run, n = G.game.area || 1, pool = (R && R.bossPool && R.bossPool(R.segBase ? R.segBase(n) : R.field(n))) || [];
     const tk = (id) => { const k = R.bossTierK && R.bossTierK(id, n); return k ? k.hp : 1; }; // (a deep guardian met higher up counts at that depth's strength, runplan.js)
     const big = pool.filter((id) => !(G.BOSS_BY_ID[id] && G.BOSS_BY_ID[id].small)).map((id) => bigHp(id) * tk(id)).filter((v) => v > 0);
     const avg = big.length ? big.reduce((a, v) => a + v, 0) / big.length : 4500;

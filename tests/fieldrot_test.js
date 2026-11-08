@@ -24,7 +24,7 @@ const PORT = +process.env.COOP_PORT || 9879;
       await p.until('!!G.game.run && !!G.world && G.game.area === 1', 30000); await sleep(300);
       const r = JSON.parse(await p.eval(`(() => {
         const R = G.Run, run = G.game.run, segs = R.def().segs.map((s) => s[0]);
-        return JSON.stringify({ fields: run.fields, segs, tiers: segs.map((b) => R.TIERS[R.tierOf(b)]), f1: R.field(1), entered: (G.save.data.lastFields || []).slice() });
+        return JSON.stringify({ fields: run.fields, segs, tiers: segs.map((b) => R.drawPool(b)), f1: R.field(1), entered: (G.save.data.lastFields || []).slice() });
       })()`));
       if (deep) {
         await p.eval('window.__w0 = G.world; G.game.area = 7; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = "playing"; G.game.enterArea(8, "combat"); 1');

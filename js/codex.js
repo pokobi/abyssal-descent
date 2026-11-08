@@ -275,16 +275,18 @@
     STAGES = keys.map((key, i) => {
       const B = G.Tex.BIOMES[key], F = FIELD_INFO[key];
       const where = [];
-      const same = (f) => (R.tierOf ? R.tierOf(f) === R.tierOf(key) : f === key);
+      const same = (f) => (R.drawPool ? R.drawPool(f).includes(key) : f === key); // (the segments that draw this field: the middle tiers share one pool)
       for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (same(f)) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
       return { id: 'stage_' + key, key, idx: i, name: B.name, icon: F.icon, rarity: F.rarity, desc: F.desc, where };
     });
     return STAGES;
   }
   function stageDetail(o) {
-    const pool = (G.Run.bossPool ? G.Run.bossPool(o.key) : G.Run.BOSS_POOLS[o.key] || []).map((id) => G.BOSS_BY_ID[id]).filter(Boolean);
+    // the guardians of every segment that may draw this field (a field of the middle tiers is met in the entrance's and the middle depths' segments)
+    const R = G.Run, bases = R.drawPool ? R.TIERS.map((t) => t[0]).filter((b) => R.drawPool(b).includes(o.key)) : [o.key];
+    const pool = [...new Set(bases.flatMap((b) => (R.bossPool ? R.bossPool(b) : R.BOSS_POOLS[b] || [])))].map((id) => G.BOSS_BY_ID[id]).filter(Boolean);
     let h = `<div style="margin-top:8px;font-weight:700">🗺️ 登場する難易度・区分</div><div style="font-size:12.5px;line-height:1.7;color:#cfc4b0">${o.where.join('　/　') || '—'}</div>`;
-    h += `<div style="margin-top:10px;font-weight:700">👑 守護者（この中から1体が等確率で現れる）</div><div style="margin-top:4px">${pool.map((b) => G.save.data.codex.bosses[b.id] ? `<span class="tag">${b.icon} ${U.esc(b.name)}</span>` : '<span class="tag">❔ ？？？</span>').join('')}</div>`;
+    h += `<div style="margin-top:10px;font-weight:700">👑 守護者（区分ごとに、その区分の候補から1体が現れる）</div><div style="margin-top:4px">${pool.map((b) => G.save.data.codex.bosses[b.id] ? `<span class="tag">${b.icon} ${U.esc(b.name)}</span>` : '<span class="tag">❔ ？？？</span>').join('')}</div>`;
     const pool2 = G.game.enemyPool(13, o.key).slice().sort((a, b) => b[1] - a[1]).slice(0, 8);
     h += `<div style="margin-top:10px;font-weight:700">👹 よく現れる魔物</div><div style="margin-top:4px">${pool2.map(([e]) => G.save.data.codex.enemies[e.id] ? `<span class="tag">${e.icon} ${U.esc(e.name)}</span>` : '<span class="tag">❔ ？？？</span>').join('')}</div>`;
     return h;

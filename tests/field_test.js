@@ -70,10 +70,10 @@ const only = process.argv.slice(2);
         if (JSON.stringify(a) === JSON.stringify(b)) out.same++;
         const D = R.DIFFS[id];
         if (a.length !== D.segs.length) out.bad.push(id + ' length');
-        a.forEach((f, k) => { if (R.tierOf(f) !== R.tierOf(D.segs[k][0])) out.bad.push(id + ' ' + f + ' in tier ' + R.tierOf(D.segs[k][0])); if (!R.ready(f)) out.bad.push(id + ' ' + f + ' not built'); out.fields[f] = (out.fields[f] || 0) + 1; });
-        const ready = (t) => R.TIERS[R.tierOf(t)].filter((f) => R.ready(f)).length;
-        const need = {}; D.segs.forEach(([f]) => { const t = R.tierOf(f); need[t] = (need[t] || 0) + 1; });
-        const over = Object.keys(need).some((t) => need[t] > ready(R.TIERS[t][0]));
+        a.forEach((f, k) => { if (!R.drawPool(D.segs[k][0]).includes(f)) out.bad.push(id + ' ' + f + ' not in the pool of ' + D.segs[k][0]); if (!R.isField(f)) out.bad.push(id + ' ' + f + ' not built'); out.fields[f] = (out.fields[f] || 0) + 1; });
+        const ready = (b) => R.drawPool(b).filter((f) => R.isField(f)).length, key = (b) => R.drawPool(b).join();
+        const need = {}; D.segs.forEach(([b]) => { need[key(b)] = (need[key(b)] || 0) + 1; });
+        const over = D.segs.some(([b]) => need[key(b)] > ready(b));
         if (!over && new Set(a).size !== a.length) out.dup++;
         out.diffs++;
       }

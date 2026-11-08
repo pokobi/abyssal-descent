@@ -23,6 +23,12 @@
   ];
   R.tierOf = (f) => R.TIERS.findIndex((t) => t.includes(f));
   R.baseOf = (f) => { const t = R.TIERS[R.tierOf(f)]; return t ? t[0] : f; };
+  // The two middle tiers (the entrance's and the middle depths') are one pool: a segment of either draws from all eight of their fields.
+  // What the segment holds stays its own (its depth, foes' strength, guardians: R.segBase), only the place is drawn from the eight.
+  R.MERGED = [1, 2];
+  R.drawPool = (base) => { const t = R.tierOf(base); return t < 0 ? [base] : R.MERGED.includes(t) ? R.MERGED.flatMap((k) => R.TIERS[k]) : R.TIERS[t]; };
+  R.isField = (f) => R.ready(f) || R.TIERS.some((t) => t[0] === f); // (the first field of a tier is always there)
+  R.segBase = (n) => R.def().segs[R.seg(n)][0]; // the tier a segment belongs to (by its first field): what decides its guardians
   // a field joins the draw once its generator exists (fieldgen.js registers them)
   R.ready = (f) => !!(G.FieldGen && G.FieldGen.gen && G.FieldGen.gen[f]);
   // legacy: a run saved before the draw existed keeps the fields it was made with (its saved area is rebuilt from them)
@@ -33,7 +39,7 @@
     const D = R.DIFFS[d.id] || R.DIFFS.normal, out = [], used = new Set(), av = new Set(avoid || []);
     const rng = new G.RNG(((seed || 1) ^ G.U.hashStr('fields:' + d.id)) >>> 0);
     for (const [base] of D.segs) {
-      const t = R.TIERS[R.tierOf(base)] || [base], cand = t.filter((f) => f === base || R.ready(f));
+      const t = R.drawPool(base), cand = t.filter((f) => f === base || R.isField(f));
       const fresh = cand.filter((f) => !used.has(f)), pref = fresh.filter((f) => !av.has(f)), from = pref.length ? pref : fresh.length ? fresh : cand;
       const f = from[Math.floor(rng.next() * from.length) % from.length] || base;
       used.add(f); out.push(f);
@@ -160,7 +166,7 @@
   R.TIER_POW = { gate: [4400, 22], halls: [4550, 23], ruin: [6500, 30] }; // [average base health, average blow] of each tier's big guardians
   R.bossTierK = function (id, n) {
     const home = R.BOSS_HOME[id]; if (!home) return null;
-    const here = R.baseOf(R.field(n)); if (here === home || !R.TIER_POW[here] || !R.TIER_POW[home]) return null;
+    const here = R.segBase(n); if (here === home || !R.TIER_POW[here] || !R.TIER_POW[home]) return null;
     const a = R.TIER_POW[here], b = R.TIER_POW[home];
     return { hp: a[0] / b[0], dmg: a[1] / b[1] };
   };
@@ -173,7 +179,7 @@
   R.bossFor = function (n) {
     if (R.cur.id === 'extra' && R.isLast(n)) return 'sovereign'; // extra: the last guardian is always the Crimson Sovereign, on its own field
     const used = new Set(), draw = (m) => {
-      const pool = R.bossPool(R.field(m)).filter((id) => G.BOSS_BY_ID[id] && G.bosses.has(id));
+      const pool = R.bossPool(R.segBase(m)).filter((id) => G.BOSS_BY_ID[id] && G.bosses.has(id)); // (the segment's guardians, whichever of the pool's fields it drew)
       if (!pool.length) return null;
       const fresh = pool.filter((id) => !used.has(id)), c = fresh.length ? fresh : pool;
       const rng = new G.RNG(((G.game.seed || 1) ^ G.U.hashStr('boss' + m)) >>> 0);

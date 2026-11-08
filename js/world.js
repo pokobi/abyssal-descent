@@ -292,12 +292,13 @@
       // highest top under the footprint within maxDown below feet (while the player moves, a terrain's ground is its drawn surface under the middle)
       const PP = this.pp;
       const a = this.query(pos.x - hw + 0.003, pos.y - maxDown - (PP ? TERR_M : 0), pos.z - hw + 0.003, pos.x + hw - 0.003, pos.y + 0.01, pos.z + hw - 0.003);
-      let best = -Infinity;
+      let best = -Infinity, terr = false;
       for (const c of a) {
         let top = c.y1;
         if (PP && c.tg) { if (!(pos.x >= c.x0 && pos.x < c.x1 && pos.z >= c.z0 && pos.z < c.z1)) continue; top = this.tTop(c, pos.x, pos.z); }
-        if (top <= pos.y + 0.011 && top >= pos.y - maxDown - 1e-6 && top > best) best = top;
+        if (top <= pos.y + 0.011 && top >= pos.y - maxDown - 1e-6 && top > best) { best = top; terr = !!(PP && c.tg); }
       }
+      this.gTerr = terr; // (the ground found is a terrain's drawn surface: the feet are set right on it, player.js)
       return best;
     }
     // push out of any overlapping collider (safety net for spawn / teleports)

@@ -416,7 +416,7 @@
       // ground probe
       const gnd = w.groundAt(this.pos, this.hw, 0.08);
       const onGround = gnd > -Infinity && this.pos.y - gnd < 0.06 && this.vel.y <= 0.01;
-      if (onGround) { this.pos.y = Math.max(this.pos.y, gnd); this.grounded = true; if (this.vel.y < 0) this.vel.y = 0; }
+      if (onGround) { this.pos.y = w.gTerr ? gnd : Math.max(this.pos.y, gnd); this.grounded = true; if (this.vel.y < 0) this.vel.y = 0; } // (on a terrain's slope the feet stay right on it: no hovering a few cm over the way down, then dropping)
       else if (wasGrounded && this.vel.y <= 0 && !this.pileState) {
         // snap down stairs / small drops
         const g2 = w.groundAt(this.pos, this.hw, 0.6);

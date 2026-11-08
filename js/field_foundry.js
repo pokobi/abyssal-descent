@@ -29,7 +29,7 @@
     for (let x = 6; x < W; x += 13) for (let z = pz0 + 5; z < pz1; z += 13) w.addLight(x, MELT + 1.5, z, { flame: 0, intensity: 14, range: 15, color: '#ff6a20', emit: false, prio: 0.7 });
     w.solid('trim', 0, -0.4, pz0 - 0.4, W, 0.2, pz0, { uv: 1 }); w.solid('trim', 0, -0.4, pz1, W, 0.2, pz1 + 0.4, { uv: 1 });
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT + 2, beams: 0 });
-    w.solid('rock', -3, HT, -3, W + 3, HT + 2, D + 3, { uv: 6, noGrapple: true, grad: false });
+    w.solid('rock', -3, HT, -3, W + 3, HT + 2, D + 3, { uv: 6, grad: false });
     // ---- the bays (low ones at the landings' height, high ones on gantries), the catwalks of a tree over them
     const bays = [];
     for (let r = 0; r < nR; r++) for (let c = 0; c < nC; c++) {
@@ -120,7 +120,7 @@
   function smelter(w, rng, x, z, y) {
     w.solid('block', x, y, z, x + 3.2, y + 3.4, z + 3.2, { uv: 2 });
     w.visual('glow', x + 1.0, y + 0.4, z + 3.2, x + 2.2, y + 1.5, z + 3.24, { uv: 1, grad: false, tint: [1, 0.45, 0.1] });
-    w.solid('block', x + 0.9, y + 3.4, z + 0.9, x + 2.3, HT, z + 2.3, { uv: 2, noGrapple: true });
+    w.solid('block', x + 0.9, y + 3.4, z + 0.9, x + 2.3, HT, z + 2.3, { uv: 2 });
     w.addLight(x + 1.6, y + 1.2, z + 4, { flame: 0.6, intensity: 8, range: 9, color: '#ff7a30', prio: 0.9 });
   }
   // a moving plate: (x0..x1, z0..z1) at y, travelling (dx, dy, dz) and back, stopping at each end; carries what stands on it

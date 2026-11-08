@@ -55,7 +55,7 @@
     const s = 2.6, h = 6;
     w.solid('wall', x - s, 0, z - s, x + s, h, z + s, { uv: 2.5 });
     w.solid('trim', x - s - 0.2, h, z - s - 0.2, x + s + 0.2, h + 0.4, z + s + 0.2, { uv: 1.5 });
-    w.solid('block', x - 1.2, h + 0.4, z - 1.2, x + 1.2, HT, z + 1.2, { uv: 2, noGrapple: true });
+    w.solid('block', x - 1.2, h + 0.4, z - 1.2, x + 1.2, HT, z + 1.2, { uv: 2 });
     const d = { pz: [0, 1], nz: [0, -1], px: [1, 0], nx: [-1, 0] }[face];
     const mx = x + d[0] * (s + 0.02), mz = z + d[1] * (s + 0.02), across = d[0] ? 'z' : 'x';
     w.visual('lava', across === 'x' ? mx - 1.1 : mx - 0.02, 0.6, across === 'z' ? mz - 1.1 : mz - 0.02, across === 'x' ? mx + 1.1 : mx + 0.02, 2.3, across === 'z' ? mz + 1.1 : mz + 0.02, { uv: 1, grad: false });

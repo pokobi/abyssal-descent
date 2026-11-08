@@ -90,7 +90,7 @@
 
     // ---- the floor, the vault, the walls round it
     w.solid('floor', 0, -1, 0, W, 0, D, { uv: 4 });
-    w.solid('rock', -3, VAULT, -3, W + 3, VAULT + 1.5, D + 3, { uv: 6, noGrapple: true, grad: false });
+    w.solid('rock', -3, VAULT, -3, W + 3, VAULT + 1.5, D + 3, { uv: 6, grad: false });
     H.perimeter(w, rng, W, D, { gates, h: VAULT, top: VAULT + 1.5, beams: 0 });
 
     // ---- the terraces: each side, stretch by stretch along z

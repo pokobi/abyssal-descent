@@ -70,8 +70,8 @@
     for (let x = 0; x < W; x += 2) w.visual('trim', x, 0, LAND_N - 0.3, x + 1.6, 0.35, LAND_N, { uv: 1 });
     // (the dark beyond the landings' edges: the north rock wall with the gates, rock either side of the way in)
     let ax = -2;
-    for (const g of [...gxs, W + 6]) { const e = g - 5; if (e > ax) w.solid('rock', ax, -14, -4, e, 14, 0, { uv: 6, noGrapple: true, grad: false }); ax = g + 5; }
-    for (const s of [-1, 1]) w.solid('rock', s < 0 ? cx - 16 : cx + 9, -14, D - LAND_S, s < 0 ? cx - 9 : cx + 16, 9, D + 3, { uv: 6, noGrapple: true, grad: false });
+    for (const g of [...gxs, W + 6]) { const e = g - 5; if (e > ax) w.solid('rock', ax, -14, -4, e, 14, 0, { uv: 6, grad: false }); ax = g + 5; }
+    for (const s of [-1, 1]) w.solid('rock', s < 0 ? cx - 16 : cx + 9, -14, D - LAND_S, s < 0 ? cx - 9 : cx + 16, 9, D + 3, { uv: 6, grad: false });
     H.perimeter(w, rng, W, D, { gates, h: 14, walls: false, beams: 0, stub: 2.5 });
     w.pillars = [];
     w.unsafeGround = (x, z) => !!F.pillarAt(w, x, z); // (player.js: never remember a sinking pillar as the safe place to come back to)

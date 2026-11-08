@@ -790,7 +790,7 @@
         return;
       }
       // perception
-      this.losT -= dt;
+      this.losT -= dt; if (this.repoT > 0) this.repoT -= dt;
       const tgt = this.target();
       const toT = tgt.pos.clone().sub(this.pos);
       const distH = Math.hypot(toT.x, toT.z);
@@ -915,7 +915,7 @@
         return out;
       }
       if (ai === 'flyer') {
-        if (!this.hasLOS) return flow(out);
+        if (!this.hasLOS || this.repoT > 0) return flow(out); // (going round to a better place after a dive that could not reach you)
         const l = distH || 1;
         if (distH > 6) { out.x = toT.x / l; out.z = toT.z / l; }
         else { out.x = -toT.z / l; out.z = toT.x / l; out.speed = this.speed * 0.6; }
@@ -948,7 +948,7 @@
         case 'slash': if (distH < atkRange + this.radius && Math.abs(dy) < 2) begin(0.45); break;
         case 'slam': if (distH < atkRange + this.radius * 0.5 && Math.abs(dy) < 2.5) begin(0.9); break;
         case 'bounce': if (distH < 6 && Math.abs(dy) < 2.5) begin(0.45); break;
-        case 'swoop': if (distH < 13) begin(0.35); break;
+        case 'swoop': if (distH < 13 && !(this.repoT > 0)) begin(0.35); break;
         case 'throw': if (distH < def.range) begin(0.55); break;
         case 'orb': if (distH < def.range) begin(0.6); break;
         case 'spore': if (distH < def.range) begin(0.8); break;
@@ -1013,12 +1013,26 @@
           return { x: 0, z: 0, speed: 0 };
         }
         case 'swoop': {
+          // the dive: at where you will be when it gets there (your speed taken into it), only with a clear way for its body (else it
+          // breaks off and flies round to you instead of diving into a wall or at the air where you stood); it bends after you a little on
+          // the way, a wall stops it, and two misses in a row send it round to a better place first (no diving at nothing again and again)
           if (inWind) { this.alt += dt * 2; return { x: -dirx, z: -dirz, speed: 3 }; }
-          if (!A.dir) { A.dir = tgt.eye.clone().sub(this.centerPos()).normalize(); G.sfx.monster(this.pos, 'screech', def.pitch, 0.8); }
+          const SW = E.SWOOP, c = this.centerPos();
+          if (!A.dir) {
+            const d0 = c.distanceTo(tgt.eye), aim = tgt.eye.clone().addScaledVector(tgt.vel || V(), Math.min(0.8, d0 / SW.speed) * SW.lead);
+            if (aim.distanceTo(c) > SW.speed * SW.dur * 0.95 || !this.flyClear(c, aim)) { end(SW.retry); this.repoT = SW.repo; return { x: 0, z: 0, speed: 0 }; }
+            A.dir = aim.sub(c).normalize(); G.sfx.monster(this.pos, 'screech', def.pitch, 0.8);
+          } else if (!A.hit) {
+            const want = tgt.eye.clone().sub(c); if (want.dot(A.dir) > 0) A.dir.lerp(want.normalize(), Math.min(1, SW.turn * dt)).normalize();
+          }
           this.atk = 1;
-          this.pos.addScaledVector(A.dir, 17 * dt);
+          this.pos.addScaledVector(A.dir, SW.speed * dt);
           if (!A.hit && this.centerPos().distanceTo(tgt.eye) < 1.3) { A.hit = true; hitPlayer(this.dmg); }
-          if (A.t - A.wind > 0.9 || A.hit && A.t - A.wind > 0.3 || (A.groundT || 0) > 0.15) { end(); this.alt = U.rand(3, 5); }
+          const wall = this.hitWallFlag && A.t - A.wind > 0.08;
+          if (A.t - A.wind > SW.dur || A.hit && A.t - A.wind > 0.3 || (A.groundT || 0) > 0.15 || wall) {
+            end(); this.alt = U.rand(3, 5);
+            if (A.hit) this.swoopMiss = 0; else if ((this.swoopMiss = (this.swoopMiss || 0) + 1) >= 2) { this.swoopMiss = 0; this.repoT = SW.repo * 1.6; } else if (wall) this.repoT = SW.repo;
+          }
           return { x: 0, z: 0, speed: 0, fly: true };
         }
         case 'throw': case 'orb': case 'spore': {
@@ -1258,6 +1272,12 @@
     }
     clampBounds() { const w = G.world; this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.5); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); }
     // circle vs AABB push-out within a vertical band; returns true if blocked
+    flyClear(a, b) {
+      const w = G.world; if (!w.los(a, b)) return false;
+      const d = b.clone().sub(a); d.y = 0; const L = d.length(); if (L < 0.01) return true;
+      const sx = -d.z / L * this.radius * 0.7, sz = d.x / L * this.radius * 0.7;
+      return w.los(V(a.x + sx, a.y, a.z + sz), V(b.x + sx, b.y, b.z + sz)) && w.los(V(a.x - sx, a.y, a.z - sz), V(b.x - sx, b.y, b.z - sz));
+    }
     pushOut(dx, dz, y0, y1) {
       const w = G.world, r = this.radius * 0.8;
       this.pos.x += dx; this.pos.z += dz;
@@ -1576,6 +1596,9 @@
   // out of sight. One that stays far off (over 22 m) and gets no nearer for 12 s (it cannot find its way, or wanders) is brought in:
   // set down 10-20 m from you, on your level, in a puff of smoke (as the stuck-foe failsafe does). Guardians, the gold mimic and what
   // does not count for the area are left out.
+  // the swoop of the bats and crows: speed (m/s) and longest dive (s); how fast it bends after you (per s); how long it goes round to a
+  // better place after a dive that could not reach you; how soon it tries again when it broke one off
+  E.SWOOP = { speed: 17, dur: 0.9, turn: 0.8, lead: 0.5, repo: 1.2, retry: 0.7 }; // (lead: how much of your speed it allows for: half, a dodge still works)
   E.REST = { n: 2, quiet: 20, far: 22, pull: 12 };
   let restAt = -1, restS = null;
   E.restSet = function () {

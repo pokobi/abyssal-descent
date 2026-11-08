@@ -35,7 +35,7 @@ const PORT = +process.env.COOP_PORT || 9981;
     await p.until("G.game.state === 'playing' && document.documentElement.classList.contains('m-play')", 20000);
     await sleep(800);
     const W = await p.eval('innerWidth'), H = await p.eval('innerHeight');
-    console.log('screen', W, H);
+    console.log('screen', W, H, 'field', await p.eval('G.world.biome + (G.world.layout ? "/" + G.world.layout : "")'));
     check(await p.eval('document.querySelectorAll("#m-tiles .ab").length') >= 9, 'skills and items are placed as buttons of their own');
     check(await p.eval('document.querySelector("[data-id=use]").style.display') === 'none', 'there is no interact button by default');
     // fingers: touch points are sent as the whole current set
@@ -102,7 +102,7 @@ const PORT = +process.env.COOP_PORT || 9981;
     await p.eval('G.game.dev.freeze = false; G.game.state = "playing"; G.ui.clearScreen(); window.__mobile.tapKey(G.BIND.w3[0]); 1');
     await sleep(700);
     const rl = await p.eval('(() => { const r = document.querySelector("[data-id=reload]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
-    check(await p.eval('G.player.meleeMode === true'), 'the melee weapon is in hand');
+    check(await p.eval('G.player.meleeMode === true'), 'the melee weapon is in hand ' + await p.eval('JSON.stringify([G.game.state, !!G.game.search, G.player.dead, G.player.pileState, G.player.grapple.state, G.player.melee && G.player.melee.id, G.player.weapons.length])'));
     await touch('touchStart', [[8, rl[0], rl[1]]]);
     // (the headless game runs slowly: give the guard up to 3 s of real time to come up)
     for (let i = 0; i < 30 && !(await p.eval('G.weapons.guarding() === true')); i++) await sleep(100);

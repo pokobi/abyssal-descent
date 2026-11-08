@@ -30,7 +30,7 @@
     w.deepWater = [{ x0: 0, z0: wz0, x1: W, z1: wz1, y: 0 }];
     w.solid('trim', 0, -0.3, wz0 - 0.4, W, 0.12, wz0, { uv: 1 }); w.solid('trim', 0, -0.3, wz1, W, 0.12, wz1 + 0.4, { uv: 1 });
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT + 2, beams: 0 });
-    w.solid('rock', -3, HT, -3, W + 3, HT + 2, D + 3, { uv: 6, noGrapple: true, grad: false });
+    w.solid('rock', -3, HT, -3, W + 3, HT + 2, D + 3, { uv: 6, grad: false });
     // ---- the blocks: walls round each (their tops the ways), some filled to a flat roof, the water inside the others
     const blk = [];
     for (let r = 0; r < nR; r++) for (let c = 0; c < nC; c++) {

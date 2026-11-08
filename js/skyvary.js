@@ -133,13 +133,16 @@
   };
 
   // ---------------------------------------------------------------- choosing and applying
+  // the field's own sky (the first of its moods) is drawn this many times as often as its weight says: most areas have plain weather
+  // (with ×2: the plain sky 53-71% of the areas, a weather that lays an element 0-23%)
+  S.BASE_K = 2;
   S.choose = function (w, n, kind) {
     const list = S.V[w.biome] || S.V[w.field];
     if (!list || !G.game || !G.game.seed) return null;
     if (w.isBoss || kind === 'boss') return list[0]; // (a guardian's hall: the field's own sky, never a weather)
     if (S.force) { const f = list.find((v) => v.id === S.force); if (f) return f; } // (development: G.Sky.force = 'rain' etc.)
     const rng = new G.RNG(((G.game.seed ^ U.hashStr('sky:' + n + ':' + kind)) >>> 0) || 1);
-    return rng.weighted(list, (v) => v.w);
+    return rng.weighted(list, (v) => v.w * (v === list[0] ? S.BASE_K : 1));
   };
   const mixHex = (a, b, k) => { const c = new THREE.Color(a).lerp(new THREE.Color(b), k); return '#' + c.getHexString(); };
   // the field's light and fog with a mood laid over them (a copy: the field's own table is never changed)

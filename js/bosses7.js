@@ -39,7 +39,8 @@
   const bigHp = (id) => CLASS_HP[id] || (BS.SPECS && BS.SPECS[id] && BS.SPECS[id].hp) || 0;
   BS.smallBase = function (S) {
     const R = G.Run, n = G.game.area || 1, pool = (R && R.bossPool && R.bossPool(R.field(n))) || [];
-    const big = pool.filter((id) => !(G.BOSS_BY_ID[id] && G.BOSS_BY_ID[id].small)).map(bigHp).filter((v) => v > 0);
+    const tk = (id) => { const k = R.bossTierK && R.bossTierK(id, n); return k ? k.hp : 1; }; // (a deep guardian met higher up counts at that depth's strength, runplan.js)
+    const big = pool.filter((id) => !(G.BOSS_BY_ID[id] && G.BOSS_BY_ID[id].small)).map((id) => bigHp(id) * tk(id)).filter((v) => v > 0);
     const avg = big.length ? big.reduce((a, v) => a + v, 0) / big.length : 4500;
     return avg * BS.SMALL_HP * (S.hp / 4500);
   };
@@ -384,8 +385,9 @@
       if (Math.random() < 0.5) G.fx.smoke(this.pos.clone().setY(0.2), 1, 0.6, 0x0a0410, 0.6, 0.5);
       return false;
     }
-    if (!a.c) { a.c = this.pos.clone().setY(0); a.tele = G.fx.telegraph(a.c, 2.6, 0.55, 0xff2040); G.sfx.attackWind && G.sfx.attackWind(a.c, true); }
-    if (a.t < 2.0) return false;
+    const UP = 1.45 + BS.slow(0.55); // (the circle under you, then the cut out of it)
+    if (!a.c) { a.c = this.pos.clone().setY(0); a.tele = G.fx.telegraph(a.c, 2.6, UP - 1.45, 0xff2040); G.sfx.attackWind && G.sfx.attackWind(a.c, true); }
+    if (a.t < UP) return false;
     if (!a.up) {
       a.up = true; this.root.visible = true; this.main.invuln = false; this.shade.visible = false;
       this.face(P.pos, 1, 99); this.pose = 'rise';
@@ -393,18 +395,18 @@
       G.fx.beam(a.c.clone().setY(0.2), a.c.clone().setY(4.5), 0xe0e6ff, 0.12, 0.35); G.sfx.swing(true, 'blade'); G.sfx.explosion(a.c, 0.6);
       if (Math.hypot(P.pos.x - a.c.x, P.pos.z - a.c.z) < 2.6 && P.pos.y < 3) { this.hit(26, 'aoe', a.c); P.vel.y = Math.max(P.vel.y, 10); }
     }
-    this.hY = Math.max(0, Math.sin(Math.min(1, (a.t - 2.0) / 0.6) * Math.PI) * 2.2);
-    return a.t > 2.7;
+    this.hY = Math.max(0, Math.sin(Math.min(1, (a.t - UP) / 0.6) * Math.PI) * 2.2);
+    return a.t > UP + 0.7;
   }
   // 三日月: a spinning cut that sends a low crescent wave rolling out; jump over it (two in the second phase)
   function oboroCrescent(a, dt) {
-    this.pose = 'spin';
-    if (a.t < 0.65) { this.yaw += dt * a.t * 26; if (!a.s0) { a.s0 = true; G.sfx.attackWind && G.sfx.attackWind(this.pos, true); a.tele = G.fx.telegraph(this.pos.clone().setY(0), 2.2, 0.65, 0xff2040); } return false; }
+    this.pose = 'spin'; const TW = BS.slow(0.65);
+    if (a.t < TW) { this.yaw += dt * a.t * 26; if (!a.s0) { a.s0 = true; G.sfx.attackWind && G.sfx.attackWind(this.pos, true); a.tele = G.fx.telegraph(this.pos.clone().setY(0), 2.2, TW, 0xff2040); } return false; }
     this.yaw += dt * 20;
     if (!a.c) { a.c = this.pos.clone().setY(0); G.sfx.whoosh(0.5, 1.2); G.sfx.swing(true, 'blade'); }
     const d1 = ringWave(this, a, 'w1', a.c, 17, 18, 18, 0xd8e0ff, dt);
     let d2 = true;
-    if (this.phase > 1) { if (a.t > 1.1) { if (!a.s2) { a.s2 = true; G.sfx.whoosh(0.5, 1.2); } d2 = ringWave(this, a, 'w2', a.c, 17, 18, 18, 0xff3050, dt); } else d2 = false; }
+    if (this.phase > 1) { if (a.t > TW + 0.45) { if (!a.s2) { a.s2 = true; G.sfx.whoosh(0.5, 1.2); } d2 = ringWave(this, a, 'w2', a.c, 17, 18, 18, 0xff3050, dt); } else d2 = false; }
     return d1 && d2;
   }
   // 影分身 (second phase): two shadow copies take up positions around you and all three cut through you, one after another
@@ -539,7 +541,7 @@
   function foxPounce(a, dt) {
     const P = Pl(), n = this.phase > 1 ? 4 : 3;
     if (!a.st) { a.st = 'wind'; a.t0 = a.t; a.k = 0; }
-    const lt = a.t - a.t0, wind = a.k === 0 ? 0.55 : 0.32, air = 0.44;
+    const air = 0.44, lt = a.t - a.t0, wind = a.k === 0 ? 0.55 : BS.slow(0.32 + air) - air; // (its circle lasts the wind-up and the jump)
     if (a.st === 'wind') {
       this.pose = 'crouch';
       if (!a.c) {
@@ -594,13 +596,13 @@
   }
   // 尾の旋風: it spins with its tails spread and a ring of blue fire rolls out along the floor (jump it; two in the second phase)
   function foxSpin(a, dt) {
-    this.pose = 'spin';
-    if (a.t < 0.55) { this.yaw += dt * a.t * 30; if (!a.s0) { a.s0 = true; a.tele = G.fx.telegraph(this.pos.clone().setY(0), 2.0, 0.55, 0x60b0ff); G.sfx.monster(this.pos, 'snarl', 1.4, 0.7); } return false; }
+    this.pose = 'spin'; const TW = BS.slow(0.55);
+    if (a.t < TW) { this.yaw += dt * a.t * 30; if (!a.s0) { a.s0 = true; a.tele = G.fx.telegraph(this.pos.clone().setY(0), 2.0, TW, 0x60b0ff); G.sfx.monster(this.pos, 'snarl', 1.4, 0.7); } return false; }
     this.yaw += dt * 18;
     if (!a.c) { a.c = this.pos.clone().setY(0); G.sfx.whoosh(0.6, 1); G.sfx.fire && G.sfx.fire(this.pos); }
     const d1 = ringWave(this, a, 'w1', a.c, 14, 15, 16, 0x60c0ff, dt);
     let d2 = true;
-    if (this.phase > 1) { if (a.t > 1.05) d2 = ringWave(this, a, 'w2', a.c, 14, 15, 16, 0xa0e0ff, dt); else d2 = false; }
+    if (this.phase > 1) { if (a.t > TW + 0.5) d2 = ringWave(this, a, 'w2', a.c, 14, 15, 16, 0xa0e0ff, dt); else d2 = false; }
     return d1 && d2;
   }
   // 狐火の環: it races a circle round you, dropping foxfire that bursts a moment later; get out of the ring or between the flames
@@ -768,9 +770,9 @@
   }
   // 刃の独楽: it spins like a top with all four arms out and drifts after you; stay out of the circle
   function dollTop(a, dt) {
-    const P = Pl(), R = 2.8, dur = this.phase > 1 ? 2.6 : 2.1;
-    if (a.t < 0.5) { this.pose = 'spin'; this.yaw += dt * a.t * 40; if (!a.tele) a.tele = G.fx.telegraph(this.pos.clone().setY(0), R, 0.5, 0xff6020); G.fx.teleMove(a.tele, this.pos.clone().setY(0)); if (!a.s0) { a.s0 = true; G.sfx.mech('boltBack', 0, 1.2); } return false; }
-    if (a.t < 0.5 + dur) {
+    const P = Pl(), R = 2.8, dur = this.phase > 1 ? 2.6 : 2.1, TW = BS.slow(0.5);
+    if (a.t < TW) { this.pose = 'spin'; this.yaw += dt * a.t * 40; if (!a.tele) a.tele = G.fx.telegraph(this.pos.clone().setY(0), R, TW, 0xff6020); G.fx.teleMove(a.tele, this.pos.clone().setY(0)); if (!a.s0) { a.s0 = true; G.sfx.mech('boltBack', 0, 1.2); } return false; }
+    if (a.t < TW + dur) {
       this.pose = 'spin'; this.yaw += dt * 22;
       const to = P.pos.clone().sub(this.pos); to.y = 0; const d = to.length();
       if (d > 0.5) this.dash(to.x / d, to.z / d, this.phase > 1 ? 5.6 : 4.6, dt);
@@ -784,7 +786,7 @@
     if (a.ring) { if (a.ring.parent) a.ring.parent.remove(a.ring); a.ring = null; }
     // dizzy for a moment afterwards: it wobbles, an opening
     this.pose = 'wind'; this.J.torso.rotation.z = Math.sin(a.t * 14) * 0.3;
-    return a.t > 0.5 + dur + 0.75;
+    return a.t > TW + dur + 0.75;
   }
   // 発条跳び: it springs high across the arena and drops three bombs along the way
   function dollLeap(a, dt) {
@@ -905,7 +907,7 @@
     if (!a.pts) { a.pts = []; G.sfx.monster(this.pos, 'screech', 1.9, 0.5); }
     while (a.pts.length < n && a.t >= 0.15 + a.pts.length * 0.38) {
       const c = this.lead(0.25);
-      a.pts.push({ c, t: a.t + 0.8, tele: G.fx.telegraph(c, 2.5, 0.8, 0x70c0ff) });
+      const tw = BS.slow(0.8); a.pts.push({ c, t: a.t + tw, tele: G.fx.telegraph(c, 2.5, tw, 0x70c0ff) });
       G.sfx.mech('click', 0, 0.6);
     }
     for (const p of a.pts) if (!p.done && a.t >= p.t) {
@@ -937,11 +939,12 @@
   function impDive(a, dt) {
     const P = Pl();
     if (a.t < 0.5) { this.pose = 'cast'; this.wantY = 8; this.face(P.pos, dt, 6); return false; }
-    if (!a.c) { a.c = this.lead(0.2); a.tele = G.fx.telegraph(a.c, 3.8, 0.75, 0x70c0ff); a.from = this.pos.clone(); a.fy = this.y; G.sfx.monster(this.pos, 'screech', 2.0, 0.6); }
-    if (a.t < 1.25) { this.pose = 'dive'; this.face(a.c, dt, 10); return false; }
+    const TW = BS.slow(0.75), DV = 0.5 + TW; // (the circle, then the dive)
+    if (!a.c) { a.c = this.lead(0.2); a.tele = G.fx.telegraph(a.c, 3.8, TW, 0x70c0ff); a.from = this.pos.clone(); a.fy = this.y; G.sfx.monster(this.pos, 'screech', 2.0, 0.6); }
+    if (a.t < DV) { this.pose = 'dive'; this.face(a.c, dt, 10); return false; }
     if (!a.down) {
       this.diving = true;
-      const f = Math.min(1, (a.t - 1.25) / 0.26);
+      const f = Math.min(1, (a.t - DV) / 0.26);
       this.pos.lerpVectors(a.from, a.c, f); this.pos.y = 0; this.y = a.fy * (1 - f) + 0.6 * f;
       this.trail(dt, 0.025, 0x90d0ff);
       if (f < 1) return false;

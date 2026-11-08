@@ -156,8 +156,10 @@
   }
   // weapons born with an element (element.js): no 属性コア fits them
   // (the common guns are set to one standard: about 150 sustained DPS; a shotgun 170 with every pellet, a sniper rifle 120 on the body)
+  // (a gun whose rounds burn, chill or shock is a gun of that element too: 焼夷 fire, 冷気 ice, 電撃 volt)
   const INNATE = { p_cinder: 'fire', n_dragon: 'fire', y_storm: 'volt', y_tide: 'water' };
-  for (const w of WEAPONS) { const el = INNATE[w.id] || (w.arch === 'flame' ? 'fire' : w.arch === 'tesla' ? 'volt' : null); if (el) w.el = el; }
+  const TRAIT_INNATE = { incendiary: 'fire', cryo: 'ice', shock: 'volt' };
+  for (const w of WEAPONS) { const el = INNATE[w.id] || TRAIT_INNATE[w.trait] || (w.arch === 'flame' ? 'fire' : w.arch === 'tesla' ? 'volt' : null); if (el) w.el = el; }
   const MYTH = { y_midas: 7000, y_echo: 8000, y_maw: 9000, y_storm: 12000, y_hive: 8000, y_ruin: 10000, y_eternal: 9000, y_moon: 7500, y_crown: 10000, y_tide: 9000 };
   for (const w of WEAPONS) if (MYTH[w.id]) w.price = MYTH[w.id];
   for (const w of WEAPONS) if (w.rarity === 'mythic') w.mythic = true; // (ミシック: the shop's 神器 shelf, alchemy and the parts read this flag)

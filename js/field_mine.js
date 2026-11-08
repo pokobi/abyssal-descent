@@ -124,10 +124,10 @@
     //  slope it must have from the higher end, then let the limit even it out)
     T.limit(floor, 0.45, keep);
     T.build(w, floor, { mk: 'floor', uv: 4, cliff: 1.2, tintSeed: seed & 511, skirtMk: 'rock', skirt: false });
-    T.build(w, rock, { mk: 'rock', uv: 5, cliff: 1.2, skirtMk: 'rock', noGrapple: true });
+    T.build(w, rock, { mk: 'rock', uv: 5, cliff: 1.2, skirtMk: 'rock' });
     w.groundElse = () => 0;
     // the roof over everything, hanging stone teeth in the caves
-    w.solid('rock', -3, CEIL, -3, W + 3, CEIL + 2, D + 3, { uv: 6, noGrapple: true, grad: false });
+    w.solid('rock', -3, CEIL, -3, W + 3, CEIL + 2, D + 3, { uv: 6, grad: false });
     for (const c of caves) for (let k = 0; k < Math.round(c.r * 0.8); k++) { const a = rng.range(0, 6.3), d = rng.range(0, c.r * 0.8), L = rng.range(1, 3.2); w.batch.geo('rock', PG().cone, Mx(c.x + Math.cos(a) * d, CEIL - L / 2, c.z + Math.sin(a) * d, rng.range(0.5, 1.1), L, rng.range(0.5, 1.1), Math.PI, 0, 0)); }
     // lumps of rock along the cave walls (the grid's corners hidden)
     for (let z = 1; z < D - 1; z++) for (let x = 1; x < W - 1; x++) {
@@ -135,7 +135,7 @@
       const edge = open[i - 1] || open[i + 1] || open[i - W] || open[i + W];
       if (!edge || rng.chance(0.55)) continue;
       const fl = Math.max(open[i - 1] ? floor.h[i - 1] : -9, open[i + 1] ? floor.h[i + 1] : -9, open[i - W] ? floor.h[i - W] : -9, open[i + W] ? floor.h[i + W] : -9);
-      T.boulder(w, x + 0.5, fl + rng.range(-0.6, 3.5), z + 0.5, rng.range(0.6, 1.1), rng.range(0.7, 1.4), rng.range(0.6, 1.1), rng, { noGrapple: true }); // (solid: it stands out of the wall into the cave)
+      T.boulder(w, x + 0.5, fl + rng.range(-0.6, 3.5), z + 0.5, rng.range(0.6, 1.1), rng.range(0.7, 1.4), rng.range(0.6, 1.1), rng, {}); // (solid: it stands out of the wall into the cave)
     }
     H.perimeter(w, rng, W, D, { gates, h: CEIL, walls: false, beams: 0, stub: 2 });
     // ---- the workings

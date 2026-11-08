@@ -388,7 +388,7 @@
     w.solid('block', 0, 0, gz1, cx - hw, HC + 2, nz - 5, { uv: 3 }); w.solid('block', 0, 0, nz + 5, cx - hw, HC + 2, D, { uv: 3 });
     w.solid('block', 0, 0, nz - 5, cx - hw - 6, HC + 2, nz + 5, { uv: 3 });
     w.solid('block', cx + hw, 0, gz1, W, HC + 2, D, { uv: 3 });
-    w.solid('block', cx - hw - 7, HC, gz1, cx + hw + 1, HC + 2, D, { uv: 4, noGrapple: true });
+    w.solid('block', cx - hw - 7, HC, gz1, cx + hw + 1, HC + 2, D, { uv: 4 });
     w.ceilingRoad = HC;
     for (let z = gz1 + 5; z < D - 3; z += 6) for (const sx of [-1, 1]) {
       if (sx < 0 && Math.abs(z - nz) < 7) continue;

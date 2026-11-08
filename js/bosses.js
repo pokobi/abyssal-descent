@@ -2,6 +2,11 @@
 // Bosses: each has unique mechanics (weak points, invulnerable phases, terrain interaction) instead of scaled-up stats.
 (function () {
   const BS = (G.bosses = { active: null });
+  // A warning circle shown for 0.8 s or less (on the guardian's own clock) gets 0.2 s more before its blow lands; a longer one is left as it
+  // is. (迅雷の小鬼's bolts set the line: warnings as short as those were too short to read.) Every guardian of the draw passes its short
+  // warnings through this, its blow timed to the same longer wind-up.
+  BS.TELE_SHORT = 0.8; BS.TELE_ADD = 0.2;
+  BS.slow = (t) => (t <= BS.TELE_SHORT + 1e-6 ? t + BS.TELE_ADD : t);
   BS.GIMMICK_PCT = 0.08; // (see Boss.gimmickClear)
   const U = G.U;
   const V = G.U.V;
@@ -19,6 +24,7 @@
       const RN = G.Run, an = G.game.area || level;
       this.hpScale = 1.7 * (1 + 0.24 * L) * Math.pow(1.04, L) * Math.max(0.3, 1 + P.stats.enemyHp) * RN.bossHpMul(an);
       this.dmgScale = (1 + 0.08 * L) * RN.bossDmgMul(an);
+      { const tk = RN.bossTierK && def && RN.bossTierK(def.id, an); if (tk) { this.hpScale *= tk.hp; this.dmgScale *= tk.dmg; } } // (away from its own depth: that depth's strength, runplan.js)
       this.loop = Math.floor((level - 1) / 25);
       this.parts = [];
       this.root = new THREE.Group();
@@ -264,7 +270,7 @@
       const sp = (1 + (this.phase - 1) * 0.2) * BS.tempo();
       if (a.k.startsWith('x_')) { if (BS.runX(this, a, dt)) { this.act = null; this.noTurnT = 1.6 / sp; this.cd = U.rand(1.2, 2) / sp; } return; }
       if (a.k === 'slam') {
-        const wind = 1.3 / sp;
+        const wind = BS.slow(1.3 / sp);
         if (a.t < wind) { for (const ar of J.arms) ar.sh.rotation.x = -2.8 * (a.t / wind); if (!a.tele) { a.tele = this.tele(this.pos, 6, wind, 0xd06020); G.ui.toastSmall('⚠ 衝撃波 — ジャンプで回避！'); } return; }
         if (!a.hit) {
           a.hit = true;
@@ -283,7 +289,7 @@
         if (!a.hitP && Math.abs(d - w.r) < 0.8 && P.pos.y < 0.6) { a.hitP = true; this.hurtPlayer(32, 'aoe'); P.vel.y = 6; }
         if (w.r > 34) { w.sr.dispose(); this.act = null; this.noTurnT = 2.4 / sp; this.cd = U.rand(1.5, 2.5) / sp; }
       } else if (a.k === 'sweep') {
-        const wind = 1.0 / sp;
+        const wind = BS.slow(1.0 / sp);
         const arm = J.arms[1];
         if (a.t < wind) { arm.sh.rotation.z = -1.4 * (a.t / wind); arm.sh.rotation.x = -1.2; if (!a.warn) { a.warn = true; G.ui.toastSmall('⚠ 薙ぎ払い — しゃがめ！'); G.sfx.attackWind(this.pos, true); a.tele = this.tele(this.pos.clone().add(V(Math.sin(this.yaw) * 5, 0, Math.cos(this.yaw) * 5)), 6, wind, 0xd06020); } return; }
         const k = Math.min(1, (a.t - wind) / 0.5);
@@ -370,7 +376,7 @@
         if (Math.random() < dt * 18) G.fx.dust(V(this.hpos.x + U.rand(-1, 1), 0.05, this.hpos.z + U.rand(-1, 1)), V(0, 1, 0), 0x7a6a50, 2);
         this.rumT = (this.rumT || 0) - dt; if (this.rumT <= 0) { this.rumT = 0.6; G.sfx.monster(this.hpos.clone().setY(0), 'rumble', 0.6, 0.9); P.addShake(Math.max(0, 0.15 - d * 0.005)); }
         if (this.stateT <= 0 && d < 3) {
-          this.state = 'warn'; this.stateT = 1.1 / sp;
+          this.state = 'warn'; this.stateT = BS.slow(1.1 / sp);
           this.erC = V(P.pos.x, 0, P.pos.z);
           this.tg = this.tele(this.erC, 4, this.stateT, 0xc06020);
           G.sfx.rumble(1.2, 1.0);
@@ -733,7 +739,7 @@
         }
         if (a.t > 2 && !(a.pulled > 0)) { J.arms[0].sh.rotation.x = 0; this.act = null; this.cd = 1.5; }
       } else if (a.k === 'cleave') {
-        const wind = 0.9 / sp;
+        const wind = BS.slow(0.9 / sp);
         const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
         if (!a.c) { a.c = V(this.pos.x + fx * 3.6, 0, this.pos.z + fz * 3.6); a.tg = this.tele(a.c, 3.4, wind, 0xc02010); G.sfx.attackWind(this.pos, true); }
         if (a.t < wind) { J.arms[1].sh.rotation.x = -3.0 * a.t / wind; return; }
@@ -746,7 +752,7 @@
         }
         if (a.t > wind + 0.8) { J.arms[1].sh.rotation.x = 0; this.act = null; this.cd = 1.2; }
       } else if (a.k === 'spin') {
-        const wind = 0.8;
+        const wind = BS.slow(0.8);
         if (!a.tg) { a.tg = this.tele(this.pos, 5.5, wind, 0xc02010); G.sfx.attackWind(this.pos, true); }
         if (a.t < wind) { J.arms[1].sh.rotation.z = -1.4 * a.t / wind; return; }
         this.yaw += dt * 14; J.arms[1].sh.rotation.z = -1.4;

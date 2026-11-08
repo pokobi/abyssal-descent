@@ -32,7 +32,7 @@ const T = {
   mobile: ['tests/mobile_test.js'], trial: ['tests/trial_test.js'], boss_hp: ['tests/boss_hp_test.js'],
   skill: ['tests/coop/skill_test.js'], coop: ['tests/coop/coop_test.js'], world: ['tests/coop/world_test.js'], sky: ['tests/coop/sky_test.js'],
   run: ['tests/coop/run_test.js', 'normal', '5'], field: ['tests/field_test.js'], foe: ['tests/foe_test.js'], coop_duel: ['tests/coop/duel_test.js'], bossobj: ['tests/coop/bossobj_test.js'],
-  hazard: ['tests/hazard_test.js'], device: ['tests/device_test.js'], chest: ['tests/chest_test.js'], water: ['tests/water_test.js'], coop_device: ['tests/coop/device_test.js'], coop_ground: ['tests/coop/ground_test.js'], rest: ['tests/rest_test.js'], geom: ['tests/geom_audit.js', 'all', 'combat', '1'], geom_rooms: ['tests/geom_audit.js', 'all', 'shop,event,shrine,forge,alchemy,boss', '1'], loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'], pillar: ['tests/pillar_test.js'], works: ['tests/works_test.js'],
+  hazard: ['tests/hazard_test.js'], device: ['tests/device_test.js'], chest: ['tests/chest_test.js'], water: ['tests/water_test.js'], coop_device: ['tests/coop/device_test.js'], coop_ground: ['tests/coop/ground_test.js'], rest: ['tests/rest_test.js'], geom: ['tests/geom_audit.js', 'all', 'combat', '1'], geom_rooms: ['tests/geom_audit.js', 'all', 'shop,event,shrine,forge,alchemy,boss', '1'], signs: ['tests/geom_audit.js', 'all', 'combat,shop,event,shrine,forge,alchemy,boss', '1', 'signs'], shopview: ['tests/geom_audit.js', 'all', 'shop', '1', 'shopview'], swim: ['tests/swim_test.js'], grapple: ['tests/grapple_test.js'], bat: ['tests/bat_test.js'], bossfield: ['tests/bossfield_test.js'], loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'], pillar: ['tests/pillar_test.js'], works: ['tests/works_test.js'],
 };
 // game file (regex on the path) -> tests. The guardians are handled apart: only the ones defined in the changed files are fought.
 const MAP = [
@@ -67,6 +67,12 @@ const MAP = [
   [/^js\/(enemies|weather|world)\.js$|^tests\/rest_test\.js$/, ['rest']],
   [/^js\/(field_\w+|fieldgen\w*|terrain|props|world|strata|graves|gimmick\w*|levelgen)\.js$|^tests\/geom_audit\.js$/, ['geom']], // (what you see and what you hit agree: no floor to fall through, no wall to walk through)
   [/^js\/(field_rooms|fieldgen\w*|levelgen|props|areas|rooms2|terrain|world)\.js$|^tests\/geom_audit\.js$/, ['geom_rooms']], // (the last foes pointed at and brought in; no weather under a roof) // (the new fields' own foes: drawn in their field, bodies, attacks)
+  [/^js\/(areas|field_\w+|fieldgen\w*|levelgen|strata|world|props)\.js$|^tests\/geom_audit\.js$/, ['signs']], // (the sign over every gate is in sight from the floor in front of it)
+  [/^js\/(field_rooms|levelgen|props|areas)\.js$|^tests\/geom_audit\.js$/, ['shopview']], // (nothing of the merchant's hall stands between you and its wares)
+  [/^js\/(player|water|audio|fields|field_flooded)\.js$/, ['swim']], // (deep water: the look under it, swimming up to its surface)
+  [/^js\/(player|world|terrain|field_\w+|fieldgen\w*)\.js$/, ['grapple']], // (the grapple holds on ceilings and rock, never past the place's own heights)
+  [/^js\/(enemies|data_enemies)\.js$/, ['bat']], // (the bats' swoop: never at the air, never into a wall)
+  [/^js\/runplan\.js$|^tests\/bossfield_test\.js$/, ['bossfield']], // (the guardians come up from the deep work in the fields of their new tiers)
   [/^js\/bosses7\.js$/, ['boss_hp']],
   [/^js\/bosses\d?\.js$/, ['gimmick']], // (a guardian's gimmicks cleared: a share of its health)
   [/^js\/(fx|statusui|pstatus|hudextra|ui|codex|devmode|perfmon|audio|textures|icons|icondata|avatar|warmup|util|smoothscroll)\.js$/, ['solo_smoke']],

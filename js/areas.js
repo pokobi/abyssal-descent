@@ -69,11 +69,71 @@
       ex.light.on = true; ex.light.intensity = 30; ex.light.color = T.color;
       if (ex.glow) ex.glow.material.color.set(T.color);
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(T), transparent: true, depthWrite: false }));
-      ex.labelY = w.strata ? 12.8 : 11.5; // hang the sign clear of the flames on the gate lintel
-      sp.scale.set(5.6, 2.4, 1); sp.position.set(ex.x, ex.labelY, 1.2);
+      const sg = AR.signPlace(w, ex); // over the frame, under whatever ceiling is above it
+      ex.labelY = sg.y; ex.lowSign = sg.low;
+      sp.scale.set(SIGN_W * sg.k, SIGN_H * sg.k, 1); sp.position.set(ex.x, ex.labelY, sg.z);
       w.group.add(sp); ex.label = sp;
     });
     if (!instant) { G.sfx.stoneGrind(V(w.W / 2, 2, 0), 2); G.sfx.bell(); }
+  };
+
+  // ---------------- the sign over an open gate ----------------
+  // It hangs at 11.5 m (12.8 on the stacked-storey fields), over the gate's frame (8.9 m), and it must be read from the floor in front
+  // of the gate. So it is hung at the highest place, from there down, that most of the places in front of the gate see (the floors you
+  // walk to, 6-20 m out, from where the gate itself is in sight): under a vault, a ceiling, the arch of a passage, the slab of the storey
+  // above. Where nothing over the frame will do (a low room), a smaller sign hangs in front of the frame's lintel, and the gate gets its
+  // screen marker too (AR.exitMarks). What counts as in the way is what is drawn (solid boxes, w.visual boxes); the frame's own parts
+  // never do (w._gateFrame, levelgen.js gateFrame). tests/geom_audit.js '... signs' checks every gate of every field and room by its triangles.
+  const SIGN_W = 5.6, SIGN_H = 2.4, FRAME_TOP = 8.9;
+  const drawnCol = (c) => c.vis && !c.gateFrame;
+  const _sd = new THREE.Vector3();
+  function signLine(w, o, x, y, z) {
+    _sd.set(x - o.x, y - o.y, z - o.z); const L = _sd.length(); if (L < 0.1) return true; _sd.divideScalar(L);
+    if (w.raycast(o, _sd, L - 0.15, { filter: drawnCol })) return false;
+    const ix = 1 / _sd.x, iy = 1 / _sd.y, iz = 1 / _sd.z, M = L - 0.15;
+    for (const b of w.visBoxes || []) {
+      let t1 = (b[0] - o.x) * ix, t2 = (b[3] - o.x) * ix, tn = Math.min(t1, t2), tf = Math.max(t1, t2);
+      t1 = (b[1] - o.y) * iy; t2 = (b[4] - o.y) * iy; tn = Math.max(tn, Math.min(t1, t2)); tf = Math.min(tf, Math.max(t1, t2));
+      t1 = (b[2] - o.z) * iz; t2 = (b[5] - o.z) * iz; tn = Math.max(tn, Math.min(t1, t2)); tf = Math.min(tf, Math.max(t1, t2));
+      if (tf >= Math.max(tn, 0) && tn > 0.05 && tn < M) return false;
+    }
+    return true;
+  }
+  // where the sign is read from: the floors you walk to at the gate's own level, 6-20 m in front of it and within 9 m to either side,
+  // from where the gate itself is in sight (a dozen of them)
+  function signViews(w, ex) {
+    const out = []; if (!w.nf || !w.reachMask || !w.N) return out;
+    for (let z = 6.5; z <= 20; z += 1) for (let x = Math.floor(ex.x - 9) + 0.5; x <= ex.x + 9; x += 1) {
+      const xi = Math.floor(x) + w.xo, zi = Math.floor(z) + w.zo; if (xi < 0 || zi < 0 || xi >= w.Wn || zi >= w.Dn) continue;
+      for (let k = 0; k < (w.L || 1); k++) { const i = k * w.N + zi * w.Wn + xi; const f = w.nf[i]; if (w.reachMask[i] && !w.nb[i] && f > -1.5 && f < 1.5) { out.push(new THREE.Vector3(x, f + 1.6, z)); break; } }
+    }
+    const seen = out.filter((v) => signLine(w, v, ex.x, 2.5, 1.4));
+    const step = Math.max(1, Math.floor(seen.length / 12));
+    return seen.filter((v, i) => i % step === 0).slice(0, 14);
+  }
+  AR.signPlace = function (w, ex) {
+    const base = w.strata ? 12.8 : 11.5, pad = 0.3, x0 = ex.x - SIGN_W / 2 - 0.3, x1 = ex.x + SIGN_W / 2 + 0.3, z0 = 0.3, z1 = 2.8, lo = 6.4, hi = base + SIGN_H / 2 + pad;
+    // the lowest thing drawn right over the sign's place
+    let ceil = Infinity;
+    const take = (bx0, by0, bz0, bx1, by1, bz1) => { if (bx1 > x0 && bx0 < x1 && bz1 > z0 && bz0 < z1 && by1 > lo && by0 < hi) ceil = Math.min(ceil, Math.max(lo, by0)); };
+    for (const c of w.query(x0, lo, z0, x1, hi, z1)) if (drawnCol(c) && c.alive !== false) take(c.x0, c.y0, c.z0, c.x1, c.y1, c.z1);
+    for (const b of w.visBoxes || []) take(b[0], b[1], b[2], b[3], b[4], b[5]);
+    const room = ceil - pad;
+    const cands = [];
+    for (let y = Math.min(base, room - SIGN_H / 2); y >= FRAME_TOP + 0.2 + SIGN_H / 2 - 1e-6; y -= 0.5) cands.push({ y, k: 1, z: 1.2, low: false });
+    for (let y = Math.min(FRAME_TOP - 0.2, room - SIGN_H * 0.35); y >= 4.4 - 1e-6; y -= 0.5) cands.push({ y, k: 0.7, z: 1.9, low: true });
+    if (!cands.length) return { y: 4.4, k: 0.7, z: 1.9, low: true };
+    const views = signViews(w, ex);
+    if (!views.length) return cands[0];
+    let best = cands[0], bv = -1;
+    for (const c of cands) {
+      let ok = 0;
+      for (const v of views) { let n = 0; for (const u of [-0.3, 0, 0.3]) if (signLine(w, v, ex.x + u * SIGN_W * c.k, c.y, c.z)) n++; if (n >= 2) ok++; }
+      const f = ok / views.length;
+      if (f >= 0.75) return c;
+      if (f > bv + 1e-6) { bv = f; best = c; }
+    }
+    return Object.assign({}, best, { low: true }); // (nowhere quite in sight: the best there is, and the screen marker)
   };
 
   // ---------------- mini shop (appears after each cleared arena) ----------------
@@ -1015,15 +1075,15 @@
     P.addShake(0.3);
   };
 
-  // ---------------- exit markers (the stacked-storey fields: the hanging sign is hidden by the slabs above) ----------------
+  // ---------------- exit markers (the stacked-storey fields, where the slabs above hide the hanging sign, and every gate of a room too low for it) ----------------
   // a small screen marker per open gate: icon, name, distance; at the edge of the screen when the gate is out of view
   const _em = new THREE.Vector3();
   AR.exitMarks = function (w) {
     const root = document.getElementById('worldui');
-    const on = root && w.exits && w.strata && GM.state === 'playing';
+    const on = root && w.exits && GM.state === 'playing';
     for (const ex of w.exits || []) {
       let m = ex.mark;
-      if (!on || !ex.open || !ex.type) { if (m) m.style.display = 'none'; continue; }
+      if (!on || !ex.open || !ex.type || !(w.strata || ex.lowSign)) { if (m) m.style.display = 'none'; continue; }
       if (!m) {
         m = ex.mark = document.createElement('div'); m.className = 'exit-mark';
         const T = AR.TYPES[ex.type]; m.style.setProperty('--c', typeof T.color === 'string' ? T.color : '#' + (+T.color).toString(16).padStart(6, '0'));

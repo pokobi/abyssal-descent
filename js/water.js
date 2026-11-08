@@ -28,6 +28,13 @@
     Wt.falls = (w && w.waterfalls) || [];
     Wt.streams = (w && w.streams) || [];
     Wt.flooded = !!(w && w.biome === 'flooded');
+    uwReset(); // (a new place: whatever was under the water before is gone, its fog with it)
+    // the surface seen from below: a pale shifting sheet over your head (the water's own plane is drawn from above only)
+    if (w && w.deepWater) for (const d of w.deepWater) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(d.x1 - d.x0, d.z1 - d.z0), new THREE.MeshBasicMaterial({ color: 0x9ad8d0, map: (w.mats.water && w.mats.water.map) || null, transparent: true, opacity: 0.34, depthWrite: false }));
+      m.rotation.x = Math.PI / 2; m.position.set((d.x0 + d.x1) / 2, d.y - 0.015, (d.z0 + d.z1) / 2); m.userData.noAudit = true; m.renderOrder = 2;
+      w.group.add(m);
+    }
   };
   // is p in the water (inside a pool, near its surface)? returns the pool
   Wt.at = function (p, below, above) {
@@ -86,10 +93,52 @@
     for (let i = 0; i < 3; i++) { const a = R() * 6.28, d = r * 0.5; Wt.ripple(pos.x + Math.cos(a) * d, pos.z + Math.sin(a) * d, 0.8); }
   };
 
+  // ---------------------------------------------------------------- under the water (the deep water of the drowned town, w.deepWater)
+  // With your eyes below its surface the water closes round you: a thick blue-green haze (darker the deeper), a tint over the screen with
+  // light drifting through it (#underwater, style.css), every sound muffled (audio.js A.underwater), the surface a pale sheet overhead,
+  // bubbles rising from you. Out again, the place's own fog comes back. (Hold jump to swim up to the surface: player.js)
+  const UW = { on: false, saved: null, el: null, bubT: 0 }, UW_FOG = new THREE.Color('#0e3c3b');
+  Wt.camUnder = function () {
+    const w = G.world, c = G.camera && G.camera.position; if (!w || !w.deepWater || !c) return null;
+    for (const d of w.deepWater) if (c.x > d.x0 && c.x < d.x1 && c.z > d.z0 && c.z < d.z1 && c.y < d.y - 0.03) return d;
+    return null;
+  };
+  Wt.underOn = () => UW.on;
+  function uwEl() {
+    if (UW.el) return UW.el;
+    const wrap = document.getElementById('canvas-wrap'); if (!wrap) return null;
+    const el = document.createElement('div'); el.id = 'underwater'; wrap.appendChild(el); // (over the world, under the HUD)
+    return (UW.el = el);
+  }
+  function uwOff(restore) {
+    if (!UW.on) return;
+    UW.on = false;
+    if (restore && UW.saved) { const sc = G.scene; sc.fog.color.copy(UW.saved.c); sc.fog.density = UW.saved.d; G.fx.setFog(sc.fog.color, sc.fog.density); }
+    UW.saved = null; if (UW.el) UW.el.classList.remove('on'); if (G.sfx.underwater) G.sfx.underwater(false);
+  }
+  function uwReset() { uwOff(false); }
+  function updateUnder(dt) {
+    const GM = G.game, d = GM.state === 'playing' ? Wt.camUnder() : null, sc = G.scene;
+    if (!d) { if (GM.state !== 'paused') uwOff(true); return; }
+    if (!UW.on) { UW.on = true; UW.saved = { c: sc.fog.color.clone(), d: sc.fog.density }; const el = uwEl(); if (el) el.classList.add('on'); if (G.sfx.underwater) G.sfx.underwater(true); }
+    const c = G.camera.position, depth = Math.max(0, d.y - c.y);
+    sc.fog.color.copy(UW_FOG).multiplyScalar(Math.max(0.5, 1 - depth * 0.15));
+    sc.fog.density = Math.max(UW.saved.d, 0.075 + depth * 0.012);
+    G.fx.setFog(sc.fog.color, sc.fog.density);
+    // bubbles rise from you now and then (up to the surface)
+    UW.bubT -= dt;
+    if (UW.bubT <= 0) {
+      UW.bubT = 0.35 + Math.random() * 0.7;
+      const f = G.player.forward ? G.player.forward() : new THREE.Vector3(0, 0, -1);
+      for (let k = 0, n = 2 + Math.floor(Math.random() * 3); k < n; k++) G.fx.norm.spawn(c.x + f.x * 0.45 + (Math.random() - 0.5) * 0.12, c.y - 0.25, c.z + f.z * 0.45 + (Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.2, 1.1 + Math.random() * 0.6, (Math.random() - 0.5) * 0.2, Math.min(1.6, depth / 1.2 + 0.4), 0.035, 0.05, 0.85, 0.97, 1, 0.75, -0.6, 0.4);
+    }
+  }
+
   // ---------------------------------------------------------------- every frame
   Wt.update = function (dt) {
     const w = G.world, P = G.player; if (!w || !P || !U2()) return;
     const GM = G.game;
+    updateUnder(dt);
     // you wading: rings at your feet as you go (the steps make their own splash)
     if (P.inWater && P.speedH > 0.6) { wadeT -= dt; if (wadeT <= 0) { wadeT = 0.24; Wt.ripple(P.pos.x, P.pos.z, 0.25 + Math.min(0.4, P.speedH * 0.05)); } }
     // the foes wading: a ring now and then round each that moves, a few drops

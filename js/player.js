@@ -3,6 +3,9 @@
 (function () {
   // the grapple's cooldown: 15 s, shortened by the grapple-cooldown stat (never below 15% of that)
   G.GRAPPLE_CD = 15;
+  G.SWIM_FLOAT = 1.25; G.SWIM_UP = 3.2; G.SWIM_SINK = 2.4; // deep water: the feet this far under the surface when floating; m/s up while jump is held; the fastest you sink
+  G.GRAPPLE_TOP = 5; // m over the highest floor you walk to: as high as the grapple takes you (player.js grappleBounds)
+  G.GRAPPLE_LEDGE = 3.2; // m over every floor within 6 m: a place you were not meant to stand (put back where you stood)
   G.grappleCdOf = (st) => (st.grappleBase || G.GRAPPLE_CD) * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0))); // (the class sets the base: 15-28 s, see classes.js)
   const U = G.U, I = G.input;
   const V = G.U.V;
@@ -384,6 +387,7 @@
         }
       }
       if (this.grapple.state === 'attached' && I.hit('jump')) { this.detachGrapple(true); }
+      this.swim(dt);
       if (G.Strata.ladders.length && this.grapple.state !== 'attached' && !this.pileState) G.Strata.ladder(this, fwdIn > 0 || I.down('jump'), dt);
       // speed cap safety
       const vmax = 60; if (this.vel.length() > vmax) this.vel.setLength(vmax);
@@ -439,13 +443,14 @@
       }
       // fail-safes: out of bounds / abyss
       if (this.pos.y < w.killY) this.fellInPit();
+      this.grappleBounds(w, dt);
       const inTunnel = this.pos.z < 0.5 && (w.exits || []).some((ex) => this.pos.x > ex.gx0 && this.pos.x < ex.gx1);
       if (!inTunnel) {
         this.pos.z = U.clamp(this.pos.z, 0.36, w.D - 0.36);
         if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.36); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.36, w.W - 0.36);
       }
       // safe position memory
-      if (this.grounded && !this.pileState) {
+      if (this.grounded && !this.pileState && !this._grapAir) {
         this._safeT = (this._safeT || 0) - dt;
         if (this._safeT <= 0) {
           this._safeT = 0.3;
@@ -467,6 +472,43 @@
       const a = G.world.query(this.pos.x - 0.1, this.pos.y - 0.1, this.pos.z - 0.1, this.pos.x + 0.1, this.pos.y + 0.01, this.pos.z + 0.1);
       let best = null; for (const c of a) if (!best || c.y1 > best.y1) best = c;
       return best ? best.surf : 'stone';
+    }
+    // deep water (the drowned town, w.deepWater): hold jump and you swim up to the surface and float there, head and shoulders out (from
+    // there you can climb out onto a wall's top); let go and you sink back, slowly
+    swim(dt) {
+      const w = G.world; this.swimming = false;
+      if (!w || !w.deepWater || this.pileState || this.grapple.state === 'attached' || this.liftVy != null || this.mantle) return;
+      const d = w.deepWater.find((q) => this.pos.x > q.x0 && this.pos.x < q.x1 && this.pos.z > q.z0 && this.pos.z < q.z1);
+      if (!d || this.pos.y > d.y - 0.6) return;
+      this.swimming = true;
+      const top = d.y - G.SWIM_FLOAT;
+      if (I.down('jump')) {
+        if (this.pos.y < top - 0.04) this.vel.y += (G.SWIM_UP - this.vel.y) * Math.min(1, 7 * dt);
+        else this.vel.y = (top - this.pos.y) * 6; // (floating: held at the surface)
+      } else if (this.vel.y < -G.SWIM_SINK) this.vel.y = -G.SWIM_SINK; // (the water holds you back as you sink)
+    }
+    // The grapple takes you to ceilings, cliffs and walls, but not above the place itself. From the moment it holds until you are down
+    // again on ground you walk to: never higher than 5 m over the highest floor you can walk to (held there, the rope lets go); and come
+    // down on top of something far above every floor round it (a cliff's top, the top of a wall, a vault's ledge) and in a moment you are
+    // put back where you last stood. (w.reachTops / reachNear, world.js: the floors the nav reaches from the entrance)
+    grappleBounds(w, dt) {
+      if (this.grapple.state === 'attached') this._grapAir = true;
+      if (!this._grapAir || !w.reachTops) return;
+      const rt = w.reachTops(); if (!rt || !(rt.max > -Infinity)) { this._grapAir = false; return; }
+      const cap = rt.max + G.GRAPPLE_TOP;
+      if (this.pos.y > cap) {
+        this.pos.y = cap; if (this.vel.y > 0) this.vel.y = 0;
+        if (this.grapple.state === 'attached') { this._capT = (this._capT || 0) + dt; if (this._capT > 0.25) this.detachGrapple(false); }
+      } else this._capT = 0;
+      if (!this.grounded || this.grapple.state === 'attached') return;
+      if (this.pos.y > w.reachNear(this.pos.x, this.pos.z, 6) + G.GRAPPLE_LEDGE) {
+        this._offT = (this._offT || 0) + dt;
+        if (this._offT > 0.5) {
+          this._offT = 0; this._grapAir = false;
+          this.pos.copy(this.lastSafe); this.pos.y += 0.05; this.vel.set(0, 0, 0); w.depenetrate(this.pos, this.hw, this.height);
+          G.ui.toastSmall('⚓ そこへは上がれない');
+        }
+      } else { this._grapAir = false; this._offT = 0; }
     }
     fellInPit() {
       const wf = G.world.fallFrac || 0.15;

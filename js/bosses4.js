@@ -4,6 +4,7 @@
 //  the ruined depths: 骨積みの巨人, 虚ろなる騎士王, 不死王リッチ, 奈落の巨獣, 深淵の紡ぎ女
 (function () {
   const BS = G.bosses, U = G.U;
+  const SLOW_K = { swipe: 1, slam: 1, charge: 1, nova: 1 }; // (the attacks whose circle lasts exactly the wind-up: BS.slow lengthens the short ones)
   const { mat, mesh, joint } = BS.h;
   const V = G.U.V;
   const PG = () => G.Props.PG;
@@ -275,7 +276,8 @@
     run0(dt) {
       const a = this.act, P = Pl(), S = this.S;
       a.t += dt * this.atkRate();
-      const wind = a.wind || 0.7;
+      // (the swing, the slam, the charge and the nova show their circle for exactly the wind-up: 0.8 s or less of it is 0.2 s longer, BS.slow)
+      const wind0 = a.wind || 0.7, wind = SLOW_K[a.k] ? BS.slow(wind0) : wind0;
       const fwd = V(Math.sin(this.yaw), 0, Math.cos(this.yaw));
       this.pose.k = Math.min(1, a.t / Math.max(0.15, wind));
       const sfxW = () => { if (!a.sw) { a.sw = true; G.sfx.monster(this.pos, a.cry || 'roar', S.pitch || 0.6, 0.9); } };
@@ -289,7 +291,7 @@
             a.done = true; G.sfx.whoosh(0.7, 0.6);
             if (Math.hypot(P.pos.x - sc.x, P.pos.z - sc.z) < a.r * 0.6 + 0.4 && P.pos.y < (a.h || 4)) { this.hit(a.dmg, 'melee', this.pos.clone(), a.elem); P.vel.addScaledVector(fwd, a.knock || 8); P.vel.y = Math.max(P.vel.y, 3); }
             G.vfx.nova(sc, a.r * 0.6, 0.1, { style: 'shock', dome: false, ground: a.col || 0xffa060 }); G.vfx.slash(this.pos.clone().setY((this.J && this.J.height ? this.J.height : 3) * 0.45), fwd, a.r * 1.15, 2.4, a.col || 0xffc090, { tilt: (Math.random() - 0.5) * 0.9, dur: 0.14, r0: a.r * 0.3, cw: Math.random() < 0.5 });
-            if (a.combo && (a.n = (a.n || 1)) < Math.min(3, a.combo + (BS.diffRank && BS.diffRank() >= 2 ? 1 : 0))) { a.n++; a.t = wind * 0.45; a.done = false; a.tele = null; this.pose.hit = 0; break; }
+            if (a.combo && (a.n = (a.n || 1)) < Math.min(3, a.combo + (BS.diffRank && BS.diffRank() >= 2 ? 1 : 0))) { a.n++; a.t = wind - BS.slow(wind0 * 0.55); a.done = false; a.tele = null; this.pose.hit = 0; break; }
           }
           if (a.t > wind + (a.rec || 0.5)) this.end();
           break;

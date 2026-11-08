@@ -1331,6 +1331,7 @@
     if (P.weapons.length >= P.stats.weaponSlots) return false;
     const x = it.gun || {}, w = G.weapons.make(it.id);
     w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag;
+    if (G.ownEl(w) && w.atts.core) { P.attStash.push(w.atts.core); delete w.atts.core; } // (a gun with an element of its own takes no 属性コア: one put in before is kept aside)
     P.weapons.push(w); G.weapons.switchTo(P.weapons.length - 1); G.ui.refreshWeapon(); P.recalc();
     const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を${quiet ? '装備した' : '拾った'}`);
     return true;
@@ -1869,15 +1870,18 @@
       cat = `🔫 ${ob.cat} · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
       const cur = P.weapon ? G.weapons.stats(P.weapon) : { dmg: 0, pellets: 1, rpm: 0, mag: 0, reload: 0, spread: 0 }; // no gun in hand: everything is a gain
       const cmp = (label, a, b, fmt, better) => { const up = better === 'low' ? a < b : a > b; const cls = Math.abs(a - b) < 1e-6 ? '' : up ? 'up' : 'down'; return `<div>${label} <b class="${cls}">${fmt(a)}</b> <span style="opacity:.6">(${fmt(b)})</span></div>`; };
-      const nd = ob.dmg * (ob.pellets || 1), cd = cur.dmg * (cur.pellets || 1);
-      stats = cmp('💥ダメージ', nd, cd, (v) => Math.round(v)) + cmp('🔁連射', ob.rpm, cur.rpm, (v) => Math.round(v)) + cmp('📊DPS', nd * ob.rpm / 60, cd * cur.rpm / 60, (v) => Math.round(v)) + cmp('📦装弾数', ob.mag, cur.mag, (v) => v) + cmp('♻️リロード', ob.reload, cur.reload, (v) => v.toFixed(1) + 's', 'low') + cmp('🎯拡散', ob.spread, cur.spread, (v) => v.toFixed(1) + '°', 'low');
+      // the gun on the shelf as you would hold it: its forge level and your own stats, the same as the one in your hand (not its bare Lv0 numbers)
+      const sh = G.weapons.stats({ id: ob.id, def: ob, atts: {}, lv: o.lv || 0, ver: 0 });
+      const nd = sh.dmg * (sh.pellets || 1), cd = cur.dmg * (cur.pellets || 1);
+      stats = cmp('💥ダメージ', nd, cd, (v) => Math.round(v)) + cmp('🔁連射', sh.rpm, cur.rpm, (v) => Math.round(v)) + cmp('📊DPS', nd * sh.rpm / 60, cd * cur.rpm / 60, (v) => Math.round(v)) + cmp('📦装弾数', sh.mag, cur.mag, (v) => v) + cmp('♻️リロード', sh.reload, cur.reload, (v) => v.toFixed(1) + 's', 'low') + cmp('🎯拡散', sh.spread, cur.spread, (v) => v.toFixed(1) + '°', 'low');
       if (ob.trait) note += `${G.WEAPON_TRAITS[ob.trait].icon} ${G.WEAPON_TRAITS[ob.trait].name}: ${G.WEAPON_TRAITS[ob.trait].desc}　`;
       if (P.weapons.length >= P.stats.weaponSlots) note += '⚠ 武器スロット満杯：購入時に交換する武器を選択（旧武器は下取り）';
     } else if (o.kind === 'melee') {
       cat = `🗡️ 近接武器（${ob.cat}） · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
-      const cur = P.melee.def;
+      // both as you would swing them: their forge levels and your own stats (the one on the shelf may come forged)
+      const cur = G.weapons.meleeStats(P.melee), sm = G.weapons.meleeStats({ id: ob.id, def: ob, lv: o.lv || 0, atts: {} });
       const cmp = (label, a, b, fmt, better) => { const up = better === 'low' ? a < b : a > b; const cls = Math.abs(a - b) < 1e-6 ? '' : up ? 'up' : 'down'; return `<div>${label} <b class="${cls}">${fmt(a)}</b> <span style="opacity:.6">(${fmt(b)})</span></div>`; };
-      stats = cmp('💥ダメージ', ob.dmg, cur.dmg, (v) => Math.round(v)) + cmp('⚡攻撃間隔', ob.swing, cur.swing, (v) => v.toFixed(2) + 's', 'low') + cmp('📊DPS', ob.dmg / ob.swing, cur.dmg / cur.swing, (v) => Math.round(v)) + cmp('📏リーチ', ob.range, cur.range, (v) => v + 'm') + cmp('🔨重撃', ob.heavy[0], cur.heavy[0], (v) => '×' + v) + cmp('👟移動', ob.moveMul, cur.moveMul, (v) => '×' + v.toFixed(2));
+      stats = cmp('💥ダメージ', sm.dmg, cur.dmg, (v) => Math.round(v)) + cmp('⚡攻撃間隔', sm.swing, cur.swing, (v) => v.toFixed(2) + 's', 'low') + cmp('📊DPS', sm.dmg / sm.swing, cur.dmg / cur.swing, (v) => Math.round(v)) + cmp('📏リーチ', sm.range, cur.range, (v) => +v.toFixed(1) + 'm') + cmp('🔨重撃', sm.heavy[0], cur.heavy[0], (v) => '×' + v) + cmp('👟移動', sm.moveMul, cur.moveMul, (v) => '×' + v.toFixed(2));
       if (ob.traitDesc) note += '✦ ' + ob.traitDesc + '　';
       { const tv = G.Pawn.tradeValue(P.melee, true); if (tv > 0) note += `♻️ 今の${P.melee.def.name}は下取り +${U.fmt(tv)}🪙　`; }
       note += `⚠ 現在の ${cur.icon}${cur.name} と交換（${G.K('w3')}）`;

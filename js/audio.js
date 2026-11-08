@@ -3,6 +3,9 @@
 // short transients and a dark convolution reverb so it reads as physical rather than "beepy".
 (function () {
   const A = (G.sfx = {});
+  let muffle = null;
+  // your head under the water (water.js): every sound dull and far, as through the water
+  A.underwater = function (on) { if (!muffle || !ctx) return; muffle.frequency.setTargetAtTime(on ? 620 : 22000, ctx.currentTime, on ? 0.05 : 0.12); };
   let ctx = null, master, dry, revSend, reverb, gunBus, shaper;
   let white, pink, brown;
   let voices = 0;
@@ -51,7 +54,8 @@
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5; comp.attack.value = 0.002; comp.release.value = 0.25;
     master = ctx.createGain(); master.gain.value = A.volume;
-    master.connect(comp); comp.connect(ctx.destination);
+    muffle = ctx.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 22000; muffle.Q.value = 0.5; // (closed under the water: A.underwater)
+    master.connect(muffle); muffle.connect(comp); comp.connect(ctx.destination);
     dry = ctx.createGain(); dry.gain.value = 1; dry.connect(master);
     reverb = ctx.createConvolver(); reverb.buffer = makeIR(2.8, 2.6);
     const revLP = ctx.createBiquadFilter(); revLP.type = 'lowpass'; revLP.frequency.value = 3200;

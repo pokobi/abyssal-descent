@@ -35,10 +35,10 @@ const secs = +process.argv[2] || 5;
       return g.eval('G.Coop.fpOk');
     };
     const e0 = () => h.errs.length + g.errs.length;
-    for (const kind of process.env.QUICK ? ['combat'] : kinds) {
+    for (const kind of process.env.QUICK ? ['combat'] : process.env.KINDS ? process.env.KINDS.split(',') : kinds) {
       const before = e0();
       let ok = false;
-      try { ok = await go(n, kind); } catch (e) { check(false, `${kind}: reached by the guest (${String(e.message).slice(0, 80)})`); await h.eval('G.game.transitioning = false; 1'); continue; }
+      try { ok = await go(n, kind); } catch (e) { check(false, `${kind}: reached by the guest (${String(e.message).slice(0, 80)}) ` + JSON.stringify(await g.eval('JSON.stringify([G.game.area, G.game.stage, G.game.state, G.game.transitioning, G.Coop.fpOk])')) + ' ' + h.errs.concat(g.errs).slice(-2).join(' | ').slice(0, 400)); await h.eval('G.game.transitioning = false; 1'); continue; }
       await g.eval(`window.__cb = __coopbot(${secs * 1000}); 1`); await h.eval(`window.__cb = __coopbot(${secs * 1000}); 1`);
       await sleep(secs * 1000 + 200);
       check(ok && e0() === before, `${kind}: same world, no errors` + (e0() > before ? ' ' + h.errs.concat(g.errs).slice(-2).join(' | ').slice(0, 300) : ''));

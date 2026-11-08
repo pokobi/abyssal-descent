@@ -631,6 +631,10 @@
   LG.tree = tree;
   function gateFrame(w, x, z, side, y0) {
     if (y0) { const sv = w.solid.bind(w), vv = w.visual.bind(w); const sh = (f) => (m, a, b, c, d2, e, f2, o) => f(m, a, b + y0, c, d2, e + y0, f2, o); w.solid = sh(sv); w.visual = sh(vv); try { gateFrame(w, x, z, side, 0); } finally { w.solid = sv; w.visual = vv; } return; }
+    w._gateFrame = true; try { gateFrame0(w, x, z, side); } finally { w._gateFrame = false; }
+  }
+  // (the frame's own parts carry w._gateFrame: a sign hung over the gate is placed clear of what is over the frame, not of the frame, areas.js AR.signPlace)
+  function gateFrame0(w, x, z, side) {
     const s = side === 'S' ? -1 : 1; // inward direction
     const zz = z, d = 1.3;
     const za = side === 'S' ? zz - d : zz, zb = side === 'S' ? zz : zz + d;
@@ -1093,6 +1097,11 @@
   // the other four stalls line the west and east walls; the fountain and the re-stock altar sit by the walls near the door, clear of the stalls,
   // and the pawn counter is on the south wall beside the door.
   // Every stall has a stepped counter (three wares in front, two on a raised shelf behind), so a stall is short and the whole hall reads at a glance.
+  // what the field's own shell (field_rooms.js) leaves bare in the merchant's hall: the stalls along both walls and the floor in front of
+  // them, the two islands with the re-stock altar and the parts bench before them, the fountain, the pawn counter and the aisle from the
+  // door. [x0, z0, x1, z1] (the hall is 44 x 44). Its pillars, chains, lanterns, rocks and falls go round them, so nothing stands
+  // between you and the wares.
+  LG.SHOP_KEEP = [[0, 7, 10.5, 41], [33.5, 7, 44, 35], [7, 18.5, 37.5, 33], [30, 35, 41.5, 44], [17, 33, 27, 44]];
   LG.shop = function (area, seed, gates) {
     const rng = new G.RNG(seed);
     const W = 44, D = 44;
@@ -1100,7 +1109,7 @@
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
     // the place round the hall: the field's own (field_rooms.js), or the stone hall with its beams and chandeliers
     const shell = LG.shellFor && LG.shellFor(w);
-    if (shell) shell(w, rng, W, D, { kind: 'shop', gates });
+    if (shell) shell(w, rng, W, D, { kind: 'shop', gates, keep: LG.SHOP_KEEP });
     else {
       floors(w, W, D, null, 'floor');
       perimeter(w, rng, W, D, { h: 10, top: 16, beams: 0, gates });

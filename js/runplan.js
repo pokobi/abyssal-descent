@@ -144,8 +144,20 @@
   R.BOSS_POOLS = {
     grave: ['houndlord', 'boneking', 'broodmother', 'wyrm', 'colossus', 'oboro', 'foxfire', 'stormimp'],
     gate: ['warlock', 'boneking', 'cerberus', 'madman', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur', 'oboro', 'karakuri', 'stormimp'],
-    halls: ['warlock', 'boneking', 'cerberus', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur', 'oboro', 'karakuri', 'foxfire'],
-    ruin: ['ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver', 'warden', 'arbiter', 'minotaur', 'cinderpriest', 'ashdrake', 'foxfire', 'karakuri', 'stormimp'],
+    // (the deep guardians and the madman come up to the middle depths too: every guardian is met in two tiers at least)
+    halls: ['warlock', 'boneking', 'cerberus', 'executioner', 'colossus', 'warden', 'arbiter', 'minotaur', 'oboro', 'karakuri', 'foxfire',
+      'madman', 'ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver', 'cinderpriest', 'ashdrake'],
+    ruin: ['ossuary', 'hollowknight', 'lich', 'behemoth', 'weaver', 'warden', 'arbiter', 'minotaur', 'cinderpriest', 'ashdrake', 'foxfire', 'karakuri', 'stormimp', 'madman'],
+  };
+  // A guardian met away from its own depth (the deep ones in the middle depths, the madman further down) is brought to that depth's
+  // strength: its health and its blows are scaled by the tier's own big guardians (their average base health and blow) over its home tier's.
+  R.BOSS_HOME = { ossuary: 'ruin', hollowknight: 'ruin', lich: 'ruin', behemoth: 'ruin', weaver: 'ruin', cinderpriest: 'ruin', ashdrake: 'ruin', madman: 'gate' };
+  R.TIER_POW = { gate: [4400, 22], halls: [4550, 23], ruin: [6500, 30] }; // [average base health, average blow] of each tier's big guardians
+  R.bossTierK = function (id, n) {
+    const home = R.BOSS_HOME[id]; if (!home) return null;
+    const here = R.baseOf(R.field(n)); if (here === home || !R.TIER_POW[here] || !R.TIER_POW[home]) return null;
+    const a = R.TIER_POW[here], b = R.TIER_POW[home];
+    return { hp: a[0] / b[0], dmg: a[1] / b[1] };
   };
   // a field without a pool of its own draws from its tier's first field (the guardians' strength follows the segment, not the place)
   R.bossPool = (f) => R.BOSS_POOLS[f] || R.BOSS_POOLS[R.baseOf(f)] || [];

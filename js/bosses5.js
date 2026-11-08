@@ -142,7 +142,7 @@
     if (!a.s) { a.s = { i: 0, next: a.wind || 0.5, cur: null }; sfxCast(this, a); pose(this, 1); }
     const s = a.s;
     if (!s.cur && s.i < n && a.t >= s.next) {
-      const d = Math.max(0.62, (a.delay || 0.95) - s.i * 0.07), c = P.pos.clone().setY(0);
+      const d = BS.slow(Math.max(0.62, (a.delay || 0.95) - s.i * 0.07)), c = P.pos.clone().setY(0);
       s.cur = { c, t: a.t + d, tele: FX().telegraph(c, r, d, col) }; s.i++;
     }
     if (s.cur && a.t >= s.cur.t) {
@@ -157,7 +157,7 @@
   const RING_HW = 0.8; // half-width of a jump-over ring, drawn and tested
   atk.rings = function (a) {
     // rings you have to jump: never more than three, far enough apart to land, take off again and time the next one, and not too fast
-    const P = Pl(), n = Math.min(3, a.n || 3), gap = Math.max(1.4, a.gap || 0.75), speed = Math.min(13, a.speed || 15), W = a.wind || 0.8, col = a.col || 0xffa060, R = 44;
+    const P = Pl(), n = Math.min(3, a.n || 3), gap = Math.max(1.4, a.gap || 0.75), speed = Math.min(13, a.speed || 15), W = BS.slow(a.wind || 0.8), col = a.col || 0xffa060, R = 44;
     if (!a.rg) {
       sfxCast(this, a); pose(this, 1);
       a.o = this.pos.clone().setY(0); a.rg = []; a.tele = FX().telegraph(a.o, 5, W, col);
@@ -262,9 +262,9 @@
         const an = Math.random() * 6.28, d = a.dist || 3.4;
         this.pos.set(P.pos.x + Math.cos(an) * d, 0, P.pos.z + Math.sin(an) * d); arenaClamp(this, this.pos);
         this.root.visible = true; this.face(P.pos, 1, 99); FX().smoke(this.pos.clone().setY(2), 12, 1.4, 0x1a0a20, 0.6, 1.2);
-        s.ph = 'tele'; s.t = a.t; s.tele = FX().telegraph(this.pos.clone().setY(0), r, a.tele || 0.5, col); pose(this, 1); this.pose && (this.pose.n = 'swing');
+        s.ph = 'tele'; s.t = a.t; s.tele = FX().telegraph(this.pos.clone().setY(0), r, BS.slow(a.tele || 0.5), col); pose(this, 1); this.pose && (this.pose.n = 'swing');
       }
-    } else if (s.ph === 'tele' && el > (a.tele || 0.5)) {
+    } else if (s.ph === 'tele' && el > BS.slow(a.tele || 0.5)) {
       s.ph = 'hit'; s.t = a.t; if (this.pose) this.pose.hit = 1;
       boom(this.pos, r, col, () => { if (hd(P.pos, this.pos) < r && P.pos.y < 3) { this.hurtPlayer(a.dmg || 24, 'melee', this.pos.clone(), a.elem); const kd = P.pos.clone().sub(this.pos).setY(0).normalize(); P.vel.addScaledVector(kd, 9); P.vel.y = Math.max(P.vel.y, 4); } });
     } else if (s.ph === 'hit' && el > 0.25) {

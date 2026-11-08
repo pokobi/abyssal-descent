@@ -78,8 +78,9 @@ function audit(o) {
   }
   const cellAt = (x, z) => { const a = Math.floor(x - X0), b = Math.floor(z - Z0); return a < 0 || b < 0 || a >= GW || b >= GD ? null : cells[b * GW + a]; };
   // a ray (o, d unit, len) against the triangles near it: the nearest hit's distance, or Infinity
+  let lastHit = -1; // (the triangle the last ray stopped on)
   const ray = (ox, oy, oz, dx, dy, dz, len) => {
-    const seen = new Set(); let best = Infinity;
+    const seen = new Set(); let best = Infinity; lastHit = -1;
     const ex = ox + dx * len, ez = oz + dz * len;
     const a0 = Math.floor(Math.min(ox, ex) - X0), a1 = Math.floor(Math.max(ox, ex) - X0), b0 = Math.floor(Math.min(oz, ez) - Z0), b1 = Math.floor(Math.max(oz, ez) - Z0);
     for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) {
@@ -97,7 +98,7 @@ function audit(o) {
         const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
         const v = (dx * qx + dy * qy + dz * qz) * inv; if (v < -1e-4 || u + v > 1 + 1e-4) continue;
         const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
-        if (tt >= -0.02 && tt <= len && tt < best) best = tt;
+        if (tt >= -0.02 && tt <= len && tt < best) { best = tt; lastHit = t; }
       }
     }
     return best;
@@ -117,6 +118,48 @@ function audit(o) {
   }
   const floorsNear = (x, z, R) => { const out = []; const a0 = Math.floor(x - R), a1 = Math.floor(x + R), b0 = Math.floor(z - R), b1 = Math.floor(z + R); for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const L = reachH.get(a + ',' + b); if (L) out.push(...L); } return out; };
   if (o.dbg) { const [x, y, z] = o.dbg, L = cellAt(x, z) || []; return { n: L.length, mats: [...new Set(L.map((t) => mlist[tmat[t]]))], ys: L.filter((t) => nrm[t * 3 + 1] > 0.5).map((t) => +tri[t * 9 + 1].toFixed(2)).slice(0, 20), down: ray(x, y + 0.5, z, 0, -1, 0, 0.75), NT, X0, GW }; }
+  // ================= signs: the sign over every open gate, read from the floors in front of it (from where you can see the gate itself,
+  // most places must see most of the sign: not buried in a ceiling, a vault, a slab or an arch)
+  if (o.signs) {
+    const out = [];
+    for (const ex of w.exits || []) {
+      if (!ex.label) continue;
+      const sp = ex.label, sw = sp.scale.x, sh = sp.scale.y, sx = sp.position.x, sy = ex.labelY, sz = sp.position.z;
+      const pts = []; for (const u of [-0.35, 0, 0.35]) for (const v of [-0.3, 0, 0.3]) pts.push([sx + u * sw, sy + v * sh, sz]);
+      const views = [];
+      for (const [key, hs] of reachH) { const [cx, cz] = key.split(',').map(Number), x = cx + 0.5, z = cz + 0.5; if (z < 6 || z > 26 || Math.abs(x - ex.x) > 14) continue; for (const h of hs) views.push([x, h + 1.6, z]); }
+      const step = Math.max(1, Math.floor(views.length / 60));
+      let seeGate = 0, seeSign = 0; const blind = [];
+      for (let i = 0; i < views.length; i += step) {
+        const [x, y, z] = views[i];
+        const vis = (px, py, pz) => { const dx = px - x, dy = py - y, dz = pz - z, L = Math.hypot(dx, dy, dz); return ray(x, y, z, dx / L, dy / L, dz / L, L - 0.1) >= L - 0.15; };
+        if (!vis(ex.x, 2.5, 1.4)) continue; // (the gate itself out of sight from here: not a place to read its sign from)
+        seeGate++;
+        if (pts.filter((q) => vis(q[0], q[1], q[2])).length >= 5) seeSign++; else if (blind.length < 3) blind.push([x, +y.toFixed(1), z]);
+      }
+      out.push({ x: ex.x, y: +sy.toFixed(2), k: +(sw / 5.6).toFixed(2), low: !!ex.lowSign, seeGate, seeSign, blind });
+    }
+    if (o.only === 'signs') return { W: w.W, D: w.D, tris: NT, signs: out };
+  }
+  // ================= shopview: every ware of the merchant's hall seen from where you stand to buy it (3-6 m out in front of its stall,
+  // straight on and 35 degrees to either side, at eye height): nothing of the hall in between
+  if (o.only === 'shopview') {
+    const out = [];
+    for (const sl of w.shopSlots || []) {
+      const tx = sl.x, ty = sl.y + 0.35, tz = sl.z, nx = sl.nx, nz = sl.nz;
+      let n = 0, blocked = 0; const by = {};
+      for (const d of [3, 4.5, 6]) for (const an of [-0.61, 0, 0.61]) {
+        const vx = nx * Math.cos(an) - nz * Math.sin(an), vz = nx * Math.sin(an) + nz * Math.cos(an);
+        const x = tx + vx * d, z = tz + vz * d, y = 1.6;
+        if (x < 0.5 || z < 0.5 || x > w.W - 0.5 || z > w.D - 0.5 || inside(x, 1.0, z, 0.2) || inside(x, y, z, 0.1)) continue;
+        n++;
+        const dx = tx - x, dy = ty - y, dz = tz - z, L = Math.hypot(dx, dy, dz);
+        if (ray(x, y, z, dx / L, dy / L, dz / L, L - 0.45) < L - 0.5) { blocked++; const m = mlist[tmat[lastHit]]; by[m] = (by[m] || 0) + 1; }
+      }
+      out.push({ x: +tx.toFixed(1), z: +tz.toFixed(1), n, blocked, by });
+    }
+    return { W: w.W, D: w.D, tris: NT, slots: out };
+  }
   const res = { floor: [], wall: [], ghost: [] };
   const cap = 6000;
   // ================= floor: drawn facing up, nothing solid under it
@@ -227,8 +270,11 @@ function audit(o) {
 
 // ---------------------------------------------------------------- the run
 const FIELDS = ['hamlet', 'dusk', 'battlefield', 'catacombs', 'castle', 'shaft', 'flooded', 'foundry', 'mine', 'frozen', 'pillars', 'sanctum'];
+// (the 5th argument 'signs': only the signs over the gates, in every field, the first four too)
+const SIGNS = process.argv[5] === 'signs', SHOPV = process.argv[5] === 'shopview';
+const FIELDS_ALL = ['grave', 'gate', 'halls', 'ruin', ...FIELDS];
 (async () => {
-  const want = (process.argv[2] && process.argv[2] !== 'all') ? process.argv[2].split(',') : FIELDS;
+  const want = (process.argv[2] && process.argv[2] !== 'all') ? process.argv[2].split(',') : SIGNS || SHOPV ? FIELDS_ALL : FIELDS;
   const kinds = (process.argv[3] || 'combat,shop,event,shrine,forge,alchemy,boss').split(',');
   const seeds = +(process.argv[4] || 2);
   const skipMats = (process.env.AUDIT_SKIP || 'water,lava,glow,web,fire,flame,vine').split(',');
@@ -241,6 +287,7 @@ const FIELDS = ['hamlet', 'dusk', 'battlefield', 'catacombs', 'castle', 'shaft',
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000);
     await sleep(500);
+    if (process.env.AUDIT_PRE) await p.eval(process.env.AUDIT_PRE + '; 1'); // (debugging: code run in the page before the areas are built)
     await p.eval(`window.__audit = ${audit.toString()}; const pl = G.FieldGen.pickLayout; G.FieldGen.pickLayout = function (rng, field, list) { (window.__lay = window.__lay || {})[field] = list; return pl.apply(this, arguments); }; 1`);
     const enter = async (field, n, kind, layout, seed) => {
       await p.eval('window.__w0 = G.world; 1');
@@ -260,8 +307,23 @@ const FIELDS = ['hamlet', 'dusk', 'battlefield', 'catacombs', 'castle', 'shaft',
       for (const j of jobs) {
         await enter(field, j.n, j.kind, j.lay, j.seed);
         if (process.env.AUDIT_DBG) { console.log('DBG', await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats, dbg: process.env.AUDIT_DBG.split(',').map(Number) })}))`)); continue; }
-        const r = JSON.parse(await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats })}))`));
         const tag = `${field} ${j.kind}${j.lay ? '/' + j.lay : ''} seed ${j.seed}`;
+        if (SHOPV) {
+          const r = JSON.parse(await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats, only: 'shopview' })}))`));
+          const bad = r.slots.filter((q) => q.n >= 4 && q.blocked >= 2);
+          serious += bad.length; total += r.slots.length;
+          console.log(`${tag}: ${r.slots.length} wares, ${bad.length} hidden${bad.length ? '  <- ' + bad.map((q) => `(${q.x},${q.z}) ${q.blocked}/${q.n} ${JSON.stringify(q.by)}`).join(' ') : ''}`);
+          continue;
+        }
+        if (SIGNS) {
+          await p.eval("(() => { const w = G.world; if (w.exits && w.exits.some((e) => !e.open)) G.Areas.openGates(true); })(); 1");
+          const r = JSON.parse(await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats, signs: true, only: 'signs' })}))`));
+          const bad = r.signs.filter((g) => g.seeGate >= 3 && g.seeSign < g.seeGate * 0.6);
+          serious += bad.length; total += r.signs.length;
+          console.log(`${tag}: ${r.signs.map((g) => `x${g.x} y${g.y}${g.low ? ' low' : ''} ${g.seeSign}/${g.seeGate}`).join(' | ') || 'no gates'}${bad.length ? '  <- HIDDEN ' + JSON.stringify(bad.map((g) => g.blind)) : ''}`);
+          continue;
+        }
+        const r = JSON.parse(await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats })}))`));
         const big = (a, n) => a.filter((c) => c.n >= n);
         // (what counts: a floor at least 0.5 m across both ways (narrower, nobody stands on it); a wall at least 0.5 m wide and tall (a thinner
         // thing you brush past); an invisible face at least 0.6 m wide and tall, or an invisible top 0.6 m across (less: the box round a
@@ -282,6 +344,8 @@ const FIELDS = ['hamlet', 'dusk', 'battlefield', 'catacombs', 'castle', 'shaft',
     if (p.errs.length) console.log('page errors:', p.errs.slice(0, 3));
   } catch (e) { console.log('crashed', e && e.stack || e); total = -1; }
   finally { if (out) out.end(); ch.close(); srv.close(); }
-  console.log(serious === 0 ? `\nGEOM AUDIT PASSED (${total} small left)` : `\nGEOM AUDIT FAILED (${serious} serious, ${total} in all)`);
+  if (SHOPV) console.log(serious === 0 ? `\nSHOP VIEW PASSED (${total} wares)` : `\nSHOP VIEW FAILED (${serious} wares hidden of ${total})`);
+  else if (SIGNS) console.log(serious === 0 ? `\nSIGN AUDIT PASSED (${total} signs)` : `\nSIGN AUDIT FAILED (${serious} hidden of ${total})`);
+  else console.log(serious === 0 ? `\nGEOM AUDIT PASSED (${total} small left)` : `\nGEOM AUDIT FAILED (${serious} serious, ${total} in all)`);
   process.exit(serious === 0 && total >= 0 ? 0 : 1);
 })();

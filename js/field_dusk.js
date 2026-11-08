@@ -66,8 +66,8 @@
     for (const [z0, z1] of [[ZN - 0.45, ZN], [ZS, ZS + 0.45]]) for (const [a, b] of [[0, dx0], [dx1, W]]) w.solid('wall', a, 0, z0, b, 1.0, z1, { uv: 1.5 });
     occ.mark(0, ZN, dx0 + 1, ZS, 2); occ.mark(dx1 - 1, ZN, W, ZS, 2); if (gap) occ.mark(dx0, gap.z0 - 1, dx1, gap.z1 + 1, 2);
     H.perimeter(w, rng, W, D, { gates, h: 6.5, walls: false, beams: 0, stub: 4 });
-    { let ax = -1; for (const g of [...LG.gateXs(W, gates), W + 7]) { const e = g - 6.5; if (e > ax) w.solid('rock', ax, -1, -3, e, 9, 0, { uv: 6, noGrapple: true, grad: false }); ax = g + 6.5; } }
-    for (const [a, b] of [[-3, cx - 7], [cx + 7, W + 3]]) w.solid('rock', a, -1, D, b, 8, D + 3, { uv: 6, noGrapple: true, grad: false });
+    { let ax = -1; for (const g of [...LG.gateXs(W, gates), W + 7]) { const e = g - 6.5; if (e > ax) w.solid('rock', ax, -1, -3, e, 9, 0, { uv: 6, grad: false }); ax = g + 6.5; } }
+    for (const [a, b] of [[-3, cx - 7], [cx + 7, W + 3]]) w.solid('rock', a, -1, D, b, 8, D + 3, { uv: 6, grad: false });
     // ---- the city on the deck: the avenue in the middle, ruined houses along the sides, the great pillars, columns, statues
     const sideX = [[dx0 + 1.2, cx - 6.5], [cx + 6.5, dx1 - 1.2]];
     for (const [a, b] of sideX) for (let z = ZN + 4; z < ZS - 8;) {

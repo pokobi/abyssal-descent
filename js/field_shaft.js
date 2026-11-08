@@ -55,7 +55,7 @@
       else { rock.m[i] = 0; road.h[i] = Math.round(h / T.HQ) * T.HQ; }
     }
     T.build(w, road, { mk: 'floor', uv: 4, cliff: 1.2, tintSeed: seed & 511 });
-    T.build(w, rock, { mk: 'rock', uv: 6, cliff: 1.2, skirtMk: 'rock', noGrapple: true, tint: [0.9, 0.88, 0.85] });
+    T.build(w, rock, { mk: 'rock', uv: 6, cliff: 1.2, skirtMk: 'rock', tint: [0.9, 0.88, 0.85] });
     w.groundElse = () => 0;
     // the road over the arch: a stone span on the arch's two walls
     const spans = {};
@@ -83,14 +83,14 @@
         }
       } }
     for (const s of [-1, 1]) w.solid('trim', cx + s * 6.4 - 0.6, 0, archZ1 - 1.6, cx + s * 6.4 + 0.6, 9.8, archZ1 - 0.4, { uv: 2 });
-    w.solid('trim', archX0 - 1, 9.8, archZ1 - 1.6, archX1 + 1, 11, archZ1 - 0.4, { uv: 2, noGrapple: true });
+    w.solid('trim', archX0 - 1, 9.8, archZ1 - 1.6, archX1 + 1, 11, archZ1 - 0.4, { uv: 2 });
     // the rock over the passage where no road crosses it (between the gallery and the span)
-    { const zs = bridge.length ? Math.min(...bridge.map((b) => b[1])) : archZ0; if (zs > archZ0) w.solid('rock', archX0, 9.6, archZ0, archX1, ROCK, zs, { uv: 6, noGrapple: true, grad: false }); }
+    { const zs = bridge.length ? Math.min(...bridge.map((b) => b[1])) : archZ0; if (zs > archZ0) w.solid('rock', archX0, 9.6, archZ0, archX1, ROCK, zs, { uv: 6, grad: false }); }
     w.navLayers = 2;
     // ---- the bounds of the gallery (rock round it, a roof of rock) and the gates in its north wall
     H.perimeter(w, rng, W, D, { gates, h: 12, walls: false, beams: 0, stub: 3.5, southY: TOP });
-    w.solid('rock', -3, 12, -3, W + 3, 15, GAL, { uv: 6, noGrapple: true, grad: false });
-    { let ax = -3; for (const g of [...LG.gateXs(W, gates), W + 9]) { const e = g - 6; if (e > ax) w.solid('rock', ax, 0, -3, e, 12, 0, { uv: 6, noGrapple: true, grad: false }); ax = g + 6; } }
+    w.solid('rock', -3, 12, -3, W + 3, 15, GAL, { uv: 6, grad: false });
+    { let ax = -3; for (const g of [...LG.gateXs(W, gates), W + 9]) { const e = g - 6; if (e > ax) w.solid('rock', ax, 0, -3, e, 12, 0, { uv: 6, grad: false }); ax = g + 6; } }
     for (const g of LG.gateXs(W, gates)) { P().brazier(w, g - 5, 0, 4.5, 1, true); P().brazier(w, g + 5, 0, 4.5, 1, true); }
     for (let x = 10; x < W - 6; x += 12) { P().pillarSquare(w, x, GAL - 1.2, 0, 12, 1.1); P().torch(w, x, 3.6, GAL - 2, 'nz'); }
     occ.mark(0, GAL - 3, W, GAL + 1, 2);
@@ -159,7 +159,7 @@
   F.SHELL.shaft = Object.assign({}, F.SHELL.hall, {
     road(w, rng, W, AD, D) {
       const nook = FB.roadHall(w, rng, W, AD, D, false), cx = W / 2;
-      for (let z = AD + 8; z < D - 4; z += 9) for (const s of [-1, 1]) { if (s < 0 && Math.abs(z - nook.nz) < 8) continue; T.boulder(w, cx + s * 6.2, rng.range(0, 6), z + rng.range(-2, 2), rng.range(1, 1.8), rng.range(1.2, 2.2), rng.range(1, 1.8), rng, { noGrapple: true }); /* (solid: it stands out of the wall) */ }
+      for (let z = AD + 8; z < D - 4; z += 9) for (const s of [-1, 1]) { if (s < 0 && Math.abs(z - nook.nz) < 8) continue; T.boulder(w, cx + s * 6.2, rng.range(0, 6), z + rng.range(-2, 2), rng.range(1, 1.8), rng.range(1.2, 2.2), rng.range(1, 1.8), rng, {}); /* (solid: it stands out of the wall) */ }
       for (let z = AD + 10; z < D - 6; z += 13) w.batch.geo('iron', PG().cyl8, Mx(cx + rng.range(-3, 3), 7, z, 0.12, 12, 0.12));
       return nook;
     },

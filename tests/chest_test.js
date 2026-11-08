@@ -8,7 +8,7 @@ const path = require('path');
 const { serve, launch, sleep } = require('./coop/cdp');
 const ROOT = path.resolve(__dirname, '..');
 const PORT = +process.env.COOP_PORT || 9967;
-const FIELDS = ['grave', 'hamlet', 'dusk', 'gate', 'catacombs', 'castle', 'halls', 'flooded', 'foundry', 'ruin', 'frozen', 'sanctum'];
+const FIELDS = ['grave', 'hamlet', 'dusk', 'battlefield', 'gate', 'catacombs', 'castle', 'shaft', 'halls', 'flooded', 'foundry', 'mine', 'ruin', 'frozen', 'sanctum', 'pillars'];
 (async () => {
   const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
   const fails = [];

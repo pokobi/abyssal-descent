@@ -906,6 +906,12 @@
         const x = r.x0 + 1, z = r.z0 + 1, y = G.Terrain ? G.Terrain.flat(w, r.x0, r.z0, r.x1, r.z1, 0.3) : 0; // (on ground of its own, only where it lies flat)
         if (y != null && chestSpotFree(w, x, y, z)) { P().chest(w, x, z, y, rng.range(0, 6), tier); done = true; }
       }
+      // no room on the floor (a field of narrow ways: caves, a maze): a platform after all
+      for (let k = 0; k < 8 && !done && tops.length; k++) {
+        const ti = rng.int(0, tops.length - 1), t = tops[ti];
+        const x = rng.range(Math.min(t.x0 + 0.9, t.cx), Math.max(t.x1 - 0.9, t.cx)), z = rng.range(Math.min(t.z0 + 0.9, t.cz), Math.max(t.z1 - 0.9, t.cz));
+        if (chestSpotFree(w, x, t.y, z)) { P().chest(w, x, z, t.y, rng.range(0, 6), tier); tops.splice(ti, 1); done = true; }
+      }
     }
   }
 

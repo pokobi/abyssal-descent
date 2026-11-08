@@ -116,7 +116,7 @@
     }
     // ---- the ground: the floor (smoothed so every gallery can be walked), the rock round it up to the roof
     const floor = T.grid(W, D, -6), rock = T.grid(W, D, -6);
-    for (let i = 0; i < W * D; i++) { if (open[i]) { rock.m[i] = 0; floor.h[i] = lvl[i] + (fixed[i] ? 0 : 0) + (fixed[i] ? T.fbm(n2, (i % W) / 5, Math.floor(i / W) / 5, 2) * 0.35 : 0); } else { floor.m[i] = 0; rock.h[i] = CEIL; } }
+    for (let i = 0; i < W * D; i++) { if (open[i]) { rock.m[i] = 0; floor.h[i] = lvl[i]; } else { floor.m[i] = 0; rock.h[i] = CEIL; } }
     const keep = new Uint8Array(W * D);
     for (const c of caves) if (c.fix) for (let i = 0; i < W * D; i++) if (open[i] && fixed[i] && Math.hypot((i % W) + 0.5 - c.x, Math.floor(i / W) + 0.5 - c.z) < c.r) { floor.h[i] = 0; keep[i] = 1; }
     for (let z = 0; z < 3; z++) for (let x = 0; x < W; x++) if (open[z * W + x]) { floor.h[z * W + x] = 0; keep[z * W + x] = 1; }
@@ -158,6 +158,8 @@
     for (const c of caves) {
       occ.mark(c.x - 2, c.z - 2, c.x + 2, c.z + 2, 0);
       if (c.fix) continue;
+      // chest spots on its floor (where it lies flat)
+      for (let k = 0; k < 3; k++) { const a = k * 2.1 + rng.range(0, 1), d = c.r * 0.45, x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d, y = T.flat(w, x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3); if (y != null && occ.free(x - 1.5, z - 1.5, x + 1.5, z + 1.5)) { occ.mark(x - 1.5, z - 1.5, x + 1.5, z + 1.5); w.platTops.push({ x0: x - 1.5, z0: z - 1.5, x1: x + 1.5, z1: z + 1.5, y, cx: x, cz: z }); } }
       // a lantern hung in every cave, on a post near its middle
       { const a = rng.range(0, 6.3), x = c.x + Math.cos(a) * c.r * 0.35, z = c.z + Math.sin(a) * c.r * 0.35; if (occ.free(x - 0.6, z - 0.6, x + 0.6, z + 0.6)) { occ.mark(x - 0.6, z - 0.6, x + 0.6, z + 0.6); F.lantern(w, x, z, '#ffb060', fy(x, z)); } }
       const n = Math.round(c.r / 3);

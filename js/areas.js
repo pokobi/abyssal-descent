@@ -137,9 +137,65 @@
   };
 
   // ---------------- mini shop (appears after each cleared arena) ----------------
+  // ---------------- where the mini shop stands ----------------
+  // It stands by the north gates (w.miniSlots: a row of three stands, w.miniHeal: the basin at its end), where the old fields keep the
+  // ground bare for it. A field that does not (a cave's rock, a pillar, a pit, a pool) could have it half buried: so before it is raised,
+  // each place is checked (floor you walk to, level, free of anything solid or drawn up to above the head, room in front of it to stand)
+  // and, where it fails, the row moves to the nearest place that holds it whole (along x or along z), else each piece to the nearest
+  // free place near where it was meant to be. Nothing random: the same area always puts it in the same place (a reload, every co-op screen).
+  const MINI = { hs: 0.75, top: 2.6, front: 1.8 }; // (a stand's half width with room round it; how high it must be free; the room in front)
+  function miniSpot(w, x, z, taken, ref) {
+    if (x < 2 || z < 3 || x > w.W - 2 || z > w.D - 3) return null;
+    if (taken && taken.some((q) => Math.hypot(q[0] - x, q[1] - z) < 2.4)) return null;
+    const i = w.navIdx(x, z, ref + 2.5); if (i < 0 || w.nb[i] || !(w.nf[i] > -50) || (w.reachMask && !w.reachMask[i])) return null;
+    const f = w.nf[i];
+    for (const q of w.deepWater || []) if (x > q.x0 - 1 && x < q.x1 + 1 && z > q.z0 - 1 && z < q.z1 + 1) return null;
+    for (const q of w.fields || []) if ((q.kind === 'lava' || q.kind === 'poison' || q.kind === 'vent') && x > q.x0 - 1 && x < q.x1 + 1 && z > q.z0 - 1 && z < q.z1 + 1) return null;
+    // level: the floor under its four corners where it is under its middle
+    for (const [a, b] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) { const g = w.groundAt(V(x + a, f + 0.3, z + b), 0.05, 0.6); if (!(g > f - 0.15)) return null; }
+    const free = (x0, y0, z0, x1, y1, z1) => {
+      if (!w.boxFree(x0, y0, z0, x1, y1, z1)) return false;
+      for (const b of w.visBoxes || []) if (b[3] > x0 && b[0] < x1 && b[4] > y0 && b[1] < y1 && b[5] > z0 && b[2] < z1) return false;
+      return true;
+    };
+    if (!free(x - MINI.hs, f + 0.15, z - MINI.hs, x + MINI.hs, f + MINI.top, z + MINI.hs)) return null;
+    if (!free(x - 0.6, f + 0.15, z + MINI.hs, x + 0.6, f + 1.9, z + MINI.hs + MINI.front)) return null; // (where you stand to buy)
+    return f;
+  }
+  AR.miniPlace = function (w) {
+    if (w.miniPlaced || !w.miniSlots || !w.miniSlots.length || !w.nf) return;
+    w.miniPlaced = true;
+    const pts = w.miniSlots.map((q) => [q.x, q.z]).concat(w.miniHeal ? [[w.miniHeal.x, w.miniHeal.z]] : []), ref = (w.miniSlots[0].y || 1.15) - 1.15; // (the level it was laid at)
+    const set = (out) => { out.forEach(([x, z, f], k) => { if (k < w.miniSlots.length) Object.assign(w.miniSlots[k], { x, z, y: f + 1.15 }); else w.miniHeal.set(x, f, z); }); };
+    const at = (list) => { const out = []; for (const [x, z] of list) { const f = miniSpot(w, x, z, null, ref); if (f == null) return null; out.push([x, z, f]); } return out; };
+    // where it was meant to be
+    let got = at(pts); if (got) { set(got); return; }
+    // the whole row moved (along x as laid, or turned along z), the nearest place first
+    const bx = pts[0][0], bz = pts[0][1], rel = pts.map(([x, z]) => [x - bx, z - bz]), cx = pts.reduce((s, q) => s + q[0], 0) / pts.length, cz = pts.reduce((s, q) => s + q[1], 0) / pts.length;
+    const cand = [];
+    for (let dz = -24; dz <= 24; dz++) for (let dx = -30; dx <= 30; dx++) cand.push([dx, dz, Math.hypot(dx, dz * 1.3)]);
+    cand.sort((p, q) => p[2] - q[2] || p[1] - q[1] || p[0] - q[0]);
+    for (const [dx, dz, dist] of cand) {
+      if (dist > 26) break;
+      for (const turn of [false, true]) {
+        const list = rel.map(([rx, rz]) => (turn ? [cx + dx - rz, cz + dz + rx - (rel[rel.length - 1][0]) / 2] : [cx + dx + rx - (rel[rel.length - 1][0]) / 2, cz + dz + rz]));
+        got = at(list); if (got) { set(got); return; }
+      }
+    }
+    // no room for a row: each piece on its own, as near where it was meant to be as there is room
+    const out = [], taken = [];
+    for (const [x0, z0] of pts) {
+      let best = null;
+      for (const [dx, dz, dist] of cand) { if (dist > 26) break; const x = x0 + dx, z = z0 + dz, f = miniSpot(w, x, z, taken, ref); if (f != null) { best = [x, z, f]; break; } }
+      if (!best) return; // (nowhere at all: left where it was)
+      out.push(best); taken.push([best[0], best[1]]);
+    }
+    set(out);
+  };
   AR.spawnMiniShop = function (roadside, healOnly, preset, quiet) {
     const w = G.world;
     if (!w.miniSlots || GM.shop) return;
+    if (!w.road) AR.miniPlace(w); // (the post-clear stall: by the north gates, never buried; a guardian's road keeps the places it laid)
     if (preset) {
       // restore a mini shop exactly as it was
       const S = GM.shop = { offers: preset, rerolls: 0, w, mini: true, healUsed: false };
@@ -165,7 +221,7 @@
     buildHeal(w, S);
     if (w.roadMerchant && !healOnly) { const m = G.enemies.buildModel(G.ENEMY_BY_ID.shaman_normal, {}); m.group.position.copy(w.roadMerchant); m.group.rotation.y = Math.PI / 2; w.group.add(m.group); AR.keeperCol(w, m); }
     if (quiet) return;
-    if (!roadside) { G.fx.smoke(V(w.W / 2, 0.5, 12), 14, 1.5, 0x5a4a30, 0.6, 1.2); G.ui.toast('🛒 旅の商人が店を広げた（北の門の前）', 'good'); }
+    if (!roadside) { const s0 = w.miniSlots[1] || w.miniSlots[0]; G.fx.smoke(s0 ? V(s0.x, s0.y - 0.65, s0.z) : V(w.W / 2, 0.5, 12), 14, 1.5, 0x5a4a30, 0.6, 1.2); G.ui.toast('🛒 旅の商人が店を広げた（北の門の前）', 'good'); }
     else setTimeout(() => G.ui.toastSmall(w.stoneVendor ? '🗿 道の脇に古の交換石機と癒しの水盆がある' : '🛒 道の脇に商人と癒しの水盆がある'), 3200);
   };
   // paid healing basin

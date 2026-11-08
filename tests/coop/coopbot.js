@@ -30,7 +30,8 @@ window.__coopbot = async function (ms) {
       const ex = w.exits.find((x) => x.open) || null;
       if (ex) {
         const t = w.triggers.find((q) => q.kind === 'exit' && q.exit === ex);
-        if (t) { const g = t._r || t; P.pos.set((g.x0 + g.x1) / 2, P.pos.y, (g.z0 + g.z1) / 2); P.vel.set(0, 0, 0); window.__cbs.gates++; await new Promise((r) => setTimeout(r, 900)); }
+        if (t) { const g = t._r || t; P.pos.set((g.x0 + g.x1) / 2, 0.05, (g.z0 + g.z1) / 2); // (the gates' tunnels are at the ground's height: y 0, whatever height the area starts at)
+          P.vel.set(0, 0, 0); window.__cbs.gates++; await new Promise((r) => setTimeout(r, 900)); }
       }
     }
   }

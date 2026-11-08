@@ -369,6 +369,8 @@
     // the ground changed after the area was built (a pillar fell): the floor and the blocked cells in x0..x1, z0..z1 are worked out again
     // exactly as buildNav does it, and the clearance penalty around them (single-storey areas only)
     navPatch(x0, z0, x1, z1) {
+      // (a field of two layers that has things changing the ground, w.navRebuild: the whole grid is worked out again)
+      if (this.nf && this.L !== 1 && this.navRebuild) { this.buildNav(); this._vn = null; return; }
       if (!this.nf || this.L !== 1) return;
       const W = this.Wn, D = this.Dn, xo = this.xo, zo = this.zo, tmp = [];
       const ax = Math.max(0, Math.floor(x0) + xo), bx = Math.min(W - 1, Math.floor(x1) + xo), az = Math.max(0, Math.floor(z0) + zo), bz = Math.min(D - 1, Math.floor(z1) + zo);

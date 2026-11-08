@@ -576,13 +576,13 @@
           const a = i / 26 * Math.PI * 2 + rng.range(-0.1, 0.1), r = rng.range(170, 230), h = rng.range(35, 90);
           const m = new THREE.Mesh(PG.cone, mtn); m.scale.set(rng.range(30, 60), h, rng.range(30, 60)); m.position.set(cx + Math.cos(a) * r, h / 2 - 8, cz + Math.sin(a) * r); grp.add(m);
         }
-        // tree line beyond the city walls
-        for (let i = 0; i < 70; i++) {
+        // tree line beyond the city walls (not where the area hangs over the abyss: w.noGround)
+        if (!w.noGround) for (let i = 0; i < 70; i++) {
           const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.75, Math.max(W, D) * 1.3);
           tree(grp, w, cx + Math.cos(a) * r, -0.5, cz + Math.sin(a) * r, rng, rng.range(1.2, 2.2));
         }
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ color: w.mats.biome.groundCol ?? (w.mats.biome.night ? 0x1c2416 : 0x3e4a26), roughness: 1 }));
-        ground.rotation.x = -Math.PI / 2; ground.position.set(cx, -0.6, cz); grp.add(ground);
+        ground.rotation.x = -Math.PI / 2; ground.position.set(cx, w.noGround ? -140 : -0.6, cz); grp.add(ground);
       } else {
         // sea of clouds far below + floating islets
         const ct = G.Tex.spr.cloud; ct.wrapS = ct.wrapT = THREE.RepeatWrapping;

@@ -1,8 +1,7 @@
 'use strict';
 // The surface tier's new fields (runplan.js R.TIERS[0]): drawn instead of the graveyard for a segment.
-//   hamlet - 霧の廃村: a village left empty, at night in the mist. Streets of ruined houses, a square with a well, a bell tower, gardens,
-//            now and then a stream with footbridges. The guardian waits beyond a timber palisade at the end of the main street.
-//   dusk   - 黄昏の廃都 (below): a fallen city on the rim of the abyss at sundown.
+//   hamlet - 霧の廃村: the village's pieces (its area: field_hamlet.js) and the guardian's approach down its main street.
+//   dusk   - 黄昏の廃都: the fallen city's pieces (its area: field_dusk.js) and its guardian approach.
 (function () {
   const LG = G.LevelGen, H = LG._, F = G.FieldGen, FB = F._, U = G.U, V = U.V;
   const P = () => G.Props, PG = () => G.Props.PG;
@@ -104,117 +103,8 @@
   }
 
   // ---------------------------------------------------------------- 霧の廃村
-  function genHamlet(area, seed, extraChests, gates, kind) {
-    const { rng, W, D, w, occ } = FB.base(area, seed, 'hamlet');
-    FB.reserve(occ, W, D, gates);
-    H.floors(w, W, D, null, 'floor');
-    H.perimeter(w, rng, W, D, { gates, h: 4.2 });
-    const layout = rng.pick(['crossroads', 'stream', 'square']);
-    w.layout = layout;
-    const cx = W / 2, SW = 2.6, cz = Math.round(D * (layout === 'stream' ? 0.46 : 0.5));
-    const street = (x0, z0, x1, z1) => { w.visual('cobble', x0, 0, z0, x1, 0.03, z1, { uv: 2, grad: false }); occ.mark(x0 - 0.6, z0, x1 + 0.6, z1); };
-    // the main street from the entrance up to the gates, and the lanes to each gate
-    street(cx - SW, 9, cx + SW, D);
-    const gxs = LG.gateXs(W, gates || 1);
-    street(Math.min(...gxs) - 1.6, 9, Math.max(...gxs) + 1.6, 12.2);
-    for (const gx of gxs) street(gx - 1.6, 0, gx + 1.6, 12);
-    let sq = null;
-    if (layout === 'crossroads') street(3, cz - SW, W - 3, cz + SW);
-    else if (layout === 'square') {
-      // the market square: wide paving, a well, stalls round the edge and the old notice board
-      sq = { x0: Math.round(cx - 12), z0: Math.round(cz - 9), x1: Math.round(cx + 12), z1: Math.round(cz + 9) };
-      w.visual('cobble', sq.x0, 0, sq.z0, sq.x1, 0.03, sq.z1, { uv: 2, grad: false }); occ.mark(sq.x0 - 1, sq.z0 - 1, sq.x1 + 1, sq.z1 + 1);
-      P().well(w, cx + 6.5, cz - 3, 0);
-      for (const [x, z, ax] of [[sq.x0 + 3, sq.z0 + 3, true], [sq.x1 - 3, sq.z0 + 3, true], [sq.x0 + 3, sq.z1 - 3, true], [sq.x1 - 3, sq.z1 - 3, true], [sq.x0 + 2.4, cz, false]]) if (rng.chance(0.85)) stall(w, rng, x, z, ax);
-      w.solid('woodDark', cx - 7.5, 0, cz + 4, cx - 7.3, 2.6, cz + 4.2, { uv: 1 }); w.solid('woodDark', cx - 5.2, 0, cz + 4, cx - 5.0, 2.6, cz + 4.2, { uv: 1 });
-      w.solid('wood', cx - 7.6, 1.2, cz + 3.95, cx - 4.9, 2.4, cz + 4.05, { uv: 1 });
-      street(3, cz - SW, sq.x0, cz + SW); street(sq.x1, cz - SW, W - 3, cz + SW);
-    } else {
-      // a stream runs across the village; a footbridge carries the main street over it, and a second one further along
-      const z0 = cz - 2.2, z1 = cz + 2.2;
-      w.visual('water', 3, 0.0, z0, W - 3, 0.04, z1, { uv: 3, grad: false, skip: { bottom: true } });
-      w.waterZones.push({ x0: 3, z0, x1: W - 3, z1 });
-      w.streams = [{ x0: 3, z0, x1: W - 3, z1 }]; w.waterFlow = { x: (seed & 1 ? 0.55 : -0.55), z: 0 }; // (it runs across the village: water.js)
-      w.visual('rock', 3, 0, z0 - 0.35, W - 3, 0.14, z0, { uv: 2, grad: false }); w.visual('rock', 3, 0, z1, W - 3, 0.14, z1 + 0.35, { uv: 2, grad: false });
-      occ.mark(3, z0 - 1, W - 3, z1 + 1);
-      const bx2 = rng.chance(0.5) ? rng.range(8, cx - 10) : rng.range(cx + 10, W - 8);
-      for (const [bx, bw] of [[cx, SW + 0.4], [bx2, 1.6]]) {
-        w.visual('wood', bx - bw, 0.04, z0 - 0.5, bx + bw, 0.16, z1 + 0.5, { uv: 1.5 });
-        for (const sd of [-1, 1]) { w.solid('woodDark', bx + sd * bw - 0.06, 0, z0 - 0.5, bx + sd * bw + 0.06, 1.0, z1 + 0.5, { uv: 1 }); for (const zz of [z0 - 0.5, z1 + 0.5]) w.solid('woodDark', bx + sd * bw - 0.1, 0, zz - 0.1, bx + sd * bw + 0.1, 1.2, zz + 0.1, { uv: 1 }); }
-      }
-      // reeds along the banks
-      for (let i = 0; i < 14; i++) { const x = rng.range(5, W - 5); if (Math.abs(x - cx) < SW + 2 || Math.abs(x - bx2) < 3) continue; for (let k = 0; k < 5; k++) w.batch.geo('leaf', PG().cone, Mx(x + rng.range(-0.6, 0.6), 0.5, (rng.chance(0.5) ? z0 : z1) + rng.range(-0.3, 0.3), 0.06, 1.0, 0.06, rng.range(-0.2, 0.2), 0, rng.range(-0.2, 0.2))); }
-      // the lane along the north bank
-      street(3, z0 - 4.6, W - 3, z0 - 1.2);
-    }
-    // houses along the streets, their doors on the street
-    const houses = [];
-    const tryHouse = (R, door) => {
-      if (R.x0 < 2.5 || R.z0 < 2.5 || R.x1 > W - 2.5 || R.z1 > D - 2.5) return false;
-      if (!occ.free(R.x0 - 0.6, R.z0 - 0.6, R.x1 + 0.6, R.z1 + 0.6)) return false;
-      occ.mark(R.x0 - 0.6, R.z0 - 0.6, R.x1 + 0.6, R.z1 + 0.6);
-      H.house(w, rng, R, { door, ruined: 0.6, h: [3.4, 4.6] }); houses.push(R);
-      return true;
-    };
-    for (const side of [-1, 1]) for (let z = 14; z < D - 10;) {
-      const len = rng.int(7, 10), dep = rng.int(6, 8);
-      const xa = side < 0 ? cx - SW - 1.2 - dep : cx + SW + 1.2;
-      if (rng.chance(0.88)) tryHouse({ x0: xa, z0: z, x1: xa + dep, z1: z + len }, side < 0 ? 'E' : 'W');
-      z += len + rng.int(2, 4);
-    }
-    const laneZ = layout === 'stream' ? cz - 2.2 - 2.9 : cz;
-    if (layout !== 'square') for (const side of [-1, 1]) for (let x = 4; x < W - 10;) {
-      const len = rng.int(7, 10), dep = rng.int(6, 8);
-      const za = side < 0 ? laneZ - (layout === 'stream' ? 1.7 : SW) - 1.2 - dep : laneZ + SW + 1.2;
-      if (!(layout === 'stream' && side > 0) && rng.chance(0.85)) tryHouse({ x0: x, z0: za, x1: x + len, z1: za + dep }, side < 0 ? 'S' : 'N');
-      x += len + rng.int(2, 4);
-    }
-    // the chapel and its bell tower, with a little churchyard (before the houses back from the streets: the village always keeps its bell)
-    let bell = false;
-    {
-      const r = occ.place(rng, 12, 15, 1.5);
-      if (r) {
-        const x0 = r.x0, z0 = r.z0, x1 = r.x1, z1 = r.z1, wallH = (z) => 3.0 + Math.abs(Math.sin(z * 0.9 + seed)) * 2.2;
-        for (let z = z0 + 0.6; z < z1 - 0.6; z += 1.5) { if (rng.chance(0.12)) continue; w.solid('wall', x0, 0, z, x0 + 0.6, wallH(z), z + 1.5, { uv: 2 }); w.solid('wall', x1 - 0.6, 0, z, x1, wallH(z + 5), z + 1.5, { uv: 2 }); }
-        w.solid('wall', x0, 0, z0, x1, 5.5, z0 + 0.6, { uv: 2 });
-        for (const [a, b] of [[x0, (x0 + x1) / 2 - 1.2], [(x0 + x1) / 2 + 1.2, x1]]) w.solid('wall', a, 0, z1 - 0.6, b, 4.2, z1, { uv: 2 });
-        P().statue(w, (x0 + x1) / 2, z0 + 1.2, 0, 0, rng, 0.9);
-        P().candles(w, (x0 + x1) / 2 + 1.2, 0, z0 + 1.6, rng, true);
-        for (let z = z0 + 5; z < z1 - 3; z += 2.2) for (const sx of [-1, 1]) w.solid('woodDark', (x0 + x1) / 2 + sx * 1.4 - (sx < 0 ? 2.8 : 0), 0, z, (x0 + x1) / 2 + sx * 1.4 + (sx > 0 ? 2.8 : 0), 0.5, z + 0.45, { uv: 1 });
-        belltower(w, rng, x1 - 2.2, z0 + 2.2, rng.range(9, 11.5), 1);
-        occ.mark(x1, z0 + 0.8, x1 + 2.4, z0 + 3.6); // (the bell rope hangs outside the east face: kept clear)
-        bell = true;
-        for (let i = 0; i < 6; i++) { const q = occ.place(rng, 1, 2, 0.6, 16); if (q) P().gravestone(w, q.x0 + 0.5, q.z0 + 0.4, 0, rng.range(-0.3, 0.3), rng); }
-      }
-    }
-    // no room for the chapel: the bell tower stands on its own, its rope toward the main street
-    if (!bell) { const r = occ.place(rng, 6, 6, 1.0, 80); if (r) belltower(w, rng, r.x0 + 3, r.z0 + 3, rng.range(9, 10.5), r.x0 + 3 < cx ? 1 : -1); }
-    // a few more houses back from the streets
-    for (let i = 0; i < 3; i++) { const r = occ.place(rng, rng.int(7, 9), rng.int(6, 8), 1.5, 20); if (r) { H.house(w, rng, r, { ruined: 0.7, h: [3.4, 4.4] }); houses.push(r); } }
-    // gardens: split-rail fences round rows of withered crops, a scarecrow
-    for (let i = 0; i < 2 + rng.int(0, 2); i++) {
-      const gw = rng.int(7, 10), gd = rng.int(6, 8);
-      const r = occ.place(rng, gw, gd, 1.4); if (!r) continue;
-      const gx = (r.x0 + r.x1) / 2;
-      F.woodFence(w, r.x0, r.z0, r.x1, r.z0, 1.1, [[gx - 0.9, gx + 0.9]]); F.woodFence(w, r.x0, r.z1, r.x1, r.z1, 1.1, [[gx - 0.9, gx + 0.9]]);
-      F.woodFence(w, r.x0, r.z0, r.x0, r.z1, 1.1, []); F.woodFence(w, r.x1, r.z0, r.x1, r.z1, 1.1, []);
-      for (let z = r.z0 + 1.2; z < r.z1 - 0.8; z += 1.3) {
-        w.visual('mud', r.x0 + 0.6, 0, z - 0.3, r.x1 - 0.6, 0.08, z + 0.3, { uv: 2, grad: false });
-        for (let x = r.x0 + 1; x < r.x1 - 0.8; x += rng.range(0.7, 1.3)) if (rng.chance(0.6)) w.batch.geo('leaf', PG().ico, Mx(x, 0.18, z, 0.22, rng.range(0.15, 0.35), 0.22), { tint: [0.75, 0.7, 0.45] });
-      }
-      if (rng.chance(0.7)) scarecrow(w, rng, gx + rng.range(-1.5, 1.5), (r.z0 + r.z1) / 2 + 0.6);
-    }
-    // haystacks, carts, crates, woodpiles, dead trees, a well or two in the yards
-    for (let i = 0; i < 3 + rng.int(0, 3); i++) { const r = occ.place(rng, 3, 3, 1, 14); if (r) haystack(w, r.x0 + 1.5, r.z0 + 1.5, rng.range(0.85, 1.15)); }
-    for (let i = 0; i < 2 + rng.int(0, 2); i++) { const ax = rng.chance(0.5), r = occ.place(rng, ax ? 6 : 3, ax ? 3 : 6, 1, 14); if (r) cart(w, rng, (r.x0 + r.x1) / 2 - (ax ? 0.8 : 0), (r.z0 + r.z1) / 2 - (ax ? 0 : 0.8), ax); }
-    if (layout !== 'square') { const r = occ.place(rng, 4, 4, 1.5, 20); if (r) P().well(w, r.x0 + 2, r.z0 + 2, 0); }
-    for (let i = 0; i < 5 + rng.int(0, 4); i++) { const r = occ.place(rng, 2, 2, 1.2, 12); if (r) F.deadTree(w, r.x0 + 1, r.z0 + 1, rng, rng.range(0.9, 1.35)); }
-    for (let i = 0; i < 6; i++) { const r = occ.place(rng, 2, 2, 0.8, 10); if (!r) continue; if (rng.chance(0.5)) { P().barrel(w, r.x0 + 0.6, r.z0 + 0.6, 0, rng, rng.chance(0.2)); if (rng.chance(0.5)) P().crate(w, r.x0 + 1.4, r.z0 + 1.3, 0, rng); } else { for (let k = 0; k < 3; k++) w.batch.geo('woodDark', PG().cyl8, Mx(r.x0 + 1, 0.15 + k * 0.28, r.z0 + 1, 0.14, 1.6, 0.14, 0, k * 0.4, Math.PI / 2)); w.addCollider(r.x0 + 0.2, 0, r.z0 + 0.6, r.x0 + 1.8, 0.8, r.z0 + 1.4, { surf: 'wood' }); } }
-    // lamp posts along the main street; a few lit windows (someone, or something, is still here)
-    for (let z = D - 14; z > 14; z -= 10) { F.lantern(w, cx - SW - 0.6, z, '#ffb070'); if (rng.chance(0.6)) F.lantern(w, cx + SW + 0.6, z - 5, '#ffb070'); }
-    for (const R of houses) if (rng.chance(0.25)) w.addLight((R.x0 + R.x1) / 2, 1.6, (R.z0 + R.z1) / 2, { flame: 0.3, intensity: 3, range: 6, color: '#ffa850', prio: 0.5 });
-    return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
-  }
+  // (the hamlet's area itself: field_hamlet.js, houses to walk into and roofs to walk on; it builds with these pieces)
+  F._hamlet = { haystack, cart, stall, scarecrow, belltower };
 
   // ---------------------------------------------------------------- the hamlet's guardian approach: the main street between the last houses
   function roadHamlet(w, rng, W, AD, D) {
@@ -265,7 +155,6 @@
     },
     text: { sub: '— 村の奥へ —', icon: '🏚️', obj: '村の奥へ進め — 柵の門をくぐると戦いが始まる' },
   };
-  F.gen.hamlet = genHamlet;
 
   // ---------------------------------------------------------------- 黄昏の廃都
   // A two-storey ruin: roofless outer walls (doorways, broken window rows) round a court; an upper floor along one side reached by
@@ -326,91 +215,6 @@
     for (const sx of [-1, 1]) P().statue(w, x + sx * (span / 2 + pw / 2), z + d / 2 + 0.6, 0, 0, rng, 0.75);
   }
 
-  function genDusk(area, seed, extraChests, gates, kind) {
-    const { rng, W, D, w, occ } = FB.base(area, seed, 'dusk');
-    FB.reserve(occ, W, D, gates);
-    H.floors(w, W, D, null, 'floor');
-    H.perimeter(w, rng, W, D, { gates, h: 6.5 });
-    const layout = rng.pick(['avenue', 'forum', 'terraces']);
-    w.layout = layout;
-    const cx = W / 2, cz = Math.round(D / 2);
-    const way = (x0, z0, x1, z1) => { w.visual('cobble', x0, 0, z0, x1, 0.03, z1, { uv: 2.5, grad: false }); occ.mark(x0 - 0.6, z0, x1 + 0.6, z1); };
-    const gxs = LG.gateXs(W, gates || 1);
-    way(Math.min(...gxs) - 1.6, 9, Math.max(...gxs) + 1.6, 12.2);
-    for (const gx of gxs) way(gx - 1.6, 0, gx + 1.6, 12);
-    if (layout === 'avenue') {
-      // the grand avenue: wide paving, colonnades both sides, an arch half way, statues on plinths
-      way(cx - 5.5, 9, cx + 5.5, D);
-      for (const sx of [-1, 1]) H.colonnade(w, rng, cx + sx * 8, 16, D - 30, false, rng.range(6, 7.5), true);
-      occ.mark(cx - 9.3, 14, cx + 9.3, D - 12);
-      arch(w, rng, cx, Math.round(D * 0.55), 11.6);
-      occ.mark(cx - 10.2, D * 0.55 - 2, cx + 10.2, D * 0.55 + 2);
-    } else if (layout === 'forum') {
-      // the forum: a paved square, the temple on its podium at the north end, a dry fountain in the middle
-      way(cx - 2.4, 9, cx + 2.4, D);
-      const fx0 = Math.round(cx - 15), fx1 = Math.round(cx + 15), fz0 = Math.round(cz - 13), fz1 = Math.round(cz + 11);
-      w.visual('cobble', fx0, 0, fz0, fx1, 0.03, fz1, { uv: 2.5, grad: false }); occ.mark(fx0 - 1, fz0 - 1, fx1 + 1, fz1 + 1);
-      // the dry fountain
-      const fz = cz + 5;
-      w.solid('block', cx - 3.2, 0, fz - 3.2, cx + 3.2, 0.7, fz - 2.8, { uv: 1 }); w.solid('block', cx - 3.2, 0, fz + 2.8, cx + 3.2, 0.7, fz + 3.2, { uv: 1 });
-      w.solid('block', cx - 3.2, 0, fz - 2.8, cx - 2.8, 0.7, fz + 2.8, { uv: 1 }); w.solid('block', cx + 2.8, 0, fz - 2.8, cx + 3.2, 0.7, fz + 2.8, { uv: 1 });
-      w.visual('dark', cx - 2.8, 0, fz - 2.8, cx + 2.8, 0.05, fz + 2.8, { uv: 2, grad: false });
-      P().statue(w, cx, fz, 0.05, rng.range(0, 6), rng, 1.3);
-      // the temple: a podium you climb from the front, columns round it, the cella's broken walls
-      const tz0 = fz0 + 1, R = { x0: cx - 8, z0: tz0, x1: cx + 8, z1: tz0 + 10 }, h = 2.0;
-      const top = H.platform(w, rng, R, h, ['S'], { decor: false, mk: 'block' });
-      w.platTops.push(top);
-      for (let x = top.x0 + 0.6; x <= top.x1 - 0.5; x += 3) for (const z of [top.z0 + 0.6, top.z1 - 0.8]) P().pillarRound(w, x, z, h, rng.range(5, 7.5), 0.42, rng.chance(0.25), rng);
-      w.solid('wall', cx - 3.5, h, top.z0 + 2, cx + 3.5, h + rng.range(3, 5), top.z0 + 2.6, { uv: 2 });
-      P().brazier(w, cx - 2, h, top.z1 - 2, 1); P().brazier(w, cx + 2, h, top.z1 - 2, 1);
-    } else {
-      // terraces: the city climbs from west to east in two broad steps, stairs between them
-      way(cx - 2.4, 9, cx + 2.4, D);
-      const h1 = 2.0, h2 = 4.0;
-      for (const [x0, x1, h] of [[W - 29, W - 17, h1], [W - 14, W - 2.5, h2]]) {
-        const R = { x0, z0: 18, x1, z1: D - 16 };
-        if (!occ.free(R.x0, R.z0, R.x1, R.z1)) continue;
-        occ.mark(R.x0, R.z0, R.x1, R.z1);
-        const top = H.platform(w, rng, R, h, ['W', 'S'], { decor: true, mk: 'block' });
-        w.platTops.push(top);
-        for (let z = top.z0 + 3; z < top.z1 - 3; z += 6) if (rng.chance(0.6)) P().pillarRound(w, top.x0 + 1, z, h, rng.range(3, 6), 0.4, rng.chance(0.3), rng);
-      }
-    }
-    // the two-storey ruins: their upper floors are the rooftops of the fight
-    for (let i = 0; i < 3 + rng.int(0, 2); i++) {
-      const bw = rng.int(9, 13), bd = rng.int(9, 12);
-      const r = occ.place(rng, bw, bd, 1.6, 30); if (!r) continue;
-      const up = ruinBlock(w, rng, r, rng.pick([3, 3.5]));
-      if (up) w.platTops.push(up);
-    }
-    // the cracked great pillars (崩れかけた大柱, gimmick_a.js): two or three, each leaning toward an open lane it will fall along
-    if (G.Gim) {
-      const want = 2 + (rng.chance(0.5) ? 1 : 0), dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]], L = G.Gim.PIL.laneL + 0.6;
-      for (let t = 0, n = 0; t < 160 && n < want; t++) {
-        const x = Math.round(rng.range(8, W - 8)) + 0.5, z = Math.round(rng.range(18, D - 14)) + 0.5, [dx, dz] = rng.pick(dirs);
-        if (!occ.free(x - 1.7, z - 1.7, x + 1.7, z + 1.7)) continue;
-        const lx0 = Math.min(x, x + dx * L) - (dx ? 0 : 1.9), lx1 = Math.max(x, x + dx * L) + (dx ? 0 : 1.9), lz0 = Math.min(z, z + dz * L) - (dz ? 0 : 1.9), lz1 = Math.max(z, z + dz * L) + (dz ? 0 : 1.9);
-        if (lx0 < 3 || lx1 > W - 3 || lz0 < 14 || lz1 > D - 10 || !occ.free(lx0, lz0, lx1, lz1)) continue;
-        occ.mark(x - 1.7, z - 1.7, x + 1.7, z + 1.7); occ.mark(lx0, lz0, lx1, lz1);
-        G.Gim.addPillar(w, x, z, dx, dz, rng.range(0, 100)); n++;
-      }
-    }
-    // low ruins, broken walls and colonnade fragments (kept few: the open paving between them is where the fights are)
-    for (let i = 0; i < 2; i++) { const r = occ.place(rng, rng.int(7, 9), rng.int(6, 8), 1.4, 20); if (r) H.house(w, rng, r, { ruined: 1, h: [3.2, 4.4] }); }
-    for (let i = 0; i < 2; i++) { const ax = rng.chance(0.5), len = rng.int(8, 14); const r = occ.place(rng, ax ? len + 2 : 3, ax ? 3 : len + 2, 1.5, 20); if (r) H.colonnade(w, rng, ax ? r.x0 + 1 : r.x0 + 1.5, ax ? r.z0 + 1.5 : r.z0 + 1, len, ax, rng.range(5, 7), true); }
-    for (let i = 0; i < 3; i++) { const ax = rng.chance(0.5), r = occ.place(rng, ax ? 7 : 2, ax ? 2 : 7, 1, 14); if (r) fallenColumn(w, rng, (r.x0 + r.x1) / 2 - (ax ? 0.6 : 0), (r.z0 + r.z1) / 2 - (ax ? 0 : 0.6), ax); }
-    for (let i = 0; i < 3; i++) { const ax = rng.chance(0.5), len = rng.int(3, 6); const r = occ.place(rng, ax ? len : 1, ax ? 1 : len, 1); if (r) H.lowWall(w, rng, ax ? r.x0 : r.x0 + 0.5, ax ? r.z0 + 0.5 : r.z0, len, ax); }
-    // obelisks and statues on plinths, dry trees, tall dry grass
-    for (let i = 0; i < 2; i++) { const r = occ.place(rng, 3, 3, 1.5, 16); if (!r) continue; const x = r.x0 + 1.5, z = r.z0 + 1.5; w.solid('block', x - 1.2, 0, z - 1.2, x + 1.2, 0.8, z + 1.2, { uv: 1 }); w.solid('block', x - 0.5, 0.8, z - 0.5, x + 0.5, 0.8 + rng.range(6, 9), z + 0.5, { uv: 2 }); }
-    for (let i = 0; i < 2; i++) { const r = occ.place(rng, 3, 3, 1.2, 14); if (r) { w.solid('block', r.x0 + 0.4, 0, r.z0 + 0.4, r.x1 - 0.4, 1.0, r.z1 - 0.4, { uv: 1 }); P().statue(w, r.x0 + 1.5, r.z0 + 1.5, 1.0, rng.range(0, 6), rng, 0.9); } }
-    for (let i = 0; i < 4 + rng.int(0, 3); i++) { const r = occ.place(rng, 2, 2, 1.2, 12); if (r) F.deadTree(w, r.x0 + 1, r.z0 + 1, rng, rng.range(0.9, 1.3)); }
-    for (let i = 0; i < 26; i++) { const x = rng.range(4, W - 4), z = rng.range(14, D - 6); if (!occ.free(x - 0.5, z - 0.5, x + 0.5, z + 0.5)) continue; for (let k = 0; k < 4; k++) w.batch.geo('leaf', PG().cone, Mx(x + rng.range(-0.5, 0.5), 0.35, z + rng.range(-0.5, 0.5), 0.05, 0.7, 0.05, rng.range(-0.3, 0.3), 0, rng.range(-0.3, 0.3)), { tint: [1.5, 1.25, 0.6] }); }
-    for (let i = 0; i < 5; i++) { const r = occ.place(rng, 2, 2, 0.8, 10); if (r) { if (rng.chance(0.5)) P().urn(w, r.x0 + 1, r.z0 + 1, 0, rng); else P().rubble(w, r.x0 + 1, 0, r.z0 + 1, rng, rng.range(0.8, 1.4)); } }
-    // braziers lit along the ways (the city is not quite empty)
-    for (let z = D - 16; z > 16; z -= 14) { P().brazier(w, cx - (layout === 'avenue' ? 6.4 : 3), 0, z, 0.9, true); if (rng.chance(0.6)) P().brazier(w, cx + (layout === 'avenue' ? 6.4 : 3), 0, z - 7, 0.9, true); }
-    skyline(w, rng, W, D);
-    return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
-  }
   // far beyond the city walls: the broken towers of the rest of the city against the sunset (visual only)
   function skyline(w, rng, W, D) {
     w.deferred.push((grp) => {
@@ -449,6 +253,8 @@
     skyline(w, rng, W, D);
     return { nz, side: -1, nx: cx - hw - 2.4 };
   }
+  // (the fallen city's area itself: field_dusk.js, the city on the great bridge; it builds with these pieces)
+  F._dusk = { ruinBlock, fallenColumn, arch, skyline };
   F.SHELL.dusk = {
     outdoor: true, wallH: 4.5, road: roadDusk,
     ring(w, rng, W, AD, last) {
@@ -464,5 +270,4 @@
     },
     text: { sub: '— 都の奥へ —', icon: '🏛️', obj: '大通りを進め — 凱旋門をくぐると戦いが始まる' },
   };
-  F.gen.dusk = genDusk;
 })();

@@ -94,7 +94,9 @@
   const inside = (f, p, pad) => p.x > f.x0 - (pad || 0) && p.x < f.x1 + (pad || 0) && p.z > f.z0 - (pad || 0) && p.z < f.z1 + (pad || 0);
   let tick = 0, hurtT = 0, seen = null, deepT = 0;
   F.onExplode = function (pos, r) {
-    const w = G.world; if (!w || !w.fields) return;
+    const w = G.world;
+    if (w && w.iceTiles && G.FieldGen && G.FieldGen.iceHit && pos.y < 3) G.FieldGen.iceHit(w, pos.x, pos.z, Math.max(1.5, r * 0.8), 1); // (the frozen lake's ice cracks and breaks)
+    if (!w || !w.fields) return;
     for (const f of w.fields) if (f.kind === 'oil' && f.burnT <= 0 && pos.y < 3 && pos.x > f.x0 - r && pos.x < f.x1 + r && pos.z > f.z0 - r && pos.z < f.z1 + r) F.ignite(f);
   };
   F.ignite = function (f) {

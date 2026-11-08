@@ -26,56 +26,8 @@
   function vaultIcicles(w, rng, W, D, y, n) {
     for (let i = 0; i < n; i++) w.batch.geo('ice', PG().cone, Mx(rng.range(3, W - 3), y - 0.9, rng.range(3, D - 3), rng.range(0.15, 0.35), rng.range(1.2, 3.2), rng.range(0.15, 0.35), Math.PI, 0, 0));
   }
-  function genFrozen(area, seed, extraChests, gates, kind) {
-    const { rng, W, D, w, occ } = FB.base(area, seed, 'frozen');
-    FB.reserve(occ, W, D, gates);
-    const HT = 16;
-    H.floors(w, W, D, null, 'floor');
-    H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0 });
-    F.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: rng.int(0, 2) });
-    vaultIcicles(w, rng, W, D, HT, 60);
-    const layout = rng.pick(['nave', 'crypt', 'glacier']);
-    w.layout = layout;
-    const cx = W / 2, cz = D / 2;
-    if (layout === 'nave') {
-      // the nave: two rows of ice-sheathed pillars, the tombs of the aisles behind them
-      for (const sx of [-1, 1]) for (let z = 20; z < D - 14; z += 9) { const x = Math.round(cx + sx * rng.range(9, 11)); if (occ.free(x - 1.4, z - 1.4, x + 1.4, z + 1.4)) { occ.mark(x - 1.4, z - 1.4, x + 1.4, z + 1.4); icePillar(w, rng, x, z, HT); } }
-      for (const sx of [-1, 1]) for (let z = 22; z < D - 16; z += 6) { const x = cx + sx * rng.range(16, 20); if (occ.free(x - 1.6, z - 1.2, x + 1.6, z + 1.2)) { occ.mark(x - 1.6, z - 1.2, x + 1.6, z + 1.2); P().sarcophagus(w, x, z, 0, true, rng); } }
-    } else if (layout === 'crypt') {
-      // a raised crypt in the middle: the frozen lord's tomb on top, a ring of sarcophagi round its foot
-      const s = 8, h = 2.5, L = Math.ceil(LG.stairsLen(h));
-      const R = { x0: Math.round(cx - s - L), z0: Math.round(cz - s - L), x1: Math.round(cx + s + L), z1: Math.round(cz + s + L) };
-      if (occ.free(R.x0, R.z0, R.x1, R.z1)) {
-        occ.mark(R.x0, R.z0, R.x1, R.z1);
-        const top = H.platform(w, rng, R, h, ['N', 'S', 'E', 'W'], { decor: false, mk: 'block' });
-        w.platTops.push(top);
-        P().sarcophagus(w, top.cx, top.cz, h, true, rng);
-        for (const [dx, dz] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) P().crystals(w, top.cx + dx, h, top.cz + dz, rng, 1.4);
-        for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, x = cx + Math.cos(a) * (s + L + 4), z = cz + Math.sin(a) * (s + L + 4); if (occ.free(x - 1.6, z - 1.2, x + 1.6, z + 1.2)) { occ.mark(x - 1.6, z - 1.2, x + 1.6, z + 1.2); P().sarcophagus(w, x, z, 0, rng.chance(0.5), rng); } }
-      }
-    } else {
-      // the glacier: the ice has come in through a broken wall: ridges of ice across the floor with gaps between them
-      for (let i = 0; i < 5; i++) {
-        const z = Math.round(20 + (D - 36) * i / 4 + rng.range(-2, 2)), gap = rng.range(8, W - 8), len = rng.range(10, 22), x0 = rng.chance(0.5) ? 4 : W - 4 - len;
-        if (Math.abs(x0 + len / 2 - gap) < len / 2 + 3) continue;
-        for (let x = x0; x < x0 + len; x += 2) { const hh = rng.range(1.2, 2.6); w.solid('ice', x, 0, z - 1.2, x + 2, hh, z + 1.2, { uv: 2, grad: false, noGrapple: true }); }
-        occ.mark(x0 - 1, z - 2, x0 + len + 1, z + 2);
-      }
-    }
-    // ice-sheathed pillars here and there, crystal growths, frozen statues, braziers burning blue-white
-    for (let i = 0; i < (layout === 'nave' ? 3 : 7); i++) { const r = occ.place(rng, 3, 3, 2, 20); if (r) icePillar(w, rng, r.x0 + 1.5, r.z0 + 1.5, HT); }
-    for (let i = 0; i < 8; i++) { const r = occ.place(rng, 2, 2, 1, 14); if (r) P().crystals(w, r.x0 + 1, 0, r.z0 + 1, rng, rng.range(1, 1.8)); }
-    for (let i = 0; i < 3; i++) { const r = occ.place(rng, 3, 3, 1.5, 16); if (r) frozenStatue(w, rng, r.x0 + 1.5, r.z0 + 1.5); }
-    for (let i = 0; i < 4; i++) { const r = occ.place(rng, 2, 2, 1, 14); if (r) P().brazier(w, r.x0 + 1, 0, r.z0 + 1, 1); }
-    for (let i = 0; i < 4; i++) { const r = occ.place(rng, 2, 2, 0.8, 10); if (r) { if (rng.chance(0.5)) P().urn(w, r.x0 + 1, r.z0 + 1, 0, rng); else P().bones(w, r.x0 + 1, 0.02, r.z0 + 1, rng); } }
-    // slick ice underfoot (the field's own patches, on top of whatever the depth brings)
-    if (G.Fields) for (let i = 0; i < 2 + rng.int(0, 2); i++) { const fw = rng.int(4, 8), fd = rng.int(4, 8), r = occ.place(rng, fw, fd, 1); if (r) G.Fields.add(w, 'ice', r.x0, r.z0, r.x1, r.z1); }
-    // hoarfrost on the walls (pale streaks)
-    for (let z = 8; z < D - 4; z += 7) for (const side of [0, W]) w.visual('ice', side === 0 ? 0 : W - 0.03, rng.range(2, 6), z, side === 0 ? 0.03 : W, rng.range(8, 12), z + rng.range(1, 3), { uv: 2, grad: false });
-    w.icicles = { y: HT, next: 4 };
-    return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
-  }
-  F.gen.frozen = genFrozen;
+  // (the mausoleum's area itself: field_frozen.js, the frozen lake whose ice breaks; it builds with these pieces)
+  F._frozen = { icePillar, frozenStatue, vaultIcicles };
   // the icicles that fall: while you fight in a frozen hall, every few seconds one breaks from the vault near you. A pale ring on the
   // floor marks it a second before it lands; inside the ring it hurts and leaves ice (each player's own: they fall around whoever is there).
   F.tickIcicles = function (w, dt) {
@@ -90,6 +42,7 @@
         G.sfx.ice ? G.sfx.ice(f.p) : G.sfx.explosion(f.p, 0.3);
         if (Math.hypot(Pl.pos.x - f.p.x, Pl.pos.z - f.p.z) < f.r && Pl.pos.y < 3) G.combat.damagePlayer(Pl.stats.maxHp * 0.07, { src: 'aoe', pos: f.p.clone(), elem: 'frost', el: 'ice' });
         for (const e of G.enemies.list) if (e.alive && !e._rep && !e.flyer && Math.hypot(e.pos.x - f.p.x, e.pos.z - f.p.z) < f.r + (e.radius || 0.5) * 0.5) G.combat.damageEnemy(e, e.maxHp * 0.05, { src: 'env', el: 'ice' });
+        if (F.iceHit) F.iceHit(w, f.p.x, f.p.z, f.r, 1); // (on the frozen lake it cracks the ice: field_frozen.js)
         if (f.mesh) { w.group.remove(f.mesh); f.mesh = null; }
       } else if (f.mesh) f.mesh.position.y = (I.y - 1.4) - (I.y - 2.6) * Math.pow(Math.max(0, (f.t - f.T + 0.4) / 0.4), 2); // (it hangs, shakes loose, then drops in the last 0.4 s)
     }

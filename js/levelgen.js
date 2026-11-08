@@ -1098,11 +1098,15 @@
     const W = 44, D = 44;
     const w = new G.World(W, D, G.Tex.biomeFor(area));
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
-    floors(w, W, D, null, 'floor');
-    perimeter(w, rng, W, D, { h: 10, top: 16, beams: 0, gates });
-    // ceiling beams + chandeliers make it a hall
-    for (let z = 6; z < D - 4; z += 7) { w.solid('woodDark', 0, 9.2, z - 0.35, W, 9.9, z + 0.35, { uv: 2 }); }
-    for (const [cx, cz] of [[W / 2, 13], [W / 2, 30], [9, 22], [W - 9, 22]]) P().chandelier(w, cx, 6.0, cz, 9.2);
+    // the place round the hall: the field's own (field_rooms.js), or the stone hall with its beams and chandeliers
+    const shell = LG.shellFor && LG.shellFor(w);
+    if (shell) shell(w, rng, W, D, { kind: 'shop', gates });
+    else {
+      floors(w, W, D, null, 'floor');
+      perimeter(w, rng, W, D, { h: 10, top: 16, beams: 0, gates });
+      for (let z = 6; z < D - 4; z += 7) { w.solid('woodDark', 0, 9.2, z - 0.35, W, 9.9, z + 0.35, { uv: 2 }); }
+      for (const [cx, cz] of [[W / 2, 13], [W / 2, 30], [9, 22], [W - 9, 22]]) P().chandelier(w, cx, 6.0, cz, 9.2);
+    }
     // red carpet from the door up to the two islands and on between them to the exits; braziers along it and a few warm lights over the aisle
     P().rug(w, W / 2, 33.6, 0, 4, 20, [0.45, 0.08, 0.06]);
     P().rug(w, W / 2, 14, 0, 1.4, 12, [0.45, 0.08, 0.06]);
@@ -1525,11 +1529,16 @@
     const W = 40, D = 34;
     const w = new G.World(W, D, G.Tex.biomeFor(area));
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
-    floors(w, W, D, null, kind === 'shrine' ? 'cobble' : 'floor');
-    perimeter(w, rng, W, D, { h: 10, top: 16, beams: 0, gates });
-    if (kind !== 'trial') {
-      for (let z = 6; z < D - 4; z += 7) w.solid('woodDark', 0, 9.2, z - 0.35, W, 9.9, z + 0.35, { uv: 2 });
-      P().chandelier(w, W / 2, 6, D / 2, 9.2);
+    // the place round the room: the field's own (field_rooms.js), or the stone hall
+    const shell = LG.shellFor && LG.shellFor(w);
+    if (shell) shell(w, rng, W, D, { kind, gates });
+    else {
+      floors(w, W, D, null, kind === 'shrine' ? 'cobble' : 'floor');
+      perimeter(w, rng, W, D, { h: 10, top: 16, beams: 0, gates });
+      if (kind !== 'trial') {
+        for (let z = 6; z < D - 4; z += 7) w.solid('woodDark', 0, 9.2, z - 0.35, W, 9.9, z + 0.35, { uv: 2 });
+        P().chandelier(w, W / 2, 6, D / 2, 9.2);
+      }
     }
     for (const [x, z] of [[3, 4], [W - 3, 4], [3, D - 4], [W - 3, D - 4]]) P().brazier(w, x, 0, z, 1);
     const cz = D / 2 + 1;

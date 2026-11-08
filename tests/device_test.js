@@ -279,11 +279,11 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
       check(await ev('return G.Strata.doors[0].state === "broken"'), 'gate: blasts batter it down');
       check(await ev('const it = G.Strata.doors[1].it; return it.type === "celldoor" && G.world.interactables.includes(it)'), 'gate: the key works it (it is a cell gate)');
     }
-    // the frozen hall's glacier: its ice ridges are as slick as an ice sheet, the stone floor beside them is not
+    // the frozen lake (field_frozen.js): its ice is slick, the stone shore is not; two blows break a tile out (no ground there),
+    // and in a while it freezes over again
     {
-      const r = await ev(`for (let n = 2; n < 40; n++) { const w = T.enter('frozen', n); if (w.layout === 'glacier') break; } const w = G.world;
-        const c = w.colliders.find((c) => c.alive && c.surf === 'ice' && c.y1 > 1); if (!c) return null; return { x: (c.x0 + c.x1) / 2, z: (c.z0 + c.z1) / 2, y: c.y1 };`);
-      check(!!r, 'ice: the glacier has its ridges of ice');
+      const r = await ev(`T.enter('frozen', 3); const w = G.world, t = (w.iceTiles || []).find((q) => q.col.alive && w.boxFree(q.x0 + 0.5, 0.05, q.z0 + 0.5, q.x1 - 0.5, 1.9, q.z1 - 0.5)); if (!t) return null; window.__t = t; return { x: (t.x0 + t.x1) / 2, z: (t.z0 + t.z1) / 2, y: t.col.y1, n: w.iceTiles.length };`);
+      check(!!r && r.n > 50, `ice: the hall stands over a frozen lake (${r && r.n} tiles of ice)`);
       if (r) {
         await ev(`const P = G.player; P.pos.set(${r.x}, ${r.y} + 0.02, ${r.z}); P.vel.set(0, 0, 0); return 1`);
         await wait(0.3);
@@ -291,8 +291,13 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
         await ev(`const w = G.world, s = w.spawn; G.player.pos.set(s.x, 0.05, s.z); G.player.vel.set(0, 0, 0); return 1`);
         await wait(0.3);
         const off = await ev('return { slip: G.player.fieldSlip }');
-        check(on.g && on.slip <= 0.12 && on.slide >= 1.8, `ice: standing on a ridge of ice is slick (${JSON.stringify(on)})`);
-        check(off.slip === 1, 'ice: the stone floor is not');
+        check(on.g && on.slip <= 0.12 && on.slide >= 1.8, `ice: standing on the lake's ice is slick (${JSON.stringify(on)})`);
+        check(off.slip === 1, 'ice: the stone shore is not');
+        const b = await ev(`const w = G.world, t = __t, F = G.FieldGen; F.iceHit(w, ${r.x}, ${r.z}, 1, 1); const one = t.col.alive; F.iceHit(w, ${r.x}, ${r.z}, 1, 1); const two = t.col.alive, i = w.navIdx(${r.x}, ${r.z}); return { one, two, nf: w.nf[i], fb: w.floorBelow(${r.x}, 1, ${r.z}) };`);
+        check(b.one === true && b.two === false, `ice: one blow cracks it, the second breaks it out (${b.one}, ${b.two})`);
+        check((b.nf === null || b.nf > 5) && b.fb < -5, `ice: where it broke there is no ground, for you or the foes (${b.nf}, ${b.fb})`); // (under the vault the nav's floor over a hole is the vault's top: out of reach)
+        const f = await ev(`const w = G.world, t = __t; t.t = 999; G.FieldGen.tickIce(w, 0.1); return { alive: t.col.alive, hp: t.hp, nf: w.nf[w.navIdx(${r.x}, ${r.z})] };`);
+        check(f.alive && f.hp === 2 && Math.abs(f.nf) < 0.05, `ice: in a while it freezes over again (${JSON.stringify(f)})`);
       }
     }
     // the gale and the bell by the key, a projectile at the bell

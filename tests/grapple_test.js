@@ -1,7 +1,6 @@
 'use strict';
-// The grapple: it holds on a cave's ceiling and its rock walls; it never takes you more than G.GRAPPLE_TOP (5 m) over the highest floor
-// you can walk to; and come down after it on top of something far above every floor round it (a cliff's top, a wall's top), you are
-// put back where you last stood (only after the grapple: standing up there some other way is left alone).
+// The grapple holds on a cave's ceiling and its rock walls, and takes you as high as it will; the map's bounds are walls of no height:
+// high over an exit you cannot get past them (over the tunnel's roof and out), while down in the exit's opening the tunnel still lets you in.
 //   node tests/grapple_test.js [fields, default mine,catacombs,shaft]
 const path = require('path');
 const { serve, launch, sleep } = require('./coop/cdp');
@@ -12,38 +11,31 @@ const PAGE = `
 window.__grap = function () {
   const GM = G.game, P = G.player, w = G.world, K = G.input.keys, B = G.BIND, out = {};
   G.enemies.clear(); GM.objective = null; G.ui.clearScreen(); GM.state = 'playing'; GM.dev = { god: true, speed: 1 };
-  const rt = w.reachTops(); out.max = +rt.max.toFixed(2); out.cap = +(rt.max + G.GRAPPLE_TOP).toFixed(2);
-  // 1) straight up from a floor you walk to: what is overhead can be held (a ceiling or the rock), and it does not lift you past the cap
+  // 1) straight up from a floor you walk to: what is overhead can be held (a ceiling or the rock), and the rope takes you up
   const c = w.randomOpenCell({ next: Math.random }, (x, z, idx) => w.reachMask[idx] && Math.abs(w.nf[idx]) < 0.5 && (() => { const h = w.raycast(new THREE.Vector3(x + 0.5, w.nf[idx] + 1.7, z + 0.5), new THREE.Vector3(0, 1, 0), 40); return h && h.t > 5 && h.t < 40; })());
   if (!c) { out.noCeil = true; } else {
-    P.pos.set(c.x, c.y + 0.05, c.z); P.vel.set(0, 0, 0); P.pitch = 1.5; P.grappleCd = 0; P.lastSafe.copy(P.pos);
+    P.pos.set(c.x, c.y + 0.05, c.z); P.vel.set(0, 0, 0); P.pitch = 1.5; P.grappleCd = 0;
     GM.step(0.05, 3);
     const pv = P.grapplePreview; out.overhead = pv ? { ok: pv.ok, dist: +pv.dist.toFixed(1), y: +pv.point.y.toFixed(1) } : null;
     K[B.grapple[0]] = true; G.input.pressed[B.grapple[0]] = true;
     let maxY = -99, att = false;
     for (let i = 0; i < 80; i++) { GM.step(0.05, 1); maxY = Math.max(maxY, P.pos.y); if (P.grapple.state === 'attached') att = true; }
     K[B.grapple[0]] = false; GM.step(0.05, 40);
-    out.attached = att; out.maxY = +maxY.toFixed(2);
+    out.attached = att; out.rose = +(maxY - c.y).toFixed(2);
   }
-  // 2) on top of something far above every floor round it, after the grapple: put back
-  let spot = null;
-  for (const k of w.colliders) {
-    if (!k.vis || k.alive === false || k.x1 - k.x0 < 1.2 || k.z1 - k.z0 < 1.2) continue;
-    const x = (k.x0 + k.x1) / 2, z = (k.z0 + k.z1) / 2; if (x < 1.5 || z < 1.5 || x > w.W - 1.5 || z > w.D - 1.5) continue;
-    if (!(k.y1 > w.reachNear(x, z, 6) + 4) || k.y1 > out.cap) continue;
-    if (!w.boxFree(x - 0.4, k.y1 + 0.05, z - 0.4, x + 0.4, k.y1 + 1.9, z + 0.4)) continue;
-    spot = { x, y: k.y1, z }; break;
-  }
-  out.ledge = spot ? [+spot.x.toFixed(1), +spot.y.toFixed(1), +spot.z.toFixed(1)] : null;
-  if (spot) {
-    const safe = new THREE.Vector3(c ? c.x : w.spawn.x, c ? c.y + 0.05 : 0.05, c ? c.z : w.spawn.z);
-    // not after a grapple: left alone
-    P.lastSafe.copy(safe); P._grapAir = false; P.pos.set(spot.x, spot.y + 0.02, spot.z); P.vel.set(0, 0, 0); GM.step(0.05, 30);
-    out.stayY = +P.pos.y.toFixed(2);
-    // after a grapple: put back
-    P.lastSafe.copy(safe); P._grapAir = true; P.pos.set(spot.x, spot.y + 0.02, spot.z); P.vel.set(0, 0, 0); GM.step(0.05, 30);
-    out.backY = +P.pos.y.toFixed(2); out.backD = +Math.hypot(P.pos.x - safe.x, P.pos.z - safe.z).toFixed(2);
-  }
+  // 2) high over an exit, pushing north: the map's bound holds (not over the tunnel's roof and out)
+  G.Areas.openGates(true);
+  const ex = w.exits[0];
+  let top = 0; for (const k of w.query(ex.x - 4, -2, -14, ex.x + 4, 60, 0.4)) if (k.alive !== false) top = Math.max(top, k.y1);
+  out.wallTop = +top.toFixed(1);
+  let minZ = 99;
+  P.pos.set(ex.x, top + 2.5, 2); P.vel.set(0, 0, 0);
+  for (let i = 0; i < 25; i++) { P.vel.z = -14; P.vel.y = Math.max(P.vel.y, 0); P.pos.y = Math.max(P.pos.y, top + 2.5); GM.step(0.05, 1); minZ = Math.min(minZ, P.pos.z); }
+  out.highMinZ = +minZ.toFixed(2);
+  // 3) down in the exit's opening: the tunnel still lets you in
+  minZ = 99; P.pos.set(ex.x, 0.05, 1.2); P.vel.set(0, 0, 0);
+  for (let i = 0; i < 6; i++) { P.vel.z = -6; GM.step(0.05, 1); minZ = Math.min(minZ, P.pos.z); }
+  out.lowMinZ = +minZ.toFixed(2);
   return JSON.stringify(out);
 };
 1;`;
@@ -59,6 +51,7 @@ window.__grap = function () {
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000); await sleep(400);
     await p.eval(PAGE);
+    if (process.env.GRAPPLE_PRE) await p.eval(process.env.GRAPPLE_PRE + '; 1'); // (debugging: code run in the page first)
     for (const f of fields) {
       await p.eval('window.__w0 = G.world; 1');
       await p.eval(`(() => { G.Run.field = () => '${f}'; G.game.seed = 1017; G.game.area = 2; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.enterArea(3, 'combat'); })(); 1`);
@@ -67,18 +60,15 @@ window.__grap = function () {
       console.log(f, JSON.stringify(r));
       if (!r.noCeil) {
         ok(r.overhead && r.overhead.ok, `${f}: what is over your head can be held (${JSON.stringify(r.overhead)})`);
-        ok(r.attached, `${f}: the grapple holds`);
-        ok(r.maxY <= r.cap + 0.05, `${f}: never past ${r.cap} m (the highest floor ${r.max} + 5; went to ${r.maxY})`);
+        ok(r.attached && r.rose > 2, `${f}: the grapple holds and takes you up (${r.rose} m)`);
       } else console.log(`   (${f}: nothing overhead to hold)`);
-      if (r.ledge) {
-        ok(r.stayY > r.ledge[1] - 0.2, `${f}: up on ${JSON.stringify(r.ledge)} some other way: left alone (${r.stayY})`);
-        ok(r.backY < r.ledge[1] - 2 && r.backD < 1, `${f}: up there after the grapple: put back where you stood (${r.backY}, ${r.backD} m off)`);
-      } else console.log(`   (${f}: no ledge high above the floors)`);
+      ok(r.highMinZ >= 0.3, `${f}: high over an exit (${r.wallTop + 2.5} m), the map's bound holds (z never below ${r.highMinZ})`);
+      ok(r.lowMinZ < 0.3, `${f}: down in the exit's opening the tunnel still lets you in (z ${r.lowMinZ})`);
     }
     const errs = p.errs || [];
     ok(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
   } catch (e) { console.log('crashed', e && e.stack || e); fails++; }
   finally { ch.close(); srv.close(); }
-  console.log(fails ? `\nGRAPPLE TEST FAILED (${fails})` : '\nGRAPPLE TEST PASSED');
+  console.log(fails ? '\nGRAPPLE TEST FAILED (' + fails + ')' : '\nGRAPPLE TEST PASSED');
   process.exit(fails ? 1 : 0);
 })();

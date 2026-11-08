@@ -419,26 +419,6 @@
       return best;
     }
     // y (optional): the surface at or just below that height (strata); without it, the lowest one
-    // the floors you walk to from the entrance (reachMask, levelgen.js validate), the highest one per 1 m cell, and the highest of all:
-    // where the grapple may take you (player.js: never far above them)
-    reachTops() {
-      if (this._rt !== undefined) return this._rt;
-      if (!this.nf || !this.reachMask || !this.N) return (this._rt = null);
-      const N = this.N, L = this.L || 1, top = new Float32Array(N).fill(-Infinity); let max = -Infinity;
-      for (let k = 0; k < L; k++) for (let c = 0; c < N; c++) { const i = k * N + c; if (!this.reachMask[i] || this.nb[i] || !(this.nf[i] > -50)) continue; if (this.nf[i] > top[c]) top[c] = this.nf[i]; }
-      for (let c = 0; c < N; c++) if (top[c] > max) max = top[c];
-      return (this._rt = { top, max });
-    }
-    // the highest floor you walk to within R m of (x, z) (-Infinity: none; Infinity: no nav to tell)
-    reachNear(x, z, R) {
-      const rt = this.reachTops(); if (!rt) return Infinity;
-      let m = -Infinity;
-      for (let b = Math.floor(z - R); b <= Math.floor(z + R); b++) for (let a = Math.floor(x - R); a <= Math.floor(x + R); a++) {
-        const xi = a + this.xo, zi = b + this.zo; if (xi < 0 || zi < 0 || xi >= this.Wn || zi >= this.Dn) continue;
-        const v = rt.top[zi * this.Wn + xi]; if (v > m) m = v;
-      }
-      return m;
-    }
     navIdx(x, z, y) {
       const xi = Math.floor(x) + this.xo, zi = Math.floor(z) + this.zo; if (xi < 0 || zi < 0 || xi >= this.Wn || zi >= this.Dn) return -1;
       const i = zi * this.Wn + xi;

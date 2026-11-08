@@ -68,6 +68,8 @@
     T.mesh(w, hf, o);
     const cc = T.cellCorners(hf, o);
     h.set(T.cellTops(hf, o, cc));
+    // the grid as the player's feet read it (world.js, while the player moves): its columns carry it (c.tg), T.surf gives the drawn height
+    const grid = { hf, ox, oz, cc, cliff: !!o.cliff };
     const steep = (i) => { const a = cc[i * 4], b = cc[i * 4 + 1], c = cc[i * 4 + 2], d = cc[i * 4 + 3]; return Math.max(a, b, c, d) - Math.min(a, b, c, d) > 0.3; };
     const co = { surf: o.surf || 'stone', noGrapple: o.noGrapple };
     for (let z = 0; z < D; z++) {
@@ -78,17 +80,17 @@
         if (steep(i)) {
           for (const [fx, fz] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
             const y = (cc[i * 4] * (1 - fx) + cc[i * 4 + 1] * fx) * (1 - fz) + (cc[i * 4 + 2] * (1 - fx) + cc[i * 4 + 3] * fx) * fz;
-            w.addCollider(ox + x + fx - 0.25, base, oz + z + fz - 0.25, ox + x + fx + 0.25, Math.round(y * 16) / 16, oz + z + fz + 0.25, co);
+            w.addCollider(ox + x + fx - 0.25, base, oz + z + fz - 0.25, ox + x + fx + 0.25, Math.round(y * 16) / 16, oz + z + fz + 0.25, co).tg = grid;
           }
           x++; continue;
         }
         let x2 = x + 1; while (x2 < W && m[z * W + x2] && h[z * W + x2] === h[i] && !steep(z * W + x2)) x2++;
-        w.addCollider(ox + x, base, oz + z, ox + x2, h[i], oz + z + 1, co);
+        w.addCollider(ox + x, base, oz + z, ox + x2, h[i], oz + z + 1, co).tg = grid;
         x = x2;
       }
     }
     w.groundGrid = w.groundGrid || [];
-    w.groundGrid.push({ hf, ox, oz });
+    w.groundGrid.push(grid);
     w.groundTop = (x, z) => {
       for (const g of w.groundGrid) {
         const cx = Math.floor(x - g.ox), cz = Math.floor(z - g.oz);
@@ -98,6 +100,17 @@
       return w.groundElse ? w.groundElse(x, z) : 0;
     };
     return hf;
+  };
+  // the height of the drawn ground at (x, z) on a grid (T.build's grid): the very triangle the mesh draws there (T.mesh splits each cell
+  // along its shorter diagonal, T.meshCliff always from x0z0 to x1z1); null off the grid or over a cell without ground
+  T.surf = function (g, x, z) {
+    const W = g.hf.W, D = g.hf.D, cx = Math.floor(x - g.ox), cz = Math.floor(z - g.oz);
+    if (cx < 0 || cz < 0 || cx >= W || cz >= D) return null;
+    const i = cz * W + cx; if (!g.hf.m[i]) return null;
+    const fx = Math.min(1, Math.max(0, x - g.ox - cx)), fz = Math.min(1, Math.max(0, z - g.oz - cz));
+    const a = g.cc[i * 4], b = g.cc[i * 4 + 1], c = g.cc[i * 4 + 2], d = g.cc[i * 4 + 3]; // x0z0 x1z0 x0z1 x1z1
+    if (g.cliff || Math.abs(a - d) < Math.abs(b - c)) return fz >= fx ? a + fx * (d - c) + fz * (c - a) : a + fx * (b - a) + fz * (d - b);
+    return fx + fz <= 1 ? a + fx * (b - a) + fz * (c - a) : d + (1 - fx) * (c - d) + (1 - fz) * (b - d);
   };
   // the mesh's four corner heights over every cell (as T.mesh / T.meshCliff lay them): 4 per cell, x0z0 x1z0 x0z1 x1z1
   T.cellCorners = function (hf, o) {

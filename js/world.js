@@ -88,6 +88,7 @@
   G.Batch = Batch;
 
   // ---------------- world ----------------
+  const TERR_M = 0.8; // (while the player moves: how far under the drawn surface of a terrain its column's top may stand; the queries reach down by it)
   class World {
     constructor(W, D, biome) {
       this.W = W; this.D = D; this.biome = biome; this.zo = 0; this.Dn = D; this.xo = 0; this.Wn = W;
@@ -156,7 +157,23 @@
       }
       return out;
     }
-    boxFree(x0, y0, z0, x1, y1, z1) { return this.query(x0, y0, z0, x1, y1, z1).length === 0; }
+    boxFree(x0, y0, z0, x1, y1, z1) {
+      if (!this.pp) return this.query(x0, y0, z0, x1, y1, z1).length === 0;
+      // (the player: a terrain's column is in the way only where its drawn surface is: under the box's middle, or a step and more above
+      // the box's bottom beside it, see tTop)
+      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      for (const c of this.query(x0, y0 - TERR_M, z0, x1, y1, z1)) {
+        if (!c.tg) { if (c.y1 > y0) return false; continue; }
+        const inC = cx >= c.x0 && cx < c.x1 && cz >= c.z0 && cz < c.z1;
+        if (this.tTop(c, cx, cz) > y0 + (inC ? 0.01 : 0.5)) return false;
+      }
+      return true;
+    }
+    // the drawn surface of a terrain's column (terrain.js T.surf) at the point of it nearest (x, z)
+    tTop(c, x, z) {
+      const s = G.Terrain.surf(c.tg, Math.min(c.x1 - 1e-4, Math.max(c.x0 + 1e-4, x)), Math.min(c.z1 - 1e-4, Math.max(c.z0 + 1e-4, z)));
+      return s == null ? c.y1 : s;
+    }
     floorBelow(x, y, z) {
       const a = this.query(x - 0.01, -60, z - 0.01, x + 0.01, y + 0.01, z + 0.01);
       let best = -100;
@@ -215,20 +232,35 @@
       const EPS = 0.002, STEP = st.stepH ?? 0.5;
       const res = { hitWall: false, hitCeil: false, landed: false, stepped: 0 };
       const tmp = [];
+      // While the player moves (this.pp) the ground of a terrain (its columns carry c.tg, terrain.js) is its drawn surface, not the stepped
+      // tops of its columns: the feet follow the slope smoothly (the column under the middle lifts them onto it as it rises), a neighbour
+      // column is passed over unless its surface stands more than a step above the feet (a drop: a wall). Everything else is as it was.
+      const PP = this.pp, inC = (c) => pos.x >= c.x0 && pos.x < c.x1 && pos.z >= c.z0 && pos.z < c.z1;
       // horizontal axes
       for (const ax of ['x', 'z']) {
         const dv = vel[ax] * dt;
         if (dv === 0) continue;
         pos[ax] += dv;
         tmp.length = 0;
-        this.query(pos.x - hw, pos.y + EPS, pos.z - hw, pos.x + hw, pos.y + h, pos.z + hw, tmp);
+        this.query(pos.x - hw, pos.y + EPS - (PP ? TERR_M : 0), pos.z - hw, pos.x + hw, pos.y + h, pos.z + hw, tmp);
         for (const c of tmp) {
-          // overlap still?
-          if (!(c.x1 > pos.x - hw && c.x0 < pos.x + hw && c.y1 > pos.y + EPS && c.y0 < pos.y + h && c.z1 > pos.z - hw && c.z0 < pos.z + hw)) continue;
-          const rise = c.y1 - pos.y;
-          if (st.canStep && rise > 0 && rise <= STEP && this.boxFree(pos.x - hw, c.y1 + EPS, pos.z - hw, pos.x + hw, c.y1 + h, pos.z + hw)) {
-            pos.y = c.y1 + EPS * 0.5; res.stepped = Math.max(res.stepped, rise);
-            continue;
+          if (PP && c.tg) {
+            if (!(c.x1 > pos.x - hw && c.x0 < pos.x + hw && c.z1 > pos.z - hw && c.z0 < pos.z + hw && c.y0 < pos.y + h)) continue;
+            const mid = inC(c), top = this.tTop(c, pos.x, pos.z), rise = top - pos.y;
+            if (rise <= EPS) continue;
+            if (mid && rise <= (st.canStep ? STEP : 0.3) && this.boxFree(pos.x - hw, top + EPS, pos.z - hw, pos.x + hw, top + h, pos.z + hw)) {
+              pos.y = top + EPS * 0.5; if (rise > 0.3) res.stepped = Math.max(res.stepped, rise);
+              continue;
+            }
+            if (!mid && rise <= STEP) continue;
+          } else {
+            // overlap still?
+            if (!(c.x1 > pos.x - hw && c.x0 < pos.x + hw && c.y1 > pos.y + EPS && c.y0 < pos.y + h && c.z1 > pos.z - hw && c.z0 < pos.z + hw)) continue;
+            const rise = c.y1 - pos.y;
+            if (st.canStep && rise > 0 && rise <= STEP && this.boxFree(pos.x - hw, c.y1 + EPS, pos.z - hw, pos.x + hw, c.y1 + h, pos.z + hw)) {
+              pos.y = c.y1 + EPS * 0.5; res.stepped = Math.max(res.stepped, rise);
+              continue;
+            }
           }
           if (dv > 0) pos[ax] = (ax === 'x' ? c.x0 : c.z0) - hw - EPS;
           else pos[ax] = (ax === 'x' ? c.x1 : c.z1) + hw + EPS;
@@ -239,8 +271,14 @@
       const dy = vel.y * dt;
       pos.y += dy;
       tmp.length = 0;
-      this.query(pos.x - hw + EPS, pos.y, pos.z - hw + EPS, pos.x + hw - EPS, pos.y + h, pos.z + hw - EPS, tmp);
+      this.query(pos.x - hw + EPS, pos.y - (PP ? TERR_M : 0), pos.z - hw + EPS, pos.x + hw - EPS, pos.y + h, pos.z + hw - EPS, tmp);
       for (const c of tmp) {
+        if (PP && c.tg) { // (only the column under the middle is the ground; it never stands over you)
+          if (!inC(c)) continue;
+          const top = this.tTop(c, pos.x, pos.z), up = top - pos.y;
+          if (up > 0 && up <= (dy <= 0 ? Math.max(0.6, -dy + 0.05) : 0.3)) { pos.y = top; if (dy <= 0) { if (vel.y < 0) res.landed = true; vel.y = 0; } }
+          continue;
+        }
         if (!(c.y1 > pos.y && c.y0 < pos.y + h)) continue;
         if (dy <= 0 && c.y1 - pos.y <= Math.max(0.6, -dy + 0.05)) { pos.y = c.y1; if (vel.y < 0) res.landed = true; vel.y = 0; }
         else if (dy > 0) { pos.y = c.y0 - h - EPS; vel.y = 0; res.hitCeil = true; }
@@ -251,10 +289,15 @@
       return res;
     }
     groundAt(pos, hw, maxDown) {
-      // highest top under the footprint within maxDown below feet
-      const a = this.query(pos.x - hw + 0.003, pos.y - maxDown, pos.z - hw + 0.003, pos.x + hw - 0.003, pos.y + 0.01, pos.z + hw - 0.003);
+      // highest top under the footprint within maxDown below feet (while the player moves, a terrain's ground is its drawn surface under the middle)
+      const PP = this.pp;
+      const a = this.query(pos.x - hw + 0.003, pos.y - maxDown - (PP ? TERR_M : 0), pos.z - hw + 0.003, pos.x + hw - 0.003, pos.y + 0.01, pos.z + hw - 0.003);
       let best = -Infinity;
-      for (const c of a) if (c.y1 <= pos.y + 0.011 && c.y1 > best) best = c.y1;
+      for (const c of a) {
+        let top = c.y1;
+        if (PP && c.tg) { if (!(pos.x >= c.x0 && pos.x < c.x1 && pos.z >= c.z0 && pos.z < c.z1)) continue; top = this.tTop(c, pos.x, pos.z); }
+        if (top <= pos.y + 0.011 && top >= pos.y - maxDown - 1e-6 && top > best) best = top;
+      }
       return best;
     }
     // push out of any overlapping collider (safety net for spawn / teleports)

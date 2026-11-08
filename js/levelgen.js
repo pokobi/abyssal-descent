@@ -600,7 +600,7 @@
         }
         const rockM = w.mats.rock, grassM = new THREE.MeshStandardMaterial({ color: w.mats.biome.isletGrass ?? 0x8ab05a, roughness: 0.9, flatShading: true });
         for (let i = 0; i < 14; i++) {
-          const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.8, 170), s = rng.range(5, 16);
+          const a = rng.range(0, Math.PI * 2), r0 = rng.range(Math.max(W, D) * 0.8, 170), s = rng.range(5, 16), r = Math.max(r0, Math.hypot(W, D) / 2 + s * 1.2 + 8); // (clear of the area's corners, its tree and all: never over the floor)
           const g = new THREE.Group(); g.position.set(cx + Math.cos(a) * r, rng.range(-12, 25), cz + Math.sin(a) * r);
           const rk = new THREE.Mesh(PG.cone, rockM); rk.scale.set(s, s * 1.4, s); rk.rotation.x = Math.PI; rk.position.y = -s * 0.7; g.add(rk);
           const top = new THREE.Mesh(PG.cyl, grassM); top.scale.set(s, s * 0.12, s); g.add(top);

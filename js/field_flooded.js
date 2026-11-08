@@ -55,15 +55,16 @@
       const seg = (x0, z0, x1, z1, side) => {
         if (side === breach) {
           const along = side === 'N' || side === 'S', a0 = along ? x0 : z0, a1 = along ? x1 : z1, m = rng.range(a0 + 3, a1 - 3);
-          if (along) { w.solid('wall', x0, BED, z0, m - 1.2, TOP, z1, { uv: 2.5 }); w.solid('wall', m + 1.2, BED, z0, x1, TOP, z1, { uv: 2.5 }); }
-          else { w.solid('wall', x0, BED, z0, x1, TOP, m - 1.2, { uv: 2.5 }); w.solid('wall', x0, BED, m + 1.2, x1, TOP, z1, { uv: 2.5 }); }
+          if (along) { wall(x0, z0, m - 1.2, z1); wall(m + 1.2, z0, x1, z1); }
+          else { wall(x0, z0, x1, m - 1.2); wall(x0, m + 1.2, x1, z1); }
           return;
         }
-        w.solid('wall', x0, BED, z0, x1, TOP, z1, { uv: 2.5 });
+        wall(x0, z0, x1, z1);
       };
+      // a wall's top, and the moss at the waterline round it (on the wall only: inside it is open water, not a floor of moss)
+      const wall = (x0, z0, x1, z1) => { w.solid('wall', x0, BED, z0, x1, TOP, z1, { uv: 2.5 }); w.visual('moss', x0 - 0.05, -0.2, z0 - 0.05, x1 + 0.05, 0.25, z1 + 0.05, { uv: 2, grad: false, skip: { top: true, bottom: true } }); };
       seg(b.x0, b.z0, b.x1, b.z0 + WT, 'N'); seg(b.x0, b.z1 - WT, b.x1, b.z1, 'S');
       seg(b.x0, b.z0 + WT, b.x0 + WT, b.z1 - WT, 'W'); seg(b.x1 - WT, b.z0 + WT, b.x1, b.z1 - WT, 'E');
-      w.visual('moss', b.x0 - 0.05, -0.2, b.z0 - 0.05, b.x1 + 0.05, 0.25, b.z1 + 0.05, { uv: 2, grad: false });
       // the steps down into the flooded inside (and up out of it)
       H.stairs(w, 'N', b.z1 - WT, b.x0 + WT + 1.2, 1.6, BED, TOP, 'trim');
       // a drowned room's leavings: a statue up to its chest, a pillar to the vault
@@ -76,7 +77,7 @@
     const extra = layout === 'canals' ? 0.15 : 0.35;
     for (let r = 0; r < nR; r++) for (let c = 0; c < nC; c++) { if (B(c + 1, r) && rng.chance(extra)) links.add(lk(r * nC + c, r * nC + c + 1)); if (B(c, r + 1) && rng.chance(extra)) links.add(lk(r * nC + c, (r + 1) * nC + c)); }
     const cross = (x0, z0, x1, z1, y, arch) => {
-      if (arch) { w.solid('block', x0, y - 0.5, z0, x1, y, z1, { uv: 2, tag: 'bridge' }); w.visual('block', x0 + (x1 - x0 > z1 - z0 ? 0.6 : 0), BED, z0 + (x1 - x0 > z1 - z0 ? 0 : 0.6), x1 - (x1 - x0 > z1 - z0 ? 0.6 : 0), y - 1.6, z1 - (x1 - x0 > z1 - z0 ? 0 : 0.6), { uv: 3 }); }
+      if (arch) w.solid('block', x0, y - 0.5, z0, x1, y, z1, { uv: 2, tag: 'bridge' }); // (open water under it: nothing on the bed to snag what the current carries)
       else w.solid('wood', x0, y - 0.18, z0, x1, y, z1, { uv: 1, tag: 'bridge' });
     };
     for (const key of links) {

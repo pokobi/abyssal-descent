@@ -24,7 +24,7 @@
   function npc(def, pos, ev, light) {
     const w = G.world;
     const m = G.enemies.buildModel(def, {});
-    m.group.position.copy(pos); w.group.add(m.group);
+    m.group.position.copy(pos); w.group.add(m.group); if (G.Areas.keeperCol) G.Areas.keeperCol(w, m);
     w.lightSources.push({ pos: pos.clone().add(V(0, 2.6, 0.6)), color: light || '#ffd080', intensity: 7, range: 8, flame: 0, emit: false, ph: 0, prio: 2, steady: true });
     w.interactables.push({ type: 'npc', ev, pos: pos.clone().add(V(0, 1.4, 0)), model: m, used: false });
   }

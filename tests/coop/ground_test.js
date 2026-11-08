@@ -51,6 +51,7 @@ const PORT = +process.env.COOP_PORT || 9451;
     check(k >= 0 && gotIt, `pillars: a pillar the host's 沈め手 stamps on starts to sink on the guest's screen too (pillar ${k})`);
     // many turns: start every pillar on the host soon, then watch both screens side by side
     await h.eval("G.world.pillars.forEach((q) => { if (q.st === 'up') q.next = q.t + Math.random() * 8; }); 1");
+    await g.eval("if (!window.__plN) { window.__plN = 0; const f = G.Coop.handlers.pl; G.Coop.handlers.pl = function () { window.__plN++; return f.apply(this, arguments); }; window.__plsN = window.__plsN || 0; const f2 = G.Coop.handlers.pls; G.Coop.handlers.pls = function () { window.__plsN++; return f2.apply(this, arguments); }; } 1");
     const ORDER = ['up', 'warn', 'sink', 'down', 'rise'];
     const near = (a, b) => { const i = ORDER.indexOf(a), j = ORDER.indexOf(b); return i === j || Math.abs(i - j) === 1 || Math.abs(i - j) === 4; };
     let bad = 0, seen = 0, worst = '';
@@ -59,6 +60,7 @@ const PORT = +process.env.COOP_PORT || 9451;
       const [a, b] = await Promise.all([sts(h), sts(g)]);
       a.forEach((s, i) => { if (s !== 'up') seen++; if (!near(s, b[i])) { bad++; worst = `${i}: host ${s} / guest ${b[i]}`; } });
     }
+    if (bad) console.log('  diag', await g.eval("JSON.stringify({ st: G.game.state, live: G.Coop.live, area: G.game.area, t: +G.game.time.toFixed(1), pl: window.__plN || 0, pls: window.__plsN || 0 })"), await h.eval("JSON.stringify({ st: G.game.state, area: G.game.area, t: +G.game.time.toFixed(1) })"));
     check(seen > 20 && bad === 0, `pillars: over ~35 s of turns the guest's pillars keep in step with the host's (${seen} sinking sightings, ${bad} out of step${worst ? ' — ' + worst : ''})`);
     // a screen that lost its way (as if it missed the word) asks and is put right
     await g.eval("if (!window.__plsN) { window.__plsN = 0; const f = G.Coop.handlers.pls; G.Coop.handlers.pls = function (m) { window.__plsN++; return f.apply(this, arguments); }; } 1");

@@ -125,6 +125,11 @@
       return c;
     }
     removeCollider(c) { c.alive = false; }
+    // a round thing standing at (x, z), radius r, from y0 to y1: two boxes in a cross (a square round it would stand out of it at its
+    // corners, one inside it would let you walk into its sides); returns both
+    roundCollider(x, z, r, y0, y1, o) {
+      return [this.addCollider(x - r * 0.92, y0, z - r * 0.5, x + r * 0.92, y1, z + r * 0.5, o), this.addCollider(x - r * 0.5, y0, z - r * 0.92, x + r * 0.5, y1, z + r * 0.92, o)];
+    }
     // solid box = visible geometry + collider (the only way static solids are created => no invisible walls)
     solid(mk, x0, y0, z0, x1, y1, z1, o) {
       o = o || {};

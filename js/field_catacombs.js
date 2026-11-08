@@ -1,207 +1,284 @@
 'use strict';
-// 地下墓所 (catacombs, the entrance tier), on a framework of its own: two layers, one under the other.
-//   Above: a maze of low passages walled with bones (a ceiling just over your head), small burial chambers on its corners.
-//   Below: the great ossuary, a dark vaulted crypt under the whole middle of the maze, its piers standing right under the maze's.
-// Where the maze's floor has fallen in you drop into the crypt; the wells in the burial chambers have stairs down (and back up).
-// The iron gates in the passages still shut (the key) and must be battered down. You come down into the stair hall at the south and
-// leave through the vestibule with the gates at the north.
+// 地下墓所 (catacombs, the entrance tier): 納骨壁の大回廊, the great ossuary nave.
+//   A long, narrow nave under a high vault, from the stair hall at the south to the vestibule with the gates at the north. Its two long
+//   walls rise in tiers of burial niches: the nave's floor, a terrace 4.5 m up, a second one 9 m up against the wall, then the wall
+//   up to the vault. Stairs climb the terraces' faces; stone bridges cross the nave between the first terraces. Small burial chapels
+//   are dug into the first terrace at the nave's level, behind iron gates (shut one behind you, the key: the monsters must batter it).
+//   From the nave you see up every tier: what is left to find is seldom out of sight for long.
+//   Layouts: 'nave' (the terraces the whole length), 'crossing' (they break off round a crossing in the middle, a monument of bones
+//   in it), 'collapse' (stretches of the terraces fallen into slopes of rubble you can climb; one bridge broken in the middle).
 (function () {
-  const LG = G.LevelGen, H = LG._, F = G.FieldGen, FB = F._, U = G.U, V = U.V;
-  const P = () => G.Props, PG = () => G.Props.PG;
+  const LG = G.LevelGen, H = LG._, F = G.FieldGen, FB = F._, U = G.U;
+  const P = () => G.Props;
   const CR = () => F._crypt;
-  const CELL = 5.5, WT = 1.2, HT = 4.6, LOW = -4.5, SLAB = 0.3;
+  const T1 = 4.5, T2 = 9, VAULT = 16, D1 = 9, D2 = 3.6, SL = 0.3; // terrace tops, the vault; the terraces' depth from the wall; a top slab
+  const NZ = 12, SZ = 11; // the vestibule (north) and the stair hall (south): no terraces there
 
   function genCatacombs(area, seed, extraChests, gates, kind) {
     const rng = new G.RNG(seed);
-    const cols = 12 + rng.int(0, 1), rows = 10 + rng.int(0, 2), oz = 18;
-    const W = Math.ceil(cols * CELL + 6), D = Math.ceil(oz + rows * CELL + 11);
-    const ox = (W - cols * CELL) / 2;
+    const layout = F.pickLayout(rng, 'catacombs', ['nave', 'crossing', 'collapse']);
+    const NAVE = 18 + rng.int(0, 2) * 2, L = 78 + rng.int(0, 3) * 4;
+    const W = NAVE + 2 * D1, D = NZ + L + SZ, z0 = NZ, z1 = NZ + L;
     const w = new G.World(W, D, 'catacombs');
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
+    w.layout = layout;
     const occ = H.Occ(W, D);
     FB.reserve(occ, W, D, gates);
-    const layout = F.pickLayout(rng, 'catacombs', ['ossuary', 'wells', 'collapse']);
-    w.layout = layout;
-    // ---- the maze: a tree of passages with a few loops, some 2 x 2 burial chambers
-    const id = (c, r) => r * cols + c, open = new Set(), key = (a, b) => (a < b ? a + ':' + b : b + ':' + a);
-    const seen = new Uint8Array(cols * rows), stack = [[Math.floor(cols / 2), rows - 1]]; seen[id(...stack[0])] = 1;
-    while (stack.length) {
-      const [c, r] = stack[stack.length - 1];
-      const nb = [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]].filter(([a, b]) => a >= 0 && b >= 0 && a < cols && b < rows && !seen[id(a, b)]);
-      if (!nb.length) { stack.pop(); continue; }
-      const [a, b] = rng.pick(nb); seen[id(a, b)] = 1; open.add(key(id(c, r), id(a, b))); stack.push([a, b]);
-    }
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { if (c + 1 < cols && rng.chance(0.14)) open.add(key(id(c, r), id(c + 1, r))); if (r + 1 < rows && rng.chance(0.14)) open.add(key(id(c, r), id(c, r + 1))); }
-    // the crypt lies under the inner cells (not the outer ring)
-    const inCrypt = (c, r) => c >= 1 && c <= cols - 2 && r >= 1 && r <= rows - 2;
-    const rooms = [];
-    for (let t = 0; t < 40 && rooms.length < (layout === 'wells' ? 4 : 3); t++) {
-      const c = rng.int(1, cols - 3), r = rng.int(1, rows - 3);
-      if (rooms.some((q) => Math.abs(q.c - c) < 4 && Math.abs(q.r - r) < 4)) continue;
-      rooms.push({ c, r, well: rooms.length < (layout === 'wells' ? 3 : 2) });
-      open.add(key(id(c, r), id(c + 1, r))); open.add(key(id(c, r + 1), id(c + 1, r + 1))); open.add(key(id(c, r), id(c, r + 1))); open.add(key(id(c + 1, r), id(c + 1, r + 1)));
-    }
-    const inRoom = (c, r) => rooms.find((q) => c >= q.c && c <= q.c + 1 && r >= q.r && r <= q.r + 1);
-    // fallen floor: dead ends over the crypt (a pit there costs no way through)
-    const degree = (c, r) => [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]].filter(([a, b]) => a >= 0 && b >= 0 && a < cols && b < rows && open.has(key(id(c, r), id(a, b)))).length;
-    const holes = new Set();
-    const nHoles = layout === 'collapse' ? 7 : 3;
-    for (let t = 0; t < 200 && holes.size < nHoles; t++) {
-      const c = rng.int(1, cols - 2), r = rng.int(1, rows - 2);
-      if (!inCrypt(c, r) || inRoom(c, r) || degree(c, r) !== 1 || holes.has(id(c, r))) continue;
-      holes.add(id(c, r));
-    }
-    // ---- the floors: the maze's (a thin slab over the crypt, solid ground elsewhere), the crypt's
-    const cx0 = (c) => ox + c * CELL, cz0 = (r) => oz + r * CELL;
-    w.solid('floor', 0, -1, 0, W, 0, oz, { uv: 4 }); w.solid('floor', 0, -1, oz + rows * CELL, W, 0, D, { uv: 4 });
-    w.solid('floor', 0, -1, oz, ox, 0, oz + rows * CELL, { uv: 4 }); w.solid('floor', ox + cols * CELL, -1, oz, W, 0, oz + rows * CELL, { uv: 4 });
-    const holeR = [];
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const x0 = cx0(c), z0 = cz0(r), x1 = x0 + CELL, z1 = z0 + CELL;
-      if (!inCrypt(c, r)) { w.solid(rng.chance(0.5) ? 'floor' : 'cobble', x0, -1, z0, x1, 0, z1, { uv: 4 }); continue; }
-      const room = inRoom(c, r);
-      let hole = null;
-      if (holes.has(id(c, r))) hole = { x0: x0 + WT / 2 + 0.2, z0: z0 + WT / 2 + 0.2, x1: x1 - WT / 2 - 0.2, z1: z1 - WT / 2 - 0.2 };
-      else if (room && room.well && room.c === c && room.r === r) hole = { x0: x0 + WT / 2 + 0.4, z0: z0 + WT / 2 + 0.4, x1: x0 + 2 * CELL - WT / 2 - 0.4, z1: z0 + 2 * CELL - WT / 2 - 0.4, well: true };
-      if (room && room.well && !(room.c === c && room.r === r)) hole = 'in-well';
-      if (hole === 'in-well') { // (the parts of a chamber round its well: slab only where the well does not reach)
-        const q = room, hx0 = cx0(q.c) + WT / 2 + 0.4, hz0 = cz0(q.r) + WT / 2 + 0.4, hx1 = cx0(q.c) + 2 * CELL - WT / 2 - 0.4, hz1 = cz0(q.r) + 2 * CELL - WT / 2 - 0.4;
-        slabAround(w, x0, z0, x1, z1, hx0, hz0, hx1, hz1);
-        continue;
-      }
-      if (!hole) { w.solid('floor', x0, -SLAB, z0, x1, 0, z1, { uv: 4 }); continue; }
-      slabAround(w, x0, z0, x1, z1, hole.x0, hole.z0, hole.x1, hole.z1);
-      holeR.push(hole);
-    }
-    // the crypt: its floor, its outer walls lined with bones, the piers under the maze's, a vault of shadow
-    const kx0 = cx0(1), kz0 = cz0(1), kx1 = cx0(cols - 1), kz1 = cz0(rows - 1);
-    w.solid('cobble', kx0, LOW - 1, kz0, kx1, LOW, kz1, { uv: 3 });
-    w.solid('rock', kx0, -14, kz0, kx1, LOW - 1, kz1, { uv: 6, grad: false });
-    for (const [a, b, c2, d] of [[kx0 - 1, kz0 - 1, kx1 + 1, kz0], [kx0 - 1, kz1, kx1 + 1, kz1 + 1], [kx0 - 1, kz0, kx0, kz1], [kx1, kz0, kx1 + 1, kz1]]) w.solid('wall', a, LOW - 1, b, c2, -SLAB, d, { uv: 2.5 });
-    for (let c = 1; c <= cols - 1; c++) for (let r = 1; r <= rows - 1; r++) {
-      const x = cx0(c), z = cz0(r);
-      if (c === 1 || c === cols - 1 || r === 1 || r === rows - 1) continue;
-      if (holeR.some((h) => x > h.x0 - 0.4 && x < h.x1 + 0.4 && z > h.z0 - 0.4 && z < h.z1 + 0.4)) continue;
-      w.solid('block', x - 0.55, LOW, z - 0.55, x + 0.55, -SLAB, z + 0.55, { uv: 2 });
-      w.visual('trim', x - 0.75, -SLAB - 0.35, z - 0.75, x + 0.75, -SLAB, z + 0.75, { uv: 1 });
-    }
-    for (let x = kx0 + 0.5; x < kx1 - 1; x += 3.3) { CR().ossuary(w, rng, x, x + 3.2, kz0, true, 1, LOW); CR().ossuary(w, rng, x, x + 3.2, kz1, true, -1, LOW); }
-    for (let z = kz0 + 0.5; z < kz1 - 1; z += 3.3) { CR().ossuary(w, rng, z, z + 3.2, kx0, false, 1, LOW); CR().ossuary(w, rng, z, z + 3.2, kx1, false, -1, LOW); }
-    // in the crypt: rows of coffins, heaps of bones, candles of a cold light, an altar under each well
-    for (let i = 0; i < 18; i++) {
-      const x = rng.range(kx0 + 2, kx1 - 2), z = rng.range(kz0 + 2, kz1 - 2);
-      if (holeR.some((h) => x > h.x0 - 1.5 && x < h.x1 + 1.5 && z > h.z0 - 1.5 && z < h.z1 + 1.5)) continue;
-      const t = rng.next();
-      if (t < 0.4) P().sarcophagus(w, x, z, LOW, rng.chance(0.5), rng);
-      else if (t < 0.75) P().bones(w, x, LOW + 0.02, z, rng);
-      else P().urn(w, x, z, LOW, rng);
-    }
-    for (let x = kx0 + 4; x < kx1 - 2; x += 11) for (let z = kz0 + 4; z < kz1 - 2; z += 11) w.addLight(x, LOW + 2.5, z, { flame: 0.3, intensity: 7, range: 11, color: '#7ad0b0', prio: 0.7 });
-    // the wells: a stair down one side, the rim railed where the stair is not
-    for (const h of holeR) {
-      if (!h.well) {
-        for (let k = 0; k < 5; k++) P().rubble(w, rng.range(h.x0, h.x1), LOW, rng.range(h.z0, h.z1), rng, rng.range(0.8, 1.4), 'rock');
-        continue;
-      }
-      const sx = h.x0 + 1.3;
-      H.stairs(w, 'S', h.z0, sx, 2.2, LOW, 0, 'trim');
-      for (const [a, b] of [[h.z0 + 0.2, h.z1]]) w.solid('wall', h.x1 - 0.3, 0, a, h.x1, 0.9, b, { uv: 1.5 });
-      w.solid('wall', sx + 1.2, 0, h.z1 - 0.3, h.x1, 0.9, h.z1, { uv: 1.5 });
-      const ax = (sx + 1.2 + h.x1) / 2, az = (h.z0 + h.z1) / 2;
-      w.solid('trim', ax - 1.3, LOW, az - 0.7, ax + 1.3, LOW + 1.1, az + 0.7, { uv: 1 }); P().candles(w, ax, LOW + 1.1, az, rng, true); P().skull(w, ax + 0.7, LOW + 1.12, az, 0, 1.1);
-      w.addLight(ax, LOW + 2, az, { flame: 0.4, intensity: 9, range: 12, color: '#ffb070', prio: 1 });
-    }
-    // ---- the maze's walls (on the slab), its low ceiling
-    const nOpenN = new Set([Math.floor(cols / 2), ...LG.gateXs(W, gates || 1).map((g) => U.clamp(Math.floor((g - ox) / CELL), 0, cols - 1))]);
-    const nOpenS = new Set([Math.floor(cols / 2), rng.int(0, cols - 1)]);
-    const wall = (x0, z0, x1, z1) => { w.solid('wall', x0, 0, z0, x1, HT, z1, { uv: 2.5 }); occ.mark(x0 - 0.4, z0 - 0.4, x1 + 0.4, z1 + 0.4); };
-    for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) {
-      const x = cx0(c), z = cz0(r);
-      w.solid('block', x - WT / 2, 0, z - WT / 2, x + WT / 2, HT, z + WT / 2, { uv: 2 });
-      occ.mark(x - WT / 2 - 0.4, z - WT / 2 - 0.4, x + WT / 2 + 0.4, z + WT / 2 + 0.4);
-      if (c < cols) {
-        const closed = r === 0 ? !nOpenN.has(c) : r === rows ? !nOpenS.has(c) : !open.has(key(id(c, r - 1), id(c, r)));
-        if (closed) wall(x + WT / 2, z - WT / 2, x + CELL - WT / 2, z + WT / 2);
-      }
-      if (r < rows) {
-        const closed = c === 0 || c === cols || !open.has(key(id(c - 1, r), id(c, r)));
-        if (closed) wall(x - WT / 2, z + WT / 2, x + WT / 2, z + CELL - WT / 2);
+    // x of a side's terrace: s = -1 west (its wall at x = 0), +1 east (its wall at x = W); u: distance from that wall
+    const X = (s, u) => (s < 0 ? u : W - u);
+    const box = (mk, s, u0, u1, y0, y1, za, zb, o) => { const a = X(s, u0), b = X(s, u1); w.solid(mk, Math.min(a, b), y0, za, Math.max(a, b), y1, zb, o || { uv: 2.5 }); };
+    const vis = (mk, s, u0, u1, y0, y1, za, zb, o) => { const a = X(s, u0), b = X(s, u1); w.visual(mk, Math.min(a, b), y0, za, Math.max(a, b), y1, zb, o || { uv: 1 }); };
+
+    // ---- the plan along the nave (z): for each side, what stands where
+    const zc = Math.round((z0 + z1) / 2);
+    const gap = layout === 'crossing' ? [zc - 8, zc + 8] : null; // (the crossing: no terraces there)
+    // bridges between the first terraces (z of their middle)
+    const bridges = gap ? [gap[0] - 6, gap[1] + 6] : [Math.round(z0 + L * 0.3), Math.round(z0 + L * 0.68)];
+    const broken = layout === 'collapse' ? rng.int(0, 1) : -1; // (which bridge fell in the middle)
+    // fallen stretches (collapse): one or two, on either side, never under a bridge's end
+    const falls = [];
+    if (layout === 'collapse') {
+      for (let t = 0; t < 30 && falls.length < 2; t++) {
+        const s = rng.chance(0.5) ? -1 : 1, za = Math.round(rng.range(z0 + 8, z1 - 20)), zb = za + 11;
+        if (bridges.some((b) => b > za - 4 && b < zb + 4) || falls.some((f) => f.s === s && f.zb > za - 8 && f.za < zb + 8)) continue;
+        falls.push({ s, za, zb });
       }
     }
-    w.solid('rock', -3, HT, oz - WT / 2, W + 3, HT + 1.5, oz + rows * CELL + WT / 2, { uv: 6, noGrapple: true, grad: false });
-    // the halls at both ends (higher vaults)
-    const HH = 8;
-    w.solid('rock', -3, HH, -3, W + 3, HH + 1.5, oz - WT / 2, { uv: 6, noGrapple: true, grad: false });
-    w.solid('rock', -3, HH, oz + rows * CELL + WT / 2, W + 3, HH + 1.5, D + 3, { uv: 6, noGrapple: true, grad: false });
-    w.solid('wall', -3, HT, oz - WT / 2 - 0.3, W + 3, HH, oz - WT / 2, { uv: 2.5 }); w.solid('wall', -3, HT, oz + rows * CELL + WT / 2, W + 3, HH, oz + rows * CELL + WT / 2 + 0.3, { uv: 2.5 });
-    if (ox > 0.5) { w.solid('wall', -3, 0, oz, ox - WT / 2, HT, oz + rows * CELL, { uv: 2.5 }); w.solid('wall', ox + cols * CELL + WT / 2, 0, oz, W + 3, HT, oz + rows * CELL, { uv: 2.5 }); }
-    H.perimeter(w, rng, W, D, { gates, h: HH, top: HH + 1.5, beams: 0 });
-    occ.mark(0, oz - 1, ox, oz + rows * CELL + 1); occ.mark(ox + cols * CELL, oz - 1, W, oz + rows * CELL + 1);
-    // iron gates in east-west openings on loops (every cell still reached with all of them shut), not in a chamber or by a pit
-    if (G.Strata && CR()) {
-      const cand = [];
-      for (let r = 0; r < rows; r++) for (let c = 1; c < cols; c++) {
-        if (!open.has(key(id(c - 1, r), id(c, r)))) continue;
-        if (inRoom(c - 1, r) && inRoom(c - 1, r) === inRoom(c, r)) continue;
-        if ((inRoom(c - 1, r) || {}).well || (inRoom(c, r) || {}).well) continue; // (a well's pit would take one side of it)
-        if (holes.has(id(c - 1, r)) || holes.has(id(c, r))) continue;
-        cand.push([rng.next(), c, r]);
+    // chapels (dug into the first terrace, a gate in the face): two or three, the sides alternating, apart from bridges and falls
+    const chapels = [];
+    for (let t = 0; t < 60 && chapels.length < (layout === 'nave' ? 3 : 2) + (layout === 'collapse' ? 0 : 1); t++) {
+      const s = chapels.length % 2 ? 1 : -1, za = Math.round(rng.range(z0 + 3, z1 - 10)), zb = za + 7;
+      if (gap && zb > gap[0] - 2 && za < gap[1] + 2) continue;
+      if (bridges.some((b) => b > za - 4 && b < zb + 4)) continue;
+      if (falls.some((f) => f.s === s && f.zb > za - 3 && f.za < zb + 3)) continue;
+      if (chapels.some((c) => c.s === s && c.zb > za - 6 && c.za < zb + 6)) continue;
+      chapels.push({ s, za, zb });
+    }
+    // stairs: up to the first terrace (in the nave, against its face) and up to the second (on the first, against the second's face)
+    // { s, z: the top's z (it runs down southward from there), lo / hi: the levels }
+    const runs = (hFrom, hTo) => LG.stairsLen(hTo - hFrom);
+    const stairs = [];
+    // each stretch of terrace that runs unbroken (the crossing cuts them in two) gets its own: two up to the first, one or two up to the second
+    const pieces = gap ? [[z0, gap[0]], [gap[1], z1]] : [[z0, z1]];
+    const hits = (list, za, zb, pad) => list.some((q) => q.zb > za - pad && q.za < zb + pad);
+    const place = (s, pa, pb, lv, want, anyway) => {
+      const len = runs(lv ? T1 : 0, lv ? T2 : T1) + 2.4; // (the run and its landing)
+      const have = [];
+      for (let t = 0; t < 120 && have.length < want; t++) {
+        const za = Math.round(rng.range(pa + 1.5, pb - len - 1.5)), zb = za + len;
+        if (za < pa + 1 || zb > pb - 1) continue;
+        if (hits(falls.filter((f) => f.s === s), za, zb, 2)) continue;
+        // (a bridge may cross over the lower half of a stair to the first terrace: there is head room under it, not by the landing)
+        if (!lv && ((!anyway && hits(chapels.filter((c) => c.s === s), za, zb, 1)) || bridges.some((b) => b > za - 2.5 && b < za + 9.5))) continue;
+        if (hits(have, za, zb, t > 60 ? 2 : 10) || hits(stairs.filter((q) => q.s === s && q.lv === lv), za, zb, 2)) continue;
+        have.push({ s, lv, za, zb });
       }
-      cand.sort((a, b) => a[0] - b[0]);
-      const whole = (cut) => {
-        const shut = new Set(cut.map(([c, r]) => key(id(c - 1, r), id(c, r)))), sn = new Uint8Array(cols * rows), q = [0]; sn[0] = 1; let n = 1;
-        while (q.length) { const i = q.pop(), c = i % cols, r = (i / cols) | 0; for (const [a, b] of [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]]) { if (a < 0 || b < 0 || a >= cols || b >= rows) continue; const j = id(a, b), k = key(i, j); if (sn[j] || !open.has(k) || shut.has(k)) continue; sn[j] = 1; n++; q.push(j); } }
-        return n === cols * rows;
+      stairs.push(...have);
+      return have;
+    };
+    for (const [pa, pb] of pieces) {
+      let n0 = 0;
+      for (const s of [-1, 1]) { n0 += place(s, pa, pb, 0, 2, false).length; place(s, pa, pb, 1, 1 + (rng.chance(0.5) ? 1 : 0), false); }
+      // no way up onto this stretch's first terraces from either side: one stair anyway, giving up the chapel in its way
+      if (!n0) for (const s of [-1, 1]) {
+        const h = place(s, pa, pb, 0, 1, true);
+        if (!h.length) continue;
+        for (let i = chapels.length - 1; i >= 0; i--) { const c = chapels[i]; if (c.s === s && c.zb > h[0].za - 1 && c.za < h[0].zb + 1) chapels.splice(i, 1); }
+        break;
+      }
+    }
+
+    // ---- the floor, the vault, the walls round it
+    w.solid('floor', 0, -1, 0, W, 0, D, { uv: 4 });
+    w.solid('rock', -3, VAULT, -3, W + 3, VAULT + 1.5, D + 3, { uv: 6, noGrapple: true, grad: false });
+    H.perimeter(w, rng, W, D, { gates, h: VAULT, top: VAULT + 1.5, beams: 0 });
+
+    // ---- the terraces: each side, stretch by stretch along z
+    const cuts = (s) => {
+      // the z-stretches of a side: plain terrace, chapel, fall, crossing gap (sorted, covering z0..z1)
+      const xs = [{ za: z0, zb: z1, t: 'plain' }];
+      const split = (za, zb, t, o) => {
+        for (let i = 0; i < xs.length; i++) {
+          const q = xs[i]; if (q.t !== 'plain' || zb <= q.za || za >= q.zb) continue;
+          const parts = [];
+          if (za > q.za) parts.push({ za: q.za, zb: za, t: 'plain' });
+          parts.push(Object.assign({ za: Math.max(za, q.za), zb: Math.min(zb, q.zb), t }, o));
+          if (zb < q.zb) parts.push({ za: zb, zb: q.zb, t: 'plain' });
+          xs.splice(i, 1, ...parts); return;
+        }
       };
-      const chosen = [];
-      for (const [, c, r] of cand) {
-        if (chosen.length >= 3) break;
-        if (chosen.some(([a, b]) => Math.abs(a - c) + Math.abs(b - r) < 3) || !whole([...chosen, [c, r]])) continue;
-        chosen.push([c, r]);
+      if (gap) split(gap[0], gap[1], 'gap');
+      for (const c of chapels) if (c.s === s) split(c.za, c.zb, 'chapel', { c });
+      for (const f of falls) if (f.s === s) split(f.za, f.zb, 'fall', { f });
+      return xs;
+    };
+    const t1top = [], t2top = []; // (the walkable tops, for the rails and the chest spots)
+    for (const s of [-1, 1]) {
+      for (const q of cuts(s)) {
+        const { za, zb } = q;
+        if (q.t === 'gap') continue;
+        if (q.t === 'plain') {
+          box('wall', s, 0, D1, 0, T1 - SL, za, zb);
+          box('floor', s, 0, D1, T1 - SL, T1, za, zb, { uv: 4 });
+          box('wall', s, 0, D2, T1, T2 - SL, za, zb);
+          box('floor', s, 0, D2, T2 - SL, T2, za, zb, { uv: 4 });
+          t1top.push({ s, za, zb }); t2top.push({ s, za, zb });
+          // the niches: rows of skulls in the first terrace's face, the second's, and the wall above
+          CR().ossuary(w, rng, za, zb, X(s, D1), false, -s, 0);
+          CR().ossuary(w, rng, za, zb, X(s, D2), false, -s, T1);
+          CR().ossuary(w, rng, za, zb, X(s, 0), false, -s, T2);
+          CR().ossuary(w, rng, za, zb, X(s, 0), false, -s, T2 + 3.4);
+        } else if (q.t === 'chapel') {
+          // a chapel dug into the first terrace: its walls, its ceiling under the terrace's top, the iron gate in the face
+          const gx = X(s, D1 - 0.5);
+          CR().gate(w, rng, gx, za, zb, T1 - SL, 1);
+          box('wall', s, 0, D1 - 1, 0, T1 - SL, za, za + 0.6); box('wall', s, 0, D1 - 1, 0, T1 - SL, zb - 0.6, zb);
+          box('rock', s, 0, D1 - 1, 4.12, T1 - SL, za + 0.6, zb - 0.6, { uv: 3 });
+          box('floor', s, 0, D1, T1 - SL, T1, za, zb, { uv: 4 });
+          box('wall', s, 0, D2, T1, T2 - SL, za, zb);
+          box('floor', s, 0, D2, T2 - SL, T2, za, zb, { uv: 4 });
+          t1top.push({ s, za, zb }); t2top.push({ s, za, zb });
+          CR().ossuary(w, rng, za, zb, X(s, D2), false, -s, T1);
+          CR().ossuary(w, rng, za, zb, X(s, 0), false, -s, T2);
+          CR().ossuary(w, rng, za, zb, X(s, 0), false, -s, T2 + 3.4);
+          // inside: the back wall's niches, a sarcophagus, candles; a cold light
+          CR().ossuary(w, rng, za + 0.9, zb - 0.9, X(s, 0), false, -s, 0);
+          const cx = X(s, (D1 - 1) / 2 + 0.3), cz = (za + zb) / 2;
+          P().sarcophagus(w, cx, cz, 0, true, rng);
+          P().candles(w, X(s, 1.2), 0, za + 1.4, rng, true); P().candles(w, X(s, 1.2), 0, zb - 1.4, rng, false);
+          w.addLight(cx, 3, cz, { flame: 0.3, intensity: 6, range: 9, color: '#7ad0b0', prio: 0.8 });
+          // a chest's place: by the sarcophagus, away from the gate
+          w.platTops.push({ x0: Math.min(X(s, 0.8), X(s, 3)), z0: za + 1.2, x1: Math.max(X(s, 0.8), X(s, 3)), z1: zb - 1.2, y: 0, cx: X(s, 1.9), cz });
+          occ.mark(Math.min(X(s, 0), X(s, D1)), za, Math.max(X(s, 0), X(s, D1)), zb, 2);
+        } else if (q.t === 'fall') {
+          // a stretch where the first terrace's face fell in: a slope of rubble from the nave's floor up to the first terrace's level
+          // (0.25 m a step, 0.5 m deep: as easy as a stair, for you and for the foes), 4 m of it out in the nave. The second terrace
+          // still stands over the back of it.
+          const uTop = D2 + 0.6, uLow = D1 + 4, n = Math.round(T1 / 0.25), run = (uLow - uTop) / n;
+          box('wall', s, 0, uTop, 0, T1 - SL, za, zb); box('floor', s, 0, uTop, T1 - SL, T1, za, zb, { uv: 4 });
+          for (let i = 0; i < n; i++) { const u1 = uLow - i * run, h = (i + 1) * (T1 / n); box('rock', s, u1 - run, u1, 0, h, za, zb, { uv: 2, grad: false }); }
+          box('wall', s, 0, D2, T1, T2 - SL, za, zb);
+          box('floor', s, 0, D2, T2 - SL, T2, za, zb, { uv: 4 });
+          t2top.push({ s, za, zb });
+          CR().ossuary(w, rng, za, zb, X(s, D2), false, -s, T1);
+          // stones fallen out into the nave at its foot (small ones on the slope: nothing to trip on)
+          for (let k = 0; k < 3; k++) P().rubble(w, X(s, rng.range(uLow + 0.8, uLow + 2.2)), 0, rng.range(za + 1, zb - 1), rng, rng.range(1, 1.5), 'rock');
+          for (let k = 0; k < 4; k++) { const u = rng.range(uTop + 1, uLow - 1), h = T1 * (uLow - u) / (uLow - uTop); P().rubble(w, X(s, u), h, rng.range(za + 1, zb - 1), rng, rng.range(0.5, 0.9), 'rock'); }
+          // (the wall above, behind the fall)
+          CR().ossuary(w, rng, za + 2, zb - 2, X(s, 0), false, -s, T2);
+          occ.mark(Math.min(X(s, 0), X(s, D1 + 6.4)), za, Math.max(X(s, 0), X(s, D1 + 6.4)), zb, 2);
+        }
       }
-      for (const [c, r] of chosen) CR().gate(w, rng, cx0(c), cz0(r) + WT / 2, cz0(r + 1) - WT / 2, HT, WT);
     }
-    // chest spots: the dead ends of the maze (a chest at the end of a blind passage) and the crypt's corners
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if ((degree(c, r) === 1 || rng.chance(0.4)) && !holes.has(id(c, r)) && !inRoom(c, r)) { const x0 = cx0(c) + WT / 2 + 0.6, z0 = cz0(r) + WT / 2 + 0.6; w.platTops.push({ x0, z0, x1: x0 + CELL - WT - 1.2, z1: z0 + CELL - WT - 1.2, y: 0, cx: x0 + (CELL - WT) / 2 - 0.6, cz: z0 + (CELL - WT) / 2 - 0.6 }); }
-    for (const [x, z] of [[kx0 + 2.5, kz0 + 2.5], [kx1 - 2.5, kz0 + 2.5], [kx0 + 2.5, kz1 - 2.5], [kx1 - 2.5, kz1 - 2.5]]) w.platTops.push({ x0: x - 1.5, z0: z - 1.5, x1: x + 1.5, z1: z + 1.5, y: LOW, cx: x, cz: z });
-    // ---- the maze's dressing: skull niches, candles (few: it is dark), webs, bones; the chambers' coffins
-    let lights = 0;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const x0 = cx0(c) + WT / 2, z0 = cz0(r) + WT / 2, x1 = x0 + CELL - WT, z1 = z0 + CELL - WT;
-      if (holes.has(id(c, r))) { for (let k = 0; k < 3; k++) P().rubble(w, k % 2 ? x0 + 0.3 : x1 - 0.3, 0, rng.range(z0, z1), rng, 0.6, 'rock'); continue; }
-      const room = inRoom(c, r);
-      if (!room) {
-        if (r > 0 && !open.has(key(id(c, r - 1), id(c, r))) && rng.chance(0.6)) CR().ossuary(w, rng, x0, x1, z0, true, 1, 0);
-        if (c > 0 && !open.has(key(id(c - 1, r), id(c, r))) && rng.chance(0.45)) CR().ossuary(w, rng, z0, z1, x0, false, 1, 0);
-        if (rng.chance(0.18) && lights < 16) { P().candles(w, x0 + 0.4, 0, z0 + 0.4, rng, true); lights++; }
-        if (rng.chance(0.25)) P().web(w, x0 + 0.3, HT - 0.9, z0 + 0.3, Math.PI / 4, rng.range(1, 1.6));
-        if (rng.chance(0.3)) P().bones(w, (x0 + x1) / 2 + rng.range(-1, 1), 0.02, (z0 + z1) / 2 + rng.range(-1, 1), rng);
-      } else if (room.c === c && room.r === r && !room.well) {
-        const rx = cx0(c) + CELL, rz = cz0(r) + CELL;
-        P().sarcophagus(w, rx, rz, 0, true, rng); occ.mark(rx - 1.6, rz - 1.2, rx + 1.6, rz + 1.2);
-        w.platTops.push({ x0: rx - 3.5, z0: rz - 3.5, x1: rx + 3.5, z1: rz + 3.5, y: 0, cx: rx + 2.5, cz: rz + 2.5 });
-        P().chandelier(w, rx, HT - 1.6, rz, HT); lights++;
+    // the terraces' ends (north and south, and round the crossing): niches on the end faces
+    for (const s of [-1, 1]) for (const q of cuts(s)) {
+      if (q.t === 'gap') continue;
+      const prev = cuts(s).find((r) => r.zb === q.za), next = cuts(s).find((r) => r.za === q.zb);
+      const lo = Math.min(X(s, 0), X(s, D1)), hi = Math.max(X(s, 0), X(s, D1));
+      if (!prev || prev.t === 'gap') CR().ossuary(w, rng, lo, hi, q.za, true, -1, 0);
+      if (!next || next.t === 'gap') CR().ossuary(w, rng, lo, hi, q.zb, true, 1, 0);
+    }
+    // ---- the rails along the terraces' edges (gaps: stairs' heads, bridges' ends, every so often a gap to drop through)
+    const rail = (s, u, y, za, zb, gaps) => {
+      let z = za;
+      const gs = gaps.filter((g) => g[1] > za && g[0] < zb).sort((a, b) => a[0] - b[0]);
+      const seg = (a, b) => { if (b - a < 0.6) return; box('wall', s, u - 0.35, u, y, y + 0.95, a, b, { uv: 2 }); box('trim', s, u - 0.42, u + 0.07, y + 0.95, y + 1.05, a, b, { uv: 1 }); };
+      for (const g of gs) { seg(z, Math.max(z, g[0])); z = Math.max(z, g[1]); }
+      seg(z, zb);
+    };
+    const drops = [];
+    for (let z = z0 + 9; z < z1 - 6; z += rng.range(13, 18)) drops.push([z, z + 2.2]);
+    for (const s of [-1, 1]) {
+      const g1 = drops.slice(), g2 = drops.map(([a, b]) => [a + 5, b + 5]);
+      for (const b of bridges) g1.push([b - 1.8, b + 1.8]);
+      for (const st of stairs) if (st.s === s) (st.lv ? g2 : g1).push([st.za - 0.2, st.za + 2.6]);
+      for (const f of falls) if (f.s === s) g1.push([f.za, f.zb]);
+      for (const q of t1top) if (q.s === s) rail(s, D1, T1, q.za, q.zb, g1);
+      for (const q of t2top) if (q.s === s) rail(s, D2, T2, q.za, q.zb, g2);
+      // across the ends of the tops (north / south / at the crossing): the drop into the vestibule, the hall or the crossing
+      for (const q of cuts(s)) {
+        if (q.t === 'gap' || q.t === 'fall') continue;
+        const all = cuts(s), prev = all.find((r) => r.zb === q.za), next = all.find((r) => r.za === q.zb);
+        for (const [zEnd, open] of [[q.za, !prev || prev.t === 'gap'], [q.zb, !next || next.t === 'gap']]) {
+          if (!open) continue;
+          const a = Math.min(X(s, D2), X(s, D1)), b = Math.max(X(s, D2), X(s, D1)), c = Math.min(X(s, 0), X(s, D2)), d = Math.max(X(s, 0), X(s, D2));
+          const zz = zEnd === q.za ? [zEnd, zEnd + 0.35] : [zEnd - 0.35, zEnd];
+          w.solid('wall', a, T1, zz[0], b, T1 + 0.95, zz[1], { uv: 2 }); w.solid('trim', a, T1 + 0.95, zz[0] - 0.04, b, T1 + 1.05, zz[1] + 0.04, { uv: 1 });
+          w.solid('wall', c, T2, zz[0], d, T2 + 0.95, zz[1], { uv: 2 }); w.solid('trim', c, T2 + 0.95, zz[0] - 0.04, d, T2 + 1.05, zz[1] + 0.04, { uv: 1 });
+        }
       }
     }
-    // the vestibule (north): pillars, coffins stacked; the stair hall (south): torches, a sarcophagus either side
-    for (let x = 8; x < W - 6; x += 11) { if (LG.gateXs(W, gates || 1).some((g) => Math.abs(g - x) < 7)) continue; P().pillarSquare(w, x, 7, 0, HH, 1.1); occ.mark(x - 1.2, 6, x + 1.2, 8); }
-    for (const sx of [-1, 1]) { const x = W / 2 + sx * rng.range(8, 12), z = D - 5; P().sarcophagus(w, x, z, 0, true, rng); occ.mark(x - 1.6, z - 1.2, x + 1.6, z + 1.2); }
-    for (let x = 6; x < W - 4; x += 9) if (Math.abs(x - W / 2) > 5) P().torch(w, x, 3.2, D, 'nz');
+    // ---- the stairs (each with a landing at its head, level with the terrace it climbs to)
+    for (const st of stairs) {
+      const s = st.s, lo = st.lv ? T1 : 0, hi = st.lv ? T2 : T1, u = st.lv ? D2 : D1, wd = 2.2;
+      const cx = X(s, u + wd / 2);
+      box('trim', s, u, u + wd, lo, hi, st.za, st.za + 2.4, { uv: 1.5 }); // (the landing)
+      H.stairs(w, 'S', st.za + 2.4, cx, wd, lo, hi, 'trim');
+      // its outer side railed on the landing
+      box('wall', s, u + wd - 0.3, u + wd, hi, hi + 0.95, st.za, st.za + 2.4, { uv: 2 });
+      occ.mark(Math.min(X(s, u), X(s, u + wd)) - 0.4, st.za - 0.4, Math.max(X(s, u), X(s, u + wd)) + 0.4, st.zb + 0.4, 2);
+    }
+    // ---- the bridges across the nave, between the first terraces
+    bridges.forEach((bz, i) => {
+      const a = D1, b = W - D1, za = bz - 1.7, zb = bz + 1.7;
+      if (i === broken) {
+        // fallen in the middle: a stub from each side, its broken end over the nave
+        for (const [p, q] of [[a, a + 5.5], [b - 5.5, b]]) {
+          w.solid('block', p, T1 - 0.7, za, q, T1, zb, { uv: 2 });
+          w.solid('wall', p, T1, za, q, T1 + 0.95, za + 0.3, { uv: 2 }); w.solid('wall', p, T1, zb - 0.3, q, T1 + 0.95, zb, { uv: 2 });
+        }
+        for (let k = 0; k < 5; k++) P().rubble(w, rng.range(a + 6, b - 6), 0, rng.range(za, zb), rng, rng.range(0.6, 1.1), 'rock');
+        return;
+      }
+      w.solid('block', a, T1 - 0.7, za, b, T1, zb, { uv: 2 });
+      w.solid('wall', a, T1, za, b, T1 + 0.95, za + 0.3, { uv: 2 }); w.solid('trim', a, T1 + 0.95, za - 0.04, b, T1 + 1.05, za + 0.34, { uv: 1 });
+      w.solid('wall', a, T1, zb - 0.3, b, T1 + 0.95, zb, { uv: 2 }); w.solid('trim', a, T1 + 0.95, zb - 0.34, b, T1 + 1.05, zb + 0.04, { uv: 1 });
+      // skulls along its sides, a lamp hanging under its middle
+      for (let x = a + 1.5; x < b - 1; x += 2.2) for (const z of [za - 0.02, zb + 0.02]) P().skull(w, x, T1 - 0.5, z, z < bz ? Math.PI : 0, 0.8);
+      w.addLight((a + b) / 2, T1 - 1.6, bz, { flame: 0.4, intensity: 6, range: 10, color: '#ffb070', prio: 0.6 });
+    });
+    // ---- the crossing: a monument of bones on a stepped plinth
+    if (gap) {
+      const cx = W / 2, cz = zc;
+      for (const [r, y0, y1] of [[4, 0, 0.45], [3.1, 0.45, 0.9], [2.2, 0.9, 1.35]]) w.solid('trim', cx - r, y0, cz - r, cx + r, y1, cz + r, { uv: 1.5 });
+      w.solid('block', cx - 1.2, 1.35, cz - 1.2, cx + 1.2, 4.6, cz + 1.2, { uv: 2 });
+      for (const f of [-1, 1]) { CR().ossuary(w, rng, cx - 1, cx + 1, cz + f * 1.2, true, f, 0.7); CR().ossuary(w, rng, cz - 1, cz + 1, cx + f * 1.2, false, f, 0.7); }
+      P().candles(w, cx - 2.6, 0.9, cz - 2.6, rng, true); P().candles(w, cx + 2.6, 0.9, cz + 2.6, rng, true);
+      w.addLight(cx, 5.5, cz, { flame: 0.3, intensity: 10, range: 16, color: '#ffb070', prio: 1 });
+      occ.mark(cx - 4.6, cz - 4.6, cx + 4.6, cz + 4.6, 2);
+      w.platTops.push({ x0: cx - 3.9, z0: cz - 3.9, x1: cx - 2.4, z1: cz + 3.9, y: 0, cx: cx - 3.2, cz });
+      // the crossing's side walls: niches all the way up
+      for (const s of [-1, 1]) for (const y0 of [0, 3.4, 6.8, 10.2]) CR().ossuary(w, rng, gap[0] + 0.5, gap[1] - 0.5, X(s, 0), false, -s, y0);
+    }
+    // ---- the nave's floor: rows of sarcophagi (lanes between them), heaps of bones, urns, candles; lamps hanging from the vault
+    for (let z = z0 + 6; z < z1 - 4; z += rng.range(7, 10)) {
+      if (gap && z > gap[0] - 5 && z < gap[1] + 5) continue;
+      if (bridges.some((b) => Math.abs(b - z) < 2.5)) continue;
+      for (const f of [-1, 1]) {
+        const x = W / 2 + f * rng.range(2.6, NAVE / 2 - 4.2);
+        if (!occ.free(x - 1.6, z - 1.2, x + 1.6, z + 1.2)) continue;
+        if (rng.chance(0.65)) { P().sarcophagus(w, x, z, 0, rng.chance(0.5), rng); occ.mark(x - 1.6, z - 1.2, x + 1.6, z + 1.2); }
+        else if (rng.chance(0.5)) { P().urn(w, x, z, 0, rng); occ.mark(x - 0.6, z - 0.6, x + 0.6, z + 0.6); }
+        else P().bones(w, x, 0.02, z, rng);
+      }
+    }
+    for (let z = z0 + 10; z < z1 - 6; z += 16) P().chandelier(w, W / 2, VAULT - 5, z, VAULT);
+    // braziers on the second terraces, candles along the first, webs in the corners
+    for (const q of t2top) for (let z = q.za + 4; z < q.zb - 3; z += 14) { P().brazier(w, X(q.s, 1.4), T2, z, 0.9, true); w.addLight(X(q.s, 1.4), T2 + 1.6, z, { flame: 0.5, intensity: 7, range: 11, color: '#ff9a50', prio: 0.7 }); }
+    for (const q of t1top) for (let z = q.za + 3; z < q.zb - 2; z += 9) if (rng.chance(0.6)) P().candles(w, X(q.s, D1 - 0.8), T1, z, rng, rng.chance(0.5));
+    for (const q of t2top) if (rng.chance(0.5)) P().web(w, X(q.s, 0.4), VAULT - 1.4, q.za + 0.4, Math.PI / 4, rng.range(1.2, 1.8));
+    // chest spots on the tops: the second terraces' ends and a few places on the first
+    for (const q of t2top) if (q.zb - q.za > 6) for (const z of [q.za + 2.2, q.zb - 2.2]) if (rng.chance(0.5)) w.platTops.push({ x0: Math.min(X(q.s, 0.6), X(q.s, D2 - 0.8)), z0: z - 1.2, x1: Math.max(X(q.s, 0.6), X(q.s, D2 - 0.8)), z1: z + 1.2, y: T2, cx: X(q.s, 1.6), cz: z });
+    for (const q of t1top) if (q.zb - q.za > 10 && rng.chance(0.6)) { const z = rng.range(q.za + 3, q.zb - 3); if (stairs.some((st) => st.s === q.s && st.lv === 1 && z > st.za - 1.5 && z < st.zb + 1.5)) continue; w.platTops.push({ x0: Math.min(X(q.s, D2 + 0.8), X(q.s, D1 - 1)), z0: z - 1.2, x1: Math.max(X(q.s, D2 + 0.8), X(q.s, D1 - 1)), z1: z + 1.2, y: T1, cx: X(q.s, D2 + 2), cz: z }); }
+    // ---- the vestibule (north): pillars, braziers by the gates; the stair hall (south): torches, a sarcophagus either side
+    for (let x = 7; x < W - 5; x += 10) { if (LG.gateXs(W, gates || 1).some((g) => Math.abs(g - x) < 7)) continue; P().pillarSquare(w, x, 7, 0, VAULT, 1.1); occ.mark(x - 1.2, 6, x + 1.2, 8); }
+    for (const sx of [-1, 1]) { const x = W / 2 + sx * rng.range(7, 10), z = D - 5; P().sarcophagus(w, x, z, 0, true, rng); occ.mark(x - 1.6, z - 1.2, x + 1.6, z + 1.2); }
+    for (let x = 5; x < W - 3; x += 8) if (Math.abs(x - W / 2) > 5) P().torch(w, x, 3.2, D, 'nz');
     for (const g of LG.gateXs(W, gates || 1)) { P().brazier(w, g - 4.5, 0, 4.5, 1, true); P().brazier(w, g + 4.5, 0, 4.5, 1, true); }
-    // (the crypt and the halls are not for the area's later things: they go on the maze's floor)
-    for (const h of holeR) occ.mark(h.x0 - 0.5, h.z0 - 0.5, h.x1 + 0.5, h.z1 + 0.5, 2);
-    w.navLayers = 2;
+    // (the terraces and chapels are not for the area's later things: they go on the nave's floor)
+    for (const s of [-1, 1]) occ.mark(Math.min(X(s, 0), X(s, D1)), z0, Math.max(X(s, 0), X(s, D1)), z1, 2);
+    w.navLayers = 2; w.navRebuild = true; // (two layers: a gate's leaves swinging open or shut rebuild the nav, a small one)
     return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
-  }
-  // a slab over a cell, with a hole (hx0..hx1, hz0..hz1) left in it
-  function slabAround(w, x0, z0, x1, z1, hx0, hz0, hx1, hz1) {
-    const a0 = Math.max(x0, hx0), a1 = Math.min(x1, hx1), b0 = Math.max(z0, hz0), b1 = Math.min(z1, hz1);
-    if (a0 >= a1 || b0 >= b1) { w.solid('floor', x0, -SLAB, z0, x1, 0, z1, { uv: 4 }); return; }
-    if (b0 > z0) w.solid('floor', x0, -SLAB, z0, x1, 0, b0, { uv: 4 });
-    if (b1 < z1) w.solid('floor', x0, -SLAB, b1, x1, 0, z1, { uv: 4 });
-    if (a0 > x0) w.solid('floor', x0, -SLAB, b0, a0, 0, b1, { uv: 4 });
-    if (a1 < x1) w.solid('floor', a1, -SLAB, b0, x1, 0, b1, { uv: 4 });
-    for (const [p, q, r2, s] of [[a0, b0, a1, b0 + 0.12], [a0, b1 - 0.12, a1, b1], [a0, b0, a0 + 0.12, b1], [a1 - 0.12, b0, a1, b1]]) w.visual('rock', p, -SLAB - 0.5, q, r2, -SLAB, s, { uv: 2, grad: false }); // (the broken edge)
   }
   F.gen.catacombs = genCatacombs;
 })();

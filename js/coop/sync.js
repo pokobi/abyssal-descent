@@ -162,7 +162,7 @@
       try {
         if (m.s === 'open') dOpen.call(S, d);
         else if (m.s === 'broken') dBreak.call(S, d);
-        else { d.state = 'closed'; d.col.alive = true; d.it.opened = false; if (G.sfx.chain) G.sfx.chain(0.35, 0.3); }
+        else { d.state = 'closed'; d.col.alive = true; d.it.opened = false; if (S.leafCols) S.leafCols(d, false); if (G.sfx.chain) G.sfx.chain(0.35, 0.3); }
       } finally { K._net = false; }
     };
     // how battered a gate is follows the host (only foes batter them)
@@ -218,8 +218,9 @@
     }
 
     // ---------------- ground that moves and breaks: the host's is everyone's ----------------
-    // The sea of pillars (field_pillars.js): a pillar starts to sink on the host's word (its own clock, or a 沈め手's stamp); the rest of
-    // its turn (warning, sinking, down, rising) each screen plays out from that moment, so no screen's clock drifts away from the host's.
+    // The sea of pillars (field_pillars.js): a pillar starts to sink on the host's word (its own clock, or a 沈め手's stamp); every step of
+    // its turn after that (warning, sinking, down, rising, up) is the host's word too, each screen playing it out from that moment: a
+    // screen whose clock runs slow (a heavy frame, a menu) is set right at every step, never drifting away from the host's.
     // The frozen lake (field_frozen.js): the host keeps the ice. A blow seen only on a guest's screen (its own blast, the icicles that fall
     // round it) goes to the host; a foe's blast, which every screen sets off on its own, counts on the host's alone. What changes is
     // sent to everyone as it stands; broken ice freezes over on the host's word, when nobody, on any screen, stands in its place.
@@ -232,40 +233,47 @@
       let foeBlast = 0;
       const ask = (w) => { if (!w._gq) { w._gq = true; K.send({ t: 'gq', a: GM.area }); } };
       const iceSend = (w, ks, to) => { if (ks.length) K.send({ t: 'ice', a: GM.area, s: ks.map((k) => [k, w.iceTiles[k].hp]) }, to); };
-      K.groundSnap = function (to) {
+      K.groundSnap = function (to, periodic) {
         const w = G.world; if (!w) return;
-        if (w.pillars && w.pillars.length) K.send({ t: 'pls', a: GM.area, s: w.pillars.map((p) => [ST.indexOf(p.st), r2(p.t)]) }, to);
+        if (w.pillars && w.pillars.length) K.send({ t: 'pls', a: GM.area, s: w.pillars.map((p) => [ST.indexOf(p.st), r2(p.t)]), per: periodic ? 1 : 0 }, to);
         if (w.iceTiles) K.send({ t: 'ice', a: GM.area, all: w.iceTiles.map((t) => t.hp).join('') }, to); // (every tile: one digit each)
       };
       FG.tickPillars = function (w, dt) {
         if (!K.live) return tp.call(FG, w, dt);
         if (K.role !== 'host') {
           ask(w);
-          // (a pillar that stands waits for the host's word; one told while still rising goes as soon as it stands)
-          for (const p of w.pillars) if (p.st === 'up') { p.next = p.go ? 0 : 1e9; p.go = false; }
+          // (a pillar that stands waits for the host's word to go)
+          for (const p of w.pillars) if (p.st === 'up') p.next = 1e9;
           return tp.call(FG, w, dt);
         }
         for (const p of w.pillars) p._was = p.st;
         const r = tp.call(FG, w, dt);
-        const go = [];
-        w.pillars.forEach((p, i) => { if (p._was === 'up' && p.st !== 'up') go.push(i); });
-        if (go.length) K.send({ t: 'pl', a: GM.area, i: go });
+        // (every few seconds everyone is told how the ground stands: a screen that stopped a while (a menu, a hitch) catches up)
+        w._gsT = (w._gsT || 0) + dt; if (w._gsT > 4) { w._gsT = 0; K.groundSnap(undefined, true); }
+        const ch = [];
+        w.pillars.forEach((p, i) => { if (p._was !== p.st) ch.push([i, ST.indexOf(p.st)]); });
+        if (ch.length) K.send({ t: 'pl', a: GM.area, c: ch });
         return r;
+      };
+      // (a step on the host: the same step here, from its start; a pillar already in it stays as it is)
+      const setPillar = (w, p, st, t) => {
+        p.st = st; p.t = t; p.go = false;
+        p.col.alive = st !== 'down';
+        const ign = st !== 'up';
+        if (!!p.col.navIgnore !== ign) { p.col.navIgnore = ign; w.navPatch(p.x0, p.z0, p.x1, p.z1); w._vn = null; }
       };
       K.handlers.pl = function (m) {
         const w = G.world; if (K.role === 'host' || m.a !== GM.area || !w || !w.pillars) return;
-        for (const i of m.i) if (w.pillars[i]) w.pillars[i].go = true;
+        for (const [i, c] of m.c || []) { const p = w.pillars[i], st = ST[c]; if (p && st && p.st !== st) setPillar(w, p, st, 0); }
       };
       K.handlers.pls = function (m) {
         const w = G.world; if (K.role === 'host' || m.a !== GM.area || !w || !w.pillars) return;
+        const near = (a, b) => { const i = ST.indexOf(a), j = ST.indexOf(b); return i === j || Math.abs(i - j) === 1 || Math.abs(i - j) === 4; };
         m.s.forEach(([c, t], i) => {
           const p = w.pillars[i], st = ST[c]; if (!p || !st) return;
-          p.go = false;
+          if (m.per && near(p.st, st)) return; // (the regular word: a pillar a step behind or ahead is only the moment the word took)
           if (p.st === st && Math.abs(p.t - t) < 0.4) return;
-          p.st = st; p.t = t;
-          p.col.alive = st !== 'down';
-          const ign = st !== 'up';
-          if (!!p.col.navIgnore !== ign) { p.col.navIgnore = ign; w.navPatch(p.x0, p.z0, p.x1, p.z1); w._vn = null; }
+          setPillar(w, p, st, t);
         });
       };
       // (a foe's blast on a guest's screen: the host has its own of it. combat.js lets no foe's blast reach the ice today; this keeps it once if one ever does)
@@ -285,6 +293,7 @@
         if (!K.live) return ti.call(FG, w, dt);
         if (K.role !== 'host') { ask(w); return []; }
         const ks = ti.call(FG, w, dt);
+        if (!w.pillars) { w._gsT = (w._gsT || 0) + dt; if (w._gsT > 4) { w._gsT = 0; K.groundSnap(undefined, true); } }
         iceSend(w, ks);
         return ks;
       };

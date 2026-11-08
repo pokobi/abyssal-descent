@@ -103,7 +103,7 @@
     if (Math.random() < 0.05) { const o = S.offers.find((x) => x.kind !== 'weapon'); if (o) { o.kind = 'revive'; o.obj = GM.REVIVE; o.price = Math.round(GM.revivePrice() * 1.1 / 10) * 10; } }
     for (const o of S.offers) GM.buildPedestal(o, w);
     buildHeal(w, S);
-    if (w.roadMerchant && !healOnly) { const m = G.enemies.buildModel(G.ENEMY_BY_ID.shaman_normal, {}); m.group.position.copy(w.roadMerchant); m.group.rotation.y = Math.PI / 2; w.group.add(m.group); }
+    if (w.roadMerchant && !healOnly) { const m = G.enemies.buildModel(G.ENEMY_BY_ID.shaman_normal, {}); m.group.position.copy(w.roadMerchant); m.group.rotation.y = Math.PI / 2; w.group.add(m.group); AR.keeperCol(w, m); }
     if (quiet) return;
     if (!roadside) { G.fx.smoke(V(w.W / 2, 0.5, 12), 14, 1.5, 0x5a4a30, 0.6, 1.2); G.ui.toast('🛒 旅の商人が店を広げた（北の門の前）', 'good'); }
     else setTimeout(() => G.ui.toastSmall(w.stoneVendor ? '🗿 道の脇に古の交換石機と癒しの水盆がある' : '🛒 道の脇に商人と癒しの水盆がある'), 3200);
@@ -435,10 +435,17 @@
       const ev = evs[i];
       const def = ev.id === 'lost_soul' || ev.id === 'spirit' ? G.ENEMY_BY_ID.wraith_normal : ev.id === 'gambler' ? G.ENEMY_BY_ID.skeleton_bone : G.ENEMY_BY_ID.shaman_normal;
       const m = G.enemies.buildModel(def, {});
-      m.group.position.copy(pos); w.group.add(m.group);
+      m.group.position.copy(pos); w.group.add(m.group); AR.keeperCol(w, m);
       w.lightSources.push({ pos: pos.clone().add(V(0, 2.6, 0.6)), color: '#d0a0ff', intensity: 6, range: 7, flame: 0, emit: false, ph: 0, prio: 2, steady: true });
       w.interactables.push({ type: 'npc', ev, pos: pos.clone().add(V(0, 1.4, 0)), model: m, used: false });
     });
+  };
+  // a keeper of a room (or the merchant on the road) stands where it is drawn: a round body you walk round, gone with it when it goes
+  AR.keeperCol = function (w, m, gone) {
+    if (!w || !m || !m.group) return;
+    for (const c of m.cols || []) c.alive = false;
+    m.cols = gone ? [] : w.roundCollider(m.group.position.x, m.group.position.z, 0.42, m.group.position.y, m.group.position.y + 1.8, { surf: 'wood' });
+    if (w.navPatch && w.nf) { const p = m.group.position; w.navPatch(p.x - 1, p.z - 1, p.x + 1, p.z + 1); w._vn = null; }
   };
   // ---------------- transmutation hall (練成所) ----------------
   const ALCH_MAX = 2; // transmutations allowed per hall
@@ -446,7 +453,7 @@
   AR.setupAlchemy = function () {
     const w = G.world;
     const m = G.enemies.buildModel(G.ENEMY_BY_ID.shaman_normal, {});
-    m.group.position.copy(w.npcSpots[0]); w.group.add(m.group);
+    m.group.position.copy(w.npcSpots[0]); w.group.add(m.group); AR.keeperCol(w, m);
     const light = { pos: w.cauldronPos.clone().add(V(0, 1.1, 0)), color: '#58ff98', intensity: 9, range: 10, flame: 0, emit: false, ph: 0, prio: 3, steady: true };
     w.lightSources.push(light);
     w.interactables.push({ type: 'cauldron', pos: w.cauldronPos.clone(), used: 0, model: m, light });
@@ -942,7 +949,7 @@
   AR.setupForge = function () {
     const w = G.world;
     const m = G.enemies.buildModel(G.ENEMY_BY_ID.brute_normal, { scale: 0.75 });
-    m.group.position.copy(w.npcSpots[0]); w.group.add(m.group);
+    m.group.position.copy(w.npcSpots[0]); w.group.add(m.group); AR.keeperCol(w, m);
     w.interactables.push({ type: 'anvil', pos: w.anvilPos.clone(), used: 0, model: m });
   };
   AR.FORGE_MAX = 15;
@@ -1042,7 +1049,7 @@
     const w = G.world;
     for (const it of w.interactables) {
       if (it.model && it.model.animate) it.model.animate({ walk: 0, mv: 0, atk: 0, wind: Math.max(0, Math.sin(GM.time * 0.9)) * 0.25, flinch: 0, t: GM.time });
-      if (it.model && it.type === 'npc') { const to = P.pos.clone().sub(it.model.group.position); it.model.group.rotation.y = Math.atan2(to.x, to.z); if (it.used && it.model.group.visible) { it.model.group.visible = false; G.fx.smoke(it.pos, 12, 1, 0x4a3a5a, 0.6, 1.2); } }
+      if (it.model && it.type === 'npc') { const to = P.pos.clone().sub(it.model.group.position); it.model.group.rotation.y = Math.atan2(to.x, to.z); if (it.used && it.model.group.visible) { it.model.group.visible = false; AR.keeperCol(G.world, it.model, true); G.fx.smoke(it.pos, 12, 1, 0x4a3a5a, 0.6, 1.2); } }
     }
     for (const ex of w.exits || []) if (ex.label) { ex.label.position.y = (ex.labelY || 10.4) + Math.sin(GM.time * 1.5 + ex.idx) * 0.12; }
     AR.exitMarks(w);

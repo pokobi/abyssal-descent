@@ -135,7 +135,7 @@
       const edge = open[i - 1] || open[i + 1] || open[i - W] || open[i + W];
       if (!edge || rng.chance(0.55)) continue;
       const fl = Math.max(open[i - 1] ? floor.h[i - 1] : -9, open[i + 1] ? floor.h[i + 1] : -9, open[i - W] ? floor.h[i - W] : -9, open[i + W] ? floor.h[i + W] : -9);
-      T.boulder(w, x + 0.5, fl + rng.range(-0.6, 3.5), z + 0.5, rng.range(0.6, 1.1), rng.range(0.7, 1.4), rng.range(0.6, 1.1), rng, { collide: false });
+      T.boulder(w, x + 0.5, fl + rng.range(-0.6, 3.5), z + 0.5, rng.range(0.6, 1.1), rng.range(0.7, 1.4), rng.range(0.6, 1.1), rng, { noGrapple: true }); // (solid: it stands out of the wall into the cave)
     }
     H.perimeter(w, rng, W, D, { gates, h: CEIL, walls: false, beams: 0, stub: 2 });
     // ---- the workings

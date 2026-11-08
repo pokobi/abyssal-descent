@@ -188,7 +188,7 @@
     // the merchant's balcony on the left half way
     const nz = gz1 + (D - gz1) * 0.45;
     w.solid('floor', cx - hw - 6, -1, nz - 5, cx - hw, 0, nz + 6, { uv: 2 });
-    w.deferred.push((grp) => { const m = new THREE.Mesh(PG().box, w.mats.rock); m.scale.set(hw * 2 + 2, 5, D - gz1); m.position.set(cx, -3.6, (gz1 + D) / 2); grp.add(m); const b = new THREE.Mesh(PG().cone, w.mats.rock); b.scale.set(8, 14, 8); b.rotation.x = Math.PI; b.position.set(cx - hw - 3, -7, nz); grp.add(b); });
+    w.deferred.push((grp) => { const m = new THREE.Mesh(PG().box, w.mats.rock); m.scale.set(hw * 2, 5, D - gz1); m.position.set(cx, -3.6, (gz1 + D) / 2); grp.add(m); /* (no wider than the bridge: a ledge of it beside the balustrade would be a floor nothing holds up) */ const b = new THREE.Mesh(PG().cone, w.mats.rock); b.scale.set(2.9, 13, 5.4); b.rotation.x = Math.PI; b.position.set(cx - hw - 3, -1.05 - 6.5, nz + 0.5); grp.add(b); /* (under the balcony's floor, no wider than it) */ });
     // balustrades along the bridge (open at the balcony), statues and golden lamps
     const bal = (x0, z0, x1, z1) => { w.solid('block', x0, 0, z0, x1, 1.0, z1, { uv: 1 }); w.visual('trim', x0 - 0.04, 1.0, z0 - 0.04, x1 + 0.04, 1.08, z1 + 0.04, { uv: 1 }); };
     bal(cx + hw - 0.4, gz1, cx + hw, D); bal(cx - hw, gz1, cx - hw + 0.4, nz - 5); bal(cx - hw, nz + 6, cx - hw + 0.4, D);

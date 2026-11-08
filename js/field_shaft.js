@@ -60,14 +60,28 @@
     // the road over the arch: a stone span on the arch's two walls
     const spans = {};
     for (const [x, z, up] of bridge) { const k = Math.round(up * 4); (spans[k] = spans[k] || []).push([x, z]); }
+    // (drawn cell by cell, in runs along x: just where the road is, nothing over the edges of it)
     for (const k in spans) {
-      const up = k / 4, cells = spans[k];
-      for (const [x, z] of cells) w.addCollider(x, up - 1.1, z, x + 1, up, z + 1, { surf: 'stone' });
-      const xs = cells.map((c) => c[0]), zs = cells.map((c) => c[1]);
-      w.visual('block', Math.min(...xs), up - 1.1, Math.min(...zs), Math.max(...xs) + 1, up, Math.max(...zs) + 1, { uv: 3 });
+      const up = k / 4, rows = {};
+      for (const [x, z] of spans[k]) (rows[z] = rows[z] || []).push(x);
+      for (const z in rows) {
+        const xs = rows[z].sort((a, b) => a - b);
+        for (let i = 0; i < xs.length;) { let j = i; while (j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++; w.solid('block', xs[i], up - 1.1, +z, xs[j] + 1, up, +z + 1, { uv: 3, surf: 'stone' }); i = j + 1; }
+      }
     }
     // the arch's vault over the passage (under the span) and its facing on the bottom floor
-    w.visual('block', archX0, 9.2, archZ0, archX1, 9.6, archZ1 - 1, { uv: 3, grad: false });
+    // (solid, and only where no road crosses over it: there the road's stones are the vault, at whatever height the road runs;
+    // elsewhere its top is ground beside the road)
+    { const over = new Set(bridge.map(([x, z]) => x + ',' + z));
+      for (let z = Math.floor(archZ0); z < Math.ceil(archZ1 - 1); z++) {
+        let x = Math.floor(archX0);
+        while (x < Math.ceil(archX1)) {
+          if (over.has(x + ',' + z)) { x++; continue; }
+          let x2 = x + 1; while (x2 < Math.ceil(archX1) && !over.has(x2 + ',' + z)) x2++;
+          w.solid('block', Math.max(archX0, x), 9.2, Math.max(archZ0, z), Math.min(archX1, x2), 9.6, Math.min(archZ1 - 1, z + 1), { uv: 3, grad: false });
+          x = x2;
+        }
+      } }
     for (const s of [-1, 1]) w.solid('trim', cx + s * 6.4 - 0.6, 0, archZ1 - 1.6, cx + s * 6.4 + 0.6, 9.8, archZ1 - 0.4, { uv: 2 });
     w.solid('trim', archX0 - 1, 9.8, archZ1 - 1.6, archX1 + 1, 11, archZ1 - 0.4, { uv: 2, noGrapple: true });
     // the rock over the passage where no road crosses it (between the gallery and the span)
@@ -94,7 +108,9 @@
       if (rng.chance(0.42)) continue; // (broken: gaps to drop through)
       const p = at(phi, 0.97);
       w.batch.geo('block', PG().box, Mx(p.x, p.y + 0.45, p.z, 0.5, 0.9, 1.9, 0, -p.a * 1, 0));
-      w.addCollider(p.x - 0.35, p.y, p.z - 0.35, p.x + 0.35, p.y + 0.9, p.z + 0.35, { surf: 'stone' });
+      // (solid its whole length: three short boxes along it, turned with it)
+      const ca = Math.cos(p.a), sa = Math.sin(p.a), ex = 0.25 * Math.abs(ca) + 0.32 * Math.abs(sa), ez = 0.25 * Math.abs(sa) + 0.32 * Math.abs(ca);
+      for (const t of [-0.63, 0, 0.63]) { const qx = p.x - sa * t, qz = p.z + ca * t; w.addCollider(qx - ex, p.y, qz - ez, qx + ex, p.y + 0.9, qz + ez, { surf: 'stone' }); }
     }
     // what lies on the road: crates of the old works, barrels, rubble fallen from the rim, bones; niches cut in the wall with candles
     for (let i = 0; i < 26; i++) {
@@ -115,10 +131,11 @@
     }
     // the bottom: the wreck of the great lift, its chains still hanging from the rim, a ring of stones round the old drain
     const by = 0;
-    for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2 + 0.4, r = rng.range(3, 6); w.batch.geo('iron', PG().cyl8, Mx(cx + Math.cos(a) * r, TOP / 2 + 4, cz + Math.sin(a) * r, 0.16, TOP + 8, 0.16)); }
+    // (the chains end in their hooks over your head: nothing hangs where you walk)
+    for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2 + 0.4, r = rng.range(3, 6), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r, lo = by + rng.range(4.2, 6); w.batch.geo('iron', PG().cyl8, Mx(x, (lo + TOP + 8) / 2, z, 0.16, TOP + 8 - lo, 0.16)); w.batch.geo('iron', PG().box, Mx(x, lo - 0.2, z, 0.34, 0.4, 0.12)); }
     w.solid('woodDark', cx - 3.2, by, cz - 2.4, cx + 3.2, by + 0.5, cz + 2.4, { uv: 2 });
     for (const [sx, sz] of [[-3, -2.2], [3, -2.2], [-3, 2.2]]) w.solid('iron', cx + sx - 0.12, by + 0.5, cz + sz - 0.12, cx + sx + 0.12, by + rng.range(2, 4), cz + sz + 0.12, { uv: 1 });
-    w.batch.geo('iron', PG().box, Mx(cx + 1.4, by + 1.6, cz + 2.4, 3.6, 0.12, 0.12, 0, 0, 0.6));
+    w.solid('iron', cx - 0.4, by + 0.5, cz + 2.28, cx + 3.2, by + 0.64, cz + 2.52, { uv: 1 }); // (a beam of the lift, fallen across its floor)
     occ.mark(cx - 5, cz - 4, cx + 5, cz + 4);
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, r = r0 - 1.2; T.boulder(w, cx + Math.cos(a) * r, by - 0.2, cz + Math.sin(a) * r, 0.6, 0.45, 0.6, rng, { collide: false }); }
     w.addLight(cx, 6, cz, { flame: 0, intensity: 9, range: 18, color: '#7a9ad8', emit: false, prio: 0.8 });
@@ -142,7 +159,7 @@
   F.SHELL.shaft = Object.assign({}, F.SHELL.hall, {
     road(w, rng, W, AD, D) {
       const nook = FB.roadHall(w, rng, W, AD, D, false), cx = W / 2;
-      for (let z = AD + 8; z < D - 4; z += 9) for (const s of [-1, 1]) { if (s < 0 && Math.abs(z - nook.nz) < 8) continue; T.boulder(w, cx + s * 6.2, rng.range(0, 6), z + rng.range(-2, 2), rng.range(1, 1.8), rng.range(1.2, 2.2), rng.range(1, 1.8), rng, { collide: false }); }
+      for (let z = AD + 8; z < D - 4; z += 9) for (const s of [-1, 1]) { if (s < 0 && Math.abs(z - nook.nz) < 8) continue; T.boulder(w, cx + s * 6.2, rng.range(0, 6), z + rng.range(-2, 2), rng.range(1, 1.8), rng.range(1.2, 2.2), rng.range(1, 1.8), rng, { noGrapple: true }); /* (solid: it stands out of the wall) */ }
       for (let z = AD + 10; z < D - 6; z += 13) w.batch.geo('iron', PG().cyl8, Mx(cx + rng.range(-3, 3), 7, z, 0.12, 12, 0.12));
       return nook;
     },

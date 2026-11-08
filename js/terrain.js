@@ -1,8 +1,9 @@
 'use strict';
 // Ground that is not a flat floor (G.Terrain), for the fields built on their own frameworks:
-//   - a height grid of 1 m cells: each cell is a column whose top is its height (steps of HQ, so a walk up or down a slope is a run of
-//     small steps the feet climb by themselves, and the nav sees ordinary floor); over it lies one smooth mesh whose corners sit at the
-//     mean of the tops round them, so the look is a rolling slope while the feet stand on the columns (never more than a few cm apart)
+//   - a height grid of 1 m cells (heights in steps of HQ, so a walk up or down a slope is a run of small steps the feet climb by
+//     themselves, and the nav sees ordinary floor); over it lies one smooth mesh whose corners sit at the mean of the heights round them,
+//     and each cell is then a column whose top is that mesh's height over the cell's middle: the feet stand where the eye sees the
+//     ground (an uneven patch the mesh smooths over does not leave columns standing out of it or sunk under it)
 //   - rock outcrops: a ragged band of crags that bounds an area without a wall
 //   - T.at(w, y, fn): builds a prop that only knows the floor at y = 0 on top of the ground at y
 //   - T.flat(w, x0, z0, x1, z1): the height of the ground over a rectangle if it is flat enough to lay something on it (else null);
@@ -61,17 +62,31 @@
     o = o || {};
     const { W, D, h, m, base } = hf;
     const ox = o.x0 || 0, oz = o.z0 || 0;
+    // the look first, from the heights as they are; then each column's top set to the look over its middle. A steep cell (its corners
+    // over 0.3 m apart) is four columns of half a metre instead, each at the look over its own middle: the feet follow the slope
+    hf._c = T.corners(hf);
+    T.mesh(w, hf, o);
+    const cc = T.cellCorners(hf, o);
+    h.set(T.cellTops(hf, o, cc));
+    const steep = (i) => { const a = cc[i * 4], b = cc[i * 4 + 1], c = cc[i * 4 + 2], d = cc[i * 4 + 3]; return Math.max(a, b, c, d) - Math.min(a, b, c, d) > 0.3; };
+    const co = { surf: o.surf || 'stone', noGrapple: o.noGrapple };
     for (let z = 0; z < D; z++) {
       let x = 0;
       while (x < W) {
         const i = z * W + x;
         if (!m[i]) { x++; continue; }
-        let x2 = x + 1; while (x2 < W && m[z * W + x2] && h[z * W + x2] === h[i]) x2++;
-        w.addCollider(ox + x, base, oz + z, ox + x2, h[i], oz + z + 1, { surf: o.surf || 'stone', noGrapple: o.noGrapple });
+        if (steep(i)) {
+          for (const [fx, fz] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+            const y = (cc[i * 4] * (1 - fx) + cc[i * 4 + 1] * fx) * (1 - fz) + (cc[i * 4 + 2] * (1 - fx) + cc[i * 4 + 3] * fx) * fz;
+            w.addCollider(ox + x + fx - 0.25, base, oz + z + fz - 0.25, ox + x + fx + 0.25, Math.round(y * 16) / 16, oz + z + fz + 0.25, co);
+          }
+          x++; continue;
+        }
+        let x2 = x + 1; while (x2 < W && m[z * W + x2] && h[z * W + x2] === h[i] && !steep(z * W + x2)) x2++;
+        w.addCollider(ox + x, base, oz + z, ox + x2, h[i], oz + z + 1, co);
         x = x2;
       }
     }
-    T.mesh(w, hf, o);
     w.groundGrid = w.groundGrid || [];
     w.groundGrid.push({ hf, ox, oz });
     w.groundTop = (x, z) => {
@@ -83,6 +98,28 @@
       return w.groundElse ? w.groundElse(x, z) : 0;
     };
     return hf;
+  };
+  // the mesh's four corner heights over every cell (as T.mesh / T.meshCliff lay them): 4 per cell, x0z0 x1z0 x0z1 x1z1
+  T.cellCorners = function (hf, o) {
+    const { W, D, h, m } = hf, out = new Float32Array(W * D * 4), cl = o && o.cliff;
+    const c = hf._c || T.corners(hf), W1 = W + 1;
+    const top = (x, z) => (x < 0 || z < 0 || x >= W || z >= D || !m[z * W + x] ? null : h[z * W + x]);
+    const cliffCorner = (x, z, hc) => { let s = 0, k = 0; for (const [a, b] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) { const t = top(x + a, z + b); if (t != null && Math.abs(t - hc) <= cl) { s += t; k++; } } return k ? s / k : hc; };
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+      const i = z * W + x; if (!m[i]) continue;
+      [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([a, b], k) => {
+        if (cl) out[i * 4 + k] = cliffCorner(x + a, z + b, h[i]);
+        else { const v = c[(z + b) * W1 + x + a]; out[i * 4 + k] = isNaN(v) ? h[i] : v; }
+      });
+    }
+    return out;
+  };
+  // the mesh's height over the middle of every cell, in steps of 1/16 m
+  T.cellTops = function (hf, o, cc) {
+    cc = cc || T.cellCorners(hf, o);
+    const out = new Float32Array(hf.h);
+    for (let i = 0; i < hf.W * hf.D; i++) if (hf.m[i]) out[i] = Math.round((cc[i * 4] + cc[i * 4 + 1] + cc[i * 4 + 2] + cc[i * 4 + 3]) / 4 * 16) / 16;
+    return out;
   };
   // the corner heights: the mean of the tops of the cells that meet there
   T.corners = function (hf) {
@@ -211,8 +248,23 @@
   const lump = new THREE.DodecahedronGeometry(1, 0);
   T.boulder = function (w, x, y, z, sx, sy, sz, rng, o) {
     o = o || {};
-    w.batch.geo(o.mk || 'rock', lump, new THREE.Matrix4().compose(V(x, y + sy * 0.55, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rng.range(-0.4, 0.4), rng.range(0, 6.3), rng.range(-0.4, 0.4))), V(sx, sy, sz)), { su: 0.5, sv: 0.5, tint: o.tint });
-    if (o.collide !== false) w.addCollider(x - sx * 0.7, y - 0.5, z - sz * 0.7, x + sx * 0.7, y + sy * (o.top ?? 1.25), z + sz * 0.7, { surf: 'stone', noGrapple: o.noGrapple });
+    const tl = o.collide === false ? 0.4 : 0.2; // (a solid one leans less: its boxes stand upright)
+    const ax = rng.range(-tl, tl), yaw = rng.range(0, 6.3), az = rng.range(-tl, tl);
+    w.batch.geo(o.mk || 'rock', lump, new THREE.Matrix4().compose(V(x, y + sy * 0.55, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(ax, yaw, az)), V(sx, sy, sz)), { su: 0.5, sv: 0.5, tint: o.tint });
+    // (the lump is a dodecahedron of radius 1 scaled by sx / sy / sz, its middle 0.55 sy up: round, so its collider is three boxes, a
+    // broad one through its middle (to its faces, 0.79 out) and narrower ones above and below where it rounds off: you neither walk
+    // into the rock nor bump into air beside it; the top one ends where its top is)
+    if (o.collide !== false) {
+      // (turned about y by yaw, a lump longer one way than the other is that much wider across x or z: the boxes take its turned size)
+      const c = Math.cos(yaw), s = Math.sin(yaw), ex = Math.hypot(sx * c, sz * s), ez = Math.hypot(sx * s, sz * c);
+      sx = ex; sz = ez;
+      const top = y + sy * (o.top ?? 1.45);
+      // (the middle one a cross of two boxes: a square round the rock would stand out of it at its corners)
+      for (const [a, b, kx, kz] of [[y - 0.5, y, 0.5, 0.5], [y, y + sy * 1.1, 0.8, 0.55], [y, y + sy * 1.1, 0.55, 0.8], [y + sy * 1.1, top, 0.5, 0.5]]) {
+        const hi = Math.min(b, top); if (hi <= a) continue;
+        w.addCollider(x - sx * kx, a, z - sz * kz, x + sx * kx, hi, z + sz * kz, { surf: 'stone', noGrapple: o.noGrapple });
+      }
+    }
   };
   // a ragged band of crags along an edge of the area: side 'W' | 'E' | 'N' | 'S', from a0 to a1 along it, reaching depth d0..d1 into
   // the area, h0..h1 high over the ground at its foot (gy(x, z)); too high to climb or jump over (and no hook holds on it)
@@ -233,9 +285,9 @@
       const fx = side === 'W' ? x1 : side === 'E' ? x0 : null, fz = side === 'N' ? z1 : side === 'S' ? z0 : null;
       for (let k = 0; k < 2; k++) {
         const s = rng.range(1.1, 2.2), u = rng.range(0.2, 0.8);
-        const bx = fx != null ? fx + (side === 'W' ? -0.4 : 0.4) * s : x0 + (x1 - x0) * u, bz = fz != null ? fz + (side === 'N' ? -0.4 : 0.4) * s : z0 + (z1 - z0) * u;
+        const bx = fx != null ? fx + (side === 'W' ? -0.75 : 0.75) * s : x0 + (x1 - x0) * u, bz = fz != null ? fz + (side === 'N' ? -0.75 : 0.75) * s : z0 + (z1 - z0) * u; // (sunk well into the face: a bulge, not a boulder stood against it)
         const by = rng.range(g - 0.5, g + hh * 0.7);
-        T.boulder(w, bx, by, bz, s * rng.range(0.9, 1.4), s * rng.range(0.8, 1.2), s * rng.range(0.9, 1.4), rng, { collide: false, tint: o.tint });
+        T.boulder(w, bx, by, bz, s * rng.range(0.9, 1.4), s * rng.range(0.8, 1.2), s * rng.range(0.9, 1.4), rng, { tint: o.tint, noGrapple: true }); // (solid: it stands out of the face)
       }
       T.boulder(w, (x0 + x1) / 2 + rng.range(-1, 1), g + hh - 0.8, (z0 + z1) / 2 + rng.range(-1, 1), rng.range(1.6, 2.6), rng.range(1, 1.8), rng.range(1.6, 2.6), rng, { collide: false, tint: o.tint });
       a += len;

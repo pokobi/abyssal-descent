@@ -31,8 +31,9 @@
       box(p, 0.35, q, 0.41, 0.04, 'iron', false);         // low rail
       for (let u = p + 0.08; u < q; u += 0.22) box(u, 0.18, u + 0.035, h + 0.18 * ((Math.round(u / 0.22) % 2) ? 1 : 0.5), 0.02, 'iron', false); // bars with spikes
       for (let u = p; u <= q + 0.01; u += Math.max(1.2, (q - p) / Math.ceil((q - p) / 2.4))) box(u - 0.06, 0, u + 0.06, h + 0.25, 0.06, 'iron', false); // posts
-      if (alongX) w.addCollider(p, 0, c - 0.08, q, h + 0.2, c + 0.08, { surf: 'metal', noGrapple: true });
-      else w.addCollider(c - 0.08, 0, p, c + 0.08, h + 0.2, q, { surf: 'metal', noGrapple: true });
+      // (tag 'grate': you see through between its bars, and it stops you)
+      if (alongX) w.addCollider(p, 0, c - 0.08, q, h + 0.2, c + 0.08, { surf: 'metal', noGrapple: true, tag: 'grate' });
+      else w.addCollider(c - 0.08, 0, p, c + 0.08, h + 0.2, q, { surf: 'metal', noGrapple: true, tag: 'grate' });
     }
   };
   F.deadTree = function (w, x, z, rng, s) {

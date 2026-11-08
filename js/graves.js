@@ -55,7 +55,12 @@
       const ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: ringTex, color: tint, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.04, 0.2); ring.scale.set(3.2, 3.2, 1); g.add(ring);
       w.group.add(g);
-      Gr.list.push({ i: gi++, x: d.x, y: d.y, z: d.z, g, glow, ring, stone, wisp, tint, ph: Math.random() * 6, used: false, dwell: 0, wT: 0, sT: 0, dT: 0, base: g.position.clone() });
+      // the headstone is solid (the box round it turned; gone with the grave)
+      const lz = -0.55 * 1.3, ca = Math.cos(d.ry), sa = Math.sin(d.ry), sx = d.x + lz * sa, sz = d.z + lz * ca, hx = 0.48, hz = 0.13;
+      const ex = Math.abs(hx * ca) + Math.abs(hz * sa), ez = Math.abs(hx * sa) + Math.abs(hz * ca);
+      const col = w.addCollider(sx - ex, d.y, sz - ez, sx + ex, d.y + 1.5, sz + ez, { surf: 'stone' });
+      if (w.navPatch) { w.navPatch(col.x0, col.z0, col.x1, col.z1); w._vn = null; }
+      Gr.list.push({ i: gi++, x: d.x, y: d.y, z: d.z, g, glow, ring, stone, col, wisp, tint, ph: Math.random() * 6, used: false, dwell: 0, wT: 0, sT: 0, dT: 0, base: g.position.clone() });
     }
   };
   // mid-area save: which graves are still there (the rest have already raised their foe) and which have given their warning
@@ -65,7 +70,7 @@
     for (const o of Gr.list) { if (!S.left.includes(o.i)) { o.used = true; Gr.drop(o); } else if ((S.warned || []).includes(o.i)) o.warned = true; }
     Gr.list = Gr.list.filter((o) => !o.used);
   };
-  Gr.drop = function (o) { if (o.g && o.g.parent) o.g.parent.remove(o.g); if (o.glow) o.glow.material.dispose(); if (o.ring) { o.ring.geometry.dispose(); o.ring.material.dispose(); } };
+  Gr.drop = function (o) { if (o.col) { const c = o.col, w = G.world; c.alive = false; o.col = null; if (w && w.navPatch && w.colliders.includes(c)) { w.navPatch(c.x0, c.z0, c.x1, c.z1); w._vn = null; } } if (o.g && o.g.parent) o.g.parent.remove(o.g); if (o.glow) o.glow.material.dispose(); if (o.ring) { o.ring.geometry.dispose(); o.ring.material.dispose(); } };
 
   // ---- the grave opens and something climbs out ----
   Gr.trigger = function (o) {

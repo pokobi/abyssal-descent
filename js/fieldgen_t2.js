@@ -1,6 +1,6 @@
 'use strict';
 // The entrance tier's new fields (runplan.js R.TIERS[1]): drawn instead of the dungeon entrance for a segment.
-//   catacombs - 地下墓所: the pieces of the burial maze (its area: field_catacombs.js) and its guardian approach.
+//   catacombs - 地下墓所: the pieces of the ossuary nave (its area: field_catacombs.js) and its guardian approach.
 //   castle    - 血月の古城: the pieces of the castle (its area: field_castle.js) and its guardian approach.
 (function () {
   const LG = G.LevelGen, H = LG._, F = G.FieldGen, FB = F._, U = G.U, V = U.V;
@@ -8,7 +8,7 @@
   const Mx = (x, y, z, sx, sy, sz, rx, ry, rz) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)), V(sx, sy, sz));
 
   // ---------------------------------------------------------------- 地下墓所
-  // a gate in a passage of the maze: the opening walled up with bones to an arch 3 m wide and 4 m high, a two-leaved iron gate in it
+  // an iron gate in a wall (a chapel's, off the nave): the opening walled up with bones to an arch 3 m wide and 4 m high, a two-leaved iron gate in it
   // (strata.js draws and works it), skulls over the arch and candles at its feet. It stands open; shut it behind you (the key) and the
   // monsters must batter it down to follow.
   function cryptGate(w, rng, x, zA, zB, HT, WT) {
@@ -42,7 +42,7 @@
       }
     }
   }
-  // (the catacombs' area itself: field_catacombs.js, a maze over a crypt; these two pieces are its)
+  // (the catacombs' area itself: field_catacombs.js, the great ossuary nave; these two pieces are its)
   F._crypt = { gate: cryptGate, ossuary };
   // the catacombs' guardian approach: a long burial gallery (the stone hall's build, its walls lined with skulls)
   F.SHELL.catacombs = {

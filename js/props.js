@@ -178,7 +178,7 @@
   P.bookshelf = function (w, x, z, y, alongX, rng) {
     const L = 2.0, D = 0.45, H = 2.4;
     const hx = alongX ? L / 2 : D / 2, hz = alongX ? D / 2 : L / 2;
-    w.addCollider(x - hx, y, z - hz, x + hx, y + H, z + hz, { surf: 'wood' });
+    w.addCollider(x - hx, y, z - hz, x + hx, y + H, z + hz, { surf: 'wood', tag: 'grate' }); // (open at the front: the books stand back in it)
     w.batch.box('woodDark', x - hx, y, z - hz, x + hx, y + 0.08, z + hz, { uv: 1 });
     w.batch.box('woodDark', x - hx, y + H - 0.08, z - hz, x + hx, y + H, z + hz, { uv: 1 });
     if (alongX) { w.batch.box('woodDark', x - hx, y, z - hz, x - hx + 0.06, y + H, z + hz, { uv: 1 }); w.batch.box('woodDark', x + hx - 0.06, y, z - hz, x + hx, y + H, z + hz, { uv: 1 }); }
@@ -225,7 +225,7 @@
       const t = -s / 2 + (i / n) * s;
       for (const [bx, bz] of [[t, -s / 2], [t, s / 2], [-s / 2, t], [s / 2, t]]) w.batch.box('iron', x + bx - 0.02, y + 0.1, z + bz - 0.02, x + bx + 0.02, y + h - 0.08, z + bz + 0.02, { uv: 1 });
     }
-    w.addCollider(x - s / 2, y + 0.1, z - s / 2, x + s / 2, y + h, z + s / 2, { surf: 'metal' });
+    w.addCollider(x - s / 2, y + 0.1, z - s / 2, x + s / 2, y + h, z + s / 2, { surf: 'metal', tag: 'grate' });
     if (rng && rng.chance(0.6)) { P.bones(w, x, y + 0.1, z, rng); }
   };
   P.well = function (w, x, z, y) {
@@ -277,7 +277,7 @@
       const h = rr(rng, 0.5, 1.6) * s;
       w.batch.geo('ice', PG.oct3, M(x + rr(rng, -0.5, 0.5) * s, y + h * 0.4, z + rr(rng, -0.5, 0.5) * s, 0.2 * s, h, 0.2 * s, rr(rng, -0.4, 0.4), rr(rng, 0, 3), rr(rng, -0.4, 0.4)));
     }
-    w.addCollider(x - 0.45 * s, y, z - 0.45 * s, x + 0.45 * s, y + 1.0 * s, z + 0.45 * s);
+    w.roundCollider(x, z, 0.6 * s, y, y + 1.0 * s, { tag: 'grate' }); // (a cluster of spikes: round enough; seen through between them)
   };
   P.weaponRack = function (w, x, z, y, alongX) {
     const hx = alongX ? 1.0 : 0.2, hz = alongX ? 0.2 : 1.0;
@@ -288,7 +288,7 @@
       w.batch.geo('iron', PG.box, M(x + ox, y + 0.9, z + oz, 0.05, 1.7, 0.02, alongX ? 0 : 0, alongX ? 0 : Math.PI / 2, (i % 2) * 0.08));
       w.batch.geo('woodDark', PG.box, M(x + ox, y + 0.25, z + oz, 0.04, 0.3, 0.04));
     }
-    w.addCollider(x - hx, y + 0.12, z - hz, x + hx, y + 1.7, z + hz, { surf: 'wood' });
+    w.addCollider(x - hx, y + 0.12, z - hz, x + hx, y + 1.7, z + hz, { surf: 'wood', tag: 'grate' }); // (a rack: you see through it between the weapons, and it stops you)
   };
   P.gravestone = function (w, x, z, y, ry, rng) {
     const t = rng ? rng.int(0, 2) : 0;

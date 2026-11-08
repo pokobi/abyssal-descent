@@ -560,6 +560,7 @@
       // (a gate that starts open, or is restored open / broken, is drawn that way from the first frame)
       Object.assign(d, { g, mat, bars, base: mat.color.clone(), ang: d.state === 'open' ? 1.75 : 0, fall: d.state === 'broken' ? 1 : 0, shake: 0 });
       S.paintDoor(d);
+      leafCols(d, d.state === 'open', true);
     }
     S.update(0);
   };
@@ -652,8 +653,33 @@
     for (const b of d.bars) { b.m.rotation.z = b.bend * k * k * 0.45; b.m.rotation.x = b.bend * k * 0.18; b.m.position.x = b.x + b.bend * k * 0.06; }
   };
   const doorPos = (d) => V(d.plane, d.y + 1.1, (d.lo + d.hi) / 2);
+  // an open gate's leaves stand out from the wall (swung 1.75 rad round their hinges): solid where they stand, in two lengths each;
+  // gone again when it is shut, or battered down (its leaves then lie flat on the floor)
+  function leafCols(d, on, built) {
+    const w = G.world;
+    for (const c of d.leafCols || []) c.alive = false;
+    const had = d.leafCols && d.leafCols.length;
+    d.leafCols = [];
+    if (!w || !d.g) return;
+    const two = d.leaves === 2, wd = two ? (d.hi - d.lo) / 2 : d.hi - d.lo, A = 1.75;
+    if (on) {
+      const legs = [[d.hz, d.sg, -Math.PI / 2 + d.face * d.sg * A]];
+      if (two) legs.push([d.hz2, -d.sg, -Math.PI / 2 - d.face * d.sg * A]);
+      for (const [hz, sg, phi] of legs) {
+        const ux = sg * Math.cos(phi), uz = -sg * Math.sin(phi);
+        for (const [a, b] of [[0.05, wd / 2], [wd / 2, wd - 0.02]]) {
+          const x0 = d.plane + ux * a, z0 = hz + uz * a, x1 = d.plane + ux * b, z1 = hz + uz * b;
+          d.leafCols.push(w.addCollider(Math.min(x0, x1) - 0.06, d.y, Math.min(z0, z1) - 0.06, Math.max(x0, x1) + 0.06, d.y + d.h, Math.max(z0, z1) + 0.06, { surf: 'metal', noGrapple: true, tag: 'grate' })); // (bars: seen through, and they stop you)
+        }
+      }
+      const Pl = G.player; if (!built && Pl && Pl.pos && w.depenetrate) w.depenetrate(Pl.pos, Pl.hw, Pl.height); // (not while the area is being put up: you are not in it yet)
+    }
+    if ((on || had) && w.navPatch && w.nf) { w.navPatch(d.plane - wd - 0.5, d.lo - wd - 0.5, d.plane + wd + 0.5, d.hi + wd + 0.5); w._vn = null; }
+  }
+  S.leafCols = (d, on) => leafCols(d, on);
   function free(d, state) {
     d.state = state; d.col.alive = false; d.it.opened = true;
+    leafCols(d, state === 'open');
     if (G.game.search && G.game.search.it === d.it) G.game.cancelSearch();
   }
   S.openDoor = function (d) {
@@ -667,7 +693,7 @@
     const inDoor = (p, r) => Math.abs(p.x - d.plane) < 1.1 + r && p.z > d.lo - 0.4 - r && p.z < d.hi + 0.4 + r && p.y > d.y - 1.5 && p.y < d.y + d.h;
     if (inDoor(G.player.pos, 0.3)) return false;
     for (const e of G.enemies.list) if (e.alive && inDoor(e.pos, e.radius || 0.5)) return false;
-    d.state = 'closed'; d.col.alive = true; d.it.opened = false;
+    d.state = 'closed'; d.col.alive = true; d.it.opened = false; leafCols(d, false);
     G.sfx.chain(0.35, 0.3); G.sfx.mech && G.sfx.mech('click', 0, 0.8);
     return true;
   };
@@ -685,7 +711,7 @@
       const d = S.doors[i]; if (!d || !v) return;
       d.hp = v[1]; if (d.g) S.paintDoor(d);
       if (v[0] === 'open') { free(d, 'open'); d.ang = 1.75; } else if (v[0] === 'broken') { free(d, 'broken'); d.fall = 1; }
-      else if (v[0] === 'closed' && d.state === 'open') { d.state = 'closed'; d.col.alive = true; d.it.opened = false; d.ang = 0; } // (a crypt gate stands open until someone shuts it)
+      else if (v[0] === 'closed' && d.state === 'open') { d.state = 'closed'; d.col.alive = true; d.it.opened = false; d.ang = 0; leafCols(d, false); } // (a crypt gate stands open until someone shuts it)
     });
     S.update(0);
   };

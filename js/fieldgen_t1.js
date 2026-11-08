@@ -22,8 +22,9 @@
       const box = (u0, y0, u1, y1, t) => { if (alongX) w.visual('woodDark', u0, y0, c - t, u1, y1, c + t, { uv: 1 }); else w.visual('woodDark', c - t, y0, u0, c + t, y1, u1, { uv: 1 }); };
       box(p, h * 0.42, q, h * 0.42 + 0.09, 0.04); box(p, h * 0.82, q, h * 0.82 + 0.09, 0.04);
       for (let u = p; u <= q + 0.01; u += Math.max(1.4, (q - p) / Math.ceil((q - p) / 2.2))) box(Math.min(u, q) - 0.07, 0, Math.min(u, q) + 0.07, h + 0.12, 0.07);
-      if (alongX) w.addCollider(p, 0, c - 0.08, q, h, c + 0.08, { surf: 'wood', noGrapple: true });
-      else w.addCollider(c - 0.08, 0, p, c + 0.08, h, q, { surf: 'wood', noGrapple: true });
+      // (tag 'grate': you see through between its rails, and it stops you)
+      if (alongX) w.addCollider(p, 0, c - 0.08, q, h, c + 0.08, { surf: 'wood', noGrapple: true, tag: 'grate' });
+      else w.addCollider(c - 0.08, 0, p, c + 0.08, h, q, { surf: 'wood', noGrapple: true, tag: 'grate' });
     }
   };
   // a timber palisade: sharpened stakes side by side (the guardian's ring in the hamlet)
@@ -52,7 +53,7 @@
     s = s || 1;
     w.batch.geo('wood', PG().cyl, Mx(x, 0.6 * s, z, 1.05 * s, 1.2 * s, 1.05 * s), { tint: STRAW });
     w.batch.geo('wood', PG().cone, Mx(x, 1.5 * s, z, 1.1 * s, 0.7 * s, 1.1 * s), { tint: STRAW });
-    w.addCollider(x - 0.95 * s, 0, z - 0.95 * s, x + 0.95 * s, 1.5 * s, z + 0.95 * s, { surf: 'wood', noGrapple: true });
+    w.roundCollider(x, z, 1.05 * s, 0, 1.5 * s, { surf: 'wood', noGrapple: true }); // (round: the cylinder of hay, radius 1.05)
   }
   // a broken farm cart, along x or along z
   function cart(w, rng, x, z, alongX) {

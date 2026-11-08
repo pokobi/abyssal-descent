@@ -368,7 +368,11 @@
     w.solid('block', x - 0.95, 0, z - 0.95, x + 0.95, PIL.base, z + 0.95, { uv: 1 });
     const g = Gm.add(w, 'pillar', { x, z, dx, dz, seed, look: V(x, 1.7, z), useR: 1.0, useD: 6 });
     const lx = PIL.lean * PIL.H + 0.05;
-    Gm.col(w, g, x - 0.78 + Math.min(0, dx) * lx, PIL.base, z - 0.78 + Math.min(0, dz) * lx, x + 0.78 + Math.max(0, dx) * lx, PIL.base + PIL.H, z + 0.78 + Math.max(0, dz) * lx, { surf: 'stone' });
+    // (round and leaning a little: in three lengths up it, each a cross of two boxes following the lean)
+    for (let k = 0; k < 3; k++) {
+      const y0 = PIL.base + k * PIL.H / 3, y1 = y0 + PIL.H / 3, ym = (y0 + y1) / 2 - PIL.base, cx = x + dx * PIL.lean * ym, cz = z + dz * PIL.lean * ym, r = PIL.R + 0.06 + PIL.lean * PIL.H / 6;
+      Gm.col(w, g, cx - r * 0.92, y0, cz - r * 0.5, cx + r * 0.92, y1, cz + r * 0.5, { surf: 'stone' }); Gm.col(w, g, cx - r * 0.5, y0, cz - r * 0.92, cx + r * 0.5, y1, cz + r * 0.92, { surf: 'stone' });
+    }
     for (const y of [1.4, 3.3, 5.2, 7.1]) g.hb.push({ p: V(x + dx * PIL.lean * y, y, z + dz * PIL.lean * y), r: 0.85 });
     return g;
   };

@@ -437,7 +437,10 @@
   // (fieldgen_t4.js sanctum) a statue at (x, z) on an island's rim, blowing along (dx, dz) for len metres
   Gm.addGale = function (w, x, z, dx, dz, len) {
     const g = Gm.add(w, 'gale', { x, z, dx, dz, len, use: V(x + dx * 0.85, 2.2, z + dz * 0.85), useR: 1.1, useD: 3.8 });
-    Gm.col(w, g, x - 0.85, 0, z - 0.85, x + 0.85, 3.7, z + 0.85, { surf: 'stone' });
+    // (its plinth square, its head round: the box round the plinth, then a cross of two round the head)
+    Gm.col(w, g, x - 0.82, 0, z - 0.82, x + 0.82, 1.38, z + 0.82, { surf: 'stone' });
+    Gm.col(w, g, x - 0.42, 1.38, z - 0.42, x + 0.42, 1.95, z + 0.42, { surf: 'stone' }); // (the neck: the head swells out above it)
+    Gm.col(w, g, x - 0.88, 1.95, z - 0.48, x + 0.88, 3.4, z + 0.48, { surf: 'stone' }); Gm.col(w, g, x - 0.48, 1.95, z - 0.88, x + 0.48, 3.4, z + 0.88, { surf: 'stone' });
     g.hb.push({ p: V(x, 2.5, z), r: 1.2 }, { p: V(x, 0.8, z), r: 1.0 });
     return g;
   };

@@ -22,10 +22,17 @@
       const q = q0.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, rry || 0, rz || 0)));
       w.batch.geo(mk, geo || PG().box, new THREE.Matrix4().compose(V(px, y + ly, pz), q, V(sx, sy, sz)), tint ? { tint } : undefined);
     };
-    // a collider round a part (the box round its turned footprint)
-    const col = (lx, lz, hx, hz, y0, y1) => {
-      const ex = Math.abs(hx * c) + Math.abs(hz * s), ez = Math.abs(hx * s) + Math.abs(hz * c), [px, pz] = at(lx, lz);
-      return w.addCollider(px - ex, y + y0, pz - ez, px + ex, y + y1, pz + ez, { surf: 'wood' });
+    // colliders round a part: its footprint cut into pieces of 0.8 m at most, a box round each piece turned (one box round a long part
+    // turned across the axes would stand over empty ground at its corners)
+    const col = (lx, lz, hx, hz, y0, y1, o) => {
+      const nx = Math.max(1, Math.ceil(2 * hx / 0.8)), nz = Math.max(1, Math.ceil(2 * hz / 0.8)), qx = hx / nx, qz = hz / nz;
+      const ex = Math.abs(qx * c) + Math.abs(qz * s), ez = Math.abs(qx * s) + Math.abs(qz * c);
+      let last = null;
+      for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
+        const [px, pz] = at(lx - hx + (2 * i + 1) * qx, lz - hz + (2 * k + 1) * qz);
+        last = w.addCollider(px - ex, y + y0, pz - ez, px + ex, y + y1, pz + ez, Object.assign({ surf: 'wood' }, o));
+      }
+      return last;
     };
     return { part, col, at };
   }
@@ -37,22 +44,38 @@
     for (const lz of [-2.1, 0, 2.1]) r.part('woodDark', 0, 0.62, lz, 2.6, 0.28, 0.28);
     for (const sx of [-1, 1]) r.part('woodDark', sx * 1.0, 1.75, -0.4, 0.28, 2.3, 0.28, 0, 0, -sx * 0.16);
     r.part('woodDark', 0, 2.85, -0.4, 2.3, 0.3, 0.3);
-    if (broken) { r.part('wood', 0, 1.1, 0.4, 0.26, 0.26, 2.6, -0.35, 0, 0); r.part('wood', 1.6, 0.2, 2.6, 0.26, 0.26, 2.9, 0, 0.7, 1.5); }
-    else { r.part('wood', 0, 2.2, 0.9, 0.26, 0.26, 5.4, -0.62, 0, 0); r.part('iron', 0, 3.85, 3.15, 0.85, 0.4, 0.85, -0.62, 0, 0); }
+    if (broken) {
+      r.part('wood', 0, 1.1, 0.4, 0.26, 0.26, 2.6, -0.35, 0, 0); r.part('wood', 1.6, 0.2, 2.6, 0.26, 0.26, 2.9, 0, 0.7, 1.5);
+      for (const t of [-0.9, 0, 0.9]) r.col(0, 0.4 + 0.94 * t, 0.15, 0.45, 1.1 + 0.34 * t - 0.2, 1.1 + 0.34 * t + 0.2); // (the snapped arm)
+    } else {
+      r.part('wood', 0, 2.2, 0.9, 0.26, 0.26, 5.4, -0.62, 0, 0); r.part('iron', 0, 3.85, 3.15, 0.85, 0.4, 0.85, -0.62, 0, 0);
+      for (const t of [-2.4, -1.2, 0, 1.2, 2.4]) r.col(0, 0.9 + 0.81 * t, 0.16, 0.5, 2.2 + 0.58 * t - 0.25, 2.2 + 0.58 * t + 0.25); // (the arm, cocked)
+      r.col(0, 3.15, 0.45, 0.45, 3.55, 4.15); // (its bucket)
+    }
     for (const [lx, lz] of [[-1.35, -1.7], [1.35, -1.7], [-1.35, 1.7]]) wheel(r, lx, 0.55, lz, 0.55);
     wheel(r, 2.3, 0.1, 1.2, 0.55, true);
-    r.col(0, 0, 1.3, 2.4, -0.3, 1.0);
-    r.col(0, -0.4, 1.2, 0.3, -0.3, 3.0);
+    // (solid where it is drawn: the frame's beams and wheels, the posts and the beam across them; between them, open ground)
+    for (const sx of [-1.1, 1.1]) r.col(sx, 0, 0.15, 2.4, -0.3, 0.78);
+    for (const lz of [-2.1, 0, 2.1]) r.col(0, lz, 1.3, 0.14, -0.3, 0.76);
+    for (const [lx, lz] of [[-1.35, -1.7], [1.35, -1.7], [-1.35, 1.7]]) r.col(lx, lz, 0.1, 0.55, -0.3, 1.1);
+    for (const sx of [-1, 1]) r.col(sx * 1.0, -0.4, 0.22, 0.18, -0.3, 2.9);
+    r.col(0, -0.4, 1.15, 0.15, 2.7, 3.0);
     return 2.8;
   }
   // the burnt frame of a siege tower, its posts broken off at different heights, its ramp fallen in front
   function tower(w, rng, x, y, z, ry) {
     const r = rig(w, x, y, z, ry), hs = [rng.range(5, 7.5), rng.range(3, 6), rng.range(4.5, 7), rng.range(2.5, 5)];
     [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]].forEach(([lx, lz], k) => { r.part('woodDark', lx, hs[k] / 2 - 0.3, lz, 0.38, hs[k], 0.38, rng.range(-0.06, 0.06), 0, rng.range(-0.06, 0.06)); r.col(lx, lz, 0.22, 0.22, -0.3, hs[k] - 0.3); });
-    for (const ly of [2.2, 4.4]) for (const [lx, lz, sx, sz] of [[0, -1.6, 3.4, 0.25], [0, 1.6, 3.4, 0.25], [-1.6, 0, 0.25, 3.4], [1.6, 0, 0.25, 3.4]]) if (ly < 3 || rng.chance(0.5)) r.part('woodDark', lx, ly, lz, sx, 0.25, sz);
+    for (const ly of [2.2, 4.4]) for (const [lx, lz, sx, sz] of [[0, -1.6, 3.4, 0.25], [0, 1.6, 3.4, 0.25], [-1.6, 0, 0.25, 3.4], [1.6, 0, 0.25, 3.4]]) if (ly < 3 || rng.chance(0.5)) { r.part('woodDark', lx, ly, lz, sx, 0.25, sz); r.col(lx, lz, sx / 2, sz / 2, ly - 0.13, ly + 0.13); }
     r.part('wood', 0, 2.3, 0, 3.2, 0.14, 3.2); r.col(0, 0, 1.7, 1.7, 2.1, 2.4);
-    for (let k = 0; k < 5; k++) if (rng.chance(0.7)) r.part('wood', -1.3 + k * 0.65, 1.2 + rng.range(0, 1.6), -1.72, 0.55, rng.range(1.2, 2.4), 0.06, 0, 0, rng.range(-0.15, 0.15));
+    for (let k = 0; k < 5; k++) if (rng.chance(0.7)) {
+      const ly = 1.2 + rng.range(0, 1.6), h = rng.range(1.2, 2.4);
+      r.part('wood', -1.3 + k * 0.65, ly, -1.72, 0.55, h, 0.06, 0, 0, rng.range(-0.15, 0.15));
+      r.col(-1.3 + k * 0.65, -1.72, 0.28, 0.06, ly - h / 2, ly + h / 2); // (a board of its siding: solid)
+    }
+    // its ramp, fallen in front: you walk up it (steps under the planks)
     r.part('wood', 0, 0.55, 3.7, 3, 0.14, 4.2, 0.24, 0, 0.05);
+    for (const t of [-1.6, -0.55, 0.55, 1.6]) r.col(0, 3.7 + 0.97 * t, 1.5, 0.53, -0.3, 0.62 - 0.24 * t);
     r.part('dark', 0, 0.04, 0, 4.6, 0.04, 4.6, 0, 0, 0);
     return 3.4;
   }
@@ -61,9 +84,10 @@
     const r = rig(w, x, y, z, ry);
     for (const [lx, lz] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) r.part('woodDark', lx, 0.5, lz, 0.18, 1.0, 0.18, lx * 0.2, 0, lz * 0.2);
     r.part('woodDark', 0, 1.1, 0, 0.32, 0.26, 3.2, rng.range(-0.15, 0.1), 0, 0);
-    for (const sx of [-1, 1]) r.part('woodDark', sx * 0.9, 1.15, -1.1, 1.8, 0.14, 0.14, 0, sx * 0.4, 0);
+    for (const sx of [-1, 1]) { r.part('woodDark', sx * 0.9, 1.15, -1.1, 1.8, 0.14, 0.14, 0, sx * 0.4, 0); r.col(sx * 0.9, -1.25, 0.85, 0.3, 0.95, 1.35); }
     r.part('iron', 0, 1.3, 0.6, 0.06, 0.06, 2.6, 0, 0, 0);
-    r.col(0, 0, 0.8, 1.4, -0.3, 1.2);
+    for (const [lx, lz] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) r.col(lx * 1.1, lz * 1.1, 0.12, 0.12, -0.3, 1.0);
+    r.col(0, 0, 0.18, 1.6, 0.95, 1.26); r.col(0, 0.6, 0.06, 1.3, 1.26, 1.36);
     return 1.8;
   }
   // a line of stakes (cheval de frise): a log with sharpened stakes crossed through it, low enough to vault
@@ -71,17 +95,25 @@
     const r = rig(w, x, y, z, along ? 0 : Math.PI / 2);
     r.part('woodDark', 0, 0.55, 0, 0.36, len, 0.36, 0, 0, Math.PI / 2, PG().cyl8);
     for (let u = -len / 2 + 0.4; u < len / 2; u += 0.75) for (const s of [-1, 1]) { r.part('wood', u, 0.62, 0, 0.09, 2.3, 0.09, s * 0.72, 0, 0); r.part('iron', u, 0.62 + Math.cos(0.72) * 1.15, s * Math.sin(0.72) * 1.15, 0.1, 0.22, 0.1, s * 0.72, 0, 0, PG().cone); }
-    r.col(0, 0, len / 2, 0.75, -0.2, 1.05);
+    r.col(0, 0, len / 2, 0.75, -0.2, 1.05, { tag: 'grate' }); // (a barrier of stakes: you see through it between them, and it stops you)
   }
   // spears left standing in the ground, a helm and a shield among them
   function spears(w, rng, x, y, z, n) {
     for (let i = 0; i < n; i++) {
-      const a = rng.range(0, 6.3), d = rng.range(0, 1.6), px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, rx = rng.range(-0.45, 0.45), rz = rng.range(-0.45, 0.45), L = rng.range(2.2, 3);
+      const a = rng.range(0, 6.3), d = rng.range(0, 1.6), px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, rx = rng.range(-0.16, 0.16), rz = rng.range(-0.16, 0.16), L = rng.range(2.2, 3); // (standing nearly upright: solid where drawn)
       w.batch.geo('woodDark', PG().cyl8, Mx(px, y + L * 0.4, pz, 0.045, L, 0.045, rx, 0, rz));
       const tip = new THREE.Vector3(0, L * 0.5, 0).applyEuler(new THREE.Euler(rx, 0, rz));
+      // (solid up to its head, in lengths along its lean: a stand of spears is something you walk round)
+      const dir = tip.clone().normalize(), base = V(px, y + L * 0.4, pz).addScaledVector(dir, -L * 0.5);
+      for (const [h0, h1] of [[0, 0.8], [0.8, 1.6], [1.6, Math.min(2.4, L * 0.85 * dir.y)]]) {
+        if (h1 <= h0) continue;
+        const a = base.clone().addScaledVector(dir, h0 / dir.y), b = base.clone().addScaledVector(dir, h1 / dir.y);
+        if (b.y < y) continue;
+        w.addCollider(Math.min(a.x, b.x) - 0.07, Math.max(y, a.y), Math.min(a.z, b.z) - 0.07, Math.max(a.x, b.x) + 0.07, b.y, Math.max(a.z, b.z) + 0.07, { surf: 'wood', noGrapple: true });
+      }
       w.batch.geo('iron', PG().cone, Mx(px + tip.x, y + L * 0.4 + tip.y, pz + tip.z, 0.07, 0.3, 0.07, rx, 0, rz));
     }
-    if (rng.chance(0.7)) { const h = rng.int(0, 1); w.batch.geo('wood', PG().cyl8, Mx(x + rng.range(-1, 1), y + 0.45, z + rng.range(-1, 1), 0.55, 0.07, 0.55, rng.range(1.0, 1.3), rng.range(0, 6), 0), { tint: HOST[h] }); }
+    if (rng.chance(0.7)) { const h = rng.int(0, 1), sx = x + rng.range(-1, 1), sz = z + rng.range(-1, 1); w.batch.geo('wood', PG().cyl8, Mx(sx, y + 0.45, sz, 0.55, 0.07, 0.55, rng.range(1.0, 1.3), rng.range(0, 6), 0), { tint: HOST[h] }); w.addCollider(sx - 0.4, y, sz - 0.4, sx + 0.4, y + 0.9, sz + 0.4, { surf: 'wood' }); } // (a shield leant up: solid)
     if (rng.chance(0.6)) P().skull(w, x + rng.range(-1, 1), y + 0.02, z + rng.range(-1, 1), rng.range(0, 6), 1);
   }
   // a host's banner on its pole, torn
@@ -106,7 +138,8 @@
     const r = rig(w, x + rng.range(2.6, 3.4), y, z + rng.range(-1, 1), rng.range(0, 6.3));
     r.part('woodDark', 0, 0.9, 0, 0.08, 1.8, 0.08); r.part('woodDark', 0, 0.55, 1.6, 0.08, 1.1, 0.08, 0.6, 0, 0);
     for (const s of [-1, 1]) r.part('cloth', s * 0.75, 0.55, 0.8, 0.04, 1.75, 3.0, 0, 0, s * 0.95, null, [0.9, 0.85, 0.7]);
-    r.col(0, 0.8, 1.1, 1.6, -0.2, 1.0);
+    // (its cloth falls from the ridge at about 1 m to the ground 1.45 m out each side: solid in steps under it, none past where it is low)
+    r.col(0, 0.8, 0.5, 1.5, -0.2, 0.75); for (const sx of [-1, 1]) r.col(sx * 0.75, 0.8, 0.25, 1.5, -0.2, 0.35);
   }
   // standing stones on a barrow's top, now and then a dolmen
   function stones(w, rng, x, y, z, R) {
@@ -114,7 +147,13 @@
     for (let k = 0; k < n; k++) {
       if (rng.chance(0.2)) continue;
       const a = a0 + k / n * 6.28, px = x + Math.cos(a) * R, pz = z + Math.sin(a) * R, h = rng.range(1.8, 3.2), fallen = rng.chance(0.15);
-      if (fallen) { w.batch.geo('block', PG().box, Mx(px, y + 0.3, pz, 0.7, 0.55, h, 0.08, a, 0)); w.addCollider(px - 0.6, y - 0.2, pz - 0.6, px + 0.6, y + 0.55, pz + 0.6, { surf: 'stone' }); continue; }
+      if (fallen) {
+        // lying along a: solid along its length, a short box at a time
+        w.batch.geo('block', PG().box, Mx(px, y + 0.3, pz, 0.7, 0.55, h, 0.08, a, 0));
+        const n = Math.ceil(h / 0.7), ca = Math.cos(a), sa = Math.sin(a);
+        for (let k = 0; k < n; k++) { const t = -h / 2 + (k + 0.5) * (h / n), qx = px + sa * t, qz = pz + ca * t, e = 0.35 * Math.abs(ca) + (h / n / 2) * Math.abs(sa), f = 0.35 * Math.abs(sa) + (h / n / 2) * Math.abs(ca); w.addCollider(qx - e, y - 0.2, qz - f, qx + e, y + 0.58, qz + f, { surf: 'stone' }); }
+        continue;
+      }
       w.batch.geo('block', PG().box, Mx(px, y + h / 2 - 0.2, pz, 0.75, h, 0.5, rng.range(-0.08, 0.08), a, rng.range(-0.08, 0.08)));
       w.addCollider(px - 0.42, y - 0.2, pz - 0.42, px + 0.42, y + h - 0.2, pz + 0.42, { surf: 'stone' });
     }
@@ -235,7 +274,7 @@
     for (let i = 0; i < rng.int(3, 5); i++) { const r = spot(3, 3, 1.5, 1.2); if (r) T.at(w, r.y, () => F.deadTree(w, r.cx, r.cz, rng, rng.range(0.9, 1.3))); }
     for (let i = 0; i < rng.int(5, 9); i++) { const r = spot(2, 2, 0.5, 1.6); if (!r) continue; if (rng.chance(0.5)) P().bones(w, r.cx, r.y + 0.02, r.cz, rng); else T.boulder(w, r.cx, r.y - 0.2, r.cz, rng.range(0.7, 1.4), rng.range(0.5, 1), rng.range(0.7, 1.4), rng); }
     // cairns for the fallen
-    for (let i = 0; i < rng.int(1, 3); i++) { const r = spot(3, 3, 1, 0.8); if (!r) continue; for (let k = 0; k < 6; k++) T.boulder(w, r.cx + rng.range(-0.6, 0.6), r.y + k * 0.28, r.cz + rng.range(-0.6, 0.6), 0.75 - k * 0.09, 0.4, 0.75 - k * 0.09, rng, { collide: k === 0, top: 3.4 }); P().skull(w, r.cx, r.y + 1.7, r.cz, rng.range(0, 6), 1.1); }
+    for (let i = 0; i < rng.int(1, 3); i++) { const r = spot(3, 3, 1, 0.8); if (!r) continue; for (let k = 0; k < 6; k++) T.boulder(w, r.cx + rng.range(-0.6, 0.6), r.y + k * 0.28, r.cz + rng.range(-0.6, 0.6), 0.75 - k * 0.09, 0.4, 0.75 - k * 0.09, rng); /* (each stone of the cairn solid) */ P().skull(w, r.cx, r.y + 1.7, r.cz, rng.range(0, 6), 1.1); }
     // braziers at the gates, lanterns on the way in
     for (const g of gxs) { P().brazier(w, g - 5.4, 0, 4.5, 1, true); P().brazier(w, g + 5.4, 0, 4.5, 1, true); }
     for (const s of [-1, 1]) F.lantern(w, cx + s * 5.5, D - 6, '#ffb070');

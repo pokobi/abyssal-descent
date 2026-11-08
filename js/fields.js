@@ -30,7 +30,7 @@
   const BIOME = {
     flooded: ['water', 'water', 'moss', 'mud'], forge: ['lava', 'oil', 'oil', 'vent'], frozen: ['ice', 'ice', 'water', 'vent'],
     temple: ['moss', 'thorns', 'water'], catacombs: ['poison', 'oil', 'mud'], ruins: ['moss', 'mud', 'thorns', 'water'],
-    bloodmoon: ['thorns', 'poison', 'mud', 'oil'], sky: ['vent', 'vent', 'moss'], hamlet: ['mud', 'water', 'thorns', 'moss'], battlefield: ['mud', 'thorns', 'oil', 'mud'], dusk: ['moss', 'thorns', 'mud', 'oil'], castle: ['thorns', 'oil', 'poison', 'mud'], foundry: ['lava', 'oil', 'oil', 'vent'], sanctum: ['vent', 'vent', 'holy', 'moss'], void: ['poison', 'vent', 'ice'], abyss: ['poison', 'lava', 'vent'],
+    bloodmoon: ['thorns', 'poison', 'mud', 'oil'], sky: ['vent', 'vent', 'moss'], hamlet: ['mud', 'water', 'thorns', 'moss'], battlefield: ['mud', 'thorns', 'oil', 'mud'], shaft: ['oil', 'vent', 'mud', 'poison'], dusk: ['moss', 'thorns', 'mud', 'oil'], castle: ['thorns', 'oil', 'poison', 'mud'], foundry: ['lava', 'oil', 'oil', 'vent'], sanctum: ['vent', 'vent', 'holy', 'moss'], void: ['poison', 'vent', 'ice'], abyss: ['poison', 'lava', 'vent'],
   };
   const ANY = ['water', 'moss', 'mud', 'poison', 'oil', 'thorns', 'vent', 'ice', 'lava'];
 

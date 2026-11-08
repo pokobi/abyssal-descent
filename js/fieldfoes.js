@@ -9,6 +9,7 @@
 //   凍てつく霊廟 霜の亡霊 (three slow frost orbs)       氷晶の守り手 (a lane of ice spikes)
 //   天空の聖域 虚空の使徒 (a column of light on a marked circle) 雲の守護像 (a gust that blows you back — mind the edge)
 //   古戦場の丘 亡霊の槍兵 (marks a lane, then charges down it) 屍肉の鴉 (a flock that swoops in turn)
+//   螺旋の大縦坑 鉤鎖の亡者 (a hooked chain down a lane: it reels you in) 落石の番人 (rocks fall on three marked circles)
 // New bodies are built here with the enemy builder's own parts (enemies.js E._); new attacks hook its attack switch.
 (function () {
   const E = G.enemies, X = E._, B = X.B, mesh = X.mesh, joint = X.joint, leg = X.leg;
@@ -269,10 +270,14 @@
     desc: '偽りの空に仕える顔のない使徒。足元に光の輪を描き、そこへ天から光の柱を落とす。輪の外へ。' });
   add({ id: 'ff_cloudguard', fields: ['sanctum'], plan: 'gargoyle', name: '雲の守護像', icon: '🗽', hp: 125, dmg: 8, speed: 4.2, size: 1.05, attack: 'gust', range: 15, cd: 3.2, ai: 'ranged', flyer: true, h: 1.4, sound: 'screech', pitch: 0.6, unlockK: 4, rarity: 'uncommon', color: '#e8e4dc', eye: '#ffd090',
     desc: '聖域の縁に据えられた白い石像。翼を打って突風を起こし、獲物を吹き飛ばす。足場の縁では特に危ない。' });
-  add({ id: 'ff_pikeman', fields: ['battlefield'], plan: 'knight', name: '亡霊の槍兵', icon: '🔱', hp: 160, dmg: 22, speed: 4.6, size: 1.02, attack: 'charge', range: 16, cd: 3.6, ai: 'melee', h: 2.0, frontArmor: 0.35, undead: true, sound: 'groan', pitch: 0.8, unlockK: 0, rarity: 'common', color: '#6a6a62', eye: '#ff6a40',
+  add({ id: 'ff_pikeman', fields: ['battlefield'], plan: 'knight', name: '亡霊の槍兵', icon: '🔱', hp: 160, dmg: 22, speed: 4.6, size: 1.02, attack: 'lancecharge', range: 16, cd: 3.6, ai: 'melee', h: 2.0, frontArmor: 0.35, undead: true, sound: 'groan', pitch: 0.8, unlockK: 0, rarity: 'common', color: '#6a6a62', eye: '#ff6a40',
     desc: '丘で討たれた兵の亡霊。槍を構えて足元に一筋の線を引き、その線の上を一気に駆け抜ける。線の上から横へ外れろ。' });
   add({ id: 'ff_crow', fields: ['battlefield'], plan: 'bat', name: '屍肉の鴉', icon: '🐦‍⬛', hp: 38, dmg: 7, speed: 11, size: 0.8, attack: 'swoop', range: 2.0, cd: 2.0, ai: 'flyer', flyer: true, h: 0.8, sound: 'screech', pitch: 1.1, unlockK: 0, rarity: 'common', pack: true, color: '#1c1a20', eye: '#ff3a2a',
     desc: '戦場の屍をついばむ黒い鴉。群れで飛び回り、代わる代わる急降下してくる。一羽は脆い。' });
+  add({ id: 'ff_hookwraith', fields: ['shaft'], plan: 'wraith', name: '鉤鎖の亡者', icon: '⛓️', hp: 110, dmg: 12, speed: 5.0, size: 1, attack: 'hook', range: 18, cd: 3.4, ai: 'ranged', hover: true, undead: true, sound: 'wail', pitch: 0.8, unlockK: 0, rarity: 'common', color: '#5a6070', eye: '#ffb050', orn: 'wisps',
+    desc: '縦坑の昇降機に繋がれて死んだ坑夫の亡霊。足元に線を引き、その線の上へ鉤のついた鎖を投げて、掛かった獲物を手元まで引き寄せる。縁の近くでは特に危ない。' });
+  add({ id: 'ff_rockwarden', fields: ['shaft'], plan: 'golem', name: '落石の番人', icon: '🪨', hp: 260, dmg: 22, speed: 3.2, size: 0.8, attack: 'rockfall', range: 26, cd: 4.0, ai: 'ranged', h: 2.4, shield: 0.3, sound: 'rumble', pitch: 0.9, unlockK: 1, rarity: 'uncommon', color: '#7a7064', eye: '#ffd070',
+    desc: '縦坑の壁から削り出された石の番人。地を踏み鳴らすと、獲物の足元とその周りの三つの円に、縁から岩が降ってくる。円の外へ。' });
   G.ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
 
   // ---------------------------------------------------------------- what happens when they spawn / die
@@ -514,7 +519,7 @@
   };
   // 雲の守護像: a gust down a fan in front of it: knocked back and off your feet
   // 亡霊の槍兵: a lane marked before it, then the charge down it, spear first (through you once, with a shove)
-  K.charge = {
+  K.lancecharge = {
     can: (e, tgt, toT, d) => (d < e.def.range && d > 3.5 ? 0.9 : null),
     update(e, A, dt, tgt, toT, d, inWind) {
       if (!A.lane) {
@@ -535,6 +540,60 @@
       if (Math.random() < dt * 30) G.fx.dust(e.pos.clone(), V(-dir.x, 0.6, -dir.z), 0x6a6050, 1);
       if (t * SP >= A.lane.len || t > 1.6) endA(e);
       return { x: dir.x, z: dir.z, speed: SP };
+    },
+  };
+  // 鉤鎖の亡者: a lane marked toward you, then the chain flies down it; caught, you are reeled in to it
+  K.hook = {
+    can: (e, tgt, toT, d) => (d < e.def.range && d > 4 ? 0.85 : null),
+    update(e, A, dt, tgt, toT, d, inWind) {
+      if (!A.lane) {
+        const from = e.pos.clone(), dir = V(toT.x, 0, toT.z).normalize(), len = Math.min(e.def.range, d + 3);
+        const fy = G.world.floorBelow(from.x, from.y + 1, from.z); from.y = isFinite(fy) && fy > -50 ? fy : tgt.pos.y;
+        A.lane = { a: from, b: from.clone().addScaledVector(dir, len), dir, len };
+        A.tl = G.fx.teleLine(A.lane.a, A.lane.b, 1.4, A.wind, 0xb0b8c8);
+      }
+      if (inWind) { e.yaw = Math.atan2(A.lane.dir.x, A.lane.dir.z); return { x: 0, z: 0 }; }
+      if (A.tl) { G.fx.endTeleLine(A.tl); A.tl = null; G.sfx.whoosh(0.5, 0.7); }
+      e.atk = 1;
+      const t = A.t - A.wind, reach = Math.min(A.lane.len, t * 34);
+      const tip = A.lane.a.clone().addScaledVector(A.lane.dir, reach); tip.y = e.pos.y + 1.2;
+      A.ray = G.vfx.hold(A.ray, 0x8a90a0, 0xd0d8e8); A.ray.set(e.centerPos(), A.caught ? tgt.pos.clone().setY(tgt.pos.y + 1) : tip, 0.08);
+      if (!A.caught && !A.missed && segDistH(tgt.pos, A.lane.a, tip) < 1.0 && Math.abs(tgt.pos.y - A.lane.a.y) < 2.4) { A.caught = true; A.ct = 0; hitP(e, tgt, e.dmg, 'ranged'); G.sfx.hit && G.sfx.hit(tgt.pos, 'metal'); }
+      if (!A.caught && reach >= A.lane.len) A.missed = true;
+      if (A.caught) {
+        A.ct += dt;
+        if (tgt === Pl()) { const P = Pl(), dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, L = Math.hypot(dx, dz); if (L > 2.2) { P.vel.x = dx / L * 13; P.vel.z = dz / L * 13; P.vel.y = Math.max(P.vel.y, 1.5); P.grounded = false; } }
+        if (A.ct > 0.55) endA(e);
+      } else if (A.missed && t > A.lane.len / 34 + 0.25) endA(e);
+      return { x: 0, z: 0 };
+    },
+  };
+  // 落石の番人: three circles round you (one where you stand), then the rocks come down on them from above
+  K.rockfall = {
+    can: (e, tgt, toT, d) => (d < e.def.range ? 1.2 : null),
+    update(e, A, dt, tgt, toT, d, inWind) {
+      const R = 2.3;
+      if (!A.spots) {
+        A.spots = []; A.teles = [];
+        for (let k = 0; k < 3; k++) {
+          const a = Math.random() * Math.PI * 2, r = k ? U.rand(3, 5.5) : 0, q = tgt.pos.clone().add(V(Math.cos(a) * r, 0, Math.sin(a) * r));
+          const fy = G.world.floorBelow(q.x, tgt.pos.y + 2, q.z); if (!isFinite(fy) || fy < tgt.pos.y - 6) continue; q.y = fy;
+          A.spots.push(q); A.teles.push(G.fx.telegraph(q.clone().setY(q.y + 0.02), R, A.wind + 0.2, 0xd09050));
+        }
+        G.sfx.stoneGrind(e.pos, 0.6);
+      }
+      if (inWind) { e.yaw = Math.atan2(toT.x, toT.z); return { x: 0, z: 0 }; }
+      if (!A.done) {
+        A.done = true; e.atk = 1;
+        for (const tl of A.teles) G.fx.endTelegraph(tl);
+        for (const q of A.spots) {
+          G.fx.debris(q.clone().setY(q.y + 6), G.world.mats.rock, 7, 0.45, 6); G.fx.dust(q, V(0, 1, 0), 0x7a6e60, 10); G.vfx.nova(q.clone(), R, 0.12, { style: 'shock', dome: false, ground: 0x9a8a70 });
+          if (Math.hypot(tgt.pos.x - q.x, tgt.pos.z - q.z) < R && tgt.pos.y - q.y < 2) { hitP(e, tgt, e.dmg, 'aoe'); break; }
+        }
+        G.sfx.explosion(A.spots[0] || e.pos, 0.35);
+      }
+      if (A.t - A.wind > 0.4) endA(e);
+      return { x: 0, z: 0 };
     },
   };
   K.gust = {

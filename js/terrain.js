@@ -94,8 +94,45 @@
     for (let k = 0; k < c.length; k++) c[k] = n[k] ? c[k] / n[k] : NaN;
     return c;
   };
+  // cliff mode (o.cliff): every cell keeps its own corners, each the mean of the tops round it that lie within o.cliff of the cell's
+  // own (a slope stays smooth, a drop stays a drop), and a face of rock goes down every drop to the cell below
+  T.meshCliff = function (w, hf, o) {
+    const { W, D, h, m } = hf, ox = o.x0 || 0, oz = o.z0 || 0, cl = o.cliff;
+    const G0 = w.batch._grp(o.mk || 'floor'), uvS = 1 / (o.uv || 4);
+    const n = T.noise(o.tintSeed || 7);
+    const tint = o.tint || [1, 1, 1], steepT = o.steepTint || [0.62, 0.58, 0.52];
+    const top = (x, z) => (x < 0 || z < 0 || x >= W || z >= D || !m[z * W + x] ? null : h[z * W + x]);
+    const corner = (x, z, hc) => {
+      let s = 0, c = 0;
+      for (const [a, b] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) { const t = top(x + a, z + b); if (t != null && Math.abs(t - hc) <= cl) { s += t; c++; } }
+      return c ? s / c : hc;
+    };
+    const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nv = new THREE.Vector3();
+    const faceMk = o.skirtMk || 'rock';
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+      const i = z * W + x; if (!m[i]) continue;
+      const hc = h[i];
+      const y00 = corner(x, z, hc), y10 = corner(x + 1, z, hc), y11 = corner(x + 1, z + 1, hc), y01 = corner(x, z + 1, hc);
+      e1.set(1, y11 - y00, 1); e2.set(1, y10 - y01, -1); nv.crossVectors(e2, e1).normalize(); if (nv.y < 0) nv.negate();
+      const steep = Math.min(1, Math.max(0, (1 - nv.y) * 3.2)), f = 0.84 + n((ox + x) * 0.21, (oz + z) * 0.21) * 0.3;
+      const col = [(tint[0] * (1 - steep) + steepT[0] * steep) * f, (tint[1] * (1 - steep) + steepT[1] * steep) * f, (tint[2] * (1 - steep) + steepT[2] * steep) * f];
+      const base = G0.p.length / 3;
+      for (const [vx, vz, vy] of [[x, z, y00], [x + 1, z, y10], [x + 1, z + 1, y11], [x, z + 1, y01]]) {
+        G0.p.push(ox + vx, vy, oz + vz); G0.n.push(nv.x, nv.y, nv.z); G0.u.push((ox + vx) * uvS, -(oz + vz) * uvS); G0.c.push(col[0], col[1], col[2]);
+      }
+      G0.i.push(base, base + 3, base + 2, base, base + 2, base + 1);
+      // the drops on its four sides (down to the lower cell, or to the grid's base where there is no ground of this grid)
+      const lo = (t) => (t == null ? (o.skirt === false ? null : hf.base) : t < hc - cl ? t : null);
+      const L = lo(top(x - 1, z)), R = lo(top(x + 1, z)), N = lo(top(x, z - 1)), S = lo(top(x, z + 1));
+      if (L != null) w.visual(faceMk, ox + x - 0.02, L, oz + z, ox + x, hc + 0.02, oz + z + 1, { uv: 3, grad: false, skip: { px: true, top: true, bottom: true } });
+      if (R != null) w.visual(faceMk, ox + x + 1, R, oz + z, ox + x + 1.02, hc + 0.02, oz + z + 1, { uv: 3, grad: false, skip: { nx: true, top: true, bottom: true } });
+      if (N != null) w.visual(faceMk, ox + x, N, oz + z - 0.02, ox + x + 1, hc + 0.02, oz + z, { uv: 3, grad: false, skip: { pz: true, top: true, bottom: true } });
+      if (S != null) w.visual(faceMk, ox + x, S, oz + z + 1, ox + x + 1, hc + 0.02, oz + z + 1.02, { uv: 3, grad: false, skip: { nz: true, top: true, bottom: true } });
+    }
+  };
   T.mesh = function (w, hf, o) {
     o = o || {};
+    if (o.cliff) return T.meshCliff(w, hf, o);
     const { W, D, h, m } = hf, ox = o.x0 || 0, oz = o.z0 || 0;
     const c = T.corners(hf), W1 = W + 1;
     const G0 = w.batch._grp(o.mk || 'floor'), uvS = 1 / (o.uv || 4);

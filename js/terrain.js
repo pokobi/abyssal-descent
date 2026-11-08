@@ -67,6 +67,7 @@
     hf._c = T.corners(hf);
     T.mesh(w, hf, o);
     const cc = T.cellCorners(hf, o);
+    hf._cc = cc;
     h.set(T.cellTops(hf, o, cc));
     // the grid as the player's feet read it (world.js, while the player moves): its columns carry it (c.tg), T.surf gives the drawn height
     const grid = { hf, ox, oz, cc, cliff: !!o.cliff };
@@ -100,6 +101,18 @@
       return w.groundElse ? w.groundElse(x, z) : 0;
     };
     return hf;
+  };
+  // the rock that bounds an area, built as a grid (T.build, after it): an invisible wall over each run of its cells along x, from the
+  // lowest corner drawn in the run up into the sky (w.skyCap), so its top is no place to stand and no way out over it
+  T.skyCap = function (w, hf, o) {
+    const { W, D, m } = hf, cc = hf._cc, ox = (o && o.x0) || 0, oz = (o && o.z0) || 0;
+    for (let z = 0; z < D; z++) for (let x = 0; x < W;) {
+      if (!m[z * W + x]) { x++; continue; }
+      let x2 = x, lo = Infinity;
+      while (x2 < W && m[z * W + x2]) { const k = (z * W + x2) * 4; lo = Math.min(lo, cc[k], cc[k + 1], cc[k + 2], cc[k + 3]); x2++; }
+      w.skyCap(ox + x, lo, oz + z, ox + x2, oz + z + 1);
+      x = x2;
+    }
   };
   // the height of the drawn ground at (x, z) on a grid (T.build's grid): the very triangle the mesh draws there (T.mesh splits each cell
   // along its shorter diagonal, T.meshCliff always from x0z0 to x1z1); null off the grid or over a cell without ground
@@ -266,7 +279,8 @@
     w.batch.geo(o.mk || 'rock', lump, new THREE.Matrix4().compose(V(x, y + sy * 0.55, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(ax, yaw, az)), V(sx, sy, sz)), { su: 0.5, sv: 0.5, tint: o.tint });
     // (the lump is a dodecahedron of radius 1 scaled by sx / sy / sz, its middle 0.55 sy up: round, so its collider is three boxes, a
     // broad one through its middle (to its faces, 0.79 out) and narrower ones above and below where it rounds off: you neither walk
-    // into the rock nor bump into air beside it; the top one ends where its top is)
+    // into the rock nor bump into air beside it; the top one ends where its top is). Returns its colliders.
+    const cols = [];
     if (o.collide !== false) {
       // (turned about y by yaw, a lump longer one way than the other is that much wider across x or z: the boxes take its turned size)
       const c = Math.cos(yaw), s = Math.sin(yaw), ex = Math.hypot(sx * c, sz * s), ez = Math.hypot(sx * s, sz * c);
@@ -275,12 +289,14 @@
       // (the middle one a cross of two boxes: a square round the rock would stand out of it at its corners)
       for (const [a, b, kx, kz] of [[y - 0.5, y, 0.5, 0.5], [y, y + sy * 1.1, 0.8, 0.55], [y, y + sy * 1.1, 0.55, 0.8], [y + sy * 1.1, top, 0.5, 0.5]]) {
         const hi = Math.min(b, top); if (hi <= a) continue;
-        w.addCollider(x - sx * kx, a, z - sz * kz, x + sx * kx, hi, z + sz * kz, { surf: 'stone', noGrapple: o.noGrapple });
+        cols.push(w.addCollider(x - sx * kx, a, z - sz * kz, x + sx * kx, hi, z + sz * kz, { surf: 'stone', noGrapple: o.noGrapple }));
       }
     }
+    return cols;
   };
   // a ragged band of crags along an edge of the area: side 'W' | 'E' | 'N' | 'S', from a0 to a1 along it, reaching depth d0..d1 into
-  // the area, h0..h1 high over the ground at its foot (gy(x, z)); too high to climb or jump over (and no hook holds on it)
+  // the area, h0..h1 high over the ground at its foot (gy(x, z)); too high to climb or jump over. The hook holds on its face, but over
+  // its top stands an invisible wall up into the sky (w.skyCap), and over the tops of the lumps on its face that come up near it
   T.crags = function (w, rng, side, a0, a1, d0, d1, h0, h1, gy, o) {
     o = o || {};
     const W = w.W, D = w.D, out = [];
@@ -292,7 +308,8 @@
       else if (side === 'N') { z0 = -3; z1 = d; x0 = a; x1 = a + len; }
       else { z0 = D - d; z1 = D + 3; x0 = a; x1 = a + len; }
       const g = Math.min(gy(x0 + 0.5, z0 + 0.5), gy(x1 - 0.5, z0 + 0.5), gy(x0 + 0.5, z1 - 0.5), gy(x1 - 0.5, z1 - 0.5));
-      w.solid('rock', x0, g - 3, z0, x1, g + hh, z1, { uv: 5, grad: false, noGrapple: true, tint: o.tint });
+      w.solid('rock', x0, g - 3, z0, x1, g + hh, z1, { uv: 5, grad: false, tint: o.tint });
+      w.skyCap(x0, g + hh, z0, x1, z1);
       out.push({ x0, z0, x1, z1, top: g + hh });
       // lumps on its face and top so it reads as rock, not a wall
       const fx = side === 'W' ? x1 : side === 'E' ? x0 : null, fz = side === 'N' ? z1 : side === 'S' ? z0 : null;
@@ -300,7 +317,8 @@
         const s = rng.range(1.1, 2.2), u = rng.range(0.2, 0.8);
         const bx = fx != null ? fx + (side === 'W' ? -0.75 : 0.75) * s : x0 + (x1 - x0) * u, bz = fz != null ? fz + (side === 'N' ? -0.75 : 0.75) * s : z0 + (z1 - z0) * u; // (sunk well into the face: a bulge, not a boulder stood against it)
         const by = rng.range(g - 0.5, g + hh * 0.7);
-        T.boulder(w, bx, by, bz, s * rng.range(0.9, 1.4), s * rng.range(0.8, 1.2), s * rng.range(0.9, 1.4), rng, { tint: o.tint, noGrapple: true }); // (solid: it stands out of the face)
+        const lc = T.boulder(w, bx, by, bz, s * rng.range(0.9, 1.4), s * rng.range(0.8, 1.2), s * rng.range(0.9, 1.4), rng, { tint: o.tint }); // (solid: it stands out of the face)
+        for (const c of lc) if (c.y1 > g + hh - 2) w.skyCap(c.x0, c.y1, c.z0, c.x1, c.z1); // (a lump up by the top: no standing on it either)
       }
       T.boulder(w, (x0 + x1) / 2 + rng.range(-1, 1), g + hh - 0.8, (z0 + z1) / 2 + rng.range(-1, 1), rng.range(1.6, 2.6), rng.range(1, 1.8), rng.range(1.6, 2.6), rng, { collide: false, tint: o.tint });
       a += len;

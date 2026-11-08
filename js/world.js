@@ -132,6 +132,15 @@
     roundCollider(x, z, r, y0, y1, o) {
       return [this.addCollider(x - r * 0.92, y0, z - r * 0.5, x + r * 0.92, y1, z + r * 0.5, o), this.addCollider(x - r * 0.5, y0, z - r * 0.92, x + r * 0.5, y1, z + r * 0.92, o)];
     }
+    // an invisible wall from y0 up into the sky over x0..x1 / z0..z1: the rock that bounds an area (the rim round a shaft, crags, canyon
+    // walls) can't be stood on or climbed over. Like the anti-perch columns (levelgen fireTops), shots, sight and the grapple pass
+    // through it (the rock's face below still holds the hook); the nav grid doesn't see it (the rock's top was no way for monsters anyway)
+    skyCap(x0, y0, z0, x1, z1) {
+      if (x1 - x0 < 0.001 || z1 - z0 < 0.001) return null;
+      const c = this.addCollider(x0, y0, z0, x1, World.SKY_Y, z1, { noGrapple: true });
+      c.ghost = true; c.noFire = true; c.navIgnore = true; c.skyCap = true;
+      return c;
+    }
     // solid box = visible geometry + collider (the only way static solids are created => no invisible walls)
     solid(mk, x0, y0, z0, x1, y1, z1, o) {
       o = o || {};
@@ -895,6 +904,7 @@
       this.group.traverse((o) => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
     }
   }
+  World.SKY_Y = 500; // the top of a skyCap: high over anything a hook or a jump reaches
   G.World = World;
 
   // ---------------- dynamic torch lights (constant light count) ----------------

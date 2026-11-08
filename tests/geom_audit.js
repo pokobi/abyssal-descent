@@ -239,6 +239,7 @@ function audit(o) {
     const S = 0.4;
     for (const c of solidCols) {
       if (c.bars || c.tag === 'grate' || c.tag === 'portcullis') continue;
+      if (c.ghost) continue; // (the invisible anti-perch walls over perches and bounding rock: invisible on purpose, levelgen fireTops / w.skyCap)
       if (c.x1 - c.x0 <= 1.2 && c.z1 - c.z0 <= 1.2 && c.y1 - c.y0 <= 1.6) continue; // (a small thing, a brazier on its legs, a stool: its box round it is close enough) // (a grate, a barrier of stakes: you see through it between its bars, and it stops you)
       const faces = [[1, 0, c.x1, c.z0, c.z1], [-1, 0, c.x0, c.z0, c.z1], [0, 1, c.z1, c.x0, c.x1], [0, -1, c.z0, c.x0, c.x1]];
       for (const [nx, nz, pl, a0, a1] of faces) {

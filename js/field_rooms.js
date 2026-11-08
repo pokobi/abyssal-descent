@@ -29,6 +29,7 @@
     const rk = T.grid(W, D, -2), cx = W / 2, cz = D / 2, rx = W / 2 + 0.6, rz = D / 2 + 0.6; // (a rounded square: the room's things by the walls keep their room)
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) { const i = z * W + x, d = Math.pow(Math.pow(Math.abs(x + 0.5 - cx) / rx, 4) + Math.pow(Math.abs(z + 0.5 - cz) / rz, 4), 0.25); if (d < 1 || (z < 6 && gateGap(W, o.gates, x + 0.5, 6)) || (z > D - 6 && Math.abs(x + 0.5 - cx) < 6)) { rk.m[i] = 0; continue; } rk.h[i] = 16 + Math.sin(x * 0.7 + z) * 0.6; }
     T.build(w, rk, { mk: 'rock', uv: 5, cliff: 1.2 });
+    T.skyCap(w, rk); // (open to the sky: nobody gets up onto the rock round the chamber)
     w.groundTop = null; w.groundGrid = null;
     for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2, r = Math.min(rx, rz) * 0.6; if (!clear(o, cx + Math.cos(a) * r, cz + Math.sin(a) * r, 0.6)) continue; w.batch.geo('iron', PG().cyl8, new THREE.Matrix4().compose(V(cx + Math.cos(a) * r, 18, cz + Math.sin(a) * r), new THREE.Quaternion(), V(0.12, 24, 0.12))); }
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; w.addLight(cx + Math.cos(a) * (rx - 1), 3.4, cz + Math.sin(a) * (rz - 1), { flame: 1, intensity: 6, range: 10 }); }

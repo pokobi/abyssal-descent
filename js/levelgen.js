@@ -427,6 +427,7 @@
       const y0 = Math.min(fy(s.z0), fy(s.z1)) - 2, h = 13 + rng.range(-2, 3);
       w.solid('rock', 0, y0, s.z0, cx - s.hwL, h, s.z1, { uv: 6, grad: false });
       w.solid('rock', cx + s.hwR, y0, s.z0, W, h, s.z1, { uv: 6, grad: false });
+      w.skyCap(0, h, s.z0, cx - s.hwL, s.z1); w.skyCap(cx + s.hwR, h, s.z0, W, s.z1); // (the canyon's rims: no way up onto them)
       const zm = (s.z0 + s.z1) / 2, f = fy(zm);
       if (s.z0 >= zS || s.z1 <= zL) {
         if (rng.chance(0.55)) P().rubble(w, cx - s.hwL + 0.8, f, zm + rng.range(-2, 2), rng, rng.range(0.8, 1.5), 'rock');

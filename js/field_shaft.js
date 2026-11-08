@@ -56,6 +56,7 @@
     }
     T.build(w, road, { mk: 'floor', uv: 4, cliff: 1.2, tintSeed: seed & 511 });
     T.build(w, rock, { mk: 'rock', uv: 6, cliff: 1.2, skirtMk: 'rock', tint: [0.9, 0.88, 0.85] });
+    T.skyCap(w, rock); // (the rim: the hook holds on the shaft's wall, but nobody gets up onto the rock round it)
     w.groundElse = () => 0;
     // the road over the arch: a stone span on the arch's two walls
     const spans = {};
@@ -85,7 +86,7 @@
     for (const s of [-1, 1]) w.solid('trim', cx + s * 6.4 - 0.6, 0, archZ1 - 1.6, cx + s * 6.4 + 0.6, 9.8, archZ1 - 0.4, { uv: 2 });
     w.solid('trim', archX0 - 1, 9.8, archZ1 - 1.6, archX1 + 1, 11, archZ1 - 0.4, { uv: 2 });
     // the rock over the passage where no road crosses it (between the gallery and the span)
-    { const zs = bridge.length ? Math.min(...bridge.map((b) => b[1])) : archZ0; if (zs > archZ0) w.solid('rock', archX0, 9.6, archZ0, archX1, ROCK, zs, { uv: 6, grad: false }); }
+    { const zs = bridge.length ? Math.min(...bridge.map((b) => b[1])) : archZ0; if (zs > archZ0) { w.solid('rock', archX0, 9.6, archZ0, archX1, ROCK, zs, { uv: 6, grad: false }); w.skyCap(archX0, ROCK, archZ0, archX1, zs); } }
     w.navLayers = 2;
     // ---- the bounds of the gallery (rock round it, a roof of rock) and the gates in its north wall
     H.perimeter(w, rng, W, D, { gates, h: 12, walls: false, beams: 0, stub: 3.5, southY: TOP });
@@ -148,7 +149,7 @@
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) if (!road.m[z * W + x]) occ.mark(x, z, x + 1, z + 1, 2);
     // ledges for chests: a few wide niches on the turns
     for (let i = 0; i < 3; i++) { const p = at(rng.range(0.6, PHI - 0.8), 0.5); w.platTops.push({ x0: p.x - 1.5, z0: p.z - 1.5, x1: p.x + 1.5, z1: p.z + 1.5, y: road.h[Math.floor(p.z) * W + Math.floor(p.x)], cx: p.x, cz: p.z }); }
-    // (the rock round the shaft stands higher than the top of the way; no one gets up there, so it gets no fire bed: fireTops)
+    // (the rock round the shaft stands higher than the top of the way, an invisible wall over it: no one gets up there, so it gets no fire bed: fireTops)
     for (const c of w.colliders) if (c.y1 > TOP + 3) c.noFire = true;
     const ww = FB.finish(w, rng, occ, W, D, area, kind, extraChests);
     ww.spawn = { x: W / 2, y: TOP, z: D - 4.5, yaw: 0 };

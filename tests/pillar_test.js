@@ -20,6 +20,8 @@ const PORT = +process.env.COOP_PORT || 9981;
     await p.until("G.world && G.world.biome === 'pillars' && !!G.world.pillars", 40000).catch(async (e) => { console.log(await p.eval("JSON.stringify({ f: G.world && G.world.field, b: G.world && G.world.biome, st: G.game.state, stage: G.game.stage, area: G.game.area })"), p.errs.slice(0, 3)); throw e; });
     await sleep(1500);
     await p.eval("G.enemies.clear(); G.game.objective = null; G.game.waves = null; G.ui.clearScreen(); G.game.state = 'playing'; G.game.dev = { god: false, speed: 1 }; 1");
+    // (no weather while it is measured: a stormy sky's bolt landing on you would take its own share of your HP)
+    await p.eval('G.world.sky = null; G.Weather && G.Weather.reset && G.Weather.reset(); 1');
     const s0 = await p.eval(`JSON.stringify((() => {
       const w = G.world, P = G.player;
       const p = w.pillars.slice().sort((a, b) => Math.abs((a.x0 + a.x1) / 2 - w.W / 2) - Math.abs((b.x0 + b.x1) / 2 - w.W / 2))[0];

@@ -7,6 +7,7 @@
 // Lightning (the stormy moods, `bolt`): while you fight, a bolt now and then comes down near you or near a foe, a ring on the ground
 // a moment first. It hurts whoever is inside and leaves volt: on someone wet from the rain that is 漏電.
 // Each screen runs its own weather around its own player (in co-op the foes are the host's: a guest's bolts never hit them).
+// Under a roof the sky does not reach: no element is laid on whoever stands under one (you or a foe), and no bolt comes down there.
 (function () {
   const W = (G.Weather = {});
   const U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
@@ -19,6 +20,20 @@
   W.pending = () => bolts.length;
 
   W.mood = () => { const w = G.world; return (w && w.sky) || null; };
+  // a roof over (x, z) above a body standing at y, h tall: anything solid overhead (a roof, a bridge's deck, an overhang, the ceiling
+  // of a low passage, the road of the turn above). The area's own vault (one collider over nearly all of it: the sky of a hall under
+  // the ground) is not a roof, nor is anything gone (a broken tile, a sunk pillar).
+  W.roofed = function (x, y, z, h) {
+    const w = G.world; if (!w || !w.query) return false;
+    const top = y + (h || 1.7);
+    for (const c of w.query(x - 0.05, top, z - 0.05, x + 0.05, top + 40, z + 0.05)) {
+      if (c.alive === false || c.enemyOnly || c.y0 < top - 0.05) continue;
+      if (c.x1 - c.x0 >= w.W * 0.8 && c.z1 - c.z0 >= w.D * 0.8) continue;
+      if (x < c.x0 || x > c.x1 || z < c.z0 || z > c.z1) continue;
+      return true;
+    }
+    return false;
+  };
   W.reset = function () { for (const b of bolts) if (b.tele) G.fx.endTelegraph(b.tele); bolts = []; boltT = 6 + Math.random() * 6; tickT = 0; };
 
   W.update = function (dt) {
@@ -30,8 +45,8 @@
       tickT -= dt;
       if (tickT <= 0) {
         tickT = 0.5;
-        if (EL.envPlayer(v.el, W.BARE) && !seen.k[v.id + v.el]) { seen.k[v.id + v.el] = true; G.ui.toastSmall(`${EL.BY[v.el].icon} ${v.name}：${TIP[v.el]}`); }
-        for (const e of G.enemies.list) if (e.alive && !e._rep && !e.custom && !e.boss && !e.burrowed) EL.envEnemy(e, v.el, W.BARE);
+        if (!P.dead && !W.roofed(P.pos.x, P.pos.y, P.pos.z, 1.7) && EL.envPlayer(v.el, W.BARE) && !seen.k[v.id + v.el]) { seen.k[v.id + v.el] = true; G.ui.toastSmall(`${EL.BY[v.el].icon} ${v.name}：${TIP[v.el]}`); }
+        for (const e of G.enemies.list) if (e.alive && !e._rep && !e.custom && !e.boss && !e.burrowed && !W.roofed(e.pos.x, e.pos.y, e.pos.z, e.height || 1.7)) EL.envEnemy(e, v.el, W.BARE);
       }
     }
     // ---- lightning ----
@@ -52,6 +67,7 @@
       const y = w.floorBelow(x, p.y + 1.5, z);
       if (y < w.killY || Math.abs(y - p.y) > 3) continue;
       if (!w.boxFree(x - 0.3, y + 0.1, z - 0.3, x + 0.3, y + 1.8, z + 0.3)) continue;
+      if (W.roofed(x, y, z, 1.8)) continue; // (not under a roof)
       return V(x, y, z);
     }
     return null;
@@ -89,9 +105,9 @@
     if (G.Sky && G.Sky.flashNow) G.Sky.flashNow();
     if (G.sfx.thunder) G.sfx.thunder(0);
     P.addShake && P.addShake(Math.max(0, 0.35 - P.pos.distanceTo(p) * 0.02));
-    if (!P.dead && Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < r && Math.abs(P.pos.y - p.y) < 2.5) C.damagePlayer(P.stats.maxHp * 0.08, { src: 'aoe', pos: p.clone(), el: 'volt' });
+    if (!P.dead && Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < r && Math.abs(P.pos.y - p.y) < 2.5 && !W.roofed(P.pos.x, P.pos.y, P.pos.z, 1.7)) C.damagePlayer(P.stats.maxHp * 0.08, { src: 'aoe', pos: p.clone(), el: 'volt' });
     for (const e of G.enemies.list) {
-      if (!e.alive || e._rep || e.custom || e.boss) continue;
+      if (!e.alive || e._rep || e.custom || e.boss || W.roofed(e.pos.x, e.pos.y, e.pos.z, e.height || 1.7)) continue;
       if (Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < r + (e.radius || 0.5) * 0.5 && Math.abs(e.pos.y - p.y) < 3) C.damageEnemy(e, e.maxHp * 0.08, { src: 'env', el: 'volt' });
     }
   }

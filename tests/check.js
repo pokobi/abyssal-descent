@@ -32,7 +32,7 @@ const T = {
   mobile: ['tests/mobile_test.js'], trial: ['tests/trial_test.js'], boss_hp: ['tests/boss_hp_test.js'],
   skill: ['tests/coop/skill_test.js'], coop: ['tests/coop/coop_test.js'], world: ['tests/coop/world_test.js'], sky: ['tests/coop/sky_test.js'],
   run: ['tests/coop/run_test.js', 'normal', '5'], field: ['tests/field_test.js'], foe: ['tests/foe_test.js'], coop_duel: ['tests/coop/duel_test.js'], bossobj: ['tests/coop/bossobj_test.js'],
-  hazard: ['tests/hazard_test.js'], device: ['tests/device_test.js'], chest: ['tests/chest_test.js'], water: ['tests/water_test.js'], coop_device: ['tests/coop/device_test.js'], coop_ground: ['tests/coop/ground_test.js'], loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'], pillar: ['tests/pillar_test.js'], works: ['tests/works_test.js'],
+  hazard: ['tests/hazard_test.js'], device: ['tests/device_test.js'], chest: ['tests/chest_test.js'], water: ['tests/water_test.js'], coop_device: ['tests/coop/device_test.js'], coop_ground: ['tests/coop/ground_test.js'], rest: ['tests/rest_test.js'], loot: ['tests/coop/loot_test.js'], give: ['tests/give_test.js'], gimmick: ['tests/gimmick_test.js'], shop: ['tests/shop_test.js'], fx: ['tests/coop/fx_test.js'], room: ['tests/coop/room_test.js'], playtest: ['tests/coop/playtest_test.js'], pillar: ['tests/pillar_test.js'], works: ['tests/works_test.js'],
 };
 // game file (regex on the path) -> tests. The guardians are handled apart: only the ones defined in the changed files are fought.
 const MAP = [
@@ -63,7 +63,8 @@ const MAP = [
   [/^js\/water\.js$/, ['solo_smoke']],
   [/^js\/(field_pillars|terrain|player|world)\.js$|^tests\/pillar_test\.js$/, ['pillar']],
   [/^js\/(field_foundry|field_flooded|fields|player|world)\.js$|^tests\/works_test\.js$/, ['works']], // (the foundry's machines carry you; chest-deep water slows you) // (the sea of pillars: a pillar sinks with you on it and comes back up)
-  [/^js\/(fieldfoes|enemies|data_enemies)\.js$/, ['foe']], // (the new fields' own foes: drawn in their field, bodies, attacks)
+  [/^js\/(fieldfoes|enemies|data_enemies)\.js$/, ['foe']],
+  [/^js\/(enemies|weather|world)\.js$|^tests\/rest_test\.js$/, ['rest']], // (the last foes pointed at and brought in; no weather under a roof) // (the new fields' own foes: drawn in their field, bodies, attacks)
   [/^js\/bosses7\.js$/, ['boss_hp']],
   [/^js\/bosses\d?\.js$/, ['gimmick']], // (a guardian's gimmicks cleared: a share of its health)
   [/^js\/(fx|statusui|pstatus|hudextra|ui|codex|devmode|perfmon|audio|textures|icons|icondata|avatar|warmup|util|smoothscroll)\.js$/, ['solo_smoke']],

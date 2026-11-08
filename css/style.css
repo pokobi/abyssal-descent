@@ -985,6 +985,9 @@ body.tut-on #banner { top: 52%; }
 .tgt-edge span { font-size: 30px; filter: drop-shadow(0 0 8px #ffb020); }
 .tgt-edge b { font-size: 12px; color: #ffe08a; text-shadow: 0 0 3px #000; }
 .tgt-edge.champ i { border-bottom-color: #ff4020; filter: drop-shadow(0 0 6px #ff2010); }
+.tgt-edge.rest i { border-bottom-color: #e8dcc8; filter: drop-shadow(0 0 5px #000); }
+.tgt-edge.rest span { font-size: 22px; opacity: 0.9; filter: drop-shadow(0 0 6px #a02020); }
+.tgt-edge.rest b { color: #f0e6d6; }
 .tgt-edge.champ span { filter: drop-shadow(0 0 8px #ff3010); }
 
 /* Tab: small descriptions under items and attachments */

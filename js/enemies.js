@@ -1566,8 +1566,49 @@
       e.update(dt);
       if (e.removed) drop(i);
     }
+    restPull(dt);
     E.updateBars();
   };
+
+  // ---------------- the last foes: pointed at, and brought in (an area must never hang on one foe nobody can find) ----------------
+  // In a fight (a combat area not cleared yet), once two or fewer foes are left, or nobody has hit a foe or been hurt for 20 s, every
+  // foe left is pointed at: from the screen's edge when it is off the screen, where it stands (through walls) when it is in front but
+  // out of sight. One that stays far off (over 22 m) and gets no nearer for 12 s (it cannot find its way, or wanders) is brought in:
+  // set down 10-20 m from you, on your level, in a puff of smoke (as the stuck-foe failsafe does). Guardians, the gold mimic and what
+  // does not count for the area are left out.
+  E.REST = { n: 2, quiet: 20, far: 22, pull: 12 };
+  let restAt = -1, restS = null;
+  E.restSet = function () {
+    const GM = G.game, O = GM.objective;
+    if (GM.time === restAt) return restS;
+    restAt = GM.time; restS = null;
+    if (!O || O.tutorial || GM.areaCleared || GM.state !== 'playing' || !['combat', 'elite', 'cursed', 'vault'].includes(GM.stage)) return null;
+    const left = E.list.filter((e) => e.alive && e.isEnemy && !e.ally && !e.custom && !e.boss && !e.ignoreCount && e.def.id !== 'mimic_gold');
+    if (!left.length) return null;
+    let fight = Math.max(P.lastHurtT || -99, GM.areaStartT || 0);
+    for (const e of left) if (e.lastHitT > fight) fight = e.lastHitT;
+    if (left.length > E.REST.n && GM.time - fight < E.REST.quiet) return null;
+    return (restS = new Set(left));
+  };
+  function restPull(dt) {
+    const set = E.restSet(), w = G.world;
+    if (!set || !w || P.dead) return;
+    for (const e of set) {
+      if (e._rep || e.burrowed || !e.alive || e.state === 'spawn') continue;
+      const d = Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z);
+      if (d < E.REST.far) { e._restT = 0; e._restD = d; continue; }
+      if (!(e._restT > 0) || d < e._restD - 2) { e._restT = 1e-6; e._restD = d; continue; } // (coming nearer: let it come)
+      e._restT += dt;
+      if (e._restT < E.REST.pull) continue;
+      e._restT = 0;
+      const c = w.randomOpenCell({ next: Math.random }, (x, z, idx) => (!w.reachMask || w.reachMask[idx]) && Math.abs(w.nf[idx] - P.pos.y) < 2.5 && Math.hypot(x - P.pos.x, z - P.pos.z) > 10 && Math.hypot(x - P.pos.x, z - P.pos.z) < 20);
+      if (!c) continue;
+      G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1);
+      e.pos.set(c.x, c.y + (e.flyer ? e.alt : 0), c.z); e.vel.set(0, 0, 0); e.climb = 0; e._stN = 0;
+      G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1);
+      E.pulled = (E.pulled || 0) + 1; // (counted for the tests)
+    }
+  }
 
   // ---------------- health bars (DOM, pooled) ----------------
   function getBar() {
@@ -1591,10 +1632,13 @@
     const cam = G.camera;
     let aimBar = null, aimD2 = 70 * 70;
     const sharp = P.has('o_sharp');
+    const rest = E.restSet();
     for (const e of E.list) {
       if (e.noBar || e.boss && !e.showBar) { continue; }
       const show = e.alive && !e.burrowed && !(e.cloakOn) && e.state !== 'spawn' && !e.untargetable && (e.marked || (e.hasLOS || G.game.time - e.lastHitT < 3 || e.showBar) && e.pos.distanceTo(P.pos) < (sharp ? 90 : 55));
       if (e.marked) E.edgeMark(e, show);
+      else if (rest && rest.has(e)) E.edgeMark(e, show, 'rest');
+      else if (E.marks.has(e)) E.marks.get(e).style.display = 'none';
       if (!show) { if (e.bar) { e.bar.el.style.display = 'none'; e.bar.used = false; e.bar = null; } continue; }
       const hp = _hpv.set(e.pos.x, e.pos.y + e.height + 0.35, e.pos.z);
       if (e.barPos) hp.copy(e.barPos());
@@ -1643,17 +1687,28 @@
   };
   // off-screen pointer at the screen edge toward a living hunt target
   E.marks = new Map();
-  E.edgeMark = function (e, onScreenOk) {
+  // (kind 'rest': one of the last foes (E.restSet): a paler mark; in front of you but out of sight, it is shown where the foe stands)
+  E.edgeMark = function (e, onScreenOk, kind) {
+    const k = kind || 'tgt';
     let m = E.marks.get(e);
-    if (!m) { m = document.createElement('div'); m.className = 'tgt-edge' + (e.champion ? ' champ' : ''); m.innerHTML = `<i></i><span>${e.champion ? '👑' : '🎯'}</span><b></b>`; E.barRoot.appendChild(m); E.marks.set(e, m); }
+    if (m && m._k !== k) { m.remove(); E.marks.delete(e); m = null; }
+    if (!m) { m = document.createElement('div'); m._k = k; m.className = 'tgt-edge' + (k === 'rest' ? ' rest' : e.champion ? ' champ' : ''); m.innerHTML = `<i></i><span>${k === 'rest' ? '💀' : e.champion ? '👑' : '🎯'}</span><b></b>`; E.barRoot.appendChild(m); E.marks.set(e, m); }
     const p = V(e.pos.x, e.pos.y + e.height * 0.6, e.pos.z);
-    const inView = onScreenOk && G.fx.project(p, scr);
-    if (inView) { m.style.display = 'none'; return; }
+    const proj = G.fx.project(p, scr);
+    if (proj && onScreenOk) { m.style.display = 'none'; return; }
+    const to = e.pos.clone().sub(P.pos);
+    if (proj && k === 'rest') {
+      m.style.display = ''; m.style.left = scr.x + 'px'; m.style.top = scr.y + 'px';
+      m.querySelector('i').style.display = 'none';
+      m.querySelector('b').textContent = Math.round(to.length()) + 'm';
+      return;
+    }
+    m.querySelector('i').style.display = '';
     // direction relative to the view
-    const to = e.pos.clone().sub(P.pos); const ang = Math.atan2(to.x, -to.z) + P.yaw;
+    const ang = Math.atan2(to.x, -to.z) + P.yaw;
     const W = innerWidth, H = innerHeight, cx = W / 2, cy = H / 2, sx = Math.sin(ang), sy = -Math.cos(ang);
-    const k = Math.min((cx - 50) / Math.max(0.001, Math.abs(sx)), (cy - 60) / Math.max(0.001, Math.abs(sy)));
-    m.style.display = ''; m.style.left = (cx + sx * k) + 'px'; m.style.top = (cy + sy * k) + 'px';
+    const kk = Math.min((cx - 50) / Math.max(0.001, Math.abs(sx)), (cy - 60) / Math.max(0.001, Math.abs(sy)));
+    m.style.display = ''; m.style.left = (cx + sx * kk) + 'px'; m.style.top = (cy + sy * kk) + 'px';
     m.querySelector('i').style.transform = `rotate(${ang}rad)`;
     m.querySelector('b').textContent = Math.round(to.length()) + 'm';
   };

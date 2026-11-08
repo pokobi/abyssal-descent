@@ -172,7 +172,7 @@ const PORT = +process.env.COOP_PORT || 9993;
       const r = await p.eval(`(async () => {
         const H = window.__H, P = G.player, EL = G.Elem; H.enter('${field}', '${mood}'); await H.sl(300);
         const w = G.world; G.game.dev.god = true; P.au = null;
-        const es = []; for (let i = 0; i < 3; i++) { const c = w.randomOpenCell(G.game.arng, (x, z, k) => (!w.reachMask || w.reachMask[k]) && H.dry(x, z, k)); const e = G.enemies.spawn(H.walkers()[i], 9, new THREE.Vector3(c.x, c.y, c.z), { noLoot: true }); e.state = 'idle'; e.speed = 0; e.atkCd = 99; es.push(e); }
+        const es = []; for (let i = 0; i < 3; i++) { const c = w.randomOpenCell(G.game.arng, (x, z, k) => (!w.reachMask || w.reachMask[k]) && H.dry(x, z, k) && !G.Weather.roofed(x, w.nf[k], z, 2.4)); /* (in the open: under a roof the sky does not reach) */ const e = G.enemies.spawn(H.walkers()[i], 9, new THREE.Vector3(c.x, c.y, c.z), { noLoot: true }); e.state = 'idle'; e.speed = 0; e.atkCd = 99; es.push(e); }
         const other = '${el}' === 'fire' ? 'ice' : 'fire'; EL.setAura(es[2], other, 30); // (an element of the player's on a foe: the weather leaves it alone)
         await H.sl(3600);
         const res = { mood: w.sky && w.sky.id, el: w.sky && w.sky.el, me: EL.playerAura(), foes: es.map((e) => EL.auraOf(e)) };

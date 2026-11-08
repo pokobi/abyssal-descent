@@ -930,7 +930,7 @@
         out.x = dx / l; out.z = dz / l;
         return out;
       }
-      if (distH < def.range * 0.7 && this.hasLOS && !this.barredFrom(tgt)) return out;
+      if (distH < def.range * 0.7 && (this._deep ? toT.y < 0.3 : Math.abs(toT.y) < 1.2) && this.hasLOS && !this.barredFrom(tgt)) return out; // (close, but well above or below it: it keeps going the way up / down, the nav's; in deep water with you above it, it climbs out first)
       return flow(out);
     }
     tryAttack(tgt, toT, distH) {
@@ -941,6 +941,7 @@
       const k = def.attack;
       const begin = (wind, data) => { this.attackState = Object.assign({ kind: k, t: 0, wind }, data || {}); this.wind = 0; };
       if (!this.hasLOS && !['burrow', 'support'].includes(k)) return;
+      if (this._deep && dy > 0.3 && ['lunge', 'pounce', 'slash', 'slam', 'bounce', 'dashslash', 'charge', 'boulder'].includes(k)) return; // (in deep water with you above it: no blow from the water, it climbs out first)
       if (['lunge', 'pounce', 'slash', 'slam', 'bounce', 'dashslash', 'charge'].includes(k) && this.barredFrom(tgt)) return; // no melee through prison bars
       switch (k) {
         case 'lunge': if (distH < 6.5 && Math.abs(dy) < 2.5) begin(0.35); break;
@@ -1244,8 +1245,14 @@
       if (edge && (this.pos.x !== sx || this.pos.z !== sz) && !w.edgeSafe((this._eq || (this._eq = V())).set(sx, this.pos.y, sz), this.pos.x, this.pos.z, air)) { this.pos.x = sx; this.pos.z = sz; }
       if (this.hitWallFlag && G.Strata.doors.length && !this.boss) G.Strata.bash(this, dt);
       // deep water (the drowned town): a walker pressed against a ledge (a wall's top, a step out of it) rises slowly up the water, to the
-      // surface at most, and so climbs out onto it (the nav lets it head there: world.js canStep)
-      if (this.hitWallFlag && (dx || dz) && w.deepWater && !this.boss && w.deepWater.some((q) => this.pos.x > q.x0 && this.pos.x < q.x1 && this.pos.z > q.z0 && this.pos.z < q.z1 && this.pos.y < q.y - 0.05)) this.vel.y = Math.max(this.vel.y, E.SWIM_RISE + 22 * dt);
+      // surface at most, and so climbs out onto it (the nav lets it head there: world.js canStep). Once it rises it keeps rising a moment
+      // even when it stops pressing (a shove, a turn); this._deep: under the surface, for its choices (decideMove, tryAttack)
+      const deepQ = w.deepWater && !this.boss ? w.deepWater.find((q) => this.pos.x > q.x0 && this.pos.x < q.x1 && this.pos.z > q.z0 && this.pos.z < q.z1 && this.pos.y < q.y - 0.05) : null;
+      this._deep = !!deepQ;
+      if (deepQ) {
+        if (this.hitWallFlag && (dx || dz)) this.swimUpT = E.SWIM_KEEP;
+        if (this.swimUpT > 0) { this.swimUpT -= dt; this.vel.y = Math.max(this.vel.y, E.SWIM_RISE + 22 * dt); }
+      } else this.swimUpT = 0;
       // vertical / ground
       this.vel.y -= 22 * dt;
       const ny = this.pos.y + this.vel.y * dt;
@@ -1601,7 +1608,7 @@
   // does not count for the area are left out.
   // the swoop of the bats and crows: speed (m/s) and longest dive (s); how fast it bends after you (per s); how long it goes round to a
   // better place after a dive that could not reach you; how soon it tries again when it broke one off
-  E.SWIM_RISE = 1.4; // m/s: a foe rising up the deep water to climb out onto a ledge
+  E.SWIM_RISE = 1.4; E.SWIM_KEEP = 0.5; // m/s: a foe rising up the deep water to climb out onto a ledge; s it keeps rising after it stops pressing
   E.SWOOP = { speed: 17, dur: 0.9, turn: 0.8, lead: 0.5, repo: 1.2, retry: 0.7 }; // (lead: how much of your speed it allows for: half, a dodge still works)
   E.REST = { n: 2, quiet: 20, far: 22, pull: 12 };
   let restAt = -1, restS = null;

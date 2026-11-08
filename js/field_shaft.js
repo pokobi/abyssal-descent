@@ -138,5 +138,14 @@
     return ww;
   }
   F.gen.shaft = genShaft;
-  F.SHELL.shaft = Object.assign({}, F.SHELL.hall, { text: { sub: '— 縦坑の底へ —', icon: '🌀', obj: '縦坑の底の回廊を進め — 石の扉をくぐると戦いが始まる' } });
+  // the guardian's approach: the stone corridor at the shaft's foot, its walls the bare rock, the old lift's chains hanging down it
+  F.SHELL.shaft = Object.assign({}, F.SHELL.hall, {
+    road(w, rng, W, AD, D) {
+      const nook = FB.roadHall(w, rng, W, AD, D, false), cx = W / 2;
+      for (let z = AD + 8; z < D - 4; z += 9) for (const s of [-1, 1]) { if (s < 0 && Math.abs(z - nook.nz) < 8) continue; T.boulder(w, cx + s * 6.2, rng.range(0, 6), z + rng.range(-2, 2), rng.range(1, 1.8), rng.range(1.2, 2.2), rng.range(1, 1.8), rng, { collide: false }); }
+      for (let z = AD + 10; z < D - 6; z += 13) w.batch.geo('iron', PG().cyl8, Mx(cx + rng.range(-3, 3), 7, z, 0.12, 12, 0.12));
+      return nook;
+    },
+    text: { sub: '— 縦坑の底へ —', icon: '🌀', obj: '縦坑の底の回廊を進め — 石の扉をくぐると戦いが始まる' },
+  });
 })();

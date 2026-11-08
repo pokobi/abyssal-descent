@@ -194,5 +194,16 @@
     return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
   }
   F.gen.mine = genMine;
-  F.SHELL.mine = Object.assign({}, F.SHELL.hall, { text: { sub: '— 坑道の奥へ —', icon: '⛏️', obj: '坑道の奥へ進め — 石の扉をくぐると戦いが始まる' } });
+  // the guardian's approach: the main gallery, timbered, rails down it, a cart or two, lanterns
+  F.SHELL.mine = Object.assign({}, F.SHELL.hall, {
+    road(w, rng, W, AD, D) {
+      const nook = FB.roadHall(w, rng, W, AD, D, false), cx = W / 2;
+      for (let z = AD + 6; z < D - 3; z += 5) props(w, cx, 0, z, 0, 1, 12.6);
+      for (let z = AD + 4; z < D - 2; z += 2) for (const s of [-0.55, 0.55]) w.visual('iron', cx + 2 + s - 0.04, 0, z, cx + 2 + s + 0.04, 0.08, z + 2, { uv: 1 });
+      for (let k = 0; k < 2; k++) cart(w, rng, cx + 2, 0, rng.range(AD + 12, D - 10), 0, rng.chance(0.6));
+      for (let z = AD + 9; z < D - 6; z += 14) F.lantern(w, cx + 5.6, z, '#ffb060');
+      return nook;
+    },
+    text: { sub: '— 坑道の奥へ —', icon: '⛏️', obj: '坑道の奥へ進め — 石の扉をくぐると戦いが始まる' },
+  });
 })();

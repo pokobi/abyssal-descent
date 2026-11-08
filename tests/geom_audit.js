@@ -143,6 +143,23 @@ function audit(o) {
   }
   // ================= shopview: every ware of the merchant's hall seen from where you stand to buy it (3-6 m out in front of its stall,
   // straight on and 35 degrees to either side, at eye height): nothing of the hall in between
+  // ================= mini: the mini shop after a fight (three stands and the basin, areas.js AR.miniPlace): nothing drawn in the room
+  // each takes (up to above the head) nor in front of it where you stand
+  if (o.only === 'mini') {
+    const d0 = (w.miniSlots || []).map((q) => [q.x, q.z]);
+    G.Areas.miniPlace(w);
+    const pieces = (w.miniSlots || []).map((q, k) => ({ k: 'stand' + (k + 1), x: q.x, z: q.z, f: q.y - 1.15 })).concat(w.miniHeal ? [{ k: 'basin', x: w.miniHeal.x, z: w.miniHeal.z, f: w.miniHeal.y }] : []);
+    const out = [];
+    for (const q of pieces) {
+      let hits = 0; const y0 = q.f + 0.2, y1 = q.f + 2.4;
+      for (let a = -0.5; a <= 0.51; a += 0.25) for (let b = -0.5; b <= 0.51; b += 0.25) if (ray(q.x + a, y1, q.z + b, 0, -1, 0, y1 - y0) < y1 - y0) hits++;
+      for (const hy of [0.4, 1.0, 1.8]) for (const b of [-0.5, 0, 0.5]) { if (ray(q.x - 0.6, q.f + hy, q.z + b, 1, 0, 0, 1.2) < 1.2) hits++; if (ray(q.x + b, q.f + hy, q.z - 0.6, 0, 0, 1, 1.2) < 1.2) hits++; }
+      for (const hy of [0.5, 1.4]) if (ray(q.x, q.f + hy, q.z + 0.6, 0, 0, 1, 1.8) < 1.8) hits++; // (in front, where you stand)
+      out.push({ k: q.k, x: +q.x.toFixed(1), z: +q.z.toFixed(1), f: +q.f.toFixed(2), hits });
+    }
+    const moved = d0.some(([x, z], k) => !w.miniSlots[k] || Math.abs(w.miniSlots[k].x - x) > 0.01 || Math.abs(w.miniSlots[k].z - z) > 0.01);
+    return { W: w.W, D: w.D, tris: NT, mini: out, moved };
+  }
   if (o.only === 'shopview') {
     const out = [];
     for (const sl of w.shopSlots || []) {
@@ -271,10 +288,10 @@ function audit(o) {
 // ---------------------------------------------------------------- the run
 const FIELDS = ['hamlet', 'dusk', 'battlefield', 'catacombs', 'castle', 'shaft', 'flooded', 'foundry', 'mine', 'frozen', 'pillars', 'sanctum'];
 // (the 5th argument 'signs': only the signs over the gates, in every field, the first four too)
-const SIGNS = process.argv[5] === 'signs', SHOPV = process.argv[5] === 'shopview';
+const SIGNS = process.argv[5] === 'signs', SHOPV = process.argv[5] === 'shopview', MINIV = process.argv[5] === 'mini';
 const FIELDS_ALL = ['grave', 'gate', 'halls', 'ruin', ...FIELDS];
 (async () => {
-  const want = (process.argv[2] && process.argv[2] !== 'all') ? process.argv[2].split(',') : SIGNS || SHOPV ? FIELDS_ALL : FIELDS;
+  const want = (process.argv[2] && process.argv[2] !== 'all') ? process.argv[2].split(',') : SIGNS || SHOPV || MINIV ? FIELDS_ALL : FIELDS;
   const kinds = (process.argv[3] || 'combat,shop,event,shrine,forge,alchemy,boss').split(',');
   const seeds = +(process.argv[4] || 2);
   const skipMats = (process.env.AUDIT_SKIP || 'water,lava,glow,web,fire,flame,vine').split(',');
@@ -308,6 +325,13 @@ const FIELDS_ALL = ['grave', 'gate', 'halls', 'ruin', ...FIELDS];
         await enter(field, j.n, j.kind, j.lay, j.seed);
         if (process.env.AUDIT_DBG) { console.log('DBG', await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats, dbg: process.env.AUDIT_DBG.split(',').map(Number) })}))`)); continue; }
         const tag = `${field} ${j.kind}${j.lay ? '/' + j.lay : ''} seed ${j.seed}`;
+        if (MINIV) {
+          const r = JSON.parse(await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats, only: 'mini' })}))`));
+          const bad = r.mini.filter((q) => q.hits > 0);
+          serious += bad.length; total += r.mini.length;
+          console.log(`${tag}: ${r.mini.length} pieces${r.moved ? ' (moved)' : ''}, ${bad.length} buried${bad.length ? '  <- ' + JSON.stringify(bad) : ''}`);
+          continue;
+        }
         if (SHOPV) {
           const r = JSON.parse(await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats, only: 'shopview' })}))`));
           const bad = r.slots.filter((q) => q.n >= 4 && q.blocked >= 2);
@@ -344,7 +368,8 @@ const FIELDS_ALL = ['grave', 'gate', 'halls', 'ruin', ...FIELDS];
     if (p.errs.length) console.log('page errors:', p.errs.slice(0, 3));
   } catch (e) { console.log('crashed', e && e.stack || e); total = -1; }
   finally { if (out) out.end(); ch.close(); srv.close(); }
-  if (SHOPV) console.log(serious === 0 ? `\nSHOP VIEW PASSED (${total} wares)` : `\nSHOP VIEW FAILED (${serious} wares hidden of ${total})`);
+  if (MINIV) console.log(serious === 0 ? `\nMINI SHOP AUDIT PASSED (${total} pieces)` : `\nMINI SHOP AUDIT FAILED (${serious} buried of ${total})`);
+  else if (SHOPV) console.log(serious === 0 ? `\nSHOP VIEW PASSED (${total} wares)` : `\nSHOP VIEW FAILED (${serious} wares hidden of ${total})`);
   else if (SIGNS) console.log(serious === 0 ? `\nSIGN AUDIT PASSED (${total} signs)` : `\nSIGN AUDIT FAILED (${serious} hidden of ${total})`);
   else console.log(serious === 0 ? `\nGEOM AUDIT PASSED (${total} small left)` : `\nGEOM AUDIT FAILED (${serious} serious, ${total} in all)`);
   process.exit(serious === 0 && total >= 0 ? 0 : 1);

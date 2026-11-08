@@ -161,13 +161,13 @@
     P.fieldSpeed = 1; P.fieldSlip = 1; P.fieldJump = 1; P.fieldSlide = 1;
     // standing on a block of ice (the frozen hall's glacier ridges and the like): as slick as an ice sheet underfoot
     if (w && P.grounded && !P.dead && P.surfaceBelow && P.surfaceBelow() === 'ice') { P.fieldSlip = 0.12; P.fieldSlide = 1.8; }
-    // deep water (w.deepWater, the drowned town): chest-deep you wade slowly and can hardly jump; the foes in it are slowed too,
-    // all but those of the water (and anything that flies)
+    // deep water (w.deepWater, the drowned town): chest-deep you wade at half speed and can hardly jump; the foes in it wade at half
+    // speed too, all but those of the water (and anything that flies); one pressed against a ledge rises up the water to climb out (enemies.js)
     if (w && w.deepWater) {
       const deep = (p) => w.deepWater.some((d) => p.x > d.x0 && p.x < d.x1 && p.z > d.z0 && p.z < d.z1 && p.y < d.y - 0.9);
       if (!P.dead && deep(P.pos)) { P.fieldSpeed = 0.5; P.fieldJump = 0.5; }
       deepT -= dt;
-      if (deepT <= 0) { deepT = 0.25; for (const e of G.enemies.list) if (e.alive && !e.boss && !e._rep && !e.def.flyer && e.def.el !== 'water' && deep(e.pos)) e.st.slow = Math.max(e.st.slow || 0, 0.35); }
+      if (deepT <= 0) { deepT = 0.25; for (const e of G.enemies.list) if (e.alive && !e.boss && !e._rep && !e.def.flyer && e.def.el !== 'water' && deep(e.pos)) e.st.wade = Math.max(e.st.wade || 0, 0.35); /* (half speed, as you: combat.js speedMul) */ }
     }
     if (!seen || seen.run !== G.game.run) seen = { run: G.game.run, k: {} };
     envTick(dt);

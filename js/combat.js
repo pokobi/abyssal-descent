@@ -408,7 +408,7 @@
   C.updateStatus = function (e, dt) {
     const s = e.st;
     if (G.Elem) G.Elem.tick(e, dt);
-    for (const k of ['stun', 'fear', 'root', 'slow', 'mark', 'frozen', 'shock', 'vuln']) if (s[k] > 0) s[k] -= dt;
+    for (const k of ['stun', 'fear', 'root', 'slow', 'wade', 'mark', 'frozen', 'shock', 'vuln']) if (s[k] > 0) s[k] -= dt;
     if (s.frost > 0) { s.frost -= dt; if (s.frost <= 0) s.frostStacks = 0; }
     if (s.nailT > 0) { s.nailT -= dt; if (s.nailT <= 0) s.nails = 0; }
     s.tick = (s.tick || 0) - dt;
@@ -432,6 +432,7 @@
     let m = 1;
     if (s.frost > 0) m *= 1 - Math.min(0.5, (s.frostStacks || 0) * 0.1 + 0.1);
     if (s.slow > 0) m *= 0.7;
+    if (s.wade > 0) m *= 0.5; // (chest-deep in the drowned town's water: as slow as you are there, fields.js)
     if (s.elSlow > 0) m *= 0.4; // a guardian caught in 凍結 (element.js)
     if (G.game.enemyTimeScale < 1) m *= 1;
     return m * (1 + P.stats.enemySpeed) * G.Depth.speedMul(e);

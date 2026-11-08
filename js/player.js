@@ -4,7 +4,7 @@
   // the grapple's cooldown: 15 s, shortened by the grapple-cooldown stat (never below 15% of that)
   G.GRAPPLE_CD = 15;
   G.TUNNEL_TOP = 4.5; // m: the feet below this in an exit's opening (6 m high) to be let into its tunnel past the map's bounds
-  G.SWIM_FLOAT = 1.25; G.SWIM_UP = 3.2; G.SWIM_SINK = 2.4; // deep water: the feet this far under the surface when floating; m/s up while jump is held; the fastest you sink
+  G.SWIM_FLOAT = 0.75; G.SWIM_UP = 3.2; G.SWIM_SINK = 2.4; G.SWIM_HOP = 6.2; // deep water: the feet this far under the surface at the top (chest out); m/s up while jump is held; the fastest you sink; the hop out at the top (m/s)
   G.grappleCdOf = (st) => (st.grappleBase || G.GRAPPLE_CD) * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0))); // (the class sets the base: 15-28 s, see classes.js)
   const U = G.U, I = G.input;
   const V = G.U.V;
@@ -302,7 +302,7 @@
 
       // ---- mantle ----
       if (this.mantle) { this.updateMantle(dt); this.postMove(dt, 0, true); return; }
-      if (!this.pileState && this.jumpBuf > -0.2 && I.down('jump') && fwdIn > 0 && this.grapple.state !== 'attached') { if (this.tryMantle(fx, fz)) { this.postMove(dt, 0, true); return; } }
+      if (!this.pileState && (this.jumpBuf > -0.2 || this.swimming) && I.down('jump') && fwdIn > 0 && this.grapple.state !== 'attached') { if (this.tryMantle(fx, fz)) { this.postMove(dt, 0, true); return; } } // (swimming: held jump climbs out onto a wall's top)
 
       // ---- pile driver states ----
       if (this.pileState === 'charge') {
@@ -473,18 +473,19 @@
       let best = null; for (const c of a) if (!best || c.y1 > best.y1) best = c;
       return best ? best.surf : 'stone';
     }
-    // deep water (the drowned town, w.deepWater): hold jump and you swim up to the surface and float there, head and shoulders out (from
-    // there you can climb out onto a wall's top); let go and you sink back, slowly
+    // deep water (the drowned town, w.deepWater): hold jump and you swim up to the surface, chest out of the water, and at the top you hop
+    // up out of it (held, you bob: up, a hop, back into the water, a hop... ). Moving at a wall's top while you hold jump, you climb onto
+    // it (tryMantle). Let go and you sink back, slowly.
     swim(dt) {
       const w = G.world; this.swimming = false;
       if (!w || !w.deepWater || this.pileState || this.grapple.state === 'attached' || this.liftVy != null || this.mantle) return;
       const d = w.deepWater.find((q) => this.pos.x > q.x0 && this.pos.x < q.x1 && this.pos.z > q.z0 && this.pos.z < q.z1);
-      if (!d || this.pos.y > d.y - 0.6) return;
+      if (!d || this.pos.y > d.y - 0.3) return;
       this.swimming = true;
       const top = d.y - G.SWIM_FLOAT;
       if (I.down('jump')) {
-        if (this.pos.y < top - 0.04) this.vel.y += (G.SWIM_UP - this.vel.y) * Math.min(1, 7 * dt);
-        else this.vel.y = (top - this.pos.y) * 6; // (floating: held at the surface)
+        if (this.pos.y < top - 0.05) this.vel.y = Math.max(this.vel.y, this.vel.y + (G.SWIM_UP - this.vel.y) * Math.min(1, 7 * dt));
+        else if (this.vel.y < G.SWIM_HOP * 0.5) { this.vel.y = G.SWIM_HOP; this.grounded = false; if (G.Water) G.Water.splash(this.pos, 0.7, { silent: true }); } // (at the top: a hop out of the water)
       } else if (this.vel.y < -G.SWIM_SINK) this.vel.y = -G.SWIM_SINK; // (the water holds you back as you sink)
     }
     fellInPit() {

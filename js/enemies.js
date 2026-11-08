@@ -1243,6 +1243,9 @@
       // (nor is it shoved out over the edge by a wall it slid along: a railing's end, a pillar by the brink)
       if (edge && (this.pos.x !== sx || this.pos.z !== sz) && !w.edgeSafe((this._eq || (this._eq = V())).set(sx, this.pos.y, sz), this.pos.x, this.pos.z, air)) { this.pos.x = sx; this.pos.z = sz; }
       if (this.hitWallFlag && G.Strata.doors.length && !this.boss) G.Strata.bash(this, dt);
+      // deep water (the drowned town): a walker pressed against a ledge (a wall's top, a step out of it) rises slowly up the water, to the
+      // surface at most, and so climbs out onto it (the nav lets it head there: world.js canStep)
+      if (this.hitWallFlag && (dx || dz) && w.deepWater && !this.boss && w.deepWater.some((q) => this.pos.x > q.x0 && this.pos.x < q.x1 && this.pos.z > q.z0 && this.pos.z < q.z1 && this.pos.y < q.y - 0.05)) this.vel.y = Math.max(this.vel.y, E.SWIM_RISE + 22 * dt);
       // vertical / ground
       this.vel.y -= 22 * dt;
       const ny = this.pos.y + this.vel.y * dt;
@@ -1598,6 +1601,7 @@
   // does not count for the area are left out.
   // the swoop of the bats and crows: speed (m/s) and longest dive (s); how fast it bends after you (per s); how long it goes round to a
   // better place after a dive that could not reach you; how soon it tries again when it broke one off
+  E.SWIM_RISE = 1.4; // m/s: a foe rising up the deep water to climb out onto a ledge
   E.SWOOP = { speed: 17, dur: 0.9, turn: 0.8, lead: 0.5, repo: 1.2, retry: 0.7 }; // (lead: how much of your speed it allows for: half, a dodge still works)
   E.REST = { n: 2, quiet: 20, far: 22, pull: 12 };
   let restAt = -1, restS = null;

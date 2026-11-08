@@ -570,10 +570,17 @@
       const i = this.navIdx(x, z, y); if (i < 0 || !this.nc) return null;
       out.lo = this.nf[i] + 0.4; out.hi = this.nc[i] - 0.3; return out;
     }
+    // the surface of the deep water over node a (its floor under it), or -Infinity
+    deepTop(a) {
+      const i = a % this.N, x = (i % this.Wn) - (this.xo || 0) + 0.5, z = Math.floor(i / this.Wn) - (this.zo || 0) + 0.5;
+      for (const q of this.deepWater) if (x > q.x0 && x < q.x1 && z > q.z0 && z < q.z1 && this.nf[a] < q.y - 0.6) return q.y;
+      return -Infinity;
+    }
     navFloor(x, z, y) { const i = this.navIdx(x, z, y); return i < 0 ? -Infinity : this.nf[i]; }
     canStep(a, b) { // a->b walkable (for monsters)
       if (this.nb[a] || this.nb[b]) return false;
       const d = this.nf[b] - this.nf[a];
+      if (d > 0.8 && this.deepWater && this.nf[b] <= this.deepTop(a) + 0.9) return true; // (out of deep water: rising up it, onto what stands no more than 0.9 m over its surface)
       return d <= 0.8 && d >= (this.L > 1 ? -2.6 : -6.5) && (this.L === 1 || this.land(a, b % this.N) === b); // storeys: no leaping off a slab edge (stairs and steps only)
     }
     // flood reachable set (forward edges) for validation

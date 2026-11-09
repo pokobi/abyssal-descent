@@ -52,8 +52,8 @@ const MAP = [
   [/^js\/(classes|vfx)\.js$|^js\/coop\/(fxsync|client|host)\.js$|^tests\/coop\/perk_test\.js$/, ['coop_perk']], // (秘伝 in co-op: each chooses their own, a late joiner is offered theirs, the pictures go across)
   [/^js\/(warmup|perfmon|inventory|areas|enemies|props|vfx|fx)\.js$|^js\/game\.js$|^tests\/warm_test\.js$/, ['warm']], // (after an area's fade nothing makes a shader on the spot; the perf monitor puts a slow frame where it belongs)
   [/^js\/data_(items|weapons)\.js$/, ['skill']],
-  [/^js\/(data_weapons|weapons|classes)\.js$|^tests\/scope_test\.js$/, ['scope']], // (the magnification while aiming is the scope's own; iron sights on the sniper rifles; the sniper class's 2x scope)
-  [/^js\/(melee|weapons)\.js$/, ['solo_smoke', 'skill']],
+  [/^js\/(data_weapons|weapons|classes|optics)\.js$|^tests\/scope_test\.js$/, ['scope']], // (the magnification while aiming is the scope's own; iron sights on the sniper rifles; the sniper class's 2x scope)
+  [/^js\/(melee|weapons|optics)\.js$/, ['solo_smoke', 'skill']],
   [/^js\/(combat|enemies|player|game|data_enemies|data_buffs|depth)\.js$/, ['solo_smoke', 'run']],
   [/^js\/(game|parts|pawn)\.js$/, ['give', 'shop']], // (weapons handed over: never pushing out the ones held)
   [/^js\/(world|levelgen|fieldgen|fieldgen_t\d|field_\w+|terrain|strata|props|graves|fields)\.js$/, ['solo_smoke', 'world', 'run']], // (the new fields come up in co-op runs too)

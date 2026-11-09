@@ -603,6 +603,8 @@
     // ---- attachments ----
     const atop = (id) => G.ATT_BY_ID[id] && G.ATT_BY_ID[id].visual;
     if (atts.optic && G.Optics) {
+      // the iron sights fold away under a sight: the thin posts standing above the rail on the gun's centre line
+      for (const o of g.children) if (o.isMesh && o.geometry === PG.box && o.scale.x <= 0.012 && o.scale.y >= 0.015 && Math.abs(o.position.x) <= 0.015 && o.position.y + o.scale.y / 2 > M.railY + 0.004) o.visible = false;
       G.Optics.build({ g, M, metal, y: M.railY, z: M.opticZ, pipMat: W.pipMaterial() }, atop(atts.optic));
       if (M.irons) for (const o of M.irons) o.visible = false; // (the iron sights fold away under a sight)
     }

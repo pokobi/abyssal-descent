@@ -1340,7 +1340,7 @@
     if (P.weapons.length >= P.stats.weaponSlots) return false;
     const x = it.gun || {}, w = G.weapons.make(it.id);
     w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag;
-    if (G.ownEl(w) && w.atts.core) { P.attStash.push(w.atts.core); delete w.atts.core; } // (a gun with an element of its own takes no 属性コア: one put in before is kept aside)
+    for (const [slot, id] of Object.entries(w.atts)) if (!G.attOk(G.ATT_BY_ID[id], w)) { P.attStash.push(id); delete w.atts[slot]; } // (a part it cannot take is kept aside: a 属性コア on a gun with an element of its own, a scope on a gun for dot sights only)
     P.weapons.push(w); G.weapons.switchTo(P.weapons.length - 1); G.ui.refreshWeapon(); P.recalc();
     const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を${quiet ? '装備した' : '拾った'}`);
     return true;

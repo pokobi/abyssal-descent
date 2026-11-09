@@ -18,7 +18,7 @@
     if (geo) return geo;
     const PG = G.Props.PG;
     geo = {
-      box: PG.box, cyl: PG.cyl,
+      box: PG.box, cyl: new THREE.CylinderGeometry(1, 1, 1, 40),
       tube: new THREE.CylinderGeometry(1, 1, 1, 40, 1, true),
       torThin: new THREE.TorusGeometry(1, 0.06, 8, 56), torMid: new THREE.TorusGeometry(1, 0.13, 10, 48), torFat: new THREE.TorusGeometry(1, 0.2, 10, 48),
       cone: new THREE.ConeGeometry(1, 1, 12), oct: new THREE.OctahedronGeometry(1, 0),
@@ -60,15 +60,15 @@
       int k = int(uKind + 0.5);
       float ret = 0.0, glow = 0.0; vec3 rc = vec3(1.0, 0.16, 0.08);
       if (k == 0) { // red dot
-        ret = ln(r, 0.034, aa); glow = exp(-r * 22.0) * 0.6;
+        ret = ln(r, 0.05, aa); glow = exp(-r * 18.0) * 0.6;
       } else if (k == 1) { // reflex: an orange dot inside four short ticks
         rc = vec3(1.0, 0.5, 0.08);
         float tk = min(min(seg(p, vec2(0.14, 0.0), vec2(0.24, 0.0)), seg(p, vec2(-0.14, 0.0), vec2(-0.24, 0.0))), min(seg(p, vec2(0.0, 0.14), vec2(0.0, 0.24)), seg(p, vec2(0.0, -0.14), vec2(0.0, -0.24))));
-        ret = max(ln(r, 0.03, aa), ln(tk, 0.011, aa)); glow = exp(-r * 20.0) * 0.5;
+        ret = max(ln(r, 0.042, aa), ln(tk, 0.012, aa)); glow = exp(-r * 18.0) * 0.5;
       } else if (k == 2) { // holographic: the big ring, its four ticks and the dot
         rc = vec3(1.0, 0.24, 0.12);
         float tk = min(min(seg(p, vec2(0.0, 0.49), vec2(0.0, 0.6)), seg(p, vec2(0.0, -0.49), vec2(0.0, -0.6))), min(seg(p, vec2(0.49, 0.0), vec2(0.6, 0.0)), seg(p, vec2(-0.49, 0.0), vec2(-0.6, 0.0))));
-        ret = max(max(ln(r, 0.03, aa), ln(abs(r - 0.46), 0.013, aa)), ln(tk, 0.012, aa));
+        ret = max(max(ln(r, 0.038, aa), ln(abs(r - 0.46), 0.014, aa)), ln(tk, 0.013, aa));
         glow = exp(-abs(r - 0.46) * 30.0) * 0.25 + exp(-r * 22.0) * 0.4;
       } else if (k == 3) { // 狩人の眼: a beast's slit pupil, breathing, in an iris of fine lines
         rc = vec3(1.0, 0.6, 0.1);
@@ -154,14 +154,13 @@
       bx(t, H + 2 * t, D, -(W / 2 + t / 2), cy, z); bx(t, H + 2 * t, D, W / 2 + t / 2, cy, z);
       bx(W + 2 * t, t, D, 0, cy + H / 2 + t / 2, z); bx(W + 2 * t, t, D, 0, cy - H / 2 - t / 2, z);
       bx(W + 2 * t, 0.003, 0.02, 0, cy + H / 2 + t + 0.002, z - 0.01, metal, -0.32, 0, 0);
-      bx(0.012, 0.004, 0.006, 0, y + 0.012, z + 0.016, K.orange);
+      bx(0.0025, 0.005, 0.005, W / 2 + t + 0.0015, cy - H / 2 + 0.004, z + 0.002, K.orange);
       glass(false, W, H, 0, cy, z - 0.002, 'reflex');
       dot(cy, H / 2, z + D / 2);
     } else if (v === 'holo') {
       // round: a short tube on a block, rims at both ends, buttons on the side
       const R = 0.021, D = 0.032, cy = y + 0.015 + R + 0.003;
       bx(0.032, 0.015, 0.05, 0, y + 0.0075, z);
-      bx(0.012, 0.012, 0.03, 0, y + 0.017, z);
       hood(R + 0.002, R + 0.002, D, 0, cy, z, metalDS());
       ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z - D / 2, metal); ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z + D / 2, metal);
       bx(0.004, 0.006, 0.006, -0.018, y + 0.008, z - 0.008, K.rubber); bx(0.004, 0.006, 0.006, -0.018, y + 0.008, z + 0.004, K.rubber);
@@ -171,7 +170,7 @@
       // 狩人の眼 (epic): an eye of horn and bone, the window almond-shaped, fangs above and below, leather wraps, an amber stone that throbs
       const Rx = 0.03, Ry = 0.016, D = 0.03, cy = y + 0.018 + Ry + 0.004;
       bx(0.03, 0.016, 0.05, 0, y + 0.008, z);
-      for (const s of [-1, 1]) bx(0.006, 0.02, 0.012, s * 0.016, y + 0.02, z, K.bone, 0, 0, -s * 0.5); // the bone claws that hold it
+      for (const s of [-1, 1]) bx(0.006, 0.012, 0.012, s * 0.02, y + 0.017, z, K.bone, 0, 0, -s * 0.5); // the bone claws that hold it
       hood(Rx + 0.002, Ry + 0.002, D, 0, cy, z, K.horn);
       ring(Gm.torFat, Rx + 0.004, Ry + 0.004, 0, cy, z - D / 2, K.bone); ring(Gm.torMid, Rx + 0.003, Ry + 0.003, 0, cy, z + D / 2, K.bone);
       for (const [x, s] of [[-0.016, 1], [0, 1], [0.016, 1], [-0.009, -1], [0.009, -1]]) { // fangs, leaning outwards
@@ -180,7 +179,6 @@
       }
       for (const dz of [-0.007, 0.007]) bx(0.014, 0.0045, 0.006, 0, cy + Ry + 0.0035, z + dz, K.leather);
       for (const s of [-1, 1]) bx(0.0045, 0.012, 0.006, s * (Rx + 0.004), cy, z + 0.004, K.leather);
-      cyv(0.006, 0.004, 0, cy - Ry - 0.004, z + D / 2 + 0.002, K.bone);
       const gem = add(Gm.oct, K.amber, 0.005, 0.008, 0.005, Rx + 0.008, cy + 0.008, z - 0.004);
       M.pulse.push({ o: gem, s: 1, k: 0.22, w: 2.2 });
       glass(true, 2 * Rx, 2 * Ry, 0, cy, z - D * 0.2, 'hunter');
@@ -189,7 +187,6 @@
       // 千里眼 (legendary): a navy and brass tube ringed by two turning circles of runes, a crystal floating above
       const R = 0.022, D = 0.03, cy = y + 0.016 + R + 0.004;
       bx(0.03, 0.016, 0.05, 0, y + 0.008, z, K.brass);
-      bx(0.012, 0.008, 0.03, 0, y + 0.019, z, K.brass);
       hood(R + 0.002, R + 0.002, D, 0, cy, z, K.navy);
       ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z - D / 2, K.brass); ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z + D / 2, K.brass);
       for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + 0.39; bx(0.003, 0.003, 0.008, Math.cos(a) * (R + 0.0028), cy + Math.sin(a) * (R + 0.0028), z, K.cyanDim, 0, 0, a); }
@@ -209,7 +206,7 @@
       // 神の眼 (mythic): a gold tube crowned by a burst of rays, a halo of stones turning behind it, a gem that breathes light
       const R = 0.023, D = 0.03, cy = y + 0.018 + R + 0.004;
       bx(0.032, 0.018, 0.052, 0, y + 0.009, z, K.gold);
-      for (const s of [-1, 1]) bx(0.006, 0.014, 0.03, s * 0.012, y + 0.022, z, K.gold, 0, 0, s * 0.3);
+      for (const s of [-1, 1]) bx(0.006, 0.008, 0.03, s * 0.017, y + 0.021, z, K.gold, 0, 0, s * 0.3);
       hood(R + 0.002, R + 0.002, D, 0, cy, z, K.goldIn);
       ring(Gm.torFat, R + 0.004, R + 0.004, 0, cy, z - D / 2, K.gold); ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z + D / 2, K.gold);
       for (let i = 0; i < 16; i++) {

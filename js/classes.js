@@ -13,16 +13,16 @@
       fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun' || o.arch === 'autoshotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
     { id: 'sniper', name: '狙撃手', icon: '🎯', col: '#5aa8ff', gun: 'n_scout', melee: 'm_basic', skill: 'decoy', ult: 'ult_shadow', grapple: 18,
       mods: {}, minus: 'ADSせずに撃つ（腰だめ）と拡散+40%', favName: '狙撃銃・DMR（銃と部品）、会心・ヘッドショットの加護',
-      fav: (o) => o.kind === 'weapon' && (o.arch === 'sniper' || o.arch === 'dmr'), look: '緑のフード付きマントとマスク', role: '遠くから急所を撃つ' },
+      fav: (o) => o.kind === 'weapon' && (o.arch === 'sniper' || o.arch === 'dmr'), look: '青いフード付きマントとマスク、右目の照準鏡', role: '遠くから急所を撃つ' },
     { id: 'blade', name: '剣士', icon: '⚔️', col: '#ffb040', gun: 'p_viper', melee: 'm_machete', skill: 'haste', ult: 'ult_bladestorm', grapple: 15,
       mods: { magSize: -0.25, moveSpeed: 0.1 }, minus: '銃の装弾数-25%', favName: '近接武器（武器と部品）、近接の加護',
-      fav: (o) => o.kind === 'melee', look: '羽織と袴、鉢巻、背中に鞘', role: '近接で斬り込む' },
+      fav: (o) => o.kind === 'melee', look: '橙の羽織と紺の袴、白い鉢巻、背中に鞘', role: '近接で斬り込む' },
     { id: 'heavy', name: '重装兵', icon: '🛡️', col: '#c08a5a', gun: 'g_breacher', melee: 'm_woodshield', skill: 'thornarmor', ult: 'ult_bastion', grapple: 28,
       mods: { armor: 0.1, maxHp: 20, moveSpeed: -0.12, slideBoost: -0.4 }, minus: '移動速度-12%、スライディングの距離-40%', favName: '防具・盾、近接の部品、防御の加護',
-      fav: (o) => o.kind === 'armor' || (o.kind === 'melee' && !!o.guard && o.guard[0] >= 0.75), look: '板金の鎧と大きな肩当て、顔まで覆う兜', role: '前に立って受け止める' },
+      fav: (o) => o.kind === 'armor' || (o.kind === 'melee' && !!o.guard && o.guard[0] >= 0.75), look: '板金の鎧と大きな肩当て、茶色の陣羽織とマント、顔まで覆う兜', role: '前に立って受け止める' },
     { id: 'mage', name: '術士', icon: '🔮', col: '#b07aff', gun: 't_rivet', atts: { core: 'c_water' }, melee: 'm_basic', skill: 'fireball', ult: 'ult_tsunami', grapple: 20,
       mods: { elIcd: 0.4, maxHp: -15 }, minus: '最大HP-15', favName: '属性コア・属性のスキル、属性・状態異常・スキル強化の加護',
-      fav: (o) => (o.kind === 'attachment' && o.slot === 'core') || (o.kind === 'skill' && G.Elem && !!G.Elem.skEl(o.id)), look: 'フード付きのローブ。まわりに属性の光球が浮く', role: '属性反応で崩す' },
+      fav: (o) => (o.kind === 'attachment' && o.slot === 'core') || (o.kind === 'skill' && G.Elem && !!G.Elem.skEl(o.id)), look: '紫のフード付きローブ。フードの奥で目が光り、まわりに属性の光球が浮く', role: '属性反応で崩す' },
   ];
   // ---------------- the class's own effect (固有効果): what every run starts with ----------------
   // rows: [what, how much]; notes: the rest of the rule in words

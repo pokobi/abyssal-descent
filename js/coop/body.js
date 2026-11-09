@@ -8,44 +8,10 @@
   const rot = (o, x, y, z, k) => { o.rotation.x += (x - o.rotation.x) * k; o.rotation.y += (y - o.rotation.y) * k; o.rotation.z += (z - o.rotation.z) * k; };
 
   K.buildBody = function (name, col, cls) {
-    const PG = G.Props.PG, M = G.avatar.mats || [], leather = M[0], plate = M[1], cloth = M[2], dark = M[3];
-    const m = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); parent.add(o); return o; };
     const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
-    const root = new THREE.Group(), J = {};
-    J.body = j(root, 0, 0.95, 0);
-    m(J.body, PG.box, leather, 0.34, 0.2, 0.22, 0, 0.02, 0);
-    J.chest = j(J.body, 0, 0.12, 0);
-    m(J.chest, PG.box, leather, 0.4, 0.5, 0.24, 0, 0.27, 0);
-    m(J.chest, PG.box, plate, 0.42, 0.3, 0.26, 0, 0.36, 0.01);
-    for (const s of [-1, 1]) m(J.chest, PG.sph, plate, 0.13, 0.1, 0.14, s * 0.24, 0.5, 0);
-    m(J.chest, PG.box, dark, 0.38, 0.05, 0.25, 0, 0.08, 0);
-    m(J.chest, PG.box, cloth, 0.42, 0.65, 0.03, 0, 0.25, -0.15, 0.12);
-    J.head = j(J.chest, 0, 0.58, 0);
-    m(J.head, PG.sph, leather, 0.12, 0.14, 0.13, 0, 0.12, 0);
-    J.hood = m(J.head, PG.cone, cloth, 0.17, 0.32, 0.17, 0, 0.16, -0.02);
-    m(J.head, PG.box, dark, 0.16, 0.05, 0.02, 0, 0.12, 0.12);
-    J.arms = [];
-    for (const s of [-1, 1]) {
-      const sh = j(J.chest, s * 0.25, 0.48, 0);
-      m(sh, PG.cyl8, leather, 0.055, 0.3, 0.055, 0, -0.15, 0);
-      const el = j(sh, 0, -0.3, 0);
-      m(el, PG.cyl8, leather, 0.05, 0.28, 0.05, 0, -0.14, 0);
-      m(el, PG.cyl8, plate, 0.058, 0.12, 0.058, 0, -0.1, 0);
-      const hand = j(el, 0, -0.3, 0);
-      m(hand, PG.box, dark, 0.07, 0.09, 0.07);
-      J.arms.push({ sh, el, hand });
-    }
+    // the same figure as your own (avatar.js), with materials of its own
+    const F = G.avatar.buildFigure(), root = F.root, J = F.J;
     J.hold = j(J.arms[1].hand, 0, -0.02, 0.06);
-    J.legs = [];
-    for (const s of [-1, 1]) {
-      const hip = j(J.body, s * 0.1, -0.06, 0);
-      m(hip, PG.cyl8, leather, 0.07, 0.42, 0.07, 0, -0.21, 0);
-      const kn = j(hip, 0, -0.43, 0);
-      m(kn, PG.cyl8, leather, 0.06, 0.4, 0.06, 0, -0.2, 0);
-      m(kn, PG.box, dark, 0.1, 0.1, 0.2, 0, -0.42, 0.04);
-      m(kn, PG.sph, plate, 0.07, 0.06, 0.06, 0, 0, 0.04);
-      J.legs.push({ hip, kn });
-    }
     const c = document.createElement('canvas'); c.width = 256; c.height = 48;
     const x = c.getContext('2d'); x.font = '700 28px sans-serif'; x.textAlign = 'center'; x.lineWidth = 5; x.strokeStyle = '#000'; x.strokeText(name, 128, 34); x.fillStyle = col || '#ffe2a0'; x.fillText(name, 128, 34);
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));

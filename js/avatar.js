@@ -1,151 +1,270 @@
 'use strict';
-// Player character model, shown only in third-person moments (grapple / pile driver).
+// Player character model, shown only in third-person moments (grapple / pile driver); the same figure is the class screen's preview
+// (classes.js) and a team-mate's body in co-op (coop/body.js).
+// One figure for everyone (a body in a plain suit: skin, suit, gloves, boots), dressed per class in the class's colours (AV.dress).
+// Every figure has its own materials, so a buff's glow on your own body (pstatus.js, AV.mats) never lights up anyone else's.
 (function () {
   const AV = (G.avatar = { tpK: 0 });
   const V = G.U.V;
   const U = G.U;
   let root, J = {};
 
-  // the common figure (body, head with its hood, arms, legs) on its own root: the third-person avatar, and the class screen's preview (classes.js)
+  // ---- shapes made once: a rounded limb, a box narrower at the bottom, a dome, an open hood, flared skirts
+  const GEO = {};
+  function geo() {
+    if (GEO.limb) return GEO;
+    GEO.limb = new THREE.CapsuleGeometry(0.5, 1, 4, 10); // (scale (d, h / 2, d): d across, h long with its rounded ends)
+    GEO.dome = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    // a hood: a sphere left open at the front (the face) and at the bottom (the neck)
+    GEO.hood = new THREE.SphereGeometry(1, 18, 12, Math.PI / 2 + 0.8, Math.PI * 2 - 1.6, 0, Math.PI * 0.74);
+    GEO.flare = new THREE.CylinderGeometry(0.62, 1, 1, 16);  // a robe's or a hakama's skirt
+    GEO.cape = new THREE.CylinderGeometry(0.72, 1, 1, 16);   // a capelet over the shoulders
+    GEO.ring = new THREE.TorusGeometry(1, 0.08, 6, 24);
+    return GEO;
+  }
+  const tapers = {};
+  // a box whose bottom is narrower (bx, bz of the top's width / depth): a torso, a breastplate, a cloak
+  function taper(bx, bz) {
+    const k = bx + ':' + bz;
+    if (tapers[k]) return tapers[k];
+    const g = new THREE.BoxGeometry(1, 1, 1, 1, 2, 1), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i), t = 0.5 - y; p.setX(i, p.getX(i) * (1 - (1 - bx) * t)); p.setZ(i, p.getZ(i) * (1 - (1 - bz) * t)); }
+    g.computeVertexNormals();
+    return (tapers[k] = g);
+  }
+  AV.geo = geo; AV.taper = taper;
+
+  // the base materials (each figure clones its own)
+  let BASE = null;
+  function base() {
+    if (BASE) return BASE;
+    const t = G.Tex.tex;
+    BASE = {
+      suit: new THREE.MeshStandardMaterial({ color: 0x3a3a3e, roughness: 0.9, map: t.cloth.map }),
+      skin: new THREE.MeshStandardMaterial({ color: 0xc8957a, roughness: 0.75 }),
+      glove: new THREE.MeshStandardMaterial({ color: 0x2c2620, roughness: 0.7 }),
+      boot: new THREE.MeshStandardMaterial({ color: 0x2a231d, roughness: 0.65 }),
+      hair: new THREE.MeshStandardMaterial({ color: 0x1e1814, roughness: 0.9 }),
+      eye: new THREE.MeshBasicMaterial({ color: 0x0c0a08 }),
+    };
+    return BASE;
+  }
+
+  // the common figure on its own root. The joints (body, chest, head, arms: shoulder / elbow / hand, legs: hip / knee) stay where every pose expects them.
   AV.buildFigure = function () {
-    const PG = G.Props.PG, M = AV.mats, leather = M[0], plate = M[1], cloth = M[2], dark = M[3];
-    const m = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
+    const PG = G.Props.PG, GE = geo(), B = base();
+    const M = {}; for (const k in B) M[k] = B[k].clone();
+    const m = (parent, g, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(g, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
     const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
-    const root = new THREE.Group(), J = {};
-    J.body = j(root, 0, 0.95, 0);                   // pelvis pivot
-    m(J.body, PG.box, leather, 0.34, 0.2, 0.22, 0, 0.02, 0);
+    const root = new THREE.Group(), J = { M };
+    J.body = j(root, 0, 0.95, 0);                                       // pelvis pivot
+    m(J.body, taper(0.88, 0.9), M.suit, 0.32, 0.2, 0.21, 0, 0.01, 0);  // hips
     J.chest = j(J.body, 0, 0.12, 0);
-    m(J.chest, PG.box, leather, 0.4, 0.5, 0.24, 0, 0.27, 0);
-    m(J.chest, PG.box, plate, 0.42, 0.3, 0.26, 0, 0.36, 0.01);
-    for (const s of [-1, 1]) m(J.chest, PG.sph, plate, 0.13, 0.1, 0.14, s * 0.24, 0.5, 0);
-    m(J.chest, PG.box, dark, 0.38, 0.05, 0.25, 0, 0.08, 0);          // belt
-    m(J.chest, PG.box, cloth, 0.42, 0.65, 0.03, 0, 0.25, -0.15, 0.12); // cloak
+    m(J.chest, taper(0.76, 0.86), M.suit, 0.42, 0.52, 0.23, 0, 0.27, 0); // torso, wider at the shoulders
+    m(J.chest, PG.cyl8, M.skin, 0.05, 0.08, 0.05, 0, 0.55, 0);           // neck
+    for (const s of [-1, 1]) m(J.chest, PG.sph, M.suit, 0.095, 0.09, 0.1, s * 0.23, 0.47, 0); // shoulders
     J.head = j(J.chest, 0, 0.58, 0);
-    m(J.head, PG.sph, leather, 0.12, 0.14, 0.13, 0, 0.12, 0);
-    J.hood = m(J.head, PG.cone, cloth, 0.17, 0.32, 0.17, 0, 0.16, -0.02);      // hood
-    m(J.head, PG.box, dark, 0.16, 0.05, 0.02, 0, 0.12, 0.12);         // face shadow
+    m(J.head, PG.sph, M.skin, 0.115, 0.132, 0.12, 0, 0.12, 0);
+    for (const s of [-1, 1]) m(J.head, PG.sph, M.eye, 0.016, 0.014, 0.01, s * 0.042, 0.135, 0.108);
+    J.hood = m(J.head, PG.sph, M.hair, 0.122, 0.085, 0.128, 0, 0.18, -0.012); // hair (a class's hat hides it)
     J.arms = [];
     for (const s of [-1, 1]) {
       const sh = j(J.chest, s * 0.25, 0.48, 0);
-      m(sh, PG.cyl8, leather, 0.055, 0.3, 0.055, 0, -0.15, 0);
+      m(sh, GE.limb, M.suit, 0.1, 0.16, 0.1, 0, -0.15, 0);
       const el = j(sh, 0, -0.3, 0);
-      m(el, PG.cyl8, leather, 0.05, 0.28, 0.05, 0, -0.14, 0);
-      m(el, PG.cyl8, plate, 0.058, 0.12, 0.058, 0, -0.1, 0);
+      m(el, GE.limb, M.suit, 0.088, 0.15, 0.088, 0, -0.14, 0);
       const hand = j(el, 0, -0.3, 0);
-      m(hand, PG.box, dark, 0.07, 0.09, 0.07);
+      m(hand, PG.box, M.glove, 0.07, 0.09, 0.075);
+      m(hand, PG.box, M.glove, 0.025, 0.05, 0.03, -s * 0.04, 0.01, 0.025, 0, 0, -s * 0.4); // thumb
       J.arms.push({ sh, el, hand });
     }
     J.legs = [];
     for (const s of [-1, 1]) {
       const hip = j(J.body, s * 0.1, -0.06, 0);
-      m(hip, PG.cyl8, leather, 0.07, 0.42, 0.07, 0, -0.21, 0);
+      m(hip, GE.limb, M.suit, 0.13, 0.23, 0.13, 0, -0.21, 0);
       const kn = j(hip, 0, -0.43, 0);
-      m(kn, PG.cyl8, leather, 0.06, 0.4, 0.06, 0, -0.2, 0);
-      m(kn, PG.box, dark, 0.1, 0.1, 0.2, 0, -0.42, 0.04);              // boot
-      m(kn, PG.sph, plate, 0.07, 0.06, 0.06, 0, 0, 0.04);               // knee guard
+      m(kn, GE.limb, M.suit, 0.11, 0.21, 0.11, 0, -0.2, 0);
+      m(kn, PG.box, M.boot, 0.12, 0.12, 0.17, 0, -0.39, 0.02);          // boot
+      m(kn, PG.box, M.boot, 0.11, 0.07, 0.09, 0, -0.42, 0.12);          // toe
       J.legs.push({ hip, kn });
     }
     return { root, J };
   };
   AV.init = function (scene) {
-    const t = G.Tex.tex, PG = G.Props.PG;
-    const leather = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 0.8, map: t.skin.map, normalMap: t.skin.normalMap });
-    const plate = new THREE.MeshStandardMaterial({ color: 0x7a7c80, roughness: 0.35, metalness: 0.8, map: t.metal.map, normalMap: t.metal.normalMap });
-    const cloth = new THREE.MeshStandardMaterial({ color: 0x3a2a24, roughness: 0.95, map: t.cloth.map, side: THREE.DoubleSide });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x1c1a18, roughness: 0.7 });
+    const PG = G.Props.PG;
     const gun = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.4, metalness: 0.6 });
-    const m = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
-    const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
-    AV.mats = [leather, plate, cloth, dark];
-    { const F = AV.buildFigure(); root = F.root; J = F.J; }
+    const m = (parent, g, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(g, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
+    { const F = AV.buildFigure(); root = F.root; J = F.J; AV._J = J; }
     // sidearm in the right hand (a blade instead in a duel)
     J.gun = m(J.arms[1].hand, PG.box, gun, 0.04, 0.06, 0.32, 0, -0.02, 0.12);
     J.blade = new THREE.Group(); J.arms[1].hand.add(J.blade);
-    m(J.blade, PG.box, dark, 0.035, 0.045, 0.16, 0, -0.02, 0.06);
-    m(J.blade, PG.box, plate, 0.14, 0.03, 0.03, 0, -0.02, 0.15);
+    m(J.blade, PG.box, J.M.glove, 0.035, 0.045, 0.16, 0, -0.02, 0.06);
+    m(J.blade, PG.box, gun, 0.14, 0.03, 0.03, 0, -0.02, 0.15);
     m(J.blade, PG.box, new THREE.MeshStandardMaterial({ color: 0xd8dce6, roughness: 0.2, metalness: 0.95 }), 0.02, 0.06, 0.62, 0, -0.02, 0.46);
     J.blade.visible = false;
     root.visible = false;
     scene.add(root);
     AV.root = root;
+    AV.mats = mats(root);
   };
-  // ---- the class's clothes over the common figure (also used for the bodies of team-mates in co-op)
-  const DM = {};
-  const dmat = (k, col, o) => DM[k] || (DM[k] = new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.85 }, o || {})));
+  // every material of a figure that can glow (pstatus.js lights your own body's up with a buff's colour)
+  function mats(r) { const s = new Set(); r.traverse((o) => { const m = o.material; if (m && m.emissive && m.emissive.getHex() === 0) s.add(m); }); return [...s]; } // (what glows of itself, goggles and lenses, is left alone)
+
+  // ---- the class's clothes over the common figure (also the bodies of team-mates in co-op, and the class screen's preview).
+  // Colours per class: suit (under the clothes), main (the class's own colour), dark, accent (its brightest, the class colour itself), leather.
+  const PAL = {
+    soldier: { suit: 0x55603a, main: 0x66733f, dark: 0x3c4428, accent: 0x9ab070, leather: 0x3b2f22 },
+    assault: { suit: 0x2c2b2e, main: 0xc0382a, dark: 0x5a1a14, accent: 0xff6a50, leather: 0x2a2420 },
+    sniper: { suit: 0x223247, main: 0x2f5c96, dark: 0x182638, accent: 0x5aa8ff, leather: 0x262a32 },
+    blade: { suit: 0x2b2430, main: 0xe08a24, dark: 0x2e2a44, accent: 0xffb040, leather: 0x2a2420 },
+    heavy: { suit: 0x3a332c, main: 0x8a5a36, dark: 0x4a3020, accent: 0xc08a5a, leather: 0x5a3c26 },
+    mage: { suit: 0x2a1c3e, main: 0x6b3fb5, dark: 0x3a2266, accent: 0xb07aff, leather: 0x231a2c },
+  };
+  AV.PAL = PAL;
   AV.dress = function (J, cls) {
     for (const o of J.dressed || []) if (o.parent) o.parent.remove(o);
     J.dressed = []; J.orbs = null; J.dressCls = cls;
     if (J.hood) J.hood.visible = true;
     J.chest.scale.setScalar(1);
-    const PG = G.Props.PG, C = G.Classes && G.Classes.BY[cls]; if (!C) return;
-    const add = (parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; o.frustumCulled = false; parent.add(o); J.dressed.push(o); return o; };
-    const steel = dmat('steel', 0x9aa0a8, { roughness: 0.35, metalness: 0.8 }), dark = dmat('dark', 0x1c1a18, { roughness: 0.7 });
-    const H = J.head, Ch = J.chest, B = J.body;
+    const PG = G.Props.PG, GE = geo(), C = G.Classes && G.Classes.BY[cls], P = PAL[cls]; if (!C || !P) return;
+    const mc = J.mc || (J.mc = {});
+    const mat = (k, col, o) => mc[k] || (mc[k] = new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.85 }, o || {})));
+    const add = (parent, g, mt, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(g, mt); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; o.frustumCulled = false; parent.add(o); J.dressed.push(o); return o; };
+    // the suit, the gloves and the boots take the class's colours
+    if (J.M) { J.M.suit.color.setHex(P.suit); J.M.glove.color.setHex(P.leather); J.M.boot.color.setHex(P.leather); }
+    const main = mat('main', P.main), dark = mat('dark', P.dark), acc = mat('acc', P.accent, { roughness: 0.55 }), lea = mat('lea', P.leather, { roughness: 0.7 });
+    const steel = mat('steel', 0x9aa0a8, { roughness: 0.32, metalness: 0.85 }), black = mat('black', 0x16130f, { roughness: 0.7 });
+    const H = J.head, Ch = J.chest, B = J.body, A = J.arms, L = J.legs;
     switch (cls) {
       case 'soldier': {
-        const ol = dmat('olive', 0x5a6a3a), ol2 = dmat('olive2', 0x434f2c);
+        // helmet with goggles, a plate carrier with magazine pouches, a pack with a bedroll, knee pads
         J.hood.visible = false;
-        add(H, PG.sph, ol, 0.155, 0.11, 0.16, 0, 0.19, 0); add(H, PG.box, ol2, 0.3, 0.02, 0.32, 0, 0.15, 0.01);
-        add(Ch, PG.box, ol, 0.44, 0.34, 0.28, 0, 0.3, 0);
-        for (const x of [-0.12, 0, 0.12]) add(Ch, PG.box, ol2, 0.09, 0.08, 0.05, x, 0.2, 0.15);
-        for (const L of J.legs) add(L.hip, PG.cyl8, ol2, 0.075, 0.3, 0.075, 0, -0.2, 0);
+        add(H, GE.dome, main, 0.15, 0.13, 0.158, 0, 0.15, -0.005);
+        add(H, PG.cyl, dark, 0.158, 0.014, 0.166, 0, 0.152, -0.005);
+        for (const s of [-1, 1]) add(H, PG.box, black, 0.012, 0.1, 0.02, s * 0.112, 0.08, 0.02);
+        add(H, PG.box, black, 0.17, 0.025, 0.02, 0, 0.215, 0.135);
+        const lens = mat('lens', 0xffc040, { emissive: 0x5a3a00, roughness: 0.2 });
+        for (const s of [-1, 1]) add(H, PG.cyl8, lens, 0.03, 0.02, 0.03, s * 0.045, 0.218, 0.142, Math.PI / 2);
+        add(Ch, taper(0.9, 0.95), dark, 0.45, 0.34, 0.29, 0, 0.31, 0);
+        for (const x of [-0.12, 0, 0.12]) add(Ch, PG.box, main, 0.085, 0.11, 0.05, x, 0.2, 0.16);
+        add(Ch, PG.box, main, 0.07, 0.08, 0.04, 0.13, 0.4, 0.16);
+        add(Ch, PG.box, black, 0.36, 0.05, 0.25, 0, 0.06, 0);
+        for (const s of [-1, 1]) add(Ch, PG.box, main, 0.07, 0.08, 0.06, s * 0.15, 0.04, 0.12);
+        add(Ch, PG.box, main, 0.32, 0.36, 0.14, 0, 0.3, -0.2);
+        add(Ch, PG.cyl8, dark, 0.065, 0.32, 0.065, 0, 0.53, -0.2, 0, 0, Math.PI / 2);
+        add(A[0].sh, PG.box, acc, 0.02, 0.05, 0.05, -0.052, -0.08, 0);
+        for (const l of L) add(l.kn, PG.box, dark, 0.12, 0.09, 0.06, 0, 0, 0.055);
         break;
       }
       case 'assault': {
-        const red = dmat('red', 0xb02a24), redD = dmat('redD', 0x5a1a14), lens = dmat('lens', 0xffc040, { emissive: 0x6a4000, roughness: 0.2 });
-        J.hood.visible = false;
-        add(H, PG.cyl8, red, 0.135, 0.05, 0.135, 0, 0.2, 0);
-        add(H, PG.box, red, 0.03, 0.14, 0.05, 0.03, 0.15, -0.14, 0.5, 0, 0.2); add(H, PG.box, red, 0.03, 0.12, 0.05, -0.03, 0.15, -0.14, 0.6, 0, -0.25);
-        add(H, PG.box, dark, 0.22, 0.05, 0.05, 0, 0.27, 0.1); for (const x of [-0.05, 0.05]) add(H, PG.sph, lens, 0.032, 0.026, 0.02, x, 0.27, 0.13);
-        add(Ch, PG.box, redD, 0.41, 0.26, 0.26, 0, 0.33, 0);
+        // a red bandana with its tails, goggles up on the forehead, a scarf over the mouth, a light vest with a bandolier, red armbands
+        add(H, PG.cyl8, main, 0.125, 0.045, 0.13, 0, 0.185, 0);
+        add(H, PG.box, main, 0.03, 0.15, 0.05, 0.03, 0.15, -0.14, 0.6, 0, 0.2); add(H, PG.box, main, 0.03, 0.12, 0.05, -0.03, 0.15, -0.14, 0.7, 0, -0.25);
+        add(H, PG.box, black, 0.21, 0.035, 0.03, 0, 0.225, 0.1);
+        const lens = mat('lens', 0xffc040, { emissive: 0x6a4000, roughness: 0.2 });
+        for (const s of [-1, 1]) add(H, PG.cyl8, lens, 0.034, 0.02, 0.034, s * 0.048, 0.228, 0.115, Math.PI / 2);
+        add(H, PG.cyl8, dark, 0.118, 0.07, 0.124, 0, 0.055, 0.004);
+        add(Ch, taper(0.88, 0.95), dark, 0.43, 0.3, 0.27, 0, 0.32, 0);
+        for (const s of [-1, 1]) add(Ch, PG.box, main, 0.03, 0.3, 0.02, s * 0.12, 0.32, 0.14);
+        add(Ch, PG.box, black, 0.05, 0.62, 0.03, 0, 0.28, 0.15, 0, 0, 0.62);
+        const brass = mat('brass', 0xc8a050, { roughness: 0.35, metalness: 0.8 });
+        for (let i = 0; i < 5; i++) add(Ch, PG.cyl8, brass, 0.012, 0.04, 0.012, -0.16 + i * 0.08, 0.06 + i * 0.105, 0.17, 0, 0, 0.62);
+        add(A[0].sh, PG.sph, main, 0.12, 0.07, 0.12, 0, 0.02, 0);
+        for (const a of A) add(a.sh, PG.cyl8, main, 0.058, 0.04, 0.058, 0, -0.14, 0);
+        for (const l of L) add(l.hip, PG.box, main, 0.012, 0.38, 0.02, (l === L[0] ? -1 : 1) * 0.064, -0.21, 0);
         break;
       }
       case 'sniper': {
-        const gr = dmat('green', 0x3a5a30), grD = dmat('greenD', 0x24381c);
+        // a blue hood open at the face, a mask, a scope's eyepiece on the right eye, a capelet and a long cloak torn at its hem
         J.hood.visible = false;
-        add(H, PG.cone, gr, 0.19, 0.36, 0.19, 0, 0.17, -0.02); add(H, PG.box, grD, 0.17, 0.08, 0.03, 0, 0.06, 0.12);
-        add(Ch, PG.box, gr, 0.52, 0.9, 0.03, 0, 0.05, -0.17, 0.14);
-        for (let i = 0; i < 6; i++) add(Ch, PG.box, i % 2 ? grD : gr, 0.07, 0.22, 0.02, -0.2 + i * 0.08, -0.45, -0.24 - (i % 3) * 0.01, 0.2, 0, (i - 2.5) * 0.08);
-        for (const s of [-1, 1]) add(Ch, PG.box, grD, 0.16, 0.12, 0.27, s * 0.22, 0.5, 0);
+        const hood = mat('hood', P.main, { side: THREE.DoubleSide });
+        add(H, GE.hood, hood, 0.15, 0.165, 0.155, 0, 0.135, -0.012);
+        add(H, PG.cone, hood, 0.06, 0.14, 0.05, 0, 0.17, -0.17, -2.0);
+        add(H, PG.box, dark, 0.15, 0.065, 0.05, 0, 0.065, 0.088);
+        add(H, PG.cyl8, black, 0.026, 0.035, 0.026, 0.045, 0.14, 0.12, Math.PI / 2);
+        add(H, PG.cyl8, new THREE.MeshBasicMaterial({ color: P.accent }), 0.02, 0.01, 0.02, 0.045, 0.14, 0.14, Math.PI / 2);
+        add(Ch, GE.cape, main, 0.29, 0.15, 0.19, 0, 0.47, -0.005);
+        add(Ch, taper(1.15, 1), main, 0.46, 0.95, 0.03, 0, 0.06, -0.165, 0.12);
+        for (let i = 0; i < 6; i++) add(Ch, PG.box, i % 2 ? dark : main, 0.075, 0.2, 0.02, -0.2 + i * 0.08, -0.48, -0.23 - (i % 3) * 0.01, 0.16, 0, (i - 2.5) * 0.08);
+        for (const a of A) add(a.el, PG.cyl8, dark, 0.055, 0.16, 0.055, 0, -0.17, 0);
+        add(Ch, PG.box, black, 0.36, 0.05, 0.25, 0, 0.06, 0);
         break;
       }
       case 'blade': {
-        const hao = dmat('haori', 0x5a3a8a), hak = dmat('hakama', 0x3a3a56), wh = dmat('white', 0xe8e4dc);
-        J.hood.visible = false;
-        add(H, PG.cyl8, wh, 0.132, 0.03, 0.132, 0, 0.21, 0); add(H, PG.box, wh, 0.02, 0.12, 0.04, 0, 0.17, -0.14, 0.5);
-        add(Ch, PG.box, hao, 0.46, 0.6, 0.27, 0, 0.22, 0);
-        for (const A of J.arms) add(A.sh, PG.box, hao, 0.13, 0.26, 0.14, 0, -0.14, 0);
-        add(B, PG.cone, hak, 0.22, 0.5, 0.18, 0, -0.3, 0);
-        add(Ch, PG.cyl8, dark, 0.03, 0.85, 0.03, 0.05, 0.3, -0.17, 0, 0, 0.6); add(Ch, PG.cyl8, wh, 0.035, 0.05, 0.035, 0.27, 0.62, -0.17, 0, 0, 0.6);
+        // an orange haori over a dark kimono, wide sleeves, a dark hakama, a white hachimaki and obi, a sheath across the back, a topknot
+        const wh = mat('white', 0xece6da);
+        add(H, PG.sph, J.M ? J.M.hair : black, 0.04, 0.05, 0.04, 0, 0.27, -0.06);
+        add(H, PG.cyl8, wh, 0.123, 0.026, 0.129, 0, 0.17, 0);
+        add(H, PG.box, wh, 0.02, 0.14, 0.035, 0.02, 0.13, -0.14, 0.45, 0, 0.15); add(H, PG.box, wh, 0.02, 0.12, 0.035, -0.02, 0.13, -0.14, 0.55, 0, -0.2);
+        add(Ch, taper(0.86, 0.94), main, 0.46, 0.56, 0.27, 0, 0.25, 0);
+        add(Ch, PG.box, dark, 0.11, 0.3, 0.02, 0, 0.36, 0.135);
+        for (const s of [-1, 1]) add(Ch, PG.box, wh, 0.025, 0.24, 0.02, s * 0.05, 0.4, 0.14, 0, 0, s * 0.35);
+        add(Ch, PG.box, wh, 0.37, 0.065, 0.26, 0, 0.06, 0);
+        add(Ch, PG.box, acc, 0.06, 0.04, 0.03, 0.07, 0.06, 0.13);
+        add(B, PG.box, main, 0.47, 0.22, 0.28, 0, -0.07, 0);
+        add(B, PG.box, mat('band', 0x9a5a14), 0.475, 0.03, 0.285, 0, -0.17, 0);
+        for (const a of A) { add(a.sh, PG.box, main, 0.15, 0.3, 0.16, 0, -0.14, 0); add(a.sh, PG.box, wh, 0.152, 0.025, 0.162, 0, -0.29, 0); }
+        add(B, GE.flare, dark, 0.24, 0.6, 0.2, 0, -0.42, 0);
+        for (const x of [-0.08, 0, 0.08]) add(B, PG.box, black, 0.008, 0.5, 0.01, x, -0.42, 0.19, -0.12);
+        add(Ch, PG.cyl8, black, 0.03, 0.85, 0.03, 0.05, 0.3, -0.17, 0, 0, 0.6);
+        add(Ch, PG.cyl8, acc, 0.034, 0.05, 0.034, 0.16, 0.48, -0.17, 0, 0, 0.6);
+        add(Ch, PG.cyl8, wh, 0.035, 0.12, 0.035, 0.29, 0.66, -0.17, 0, 0, 0.6);
         break;
       }
       case 'heavy': {
-        const gold = dmat('gold', 0xc8a050, { roughness: 0.3, metalness: 0.9 });
+        // a great helm with a visor slit and a brown crest, a breastplate, layered pauldrons, a brown tabard and cape, vambraces, greaves
         J.hood.visible = false;
-        add(H, PG.box, steel, 0.26, 0.3, 0.27, 0, 0.13, 0); add(H, PG.box, dark, 0.2, 0.025, 0.02, 0, 0.15, 0.14); add(H, PG.box, gold, 0.03, 0.08, 0.22, 0, 0.31, 0);
-        for (const s of [-1, 1]) { add(Ch, PG.sph, steel, 0.2, 0.14, 0.2, s * 0.3, 0.52, 0); add(Ch, PG.box, gold, 0.22, 0.02, 0.22, s * 0.3, 0.46, 0); }
-        add(Ch, PG.box, steel, 0.46, 0.38, 0.3, 0, 0.34, 0); add(Ch, PG.box, gold, 0.06, 0.3, 0.02, 0, 0.36, 0.16);
-        for (const L of J.legs) add(L.kn, PG.box, steel, 0.13, 0.3, 0.13, 0, -0.2, 0.01);
+        const bronze = mat('bronze', 0xb08850, { roughness: 0.35, metalness: 0.8 });
+        add(H, PG.cyl8, steel, 0.14, 0.27, 0.15, 0, 0.13, 0);
+        add(H, GE.dome, steel, 0.14, 0.07, 0.15, 0, 0.265, 0);
+        add(H, PG.box, black, 0.19, 0.022, 0.02, 0, 0.15, 0.147);
+        add(H, PG.box, black, 0.02, 0.08, 0.02, 0, 0.09, 0.147);
+        add(H, PG.box, main, 0.03, 0.1, 0.24, 0, 0.35, -0.01);
+        add(Ch, taper(0.84, 0.92), steel, 0.46, 0.4, 0.3, 0, 0.34, 0);
+        add(Ch, PG.box, steel, 0.38, 0.1, 0.27, 0, 0.1, 0);
+        for (const s of [-1, 1]) { add(Ch, PG.sph, steel, 0.2, 0.14, 0.2, s * 0.3, 0.52, 0); add(Ch, PG.sph, steel, 0.18, 0.1, 0.18, s * 0.31, 0.44, 0); add(Ch, PG.box, lea, 0.21, 0.02, 0.21, s * 0.3, 0.47, 0); }
+        add(Ch, PG.oct, acc, 0.07, 0.012, 0.07, 0, 0.38, 0.155, Math.PI / 2);
+        add(Ch, PG.box, lea, 0.4, 0.06, 0.29, 0, 0.03, 0); add(Ch, PG.box, bronze, 0.06, 0.05, 0.02, 0, 0.03, 0.15);
+        add(B, PG.box, main, 0.26, 0.48, 0.02, 0, -0.16, 0.135); add(B, PG.box, main, 0.26, 0.48, 0.02, 0, -0.16, -0.135);
+        add(B, PG.box, acc, 0.265, 0.03, 0.025, 0, -0.39, 0.135);
+        add(Ch, taper(1.25, 1), dark, 0.5, 1.05, 0.03, 0, 0.0, -0.185, 0.1);
+        for (const a of A) { add(a.el, PG.cyl8, steel, 0.065, 0.2, 0.065, 0, -0.15, 0); add(a.hand, PG.box, steel, 0.08, 0.06, 0.085, 0, 0.02, 0); }
+        for (const l of L) { add(l.kn, PG.cyl8, steel, 0.075, 0.32, 0.075, 0, -0.2, 0.005); add(l.kn, PG.sph, steel, 0.075, 0.065, 0.07, 0, 0, 0.04); add(l.kn, PG.box, steel, 0.125, 0.06, 0.2, 0, -0.36, 0.05); }
         J.chest.scale.setScalar(1.1);
         break;
       }
       case 'mage': {
-        const robe = dmat('robe', 0x26368a), gold = dmat('sash', 0xc8a050, { roughness: 0.4, metalness: 0.6 });
+        // a purple hood with the face in shadow and two glowing eyes, a robe trimmed with gold, a capelet, bell sleeves, a sash, a book; orbs
         J.hood.visible = false;
-        add(H, PG.cone, robe, 0.19, 0.38, 0.19, 0, 0.17, -0.02);
-        add(Ch, PG.box, robe, 0.45, 0.52, 0.29, 0, 0.27, 0); add(Ch, PG.box, gold, 0.46, 0.05, 0.3, 0, 0.08, 0);
-        add(B, PG.cone, robe, 0.3, 0.85, 0.26, 0, -0.42, 0);
+        const hood = mat('hood', P.main, { side: THREE.DoubleSide }), gold = mat('gold', 0xd4ae5a, { roughness: 0.35, metalness: 0.7 });
+        add(H, GE.hood, hood, 0.16, 0.175, 0.165, 0, 0.13, -0.012);
+        add(H, PG.cone, hood, 0.07, 0.17, 0.06, 0, 0.2, -0.17, -2.1);
+        add(H, PG.box, black, 0.17, 0.15, 0.02, 0, 0.115, 0.1);
+        for (const s of [-1, 1]) add(H, PG.sph, new THREE.MeshBasicMaterial({ color: P.accent }), 0.016, 0.012, 0.01, s * 0.04, 0.13, 0.112);
+        add(Ch, taper(0.8, 0.88), main, 0.44, 0.52, 0.27, 0, 0.27, 0);
+        for (const s of [-1, 1]) add(Ch, PG.box, gold, 0.025, 0.22, 0.02, s * 0.05, 0.42, 0.137, 0, 0, s * 0.4);
+        add(Ch, PG.box, gold, 0.03, 0.34, 0.02, 0, 0.17, 0.137);
+        add(Ch, GE.cape, dark, 0.28, 0.16, 0.19, 0, 0.47, 0);
+        add(Ch, GE.ring, gold, 0.28, 0.19, 0.4, 0, 0.395, 0, Math.PI / 2);
+        add(Ch, PG.box, gold, 0.42, 0.06, 0.28, 0, 0.06, 0);
+        add(B, GE.flare, main, 0.25, 0.86, 0.22, 0, -0.43, 0);
+        for (const s of [-1, 1]) add(B, PG.box, gold, 0.025, 0.84, 0.02, s * 0.06, -0.43, 0.18, -0.1);
+        add(B, GE.ring, gold, 0.25, 0.22, 0.5, 0, -0.85, 0, Math.PI / 2);
+        add(B, PG.box, gold, 0.035, 0.22, 0.02, 0.1, -0.08, 0.15);
+        add(B, PG.box, mat('book', 0x3a2418), 0.12, 0.15, 0.045, -0.17, -0.02, 0.06, 0, 0.35, 0); add(B, PG.box, gold, 0.124, 0.02, 0.05, -0.17, -0.02, 0.06, 0, 0.35, 0);
+        for (const a of A) { add(a.el, GE.flare, main, 0.075, 0.24, 0.075, 0, -0.17, 0); add(a.el, GE.ring, gold, 0.075, 0.075, 0.4, 0, -0.29, 0, Math.PI / 2); }
         const g = new THREE.Group(); g.position.set(0, 0.55, 0); B.add(g); J.dressed.push(g); J.orbs = g;
-        for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2; const o = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: 0x7a9aff })); o.scale.setScalar(0.05); o.position.set(Math.cos(a) * 0.5, Math.sin(a * 2) * 0.1, Math.sin(a) * 0.5); o.frustumCulled = false; g.add(o); }
+        for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2; const o = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: P.accent })); o.scale.setScalar(0.05); o.position.set(Math.cos(a) * 0.5, Math.sin(a * 2) * 0.1, Math.sin(a) * 0.5); o.frustumCulled = false; g.add(o); }
         break;
       }
     }
+    if (J === AV._J) AV.mats = mats(root);
   };
   // the mage's orbs turn and take the colour of the element in hand
   AV.orbTick = function (J, dt, el) {
     if (!J.orbs) return;
     J.orbs.rotation.y += dt * 2.2;
-    const c = el && G.Elem && G.Elem.BY[el] ? G.Elem.BY[el].hex : 0x7a9aff;
+    const c = el && G.Elem && G.Elem.BY[el] ? G.Elem.BY[el].hex : PAL.mage.accent;
     for (const o of J.orbs.children) o.material.color.setHex(c);
   };
 

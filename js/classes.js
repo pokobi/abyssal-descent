@@ -11,7 +11,7 @@
     { id: 'assault', name: '突撃兵', icon: '💨', col: '#ff6a50', gun: 's_wasp', melee: 'm_basic', skill: 'dash', ult: 'ult_berserk', grapple: 15,
       mods: { moveSpeed: 0.1 }, minus: '20m以上の敵への与ダメ-20%', favName: 'SMG・ショットガン（銃と部品）、機動・連射・装填の加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun' || o.arch === 'autoshotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
-    { id: 'sniper', name: '狙撃手', icon: '🎯', col: '#5aa8ff', gun: 'n_scout', melee: 'm_basic', skill: 'decoy', ult: 'ult_shadow', grapple: 18,
+    { id: 'sniper', name: '狙撃手', icon: '🎯', col: '#5aa8ff', gun: 'n_scout', atts: { optic: 'o_x2' }, melee: 'm_basic', skill: 'decoy', ult: 'ult_shadow', grapple: 18,
       mods: {}, minus: 'ADSせずに撃つ（腰だめ）と拡散+40%', favName: '狙撃銃・DMR（銃と部品）、会心・ヘッドショットの加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'sniper' || o.arch === 'dmr'), look: '青いフード付きマントとマスク、右目の照準鏡', role: '遠くから急所を撃つ' },
     { id: 'blade', name: '剣士', icon: '⚔️', col: '#ffb040', gun: 'p_viper', melee: 'm_machete', skill: 'haste', ult: 'ult_bladestorm', grapple: 15,
@@ -446,7 +446,7 @@
   const bar = (label, v, lo, hi, txt, good) => { const k = Math.max(0.04, Math.min(1, (v - lo) / (hi - lo))); return `<div class="cls-bar"><span>${label}</span><i><b style="width:${(k * 100).toFixed(0)}%;background:${good ? 'var(--cc)' : '#c06050'}"></b></i><em>${txt}</em></div>`; };
   CL.detailHTML = function (c) {
     const n = CL.numbers(c), g = wDef(c.gun), mel = wDef(c.melee);
-    const core = c.atts && c.atts.core && G.ATT_BY_ID[c.atts.core];
+    const kitAtts = Object.values(c.atts || {}).map((id) => G.ATT_BY_ID[id]).filter(Boolean);
     const R = (r) => (G.RARITY[r] ? G.RARITY[r].color : '#ccc');
     const kitRow = (tag, icon, name, rar, sub) => `<div class="cls-kit"><span class="cls-tag">${tag}</span><span class="cls-kic">${icon}</span><div><b style="color:${R(rar)}">${esc(name)}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
     // the skill and the ultimate: the status screen's own card for them (its cooldown, damage, range and the numbers in the text are the game's)
@@ -457,7 +457,7 @@
       <div class="cls-cols">
         <div class="cls-col">
           <div class="cls-sec">装備</div>
-          ${kitRow('銃', g.icon || '🔫', g.name, g.rarity, esc(g.cat || '') + (core ? `・${core.icon}${core.name}付き` : ''))}
+          ${kitRow('銃', g.icon || '🔫', g.name, g.rarity, esc(g.cat || '') + kitAtts.map((a) => `・${a.icon}${a.name}付き`).join(''))}
           ${kitRow('近接', mel.icon || '🗡️', mel.name, mel.rarity, esc(mel.cat || ''))}
           <div class="cls-sec">スキル</div>
           ${skRow('スキル', c.skill, false)}

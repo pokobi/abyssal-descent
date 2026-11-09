@@ -35,6 +35,7 @@
         const v = a.mods[k];
         if (k === 'elem') { s.elem = v; continue; }
         if (k === 'el') continue; // (属性コア: read at the shot, see G.Elem.wEl)
+        if (k === 'magnify') { s.zoom = v; continue; } // (a scope: the magnification while aiming is its own, whatever the gun)
         if (k.endsWith('+')) { const kk = k.slice(0, -1); s[kk] = (s[kk] || 0) + v; continue; }
         if (k === 'critChance') { s.critChance += v; continue; }
         s[k] = (s[k] === undefined ? 1 : s[k]) * v;
@@ -239,8 +240,10 @@
         M.bolt = box(0.05, 0.012, 0.012, 0.035, 0.04, 0.08, mats.steel);
         M.mag = box(0.03, 0.06, 0.07, 0, -0.06, -0.02, metal);
         box(0.03, 0.012, 0.25, 0, 0.06, -0.04, metal);
-        M.muzzle.set(0, 0.025, -0.81); M.sightY = 0.1; M.ironY = 0.08; M.railY = 0.066; M.fore.set(0, -0.04, -0.28); M.grip.set(0, -0.06, 0.12);
-        if (!atts.optic) atts = Object.assign({}, atts, { optic: '__defscope' });
+        // iron sights (no scope comes with it: a scope is an attachment like on any gun): a hooded post on the barrel, a notched leaf on the receiver
+        cyl(0.017, 0.022, 0, 0.025, -0.7, metal); box(0.006, 0.05, 0.008, 0, 0.062, -0.7); box(0.026, 0.006, 0.03, 0, 0.09, -0.7, metal);
+        box(0.007, 0.026, 0.016, -0.01, 0.079, 0.06); box(0.007, 0.026, 0.016, 0.01, 0.079, 0.06); box(0.03, 0.008, 0.02, 0, 0.068, 0.06, metal);
+        M.muzzle.set(0, 0.025, -0.81); M.sightY = 0.088; M.ironY = 0.088; M.railY = 0.066; M.fore.set(0, -0.04, -0.28); M.grip.set(0, -0.06, 0.12);
         break;
       }
       case 'shotgun': case 'autoshotgun': {
@@ -577,7 +580,7 @@
     // ---- attachments ----
     const atop = (id) => G.ATT_BY_ID[id] && G.ATT_BY_ID[id].visual;
     if (atts.optic) {
-      const v = atts.optic === '__defscope' ? 'scope' : atop(atts.optic);
+      const v = atop(atts.optic);
       const z = M.opticZ, y = M.railY;
       if (v === 'reddot') {
         box(0.025, 0.012, 0.04, 0, y + 0.006, z, metal); box(0.003, 0.028, 0.004, -0.0125, y + 0.026, z - 0.015, metal); box(0.003, 0.028, 0.004, 0.0125, y + 0.026, z - 0.015, metal); box(0.026, 0.003, 0.004, 0, y + 0.0395, z - 0.015, metal); box(0.022, 0.022, 0.001, 0, y + 0.026, z - 0.015, mats.lens);

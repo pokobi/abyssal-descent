@@ -96,6 +96,7 @@
     '🪽': ['feathered-wing', '#e8f0ff'],
     '🐺': ['wolf-head', '#b8c0d0'],
     '🔍': ['magnifying-glass', '#c9d2dc'],
+    '🔎': ['magnifying-glass', '#9fd0ff'],
     '🛠': ['spanner', '#c9d2dc'],
     '📊': ['histogram', '#8fd0ff'],
     '📐': ['expand', '#c8d8e8'],
@@ -581,6 +582,7 @@
     o_reflex: P.front(R(130, 110, 252, 236, 46), R(162, 142, 188, 180, 30), 232, C.orange),
     o_holo: [...P.front(R(84, 128, 344, 222, 28), R(118, 160, 276, 160, 16), 240, C.red), EV(O(256, 240, 56) + O(256, 240, 44), C.red)],
     o_2x: [L(R(140, 304, 232, 30, 10), C.black), L(PG(112, 214, 380, 196, 418, 214, 418, 304, 112, 304, 96, 260), C.dark), L(R(410, 214, 12, 84, 5), C.glass), L(R(186, 170, 70, 36, 10), C.black), L(O(220, 186, 10), C.red)],
+    o_x2: P.scope(280, 19),
     o_4x: P.scope(360, 22),
     o_8x: [...P.scope(452, 40), L(O(300, 238, 20), C.dark)],
     o_marksman: [...P.scope(400, 30), L(R(340, 178, 32, 30, 8), C.dark)],
@@ -652,7 +654,7 @@
   };
   // long parts lie diagonally across the tile (like most game icons), short ones are just zoomed a little
   const TILT = { o_: [1.28, -28], m_: [1.26, -30], b_: [1.16, -35], g_: [1.12, 10], u_: [1.14, 0], k_: [1.08, -28], a_: [1.06, 22], t_: [1.0, 0] };
-  const ZOOM = { o_2x: 1.55, o_8x: 1.18, b_short: 1.8, b_heavy: 1.08, b_blast: 1.08, m_amp: 1.22, m_nozzle: 1.28, u_handstop: 1.4, u_agrip: 1.25 };
+  const ZOOM = { o_x2: 1.4, o_2x: 1.55, o_8x: 1.18, b_short: 1.8, b_heavy: 1.08, b_blast: 1.08, m_amp: 1.22, m_nozzle: 1.28, u_handstop: 1.4, u_agrip: 1.25 };
   for (const id in ATT) {
     const t = TILT[id.slice(0, 2)]; if (!t) continue;
     if (id === 'o_reddot' || id === 'o_reflex' || id === 'o_holo') { ATT[id] = Z(ATT[id], 1.06, 0); continue; }

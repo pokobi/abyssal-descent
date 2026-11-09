@@ -653,7 +653,7 @@
         cyl(r0 * 0.95, 0.025, mz.x, mz.y, mz.z - 0.012, AM.steel2);
         for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; box(0.006, 0.006, 0.05, mz.x + Math.cos(a) * r0 * 0.9, mz.y + Math.sin(a) * r0 * 0.9, mz.z - 0.048, AM.dark, 0, 0, a); }
         cyl(r0 * 1.1, 0.006, mz.x, mz.y, mz.z - 0.075, AM.steel2);
-        M.muzzle = V(mz.x, mz.y, mz.z - 0.075);
+        M.muzzle = V(mz.x, mz.y, mz.z - 0.075); M.flashHider = true;
       } else if (v === 'amp') {
         cyl(r0, 0.03, mz.x, mz.y, mz.z - 0.015, AM.dark);
         const bell = new THREE.Mesh(PG.cone, AM.steel2); bell.scale.set(r0 * 2.1, 0.07, r0 * 2.1); bell.rotation.x = Math.PI / 2; bell.position.set(mz.x, mz.y, mz.z - 0.065); g.add(bell);
@@ -851,7 +851,7 @@
     const w = info && info.weapon;
     if (w && w.def && w.def.kind !== 'melee' && (info.src === 'bullet' || info.src === 'explosion')) {
       const s = W.stats(w);
-      if (s.soulAmmo) { if (w.soulArea !== G.game.area) { w.soul = (w.soul || 0) / 2; w.soulArea = G.game.area; } w.soul = Math.min(0.4, (w.soul || 0) + 0.01); }
+      if (s.soulAmmo) w.soul = Math.min(0.4, soulOf(w) + 0.01);
       if (s.chainKill && !info.proc && e) {
         const c = e.centerPos(); let best = null, bd = 12;
         for (const o of G.enemies.inRadius(c, 12)) { if (!o.alive || o.ally || o === e) continue; const d = o.centerPos().distanceTo(c); if (d < bd) { bd = d; best = o; } }
@@ -1060,8 +1060,9 @@
     // feedback
     const silent = model && model.suppressed || w.def.trait === 'silent' || !!s.hush;
     if (s.proj && s.sound !== 'nail') G.sfx.launcher(s.sound); else if (s.sound === 'tesla') { G.sfx.zap(null); G.sfx.gun('nail', { vol: 0.5 }); } else if (s.sound === 'rail') G.sfx.launcher('rail'); else G.sfx.gun(s.sound, { suppressed: silent, auto: s.auto || s.autoShot, id: w.def.id, trait: w.def.trait, rar: w.def.rarity });
-    if (!silent) G.fx.flash(muzzle, 0xffb060, s.sound === 'shotgun' ? 45 : 25, 0.06, 10);
-    anim.flash = silent ? 0.02 : 0.05;
+    const hider = model && model.flashHider ? 0.4 : 1; // (フラッシュハイダー: a smaller muzzle flash)
+    if (!silent) G.fx.flash(muzzle, 0xffb060, (s.sound === 'shotgun' ? 45 : 25) * hider, 0.06, hider < 1 ? 7 : 10);
+    anim.flash = silent ? 0.02 : hider < 1 ? 0.03 : 0.05;
     const crouchRec = P.crouching && P.grounded ? 1 - (s.crouchRecoil || 0) : 1;
     const rec = s.recoil * crouchRec * (1 - W.adsT * 0.35);
     P.addRecoil(THREE.MathUtils.degToRad(rec * 0.55) * (0.8 + Math.random() * 0.4), THREE.MathUtils.degToRad(rec * 0.22) * (Math.random() - 0.5));
@@ -1095,6 +1096,15 @@
     return fwd.clone().addScaledVector(right, Math.cos(th) * r).addScaledVector(u2, Math.sin(th) * r).normalize();
   }
   W.coneDir = coneDir;
+  // 魂喰らいの弾: what this arm has taken so far (half of it carries into a new area)
+  const soulOf = (w) => { if (w.soulArea !== G.game.area) { w.soul = (w.soul || 0) / 2; w.soulArea = G.game.area; } return w.soul || 0; };
+  // a sure crit, whatever kind of round it is: the first hit out of 隠密 (with its own multiplier), 月影 / 魔弾の引鉄, 神の眼 (aimed, on the head), 急所穿ち
+  const sureCrit = (s, info, ads) => {
+    if (P.temps.has('cloak') && !W._cloakUsed) { info.forceCrit = true; info.cloakMul = W._cloakMul; W._cloakUsed = true; G.combat.untemp('cloak'); }
+    if (s.moonShot || s.forceCrit || (s.godEye && ads && info.head) || (G.Classes && G.Classes.sureCrit(s, info))) { info.forceCrit = true; info.cloakMul = info.cloakMul || 1; }
+  };
+  // 魔弾の引鉄: a crit leaves the next shot a sure crit, for as many in a row as it allows
+  const critRun = (w, s, info) => { if (info.wasCrit) { w.critRun = (w.critRun || 0) + 1; if (w.critRun <= s.critChain) w.critNext = true; else { w.critRun = 0; w.critNext = false; } } else if (!s.forceCrit) w.critRun = 0; };
 
   W.traceShot = function (w, s, o, dir, muzzle, pellets, depth, exclude) {
     depth = depth || 0;
@@ -1123,16 +1133,11 @@
         lowHit: hp.y < h.e.pos.y + h.e.height * 0.35, lifesteal: s.lifesteal || 0,
       };
       if (w.def.trait === 'execute' && !h.e.boss && h.e.hp < h.e.maxHp * 0.2) info.forceExecute = true;
-      if (s.soulAmmo && w.soulArea !== G.game.area) { w.soul = (w.soul || 0) / 2; w.soulArea = G.game.area; } // (魂喰らい: half of it carries into a new area)
-      let dmg = s.dmg * fall * pmul * (info.hushMul || 1) * (1 + (s.soulAmmo ? w.soul || 0 : 0));
-      if (info.forceExecute) dmg = h.e.hp + h.e.shield + 1;
-      if (P.temps.has('cloak') && !W._cloakUsed) { info.forceCrit = true; info.cloakMul = W._cloakMul; W._cloakUsed = true; G.combat.untemp('cloak'); }
-      if (s.moonShot || s.forceCrit) { info.forceCrit = true; info.cloakMul = 1; }
-      // 神の眼: aiming down the sights, a hit on the weak point (the head) is a sure crit
-      if (s.godEye && P.adsActive && info.head) { info.forceCrit = true; info.cloakMul = 1; }
-      if (G.Classes && G.Classes.sureCrit(s, info)) { info.forceCrit = true; info.cloakMul = 1; } // 急所穿ち (狙撃手): a full shot to the head
       // 消音の極意: a foe that is not on to you (cannot see you, or is after a decoy) takes more
       if (s.hush && (!h.e.hasLOS || (G.combat.getDecoy && G.combat.getDecoy()))) info.hushMul = 1 + s.hush;
+      let dmg = s.dmg * fall * pmul * (info.hushMul || 1) * (1 + (s.soulAmmo ? soulOf(w) : 0)); // (魂喰らい: what the arm has taken so far)
+      if (info.forceExecute) dmg = h.e.hp + h.e.shield + 1;
+      sureCrit(s, info, P.adsActive); // (隠密, 月影 / 魔弾の引鉄, 神の眼, 急所穿ち)
       G.combat.damageEnemy(h.e, dmg, info);
       if (s.focusShot && G.Classes) G.Classes.focusHit(h.e, info, s); // the gauge back on a head, 一発入魂's rounds (狙撃手)
       if (s.beam) { G.fx.sparks(hp, null, 12, 0x9fd4ff, 8); G.fx.flash(hp, 0x9fd4ff, 30, 0.12, 6); }
@@ -1145,7 +1150,7 @@
       if (w.def.trait === 'hive' && W.bees.length < 12 && h.e.alive) W.bees.push({ e: h.e, pos: hp.clone(), t: 3, dmg: s.dmg * 0.6, w, area: G.game.area });
       if (w.def.trait === 'crown' && info.head) W.crown(h.e);
       if (w.def.trait === 'moon' && info.wasCrit && !h.e.alive) w.moonN = Math.min(5, (w.moonN || 0) + 2);
-      if (s.critChain) { if (info.wasCrit) { w.critRun = (w.critRun || 0) + 1; if (w.critRun <= s.critChain) w.critNext = true; else { w.critRun = 0; w.critNext = false; } } else if (!s.forceCrit) w.critRun = 0; }
+      if (s.critChain) critRun(w, s, info);
       if (w.def.trait === 'stormcall' && info.head) { G.fx.strike(hp, 0xd0e0ff, true); G.combat.chain(h.e, 5, s.dmg * 1.2, 14, { src: 'bullet', proc: true }); G.sfx.zap(hp); }
       if (w.def.pull || s.pull) { /* projectile only */ }
       // ricochet to another enemy
@@ -1208,11 +1213,11 @@
     if (wh && wh.t < 2) d.copy(dir);
     const speed = pj.speed * (1 + (P.stats.projSpeed || 0));
     const base = {
-      kind: pj.kind, pos: muzzle.clone(), vel: d.multiplyScalar(speed), grav: pj.grav, owner: 'player', dmg: s.dmg, radius: pj.kind === 'rocket' ? 0.25 : 0.12, weapon: w,
+      kind: pj.kind, pos: muzzle.clone(), vel: d.multiplyScalar(speed), grav: pj.grav, owner: 'player', dmg: s.dmg * (1 + (s.soulAmmo ? soulOf(w) : 0)), radius: pj.kind === 'rocket' ? 0.25 : 0.12, weapon: w,
       headMul: s.headMul, pierce: s.pierce || 0, life: 6,
-      info: { src: 'bullet', weapon: w, elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), shieldMul: s.shieldMul, critBonus: s.critChance, headMul: s.headMul },
+      info: { src: 'bullet', weapon: w, elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), shieldMul: s.shieldMul, critBonus: s.critChance, headMul: s.headMul, eliteBonus: s.eliteDmg || 0, lifesteal: s.lifesteal || 0 },
     };
-    if (pj.explode) { base.explode = pj.explode; base.info = { src: 'explosion', weapon: w, elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), icd: 2.5, icdKey: 'w:' + w.def.id, shieldMul: s.shieldMul }; if (w.def.trait === 'cluster') base.cluster = 4; }
+    if (pj.explode) { base.explode = pj.explode; base.info = { src: 'explosion', weapon: w, elem: s.elem, elemChance: s.elemChance, el: G.Elem.wEl(w), icd: 2.5, icdKey: 'w:' + w.def.id, shieldMul: s.shieldMul, eliteBonus: s.eliteDmg || 0, lifesteal: s.lifesteal || 0 }; if (w.def.trait === 'cluster') base.cluster = 4; }
     if (pj.fuse) { base.fuse = pj.fuse; base.bounce = !!pj.bounce; }
     if (w.def.trait === 'homing') { base.homing = 5; }
     // 終末 (ruin): the blast leaves a black hole for 3 s, which goes off again at the end
@@ -1226,9 +1231,17 @@
       };
     }
     if (pj.kind === 'grenade') base.onHitEnemyExplode = true;
-    if (s.pull || w.def.pull) {
-      base.onHitEnemy = (e) => { if (!e.boss) { const toMe = P.pos.clone().sub(e.pos).setY(0); e.knockback(toMe.normalize(), Math.min(22, toMe.length() * 2.2)); G.combat.stun(e, 0.8); } G.sfx.chain(0.4, 0.4); };
+    // what a round does to the foe it strikes (a bolt, a nail, a harpoon; a blast is no crit and has none of these)
+    const hits = [];
+    if (s.pull || w.def.pull) hits.push((e) => { if (!e.boss) { const toMe = P.pos.clone().sub(e.pos).setY(0); e.knockback(toMe.normalize(), Math.min(22, toMe.length() * 2.2)); G.combat.stun(e, 0.8); } G.sfx.chain(0.4, 0.4); });
+    if (!pj.explode) {
+      const ads = P.adsActive;
+      base.preHitEnemy = (e, info) => sureCrit(s, info, ads); // (隠密, 魔弾の引鉄, 神の眼, 急所穿ち)
+      if (w.def.trait === 'chainHit') hits.push((e) => { if (Math.random() < 0.5) { G.combat.chain(e, 2, s.dmg * 0.5, 9, { src: 'bullet', proc: true }); G.fx.strike(e.centerPos()); } }); // 連鎖雷 (雷霆弩)
+      if (s.critChain) hits.push((e, hp, info) => critRun(w, s, info)); // 魔弾の引鉄
+      if (s.focusShot && G.Classes) hits.push((e, hp, info) => G.Classes.focusHit(e, info, s)); // 狙撃手: the gauge back on a head
     }
+    if (hits.length) base.onHitEnemy = (e, hp, info) => { for (const f of hits) f(e, hp, info); };
     const p = G.combat.spawnProjectile(base);
     // GL rounds explode on enemy contact
     if (pj.kind === 'grenade') { p.onHitEnemy = null; }

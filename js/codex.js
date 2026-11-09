@@ -14,7 +14,7 @@
     ['valuable', '💰 金品', () => G.VALUABLES],
     ['skill', '🔮 スキル', () => G.SKILLS],
     ['ult', '🌟 アルティメット', () => G.ULTS],
-    ['enemy', '👹 モンスター', () => G.ENEMIES.filter((e) => !extraHidden('enemy', e))],
+    ['enemy', '👹 魔物', () => G.ENEMIES.filter((e) => !extraHidden('enemy', e))],
     ['boss', '👑 ボス', () => G.BOSSES.filter((b) => !(G.RETIRED_BOSSES || []).includes(b.id) && !extraHidden('boss', b))],
     ['stage', '🗺️ フィールド', () => stages()],
     ['depth', '🌀 深淵', () => G.Depth.CODEX],
@@ -238,7 +238,7 @@
     if (tab === 'item') return G.ITEM_CAT[o.cat].name;
     if (tab === 'skill') return 'スキル';
     if (tab === 'ult') return 'アルティメット';
-    if (tab === 'enemy') return 'モンスター' + (o.vicon ? ' ' + o.vicon : '');
+    if (tab === 'enemy') return '魔物' + (o.vicon ? ' ' + o.vicon : '');
     if (tab === 'boss') return 'ボス';
     if (tab === 'armor') return '防具（' + G.ARMOR_SLOT_BY_ID[o.slot].name + '・' + G.ARMOR_MAT_BY_ID[o.mat].name + '）';
     if (tab === 'valuable') return '金品';

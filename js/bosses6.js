@@ -636,7 +636,7 @@
       if (BS.swapMerc) { BS.hurtMerc(BS.swapMerc, 1e9); G.fx.ring(P.pos.clone().setY(P.pos.y + 0.2), 4, VIO, 0.5); return; } // aimed at the mercenary: it is simply smashed (capped at half its health)
       this.lift = { ph: 'up', t: 0, top: Math.max(this.floorY(), P.pos.y) + TOP, hold: 1.5 };
       P.grapple.state = 'none'; P.pileState = null; P.grounded = false; this.lockSkills(true);
-      G.ui.toast('🌀 重力が反転した！ — スキル・ULT・グラップルは使えない', 'warn'); if (G.sfx.gravLift) G.sfx.gravLift(); else G.sfx.magic(P.pos, 'dark'); P.addShake(0.5);
+      G.ui.toast('🌀 重力が反転した！ — スキル・アルティメット・グラップルは使えない', 'warn'); if (G.sfx.gravLift) G.sfx.gravLift(); else G.sfx.magic(P.pos, 'dark'); P.addShake(0.5);
     }
     updateLift(dt) {
       const L = this.lift, P = Pl(); if (!L) return;
@@ -1366,7 +1366,7 @@
   // (the second half is a secret: the first entry says nothing of it, and the second stays hidden in the codex until the crown has broken once)
   G.BOSSES.push(
     { id: 'sovereign', name: '虚無の君主', title: 'CRIMSON SOVEREIGN', icon: '🌑', rarity: 'mythic', desc: '深淵の最奥、紅い月の下、奈落の向こう岸にそびえる巨人。こちらからは決して届かない場所から、床を剥がし、巨大な手で叩き潰し、薙ぎ払う。', mech: ['エクストラの最終エリアに必ず現れる。戦いが始まると入口の足場は閉ざされる', '床が定期的に崩れて奈落になる（赤く光ってから約2秒）。落ちると最大HPの約40%のダメージを受け、近くの無事な床へ戻される', '叩きつけた手はしばらく床に残り、攻撃できる（ダメージ1.5倍）。薙ぎ払いは大きく吹き飛ばす', 'しばらくダメージが入らないと、こちら側に「虚晶の造物」が現れる。砕くと君主に大ダメージ'], field: true, ending: true },
-    { id: 'sovereign2', name: '虚無の化身', title: 'AVATAR OF THE VOID', icon: '🌌', rarity: 'mythic', codexOnly: true, desc: '王冠が砕けた君主の、真の姿。重力を裏返して戦う者を星々の只中へと引きずり上げ、天空の円い足場の周りを巡りながら攻め立てる。', mech: ['虚無の君主の王冠が砕けると現れる。重力が裏返り、天空の円い足場へと舞台が移る', '足場は扇形や渦巻き状に崩れ、しばらくすると戻る。落ちると大ダメージを受けて無事な足場へ戻される', '星の環・天の裂け目・彗星の槍・掌の檻で攻めてくる。胸の虚無核が弱点。閉じた両手は攻撃できる（ダメージ1.5倍）', '紫の紋章に入ると重力が反転し、高く打ち上げられてから叩きつけられる（最大HPの50%）。空中では少しだけ動け、射撃はできるが、スキル・ULT・グラップルは使えない', '虚無の渦はどこにでも開き、ほかの攻撃と重なることもある。強く引き寄せる（走れば逃げられる）'], field: true },
+    { id: 'sovereign2', name: '虚無の化身', title: 'AVATAR OF THE VOID', icon: '🌌', rarity: 'mythic', codexOnly: true, desc: '王冠が砕けた君主の、真の姿。重力を裏返して戦う者を星々の只中へと引きずり上げ、天空の円い足場の周りを巡りながら攻め立てる。', mech: ['虚無の君主の王冠が砕けると現れる。重力が裏返り、天空の円い足場へと舞台が移る', '足場は扇形や渦巻き状に崩れ、しばらくすると戻る。落ちると大ダメージを受けて無事な足場へ戻される', '星の環・天の裂け目・彗星の槍・掌の檻で攻めてくる。胸の虚無核が弱点。閉じた両手は攻撃できる（ダメージ1.5倍）', '紫の紋章に入ると重力が反転し、高く打ち上げられてから叩きつけられる（最大HPの50%）。空中では少しだけ動け、射撃はできるが、スキル・アルティメット・グラップルは使えない', '虚無の渦はどこにでも開き、ほかの攻撃と重なることもある。強く引き寄せる（走れば逃げられる）'], field: true },
   );
   G.BOSS_BY_ID = Object.fromEntries(G.BOSSES.map((b) => [b.id, b]));
   BS.CLS.sovereign = Sovereign; BS.CLS.sovereign2 = Sovereign; // (sovereign2: only ever built by the codex)

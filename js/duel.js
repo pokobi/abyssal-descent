@@ -68,7 +68,7 @@
   function arm(b) {
     const s = (b.duelSt = { n: 0, wg: 0, wgMax: 0, stunT: 0 });
     const pt0 = b.phaseText.bind(b);
-    b.phaseText = () => (D.cur && D.cur.b === b ? `⚔ 決闘中 — 金色に光った瞬間に${D.keyName()}でパリィ（白いゲージを削り切ればブレイク）` : s.stunT > 0 ? `💥 ブレイク — 総攻撃の好機！（被ダメージ×${D.STUN_MUL}）` : s.wg > 0 ? '⚪ 白いゲージ（盾）を削り切るまで本体は無傷' : pt0());
+    b.phaseText = () => (D.cur && D.cur.b === b ? `⚔ 決闘中 — 金色に光った瞬間に${D.keyName()}でパリィ（白いゲージを削り切ればブレイク）` : s.stunT > 0 ? `💥 ブレイク — 総攻撃の好機！（被ダメ×${D.STUN_MUL}）` : s.wg > 0 ? '⚪ 白いゲージ（盾）を削り切るまで本体は無傷' : pt0());
     // its health only falls while no white gauge is left; what would have come off goes into the gauge instead (at a rate)
     let hp = b.hp;
     Object.defineProperty(b, 'hp', { configurable: true, get: () => hp, set: (v) => {
@@ -250,7 +250,7 @@
     G.fx.dmgNum && G.fx.dmgNum(b.main.centerPos(), 'BREAK ' + dmg, 'crit');
     G.fx.sparks(b.main.centerPos(), null, 40, 0xffffff, 12); G.sfx.shieldBreak && G.sfx.shieldBreak(b.pos); G.sfx.explosion && G.sfx.explosion(b.pos, 0.8);
     D.breakFx(b);
-    G.ui.toast(`💥 ブレイク！ ${b.def.name}が崩れた — ${D.STUN}秒間 総攻撃（被ダメージ×${D.STUN_MUL}）`, 'good');
+    G.ui.toast(`💥 ブレイク！ ${b.def.name}が崩れた — ${D.STUN}秒間 総攻撃（被ダメ×${D.STUN_MUL}）`, 'good');
     D.finish(true);
     if (!b.dead) { st.stunT = D.STUN; stopBoss(b); }
   };

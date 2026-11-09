@@ -6,7 +6,7 @@
   G.bindBuffs = () => { C = G.combat; P = G.player; };
   const CAT = {
     stat: { name: '能力', icon: '📈' }, pile: { name: 'パイルドライバー強化', icon: '🔨' }, curse: { name: '呪い', icon: '🕯️' }, trade: { name: '代償', icon: '⚖️' }, offense: { name: '攻撃', icon: '⚔️' }, defense: { name: '防御', icon: '🛡️' },
-    mobility: { name: '機動', icon: '👟' }, economy: { name: '経済', icon: '🪙' }, element: { name: '状態異常', icon: '☣️' }, attr: { name: '属性', icon: '🌈' }, summon: { name: '召喚', icon: '👻' }, skill: { name: 'スキル強化', icon: '🔮' }, ult: { name: 'アルティメット強化', icon: '🌟' }, melee: { name: '近接', icon: '🗡️' }, pact: { name: '契約', icon: '📜' }, relic: { name: '遺物', icon: '🏺' },
+    mobility: { name: '機動', icon: '👟' }, economy: { name: '経済', icon: '🪙' }, element: { name: '状態異常', icon: '☣️' }, attr: { name: '属性', icon: '🌈' }, summon: { name: '召喚', icon: '👻' }, skill: { name: 'スキル強化', icon: '🔮' }, ult: { name: 'アルティメット強化', icon: '🌟' }, melee: { name: '近接', icon: '🗡️' }, pact: { name: '誓約', icon: '📜' }, relic: { name: '遺物', icon: '🏺' },
   };
   G.BUFF_CAT = CAT;
   function add(id, name, icon, rarity, cat, desc, def) {
@@ -141,7 +141,7 @@
   add('h_moving', '機動戦', '🏃', 'uncommon', 'mobility', '移動速度に比例して与ダメ最大+25%。', { hooks: { preHit(c) { c.bonus += Math.min(0.25, P.speedH / 12 * 0.25); } } });
   add('h_still', '不動の構え', '🗿', 'uncommon', 'offense', '静止中、与ダメ+25%・拡散-30%。', { hooks: { preHit(c) { if (P.speedH < 0.5) c.bonus += 0.25; } }, flag: true });
   add('h_last', '最後の一発', '🔚', 'rare', 'offense', 'マガジン最後の3発のダメージ+100%。', { hooks: { preHit(c) { if (isWeapon(c) && P.weapon && P.weapon.mag < 3) c.bonus += 1.0; } } });
-  add('h_firstb', '初撃強化', '🥇', 'uncommon', 'offense', 'リロード後最初の5発のダメージ+30%。', { hooks: { onReloadEnd(c, n, s) { s.k = 5; }, onShoot(c, n, s) { if (s.k > 0) s.k--; s.on = s.k > 0; }, preHit(c, n, s) { if (isWeapon(c) && s.on) c.bonus += 0.3; } } });
+  add('h_firstb', '初撃強化', '🥇', 'uncommon', 'offense', 'リロード後最初の5発のダメージ+30%。', { hooks: { onReloadEnd(c, n, s) { s.k = 5; s.on = true; }, onShoot(c, n, s) { if (s.k > 0) s.k--; s.on = s.k > 0; }, preHit(c, n, s) { if (isWeapon(c) && s.on) c.bonus += 0.3; } } });
   add('h_fullhp', '万全', '💯', 'uncommon', 'offense', 'HP満タン時、与ダメ+20%。', { hooks: { preHit(c) { if (P.hp >= P.stats.maxHp) c.bonus += 0.2; } } });
   add('h_desperate', '背水の陣', '🔥', 'rare', 'offense', 'HPが低いほど与ダメ上昇（最大+50%）。', { hooks: { preHit(c) { c.bonus += 0.5 * (1 - P.hp / P.stats.maxHp); } } });
   add('h_shieldstun', '盾割りの衝撃', '🔨', 'uncommon', 'offense', 'シールドを破壊した敵を2秒スタン。', { hooks: { onShieldBreak(c) { C.stun(c.e, 2); } } });
@@ -202,7 +202,7 @@
   add('d_melee', '堅牢', '🧱', 'uncommon', 'defense', '近接攻撃の被ダメ-20%。', { max: 2, hooks: { preDamaged(c, n) { if (c.src === 'melee') c.red += 0.2 * n; } } });
   add('d_blast', '爆風耐性', '💣', 'common', 'defense', '爆発・範囲攻撃の被ダメ-50%。', { hooks: { preDamaged(c) { if (c.src === 'explosion' || c.src === 'aoe') c.red += 0.5; } } });
   add('d_laststand', '最後の抵抗', '⚔️', 'rare', 'defense', 'HP25%以下で被ダメ-35%。', { hooks: { preDamaged(c) { if (P.hp < P.stats.maxHp * 0.25) c.red += 0.35; } } });
-  add('d_phoenix', '不死鳥', '🐦', 'mythic', 'defense', 'ラン中1回だけ、死亡時にHP全快で復活し周囲に大爆発を起こす。', { flag: true });
+  add('d_phoenix', '不死鳥', '🐦', 'mythic', 'defense', '周回中1回だけ、死亡時にHP全快で復活し周囲に大爆発を起こす。', { flag: true });
   add('d_vampaura', '吸血の霧', '🌫️', 'epic', 'defense', '周囲6mの敵から毎秒生命力を吸収する。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.5; let tot = 0; for (const e of C.inRadius(P.pos, 6)) { C.damageEnemy(e, sc(4) * n, { src: 'buff', proc: true, silent: true }); tot += Math.max(1.2, G.player.stats.maxHp * 0.003); } if (tot) C.heal(tot * n, true); } } });
   add('d_iron', '鉄の皮膚', '🪖', 'legendary', 'defense', '1回の被ダメが最大HPの25%を超えなくなる。', { flag: true });
   add('d_cleanse', '浄化の加護', '✨', 'uncommon', 'defense', '状態異常の持続時間-60%。', { flag: true });
@@ -423,8 +423,8 @@
   add('sa_area', '術式拡張', '⭕', 'uncommon', 'skill', '全スキルの範囲・射程+12%。', { mods: { skillRad: 0.12 }, max: 2 });
   add('sa_dur', '持続詠唱', '⌛', 'uncommon', 'skill', '全スキルの効果時間+15%。', { mods: { skillDur: 0.15 }, max: 2 });
   add('sa_charge', '多重充填', '🔋', 'rare', 'skill', 'チャージ式スキルのチャージ数+1。', { mods: { skillCharges: 1 }, max: 2 });
-  add('sa_fire', '灼熱の術式', '🔥', 'rare', 'skill', 'スキル・アルティメットの命中時、20%で炎上させる。', { mods: { techBurn: 0.6 }, max: 2 });
-  add('sa_frost', '凍結の術式', '❄️', 'rare', 'skill', 'スキル・アルティメットの命中時、20%で冷気を付与する。', { mods: { techFrost: 0.6 }, max: 2 });
+  add('sa_fire', '灼熱の術式', '🔥', 'rare', 'skill', 'スキル・アルティメットの命中時、21%で炎上させる。', { mods: { techBurn: 0.6 }, max: 2 });
+  add('sa_frost', '凍結の術式', '❄️', 'rare', 'skill', 'スキル・アルティメットの命中時、21%で冷気を付与する。', { mods: { techFrost: 0.6 }, max: 2 });
   add('sa_shock', '雷鳴の術式', '⚡', 'rare', 'skill', 'スキル・アルティメットの命中時、15%で近くの2体へ雷撃が連鎖する。', { mods: { techShock: 0.6 }, max: 2 });
   add('sa_stun', '衝撃の術式', '💫', 'uncommon', 'skill', 'スキル・アルティメットの命中時、15%で0.6秒スタン（ボス無効）。', { mods: { techStun: 1 } });
   add('sa_vamp', '吸命の術式', '🩸', 'rare', 'skill', 'スキル・アルティメットの与ダメの2%を回復。', { mods: { techVamp: 0.5 }, max: 3 });
@@ -433,7 +433,7 @@
   [0.06, 0.1].forEach((v, i) => add('ua_cd' + (i + 1), '覚醒の刻 ' + PT[i][0], '⏳', PT[i + 1][1], 'ult', `アルティメットのクールタイム-${Math.round(v * 100)}%`, { mods: { ultCd: v }, max: 2 }));
   add('ua_dur', '永き奇跡', '⌛', 'rare', 'ult', 'アルティメットの効果時間+15%。', { mods: { ultDur: 0.15 }, max: 2 });
   add('ua_charge', '魂の充填', '💠', 'rare', 'ult', '敵を倒す度にアルティメットのクールタイム-1秒。', { max: 3, hooks: { onKill(c, n) { C.ultReduce(1 * n); } } });
-  add('ua_heal', '再起の光', '💚', 'uncommon', 'ult', 'アルティメット使用時、最大HPの12%を回復。', { mods: { ultHeal: 0.5 }, max: 2 });
+  add('ua_heal', '再起の光', '💚', 'uncommon', 'ult', 'アルティメット使用時、最大HPの12.5%を回復。', { mods: { ultHeal: 0.5 }, max: 2 });
   add('ua_shield', '守護の光輪', '🛡️', 'uncommon', 'ult', 'アルティメット使用時、10秒間だけ持続するシールド+40。', { mods: { ultShield: 0.5 }, max: 2 });
   add('ua_over', '覚醒', '⚡', 'rare', 'ult', 'アルティメット使用後8秒間、与ダメ+15%・連射速度+10%。', { mods: { ultOver: 1 } });
   add('ua_echo', '奇跡の残響', '🔁', 'epic', 'ult', 'アルティメット使用時、20%でクールタイムが半分になる。', { mods: { ultEcho: 1 } });

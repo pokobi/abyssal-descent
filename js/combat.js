@@ -111,6 +111,14 @@
       G.buffs.emit('onCoin', { amount: a });
     }
   };
+  // coins handed back as they are (a bank's deposit, a bet's winnings): no coin-gain bonus on them and no onCoin; only `earned` of it counts as coins gained
+  C.payout = function (amount, reason, earned) {
+    if (!G.game.run) return;
+    const a = Math.max(0, Math.round(amount));
+    G.game.run.coins += a; G.game.run.coinsTotal += Math.max(0, Math.round(earned || 0));
+    G.ui.coinPop(a, reason);
+    G.sfx.coins(Math.min(5, Math.ceil(a / 20)));
+  };
   let coinGeo = null, coinMat = null, orbMat = null;
   C.spawnPickup = function (kind, pos, value) {
     if (!coinGeo) {
@@ -269,7 +277,7 @@
       }
       // lifesteal (direct hits only)
       if (!info.proc && src !== 'dot') {
-        const ls = st.lifesteal + (info.weapon && info.weapon.trait === 'lifesteal' ? 0.04 : 0) + (info.lifesteal || 0);
+        const ls = st.lifesteal + (info.weapon && info.weapon.def && info.weapon.def.trait === 'lifesteal' ? 0.04 : 0) + (info.lifesteal || 0);
         if (ls > 0) C.leech(dealt * ls, ls);
       }
     }
@@ -336,7 +344,7 @@
     try { G.buffs.emit('onKill', { e, pos: e.centerPos(), head: !!info.head, src: info.src, overkill: overkill || 0, weapon: info.weapon, proc: info.proc }); } finally { C._noCoins = false; }
     if (G.Classes) G.Classes.onKill(e, info); // (the class's own effect: 一点集中)
     if (G.weapons && G.weapons.onKillTrait) G.weapons.onKillTrait(e, info); // (a crowned foe passes its crown on: 王権)
-    if (info.weapon && info.weapon.trait === 'killReload') { info.weapon.mag = G.weapons.stats(info.weapon).mag; info.weapon.reloading = false; }
+    if (info.weapon && info.weapon.def && info.weapon.def.trait === 'killReload') { info.weapon.mag = G.weapons.stats(info.weapon).mag; info.weapon.reloading = false; }
     if (e.st.markKillReset) {
       const sk = P.skills.find((s) => s && s.id === 'mark'); if (sk) sk.cd = 0;
       const m = G.abilities.skm('mark');
@@ -805,8 +813,9 @@
         if (p.explode) { p.pos.copy(hp); detonate(p); done = true; }
         else {
           const info = Object.assign({ src: 'bullet', head: enemyHit.part === 'head', headMul: p.headMul || 2, dir: tmpD.clone(), pos: hp, part: enemyHit.part, weapon: p.weapon }, p.info || {});
+          if (p.preHitEnemy) p.preHitEnemy(e, info); // (the shooter's say before the blow lands: a sure crit)
           C.damageEnemy(e, p.dmg, info);
-          if (p.onHitEnemy) p.onHitEnemy(e, hp);
+          if (p.onHitEnemy) p.onHitEnemy(e, hp, info);
           if (p.pierce-- <= 0) done = true;
         }
       } else if (p.owner === 'enemy' && hitPlayer(p, wh ? Math.max(0, wh.t) : step)) { // only up to the wall this shot hits: never through a pillar

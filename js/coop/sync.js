@@ -49,7 +49,7 @@
       const id = K.live && cont && !K._real ? cidOf(src) : null;
       if (!id) return open0.call(UIV, cont, src);
       if (K.role === 'host') {
-        if (locks[id] !== undefined) { K.msg('他の人が漁っています'); return; }
+        if (locks[id] !== undefined) { K.msg('仲間が漁っています'); return; }
         locks[id] = 0; hold = { id, cont, src };
         K.send({ t: 'cs', id, d: snap(cont) });
         open0.call(UIV, cont, src);
@@ -76,7 +76,7 @@
       const src = find(m.id) || pd.src;
       if (m.gone) { apply(src, m.id, { cols: 3, rows: 2, name: '', k: 'corpse', it: [] }); K.msg('中身はもう残っていない'); return; }
       apply(src, m.id, m.d);
-      if (!m.ok) { K.msg('他の人が漁っています'); return; }
+      if (!m.ok) { K.msg('仲間が漁っています'); return; }
       hold = { id: m.id, cont: src.cont, src };
       K._real = true;
       try { open0.call(UIV, src.cont, src); } finally { K._real = false; }

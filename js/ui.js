@@ -852,7 +852,7 @@
     const confirm = (k) => {
       const s = UI.screen(`<div class="panel" style="width:min(520px,94vw);text-align:center"><h2>⚠️ 本当にリセットしますか？</h2>
         <div style="font-size:15px;color:#ecdcb8;margin:8px 0"><b>${kinds[k][0]}</b></div>
-        <div style="font-size:13px;color:#ddd3c0;line-height:1.6">${kinds[k][1]}<br><b style="color:#ff8a7a">この操作は元に戻せません。</b>${G.game && G.game.run && G.game.state !== 'title' ? '<br>プレイ中の冒険は、そのまま終了します。' : ''}</div>
+        <div style="font-size:13px;color:#ddd3c0;line-height:1.6">${kinds[k][1]}<br><b style="color:#ff8a7a">この操作は元に戻せません。</b>${G.game && G.game.run && G.game.state !== 'title' ? '<br>プレイ中の周回は、そのまま終了します。' : ''}</div>
         <div style="display:flex;gap:10px;justify-content:center;margin-top:18px"><button class="btn primary" id="rs-yes" style="background:#8a2a2a">リセットする</button><button class="btn" id="rs-no">やめる</button></div></div>`, 'dim');
       s.querySelector('#rs-no').onclick = () => { G.sfx.ui('click'); pick(); };
       s.querySelector('#rs-yes').onclick = () => { G.sfx.ui('select'); G.save.reset(k); if (G.game) G.game.state = 'title'; s.querySelector('.panel').innerHTML = '<h2>リセットしました</h2><div style="margin-top:8px">再読み込みします…</div>'; setTimeout(() => location.reload(), 500); };
@@ -906,7 +906,7 @@
         <button class="btn" id="p-help">🎮 操作方法</button>
         ${G.Dev && G.Dev.on() ? '<button class="btn" id="p-dev">🛠 デバッグ（F9）</button>' : ''}
         ${G.Tutorial.active ? '<button class="btn" id="p-tutend">📘 チュートリアルを終了して本編へ</button>' : ''}
-        ${G.game.canSuspend() ? '<button class="btn" id="p-susp">🏠 タイトルへ（中断）<small style="display:block;font-size:11px;color:var(--dim);margin-top:2px">ランはこのまま残り、タイトルの「続きから」で再開できます</small></button>' : ''}
+        ${G.game.canSuspend() ? '<button class="btn" id="p-susp">🏠 タイトルへ（中断）<small style="display:block;font-size:11px;color:var(--dim);margin-top:2px">周回はこのまま残り、タイトルの「続きから」で再開できます</small></button>' : ''}
         <button class="btn" id="p-quit">🏳 諦めてタイトルへ</button>
       </div><div style="margin-top:12px;font-size:12px;color:var(--dim)">エリア ${G.game.area}</div></div>`, 'dim');
     s.querySelector('#p-resume').onclick = () => G.game.resume();
@@ -925,7 +925,7 @@
     { const d = s.querySelector('#p-dev'); if (d) d.onclick = () => { G.sfx.ui('open'); G.ui.clearScreen(); G.Dev.open(() => UI.pause()); }; }
     const te = s.querySelector('#p-tutend'); if (te) te.onclick = () => { G.sfx.ui('select'); G.Tutorial.finish(); };
     { const b = s.querySelector('#p-susp'); if (b) b.onclick = () => { G.sfx.ui('click'); G.game.suspend(); }; }
-    s.querySelector('#p-quit').onclick = () => { G.sfx.ui('click'); UI.choice('本当に諦めますか？', 'このランの進行は失われます（記録は保存されます）。', [{ icon: '🏳', label: '諦める', onPick: () => G.game.abandon() }], () => UI.pause()); };
+    s.querySelector('#p-quit').onclick = () => { G.sfx.ui('click'); UI.choice('本当に諦めますか？', 'この周回の進行は失われます（記録は保存されます）。', [{ icon: '🏳', label: '諦める', onPick: () => G.game.abandon() }], () => UI.pause()); };
   };
   UI.clickToResume = function () {
     const s = UI.screen(`<div class="clicklock" id="cl">🖱️ クリックして再開</div>`);
@@ -941,7 +941,7 @@
     let n = ''; for (let i = 1; i <= cap; i++) n += `<i class="${i <= lv ? 'on' : i <= lv + add ? 'add' : ''}"></i>`;
     const max = lv + add >= cap;
     const txt = cls === 'thin' ? '' : `<em>${add ? `+${lv}→<b>+${lv + add}</b>` : '+' + lv}<small>/${cap}${max ? ' 最大' : ''}</small></em>`;
-    return `<span class="fgb${cls ? ' ' + cls : ''}${max ? ' max' : ''}" title="強化 +${lv}（このレア度の上限 +${cap}）"><span class="fgb-n">${n}</span>${txt}</span>`;
+    return `<span class="fgb${cls ? ' ' + cls : ''}${max ? ' max' : ''}" title="強化 +${lv}（このレアリティの上限 +${cap}）"><span class="fgb-n">${n}</span>${txt}</span>`;
   };
   UI.coinBox = (cls) => `<div class="coinbox ${cls || ''}"><span>🪙</span><b>${U.fmt((G.game.run && G.game.run.coins) || 0)}</b><small>所持金</small></div>`;
   UI.choice = function (title, desc, options, cancel) {
@@ -1148,7 +1148,7 @@
         <div class="stat-box"><div class="sv">🪙 ${U.fmt(r.coinsTotal)}</div><div class="sl">獲得コイン</div></div>
         <div class="stat-box"><div class="sv">⏱ ${U.time(r.playT !== undefined ? r.playT : G.game.time - r.startT)}</div><div class="sl">クリアタイム</div></div>
         <div class="stat-box"><div class="sv">🌟 ${P.buffs.size}</div><div class="sl">取得加護</div></div>
-        <div class="stat-box"><div class="sv">🩸 ${U.fmt(Math.round(r.dmgTaken || 0))}</div><div class="sl">被ダメージ</div></div>
+        <div class="stat-box"><div class="sv">🩸 ${U.fmt(Math.round(r.dmgTaken || 0))}</div><div class="sl">受けたダメージ</div></div>
         <div class="stat-box"><div class="sv">🪔 ${P.revives || 0}</div><div class="sl">残った灯火</div></div>
       </div>
       ${o.unlock ? `<div class="vic-unlock">🔓 ${o.unlock} が解放されました</div>` : ''}

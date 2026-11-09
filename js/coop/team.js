@@ -198,7 +198,7 @@
     K.handlers.ts = function (m, from) { const rp = K.players.get(m.i); if (rp) rp.stats = m.s; if (K.role === 'host') K.relay(m, from); };
     K.statsHTML = function () {
       const row = (n, s) => `<tr><td>${U.esc(n)}</td><td>${s.k}</td><td>${s.d.toLocaleString()}</td><td>${s.t.toLocaleString()}</td><td>${s.c.toLocaleString()}</td></tr>`;
-      let h = `<table class="coop-stats"><tr><th></th><th>討伐</th><th>与ダメ</th><th>被ダメ</th><th>獲得コイン</th></tr>` + row(K.name, myStats());
+      let h = `<table class="coop-stats"><tr><th></th><th>撃破</th><th>与ダメ</th><th>被ダメ</th><th>獲得コイン</th></tr>` + row(K.name, myStats());
       for (const rp of K.players.values()) if (rp.id !== K.id) h += row(rp.name, rp.stats || { k: 0, d: 0, t: 0, c: 0 });
       return h + '</table>';
     };

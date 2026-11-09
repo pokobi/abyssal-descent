@@ -540,7 +540,7 @@
     return {
       cls: P.cls, perks: (P.perks || []).slice(), hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
       buffs: [...P.buffs], buffState: P.buffState,
-      weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, forge: w.forge || undefined, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined })), wIdx: P.wIdx, kitAtts: P.kitAtts || [],
+      weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, forge: w.forge || undefined, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined, soul: w.soul || undefined, soulArea: w.soul ? w.soulArea : undefined })), wIdx: P.wIdx, kitAtts: P.kitAtts || [],
       wOrder: G.weapons.order().map((t) => (t === 'm' ? 'm' : t ? P.weapons.indexOf(t) : null)),
       melee: { id: P.melee.id, lv: P.melee.lv || 0, forge: P.melee.forge || undefined, kit: P.melee.kit ? 1 : undefined, atts: P.melee.atts && P.melee.atts.core ? { core: P.melee.atts.core } : undefined },
       skills: P.skills.map((s) => (s ? s.id : null)), skillLv: P.skills.map((s) => (s ? s.lv || 0 : 0)), skillKit: P.skills.map((s) => (s && s.kit ? 1 : 0)), pileTome: P.pileTome || 0,
@@ -593,7 +593,7 @@
     P.perks = (d.perks || []).filter((id) => G.Classes && G.Classes.PERK[id]);
     P.recalc();
     P.phoenixUsed = !!d.phoenixUsed;
-    P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag; return w; });
+    P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag; if (x.soul) { w.soul = x.soul; w.soulArea = x.soulArea; } return w; });
     const coresBack = []; for (const w of P.weapons) for (const [slot, id] of Object.entries(w.atts)) if (!G.attOk(G.ATT_BY_ID[id], w)) { coresBack.push(id); delete w.atts[slot]; w.ver++; } // (a core on a gun with an element of its own, a scope on a gun that takes dot sights only)
     if (!P.weapons.length && !Array.isArray(d.weapons)) P.weapons = [G.weapons.make('starter')]; // (a run saved with every gun put away keeps none)
     P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
@@ -1262,7 +1262,7 @@
   };
   // a gun thrown away from the inventory screen becomes a pickup on the ground that keeps its upgrades, parts and ammo
   // a gun out of your hands as an inventory thing (attachments, level, ammo and kills ride along)
-  GM.gunItem = (w) => G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, forge: w.forge || undefined, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined } }); // (its own element and the kit mark ride along)
+  GM.gunItem = (w) => G.Inv.make('gun', w.id, 1, { gun: { atts: Object.assign({}, w.atts), lv: w.lv || 0, forge: w.forge || undefined, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined, soul: w.soul || undefined, soulArea: w.soul ? w.soulArea : undefined } }); // (its own element, the kit mark and 魂喰らい's count ride along)
   GM.meleeItem = (m) => G.Inv.make('melee', m.id, 1, { gun: { lv: m.lv || 0, forge: m.forge || undefined, kit: m.kit ? 1 : undefined, atts: m.atts && m.atts.core ? { core: m.atts.core } : undefined } }); // (its 属性コア rides along)
   // take a gun out of your hands (every gun can go: with none left you fight with the melee weapon / fists)
   GM.releaseGun = function (w) {
@@ -1339,7 +1339,7 @@
   GM.takeGun = function (it, quiet) {
     if (P.weapons.length >= P.stats.weaponSlots) return false;
     const x = it.gun || {}, w = G.weapons.make(it.id);
-    w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag;
+    w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag; if (x.soul) { w.soul = x.soul; w.soulArea = x.soulArea; }
     for (const [slot, id] of Object.entries(w.atts)) if (!G.attOk(G.ATT_BY_ID[id], w)) { P.attStash.push(id); delete w.atts[slot]; } // (a part it cannot take is kept aside: a 属性コア on a gun with an element of its own, a scope on a gun for dot sights only)
     P.weapons.push(w); G.weapons.switchTo(P.weapons.length - 1); G.ui.refreshWeapon(); P.recalc();
     const d = G.WEAPON_BY_ID[it.id]; G.ui.toastSmall(`${d.icon} ${d.name} を${quiet ? '装備した' : '拾った'}`);
@@ -1791,10 +1791,10 @@
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;
       const n = c.cont.items.length;
-      G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `死体を漁る — ${GM.searchDur(1).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? (n ? '中身を確認できる' : '何も残っていない') : '一度押すと漁り始める。', action: c.searched ? (n ? '開く' : null) : S ? '漁っている…' : '漁る' });
+      G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `亡骸を漁る — ${GM.searchDur(1).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? (n ? '中身を確認できる' : '何も残っていない') : '一度押すと漁り始める。', action: c.searched ? (n ? '開く' : null) : S ? '漁っている…' : '漁る' });
       if (I.hit('interact') && !S) {
         if (c.searched) { if (n) G.InvUI.open(c.cont, c); }
-        else GM.startSearch(c, (c.box ? c.box.getCenter(V()) : e.pos.clone().setY(e.pos.y + 0.45)), 1, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '死体を漁っている…');
+        else GM.startSearch(c, (c.box ? c.box.getCenter(V()) : e.pos.clone().setY(e.pos.y + 0.45)), 1, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '亡骸を漁っている…');
       }
       return;
     } else if (best.type === 'loot') {
@@ -1896,7 +1896,7 @@
       { const tv = G.Pawn.tradeValue(P.melee, true); if (tv > 0) note += `♻️ 今の${P.melee.def.name}は下取り +${U.fmt(tv)}🪙　`; }
       note += `⚠ 現在の ${cur.icon}${cur.name} と交換（${G.K('w3')}）`;
     } else if (o.kind === 'forge') {
-      cat = '⚒️ 強化サービス'; note = `購入時に強化する武器を選ぶ（上限はレア度で決まる: ${G.Areas.capText()}）・価格は武器の強化値で変わる`;
+      cat = '⚒️ 強化サービス'; note = `購入時に強化する武器を選ぶ（上限はレアリティで決まる: ${G.Areas.capText()}）・価格は武器の強化値で変わる`;
     } else if (o.kind === 'tome') {
       cat = '📘 スキル強化'; note = '購入時に強化するスキルを選ぶ・価格はそのスキルの Lv で変わる：' + P.skills.filter((s) => s).map((s) => `${s.def.icon}Lv${(s.lv || 0) + 1}`).join(' ');
     } else if (o.kind === 'relic') {
@@ -1969,7 +1969,7 @@
       if (o.kind === 'forge') {
         const list = GM.forgeTargets();
         if (!list.length) return deny('全て最大強化');
-        return modal('⚒️ どれを鍛える？', `強化値+1（ダメージ×1.13）・強化値が高いほど高くなる・上限はレア度で決まる（${G.Areas.capText()}）`, list.map((x) => { const c = o.free ? 0 : G.Areas.forgeCost(x.w); return { icon: x.w.def.icon, label: `${G.weapons.keyLabel(x.t)}${x.w.def.name} +${x.w.lv || 0} → +${(x.w.lv || 0) + 1}（${o.free ? '無料' : U.fmt(c) + '🪙'}）`, disabled: run.coins < c, onPick: () => { o.price = c; x.w.lv = (x.w.lv || 0) + 1; x.w.forge = (x.w.forge || 0) + c; if (x.gun) { x.w.ver++; if (x.w === P.weapon) G.weapons.equip(true); } done(); G.sfx.mech('magIn'); G.ui.toast(`⚒️ ${x.w.def.name} を +${x.w.lv} に強化した`, 'good'); } }; }));
+        return modal('⚒️ どれを鍛える？', `強化値+1（ダメージ×1.13）・強化値が高いほど高くなる・上限はレアリティで決まる（${G.Areas.capText()}）`, list.map((x) => { const c = o.free ? 0 : G.Areas.forgeCost(x.w); return { icon: x.w.def.icon, label: `${G.weapons.keyLabel(x.t)}${x.w.def.name} +${x.w.lv || 0} → +${(x.w.lv || 0) + 1}（${o.free ? '無料' : U.fmt(c) + '🪙'}）`, disabled: run.coins < c, onPick: () => { o.price = c; x.w.lv = (x.w.lv || 0) + 1; x.w.forge = (x.w.forge || 0) + c; if (x.gun) { x.w.ver++; if (x.w === P.weapon) G.weapons.equip(true); } done(); G.sfx.mech('magIn'); G.ui.toast(`⚒️ ${x.w.def.name} を +${x.w.lv} に強化した`, 'good'); } }; }));
       }
       if (o.kind === 'tome') {
         const list = GM.tomeTargets();

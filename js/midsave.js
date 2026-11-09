@@ -58,7 +58,7 @@
       st: Object.assign({}, P.st),
       temps: [...P.temps].filter(([, t]) => t.t < 9000).map(([id, t]) => [id, { t: t.t, max: t.max, mods: t.mods, icon: t.icon, label: t.label }]),
       skillCd: P.skills.map((s) => (s ? { cd: s.cd, charges: s.charges } : null)),
-      grappleCd: P.grappleCd || 0, pileCd: P.pileCd || 0, pileFree: !!P.pileFree, meleeMode: !!P.meleeMode,
+      grappleCd: P.grappleCd || 0, pileCd: P.pileCd || 0, pileFree: !!P.pileFree, meleeMode: !!P.meleeMode, devour: G.weapons.devour || 0,
     });
     S.cleared = !!GM.areaCleared;
     S.rewardPending = GM.rewardPending || null;
@@ -119,7 +119,7 @@
       P.st = Object.assign({}, pl.st || {});
       P.temps = new Map((pl.temps || []).map(([id, t]) => [id, Object.assign({}, t)])); P.recalc();
       (pl.skillCd || []).forEach((c, i) => { const s = P.skills[i]; if (s && c) { s.cd = c.cd; s.charges = c.charges; s.maxCd = G.abilities.cdOf(s); } });
-      P.grappleCd = pl.grappleCd || 0; P.pileCd = pl.pileCd || 0; P.pileFree = !!pl.pileFree;
+      P.grappleCd = pl.grappleCd || 0; P.pileCd = pl.pileCd || 0; P.pileFree = !!pl.pileFree; G.weapons.devour = pl.devour || 0; // (喰魂の大鎌: its stacks last the area)
       P.hp = Math.min(P.stats.maxHp, pl.hp); P.os = pl.os || 0;
       G.weapons.equip(true);
       if (pl.meleeMode) G.weapons.setMelee();

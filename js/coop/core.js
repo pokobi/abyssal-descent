@@ -257,7 +257,7 @@
     const rp = K.players.get(id); if (!rp) return;
     K.players.delete(id);
     if (rp.body) G.scene.remove(rp.body.root);
-    if (K.role === 'guest') { if (K.live) K.ended('ホストとの接続が切れました', 'ランは終了します'); else K.lobbyErr('ホストとの接続が切れました'); return; }
+    if (K.role === 'guest') { if (K.live) K.ended('ホストとの接続が切れました', '周回は終了します'); else K.lobbyErr('ホストとの接続が切れました'); return; }
     K.msg(`${rp.name} が抜けた`);
     if (K.onLeave) K.onLeave(rp);
     K.send({ t: 'left', i: id, r: roster() });

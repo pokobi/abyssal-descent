@@ -501,7 +501,7 @@
     { id: 'blood_altar', npc: '血の司祭', icon: '🩸', text: '「血を捧げよ。さすれば力を授けよう」\n最大HPを永続的に10%失う代わりに、上位の加護を一つ選べる。',
       opts: () => [{ icon: '🩸', label: '血を捧げる', sub: '最大HP -10%（永続） → 上位の加護を選択', run: () => { P.permMaxHp -= Math.round(P.stats.maxHp * 0.1); P.recalc(); return { boon: 'boost' }; } }] },
     { id: 'gambler', npc: '骸骨の賭博師', icon: '🎲', text: '「賭けをしないか？ 所持金の3割を賭けて、勝てば倍だ」',
-      opts: () => { const bet = Math.floor(GM.run.coins * 0.3); return [{ icon: '🎲', label: `${bet}🪙 賭ける`, sub: '勝率50%：勝てば賭け金×2', disabled: bet < 20, run: () => { if (Math.random() < 0.5) { G.combat.coins(bet, null, '賭けに勝利'); G.ui.toast('🎲 勝った！', 'good'); } else { GM.run.coins -= bet; G.ui.toast(`🎲 負けた… -${bet}🪙`, 'warn'); } } }]; } },
+      opts: () => { const bet = Math.floor(GM.run.coins * 0.3); return [{ icon: '🎲', label: `${bet}🪙 賭ける`, sub: '勝率50%：勝てば賭け金×2', disabled: bet < 20, run: () => { if (Math.random() < 0.5) { G.combat.payout(bet, '賭けに勝利', bet); G.ui.toast('🎲 勝った！', 'good'); } else { GM.run.coins -= bet; G.ui.toast(`🎲 負けた… -${bet}🪙`, 'warn'); } } }]; } },
     { id: 'cursed_spring', npc: '泉の番人', icon: '⛲', text: '「この泉の水は傷を癒す。だが、時に呪いも運ぶ」',
       opts: () => [{ icon: '🥤', label: '泉の水を飲む', sub: 'HP全回復＋50%で加護 / 50%で呪い', run: () => { G.combat.heal(9999); G.sfx.drink(); if (Math.random() < 0.5) AR.randomGoodBuff(1); else AR.addCurse(); } }] },
     { id: 'lost_soul', npc: '迷える魂', icon: '👻', text: '「…さむい…なにか…わけて…」\n施せば何かを返してくれそうだ。',
@@ -926,7 +926,7 @@
         prevHtml = `<div class="alch-prev ready ${isReroll ? 'reroll' : ''}" style="--rc:${G.ui.R(RAR_BY_TIER[tTier])}">
           <div class="ap-ic">？</div>
           <div class="ap-info">
-            <div class="ap-tag">${isReroll ? '⚠️ 同ランク再練成（リロール）' : '✦ レアリティ +1 確定'}</div>
+            <div class="ap-tag">${isReroll ? '⚠️ 同レアリティ再練成（リロール）' : '✦ レアリティ +1 確定'}</div>
             <div class="ap-main" style="color:${G.ui.R(RAR_BY_TIER[tTier])}">【${tRar.name}】の${catLabel}</div>
             <div class="ap-sub">${isReroll ? `${G.RARITY[RAR_BY_TIER[s1.tier]].name}同士ではレアリティは上がらず、別の新品候補（3択）へ作り変えます${s1.tier === 4 && (s1.cat === 'weapon' || s1.cat === 'armor') ? '（ミシックが候補に入ることがある）' : ''}` : '3つの候補の中から好きな1つを選んで獲得できます（耐久100%・新品）'}</div>
           </div>

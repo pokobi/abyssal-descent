@@ -444,7 +444,7 @@
   Gm.warmMats.push(() => Gm.mat(POUR_VS, POUR_FS, { uFront: { value: 0 }, uTail: { value: 0 }, uA: { value: 0 } }, { blending: THREE.AdditiveBlending }));
   Gm.K.oil = {
     name: '煮え油の大釜', icon: '🫕', rc: '#e09040', cat: '傾ける — 調べる・撃つ・叩く',
-    desc: '城壁の下の焦げ跡（7×4m）に煮え油が流れ落ち、9秒燃える。落ちた瞬間、下の敵は熱傷を負う。一度きり。',
+    desc: '城壁の下の焦げ跡（7×4m）に煮え油が流れ落ち、9秒燃える。油が届いた者はダメージを受けて炎上する（自分も）。一度きり。',
     interact: { verb: '傾ける', doing: '大釜を傾けている…', dur: 1.0 },
     build(g, w) {
       potShape();

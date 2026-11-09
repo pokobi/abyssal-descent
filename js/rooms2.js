@@ -19,7 +19,7 @@
   const coins = () => GM.run.coins;
   const fmt = (v) => U.fmt(Math.round(v));
   const pay = (v) => { GM.run.coins -= Math.round(v); G.sfx.coins(3); GM.quietUntil = performance.now() + 1200; };
-  const gain = (v, label) => C.coins(Math.round(v), null, label);
+  const gain = (v, label, earned) => C.payout(v, label, earned); // (handed back as it is: no coin-gain bonus on a stake or a deposit)
 
   function npc(def, pos, ev, light) {
     const w = G.world;
@@ -87,7 +87,7 @@
       opts: () => {
         const bet = Math.max(100, Math.round(coins() * 0.25 / 10) * 10), lot = GM.price(500), slot = GM.price(150);
         return [
-          { icon: '🎲', label: `倍か無か（${fmt(bet)}🪙）`, sub: '所持の25%を賭ける。47%で倍になる', disabled: coins() < bet, run: () => { pay(bet); if (Math.random() < 0.47) { gain(bet * 2, '倍!'); G.ui.toast(`🎲 当たり！ +${fmt(bet * 2)}`, 'good'); G.sfx.ui('rare'); } else { G.ui.toast('🎲 外れ…', 'warn'); G.sfx.ui('deny'); } return { reopen: true }; } },
+          { icon: '🎲', label: `倍か無か（${fmt(bet)}🪙）`, sub: '所持の25%を賭ける。47%で倍になる', disabled: coins() < bet, run: () => { pay(bet); if (Math.random() < 0.47) { gain(bet * 2, '倍!', bet); G.ui.toast(`🎲 当たり！ +${fmt(bet * 2)}`, 'good'); G.sfx.ui('rare'); } else { G.ui.toast('🎲 外れ…', 'warn'); G.sfx.ui('deny'); } return { reopen: true }; } },
           { icon: '📦', label: lotsLeft > 0 ? `宝箱くじ（${fmt(lot)}🪙） 残り${lotsLeft}回` : '宝箱くじ（売り切れ）', sub: lotsLeft > 0 ? '古びた55%・上等30%・装飾8%・ミミック7%' : 'この部屋の分は売り切れた', disabled: lotsLeft <= 0 || coins() < lot, run: () => {
             lotsLeft--;
             pay(lot);
@@ -106,7 +106,7 @@
             pay(slot); const r = Math.random(); const sym = ['🍒', '💎', '💀', '👑', '🔔'];
             let mul = 0; if (r < 0.01) mul = 50; else if (r < 0.05) mul = 15; else if (r < 0.15) mul = 5; else if (r < 0.4) mul = 2;
             const face = mul === 50 ? '👑👑👑' : mul === 15 ? '💎💎💎' : mul === 5 ? '🔔🔔🔔' : mul === 2 ? '🍒🍒' + U.pick(sym) : U.pick(sym) + U.pick(sym) + U.pick(sym);
-            if (mul) { gain(slot * mul, 'スロット'); G.ui.toast(`🎰 ${face} ×${mul}！ +${fmt(slot * mul)}`, 'good'); if (mul >= 15) G.sfx.ui('rare'); } else G.ui.toast(`🎰 ${face} はずれ`, 'warn');
+            if (mul) { gain(slot * mul, 'スロット', slot * (mul - 1)); G.ui.toast(`🎰 ${face} ×${mul}！ +${fmt(slot * mul)}`, 'good'); if (mul >= 15) G.sfx.ui('rare'); } else G.ui.toast(`🎰 ${face} はずれ`, 'warn');
             return { reopen: true };
           } },
         ];
@@ -122,7 +122,7 @@
       opts: () => [
         { icon: '📥', label: '全額預ける', sub: `🪙${fmt(coins())} を預金`, disabled: coins() < 1, run: () => { GM.run.bank = (GM.run.bank || 0) + coins(); GM.run.coins = 0; G.sfx.coins(5); return { reopen: true }; } },
         { icon: '📥', label: '半分預ける', sub: `🪙${fmt(Math.floor(coins() / 2))} を預金`, disabled: coins() < 2, run: () => { const v = Math.floor(coins() / 2); GM.run.bank = (GM.run.bank || 0) + v; GM.run.coins -= v; G.sfx.coins(3); return { reopen: true }; } },
-        { icon: '📤', label: '全額引き出す', sub: `🏦${fmt(GM.run.bank || 0)} を受け取る`, disabled: !(GM.run.bank > 0), run: () => { gain(GM.run.bank, '払い戻し'); GM.run.bank = 0; GM.run.bankUp = 0; return { reopen: true }; } },
+        { icon: '📤', label: '全額引き出す', sub: `🏦${fmt(GM.run.bank || 0)} を受け取る`, disabled: !(GM.run.bank > 0), run: () => { gain(GM.run.bank, '払い戻し', 0); GM.run.bank = 0; GM.run.bankUp = 0; return { reopen: true }; } },
       ],
     }, '#80e0c0');
   };

@@ -1218,8 +1218,10 @@
         const near = this._apw === w && Math.abs(this._apx - this.pos.x) < 3 && Math.abs(this._apz - this.pos.z) < 3; // (where the last frame left it, in this area: a dive moves it before this; a teleport is not a move)
         const px = near ? this._apx : this.pos.x, pz = near ? this._apz : this.pos.z;
         this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.2, this.pos.y + this.height);
-        if (!E.airOk(this.pos.x, this.pos.z) && E.airOk(px, pz)) {
-          if (E.airOk(this.pos.x, pz)) this.pos.z = pz; else if (E.airOk(px, this.pos.z)) this.pos.x = px; else { this.pos.x = px; this.pos.z = pz; }
+        // ...and (a one-storey field) never on over a roof: the hall under it is yours to walk, the top of it no place for a flyer
+        const free = (x, z) => E.airOk(x, z) && !this.overRoof(x, z);
+        if (!free(this.pos.x, this.pos.z) && free(px, pz)) {
+          if (free(this.pos.x, pz)) this.pos.z = pz; else if (free(px, this.pos.z)) this.pos.x = px; else { this.pos.x = px; this.pos.z = pz; }
           this.vel.x = 0; this.vel.z = 0;
           if (diving) this.hitWallFlag = true; // (a dive that meets the border ends there, as at a wall)
         }
@@ -1296,6 +1298,17 @@
       this.clampBounds();
     }
     clampBounds() { const w = G.world; this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.5); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); }
+    // would this body, at (x, z) at its height, be over a roof (something whose underside is over the head room of the floor there and
+    // whose top is under the body)? One-storey fields only: in the storeyed ones the slabs between storeys are what it flies over
+    overRoof(x, z) {
+      const w = G.world; if ((w.L || 1) > 1) return false;
+      const i = w.navIdx(x, z); if (i < 0) return false;
+      const fl = w.nf[i]; if (!(fl > -50)) return false;
+      const out = E._roofQ || (E._roofQ = []); out.length = 0;
+      w.query(x - 0.1, fl + 2.2, z - 0.1, x + 0.1, this.pos.y + 0.05, z + 0.1, out);
+      let roof = false; for (const c of out) if (c.y0 > fl + 2.2 && c.y1 <= this.pos.y + 0.05 && !c.navIgnore && !c.dest) { roof = true; break; }
+      out.length = 0; return roof;
+    }
     // the underside of the lowest solid thing over this body, up to yTo + its height (Infinity: open sky)
     ceilAbove(yTo) {
       const w = G.world, r = this.radius * 0.6, y0 = this.pos.y + this.height * 0.5, out = E._ceilQ || (E._ceilQ = []);
@@ -1650,6 +1663,7 @@
       if (i < 0 || col[i % N]) return;
       const r = w.reach(i); for (let n = 0; n < r.length; n++) if (r[n]) { col[n % N] = 1; any++; }
     };
+    if (w.reachMask && w.reachMask.length === N * L) for (let n = 0; n < w.reachMask.length; n++) if (w.reachMask[n]) { col[n % N] = 1; any++; } // (the level's own check: reached from where you come in)
     if (w.spawn) seed(w.spawn.x, w.spawn.z, w.spawn.y);
     if (P && P.pos) seed(P.pos.x, P.pos.z, P.pos.y);
     if (!any) { w._air = { nf: w.nf, ok: null }; return null; } // (no ground plan to go by: no limit beyond the area's own bounds)

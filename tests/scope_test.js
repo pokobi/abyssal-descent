@@ -56,7 +56,7 @@ const PORT = +process.env.COOP_PORT || 9995;
     const dots = {};
     for (const o of ['o_reddot', 'o_reflex', 'o_holo', 'o_hunter', 'o_seer', 'o_god']) dots[o] = await vm(o);
     check(Object.values(dots).every((d) => d.dot && !d.so && d.winH > 0.01), 'the dot sights: a window of their own, no scope');
-    check(dots.o_seer.spin >= 2 && dots.o_god.spin >= 1, '千里眼 and 神の眼 carry turning rings');
+    check(dots.o_seer.spin === 1 && dots.o_god.spin === 0 && dots.o_hunter.spin === 0, 'the epic and better sights kept plain: 千里眼 one thin turning ring of runes, the others none');
     {
       // a dot sight's window covers about 40% of the screen's height while aiming
       await vm('o_reddot'); await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.enemies.clear(); G.input.mouse[2] = true; 1"); await sleep(1500);
@@ -66,7 +66,9 @@ const PORT = +process.env.COOP_PORT || 9995;
     }
     {
       // the 8x: the screen black round its eyepiece, the rangefinder reads a distance
-      await p.eval("(() => { const w = G.player.weapons[0]; w.atts.optic = 'o_8x'; w.ver++; G.weapons.equip(true); G.ui.clearScreen(); G.game.state = 'playing'; G.enemies.clear(); G.input.mouse[2] = true; return 1; })()"); await sleep(2000);
+      await p.eval("(() => { const w = G.player.weapons[0]; w.atts.optic = 'o_8x'; w.ver++; G.weapons.equip(true); G.ui.clearScreen(); G.game.state = 'playing'; G.enemies.clear(); G.input.mouse[2] = true; return 1; })()"); await sleep(1500);
+      await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.input.mouse[2] = true; 1"); // (an area cleared by the clean-up may have put a screen up)
+      await p.until('G.weapons.adsT > 0.95 && !!G.weapons.isScoped', 8000).catch(() => {}); await sleep(400);
       const r = JSON.parse(await p.eval("(() => { const el = document.getElementById('scope-overlay'); const t = el.querySelector('.x8rng'); return JSON.stringify({ on: el.style.opacity === '1', kind: el.dataset.kind, svg: !!el.querySelector('.x8 svg'), txt: t ? t.textContent : '', scoped: !!G.weapons.isScoped }); })()"));
       await p.eval("G.input.mouse[2] = false; 1"); await sleep(800);
       check(r.on && r.kind === 'x8' && r.svg && r.scoped && /^(\d+ m|--- m)$/.test(r.txt), 'the 8x blacks the screen out round its eyepiece; the rangefinder reads ' + JSON.stringify(r));
@@ -77,6 +79,18 @@ const PORT = +process.env.COOP_PORT || 9995;
     const s4 = await vm('o_4x');
     check(s4.pip, 'a 4x scope is drawn as a scope with a lens (picture in picture)');
     // aiming: the camera's zoom follows the scope (the lens does the rest on a pip scope)
+    {
+      // the sniper's focus gauge fills only while truly aiming: not while reloading, using an item, switching, holding a grenade
+      const r = JSON.parse(await p.eval(`(() => { const P = G.player, W = G.weapons, CL = G.Classes; P.cls = 'sniper'; P.resetRun(); P.meleeMode = false; W.equip(true); G.game.state = 'playing';
+        const st = CL.state(), w = P.weapon, tick = (n) => { for (let i = 0; i < n; i++) { W.adsT = 1; CL.tick(0.05); } return +st.focus.toFixed(2); };
+        const o = {}; st.focus = 0; o.aim = tick(10);
+        st.focus = 0; w.reloading = true; o.reload = tick(10); w.reloading = false;
+        const ib = G.ItemAnim.busy; G.ItemAnim.busy = () => true; st.focus = 0; o.item = tick(10); G.ItemAnim.busy = ib;
+        st.focus = 0; W.switchT = 0.3; o.sw = tick(4); W.switchT = 0;
+        const gh = G.GrenHold.active; G.GrenHold.active = () => true; st.focus = 0; o.gren = tick(10); G.GrenHold.active = gh;
+        return JSON.stringify(o); })()`));
+      check(r.aim > 0.2 && r.reload === 0 && r.item === 0 && r.sw === 0 && r.gren === 0, "the sniper's gauge fills while aiming, not while reloading, using an item, switching or holding a grenade " + JSON.stringify(r));
+    }
     const aim = async (optic) => { await vm(optic); return p.eval("(() => { const W = G.weapons; W.adsT = 1; W.curStats = G.weapons.stats(G.player.weapons[0]); return Math.round(W.adsZoom() * 100) / 100 + ':' + Math.round(W.camZoom() * 100) / 100; })()"); };
     const aBare = await aim(null), aX2 = await aim('o_x2'), a8 = await aim('o_8x');
     console.log(`      aim (ads:cam): bare ${aBare}, 2x ${aX2}, 8x ${a8}`);

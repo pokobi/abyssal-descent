@@ -66,10 +66,19 @@ const PORT = +process.env.COOP_PORT || 9995;
     }
     {
       // the 8x: the screen black round its eyepiece, the rangefinder reads a distance
-      await p.eval("(() => { const w = G.player.weapons[0]; w.atts.optic = 'o_8x'; w.ver++; G.weapons.equip(true); G.ui.clearScreen(); G.game.state = 'playing'; G.enemies.clear(); G.input.mouse[2] = true; return 1; })()"); await sleep(1500);
-      await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.input.mouse[2] = true; 1"); // (an area cleared by the clean-up may have put a screen up)
-      await p.until('G.weapons.adsT > 0.95 && !!G.weapons.isScoped', 8000).catch(() => {}); await sleep(400);
-      const r = JSON.parse(await p.eval("(() => { const el = document.getElementById('scope-overlay'); const t = el.querySelector('.x8rng'); return JSON.stringify({ on: el.style.opacity === '1', kind: el.dataset.kind, svg: !!el.querySelector('.x8 svg'), txt: t ? t.textContent : '', scoped: !!G.weapons.isScoped }); })()"));
+      // (one in-page wait: an area cleared by the clean-up may put a screen up and drop the sights; set it back until the 8x has been up a moment)
+      const r = JSON.parse(await p.eval(`(async () => {
+        const w = G.player.weapons[0]; w.atts.optic = 'o_8x'; w.ver++; G.weapons.equip(true); G.enemies.clear();
+        let up = 0;
+        for (let i = 0; i < 60 && up < 6; i++) {
+          if (G.game.state !== 'playing') { G.ui.clearScreen(); G.game.state = 'playing'; }
+          G.player.meleeMode = false; G.input.mouse[2] = true;
+          await new Promise((res) => setTimeout(res, 150));
+          up = G.weapons.isScoped && G.weapons.adsT > 0.95 ? up + 1 : 0;
+        }
+        const el = document.getElementById('scope-overlay'); const t = el.querySelector('.x8rng');
+        return JSON.stringify({ on: el.style.opacity === '1', kind: el.dataset.kind, svg: !!el.querySelector('.x8 svg'), txt: t ? t.textContent : '', scoped: !!G.weapons.isScoped, up });
+      })()`));
       await p.eval("G.input.mouse[2] = false; 1"); await sleep(800);
       check(r.on && r.kind === 'x8' && r.svg && r.scoped && /^(\d+ m|--- m)$/.test(r.txt), 'the 8x blacks the screen out round its eyepiece; the rangefinder reads ' + JSON.stringify(r));
       check(await p.eval("document.getElementById('scope-overlay').style.opacity === '0'"), 'and lowering the gun lifts it');

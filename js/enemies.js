@@ -1207,6 +1207,9 @@
         const diving = this.attackState && this.attackState.kind === 'swoop' && this.attackState.t >= this.attackState.wind;
         if (!diving) this.pos.y = U.damp(this.pos.y, ty, 2.5, dt);
         if (ceil < Infinity && this.pos.y + this.height > ceil - 0.05) this.pos.y = ceil - this.height - 0.05;
+        // sinking on to something (a roof, a slab's top) is answered by standing it on top, here, before the sideways push-out below
+        // (else a body that sank into a roof's edge was shoved out sideways, metres at a time)
+        if (!this.def.hover) { const fb0 = w.floorBelow(this.pos.x, this.pos.y + 1.2, this.pos.z); if (fb0 > -50 && this.pos.y < fb0 + 0.35) this.pos.y = fb0 + 0.35; }
         // the air it may be in (E.airOk): a move that would take it out of it (a chase, a dive, a shove, sliding along a wall) is cut short
         // where it would leave, keeping what slides along the border
         const near = this._apw === w && Math.abs(this._apx - this.pos.x) < 3 && Math.abs(this._apz - this.pos.z) < 3; // (where the last frame left it, in this area: a dive moves it before this; a teleport is not a move)
@@ -1538,6 +1541,16 @@
   E.init = function () { P = G.player; C = G.combat; PG = G.Props.PG; E.bars = []; E.barRoot = document.getElementById('worldui'); };
   E.spawn = function (def, level, pos, opts) {
     const e = new Enemy(def, level, pos, opts);
+    // a flyer is never set down inside something (a storey's floor over the spot, a roof, a beam): it comes in under the lowest thing
+    // that would be in its body (else, the moment it came to life, the wall push-out shoved it out sideways, metres at a time)
+    if (e.flyer && !e.custom && G.world && G.world.query) {
+      const w = G.world, r = e.radius * 0.6;
+      const hit = w.query(e.pos.x - r, e.pos.y + 0.05, e.pos.z - r, e.pos.x + r, e.pos.y + e.height, e.pos.z + r).filter((c) => !c.navIgnore && !c.dest);
+      if (hit.length) {
+        const low = Math.min(...hit.map((c) => c.y0)), fl = w.floorBelow(e.pos.x, low - 0.01, e.pos.z);
+        e.pos.y = Math.max(fl > -50 ? fl + 0.35 : low - e.height - 0.1, Math.min(e.pos.y, low - e.height - 0.1));
+      }
+    }
     // anything that appears while a boss is alive (its summons, splits, adds) is worth no coins: no farming the boss
     if (G.bosses && G.bosses.active && G.bosses.active.alive !== false) e.bossSpawn = true;
     E.list.push(e);

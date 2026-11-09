@@ -34,10 +34,11 @@ const LIMIT = +(process.env.CLEAR_SECS || 150);
           if (!e.alive || e.custom || e.boss || e.ally || e.burrowed || e.state === 'spawn') continue;
           const b = before.get(e);
           const blinker = e.def.blink || e.def.variant === 'shadow' || (e.mut && e.mut.blink); // (their own sidestep / the mutation's blink: a move of theirs, not a warp to you)
-          if (b && !blinker) { const step = Math.hypot(e.pos.x - b.x, e.pos.z - b.z); if (step > window.__W.jump) { window.__W.jump = step; window.__W.jumpEx = e.def.name + ' ' + step.toFixed(2) + 'm in ' + dt.toFixed(3) + ' s'; } }
-          const ok = e.flyer ? E.airOk(e.pos.x, e.pos.z) : E.walkOk(e.pos.x, e.pos.z, e.pos.y);
+          if (b && !blinker) { const step = Math.hypot(e.pos.x - b.x, e.pos.z - b.z); if (step > window.__W.jump) { window.__W.jump = step; window.__W.jumpEx = G.world.field + ' ' + e.def.name + ' ' + step.toFixed(2) + 'm in ' + dt.toFixed(3) + ' s @' + b.x.toFixed(1) + ',' + b.y.toFixed(1) + ',' + b.z.toFixed(1) + ' -> ' + e.pos.x.toFixed(1) + ',' + e.pos.y.toFixed(1) + ',' + e.pos.z.toFixed(1) + ' atk ' + (e.attackState && e.attackState.kind) + ' st ' + e.state; } }
+          const onMover = (G.world.movers || []).some((m) => { const c = m.col; return e.pos.x > c.x0 - 0.3 && e.pos.x < c.x1 + 0.3 && e.pos.z > c.z0 - 0.3 && e.pos.z < c.z1 + 0.3 && Math.abs(e.pos.y - c.y1) < 0.3; }); // (riding a foundry's moving platform: you can ride it too)
+          const ok = onMover || (e.flyer ? E.airOk(e.pos.x, e.pos.z) : E.walkOk(e.pos.x, e.pos.z, e.pos.y));
           let r = seen.get(e); if (!r || r.w !== G.world) { r = { w: G.world, p: e.pos.clone(), t: GM.time, noted: false, bad: false }; seen.set(e, r); }
-          if (!ok && !r.bad) { r.bad = true; window.__W.bad.push(G.world.field + ' ' + e.def.name + (e.flyer ? '(飛)' : '') + ' @' + e.pos.x.toFixed(1) + ',' + e.pos.y.toFixed(1) + ',' + e.pos.z.toFixed(1)); }
+          if (!ok && !r.bad) { r.bad = true; window.__W.bad.push(G.world.field + ' ' + e.def.name + (e.flyer ? '(飛)' : '') + ' @' + e.pos.x.toFixed(1) + ',' + e.pos.y.toFixed(1) + ',' + e.pos.z.toFixed(1) + (b ? ' from ' + b.x.toFixed(1) + ',' + b.y.toFixed(1) + ',' + b.z.toFixed(1) : ' (new: no earlier place)') + ' age ' + (GM.time - (e.bornT || 0)).toFixed(1) + ' split ' + !!e.splitFrom); }
           if (e.pos.distanceTo(r.p) > 0.6) { r.p.copy(e.pos); r.t = GM.time; }
           else if (!r.noted && GM.time - r.t > 20 && Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) > 8) { r.noted = true; window.__W.stuck.push(G.world.field + ' ' + e.def.name + ' still 20 s @' + e.pos.x.toFixed(1) + ',' + e.pos.y.toFixed(1) + ',' + e.pos.z.toFixed(1) + ' sees you ' + !!e.hasLOS + ' aware ' + !!e.aware); }
         }
@@ -56,7 +57,7 @@ const LIMIT = +(process.env.CLEAR_SECS || 150);
       };
       return 1;
     })()`);
-    const fields = JSON.parse(await p.eval('JSON.stringify(G.Run.TIERS.flat().filter((f) => G.Run.isField(f)))'));
+    const fields = JSON.parse(await p.eval('JSON.stringify(G.Run.TIERS.flat().filter((f) => G.Run.isField(f)))')).filter((f) => !process.env.CLEAR_FIELDS || process.env.CLEAR_FIELDS.split(',').includes(f));
     const times = [], marks = [];
     for (const f of fields) {
       await p.eval(`(() => { const GM = G.game; G.Run.field = () => '${f}'; GM.seed = ${(f.length * 4099 + f.charCodeAt(0)) % 100000}; GM.area = 7; GM.transitioning = false; G.ui.clearScreen(); GM.state = 'playing'; GM.dev = { god: true, speed: 1 }; GM.enterArea(8, 'combat'); return 1; })()`);

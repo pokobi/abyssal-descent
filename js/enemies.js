@@ -1311,7 +1311,7 @@
     }
     // the underside of the lowest solid thing over this body, up to yTo + its height (Infinity: open sky)
     ceilAbove(yTo) {
-      const w = G.world, r = this.radius * 0.6, y0 = this.pos.y + this.height * 0.5, out = E._ceilQ || (E._ceilQ = []);
+      const w = G.world, r = this.radius * 0.6, y0 = this.pos.y + 0.2, out = E._ceilQ || (E._ceilQ = []); // (from just over the feet: a slab it has begun to rise or dive into is a ceiling too, never a wall to be shoved sideways out of)
       out.length = 0;
       w.query(this.pos.x - r, y0, this.pos.z - r, this.pos.x + r, Math.max(yTo, this.pos.y) + this.height + 0.6, this.pos.z + r, out);
       let best = Infinity;

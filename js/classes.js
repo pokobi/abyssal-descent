@@ -337,7 +337,10 @@
     if (!is('sniper')) return;
     const st = S();
     const q0 = Math.floor(st.focus * 4 + 1e-6);
-    if (!P.meleeMode && G.weapons.adsT > 0.9) st.focus = Math.min(1, st.focus + dt / 1.5);
+    const Wp = G.weapons, w = P.weapon, an = Wp.anim || {};
+    const aiming = !P.meleeMode && !!w && Wp.adsT > 0.9 && !w.reloading && !(Wp.switchT > 0) && !(an.melee > 0) && !(an.throwT > 0) && !P.mantle && !P.pileState
+      && !(G.ItemAnim && G.ItemAnim.busy()) && !(G.GrenHold && G.GrenHold.active()) && !(G.abilities.wheelOpen && G.abilities.wheelOpen());
+    if (aiming) st.focus = Math.min(1, st.focus + dt / 1.5);
     else if (st.focus > 0) st.focus = Math.max(0, st.focus - dt * 0.5);
     const q = Math.floor(st.focus * 4 + 1e-6);
     if (q > q0 && G.sfx && G.sfx.focus) G.sfx.focus(q); // (a quiet blip each quarter, a chime when full)

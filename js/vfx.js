@@ -979,6 +979,7 @@
     add(new THREE.Mesh(arcGeo(0.5, 1, 1, 4), mk(SLASH_VS, SLASH_FS, { uP: { value: 0 }, uA: { value: 0 }, uC: { value: col3(0xffffff) }, uTail: { value: 0.5 } }, { blending: THREE.AdditiveBlending, side: THREE.DoubleSide })));
     add(new THREE.Mesh(waveGeo(4, 2), mk(WAVE_VS, WAVE_FS, { uA: { value: 0 }, uHalf: { value: 2 } }, { side: THREE.DoubleSide })));
     add(new THREE.Mesh(arcGeo(0.5, 1, 1, 4), crescentMat(0xffffff)));
+    add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mk(SHEET_VS, SHEET_FS, { uA: { value: 0 }, uFront: { value: 0 }, uHalf: { value: 1 } }, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }))); // (the great wave's sheet of water on the ground: 大海嘯)
     for (const k of ['rock', 'ice']) spikeKind(k);
   };
   // shown (far below the world) while the renderer compiles: the first use never stalls

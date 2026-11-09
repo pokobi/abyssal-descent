@@ -211,17 +211,23 @@
     return ORDER.filter((k) => s[k] > 0);
   };
   // ---- invisibility: the hands and whatever they hold (first person) and your body (third person) turn see-through,
-  // and the screen edges shimmer. The see-through look uses per-mesh copies of the materials (gun materials are shared
-  // with weapons lying around), handed back when the effect has faded out.
+  // and the screen edges shimmer. The see-through look uses copies of the materials (gun materials are shared with weapons
+  // lying around); the original goes back when the effect has faded out. The copies are kept, one for each material (never
+  // disposed): their shader programs stay made, and the warm-up makes them once at the start (PS.ghostWarm), so turning
+  // invisible never makes a shader on the spot (it held the frame ~0.4 s).
   let ghostK = 0, ghostVig = null;
   const ghosted = new Set();
+  const ghostOf = new WeakMap();
+  const ghostMat = (m) => { let c = ghostOf.get(m); if (!c) { c = m.clone(); c.transparent = true; c.depthWrite = false; ghostOf.set(m, c); } return c; };
+  const ghostable = (arr) => !arr.some((m) => m.transparent || m.blending !== THREE.NormalBlending || m.isShaderMaterial);
+  PS.ghostWarm = function (root) { root.traverse((o) => { if (!o.isMesh || !o.material) return; const arr = Array.isArray(o.material) ? o.material : [o.material]; if (ghostable(arr)) o.material = Array.isArray(o.material) ? arr.map(ghostMat) : ghostMat(arr[0]); }); };
   function ghostMesh(o, op) {
     if (!o.isMesh || !o.material || o.userData._noGhost) return;
     let g = o.userData._ghost;
     if (!g) {
       const src = o.material, arr = Array.isArray(src) ? src : [src];
-      if (arr.some((m) => m.transparent || m.blending !== THREE.NormalBlending || m.isShaderMaterial)) { o.userData._noGhost = true; return; } // flashes / glows / lenses / the scope picture keep their own look
-      const cl = arr.map((m) => { const c = m.clone(); c.transparent = true; c.depthWrite = false; return c; });
+      if (!ghostable(arr)) { o.userData._noGhost = true; return; } // flashes / glows / lenses / the scope picture keep their own look
+      const cl = arr.map(ghostMat);
       g = o.userData._ghost = { src, cl, shadow: o.castShadow };
       o.material = Array.isArray(src) ? cl : cl[0];
       o.castShadow = false;
@@ -230,7 +236,7 @@
     for (const m of g.cl) m.opacity = op;
   }
   function unghostAll() {
-    for (const o of ghosted) { const g = o.userData._ghost; if (!g) continue; o.material = g.src; o.castShadow = g.shadow; for (const m of g.cl) m.dispose(); delete o.userData._ghost; }
+    for (const o of ghosted) { const g = o.userData._ghost; if (!g) continue; o.material = g.src; o.castShadow = g.shadow; delete o.userData._ghost; } // (the copies are kept: ghostMat)
     ghosted.clear();
   }
   function updateInvis(dt, t, P) {

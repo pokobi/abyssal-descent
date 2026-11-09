@@ -143,6 +143,8 @@
       if (G.ItemAnim) for (const k of ['throw', 'bandage', 'drink', 'inject', 'eat', 'plate', 'device']) { try { tmp.add(G.ItemAnim.build(k, null)); } catch (e) { /* ignore */ } }
       if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id, 0.42)); } catch (e) { /* ignore */ } }
       if (G.ItemAnim) { try { const h = new THREE.Group(); G.ItemAnim.hand(h, true); tmp.add(h); } catch (e) { /* ignore */ } }
+      // see-through hands and gun (影の舞, the invisibility draught: pstatus.js ghostMesh): their shader variants, once
+      if (G.PStatus && G.PStatus.ghostWarm && Wp.buildGun && G.WEAPON_BY_ID.n_scout) { try { const gm = Wp.buildGun(G.WEAPON_BY_ID.n_scout, {}, true).group; G.PStatus.ghostWarm(gm); tmp.add(gm); } catch (e) { /* ignore */ } }
       Wp.vmScene.updateMatrixWorld(true);
       r.compile(Wp.vmScene, Wp.vmCam);
       uploadTextures(Wp.vmScene, r);

@@ -215,14 +215,13 @@
     if (pools.beam[0]) show(pools.beam[0].m);
     if (pools.bubble[0]) show(pools.bubble[0].m);
     if (pools.debris[0]) show(pools.debris[0].m, (G.world && G.world.mats && G.world.mats.rock) || FX.dmats.hole);
-    const sr = FX.shockRing(new THREE.Vector3(0, -500, 0), 0xffa040, 0.8, 10);
+    const sr = FX.srKeep(); sr.visible = true;
     const vxBack = G.vfx && G.vfx.warmShow ? G.vfx.warmShow() : null;
     const gmBack = G.Gim && G.Gim.warmShow ? G.Gim.warmShow() : null; // (the fields' devices: gimmick.js)
     try { return fn(); } finally {
       if (vxBack) vxBack();
       if (gmBack) gmBack();
-      sr.dispose();
-      const idx = FX.shocks.indexOf(sr); if (idx >= 0) FX.shocks.splice(idx, 1);
+      sr.visible = false; // (kept, not disposed: see FX.srKeep)
       for (const [m, vis, mat, fc] of saved) { m.visible = vis; m.material = mat; m.frustumCulled = fc; }
     }
   };
@@ -432,9 +431,17 @@
       gl_FragColor = vec4(c * (0.9 + band * 0.6), a);
     }`;
   FX.shocks = [];
+  const srMat = (color, hw) => new THREE.ShaderMaterial({ uniforms: { uR: { value: 0 }, uHW: { value: hw || 0.8 }, uCol: { value: new THREE.Color(color || 0xffa040) }, uA: { value: 1 } }, vertexShader: SR_VS, fragmentShader: SR_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  // one ring's material is kept for good (never disposed, drawn once at the warm-up): its shader program stays made, so a ring that comes and
+  // goes (every blast, every ground wave) never has its shader made again on the spot (three.js drops a program with its last material)
+  FX.srKeep = function () {
+    if (!FX._srKeep) { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); const m = FX._srKeep = new THREE.Mesh(g, srMat()); m.visible = false; m.frustumCulled = false; m.renderOrder = 6; m.position.set(0, -500, 0); }
+    if (!FX._srKeep.parent) scene.add(FX._srKeep);
+    return FX._srKeep;
+  };
   FX.shockRing = function (c, color, hw, maxR) {
     const R = maxR || 50, g = new THREE.PlaneGeometry(R * 2, R * 2); g.rotateX(-Math.PI / 2);
-    const mat = new THREE.ShaderMaterial({ uniforms: { uR: { value: 0 }, uHW: { value: hw || 0.8 }, uCol: { value: new THREE.Color(color || 0xffa040) }, uA: { value: 1 } }, vertexShader: SR_VS, fragmentShader: SR_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    const mat = srMat(color, hw);
     const m = new THREE.Mesh(g, mat); m.position.set(c.x, c.y + 0.16, c.z); m.frustumCulled = false; m.renderOrder = 6; scene.add(m);
     const o = { m, life: 0.3, set(r, a) { mat.uniforms.uR.value = r; mat.uniforms.uA.value = a === undefined ? 1 : a; this.life = 0.3; }, dispose() { if (m.parent) m.parent.remove(m); g.dispose(); mat.dispose(); o.dead = true; } };
     FX.shocks.push(o); return o;

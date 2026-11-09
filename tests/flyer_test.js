@@ -47,7 +47,7 @@ const SECS = +(process.env.FLY_SECS || 14);
           const s = spots[si++ % spots.length]; P.pos.set(s.x, s.y + 0.05, s.z); P.vel.set(0, 0, 0); next = t + 3.5;
           if (E.list.filter(isFly).length < 6) for (let k = 0; k < 3; k++) { const d = defs[(si + k) % defs.length]; GM.spawnEnemy({ def: d, near: true }); }
           if (old) for (const e of E.list) Object.getPrototypeOf(e).ceilAbove = () => Infinity;
-          let n = 0; for (const e of E.list) if (isFly(e)) { if (!start.has(e)) { start.set(e, { inside: airOk(e.pos.x, e.pos.z), p: e.pos.clone(), y0: e.pos.y }); res.flyers++; if (n++ % 2 === 0) e.alt = 9 + Math.random() * 3; } }
+          let n = 0; for (const e of E.list) if (isFly(e)) { if (!start.has(e)) { start.set(e, { inside: airOk(e.pos.x, e.pos.z), p: e.pos.clone(), y0: e.pos.y, t0: t }); res.flyers++; if (n++ % 2 === 0) e.alt = 9 + Math.random() * 3; } }
         }
         P.hp = P.stats.maxHp;
         GM.step(0.05, 1); t += 0.05; res.steps++;
@@ -59,7 +59,8 @@ const SECS = +(process.env.FLY_SECS || 14);
           const bad = [];
           if (st.inside && !airOk(e.pos.x, e.pos.z)) { res.out++; bad.push('out'); }
           if (inSolid(c)) { res.solid++; bad.push('solid'); }
-          if (overRoof(e)) { res.roof++; bad.push('roof'); }
+          st.trail = st.trail || []; st.trail.push(e.pos.x.toFixed(1) + ',' + e.pos.y.toFixed(1) + ',' + e.pos.z.toFixed(1)); if (st.trail.length > 6) st.trail.shift();
+          if (overRoof(e)) { res.roof++; bad.push('roof'); if (!st.roofed) { st.roofed = true; res.trails = (res.trails || []).concat(e.def.name + ' age ' + (t - st.t0).toFixed(1) + 's: ' + st.trail.join(' > ')); } }
           res.maxUp = Math.max(res.maxUp, e.pos.y - P.pos.y);
           if (bad.length && res.ex.length < 4) res.ex.push(bad.join('+') + ' ' + e.def.name + ' @' + e.pos.x.toFixed(1) + ',' + e.pos.y.toFixed(1) + ',' + e.pos.z.toFixed(1));
         }
@@ -69,11 +70,12 @@ const SECS = +(process.env.FLY_SECS || 14);
       return res;
     };
     1`);
-    const fields = JSON.parse(await p.eval('JSON.stringify(G.Run.TIERS.flat().filter((f) => G.Run.isField(f)))'));
+    const fields = JSON.parse(await p.eval('JSON.stringify(G.Run.TIERS.flat().filter((f) => G.Run.isField(f)))')).filter((f) => !process.env.FLY_FIELDS || process.env.FLY_FIELDS.split(',').includes(f));
     let tot = { samples: 0, out: 0, solid: 0, roof: 0, flyers: 0 };
     for (const f of fields) {
       const r = JSON.parse(await p.eval(`window.__flyRun('${f}', ${(f.length * 7919) % 100000}, ${SECS}, ${OLD}).then(JSON.stringify)`));
       if (r.skip) { console.log(`      ${f}: skipped (${r.skip})`); continue; }
+      if (r.trails) for (const tr of r.trails.slice(0, 3)) console.log('        roof trail: ' + tr);
       console.log(`      ${f.padEnd(12)} L${r.L} flyers ${r.flyers} samples ${r.samples} moved ${r.moved}m  out ${r.out} solid ${r.solid} roof ${r.roof} maxUp ${r.maxUp}${r.ex.length ? '  e.g. ' + r.ex.join(' | ') : ''}`);
       for (const k of Object.keys(tot)) tot[k] += r[k];
     }

@@ -1205,11 +1205,11 @@
         const ceil = this.ceilAbove(Math.max(ty, this.pos.y));
         if (ceil < Infinity) ty = Math.min(ty, ceil - this.height - 0.1);
         const diving = this.attackState && this.attackState.kind === 'swoop' && this.attackState.t >= this.attackState.wind;
+        const yWas = this.pos.y;
         if (!diving) this.pos.y = U.damp(this.pos.y, ty, 2.5, dt);
         if (ceil < Infinity && this.pos.y + this.height > ceil - 0.05) this.pos.y = ceil - this.height - 0.05;
-        // sinking on to something (a roof, a slab's top) is answered by standing it on top, here, before the sideways push-out below
-        // (else a body that sank into a roof's edge was shoved out sideways, metres at a time)
-        if (!this.def.hover) { const fb0 = w.floorBelow(this.pos.x, this.pos.y + 1.2, this.pos.z); if (fb0 > -50 && this.pos.y < fb0 + 0.35) this.pos.y = fb0 + 0.35; }
+        // nor up past the top of a roof it is beside (climbing a building's eave): it stays at the height it had
+        if (this.pos.y > yWas && this.overRoof(this.pos.x, this.pos.z) && !this.overRoof(this.pos.x, this.pos.z, yWas)) this.pos.y = yWas;
         // the air it may be in (E.airOk): a move that would take it out of it (a chase, a dive, a shove, sliding along a wall) is cut short
         // where it would leave, keeping what slides along the border
         const near = this._apw === w && Math.abs(this._apx - this.pos.x) < 3 && Math.abs(this._apz - this.pos.z) < 3; // (where the last frame left it, in this area: a dive moves it before this; a teleport is not a move)
@@ -1303,13 +1303,13 @@
     clampBounds() { const w = G.world; this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.5); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); }
     // would this body, at (x, z) at its height, be over a roof (something whose underside is over the head room of the floor there and
     // whose top is under the body)? One-storey fields only: in the storeyed ones the slabs between storeys are what it flies over
-    overRoof(x, z) {
+    overRoof(x, z, y) {
       const w = G.world; if ((w.L || 1) > 1) return false;
       const i = w.navIdx(x, z); if (i < 0) return false;
       const fl = w.nf[i]; if (!(fl > -50)) return false;
-      const out = E._roofQ || (E._roofQ = []); out.length = 0;
-      w.query(x - 0.1, fl + 2.2, z - 0.1, x + 0.1, this.pos.y + 0.05, z + 0.1, out);
-      let roof = false; for (const c of out) if (c.y0 > fl + 2.2 && c.y1 <= this.pos.y + 0.05 && !c.navIgnore && !c.dest) { roof = true; break; }
+      const yy = y === undefined ? this.pos.y : y, out = E._roofQ || (E._roofQ = []); out.length = 0;
+      w.query(x - 0.1, fl + 2.2, z - 0.1, x + 0.1, yy + 0.05, z + 0.1, out);
+      let roof = false; for (const c of out) if (c.y0 > fl + 2.2 && c.y1 <= yy + 0.05 && !c.navIgnore && !c.dest) { roof = true; break; }
       out.length = 0; return roof;
     }
     // the underside of the lowest solid thing over this body, up to yTo + its height (Infinity: open sky)
@@ -1541,14 +1541,14 @@
   E.init = function () { P = G.player; C = G.combat; PG = G.Props.PG; E.bars = []; E.barRoot = document.getElementById('worldui'); };
   E.spawn = function (def, level, pos, opts) {
     const e = new Enemy(def, level, pos, opts);
-    // a flyer is never set down inside something (a storey's floor over the spot, a roof, a beam): it comes in under the lowest thing
-    // that would be in its body (else, the moment it came to life, the wall push-out shoved it out sideways, metres at a time)
-    if (e.flyer && !e.custom && G.world && G.world.query) {
-      const w = G.world, r = e.radius * 0.6;
-      const hit = w.query(e.pos.x - r, e.pos.y + 0.05, e.pos.z - r, e.pos.x + r, e.pos.y + e.height, e.pos.z + r).filter((c) => !c.navIgnore && !c.dest);
-      if (hit.length) {
-        const low = Math.min(...hit.map((c) => c.y0)), fl = w.floorBelow(e.pos.x, low - 0.01, e.pos.z);
-        e.pos.y = Math.max(fl > -50 ? fl + 0.35 : low - e.height - 0.1, Math.min(e.pos.y, low - e.height - 0.1));
+    // a flyer comes in under the lowest thing over the floor of its spot (a storey's floor, a roof, an eave, a beam), never inside it or
+    // on top of it (inside: the wall push-out shoved it out sideways, metres at a time, the moment it came to life; on top: over a roof)
+    if (e.flyer && !e.custom && G.world && G.world.query && G.world.nf) {
+      const w = G.world, r = e.radius * 0.6, i = w.navIdx(e.pos.x, e.pos.z, e.pos.y - 2.5);
+      const fl = i >= 0 && w.nf[i] > -50 ? w.nf[i] : w.floorBelow(e.pos.x, e.pos.y, e.pos.z);
+      if (fl > -50) {
+        const over = w.query(e.pos.x - r, fl + 0.2, e.pos.z - r, e.pos.x + r, e.pos.y + e.height, e.pos.z + r).filter((c) => !c.navIgnore && !c.dest && c.y0 > fl + 0.2);
+        if (over.length) { const low = Math.min(...over.map((c) => c.y0)); e.pos.y = Math.max(fl + 0.35, Math.min(e.pos.y, low - e.height - 0.1)); }
       }
     }
     // anything that appears while a boss is alive (its summons, splits, adds) is worth no coins: no farming the boss

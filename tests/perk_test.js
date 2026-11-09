@@ -112,12 +112,15 @@ window.T = {
     // ---------------- 突撃兵
     const as = await J(p, `const C = G.Classes; let P = T.as('assault'); const a = [C.dmgAdd(P, 5), C.dmgAdd(P, 13)]; P = T.as('assault', ['assault_1a']); const b = [C.dmgAdd(P, 5), C.dmgAdd(P, 13), C.dmgAdd(P, 25)];
       P = T.as('assault', ['assault_2b']); const hi = [C.dmgAdd(P, 30), C.fireAdd()]; P.hp = P.stats.maxHp * 0.4; const lo = [C.dmgAdd(P, 30), C.fireAdd()];
-      P = T.as('assault', ['assault_1b']); P.hp = 20; const m0 = C.moveAdd(); const e = T.mk(5); e.hp = 1; G.combat.damageEnemy(e, 50, { src: 'bullet' }); const hp1 = P.hp, m1 = C.moveAdd(); T.step(5.2); const m2 = C.moveAdd(); T.clean();
+      P = T.as('assault', ['assault_1b']); P.hp = 20; const m0 = C.moveAdd(); const e = T.mk(5); e.hp = 1; let beams = 0; const fb = G.fx.beam; G.fx.beam = function () { beams++; return fb.apply(this, arguments); }; try { G.combat.damageEnemy(e, 50, { src: 'bullet' }); } finally { G.fx.beam = fb; } const hp1 = P.hp, m1 = C.moveAdd();
+      G.ui.clsHud(); const pop = document.querySelector('#hp-wrap .rush-pop'), ind = document.getElementById('cls-ind'); const fx = { pop: pop ? pop.textContent : '', flare: document.getElementById('hp-wrap').classList.contains('rush-heal'), veil: !!document.querySelector('#rush-veil.kick'), lines: Math.round(C.rushLines() * 100) / 100, fov: P.fovKick, beams, chip: ind ? ind.textContent : '' };
+      T.step(5.2); const m2 = C.moveAdd(); G.ui.clsHud(); fx.after = [Math.round(C.rushLines() * 100) / 100, ind ? ind.textContent : '']; T.clean();
       P = T.as('assault'); const sl0 = P.stats.slideBoost; P = T.as('assault', ['assault_2a']); const sl1 = P.stats.slideBoost;
       const r = (x) => Math.round(x * 1000) / 1000;
-      return { a: a.map(r), b: b.map(r), hi: hi.map(r), lo: lo.map(r), heal: hp1 - 20, m: [m0, m1, m2].map(r), sl: r(sl1 - sl0) };`);
+      return { a: a.map(r), b: b.map(r), hi: hi.map(r), lo: lo.map(r), heal: hp1 - 20, m: [m0, m1, m2].map(r), sl: r(sl1 - sl0), fx };`);
     check(as.a.join() === '0.175,0' && as.b.join() === '0.267,0.053,-0.2', `突撃兵 肉薄: +40% reaching 15 m (5 m: ${as.b[0]}, 13 m: ${as.b[1]}; without: ${as.a}); still -20% far away`);
     check(as.heal === 30 && as.m.join() === '0,0.25,0', `突撃兵 血の昂り: a kill heals 30 (${as.heal}) and +25% speed for 5 s (${as.m})`);
+    check(/\+30/.test(as.fx.pop) && as.fx.flare && as.fx.veil && as.fx.beams >= 1 && as.fx.fov >= 6 && as.fx.lines > 0.4 && /血の昂り/.test(as.fx.chip) && /移動\+25%/.test(as.fx.chip) && as.fx.after[0] === 0 && !/血の昂り/.test(as.fx.after[1]), `突撃兵 血の昂り shows: the life drawn in from the foe, "${as.fx.pop}" from the HP bar, the bar's flare, the red pulse, the view widened, speed lines, "${as.fx.chip}"; all gone 5 s on`);
     check(as.hi.join() === '-0.2,0' && as.lo.join() === '0.1,0.2' && as.sl === 0.3, `突撃兵 背水: below half health +30% damage, +20% fire rate (${as.hi} -> ${as.lo}); 猛進: slides +30% further (${as.sl})`);
     const tk = await J(p, `const C = G.Classes; const P = T.as('assault', ['assault_2a']); const e = T.mk(0.9); const hp0 = e.hp;
       const f = new THREE.Vector3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); P.sliding = true; P.vel.set(f.x * 12, 0, f.z * 12); C.tick(0.016);

@@ -1206,9 +1206,23 @@
         this.climb = this.hitWallFlag ? Math.min(7, (this.climb || 0) + dt * 6) : Math.max(0, (this.climb || 0) - dt * 1.5);
         let ty = Math.max(isFinite(fl) ? fl : 0, P.pos.y) + (this.def.hover ? 0.2 : this.alt) + this.climb;
         if (this.airOn && w.navLayers > 1) { const b = this._band; ty = U.clamp(P.pos.y + (this.def.hover ? 0.2 : this.alt) + this.climb, b.lo, Math.max(b.lo, b.hi - this.height)); } // stay in the air band we are in: never through a slab
+        // a roof, a ceiling, the rock over a tunnel: the underside of whatever is over it caps how high it goes (climbing over a wall or
+        // following you up never takes it into them)
+        const ceil = this.ceilAbove(Math.max(ty, this.pos.y));
+        if (ceil < Infinity) ty = Math.min(ty, ceil - this.height - 0.1);
         const diving = this.attackState && this.attackState.kind === 'swoop' && this.attackState.t >= this.attackState.wind;
         if (!diving) this.pos.y = U.damp(this.pos.y, ty, 2.5, dt);
+        if (ceil < Infinity && this.pos.y + this.height > ceil - 0.05) this.pos.y = ceil - this.height - 0.05;
+        // the air it may be in (E.airOk): a move that would take it out of it (a chase, a dive, a shove, sliding along a wall) is cut short
+        // where it would leave, keeping what slides along the border
+        const near = this._apw === w && Math.abs(this._apx - this.pos.x) < 3 && Math.abs(this._apz - this.pos.z) < 3; // (where the last frame left it, in this area: a dive moves it before this; a teleport is not a move)
+        const px = near ? this._apx : this.pos.x, pz = near ? this._apz : this.pos.z;
         this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.2, this.pos.y + this.height);
+        if (!E.airOk(this.pos.x, this.pos.z) && E.airOk(px, pz)) {
+          if (E.airOk(this.pos.x, pz)) this.pos.z = pz; else if (E.airOk(px, this.pos.z)) this.pos.x = px; else { this.pos.x = px; this.pos.z = pz; }
+          this.vel.x = 0; this.vel.z = 0;
+          if (diving) this.hitWallFlag = true; // (a dive that meets the border ends there, as at a wall)
+        }
         if (this.hitWallFlag && G.Strata.doors.length && !this.boss) G.Strata.bash(this, dt);
         if (!this.def.hover) {
           const fb = w.floorBelow(this.pos.x, this.pos.y + 1.2, this.pos.z);
@@ -1219,6 +1233,7 @@
           }
         }
         this.clampBounds();
+        this._apx = this.pos.x; this._apz = this.pos.z; this._apw = w;
         this.grounded = false;
         return;
       }
@@ -1281,6 +1296,16 @@
       this.clampBounds();
     }
     clampBounds() { const w = G.world; this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.5); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); }
+    // the underside of the lowest solid thing over this body, up to yTo + its height (Infinity: open sky)
+    ceilAbove(yTo) {
+      const w = G.world, r = this.radius * 0.6, y0 = this.pos.y + this.height * 0.5, out = E._ceilQ || (E._ceilQ = []);
+      out.length = 0;
+      w.query(this.pos.x - r, y0, this.pos.z - r, this.pos.x + r, Math.max(yTo, this.pos.y) + this.height + 0.6, this.pos.z + r, out);
+      let best = Infinity;
+      for (const c of out) if (c.y0 >= y0 && c.y0 < best && !c.navIgnore && !c.dest) best = c.y0;
+      out.length = 0;
+      return best;
+    }
     // circle vs AABB push-out within a vertical band; returns true if blocked
     flyClear(a, b) {
       const w = G.world; if (!w.los(a, b)) return false;
@@ -1609,6 +1634,49 @@
   // the swoop of the bats and crows: speed (m/s) and longest dive (s); how fast it bends after you (per s); how long it goes round to a
   // better place after a dive that could not reach you; how soon it tries again when it broke one off
   E.SWIM_RISE = 1.4; E.SWIM_KEEP = 0.5; // m/s: a foe rising up the deep water to climb out onto a ledge; s it keeps rising after it stops pressing
+  // ---- the air a flyer may be in, worked out once for each area's ground plan: over the floor you can walk to from where you came in (or
+  // from where you stand), and a little beyond it: 2 m over a wall, a pillar or the rock beside it, 6 m out over the void beside it. A
+  // flyer never moves out of it (physics, fly): not into the rock round a mine's tunnels, not over the wall round a field, not out over the
+  // sky round the islands. (Not a pull back: a move that would take it out simply does not happen.)
+  E.AIR_WALL = 2; E.AIR_VOID = 6;
+  E.airMask = function () {
+    const w = G.world; if (!w || !w.nf || !w.reach) return null;
+    if (w._air && w._air.nf === w.nf) return w._air.ok ? w._air : null;
+    const W = w.Wn, D = w.Dn, N = w.N, L = w.L || 1;
+    const col = new Uint8Array(N); let any = 0;
+    const seed = (x, z, y) => {
+      let i = w.navIdx(x, z, y);
+      if (i >= 0 && w.nb[i]) { i = -1; for (let r = 1; r <= 2 && i < 0; r++) for (let dz = -r; dz <= r && i < 0; dz++) for (let dx = -r; dx <= r; dx++) { const j = w.navIdx(x + dx, z + dz, y); if (j >= 0 && !w.nb[j]) { i = j; break; } } }
+      if (i < 0 || col[i % N]) return;
+      const r = w.reach(i); for (let n = 0; n < r.length; n++) if (r[n]) { col[n % N] = 1; any++; }
+    };
+    if (w.spawn) seed(w.spawn.x, w.spawn.z, w.spawn.y);
+    if (P && P.pos) seed(P.pos.x, P.pos.z, P.pos.y);
+    if (!any) { w._air = { nf: w.nf, ok: null }; return null; } // (no ground plan to go by: no limit beyond the area's own bounds)
+    const dist = new Uint8Array(N).fill(255), q = new Int32Array(N); let qh = 0, qt = 0;
+    for (let i = 0; i < N; i++) if (col[i]) { dist[i] = 0; q[qt++] = i; }
+    while (qh < qt) {
+      const i = q[qh++], d = dist[i]; if (d >= E.AIR_VOID) continue;
+      const x = i % W, z = (i / W) | 0;
+      if (x + 1 < W && dist[i + 1] > d + 1) { dist[i + 1] = d + 1; q[qt++] = i + 1; }
+      if (x > 0 && dist[i - 1] > d + 1) { dist[i - 1] = d + 1; q[qt++] = i - 1; }
+      if (z + 1 < D && dist[i + W] > d + 1) { dist[i + W] = d + 1; q[qt++] = i + W; }
+      if (z > 0 && dist[i - W] > d + 1) { dist[i - W] = d + 1; q[qt++] = i - W; }
+    }
+    const ok = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      let ground = false; for (let k = 0; k < L; k++) if (w.nf[k * N + i] > -Infinity) { ground = true; break; }
+      ok[i] = dist[i] <= (ground ? E.AIR_WALL : E.AIR_VOID) ? 1 : 0;
+    }
+    w._air = { nf: w.nf, ok, W, D, xo: w.xo, zo: w.zo };
+    return w._air;
+  };
+  E.airOk = function (x, z) {
+    const a = E.airMask(); if (!a) return true;
+    const xi = Math.floor(x) + a.xo, zi = Math.floor(z) + a.zo;
+    if (xi < 0 || zi < 0 || xi >= a.W || zi >= a.D) return false;
+    return a.ok[zi * a.W + xi] === 1;
+  };
   E.SWOOP = { speed: 17, dur: 0.9, turn: 0.8, lead: 0.5, repo: 1.2, retry: 0.7 }; // (lead: how much of your speed it allows for: half, a dodge still works)
   E.REST = { n: 2, quiet: 20, far: 22, pull: 12 };
   let restAt = -1, restS = null;

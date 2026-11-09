@@ -455,7 +455,7 @@
           const d = d0.clone().applyAxisAngle(V(0, 1, 0), ang), k = ang ? 0.7 : 1;
           const pr = { kind, pos: o.clone(), vel: d.multiplyScalar(id === 'fireball' ? 40 : 65), grav: id === 'spear' ? 3 : 0, owner: 'player', dmg: sc(p.dmg) * k, radius: 0.25, pierce: id === 'fireball' ? 0 : 99, life: 4, info: { src: 'skill', shieldMul: p.shieldMul || 1, knock: 6 } };
           if (id === 'icespear') pr.onHitEnemy = (e) => C.status(e, 'frost', m.x_deep ? 10 : 5);
-          if (id === 'fireball') { pr.explode = p.r; pr.info = { src: 'skill', elem: 'fire', color: 0xff8030 }; if (m.x_napalm) pr.onDetonate = (q) => { const g = q.pos.clone(); const fl = G.world.floorBelow(g.x, g.y + 0.5, g.z); if (fl > -50) g.y = fl; C.zone(g, p.r * 0.7, 4, 'fire', sc(28)); }; }
+          if (id === 'fireball') { pr.explode = p.r; pr.info = { src: 'skill', elem: 'fire', color: 0xff8030 }; if (m.x_napalm) pr.onDetonate = (q) => { C.explode(q.pos, q.explode, q.dmg, Object.assign({ src: 'explosion' }, q.info)); /* (an onDetonate takes the place of the blast: the fireball's own blast first, then the fire left behind) */ const g = q.pos.clone(); const fl = G.world.floorBelow(g.x, g.y + 0.5, g.z); if (fl > -50) g.y = fl; C.zone(g, p.r * 0.7, 4, 'fire', sc(28)); }; }
           C.spawnProjectile(pr);
         }
         G.sfx.whoosh(0.3, 0.8); if (id === 'fireball') G.sfx.fire(o); if (id === 'icespear') G.sfx.ice(o);

@@ -951,9 +951,9 @@
           if (z.kind === 'smoke' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) pl.smokeT = 0.6;
         }
       }
-      if (z.kind === 'whirl') { for (const e of G.enemies.inRadius(p, r)) { if (e.boss || e.def.big) continue; const d = p.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 0.8) e.pos.addScaledVector(d.normalize(), Math.min(l, 2.5 * dt)); } }
+      if (z.kind === 'whirl') { for (const e of G.enemies.inRadius(p, r)) { if (e.boss || e.def.big) continue; const d = p.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 0.8) G.enemies.pullTo(e, d.normalize(), Math.min(l, 2.5 * dt)); } }
       if (z.kind === 'gravity') {
-        for (const e of G.enemies.inRadius(p, r * 1.2)) { if (e.boss) continue; const d = p.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 0.5) e.pos.addScaledVector(d.normalize(), Math.min(l, 9 * dt)); e.st.stun = Math.max(e.st.stun || 0, 0.1); }
+        for (const e of G.enemies.inRadius(p, r * 1.2)) { if (e.boss) continue; const d = p.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 0.5) G.enemies.pullTo(e, d.normalize(), Math.min(l, 9 * dt)); e.st.stun = Math.max(e.st.stun || 0, 0.1); }
       }
       if (z.t >= z.dur) { G.vfx.zoneEnd(z); if (z.onEnd) G.abilities.withSk(z.sk || null, z.onEnd)(z); C.zones.splice(i, 1); }
     }

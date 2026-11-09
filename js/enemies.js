@@ -1191,6 +1191,8 @@
       if (this.burrowed) {
         if (!w.trench && dx && !w.edgeSafe(this.pos, this.pos.x + dx * dt, this.pos.z)) dx = 0; // (never tunnels out under the void)
         if (!w.trench && dz && !w.edgeSafe(this.pos, this.pos.x, this.pos.z + dz * dt)) dz = 0;
+        if (dx && E.walkOk(this.pos.x, this.pos.z, this.pos.y) && !E.walkOk(this.pos.x + dx * dt, this.pos.z, this.pos.y)) dx = 0; // (nor comes up where you cannot reach it)
+        if (dz && E.walkOk(this.pos.x, this.pos.z, this.pos.y) && !E.walkOk(this.pos.x, this.pos.z + dz * dt, this.pos.y)) dz = 0;
         this.pos.x += dx * dt; this.pos.z += dz * dt; const f = w.navFloor(this.pos.x, this.pos.z, this.pos.y); if (isFinite(f)) this.pos.y = f; this.clampBounds(); return;
       }
       if (fly) {
@@ -1702,6 +1704,13 @@
     if (xi < 0 || zi < 0 || xi >= a.W || zi >= a.D) return false;
     return a.ok[zi * a.W + xi] === 1;
   };
+  // a pull (a whirl, a grasp: combat.js zones) moves a foe only where it may stand (E.walkOk / E.airOk), never off on to a statue's top or into a pit
+  E.pullTo = function (e, d, step) {
+    const nx = e.pos.x + d.x * step, nz = e.pos.z + d.z * step;
+    const ok = (x, z) => (e.flyer ? E.airOk(x, z) : E.walkOk(x, z, e.pos.y));
+    if (ok(e.pos.x, e.pos.z) && !ok(nx, nz)) return false;
+    e.pos.x = nx; e.pos.z = nz; return true;
+  };
   E.SWOOP = { speed: 17, dur: 0.9, turn: 0.8, lead: 0.5, repo: 1.2, retry: 0.7 }; // (lead: how much of your speed it allows for: half, a dodge still works)
   E.REST = { n: 2, quiet: 20 };
   // may a walker stand at (x, z) at height y? Floor you can walk to from where you come in (the level's own check, w.reachMask), a wall
@@ -1710,6 +1719,7 @@
     const w = G.world, m = w && w.reachMask; if (!m || !w.nf || m.length !== w.nf.length) return true; // (a ground plan made anew since: no word to go by)
     const i = w.navIdx(x, z, y); if (i < 0) return true;
     if (!(w.nf[i] > -Infinity)) return true;
+    if (w.nf[i] > y + 1.0) return true; // (the body is down beside something tall here, a statue on its plinth: that is a wall to it, not a floor it stands on)
     return m[i] === 1 || m[i] === true || w.nb[i] === 1;
   };
   let restAt = -1, restS = null;

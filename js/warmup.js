@@ -57,13 +57,55 @@
   };
   // one model of every enemy kind, parked far below the world, so every shader they need exists before the first fight
   W.enemyModels = function () {
-    const sc = G.scene; if (!sc || !G.enemies || !G.enemies.buildModel || !G.ENEMIES) return null;
+    const sc = G.scene, tmp = enemyGroup(); if (!sc || !tmp) return null;
+    sc.add(tmp);
+    return tmp;
+  };
+  function enemyGroup() {
+    if (!G.enemies || !G.enemies.buildModel || !G.ENEMIES) return null;
     const tmp = new THREE.Group(); tmp.position.set(0, -800, 0);
     const seen = new Set();
     for (const d of G.ENEMIES) { const k = d.plan + '|' + d.variant; if (seen.has(k)) continue; seen.add(k); try { tmp.add(G.enemies.buildModel(d, { scale: 1 }).group); } catch (e) { /* ignore */ } }
     if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id)); } catch (e) { /* ignore */ } } // every throwable's materials, so the first throw doesn't stall
-    sc.add(tmp);
     return tmp;
+  }
+
+  // What only turns up later in an area, as samples parked far below the world while the area's shaders are made (game.js enterArea):
+  // the highlight on a searchable body / chest, the shop's stands with each kind of ware (and a gun of each kind, a melee weapon of each
+  // kind), the healing basin and its hint, one model of every enemy kind. Without them the first of each to appear in play made the
+  // page wait for its shader on the spot (0.1 - 0.5 s here, up to a second on a machine whose driver compiles slowly: the first
+  // foe searched, the first mini shop). The enemies are built once a session; the rest each area (it uses the area's own materials).
+  W.lateKit = function () {
+    const w = G.world, GM = G.game; if (!w || !w.mats || !GM) return null;
+    const kit = new THREE.Group(); kit.name = 'warmKit'; kit.position.set(0, -800, 0);
+    const add = (fn) => { try { const o = fn(); if (o) kit.add(o); } catch (e) { if (W.log) console.warn('warm kit', e); } };
+    if (!W._enemies) W._enemies = enemyGroup();
+    if (W._enemies) { W._enemies.position.set(0, 0, 0); kit.add(W._enemies); }
+    if (G.Inv && G.Inv.lookSample) add(() => G.Inv.lookSample());
+    // the shop's own stands, built into a stand-in world (no colliders, no lights or pointers left in the real one)
+    if (GM.buildPedestal) {
+      const fake = { group: new THREE.Group(), mats: w.mats, lightSources: [] }, slot = { x: 0, y: 0, z: 0 };
+      const stand = (kind, obj) => { if (!obj || !obj.rarity) return; try { GM.buildPedestal({ kind, obj, price: 100, slot, lv: 0 }, fake); } catch (e) { if (W.log) console.warn('warm stand', kind, e); } };
+      const one = (list, key) => { const seen = new Set(), out = []; for (const x of list || []) { const k = x[key]; if (k == null || seen.has(k)) continue; seen.add(k); out.push(x); } return out; };
+      for (const d of one((G.WEAPONS || []).filter((x) => x.id !== 'starter'), 'arch')) stand('weapon', d);
+      for (const d of one(G.MELEE, 'mcat')) stand('melee', d);
+      stand('armor', (G.ARMOR || [])[0]); stand('relic', (G.BUFFS || []).find((b) => b.cat === 'relic'));
+      stand('revive', GM.REVIVE); stand('skill', (G.SKILLS || [])[0]); stand('ult', (G.ULTS || [])[0]);
+      stand('attachment', (G.ATTACHMENTS || [])[0]); stand('forge', GM.SVC_FORGE); stand('tome', GM.SVC_TOME);
+      stand('item', (G.ITEMS || []).find((x) => x.cat === 'grenade')); stand('item', (G.ITEMS || []).find((x) => x.cat !== 'grenade'));
+      stand('buff', (G.BUFFS || []).find((b) => b.cat !== 'relic' && b.cat !== 'curse' && b.cat !== 'pact'));
+      kit.add(fake.group);
+    }
+    // the healing basin's water and the hint drawn round it when you are hurt (game.js updateHealHint)
+    add(() => {
+      const g = new THREE.Group(), PG = G.Props.PG, c = 0x60ff90;
+      g.add(new THREE.Mesh(PG.cyl, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })));
+      g.add(new THREE.Mesh(PG.oct, new THREE.MeshBasicMaterial({ color: c, side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false })));
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 8, 12, 1, true), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })));
+      g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false })));
+      return g;
+    });
+    return kit;
   };
   W.bootAsync = async function () {
     const r = G.renderer; if (!r) return;

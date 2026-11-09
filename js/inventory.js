@@ -522,6 +522,18 @@
     if (isChest) return !src.opened ? 'new' : src.cont && src.cont.items.length ? 'loot' : 'empty';
     return !src.searched ? 'new' : src.cont.items.length ? 'loot' : 'empty';
   }
+  // the same pieces as that highlight (ring, glow, tag, outline shell), for the warm-up (warmup.js W.lateKit): their shaders are made
+  // with the area's, not when the first foe falls
+  IV.lookSample = function () {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.RingGeometry(0.85, 0.94, 36), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })));
+    g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: COL.new, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })));
+    g.add(new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, opacity: 0 })));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshStandardMaterial({ color: 0x808080 }));
+    body.add(new THREE.Mesh(body.geometry, outlineMat(COL.new))); body.add(new THREE.Mesh(body.geometry, outlineMat(COL.loot)));
+    g.add(body);
+    return g;
+  };
   function modelOf(src, isChest) { return isChest ? src.mesh : src.e && src.e.model && src.e.model.group; }
   function makeLook(src, isChest) {
     const w = G.world, root = modelOf(src, isChest);

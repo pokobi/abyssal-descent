@@ -704,7 +704,10 @@
     if (G.Warm && G.Warm.worldAsync) {
       const fade = document.getElementById('fade'), had = fade.classList.contains('on');
       fade.classList.add('on'); GM._warming = true;
+      // (what turns up later in the area, as samples: their shaders made now with the rest; the compile is started at once, so they leave at once)
+      const kit = G.Warm.lateKit ? G.Warm.lateKit() : null; if (kit) G.scene.add(kit);
       GM._warmP = G.Warm.worldAsync().then(() => { GM._warming = false; if (!had) fade.classList.remove('on'); });
+      if (kit) G.scene.remove(kit);
     } else if (G.Warm) G.Warm.world();
   };
   function layoutName(l) { return { courtyard: '中庭', halls: '回廊', chasm: '大裂谷', terrace: '段丘', crypt: '納骨堂' }[l] || '遺構'; }

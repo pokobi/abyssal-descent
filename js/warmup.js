@@ -137,6 +137,8 @@
     try {
       const guns = Object.values(G.WEAPON_ARCH || {}).length ? [G.WEAPON_BY_ID.starter, G.WEAPON_BY_ID.a_ranger, G.WEAPON_BY_ID.g_breacher, G.WEAPON_BY_ID.n_longbow, G.WEAPON_BY_ID.k_bastion, G.WEAPON_BY_ID.f_scorch] : [];
       for (const d of guns) if (d) { try { tmp.add(Wp.displayModel(d, { optic: 'o_4x', muzzle: 'm_supp', under: 'u_laser' })); } catch (e) { /* ignore */ } }
+      // every sight once (their glass, their glowing stones, the open hoods seen from inside are shaders of their own)
+      if (G.WEAPON_BY_ID.n_scout) for (const a of G.ATTACHMENTS || []) if (a.slot === 'optic') { try { tmp.add(Wp.displayModel(G.WEAPON_BY_ID.n_scout, { optic: a.id })); } catch (e) { /* ignore */ } }
       if (G.MELEE && G.MELEE[0]) { try { tmp.add(Wp.meleeDisplayModel(G.MELEE[0])); } catch (e) { /* ignore */ } }
       if (G.ItemAnim) for (const k of ['throw', 'bandage', 'drink', 'inject', 'eat', 'plate', 'device']) { try { tmp.add(G.ItemAnim.build(k, null)); } catch (e) { /* ignore */ } }
       if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id, 0.42)); } catch (e) { /* ignore */ } }

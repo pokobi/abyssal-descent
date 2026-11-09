@@ -77,34 +77,56 @@
   // into a texture which the scope's rear lens shows magnified further (plus vignette, a touch of colour fringing and the reticle).
   let pip = null;
   const PIP_FRAG = `
-    uniform sampler2D tMap; uniform float uLive; uniform float uCrop; varying vec2 vUv;
+    uniform sampler2D tMap; uniform float uLive; uniform float uCrop; uniform float uKind; varying vec2 vUv;
+    float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
+    float ln(float d, float w, float aa) { return smoothstep(w + aa, w, d); }
     void main() {
       vec2 p = vUv * 2.0 - 1.0; float r = length(p);
+      const float RIM = 0.8; // the glass ends here; outside it, the thick rim of the scope
+      vec2 g = p / RIM; float rg = r / RIM;
+      float aa = fwidth(g.x) * 1.3;
+      int k = int(uKind + 0.5);
       vec3 col;
-      float w = fwidth(p.x) * 1.3;
       if (uLive > 0.5) {
         vec2 q = p * (1.0 + 0.05 * r * r) * 0.5 * uCrop + 0.5; float ca = 0.004 * r * r * uCrop;
         col = vec3(texture2D(tMap, q + p * ca).r, texture2D(tMap, q).g, texture2D(tMap, q - p * ca).b);
-        col *= mix(1.0, 0.25, smoothstep(0.74, 1.0, r));
-        float h = abs(p.y), v = abs(p.x);
-        float hz = mix(smoothstep(0.004 + w, 0.004, h), smoothstep(0.02 + w, 0.02, h), step(0.24, v)) * step(0.03, v);
-        float vt = mix(smoothstep(0.004 + w, 0.004, v), smoothstep(0.02 + w, 0.02, v), step(0.24, h)) * step(0.03, h);
-        float dots = 0.0;
-        for (int k = 1; k < 5; k++) { float d = float(k) * 0.075; dots = max(dots, smoothstep(0.014 + w, 0.014, length(vec2(v - d, p.y)))); dots = max(dots, smoothstep(0.014 + w, 0.014, length(vec2(p.x, h - d)))); }
-        float ret = clamp(max(max(hz, vt), dots) * step(r, 0.95), 0.0, 1.0);
-        col = mix(col, vec3(0.0), ret * 0.92);
-        col += vec3(1.0, 0.12, 0.06) * smoothstep(0.009 + w, 0.009, r) * 1.6;
-        col += vec3(0.04, 0.05, 0.08) * smoothstep(0.9, 0.0, length(p - vec2(-0.5, 0.52))) * 0.3;
+        col *= k == 0 ? vec3(1.04, 1.0, 0.9) : k == 1 ? vec3(0.96, 0.99, 1.04) : k == 2 ? vec3(0.95, 1.03, 0.95) : vec3(1.0);
+        col *= mix(1.0, 0.3, smoothstep(0.8, 1.0, rg));
+        float blk = 0.0, li = 0.0; vec3 lit = vec3(0.0);
+        float h = abs(g.y), v = abs(g.x);
+        if (k == 0) { // 2x: an amber chevron over a post with drop marks, short bars from the sides
+          li = ln(min(seg(g, vec2(0.0), vec2(-0.075, -0.07)), seg(g, vec2(0.0), vec2(0.075, -0.07))), 0.012, aa); lit = vec3(1.0, 0.62, 0.12);
+          blk = ln(seg(g, vec2(0.0, -0.14), vec2(0.0, -1.0)), 0.006, aa);
+          for (int i = 0; i < 3; i++) { float yy = -0.26 - float(i) * 0.12, w2 = 0.09 - float(i) * 0.02; blk = max(blk, ln(seg(g, vec2(-w2, yy), vec2(w2, yy)), 0.005, aa)); }
+          blk = max(blk, ln(h, 0.006, aa) * step(0.55, v));
+        } else if (k == 1) { // 2.5x: a red circle and dot, heavy posts from the sides and below
+          li = max(ln(abs(rg - 0.3), 0.007, aa), ln(rg, 0.024, aa)); lit = vec3(1.0, 0.15, 0.08);
+          blk = max(ln(h, 0.01, aa) * step(0.45, v), ln(v, 0.01, aa) * step(0.45, h) * step(g.y, 0.0));
+        } else if (k == 2) { // marksman 3x: a fine cross, heavy posts outside, the drop ladder under the centre, a green lit dot
+          blk = max(ln(h, 0.0035, aa) * step(0.05, v), ln(v, 0.0035, aa) * step(0.05, h));
+          blk = max(blk, max(ln(h, 0.016, aa) * step(0.62, v), ln(v, 0.016, aa) * step(0.62, h)));
+          for (int i = 0; i < 5; i++) { float yy = -0.12 - float(i) * 0.09, w2 = 0.08 - float(i) * 0.012; blk = max(blk, ln(seg(g, vec2(-w2, yy), vec2(w2, yy)), 0.0035, aa)); }
+          li = ln(rg, 0.018, aa); lit = vec3(0.3, 1.0, 0.4);
+        } else { // 4x: the duplex: a fine cross that thickens into posts
+          blk = max(max(ln(h, 0.004, aa), ln(v, 0.004, aa)), max(ln(h, 0.02, aa) * step(0.38, v), ln(v, 0.02, aa) * step(0.38, h)));
+        }
+        col = mix(col, vec3(0.0), blk * step(rg, 1.0) * 0.94);
+        col = mix(col, lit * 1.6, li) + lit * exp(-rg * 16.0) * 0.3;
+        col += vec3(0.04, 0.05, 0.08) * smoothstep(0.9, 0.0, length(g - vec2(-0.5, 0.52))) * 0.3;
       } else {
-        col = vec3(0.1, 0.12, 0.16) * 0.2 + vec3(0.2, 0.26, 0.34) * smoothstep(1.0, 0.0, length(p - vec2(-0.45, 0.5))) * 0.5;
+        col = vec3(0.1, 0.12, 0.16) * 0.2 + vec3(0.2, 0.26, 0.34) * smoothstep(1.0, 0.0, length(g - vec2(-0.45, 0.5))) * 0.5;
       }
-      col *= smoothstep(1.0, 0.955, r);
+      // the rim: dark metal with a bevel catching the light at its inner edge
+      float bev = exp(-abs(r - RIM - 0.02) * 55.0) * (0.55 + 0.45 * dot(p / max(r, 0.0001), vec2(-0.6, 0.8)));
+      vec3 rimc = vec3(0.022, 0.023, 0.026) + vec3(0.16, 0.16, 0.17) * max(bev, 0.0) + vec3(0.035) * smoothstep(0.86, 0.93, r) * smoothstep(1.0, 0.93, r);
+      col = mix(col, rimc, smoothstep(RIM - 0.006, RIM + 0.006, r));
+      col *= smoothstep(1.0, 0.975, r);
       gl_FragColor = vec4(col, 1.0);
     }`;
   W.pipMaterial = function () {
     if (!pip) {
       pip = { tex: null, size: 0, on: false, crop: 0.2, v2: new THREE.Vector2(), v2b: new THREE.Vector2(),
-        mat: new THREE.ShaderMaterial({ uniforms: { tMap: { value: new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1) }, uLive: { value: 0 }, uCrop: { value: 0.2 } }, vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: PIP_FRAG, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }) };
+        mat: new THREE.ShaderMaterial({ uniforms: { tMap: { value: new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1) }, uLive: { value: 0 }, uCrop: { value: 0.2 }, uKind: { value: 3 } }, vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: PIP_FRAG, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }) };
       pip.mat.uniforms.tMap.value.needsUpdate = true;
     }
     return pip.mat;
@@ -241,8 +263,9 @@
         M.mag = box(0.03, 0.06, 0.07, 0, -0.06, -0.02, metal);
         box(0.03, 0.012, 0.25, 0, 0.06, -0.04, metal);
         // iron sights (no scope comes with it: a scope is an attachment like on any gun): a hooded post on the barrel, a notched leaf on the receiver
-        cyl(0.017, 0.022, 0, 0.025, -0.7, metal); box(0.006, 0.05, 0.008, 0, 0.062, -0.7); box(0.026, 0.006, 0.03, 0, 0.09, -0.7, metal);
-        box(0.007, 0.026, 0.016, -0.01, 0.079, 0.06); box(0.007, 0.026, 0.016, 0.01, 0.079, 0.06); box(0.03, 0.008, 0.02, 0, 0.068, 0.06, metal);
+        cyl(0.017, 0.022, 0, 0.025, -0.7, metal);
+        M.irons = [box(0.006, 0.05, 0.008, 0, 0.062, -0.7), box(0.026, 0.006, 0.03, 0, 0.09, -0.7, metal),
+          box(0.007, 0.026, 0.016, -0.01, 0.079, 0.06), box(0.007, 0.026, 0.016, 0.01, 0.079, 0.06), box(0.03, 0.008, 0.02, 0, 0.068, 0.06, metal)];
         M.muzzle.set(0, 0.025, -0.81); M.sightY = 0.088; M.ironY = 0.088; M.railY = 0.066; M.fore.set(0, -0.04, -0.28); M.grip.set(0, -0.06, 0.12);
         break;
       }
@@ -579,63 +602,9 @@
     const AMMO_COL = { a_hollow: 0xd8b070, a_ap: 0x4a90e0, a_fire: 0xff6a20, a_cryo: 0x7ad8ff, a_toxic: 0x70e040, a_shock: 0xf0e040, a_explo: 0xff3030, a_rico: 0xc0c0c8, a_silver: 0xeef2ff, a_slug: 0x9a6a3a, a_pierce: 0xa060e8, a_bleed: 0xc02030, a_vamp: 0x9020b0, a_tracer: 0xff8040, a_hunter: 0x88a850 };
     // ---- attachments ----
     const atop = (id) => G.ATT_BY_ID[id] && G.ATT_BY_ID[id].visual;
-    if (atts.optic) {
-      const v = atop(atts.optic);
-      const z = M.opticZ, y = M.railY;
-      if (v === 'reddot') {
-        box(0.025, 0.012, 0.04, 0, y + 0.006, z, metal); box(0.003, 0.028, 0.004, -0.0125, y + 0.026, z - 0.015, metal); box(0.003, 0.028, 0.004, 0.0125, y + 0.026, z - 0.015, metal); box(0.026, 0.003, 0.004, 0, y + 0.0395, z - 0.015, metal); box(0.022, 0.022, 0.001, 0, y + 0.026, z - 0.015, mats.lens);
-        const dot = new THREE.Mesh(PG.sph, mats.glow); dot.scale.setScalar(0.0012); dot.position.set(0, y + 0.026, z - 0.016); g.add(dot);
-        M.sightY = y + 0.026; M.dotSight = true;
-      } else if (v === 'holo') {
-        box(0.03, 0.016, 0.06, 0, y + 0.008, z, metal);
-        box(0.004, 0.03, 0.05, -0.016, y + 0.03, z, metal); box(0.004, 0.03, 0.05, 0.016, y + 0.03, z, metal); box(0.036, 0.004, 0.05, 0, y + 0.047, z, metal);
-        box(0.028, 0.026, 0.002, 0, y + 0.03, z - 0.02, mats.lens);
-        const dot = new THREE.Mesh(PG.torus, mats.glow); dot.scale.setScalar(0.003); dot.position.set(0, y + 0.03, z - 0.021); g.add(dot);
-        M.sightY = y + 0.03; M.dotSight = true;
-      } else if (v === 'scope' || v === 'scopeL') {
-        // a real magnified scope: ring mounts, main tube, objective bell with a sun shade, ocular bell with a rubber eyecup,
-        // magnification ring, elevation / windage turrets and a parallax knob. The rear lens shows the world magnified (picture in picture).
-        const big = v === 'scopeL';
-        M.scopeOptic = true; M.scopeKind = v; M.pip = true;
-        const len = big ? 0.34 : 0.27, r = big ? 0.024 : 0.021, cy = y + 0.02 + r;
-        // plain materials (no normal / colour maps): textures this close to the eye shimmer when the scope moves
-        if (!W._scopeMats) W._scopeMats = { metal: new THREE.MeshStandardMaterial({ color: 0x25272b, metalness: 0.65, roughness: 0.42 }), ring: new THREE.MeshStandardMaterial({ color: 0x6c7078, metalness: 0.8, roughness: 0.32 }), rubber: new THREE.MeshStandardMaterial({ color: 0x121214, metalness: 0, roughness: 0.9 }) };
-        const sm = W._scopeMats, ring = sm.ring, rubber = sm.rubber, tube = sm.metal;
-        const vcyl = (rr, hh, px, py, pz, m, rz) => { const o = new THREE.Mesh(PG.cyl, m || tube); o.scale.set(rr, hh, rr); o.position.set(px, py, pz); if (rz) o.rotation.z = rz; g.add(o); return o; };
-        for (const dz of [-len * 0.2, len * 0.2]) {
-          box(0.034, 0.012, 0.1, 0, y + 0.006, z + dz, tube);                // base on the rail
-          cyl(r * 1.22, 0.026, 0, cy, z + dz, ring);                           // ring
-          for (const sx of [-1, 1]) box(0.006, 0.014, 0.014, sx * r * 1.3, cy - r * 0.55, z + dz, tube); // clamp bolts
-        }
-        cyl(r, len, 0, cy, z, tube);                                          // main tube
-        cyl(r * 1.55, 0.08, 0, cy, z - len / 2 - 0.02, tube);                 // objective bell
-        cyl(r * 1.64, 0.014, 0, cy, z - len / 2 - 0.066, ring);                // bell rim
-        cyl(r * 1.5, 0.05, 0, cy, z - len / 2 - 0.1, rubber);                  // sun shade
-        cyl(r * 1.42, 0.004, 0, cy, z - len / 2 - 0.058, new THREE.MeshStandardMaterial({ color: 0x10203a, metalness: 0.4, roughness: 0.04, emissive: 0x04101c })); // front glass
-        cyl(r * 1.3, 0.052, 0, cy, z + len / 2 + 0.016, tube);                // ocular bell
-        cyl(r * 1.45, 0.02, 0, cy, z + len / 2 + 0.048, rubber);               // eyecup
-        cyl(r * 1.14, 0.05, 0, cy, z + len * 0.3, ring);                       // magnification ring ...
-        for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; box(0.004, 0.004, 0.034, Math.cos(a) * r * 1.15, cy + Math.sin(a) * r * 1.15, z + len * 0.3, rubber, 0, 0, a); } // ... and its grip ribs
-        vcyl(r * 0.62, 0.012, 0, cy + r + 0.004, z - len * 0.06, ring);        // elevation turret
-        vcyl(r * 0.5, 0.022, 0, cy + r + 0.017, z - len * 0.06, tube);
-        vcyl(r * 0.52, 0.006, 0, cy + r + 0.03, z - len * 0.06, rubber);
-        vcyl(r * 0.6, 0.012, r + 0.004, cy, z - len * 0.06, ring, Math.PI / 2); // windage turret
-        vcyl(r * 0.48, 0.022, r + 0.017, cy, z - len * 0.06, tube, Math.PI / 2);
-        vcyl(r * 0.5, 0.012, -(r * 1.5) - 0.004, cy, z - len / 2 - 0.02, tube, Math.PI / 2); // parallax knob
-        vcyl(r * 0.42, 0.02, -(r * 1.5) - 0.014, cy, z - len / 2 - 0.02, rubber, Math.PI / 2);
-        // the lens sits clearly in front of the eyecup's end face (they used to share a plane and z-fought = flicker), and always wins the depth test
-        const lens = new THREE.Mesh(new THREE.CircleGeometry(r * 1.3, 48), W.pipMaterial());
-        lens.position.set(0, cy, z + len / 2 + 0.066); lens.renderOrder = 5; g.add(lens);
-        M.pipLens = lens; M.lensZ = lens.position.z; M.lensR = r * 1.3; M.sightY = cy;
-      } else if (v === 'acog') {
-        M.scopeOptic = true; M.scopeKind = v;
-        const len = v === 'acog' ? 0.11 : v === 'scope' ? 0.2 : 0.28, r = v === 'acog' ? 0.017 : v === 'scope' ? 0.019 : 0.023;
-        box(0.02, 0.018, 0.03, 0, y + 0.009, z - len * 0.25, metal); box(0.02, 0.018, 0.03, 0, y + 0.009, z + len * 0.25, metal);
-        cyl(r, len, 0, y + 0.018 + r, z, metal);
-        cyl(r * 1.3, 0.03, 0, y + 0.018 + r, z - len / 2, metal); cyl(r * 1.2, 0.03, 0, y + 0.018 + r, z + len / 2, metal);
-        const ln = cyl(r * 1.1, 0.002, 0, y + 0.018 + r, z + len / 2 + 0.016, mats.lens);
-        M.sightY = y + 0.018 + r;
-      }
+    if (atts.optic && G.Optics) {
+      G.Optics.build({ g, M, metal, y: M.railY, z: M.opticZ, pipMat: W.pipMaterial() }, atop(atts.optic));
+      if (M.irons) for (const o of M.irons) o.visible = false; // (the iron sights fold away under a sight)
     }
     // barrel, muzzle, magazine, under-barrel, stock, trigger and ammo: each sits on the mount point of the gun it is fitted to (MNT), is built from its own
     // little parts and stays a few shades off the gun's finish so it reads as a separate piece
@@ -819,7 +788,7 @@
       M.lHand = hand(M.fore.clone().add(V(-0.01, -0.03, 0.0)), false);
     }
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
-    if (def.arch === 'pistol' || def.arch === 'revolver') { g.scale.setScalar(1.3); M.sightY *= 1.3; }
+    if (def.arch === 'pistol' || def.arch === 'revolver') { g.scale.setScalar(1.3); M.sightY *= 1.3; for (const k of ['winH', 'winZ', 'lensZ', 'lensR']) if (M[k] !== undefined) M[k] *= 1.3; }
     M.group = g; M.barrels = barrels;
     return M;
   }
@@ -834,6 +803,7 @@
     if (model) vmRoot.remove(model.group);
     model = buildGun(w.def, w.atts, true);
     vmRoot.add(model.group);
+    if (model.pip) W.pipMaterial().uniforms.uKind.value = model.pipKind || 0; // (the reticle of this scope)
     if (W.melee) W.melee.show(false);
     W.switchT = immediate ? 0 : 0.35;
     W.adsT = 0;
@@ -1311,7 +1281,8 @@
     anim.swayY = U.damp(anim.swayY, U.clamp(I.my * 0.0006, -0.05, 0.05), 10, dt);
     anim.kick = U.damp(anim.kick, 0, 14, dt);
     const sightY = model.sightY;
-    const adsPos = V(0, -sightY - (model.dotSight || model.scopeOptic ? 0 : 0.012), model.pip ? -(model.lensR || 0.028) * 2.32 - model.lensZ : -0.44);
+    const adsZ = model.lensZ !== undefined ? -(model.lensR || 0.028) * 2.32 - model.lensZ : model.winZ !== undefined ? -model.winH / G.Optics.DOT_T - model.winZ : -0.44;
+    const adsPos = V(0, -sightY - (model.dotSight || model.scopeOptic ? 0 : 0.012), adsZ);
     const p = hipPos.clone().lerp(adsPos, ads);
     let rx = 0, ry = 0, rz = 0;
     // bob
@@ -1389,6 +1360,16 @@
     W.dotAds = !!model.dotSight && W.adsT > 0.6;
     vmRoot.visible = !scoped && G.game.state !== 'dead' && G.avatar.tpK < (G.avatar.returning ? 0.55 : 0.3);
     G.ui.scope(scoped, model.scopeKind);
+    if (G.Optics) G.Optics.tick(model, dt, G.game.time);
+    if (scoped && model.scopeKind === 'x8') { // the 8x's rangefinder: the distance to what is under the centre, red on a foe
+      W._rngT = (W._rngT || 0) - dt;
+      if (W._rngT <= 0) {
+        W._rngT = 0.1; const o = G.camera.getWorldPosition(W._rv1 || (W._rv1 = new THREE.Vector3())), d = G.camera.getWorldDirection(W._rv2 || (W._rv2 = new THREE.Vector3()));
+        const wh = G.world ? G.world.raycast(o, d, 600) : null, eh = G.enemies.raycast(o, d, wh ? wh.t : 600);
+        const t = eh ? eh.t : wh ? wh.t : null;
+        G.ui.scopeRange(t === null ? '--- m' : Math.round(t) + ' m', !!eh);
+      }
+    }
     if (pip) { pip.on = lensOn && vmRoot.visible; pip.mat.uniforms.uLive.value = pip.on ? 1 : 0; }
   };
   function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }

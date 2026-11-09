@@ -178,16 +178,21 @@
   const SHOTGUN = (w) => (w.pellets || 1) > 1;
   // high-magnification optics: not on handguns or shotguns
   const LONGGUN = (w) => NOT_PROJ(w) && !SHOTGUN(w) && w.arch !== 'pistol' && w.arch !== 'revolver';
+  // sights: handguns, SMGs and shotguns take dot sights only; the 8x scope is for sniper rifles alone
+  const DOTONLY = (w) => w.arch === 'smg' || w.arch === 'pistol' || w.arch === 'revolver' || SHOTGUN(w);
+  const SCOPE = (w) => !w.flame && !DOTONLY(w);
+  const SCOPE_LONG = (w) => LONGGUN(w) && !DOTONLY(w);
+  const SNIPER = (w) => w.arch === 'sniper';
   const SEMI = (w) => !w.auto && !w.burst && !w.charge && !w.flame;
   const AT = [
     // (the magnification while aiming is the sight's own: magnify on a scope; a dot sight does not magnify, the gun's iron sights' zoom stays)
     ['o_reddot', 'optic', 'レッドドット', '🔴', 'common', 200, { adsTime: 0.9 }, 'reddot', '素早く構えられる等倍の照準器。', GUNLIKE],
     ['o_holo', 'optic', 'ホロサイト', '⭕', 'uncommon', 260, { adsSpread: 0.85 }, 'holo', '精度が向上する等倍のホログラフィック照準器。', GUNLIKE],
-    ['o_x2', 'optic', '2倍スコープ', '🔎', 'common', 220, { magnify: 2, adsTime: 1.08, adsSpread: 0.85 }, 'acog', '近〜中距離向けの2倍スコープ。', GUNLIKE],
-    ['o_2x', 'optic', '2.5倍スコープ', '🔍', 'uncommon', 300, { magnify: 2.5, adsTime: 1.15, adsSpread: 0.75 }, 'acog', '中距離向けの2.5倍スコープ。', GUNLIKE],
-    ['o_4x', 'optic', '4倍スコープ', '🔭', 'rare', 380, { magnify: 4, adsTime: 1.3, adsSpread: 0.5, headMul: 1.08 }, 'scope', '遠距離狙撃用スコープ。（ハンドガン・ショットガン不可）', LONGGUN],
-    ['o_8x', 'optic', '8倍スナイパースコープ', '🔭', 'epic', 480, { magnify: 8, adsTime: 1.45, adsSpread: 0.3, headMul: 1.15 }, 'scopeL', '極遠距離用の高倍率スコープ。（ハンドガン・ショットガン不可）', LONGGUN],
-    ['o_hunter', 'optic', '狩人の眼', '👁️', 'epic', 520, { critChance: 0.08 }, 'holo', '会心率+8%。弱点を見抜く魔眼の照準（等倍）。', GUNLIKE],
+    ['o_x2', 'optic', '2倍スコープ', '🔎', 'common', 220, { magnify: 2, adsTime: 1.08, adsSpread: 0.85 }, 'x2', '近〜中距離向けの2倍スコープ。（ハンドガン・SMG・ショットガン不可）', SCOPE],
+    ['o_2x', 'optic', '2.5倍スコープ', '🔍', 'uncommon', 300, { magnify: 2.5, adsTime: 1.15, adsSpread: 0.75 }, 'x25', '中距離向けの2.5倍スコープ。（ハンドガン・SMG・ショットガン不可）', SCOPE],
+    ['o_4x', 'optic', '4倍スコープ', '🔭', 'rare', 380, { magnify: 4, adsTime: 1.3, adsSpread: 0.5, headMul: 1.08 }, 'x4', '遠距離狙撃用スコープ。（ハンドガン・SMG・ショットガン不可）', SCOPE_LONG],
+    ['o_8x', 'optic', '8倍スナイパースコープ', '🔭', 'epic', 480, { magnify: 8, adsTime: 1.45, adsSpread: 0.3, headMul: 1.15 }, 'x8', '極遠距離用の高倍率スコープ。距離計付き。（スナイパーライフル専用）', SNIPER],
+    ['o_hunter', 'optic', '狩人の眼', '👁️', 'epic', 520, { critChance: 0.08 }, 'hunter', '会心率+8%。弱点を見抜く魔眼の照準（等倍）。', GUNLIKE],
     ['m_supp', 'muzzle', 'サプレッサー', '🔇', 'common', 220, { recoil: 0.9, range: 0.95 }, 'supp', '発射音を抑え、反動を軽減。', NOT_PROJ],
     ['m_comp', 'muzzle', 'コンペンセイター', '🔩', 'common', 200, { recoil: 0.75 }, 'comp', '反動-25%。', GUNLIKE],
     ['m_brake', 'muzzle', 'マズルブレーキ', '⚙️', 'uncommon', 260, { recoil: 0.8, spread: 0.9 }, 'brake', '反動-20%、拡散-10%。', GUNLIKE],
@@ -228,8 +233,8 @@
     ['a_pierce', 'ammo', '貫通弾', '➶', 'rare', 420, { 'pierce+': 1 }, null, '敵を1体追加で貫通。', GUNLIKE],
     ['a_bleed', 'ammo', '破砕弾', '🔨', 'uncommon', 280, { 'shred+': 1 }, null, '同じ敵に当て続けると、1発ごとに与ダメ+3%（最大+30%）。1.5秒当てないと元に戻る。', GUNLIKE],
     ['a_vamp', 'ammo', '吸血弾', '🦇', 'epic', 560, { 'lifesteal+': 0.03 }, null, '与ダメの3%を回復。', GUNLIKE],
-    ['o_reflex', 'optic', 'リフレックスサイト', '🟠', 'common', 190, { adsTime: 0.8, adsSpread: 0.9 }, 'reddot', '素早く構えられ、ADS時の拡散-10%（等倍）。', GUNLIKE],
-    ['o_marksman', 'optic', 'マークスマンスコープ', '🔍', 'rare', 400, { magnify: 3, headMul: 1.12, adsSpread: 0.8, range: 1.15 }, 'scope', '3倍。射程+15%、ヘッドショット倍率+12%。（ハンドガン・ショットガン不可）', LONGGUN],
+    ['o_reflex', 'optic', 'リフレックスサイト', '🟠', 'common', 190, { adsTime: 0.8, adsSpread: 0.9 }, 'reflex', '素早く構えられ、ADS時の拡散-10%（等倍）。', GUNLIKE],
+    ['o_marksman', 'optic', 'マークスマンスコープ', '🔍', 'rare', 400, { magnify: 3, headMul: 1.12, adsSpread: 0.8, range: 1.15 }, 'x3', '3倍。射程+15%、ヘッドショット倍率+12%。（ハンドガン・SMG・ショットガン不可）', SCOPE_LONG],
     ['m_amp', 'muzzle', '増幅マズル', '🔊', 'uncommon', 250, { dmg: 1.1, recoil: 1.1 }, 'amp', 'ダメージ+10%、反動+10%。', GUNLIKE],
     ['b_ceramic', 'barrel', 'セラミックバレル', '🏺', 'uncommon', 290, { range: 1.2, spread: 0.85 }, null, '射程+20%、拡散-15%。', GUNLIKE],
     ['g_belt', 'mag', '給弾ベルト', '🎗️', 'rare', 360, { mag: 1.3, reload: 0.85 }, 'belt', '装弾数+30%、リロード時間-15%。', GUNLIKE],
@@ -255,7 +260,7 @@
     ['c_earth', 'core', '地の属性コア', '🪨', 'epic', 520, { el: 'earth' }, null, '武器（銃・近接）の攻撃が地属性になる（敵に付いた属性で結晶を作る）。', NOEL],
     ['b_blast', 'barrel', '高圧発射筒', '🎇', 'rare', 380, { 'explodeR+': 1.2, dmg: 1.1 }, null, '爆発半径+1.2m、ダメージ+10%。', (w) => !!(w.proj && w.proj.explode)],
     // レジェンダリー: each slot gets one (2026-11)
-    ['o_seer', 'optic', '千里眼', '👁️', 'legendary', 680, { critChance: 0.08, 'xray+': 1 }, 'holo', 'ADS中、壁越しに敵の姿が光って見える。会心率+8%。', GUNLIKE],
+    ['o_seer', 'optic', '千里眼', '👁️', 'legendary', 680, { critChance: 0.08, 'xray+': 1 }, 'seer', 'ADS中、壁越しに敵の姿が光って見える。会心率+8%。', GUNLIKE],
     ['m_hush', 'muzzle', '消音の極意', '🤐', 'legendary', 650, { recoil: 0.85, 'hush+': 0.4 }, 'supp2', '撃っても敵に気づかれにくい（発砲の音と光がない）。自分に気づいていない敵（こちらが見えていない敵・囮や味方を狙っている敵）への与ダメ+40%。', NOT_PROJ],
     ['b_star', 'barrel', '星鉄の銃身', '🌠', 'legendary', 680, { dmg: 1.2, range: 1.3, 'noFall+': 1 }, null, 'ダメージ+20%、射程+30%。距離によるダメージの減衰がなくなる。', NOT_PROJ],
     ['u_twin', 'under', '双撃の銃架', '🎯', 'legendary', 650, { 'underGL+': 1 }, 'gyro', '10発撃つごとに、照準の先へ小型の擲弾を自動で撃ち出す。', GUNLIKE],
@@ -266,7 +271,7 @@
     ['c_chaos', 'core', '混沌の属性コア', '🌈', 'mythic', 1400, { 'chaos+': 1 }, null, '武器（銃・近接）の攻撃の属性が、当たるたびに、敵に付いている属性と反応する属性へ自動で切り替わる（反応を起こし続ける）。', NOEL],
     ['g_eternal', 'mag', '永劫の弾倉', '🔄', 'mythic', 1400, { 'noReload+': 1 }, 'infdrum', 'リロードがなくなる。弾は毎秒、装弾数の15%ずつ自動で補充される。', GUNLIKE],
     ['a_soul', 'ammo', '魂喰らいの弾', '👻', 'mythic', 1400, { 'soulAmmo+': 1 }, null, 'この武器で倒すたびに、そのエリアの間ずっと与ダメ+1%（最大+40%）。次のエリアには半分を持ち越す。', GUNLIKE],
-    ['o_god', 'optic', '神の眼', '🌟', 'mythic', 1400, { adsTime: 0.77, 'godEye+': 1 }, 'holo', 'ADS中、敵の弱点（頭）が光って見える。ADS中の弱点への命中は必ず会心。ADS速度+30%。', GUNLIKE],
+    ['o_god', 'optic', '神の眼', '🌟', 'mythic', 1400, { adsTime: 0.77, 'godEye+': 1 }, 'god', 'ADS中、敵の弱点（頭）が光って見える。ADS中の弱点への命中は必ず会心。ADS速度+30%。', GUNLIKE],
     ['t_time', 'trigger', '時穿ちの引鉄', '⏳', 'mythic', 1400, { 'echoShot+': 1 }, null, '撃った弾が0.5秒後に同じ軌道でもう一度飛ぶ（ダメージ60%）。', GUNLIKE],
   ];
   const ATTACHMENTS = AT.map(([id, slot, name, icon, rarity, price, mods, visual, desc, compat]) => ({ id, slot, name, icon, rarity, price, mods, visual, desc, compat, kind: 'attachment' }));

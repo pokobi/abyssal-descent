@@ -594,7 +594,7 @@
     P.recalc();
     P.phoenixUsed = !!d.phoenixUsed;
     P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag; return w; });
-    const coresBack = []; for (const w of P.weapons) if (G.ownEl(w) && w.atts.core) { coresBack.push(w.atts.core); delete w.atts.core; w.ver++; }
+    const coresBack = []; for (const w of P.weapons) for (const [slot, id] of Object.entries(w.atts)) if (!G.attOk(G.ATT_BY_ID[id], w)) { coresBack.push(id); delete w.atts[slot]; w.ver++; } // (a core on a gun with an element of its own, a scope on a gun that takes dot sights only)
     if (!P.weapons.length && !Array.isArray(d.weapons)) P.weapons = [G.weapons.make('starter')]; // (a run saved with every gun put away keeps none)
     P.wIdx = Math.max(0, Math.min(d.wIdx || 0, P.weapons.length - 1));
     P.wOrder = (d.wOrder || []).map((t) => (t === 'm' ? 'm' : t === null ? null : P.weapons[t] || null));

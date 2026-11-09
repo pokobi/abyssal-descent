@@ -150,7 +150,15 @@
       G.sfx.timeDrone(S.k);
     } else el.style.opacity = '0';
   };
-  UI.scope = function (on, kind) { if (kind && UI.el.scope.dataset.kind !== kind) UI.el.scope.dataset.kind = kind; UI.el.scope.style.opacity = on ? 1 : 0; UI.el.crosshair.style.opacity = on ? 0 : UI.el.crosshair.style.opacity; };
+  UI.scope = function (on, kind) {
+    const el = UI.el.scope;
+    if (kind && el.dataset.kind !== kind) {
+      el.dataset.kind = kind;
+      if (kind === 'x8' && !el.querySelector('.x8') && G.Optics) { const d = document.createElement('div'); d.className = 'x8'; d.innerHTML = G.Optics.x8Svg(); el.appendChild(d); UI._x8rng = d.querySelector('.x8rng'); }
+    }
+    el.style.opacity = on ? 1 : 0; UI.el.crosshair.style.opacity = on ? 0 : UI.el.crosshair.style.opacity;
+  };
+  UI.scopeRange = function (txt, foe) { const t = UI._x8rng; if (!t) return; if (t.textContent !== txt) t.textContent = txt; const c = foe ? '#ff5038' : '#ffb040'; if (t.getAttribute('fill') !== c) t.setAttribute('fill', c); };
   UI.pileIndicator = function (on) { UI.el.pileInd.classList.toggle('hidden', !on); };
   UI.grappleHint = function (pv, state, cd) {
     const ch = UI.el.crosshair, gi = UI.el.grappleInd;

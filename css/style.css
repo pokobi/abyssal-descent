@@ -254,8 +254,8 @@ button { font-family: inherit; }
 .ebar.far .ch { visibility: hidden; }
 .ebar.boss-weak .hb { width: 50px; }
 .dnum { position: absolute; font-weight: 900; font-size: 18px; color: #fff; text-shadow: 0 0 3px #000, 0 2px 2px #000; transform: translate(-50%,-50%); animation: dnum .8s ease-out forwards; white-space: nowrap; }
-.dnum.head { font-size: 23px; text-shadow: 0 0 0 #000, 1.5px 0 #000, -1.5px 0 #000, 0 1.5px #000, 0 -1.5px #000, 3px 0 #ffd34a, -3px 0 #ffd34a, 0 3px #ffd34a, 0 -3px #ffd34a, 2.2px 2.2px #ffd34a, -2.2px -2.2px #ffd34a, 2.2px -2.2px #ffd34a, -2.2px 2.2px #ffd34a; }
-/* the colour of a number is the element of the hit (element.js); a headshot is the yellow outline above, a crit the '!!' after it */
+.dnum.head { font-size: 27px; font-style: italic; letter-spacing: 0.02em; color: #fff1b0; text-shadow: 0 0 2px #000, 0 2px 2px #000, 0 0 10px rgba(255,205,60,0.95), 0 0 20px rgba(255,170,30,0.6); }
+/* the colour of a number is the element of the hit (element.js), pale gold without one; a headshot glows gold, bigger and leaning; a crit has '!!' after it */
 .dnum.el-fire { color: #ff6a3a; } .dnum.el-water { color: #3f9dff; } .dnum.el-ice { color: #a8ecff; } .dnum.el-volt { color: #b88cff; } .dnum.el-wind { color: #4fd8c0; } .dnum.el-earth { color: #e0a640; }
 .dnum.rxn { font-size: 25px; }
 .dnum.rxl { font-size: 15px; letter-spacing: 0.08em; }

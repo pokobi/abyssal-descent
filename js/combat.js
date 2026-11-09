@@ -256,7 +256,7 @@
       e.lastHitT = G.game.time;
       e.flinch = Math.min(1, e.flinch + (src === 'dot' ? 0.05 : 0.35));
       if (!info.silent) {
-        // colour = the element of the hit (white: none), a yellow outline = a headshot, '!!' after the number = a crit, a reaction's damage in its own colour
+        // colour = the element of the hit (white: none), a gold glow, bigger and leaning = a headshot, '!!' after the number = a crit, a reaction's damage in its own colour
         const ncls = src === 'dot' ? (info.elem === 'poison' ? 'poison' : info.elem === 'shock' ? 'dot dshock' : 'dot') : src === 'react' ? 'rxn rx-' + (info.rx || 'blast') : (info.head ? 'head ' : '') + (er && er.el ? 'el-' + er.el : '') + (er && er.rx ? ' rxn' : '');
         G.fx.dmgNum(pos, crit && src !== 'dot' ? Math.max(1, Math.round(dmg)) + '!!' : dmg, ncls);
         if (src === 'bullet' || src === 'melee') {

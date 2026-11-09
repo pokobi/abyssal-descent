@@ -1226,7 +1226,7 @@
         }
         if (this.hitWallFlag && G.Strata.doors.length && !this.boss) G.Strata.bash(this, dt);
         if (!this.def.hover) {
-          const fb = w.floorBelow(this.pos.x, this.pos.y + 1.2, this.pos.z);
+          const fb = this.floorUnder(near && this._apy !== undefined ? this._apy : this.pos.y);
           if (fb > -50 && this.pos.y < fb + 0.35) {
             this.pos.y = fb + 0.35;
             const A = this.attackState;
@@ -1234,7 +1234,7 @@
           }
         }
         this.clampBounds();
-        this._apx = this.pos.x; this._apz = this.pos.z; this._apw = w;
+        this._apx = this.pos.x; this._apz = this.pos.z; this._apy = this.pos.y; this._apw = w;
         this.grounded = false;
         return;
       }
@@ -1277,7 +1277,16 @@
       } else this.swimUpT = 0;
       // vertical / ground
       this.vel.y -= 22 * dt;
-      const ny = this.pos.y + this.vel.y * dt;
+      let ny = this.pos.y + this.vel.y * dt;
+      // rising (a blow, a leap): the head stops under what is over it. Without this the wall test (pushOut) found the body's centre inside
+      // the slab the head had entered and threw it sideways to the slab's edge: a tall foe struck in a low room, out through its wall
+      if (this.vel.y > 0 && !this.boss && !this.tramp && !deepQ) {
+        const h0 = this.pos.y + this.height, hq = E._hdQ || (E._hdQ = []); hq.length = 0;
+        w.query(this.pos.x - 0.05, h0, this.pos.z - 0.05, this.pos.x + 0.05, ny + this.height + 0.02, this.pos.z + 0.05, hq);
+        let cl = Infinity; for (const c of hq) if (c.y0 >= h0 && c.y0 < cl) cl = c.y0;
+        hq.length = 0;
+        if (ny + this.height > cl - 0.02) { ny = cl - this.height - 0.02; this.vel.y = 0; }
+      }
       const a = w.query(this.pos.x - this.radius * 0.5, ny - 0.05, this.pos.z - this.radius * 0.5, this.pos.x + this.radius * 0.5, this.pos.y + 0.85, this.pos.z + this.radius * 0.5);
       let top = -Infinity; for (const c of a) if (c.y1 <= this.pos.y + 0.86 && c.y1 > top) top = c.y1;
       if (top > -Infinity && ny <= top) { this.pos.y = U.damp(this.pos.y, top, 18, dt); if (top - this.pos.y < 0.02) this.pos.y = top; if (this.vel.y < 0) this.vel.y = 0; this.grounded = true; }
@@ -1317,6 +1326,15 @@
       out.length = 0; return roof;
     }
     // the underside of the lowest solid thing over this body, up to yTo + its height (Infinity: open sky)
+    // the floor under a flyer: the highest top up to 1.2 over its feet (the ground a dive took it into, a floor it sank to). What was over
+    // it a moment ago is left out (yWas: its feet then): a slab whose underside was above them is a ceiling, and taking its top for the
+    // floor lifted the body up through it (from under a room's ceiling into the roof over it, which then threw it out sideways)
+    floorUnder(yWas) {
+      const w = G.world, x = this.pos.x, z = this.pos.z, y = this.pos.y + 1.2, out = E._flQ || (E._flQ = []); out.length = 0;
+      w.query(x - 0.01, -60, z - 0.01, x + 0.01, y + 0.01, z + 0.01, out);
+      let best = -100; for (const c of out) if (c.y1 <= y + 0.02 && c.y1 > best && c.y0 < yWas + 0.2) best = c.y1;
+      out.length = 0; return best;
+    }
     ceilAbove(yTo) {
       const w = G.world, r = this.radius * 0.6, y0 = this.pos.y + 0.2, out = E._ceilQ || (E._ceilQ = []); // (from just over the feet: a slab it has begun to rise or dive into is a ceiling too, never a wall to be shoved sideways out of)
       out.length = 0;
@@ -1343,6 +1361,8 @@
         let ox = this.pos.x - cx, oz = this.pos.z - cz; let d = Math.hypot(ox, oz);
         if (d >= r) continue;
         if (d < 1e-4) { // center inside: push along least penetration
+          // only the head is in it (a ceiling the body rose into): that is settled up and down, never by a throw to the slab's far edge
+          if (c.y0 >= y1 - 0.5) continue;
           const pen = [[this.pos.x - c.x0, -1, 0], [c.x1 - this.pos.x, 1, 0], [this.pos.z - c.z0, 0, -1], [c.z1 - this.pos.z, 0, 1]].sort((p, q) => p[0] - q[0])[0];
           this.pos.x += pen[1] * (pen[0] + r); this.pos.z += pen[2] * (pen[0] + r);
         } else { this.pos.x += ox / d * (r - d); this.pos.z += oz / d * (r - d); }

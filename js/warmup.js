@@ -96,6 +96,15 @@
       stand('buff', (G.BUFFS || []).find((b) => b.cat !== 'relic' && b.cat !== 'curse' && b.cat !== 'pact'));
       kit.add(fake.group);
     }
+    // a chest left closed when the area is cleared: its beam, ring and ripple (game.js, seen through walls; a see-through two-sided
+    // material is drawn back then front: two shaders each)
+    add(() => {
+      const g = new THREE.Group(), c = 0xffe0a0, base = { color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide };
+      g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false })));
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 11, 12, 1, true), new THREE.MeshBasicMaterial(Object.assign({ fog: false }, base))));
+      g.add(new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 32), new THREE.MeshBasicMaterial(Object.assign({}, base))));
+      return g;
+    });
     // the healing basin's water and the hint drawn round it when you are hurt (game.js updateHealHint)
     add(() => {
       const g = new THREE.Group(), PG = G.Props.PG, c = 0x60ff90;

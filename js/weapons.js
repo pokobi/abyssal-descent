@@ -1026,7 +1026,7 @@
     const o = G.camera.position.clone();
     const fwd = P.forward();
     const spreadDeg = W.currentSpread(s);
-    if (G.Classes) s = G.Classes.shot(s); // 一点集中 (狙撃手): a full gauge makes this shot hit harder and pierce one
+    if (G.Classes) s = G.Classes.shot(s); // 一点集中 (狙撃手): the gauge makes this shot hit harder; it pierces one
     const pellets = s.pellets || 1;
     const muzzle = W.muzzleWorld();
     const doubled = Math.random() < s.doubleShot;
@@ -1134,7 +1134,7 @@
       // 消音の極意: a foe that is not on to you (cannot see you, or is after a decoy) takes more
       if (s.hush && (!h.e.hasLOS || (G.combat.getDecoy && G.combat.getDecoy()))) info.hushMul = 1 + s.hush;
       G.combat.damageEnemy(h.e, dmg, info);
-      if (s.focusShot && G.Classes) G.Classes.focusHit(h.e, info, s); // 残心 / 一発入魂 (狙撃手)
+      if (s.focusShot && G.Classes) G.Classes.focusHit(h.e, info, s); // the gauge back on a head, 一発入魂's rounds (狙撃手)
       if (s.beam) { G.fx.sparks(hp, null, 12, 0x9fd4ff, 8); G.fx.flash(hp, 0x9fd4ff, 30, 0.12, 6); }
       if (s.explo || w.def.trait === 'explosiveRounds') G.combat.explode(hp, 1.6, s.dmg * 0.6 * fall, { src: 'explosion', small: true, proc: true });
       if (w.def.trait === 'chainHit' && Math.random() < 0.5) { G.combat.chain(h.e, 2, s.dmg * 0.5, 9, { src: 'bullet', proc: true }); G.fx.strike(h.e.centerPos()); }

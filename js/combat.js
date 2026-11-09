@@ -183,7 +183,7 @@
     if (e.boss) add += st.bossDmg;
     if (e.elite || e.boss) add += st.eliteDmg + (info.eliteBonus || 0);
     if (P.adsActive && src === 'bullet') add += st.adsDmg;
-    if (G.Classes && !info.enemy && src !== 'dot' && src !== 'react') add += G.Classes.dmgAdd(P, dist);
+    if (G.Classes && !info.enemy && src !== 'dot' && src !== 'react') add += G.Classes.dmgAdd(P, dist, src);
     if (src === 'dot' || src === 'react') add = 0; // (a reaction's strength is its own: 属性熟練 and the reaction boons, see element.js)
     let dmg = amount * Math.max(0.1, 1 + add);
     const baseHit = dmg; // what a status this hit applies is measured by (no crit, head or mark: those would make it swing wildly)

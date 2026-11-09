@@ -1,7 +1,7 @@
 'use strict';
 // 秘伝 (js/classes.js): after each guardian the class's pair of perks is offered (一の巻, then 二の巻; easy both at the first; none at the
 // last guardian), before the guardian's boon; the choice is saved with the run and a perk still owed is offered later. Every one of the
-// 24 perks does what its card says, the class's start effects changed (sniper: +40%, no gauge back; heavy: knocked about again), and the
+// 24 perks does what its card says, the class's start effects changed (sniper: the gauge, every shot through one, a head gives the gauge back; heavy: knocked about again), and the
 // pictures (飛燕's crescent, 一閃's beam) run without errors.
 //   node tests/perk_test.js
 const path = require('path');
@@ -95,7 +95,7 @@ window.T = {
     check(await p.eval("G.player.perks.join() === 'blade_1a' && !document.querySelector('.pk-card') && G.game.state !== 'buff'"), '...taken, and back to the game');
 
     // ---------------- the screens: the class screen shows the four, the status sheet the chosen one
-    check(await p.eval("(() => { const c = G.Classes.BY.sniper, h = G.Classes.detailHTML(c); return ['残心', '一発入魂', '急所穿ち', '一閃'].every((n) => h.includes(n)) && /秘伝/.test(h) && !/Lv3/.test(h) && /\\+40%/.test(h); })()"), 'class screen: the start effect (+40%) and the four perks, no Lv');
+    check(await p.eval("(() => { const c = G.Classes.BY.sniper, h = G.Classes.detailHTML(c); return ['鷹の目', '一発入魂', '急所穿ち', '一閃'].every((n) => h.includes(n)) && /秘伝/.test(h) && !/Lv3/.test(h) && /\\+40%/.test(h); })()"), 'class screen: the start effect (+40%) and the four perks, no Lv');
     check(await p.eval("(() => { const c = G.Classes.BY.heavy, h = G.Classes.perksHTML(c, ['heavy_1a']); const d = document.createElement('div'); d.innerHTML = h; return d.querySelectorAll('.cls-pk-c.on').length === 1 && d.querySelectorAll('.cls-pk-c.off').length === 1 && /次の守護者で選ぶ/.test(d.textContent); })()"), 'status sheet: the perk taken, the other one dimmed, the next scroll still to come');
 
     // ---------------- 兵士
@@ -130,14 +130,22 @@ window.T = {
 
     // ---------------- 狙撃手
     const sn = await J(p, `const C = G.Classes, W = G.weapons; let P = T.as('sniper'); const st = () => C.state(); const w = P.weapons[0]; const s = W.stats(w);
-      st().focus = 1; W.adsT = 1; const a = C.shot(s); const e0 = T.mk(6); e0.hp = 1; st().focus = 0; G.combat.killEnemy(e0, { src: 'bullet', head: true }); const back0 = st().focus; T.clean();
-      P = T.as('sniper', ['sniper_1a']); st().focus = 1; W.adsT = 1; let q = C.shot(W.stats(P.weapons[0])); const e1 = T.mk(6); C.focusHit(e1, { head: true }, q); const f1 = st().focus; e1.alive = false; C.focusHit(e1, { head: true }, q); const f2 = st().focus; T.clean();
-      P = T.as('sniper', ['sniper_1b']); const w2 = P.weapons[0]; w2.mag = 1; st().focus = 1; W.adsT = 1; q = C.shot(W.stats(w2)); const e2 = T.mk(6); C.focusHit(e2, { head: true }, q); const m1 = w2.mag; e2.alive = false; C.focusHit(e2, { head: true }, q); const m2 = w2.mag; C.focusHit(e2, { head: true }, q); const m3 = w2.mag; T.clean();
-      P = T.as('sniper', ['sniper_2a']); st().focus = 1; W.adsT = 1; q = C.shot(W.stats(P.weapons[0])); const sure = [C.sureCrit(q, { head: true }), C.sureCrit(q, { head: false }), C.sureCrit(W.stats(P.weapons[0]), { head: true })];
+      W.adsT = 1; st().focus = 1; const a = C.shot(s); st().focus = 0.5; const h = C.shot(s); st().focus = 0; const z = C.shot(s);
+      W.adsT = 0; st().focus = 1; const hip = C.shot(s); W.adsT = 1;
+      const e1 = T.mk(6); st().focus = 0; C.focusHit(e1, { head: false }, z); const fb = st().focus; C.focusHit(e1, { head: true }, z); const f1 = st().focus; e1.alive = false; C.focusHit(e1, { head: true }, z); const f2 = st().focus; T.clean();
+      const far0 = C.dmgAdd(P, 30, 'bullet');
+      P = T.as('sniper', ['sniper_1a']); const far = [0, 15, 30, 60].map((d) => Math.round(C.dmgAdd(P, d, 'bullet') * 100) / 100).concat(Math.round(C.dmgAdd(P, 30, 'melee') * 100) / 100); T.clean();
+      P = T.as('sniper', ['sniper_1b']); const w2 = P.weapons[0]; P.meleeMode = false; W.equip(true); G.game.state = 'playing'; st().focus = 0; for (let i = 0; i < 16; i++) { W.adsT = 1; C.tick(0.05); } const fill = Math.round(st().focus * 100) / 100;
+      w2.mag = 1; st().focus = 1; W.adsT = 1; let q = C.shot(W.stats(w2)); const e2 = T.mk(6); C.focusHit(e2, { head: true }, q); const m1 = w2.mag; e2.alive = false; C.focusHit(e2, { head: true }, q); const m2 = w2.mag; C.focusHit(e2, { head: true }, q); const m3 = w2.mag;
+      st().focus = 0.5; q = C.shot(W.stats(w2)); const e3 = T.mk(6); C.focusHit(e3, { head: true }, q); const m4 = w2.mag; T.clean();
+      P = T.as('sniper', ['sniper_2a']); st().focus = 1; W.adsT = 1; q = C.shot(W.stats(P.weapons[0])); st().focus = 0.5; const q2 = C.shot(W.stats(P.weapons[0])); const sure = [C.sureCrit(q, { head: true }), C.sureCrit(q, { head: false }), C.sureCrit(q2, { head: true })];
       W.adsT = 0;
-      return { mul: Math.round(a.dmg / s.dmg * 100) / 100, pierce: (a.pierce || 0) - (s.pierce || 0), back0, f: [f1, f2], m: [m1, m2, m3], sure };`);
-    check(sn.mul === 1.4 && sn.pierce === 1 && sn.back0 === 0, `狙撃手 start: a full shot x${sn.mul}, through ${sn.pierce} more; a headshot kill gives no gauge back (${sn.back0})`);
-    check(sn.f.join() === '0.5,0.9' && sn.m.join() === '2,3,3', `狙撃手 残心: the gauge back to 50% on a head, 90% on the kill (${sn.f}); 一発入魂: a round, one more on the kill, no more (${sn.m})`);
+      const r2 = (v) => Math.round(v * 100) / 100;
+      return { mul: [r2(a.dmg / s.dmg), r2(h.dmg / s.dmg), r2(z.dmg / s.dmg), r2(hip.dmg / s.dmg)], pierce: [a, h, z, hip].map((o) => (o.pierce || 0) - (s.pierce || 0)), f: [fb, f1, f2], far0, far, fill, m: [m1, m2, m3, m4], sure };`);
+    check(sn.mul.join() === '1.4,1.2,1,1' && sn.pierce.join() === '1,1,1,1', `狙撃手 start: the shot as strong as the gauge (full / half / empty / hip ×${sn.mul}), every shot through one more (${sn.pierce})`);
+    check(sn.f.join() === '0,0.5,1', `狙撃手 start: a body hit gives nothing back, a head half the gauge, a head kill all of it (${sn.f})`);
+    check(sn.far0 === 0 && sn.far.join() === '0,0.2,0.4,0.4,0', `狙撃手 鷹の目: a gun's hit +0 / +20 / +40 / +40% at 0 / 15 / 30 / 60 m, not a melee blow; nothing without it (${sn.far}; ${sn.far0})`);
+    check(sn.fill >= 0.99 && sn.m.join() === '2,3,3,3', `狙撃手 一発入魂: the gauge full in 0.8 s (${sn.fill}); a full shot's head a round, one more on the kill, no more, none for a shot not full (${sn.m})`);
     check(sn.sure.join() === 'true,false,false', `狙撃手 急所穿ち: a full shot to the head is a sure crit; not the body, not a shot that was not full (${sn.sure})`);
     // 一閃: more foes in a row than a plain full shot goes through (the beam takes them all); one foe just off the line, where a thin shot
     // misses it (the beam, 0.8 m across, still takes it). No spread on the shots.

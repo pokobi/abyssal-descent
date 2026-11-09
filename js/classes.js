@@ -31,8 +31,8 @@
       notes: ['加護「選択肢」「運命の再配」とは別に数える。'] },
     assault: { name: '突貫', icon: '💨', short: '近い敵ほど大ダメージ', rows: [['近い敵への与ダメ（0mで最大、12mで0）', '+30%']],
       notes: ['距離に応じてなめらかに減る（6mなら半分）。'] },
-    sniper: { name: '一点集中', icon: '🎯', short: 'ADSでためた1発が強く、敵を貫く', rows: [['満タンの1発のダメージ（1体貫通）', '+40%']],
-      notes: ['ADS中にゲージがたまる（1.5秒で満タン）。撃つと0になり、ADSをやめると1秒で半分減る。'] },
+    sniper: { name: '一点集中', icon: '🎯', short: 'ためるほど強い1発。頭を撃てばゲージが戻る', rows: [['ゲージに応じた与ダメ（満タンで）', '+40%'], ['撃った弾', '1体貫通'], ['ヘッドショットで戻るゲージ', '50%'], ['ヘッドショットで倒すと', '全部戻る']],
+      notes: ['ADS中にゲージがたまる（1.5秒で満タン）。撃つと0になり、ADSをやめると1秒で半分減る。', 'ゲージ半分なら+20%。腰だめ撃ちにはゲージが乗らない。'] },
     blade: { name: '連斬', icon: '⚔️', short: '近接を当て続けるほど、攻撃も移動も速くなる', rows: [['近接を当てるとたまる層の上限', '5層']],
       notes: ['1層につき近接の攻撃速度+5%・移動速度+3%（銃には効かない）。', '7.5秒続き、当てるたびに7.5秒に戻る。切れると全部なくなる。'] },
     heavy: { name: '鉄壁', icon: '🛡️', short: '攻撃を受けると、しばらく硬くなる', rows: [['ダメージを受けた後3秒間の被ダメ', '-10%'], ['いつでも被ダメ', '-10%']],
@@ -49,7 +49,7 @@
       [PK('soldier_2a', '掘り出し物', '💎', '加護の選択肢に、レアリティの高いカードがずっと出やすくなる'), PK('soldier_2b', '百戦の備え', '🎖️', '持っている加護1つにつき与ダメが上がる（コモン・アンコモン +2.5%、レア +5%、エピック +10%、レジェンダリー +20%、ミシック +40%）')]],
     assault: [[PK('assault_1a', '肉薄', '👊', '至近距離の与ダメ +30% → +40%。効く距離が 12m → 15m に伸びる'), PK('assault_1b', '血の昂り', '🩸', '敵を倒すとHPを30回復し、5秒間移動速度 +25%')],
       [PK('assault_2a', '猛進', '🐗', 'スライディングで敵にぶつかると体当たりになり、大きなダメージを与えてよろめかせる。スライディングの距離 +30%'), PK('assault_2b', '背水', '🌊', 'HPが半分を切っている間、与ダメ +30%・連射速度 +20%')]],
-    sniper: [[PK('sniper_1a', '残心', '🧘', '満タンの1発がヘッドショットに当たると、ゲージが50%戻る。その1発で倒すと90%戻る'), PK('sniper_1b', '一発入魂', '🔂', '満タンの1発がヘッドショットに当たると、弾が1発戻る。その1発で倒すと、さらに1発戻る')],
+    sniper: [[PK('sniper_1a', '鷹の目', '🦅', '遠い敵ほど銃の与ダメが上がる（30mで最大+40%、15mなら+20%）。ゲージとは別に加わる'), PK('sniper_1b', '一発入魂', '🔂', 'ゲージのたまる速さ+100%。満タンの1発がヘッドショットに当たると、弾が1発戻る。その1発で倒すと、さらに1発戻る')],
       [PK('sniper_2a', '急所穿ち', '💀', '満タンの1発がヘッドショットなら、必ず会心になる'), PK('sniper_2b', '一閃', '⚡', '満タンの1発が太い光の筋になり、線の上の敵を何体でも貫く。当たり判定も大きくなる。貫いてもダメージは落ちない')]],
     blade: [[PK('blade_1a', '深い連斬', '🌀', '層の上限 5 → 7'), PK('blade_1b', '軽身', '🍃', '近接武器を持っている間、移動速度 +10%')],
       [PK('blade_2a', '見切り', '👁️', 'いつでもパリィできる。敵の攻撃が当たる直前にガード（リロード）を押すと、その攻撃を完全に防ぎ、重撃の200%のダメージを返す。遠距離の攻撃は防ぐだけ（返さない）'), PK('blade_2b', '飛燕', '🕊️', '重撃が、前へ斬撃を飛ばす。斬撃は敵を貫き、重撃の60%のダメージを与える')]],
@@ -110,9 +110,11 @@
   // the running state (stacks, gauges, timers), kept on the player and cleared with the kit
   const S = () => { const P = G.player; return P._cs || (P._cs = { blade: 0, bladeT: 0, focus: 0, ironT: 0 }); };
   CL.state = S;
-  // 突撃兵: close range (smooth, 0 m best, 12 m nothing; 肉薄: 15 m, +40%), far away a little less; 背水: below half health. 術士 昂る理: its stacks
-  CL.dmgAdd = function (P, dist) {
+  // 突撃兵: close range (smooth, 0 m best, 12 m nothing; 肉薄: 15 m, +40%), far away a little less; 背水: below half health. 術士 昂る理: its stacks.
+  // 狙撃手 鷹の目: a gun's hit farther off, stronger
+  CL.dmgAdd = function (P, dist, src) {
     let a = 0;
+    if (is('sniper') && CL.has('sniper_1a') && src === 'bullet') a += 0.4 * Math.min(1, dist / 30); // 鷹の目 (0 m nothing, 30 m and beyond +40%)
     if (is('assault')) {
       if (dist >= 20) a -= 0.2;
       else { const far = CL.has('assault_1a'); a += Math.max(0, 1 - dist / (far ? 15 : 12)) * (far ? 0.4 : 0.3); }
@@ -135,27 +137,28 @@
   CL.blade = () => { if (!is('blade')) return 0; const s = S(); if (s.blade && s.bladeT <= now()) s.blade = 0; return s.blade; };
   CL.onMeleeHit = function () { if (!is('blade')) return; const s = S(); s.blade = Math.min(CL.bladeMax(), CL.blade() + 1); s.bladeT = now() + 7.5; };
   CL.meleeSpeed = () => 1 + CL.blade() * 0.05;
-  // 狙撃手: the focus gauge (filled while aiming down the sights); a full shot +40% and through one. 一閃: through all, a beam 0.8 m across
+  // 狙撃手: the focus gauge (filled while aiming down the sights): a shot is stronger by as much as the gauge holds (full +40%, half +20%) and
+  // every shot goes through one foe. Only a full shot is 急所穿ち's sure crit and 一閃's beam (through all, 0.8 m across)
   CL.focus = () => (is('sniper') ? S().focus : 0);
   CL.spreadMul = (ads) => (is('sniper') ? 1 + 0.4 * (1 - ads) : 1);
   CL.shot = function (s) {
     if (!is('sniper')) return s;
-    const st = S(), full = st.focus >= 1 && G.weapons.adsT > 0.6;
+    const st = S(), g = G.weapons.adsT > 0.6 ? Math.min(1, st.focus) : 0, full = g >= 1; // (the gauge rides on an aimed shot only)
     st.focus = 0;
-    if (!full) return s;
-    const o = Object.assign({}, s, { dmg: s.dmg * 1.4, pierce: (s.pierce || 0) + 1, focusShot: { head: false, kill: false } });
-    if (CL.has('sniper_2b')) { o.pierce = 999; o.beam = 0.4; }
+    const o = Object.assign({}, s, { dmg: s.dmg * (1 + 0.4 * g), pierce: (s.pierce || 0) + 1, focusShot: { head: false, kill: false, full, g } });
+    if (full && CL.has('sniper_2b')) { o.pierce = 999; o.beam = 0.4; }
     return o;
   };
-  // a full shot has struck (weapons.js traceShot, after the blow): 残心 gives the gauge back, 一発入魂 a round (once for the head, once more for the kill)
+  // a shot has struck (weapons.js traceShot, after the blow): a head gives half the gauge back, a head kill all of it (the start effect);
+  // 一発入魂: a full shot's head a round, its kill one more
   CL.focusHit = function (e, info, s) {
     const f = s && s.focusShot; if (!f || !info.head || !is('sniper')) return;
     const P = G.player, st = S(), w = P.weapon, killed = !e.alive;
     const mag = (n) => { if (w && !P.meleeMode && !w.def.melee) w.mag = Math.min(G.weapons.stats(w).mag, w.mag + n); };
-    if (!f.head) { f.head = true; if (CL.has('sniper_1a')) st.focus = Math.max(st.focus, 0.5); if (CL.has('sniper_1b')) mag(1); }
-    if (killed && !f.kill) { f.kill = true; if (CL.has('sniper_1a')) st.focus = Math.max(st.focus, 0.9); if (CL.has('sniper_1b')) mag(1); }
+    if (!f.head) { f.head = true; st.focus = Math.max(st.focus, 0.5); if (f.full && CL.has('sniper_1b')) mag(1); }
+    if (killed && !f.kill) { f.kill = true; st.focus = 1; if (f.full && CL.has('sniper_1b')) mag(1); }
   };
-  CL.sureCrit = (s, info) => !!(s && s.focusShot && info.head && CL.has('sniper_2a')); // 急所穿ち
+  CL.sureCrit = (s, info) => !!(s && s.focusShot && s.focusShot.full && info.head && CL.has('sniper_2a')); // 急所穿ち (a full shot only)
   // 重装兵: a hit opens 3 s of 鉄壁 (-10%); 根を張る halves the knockback taken (combat.js damagePlayer / player.js)
   CL.ironOn = () => is('heavy') && S().ironT > now();
   CL.ironRed = () => (CL.ironOn() ? 0.1 : 0);
@@ -340,7 +343,7 @@
     const Wp = G.weapons, w = P.weapon, an = Wp.anim || {};
     const aiming = !P.meleeMode && !!w && Wp.adsT > 0.9 && !w.reloading && !(Wp.switchT > 0) && !(an.melee > 0) && !(an.throwT > 0) && !P.mantle && !P.pileState
       && !(G.ItemAnim && G.ItemAnim.busy()) && !(G.GrenHold && G.GrenHold.active()) && !(G.abilities.wheelOpen && G.abilities.wheelOpen());
-    if (aiming) st.focus = Math.min(1, st.focus + dt / 1.5);
+    if (aiming) st.focus = Math.min(1, st.focus + dt / 1.5 * (CL.has('sniper_1b') ? 2 : 1)); // (一発入魂: twice as fast)
     else if (st.focus > 0) st.focus = Math.max(0, st.focus - dt * 0.5);
     const q = Math.floor(st.focus * 4 + 1e-6);
     if (q > q0 && G.sfx && G.sfx.focus) G.sfx.focus(q); // (a quiet blip each quarter, a chime when full)

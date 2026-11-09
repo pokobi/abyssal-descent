@@ -1,6 +1,6 @@
 'use strict';
 // The last foes of a fight, and the sky under a roof:
-//  - two or fewer foes left (or nobody fighting for 20 s): each is pointed at (a 💀 mark), and one far off and out of sight is brought in;
+//  - two or fewer foes left (or nobody fighting for 20 s): each is pointed at (a 💀 mark); none is ever moved to you (no warping), even far off and out of sight;
 //  - in the rain, nobody under a roof gets wet (you or a foe), and out in the open everyone does.
 //   node tests/rest_test.js
 const path = require('path');
@@ -57,17 +57,16 @@ const PORT = +process.env.COOP_PORT || 9987;
     await p.eval('G.game.areaStartT = G.game.time - 30; G.player.lastHurtT = -99; G.enemies.list.forEach((e) => { e.lastHitT = -99; }); 1');
     await sleep(400);
     check(await p.eval('(G.enemies.restSet() || new Set()).size') === 5, 'nobody fighting for 20 s: all five pointed at');
-    // one far off and out of sight that keeps wandering (never still long enough for the stuck-foe failsafe) is brought in
+    // one far off and out of sight is left where it is: pointed at, never moved to you (it only ever walks: no jump of more than a few metres)
     await p.eval('window.__F.forEach((e, i) => { if (i !== 2 && e.alive) G.combat.damageEnemy(e, 1e9, { src: "test" }); }); 1');
     if (!(await p.eval('!!(window.__F[2] && window.__F[2].alive)'))) { const k = await foeAt(farHidden); await p.eval(`window.__F[2] = window.__F[${k}]; 1`); }
     await settle();
-    await p.eval('window.__keep = setInterval(() => { const e = window.__F[2]; if (e) { e._stN = 0; } if (G.game.areaCleared || G.game.rewardPending) { G.game.areaCleared = false; G.game.rewardPending = null; } }, 300); 1');
+    await p.eval('window.__jump = 0; window.__lastP = null; window.__keep = setInterval(() => { const e = window.__F[2]; if (e && e.alive) { if (window.__lastP) window.__jump = Math.max(window.__jump, Math.hypot(e.pos.x - window.__lastP.x, e.pos.z - window.__lastP.z)); window.__lastP = e.pos.clone(); } if (G.game.areaCleared || G.game.rewardPending) { G.game.areaCleared = false; G.game.rewardPending = null; } }, 100); 1');
     const d0 = await p.eval('(() => { const e = window.__F[2], P = G.player; return Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z); })()');
-    const n0 = await p.eval('G.enemies.pulled || 0');
     await waitT(14);
     const d1 = await p.eval('(() => { const e = window.__F[2], P = G.player; return Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z); })()');
-    if (!(d1 < 21)) console.log('  diag3', await p.eval('JSON.stringify({ alive: window.__F[2].alive, rest: (G.enemies.restSet() || new Set()).size, cl: G.game.areaCleared, st: G.game.state, n: G.enemies.list.filter((e) => e.alive).length, ob: window.__ob || [] })'));
-    check((await p.eval('G.enemies.pulled || 0')) > n0 && d1 < 21, `the last one, far off and out of sight, is brought in (${d0.toFixed(0)} m -> ${d1.toFixed(0)} m)`);
+    const jump = await p.eval('window.__jump');
+    check(jump < 3 && (await p.eval('!!window.__F[2].alive && (G.enemies.restSet() || new Set()).has(window.__F[2])')), `the last one, far off and out of sight, is pointed at and never warped to you (${d0.toFixed(0)} m -> ${d1.toFixed(0)} m, largest step in 0.1 s ${jump.toFixed(1)} m)`);
     await p.eval('clearInterval(window.__keep); 1');
 
     // ================= the sky under a roof

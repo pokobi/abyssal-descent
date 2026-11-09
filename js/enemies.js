@@ -829,15 +829,8 @@
       // anti-stuck: wanted to move for a while but barely did -> sidestep / hop
       this._stT = (this._stT || 0) + dt;
       if (this._stT > 1.5) {
-        // failsafe: stuck out of sight for ~6s -> slip back into the fight near the player (an area must always be clearable)
+        // (no foe is ever moved to you: an area stays clearable because none can get where you cannot reach it, see E.walkOk / E.airOk)
         const bashing = this.bashAt && G.game.time - this.bashAt < 1.2; // battering a cell gate is not being stuck
-        const stuck = !bashing && this._stP && !this.attackState && this._stP.distanceTo(this.pos) < 0.4 && distH > 6 && !this.hasLOS;
-        this._stN = stuck ? (this._stN || 0) + 1 : 0;
-        if (this._stN >= 4 && !this.custom && !this.boss && !this.burrowed) {
-          this._stN = 0;
-          const c = w0().randomOpenCell({ next: Math.random }, (x, z, idx) => (!w0().reachMask || w0().reachMask[idx]) && Math.abs(w0().nf[idx] - P.pos.y) < 2.5 && Math.hypot(x - P.pos.x, z - P.pos.z) > 10 && Math.hypot(x - P.pos.x, z - P.pos.z) < 24);
-          if (c) { G.fx.smoke(this.centerPos(), 6, 1, 0x1a1412, 1, 1); this.pos.set(c.x, c.y + (this.flyer ? this.alt : 0), c.z); this.vel.set(0, 0, 0); this.climb = 0; G.fx.smoke(this.centerPos(), 6, 1, 0x1a1412, 1, 1); }
-        }
         if (!bashing && this._stP && this.mv > 0.5 && !this.attackState && this._stP.distanceTo(this.pos) < 0.4 && distH > 4) {
           const a = Math.random() * Math.PI * 2; this.vel.x += Math.cos(a) * 6; this.vel.z += Math.sin(a) * 6;
           if (!this.flyer && this.grounded) this.vel.y = 5;
@@ -1130,6 +1123,7 @@
       const np = this.pos.clone().addScaledVector(dir, d);
       const i = G.world.navIdx(np.x, np.z, this.pos.y);
       if (i < 0 || G.world.nb[i] || G.world.nf[i] === -Infinity || Math.abs(G.world.nf[i] - this.pos.y) > 2.5) return;
+      if (this.flyer ? !E.airOk(np.x, np.z) : !E.walkOk(np.x, np.z, this.pos.y)) return; // (a sidestep, never on to a place you cannot reach)
       G.fx.smoke(this.centerPos(), 8, 0.8, 0x1a1020, 0.5, 0.8);
       this.pos.x = np.x; this.pos.z = np.z; if (!this.flyer && !this.def.hover) this.pos.y = G.world.nf[i];
       G.fx.smoke(this.centerPos(), 8, 0.8, 0x1a1020, 0.5, 0.8);
@@ -1260,6 +1254,12 @@
       this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.6, this.pos.y + this.height);
       // (nor is it shoved out over the edge by a wall it slid along: a railing's end, a pillar by the brink)
       if (edge && (this.pos.x !== sx || this.pos.z !== sz) && !w.edgeSafe((this._eq || (this._eq = V())).set(sx, this.pos.y, sz), this.pos.x, this.pos.z, air)) { this.pos.x = sx; this.pos.z = sz; }
+      // nor ever on to floor you cannot walk to (a ledge a blow lifts it on to, a pit it is shoved down into, a wall's top): whatever moves
+      // it (its own steps, a shove, a blow), it stops where that floor begins. Over the void a blow still throws it off (a fall).
+      if ((this.pos.x !== sx || this.pos.z !== sz) && !this.boss && E.walkOk(sx, sz, this.pos.y) && !E.walkOk(this.pos.x, this.pos.z, this.pos.y)) {
+        if (E.walkOk(this.pos.x, sz, this.pos.y)) this.pos.z = sz; else if (E.walkOk(sx, this.pos.z, this.pos.y)) this.pos.x = sx; else { this.pos.x = sx; this.pos.z = sz; }
+        this.vel.x = 0; this.vel.z = 0;
+      }
       if (this.hitWallFlag && G.Strata.doors.length && !this.boss) G.Strata.bash(this, dt);
       // deep water (the drowned town): a walker pressed against a ledge (a wall's top, a step out of it) rises slowly up the water, to the
       // surface at most, and so climbs out onto it (the nav lets it head there: world.js canStep). Once it rises it keeps rising a moment
@@ -1634,16 +1634,14 @@
       e.update(dt);
       if (e.removed) drop(i);
     }
-    restPull(dt);
     E.updateBars();
   };
 
   // ---------------- the last foes: pointed at, and brought in (an area must never hang on one foe nobody can find) ----------------
   // In a fight (a combat area not cleared yet), once two or fewer foes are left, or nobody has hit a foe or been hurt for 20 s, every
   // foe left is pointed at: from the screen's edge when it is off the screen, where it stands (through walls) when it is in front but
-  // out of sight. One that stays far off (over 22 m) and gets no nearer for 12 s (it cannot find its way, or wanders) is brought in:
-  // set down 10-20 m from you, on your level, in a puff of smoke (as the stuck-foe failsafe does). Guardians, the gold mimic and what
-  // does not count for the area are left out.
+  // out of sight. None is ever moved to you (pokobi: no warping): a foe can never be where you cannot get at it (E.walkOk, E.airOk), so
+  // the marks are all it takes. Guardians, the gold mimic and what does not count for the area are left out.
   // the swoop of the bats and crows: speed (m/s) and longest dive (s); how fast it bends after you (per s); how long it goes round to a
   // better place after a dive that could not reach you; how soon it tries again when it broke one off
   E.SWIM_RISE = 1.4; E.SWIM_KEEP = 0.5; // m/s: a foe rising up the deep water to climb out onto a ledge; s it keeps rising after it stops pressing
@@ -1692,7 +1690,15 @@
     return a.ok[zi * a.W + xi] === 1;
   };
   E.SWOOP = { speed: 17, dur: 0.9, turn: 0.8, lead: 0.5, repo: 1.2, retry: 0.7 }; // (lead: how much of your speed it allows for: half, a dodge still works)
-  E.REST = { n: 2, quiet: 20, far: 22, pull: 12 };
+  E.REST = { n: 2, quiet: 20 };
+  // may a walker stand at (x, z) at height y? Floor you can walk to from where you come in (the level's own check, w.reachMask), a wall
+  // (its cell is shut: pushOut keeps the body off it), or no floor at all (the void: a fall). Not a ledge, a pit or a wall top you cannot reach
+  E.walkOk = function (x, z, y) {
+    const w = G.world, m = w && w.reachMask; if (!m || !w.nf || m.length !== w.nf.length) return true; // (a ground plan made anew since: no word to go by)
+    const i = w.navIdx(x, z, y); if (i < 0) return true;
+    if (!(w.nf[i] > -Infinity)) return true;
+    return m[i] === 1 || m[i] === true || w.nb[i] === 1;
+  };
   let restAt = -1, restS = null;
   E.restSet = function () {
     const GM = G.game, O = GM.objective;
@@ -1706,25 +1712,6 @@
     if (left.length > E.REST.n && GM.time - fight < E.REST.quiet) return null;
     return (restS = new Set(left));
   };
-  function restPull(dt) {
-    const set = E.restSet(), w = G.world;
-    if (!set || !w || P.dead) return;
-    for (const e of set) {
-      if (e._rep || e.burrowed || !e.alive || e.state === 'spawn') continue;
-      const d = Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z);
-      if (d < E.REST.far) { e._restT = 0; e._restD = d; continue; }
-      if (!(e._restT > 0) || d < e._restD - 2) { e._restT = 1e-6; e._restD = d; continue; } // (coming nearer: let it come)
-      e._restT += dt;
-      if (e._restT < E.REST.pull) continue;
-      e._restT = 0;
-      const c = w.randomOpenCell({ next: Math.random }, (x, z, idx) => (!w.reachMask || w.reachMask[idx]) && Math.abs(w.nf[idx] - P.pos.y) < 2.5 && Math.hypot(x - P.pos.x, z - P.pos.z) > 10 && Math.hypot(x - P.pos.x, z - P.pos.z) < 20);
-      if (!c) continue;
-      G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1);
-      e.pos.set(c.x, c.y + (e.flyer ? e.alt : 0), c.z); e.vel.set(0, 0, 0); e.climb = 0; e._stN = 0;
-      G.fx.smoke(e.centerPos(), 6, 1, 0x1a1412, 1, 1);
-      E.pulled = (E.pulled || 0) + 1; // (counted for the tests)
-    }
-  }
 
   // ---------------- health bars (DOM, pooled) ----------------
   function getBar() {

@@ -16,6 +16,9 @@ const PORT = +process.env.COOP_PORT || 9993;
     await p.until('!!G.game.run && !!G.world', 30000);
     await sleep(600);
     const pct = await p.eval('G.bosses.GIMMICK_PCT');
+    check(pct === 0.15, `the share is 15% of the guardian's max health (${pct})`);
+    // no notice in words when a batch is broken (the blast and the damage number say it)
+    await p.eval("window.__gt = []; const t0 = G.ui.toast, f0 = G.ui.feed; G.ui.toast = function (m) { window.__gt.push(String(m)); return t0.apply(this, arguments); }; G.ui.feed = function (m) { window.__gt.push(String(m)); return f0.apply(this, arguments); }; 1");
     // [guardian, how its gimmicks are raised, where they are]
     const CASES = [
       ['archon', 'b.spawnWards()', 'b.wards'],
@@ -40,12 +43,13 @@ const PORT = +process.env.COOP_PORT || 9993;
       const r = await p.eval(`(async () => {
         const b = G.bosses.active; G.ui.clearScreen(); G.game.state = 'playing';
         b.hp = b.maxHp * 0.9; ${raise};
-        const parts = ${list}, h0 = b.hp;
+        const parts = ${list}, h0 = b.hp; window.__gt.length = 0;
         for (const q of parts) for (let i = 0; i < 80 && q.alive; i++) G.combat.damageEnemy(q, q.maxHp + 50, { src: 'gun' });
         await new Promise((res) => setTimeout(res, 400)); // (the crystals are counted in the guardian's own update)
-        return { n: parts.length, left: parts.filter((q) => q.alive).length, lost: (h0 - b.hp) / b.maxHp };
+        return { n: parts.length, left: parts.filter((q) => q.alive).length, lost: (h0 - b.hp) / b.maxHp, said: window.__gt.filter((m) => /最大HP|全て壊した|大ダメージ/.test(m)) };
       })()`);
       check(r.n > 0 && r.left === 0 && Math.abs(r.lost - pct) < 0.02, `${id}: breaking all ${r.n} gimmicks takes ${Math.round(r.lost * 1000) / 10}% of its health (want ${pct * 100}%)`);
+      check(!r.said.length, `${id}: no notice of the share in words${r.said.length ? ' (' + r.said.join(' / ') + ')' : ''}`);
     }
     // a nest whose egg sac hatched pays nothing
     await fight('broodmother');

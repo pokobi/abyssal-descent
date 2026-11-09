@@ -1310,8 +1310,10 @@
       const i = w.navIdx(x, z); if (i < 0) return false;
       const fl = w.nf[i]; if (!(fl > -50)) return false;
       const yy = y === undefined ? this.pos.y : y, out = E._roofQ || (E._roofQ = []); out.length = 0;
-      w.query(x - 0.1, fl + 2.2, z - 0.1, x + 0.1, yy + 0.05, z + 0.1, out);
-      let roof = false; for (const c of out) if (c.y0 > fl + 2.2 && c.y1 <= yy + 0.05 && !c.navIgnore && !c.dest) { roof = true; break; }
+      // (a top up to 0.2 over the feet counts: pushOut walls the body only from 0.2 up, so a roof whose top is a little over the feet would
+      // neither stop it nor count, and the floor under it would then lift it on to that roof)
+      w.query(x - 0.1, fl + 2.2, z - 0.1, x + 0.1, yy + 0.2, z + 0.1, out);
+      let roof = false; for (const c of out) if (c.y0 > fl + 2.2 && c.y1 <= yy + 0.2 && !c.navIgnore && !c.dest) { roof = true; break; }
       out.length = 0; return roof;
     }
     // the underside of the lowest solid thing over this body, up to yTo + its height (Infinity: open sky)

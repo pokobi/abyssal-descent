@@ -1,7 +1,7 @@
 'use strict';
 // Optics: what each sight looks like on the gun and through it (built from weapons.js buildGun).
 // - Dot sights (no magnification): a big window brought close to the eye while aiming (it covers DOT_Q of the screen's height), the reticle drawn
-//   on the glass. The red dot is square, the holographic sight round; the epic and better ones are made as pieces of their own, alive.
+//   on the glass. The red dot is square, the holographic sight round; the epic and better ones have a shape of their own, kept plain so the view stays clear (pokobi: sight first).
 // - Scopes 2x to 4x: a lens that shows the world magnified (picture in picture, weapons.js) inside a thick rim, each with its own reticle and its own
 //   body; the world around the lens stays in view.
 // - The 8x (sniper rifles only): the one sight that blacks the screen out around a full eyepiece, with a rangefinder (the SVG here, ui.js scope).
@@ -70,42 +70,30 @@
         float tk = min(min(seg(p, vec2(0.0, 0.49), vec2(0.0, 0.6)), seg(p, vec2(0.0, -0.49), vec2(0.0, -0.6))), min(seg(p, vec2(0.49, 0.0), vec2(0.6, 0.0)), seg(p, vec2(-0.49, 0.0), vec2(-0.6, 0.0))));
         ret = max(max(ln(r, 0.038, aa), ln(abs(r - 0.46), 0.014, aa)), ln(tk, 0.013, aa));
         glow = exp(-abs(r - 0.46) * 30.0) * 0.25 + exp(-r * 22.0) * 0.4;
-      } else if (k == 3) { // 狩人の眼: a beast's slit pupil, breathing, in an iris of fine lines
+      } else if (k == 3) { // 狩人の眼: a beast's slit pupil, breathing, in one thin ring
         rc = vec3(1.0, 0.6, 0.1);
-        float bw = 0.06 + 0.014 * sin(uTime * 2.2);
-        float e = length(vec2(p.x / bw, p.y / 0.34));
-        float slit = ln(abs((e - 1.0) * bw), 0.009, aa) + smoothstep(1.0, 0.2, e) * 0.35;
-        float spokes = smoothstep(0.22, 0.0, abs(fract(an * 40.0 / 6.2832) - 0.5)) * smoothstep(0.4, 0.46, r) * smoothstep(0.66, 0.58, r) * 0.55;
-        float iris = ln(abs(r - 0.68), 0.008, aa) + ln(abs(r - 0.4), 0.005, aa) * 0.7;
-        float marks = 0.0; for (int i = 0; i < 4; i++) { float a = float(i) * 1.5708 + 0.7854; vec2 dd = vec2(cos(a), sin(a)); marks = max(marks, ln(seg(p, dd * 0.74, dd * 0.86), 0.012, aa)); }
-        ret = clamp(max(max(slit, spokes), max(iris, marks)), 0.0, 1.0); ret = max(ret, ln(r, 0.022, aa));
-        glow = exp(-r * 9.0) * (0.35 + 0.15 * sin(uTime * 2.2)) + exp(-abs(r - 0.68) * 26.0) * 0.2;
-      } else if (k == 4) { // 千里眼: a diamond in rings of turning runes
+        float bw = 0.055 + 0.01 * sin(uTime * 2.2);
+        float e = length(vec2(p.x / bw, p.y / 0.3));
+        float slit = ln(abs((e - 1.0) * bw), 0.008, aa);
+        ret = clamp(max(max(slit, ln(abs(r - 0.6), 0.006, aa) * 0.8), ln(r, 0.02, aa)), 0.0, 1.0);
+        glow = exp(-r * 14.0) * 0.25;
+      } else if (k == 4) { // 千里眼: a diamond in a thin ring, four short ticks turning inside it
         rc = vec3(0.35, 0.95, 1.0);
-        float dia = ln(abs(p.x) + abs(p.y), 0.05, aa);
-        float r1 = ln(abs(r - 0.27), 0.007, aa);
-        float a1 = an + uTime * 0.5; float f1 = fract(a1 * 12.0 / 6.2832);
-        float dash = step(0.18, f1) * step(f1, 0.82) * ln(abs(r - 0.5), 0.011, aa);
-        float rune = ln(abs(f1 - 0.5) * r * 0.524, 0.006, aa) * smoothstep(0.38, 0.4, r) * smoothstep(0.47, 0.45, r);
-        float a2 = an - uTime * 0.3; float f2 = fract(a2 * 6.0 / 6.2832);
-        float dots = ln(length(vec2((f2 - 0.5) * r * 1.047, r - 0.76)), 0.022, aa);
-        float r3 = ln(abs(r - 0.76), 0.004, aa) * 0.6;
-        ret = clamp(max(max(dia, r1), max(max(dash, rune), max(dots, r3))), 0.0, 1.0);
-        glow = exp(-r * 10.0) * 0.4 + exp(-abs(r - 0.5) * 24.0) * 0.25;
-      } else { // 神の眼: a four-pointed star in turning rays and a shimmering ring
+        float dia = ln(abs(p.x) + abs(p.y), 0.045, aa);
+        float r1 = ln(abs(r - 0.5), 0.006, aa);
+        float a1 = an + uTime * 0.4; float f1 = fract(a1 * 4.0 / 6.2832);
+        float tick = ln(abs(f1 - 0.5) * r * 1.571, 0.008, aa) * smoothstep(0.38, 0.4, r) * smoothstep(0.47, 0.45, r);
+        ret = clamp(max(max(dia, r1), tick), 0.0, 1.0);
+        glow = exp(-r * 14.0) * 0.25;
+      } else { // 神の眼: a four-pointed star in a thin ring, its light breathing
         rc = vec3(1.0, 0.86, 0.42);
-        float star = max(step(abs(p.x) / 0.13 + abs(p.y) / 0.024, 1.0), step(abs(p.x) / 0.024 + abs(p.y) / 0.13, 1.0));
-        float a = an + uTime * 0.25; float f = fract(a * 16.0 / 6.2832); float idx = mod(floor(a * 16.0 / 6.2832), 2.0);
-        float len = mix(0.4, 0.31, idx);
-        float rays = ln(abs(f - 0.5) * r * 0.393, 0.006, aa) * smoothstep(0.17, 0.19, r) * smoothstep(len + 0.01, len, r);
-        float ring = ln(abs(r - 0.47), 0.008, aa);
-        float a3 = an - uTime * 0.6; float f3 = fract(a3 * 24.0 / 6.2832);
-        float ring2 = step(0.3, f3) * step(f3, 0.7) * ln(abs(r - 0.54), 0.006, aa);
-        ret = clamp(max(max(star, rays), max(ring, ring2)), 0.0, 1.0);
-        glow = exp(-r * 8.0) * 0.45 + (0.5 + 0.5 * sin(an * 8.0 - uTime * 3.0)) * exp(-abs(r - 0.47) * 20.0) * 0.35;
+        float star = max(step(abs(p.x) / 0.12 + abs(p.y) / 0.022, 1.0), step(abs(p.x) / 0.022 + abs(p.y) / 0.12, 1.0));
+        float ring = ln(abs(r - 0.47), 0.007, aa);
+        ret = clamp(max(star, ring), 0.0, 1.0);
+        glow = exp(-r * 12.0) * (0.3 + 0.1 * sin(uTime * 2.0));
       }
       float edge = mix(max(abs(u.x), abs(u.y)), length(u), uRound);
-      float ga = 0.05 + 0.2 * smoothstep(0.6, 1.0, edge) + 0.05 * smoothstep(0.1, 0.0, abs(u.x * 0.7 + u.y - 0.6));
+      float ga = 0.02 + 0.06 * smoothstep(0.75, 1.0, edge);
       vec3 col = mix(uTint, rc, clamp(ret, 0.0, 1.0)) + rc * glow;
       gl_FragColor = vec4(col, clamp(max(ga, max(ret, glow * 0.8)), 0.0, 1.0));
     }`;
@@ -167,57 +155,43 @@
       glass(true, 2 * R, 2 * R, 0, cy, z - D * 0.2, 'holo');
       dot(cy, R, z + D / 2);
     } else if (v === 'hunter') {
-      // 狩人の眼 (epic): an eye of horn and bone, the window almond-shaped, fangs above and below, leather wraps, an amber stone that throbs
+      // 狩人の眼 (epic): an eye of horn and bone, the window almond-shaped, one fang over it, an amber stone that throbs
       const Rx = 0.03, Ry = 0.016, D = 0.03, cy = y + 0.018 + Ry + 0.004;
       bx(0.03, 0.016, 0.05, 0, y + 0.008, z);
       for (const s of [-1, 1]) bx(0.006, 0.012, 0.012, s * 0.02, y + 0.017, z, K.bone, 0, 0, -s * 0.5); // the bone claws that hold it
       hood(Rx + 0.002, Ry + 0.002, D, 0, cy, z, K.horn);
-      ring(Gm.torFat, Rx + 0.004, Ry + 0.004, 0, cy, z - D / 2, K.bone); ring(Gm.torMid, Rx + 0.003, Ry + 0.003, 0, cy, z + D / 2, K.bone);
-      for (const [x, s] of [[-0.016, 1], [0, 1], [0.016, 1], [-0.009, -1], [0.009, -1]]) { // fangs, leaning outwards
-        const k = x === 0 ? 1.25 : 1, yy = cy + s * (Ry * Math.sqrt(Math.max(0, 1 - (x / Rx) ** 2)) + 0.007 * k);
-        add(Gm.cone, K.bone, 0.0035, 0.013 * k, 0.0035, x, yy, z - D / 2 + 0.002, -0.35 * s, 0, s > 0 ? -x * 14 : Math.PI - x * 14);
-      }
-      for (const dz of [-0.007, 0.007]) bx(0.014, 0.0045, 0.006, 0, cy + Ry + 0.0035, z + dz, K.leather);
-      for (const s of [-1, 1]) bx(0.0045, 0.012, 0.006, s * (Rx + 0.004), cy, z + 0.004, K.leather);
+      ring(Gm.torMid, Rx + 0.003, Ry + 0.003, 0, cy, z - D / 2, K.bone); ring(Gm.torThin, Rx + 0.002, Ry + 0.002, 0, cy, z + D / 2, K.bone);
+      add(Gm.cone, K.bone, 0.003, 0.011, 0.003, 0, cy + Ry + 0.009, z - D / 2 + 0.002, -0.3, 0, 0); // one fang over the eye
       const gem = add(Gm.oct, K.amber, 0.005, 0.008, 0.005, Rx + 0.008, cy + 0.008, z - 0.004);
       M.pulse.push({ o: gem, s: 1, k: 0.22, w: 2.2 });
       glass(true, 2 * Rx, 2 * Ry, 0, cy, z - D * 0.2, 'hunter');
       dot(cy, Ry, z + D / 2);
     } else if (v === 'seer') {
-      // 千里眼 (legendary): a navy and brass tube ringed by two turning circles of runes, a crystal floating above
+      // 千里眼 (legendary): a navy and brass tube, a thin ring of four runes turning on its front, a crystal floating above
       const R = 0.022, D = 0.03, cy = y + 0.016 + R + 0.004;
       bx(0.03, 0.016, 0.05, 0, y + 0.008, z, K.brass);
       hood(R + 0.002, R + 0.002, D, 0, cy, z, K.navy);
       ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z - D / 2, K.brass); ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z + D / 2, K.brass);
-      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + 0.39; bx(0.003, 0.003, 0.008, Math.cos(a) * (R + 0.0028), cy + Math.sin(a) * (R + 0.0028), z, K.cyanDim, 0, 0, a); }
-      const r1 = new THREE.Group(); r1.position.set(0, cy, z - 0.004); g.add(r1);
-      ring(Gm.torThin, R + 0.012, R + 0.012, 0, 0, 0, K.cyan, r1);
-      for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; bx(0.0025, 0.006, 0.002, Math.cos(a) * (R + 0.012), Math.sin(a) * (R + 0.012), 0, K.cyan, 0, 0, a, r1); }
-      const r2 = new THREE.Group(); r2.position.set(0, cy, z + 0.006); r2.rotation.x = 0.22; g.add(r2);
-      ring(Gm.torThin, R + 0.019, R + 0.019, 0, 0, 0, K.cyanDim, r2);
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; add(Gm.oct, K.cyan, 0.0022, 0.0022, 0.0022, Math.cos(a) * (R + 0.019), Math.sin(a) * (R + 0.019), 0, 0, 0, 0, r2); }
-      M.spin.push({ o: r1, w: 0.6 }, { o: r2, w: -0.35 });
+      const r1 = new THREE.Group(); r1.position.set(0, cy, z - D / 2 - 0.002); g.add(r1);
+      ring(Gm.torThin, R + 0.006, R + 0.006, 0, 0, 0, K.cyanDim, r1);
+      for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.785; bx(0.0022, 0.005, 0.002, Math.cos(a) * (R + 0.006), Math.sin(a) * (R + 0.006), 0, K.cyan, 0, 0, a, r1); }
+      M.spin.push({ o: r1, w: 0.5 });
       cyv(0.0022, 0.012, 0, cy + R + 0.008, z, K.brass);
       const cr = add(Gm.oct, K.cyan, 0.006, 0.011, 0.006, 0, cy + R + 0.024, z);
       M.pulse.push({ o: cr, s: 1, k: 0.12, w: 1.6, bob: 0.002, y0: cr.position.y, spin: 1.2 });
       glass(true, 2 * R, 2 * R, 0, cy, z - D * 0.2, 'seer');
       dot(cy, R, z + D / 2);
     } else if (v === 'god') {
-      // 神の眼 (mythic): a gold tube crowned by a burst of rays, a halo of stones turning behind it, a gem that breathes light
+      // 神の眼 (mythic): a gold tube with three short rays above it and a gem that breathes light
       const R = 0.023, D = 0.03, cy = y + 0.018 + R + 0.004;
       bx(0.032, 0.018, 0.052, 0, y + 0.009, z, K.gold);
       for (const s of [-1, 1]) bx(0.006, 0.008, 0.03, s * 0.017, y + 0.021, z, K.gold, 0, 0, s * 0.3);
       hood(R + 0.002, R + 0.002, D, 0, cy, z, K.goldIn);
-      ring(Gm.torFat, R + 0.004, R + 0.004, 0, cy, z - D / 2, K.gold); ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z + D / 2, K.gold);
-      for (let i = 0; i < 16; i++) {
-        const a = i / 16 * Math.PI * 2; if (Math.sin(a) < -0.45) continue; // (not into the gun below)
-        const L = i % 2 ? 0.011 : 0.021, rr = R + 0.005 + L / 2;
-        add(Gm.cone, K.gold, 0.0032, L, 0.0032, Math.cos(a) * rr, cy + Math.sin(a) * rr, z - D / 2 + 0.001, 0, 0, a - Math.PI / 2);
+      ring(Gm.torMid, R + 0.003, R + 0.003, 0, cy, z - D / 2, K.gold); ring(Gm.torThin, R + 0.002, R + 0.002, 0, cy, z + D / 2, K.gold);
+      for (const a of [Math.PI / 2, Math.PI / 6, Math.PI * 5 / 6]) { // three short rays: up, and up to either side
+        const L = a === Math.PI / 2 ? 0.014 : 0.009, rr = R + 0.005 + L / 2;
+        add(Gm.cone, K.gold, 0.003, L, 0.003, Math.cos(a) * rr, cy + Math.sin(a) * rr, z - D / 2 + 0.001, 0, 0, a - Math.PI / 2);
       }
-      const h = new THREE.Group(); h.position.set(0, cy, z + 0.008); g.add(h);
-      ring(Gm.torThin, R + 0.031, R + 0.031, 0, 0, 0, K.halo, h);
-      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; add(Gm.oct, K.gem, 0.0028, 0.0045, 0.0028, Math.cos(a) * (R + 0.031), Math.sin(a) * (R + 0.031), 0, 0, 0, a - Math.PI / 2, h); }
-      M.spin.push({ o: h, w: 0.25 });
       const gem = add(Gm.oct, K.gem, 0.0055, 0.009, 0.0055, 0, cy + R + 0.008, z + D / 2 - 0.002);
       M.pulse.push({ o: gem, s: 1, k: 0.25, w: 1.8, spin: 0.8 });
       glass(true, 2 * R, 2 * R, 0, cy, z - D * 0.2, 'god');
@@ -351,46 +325,19 @@
     }
   };
 
-  // ---- the 8x eyepiece (ui.js scope): a vignette and a glint on the glass, a mil-dot reticle with heavy posts, numbered marks, a stadia ladder,
-  // a lit centre, the rangefinder's readout under it
+  // ---- the 8x eyepiece (ui.js scope): the reticle only (a fine cross thickening into posts, a few mil dots, a lit centre) and the rangefinder's
+  // small readout under it; nothing else on the glass
   O.x8Svg = function () {
-    const dots = [], nums = [], hash = [];
-    for (let i = 1; i <= 4; i++) {
-      const d = i * 8;
-      for (const [x, yy] of [[d, 0], [-d, 0], [0, d], [0, -d]]) dots.push(`<circle cx="${x}" cy="${yy}" r="0.95"/>`);
-      for (const [x, yy] of [[d - 4, 0], [-(d - 4), 0], [0, d - 4], [0, -(d - 4)]]) hash.push(x ? `<line x1="${x}" y1="-1.3" x2="${x}" y2="1.3"/>` : `<line x1="-1.3" y1="${yy}" x2="1.3" y2="${yy}"/>`);
-      if (i % 2 === 0) nums.push(`<text x="${d}" y="-3">${i * 2}</text><text x="${-d}" y="-3">${i * 2}</text><text x="3" y="${d + 1.2}">${i * 2}</text>`);
-    }
-    const ladder = [];
-    for (let i = 0; i < 5; i++) { const yy = 44 + i * 5, w = 14 - i * 2.2; ladder.push(`<line x1="${-60 - w}" y1="${yy}" x2="-60" y2="${yy}"/><text x="-58" y="${yy + 1.3}">${(i + 2) * 100}</text>`); }
+    const dots = [];
+    for (let i = 1; i <= 3; i++) { const d = i * 10; for (const [x, yy] of [[d, 0], [-d, 0], [0, d], [0, -d]]) dots.push(`<circle cx="${x}" cy="${yy}" r="0.75"/>`); }
     return `<svg viewBox="-100 -100 200 200" xmlns="http://www.w3.org/2000/svg">
-<defs>
-<radialGradient id="x8v" cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse"><stop offset="0.7" stop-color="#000" stop-opacity="0"/><stop offset="0.9" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0.92"/></radialGradient>
-<radialGradient id="x8t" cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse"><stop offset="0.55" stop-color="#4060a0" stop-opacity="0"/><stop offset="1" stop-color="#3a5080" stop-opacity="0.2"/></radialGradient>
-<filter id="x8g" x="-2" y="-2" width="5" height="5"><feGaussianBlur stdDeviation="1.1"/></filter>
-</defs>
-<circle r="100" fill="url(#x8t)"/>
-<circle r="100" fill="url(#x8v)"/>
-<path d="M -78 -48 A 92 92 0 0 1 -30 -87" stroke="#fff" stroke-opacity="0.07" stroke-width="9" fill="none" stroke-linecap="round"/>
-<path d="M 70 60 A 92 92 0 0 1 50 77" stroke="#fff" stroke-opacity="0.04" stroke-width="5" fill="none" stroke-linecap="round"/>
-<g fill="#060606" stroke="none">
-<rect x="-100" y="-1.7" width="60" height="3.4"/><rect x="40" y="-1.7" width="60" height="3.4"/><rect x="-1.7" y="40" width="3.4" height="60"/><rect x="-1.7" y="-100" width="3.4" height="60"/>
+<g fill="#050505" stroke="none">
+<rect x="-100" y="-1.1" width="58" height="2.2"/><rect x="42" y="-1.1" width="58" height="2.2"/><rect x="-1.1" y="42" width="2.2" height="58"/><rect x="-1.1" y="-100" width="2.2" height="58"/>
 ${dots.join('')}
 </g>
-<g stroke="#060606" stroke-width="0.38" fill="none">
-<line x1="-40" y1="0" x2="40" y2="0"/><line x1="0" y1="-40" x2="0" y2="40"/>
-${hash.join('')}
-</g>
-<g stroke="#060606" stroke-width="0.45" fill="#0a0a0a" font-family="monospace" font-size="3.2" text-anchor="middle">${ladder.join('').replace(/<text /g, '<text stroke="none" text-anchor="start" ')}</g>
-<g fill="#0a0a0a" font-family="monospace" font-size="3.4" text-anchor="middle">${nums.join('')}</g>
-<circle r="3" fill="none" stroke="#ff3a24" stroke-opacity="0.35" stroke-width="0.3"/>
-<circle class="x8c" r="1.7" fill="#ff3020" filter="url(#x8g)"/>
-<circle r="0.75" fill="#ff5a3a"/>
-<text x="70" y="-66" fill="#fff" fill-opacity="0.35" font-family="monospace" font-size="6">8×</text>
-<g transform="translate(0 62)">
-<rect x="-19" y="-6.5" width="38" height="12" rx="2.2" fill="#140402" fill-opacity="0.6" stroke="#ff6a40" stroke-opacity="0.45" stroke-width="0.4"/>
-<text class="x8rng" y="2.4" text-anchor="middle" font-family="monospace" font-size="7" fill="#ffb040">--- m</text>
-</g>
+<g stroke="#050505" stroke-width="0.32"><line x1="-42" y1="0" x2="42" y2="0"/><line x1="0" y1="-42" x2="0" y2="42"/></g>
+<circle r="0.8" fill="#ff3020"/>
+<text class="x8rng" x="0" y="70" text-anchor="middle" font-family="monospace" font-size="5.5" fill="#ffb040" fill-opacity="0.8">--- m</text>
 </svg>`;
   };
 })();

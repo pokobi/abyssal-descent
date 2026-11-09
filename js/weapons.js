@@ -82,44 +82,36 @@
     float ln(float d, float w, float aa) { return smoothstep(w + aa, w, d); }
     void main() {
       vec2 p = vUv * 2.0 - 1.0; float r = length(p);
-      const float RIM = 0.8; // the glass ends here; outside it, the thick rim of the scope
+      const float RIM = 0.86; // the glass ends here; outside it, the rim of the scope
       vec2 g = p / RIM; float rg = r / RIM;
       float aa = fwidth(g.x) * 1.3;
       int k = int(uKind + 0.5);
       vec3 col;
       if (uLive > 0.5) {
-        vec2 q = p * (1.0 + 0.05 * r * r) * 0.5 * uCrop + 0.5; float ca = 0.004 * r * r * uCrop;
-        col = vec3(texture2D(tMap, q + p * ca).r, texture2D(tMap, q).g, texture2D(tMap, q - p * ca).b);
-        col *= k == 0 ? vec3(1.04, 1.0, 0.9) : k == 1 ? vec3(0.96, 0.99, 1.04) : k == 2 ? vec3(0.95, 1.03, 0.95) : vec3(1.0);
-        col *= mix(1.0, 0.3, smoothstep(0.8, 1.0, rg));
+        // the world as it is (no tint, no darkened edge, no fringes): only the reticle is drawn over it
+        col = texture2D(tMap, p * 0.5 * uCrop + 0.5).rgb;
         float blk = 0.0, li = 0.0; vec3 lit = vec3(0.0);
         float h = abs(g.y), v = abs(g.x);
-        if (k == 0) { // 2x: an amber chevron over a post with drop marks, short bars from the sides
-          li = ln(min(seg(g, vec2(0.0), vec2(-0.075, -0.07)), seg(g, vec2(0.0), vec2(0.075, -0.07))), 0.012, aa); lit = vec3(1.0, 0.62, 0.12);
-          blk = ln(seg(g, vec2(0.0, -0.14), vec2(0.0, -1.0)), 0.006, aa);
-          for (int i = 0; i < 3; i++) { float yy = -0.26 - float(i) * 0.12, w2 = 0.09 - float(i) * 0.02; blk = max(blk, ln(seg(g, vec2(-w2, yy), vec2(w2, yy)), 0.005, aa)); }
-          blk = max(blk, ln(h, 0.006, aa) * step(0.55, v));
-        } else if (k == 1) { // 2.5x: a red circle and dot, heavy posts from the sides and below
-          li = max(ln(abs(rg - 0.3), 0.007, aa), ln(rg, 0.024, aa)); lit = vec3(1.0, 0.15, 0.08);
-          blk = max(ln(h, 0.01, aa) * step(0.45, v), ln(v, 0.01, aa) * step(0.45, h) * step(g.y, 0.0));
-        } else if (k == 2) { // marksman 3x: a fine cross, heavy posts outside, the drop ladder under the centre, a green lit dot
-          blk = max(ln(h, 0.0035, aa) * step(0.05, v), ln(v, 0.0035, aa) * step(0.05, h));
-          blk = max(blk, max(ln(h, 0.016, aa) * step(0.62, v), ln(v, 0.016, aa) * step(0.62, h)));
-          for (int i = 0; i < 5; i++) { float yy = -0.12 - float(i) * 0.09, w2 = 0.08 - float(i) * 0.012; blk = max(blk, ln(seg(g, vec2(-w2, yy), vec2(w2, yy)), 0.0035, aa)); }
-          li = ln(rg, 0.018, aa); lit = vec3(0.3, 1.0, 0.4);
-        } else { // 4x: the duplex: a fine cross that thickens into posts
-          blk = max(max(ln(h, 0.004, aa), ln(v, 0.004, aa)), max(ln(h, 0.02, aa) * step(0.38, v), ln(v, 0.02, aa) * step(0.38, h)));
+        if (k == 0) { // 2x: an amber chevron over a fine post
+          li = ln(min(seg(g, vec2(0.0), vec2(-0.07, -0.065)), seg(g, vec2(0.0), vec2(0.07, -0.065))), 0.011, aa); lit = vec3(1.0, 0.62, 0.12);
+          blk = ln(seg(g, vec2(0.0, -0.13), vec2(0.0, -1.0)), 0.004, aa);
+        } else if (k == 1) { // 2.5x: a red circle and dot
+          li = max(ln(abs(rg - 0.28), 0.006, aa), ln(rg, 0.022, aa)); lit = vec3(1.0, 0.15, 0.08);
+        } else if (k == 2) { // marksman 3x: a fine cross open at the centre, three drop marks under it, a green dot
+          blk = max(ln(h, 0.003, aa) * step(0.06, v), ln(v, 0.003, aa) * step(0.06, h) * step(0.0, g.y));
+          for (int i = 0; i < 3; i++) { float yy = -0.14 - float(i) * 0.1, w2 = 0.06 - float(i) * 0.012; blk = max(blk, ln(seg(g, vec2(-w2, yy), vec2(w2, yy)), 0.003, aa)); }
+          li = ln(rg, 0.016, aa); lit = vec3(0.3, 1.0, 0.4);
+        } else { // 4x: the duplex: a fine cross that thickens towards the rim
+          blk = max(max(ln(h, 0.003, aa), ln(v, 0.003, aa)), max(ln(h, 0.011, aa) * step(0.45, v), ln(v, 0.011, aa) * step(0.45, h)));
         }
-        col = mix(col, vec3(0.0), blk * step(rg, 1.0) * 0.94);
-        col = mix(col, lit * 1.6, li) + lit * exp(-rg * 16.0) * 0.3;
-        col += vec3(0.04, 0.05, 0.08) * smoothstep(0.9, 0.0, length(g - vec2(-0.5, 0.52))) * 0.3;
+        col = mix(col, vec3(0.0), blk * step(rg, 1.0) * 0.9);
+        col = mix(col, lit * 1.5, li);
       } else {
         col = vec3(0.1, 0.12, 0.16) * 0.2 + vec3(0.2, 0.26, 0.34) * smoothstep(1.0, 0.0, length(g - vec2(-0.45, 0.5))) * 0.5;
       }
-      // the rim: dark metal with a bevel catching the light at its inner edge
-      float bev = exp(-abs(r - RIM - 0.02) * 55.0) * (0.55 + 0.45 * dot(p / max(r, 0.0001), vec2(-0.6, 0.8)));
-      vec3 rimc = vec3(0.022, 0.023, 0.026) + vec3(0.16, 0.16, 0.17) * max(bev, 0.0) + vec3(0.035) * smoothstep(0.86, 0.93, r) * smoothstep(1.0, 0.93, r);
-      col = mix(col, rimc, smoothstep(RIM - 0.006, RIM + 0.006, r));
+      // the rim: plain dark metal, a faint edge where the glass meets it
+      vec3 rimc = vec3(0.025, 0.026, 0.03) + vec3(0.07) * exp(-abs(r - RIM - 0.012) * 70.0);
+      col = mix(col, rimc, smoothstep(RIM - 0.004, RIM + 0.004, r));
       col *= smoothstep(1.0, 0.975, r);
       gl_FragColor = vec4(col, 1.0);
     }`;

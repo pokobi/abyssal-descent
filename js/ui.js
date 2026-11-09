@@ -93,6 +93,18 @@
     const f = UI.el.tint; f.style.background = 'radial-gradient(ellipse at center, rgba(40,120,40,0) 50%, rgba(60,160,60,0.35) 100%)';
     f.style.transition = 'none'; f.style.opacity = 1; void f.offsetWidth; f.style.transition = 'opacity .6s'; f.style.opacity = 0;
   };
+  // 血の昂り (突撃兵): a kill heals and hastens. The amount rises from the HP bar, the bar flares, a red pulse runs round the screen's edge
+  UI.bloodRush = function (healed) {
+    const hw = document.getElementById('hp-wrap');
+    if (hw && healed > 0) {
+      const pop = document.createElement('div'); pop.className = 'rush-pop'; pop.textContent = `🩸 +${healed}`;
+      hw.appendChild(pop); setTimeout(() => pop.remove(), 1200);
+      hw.classList.remove('rush-heal'); void hw.offsetWidth; hw.classList.add('rush-heal');
+    }
+    let v = UI._rushEl;
+    if (!v || !v.isConnected) { v = UI._rushEl = document.createElement('div'); v.id = 'rush-veil'; (UI.el.hud || document.body).appendChild(v); }
+    v.classList.remove('kick'); void v.offsetWidth; v.classList.add('kick');
+  };
   UI.whiteFlash = function (k) {
     const f = UI.el.tint; f.style.background = '#fff';
     f.style.transition = 'none'; f.style.opacity = k; void f.offsetWidth; f.style.transition = 'opacity 1.6s'; f.style.opacity = 0;
@@ -314,7 +326,8 @@
     if (P.cls === 'heavy' && CL.ironOn()) parts.push('🛡️ 鉄壁');
     if (CL.has('heavy_2b') && CL.gritLeft() > 0) parts.push(`💢 不屈 ${Math.ceil(CL.gritLeft())}秒`);
     if (CL.backWater()) parts.push('🌊 背水');
-    if (CL.has('assault_1b') && (CL.state().rushT || 0) > G.game.time) parts.push('🩸 血の昂り');
+    if (CL.rushLeft() > 0) parts.push(`🩸 血の昂り 移動+25% ${CL.rushLeft().toFixed(1)}秒`);
+    if (UI._rushEl) sStyle(UI._rushEl, 'opacity', (CL.rushLeft() / 5 * 0.4).toFixed(2)); // (the red edge fades with the speed)
     if (CL.rxStacks() > 0) parts.push(`🔥 昂る理 ×${CL.rxStacks()}`);
     const txt = parts.join('　');
     sText(el, txt); el.classList.toggle('on', !!txt);

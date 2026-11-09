@@ -592,7 +592,7 @@
       G.sfx.listener.x = cam.position.x; G.sfx.listener.y = cam.position.y; G.sfx.listener.z = cam.position.z;
       G.sfx.listenerYawNeg = -this.yaw;
       // speed lines
-      const sl = U.clamp((this.speedH - 10.5) / 12, 0, 1) + (this.pileState === 'fall' ? 0.6 : 0) + (this.grapple.state === 'attached' ? 0.25 : 0);
+      const sl = U.clamp((this.speedH - 10.5) / 12, 0, 1) + (this.pileState === 'fall' ? 0.6 : 0) + (this.grapple.state === 'attached' ? 0.25 : 0) + (G.Classes ? G.Classes.rushLines() : 0); // (血の昂り of the 突撃兵)
       G.ui.speedLines(Math.min(1, sl));
       if (this.slideLoop) this.slideLoop.set(Math.min(1.4, this.speedH / 10));
     }

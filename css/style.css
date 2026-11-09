@@ -1995,3 +1995,16 @@ html.m .pk-cards { flex-direction: column; gap: 12px; padding: 12px; } html.m .c
 #shield-gauge b { position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%); font-size: 11px; color: #ffb0a0; white-space: nowrap; font-weight: 700; }
 #shield-veil { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 90px rgba(110,180,255,0.55); opacity: 0; transition: opacity .15s; }
 #shield-veil.on { opacity: 0.45; } #shield-veil.hit { opacity: 1; transition: none; }
+
+/* ---- 血の昂り (突撃兵): the heal rising from the HP bar, the bar's flare, the red pulse round the screen and its edge while the speed lasts */
+#hp-wrap { position: relative; }
+.rush-pop { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font-size: 28px; font-weight: 900; color: #8dff9a; white-space: nowrap; pointer-events: none;
+  text-shadow: 0 0 6px #000, 0 0 16px rgba(90,255,130,0.75); animation: rushPop 1.15s ease-out forwards; }
+@keyframes rushPop { 0% { transform: translate(-50%, 10px) scale(0.5); opacity: 0; } 14% { transform: translate(-50%, -4px) scale(1.3); opacity: 1; } 40% { transform: translate(-50%, -14px) scale(1); opacity: 1; } 100% { transform: translate(-50%, -48px) scale(0.95); opacity: 0; } }
+#hp-wrap.rush-heal { animation: hpWrapRush .6s ease-out; }
+#hp-wrap.rush-heal #hp-fill { animation: hpRush .6s ease-out; }
+@keyframes hpWrapRush { 0% { border-color: #8dff9a; box-shadow: 0 0 22px rgba(90,255,130,0.7); } 100% { border-color: var(--line); box-shadow: none; } }
+@keyframes hpRush { 0% { filter: brightness(2.4) saturate(1.5); } 100% { filter: none; } }
+#rush-veil { position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0; box-shadow: inset 0 0 140px rgba(230,30,50,0.6), inset 0 0 40px rgba(255,60,80,0.35); }
+#rush-veil.kick { animation: rushKick .5s ease-out; }
+@keyframes rushKick { 0% { opacity: 1; } 100% { opacity: 0.4; } }

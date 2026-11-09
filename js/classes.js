@@ -127,7 +127,7 @@
   CL.moveAdd = function () {
     let a = 0;
     if (is('blade')) { a += CL.blade() * 0.03; if (CL.has('blade_1b') && G.player.meleeMode) a += 0.1; }
-    if (CL.has('assault_1b') && (S().rushT || 0) > now()) a += 0.25;
+    if (CL.rushLeft() > 0) a += 0.25;
     return a;
   };
   // 剣士: stacks on every melee swing that lands (深い連斬: up to 7)
@@ -218,8 +218,20 @@
   // a kill by the player (C.killEnemy): 血の昂り
   CL.onKill = function (e, info) {
     const P = G.player; if (!P || !e || (info && (info.enemy || info.remote !== undefined))) return;
-    if (CL.has('assault_1b') && !P.dead) { G.combat.heal(30); S().rushT = now() + 5; }
+    if (CL.has('assault_1b') && !P.dead) {
+      const hp0 = P.hp; G.combat.heal(30, true); const healed = Math.round(P.hp - hp0);
+      S().rushT = now() + 5;
+      // seen at once: the fallen foe's life runs into you as a red thread, the amount rises from the HP bar, the screen's edge pulses red,
+      // the view widens a little; while the speed lasts, speed lines and a red edge that fades with it (ui.js clsHud, player.js)
+      const c = e.centerPos ? e.centerPos() : e.pos.clone(), to = P.chestPos();
+      G.fx.beam(c, to, 0xff4058, 0.06, 0.3); G.fx.beam(c, to, 0xffc0c8, 0.02, 0.22); G.fx.sparks(c, null, 12, 0xff5068, 6);
+      P.fovKick = Math.max(P.fovKick || 0, 7);
+      if (G.ui.bloodRush) G.ui.bloodRush(healed);
+      if (G.sfx.heal) G.sfx.heal(); if (G.sfx.heartbeat) G.sfx.heartbeat(0.7); G.sfx.whoosh(0.35, 0.6, true);
+    }
   };
+  CL.rushLeft = () => (CL.has('assault_1b') ? Math.max(0, (S().rushT || 0) - now()) : 0);
+  CL.rushLines = () => CL.rushLeft() / 5 * 0.45; // (the speed lines while 血の昂り lasts, fading with it)
   // ---- 見切り (剣士): the guard key pressed just before a blow lands parries it (the guardians' duel window, duel.js D.win: no gold flash here).
   // A melee blow is struck back at 200% of the heavy blow; a shot is only stopped. Pressing again too soon after a press that caught nothing does nothing.
   CL.parryPress = function () {

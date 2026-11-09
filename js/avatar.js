@@ -38,9 +38,8 @@
   let BASE = null;
   function base() {
     if (BASE) return BASE;
-    const t = G.Tex.tex;
     BASE = {
-      suit: new THREE.MeshStandardMaterial({ color: 0x3a3a3e, roughness: 0.9, map: t.cloth.map }),
+      suit: new THREE.MeshStandardMaterial({ color: 0x3a3a3e, roughness: 0.9 }),
       skin: new THREE.MeshStandardMaterial({ color: 0xc8957a, roughness: 0.75 }),
       glove: new THREE.MeshStandardMaterial({ color: 0x2c2620, roughness: 0.7 }),
       boot: new THREE.MeshStandardMaterial({ color: 0x2a231d, roughness: 0.65 }),
@@ -239,8 +238,8 @@
         const hood = mat('hood', P.main, { side: THREE.DoubleSide }), gold = mat('gold', 0xd4ae5a, { roughness: 0.35, metalness: 0.7 });
         add(H, GE.hood, hood, 0.16, 0.175, 0.165, 0, 0.13, -0.012);
         add(H, PG.cone, hood, 0.07, 0.17, 0.06, 0, 0.2, -0.17, -2.1);
-        add(H, PG.box, black, 0.17, 0.15, 0.02, 0, 0.115, 0.1);
-        for (const s of [-1, 1]) add(H, PG.sph, new THREE.MeshBasicMaterial({ color: P.accent }), 0.016, 0.012, 0.01, s * 0.04, 0.13, 0.112);
+        add(H, PG.sph, mat('shade', 0x0a0810, { roughness: 1 }), 0.119, 0.135, 0.123, 0, 0.12, 0.004); // (the face lost in the hood's shadow)
+        for (const s of [-1, 1]) add(H, PG.sph, new THREE.MeshBasicMaterial({ color: P.accent }), 0.02, 0.013, 0.01, s * 0.042, 0.135, 0.124);
         add(Ch, taper(0.8, 0.88), main, 0.44, 0.52, 0.27, 0, 0.27, 0);
         for (const s of [-1, 1]) add(Ch, PG.box, gold, 0.025, 0.22, 0.02, s * 0.05, 0.42, 0.137, 0, 0, s * 0.4);
         add(Ch, PG.box, gold, 0.03, 0.34, 0.02, 0, 0.17, 0.137);

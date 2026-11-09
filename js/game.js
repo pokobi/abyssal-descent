@@ -1535,8 +1535,9 @@
     S.lines = ['ほう…生きてここまで来たか。', '金さえあれば、何でも揃うさ。', '深淵の底には何があるか、知りたいかね？', 'この先の守護者は手強いぞ。', '武器は高いが、命よりは安い。', '良い品を選ぶといい。次は無いかもしれん。'];
     S.talkT = 2;
     G.Pawn.setup(w);
-    const fr = S.offers.find((o) => o.free);
-    if (fr) setTimeout(() => { if (GM.shop === S && !fr.sold) { G.ui.toast(`🎁 常連客特典：${fr.obj.icon} ${fr.obj.name} が無料！ 緑に光る台を探せ`, 'good'); G.sfx.ui('rare'); } }, 2400);
+    // 常連客: the free offer is named 2.4 s in, looked up then on the shelves as they are: "continue" restores the mid-area save after this
+    // (other shelves, the free one already bought or rerolled away), and the offer stocked here would be named again for nothing
+    if (P.has('e_free')) setTimeout(() => { const fr = GM.shop === S ? S.offers.find((o) => o.free && !o.sold) : null; if (fr) { G.ui.toast(`🎁 常連客特典：${fr.obj.icon} ${fr.obj.name} が無料！ 緑に光る台を探せ`, 'good'); G.sfx.ui('rare'); } }, 2400);
   };
   GM.fillShop = function () { GM._rb = G.Run.shopRarityBonus(GM.area); try { fillShopBody(); } finally { GM._rb = 0; } };
   function fillShopBody() {

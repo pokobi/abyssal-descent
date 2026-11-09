@@ -7,7 +7,7 @@
   // warnings through this, its blow timed to the same longer wind-up.
   BS.TELE_SHORT = 0.8; BS.TELE_ADD = 0.2;
   BS.slow = (t) => (t <= BS.TELE_SHORT + 1e-6 ? t + BS.TELE_ADD : t);
-  BS.GIMMICK_PCT = 0.08; // (see Boss.gimmickClear)
+  BS.GIMMICK_PCT = 0.15; // (see Boss.gimmickClear)
   const U = G.U;
   const V = G.U.V;
   let P, C, PG;
@@ -110,8 +110,7 @@
       this.hp -= v;
       const p = at || (this.main && this.main.centerRef ? this.main.centerRef.clone() : this.pos.clone().setY(2));
       G.fx.explosion(p, 3, col || 0xffc060, { decal: false }); G.sfx.shieldBreak && G.sfx.shieldBreak(p);
-      if (G.fx.dmgNum) G.fx.dmgNum(p, Math.round(v), 'crit');
-      G.ui.toast(`💥 ${what}を全て壊した！ ${this.def.name}に大ダメージ（最大HPの${Math.round(BS.GIMMICK_PCT * 100)}%）`, 'good');
+      if (G.fx.dmgNum) G.fx.dmgNum(p, Math.round(v), 'crit'); // (the blast and the number say it: no notice in words, pokobi 2026-11-09)
       this.bar && this.bar();
     }
     kill() {

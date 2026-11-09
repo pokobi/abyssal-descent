@@ -978,11 +978,117 @@
     add(new THREE.Mesh(sphGeo, fireMat()));
     add(new THREE.Mesh(arcGeo(0.5, 1, 1, 4), mk(SLASH_VS, SLASH_FS, { uP: { value: 0 }, uA: { value: 0 }, uC: { value: col3(0xffffff) }, uTail: { value: 0.5 } }, { blending: THREE.AdditiveBlending, side: THREE.DoubleSide })));
     add(new THREE.Mesh(waveGeo(4, 2), mk(WAVE_VS, WAVE_FS, { uA: { value: 0 }, uHalf: { value: 2 } }, { side: THREE.DoubleSide })));
+    add(new THREE.Mesh(arcGeo(0.5, 1, 1, 4), crescentMat(0xffffff)));
     for (const k of ['rock', 'ice']) spikeKind(k);
   };
   // shown (far below the world) while the renderer compiles: the first use never stalls
   VX.warmShow = function () { const saved = warmMeshes.map((m) => [m, m.visible]); for (const m of warmMeshes) { m.visible = true; m.position.set(0, -500, 0); } return () => { for (const [m, v] of saved) m.visible = v; }; };
   VX.setFog = function (color, density) { FOG.c.value.set(color); FOG.d.value = density; };
+  // ================================================================ 秘伝 (classes.js): 飛燕's flying crescent, 一閃's shaft of light
+  // a crescent of a blade's edge: thick in the middle, tapering to two points, its leading (outer) edge white-hot, shimmering as it flies
+  const CRES_FS = `uniform float uT; uniform float uA; uniform vec3 uC; uniform float uSeed; ${FOG_U}
+    varying float vU; varying float vV2;
+    ${NOISE}
+    void main() {
+      float th = sin(3.14159 * vU);                // 0 at the two points, 1 in the middle
+      float inner = 1.0 - th;                     // the inner edge comes out to meet the outer one towards the points
+      if (vV2 < inner) discard;
+      float w = (vV2 - inner) / max(1.0 - inner, 0.001);
+      float hot = pow(w, 5.0);
+      float n = vnoise(vec2(vU * 26.0 - uT * 9.0 + uSeed * 7.0, w * 3.0));
+      vec3 col = mix(uC, vec3(1.0), hot * 0.85 + 0.1);
+      float a = (0.18 + 0.82 * pow(w, 1.6)) * smoothstep(0.0, 0.18, th) * (0.8 + 0.4 * n) * uA;
+      ${fogAdd}
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(col * fogv * 1.5, clamp(a, 0.0, 1.0));
+    }`;
+  const crescentMat = (col) => mk(SLASH_VS, CRES_FS, { uA: { value: 1 }, uC: { value: col3(col) }, uSeed: { value: Math.random() } }, { blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  let cresGeo = null, cresGlowGeo = null, scarGeo = null;
+  const cresGeos = () => { if (cresGeo) return; cresGeo = arcGeo(0.86, 1.25, 2.4, 36); cresGlowGeo = arcGeo(0.6, 1.5, 2.7, 36); scarGeo = new THREE.PlaneGeometry(1, 1); scarGeo.rotateX(-Math.PI / 2); };
+  // 飛燕: from a along dir for len (the caller stops it short of a wall: broke = 1, it shatters there) at speed m/s, tilted about its line of
+  // flight. Its edge in three thin layers (some body to it) inside a wide glow; afterimages left behind it; a shallow glowing cut and
+  // sparks on the floor under it (when the floor is near); at a wall it bursts into splinters of light. The hits are classes.js's own.
+  VX.skySlash = function (a, dir, len, speed, col, broke, tilt) {
+    cresGeos();
+    const d = dir.clone().normalize(), g = new THREE.Group(), UPV = V(0, 1, 0);
+    g.rotation.order = 'YXZ';
+    g.rotation.set(-Math.asin(Math.max(-1, Math.min(1, d.y))), Math.atan2(d.x, d.z), tilt || 0);
+    const mats = [];
+    const layer = (geo, alpha, y) => { const mt = crescentMat(col); mt.uniforms.uA.value = alpha; const m = new THREE.Mesh(geo, mt); m.position.y = y; m.frustumCulled = false; m.renderOrder = 9; g.add(m); mats.push([mt, alpha]); };
+    layer(cresGlowGeo, 0.35, 0);
+    for (const y of [-0.05, 0, 0.05]) layer(cresGeo, y ? 0.55 : 1, y);
+    scene.add(g);
+    const ghosts = [], scar = { dark: new THREE.MeshBasicMaterial({ color: 0x140c08, transparent: true, opacity: 0.55, depthWrite: false }), glow: new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }), parts: [] };
+    let s = 0, t = 0, ghostT = 0, scarS = 0, sparkT = 0, endT = -1;
+    const posAt = (k) => a.clone().addScaledVector(d, k);
+    const place = (k) => { g.position.copy(posAt(k)).addScaledVector(d, -1.05); }; // (the middle of its edge at k)
+    place(0);
+    live.push({
+      update(dt) {
+        t += dt;
+        if (endT < 0) {
+          s = Math.min(len, s + speed * dt);
+          place(s);
+          ghostT -= dt;
+          if (ghostT <= 0) { ghostT = 0.022; const m = new THREE.Mesh(cresGeo, crescentMat(col)); m.frustumCulled = false; m.renderOrder = 8; m.rotation.copy(g.rotation); m.position.copy(g.position); scene.add(m); ghosts.push({ m, t: 0 }); }
+          const p = posAt(s), fl = G.world.floorBelow(p.x, p.y + 0.2, p.z);
+          if (fl > -50 && p.y - fl < 1.9) {
+            while (scarS + 0.35 <= s) {
+              const q = posAt(scarS + 0.175), f2 = G.world.floorBelow(q.x, q.y + 0.2, q.z); scarS += 0.35;
+              if (f2 < -50 || q.y - f2 > 1.9) continue;
+              for (const [mt, w, up] of [[scar.dark, 0.09, 0.015], [scar.glow, 0.025, 0.02]]) { const m = new THREE.Mesh(scarGeo, mt); m.position.set(q.x, f2 + up, q.z); m.rotation.y = Math.atan2(d.x, d.z); m.scale.set(w, 1, 0.38); m.renderOrder = 7; scene.add(m); scar.parts.push(m); }
+            }
+            sparkT -= dt; if (sparkT <= 0) { sparkT = 0.05; G.fx.sparks(V(p.x, fl + 0.05, p.z), UPV, 2, col, 4); }
+          } else scarS = s;
+          if (s >= len) {
+            endT = 0;
+            if (broke) { // shattered on the wall: splinters of its light fly back off it
+              const e = posAt(len), back = d.clone().negate();
+              G.fx.sparks(e, back, 26, col, 9); G.fx.sparks(e, back, 10, 0xffffff, 6); G.fx.flash(e, col, 45, 0.18, 8); G.fx.dust(e, back, 0x8a8070, 5);
+              for (let i = 0; i < 5; i++) {
+                const m = new THREE.Mesh(cresGeo, crescentMat(col)); m.frustumCulled = false; m.renderOrder = 9; m.position.copy(e); m.rotation.set(rnd(-1, 1), rnd(0, 6.3), rnd(-1, 1)); m.scale.setScalar(rnd(0.18, 0.32)); scene.add(m);
+                ghosts.push({ m, t: 0, life: 0.32, v: V(rnd(-1, 1), rnd(-0.2, 1), rnd(-1, 1)).normalize().multiplyScalar(rnd(3, 6)).addScaledVector(d, -2) });
+              }
+            }
+          }
+        } else {
+          endT += dt;
+          const k = Math.max(0, 1 - endT / (broke ? 0.06 : 0.14));
+          for (const [mt, al] of mats) mt.uniforms.uA.value = al * k;
+          if (!broke) { place(len + endT * speed * 0.5); g.scale.setScalar(1 + endT * 1.5); } // (out of reach it spreads and fades)
+          if (k <= 0) g.visible = false;
+        }
+        for (let i = ghosts.length - 1; i >= 0; i--) {
+          const gh = ghosts[i]; gh.t += dt; const k = 1 - gh.t / (gh.life || 0.16);
+          if (gh.v) gh.m.position.addScaledVector(gh.v, dt);
+          gh.m.material.uniforms.uA.value = Math.max(0, k) * (gh.v ? 0.9 : 0.42);
+          if (k <= 0) { scene.remove(gh.m); gh.m.material.dispose(); ghosts.splice(i, 1); }
+        }
+        scar.dark.opacity = 0.55 * Math.min(1, Math.max(0, 1 - t / 2.6) * 1.6); scar.glow.opacity = 0.9 * Math.max(0, 1 - t / 0.7); // (the cut's glow dies first, the cut itself in 2.6 s)
+        return t < 2.6 || ghosts.length > 0;
+      },
+      dispose() { scene.remove(g); for (const [mt] of mats) mt.dispose(); for (const gh of ghosts) { scene.remove(gh.m); gh.m.material.dispose(); } for (const m of scar.parts) scene.remove(m); scar.dark.dispose(); scar.glow.dispose(); },
+    });
+  };
+  // 一閃: a thick shaft of light from a to b (0.8 m across, the width its hit test uses), there at once, held a moment with a wide halo
+  // round it, then thinning to a thread and gone in half a second
+  VX.focusBeam = function (a, b, col) {
+    const d = b.clone().sub(a), len = d.length() || 0.01, q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), d.clone().normalize());
+    const outer = new THREE.Mesh(cylGeo, beamMat(col, 0xdff0ff, 6)), core = new THREE.Mesh(cylGeo, beamMat(0xffffff, 0xffffff, 10)), halo = new THREE.Mesh(cylGeo, beamMat(col, col, 3));
+    for (const m of [halo, outer, core]) { m.frustumCulled = false; m.renderOrder = 8; m.material.uniforms.uEnds.value = 1; m.position.copy(a).addScaledVector(d, 0.5); m.quaternion.copy(q); scene.add(m); }
+    const R = 0.4, HOLD = 0.07, DUR = 0.5; let t = 0;
+    live.push({
+      update(dt) {
+        t += dt;
+        const k = t < HOLD ? 1 : Math.max(0, 1 - (t - HOLD) / (DUR - HOLD)), thin = Math.max(0.06, Math.pow(k, 1.8)), pulse = t < HOLD ? 1.15 : 1;
+        outer.scale.set(R * thin * pulse, len, R * thin * pulse); outer.material.uniforms.uA.value = Math.min(1, k * 1.3);
+        core.scale.set(R * 0.3 * Math.max(0.1, thin), len, R * 0.3 * Math.max(0.1, thin)); core.material.uniforms.uA.value = k;
+        const hs = R * 2.4 * (1 + t * 2); halo.scale.set(hs, len, hs); halo.material.uniforms.uA.value = 0.22 * Math.max(0, 1 - t / 0.2);
+        return t < DUR;
+      },
+      dispose() { for (const m of [outer, core, halo]) { scene.remove(m); m.material.dispose(); } },
+    });
+  };
   VX.clear = function () {
     for (const e of live) e.dispose(); live.length = 0;
     for (const o of fbPool) { o.on = false; o.m.visible = false; }

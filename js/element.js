@@ -303,6 +303,7 @@
   const RX_ELS = { boil: ['fire', 'water'], thaw: ['fire', 'ice'], freeze: ['water', 'ice'], blast: ['fire', 'volt'], leak: ['volt', 'water'], brittle: ['ice', 'volt'], shatter: ['earth', 'ice'] };
   EL.after = function (e, id, withEl, opts) {
     if (!e || !id) return;
+    if (G.Classes && G.Classes.onReaction) G.Classes.onReaction(e, id, opts); // 昂る理 / 理の障壁 (術士)
     if (P && P.has && P.has('x_myth') && !(opts && opts.echo)) { const els = (RX_ELS[id] || []).concat(withEl ? [withEl] : [], id === 'swirl' ? ['wind'] : id === 'crystal' ? ['earth'] : []); for (const sk of P.skills) if (sk && !(sk.def && sk.def.ult) && sk.cd > 0 && els.includes(EL.skEl(sk.id))) sk.cd = Math.max(0, sk.cd - 1); }
     opts = opts || {};
     if (EL._depth > 3) return;

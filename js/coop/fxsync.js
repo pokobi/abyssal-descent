@@ -45,6 +45,15 @@
         try { return f.apply(VX, arguments); } finally { K._vxDepth--; }
       };
     }
+    // the 秘伝's pictures (一閃's shaft of light, 飛燕's flying crescent: classes.js) come only from the player's own blows
+    for (const fn of ['focusBeam', 'skySlash']) {
+      const f = VX[fn]; if (!f) continue;
+      VX[fn] = function () {
+        if (K.live && !K._fxNet && !K._noMirror && !(K._vxDepth > 0)) push(['v', fn, Array.prototype.map.call(arguments, enc)]);
+        K._vxDepth = (K._vxDepth || 0) + 1;
+        try { return f.apply(VX, arguments); } finally { K._vxDepth--; }
+      };
+    }
     // a held beam (a guardian's sweeping laser): its position goes out 20 times a second and the other screens hold their own copy
     const vray = VX.ray, rays = new Map(); let rid = 0;
     VX.ray = function (col, c2, al) {

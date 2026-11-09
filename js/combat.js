@@ -591,6 +591,7 @@
     if (!P || P.dead || (G.game.state !== 'playing' && G.game.state !== 'inv')) return 0;
     info = info || {};
     if (P.invulnT > 0 || (G.game.dev && G.game.dev.god)) return 0;
+    if (G.Classes && G.Classes.parry(amount, info)) return 0; // 見切り (剣士): parried
     // info.fixed: an exact share of max HP (the last guardian's gravity crash): no scaling, defence, armour or dodge; shields and guard buffs still count
     if (!info.fixed) {
       amount *= 1 + P.stats.enemyDmg;
@@ -611,9 +612,11 @@
     if (P.pileState === 'charge') ctx.red += 0.5;
     let armor = info.fixed ? 0 : U.clamp(P.stats.armor + ctx.red, -1, 0.85);
     const iron = !info.fixed && G.Classes ? G.Classes.ironRed() : 0; // 鉄壁 (重装兵): its own factor, the total still at most 85%
-    if (iron > 0) { if (!P._knockSnap) P._knockSnap = P.vel.clone(); armor = Math.min(0.85, 1 - (1 - armor) * (1 - iron)); }
+    if (iron > 0) armor = Math.min(0.85, 1 - (1 - armor) * (1 - iron));
+    { const kk = G.Classes ? G.Classes.knockK() : 1; if (kk < 1 && !P._knockSnap) { P._knockSnap = P.vel.clone(); P._knockK = kk; } } // 根を張る (重装兵): knocked half as far (player.js)
     let dmg = amount * (1 - armor);
     if (G.weapons.guardAbsorb) dmg = G.weapons.guardAbsorb(dmg, info); // a melee guard held up towards the hit
+    if (G.Classes) dmg = G.Classes.shieldAbsorb(dmg, info); // 携行防盾 (重装兵): the shield raised with the sights
     if (P.has('d_iron')) dmg = Math.min(dmg, P.stats.maxHp * 0.25);
     // 天秤の祈り: the foes around you take the blow instead (x3: their health runs on a bigger scale)
     if (dmg > 0 && P.temps.has('sk_scale') && G.abilities.scale && !info.fall) {
@@ -634,6 +637,7 @@
       dmg = Math.max(0, P.hp - 1); P.lastGuardT = G.game.time; P.invulnT = Math.max(P.invulnT || 0, 0.8);
       G.ui.toast('💢 致命の一撃を耐えた！', 'warn'); G.sfx.heartbeat(1);
     }
+    if (G.Classes) dmg = G.Classes.lethal(dmg); // 不屈 (重装兵): before a soul lantern
     if (P.temps.has('ult_bastion') && G.PStatus && G.PStatus.guardHit) G.PStatus.guardHit(amount, dmg + osHit);
     const atk = info.attacker;
     if (atk && atk.alive && atk.isEnemy) {

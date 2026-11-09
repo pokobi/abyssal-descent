@@ -310,9 +310,24 @@
     const CL = G.Classes; if (!CL || !P) return;
     let el = UI._clsEl;
     if (!el || !el.isConnected) { const bl = document.getElementById('hud-bl'); if (!bl) return; el = UI._clsEl = document.createElement('div'); el.id = 'cls-ind'; bl.prepend(el); }
-    let txt = '';
-    if (P.cls === 'heavy' && CL.ironOn()) txt = '🛡️ 鉄壁';
+    const parts = [];
+    if (P.cls === 'heavy' && CL.ironOn()) parts.push('🛡️ 鉄壁');
+    if (CL.has('heavy_2b') && CL.gritLeft() > 0) parts.push(`💢 不屈 ${Math.ceil(CL.gritLeft())}秒`);
+    if (CL.backWater()) parts.push('🌊 背水');
+    if (CL.has('assault_1b') && (CL.state().rushT || 0) > G.game.time) parts.push('🩸 血の昂り');
+    if (CL.rxStacks() > 0) parts.push(`🔥 昂る理 ×${CL.rxStacks()}`);
+    const txt = parts.join('　');
     sText(el, txt); el.classList.toggle('on', !!txt);
+    // 携行防盾 (重装兵): its strength as an upright gauge beside the crosshair while the sights are up, a blue rim round the screen
+    let sg = UI._shEl;
+    if (CL.has('heavy_2a')) {
+      if (!sg || !sg.isConnected) { const hud = document.getElementById('hud'); if (!hud) return; sg = UI._shEl = document.createElement('div'); sg.id = 'shield-gauge'; sg.innerHTML = '<i></i><b></b>'; hud.appendChild(sg); const v = document.createElement('div'); v.id = 'shield-veil'; hud.appendChild(v); UI._shVeil = v; }
+      const st = CL.state(), up = CL.shieldRaised(), mx = CL.shMax(), broke = (st.shBrokeT || 0) > G.game.time;
+      sStyle(sg.firstChild, 'height', (Math.max(0, Math.min(1, (st.shHp ?? mx) / mx)) * 100).toFixed(1) + '%');
+      sText(sg.lastChild, broke ? `${Math.ceil(st.shBrokeT - G.game.time)}秒` : '');
+      sg.classList.toggle('on', up); sg.classList.toggle('broken', broke);
+      if (UI._shVeil) { UI._shVeil.classList.toggle('on', up && !broke); UI._shVeil.classList.toggle('hit', (st.shFlash || 0) > 0.5); }
+    } else if (sg) { sg.classList.remove('on'); if (UI._shVeil) UI._shVeil.classList.remove('on', 'hit'); }
     const hw = document.getElementById('hp-wrap'); if (hw) hw.classList.toggle('iron', P.cls === 'heavy' && CL.ironOn());
     // 連斬 (剣士): the stacks as segments (5 / 6 / 7) and the time left as one long bar, under the crosshair like the sniper's gauge
     let bb = UI._bladeEl;

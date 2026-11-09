@@ -27,8 +27,9 @@
     const L = bare ? (sk && sk.lv) || 0 : A.totalLv(sk), lvK = 1 - Math.min(0.36, 0.02 * L);
     if (bare) return sk.def.cd * (sk.def.ult ? 1 : A.SKILL_CD_MUL) * lvK;
     const st = P.stats, own = 1 - Math.min(0.5, A.skm ? A.skm(sk.id).cd : 0);
-    if (sk.def.ult) return sk.def.cd * (1 - st.cdr * 0.5) * (1 - (st.ultCd || 0)) * lvK * own;
-    return sk.def.cd * A.SKILL_CD_MUL * (1 - st.cdr) * (1 - (st.skillCd || 0)) * lvK * own * (P.temps.has('ult_overcharge') ? (P.ocCd || 0.3) : 1);
+    const cls = G.Classes ? G.Classes.cdMul(sk) : 1; // 詠唱短縮 (術士): the skills and ultimates of an element
+    if (sk.def.ult) return sk.def.cd * (1 - st.cdr * 0.5) * (1 - (st.ultCd || 0)) * lvK * own * cls;
+    return sk.def.cd * A.SKILL_CD_MUL * (1 - st.cdr) * (1 - (st.skillCd || 0)) * lvK * own * cls * (P.temps.has('ult_overcharge') ? (P.ocCd || 0.3) : 1);
   };
   // skill power grows with its level (raised with skill tomes / buying the same skill again)
   A.power = (sk, bare) => Math.pow(1.3, bare ? (sk && sk.lv) || 0 : A.totalLv(sk)) * A.SKILL_POW_MUL * (1 + (!bare && sk && A.skm ? A.skm(sk.id).dmg : 0));

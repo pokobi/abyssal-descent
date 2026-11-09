@@ -218,7 +218,7 @@
       <div class="sh-c"><span>エリア <b>${G.game.area}</b></span><span>❤ <b>${Math.ceil(P.hp)}</b>/${st.maxHp}</span>${P.os > 0.5 ? `<span class="os">🛡 <b>+${Math.ceil(P.os)}</b></span>` : ''}<span>🪙 <b>${U.fmt(run.coins || 0)}</b></span><span>🪔 <b>${P.revives || 0}</b></span><span>撃破 <b>${run.kills || 0}</b></span></div></div>`;
     const empty = Math.max(0, st.weaponSlots - P.weapons.length);
     const CLS = G.Classes, cl = CLS && CLS.of(P.cls);
-    const clsP = cl && cl.pas ? panel('CLASS', `${cl.icon} ${cl.name}`, `<div style="--cc:${cl.col}">${CLS.pasHTML(cl, CLS.lv())}<div class="cls-pas-n">▼ 短所：${esc(cl.minus)}</div></div>`) : '';
+    const clsP = cl && cl.pas ? panel('CLASS', `${cl.icon} ${cl.name}`, `<div style="--cc:${cl.col}">${CLS.pasHTML(cl)}${CLS.perksHTML(cl, CLS.perksOf(P))}<div class="cls-pas-n">▼ 短所：${esc(cl.minus)}</div></div>`) : '';
     if (compact) return `<div class="sw cp">${head}<div class="scols"><div class="col">${panel('ROUTE', '道程', UI.routeHTML())}${clsP}${panel('STATS', '能力値', statsBody())}</div></div><div class="srow">${panel(`PERKS・${P.buffs.size}`, '加護', perksBody(), 'perks')}</div></div>`;
     const loadout = panel('LOADOUT', '武器', G.weapons.gunsInOrder().map(gunCard).join('') + Array.from({ length: empty }, () => `<div class="wc empty"><div class="wc-h0"><span class="key">＋</span><span class="nm">武器スロット：空き</span></div></div>`).join('') + meleeCard());
     const abil = panel('ABILITIES', 'スキル', P.skills.map((sk, i) => (sk ? skillCard(sk, G.input.skillKey(i)) : `<div class="sc empty"><div class="sc-h"><span class="key">${G.input.skillKey(i)}</span><span class="nm">— 空き —</span></div></div>`)).join('') + pileCard());

@@ -1134,7 +1134,7 @@
     const maxD = 300;
     const wh = G.world.raycast(o, dir, maxD);
     const limit = wh ? wh.t : maxD;
-    const hits = G.enemies.raycastAll(o, dir, limit, exclude);
+    const hits = G.enemies.raycastAll(o, dir, limit, exclude, s.beam || 0); // (一閃 of the 狙撃手: a shaft of light 0.8 m across)
     // 導きの弾道: a round that hits no foe turns, 0.4 s later, towards the nearest one within 20 m (70%)
     if (!hits.length && depth === 0 && !s.guided && P.has('h_myth')) { const end0 = wh ? wh.point.clone() : o.clone().addScaledVector(dir, 40), area = G.game.area, dd = s.dmg * 0.7; setTimeout(() => { if (G.game.area !== area || P.dead) return; let best = null, bd = 20; for (const e of G.enemies.inRadius(end0, 20)) { if (!e.alive || e.ally) continue; const d = e.centerPos().distanceTo(end0); if (d < bd) { bd = d; best = e; } } if (!best) return; G.fx.tracer(end0, best.centerPos(), 0xa0e0ff, 0.025, 0.2); G.combat.damageEnemy(best, dd, { src: 'bullet', weapon: w, proc: true, noMarker: true }); }, 400); }
     let pierce = s.pierce || 0;
@@ -1163,9 +1163,12 @@
       if (s.moonShot || s.forceCrit) { info.forceCrit = true; info.cloakMul = 1; }
       // 神の眼: aiming down the sights, a hit on the weak point (the head) is a sure crit
       if (s.godEye && P.adsActive && info.head) { info.forceCrit = true; info.cloakMul = 1; }
+      if (G.Classes && G.Classes.sureCrit(s, info)) { info.forceCrit = true; info.cloakMul = 1; } // 急所穿ち (狙撃手): a full shot to the head
       // 消音の極意: a foe that is not on to you (cannot see you, or is after a decoy) takes more
       if (s.hush && (!h.e.hasLOS || (G.combat.getDecoy && G.combat.getDecoy()))) info.hushMul = 1 + s.hush;
       G.combat.damageEnemy(h.e, dmg, info);
+      if (s.focusShot && G.Classes) G.Classes.focusHit(h.e, info, s); // 残心 / 一発入魂 (狙撃手)
+      if (s.beam) { G.fx.sparks(hp, null, 12, 0x9fd4ff, 8); G.fx.flash(hp, 0x9fd4ff, 30, 0.12, 6); }
       if (s.explo || w.def.trait === 'explosiveRounds') G.combat.explode(hp, 1.6, s.dmg * 0.6 * fall, { src: 'explosion', small: true, proc: true });
       if (w.def.trait === 'chainHit' && Math.random() < 0.5) { G.combat.chain(h.e, 2, s.dmg * 0.5, 9, { src: 'bullet', proc: true }); G.fx.strike(h.e.centerPos()); }
       if (s.chain) { G.combat.chain(h.e, s.chain, s.dmg * 0.6, 8, { src: 'bullet', proc: true, elem: 'shock', elemChance: 0.3 }); if (Math.random() < 0.35) G.fx.strike(h.e.centerPos()); }
@@ -1194,7 +1197,12 @@
     }
     if (G.Strata.doors.length) for (const [dr] of G.Strata.doorsOnRay(o, dir, o.distanceTo(end))) G.Strata.hitDoor(dr, s.dmg, 'bullet');
     // tracer
-    if (muzzle && (pellets <= 1 || Math.random() < 0.35)) {
+    if (s.beam && muzzle && depth === 0) { // 一閃: the shaft of light from the muzzle to the wall it stops at
+      const bEnd = wh ? wh.point : o.clone().addScaledVector(dir, 120);
+      if (G.vfx.focusBeam) G.vfx.focusBeam(muzzle, bEnd, 0x6ab8ff);
+      G.fx.flash(muzzle, 0x9fd4ff, 70, 0.14, 10);
+      if (G.sfx.focusBeam) G.sfx.focusBeam();
+    } else if (muzzle && (pellets <= 1 || Math.random() < 0.35)) {
       const wel = G.Elem.wEl(w);
       const col = s.goldShot ? 0xffd040 : wel ? G.Elem.BY[wel].hex : s.elem === 'fire' ? 0xffa060 : s.elem === 'frost' ? 0xbfe8ff : s.elem === 'shock' || s.sound === 'tesla' ? 0xe0e8ff : s.elem === 'poison' ? 0xb0e070 : 0xffd8a0;
       if (s.sound === 'tesla') G.fx.lightning(muzzle, end, 0xd8e4ff);

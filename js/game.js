@@ -538,7 +538,7 @@
   GM.slotsUsed = () => { let n = 0; for (let i = 1; i <= GM.SLOTS; i++) if (GM.loadRun(i)) n++; return n; };
   GM.playerSnap = function () {
     return {
-      cls: P.cls, hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
+      cls: P.cls, perks: (P.perks || []).slice(), hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
       buffs: [...P.buffs], buffState: P.buffState,
       weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, forge: w.forge || undefined, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined })), wIdx: P.wIdx, kitAtts: P.kitAtts || [],
       wOrder: G.weapons.order().map((t) => (t === 'm' ? 'm' : t ? P.weapons.indexOf(t) : null)),
@@ -590,6 +590,7 @@
     { const RET = { h_bleed: 150, s_dodge_1: 150, s_dodge_2: 250, s_dodge_3: 400 }; const gone = (d.buffs || []).reduce((n, [id, c]) => n + (RET[id] ? RET[id] * (c || 1) : 0), 0); if (gone && GM.run) { GM.run.coins += gone; setTimeout(() => G.ui.toast(`🪙 廃止された加護を ${gone} コインで返却しました`, 'good'), 1500); } }
     P.buffState = d.buffState || {};
     P.permMaxHp = d.permMaxHp || 0;
+    P.perks = (d.perks || []).filter((id) => G.Classes && G.Classes.PERK[id]);
     P.recalc();
     P.phoenixUsed = !!d.phoenixUsed;
     P.weapons = (d.weapons || []).filter((x) => G.WEAPON_BY_ID[x.id]).map((x) => { const w = G.weapons.make(x.id); w.atts = Object.fromEntries(Object.entries(x.atts || {}).filter(([, a]) => G.ATT_BY_ID[a])); w.lv = x.lv || 0; w.forge = x.forge || 0; w.kills = x.kills || 0; if (x.el) w.el = x.el; if (x.kit) w.kit = true; w.ver++; w.mag = x.mag ?? w.mag; return w; });
@@ -1134,9 +1135,7 @@
     if (opts === true) opts = { boss: true };
     opts = opts || {};
     const stage = GM.stage, bossKill = !!opts.boss;
-    const clsLv0 = G.Classes ? G.Classes.lv() : 1;
     GM.areaCleared = true; GM.clearSweep = true;
-    if (bossKill && G.Classes) G.Classes.afterGuardian(clsLv0);
     G.Depth.liftDarkness();
     GM.clearMarkers();
     GM.run.areasCleared++;
@@ -1183,6 +1182,8 @@
     if (!rp || GM.rewardPending !== rp && !GM._forceReward) return;
     if (GM.state !== 'playing' || performance.now() < (G.ui.bannerHold || 0)) { setTimeout(() => GM.giveReward(rp), 300); return; }
     const { reward, boss, n } = rp;
+    // a guardian's fall: first the class's 秘伝 (classes.js), then its boon
+    if (boss && G.Classes && G.Classes.perkDue() > 0) { G.Classes.offerPerks(() => GM.giveReward(rp)); return; }
     // once the choosing is over (not before: the clear banner and the card screen would drown it) tell a hurt player about the basin
     const fin = () => setTimeout(() => GM.healNotice(), 700);
     if (reward === 'double') GM.offerBuffs(false, { title: 'CURSED SPOILS (1/2)', after: () => setTimeout(() => GM.offerBuffs(true, { title: 'CURSED SPOILS (2/2)', after: fin }), 300) });
@@ -1382,7 +1383,7 @@
     const out = [];
     const r = Math.random;
     for (let i = 0; i < n && pool.length; i++) {
-      const rar = U.weighted(G.RARITY_ORDER.filter((k) => pool.some((b) => b.rarity === k)), (k) => G.rarityWeight(k, GM.area, luck) * (boost && G.RARITY[k].tier < 2 ? 0.25 : 1), r);
+      const rar = U.weighted(G.RARITY_ORDER.filter((k) => pool.some((b) => b.rarity === k)), (k) => G.rarityWeight(k, GM.area, luck) * (boost && G.RARITY[k].tier < 2 ? 0.25 : 1) * (G.Classes ? G.Classes.rarW(k) : 1), r); // (掘り出し物 of the 兵士: rare and better x2)
       const cands = pool.filter((b) => b.rarity === rar && !out.includes(b));
       if (!cands.length) continue;
       // prefer mechanics over plain stats a bit

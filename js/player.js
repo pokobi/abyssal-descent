@@ -316,7 +316,7 @@
         const g0 = w.groundAt(this.pos, this.hw, 60); const c = V(this.pos.x, g0 > -Infinity ? g0 : this.pos.y, this.pos.z);
         for (const e of G.enemies.inRadius(c, 10)) { if (e.boss) continue; const d = c.clone().sub(e.pos); d.y = 0; const l = d.length(); if (l > 1) e.pos.addScaledVector(d.normalize(), Math.min(l, 16 * dt)); }
       }
-      if (this._knockSnap) { const k = this._knockSnap; this._knockSnap = null; if (Math.hypot(this.vel.x, this.vel.z) > Math.hypot(k.x, k.z) + 0.5) { this.vel.x = k.x; this.vel.z = k.z; } if (this.vel.y > Math.max(k.y, 0) + 0.5) this.vel.y = Math.max(k.y, 0); } // 鉄壁 (重装兵): not knocked away
+      if (this._knockSnap) { const k = this._knockSnap, kk = this._knockK || 0; this._knockSnap = null; if (Math.hypot(this.vel.x, this.vel.z) > Math.hypot(k.x, k.z) + 0.5) { this.vel.x = k.x + (this.vel.x - k.x) * kk; this.vel.z = k.z + (this.vel.z - k.z) * kk; } const ky = Math.max(k.y, 0); if (this.vel.y > ky + 0.5) this.vel.y = ky + (this.vel.y - ky) * kk; } // 根を張る (重装兵): the knock taken cut to kk of itself
       // ---- speed target ----
       const spd = this.walkSpeed();
       let targetSpeed = spd;

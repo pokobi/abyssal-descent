@@ -807,6 +807,25 @@
     [[3300, 0.24, 0.5], [4950, 0.17, 0.4], [6600, 0.11, 0.3], [8250, 0.06, 0.22]].forEach(([f, g, d]) => tn({ t: t + 0.04, f0: f, f1: f * 1.004, d, g, to: out, type: 'sine' }));
     nz({ t: t + 0.04, f: [['bandpass', 7400, 7]], g: 0.16, d: 0.2, to: out });
   };
+  // 飛燕: the air torn open as the crescent leaves the blade (a hiss sweeping up and away, a thin whistle over it, a low swish under it)
+  A.skySlash = function () {
+    if (!ctx || !voice(0.6)) return;
+    const t = ctx.currentTime, out = dest(null, 0.35); out.gain.value = 0.8;
+    nz({ t, buf: 'pink', f: [['bandpass', 900, 1.2, 5200, 0.28]], g: 0.7, a: 0.01, d: 0.42, to: out });
+    nz({ t, f: [['highpass', 4200, 0.7]], g: 0.28, a: 0.004, d: 0.2, to: out });
+    tn({ t, f0: 1300, f1: 3600, d: 0.32, g: 0.07, to: out, type: 'sine' });
+    nz({ t, buf: 'brown', f: [['lowpass', 380]], g: 0.35, a: 0.01, d: 0.26, to: out });
+  };
+  // 一閃: a heavy, sharp crack (the snap, a deep thump under it, a bright ring left hanging in the air)
+  A.focusBeam = function () {
+    if (!ctx || !voice(1.0)) return;
+    const t = ctx.currentTime, out = dest(null, 0.5); out.gain.value = 0.9;
+    nz({ t, f: [['highpass', 1800, 0.7]], g: 0.85, a: 0.001, d: 0.06, to: out });
+    tn({ t, f0: 180, f1: 42, d: 0.38, g: 0.6, to: out, type: 'sine' });
+    nz({ t, buf: 'brown', f: [['lowpass', 900, 0.7, 200, 0.4]], g: 0.6, a: 0.002, d: 0.45, to: out });
+    tn({ t: t + 0.01, f0: 3200, f1: 2600, d: 0.55, g: 0.07, to: out, type: 'triangle' });
+    nz({ t: t + 0.02, f: [['bandpass', 6000, 6]], g: 0.12, d: 0.42, to: out });
+  };
   // a parry: two blades meeting hard, "kakiin!" (a sharp crack, a short thud, then struck-steel partials ringing out); pos = null for your own
   A.clang = function (pos) {
     if (!ctx) return;

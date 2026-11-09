@@ -47,6 +47,7 @@
       gd.kick = Math.max(0, gd.kick - dt * 6); gd.flash = 0; if (gEl) gEl.classList.remove('on');
       return;
     }
+    if (I.down('reload') && !gd.pdn && G.Classes) G.Classes.parryPress(); // 見切り (剣士): the moment the guard key goes down
     gd.pdn = I.down('reload');
     const g = P.melee.def.guard;
     // the gauge refills even while the melee weapon is put away (measured by game time since the last tick)
@@ -820,6 +821,7 @@
         if (n) { G.sfx.zap(o); G.fx.flash(o.clone().addScaledVector(f, 4), 0xc8d8ff, 40, 0.25, 14); P.addShake(0.4); }
       }
     }
+    if (heavy && G.Classes) G.Classes.onHeavy(o, f, dmg); // 飛燕 (剣士): the heavy blow's crescent flies on
     G.sfx.meleeHit(hit, def.mcat, heavy);
     if (hit) {
       P.addShake(heavy ? 0.45 : 0.18);

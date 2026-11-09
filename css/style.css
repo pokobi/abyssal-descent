@@ -1918,10 +1918,10 @@ html.m .cls-merit b { font-size: 26px; } html.m .cls-merit small { font-size: 16
 #blade-bar.on { display: flex; }
 #blade-bar .bb-seg { display: flex; gap: 2px; }
 #blade-bar .bb-seg i { flex: 1; height: 5px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 2px; }
-#blade-bar .bb-seg i.on { background: #c4a0f0; border-color: #e0caff; }
+#blade-bar .bb-seg i.on { background: #ffb040; border-color: #ffd890; }
 #blade-bar.full .bb-seg i.on { background: #ffe27a; border-color: #fff0b0; box-shadow: 0 0 6px #ffe27a; }
 #blade-bar .bb-time { height: 3px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden; }
-#blade-bar .bb-time i { display: block; height: 100%; width: 0; background: #e0caff; }
+#blade-bar .bb-time i { display: block; height: 100%; width: 0; background: #ffd890; }
 /* 連斬: larger and louder (the swordsman watches it all the time) */
 #blade-bar { left: calc(50% - 75px); top: calc(50% + 34px); width: 150px; gap: 4px; filter: drop-shadow(0 0 3px rgba(0,0,0,0.9)); }
 #blade-bar .bb-seg { gap: 4px; }
@@ -1959,3 +1959,39 @@ html.m #blade-bar { transform: scale(0.85); }
 /* the workbench offering every weapon of the kind: more than three side by side in two columns */
 .pb-cands.many { display: grid; grid-template-columns: 1fr 1fr; }
 .pb-sec small { margin-left: 0.5em; font-size: 0.8em; font-weight: 600; color: #a99d88; }
+
+/* ---- 秘伝 (classes.js): the choice after a guardian, in the class's colour; the perks on the class / status screens; 携行防盾 */
+.pk-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.3), rgba(0,0,0,0.78)); pointer-events: none; }
+.pk-head { text-align: center; }
+.pk-title { font-size: 42px; font-weight: 900; letter-spacing: 0.2em; color: var(--cc); text-shadow: 0 0 18px var(--cc), 0 2px 0 #000; }
+.pk-cls { margin-top: 4px; font-size: 15px; color: #e8dcc8; }
+.pk-cards { display: flex; gap: 34px; padding: 20px 28px; border: 2px solid var(--cc); border-radius: 18px; background: rgba(10,8,6,0.6);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--cc) 45%, transparent), inset 0 0 44px color-mix(in srgb, var(--cc) 16%, transparent); pointer-events: auto; }
+.card.pk-card { width: 300px; min-height: 300px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pk-ic { font-size: 64px; line-height: 1.1; margin-top: 12px; filter: drop-shadow(0 0 10px var(--cc)); }
+.pk-name { font-size: 25px; font-weight: 900; color: #fff3dc; }
+.pk-tag { font-size: 12px; padding: 2px 12px; border-radius: 99px; background: color-mix(in srgb, var(--cc) 34%, transparent); color: #fff; }
+.pk-desc { font-size: 14px; line-height: 1.65; color: #e8dcc8; text-align: left; padding: 6px 4px 0; }
+.pk-keys { font-size: 12px; color: var(--dim); }
+.pk-foot { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 13px; }
+.pk-f span { color: var(--dim); margin-right: 8px; } .pk-f b { margin: 0 4px; color: #f0e2c8; } .pk-f.dim { opacity: 0.7; } .pk-f i { color: var(--dim); font-style: normal; }
+html.m .pk-cards { flex-direction: column; gap: 12px; padding: 12px; } html.m .card.pk-card { width: min(86vw, 340px); min-height: 0; } html.m .pk-ic { font-size: 40px; margin-top: 4px; } html.m .pk-title { font-size: 28px; }
+.cls-pk { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.cls-pk-t { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 8px; }
+.cls-pk-t.later { opacity: 0.55; }
+.cls-pk-h { font-size: 12px; font-weight: 800; color: var(--cc, #ffd27a); margin-bottom: 4px; display: flex; gap: 8px; align-items: baseline; }
+.cls-pk-h small { color: var(--dim); font-weight: 400; } .cls-pk-h em { margin-left: auto; font-style: normal; font-size: 11px; color: var(--dim); font-weight: 400; }
+.cls-pk-c { display: flex; gap: 8px; align-items: flex-start; padding: 4px 2px; font-size: 12px; }
+.cls-pk-c + .cls-pk-c { border-top: 1px dashed rgba(255,255,255,0.08); }
+.cls-pk-ic { font-size: 18px; width: 24px; text-align: center; flex: none; }
+.cls-pk-c b { color: #f0e2c8; } .cls-pk-c small { display: block; color: #cfc4b0; line-height: 1.45; }
+.cls-pk-c i { font-style: normal; margin-left: 6px; font-size: 10px; padding: 0 6px; border-radius: 99px; background: var(--cc, #ffd27a); color: #1a1410; font-weight: 800; }
+.cls-pk-c.on { background: color-mix(in srgb, var(--cc, #ffd27a) 14%, transparent); border-radius: 4px; }
+.cls-pk-c.off { opacity: 0.4; }
+#shield-gauge { position: absolute; left: calc(50% + 48px); top: calc(50% - 42px); width: 8px; height: 84px; border: 1px solid rgba(180,220,255,0.75); border-radius: 3px; background: rgba(0,0,0,0.5); display: none; pointer-events: none; filter: drop-shadow(0 0 3px rgba(0,0,0,0.9)); }
+#shield-gauge.on { display: block; }
+#shield-gauge i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#e0f0ff, #5aa8ff); border-radius: 2px; }
+#shield-gauge.broken { border-color: rgba(255,120,100,0.85); }
+#shield-gauge b { position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%); font-size: 11px; color: #ffb0a0; white-space: nowrap; font-weight: 700; }
+#shield-veil { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 90px rgba(110,180,255,0.55); opacity: 0; transition: opacity .15s; }
+#shield-veil.on { opacity: 0.45; } #shield-veil.hit { opacity: 1; transition: none; }

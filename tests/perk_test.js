@@ -138,9 +138,11 @@ window.T = {
     check(sn.sure.join() === 'true,false,false', `狙撃手 急所穿ち: a full shot to the head is a sure crit; not the body, not a shot that was not full (${sn.sure})`);
     // 一閃: more foes in a row than a plain full shot goes through (the beam takes them all); one foe just off the line, where a thin shot
     // misses it (the beam, 0.8 m across, still takes it). No spread on the shots.
-    const beam = async (perks) => J(p, `const C = G.Classes, W = G.weapons; const P = T.as('sniper', ${JSON.stringify(perks)}); P.pitch = 0; G.game.step(0.02, 2);
+    const beam = async (perks) => J(p, `const C = G.Classes, W = G.weapons; const P = T.as('sniper', ${JSON.stringify(perks)}); P.pitch = 0;
+      { const y0 = P.yaw; for (let k = 0; k < 16; k++) { P.yaw = y0 + k * Math.PI / 8; const f = new THREE.Vector3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); if (!G.world.raycast(P.pos.clone().add(new THREE.Vector3(0, 1.6, 0)), f, 13)) break; } } // (a way with no wall for 13 m: the beam stops at walls)
+      G.game.step(0.02, 2);
       const w = P.weapons[0], through = (W.stats(w).pierce || 0) + 1, row = [];
-      for (let i = 0; i < through + 3; i++) row.push(T.mk(5 + i * 2.2));
+      for (let i = 0; i < through + 3; i++) row.push(T.mk(3 + i * 1.6));
       let vb = 0; const f0 = G.vfx.focusBeam, sp0 = W.currentSpread; G.vfx.focusBeam = function () { vb++; return f0.apply(this, arguments); }; W.currentSpread = () => 0;
       const fire = () => { C.state().focus = 1; W.adsT = 1; w.mag = 5; W.shoot(w, W.stats(w)); };
       try {

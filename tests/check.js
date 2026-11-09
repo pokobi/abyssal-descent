@@ -4,12 +4,14 @@
 //   node tests/check.js <ref>      what changed since <ref> (e.g. origin/main)
 //   node tests/check.js --all      everything
 //   node tests/check.js --dry      only print which tests it would run
+//   node tests/check.js --skip=a,b leave out tests already run (the related ones run first, push-then-test)
 // Always: the syntax of every script and the data tables (tests/data_check.js, no browser, under a second).
 // Any game code touched: the solo gate (a bot plays 45 s). Then the tests mapped from the files below.
 const { execFileSync, spawnSync } = require('child_process');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const args = process.argv.slice(2), ALL = args.includes('--all'), DRY = args.includes('--dry');
+const SKIP = (args.find((a) => a.startsWith('--skip=')) || '').slice(7).split(',').filter(Boolean);
 const ref = args.find((a) => !a.startsWith('--'));
 const X = { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] }; // (git's line-ending warnings stay quiet)
 const git = (...a) => execFileSync('git', a, X).split('\n').map((s) => s.trim()).filter(Boolean);
@@ -105,7 +107,7 @@ if (files.includes('tests/coop/boss_sweep.js')) for (const id of ['colossus', 't
 // the aim trial is long (it times eight clears): only when the game code (js/) changed says so
 if (/^[+-].*(試練|trial|TRIAL)/m.test(diffText)) add('trial', 'diff mentions the trial');
 if (gameCode) add('solo_gate', 'game code');
-let order = ALL ? Object.keys(T) : Object.keys(T).filter((t) => want.has(t));
+let order = (ALL ? Object.keys(T) : Object.keys(T).filter((t) => want.has(t))).filter((t) => !SKIP.includes(t));
 if (ALL) bossIds = new Set(ALL_BOSSES);
 // the gate first (it also checks the syntax of every script), the long ones last
 const LAST = ['trial', 'run'];

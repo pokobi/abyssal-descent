@@ -83,6 +83,7 @@ void main(){
     const tmp = new THREE.Scene(), add = (m) => { const q = new THREE.Mesh(quad.geometry, m); q.frustumCulled = false; tmp.add(q); };
     for (const k in SRC) add(pending['w:' + k] = surfMat(SRC[k][1]));
     if (X.EXSRC) for (const k in X.EXSRC) add(pending['x:' + k] = surfMat(X.EXSRC[k][2]));
+    for (const k in SPR) add(pending['s:' + k] = sprMat(SPR[k][1]));
     add(mat2);
     try { renderer.compile(tmp, cam); } catch (e) { /* (each is then made when first used) */ }
   };
@@ -302,6 +303,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         o.wrapS = o.wrapT = THREE.RepeatWrapping; o.magFilter = THREE.LinearFilter; o.minFilter = THREE.LinearMipmapLinearFilter; o.generateMipmaps = true; o.anisotropy = t.map.anisotropy || 8; o.needsUpdate = true;
         t.orm = o;
       }
+      X.upgradeSprites(renderer);
       X.upgraded = true; X.stats.tex = Math.round(performance.now() - t0);
     } catch (e) { console.warn('gfx: textures kept as they were', e); return false; }
     return true;
@@ -341,6 +343,49 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     return g;
   };
   X.rboxCount = () => cache.size;
+
+  // ---- the small pictures the effects are drawn with (textures.js paints them with plain gradients): the same pictures with their
+  // edges broken up and their insides uneven, as smoke and fire are. Painted here and put back into the same canvases. ----
+  const SPR = {
+    smoke: [256, `
+vec4 spr(vec2 uv){ vec2 p = uv * 2. - 1.; float r = length(p), n = fbm(uv, 4., 3.), n2 = fbm(uv, 9., 7.);
+  float e = 1. - smoothstep(.3 + n * .36, .6 + n * .4, r);
+  return vec4(vec3(.8 + n2 * .2), e * (.32 + n2 * .5) * .9); }`],
+    flame: [128, `
+vec4 spr(vec2 uv){ vec2 p = vec2((uv.x - .5) * 2., uv.y); float n = fbm(uv, 5., 2.), n2 = fbm(uv, 12., 5.);
+  float w = .66 * sin(3.14159 * pow(clamp(p.y * 1.04, 0., 1.), .5)) * (1. - p.y * .3);
+  float d = abs(p.x) + (n - .5) * .34 * (.3 + p.y);
+  float b = (1. - smoothstep(w * .3, w, d)) * smoothstep(.02, .14, p.y) * (1. - smoothstep(.74, 1., p.y + (n2 - .5) * .3));
+  vec3 c = mix(vec3(1., .47, .16), vec3(1., .8, .47), b); c = mix(c, vec3(1., .98, .9), b * b * (1. - p.y) * .9);
+  return vec4(c, b); }`],
+    hole: [128, `
+vec4 spr(vec2 uv){ vec2 p = uv * 2. - 1.; float r = length(p); vec2 q = p / max(r, 1e-4);
+  float e = .5 + .28 * vnoise(q * 2.2 + 10., 64., 1.) + .13 * vnoise(q * 6. + 20., 64., 2.);
+  float chip = 1. - smoothstep(e - .16, e, r), hole = 1. - smoothstep(.1, .2, r), ring = (1. - smoothstep(.2, .34, r)) * (1. - hole);
+  float cr = smoothstep(.93, 1., vnoise(q * 3.3 + 40., 64., 4.)) * (1. - smoothstep(.3, .85, r)) * smoothstep(.15, .3, r);
+  vec3 c = mix(vec3(.24, .22, .2), vec3(.07, .06, .055), ring); c = mix(c, vec3(0.), hole); c *= .8 + .4 * vnoise(uv * 24., 64., 9.);
+  return vec4(c, max(chip * .88, cr * .55)); }`],
+    scorch: [256, `
+vec4 spr(vec2 uv){ vec2 p = uv * 2. - 1.; float r = length(p), n = fbm(uv, 4., 3.), n2 = fbm(uv, 14., 5.);
+  float e = 1. - smoothstep(.22 + n * .4, .58 + n * .42, r);
+  return vec4(vec3(.02, .018, .015), e * (.45 + n2 * .45)); }`],
+  };
+  const sprMat = (body) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: 'precision highp float; varying vec2 vUv;\n' + X.NOISE + body + '\nvoid main(){ gl_FragColor = spr(vUv); }', depthTest: false, depthWrite: false });
+  X.upgradeSprites = function (renderer) {
+    const spr = G.Tex && G.Tex.spr; if (!spr) return;
+    ready();
+    const prev = renderer.getRenderTarget(), ac = renderer.autoClear; renderer.autoClear = true;
+    for (const k in SPR) {
+      const tex = spr[k]; if (!tex || !tex.image || !tex.image.getContext) continue;
+      const px = SPR[k][0], rt = new THREE.WebGLRenderTarget(px, px, { depthBuffer: false }), m = X.pendingMat('s:' + k) || sprMat(SPR[k][1]);
+      quad.material = m; renderer.setRenderTarget(rt); renderer.render(scene, cam);
+      const b = new Uint8Array(px * px * 4); renderer.readRenderTargetPixels(rt, 0, 0, px, px, b); rt.dispose(); m.dispose();
+      const img = new ImageData(px, px);   // (the target's rows run upward, a canvas's downward)
+      for (let y = 0; y < px; y++) img.data.set(b.subarray((px - 1 - y) * px * 4, (px - y) * px * 4), y * px * 4);
+      const cv = tex.image; cv.width = cv.height = px; cv.getContext('2d').putImageData(img, 0, 0); tex.needsUpdate = true;
+    }
+    renderer.setRenderTarget(prev); renderer.autoClear = ac;
+  };
 })();
 // ---- rounded, organic shapes: distance fields (smooth unions and cuts of simple solids) turned into a mesh by surface nets, with
 // normals taken from the field; the surfaces of what is held in the hands; the hands themselves ----

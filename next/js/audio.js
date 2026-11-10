@@ -6,10 +6,15 @@
   let muffle = null;
   // your head under the water (water.js): every sound dull and far, as through the water
   A.underwater = function (on) { if (!muffle || !ctx) return; muffle.frequency.setTargetAtTime(on ? 620 : 22000, ctx.currentTime, on ? 0.05 : 0.12); };
-  let ctx = null, master, dry, revSend, reverb, gunBus, shaper;
+  let ctx = null, master, dry, revSend, reverb, gunBus, shaper, eqLo, eqHi, irOld, irIn, irOut;
   let white, pink, brown;
   let voices = 0;
   const MAXV = 56;
+  // Two sets of sound, chosen in the settings (設定 → 音の種類). 'new' (the default): rooms and open ground answer differently (a
+  // reverb with early reflections whose high end dies first, a far echo outdoors), what is behind you is duller, a shot has weight under
+  // it, the metal of the action and the place answering back, a blast throws debris that falls after it. 'classic': as it was.
+  const NEW = () => G.save.data.settings.sound !== 'classic';
+  const outdoor = () => { const b = G.world && G.world.mats && G.world.mats.biome; return !!(b && b.outdoor); };
   A.volume = G.save.data.settings.volume;
   A.listener = { x: 0, y: 0, z: 0 };
 
@@ -48,6 +53,33 @@
     return b;
   }
 
+  // a room's answer: a few sharp early returns (each ear its own), then a tail that grows out of them and loses its high end first.
+  // o: { rt (s to -60 dB), hf, hfFall, er (how many early returns), erSpan (s), slap (s: one far echo), tailG, pre (s) }
+  function makeIR2(secs, o) {
+    const sr = ctx.sampleRate, len = Math.floor(sr * secs), b = ctx.createBuffer(2, len, sr), pre = Math.floor(sr * (o.pre || 0.012));
+    for (let c = 0; c < 2; c++) {
+      const d = b.getChannelData(c); let lp = 0, lp2 = 0;
+      for (let i = pre; i < len; i++) {
+        const t = (i - pre) / sr, w = Math.random() * 2 - 1, k = Math.max(0.04, (o.hf || 0.55) * Math.exp(-t * (o.hfFall || 1.6)));
+        lp += (w - lp) * k; lp2 += (lp - lp2) * 0.9;
+        d[i] = lp2 * Math.exp(-t * (6.9 / (o.rt || secs * 0.7))) * Math.min(1, t / 0.06) * (o.tailG || 1) * 2.2;
+      }
+      for (let n = 0; n < (o.er || 10); n++) {
+        const tt = (o.pre || 0.012) + 0.004 + Math.pow(Math.random(), 1.5) * (o.erSpan || 0.075), i = Math.floor(tt * sr), g = Math.max(0.15, 0.9 - tt * 6) * (Math.random() < 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.5);
+        for (let j = 0; j < 24 && i + j < len; j++) d[i + j] += g * Math.exp(-j / 5) * (j % 2 ? -0.6 : 1);
+      }
+      if (o.slap) { const i0 = Math.floor(sr * (o.slap + (c ? 0.013 : 0))); for (let j = 0; j < sr * 0.12 && i0 + j < len; j++) d[i0 + j] += (Math.random() * 2 - 1) * 0.35 * Math.exp(-j / (sr * 0.03)); }
+    }
+    return b;
+  }
+  // put the chosen set in force (the reverb, the tone of the whole): at the start, when the setting changes, when the ground changes
+  A.applySet = function () {
+    if (!ctx || !reverb) return;
+    const n = NEW(), o = outdoor();
+    reverb.buffer = n ? (o ? irOut : irIn) : irOld; revSend.gain.value = n && o ? 0.4 : 0.55;
+    eqLo.gain.value = n ? 2.5 : 0; eqHi.gain.value = n ? 2 : 0;
+    A._setKey = n + '|' + o;
+  };
   A.init = function () {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; return; }
@@ -55,9 +87,13 @@
     comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5; comp.attack.value = 0.002; comp.release.value = 0.25;
     master = ctx.createGain(); master.gain.value = A.volume;
     muffle = ctx.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 22000; muffle.Q.value = 0.5; // (closed under the water: A.underwater)
-    master.connect(muffle); muffle.connect(comp); comp.connect(ctx.destination);
+    eqLo = ctx.createBiquadFilter(); eqLo.type = 'lowshelf'; eqLo.frequency.value = 90; eqLo.gain.value = 0;
+    eqHi = ctx.createBiquadFilter(); eqHi.type = 'highshelf'; eqHi.frequency.value = 7500; eqHi.gain.value = 0;
+    const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08; // (a ceiling: nothing clips)
+    master.connect(muffle); muffle.connect(eqLo); eqLo.connect(eqHi); eqHi.connect(comp); comp.connect(lim); lim.connect(ctx.destination);
     dry = ctx.createGain(); dry.gain.value = 1; dry.connect(master);
-    reverb = ctx.createConvolver(); reverb.buffer = makeIR(2.8, 2.6);
+    reverb = ctx.createConvolver(); irOld = makeIR(2.8, 2.6); reverb.buffer = irOld;
+    irIn = makeIR2(3.0, { rt: 2.3, hf: 0.5, hfFall: 1.3, er: 12, erSpan: 0.07 }); irOut = makeIR2(1.8, { rt: 1.0, hf: 0.35, hfFall: 2.6, er: 5, erSpan: 0.12, slap: 0.21, tailG: 0.6 });
     const revLP = ctx.createBiquadFilter(); revLP.type = 'lowpass'; revLP.frequency.value = 3200;
     const revHP = ctx.createBiquadFilter(); revHP.type = 'highpass'; revHP.frequency.value = 120;
     revSend = ctx.createGain(); revSend.gain.value = 0.55;
@@ -70,6 +106,7 @@
     gunBus = ctx.createGain(); gunBus.gain.value = 0.9;
     gunBus.connect(shaper); shaper.connect(dry);
     white = makeNoise('white', 2); pink = makeNoise('pink', 2); brown = makeNoise('brown', 3);
+    A.applySet();
     A.startAmbience();
   };
   A.setVolume = (v) => { A.volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); };
@@ -82,6 +119,7 @@
   // ---------- routing helpers ----------
   // returns {node, wet} destination for a sound; positional when pos given
   function dest(pos, wet, bus) {
+    const set = NEW(); if (A._setKey !== set + '|' + outdoor()) A.applySet();
     const g = ctx.createGain();
     let out = g;
     // (a position that is not a number must not take the whole frame down: the sound just plays unplaced)
@@ -98,6 +136,7 @@
       // pan relative to listener yaw
       const ang = Math.atan2(dx, -dz) - (A.listenerYawNeg || 0);
       p.pan.value = Math.max(-0.85, Math.min(0.85, Math.sin(ang) * Math.min(1, dist / 4)));
+      if (set) { const c = Math.cos(ang); if (c < 0) lp.frequency.value *= 0.62 + 0.38 * (1 + c); } // (what is behind you is duller)
       g.connect(lp); lp.connect(p); out = p;
       wet = (wet || 0.3) * (1 + Math.min(1.5, dist * 0.03));
     }
@@ -123,7 +162,7 @@
     const t0 = o.t || ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = o.buf === 'pink' ? pink : o.buf === 'brown' ? brown : white;
-    src.playbackRate.value = o.rate || 1;
+    src.playbackRate.value = (o.rate || 1) * (NEW() ? 0.97 + Math.random() * 0.06 : 1); // (no two alike)
     let node = src;
     for (const f of o.f || []) {
       const bq = ctx.createBiquadFilter(); bq.type = f[0]; bq.frequency.setValueAtTime(f[1], t0);
@@ -214,6 +253,17 @@
     nz({ t, buf: 'pink', f: [['lowpass', p.body * pr, 0.9, p.body * 0.35, p.bd]], g: p.bg, a: 0.001, d: p.bd, to: out });
     // low thump (chest punch)
     tn({ t, f0: p.thump[0] * pr, f1: p.thump[1], d: 0.09 + p.tg * 0.12, g: p.tg, to: out, type: 'triangle', lp: 400 });
+    if (NEW()) {
+      // the weight under the shot; the metal of the action; the place answering back (a room: two quick dark returns, open ground: one far echo)
+      tn({ t, f0: 62 * pr, f1: 34, d: 0.11 + p.tg * 0.06, g: p.tg * 0.5, to: out, type: 'sine' });
+      if (!opts.suppressed) {
+        tn({ t: t + 0.006, f0: vr(2300, 0.08), d: 0.035, g: 0.04 + p.crack * 0.05, to: out, type: 'triangle' });
+        tn({ t: t + 0.008, f0: vr(3650, 0.08), d: 0.025, g: 0.025 + p.crack * 0.04, to: out, type: 'sine' });
+        const fast = kind === 'minigun' || kind === 'smg' || kind === 'nail';
+        if (outdoor()) { if (!fast) { const e = dest(null, 0.9, dry); e.gain.value = 0.2 * (opts.vol || 1); nz({ t: t + 0.17 + Math.random() * 0.04, buf: 'pink', f: [['lowpass', 1300, 0.7, 300, 0.4]], g: p.bg * 0.5, a: 0.02, d: 0.35 + p.tail * 0.5, to: e }); } }
+        else { const e = dest(null, 0.5, dry); e.gain.value = 0.3 * (opts.vol || 1); for (const [dl, gg] of fast ? [[0.036, 0.42]] : [[0.034, 0.5], [0.071, 0.3]]) nz({ t: t + dl, buf: 'pink', f: [['lowpass', p.body * 0.5, 0.8, p.body * 0.2, p.bd]], g: p.bg * gg, a: 0.002, d: p.bd * 1.2, to: e }); }
+      }
+    }
     // decaying tail, through reverb mostly
     if (p.tail > 0.1) {
       const tail = dest(null, 1.2, dry); tail.gain.value = 0.35;
@@ -503,7 +553,7 @@
     const t = ctx.currentTime, out = dest(pos, 0.3); out.gain.value = 0.45;
     if (surface === 'wood') { nz({ t, f: [['bandpass', 700, 2]], g: 0.5, d: 0.05, to: out }); tn({ t, f0: 220, f1: 120, d: 0.05, g: 0.2, to: out }); }
     else if (surface === 'metal') { nz({ t, f: [['bandpass', 2400, 5]], g: 0.4, d: 0.05, to: out }); tn({ t, f0: vr(1500, 0.1), d: 0.12, g: 0.06, to: out }); }
-    else { nz({ t, f: [['bandpass', vr(1600, 0.2), 1.2]], g: 0.45, d: 0.04, to: out }); nz({ t: t + 0.01, buf: 'pink', f: [['lowpass', 2500]], g: 0.25, d: 0.08, to: out }); }
+    else { nz({ t, f: [['bandpass', vr(1600, 0.2), 1.2]], g: 0.45, d: 0.04, to: out }); nz({ t: t + 0.01, buf: 'pink', f: [['lowpass', 2500]], g: 0.25, d: 0.08, to: out }); if (NEW()) for (let i = 0; i < 2; i++) nz({ t: t + 0.05 + Math.random() * 0.18, f: [['bandpass', vr(3200, 0.3), 4]], g: 0.05, d: 0.02, to: out }); } // (chips of stone falling)
   };
   A.explosion = function (pos, size) {
     if (!ctx) return;
@@ -515,6 +565,13 @@
     nz({ t, f: [['lowpass', 5000, 0.5, 600, 0.3]], g: 0.6, d: 0.25, to: out });
     // debris crackles
     for (let i = 0; i < 10; i++) nz({ t: t + 0.08 + Math.random() * 0.6, f: [['bandpass', vr(2000, 0.5), 3]], g: 0.08, d: 0.03, to: out });
+    if (NEW()) {
+      // the pressure felt before it is heard, the crack of it, and what it threw up coming down again
+      tn({ t, f0: 44, f1: 19, d: 1.1 + size * 0.4, g: 0.45, to: out, type: 'sine' });
+      nz({ t, f: [['highpass', 2600]], g: 0.3, d: 0.018, to: out });
+      for (let i = 0; i < 9 + Math.round(size * 3); i++) { const dl = 0.45 + Math.random() * (1.0 + size * 0.3); nz({ t: t + dl, buf: i % 3 ? 'white' : 'pink', f: [['bandpass', vr(i % 3 ? 3000 : 900, 0.4), i % 3 ? 4 : 1.5]], g: 0.05 + Math.random() * 0.05, d: 0.02 + Math.random() * 0.05, to: out }); }
+      if (outdoor()) { const e = dest(pos, 1.0, dry); e.gain.value = 0.25; nz({ t: t + 0.26, buf: 'brown', f: [['lowpass', 700, 0.6, 150, 0.9]], g: 0.8, a: 0.03, d: 1.1, to: e }); }
+    }
   };
   A.melee = function (hit) {
     if (!ctx) return;

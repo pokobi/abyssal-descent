@@ -162,10 +162,16 @@
       tank: mk({ color: 0x6a2a1a, metalness: 0.6, roughness: 0.5 }),
     };
     W.mats = mats;
-    const fl = G.Tex.canvasTex(128, (g, s) => {
-      g.translate(s / 2, s / 2);
-      for (let i = 0; i < 6; i++) { g.rotate(Math.PI / 3); const gr = g.createLinearGradient(0, 0, s / 2, 0); gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(1, 'rgba(255,140,40,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(0, -s * 0.05); g.lineTo(s * 0.5, 0); g.lineTo(0, s * 0.05); g.fill(); }
-      const r = g.createRadialGradient(0, 0, 0, 0, 0, s * 0.25); r.addColorStop(0, 'rgba(255,250,220,1)'); r.addColorStop(1, 'rgba(255,160,60,0)'); g.fillStyle = r; g.fillRect(-s / 2, -s / 2, s, s);
+    const fl = G.Tex.canvasTex(256, (g, s) => {
+      g.translate(s / 2, s / 2); g.globalCompositeOperation = 'lighter';
+      let sd = 7; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+      for (let i = 0; i < 11; i++) {
+        const a = i / 11 * 6.283 + (rnd() - 0.5) * 0.5, len = s * (0.2 + rnd() * 0.28), w = s * (0.03 + rnd() * 0.035);
+        g.save(); g.rotate(a);
+        const gr = g.createLinearGradient(0, 0, len, 0); gr.addColorStop(0, 'rgba(255,236,190,0.95)'); gr.addColorStop(0.35, 'rgba(255,170,70,0.6)'); gr.addColorStop(1, 'rgba(255,110,30,0)'); g.fillStyle = gr;
+        g.beginPath(); g.moveTo(0, -w); g.quadraticCurveTo(len * 0.5, -w * 0.5, len, 0); g.quadraticCurveTo(len * 0.5, w * 0.5, 0, w); g.fill(); g.restore();
+      }
+      const r = g.createRadialGradient(0, 0, 0, 0, 0, s * 0.2); r.addColorStop(0, 'rgba(255,252,236,1)'); r.addColorStop(0.5, 'rgba(255,200,120,0.55)'); r.addColorStop(1, 'rgba(255,150,60,0)'); g.fillStyle = r; g.fillRect(-s / 2, -s / 2, s, s);
     }, false);
     flashSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: fl, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     flashSprite2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xff9a40, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));

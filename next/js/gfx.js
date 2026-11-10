@@ -1365,6 +1365,32 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   const gnCache = {};
   X.gunParts = function (arch) { if (gnCache[arch] !== undefined) return gnCache[arch]; let r = null; try { r = GN[arch] ? GN[arch]() : null; } catch (e) { console.warn('gfx: no gun', arch, e); r = null; } return (gnCache[arch] = r); };
+  // ---- a great pointed vault over a hall: the line of its arch, a rib along that line, the web of the vault between ribs. Half-span a,
+  // rise H above the springing; the crown is a point (the two sides meet there at an angle, as two arcs struck from apart do) ----
+  const archY = (t, H) => H * Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(t) * 0.9 + 0.1, 2))) / 0.99499;
+  const archLine = (a, H, seg) => { const P = []; for (let i = 0; i <= seg; i++) { const t = -1 + 2 * i / seg; P.push([t * a, archY(t, H)]); } return P; };
+  // a rib: the arch's line given a depth (outward, the same all the way) and a width along the hall, its edges taken off
+  X.archRib = function (a, H, deep, wide, seg) {
+    seg = seg || 30; const inn = archLine(a, H, seg), out = [];
+    for (let i = 0; i <= seg; i++) { const q0 = inn[Math.max(0, i - 1)], q1 = inn[Math.min(seg, i + 1)]; let nx = -(q1[1] - q0[1]), ny = q1[0] - q0[0]; const l = Math.hypot(nx, ny) || 1; out.push([inn[i][0] + nx / l * deep, inn[i][1] + ny / l * deep]); }
+    const sh = new THREE.Shape(); sh.moveTo(inn[0][0], inn[0][1]); for (let i = 1; i <= seg; i++) sh.lineTo(inn[i][0], inn[i][1]); for (let i = seg; i >= 0; i--) sh.lineTo(out[i][0], out[i][1]); sh.closePath();
+    const bv = Math.min(0.07, wide * 0.15), g = new THREE.ExtrudeGeometry(sh, { depth: wide - bv * 2, bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelOffset: -bv, bevelSegments: 1, curveSegments: 1, steps: 1 });
+    g.translate(0, 0, -(wide - bv * 2) / 2);
+    return boxUV(g, 0.4);
+  };
+  // the web: the arch's line drawn along the hall for a length, seen from below (its other side is never seen)
+  X.archWeb = function (a, H, len, seg, uvk) {
+    seg = seg || 30; const P = archLine(a, H, seg), pos = [], nor = [], uv = [], idx = [], k = uvk || 0.3; let run = 0;
+    for (let i = 0; i <= seg; i++) {
+      if (i) run += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+      const q0 = P[Math.max(0, i - 1)], q1 = P[Math.min(seg, i + 1)]; let nx = q1[1] - q0[1], ny = -(q1[0] - q0[0]); const l = Math.hypot(nx, ny) || 1;
+      for (const z of [0, len]) { pos.push(P[i][0], P[i][1], z); nor.push(nx / l, ny / l, 0); uv.push(z * k, run * k); }
+    }
+    for (let i = 0; i < seg; i++) { const a0 = i * 2, b0 = a0 + 1, c0 = a0 + 2, d0 = a0 + 3; idx.push(a0, c0, b0, b0, c0, d0); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    return g;
+  };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

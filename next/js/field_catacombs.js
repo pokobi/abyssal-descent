@@ -262,7 +262,45 @@
         else P().bones(w, x, 0.02, z, rng);
       }
     }
-    for (let z = z0 + 10; z < z1 - 6; z += 16) P().chandelier(w, W / 2, VAULT - 5, z, VAULT);
+    for (let z = z0 + 10; z < z1 - 6; z += 16) { P().chandelier(w, W / 2, VAULT - 7.5, z, VAULT); w.addLight(W / 2, VAULT - 8.2, z, { flame: 0, intensity: 13, range: 21, color: '#ffb46e', prio: 1.1, steady: false }); }
+    // ---- the vault over it all (to look at: nothing here is in anyone's way). A pointed vault springs from the long walls above the second
+    // terraces; a stone rib crosses under it at every bay, on a pilaster against the wall; a ridge runs along its crown. The faces of both
+    // terraces carry flat buttresses at the same bays, and every other one a torch. No dice are thrown for any of it (it is all by the bay).
+    {
+      const GX = G.GFX, BAY = 8, SPR = T2 + 1.2, AH = VAULT - SPR - 0.55, M4 = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
+      if (GX && GX.archRib) {
+        w.batch.geo('wall', GX.archWeb(W / 2 + 0.15, AH + 0.45, D, 30, 0.28), M4(W / 2, SPR, 0), { gradBase: -999 });
+        const rib = GX.archRib(W / 2 - 0.05, AH, 0.62, 0.86, 30), small = GX.archRib(W / 2 - 0.05, AH + 0.12, 0.3, 0.4, 30);
+        for (let z = BAY / 2, n = 0; z < D - 1; z += BAY, n++) w.batch.geo('trim', rib, M4(W / 2, SPR, z));
+        for (let z = BAY, n = 0; z < D - 1; z += BAY, n++) w.batch.geo('trim', small, M4(W / 2, SPR, z));
+        w.visual('trim', W / 2 - 0.22, SPR + AH - 0.2, 0.2, W / 2 + 0.22, SPR + AH + 0.3, D - 0.2, { uv: 2, grad: false });
+      }
+      // pilasters under the ribs, against the long walls: shaft, a base, a capital in two steps
+      for (let z = BAY / 2; z < D - 1; z += BAY) for (const s of [-1, 1]) {
+        const onTerrace = z > z0 && z < z1 && !(gap && z > gap[0] && z < gap[1]), y0 = onTerrace ? T2 : 0;
+        vis('trim', s, 0, 0.62, y0, SPR - 0.5, z - 0.42, z + 0.42, { uv: 2 });
+        vis('trim', s, 0, 0.78, y0, y0 + 0.36, z - 0.56, z + 0.56, { uv: 2 });
+        vis('trim', s, 0, 0.8, SPR - 0.5, SPR - 0.22, z - 0.58, z + 0.58, { uv: 2 });
+        vis('trim', s, 0, 0.96, SPR - 0.22, SPR + 0.1, z - 0.7, z + 0.7, { uv: 2 });
+      }
+      // flat buttresses up the terraces' faces at the same bays (not where a stair, a chapel's gate or a fall is); a corbel under each slab
+      const clear = (s, lv, z) => !stairs.some((q) => q.s === s && q.lv === lv && z > q.za - 1.2 && z < q.zb + 1.2) && !falls.some((f) => f.s === s && z > f.za - 1 && z < f.zb + 1) && !(gap && z > gap[0] - 0.6 && z < gap[1] + 0.6)
+        && !(lv === 0 && chapels.some((c) => c.s === s && z > c.za - 0.8 && z < c.zb + 0.8)) && !bridges.some((b) => lv === 0 && Math.abs(b - z) < 2.6);
+      let nb = 0;
+      for (let z = z0 + BAY / 2 + (BAY - (z0 % BAY)) % BAY; z < z1 - 1; z += BAY, nb++) for (const s of [-1, 1]) {
+        if (clear(s, 0, z)) {
+          vis('trim', s, D1, D1 + 0.3, 0, T1 - SL - 0.3, z - 0.4, z + 0.4, { uv: 2 });
+          vis('trim', s, D1, D1 + 0.42, 0, 0.4, z - 0.5, z + 0.5, { uv: 2 });
+          vis('trim', s, D1, D1 + 0.5, T1 - SL - 0.3, T1 - SL, z - 0.5, z + 0.5, { uv: 2 });
+          // a torch on every other one, the two sides turn about
+          if ((nb + (s > 0 ? 1 : 0)) % 2 === 0) P().torch(w, X(s, D1 + 0.3), 2.7, z, s < 0 ? 'px' : 'nx');
+        }
+        if (clear(s, 1, z)) {
+          vis('trim', s, D2, D2 + 0.26, T1, T2 - SL - 0.26, z - 0.36, z + 0.36, { uv: 2 });
+          vis('trim', s, D2, D2 + 0.44, T2 - SL - 0.26, T2 - SL, z - 0.46, z + 0.46, { uv: 2 });
+        }
+      }
+    }
     // braziers on the second terraces, candles along the first, webs in the corners
     for (const q of t2top) for (let z = q.za + 4; z < q.zb - 3; z += 14) { P().brazier(w, X(q.s, 1.4), T2, z, 0.9, true); w.addLight(X(q.s, 1.4), T2 + 1.6, z, { flame: 0.5, intensity: 7, range: 11, color: '#ff9a50', prio: 0.7 }); }
     for (const q of t1top) for (let z = q.za + 3; z < q.zb - 2; z += 9) if (rng.chance(0.6)) P().candles(w, X(q.s, D1 - 0.8), T1, z, rng, rng.chance(0.5));

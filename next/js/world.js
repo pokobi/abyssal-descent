@@ -1039,7 +1039,8 @@
       this.t -= dt;
       if (this.t <= 0) {
         this.t = 0.25;
-        const S = world.lightSources;
+        // (a flame that is only a flame - the candles of a chandelier beside the two that light - takes no place among the lights that are lit)
+        const S = world.lightSources.filter((s) => !s.noLight && s.intensity > 0);
         // stacked storeys: a light one floor up or down is behind a slab, so the ones on your own storey come first
         const vk = world.strata ? 9 : 1;
         const arr = S.map((s) => { const dy = s.pos.y - camPos.y; return [s, (s.pos.distanceToSquared(camPos) + dy * dy * (vk - 1)) / (s.prio || 1)]; }).sort((a, b) => a[1] - b[1]);

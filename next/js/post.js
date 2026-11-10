@@ -11,7 +11,7 @@ vec3 vpos(vec2 uv){ float d = texture2D(tDepth, uv).x; vec4 v = projInv * vec4(u
 ${DEPTH}
 float ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(.06711056, .00583715)))); }
 void main(){
-  float d0 = texture2D(tDepth, vUv).x; if (d0 >= .99999) { gl_FragColor = vec4(1., 1000., 0., 1.); return; }
+  float d0 = texture2D(tDepth, vUv).x; if (d0 >= .99999) { gl_FragColor = vec4(1., 1000., .5, 1.); return; }
   vec3 p = vpos(vUv); vec2 t = 1. / res;
   vec3 pr = vpos(vUv + vec2(t.x, 0.)), pl = vpos(vUv - vec2(t.x, 0.)), pu = vpos(vUv + vec2(0., t.y)), pd = vpos(vUv - vec2(0., t.y));
   vec3 dx = abs(pr.z - p.z) < abs(p.z - pl.z) ? pr - p : p - pl, dy = abs(pu.z - p.z) < abs(p.z - pd.z) ? pu - p : p - pd;
@@ -28,17 +28,26 @@ void main(){
   }
   float ao = clamp(1. - acc / float(N) * 2.4 * strength, 0., 1.);
   ao = mix(ao, 1., smoothstep(40., 90., -p.z));   // (none far off: it would only shimmer there)
-  gl_FragColor = vec4(ao, -p.z, 0., 1.);
+  // the bend of the surface: its neighbours two steps off, measured along its own normal. They lie below it on an edge that stands out,
+  // above it in a crease. (a step to another surface altogether is no bend: left out)
+  float wpx = -p.z * 2. / (proj[1][1] * res.y), lim = wpx * 5., cv = 0.;
+  for (int i = 0; i < 4; i++) {
+    vec2 o = (i == 0 ? vec2(t.x, 0.) : i == 1 ? vec2(-t.x, 0.) : i == 2 ? vec2(0., t.y) : vec2(0., -t.y)) * 2.;
+    vec3 q = vpos(vUv + o) - p; float hgt = dot(q, n);
+    cv += abs(q.z) > wpx * 9. ? 0. : clamp(hgt, -lim, lim);
+  }
+  cv = clamp(-cv / (wpx * 9.), -1., 1.) * (1. - smoothstep(18., 42., -p.z));
+  gl_FragColor = vec4(ao, -p.z, cv * .5 + .5, 1.);
 }`;
   // blur along one axis, not across a step in depth
   const BLUR_FS = `precision highp float; varying vec2 vUv; uniform sampler2D tAO; uniform vec2 dir;
 void main(){
-  vec2 c = texture2D(tAO, vUv).xy; float sum = c.x * .2, w = .2;
+  vec3 c = texture2D(tAO, vUv).xyz; float sum = c.x * .2, w = .2;
   for (int i = 1; i <= 4; i++) {
     float k = (i == 1 ? .17 : i == 2 ? .12 : i == 3 ? .07 : .04);
     for (int s = -1; s <= 1; s += 2) { vec2 q = texture2D(tAO, vUv + dir * float(i * s)).xy; float ww = k * max(0., 1. - abs(q.y - c.y) / (.04 + c.y * .04)); sum += q.x * ww; w += ww; }
   }
-  gl_FragColor = vec4(sum / w, c.y, 0., 1.);
+  gl_FragColor = vec4(sum / w, c.y, c.z, 1.);
 }`;
   // the world with the held weapon over it (the weapon's target is cleared to nothing, so its alpha is its cover)
   const MIX = `uniform sampler2D tScene; uniform sampler2D tGun; uniform float gunOn;
@@ -68,6 +77,7 @@ void main(){ gl_FragColor = vec4(texture2D(tScene, .5 + (vUv - .5) * part).rgb, 
   const FIN_FS = `precision highp float; varying vec2 vUv; uniform sampler2D tAO; uniform sampler2D tBloom;
 uniform float time; uniform float aoAmt; uniform float bloomAmt; uniform float exposure; uniform vec2 res; uniform float grade;
 uniform sampler2D tDepth; uniform mat4 reproj; uniform float mblur;
+uniform float cavAmt; uniform vec4 aL[12]; uniform vec4 aC[12]; uniform float airK; uniform mat4 projInv;
 ${MIX}
 vec3 RRT(vec3 v){ vec3 a = v * (v + .0245786) - .000090537; vec3 b = v * (.983729 * v + .4329510) + .238081; return a / b; }
 vec3 aces(vec3 c){
@@ -90,11 +100,31 @@ vec3 world(vec2 uv){
   for (int i = 0; i < 8; i++) s += texture2D(tScene, uv + vel * ((float(i) + .5 + j) / 8. - .5)).rgb;
   return s / 8.;
 }
+// the air: each light near by glows in the dust and damp between it and the eye. Along the line of sight to what is seen, the light a
+// lamp throws into the air is summed in closed form (falling off as the square of the distance, to nothing at the lamp's reach)
+vec3 air(vec2 uv){
+  if (airK <= 0.) return vec3(0.);
+  vec4 v = projInv * vec4(uv * 2. - 1., texture2D(tDepth, uv).x * 2. - 1., 1.); vec3 p = v.xyz / v.w;
+  float T = min(length(p), 70.); vec3 dir = normalize(p), s = vec3(0.);
+  for (int i = 0; i < 12; i++) {
+    float I = aL[i].w; if (I <= 0.) continue;
+    vec3 lp = aL[i].xyz; float R = aC[i].w, b = dot(lp, dir), h2 = dot(lp, lp) - b * b + .05, k2 = R * R - h2;
+    if (k2 <= 0.) continue;
+    float k = sqrt(k2), h = sqrt(h2), u0 = max(-b, -k), u1 = min(T - b, k);
+    if (u1 <= u0) continue;
+    s += aC[i].rgb * (I * ((atan(u1 / h) - atan(u0 / h)) / h - (u1 - u0) / (R * R)));
+  }
+  return s * airK;
+}
 void main(){
   vec2 uv = vUv, cc = uv - .5;
   vec3 c = world(uv);
   float lum = dot(c, vec3(.2126, .7152, .0722));
-  c *= mix(1., texture2D(tAO, uv).r, aoAmt * (1. - smoothstep(.6, 5., lum) * .7));
+  vec3 aoS = texture2D(tAO, uv).rgb;
+  c *= mix(1., aoS.r, aoAmt * (1. - smoothstep(.6, 5., lum) * .7));
+  // wear: an edge that stands out catches a little more light, a crease holds a little more dark
+  float cv = aoS.b * 2. - 1.; c *= 1. + cv * (cv > 0. ? .6 : .32) * cavAmt * step(.001, aoAmt);
+  c += air(uv);
   if (gunOn > .5) { vec4 g = texture2D(tGun, uv); c = c * (1. - clamp(g.a, 0., 1.)) + g.rgb; }
   c += texture2D(tBloom, uv).rgb * bloomAmt;
   c *= exposure;
@@ -112,7 +142,7 @@ void main(){
   gl_FragColor = vec4(mix(c * 12.92, pow(c, vec3(1. / 2.4)) * 1.055 - .055, step(.0031308, c)), 1.);
 }`;
 
-  const Post = G.Post = { active: false, ao: true, bloom: true, msaa: 4, set: { aoAmt: 0.75, aoRadius: 0.75, aoStrength: 1, bloomAmt: 0.07, thresh: 0.95, grade: 1, gain: 1.2, mblur: 0.5 } };
+  const Post = G.Post = { active: false, ao: true, bloom: true, msaa: 4, set: { aoAmt: 0.75, aoRadius: 0.75, aoStrength: 1, bloomAmt: 0.07, thresh: 0.95, grade: 1, gain: 1.2, mblur: 0.5, cav: 0.7, air: 0.02 } };
   Post.mblurOn = () => !!(G.save && G.save.data && G.save.data.settings.motionBlur !== false); // (the setting: on unless turned off)
   Post.stats = { n: 0, ms: 0 }; // (warm draws: how many, how long)
   let R = null, quad, cam, scn, rtScene, rtGun, rtAO, rtAO2, rtPip, pipSize = 0, mips = [], W = 0, H = 0, curMsaa = -1;
@@ -131,7 +161,8 @@ void main(){
     mDown = mk(DOWN_FS, { tSrc: T(), texel: V2() });
     mUp = mk(UP_FS, { tSrc: T(), tAdd: T(), texel: V2(), mixk: { value: 0.5 } });
     mPip = mk(PIP_FS, { tScene: T(), part: V2() });
-    mFin = mk(FIN_FS, { tScene: T(), tGun: T(), gunOn: { value: 0 }, tAO: T(), tBloom: T(), time: { value: 0 }, aoAmt: { value: 1 }, bloomAmt: { value: 0.05 }, exposure: { value: 1 }, res: V2(), grade: { value: 1 }, tDepth: T(), reproj: M4(), mblur: { value: 0 } });
+    mFin = mk(FIN_FS, { tScene: T(), tGun: T(), gunOn: { value: 0 }, tAO: T(), tBloom: T(), time: { value: 0 }, aoAmt: { value: 1 }, bloomAmt: { value: 0.05 }, exposure: { value: 1 }, res: V2(), grade: { value: 1 }, tDepth: T(), reproj: M4(), mblur: { value: 0 }, cavAmt: { value: 0 }, airK: { value: 0 }, projInv: M4(),
+      aL: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, aC: { value: Array.from({ length: 12 }, () => new THREE.Vector4(1, 1, 1, 10)) } });
   };
   const hdr = (w, h, o) => new THREE.WebGLRenderTarget(w, h, Object.assign({ type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }, o || {}));
   Post.resize = function () {
@@ -179,6 +210,36 @@ void main(){
     R.setRenderTarget(prev);
   };
   let pipTex = null;
+  // the lights whose glow in the air is drawn: the nearest dozen. One out of sight behind a wall glows faintly (its light does not reach
+  // the air on this side); which, and whether in sight, is looked at a few times a second and eased to
+  const AIRN = 12, airSel = [], aV = new THREE.Vector3(), aCol = new THREE.Color(); let airT = 0;
+  function airLights(camera, time) {
+    const u = mFin.uniforms, w = G.world, S = w && w.lightSources, k = Post.set.air;
+    if (!k || !S || !camera) { u.airK.value = 0; return; }
+    const now = performance.now();
+    if (now - airT > 300) {
+      airT = now; const cp = aV.setFromMatrixPosition(camera.matrixWorld).clone(), list = [];
+      for (const s of S) { if (s.on === false || s.emit === false || s.noLight || !(s.intensity > 0)) continue; const d2 = s.pos.distanceToSquared(cp); if (d2 < 3000) list.push([d2, s]); }
+      list.sort((a, b) => a[0] - b[0]); airSel.length = 0;
+      for (let i = 0; i < Math.min(AIRN, list.length); i++) {
+        const s = list[i][1]; let vis = 1;
+        try { aV.copy(s.pos); aV.y += 0.3; vis = w.los && !w.los(cp, aV) ? 0.28 : 1; } catch (e) { vis = 1; }
+        s._airGoal = vis; if (s._air === undefined) s._air = vis; airSel.push(s);
+      }
+    }
+    for (let i = 0; i < AIRN; i++) {
+      const s = airSel[i], L = u.aL.value[i], C = u.aC.value[i];
+      if (!s) { L.w = 0; continue; }
+      s._air += (s._airGoal - s._air) * 0.1;
+      aV.copy(s.pos); aV.y += 0.25; aV.applyMatrix4(camera.matrixWorldInverse);
+      const fl = s.steady ? 1 : 0.9 + 0.07 * Math.sin(time * 8.3 + s.ph) + 0.05 * Math.sin(time * 19.7 + s.ph * 2);
+      L.set(aV.x, aV.y, aV.z, (s.intensity / 9) * fl * s._air);
+      aCol.set(s.color); C.set(aCol.r, aCol.g, aCol.b, (s.range || 13) * 1.1);
+    }
+    const fog = G.scene && G.scene.fog && G.scene.fog.density;
+    u.airK.value = k * (fog ? Math.min(2.2, Math.max(0.6, fog / 0.02)) : 1);
+    u.projInv.value.copy(camera.projectionMatrixInverse);
+  }
   const curVP = new THREE.Matrix4(), prevVP = new THREE.Matrix4(), invVP = new THREE.Matrix4(), mbP = new THREE.Vector3(), mbLast = new THREE.Vector3(); let mbHas = false, mbT = 0;
   Post.pipTexture = function () { return pipTex; };
   function post(camera, gunOn, time, warming) {
@@ -213,7 +274,8 @@ void main(){
       if (mbHas && dtR > 0 && dtR < 0.25 && mbP.distanceToSquared(mbLast) < 9) { mb = s.mblur * Math.min(1.5, Math.max(0.25, (1 / 60) / dtR)); u.reproj.value.multiplyMatrices(prevVP, invVP.copy(curVP).invert()); }
       prevVP.copy(curVP); mbLast.copy(mbP); mbHas = true;
     } else if (!warming) mbHas = false;
-    u.tDepth.value = depth; u.mblur.value = mb;
+    u.tDepth.value = depth; u.mblur.value = mb; u.cavAmt.value = Post.ao && camera && !warming ? s.cav : 0;
+    if (warming) u.airK.value = 0; else airLights(camera, time);
     draw(mFin, warming ? rtAO2 : null);
   }
   // one frame: the world, then (drawGun) what is held, then everything laid together on the screen.

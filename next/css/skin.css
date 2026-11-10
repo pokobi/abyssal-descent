@@ -62,7 +62,6 @@ select, input, textarea, button { font-family: var(--serif); }
 .iv-wbox,
 .iv-sk,
 .iv-spec,
-.iv-grid,
 .iv-menu,
 .iv-hs,
 .iv-kitguide,
@@ -186,6 +185,14 @@ select, input[type="text"], input[type="number"] { background-image: linear-grad
 input[type="range"] { accent-color: #c9a45c; }
 .set-row { border-bottom: 1px solid rgba(170, 138, 84, 0.12); }
 #tooltip, .iv-tip { border-top: 1px solid rgba(226, 190, 118, 0.55); }
+/* ---- the bag: its cells ruled in gold, plainly, so that where a thing lies and how many cells it takes is seen at once ---- */
+.iv-grid {
+  background-color: rgba(7, 6, 5, 0.78);
+  background-image: linear-gradient(rgba(214, 178, 106, 0.36) 1px, transparent 1px), linear-gradient(90deg, rgba(214, 178, 106, 0.36) 1px, transparent 1px);
+  background-size: var(--cs) var(--cs);
+  border: 1px solid rgba(214, 178, 106, 0.6); border-radius: 0;
+  box-shadow: inset -1px -1px 0 rgba(214, 178, 106, 0.36), inset 0 0 26px rgba(0, 0, 0, 0.45), 0 0 0 2px rgba(0, 0, 0, 0.6);
+}
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #0d0b09; box-shadow: inset 0 0 4px #000; }
 ::-webkit-scrollbar-thumb { background-image: linear-gradient(90deg, #6b5a36, #3a301e); border: 1px solid #0a0908; border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.25); }

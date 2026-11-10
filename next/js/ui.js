@@ -810,6 +810,7 @@
     const S = G.save.data.settings;
     if (S.askTutorial === undefined) S.askTutorial = true;
     const rowR = (id, label, min, max, step, fmt) => `<div class="set-row"><span>${label}</span><input type="range" id="s-${id}" min="${min}" max="${max}" step="${step}" value="${S[id]}"><span class="v" id="v-${id}">${fmt(S[id])}</span></div>`;
+    if (S.motionBlur === undefined) S.motionBlur = true; // (a save from before the setting: on)
     const rowC = (id, label) => `<div class="set-row"><span>${label}</span><input type="checkbox" id="s-${id}" ${S[id] ? 'checked' : ''}><span></span></div>`;
     const s = UI.screen(`<div class="panel" style="width:min(640px,94vw)"><h2>⚙️ 設定</h2>
       ${rowR('sens', '🖱️ マウス感度', 0.1, 3, 0.05, (v) => (+v).toFixed(2))}
@@ -820,6 +821,7 @@
       ${rowR('bob', '🚶 視点の揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
       <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（軽量：低解像度・影なし・簡易ライト）</option><option value="med">中（標準：解像度1.0倍・影は軽め）</option><option value="high">高（最高画質）</option></select><span></span></div>
       ${rowC('dmgNums', '🔢 ダメージ表記')}${rowC('crouchToggle', '🧎 しゃがみ切替式')}${rowC('autoSprint', `🏃 常に走る（${G.K('sprint')}で歩く）`)}${rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')}${rowC('invertY', '↕️ 上下反転')}${rowC('fullscreen', '⛶ 開始時フルスクリーン')}${rowC('showFps', '📈 FPS表示')}${rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認')}
+      ${rowC('motionBlur', '💨 モーションブラー（画質が中・高の時）')}
       <div class="set-row"><span>🔊 音の種類</span><select id="s-sound"><option value="new">新しい音</option><option value="classic">元の音</option></select><span></span></div>
       <div class="set-row"><span>⌨️ キー配置</span><button class="btn small" id="s-keys">キー設定を開く</button><span></span></div>
       <div class="set-row"><span>🗑️ データのリセット</span><button class="btn small" id="s-reset">リセットする…</button><span></span></div>
@@ -831,7 +833,7 @@
       const inp = s.querySelector('#s-' + id), v = s.querySelector('#v-' + id);
       inp.oninput = () => { S[id] = +inp.value; v.textContent = inp.parentElement.querySelector('.v').textContent = id === 'fov' ? S[id] + '°' : id === 'volume' || id === 'shake' || id === 'bob' ? Math.round(S[id] * 100) + '%' : (+S[id]).toFixed(2); if (id === 'volume') G.sfx.setVolume(S[id]); G.save.write(); };
     }
-    for (const id of ['dmgNums', 'crouchToggle', 'autoSprint', 'sprintToggle', 'invertY', 'fullscreen', 'showFps', 'askTutorial']) { const inp = s.querySelector('#s-' + id); inp.onchange = () => { S[id] = inp.checked; G.save.write(); }; }
+    for (const id of ['dmgNums', 'crouchToggle', 'autoSprint', 'sprintToggle', 'invertY', 'fullscreen', 'showFps', 'askTutorial', 'motionBlur']) { const inp = s.querySelector('#s-' + id); inp.onchange = () => { S[id] = inp.checked; G.save.write(); }; }
     s.querySelector('#s-quality').onchange = (e) => { S.quality = e.target.value; G.save.write(); G.game.applyQuality(); };
     s.querySelector('#s-sound').value = S.sound === 'classic' ? 'classic' : 'new';
     s.querySelector('#s-sound').onchange = (e) => { S.sound = e.target.value; G.save.write(); if (G.sfx.applySet) G.sfx.applySet(); };

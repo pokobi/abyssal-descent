@@ -67,6 +67,7 @@ void main(){
 void main(){ gl_FragColor = vec4(texture2D(tScene, .5 + (vUv - .5) * part).rgb, 1.); }`;
   const FIN_FS = `precision highp float; varying vec2 vUv; uniform sampler2D tAO; uniform sampler2D tBloom;
 uniform float time; uniform float aoAmt; uniform float bloomAmt; uniform float exposure; uniform vec2 res; uniform float grade;
+uniform sampler2D tDepth; uniform mat4 reproj; uniform float mblur;
 ${MIX}
 vec3 RRT(vec3 v){ vec3 a = v * (v + .0245786) - .000090537; vec3 b = v * (.983729 * v + .4329510) + .238081; return a / b; }
 vec3 aces(vec3 c){
@@ -75,9 +76,23 @@ vec3 aces(vec3 c){
   c *= 1. / .6; c = I * c; c = RRT(c); c = O * c; return clamp(c, 0., 1.);
 }
 float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+// motion blur: where this point of the world was on the screen a frame ago (its depth, taken back through this frame's camera and
+// forward through the last one's), and the picture smeared along that. What is held is laid on afterwards, sharp, as the eye keeps it
+vec3 world(vec2 uv){
+  vec3 c0 = texture2D(tScene, uv).rgb;
+  if (mblur <= 0.) return c0;
+  vec4 p = reproj * vec4(uv * 2. - 1., texture2D(tDepth, uv).x * 2. - 1., 1.);
+  if (p.w <= 0.) return c0;
+  vec2 vel = (uv - (p.xy / p.w * .5 + .5)) * mblur; float len = length(vel);
+  if (len < .0007) return c0;
+  vel *= min(1., .03 / len);
+  float j = hash(gl_FragCoord.xy + fract(time) * 311.) - .5; vec3 s = vec3(0.);
+  for (int i = 0; i < 8; i++) s += texture2D(tScene, uv + vel * ((float(i) + .5 + j) / 8. - .5)).rgb;
+  return s / 8.;
+}
 void main(){
   vec2 uv = vUv, cc = uv - .5;
-  vec3 c = texture2D(tScene, uv).rgb;
+  vec3 c = world(uv);
   float lum = dot(c, vec3(.2126, .7152, .0722));
   c *= mix(1., texture2D(tAO, uv).r, aoAmt * (1. - smoothstep(.6, 5., lum) * .7));
   if (gunOn > .5) { vec4 g = texture2D(tGun, uv); c = c * (1. - clamp(g.a, 0., 1.)) + g.rgb; }
@@ -97,7 +112,8 @@ void main(){
   gl_FragColor = vec4(mix(c * 12.92, pow(c, vec3(1. / 2.4)) * 1.055 - .055, step(.0031308, c)), 1.);
 }`;
 
-  const Post = G.Post = { active: false, ao: true, bloom: true, msaa: 4, set: { aoAmt: 0.75, aoRadius: 0.75, aoStrength: 1, bloomAmt: 0.07, thresh: 0.95, grade: 1, gain: 1.2 } };
+  const Post = G.Post = { active: false, ao: true, bloom: true, msaa: 4, set: { aoAmt: 0.75, aoRadius: 0.75, aoStrength: 1, bloomAmt: 0.07, thresh: 0.95, grade: 1, gain: 1.2, mblur: 0.5 } };
+  Post.mblurOn = () => !!(G.save && G.save.data && G.save.data.settings.motionBlur !== false); // (the setting: on unless turned off)
   Post.stats = { n: 0, ms: 0 }; // (warm draws: how many, how long)
   let R = null, quad, cam, scn, rtScene, rtGun, rtAO, rtAO2, rtPip, pipSize = 0, mips = [], W = 0, H = 0, curMsaa = -1;
   const mk = (fs, u) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: fs, uniforms: u, depthTest: false, depthWrite: false });
@@ -115,7 +131,7 @@ void main(){
     mDown = mk(DOWN_FS, { tSrc: T(), texel: V2() });
     mUp = mk(UP_FS, { tSrc: T(), tAdd: T(), texel: V2(), mixk: { value: 0.5 } });
     mPip = mk(PIP_FS, { tScene: T(), part: V2() });
-    mFin = mk(FIN_FS, { tScene: T(), tGun: T(), gunOn: { value: 0 }, tAO: T(), tBloom: T(), time: { value: 0 }, aoAmt: { value: 1 }, bloomAmt: { value: 0.05 }, exposure: { value: 1 }, res: V2(), grade: { value: 1 } });
+    mFin = mk(FIN_FS, { tScene: T(), tGun: T(), gunOn: { value: 0 }, tAO: T(), tBloom: T(), time: { value: 0 }, aoAmt: { value: 1 }, bloomAmt: { value: 0.05 }, exposure: { value: 1 }, res: V2(), grade: { value: 1 }, tDepth: T(), reproj: M4(), mblur: { value: 0 } });
   };
   const hdr = (w, h, o) => new THREE.WebGLRenderTarget(w, h, Object.assign({ type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }, o || {}));
   Post.resize = function () {
@@ -163,6 +179,7 @@ void main(){
     R.setRenderTarget(prev);
   };
   let pipTex = null;
+  const curVP = new THREE.Matrix4(), prevVP = new THREE.Matrix4(), invVP = new THREE.Matrix4(), mbP = new THREE.Vector3(), mbLast = new THREE.Vector3(); let mbHas = false, mbT = 0;
   Post.pipTexture = function () { return pipTex; };
   function post(camera, gunOn, time, warming) {
     const s = Post.set, depth = rtScene.depthTexture;
@@ -187,6 +204,16 @@ void main(){
     const u = mFin.uniforms;
     u.tScene.value = rtScene.texture; u.tGun.value = rtGun.texture; u.gunOn.value = gunOn ? 1 : 0; u.tAO.value = rtAO.texture; u.tBloom.value = bloomTex || rtAO.texture;
     u.time.value = time; u.aoAmt.value = Post.ao && camera ? s.aoAmt : 0; u.bloomAmt.value = bloomTex && Post.bloom ? s.bloomAmt : 0; u.exposure.value = R.toneMappingExposure * s.gain; u.res.value.set(W, H); u.grade.value = s.grade;
+    // (motion blur: this frame's camera undone, the last frame's applied. Its length is brought to what a sixtieth of a second would give,
+    // so a slow frame does not smear further; nothing on the first frame, nor when the camera has jumped - a new area, a return to life)
+    let mb = 0;
+    if (camera && !warming && Post.mblurOn()) {
+      const now = performance.now(), dtR = (now - mbT) / 1000; mbT = now;
+      curVP.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); mbP.setFromMatrixPosition(camera.matrixWorld);
+      if (mbHas && dtR > 0 && dtR < 0.25 && mbP.distanceToSquared(mbLast) < 9) { mb = s.mblur * Math.min(1.5, Math.max(0.25, (1 / 60) / dtR)); u.reproj.value.multiplyMatrices(prevVP, invVP.copy(curVP).invert()); }
+      prevVP.copy(curVP); mbLast.copy(mbP); mbHas = true;
+    } else if (!warming) mbHas = false;
+    u.tDepth.value = depth; u.mblur.value = mb;
     draw(mFin, warming ? rtAO2 : null);
   }
   // one frame: the world, then (drawGun) what is held, then everything laid together on the screen.

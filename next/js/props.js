@@ -37,6 +37,23 @@
     // (a room's things: a box with its edges just taken off - on walls and floors the plain box stays; a flat hoop for a barrel)
     PG.cbox = G.GFX ? G.GFX.makeRbox(1, 1, 1, 0.035, 1) : PG.box;
     PG.hoop = new THREE.LatheGeometry([[0.985, -0.5], [1.0, -0.5], [1.014, -0.36], [1.014, 0.36], [1.0, 0.5], [0.985, 0.5]].map((q) => new THREE.Vector2(q[0], q[1])), 28);
+    // a skull in one piece (it looks to +z, its base at the origin): the vault of it, the face under a brow, cheekbones, the jaw; and, of
+    // the dark, its sockets, the nose, the line of the teeth. Far fewer faces than the three balls and a box it was, and a skull to look at
+    if (G.GFX && G.GFX.Geo) {
+      const Ge = G.GFX.Geo, sp = (r, a, b, sc, at) => Ge.xf(new THREE.SphereGeometry(r, a, b), at, null, sc), rbx = (w, h, d, r, at, rot) => Ge.xf(G.GFX.makeRbox(w, h, d, r, 1), at, rot);
+      PG.skullB = Ge.merge([sp(1, 10, 7, [0.095, 0.09, 0.115], [0, 0.118, -0.012]), rbx(0.104, 0.074, 0.06, 0.016, [0, 0.058, 0.072]), rbx(0.122, 0.022, 0.034, 0.008, [0, 0.128, 0.082], [0.25, 0, 0]),
+        sp(1, 6, 4, [0.03, 0.022, 0.03], [0.057, 0.072, 0.058]), sp(1, 6, 4, [0.03, 0.022, 0.03], [-0.057, 0.072, 0.058]), rbx(0.082, 0.03, 0.05, 0.01, [0, 0.016, 0.07])]);
+      const nose = new THREE.ConeGeometry(0.016, 0.036, 3); nose.rotateX(-0.2);
+      PG.skullD = Ge.merge([sp(1, 6, 4, [0.026, 0.028, 0.016], [0.036, 0.098, 0.098]), sp(1, 6, 4, [0.026, 0.028, 0.016], [-0.036, 0.098, 0.098]), Ge.xf(nose, [0, 0.062, 0.104]), rbx(0.07, 0.006, 0.012, 0.002, [0, 0.032, 0.1])]);
+      // the ends of long bones stacked in a niche, a stretch one long and one high (set to the niche's size): knobs in rows, none like the next
+      const ends = []; let sd = 7;
+      const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+      for (let j = 0; j < 4; j++) for (let i = 0; i < 9; i++) {
+        const r = 0.042 + rnd() * 0.016, g = new THREE.SphereGeometry(1, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2); g.rotateX(Math.PI / 2);
+        ends.push(Ge.xf(g, [(i + 0.5 + (j % 2) * 0.5) / 9.5 - 0.5 + (rnd() - 0.5) * 0.02, (j + 0.5) / 4 + (rnd() - 0.5) * 0.04, (rnd() - 0.5) * 0.3], null, [r, r * 2.2, 1]));
+      }
+      PG.boneEnds = Ge.merge(ends);
+    }
     for (const k in PG) PG[k].userData.shared = true;
   };
   P.PG = PG;
@@ -140,6 +157,7 @@
   };
   P.skull = function (w, x, y, z, ry, s) {
     s = s || 1;
+    if (PG.skullB) { w.batch.geo('bone', PG.skullB, M(x, y, z, s, s, s, 0, ry, 0)); w.batch.geo('dark', PG.skullD, M(x, y, z, s, s, s, 0, ry, 0)); return; }
     w.batch.geo('bone', PG.sph, M(x, y + 0.1 * s, z, 0.1 * s, 0.09 * s, 0.12 * s, 0, ry, 0));
     w.batch.geo('bone', PG.cbox, M(x + Math.sin(ry) * 0.06 * s, y + 0.04 * s, z + Math.cos(ry) * 0.06 * s, 0.1 * s, 0.05 * s, 0.07 * s, 0, ry, 0));
     w.batch.geo('dark', PG.sph, M(x + Math.sin(ry) * 0.09 * s - Math.cos(ry) * 0.035 * s, y + 0.11 * s, z + Math.cos(ry) * 0.09 * s + Math.sin(ry) * 0.035 * s, 0.025 * s, 0.025 * s, 0.025 * s));

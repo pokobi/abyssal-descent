@@ -32,13 +32,28 @@
   }
   // an ossuary wall face: rows of skulls in dark niches (visual, on a wall along x or z, facing dir)
   function ossuary(w, rng, a0, a1, c, alongX, face, y0) {
+    // (the niche built out of the wall: a sill under each row and a lintel over it, piers between the bays; in it the ends of stacked
+    // long bones, and the skulls set along the top of them, each turned a little its own way)
+    const PGs = PG(), deep = 0.3;
+    const slab = (mk, u0, u1, ya, yb, d0, d1, o) => { const lo = c + face * Math.min(d0, d1), hi = c + face * Math.max(d0, d1), x0 = Math.min(lo, hi), x1 = Math.max(lo, hi); if (alongX) w.visual(mk, u0, ya, x0, u1, yb, x1, o); else w.visual(mk, x0, ya, u0, x1, yb, u1, o); };
+    const ry0 = alongX ? (face > 0 ? 0 : Math.PI) : (face > 0 ? Math.PI / 2 : -Math.PI / 2);
     for (let y = y0 + 0.9; y < y0 + 4.2; y += 1.1) {
       if (rng.chance(0.25)) continue;
-      if (alongX) w.visual('dark', a0 + 0.3, y, c + face * 0.02, a1 - 0.3, y + 0.55, c + face * 0.06, { uv: 1, grad: false });
-      else w.visual('dark', c + face * 0.02, y, a0 + 0.3, c + face * 0.06, y + 0.55, a1 - 0.3, { uv: 1, grad: false });
+      slab('dark', a0 + 0.3, a1 - 0.3, y, y + 0.55, 0.02, 0.06, { uv: 1, grad: false });
+      if (a1 - a0 > 1.4) {
+        slab('trim', a0 + 0.16, a1 - 0.16, y - 0.13, y, 0, deep + 0.05, { uv: 1.2, grad: false });
+        slab('trim', a0 + 0.16, a1 - 0.16, y + 0.55, y + 0.69, 0, deep - 0.04, { uv: 1.2, grad: false });
+        const nb = Math.max(1, Math.round((a1 - a0 - 0.6) / 2.4)), bw = (a1 - a0 - 0.6) / nb;
+        for (let k = 0; k <= nb; k++) { const u = a0 + 0.3 + k * bw; slab('trim', u - 0.13, u + 0.13, y, y + 0.55, 0, deep, { uv: 1.2, grad: false }); }
+        if (PGs.boneEnds) for (let k = 0; k < nb; k++) {
+          const u = a0 + 0.3 + (k + 0.5) * bw, d = 0.13;
+          if (alongX) w.batch.geo('bone', PGs.boneEnds, Mx(u, y, c + face * d, bw - 0.3, 0.3, 0.2, 0, face > 0 ? 0 : Math.PI, 0), { tint: [0.62, 0.58, 0.5] });
+          else w.batch.geo('bone', PGs.boneEnds, Mx(c + face * d, y, u, bw - 0.3, 0.3, 0.2, 0, face > 0 ? Math.PI / 2 : -Math.PI / 2, 0), { tint: [0.62, 0.58, 0.5] });
+        }
+      }
       for (let u = a0 + 0.55; u < a1 - 0.4; u += 0.55) if (rng.chance(0.7)) {
-        const ry = alongX ? (face > 0 ? 0 : Math.PI) : (face > 0 ? Math.PI / 2 : -Math.PI / 2);
-        if (alongX) P().skull(w, u, y + 0.06, c + face * 0.2, ry, 0.75); else P().skull(w, c + face * 0.2, y + 0.06, u, ry, 0.75);
+        const ry = ry0 + (((u * 7.3 + y * 3.1) % 1) - 0.5) * 0.7, yy = y + (a1 - a0 > 1.4 && PGs.boneEnds ? 0.3 : 0.02);
+        if (alongX) P().skull(w, u, yy, c + face * 0.17, ry, 0.95); else P().skull(w, c + face * 0.17, yy, u, ry, 0.95);
       }
     }
   }

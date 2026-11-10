@@ -1161,15 +1161,16 @@
   // recorded room tone per area look: [bank key, level] layers, crossfaded when the area changes.
   // the procedural rumble stays underneath, quieter while a recorded bed plays.
   const BEDS = {
-    catacombs: [['amb_cave', 0.5]], temple: [['amb_deep', 0.6]], halls: [['amb_deep', 0.6]], gate: [['amb_cavern', 0.4]], abyss: [['amb_cavern', 0.45]],
-    flooded: [['amb_cavern', 0.35], ['amb_water', 0.3]], forge: [['amb_deep', 0.5], ['amb_fire', 0.35]], frozen: [['amb_cavern', 0.35], ['amb_wind', 0.25]],
+    catacombs: [['amb_deep', 0.5]], temple: [['amb_deep', 0.6]], halls: [['amb_deep', 0.6]], gate: [['amb_deep', 0.4]], abyss: [['amb_deep', 0.45]],
+    flooded: [['amb_deep', 0.35], ['amb_water', 0.3]], forge: [['amb_deep', 0.5], ['amb_fire', 0.35]], frozen: [['amb_deep', 0.35], ['amb_wind', 0.25]],
     ruins: [['amb_wind', 0.4]], bloodmoon: [['amb_wind', 0.4]], grave: [['amb_wind', 0.35]], crimson: [['amb_wind', 0.4]], ruin: [['amb_wind', 0.35], ['amb_fire', 0.2]],
-    sky: [['amb_wind', 0.55]], void: [['amb_wind', 0.35], ['amb_cavern', 0.25]],
+    sky: [['amb_wind', 0.55]], void: [['amb_wind', 0.35], ['amb_deep', 0.25]],
   };
   // (by the field's own name where it has one: the hollow and drip of a cave, wind over open ground, the roar of the foundry's fires)
+  // (water is heard only where there is water - the flooded field: the recorded caves dripped, and it dripped everywhere)
   const FBEDS = {
-    catacombs: [['amb_cave', 0.5]], rooms: [['amb_deep', 0.55]], castle: [['amb_deep', 0.5]], mine: [['amb_cave', 0.45], ['amb_water', 0.3]], shaft: [['amb_cavern', 0.45], ['amb_wind', 0.2]],
-    pillars: [['amb_cavern', 0.45]], flooded: [['amb_cavern', 0.35], ['amb_water', 0.4]], foundry: [['amb_deep', 0.45], ['amb_fire', 0.4]], frozen: [['amb_wind', 0.45]],
+    catacombs: [['amb_deep', 0.5]], rooms: [['amb_deep', 0.55]], castle: [['amb_deep', 0.5]], mine: [['amb_deep', 0.5]], shaft: [['amb_deep', 0.45], ['amb_wind', 0.2]],
+    pillars: [['amb_deep', 0.45]], flooded: [['amb_deep', 0.35], ['amb_water', 0.4]], foundry: [['amb_deep', 0.45], ['amb_fire', 0.4]], frozen: [['amb_wind', 0.45]],
     hamlet: [['amb_wind', 0.4]], battlefield: [['amb_wind', 0.5]], dusk: [['amb_wind', 0.4]],
   };
   let beds = [], bedKey = null, bedV = 1;
@@ -1389,8 +1390,19 @@
     nz({ t: t + 0.05, buf: 'brown', f: [['lowpass', 260, 0.8, 80, 3]], g: 1.0, a: 0.15, d: 3.2, to: out });
   };
   // prying an ornate chest: a wooden creak plus a rattling lock, both rising in pitch with progress (k 0..1)
-  A.chestPry = function (k, pos) {
-    if (!ctx || smp('chest_pry', pos, 0.55 + k * 0.35, 0.8 + k * 0.5, 0.15)) return;
+  // (what is searched: a chest creaks and its lock rattles; a body, a bag, a heap is gone through with the hands - cloth and leather)
+  let pryAt = 0;
+  A.chestPry = function (k, pos, soft) {
+    if (!ctx) return;
+    if (soft) {
+      if (smp('rummage', pos, 0.5 + k * 0.2, 0.92 + k * 0.16, 0.1)) return;
+      if (!voice(0.2)) return;
+      const t = ctx.currentTime, out = dest(pos, 0.1);
+      nz({ t, buf: 'pink', f: [['bandpass', vr(900, 0.3), 0.9], ['lowpass', 2600]], g: 0.22 + k * 0.1, a: 0.03, d: vr(0.14, 0.3), to: out });
+      return;
+    }
+    // (a recorded creak lasts: one at a time, not one on top of the other at every tick)
+    if (usable('chest_pry')) { const now = ctx.currentTime; if (now < pryAt) return; if (smp('chest_pry', pos, 0.5 + k * 0.3, 0.85 + k * 0.3, 0.15)) { pryAt = now + 0.55 - k * 0.2; return; } }
     const t = ctx.currentTime, out = dest(pos, 0.15);
     nz({ t, buf: 'brown', f: [['bandpass', vr(260 + k * 480, 0.15), 6, vr(420 + k * 700, 0.1), 0.14]], g: 0.55 + k * 0.35, a: 0.012, d: vr(0.13, 0.3), to: out, rate: 0.6 });
     nz({ t: t + 0.012, buf: 'white', f: [['bandpass', vr(3000 + k * 1600, 0.2), 10]], g: 0.22 + k * 0.28, d: 0.03, to: out });

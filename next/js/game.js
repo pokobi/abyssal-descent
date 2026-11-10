@@ -1871,7 +1871,7 @@
     const it = S.it;
     if (it && it.lid) it.lid.rotation.x = -Math.min(0.12, k * 0.12) + Math.sin(GM.time * (30 + k * 30)) * (0.006 + k * 0.016);
     S.pryT -= dt;
-    if (S.pryT <= 0) { S.pryT = 0.3 - 0.18 * k; G.sfx.chestPry ? G.sfx.chestPry(k, S.pos) : G.sfx.mech('click'); }
+    if (S.pryT <= 0) { S.pryT = 0.3 - 0.18 * k; G.sfx.chestPry ? G.sfx.chestPry(k, S.pos, !(it && it.lid)) : G.sfx.mech('click'); } // (a thing with a lid is pried; anything else is gone through by hand)
     G.ui.holdRing(k, 'pry', { center: S.icon, label: S.label, cls: 'search' });
     if (k >= 1) { GM.search = null; G.ui.holdRing(1, 'done'); S.onDone(); }
   }

@@ -14,12 +14,12 @@
 
 | ファイル | 使い道 | 元のファイル | 配布物 |
 |---|---|---|---|
-| step_stone_1.ogg | 足音（石） | Fantozzi-StoneL1.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
-| step_stone_2.ogg | 足音（石） | Fantozzi-StoneL2.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
-| step_stone_3.ogg | 足音（石） | Fantozzi-StoneL3.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
-| step_stone_4.ogg | 足音（石） | Fantozzi-StoneR1.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
-| step_stone_5.ogg | 足音（石） | Fantozzi-StoneR2.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
-| step_stone_6.ogg | 足音（石） | Fantozzi-StoneR3.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
+| step_stone_1.ogg | 足音（石） | 0606.wav（Step, Shoe on Stone Staircase） | BigSoundBank |
+| step_stone_2.ogg | 足音（石） | 0606.wav（Step, Shoe on Stone Staircase） | BigSoundBank |
+| step_stone_3.ogg | 足音（石） | 0606.wav（Step, Shoe on Stone Staircase） | BigSoundBank |
+| step_stone_4.ogg | 足音（石） | 0606.wav（Step, Shoe on Stone Staircase） | BigSoundBank |
+| step_stone_5.ogg | 足音（石） | 0606.wav（Step, Shoe on Stone Staircase） | BigSoundBank |
+| step_stone_6.ogg | 足音（石） | 0606.wav（Step, Shoe on Stone Staircase） | BigSoundBank |
 | step_grass_1.ogg | 足音（草・土） | Fantozzi-SandL1.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
 | step_grass_2.ogg | 足音（草・土） | Fantozzi-SandL2.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
 | step_grass_3.ogg | 足音（草・土） | Fantozzi-SandL3.flac | Fantozzi's Footsteps (Grass/Sand & Stone) |
@@ -117,6 +117,12 @@
 | pickup_4.ogg | 拾う | cloth2.ogg | RPG Audio |
 | chest_unlock_1.ogg | 錠が開く | lock_open_01.ogg | 100 CC0 metal and wood SFX |
 | chest_unlock_2.ogg | 錠が開く | metalLatch.ogg | RPG Audio |
+| rummage_1.ogg | 手で漁る | cloth1.ogg | RPG Audio |
+| rummage_2.ogg | 手で漁る | cloth2.ogg | RPG Audio |
+| rummage_3.ogg | 手で漁る | cloth3.ogg | RPG Audio |
+| rummage_4.ogg | 手で漁る | cloth4.ogg | RPG Audio |
+| rummage_5.ogg | 手で漁る | handleSmallLeather.ogg | RPG Audio |
+| rummage_6.ogg | 手で漁る | handleSmallLeather2.ogg | RPG Audio |
 | chest_pry_1.ogg | 蓋がきしむ | creak1.ogg | RPG Audio |
 | chest_pry_2.ogg | 蓋がきしむ | creak2.ogg | RPG Audio |
 | chest_pry_3.ogg | 蓋がきしむ | creak3.ogg | RPG Audio |
@@ -174,8 +180,6 @@
 | launch_crossbow_2.ogg | クロスボウを撃つ | Crossbow Shoot.wav | Medieval sound effects - Weapon Textures |
 | launch_crossbow_3.ogg | クロスボウを撃つ | Crossbow Shoot.wav | Medieval sound effects - Weapon Textures |
 | launch_crossbow_4.ogg | クロスボウを撃つ | Crossbow Shoot.wav | Medieval sound effects - Weapon Textures |
-| amb_cave_1.ogg | 環境：洞窟 | 2135.wav（Cave #1） | BigSoundBank |
-| amb_cavern_1.ogg | 環境：大きな洞 | 2136.wav（Cave #2） | BigSoundBank |
 | amb_wind_1.ogg | 環境：風 | 0595.wav（Wind） | BigSoundBank |
 | amb_fire_1.ogg | 環境：火 | 0987.wav（Big Branching Fire #1） | BigSoundBank |
 | amb_water_1.ogg | 環境：水滴 | 1384.wav（Drops of water #1） | BigSoundBank |

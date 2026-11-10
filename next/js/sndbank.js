@@ -6,7 +6,7 @@
 (function () {
   window.G = window.G || {};
   G.SND = {
- "step_stone": { "f": [  "step_stone_1.ogg",  "step_stone_2.ogg",  "step_stone_3.ogg",  "step_stone_4.ogg",  "step_stone_5.ogg",  "step_stone_6.ogg" ], "v": 0.5, "p": 0.05, "wet": 0.22 },
+ "step_stone": { "f": [  "step_stone_1.ogg",  "step_stone_2.ogg",  "step_stone_3.ogg",  "step_stone_4.ogg",  "step_stone_5.ogg",  "step_stone_6.ogg" ], "v": 0.6, "p": 0.05, "wet": 0.22 },
  "step_grass": { "f": [  "step_grass_1.ogg",  "step_grass_2.ogg",  "step_grass_3.ogg",  "step_grass_4.ogg",  "step_grass_5.ogg",  "step_grass_6.ogg" ], "v": 0.72, "p": 0.05, "wet": 0.12 },
  "step_wood": { "f": [  "step_wood_1.ogg",  "step_wood_2.ogg",  "step_wood_3.ogg",  "step_wood_4.ogg",  "step_wood_5.ogg",  "step_wood_6.ogg" ], "v": 0.55, "p": 0.05, "wet": 0.2 },
  "gun_pistol": { "f": [  "gun_pistol_1.ogg",  "gun_pistol_2.ogg",  "gun_pistol_3.ogg",  "gun_pistol_4.ogg",  "gun_pistol_5.ogg" ], "v": 1.0, "bus": "gun", "p": 0.03, "wet": 0.3 },
@@ -33,6 +33,7 @@
  "coins": { "f": [  "coins_1.ogg",  "coins_2.ogg" ], "v": 0.4, "p": 0.06, "wet": 0.15 },
  "pickup": { "f": [  "pickup_1.ogg",  "pickup_2.ogg",  "pickup_3.ogg",  "pickup_4.ogg" ], "v": 0.39, "p": 0.06, "wet": 0.1 },
  "chest_unlock": { "f": [  "chest_unlock_1.ogg",  "chest_unlock_2.ogg" ], "v": 0.5, "p": 0.04, "wet": 0.25 },
+ "rummage": { "f": [  "rummage_1.ogg",  "rummage_2.ogg",  "rummage_3.ogg",  "rummage_4.ogg",  "rummage_5.ogg",  "rummage_6.ogg" ], "v": 0.4, "p": 0.08, "wet": 0.1 },
  "chest_pry": { "f": [  "chest_pry_1.ogg",  "chest_pry_2.ogg",  "chest_pry_3.ogg" ], "v": 0.5, "p": 0.05, "wet": 0.25 },
  "ui_open": { "f": [  "ui_open_1.ogg",  "ui_open_2.ogg",  "ui_open_3.ogg",  "ui_open_4.ogg" ], "v": 0.22, "p": 0.04, "wet": 0.08 },
  "ui_back": { "f": [  "ui_back_1.ogg" ], "v": 0.15, "p": 0.04, "wet": 0.08 },
@@ -47,10 +48,8 @@
  "mon_die": { "f": [  "mon_die_1.ogg",  "mon_die_2.ogg",  "mon_die_3.ogg",  "mon_die_4.ogg" ], "v": 0.5, "p": 0.1, "wet": 0.35 },
  "melee_slice": { "f": [  "melee_slice_1.ogg",  "melee_slice_2.ogg",  "melee_slice_3.ogg" ], "v": 0.35, "p": 0.08, "wet": 0.12 },
  "launch_crossbow": { "f": [  "launch_crossbow_1.ogg",  "launch_crossbow_2.ogg",  "launch_crossbow_3.ogg",  "launch_crossbow_4.ogg" ], "v": 0.45, "p": 0.05, "wet": 0.2 },
- "amb_cave": { "f": [  "amb_cave_1.ogg" ], "v": 2.2 },
- "amb_cavern": { "f": [  "amb_cavern_1.ogg" ], "v": 1.7 },
- "amb_deep": { "f": [  "amb_cavern_1.ogg" ], "v": 1.7, "rate": 0.6 },
  "amb_wind": { "f": [  "amb_wind_1.ogg" ], "v": 1.2 },
+ "amb_deep": { "f": [  "amb_wind_1.ogg" ], "v": 1.6, "rate": 0.42 },
  "amb_fire": { "f": [  "amb_fire_1.ogg" ], "v": 2.6 },
  "amb_water": { "f": [  "amb_water_1.ogg" ], "v": 1.0 }
 };

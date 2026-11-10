@@ -121,9 +121,11 @@
     const r = new THREE.Group(), l = new THREE.Group();
     root.add(r, l);
     const mk = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 2.4; return m; };
-    const blade = mk({ color: 0xdce2ec, metalness: 0.52, roughness: 0.18, emissive: 0x242a34, emissiveIntensity: 0.25 });
+    // (the finer surfaces of gfx.js where there are any: a blade's ground steel, the hide of a wrapped grip)
+    const sx = (name, ns) => { const t = G.GFX && G.GFX.tex ? G.GFX.tex(name) : null; return t ? { map: t.map, normalMap: t.normalMap, roughnessMap: t.orm, normalScale: new THREE.Vector2(ns, ns) } : null; };
+    const blade = mk(Object.assign({ color: 0xdce2ec, metalness: 0.52, roughness: 0.18, emissive: 0x242a34, emissiveIntensity: 0.25 }, sx('steel', 0.45) ? Object.assign({ roughness: 0.34, color: 0xf0f4fa }, sx('steel', 0.45)) : {}));
     const dark = mk({ color: 0x241e1c, metalness: 0.3, roughness: 0.62 });
-    const wrap = mk({ color: 0x3a1a14, roughness: 0.9, map: G.Tex.tex.cloth.map });
+    const wrap = mk(Object.assign({ color: 0x3a1a14, roughness: 0.9, map: G.Tex.tex.cloth.map }, sx('leather', 1) ? Object.assign({ color: 0x5a2c20, roughness: 1 }, sx('leather', 1)) : {}));
     const gold = mk({ color: 0xffcf40, metalness: 0.45, roughness: 0.20, emissive: 0x7a4c08, emissiveIntensity: 0.50 });
     const goldBr = mk({ color: 0xfff0a0, metalness: 0.50, roughness: 0.12, emissive: 0xb88214, emissiveIntensity: 0.72 });
     let bladeM = blade;
@@ -131,7 +133,8 @@
     if (def.model === 'emberblade') bladeM = mk({ color: 0xff6018, metalness: 0.35, roughness: 0.18, emissive: 0xff4808, emissiveIntensity: 1.8 });
     if (def.model === 'holy') bladeM = mk({ color: 0xfff8e8, metalness: 0.45, roughness: 0.10, emissive: 0xffdf80, emissiveIntensity: 1.1 });
     if (def.model === 'twin') bladeM = mk({ color: 0x68f040, metalness: 0.4, roughness: 0.18, emissive: 0x28b810, emissiveIntensity: 1.2 });
-    const box = (p, w, h, d, x, y, z, m, rx, ry, rz) => { const o = new THREE.Mesh(PG.box, m); o.scale.set(w, h, d); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); p.add(o); return o; };
+    // (a part is a box cut to its size with its edges rounded a little, as on the guns)
+    const box = (p, w, h, d, x, y, z, m, rx, ry, rz) => { const rg = G.GFX && G.GFX.rbox ? G.GFX.rbox(w, h, d, Math.min(0.003, Math.min(Math.abs(w), Math.abs(h), Math.abs(d)) * 0.2)) : null; const o = new THREE.Mesh(rg || PG.box, m); if (!rg) o.scale.set(w, h, d); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); p.add(o); return o; };
     const cyl = (p, rad, len, x, y, z, m) => { const o = new THREE.Mesh(PG.cyl8, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); p.add(o); return o; };
     const cone = (p, rad, len, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); o.rotation.x = rx || 0; p.add(o); return o; };
     const flatTip = (p, w, len, d, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(w * 0.58, len, d * 0.58); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, Math.PI / 4, 0); p.add(o); return o; };

@@ -953,6 +953,35 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     return (revo = { metal: fit(ME), steel: fit(ST), wood: wo, brass: fit(BR), drum: boxUV(dr, 6), drumBrass: fit(rims) });
   };
 
+  // ---- the light machine gun: a receiver from one outline under its feed cover, a rail raised on two posts, a slotted guard with its
+  // heat shield, a heavy barrel with gas block and flash hider, a bipod, a stock with a window cut through it, the box and its belt ----
+  let lmgc = null;
+  X.lmgParts = function () {
+    if (lmgc) return lmgc;
+    const ME = [], ST = [], PO = [], fit = (list) => boxUV(Geo.merge(list), 5);
+    ME.push(side([[0.18, 0.062], [0.18, -0.02], [0.05, -0.028], [-0.06, -0.028], [-0.18, -0.022], [-0.18, 0.05], [-0.15, 0.066], [0.1, 0.068]], 0.064, 0.005, null, 0, 2));
+    ME.push(rb(0.058, 0.014, 0.2, 0.004, 0, 0.071, 0.02));
+    for (const f of [0.15, 0.05]) ME.push(rb(0.012, 0.05, 0.02, 0.003, 0, 0.1, f));
+    ME.push(rb(0.024, 0.006, 0.14, 0.001, 0, 0.1235, 0.1));
+    for (let i = 0; i < 7; i++) ME.push(rb(0.024, 0.0035, 0.011, 0.0008, 0, 0.1282, 0.04 + i * 0.02));
+    PO.push(sec(rrect(0, 0.02, 0.06, 0.07, 0.012, 3), 0.17, 0.47, 0.004));
+    ME.push(rb(0.04, 0.008, 0.26, 0.003, 0, 0.058, 0.32));
+    for (let i = 0; i < 6; i++) for (const sx of [-1, 1]) ME.push(rb(0.002, 0.012, 0.024, 0.0008, sx * 0.0302, 0.03, 0.21 + i * 0.042));
+    const brl = lathe([[0.0005, 0.45], [0.0145, 0.45], [0.0145, 0.6], [0.013, 0.61], [0.013, 0.745], [0.0005, 0.745]], 16); brl.translate(0, 0.025, 0); ME.push(brl);
+    const fh = lathe([[0.0005, 0.74], [0.018, 0.74], [0.022, 0.756], [0.022, 0.8], [0.018, 0.812], [0.0005, 0.812]], 16); fh.translate(0, 0.025, 0); ME.push(fh);
+    ME.push(rb(0.022, 0.034, 0.03, 0.004, 0, 0.018, 0.5));
+    const gas = lathe([[0.0005, 0.45], [0.008, 0.45], [0.008, 0.505], [0.0005, 0.505]], 10); gas.translate(0, 0.002, 0); ST.push(gas);
+    PO.push(side([[-0.085, -0.022], [-0.105, -0.118], [-0.142, -0.122], [-0.15, -0.06], [-0.135, -0.022]], 0.036, 0.009, null, 0, 2));
+    PO.push(side([[-0.18, 0.05], [-0.18, -0.022], [-0.3, -0.04], [-0.44, -0.05], [-0.45, -0.045], [-0.45, 0.045], [-0.3, 0.05]], 0.05, 0.005, [[[-0.23, 0.026], [-0.23, -0.008], [-0.4, -0.026], [-0.4, 0.026]]], 0, 2));
+    for (const sx of [-1, 1]) { ST.push(Geo.rod([sx * 0.018, -0.012, -0.5], [sx * 0.042, -0.125, -0.585], 0.005, 8)); ST.push(rb(0.014, 0.006, 0.02, 0.002, sx * 0.043, -0.128, 0.588)); }
+    ST.push(side([[-0.03, -0.022], [-0.035, -0.05], [-0.045, -0.058], [-0.08, -0.058], [-0.09, -0.022]], 0.01, 0.002, [[[-0.038, -0.032], [-0.041, -0.048], [-0.047, -0.052], [-0.078, -0.052], [-0.083, -0.032]]]));
+    ST.push(side([[-0.055, -0.03], [-0.061, -0.03], [-0.064, -0.042], [-0.06, -0.05], [-0.057, -0.049], [-0.059, -0.04]], 0.006, 0.0012));
+    // the box, about its own middle (weapons.js sets it), and the belt up from it to the feed: it comes away with the box
+    const MG = [X.makeRbox(0.09, 0.1, 0.1, 0.008, 1), Geo.xf(X.makeRbox(0.094, 0.012, 0.104, 0.004, 1), [0, 0.046, 0])];
+    const BL = []; for (let i = 0; i < 6; i++) BL.push(Geo.rod([0.012, 0.056 + i * 0.011, -0.016], [0.012, 0.056 + i * 0.011, 0.016], 0.0048, 8));
+    return (lmgc = { metal: fit(ME), steel: fit(ST), poly: fit(PO), mag: fit(MG), belt: fit(BL) });
+  };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

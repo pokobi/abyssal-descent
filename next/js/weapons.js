@@ -346,6 +346,16 @@
         break;
       }
       case 'lmg': {
+        // (the machine gun with a shaped receiver, a rail on posts, a slotted guard, a bipod, the box with its belt: gfx.js)
+        const LM = G.GFX && G.GFX.lmgParts ? G.GFX.lmgParts() : null;
+        if (LM) {
+          const part = (geo, m, parent) => { const o = new THREE.Mesh(geo, m); (parent || g).add(o); return o; };
+          part(LM.metal, metal); part(LM.poly, poly); part(LM.steel, mats.steel);
+          M.mag = part(LM.mag, metal); M.mag.position.set(0.03, -0.07, -0.04); part(LM.belt, mats.brass, M.mag);
+          M.bolt = box(0.012, 0.02, 0.04, 0.04, 0.04, 0.02, mats.steel);
+          M.muzzle.set(0, 0.025, -0.82); M.opticZ = -0.1; M.sightY = 0.135; M.ironY = 0.135; M.railY = 0.13; M.fore.set(0, -0.03, -0.3); M.grip.set(0, -0.06, 0.12);
+          break;
+        }
         box(0.07, 0.09, 0.36, 0, 0.02, 0.0); box(0.06, 0.07, 0.3, 0, 0.02, -0.32, poly);
         cyl(0.014, 0.3, 0, 0.025, -0.6); cyl(0.022, 0.06, 0, 0.025, -0.78);
         M.mag = box(0.09, 0.1, 0.1, 0.03, -0.07, -0.04, metal);

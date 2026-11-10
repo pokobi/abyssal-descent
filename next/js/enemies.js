@@ -23,11 +23,11 @@
     golem: { skin: '#7a7066', sec: '#4a4440', rough: 0.95, blood: 0x6a6056, tex: 'rock' },
     shaman: { skin: '#32283a', sec: '#d8ccb0', rough: 0.9, blood: 0x6a0c0c, tex: 'skin' },
     mantis: { skin: '#48562f', sec: '#252d18', rough: 0.45, blood: 0x6a9a20, tex: 'scales' },
-    worm: { skin: '#8a6050', sec: '#3a2a20', rough: 0.5, blood: 0x7a3010, tex: 'scales' },
-    mimic: { skin: '#8a5a30', sec: '#c8a050', rough: 0.6, blood: 0x6a0c0c, tex: 'skin' },
+    worm: { skin: '#74524a', sec: '#3a2a20', rough: 0.5, blood: 0x7a3010, tex: 'scales' },
+    mimic: { skin: '#5e442c', sec: '#3a3836', rough: 0.45, blood: 0x6a0c0c, tex: 'skin' },
   };
   // (a coat of its own kind for each, where gfx.js can make it: a pelt, a shell, a hide, a cloth)
-  const XTEX = { hound: 'fur', bat: 'fur', spider: 'chitin', beetle: 'chitin', mantis: 'chitin', brute: 'leather', imp: 'leather', worm: 'leather', mushroom: 'leather', wraith: 'weave', shaman: 'weave',
+  const XTEX = { golem: 'rock', gargoyle: 'rock', mimic: 'walnut', hound: 'fur', bat: 'fur', spider: 'chitin', beetle: 'chitin', mantis: 'chitin', brute: 'leather', imp: 'leather', worm: 'leather', mushroom: 'leather', wraith: 'weave', shaman: 'weave',
     villager: 'leather', scarecrow: 'weave', knight: 'steel', archer: 'bone', drowned: 'bone', leech: 'leather', smith: 'leather', seraph: 'bone' };
   function mkMats(def, opts) {
     const pc = PLANCOL[def.plan];
@@ -40,8 +40,9 @@
     const xt = !bt && XTEX[def.plan] && G.GFX && G.GFX.tex ? G.GFX.tex(XTEX[def.plan]) : null;
     if (xt) { skin.map = xt.map; skin.normalMap = xt.normalMap; skin.roughnessMap = xt.orm; skin.aoMap = xt.orm; skin.roughness = Math.min(1, pc.rough + 0.35); skin.color.multiplyScalar(1.25); } // (these surfaces are pale, to be tinted: a little brighter under them)
     if (pc.trans) { skin.transparent = true; skin.opacity = pc.trans; }
-    if (def.plan === 'slime') { skin.emissive = new THREE.Color(col).multiplyScalar(0.25); skin.roughness = 0.16; skin.map = null; skin.normalScale = new THREE.Vector2(0.3, 0.3); } // (wet, and without the pattern of a hide: a jelly)
+    if (def.plan === 'slime') { skin.color.multiplyScalar(0.2); skin.emissive = new THREE.Color(col).multiplyScalar(0.025); skin.roughness = 0.1; skin.map = null; skin.normalScale = new THREE.Vector2(0.3, 0.3); skin.opacity = 0.8; } // (wet, and without the pattern of a hide: a jelly)
     const sec = new THREE.MeshStandardMaterial({ color: pc.sec, roughness: 0.7, map: t.smooth.map });
+    if (def.plan === 'mimic') { sec.metalness = 0.7; sec.roughness = 0.6; sec.map = null; }   // (iron bands)
     if (bt) { sec.map = t.metal.map; sec.normalMap = t.metal.normalMap; sec.metalness = 0.6; sec.roughness = 0.85; sec.color.set('#c2b6a4'); } // (a skeleton's iron: helmet, sword, shield)
     const eyeCol = opts && opts.ally ? '#80d0ff' : def.eye || (def.plan === 'skeleton' ? '#ff9040' : '#ffcc40');
     const eye = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: eyeCol, emissiveIntensity: 2.2 });
@@ -267,15 +268,23 @@
     R.animate = function (a) { an(a); jaw.rotation.x = 0.05 + Math.max(0, a.atk || 0) * 0.4 + (a.wind || 0) * 0.25 + Math.max(0, Math.sin((a.t || 0) * 7.3) * Math.sin((a.t || 0) * 1.1) - 0.5) * 0.3; };
     return R;
   };
+  // the slime: a heap of dark jelly that sags onto the floor and creeps - what it has taken still inside it (a skull, a few bones),
+  // bubbles rising through it, a core that glows where a heart would be, a wet trail under it. No face. It squashes and stretches as
+  // it did.
   B.slime = function (root, M) {
     const body = joint(root, 0, 0, 0);
-    const FG = G.GFX && G.GFX.foeGeo; // (a body that sags onto the floor, bubbles held in it, a mouth that curves: gfx.js)
+    const FG = G.GFX && G.GFX.foeGeo, PP = G.Props.PG;
     const blob = mesh(body, (FG && FG('slime')) || PG.sph, M.skin, 0.62, 0.55, 0.62, 0, 0.55, 0);
-    if (FG) for (const [x, y, z, r] of [[0.2, 0.35, 0.15, 0.05], [-0.25, 0.6, -0.1, 0.04], [0.05, 0.8, -0.2, 0.035], [-0.1, 0.3, 0.3, 0.03]]) mesh(body, PG.sph, M.sec, r, r, r, x, y, z);
-    const core = mesh(body, PG.sph, M.sec, 0.22, 0.2, 0.22, 0, 0.5, 0);
+    mesh(body, PG.sph, M.skin, 0.8, 0.03, 0.76, 0.05, 0.015, -0.03);                                                   // what it leaves on the floor
+    for (const [x, z, r] of [[0.66, 0.32, 0.15], [-0.6, -0.42, 0.12], [-0.22, 0.74, 0.1], [0.3, -0.7, 0.08]]) mesh(body, PG.sph, M.skin, r, 0.025, r, x, 0.015, z);
+    if (PP.skullB) { mesh(body, PP.skullB, M.tooth, 1.2, 1.2, 1.2, 0.13, 0.2, 0.2, -0.5, 0.7, 0.35); mesh(body, PP.skullD, M.dark, 1.2, 1.2, 1.2, 0.13, 0.2, 0.2, -0.5, 0.7, 0.35); }
+    for (const [x, y, z, l, rx, rz] of [[-0.22, 0.3, 0.1, 0.36, 0.5, 1.1], [0.05, 0.62, -0.2, 0.3, -0.7, 0.4], [-0.12, 0.2, -0.25, 0.26, 1.3, -0.5], [0.25, 0.45, -0.05, 0.2, 0.2, -1.2]]) {
+      const b = joint(body, x, y, z); b.rotation.set(rx, 0, rz);
+      mesh(b, PG.cyl8, M.tooth, 0.014, l, 0.014); mesh(b, PG.sph, M.tooth, 0.026, 0.022, 0.026, 0, l / 2, 0); mesh(b, PG.sph, M.tooth, 0.024, 0.02, 0.024, 0, -l / 2, 0);
+    }
+    for (const [x, y, z, r] of [[0.2, 0.35, 0.15, 0.05], [-0.25, 0.6, -0.1, 0.04], [0.05, 0.8, -0.2, 0.035], [-0.1, 0.3, 0.3, 0.03], [0.3, 0.7, 0.1, 0.025], [-0.32, 0.4, 0.22, 0.02]]) mesh(body, PG.sph, M.sec, r, r, r, x, y, z);
+    const core = mesh(body, PG.sph, M.eye, 0.055, 0.055, 0.055, 0, 0.5, 0);
     const face = joint(body, 0, 0.62, 0.45);
-    for (const s of [-1, 1]) mesh(face, PG.sph, M.eye, 0.07, 0.09, 0.04, s * 0.15, 0.08, 0.05);
-    if (FG) mesh(face, FG('smile'), M.dark, 0.11, 0.07, 0.05, 0, -0.11, 0.15); else mesh(face, PG.box, M.dark, 0.2, 0.04, 0.04, 0, -0.08, 0.06);
     return {
       J: { body, blob, face }, h: 1.1, r: 0.6,
       hits: [{ n: body, r: 0.25, part: 'head', o: V(0, 0.75, 0.25) }, { n: body, r: 0.55, part: 'body', o: V(0, 0.5, 0) }],
@@ -672,28 +681,52 @@
       },
     };
   };
-  B.golem = function (root, M) {
+  // the golem: a giant of piled rock - a breast of two great stones with a cleft between them and a light in the cleft, a belly stone,
+  // boulders for shoulders, a small head sunk between them with a brow and two slits of light; arms of three stones ending in fists
+  // with knuckles, legs like pillars on broad feet; moss where the rain reaches (not on one that keeps a gate in the dry). Joints, the
+  // heart's pulse and what a shot hits as before.
+  B.golem = function (root, M, opts, def) {
+    const D = PG.dode, I = PG.ico || PG.dode;
     const hips = joint(root, 0, 1.3, 0);
-    mesh(hips, PG.dode, M.skin, 0.5, 0.35, 0.4);
+    mesh(hips, D, M.skin, 0.5, 0.35, 0.4); mesh(hips, I, M.skin, 0.3, 0.26, 0.3, 0, -0.1, 0.08, 0.4, 0.7, 0);
     const torso = joint(hips, 0, 0.3, 0);
-    mesh(torso, PG.box, M.skin, 1.1, 0.9, 0.7, 0, 0.45, 0, 0.05, 0, 0);
-    mesh(torso, PG.dode, M.skin, 0.5, 0.4, 0.4, 0.4, 0.95, -0.1);
-    mesh(torso, PG.dode, M.skin, 0.45, 0.35, 0.4, -0.45, 0.9, -0.05);
-    const glow = mesh(torso, PG.sph, M.eye, 0.12, 0.12, 0.05, 0, 0.5, 0.36);
+    mesh(torso, D, M.skin, 0.46, 0.4, 0.42, 0, 0.18, 0.02, 0.5, 1.1, 0.3);                                               // belly
+    for (const s of [-1, 1]) mesh(torso, D, M.skin, 0.37, 0.44, 0.4, s * 0.39, 0.58, 0.06, 0.2 + s * 0.2, s * 0.5, s * 0.15);   // the two stones of the breast
+    mesh(torso, D, M.skin, 0.62, 0.5, 0.36, 0, 0.56, -0.2, 0.3, 0.2, 0);                                                 // back
+    mesh(torso, I, M.skin, 0.3, 0.2, 0.28, 0, 0.92, -0.05, 0.2, 0.5, 0);                                                 // the yoke under the head
+    mesh(torso, D, M.skin, 0.5, 0.4, 0.4, 0.4, 0.95, -0.1); mesh(torso, D, M.skin, 0.45, 0.35, 0.4, -0.45, 0.9, -0.05);
+    mesh(torso, PG.sph, M.dark, 0.16, 0.3, 0.1, 0, 0.54, 0.2);                                                           // the cleft
+    const glow = mesh(torso, PG.sph, M.eye, 0.085, 0.085, 0.085, 0, 0.5, 0.27);
     const head = joint(torso, 0, 1.05, 0.12);
-    mesh(head, PG.box, M.skin, 0.38, 0.3, 0.35);
-    for (const s of [-1, 1]) mesh(head, PG.box, M.eye, 0.07, 0.03, 0.02, s * 0.1, 0.02, 0.18);
+    mesh(head, D, M.skin, 0.24, 0.2, 0.22, 0, 0, 0, 0.3, 0.6, 0); mesh(head, I, M.skin, 0.22, 0.09, 0.14, 0, 0.1, 0.12, 0.25, 0, 0);
+    mesh(head, I, M.skin, 0.15, 0.1, 0.14, 0, -0.13, 0.08, 0, 0.5, 0);
+    for (const s of [-1, 1]) mesh(head, PG.box, M.eye, 0.075, 0.022, 0.02, s * 0.09, 0.02, 0.19, 0, 0, -s * 0.2);
     const arms = [];
     for (const s of [-1, 1]) {
       const sh = joint(torso, s * 0.75, 0.75, 0);
-      mesh(sh, PG.dode, M.skin, 0.32, 0.3, 0.32);
-      mesh(sh, PG.dode, M.skin, 0.25, 0.4, 0.25, 0, -0.45, 0);
+      mesh(sh, D, M.skin, 0.32, 0.3, 0.32, 0, 0, 0, 0.3, s * 0.4, 0);
+      mesh(sh, D, M.skin, 0.25, 0.38, 0.25, 0, -0.45, 0, 0, 0.6, 0);
       const el = joint(sh, 0, -0.8, 0);
-      mesh(el, PG.dode, M.skin, 0.24, 0.38, 0.24, 0, -0.3, 0);
-      mesh(el, PG.dode, M.skin, 0.35, 0.3, 0.35, 0, -0.75, 0.05);
+      mesh(el, I, M.skin, 0.2, 0.18, 0.2);
+      mesh(el, D, M.skin, 0.24, 0.36, 0.24, 0, -0.3, 0, 0, 1.0, 0.1);
+      mesh(el, D, M.skin, 0.35, 0.3, 0.35, 0, -0.75, 0.05, 0.4, 0.3, 0);
+      for (let k = 0; k < 3; k++) mesh(el, I, M.skin, 0.12, 0.13, 0.12, (k - 1) * 0.2, -0.93, 0.2, 0.3, k, 0);            // knuckles
       arms.push({ sh, el });
     }
-    const L = [leg(hips, M, -0.32, -0.15, 0, 1.15, 0.32), leg(hips, M, 0.32, -0.15, 0, 1.15, 0.32)];
+    const gleg = (x) => {
+      const hip = joint(hips, x, -0.15, 0);
+      mesh(hip, D, M.skin, 0.27, 0.36, 0.27, 0, -0.26, 0, 0.2, x * 2, 0);
+      const kn = joint(hip, 0, -0.575, 0);
+      mesh(kn, I, M.skin, 0.2, 0.17, 0.21, 0, 0, 0.04);
+      mesh(kn, D, M.skin, 0.23, 0.3, 0.23, 0, -0.28, 0, 0, 0.8, 0.1);
+      mesh(kn, D, M.skin, 0.3, 0.15, 0.38, 0, -0.5, 0.06, 0, 0.3, 0);                                                    // foot
+      return { hip, kn };
+    };
+    const L = [gleg(-0.32), gleg(0.32)];
+    if (!(def && def.fieldFoe)) {
+      const moss = new THREE.MeshStandardMaterial({ color: 0x343f1e, roughness: 1 }); M.all.push(moss);
+      for (const [j, x, y, z, r, rx, rz] of [[torso, 0.42, 1.24, -0.12, 0.27, 0, -0.25], [torso, -0.5, 1.16, -0.04, 0.23, 0.1, 0.3], [torso, 0.05, 1.0, -0.4, 0.3, -0.6, 0], [head, -0.05, 0.17, -0.03, 0.15, -0.2, 0.1], [arms[0].sh, -0.08, 0.24, 0, 0.2, 0, 0.4]]) mesh(j, PG.sph, moss, r, r * 0.2, r * 0.85, x, y, z, rx, 0, rz);
+    }
     return {
       J: { torso, head, arms, L, glow }, h: 3.2, r: 1.0,
       hits: [{ n: head, r: 0.28, part: 'head' }, { n: torso, r: 0.7, part: 'body', o: V(0, 0.45, 0) }, { n: hips, r: 0.45, part: 'body' }, { n: arms[0].el, r: 0.3, part: 'body', o: V(0, -0.6, 0) }, { n: arms[1].el, r: 0.3, part: 'body', o: V(0, -0.6, 0) }],
@@ -706,7 +739,7 @@
         arms[1].sh.rotation.x = Math.sin(w) * 0.3 * a.mv - a.wind * (a.throwing ? 3.0 : 2.6) + a.atk * 3.2;
         torso.rotation.x = 0.1 - a.wind * 0.3 + a.atk * 0.5 - a.flinch * 0.15;
         hips.position.y = 1.3 + Math.abs(Math.sin(w)) * 0.06;
-        glow.scale.setScalar(0.12 * (1 + Math.sin(a.t * 3) * 0.15));
+        glow.scale.setScalar(0.085 * (1 + Math.sin(a.t * 3) * 0.15));
       },
     };
   };
@@ -815,19 +848,30 @@
       },
     };
   };
+  // the worm: a blind borer - a head of plates over a round mouth, a lip of flesh, three rings of teeth leaning in, four hooked jaws
+  // that open with it; behind it ring after ring, each under a plate of its own, bristles along the flanks, a spike at the tail.
   B.worm = function (root, M) {
     const head = joint(root, 0, 0.8, 0);
-    mesh(head, PG.sph, M.skin, 0.55, 0.5, 0.6);
+    mesh(head, PG.sph, M.skin, 0.55, 0.5, 0.52, 0, 0, -0.05);
+    mesh(head, PG.sph, M.sec, 0.58, 0.3, 0.5, 0, 0.25, -0.1); mesh(head, PG.sph, M.sec, 0.4, 0.14, 0.3, 0, 0.36, 0.2, 0.35);                 // a carapace over the crown, its brow
     const mouth = joint(head, 0, 0, 0.45);
-    for (let i = 0; i < 10; i++) { const a0 = i / 10 * Math.PI * 2; mesh(mouth, PG.cone, M.tooth, 0.04, 0.2, 0.04, Math.cos(a0) * 0.3, Math.sin(a0) * 0.3, 0.05, Math.PI / 2 + Math.sin(a0) * 0.5, 0, -Math.cos(a0) * 0.5); }
-    mesh(mouth, PG.sph, M.dark, 0.32, 0.32, 0.1, 0, 0, 0.0);
-    for (let i = 0; i < 4; i++) mesh(head, PG.sph, M.eye, 0.04, 0.04, 0.03, Math.cos(i * 1.57 + 0.78) * 0.35, Math.sin(i * 1.57 + 0.78) * 0.35, 0.38);
+    for (let i = 0; i < 12; i++) { const a0 = i / 12 * Math.PI * 2; mesh(mouth, PG.sph, M.sec, 0.078, 0.078, 0.06, Math.cos(a0) * 0.33, Math.sin(a0) * 0.33, 0.05); }   // the lip, in lobes
+    mesh(mouth, PG.sph, M.dark, 0.31, 0.31, 0.08, 0, 0, 0.03); mesh(mouth, PG.sph, M.dark, 0.15, 0.15, 0.2, 0, 0, -0.05);
+    for (let k = 0; k < 3; k++) { const n = 14 - k * 4, rr = 0.27 - k * 0.075; for (let i = 0; i < n; i++) { const a0 = (i + k * 0.5) / n * Math.PI * 2; mesh(mouth, PG.cone, M.tooth, 0.03 - k * 0.006, 0.17 - k * 0.04, 0.03 - k * 0.006, Math.cos(a0) * rr, Math.sin(a0) * rr, 0.09 - k * 0.03, Math.PI / 2 + Math.sin(a0) * 0.5, 0, -Math.cos(a0) * 0.5); } }
+    for (let i = 0; i < 4; i++) {   // (the jaws: out from the lip, forward, and hooked back in)
+      const a0 = i * Math.PI / 2 + Math.PI / 4, j = joint(mouth, Math.cos(a0) * 0.37, Math.sin(a0) * 0.37, 0.04); j.rotation.z = a0 - Math.PI / 2;
+      mesh(j, PG.sph, M.sec, 0.07, 0.07, 0.07); mesh(j, PG.cone, M.dark, 0.06, 0.3, 0.05, 0, 0.07, 0.12, 1.0); mesh(j, PG.cone, M.tooth, 0.032, 0.2, 0.032, 0, 0.07, 0.33, 2.3);
+    }
+    for (let i = 0; i < 4; i++) mesh(head, PG.sph, M.eye, 0.025, 0.025, 0.02, Math.cos(i * 1.57) * 0.43, Math.sin(i * 1.57) * 0.4, 0.34);
     const segs = [];
     for (let i = 0; i < 9; i++) {
       const s = new THREE.Group();
       const r = 0.5 - i * 0.035;
-      mesh(s, PG.sph, M.skin, r, r * 0.95, r * 0.7);
-      mesh(s, PG.torus, M.sec, r * 0.95, r * 0.95, 0.6);
+      mesh(s, PG.sph, M.skin, r, r * 0.92, 0.4);
+      mesh(s, PG.sph, M.sec, r * 0.8, r * 0.24, 0.42, 0, r * 0.72, -0.04, -0.14);                                          // its plate
+      for (const sd of [-1, 1]) { mesh(s, PG.sph, M.dark, 0.03, 0.04, 0.03, sd * r * 0.96, r * 0.12, 0); for (const dz of [-0.1, 0.1]) mesh(s, PG.cone, M.dark, 0.018, 0.2, 0.018, sd * r * 0.98, -r * 0.3, dz, 0, 0, sd * 2.1); }
+      if (i === 8) mesh(s, PG.cone, M.sec, 0.11, 0.5, 0.11, 0, 0.02, -0.38, -Math.PI / 2);
+      s.position.set(0, 0.8 - (i + 1) * 0.06, -(i + 1) * 0.55);       // (laid out behind the head until it moves: animateWorm puts them on its trail)
       root.add(s); segs.push(s);
     }
     return {
@@ -839,17 +883,41 @@
       },
     };
   };
+  // the mimic: an oak chest bound in iron like any other in these halls (props.js) - until the lid lifts: a roof of raw flesh, fangs
+  // of all sizes above and below, a thick tongue, eyes far back in the dark, coins it has swallowed; four jointed legs folded under
+  // it. What moved moves as before.
+  let MIMG = null;
   B.mimic = function (root, M) {
+    const PP = G.Props.PG, bx = PP.cbox || PG.box;
+    if (!MIMG) MIMG = new THREE.CylinderGeometry(1, 1, 1, 18, 1, false, 0, Math.PI);      // (half a drum: turned on its side, the upper half)
+    const flesh = new THREE.MeshStandardMaterial({ color: 0x5a1418, roughness: 0.32 }), roof = new THREE.MeshStandardMaterial({ color: 0x4a1014, roughness: 0.32, side: THREE.BackSide }), gold = new THREE.MeshStandardMaterial({ color: 0x8c7036, metalness: 0.8, roughness: 0.45 });
+    const tongueM = new THREE.MeshStandardMaterial({ color: 0x6a1c24, roughness: 0.28 }); M.all.push(flesh, roof, gold, tongueM);
     const body = joint(root, 0, 0.35, 0);
-    mesh(body, PG.box, M.skin, 1.0, 0.55, 0.7, 0, 0.27, 0);
+    mesh(body, bx, M.skin, 1.1, 0.55, 0.7, 0, 0.275, 0); mesh(body, bx, M.skin, 1.16, 0.07, 0.76, 0, 0.035, 0);
+    for (const x of [-0.36, 0.36]) { mesh(body, bx, M.sec, 0.075, 0.57, 0.72, x, 0.28, 0); for (const y of [0.14, 0.42]) mesh(body, PG.sph, M.sec, 0.022, 0.022, 0.016, x, y, 0.362); }
+    mesh(body, bx, M.sec, 0.13, 0.16, 0.03, 0, 0.44, 0.355); mesh(body, PG.sph, M.dark, 0.016, 0.03, 0.01, 0, 0.42, 0.372);            // the lock plate, its keyhole
+    mesh(body, bx, flesh, 1.02, 0.04, 0.62, 0, 0.535, 0);                                                                           // the floor of the mouth
+    for (let i = 0; i < 9; i++) mesh(body, PG.cyl, gold, 0.036, 0.008, 0.036, -0.3 + (i % 5) * 0.13 + (i > 4 ? 0.06 : 0), 0.562 + (i % 2) * 0.006, -0.12 + (i > 4 ? 0.1 : 0) + (i % 3) * 0.02, (i % 3) * 0.2, 0, (i % 2) * 0.25);
     const lid = joint(body, 0, 0.55, -0.35);
-    mesh(lid, PG.box, M.skin, 1.0, 0.25, 0.7, 0, 0.12, 0.35);
-    for (let i = 0; i < 8; i++) { mesh(lid, PG.cone, M.tooth, 0.03, 0.1, 0.03, -0.42 + i * 0.12, -0.03, 0.66, Math.PI); mesh(body, PG.cone, M.tooth, 0.03, 0.1, 0.03, -0.42 + i * 0.12, 0.58, 0.31); }
-    for (const bx of [-0.35, 0.35]) mesh(body, PG.box, M.sec, 0.08, 0.57, 0.72, bx, 0.28, 0);
-    const tongue = mesh(body, PG.box, new THREE.MeshStandardMaterial({ color: 0xa02838 }), 0.2, 0.04, 0.5, 0, 0.55, 0.4);
-    for (const s of [-1, 1]) mesh(lid, PG.sph, M.eye, 0.05, 0.05, 0.03, s * 0.2, 0.2, 0.7);
+    mesh(lid, MIMG, M.skin, 0.35, 1.1, 0.35, 0, 0, 0.35, 0, 0, Math.PI / 2);
+    mesh(lid, MIMG, roof, 0.335, 1.06, 0.335, 0, 0, 0.35, 0, 0, Math.PI / 2);
+    for (const x of [-0.36, 0.36]) mesh(lid, MIMG, M.sec, 0.358, 0.075, 0.358, x, 0, 0.35, 0, 0, Math.PI / 2);
+    mesh(lid, MIMG, M.sec, 0.358, 0.07, 0.358, 0, 0, 0.35, 0, 0, Math.PI / 2);
+    for (let i = 0; i < 9; i++) { const h = 0.09 + (i * 7 % 3) * 0.04; mesh(lid, PG.cone, M.tooth, 0.028, h, 0.028, -0.44 + i * 0.11, -h / 2 + 0.012, 0.665, Math.PI); }
+    for (let i = 0; i < 8; i++) { const h = 0.07 + ((i * 5 + 1) % 3) * 0.035; mesh(body, PG.cone, M.tooth, 0.026, h, 0.026, -0.4 + i * 0.115, 0.55 + h / 2, 0.305); }
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { mesh(lid, PG.cone, M.tooth, 0.022, 0.07 + k * 0.015, 0.022, s * 0.5, -0.03, 0.22 + k * 0.16, Math.PI); mesh(body, PG.cone, M.tooth, 0.02, 0.06, 0.02, s * 0.5, 0.58, 0.02 - k * 0.15 + 0.2); }
+    const tongue = joint(body, 0, 0.565, 0.02);
+    for (let k = 0; k < 5; k++) mesh(tongue, PG.sph, tongueM, 0.115 - k * 0.014, 0.036, 0.1, Math.sin(k * 1.3) * 0.02, 0.012 + k * 0.004, 0.06 + k * 0.135);
+    for (const s of [-1, 1]) { mesh(lid, PG.sph, M.eye, 0.034, 0.028, 0.02, s * 0.15, 0.13, 0.1); mesh(lid, PG.sph, M.eye, 0.018, 0.016, 0.012, s * 0.31, 0.08, 0.17); }
+    const mleg = (x, z) => {
+      const s = Math.sign(x), hip = joint(body, x, 0.04, z);
+      mesh(hip, PG.sph, M.dark, 0.07, 0.07, 0.07); mesh(hip, PG.cyl8, M.dark, 0.036, 0.26, 0.036, s * 0.1, 0.065, 0, 0, 0, -s * 1.0);
+      const kn = joint(hip, s * 0.2, 0.13, 0);
+      mesh(kn, PG.sph, M.dark, 0.046, 0.046, 0.046); mesh(kn, PG.cyl8, M.dark, 0.024, 0.46, 0.024, s * 0.045, -0.22, 0, 0, 0, s * 0.2); mesh(kn, PG.cone, M.dark, 0.022, 0.1, 0.022, s * 0.1, -0.49, 0, Math.PI, 0, s * 0.2);
+      return { hip, kn };
+    };
     const L = [];
-    for (const [x, z] of [[-0.35, 0.25], [0.35, 0.25], [-0.35, -0.25], [0.35, -0.25]]) L.push(leg(body, M, x, 0, z, 0.38, 0.06, M.sec));
+    for (const [x, z] of [[-0.42, 0.25], [0.42, 0.25], [-0.42, -0.25], [0.42, -0.25]]) L.push(mleg(x, z));
     // coin glint
     const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xffd060, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); gl.scale.setScalar(0.6); gl.position.set(0, 0.5, 0.2); body.add(gl);
     return {
@@ -1787,6 +1855,8 @@
         wp.y -= (i + 1) * 0.06 * m.scale;
         const lp = wp.applyMatrix4(inv);
         m.J.segs[i].position.copy(lp);
+        const pv = i ? m.J.segs[i - 1].position : m.J.head.position, dx = pv.x - lp.x, dz = pv.z - lp.z;
+        if (dx * dx + dz * dz > 0.0004) m.J.segs[i].rotation.y = Math.atan2(dx, dz);
       }
       m.animate({ atk: this.atk, wind: 0, t: G.game.time });
     }

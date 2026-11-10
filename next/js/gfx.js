@@ -527,6 +527,18 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   col = S(vec3(.8 + (n1 - .5) * .2) * (.68 + pl * .32));
   rough = .36 + (n1 - .5) * .2 + pit * .3 + (1. - pl) * .3; metal = 0.;
 }`],
+    // (living rock: broad lumps, cracks that wander between them, finer cracks, a grain, pits)
+    rock: [512, 1.0, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 3., 1.), n2 = fbm(uv, 12., 2.), n3 = fbm(uv, 48., 3.), g = vnoise(uv * 160., 160., 4.);
+  vec3 v = voro(uv + (vec2(fbm(uv, 6., 8.), fbm(uv, 6., 9.)) - .5) * .12, 6., 5.);
+  float cr = 1. - smoothstep(.0, .035, v.y - v.x);
+  float ck = smoothstep(.78, .9, ridge(uv, 9., 6.)) * .6;
+  float pit = smoothstep(.74, .9, vnoise(uv * 64., 64., 7.));
+  h = .5 + (n1 - .5) * .5 + (n2 - .5) * .22 + (n3 - .5) * .1 + (g - .5) * .04 - cr * .3 - ck * .14 - pit * .07;
+  col = S(vec3(.7 + (n1 - .5) * .22 + (n2 - .5) * .16 + (n3 - .5) * .08) * (1. - cr * .45) * (1. - ck * .25));
+  rough = .92 + (n3 - .5) * .12; metal = 0.;
+}`],
     weave: [512, 1.0, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   float n = 40.; vec2 p = uv * n; float wa = sin(p.x * 6.2831853) * .5 + .5, we = sin(p.y * 6.2831853) * .5 + .5;
@@ -1641,7 +1653,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----
-  const fuseCache = new Map(), HARD = { golem: 1, beetle: 1, knight: 1, gargoyle: 1 }, NOFUSE = { skeleton: 1, worm: 1, mimic: 1, slime: 1, eye: 1 };
+  const fuseCache = new Map(), HARD = { golem: 1, beetle: 1, knight: 1, gargoyle: 1 }, NOFUSE = { skeleton: 1, mimic: 1, slime: 1, eye: 1 };
   const POSES = [{ walk: 0.7, mv: 1, atk: 0, wind: 0, flinch: 0, t: 1.3 }, { walk: 2.9, mv: 1, atk: 1, wind: 0, flinch: 0, t: 2.7, throwing: true }, { walk: 4.1, mv: 0, atk: 0, wind: 1, flinch: 1, t: 4.1, stunned: true }, { walk: 5.3, mv: 0.5, atk: 0.5, wind: 0.5, flinch: 0.5, t: 7.9 }];
   X.fuse = function (inner, model, M, plan, o) {
     const S = X.S, PG = G.Props && G.Props.PG; if (!S || !PG || NOFUSE[plan]) return 0;

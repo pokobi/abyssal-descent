@@ -1443,10 +1443,205 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     return (fgc[name] = g);
   };
 
+  // ---- what the field foes carry and wear (fieldfoes.js), in metres, as lists of parts { g, m }: m says which of the wearer's
+  // materials. A thing held in a hand has its grip at the origin and runs forward (+z, the way a body faces); a thing worn sits about
+  // the joint it hangs on ----
+  const fpart = (m, list, k) => ({ g: boxUV(Geo.merge(Array.isArray(list) ? list : [list]), k || 2.5), m });
+  const toZ = (g) => { g.rotateX(HX); return g; };       // (drawn up the y axis like a hand weapon, then laid forward)
+  // a round bar along a line of points, its radius by how far along it (0 to 1). sm: how many points to draw the curve through them
+  // with (false: straight from point to point)
+  const tubeR = (pts, rf, seg, sm) => {
+    const V3 = THREE.Vector3;
+    const P = sm === false ? pts.map((p) => new V3(p[0], p[1], p[2])) : new THREE.CatmullRomCurve3(pts.map((p) => new V3(p[0], p[1], p[2]))).getPoints(sm || pts.length * 4);
+    const n = P.length, sg = seg || 8, pos = [], idx = [], t = new V3(), b = new V3(), nn = new V3(); let pb = null;
+    for (let i = 0; i < n; i++) {
+      t.copy(P[Math.min(i + 1, n - 1)]).sub(P[Math.max(i - 1, 0)]).normalize();
+      if (!pb) pb = Math.abs(t.x) < 0.9 ? new V3(1, 0, 0) : new V3(0, 1, 0);
+      b.copy(pb).addScaledVector(t, -pb.dot(t)).normalize(); pb.copy(b); nn.crossVectors(t, b);
+      const r = typeof rf === 'function' ? rf(i / (n - 1)) : rf;
+      for (let k = 0; k < sg; k++) { const a = k / sg * Math.PI * 2, c = Math.cos(a) * r, s = Math.sin(a) * r; pos.push(P[i].x + b.x * c + nn.x * s, P[i].y + b.y * c + nn.y * s, P[i].z + b.z * c + nn.z * s); }
+    }
+    for (let i = 0; i + 1 < n; i++) for (let k = 0; k < sg; k++) { const a = i * sg + k, a2 = i * sg + (k + 1) % sg, c = a + sg, c2 = a2 + sg; idx.push(a, a2, c, a2, c2, c); }
+    const c0 = pos.length / 3; pos.push(P[0].x, P[0].y, P[0].z, P[n - 1].x, P[n - 1].y, P[n - 1].z);
+    for (let k = 0; k < sg; k++) { idx.push(c0, (k + 1) % sg, k); idx.push(c0 + 1, (n - 1) * sg + k, (n - 1) * sg + (k + 1) % sg); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  };
+  // a sheet hanging from y1 down to y0: its half-width w(v) and where it lies z(x, v, u) at each height (v: 0 at the foot, 1 at the
+  // top; u: -1 to 1 across). drop(u): how much higher the foot ends across it (a torn hem). th: a thickness, with a back and a rim
+  const sheet = (y0, y1, wf, zf, ny, nx, th, drop) => {
+    const pos = [], idx = [], row = nx + 1;
+    const lay = (dz) => { for (let j = 0; j <= ny; j++) { const v = j / ny, w = Math.max(wf(v), 0.0004); for (let i = 0; i <= nx; i++) { const u = i / nx * 2 - 1, x = u * w; pos.push(x, y0 + (y1 - y0) * v + (drop ? drop(u) * (1 - v) * (1 - v) : 0), zf(x, v, u) + dz); } } };
+    lay(0);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = j * row + i, b = a + 1, c = a + row, d = c + 1; idx.push(a, b, d, a, d, c); }
+    if (th) {
+      const o = pos.length / 3; lay(-th);
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = o + j * row + i, b = a + 1, c = a + row, d = c + 1; idx.push(a, d, b, a, c, d); }
+      const B = []; for (let i = 0; i <= nx; i++) B.push(i); for (let j = 1; j <= ny; j++) B.push(j * row + nx); for (let i = nx - 1; i >= 0; i--) B.push(ny * row + i); for (let j = ny - 1; j >= 1; j--) B.push(j * row);
+      for (let k = 0; k < B.length; k++) { const a = B[k], b = B[(k + 1) % B.length]; idx.push(a, o + a, b, b, o + a, o + b); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  };
+  const GEAR = {}, gearC = {};
+  // a hay fork: a haft worn smooth and not quite straight, a socket, three tines drawn out to points
+  GEAR.pitchfork = () => {
+    const iron = [toZ(hl([[0.0005, 1.12], [0.027, 1.12], [0.025, 1.24], [0.016, 1.29], [0.0005, 1.29]], 1, 1, 10)), toZ(ringY(1.135, 0.027, 0.005))];
+    for (const x of [-0.085, 0, 0.085]) iron.push(tubeR([[x * 0.15, 0, 1.26], [x * 0.9, 0, 1.31], [x * 1.1, -0.006, 1.42], [x, -0.03, 1.6 + (x ? 0 : 0.035)]], (t) => 0.0125 - t * 0.0105, 6, 14));
+    return [fpart('wood', tubeR([[0, 0.012, -0.42], [0.006, 0, 0], [0, -0.008, 0.6], [-0.004, 0, 1.2]], (t) => 0.021 - t * 0.003, 8, 16), 3), fpart('iron', iron, 4)];
+  };
+  // a sword for two hands: a long grip bound in hide, a wheel for a pommel, a guard drawn down at its ends, a broad blade with a ridge
+  GEAR.greatsword = () => [
+    fpart('leather', toZ(hl(wrapPts(-0.2, 0.062, 0.021, 13), 0.86, 1.1)), 6),
+    fpart('iron', [toZ(hl([[0.0005, -0.27], [0.024, -0.265], [0.037, -0.24], [0.024, -0.214], [0.0005, -0.2]], 0.62, 1, 14)),
+      toZ(side([[0.18, 0.058], [0.192, 0.072], [0.176, 0.094], [0.03, 0.088], [-0.03, 0.088], [-0.176, 0.094], [-0.192, 0.072], [-0.18, 0.058], [-0.02, 0.064], [0.02, 0.064]], 0.028, 0.007)),
+      toZ(rbx(0.034, 0.05, 0.05, 0.008, 0, 0.076, 0))], 4),
+    fpart('blade', toZ(straight([[0.09, 0.043, 0.043, 0.0115], [0.5, 0.039, 0.039, 0.0108], [0.98, 0.033, 0.033, 0.0092], [1.2, 0.021, 0.021, 0.0062]], [1.32, 0])), 3),
+    fpart('dark', toZ(rbx(0.013, 0.62, 0.011, 0.002, 0, 0.43, 0)), 3),
+  ];
+  // a kite shield: round above, drawn down to a point, bent about the arm; an iron rim, a boss, two bands, nails
+  GEAR.kite = () => {
+    const Y0 = -0.62, Y1 = 0.4, wf = (v) => v < 0.7 ? 0.3 * Math.pow(v / 0.7, 0.7) : 0.3 * Math.sqrt(1 - Math.pow((v - 0.7) / 0.3, 2) * 0.9), bend = (x) => -1.1 * x * x;
+    const rim = [], st = [];
+    for (let i = 0; i <= 24; i++) { const v = i / 24; rim.push([wf(v), Y0 + (Y1 - Y0) * v, bend(wf(v)) - 0.015]); }
+    for (let i = 24; i >= 0; i--) { const v = i / 24; rim.push([-wf(v), Y0 + (Y1 - Y0) * v, bend(wf(v)) - 0.015]); }
+    st.push(tubeR(rim, 0.017, 6, false), ball(0.085, [0, -0.02, 0.0], [1, 1, 0.6]), ball(0.02, [0, -0.02, 0.05]));
+    st.push(sheet(-0.55, 0.37, () => 0.024, (x) => bend(x) + 0.007, 8, 2, 0.008), sheet(0.09, 0.145, () => 0.285, (x) => bend(x) + 0.007, 1, 12, 0.008));
+    for (const v of [0.22, 0.42, 0.62, 0.8, 0.93]) for (const s of [-1, 1]) { const x = s * (wf(v) - 0.05); st.push(ball(0.012, [x, Y0 + (Y1 - Y0) * v, bend(x) + 0.003])); }
+    return [fpart('paint', sheet(Y0, Y1, wf, bend, 18, 12, 0.03), 2.2), fpart('steel', st, 4)];
+  };
+  // a longbow: a stave thick at the grip and thin at the horns, its ends bent back a little; the grip bound, horn nocks. It stands
+  // up the y axis, its belly forward; the string (the wearer's own, it draws it) runs behind it at z = -0.16
+  GEAR.longbow = () => {
+    const pts = []; for (let i = -10; i <= 10; i++) { const t = i / 10, a = Math.abs(t); pts.push([0, t * 0.78, -0.19 * a * a + (a > 0.8 ? (a - 0.8) * 0.15 : 0)]); }
+    return [fpart('wood', tubeR(pts, (t) => 0.008 + 0.015 * Math.pow(Math.sin(Math.PI * t), 0.7), 7, false), 4), fpart('leather', hl(wrapPts(-0.07, 0.07, 0.026, 7), 0.9, 1.05), 6),
+      fpart('bone', [ball(0.012, [0, 0.78, -0.16], [0.8, 1.3, 1]), ball(0.012, [0, -0.78, -0.16], [0.8, 1.3, 1])], 4)];
+  };
+  // a quiver: a case of hide wider at its mouth, bound at the rim, six arrows standing in it, their flights of three vanes
+  GEAR.quiver = () => {
+    const dk = [], fl = [];
+    for (let i = 0; i < 6; i++) {
+      const a = i * 2.4, r = 0.012 + (i % 3) * 0.013, x = Math.cos(a) * r, z = Math.sin(a) * r * 0.8, top = 0.5 + (i % 3) * 0.035;
+      dk.push(Geo.rod([x, 0.2, z], [x * 1.6, top, z * 1.6], 0.005, 5));
+      for (let k = 0; k < 3; k++) fl.push(Geo.xf(ext([[0.004, 0], [0.028, 0.018], [0.03, 0.1], [0.004, 0.135]], 0.002, 0), [x * 1.5, top - 0.16, z * 1.5], [0, a + k * 2.094, 0]));
+    }
+    return [fpart('leather', [hl([[0.0005, -0.3], [0.05, -0.3], [0.058, -0.27], [0.066, 0.2], [0.074, 0.24], [0.078, 0.27], [0.068, 0.27], [0.06, 0.22], [0.0005, 0.2]], 1, 0.8, 14),
+      Geo.xf(ringY(0.2, 0.068, 0.008), null, null, [1, 1, 0.8]), Geo.xf(ringY(-0.22, 0.058, 0.007), null, null, [1, 1, 0.8])], 5), fpart('dark', dk, 4), fpart('fletch', fl, 6)];
+  };
+  // a reaping hook: a short haft, a ferrule, a blade that comes round in more than half a ring, its edge inside. Drawn up the y axis
+  GEAR.sickle = () => {
+    const bl = (t, w) => ({ a: w * 0.45, b: w * 0.55, T: 0.008 - t * 0.003, tb: 0.006 - t * 0.003 });
+    return [fpart('wood', hl([[0.0005, -0.13], [0.019, -0.13], [0.0165, -0.02], [0.0185, 0.09], [0.0005, 0.09]], 1, 1, 10), 5),
+      fpart('iron', [ringY(0.075, 0.0195, 0.005), cres(7, 0.052, 0.005, 0.075, 1.5, 0.42, 0.085, 0.0, bl)], 5)];
+  };
+  // a great helm drawn up to a blunt point: a comb over the crown from brow to nape, a band across the sight with two slits in it,
+  // breaths pierced in one cheek, a fall of mail from its rim onto the shoulders
+  GEAR.helm = () => {
+    const prof = [[0.0005, 0.4], [0.035, 0.395], [0.09, 0.36], [0.14, 0.3], [0.17, 0.22], [0.18, 0.14], [0.178, 0.04], [0.17, -0.03], [0.176, -0.05], [0.166, -0.058], [0.0005, -0.058]], ZS = 1.08;
+    const rAt = (y) => { for (let i = 0; i + 1 < prof.length; i++) { const a = prof[i], b = prof[i + 1]; if (y <= a[1] && y >= b[1]) return a[0] + (b[0] - a[0]) * (a[1] - y) / (a[1] - b[1] || 1); } return 0.17; };
+    const comb = [], inner = [], ys = [-0.05, 0.04, 0.14, 0.22, 0.3, 0.36, 0.395];
+    for (const y of ys) { comb.push([rAt(y) * ZS + 0.01, y]); inner.push([rAt(y) * ZS - 0.012, y]); }
+    comb.push([0, 0.418]); inner.push([0, 0.39]);
+    for (let i = ys.length - 1; i >= 3; i--) { comb.push([-(rAt(ys[i]) * ZS + 0.008), ys[i]]); inner.push([-(rAt(ys[i]) * ZS - 0.012), ys[i]]); }
+    const cg = side(comb.concat(inner.reverse()), 0.03, 0.006); cg.rotateY(Math.PI);
+    const band = ext(arcRing(0.172, 0.189, -HX - 1.25, -HX + 1.25, 18), 0.05, 0.004); band.rotateX(-HX); band.scale(1, 1, ZS); band.translate(0, 0.165, 0);
+    const dk = [];
+    for (const s of [-1, 1]) dk.push(rbx(0.066, 0.011, 0.014, 0.002, s * 0.072, 0.168, Math.sqrt(0.189 * 0.189 - 0.072 * 0.072) * ZS - 0.002, [0, s * 0.39, 0]));
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { const x = 0.045 + i * 0.028, y = 0.03 + j * 0.028; dk.push(ball(0.0065, [x, y, Math.sqrt(Math.pow(rAt(y), 2) - x * x) * ZS + 0.001])); }
+    return [fpart('steel', hl(prof, 1, ZS, 24), 3), fpart('trim', [cg, band, Geo.xf(ringY(-0.045, 0.176, 0.008), null, null, [1, 1, ZS])], 4), fpart('dark', dk, 4),
+      fpart('mail', hl([[0.166, -0.04], [0.19, -0.1], [0.228, -0.175], [0.216, -0.185], [0.17, -0.1], [0.15, -0.04]], 1, 1.02, 20), 9)];
+  };
+  // a cloak from the shoulders to the calf, in folds, its hem torn. It hangs from the origin
+  GEAR.cape = () => [fpart('cloth', sheet(-1.0, 0, (v) => 0.36 - v * 0.13, (x, v, u) => -(1 - v) * (1 - v) * 0.16 + Math.sin(u * 8.5 + 0.6) * 0.035 * (1 - v * 0.8) + Math.sin(u * 3.1) * 0.02 * (1 - v), 14, 16, 0,
+    (u) => 0.12 * Math.abs(Math.sin(u * 5.3 + 1)) + 0.07 * Math.sin(u * 11) - 0.05), 2)];
+  // a rag of a hand's breadth, torn at its foot: what is left of a skirt or a sleeve. It hangs from the origin
+  GEAR.tatter = () => [fpart('cloth', sheet(-0.34, 0, (v) => 0.075 - v * 0.02, (x, v, u) => Math.sin(u * 4 + 1) * 0.012 * (1 - v) + (1 - v) * (1 - v) * 0.03, 5, 4, 0, (u) => 0.1 * Math.abs(Math.sin(u * 3.7 + 0.5)) - 0.03), 3)];
+  // a ribbon of waterweed, or of wet hair: wavy at its edges, twisting as it hangs. From the origin down
+  GEAR.weed = () => [fpart('weed', sheet(-0.6, 0, (v) => 0.004 + 0.024 * Math.sqrt(v) * (0.65 + 0.35 * Math.sin(v * 9)), (x, v) => Math.sin(v * 7) * 0.03 * (1 - v) + x * Math.sin(v * 11) * 0.7, 12, 2, 0), 4)];
+  // a wing: the arm of it along the fore edge, long flight feathers fanned from the hand, shorter ones along the forearm, a row of
+  // coverts laid over their roots. It reaches out along +x from the origin, its feathers falling to -y
+  GEAR.wing = () => {
+    const feather = (len, w) => sheet(-len, 0, (v) => w * Math.max(0.24 * v, Math.pow(Math.sin(Math.PI * (1 - v) * 0.96 + 0.04), 0.55)), (x) => -x * x * 5, 6, 2, 0);
+    const F = [tubeR([[0, 0, 0], [0.3, 0.12, -0.02], [0.62, 0.1, -0.05], [1.0, -0.03, -0.08]], (t) => 0.032 - t * 0.02, 6, 14)];
+    for (let i = 0; i < 8; i++) F.push(Geo.xf(feather(0.6 - i * 0.012, 0.062), [0.6 + i * 0.055, 0.09 - i * 0.017, -0.05 + i * 0.004], [0, 0, 0.12 + i * 0.165]));     // from the hand
+    for (let i = 0; i < 7; i++) F.push(Geo.xf(feather(0.44 + i * 0.02, 0.066), [0.07 + i * 0.085, 0.03 + Math.sin(i * 0.5) * 0.07, -0.02 - i * 0.004], [0, 0, -0.1 + i * 0.035]));   // along the forearm
+    for (let i = 0; i < 10; i++) F.push(Geo.xf(feather(0.2 + (i % 2) * 0.03, 0.05), [0.05 + i * 0.095, 0.04 + Math.sin(i * 0.36) * 0.08 - (i > 6 ? (i - 6) * 0.03 : 0), 0.004 + i * 0.002], [0, 0, -0.05 + i * 0.07]));   // coverts
+    for (let i = 0; i < 8; i++) F.push(Geo.xf(feather(0.1, 0.04), [0.08 + i * 0.11, 0.07 + Math.sin(i * 0.4) * 0.07 - (i > 5 ? (i - 5) * 0.04 : 0), 0.016], [0, 0, i * 0.06]));
+    return [fpart('feather', F, 5)];
+  };
+  // a hat of felt gone shapeless: the crown fallen to one side, the brim rippled and torn away at one place; a cord about it
+  GEAR.hat = () => {
+    const g = new THREE.LatheGeometry(spl([[0.0005, 0.36], [0.05, 0.34], [0.1, 0.25], [0.16, 0.12], [0.2, 0.03], [0.24, 0.0], [0.42, -0.03], [0.445, -0.045], [0.42, -0.055], [0.2, -0.02], [0.0005, -0.02]], 30), 32);
+    const ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) {
+      let x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i); const a = Math.atan2(z, x), r = Math.hypot(x, z);
+      if (r > 0.22) { const k = (r - 0.22) / 0.22, torn = Math.max(0, 1 - Math.abs(Math.atan2(Math.sin(a - 2.2), Math.cos(a - 2.2))) / 0.5); y += k * (0.045 * Math.sin(a * 3 + 1) + 0.025 * Math.sin(a * 7)) - k * k * 0.05; const sh = 1 - torn * 0.55 * k; x *= sh; z *= sh; }
+      if (y > 0.1) { const k = (y - 0.1) / 0.26; x += k * k * 0.11; z -= k * k * 0.05; y -= k * k * 0.07; }
+      ps.setXYZ(i, x, y, z);
+    }
+    g.computeVertexNormals();
+    return [fpart('felt', g, 3), fpart('cord', ringY(0.045, 0.2, 0.012), 6)];
+  };
+  // two iron bottles side by side on the back, banded and capped; a pipe between their heads, another over the right shoulder
+  GEAR.tank = () => {
+    const iron = [rbx(0.2, 0.05, 0.02, 0.005, 0, 0.1, 0.1), rbx(0.2, 0.05, 0.02, 0.005, 0, -0.14, 0.1)], brass = [];
+    for (const s of [-1, 1]) {
+      iron.push(Geo.xf(hl([[0.0005, -0.3], [0.07, -0.29], [0.105, -0.25], [0.11, -0.2], [0.11, 0.2], [0.1, 0.26], [0.06, 0.3], [0.03, 0.31], [0.03, 0.35], [0.0005, 0.35]], 1, 1, 14), [s * 0.118, 0, 0]));
+      for (const y of [-0.17, 0.02, 0.2]) brass.push(Geo.xf(ringY(y, 0.111, 0.008), [s * 0.118, 0, 0]));
+      brass.push(Geo.xf(hl([[0.0005, 0.35], [0.036, 0.35], [0.036, 0.375], [0.0005, 0.38]], 1, 1, 10), [s * 0.118, 0, 0]));
+    }
+    brass.push(tubeR([[-0.118, 0.37, 0], [-0.08, 0.47, 0.02], [0.08, 0.47, 0.02], [0.118, 0.37, 0]], 0.014, 6, 12), tubeR([[0.118, 0.37, 0], [0.2, 0.48, 0.1], [0.28, 0.45, 0.27], [0.31, 0.27, 0.32]], 0.016, 6, 14));
+    return [fpart('iron', iron, 3), fpart('brass', brass, 4)];
+  };
+  // a fire-pipe: a tube with a bound grip, two collars, a bell at its mouth, a thin pilot pipe laid along it. Forward from the grip
+  GEAR.nozzle = () => [
+    fpart('iron', [toZ(hl([[0.0005, -0.1], [0.02, -0.1], [0.02, 0.5], [0.026, 0.51], [0.03, 0.56], [0.05, 0.64], [0.056, 0.665], [0.047, 0.665], [0.024, 0.575], [0.0005, 0.565]], 1, 1, 14)),
+      toZ(ringY(0.16, 0.021, 0.006)), toZ(ringY(0.42, 0.021, 0.006)), tubeR([[0, 0.03, 0.12], [0, 0.045, 0.3], [0, 0.05, 0.5], [0, 0.066, 0.66]], 0.007, 5, 10), rbx(0.012, 0.06, 0.012, 0.003, 0, 0.05, 0.16)], 4),
+    fpart('leather', toZ(hl(wrapPts(-0.075, 0.075, 0.027, 7))), 6),
+  ];
+  // a smith's face: a hood of hide over the skull and neck, an iron plate before the face bent round it, nailed at its edge
+  GEAR.smithmask = () => {
+    const zf = (x) => Math.sqrt(0.2 * 0.2 - x * x) - 0.022, wf = (v) => 0.105 + 0.03 * Math.sin(v * Math.PI) - (v < 0.25 ? (0.25 - v) * 0.16 : 0), iron = [sheet(-0.075, 0.26, wf, zf, 10, 8, 0.012)];
+    for (const v of [0.12, 0.5, 0.9]) for (const s of [-1, 1]) { const x = s * (wf(v) - 0.016); iron.push(ball(0.008, [x, -0.075 + 0.335 * v, zf(x) + 0.001])); }
+    iron.push(sheet(0.06, 0.14, () => 0.012, (x) => zf(x) + 0.006, 2, 1, 0.006));    // a ridge down the nose
+    return [fpart('iron', iron, 4), fpart('leather', [hl([[0.0005, 0.335], [0.07, 0.325], [0.13, 0.285], [0.168, 0.22], [0.178, 0.14], [0.172, 0.04], [0.15, -0.04], [0.16, -0.1], [0.2, -0.15], [0.19, -0.16], [0.12, -0.08], [0.0005, -0.06]], 1, 1.06, 18)], 4)];
+  };
+  // a smith's apron: a bib over the chest, a broad skirt of hide over the belly to below the knee, a strap about the neck and one
+  // about the waist, a hammer hung from it. About the spine's foot
+  GEAR.apron = () => {
+    const prof = [[0.5, 0.225], [0.34, 0.29], [0.2, 0.35], [0.02, 0.335], [-0.2, 0.255], [-0.56, 0.22]];     // [height, how far forward the body's front is there]
+    const fz = (y) => { for (let i = 0; i + 1 < prof.length; i++) { const a = prof[i], b = prof[i + 1]; if (y <= a[0] && y >= b[0]) { const t = (a[0] - y) / (a[0] - b[0]); return a[1] + (b[1] - a[1]) * (t * t * (3 - 2 * t)); } } return 0.22; };
+    const Y0 = -0.56, Y1 = 0.5, wf = (v) => v > 0.72 ? 0.125 + (1 - v) * 0.1 : v > 0.62 ? 0.153 + (0.72 - v) * 1.2 : 0.273 + (0.62 - v) * 0.06;
+    const zf = (x, v) => fz(Y0 + (Y1 - Y0) * v) - x * x * (1.2 + 0.7 * Math.min(1, Math.max(0, (v - 0.2) / 0.2))) + Math.sin(x * 22) * 0.008 * Math.max(0, 0.5 - v);
+    const lea = [sheet(Y0, Y1, wf, zf, 18, 10, 0.014, (u) => 0.03 * Math.sin(u * 4 + 1))];
+    lea.push(tubeR([[0.12, 0.5, 0.19], [0.15, 0.62, 0.06], [0.1, 0.66, -0.08], [0, 0.65, -0.12], [-0.1, 0.66, -0.08], [-0.15, 0.62, 0.06], [-0.12, 0.5, 0.19]], 0.011, 5, 24));
+    const belt = [[0.275, 0.14, 0.2]]; for (let i = 0; i <= 14; i++) { const a = i / 14 * Math.PI; belt.push([Math.cos(a) * 0.3, 0.14, 0.05 - Math.sin(a) * 0.24]); } belt.push([-0.275, 0.14, 0.2]);
+    lea.push(tubeR(belt, 0.013, 5, false));
+    const iron = [ball(0.011, [0.105, 0.47, zf(0.105, 0.97) + 0.002]), ball(0.011, [-0.105, 0.47, zf(-0.105, 0.97) + 0.002]), rbx(0.05, 0.05, 0.11, 0.008, -0.27, -0.12, -0.12)];
+    return [fpart('leather', lea, 3), fpart('iron', iron, 4), fpart('wood', tubeR([[-0.27, 0.15, -0.12], [-0.27, -0.12, -0.12]], 0.013, 6, false), 4)];
+  };
+  // a pike: a long ash haft, a shoe at its foot, a socket and a bar under a leaf of a head, a rag of a pennon
+  GEAR.pike = () => [
+    fpart('wood', tubeR([[0, 0.004, -0.75], [0.004, 0, 0], [0, -0.004, 0.9], [0, 0, 1.72]], (t) => 0.019 - t * 0.003, 8, 14), 3),
+    fpart('iron', [toZ(hl([[0.0005, 1.66], [0.022, 1.66], [0.02, 1.78], [0.012, 1.84], [0.0005, 1.84]], 1, 1, 10)), toZ(spike(0.018, 0.09, [0, -0.79, 0], [Math.PI, 0, 0], 8)), toZ(rbx(0.012, 0.014, 0.13, 0.004, 0, 1.8, 0))], 4),
+    fpart('blade', toZ(straight([[1.83, 0.012, 0.012, 0.011], [1.9, 0.03, 0.03, 0.012], [2.02, 0.024, 0.024, 0.0095], [2.16, 0.011, 0.011, 0.006]], [2.24, 0])), 3),
+    fpart('cloth', Geo.xf(sheet(-0.34, 0, (v) => 0.075 - v * 0.02, (x, v, u) => Math.sin(u * 4 + 1) * 0.012 * (1 - v), 5, 4, 0, (u) => 0.1 * Math.abs(Math.sin(u * 3.7 + 0.5)) - 0.03), [0, -0.02, 1.6], [0, HX, 0]), 6),
+  ];
+  // a miner's pick: a short haft, a head drawn out to a point both ways in a bow
+  GEAR.pick = () => [
+    fpart('wood', tubeR([[0, 0, -0.3], [0.003, 0, 0.2], [0, 0, 0.62]], (t) => 0.02 - t * 0.002, 8, 8), 3),
+    fpart('iron', [tubeR([[0, -0.3, 0.5], [0, -0.15, 0.585], [0, 0, 0.61], [0, 0.15, 0.585], [0, 0.3, 0.5]], (t) => 0.007 + 0.019 * Math.sin(Math.PI * t), 6, 16), toZ(rbx(0.05, 0.07, 0.06, 0.01, 0, 0.61, 0))], 4),
+  ];
+  // a kettle hat: a round skull of iron with a broad brim, over a coif of mail that falls on the shoulders
+  GEAR.kettle = () => [
+    fpart('steel', [hl([[0.0005, 0.335], [0.06, 0.325], [0.12, 0.285], [0.16, 0.215], [0.172, 0.15], [0.176, 0.13], [0.245, 0.082], [0.25, 0.07], [0.24, 0.062], [0.17, 0.1], [0.0005, 0.1]], 1, 1.08, 24),
+      Geo.xf(side([[0.19, 0.13], [0.18, 0.22], [0.13, 0.3], [0, 0.345], [-0.13, 0.3], [-0.18, 0.22], [-0.19, 0.13], [-0.17, 0.13], [-0.16, 0.21], [-0.12, 0.28], [0, 0.32], [0.12, 0.28], [0.16, 0.21], [0.17, 0.13]], 0.022, 0.005))], 3),
+    fpart('mail', hl([[0.0005, 0.3], [0.1, 0.27], [0.158, 0.18], [0.166, 0.08], [0.152, -0.02], [0.162, -0.06], [0.2, -0.12], [0.238, -0.175], [0.226, -0.185], [0.0005, -0.16]], 1, 1.03, 20), 9),
+  ];
+  X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----
-  const fuseCache = new Map(), HARD = { golem: 1, beetle: 1, knight: 1, gargoyle: 1, scarecrow: 1, smith: 1 }, NOFUSE = { skeleton: 1, worm: 1, mimic: 1, slime: 1, eye: 1 };
+  const fuseCache = new Map(), HARD = { golem: 1, beetle: 1, knight: 1, gargoyle: 1 }, NOFUSE = { skeleton: 1, worm: 1, mimic: 1, slime: 1, eye: 1 };
   const POSES = [{ walk: 0.7, mv: 1, atk: 0, wind: 0, flinch: 0, t: 1.3 }, { walk: 2.9, mv: 1, atk: 1, wind: 0, flinch: 0, t: 2.7, throwing: true }, { walk: 4.1, mv: 0, atk: 0, wind: 1, flinch: 1, t: 4.1, stunned: true }, { walk: 5.3, mv: 0.5, atk: 0.5, wind: 0.5, flinch: 0.5, t: 7.9 }];
   X.fuse = function (inner, model, M, plan, o) {
     const S = X.S, PG = G.Props && G.Props.PG; if (!S || !PG || NOFUSE[plan]) return 0;
@@ -1475,7 +1670,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       for (let i = 0; i < all.length; i++) { const v = all[i], q = snap[i]; v.position.copy(q[0]); v.quaternion.copy(q[1]); v.scale.copy(q[2]); v.visible = q[3]; }
       if (!ok) return 0;
     }
-    const hard = !!HARD[plan], fixed = M ? [M.skin, M.sec] : null, inv = new THREE.Quaternion(), m4 = new THREE.Matrix4();
+    const hard = !!HARD[plan], fixed = M ? [M.skin, M.sec].concat((model && model.mats) || []) : null, inv = new THREE.Quaternion(), m4 = new THREE.Matrix4();
     const rnd = o.round || (hard ? 0.3 : 0.62), blend = o.blend || (hard ? 0.025 : 0.075);
     let made = 0;
     for (const g of all) {
@@ -1520,7 +1715,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         }
         [lo, hi] = box(use);
         const L = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]), k = Math.min(o.free ? 0.4 : 0.12, Math.max(0.012, L * blend)), pad = k + cell * 2;
-        const key = rnd.toFixed(2) + ',' + blend.toFixed(3) + ',' + cell.toFixed(4) + use.map((q) => q.t + ',' + (q.c ? [q.x, q.y, q.z, q.sx, q.sy, q.sz, q.c.quaternion.x, q.c.quaternion.y, q.c.quaternion.z, q.c.quaternion.w] : [q.r]).map((v) => v.toFixed(3)).join(',')).join('|');
+        const uvm = (mat.userData && mat.userData.uvk) || 1.5, key = rnd.toFixed(2) + ',' + blend.toFixed(3) + ',' + cell.toFixed(4) + ',' + uvm + use.map((q) => q.t + ',' + (q.c ? [q.x, q.y, q.z, q.sx, q.sy, q.sz, q.c.quaternion.x, q.c.quaternion.y, q.c.quaternion.z, q.c.quaternion.w] : [q.r]).map((v) => v.toFixed(3)).join(',')).join('|');
         let geo = fuseCache.get(key);
         if (geo === undefined) {
           const fn = (x, y, z) => { let d = 1e9; for (let n = 0; n < use.length; n++) { const v = sd1(use[n], x, y, z); d = n ? S.smin(d, v, k) : v; } return d; };
@@ -1530,7 +1725,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
             const gm = S.mesh(fn, [lo[0] - pad, lo[1] - pad, lo[2] - pad], [hi[0] + pad, hi[1] + pad, hi[2] + pad], cell);
             if (gm.attributes.position && gm.attributes.position.count >= 12) {
               // (the texture at one grain on every part, whatever its size)
-              const ps = gm.attributes.position, nr = gm.attributes.normal, uv = gm.attributes.uv, uvk = o.free ? 2.4 / L : 1.5;   // (a guardian's part is metres across: the texture by the part, not by the metre)
+              const ps = gm.attributes.position, nr = gm.attributes.normal, uv = gm.attributes.uv, uvk = o.free ? 2.4 / L : uvm;   // (a guardian's part is metres across: the texture by the part, not by the metre)
               for (let n = 0; n < ps.count; n++) { const ax = Math.abs(nr.getX(n)), ay = Math.abs(nr.getY(n)), az = Math.abs(nr.getZ(n)), x = ps.getX(n) * uvk, y = ps.getY(n) * uvk, z = ps.getZ(n) * uvk; if (ax >= ay && ax >= az) uv.setXY(n, z, y); else if (ay >= az) uv.setXY(n, x, z); else uv.setXY(n, x, y); }
               geo = gm;
             }

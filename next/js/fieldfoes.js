@@ -21,38 +21,83 @@
 
   // ---------------------------------------------------------------- colours of the new bodies
   Object.assign(X.PLANCOL, {
-    villager: { skin: '#8a8270', sec: '#4a3a2a', rough: 0.85, blood: 0x4a3a20, tex: 'skin' },
-    scarecrow: { skin: '#b89a5a', sec: '#4a3a26', rough: 0.95, blood: 0x6a5a30, tex: 'skin' },
+    villager: { skin: '#6e695c', sec: '#4a3a2a', rough: 0.85, blood: 0x4a3a20, tex: 'skin' },
+    scarecrow: { skin: '#7d6a44', sec: '#4a3a26', rough: 0.95, blood: 0x6a5a30, tex: 'skin' },
     knight: { skin: '#4a4a52', sec: '#2a2224', rough: 0.45, metal: 0.6, blood: 0x2a2a2a, tex: 'skin' },
     archer: { skin: '#cfc2a6', sec: '#4a3a2a', rough: 0.7, blood: 0x6a6050, tex: 'skin' },
-    drowned: { skin: '#6a8a84', sec: '#2a3a34', rough: 0.3, blood: 0x2a4a40, tex: 'skin' },
+    drowned: { skin: '#687270', sec: '#2a3a34', rough: 0.3, blood: 0x2a4a40, tex: 'skin' },
     leech: { skin: '#3a1a1c', sec: '#7a2a2a', rough: 0.2, blood: 0x6a0a0a, tex: 'skin' },
-    smith: { skin: '#6a4a36', sec: '#2a1a12', rough: 0.7, blood: 0x6a1a0a, tex: 'skin' },
-    seraph: { skin: '#e8e2d4', sec: '#c8a050', rough: 0.4, blood: 0xc8b890, tex: 'skin' },
+    smith: { skin: '#5e4636', sec: '#2a1a12', rough: 0.7, blood: 0x6a1a0a, tex: 'skin' },
+    seraph: { skin: '#6a665e', sec: '#7a5f2e', rough: 0.4, blood: 0xc8b890, tex: 'skin' },
   });
 
-  // ---------------------------------------------------------------- a shared humanoid frame (hips, torso, head, arms, legs)
+  // ---------------------------------------------------------------- materials of a body's own, things shaped in gfx.js
+  const TX = (n) => (n && G.GFX && G.GFX.tex ? G.GFX.tex(n) : null);
+  // a material of the wearer's own, one of gfx.js's surfaces on it; kept with the body's materials (they fade, flash and are thrown away together)
+  function wear(M, color, texName, o, uvk) {
+    const m = new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.9 }, o || {})), t = TX(texName);
+    if (t) { m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; m.color.multiplyScalar(1.25); }
+    if (uvk) m.userData.uvk = uvk;
+    M.all.push(m); return m;
+  }
+  // a thing shaped in gfx.js (foeGear) hung on a joint: MM gives each of its parts a material. Returns the joint it hangs in
+  function gear(parent, name, MM, x, y, z, rx, ry, rz, s) {
+    const d = G.GFX && G.GFX.foeGear ? G.GFX.foeGear(name) : null, g = joint(parent, x, y, z);
+    g.rotation.set(rx || 0, ry || 0, rz || 0); if (s) { if (Array.isArray(s)) g.scale.set(s[0], s[1], s[2]); else g.scale.setScalar(s); }
+    if (d) for (const q of d) { const m = new THREE.Mesh(q.g, MM[q.m] || MM.def); m.castShadow = true; g.add(m); }
+    return g;
+  }
+
+  // ---------------------------------------------------------------- a shared humanoid frame (hips, trunk, head, arms, legs)
+  // (a body of masses, not of boxes: a cage of ribs over a belly, shoulders, a neck; a skull with brow, nose and jaw, the eyes sunk in
+  // their sockets; arms with a swell above and below the elbow, hands with fingers; thighs, calves, feet. Melted into one surface joint by
+  // joint, gfx.js. The joints are as they were: each kind dresses and arms it. noHead: the kind makes the head itself)
   function humanoid(root, M, o) {
     PGs();
-    const legL = o.leg || 0.88, th = o.torso || 0.62, w = o.width || 0.42, hr = o.head || 0.14;
+    const legL = o.leg || 0.88, th = o.torso || 0.62, w = o.width || 0.42, hr = o.head || 0.14, hu = o.hunch || 0, al = o.arm || 0.3, ak = al / 0.3;
+    const tm = o.torsoMat || M.skin, am = o.armMat || M.skin, hm = o.headMat || M.skin, lm = o.legMat || M.skin, hdm = o.handMat || am, fm = o.footMat || M.sec;
+    if (!M.skin.userData.uvk) M.skin.userData.uvk = o.uvk || 3;                                             // (the hide's grain: finer than on a beast)
     const hips = joint(root, 0, legL + 0.05, 0);
-    mesh(hips, PG.box, o.hipMat || M.sec, w * 0.9, 0.18, 0.24);
+    mesh(hips, PG.sph, o.hipMat || M.sec, w * 0.47, 0.13, 0.15);
     const spine = joint(hips, 0, 0.08, 0);
-    const torso = mesh(spine, PG.box, o.torsoMat || M.skin, w, th, 0.26, 0, th / 2, 0, o.hunch || 0);
-    const head = joint(spine, 0, th + 0.1, (o.hunch || 0) * 0.45);
-    mesh(head, PG.sph, o.headMat || M.skin, hr, hr * 1.12, hr * 1.05, 0, hr * 0.6, 0);
-    if (o.eyes !== false) for (const s of [-1, 1]) mesh(head, PG.sph, M.eye, 0.028, 0.022, 0.02, s * hr * 0.4, hr * 0.68, hr * 0.92);
+    mesh(spine, PG.sph, tm, w * 0.36, th * 0.5, 0.125, 0, th * 0.48, hu * th * 0.2, hu * 0.6);              // the trunk's core
+    mesh(spine, PG.sph, tm, w * 0.52, th * 0.36, 0.165, 0, th * 0.66, hu * th * 0.5 + 0.01, hu);          // ribs
+    mesh(spine, PG.sph, tm, w * 0.42, th * 0.3, 0.145, 0, th * 0.27, 0.02);                                 // belly
+    for (const s of [-1, 1]) mesh(spine, PG.sph, tm, 0.105, 0.085, 0.1, s * w * 0.48, th - 0.05, hu * th * 0.75);   // shoulders
+    mesh(spine, PG.cyl8, o.neckMat || hm, 0.05, 0.14, 0.055, 0, th + 0.05, hu * th * 0.9);                  // neck
+    const head = joint(spine, 0, th + 0.1, hu * 0.45);
+    if (!o.noHead) {
+      mesh(head, PG.sph, hm, hr, hr * 1.1, hr * 1.05, 0, hr * 0.64, -hr * 0.05);                            // skull
+      mesh(head, PG.box, hm, hr * 1.5, hr * 0.3, hr * 0.5, 0, hr * 0.95, hr * 0.78, 0.25);                  // brow
+      mesh(head, PG.box, hm, hr * 1.15, hr * 0.62, hr * 1.0, 0, hr * 0.16, hr * 0.36);                      // jaw
+      mesh(head, PG.sph, hm, hr * 0.2, hr * 0.3, hr * 0.26, 0, hr * 0.56, hr * 1.0);                        // nose
+      mesh(head, PG.box, M.dark, hr * 0.7, hr * 0.06, hr * 0.1, 0, hr * 0.2, hr * 0.86);                    // mouth
+      if (o.eyes !== false) for (const s of [-1, 1]) { mesh(head, PG.sph, M.dark, hr * 0.26, hr * 0.2, hr * 0.14, s * hr * 0.42, hr * 0.72, hr * 0.86); mesh(head, PG.sph, M.eye, o.eyeR || 0.016, (o.eyeR || 0.016) * 0.9, 0.012, s * hr * 0.42, hr * 0.72, hr * 0.94); }
+    }
     const arms = [];
     for (const s of [-1, 1]) {
       const sh = joint(spine, s * (w / 2 + 0.05), th - 0.06, 0);
-      mesh(sh, PG.sph, o.armMat || M.skin, 0.075, 0.075, 0.075);
-      mesh(sh, PG.box, o.armMat || M.skin, 0.075, 0.3, 0.075, 0, -0.15, 0);
-      const el = joint(sh, 0, -0.3, 0); mesh(el, PG.box, o.armMat || M.skin, 0.065, 0.28, 0.065, 0, -0.14, 0);
-      const hand = joint(el, 0, -0.3, 0); mesh(hand, PG.sph, o.armMat || M.skin, 0.055, 0.06, 0.055);
+      mesh(sh, PG.sph, am, 0.062, 0.085, 0.066, 0, -0.025, 0);
+      mesh(sh, PG.sph, am, 0.052, al * 0.57, 0.058, 0, -al * 0.5, 0);
+      const el = joint(sh, 0, -al, 0);
+      mesh(el, PG.sph, am, 0.047, al * 0.37, 0.052, 0, -al * 0.27, 0.005); mesh(el, PG.cyl8, am, 0.034, al * 0.87, 0.036, 0, -al * 0.5, 0);
+      const hand = joint(el, 0, -al, 0);
+      mesh(hand, PG.sph, hdm, 0.045, 0.055, 0.03);
+      for (let i = 0; i < 3; i++) mesh(hand, PG.sph, hdm, 0.014, 0.04 * ak, 0.016, (i - 1) * 0.028, -0.065, 0.012);
+      mesh(hand, PG.sph, hdm, 0.015, 0.03, 0.016, -s * 0.045, -0.02, 0.02);
       arms.push({ sh, el, hand });
     }
-    const L = [leg(hips, M, -0.12, -0.04, 0, legL, 0.09, o.legMat), leg(hips, M, 0.12, -0.04, 0, legL, 0.09, o.legMat)];
-    return { hips, spine, torso, head, arms, L, h: legL + 0.13 + th + 0.1 + hr * 2.2, hipY: legL + 0.05 };
+    const hleg = (x) => {
+      const hip = joint(hips, x, -0.04, 0);
+      mesh(hip, PG.sph, lm, 0.075, legL * 0.27, 0.085, 0, -legL * 0.24, 0.005);
+      const kn = joint(hip, 0, -legL * 0.5, 0);
+      mesh(kn, PG.sph, lm, 0.055, legL * 0.15, 0.062, 0, -legL * 0.16, -0.02);                               // calf
+      mesh(kn, PG.cyl8, lm, 0.04, legL * 0.44, 0.042, 0, -legL * 0.25, 0);
+      mesh(kn, PG.box, fm, 0.09, 0.065, 0.2, 0, -legL * 0.5 + 0.032, 0.045);                                 // foot
+      return { hip, kn };
+    };
+    const L = [hleg(-0.12), hleg(0.12)];
+    return { hips, spine, head, arms, L, h: legL + 0.13 + th + 0.1 + hr * 2.2, hipY: legL + 0.05 };
   }
   function walkAnim(Hm, a, o) {
     const w = a.walk, k = o.swing ?? 0.6;
@@ -63,17 +108,41 @@
     Hm.head.rotation.y = Math.sin(a.t * 1.3) * 0.15;
   }
   const humanHits = (Hm, hr) => [{ n: Hm.head, r: (hr || 0.14) + 0.02, part: 'head', o: V(0, (hr || 0.14) * 0.6, 0) }, { n: Hm.spine, r: 0.27, part: 'body', o: V(0, 0.32, 0) }, { n: Hm.hips, r: 0.22, part: 'body', o: V(0, -0.3, 0) }];
+  // rags hung about a waist: where each hangs by the angle about the body (0: before it)
+  const tatters = (on, MM, angs, rx0, rz0, y, len) => { for (let i = 0; i < angs.length; i++) { const a = angs[i]; gear(on, 'tatter', MM, Math.sin(a) * rx0, y, Math.cos(a) * rz0, 0.06, a, 0, [1, (len || 1) * (0.8 + (i % 3) * 0.22), 1]); } };
 
-  // 屍喰いの村人: a hunched villager in rags, a pitchfork, long arms
-  B.villager = function (root, M) {
-    const Hm = humanoid(root, M, { leg: 0.82, torso: 0.6, hunch: 0.45, head: 0.13 });
-    const rag = new THREE.MeshStandardMaterial({ color: 0x4a3c2a, roughness: 1, side: THREE.DoubleSide });
-    mesh(Hm.spine, PG.box, rag, 0.48, 0.5, 0.3, 0, 0.32, 0, 0.45); mesh(Hm.hips, PG.cone, rag, 0.34, 0.5, 0.24, 0, -0.3, 0, Math.PI);
+  // 屍喰いの村人: a stooped villager in what is left of a smock and a hood, a rope still about the neck, long arms, a hay fork
+  B.villager = function (root, M, opts, def) {
+    const th = 0.6, hu = 0.45, hr = 0.13, al = 0.34, miner = !!(def && def.id === 'ff_miner');
+    const Hm = humanoid(root, M, { leg: 0.82, torso: th, hunch: hu, head: hr, arm: al, footMat: M.skin });
+    const rag = wear(M, miner ? 0x34302a : 0x3c352b, 'weave', { roughness: 1, side: THREE.DoubleSide }, 5), cord = wear(M, 0x6a5a40, 'weave', { roughness: 1 }, 7), hide = wear(M, 0x2e2018, 'leather');
+    const wood = wear(M, 0x4a3524, 'walnut'), iron = wear(M, 0x3a3634, 'steel', { metalness: 0.7, roughness: 0.85 });
+    // the smock: over the ribs and the belly, off one shoulder; a short skirt of it and rags below
+    mesh(Hm.spine, PG.sph, rag, 0.236, 0.235, 0.185, 0, 0.385, 0.14, hu); mesh(Hm.spine, PG.sph, rag, 0.205, 0.2, 0.17, 0, 0.16, 0.035);
+    mesh(Hm.spine, PG.sph, rag, 0.125, 0.09, 0.115, -0.2, 0.555, 0.2); mesh(Hm.arms[0].sh, PG.sph, rag, 0.064, 0.14, 0.068, 0, -0.1, 0);
+    mesh(Hm.hips, PG.cone, rag, 0.25, 0.3, 0.2, 0, -0.1, 0);
+    tatters(Hm.hips, { cloth: rag }, [-1.0, -0.35, 0.4, 1.1, 2.5, 3.5], 0.2, 0.16, -0.2, 1);
+    // the hood, its fall on the neck; a mouth that opens too far, teeth
+    if (miner) {   // (the miner: a cap of hide with a stub of candle on its brow)
+      mesh(Hm.head, PG.sph, hide, hr * 1.1, hr * 0.8, hr * 1.14, 0, hr * 1.02, -hr * 0.1); mesh(Hm.head, PG.cyl8, hide, hr * 1.25, hr * 0.1, hr * 1.3, 0, hr * 0.98, -hr * 0.02);
+      mesh(Hm.head, PG.cyl8, M.tooth, 0.016, 0.05, 0.016, 0, hr * 1.5, hr * 0.95); mesh(Hm.head, PG.sph, M.eye, 0.012, 0.022, 0.012, 0, hr * 1.5 + 0.04, hr * 0.95);
+    } else {
+      mesh(Hm.head, PG.sph, rag, hr * 1.1, hr * 1.1, hr * 1.14, 0, hr * 0.76, -hr * 0.24); mesh(Hm.head, PG.sph, rag, hr * 0.9, hr * 0.6, hr * 0.7, 0, -hr * 0.1, -hr * 0.55);
+      mesh(Hm.head, PG.cone, rag, hr * 0.6, hr * 1.5, hr * 0.6, 0, hr * 1.3, -hr * 1.15, -1.25); mesh(Hm.head, PG.sph, rag, hr * 0.95, hr * 0.22, hr * 0.5, 0, hr * 1.42, hr * 0.42, 0.3);
+      mesh(Hm.spine, PG.sph, rag, 0.25, 0.085, 0.19, 0, th - 0.04, hu * th * 0.72, hu);
+    }
+    mesh(Hm.head, PG.box, M.dark, hr * 0.72, hr * 0.3, hr * 0.14, 0, hr * 0.1, hr * 0.84);
+    for (let i = 0; i < 4; i++) mesh(Hm.head, PG.cone, M.tooth, 0.008, 0.026, 0.008, (i - 1.5) * hr * 0.2, hr * 0.2, hr * 0.92, Math.PI);
+    for (let i = 0; i < 3; i++) mesh(Hm.head, PG.cone, M.tooth, 0.008, 0.022, 0.008, (i - 1) * hr * 0.22, hr * 0.0, hr * 0.9);
+    // the rope: about the neck with its end hanging, another for a belt
+    if (!miner) { mesh(Hm.spine, PG.torus, cord, 0.078, 0.082, 0.26, 0, th + 0.015, hu * th * 0.86, Math.PI / 2 - hu); mesh(Hm.spine, PG.cyl8, cord, 0.011, 0.26, 0.011, 0.035, th - 0.13, hu * th * 0.86 + 0.085); }
+    mesh(Hm.hips, PG.torus, cord, 0.205, 0.165, 0.26, 0, 0.07, 0, Math.PI / 2);
+    for (const l of Hm.L) mesh(l.kn, PG.cyl8, rag, 0.05, 0.2, 0.053, 0, -0.82 * 0.3, 0);                                  // bound shins
+    for (const a of Hm.arms) for (let i = 0; i < 3; i++) mesh(a.hand, PG.cone, M.dark, 0.008, 0.04, 0.008, (i - 1) * 0.028, -0.105, 0.016, Math.PI);   // nails
     const fork = joint(Hm.arms[1].hand, 0, 0, 0);
-    mesh(fork, PG.cyl8, M.sec, 0.025, 1.6, 0.025, 0, 0, 0.5, Math.PI / 2);
-    for (const dx of [-0.08, 0, 0.08]) mesh(fork, PG.box, X.ironMat || M.dark, 0.015, 0.015, 0.28, dx, 0, 1.38);
+    gear(fork, miner ? 'pick' : 'pitchfork', { wood, iron });
     return {
-      J: Hm, h: Hm.h * 0.92, r: 0.4,
+      J: Hm, h: Hm.h * 0.92, r: 0.4, mats: [rag, cord, hide],
       hits: humanHits(Hm, 0.13), orn: { head: Hm.head, back: Hm.spine, backZ: [-0.1, -0.1], backY: 0.4 },
       animate(a) {
         walkAnim(Hm, a, { lean: 0.45, swing: 0.7 });
@@ -82,25 +151,41 @@
       },
     };
   };
-  // 呪いの案山子: a crossbar of wood, a straw body in a ragged coat, a sack head with a stitched grin, one leg pole
+  // 呪いの案山子: a stake and a crossbar lashed together, a trunk of sacking stuffed with straw under a coat in rags, a sack for a head
+  // with holes cut for eyes and a sewn grin, a shapeless hat; straw at every opening, a reaping hook in each bundle of a hand
   B.scarecrow = function (root, M) {
     PGs();
     const body = joint(root, 0, 1.25, 0);
-    mesh(body, PG.cyl8, M.sec, 0.05, 2.6, 0.05, 0, -0.1, 0);
-    mesh(body, PG.cyl8, M.sec, 0.045, 1.9, 0.045, 0, 0.55, 0, 0, 0, Math.PI / 2);
-    const coat = new THREE.MeshStandardMaterial({ color: 0x3a2a2a, roughness: 1, side: THREE.DoubleSide });
-    mesh(body, PG.box, coat, 0.6, 0.85, 0.3, 0, 0.15, 0); mesh(body, PG.cone, coat, 0.42, 0.7, 0.3, 0, -0.55, 0, Math.PI);
-    for (let i = 0; i < 6; i++) mesh(body, PG.cone, M.skin, 0.05, 0.3, 0.05, (i - 2.5) * 0.1, -0.95, 0.05, Math.PI);
+    const wood = wear(M, 0x51453a, 'walnut', { roughness: 1 }), coat = wear(M, 0x2c2420, 'weave', { roughness: 1, side: THREE.DoubleSide }, 5), cord = wear(M, 0x6a5a40, 'weave', { roughness: 1 }, 7), iron = wear(M, 0x3a3634, 'steel', { metalness: 0.7, roughness: 0.85 });
+    mesh(body, PG.cyl8, wood, 0.045, 2.6, 0.045, 0, -0.1, 0); mesh(body, PG.cone, wood, 0.045, 0.14, 0.045, 0, -1.46, 0, Math.PI);
+    mesh(body, PG.cyl8, wood, 0.038, 1.9, 0.038, 0, 0.55, 0, 0, 0, Math.PI / 2);
+    mesh(body, PG.torus, cord, 0.07, 0.07, 0.5, 0, 0.55, 0, 0, 0.78, 0); mesh(body, PG.torus, cord, 0.07, 0.07, 0.5, 0, 0.55, 0, 0, -0.78, 0);     // the lashing
+    // the trunk of sacking, the coat open over it
+    mesh(body, PG.sph, M.skin, 0.2, 0.36, 0.19, 0, 0.2, 0.02); mesh(body, PG.sph, M.skin, 0.18, 0.26, 0.17, 0, -0.14, 0.01);
+    for (const s of [-1, 1]) { mesh(body, PG.sph, coat, 0.17, 0.42, 0.21, s * 0.15, 0.16, -0.03); mesh(body, PG.sph, coat, 0.15, 0.1, 0.13, s * 0.22, 0.52, 0); mesh(body, PG.cyl8, coat, 0.068, 0.56, 0.072, s * 0.54, 0.55, 0, 0, 0, Math.PI / 2); }
+    mesh(body, PG.sph, coat, 0.26, 0.4, 0.14, 0, 0.14, -0.1);
+    tatters(body, { cloth: coat }, [-1.2, -0.6, 0.65, 1.25, 2.2, 2.9, 3.6, 4.2], 0.27, 0.2, -0.16, 1.5);
+    for (const s of [-1, 1]) { gear(body, 'tatter', { cloth: coat }, s * 0.7, 0.5, 0.03, 0, 0, 0, [0.8, 0.9, 1]); gear(body, 'tatter', { cloth: coat }, s * 0.42, 0.5, -0.04, 0, Math.PI, 0, [1, 1.3, 1]); }
+    for (let i = 0; i < 9; i++) mesh(body, PG.cone, M.skin, 0.022, 0.26 + (i % 3) * 0.06, 0.022, Math.sin(i * 2.3) * 0.13, -0.5 - (i % 2) * 0.05, Math.cos(i * 2.3) * 0.1, Math.PI + Math.cos(i * 2.3) * 0.25, 0, Math.sin(i * 2.3) * 0.25);   // straw out of its foot
+    for (let i = 0; i < 5; i++) mesh(body, PG.cone, M.skin, 0.014, 0.14, 0.014, (i - 2) * 0.035, 0.36, 0.17, 0.9, 0, (i - 2) * 0.3);                    // and out of its breast
     const head = joint(body, 0, 0.92, 0);
-    mesh(head, PG.sph, M.skin, 0.22, 0.25, 0.21);
-    mesh(head, PG.cone, coat, 0.32, 0.28, 0.32, 0, 0.3, 0);
-    mesh(head, PG.cyl, coat, 0.42, 0.02, 0.42, 0, 0.17, 0);
-    for (const s of [-1, 1]) mesh(head, PG.sph, M.eye, 0.045, 0.045, 0.02, s * 0.08, 0.04, 0.19);
-    mesh(head, PG.box, M.dark, 0.18, 0.02, 0.02, 0, -0.08, 0.2);
+    mesh(head, PG.sph, M.skin, 0.2, 0.235, 0.195); mesh(head, PG.cone, M.skin, 0.17, 0.16, 0.16, 0, -0.27, 0);
+    for (const s of [-1, 1]) mesh(head, PG.sph, M.skin, 0.05, 0.07, 0.045, s * 0.15, 0.17, -0.02, 0, 0, -s * 0.5);                                     // the sack's corners
+    mesh(head, PG.torus, cord, 0.105, 0.1, 0.3, 0, -0.2, 0, Math.PI / 2);
+    for (const s of [-1, 1]) { mesh(head, PG.sph, M.dark, 0.045, 0.058, 0.03, s * 0.08, 0.035, 0.17, 0, 0, s * 0.35); mesh(head, PG.sph, M.eye, 0.016, 0.02, 0.012, s * 0.08, 0.03, 0.172); }
+    mesh(head, PG.box, M.dark, 0.2, 0.022, 0.03, 0, -0.09, 0.172, 0, 0, 0.06);
+    for (let i = 0; i < 7; i++) mesh(head, PG.box, M.sec, 0.007, 0.06, 0.008, (i - 3) * 0.03, -0.09 + (i - 3) * 0.002, 0.19 - Math.abs(i - 3) * 0.006, 0, 0, (i % 2 ? 0.4 : -0.4));   // the stitches
+    gear(head, 'hat', { felt: coat, cord }, 0, 0.13, 0, 0, 0.5, 0.1);
     const arms = [];
-    for (const s of [-1, 1]) { const sh = joint(body, s * 0.92, 0.55, 0); for (let i = 0; i < 4; i++) mesh(sh, PG.cone, M.skin, 0.04, 0.26, 0.04, 0, -0.1, (i - 1.5) * 0.06, 0.4); const blade = joint(sh, 0, -0.05, 0); mesh(blade, PG.torus, X.ironMat || M.dark, 0.26, 0.26, 0.6, 0, -0.1, 0.18, 0, 0, 0); arms.push(sh); }
+    for (const s of [-1, 1]) {
+      const sh = joint(body, s * 0.92, 0.55, 0);
+      for (let i = 0; i < 8; i++) mesh(sh, PG.cone, M.skin, 0.02, 0.22 + (i % 3) * 0.05, 0.02, Math.sin(i * 2.1) * 0.03, -0.1, Math.cos(i * 2.1) * 0.04, 0.4 + Math.cos(i * 2.1) * 0.3, 0, Math.sin(i * 2.1) * 0.3 + Math.PI);
+      mesh(sh, PG.torus, cord, 0.05, 0.05, 0.4, 0, 0.0, 0, Math.PI / 2);
+      gear(sh, 'sickle', { wood, iron }, 0, -0.16, 0.06, 1.25, 0, 0, 1.45);
+      arms.push(sh);
+    }
     return {
-      J: { body, head, arms }, h: 2.4, r: 0.45, hover: true,
+      J: { body, head, arms }, h: 2.4, r: 0.45, hover: true, mats: [coat],
       hits: [{ n: head, r: 0.24, part: 'head' }, { n: body, r: 0.38, part: 'body', o: V(0, 0.1, 0) }, { n: body, r: 0.3, part: 'body', o: V(0, -0.6, 0) }],
       orn: { head, back: body, backZ: [-0.18, -0.18], backY: 0.3 },
       animate(a) {
@@ -111,16 +196,48 @@
       },
     };
   };
-  // 呪われた騎士: plate over the bones, a closed helm, a tower shield and a greatsword
-  B.knight = function (root, M) {
-    const Hm = humanoid(root, M, { leg: 0.92, torso: 0.66, width: 0.5, head: 0.15, torsoMat: M.skin, armMat: M.skin, legMat: M.skin });
-    mesh(Hm.spine, PG.box, M.skin, 0.58, 0.42, 0.34, 0, 0.42, 0.02);
-    for (const s of [-1, 1]) mesh(Hm.spine, PG.sph, M.skin, 0.17, 0.12, 0.17, s * 0.32, 0.6, 0);
-    mesh(Hm.head, PG.cyl8, M.skin, 0.17, 0.3, 0.18, 0, 0.12, 0); mesh(Hm.head, PG.box, M.dark, 0.2, 0.025, 0.02, 0, 0.14, 0.17);
-    mesh(Hm.head, PG.cone, M.sec, 0.05, 0.3, 0.05, 0, 0.36, -0.02);
-    const shield = joint(Hm.arms[0].hand, 0, 0, 0.1); mesh(shield, PG.box, M.skin, 0.62, 0.95, 0.07, 0, 0.15, 0.05); mesh(shield, PG.box, M.sec, 0.12, 0.6, 0.08, 0, 0.15, 0.08);
-    const sword = joint(Hm.arms[1].hand, 0, 0, 0); mesh(sword, PG.box, X.ironMat || M.skin, 0.06, 0.12, 1.3, 0, 0, 0.62); mesh(sword, PG.box, M.sec, 0.28, 0.05, 0.06, 0, 0, 0.0);
-    const cape = mesh(Hm.spine, PG.box, M.sec, 0.5, 0.95, 0.03, 0, 0.12, -0.18);
+  // 呪われた騎士: plate from crown to toe - a keeled breast over lames at the belly, great shoulders, a gorget, elbow and knee cops,
+  // gauntlets, pointed shoes of iron; a great helm with its sight a slit and a fall of mail; a kite shield, a sword for two hands,
+  // a cloak in tatters
+  B.knight = function (root, M, opts, def) {
+    const th = 0.66, legL = 0.92, pike = !!(def && def.id === 'ff_pikeman');
+    const Hm = humanoid(root, M, { leg: legL, torso: th, width: 0.5, head: 0.15, noHead: true, footMat: M.skin, hipMat: M.skin });
+    const trim = wear(M, 0x3e3526, 'steel', { metalness: 0.75, roughness: 0.85 }), mail = wear(M, 0x2e2e33, 'weave', { metalness: 0.65, roughness: 0.75 }), cloth = wear(M, 0x3a1318, 'weave', { roughness: 1, side: THREE.DoubleSide });
+    const paint = wear(M, 0x2c1214, 'walnut', { roughness: 0.85 }), blade = wear(M, 0x85858c, 'steel', { metalness: 0.9, roughness: 0.5 }), hide = wear(M, 0x2a1c14, 'leather'), iron = wear(M, 0x3c3a3c, 'steel', { metalness: 0.8, roughness: 0.75 });
+    // the cuirass
+    mesh(Hm.spine, PG.sph, M.skin, 0.29, 0.25, 0.215, 0, 0.44, 0.035); mesh(Hm.spine, PG.sph, M.skin, 0.075, 0.22, 0.07, 0, 0.42, 0.2, 0.1);   // a keel down the breast
+    mesh(Hm.spine, PG.sph, M.skin, 0.27, 0.26, 0.17, 0, 0.42, -0.045);
+    for (let i = 0; i < 3; i++) mesh(Hm.spine, PG.cyl8, M.skin, 0.25 + i * 0.012, 0.078, 0.185 + i * 0.01, 0, 0.19 - i * 0.065, 0.01);
+    mesh(Hm.spine, PG.cyl8, M.skin, 0.115, 0.09, 0.115, 0, th - 0.015, 0);
+    for (const s of [-1, 1]) { mesh(Hm.spine, PG.sph, M.skin, 0.17, 0.12, 0.175, s * 0.31, 0.61, 0, 0, 0, -s * 0.25); mesh(Hm.spine, PG.sph, M.skin, 0.145, 0.1, 0.155, s * 0.37, 0.53, 0, 0, 0, -s * 0.5); mesh(Hm.spine, PG.box, M.skin, 0.03, 0.09, 0.2, s * 0.2, 0.69, 0, 0, 0, -s * 0.5); }
+    mesh(Hm.hips, PG.cyl8, M.sec, 0.265, 0.055, 0.2, 0, 0.045, 0); mesh(Hm.hips, PG.box, trim, 0.06, 0.07, 0.03, 0, 0.045, 0.2);
+    for (const s of [-1, 1]) mesh(Hm.hips, PG.box, M.skin, 0.17, 0.25, 0.03, s * 0.125, -0.14, 0.115, -0.14, 0, 0);                                      // tassets
+    gear(Hm.hips, 'tatter', { cloth }, 0, -0.02, 0.135, 0.02, 0, 0, [1.25, 1.9, 1]); gear(Hm.hips, 'tatter', { cloth }, 0, -0.02, -0.14, 0.02, Math.PI, 0, [1.4, 1.7, 1]);
+    for (let i = 0; i < 2; i++) {
+      const a = Hm.arms[i], s = i ? 1 : -1, l = Hm.L[i];
+      mesh(a.sh, PG.cyl8, M.skin, 0.062, 0.2, 0.066, 0, -0.16, 0);
+      mesh(a.el, PG.sph, M.skin, 0.07, 0.07, 0.076); mesh(a.el, PG.cyl8, M.skin, 0.07, 0.022, 0.07, s * 0.06, 0, 0, 0, 0, Math.PI / 2);
+      mesh(a.el, PG.cyl8, M.skin, 0.058, 0.2, 0.062, 0, -0.14, 0); mesh(a.el, PG.cyl8, M.skin, 0.066, 0.06, 0.07, 0, -0.25, 0);
+      mesh(a.hand, PG.box, M.skin, 0.1, 0.09, 0.085, 0, -0.02, 0.005); mesh(a.hand, PG.box, M.skin, 0.09, 0.065, 0.05, 0, -0.085, 0.022);
+      mesh(l.hip, PG.cyl8, M.skin, 0.09, legL * 0.36, 0.097, 0, -legL * 0.24, 0.005);
+      mesh(l.kn, PG.sph, M.skin, 0.078, 0.085, 0.09, 0, 0, 0.012); mesh(l.kn, PG.cyl8, M.skin, 0.075, 0.022, 0.075, s * 0.07, 0, 0.01, 0, 0, Math.PI / 2);
+      mesh(l.kn, PG.cyl8, M.skin, 0.064, legL * 0.4, 0.07, 0, -legL * 0.26, 0);
+      mesh(l.kn, PG.box, M.skin, 0.105, 0.085, 0.21, 0, -legL * 0.5 + 0.045, 0.045); mesh(l.kn, PG.cone, M.skin, 0.05, 0.13, 0.04, 0, -legL * 0.5 + 0.03, 0.2, Math.PI / 2);
+    }
+    let cape = null;
+    if (pike) {   // (the pikeman: a kettle hat over mail, the dark of a face in it; no shield, no cloak - both hands to the pike)
+      gear(Hm.head, 'kettle', { steel: M.skin, mail }, 0, -0.02, 0);
+      mesh(Hm.head, PG.sph, M.dark, 0.105, 0.125, 0.04, 0, 0.08, 0.15);
+      for (const s of [-1, 1]) mesh(Hm.head, PG.sph, M.eye, 0.013, 0.011, 0.01, s * 0.045, 0.1, 0.178);
+      gear(joint(Hm.arms[1].hand, 0, 0, 0), 'pike', { wood: wear(M, 0x4a3a28, 'walnut'), iron, blade, cloth });
+    } else {
+      gear(Hm.head, 'helm', { steel: M.skin, trim, dark: M.dark, mail }, 0, -0.02, 0);
+      for (const s of [-1, 1]) mesh(Hm.head, PG.sph, M.eye, 0.014, 0.008, 0.01, s * 0.07, 0.148, 0.172);
+      const shield = joint(Hm.arms[0].hand, 0, 0, 0.1); shield.rotation.x = 1.1;       // (the arm is held out before it: the shield stands upright all the same)
+      gear(shield, 'kite', { paint, steel: iron }, 0, -0.04, 0.07, 0, 0, 0, 0.86);
+      gear(joint(Hm.arms[1].hand, 0, 0, 0), 'greatsword', { leather: hide, iron, blade, dark: M.dark });
+      cape = gear(Hm.spine, 'cape', { cloth }, 0, th - 0.02, -0.19);
+    }
     return {
       J: Hm, h: Hm.h, r: 0.45,
       hits: humanHits(Hm, 0.17), orn: { head: Hm.head, back: Hm.spine, backZ: [-0.22, -0.22], backY: 0.5 },
@@ -129,21 +246,35 @@
         Hm.arms[0].sh.rotation.x = -1.1; Hm.arms[0].sh.rotation.y = 0.5;
         Hm.arms[1].sh.rotation.x = -0.4 - a.wind * 2.2 + a.atk * 3.0; Hm.arms[1].el.rotation.x = -0.5 - a.wind * 0.5;
         Hm.spine.rotation.y = a.atk * 0.7 - a.wind * 0.5;
-        cape.rotation.x = 0.1 + a.mv * 0.3 + Math.sin(a.t * 2) * 0.05;
+        if (cape) cape.rotation.x = 0.1 + a.mv * 0.3 + Math.sin(a.t * 2) * 0.05;
       },
     };
   };
-  // 城の弓兵: bones in a leather jerkin, a longbow, a quiver of black arrows
+  // 城の弓兵: bones in a hood and a jerkin of hide, sleeves and hose of cloth, boots; a bracer on the bow arm, a quiver on a strap,
+  // a longbow taller than its shoulder
   B.archer = function (root, M) {
-    const Hm = humanoid(root, M, { leg: 0.9, torso: 0.6, width: 0.38, head: 0.13 });
-    const leather = new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.9 });
-    mesh(Hm.spine, PG.box, leather, 0.44, 0.5, 0.3, 0, 0.36, 0); mesh(Hm.head, PG.cone, leather, 0.19, 0.3, 0.19, 0, 0.26, -0.03);
-    const quiver = joint(Hm.spine, 0.12, 0.5, -0.18); mesh(quiver, PG.cyl8, leather, 0.08, 0.6, 0.08, 0, 0, 0, 0.3); for (let i = 0; i < 4; i++) mesh(quiver, PG.box, M.dark, 0.01, 0.25, 0.01, (i - 1.5) * 0.03, 0.38, 0.1, 0.3);
+    const th = 0.6, legL = 0.9, PP = G.Props.PG;
+    const jerkin = wear(M, 0x3a2a1c, 'leather'), cloth = wear(M, 0x2c2e27, 'weave', { roughness: 1, side: THREE.DoubleSide }, 6), wood = wear(M, 0x4a3524, 'walnut'), fletch = wear(M, 0x4a4a48, 'weave', { roughness: 1, side: THREE.DoubleSide });
+    const Hm = humanoid(root, M, { leg: legL, torso: th, width: 0.38, head: 0.13, noHead: true, torsoMat: jerkin, armMat: cloth, legMat: cloth, handMat: M.skin, footMat: jerkin, hipMat: jerkin, neckMat: M.skin });
+    // the skull in its hood
+    if (PP.skullB) { mesh(Hm.head, PP.skullB, M.skin, 1.2, 1.2, 1.2, 0, -0.02, 0.0); mesh(Hm.head, PP.skullD, M.dark, 1.2, 1.2, 1.2, 0, -0.02, 0.0); }
+    for (const s of [-1, 1]) mesh(Hm.head, PG.sph, M.eye, 0.011, 0.011, 0.008, s * 0.043, 0.098, 0.112);
+    mesh(Hm.head, PG.sph, cloth, 0.163, 0.172, 0.172, 0, 0.13, -0.05); mesh(Hm.head, PG.cone, cloth, 0.09, 0.22, 0.09, 0, 0.25, -0.15, -0.95);
+    mesh(Hm.head, PG.sph, cloth, 0.15, 0.075, 0.135, 0, -0.035, 0.0);
+    mesh(Hm.spine, PG.sph, cloth, 0.27, 0.1, 0.19, 0, th - 0.05, 0);                                                     // the hood's cape on the shoulders
+    // the jerkin: its skirt, a belt, the lacing down its breast
+    mesh(Hm.spine, PG.sph, jerkin, 0.2, 0.27, 0.152, 0, 0.33, 0.012); mesh(Hm.hips, PG.cone, jerkin, 0.215, 0.26, 0.17, 0, -0.06, 0);
+    mesh(Hm.hips, PG.torus, M.sec, 0.195, 0.15, 0.3, 0, 0.07, 0, Math.PI / 2); mesh(Hm.hips, PG.box, M.tooth, 0.045, 0.05, 0.02, 0.02, 0.07, 0.155);
+    for (let i = 0; i < 4; i++) mesh(Hm.spine, PG.box, M.dark, 0.055, 0.007, 0.012, 0, 0.24 + i * 0.065, 0.162 + (i === 3 ? 0.006 : 0), 0, 0, i % 2 ? 0.35 : -0.35);
+    mesh(Hm.spine, PG.torus, M.sec, 0.205, 0.16, 0.2, 0, 0.36, 0.0, Math.PI / 2, 0.62, 0);                               // the quiver's strap
+    mesh(Hm.arms[0].el, PG.cyl8, jerkin, 0.045, 0.2, 0.047, 0, -0.14, 0);                                                // the bracer
+    for (const l of Hm.L) { mesh(l.kn, PG.cyl8, jerkin, 0.05, legL * 0.27, 0.054, 0, -legL * 0.355, 0); mesh(l.kn, PG.cyl8, jerkin, 0.058, 0.04, 0.062, 0, -legL * 0.22, 0); }
+    gear(Hm.spine, 'quiver', { leather: jerkin, dark: M.dark, fletch }, 0.12, 0.42, -0.2, 0.2, 0, -0.35);
     const bow = joint(Hm.arms[0].hand, 0, 0, 0.05);
-    for (const s of [-1, 1]) mesh(bow, PG.box, M.sec, 0.03, 0.62, 0.04, 0, s * 0.3, -s * 0.06, s * 0.25);
-    const string = mesh(bow, PG.box, M.tooth, 0.005, 1.1, 0.005, 0, 0, -0.16);
+    gear(bow, 'longbow', { wood, leather: jerkin, bone: M.tooth });
+    const string = mesh(bow, PG.box, M.tooth, 0.004, 1.56, 0.004, 0, 0, -0.16);
     return {
-      J: Hm, h: Hm.h, r: 0.38,
+      J: Hm, h: Hm.h, r: 0.38, mats: [jerkin, cloth],
       hits: humanHits(Hm, 0.13), orn: { head: Hm.head, back: Hm.spine, backZ: [-0.18, -0.18], backY: 0.45 },
       animate(a) {
         walkAnim(Hm, a, { lean: 0.06 });
@@ -153,16 +284,36 @@
       },
     };
   };
-  // 溺れ人: a swollen drowned body, waterweed hanging off it, always dripping
+  // 溺れ人: a body swollen with water - the belly, the breast, the neck gone into the shoulders, the face puffed; a rag at the loins,
+  // weed and wet hair hanging off it, barnacles on the shoulders and the back, a shackle with its broken chain
   B.drowned = function (root, M) {
-    const Hm = humanoid(root, M, { leg: 0.84, torso: 0.66, width: 0.5, head: 0.16, hunch: 0.25 });
-    mesh(Hm.spine, PG.sph, M.skin, 0.32, 0.36, 0.24, 0, 0.36, 0.04);
-    const weed = new THREE.MeshStandardMaterial({ color: 0x2a4a2a, roughness: 0.9, side: THREE.DoubleSide });
+    const th = 0.66, legL = 0.84, hr = 0.145, hu = 0.25;
+    const Hm = humanoid(root, M, { leg: legL, torso: th, width: 0.5, head: hr, hunch: hu, footMat: M.skin, hipMat: M.skin, eyeR: 0.007 });
+    const weed = wear(M, 0x34503a, null, { roughness: 0.45, side: THREE.DoubleSide }), rag = wear(M, 0x2a2e28, 'weave', { roughness: 0.8, side: THREE.DoubleSide }, 5), barn = wear(M, 0x8c8a7a, 'bone'), iron = wear(M, 0x3a2e28, 'steel', { metalness: 0.6, roughness: 0.9 });
+    mesh(Hm.spine, PG.sph, M.skin, 0.24, 0.24, 0.2, 0, 0.2, 0.06); mesh(Hm.spine, PG.sph, M.skin, 0.25, 0.19, 0.155, 0, 0.45, 0.06, hu);
+    mesh(Hm.head, PG.sph, M.dark, hr * 0.3, hr * 0.3, hr * 0.12, hr * 0.05, hr * 0.1, hr * 0.84);                          // the mouth, hanging open
+    for (const s of [-1, 1]) mesh(Hm.head, PG.sph, M.dark, hr * 0.3, hr * 0.26, hr * 0.14, s * hr * 0.42, hr * 0.7, hr * 0.86);   // the hollows of the eyes
+    for (let i = 0; i < 2; i++) {
+      const a = Hm.arms[i], l = Hm.L[i];
+      mesh(a.sh, PG.sph, M.skin, 0.064, 0.16, 0.07, 0, -0.14, 0); mesh(a.el, PG.sph, M.skin, 0.052, 0.12, 0.056, 0, -0.1, 0); mesh(a.hand, PG.sph, M.skin, 0.058, 0.066, 0.042, 0, -0.01, 0);
+      for (let k = 0; k < 3; k++) mesh(a.hand, PG.cone, M.dark, 0.009, 0.05, 0.009, (k - 1) * 0.028, -0.11, 0.02, Math.PI - 0.3);
+      mesh(l.hip, PG.sph, M.skin, 0.088, legL * 0.26, 0.098, 0, -legL * 0.22, 0.01); mesh(l.kn, PG.sph, M.skin, 0.062, legL * 0.16, 0.07, 0, -legL * 0.17, -0.015);
+    }
+    mesh(Hm.hips, PG.cone, rag, 0.27, 0.26, 0.22, 0, -0.06, 0);
+    tatters(Hm.hips, { cloth: rag }, [-0.8, 0.1, 0.9, 2.3, 3.1, 3.9], 0.24, 0.19, -0.14, 1.2);
+    const hair = wear(M, 0x34342c, null, { roughness: 0.55, side: THREE.DoubleSide });
+    mesh(Hm.head, PG.sph, hair, hr * 0.45, hr * 0.2, hr * 0.45, 0, hr * 1.68, -hr * 0.05);
     const weeds = [];
-    for (let i = 0; i < 7; i++) { const j = joint(i < 3 ? Hm.head : Hm.spine, (i - 3) * 0.08, i < 3 ? 0.18 : 0.6, 0.12); mesh(j, PG.box, weed, 0.05, 0.6, 0.01, 0, -0.3, 0); weeds.push(j); }
-    for (const s of [-1, 1]) mesh(Hm.arms[s < 0 ? 0 : 1].hand, PG.cone, M.dark, 0.03, 0.14, 0.03, 0, -0.08, 0.05, Math.PI);
+    for (let i = 0; i < 12; i++) {   // (locks of it from the crown, lying out over the skull and hanging: over the face, the ears, the nape)
+      const a = i / 12 * Math.PI * 2 + 0.26, front = Math.cos(a) > 0.6, j = joint(Hm.head, Math.sin(a) * hr * 0.3, hr * 1.63, -hr * 0.05 + Math.cos(a) * hr * 0.3), k1 = joint(j, 0, 0, 0);
+      k1.rotation.y = a; gear(k1, 'weed', { weed: hair }, 0, 0, 0, -0.5, 0, 0, [3.6, (front ? 0.5 : 0.75) + (i % 3) * 0.14, 1]); weeds.push(j);
+    }
+    for (let i = 0; i < 5; i++) { const j = joint(Hm.spine, (i - 2) * 0.12, 0.6 - (i % 2) * 0.12, 0.2 - Math.abs(i - 2) * 0.03); gear(j, 'weed', { weed }, 0, 0, 0, 0, i * 1.3, 0, [1.5, 0.9 + (i % 3) * 0.2, 1]); weeds.push(j); }
+    for (let i = 0; i < 7; i++) { const a = i * 2.4, r = 0.016 + (i % 3) * 0.008, on = Hm.spine; mesh(on, PG.cone, barn, r, r * 1.3, r, Math.cos(a) * 0.24, 0.5 + Math.sin(i * 1.7) * 0.12, -0.1 - Math.abs(Math.sin(a)) * 0.08, -1.2, 0, Math.cos(a) * 0.9); }
+    mesh(Hm.L[0].kn, PG.torus, iron, 0.062, 0.066, 0.5, 0, -legL * 0.4, 0, Math.PI / 2);
+    for (let i = 0; i < 4; i++) mesh(Hm.L[0].kn, PG.torus, iron, 0.022, 0.03, 0.5, -0.07 - i * 0.012, -legL * 0.41 - i * 0.022, -0.02 - i * 0.03, i % 2 ? 0.3 : Math.PI / 2, i % 2 ? 0 : 0.5, 0);
     return {
-      J: Hm, h: Hm.h, r: 0.45,
+      J: Hm, h: Hm.h, r: 0.45, mats: [rag],
       hits: humanHits(Hm, 0.16), orn: { head: Hm.head, back: Hm.spine, backZ: [-0.2, -0.2], backY: 0.4 },
       animate(a) {
         walkAnim(Hm, a, { lean: 0.28, swing: 0.4 });
@@ -171,15 +322,24 @@
       },
     };
   };
-  // 大蛭: a fat ringed slug with a round sucker for a mouth
+  // 大蛭: a fat worm of rings, dark above and pale under; a round mouth with rings of teeth inside a lip of flesh, no eyes to speak of
   B.leech = function (root, M) {
     PGs();
     const body = joint(root, 0, 0.36, 0);
     const segs = [];
-    for (let i = 0; i < 5; i++) { const j = joint(body, 0, 0, 0.45 - i * 0.24); mesh(j, PG.sph, i % 2 ? M.skin : M.sec, 0.32 - i * 0.03, 0.3 - i * 0.03, 0.2, 0, 0, 0); segs.push(j); }
-    const mouth = joint(segs[0], 0, 0.02, 0.18); mesh(mouth, PG.torus, M.sec, 0.16, 0.16, 0.4, 0, 0, 0); mesh(mouth, PG.sph, M.dark, 0.13, 0.13, 0.05, 0, 0, 0.02);
-    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; mesh(mouth, PG.cone, M.tooth, 0.015, 0.06, 0.015, Math.cos(a) * 0.1, Math.sin(a) * 0.1, 0.03, Math.PI / 2); }
-    for (const s of [-1, 1]) mesh(segs[0], PG.sph, M.eye, 0.025, 0.025, 0.02, s * 0.14, 0.18, 0.1);
+    for (let i = 0; i < 5; i++) {
+      const j = joint(body, 0, 0, 0.45 - i * 0.24), r = 0.32 - i * 0.03, h = 0.27 - i * 0.027;
+      for (const d of [-0.085, 0, 0.085]) mesh(j, PG.sph, M.skin, r * (d ? 0.9 : 1), h * (d ? 0.9 : 1), 0.1, 0, 0.02, d);
+      mesh(j, PG.sph, M.sec, r * 0.82, h * 0.5, 0.17, 0, -h * 0.55, 0);                                                    // the pale belly
+      for (const s of [-1, 1]) mesh(j, PG.sph, M.dark, 0.035, 0.012, 0.03, s * r * 0.45, h * 0.88 + 0.02, (i % 2 ? 0.03 : -0.03));   // blotches down the back
+      segs.push(j);
+    }
+    mesh(segs[4], PG.sph, M.skin, 0.13, 0.1, 0.12, 0, -0.03, -0.14); mesh(segs[4], PG.sph, M.sec, 0.1, 0.03, 0.08, 0, -0.12, -0.17);   // the tail and its sucker
+    const mouth = joint(segs[0], 0, 0.02, 0.18);
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; mesh(mouth, PG.sph, M.skin, 0.05, 0.05, 0.045, Math.cos(a) * 0.15, Math.sin(a) * 0.14, -0.005); }   // the lip, in lobes
+    mesh(mouth, PG.torus, M.sec, 0.13, 0.125, 0.3, 0, 0, 0.022); mesh(mouth, PG.sph, M.dark, 0.125, 0.12, 0.03, 0, 0, 0.012); mesh(mouth, PG.sph, M.dark, 0.05, 0.05, 0.06, 0, 0, -0.01);
+    for (let k = 0; k < 3; k++) { const n = 12 - k * 3, rr = 0.105 - k * 0.03; for (let i = 0; i < n; i++) { const a = (i + k * 0.5) / n * Math.PI * 2; mesh(mouth, PG.cone, M.tooth, 0.011 - k * 0.002, 0.05 - k * 0.008, 0.011 - k * 0.002, Math.cos(a) * rr, Math.sin(a) * rr, 0.035 - k * 0.006, Math.PI / 2 + Math.sin(a) * 0.45, 0, -Math.cos(a) * 0.45); } }
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) mesh(segs[0], PG.sph, M.eye, 0.011, 0.011, 0.009, s * (0.13 + k * 0.035), 0.2 - k * 0.025, 0.11 - k * 0.04);
     return {
       J: { body, segs, mouth }, h: 0.75, r: 0.42,
       hits: [{ n: segs[0], r: 0.3, part: 'head' }, { n: segs[2], r: 0.3, part: 'body' }, { n: segs[4], r: 0.26, part: 'body' }],
@@ -190,38 +350,65 @@
       },
     };
   };
-  // 火吹き職工: a stocky smith in a leather apron, a fuel tank on the back, a nozzle that glows
+  // 火吹き職工: a thick-set smith - a belly, a bull's neck, heavy arms in gauntlets of hide; an apron from breast to shin, an iron
+  // plate before the face with two slits the fire shows through, two bottles on the back, a fire-pipe whose mouth glows
   B.smith = function (root, M) {
-    const Hm = humanoid(root, M, { leg: 0.8, torso: 0.62, width: 0.56, head: 0.15 });
-    const leather = new THREE.MeshStandardMaterial({ color: 0x3a2214, roughness: 0.9 });
-    mesh(Hm.spine, PG.box, leather, 0.6, 0.66, 0.3, 0, 0.3, 0.03);
-    mesh(Hm.head, PG.box, X.ironMat || M.dark, 0.3, 0.26, 0.3, 0, 0.12, 0); mesh(Hm.head, PG.box, M.eye, 0.22, 0.04, 0.02, 0, 0.13, 0.16);
-    const tank = joint(Hm.spine, 0, 0.42, -0.26); for (const s of [-1, 1]) mesh(tank, PG.cyl8, X.ironMat || M.dark, 0.12, 0.62, 0.12, s * 0.13, 0, 0);
-    const glow = new THREE.MeshStandardMaterial({ color: 0x2a0a00, emissive: 0xff6a10, emissiveIntensity: 2 });
-    const nozzle = joint(Hm.arms[1].hand, 0, 0, 0); mesh(nozzle, PG.cyl8, X.ironMat || M.dark, 0.045, 0.6, 0.045, 0, 0, 0.3, Math.PI / 2); const tip = mesh(nozzle, PG.sph, glow, 0.06, 0.06, 0.06, 0, 0, 0.62);
+    const th = 0.62, legL = 0.8;
+    const hide = wear(M, 0x3a2416, 'leather'), cloth = wear(M, 0x24201c, 'weave', { roughness: 1 }, 6), iron = wear(M, 0x35312f, 'steel', { metalness: 0.75, roughness: 0.8 }), brass = wear(M, 0x6a4c26, 'steel', { metalness: 0.8, roughness: 0.6 }), wood = wear(M, 0x4a3524, 'walnut');
+    const Hm = humanoid(root, M, { leg: legL, torso: th, width: 0.56, head: 0.15, legMat: cloth, footMat: hide, hipMat: cloth, eyes: false });
+    mesh(Hm.spine, PG.sph, M.skin, 0.3, 0.25, 0.25, 0, 0.2, 0.07); mesh(Hm.spine, PG.sph, M.skin, 0.31, 0.22, 0.2, 0, 0.43, 0.04);
+    mesh(Hm.spine, PG.sph, M.skin, 0.22, 0.11, 0.15, 0, th - 0.015, -0.02);
+    for (let i = 0; i < 2; i++) {
+      const a = Hm.arms[i], l = Hm.L[i];
+      mesh(a.sh, PG.sph, M.skin, 0.078, 0.17, 0.084, 0, -0.14, 0); mesh(a.sh, PG.sph, M.skin, 0.092, 0.09, 0.095, 0, 0, 0);
+      mesh(a.el, PG.cyl8, hide, 0.056, 0.2, 0.06, 0, -0.17, 0); mesh(a.el, PG.cyl8, hide, 0.068, 0.045, 0.072, 0, -0.07, 0); mesh(a.hand, PG.sph, hide, 0.06, 0.07, 0.05, 0, -0.02, 0.005);
+      mesh(l.hip, PG.sph, cloth, 0.095, legL * 0.27, 0.105, 0, -legL * 0.23, 0.005); mesh(l.kn, PG.cyl8, hide, 0.058, legL * 0.3, 0.062, 0, -legL * 0.34, 0); mesh(l.kn, PG.cyl8, hide, 0.066, 0.045, 0.07, 0, -legL * 0.2, 0);
+    }
+    gear(Hm.spine, 'apron', { leather: hide, iron, wood }, 0, 0, 0);
+    gear(Hm.head, 'smithmask', { iron, leather: hide }, 0, -0.02, 0);
+    for (const s of [-1, 1]) mesh(Hm.head, PG.box, M.eye, 0.05, 0.011, 0.012, s * 0.048, 0.14, 0.166, 0, s * 0.24, 0);
+    const tank = joint(Hm.spine, 0, 0.42, -0.26); gear(tank, 'tank', { iron, brass });
+    const glow = new THREE.MeshStandardMaterial({ color: 0x2a0a00, emissive: 0xff6a10, emissiveIntensity: 2 }); M.all.push(glow);
+    const nozzle = joint(Hm.arms[1].hand, 0, 0, 0); gear(nozzle, 'nozzle', { iron, leather: hide }); const tip = mesh(nozzle, PG.sph, glow, 0.035, 0.035, 0.035, 0, 0, 0.6);
     return {
-      J: Object.assign(Hm, { nozzle }), h: Hm.h, r: 0.48,
+      J: Object.assign(Hm, { nozzle }), h: Hm.h, r: 0.48, mats: [hide, cloth],
       hits: humanHits(Hm, 0.17), orn: { head: Hm.head, back: Hm.spine, backZ: [-0.3, -0.3], backY: 0.45 },
       animate(a) {
         walkAnim(Hm, a, { lean: 0.12, swing: 0.45 });
         Hm.arms[1].sh.rotation.x = -1.3 - a.wind * 0.2; Hm.arms[0].sh.rotation.x = -0.9;
-        tip.scale.setScalar(0.06 * (1 + a.atk * 1.5 + a.wind * 0.6)); // (the nozzle's glow swells as it breathes)
+        tip.scale.setScalar(0.035 * (1 + a.atk * 1.5 + a.wind * 0.6)); // (the pipe's mouth glows more as it breathes)
       },
     };
   };
-  // 虚空の使徒: a tall robed figure with a faceless mask, a halo and six pale wings; it hovers
+  // 虚空の使徒: a tall figure in a robe that hangs to nothing, a veil over the head and before the face a blank oval of bone, cracked;
+  // a ring of light behind the head with rays out of it, six wings of soiled feathers, long hands out of wide sleeves; it hovers
   B.seraph = function (root, M) {
     PGs();
+    const FG = G.GFX && G.GFX.foeGeo;
     const body = joint(root, 0, 1.4, 0);
-    mesh(body, PG.cone, M.skin, 0.42, 1.7, 0.4, 0, -0.45, 0);
-    const head = joint(body, 0, 0.55, 0); mesh(head, PG.sph, M.skin, 0.2, 0.24, 0.2); mesh(head, PG.sph, M.sec, 0.16, 0.2, 0.06, 0, 0, 0.16);
-    mesh(head, PG.box, M.eye, 0.12, 0.012, 0.02, 0, 0.02, 0.2);
-    const halo = joint(head, 0, 0.32, -0.08); mesh(halo, PG.torus, M.sec, 0.32, 0.32, 0.5, 0, 0, 0, 0.2);
-    const wingM = new THREE.MeshStandardMaterial({ color: 0xf4f0e8, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x302a20 });
+    const mask = wear(M, 0x8f8876, 'bone', { roughness: 0.45 }), wingM = wear(M, 0x7d776c, 'weave', { roughness: 0.8, side: THREE.DoubleSide }, 9);
+    mesh(body, (FG && FG('robe')) || PG.cone, M.skin, 0.42, 1.7, 0.4, 0, -0.45, 0);
+    mesh(body, (FG && FG('robe')) || PG.cone, M.skin, 0.36, 0.44, 0.25, 0, 0.27, 0);                                    // a cape over the shoulders
+    mesh(body, PG.cyl8, M.skin, 0.062, 0.14, 0.062, 0, 0.5, 0.01);
+    mesh(body, PG.torus, M.sec, 0.125, 0.1, 0.22, 0, 0.46, 0.01, Math.PI / 2 - 0.2);                                     // a collar of old gold
+    mesh(body, PG.box, M.sec, 0.09, 0.56, 0.014, 0, -0.15, 0.245, -0.115); mesh(body, PG.box, M.sec, 0.09, 0.56, 0.014, 0, -0.7, 0.325, -0.14); mesh(body, PG.oct3 || PG.sph, M.sec, 0.045, 0.065, 0.02, 0, 0.2, 0.215);
+    const head = joint(body, 0, 0.55, 0);
+    mesh(head, PG.sph, M.skin, 0.17, 0.21, 0.18, 0, 0.03, -0.04); mesh(head, PG.cone, M.skin, 0.17, 0.3, 0.13, 0, -0.14, -0.09); mesh(head, PG.sph, M.dark, 0.1, 0.15, 0.05, 0, 0.0, 0.105);
+    mesh(head, PG.sph, mask, 0.092, 0.142, 0.05, 0, -0.005, 0.125);
+    mesh(head, PG.box, M.eye, 0.006, 0.085, 0.01, 0, 0.015, 0.172);
+    mesh(head, PG.box, M.dark, 0.004, 0.09, 0.006, 0.035, -0.055, 0.165, 0, 0, 0.5); mesh(head, PG.box, M.dark, 0.0035, 0.05, 0.006, 0.058, -0.005, 0.155, 0, 0, -0.4);   // the cracks
+    const halo = joint(head, 0, 0.08, -0.16);
+    mesh(halo, PG.torus, M.sec, 0.3, 0.3, 0.22, 0, 0, 0); mesh(halo, PG.torus, M.sec, 0.23, 0.23, 0.1, 0, 0, 0);
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, l = i % 2 ? 0.1 : 0.19; mesh(halo, PG.cone, M.sec, 0.011, l, 0.006, Math.cos(a) * (0.31 + l / 2), Math.sin(a) * (0.31 + l / 2), 0, 0, 0, a - Math.PI / 2); }
     const wings = [];
-    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const j = joint(body, s * 0.12, 0.3 - k * 0.32, -0.15); mesh(j, PG.box, wingM, 1.1 - k * 0.2, 0.32, 0.02, s * (0.55 - k * 0.1), 0, 0, 0, 0, s * (0.35 - k * 0.3)); wings.push({ j, s, k }); }
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const j = joint(body, s * 0.12, 0.3 - k * 0.32, -0.15), sc = 1.15 - k * 0.2; gear(j, 'wing', { feather: wingM }, 0, 0, 0, 0, 0, s * (0.55 - k * 0.5), [s * sc, sc, 1]); wings.push({ j, s, k }); }
     const arms = [];
-    for (const s of [-1, 1]) { const sh = joint(body, s * 0.3, 0.25, 0.05); mesh(sh, PG.cone, M.skin, 0.1, 0.62, 0.1, 0, -0.28, 0); arms.push(sh); }
+    for (const s of [-1, 1]) {
+      const sh = joint(body, s * 0.3, 0.25, 0.05);
+      mesh(sh, (FG && FG('robe')) || PG.cone, M.skin, 0.085, 0.62, 0.085, 0, -0.29, 0);
+      mesh(sh, PG.sph, mask, 0.03, 0.045, 0.02, 0, -0.62, 0.01); for (let i = 0; i < 4; i++) mesh(sh, PG.cone, mask, 0.008, 0.13, 0.008, (i - 1.5) * 0.016, -0.71, 0.012, Math.PI, 0, (i - 1.5) * 0.09);
+      arms.push(sh);
+    }
     return {
       J: { body, head, halo, wings, arms }, h: 2.3, r: 0.45, hover: true,
       hits: [{ n: head, r: 0.22, part: 'head' }, { n: body, r: 0.4, part: 'body', o: V(0, -0.2, 0) }, { n: body, r: 0.34, part: 'body', o: V(0, -0.9, 0) }],
@@ -242,7 +429,7 @@
   const add = (o) => { const d = Object.assign({}, base, o); d.minArea = d.unlockK * 5 + 1; d.desc = d.desc + `\n【${G.Run && G.Run.FIELD_NAME ? o.fields.map((f) => G.Tex.BIOMES[f] ? G.Tex.BIOMES[f].name : f).join('・') : ''}にだけ現れる】`; ENEMIES.push(d); return d; };
   add({ id: 'ff_ghoul', fields: ['hamlet'], plan: 'villager', name: '屍喰いの村人', icon: '🧟', hp: 80, dmg: 13, speed: 6.4, size: 1, attack: 'lunge', range: 2.4, cd: 1.3, ai: 'flank', h: 1.6, undead: true, sound: 'groan', pitch: 0.9, unlockK: 0, rarity: 'common', pack: true,
     desc: '村を捨てきれなかった者の成れの果て。群れで獲物を囲み、熊手を構えて跳びかかる。一体が気づくと周りの仲間も駆けつける。' });
-  add({ id: 'ff_scarecrow', fields: ['hamlet'], plan: 'scarecrow', name: '呪いの案山子', icon: '🎃', hp: 115, dmg: 11, speed: 4.8, size: 1, attack: 'sickles', range: 22, cd: 2.8, ai: 'ranged', h: 2.4, hover: true, blink: true, sound: 'screech', pitch: 0.7, unlockK: 1, rarity: 'uncommon', color: '#b89a5a', eye: '#ff7a20',
+  add({ id: 'ff_scarecrow', fields: ['hamlet'], plan: 'scarecrow', name: '呪いの案山子', icon: '🎃', hp: 115, dmg: 11, speed: 4.8, size: 1, attack: 'sickles', range: 22, cd: 2.8, ai: 'ranged', h: 2.4, hover: true, blink: true, sound: 'screech', pitch: 0.7, unlockK: 1, rarity: 'uncommon', color: '#7d6a44', eye: '#ff7a20',
     desc: '畑に立つ案山子に呪いが宿ったもの。鎌を三本まとめて投げ、狙われると一瞬で別の場所に移る。' });
   add({ id: 'ff_sentinel', fields: ['dusk'], plan: 'golem', name: '夕陽の番兵', icon: '🗿', hp: 250, dmg: 24, speed: 3.0, size: 0.72, attack: 'sunray', range: 30, cd: 4.2, ai: 'ranged', h: 2.3, shield: 0.3, sound: 'rumble', pitch: 1.1, unlockK: 1, rarity: 'uncommon', color: '#c8a878', eye: '#ffb050', orn: 'ember',
     desc: '廃都の門を守っていた砂岩の像。目に夕陽を集め、足元に印した一筋の道へ光線を放つ。光る線の上から横へ逃げろ。' });

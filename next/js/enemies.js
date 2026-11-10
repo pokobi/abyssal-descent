@@ -27,7 +27,8 @@
     mimic: { skin: '#8a5a30', sec: '#c8a050', rough: 0.6, blood: 0x6a0c0c, tex: 'skin' },
   };
   // (a coat of its own kind for each, where gfx.js can make it: a pelt, a shell, a hide, a cloth)
-  const XTEX = { hound: 'fur', bat: 'fur', spider: 'chitin', beetle: 'chitin', mantis: 'chitin', brute: 'leather', imp: 'leather', worm: 'leather', mushroom: 'leather', wraith: 'weave', shaman: 'weave' };
+  const XTEX = { hound: 'fur', bat: 'fur', spider: 'chitin', beetle: 'chitin', mantis: 'chitin', brute: 'leather', imp: 'leather', worm: 'leather', mushroom: 'leather', wraith: 'weave', shaman: 'weave',
+    villager: 'leather', scarecrow: 'weave', knight: 'steel', archer: 'bone', drowned: 'bone', leech: 'leather', smith: 'leather', seraph: 'bone' };
   function mkMats(def, opts) {
     const pc = PLANCOL[def.plan];
     const t = G.Tex.tex;
@@ -887,7 +888,7 @@
     const M = mkMats(def, opts);
     const root = new THREE.Group();
     const inner = new THREE.Group(); root.add(inner);
-    const m = B[def.plan](inner, M, opts);
+    const m = B[def.plan](inner, M, opts, def);
     // (the blocks hung on each joint melted into one surface: gfx.js. Only with the full look on: it costs a moment at a body's first making)
     if (G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(inner, m, M, def.plan); } catch (e) { /* the body stays as it was built */ } }
     addOrnaments(m, def, M);

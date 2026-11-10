@@ -1226,6 +1226,143 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   const sCache = {};
   X.shieldParts = function (kind) { if (sCache[kind] !== undefined) return sCache[kind]; let r = null; try { r = SH[kind] ? SH[kind]() : null; } catch (e) { console.warn('gfx: no shield', kind, e); r = null; } return (sCache[kind] = r); };
+  // ---- the rest of the guns (weapons.js), as lists of parts { g, at, m, role }: role says what a part is to the gun - 'bolt' / 'mag' (what
+  // moves at a shot, what comes away at a reload), 'onbolt' / 'onmag' (rides on that), 'spin' (the turning cluster), 'extra'. In the
+  // gun's own measure: forward is -z, a point f forward of the origin lies at z = -f ----
+  const gpart = (m, list, role, o) => { const g = boxUV(Geo.merge(Array.isArray(list) ? list : [list]), 5); g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()); g.translate(-c.x, -c.y, -c.z); return Object.assign({ g, at: [c.x, c.y, c.z], m, role: role || '' }, o || {}); };
+  const tubeZ = (pts, y, x, seg) => { const g = lathe(pts, seg || 18); g.translate(x || 0, y || 0, 0); return g; };   // turned about the bore: [radius, forward]
+  const rodG = (a, b, r, seg) => Geo.rod(a, b, r, seg || 8);
+  const bandZ = (r, f0, f1, y, t) => tubeZ([[r, f0], [r + (t || 0.008), f0 + 0.005], [r + (t || 0.008), f1 - 0.005], [r, f1]], y);
+  const flower = (r, d, n) => { const p = []; for (let i = 0; i < 48; i++) { const a = i / 48 * TAU, rr = r + d * Math.cos(a * (n || 6)); p.push([Math.cos(a) * rr, Math.sin(a) * rr]); } return p; };
+  // the grip and the stock with a window through it that most of them share: the grip about z = gz, the stock from s0 back to s1
+  const gripG = (gz, top, bot, w) => side([[-gz + 0.028, top], [-gz + 0.008, bot + 0.004], [-gz - 0.028, bot], [-gz - 0.034, (top + bot) / 2 + 0.01], [-gz - 0.022, top]], w || 0.034, 0.009, null, 0, 2);
+  const stockG = (s0, s1, yt, yb) => side([[-s0, yt], [-s0, yb + 0.012], [-(s0 + s1) / 2, yb + 0.004], [-s1 + 0.012, yb - 0.006], [-s1, yb], [-s1, yt - 0.008], [-(s0 + s1) / 2, yt + 0.002]], 0.04, 0.006,
+    [[[-s0 - 0.045, yt - 0.024], [-s0 - 0.045, yb + 0.032], [-s1 + 0.045, yb + 0.024], [-s1 + 0.045, yt - 0.028]]], 0, 2);
+  const GN = {};
+
+  // the rotary gun: six barrels in three clamps on a shaft (they turn), a ribbed housing, a carrying bar on two posts, a grip under
+  // the motor box, the box of the belt and its chute
+  GN.minigun = () => {
+    const br = [], cl = [];
+    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU, x = Math.cos(a) * 0.035, y = Math.sin(a) * 0.035; br.push(rodG([x, y, 0.175], [x, y, -0.375], 0.0105, 10), rodG([x, y, -0.362], [x, y, -0.39], 0.0128, 10)); }
+    for (const f of [0.32, 0.1, -0.1]) cl.push(sec(flower(0.05, 0.0055), f - 0.012, f + 0.012, 0.003));
+    cl.push(rodG([0, 0, 0.17], [0, 0, -0.33], 0.012, 10));
+    return { parts: [
+      gpart('steel', br, 'spin'), gpart('metal', cl, 'spin'),
+      gpart('metal', [tubeZ([[0.0005, -0.24], [0.058, -0.24], [0.07, -0.225], [0.07, -0.16], [0.066, -0.155], [0.066, -0.145], [0.07, -0.14], [0.07, -0.03], [0.064, 0], [0.06, 0.002], [0.06, 0.19], [0.066, 0.2], [0.066, 0.215], [0.05, 0.22], [0.0005, 0.22]], 0, 0, 24),
+        rodG([0, 0.06, -0.015], [0, 0.172, -0.015], 0.008), rodG([0, 0.06, 0.115], [0, 0.172, 0.115], 0.008), rb(0.03, 0.075, 0.05, 0.008, 0.07, -0.035, -0.21, [0, 0, -0.5])]),
+      gpart('poly', [rb(0.13, 0.1, 0.17, 0.02, 0, 0.03, -0.28), gripG(0.3, -0.02, -0.118, 0.036), rodG([0, 0.17, -0.03], [0, 0.17, 0.13], 0.0125, 10)]),
+      gpart('metal', [Geo.xf(X.makeRbox(0.12, 0.14, 0.12, 0.012, 1), [0.1, -0.12, 0.25]), Geo.xf(X.makeRbox(0.124, 0.014, 0.124, 0.005, 1), [0.1, -0.054, 0.25])], 'mag'),
+    ] };
+  };
+  // the crossbow: a stock in one piece, a steel prod bent back to its nocks, the string drawn to the nut, a stirrup, the bolt with its
+  // head and three vanes (the bolt is what goes at a shot)
+  GN.crossbow = () => {
+    const bow = [], N = 16, zc = (x) => -0.385 + 0.09 * Math.pow(Math.abs(x) / 0.3, 2), th = (x) => 0.017 - 0.009 * Math.abs(x) / 0.3;
+    for (let i = 0; i <= N; i++) { const x = -0.3 + 0.6 * i / N; bow.push([x, zc(x) - th(x)]); } for (let i = N; i >= 0; i--) { const x = -0.3 + 0.6 * i / N; bow.push([x, zc(x) + th(x)]); }
+    const prod = ext(bow, 0.02, 0.004); prod.rotateX(HX); prod.translate(0, 0.02, 0);
+    const st = new THREE.TorusGeometry(0.034, 0.0042, 6, 18); st.rotateX(HX); st.translate(0, 0, -0.43);
+    const fl = []; for (let i = 0; i < 3; i++) { const g0 = Geo.xf(X.makeRbox(0.0012, 0.02, 0.06, 0.0004, 1), [0, 0.011, 0]); g0.rotateZ(i * TAU / 3); g0.translate(0, 0.045, 0.02); fl.push(g0); }
+    return { parts: [
+      gpart('wood', side([[0.4, 0.022], [0.4, -0.008], [0.36, -0.026], [0.0, -0.03], [-0.04, -0.035], [-0.062, -0.112], [-0.098, -0.116], [-0.105, -0.05], [-0.16, -0.045], [-0.36, -0.06], [-0.38, -0.055], [-0.38, 0.03], [-0.2, 0.03], [-0.16, 0.022]], 0.04, 0.008, null, 0, 2)),
+      gpart('metal', [prod, ball(0.008, [-0.3, 0.02, -0.295]), ball(0.008, [0.3, 0.02, -0.295]), rb(0.05, 0.03, 0.05, 0.006, 0, 0.012, 0.385)]),
+      gpart('steel', [st, rb(0.02, 0.014, 0.03, 0.004, 0, 0.03, -0.035), side([[-0.02, -0.03], [-0.014, -0.03], [-0.018, -0.045], [-0.026, -0.056], [-0.03, -0.055], [-0.024, -0.044]], 0.006, 0.0012)]),
+      gpart('poly', [rodG([-0.298, 0.03, -0.295], [0, 0.03, 0.03], 0.0022, 5), rodG([0.298, 0.03, -0.295], [0, 0.03, 0.03], 0.0022, 5)]),
+      gpart('wood', rodG([0, 0.045, 0.05], [0, 0.045, -0.45], 0.0052, 8), 'bolt'),
+      gpart('steel', spike(0.011, 0.05, [0, 0.045, -0.47], [-HX, 0, 0], 4), 'onbolt'), gpart('poly', fl, 'onbolt'),
+    ] };
+  };
+  // the launcher: a tube with a flared mouth and a venturi behind, two grips, a sight box on its left, a rest for the shoulder; the
+  // rocket's nose shows at the mouth (it is the 'bolt')
+  GN.rocket = () => ({ parts: [
+    gpart('poly', [tubeZ([[0.0005, -0.33], [0.07, -0.33], [0.074, -0.31], [0.066, -0.27], [0.062, -0.24], [0.062, 0.2], [0.066, 0.21], [0.066, 0.25], [0.062, 0.26], [0.062, 0.57], [0.07, 0.58], [0.072, 0.62], [0.066, 0.632], [0.056, 0.632], [0.054, 0.56], [0.0005, 0.56]], 0.03, 0, 26),
+      gripG(0.0, -0.03, -0.128, 0.03), side([[0.266, -0.03], [0.263, -0.126], [0.232, -0.126], [0.232, -0.03]], 0.03, 0.008, null, 0, 2), rb(0.05, 0.03, 0.12, 0.01, 0, -0.046, -0.2)]),
+    gpart('metal', [bandZ(0.0625, 0.565, 0.635, 0.03, 0.01), bandZ(0.0625, -0.335, -0.265, 0.03, 0.012), bandZ(0.062, 0.1, 0.13, 0.03, 0.005), rb(0.034, 0.03, 0.13, 0.006, 0, -0.04, 0.07),
+      rb(0.03, 0.05, 0.06, 0.006, -0.075, 0.08, 0.1), rb(0.012, 0.03, 0.022, 0.003, -0.068, 0.05, 0.1)]),
+    gpart('steel', [tubeZ([[0.0005, 0.128], [0.011, 0.128], [0.011, 0.133], [0.0005, 0.133]], 0.08, -0.075), side([[0.03, -0.034], [0.036, -0.034], [0.032, -0.048], [0.024, -0.058], [0.021, -0.057], [0.026, -0.047]], 0.006, 0.0012)]),
+    gpart('metal', tubeZ([[0.0005, 0.6], [0.045, 0.6], [0.05, 0.615], [0.05, 0.65], [0.04, 0.685], [0.022, 0.71], [0.0005, 0.722]], 0.03, 0, 20), 'bolt'),
+  ] });
+  // the grenade launcher: a short wide barrel, a cylinder of six chambers (it turns), a frame strapped over and under it, a fore grip
+  GN.gl = () => {
+    const ch = []; for (let i = 0; i < 6; i++) { const a = (i + 0.5) / 6 * TAU; for (const y of [-0.0605, 0.0605]) ch.push(Geo.xf(new THREE.CylinderGeometry(0.019, 0.019, 0.004, 14), [Math.cos(a) * 0.042, y, Math.sin(a) * 0.042])); }
+    const dr = sec(flower(0.064, 0.006), -0.06, 0.06, 0.004); dr.rotateX(-HX);
+    return { drum: { at: [0, 0, -0.03], parts: [{ g: boxUV(dr, 5), m: 'metal' }, { g: boxUV(Geo.merge(ch), 5), m: 'brass' }] }, parts: [
+      gpart('metal', [tubeZ([[0.0005, 0.1], [0.03, 0.1], [0.03, 0.36], [0.034, 0.365], [0.034, 0.388], [0.027, 0.39], [0.025, 0.3], [0.0005, 0.3]], 0.03, 0, 20),
+        side([[0.13, 0.0755], [0.13, -0.005], [0.094, -0.005], [0.094, 0.0712], [-0.034, 0.0712], [-0.034, -0.03], [-0.06, -0.04], [-0.15, -0.03], [-0.15, 0.062], [-0.13, 0.0755]], 0.05, 0.002, null, 0, 1),
+        rb(0.03, 0.012, 0.14, 0.004, 0, -0.08, 0.03), rb(0.04, 0.085, 0.036, 0.006, 0, -0.045, 0.112), rb(0.04, 0.06, 0.03, 0.006, 0, -0.055, -0.045)]),
+      gpart('steel', [rb(0.004, 0.034, 0.006, 0.001, 0, 0.08, 0.372), rb(0.022, 0.03, 0.004, 0.001, 0, 0.104, -0.1), side([[-0.075, -0.04], [-0.081, -0.04], [-0.085, -0.052], [-0.081, -0.062], [-0.078, -0.061], [-0.08, -0.05]], 0.006, 0.0012)]),
+      gpart('poly', [gripG(0.12, -0.035, -0.135), stockG(0.15, 0.4, 0.062, -0.04), side([[0.216, 0.003], [0.213, -0.11], [0.185, -0.11], [0.185, 0.003]], 0.03, 0.008, null, 0, 2)]),
+    ] };
+  };
+  // the flamethrower: a pipe under a pierced shroud to a flared mouth of brass, the tank slung under it with its valve and bands, a
+  // feed line, the pilot's thin pipe
+  GN.flame = () => ({ parts: [
+    gpart('metal', [side([[0.15, 0.055], [0.15, -0.015], [-0.06, -0.018], [-0.15, -0.015], [-0.15, 0.05], [-0.12, 0.058]], 0.048, 0.006, null, 0, 2),
+      tubeZ([[0.0005, 0.15], [0.016, 0.15], [0.016, 0.5], [0.0005, 0.5]], 0.03),
+      tubeZ([[0.018, 0.28], [0.026, 0.285], [0.026, 0.31], [0.022, 0.314], [0.022, 0.332], [0.026, 0.336], [0.026, 0.36], [0.022, 0.364], [0.022, 0.382], [0.026, 0.386], [0.026, 0.41], [0.022, 0.414], [0.022, 0.432], [0.026, 0.436], [0.026, 0.465], [0.018, 0.47]], 0.03)]),
+    gpart('brass', [tubeZ([[0.016, 0.49], [0.024, 0.492], [0.031, 0.505], [0.034, 0.548], [0.03, 0.55], [0.024, 0.512], [0.016, 0.5]], 0.03, 0, 20), rodG([0, 0.003, -0.2], [0, 0.002, -0.552], 0.004, 6), rodG([0, -0.05, -0.29], [0, -0.012, -0.335], 0.006, 6), rodG([0, -0.012, -0.335], [0, 0.012, -0.3], 0.006, 6)]),
+    gpart('tank', tubeZ([[0.0005, -0.03], [0.03, -0.028], [0.046, -0.015], [0.05, 0.005], [0.05, 0.235], [0.046, 0.255], [0.03, 0.268], [0.012, 0.272], [0.012, 0.288], [0.0005, 0.288]], -0.07, 0, 22), 'mag'),
+    gpart('metal', [bandZ(0.0495, 0.04, 0.062, -0.07, 0.004), bandZ(0.0495, 0.18, 0.202, -0.07, 0.004), tubeZ([[0.0005, 0.286], [0.017, 0.286], [0.017, 0.296], [0.0005, 0.296]], -0.07)], 'onmag'),
+    gpart('poly', [gripG(0.12, -0.03, -0.135), stockG(0.15, 0.4, 0.05, -0.035)]),
+  ] });
+  // the rail gun: two glowing rails under coils between an upper and a lower spar, a body with a toothed rail on top, the cell
+  GN.rail = () => {
+    const teeth = []; for (let i = 0; i < 9; i++) teeth.push(rb(0.024, 0.004, 0.011, 0.0008, 0, 0.063, -0.06 + i * 0.021));
+    const coils = []; for (let i = 0; i < 5; i++) { const c = new THREE.TorusGeometry(0.045, 0.0075, 8, 22); c.translate(0, 0.02, -0.25 - i * 0.08); coils.push(c); }
+    const fr = []; for (const f of [0.215, 0.29, 0.37, 0.45, 0.53, 0.61, 0.755]) fr.push(sec(rrect(0, 0.02, 0.082, 0.07, 0.016, 3), f - 0.006, f + 0.006, 0.002, [rrect(0, 0.02, 0.066, 0.054, 0.012, 3)]));
+    return { parts: [
+      gpart('metal', [side([[0.22, 0.06], [0.22, -0.02], [0.1, -0.022], [-0.15, -0.02], [-0.15, 0.05], [-0.1, 0.062]], 0.066, 0.006, null, 0, 2), rb(0.026, 0.006, 0.2, 0.001, 0, 0.0585, 0.025),
+        rb(0.03, 0.006, 0.55, 0.002, 0, 0.052, 0.49), rb(0.03, 0.006, 0.55, 0.002, 0, -0.012, 0.49)].concat(teeth, fr)),
+      gpart('glow', [rb(0.014, 0.024, 0.52, 0.003, 0.025, 0.02, 0.5), rb(0.014, 0.024, 0.52, 0.003, -0.025, 0.02, 0.5)]), gpart('coil', coils),
+      gpart('glow', Geo.xf(X.makeRbox(0.04, 0.06, 0.08, 0.008, 1), [0, -0.06, -0.05]), 'mag'),
+      gpart('metal', [rb(0.044, 0.008, 0.084, 0.003, 0, -0.092, 0.05), rb(0.044, 0.008, 0.084, 0.003, 0, -0.03, 0.05)], 'onmag'),
+      gpart('poly', [gripG(0.1, -0.03, -0.135), stockG(0.15, 0.41, 0.05, -0.045)]),
+    ] };
+  };
+  // the nailer: a tool's body with a bar to carry it by, a nose with a safety foot, the coil of nails in its drum, an air fitting
+  GN.nail = () => {
+    const drum = new THREE.CylinderGeometry(0.05, 0.05, 0.03, 22); drum.rotateZ(HX); drum.translate(0, 0, -0.05);
+    const hub = new THREE.CylinderGeometry(0.014, 0.014, 0.036, 10); hub.rotateZ(HX); hub.translate(0, 0, -0.05);
+    return { parts: [
+      gpart('metal', [side([[0.14, 0.066], [0.14, -0.01], [0.1, -0.03], [-0.02, -0.03], [-0.14, -0.02], [-0.14, 0.05], [-0.1, 0.066]], 0.056, 0.012, null, 0, 2),
+        rodG([0, 0.06, -0.165], [0, 0.072, -0.165], 0.009), rodG([0, 0.06, 0.055], [0, 0.072, 0.055], 0.009), tubeZ([[0.0005, -0.165], [0.03, -0.165], [0.034, -0.15], [0.03, -0.135], [0.0005, -0.135]], 0.02)]),
+      gpart('poly', [rodG([0, 0.072, -0.175], [0, 0.072, 0.065], 0.013, 10), gripG(0.12, -0.03, -0.135)]),
+      gpart('steel', [tubeZ([[0.0005, 0.14], [0.016, 0.14], [0.016, 0.16], [0.012, 0.165], [0.012, 0.325], [0.0005, 0.325]], 0.03), rb(0.01, 0.03, 0.02, 0.003, 0, 0.012, 0.325), rb(0.022, 0.006, 0.03, 0.002, 0, -0.002, 0.33)]),
+      gpart('brass', Geo.xf(new THREE.CylinderGeometry(0.008, 0.01, 0.022, 8), [0, -0.146, 0.132])),
+      gpart('metal', drum, 'mag'), gpart('steel', hub, 'onmag'),
+    ] };
+  };
+  // the harpoon gun: a banded tube, the shaft of the spear out of its mouth (the 'bolt') with a barbed head, a reel of line, a wooden stock
+  GN.harpoon = () => {
+    const reel = new THREE.CylinderGeometry(0.028, 0.028, 0.026, 16); reel.rotateZ(HX); reel.translate(0, -0.022, -0.1);
+    const rope = new THREE.CylinderGeometry(0.022, 0.022, 0.02, 14); rope.rotateZ(HX); rope.translate(0, -0.022, -0.1);
+    const head = [spike(0.02, 0.085, [0, 0.03, -0.712], [-HX, 0, 0], 4)]; for (const s of [-1, 1]) head.push(spike(0.007, 0.05, [s * 0.014, 0.03, -0.668], [HX - 0.001, 0, s * 0.42], 4));
+    return { parts: [
+      gpart('metal', [tubeZ([[0.0005, -0.05], [0.026, -0.05], [0.03, -0.04], [0.03, 0.43], [0.034, 0.435], [0.034, 0.452], [0.02, 0.455], [0.018, 0.4], [0.0005, 0.4]], 0.03, 0, 20), bandZ(0.0298, 0.1, 0.125, 0.03, 0.005), bandZ(0.0298, 0.27, 0.295, 0.03, 0.005), reel]),
+      gpart('poly', rope),
+      gpart('steel', rodG([0, 0.03, -0.17], [0, 0.03, -0.67], 0.006, 8), 'bolt'),
+      gpart('steel', head, 'extra'),
+      gpart('wood', side([[0.06, 0.004], [0.04, -0.03], [-0.04, -0.035], [-0.062, -0.112], [-0.098, -0.116], [-0.105, -0.05], [-0.16, -0.045], [-0.35, -0.06], [-0.37, -0.055], [-0.37, 0.036], [-0.2, 0.036], [-0.13, 0.02], [-0.05, 0.004]], 0.04, 0.008, null, 0, 2)),
+      gpart('steel', side([[-0.02, -0.034], [-0.014, -0.034], [-0.018, -0.049], [-0.026, -0.06], [-0.03, -0.059], [-0.024, -0.048]], 0.006, 0.0012)),
+    ] };
+  };
+  // the lightning gun: a ribbed insulator, a brass electrode to a glowing ball between its coils, a brass vessel at its side
+  GN.tesla = () => {
+    const ins = [[0.0005, 0.15]]; for (let i = 0; i < 5; i++) { const f = 0.152 + i * 0.022; ins.push([0.03, f], [0.03, f + 0.01], [0.021, f + 0.014], [0.021, f + 0.019]); } ins.push([0.0005, 0.262]);
+    const tco = []; for (let i = 0; i < 3; i++) { const c = new THREE.TorusGeometry(0.04, 0.007, 8, 22); c.translate(0, 0.03, -0.2 - i * 0.07); tco.push(c); }
+    return { parts: [
+      gpart('coil', tco),
+      gpart('metal', [side([[0.15, 0.06], [0.15, -0.02], [-0.15, -0.02], [-0.15, 0.05], [-0.11, 0.062]], 0.056, 0.008, null, 0, 2), rb(0.024, 0.005, 0.18, 0.001, 0, 0.0625, 0.02)]),
+      gpart('steel', tubeZ(ins, 0.03, 0, 20)),
+      gpart('brass', [tubeZ([[0.0005, 0.25], [0.011, 0.25], [0.011, 0.43], [0.016, 0.436], [0.016, 0.444], [0.0005, 0.444]], 0.03), rodG([0, 0.076, -0.18], [0, 0.076, -0.36], 0.0035, 6), rodG([0, -0.016, -0.18], [0, -0.016, -0.36], 0.0035, 6),
+        rodG([0, 0.076, -0.18], [0, 0.05, -0.16], 0.0035, 6), rodG([0, -0.016, -0.18], [0, 0.01, -0.16], 0.0035, 6)]),
+      gpart('glow', ball(0.025, [0, 0.03, -0.46])),
+      gpart('brass', tubeZ([[0.0005, -0.082], [0.02, -0.08], [0.03, -0.066], [0.03, 0.028], [0.02, 0.04], [0.008, 0.044], [0.008, 0.056], [0.0005, 0.056]], 0.0, 0.05, 18), 'mag'),
+      gpart('poly', [gripG(0.12, -0.03, -0.135), stockG(0.15, 0.4, 0.05, -0.035)]),
+    ] };
+  };
+  const gnCache = {};
+  X.gunParts = function (arch) { if (gnCache[arch] !== undefined) return gnCache[arch]; let r = null; try { r = GN[arch] ? GN[arch]() : null; } catch (e) { console.warn('gfx: no gun', arch, e); r = null; } return (gnCache[arch] = r); };
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

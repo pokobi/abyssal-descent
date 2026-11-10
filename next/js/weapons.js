@@ -202,6 +202,19 @@
     const cyl = (r, len, x, y, z, m, seg, parent) => { const o = new THREE.Mesh(seg === 8 ? PG.cyl8 : PG.cyl, m || metal); o.scale.set(r, len, r); o.rotation.x = Math.PI / 2; o.position.set(x, y, z); (parent || g).add(o); return o; };
     const M = { muzzle: V(0, 0.03, -0.4), sightY: 0.08, mag: null, bolt: null, fore: V(0, -0.02, -0.25), grip: V(0, -0.05, 0.06), ejector: V(0.03, 0.05, 0), opticY: 0.075, opticZ: 0, railY: 0.07, ironY: 0.08, extra: [] };
     let barrels = null;
+    // (the guns shaped in gfx.js as lists of parts: each is given its material here; a part may be the bolt or the magazine, ride on one of
+    // them, turn with the barrels, or be the cylinder that turns)
+    const GP = G.GFX && G.GFX.gunParts ? G.GFX.gunParts(def.arch) : null;
+    const putParts = () => {
+      const MM = { metal, poly, steel: mats.steel, wood: mats.wood, brass: mats.brass, tank: mats.tank, coil: mats.coil, glow: mats.railGlow }, kids = [];
+      for (const q of GP.parts) {
+        const o = new THREE.Mesh(q.g, MM[q.m] || metal); o.position.set(q.at[0], q.at[1], q.at[2]);
+        if (q.role === 'bolt') { M.bolt = o; g.add(o); } else if (q.role === 'mag') { M.mag = o; g.add(o); } else if (q.role === 'spin' && barrels) barrels.add(o);
+        else if (q.role === 'extra') { g.add(o); M.extra.push(o); } else if (q.role === 'onbolt' || q.role === 'onmag') kids.push([q.role, o]); else g.add(o);
+      }
+      for (const [r, o] of kids) { const par = r === 'onbolt' ? M.bolt : M.mag; if (par) { o.position.sub(par.position); par.add(o); } else g.add(o); }
+      if (GP.drum) { const d = new THREE.Group(); d.position.set(GP.drum.at[0], GP.drum.at[1], GP.drum.at[2]); d.rotation.x = Math.PI / 2; for (const q of GP.drum.parts) d.add(new THREE.Mesh(q.g, MM[q.m] || metal)); d.userData.spin = true; g.add(d); M.bolt = d; }
+    };
     switch (def.arch) {
       case 'pistol': {
         // (the pistol with a shaped slide and a frame cut from one outline: gfx.js. Muzzle, grip, rail and sight line where they were)
@@ -369,6 +382,7 @@
       }
       case 'minigun': {
         barrels = new THREE.Group(); barrels.position.set(0, 0, -0.35); g.add(barrels);
+        if (GP) { putParts(); M.muzzle.set(0, 0.0, -0.74); M.opticZ = 0.05; M.sightY = 0.2; M.ironY = 0.2; M.railY = 0.18; M.fore.set(0, 0.17, 0.05); M.grip.set(0, -0.05, 0.3); break; }
         for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; cyl(0.011, 0.55, Math.cos(a) * 0.035, Math.sin(a) * 0.035, -0.1, mats.steel, 8, barrels); }
         cyl(0.055, 0.03, 0, 0, -0.32, metal, 16, barrels); cyl(0.055, 0.03, 0, 0, 0.1, metal, 16, barrels);
         cyl(0.07, 0.24, 0, 0, 0.12, metal); box(0.14, 0.12, 0.18, 0, -0.02, 0.28, poly);
@@ -379,6 +393,7 @@
         break;
       }
       case 'crossbow': {
+        if (GP) { putParts(); M.muzzle.set(0, 0.045, -0.5); M.sightY = 0.08; M.ironY = 0.08; M.railY = 0.04; M.fore.set(0, -0.03, -0.2); M.grip.set(0, -0.06, 0.08); break; }
         box(0.04, 0.05, 0.6, 0, 0.0, -0.1, mats.wood);
         box(0.6, 0.02, 0.03, 0, 0.02, -0.38, metal, 0, 0, 0);
         const limbL = box(0.32, 0.018, 0.025, -0.16, 0.02, -0.36, metal, 0, -0.25); const limbR = box(0.32, 0.018, 0.025, 0.16, 0.02, -0.36, metal, 0, 0.25);
@@ -389,6 +404,7 @@
         break;
       }
       case 'rocket': {
+        if (GP) { putParts(); M.muzzle.set(0, 0.03, -0.7); M.sightY = 0.11; M.ironY = 0.11; M.railY = 0.1; M.fore.set(0, -0.06, -0.25); M.grip.set(0, -0.06, 0.0); break; }
         cyl(0.062, 0.95, 0, 0.03, -0.15, poly); cyl(0.07, 0.06, 0, 0.03, -0.6, metal); cyl(0.07, 0.06, 0, 0.03, 0.3, metal);
         box(0.03, 0.1, 0.045, 0, -0.08, 0.0, poly, 0.3); box(0.03, 0.1, 0.045, 0, -0.08, -0.25, poly, 0.1);
         box(0.03, 0.05, 0.06, -0.075, 0.08, -0.1, metal);
@@ -397,12 +413,14 @@
         break;
       }
       case 'gl': {
+        if (GP) { putParts(); M.muzzle.set(0, 0.03, -0.39); M.sightY = 0.1; M.ironY = 0.1; M.railY = 0.075; M.fore.set(0, -0.06, -0.2); M.grip.set(0, -0.07, 0.12); break; }
         cyl(0.03, 0.26, 0, 0.03, -0.25); const drum = cyl(0.07, 0.12, 0, 0.0, -0.03, metal); M.bolt = drum; drum.userData.spin = true;
         box(0.05, 0.06, 0.2, 0, 0.04, 0.05); box(0.034, 0.1, 0.045, 0, -0.08, 0.12, poly, 0.3); box(0.04, 0.07, 0.2, 0, 0.0, 0.3, poly);
         M.muzzle.set(0, 0.03, -0.39); M.sightY = 0.1; M.ironY = 0.1; M.railY = 0.075; M.fore.set(0, -0.06, -0.2); M.grip.set(0, -0.07, 0.12);
         break;
       }
       case 'flame': {
+        if (GP) { putParts(); M.muzzle.set(0, 0.03, -0.56); M.sightY = 0.09; M.ironY = 0.09; M.railY = 0.06; M.fore.set(0, -0.05, -0.28); M.grip.set(0, -0.06, 0.12); { const pilot = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.flame, color: 0x7aaaff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); pilot.scale.setScalar(0.04); pilot.position.set(0, 0.0, -0.57); g.add(pilot); M.extra.push(pilot); } break; }
         box(0.05, 0.07, 0.3, 0, 0.02, 0); cyl(0.02, 0.36, 0, 0.03, -0.33, metal); cyl(0.03, 0.05, 0, 0.03, -0.52, mats.brass);
         M.mag = cyl(0.05, 0.3, 0, -0.07, -0.12, mats.tank);
         box(0.034, 0.1, 0.045, 0, -0.08, 0.12, poly, 0.3); box(0.04, 0.07, 0.2, 0, 0.0, 0.3, poly);
@@ -412,6 +430,7 @@
         break;
       }
       case 'rail': {
+        if (GP) { putParts(); M.muzzle.set(0, 0.02, -0.78); M.sightY = 0.1; M.ironY = 0.1; M.railY = 0.065; M.fore.set(0, -0.04, -0.3); M.grip.set(0, -0.07, 0.1); break; }
         box(0.07, 0.08, 0.5, 0, 0.02, -0.1); for (let i = 0; i < 5; i++) { const r = new THREE.Mesh(PG.torus, mats.coil); r.scale.set(0.045, 0.045, 0.06); r.position.set(0, 0.02, -0.25 - i * 0.08); g.add(r); }
         box(0.02, 0.02, 0.5, 0.025, 0.02, -0.5, mats.railGlow); box(0.02, 0.02, 0.5, -0.025, 0.02, -0.5, mats.railGlow);
         box(0.034, 0.1, 0.045, 0, -0.08, 0.1, poly, 0.3); box(0.045, 0.09, 0.22, 0, 0.0, 0.3, poly);
@@ -420,12 +439,14 @@
         break;
       }
       case 'nail': {
+        if (GP) { putParts(); M.muzzle.set(0, 0.03, -0.34); M.sightY = 0.1; M.ironY = 0.1; M.railY = 0.085; M.fore.set(0, 0.07, -0.12); M.grip.set(0, -0.07, 0.12); break; }
         box(0.06, 0.1, 0.28, 0, 0.02, 0); cyl(0.012, 0.18, 0, 0.03, -0.24); M.mag = cyl(0.05, 0.03, 0, 0.0, -0.05, metal); M.mag.rotation.set(0, 0, Math.PI / 2);
         box(0.034, 0.1, 0.045, 0, -0.08, 0.12, poly, 0.3); box(0.03, 0.03, 0.2, 0, 0.07, -0.05, metal);
         M.muzzle.set(0, 0.03, -0.34); M.sightY = 0.1; M.ironY = 0.1; M.railY = 0.085; M.fore.set(0, 0.07, -0.12); M.grip.set(0, -0.07, 0.12);
         break;
       }
       case 'harpoon': {
+        if (GP) { putParts(); M.muzzle.set(0, 0.03, -0.7); M.sightY = 0.08; M.ironY = 0.08; M.railY = 0.06; M.fore.set(0, -0.03, -0.3); M.grip.set(0, -0.06, 0.08); break; }
         cyl(0.03, 0.5, 0, 0.03, -0.2, metal); M.bolt = box(0.012, 0.012, 0.5, 0, 0.03, -0.42, mats.steel);
         const tip = new THREE.Mesh(PG.cone, mats.steel); tip.scale.set(0.025, 0.08, 0.025); tip.rotation.x = -Math.PI / 2; tip.position.set(0, 0.03, -0.71); g.add(tip); M.extra.push(tip);
         box(0.034, 0.1, 0.045, 0, -0.07, 0.08, mats.wood, 0.3); box(0.045, 0.08, 0.24, 0, 0.0, 0.25, mats.wood);
@@ -433,6 +454,7 @@
         break;
       }
       case 'tesla': {
+        if (GP) { putParts(); M.muzzle.set(0, 0.03, -0.48); M.sightY = 0.09; M.ironY = 0.09; M.railY = 0.065; M.fore.set(0, -0.05, -0.25); M.grip.set(0, -0.07, 0.12); break; }
         box(0.06, 0.08, 0.3, 0, 0.02, 0); for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(PG.torus, mats.coil); r.scale.set(0.04, 0.04, 0.08); r.position.set(0, 0.03, -0.2 - i * 0.07); g.add(r); }
         cyl(0.012, 0.3, 0, 0.03, -0.3, mats.brass); const ball = new THREE.Mesh(PG.sph, mats.railGlow); ball.scale.setScalar(0.025); ball.position.set(0, 0.03, -0.46); g.add(ball);
         M.mag = cyl(0.03, 0.12, 0.05, 0.0, 0.02, mats.brass);

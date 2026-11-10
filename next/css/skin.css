@@ -1,13 +1,48 @@
-/* The look of the interface: cut stone, wrought iron and old gold. What is shown and where is style.css's; this lays the surfaces over it.
-   (made by a script: the stone, iron and brass are small noise pictures written into the file itself) */
+/* The look of the interface. The faces are left plain so that what is written on them reads at a glance; the work is in the frames -
+   a double line of old gold, a fitting at each corner, a device on the edge - in the rules under the headings, and in the type.
+   What is shown and where is style.css's. (made by a script) */
 :root {
-  --gold: #c9a45c; --gold2: #ecd49a; --ink: #0c0a08; --panel: rgba(21, 19, 16, 0.9); --panel2: rgba(31, 27, 22, 0.94);
-  --line: rgba(160, 130, 80, 0.4); --text: #e9e0cd; --dim: #a59982;
-  --tex-stone: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='f0' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.045' numOctaves='4' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.86  0 0 0 0 0.78  0 0 0 0 0.64  0.4 0.4 0.4 0 -0.67'/%3E%3C/filter%3E%3Cfilter id='f1' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.022' numOctaves='4' seed='29' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.6 0.6 0.6 0 -0.74'/%3E%3C/filter%3E%3Cfilter id='f2' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 0.94  0 0 0 0 0.82  0.5 0.5 0.5 0 -0.78'/%3E%3C/filter%3E%3Cfilter id='f3' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2' seed='17' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.55 0.55 0.55 0 -0.7'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23f0)'/%3E%3Crect width='320' height='320' filter='url(%23f1)'/%3E%3Crect width='320' height='320' filter='url(%23f2)'/%3E%3Crect width='320' height='320' filter='url(%23f3)'/%3E%3C/svg%3E"); --tex-iron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f0' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035 0.6' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.8  0 0 0 0 0.8  0 0 0 0 0.84  0.45 0.45 0.45 0 -0.6'/%3E%3C/filter%3E%3Cfilter id='f1' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.6 0.6 0.6 0 -0.74'/%3E%3C/filter%3E%3Cfilter id='f2' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='4' seed='41' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.3  0 0 0 0 0.14  0.55 0.55 0.55 0 -0.74'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23f0)'/%3E%3Crect width='240' height='240' filter='url(%23f1)'/%3E%3Crect width='240' height='240' filter='url(%23f2)'/%3E%3C/svg%3E"); --tex-brass: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120'%3E%3Cfilter id='f0' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.85' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 0.96  0 0 0 0 0.8  0.5 0.5 0.5 0 -0.62'/%3E%3C/filter%3E%3Cfilter id='f1' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.015 0.7' numOctaves='3' seed='23' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.2  0 0 0 0 0.1  0 0 0 0 0  0.55 0.55 0.55 0 -0.68'/%3E%3C/filter%3E%3Cfilter id='f2' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='4' seed='13' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.25  0 0 0 0 0.14  0 0 0 0 0.02  0.6 0.6 0.6 0 -0.8'/%3E%3C/filter%3E%3Crect width='240' height='120' filter='url(%23f0)'/%3E%3Crect width='240' height='120' filter='url(%23f1)'/%3E%3Crect width='240' height='120' filter='url(%23f2)'/%3E%3C/svg%3E"); --tex-parch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='f0' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='5' seed='19' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.22  0 0 0 0 0.08  0.5 0.5 0.5 0 -0.62'/%3E%3C/filter%3E%3Cfilter id='f1' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' seed='37' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.2  0 0 0 0 0.1  0.5 0.5 0.5 0 -0.72'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23f0)'/%3E%3Crect width='280' height='280' filter='url(%23f1)'/%3E%3C/svg%3E");
-  --edge-stone: inset 0 1px 0 rgba(255, 238, 200, 0.11), inset 0 0 0 1px rgba(150, 124, 78, 0.24), inset 0 -24px 32px -24px rgba(0, 0, 0, 0.7), 0 5px 20px rgba(0, 0, 0, 0.6);
-  --edge-iron: inset 0 1px 0 rgba(255, 240, 210, 0.17), inset 0 0 0 1px rgba(160, 130, 80, 0.34), 0 2px 0 #000, 0 5px 12px rgba(0, 0, 0, 0.5);
+  --gold: #c9a45c; --gold2: #ecd49a; --ink: #0c0a08; --panel: rgba(17, 15, 12, 0.92); --panel2: rgba(28, 25, 21, 0.95);
+  --line: rgba(170, 138, 84, 0.42); --text: #ece4d2; --dim: #b1a58d;
+  --serif: 'Spectral', 'Shippori Mincho', 'Noto Serif JP', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+  --display: 'Cinzel', 'Zen Antique', 'Shippori Mincho', 'Noto Serif JP', serif;
+  --c-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='rotate(0 32 32)'%3E%3Cpath d='M0 0H46V3H10Q3 3 3 10V46H0Z' fill='url(%23g)'/%3E%3Cpath d='M8.5 40V13Q8.5 8.5 13 8.5H40' stroke='%237d6536' stroke-width='1.1' stroke-linecap='round'/%3E%3Cpath d='M22 8.5C30 8.5 33 15 28 19C24.5 21.5 21 18.5 23.5 15.5M8.5 22C8.5 30 15 33 19 28C21.5 24.5 18.5 21 15.5 23.5' stroke='%23c9a45c' stroke-width='1.3' stroke-linecap='round'/%3E%3Cpath d='M16 10.5l5.5 5.5l-5.5 5.5l-5.5-5.5z' fill='%23ecd49a' stroke='%233a2c12' stroke-width='.7'/%3E%3Cpath d='M50 0l3 3l-3 3l-3-3zM3 47l3 3l-3 3l-3-3z' fill='%23ecd49a' stroke='%233a2c12' stroke-width='.5'/%3E%3Cpath d='M55 3H62M3 55V62' stroke='%23c9a45c' stroke-width='1' stroke-linecap='round' opacity='.7'/%3E%3Ccircle cx='40' cy='8.5' r='1.5' fill='%23ecd49a'/%3E%3Ccircle cx='8.5' cy='40' r='1.5' fill='%23ecd49a'/%3E%3C/g%3E%3C/svg%3E"); --c-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='rotate(90 32 32)'%3E%3Cpath d='M0 0H46V3H10Q3 3 3 10V46H0Z' fill='url(%23g)'/%3E%3Cpath d='M8.5 40V13Q8.5 8.5 13 8.5H40' stroke='%237d6536' stroke-width='1.1' stroke-linecap='round'/%3E%3Cpath d='M22 8.5C30 8.5 33 15 28 19C24.5 21.5 21 18.5 23.5 15.5M8.5 22C8.5 30 15 33 19 28C21.5 24.5 18.5 21 15.5 23.5' stroke='%23c9a45c' stroke-width='1.3' stroke-linecap='round'/%3E%3Cpath d='M16 10.5l5.5 5.5l-5.5 5.5l-5.5-5.5z' fill='%23ecd49a' stroke='%233a2c12' stroke-width='.7'/%3E%3Cpath d='M50 0l3 3l-3 3l-3-3zM3 47l3 3l-3 3l-3-3z' fill='%23ecd49a' stroke='%233a2c12' stroke-width='.5'/%3E%3Cpath d='M55 3H62M3 55V62' stroke='%23c9a45c' stroke-width='1' stroke-linecap='round' opacity='.7'/%3E%3Ccircle cx='40' cy='8.5' r='1.5' fill='%23ecd49a'/%3E%3Ccircle cx='8.5' cy='40' r='1.5' fill='%23ecd49a'/%3E%3C/g%3E%3C/svg%3E"); --c-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='rotate(180 32 32)'%3E%3Cpath d='M0 0H46V3H10Q3 3 3 10V46H0Z' fill='url(%23g)'/%3E%3Cpath d='M8.5 40V13Q8.5 8.5 13 8.5H40' stroke='%237d6536' stroke-width='1.1' stroke-linecap='round'/%3E%3Cpath d='M22 8.5C30 8.5 33 15 28 19C24.5 21.5 21 18.5 23.5 15.5M8.5 22C8.5 30 15 33 19 28C21.5 24.5 18.5 21 15.5 23.5' stroke='%23c9a45c' stroke-width='1.3' stroke-linecap='round'/%3E%3Cpath d='M16 10.5l5.5 5.5l-5.5 5.5l-5.5-5.5z' fill='%23ecd49a' stroke='%233a2c12' stroke-width='.7'/%3E%3Cpath d='M50 0l3 3l-3 3l-3-3zM3 47l3 3l-3 3l-3-3z' fill='%23ecd49a' stroke='%233a2c12' stroke-width='.5'/%3E%3Cpath d='M55 3H62M3 55V62' stroke='%23c9a45c' stroke-width='1' stroke-linecap='round' opacity='.7'/%3E%3Ccircle cx='40' cy='8.5' r='1.5' fill='%23ecd49a'/%3E%3Ccircle cx='8.5' cy='40' r='1.5' fill='%23ecd49a'/%3E%3C/g%3E%3C/svg%3E"); --c-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='rotate(270 32 32)'%3E%3Cpath d='M0 0H46V3H10Q3 3 3 10V46H0Z' fill='url(%23g)'/%3E%3Cpath d='M8.5 40V13Q8.5 8.5 13 8.5H40' stroke='%237d6536' stroke-width='1.1' stroke-linecap='round'/%3E%3Cpath d='M22 8.5C30 8.5 33 15 28 19C24.5 21.5 21 18.5 23.5 15.5M8.5 22C8.5 30 15 33 19 28C21.5 24.5 18.5 21 15.5 23.5' stroke='%23c9a45c' stroke-width='1.3' stroke-linecap='round'/%3E%3Cpath d='M16 10.5l5.5 5.5l-5.5 5.5l-5.5-5.5z' fill='%23ecd49a' stroke='%233a2c12' stroke-width='.7'/%3E%3Cpath d='M50 0l3 3l-3 3l-3-3zM3 47l3 3l-3 3l-3-3z' fill='%23ecd49a' stroke='%233a2c12' stroke-width='.5'/%3E%3Cpath d='M55 3H62M3 55V62' stroke='%23c9a45c' stroke-width='1' stroke-linecap='round' opacity='.7'/%3E%3Ccircle cx='40' cy='8.5' r='1.5' fill='%23ecd49a'/%3E%3Ccircle cx='8.5' cy='40' r='1.5' fill='%23ecd49a'/%3E%3C/g%3E%3C/svg%3E");
+  --s-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='rotate(0 11.00 11.00)'%3E%3Cpath d='M0 0H14.85 V1.32 H3.96 Q1.32 1.32 1.32 3.96 V14.85 H0Z' fill='url(%23g)'/%3E%3Cpath d='M3.58 3.58 H12.10 M3.58 3.58 V12.10' stroke='%237d6536' stroke-width='0.80' stroke-linecap='round' opacity='.85'/%3E%3Ccircle cx='14.85' cy='0.66' r='1.26' fill='%23ecd49a' stroke='%233a2c12' stroke-width='0.28'/%3E%3Ccircle cx='0.66' cy='14.85' r='1.26' fill='%23ecd49a' stroke='%233a2c12' stroke-width='0.28'/%3E%3C/g%3E%3C/svg%3E"); --s-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='rotate(90 11.00 11.00)'%3E%3Cpath d='M0 0H14.85 V1.32 H3.96 Q1.32 1.32 1.32 3.96 V14.85 H0Z' fill='url(%23g)'/%3E%3Cpath d='M3.58 3.58 H12.10 M3.58 3.58 V12.10' stroke='%237d6536' stroke-width='0.80' stroke-linecap='round' opacity='.85'/%3E%3Ccircle cx='14.85' cy='0.66' r='1.26' fill='%23ecd49a' stroke='%233a2c12' stroke-width='0.28'/%3E%3Ccircle cx='0.66' cy='14.85' r='1.26' fill='%23ecd49a' stroke='%233a2c12' stroke-width='0.28'/%3E%3C/g%3E%3C/svg%3E"); --s-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='rotate(180 11.00 11.00)'%3E%3Cpath d='M0 0H14.85 V1.32 H3.96 Q1.32 1.32 1.32 3.96 V14.85 H0Z' fill='url(%23g)'/%3E%3Cpath d='M3.58 3.58 H12.10 M3.58 3.58 V12.10' stroke='%237d6536' stroke-width='0.80' stroke-linecap='round' opacity='.85'/%3E%3Ccircle cx='14.85' cy='0.66' r='1.26' fill='%23ecd49a' stroke='%233a2c12' stroke-width='0.28'/%3E%3Ccircle cx='0.66' cy='14.85' r='1.26' fill='%23ecd49a' stroke='%233a2c12' stroke-width='0.28'/%3E%3C/g%3E%3C/svg%3E"); --s-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='rotate(270 11.00 11.00)'%3E%3Cpath d='M0 0H14.85 V1.32 H3.96 Q1.32 1.32 1.32 3.96 V14.85 H0Z' fill='url(%23g)'/%3E%3Cpath d='M3.58 3.58 H12.10 M3.58 3.58 V12.10' stroke='%237d6536' stroke-width='0.80' stroke-linecap='round' opacity='.85'/%3E%3Ccircle cx='14.85' cy='0.66' r='1.26' fill='%23ecd49a' stroke='%233a2c12' stroke-width='0.28'/%3E%3Ccircle cx='0.66' cy='14.85' r='1.26' fill='%23ecd49a' stroke='%233a2c12' stroke-width='0.28'/%3E%3C/g%3E%3C/svg%3E");
+  --crest: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='14' viewBox='0 0 200 14' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M100 0 L108 6.5 L100 13 L92 6.5 Z' fill='url(%23g)' stroke='%233a2c12' stroke-width='.6'/%3E%3Cpath d='M84 1 l2.6 2.6 l-2.6 2.6 l-2.6 -2.6 z M116 1 l2.6 2.6 l-2.6 2.6 l-2.6 -2.6 z' fill='%23ecd49a'/%3E%3Cpath d='M56 1.5 H76 M124 1.5 H144' stroke='%23c9a45c' stroke-width='2.6' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='1.5' r='1.7' fill='%23ecd49a'/%3E%3Ccircle cx='150' cy='1.5' r='1.7' fill='%23ecd49a'/%3E%3Cpath d='M10 1.5 H44 M156 1.5 H190' stroke='%23c9a45c' stroke-width='1' stroke-linecap='round' opacity='.7'/%3E%3C/svg%3E"); --crest-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='14' viewBox='0 0 200 14' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M100 14 L108 7.5 L100 1 L92 7.5 Z' fill='url(%23g)' stroke='%233a2c12' stroke-width='.6'/%3E%3Cpath d='M84 13 l2.6 -2.6 l-2.6 -2.6 l-2.6 2.6 z M116 13 l2.6 -2.6 l-2.6 -2.6 l-2.6 2.6 z' fill='%23ecd49a'/%3E%3Cpath d='M56 12.5 H76 M124 12.5 H144' stroke='%23c9a45c' stroke-width='2.6' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='12.5' r='1.7' fill='%23ecd49a'/%3E%3Ccircle cx='150' cy='12.5' r='1.7' fill='%23ecd49a'/%3E%3Cpath d='M10 12.5 H44 M156 12.5 H190' stroke='%23c9a45c' stroke-width='1' stroke-linecap='round' opacity='.7'/%3E%3C/svg%3E"); --rule: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='9' viewBox='0 0 260 9' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ecd49a'/%3E%3Cstop offset='.55' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%237d6536'/%3E%3C/linearGradient%3E%3ClinearGradient id='l' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23c9a45c' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23c9a45c'/%3E%3C/linearGradient%3E%3ClinearGradient id='r' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23c9a45c'/%3E%3Cstop offset='1' stop-color='%23c9a45c' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='4' width='112' height='1' fill='url(%23l)'/%3E%3Crect x='148' y='4' width='112' height='1' fill='url(%23r)'/%3E%3Cpath d='M130 0 l4.5 4.5 l-4.5 4.5 l-4.5 -4.5 z' fill='url(%23g)'/%3E%3Cpath d='M118 2.5 l2 2 l-2 2 l-2 -2 z M142 2.5 l2 2 l-2 2 l-2 -2 z' fill='%23c9a45c'/%3E%3C/svg%3E"); --loz: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7' viewBox='0 0 7 7' fill='none'%3E%3Cpath d='M3.5 0 L7 3.5 L3.5 7 L0 3.5 Z' fill='%23c9a45c'/%3E%3C/svg%3E"); --loz-d: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7' viewBox='0 0 7 7' fill='none'%3E%3Cpath d='M3.5 0 L7 3.5 L3.5 7 L0 3.5 Z' fill='%235a3d12'/%3E%3C/svg%3E");
+  --t-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7' viewBox='0 0 7 7' fill='none'%3E%3Cg transform='rotate(0 3.5 3.5)'%3E%3Cpath d='M0 0 H7 L0 7 Z' fill='%23c9a45c' opacity='.85'/%3E%3C/g%3E%3C/svg%3E"); --t-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7' viewBox='0 0 7 7' fill='none'%3E%3Cg transform='rotate(90 3.5 3.5)'%3E%3Cpath d='M0 0 H7 L0 7 Z' fill='%23c9a45c' opacity='.85'/%3E%3C/g%3E%3C/svg%3E"); --t-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7' viewBox='0 0 7 7' fill='none'%3E%3Cg transform='rotate(180 3.5 3.5)'%3E%3Cpath d='M0 0 H7 L0 7 Z' fill='%23c9a45c' opacity='.85'/%3E%3C/g%3E%3C/svg%3E"); --t-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7' viewBox='0 0 7 7' fill='none'%3E%3Cg transform='rotate(270 3.5 3.5)'%3E%3Cpath d='M0 0 H7 L0 7 Z' fill='%23c9a45c' opacity='.85'/%3E%3C/g%3E%3C/svg%3E"); --grain: none;
+  --frame: inset 0 0 0 1px #070605, inset 0 0 0 2px rgba(214, 178, 106, 0.62), inset 0 0 0 5px rgba(9, 8, 6, 0.86), inset 0 0 0 6px rgba(170, 138, 84, 0.3), inset 0 0 46px rgba(0, 0, 0, 0.42);
+  --frame-thin: inset 0 0 0 1px #070605, inset 0 0 0 2px rgba(201, 164, 92, 0.46), inset 0 0 22px rgba(0, 0, 0, 0.36);
 }
-/* ---- slabs: the panels of the menus ---- */
+/* ---- the type: an old book hand for what is read, cut capitals and an antique face for what is announced ---- */
+html, body { font-family: var(--serif); font-weight: 500; font-variant-numeric: lining-nums; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+select, input, textarea, button { font-family: var(--serif); }
+#anom-alert .aa-head,
+#area-title,
+#banner .bn-big,
+#boss-name,
+#hold-ring .hr-key,
+#status-overlay .sh-t,
+#status-overlay .sp > header .en,
+#trial-clock b,
+#trial-hud .th-rank,
+#trial-hud .th-score,
+#tut .tut-t,
+.bs-title,
+.cx-head h2,
+.df-card .df-en,
+.df-title,
+.ld-title,
+.panel h2,
+.serif,
+.title-logo,
+.vic-title,
+/* death */
+.death-title { font-family: var(--display); font-synthesis: none; }
+.title-logo { font-family: 'Cinzel Decorative', 'Cinzel', serif; }
+/* (the figures of the HUD: cut capitals' numerals) */
+#ammo, #ammo-max, #hp-text, #coins, .set-row .v { font-family: 'Cinzel', var(--serif); }
+#area-title .ar-diff { font-family: var(--serif); }
+/* ---- the panels: a plain dark face in a double frame ---- */
 .panel,
 #interact-panel,
 .icard,
@@ -39,20 +74,42 @@
 .cls-view,
 .pk-cards,
 .pb-cand {
-  background-image: var(--tex-stone), linear-gradient(180deg, rgba(62, 55, 46, 0.5), rgba(18, 16, 13, 0.55));
-  background-color: rgba(22, 20, 17, 0.93);
-  border-color: #0b0a08;
-  box-shadow: var(--edge-stone);
+  background-image: var(--grain), linear-gradient(180deg, rgba(34, 30, 25, 0.97), rgba(17, 15, 12, 0.98));
+  background-color: rgba(17, 15, 12, 0.95);
+  border-color: #070605; border-radius: 3px;
+  box-shadow: var(--frame-thin), 0 6px 22px rgba(0, 0, 0, 0.6);
 }
-/* the big ones carry a rivet in each corner */
-.panel,
-#interact-panel,
+/* (the smaller ones: a light fitting in each corner) */
 .codex,
-.iv-panel,
-#status-overlay .sp {
-  background-image: radial-gradient(circle at 10px 10px, #a58a52 0 1.6px, #3a2f1c 2.1px 3px, rgba(0,0,0,.55) 3.4px 4.2px, transparent 4.6px), radial-gradient(circle at calc(100% - 10px) 10px, #a58a52 0 1.6px, #3a2f1c 2.1px 3px, rgba(0,0,0,.55) 3.4px 4.2px, transparent 4.6px), radial-gradient(circle at 10px calc(100% - 10px), #a58a52 0 1.6px, #3a2f1c 2.1px 3px, rgba(0,0,0,.55) 3.4px 4.2px, transparent 4.6px), radial-gradient(circle at calc(100% - 10px) calc(100% - 10px), #a58a52 0 1.6px, #3a2f1c 2.1px 3px, rgba(0,0,0,.55) 3.4px 4.2px, transparent 4.6px), var(--tex-stone), linear-gradient(180deg, rgba(62, 55, 46, 0.5), rgba(18, 16, 13, 0.55));
+#interact-panel,
+#status-overlay .sp,
+.icard,
+.side-info,
+.alch-work,
+#tut-map .tut-box,
+.pk-cards {
+  background-image: var(--s-tl), var(--s-tr), var(--s-br), var(--s-bl), var(--grain), linear-gradient(180deg, rgba(34, 30, 25, 0.97), rgba(17, 15, 12, 0.98));
+  background-position: left 2px top 2px, right 2px top 2px, right 2px bottom 2px, left 2px bottom 2px, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, no-repeat;
+  box-shadow: var(--frame), 0 8px 26px rgba(0, 0, 0, 0.6);
 }
-/* ---- the pieces of the HUD: the same stone, thinner, so the fight shows through ---- */
+/* (the great ones: the full fitting, and a device at the middle of the top and bottom edges) */
+.panel,
+.iv-panel,
+.cls-view {
+  background-image: var(--c-tl), var(--c-tr), var(--c-br), var(--c-bl), var(--crest), var(--crest-b), var(--loz), var(--loz), var(--grain), linear-gradient(180deg, rgba(34, 30, 25, 0.97), rgba(17, 15, 12, 0.98));
+  background-position: left 2px top 2px, right 2px top 2px, right 2px bottom 2px, left 2px bottom 2px, center top 1px, center bottom 1px, left -2px center, right -2px center, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, no-repeat;
+  box-shadow: var(--frame), 0 18px 60px rgba(0, 0, 0, 0.75);
+}
+/* ---- headings: gold letters over a rule ---- */
+.panel h2, .cx-head h2, .df-title, #tut .tut-t {
+  background: var(--rule) center bottom no-repeat; padding-bottom: 13px; letter-spacing: 0.14em;
+  text-shadow: 0 1px 0 #000, 0 0 18px rgba(201, 164, 92, 0.28);
+}
+.cx-head h2 { background: none; padding-bottom: 0; }
+h1, h2, h3, #banner { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.95), 0 0 20px rgba(201, 164, 92, 0.22); }
+/* ---- the pieces of the HUD: a dark band between two fine gold lines, so the fight shows round it ---- */
 #objective,
 #coins,
 #weapon-info,
@@ -60,13 +117,14 @@
 #gren-hint,
 #feed div,
 .wlabel,
-#cls-ind {
-  background-image: var(--tex-stone), linear-gradient(180deg, rgba(58, 52, 44, 0.35), rgba(14, 12, 10, 0.4));
-  background-color: rgba(18, 16, 14, 0.74);
-  border-color: rgba(8, 7, 6, 0.9);
-  box-shadow: inset 0 1px 0 rgba(255, 238, 200, 0.1), inset 0 0 0 1px rgba(150, 124, 78, 0.22), 0 3px 12px rgba(0, 0, 0, 0.5);
+#cls-ind,
+#hp-wrap {
+  background-image: linear-gradient(90deg, rgba(201, 164, 92, 0), rgba(214, 178, 106, 0.7) 18%, rgba(214, 178, 106, 0.7) 82%, rgba(201, 164, 92, 0)), linear-gradient(90deg, rgba(201, 164, 92, 0), rgba(214, 178, 106, 0.45) 18%, rgba(214, 178, 106, 0.45) 82%, rgba(201, 164, 92, 0)), linear-gradient(180deg, rgba(24, 21, 18, 0.82), rgba(10, 9, 7, 0.84));
+  background-size: 100% 1px, 100% 1px, 100% 100%; background-position: 0 0, 0 100%, 0 0; background-repeat: no-repeat;
+  background-color: transparent;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.5);
 }
-/* ---- sockets: slots sunk into the stone, an iron lip round them ---- */
+/* ---- sockets: a plain sunk square, a gold lip, a small fitting in each corner ---- */
 .wslot,
 .ab,
 .bicon,
@@ -74,12 +132,12 @@
 .alch-slot.empty,
 .gain.gear .g-ic,
 .alch-prev .ap-ic {
-  background-image: var(--tex-iron), radial-gradient(ellipse at 50% 35%, rgba(70, 62, 52, 0.55), rgba(8, 7, 6, 0.75));
-  background-color: rgba(14, 12, 10, 0.86);
-  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(150, 124, 78, 0.34), 0 1px 0 1px rgba(255, 236, 190, 0.07);
+  background-image: var(--t-tl), var(--t-tr), var(--t-br), var(--t-bl), radial-gradient(ellipse at 50% 30%, rgba(54, 48, 40, 0.7), rgba(9, 8, 6, 0.86));
+  background-position: left 1px top 1px, right 1px top 1px, right 1px bottom 1px, left 1px bottom 1px, 0 0; background-repeat: no-repeat;
+  background-color: rgba(12, 10, 8, 0.88); border-radius: 3px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(170, 138, 84, 0.46), 0 0 0 2px rgba(0, 0, 0, 0.6);
 }
-/* ---- channels: the gauges are cut into the surface; what fills them is glossed like glass ---- */
-#hp-wrap,
+/* ---- gauges: a channel with a gold lip; what fills it is glossed ---- */
 #boss-bar,
 .ebar .hb,
 .ebar .sb,
@@ -89,25 +147,27 @@
 #focus-bar,
 .fgb.thin,
 #shield-gauge {
-  background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(42, 36, 30, 0.55));
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(150, 124, 78, 0.36), 0 1px 0 1px rgba(255, 236, 190, 0.07);
+  background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), rgba(34, 30, 25, 0.6));
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(170, 138, 84, 0.44), 0 0 0 2px rgba(0, 0, 0, 0.5);
 }
 [id$="-fill"], [class$="-fill"], .hb > i, .sb > i, .bs-bar > i { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), inset 0 -3px 4px rgba(0, 0, 0, 0.32); }
-/* ---- plates: what is clicked ---- */
+/* ---- what is clicked: a plain plate in a double line, a lozenge at each end ---- */
 .btn {
-  background-image: var(--tex-iron), linear-gradient(180deg, #3d362d, #1b1814);
-  border: 1px solid #090807; border-radius: 2px;
-  box-shadow: var(--edge-iron);
-  text-shadow: 0 1px 0 #000; letter-spacing: 0.06em;
+  background: var(--loz) left 9px center no-repeat, var(--loz) right 9px center no-repeat, linear-gradient(180deg, #312b23, #18150f);
+  border: 1px solid #070605; border-radius: 2px; letter-spacing: 0.1em; text-shadow: 0 1px 0 #000;
+  box-shadow: inset 0 0 0 1px rgba(201, 164, 92, 0.55), inset 0 0 0 3px rgba(9, 8, 6, 0.6), inset 0 0 0 4px rgba(170, 138, 84, 0.18), 0 2px 0 #000, 0 6px 14px rgba(0, 0, 0, 0.5);
 }
-.btn:hover { box-shadow: inset 0 1px 0 rgba(255, 240, 210, 0.3), inset 0 0 0 1px rgba(226, 190, 118, 0.75), inset 0 0 18px rgba(201, 164, 92, 0.16), 0 2px 0 #000, 0 6px 16px rgba(0, 0, 0, 0.55); }
-.btn:active { transform: translateY(1px); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(160, 130, 80, 0.4); }
+.btn:hover { border-color: #070605; box-shadow: inset 0 0 0 1px rgba(236, 212, 154, 0.95), inset 0 0 0 3px rgba(9, 8, 6, 0.6), inset 0 0 0 4px rgba(201, 164, 92, 0.4), inset 0 0 22px rgba(201, 164, 92, 0.2), 0 2px 0 #000, 0 7px 18px rgba(0, 0, 0, 0.55); }
+.btn:active { transform: translateY(1px); }
+.btn.small { background: linear-gradient(180deg, #312b23, #18150f); box-shadow: inset 0 0 0 1px rgba(201, 164, 92, 0.5), 0 2px 0 #000, 0 4px 10px rgba(0, 0, 0, 0.45); }
+.btn.small:hover { box-shadow: inset 0 0 0 1px rgba(236, 212, 154, 0.95), inset 0 0 14px rgba(201, 164, 92, 0.2), 0 2px 0 #000, 0 4px 12px rgba(0, 0, 0, 0.5); }
 .btn.primary {
-  background-image: var(--tex-brass), linear-gradient(180deg, #d6af63, #94692a 55%, #6f4e1d);
-  color: #1c1408; border-color: #2c1e0a; text-shadow: 0 1px 0 rgba(255, 240, 200, 0.45);
-  box-shadow: inset 0 1px 0 rgba(255, 246, 214, 0.62), inset 0 -2px 3px rgba(60, 36, 8, 0.5), 0 2px 0 #2a1c08, 0 6px 14px rgba(0, 0, 0, 0.55);
+  background: var(--loz-d) left 9px center no-repeat, var(--loz-d) right 9px center no-repeat, linear-gradient(180deg, #e6c680, #b68f42 52%, #8c6828);
+  color: #1b1307; border-color: #2c1e0a; text-shadow: 0 1px 0 rgba(255, 240, 200, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 246, 214, 0.75), inset 0 0 0 3px rgba(122, 86, 30, 0.55), inset 0 0 0 4px rgba(60, 40, 10, 0.4), 0 2px 0 #2a1c08, 0 6px 14px rgba(0, 0, 0, 0.55);
 }
-.btn.primary:hover { box-shadow: inset 0 1px 0 rgba(255, 250, 226, 0.8), inset 0 -2px 3px rgba(60, 36, 8, 0.5), inset 0 0 20px rgba(255, 226, 150, 0.3), 0 2px 0 #2a1c08, 0 8px 18px rgba(0, 0, 0, 0.6); }
+.btn.primary:hover { box-shadow: inset 0 0 0 1px #fff7dc, inset 0 0 0 3px rgba(122, 86, 30, 0.55), inset 0 0 0 4px rgba(60, 40, 10, 0.4), inset 0 0 24px rgba(255, 232, 160, 0.4), 0 2px 0 #2a1c08, 0 8px 18px rgba(0, 0, 0, 0.6); }
+/* ---- cards and rows that are chosen: plain, a single fine line ---- */
 .card,
 .choice,
 .cx-item,
@@ -116,17 +176,17 @@
 .cls-item,
 .pb-c,
 .choice-aside {
-  background-image: var(--tex-stone), linear-gradient(180deg, rgba(66, 58, 48, 0.5), rgba(20, 17, 14, 0.5));
-  box-shadow: inset 0 1px 0 rgba(255, 238, 200, 0.12), inset 0 0 0 1px rgba(150, 124, 78, 0.22), 0 3px 10px rgba(0, 0, 0, 0.5);
+  background-image: linear-gradient(180deg, rgba(40, 35, 29, 0.93), rgba(19, 17, 14, 0.95));
+  box-shadow: inset 0 0 0 1px rgba(170, 138, 84, 0.26), inset 0 1px 0 1px rgba(255, 238, 200, 0.06), 0 3px 10px rgba(0, 0, 0, 0.45);
+  border-radius: 3px;
 }
-/* ---- lettering: gold cut into the stone ---- */
-h1, h2, h3, .panel h2, #banner, .codex h2 { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.95), 0 -1px 0 rgba(255, 240, 200, 0.16), 0 0 20px rgba(201, 164, 92, 0.22); }
-.keys kbd, kbd { background-image: var(--tex-iron), linear-gradient(180deg, #4a4238, #25211b); border-color: #0a0908; box-shadow: inset 0 1px 0 rgba(255, 240, 210, 0.2), 0 2px 0 #000; text-shadow: 0 1px 0 #000; }
-select, input[type="text"], input[type="number"] { background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(40, 34, 28, 0.4)); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(150, 124, 78, 0.25); }
+.card, .df-card { background-image: var(--s-tl), var(--s-tr), var(--s-br), var(--s-bl), linear-gradient(180deg, rgba(42, 37, 31, 0.9), rgba(18, 16, 13, 0.94)); background-position: left 3px top 3px, right 3px top 3px, right 3px bottom 3px, left 3px bottom 3px, 0 0; background-repeat: no-repeat; border-radius: 4px; }
+.keys kbd, kbd { background-image: linear-gradient(180deg, #4a4238, #25211b); border-color: #0a0908; box-shadow: inset 0 0 0 1px rgba(201, 164, 92, 0.3), 0 2px 0 #000; text-shadow: 0 1px 0 #000; font-family: var(--serif); }
+select, input[type="text"], input[type="number"] { background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(34, 30, 25, 0.5)); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(170, 138, 84, 0.3); border-radius: 2px; }
 input[type="range"] { accent-color: #c9a45c; }
-/* the name-plate of a thing looked at: a strip of parchment-brown under the gold */
+.set-row { border-bottom: 1px solid rgba(170, 138, 84, 0.12); }
 #tooltip, .iv-tip { border-top: 1px solid rgba(226, 190, 118, 0.55); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #0d0b09; box-shadow: inset 0 0 4px #000; }
-::-webkit-scrollbar-thumb { background-image: var(--tex-iron), linear-gradient(90deg, #4a4033, #2a241c); border: 1px solid #0a0908; border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.2); }
-::-webkit-scrollbar-thumb:hover { background-image: var(--tex-brass), linear-gradient(90deg, #a8843f, #6d5122); }
+::-webkit-scrollbar-thumb { background-image: linear-gradient(90deg, #6b5a36, #3a301e); border: 1px solid #0a0908; border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.25); }
+::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(90deg, #b08c46, #6d5122); }

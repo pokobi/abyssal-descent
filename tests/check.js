@@ -81,7 +81,7 @@ const MAP = [
   [/^js\/(areas|field_\w+|fieldgen\w*|levelgen|strata|world|props)\.js$|^tests\/geom_audit\.js$/, ['signs']], // (the sign over every gate is in sight from the floor in front of it)
   [/^js\/(field_rooms|levelgen|props|areas)\.js$|^tests\/geom_audit\.js$/, ['shopview']],
   [/^js\/(areas|field_\w+|fieldgen\w*|levelgen|props|terrain|world)\.js$|^tests\/geom_audit\.js$/, ['minishop']], // (the mini shop after a fight is never buried in rock or a pillar) // (nothing of the merchant's hall stands between you and its wares)
-  [/^js\/(player|water|audio|fields|field_flooded)\.js$/, ['swim']], // (deep water: the look under it, swimming up to its surface)
+  [/^js\/(player|water|audio|fields|field_flooded|enemies|world)\.js$/, ['swim']], // (deep water: the look under it, swimming up to its surface; a foe rising up it and out: enemies.js, and the route out of it: world.js)
   [/^js\/(player|world|terrain|field_\w+|fieldgen\w*)\.js$/, ['grapple']], // (the grapple holds on ceilings and rock, never past the place's own heights)
   [/^js\/(world|terrain|player|levelgen|field_shaft|field_rooms|field_battlefield)\.js$|^tests\/rim_test\.js$/, ['rim']], // (the rock that bounds an area: nobody gets up onto it, the hook holds on its face)
   [/^js\/(enemies|data_enemies)\.js$/, ['bat']], // (the bats' swoop: never at the air, never into a wall)

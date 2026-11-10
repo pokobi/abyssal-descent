@@ -301,7 +301,7 @@
   };
 
   // ---------------------------------------------------------------- the new attacks
-  const EP = E.Enemy.prototype, try0 = EP.tryAttack, upd0 = EP.updateAttack;
+  const EP = E.Enemy.prototype, try0 = EP.tryAttack, upd0 = EP.updateAttack, move0 = EP.decideMove;
   const K = {};
   const C = () => G.combat, Pl = () => G.player;
   const endA = (e, cd) => { e.attackState = null; e.atk = 0; e.wind = 0; e.atkCd = (cd ?? e.def.cd) * (e.eliteMod && e.eliteMod.id === 'rage' ? 0.7 : 1) * (Pl().has('pact_fury') ? 0.8 : 1) * U.rand(0.85, 1.2); if (e.tele) { G.fx.endTelegraph(e.tele); e.tele = null; } };
@@ -382,7 +382,23 @@
     update(e, A, dt, tgt, toT, d, inWind) {
       if (!A.spots) {
         A.spots = [];
-        for (let i = 0; i < 2; i++) { const a = Math.random() * Math.PI * 2, p = e.pos.clone().add(V(Math.cos(a) * 2.6, 0, Math.sin(a) * 2.6)); p.y = G.world.floorBelow(p.x, e.pos.y + 1.5, p.z); if (isFinite(p.y)) { A.spots.push(p); G.vfx.area(p.clone(), 1.2, 'dark', A.wind + 0.3); } }
+        // each at a spot a skeleton can stand: open floor at the caller's own height that you can walk to. (Any spot 2.6 m off was taken:
+        // beside a wall that could be inside it, or past it where there is no floor at all - the skeleton then came out at the bottom of
+        // the world and died of the fall at once, so the call raised one or none.) Nearer in if there is no room; at its feet if none at all
+        const w = G.world;
+        for (let i = 0; i < 2; i++) {
+          let p = null;
+          for (let k = 0; k < 12 && !p; k++) {
+            const a = Math.random() * Math.PI * 2, r = k < 6 ? 2.6 : 1.3, q = e.pos.clone().add(V(Math.cos(a) * r, 0, Math.sin(a) * r));
+            q.y = w.floorBelow(q.x, e.pos.y + 1.5, q.z);
+            if (Math.abs(q.y - e.pos.y) > 1.2 || !w.boxFree(q.x - 0.35, q.y + 0.15, q.z - 0.35, q.x + 0.35, q.y + 1.9, q.z + 0.35)) continue;
+            const n = w.nf ? w.navIdx(q.x, q.z, q.y) : -1;
+            if (w.nf && (n < 0 || w.nb[n] || Math.abs(w.nf[n] - q.y) > 0.6 || (w.reachMask && w.reachMask.length === w.nf.length && !w.reachMask[n]))) continue;
+            p = q;
+          }
+          if (!p) p = e.pos.clone();
+          A.spots.push(p); G.vfx.area(p.clone(), 1.2, 'dark', A.wind + 0.3);
+        }
         G.sfx.magic(e.pos, 'dark');
       }
       if (inWind) return { x: 0, z: 0 };
@@ -510,12 +526,14 @@
     },
   };
   // 虚空の使徒: a ring of light where you stand, then the column out of the sky onto it
+  // (in the air with no floor under you, over the void: at your own height. floorBelow gives -100 there, which is finite: the ring and the
+  // column were drawn down at the bottom of the world, and the blow never reached you)
   K.smite = {
     blind: true,
     can: (e, tgt, toT, d) => (d < e.def.range ? 1.05 : null),
     update(e, A, dt, tgt, toT, d, inWind) {
       const R = 2.6;
-      if (!A.c) { A.c = tgt.pos.clone(); A.c.y = G.world.floorBelow(A.c.x, A.c.y + 1, A.c.z); if (!isFinite(A.c.y)) A.c.y = tgt.pos.y; e.tele = G.fx.telegraph(A.c.clone().setY(A.c.y + 0.02), R, A.wind, 0xffe0a0); G.sfx.magic(e.pos, 'holy'); }
+      if (!A.c) { A.c = tgt.pos.clone(); A.c.y = G.world.floorBelow(A.c.x, A.c.y + 1, A.c.z); if (!(A.c.y > -50)) A.c.y = tgt.pos.y; e.tele = G.fx.telegraph(A.c.clone().setY(A.c.y + 0.02), R, A.wind, 0xffe0a0); G.sfx.magic(e.pos, 'holy'); }
       if (inWind) return { x: 0, z: 0 };
       if (!A.hit) {
         A.hit = true; e.atk = 1; if (e.tele) { G.fx.endTelegraph(e.tele); e.tele = null; }
@@ -529,8 +547,11 @@
   };
   // 雲の守護像: a gust down a fan in front of it: knocked back and off your feet
   // 亡霊の槍兵: a lane marked before it, then the charge down it, spear first (through you once, with a shove)
+  // (min: the run-up it wants. Closer than that it backs off to get it, decideMove below; with no room to get - a wall behind it, you
+  // keeping up with it - it charges from where it stands)
   K.lancecharge = {
-    can: (e, tgt, toT, d) => (d < e.def.range && d > 3.5 ? 0.9 : null),
+    min: 3.5,
+    can: (e, tgt, toT, d) => (d < e.def.range && (d > 3.5 || e._backT > 1.2) ? 0.9 : null),
     update(e, A, dt, tgt, toT, d, inWind) {
       if (!A.lane) {
         const dir = V(toT.x, 0, toT.z).normalize(), len = Math.min(e.def.range + 2, d + 4), a = e.pos.clone();
@@ -630,7 +651,7 @@
       if (inWind) { e.yaw = Math.atan2(toT.x, toT.z); return { x: 0, z: 0 }; }
       if (!A.done) {
         A.done = true; e.atk = 1;
-        const f = V(Math.sin(e.yaw), 0, Math.cos(e.yaw)), o = e.pos.clone(); o.y = G.world.floorBelow(o.x, o.y + 0.5, o.z); if (!isFinite(o.y)) o.y = tgt.pos.y;
+        const f = V(Math.sin(e.yaw), 0, Math.cos(e.yaw)), o = e.pos.clone(); o.y = G.world.floorBelow(o.x, o.y + 0.5, o.z); if (!(o.y > -50)) o.y = tgt.pos.y; // (it hangs out over the void: no floor under it, see smite)
         G.vfx.fan(o.clone().setY(o.y + 0.05), f, R, HALF, 0.45, { col: 0xdff0ff });
         for (let i = 0; i < 14; i++) { const a = (Math.random() - 0.5) * HALF * 2, r = Math.random() * R, q = e.pos.clone().addScaledVector(yawed(f, a), r); G.fx.norm.spawn(q.x, o.y + 0.5 + Math.random() * 2, q.z, f.x * 14, 0.5, f.z * 14, 0.5, 0.25, 0.6, 0.9, 0.95, 1, 0.4, 0, 0); }
         G.sfx.whoosh(0.6, 0.5);
@@ -645,6 +666,17 @@
     },
   };
 
+  // an attack that wants a run-up (min): closer than that, the foe backs away from you to get it. (A melee foe stops once you are well
+  // inside its reach, and these two had no blow for that close: they stood at arm's length and did nothing, for as long as you stayed)
+  EP.decideMove = function (tgt, toT, distH, dt) {
+    const k = K[this.def.attack];
+    if (k && k.min && distH < k.min && this.hasLOS && Math.abs(toT.y) < 1.2 && !this.barredFrom(tgt)) {
+      this._backT = (this._backT || 0) + dt;
+      const l = distH || 1; return { x: -toT.x / l, z: -toT.z / l };
+    }
+    this._backT = 0;
+    return move0.call(this, tgt, toT, distH, dt);
+  };
   EP.tryAttack = function (tgt, toT, distH) {
     const k = K[this.def.attack]; if (!k) return try0.call(this, tgt, toT, distH);
     if (this.atkCd > 0 || this.state === 'spawn') return;

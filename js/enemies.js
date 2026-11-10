@@ -883,7 +883,11 @@
         // flyers go straight while they can see you; otherwise they follow the ground flow field around walls
         if (this.flyer && (this.hasLOS || !w.flowDir(this.pos.x, this.pos.z, o, this.pos.y))) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; return o; }
         if (this.flyer) return o;
-        const f = w.flowDir(this.pos.x, this.pos.z, o, this.pos.y);
+        // on the rim of a slab the grid doesn't hold: off it first, and on the way it began to fall (the first moment off the rim, the route
+        // of the surface below would turn it straight back onto it)
+        const rim = (this.grounded || G.game.time - (this._rimT || -9) < 0.4) && w.rimDir(this.pos.x, this.pos.z, this.pos.y, o);
+        if (rim && this.grounded) this._rimT = G.game.time;
+        const f = rim || w.flowDir(this.pos.x, this.pos.z, o, this.pos.y) || w.blockedDir(this.pos.x, this.pos.z, this.pos.y, o);
         if (!f || (this.hasLOS && distH < 7 && Math.abs(toT.y) < 2.5 && !this.barredFrom(tgt))) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; } // in sight and on the same level: straight at you (unless prison bars are in the way: then round through the doorway)
         return o;
       };
@@ -1209,6 +1213,9 @@
         const diving = this.attackState && this.attackState.kind === 'swoop' && this.attackState.t >= this.attackState.wind;
         const yWas = this.pos.y;
         if (!diving) this.pos.y = U.damp(this.pos.y, ty, 2.5, dt);
+        // sinking, it stops on what it is over. (The walls push a body out sideways from 0.2 over its feet: one that sank that far into the
+        // roof it was on was thrown off the roof's side, metres at a time)
+        if (!diving && !this.def.hover && this.pos.y < yWas) { const fb = this.floorUnder(yWas); if (fb > -50 && this.pos.y < fb + 0.35) this.pos.y = Math.min(yWas, fb + 0.35); }
         if (ceil < Infinity && this.pos.y + this.height > ceil - 0.05) this.pos.y = ceil - this.height - 0.05;
         // nor up past the top of a roof it is beside (climbing a building's eave): it stays at the height it had
         if (this.pos.y > yWas && this.overRoof(this.pos.x, this.pos.z) && !this.overRoof(this.pos.x, this.pos.z, yWas)) this.pos.y = yWas;
@@ -1271,9 +1278,19 @@
       // even when it stops pressing (a shove, a turn); this._deep: under the surface, for its choices (decideMove, tryAttack)
       const deepQ = w.deepWater && !this.boss ? w.deepWater.find((q) => this.pos.x > q.x0 && this.pos.x < q.x1 && this.pos.z > q.z0 && this.pos.z < q.z1 && this.pos.y < q.y - 0.05) : null;
       this._deep = !!deepQ;
+      // (what it pressed against at the surface may be nothing it can get on to: the side of a bridge a metre over the water, which it walks
+      // under on the bed. Its lunge lifted it into that, it rose, and it hung there pressing at the bridge's side for good. A foe that has
+      // been at the surface a while and is still afloat lets go, sinks to the bed and stays down a few seconds)
+      if (this.grounded) this._surfT = 0;
+      if (this._sinkT > 0) this._sinkT -= dt;
+      if (this._surfHold > 0) { this._surfHold -= dt; this._surfT = (this._surfT || 0) + dt; }
       if (deepQ) {
-        if (this.hitWallFlag && (dx || dz)) this.swimUpT = E.SWIM_KEEP;
-        if (this.swimUpT > 0) { this.swimUpT -= dt; this.vel.y = Math.max(this.vel.y, E.SWIM_RISE + 22 * dt); }
+        if (this.hitWallFlag && (dx || dz) && !(this._sinkT > 0)) this.swimUpT = E.SWIM_KEEP;
+        if (this.swimUpT > 0) {
+          this.swimUpT -= dt; this.vel.y = Math.max(this.vel.y, E.SWIM_RISE + 22 * dt);
+          if (this.pos.y > deepQ.y - 0.3) this._surfHold = 0.3;
+          if (this._surfT > E.SWIM_GIVEUP) { this._surfT = 0; this._surfHold = 0; this.swimUpT = 0; this._sinkT = E.SWIM_SINK; }
+        }
       } else this.swimUpT = 0;
       // vertical / ground
       this.vel.y -= 22 * dt;
@@ -1682,6 +1699,7 @@
   // the swoop of the bats and crows: speed (m/s) and longest dive (s); how fast it bends after you (per s); how long it goes round to a
   // better place after a dive that could not reach you; how soon it tries again when it broke one off
   E.SWIM_RISE = 1.4; E.SWIM_KEEP = 0.5; // m/s: a foe rising up the deep water to climb out onto a ledge; s it keeps rising after it stops pressing
+  E.SWIM_GIVEUP = 1.5; E.SWIM_SINK = 3; // s afloat at the surface, still not out, before it lets go and sinks; s it then stays down
   // ---- the air a flyer may be in, worked out once for each area's ground plan: over the floor you can walk to from where you came in (or
   // from where you stand), and a little beyond it: 2 m over a wall, a pillar or the rock beside it, 6 m out over the void beside it. A
   // flyer never moves out of it (physics, fly): not into the rock round a mine's tunnels, not over the wall round a field, not out over the

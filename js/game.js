@@ -645,6 +645,7 @@
     if (w.field) G.save.mark('items', 'stage_' + w.field);
     if (G.Run.drawOn()) { const f = G.Run.field(n), L = G.save.data.lastFields || (G.save.data.lastFields = []); if (f && !L.includes(f)) { L.push(f); G.save.write(); } } // (a field this game went into: passed over in the next game, runplan.js)
     P.spawnAt(w);
+    w.warmAir(); // (the flyers' ways, worked out now: from where you come in)
     G.weapons.equip(true);
     G.weapons.hidden(false);
     GM.areaCleared = false; GM.areaDamage = 0; GM.areaStartT = GM.time; GM.areaKills = 0; GM.enrageReset();

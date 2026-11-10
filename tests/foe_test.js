@@ -36,9 +36,12 @@ const only = process.argv.slice(2);
         const e0 = window.__errs = (window.__errs || 0);
         const def = G.ENEMY_BY_ID['${id}'];
         const w = G.world;
-        // stand the player on open floor, the foe 7 m in front of it
+        // stand the player on open floor, the foe 7 m in front of it. The foe's spot has to be floor a foe can walk too: it falls on the line
+        // between two cells, and with one of them outside the walkable floor (the lip of a channel, the edge of the map) the foe had no route
+        // and stood there, or was held 3 m from you - a run failed about one time in ten on where it was put, not on what the foe did
+        const walk = (x, z, y) => { const n = w.navIdx(x, z, y + 0.1); return n >= 0 && !w.nb[n] && (!w.reachMask || !!w.reachMask[n]); };
         let at = null;
-        for (let k = 0; k < 400 && !at; k++) { const c = w.randomOpenCell(GM.arng, (x, z, i) => !w.reachMask || w.reachMask[i]); if (!c) continue; const ahead = { x: c.x, y: c.y, z: c.z - 6.5 }; const fy = w.floorBelow(ahead.x, c.y + 1.5, ahead.z); if (isFinite(fy) && Math.abs(fy - c.y) < 0.3 && w.boxFree(ahead.x - 0.8, fy + 0.1, ahead.z - 0.8, ahead.x + 0.8, fy + 2.5, ahead.z + 0.8) && w.groundAt(new THREE.Vector3(c.x, c.y + 0.5, c.z - 3), 0.3, 1) > -Infinity) at = [c, Object.assign(ahead, { y: fy })]; }
+        for (let k = 0; k < 400 && !at; k++) { const c = w.randomOpenCell(GM.arng, (x, z, i) => !w.reachMask || w.reachMask[i]); if (!c) continue; const ahead = { x: c.x, y: c.y, z: c.z - 6.5 }; const fy = w.floorBelow(ahead.x, c.y + 1.5, ahead.z); if (isFinite(fy) && Math.abs(fy - c.y) < 0.3 && w.boxFree(ahead.x - 0.8, fy + 0.1, ahead.z - 0.8, ahead.x + 0.8, fy + 2.5, ahead.z + 0.8) && walk(ahead.x, ahead.z - 0.4, fy) && walk(ahead.x, ahead.z + 0.4, fy) && w.groundAt(new THREE.Vector3(c.x, c.y + 0.5, c.z - 3), 0.3, 1) > -Infinity) at = [c, Object.assign(ahead, { y: fy })]; }
         if (!at) return JSON.stringify({ err: 'no spot' });
         P.pos.set(at[0].x, at[0].y + 0.05, at[0].z); P.vel.set(0, 0, 0); P.yaw = 0; P.hp = P.stats.maxHp;
         const e = G.enemies.spawn(def, 10, new THREE.Vector3(at[1].x, at[1].y + (def.flyer ? 3 : 0), at[1].z), { noLoot: true });

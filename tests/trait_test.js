@@ -12,12 +12,15 @@ const PORT = +process.env.COOP_PORT || 9893;
 
 const PAGE = `
 window.T = {
-  // a dummy foe dz m ahead (dx to the side) that never moves, its body and hit spheres where it stands
+  // a dummy foe dz m ahead (dx to the side) that never moves, its body and hit spheres where it stands. It faces you: a foe comes out
+  // facing any way, and from behind or the side a round at head height met the hunched back first (the head shot struck the body
+  // about one run in six)
   mk(dz, dx, hp) {
     const P = G.player, f = new THREE.Vector3(-Math.sin(T.yaw), 0, -Math.cos(T.yaw)), side = new THREE.Vector3(-f.z, 0, f.x);
     const pos = P.pos.clone().addScaledVector(f, dz).addScaledVector(side, dx || 0);
     const e = G.enemies.spawn(G.ENEMY_BY_ID.brute_normal, 5, pos, { noSplit: true });
     e.maxHp = e.hp = hp || 1e6; e.shield = e.maxShield = 0; e.update = () => {}; e.state = 'chase';
+    e.yaw = Math.atan2(P.pos.x - pos.x, P.pos.z - pos.z); e.model.group.rotation.y = e.yaw;
     e.model.group.position.copy(e.pos); e.updateHits(); e.hasLOS = true;
     return e;
   },

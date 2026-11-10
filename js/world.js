@@ -418,6 +418,7 @@
             if (b < 0) continue;
             const dh = this.nf[b] - this.nf[a];
             if (dh > 0.8 || dh < -2.6) continue;
+            if (dh < -0.8 && this.dropBarred(a, b, DIAG[d] ? this.land(a, z * W + xx) : -1, DIAG[d] ? this.land(a, zz * W + x) : -1)) continue;
             adj[a * 8 + d] = b; cnt[b + 1]++;
           }
         }
@@ -513,30 +514,97 @@
       if (this.nf[a] > this.airMaxY || this.nf[b] > this.airMaxY) return false;
       return Math.min(this.nc[a], this.nc[b]) - Math.max(this.nf[a], this.nf[b]) - 0.2 >= 1.8;
     }
+    // the height a flyer can cross at from node a to its neighbour b: the tallest gap, within the air the two share, that nothing stands in
+    // along the line between the two cell centres. The floors and ceilings alone took a thin wall for air (it holds no cell centre), and the
+    // route then ran a flyer in a room straight at the wall, where it stayed. near: what stands in a's air about its cell. Sets g.lo / g.hi
+    // (the band to fly in on that way); false if nothing a flyer's height is left
+    airGap(a, b, near, g) {
+      const lo = Math.max(this.nf[a], this.nf[b]) + 0.4, hi = Math.min(this.nc[a], this.nc[b]) - 0.3;
+      g.lo = lo; g.hi = hi;
+      if (!near.length) return true;
+      const W = this.Wn, N = this.N, ia = a % N, ib = b % N;
+      const ax = ia % W - this.xo + 0.5, az = ((ia / W) | 0) - this.zo + 0.5, dx = ib % W - ia % W, dz = ((ib / W) | 0) - ((ia / W) | 0);
+      const hit = this._agH || (this._agH = []); hit.length = 0;
+      for (const c of near) {
+        if (c.y1 + 0.25 <= lo || c.y0 - 0.15 >= hi) continue;
+        // the stretch of the line a -> b that runs through the box, in plan. Only what the line crosses counts: a wall it runs beside
+        // (a cell centre a hand from a wall) is no bar, the body slides along that, and neither is one it only touches at an end. A line along
+        // the seam of two boxes, or through the point where two corners meet, is barred: it would slip between them
+        let t0 = 0, t1 = 1;
+        if (dx) { let u = (c.x0 - ax) / dx, v = (c.x1 - ax) / dx; if (u > v) { const t = u; u = v; v = t; } if (u > t0) t0 = u; if (v < t1) t1 = v; }
+        else if (ax < c.x0 || ax > c.x1) continue;
+        if (dz) { let u = (c.z0 - az) / dz, v = (c.z1 - az) / dz; if (u > v) { const t = u; u = v; v = t; } if (u > t0) t0 = u; if (v < t1) t1 = v; }
+        else if (az < c.z0 || az > c.z1) continue;
+        if (t0 <= t1 && t1 > 0 && t0 < 1) hit.push(c);
+      }
+      if (!hit.length) return true;
+      // climb from lo to hi over what is in the way (a little clear of each top and underside), keeping the tallest gap met
+      let cur = lo, glo = lo, ghi = lo;
+      for (let n = 0; n < 64 && cur < hi; n++) {
+        let up = cur, nxt = hi;
+        for (const c of hit) { const c0 = c.y0 - 0.15, c1 = c.y1 + 0.25; if (c1 <= cur) continue; if (c0 <= cur) { if (c1 > up) up = c1; } else if (c0 < nxt) nxt = c0; }
+        if (up > cur) { cur = up; continue; }
+        if (nxt - cur > ghi - glo) { glo = cur; ghi = nxt; }
+        cur = nxt;
+      }
+      hit.length = 0;
+      if (ghi - glo < 1.3) return false; // (as narrow as the narrowest band airOK lets through)
+      g.lo = glo; g.hi = ghi; return true;
+    }
     buildAir() {
-      const W = this.Wn, D = this.Dn, N = this.N, L = this.L, NL = N * L;
-      const cnt = new Int32Array(NL + 1), fromList = [];
-      const cells = new Int32Array(8);
+      const W = this.Wn, D = this.Dn, N = this.N, L = this.L, NL = N * L, nf = this.nf, nc = this.nc;
+      const cnt = new Int32Array(NL + 1), fs = new Int32Array(NL + 1), near = [], g = { lo: 0, hi: 0 };
+      // the air a flyer may not be in (E.airOk: over the middle of a house nobody can get into, the rock round a tunnel) is no way either:
+      // a route across it ran the flyer up against that border, and there it stayed for good
+      const am = G.enemies && G.enemies.airMask ? G.enemies.airMask() : null, okc = am ? am.ok : null;
+      // the ways out, in the order of the nodes they leave, with the band of each (the arrays grow as needed)
+      let cap = this._airCap || NL * 5 + 64, ne = 0;
+      let fb = new Int32Array(cap), fd = new Uint8Array(cap), flo = new Float32Array(cap), fhi = new Float32Array(cap);
       for (let a = 0; a < NL; a++) {
-        if (this.nf[a] === -Infinity || this.nf[a] > this.airMaxY) continue;
-        const i = a % N, x = i % W, z = (i / W) | 0;
+        fs[a] = ne;
+        if (nf[a] === -Infinity || nf[a] > this.airMaxY) continue;
+        const i = a % N, x = i % W, z = (i / W) | 0, cx = x - this.xo + 0.5, cz = z - this.zo + 0.5;
+        if (okc && !okc[i]) continue;
+        // what stands in this node's air about its cell (its own floor and ceiling are not in it): the ways out of it are tested against these
+        near.length = 0; this.query(cx - 1.05, nf[a] + 0.15, cz - 1.05, cx + 1.05, nc[a] - 0.15, cz + 1.05, near);
+        let m = 0; for (let j = 0; j < near.length; j++) if (!near[j].navIgnore) near[m++] = near[j];
+        near.length = m;
         for (let d = 0; d < 8; d++) {
           const xx = x + DIRS[d][0], zz = z + DIRS[d][1];
           if (xx < 0 || zz < 0 || xx >= W || zz >= D) continue;
           const cb = zz * W + xx;
-          for (let k = 0; k < L; k++) { const b = k * N + cb; if (this.nf[b] === -Infinity) break; if (this.airOK(a, b)) { fromList.push(a, b, d); cnt[b + 1]++; } }
+          if (okc && !okc[cb]) continue;
+          for (let k = 0; k < L; k++) {
+            const b = k * N + cb; if (nf[b] === -Infinity) break;
+            if (!this.airOK(a, b)) continue;
+            // (nothing stands about the cell: the whole of the air the two share)
+            if (!m) { g.lo = Math.max(nf[a], nf[b]) + 0.4; g.hi = Math.min(nc[a], nc[b]) - 0.3; } else if (!this.airGap(a, b, near, g)) continue;
+            if (ne === cap) {
+              cap *= 2; const o = [fb, fd, flo, fhi];
+              fb = new Int32Array(cap); fd = new Uint8Array(cap); flo = new Float32Array(cap); fhi = new Float32Array(cap);
+              fb.set(o[0]); fd.set(o[1]); flo.set(o[2]); fhi.set(o[3]);
+            }
+            fb[ne] = b; fd[ne] = d; flo[ne] = g.lo; fhi[ne] = g.hi; ne++; cnt[b + 1]++;
+          }
         }
       }
+      fs[NL] = ne; this._airCap = ne + 256;
       for (let b = 0; b < NL; b++) cnt[b + 1] += cnt[b];
-      const ra = new Int32Array(cnt[NL]), rd = new Uint8Array(cnt[NL]), fill = cnt.slice(0, NL);
-      for (let e = 0; e < fromList.length; e += 3) { const b = fromList[e + 1], p = fill[b]++; ra[p] = fromList[e]; rd[p] = fromList[e + 2]; }
-      this.aadj = { rs: cnt, ra, rd };
+      // rs/ra/rd: the ways into each node (the distance field walks them back from the target); fs/fb/fd: the ways out, with the band of each
+      const ra = new Int32Array(ne), rd = new Uint8Array(ne), fill = cnt.slice(0, NL);
+      for (let a = 0; a < NL; a++) for (let e = fs[a], e1 = fs[a + 1]; e < e1; e++) { const q = fill[fb[e]]++; ra[q] = a; rd[q] = fd[e]; }
+      this.aadj = { rs: cnt, ra, rd, fs, fb, fd, flo, fhi };
+    }
+    // the flyers' ways, worked out as the area loads (left to the first flyer's first look for a way, they were a hitch at the start of the fight)
+    warmAir() {
+      if (!this.nc || this.aadj) return;
+      if (this.airMaxY === undefined) this.airMaxY = (this.strata ? this.strata.HT : 1e9) - 1;
+      this.buildAir(); this.ndistA = new Float32Array(this.N * this.L);
     }
     // flyers' distance field towards (tx, tz, ty); stops as soon as every wanted node (the flyers' own) is settled
     updateAirFlow(tx, tz, ty, wanted) {
       if (!this.nc) return false;
-      if (this.airMaxY === undefined) this.airMaxY = (this.strata ? this.strata.HT : 1e9) - 1;
-      if (!this.aadj) { this.buildAir(); this.ndistA = new Float32Array(this.N * this.L); }
+      if (!this.aadj) this.warmAir();
       let t = this.navIdx(tx, tz, ty); if (t < 0) return false;
       const dist = this.ndistA; dist.fill(Infinity);
       const heap = this.heap, hk = this.hkey; let hn = 0;
@@ -563,20 +631,23 @@
     airDir(x, z, y, out) {
       if (!this.ndistA) return null;
       const i = this.navIdx(x, z, y); if (i < 0 || this.ndistA[i] === Infinity) return null;
-      const W = this.Wn, N = this.N, ic = i % N, ix = ic % W, iz = (ic / W) | 0;
-      let best = this.ndistA[i], bb = -1, bd = -1;
-      for (let d = 0; d < 8; d++) {
-        const xx = ix + DIRS[d][0], zz = iz + DIRS[d][1]; if (xx < 0 || zz < 0 || xx >= W || zz >= this.Dn) continue;
-        for (let k = 0; k < this.L; k++) { const b = k * N + zz * W + xx; if (this.nf[b] === -Infinity) break; if (this.ndistA[b] < best && this.airOK(i, b)) { best = this.ndistA[b]; bb = b; bd = d; } }
-      }
-      if (bb < 0) return null;
-      out.x = DIRS[bd][0]; out.z = DIRS[bd][1]; const l = Math.hypot(out.x, out.z); out.x /= l; out.z /= l;
-      out.lo = Math.max(this.nf[i], this.nf[bb]) + 0.4; out.hi = Math.min(this.nc[i], this.nc[bb]) - 0.3;
+      // over the ceiling of the highest floor there (on a roof no storey of the grid stands for): not in that node's air, and its ways and
+      // its band are not for this body (taking them, a flyer on a roof sank into it, making for the room under it)
+      if (y > this.nc[i]) return null;
+      const A = this.aadj, dist = this.ndistA;
+      let best = dist[i], be = -1;
+      for (let e = A.fs[i], e1 = A.fs[i + 1]; e < e1; e++) if (dist[A.fb[e]] < best) { best = dist[A.fb[e]]; be = e; }
+      if (be < 0) return null;
+      // towards the next cell's centre: the way was tested along the line between the centres (a doorway is open there, its jambs stand beside it)
+      const ic = i % this.N, dr = DIRS[A.fd[be]];
+      out.x = ic % this.Wn - this.xo + dr[0] + 0.5 - x; out.z = ((ic / this.Wn) | 0) - this.zo + dr[1] + 0.5 - z;
+      const l = Math.hypot(out.x, out.z) || 1; out.x /= l; out.z /= l;
+      out.lo = A.flo[be]; out.hi = A.fhi[be];
       return out;
     }
     // the altitude band of the air a flyer at (x, y, z) is in
     airBand(x, z, y, out) {
-      const i = this.navIdx(x, z, y); if (i < 0 || !this.nc) return null;
+      const i = this.navIdx(x, z, y); if (i < 0 || !this.nc || y > this.nc[i]) return null;
       out.lo = this.nf[i] + 0.4; out.hi = this.nc[i] - 0.3; return out;
     }
     // the surface of the deep water over node a (its floor under it), or -Infinity
@@ -586,6 +657,32 @@
       return -Infinity;
     }
     navFloor(x, z, y) { const i = this.navIdx(x, z, y); return i < 0 ? -Infinity : this.nf[i]; }
+    // a drop from a down to b that a body can't take: it leaves a at a's height, and what is over b (the slab of an upper floor) stands
+    // there at head height, a wall to it. The routes took the height change alone: off the upper steps of a stair that runs beside an upper
+    // floor they sent foes sideways into the slab's edge, and one that had stepped onto the slab was turned back and forth on its rim
+    // (c1, c2: the two cells beside a diagonal drop; it goes by their corner, so the higher of their floors may be underfoot there)
+    dropBarred(a, b, c1, c2) {
+      if (!this.nc) return false;
+      let f = this.nf[a]; if (this.nf[b] - f >= -0.8) return false;
+      if (c1 >= 0 && this.nf[c1] > f) f = this.nf[c1];
+      if (c2 >= 0 && this.nf[c2] > f) f = this.nf[c2];
+      return this.nc[b] < f + 1.9;
+    }
+    // (x, y, z) stands on the rim of something that ends part-way into its cell (the edge of an upper floor's slab beside a stair): the
+    // cell's centre, and so the grid, holds only the surface far below, and that surface's route turned a foe on the rim back and forth.
+    // The way off the rim is to the cell's centre: sets out to it. null where the grid holds what it stands on, or the centre has a
+    // floor at this height too (something the grid leaves out), or can't be stood in, or is under deep water (a foe risen up the water is
+    // climbing out onto what it is beside, canStep: turned back to the centre it sank, rose and was turned back again, for good)
+    rimDir(x, z, y, out) {
+      if (this.L === 1) return null;
+      const i = this.navIdx(x, z, y); if (i < 0 || this.nb[i] || y - this.nf[i] <= 0.8) return null;
+      if (this.deepWater && this.deepTop(i) > -Infinity) return null;
+      const ic = i % this.N, cx = ic % this.Wn - this.xo + 0.5, cz = ((ic / this.Wn) | 0) - this.zo + 0.5;
+      const q = this._rimQ || (this._rimQ = []); q.length = 0; this.query(cx - 0.01, y - 0.6, cz - 0.01, cx + 0.01, y + 0.1, cz + 0.01, q);
+      const n = q.length; q.length = 0; if (n) return null;
+      out.x = cx - x; out.z = cz - z; const l = Math.hypot(out.x, out.z) || 1; out.x /= l; out.z /= l;
+      return out;
+    }
     canStep(a, b) { // a->b walkable (for monsters)
       if (this.nb[a] || this.nb[b]) return false;
       const d = this.nf[b] - this.nf[a];
@@ -698,6 +795,25 @@
       }
       return src >= 0 && dist[src] < Infinity;
     }
+    // (x, y, z) is in a cell the routes leave out because something stands in part of it (half a stair's width beside a wall, the foot of
+    // a pillar): sets out towards the cell of the route beside it that is nearest the target. flowDir has no heading there, and a foe then
+    // went straight at its target - into that wall, where it stayed. null where the cell is open, or nothing beside it is on a route
+    blockedDir(x, z, y, out) {
+      const i = this.navIdx(x, z, y); if (i < 0 || !this.nb[i]) return null;
+      const W = this.Wn, nd = this.ndist, ic = i % this.N, ix = ic % W, iz = (ic / W) | 0, lo = this.L > 1 ? -2.6 : -6.5;
+      let best = Infinity, bd = -1;
+      for (let d = 0; d < 8; d++) {
+        const dx = DIRS[d][0], dz = DIRS[d][1], ax = ix + dx, az = iz + dz; if (ax < 0 || az < 0 || ax >= W || az >= this.Dn) continue;
+        const a = this.land(i, az * W + ax); if (a < 0 || this.nb[a] || !(nd[a] < best)) continue;
+        const dh = this.nf[a] - this.nf[i]; if (dh > 0.8 || dh < lo || this.dropBarred(i, a)) continue;
+        if (dx && dz) { const c1 = this.land(i, az * W + ix), c2 = this.land(i, iz * W + ax); if (c1 < 0 || c2 < 0 || this.nb[c1] || this.nb[c2]) continue; } // (not round a corner)
+        best = nd[a]; bd = d;
+      }
+      if (bd < 0) return null;
+      out.x = ix - this.xo + DIRS[bd][0] + 0.5 - x; out.z = iz - this.zo + DIRS[bd][1] + 0.5 - z;
+      const l = Math.hypot(out.x, out.z) || 1; out.x /= l; out.z /= l;
+      return out;
+    }
     // direction toward target following the flow field (null if unreachable)
     flowDir(x, z, out, y, field) {
       const nd = field || this.ndist;
@@ -712,8 +828,9 @@
         if (ax < 0 || az < 0 || ax >= W || az >= this.Dn) continue;
         const a = this.land(i, az * W + ax);
         if (a < 0) continue;
-        if (dx && dz) { const c1 = this.land(i, az * W + ix), c2 = this.land(i, iz * W + ax); if (c1 < 0 || c2 < 0 || this.nb[c1] || this.nb[c2] || !this.canStep(i, c1) || !this.canStep(i, c2)) continue; }
-        if (!this.canStep(i, a)) continue; // never steer into a cell we can't actually walk into
+        let c1 = -1, c2 = -1;
+        if (dx && dz) { c1 = this.land(i, az * W + ix); c2 = this.land(i, iz * W + ax); if (c1 < 0 || c2 < 0 || this.nb[c1] || this.nb[c2] || !this.canStep(i, c1) || !this.canStep(i, c2) || this.dropBarred(i, c1) || this.dropBarred(i, c2)) continue; }
+        if (!this.canStep(i, a) || this.dropBarred(i, a, c1, c2)) continue; // never steer into a cell we can't actually walk into
         if (nd[a] < best) { best = nd[a]; bx = dx; bz = dz; }
       }
       if (!bx && !bz) return null;

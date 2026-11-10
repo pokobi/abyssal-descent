@@ -23,12 +23,17 @@
     PG.rbox = G.GFX ? G.GFX.makeRbox(1, 1, 1, 0.13, 2) : PG.box; // (a unit box with its edges softened: the parts of bodies, stretched to size like the plain one)
     PG.plane = new THREE.PlaneGeometry(1, 1);
     const pts = [];
-    for (let i = 0; i <= 14; i++) { const t = i / 14; const r = 0.18 + Math.sin(t * Math.PI) * 0.22 + (t > 0.85 ? (t - 0.85) * 0.6 : 0) - (t > 0.75 && t < 0.85 ? 0.05 : 0); pts.push(new THREE.Vector2(Math.max(0.05, r), t * 0.9)); }
-    PG.urn = new THREE.LatheGeometry(pts, 14);
-    const bp = []; for (let i = 0; i <= 10; i++) { const t = i / 10; bp.push(new THREE.Vector2(0.36 + Math.sin(t * Math.PI) * 0.06, t)); }
-    PG.barrel = new THREE.LatheGeometry(bp, 16);
+    for (let i = 0; i <= 28; i++) { const t = i / 28; const r = 0.18 + Math.sin(t * Math.PI) * 0.22 + (t > 0.85 ? (t - 0.85) * 0.6 : 0) - (t > 0.75 && t < 0.85 ? 0.05 : 0); pts.push(new THREE.Vector2(Math.max(0.05, r), t * 0.9)); }
+    PG.urn = new THREE.LatheGeometry(pts, 28);
+    // (a barrel: the swell of its staves, a chime at each end standing proud of the head)
+    const bp = [new THREE.Vector2(0.3, 0), new THREE.Vector2(0.354, 0)]; for (let i = 0; i <= 20; i++) { const t = i / 20; bp.push(new THREE.Vector2(0.36 + Math.sin(t * Math.PI) * 0.06, t)); }
+    bp.push(new THREE.Vector2(0.354, 1), new THREE.Vector2(0.338, 0.992), new THREE.Vector2(0.334, 0.95));
+    PG.barrel = new THREE.LatheGeometry(bp, 28);
     const bowl = []; for (let i = 0; i <= 8; i++) { const t = i / 8; bowl.push(new THREE.Vector2(0.1 + Math.sin(t * Math.PI / 2) * 0.5, t * 0.35)); }
-    PG.bowl = new THREE.LatheGeometry(bowl, 14);
+    PG.bowl = new THREE.LatheGeometry(bowl, 24);
+    // (a room's things: a box with its edges just taken off - on walls and floors the plain box stays; a flat hoop for a barrel)
+    PG.cbox = G.GFX ? G.GFX.makeRbox(1, 1, 1, 0.035, 1) : PG.box;
+    PG.hoop = new THREE.LatheGeometry([[0.985, -0.5], [1.0, -0.5], [1.014, -0.36], [1.014, 0.36], [1.0, 0.5], [0.985, 0.5]].map((q) => new THREE.Vector2(q[0], q[1])), 28);
     for (const k in PG) PG[k].userData.shared = true;
   };
   P.PG = PG;
@@ -39,8 +44,8 @@
   P.torch = function (w, x, y, z, dir) {
     const d = { px: [1, 0], nx: [-1, 0], pz: [0, 1], nz: [0, -1] }[dir];
     const ry = Math.atan2(d[0], d[1]);
-    w.batch.geo('iron', PG.box, M(x, y, z, 0.16, 0.3, 0.06, 0, ry, 0)); // wall plate
-    w.batch.geo('iron', PG.box, M(x + d[0] * 0.15, y - 0.05, z + d[1] * 0.15, 0.05, 0.05, 0.3, 0, ry, 0)); // arm
+    w.batch.geo('iron', PG.cbox, M(x, y, z, 0.16, 0.3, 0.06, 0, ry, 0)); // wall plate
+    w.batch.geo('iron', PG.cbox, M(x + d[0] * 0.15, y - 0.05, z + d[1] * 0.15, 0.05, 0.05, 0.3, 0, ry, 0)); // arm
     w.batch.geo('iron', PG.torus, M(x + d[0] * 0.3, y + 0.05, z + d[1] * 0.3, 0.09, 0.09, 0.09, Math.PI / 2, 0, 0));
     w.batch.geo('woodDark', PG.cyl8, M(x + d[0] * 0.3, y + 0.15, z + d[1] * 0.3, 0.045, 0.5, 0.045, d[1] * 0.25, 0, -d[0] * 0.25));
     w.batch.geo('dark', PG.cyl8, M(x + d[0] * 0.36, y + 0.42, z + d[1] * 0.36, 0.07, 0.12, 0.07), { tint: [0.15, 0.1, 0.08] });
@@ -52,7 +57,7 @@
     w.batch.geo('trim', PG.oct, M(x, y + 0.06 * s, z, 0.42 * s, 0.12 * s, 0.42 * s));
     w.batch.geo('iron', PG.bowl, M(x, y + 0.7 * s, z, s, s, s));
     w.batch.geo('dark', PG.dode, M(x, y + 0.9 * s, z, 0.35 * s, 0.12 * s, 0.35 * s), { tint: [0.3, 0.12, 0.05] });
-    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; w.batch.geo('iron', PG.box, M(x + Math.cos(a) * 0.5 * s, y + 0.95 * s, z + Math.sin(a) * 0.5 * s, 0.06 * s, 0.25 * s, 0.06 * s)); }
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; w.batch.geo('iron', PG.cbox, M(x + Math.cos(a) * 0.5 * s, y + 0.95 * s, z + Math.sin(a) * 0.5 * s, 0.06 * s, 0.25 * s, 0.06 * s)); }
     if (collide !== false) w.addCollider(x - 0.42 * s, y, z - 0.42 * s, x + 0.42 * s, y + 1.05 * s, z + 0.42 * s, { surf: 'metal' });
     w.addLight(x, y + 1.0 * s, z, { flame: 2.2 * s, intensity: 16 * s, range: 16 * s, prio: 1.4 });
   };
@@ -68,7 +73,7 @@
   P.chandelier = function (w, x, y, z, top) {
     w.batch.geo('iron', PG.torus, M(x, y, z, 1.1, 1.1, 1.1, Math.PI / 2, 0, 0));
     w.batch.geo('iron', PG.torus, M(x, y + 0.02, z, 0.6, 0.6, 0.6, Math.PI / 2, 0, 0));
-    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; w.batch.geo('iron', PG.box, M(x + Math.cos(a) * 0.55, y + 0.6, z + Math.sin(a) * 0.55, 0.03, 1.3, 0.03, Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7)); }
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; w.batch.geo('iron', PG.cbox, M(x + Math.cos(a) * 0.55, y + 0.6, z + Math.sin(a) * 0.55, 0.03, 1.3, 0.03, Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7)); }
     // chain to ceiling
     const len = top - y - 1.2;
     if (len > 0) P.chain(w, x, y + 1.2, z, len);
@@ -133,7 +138,7 @@
   P.skull = function (w, x, y, z, ry, s) {
     s = s || 1;
     w.batch.geo('bone', PG.sph, M(x, y + 0.1 * s, z, 0.1 * s, 0.09 * s, 0.12 * s, 0, ry, 0));
-    w.batch.geo('bone', PG.box, M(x + Math.sin(ry) * 0.06 * s, y + 0.04 * s, z + Math.cos(ry) * 0.06 * s, 0.1 * s, 0.05 * s, 0.07 * s, 0, ry, 0));
+    w.batch.geo('bone', PG.cbox, M(x + Math.sin(ry) * 0.06 * s, y + 0.04 * s, z + Math.cos(ry) * 0.06 * s, 0.1 * s, 0.05 * s, 0.07 * s, 0, ry, 0));
     w.batch.geo('dark', PG.sph, M(x + Math.sin(ry) * 0.09 * s - Math.cos(ry) * 0.035 * s, y + 0.11 * s, z + Math.cos(ry) * 0.09 * s + Math.sin(ry) * 0.035 * s, 0.025 * s, 0.025 * s, 0.025 * s));
     w.batch.geo('dark', PG.sph, M(x + Math.sin(ry) * 0.09 * s + Math.cos(ry) * 0.035 * s, y + 0.11 * s, z + Math.cos(ry) * 0.09 * s - Math.sin(ry) * 0.035 * s, 0.025 * s, 0.025 * s, 0.025 * s));
   };
@@ -162,17 +167,17 @@
       w.batch.geo(mk, geo, M(x + (lx * c + lz * sn) * s, b + ly * s, z + (-lx * sn + lz * c) * s, sx * s, sy * s, sz * s, rx || 0, ry + (ory || 0), rz || 0), { tint: [0.95, 0.95, 0.92] });
     };
     // armored knight leaning on a greatsword
-    add(PG.box, -0.18, 0.45, 0, 0.22, 0.9, 0.26); add(PG.box, 0.18, 0.45, 0, 0.22, 0.9, 0.26); // legs
-    add(PG.box, 0, 1.25, 0, 0.62, 0.75, 0.36); // torso
-    add(PG.box, 0, 0.92, 0.0, 0.7, 0.22, 0.42); // belt/skirt
+    add(PG.cbox, -0.18, 0.45, 0, 0.22, 0.9, 0.26); add(PG.cbox, 0.18, 0.45, 0, 0.22, 0.9, 0.26); // legs
+    add(PG.cbox, 0, 1.25, 0, 0.62, 0.75, 0.36); // torso
+    add(PG.cbox, 0, 0.92, 0.0, 0.7, 0.22, 0.42); // belt/skirt
     add(PG.sph, -0.38, 1.55, 0, 0.17, 0.15, 0.2); add(PG.sph, 0.38, 1.55, 0, 0.17, 0.15, 0.2); // pauldrons
-    add(PG.box, 0, 1.82, 0, 0.26, 0.3, 0.28); // helm
-    add(PG.box, 0, 1.98, 0, 0.06, 0.12, 0.28); // crest
-    add(PG.box, -0.36, 1.2, 0.12, 0.13, 0.55, 0.13, -0.4); add(PG.box, 0.36, 1.2, 0.12, 0.13, 0.55, 0.13, -0.4); // arms
-    add(PG.box, 0, 0.75, 0.32, 0.08, 1.5, 0.03); // blade
-    add(PG.box, 0, 1.5, 0.32, 0.45, 0.06, 0.06); // crossguard
-    add(PG.box, 0, 1.65, 0.32, 0.05, 0.25, 0.05);
-    add(PG.box, 0, 1.2, -0.22, 0.75, 1.1, 0.05, 0.05); // cape
+    add(PG.cbox, 0, 1.82, 0, 0.26, 0.3, 0.28); // helm
+    add(PG.cbox, 0, 1.98, 0, 0.06, 0.12, 0.28); // crest
+    add(PG.cbox, -0.36, 1.2, 0.12, 0.13, 0.55, 0.13, -0.4); add(PG.cbox, 0.36, 1.2, 0.12, 0.13, 0.55, 0.13, -0.4); // arms
+    add(PG.cbox, 0, 0.75, 0.32, 0.08, 1.5, 0.03); // blade
+    add(PG.cbox, 0, 1.5, 0.32, 0.45, 0.06, 0.06); // crossguard
+    add(PG.cbox, 0, 1.65, 0.32, 0.05, 0.25, 0.05);
+    add(PG.cbox, 0, 1.2, -0.22, 0.75, 1.1, 0.05, 0.05); // cape
     w.addCollider(x - 0.45 * s, b, z - 0.45 * s, x + 0.45 * s, b + 2.1 * s, z + 0.45 * s);
     if (rng && rng.chance(0.4)) { const bc = rng.chance(0.5); P.candles(w, x + 0.6 * s, y + 0.5 * s, z + 0.95 * s, rng, bc); }
   };
@@ -236,8 +241,8 @@
     w.addCollider(x - r, y, z - r, x + r, y + 0.9, z + r);
     for (const sx of [-1, 1]) w.solid('woodDark', x + sx * (r - 0.15) - 0.1, y + 0.9, z - 0.1, x + sx * (r - 0.15) + 0.1, y + 3.0, z + 0.1, { uv: 1 });
     w.batch.box('woodDark', x - r - 0.1, y + 2.9, z - 0.08, x + r + 0.1, y + 3.05, z + 0.08, { uv: 1 });
-    w.batch.geo('wood', PG.box, M(x, y + 3.15, z, 2 * r + 0.6, 0.06, 1.0, 0.45, 0, 0));
-    w.batch.geo('wood', PG.box, M(x, y + 3.15, z, 2 * r + 0.6, 0.06, 1.0, -0.45, 0, 0));
+    w.batch.geo('wood', PG.cbox, M(x, y + 3.15, z, 2 * r + 0.6, 0.06, 1.0, 0.45, 0, 0));
+    w.batch.geo('wood', PG.cbox, M(x, y + 3.15, z, 2 * r + 0.6, 0.06, 1.0, -0.45, 0, 0));
     P.chain(w, x, y + 1.5, z, 1.4);
     w.batch.geo('woodDark', PG.cyl8, M(x, y + 1.35, z, 0.2, 0.3, 0.2));
   };
@@ -286,16 +291,16 @@
     w.batch.box('woodDark', x - (alongX ? hx : 0.05), y + 1.5, z - (alongX ? 0.05 : hz), x + (alongX ? hx : 0.05), y + 1.6, z + (alongX ? 0.05 : hz), { uv: 1 });
     for (let i = -2; i <= 2; i++) {
       const ox = alongX ? i * 0.35 : 0, oz = alongX ? 0 : i * 0.35;
-      w.batch.geo('iron', PG.box, M(x + ox, y + 0.9, z + oz, 0.05, 1.7, 0.02, alongX ? 0 : 0, alongX ? 0 : Math.PI / 2, (i % 2) * 0.08));
-      w.batch.geo('woodDark', PG.box, M(x + ox, y + 0.25, z + oz, 0.04, 0.3, 0.04));
+      w.batch.geo('iron', PG.cbox, M(x + ox, y + 0.9, z + oz, 0.05, 1.7, 0.02, alongX ? 0 : 0, alongX ? 0 : Math.PI / 2, (i % 2) * 0.08));
+      w.batch.geo('woodDark', PG.cbox, M(x + ox, y + 0.25, z + oz, 0.04, 0.3, 0.04));
     }
     w.addCollider(x - hx, y + 0.12, z - hz, x + hx, y + 1.7, z + hz, { surf: 'wood', tag: 'grate' }); // (a rack: you see through it between the weapons, and it stops you)
   };
   P.gravestone = function (w, x, z, y, ry, rng) {
     const t = rng ? rng.int(0, 2) : 0;
-    if (t === 0) w.batch.geo('block', PG.box, M(x, y + 0.5, z, 0.7, 1.0, 0.18, rr(rng, -0.1, 0.1), ry, rr(rng, -0.1, 0.1)), { su: 0.5, sv: 0.5 });
-    else if (t === 1) { w.batch.geo('block', PG.box, M(x, y + 0.6, z, 0.16, 1.2, 0.16, 0, ry, 0)); w.batch.geo('block', PG.box, M(x, y + 0.85, z, 0.7, 0.16, 0.16, 0, ry, 0)); }
-    else { w.batch.geo('trim', PG.box, M(x, y + 0.35, z, 0.6, 0.7, 0.25, 0, ry, 0)); w.batch.geo('trim', PG.cyl, M(x, y + 0.7, z, 0.3, 0.25, 0.3, Math.PI / 2, ry, 0)); }
+    if (t === 0) w.batch.geo('block', PG.cbox, M(x, y + 0.5, z, 0.7, 1.0, 0.18, rr(rng, -0.1, 0.1), ry, rr(rng, -0.1, 0.1)), { su: 0.5, sv: 0.5 });
+    else if (t === 1) { w.batch.geo('block', PG.cbox, M(x, y + 0.6, z, 0.16, 1.2, 0.16, 0, ry, 0)); w.batch.geo('block', PG.cbox, M(x, y + 0.85, z, 0.7, 0.16, 0.16, 0, ry, 0)); }
+    else { w.batch.geo('trim', PG.cbox, M(x, y + 0.35, z, 0.6, 0.7, 0.25, 0, ry, 0)); w.batch.geo('trim', PG.cyl, M(x, y + 0.7, z, 0.3, 0.25, 0.3, Math.PI / 2, ry, 0)); }
     w.addCollider(x - 0.38, y, z - 0.38, x + 0.38, y + 1.0, z + 0.38);
   };
   // a floating text label (no physical board): a soft translucent plate with glowing text, readable from both sides
@@ -337,14 +342,14 @@
     const ry = rng && rng.chance(0.5) ? 0 : 0;
     w.deferred.push((grp) => {
       const g = new THREE.Group();
-      const body = new THREE.Mesh(PG.box, w.mats.wood); body.scale.set(s, s, s); body.position.y = s / 2;
+      const body = new THREE.Mesh(PG.cbox, w.mats.wood); body.scale.set(s, s, s); body.position.y = s / 2;
       g.add(body);
       for (const sy of [0.04, s - 0.04]) for (const ax of [0, 1]) {
-        const b = new THREE.Mesh(PG.box, w.mats.woodDark);
+        const b = new THREE.Mesh(PG.cbox, w.mats.woodDark);
         b.scale.set(ax ? s + 0.03 : 0.1, 0.08, ax ? 0.1 : s + 0.03);
         b.position.set(0, sy, 0); if (ax) b.position.z = 0; g.add(b);
       }
-      const brace = new THREE.Mesh(PG.box, w.mats.woodDark); brace.scale.set(s * 1.3, 0.09, 0.04); brace.rotation.z = Math.PI / 4; brace.position.set(0, s / 2, s / 2 + 0.01); g.add(brace);
+      const brace = new THREE.Mesh(PG.cbox, w.mats.woodDark); brace.scale.set(s * 1.3, 0.09, 0.04); brace.rotation.z = Math.PI / 4; brace.position.set(0, s / 2, s / 2 + 0.01); g.add(brace);
       const brace2 = brace.clone(); brace2.position.z = -s / 2 - 0.01; g.add(brace2);
       g.position.set(x, y, z); g.rotation.y = ry;
       g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
@@ -360,12 +365,13 @@
       if (explosive) { body.material = w.mats.wood.clone(); body.material.color.set('#7a3020'); }
       body.scale.set(1, 1.1, 1); g.add(body);
       for (const hy of [0.15, 0.55, 0.95]) {
-        const hp = new THREE.Mesh(PG.torus, w.mats.iron); hp.rotation.x = Math.PI / 2; hp.position.y = hy; hp.scale.set(0.4, 0.4, 0.25); g.add(hp);
+        // (a flat iron hoop, sitting on the swell where it is)
+        const hr = (0.36 + Math.sin(hy / 1.1 * Math.PI) * 0.06) * 1.004, hp = new THREE.Mesh(PG.hoop, w.mats.iron); hp.position.y = hy; hp.scale.set(hr, 0.075, hr); g.add(hp);
       }
-      const lid = new THREE.Mesh(PG.cyl, w.mats.woodDark); lid.scale.set(0.37, 0.03, 0.37); lid.position.y = 1.1; g.add(lid);
+      const lid = new THREE.Mesh(PG.cyl, w.mats.woodDark); lid.scale.set(0.336, 0.03, 0.336); lid.position.y = 1.058; g.add(lid);   // (the head, let in below the chime)
       if (explosive) {
         const fuse = new THREE.Mesh(PG.cyl8, w.mats.dark); fuse.scale.set(0.02, 0.18, 0.02); fuse.position.set(0.1, 1.2, 0); fuse.rotation.z = 0.4; g.add(fuse);
-        const lbl = new THREE.Mesh(PG.box, w.mats.dark); lbl.scale.set(0.3, 0.25, 0.02); lbl.position.set(0, 0.6, 0.41); g.add(lbl);
+        const lbl = new THREE.Mesh(PG.cbox, w.mats.dark); lbl.scale.set(0.3, 0.25, 0.02); lbl.position.set(0, 0.6, 0.41); g.add(lbl);
       }
       g.position.set(x, y, z); g.rotation.y = rr(rng, 0, 6);
       g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
@@ -390,10 +396,10 @@
     w.deferred.push((grp) => {
       const g = new THREE.Group();
       for (let i = 0; i < 4; i++) {
-        const p = new THREE.Mesh(PG.box, w.mats.wood); p.scale.set(L, 0.22, 0.08);
+        const p = new THREE.Mesh(PG.cbox, w.mats.wood); p.scale.set(L, 0.22, 0.08);
         p.position.set(0, 0.2 + i * 0.3, 0); p.rotation.z = (Math.random() - 0.5) * 0.12; g.add(p);
       }
-      for (const sx of [-1.2, 1.2]) { const p = new THREE.Mesh(PG.box, w.mats.woodDark); p.scale.set(0.14, 1.4, 0.14); p.position.set(sx, 0.7, -0.1); g.add(p); }
+      for (const sx of [-1.2, 1.2]) { const p = new THREE.Mesh(PG.cbox, w.mats.woodDark); p.scale.set(0.14, 1.4, 0.14); p.position.set(sx, 0.7, -0.1); g.add(p); }
       g.position.set(x, y, z); g.rotation.y = alongX ? 0 : Math.PI / 2;
       g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
       grp.add(g); d.mesh = g;
@@ -428,21 +434,21 @@
       const goldM = T >= 3 ? CHM.bossGold : w.mats.gold;
       const sc = T >= 3 ? 1.38 : T >= 2 ? 1.22 : T === 1 ? 1.08 : 1;
       const inner = new THREE.Group(); inner.scale.setScalar(sc); g.add(inner);
-      add(inner, PG.box, bodyM, 1.1, 0.55, 0.7, 0, 0.275, 0);
+      add(inner, PG.cbox, bodyM, 1.1, 0.55, 0.7, 0, 0.275, 0);
       const lidG = new THREE.Group(); lidG.position.set(0, 0.55, -0.35); inner.add(lidG);
       add(lidG, PG.cyl, bodyM, 0.35, 1.1, 0.35, 0, 0, 0.35, 0, 0, Math.PI / 2);
-      add(lidG, PG.box, bodyM, 1.1, 0.02, 0.7, 0, 0, 0.35);
-      for (const bx of [-0.4, 0.4]) { add(inner, PG.box, bandM, 0.08, 0.57, 0.72, bx, 0.28, 0); add(lidG, PG.cyl, bandM, 0.36, 0.08, 0.36, bx, 0, 0.35, 0, 0, Math.PI / 2); }
+      add(lidG, PG.cbox, bodyM, 1.1, 0.02, 0.7, 0, 0, 0.35);
+      for (const bx of [-0.4, 0.4]) { add(inner, PG.cbox, bandM, 0.08, 0.57, 0.72, bx, 0.28, 0); add(lidG, PG.cyl, bandM, 0.36, 0.08, 0.36, bx, 0, 0.35, 0, 0, Math.PI / 2); }
       if (T >= 1) {
         // corner caps & studs
         const capM = T >= 2 ? goldM : CHM.steel;
-        for (const cx of [-0.53, 0.53]) for (const cz of [-0.33, 0.33]) add(inner, PG.box, capM, 0.09, 0.57, 0.09, cx, 0.28, cz);
+        for (const cx of [-0.53, 0.53]) for (const cz of [-0.33, 0.33]) add(inner, PG.cbox, capM, 0.09, 0.57, 0.09, cx, 0.28, cz);
         for (let i = 0; i < 5; i++) add(inner, PG.sph, capM, 0.025, 0.025, 0.025, -0.3 + i * 0.15, 0.08, 0.36);
       }
       if (T >= 2) {
         // gilded trims, velvet stripe, crown & jewels
-        add(inner, PG.box, T >= 3 ? CHM.royalVelvet : CHM.velvet, 1.12, 0.08, 0.72, 0, 0.5, 0);
-        add(inner, PG.box, goldM, 1.2, 0.06, 0.78, 0, 0.03, 0);
+        add(inner, PG.cbox, T >= 3 ? CHM.royalVelvet : CHM.velvet, 1.12, 0.08, 0.72, 0, 0.5, 0);
+        add(inner, PG.cbox, goldM, 1.2, 0.06, 0.78, 0, 0.03, 0);
         const crown = new THREE.Group(); crown.position.set(0, 0.36, 0.35); lidG.add(crown);
         const crSc = T >= 3 ? 1.32 : 1, spN = T >= 3 ? 7 : 5;
         add(crown, PG.cyl8, goldM, 0.16 * crSc, 0.08 * crSc, 0.16 * crSc);
@@ -451,8 +457,8 @@
         jewels.forEach((m, i) => add(inner, PG.oct, m, 0.05, 0.065, 0.03, -0.36 + i * 0.24, 0.3, 0.37));
         add(lidG, PG.oct, T >= 3 ? CHM.amethyst : CHM.ruby, 0.07, 0.09, 0.04, 0, 0.2, 0.72);
         if (T >= 3) {
-          add(inner, PG.box, CHM.obsidian, 1.34, 0.05, 0.9, 0, -0.02, 0);
-          add(inner, PG.box, goldM, 0.1, 0.57, 0.73, 0, 0.28, 0);
+          add(inner, PG.cbox, CHM.obsidian, 1.34, 0.05, 0.9, 0, -0.02, 0);
+          add(inner, PG.cbox, goldM, 0.1, 0.57, 0.73, 0, 0.28, 0);
           add(lidG, PG.cyl, goldM, 0.365, 0.1, 0.365, 0, 0, 0.35, 0, 0, Math.PI / 2);
           for (const cx of [-0.55, 0.55]) for (const cz of [-0.35, 0.35]) {
             add(inner, PG.cone, goldM, 0.06, 0.22, 0.06, cx * 1.06, 0.62, cz * 1.06, cz * 0.4, 0, -cx * 0.4);
@@ -465,7 +471,7 @@
         halo.scale.set(T >= 3 ? 3.2 : 2.4, T >= 3 ? 2.2 : 1.6, 1); halo.position.y = T >= 3 ? 0.68 : 0.55; g.add(halo); it.halo = halo;
       }
       const lockM = T >= 2 ? goldM : T === 1 ? CHM.steel : w.mats.brass;
-      add(inner, PG.box, lockM, 0.14, 0.18, 0.06, 0, 0.5, 0.37);
+      add(inner, PG.cbox, lockM, 0.14, 0.18, 0.06, 0, 0.5, 0.37);
       if (T >= 3) add(inner, PG.oct, CHM.amethyst, 0.055, 0.07, 0.04, 0, 0.5, 0.41);
       else if (T === 1) add(inner, PG.oct, CHM.sapph, 0.04, 0.05, 0.03, 0, 0.5, 0.41);
       g.position.set(x, y, z); g.rotation.y = ry;

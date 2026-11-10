@@ -592,6 +592,7 @@
     size = size || 1;
     if (smp('explosion', pos, Math.min(1.6, 0.8 + size * 0.3), 1.08 - Math.min(0.3, size * 0.1), 1.0)) return;
     const t = ctx.currentTime, out = dest(pos, 1.0); out.gain.value = Math.min(1.6, 0.8 + size * 0.3);
+    smp('explosion_tail', pos, Math.min(1, 0.45 + size * 0.2), 1.05 - Math.min(0.25, size * 0.08), 0.8); // (under it, a recorded blast rolling away)
     tn({ t, f0: 75, f1: 28, d: 0.8 + size * 0.3, g: 1.0, to: out, type: 'sine' });
     nz({ t, buf: 'brown', f: [['lowpass', 1200, 0.6, 120, 1.2]], g: 1.0, a: 0.004, d: 1.0 + size * 0.4, to: out });
     nz({ t, f: [['lowpass', 5000, 0.5, 600, 0.3]], g: 0.6, d: 0.25, to: out });
@@ -727,6 +728,8 @@
       case 'slosh': nz({ t, buf: 'pink', f: [['bandpass', 500 * pitch, 2, 250, 0.3]], g: 0.6, a: 0.03, d: 0.3, to: out }); break;
     }
   };
+  // a thing of bones coming apart
+  A.bones = function (pos, vol) { if (ctx) smp('bones', pos, vol || 0.8, 1, 0.3); };
   A.monsterDie = function (pos, kind, pitch) {
     if (!ctx) return;
     if (smp('mon_die', pos, 0.7, (pitch || 1) * 0.9, 0.4)) { const t = ctx.currentTime, out = dest(pos, 0.3); tn({ t: t + 0.2, f0: 90, f1: 40, d: 0.2, g: 0.4, to: out, type: 'triangle' }); return; }
@@ -1199,6 +1202,7 @@
   A.splash = function (pos, size) {
     if (!ctx || !voice(0.8)) return;
     size = Math.max(0.1, Math.min(1.5, size ?? 0.6));
+    if (smp(size >= 0.6 ? 'splash_big' : 'splash_small', pos, 0.48 + size * 0.36, 1.1 - size * 0.12, 0.3 + size * 0.15)) return; // (a recording of water thrown up, where there is one)
     const t = ctx.currentTime, out = dest(pos, 0.3 + size * 0.15); out.gain.value *= 0.48 + size * 0.36; // (a big one stays well clear of clipping)
     nz({ t, f: [['bandpass', vr(1500 - size * 450, 0.15), 0.9, 360, 0.1 + size * 0.08]], g: 0.5 + size * 0.3, a: 0.003, d: 0.08 + size * 0.12, to: out });
     nz({ t: t + 0.008, buf: 'pink', f: [['lowpass', 2300 - size * 700], ['highpass', 160]], g: 0.22 + size * 0.28, a: 0.015, d: 0.2 + size * 0.38, to: out });

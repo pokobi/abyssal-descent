@@ -59,6 +59,13 @@
 | break_wood_5.ogg | 木が壊れる | wood_cracking_03.ogg | 100 CC0 metal and wood SFX |
 | break_wood_6.ogg | 木が壊れる | wood_cracking_04.ogg | 100 CC0 metal and wood SFX |
 | thunder_1.ogg | 雷 | 3113.wav（Thunder #2） | BigSoundBank |
+| splash_big_1.ogg | 大きな水しぶき | 1519.wav（Splash, Big #1） | BigSoundBank |
+| splash_big_2.ogg | 大きな水しぶき | 1520.wav（Splash, big #2） | BigSoundBank |
+| splash_small_1.ogg | 小さな水しぶき | 1529.wav（Splash, Small #1） | BigSoundBank |
+| splash_small_2.ogg | 小さな水しぶき | 1530.wav（Splash, small #2） | BigSoundBank |
+| explosion_tail_1.ogg | 爆発の遠い響き | 1023.wav（Explosion far Away #1） | BigSoundBank |
+| bones_1.ogg | 骨が崩れる | 1408.wav（Bones cracking #2） | BigSoundBank |
+| bones_2.ogg | 骨が崩れる | 1409.wav（Bones cracking #3） | BigSoundBank |
 | coins_1.ogg | 硬貨 | handleCoins.ogg | RPG Audio |
 | coins_2.ogg | 硬貨 | handleCoins2.ogg | RPG Audio |
 | pickup_1.ogg | 拾う | handleSmallLeather.ogg | RPG Audio |

@@ -770,6 +770,7 @@
       if (!cleared && !this.noReward && !this.custom && !this.boss && !this.noLoot && G.Inv) G.Inv.addCorpse(this);
       if (this.mut && !cleared) G.Depth.onDeath(this);
       G.sfx.monsterDie(this.pos, this.def.sound, this.def.pitch);
+      if (this.def.plan === 'skeleton' && G.sfx.bones) G.sfx.bones(this.pos); // (its bones coming apart)
       G.fx.blood(this.centerPos(), null, this.bloodColor, 18);
       if (this.eliteMod && this.eliteMod.id === 'bomb' && !cleared) { setTimeout(() => C.explode(this.centerPos(), 4.5, this.dmg * 1.5, { enemy: true, src: 'explosion' }), 400); G.fx.telegraph(this.pos, 4.5, 0.4, 0xff6020); }
       if (this.def.plan === 'mushroom' && !cleared) { C.zone(this.pos.clone(), 3.5, 5, 'acid', this.dmg * 0.6, { enemy: true }); G.fx.smoke(this.centerPos(), 14, 1.5, 0x6a8a2a, 0.5, 1.5); }

@@ -135,7 +135,7 @@
     ensureBubble();
     if (G.scene && bubble.parent !== G.scene) { G.scene.add(bubble); G.scene.add(shards); }
     bubble.visible = true; shards.visible = true;
-    if (G.renderer && G.scene && G.camera) { try { G.renderer.compile(G.scene, G.camera); } catch (e) { /* ignore */ } }
+    if (G.renderer && G.scene && G.camera) { try { if (G.Post) { G.Post.withTarget(() => G.renderer.compile(G.scene, G.camera)); G.Post.drawWarm(G.scene, G.camera); } else G.renderer.compile(G.scene, G.camera); } catch (e) { /* ignore */ } }
     bubble.visible = false; shards.visible = false;
   };
   // a hit softened by the bastion: golden ring + chime + "-N 軽減"

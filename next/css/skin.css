@@ -1,0 +1,132 @@
+/* The look of the interface: cut stone, wrought iron and old gold. What is shown and where is style.css's; this lays the surfaces over it.
+   (made by a script: the stone, iron and brass are small noise pictures written into the file itself) */
+:root {
+  --gold: #c9a45c; --gold2: #ecd49a; --ink: #0c0a08; --panel: rgba(21, 19, 16, 0.9); --panel2: rgba(31, 27, 22, 0.94);
+  --line: rgba(160, 130, 80, 0.4); --text: #e9e0cd; --dim: #a59982;
+  --tex-stone: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='f0' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.016' numOctaves='5' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.86  0 0 0 0 0.78  0 0 0 0 0.64  0.5 0.5 0.5 0 -0.73'/%3E%3C/filter%3E%3Cfilter id='f1' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.022' numOctaves='4' seed='29' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.6 0.6 0.6 0 -0.74'/%3E%3C/filter%3E%3Cfilter id='f2' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 0.94  0 0 0 0 0.82  0.5 0.5 0.5 0 -0.78'/%3E%3C/filter%3E%3Cfilter id='f3' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2' seed='17' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.55 0.55 0.55 0 -0.7'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23f0)'/%3E%3Crect width='320' height='320' filter='url(%23f1)'/%3E%3Crect width='320' height='320' filter='url(%23f2)'/%3E%3Crect width='320' height='320' filter='url(%23f3)'/%3E%3C/svg%3E"); --tex-iron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f0' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035 0.6' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.8  0 0 0 0 0.8  0 0 0 0 0.84  0.45 0.45 0.45 0 -0.6'/%3E%3C/filter%3E%3Cfilter id='f1' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.6 0.6 0.6 0 -0.74'/%3E%3C/filter%3E%3Cfilter id='f2' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='4' seed='41' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.3  0 0 0 0 0.14  0.55 0.55 0.55 0 -0.74'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23f0)'/%3E%3Crect width='240' height='240' filter='url(%23f1)'/%3E%3Crect width='240' height='240' filter='url(%23f2)'/%3E%3C/svg%3E"); --tex-brass: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120'%3E%3Cfilter id='f0' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.85' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 0.96  0 0 0 0 0.8  0.5 0.5 0.5 0 -0.62'/%3E%3C/filter%3E%3Cfilter id='f1' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.015 0.7' numOctaves='3' seed='23' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.2  0 0 0 0 0.1  0 0 0 0 0  0.55 0.55 0.55 0 -0.68'/%3E%3C/filter%3E%3Cfilter id='f2' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='4' seed='13' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.25  0 0 0 0 0.14  0 0 0 0 0.02  0.6 0.6 0.6 0 -0.8'/%3E%3C/filter%3E%3Crect width='240' height='120' filter='url(%23f0)'/%3E%3Crect width='240' height='120' filter='url(%23f1)'/%3E%3Crect width='240' height='120' filter='url(%23f2)'/%3E%3C/svg%3E"); --tex-parch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='f0' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='5' seed='19' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.22  0 0 0 0 0.08  0.5 0.5 0.5 0 -0.62'/%3E%3C/filter%3E%3Cfilter id='f1' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' seed='37' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.2  0 0 0 0 0.1  0.5 0.5 0.5 0 -0.72'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23f0)'/%3E%3Crect width='280' height='280' filter='url(%23f1)'/%3E%3C/svg%3E");
+  --edge-stone: inset 0 1px 0 rgba(255, 238, 200, 0.11), inset 0 0 0 1px rgba(150, 124, 78, 0.24), inset 0 -24px 32px -24px rgba(0, 0, 0, 0.7), 0 5px 20px rgba(0, 0, 0, 0.6);
+  --edge-iron: inset 0 1px 0 rgba(255, 240, 210, 0.17), inset 0 0 0 1px rgba(160, 130, 80, 0.34), 0 2px 0 #000, 0 5px 12px rgba(0, 0, 0, 0.5);
+}
+/* ---- slabs: the panels of the menus ---- */
+.panel,
+#interact-panel,
+.icard,
+.side-info,
+#tooltip,
+.codex,
+#trial-hud,
+#pguard .pg,
+#pallies .pa,
+.iv-armorcol,
+.iv-merc,
+#status-overlay .sh,
+#status-overlay .sp,
+.iv-tip,
+.iv-panel,
+.iv-eq,
+.iv-wbox,
+.iv-sk,
+.iv-spec,
+.iv-grid,
+.iv-menu,
+.iv-hs,
+.iv-kitguide,
+#tut .tut-tile,
+.panel.alch-panel,
+.alch-work,
+.alch-prev,
+#tut-map .tut-box,
+.cls-view,
+.pk-cards,
+.pb-cand {
+  background-image: var(--tex-stone), linear-gradient(180deg, rgba(62, 55, 46, 0.5), rgba(18, 16, 13, 0.55));
+  background-color: rgba(22, 20, 17, 0.93);
+  border-color: #0b0a08;
+  box-shadow: var(--edge-stone);
+}
+/* the big ones carry a rivet in each corner */
+.panel,
+#interact-panel,
+.codex,
+.iv-panel,
+#status-overlay .sp {
+  background-image: radial-gradient(circle at 10px 10px, #a58a52 0 1.6px, #3a2f1c 2.1px 3px, rgba(0,0,0,.55) 3.4px 4.2px, transparent 4.6px), radial-gradient(circle at calc(100% - 10px) 10px, #a58a52 0 1.6px, #3a2f1c 2.1px 3px, rgba(0,0,0,.55) 3.4px 4.2px, transparent 4.6px), radial-gradient(circle at 10px calc(100% - 10px), #a58a52 0 1.6px, #3a2f1c 2.1px 3px, rgba(0,0,0,.55) 3.4px 4.2px, transparent 4.6px), radial-gradient(circle at calc(100% - 10px) calc(100% - 10px), #a58a52 0 1.6px, #3a2f1c 2.1px 3px, rgba(0,0,0,.55) 3.4px 4.2px, transparent 4.6px), var(--tex-stone), linear-gradient(180deg, rgba(62, 55, 46, 0.5), rgba(18, 16, 13, 0.55));
+}
+/* ---- the pieces of the HUD: the same stone, thinner, so the fight shows through ---- */
+#objective,
+#coins,
+#weapon-info,
+.toast,
+#gren-hint,
+#feed div,
+.wlabel,
+#cls-ind {
+  background-image: var(--tex-stone), linear-gradient(180deg, rgba(58, 52, 44, 0.35), rgba(14, 12, 10, 0.4));
+  background-color: rgba(18, 16, 14, 0.74);
+  border-color: rgba(8, 7, 6, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 238, 200, 0.1), inset 0 0 0 1px rgba(150, 124, 78, 0.22), 0 3px 12px rgba(0, 0, 0, 0.5);
+}
+/* ---- sockets: slots sunk into the stone, an iron lip round them ---- */
+.wslot,
+.ab,
+.bicon,
+.tfx,
+.alch-slot.empty,
+.gain.gear .g-ic,
+.alch-prev .ap-ic {
+  background-image: var(--tex-iron), radial-gradient(ellipse at 50% 35%, rgba(70, 62, 52, 0.55), rgba(8, 7, 6, 0.75));
+  background-color: rgba(14, 12, 10, 0.86);
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(150, 124, 78, 0.34), 0 1px 0 1px rgba(255, 236, 190, 0.07);
+}
+/* ---- channels: the gauges are cut into the surface; what fills them is glossed like glass ---- */
+#hp-wrap,
+#boss-bar,
+.ebar .hb,
+.ebar .sb,
+#boss-split .bs-bar,
+#guard-gauge,
+.pb-wrap,
+#focus-bar,
+.fgb.thin,
+#shield-gauge {
+  background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(42, 36, 30, 0.55));
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(150, 124, 78, 0.36), 0 1px 0 1px rgba(255, 236, 190, 0.07);
+}
+[id$="-fill"], [class$="-fill"], .hb > i, .sb > i, .bs-bar > i { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), inset 0 -3px 4px rgba(0, 0, 0, 0.32); }
+/* ---- plates: what is clicked ---- */
+.btn {
+  background-image: var(--tex-iron), linear-gradient(180deg, #3d362d, #1b1814);
+  border: 1px solid #090807; border-radius: 2px;
+  box-shadow: var(--edge-iron);
+  text-shadow: 0 1px 0 #000; letter-spacing: 0.06em;
+}
+.btn:hover { box-shadow: inset 0 1px 0 rgba(255, 240, 210, 0.3), inset 0 0 0 1px rgba(226, 190, 118, 0.75), inset 0 0 18px rgba(201, 164, 92, 0.16), 0 2px 0 #000, 0 6px 16px rgba(0, 0, 0, 0.55); }
+.btn:active { transform: translateY(1px); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(160, 130, 80, 0.4); }
+.btn.primary {
+  background-image: var(--tex-brass), linear-gradient(180deg, #d6af63, #94692a 55%, #6f4e1d);
+  color: #1c1408; border-color: #2c1e0a; text-shadow: 0 1px 0 rgba(255, 240, 200, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 246, 214, 0.62), inset 0 -2px 3px rgba(60, 36, 8, 0.5), 0 2px 0 #2a1c08, 0 6px 14px rgba(0, 0, 0, 0.55);
+}
+.btn.primary:hover { box-shadow: inset 0 1px 0 rgba(255, 250, 226, 0.8), inset 0 -2px 3px rgba(60, 36, 8, 0.5), inset 0 0 20px rgba(255, 226, 150, 0.3), 0 2px 0 #2a1c08, 0 8px 18px rgba(0, 0, 0, 0.6); }
+.card,
+.choice,
+.cx-item,
+.df-card,
+.alch-item,
+.cls-item,
+.pb-c,
+.choice-aside {
+  background-image: var(--tex-stone), linear-gradient(180deg, rgba(66, 58, 48, 0.5), rgba(20, 17, 14, 0.5));
+  box-shadow: inset 0 1px 0 rgba(255, 238, 200, 0.12), inset 0 0 0 1px rgba(150, 124, 78, 0.22), 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+/* ---- lettering: gold cut into the stone ---- */
+h1, h2, h3, .panel h2, #banner, .codex h2 { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.95), 0 -1px 0 rgba(255, 240, 200, 0.16), 0 0 20px rgba(201, 164, 92, 0.22); }
+.keys kbd, kbd { background-image: var(--tex-iron), linear-gradient(180deg, #4a4238, #25211b); border-color: #0a0908; box-shadow: inset 0 1px 0 rgba(255, 240, 210, 0.2), 0 2px 0 #000; text-shadow: 0 1px 0 #000; }
+select, input[type="text"], input[type="number"] { background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(40, 34, 28, 0.4)); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(150, 124, 78, 0.25); }
+input[type="range"] { accent-color: #c9a45c; }
+/* the name-plate of a thing looked at: a strip of parchment-brown under the gold */
+#tooltip, .iv-tip { border-top: 1px solid rgba(226, 190, 118, 0.55); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0d0b09; box-shadow: inset 0 0 4px #000; }
+::-webkit-scrollbar-thumb { background-image: var(--tex-iron), linear-gradient(90deg, #4a4033, #2a241c); border: 1px solid #0a0908; border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.2); }
+::-webkit-scrollbar-thumb:hover { background-image: var(--tex-brass), linear-gradient(90deg, #a8843f, #6d5122); }

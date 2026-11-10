@@ -11,15 +11,16 @@
   P.M = M;
   P.init = function () {
     PG.oct = new THREE.CylinderGeometry(1, 1, 1, 8, 1); PG.oct.rotateY(Math.PI / 8);
-    PG.cyl = new THREE.CylinderGeometry(1, 1, 1, 16, 1);
-    PG.cyl8 = new THREE.CylinderGeometry(1, 1, 1, 10, 1);
-    PG.cone = new THREE.ConeGeometry(1, 1, 8);
-    PG.sph = new THREE.SphereGeometry(1, 12, 8);
+    PG.cyl = new THREE.CylinderGeometry(1, 1, 1, 22, 1);
+    PG.cyl8 = new THREE.CylinderGeometry(1, 1, 1, 12, 1);
+    PG.cone = new THREE.ConeGeometry(1, 1, 14);
+    PG.sph = new THREE.SphereGeometry(1, 18, 12);
     PG.dode = new THREE.DodecahedronGeometry(1, 0);
     PG.ico = new THREE.IcosahedronGeometry(1, 0);
     PG.oct3 = new THREE.OctahedronGeometry(1, 0);
-    PG.torus = new THREE.TorusGeometry(1, 0.12, 6, 16);
+    PG.torus = new THREE.TorusGeometry(1, 0.12, 8, 24);
     PG.box = new THREE.BoxGeometry(1, 1, 1);
+    PG.rbox = G.GFX ? G.GFX.makeRbox(1, 1, 1, 0.13, 2) : PG.box; // (a unit box with its edges softened: the parts of bodies, stretched to size like the plain one)
     PG.plane = new THREE.PlaneGeometry(1, 1);
     const pts = [];
     for (let i = 0; i <= 14; i++) { const t = i / 14; const r = 0.18 + Math.sin(t * Math.PI) * 0.22 + (t > 0.85 ? (t - 0.85) * 0.6 : 0) - (t > 0.75 && t < 0.85 ? 0.05 : 0); pts.push(new THREE.Vector2(Math.max(0.05, r), t * 0.9)); }

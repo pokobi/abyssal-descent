@@ -10,6 +10,9 @@
 (function () {
   // (with post.js on, the frame is drawn to its own target: shaders must be compiled for that, or each compiles again at its first draw)
   const CMP = (r, sc, cam) => (G.Post ? G.Post.withTarget(() => r.compile(sc, cam)) : r.compile(sc, cam));
+  // (and drawn once into that target, small: see Post.drawWarm)
+  const DRAW = (sc, cam, held) => { if (G.Post && G.Post.drawWarm) G.Post.drawWarm(sc, cam, held); };
+  const fxWarm = (fn) => { if (G.fx && G.fx.withWarm) G.fx.withWarm(fn); else fn(); };
   const W = (G.Warm = { log: false });
   const TEXKEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap'];
   const now = () => performance.now();
@@ -30,7 +33,7 @@
     const t0 = now();
     try {
       sc.updateMatrixWorld(true);
-      if (G.fx && G.fx.withWarm) G.fx.withWarm(() => CMP(r, sc, cam)); else CMP(r, sc, cam);
+      fxWarm(() => { CMP(r, sc, cam); DRAW(sc, cam); });
       const n = uploadTextures(sc, r);
       if (W.log) console.log('[warm] world', (now() - t0).toFixed(0) + 'ms', n + ' textures');
     } catch (e) { console.warn('warm world failed', e); }
@@ -51,7 +54,7 @@
         let pending = false;
         const ps = r.info.programs || [];
         for (let i = 0; i < ps.length; i++) { const p = ps[i]; if (p && p.isReady && !p.isReady()) { pending = true; break; } }
-        if (!pending || now() > deadline) { if (G.Perf && G.Perf.note) G.Perf.note(`シェーダー準備 ${Math.round(now() - t0)}ms（呼び出し ${Math.round(tc)}ms）${pending ? ' 時間切れ' : ''}`); resolve(); }
+        if (!pending || now() > deadline) { try { fxWarm(() => DRAW(sc, cam)); } catch (e) { /* ignore */ } if (G.Perf && G.Perf.note) G.Perf.note(`シェーダー準備 ${Math.round(now() - t0)}ms（呼び出し ${Math.round(tc)}ms）${pending ? ' 時間切れ' : ''}`); resolve(); }
         else setTimeout(tick, 8);
       };
       tick();
@@ -148,7 +151,7 @@
       // see-through hands and gun (影の舞, the invisibility draught: pstatus.js ghostMesh): their shader variants, once
       if (G.PStatus && G.PStatus.ghostWarm && Wp.buildGun && G.WEAPON_BY_ID.n_scout) { try { const gm = Wp.buildGun(G.WEAPON_BY_ID.n_scout, {}, true).group; G.PStatus.ghostWarm(gm); tmp.add(gm); } catch (e) { /* ignore */ } }
       Wp.vmScene.updateMatrixWorld(true);
-      CMP(r, Wp.vmScene, Wp.vmCam);
+      CMP(r, Wp.vmScene, Wp.vmCam); DRAW(Wp.vmScene, Wp.vmCam, true);
       uploadTextures(Wp.vmScene, r);
     } catch (e) { console.warn('warm viewmodel failed', e); }
     Wp.vmScene.remove(tmp);

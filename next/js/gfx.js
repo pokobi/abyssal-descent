@@ -6,6 +6,7 @@
 //  * rbox: a box with its edges rounded, cut to the size asked for (a unit box stretched to size cannot be rounded evenly).
 (function () {
   const X = G.GFX = {};
+  X.stats = { tex: 0, hand: 0, surf: 0 }; // (ms spent making things, for the record)
   // tileable noise (GLSL): every function takes a period, so a texture built from them repeats without a seam
   X.NOISE = /* glsl */`
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -50,37 +51,56 @@ void ashlar(vec2 uv, float rows, float colsBase, float seed, out float d, out fl
 vec3 S(vec3 c){ return pow(max(c, 0.), vec3(2.2)); }   // a colour thought of as on the screen, to linear
 `;
   const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }';
-  const FS = (body) => `precision highp float; varying vec2 vUv; uniform int mode; uniform float texel; uniform float nStr; uniform float aoStr;
+  const FS = (body) => `precision highp float; varying vec2 vUv; uniform int mode;
 ${X.NOISE}
 ${body}
+void main(){ float h, r, m; vec3 c; mat(vUv, h, c, r, m); if (mode == 0) gl_FragColor = vec4(c, 1.); else gl_FragColor = vec4(h, r, m, 1.); }`;
+  // from the height (r of tH; g roughness, b metalness): the normal, or occlusion / roughness / metalness
+  const FS2 = `precision highp float; varying vec2 vUv; uniform sampler2D tH; uniform int mode; uniform float texel; uniform float nStr; uniform float aoStr;
 void main(){
-  float h, r, m; vec3 c; mat(vUv, h, c, r, m);
-  if (mode == 0) { gl_FragColor = vec4(c, 1.); return; }
-  float h2, r2, m2; vec3 c2;
-  if (mode == 1) {
-    float hx, hy, hx0, hy0;
-    mat(vUv + vec2(texel, 0.), hx, c2, r2, m2); mat(vUv - vec2(texel, 0.), hx0, c2, r2, m2);
-    mat(vUv + vec2(0., texel), hy, c2, r2, m2); mat(vUv - vec2(0., texel), hy0, c2, r2, m2);
+  vec4 s = texture2D(tH, vUv); float h = s.r;
+  if (mode == 0) {
+    float hx = texture2D(tH, vUv + vec2(texel, 0.)).r, hx0 = texture2D(tH, vUv - vec2(texel, 0.)).r, hy = texture2D(tH, vUv + vec2(0., texel)).r, hy0 = texture2D(tH, vUv - vec2(0., texel)).r;
     vec3 n = normalize(vec3((hx0 - hx) * nStr, (hy0 - hy) * nStr, 1.));
     gl_FragColor = vec4(n * .5 + .5, 1.); return;
   }
   float acc = 0.;
-  for (int i = 0; i < 12; i++) { float a = float(i) * 2.399963, rr = texel * (2. + float(i) * 1.6); mat(vUv + vec2(cos(a), sin(a)) * rr, h2, c2, r2, m2); acc += max(0., h2 - h); }
-  gl_FragColor = vec4(clamp(1. - acc / 12. * aoStr, 0., 1.), clamp(r, 0.03, 1.), clamp(m, 0., 1.), 1.);
+  for (int i = 0; i < 12; i++) { float a = float(i) * 2.399963, rr = texel * (2. + float(i) * 1.6); acc += max(0., texture2D(tH, vUv + vec2(cos(a), sin(a)) * rr).r - h); }
+  gl_FragColor = vec4(clamp(1. - acc / 12. * aoStr, 0., 1.), clamp(s.g, 0.03, 1.), clamp(s.b, 0., 1.), 1.);
 }`;
-  let quad, cam, scene;
+  let quad, cam, scene, mat2;
+  const surfMat = (body) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS(body), depthTest: false, depthWrite: false, uniforms: { mode: { value: 0 } } });
+  function ready() {
+    if (quad) return;
+    cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1); scene = new THREE.Scene(); quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); quad.frustumCulled = false; scene.add(quad);
+    mat2 = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS2, depthTest: false, depthWrite: false, uniforms: { tH: { value: null }, mode: { value: 0 }, texel: { value: 1 }, nStr: { value: 1 }, aoStr: { value: 3 } } });
+  }
+  // start the making of every surface's program at once: the driver builds them side by side while the first ones are being used
+  // (one after another they took four seconds; this way, about one)
+  const pending = {};
+  X.kick = function (renderer) {
+    ready();
+    const tmp = new THREE.Scene(), add = (m) => { const q = new THREE.Mesh(quad.geometry, m); q.frustumCulled = false; tmp.add(q); };
+    for (const k in SRC) add(pending['w:' + k] = surfMat(SRC[k][1]));
+    if (X.EXSRC) for (const k in X.EXSRC) add(pending['x:' + k] = surfMat(X.EXSRC[k][2]));
+    add(mat2);
+    try { renderer.compile(tmp, cam); } catch (e) { /* (each is then made when first used) */ }
+  };
+  X.pendingMat = (key) => { const m = pending[key]; delete pending[key]; return m; };
   // bake one surface: three square targets (colour in sRGB, normal, occlusion / roughness / metalness)
   X.bake = function (renderer, px, body, o) {
-    o = o || {};
-    if (!quad) { cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1); scene = new THREE.Scene(); quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); quad.frustumCulled = false; scene.add(quad); }
-    const mat = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS(body), depthTest: false, depthWrite: false,
-      uniforms: { mode: { value: 0 }, texel: { value: 1 / px }, nStr: { value: (o.normal === undefined ? 1 : o.normal) * px / 64 }, aoStr: { value: o.ao === undefined ? 3 : o.ao } } });
-    quad.material = mat;
+    o = o || {}; ready();
+    const mat = o.mat || surfMat(body);
     const rt = (srgb) => { const t = new THREE.WebGLRenderTarget(px, px, { depthBuffer: false }); if (srgb) t.texture.colorSpace = THREE.SRGBColorSpace; return t; };
+    const hgt = new THREE.WebGLRenderTarget(px, px, { depthBuffer: false, type: THREE.HalfFloatType, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     const out = [rt(true), rt(false), rt(false)], prev = renderer.getRenderTarget(), ac = renderer.autoClear;
     renderer.autoClear = true;
-    for (let i = 0; i < 3; i++) { mat.uniforms.mode.value = i; renderer.setRenderTarget(out[i]); renderer.render(scene, cam); }
-    renderer.setRenderTarget(prev); renderer.autoClear = ac; mat.dispose();
+    quad.material = mat; mat.uniforms.mode.value = 0; renderer.setRenderTarget(out[0]); renderer.render(scene, cam);
+    mat.uniforms.mode.value = 1; renderer.setRenderTarget(hgt); renderer.render(scene, cam);
+    quad.material = mat2; const u = mat2.uniforms; u.tH.value = hgt.texture; u.texel.value = 1 / px; u.nStr.value = (o.normal === undefined ? 1 : o.normal) * px / 64; u.aoStr.value = o.ao === undefined ? 3 : o.ao;
+    u.mode.value = 0; renderer.setRenderTarget(out[1]); renderer.render(scene, cam);
+    u.mode.value = 1; renderer.setRenderTarget(out[2]); renderer.render(scene, cam);
+    renderer.setRenderTarget(prev); renderer.autoClear = ac; mat.dispose(); hgt.dispose();
     return out;
   };
 
@@ -268,11 +288,13 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // bake the lot and write each into the texture objects textures.js made (same objects: whatever already points at them follows)
   X.upgradeTextures = function (renderer, px) {
     const T = G.Tex; if (!T || !T.tex || !renderer) return false;
+    const t0 = performance.now();
     try {
+      X.kick(renderer);
       for (const k in SRC) {
         const t = T.tex[k]; if (!t || !t.map) continue;
         const small = k === 'metal' || k === 'cloth' || k === 'skin' || k === 'scales', size = small ? Math.max(256, px >> 1) : px;
-        const rts = X.bake(renderer, size, SRC[k][1], { normal: SRC[k][0], ao: 3 }), bufs = [];
+        const rts = X.bake(renderer, size, SRC[k][1], { normal: SRC[k][0], ao: 3, mat: pending['w:' + k] }), bufs = []; delete pending['w:' + k];
         for (let i = 0; i < 3; i++) { const b = new Uint8Array(size * size * 4); renderer.readRenderTargetPixels(rts[i], 0, 0, size, size, b); bufs.push(b); rts[i].dispose(); }
         const put = (tex, data) => { tex.dispose(); tex.image = { data, width: size, height: size }; tex.needsUpdate = true; };
         put(t.map, bufs[0]); put(t.normalMap, bufs[1]);
@@ -280,7 +302,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         o.wrapS = o.wrapT = THREE.RepeatWrapping; o.magFilter = THREE.LinearFilter; o.minFilter = THREE.LinearMipmapLinearFilter; o.generateMipmaps = true; o.anisotropy = t.map.anisotropy || 8; o.needsUpdate = true;
         t.orm = o;
       }
-      X.upgraded = true;
+      X.upgraded = true; X.stats.tex = Math.round(performance.now() - t0);
     } catch (e) { console.warn('gfx: textures kept as they were', e); return false; }
     return true;
   };
@@ -319,4 +341,182 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     return g;
   };
   X.rboxCount = () => cache.size;
+})();
+// ---- rounded, organic shapes: distance fields (smooth unions and cuts of simple solids) turned into a mesh by surface nets, with
+// normals taken from the field; the surfaces of what is held in the hands; the hands themselves ----
+(function () {
+  const X = G.GFX, S = X.S = {};
+  S.sph = (x, y, z, cx, cy, cz, r) => Math.hypot(x - cx, y - cy, z - cz) - r;
+  S.ell = (x, y, z, cx, cy, cz, rx, ry, rz) => { const a = (x - cx) / rx, b = (y - cy) / ry, c = (z - cz) / rz, k0 = Math.hypot(a, b, c), k1 = Math.hypot(a / rx, b / ry, c / rz); return k1 < 1e-9 ? -Math.min(rx, ry, rz) : k0 * (k0 - 1) / k1; };
+  S.cap = (x, y, z, ax, ay, az, bx, by, bz, r) => {
+    const px = x - ax, py = y - ay, pz = z - az, dx = bx - ax, dy = by - ay, dz = bz - az;
+    let h = (px * dx + py * dy + pz * dz) / (dx * dx + dy * dy + dz * dz || 1); h = h < 0 ? 0 : h > 1 ? 1 : h;
+    return Math.hypot(px - dx * h, py - dy * h, pz - dz * h) - r;
+  };
+  S.cone = (x, y, z, ax, ay, az, bx, by, bz, r1, r2) => {
+    const px = x - ax, py = y - ay, pz = z - az, dx = bx - ax, dy = by - ay, dz = bz - az;
+    let h = (px * dx + py * dy + pz * dz) / (dx * dx + dy * dy + dz * dz || 1); h = h < 0 ? 0 : h > 1 ? 1 : h;
+    return Math.hypot(px - dx * h, py - dy * h, pz - dz * h) - (r1 + (r2 - r1) * h);
+  };
+  S.box = (x, y, z, cx, cy, cz, hx, hy, hz, r) => {
+    const qx = Math.abs(x - cx) - hx + r, qy = Math.abs(y - cy) - hy + r, qz = Math.abs(z - cz) - hz + r;
+    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0) - r;
+  };
+  S.tor = (x, y, z, cx, cy, cz, nx, ny, nz, R, r) => { const px = x - cx, py = y - cy, pz = z - cz, h = px * nx + py * ny + pz * nz, q = Math.hypot(px - nx * h, py - ny * h, pz - nz * h) - R; return Math.hypot(q, h) - r; };
+  S.smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
+  S.smax = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.max(a, b) + h * h * k * 0.25; };
+  S.cut = (a, b, k) => S.smax(a, -b, k);
+  // a chain of tapering capsules through the points (a finger, a limb), its joints a little swollen
+  S.chain = (x, y, z, pts, r0, r1, k, knob) => {
+    let d = 1e9; const n = pts.length - 1;
+    for (let i = 0; i < n; i++) { const a = pts[i], b = pts[i + 1]; d = S.smin(d, S.cone(x, y, z, a[0], a[1], a[2], b[0], b[1], b[2], r0 + (r1 - r0) * i / n, r0 + (r1 - r0) * (i + 1) / n), k || 0.0035); }
+    if (knob) for (let i = 1; i < n; i++) { const a = pts[i]; d = S.smin(d, S.sph(x, y, z, a[0], a[1], a[2], (r0 + (r1 - r0) * i / n) * knob), 0.003); }
+    return d;
+  };
+  // fn(x, y, z) -> distance; b0 / b1: the box to look in; cell: the size of one step. Returns a geometry (position, normal, uv)
+  S.mesh = function (fn, b0, b1, cell) {
+    const nx = Math.ceil((b1[0] - b0[0]) / cell) + 1, ny = Math.ceil((b1[1] - b0[1]) / cell) + 1, nz = Math.ceil((b1[2] - b0[2]) / cell) + 1;
+    const val = new Float32Array(nx * ny * nz);
+    // (the field is asked only near the surface: far from it, some of the steps it says it is away are filled in unasked)
+    for (let k = 0, o = 0; k < nz; k++) for (let j = 0; j < ny; j++, o += nx) {
+      const y = b0[1] + j * cell, z = b0[2] + k * cell;
+      for (let i = 0; i < nx;) {
+        const v = fn(b0[0] + i * cell, y, z); val[o + i] = v; i++;
+        for (let sk = Math.floor((Math.abs(v) * 0.6 - cell * 2) / cell); sk > 0 && i < nx; sk--, i++) val[o + i] = v;
+      }
+    }
+    const cx = nx - 1, cy = ny - 1, cz = nz - 1, vid = new Int32Array(cx * cy * cz).fill(-1), pos = [], idx = [];
+    const at = (i, j, k) => val[(k * ny + j) * nx + i];
+    const EDG = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]], c = new Float32Array(8);
+    for (let k = 0; k < cz; k++) for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
+      let mask = 0;
+      for (let q = 0; q < 8; q++) { c[q] = at(i + (q & 1), j + ((q >> 1) & 1), k + ((q >> 2) & 1)); if (c[q] < 0) mask |= 1 << q; }
+      if (mask === 0 || mask === 255) continue;
+      let sx = 0, sy = 0, sz = 0, n = 0;
+      for (const [a, b] of EDG) {
+        if ((c[a] < 0) === (c[b] < 0)) continue;
+        const t = c[a] / (c[a] - c[b]);
+        sx += (a & 1) + ((b & 1) - (a & 1)) * t; sy += ((a >> 1) & 1) + (((b >> 1) & 1) - ((a >> 1) & 1)) * t; sz += ((a >> 2) & 1) + (((b >> 2) & 1) - ((a >> 2) & 1)) * t; n++;
+      }
+      vid[(k * cy + j) * cx + i] = pos.length / 3;
+      pos.push(b0[0] + (i + sx / n) * cell, b0[1] + (j + sy / n) * cell, b0[2] + (k + sz / n) * cell);
+    }
+    const V = (i, j, k) => vid[(k * cy + j) * cx + i];
+    const quad = (a, b, c2, d, flip) => { if (a < 0 || b < 0 || c2 < 0 || d < 0) return; if (!flip) idx.push(a, c2, b, a, d, c2); else idx.push(a, b, c2, a, c2, d); };
+    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const v0 = at(i, j, k);
+      if (i < cx && j > 0 && k > 0 && j < cy && k < cz) { const v1 = at(i + 1, j, k); if ((v0 < 0) !== (v1 < 0)) quad(V(i, j - 1, k - 1), V(i, j, k - 1), V(i, j, k), V(i, j - 1, k), v0 < 0); }
+      if (j < cy && i > 0 && k > 0 && i < cx && k < cz) { const v1 = at(i, j + 1, k); if ((v0 < 0) !== (v1 < 0)) quad(V(i - 1, j, k - 1), V(i, j, k - 1), V(i, j, k), V(i - 1, j, k), v0 >= 0); }
+      if (k < cz && i > 0 && j > 0 && i < cx && j < cy) { const v1 = at(i, j, k + 1); if ((v0 < 0) !== (v1 < 0)) quad(V(i - 1, j - 1, k), V(i, j - 1, k), V(i, j, k), V(i - 1, j, k), v0 < 0); }
+    }
+    const nor = new Float32Array(pos.length), uv = new Float32Array(pos.length / 3 * 2), e = cell * 0.5, sc = 1 / Math.max(b1[0] - b0[0], b1[1] - b0[1], b1[2] - b0[2]);
+    for (let i = 0, u = 0; i < pos.length; i += 3, u += 2) {
+      const x = pos[i], y = pos[i + 1], z = pos[i + 2];
+      let gx = fn(x + e, y, z) - fn(x - e, y, z), gy = fn(x, y + e, z) - fn(x, y - e, z), gz = fn(x, y, z + e) - fn(x, y, z - e);
+      const l = Math.hypot(gx, gy, gz) || 1; gx /= l; gy /= l; gz /= l; nor[i] = gx; nor[i + 1] = gy; nor[i + 2] = gz;
+      // (a plain wrap for the texture: laid on from the side the surface faces most)
+      const ax = Math.abs(gx), ay = Math.abs(gy), az = Math.abs(gz);
+      if (ax >= ay && ax >= az) { uv[u] = z * sc * 3; uv[u + 1] = y * sc * 3; } else if (ay >= az) { uv[u] = x * sc * 3; uv[u + 1] = z * sc * 3; } else { uv[u] = x * sc * 3; uv[u + 1] = y * sc * 3; }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx);
+    return g;
+  };
+
+  // ---- surfaces of what is held: pale, to be tinted by the material's colour ----
+  const EX = {
+    gunmetal: [512, 0.45, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 4., 1.), n2 = fbm(uv, 40., 2.), n3 = vnoise(uv * 96., 96., 3.), n4 = vnoise(uv * 48., 48., 9.);
+  float scr = smoothstep(.80, .93, ridge(uv, 5., 4.)) * smoothstep(.45, .7, fbm(uv, 3., 11.));
+  h = .5 + (n3 - .5) * .035 + (n4 - .5) * .03 - scr * .06;
+  col = S(vec3(.46 + (n1 - .5) * .12 + (n2 - .5) * .06) + scr * .3);
+  rough = .78 + (n2 - .5) * .22 + (n1 - .5) * .16 - scr * .3; metal = 0.;
+}`],
+    polymer: [512, 0.7, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  vec3 v = voro(uv, 56., 1.); float n1 = fbm(uv, 4., 2.), n2 = vnoise(uv * 200., 200., 5.);
+  h = .5 + (v.x - .45) * .17 + (n2 - .5) * .05;
+  col = S(vec3(.8 + (n1 - .5) * .16 + (v.z - .5) * .06));
+  rough = .9 + (n1 - .5) * .2 + (v.x - .4) * .12; metal = 0.;
+}`],
+    steel: [512, 0.4, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 4., 1.), n2 = fbm(uv, 48., 2.), br = vnA(vec2(uv.x * 8., uv.y * 400.), vec2(8., 400.), 3.);
+  h = .5 + (br - .5) * .16 + (n2 - .5) * .05;
+  col = S(vec3(.84 + (n1 - .5) * .14 + (br - .5) * .06));
+  rough = .8 + (br - .5) * .3 + (n1 - .5) * .2; metal = 0.;
+}`],
+    leather: [512, 0.9, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  vec3 v = voro(uv, 30., 1.); vec3 v2 = voro(uv, 90., 2.); float n1 = fbm(uv, 5., 2.);
+  float cr = smoothstep(.0, .06, v.y - v.x), cr2 = smoothstep(.0, .09, v2.y - v2.x);
+  h = .35 + cr * .4 + cr2 * .16 + (n1 - .5) * .1;
+  col = S(vec3(.72 + (n1 - .5) * .22) * (.74 + cr * .26));
+  rough = .86 + (n1 - .5) * .2 - cr * .1; metal = 0.;
+}`],
+    weave: [512, 1.0, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n = 40.; vec2 p = uv * n; float wa = sin(p.x * 6.2831853) * .5 + .5, we = sin(p.y * 6.2831853) * .5 + .5;
+  float over = step(.5, fract((floor(p.x) + floor(p.y)) * .5)), w = mix(wa, we, over);
+  float n1 = fbm(uv, 6., 2.), n2 = vnoise(uv * 160., 160., 5.), fold = fbm(uv, 3., 9.);
+  h = .4 + w * .32 + (n2 - .5) * .1 + (fold - .5) * .5;
+  col = S(vec3(.72 + (n1 - .5) * .2 + (w - .5) * .16));
+  rough = 1.; metal = 0.;
+}`],
+  };
+  const texCache = {};
+  X.EXSRC = EX;
+  // a surface by name: { map, normalMap, orm } (made at first asking; null where there is no GPU to make it)
+  X.tex = function (name) {
+    if (texCache[name] !== undefined) return texCache[name];
+    const src = EX[name], renderer = G.renderer; texCache[name] = null;
+    if (!src || !renderer) return null;
+    const t0 = performance.now();
+    try {
+      const size = src[0], rts = X.bake(renderer, size, src[2], { normal: src[1], ao: 2.5, mat: X.pendingMat('x:' + name) }), out = [];
+      for (let i = 0; i < 3; i++) {
+        const b = new Uint8Array(size * size * 4); renderer.readRenderTargetPixels(rts[i], 0, 0, size, size, b); rts[i].dispose();
+        const t = new THREE.DataTexture(b, size, size, THREE.RGBAFormat);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 8;
+        if (i === 0) t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; out.push(t);
+      }
+      texCache[name] = { map: out[0], normalMap: out[1], orm: out[2] }; X.stats.surf += Math.round(performance.now() - t0);
+    } catch (e) { console.warn('gfx: no surface', name, e); }
+    return texCache[name];
+  };
+
+  // ---- a gloved hand closed on a grip. The grip runs up through the origin; the palm lies on the +x side, the fingers come round the
+  // front (-z) to the other side, the first of them laid forward to the trigger, the thumb round the back. mirror: the other hand ----
+  function grip(x, y, z) {
+    let d = S.box(x, y, z, 0.027, -0.002, 0.004, 0.0105, 0.04, 0.026, 0.011);
+    d = S.smin(d, S.ell(x, y, z, 0.035, 0.0, 0.004, 0.011, 0.038, 0.03), 0.01);                       // back of the hand
+    d = S.smin(d, S.cap(x, y, z, 0.004, 0.034, 0.03, 0.024, 0.03, 0.022, 0.015), 0.012);            // the web between thumb and finger
+    d = S.smin(d, S.cap(x, y, z, 0.02, -0.04, 0.024, 0.028, -0.02, 0.018, 0.016), 0.012);           // heel
+    let f = 1e9; const ys = [0.01, -0.011, -0.031], rs = [0.0101, 0.0098, 0.0089];
+    for (let i = 0; i < 3; i++) { const yy = ys[i]; f = S.smin(f, S.chain(x, y, z, [[0.031, yy, -0.012], [0.019, yy, -0.034], [-0.008, yy, -0.0355], [-0.0235, yy + 0.001, -0.02], [-0.024, yy + 0.003, 0.0]], rs[i], rs[i] * 0.86, 0.0035, 1.08), 0.0022); }
+    f = S.smin(f, S.chain(x, y, z, [[0.031, 0.031, -0.01], [0.025, 0.034, -0.038], [0.013, 0.034, -0.058], [-0.002, 0.032, -0.064]], 0.0097, 0.0082, 0.0035, 1.08), 0.0022);   // first finger
+    d = S.smin(d, f, 0.009);
+    d = S.smin(d, S.chain(x, y, z, [[0.015, 0.03, 0.033], [-0.01, 0.041, 0.026], [-0.0235, 0.044, 0.006], [-0.0245, 0.044, -0.019]], 0.0125, 0.0096, 0.0035, 1.08), 0.009);   // thumb
+    d = S.smin(d, S.cone(x, y, z, 0.03, -0.03, 0.028, 0.046, -0.066, 0.08, 0.027, 0.031), 0.012);    // wrist
+    return d;
+  }
+  // the hard pad over the knuckles and the strap at the wrist: the same shape grown a little and cut to a region
+  const pad = (x, y, z) => S.smax(grip(x, y, z) - 0.0018, S.box(x, y, z, 0.043, 0.0, 0.004, 0.012, 0.024, 0.022, 0.006), 0.002);
+  const strap = (x, y, z) => { const t = ((x - 0.03) * 0.016 + (y + 0.03) * -0.036 + (z - 0.028) * 0.052) / 0.0653; return S.smax(grip(x, y, z) - 0.0016, Math.abs(t - 0.036) - 0.01, 0.0015); };
+  const handCache = {};
+  // the same shape seen in a mirror (x turned over, and with it the way each face winds)
+  function mirror(g) {
+    const m = g.clone(), p = m.attributes.position, n = m.attributes.normal, ix = m.index;
+    for (let i = 0; i < p.count; i++) { p.setX(i, -p.getX(i)); n.setX(i, -n.getX(i)); }
+    for (let i = 0; i < ix.count; i += 3) { const a = ix.getX(i + 1); ix.setX(i + 1, ix.getX(i + 2)); ix.setX(i + 2, a); }
+    return m;
+  }
+  // { hand, pad, strap }: geometries of one hand (right: as described; left: its mirror)
+  X.hand = function (right) {
+    const k = right ? 'r' : 'l'; if (handCache[k]) return handCache[k];
+    if (!right) { const r = X.hand(true); return (handCache.l = { hand: mirror(r.hand), pad: mirror(r.pad), strap: mirror(r.strap) }); }
+    const mk = (fn, b0, b1, cell) => { const t0 = performance.now(), g = S.mesh(fn, b0, b1, cell); X.stats.hand += Math.round(performance.now() - t0); return g; };
+    return (handCache.r = { hand: mk(grip, [-0.04, -0.105, -0.08], [0.085, 0.065, 0.12], 0.0023), pad: mk(pad, [0.028, -0.03, -0.024], [0.062, 0.03, 0.032], 0.0017), strap: mk(strap, [-0.005, -0.085, 0.02], [0.085, -0.01, 0.1], 0.0021) });
+  };
 })();

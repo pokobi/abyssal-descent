@@ -145,14 +145,16 @@
     W.getModel = () => model;
     const t = G.Tex.tex;
     const mk = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 2.2; return m; };
+    // (the finer surfaces of gfx.js where there is a GPU to make them: colour, normal, and occlusion / roughness in one)
+    const sx = (name) => { const s = G.GFX && G.GFX.tex ? G.GFX.tex(name) : null; return s ? { map: s.map, normalMap: s.normalMap, roughnessMap: s.orm, aoMap: s.orm } : null; };
     mats = {
-      gun: mk({ color: 0x4a4d54, metalness: 0.45, roughness: 0.42, normalMap: t.metal.normalMap, map: t.metal.map }),
-      steel: mk({ color: 0x9a9da3, metalness: 0.7, roughness: 0.3, normalMap: t.metal.normalMap }),
-      poly: mk({ color: 0x2a2b2e, metalness: 0.05, roughness: 0.72, normalMap: t.skin.normalMap }),
+      gun: mk(Object.assign({ color: 0x4a4d54, metalness: 0.5, roughness: 0.6 }, sx('gunmetal') || { roughness: 0.42, metalness: 0.45, normalMap: t.metal.normalMap, map: t.metal.map })),
+      steel: mk(Object.assign({ color: 0x9a9da3, metalness: 0.7, roughness: 0.4 }, sx('steel') || { roughness: 0.3, normalMap: t.metal.normalMap })),
+      poly: mk(Object.assign({ color: 0x2a2b2e, metalness: 0.05, roughness: 0.8 }, sx('polymer') || { roughness: 0.72, normalMap: t.skin.normalMap })),
       wood: mk({ color: 0x8a5a34, metalness: 0, roughness: 0.55, map: t.planks.map, normalMap: t.planks.normalMap }),
       brass: mk({ color: 0xc89a50, metalness: 1, roughness: 0.3 }),
-      glove: mk({ color: 0x2a221c, metalness: 0, roughness: 0.85, normalMap: t.skin.normalMap }),
-      sleeve: mk({ color: 0x3a3a34, metalness: 0, roughness: 0.95, map: t.cloth.map, normalMap: t.cloth.normalMap }),
+      glove: mk(Object.assign({ color: 0x5a4532, metalness: 0, roughness: 0.95 }, sx('leather') || { color: 0x2a221c, roughness: 0.85, normalMap: t.skin.normalMap })),
+      sleeve: mk(Object.assign({ color: 0x5c5c50, metalness: 0, roughness: 1 }, sx('weave') || { color: 0x3a3a34, roughness: 0.95, map: t.cloth.map, normalMap: t.cloth.normalMap })),
       lens: mk({ color: 0x8aa0b0, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.08, depthWrite: false }),
       glow: new THREE.MeshBasicMaterial({ color: 0xff3020 }),
       coil: mk({ color: 0xb08040, metalness: 1, roughness: 0.35, emissive: 0x302010 }),
@@ -189,7 +191,8 @@
     }
     const woodOr = isLeg ? poly : (def.finish === 'wood' || def.arch === 'shotgun' || def.arch === 'crossbow' || def.arch === 'dmr' ? mats.wood : poly);
     const PG = G.Props.PG;
-    const box = (w, h, d, x, y, z, m, rx, ry, rz, parent) => { const o = new THREE.Mesh(PG.box, m || metal); o.scale.set(w, h, d); o.position.set(x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); (parent || g).add(o); return o; };
+    // (a part is a box cut to its size with its edges rounded a little: light catches the edges, as on a thing that was machined)
+    const box = (w, h, d, x, y, z, m, rx, ry, rz, parent) => { const rg = G.GFX ? G.GFX.rbox(w, h, d, Math.min(0.0035, Math.min(Math.abs(w), Math.abs(h), Math.abs(d)) * 0.2)) : null; const o = new THREE.Mesh(rg || PG.box, m || metal); if (!rg) o.scale.set(w, h, d); o.position.set(x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); (parent || g).add(o); return o; };
     const cyl = (r, len, x, y, z, m, seg, parent) => { const o = new THREE.Mesh(seg === 8 ? PG.cyl8 : PG.cyl, m || metal); o.scale.set(r, len, r); o.rotation.x = Math.PI / 2; o.position.set(x, y, z); (parent || g).add(o); return o; };
     const M = { muzzle: V(0, 0.03, -0.4), sightY: 0.08, mag: null, bolt: null, fore: V(0, -0.02, -0.25), grip: V(0, -0.05, 0.06), ejector: V(0.03, 0.05, 0), opticY: 0.075, opticZ: 0, railY: 0.07, ironY: 0.08, extra: [] };
     let barrels = null;
@@ -770,9 +773,14 @@
     if (showHands !== false) {
       const hand = (p, right) => {
         const hg = new THREE.Group(); hg.position.copy(p);
-        const palm = new THREE.Mesh(PG.box, mats.glove); palm.scale.set(0.05, 0.075, 0.075); hg.add(palm);
-        const fing = new THREE.Mesh(PG.box, mats.glove); fing.scale.set(0.055, 0.035, 0.06); fing.position.set(right ? -0.022 : 0.022, 0.0, -0.01); hg.add(fing);
-        const thumb = new THREE.Mesh(PG.box, mats.glove); thumb.scale.set(0.02, 0.02, 0.05); thumb.position.set(right ? 0.02 : -0.02, 0.035, -0.02); thumb.rotation.y = right ? -0.3 : 0.3; hg.add(thumb);
+        // (a gloved hand closed on the grip, one rounded shape with a pad over the knuckles and a strap at the wrist: gfx.js)
+        const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right) : null;
+        if (hs) { hg.add(new THREE.Mesh(hs.hand, mats.glove), new THREE.Mesh(hs.pad, mats.poly), new THREE.Mesh(hs.strap, mats.sleeve)); }
+        else {
+          const palm = new THREE.Mesh(PG.box, mats.glove); palm.scale.set(0.05, 0.075, 0.075); hg.add(palm);
+          const fing = new THREE.Mesh(PG.box, mats.glove); fing.scale.set(0.055, 0.035, 0.06); fing.position.set(right ? -0.022 : 0.022, 0.0, -0.01); hg.add(fing);
+          const thumb = new THREE.Mesh(PG.box, mats.glove); thumb.scale.set(0.02, 0.02, 0.05); thumb.position.set(right ? 0.02 : -0.02, 0.035, -0.02); thumb.rotation.y = right ? -0.3 : 0.3; hg.add(thumb);
+        }
         const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.038, 0.42, 0.038); arm.rotation.x = Math.PI / 2 - 0.35; arm.rotation.z = right ? 0.25 : -0.45; arm.position.set(right ? 0.06 : -0.08, -0.08, 0.2); hg.add(arm);
         const cuff = new THREE.Mesh(PG.cyl8, mats.glove); cuff.scale.set(0.034, 0.05, 0.034); cuff.rotation.x = Math.PI / 2 - 0.35; cuff.rotation.z = right ? 0.25 : -0.45; cuff.position.set(right ? 0.012 : -0.012, -0.015, 0.035); hg.add(cuff);
         g.add(hg);

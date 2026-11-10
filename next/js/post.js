@@ -98,6 +98,7 @@ void main(){
 }`;
 
   const Post = G.Post = { active: false, ao: true, bloom: true, msaa: 4, set: { aoAmt: 0.75, aoRadius: 0.75, aoStrength: 1, bloomAmt: 0.06, thresh: 1.15, grade: 1, gain: 1.2 } };
+  Post.stats = { n: 0, ms: 0 }; // (warm draws: how many, how long)
   let R = null, quad, cam, scn, rtScene, rtGun, rtAO, rtAO2, rtPip, pipSize = 0, mips = [], W = 0, H = 0, curMsaa = -1;
   const mk = (fs, u) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: fs, uniforms: u, depthTest: false, depthWrite: false });
   let mAO, mBlur, mPre, mDown, mUp, mFin, mPip;
@@ -139,6 +140,20 @@ void main(){
     if (!Post.active || !rtScene) return fn();
     const prev = R.getRenderTarget(); R.setRenderTarget(rtScene);
     try { return fn(); } finally { R.setRenderTarget(prev); }
+  };
+  // Draw a scene once into the frame's own kind of target, everything in it whether in view or not, a few pixels wide. Making a shader
+  // (compile) is not the whole of it on some drivers: the first DRAW into a target of another kind (many samples, a wide range of
+  // brightness) builds the shader again for that target, and the frame waited a third of a second on a blast's first ring.
+  Post.drawWarm = function (sc, cam, held) {
+    if (!Post.active || !rtScene || !sc || !cam) return;
+    const t0 = performance.now();
+    const rt = held ? rtGun : rtScene, vp = rt.viewport.clone(), sci = rt.scissor.clone(), list = [], prev = R.getRenderTarget();
+    rt.viewport.set(0, 0, 8, 8); rt.scissor.set(0, 0, 8, 8);
+    sc.traverse((o) => { if (o.frustumCulled) { o.frustumCulled = false; list.push(o); } });
+    try { R.setRenderTarget(rt); R.render(sc, cam); } catch (e) { /* (the frame will make what it needs itself) */ }
+    for (const o of list) o.frustumCulled = true;
+    rt.viewport.copy(vp); rt.scissor.copy(sci); R.setRenderTarget(prev);
+    Post.stats.n++; Post.stats.ms += Math.round(performance.now() - t0);
   };
   // draw every pass once (behind the loading screen), so none of them compiles in the middle of play
   Post.warm = function () {

@@ -56,7 +56,7 @@
 
   // ---------------- model builders ----------------
   function mesh(parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) {
-    const m = new THREE.Mesh(geo, mat); m.scale.set(sx, sy, sz); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0);
+    const m = new THREE.Mesh((geo === PG.box && PG.rbox) || geo, mat); m.scale.set(sx, sy, sz); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); // (a body's boxes have their edges softened)
     m.castShadow = true; parent.add(m); return m;
   }
   function joint(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; }

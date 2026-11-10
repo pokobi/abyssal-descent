@@ -58,6 +58,8 @@
       PG.boneEnds = Ge.merge(ends);
     }
     for (const k in PG) PG[k].userData.shared = true;
+    // (the carved statues take a moment each to cut, gfx.js: one a frame behind the title, before a world asks for them)
+    if (G.GFX && G.GFX.propGeo && typeof setTimeout === 'function') { const names = ['statue0', 'statue1', 'statue2', 'statue3'], step = () => { const n = names.shift(); if (!n) return; try { G.GFX.propGeo(n); } catch (e) { /* made when asked for */ } setTimeout(step, 30); }; setTimeout(step, 300); }
   };
   P.PG = PG;
   // Many of one thing (the skulls of an ossuary, the ends of its bones): each kind is drawn as instances of one shape, by stretches of the
@@ -83,26 +85,30 @@
     }
   };
   const rr = (rng, a, b) => rng ? rng.range(a, b) : a + Math.random() * (b - a);
+  // a number from 0 to 1 by where a thing stands (which of its kinds, how it is turned): the dice of the level are not thrown for looks
+  const hsh = (x, z, k) => { const v = Math.sin(x * 12.9898 + z * 78.233 + (k || 0) * 37.719) * 43758.5453; return v - Math.floor(v); };
+  // a thing shaped in gfx.js (propGeo: parts by material) set down in the world's own mesh: turned by ry, sized by s (o.sy: its height
+  // apart; o.rx, o.rz: leaning; o.inst: drawn as instances - for what there is much of)
+  function put(w, name, x, y, z, ry, s, o) {
+    const parts = G.GFX && G.GFX.propGeo ? G.GFX.propGeo(name) : null; if (!parts) return false;
+    o = o || {}; s = s || 1;
+    const m = M(x, y, z, o.sx || s, o.sy || s, o.sz || o.sx || s, o.rx || 0, ry || 0, o.rz || 0);
+    for (const q of parts) { if (o.inst) P.inst(w, q.m, q.g, m, o.tint || q.tint); else w.batch.geo(q.m, q.g, m, { tint: o.tint || q.tint || undefined, su: o.su, sv: o.sv, gradBase: o.gradBase }); }
+    return true;
+  }
+  P.put = put; P.hsh = hsh;
 
   // ---------- light fixtures ----------
   // wall torch. dir: outward normal from wall ('px','nx','pz','nz')
   P.torch = function (w, x, y, z, dir) {
     const d = { px: [1, 0], nx: [-1, 0], pz: [0, 1], nz: [0, -1] }[dir];
     const ry = Math.atan2(d[0], d[1]);
-    w.batch.geo('iron', PG.cbox, M(x, y, z, 0.16, 0.3, 0.06, 0, ry, 0)); // wall plate
-    w.batch.geo('iron', PG.cbox, M(x + d[0] * 0.15, y - 0.05, z + d[1] * 0.15, 0.05, 0.05, 0.3, 0, ry, 0)); // arm
-    w.batch.geo('iron', PG.torus, M(x + d[0] * 0.3, y + 0.05, z + d[1] * 0.3, 0.09, 0.09, 0.09, Math.PI / 2, 0, 0));
-    w.batch.geo('woodDark', PG.cyl8, M(x + d[0] * 0.3, y + 0.15, z + d[1] * 0.3, 0.045, 0.5, 0.045, d[1] * 0.25, 0, -d[0] * 0.25));
-    w.batch.geo('dark', PG.cyl8, M(x + d[0] * 0.36, y + 0.42, z + d[1] * 0.36, 0.07, 0.12, 0.07), { tint: [0.15, 0.1, 0.08] });
+    put(w, 'sconce', x, y, z, ry);   // (a plate nailed to the wall, a bent arm, a ring with claws, a brand wound with pitched rag: gfx.js)
     w.addLight(x + d[0] * 0.38, y + 0.5, z + d[1] * 0.38, { flame: 1 });
   };
   P.brazier = function (w, x, y, z, s, collide) {
     s = s || 1;
-    w.batch.geo('trim', PG.oct, M(x, y + 0.35 * s, z, 0.32 * s, 0.7 * s, 0.32 * s), { gradBase: y });
-    w.batch.geo('trim', PG.oct, M(x, y + 0.06 * s, z, 0.42 * s, 0.12 * s, 0.42 * s));
-    w.batch.geo('iron', PG.bowl, M(x, y + 0.7 * s, z, s, s, s));
-    w.batch.geo('dark', PG.dode, M(x, y + 0.9 * s, z, 0.35 * s, 0.12 * s, 0.35 * s), { tint: [0.3, 0.12, 0.05] });
-    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; w.batch.geo('iron', PG.cbox, M(x + Math.cos(a) * 0.5 * s, y + 0.95 * s, z + Math.sin(a) * 0.5 * s, 0.06 * s, 0.25 * s, 0.06 * s)); }
+    put(w, 'brazier', x, y, z, hsh(x, z) * 2, s);   // (three legs of wrought iron, a basket of bars, coals: gfx.js)
     if (collide !== false) w.addCollider(x - 0.42 * s, y, z - 0.42 * s, x + 0.42 * s, y + 1.05 * s, z + 0.42 * s, { surf: 'metal' });
     w.addLight(x, y + 1.0 * s, z, { flame: 2.2 * s, intensity: 16 * s, range: 16 * s, prio: 1.4 });
   };
@@ -110,21 +116,19 @@
     const n = 3 + Math.floor(rr(rng, 0, 4));
     for (let i = 0; i < n; i++) {
       const ox = rr(rng, -0.25, 0.25), oz = rr(rng, -0.25, 0.25), h = rr(rng, 0.12, 0.35);
-      w.batch.geo('candle', PG.cyl8, M(x + ox, y + h / 2, z + oz, 0.035, h, 0.035));
+      put(w, 'candle', x + ox, y + h / 2, z + oz, hsh(x + ox, z + oz) * 6.28, 0.035, { sy: h, inst: true });
       if (i === 0 && light !== false) w.addLight(x + ox, y + h + 0.05, z + oz, { flame: 0.35, intensity: 2.5, range: 5, prio: 0.5 });
       else w.lightSources.push({ pos: new THREE.Vector3(x + ox, y + h + 0.05, z + oz), color: '#ffb060', intensity: 0, range: 0, flame: 0.3, emit: true, noLight: true, ph: Math.random() * 99, prio: 0.0001 });
     }
   };
   P.chandelier = function (w, x, y, z, top) {
-    w.batch.geo('iron', PG.torus, M(x, y, z, 1.1, 1.1, 1.1, Math.PI / 2, 0, 0));
-    w.batch.geo('iron', PG.torus, M(x, y + 0.02, z, 0.6, 0.6, 0.6, Math.PI / 2, 0, 0));
-    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; w.batch.geo('iron', PG.cbox, M(x + Math.cos(a) * 0.55, y + 0.6, z + Math.sin(a) * 0.55, 0.03, 1.3, 0.03, Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7)); }
+    put(w, 'chandelier', x, y, z, 0);   // (a ring hung by rods from a boss, a lesser ring, pans with prickets: gfx.js)
     // chain to ceiling
     const len = top - y - 1.2;
     if (len > 0) P.chain(w, x, y + 1.2, z, len);
     for (let i = 0; i < 8; i++) {
       const a = i / 8 * Math.PI * 2;
-      w.batch.geo('candle', PG.cyl8, M(x + Math.cos(a) * 1.1, y + 0.15, z + Math.sin(a) * 1.1, 0.04, 0.25, 0.04));
+      put(w, 'candle', x + Math.cos(a) * 1.1, y + 0.15 + (i % 3) * 0.015, z + Math.sin(a) * 1.1, a * 3, 0.036, { sy: 0.22 + (i % 3) * 0.035 });
       if (i % 4 === 0) w.addLight(x + Math.cos(a) * 1.1, y + 0.35, z + Math.sin(a) * 1.1, { flame: 0.4, intensity: 10, range: 14, prio: 1.2 });
       else w.lightSources.push({ pos: new THREE.Vector3(x + Math.cos(a) * 1.1, y + 0.35, z + Math.sin(a) * 1.1), color: '#ffb060', intensity: 0, range: 0, flame: 0.35, emit: true, noLight: true, ph: Math.random() * 99, prio: 0.0001 });
     }
@@ -149,14 +153,14 @@
     const b = r + 0.18;
     const top = broken ? y0 + h * rr(rng, 0.3, 0.7) : y0 + h;
     w.solid('trim', x - b, y0, z - b, x + b, y0 + 0.4, z + b);
-    w.batch.geo('trim', PG.oct, M(x, y0 + 0.47, z, b - 0.04, 0.14, b - 0.04));
+    put(w, 'colbase', x, y0 + 0.48, z, 0, r * 1.02, { sy: 0.17, su: 3, sv: 0.3 });
     const sh = top - (broken ? 0 : 0.5) - (y0 + 0.54);
     // octagonal shaft whose apothem == collider half-size (no invisible margin on the flats)
     const R = r / Math.cos(Math.PI / 8);
-    w.batch.geo('trim', PG.oct, M(x, y0 + 0.54 + sh / 2, z, R, sh, R), { su: 2, sv: sh / 2, gradBase: y0 });
+    put(w, 'shaft', x, y0 + 0.54 + sh / 2, z, hsh(x, z) * 0.4, r, { sy: sh, su: 3, sv: sh / 1.4, gradBase: y0 });   // (a fluted shaft, swelling a little below its middle)
     w.addCollider(x - r, y0 + 0.4, z - r, x + r, top, z + r);
     if (!broken) {
-      w.batch.geo('trim', PG.oct, M(x, top - 0.43, z, b - 0.06, 0.14, b - 0.06));
+      put(w, 'colcap', x, top - 0.445, z, 0, r, { sy: 0.18, su: 3, sv: 0.3 });
       w.solid('trim', x - b, top - 0.36, z - b, x + b, top, z + b);
     } else {
       // jagged top + rubble at base
@@ -214,23 +218,8 @@
     w.solid('block', x - 0.85 * s, y + 0.5 * s, z - 0.85 * s, x + 0.85 * s, y + 1.6 * s, z + 0.85 * s, { uv: 1.5 });
     w.solid('trim', x - 0.95 * s, y + 1.6 * s, z - 0.95 * s, x + 0.95 * s, y + 1.8 * s, z + 0.95 * s);
     const b = y + 1.8 * s;
-    const mk = 'trim';
-    const add = (geo, lx, ly, lz, sx, sy, sz, rx, rz, ory) => {
-      const c = Math.cos(ry), sn = Math.sin(ry);
-      w.batch.geo(mk, geo, M(x + (lx * c + lz * sn) * s, b + ly * s, z + (-lx * sn + lz * c) * s, sx * s, sy * s, sz * s, rx || 0, ry + (ory || 0), rz || 0), { tint: [0.95, 0.95, 0.92] });
-    };
-    // armored knight leaning on a greatsword
-    add(PG.cbox, -0.18, 0.45, 0, 0.22, 0.9, 0.26); add(PG.cbox, 0.18, 0.45, 0, 0.22, 0.9, 0.26); // legs
-    add(PG.cbox, 0, 1.25, 0, 0.62, 0.75, 0.36); // torso
-    add(PG.cbox, 0, 0.92, 0.0, 0.7, 0.22, 0.42); // belt/skirt
-    add(PG.sph, -0.38, 1.55, 0, 0.17, 0.15, 0.2); add(PG.sph, 0.38, 1.55, 0, 0.17, 0.15, 0.2); // pauldrons
-    add(PG.cbox, 0, 1.82, 0, 0.26, 0.3, 0.28); // helm
-    add(PG.cbox, 0, 1.98, 0, 0.06, 0.12, 0.28); // crest
-    add(PG.cbox, -0.36, 1.2, 0.12, 0.13, 0.55, 0.13, -0.4); add(PG.cbox, 0.36, 1.2, 0.12, 0.13, 0.55, 0.13, -0.4); // arms
-    add(PG.cbox, 0, 0.75, 0.32, 0.08, 1.5, 0.03); // blade
-    add(PG.cbox, 0, 1.5, 0.32, 0.45, 0.06, 0.06); // crossguard
-    add(PG.cbox, 0, 1.65, 0.32, 0.05, 0.25, 0.05);
-    add(PG.cbox, 0, 1.2, -0.22, 0.75, 1.1, 0.05, 0.05); // cape
+    // (carved figures, gfx.js: a knight on his sword, a mourner in a hood, an angel of the graveyard, a knight broken off at the neck)
+    put(w, 'statue' + [0, 1, 2, 0, 1, 3, 2][Math.floor(hsh(x, z) * 7)], x, b, z, ry, s * 1.2);
     w.addCollider(x - 0.45 * s, b, z - 0.45 * s, x + 0.45 * s, b + 2.1 * s, z + 0.45 * s);
     if (rng && rng.chance(0.4)) { const bc = rng.chance(0.5); P.candles(w, x + 0.6 * s, y + 0.5 * s, z + 0.95 * s, rng, bc); }
   };
@@ -351,9 +340,8 @@
   };
   P.gravestone = function (w, x, z, y, ry, rng) {
     const t = rng ? rng.int(0, 2) : 0;
-    if (t === 0) w.batch.geo('block', PG.cbox, M(x, y + 0.5, z, 0.7, 1.0, 0.18, rr(rng, -0.1, 0.1), ry, rr(rng, -0.1, 0.1)), { su: 0.5, sv: 0.5 });
-    else if (t === 1) { w.batch.geo('block', PG.cbox, M(x, y + 0.6, z, 0.16, 1.2, 0.16, 0, ry, 0)); w.batch.geo('block', PG.cbox, M(x, y + 0.85, z, 0.7, 0.16, 0.16, 0, ry, 0)); }
-    else { w.batch.geo('trim', PG.cbox, M(x, y + 0.35, z, 0.6, 0.7, 0.25, 0, ry, 0)); w.batch.geo('trim', PG.cyl, M(x, y + 0.7, z, 0.3, 0.25, 0.3, Math.PI / 2, ry, 0)); }
+    const lx = t === 0 ? rr(rng, -0.1, 0.1) : (hsh(x, z, 1) - 0.5) * 0.14, lz = t === 0 ? rr(rng, -0.1, 0.1) : (hsh(x, z, 2) - 0.5) * 0.14;   // (they lean, each its own way)
+    put(w, 'grave' + t, x, y - 0.03, z, ry, 0.9 + hsh(x, z, 3) * 0.25, { rx: lx, rz: lz });
     w.addCollider(x - 0.38, y, z - 0.38, x + 0.38, y + 1.0, z + 0.38);
   };
   // a floating text label (no physical board): a soft translucent plate with glowing text, readable from both sides

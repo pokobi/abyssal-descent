@@ -1650,6 +1650,147 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   ];
   X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
 
+  // ---- the furniture of the halls (props.js), in metres, standing on the origin and looking to +z: lists of parts { g, m (which of
+  // the world's materials), tint }. What is carved - the statues - is cut from a field like the hands and the skull ----
+  const PROP = {}, propC = {};
+  const ppart = (m, list, k, tint) => ({ g: boxUV(Geo.merge(Array.isArray(list) ? list : [list]), k || 0.5), m, tint: tint || null });
+  const arcPts = (cx, cy, r, a0, a1, n) => { const p = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } return p; };
+  const turnY = (g, a) => { g.rotateY(a); return g; };
+  // a knight of stone, both hands on the pommel of a sword stood before him, a cloak down his back. headless: broken off at the neck
+  const knight = (headless) => () => {
+    const S = X.S, sm = S.smin;
+    const fn = (x, y, z) => {
+      const ax = Math.abs(x), a = Math.atan2(x, z + 0.0001);
+      let d = S.cone(ax, y, z, 0.11, 0.08, 0.0, 0.1, 0.98, 0.0, 0.085, 0.105);
+      d = sm(d, S.box(ax, y, z, 0.13, 0.045, 0.06, 0.075, 0.045, 0.14, 0.035), 0.03);
+      d = sm(d, S.ell(ax, y, z, 0.108, 0.55, 0.03, 0.095, 0.085, 0.105), 0.03);                          // knee cops
+      d = sm(d, S.cone(x, y, z, 0, 0.56, 0, 0, 1.1, 0, 0.25, 0.2) + Math.sin(a * 12) * 0.007, 0.04);  // the skirt of the coat, in folds
+      d = sm(d, S.ell(x, y, z, 0, 1.38, 0.01, 0.25, 0.3, 0.18), 0.07);
+      d = sm(d, S.box(x, y, z, 0, 1.1, 0, 0.215, 0.035, 0.17, 0.03), 0.02);                         // belt
+      d = sm(d, S.ell(ax, y, z, 0.3, 1.6, 0, 0.13, 0.1, 0.13), 0.04);
+      d = sm(d, S.cone(ax, y, z, 0.31, 1.55, 0, 0.33, 1.2, 0.05, 0.068, 0.06), 0.03);
+      d = sm(d, S.cone(ax, y, z, 0.33, 1.2, 0.05, 0.05, 1.19, 0.29, 0.056, 0.05), 0.03);
+      d = sm(d, S.ell(x, y, z, 0, 1.19, 0.305, 0.09, 0.06, 0.065), 0.025);
+      d = sm(d, S.cone(x, y, z, 0, 1.6, 0, 0, 1.76, 0.01, 0.095, 0.085), 0.04);
+      if (!headless) {
+        d = sm(d, S.cone(x, y, z, 0, 1.76, 0.012, 0, 1.97, 0.012, 0.128, 0.112), 0.02);
+        d = sm(d, S.sph(x, y, z, 0, 1.975, 0.012, 0.108), 0.03);
+        d = S.cut(d, S.box(x, y, z, 0, 1.89, 0.14, 0.09, 0.014, 0.05, 0.003), 0.008);                // the sight
+        d = sm(d, S.box(x, y, z, 0, 1.9, 0.11, 0.014, 0.13, 0.03, 0.006), 0.012);                   // the bar down the face
+      } else d = S.smax(d, y - 1.7 - Math.sin(x * 23) * 0.03 - Math.sin(z * 31) * 0.025, 0.01);
+      d = sm(d, S.box(x, y, z, 0, 0.9, -0.16, 0.27 + (1.6 - y) * 0.07, 0.66, 0.03, 0.02) + Math.sin(x * 34) * 0.008, 0.05);   // the cloak
+      return d;
+    };
+    return [ppart('trim', [S.mesh(fn, [-0.55, 0, -0.3], [0.55, 2.12, 0.42], 0.024), rbx(0.085, 1.1, 0.032, 0.008, 0, 0.56, 0.315), rbx(0.38, 0.045, 0.05, 0.012, 0, 1.115, 0.315)], 0.7, [0.95, 0.95, 0.92])];
+  };
+  PROP.statue0 = knight(false); PROP.statue3 = knight(true);
+  // a mourner: a robe to the ground in folds, the arms crossed on the breast, the head bowed in a deep hood, a face far back in it
+  PROP.statue1 = () => {
+    const S = X.S, sm = S.smin;
+    const fn = (x, y, z) => {
+      const ax = Math.abs(x), a = Math.atan2(x, z + 0.0001), fold = (Math.sin(a * 11 + y * 2.5) * 0.013 + Math.sin(a * 5 - y * 1.7) * 0.008) * Math.max(0, Math.min(1, (1.3 - y) / 0.9));
+      let d = S.cone(x, y, z, 0, 0.0, 0, 0, 1.25, 0, 0.37, 0.2) + fold;
+      d = sm(d, S.ell(x, y, z, 0, 1.38, 0, 0.27, 0.24, 0.19), 0.1);
+      d = sm(d, S.cone(ax, y, z, 0.27, 1.45, 0, 0.28, 1.12, 0.08, 0.085, 0.08), 0.05);
+      d = sm(d, S.cone(ax, y, z, 0.28, 1.12, 0.08, 0.0, 1.21, 0.21, 0.075, 0.065), 0.04);
+      d = sm(d, S.ell(x, y, z, 0, 1.73, 0.06, 0.155, 0.175, 0.175), 0.08);
+      d = sm(d, S.cone(x, y, z, 0, 1.62, -0.08, 0, 1.3, -0.15, 0.13, 0.17), 0.08);                  // the hood's fall
+      d = S.cut(d, S.ell(x, y, z, 0, 1.68, 0.25, 0.078, 0.105, 0.1), 0.03);                         // its hollow
+      d = Math.min(d, S.ell(x, y, z, 0, 1.675, 0.125, 0.07, 0.095, 0.07));                            // the face in it
+      return d;
+    };
+    return [ppart('trim', S.mesh(fn, [-0.5, 0, -0.42], [0.5, 2.0, 0.42], 0.025), 0.7, [0.95, 0.95, 0.92])];
+  };
+  // an angel of the graveyard: a long robe, the wings folded down its back to the calves, the head bowed, one hand on the breast
+  PROP.statue2 = () => {
+    const S = X.S, sm = S.smin;
+    const fn = (x, y, z) => {
+      const ax = Math.abs(x), a = Math.atan2(x, z + 0.0001), fold = Math.sin(a * 13 + y * 2) * 0.011 * Math.max(0, Math.min(1, (1.2 - y) / 0.8));
+      let d = S.cone(x, y, z, 0, 0.0, 0, 0, 1.2, 0, 0.33, 0.19) + fold;
+      d = sm(d, S.ell(x, y, z, 0, 1.36, 0, 0.24, 0.24, 0.17), 0.09);
+      d = sm(d, S.cone(x, y, z, 0.25, 1.46, 0, 0.27, 1.1, 0.07, 0.075, 0.07), 0.05); d = sm(d, S.cone(x, y, z, 0.27, 1.1, 0.07, 0.02, 1.28, 0.19, 0.066, 0.055), 0.035);   // the hand on the breast
+      d = sm(d, S.cone(x, y, z, -0.25, 1.46, 0, -0.29, 1.08, 0.04, 0.075, 0.07), 0.05); d = sm(d, S.cone(x, y, z, -0.29, 1.08, 0.04, -0.27, 0.8, 0.1, 0.066, 0.055), 0.035);
+      d = sm(d, S.cone(x, y, z, 0, 1.56, 0, 0, 1.68, 0.03, 0.07, 0.065), 0.04);
+      d = sm(d, S.ell(x, y, z, 0, 1.78, 0.06, 0.105, 0.13, 0.12), 0.03);                             // the head, bowed
+      d = sm(d, S.ell(x, y, z, 0, 1.81, 0.0, 0.122, 0.125, 0.125) + Math.sin(a * 9 + y * 30) * 0.006, 0.02);   // the hair
+      const wing = S.ell(ax, y, z + ax * 0.45, 0.25, 1.22, -0.15, 0.18, 0.82, 0.06) + (Math.sin(y * 27 - ax * 14) > 0 ? 0.008 : 0);
+      d = sm(d, wing, 0.03);
+      return d;
+    };
+    return [ppart('trim', S.mesh(fn, [-0.52, 0, -0.5], [0.52, 2.1, 0.4], 0.025), 0.7, [0.95, 0.95, 0.92])];
+  };
+  // headstones: a round-headed slab on a foot, lines of an inscription, a cross cut over them; a cross with a ring; a pointed slab
+  const moss3 = (pts) => pts.map((p) => ball(p[3], [p[0], p[1], p[2]], [1, p[4], p[5]]));
+  PROP.grave0 = () => [
+    ppart('block', [ext([[0.34, 0], [0.34, 0.72]].concat(arcPts(0, 0.72, 0.34, 0, Math.PI, 14).slice(1), [[-0.34, 0]]), 0.16, 0.022), rbx(0.86, 0.12, 0.3, 0.03, 0, 0.06, 0)], 0.9),
+    ppart('dark', [rbx(0.3, 0.014, 0.01, 0.002, 0, 0.7, 0.078), rbx(0.42, 0.014, 0.01, 0.002, 0, 0.62, 0.078), rbx(0.36, 0.014, 0.01, 0.002, 0.02, 0.54, 0.078), rbx(0.22, 0.014, 0.01, 0.002, -0.05, 0.46, 0.078),
+      rbx(0.03, 0.17, 0.01, 0.002, 0, 0.9, 0.078), rbx(0.11, 0.03, 0.01, 0.002, 0, 0.925, 0.078)], 1),
+    ppart('moss', moss3([[-0.22, 0.14, 0.07, 0.12, 0.7, 0.3], [0.25, 0.3, 0.075, 0.09, 1.2, 0.25], [0.1, 1.03, 0, 0.14, 0.3, 0.6], [-0.3, 0.75, -0.02, 0.08, 1.4, 0.9]]), 1, [0.4, 0.46, 0.36])];
+  PROP.grave1 = () => {
+    const c = [[0.07, 0], [0.085, 0.78], [0.3, 0.76], [0.33, 0.8], [0.33, 0.92], [0.3, 0.96], [0.085, 0.94], [0.075, 1.2], [0.11, 1.24], [-0.11, 1.24], [-0.075, 1.2], [-0.085, 0.94], [-0.3, 0.96], [-0.33, 0.92], [-0.33, 0.8], [-0.3, 0.76], [-0.085, 0.78], [-0.07, 0]];
+    const ring = new THREE.TorusGeometry(0.2, 0.035, 6, 24); ring.scale(1, 1, 1.3); ring.translate(0, 0.86, 0);
+    return [ppart('block', [ext(c, 0.14, 0.02), ring, rbx(0.5, 0.14, 0.34, 0.03, 0, 0.07, 0), rbx(0.36, 0.1, 0.26, 0.025, 0, 0.19, 0)], 0.9),
+      ppart('moss', moss3([[0.2, 0.15, 0.1, 0.11, 0.6, 0.5], [-0.2, 0.94, 0.03, 0.09, 0.5, 0.7], [0.0, 1.25, 0, 0.1, 0.3, 0.7]]), 1, [0.4, 0.46, 0.36])];
+  };
+  PROP.grave2 = () => {
+    const o = [[0.3, 0], [0.3, 0.5], [0.33, 0.52], [0.33, 0.58], [0.28, 0.6]].concat(arcPts(-0.18, 0.6, 0.46, 0, 1.17, 8).slice(1), arcPts(0.18, 0.6, 0.46, Math.PI - 1.17, Math.PI, 8), [[-0.33, 0.58], [-0.33, 0.52], [-0.3, 0.5], [-0.3, 0]]);
+    return [ppart('trim', [ext(o, 0.22, 0.025), rbx(0.8, 0.1, 0.4, 0.03, 0, 0.05, 0)], 0.9),
+      ppart('dark', [rbx(0.34, 0.012, 0.01, 0.002, 0, 0.44, 0.108), rbx(0.4, 0.012, 0.01, 0.002, 0, 0.37, 0.108), rbx(0.28, 0.012, 0.01, 0.002, 0, 0.3, 0.108), ext(arcPts(0, 0.72, 0.1, 0, Math.PI * 2, 16).slice(1), 0.01, 0, [arcPts(0, 0.72, 0.075, 0, Math.PI * 2, 12).slice(1)]).translate(0, 0, 0.108)], 1),
+      ppart('moss', moss3([[-0.26, 0.1, 0.12, 0.13, 0.5, 0.4], [0.22, 0.55, 0.1, 0.08, 1.1, 0.3]]), 1, [0.4, 0.46, 0.36])];
+  };
+  // a candle: one high, one about - a little guttered at its head, wax run down one side and set at the foot
+  PROP.candle = () => {
+    const g = new THREE.LatheGeometry(spl([[0.0005, -0.5], [1.5, -0.5], [1.55, -0.46], [1.12, -0.38], [1.02, -0.2], [1.0, 0.3], [1.04, 0.47], [0.9, 0.5], [0.55, 0.46], [0.0005, 0.44]], 18), 10);
+    const ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), a = Math.atan2(z, x), run = Math.max(0, Math.cos(a - 0.9)) * Math.max(0, Math.sin((y + 0.5) * 2.6)) * 0.34 + Math.max(0, Math.cos(a + 2.2)) * Math.max(0, 0.2 - y) * 0.3; ps.setX(i, x * (1 + run)); ps.setZ(i, z * (1 + run)); }
+    g.computeVertexNormals();
+    const wick = new THREE.CylinderGeometry(0.1, 0.1, 0.06, 4); wick.translate(0, 0.49, 0);
+    return [{ g, m: 'candle' }, { g: wick, m: 'dark' }];
+  };
+  // a wall torch: an iron plate nailed to the wall, a bent arm, a ring with three claws, a brand of wood wound with pitched rag.
+  // The wall is at the origin, the brand stands out to +z (its flame at about z 0.38, y 0.5)
+  PROP.sconce = () => {
+    const iron = [ext([[0.07, -0.16], [0.085, -0.02], [0.06, 0.13], [0, 0.2], [-0.06, 0.13], [-0.085, -0.02], [-0.07, -0.16], [0, -0.23]], 0.016, 0.004).translate(0, 0, 0.008),
+      tubeR([[0, -0.04, 0.01], [0, -0.07, 0.14], [0, -0.01, 0.26], [0, 0.04, 0.3]], 0.017, 6, 12), tubeR([[0, -0.2, 0.012], [0, -0.14, 0.12], [0, -0.07, 0.17]], 0.011, 5, 8)];
+    for (const y of [-0.1, 0.1]) iron.push(ball(0.014, [0, y, 0.018], [1, 1, 0.6]));
+    const ring = new THREE.TorusGeometry(0.058, 0.011, 6, 16); ring.rotateX(HX); ring.translate(0, 0.06, 0.3); iron.push(ring);
+    for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; iron.push(tubeR([[Math.cos(a) * 0.058, 0.06, 0.3 + Math.sin(a) * 0.058], [Math.cos(a) * 0.075, 0.16, 0.31 + Math.sin(a) * 0.075], [Math.cos(a) * 0.06, 0.24, 0.325 + Math.sin(a) * 0.06]], 0.008, 4, 6)); }
+    const brand = tubeR([[0, -0.12, 0.26], [0, 0.1, 0.31], [0, 0.34, 0.365]], (t) => 0.03 + t * 0.012, 7, 6);
+    const head = [ball(0.07, [0, 0.42, 0.385], [1, 1.35, 1])]; for (let i = 0; i < 4; i++) { const r = new THREE.TorusGeometry(0.064 - Math.abs(i - 1.5) * 0.006, 0.012, 5, 12); r.rotateX(HX + 0.22 + (i % 2) * 0.12); r.translate(0, 0.365 + i * 0.035, 0.372 + i * 0.008); head.push(r); }
+    return [ppart('iron', iron, 3), ppart('woodDark', brand, 2), ppart('dark', head, 3, [0.16, 0.1, 0.07])];
+  };
+  // a brazier: three legs of wrought iron bowed out and tied with a ring, a basket of bars on them, coals heaped in it. One high
+  PROP.brazier = () => {
+    const iron = [], coal = [];
+    for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.3, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 0.4, 0, s * 0.4], [c * 0.3, 0.08, s * 0.3], [c * 0.13, 0.36, s * 0.13], [c * 0.16, 0.56, s * 0.16], [c * 0.3, 0.72, s * 0.3]], 0.022, 6, 14), ball(0.035, [c * 0.4, 0.02, s * 0.4], [1.3, 0.6, 1.3])); }
+    const tie = new THREE.TorusGeometry(0.14, 0.014, 6, 18); tie.rotateX(HX); tie.translate(0, 0.37, 0); iron.push(tie);
+    for (const [y, r, t] of [[0.72, 0.31, 0.018], [0.86, 0.39, 0.014], [1.0, 0.43, 0.02]]) { const g = new THREE.TorusGeometry(r, t, 6, 28); g.rotateX(HX); g.translate(0, y, 0); iron.push(g); }
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 0.2, 0.7, s * 0.2], [c * 0.31, 0.72, s * 0.31], [c * 0.39, 0.86, s * 0.39], [c * 0.43, 1.0, s * 0.43], [c * 0.45, 1.06, s * 0.45]], 0.011, 4, 10)); }
+    iron.push(hl([[0.0005, 0.69], [0.2, 0.69], [0.22, 0.705], [0.2, 0.72], [0.0005, 0.72]], 1, 1, 16));
+    for (let i = 0; i < 11; i++) { const a = i * 2.4, r = 0.06 + (i % 4) * 0.075, g = new THREE.DodecahedronGeometry(0.075 + (i % 3) * 0.022, 0); g.rotateX(i); g.rotateY(i * 2); g.translate(Math.cos(a) * r, 0.8 + (i % 3) * 0.045 - r * 0.12, Math.sin(a) * r); coal.push(g); }
+    return [ppart('iron', iron, 3), ppart('dark', coal, 3, [0.3, 0.12, 0.05])];
+  };
+  // a ring of iron hung by four rods from a boss, a lesser ring inside it, eight pans with their prickets round the rim. The candles
+  // stand at 1.1 from its middle, their feet at 0.025
+  PROP.chandelier = () => {
+    const iron = [];
+    for (const [r, hh, t] of [[1.1, 0.07, 0.014], [0.6, 0.05, 0.012]]) iron.push(hl([[r - t, -hh / 2], [r + t, -hh / 2], [r + t * 1.6, 0], [r + t, hh / 2], [r - t, hh / 2], [r - t * 1.6, 0], [r - t, -hh / 2]], 1, 1, 40));
+    for (let i = 0; i < 4; i++) { const a = i * HX, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 1.1, 0, s * 1.1], [c * 0.6, 0.02, s * 0.6], [c * 0.2, 0.1, s * 0.2]], 0.014, 5, 8), tubeR([[c * 1.1, 0.03, s * 1.1], [c * 0.6, 0.62, s * 0.6], [c * 0.06, 1.2, s * 0.06]], 0.011, 5, false)); }
+    iron.push(ball(0.07, [0, 1.2, 0], [1, 1.2, 1]), ball(0.09, [0, 0.1, 0], [1, 0.6, 1]), spike(0.035, 0.2, [0, -0.02, 0], [Math.PI, 0, 0], 6));
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, c = Math.cos(a) * 1.1, s = Math.sin(a) * 1.1; iron.push(Geo.xf(hl([[0.0005, 0.0], [0.03, 0.0], [0.075, 0.02], [0.08, 0.03], [0.07, 0.03], [0.03, 0.015], [0.0005, 0.015]], 1, 1, 10), [c, 0.01, s])); iron.push(Geo.xf(new THREE.TorusGeometry(0.03, 0.008, 4, 8, Math.PI), [c * 1.04, -0.03, s * 1.04], [0, -a + HX, 0])); }
+    return [ppart('iron', iron, 3)];
+  };
+  // a column: a shaft that swells a little below its middle, fluted (one high, one in radius); a base of two rolls and a hollow, a
+  // capital of a roll under a spreading bell (each one high and one in radius, to be sized)
+  PROP.shaft = () => {
+    const g = new THREE.LatheGeometry([[0.99, -0.5], [1.0, -0.25], [0.985, 0.1], [0.94, 0.5]].map((q) => new THREE.Vector2(q[0], q[1])), 96), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), z = ps.getZ(i), a = Math.atan2(z, x), k = 1 - 0.06 * Math.pow(Math.abs(Math.sin(a * 8)), 1.6); ps.setX(i, x * k); ps.setZ(i, z * k); }
+    g.computeVertexNormals(); return [{ g, m: 'trim' }];
+  };
+  PROP.colbase = () => [{ g: new THREE.LatheGeometry(spl([[0.0005, -0.5], [1.18, -0.5], [1.26, -0.36], [1.18, -0.2], [1.02, -0.12], [0.98, 0.0], [1.06, 0.12], [1.12, 0.26], [1.06, 0.4], [0.98, 0.5], [0.0005, 0.5]], 30), 24), m: 'trim' }];
+  PROP.colcap = () => [{ g: new THREE.LatheGeometry(spl([[0.0005, -0.5], [0.94, -0.5], [1.02, -0.4], [0.96, -0.28], [0.95, -0.16], [1.04, 0.1], [1.2, 0.36], [1.24, 0.44], [1.24, 0.5], [0.0005, 0.5]], 30), 24), m: 'trim' }];
+  X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

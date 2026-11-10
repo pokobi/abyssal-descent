@@ -133,11 +133,44 @@
         for (const wy of h > R1 ? [1.3, 4.4] : [1.3]) {
           if (along) { const fz = sd === 'N' ? z0w - 0.02 : z1w; w.visual('dark', u - 0.5, wy, fz, u + 0.5, wy + 1.1, fz + 0.02, { uv: 1, grad: false }); }
           else { const fx = sd === 'W' ? x0w - 0.02 : x1w; w.visual('dark', fx, wy, u - 0.5, fx + 0.02, wy + 1.1, u + 0.5, { uv: 1, grad: false }); }
+          // (its frame and the cross of its bars, a stone sill, a shutter hung open to each side)
+          const out = sd === 'N' || sd === 'W' ? -1 : 1, f0 = along ? (sd === 'N' ? z0w : z1w) : (sd === 'W' ? x0w : x1w);
+          const pc = (mk, ua, ub, ya, yb, d) => { const fa = Math.min(f0, f0 + out * d), fb = Math.max(f0, f0 + out * d); if (along) w.visual(mk, ua, ya, fa, ub, yb, fb, { uv: 1, grad: false }); else w.visual(mk, fa, ya, ua, fb, yb, ub, { uv: 1, grad: false }); };
+          pc('woodDark', u - 0.58, u + 0.58, wy - 0.06, wy, 0.07); pc('woodDark', u - 0.58, u + 0.58, wy + 1.1, wy + 1.18, 0.07);
+          pc('woodDark', u - 0.58, u - 0.5, wy, wy + 1.1, 0.07); pc('woodDark', u + 0.5, u + 0.58, wy, wy + 1.1, 0.07);
+          pc('woodDark', u - 0.025, u + 0.025, wy, wy + 1.1, 0.045); pc('woodDark', u - 0.5, u + 0.5, wy + 0.62, wy + 0.67, 0.045);
+          pc('trim', u - 0.66, u + 0.66, wy - 0.14, wy - 0.06, 0.13);
+          pc('wood', u - 1.06, u - 0.6, wy - 0.02, wy + 1.14, 0.045); pc('wood', u + 0.6, u + 1.06, wy - 0.02, wy + 1.14, 0.045);
         }
       }
     };
     wallSide('N', 0, z0, 0, z0 + T, x0, x1); wallSide('S', 0, z1 - T, 0, z1, x0, x1);
     wallSide('W', x0, 0, x0 + T, 0, z0 + T, z1 - T); wallSide('E', x1 - T, 0, x1, 0, z0 + T, z1 - T);
+    // ---- the timber frame, to look at: a plinth of stone under the wall (broken at the doors), posts at the corners and between, a plate
+    // along the top of each storey - all a hand's breadth proud of the plaster. No dice are thrown for it.
+    if (!ruin) {
+      const side = (sd) => {
+        const along = sd === 'N' || sd === 'S', out = sd === 'N' || sd === 'W' ? -1 : 1, f0 = sd === 'N' ? z0 : sd === 'S' ? z1 : sd === 'W' ? x0 : x1, a0 = along ? x0 : z0, a1 = along ? x1 : z1;
+        const pc = (mk, ua, ub, ya, yb, d, uv) => { if (ub - ua < 0.02) return; const fa = Math.min(f0, f0 + out * d), fb = Math.max(f0, f0 + out * d); if (along) w.visual(mk, ua, ya, fa, ub, yb, fb, { uv: uv || 1.2, grad: false }); else w.visual(mk, fa, ya, ua, fb, yb, ub, { uv: uv || 1.2, grad: false }); };
+        const ds = q.doors.filter((d) => d.sd === sd).sort((p2, r) => p2.a - r.a);
+        let u = a0 - 0.06;
+        for (const d of ds) { pc('trim', u, d.a - 0.12, 0, 0.5, 0.07, 1.5); u = d.b + 0.12; }
+        pc('trim', u, a1 + 0.06, 0, 0.5, 0.07, 1.5);
+        for (const d of ds) pc('woodDark', d.a - 0.2, d.b + 0.2, DH + 0.12, DH + 0.3, 0.1);                 // (a lintel over the door)
+        pc('woodDark', a0 - 0.08, a1 + 0.08, h - 0.34, h - 0.1, 0.09);                                       // (the plate under the roof)
+        if (h > R1) pc('woodDark', a0 - 0.08, a1 + 0.08, R1 - 0.1, R1 + 0.14, 0.09);                         // (the upper floor's beam)
+        const n = Math.max(2, Math.round((a1 - a0) / 3.2));
+        for (let i = 0; i <= n; i++) {
+          const pu = i === 0 ? a0 + 0.02 : i === n ? a1 - 0.2 : a0 + (a1 - a0) * i / n - 0.09;
+          if (ds.some((d) => pu + 0.18 > d.a - 0.05 && pu < d.b + 0.05)) continue;
+          // (a post between two windows, not through one)
+          let hit = false; for (let wu = a0 + (along ? 1.6 : T + 1.6); wu < a1 - 1.6; wu += 3.2) if (pu + 0.18 > wu - 1.08 && pu < wu + 1.08) hit = true;
+          if (hit && i !== 0 && i !== n) continue;
+          pc('woodDark', pu, pu + 0.18, 0.5, h - 0.34, 0.085);
+        }
+      };
+      side('N'); side('S'); side('W'); side('E');
+    }
     for (const d of q.doors) { // the door frames
       if (d.sd === 'N' || d.sd === 'S') { const z = d.sd === 'N' ? z0 - 0.04 : z1; w.visual('woodDark', d.a - 0.12, 0, z, d.a, DH + 0.12, z + 0.04, { uv: 1 }); w.visual('woodDark', d.b, 0, z, d.b + 0.12, DH + 0.12, z + 0.04, { uv: 1 }); w.visual('woodDark', d.a - 0.12, DH, z, d.b + 0.12, DH + 0.14, z + 0.04, { uv: 1 }); }
       else { const x = d.sd === 'W' ? x0 - 0.04 : x1; w.visual('woodDark', x, 0, d.a - 0.12, x + 0.04, DH + 0.12, d.a, { uv: 1 }); w.visual('woodDark', x, 0, d.b, x + 0.04, DH + 0.12, d.b + 0.12, { uv: 1 }); w.visual('woodDark', x, DH, d.a - 0.12, x + 0.04, DH + 0.14, d.b + 0.12, { uv: 1 }); }
@@ -172,6 +205,22 @@
     if (along) for (const s of [-1, 1]) w.batch.geo('woodDark', PG().box, Mx(cxm, h + 1.0, czm + s * (z1 - z0) / 4, x1 - x0 + 0.5, 0.18, (z1 - z0) / 2 * 1.16, s * 0.55, 0, 0));
     else for (const s of [-1, 1]) w.batch.geo('woodDark', PG().box, Mx(cxm + s * (x1 - x0) / 4, h + 1.0, czm, (x1 - x0) / 2 * 1.16, 0.18, z1 - z0 + 0.5, 0, 0, -s * 0.55));
     w.addCollider(x0, h, z0, x1, h + 2.1, z1, { noGrapple: true });
+    // ---- the gable walls under the two pitches, a ridge beam, a chimney of stone (to look at)
+    {
+      const hw = (along ? z1 - z0 : x1 - x0) / 2, rise = hw * 0.62, len = along ? x1 - x0 : z1 - z0;
+      if (!house.tri) { const sh = new THREE.Shape(); sh.moveTo(-1, 0); sh.lineTo(1, 0); sh.lineTo(0, 1); sh.closePath(); house.tri = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, steps: 1 }); house.tri.translate(0, 0, -0.5); house.tri.userData.shared = true; }
+      for (const e of [-1, 1]) {
+        if (along) w.batch.geo('wall', house.tri, Mx(cxm + e * (len / 2 - 0.16), h, czm, hw - 0.05, rise - 0.12, 0.3, 0, Math.PI / 2, 0), { su: 2, sv: 1.2 });
+        else w.batch.geo('wall', house.tri, Mx(cxm, h, czm + e * (len / 2 - 0.16), hw - 0.05, rise - 0.12, 0.3, 0, 0, 0), { su: 2, sv: 1.2 });
+      }
+      if (along) w.visual('woodDark', x0 - 0.3, h + rise - 0.22, czm - 0.11, x1 + 0.3, h + rise + 0.04, czm + 0.11, { uv: 1.2, grad: false });
+      else w.visual('woodDark', cxm - 0.11, h + rise - 0.22, z0 - 0.3, cxm + 0.11, h + rise + 0.04, z1 + 0.3, { uv: 1.2, grad: false });
+      // (which end the chimney stands at: by where the house is, not by a throw of the dice)
+      const ce = (Math.round(x0 * 7 + z0 * 3) % 2) ? 1 : -1, kx = along ? cxm + ce * (len / 2 - 1.3) : cxm + 0.9, kz = along ? czm + 0.9 : czm + ce * (len / 2 - 1.3);
+      w.visual('block', kx - 0.42, h - 0.2, kz - 0.42, kx + 0.42, h + rise + 0.9, kz + 0.42, { uv: 1.4 });
+      w.visual('trim', kx - 0.52, h + rise + 0.9, kz - 0.52, kx + 0.52, h + rise + 1.05, kz + 0.52, { uv: 1 });
+      for (const [ox, oz] of [[-0.18, -0.18], [0.18, 0.18]]) w.batch.geo('dark', PG().cyl8, Mx(kx + ox, h + rise + 1.22, kz + oz, 0.11, 0.34, 0.11), { tint: [0.5, 0.3, 0.22] });
+    }
   }
   F.gen.hamlet = genHamlet;
 })();

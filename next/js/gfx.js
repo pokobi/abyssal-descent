@@ -1014,14 +1014,16 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       for (let i = 0; i < all.length; i++) { const v = all[i], q = snap[i]; v.position.copy(q[0]); v.quaternion.copy(q[1]); v.scale.copy(q[2]); v.visible = q[3]; }
       if (!ok) return 0;
     }
-    const hard = !!HARD[plan], mats = [M.skin, M.sec], inv = new THREE.Quaternion(), m4 = new THREE.Matrix4();
+    const hard = !!HARD[plan], fixed = M ? [M.skin, M.sec] : null, inv = new THREE.Quaternion(), m4 = new THREE.Matrix4();
+    const rnd = o.round || (hard ? 0.3 : 0.62), blend = o.blend || (hard ? 0.025 : 0.075);
     let made = 0;
     for (const g of all) {
       if (g.isMesh || !g.children.length) continue;
-      for (const mat of mats) {
+      // (a body's own two materials; or, where parts are chosen one by one, whatever plain material they wear)
+      for (const mat of fixed || [...new Set(g.children.filter((c) => c.isMesh && c.material && !Array.isArray(c.material) && !c.material.transparent).map((c) => c.material))]) {
         const P = [];
         for (const c of g.children) {
-          if (!c.isMesh || c.material !== mat || !kind.has(c.geometry) || held.has(c) || !c.visible || c.children.length) continue;
+          if (!c.isMesh || c.material !== mat || !kind.has(c.geometry) || held.has(c) || (o.pick && !o.pick(c)) || !c.visible || c.children.length) continue;
           const sx = Math.abs(c.scale.x), sy = Math.abs(c.scale.y), sz = Math.abs(c.scale.z), t = kind.get(c.geometry);
           if (!(sx > 0 && sy > 0 && sz > 0)) continue;
           const e = m4.makeRotationFromQuaternion(inv.copy(c.quaternion).invert()).elements.slice(0, 11);
@@ -1032,12 +1034,12 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         if (!P.length) continue;
         const box = (list) => { const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9]; for (const q of list) { lo[0] = Math.min(lo[0], q.x - q.ext); lo[1] = Math.min(lo[1], q.y - q.ext); lo[2] = Math.min(lo[2], q.z - q.ext); hi[0] = Math.max(hi[0], q.x + q.ext); hi[1] = Math.max(hi[1], q.y + q.ext); hi[2] = Math.max(hi[2], q.z + q.ext); } return [lo, hi]; };
         let [lo, hi] = box(P);
-        const L0 = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]), cell = Math.min(0.07, Math.max(0.011, L0 / 34));
+        const L0 = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]), cell = o.free ? Math.max(0.011, L0 / 34) : Math.min(0.07, Math.max(0.011, L0 / 34));
         const use = P.filter((q) => q.thin >= cell * 2.2);
         if (!use.length || (use.length === 1 && use[0].t !== 0)) continue;   // (a ball or a rod alone is already what it should be)
         [lo, hi] = box(use);
-        const L = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]), k = Math.min(0.12, Math.max(0.012, L * (hard ? 0.025 : 0.075))), pad = k + cell * 2;
-        const key = (hard ? 'h' : 's') + cell.toFixed(4) + use.map((q) => q.t + ',' + [q.x, q.y, q.z, q.sx, q.sy, q.sz, q.c.quaternion.x, q.c.quaternion.y, q.c.quaternion.z, q.c.quaternion.w].map((v) => v.toFixed(3)).join(',')).join('|');
+        const L = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]), k = Math.min(o.free ? 0.4 : 0.12, Math.max(0.012, L * blend)), pad = k + cell * 2;
+        const key = rnd.toFixed(2) + ',' + blend.toFixed(3) + ',' + cell.toFixed(4) + use.map((q) => q.t + ',' + [q.x, q.y, q.z, q.sx, q.sy, q.sz, q.c.quaternion.x, q.c.quaternion.y, q.c.quaternion.z, q.c.quaternion.w].map((v) => v.toFixed(3)).join(',')).join('|');
         let geo = fuseCache.get(key);
         if (geo === undefined) {
           const fn = (x, y, z) => {
@@ -1045,11 +1047,11 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
             for (let n = 0; n < use.length; n++) {
               const q = use[n], e = q.e, px = x - q.x, py = y - q.y, pz = z - q.z, lx = e[0] * px + e[4] * py + e[8] * pz, ly = e[1] * px + e[5] * py + e[9] * pz, lz = e[2] * px + e[6] * py + e[10] * pz;
               let v;
-              if (q.t === 0) { const hx = q.sx / 2, hy = q.sy / 2, hz = q.sz / 2; v = S.box(lx, ly, lz, 0, 0, 0, hx, hy, hz, Math.min(hx, hy, hz) * (hard ? 0.3 : 0.62)); }
+              if (q.t === 0) { const hx = q.sx / 2, hy = q.sy / 2, hz = q.sz / 2; v = S.box(lx, ly, lz, 0, 0, 0, hx, hy, hz, Math.min(hx, hy, hz) * rnd); }
               else if (q.t === 1) v = S.ell(lx, ly, lz, 0, 0, 0, q.sx, q.sy, q.sz);
               else {
                 const r = Math.min(q.sx, q.sz), qx = lx * r / q.sx, qz = lz * r / q.sz;
-                if (q.t === 2) { const rr = Math.min(r, q.sy / 2) * (hard ? 0.2 : 0.4), dr = Math.hypot(qx, qz) - r + rr, dy = Math.abs(ly) - q.sy / 2 + rr; v = Math.hypot(Math.max(dr, 0), Math.max(dy, 0)) + Math.min(Math.max(dr, dy), 0) - rr; }
+                if (q.t === 2) { const rr = Math.min(r, q.sy / 2) * rnd * 0.65, dr = Math.hypot(qx, qz) - r + rr, dy = Math.abs(ly) - q.sy / 2 + rr; v = Math.hypot(Math.max(dr, 0), Math.max(dy, 0)) + Math.min(Math.max(dr, dy), 0) - rr; }
                 else v = S.cone(qx, ly, qz, 0, -q.sy / 2 + r * 0.35, 0, 0, q.sy / 2 - r * 0.1, 0, r * 0.92, r * 0.1);
               }
               d = n ? S.smin(d, v, k) : v;
@@ -1062,8 +1064,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
             const gm = S.mesh(fn, [lo[0] - pad, lo[1] - pad, lo[2] - pad], [hi[0] + pad, hi[1] + pad, hi[2] + pad], cell);
             if (gm.attributes.position && gm.attributes.position.count >= 12) {
               // (the texture at one grain on every part, whatever its size)
-              const ps = gm.attributes.position, nr = gm.attributes.normal, uv = gm.attributes.uv;
-              for (let n = 0; n < ps.count; n++) { const ax = Math.abs(nr.getX(n)), ay = Math.abs(nr.getY(n)), az = Math.abs(nr.getZ(n)), x = ps.getX(n) * 1.5, y = ps.getY(n) * 1.5, z = ps.getZ(n) * 1.5; if (ax >= ay && ax >= az) uv.setXY(n, z, y); else if (ay >= az) uv.setXY(n, x, z); else uv.setXY(n, x, y); }
+              const ps = gm.attributes.position, nr = gm.attributes.normal, uv = gm.attributes.uv, uvk = o.free ? 2.4 / L : 1.5;   // (a guardian's part is metres across: the texture by the part, not by the metre)
+              for (let n = 0; n < ps.count; n++) { const ax = Math.abs(nr.getX(n)), ay = Math.abs(nr.getY(n)), az = Math.abs(nr.getZ(n)), x = ps.getX(n) * uvk, y = ps.getY(n) * uvk, z = ps.getZ(n) * uvk; if (ax >= ay && ax >= az) uv.setXY(n, z, y); else if (ay >= az) uv.setXY(n, x, z); else uv.setXY(n, x, y); }
               geo = gm;
             }
             X.stats.fuse = (X.stats.fuse || 0) + (performance.now() - t0); X.stats.fused = (X.stats.fused || 0) + 1;

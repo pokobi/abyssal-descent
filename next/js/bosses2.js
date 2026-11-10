@@ -3,6 +3,7 @@
 (function () {
   const BS = G.bosses, U = G.U;
   const { mat, mesh, joint, V } = BS.h;
+  const smesh = BS.h.smesh;
   const Boss = BS.Boss;
   let P, C, PG;
   const env = () => { P = G.player; C = G.combat; PG = G.Props.PG; };
@@ -21,32 +22,32 @@
   function humanoid(root, o) {
     const J = {};
     J.body = joint(root, 0, o.hip, 0);
-    mesh(J.body, PG.box, o.armor, 0.9 * o.s, 0.5 * o.s, 0.6 * o.s, 0, 0, 0);
+    smesh(J.body, PG.box, o.armor, 0.9 * o.s, 0.5 * o.s, 0.6 * o.s, 0, 0, 0);
     J.torso = joint(J.body, 0, 0.25 * o.s, 0);
-    mesh(J.torso, PG.box, o.armor, 1.2 * o.s, 1.1 * o.s, 0.7 * o.s, 0, 0.55 * o.s, 0);
-    mesh(J.torso, PG.box, o.trim, 1.3 * o.s, 0.18 * o.s, 0.75 * o.s, 0, 1.05 * o.s, 0);
-    for (const sx of [-1, 1]) mesh(J.torso, PG.sph, o.trim, 0.32 * o.s, 0.26 * o.s, 0.32 * o.s, sx * 0.72 * o.s, 1.05 * o.s, 0);
-    if (o.cape) mesh(J.torso, PG.box, o.cape, 1.1 * o.s, 1.8 * o.s, 0.05 * o.s, 0, 0.1 * o.s, -0.4 * o.s, 0.12);
+    smesh(J.torso, PG.box, o.armor, 1.2 * o.s, 1.1 * o.s, 0.7 * o.s, 0, 0.55 * o.s, 0);
+    smesh(J.torso, PG.box, o.trim, 1.3 * o.s, 0.18 * o.s, 0.75 * o.s, 0, 1.05 * o.s, 0);
+    for (const sx of [-1, 1]) smesh(J.torso, PG.sph, o.trim, 0.32 * o.s, 0.26 * o.s, 0.32 * o.s, sx * 0.72 * o.s, 1.05 * o.s, 0);
+    if (o.cape) smesh(J.torso, PG.box, o.cape, 1.1 * o.s, 1.8 * o.s, 0.05 * o.s, 0, 0.1 * o.s, -0.4 * o.s, 0.12);
     J.head = joint(J.torso, 0, 1.45 * o.s, 0);
-    mesh(J.head, PG.box, o.armor, 0.5 * o.s, 0.6 * o.s, 0.55 * o.s);
-    mesh(J.head, PG.box, o.glow, 0.36 * o.s, 0.06 * o.s, 0.05 * o.s, 0, 0.05 * o.s, 0.28 * o.s);
-    if (o.crest) mesh(J.head, PG.cone, o.trim, 0.12 * o.s, 0.6 * o.s, 0.12 * o.s, 0, 0.5 * o.s, -0.05 * o.s);
+    smesh(J.head, PG.box, o.armor, 0.5 * o.s, 0.6 * o.s, 0.55 * o.s);
+    smesh(J.head, PG.box, o.glow, 0.36 * o.s, 0.06 * o.s, 0.05 * o.s, 0, 0.05 * o.s, 0.28 * o.s);
+    if (o.crest) smesh(J.head, PG.cone, o.trim, 0.12 * o.s, 0.6 * o.s, 0.12 * o.s, 0, 0.5 * o.s, -0.05 * o.s);
     J.arms = [];
     for (const sx of [-1, 1]) {
       const sh = joint(J.torso, sx * 0.78 * o.s, 0.95 * o.s, 0);
-      mesh(sh, PG.cyl8, o.armor, 0.17 * o.s, 0.8 * o.s, 0.17 * o.s, 0, -0.4 * o.s, 0);
+      smesh(sh, PG.cyl8, o.armor, 0.17 * o.s, 0.8 * o.s, 0.17 * o.s, 0, -0.4 * o.s, 0);
       const el = joint(sh, 0, -0.8 * o.s, 0);
-      mesh(el, PG.cyl8, o.trim, 0.16 * o.s, 0.75 * o.s, 0.16 * o.s, 0, -0.37 * o.s, 0);
+      smesh(el, PG.cyl8, o.trim, 0.16 * o.s, 0.75 * o.s, 0.16 * o.s, 0, -0.37 * o.s, 0);
       const hand = joint(el, 0, -0.78 * o.s, 0);
       J.arms.push({ sh, el, hand });
     }
     J.legs = [];
     for (const sx of [-1, 1]) {
       const hp = joint(J.body, sx * 0.3 * o.s, -0.1 * o.s, 0);
-      mesh(hp, PG.cyl8, o.armor, 0.2 * o.s, 1.0 * o.s, 0.2 * o.s, 0, -0.5 * o.s, 0);
+      smesh(hp, PG.cyl8, o.armor, 0.2 * o.s, 1.0 * o.s, 0.2 * o.s, 0, -0.5 * o.s, 0);
       const kn = joint(hp, 0, -1.0 * o.s, 0);
-      mesh(kn, PG.cyl8, o.trim, 0.18 * o.s, 1.0 * o.s, 0.18 * o.s, 0, -0.5 * o.s, 0);
-      mesh(kn, PG.box, o.armor, 0.3 * o.s, 0.16 * o.s, 0.45 * o.s, 0, -1.0 * o.s, 0.08 * o.s);
+      smesh(kn, PG.cyl8, o.trim, 0.18 * o.s, 1.0 * o.s, 0.18 * o.s, 0, -0.5 * o.s, 0);
+      smesh(kn, PG.box, o.armor, 0.3 * o.s, 0.16 * o.s, 0.45 * o.s, 0, -1.0 * o.s, 0.08 * o.s);
       J.legs.push({ hp, kn });
     }
     return J;
@@ -67,8 +68,8 @@
         const glow = mat('#000', { emissive: light ? 0xffe080 : 0xa050ff, emissiveIntensity: 3 });
         const cape = mat(light ? '#e8e0d0' : '#14101a', { side: THREE.DoubleSide });
         const J = humanoid(g, { s: 1.15, hip: 2.3, armor, trim, glow, cape, crest: light });
-        if (light) { const l = mesh(J.arms[1].hand, PG.cone, trim, 0.16, 3.4, 0.16, 0, 0, 1.4, Math.PI / 2); l.userData.lance = true; mesh(J.arms[0].hand, PG.box, armor, 0.1, 1.3, 0.9, 0, 0, 0.2); }
-        else { for (const a of J.arms) mesh(a.hand, PG.box, trim, 0.06, 0.08, 1.4, 0, 0, 0.7); }
+        if (light) { const l = mesh(J.arms[1].hand, PG.cone, trim, 0.16, 3.4, 0.16, 0, 0, 1.4, Math.PI / 2); l.userData.lance = true; smesh(J.arms[0].hand, PG.box, armor, 0.1, 1.3, 0.9, 0, 0, 0.2); }
+        else { for (const a of J.arms) smesh(a.hand, PG.box, trim, 0.06, 0.08, 1.4, 0, 0, 0.7); }
         const k = { light, g, J, pos: c.clone().add(V(light ? -6 : 6, 0, -4)), yaw: Math.PI, hp: each, maxHp: each, down: false, reviveT: 0, act: null, cd: U.rand(1.5, 3), walk: 0, name: light ? '光の騎士ソル' : '影の騎士ウンブラ', glowM: glow };
         const part = this.part({ name: k.name, shared: false, hitW: [{ n: J.torso, r: 0.95, part: 'body', o: V(0, 0.55, 0) }, { n: J.body, r: 0.8, part: 'body' }, { n: J.head, r: 0.5, part: 'head' }], radius: 1, height: 3.6, showBar: true, blood: light ? 0xffe0a0 : 0x6020a0 });
         Object.defineProperty(part, 'hp', { get: () => k.hp, set: (v) => { k.hp = v; } });
@@ -250,10 +251,10 @@
       const vein = mat('#2a0408', { roughness: 0.6 });
       this.hg = joint(this.root, 0, 7, 0);
       this.core = mesh(this.hg, PG.sph, this.flesh, 2.6, 2.9, 2.4);
-      for (let i = 0; i < 6; i++) mesh(this.hg, PG.torus, vein, 2.0, 2.0, 2.0, U.rand(0, 3), U.rand(0, 3), 0);
-      for (let i = 0; i < 4; i++) mesh(this.hg, PG.cyl8, vein, 0.5, 2.4, 0.5, U.rand(-1, 1), 2.6, U.rand(-1, 1), U.rand(-0.4, 0.4), 0, U.rand(-0.4, 0.4));
+      for (let i = 0; i < 6; i++) smesh(this.hg, PG.torus, vein, 2.0, 2.0, 2.0, U.rand(0, 3), U.rand(0, 3), 0);
+      for (let i = 0; i < 4; i++) smesh(this.hg, PG.cyl8, vein, 0.5, 2.4, 0.5, U.rand(-1, 1), 2.6, U.rand(-1, 1), U.rand(-0.4, 0.4), 0, U.rand(-0.4, 0.4));
       this.tents = [];
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const t = joint(this.hg, Math.cos(a) * 1.6, -1.8, Math.sin(a) * 1.6); mesh(t, PG.cone, vein, 0.35, 4, 0.35, 0, -2, 0, Math.PI); this.tents.push(t); }
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const t = joint(this.hg, Math.cos(a) * 1.6, -1.8, Math.sin(a) * 1.6); smesh(t, PG.cone, vein, 0.35, 4, 0.35, 0, -2, 0, Math.PI); this.tents.push(t); }
       this.heartPart = this.part({ name: def.name, hitW: [{ n: this.hg, r: 2.7, part: 'body' }], radius: 2.7, height: 5 });
       this.heartPart.isInvuln = () => this.state !== 'exposed';
       this.heartPart.dmgMul = () => 1.3;
@@ -265,7 +266,7 @@
         const a = i / 4 * Math.PI * 2 + Math.PI / 4;
         const holder = joint(this.root, Math.cos(a) * 13, 0, Math.sin(a) * 13);
         const m = mesh(holder, PG.oct, this.pyM, 0.9, 2.2, 0.9, 0, 2.2, 0);
-        mesh(holder, PG.cyl8, vein, 1.1, 0.5, 1.1, 0, 0.25, 0);
+        smesh(holder, PG.cyl8, vein, 1.1, 0.5, 1.1, 0, 0.25, 0);
         const py = this.part({ name: '血晶柱', shared: false, hitW: [{ n: holder, r: 1.0, part: 'body', o: V(0, 2.2, 0) }], radius: 1, height: 4.4, showBar: true, blood: 0xff2040 });
         py.maxHp = Math.round(this.maxHp * 0.055); py.hp = py.maxHp; py.mesh = m; py.holder = holder;
         py.die = () => { this.pylonBroken(py); return false; };
@@ -399,7 +400,7 @@
       this.glowM = mat('#000', { emissive: 0xff2030, emissiveIntensity: 3, transparent: true });
       this.capeM = mat('#0c0a10', { side: THREE.DoubleSide, transparent: true });
       this.J = humanoid(this.root, { s: 0.95, hip: 1.9, armor: this.armorM, trim: this.trimM, glow: this.glowM, cape: this.capeM });
-      mesh(this.J.arms[1].hand, PG.box, this.trimM, 0.12, 0.16, 1.3, 0, 0, 0.5);
+      smesh(this.J.arms[1].hand, PG.box, this.trimM, 0.12, 0.16, 1.3, 0, 0, 0.5);
       this.muzzle = joint(this.J.arms[1].hand, 0, 0, 1.2);
       this.mats = [this.armorM, this.trimM, this.glowM, this.capeM];
       this.body = this.part({ name: def.name, hitW: [{ n: this.J.torso, r: 0.75, part: 'body', o: V(0, 0.5, 0) }, { n: this.J.body, r: 0.6, part: 'body' }, { n: this.J.head, r: 0.42, part: 'head' }], radius: 0.8, height: 3 });

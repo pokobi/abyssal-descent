@@ -15,6 +15,9 @@
 
   function mat(color, o) { return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.8 }, o || {})); }
   function mesh(parent, geo, m, sx, sy, sz, x, y, z, rx, ry, rz) { const o = new THREE.Mesh(geo, m); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; }
+  // (a part made and never touched again - nothing keeps hold of what this returns: such parts may be melted into one surface with
+  // their neighbours on the same joint, gfx.js. A part that is moved, hidden or recoloured by itself is made with mesh())
+  function smesh(parent, geo, m, sx, sy, sz, x, y, z, rx, ry, rz) { const o = mesh(parent, geo, m, sx, sy, sz, x, y, z, rx, ry, rz); o.userData.st = 1; return o; }
   function joint(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; }
 
   class Boss {
@@ -162,32 +165,32 @@
       this.coreM = coreM;
       const r = this.root;
       const hips = joint(r, 0, 4.2, 0);
-      mesh(hips, PG.box, dark, 2.6, 1.2, 1.8);
+      smesh(hips, PG.box, dark, 2.6, 1.2, 1.8);
       const torso = joint(hips, 0, 0.6, 0);
-      mesh(torso, PG.box, stone, 3.6, 2.8, 2.2, 0, 1.4, 0);
-      mesh(torso, PG.box, dark, 4.2, 0.6, 2.4, 0, 2.9, 0);
+      smesh(torso, PG.box, stone, 3.6, 2.8, 2.2, 0, 1.4, 0);
+      smesh(torso, PG.box, dark, 4.2, 0.6, 2.4, 0, 2.9, 0);
       const head = joint(torso, 0, 3.6, 0.3);
-      mesh(head, PG.box, stone, 1.3, 1.4, 1.3);
-      mesh(head, PG.box, dark, 1.5, 0.3, 1.5, 0, 0.75, 0);
-      for (const s of [-1, 1]) mesh(head, PG.box, coreM, 0.25, 0.08, 0.05, s * 0.3, 0.1, 0.66);
+      smesh(head, PG.box, stone, 1.3, 1.4, 1.3);
+      smesh(head, PG.box, dark, 1.5, 0.3, 1.5, 0, 0.75, 0);
+      for (const s of [-1, 1]) smesh(head, PG.box, coreM, 0.25, 0.08, 0.05, s * 0.3, 0.1, 0.66);
       const arms = [];
       for (const s of [-1, 1]) {
         const sh = joint(torso, s * 2.3, 2.4, 0);
-        mesh(sh, PG.dode, dark, 1.0, 0.9, 1.0);
-        mesh(sh, PG.box, stone, 0.9, 2.2, 0.9, 0, -1.3, 0);
+        smesh(sh, PG.dode, dark, 1.0, 0.9, 1.0);
+        smesh(sh, PG.box, stone, 0.9, 2.2, 0.9, 0, -1.3, 0);
         const el = joint(sh, 0, -2.5, 0);
-        mesh(el, PG.box, stone, 0.85, 2.0, 0.85, 0, -1.0, 0);
-        mesh(el, PG.dode, dark, 1.1, 1.0, 1.1, 0, -2.2, 0);
+        smesh(el, PG.box, stone, 0.85, 2.0, 0.85, 0, -1.0, 0);
+        smesh(el, PG.dode, dark, 1.1, 1.0, 1.1, 0, -2.2, 0);
         arms.push({ sh, el });
       }
       const legs = [];
-      for (const s of [-1, 1]) { const hp = joint(hips, s * 0.9, -0.4, 0); mesh(hp, PG.box, stone, 1.1, 3.6, 1.1, 0, -1.9, 0); mesh(hp, PG.box, dark, 1.4, 0.5, 1.6, 0, -3.7, 0.2); legs.push(hp); }
+      for (const s of [-1, 1]) { const hp = joint(hips, s * 0.9, -0.4, 0); smesh(hp, PG.box, stone, 1.1, 3.6, 1.1, 0, -1.9, 0); smesh(hp, PG.box, dark, 1.4, 0.5, 1.6, 0, -3.7, 0.2); legs.push(hp); }
       // cores
       const corePos = [[torso, 0, 1.6, 1.12, '胸の魂核'], [torso, 0, 1.4, -1.12, '背の魂核'], [arms[0].sh, 0, 0.6, 0.5, '左肩の魂核'], [arms[1].sh, 0, 0.6, 0.5, '右肩の魂核']];
       this.cores = corePos.map(([n, x, y, z, name]) => {
         const holder = joint(n, x, y, z);
         const m = mesh(holder, PG.sph, coreM, 0.45, 0.45, 0.45);
-        mesh(holder, PG.torus, dark, 0.55, 0.55, 0.55, Math.PI / 2);
+        smesh(holder, PG.torus, dark, 0.55, 0.55, 0.55, Math.PI / 2);
         const cmax = Math.round(this.maxHp * 0.07);
         const core = this.part({ name, shared: false, hitW: [{ n: holder, r: 0.6, part: 'head' }], radius: 0.6, height: 1.2, showBar: true });
         core.hp = cmax; core.maxHp = cmax; core.mesh = m; core.holder = holder;
@@ -335,16 +338,16 @@
       const tooth = mat('#e8e0c8', { roughness: 0.3 });
       const eye = mat('#000', { emissive: 0x9aff40, emissiveIntensity: 2.5 });
       this.headG = new THREE.Group(); this.root.add(this.headG);
-      mesh(this.headG, PG.sph, skin, 1.5, 1.2, 2.0);
-      mesh(this.headG, PG.box, skin, 1.6, 0.6, 1.6, 0, 0.5, 0.6);
-      this.jaw = joint(this.headG, 0, -0.5, 0.5); mesh(this.jaw, PG.box, belly, 1.3, 0.4, 1.9, 0, -0.1, 0.9);
-      for (let i = 0; i < 8; i++) { mesh(this.headG, PG.cone, tooth, 0.12, 0.45, 0.12, -0.9 + i * 0.26, -0.45, 1.75, Math.PI); mesh(this.jaw, PG.cone, tooth, 0.1, 0.35, 0.1, -0.8 + i * 0.23, 0.15, 1.6); }
-      for (const s of [-1, 1]) { mesh(this.headG, PG.sph, eye, 0.18, 0.15, 0.1, s * 0.9, 0.5, 1.2); for (let k = 0; k < 3; k++) mesh(this.headG, PG.cone, belly, 0.15, 1.0, 0.15, s * (0.5 + k * 0.25), 0.9, -0.3 - k * 0.3, -0.8, 0, s * 0.4); }
+      smesh(this.headG, PG.sph, skin, 1.5, 1.2, 2.0);
+      smesh(this.headG, PG.box, skin, 1.6, 0.6, 1.6, 0, 0.5, 0.6);
+      this.jaw = joint(this.headG, 0, -0.5, 0.5); smesh(this.jaw, PG.box, belly, 1.3, 0.4, 1.9, 0, -0.1, 0.9);
+      for (let i = 0; i < 8; i++) { smesh(this.headG, PG.cone, tooth, 0.12, 0.45, 0.12, -0.9 + i * 0.26, -0.45, 1.75, Math.PI); smesh(this.jaw, PG.cone, tooth, 0.1, 0.35, 0.1, -0.8 + i * 0.23, 0.15, 1.6); }
+      for (const s of [-1, 1]) { smesh(this.headG, PG.sph, eye, 0.18, 0.15, 0.1, s * 0.9, 0.5, 1.2); for (let k = 0; k < 3; k++) smesh(this.headG, PG.cone, belly, 0.15, 1.0, 0.15, s * (0.5 + k * 0.25), 0.9, -0.3 - k * 0.3, -0.8, 0, s * 0.4); }
       this.segs = [];
       for (let i = 0; i < 22; i++) {
         const g = new THREE.Group(); const r = 1.35 - i * 0.04;
-        mesh(g, PG.sph, skin, r, r, r * 0.8);
-        mesh(g, PG.cone, belly, 0.2, 0.7, 0.2, 0, r * 0.95, 0);
+        smesh(g, PG.sph, skin, r, r, r * 0.8);
+        smesh(g, PG.cone, belly, 0.2, 0.7, 0.2, 0, r * 0.95, 0);
         this.root.add(g); this.segs.push(g);
       }
       this.headPart = this.part({ name: def.name, hitW: [{ n: this.headG, r: 1.6, part: 'head' }], radius: 1.6, height: 2.5 });
@@ -470,13 +473,13 @@
       const iris = mat('#5a1010', { roughness: 0.2 });
       const pupil = mat('#000', { emissive: 0xff3020, emissiveIntensity: 2 });
       this.body = joint(this.root, 0, 0, 0);
-      mesh(this.body, PG.sph, flesh, 2.2, 2.2, 2.2);
-      mesh(this.body, PG.sph, iris, 1.0, 1.0, 0.35, 0, 0, 2.0);
+      smesh(this.body, PG.sph, flesh, 2.2, 2.2, 2.2);
+      smesh(this.body, PG.sph, iris, 1.0, 1.0, 0.35, 0, 0, 2.0);
       this.pupilM = mesh(this.body, PG.sph, pupil, 0.4, 0.5, 0.15, 0, 0, 2.25);
-      mesh(this.body, PG.torus, gold, 2.6, 2.6, 2.6, Math.PI / 2);
-      mesh(this.body, PG.cone, robe, 2.3, 4.5, 2.3, 0, -3.0, 0, Math.PI);
-      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; mesh(this.body, PG.sph, flesh, 0.25, 0.25, 0.25, Math.cos(a) * 1.9, Math.sin(a) * 1.9 * 0.6 + 0.6, Math.sin(a * 2) * 0.6 + 0.9); mesh(this.body, PG.sph, pupil, 0.1, 0.1, 0.08, Math.cos(a) * 1.95, Math.sin(a) * 1.9 * 0.6 + 0.6, Math.sin(a * 2) * 0.6 + 1.15); }
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; mesh(this.body, PG.cone, gold, 0.18, 1.6, 0.18, Math.cos(a) * 1.6, 2.2, Math.sin(a) * 1.6, Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); }
+      smesh(this.body, PG.torus, gold, 2.6, 2.6, 2.6, Math.PI / 2);
+      smesh(this.body, PG.cone, robe, 2.3, 4.5, 2.3, 0, -3.0, 0, Math.PI);
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; smesh(this.body, PG.sph, flesh, 0.25, 0.25, 0.25, Math.cos(a) * 1.9, Math.sin(a) * 1.9 * 0.6 + 0.6, Math.sin(a * 2) * 0.6 + 0.9); smesh(this.body, PG.sph, pupil, 0.1, 0.1, 0.08, Math.cos(a) * 1.95, Math.sin(a) * 1.9 * 0.6 + 0.6, Math.sin(a * 2) * 0.6 + 1.15); }
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; smesh(this.body, PG.cone, gold, 0.18, 1.6, 0.18, Math.cos(a) * 1.6, 2.2, Math.sin(a) * 1.6, Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); }
       this.main = this.part({ name: def.name, hitW: [{ n: this.body, r: 2.3, part: 'body' }, { n: this.body, r: 0.9, part: 'head', o: V(0, 0, 2.0) }], radius: 2.3, height: 4.6, undead: false });
       this.main.isInvuln = () => this.wards.some((w) => w.alive) || this.teleporting;
       this.main.dmgMul = (info) => (info.head ? 1.5 : 1);
@@ -497,7 +500,7 @@
       for (let i = 0; i < 6; i++) {
         const holder = joint(this.wardGroup, 0, 0, 0);
         const m = mesh(holder, PG.sph, this.wardMat, 0.55, 0.55, 0.55);
-        mesh(holder, PG.sph, mat('#000', { emissive: 0xc070ff, emissiveIntensity: 2 }), 0.22, 0.22, 0.1, 0, 0, 0.5);
+        smesh(holder, PG.sph, mat('#000', { emissive: 0xc070ff, emissiveIntensity: 2 }), 0.22, 0.22, 0.1, 0, 0, 0.5);
         const w = this.part({ name: '護符眼', shared: false, hitW: [{ n: holder, r: 0.75, part: 'head' }], radius: 0.7, height: 1.2, showBar: true });
         w.hp = hpEach; w.maxHp = hpEach; w.m = holder; w.idx = i;
         w.die = () => { w.alive = false; holder.visible = false; G.fx.explosion(w.centerRef.clone(), 1.6, 0xc070ff, { decal: false }); G.sfx.shieldBreak(w.centerRef); G.ui.feed('👁 護符眼を破壊'); if (!this.wards.some((x) => x.alive)) { this.gimmickClear('護符眼', null, 0xc070ff); this.vulnT = 12; G.ui.toast('結界が消えた！ 本体を撃て！', 'good'); G.sfx.bell(); } return false; };
@@ -618,27 +621,27 @@
       this.armorM = armor;
       const r = this.root;
       const hips = joint(r, 0, 2.7, 0);
-      mesh(hips, PG.box, armor, 1.6, 0.7, 1.0);
-      mesh(hips, PG.box, cloth, 1.7, 1.6, 0.05, 0, -0.9, 0.55);
+      smesh(hips, PG.box, armor, 1.6, 0.7, 1.0);
+      smesh(hips, PG.box, cloth, 1.7, 1.6, 0.05, 0, -0.9, 0.55);
       const torso = joint(hips, 0, 0.4, 0);
-      mesh(torso, PG.box, flesh, 1.9, 1.7, 1.2, 0, 0.9, 0);
+      smesh(torso, PG.box, flesh, 1.9, 1.7, 1.2, 0, 0.9, 0);
       this.breast = mesh(torso, PG.box, armor, 2.05, 1.6, 0.35, 0, 0.95, 0.55);
-      mesh(torso, PG.box, wound, 0.9, 0.9, 0.05, 0, 0.9, -0.62);
-      for (const s of [-1, 1]) mesh(torso, PG.sph, armor, 0.65, 0.5, 0.65, s * 1.2, 1.7, 0);
+      smesh(torso, PG.box, wound, 0.9, 0.9, 0.05, 0, 0.9, -0.62);
+      for (const s of [-1, 1]) smesh(torso, PG.sph, armor, 0.65, 0.5, 0.65, s * 1.2, 1.7, 0);
       const head = joint(torso, 0, 2.0, 0.1);
-      mesh(head, PG.box, armor, 0.75, 0.85, 0.75);
-      mesh(head, PG.cone, cloth, 0.5, 1.1, 0.5, 0, 0.6, -0.1, -0.3);
-      for (const s of [-1, 1]) mesh(head, PG.box, mat('#000', { emissive: 0xff3010, emissiveIntensity: 2 }), 0.12, 0.05, 0.02, s * 0.17, 0.05, 0.38);
+      smesh(head, PG.box, armor, 0.75, 0.85, 0.75);
+      smesh(head, PG.cone, cloth, 0.5, 1.1, 0.5, 0, 0.6, -0.1, -0.3);
+      for (const s of [-1, 1]) smesh(head, PG.box, mat('#000', { emissive: 0xff3010, emissiveIntensity: 2 }), 0.12, 0.05, 0.02, s * 0.17, 0.05, 0.38);
       const arms = [];
-      for (const s of [-1, 1]) { const sh = joint(torso, s * 1.25, 1.5, 0); mesh(sh, PG.box, flesh, 0.5, 1.4, 0.5, 0, -0.7, 0); const el = joint(sh, 0, -1.4, 0); mesh(el, PG.box, armor, 0.55, 1.3, 0.55, 0, -0.6, 0); const hand = joint(el, 0, -1.35, 0); arms.push({ sh, el, hand }); }
+      for (const s of [-1, 1]) { const sh = joint(torso, s * 1.25, 1.5, 0); smesh(sh, PG.box, flesh, 0.5, 1.4, 0.5, 0, -0.7, 0); const el = joint(sh, 0, -1.4, 0); smesh(el, PG.box, armor, 0.55, 1.3, 0.55, 0, -0.6, 0); const hand = joint(el, 0, -1.35, 0); arms.push({ sh, el, hand }); }
       // great axe
       const axe = joint(arms[1].hand, 0, 0, 0);
-      mesh(axe, PG.cyl8, mat('#4a3020', { map: G.Tex.tex.planks.map }), 0.09, 3.2, 0.09, 0, 0, 1.0, Math.PI / 2);
-      mesh(axe, PG.box, steel, 0.08, 1.3, 1.0, 0, 0.55, 2.4);
+      smesh(axe, PG.cyl8, mat('#4a3020', { map: G.Tex.tex.planks.map }), 0.09, 3.2, 0.09, 0, 0, 1.0, Math.PI / 2);
+      smesh(axe, PG.box, steel, 0.08, 1.3, 1.0, 0, 0.55, 2.4);
       // chains
-      for (let i = 0; i < 8; i++) mesh(arms[0].hand, PG.torus, armor, 0.12, 0.18, 0.12, 0, -0.2 - i * 0.22, 0, 0, i % 2 ? Math.PI / 2 : 0);
+      for (let i = 0; i < 8; i++) smesh(arms[0].hand, PG.torus, armor, 0.12, 0.18, 0.12, 0, -0.2 - i * 0.22, 0, 0, i % 2 ? Math.PI / 2 : 0);
       const legs = [];
-      for (const s of [-1, 1]) { const hp = joint(hips, s * 0.55, -0.3, 0); mesh(hp, PG.box, armor, 0.65, 2.4, 0.65, 0, -1.2, 0); mesh(hp, PG.box, armor, 0.8, 0.35, 1.0, 0, -2.35, 0.15); legs.push(hp); }
+      for (const s of [-1, 1]) { const hp = joint(hips, s * 0.55, -0.3, 0); smesh(hp, PG.box, armor, 0.65, 2.4, 0.65, 0, -1.2, 0); smesh(hp, PG.box, armor, 0.8, 0.35, 1.0, 0, -2.35, 0.15); legs.push(hp); }
       this.J = { hips, torso, head, arms, legs, axe };
       this.main = this.part({ name: def.name, hitW: [{ n: torso, r: 1.3, part: 'body', o: V(0, 0.9, 0) }, { n: head, r: 0.55, part: 'head' }, { n: hips, r: 0.9, part: 'body' }, { n: legs[0], r: 0.45, part: 'body', o: V(0, -1.2, 0) }, { n: legs[1], r: 0.45, part: 'body', o: V(0, -1.2, 0) }], radius: 1.4, height: 6 });
       this.main.dmgMul = (info, ctx) => {
@@ -774,20 +777,20 @@
       const eye = mat('#000', { emissive: 0xff3020, emissiveIntensity: 2.4 });
       this.body = joint(this.root, 0, 2.2, 0);
       this.abd = joint(this.body, 0, 0.5, -2.2);
-      mesh(this.abd, PG.sph, chit, 2.0, 1.7, 2.4);
+      smesh(this.abd, PG.sph, chit, 2.0, 1.7, 2.4);
       this.weak = mesh(this.abd, PG.sph, mark, 0.9, 0.7, 1.0, 0, 1.3, -0.4);
       const ceph = joint(this.body, 0, 0, 0.6);
-      mesh(ceph, PG.sph, chit, 1.3, 1.0, 1.4);
-      for (let i = 0; i < 8; i++) mesh(ceph, PG.sph, eye, 0.12, 0.12, 0.1, (i % 4 - 1.5) * 0.25, 0.45 + (i > 3 ? 0.2 : 0), 1.2);
+      smesh(ceph, PG.sph, chit, 1.3, 1.0, 1.4);
+      for (let i = 0; i < 8; i++) smesh(ceph, PG.sph, eye, 0.12, 0.12, 0.1, (i % 4 - 1.5) * 0.25, 0.45 + (i > 3 ? 0.2 : 0), 1.2);
       this.fangs = [];
-      for (const s of [-1, 1]) { const f = joint(ceph, s * 0.35, -0.5, 1.1); mesh(f, PG.cone, chit, 0.15, 0.7, 0.15, 0, -0.3, 0.1, Math.PI - 0.3); this.fangs.push(f); }
+      for (const s of [-1, 1]) { const f = joint(ceph, s * 0.35, -0.5, 1.1); smesh(f, PG.cone, chit, 0.15, 0.7, 0.15, 0, -0.3, 0.1, Math.PI - 0.3); this.fangs.push(f); }
       this.legs = [];
       for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
         const hip = joint(this.body, s * 0.9, 0.1, 1.0 - i * 0.6); hip.rotation.y = s * (0.5 - i * 0.35) + (s < 0 ? Math.PI : 0);
         const up = joint(hip, 0, 0, 0); up.rotation.z = 0.8;
-        mesh(up, PG.box, chit, 2.4, 0.2, 0.2, 1.2, 0, 0);
+        smesh(up, PG.box, chit, 2.4, 0.2, 0.2, 1.2, 0, 0);
         const kn = joint(up, 2.4, 0, 0); kn.rotation.z = -2.1;
-        mesh(kn, PG.box, chit, 3.0, 0.15, 0.15, 1.5, 0, 0);
+        smesh(kn, PG.box, chit, 3.0, 0.15, 0.15, 1.5, 0, 0);
         this.legs.push({ up, hip, ph: i * 1.3 + (s > 0 ? Math.PI : 0) });
       }
       this.main = this.part({ name: def.name, hitW: [{ n: ceph, r: 1.3, part: 'body' }, { n: this.abd, r: 1.9, part: 'body' }, { n: this.abd, r: 0.9, part: 'head', o: V(0, 1.3, -0.4) }], radius: 2.5, height: 4 });
@@ -893,8 +896,8 @@
         const an = i / n * Math.PI * 2 + Math.random();
         const p = V(c.x + Math.cos(an) * U.rand(8, 20), 0, c.z + Math.sin(an) * U.rand(8, 20));
         const holder = new THREE.Group(); holder.position.copy(p); this.root.parent.add(holder);
-        mesh(holder, PG.sph, sac, 0.8, 1.0, 0.8, 0, 0.9, 0);
-        for (let k = 0; k < 4; k++) mesh(holder, PG.cyl8, sac, 0.03, 1.4, 0.03, Math.cos(k * 1.57) * 0.5, 0.6, Math.sin(k * 1.57) * 0.5, 0, 0, Math.cos(k * 1.57) * 0.6);
+        smesh(holder, PG.sph, sac, 0.8, 1.0, 0.8, 0, 0.9, 0);
+        for (let k = 0; k < 4; k++) smesh(holder, PG.cyl8, sac, 0.03, 1.4, 0.03, Math.cos(k * 1.57) * 0.5, 0.6, Math.sin(k * 1.57) * 0.5, 0, 0, Math.cos(k * 1.57) * 0.6);
         const hp = Math.round(this.maxHp * 0.03);
         const egg = this.part({ name: '卵嚢', shared: false, hitW: [{ n: holder, r: 0.95, part: 'body', o: V(0, 0.9, 0) }], radius: 0.9, height: 1.8, showBar: true, blood: 0x8aa040, def: { id: 'boss_egg', name: '卵嚢', plan: 'boss', big: false, flyer: false } });
         egg.hp = hp; egg.maxHp = hp; egg.holder = holder; egg.idx = i; egg.hatchT = 10 + i * 0.5;
@@ -916,13 +919,16 @@
   }
 
   const CLS = (BS.CLS = { colossus: Colossus, wyrm: Wyrm, archon: Archon, executioner: Executioner, broodmother: BroodMother });
-  BS.Boss = Boss; BS.h = { mat, mesh, joint, V };
+  BS.Boss = Boss; BS.h = { mat, mesh, smesh, joint, V };
+  // the still parts of a guardian's body, joint by joint, into one surface each (with the full look on; made once for each shape)
+  BS.melt = function (b) { if (b && b.root && G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(b.root, {}, null, 'guardian', { still: true, free: true, round: 0.28, blend: 0.03, pick: (c) => c.userData.st === 1 }); } catch (e) { /* it stays as built */ } } return b; };
   BS.order = ['colossus', 'wyrm', 'archon', 'executioner', 'broodmother'];
   BS.forArea = function (area) { return BS.order[(Math.floor(area / 5) - 1) % BS.order.length]; };
   BS.has = (id) => !!CLS[id];
   BS.start = function (id, level, world) {
     const def = G.BOSS_BY_ID[id];
     const b = new CLS[id](def, level, world);
+    BS.melt(b);
     BS.active = b;
     if (G.Elem) G.Elem.bossInit(b, id);
     G.save.mark('bosses', id);

@@ -5,6 +5,7 @@
 (function () {
   const BS = G.bosses, U = G.U;
   const { mat, mesh, joint, V } = BS.h;
+  const smesh = BS.h.smesh;
   const Boss = BS.Boss;
   let P, C, PG;
   const env = () => { P = G.player; C = G.combat; PG = G.Props.PG; };
@@ -47,36 +48,36 @@
       const r = this.root;
       this.bodyJ = joint(r, 0, 3.2, 0);
       const B = this.bodyJ;
-      mesh(B, PG.sph, scale, 1.7, 1.45, 3.4);
-      mesh(B, PG.sph, belly, 1.35, 1.0, 3.0, 0, -0.5, 0.1);
-      for (let i = 0; i < 7; i++) mesh(B, PG.cone, horn, 0.2, 0.75, 0.2, 0, 1.35, -2.0 + i * 0.65, -0.3);
-      for (const s of [-1, 1]) mesh(B, PG.box, this.veinM, 0.07, 0.07, 4.6, s * 0.95, 0.65, 0);
+      smesh(B, PG.sph, scale, 1.7, 1.45, 3.4);
+      smesh(B, PG.sph, belly, 1.35, 1.0, 3.0, 0, -0.5, 0.1);
+      for (let i = 0; i < 7; i++) smesh(B, PG.cone, horn, 0.2, 0.75, 0.2, 0, 1.35, -2.0 + i * 0.65, -0.3);
+      for (const s of [-1, 1]) smesh(B, PG.box, this.veinM, 0.07, 0.07, 4.6, s * 0.95, 0.65, 0);
       // neck & head
       this.neck = [];
       let prev = joint(B, 0, 0.6, 2.7);
-      for (let i = 0; i < 3; i++) { const sg = joint(prev, 0, 0.22, i ? 1.0 : 0); mesh(sg, PG.sph, scale, 0.72 - i * 0.08, 0.72 - i * 0.08, 0.95, 0, 0, 0.45); this.neck.push(sg); prev = sg; }
+      for (let i = 0; i < 3; i++) { const sg = joint(prev, 0, 0.22, i ? 1.0 : 0); smesh(sg, PG.sph, scale, 0.72 - i * 0.08, 0.72 - i * 0.08, 0.95, 0, 0, 0.45); this.neck.push(sg); prev = sg; }
       this.head = joint(prev, 0, 0.1, 1.15);
-      mesh(this.head, PG.box, scale, 0.95, 0.72, 1.6, 0, 0, 0.55);
-      for (const s of [-1, 1]) { mesh(this.head, PG.cone, horn, 0.13, 1.2, 0.13, s * 0.35, 0.45, -0.25, -1.9, 0, s * 0.35); mesh(this.head, PG.sph, eyeM, 0.12, 0.08, 0.12, s * 0.38, 0.18, 0.95); }
+      smesh(this.head, PG.box, scale, 0.95, 0.72, 1.6, 0, 0, 0.55);
+      for (const s of [-1, 1]) { smesh(this.head, PG.cone, horn, 0.13, 1.2, 0.13, s * 0.35, 0.45, -0.25, -1.9, 0, s * 0.35); smesh(this.head, PG.sph, eyeM, 0.12, 0.08, 0.12, s * 0.38, 0.18, 0.95); }
       this.jaw = joint(this.head, 0, -0.28, 0.15);
-      mesh(this.jaw, PG.box, scale, 0.8, 0.22, 1.35, 0, -0.08, 0.6);
-      for (let i = 0; i < 5; i++) mesh(this.jaw, PG.cone, horn, 0.05, 0.16, 0.05, -0.3 + i * 0.15, 0.08, 1.15);
+      smesh(this.jaw, PG.box, scale, 0.8, 0.22, 1.35, 0, -0.08, 0.6);
+      for (let i = 0; i < 5; i++) smesh(this.jaw, PG.cone, horn, 0.05, 0.16, 0.05, -0.3 + i * 0.15, 0.08, 1.15);
       this.mouth = joint(this.head, 0, -0.15, 1.45);
       // tail
       this.tail = [];
       prev = joint(B, 0, 0.1, -3.0);
-      for (let i = 0; i < 6; i++) { const sg = joint(prev, 0, 0, i ? -1.05 : 0); mesh(sg, PG.sph, scale, 0.6 - i * 0.08, 0.55 - i * 0.07, 0.8, 0, 0, -0.5); this.tail.push(sg); prev = sg; }
-      mesh(prev, PG.cone, horn, 0.4, 0.9, 0.12, 0, 0.1, -1.0, -Math.PI / 2);
+      for (let i = 0; i < 6; i++) { const sg = joint(prev, 0, 0, i ? -1.05 : 0); smesh(sg, PG.sph, scale, 0.6 - i * 0.08, 0.55 - i * 0.07, 0.8, 0, 0, -0.5); this.tail.push(sg); prev = sg; }
+      smesh(prev, PG.cone, horn, 0.4, 0.9, 0.12, 0, 0.1, -1.0, -Math.PI / 2);
       // legs
       this.legs = [];
-      for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) { const hp = joint(B, sx * 1.15, -0.6, sz * 1.5); mesh(hp, PG.cyl8, scale, 0.32, 1.5, 0.32, 0, -0.75, 0); const kn = joint(hp, 0, -1.5, 0); mesh(kn, PG.cyl8, belly, 0.24, 1.3, 0.24, 0, -0.6, 0.15, 0.25); mesh(kn, PG.box, horn, 0.5, 0.15, 0.6, 0, -1.25, 0.35); this.legs.push({ hp, kn }); }
+      for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) { const hp = joint(B, sx * 1.15, -0.6, sz * 1.5); smesh(hp, PG.cyl8, scale, 0.32, 1.5, 0.32, 0, -0.75, 0); const kn = joint(hp, 0, -1.5, 0); smesh(kn, PG.cyl8, belly, 0.24, 1.3, 0.24, 0, -0.6, 0.15, 0.25); smesh(kn, PG.box, horn, 0.5, 0.15, 0.6, 0, -1.25, 0.35); this.legs.push({ hp, kn }); }
       // wings: bone arm + membrane fan (custom triangles)
       this.wings = [];
       for (const s of [-1, 1]) {
         const sh = joint(B, s * 1.25, 0.95, 0.6);
-        mesh(sh, PG.cyl8, scale, 0.18, 4.2, 0.18, s * 2.1, 0.2, 0, 0, 0, Math.PI / 2 - s * 0.1);
+        smesh(sh, PG.cyl8, scale, 0.18, 4.2, 0.18, s * 2.1, 0.2, 0, 0, 0, Math.PI / 2 - s * 0.1);
         const tip = joint(sh, s * 4.2, 0.4, 0);
-        mesh(tip, PG.cyl8, scale, 0.12, 3.4, 0.12, s * 1.5, 0, -0.8, 0.5, 0, Math.PI / 2);
+        smesh(tip, PG.cyl8, scale, 0.12, 3.4, 0.12, s * 1.5, 0, -0.8, 0.5, 0, Math.PI / 2);
         const g = new THREE.BufferGeometry();
         const v = [0, 0, 0, s * 4.2, 0.4, 0, s * 7.2, 0.5, -1.6, s * 4.2, 0.4, 0, s * 6.4, -0.1, -3.4, s * 7.2, 0.5, -1.6, 0, 0, 0, s * 6.4, -0.1, -3.4, s * 4.2, 0.4, 0, 0, 0, 0, s * 3.2, -0.2, -3.6, s * 6.4, -0.1, -3.4, 0, 0, 0, 0, -0.1, -2.8, s * 3.2, -0.2, -3.6];
         g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals();
@@ -297,38 +298,38 @@
   function giant(root, o) {
     const J = {}, s = o.s;
     J.body = joint(root, 0, o.hip, 0);
-    mesh(J.body, PG.box, o.armor, 1.0 * s, 0.55 * s, 0.65 * s);
-    mesh(J.body, PG.box, o.cape, 1.1 * s, 0.9 * s, 0.7 * s, 0, -0.55 * s, 0); // tassets
+    smesh(J.body, PG.box, o.armor, 1.0 * s, 0.55 * s, 0.65 * s);
+    smesh(J.body, PG.box, o.cape, 1.1 * s, 0.9 * s, 0.7 * s, 0, -0.55 * s, 0); // tassets
     J.torso = joint(J.body, 0, 0.25 * s, 0);
-    mesh(J.torso, PG.box, o.armor, 1.3 * s, 1.2 * s, 0.8 * s, 0, 0.6 * s, 0);
-    mesh(J.torso, PG.box, o.trim, 1.4 * s, 0.16 * s, 0.85 * s, 0, 1.15 * s, 0);
-    mesh(J.torso, PG.box, o.trim, 0.12 * s, 1.0 * s, 0.86 * s, 0, 0.6 * s, 0);
-    for (const sx of [-1, 1]) { mesh(J.torso, PG.sph, o.armor, 0.42 * s, 0.34 * s, 0.42 * s, sx * 0.78 * s, 1.15 * s, 0); for (let k = 0; k < 3; k++) mesh(J.torso, PG.cone, o.trim, 0.06 * s, 0.35 * s, 0.06 * s, sx * (0.68 + k * 0.12) * s, 1.45 * s, 0); }
-    mesh(J.torso, PG.box, o.cape, 1.3 * s, 2.3 * s, 0.05 * s, 0, -0.1 * s, -0.45 * s, 0.1);
+    smesh(J.torso, PG.box, o.armor, 1.3 * s, 1.2 * s, 0.8 * s, 0, 0.6 * s, 0);
+    smesh(J.torso, PG.box, o.trim, 1.4 * s, 0.16 * s, 0.85 * s, 0, 1.15 * s, 0);
+    smesh(J.torso, PG.box, o.trim, 0.12 * s, 1.0 * s, 0.86 * s, 0, 0.6 * s, 0);
+    for (const sx of [-1, 1]) { smesh(J.torso, PG.sph, o.armor, 0.42 * s, 0.34 * s, 0.42 * s, sx * 0.78 * s, 1.15 * s, 0); for (let k = 0; k < 3; k++) smesh(J.torso, PG.cone, o.trim, 0.06 * s, 0.35 * s, 0.06 * s, sx * (0.68 + k * 0.12) * s, 1.45 * s, 0); }
+    smesh(J.torso, PG.box, o.cape, 1.3 * s, 2.3 * s, 0.05 * s, 0, -0.1 * s, -0.45 * s, 0.1);
     J.head = joint(J.torso, 0, 1.5 * s, 0);
-    mesh(J.head, PG.box, o.armor, 0.5 * s, 0.62 * s, 0.56 * s);
-    mesh(J.head, PG.box, o.glow, 0.36 * s, 0.05 * s, 0.05 * s, 0, 0.05 * s, 0.29 * s);
+    smesh(J.head, PG.box, o.armor, 0.5 * s, 0.62 * s, 0.56 * s);
+    smesh(J.head, PG.box, o.glow, 0.36 * s, 0.05 * s, 0.05 * s, 0, 0.05 * s, 0.29 * s);
     J.crown = joint(J.head, 0, 0.36 * s, 0);
-    mesh(J.crown, PG.cyl8, o.trim, 0.33 * s, 0.12 * s, 0.33 * s);
-    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; mesh(J.crown, PG.cone, o.trim, 0.06 * s, 0.32 * s, 0.06 * s, Math.cos(a) * 0.3 * s, 0.2 * s, Math.sin(a) * 0.3 * s); }
+    smesh(J.crown, PG.cyl8, o.trim, 0.33 * s, 0.12 * s, 0.33 * s);
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; smesh(J.crown, PG.cone, o.trim, 0.06 * s, 0.32 * s, 0.06 * s, Math.cos(a) * 0.3 * s, 0.2 * s, Math.sin(a) * 0.3 * s); }
     J.gem = mesh(J.crown, PG.oct, o.gem, 0.1 * s, 0.14 * s, 0.1 * s, 0, 0.05 * s, 0.33 * s);
     J.arms = [];
     for (const sx of [-1, 1]) {
       const sh = joint(J.torso, sx * 0.85 * s, 1.0 * s, 0);
-      mesh(sh, PG.cyl8, o.armor, 0.2 * s, 0.85 * s, 0.2 * s, 0, -0.42 * s, 0);
+      smesh(sh, PG.cyl8, o.armor, 0.2 * s, 0.85 * s, 0.2 * s, 0, -0.42 * s, 0);
       const el = joint(sh, 0, -0.85 * s, 0);
-      mesh(el, PG.cyl8, o.trim, 0.18 * s, 0.8 * s, 0.18 * s, 0, -0.4 * s, 0);
+      smesh(el, PG.cyl8, o.trim, 0.18 * s, 0.8 * s, 0.18 * s, 0, -0.4 * s, 0);
       const hand = joint(el, 0, -0.82 * s, 0);
-      mesh(hand, PG.box, o.armor, 0.22 * s, 0.22 * s, 0.22 * s);
+      smesh(hand, PG.box, o.armor, 0.22 * s, 0.22 * s, 0.22 * s);
       J.arms.push({ sh, el, hand });
     }
     J.legs = [];
     for (const sx of [-1, 1]) {
       const hp = joint(J.body, sx * 0.32 * s, -0.1 * s, 0);
-      mesh(hp, PG.cyl8, o.armor, 0.24 * s, 1.05 * s, 0.24 * s, 0, -0.52 * s, 0);
+      smesh(hp, PG.cyl8, o.armor, 0.24 * s, 1.05 * s, 0.24 * s, 0, -0.52 * s, 0);
       const kn = joint(hp, 0, -1.05 * s, 0);
-      mesh(kn, PG.cyl8, o.trim, 0.2 * s, 1.0 * s, 0.2 * s, 0, -0.5 * s, 0);
-      mesh(kn, PG.box, o.armor, 0.34 * s, 0.18 * s, 0.5 * s, 0, -1.0 * s, 0.1 * s);
+      smesh(kn, PG.cyl8, o.trim, 0.2 * s, 1.0 * s, 0.2 * s, 0, -0.5 * s, 0);
+      smesh(kn, PG.box, o.armor, 0.34 * s, 0.18 * s, 0.5 * s, 0, -1.0 * s, 0.1 * s);
       J.legs.push({ hp, kn });
     }
     return J;
@@ -350,10 +351,10 @@
       // the greatsword
       const hand = this.J.arms[1].hand;
       this.sword = joint(hand, 0, 0, 0.2);
-      mesh(this.sword, PG.box, this.trimM, 0.18, 0.18, 1.1, 0, 0, -0.2);
-      mesh(this.sword, PG.box, this.trimM, 1.4, 0.18, 0.22, 0, 0, 0.4);
-      mesh(this.sword, PG.box, mat('#2a2030', { metalness: 0.9, roughness: 0.2 }), 0.42, 0.1, 6.6, 0, 0, 3.8);
-      mesh(this.sword, PG.box, this.glowM, 0.08, 0.12, 6.2, 0, 0, 3.8);
+      smesh(this.sword, PG.box, this.trimM, 0.18, 0.18, 1.1, 0, 0, -0.2);
+      smesh(this.sword, PG.box, this.trimM, 1.4, 0.18, 0.22, 0, 0, 0.4);
+      smesh(this.sword, PG.box, mat('#2a2030', { metalness: 0.9, roughness: 0.2 }), 0.42, 0.1, 6.6, 0, 0, 3.8);
+      smesh(this.sword, PG.box, this.glowM, 0.08, 0.12, 6.2, 0, 0, 3.8);
       this.sword.rotation.x = Math.PI / 2;
       this.kmats = [this.armorM, this.trimM, this.capeM, this.glowM, this.gemM];
       // a halo above the crown and a rune circle that follows him across the floor
@@ -568,27 +569,27 @@
       const eyeW = mat('#f0e8ff', { roughness: 0.2 }), iris = mat('#000', { emissive: 0xff2060, emissiveIntensity: 4 });
       this.coreM = mat('#200030', { emissive: 0xff40c0, emissiveIntensity: 4, roughness: 0.05 });
       // torso & wisp tail
-      mesh(av, PG.sph, ob, 3.2, 3.8, 2.6, 0, 0, 0);
-      for (let i = 0; i < 6; i++) mesh(av, PG.box, crack, 0.08, U.rand(1.5, 3.5), 0.08, U.rand(-2.2, 2.2), U.rand(-1.5, 1.5), 2.3, 0, 0, U.rand(-0.8, 0.8));
+      smesh(av, PG.sph, ob, 3.2, 3.8, 2.6, 0, 0, 0);
+      for (let i = 0; i < 6; i++) smesh(av, PG.box, crack, 0.08, U.rand(1.5, 3.5), 0.08, U.rand(-2.2, 2.2), U.rand(-1.5, 1.5), 2.3, 0, 0, U.rand(-0.8, 0.8));
       this.tailW = mesh(av, PG.cone, mat('#1a0828', { transparent: true, opacity: 0.75, emissive: 0x300050 }), 2.4, 7, 2.4, 0, -6.5, 0, Math.PI);
       this.coreJ = joint(av, 0, 0.4, 2.3);
       this.coreMesh = mesh(this.coreJ, PG.oct, this.coreM, 0.9, 1.3, 0.9);
       // head: horned mask with three eyes
       const head = this.avHead = joint(av, 0, 4.6, 0.3);
-      mesh(head, PG.box, ob, 2.0, 2.3, 1.6);
-      for (const s of [-1, 1]) mesh(head, PG.cone, ob, 0.35, 3.2, 0.35, s * 1.0, 2.2, -0.2, -0.3, 0, s * 0.5);
-      for (const [x, y, sc] of [[-0.55, 0.2, 0.32], [0.55, 0.2, 0.32], [0, 0.85, 0.42]]) { mesh(head, PG.sph, eyeW, sc, sc, sc * 0.6, x, y, 0.82); mesh(head, PG.sph, iris, sc * 0.45, sc * 0.45, sc * 0.3, x, y, 0.98); }
+      smesh(head, PG.box, ob, 2.0, 2.3, 1.6);
+      for (const s of [-1, 1]) smesh(head, PG.cone, ob, 0.35, 3.2, 0.35, s * 1.0, 2.2, -0.2, -0.3, 0, s * 0.5);
+      for (const [x, y, sc] of [[-0.55, 0.2, 0.32], [0.55, 0.2, 0.32], [0, 0.85, 0.42]]) { smesh(head, PG.sph, eyeW, sc, sc, sc * 0.6, x, y, 0.82); smesh(head, PG.sph, iris, sc * 0.45, sc * 0.45, sc * 0.3, x, y, 0.98); }
       // halo of eyes
       this.halo = joint(av, 0, 5.2, -1.6);
-      mesh(this.halo, PG.torus, crack, 4.2, 4.2, 4.2);
-      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; const g = joint(this.halo, Math.cos(a) * 4.2, Math.sin(a) * 4.2, 0); mesh(g, PG.sph, eyeW, 0.42, 0.42, 0.3); mesh(g, PG.sph, iris, 0.2, 0.2, 0.15, 0, 0, 0.18); }
+      smesh(this.halo, PG.torus, crack, 4.2, 4.2, 4.2);
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; const g = joint(this.halo, Math.cos(a) * 4.2, Math.sin(a) * 4.2, 0); smesh(g, PG.sph, eyeW, 0.42, 0.42, 0.3); smesh(g, PG.sph, iris, 0.2, 0.2, 0.15, 0, 0, 0.18); }
       // four arms
       this.avArms = [];
       for (const [sx, y, l] of [[-1, 1.6, 7], [1, 1.6, 7], [-1, -0.8, 5], [1, -0.8, 5]]) {
         const sh = joint(av, sx * 3.0, y, 0);
-        mesh(sh, PG.cyl8, ob, 0.45, l, 0.45, 0, -l / 2, 0);
+        smesh(sh, PG.cyl8, ob, 0.45, l, 0.45, 0, -l / 2, 0);
         const hd = joint(sh, 0, -l, 0);
-        for (let k = 0; k < 4; k++) mesh(hd, PG.cone, crack, 0.12, 1.2, 0.12, -0.4 + k * 0.27, -0.6, 0.2, Math.PI, 0, 0);
+        for (let k = 0; k < 4; k++) smesh(hd, PG.cone, crack, 0.12, 1.2, 0.12, -0.4 + k * 0.27, -0.6, 0.2, Math.PI, 0, 0);
         sh.rotation.z = sx * 0.6;
         this.avArms.push({ sh, sx, base: sx * 0.6 });
       }
@@ -783,7 +784,7 @@
           const q = P.pos.clone().setY(0);
           G.fx.telegraph(q.clone().setY(0.02), 3.8, 1.0, 0xff3080);
           const hand = new THREE.Group(); const ob = mat('#0c0810', { roughness: 0.3, metalness: 0.5 });
-          mesh(hand, PG.box, ob, 2.6, 0.8, 3.2, 0, 0, 0); for (let k = 0; k < 4; k++) mesh(hand, PG.cone, this.crackM, 0.22, 1.6, 0.22, -0.9 + k * 0.6, -0.6, 1.6, Math.PI / 2 + 0.6, 0, 0);
+          smesh(hand, PG.box, ob, 2.6, 0.8, 3.2, 0, 0, 0); for (let k = 0; k < 4; k++) smesh(hand, PG.cone, this.crackM, 0.22, 1.6, 0.22, -0.9 + k * 0.6, -0.6, 1.6, Math.PI / 2 + 0.6, 0, 0);
           hand.position.set(q.x, 22, q.z); this.own(hand);
           const h0 = performance.now();
           const iv = setInterval(() => {
@@ -962,7 +963,7 @@
     const listN = G.enemies.list.length, sceneKids = new Set(G.scene.children);
     const toast = G.ui.toast, toastS = G.ui.toastSmall; G.ui.toast = () => {}; G.ui.toastSmall = () => {};
     let b = null;
-    try { b = new Cls(def, level || 5, fake); } catch (err) { console.error(err); } finally { G.ui.toast = toast; G.ui.toastSmall = toastS; }
+    try { b = new Cls(def, level || 5, fake); BS.melt(b); } catch (err) { console.error(err); } finally { G.ui.toast = toast; G.ui.toastSmall = toastS; }
     // undo every side effect: parts registered as enemies, extra objects dropped into the scene
     const added = G.enemies.list.splice(listN); for (const p of added) { p.alive = false; p.removed = true; }
     for (const o of G.scene.children.slice()) if (!sceneKids.has(o) && (!b || o !== b.root)) G.scene.remove(o);

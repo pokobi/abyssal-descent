@@ -50,10 +50,11 @@
   }
 
   // the common figure on its own root. The joints (body, chest, head, arms: shoulder / elbow / hand, legs: hip / knee) stay where every pose expects them.
+  // (the boxes of a figure and of what it wears have their edges softened, like a foe's: PG.rbox)
   AV.buildFigure = function () {
     const PG = G.Props.PG, GE = geo(), B = base();
     const M = {}; for (const k in B) M[k] = B[k].clone();
-    const m = (parent, g, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(g, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
+    const m = (parent, g, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh((g === PG.box && PG.rbox) || g, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
     const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
     const root = new THREE.Group(), J = { M };
     J.body = j(root, 0, 0.95, 0);                                       // pelvis pivot
@@ -92,7 +93,7 @@
   AV.init = function (scene) {
     const PG = G.Props.PG;
     const gun = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.4, metalness: 0.6 });
-    const m = (parent, g, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(g, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
+    const m = (parent, g, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh((g === PG.box && PG.rbox) || g, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
     { const F = AV.buildFigure(); root = F.root; J = F.J; AV._J = J; }
     // sidearm in the right hand (a blade instead in a duel)
     J.gun = m(J.arms[1].hand, PG.box, gun, 0.04, 0.06, 0.32, 0, -0.02, 0.12);
@@ -128,7 +129,7 @@
     const PG = G.Props.PG, GE = geo(), C = G.Classes && G.Classes.BY[cls], P = PAL[cls]; if (!C || !P) return;
     const mc = J.mc || (J.mc = {});
     const mat = (k, col, o) => mc[k] || (mc[k] = new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.85 }, o || {})));
-    const add = (parent, g, mt, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh(g, mt); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; o.frustumCulled = false; parent.add(o); J.dressed.push(o); return o; };
+    const add = (parent, g, mt, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh((g === PG.box && PG.rbox) || g, mt); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; o.frustumCulled = false; parent.add(o); J.dressed.push(o); return o; };
     // the suit, the gloves and the boots take the class's colours
     if (J.M) { J.M.suit.color.setHex(P.suit); J.M.glove.color.setHex(P.leather); J.M.boot.color.setHex(P.leather); }
     const main = mat('main', P.main), dark = mat('dark', P.dark), acc = mat('acc', P.accent, { roughness: 0.55 }), lea = mat('lea', P.leather, { roughness: 0.7 });

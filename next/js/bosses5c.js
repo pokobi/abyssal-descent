@@ -4,6 +4,7 @@
 (function () {
   const BS = G.bosses, U = G.U;
   const { mat, mesh, joint } = BS.h;
+  const smesh = BS.h.smesh;
   const V = G.U.V;
   const PG = () => G.Props.PG;
   const tex = () => G.Tex.tex;
@@ -17,10 +18,10 @@
     // a chain with a spiked ball hanging from the right hand
     deco: (b, J) => {
       const s = 1.85, hand = J.arms[1].hand, iron = mat('#6a6a70', { metalness: 0.9, roughness: 0.4, map: tex().metal.map });
-      for (let i = 0; i < 6; i++) mesh(hand, PG().torus, iron, 0.14 * s, 0.14 * s, 0.14 * s, 0, -(0.25 + i * 0.3) * s, 0.15 * s, i % 2 ? Math.PI / 2 : 0, 0, 0);
+      for (let i = 0; i < 6; i++) smesh(hand, PG().torus, iron, 0.14 * s, 0.14 * s, 0.14 * s, 0, -(0.25 + i * 0.3) * s, 0.15 * s, i % 2 ? Math.PI / 2 : 0, 0, 0);
       const ball = joint(hand, 0, -2.2 * s, 0.2 * s);
-      mesh(ball, PG().sph, iron, 0.62 * s, 0.62 * s, 0.62 * s);
-      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; mesh(ball, PG().cone, iron, 0.14 * s, 0.5 * s, 0.14 * s, Math.cos(a) * 0.55 * s, Math.sin(a * 2) * 0.3 * s, Math.sin(a) * 0.55 * s, Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2); }
+      smesh(ball, PG().sph, iron, 0.62 * s, 0.62 * s, 0.62 * s);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; smesh(ball, PG().cone, iron, 0.14 * s, 0.5 * s, 0.14 * s, Math.cos(a) * 0.55 * s, Math.sin(a * 2) * 0.3 * s, Math.sin(a) * 0.55 * s, Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2); }
     },
     attacks: [
       { k: 'swipe', pose: 'swing', wind: 0.75, r: 7.5, arc: -0.1, dmg: 34, knock: 12, max: 9, w: 3, combo: 2 },
@@ -44,7 +45,7 @@
     // a halo of light over the head and three sparks circling the torso
     deco: (b, J) => {
       const s = 1.5, halo = mesh(J.head, PG().torus, glowM(0xffe060, 2.2), 1.1 * s, 1.1 * s, 1.1 * s, 0, 1.1 * s, -0.1 * s, Math.PI / 2, 0, 0);
-      b._orbs = [0, 1, 2].map((i) => { const o = joint(J.torso, 0, 1.0 * s, 0); mesh(o, PG().sph, glowM(0xfff0a0, 3), 0.2 * s, 0.2 * s, 0.2 * s, 2.0 * s, 0, 0); o.rotation.y = i * Math.PI * 2 / 3; return o; });
+      b._orbs = [0, 1, 2].map((i) => { const o = joint(J.torso, 0, 1.0 * s, 0); smesh(o, PG().sph, glowM(0xfff0a0, 3), 0.2 * s, 0.2 * s, 0.2 * s, 2.0 * s, 0, 0); o.rotation.y = i * Math.PI * 2 / 3; return o; });
       b._halo = halo;
     },
     tick: (b, dt) => { if (b._orbs) b._orbs.forEach((o, i) => { o.rotation.y += dt * (1.4 + b.phase * 0.4); o.position.y = 1.2 + Math.sin(b.t * 2 + i) * 0.25; }); if (b._halo) b._halo.rotation.z += dt * 0.8; if (Math.random() < dt * 4) G.fx.sparks(b.pos.clone().setY(3.4), null, 1, 0xfff0a0, 3); },
@@ -70,8 +71,8 @@
     deco: (b, J) => {
       const s = 2.1;
       J.head.scale.setScalar(1.35);
-      mesh(J.head, PG().box, M('#4a2c20', { map: tex().skin.map }), 0.5 * s, 0.4 * s, 0.55 * s, 0, 0.05 * s, 0.4 * s);
-      mesh(J.head, PG().torus, mat('#b8a060', { metalness: 0.9, roughness: 0.3 }), 0.14 * s, 0.14 * s, 0.14 * s, 0, -0.1 * s, 0.68 * s, 0, 0, 0);
+      smesh(J.head, PG().box, M('#4a2c20', { map: tex().skin.map }), 0.5 * s, 0.4 * s, 0.55 * s, 0, 0.05 * s, 0.4 * s);
+      smesh(J.head, PG().torus, mat('#b8a060', { metalness: 0.9, roughness: 0.3 }), 0.14 * s, 0.14 * s, 0.14 * s, 0, -0.1 * s, 0.68 * s, 0, 0, 0);
     },
     attacks: [
       { k: 'swipe', pose: 'swing', wind: 0.5, r: 6, arc: -0.05, dmg: 30, knock: 10, max: 8, w: 3, combo: 3, rec: 0.35, cry: 'roar' },
@@ -91,7 +92,7 @@
     hp: 7000, rig: 'human', speed: 3.4, radius: 1.4, range: 14, keepAway: true, stride: 3, pitch: 0.85, cd: 1.1, blood: 0x103a5a,
     look: () => ({ s: 1.6, float: true, hood: true, cloth: true, cape: true, weapon: 'staff', orb: 0x4aa0ff, eyes: 0x80c0ff, m: { body: M('#10182a', { map: tex().cloth.map, roughness: 0.95 }), cloth: M('#1a3060', { map: tex().cloth.map, side: THREE.DoubleSide, roughness: 0.95 }), skin: M('#8aa0c0') } }),
     // a crown of blue flames
-    deco: (b, J) => { const s = 1.6; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; mesh(J.head, PG().cone, glowM(0x4aa0ff, 2.6), 0.1 * s, 0.55 * s, 0.1 * s, Math.cos(a) * 0.38 * s, 0.75 * s, Math.sin(a) * 0.38 * s); } },
+    deco: (b, J) => { const s = 1.6; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; smesh(J.head, PG().cone, glowM(0x4aa0ff, 2.6), 0.1 * s, 0.55 * s, 0.1 * s, Math.cos(a) * 0.38 * s, 0.75 * s, Math.sin(a) * 0.38 * s); } },
     tick: (b, dt) => { if (Math.random() < dt * 14) { const p = b.J.head.getWorldPosition(V()); G.fx.flameLick(p.x + U.rand(-0.3, 0.3), p.y + 0.9, p.z + U.rand(-0.3, 0.3), 1.2, 0x4a9cff); } },
     attacks: [
       { k: 'volley', pose: 'cast', wind: 0.55, n: 5, spread: 0.5, salvos: 2, gap: 0.4, proj: 'soul', speed: 20, dmg: 16, elem: 'fire', w: 3 },
@@ -120,8 +121,8 @@
       const s = 2.8, bone = M('#c8c0a8', { roughness: 0.8 }), skin = mat('#2a2a38', { roughness: 0.9, side: THREE.DoubleSide });
       for (const sx of [-1, 1]) {
         const w = joint(J.body, sx * 0.7 * s, 0.7 * s, 0.3 * s);
-        mesh(w, PG().cyl8, bone, 0.1 * s, 2.6 * s, 0.1 * s, sx * 1.1 * s, 0.4 * s, 0, 0, 0, -sx * 1.2);
-        for (let i = 0; i < 4; i++) mesh(w, PG().box, skin, 0.04 * s, 1.6 * s, 0.8 * s, sx * (0.6 + i * 0.5) * s, (0.2 - i * 0.1) * s, (-0.2 - i * 0.2) * s, 0, 0, -sx * (1.2 - i * 0.12));
+        smesh(w, PG().cyl8, bone, 0.1 * s, 2.6 * s, 0.1 * s, sx * 1.1 * s, 0.4 * s, 0, 0, 0, -sx * 1.2);
+        for (let i = 0; i < 4; i++) smesh(w, PG().box, skin, 0.04 * s, 1.6 * s, 0.8 * s, sx * (0.6 + i * 0.5) * s, (0.2 - i * 0.1) * s, (-0.2 - i * 0.2) * s, 0, 0, -sx * (1.2 - i * 0.12));
       }
     },
     tick: (b, dt) => { if (Math.random() < dt * 10) { const p = b.J.heads[0].head.getWorldPosition(V()); G.fx.flameLick(p.x, p.y + 0.2, p.z, 0.9, 0x4a9cff); } },

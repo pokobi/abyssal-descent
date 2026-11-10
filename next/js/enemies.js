@@ -10,7 +10,7 @@
   // ---------------- materials ----------------
   const PLANCOL = {
     hound: { skin: '#5a4636', sec: '#2a201a', rough: 0.85, blood: 0x6a0c0c, tex: 'skin' },
-    imp: { skin: '#9a3a26', sec: '#3a1a12', rough: 0.6, blood: 0x5a0a0a, tex: 'scales' },
+    imp: { skin: '#6e2e24', sec: '#2a1612', rough: 0.6, blood: 0x5a0a0a, tex: 'scales' },
     skeleton: { skin: '#d6cab0', sec: '#5a4a3a', rough: 0.7, blood: 0x6a6050, tex: 'skin' },
     slime: { skin: '#5aa040', sec: '#2a5a20', rough: 0.15, blood: 0x4a8a20, tex: 'skin', trans: 0.82 },
     bat: { skin: '#3a2c2a', sec: '#1a1212', rough: 0.9, blood: 0x5a0a0a, tex: 'skin' },
@@ -137,18 +137,53 @@
       },
     };
   };
+  // the imp: a gaunt, pot-bellied devil - a cage of ribs over a small round belly, a hunched back, a big head with a jutting brow, a
+  // pointed chin and a wide mouth of small teeth, long ears, two horns swept back; thin arms to clawed hands, a goat's legs, a tail with
+  // a barb. Laid down as masses and melted into one hide joint by joint (gfx.js); joints, gait and what a shot hits as before.
   B.imp = function (root, M) {
     const hips = joint(root, 0, 0.55, 0);
+    mesh(hips, PG.sph, M.skin, 0.12, 0.09, 0.1);
     const torso = joint(hips, 0, 0.05, 0);
-    mesh(torso, PG.sph, M.skin, 0.2, 0.26, 0.16, 0, 0.18, 0);
+    mesh(torso, PG.sph, M.skin, 0.165, 0.19, 0.13, 0, 0.26, 0);              // ribs
+    mesh(torso, PG.sph, M.skin, 0.13, 0.13, 0.13, 0, 0.08, 0.035);           // belly
+    mesh(torso, PG.sph, M.skin, 0.13, 0.12, 0.1, 0, 0.36, -0.07);            // the hunch
+    mesh(torso, PG.sph, M.skin, 0.06, 0.08, 0.06, 0, 0.44, 0.01);            // neck
+    for (const s of [-1, 1]) mesh(torso, PG.sph, M.skin, 0.07, 0.06, 0.065, s * 0.17, 0.35, 0);   // shoulders
     const head = joint(torso, 0, 0.5, 0.02);
-    mesh(head, PG.sph, M.skin, 0.17, 0.16, 0.16);
-    for (const s of [-1, 1]) { mesh(head, PG.sph, M.eye, 0.035, 0.03, 0.02, s * 0.07, 0.02, 0.13); mesh(head, PG.cone, M.sec, 0.04, 0.18, 0.04, s * 0.09, 0.15, -0.02, -0.4, 0, s * 0.4); mesh(head, PG.cone, M.skin, 0.03, 0.1, 0.02, s * 0.17, 0.02, 0, 0, 0, -s * 1.3); }
-    mesh(head, PG.box, M.dark, 0.1, 0.02, 0.02, 0, -0.06, 0.14);
+    mesh(head, PG.sph, M.skin, 0.155, 0.145, 0.15);
+    mesh(head, PG.box, M.skin, 0.25, 0.045, 0.08, 0, 0.055, 0.115, 0.3);     // brow
+    mesh(head, PG.cone, M.skin, 0.085, 0.14, 0.08, 0, -0.14, 0.055, Math.PI); // chin
+    mesh(head, PG.sph, M.skin, 0.03, 0.04, 0.045, 0, -0.01, 0.15);           // nose
+    mesh(head, PG.box, M.dark, 0.13, 0.016, 0.03, 0, -0.07, 0.125);          // mouth
+    for (let i = 0; i < 5; i++) mesh(head, PG.cone, M.tooth, 0.008, 0.026, 0.008, (i - 2) * 0.026, -0.068 - (i % 2) * 0.012, 0.143, i % 2 ? 0 : Math.PI);
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.eye, 0.03, 0.022, 0.016, s * 0.068, 0.012, 0.128);
+      mesh(head, PG.cone, M.sec, 0.036, 0.14, 0.036, s * 0.085, 0.15, -0.01, -0.5, 0, s * 0.35);                    // horns: a root,
+      mesh(head, PG.cone, M.sec, 0.024, 0.13, 0.024, s * 0.108, 0.205, -0.07, -1.05, 0, s * 0.3);                  // and the sweep back
+      mesh(head, PG.cone, M.skin, 0.032, 0.15, 0.016, s * 0.2, 0.035, -0.01, 0, 0, -s * 1.15);                      // ears
+    }
     const arms = [];
-    for (const s of [-1, 1]) { const sh = joint(torso, s * 0.2, 0.32, 0); mesh(sh, PG.box, M.skin, 0.06, 0.32, 0.06, 0, -0.15, 0); const hand = joint(sh, 0, -0.32, 0); mesh(hand, PG.sph, M.sec, 0.05, 0.05, 0.05); arms.push({ sh, hand }); }
-    const L = [leg(hips, M, -0.1, 0, 0, 0.55, 0.08), leg(hips, M, 0.1, 0, 0, 0.55, 0.08)];
-    const tail = joint(hips, 0, 0, -0.12); mesh(tail, PG.cone, M.skin, 0.025, 0.4, 0.025, 0, -0.1, -0.15, -2.2);
+    for (const s of [-1, 1]) {
+      const sh = joint(torso, s * 0.2, 0.32, 0);
+      mesh(sh, PG.sph, M.skin, 0.04, 0.1, 0.045, 0, -0.08, 0);
+      mesh(sh, PG.cyl8, M.skin, 0.026, 0.18, 0.028, 0, -0.22, 0.005);
+      const hand = joint(sh, 0, -0.32, 0);
+      mesh(hand, PG.sph, M.skin, 0.042, 0.04, 0.048);
+      for (let i = 0; i < 3; i++) mesh(hand, PG.cone, M.dark, 0.011, 0.06, 0.011, (i - 1) * 0.03, -0.05, 0.03, Math.PI - 0.5);
+      arms.push({ sh, hand });
+    }
+    const ileg = (x) => {
+      const len = 0.55, hip = joint(hips, x, 0, 0);
+      mesh(hip, PG.sph, M.skin, 0.058, 0.155, 0.075, 0, -len * 0.24, 0.01);
+      const kn = joint(hip, 0, -len * 0.5, 0);
+      mesh(kn, PG.cyl8, M.skin, 0.028, len * 0.44, 0.032, 0, -len * 0.23, -0.015, -0.12);
+      mesh(kn, PG.sph, M.sec, 0.04, 0.035, 0.065, 0, -len * 0.5 + 0.03, 0.02);                                       // a cloven foot
+      return { hip, kn };
+    };
+    const L = [ileg(-0.1), ileg(0.1)];
+    const tail = joint(hips, 0, 0, -0.12);
+    mesh(tail, PG.cone, M.skin, 0.025, 0.4, 0.025, 0, -0.1, -0.15, -2.2);
+    mesh(tail, PG.cone, M.sec, 0.04, 0.09, 0.012, 0, -0.245, -0.345, -2.2);                                          // the barb
     const orb = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xff8030, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     orb.scale.setScalar(0.001); arms[1].hand.add(orb);
     return {
@@ -255,19 +290,39 @@
       },
     };
   };
+  // the bat: a furred body with a ruff at the neck, a pug face with a folded nose and great ears; each wing an arm and three long
+  // fingers with the skin stretched between them and scalloped at its edge. The wing's two joints are as they were.
   B.bat = function (root, M) {
     const body = joint(root, 0, 0, 0);
-    mesh(body, PG.sph, M.skin, 0.2, 0.22, 0.3);
+    mesh(body, PG.sph, M.skin, 0.17, 0.19, 0.27, 0, 0, -0.02);
+    mesh(body, PG.sph, M.skin, 0.19, 0.17, 0.15, 0, 0.03, 0.14);             // chest
+    mesh(body, PG.sph, M.skin, 0.15, 0.13, 0.11, 0, 0.09, 0.23);             // the ruff
     const head = joint(body, 0, 0.12, 0.26);
-    mesh(head, PG.sph, M.skin, 0.13, 0.12, 0.13);
-    for (const s of [-1, 1]) { mesh(head, PG.cone, M.skin, 0.05, 0.16, 0.03, s * 0.07, 0.14, -0.02, 0, 0, -s * 0.3); mesh(head, PG.sph, M.eye, 0.025, 0.025, 0.02, s * 0.05, 0.03, 0.11); mesh(head, PG.cone, M.tooth, 0.01, 0.04, 0.01, s * 0.02, -0.08, 0.1, Math.PI); }
+    mesh(head, PG.sph, M.skin, 0.115, 0.105, 0.115);
+    mesh(head, PG.sph, M.skin, 0.06, 0.05, 0.06, 0, -0.03, 0.09);            // muzzle
+    mesh(head, PG.sph, M.dark, 0.03, 0.035, 0.02, 0, 0.0, 0.14);             // the nose's leaf
+    mesh(head, PG.box, M.dark, 0.07, 0.012, 0.03, 0, -0.065, 0.1);           // mouth
+    for (const s of [-1, 1]) {
+      mesh(head, PG.cone, M.skin, 0.055, 0.2, 0.022, s * 0.075, 0.15, -0.02, -0.15, 0, -s * 0.3);    // ears
+      mesh(head, PG.cone, M.dark, 0.032, 0.14, 0.008, s * 0.075, 0.14, -0.005, -0.15, 0, -s * 0.3);  // their hollows
+      mesh(head, PG.sph, M.eye, 0.02, 0.02, 0.016, s * 0.05, 0.03, 0.1);
+      mesh(head, PG.cone, M.tooth, 0.008, 0.04, 0.008, s * 0.022, -0.08, 0.105, Math.PI);
+    }
     const wings = [];
     for (const s of [-1, 1]) {
       const sh = joint(body, s * 0.15, 0.06, 0);
-      mesh(sh, PG.box, M.sec, 0.45, 0.015, 0.36, s * 0.24, 0, -0.05);
+      mesh(sh, PG.cyl8, M.skin, 0.02, 0.46, 0.02, s * 0.23, 0, 0.1, 0, 0, Math.PI / 2);                 // the arm, along the wing's leading edge
+      mesh(sh, PG.box, M.sec, 0.45, 0.01, 0.34, s * 0.24, 0, -0.07);                                    // the skin from arm to flank
+      for (let i = 0; i < 3; i++) mesh(sh, PG.cone, M.sec, 0.075, 0.1, 0.006, s * (0.1 + i * 0.15), 0, -0.275, Math.PI / 2);   // its scalloped edge
       const tip = joint(sh, s * 0.46, 0, 0);
-      mesh(tip, PG.box, M.sec, 0.45, 0.012, 0.3, s * 0.22, 0, -0.1);
-      mesh(tip, PG.box, M.skin, 0.45, 0.03, 0.03, s * 0.22, 0, 0.05);
+      mesh(tip, PG.sph, M.skin, 0.028, 0.028, 0.028);                                                   // the wrist, and its hooked thumb
+      mesh(tip, PG.cone, M.dark, 0.012, 0.06, 0.012, 0, 0.01, 0.045, Math.PI / 2 - 0.4);
+      for (let i = 0; i < 3; i++) {                                                                     // three fingers fanned out, skin between
+        const a = 0.12 + i * 0.5, len = 0.46 - i * 0.07, dx = Math.cos(a) * len, dz = -Math.sin(a) * len + (i === 0 ? 0.05 : 0);
+        mesh(tip, PG.cyl8, M.skin, 0.011, len, 0.011, s * dx / 2, 0, dz / 2 + (i === 0 ? 0.05 : 0), Math.PI / 2, 0, -s * (Math.PI / 2 - Math.atan2(-dz, dx)));
+      }
+      mesh(tip, PG.box, M.sec, 0.43, 0.008, 0.3, s * 0.215, 0, -0.1);
+      for (let i = 0; i < 3; i++) mesh(tip, PG.cone, M.sec, 0.07, 0.09, 0.005, s * (0.08 + i * 0.14), 0, -0.285, Math.PI / 2);
       wings.push({ sh, tip, s });
     }
     const L = [leg(body, M, -0.08, -0.15, -0.1, 0.25, 0.03), leg(body, M, 0.08, -0.15, -0.1, 0.25, 0.03)];

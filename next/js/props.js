@@ -227,22 +227,24 @@
     const L = 2.0, D = 0.45, H = 2.4;
     const hx = alongX ? L / 2 : D / 2, hz = alongX ? D / 2 : L / 2;
     w.addCollider(x - hx, y, z - hz, x + hx, y + H, z + hz, { surf: 'wood', tag: 'grate' }); // (open at the front: the books stand back in it)
-    w.batch.box('woodDark', x - hx, y, z - hz, x + hx, y + 0.08, z + hz, { uv: 1 });
-    w.batch.box('woodDark', x - hx, y + H - 0.08, z - hz, x + hx, y + H, z + hz, { uv: 1 });
-    if (alongX) { w.batch.box('woodDark', x - hx, y, z - hz, x - hx + 0.06, y + H, z + hz, { uv: 1 }); w.batch.box('woodDark', x + hx - 0.06, y, z - hz, x + hx, y + H, z + hz, { uv: 1 }); }
-    else { w.batch.box('woodDark', x - hx, y, z - hz, x + hx, y + H, z - hz + 0.06, { uv: 1 }); w.batch.box('woodDark', x - hx, y, z + hz - 0.06, x + hx, y + H, z + hz, { uv: 1 }); }
-    w.batch.box('woodDark', alongX ? x - hx : x - hx, y, alongX ? z - hz : z - hz, alongX ? x + hx : x - hx + 0.04, y + H, alongX ? z - hz + 0.04 : z + hz, { uv: 1 });
+    const fry = alongX ? 0 : Math.PI / 2;
+    put(w, 'shelf', x, y, z, fry);   // (sides, plinth, cornice, shelves, back: gfx.js)
     const cols = [[0.45, 0.15, 0.1], [0.15, 0.25, 0.35], [0.2, 0.3, 0.15], [0.5, 0.4, 0.2], [0.3, 0.2, 0.3], [0.6, 0.55, 0.45]];
     for (let sh = 0; sh < 4; sh++) {
       const yy = y + 0.08 + sh * 0.58;
-      w.batch.box('woodDark', x - hx, yy, z - hz, x + hx, yy + 0.04, z + hz, { uv: 1 });
       let t = -L / 2 + 0.08;
       while (t < L / 2 - 0.12) {
         const bw = rr(rng, 0.05, 0.11), bh = rr(rng, 0.28, 0.45);
-        if (rr(rng, 0, 1) < 0.12) { t += 0.15; continue; }
+        if (rr(rng, 0, 1) < 0.12) {   // (a gap: now and then a skull or a candle end stands in it)
+          const gx = alongX ? x + t + 0.07 : x, gz = alongX ? z : z + t + 0.07, hk = hsh(gx, gz, sh);
+          if (hk < 0.25) P.skull(w, gx, yy + 0.04, gz, fry + (hk - 0.12) * 4, 0.9); else if (hk < 0.45) put(w, 'candle', gx, yy + 0.04 + 0.05, gz, hk * 9, 0.03, { sy: 0.1, inst: true });
+          t += 0.15; continue;
+        }
         const c = cols[Math.floor(rr(rng, 0, cols.length))];
-        if (alongX) w.batch.box('cloth2', x + t, yy + 0.04, z - hz + 0.05, x + t + bw, yy + 0.04 + bh, z + hz - 0.05, { uv: 1, tint: c, grad: false });
-        else w.batch.box('cloth2', x - hx + 0.05, yy + 0.04, z + t, x + hx - 0.05, yy + 0.04 + bh, z + t + bw, { uv: 1, tint: c, grad: false });
+        {   // (a book with a rounded spine and its bands, the leaves showing above: drawn as instances, each its own leather)
+          const bx = alongX ? x + t + bw / 2 : x, bz = alongX ? z : z + t + bw / 2, hk = hsh(bx, bz, sh), back = -0.03 + hk * 0.05, k = 0.55 + hk * 0.35;
+          put(w, 'book', bx + (alongX ? 0 : back), yy + 0.04, bz + (alongX ? back : 0), fry, bw, { sx: bw, sy: bh, sz: 0.3 - hk * 0.04, inst: true, tint: [c[0] * k, c[1] * k, c[2] * k] });
+        }
         t += bw + 0.01;
       }
     }
@@ -250,16 +252,19 @@
   P.table = function (w, x, z, y, alongX, rng) {
     const L = 2.2, Wd = 1.0;
     const hx = alongX ? L / 2 : Wd / 2, hz = alongX ? Wd / 2 : L / 2;
-    w.solid('wood', x - hx, y + 0.78, z - hz, x + hx, y + 0.86, z + hz, { uv: 1.5 });
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) w.solid('woodDark', x + sx * (hx - 0.12) - 0.05, y, z + sz * (hz - 0.12) - 0.05, x + sx * (hx - 0.12) + 0.05, y + 0.78, z + sz * (hz - 0.12) + 0.05, { uv: 1 });
+    const fry = alongX ? 0 : Math.PI / 2, hard = (x0, y0, z0, x1, y1, z1) => { const c = w.addCollider(x0, y0, z0, x1, y1, z1, { surf: 'wood' }); c.vis = true; return c; };
+    put(w, 'table', x, y, z, fry);   // (four boards on four legs, aprons, a stretcher: gfx.js. What stops you is as it was)
+    hard(x - hx, y + 0.78, z - hz, x + hx, y + 0.86, z + hz);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) hard(x + sx * (hx - 0.12) - 0.05, y, z + sz * (hz - 0.12) - 0.05, x + sx * (hx - 0.12) + 0.05, y + 0.78, z + sz * (hz - 0.12) + 0.05);
+    { const hk = hsh(x, z, 5), u = (hsh(x, z, 6) - 0.5) * 1.2, v = (hsh(x, z, 7) - 0.5) * 0.3; if (hk < 0.75) put(w, 'tablet' + Math.floor(hk * 4) % 3, x + (alongX ? u : v), y + 0.862, z + (alongX ? v : u), fry + (hk - 0.4) * 1.5); }   // (what was left lying on it)
     if (rng && rng.chance(0.6)) P.candles(w, x + rr(rng, -0.5, 0.5), y + 0.86, z + rr(rng, -0.2, 0.2), rng, rng.chance(0.5));
     if (rng && rng.chance(0.5)) w.batch.geo('ceramic', PG.urn, M(x + rr(rng, -0.6, 0.6), y + 0.86, z, 0.35, 0.35, 0.35));
     // benches
     if (rng && rng.chance(0.7)) {
       const o = (alongX ? hz : hx) + 0.45;
       for (const sd of [-1, 1]) {
-        if (alongX) w.solid('woodDark', x - hx + 0.1, y + 0.4, z + sd * o - 0.18, x + hx - 0.1, y + 0.48, z + sd * o + 0.18, { uv: 1 });
-        else w.solid('woodDark', x + sd * o - 0.18, y + 0.4, z - hz + 0.1, x + sd * o + 0.18, y + 0.48, z + hz - 0.1, { uv: 1 });
+        if (alongX) { put(w, 'bench', x, y, z + sd * o, 0); hard(x - hx + 0.1, y + 0.4, z + sd * o - 0.18, x + hx - 0.1, y + 0.48, z + sd * o + 0.18); }
+        else { put(w, 'bench', x + sd * o, y, z, Math.PI / 2); hard(x + sd * o - 0.18, y + 0.4, z - hz + 0.1, x + sd * o + 0.18, y + 0.48, z + hz - 0.1); }
       }
     }
   };
@@ -267,12 +272,7 @@
     s = s || 1.4;
     const h = 2.2;
     w.solid('iron', x - s / 2, y, z - s / 2, x + s / 2, y + 0.1, z + s / 2, { uv: 1 });
-    w.batch.box('iron', x - s / 2, y + h - 0.08, z - s / 2, x + s / 2, y + h, z + s / 2, { uv: 1 });
-    const n = 6;
-    for (let i = 0; i <= n; i++) {
-      const t = -s / 2 + (i / n) * s;
-      for (const [bx, bz] of [[t, -s / 2], [t, s / 2], [-s / 2, t], [s / 2, t]]) w.batch.box('iron', x + bx - 0.02, y + 0.1, z + bz - 0.02, x + bx + 0.02, y + h - 0.08, z + bz + 0.02, { uv: 1 });
-    }
+    put(w, 'cage', x, y, z, Math.floor(hsh(x, z) * 4) * Math.PI / 2, 1, { sx: s / 1.4, sy: 1, sz: s / 1.4 });   // (posts, bars, rails, a door with its lock: gfx.js)
     w.addCollider(x - s / 2, y + 0.1, z - s / 2, x + s / 2, y + h, z + s / 2, { surf: 'metal', tag: 'grate' });
     if (rng && rng.chance(0.6)) { P.bones(w, x, y + 0.1, z, rng); }
   };
@@ -281,12 +281,8 @@
     w.batch.geo('block', PG.oct, M(x, y + 0.45, z, r / Math.cos(Math.PI / 8), 0.9, r / Math.cos(Math.PI / 8)), { su: 4, sv: 0.6 });
     w.batch.geo('dark', PG.oct, M(x, y + 0.91, z, r * 0.85, 0.02, r * 0.85));
     w.addCollider(x - r, y, z - r, x + r, y + 0.9, z + r);
-    for (const sx of [-1, 1]) w.solid('woodDark', x + sx * (r - 0.15) - 0.1, y + 0.9, z - 0.1, x + sx * (r - 0.15) + 0.1, y + 3.0, z + 0.1, { uv: 1 });
-    w.batch.box('woodDark', x - r - 0.1, y + 2.9, z - 0.08, x + r + 0.1, y + 3.05, z + 0.08, { uv: 1 });
-    w.batch.geo('wood', PG.cbox, M(x, y + 3.15, z, 2 * r + 0.6, 0.06, 1.0, 0.45, 0, 0));
-    w.batch.geo('wood', PG.cbox, M(x, y + 3.15, z, 2 * r + 0.6, 0.06, 1.0, -0.45, 0, 0));
-    P.chain(w, x, y + 1.5, z, 1.4);
-    w.batch.geo('woodDark', PG.cyl8, M(x, y + 1.35, z, 0.2, 0.3, 0.2));
+    for (const sx of [-1, 1]) { const c = w.addCollider(x + sx * (r - 0.15) - 0.1, y + 0.9, z - 0.1, x + sx * (r - 0.15) + 0.1, y + 3.0, z + 0.1, { surf: 'wood' }); c.vis = true; }
+    put(w, 'wellhead', x, y, z, 0);   // (a coping, two posts and a beam, a roof of boards, a windlass with rope and crank, a bucket: gfx.js)
   };
   P.banner = function (w, x, y, z, dir, len, color) {
     // y = top of banner; dir = outward normal from wall
@@ -330,12 +326,7 @@
   P.weaponRack = function (w, x, z, y, alongX) {
     const hx = alongX ? 1.0 : 0.2, hz = alongX ? 0.2 : 1.0;
     w.solid('woodDark', x - hx, y, z - hz, x + hx, y + 0.12, z + hz, { uv: 1 });
-    w.batch.box('woodDark', x - (alongX ? hx : 0.05), y + 1.5, z - (alongX ? 0.05 : hz), x + (alongX ? hx : 0.05), y + 1.6, z + (alongX ? 0.05 : hz), { uv: 1 });
-    for (let i = -2; i <= 2; i++) {
-      const ox = alongX ? i * 0.35 : 0, oz = alongX ? 0 : i * 0.35;
-      w.batch.geo('iron', PG.cbox, M(x + ox, y + 0.9, z + oz, 0.05, 1.7, 0.02, alongX ? 0 : 0, alongX ? 0 : Math.PI / 2, (i % 2) * 0.08));
-      w.batch.geo('woodDark', PG.cbox, M(x + ox, y + 0.25, z + oz, 0.04, 0.3, 0.04));
-    }
+    put(w, 'rack', x, y + 0.1, z, alongX ? 0 : Math.PI / 2);   // (posts, a rail with pegs, a rest; pikes, a great sword, an axe, a shield: gfx.js)
     w.addCollider(x - hx, y + 0.12, z - hz, x + hx, y + 1.7, z + hz, { surf: 'wood', tag: 'grate' }); // (a rack: you see through it between the weapons, and it stops you)
   };
   P.gravestone = function (w, x, z, y, ry, rng) {
@@ -367,7 +358,7 @@
     w.batch.box('cloth2', x - sx / 2, y, z - sz / 2, x + sx / 2, y + 0.02, z + sz / 2, { uv: 2, tint: color || [0.45, 0.12, 0.1], grad: false });
   };
   P.drain = function (w, x, z, y) {
-    w.batch.box('iron', x - 0.5, y, z - 0.5, x + 0.5, y + 0.015, z + 0.5, { uv: 0.5, tint: [0.4, 0.4, 0.4] });
+    if (!put(w, 'drain', x, y, z, 0)) w.batch.box('iron', x - 0.5, y, z - 0.5, x + 0.5, y + 0.015, z + 0.5, { uv: 0.5, tint: [0.4, 0.4, 0.4] });
   };
 
   // ---------- destructibles ----------
@@ -435,12 +426,16 @@
     const L = 3;
     const hx = alongX ? L / 2 : 0.25, hz = alongX ? 0.25 : L / 2;
     w.deferred.push((grp) => {
-      const g = new THREE.Group();
+      const g = new THREE.Group(), GP = G.GFX && G.GFX.propGeo, plankG = GP ? GP('plank') : null, stakeG = GP ? GP('stake') : null;
       for (let i = 0; i < 4; i++) {
-        const p = new THREE.Mesh(PG.cbox, w.mats.wood); p.scale.set(L, 0.22, 0.08);
-        p.position.set(0, 0.2 + i * 0.3, 0); p.rotation.z = (Math.random() - 0.5) * 0.12; g.add(p);
+        const p = new THREE.Mesh((plankG && plankG[0].g) || PG.cbox, w.mats.wood); p.scale.set(L * (0.9 + (i * 7 % 3) * 0.05), 0.22 - (i % 2) * 0.03, 0.07); p.position.x = ((i * 5) % 3 - 1) * 0.06;
+        p.position.y = 0.2 + i * 0.3; p.rotation.z = (Math.random() - 0.5) * 0.12; g.add(p);
       }
-      for (const sx of [-1.2, 1.2]) { const p = new THREE.Mesh(PG.cbox, w.mats.woodDark); p.scale.set(0.14, 1.4, 0.14); p.position.set(sx, 0.7, -0.1); g.add(p); }
+      for (const sx of [-1.2, 1.2]) {
+        if (!stakeG) { const p = new THREE.Mesh(PG.cbox, w.mats.woodDark); p.scale.set(0.14, 1.4, 0.14); p.position.set(sx, 0.7, -0.1); g.add(p); continue; }
+        const p = new THREE.Mesh(stakeG[0].g, w.mats.woodDark); p.scale.set(0.13, 1.5, 0.13); p.position.set(sx, 0, -0.1); p.rotation.y = sx; g.add(p);
+        const q = new THREE.Mesh(stakeG[0].g, w.mats.woodDark); q.scale.set(0.09, 1.25, 0.09); q.position.set(sx * 0.92, 0, -0.75); q.rotation.set(0.62, 0, 0); g.add(q);   // (a prop behind it)
+      }
       g.position.set(x, y, z); g.rotation.y = alongX ? 0 : Math.PI / 2;
       g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
       grp.add(g); d.mesh = g;
@@ -532,10 +527,10 @@
   // spike trap hazard
   P.spikeTrap = function (w, x, z, y, s) {
     s = s || 2;
-    w.batch.box('iron', x - s / 2, y, z - s / 2, x + s / 2, y + 0.03, z + s / 2, { uv: 0.5, tint: [0.5, 0.45, 0.4] });
+    if (!(s === 2 && put(w, 'spikeplate', x, y, z, 0))) w.batch.box('iron', x - s / 2, y, z - s / 2, x + s / 2, y + 0.03, z + s / 2, { uv: 0.5, tint: [0.5, 0.45, 0.4] });
     const hz = { kind: 'spikes', x, z, y, s, t: Math.random() * 3, period: 3.2, up: 0, mesh: null };
     w.deferred.push((grp) => {
-      const geo = new THREE.ConeGeometry(0.05, 0.6, 5);
+      const sp = G.GFX && G.GFX.propGeo ? G.GFX.propGeo('spike') : null, geo = sp ? sp[0].g : new THREE.ConeGeometry(0.05, 0.6, 5);
       const n = Math.floor(s / 0.33);
       const im = new THREE.InstancedMesh(geo, w.mats.iron, n * n);
       let k = 0; const mm = new THREE.Matrix4();

@@ -1789,6 +1789,118 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   PROP.colbase = () => [{ g: new THREE.LatheGeometry(spl([[0.0005, -0.5], [1.18, -0.5], [1.26, -0.36], [1.18, -0.2], [1.02, -0.12], [0.98, 0.0], [1.06, 0.12], [1.12, 0.26], [1.06, 0.4], [0.98, 0.5], [0.0005, 0.5]], 30), 24), m: 'trim' }];
   PROP.colcap = () => [{ g: new THREE.LatheGeometry(spl([[0.0005, -0.5], [0.94, -0.5], [1.02, -0.4], [0.96, -0.28], [0.95, -0.16], [1.04, 0.1], [1.2, 0.36], [1.24, 0.44], [1.24, 0.5], [0.0005, 0.5]], 30), 24), m: 'trim' }];
+  // ---- (2) what is built of boards and bars ----
+  // things made for a hand or a foe (foeGear, meleeParts), stood in a rack or laid on a table: copied, turned, sorted by the world's materials
+  const WM = { wood: ['woodDark'], iron: ['iron'], steel: ['iron'], blade: ['iron', [1.5, 1.5, 1.55]], leather: ['woodDark', [0.55, 0.5, 0.45]], wrap: ['woodDark', [0.55, 0.5, 0.45]], dark: ['dark'], cloth: ['bone', [0.4, 0.12, 0.1]], paint: ['wood', [0.5, 0.26, 0.22]], gold: ['iron', [1.1, 0.95, 0.7]], goldBr: ['iron', [1.1, 0.95, 0.7]], trim: ['iron'], bone: ['bone'] };
+  const borrow = (out, parts, p, r, s) => { for (const q of parts || []) { const g = q.g.clone(); if (q.at) g.translate(q.at[0], q.at[1], q.at[2]); Geo.xf(g, p, r, s); const k = WM[q.m] || ['iron']; (out[k[0] + '|' + (k[1] || '')] = out[k[0] + '|' + (k[1] || '')] || { m: k[0], tint: k[1] || null, list: [] }).list.push(g); } };
+  const sorted = (out, k) => Object.values(out).map((o) => ({ g: Geo.merge(o.list), m: o.m, tint: o.tint }));
+  // a bookcase: two sides, a plinth, a cornice, four shelves, a back. Two long, the shelves' tops at 0.12 + 0.58 n
+  PROP.shelf = () => {
+    const L = 2.0, D = 0.45, H = 2.4, w = [];
+    for (const s of [-1, 1]) w.push(rbx(0.07, H - 0.06, D, 0.012, s * (L / 2 - 0.035), (H - 0.06) / 2, 0));
+    w.push(rbx(L, 0.1, D + 0.02, 0.012, 0, 0.05, 0.01), rbx(L + 0.1, 0.07, D + 0.07, 0.014, 0, H - 0.035, 0.02), rbx(L + 0.04, 0.05, D + 0.04, 0.012, 0, H - 0.09, 0.012));
+    for (let i = 0; i < 4; i++) w.push(rbx(L - 0.12, 0.04, D - 0.03, 0.006, 0, 0.1 + i * 0.58, 0));
+    w.push(rbx(L - 0.1, H - 0.12, 0.025, 0.004, 0, H / 2, -D / 2 + 0.014));
+    return [ppart('woodDark', w, 0.8)];
+  };
+  // a book: one thick (x), one high, one deep, standing on the origin, its rounded spine to +z with two bands on it; the leaves a little
+  // lower than the boards
+  PROP.book = () => {
+    const c = ext([[-0.5, 0.5], [-0.5, -0.46], [-0.42, -0.52], [0, -0.55], [0.42, -0.52], [0.5, -0.46], [0.5, 0.5], [0.36, 0.5], [0.36, -0.44], [-0.36, -0.44], [-0.36, 0.5]], 1, 0.012); c.rotateX(-HX); c.translate(0, 0.5, 0);
+    const bands = [rbx(1.06, 0.03, 0.07, 0.01, 0, 0.22, 0.5), rbx(1.06, 0.03, 0.07, 0.01, 0, 0.78, 0.5)];
+    return [{ g: boxUV(Geo.merge([c].concat(bands)), 3), m: 'bone' }, { g: boxUV(Geo.xf(new THREE.BoxGeometry(0.72, 0.95, 0.9), [0, 0.485, -0.02]), 3), m: 'bone', tint: [0.8, 0.74, 0.58] }];
+  };
+  // a long table of four boards on four legs, aprons under the top, a stretcher low between the ends. 2.2 by 1.0, its top at 0.86
+  PROP.table = () => {
+    const top = [], dk = [];
+    for (let i = 0; i < 4; i++) top.push(rbx(2.2 - (i % 2) * 0.05, 0.07, 0.244, 0.012, (i % 2 ? 0.02 : -0.01), 0.825, -0.375 + i * 0.25));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) dk.push(rbx(0.11, 0.79, 0.11, 0.018, sx * 0.98, 0.395, sz * 0.38));
+    for (const sz of [-1, 1]) dk.push(rbx(1.9, 0.12, 0.04, 0.008, 0, 0.72, sz * 0.38));
+    for (const sx of [-1, 1]) dk.push(rbx(0.04, 0.12, 0.7, 0.008, sx * 0.98, 0.72, 0), rbx(0.05, 0.07, 0.7, 0.01, sx * 0.98, 0.18, 0));
+    dk.push(rbx(1.92, 0.07, 0.05, 0.01, 0, 0.18, 0));
+    return [ppart('wood', top, 0.7), ppart('woodDark', dk, 0.8)];
+  };
+  // a bench: a board two long on two board legs, a rail between them. Its seat at 0.48
+  PROP.bench = () => [ppart('woodDark', [rbx(2.0, 0.06, 0.36, 0.012, 0, 0.45, 0), rbx(0.05, 0.42, 0.3, 0.01, -0.75, 0.21, 0), rbx(0.05, 0.42, 0.3, 0.01, 0.75, 0.21, 0), rbx(1.5, 0.07, 0.04, 0.008, 0, 0.24, 0)], 0.8)];
+  // what lies on a table: an open book with a pen and an inkpot; three books in a heap and a cup; a platter, a knife, two scrolls
+  PROP.tablet0 = () => {
+    const quill = ext([[0, 0], [0.012, 0.03], [0.02, 0.2], [0.004, 0.26], [-0.014, 0.2], [-0.008, 0.03]], 0.003, 0); quill.rotateX(-HX + 0.25); quill.rotateY(0.6); quill.translate(0.33, 0.07, 0.02);
+    return [ppart('bone', [rbx(0.44, 0.012, 0.3, 0.004, 0, 0.006, 0)], 3, [0.35, 0.16, 0.12]),
+      ppart('bone', [rbx(0.2, 0.03, 0.28, 0.008, -0.105, 0.03, 0, [0, 0, 0.07]), rbx(0.2, 0.03, 0.28, 0.008, 0.105, 0.03, 0, [0, 0, -0.07]), quill], 3, [0.82, 0.76, 0.6]),
+      ppart('dark', [hl([[0.0005, 0], [0.035, 0], [0.04, 0.03], [0.022, 0.055], [0.022, 0.065], [0.0005, 0.065]], 1, 1, 10).translate(0.33, 0, 0.02),
+        rbx(0.14, 0.002, 0.004, 0.001, -0.1, 0.047, 0.06, [0, 0.1, 0.07]), rbx(0.15, 0.002, 0.004, 0.001, -0.105, 0.047, 0.02, [0, 0.05, 0.07]), rbx(0.12, 0.002, 0.004, 0.001, -0.11, 0.047, -0.02, [0, -0.05, 0.07]), rbx(0.15, 0.002, 0.004, 0.001, 0.105, 0.047, 0.05, [0, 0, -0.07]), rbx(0.1, 0.002, 0.004, 0.001, 0.09, 0.047, 0.0, [0, 0.08, -0.07])], 3)];
+  };
+  PROP.tablet1 = () => [
+    ppart('bone', [rbx(0.3, 0.05, 0.22, 0.01, 0, 0.025, 0), rbx(0.26, 0.04, 0.2, 0.01, 0.02, 0.115, 0.01, [0, 0.5, 0])], 3, [0.3, 0.2, 0.14]),
+    ppart('bone', [rbx(0.28, 0.045, 0.21, 0.01, -0.01, 0.073, 0, [0, -0.25, 0])], 3, [0.16, 0.22, 0.3]),
+    ppart('iron', [hl([[0.0005, 0], [0.04, 0], [0.042, 0.008], [0.012, 0.02], [0.01, 0.06], [0.03, 0.075], [0.042, 0.13], [0.04, 0.132], [0.027, 0.08], [0.0005, 0.072]], 1, 1, 12).translate(0.32, 0, 0.08)], 4, [1.1, 1.05, 0.95])];
+  PROP.tablet2 = () => {
+    const o = {}; borrow(o, X.meleeParts && X.meleeParts('knife') ? X.meleeParts('knife').parts : [], [0.02, 0.022, 0.03], [HX, 0, 1.2]);
+    return sorted(o).concat([ppart('wood', [hl([[0.0005, 0], [0.1, 0], [0.16, 0.012], [0.17, 0.022], [0.16, 0.022], [0.1, 0.012], [0.0005, 0.01]], 1, 1, 18)], 3),
+      ppart('bone', [prism(0.022, 0.3, [-0.3, 0.022, 0.05], [HX, 0.4, 0], 8), prism(0.02, 0.26, [-0.27, 0.055, 0.04], [HX, 0.25, 0], 8)], 3, [0.82, 0.76, 0.6])]);
+  };
+  // a cage of iron bars, 1.4 square and 2.2 high (its floor plate is the world's own): corner posts, bars between them, four rails,
+  // bars over the top, a door frame in its front with a lock, a ring to hang it by
+  PROP.cage = () => {
+    const s = 1.4, h = 2.2, hs = s / 2, ir = [], n = 7;
+    for (let i = 0; i <= n; i++) { const t = -hs + i / n * s, r = i === 0 || i === n ? 0.028 : 0.014; for (const [bx, bz] of [[t, -hs], [t, hs], [-hs, t], [hs, t]]) ir.push(prism(r, h - 0.14, [bx, h / 2 + 0.03, bz], null, 6)); }
+    for (const y of [0.13, 0.8, 1.5, h - 0.05]) for (const [x, z, w, d] of [[0, -hs, s + 0.07, 0.04], [0, hs, s + 0.07, 0.04], [-hs, 0, 0.04, s + 0.07], [hs, 0, 0.04, s + 0.07]]) ir.push(rbx(w, y > 2 ? 0.09 : 0.035, d, 0.006, x, y, z));
+    for (let i = 1; i < n; i++) ir.push(prism(0.012, s, [-hs + i / n * s, h - 0.03, 0], [HX, 0, 0], 5));
+    ir.push(rbx(0.055, 1.62, 0.055, 0.008, -0.3, 0.92, hs + 0.02), rbx(0.055, 1.62, 0.055, 0.008, 0.3, 0.92, hs + 0.02), rbx(0.66, 0.055, 0.055, 0.008, 0, 1.72, hs + 0.02), rbx(0.13, 0.17, 0.06, 0.012, 0.3, 0.95, hs + 0.055));
+    for (const y of [0.4, 1.4]) ir.push(prism(0.022, 0.12, [-0.3, y, hs + 0.05], null, 6));
+    const ring = new THREE.TorusGeometry(0.08, 0.014, 6, 14); ring.translate(0, h + 0.07, 0); ir.push(ring, rbx(0.16, 0.03, 0.16, 0.006, 0, h + 0.005, 0));
+    return [ppart('iron', ir, 2), ppart('dark', ball(0.014, [0.3, 0.93, hs + 0.086], [1, 1.6, 0.4]), 2)];
+  };
+  // over a well 1.3 in radius: a coping on its wall, two posts and a beam, a pitched roof of boards with its ridge, a windlass with
+  // its rope and crank, a bucket hung from it
+  PROP.wellhead = () => {
+    const r = 1.3, st = [], wd = [], ir = [], lt = [];
+    const oct = (rr) => arcPts(0, 0, rr / Math.cos(Math.PI / 8), Math.PI / 8, Math.PI / 8 + Math.PI * 2, 8).slice(1);
+    const cop = ext(oct(r + 0.07), 0.14, 0.02, [oct(r - 0.3)]); cop.rotateX(-HX); cop.translate(0, 0.93, 0); st.push(cop);
+    for (const s of [-1, 1]) { wd.push(rbx(0.2, 2.15, 0.2, 0.025, s * (r - 0.15), 0.9 + 1.075, 0), rbx(0.1, 0.6, 0.1, 0.015, s * (r - 0.42), 2.72, 0, [0, 0, s * 0.75])); }
+    wd.push(rbx(2 * r + 0.3, 0.16, 0.18, 0.02, 0, 2.98, 0), rbx(2 * r + 0.7, 0.1, 0.1, 0.015, 0, 3.42, 0));
+    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) lt.push(rbx(2 * r + 0.62, 0.035, 0.17, 0.006, 0, 3.36 - i * 0.075, s * (0.09 + i * 0.15), [s * 0.46, 0, 0]));
+    wd.push(prism(0.085, 2 * r - 0.5, [0, 2.2, 0], [0, 0, HX], 10));
+    for (let i = 0; i < 7; i++) { const g = new THREE.TorusGeometry(0.095, 0.018, 5, 12); g.rotateY(HX); g.translate(-0.12 + i * 0.04, 2.2, 0); lt.push(g); }
+    lt.push(prism(0.016, 0.72, [0, 1.76, 0.09], null, 6));
+    ir.push(tubeR([[r - 0.25, 2.2, 0], [r + 0.08, 2.2, 0], [r + 0.08, 1.95, 0], [r + 0.3, 1.95, 0]], 0.02, 6, false), tubeR([[-0.11, 1.4, 0.09], [-0.13, 1.56, 0.09], [0, 1.66, 0.09], [0.13, 1.56, 0.09], [0.11, 1.4, 0.09]], 0.01, 5, 12));
+    wd.push(hl([[0.0005, 1.1], [0.1, 1.1], [0.125, 1.25], [0.13, 1.4], [0.115, 1.4], [0.105, 1.26], [0.085, 1.13], [0.0005, 1.13]], 1, 1, 12).translate(0, 0, 0.09));
+    for (const y of [1.16, 1.34]) { const g = new THREE.TorusGeometry(y > 1.2 ? 0.13 : 0.112, 0.008, 4, 14); g.rotateX(HX); g.translate(0, y, 0.09); ir.push(g); }
+    return [ppart('trim', st, 0.6), ppart('woodDark', wd, 0.8), ppart('wood', lt, 0.8), ppart('iron', ir, 2)];
+  };
+  // a weapon rack two long: two posts, a rail above with pegs, a rest below; two pikes, a great sword point down, an axe, a shield
+  PROP.rack = () => {
+    const wd = [rbx(0.09, 1.66, 0.09, 0.014, -0.94, 0.94, -0.1), rbx(0.09, 1.66, 0.09, 0.014, 0.94, 0.94, -0.1), rbx(1.96, 0.1, 0.07, 0.012, 0, 1.55, -0.1), rbx(1.96, 0.07, 0.12, 0.012, 0, 0.5, -0.08)];
+    for (let i = -5; i <= 5; i++) wd.push(prism(0.014, 0.1, [i * 0.17, 1.55, -0.04], [HX, 0, 0], 6));
+    const o = {};
+    if (X.foeGear) {
+      borrow(o, X.foeGear('pike'), [-0.72, 0.84, -0.02], [-HX - 0.03, 0, 0.02]); borrow(o, X.foeGear('pike'), [-0.4, 0.84, -0.02], [-HX - 0.03, 0, -0.03]);
+      borrow(o, X.foeGear('greatsword'), [0.0, 1.5, 0.0], [HX + 0.04, HX, 0]);
+      borrow(o, X.foeGear('kite'), [0.66, 0.68, 0.1], [-0.2, 0.1, 0.03], 0.9);
+    }
+    if (X.meleeParts && X.meleeParts('axe')) borrow(o, X.meleeParts('axe').parts, [0.3, 0.42, 0.0], [-0.04, HX, 0.03], 1.7);
+    return [ppart('woodDark', wd, 0.8)].concat(sorted(o));
+  };
+  // the floor of a spike trap, two square: four iron plates, a hole for each spike (six by six), a frame of flat bar, nails
+  PROP.spikeplate = () => {
+    const s = 2, ir = [], dk = [];
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) ir.push(rbx(s / 2 - 0.02, 0.024, s / 2 - 0.02, 0.004, sx * s / 4, 0.012, sz * s / 4));
+    for (const [x, z, w, d] of [[0, -s / 2 + 0.03, s, 0.07], [0, s / 2 - 0.03, s, 0.07], [-s / 2 + 0.03, 0, 0.07, s], [s / 2 - 0.03, 0, 0.07, s]]) ir.push(rbx(w, 0.036, d, 0.006, x, 0.018, z));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const k of [0.1, 0.5, 0.9]) { ir.push(ball(0.014, [sx * (s / 2 - 0.03), 0.036, sz * k * (s / 2 - 0.06)], [1, 0.5, 1]), ball(0.014, [sx * k * (s / 2 - 0.06), 0.036, sz * (s / 2 - 0.03)], [1, 0.5, 1])); }
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { const g = new THREE.CylinderGeometry(0.062, 0.062, 0.004, 10); g.translate(-s / 2 + (i + 0.5) * s / 6, 0.026, -s / 2 + (j + 0.5) * s / 6); dk.push(g); }
+    return [ppart('iron', ir, 1, [0.5, 0.45, 0.4]), ppart('dark', dk, 1)];
+  };
+  // one spike of it: four-sided, drawn to a point, on a round foot (0.6 long about its middle)
+  PROP.spike = () => { const a = new THREE.ConeGeometry(0.042, 0.52, 4).toNonIndexed(); a.computeVertexNormals(); a.translate(0, 0.04, 0); const b = new THREE.CylinderGeometry(0.046, 0.055, 0.1, 8); b.translate(0, -0.25, 0); return [{ g: boxUV(Geo.merge([a, b]), 3), m: 'iron' }]; };
+  // a board one long, one wide (y), one thick (z), about its middle, its ends split and broken; a stake one high, cut to a point
+  PROP.plank = () => [{ g: boxUV(ext([[-0.5, -0.5], [0.47, -0.5], [0.5, -0.2], [0.46, 0.05], [0.495, 0.2], [0.48, 0.5], [-0.49, 0.5], [-0.46, 0.25], [-0.5, 0.1], [-0.47, -0.2]], 1, 0.06), 1), m: 'wood' }];
+  PROP.stake = () => { const g = Geo.merge([Geo.xf(new THREE.BoxGeometry(1, 0.86, 1), [0, 0.43, 0]), Geo.xf(new THREE.ConeGeometry(0.72, 0.16, 4).toNonIndexed(), [0, 0.93, 0], [0, Math.PI / 4, 0])]); g.computeVertexNormals(); return [{ g: boxUV(g, 1), m: 'woodDark' }]; };
+  // a drain in the floor, one square: a frame, six bars, the dark under them
+  PROP.drain = () => {
+    const ir = [rbx(1, 0.03, 0.08, 0.006, 0, 0.015, -0.46), rbx(1, 0.03, 0.08, 0.006, 0, 0.015, 0.46), rbx(0.08, 0.03, 1, 0.006, -0.46, 0.015, 0), rbx(0.08, 0.03, 1, 0.006, 0.46, 0.015, 0)];
+    for (let i = 0; i < 6; i++) ir.push(rbx(0.05, 0.022, 0.86, 0.008, -0.34 + i * 0.136, 0.014, 0));
+    return [ppart('iron', ir, 1, [0.45, 0.45, 0.45]), ppart('dark', rbx(0.86, 0.004, 0.86, 0.001, 0, 0.004, 0), 1)];
+  };
   X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
 
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted

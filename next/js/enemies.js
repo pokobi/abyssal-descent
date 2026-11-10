@@ -29,12 +29,15 @@
   function mkMats(def, opts) {
     const pc = PLANCOL[def.plan];
     const t = G.Tex.tex;
-    const tx = pc.tex === 'rock' ? t.rock : t[pc.tex] || t.skin;
+    const bt = def.plan === 'skeleton' && G.GFX && G.GFX.tex ? G.GFX.tex('bone') : null; // (old bone: gfx.js)
+    const tx = bt || (pc.tex === 'rock' ? t.rock : t[pc.tex] || t.skin);
     const col = opts && opts.ally ? '#7a9ab0' : def.color || pc.skin;
     const skin = new THREE.MeshStandardMaterial({ color: col, roughness: pc.rough, metalness: pc.metal || 0, map: tx.map, normalMap: tx.normalMap });
+    if (bt) { skin.roughnessMap = bt.orm; skin.aoMap = bt.orm; skin.roughness = 0.95; }
     if (pc.trans) { skin.transparent = true; skin.opacity = pc.trans; }
     if (def.plan === 'slime') { skin.emissive = new THREE.Color(col).multiplyScalar(0.25); }
     const sec = new THREE.MeshStandardMaterial({ color: pc.sec, roughness: 0.7, map: t.smooth.map });
+    if (bt) { sec.map = t.metal.map; sec.normalMap = t.metal.normalMap; sec.metalness = 0.6; sec.roughness = 0.85; sec.color.set('#c2b6a4'); } // (a skeleton's iron: helmet, sword, shield)
     const eyeCol = opts && opts.ally ? '#80d0ff' : def.eye || (def.plan === 'skeleton' ? '#ff9040' : '#ffcc40');
     const eye = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: eyeCol, emissiveIntensity: 2.2 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x120c0a, roughness: 0.8 });
@@ -171,6 +174,29 @@
         hips.position.y = 0.95 + Math.abs(Math.sin(w)) * 0.03;
       },
     };
+  };
+  // The skeleton as bones (gfx.js): the same joints, and so the same walk and swing and the same places to be hit; only what hangs on
+  // the joints is changed - a skull with its jaw, ribs, a spine, the long bones, a helmet on some, a sword, a shield on some.
+  const skeletonPlain = B.skeleton;
+  B.skeleton = function (root, M, opts) {
+    const R = skeletonPlain(root, M, opts), K = G.GFX && G.GFX.bones ? G.GFX.bones() : null;
+    if (!K) return R;
+    const J = R.J, hips = J.spine.parent, arms = J.arms, L = J.L, shield = arms[0].hand.children.some((c) => c.isMesh);
+    for (const n of [hips, J.spine, J.head, arms[0].sh, arms[0].el, arms[0].hand, arms[1].sh, arms[1].el, arms[1].hand, L[0].hip, L[0].kn, L[1].hip, L[1].kn]) for (let i = n.children.length - 1; i >= 0; i--) if (n.children[i].isMesh) n.remove(n.children[i]);
+    const put = (parent, geo, mat, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); m.castShadow = true; parent.add(m); return m; };
+    put(hips, K.pelvis, M.skin, 0, -0.01, 0);
+    put(J.spine, K.lumbar, M.skin, 0, 0.0, -0.05); put(J.spine, K.chest, M.skin, 0, 0.2, 0.01); put(J.spine, K.neck, M.skin, 0, 0.535, -0.05);
+    put(J.head, K.skull, M.skin, 0, -0.02, 0);
+    const jaw = joint(J.head, 0, -0.008, 0); put(jaw, K.jaw, M.skin);
+    for (const s of [-1, 1]) mesh(J.head, PG.sph, M.eye, 0.007, 0.007, 0.007, s * 0.031, 0.038, 0.054);
+    if (!opts.ally && Math.random() < 0.5) put(J.head, K.helmet, M.sec, 0, 0.048, -0.012, -0.08, 0, 0.04);
+    for (let i = 0; i < 2; i++) { const a = arms[i], pos = i === 1; put(a.sh, pos ? K.humP : K.humN, M.skin); put(a.el, K.forearm, M.skin); put(a.hand, K.hand, M.skin, 0, 0, 0, 0, pos ? 0 : Math.PI, 0); }
+    put(arms[1].hand, K.sword, M.sec, 0, -0.07, 0.03);
+    if (shield) put(arms[0].hand, K.shield, M.sec, 0, -0.02, 0.06);
+    for (let i = 0; i < 2; i++) { const l = L[i], pos = i === 1; put(l.hip, pos ? K.femP : K.femN, M.skin); put(l.kn, pos ? K.shinP : K.shinN, M.skin); put(l.kn, K.foot, M.skin, 0, -0.372, 0); }
+    const an = R.animate;
+    R.animate = function (a) { an(a); jaw.rotation.x = 0.05 + Math.max(0, a.atk || 0) * 0.4 + (a.wind || 0) * 0.25 + Math.max(0, Math.sin((a.t || 0) * 7.3) * Math.sin((a.t || 0) * 1.1) - 0.5) * 0.3; };
+    return R;
   };
   B.slime = function (root, M) {
     const body = joint(root, 0, 0, 0);

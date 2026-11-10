@@ -512,6 +512,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   const texCache = {};
   X.EXSRC = EX;
+  X.mirror = (g) => mirror(g);
   // a surface by name: { map, normalMap, orm } (made at first asking; null where there is no GPU to make it)
   X.tex = function (name) {
     if (texCache[name] !== undefined) return texCache[name];
@@ -564,4 +565,170 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const mk = (fn, b0, b1, cell) => { const t0 = performance.now(), g = S.mesh(fn, b0, b1, cell); X.stats.hand += Math.round(performance.now() - t0); return g; };
     return (handCache.r = { hand: mk(grip, [-0.04, -0.105, -0.08], [0.085, 0.065, 0.12], 0.0023), pad: mk(pad, [0.028, -0.03, -0.024], [0.062, 0.03, 0.032], 0.0017), strap: mk(strap, [-0.005, -0.085, 0.02], [0.085, -0.01, 0.1], 0.0021) });
   };
+})();
+// ---- a skeleton's bones: the skull, jaw, pelvis and the long bones with their knobbed ends are distance fields; the ribs are bent
+// tubes; the spine is one vertebra repeated; helmet, sword and shield are turned and pushed-out parts. Made once, shared by every
+// skeleton (enemies.js hangs them on the joints it already has) ----
+(function () {
+  const X = G.GFX, S = X.S, smin = S.smin, V3 = THREE.Vector3;
+  const V = new V3(), M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), SC = new V3();
+  const Geo = X.Geo = {};
+  // place a geometry: p position, r rotation (radians), s scale (a number or [x, y, z])
+  Geo.xf = function (g, p, r, s) {
+    E.set(r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0); Q.setFromEuler(E);
+    if (s === undefined) SC.set(1, 1, 1); else if (typeof s === 'number') SC.set(s, s, s); else SC.set(s[0], s[1], s[2]);
+    V.set(p ? p[0] : 0, p ? p[1] : 0, p ? p[2] : 0); M4.compose(V, Q, SC); g.applyMatrix4(M4); return g;
+  };
+  // a round bar from point a to point b
+  Geo.rod = function (a, b, r, seg, r2) {
+    const d = new V3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), len = d.length(), g = new THREE.CylinderGeometry(r2 === undefined ? r : r2, r, len, seg || 6, 1);
+    g.translate(0, len / 2, 0); Q.setFromUnitVectors(V.set(0, 1, 0), d.normalize()); M4.makeRotationFromQuaternion(Q); M4.setPosition(a[0], a[1], a[2]); g.applyMatrix4(M4); return g;
+  };
+  // a turned part about the y axis: [radius, height] pairs
+  Geo.lathe = (pts, seg) => new THREE.LatheGeometry(pts.map((p) => new THREE.Vector2(Math.max(p[0], 1e-5), p[1])), seg || 12);
+  // join geometries (already placed) into one: position, normal, uv
+  Geo.merge = function (list) {
+    let n = 0; const parts = [];
+    for (const g0 of list) { const g = g0.index ? g0.toNonIndexed() : g0; if (!g.attributes.normal) g.computeVertexNormals(); parts.push(g); n += g.attributes.position.count; }
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2); let o = 0;
+    for (const g of parts) { const c = g.attributes.position.count; pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2); o += c; }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    return out;
+  };
+  const chain = (x, y, z, pts, r0, r1, k) => S.chain(x, y, z, pts, r0, r1, k || 0.004);
+
+  function skull(x, y, z) {
+    const ax = Math.abs(x);
+    let d = S.ell(x, y, z, 0, 0.098, -0.012, 0.073, 0.08, 0.092);                                  // braincase
+    d = smin(d, S.box(ax, y, z, 0, 0.05, 0.05, 0.049, 0.046, 0.031, 0.024), 0.028);                // the face
+    d = smin(d, S.cap(ax, y, z, 0, 0.089, 0.079, 0.05, 0.085, 0.069, 0.0115), 0.012);              // brow ridge
+    d = smin(d, S.ell(ax, y, z, 0.052, 0.036, 0.058, 0.02, 0.0135, 0.024), 0.012);                 // cheekbone
+    d = smin(d, S.cap(ax, y, z, 0.058, 0.036, 0.046, 0.071, 0.04, -0.004, 0.0068), 0.008);         // its arch back to the ear
+    d = smin(d, S.box(ax, y, z, 0, -0.005, 0.066, 0.03, 0.021, 0.02, 0.012), 0.016);               // upper jaw
+    d = smin(d, S.ell(ax, y, z, 0.05, 0.02, -0.03, 0.016, 0.022, 0.018), 0.014);
+    d = S.cut(d, S.ell(ax, y, z, 0.031, 0.058, 0.09, 0.0215, 0.0195, 0.036), 0.006);               // eye sockets
+    d = S.cut(d, S.ell(ax, y, z, 0.0078, 0.019, 0.097, 0.0105, 0.018, 0.024), 0.004);              // nose
+    d = S.cut(d, S.ell(x, y, z, 0, 0.036, 0.097, 0.008, 0.013, 0.022), 0.004);
+    d = S.cut(d, S.ell(ax, y, z, 0.087, 0.062, 0.014, 0.018, 0.03, 0.036), 0.012);                 // temple
+    d = S.cut(d, S.ell(ax, y, z, 0.064, 0.016, 0.034, 0.012, 0.017, 0.03), 0.008);
+    return d;
+  }
+  function jaw(x, y, z) {
+    const ax = Math.abs(x);
+    let d = chain(ax, y, z, [[0, -0.066, 0.084], [0.02, -0.064, 0.075], [0.035, -0.058, 0.046], [0.046, -0.05, 0.012]], 0.0085, 0.0075);
+    d = smin(d, chain(ax, y, z, [[0, -0.054, 0.081], [0.019, -0.052, 0.072], [0.033, -0.048, 0.045], [0.045, -0.042, 0.012]], 0.007, 0.0065), 0.006);
+    d = smin(d, S.cone(ax, y, z, 0.046, -0.048, 0.012, 0.058, 0.012, 0.0, 0.009, 0.0065), 0.006);  // the branch up to the hinge
+    d = smin(d, S.sph(x, y, z, 0, -0.068, 0.085, 0.011), 0.008);                                   // chin
+    return d;
+  }
+  function pelvis(x, y, z) {
+    const ax = Math.abs(x);
+    let wing = S.ell(ax, y, z, 0.082, 0.04, -0.014, 0.055, 0.058, 0.044);
+    wing = S.smax(wing, -S.ell(ax, y, z, 0.062, 0.056, 0.022, 0.058, 0.07, 0.054), 0.012);         // hollowed from the front: a thin flaring blade
+    let d = wing;
+    d = smin(d, S.box(x, y, z, 0, 0.03, -0.056, 0.03, 0.046, 0.014, 0.012), 0.02);                 // sacrum
+    d = smin(d, S.sph(ax, y, z, 0.085, -0.04, 0.0, 0.03), 0.02);                                   // about the hip socket
+    d = smin(d, S.tor(ax, y, z, 0.05, -0.078, 0.022, 0.55, 0.0, 0.835, 0.03, 0.0085), 0.012);
+    d = smin(d, S.cap(ax, y, z, 0, -0.072, 0.058, 0.04, -0.052, 0.05, 0.0095), 0.01);
+    return d;
+  }
+  function femur(x, y, z) {      // the ball at the origin, the shaft out and down to the knee at (0.024, -0.445)
+    let d = S.sph(x, y, z, 0, 0, 0, 0.021);
+    d = smin(d, S.cone(x, y, z, 0, 0, 0, 0.042, -0.022, 0, 0.013, 0.015), 0.01);
+    d = smin(d, S.ell(x, y, z, 0.053, -0.012, -0.004, 0.016, 0.024, 0.018), 0.012);
+    d = smin(d, S.cone(x, y, z, 0.044, -0.03, 0, 0.024, -0.4, 0.004, 0.0145, 0.0125), 0.014);
+    d = smin(d, S.ell(x, y, z, 0.006, -0.435, 0.0, 0.019, 0.02, 0.024), 0.014);
+    d = smin(d, S.ell(x, y, z, 0.042, -0.435, 0.0, 0.019, 0.02, 0.024), 0.014);
+    return d;
+  }
+  function shin(x, y, z) {       // the broad top under the knee, the shaft, the ankle knob; the thin bone beside it
+    let d = S.ell(x, y, z, 0, -0.012, 0, 0.034, 0.016, 0.026);
+    d = smin(d, S.cone(x, y, z, 0, -0.02, 0.004, 0.0, -0.36, 0.002, 0.016, 0.011), 0.016);
+    d = smin(d, S.ell(x, y, z, -0.004, -0.385, 0, 0.02, 0.018, 0.018), 0.012);
+    d = smin(d, S.cap(x, y, z, 0.03, -0.03, -0.012, 0.027, -0.385, -0.008, 0.0062), 0.006);
+    return d;
+  }
+  function humerus(x, y, z) {    // the head turned in to the shoulder, the flared end at the elbow (0, -0.305)
+    let d = S.sph(x, y, z, -0.012, -0.004, 0, 0.02);
+    d = smin(d, S.ell(x, y, z, 0.008, -0.012, 0, 0.014, 0.018, 0.016), 0.01);
+    d = smin(d, S.cone(x, y, z, 0.002, -0.02, 0, 0, -0.27, 0, 0.012, 0.0105), 0.012);
+    d = smin(d, S.ell(x, y, z, 0, -0.295, 0, 0.027, 0.013, 0.013), 0.012);
+    return d;
+  }
+  // a row of teeth round the jaw: each its own small block, some longer, some gone
+  function teeth(y, r, cz, sd, down) {
+    const out = []; let s = sd; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    for (let i = -6; i <= 6; i++) {
+      if (i === 0) continue; const k = Math.abs(i), a = (k - 0.5) / 6 * 1.25 * Math.sign(i), gone = rnd() < 0.15 && k > 1, hh = (k < 3 ? 0.0125 : k < 5 ? 0.0115 : 0.0095) * (0.85 + rnd() * 0.3), w = k < 3 ? 0.0052 : 0.0062;
+      if (gone) continue;
+      out.push(Geo.xf(new THREE.BoxGeometry(w, hh, k < 5 ? 0.0045 : 0.0066), [Math.sin(a) * r, y + (down ? hh / 2 : -hh / 2), cz + Math.cos(a) * r], [(rnd() - 0.5) * 0.12, a, (rnd() - 0.5) * 0.1]));
+    }
+    return out;
+  }
+  // a plain long bone down from the origin: thin shaft, knobbed ends
+  const bone = (len, r, ra, rb) => { const g = Geo.lathe([[0.0004, 0], [ra * 0.75, 0], [ra, ra * 0.5], [ra * 0.9, ra * 1.3], [r, len * 0.22], [r * 0.9, len * 0.5], [r, len * 0.8], [rb * 0.9, len - rb * 1.3], [rb, len - rb * 0.5], [rb * 0.7, len], [0.0004, len]], 8); g.rotateX(Math.PI); return g; };
+  const vert = (r, h) => Geo.merge([Geo.lathe([[0.0004, 0], [r, 0], [r * 0.86, h * 0.5], [r, h], [0.0004, h]], 8), Geo.xf(new THREE.BoxGeometry(r * 0.42, h * 0.8, r * 1.9), [0, h * 0.3, -r * 1.7], [0.45, 0, 0]), Geo.xf(new THREE.BoxGeometry(r * 3.2, h * 0.5, r * 0.5), [0, h * 0.55, -r * 0.9])]);
+
+  let cache = null;
+  X.bones = function () {
+    if (cache) return cache;
+    const t0 = performance.now(), b = {}, TAU = Math.PI * 2;
+    b.skull = Geo.merge([S.mesh(skull, [-0.1, -0.05, -0.115], [0.1, 0.19, 0.11], 0.0046)].concat(teeth(-0.0245, 0.0275, 0.057, 5, false)));
+    b.jaw = Geo.merge([S.mesh(jaw, [-0.07, -0.085, -0.012], [0.07, 0.025, 0.105], 0.004)].concat(teeth(-0.0475, 0.0262, 0.056, 9, true))); b.jaw.translate(0, -0.012, 0);
+    b.pelvis = S.mesh(pelvis, [-0.16, -0.125, -0.085], [0.16, 0.13, 0.085], 0.0058); b.pelvis.scale(1.12, 0.92, 0.95); b.pelvis.computeVertexNormals();
+    // (the long bones are made for the +x side - the ball of each turned in towards the body - and mirrored for the other)
+    const fem = S.mesh(femur, [-0.03, -0.47, -0.035], [0.08, 0.03, 0.035], 0.0052); fem.translate(-0.024, 0, 0); fem.scale(1, 1.034, 1); b.femP = fem; b.femN = X.mirror(fem);
+    const sh = S.mesh(shin, [-0.045, -0.415, -0.035], [0.045, 0.012, 0.035], 0.0052); sh.scale(1, 0.95, 1); b.shinP = sh; b.shinN = X.mirror(sh);
+    const hu = S.mesh(humerus, [-0.04, -0.32, -0.03], [0.035, 0.025, 0.03], 0.0048); b.humP = hu; b.humN = X.mirror(hu);
+    b.forearm = Geo.merge([Geo.xf(bone(0.285, 0.0058, 0.0105, 0.0125), [0.011, 0, 0.002]), Geo.xf(bone(0.29, 0.0052, 0.013, 0.0085), [-0.011, 0, -0.002])]);
+    // ribs: a bent tube each, from the spine round to the breastbone; the lowest two stop short. With the breastbone, collarbones and the spine behind
+    const Wd = [0.07, 0.096, 0.113, 0.125, 0.133, 0.137, 0.137, 0.132, 0.122, 0.106], Fr = [0.072, 0.086, 0.096, 0.101, 0.103, 0.1, 0.094, 0.082, 0.06, 0.03], ch = [];
+    for (let i = 0; i < 10; i++) for (const sx of [-1, 1]) {
+      const y0 = 0.257 - i * 0.026, drop = 0.03 + i * 0.0065, pm = i < 7 ? 1 : i === 7 ? 0.9 : i === 8 ? 0.7 : 0.55, zc = (Fr[i] - 0.06) / 2, dz = (Fr[i] + 0.06) / 2, pts = [];
+      for (let k = 0; k <= 10; k++) { const ph = k / 10 * Math.PI * pm; pts.push(new V3(sx * (0.007 + Wd[i] * Math.sin(ph)), y0 - drop * Math.pow(ph / Math.PI, 1.3), zc - dz * Math.cos(ph))); }
+      ch.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 12, 0.0064, 5, false));
+    }
+    ch.push(Geo.xf(X.makeRbox(0.036, 0.2, 0.013, 0.005, 1), [0, 0.133, 0.1], [-0.12, 0, 0]));
+    for (const sx of [-1, 1]) ch.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new V3(sx * 0.018, 0.24, 0.092), new V3(sx * 0.07, 0.262, 0.08), new V3(sx * 0.125, 0.268, 0.04), new V3(sx * 0.178, 0.262, -0.005)]), 8, 0.0068, 5, false));
+    const vt = vert(0.0165, 0.0185); for (let i = 0; i < 12; i++) ch.push(Geo.xf(vt.clone(), [0, i * 0.0225, -0.062 - Math.sin(i / 11 * Math.PI) * 0.012]));
+    b.chest = Geo.merge(ch); b.chest.scale(1.22, 1.22, 1.22);
+    const vl = vert(0.021, 0.026), lum = []; for (let i = 0; i < 5; i++) lum.push(Geo.xf(vl.clone(), [0, i * 0.036, Math.sin(i / 4 * Math.PI) * 0.014])); b.lumbar = Geo.merge(lum);
+    const vc = vert(0.012, 0.016), nk = []; for (let i = 0; i < 5; i++) nk.push(Geo.xf(vc.clone(), [0, i * 0.022, i * 0.004])); b.neck = Geo.merge(nk);
+    // a fist of small bones; a foot
+    const hand = [new THREE.BoxGeometry(0.05, 0.02, 0.024)];
+    for (let f = 0; f < 4; f++) { const x = -0.027 + f * 0.018; hand.push(Geo.rod([x * 0.5, -0.005, 0], [x, -0.07, 0.004], 0.0048, 5, 0.0055), Geo.rod([x, -0.074, 0.006], [x, -0.105, 0.03], 0.005, 5, 0.0045), Geo.rod([x, -0.107, 0.033], [x, -0.094, 0.057], 0.0045, 5, 0.004)); }
+    hand.push(Geo.rod([0.025, -0.01, 0.005], [0.04, -0.045, 0.025], 0.0055, 5, 0.005), Geo.rod([0.04, -0.047, 0.027], [0.03, -0.07, 0.052], 0.0048, 5, 0.004));
+    b.hand = Geo.merge(hand);
+    const foot = [Geo.xf(X.makeRbox(0.05, 0.045, 0.075, 0.016, 1), [0, -0.035, -0.012]), Geo.xf(X.makeRbox(0.04, 0.035, 0.05, 0.014, 1), [0, -0.058, -0.05])];
+    for (let f = 0; f < 5; f++) { const x = -0.026 + f * 0.013; foot.push(Geo.rod([x * 0.6, -0.05, 0.02], [x, -0.078, 0.095], 0.0055, 5, 0.0045), Geo.rod([x, -0.08, 0.098], [x * 1.05, -0.086, 0.135 - Math.abs(f - 1) * 0.008], 0.0045, 5, 0.0035)); }
+    b.foot = Geo.merge(foot);
+    // a kettle helmet: a dome with a brim, rivets about it
+    const hl = [Geo.lathe([[0.0005, 0.142], [0.05, 0.134], [0.086, 0.107], [0.101, 0.062], [0.104, 0.03], [0.156, 0.006], [0.157, -0.001], [0.099, 0.021], [0.095, 0.06], [0.081, 0.101], [0.048, 0.127], [0.0005, 0.135]], 20)];
+    for (let i = 0; i < 10; i++) { const a = i / 10 * TAU; hl.push(Geo.xf(new THREE.SphereGeometry(0.006, 5, 4), [Math.cos(a) * 0.108, 0.033, Math.sin(a) * 0.108])); }
+    b.helmet = Geo.merge(hl); b.helmet.scale(1.1, 0.92, 1.1);
+    // sword: it runs along +z from the hand (blade, cross-guard, grip, pommel)
+    const bs = new THREE.Shape([[0.02, -0.024], [0.62, -0.021], [0.78, 0], [0.62, 0.021], [0.02, 0.024]].map((p) => new THREE.Vector2(p[0], p[1])));
+    const blade = new THREE.ExtrudeGeometry(bs, { depth: 0.002, bevelEnabled: true, bevelThickness: 0.0032, bevelSize: 0.0032, bevelOffset: -0.0032, bevelSegments: 1 }); blade.translate(0, 0, -0.001); blade.rotateY(-Math.PI / 2);
+    const grip = new THREE.CylinderGeometry(0.012, 0.0135, 0.13, 8); grip.rotateX(Math.PI / 2); grip.translate(0, 0, -0.06);
+    b.sword = Geo.merge([blade, Geo.xf(X.makeRbox(0.026, 0.19, 0.022, 0.006, 1), [0, 0, 0.012]), grip, Geo.xf(new THREE.SphereGeometry(0.019, 8, 6), [0, 0, -0.135])]);
+    // shield: its face to +z
+    const shd = [Geo.lathe([[0.0005, 0.048], [0.1, 0.044], [0.2, 0.03], [0.292, 0.004], [0.292, -0.012], [0.2, 0.014], [0.1, 0.028], [0.0005, 0.032]], 28), Geo.lathe([[0.278, 0.012], [0.3, 0.004], [0.303, -0.008], [0.296, -0.016], [0.28, -0.006]], 28), Geo.lathe([[0.0005, 0.1], [0.03, 0.094], [0.055, 0.074], [0.066, 0.05], [0.082, 0.044], [0.082, 0.038], [0.0005, 0.04]], 14)];
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; shd.push(Geo.xf(new THREE.SphereGeometry(0.008, 5, 4), [Math.cos(a) * 0.23, 0.027, Math.sin(a) * 0.23])); }
+    b.shield = Geo.merge(shd); b.shield.rotateX(Math.PI / 2); b.shield.scale(0.85, 0.85, 0.85);
+    let tris = 0; for (const k in b) { b[k].computeBoundingSphere(); tris += b[k].attributes.position.count / 3; }
+    X.stats.bones = Math.round(performance.now() - t0); X.stats.boneTris = Math.round(tris);
+    return (cache = b);
+  };
+  // the surface of old bone, pale (a skeleton's own colour is laid over it)
+  X.EXSRC.bone = [512, 1.0, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 4., 1.), n2 = fbm(uv, 20., 2.), n3 = fbm(uv, 90., 3.);
+  vec3 pore = voro(uv, 70., 4.); float pr = smoothstep(.22, .0, pore.x) * step(.82, pore.z);
+  vec3 vc = voro(uv, 7., 9.); float crack = (1. - smoothstep(.0, .012, vc.y - vc.x)) * smoothstep(.5, .65, fbm(uv, 3., 12.));
+  h = .55 + (n2 - .5) * .22 + (n3 - .5) * .12 - pr * .1 - crack * .22;
+  vec3 c = mix(vec3(.96, .94, .9), vec3(.82, .76, .64), smoothstep(.35, .7, n1 + (n2 - .5) * .4));
+  c = mix(c, vec3(.44, .36, .26), clamp(pr * .4 + crack * .8 + smoothstep(.6, .85, fbm(uv, 6., 20.)) * .5, 0., 1.)); c *= .88 + n3 * .24;
+  col = S(c); rough = .84 + (n2 - .5) * .2 + pr * .16; metal = 0.;
+}`];
 })();

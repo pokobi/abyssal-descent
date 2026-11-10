@@ -231,6 +231,14 @@
         return;
       }
       w.solid('block', a, T1 - 0.7, za, b, T1, zb, { uv: 2 });
+      // (the arch that carries it: a low arch from terrace to terrace under the deck, the masonry between the two, a rib proud of each face.
+      // To look at; it springs above a head's height)
+      if (G.GFX && G.GFX.archSpandrel) {
+        const half = (b - a) / 2, rise = 1.5, y0 = T1 - 0.7 - rise, mt = new THREE.Matrix4().makeTranslation((a + b) / 2, y0, bz);
+        w.batch.geo('block', G.GFX.archSpandrel(half, rise, 3.1, 24), mt);
+        w.batch.geo('trim', G.GFX.archRib(half, rise, 0.34, 3.5, 24), mt);
+        for (const sx of [a, b]) w.visual('trim', sx - 0.35, y0 - 0.9, bz - 1.75, sx + 0.35, y0, bz + 1.75, { uv: 1.5 });   // (the corbel it springs from)
+      }
       w.solid('wall', a, T1, za, b, T1 + 0.95, za + 0.3, { uv: 2 }); w.solid('trim', a, T1 + 0.95, za - 0.04, b, T1 + 1.05, za + 0.34, { uv: 1 });
       w.solid('wall', a, T1, zb - 0.3, b, T1 + 0.95, zb, { uv: 2 }); w.solid('trim', a, T1 + 0.95, zb - 0.34, b, T1 + 1.05, zb + 0.04, { uv: 1 });
       // skulls along its sides, a lamp hanging under its middle
@@ -263,6 +271,14 @@
       }
     }
     for (let z = z0 + 10; z < z1 - 6; z += 16) { P().chandelier(w, W / 2, VAULT - 7.5, z, VAULT); w.addLight(W / 2, VAULT - 8.2, z, { flame: 0, intensity: 13, range: 21, color: '#ffb46e', prio: 1.1, steady: false }); }
+    // ---- the nave's floor: a way of paler slabs down its middle between two dark lines, a band across it at every bay (laid a finger's
+    // breadth proud of the floor: nothing to stumble on)
+    {
+      const cx = W / 2, hw = Math.min(2.2, NAVE / 2 - 3.4);
+      w.visual('floor', cx - hw, 0, z0 - 6, cx + hw, 0.012, z1 + 5, { uv: 2.2, uo: 0.37, vo: 0.21, tint: [1.22, 1.16, 1.06], grad: false, skip: { bottom: 1 } });
+      for (const sx of [-1, 1]) w.visual('dark', cx + sx * (hw + 0.1) - 0.045, 0, z0 - 6, cx + sx * (hw + 0.1) + 0.045, 0.014, z1 + 5, { uv: 1, grad: false, skip: { bottom: 1 } });
+      for (let z = 4; z < D - 1; z += 8) if (z > z0 - 5 && z < z1 + 4) w.visual('floor', D1 + 0.4, 0, z - 0.3, W - D1 - 0.4, 0.011, z + 0.3, { uv: 2.2, uo: 0.11, tint: [1.2, 1.14, 1.05], grad: false, skip: { bottom: 1 } });
+    }
     // ---- the vault over it all (to look at: nothing here is in anyone's way). A pointed vault springs from the long walls above the second
     // terraces; a stone rib crosses under it at every bay, on a pilaster against the wall; a ridge runs along its crown. The faces of both
     // terraces carry flat buttresses at the same bays, and every other one a torch. No dice are thrown for any of it (it is all by the bay).

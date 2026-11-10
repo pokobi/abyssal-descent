@@ -37,6 +37,9 @@
     // (a room's things: a box with its edges just taken off - on walls and floors the plain box stays; a flat hoop for a barrel)
     PG.cbox = G.GFX ? G.GFX.makeRbox(1, 1, 1, 0.035, 1) : PG.box;
     PG.hoop = new THREE.LatheGeometry([[0.985, -0.5], [1.0, -0.5], [1.014, -0.36], [1.014, 0.36], [1.0, 0.5], [0.985, 0.5]].map((q) => new THREE.Vector2(q[0], q[1])), 28);
+    // a pitched lid for a tomb: one long and one wide, one high, its ridge along z
+    { const sh = new THREE.Shape(); sh.moveTo(-0.5, 0); sh.lineTo(0.5, 0); sh.lineTo(0.5, 0.3); sh.lineTo(0.16, 1); sh.lineTo(-0.16, 1); sh.lineTo(-0.5, 0.3); sh.closePath();
+      PG.gable = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, steps: 1 }); PG.gable.translate(0, 0, -0.5); }
     // a skull in one piece (it looks to +z, its base at the origin): the vault of it, the face under a brow, cheekbones, the jaw; and, of
     // the dark, its sockets, the nose, the line of the teeth. Far fewer faces than the three balls and a box it was, and a skull to look at
     if (G.GFX && G.GFX.Geo) {
@@ -195,7 +198,14 @@
     // carved cross on lid
     if (rotX) { w.batch.box('trim', x - 0.7, y + 1.0, z - 0.06, x + 0.7, y + 1.04, z + 0.06, { uv: 1 }); w.batch.box('trim', x + 0.25, y + 1.0, z - 0.3, x + 0.37, y + 1.04, z + 0.3, { uv: 1 }); }
     else { w.batch.box('trim', x - 0.06, y + 1.0, z - 0.7, x + 0.06, y + 1.04, z + 0.7, { uv: 1 }); w.batch.box('trim', x - 0.3, y + 1.0, z - 0.37, x + 0.3, y + 1.04, z - 0.25, { uv: 1 }); }
-    if (rng && rng.chance(0.5)) P.candles(w, x + (rotX ? -0.8 : 0.3), y + 1.04, z + (rotX ? 0.25 : -0.8), rng, false);
+    // (a pitched lid over the flat one, a pilaster at each corner, a moulding under the lid: to look at - the box that stops you is the same)
+    {
+      const lx = rotX ? lidOff : 0, lz = rotX ? 0 : lidOff;
+      w.batch.geo('trim', PG.gable, M(x + lx, y + 1.0, z + lz, Wd - 0.1, 0.2, L - 0.1, 0, rotX ? Math.PI / 2 : 0, 0));
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) w.batch.box('trim', x + sx * (hx - 0.04) - 0.09, y + 0.25, z + sz * (hz - 0.04) - 0.09, x + sx * (hx - 0.04) + 0.09, y + 0.85, z + sz * (hz - 0.04) + 0.09, { uv: 1 });
+      w.batch.box('trim', x - hx - 0.02, y + 0.78, z - hz - 0.02, x + hx + 0.02, y + 0.85, z + hz + 0.02, { uv: 1 });
+    }
+    if (rng && rng.chance(0.5)) P.candles(w, x + (rotX ? -0.8 : 0.3), y + 1.2, z + (rotX ? 0.25 : -0.8), rng, false);
   };
   P.statue = function (w, x, z, y, ry, rng, s) {
     s = s || 1;

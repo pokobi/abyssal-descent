@@ -1378,6 +1378,13 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     g.translate(0, 0, -(wide - bv * 2) / 2);
     return boxUV(g, 0.4);
   };
+  // the masonry between an arch and the flat thing it carries (a bridge's deck): the arch's line below, a level line above
+  X.archSpandrel = function (a, H, wide, seg) {
+    seg = seg || 24; const P = archLine(a, H, seg), sh = new THREE.Shape(); sh.moveTo(P[0][0], P[0][1]);
+    for (let i = 1; i <= seg; i++) sh.lineTo(P[i][0], P[i][1]); sh.lineTo(a, H + 0.02); sh.lineTo(-a, H + 0.02); sh.closePath();
+    const g = new THREE.ExtrudeGeometry(sh, { depth: wide, bevelEnabled: false, curveSegments: 1, steps: 1 }); g.translate(0, 0, -wide / 2);
+    return boxUV(g, 0.4);
+  };
   // the web: the arch's line drawn along the hall for a length, seen from below (its other side is never seen)
   X.archWeb = function (a, H, len, seg, uvk) {
     seg = seg || 30; const P = archLine(a, H, seg), pos = [], nor = [], uv = [], idx = [], k = uvk || 0.3; let run = 0;

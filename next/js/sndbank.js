@@ -36,6 +36,22 @@
  "chest_pry": { "f": [  "chest_pry_1.ogg",  "chest_pry_2.ogg",  "chest_pry_3.ogg" ], "v": 0.5, "p": 0.05, "wet": 0.25 },
  "ui_open": { "f": [  "ui_open_1.ogg",  "ui_open_2.ogg",  "ui_open_3.ogg",  "ui_open_4.ogg" ], "v": 0.22, "p": 0.04, "wet": 0.08 },
  "ui_back": { "f": [  "ui_back_1.ogg" ], "v": 0.15, "p": 0.04, "wet": 0.08 },
- "ui_card": { "f": [  "ui_card_1.ogg",  "ui_card_2.ogg",  "ui_card_3.ogg" ], "v": 0.22, "p": 0.05, "wet": 0.08 }
+ "ui_card": { "f": [  "ui_card_1.ogg",  "ui_card_2.ogg",  "ui_card_3.ogg" ], "v": 0.22, "p": 0.05, "wet": 0.08 },
+ "mon_groan": { "f": [  "mon_groan_1.ogg",  "mon_groan_2.ogg",  "mon_groan_3.ogg",  "mon_groan_4.ogg",  "mon_groan_5.ogg",  "mon_groan_6.ogg" ], "v": 0.4, "p": 0.07, "wet": 0.35 },
+ "mon_roar": { "f": [  "mon_roar_1.ogg",  "mon_roar_2.ogg",  "mon_roar_3.ogg",  "mon_roar_4.ogg",  "mon_roar_5.ogg" ], "v": 0.6, "p": 0.07, "rate": 0.7, "wet": 0.45 },
+ "mon_hiss": { "f": [  "mon_hiss_1.ogg" ], "v": 0.45, "p": 0.1, "rate": 0.85, "wet": 0.3 },
+ "mon_snarl": { "f": [  "mon_snarl_1.ogg",  "mon_snarl_2.ogg",  "mon_snarl_3.ogg",  "mon_snarl_4.ogg",  "mon_snarl_5.ogg",  "mon_snarl_6.ogg" ], "v": 0.8, "p": 0.08, "rate": 0.72, "wet": 0.3 },
+ "mon_screech": { "f": [  "mon_screech_1.ogg",  "mon_screech_2.ogg",  "mon_screech_3.ogg",  "mon_screech_4.ogg",  "mon_screech_5.ogg" ], "v": 0.45, "p": 0.08, "rate": 0.35, "wet": 0.4 },
+ "mon_chitter": { "f": [  "mon_chitter_1.ogg",  "mon_chitter_2.ogg",  "mon_chitter_3.ogg",  "mon_chitter_4.ogg",  "mon_chitter_5.ogg",  "mon_chitter_6.ogg" ], "v": 0.7, "p": 0.12, "rate": 1.25, "wet": 0.25 },
+ "mon_rumble": { "f": [  "mon_rumble_1.ogg",  "mon_rumble_2.ogg",  "mon_rumble_3.ogg",  "mon_rumble_4.ogg",  "mon_rumble_5.ogg",  "mon_rumble_6.ogg" ], "v": 0.8, "p": 0.08, "rate": 0.8, "wet": 0.45 },
+ "mon_die": { "f": [  "mon_die_1.ogg",  "mon_die_2.ogg",  "mon_die_3.ogg",  "mon_die_4.ogg" ], "v": 0.5, "p": 0.1, "wet": 0.35 },
+ "melee_slice": { "f": [  "melee_slice_1.ogg",  "melee_slice_2.ogg",  "melee_slice_3.ogg" ], "v": 0.35, "p": 0.08, "wet": 0.12 },
+ "launch_crossbow": { "f": [  "launch_crossbow_1.ogg",  "launch_crossbow_2.ogg",  "launch_crossbow_3.ogg",  "launch_crossbow_4.ogg" ], "v": 0.45, "p": 0.05, "wet": 0.2 },
+ "amb_cave": { "f": [  "amb_cave_1.ogg" ], "v": 2.2 },
+ "amb_cavern": { "f": [  "amb_cavern_1.ogg" ], "v": 1.7 },
+ "amb_deep": { "f": [  "amb_cavern_1.ogg" ], "v": 1.7, "rate": 0.6 },
+ "amb_wind": { "f": [  "amb_wind_1.ogg" ], "v": 1.2 },
+ "amb_fire": { "f": [  "amb_fire_1.ogg" ], "v": 2.6 },
+ "amb_water": { "f": [  "amb_water_1.ogg" ], "v": 1.0 }
 };
 })();

@@ -9,6 +9,7 @@
 | Fantozzi's Footsteps (Grass/Sand & Stone) | Fantozzi | https://opengameart.org/content/fantozzis-footsteps-grasssand-stone |
 | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds |
 | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio |
+| Medieval sound effects - Weapon Textures | Ben Jaszczak & Brian Nelson | https://opengameart.org/content/medieval-sound-effects-weapon-textures |
 | 100 CC0 metal and wood SFX | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx |
 
 | ファイル | 使い道 | 元のファイル | 配布物 |
@@ -127,3 +128,54 @@
 | ui_card_1.ogg | UI：札 | bookPlace1.ogg | RPG Audio |
 | ui_card_2.ogg | UI：札 | bookPlace2.ogg | RPG Audio |
 | ui_card_3.ogg | UI：札 | bookPlace3.ogg | RPG Audio |
+| mon_groan_1.ogg | 敵の声：うめき | 2106.wav（Zombie #1） | BigSoundBank |
+| mon_groan_2.ogg | 敵の声：うめき | 2106.wav（Zombie #1） | BigSoundBank |
+| mon_groan_3.ogg | 敵の声：うめき | 2107.wav（Zombie #2） | BigSoundBank |
+| mon_groan_4.ogg | 敵の声：うめき | 2107.wav（Zombie #2） | BigSoundBank |
+| mon_groan_5.ogg | 敵の声：うめき | 2108.wav（Zombie #3） | BigSoundBank |
+| mon_groan_6.ogg | 敵の声：うめき | 2108.wav（Zombie #3） | BigSoundBank |
+| mon_roar_1.ogg | 敵の声：咆哮 | 0486.wav（Grunts） | BigSoundBank |
+| mon_roar_2.ogg | 敵の声：咆哮 | 0486.wav（Grunts） | BigSoundBank |
+| mon_roar_3.ogg | 敵の声：咆哮 | 0486.wav（Grunts） | BigSoundBank |
+| mon_roar_4.ogg | 敵の声：咆哮 | 0486.wav（Grunts） | BigSoundBank |
+| mon_roar_5.ogg | 敵の声：咆哮 | 2110.wav（Zombie #5） | BigSoundBank |
+| mon_hiss_1.ogg | 敵の声：威嚇 | 1881.wav（Cat roar #1） | BigSoundBank |
+| mon_snarl_1.ogg | 敵の声：うなり | 2953.wav（Pack of Dogs） | BigSoundBank |
+| mon_snarl_2.ogg | 敵の声：うなり | 2953.wav（Pack of Dogs） | BigSoundBank |
+| mon_snarl_3.ogg | 敵の声：うなり | 2953.wav（Pack of Dogs） | BigSoundBank |
+| mon_snarl_4.ogg | 敵の声：うなり | 2953.wav（Pack of Dogs） | BigSoundBank |
+| mon_snarl_5.ogg | 敵の声：うなり | 2953.wav（Pack of Dogs） | BigSoundBank |
+| mon_snarl_6.ogg | 敵の声：うなり | 2953.wav（Pack of Dogs） | BigSoundBank |
+| mon_screech_1.ogg | 敵の声：金切り | 0458.wav（Cries of bats） | BigSoundBank |
+| mon_screech_2.ogg | 敵の声：金切り | 0458.wav（Cries of bats） | BigSoundBank |
+| mon_screech_3.ogg | 敵の声：金切り | 0458.wav（Cries of bats） | BigSoundBank |
+| mon_screech_4.ogg | 敵の声：金切り | 0458.wav（Cries of bats） | BigSoundBank |
+| mon_screech_5.ogg | 敵の声：金切り | 0458.wav（Cries of bats） | BigSoundBank |
+| mon_chitter_1.ogg | 敵の声：かちかち | 0596.wav（Bones cracking #1） | BigSoundBank |
+| mon_chitter_2.ogg | 敵の声：かちかち | 0596.wav（Bones cracking #1） | BigSoundBank |
+| mon_chitter_3.ogg | 敵の声：かちかち | 0596.wav（Bones cracking #1） | BigSoundBank |
+| mon_chitter_4.ogg | 敵の声：かちかち | 0596.wav（Bones cracking #1） | BigSoundBank |
+| mon_chitter_5.ogg | 敵の声：かちかち | 0596.wav（Bones cracking #1） | BigSoundBank |
+| mon_chitter_6.ogg | 敵の声：かちかち | 0596.wav（Bones cracking #1） | BigSoundBank |
+| mon_rumble_1.ogg | 敵の声：岩の響き | 0580.wav（Tombstone: Opening） | BigSoundBank |
+| mon_rumble_2.ogg | 敵の声：岩の響き | 0580.wav（Tombstone: Opening） | BigSoundBank |
+| mon_rumble_3.ogg | 敵の声：岩の響き | 0580.wav（Tombstone: Opening） | BigSoundBank |
+| mon_rumble_4.ogg | 敵の声：岩の響き | 0580.wav（Tombstone: Opening） | BigSoundBank |
+| mon_rumble_5.ogg | 敵の声：岩の響き | 1022.wav（Fall of Stone） | BigSoundBank |
+| mon_rumble_6.ogg | 敵の声：岩の響き | 1022.wav（Fall of Stone） | BigSoundBank |
+| mon_die_1.ogg | 敵が倒れる声 | 2111.wav（Zombie #6） | BigSoundBank |
+| mon_die_2.ogg | 敵が倒れる声 | 2112.wav（Zombie #7） | BigSoundBank |
+| mon_die_3.ogg | 敵が倒れる声 | 0486.wav（Grunts） | BigSoundBank |
+| mon_die_4.ogg | 敵が倒れる声 | 0486.wav（Grunts） | BigSoundBank |
+| melee_slice_1.ogg | 刃が斬る | knifeSlice.ogg | RPG Audio |
+| melee_slice_2.ogg | 刃が斬る | knifeSlice2.ogg | RPG Audio |
+| melee_slice_3.ogg | 刃が斬る | drawKnife1.ogg | RPG Audio |
+| launch_crossbow_1.ogg | クロスボウを撃つ | Crossbow Shoot.wav | Medieval sound effects - Weapon Textures |
+| launch_crossbow_2.ogg | クロスボウを撃つ | Crossbow Shoot.wav | Medieval sound effects - Weapon Textures |
+| launch_crossbow_3.ogg | クロスボウを撃つ | Crossbow Shoot.wav | Medieval sound effects - Weapon Textures |
+| launch_crossbow_4.ogg | クロスボウを撃つ | Crossbow Shoot.wav | Medieval sound effects - Weapon Textures |
+| amb_cave_1.ogg | 環境：洞窟 | 2135.wav（Cave #1） | BigSoundBank |
+| amb_cavern_1.ogg | 環境：大きな洞 | 2136.wav（Cave #2） | BigSoundBank |
+| amb_wind_1.ogg | 環境：風 | 0595.wav（Wind） | BigSoundBank |
+| amb_fire_1.ogg | 環境：火 | 0987.wav（Big Branching Fire #1） | BigSoundBank |
+| amb_water_1.ogg | 環境：水滴 | 1384.wav（Drops of water #1） | BigSoundBank |

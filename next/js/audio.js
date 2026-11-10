@@ -325,7 +325,7 @@
   // projectile launchers / special
   A.launcher = function (kind) {
     if (!ctx) return;
-    if ((kind === 'rocket' || kind === 'rail') && smp('launch_' + kind)) return;
+    if ((kind === 'rocket' || kind === 'rail' || kind === 'crossbow') && smp('launch_' + kind)) return;
     if (!voice(1)) return;
     const t = ctx.currentTime, out = dest(null, 0.6);
     if (kind === 'rocket') {
@@ -356,7 +356,7 @@
     if (!ctx || !usable(key)) return null;
     const f = SB.bank[key].f[0], buf = bufs[f];
     if (!buf) { fetchBuf(f); return null; }
-    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.playbackRate.value = SB.bank[key].rate || 1;   // (the same air played slower: a deeper place)
     const g = ctx.createGain(); g.gain.value = 0.0001;
     src.connect(g); g.connect(to || dest(null, wet));
     src.start(0, Math.random() * buf.duration);
@@ -629,7 +629,9 @@
   };
   A.meleeHit = function (hit, mcat, heavy) {
     if (!ctx || !hit) return;
-    if (smp(mcat === 'blade' || mcat === 'knife' || mcat === 'scythe' || mcat === 'spear' ? 'melee_slice' : 'melee_blunt', null, heavy ? 1.1 : 0.8, heavy ? 0.85 : 1)) return;
+    const cut = mcat === 'blade' || mcat === 'knife' || mcat === 'scythe' || mcat === 'spear';
+    // (a blade: the steel, and under it the blow landing on a body)
+    if (smp(cut ? 'melee_slice' : 'melee_blunt', null, heavy ? 1.1 : 0.8, heavy ? 0.85 : 1)) { if (cut) smp('hit_flesh', null, heavy ? 0.8 : 0.55, heavy ? 0.85 : 0.95, 0.15); return; }
     const t = ctx.currentTime, out = dest(null, 0.25); out.gain.value = heavy ? 1.1 : 0.8;
     if (mcat === 'blade' || mcat === 'knife' || mcat === 'scythe' || mcat === 'spear') {
       // wet slice: sharp transient + short squelch
@@ -1164,10 +1166,16 @@
     ruins: [['amb_wind', 0.4]], bloodmoon: [['amb_wind', 0.4]], grave: [['amb_wind', 0.35]], crimson: [['amb_wind', 0.4]], ruin: [['amb_wind', 0.35], ['amb_fire', 0.2]],
     sky: [['amb_wind', 0.55]], void: [['amb_wind', 0.35], ['amb_cavern', 0.25]],
   };
+  // (by the field's own name where it has one: the hollow and drip of a cave, wind over open ground, the roar of the foundry's fires)
+  const FBEDS = {
+    catacombs: [['amb_cave', 0.5]], rooms: [['amb_deep', 0.55]], castle: [['amb_deep', 0.5]], mine: [['amb_cave', 0.45], ['amb_water', 0.3]], shaft: [['amb_cavern', 0.45], ['amb_wind', 0.2]],
+    pillars: [['amb_cavern', 0.45]], flooded: [['amb_cavern', 0.35], ['amb_water', 0.4]], foundry: [['amb_deep', 0.45], ['amb_fire', 0.4]], frozen: [['amb_wind', 0.45]],
+    hamlet: [['amb_wind', 0.4]], battlefield: [['amb_wind', 0.5]], dusk: [['amb_wind', 0.4]],
+  };
   let beds = [], bedKey = null, bedV = 1;
   function setBeds(v) {
-    const bk = (G.world && G.world.biome) || 'catacombs';
-    const want = A.samplesOn() ? BEDS[bk] || BEDS.catacombs : [];
+    const fk = G.world && G.world.field, byField = fk && FBEDS[fk], bk = byField ? 'f:' + fk : (G.world && G.world.biome) || 'catacombs';
+    const want = A.samplesOn() ? byField || BEDS[bk] || BEDS.catacombs : [];
     if (bk !== bedKey || beds.length !== want.length) {
       for (const b of beds) b.stop(1.2);
       beds = [];

@@ -76,21 +76,50 @@
     return { hip, kn };
   }
   const B = {};
+  // the hound: a lean, deep-chested beast. Its parts are laid down as balls, rods and wedges where the masses of such a body are - the
+  // ribs, the tucked belly, the haunches, the shoulders' hump, the neck; the skull, the cheeks, a long muzzle - and melted into one hide
+  // joint by joint (gfx.js). The joints, what moves them and what a shot hits are as they were.
   B.hound = function (root, M) {
     const body = joint(root, 0, 0.78, 0);
-    mesh(body, PG.sph, M.skin, 0.26, 0.24, 0.5, 0, 0, 0);
-    mesh(body, PG.sph, M.skin, 0.28, 0.27, 0.3, 0, 0.04, 0.28);
+    mesh(body, PG.sph, M.skin, 0.235, 0.29, 0.35, 0, -0.03, 0.2);           // ribs
+    mesh(body, PG.sph, M.skin, 0.17, 0.185, 0.3, 0, 0.045, -0.16);          // the belly, tucked up
+    mesh(body, PG.sph, M.skin, 0.215, 0.235, 0.23, 0, 0.02, -0.4);          // haunches
+    mesh(body, PG.sph, M.skin, 0.17, 0.17, 0.2, 0, 0.17, 0.33);             // the hump of the shoulders
+    mesh(body, PG.sph, M.skin, 0.135, 0.16, 0.2, 0, 0.14, 0.5, -0.5);       // the neck's root
+    for (const s of [-1, 1]) { mesh(body, PG.sph, M.skin, 0.09, 0.2, 0.15, s * 0.17, -0.02, 0.32); mesh(body, PG.sph, M.skin, 0.1, 0.21, 0.17, s * 0.15, 0.0, -0.38); } // shoulder blades, thighs' tops
     const neck = joint(body, 0, 0.12, 0.48);
+    mesh(neck, PG.sph, M.skin, 0.115, 0.13, 0.17, 0, 0.05, 0.05, -0.4);
     const head = joint(neck, 0, 0.06, 0.12);
-    mesh(head, PG.box, M.skin, 0.26, 0.22, 0.3, 0, 0, 0.05);
-    mesh(head, PG.box, M.skin, 0.16, 0.12, 0.22, 0, -0.04, 0.26);
-    const jaw = joint(head, 0, -0.1, 0.1);
-    mesh(jaw, PG.box, M.sec, 0.14, 0.05, 0.26, 0, 0, 0.12);
-    for (const s of [-1, 1]) { mesh(head, PG.sph, M.eye, 0.03, 0.03, 0.03, s * 0.08, 0.05, 0.19); mesh(head, PG.cone, M.skin, 0.05, 0.12, 0.05, s * 0.09, 0.15, -0.02, -0.3); for (let i = 0; i < 3; i++) mesh(head, PG.cone, M.tooth, 0.012, 0.05, 0.012, s * 0.05, -0.1, 0.22 + i * 0.05, Math.PI); }
-    const L = [];
-    for (const [x, z] of [[-0.15, 0.35], [0.15, 0.35], [-0.15, -0.35], [0.15, -0.35]]) L.push(leg(body, M, x, -0.05, z, 0.72, 0.1));
+    mesh(head, PG.sph, M.skin, 0.125, 0.115, 0.16, 0, 0.02, 0.03);          // skull
+    mesh(head, PG.box, M.skin, 0.2, 0.05, 0.1, 0, 0.075, 0.11, 0.25);       // brow
+    for (const s of [-1, 1]) mesh(head, PG.sph, M.skin, 0.075, 0.075, 0.1, s * 0.075, -0.035, 0.07); // cheeks
+    mesh(head, PG.box, M.skin, 0.115, 0.085, 0.2, 0, -0.01, 0.22);          // muzzle
+    mesh(head, PG.box, M.skin, 0.085, 0.07, 0.12, 0, -0.005, 0.33);         // its end
+    mesh(head, PG.sph, M.dark, 0.036, 0.03, 0.03, 0, 0.012, 0.392);         // nose
+    const jaw = joint(head, 0, -0.07, 0.1);
+    mesh(jaw, PG.box, M.skin, 0.095, 0.045, 0.26, 0, 0, 0.12);
+    mesh(jaw, PG.box, M.dark, 0.07, 0.01, 0.2, 0, 0.024, 0.13);             // the dark of the mouth
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.eye, 0.026, 0.02, 0.016, s * 0.07, 0.045, 0.155);
+      mesh(head, PG.cone, M.skin, 0.045, 0.15, 0.028, s * 0.085, 0.14, -0.045, -0.55, 0, -s * 0.2);   // ears, laid back
+      for (let i = 0; i < 3; i++) mesh(head, PG.cone, M.tooth, 0.011, i === 2 ? 0.065 : 0.04, 0.011, s * 0.043, -0.062, 0.2 + i * 0.07, Math.PI);
+      mesh(jaw, PG.cone, M.tooth, 0.01, 0.05, 0.01, s * 0.036, 0.045, 0.235);
+    }
+    // a leg: thigh, a thin shank, a paw with its claws (the two joints the gait works are the hip and the hock)
+    const hleg = (x, z, rear) => {
+      const len = 0.72, hip = joint(body, x, -0.05, z);
+      mesh(hip, PG.sph, M.skin, rear ? 0.08 : 0.065, 0.21, rear ? 0.125 : 0.09, 0, -len * 0.23, rear ? -0.02 : 0);
+      const kn = joint(hip, 0, -len * 0.5, 0);
+      mesh(kn, PG.cyl8, M.skin, 0.04, len * 0.46, 0.046, 0, -len * 0.23, rear ? 0.02 : 0, rear ? -0.12 : 0.04);
+      mesh(kn, PG.sph, M.skin, 0.05, 0.1, 0.06, 0, -0.06, rear ? -0.01 : 0);   // (the swell of the forearm under the joint)
+      mesh(kn, PG.sph, M.skin, 0.055, 0.04, 0.085, 0, -len * 0.5 + 0.035, 0.035);
+      for (const cx of [-0.03, 0, 0.03]) mesh(kn, PG.cone, M.dark, 0.011, 0.04, 0.011, cx, -len * 0.5 + 0.02, 0.115, Math.PI / 2 + 0.3);
+      return { hip, kn };
+    };
+    const L = [hleg(-0.15, 0.35, false), hleg(0.15, 0.35, false), hleg(-0.15, -0.35, true), hleg(0.15, -0.35, true)];
     const tail = joint(body, 0, 0.08, -0.48);
-    mesh(tail, PG.cone, M.skin, 0.06, 0.5, 0.06, 0, 0, -0.22, -Math.PI / 2 - 0.4);
+    mesh(tail, PG.cone, M.skin, 0.055, 0.5, 0.055, 0, 0, -0.22, -Math.PI / 2 - 0.4);
+    mesh(tail, PG.sph, M.skin, 0.06, 0.06, 0.1, 0, 0.02, -0.06);
     return {
       J: { body, head, jaw, tail, L }, h: 1.15, r: 0.5,
       hits: [{ n: head, r: 0.2, part: 'head', o: V(0, 0, 0.1) }, { n: body, r: 0.32, part: 'body', o: V(0, 0, 0.25) }, { n: body, r: 0.3, part: 'body', o: V(0, 0, -0.25) }],

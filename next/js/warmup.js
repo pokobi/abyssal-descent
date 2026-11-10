@@ -149,7 +149,9 @@
       if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id, 0.42)); } catch (e) { /* ignore */ } }
       if (G.ItemAnim) { try { const h = new THREE.Group(); G.ItemAnim.hand(h, true); tmp.add(h); } catch (e) { /* ignore */ } }
       // see-through hands and gun (影の舞, the invisibility draught: pstatus.js ghostMesh): their shader variants, once
-      if (G.PStatus && G.PStatus.ghostWarm && Wp.buildGun && G.WEAPON_BY_ID.n_scout) { try { const gm = Wp.buildGun(G.WEAPON_BY_ID.n_scout, {}, true).group; G.PStatus.ghostWarm(gm); tmp.add(gm); } catch (e) { /* ignore */ } }
+      // (one arm of every kind, not one arm: their sights and fittings differ in what they are made of, and the first turn unseen
+      // with a rifle in hand made a shader on the spot)
+      if (G.PStatus && G.PStatus.ghostWarm && Wp.buildGun && G.WEAPONS) { const seen = new Set(); for (const d of G.WEAPONS) { if (!d || seen.has(d.arch)) continue; seen.add(d.arch); try { const gm = Wp.buildGun(d, {}, true).group; G.PStatus.ghostWarm(gm); tmp.add(gm); } catch (e) { /* ignore */ } } }
       Wp.vmScene.updateMatrixWorld(true);
       CMP(r, Wp.vmScene, Wp.vmCam); DRAW(Wp.vmScene, Wp.vmCam, true);
       uploadTextures(Wp.vmScene, r);

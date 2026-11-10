@@ -651,6 +651,8 @@
     const root = new THREE.Group();
     const inner = new THREE.Group(); root.add(inner);
     const m = B[def.plan](inner, M, opts);
+    // (the blocks hung on each joint melted into one surface: gfx.js. Only with the full look on: it costs a moment at a body's first making)
+    if (G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(inner, m, M, def.plan); } catch (e) { /* the body stays as it was built */ } }
     addOrnaments(m, def, M);
     const s = def.size * (opts.scale || 1);
     inner.scale.setScalar(s);

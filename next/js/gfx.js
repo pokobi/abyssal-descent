@@ -835,16 +835,18 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     if (kind === 'burst') PO.push(Geo.xf(side([[0.2, -0.026], [0.25, -0.026], [0.236, -0.085], [0.222, -0.09], [0.206, -0.085]], 0.026, 0.006, null, 0, 2), null));
     // flip-up sights on the rail: a post between two ears in front, a plate with a hole behind. The line through them is weapons.js's ironY
     const SL = ((smg ? 0.075 : 0.088) - Y0) / SCL, ff = smg ? 0.2 : (0.37 + Z0) / SCL, fr = (-0.088 + Z0) / SCL;
-    ME.push(rb(0.02, 0.006, 0.026, 0.0012, 0, RY + 0.003, ff), rb(0.003, SL - RY, 0.004, 0.0006, 0, (SL + RY) / 2, ff));
-    for (const sx of [-1, 1]) ME.push(rb(0.003, SL - RY + 0.006, 0.014, 0.001, sx * 0.008, (SL + RY) / 2 + 0.003, ff));
+    // (the sights that stand on the rail are a piece of their own: they fold away under an optic)
+    const IR = [rb(0.003, SL - RY, 0.004, 0.0006, 0, (SL + RY) / 2, ff)];
+    ME.push(rb(0.02, 0.006, 0.026, 0.0012, 0, RY + 0.003, ff));
+    for (const sx of [-1, 1]) IR.push(rb(0.003, SL - RY + 0.006, 0.014, 0.001, sx * 0.008, (SL + RY) / 2 + 0.003, ff));
     ME.push(rb(0.022, 0.006, 0.026, 0.0012, 0, RY + 0.003, fr));
-    ME.push(Geo.xf(ext(rrect(0, SL - 0.002, 0.017, (SL - RY) * 2 - 0.002, 0.003, 2), 0.004, 0.0006, [circle(0, SL, 0.003, 12)]), [0, 0, -fr]));
+    IR.push(Geo.xf(ext(rrect(0, SL - 0.002, 0.017, (SL - RY) * 2 - 0.002, 0.003, 2), 0.004, 0.0006, [circle(0, SL, 0.003, 12)]), [0, 0, -fr]));
     // magazine: curved, a raised panel and ribs on its sides, a floor plate
     const MG = smg ? [side([[0.031, -0.03], [0.031, -0.2], [0.063, -0.2], [0.063, -0.03]], 0.019, 0.002), side([[0.029, -0.196], [0.029, -0.208], [0.065, -0.208], [0.065, -0.196]], 0.023, 0.002)]
       : [side([[0.021, -0.03], [0.024, -0.09], [0.031, -0.15], [0.043, -0.205], [0.046, -0.214], [0.107, -0.197], [0.106, -0.187], [0.093, -0.14], [0.082, -0.09], [0.076, -0.03]], 0.0225, 0.002),
         side([[0.028, -0.096], [0.036, -0.152], [0.047, -0.196], [0.098, -0.184], [0.088, -0.14], [0.078, -0.096]], 0.0242, 0.0012), side([[0.039, -0.203], [0.043, -0.2205], [0.111, -0.2015], [0.109, -0.185]], 0.027, 0.0022)];
     const fit = (list) => { const g = Geo.merge(list); g.scale(SCL, SCL, SCL); g.translate(0, Y0, Z0); return boxUV(g, 5); };
-    const out = { metal: fit(ME), poly: fit(PO), steel: fit(ST), muzzleY: Y0, muzzleZ: -MZ * SCL + Z0 };
+    const out = { metal: fit(ME), poly: fit(PO), steel: fit(ST), irons: fit(IR), muzzleY: Y0, muzzleZ: -MZ * SCL + Z0 };
     const mag = fit(MG); mag.computeBoundingBox(); const c = mag.boundingBox.getCenter(new THREE.Vector3()); mag.translate(-c.x, -c.y, -c.z); out.mag = mag; out.magAt = [c.x, c.y, c.z];
     let tris = 0; for (const k of ['metal', 'poly', 'steel', 'mag']) { out[k].computeBoundingSphere(); tris += out[k].attributes.position.count / 3; }
     X.stats.rifleTris = Math.round(tris);
@@ -856,12 +858,12 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   let pist = null;
   X.pistolParts = function () {
     if (pist) return pist;
-    const FR = [], ST = [], SL = [], SS = [], fit = (list) => boxUV(Geo.merge(list), 6);
+    const FR = [], ST = [], SL = [], SS = [], SI = [], fit = (list) => boxUV(Geo.merge(list), 6);
     // slide, about its own middle (weapons.js sets it at 0, 0.035, -0.02)
     SL.push(sec([[-0.0152, -0.0175], [0.0152, -0.0175], [0.0152, 0.008], [0.0112, 0.0175], [-0.0112, 0.0175], [-0.0152, 0.008]], -0.095, 0.095, 0.0012));
     for (let i = 0; i < 7; i++) for (const sx of [-1, 1]) SL.push(rb(0.0014, 0.021, 0.0032, 0.0005, sx * 0.0155, -0.002, -0.04 - i * 0.0072, [0.25, 0, 0]));
-    SL.push(rb(0.004, 0.007, 0.006, 0.001, 0, 0.0205, 0.083));
-    for (const sx of [-1, 1]) SL.push(rb(0.005, 0.0075, 0.008, 0.001, sx * 0.0075, 0.0207, -0.083));
+    SI.push(rb(0.004, 0.007, 0.006, 0.001, 0, 0.0205, 0.083));   // (the sights: a piece of their own on the slide)
+    for (const sx of [-1, 1]) SI.push(rb(0.005, 0.0075, 0.008, 0.001, sx * 0.0075, 0.0207, -0.083));
     SL.push(rb(0.02, 0.003, 0.01, 0.001, 0, 0.0185, -0.083));
     SS.push(rb(0.0008, 0.012, 0.03, 0.0002, 0.0152, 0.004, 0.02), rb(0.012, 0.0008, 0.03, 0.0002, 0.0062, 0.0173, 0.02));   // the barrel's hood, seen through the port
     // frame: one outline, the trigger guard cut through it
@@ -877,7 +879,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     ST.push(Geo.rod([-0.013, -0.017, 0.013], [-0.0166, -0.017, 0.013], 0.0038, 10), rb(0.006, 0.012, 0.007, 0.002, 0, 0.011, -0.085, [-0.4, 0, 0]));
     // magazine, about its own middle (weapons.js sets and leans it)
     const MG = [X.makeRbox(0.022, 0.076, 0.032, 0.003, 1), Geo.xf(X.makeRbox(0.03, 0.007, 0.043, 0.002, 1), [0, -0.0405, 0.002])];
-    return (pist = { frame: fit(FR), steel: fit(ST), slide: fit(SL), slideSteel: fit(SS), mag: fit(MG) });
+    return (pist = { frame: fit(FR), steel: fit(ST), slide: fit(SL), slideSteel: fit(SS), slideIrons: fit(SI), mag: fit(MG) });
   };
 
   // ---- the shotgun, in the game's own measure: a receiver from one outline with the guard cut through it, a turned barrel with a
@@ -934,13 +936,13 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   let revo = null;
   X.revolverParts = function () {
     if (revo) return revo;
-    const ME = [], ST = [], WO = [], BR = [], fit = (list) => boxUV(Geo.merge(list), 6);
+    const ME = [], ST = [], WO = [], BR = [], IR = [], fit = (list) => boxUV(Geo.merge(list), 6);
     ME.push(side([[0.035, 0.066], [0.035, -0.008], [0.024, -0.01], [0.025, -0.034], [0.018, -0.042], [-0.022, -0.042], [-0.03, -0.032], [-0.036, -0.012], [-0.078, -0.008], [-0.082, 0.02], [-0.072, 0.05], [-0.056, 0.066]], 0.026, 0.004,
       [[[0.027, 0.059], [0.027, -0.001], [-0.027, -0.001], [-0.027, 0.059]], [[0.019, -0.012], [0.019, -0.032], [0.014, -0.037], [-0.02, -0.037], [-0.027, -0.03], [-0.03, -0.012]]], 0, 2));
     const brl = lathe([[0.0005, 0.03], [0.0135, 0.03], [0.0135, 0.226], [0.0115, 0.232], [0.0005, 0.232]], 16); brl.translate(0, 0.04, 0); ME.push(brl);
     ME.push(rb(0.02, 0.02, 0.16, 0.007, 0, 0.022, 0.112), rb(0.011, 0.014, 0.196, 0.002, 0, 0.057, 0.132));
-    ME.push(side([[0.196, 0.063], [0.228, 0.063], [0.226, 0.0695], [0.212, 0.0715]], 0.005, 0.001));
-    for (const sx of [-1, 1]) ME.push(rb(0.004, 0.006, 0.01, 0.001, sx * 0.006, 0.069, -0.05));
+    IR.push(side([[0.196, 0.063], [0.228, 0.063], [0.226, 0.0695], [0.212, 0.0715]], 0.005, 0.001));   // (the sights: a piece of their own)
+    for (const sx of [-1, 1]) IR.push(rb(0.004, 0.006, 0.01, 0.001, sx * 0.006, 0.069, -0.05));
     ST.push(side([[-0.06, 0.05], [-0.068, 0.072], [-0.08, 0.08], [-0.086, 0.075], [-0.076, 0.066], [-0.074, 0.046]], 0.008, 0.0015));
     ST.push(side([[-0.002, -0.012], [0.004, -0.012], [0.0, -0.024], [-0.006, -0.032], [-0.009, -0.031], [-0.004, -0.022]], 0.006, 0.0012));
     ST.push(rb(0.004, 0.012, 0.014, 0.002, -0.0135, 0.022, -0.045));
@@ -952,7 +954,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const rims = []; for (let i = 0; i < 6; i++) { const a = (i + 0.5) / 6 * TAU; rims.push(Geo.xf(new THREE.CylinderGeometry(0.0058, 0.0058, 0.0016, 10), [Math.cos(a) * 0.018, 0.0256, Math.sin(a) * 0.018])); }
     // (the grip's grain runs down the grip, not along the gun)
     const wo = fit(WO), wuv = wo.attributes.uv; for (let i = 0; i < wuv.count; i++) wuv.setXY(i, wuv.getY(i), wuv.getX(i));
-    return (revo = { metal: fit(ME), steel: fit(ST), wood: wo, brass: fit(BR), drum: boxUV(dr, 6), drumBrass: fit(rims) });
+    return (revo = { metal: fit(ME), steel: fit(ST), wood: wo, brass: fit(BR), irons: fit(IR), drum: boxUV(dr, 6), drumBrass: fit(rims) });
   };
 
   // ---- the light machine gun: a receiver from one outline under its feed cover, a rail raised on two posts, a slotted guard with its
@@ -1290,7 +1292,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       gpart('metal', [tubeZ([[0.0005, 0.1], [0.03, 0.1], [0.03, 0.36], [0.034, 0.365], [0.034, 0.388], [0.027, 0.39], [0.025, 0.3], [0.0005, 0.3]], 0.03, 0, 20),
         side([[0.13, 0.0755], [0.13, -0.005], [0.094, -0.005], [0.094, 0.0712], [-0.034, 0.0712], [-0.034, -0.03], [-0.06, -0.04], [-0.15, -0.03], [-0.15, 0.062], [-0.13, 0.0755]], 0.05, 0.002, null, 0, 1),
         rb(0.03, 0.012, 0.14, 0.004, 0, -0.08, 0.03), rb(0.04, 0.085, 0.036, 0.006, 0, -0.045, 0.112), rb(0.04, 0.06, 0.03, 0.006, 0, -0.055, -0.045)]),
-      gpart('steel', [rb(0.004, 0.034, 0.006, 0.001, 0, 0.08, 0.372), rb(0.022, 0.03, 0.004, 0.001, 0, 0.104, -0.1), side([[-0.075, -0.04], [-0.081, -0.04], [-0.085, -0.052], [-0.081, -0.062], [-0.078, -0.061], [-0.08, -0.05]], 0.006, 0.0012)]),
+      gpart('steel', [rb(0.004, 0.034, 0.006, 0.001, 0, 0.08, 0.372), rb(0.022, 0.03, 0.004, 0.001, 0, 0.104, -0.1)], 'irons'), gpart('steel', [side([[-0.075, -0.04], [-0.081, -0.04], [-0.085, -0.052], [-0.081, -0.062], [-0.078, -0.061], [-0.08, -0.05]], 0.006, 0.0012)]),
       gpart('poly', [gripG(0.12, -0.035, -0.135), stockG(0.15, 0.4, 0.062, -0.04), side([[0.216, 0.003], [0.213, -0.11], [0.185, -0.11], [0.185, 0.003]], 0.03, 0.008, null, 0, 2)]),
     ] };
   };
@@ -1301,7 +1303,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       tubeZ([[0.0005, 0.15], [0.016, 0.15], [0.016, 0.5], [0.0005, 0.5]], 0.03),
       tubeZ([[0.018, 0.28], [0.026, 0.285], [0.026, 0.31], [0.022, 0.314], [0.022, 0.332], [0.026, 0.336], [0.026, 0.36], [0.022, 0.364], [0.022, 0.382], [0.026, 0.386], [0.026, 0.41], [0.022, 0.414], [0.022, 0.432], [0.026, 0.436], [0.026, 0.465], [0.018, 0.47]], 0.03)]),
     gpart('brass', [tubeZ([[0.016, 0.49], [0.024, 0.492], [0.031, 0.505], [0.034, 0.548], [0.03, 0.55], [0.024, 0.512], [0.016, 0.5]], 0.03, 0, 20), rodG([0, 0.003, -0.2], [0, 0.002, -0.552], 0.004, 6), rodG([0, -0.05, -0.29], [0, -0.012, -0.335], 0.006, 6), rodG([0, -0.012, -0.335], [0, 0.012, -0.3], 0.006, 6)]),
-    gpart('tank', tubeZ([[0.0005, -0.03], [0.03, -0.028], [0.046, -0.015], [0.05, 0.005], [0.05, 0.235], [0.046, 0.255], [0.03, 0.268], [0.012, 0.272], [0.012, 0.288], [0.0005, 0.288]], -0.07, 0, 22), 'mag'),
+    gpart('tank', tubeZ([[0.0005, -0.03], [0.03, -0.028], [0.046, -0.015], [0.05, 0.005], [0.05, 0.235], [0.046, 0.255], [0.03, 0.268], [0.012, 0.272], [0.012, 0.288], [0.0005, 0.288]], -0.07, 0, 22), 'mag', { tank: { r: 0.05, len: 0.3, axis: 'z' } }),
     gpart('metal', [bandZ(0.0495, 0.04, 0.062, -0.07, 0.004), bandZ(0.0495, 0.18, 0.202, -0.07, 0.004), tubeZ([[0.0005, 0.286], [0.017, 0.286], [0.017, 0.296], [0.0005, 0.296]], -0.07)], 'onmag'),
     gpart('poly', [gripG(0.12, -0.03, -0.135), stockG(0.15, 0.4, 0.05, -0.035)]),
   ] });
@@ -1329,7 +1331,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       gpart('poly', [rodG([0, 0.072, -0.175], [0, 0.072, 0.065], 0.013, 10), gripG(0.12, -0.03, -0.135)]),
       gpart('steel', [tubeZ([[0.0005, 0.14], [0.016, 0.14], [0.016, 0.16], [0.012, 0.165], [0.012, 0.325], [0.0005, 0.325]], 0.03), rb(0.01, 0.03, 0.02, 0.003, 0, 0.012, 0.325), rb(0.022, 0.006, 0.03, 0.002, 0, -0.002, 0.33)]),
       gpart('brass', Geo.xf(new THREE.CylinderGeometry(0.008, 0.01, 0.022, 8), [0, -0.146, 0.132])),
-      gpart('metal', drum, 'mag'), gpart('steel', hub, 'onmag'),
+      gpart('metal', drum, 'mag', { tank: { r: 0.05, len: 0.03, axis: 'x' } }), gpart('steel', hub, 'onmag'),
     ] };
   };
   // the harpoon gun: a banded tube, the shaft of the spear out of its mouth (the 'bolt') with a barbed head, a reel of line, a wooden stock
@@ -1357,27 +1359,12 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       gpart('brass', [tubeZ([[0.0005, 0.25], [0.011, 0.25], [0.011, 0.43], [0.016, 0.436], [0.016, 0.444], [0.0005, 0.444]], 0.03), rodG([0, 0.076, -0.18], [0, 0.076, -0.36], 0.0035, 6), rodG([0, -0.016, -0.18], [0, -0.016, -0.36], 0.0035, 6),
         rodG([0, 0.076, -0.18], [0, 0.05, -0.16], 0.0035, 6), rodG([0, -0.016, -0.18], [0, 0.01, -0.16], 0.0035, 6)]),
       gpart('glow', ball(0.025, [0, 0.03, -0.46])),
-      gpart('brass', tubeZ([[0.0005, -0.082], [0.02, -0.08], [0.03, -0.066], [0.03, 0.028], [0.02, 0.04], [0.008, 0.044], [0.008, 0.056], [0.0005, 0.056]], 0.0, 0.05, 18), 'mag'),
+      gpart('brass', tubeZ([[0.0005, -0.082], [0.02, -0.08], [0.03, -0.066], [0.03, 0.028], [0.02, 0.04], [0.008, 0.044], [0.008, 0.056], [0.0005, 0.056]], 0.0, 0.05, 18), 'mag', { tank: { r: 0.03, len: 0.13, axis: 'z' } }),
       gpart('poly', [gripG(0.12, -0.03, -0.135), stockG(0.15, 0.4, 0.05, -0.035)]),
     ] };
   };
   const gnCache = {};
   X.gunParts = function (arch) { if (gnCache[arch] !== undefined) return gnCache[arch]; let r = null; try { r = GN[arch] ? GN[arch]() : null; } catch (e) { console.warn('gfx: no gun', arch, e); r = null; } return (gnCache[arch] = r); };
-  // ---- shapes for the bodies that are not built of blocks (enemies.js), each of unit size like the plain ball and rod they stand in for:
-  // a slime's body sagging to the floor it sits on, a finely turned ball for the great eye, a tapering length of tentacle, a curved mouth ----
-  const fgc = {};
-  X.foeGeo = function (name) {
-    if (fgc[name]) return fgc[name];
-    let g = null;
-    if (name === 'slime') {
-      const c = new THREE.SplineCurve([[0.0005, -1], [0.86, -1], [1.1, -0.95], [1.13, -0.82], [1.05, -0.6], [1.0, -0.25], [0.96, 0.1], [0.86, 0.42], [0.68, 0.69], [0.44, 0.88], [0.2, 0.975], [0.0005, 1]].map((q) => new THREE.Vector2(q[0], q[1])));
-      g = new THREE.LatheGeometry(c.getPoints(30).map((q) => new THREE.Vector2(Math.max(q.x, 0.0005), q.y)), 36);
-    } else if (name === 'ball') g = new THREE.SphereGeometry(1, 36, 24);
-    else if (name === 'taper') g = new THREE.CylinderGeometry(1, 0.78, 1, 12, 1);
-    else if (name === 'smile') g = new THREE.TorusGeometry(1, 0.17, 6, 14, Math.PI);   // (turned down at the ends: a scowl, not a smile)
-    return (fgc[name] = g);
-  };
-
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

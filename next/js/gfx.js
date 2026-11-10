@@ -758,12 +758,13 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i)), x = p.getX(i) * k, y = p.getY(i) * k, z = p.getZ(i) * k; if (ax >= ay && ax >= az) uv.setXY(i, z, y); else if (ay >= az) uv.setXY(i, x, z); else uv.setXY(i, x, y); }
     return g;
   }
-  const SCL = 1.215, Y0 = 0.030, Z0 = -0.0154;   // its own measure -> the game's: the muzzle, grip and rail land where they were
   const cache = {};
-  // kind: 'rifle' | 'burst' | 'dmr'. Returns { metal, poly, steel, mag (geometry about its own middle), magAt [x, y, z], muzzleY }
+  // kind: 'rifle' | 'burst' | 'dmr' | 'smg' (the same make, short: a plain barrel, a straight magazine). Returns { metal, poly, steel, mag (geometry about its own middle), magAt [x, y, z], muzzleY }
   X.rifleParts = function (kind) {
     if (cache[kind]) return cache[kind];
-    const long = kind === 'dmr', ME = [], PO = [], ST = [], UT = 0.0215, RY = UT + 0.0094, UPW = 0.043, UB = -0.021, L = -1, EXT = long ? 0.09 : 0;
+    const long = kind === 'dmr', smg = kind === 'smg', ME = [], PO = [], ST = [],
+      SCL = smg ? 1.062 : 1.215, Y0 = smg ? 0.0272 : 0.030, Z0 = smg ? -0.031 : -0.0154,   // its own measure -> the game's: the muzzle, grip and rail land where they were
+      UT = 0.0215, RY = UT + 0.0094, UPW = 0.043, UB = -0.021, L = -1, EXT = long ? 0.09 : 0;
     // upper receiver: a section pushed along the bore
     const upSec = [[-UPW / 2, UB], [UPW / 2, UB], [UPW / 2, 0.007], [UPW / 2 - 0.0035, 0.0155], [0.0105, UT], [-0.0105, UT], [-UPW / 2 + 0.0035, 0.0155], [-UPW / 2, 0.007]];
     ME.push(sec(upSec, -0.104, 0.099, 0.0012));
@@ -777,7 +778,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const rail = (f0, f1) => { ME.push(sec(sh2(base, 0, UT), f0, f1, 0)); for (let f = f0 + 0.0026; f + 0.0052 <= f1 + 1e-6; f += 0.01) ME.push(sec(sh2(dove, 0, UT), f, f + 0.0052, 0.0005)); };
     rail(-0.101, 0.098);
     // handguard: eight plates about the barrel, slots cut through them
-    const HW = 0.046, HC = UT - HW / 2, HF0 = 0.101, HF1 = 0.42 + EXT * 0.6, fw = HW * Math.tan(Math.PI / 8) + 0.0016, th = 0.0024;
+    const HW = 0.046, HC = UT - HW / 2, HF0 = 0.101, HF1 = smg ? 0.25 : 0.42 + EXT * 0.6, fw = HW * Math.tan(Math.PI / 8) + 0.0016, th = 0.0024;
     const oct = (w) => { const p = [], R = w / 2 / Math.cos(Math.PI / 8); for (let k = 0; k < 8; k++) { const a = Math.PI / 8 + k * Math.PI / 4; p.push([Math.cos(a) * R, HC + Math.sin(a) * R]); } return p; };
     ME.push(sec(oct(HW), HF0, HF0 + 0.02, 0.0012), sec(oct(HW + 0.002), HF0 + 0.004, HF0 + 0.012, 0.0008), sec(oct(HW), HF1 - 0.004, HF1, 0.0008, [circle(0, HC, 0.0165, 16)]));
     for (let k = 0; k < 8; k++) {
@@ -791,9 +792,12 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     }
     rail(HF0 + 0.001, HF1 - 0.002);
     // barrel, gas block and tube, a three-pronged flash hider
-    const BF = 0.462 + EXT, MZ = 0.514 + EXT;
-    ME.push(lathe([[0.0005, 0.09], [0.0125, 0.09], [0.0125, 0.128], [0.0096, 0.136], [0.0096, 0.30], [0.0112, 0.303], [0.0112, 0.343], [0.0091, 0.347], [0.0091, BF], [0.0005, BF]], 16));
-    ME.push(rb(0.019, 0.013, 0.036, 0.002, 0, 0.0125, 0.323)); ST.push(Geo.rod([0, 0.0165, -0.10], [0, 0.0165, -0.31], 0.0026, 6));
+    const BF = smg ? 0.268 : 0.462 + EXT, MZ = BF + 0.052;
+    if (smg) ME.push(lathe([[0.0005, 0.09], [0.0125, 0.09], [0.0125, 0.128], [0.0105, 0.136], [0.0105, BF], [0.0005, BF]], 16));
+    else {
+      ME.push(lathe([[0.0005, 0.09], [0.0125, 0.09], [0.0125, 0.128], [0.0096, 0.136], [0.0096, 0.30], [0.0112, 0.303], [0.0112, 0.343], [0.0091, 0.347], [0.0091, BF], [0.0005, BF]], 16));
+      ME.push(rb(0.019, 0.013, 0.036, 0.002, 0, 0.0125, 0.323)); ST.push(Geo.rod([0, 0.0165, -0.10], [0, 0.0165, -0.31], 0.0026, 6));
+    }
     ME.push(lathe([[0.0005, BF - 0.004], [0.0108, BF - 0.004], [0.0108, BF + 0.001], [0.0098, BF + 0.003], [0.0098, BF + 0.007], [0.0108, BF + 0.009], [0.0108, BF + 0.018], [0.0005, BF + 0.018]], 16));
     for (let k = 0; k < 3; k++) { const a = k * TAU / 3 + Math.PI / 2; ME.push(sec(arcRing(0.0058, 0.0108, a - 0.72, a + 0.72, 5), BF + 0.017, MZ, 0.0009)); }
     // lower receiver, trigger guard, trigger, pins and controls
@@ -815,15 +819,15 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     PO.push(rb(0.043, 0.128, 0.012, 0.004, 0, -0.04, -0.312), rb(0.012, 0.01, 0.04, 0.003, 0, -0.034, -0.165));
     if (kind === 'burst') PO.push(Geo.xf(side([[0.2, -0.026], [0.25, -0.026], [0.236, -0.085], [0.222, -0.09], [0.206, -0.085]], 0.026, 0.006, null, 0, 2), null));
     // flip-up sights on the rail: a post between two ears in front, a plate with a hole behind. The line through them is weapons.js's ironY
-    const SL = (0.088 - Y0) / SCL, ff = (0.37 + Z0) / SCL, fr = (-0.088 + Z0) / SCL;
+    const SL = ((smg ? 0.075 : 0.088) - Y0) / SCL, ff = smg ? 0.2 : (0.37 + Z0) / SCL, fr = (-0.088 + Z0) / SCL;
     ME.push(rb(0.02, 0.006, 0.026, 0.0012, 0, RY + 0.003, ff), rb(0.003, SL - RY, 0.004, 0.0006, 0, (SL + RY) / 2, ff));
     for (const sx of [-1, 1]) ME.push(rb(0.003, SL - RY + 0.006, 0.014, 0.001, sx * 0.008, (SL + RY) / 2 + 0.003, ff));
     ME.push(rb(0.022, 0.006, 0.026, 0.0012, 0, RY + 0.003, fr));
     ME.push(Geo.xf(ext(rrect(0, SL - 0.002, 0.017, (SL - RY) * 2 - 0.002, 0.003, 2), 0.004, 0.0006, [circle(0, SL, 0.003, 12)]), [0, 0, -fr]));
     // magazine: curved, a raised panel and ribs on its sides, a floor plate
-    const MG = [side([[0.021, -0.03], [0.024, -0.09], [0.031, -0.15], [0.043, -0.205], [0.046, -0.214], [0.107, -0.197], [0.106, -0.187], [0.093, -0.14], [0.082, -0.09], [0.076, -0.03]], 0.0225, 0.002)];
-    MG.push(side([[0.028, -0.096], [0.036, -0.152], [0.047, -0.196], [0.098, -0.184], [0.088, -0.14], [0.078, -0.096]], 0.0242, 0.0012));
-    MG.push(side([[0.039, -0.203], [0.043, -0.2205], [0.111, -0.2015], [0.109, -0.185]], 0.027, 0.0022));
+    const MG = smg ? [side([[0.031, -0.03], [0.031, -0.2], [0.063, -0.2], [0.063, -0.03]], 0.019, 0.002), side([[0.029, -0.196], [0.029, -0.208], [0.065, -0.208], [0.065, -0.196]], 0.023, 0.002)]
+      : [side([[0.021, -0.03], [0.024, -0.09], [0.031, -0.15], [0.043, -0.205], [0.046, -0.214], [0.107, -0.197], [0.106, -0.187], [0.093, -0.14], [0.082, -0.09], [0.076, -0.03]], 0.0225, 0.002),
+        side([[0.028, -0.096], [0.036, -0.152], [0.047, -0.196], [0.098, -0.184], [0.088, -0.14], [0.078, -0.096]], 0.0242, 0.0012), side([[0.039, -0.203], [0.043, -0.2205], [0.111, -0.2015], [0.109, -0.185]], 0.027, 0.0022)];
     const fit = (list) => { const g = Geo.merge(list); g.scale(SCL, SCL, SCL); g.translate(0, Y0, Z0); return boxUV(g, 5); };
     const out = { metal: fit(ME), poly: fit(PO), steel: fit(ST), muzzleY: Y0, muzzleZ: -MZ * SCL + Z0 };
     const mag = fit(MG); mag.computeBoundingBox(); const c = mag.boundingBox.getCenter(new THREE.Vector3()); mag.translate(-c.x, -c.y, -c.z); out.mag = mag; out.magAt = [c.x, c.y, c.z];

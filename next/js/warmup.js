@@ -152,6 +152,9 @@
       // (one arm of every kind, not one arm: their sights and fittings differ in what they are made of, and the first turn unseen
       // with a rifle in hand made a shader on the spot)
       if (G.PStatus && G.PStatus.ghostWarm && Wp.buildGun && G.WEAPONS) { const seen = new Set(); for (const d of G.WEAPONS) { if (!d || seen.has(d.arch)) continue; seen.add(d.arch); try { const gm = Wp.buildGun(d, {}, true).group; G.PStatus.ghostWarm(gm); tmp.add(gm); } catch (e) { /* ignore */ } } }
+      // (and the glowing points of a sight - plain colour that the tone mapping leaves alone: no arm built bare carries one, and the first
+      // turn unseen with a sight fitted made that shader on the spot)
+      if (G.PStatus && G.PStatus.ghostWarm) { try { const gg = new THREE.Group(); for (const tm of [true, false]) gg.add(new THREE.Mesh(G.Props.PG.cyl, new THREE.MeshBasicMaterial({ color: 0xffa020, toneMapped: tm }))); G.PStatus.ghostWarm(gg); tmp.add(gg); } catch (e) { /* ignore */ } }
       Wp.vmScene.updateMatrixWorld(true);
       CMP(r, Wp.vmScene, Wp.vmCam); DRAW(Wp.vmScene, Wp.vmCam, true);
       uploadTextures(Wp.vmScene, r);

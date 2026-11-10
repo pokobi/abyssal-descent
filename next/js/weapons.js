@@ -228,6 +228,15 @@
         break;
       }
       case 'smg': {
+        const AS = G.GFX && G.GFX.rifleParts ? G.GFX.rifleParts('smg') : null; // (the short make of the rifle: gfx.js; its muzzle, grip, rail and sight line where they were)
+        if (AS) {
+          const part = (geo, m) => { const o = new THREE.Mesh(geo, m); g.add(o); return o; };
+          part(AS.metal, metal); part(AS.poly, poly); part(AS.steel, mats.steel);
+          M.bolt = box(0.01, 0.015, 0.05, 0.026, 0.035, 0.0, mats.steel);
+          M.mag = part(AS.mag, metal); M.mag.position.set(AS.magAt[0], AS.magAt[1], AS.magAt[2]);
+          M.muzzle.set(0, AS.muzzleY, AS.muzzleZ); M.sightY = 0.075; M.ironY = 0.075; M.railY = 0.06; M.fore.set(0, -0.03, -0.2); M.grip.set(0, -0.05, 0.07);
+          break;
+        }
         box(0.045, 0.06, 0.28, 0, 0.02, -0.02); M.bolt = box(0.01, 0.015, 0.05, 0.026, 0.035, 0.0, mats.steel);
         box(0.05, 0.045, 0.14, 0, 0.015, -0.21, poly); cyl(0.012, 0.08, 0, 0.02, -0.31);
         box(0.032, 0.1, 0.045, 0, -0.06, 0.07, poly, 0.25);

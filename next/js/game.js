@@ -1613,23 +1613,25 @@
       const PG = G.Props.PG;
       const col = new THREE.Color(rc);
       const m = new THREE.MeshStandardMaterial({ color: col, emissive: col.clone().multiplyScalar(0.35), metalness: 0.6, roughness: 0.3 });
-      if (o.kind === 'forge') { const an = new THREE.Mesh(PG.box, G.weapons.mats.steel); an.scale.set(0.42, 0.14, 0.2); disp.add(an); const hm = new THREE.Mesh(PG.box, w.mats.woodDark); hm.scale.set(0.05, 0.05, 0.36); hm.position.set(0.1, 0.16, 0); hm.rotation.y = 0.6; disp.add(hm); const hh = new THREE.Mesh(PG.box, G.weapons.mats.gun); hh.scale.set(0.12, 0.09, 0.09); hh.position.set(0.18, 0.16, -0.12); disp.add(hh); }
-      else if (o.kind === 'tome') { const bk = new THREE.Mesh(PG.box, new THREE.MeshStandardMaterial({ color: 0x2a4aa0, roughness: 0.6, emissive: 0x0a1840 })); bk.scale.set(0.3, 0.07, 0.4); disp.add(bk); const pg = new THREE.Mesh(PG.box, w.mats.candle); pg.scale.set(0.27, 0.05, 0.38); pg.position.x = 0.02; disp.add(pg); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0x80a0ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); gl.scale.setScalar(0.6); disp.add(gl); }
-      else if (o.kind === 'armor') { const M = G.ARMOR_MAT_BY_ID[o.obj.mat]; const am = new THREE.MeshStandardMaterial({ color: new THREE.Color(M.col), metalness: o.obj.mat === 'plate' || o.obj.mat === 'chain' ? 0.8 : 0.1, roughness: 0.5 }); const b = new THREE.Mesh(PG.box, am); b.scale.set(0.3, 0.32, 0.16); disp.add(b); const sh = new THREE.Mesh(PG.box, am); sh.scale.set(0.42, 0.08, 0.18); sh.position.y = 0.15; disp.add(sh); }
-      else if (o.kind === 'relic') { const rm = new THREE.MeshStandardMaterial({ color: 0xd0a050, metalness: 1, roughness: 0.25, emissive: 0x402008 }); const b = new THREE.Mesh(PG.oct, rm); b.scale.set(0.16, 0.24, 0.16); disp.add(b); const rr = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.012, 6, 32), rm); rr.rotation.x = 1.3; disp.add(rr); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xffb040, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false })); gl.scale.setScalar(0.7); disp.add(gl); }
-      else if (o.kind === 'revive') {
-        // soul lantern: iron frame around a pale flame
-        const iron = G.weapons.mats.gun;
-        for (const y of [-0.12, 0.12]) { const p = new THREE.Mesh(PG.box, iron); p.scale.set(0.2, 0.025, 0.2); p.position.y = y; disp.add(p); }
-        for (const [x, z] of [[-0.09, -0.09], [0.09, -0.09], [-0.09, 0.09], [0.09, 0.09]]) { const b = new THREE.Mesh(PG.box, iron); b.scale.set(0.02, 0.24, 0.02); b.position.set(x, 0, z); disp.add(b); }
-        const cap = new THREE.Mesh(PG.cone, iron); cap.scale.set(0.13, 0.1, 0.13); cap.position.y = 0.18; disp.add(cap);
-        const flame = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: 0x9ad8ff })); flame.scale.set(0.05, 0.08, 0.05); disp.add(flame);
-        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0x80c8ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })); halo.scale.setScalar(0.45); disp.add(halo);
+      // (what stands on a shop's stands, shaped in gfx.js wareGeo: an anvil, a tome, a scroll, a breastplate, a medal, a lantern, a
+      // sight, a flask, a rune stone. The part that tells the rarity takes its colour; the rest is iron, hide, glass)
+      const WG = G.GFX && G.GFX.wareGeo, WM2 = G.weapons.mats, mk = (c, o2) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.7 }, o2 || {}));
+      const MM = { rc: m, iron: WM2.gun, steel: WM2.steel, wood: w.mats.woodDark, page: w.mats.candle, leather: mk(0x3a2216), gold: mk(0x9c7a36, { metalness: 0.9, roughness: 0.4 }), glass: mk(0xa8c0c8, { transparent: true, opacity: 0.28, roughness: 0.05 }), stone: mk(0x4a4844, { roughness: 0.95 }), wax: mk(0x6e1414, { roughness: 0.45 }) };
+      const ware = (name) => { const d = WG ? WG(name) : null; if (!d) return false; for (const q of d) disp.add(new THREE.Mesh(q.g, MM[q.m] || WM2.gun)); return true; };
+      const glow = (c, sz, op) => { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false })); gl.scale.setScalar(sz); disp.add(gl); };
+      if (o.kind === 'forge') ware('forge');
+      else if (o.kind === 'tome') { ware('tome'); glow(0x80a0ff, 0.5, 0.3); }
+      else if (o.kind === 'armor') { const A = G.ARMOR_MAT_BY_ID[o.obj.mat]; MM.plate = new THREE.MeshStandardMaterial({ color: new THREE.Color(A.col), metalness: o.obj.mat === 'plate' || o.obj.mat === 'chain' ? 0.8 : 0.1, roughness: 0.5 }); ware('armor'); }
+      else if (o.kind === 'relic') { ware('relic'); glow(0xffb040, 0.6, 0.35); }
+      else if (o.kind === 'revive') {   // (the soul lantern: an iron lantern about a pale flame)
+        ware('revive');
+        const flame = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: 0xc8e4ff })); flame.scale.set(0.04, 0.07, 0.04); disp.add(flame);
+        glow(0x80c8ff, 0.45, 0.7);
       }
-      else if (o.kind === 'skill') { const b = new THREE.Mesh(PG.box, w.mats.woodDark); b.scale.set(0.32, 0.08, 0.42); disp.add(b); const pg = new THREE.Mesh(PG.box, w.mats.candle); pg.scale.set(0.29, 0.07, 0.39); pg.position.y = 0.01; disp.add(pg); const rune = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.015, 6, 24), m); rune.rotation.x = Math.PI / 2; rune.position.y = 0.12; disp.add(rune); }
-      else if (o.kind === 'attachment') { const a = new THREE.Mesh(PG.cyl, G.weapons.mats.gun); a.scale.set(0.05, 0.28, 0.05); a.rotation.z = Math.PI / 2; disp.add(a); const b = new THREE.Mesh(PG.box, G.weapons.mats.steel); b.scale.set(0.12, 0.08, 0.1); b.position.y = 0.06; disp.add(b); }
-      else if (o.kind === 'item') { if (o.obj.cat === 'grenade') { const a = new THREE.Mesh(PG.sph, G.weapons.mats.gun); a.scale.set(0.11, 0.13, 0.11); disp.add(a); } else { const a = new THREE.Mesh(PG.cyl8, new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: 0.8, roughness: 0.1, emissive: col.clone().multiplyScalar(0.3) })); a.scale.set(0.09, 0.2, 0.09); disp.add(a); const nk = new THREE.Mesh(PG.cyl8, w.mats.woodDark); nk.scale.set(0.035, 0.08, 0.035); nk.position.y = 0.14; disp.add(nk); } }
-      else { const orb = new THREE.Mesh(PG.sph, m); orb.scale.setScalar(0.16); disp.add(orb); const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.01, 6, 32), m); r2.rotation.x = 1.2; disp.add(r2); }
+      else if (o.kind === 'skill') ware('skill');
+      else if (o.kind === 'attachment') ware('attachment');
+      else if (o.kind === 'item') { if (o.obj.cat === 'grenade' && G.GrenFX) disp.add(G.GrenFX.build(o.obj.id, 1.25)); else ware('potion'); }
+      else ware('buff');
       disp.position.y = 0.45; disp.scale.setScalar(1.5);
     }
     g.add(disp);

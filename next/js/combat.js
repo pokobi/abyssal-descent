@@ -119,16 +119,17 @@
     G.ui.coinPop(a, reason);
     G.sfx.coins(Math.min(5, Math.ceil(a / 20)));
   };
-  let coinGeo = null, coinMat = null, orbMat = null;
+  let coinGeo = null, coinMat = null, orbMat = null, coreMat = null;
   C.spawnPickup = function (kind, pos, value) {
     if (!coinGeo) {
-      coinGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.025, 12); coinGeo.rotateX(Math.PI / 2);
-      coinMat = new THREE.MeshStandardMaterial({ color: 0xe8b84a, metalness: 1, roughness: 0.28, emissive: 0x3a2400 });
-      orbMat = new THREE.MeshBasicMaterial({ color: 0xff5a4a });
+      const cg = G.GFX && G.GFX.wareGeo ? G.GFX.wareGeo('coin') : null;   // (a struck coin of old gold: a rim, a cross, a ring. gfx.js)
+      if (cg) coinGeo = cg[0].g; else { coinGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.025, 12); coinGeo.rotateX(Math.PI / 2); }
+      coinMat = new THREE.MeshStandardMaterial({ color: 0xb8923a, metalness: 1, roughness: 0.36, emissive: 0x2a1a00 });
+      orbMat = new THREE.MeshBasicMaterial({ color: 0xb02a20, transparent: true, opacity: 0.72 }); coreMat = new THREE.MeshBasicMaterial({ color: 0xffd0b0 });   // (a bead of red glass, a light at its heart)
     }
     let m;
     if (kind === 'coin') m = new THREE.Mesh(coinGeo, coinMat);
-    else { m = new THREE.Mesh(G.Props.PG.sph, orbMat); m.scale.setScalar(0.16); }
+    else { m = new THREE.Mesh(G.Props.PG.sph, orbMat); m.scale.setScalar(0.15); const c = new THREE.Mesh(G.Props.PG.sph, coreMat); c.scale.setScalar(0.42); m.add(c); }
     m.position.copy(pos);
     G.scene.add(m);
     const a = Math.random() * 6.28;

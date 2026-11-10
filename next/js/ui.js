@@ -10,7 +10,7 @@
 
   UI.init = function () {
     P = G.player;
-    UI.warmFonts();
+    UI.fontsReady = UI.warmFonts(); // (the start waits for it a while behind the loading screen: game.js)
     UI.el = {
       hud: $('hud'), hpBar: $('hp-bar'), hpFill: $('hp-fill'), hpTrail: $('hp-trail'), hpText: $('hp-text'), osFill: $('os-fill'), coinVal: $('coin-val'), coins: $('coins'), coinPops: $('coin-pops'),
       runMeta: $('run-meta'), wName: $('weapon-name'), wAtts: $('weapon-atts'), ammoMag: $('ammo-mag'), ammoMax: $('ammo-max'), ammo: $('ammo'), reloadBar: $('reload-bar'), wSlots: $('weapon-slots'),
@@ -40,7 +40,8 @@
   // piece arrives, in the middle of whatever is happening. So every character the game can show is asked for at once, at the start: the
   // characters are read out of the game's own scripts (already in the browser's cache) and out of the page.
   UI.warmFonts = async function () {
-    if (!document.fonts || !document.fonts.load || !window.fetch) return;
+    // (not on a phone: fetching every piece at once there held the game up far longer than the pieces arriving one by one ever did)
+    if (window.G_MOBILE || !document.fonts || !document.fonts.load || !window.fetch) return;
     try {
       const set = new Set(), eat = (t) => { for (const ch of t) if (ch.charCodeAt(0) > 0x2000) set.add(ch); };
       const srcs = Array.from(document.scripts).map((e) => e.src).filter((u) => u && u.indexOf(location.origin) === 0);
@@ -48,8 +49,8 @@
       for (const t of texts) eat(t);
       eat(document.documentElement.innerHTML);
       const text = Array.from(set).join(''), latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-%/.,:x';
-      const faces = [["500 16px 'Shippori Mincho'", text], ["700 16px 'Shippori Mincho'", text], ["800 16px 'Shippori Mincho'", text], ["400 16px 'Zen Antique'", text],
-        ['500 16px Spectral', latin], ['700 16px Spectral', latin], ['800 16px Spectral', latin], ['700 16px Cinzel', latin], ['900 16px Cinzel', latin], ["900 16px 'Cinzel Decorative'", latin]];
+      const faces = [["500 16px 'Shippori Mincho'", text], ["700 16px 'Shippori Mincho'", text], ["400 16px 'Zen Antique'", text],
+        ['500 16px Spectral', latin], ['700 16px Spectral', latin], ['700 16px Cinzel', latin], ['900 16px Cinzel', latin], ["900 16px 'Cinzel Decorative'", latin]];
       await Promise.all(faces.map((f) => document.fonts.load(f[0], f[1]).catch(() => null)));
     } catch (e) { /* (no net, or a browser without it: the faces then come as they are needed, or the fallbacks stand) */ }
   };

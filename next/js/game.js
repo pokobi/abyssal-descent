@@ -85,6 +85,8 @@
     await new Promise((r) => setTimeout(r, 30));
     if (G.Post && G.Post.active) { G.Post.resize(); G.Post.warm(); }
     if (G.Warm) { if (G.Warm.bootAsync) await G.Warm.bootAsync(); else G.Warm.boot(); } // title world + every enemy kind, viewmodel, previews: behind the loading screen, without blocking the page
+    // (the faces of the text, asked for at the start: ui.js. Waited for here a while, so that they do not arrive in the middle of play)
+    if (G.ui.fontsReady) { ldText.textContent = '書体を準備中…'; await Promise.race([G.ui.fontsReady, new Promise((r) => setTimeout(r, 6000))]); }
     setTimeout(() => document.getElementById('loading').classList.add('done'), 300);
     requestAnimationFrame(frame);
   }

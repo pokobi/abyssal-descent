@@ -1363,6 +1363,21 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   const gnCache = {};
   X.gunParts = function (arch) { if (gnCache[arch] !== undefined) return gnCache[arch]; let r = null; try { r = GN[arch] ? GN[arch]() : null; } catch (e) { console.warn('gfx: no gun', arch, e); r = null; } return (gnCache[arch] = r); };
+  // ---- shapes for the bodies that are not built of blocks (enemies.js), each of unit size like the plain ball and rod they stand in for:
+  // a slime's body sagging to the floor it sits on, a finely turned ball for the great eye, a tapering length of tentacle, a curved mouth ----
+  const fgc = {};
+  X.foeGeo = function (name) {
+    if (fgc[name]) return fgc[name];
+    let g = null;
+    if (name === 'slime') {
+      const c = new THREE.SplineCurve([[0.0005, -1], [0.86, -1], [1.1, -0.95], [1.13, -0.82], [1.05, -0.6], [1.0, -0.25], [0.96, 0.1], [0.86, 0.42], [0.68, 0.69], [0.44, 0.88], [0.2, 0.975], [0.0005, 1]].map((q) => new THREE.Vector2(q[0], q[1])));
+      g = new THREE.LatheGeometry(c.getPoints(30).map((q) => new THREE.Vector2(Math.max(q.x, 0.0005), q.y)), 36);
+    } else if (name === 'ball') g = new THREE.SphereGeometry(1, 36, 24);
+    else if (name === 'taper') g = new THREE.CylinderGeometry(1, 0.78, 1, 12, 1);
+    else if (name === 'smile') g = new THREE.TorusGeometry(1, 0.17, 6, 14, Math.PI);   // (turned down at the ends: a scowl, not a smile)
+    return (fgc[name] = g);
+  };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----
@@ -1416,29 +1431,34 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         const box = (list) => { const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9]; for (const q of list) { lo[0] = Math.min(lo[0], q.x - q.ext); lo[1] = Math.min(lo[1], q.y - q.ext); lo[2] = Math.min(lo[2], q.z - q.ext); hi[0] = Math.max(hi[0], q.x + q.ext); hi[1] = Math.max(hi[1], q.y + q.ext); hi[2] = Math.max(hi[2], q.z + q.ext); } return [lo, hi]; };
         let [lo, hi] = box(P);
         const L0 = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]), cell = o.free ? Math.max(0.011, L0 / 34) : Math.min(0.07, Math.max(0.011, L0 / 34));
+        // the distance from a point to one part (a part: a box, a ball, a rod, a cone as the body was built; or a ball put at a joint)
+        const sd1 = (q, x, y, z) => {
+          if (q.t === 4) return Math.hypot(x - q.x, y - q.y, z - q.z) - q.r;
+        const e = q.e, px = x - q.x, py = y - q.y, pz = z - q.z, lx = e[0] * px + e[4] * py + e[8] * pz, ly = e[1] * px + e[5] * py + e[9] * pz, lz = e[2] * px + e[6] * py + e[10] * pz;
+          let v;
+          if (q.t === 0) { const hx = q.sx / 2, hy = q.sy / 2, hz = q.sz / 2; v = S.box(lx, ly, lz, 0, 0, 0, hx, hy, hz, Math.min(hx, hy, hz) * rnd); }
+          else if (q.t === 1) v = S.ell(lx, ly, lz, 0, 0, 0, q.sx, q.sy, q.sz);
+          else {
+            const r = Math.min(q.sx, q.sz), qx = lx * r / q.sx, qz = lz * r / q.sz;
+            if (q.t === 2) { const rr = Math.min(r, q.sy / 2) * rnd * 0.65, dr = Math.hypot(qx, qz) - r + rr, dy = Math.abs(ly) - q.sy / 2 + rr; v = Math.hypot(Math.max(dr, 0), Math.max(dy, 0)) + Math.min(Math.max(dr, dy), 0) - rr; }
+            else v = S.cone(qx, ly, qz, 0, -q.sy / 2 + r * 0.35, 0, 0, q.sy / 2 - r * 0.1, 0, r * 0.92, r * 0.1);
+          }
+          return v;
+        };
         const use = P.filter((q) => q.thin >= cell * 2.2);
         if (!use.length || (use.length === 1 && use[0].t !== 0)) continue;   // (a ball or a rod alone is already what it should be)
+        // (a ball at the pivot this part of the body turns on, as thick as the limb that ends there: a knee, an elbow, a shoulder then stays
+        // closed however it bends - the end of the next limb is always inside the ball)
+        if (!o.free) {
+          let best = null, bd = 1e9; for (const q of use) { const v = sd1(q, 0, 0, 0); if (v < bd) { bd = v; best = q; } }
+          if (best && best.t !== 1 && bd < best.thin * 0.45 && bd > -best.thin * 0.5) use.push({ t: 4, x: 0, y: 0, z: 0, r: best.thin * 0.5, thin: best.thin, ext: best.thin * 0.5, c: null });
+        }
         [lo, hi] = box(use);
         const L = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]), k = Math.min(o.free ? 0.4 : 0.12, Math.max(0.012, L * blend)), pad = k + cell * 2;
-        const key = rnd.toFixed(2) + ',' + blend.toFixed(3) + ',' + cell.toFixed(4) + use.map((q) => q.t + ',' + [q.x, q.y, q.z, q.sx, q.sy, q.sz, q.c.quaternion.x, q.c.quaternion.y, q.c.quaternion.z, q.c.quaternion.w].map((v) => v.toFixed(3)).join(',')).join('|');
+        const key = rnd.toFixed(2) + ',' + blend.toFixed(3) + ',' + cell.toFixed(4) + use.map((q) => q.t + ',' + (q.c ? [q.x, q.y, q.z, q.sx, q.sy, q.sz, q.c.quaternion.x, q.c.quaternion.y, q.c.quaternion.z, q.c.quaternion.w] : [q.r]).map((v) => v.toFixed(3)).join(',')).join('|');
         let geo = fuseCache.get(key);
         if (geo === undefined) {
-          const fn = (x, y, z) => {
-            let d = 1e9;
-            for (let n = 0; n < use.length; n++) {
-              const q = use[n], e = q.e, px = x - q.x, py = y - q.y, pz = z - q.z, lx = e[0] * px + e[4] * py + e[8] * pz, ly = e[1] * px + e[5] * py + e[9] * pz, lz = e[2] * px + e[6] * py + e[10] * pz;
-              let v;
-              if (q.t === 0) { const hx = q.sx / 2, hy = q.sy / 2, hz = q.sz / 2; v = S.box(lx, ly, lz, 0, 0, 0, hx, hy, hz, Math.min(hx, hy, hz) * rnd); }
-              else if (q.t === 1) v = S.ell(lx, ly, lz, 0, 0, 0, q.sx, q.sy, q.sz);
-              else {
-                const r = Math.min(q.sx, q.sz), qx = lx * r / q.sx, qz = lz * r / q.sz;
-                if (q.t === 2) { const rr = Math.min(r, q.sy / 2) * rnd * 0.65, dr = Math.hypot(qx, qz) - r + rr, dy = Math.abs(ly) - q.sy / 2 + rr; v = Math.hypot(Math.max(dr, 0), Math.max(dy, 0)) + Math.min(Math.max(dr, dy), 0) - rr; }
-                else v = S.cone(qx, ly, qz, 0, -q.sy / 2 + r * 0.35, 0, 0, q.sy / 2 - r * 0.1, 0, r * 0.92, r * 0.1);
-              }
-              d = n ? S.smin(d, v, k) : v;
-            }
-            return d;
-          };
+          const fn = (x, y, z) => { let d = 1e9; for (let n = 0; n < use.length; n++) { const v = sd1(use[n], x, y, z); d = n ? S.smin(d, v, k) : v; } return d; };
           geo = null;
           try {
             const t0 = performance.now();
@@ -1455,7 +1475,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         }
         if (!geo) continue;
         const nm = new THREE.Mesh(geo, mat); nm.castShadow = true; g.add(nm);
-        for (const q of use) g.remove(q.c);
+        for (const q of use) if (q.c) g.remove(q.c);
         made++;
       }
     }

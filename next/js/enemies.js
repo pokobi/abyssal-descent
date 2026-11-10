@@ -35,7 +35,7 @@
     const skin = new THREE.MeshStandardMaterial({ color: col, roughness: pc.rough, metalness: pc.metal || 0, map: tx.map, normalMap: tx.normalMap });
     if (bt) { skin.roughnessMap = bt.orm; skin.aoMap = bt.orm; skin.roughness = 0.95; }
     if (pc.trans) { skin.transparent = true; skin.opacity = pc.trans; }
-    if (def.plan === 'slime') { skin.emissive = new THREE.Color(col).multiplyScalar(0.25); }
+    if (def.plan === 'slime') { skin.emissive = new THREE.Color(col).multiplyScalar(0.25); skin.roughness = 0.16; skin.map = null; skin.normalScale = new THREE.Vector2(0.3, 0.3); } // (wet, and without the pattern of a hide: a jelly)
     const sec = new THREE.MeshStandardMaterial({ color: pc.sec, roughness: 0.7, map: t.smooth.map });
     if (bt) { sec.map = t.metal.map; sec.normalMap = t.metal.normalMap; sec.metalness = 0.6; sec.roughness = 0.85; sec.color.set('#c2b6a4'); } // (a skeleton's iron: helmet, sword, shield)
     const eyeCol = opts && opts.ally ? '#80d0ff' : def.eye || (def.plan === 'skeleton' ? '#ff9040' : '#ffcc40');
@@ -200,11 +200,13 @@
   };
   B.slime = function (root, M) {
     const body = joint(root, 0, 0, 0);
-    const blob = mesh(body, PG.sph, M.skin, 0.62, 0.55, 0.62, 0, 0.55, 0);
+    const FG = G.GFX && G.GFX.foeGeo; // (a body that sags onto the floor, bubbles held in it, a mouth that curves: gfx.js)
+    const blob = mesh(body, (FG && FG('slime')) || PG.sph, M.skin, 0.62, 0.55, 0.62, 0, 0.55, 0);
+    if (FG) for (const [x, y, z, r] of [[0.2, 0.35, 0.15, 0.05], [-0.25, 0.6, -0.1, 0.04], [0.05, 0.8, -0.2, 0.035], [-0.1, 0.3, 0.3, 0.03]]) mesh(body, PG.sph, M.sec, r, r, r, x, y, z);
     const core = mesh(body, PG.sph, M.sec, 0.22, 0.2, 0.22, 0, 0.5, 0);
     const face = joint(body, 0, 0.62, 0.45);
     for (const s of [-1, 1]) mesh(face, PG.sph, M.eye, 0.07, 0.09, 0.04, s * 0.15, 0.08, 0.05);
-    mesh(face, PG.box, M.dark, 0.2, 0.04, 0.04, 0, -0.08, 0.06);
+    if (FG) mesh(face, FG('smile'), M.dark, 0.11, 0.07, 0.05, 0, -0.11, 0.15); else mesh(face, PG.box, M.dark, 0.2, 0.04, 0.04, 0, -0.08, 0.06);
     return {
       J: { body, blob, face }, h: 1.1, r: 0.6,
       hits: [{ n: body, r: 0.25, part: 'head', o: V(0, 0.75, 0.25) }, { n: body, r: 0.55, part: 'body', o: V(0, 0.5, 0) }],
@@ -366,7 +368,9 @@
   };
   B.eye = function (root, M) {
     const body = joint(root, 0, 0, 0);
-    const ball = mesh(body, PG.sph, M.skin, 0.62, 0.6, 0.6);
+    const FG = G.GFX && G.GFX.foeGeo; // (a finely turned ball, a ring round the iris, tentacles that taper with a knuckle at each joint: gfx.js)
+    const ball = mesh(body, (FG && FG('ball')) || PG.sph, M.skin, 0.62, 0.6, 0.6);
+    if (FG) mesh(body, PG.torus, M.dark, 0.31, 0.31, 0.12, 0, 0, 0.555);
     const iris = mesh(body, PG.sph, M.sec, 0.32, 0.32, 0.12, 0, 0, 0.53);
     const pupil = mesh(body, PG.sph, M.eye, 0.13, 0.15, 0.06, 0, 0, 0.63);
     const lidT = joint(body, 0, 0, 0); mesh(lidT, PG.sph, M.sec, 0.65, 0.35, 0.62, 0, 0.32, -0.03);
@@ -375,7 +379,7 @@
       const a0 = i / 6 * Math.PI * 2;
       let j = joint(body, Math.cos(a0) * 0.35, -0.45, Math.sin(a0) * 0.35);
       const segs = [];
-      for (let k = 0; k < 4; k++) { mesh(j, PG.cyl8, M.sec, 0.06 - k * 0.012, 0.28, 0.06 - k * 0.012, 0, -0.14, 0); segs.push(j); j = joint(j, 0, -0.27, 0); }
+      for (let k = 0; k < 4; k++) { const tr = 0.06 - k * 0.012; mesh(j, (FG && FG('taper')) || PG.cyl8, M.sec, tr, 0.28, tr, 0, -0.14, 0); if (FG) mesh(j, PG.sph, M.sec, tr, tr, tr); segs.push(j); j = joint(j, 0, -0.27, 0); }
       tent.push({ segs, ph: i });
     }
     return {

@@ -338,23 +338,41 @@
       },
     };
   };
+  // the spider: a great hunting spider - a swollen abdomen with its mark and spinnerets, a low shield of a fore-body, eight eyes in two
+  // rows, heavy jaws that carry the fangs, two feelers; each leg a hip-ball, a thick thigh, a knee, a thin shin tapering to a claw.
+  // The legs' joints (hip, thigh, knee) and the gait are as they were.
   B.spider = function (root, M) {
     const body = joint(root, 0, 0.5, 0);
-    const abd = mesh(body, PG.sph, M.skin, 0.38, 0.32, 0.46, 0, 0.12, -0.45);
-    mesh(body, PG.sph, M.sec, 0.12, 0.05, 0.25, 0, 0.42, -0.45);
+    const abd = mesh(body, PG.sph, M.skin, 0.36, 0.3, 0.46, 0, 0.14, -0.47);
+    mesh(body, PG.sph, M.sec, 0.1, 0.03, 0.2, 0, 0.42, -0.5);                 // its mark: an hourglass, two lobes
+    mesh(body, PG.sph, M.sec, 0.07, 0.03, 0.1, 0, 0.4, -0.3);
+    for (const s of [-1, 1]) mesh(body, PG.cone, M.skin, 0.035, 0.1, 0.035, s * 0.05, 0.05, -0.92, -Math.PI / 2 - 0.3);   // spinnerets
+    mesh(body, PG.sph, M.skin, 0.1, 0.09, 0.1, 0, 0.06, -0.08);               // the waist
     const head = joint(body, 0, 0.05, 0.15);
-    mesh(head, PG.sph, M.skin, 0.24, 0.18, 0.26);
-    for (let i = 0; i < 4; i++) mesh(head, PG.sph, M.eye, 0.035, 0.035, 0.03, (i % 2 ? 1 : -1) * (0.05 + (i > 1 ? 0.07 : 0)), 0.1 + (i > 1 ? -0.03 : 0), 0.22);
+    mesh(head, PG.sph, M.skin, 0.24, 0.15, 0.27, 0, 0.0, -0.02);              // the fore-body's shield
+    mesh(head, PG.sph, M.skin, 0.15, 0.11, 0.13, 0, 0.05, 0.15);              // the face
+    for (let i = 0; i < 8; i++) { const row = i < 4 ? 0 : 1, k = (i % 4) - 1.5; mesh(head, PG.sph, M.eye, row ? 0.014 : 0.021, row ? 0.014 : 0.021, 0.014, k * (row ? 0.075 : 0.055), 0.1 + row * 0.045, 0.255 - row * 0.05 - Math.abs(k) * 0.012); }
     const fangs = [];
-    for (const s of [-1, 1]) { const f = joint(head, s * 0.07, -0.08, 0.2); mesh(f, PG.cone, M.dark, 0.03, 0.14, 0.03, 0, -0.06, 0.02, Math.PI - 0.3); fangs.push(f); }
+    for (const s of [-1, 1]) {
+      const f = joint(head, s * 0.07, -0.08, 0.2);
+      mesh(f, PG.sph, M.skin, 0.05, 0.075, 0.055, 0, 0.0, 0.03);              // the jaw
+      mesh(f, PG.cone, M.dark, 0.025, 0.13, 0.025, 0, -0.1, 0.035, Math.PI - 0.25);
+      fangs.push(f);
+      mesh(head, PG.cyl8, M.skin, 0.022, 0.2, 0.022, s * 0.15, -0.03, 0.27, 1.1, 0, -s * 0.25);   // feelers
+    }
     const legs = [];
     for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
       const hip = joint(body, s * 0.18, 0.02, 0.2 - i * 0.14);
       hip.rotation.y = s * (0.6 - i * 0.4) + (s < 0 ? Math.PI : 0);
+      mesh(hip, PG.sph, M.skin, 0.05, 0.05, 0.05);
       const up = joint(hip, 0, 0, 0); up.rotation.z = 0.7;
-      mesh(up, PG.box, M.skin, 0.55, 0.05, 0.05, 0.27, 0, 0);
+      mesh(up, PG.cyl8, M.skin, 0.036, 0.55, 0.036, 0.27, 0, 0, 0, 0, Math.PI / 2);
+      mesh(up, PG.sph, M.skin, 0.045, 0.045, 0.045, 0.1, 0, 0);
       const kn = joint(up, 0.55, 0, 0); kn.rotation.z = -1.9;
-      mesh(kn, PG.box, M.skin, 0.65, 0.04, 0.04, 0.32, 0, 0);
+      mesh(kn, PG.sph, M.skin, 0.042, 0.042, 0.042);
+      mesh(kn, PG.cyl8, M.skin, 0.024, 0.5, 0.024, 0.25, 0, 0, 0, 0, Math.PI / 2);
+      mesh(kn, PG.cone, M.dark, 0.022, 0.17, 0.022, 0.57, 0, 0, 0, 0, -Math.PI / 2);     // the foot's claw
+      for (const b of [0.14, 0.3, 0.42]) mesh(kn, PG.cone, M.dark, 0.006, 0.05, 0.006, b, 0.03, 0, 0, 0, -0.5);   // bristles
       legs.push({ hip, up, kn, ph: i * 1.3 + (s > 0 ? Math.PI : 0) });
     }
     return {
@@ -448,30 +466,70 @@
     };
   };
   // gargoyle: a crouching stone fiend held aloft by heavy wings; it picks up a stone and throws it
+  // the gargoyle: a carved beast of stone, crouched forward - a deep chest and a hollow belly, a hound's skull with a heavy brow, a
+  // beaked snout, two ribbed horns; a wing of three stone fingers with the web between them; arms with talons, bent haunches, a tail
+  // of joints ending in a barb. Its edges stay those of cut stone. Joints, flight and what a shot hits as before.
   B.gargoyle = function (root, M) {
     const body = joint(root, 0, 0.2, 0);
-    mesh(body, PG.box, M.skin, 0.5, 0.55, 0.42, 0, 0.1, 0, 0.35);
-    mesh(body, PG.box, M.sec, 0.52, 0.12, 0.44, 0, -0.12, 0.05, 0.35);
+    mesh(body, PG.sph, M.skin, 0.25, 0.27, 0.22, 0, 0.2, 0.06, 0.35);        // chest
+    mesh(body, PG.sph, M.skin, 0.19, 0.2, 0.18, 0, -0.03, -0.05, 0.35);      // belly
+    mesh(body, PG.box, M.skin, 0.36, 0.1, 0.24, 0, 0.36, 0.0, 0.35);         // the yoke of the shoulders
+    for (let i = 0; i < 4; i++) mesh(body, PG.box, M.sec, 0.06, 0.07, 0.07, 0, 0.36 - i * 0.12, -0.2 + i * 0.03, 0.35 + 0.78);   // the spine's knobs
+    mesh(body, PG.box, M.sec, 0.4, 0.07, 0.3, 0, -0.14, 0.02, 0.35);         // a girdle
     const head = joint(body, 0, 0.42, 0.2);
-    mesh(head, PG.box, M.skin, 0.3, 0.28, 0.32);
-    mesh(head, PG.box, M.skin, 0.22, 0.12, 0.18, 0, -0.1, 0.17);
-    for (const s of [-1, 1]) { mesh(head, PG.cone, M.sec, 0.05, 0.3, 0.05, s * 0.12, 0.2, -0.05, -0.5, 0, s * 0.35); mesh(head, PG.box, M.eye, 0.06, 0.03, 0.02, s * 0.07, 0.04, 0.17); }
+    mesh(head, PG.sph, M.skin, 0.15, 0.14, 0.17, 0, 0.0, -0.02);
+    mesh(head, PG.box, M.skin, 0.27, 0.07, 0.12, 0, 0.07, 0.1, 0.35);        // brow
+    mesh(head, PG.box, M.skin, 0.15, 0.1, 0.2, 0, -0.04, 0.17);              // snout
+    mesh(head, PG.cone, M.skin, 0.06, 0.12, 0.05, 0, -0.03, 0.31, Math.PI / 2 + 0.5);   // its hooked end
+    mesh(head, PG.box, M.skin, 0.13, 0.05, 0.18, 0, -0.12, 0.13);            // jaw
+    mesh(head, PG.box, M.dark, 0.1, 0.012, 0.15, 0, -0.092, 0.15);
+    for (const s of [-1, 1]) {
+      mesh(head, PG.cone, M.sec, 0.05, 0.2, 0.05, s * 0.11, 0.18, -0.04, -0.5, 0, s * 0.35);
+      mesh(head, PG.cone, M.sec, 0.03, 0.16, 0.03, s * 0.155, 0.3, -0.13, -1.1, 0, s * 0.3);
+      mesh(head, PG.box, M.eye, 0.05, 0.022, 0.016, s * 0.07, 0.03, 0.16);
+      mesh(head, PG.cone, M.skin, 0.04, 0.13, 0.02, s * 0.17, 0.06, -0.03, 0, 0, -s * 1.1);     // ears
+      mesh(head, PG.cone, M.tooth, 0.012, 0.045, 0.012, s * 0.045, -0.085, 0.24, Math.PI);
+    }
     const wings = [];
     for (const s of [-1, 1]) {
       const sh = joint(body, s * 0.22, 0.25, -0.15);
-      mesh(sh, PG.box, M.skin, 0.65, 0.05, 0.08, s * 0.32, 0, 0);
-      mesh(sh, PG.box, M.sec, 0.6, 0.02, 0.5, s * 0.32, 0, -0.25);
+      mesh(sh, PG.box, M.skin, 0.65, 0.06, 0.07, s * 0.32, 0, 0);            // the arm of the wing
+      mesh(sh, PG.sph, M.skin, 0.07, 0.07, 0.07, 0, 0, 0);
+      mesh(sh, PG.box, M.sec, 0.6, 0.016, 0.46, s * 0.32, -0.01, -0.25);
+      for (let i = 0; i < 3; i++) mesh(sh, PG.cone, M.sec, 0.1, 0.13, 0.008, s * (0.14 + i * 0.2), -0.01, -0.5, Math.PI / 2);
       const tip = joint(sh, s * 0.64, 0, 0);
-      mesh(tip, PG.box, M.sec, 0.55, 0.02, 0.45, s * 0.26, 0, -0.22); mesh(tip, PG.cone, M.skin, 0.04, 0.16, 0.04, s * 0.52, 0, 0, 0, 0, -s * Math.PI / 2);
+      mesh(tip, PG.sph, M.skin, 0.055, 0.055, 0.055);
+      mesh(tip, PG.cone, M.dark, 0.02, 0.1, 0.02, 0, 0.03, 0.07, Math.PI / 2 - 0.5);            // the thumb's hook
+      for (let i = 0; i < 3; i++) { const a = 0.1 + i * 0.42, len = 0.56 - i * 0.07; mesh(tip, PG.box, M.skin, len, 0.035, 0.035, s * Math.cos(a) * len / 2, 0, -Math.sin(a) * len / 2, 0, s * a, 0); }
+      mesh(tip, PG.box, M.sec, 0.52, 0.014, 0.42, s * 0.26, -0.01, -0.22);
+      for (let i = 0; i < 3; i++) mesh(tip, PG.cone, M.sec, 0.09, 0.12, 0.007, s * (0.1 + i * 0.17), -0.01, -0.45, Math.PI / 2);
       wings.push({ sh, tip, s });
     }
     const arms = [];
-    for (const s of [-1, 1]) { const a = joint(body, s * 0.28, 0.2, 0.15); mesh(a, PG.box, M.skin, 0.1, 0.38, 0.1, 0, -0.18, 0.05, 0.4); arms.push(a); }
+    for (const s of [-1, 1]) {
+      const a = joint(body, s * 0.28, 0.2, 0.15);
+      mesh(a, PG.sph, M.skin, 0.075, 0.075, 0.075);
+      mesh(a, PG.box, M.skin, 0.09, 0.22, 0.1, 0, -0.1, 0.02, 0.4); mesh(a, PG.box, M.skin, 0.075, 0.2, 0.08, 0, -0.27, 0.1, 0.1);
+      mesh(a, PG.sph, M.skin, 0.06, 0.05, 0.07, 0, -0.38, 0.12);
+      for (let i = 0; i < 3; i++) mesh(a, PG.cone, M.dark, 0.014, 0.07, 0.014, (i - 1) * 0.035, -0.43, 0.16, Math.PI - 0.6);
+      arms.push(a);
+    }
     // the stone in its right hand: the very model the thrown one uses (same scale, so what you see is what hits)
     const rock = mesh(arms[1], PG.dode, G.world.mats.rock, 0.26, 0.26, 0.26, 0, -0.42, 0.1); rock.visible = false;
     let relT = null; // when the throw was released (the arm swings through from there)
-    const L = [leg(body, M, -0.14, -0.2, 0, 0.35, 0.06), leg(body, M, 0.14, -0.2, 0, 0.35, 0.06)];
-    const tail = joint(body, 0, -0.1, -0.25); for (let i = 0; i < 3; i++) mesh(tail, PG.box, M.sec, 0.05, 0.05, 0.25, 0, -i * 0.06, -0.12 - i * 0.22, 0.3);
+    const gleg = (x) => {
+      const len = 0.35, hip = joint(body, x, -0.2, 0);
+      mesh(hip, PG.sph, M.skin, 0.08, 0.12, 0.1, 0, -len * 0.2, 0.02);       // haunch
+      const kn = joint(hip, 0, -len * 0.5, 0);
+      mesh(kn, PG.box, M.skin, 0.055, len * 0.5, 0.06, 0, -len * 0.25, -0.01);
+      mesh(kn, PG.box, M.skin, 0.085, 0.04, 0.13, 0, -len * 0.5 + 0.02, 0.035);
+      for (let i = 0; i < 3; i++) mesh(kn, PG.cone, M.dark, 0.012, 0.06, 0.012, (i - 1) * 0.03, -len * 0.5 + 0.015, 0.12, Math.PI / 2 + 0.4);
+      return { hip, kn };
+    };
+    const L = [gleg(-0.14), gleg(0.14)];
+    const tail = joint(body, 0, -0.1, -0.25);
+    for (let i = 0; i < 4; i++) mesh(tail, PG.box, M.sec, 0.055 - i * 0.008, 0.055 - i * 0.008, 0.2, 0, -i * 0.05, -0.1 - i * 0.18, 0.3);
+    mesh(tail, PG.cone, M.sec, 0.06, 0.12, 0.016, 0, -0.22, -0.84, -Math.PI / 2 - 0.3);          // the barb
     return {
       J: { body, head, wings, rock }, h: 1.4, r: 0.6, fly: true,
       hits: [{ n: head, r: 0.2, part: 'head' }, { n: body, r: 0.38, part: 'body', o: V(0, 0.1, 0) }, { n: wings[0].sh, r: 0.25, part: 'body', o: V(-0.4, 0, -0.2) }, { n: wings[1].sh, r: 0.25, part: 'body', o: V(0.4, 0, -0.2) }],

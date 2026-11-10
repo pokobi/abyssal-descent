@@ -1414,6 +1414,35 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     return g;
   };
 
+  // ---- shapes for the bodies that are not built of blocks (enemies.js), each of unit size like the plain ball, rod or cone it stands
+  // in for: a slime sagging onto the floor, a finely turned ball for the great eye, a tapering length of tentacle, a scowl; a toadstool's
+  // cap and stalk; a robe hanging in folds ----
+  const fgc = {};
+  const spl = (pts, n) => new THREE.SplineCurve(pts.map((q) => new THREE.Vector2(q[0], q[1]))).getPoints(n).map((q) => new THREE.Vector2(Math.max(q.x, 0.0005), q.y));
+  X.foeGeo = function (name) {
+    if (fgc[name]) return fgc[name];
+    let g = null;
+    if (name === 'slime') g = new THREE.LatheGeometry(spl([[0.0005, -1], [0.86, -1], [1.1, -0.95], [1.13, -0.82], [1.05, -0.6], [1.0, -0.25], [0.96, 0.1], [0.86, 0.42], [0.68, 0.69], [0.44, 0.88], [0.2, 0.975], [0.0005, 1]], 30), 36);
+    else if (name === 'ball') g = new THREE.SphereGeometry(1, 36, 24);
+    else if (name === 'taper') g = new THREE.CylinderGeometry(1, 0.78, 1, 12, 1);
+    else if (name === 'smile') g = new THREE.TorusGeometry(1, 0.17, 6, 14, Math.PI);   // (turned down at the ends: a scowl)
+    else if (name === 'cap') {
+      // a dome, its rim rolled under, the hollow of the gills beneath (the ball it stands in for was one across about its middle)
+      g = new THREE.LatheGeometry(spl([[0.0005, 0.62], [0.3, 0.58], [0.62, 0.42], [0.88, 0.14], [1.0, -0.14], [0.97, -0.3], [0.86, -0.36], [0.7, -0.26], [0.4, -0.16], [0.12, -0.12], [0.0005, -0.12]], 28), 40);
+      const ps = g.attributes.position;
+      for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), z = ps.getZ(i), a = Math.atan2(z, x), r = Math.hypot(x, z), k = 1 + 0.035 * Math.sin(a * 5 + 1) * r + 0.02 * Math.sin(a * 11) * r; ps.setX(i, x * k); ps.setZ(i, z * k); if (ps.getY(i) < -0.1 && r > 0.15 && r < 0.9) ps.setY(i, ps.getY(i) + 0.025 * Math.sin(a * 44)); }
+      g.computeVertexNormals();
+    } else if (name === 'stem') g = new THREE.LatheGeometry(spl([[0.0005, -0.5], [1.15, -0.5], [1.3, -0.4], [1.05, -0.2], [0.82, 0.05], [0.78, 0.18], [1.12, 0.14], [1.16, 0.2], [0.8, 0.27], [0.74, 0.5], [0.0005, 0.5]], 26), 24);   // swollen at the foot, a torn ring two thirds up
+    else if (name === 'robe') {
+      // narrow at the waist, flaring to the ground, hanging in folds (in place of a cone one across at its foot, one high)
+      g = new THREE.LatheGeometry(spl([[0.0005, 0.5], [0.42, 0.5], [0.5, 0.3], [0.62, 0.0], [0.82, -0.3], [1.0, -0.5]], 16), 36);
+      const ps = g.attributes.position;
+      for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), z = ps.getZ(i), a = Math.atan2(z, x), dn = Math.max(0, 0.5 - ps.getY(i)), k = 1 + (0.09 * Math.sin(a * 9) + 0.05 * Math.sin(a * 4 + 1)) * dn; ps.setX(i, x * k); ps.setZ(i, z * k); }
+      g.computeVertexNormals();
+    }
+    return (fgc[name] = g);
+  };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

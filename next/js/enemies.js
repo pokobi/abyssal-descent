@@ -19,9 +19,9 @@
     gargoyle: { skin: '#6e6a64', sec: '#3c3834', rough: 0.95, blood: 0x5a5650, tex: 'rock' },
     beetle: { skin: '#26384a', sec: '#141a20', rough: 0.25, metal: 0.3, blood: 0x6a8a20, tex: 'scales' },
     wraith: { skin: '#2a2a36', sec: '#0e0e14', rough: 0.95, blood: 0x30304a, tex: 'skin', trans: 0.85 },
-    mushroom: { skin: '#9a3420', sec: '#d8ccb0', rough: 0.7, blood: 0x8aa040, tex: 'skin' },
+    mushroom: { skin: '#74402c', sec: '#b8ab8e', rough: 0.7, blood: 0x8aa040, tex: 'skin' },
     golem: { skin: '#7a7066', sec: '#4a4440', rough: 0.95, blood: 0x6a6056, tex: 'rock' },
-    shaman: { skin: '#4a2a5a', sec: '#d8ccb0', rough: 0.9, blood: 0x6a0c0c, tex: 'skin' },
+    shaman: { skin: '#32283a', sec: '#d8ccb0', rough: 0.9, blood: 0x6a0c0c, tex: 'skin' },
     mantis: { skin: '#5a7a3a', sec: '#2a3a1a', rough: 0.45, blood: 0x6a9a20, tex: 'scales' },
     worm: { skin: '#8a6050', sec: '#3a2a20', rough: 0.5, blood: 0x7a3010, tex: 'scales' },
     mimic: { skin: '#8a5a30', sec: '#c8a050', rough: 0.6, blood: 0x6a0c0c, tex: 'skin' },
@@ -630,16 +630,19 @@
       },
     };
   };
+  // the mushroom: a grave-fungus as tall as a man - a domed cap with its rim rolled under and gills beneath, warts over it, a stalk
+  // swollen at the foot with a torn ring; a face sunk into the stalk under the cap's shadow. The cap still swells and flattens as it did.
   B.mushroom = function (root, M) {
+    const FG = G.GFX && G.GFX.foeGeo;
     const body = joint(root, 0, 0, 0);
     const stem = joint(body, 0, 0.3, 0);
-    mesh(stem, PG.cyl, M.sec, 0.25, 0.9, 0.25, 0, 0.45, 0);
+    mesh(stem, (FG && FG('stem')) || PG.cyl, M.sec, 0.25, 0.9, 0.25, 0, 0.45, 0);
     const cap = joint(stem, 0, 0.95, 0);
-    const capM = mesh(cap, PG.sph, M.skin, 0.75, 0.42, 0.75, 0, 0.1, 0);
-    mesh(cap, PG.cyl, M.sec, 0.68, 0.04, 0.68, 0, -0.05, 0);
-    for (let i = 0; i < 9; i++) { const a0 = i * 2.3; const rr = 0.25 + (i % 3) * 0.15; mesh(cap, PG.sph, M.tooth, 0.07, 0.03, 0.07, Math.cos(a0) * rr, 0.38 - rr * 0.35, Math.sin(a0) * rr, -Math.sin(a0) * rr, 0, Math.cos(a0) * rr); }
-    for (const s of [-1, 1]) mesh(stem, PG.sph, M.eye, 0.04, 0.05, 0.03, s * 0.09, 0.7, 0.23);
-    mesh(stem, PG.box, M.dark, 0.12, 0.03, 0.02, 0, 0.55, 0.25);
+    const capM = mesh(cap, (FG && FG('cap')) || PG.sph, M.skin, 0.75, 0.42, 0.75, 0, 0.1, 0);
+    if (!FG) mesh(cap, PG.cyl, M.sec, 0.68, 0.04, 0.68, 0, -0.05, 0);
+    for (let i = 0; i < 11; i++) { const a0 = i * 2.3, rr = 0.16 + (i % 4) * 0.13, sz = 0.035 + (i % 3) * 0.018; mesh(cap, PG.sph, M.tooth, sz, sz * 0.45, sz, Math.cos(a0) * rr, 0.36 - rr * rr * 0.42, Math.sin(a0) * rr, -Math.sin(a0) * rr, 0, Math.cos(a0) * rr); }
+    for (const s of [-1, 1]) { mesh(stem, PG.sph, M.dark, 0.05, 0.055, 0.03, s * 0.09, 0.7, 0.19); mesh(stem, PG.sph, M.eye, 0.022, 0.026, 0.018, s * 0.09, 0.695, 0.205); }   // eyes, deep in their hollows
+    mesh(stem, PG.box, M.dark, 0.15, 0.035, 0.03, 0, 0.56, 0.2); for (let i = 0; i < 4; i++) mesh(stem, PG.cone, M.tooth, 0.012, 0.035, 0.012, (i - 1.5) * 0.035, 0.565, 0.215, i % 2 ? 0 : Math.PI);
     const roots = [];
     for (let i = 0; i < 4; i++) { const r = joint(body, Math.cos(i * 1.57 + 0.78) * 0.22, 0.3, Math.sin(i * 1.57 + 0.78) * 0.22); mesh(r, PG.cone, M.sec, 0.07, 0.35, 0.07, 0, -0.15, 0, Math.PI); roots.push(r); }
     return {
@@ -693,20 +696,44 @@
       },
     };
   };
+  // the shaman: a hooded shaman in a robe to the ground, hanging in folds - a mask of bone under the hood with horns through it, wide
+  // sleeves and thin hands, a rope at the waist with charms on it; a crooked staff with a skull bound to its head, a light in the skull.
   B.shaman = function (root, M) {
+    const FG = G.GFX && G.GFX.foeGeo, PP = G.Props.PG;
     const hips = joint(root, 0, 0.9, 0);
-    const robe = mesh(hips, PG.cone, M.skin, 0.45, 1.1, 0.4, 0, -0.35, 0);
+    const robe = mesh(hips, (FG && FG('robe')) || PG.cone, M.skin, 0.45, 1.1, 0.4, 0, -0.35, 0);
+    mesh(hips, PG.torus, M.sec, 0.2, 0.2, 0.3, 0, 0.12, 0, Math.PI / 2);                              // the rope
+    for (let i = 0; i < 3; i++) mesh(hips, PG.sph, M.tooth, 0.025, 0.04, 0.02, -0.1 + i * 0.07, 0.0 - i * 0.03, 0.2);   // charms of bone
     const torso = joint(hips, 0, 0.1, 0);
-    mesh(torso, PG.sph, M.skin, 0.28, 0.4, 0.22, 0, 0.3, 0);
+    mesh(torso, PG.sph, M.skin, 0.26, 0.36, 0.2, 0, 0.3, 0);
+    mesh(torso, PG.sph, M.skin, 0.3, 0.16, 0.2, 0, 0.56, -0.02);                                      // shoulders under the cloth
+    mesh(torso, PG.sph, M.skin, 0.2, 0.2, 0.19, 0, 0.66, -0.07);                                      // the hood's fall behind
     const head = joint(torso, 0, 0.78, 0.03);
-    mesh(head, PG.sph, M.skin, 0.2, 0.22, 0.2);
-    mesh(head, PG.box, M.sec, 0.24, 0.3, 0.06, 0, -0.02, 0.18);
-    for (const s of [-1, 1]) { mesh(head, PG.sph, M.eye, 0.03, 0.02, 0.02, s * 0.06, 0.03, 0.22); mesh(head, PG.cone, M.sec, 0.03, 0.25, 0.03, s * 0.12, 0.25, 0, -0.2, 0, s * 0.4); }
+    mesh(head, PG.sph, M.skin, 0.2, 0.22, 0.2, 0, 0.01, -0.02);                                       // the hood
+    mesh(head, PG.cone, M.skin, 0.13, 0.22, 0.13, 0, 0.2, -0.09, -0.7);                               // its peak
+    mesh(head, PG.sph, M.dark, 0.14, 0.17, 0.08, 0, -0.01, 0.13);                                     // the dark inside it
+    mesh(head, PG.sph, M.sec, 0.105, 0.14, 0.05, 0, -0.01, 0.17);                                     // the mask
+    mesh(head, PG.box, M.sec, 0.07, 0.07, 0.04, 0, -0.14, 0.165);                                     // its long chin
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.dark, 0.032, 0.026, 0.02, s * 0.045, 0.025, 0.205); mesh(head, PG.sph, M.eye, 0.014, 0.012, 0.012, s * 0.045, 0.025, 0.21);
+      mesh(head, PG.cone, M.sec, 0.03, 0.2, 0.03, s * 0.12, 0.22, 0.0, -0.2, 0, s * 0.4); mesh(head, PG.cone, M.sec, 0.018, 0.14, 0.018, s * 0.175, 0.37, -0.03, -0.5, 0, s * 0.1);
+    }
+    for (let i = 0; i < 3; i++) mesh(head, PG.box, M.dark, 0.008, 0.05, 0.01, (i - 1) * 0.03, -0.09, 0.212);   // the mask's teeth, scored
     const arms = [];
-    for (const s of [-1, 1]) { const sh = joint(torso, s * 0.3, 0.55, 0); mesh(sh, PG.cone, M.skin, 0.09, 0.55, 0.09, 0, -0.25, 0); const hand = joint(sh, 0, -0.5, 0.05); arms.push({ sh, hand }); }
+    for (const s of [-1, 1]) {
+      const sh = joint(torso, s * 0.3, 0.55, 0);
+      mesh(sh, PG.cone, M.skin, 0.11, 0.55, 0.12, 0, -0.25, 0, Math.PI);                              // a wide sleeve, open at the wrist
+      mesh(sh, PG.sph, M.skin, 0.09, 0.1, 0.1, 0, -0.02, 0);
+      const hand = joint(sh, 0, -0.5, 0.05);
+      mesh(hand, PG.sph, M.sec, 0.04, 0.05, 0.045); for (let i = 0; i < 3; i++) mesh(hand, PG.cone, M.sec, 0.01, 0.07, 0.01, (i - 1) * 0.025, -0.06, 0.02, Math.PI - 0.4);
+      arms.push({ sh, hand });
+    }
     const staff = joint(arms[1].hand, 0, 0, 0);
-    mesh(staff, PG.cyl8, M.sec, 0.025, 1.9, 0.025, 0, 0.3, 0);
-    mesh(staff, PG.sph, M.eye, 0.07, 0.07, 0.07, 0, 1.25, 0);
+    mesh(staff, PG.cyl8, M.sec, 0.025, 1.0, 0.027, 0, -0.15, 0); mesh(staff, PG.cyl8, M.sec, 0.022, 0.95, 0.025, 0.02, 0.8, 0, 0, 0, -0.045);   // crooked: two lengths, not quite in line
+    mesh(staff, PG.sph, M.sec, 0.04, 0.04, 0.04, 0.005, 0.34, 0);
+    if (PP.skullB) { mesh(staff, PP.skullB, M.tooth, 1.05, 1.05, 1.05, 0.045, 1.2, 0); mesh(staff, PP.skullD, M.dark, 1.05, 1.05, 1.05, 0.045, 1.2, 0); }
+    mesh(staff, PG.sph, M.eye, 0.035, 0.035, 0.035, 0.045, 1.31, 0.04);
+    for (const a of [0.6, 2.4, 4.4]) mesh(staff, PG.box, M.dark, 0.006, 0.16, 0.01, 0.045 + Math.cos(a) * 0.05, 1.14, Math.sin(a) * 0.05);   // cords it hangs by
     const orbs = [];
     for (let i = 0; i < 3; i++) { const o = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0x8fd0ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); o.scale.setScalar(0.25); torso.add(o); orbs.push(o); }
     return {

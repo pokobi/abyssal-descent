@@ -17,7 +17,7 @@ float vnoise(vec2 p, float per, float seed){
   float a = hash12(mod(i, per) + s), b = hash12(mod(i + vec2(1., 0.), per) + s), c = hash12(mod(i + vec2(0., 1.), per) + s), d = hash12(mod(i + vec2(1., 1.), per) + s);
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
-float fbm(vec2 uv, float per, float seed){ float a = .5, s = 0., n = 0.; for (int i = 0; i < 7; i++) { s += a * vnoise(uv * per, per, seed + float(i) * 7.); n += a; a *= .5; per *= 2.; } return s / n; }
+float fbm(vec2 uv, float per, float seed){ float a = .5, s = 0., n = 0.; for (int i = 0; i < 5; i++) { s += a * vnoise(uv * per, per, seed + float(i) * 7.); n += a; a *= .5; per *= 2.; } return s / n; }
 float fbm3(vec2 uv, float per, float seed){ float a = .5, s = 0., n = 0.; for (int i = 0; i < 3; i++) { s += a * vnoise(uv * per, per, seed + float(i) * 7.); n += a; a *= .5; per *= 2.; } return s / n; }
 float vnA(vec2 p, vec2 per, float seed){
   vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); vec2 s = vec2(seed * 13.7, seed * 5.3);
@@ -25,7 +25,7 @@ float vnA(vec2 p, vec2 per, float seed){
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 float fbmA(vec2 uv, vec2 per, float seed){ float a = .5, s = 0., n = 0.; for (int i = 0; i < 5; i++) { s += a * vnA(uv * per, per, seed + float(i) * 7.); n += a; a *= .5; per *= 2.; } return s / n; }
-float ridge(vec2 uv, float per, float seed){ float a = .5, s = 0., n = 0.; for (int i = 0; i < 5; i++) { float v = 1. - abs(vnoise(uv * per, per, seed + float(i) * 3.) * 2. - 1.); s += a * v * v; n += a; a *= .5; per *= 2.; } return s / n; }
+float ridge(vec2 uv, float per, float seed){ float a = .5, s = 0., n = 0.; for (int i = 0; i < 4; i++) { float v = 1. - abs(vnoise(uv * per, per, seed + float(i) * 3.) * 2. - 1.); s += a * v * v; n += a; a *= .5; per *= 2.; } return s / n; }
 vec3 voro(vec2 uv, float per, float seed){
   vec2 p = uv * per, i = floor(p), f = fract(p); float d1 = 9., d2 = 9., id = 0.;
   for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
@@ -92,7 +92,7 @@ void main(){
   X.bake = function (renderer, px, body, o) {
     o = o || {}; ready();
     const mat = o.mat || surfMat(body);
-    const rt = (srgb) => { const t = new THREE.WebGLRenderTarget(px, px, { depthBuffer: false }); if (srgb) t.texture.colorSpace = THREE.SRGBColorSpace; return t; };
+    const rt = (srgb) => { const t = new THREE.WebGLRenderTarget(px, px, { depthBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, anisotropy: 8 }); if (srgb) t.texture.colorSpace = THREE.SRGBColorSpace; return t; };
     const hgt = new THREE.WebGLRenderTarget(px, px, { depthBuffer: false, type: THREE.HalfFloatType, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     const out = [rt(true), rt(false), rt(false)], prev = renderer.getRenderTarget(), ac = renderer.autoClear;
     renderer.autoClear = true;
@@ -295,13 +295,11 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       for (const k in SRC) {
         const t = T.tex[k]; if (!t || !t.map) continue;
         const small = k === 'metal' || k === 'cloth' || k === 'skin' || k === 'scales', size = small ? Math.max(256, px >> 1) : px;
-        const rts = X.bake(renderer, size, SRC[k][1], { normal: SRC[k][0], ao: 3, mat: pending['w:' + k] }), bufs = []; delete pending['w:' + k];
-        for (let i = 0; i < 3; i++) { const b = new Uint8Array(size * size * 4); renderer.readRenderTargetPixels(rts[i], 0, 0, size, size, b); bufs.push(b); rts[i].dispose(); }
-        const put = (tex, data) => { tex.dispose(); tex.image = { data, width: size, height: size }; tex.needsUpdate = true; };
-        put(t.map, bufs[0]); put(t.normalMap, bufs[1]);
-        const o = new THREE.DataTexture(bufs[2], size, size, THREE.RGBAFormat);
-        o.wrapS = o.wrapT = THREE.RepeatWrapping; o.magFilter = THREE.LinearFilter; o.minFilter = THREE.LinearMipmapLinearFilter; o.generateMipmaps = true; o.anisotropy = t.map.anisotropy || 8; o.needsUpdate = true;
-        t.orm = o;
+        const rts = X.bake(renderer, size, SRC[k][1], { normal: SRC[k][0], ao: 3, mat: pending['w:' + k] }); delete pending['w:' + k];
+        // (the baked targets are the textures themselves from here on - nothing holds the old ones yet, every user asks G.Tex.tex when it
+        // makes its material. Reading them back and sending them up again cost the loading screen three seconds)
+        t.map.dispose(); t.normalMap.dispose();
+        t.map = rts[0].texture; t.normalMap = rts[1].texture; t.orm = rts[2].texture;
       }
       X.upgradeSprites(renderer);
       X.upgraded = true; X.stats.tex = Math.round(performance.now() - t0);
@@ -520,14 +518,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     if (!src || !renderer) return null;
     const t0 = performance.now();
     try {
-      const size = src[0], rts = X.bake(renderer, size, src[2], { normal: src[1], ao: 2.5, mat: X.pendingMat('x:' + name) }), out = [];
-      for (let i = 0; i < 3; i++) {
-        const b = new Uint8Array(size * size * 4); renderer.readRenderTargetPixels(rts[i], 0, 0, size, size, b); rts[i].dispose();
-        const t = new THREE.DataTexture(b, size, size, THREE.RGBAFormat);
-        t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 8;
-        if (i === 0) t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; out.push(t);
-      }
-      texCache[name] = { map: out[0], normalMap: out[1], orm: out[2] }; X.stats.surf += Math.round(performance.now() - t0);
+      const size = src[0], rts = X.bake(renderer, size, src[2], { normal: src[1], ao: 2.5, mat: X.pendingMat('x:' + name) });
+      texCache[name] = { map: rts[0].texture, normalMap: rts[1].texture, orm: rts[2].texture }; X.stats.surf += Math.round(performance.now() - t0);
     } catch (e) { console.warn('gfx: no surface', name, e); }
     return texCache[name];
   };
@@ -731,4 +723,112 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   c = mix(c, vec3(.44, .36, .26), clamp(pr * .4 + crack * .8 + smoothstep(.6, .85, fbm(uv, 6., 20.)) * .5, 0., 1.)); c *= .88 + n3 * .24;
   col = S(c); rough = .84 + (n2 - .5) * .2 + pr * .16; metal = 0.;
 }`];
+})();
+// ---- the rifle (assault / burst / marksman): receivers from outlines pushed out to a thickness, a rail of real teeth, a handguard of
+// eight plates with slots cut through them, a turned barrel, flip-up sights. Built in its own measure (metres, the bore along -z through
+// the origin) and then fitted to where weapons.js keeps its muzzle, grip, rail and sight line. One geometry per material. ----
+(function () {
+  const X = G.GFX, Geo = X.Geo, TAU = Math.PI * 2;
+  const rrect = (cx, cy, w, h, r, n) => {
+    const p = []; n = n || 3; r = Math.min(r, w / 2 - 1e-5, h / 2 - 1e-5);
+    const cs = [[cx + w / 2 - r, cy + h / 2 - r, 0], [cx - w / 2 + r, cy + h / 2 - r, 1], [cx - w / 2 + r, cy - h / 2 + r, 2], [cx + w / 2 - r, cy - h / 2 + r, 3]];
+    for (const [x, y, q] of cs) for (let i = 0; i <= n; i++) { const a = (q + i / n) * Math.PI / 2; p.push([x + Math.cos(a) * r, y + Math.sin(a) * r]); }
+    return p;
+  };
+  const circle = (cx, cy, r, n) => { const p = []; for (let i = 0; i < (n || 14); i++) { const a = i / (n || 14) * TAU; p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } return p; };
+  const arcRing = (r0, r1, a0, a1, n) => { const p = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; p.push([Math.cos(a) * r1, Math.sin(a) * r1]); } for (let i = n; i >= 0; i--) { const a = a0 + (a1 - a0) * i / n; p.push([Math.cos(a) * r0, Math.sin(a) * r0]); } return p; };
+  // an outline (pairs) pushed out to a depth along z, centred on z = 0; its edges chamfered
+  const ext = (pts, depth, bevel, holes, steps) => {
+    const sh = new THREE.Shape(pts.map((p) => new THREE.Vector2(p[0], p[1])));
+    if (holes) for (const h of holes) sh.holes.push(new THREE.Path(h.map((p) => new THREE.Vector2(p[0], p[1]))));
+    bevel = Math.max(0, Math.min(bevel === undefined ? 0.0015 : bevel, depth / 2 - 1e-5));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: depth - bevel * 2, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelOffset: -bevel, bevelSegments: steps || 1, curveSegments: 8, steps: 1 });
+    g.translate(0, 0, -(depth - bevel * 2) / 2); return g;
+  };
+  // a cross-section (x, y) pushed along the bore from f0 to f1 (f: forward of the origin; forward is -z)
+  const sec = (pts, f0, f1, bevel, holes) => { const g = ext(pts, f1 - f0, bevel, holes); g.translate(0, 0, -(f0 + f1) / 2); return g; };
+  // a side outline ([forward, height]) pushed out to a width across the gun
+  const side = (pts, width, bevel, holes, x, steps) => { const g = ext(pts, width, bevel, holes, steps); g.rotateY(Math.PI / 2); if (x) g.translate(x, 0, 0); return g; };
+  const sh2 = (pts, dx, dy) => pts.map((p) => [p[0] + (dx || 0), p[1] + (dy || 0)]);
+  const rb = (w, h, d, r, x, y, f, rot) => Geo.xf(X.makeRbox(w, h, d, r === undefined ? 0.0012 : r, 1), [x, y, -f], rot);
+  const lathe = (pts, seg) => { const g = Geo.lathe(pts, seg || 18); g.rotateX(-Math.PI / 2); return g; };   // about the bore: [radius, forward]
+  // lay the texture on by position, from the side each face looks to: every part then carries it at one grain
+  function boxUV(g, k) {
+    const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i)), x = p.getX(i) * k, y = p.getY(i) * k, z = p.getZ(i) * k; if (ax >= ay && ax >= az) uv.setXY(i, z, y); else if (ay >= az) uv.setXY(i, x, z); else uv.setXY(i, x, y); }
+    return g;
+  }
+  const SCL = 1.215, Y0 = 0.030, Z0 = -0.0154;   // its own measure -> the game's: the muzzle, grip and rail land where they were
+  const cache = {};
+  // kind: 'rifle' | 'burst' | 'dmr'. Returns { metal, poly, steel, mag (geometry about its own middle), magAt [x, y, z], muzzleY }
+  X.rifleParts = function (kind) {
+    if (cache[kind]) return cache[kind];
+    const long = kind === 'dmr', ME = [], PO = [], ST = [], UT = 0.0215, RY = UT + 0.0094, UPW = 0.043, UB = -0.021, L = -1, EXT = long ? 0.09 : 0;
+    // upper receiver: a section pushed along the bore
+    const upSec = [[-UPW / 2, UB], [UPW / 2, UB], [UPW / 2, 0.007], [UPW / 2 - 0.0035, 0.0155], [0.0105, UT], [-0.0105, UT], [-UPW / 2 + 0.0035, 0.0155], [-UPW / 2, 0.007]];
+    ME.push(sec(upSec, -0.104, 0.099, 0.0012));
+    ME.push(rb(0.004, 0.017, 0.062, 0.0015, L * (UPW / 2 + 0.0008), -0.002, -0.058), rb(0.0035, 0.012, 0.03, 0.0015, L * (UPW / 2 + 0.0006), 0.002, 0.07));
+    ME.push(rb(0.006, 0.02, 0.05, 0.0025, UPW / 2 + 0.001, 0.0, -0.066));
+    ST.push(Geo.rod([UPW / 2, 0.004, 0.088], [UPW / 2 + 0.012, 0.004, 0.096], 0.006, 10));
+    ME.push(rb(0.013, 0.007, 0.03, 0.0015, 0, UT - 0.0035, -0.112), rb(0.054, 0.0085, 0.011, 0.002, 0, UT - 0.0035, -0.124));
+    // rail: a dovetail base with a tooth every 10 mm
+    const dove = [[-0.0078, 0], [0.0078, 0], [0.0078, 0.0026], [0.0106, 0.0054], [0.0106, 0.0068], [0.0086, 0.0094], [-0.0086, 0.0094], [-0.0106, 0.0068], [-0.0106, 0.0054], [-0.0078, 0.0026]];
+    const base = [[-0.0078, 0], [0.0078, 0], [0.0078, 0.0056], [-0.0078, 0.0056]];
+    const rail = (f0, f1) => { ME.push(sec(sh2(base, 0, UT), f0, f1, 0)); for (let f = f0 + 0.0026; f + 0.0052 <= f1 + 1e-6; f += 0.01) ME.push(sec(sh2(dove, 0, UT), f, f + 0.0052, 0.0005)); };
+    rail(-0.101, 0.098);
+    // handguard: eight plates about the barrel, slots cut through them
+    const HW = 0.046, HC = UT - HW / 2, HF0 = 0.101, HF1 = 0.42 + EXT * 0.6, fw = HW * Math.tan(Math.PI / 8) + 0.0016, th = 0.0024;
+    const oct = (w) => { const p = [], R = w / 2 / Math.cos(Math.PI / 8); for (let k = 0; k < 8; k++) { const a = Math.PI / 8 + k * Math.PI / 4; p.push([Math.cos(a) * R, HC + Math.sin(a) * R]); } return p; };
+    ME.push(sec(oct(HW), HF0, HF0 + 0.02, 0.0012), sec(oct(HW + 0.002), HF0 + 0.004, HF0 + 0.012, 0.0008), sec(oct(HW), HF1 - 0.004, HF1, 0.0008, [circle(0, HC, 0.0165, 16)]));
+    for (let k = 0; k < 8; k++) {
+      const ang = k * Math.PI / 4, holes = [];
+      if (k !== 2) {
+        if ((k % 2 === 0) || k === 5 || k === 7) for (let f = HF0 + 0.05; f < HF1 - 0.03; f += 0.0405) holes.push(rrect(f, 0, 0.032, 0.0072, 0.0026, 2));
+        else for (let f = HF0 + 0.04; f < HF1 - 0.02; f += 0.027) holes.push(rrect(f, 0, 0.017, 0.0052, 0.0024, 2));
+      }
+      const g = side([[HF0 + 0.019, -fw / 2], [HF1 - 0.003, -fw / 2], [HF1 - 0.003, fw / 2], [HF0 + 0.019, fw / 2]], th, 0.0006, holes);
+      ME.push(Geo.xf(g, [Math.cos(ang) * (HW / 2 - th / 2), HC + Math.sin(ang) * (HW / 2 - th / 2), 0], [0, 0, ang]));
+    }
+    rail(HF0 + 0.001, HF1 - 0.002);
+    // barrel, gas block and tube, a three-pronged flash hider
+    const BF = 0.462 + EXT, MZ = 0.514 + EXT;
+    ME.push(lathe([[0.0005, 0.09], [0.0125, 0.09], [0.0125, 0.128], [0.0096, 0.136], [0.0096, 0.30], [0.0112, 0.303], [0.0112, 0.343], [0.0091, 0.347], [0.0091, BF], [0.0005, BF]], 16));
+    ME.push(rb(0.019, 0.013, 0.036, 0.002, 0, 0.0125, 0.323)); ST.push(Geo.rod([0, 0.0165, -0.10], [0, 0.0165, -0.31], 0.0026, 6));
+    ME.push(lathe([[0.0005, BF - 0.004], [0.0108, BF - 0.004], [0.0108, BF + 0.001], [0.0098, BF + 0.003], [0.0098, BF + 0.007], [0.0108, BF + 0.009], [0.0108, BF + 0.018], [0.0005, BF + 0.018]], 16));
+    for (let k = 0; k < 3; k++) { const a = k * TAU / 3 + Math.PI / 2; ME.push(sec(arcRing(0.0058, 0.0108, a - 0.72, a + 0.72, 5), BF + 0.017, MZ, 0.0009)); }
+    // lower receiver, trigger guard, trigger, pins and controls
+    const LW = 0.0385;
+    ME.push(side([[0.086, -0.019], [0.0865, -0.045], [0.081, -0.089], [0.02, -0.084], [0.0145, -0.056], [-0.05, -0.056], [-0.06, -0.074], [-0.098, -0.068], [-0.108, -0.05], [-0.106, -0.019]], LW, 0.0022));
+    ME.push(side([[0.0835, -0.08], [0.084, -0.091], [0.018, -0.0855], [0.0185, -0.076]], LW + 0.004, 0.0015));
+    ME.push(lathe([[0.0005, -0.124], [0.0195, -0.124], [0.0195, -0.104], [0.0005, -0.104]], 16)); ST.push(lathe([[0.0005, -0.128], [0.0215, -0.128], [0.0215, -0.1245], [0.0005, -0.1245]], 16));
+    const pin = (f, y, r, out) => ST.push(Geo.rod([L * (LW / 2 - 0.001), y, -f], [L * (LW / 2 + (out || 0.0012)), y, -f], r, 10));
+    pin(0.07, -0.03, 0.0046); pin(-0.094, -0.031, 0.0046); pin(-0.03, -0.041, 0.0026); pin(-0.011, -0.045, 0.0026); pin(-0.066, -0.036, 0.0075, 0.0022);
+    ST.push(rb(0.0042, 0.0056, 0.024, 0.0015, L * (LW / 2 + 0.0034), -0.036, -0.054), rb(0.0036, 0.022, 0.009, 0.0012, L * (LW / 2 + 0.002), -0.014, 0.008), rb(0.0044, 0.012, 0.013, 0.0015, L * (LW / 2 + 0.0026), -0.031, 0.008), rb(0.003, 0.004, 0.03, 0.001, L * (LW / 2 + 0.0012), -0.041, 0.042));
+    ST.push(Geo.rod([LW / 2 - 0.001, -0.041, -0.04], [LW / 2 + 0.003, -0.041, -0.04], 0.005, 10));
+    ME.push(side([[0.0165, -0.054], [0.0165, -0.064], [0.004, -0.0915], [-0.05, -0.0915], [-0.0555, -0.086], [-0.0555, -0.054]], 0.0125, 0.0009, [[[0.0128, -0.057], [0.0128, -0.0632], [0.002, -0.0878], [-0.0495, -0.0878], [-0.0518, -0.0855], [-0.0518, -0.057]]]));
+    ST.push(side([[-0.0205, -0.055], [-0.012, -0.055], [-0.0142, -0.067], [-0.019, -0.079], [-0.0232, -0.0805], [-0.0215, -0.068]], 0.0068, 0.0014));
+    // grip and stock (wood on the marksman's)
+    PO.push(side([[-0.052, -0.055], [-0.058, -0.075], [-0.066, -0.092], [-0.096, -0.152], [-0.1, -0.158], [-0.138, -0.158], [-0.142, -0.152], [-0.118, -0.095], [-0.113, -0.075], [-0.118, -0.06], [-0.11, -0.055]], 0.031, 0.0075, null, 0, 3));
+    PO.push(side([[-0.098, -0.1555], [-0.14, -0.1555], [-0.1405, -0.161], [-0.0985, -0.161]], 0.03, 0.002));
+    ME.push(lathe([[0.0005, -0.305], [0.0148, -0.305], [0.0148, -0.106], [0.0005, -0.106]], 14));
+    PO.push(side([[-0.135, 0.022], [-0.302, 0.022], [-0.308, 0.012], [-0.308, -0.1], [-0.294, -0.106], [-0.252, -0.054], [-0.19, -0.031], [-0.135, -0.027]], 0.041, 0.0045, [[[-0.207, -0.037], [-0.288, -0.088], [-0.288, -0.037]]], 0, 2));
+    PO.push(rb(0.043, 0.128, 0.012, 0.004, 0, -0.04, -0.312), rb(0.012, 0.01, 0.04, 0.003, 0, -0.034, -0.165));
+    if (kind === 'burst') PO.push(Geo.xf(side([[0.2, -0.026], [0.25, -0.026], [0.236, -0.085], [0.222, -0.09], [0.206, -0.085]], 0.026, 0.006, null, 0, 2), null));
+    // flip-up sights on the rail: a post between two ears in front, a plate with a hole behind. The line through them is weapons.js's ironY
+    const SL = (0.088 - Y0) / SCL, ff = (0.37 + Z0) / SCL, fr = (-0.088 + Z0) / SCL;
+    ME.push(rb(0.02, 0.006, 0.026, 0.0012, 0, RY + 0.003, ff), rb(0.003, SL - RY, 0.004, 0.0006, 0, (SL + RY) / 2, ff));
+    for (const sx of [-1, 1]) ME.push(rb(0.003, SL - RY + 0.006, 0.014, 0.001, sx * 0.008, (SL + RY) / 2 + 0.003, ff));
+    ME.push(rb(0.022, 0.006, 0.026, 0.0012, 0, RY + 0.003, fr));
+    ME.push(Geo.xf(ext(rrect(0, SL - 0.002, 0.017, (SL - RY) * 2 - 0.002, 0.003, 2), 0.004, 0.0006, [circle(0, SL, 0.003, 12)]), [0, 0, -fr]));
+    // magazine: curved, a raised panel and ribs on its sides, a floor plate
+    const MG = [side([[0.021, -0.03], [0.024, -0.09], [0.031, -0.15], [0.043, -0.205], [0.046, -0.214], [0.107, -0.197], [0.106, -0.187], [0.093, -0.14], [0.082, -0.09], [0.076, -0.03]], 0.0225, 0.002)];
+    MG.push(side([[0.028, -0.096], [0.036, -0.152], [0.047, -0.196], [0.098, -0.184], [0.088, -0.14], [0.078, -0.096]], 0.0242, 0.0012));
+    MG.push(side([[0.039, -0.203], [0.043, -0.2205], [0.111, -0.2015], [0.109, -0.185]], 0.027, 0.0022));
+    const fit = (list) => { const g = Geo.merge(list); g.scale(SCL, SCL, SCL); g.translate(0, Y0, Z0); return boxUV(g, 5); };
+    const out = { metal: fit(ME), poly: fit(PO), steel: fit(ST), muzzleY: Y0, muzzleZ: -MZ * SCL + Z0 };
+    const mag = fit(MG); mag.computeBoundingBox(); const c = mag.boundingBox.getCenter(new THREE.Vector3()); mag.translate(-c.x, -c.y, -c.z); out.mag = mag; out.magAt = [c.x, c.y, c.z];
+    let tris = 0; for (const k of ['metal', 'poly', 'steel', 'mag']) { out[k].computeBoundingSphere(); tris += out[k].attributes.position.count / 3; }
+    X.stats.rifleTris = Math.round(tris);
+    return (cache[kind] = out);
+  };
 })();

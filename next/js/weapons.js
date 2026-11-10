@@ -239,6 +239,17 @@
       }
       case 'rifle': case 'burst': case 'dmr': {
         const long = def.arch === 'dmr';
+        // (the rifle built from outlines, a rail of real teeth, a slotted handguard, flip-up sights: gfx.js. The muzzle, grip, rail and
+        // sight line are where they were, so what is fitted to it and how it is held and aimed are unchanged)
+        const AR = G.GFX && G.GFX.rifleParts ? G.GFX.rifleParts(def.arch) : null;
+        if (AR) {
+          const part = (geo, m) => { const o = new THREE.Mesh(geo, m); g.add(o); return o; };
+          part(AR.metal, metal); part(AR.poly, long ? mats.wood : poly); part(AR.steel, mats.steel);
+          M.bolt = box(0.012, 0.018, 0.06, 0.03, 0.035, 0.02, mats.steel);
+          M.mag = part(AR.mag, metal); M.mag.position.set(AR.magAt[0], AR.magAt[1], AR.magAt[2]);
+          M.muzzle.set(0, AR.muzzleY, AR.muzzleZ); M.sightY = 0.088; M.ironY = 0.088; M.railY = 0.068; M.fore.set(0, -0.02, -0.28); M.grip.set(0, -0.06, 0.1);
+          break;
+        }
         box(0.05, 0.07, 0.34, 0, 0.02, 0.0);
         M.bolt = box(0.012, 0.018, 0.06, 0.03, 0.035, 0.02, mats.steel);
         box(0.056, 0.058, 0.26, 0, 0.018, -0.28, long ? mats.wood : poly);

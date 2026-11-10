@@ -498,6 +498,19 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   col = S(vec3(.72 + (n1 - .5) * .22) * (.74 + cr * .26));
   rough = .86 + (n1 - .5) * .2 - cr * .1; metal = 0.;
 }`],
+    // (a stock's wood: the grain runs along the piece, the rings cut lengthwise, open pores; no boards, no joints)
+    walnut: [512, 0.5, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float warp = fbm(uv, 3., 1.), n1 = fbm(uv, 4., 7.);
+  float g1 = vnA(vec2(uv.x * 4., uv.y * 48.), vec2(4., 48.), 2.);
+  float g2 = vnA(vec2(uv.x * 10., uv.y * 300.), vec2(10., 300.), 3.);
+  float ring = sin((uv.y * 14. + warp * 2.2 + g1 * 1.6) * 6.2831853) * .5 + .5;
+  float pore = smoothstep(.7, .9, vnA(vec2(uv.x * 36., uv.y * 420.), vec2(36., 420.), 5.));
+  h = .5 + (g2 - .5) * .09 - pore * .12 + (ring - .5) * .03;
+  vec3 c = mix(vec3(.6, .5, .42), vec3(.97, .9, .8), smoothstep(.15, .85, ring * .6 + g1 * .4));
+  c *= .9 + (g2 - .5) * .22; c *= 1. - pore * .32; c *= .92 + (n1 - .5) * .18;
+  col = S(c); rough = .55 + (g2 - .5) * .2 + pore * .3 + (n1 - .5) * .12; metal = 0.;
+}`],
     weave: [512, 1.0, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   float n = 40.; vec2 p = uv * n; float wa = sin(p.x * 6.2831853) * .5 + .5, we = sin(p.y * 6.2831853) * .5 + .5;
@@ -834,5 +847,109 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     let tris = 0; for (const k of ['metal', 'poly', 'steel', 'mag']) { out[k].computeBoundingSphere(); tris += out[k].attributes.position.count / 3; }
     X.stats.rifleTris = Math.round(tris);
     return (cache[kind] = out);
+  };
+
+  // ---- the pistol, in the game's own measure (forward is -z): a slide with its cuts and sights (its own piece: it runs back at each
+  // shot), a frame from one side outline with the trigger guard cut through it, the barrel's end, the small controls, the magazine ----
+  let pist = null;
+  X.pistolParts = function () {
+    if (pist) return pist;
+    const FR = [], ST = [], SL = [], SS = [], fit = (list) => boxUV(Geo.merge(list), 6);
+    // slide, about its own middle (weapons.js sets it at 0, 0.035, -0.02)
+    SL.push(sec([[-0.0152, -0.0175], [0.0152, -0.0175], [0.0152, 0.008], [0.0112, 0.0175], [-0.0112, 0.0175], [-0.0152, 0.008]], -0.095, 0.095, 0.0012));
+    for (let i = 0; i < 7; i++) for (const sx of [-1, 1]) SL.push(rb(0.0014, 0.021, 0.0032, 0.0005, sx * 0.0155, -0.002, -0.04 - i * 0.0072, [0.25, 0, 0]));
+    SL.push(rb(0.004, 0.007, 0.006, 0.001, 0, 0.0205, 0.083));
+    for (const sx of [-1, 1]) SL.push(rb(0.005, 0.0075, 0.008, 0.001, sx * 0.0075, 0.0207, -0.083));
+    SL.push(rb(0.02, 0.003, 0.01, 0.001, 0, 0.0185, -0.083));
+    SS.push(rb(0.0008, 0.012, 0.03, 0.0002, 0.0152, 0.004, 0.02), rb(0.012, 0.0008, 0.03, 0.0002, 0.0062, 0.0173, 0.02));   // the barrel's hood, seen through the port
+    // frame: one outline, the trigger guard cut through it
+    const fr = [[0.1, 0.0175], [0.1, -0.004], [0.052, -0.006], [0.0535, -0.014], [0.051, -0.04], [0.046, -0.045], [0.002, -0.045], [-0.006, -0.038], [-0.014, -0.024], [-0.036, -0.105], [-0.038, -0.112], [-0.082, -0.108], [-0.085, -0.101], [-0.062, -0.02], [-0.066, -0.004], [-0.082, 0.004], [-0.08, 0.0175]];
+    FR.push(side(fr, 0.0285, 0.0042, [[[0.046, -0.012], [0.0445, -0.037], [0.006, -0.0395], [-0.006, -0.014]]], 0, 2));
+    for (const sx of [-1, 1]) FR.push(rb(0.0014, 0.06, 0.03, 0.0005, sx * 0.0146, -0.064, -0.049, [0.26, 0, 0]));
+    for (let i = 0; i < 3; i++) FR.push(rb(0.021, 0.003, 0.0045, 0.0006, 0, -0.0052, 0.062 + i * 0.012));
+    // the barrel's end and the guide rod under it, trigger, slide stop, magazine catch, hammer
+    const brl = lathe([[0.0005, 0.1], [0.0064, 0.1], [0.0064, 0.1235], [0.005, 0.1255], [0.0005, 0.1255]], 14); brl.translate(0, 0.035, 0); ST.push(brl);
+    const rod = lathe([[0.0005, 0.1], [0.0034, 0.1], [0.0034, 0.1165], [0.0005, 0.1165]], 10); rod.translate(0, 0.0235, 0); ST.push(rod);
+    ST.push(side([[0.03, -0.012], [0.036, -0.012], [0.031, -0.026], [0.024, -0.034], [0.021, -0.033], [0.027, -0.024]], 0.006, 0.0012));
+    ST.push(rb(0.002, 0.005, 0.024, 0.001, -0.0152, 0.008, 0.004), rb(0.002, 0.006, 0.008, 0.001, -0.0152, 0.006, 0.05));
+    ST.push(Geo.rod([-0.013, -0.017, 0.013], [-0.0166, -0.017, 0.013], 0.0038, 10), rb(0.006, 0.012, 0.007, 0.002, 0, 0.011, -0.085, [-0.4, 0, 0]));
+    // magazine, about its own middle (weapons.js sets and leans it)
+    const MG = [X.makeRbox(0.022, 0.076, 0.032, 0.003, 1), Geo.xf(X.makeRbox(0.03, 0.007, 0.043, 0.002, 1), [0, -0.0405, 0.002])];
+    return (pist = { frame: fit(FR), steel: fit(ST), slide: fit(SL), slideSteel: fit(SS), mag: fit(MG) });
+  };
+
+  // ---- the shotgun, in the game's own measure: a receiver from one outline with the guard cut through it, a turned barrel with a
+  // ventilated rib and a bead, the magazine tube under it, a ribbed fore-end that slides (its own piece), a stock cut in one piece ----
+  const sgc = {};
+  X.shotgunParts = function (auto) {
+    const key = auto ? 'a' : 'p'; if (sgc[key]) return sgc[key];
+    const ME = [], ST = [], WO = [], BR = [], fit = (list) => boxUV(Geo.merge(list), 5);
+    ME.push(side([[0.12, 0.052], [0.12, -0.012], [0.03, -0.016], [0.032, -0.024], [0.03, -0.05], [0.024, -0.056], [-0.03, -0.056], [-0.04, -0.048], [-0.05, -0.022], [-0.12, -0.022], [-0.12, 0.03], [-0.1, 0.046], [-0.06, 0.054]], 0.044, 0.004,
+      [[[0.022, -0.022], [0.021, -0.047], [-0.026, -0.048], [-0.034, -0.026]]], 0, 2));
+    ST.push(side([[0.0, -0.022], [0.006, -0.022], [0.002, -0.034], [-0.004, -0.042], [-0.007, -0.041], [-0.002, -0.032]], 0.006, 0.0012), rb(0.0008, 0.02, 0.06, 0.0002, 0.0222, 0.03, 0.03));
+    const brl = lathe([[0.0005, 0.1], [0.0148, 0.1], [0.0148, 0.6], [0.0156, 0.605], [0.0156, 0.626], [0.0005, 0.626]], 16); brl.translate(0, 0.04, 0); ME.push(brl);
+    ME.push(rb(0.007, 0.003, 0.5, 0.0008, 0, 0.0582, 0.36));
+    for (let i = 0; i < 8; i++) ME.push(rb(0.004, 0.005, 0.007, 0.0008, 0, 0.0558, 0.14 + i * 0.062));
+    const tube = lathe([[0.0005, 0.1], [0.0118, 0.1], [0.0118, 0.565], [0.0136, 0.567], [0.0136, 0.585], [0.011, 0.588], [0.0005, 0.588]], 14); tube.translate(0, 0.006, 0); ST.push(tube);
+    ME.push(rb(0.012, 0.05, 0.012, 0.003, 0, 0.024, 0.5));
+    // the stock, wrist to butt, in one piece
+    WO.push(side([[-0.072, -0.022], [-0.098, -0.108], [-0.132, -0.112], [-0.128, -0.06], [-0.16, -0.045], [-0.3, -0.05], [-0.41, -0.07], [-0.412, 0.03], [-0.27, 0.036], [-0.17, 0.03], [-0.12, 0.03], [-0.12, -0.022]], 0.04, 0.008, null, 0, 2));
+    ME.push(rb(0.042, 0.11, 0.01, 0.004, 0, -0.022, -0.418));
+    BR.push(Geo.xf(new THREE.SphereGeometry(0.004, 8, 6), [0, 0.0625, -0.6]));
+    const out = { metal: fit(ME), steel: fit(ST), wood: fit(WO), brass: fit(BR) };
+    if (!auto) {
+      // the fore-end, about its own middle (weapons.js sets it at 0, 0, -0.28): a sleeve round the tube with gripping ribs
+      const hole = () => circle(0, 0.006, 0.0125, 14), PU = [sec(rrect(0, 0.001, 0.05, 0.046, 0.012, 3), -0.07, 0.07, 0.003, [hole()])];
+      for (let i = 0; i < 7; i++) PU.push(sec(rrect(0, 0.0005, 0.0535, 0.0485, 0.013, 3),-0.05 + i * 0.016, -0.05 + i * 0.016 + 0.006, 0.0015, [hole()]));
+      out.pump = fit(PU);
+    }
+    return (sgc[key] = out);
+  };
+
+  // ---- the bolt-action rifle: a stock cut in one piece from fore-end to butt, a round action let into it, a tapered barrel with a
+  // ringed brake, a rail of teeth, the bolt's handle with its knob (its own piece: it is worked at each shot), a box magazine ----
+  let snip = null;
+  X.sniperParts = function () {
+    if (snip) return snip;
+    const ME = [], ST = [], WO = [], fit = (list) => boxUV(Geo.merge(list), 5);
+    WO.push(side([[0.36, 0.012], [0.36, -0.02], [0.34, -0.034], [0.06, -0.04], [-0.04, -0.04], [-0.075, -0.035], [-0.1, -0.11], [-0.135, -0.115], [-0.14, -0.065], [-0.18, -0.05], [-0.3, -0.058], [-0.45, -0.075], [-0.452, 0.03], [-0.3, 0.04], [-0.2, 0.036], [-0.17, 0.018], [-0.15, 0.012]], 0.046, 0.01, null, 0, 2));
+    const act = lathe([[0.0005, -0.15], [0.02, -0.15], [0.022, -0.145], [0.022, 0.15], [0.019, 0.155], [0.0005, 0.155]], 18); act.translate(0, 0.025, 0); ME.push(act);
+    ME.push(rb(0.018, 0.012, 0.24, 0.002, 0, 0.05, 0.04), rb(0.024, 0.006, 0.25, 0.001, 0, 0.059, 0.04));
+    for (let i = 0; i < 12; i++) ME.push(rb(0.024, 0.004, 0.012, 0.0008, 0, 0.064, -0.075 + i * 0.021));
+    const brl = lathe([[0.0005, 0.15], [0.017, 0.15], [0.017, 0.2], [0.0135, 0.27], [0.011, 0.74], [0.0005, 0.74]], 16); brl.translate(0, 0.025, 0); ME.push(brl);
+    const brk = lathe([[0.0005, 0.735], [0.018, 0.735], [0.0195, 0.741], [0.0195, 0.752], [0.016, 0.753], [0.016, 0.762], [0.0195, 0.763], [0.0195, 0.774], [0.016, 0.775], [0.016, 0.784], [0.0195, 0.785], [0.0195, 0.798], [0.017, 0.806], [0.0005, 0.806]], 16); brk.translate(0, 0.025, 0); ME.push(brk);
+    ME.push(rb(0.048, 0.106, 0.012, 0.004, 0, -0.022, -0.456));
+    ST.push(side([[-0.016, -0.036], [-0.02, -0.06], [-0.03, -0.068], [-0.066, -0.068], [-0.08, -0.036]], 0.012, 0.002, [[[-0.024, -0.042], [-0.027, -0.058], [-0.033, -0.062], [-0.064, -0.062], [-0.072, -0.042]]]));
+    ST.push(side([[-0.04, -0.04], [-0.046, -0.04], [-0.05, -0.052], [-0.046, -0.06], [-0.043, -0.059], [-0.045, -0.05]], 0.006, 0.0012));
+    // the bolt, about where weapons.js sets it (0.035, 0.04, 0.08): the handle bent down to its knob, the shroud at the action's end
+    const shr = lathe([[0.0005, -0.105], [0.012, -0.105], [0.0135, -0.1], [0.0135, -0.07], [0.0005, -0.07]], 12); shr.translate(-0.035, -0.015, 0);
+    const BO = [Geo.rod([-0.03, -0.012, 0], [0.014, -0.02, 0], 0.0048, 10), Geo.xf(new THREE.SphereGeometry(0.0095, 12, 9), [0.02, -0.022, 0]), shr];
+    return (snip = { metal: fit(ME), steel: fit(ST), wood: fit(WO), bolt: fit(BO), mag: boxUV(X.makeRbox(0.03, 0.06, 0.07, 0.004, 1), 5) });
+  };
+
+  // ---- the revolver: a frame from one outline with the cylinder's window and the guard cut through it, a fluted cylinder (its own
+  // piece: it turns), a barrel with its rib, ramp and lug, a hammer, a grip of wood cut round ----
+  let revo = null;
+  X.revolverParts = function () {
+    if (revo) return revo;
+    const ME = [], ST = [], WO = [], BR = [], fit = (list) => boxUV(Geo.merge(list), 6);
+    ME.push(side([[0.035, 0.066], [0.035, -0.008], [0.024, -0.01], [0.025, -0.034], [0.018, -0.042], [-0.022, -0.042], [-0.03, -0.032], [-0.036, -0.012], [-0.078, -0.008], [-0.082, 0.02], [-0.072, 0.05], [-0.056, 0.066]], 0.026, 0.004,
+      [[[0.027, 0.059], [0.027, -0.001], [-0.027, -0.001], [-0.027, 0.059]], [[0.019, -0.012], [0.019, -0.032], [0.014, -0.037], [-0.02, -0.037], [-0.027, -0.03], [-0.03, -0.012]]], 0, 2));
+    const brl = lathe([[0.0005, 0.03], [0.0135, 0.03], [0.0135, 0.226], [0.0115, 0.232], [0.0005, 0.232]], 16); brl.translate(0, 0.04, 0); ME.push(brl);
+    ME.push(rb(0.02, 0.02, 0.16, 0.007, 0, 0.022, 0.112), rb(0.011, 0.014, 0.196, 0.002, 0, 0.057, 0.132));
+    ME.push(side([[0.196, 0.063], [0.228, 0.063], [0.226, 0.0695], [0.212, 0.0715]], 0.005, 0.001));
+    for (const sx of [-1, 1]) ME.push(rb(0.004, 0.006, 0.01, 0.001, sx * 0.006, 0.069, -0.05));
+    ST.push(side([[-0.06, 0.05], [-0.068, 0.072], [-0.08, 0.08], [-0.086, 0.075], [-0.076, 0.066], [-0.074, 0.046]], 0.008, 0.0015));
+    ST.push(side([[-0.002, -0.012], [0.004, -0.012], [0.0, -0.024], [-0.006, -0.032], [-0.009, -0.031], [-0.004, -0.022]], 0.006, 0.0012));
+    ST.push(rb(0.004, 0.012, 0.014, 0.002, -0.0135, 0.022, -0.045));
+    WO.push(side([[-0.036, -0.012], [-0.05, -0.05], [-0.062, -0.1], [-0.066, -0.112], [-0.11, -0.108], [-0.112, -0.09], [-0.098, -0.04], [-0.088, 0.0], [-0.082, 0.018], [-0.06, 0.004]], 0.032, 0.011, null, 0, 3));
+    for (const sx of [-1, 1]) BR.push(Geo.xf(new THREE.CylinderGeometry(0.006, 0.006, 0.002, 12), [sx * 0.0162, -0.03, 0.07], [0, 0, Math.PI / 2]));
+    // the cylinder, about its own axis the way weapons.js turns it (the axis is its y; the mesh is laid over): six flutes, six rims at the back
+    const prof = []; for (let i = 0; i < 72; i++) { const a = i / 72 * TAU, c = Math.cos(a * 6) * 0.5 + 0.5, r = 0.029 - 0.004 * c * c * c; prof.push([Math.cos(a) * r, Math.sin(a) * r]); }
+    const dr = sec(prof, -0.025, 0.025, 0.002); dr.rotateX(-Math.PI / 2);
+    const rims = []; for (let i = 0; i < 6; i++) { const a = (i + 0.5) / 6 * TAU; rims.push(Geo.xf(new THREE.CylinderGeometry(0.0058, 0.0058, 0.0016, 10), [Math.cos(a) * 0.018, 0.0256, Math.sin(a) * 0.018])); }
+    // (the grip's grain runs down the grip, not along the gun)
+    const wo = fit(WO), wuv = wo.attributes.uv; for (let i = 0; i < wuv.count; i++) wuv.setXY(i, wuv.getY(i), wuv.getX(i));
+    return (revo = { metal: fit(ME), steel: fit(ST), wood: wo, brass: fit(BR), drum: boxUV(dr, 6), drumBrass: fit(rims) });
   };
 })();

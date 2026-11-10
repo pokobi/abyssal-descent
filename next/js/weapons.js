@@ -151,7 +151,7 @@
       gun: mk(Object.assign({ color: 0x4a4d54, metalness: 0.5, roughness: 0.6 }, sx('gunmetal') || { roughness: 0.42, metalness: 0.45, normalMap: t.metal.normalMap, map: t.metal.map })),
       steel: mk(Object.assign({ color: 0x9a9da3, metalness: 0.7, roughness: 0.4 }, sx('steel') || { roughness: 0.3, normalMap: t.metal.normalMap })),
       poly: mk(Object.assign({ color: 0x2a2b2e, metalness: 0.05, roughness: 0.8 }, sx('polymer') || { roughness: 0.72, normalMap: t.skin.normalMap })),
-      wood: mk({ color: 0x8a5a34, metalness: 0, roughness: 0.55, map: t.planks.map, normalMap: t.planks.normalMap }),
+      wood: mk(Object.assign({ color: 0x6e4428, metalness: 0, roughness: 1 }, sx('walnut') || { color: 0x8a5a34, roughness: 0.55, map: t.planks.map, normalMap: t.planks.normalMap })),
       brass: mk({ color: 0xc89a50, metalness: 1, roughness: 0.3 }),
       glove: mk(Object.assign({ color: 0x5a4532, metalness: 0, roughness: 0.95 }, sx('leather') || { color: 0x2a221c, roughness: 0.85, normalMap: t.skin.normalMap })),
       sleeve: mk(Object.assign({ color: 0x5c5c50, metalness: 0, roughness: 1 }, sx('weave') || { color: 0x3a3a34, roughness: 0.95, map: t.cloth.map, normalMap: t.cloth.normalMap })),
@@ -204,6 +204,16 @@
     let barrels = null;
     switch (def.arch) {
       case 'pistol': {
+        // (the pistol with a shaped slide and a frame cut from one outline: gfx.js. Muzzle, grip, rail and sight line where they were)
+        const PP = G.GFX && G.GFX.pistolParts ? G.GFX.pistolParts() : null;
+        if (PP) {
+          const part = (geo, m, parent) => { const o = new THREE.Mesh(geo, m); (parent || g).add(o); return o; };
+          const sl = new THREE.Group(); sl.position.set(0, 0.035, -0.02); g.add(sl); part(PP.slide, metal, sl); part(PP.slideSteel, mats.steel, sl); M.bolt = sl;
+          part(PP.frame, poly); part(PP.steel, mats.steel);
+          M.mag = part(PP.mag, metal); M.mag.position.set(0, -0.07, 0.048); M.mag.rotation.x = 0.22;
+          M.muzzle.set(0, 0.035, -0.13); M.sightY = 0.06; M.ironY = 0.06; M.railY = 0.054; M.opticZ = 0.02; M.fore.set(0, -0.06, 0.04); M.grip.set(0, -0.05, 0.05); M.ejector.set(0.02, 0.045, -0.01);
+          break;
+        }
         const slide = box(0.032, 0.036, 0.19, 0, 0.035, -0.02); M.bolt = slide;
         box(0.03, 0.026, 0.17, 0, 0.007, -0.015, poly);
         box(0.03, 0.1, 0.045, 0, -0.055, 0.045, poly, 0.22);
@@ -219,6 +229,16 @@
         break;
       }
       case 'revolver': {
+        // (the revolver with a frame cut from one outline, a fluted cylinder that turns, a wooden grip cut round: gfx.js)
+        const RV = G.GFX && G.GFX.revolverParts ? G.GFX.revolverParts() : null;
+        if (RV) {
+          const part = (geo, m, parent) => { const o = new THREE.Mesh(geo, m); (parent || g).add(o); return o; };
+          part(RV.metal, metal); part(RV.steel, mats.steel); part(RV.wood, mats.wood); part(RV.brass, mats.brass);
+          const drum = new THREE.Group(); drum.position.set(0, 0.03, 0); drum.rotation.x = Math.PI / 2; g.add(drum); part(RV.drum, mats.steel, drum); part(RV.drumBrass, mats.brass, drum);
+          M.bolt = drum; drum.userData.spin = true;
+          M.muzzle.set(0, 0.04, -0.24); M.sightY = 0.07; M.ironY = 0.07; M.railY = 0.064; M.fore.set(0, -0.06, 0.06); M.grip.set(0, -0.05, 0.08); M.opticZ = -0.06;
+          break;
+        }
         cyl(0.013, 0.2, 0, 0.04, -0.13, metal); box(0.012, 0.012, 0.2, 0, 0.058, -0.13);
         const drum = cyl(0.032, 0.05, 0, 0.03, 0.0, mats.steel); M.bolt = drum; drum.userData.spin = true;
         box(0.03, 0.05, 0.09, 0, 0.03, 0.03);
@@ -277,6 +297,19 @@
         break;
       }
       case 'sniper': {
+        // (the bolt-action rifle with a stock in one piece, a round action, a tapered barrel, a bolt handle with its knob: gfx.js)
+        const SN = G.GFX && G.GFX.sniperParts ? G.GFX.sniperParts() : null;
+        if (SN) {
+          const part = (geo, m) => { const o = new THREE.Mesh(geo, m); g.add(o); return o; };
+          part(SN.metal, metal); part(SN.steel, mats.steel); part(SN.wood, woodOr);
+          M.bolt = part(SN.bolt, mats.steel); M.bolt.position.set(0.035, 0.04, 0.08);
+          M.mag = part(SN.mag, metal); M.mag.position.set(0, -0.06, -0.02);
+          cyl(0.017, 0.022, 0, 0.025, -0.7, metal);
+          M.irons = [box(0.006, 0.05, 0.008, 0, 0.062, -0.7), box(0.026, 0.006, 0.03, 0, 0.09, -0.7, metal),
+            box(0.007, 0.026, 0.016, -0.01, 0.079, 0.06), box(0.007, 0.026, 0.016, 0.01, 0.079, 0.06), box(0.03, 0.008, 0.02, 0, 0.068, 0.06, metal)];
+          M.muzzle.set(0, 0.025, -0.81); M.sightY = 0.088; M.ironY = 0.088; M.railY = 0.066; M.fore.set(0, -0.04, -0.28); M.grip.set(0, -0.06, 0.12);
+          break;
+        }
         box(0.05, 0.065, 0.3, 0, 0.02, 0.0); cyl(0.013, 0.6, 0, 0.025, -0.45); cyl(0.02, 0.06, 0, 0.025, -0.77, metal);
         box(0.06, 0.06, 0.4, 0, -0.005, -0.15, woodOr); box(0.045, 0.09, 0.3, 0, -0.01, 0.3, woodOr);
         box(0.03, 0.09, 0.04, 0, -0.07, 0.12, woodOr, 0.35);
@@ -292,6 +325,16 @@
       }
       case 'shotgun': case 'autoshotgun': {
         const auto = def.arch === 'autoshotgun';
+        // (the shotgun with a shaped receiver, a ribbed barrel over its tube, a sliding fore-end, a one-piece stock: gfx.js)
+        const SG = G.GFX && G.GFX.shotgunParts ? G.GFX.shotgunParts(auto) : null;
+        if (SG) {
+          const part = (geo, m) => { const o = new THREE.Mesh(geo, m); g.add(o); return o; };
+          part(SG.metal, metal); part(SG.steel, mats.steel); part(SG.wood, woodOr); part(SG.brass, mats.brass);
+          if (!auto) { M.bolt = part(SG.pump, woodOr); M.bolt.position.set(0, 0.0, -0.28); }
+          else { box(0.056, 0.06, 0.24, 0, 0.02, -0.25, poly); M.mag = cyl(0.06, 0.07, 0, -0.07, -0.08, metal); M.mag.rotation.set(0, 0, Math.PI / 2); }
+          M.muzzle.set(0, 0.04, -0.63); M.sightY = 0.065; M.ironY = 0.065; M.railY = 0.058; M.fore.set(0, -0.03, -0.28); M.grip.set(0, -0.06, 0.1);
+          break;
+        }
         box(0.05, 0.07, 0.24, 0, 0.02, 0.0);
         cyl(0.017, 0.52, 0, 0.04, -0.36);
         if (!auto) { cyl(0.014, 0.42, 0, 0.0, -0.32, mats.steel); M.bolt = box(0.055, 0.05, 0.14, 0, 0.0, -0.28, woodOr); }

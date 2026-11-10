@@ -24,12 +24,15 @@
     PG.plane = new THREE.PlaneGeometry(1, 1);
     const pts = [];
     for (let i = 0; i <= 28; i++) { const t = i / 28; const r = 0.18 + Math.sin(t * Math.PI) * 0.22 + (t > 0.85 ? (t - 0.85) * 0.6 : 0) - (t > 0.75 && t < 0.85 ? 0.05 : 0); pts.push(new THREE.Vector2(Math.max(0.05, r), t * 0.9)); }
+    // (the lip turned over and the inside wall a little way down: looked into from above, the near side of the mouth was not there)
+    pts.push(new THREE.Vector2(0.245, 0.9), new THREE.Vector2(0.2, 0.83), new THREE.Vector2(0.17, 0.62), new THREE.Vector2(0.12, 0.3));
     PG.urn = new THREE.LatheGeometry(pts, 28);
     // (a barrel: the swell of its staves, a chime at each end standing proud of the head)
     const bp = [new THREE.Vector2(0.3, 0), new THREE.Vector2(0.354, 0)]; for (let i = 0; i <= 20; i++) { const t = i / 20; bp.push(new THREE.Vector2(0.36 + Math.sin(t * Math.PI) * 0.06, t)); }
     bp.push(new THREE.Vector2(0.354, 1), new THREE.Vector2(0.338, 0.992), new THREE.Vector2(0.334, 0.95));
     PG.barrel = new THREE.LatheGeometry(bp, 28);
     const bowl = []; for (let i = 0; i <= 8; i++) { const t = i / 8; bowl.push(new THREE.Vector2(0.1 + Math.sin(t * Math.PI / 2) * 0.5, t * 0.35)); }
+    bowl.push(new THREE.Vector2(0.565, 0.35), new THREE.Vector2(0.5, 0.3), new THREE.Vector2(0.3, 0.13), new THREE.Vector2(0.05, 0.07));   // (its inside)
     PG.bowl = new THREE.LatheGeometry(bowl, 24);
     // (a room's things: a box with its edges just taken off - on walls and floors the plain box stays; a flat hoop for a barrel)
     PG.cbox = G.GFX ? G.GFX.makeRbox(1, 1, 1, 0.035, 1) : PG.box;

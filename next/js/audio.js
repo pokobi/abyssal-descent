@@ -200,7 +200,7 @@
   // in the same place and the same room as everything else. Where it has none - or they have not arrived yet, or the old set of sounds
   // is chosen in the settings - smp() reports "not played" and the caller goes on to the synthesized sound, as it always did.
   const SB = { bank: (window.G && window.G.SND) || {}, files: {} }, bufs = {}, asked = {}, lastOf = {};
-  const usable = (key) => !!SB.bank[key] && NEW();
+  const usable = (key) => !!SB.bank[key] && NEW() && !A.noSamples;   // (A.noSamples: the synthesized sounds only, to measure the one against the other)
   A.samplesOn = () => NEW() && Object.keys(bufs).length > 0;
   const fetchBuf = (f) => {
     if (asked[f]) return asked[f];
@@ -223,7 +223,7 @@
     try {
       const src = ctx.createBufferSource(); src.buffer = buf;
       src.playbackRate.value = (rate || 1) * (b.rate || 1) * vr(1, b.p === undefined ? 0.05 : b.p);
-      const out = dest(pos || null, wet === undefined ? (b.wet === undefined ? 0.2 : b.wet) : wet);
+      const out = dest(pos || null, wet === undefined ? (b.wet === undefined ? 0.2 : b.wet) : wet, b.bus === 'gun' ? gunBus : undefined);   // (a gun's recording goes the way the synthesized shot went: through the bus that thickens it)
       out.gain.value *= (vol === undefined || vol === null ? 1 : vol) * (b.v || 1) * vr(1, 0.1);
       src.connect(out); src.start();
     } catch (e) { return false; }
@@ -267,6 +267,9 @@
     opts = opts || {};
     // (a recording where there is one for this kind of gun; each named gun plays it at a pitch of its own, a little off the next gun's)
     if (smp('gun_' + (opts.suppressed ? 'suppressed' : GUN[kind] ? kind : 'rifle'), null, opts.vol, opts.id && !opts.suppressed ? 0.95 + hr(hs(opts.id), 1) * 0.1 : 1)) {
+      // (under the recording, the push in the chest: a microphone some paces off does not carry it)
+      { const gp = GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle, t = ctx.currentTime, lo = dest(null, 0.1, gunBus); lo.gain.value = opts.vol || 1;
+        tn({ t, f0: gp.thump[0] * 0.55, f1: gp.thump[1] * 0.8, d: 0.08 + gp.tg * 0.08, g: gp.tg * 0.5, to: lo, type: 'sine' }); }
       if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35);
       if (kind === 'sniper') A.mech('bolt', 0.4);
       if (kind === 'revolver') A.mech('click', 0.2);

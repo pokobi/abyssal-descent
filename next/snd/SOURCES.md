@@ -5,6 +5,7 @@
 | 配布物 | 作者 | 出所 |
 |---|---|---|
 | BigSoundBank | Joseph Sardin ほか | https://bigsoundbank.com |
+| The Free Firearm Sound Library | Ben Jaszczak, Brian Nelson, Kevin Heras, Matthew Nanney | https://opengameart.org/content/the-free-firearm-sound-library |
 | Fantozzi's Footsteps (Grass/Sand & Stone) | Fantozzi | https://opengameart.org/content/fantozzis-footsteps-grasssand-stone |
 | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds |
 | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio |
@@ -30,6 +31,47 @@
 | step_wood_4.ogg | 足音（木の床） | 0165.wav（Man Footsteps on the Wooden Floor） | BigSoundBank |
 | step_wood_5.ogg | 足音（木の床） | 0165.wav（Man Footsteps on the Wooden Floor） | BigSoundBank |
 | step_wood_6.ogg | 足音（木の床） | 0165.wav（Man Footsteps on the Wooden Floor） | BigSoundBank |
+| gun_pistol_1.ogg | 銃声：拳銃 | A_42P.wav | The Free Firearm Sound Library |
+| gun_pistol_2.ogg | 銃声：拳銃 | A_42P.wav | The Free Firearm Sound Library |
+| gun_pistol_3.ogg | 銃声：拳銃 | X_39P.wav | The Free Firearm Sound Library |
+| gun_pistol_4.ogg | 銃声：拳銃 | X_39P.wav | The Free Firearm Sound Library |
+| gun_pistol_5.ogg | 銃声：拳銃 | X_39P.wav | The Free Firearm Sound Library |
+| gun_revolver_1.ogg | 銃声：リボルバー | V_27P.wav | The Free Firearm Sound Library |
+| gun_revolver_2.ogg | 銃声：リボルバー | V_27P.wav | The Free Firearm Sound Library |
+| gun_smg_1.ogg | 銃声：サブマシンガン | G_31P.wav | The Free Firearm Sound Library |
+| gun_smg_2.ogg | 銃声：サブマシンガン | G_31P.wav | The Free Firearm Sound Library |
+| gun_smg_3.ogg | 銃声：サブマシンガン | G_31P.wav | The Free Firearm Sound Library |
+| gun_smg_4.ogg | 銃声：サブマシンガン | P_30P.wav | The Free Firearm Sound Library |
+| gun_smg_5.ogg | 銃声：サブマシンガン | P_30P.wav | The Free Firearm Sound Library |
+| gun_smg_6.ogg | 銃声：サブマシンガン | P_30P.wav | The Free Firearm Sound Library |
+| gun_rifle_1.ogg | 銃声：ライフル | D_32P.wav | The Free Firearm Sound Library |
+| gun_rifle_2.ogg | 銃声：ライフル | D_32P.wav | The Free Firearm Sound Library |
+| gun_rifle_3.ogg | 銃声：ライフル | C_28P.wav | The Free Firearm Sound Library |
+| gun_rifle_4.ogg | 銃声：ライフル | C_28P.wav | The Free Firearm Sound Library |
+| gun_rifle_5.ogg | 銃声：ライフル | C_28P.wav | The Free Firearm Sound Library |
+| gun_dmr_1.ogg | 銃声：マークスマン | U_14P.wav | The Free Firearm Sound Library |
+| gun_dmr_2.ogg | 銃声：マークスマン | U_14P.wav | The Free Firearm Sound Library |
+| gun_dmr_3.ogg | 銃声：マークスマン | U_14P.wav | The Free Firearm Sound Library |
+| gun_dmr_4.ogg | 銃声：マークスマン | U_14P.wav | The Free Firearm Sound Library |
+| gun_dmr_5.ogg | 銃声：マークスマン | U_14P.wav | The Free Firearm Sound Library |
+| gun_sniper_1.ogg | 銃声：狙撃銃 | M_21P.wav | The Free Firearm Sound Library |
+| gun_sniper_2.ogg | 銃声：狙撃銃 | M_21P.wav | The Free Firearm Sound Library |
+| gun_sniper_3.ogg | 銃声：狙撃銃 | M_21P.wav | The Free Firearm Sound Library |
+| gun_sniper_4.ogg | 銃声：狙撃銃 | W_29P.wav | The Free Firearm Sound Library |
+| gun_sniper_5.ogg | 銃声：狙撃銃 | W_29P.wav | The Free Firearm Sound Library |
+| gun_shotgun_1.ogg | 銃声：散弾銃 | O_21P.wav | The Free Firearm Sound Library |
+| gun_shotgun_2.ogg | 銃声：散弾銃 | O_21P.wav | The Free Firearm Sound Library |
+| gun_shotgun_3.ogg | 銃声：散弾銃 | K_22P.wav | The Free Firearm Sound Library |
+| gun_shotgun_4.ogg | 銃声：散弾銃 | K_22P.wav | The Free Firearm Sound Library |
+| gun_lmg_1.ogg | 銃声：軽機関銃 | C_28P.wav | The Free Firearm Sound Library |
+| gun_lmg_2.ogg | 銃声：軽機関銃 | C_28P.wav | The Free Firearm Sound Library |
+| gun_lmg_3.ogg | 銃声：軽機関銃 | C_28P.wav | The Free Firearm Sound Library |
+| gun_lmg_4.ogg | 銃声：軽機関銃 | C_28P.wav | The Free Firearm Sound Library |
+| gun_minigun_1.ogg | 銃声：ミニガン | P_30P.wav | The Free Firearm Sound Library |
+| gun_minigun_2.ogg | 銃声：ミニガン | P_30P.wav | The Free Firearm Sound Library |
+| gun_minigun_3.ogg | 銃声：ミニガン | P_30P.wav | The Free Firearm Sound Library |
+| gun_minigun_4.ogg | 銃声：ミニガン | P_30P.wav | The Free Firearm Sound Library |
+| gun_minigun_5.ogg | 銃声：ミニガン | P_30P.wav | The Free Firearm Sound Library |
 | impact_wood_1.ogg | 着弾（木） | wood_hit_01.ogg | 100 CC0 metal and wood SFX |
 | impact_wood_2.ogg | 着弾（木） | wood_hit_03.ogg | 100 CC0 metal and wood SFX |
 | impact_wood_3.ogg | 着弾（木） | wood_hit_04.ogg | 100 CC0 metal and wood SFX |

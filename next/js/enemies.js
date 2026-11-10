@@ -22,7 +22,7 @@
     mushroom: { skin: '#74402c', sec: '#b8ab8e', rough: 0.7, blood: 0x8aa040, tex: 'skin' },
     golem: { skin: '#7a7066', sec: '#4a4440', rough: 0.95, blood: 0x6a6056, tex: 'rock' },
     shaman: { skin: '#32283a', sec: '#d8ccb0', rough: 0.9, blood: 0x6a0c0c, tex: 'skin' },
-    mantis: { skin: '#5a7a3a', sec: '#2a3a1a', rough: 0.45, blood: 0x6a9a20, tex: 'scales' },
+    mantis: { skin: '#48562f', sec: '#252d18', rough: 0.45, blood: 0x6a9a20, tex: 'scales' },
     worm: { skin: '#8a6050', sec: '#3a2a20', rough: 0.5, blood: 0x7a3010, tex: 'scales' },
     mimic: { skin: '#8a5a30', sec: '#c8a050', rough: 0.6, blood: 0x6a0c0c, tex: 'skin' },
   };
@@ -576,20 +576,28 @@
   };
   B.beetle = function (root, M) {
     const body = joint(root, 0, 0.6, 0);
-    mesh(body, PG.sph, M.skin, 0.7, 0.45, 0.95, 0, 0.1, -0.1);
-    mesh(body, PG.box, M.dark, 0.02, 0.3, 1.6, 0, 0.42, -0.1);
+    // (two ribbed wing-cases with the seam between them, a broad shield before them, a flat belly; a small head under a curved horn,
+    // heavy jaws, feelers; six legs of three joints with spurs)
+    mesh(body, PG.sph, M.skin, 0.68, 0.44, 0.84, 0, 0.1, -0.2);
+    mesh(body, PG.sph, M.skin, 0.58, 0.36, 0.42, 0, 0.1, 0.52);                                                         // the shield
+    mesh(body, PG.sph, M.dark, 0.6, 0.16, 0.95, 0, -0.14, -0.05);                                                       // belly
+    mesh(body, PG.box, M.dark, 0.022, 0.1, 1.3, 0, 0.5, -0.25); mesh(body, PG.box, M.dark, 1.0, 0.1, 0.03, 0, 0.42, 0.24);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) mesh(body, PG.sph, M.dark, 0.018, 0.02, 0.6 - i * 0.07, s * (0.16 + i * 0.16), 0.455 - i * i * 0.04, -0.22, -0.02 - i * 0.012);   // ribs of the wing-cases
     const head = joint(body, 0, 0.0, 0.85);
-    mesh(head, PG.sph, M.skin, 0.42, 0.3, 0.32);
-    mesh(head, PG.cone, M.sec, 0.12, 0.55, 0.12, 0, 0.25, 0.25, 0.6);
+    mesh(head, PG.sph, M.skin, 0.34, 0.24, 0.3);
+    mesh(head, PG.cone, M.sec, 0.12, 0.4, 0.12, 0, 0.22, 0.22, 0.6); mesh(head, PG.cone, M.sec, 0.075, 0.34, 0.075, 0, 0.5, 0.36, -0.15);   // the horn, bent back at its end
+    for (const s of [-1, 1]) mesh(head, PG.cyl8, M.dark, 0.014, 0.34, 0.014, s * 0.2, 0.06, 0.38, 1.2, 0, -s * 0.5);    // feelers
     const mand = [];
     for (const s of [-1, 1]) { const m = joint(head, s * 0.22, -0.1, 0.25); mesh(m, PG.cone, M.dark, 0.06, 0.32, 0.06, s * 0.05, 0, 0.12, Math.PI / 2, 0, s * 0.4); mand.push(m); mesh(head, PG.sph, M.eye, 0.05, 0.05, 0.04, s * 0.24, 0.08, 0.2); }
     const legs = [];
     for (let i = 0; i < 3; i++) for (const s of [-1, 1]) {
       const hip = joint(body, s * 0.55, -0.1, 0.35 - i * 0.4); hip.rotation.y = s < 0 ? Math.PI : 0;
       const up = joint(hip, 0, 0, 0); up.rotation.z = 0.5;
-      mesh(up, PG.box, M.dark, 0.45, 0.08, 0.08, 0.22, 0, 0);
+      mesh(up, PG.sph, M.dark, 0.07, 0.07, 0.07); mesh(up, PG.sph, M.dark, 0.24, 0.055, 0.06, 0.22, 0, 0);
       const kn = joint(up, 0.45, 0, 0); kn.rotation.z = -1.6;
-      mesh(kn, PG.box, M.dark, 0.5, 0.06, 0.06, 0.25, 0, 0);
+      mesh(kn, PG.sph, M.dark, 0.055, 0.055, 0.055); mesh(kn, PG.cyl8, M.dark, 0.03, 0.5, 0.03, 0.25, 0, 0, 0, 0, Math.PI / 2);
+      for (const b of [0.2, 0.36]) mesh(kn, PG.cone, M.dark, 0.012, 0.07, 0.012, b, 0.035, 0, 0, 0, -0.5);
+      mesh(kn, PG.cone, M.dark, 0.026, 0.14, 0.026, 0.56, 0, 0, 0, 0, -Math.PI / 2);
       legs.push({ up, hip, ph: i * 2 + (s > 0 ? Math.PI : 0) });
     }
     return {
@@ -607,11 +615,16 @@
   };
   B.wraith = function (root, M) {
     const body = joint(root, 0, 1.2, 0);
-    const robe = mesh(body, PG.cone, M.skin, 0.5, 1.5, 0.45, 0, -0.35, 0);
+    // (a shroud hanging in folds from stooped shoulders, a deep hood with a skull far back in it, two points of light for eyes)
+    const FGw = G.GFX && G.GFX.foeGeo, PPw = G.Props.PG;
+    const robe = mesh(body, (FGw && FGw('robe')) || PG.cone, M.skin, 0.5, 1.5, 0.45, 0, -0.35, 0);
+    mesh(body, PG.sph, M.skin, 0.4, 0.2, 0.24, 0, 0.32, -0.03); mesh(body, PG.sph, M.skin, 0.26, 0.24, 0.24, 0, 0.42, -0.14);     // shoulders, the hood's fall
     const head = joint(body, 0, 0.55, 0.05);
-    mesh(head, PG.sph, M.skin, 0.25, 0.27, 0.26);
-    mesh(head, PG.sph, M.dark, 0.17, 0.19, 0.12, 0, -0.02, 0.17);
-    for (const s of [-1, 1]) mesh(head, PG.sph, M.eye, 0.04, 0.025, 0.02, s * 0.07, 0.0, 0.27);
+    mesh(head, PG.sph, M.skin, 0.25, 0.27, 0.26, 0, 0.0, -0.03);
+    mesh(head, PG.cone, M.skin, 0.17, 0.3, 0.17, 0, 0.24, -0.14, -0.8);
+    mesh(head, PG.sph, M.dark, 0.18, 0.21, 0.12, 0, -0.03, 0.15);
+    if (PPw.skullB) { mesh(head, PPw.skullB, M.tooth, 1.25, 1.25, 1.1, 0, -0.17, 0.04); mesh(head, PPw.skullD, M.dark, 1.25, 1.25, 1.1, 0, -0.17, 0.04); }
+    for (const s of [-1, 1]) mesh(head, PG.sph, M.eye, 0.016, 0.016, 0.014, s * 0.045, -0.047, 0.165);
     const rags = [];
     for (let i = 0; i < 8; i++) { const a0 = i / 8 * Math.PI * 2; const r = joint(body, Math.cos(a0) * 0.42, -1.0, Math.sin(a0) * 0.38); mesh(r, PG.box, M.skin, 0.15, 0.6, 0.02, 0, -0.25, 0, 0, -a0); rags.push(r); }
     const arms = [];
@@ -751,28 +764,41 @@
   };
   B.mantis = function (root, M) {
     const abd = joint(root, 0, 1.0, 0);
-    mesh(abd, PG.sph, M.skin, 0.25, 0.22, 0.6, 0, 0, -0.45, 0.3);
+    // (a ringed abdomen under folded wing-cases, a long neck of a thorax, a three-cornered head with great eyes, jaws and feelers; the
+    // raptorial arms: a stout haunch, a broad toothed blade, a hooked claw; thin legs with knees and feet)
+    for (let i = 0; i < 5; i++) mesh(abd, PG.sph, M.skin, 0.22 - i * 0.03, 0.2 - i * 0.027, 0.17, 0, -0.035 + i * 0.07, -0.12 - i * 0.2, 0.3);
+    for (const s of [-1, 1]) mesh(abd, PG.sph, M.sec, 0.12, 0.035, 0.55, s * 0.08, 0.2, -0.5, 0.3, 0, s * 0.25);     // wing-cases
+    mesh(abd, PG.cone, M.skin, 0.05, 0.16, 0.04, 0, 0.36, -1.08, -Math.PI / 2 + 0.3);
     const thorax = joint(abd, 0, 0.05, 0.05);
-    mesh(thorax, PG.box, M.skin, 0.16, 0.9, 0.16, 0, 0.45, 0.05, 0.25);
+    mesh(thorax, PG.cyl8, M.skin, 0.075, 0.9, 0.085, 0, 0.45, 0.05, 0.25);
+    mesh(thorax, PG.sph, M.skin, 0.12, 0.13, 0.12, 0, 0.82, 0.16); mesh(thorax, PG.sph, M.skin, 0.11, 0.1, 0.12, 0, 0.06, -0.03);
     const head = joint(thorax, 0, 0.98, 0.25);
-    mesh(head, PG.cone, M.skin, 0.2, 0.3, 0.12, 0, 0, 0.08, Math.PI / 2 + 0.3);
-    for (const s of [-1, 1]) mesh(head, PG.sph, M.eye, 0.08, 0.08, 0.06, s * 0.15, 0.04, 0.0);
+    mesh(head, PG.sph, M.skin, 0.15, 0.085, 0.1, 0, 0.03, 0.0);
+    mesh(head, PG.cone, M.skin, 0.1, 0.2, 0.08, 0, -0.03, 0.1, Math.PI / 2 + 0.75);
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.dark, 0.075, 0.085, 0.065, s * 0.14, 0.05, 0.0); mesh(head, PG.sph, M.eye, 0.022, 0.03, 0.02, s * 0.165, 0.055, 0.045);
+      mesh(head, PG.cone, M.dark, 0.018, 0.09, 0.018, s * 0.03, -0.11, 0.2, Math.PI / 2 + 1.0, 0, s * 0.4);            // jaws
+      mesh(head, PG.cyl8, M.sec, 0.006, 0.5, 0.006, s * 0.09, 0.27, 0.1, 0.35, 0, -s * 0.3);                             // feelers
+    }
     const arms = [];
     for (const s of [-1, 1]) {
       const sh = joint(thorax, s * 0.12, 0.75, 0.2);
-      mesh(sh, PG.box, M.skin, 0.07, 0.55, 0.07, 0, -0.25, 0.05);
+      mesh(sh, PG.sph, M.skin, 0.06, 0.06, 0.06); mesh(sh, PG.sph, M.skin, 0.055, 0.28, 0.07, 0, -0.26, 0.05);
       const el = joint(sh, 0, -0.52, 0.05);
-      mesh(el, PG.box, M.sec, 0.03, 0.7, 0.1, 0, 0.32, 0.02);
-      for (let k = 0; k < 4; k++) mesh(el, PG.cone, M.tooth, 0.015, 0.06, 0.015, 0, 0.1 + k * 0.14, 0.08, Math.PI / 2);
+      mesh(el, PG.sph, M.skin, 0.05, 0.05, 0.05);
+      mesh(el, PG.sph, M.sec, 0.022, 0.36, 0.075, 0, 0.32, 0.02);
+      for (let k = 0; k < 7; k++) mesh(el, PG.cone, M.tooth, 0.012, 0.05 + (k % 2) * 0.025, 0.012, 0, 0.08 + k * 0.085, 0.085, Math.PI / 2);
+      mesh(el, PG.cone, M.dark, 0.02, 0.17, 0.02, 0, 0.72, 0.07, 0.75);                                               // the claw
       arms.push({ sh, el });
     }
     const legs = [];
     for (let i = 0; i < 2; i++) for (const s of [-1, 1]) {
       const hip = joint(abd, s * 0.12, 0, 0.1 - i * 0.35);
       const up = joint(hip, 0, 0, 0); up.rotation.z = s * -0.9;
-      mesh(up, PG.box, M.skin, 0.04, 0.7, 0.04, 0, -0.35, 0);
+      mesh(up, PG.cyl8, M.skin, 0.024, 0.7, 0.024, 0, -0.35, 0); mesh(up, PG.sph, M.skin, 0.04, 0.04, 0.04);
       const kn = joint(up, 0, -0.7, 0); kn.rotation.z = s * 1.3;
-      mesh(kn, PG.box, M.skin, 0.035, 0.75, 0.035, 0, -0.37, 0);
+      mesh(kn, PG.sph, M.skin, 0.034, 0.034, 0.034); mesh(kn, PG.cyl8, M.skin, 0.017, 0.72, 0.017, 0, -0.36, 0);
+      mesh(kn, PG.cone, M.dark, 0.016, 0.09, 0.016, 0, -0.76, 0, Math.PI);
       legs.push({ hip, ph: i * Math.PI + (s > 0 ? Math.PI / 2 : 0) });
     }
     return {

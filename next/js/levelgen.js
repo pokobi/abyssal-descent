@@ -573,10 +573,31 @@
       const PG = G.Props.PG;
       if (OUT === 'ruins') {
         const mtn = new THREE.MeshStandardMaterial({ color: w.mats.biome.mtnCol ?? 0x8a7890, emissive: w.mats.biome.mtnEm ?? (w.mats.biome.night ? 0x05070d : 0x3a2a3a), roughness: 1, flatShading: true, fog: false });
-        for (let i = 0; i < 26; i++) {
-          const a = i / 26 * Math.PI * 2 + rng.range(-0.1, 0.1), r = rng.range(170, 230), h = rng.range(35, 90);
-          const m = new THREE.Mesh(PG.cone, mtn); m.scale.set(rng.range(30, 60), h, rng.range(30, 60)); m.position.set(cx + Math.cos(a) * r, h / 2 - 8, cz + Math.sin(a) * r); grp.add(m);
-        }
+        // two ranges of mountains round the whole horizon, the nearer dark, the farther higher and paler with distance: each a band of
+        // ground folded up to a broken ridge - shoulders, saddles and peaks, no two alike - where single cones used to stand in a ring.
+        // (the same throws of the dice as the cones took, so that everything thrown after them falls as before: they give the heights)
+        const hs = [];
+        for (let i = 0; i < 26; i++) { rng.range(-0.1, 0.1); rng.range(170, 230); hs.push(rng.range(35, 90)); rng.range(30, 60); rng.range(30, 60); }
+        const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+        const range = (R, k, off, mat) => {
+          const N = 260, rows = [[-70, -1, 0], [-40, 0.3, 0.3], [-16, 0.72, 0.8], [0, 1, 1], [18, 0.7, 0.8], [44, 0.3, 0.3], [70, -1, 0]], pos = [], idx = [];
+          for (let j = 0; j < rows.length; j++) for (let i = 0; i < N; i++) {
+            const t = i / N * 26 + off, i0 = Math.floor(t), f = t - i0, sm = f * f * (3 - 2 * f);
+            const base = hs[i0 % 26] * (1 - sm) + hs[(i0 + 1) % 26] * sm;
+            const sn = (q, n) => { const u = i / q, u0 = Math.floor(u), ff = u - u0, s2 = ff * ff * (3 - 2 * ff); return (hash(u0 * n + off) * (1 - s2) + hash((u0 + 1) * n + off) * s2) - 0.5; };   // (smooth, not a row of teeth)
+            const jag = (hash(i * 1.37 + off * 9) - 0.5) * 5 + sn(4, 2.11) * 20 + sn(11, 5.3) * 30;
+            const H = Math.max(8, base * k + jag * rows[j][2]), a = i / N * Math.PI * 2;
+            const rr = R + rows[j][0] + (j > 0 && j < 6 ? (hash(i * 3.3 + j * 7 + off) - 0.5) * 9 : 0);
+            pos.push(cx + Math.cos(a) * rr, rows[j][1] < 0 ? -12 : H * rows[j][1] - 8, cz + Math.sin(a) * rr);
+          }
+          for (let j = 0; j + 1 < rows.length; j++) for (let i = 0; i < N; i++) { const a0 = j * N + i, b0 = j * N + (i + 1) % N, c0 = a0 + N, d0 = b0 + N; idx.push(a0, b0, c0, b0, d0, c0); }
+          const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+          const m = new THREE.Mesh(g, mat); m.frustumCulled = false; grp.add(m);
+        };
+        mtn.side = THREE.DoubleSide;
+        const far = mtn.clone(), haze = new THREE.Color(w.mats.biome.fog || 0x202428); far.color.lerp(haze, 0.45).multiplyScalar(0.8); far.emissive.lerp(haze, 0.5);   // (paler with distance: toward the colour of the air, not a colour of its own)
+        range(215, 1.0, 0, mtn);
+        range(285, 1.45, 5.3, far);
         // tree line beyond the city walls (not where the area hangs over the abyss: w.noGround)
         if (!w.noGround) for (let i = 0; i < 70; i++) {
           const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.75, Math.max(W, D) * 1.3);

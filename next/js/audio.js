@@ -131,14 +131,17 @@
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
       // manual distance attenuation + lowpass by distance (air absorption) + stereo pan
       const att = 1 / (1 + Math.max(0, dist - 2) * 0.09);
-      g.gain.value = att;
+      // (whoever asks for this sets a level of its own on what it is handed - and so used to wipe the fall-off with distance out: a far sound
+      // was as loud as a near one. In the new set the fall-off is a stage of its own behind that level. The old set is left as it was)
+      let head = g;
+      if (set) { head = ctx.createGain(); head.gain.value = att; g.connect(head); } else g.gain.value = att;
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = Math.max(900, 16000 / (1 + dist * 0.08));
       const p = ctx.createStereoPanner();
       // pan relative to listener yaw
       const ang = Math.atan2(dx, -dz) - (A.listenerYawNeg || 0);
       p.pan.value = Math.max(-0.85, Math.min(0.85, Math.sin(ang) * Math.min(1, dist / 4)));
       if (set) { const c = Math.cos(ang); if (c < 0) lp.frequency.value *= 0.62 + 0.38 * (1 + c); } // (what is behind you is duller)
-      g.connect(lp); lp.connect(p); out = p;
+      head.connect(lp); lp.connect(p); out = p;
       wet = (wet || 0.3) * (1 + Math.min(1.5, dist * 0.03));
     }
     out.connect(bus || dry);
@@ -262,7 +265,8 @@
   A.gun = function (kind, opts) {
     if (!ctx || !voice(1)) return;
     opts = opts || {};
-    if (smp('gun_' + (opts.suppressed ? 'suppressed' : GUN[kind] ? kind : 'rifle'), null, opts.vol)) {
+    // (a recording where there is one for this kind of gun; each named gun plays it at a pitch of its own, a little off the next gun's)
+    if (smp('gun_' + (opts.suppressed ? 'suppressed' : GUN[kind] ? kind : 'rifle'), null, opts.vol, opts.id && !opts.suppressed ? 0.95 + hr(hs(opts.id), 1) * 0.1 : 1)) {
       if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35);
       if (kind === 'sniper') A.mech('bolt', 0.4);
       if (kind === 'revolver') A.mech('click', 0.2);

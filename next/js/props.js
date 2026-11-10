@@ -93,7 +93,10 @@
     const parts = G.GFX && G.GFX.propGeo ? G.GFX.propGeo(name) : null; if (!parts) return false;
     o = o || {}; s = s || 1;
     const m = M(x, y, z, o.sx || s, o.sy || s, o.sz || o.sx || s, o.rx || 0, ry || 0, o.rz || 0);
-    for (const q of parts) { if (o.inst) P.inst(w, q.m, q.g, m, o.tint || q.tint); else w.batch.geo(q.m, q.g, m, { tint: o.tint || q.tint || undefined, su: o.su, sv: o.sv, gradBase: o.gradBase }); }
+    for (const q of parts) {
+      const t = o.tint && q.tint ? [o.tint[0] * q.tint[0], o.tint[1] * q.tint[1], o.tint[2] * q.tint[2]] : o.tint || q.tint;
+      if (o.inst) P.inst(w, q.m, q.g, m, t); else w.batch.geo(q.m, q.g, m, { tint: t || undefined, su: o.su, sv: o.sv, gradBase: o.gradBase });
+    }
     return true;
   }
   P.put = put; P.hsh = hsh;
@@ -181,7 +184,9 @@
     if (s > 1.2) w.addCollider(x - 0.5 * s, y, z - 0.5 * s, x + 0.5 * s, y + maxH * 0.9, z + 0.5 * s);
   };
   P.bones = function (w, x, y, z, rng) {
-    for (let i = 0; i < 4; i++) w.batch.geo('bone', PG.cyl8, M(x + rr(rng, -0.6, 0.6), y + 0.03, z + rr(rng, -0.6, 0.6), 0.025, rr(rng, 0.25, 0.45), 0.025, Math.PI / 2, rr(rng, 0, 3), 0));
+    const lb = G.GFX && G.GFX.propGeo ? G.GFX.propGeo('longbone') : null;   // (long bones with their knobbed ends, a few ribs: gfx.js)
+    for (let i = 0; i < 4; i++) w.batch.geo('bone', lb ? lb[0].g : PG.cyl8, M(x + rr(rng, -0.6, 0.6), y + 0.03, z + rr(rng, -0.6, 0.6), lb ? 0.018 : 0.025, rr(rng, 0.25, 0.45), lb ? 0.018 : 0.025, Math.PI / 2, rr(rng, 0, 3), 0));
+    put(w, 'ribs', x + (hsh(x, z, 1) - 0.5) * 0.7, y, z + (hsh(x, z, 2) - 0.5) * 0.7, hsh(x, z, 3) * 6);
     P.skull(w, x + rr(rng, -0.3, 0.3), y, z + rr(rng, -0.3, 0.3), rr(rng, 0, 6));
   };
   P.skull = function (w, x, y, z, ry, s) {
@@ -288,13 +293,16 @@
     // y = top of banner; dir = outward normal from wall
     const d = { px: [1, 0], nx: [-1, 0], pz: [0, 1], nz: [0, -1] }[dir];
     const ry = Math.atan2(d[0], d[1]);
-    w.batch.geo('iron', PG.cyl8, M(x + d[0] * 0.12, y + 0.05, z + d[1] * 0.12, 0.03, 1.3, 0.03, 0, ry, Math.PI / 2));
+    w.batch.geo('iron', PG.cyl8, M(x + d[0] * 0.12, y + 0.05, z + d[1] * 0.12, 0.022, 1.3, 0.022, 0, ry, Math.PI / 2));
+    for (const e2 of [-1, 1]) w.batch.geo('iron', PG.sph, M(x + d[0] * 0.12 + d[1] * e2 * 0.66, y + 0.05, z + d[1] * 0.12 - d[0] * e2 * 0.66, 0.04, 0.04, 0.04));   // (the rod's knobs)
     w.deferred.push((grp) => {
-      const geo = new THREE.PlaneGeometry(1.1, len, 1, 6); geo.translate(0, -len / 2, 0);
+      const bg = G.GFX && G.GFX.propGeo ? G.GFX.propGeo('banner') : null;   // (in folds, two tails, frayed, a device on it: gfx.js)
+      const geo = bg ? bg[0].g : new THREE.PlaneGeometry(1.1, len, 1, 6); if (!bg) geo.translate(0, -len / 2, 0);
       const mat = color ? w.mats.cloth.clone() : w.mats.cloth;
       if (color) mat.color.set(color);
       const m = new THREE.Mesh(geo, mat);
       m.position.set(x + d[0] * 0.16, y, z + d[1] * 0.16); m.rotation.y = ry;
+      if (bg) { m.scale.y = len; const dv = new THREE.Mesh(bg[1].g, mat.clone()); dv.material.color.multiplyScalar(0.35); m.add(dv); }
       m.castShadow = true; m.receiveShadow = true;
       grp.add(m);
       w.animated.push({ kind: 'banner', m, ph: Math.random() * 10 });
@@ -319,7 +327,8 @@
     s = s || 1;
     for (let i = 0; i < 5; i++) {
       const h = rr(rng, 0.5, 1.6) * s;
-      w.batch.geo('ice', PG.oct3, M(x + rr(rng, -0.5, 0.5) * s, y + h * 0.4, z + rr(rng, -0.5, 0.5) * s, 0.2 * s, h, 0.2 * s, rr(rng, -0.4, 0.4), rr(rng, 0, 3), rr(rng, -0.4, 0.4)));
+      const cg = G.GFX && G.GFX.propGeo ? G.GFX.propGeo('crystal') : null;   // (six-sided, drawn to a point: gfx.js)
+      w.batch.geo('ice', cg ? cg[0].g : PG.oct3, M(x + rr(rng, -0.5, 0.5) * s, y + h * 0.4, z + rr(rng, -0.5, 0.5) * s, (cg ? 0.16 : 0.2) * s, cg ? h * 0.75 : h, (cg ? 0.16 : 0.2) * s, rr(rng, -0.4, 0.4), rr(rng, 0, 3), rr(rng, -0.4, 0.4)), { tint: [0.6, 0.7, 0.8] });
     }
     w.roundCollider(x, z, 0.6 * s, y, y + 1.0 * s, { tag: 'grate' }); // (a cluster of spikes: round enough; seen through between them)
   };
@@ -355,7 +364,7 @@
     return grp;
   };
   P.rug = function (w, x, z, y, sx, sz, color) {
-    w.batch.box('cloth2', x - sx / 2, y, z - sz / 2, x + sx / 2, y + 0.02, z + sz / 2, { uv: 2, tint: color || [0.45, 0.12, 0.1], grad: false });
+    if (!put(w, 'rug', x, y, z, 0, 1, { sx, sy: 1, sz, tint: color || [0.45, 0.12, 0.1] })) w.batch.box('cloth2', x - sx / 2, y, z - sz / 2, x + sx / 2, y + 0.02, z + sz / 2, { uv: 2, tint: color || [0.45, 0.12, 0.1], grad: false });
   };
   P.drain = function (w, x, z, y) {
     if (!put(w, 'drain', x, y, z, 0)) w.batch.box('iron', x - 0.5, y, z - 0.5, x + 0.5, y + 0.015, z + 0.5, { uv: 0.5, tint: [0.4, 0.4, 0.4] });

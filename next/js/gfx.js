@@ -1901,6 +1901,31 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     for (let i = 0; i < 6; i++) ir.push(rbx(0.05, 0.022, 0.86, 0.008, -0.34 + i * 0.136, 0.014, 0));
     return [ppart('iron', ir, 1, [0.45, 0.45, 0.45]), ppart('dark', rbx(0.86, 0.004, 0.86, 0.001, 0, 0.004, 0), 1)];
   };
+  // ---- (3) cloth, bones, crystal ----
+  // a banner one long hanging from the origin, 1.1 wide: in folds, its foot cut to two tails and frayed (uv across and down it, as
+  // the plain sheet it replaces had); the device on it - a ring and a cross - a hair before the cloth
+  PROP.banner = () => {
+    const g = sheet(-1, 0, () => 0.55, (x, v, u) => Math.sin(u * 6.5) * 0.03 * (1 - v * 0.7) + Math.sin(u * 2.3 + 1) * 0.02 * (1 - v), 12, 14, 0, (u) => 0.16 * (1 - Math.abs(u)) * (1 - Math.abs(u)) * 1.6 + 0.03 * Math.sin(u * 23) - 0.02);
+    const ps = g.attributes.position, uv = new Float32Array(ps.count * 2); for (let i = 0; i < ps.count; i++) { uv[i * 2] = ps.getX(i) / 1.1 + 0.5; uv[i * 2 + 1] = ps.getY(i) + 1; } g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    const dv = Geo.merge([ext(arcPts(0, -0.36, 0.2, 0, Math.PI * 2, 24).slice(1), 0.004, 0, [arcPts(0, -0.36, 0.15, 0, Math.PI * 2, 20).slice(1)]), rbx(0.05, 0.42, 0.004, 0.001, 0, -0.36, 0), rbx(0.26, 0.05, 0.004, 0.001, 0, -0.3, 0)]); dv.translate(0, 0, 0.035);
+    return [{ g, m: 'cloth' }, { g: dv, m: 'dark' }];
+  };
+  // a rug one square: its field, a border let into it, a fringe at both ends
+  PROP.rug = () => {
+    const fr = []; for (let i = 0; i < 24; i++) for (const s of [-1, 1]) fr.push(rbx(0.012, 0.008, 0.07, 0.002, -0.48 + i / 23 * 0.96, 0.005, s * 0.535, [0, (i % 3 - 1) * 0.15, 0]));
+    return [ppart('cloth2', rbx(1, 0.018, 1, 0.004, 0, 0.009, 0), 1), ppart('cloth2', [rbx(0.9, 0.004, 0.04, 0.001, 0, 0.02, -0.42), rbx(0.9, 0.004, 0.04, 0.001, 0, 0.02, 0.42), rbx(0.04, 0.004, 0.88, 0.001, -0.43, 0.02, 0), rbx(0.04, 0.004, 0.88, 0.001, 0.43, 0.02, 0),
+      Geo.xf(rbx(0.2, 0.004, 0.2, 0.001, 0, 0.02, 0), null, [0, Math.PI / 4, 0])], 1, [1.9, 1.6, 1.0]), ppart('cloth2', fr, 1, [1.6, 1.4, 1.1])];
+  };
+  // a long bone, one long and one in radius about its middle: a thin shaft, knobbed ends. Ribs: two bows of bone lying on the floor
+  PROP.longbone = () => [{ g: new THREE.LatheGeometry([[0.0005, -0.5], [1.3, -0.5], [1.75, -0.465], [1.6, -0.42], [1.0, -0.36], [0.85, 0], [1.0, 0.36], [1.6, 0.42], [1.75, 0.465], [1.3, 0.5], [0.0005, 0.5]].map((q) => new THREE.Vector2(q[0], q[1])), 8), m: 'bone' }];
+  PROP.ribs = () => { const l = []; for (let i = 0; i < 3; i++) { const g = new THREE.TorusGeometry(0.17 - i * 0.02, 0.011, 4, 10, 2.3); g.rotateX(-HX + 0.15); g.rotateY(i * 0.5); g.translate(i * 0.06, 0.012, i * 0.05); l.push(g); } return [ppart('bone', l, 3)]; };
+  // a crystal, two high and one in radius about its middle: a six-sided column, its faces unequal, drawn to a point off its axis
+  PROP.crystal = () => {
+    const g = new THREE.CylinderGeometry(0.8, 1, 1.5, 6, 1).toNonIndexed(); g.translate(0, -0.25, 0);
+    const t = new THREE.ConeGeometry(0.8, 0.5, 6).toNonIndexed(); t.translate(0, 0.75, 0);
+    const m = Geo.merge([g, t]), ps = m.attributes.position; for (let i = 0; i < ps.count; i++) { const y = ps.getY(i); if (y > 0.9) { ps.setX(i, 0.22); ps.setZ(i, -0.12); } else { const x = ps.getX(i), z = ps.getZ(i); ps.setX(i, x * (1 + 0.12 * Math.sin(Math.atan2(z, x) * 3 + 1))); } }
+    m.computeVertexNormals(); return [{ g: m, m: 'ice' }];
+  };
   X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
 
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted

@@ -572,7 +572,7 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
       cloth2: std(t.cloth, '#3a3a3a', 0.95, 0, 0.6, { side: THREE.DoubleSide, alphaTest: 0.5 }),
       dark: new THREE.MeshStandardMaterial({ color: 0x050403, roughness: 1 }),
       bone: std(t.smooth, '#d8cdb4', 0.7, 0, 0.5),
-      ceramic: std(t.smooth, '#9a5a3a', 0.55, 0, 0.4),
+      ceramic: std(t.smooth, '#6e4a38', 0.6, 0, 0.4),
       gold: std(t.metal, '#e0b050', 0.3, 1.0, 0.3),
     };
     if (B.floorTex === 'earth') M.floor = std(t.rock, B.floor, 0.95, 0, 1.3); // (bare earth and stone: a mine's floor)
@@ -600,7 +600,7 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     M.holy = new THREE.MeshStandardMaterial({ color: 0x1a3a48, emissive: 0x70d8ff, emissiveIntensity: 0.8, emissiveMap: t.cobble.map, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.85 });
     M.oil = new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 0.05, metalness: 0.7, transparent: true, opacity: 0.95 });
     M.vine = new THREE.MeshStandardMaterial({ color: 0x3f6a2a, roughness: 0.9, side: THREE.DoubleSide, alphaTest: 0.5, map: T.leafTex() });
-    M.web = new THREE.MeshBasicMaterial({ map: T.spr.web, transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0.8 });
+    M.web = new THREE.MeshBasicMaterial({ map: T.spr.web, transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0.3 });
     M.candle = new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.6, emissive: 0x302010 });
     M.glow = new THREE.MeshBasicMaterial({ color: 0xffb060 });
     // vertex-coloured variants for merged static geometry; plain ones are used by standalone meshes

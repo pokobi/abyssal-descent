@@ -37,7 +37,7 @@
     const skin = new THREE.MeshStandardMaterial({ color: col, roughness: pc.rough, metalness: pc.metal || 0, map: tx.map, normalMap: tx.normalMap });
     if (bt) { skin.roughnessMap = bt.orm; skin.aoMap = bt.orm; skin.roughness = 0.95; }
     const xt = !bt && XTEX[def.plan] && G.GFX && G.GFX.tex ? G.GFX.tex(XTEX[def.plan]) : null;
-    if (xt) { skin.map = xt.map; skin.normalMap = xt.normalMap; skin.roughnessMap = xt.orm; skin.aoMap = xt.orm; skin.roughness = Math.min(1, pc.rough + 0.35); skin.color.multiplyScalar(1.5); } // (these surfaces are pale, to be tinted: a little brighter under them)
+    if (xt) { skin.map = xt.map; skin.normalMap = xt.normalMap; skin.roughnessMap = xt.orm; skin.aoMap = xt.orm; skin.roughness = Math.min(1, pc.rough + 0.35); skin.color.multiplyScalar(1.25); } // (these surfaces are pale, to be tinted: a little brighter under them)
     if (pc.trans) { skin.transparent = true; skin.opacity = pc.trans; }
     if (def.plan === 'slime') { skin.emissive = new THREE.Color(col).multiplyScalar(0.25); skin.roughness = 0.16; skin.map = null; skin.normalScale = new THREE.Vector2(0.3, 0.3); } // (wet, and without the pattern of a hide: a jelly)
     const sec = new THREE.MeshStandardMaterial({ color: pc.sec, roughness: 0.7, map: t.smooth.map });
@@ -315,32 +315,66 @@
       },
     };
   };
+  // the brute: a great stooping ogre - a barrel of ribs over a gut, slabs of chest and back, a neck sunk between heaped shoulders, a
+  // heavy brow and an undershot jaw with tusks, long arms thick at the forearm, big hands and feet with their toes. A loincloth of hide
+  // with a belt; a club that is a tree's limb, bound with iron. Laid down as masses and melted into one hide joint by joint (gfx.js).
   B.brute = function (root, M) {
     const hips = joint(root, 0, 1.25, 0);
-    mesh(hips, PG.sph, M.skin, 0.5, 0.35, 0.4);
-    mesh(hips, PG.box, M.sec, 0.75, 0.35, 0.5, 0, -0.15, 0);
+    mesh(hips, PG.sph, M.skin, 0.47, 0.34, 0.39);
+    mesh(hips, PG.sph, M.skin, 0.4, 0.3, 0.3, 0, 0.12, 0.2);                 // the gut hanging over the belt
+    mesh(hips, PG.cyl, M.sec, 0.5, 0.11, 0.43, 0, 0.0, 0.02);                // belt
+    mesh(hips, PG.box, M.sec, 0.42, 0.5, 0.05, 0, -0.3, 0.36, -0.12); mesh(hips, PG.box, M.sec, 0.5, 0.42, 0.05, 0, -0.26, -0.36, 0.1);   // the hide, front and back
+    mesh(hips, PG.box, M.dark, 0.12, 0.13, 0.04, 0, 0.0, 0.445);             // buckle
     const torso = joint(hips, 0, 0.2, 0);
-    mesh(torso, PG.sph, M.skin, 0.6, 0.6, 0.45, 0, 0.45, 0.05);
-    mesh(torso, PG.sph, M.skin, 0.45, 0.4, 0.42, 0, 0.1, 0.18);
+    mesh(torso, PG.sph, M.skin, 0.56, 0.5, 0.44, 0, 0.42, 0.04);             // ribs
+    mesh(torso, PG.sph, M.skin, 0.43, 0.36, 0.4, 0, 0.08, 0.17);             // belly
+    for (const s of [-1, 1]) { mesh(torso, PG.sph, M.skin, 0.27, 0.2, 0.17, s * 0.24, 0.6, 0.33); mesh(torso, PG.sph, M.skin, 0.3, 0.3, 0.2, s * 0.27, 0.62, -0.26); mesh(torso, PG.sph, M.skin, 0.3, 0.22, 0.27, s * 0.38, 0.86, -0.04); } // chest, back, the heap of the shoulder
+    mesh(torso, PG.sph, M.skin, 0.2, 0.2, 0.2, 0, 0.9, 0.14);                // neck
     const head = joint(torso, 0, 1.0, 0.25);
-    mesh(head, PG.sph, M.skin, 0.24, 0.22, 0.25);
-    mesh(head, PG.box, M.skin, 0.3, 0.12, 0.2, 0, -0.12, 0.08);
-    for (const s of [-1, 1]) { mesh(head, PG.sph, M.eye, 0.035, 0.03, 0.02, s * 0.09, 0.04, 0.22); mesh(head, PG.cone, M.tooth, 0.04, 0.16, 0.04, s * 0.11, -0.05, 0.2, 0.2); }
+    mesh(head, PG.sph, M.skin, 0.215, 0.2, 0.235, 0, 0.02, -0.01);           // skull
+    mesh(head, PG.box, M.skin, 0.34, 0.075, 0.13, 0, 0.065, 0.17, 0.3);      // brow
+    mesh(head, PG.sph, M.skin, 0.075, 0.07, 0.085, 0, -0.025, 0.225);        // nose
+    mesh(head, PG.box, M.skin, 0.3, 0.14, 0.22, 0, -0.145, 0.09);            // jaw
+    mesh(head, PG.box, M.skin, 0.22, 0.07, 0.1, 0, -0.165, 0.2);             // chin, thrust out
+    mesh(head, PG.box, M.dark, 0.17, 0.014, 0.03, 0, -0.085, 0.212);         // the line of the mouth
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.eye, 0.026, 0.02, 0.016, s * 0.09, 0.022, 0.2);
+      mesh(head, PG.cone, M.tooth, 0.034, 0.15, 0.034, s * 0.105, -0.045, 0.2, 0.2, 0, s * 0.12);   // tusks
+      mesh(head, PG.sph, M.skin, 0.045, 0.085, 0.03, s * 0.215, 0.0, -0.01, 0, 0, s * 0.25);        // ears
+    }
     const arms = [];
     for (const s of [-1, 1]) {
       const sh = joint(torso, s * 0.62, 0.7, 0);
-      mesh(sh, PG.sph, M.skin, 0.25, 0.25, 0.25);
-      mesh(sh, PG.box, M.skin, 0.22, 0.65, 0.22, 0, -0.35, 0);
+      mesh(sh, PG.sph, M.skin, 0.24, 0.25, 0.25);
+      mesh(sh, PG.sph, M.skin, 0.155, 0.36, 0.165, 0, -0.33, 0);             // upper arm
       const el = joint(sh, 0, -0.68, 0);
-      mesh(el, PG.box, M.skin, 0.2, 0.62, 0.2, 0, -0.31, 0);
-      const hand = joint(el, 0, -0.66, 0); mesh(hand, PG.sph, M.skin, 0.17, 0.15, 0.17);
+      mesh(el, PG.sph, M.skin, 0.15, 0.2, 0.16, 0, -0.14, 0.01);             // the swell of the forearm
+      mesh(el, PG.cyl8, M.skin, 0.1, 0.5, 0.105, 0, -0.38, 0);
+      mesh(el, PG.cyl, M.sec, 0.118, 0.13, 0.122, 0, -0.52, 0);              // a bracer of hide
+      const hand = joint(el, 0, -0.66, 0);
+      mesh(hand, PG.sph, M.skin, 0.14, 0.12, 0.155);
+      for (let i = 0; i < 4; i++) mesh(hand, PG.sph, M.skin, 0.042, 0.075, 0.048, (i - 1.5) * 0.068, -0.1, 0.07);    // knuckles and fingers, curled
+      mesh(hand, PG.sph, M.skin, 0.045, 0.06, 0.07, -s * 0.13, -0.03, 0.08);                                        // thumb
       arms.push({ sh, el, hand });
     }
     const club = joint(arms[1].hand, 0, 0, 0);
-    mesh(club, PG.cyl, M.sec, 0.06, 0.9, 0.06, 0, 0, 0.4, Math.PI / 2);
-    mesh(club, PG.cyl, M.sec, 0.16, 0.5, 0.16, 0, 0, 0.85, Math.PI / 2);
-    for (let i = 0; i < 4; i++) mesh(club, PG.cone, M.dark, 0.04, 0.12, 0.04, Math.cos(i * 1.57) * 0.16, Math.sin(i * 1.57) * 0.16, 0.85, 0, 0, i * 1.57 - Math.PI / 2);
-    const L = [leg(hips, M, -0.3, -0.2, 0, 1.1, 0.24), leg(hips, M, 0.3, -0.2, 0, 1.1, 0.24)];
+    mesh(club, PG.cyl, M.sec, 0.055, 0.9, 0.06, 0, 0, 0.4, Math.PI / 2);
+    mesh(club, PG.cyl, M.sec, 0.15, 0.5, 0.17, 0, 0, 0.85, Math.PI / 2);
+    mesh(club, PG.sph, M.sec, 0.16, 0.14, 0.17, 0, 0, 1.1); mesh(club, PG.sph, M.sec, 0.07, 0.06, 0.07, 0, 0, -0.06);       // its knotted head, the butt
+    for (const z of [0.66, 1.02]) mesh(club, PG.cyl, M.dark, 0.165, 0.045, 0.185, 0, 0, z, Math.PI / 2);                 // iron bands
+    for (let i = 0; i < 6; i++) mesh(club, PG.cone, M.dark, 0.035, 0.13, 0.035, Math.cos(i * 1.047) * 0.17, Math.sin(i * 1.047) * 0.17, 0.78 + (i % 2) * 0.16, 0, 0, i * 1.047 - Math.PI / 2);
+    // a leg: a heavy thigh, a calf, a broad foot with its toes (the joints the walk works are the hip and the knee, as before)
+    const bleg = (x) => {
+      const len = 1.1, hip = joint(hips, x, -0.2, 0);
+      mesh(hip, PG.sph, M.skin, 0.2, 0.36, 0.22, 0, -len * 0.24, 0.0);
+      const kn = joint(hip, 0, -len * 0.5, 0);
+      mesh(kn, PG.sph, M.skin, 0.15, 0.24, 0.17, 0, -0.18, -0.03);           // calf
+      mesh(kn, PG.cyl8, M.skin, 0.1, len * 0.42, 0.11, 0, -len * 0.27, 0);
+      mesh(kn, PG.sph, M.skin, 0.15, 0.085, 0.24, 0, -len * 0.5 + 0.07, 0.09);   // foot
+      for (let i = 0; i < 3; i++) mesh(kn, PG.sph, M.skin, 0.05, 0.05, 0.07, (i - 1) * 0.085, -len * 0.5 + 0.05, 0.31);
+      return { hip, kn };
+    };
+    const L = [bleg(-0.3), bleg(0.3)];
     return {
       J: { hips, torso, head, arms, L, club }, h: 3.0, r: 0.95,
       hits: [{ n: head, r: 0.28, part: 'head' }, { n: torso, r: 0.62, part: 'body', o: V(0, 0.4, 0.05) }, { n: hips, r: 0.48, part: 'body' }, { n: L[0].hip, r: 0.25, part: 'body', o: V(0, -0.5, 0) }, { n: L[1].hip, r: 0.25, part: 'body', o: V(0, -0.5, 0) }],

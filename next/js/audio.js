@@ -108,6 +108,7 @@
     white = makeNoise('white', 2); pink = makeNoise('pink', 2); brown = makeNoise('brown', 3);
     A.applySet();
     A.startAmbience();
+    preloadSamples();
   };
   A.setVolume = (v) => { A.volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); };
   A.suspend = () => { if (ctx && ctx.state === 'running') ctx.suspend(); };
@@ -191,13 +192,40 @@
   }
   const vr = (v, p) => v * (1 + (Math.random() * 2 - 1) * p);
 
-  // ---------- no recorded samples: every sound is synthesized ----------
-  // smp() and friends are kept as inert hooks (they always report "not played"), so the call sites below fall through to the synthesized sound.
-  const SB = { bank: {}, files: {} }, bufs = {};
-  const usable = () => false;
-  A.samplesOn = () => false;
-  const fetchBuf = () => Promise.resolve(false);
-  const smp = () => false;
+  // ---------- recorded sounds (snd/, listed in sndbank.js) ----------
+  // Where a sound has recordings, one of them is the sound: a different one each time, its pitch and level a little off the last, put
+  // in the same place and the same room as everything else. Where it has none - or they have not arrived yet, or the old set of sounds
+  // is chosen in the settings - smp() reports "not played" and the caller goes on to the synthesized sound, as it always did.
+  const SB = { bank: (window.G && window.G.SND) || {}, files: {} }, bufs = {}, asked = {}, lastOf = {};
+  const usable = (key) => !!SB.bank[key] && NEW();
+  A.samplesOn = () => NEW() && Object.keys(bufs).length > 0;
+  const fetchBuf = (f) => {
+    if (asked[f]) return asked[f];
+    if (!ctx || !window.fetch) return Promise.resolve(false);
+    return (asked[f] = fetch('snd/' + f).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('no ' + f))))
+      .then((ab) => new Promise((ok, no) => ctx.decodeAudioData(ab, ok, no))).then((b) => { bufs[f] = b; return b; }).catch(() => false));
+  };
+  A.fetchSample = fetchBuf;
+  // (all of them asked for at the start, so that a sound's first playing is already the recording)
+  const preloadSamples = () => { try { for (const k in SB.bank) for (const f of SB.bank[k].f) fetchBuf(f); } catch (e) { /* none, then */ } };
+  // key, where (or nothing: in the head), level, speed, how much of the room (or the bank's own)
+  const smp = (key, pos, vol, rate, wet) => {
+    if (!ctx || !usable(key)) return false;
+    const b = SB.bank[key], n = b.f.length;
+    let i = Math.floor(Math.random() * n); if (n > 1 && i === lastOf[key]) i = (i + 1) % n;   // (never the same one twice running)
+    const buf = bufs[b.f[i]];
+    if (!buf) { fetchBuf(b.f[i]); return false; }
+    if (!voice(Math.min(1.5, buf.duration))) return true;   // (too much sounding already: it is dropped, and nothing stands in for it)
+    lastOf[key] = i;
+    try {
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      src.playbackRate.value = (rate || 1) * (b.rate || 1) * vr(1, b.p === undefined ? 0.05 : b.p);
+      const out = dest(pos || null, wet === undefined ? (b.wet === undefined ? 0.2 : b.wet) : wet);
+      out.gain.value *= (vol === undefined || vol === null ? 1 : vol) * (b.v || 1) * vr(1, 0.1);
+      src.connect(out); src.start();
+    } catch (e) { return false; }
+    return true;
+  };
   A.smp = smp;
 
   // ---------- weapons ----------
@@ -390,7 +418,7 @@
     if (!ctx) return;
     const bio = G.world && G.world.mats && G.world.mats.biome;
     const sk = surface === 'stone' && bio && bio.floorTex === 'grass' ? 'grass' : surface || 'stone';
-    if (smp('step_' + sk, null, 0.35 * intensity, 0.92 + intensity * 0.08) || smp('step_stone', null, 0.35 * intensity)) return;
+    if (smp('step_' + sk, null, 0.35 * intensity, 0.92 + intensity * 0.08) || (sk !== 'wood' && sk !== 'metal' && sk !== 'water' && smp('step_stone', null, 0.35 * intensity))) return; // (a floor with no recording of its own is synthesized: boards must not sound of stone)
     if (!voice(0.3)) return;
     const t = ctx.currentTime, out = dest(null, 0.15);
     out.gain.value = 0.35 * intensity;

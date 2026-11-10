@@ -511,6 +511,22 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   c *= .9 + (g2 - .5) * .22; c *= 1. - pore * .32; c *= .92 + (n1 - .5) * .18;
   col = S(c); rough = .55 + (g2 - .5) * .2 + pore * .3 + (n1 - .5) * .12; metal = 0.;
 }`],
+    // (the coats of what is fought: a pelt combed one way, the plates of a shell with their pits)
+    fur: [512, 0.9, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float w = fbm(uv, 3., 4.), cl = fbm(uv, 5., 7.);
+  float s1 = vnA(vec2(uv.x * 192., uv.y * 20.), vec2(192., 20.), 1.), s2 = vnA(vec2(uv.x * 448., uv.y * 40.), vec2(448., 40.), 2.);   // (fine short hairs, not planks)
+  h = .5 + (s1 - .5) * .32 + (s2 - .5) * .26 + (cl - .5) * .3;
+  col = S(vec3(.66 + (s1 - .5) * .12 + (cl - .5) * .3 + (s2 - .5) * .08 + (w - .5) * .16));
+  rough = .9 + (s1 - .5) * .15; metal = 0.;
+}`],
+    chitin: [512, 0.6, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  vec3 v = voro(uv, 5., 3.); float pl = smoothstep(.0, .05, v.y - v.x), n1 = fbm(uv, 6., 2.), pit = smoothstep(.72, .9, vnoise(uv * 120., 120., 5.));
+  h = .5 + pl * .25 - pit * .12 + (n1 - .5) * .08;
+  col = S(vec3(.8 + (n1 - .5) * .2) * (.68 + pl * .32));
+  rough = .36 + (n1 - .5) * .2 + pit * .3 + (1. - pl) * .3; metal = 0.;
+}`],
     weave: [512, 1.0, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   float n = 40.; vec2 p = uv * n; float wa = sin(p.x * 6.2831853) * .5 + .5, we = sin(p.y * 6.2831853) * .5 + .5;

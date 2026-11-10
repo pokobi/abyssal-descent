@@ -26,6 +26,8 @@
     worm: { skin: '#8a6050', sec: '#3a2a20', rough: 0.5, blood: 0x7a3010, tex: 'scales' },
     mimic: { skin: '#8a5a30', sec: '#c8a050', rough: 0.6, blood: 0x6a0c0c, tex: 'skin' },
   };
+  // (a coat of its own kind for each, where gfx.js can make it: a pelt, a shell, a hide, a cloth)
+  const XTEX = { hound: 'fur', bat: 'fur', spider: 'chitin', beetle: 'chitin', mantis: 'chitin', brute: 'leather', imp: 'leather', worm: 'leather', mushroom: 'leather', wraith: 'weave', shaman: 'weave' };
   function mkMats(def, opts) {
     const pc = PLANCOL[def.plan];
     const t = G.Tex.tex;
@@ -34,6 +36,8 @@
     const col = opts && opts.ally ? '#7a9ab0' : def.color || pc.skin;
     const skin = new THREE.MeshStandardMaterial({ color: col, roughness: pc.rough, metalness: pc.metal || 0, map: tx.map, normalMap: tx.normalMap });
     if (bt) { skin.roughnessMap = bt.orm; skin.aoMap = bt.orm; skin.roughness = 0.95; }
+    const xt = !bt && XTEX[def.plan] && G.GFX && G.GFX.tex ? G.GFX.tex(XTEX[def.plan]) : null;
+    if (xt) { skin.map = xt.map; skin.normalMap = xt.normalMap; skin.roughnessMap = xt.orm; skin.aoMap = xt.orm; skin.roughness = Math.min(1, pc.rough + 0.35); skin.color.multiplyScalar(1.5); } // (these surfaces are pale, to be tinted: a little brighter under them)
     if (pc.trans) { skin.transparent = true; skin.opacity = pc.trans; }
     if (def.plan === 'slime') { skin.emissive = new THREE.Color(col).multiplyScalar(0.25); skin.roughness = 0.16; skin.map = null; skin.normalScale = new THREE.Vector2(0.3, 0.3); } // (wet, and without the pattern of a hide: a jelly)
     const sec = new THREE.MeshStandardMaterial({ color: pc.sec, roughness: 0.7, map: t.smooth.map });

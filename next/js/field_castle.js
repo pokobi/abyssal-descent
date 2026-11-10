@@ -68,6 +68,65 @@
       occ.mark(0, e - 2, W, e + 2, 1);
       w.platTops.push({ x0: 2, z0: e + 1, x1: W - 2, z1: e + 3.5, y, cx: W * 0.3, cz: e + 2 });
     }
+    // ---- the castle to look at (none of it stops anyone; no dice are thrown for it). Outside the curtain: a square tower at every
+    // step of the wall and at its ends, with a corbelled, crenellated head and slit windows; beyond the south wall the great keep, with
+    // a turret at each corner. On the curtain's inner face: a plinth, a string course under the merlons, arrow loops. On the retaining
+    // walls: a course of corbels under the parapet. In each gatehouse: an arch under its lintel, merlons on its two towers.
+    {
+      const vis = (mk, x0, y0, z0, x1, y1, z1, uv) => w.visual(mk, x0, y0, z0, x1, y1, z1, { uv: uv || 2 });
+      const crown = (cxx, czz, half, top) => {
+        vis('trim', cxx - half - 0.3, top - 0.6, czz - half - 0.3, cxx + half + 0.3, top, czz + half + 0.3, 2);
+        for (let k = 0; k < 4; k++) vis('trim', cxx - half - 0.3 + 0.05, top - 0.9 - 0.0, czz - half - 0.3 + 0.05, cxx + half + 0.3 - 0.05, top - 0.6, czz + half + 0.3 - 0.05, 2);
+        const e = half + 0.3, n = Math.max(2, Math.round(e * 2 / 1.7)), st = e * 2 / n;
+        for (let i = 0; i < n; i++) { const u = -e + i * st; for (const s2 of [-1, 1]) {
+          vis('block', cxx + u, top, s2 > 0 ? czz + e - 0.5 : czz - e, cxx + u + st * 0.55, top + 1.1, s2 > 0 ? czz + e : czz - e + 0.5, 1.5);
+          vis('block', s2 > 0 ? cxx + e - 0.5 : cxx - e, top, czz + u, s2 > 0 ? cxx + e : cxx - e + 0.5, top + 1.1, czz + u + st * 0.55, 1.5);
+        } }
+      };
+      const tower = (cxx, czz, half, y0, top, mk) => {
+        vis(mk || 'wall', cxx - half, y0, czz - half, cxx + half, top, czz + half, 3);
+        vis('block', cxx - half - 0.18, y0, czz - half - 0.18, cxx + half + 0.18, y0 + 1.6, czz + half + 0.18, 2.5);        // (a battered foot)
+        crown(cxx, czz, half, top);
+        for (let y = y0 + 3.2; y < top - 2.4; y += 3.6) for (const s2 of [-1, 1]) {                                    // (slit windows)
+          vis('dark', cxx - 0.11, y, s2 > 0 ? czz + half : czz - half - 0.03, cxx + 0.11, y + 1.3, s2 > 0 ? czz + half + 0.03 : czz - half, 1);
+          vis('dark', s2 > 0 ? cxx + half : cxx - half - 0.03, y, czz - 0.11, s2 > 0 ? cxx + half + 0.03 : cxx - half, y + 1.3, czz + 0.11, 1);
+        }
+      };
+      // the towers of the curtain
+      const zs = [[1.5, 0], [z1a, STEP], [z2a, TOPY], [D - 1.5, TOPY]];
+      for (const [tz, ty] of zs) for (const s2 of [-1, 1]) tower(s2 < 0 ? -3.9 : W + 3.9, tz, 2.7, -1, ty + CUR + 5.5);
+      // the keep beyond the south wall, and its turrets
+      { const kz0 = D + 1.2, kz1 = D + 19, kx0 = cx - 15, kx1 = cx + 15, top = TOPY + CUR + 17;
+        vis('wall', kx0, -1, kz0, kx1, top, kz1, 4); vis('block', kx0 - 0.3, -1, kz0, kx1 + 0.3, TOPY + 2.2, kz1 + 0.3, 3);
+        vis('trim', kx0 - 0.35, top - 0.7, kz0 - 0.35, kx1 + 0.35, top, kz1 + 0.35, 2);
+        for (let x = kx0 - 0.35; x < kx1; x += 2.2) vis('block', x, top, kz0 - 0.35, x + 1.2, top + 1.3, kz0 + 0.25, 1.5);
+        for (let x = kx0 + 3.5; x < kx1 - 2; x += 5.5) for (let y = TOPY + 6; y < top - 3; y += 5) vis('dark', x - 0.14, y, kz0 - 0.03, x + 0.14, y + 1.7, kz0, 1);
+        for (const s2 of [-1, 1]) tower(s2 < 0 ? kx0 : kx1, kz0 + 1.5, 2.4, -1, top + 4.5);
+      }
+      // the curtain's inner face, bailey by bailey
+      for (const b of B) for (const s2 of [-1, 1]) {
+        const xf = s2 < 0 ? 0 : W, xo = s2 < 0 ? 0.14 : -0.14;
+        vis('block', Math.min(xf, xf + xo), b.y, b.z0, Math.max(xf, xf + xo), b.y + 0.7, b.z1, 2);
+        vis('trim', Math.min(xf, xf + xo * 0.8), b.y + CUR - 0.3, b.z0, Math.max(xf, xf + xo * 0.8), b.y + CUR - 0.06, b.z1, 2);
+        for (let z = b.z0 + 4; z < b.z1 - 3; z += 6) vis('dark', Math.min(xf, xf + xo * 0.25), b.y + 2.1, z - 0.09, Math.max(xf, xf + xo * 0.25), b.y + 3.4, z + 0.09, 1);
+      }
+      // corbels under each parapet, on the face of the retaining wall (not across a stair)
+      for (let k = 1; k < B.length; k++) {
+        const e = B[k].z0, y = B[k].y;
+        for (let x = 0.4; x < W - 0.8; x += 1.3) {
+          if (stairs.some((q) => q.e === e && Math.abs(x + 0.3 - q.x) < q.wd / 2 + 2.8)) continue;
+          vis('trim', x, y - 0.55, e - 0.34, x + 0.55, y - 0.14, e, 1);
+        }
+      }
+      // the gatehouses
+      const GX = G.GFX;
+      for (const q of stairs) {
+        const half = q.wd / 2 + 0.4;
+        if (GX && GX.archRib) { const mt = new THREE.Matrix4().makeTranslation(q.x, q.y + 2.95, q.e + 1.0); w.batch.geo('block', GX.archSpandrel(half, 0.95, 2.36, 16), mt); w.batch.geo('trim', GX.archRib(half, 0.95, 0.3, 2.5, 16), mt); }
+        for (const s2 of [-1, 1]) crown(q.x + s2 * (q.wd / 2 + 1.4), q.e + 1.0, 1.0, q.y + 6);
+        for (let x = q.x - half; x < q.x + half - 0.3; x += 1.25) vis('block', x, q.y + 6, q.e - 0.2, x + 0.7, q.y + 7, q.e + 0.3, 1.5);
+      }
+    }
     // (placing inside one bailey: the others are closed off on the occupancy grid meanwhile)
     const inB = (b, fn) => { const save = occ.a.slice(); occ.mark(0, 0, W, b.z0 + 1.5, 1); occ.mark(0, b.z1 - 1.5, W, D, 1); try { return fn(); } finally { for (let z = 0; z < D; z++) if (z < b.z0 + 1.5 || z >= b.z1 - 1.5) for (let x = 0; x < W; x++) occ.a[z * W + x] = save[z * W + x]; } };
     // ---- the upper bailey: the keep, a tower at each corner, the chapel's ruin

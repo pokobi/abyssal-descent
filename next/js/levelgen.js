@@ -595,6 +595,8 @@
           const m = new THREE.Mesh(g, mat); m.frustumCulled = false; grp.add(m);
         };
         mtn.side = THREE.DoubleSide;
+        // (whole slopes catch the light where the cones' narrow faces did not: held down to a silhouette against the sky, whatever the field's colour for them)
+        { const lum = (c) => c.r * 0.3 + c.g * 0.6 + c.b * 0.1, lc = lum(mtn.color), le = lum(mtn.emissive); if (lc > 0.07) mtn.color.multiplyScalar(0.07 / lc); if (le > 0.012) mtn.emissive.multiplyScalar(0.012 / le); }
         const far = mtn.clone(), haze = new THREE.Color(w.mats.biome.fog || 0x202428); far.color.lerp(haze, 0.45).multiplyScalar(0.8); far.emissive.lerp(haze, 0.5);   // (paler with distance: toward the colour of the air, not a colour of its own)
         range(215, 1.0, 0, mtn);
         range(285, 1.45, 5.3, far);

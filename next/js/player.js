@@ -157,7 +157,24 @@
     eyePos() { return G.camera.position.clone(); }
     chestPos() { return V(this.pos.x, this.pos.y + this.height * 0.65, this.pos.z); }
     forward() { return V(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch)); }
-    addShake(a) { this.shake = Math.min(1.2, this.shake + a * G.save.data.settings.shake); }
+    // The view shaken. a: how hard (about 0..1). from (optional): where the blow came from, a point in the world - the view is thrown
+    // away from it. Two things make the shake: a kick on a spring (the head thrown, swinging back and settling in two or three swings)
+    // and a rumble laid over it (smooth, never the same twice, the low part of it stronger the harder the blow). Both scale with the
+    // setting (設定 → 画面揺れ).
+    addShake(a, from) {
+      const k = a * G.save.data.settings.shake; if (!(k > 0)) return;
+      this.shake = Math.min(1.2, this.shake + k);
+      const sp = this.shSp || (this.shSp = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, p: 0, r: 0, vp: 0, vr: 0, t: Math.random() * 100 });
+      // (in the view's own frame: x right, y up, z back. No source given: a jolt up through the ground, down and back)
+      let dx = (Math.random() - 0.5) * 0.9, dy = -0.3 - Math.random() * 0.4, dz = 0.25 + Math.random() * 0.4;
+      if (from && from.isVector3) {
+        let wx = this.pos.x - from.x, wy = this.pos.y + this.eyeH - from.y, wz = this.pos.z - from.z; const l = Math.hypot(wx, wy, wz);
+        if (l > 0.05) { wx /= l; wy /= l; wz /= l; const c = Math.cos(this.yaw), sn = Math.sin(this.yaw); dx = wx * c - wz * sn + (Math.random() - 0.5) * 0.25; dy = wy * 0.6 - 0.15; dz = wx * sn + wz * c; }
+      }
+      const m = Math.min(1, k);
+      sp.vx += dx * m * 2.6; sp.vy += dy * m * 2.2; sp.vz += dz * m * 2.6;
+      sp.vp += (dz * 0.8 - dy * 0.5 + (Math.random() - 0.5) * 0.4) * m * 1.9; sp.vr += (dx * 1.4 + (Math.random() - 0.5) * 0.5) * m * 1.9;
+    }
     addRecoil(p, y) { this.pitch += p; this.yaw += y; this.recoilRecover += p * 0.55; }
     // ---- inventory: items are grouped by category slot (4 heal / 5 guard / 6 boost / 7 tool) ----
     itemCount(id) { return this.bag ? G.Inv.countAll(this, 'item', id) : 0; }
@@ -542,17 +559,34 @@
       this.pitch = U.clamp(this.pitch, -1.55, 1.55);
       const cam = G.camera;
       const bobK = S.bob * this.bobAmt * (G.weapons.adsT > 0.5 ? 0.25 : 1);
-      const bobY = Math.abs(Math.sin(this.bobPhase)) * 0.055 * bobK;
+      // (a walk: the head rises and falls on each step - coming down a little sharply, as a heel does - sways with the weight from foot
+      // to foot, and tips with it)
+      const bobY = Math.pow(Math.abs(Math.sin(this.bobPhase)), 1.35) * 0.055 * bobK;
       const bobX = Math.cos(this.bobPhase) * 0.035 * bobK;
+      const bobR = -Math.cos(this.bobPhase) * 0.0045 * bobK, bobP = Math.sin(this.bobPhase * 2) * 0.0028 * bobK;
       const sh = this.shake * this.shake;
+      // the shake (see addShake): the spring, then the rumble over it
+      let shX = 0, shY = 0, shZ = 0, shp = 0, shy = 0, shr = 0;
+      const sp = this.shSp;
+      if (sp) {
+        const h = Math.min(dt, 0.033), W2 = 1936, D = 26.4;   // (7 Hz, damped to settle in two or three swings)
+        sp.vx += (-W2 * sp.x - D * sp.vx) * h; sp.x += sp.vx * h; sp.vy += (-W2 * sp.y - D * sp.vy) * h; sp.y += sp.vy * h; sp.vz += (-W2 * sp.z - D * sp.vz) * h; sp.z += sp.vz * h;
+        sp.vp += (-W2 * sp.p - D * sp.vp) * h; sp.p += sp.vp * h; sp.vr += (-W2 * sp.r - D * sp.vr) * h; sp.r += sp.vr * h;
+        sp.t += dt;
+        const t = sp.t, lo = Math.min(1, this.shake), hi = 1 - lo * 0.45;
+        const n3 = (a, b, c) => Math.sin(t * 69 + a) * 0.5 + Math.sin(t * 109 + b) * 0.32 + Math.sin(t * 183 + c) * 0.18;
+        shp = sp.p + (n3(0.3, 1.7, 4.1) * hi + Math.sin(t * 31 + 2.2) * lo * 0.6) * sh * 0.021;
+        shy = (n3(2.9, 0.4, 5.3) * hi + Math.sin(t * 27 + 0.7) * lo * 0.6) * sh * 0.017;
+        shr = sp.r + (n3(4.7, 3.1, 1.2) * hi + Math.sin(t * 23 + 5.0) * lo * 0.7) * sh * 0.019;
+        shX = sp.x + n3(1.1, 5.9, 2.4) * sh * 0.005; shY = sp.y + n3(3.6, 2.2, 0.9) * sh * 0.005; shZ = sp.z;
+      }
       const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
-      cam.position.set(this.pos.x + rx * bobX, this.pos.y + this.eyeH + this.eyeOff + this.landDip + bobY, this.pos.z + rz * bobX);
+      cam.position.set(this.pos.x + rx * (bobX + shX) - rz * shZ, this.pos.y + this.eyeH + this.eyeOff + this.landDip + bobY + shY, this.pos.z + rz * (bobX + shX) + rx * shZ);
       // tilt (strafe & slide)
       const strafe = (I.down('right') ? 1 : 0) - (I.down('left') ? 1 : 0);
       const targetRoll = (this.sliding ? 0.07 : 0) - strafe * 0.018 * (this.grounded ? 1 : 0.5) + (this.grapple.state === 'attached' ? -strafe * 0.05 : 0);
       this.roll = U.damp(this.roll, targetRoll, 8, dt);
-      const shp = (Math.random() - 0.5) * sh * 0.05, shy = (Math.random() - 0.5) * sh * 0.05, shr = (Math.random() - 0.5) * sh * 0.04;
-      cam.rotation.set(this.pitch + shp + this.hurtKick * 0.03, this.yaw + shy, this.roll + shr, 'YXZ');
+      cam.rotation.set(this.pitch + shp + bobP + this.hurtKick * 0.03, this.yaw + shy, this.roll + shr + bobR, 'YXZ');
       // third-person camera for grapple swings and the pile driver
       const gs = this.grapple.state;
       const wantTP = gs === 'firing' || gs === 'attached' || gs === 'reelEnemy' || !!this.pileState || (this.pileLandT || 0) > 0 || !!this.duelLock; // (a duel, duel.js: third person all through)

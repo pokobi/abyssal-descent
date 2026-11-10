@@ -482,7 +482,7 @@
       else { G.fx.explosion(pos, r, info.color || 0xff9a40); G.sfx.explosion(pos, r / 4); }
     }
     const d = P.pos.distanceTo(pos);
-    G.player.addShake(Math.max(0, (info.small ? 0.25 : 0.7) * (1 - d / (r * 4))));
+    G.player.addShake(Math.max(0, (info.small ? 0.25 : 0.7) * (1 - d / (r * 4))), pos); // (thrown away from the blast)
     if (info.enemy) {
       // enemy explosion hurts the player
       if (d < r + 0.4 && C.blastReaches(pos)) C.damagePlayer(dmg * (1 - 0.5 * d / (r + 0.4)), { src: 'explosion', pos, attacker: info.attacker, elem: info.elem });
@@ -659,7 +659,7 @@
     G.game.areaDamage += dmg + osHit;
     G.ui.damageFlash(Math.min(1, (dmg + osHit) / 30), info.pos || (info.attacker && info.attacker.pos));
     G.sfx.hurt(dmg + osHit);
-    P.addShake(Math.min(0.6, 0.15 + (dmg + osHit) / 60));
+    P.addShake(Math.min(0.6, 0.15 + (dmg + osHit) / 60), info.pos || (info.attacker && info.attacker.pos) || null); // (knocked away from what struck)
     P.hurtKick = Math.min(1, (dmg + osHit) / 25);
     // statuses on player
     const ps = P.st;

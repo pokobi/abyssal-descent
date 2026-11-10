@@ -1,0 +1,373 @@
+'use strict';
+// Encyclopedia of every buff, weapon, attachment, item, skill, monster and boss (with live 3D previews).
+(function () {
+  const CX = (G.codex = {});
+  const U = G.U;
+  let renderer = null, scene = null, cam = null, model = null, raf = 0, canvas = null, animState = null;
+  const TABS = [
+    ['buff', '🌟 加護', () => G.BUFFS.filter((b) => b.cat !== 'pact' && !b.skill)],
+    ['weapon', '🔫 武器', () => G.WEAPONS],
+    ['melee', '🗡️ 近接武器', () => G.MELEE.filter((m) => !m.legacy)],
+    ['attachment', '🔩 アタッチメント', () => G.ATTACHMENTS],
+    ['item', '🧪 アイテム', () => G.ITEMS],
+    ['armor', '🛡️ 防具', () => G.ARMOR],
+    ['valuable', '💰 金品', () => G.VALUABLES],
+    ['skill', '🔮 スキル', () => G.SKILLS],
+    ['ult', '🌟 アルティメット', () => G.ULTS],
+    ['enemy', '👹 魔物', () => G.ENEMIES.filter((e) => !extraHidden('enemy', e))],
+    ['boss', '👑 ボス', () => G.BOSSES.filter((b) => !(G.RETIRED_BOSSES || []).includes(b.id) && !extraHidden('boss', b))],
+    ['stage', '🗺️ フィールド', () => stages()],
+    ['depth', '🌀 深淵', () => G.Depth.CODEX],
+    ['rx', '🌈 属性反応', () => G.Elem.CODEX],
+  ];
+  let tab = 'buff', sel = null, query = '', backFn = null;
+  // The hidden top difficulty (エクストラ) does not exist for a player who has not cleared Hard: what only belongs to it (the abyssal variants of the
+  // monsters, the last guardian and its avatar) is left out of the lists altogether, and no text names the mode. A foe that was met anyway stays listed.
+  const extraOpen = () => G.Run.unlocked('extra', 1);
+  function extraHidden(kind, o) {
+    if (extraOpen()) return false;
+    const only = (kind === 'boss' && (o.id === 'sovereign' || o.id === 'sovereign2')) || (kind === 'enemy' && o.variant === 'abyss');
+    return only && !disc(kind, o);
+  }
+  // sorting: the way the list is ordered is chosen in the header (kept between visits). A tab offers the modes that mean something for it.
+  const SORTS = {
+    rarity: ['レアリティ順（低い順）', '低いレアリティを上に。同じなら種類・名前の順'],
+    rarityHi: ['レアリティ順（高い順）', '高いレアリティを上に。同じなら種類・名前の順'],
+    cat: ['種類順', '種類ごとにまとめ、その中はレアリティの高い順'],
+    name: ['名前順（あいうえお）', ''],
+    kind: ['種類順（種類→レアリティ）', '魔物の種類ごとにまとめ、その中は低いレアリティから'],
+    area: ['出現が早い順', '早い段階から出る魔物を上に'],
+    disc: ['未発見を先に', '未発見のものを上に集める'],
+    def: ['標準の並び', ''],
+  };
+  const TAB_SORTS = { enemy: ['kind', 'area', 'name', 'disc', 'def'], boss: ['def', 'name', 'disc'], stage: [], depth: [], rx: [] };
+  const sortsOf = (t) => TAB_SORTS[t] || ['rarity', 'rarityHi', 'cat', 'name', 'disc', 'def'];
+  const sortMode = () => { const m = G.save.data.settings.cxSort, ok = sortsOf(tab); return ok.includes(m) ? m : ok[0]; };
+  const tierOf = (o) => (G.RARITY[o.rarity] ? G.RARITY[o.rarity].tier : -1);
+  const catOf = (t, o) => {
+    if (t === 'armor') return String((G.ARMOR_SLOTS.findIndex((x) => x.id === o.slot) + 100)) + (o.mat || '');
+    if (t === 'attachment') return String(Object.keys(G.ATT_SLOTS).indexOf(o.slot) + 100);
+    if (t === 'buff') return String(Object.keys(G.BUFF_CAT).indexOf(o.cat) + 100);
+    return String(o.cat || o.mcat || o.slot || '');
+  };
+  const ja = new Intl.Collator('ja');
+  function sorted(a) {
+    const m = sortMode(); if (m === 'def') return a;
+    const idx = new Map(a.map((o, i) => [o, i]));
+    const hidden = (o) => secret(tab, o);
+    // a leading emoji does not decide the place of a name
+    const plain = (o) => String(o.name || '').replace(/^[^\p{L}\p{N}]+/u, '');
+    const byName = (x, y) => ja.compare(plain(x), plain(y));
+    // monsters: grouped by kind (hound, skeleton ...) in the order the kinds are written in, each group from the lowest rarity up
+    const kindIdx = new Map(); for (const e of G.ENEMIES) if (!kindIdx.has(e.plan)) kindIdx.set(e.plan, kindIdx.size);
+    const cmp = {
+      kind: (x, y) => (kindIdx.get(x.plan) ?? 99) - (kindIdx.get(y.plan) ?? 99) || tierOf(x) - tierOf(y) || (x.unlockK ?? 0) - (y.unlockK ?? 0) || byName(x, y),
+      rarity: (x, y) => tierOf(x) - tierOf(y) || catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || byName(x, y),
+      rarityHi: (x, y) => tierOf(y) - tierOf(x) || catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || byName(x, y),
+      cat: (x, y) => catOf(tab, x).localeCompare(catOf(tab, y), 'ja', { numeric: true }) || tierOf(y) - tierOf(x) || byName(x, y),
+      name: byName,
+      area: (x, y) => (x.unlockK ?? 9) - (y.unlockK ?? 9) || byName(x, y),
+      disc: (x, y) => (disc(tab, x) ? 1 : 0) - (disc(tab, y) ? 1 : 0) || tierOf(y) - tierOf(x) || idx.get(x) - idx.get(y),
+    }[m];
+    // an unmet monster / guardian shows no name, so it is never placed by its name: it keeps its own order after the known ones (before them when "未発見を先に")
+    const known = a.filter((o) => !hidden(o)), unk = a.filter(hidden);
+    if (m === 'disc') return unk.concat(known.sort(cmp));
+    if (m === 'area') return known.concat(unk).sort((x, y) => (x.unlockK ?? 9) - (y.unlockK ?? 9) || (hidden(x) - hidden(y)) || (hidden(x) ? idx.get(x) - idx.get(y) : byName(x, y)));
+    return known.sort(cmp).concat(unk);
+  }
+  const disc = (kind, o) => {
+    const c = G.save.data.codex;
+    if (kind === 'enemy') return !!c.enemies[o.id];
+    if (kind === 'boss') return !!c.bosses[o.id];
+    if (kind === 'stage') return !!G.save.data.codex.items['stage_' + o.key];
+    if (kind === 'buff') return !!c.buffs[o.id];
+    return !!c.items[o.id];
+  };
+  // not yet met: monsters and guardians are hidden completely (name, icon, model, text); everything else is shown as it is
+  const SECRET = new Set(['enemy', 'boss']);
+  const secret = (kind, o) => SECRET.has(kind) && !disc(kind, o);
+  CX.open = function (back) {
+    backFn = back;
+    const total = TABS.reduce((a, t) => a + t[2]().length, 0);
+    const found = TABS.reduce((a, t) => a + t[2]().filter((o) => disc(t[0], o)).length, 0);
+    const s = G.ui.screen(`<div class="codex"><div class="cx-head"><h2>📖 深淵図鑑</h2>${TABS.map((t) => `<span class="cx-tab ${t[0] === tab ? 'on' : ''}" data-t="${t[0]}">${t[1]} <span class="cx-count">${t[2]().length}</span></span>`).join('')}<span class="cx-count" style="margin-left:8px">発見 ${found}/${total}</span>${sortsOf(tab).length > 1 ? `<label class="cx-sort">並び順 <select id="cx-sort">${sortsOf(tab).map((k) => `<option value="${k}"${k === sortMode() ? ' selected' : ''}>${SORTS[k][0]}</option>`).join('')}</select></label>` : ''}<input id="cx-q" placeholder="🔍 検索" value="${U.esc(query)}"><button class="btn small" id="cx-back">↩ 戻る</button></div><div class="cx-body"><div class="cx-grid" id="cx-grid"></div><div class="cx-detail" id="cx-detail"></div></div></div>`, 'dim');
+    s.querySelectorAll('.cx-tab').forEach((el) => el.onclick = () => { tab = el.dataset.t; sel = null; G.sfx.ui('click'); G.ui._noKeep = true; CX.open(back); });
+    s.querySelector('#cx-back').onclick = () => { G.sfx.ui('click'); CX.close(); back(); };
+    const sq = s.querySelector('#cx-sort');
+    if (sq) sq.onchange = () => { G.save.data.settings.cxSort = sq.value; G.save.write(); G.sfx.ui('click'); renderGrid(); };
+    const q = s.querySelector('#cx-q');
+    q.oninput = () => { query = q.value; renderGrid(); };
+    // hidden: "dev" + Enter switches the debug mode on and opens its panel
+    q.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key !== 'Enter' || q.value.trim().toLowerCase() !== 'dev' || !G.Dev) return;
+      query = ''; CX.close(); G.Dev.enable(); G.ui.toast('🛠 デバッグモードを有効にしました（F9 でパネル）', 'good');
+      G.Dev.open(back);
+    };
+    renderGrid();
+  };
+  CX.close = function () { cancelAnimationFrame(raf); raf = 0; if (model && scene) scene.remove(model); model = null; };
+  function list() {
+    const t = TABS.find((x) => x[0] === tab);
+    let a = t[2]();
+    if (query) {
+      const q = query.toLowerCase();
+      a = a.filter((o) => !secret(tab, o) && (o.name + (o.desc || '') + (o.cat || '')).toLowerCase().includes(q)); // a hidden monster / guardian is never found by search
+    }
+    return sorted(a);
+  }
+  // Where a monster first shows up, per difficulty, in the area numbers the player sees (a run has 14 or 21 areas). The old text printed the internal
+  // "depth" (area + the difficulty's depth offset), which runs past 40; the pool of foes is chosen from that depth (game.js enemyPool): a kind is in
+  // from depth 5 * unlockK + 1. Extra grows with its level (+2 depth per level): shown for Extra 1.
+  const firstSeen = (o) => {
+    if (o.unlockK === undefined) return o.minArea ? `エリア${o.minArea}〜` : '特定の場所';
+    const R = G.Run, keep = R.cur, out = [];
+    try {
+      for (const [id, lv, label] of [['easy', 0, 'イージー'], ['normal', 0, 'ノーマル'], ['hard', 0, 'ハード'], ['extra', 1, 'エクストラ1']].filter((d) => d[0] !== 'extra' || extraOpen())) {
+        R.cur = { id, lv };
+        let first = 0;
+        for (let n = 1; n <= R.areas() && !first; n++) if (!R.isBoss(n) && !R.isPrep(n) && Math.floor((Math.max(1, R.depthArea(n)) - 1) / 5) >= o.unlockK) first = n;
+        out.push(first ? `${label} エリア${first}〜` : null);
+      }
+    } finally { R.cur = keep; }
+    const seen = out.filter(Boolean);
+    return seen.length ? seen.join(' / ') : '—';
+  };
+  function renderGrid() {
+    const g = document.getElementById('cx-grid'); if (!g) return;
+    const a = list();
+    // (an unmet entry shows nothing but its rarity colour)
+    g.innerHTML = a.map((o, i) => secret(tab, o)
+      ? `<div class="cx-item undisc ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">❔</span><span class="cn">？？？</span></div>`
+      : `<div class="cx-item ${disc(tab, o) ? '' : 'undisc'} ${sel === o ? 'sel' : ''}" data-i="${i}" style="--rc:${G.ui.R(o.rarity || 'epic')}"><span class="ci">${o.mat ? G.armorIcon(o) : o.icon}${disc(tab, o) ? G.Elem.badge(o) : ''}${o.vicon ? '<small style="font-size:11px">' + o.vicon + '</small>' : ''}</span><span class="cn">${U.esc(o.name)}</span></div>`).join('');
+    g.querySelectorAll('.cx-item').forEach((el) => el.onclick = () => { sel = a[+el.dataset.i]; G.sfx.ui('click'); g.querySelectorAll('.cx-item').forEach((x) => x.classList.remove('sel')); el.classList.add('sel'); renderDetail(); });
+    if (!sel && a.length) sel = a[0];
+    renderDetail();
+  }
+  const bar = (ic, label, v, max, txt) => `<div class="r"><span>${ic}</span><span>${label}</span><div class="sbar"><div style="width:${Math.min(100, v / max * 100)}%"></div></div><span class="v">${txt ?? Math.round(v)}</span></div>`;
+  function renderDetail() {
+    const d = document.getElementById('cx-detail'); if (!d || !sel) return;
+    const o = sel;
+    if (secret(tab, o)) {
+      // a monster / guardian not met yet: nothing but the bare fact
+      d.innerHTML = `<div style="--rc:${G.ui.R(o.rarity || 'epic')}"><div class="cd-icon">❔</div><div class="cd-name">？？？</div><div class="cd-cat">❔ 未発見</div><div class="cd-desc">まだ出会っていない。出会うまで、詳細は分からない。</div></div>`;
+      return;
+    }
+    const rc = G.ui.R(o.rarity || 'epic');
+    const rar = G.RARITY[o.rarity];
+    let html = `<div style="--rc:${rc}">`;
+    const want3d = tab === 'weapon' || tab === 'enemy' || tab === 'melee' || tab === 'boss';
+    if (want3d) html += `<div id="cx-3d"></div>`; else html += `<div class="cd-icon">${o.mat ? G.armorIcon(o) : o.icon}</div>`;
+    html += `<div class="cd-name">${U.esc(o.name)}</div><div class="cd-cat">${rar ? rar.name + ' · ' : ''}${catText(o)}${disc(tab, o) ? ' · ✅ 発見済み' : ' · ❔ 未発見'}</div>${G.Elem.tagOf(o) ? `<div style="text-align:center;margin-top:4px">${G.Elem.chip(o)}</div>` : ''}`;
+    html += `<div class="cd-desc">${U.descHTML(o.desc)}</div><div class="cd-stats">`;
+    if (tab === 'weapon') {
+      const s = o;
+      html += bar('💥', 'ダメージ', s.dmg * (s.pellets || 1), 320, Math.round(s.dmg) + (s.pellets > 1 ? '×' + s.pellets : ''));
+      html += bar('🔁', '連射 (RPM)', s.rpm, 1500);
+      html += bar('📊', 'DPS', s.dmg * (s.pellets || 1) * s.rpm / 60, 450);
+      html += bar('📦', '装弾数', s.mag, 250);
+      html += bar('♻️', 'リロード', 6 - s.reload, 6, s.reload.toFixed(1) + 's');
+      html += bar('🎯', '精度', 8 - s.spread, 8, s.spread.toFixed(1) + '°');
+      html += bar('📏', '射程', s.range, 250, s.range + 'm');
+      html += bar('🔭', '倍率', s.zoom, 4.5, '×' + s.zoom.toFixed(2));
+      html += `<div style="margin-top:8px">${s.auto ? '<span class="tag">🔁 フルオート</span>' : s.burst ? `<span class="tag">🔂 ${s.burst}点バースト</span>` : '<span class="tag">☝️ セミオート</span>'}${s.proj ? '<span class="tag">🚀 投射物</span>' : ''}${s.pierce ? `<span class="tag">➶ 貫通${s.pierce}</span>` : ''}${s.element && G.ELEM[s.element] ? `<span class="tag">${G.ELEM[s.element].icon} ${G.ELEM[s.element].name}付与</span>` : ''}${o.el && G.Elem.BY[o.el] ? `<span class="tag" style="color:${G.Elem.BY[o.el].col}">${G.Elem.BY[o.el].icon} ${G.Elem.BY[o.el].name}属性</span>` : ''}${s.trait ? `<span class="tag">${G.WEAPON_TRAITS[s.trait].icon} ${G.WEAPON_TRAITS[s.trait].name}: ${G.WEAPON_TRAITS[s.trait].desc}</span>` : ''}<span class="tag">🪙 ${s.price ? U.fmt(s.price) : '初期装備'}</span></div>`;
+    } else if (tab === 'melee') {
+      html += bar('💥', 'ダメージ', o.dmg, 110);
+      html += bar('⚡', '攻撃間隔', 1 / o.swing, 5, o.swing.toFixed(2) + 's');
+      html += bar('📊', 'DPS', o.dmg / o.swing, 200);
+      html += bar('📏', 'リーチ', o.range, 4.5, o.range + 'm');
+      html += bar('🔨', '重撃ダメージ', o.dmg * o.heavy[0], 320, String(Math.round(o.dmg * o.heavy[0])));
+      html += bar('🔨', '重撃倍率', o.heavy[0], 3.5, '×' + o.heavy[0]);
+      html += bar('👟', '移動速度', o.moveMul - 1, 0.2, '+' + Math.round((o.moveMul - 1) * 100) + '%');
+      html += `<div style="margin-top:8px"><span class="tag">🔑 ${G.K('w3')} で持ち替え / 左:連撃 / 右:重撃</span>${o.traitDesc ? `<span class="tag">✦ ${o.traitDesc}</span>` : ''}${o.el && G.Elem.BY[o.el] ? `<span class="tag" style="color:${G.Elem.BY[o.el].col}">${G.Elem.BY[o.el].icon} ${G.Elem.BY[o.el].name}属性</span>` : ''}${o.elem ? `<span class="tag">${{ burn: '🔥 炎上', frost: '❄️ 冷気', poison: '☠️ 毒', shock: '⚡ 電撃' }[o.elem]} ${Math.round(o.elemChance * 100)}%</span>` : ''}${o.critChance ? `<span class="tag">💢 会心+${Math.round(o.critChance * 100)}%</span>` : ''}${o.lifesteal ? `<span class="tag">🩸 吸血${Math.round(o.lifesteal * 100)}%</span>` : ''}<span class="tag">🪙 ${o.price ? U.fmt(o.price) : '初期装備'}</span></div>`;
+    } else if (tab === 'enemy') {
+      const lv = Math.max(1, o.minArea);
+      html += bar('❤️', 'HP (Lv.1)', o.hp, 900);
+      html += bar('⚔️', '攻撃 (Lv.1)', o.dmg, 60);
+      html += bar('👟', '移動速度', o.speed, 12, o.speed.toFixed(1));
+      html += bar('📐', 'サイズ', o.size, 1.6, '×' + o.size.toFixed(2));
+      html += `<div style="margin-top:8px"><span class="tag">⚔️ 攻撃: ${ATK[o.attack] || '-'}</span><span class="tag">🧠 ${AI[o.ai] || o.ai}</span>${(() => { const E = G.Elem, el = o.auFix || o.el; if (!el || !E.BY[el]) return ''; const L = E.BY[el]; return o.auFix ? `<span class="tag" style="color:${L.col}">${L.icon} 常に${L.name}属性（${L.name}に70%耐性）</span>` : `<span class="tag" style="color:${L.col}">${L.icon} ${L.name}属性の攻撃（${L.name}に25%耐性）</span>`; })()}${o.shield ? `<span class="tag">💠 シールド ${Math.round(o.shield * 100)}%</span>` : ''}${o.flyer ? '<span class="tag">🦇 飛行</span>' : ''}${o.elem ? `<span class="tag">${{ fire: '🔥', frost: '❄️', poison: '☠️', shock: '⚡' }[o.elem]} 属性攻撃</span>` : ''}${o.revive ? '<span class="tag">☠ 復活</span>' : ''}${o.dodge ? '<span class="tag">🌫️ 回避</span>' : ''}${o.frontArmor ? '<span class="tag">🛡 前面装甲</span>' : ''}${o.undead ? '<span class="tag">💀 不死</span>' : ''}<span class="tag">🗺️ 出現 ${firstSeen(o)}</span><span class="tag">☠ 撃破 ${G.save.data.codex.kills[o.id] || 0}</span></div>`;
+    } else if (tab === 'boss') {
+      // stats from a real instance at its first appearance (same numbers the fight uses)
+      const st = bossStats(o);
+      if (st) {
+        html += bar('❤️', 'HP', st.hp, bossHpMax(), U.fmt(st.hp));
+        html += bar('⚔️', '攻撃倍率', st.dmg, 3, '×' + st.dmg.toFixed(2));
+        html += bar('📐', 'サイズ', st.size, 14, st.size.toFixed(1) + 'm');
+        html += '<div style="margin-top:4px;font-size:12px;color:var(--dim)">基準：ノーマル・エリア7の守護者（難易度やエリアで変わります）</div>';
+        if (st.weak.length) html += `<div style="margin-top:6px"><span class="tag">🎯 部位: ${st.weak.map(U.esc).join(' / ')}</span></div>`;
+      }
+      { const E = G.Elem, b = E.BOSS[o.id], k = o.id === 'abyssking' ? E.KING : o.id === 'twins' ? [['fire', 'ice'], ['ice', 'fire']] : b ? [b] : null; if (k) html += `<div style="margin-top:6px">${k.map(([u, w]) => `${u ? `<span class="tag" style="color:${E.BY[u].col}">${E.BY[u].icon} ${E.BY[u].name}属性の攻撃（${E.BY[u].name}に25%耐性）</span>` : ''}${w ? `<span class="tag" style="color:${E.BY[w].col}">${E.BY[w].icon} ${E.BY[w].name}が弱点（+25%）</span>` : ''}`).join('')}${o.id === 'abyssking' ? '<span class="tag">段階ごとに炎→氷→雷</span>' : o.id === 'twins' ? '<span class="tag">片方が炎、片方が氷</span>' : ''}</div>`; }
+      html += `<div style="margin-top:6px">${o.mech.map((m) => `<div style="padding:4px 0">◆ ${m}</div>`).join('')}</div><div style="margin-top:8px"><span class="tag">⚔ 出現: ${o.id === 'sovereign' ? 'エクストラの最終エリア（専用のフィールド）' : o.id === 'sovereign2' ? '虚無の君主の王冠が砕けた後' : (Object.keys(G.Run.BOSS_POOLS).filter((f) => G.Run.BOSS_POOLS[f].includes(o.id)).map((f) => G.Run.FIELD_NAME[f]).join('・') || '—') + 'の守護者'}</span></div>`;
+    } else if (tab === 'stage') {
+      html += stageDetail(o);
+    } else if (tab === 'attachment') {
+      html += `<div><span class="tag">${G.ATT_SLOTS[o.slot].icon} スロット: ${G.ATT_SLOTS[o.slot].name}</span><span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
+    } else if (tab === 'armor') {
+      const S = G.ARMOR_SLOT_BY_ID[o.slot], M = G.ARMOR_MAT_BY_ID[o.mat];
+      html += bar('🛡️', '防御力', o.def, 42, String(o.def));
+      html += bar('⚖️', '重さ', o.weight, 2.1, o.weight ? String(o.weight) : 'なし');
+      html += `<div style="margin-top:8px"><span class="tag">${S.icon} 部位: ${S.name}</span><span class="tag">🧵 素材: ${M.name}</span><span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
+      if (o.fixed.length) html += `<div style="margin-top:6px">${o.fixed.map((f) => `<div style="padding:3px 0;color:#ffd890">◆ ${f.desc}</div>`).join('')}</div>`;
+      html += `<div style="margin-top:6px;font-size:12px;color:var(--dim)">🔧 総耐久 <b style="color:var(--text)">${G.armorMaxDur(o)}</b>（被弾で減り、0で壊れて消える。拾った物は0〜90%削れている／ショップは新品）</div>`;
+      html += `<div style="margin-top:6px;font-size:12px;color:var(--dim)">${{ rare: 'まれにエンチャントが1つ付く（10%）。', epic: 'エンチャントが付くことが多い（1つ70%・2つ10%）。', legendary: 'エンチャントが必ず付く（1つ20%・2つ70%・3つ10%）。', mythic: 'エンチャントが必ず2つ以上付く（2つ60%・3つ40%）。数値は高い方の半分から選ばれる。' }[o.rarity] || 'エンチャントは付かない。'}</div>`;
+    } else if (tab === 'valuable') {
+      html += `<div style="margin-top:8px"><span class="tag">💰 売値 ${U.fmt(o.value)}🪙</span><span class="tag">📐 大きさ ${o.size[0]}×${o.size[1]}</span><span class="tag">⚖️ 商人で売却専用</span></div>`;
+    } else if (tab === 'item') {
+      html += `<div><span class="tag">${G.ITEM_CAT[o.cat].icon} ${G.ITEM_CAT[o.cat].name}</span><span class="tag">🔑 ${o.cat === 'grenade' ? `${G.K('grenade')} で構え→左クリック投擲/右クリック下投げ` : (o.passive ? '常時：持っているだけで発動' : o.kit ? (o.data.forge ? '持ち物画面で武器へドラッグ' : '持ち物画面で防具へドラッグ') : `${G.K('item1')} / ${G.K('item2')} で使用`)}</span><span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
+    } else if (tab === 'ult') {
+      html += bar('⏳', 'クールタイム', o.cd, 160, o.cd + '秒');
+      html += `<div><span class="tag">🔑 ${G.input.skillKey(0)}（アルティメット専用枠）</span>${(() => { const c = G.Classes && G.Classes.LIST.find((x) => x.ult === o.id); return c ? `<span class="tag">🎁 ${c.icon}${c.name}の初期装備</span><span class="tag">🪙 ${U.fmt(o.price)}</span>` : `<span class="tag">🪙 ${U.fmt(o.price)}</span>`; })()}</div>`;
+    } else if (tab === 'skill') {
+      html += bar('⏳', 'クールタイム', o.cd, 35, o.cd + '秒');
+      html += `<div><span class="tag">🔑 ${[0, 1, 2, 3].map((i) => G.input.skillKey(i)).join(' / ')}</span>${o.p.charges ? `<span class="tag">🔋 チャージ ${o.p.charges}</span>` : ''}<span class="tag">🪙 ${U.fmt(o.price)}</span></div>`;
+    } else if (tab === 'buff') {
+      html += `<div><span class="tag">${G.ui.catLabel(o.cat)}</span><span class="tag">${o.max > 1 ? '📚 最大' + o.max + '重ね' : '✨ 固有'}</span></div>`;
+    }
+    html += '</div></div>';
+    d.innerHTML = html;
+    if (want3d) mount3d(document.getElementById('cx-3d'), o);
+  }
+  const ATK = { lunge: '飛びかかり', slash: '斬撃', slam: '叩きつけ（範囲）', bounce: '跳躍圧殺', swoop: '急降下', pounce: '跳躍＋糸', throw: '火球投擲', beam: '熱線', charge: '突進', orb: '追尾呪弾', spore: '毒胞子', boulder: '岩投げ＋叩きつけ', dashslash: '迅速斬り', burrow: '地中奇襲', support: '回復・シールド付与', none: '逃走' };
+  const AI = { flank: '包囲型', ranged: '遠距離型', melee: '近接型', flyer: '飛行型', support: '支援型', burrow: '潜伏型', flee: '逃走型' };
+  function catText(o) {
+    if (tab === 'buff') return '加護';
+    if (tab === 'weapon') return o.cat;
+    if (tab === 'melee') return '近接武器 · ' + o.cat;
+    if (tab === 'attachment') return 'アタッチメント';
+    if (tab === 'item') return G.ITEM_CAT[o.cat].name;
+    if (tab === 'skill') return 'スキル';
+    if (tab === 'ult') return 'アルティメット';
+    if (tab === 'enemy') return '魔物' + (o.vicon ? ' ' + o.vicon : '');
+    if (tab === 'boss') return 'ボス';
+    if (tab === 'armor') return '防具（' + G.ARMOR_SLOT_BY_ID[o.slot].name + '・' + G.ARMOR_MAT_BY_ID[o.mat].name + '）';
+    if (tab === 'valuable') return '金品';
+    if (tab === 'depth' || tab === 'rx') return o.cat;
+    if (tab === 'stage') return o.where.length ? o.where[0] + (o.where.length > 1 ? ' ほか' : '') : '';
+    return '';
+  }
+  // ---------------- the four fields ----------------
+  // (the rarity of a field is its depth: the surface uncommon, the eight of the middle tiers one pool and rare, the deep epic)
+  const FIELD_INFO = {
+    grave: { icon: '🪦', rarity: 'uncommon', desc: '月明かりの下の屋外の墓所。墓石と鉄柵、枯れ木、霊廟が並ぶ。守護者の待つ戦場は鉄柵に囲まれ、長い墓道の先にある。' },
+    gate: { icon: '🚪', rarity: 'rare', desc: '迷宮の入口。天井は高いが閉ざされ、鉄格子の窓から夜空と月明かりが差し込む。守護者の間へは長い回廊を進み、自動で開く石の扉をくぐる（戻れない）。' },
+    halls: { icon: '🏛️', rarity: 'rare', desc: '迷宮の中層。スポーン地点から出口へ向かって、溶岩の谷が南北に長く延び、西側と東側の3階建てに分ける。谷の両端には床があり、回り込める。同じ側は階段・木の坂・ハシゴで上下し、谷には板だけの橋（各階に1本以上）と、綱渡りの細い鎖が渡る。外壁には鉄格子の部屋が掘り込まれ、近づくと敵が1体だけ這い出る「湧き墓」が立つ。' },
+    hamlet: { icon: '🏚️', rarity: 'uncommon', desc: '霧に沈む、人の消えた村。家々が肩を寄せて細い路地に並び、ほとんどの家に入れる。平屋の平らな屋根の上は歩け、路地をまたぐ板でつながり、外壁の階段や二階建ての家の中の階段から上がれる。路地と部屋、屋根の上の二層で戦う。広場の鐘楼の鐘は、綱を引くか撃つと三度鳴り、響きの届いた敵を怯ませる（一度きり）。小川の流れる村もある。' },
+    dusk: { icon: '🌇', rarity: 'uncommon', desc: '深淵にかかる大橋の上に残る、夕日の廃都。南の崖から北の崖まで一本の橋が渡り、両脇は奈落。甲板の上には崩れた家並みと大通り、橋の片側の内部には奈落に開いたアーチの続く地下回廊が走り、甲板の井戸の階段で下りられる。甲板が崩れ落ちた所もある。ひびの入った大柱は、撃つか叩くと傾いた向きへ倒れ、下にいる者を押し潰す。' },
+    battlefield: { icon: '⚔️', rarity: 'uncommon', desc: '夜明け前の灰色の空の下、かつて戦があった丘。壁はなく、地面そのものがうねる。尾根と峠、塚の並ぶ野、枯れた沢筋。攻城兵器の残骸、杭の列、突き立ったままの槍、二つの軍の旗が残り、外周は岩山に囲まれる。出口は奥の崖に穿たれた門。' },
+    shaft: { icon: '🌀', rarity: 'rare', desc: '夜空へ口を開けた、岩に穿たれた巨大な円い縦穴。入口は上の縁にあり、壁に沿って刻まれた広い道を螺旋に下っていく。一巡りごとに11mほど低くなり、真ん中は底まで吹き抜けで、下の段へ飛び降りれば近道になる。底の北、道の下をくぐる大きなアーチの先に門の回廊がある。' },
+    mine: { icon: '⛏️', rarity: 'rare', desc: '掘り捨てられた古い坑道。広間はなく、形の不揃いな洞窟がそれぞれ違う高さにあり、上り下りする狭い坑道がそれらを網の目につなぐ。坑木が坑道を支え、レールとトロッコが残り、岩の中で鉱石の脈が光る。門はそれぞれ別の洞窟の奥に開く。' },
+    pillars: { icon: '🗿', rarity: 'epic', desc: '床のない闇から立ち上がる、無数の石柱の海。高さの少しずつ違う柱が肩を寄せ合って立ち、その頭が崩れた地面になる。柱の群れの間には闇の水路が走り、細い石の梁が渡る。戦っている間にも、継ぎ目が光った柱から闇へ沈み、しばらくして浮かび上がる。乗ったままだと一緒に沈む。入口から門までは、決して沈まない柱の道がつながっている。' },
+    catacombs: { icon: '⚰️', rarity: 'rare', desc: '高い丸天井の下に南北へ延びる、細長い納骨の大回廊。両側の壁は骨を納めた棚が段々に積み上がり、高さ4.5mと9mの二段の通路が続く。段は正面の階段で上り下りし、一段目どうしは回廊をまたぐ石橋でつながる。一段目の壁には鉄格子の扉のある小さな納骨室が掘られ、扉を閉めれば敵は叩き壊すまで足止めされる。交差部に骨の塔が立つものや、段の一部が崩れてがれきの坂になったものもある。' },
+    castle: { icon: '🏰', rarity: 'rare', desc: '血の色の月の下、山の斜面に三段に築かれた古城。入口は天守のある上の郭で、門は一番下の外郭にある。段の縁の胸壁から下の郭を見下ろし、門楼の下の階段で下りる。胸壁を越えて飛び降りることもできるが、上るには階段しかない。外郭の歩廊の大釜を傾けると、城壁の下に煮え油が流れ落ちて燃え上がる。' },
+    flooded: { icon: '🌊', rarity: 'rare', desc: '洞窟の底に沈んだ町。水の上に出ているのは壁と屋根だけで、壁の上と平らな屋根、通りをまたぐアーチと板が道になる。その間の水は深く、下りられるが、胸まで浸かって歩みは遅く、ほとんど跳べない（水の魔物は平気で動く）。所々に水から上がる階段がある。水門の車輪を回すと激流が通りを横切り、水の中の敵を押し流す。' },
+    foundry: { icon: '🔥', rarity: 'rare', desc: '溶けた鉄の湖の上に建つ、まだ機械の動く古い溶鉱炉。床はなく、鉄張りの作業場が二つの高さで溶鉄から立ち、足場の渡り廊下が必ずどこかへつながる。その間を、隙間を往復する台車、低い作業場から高い作業場へ上がる昇降台、上に立つ者を運ぶコンベアが動く。落ちると熱に弾き返され、元の場所に戻る。吊られたるつぼを撃つと、真下に溶鉄が降り注ぐ。' },
+    frozen: { icon: '❄️', rarity: 'epic', desc: '凍りついた地底湖の上に建つ霊廟の大広間。戦う床は氷そのもので、よく滑る。爆発や落ちてきた氷柱でひびが入り、二度目で割れて、下の冷たい水に落ちると最後に立っていた岸へ戻される（敵は戻らない）。割れた所はしばらくで凍り直す。湖の周りは石の岸、氷の中には墓の島が立ち、天井からは氷柱が落ちてくる。' },
+    sanctum: { icon: '☁️', rarity: 'epic', desc: '深淵の底に広がる、偽りの空に浮かぶ聖域。白い石の島々を広い橋がつなぎ、雲の下は闇。島の縁の風の像を目覚めさせると、突風が島を横切り、敵を奈落へ押し流す。' },
+    ruin: { icon: '🕳️', rarity: 'epic', desc: '迷宮の最奥、蒼い炎が燃える廃都。中層と同じ、南北に延びる谷で二分された3階建てで、谷底には蒼炎が流れる。崩落が進み、柱は折れ、各階の床の裂け目からも蒼炎が噴き出す（触れると高レベルの炎上）。「湧き墓」が中層より多く、鉄格子の部屋に多く立つ。' },
+  };
+  let STAGES = null;
+  function stages() {
+    if (STAGES) return STAGES;
+    const R = G.Run;
+    // (the new fields show once they are in the game; a tier's fields are drawn per segment, so each lists every segment of its tier)
+    const keys = Object.keys(FIELD_INFO).filter((k) => ['grave', 'gate', 'halls', 'ruin'].includes(k) || (R.ready && R.ready(k)));
+    keys.sort((a, b) => (R.tierOf ? R.tierOf(a) - R.tierOf(b) : 0));
+    STAGES = keys.map((key, i) => {
+      const B = G.Tex.BIOMES[key], F = FIELD_INFO[key];
+      const where = [];
+      const same = (f) => (R.drawPool ? R.drawPool(f).includes(key) : f === key); // (the segments that draw this field: the middle tiers share one pool)
+      for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (same(f)) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
+      return { id: 'stage_' + key, key, idx: i, name: B.name, icon: F.icon, rarity: F.rarity, desc: F.desc, where };
+    });
+    return STAGES;
+  }
+  function stageDetail(o) {
+    // the guardians of every segment that may draw this field (a field of the middle tiers is met in the entrance's and the middle depths' segments)
+    const R = G.Run, bases = R.drawPool ? R.TIERS.map((t) => t[0]).filter((b) => R.drawPool(b).includes(o.key)) : [o.key];
+    const pool = [...new Set(bases.flatMap((b) => (R.bossPool ? R.bossPool(b) : R.BOSS_POOLS[b] || [])))].map((id) => G.BOSS_BY_ID[id]).filter(Boolean);
+    let h = `<div style="margin-top:8px;font-weight:700">🗺️ 登場する難易度・区分</div><div style="font-size:12.5px;line-height:1.7;color:#cfc4b0">${o.where.join('　/　') || '—'}</div>`;
+    h += `<div style="margin-top:10px;font-weight:700">👑 守護者（区分ごとに、その区分の候補から1体が現れる）</div><div style="margin-top:4px">${pool.map((b) => G.save.data.codex.bosses[b.id] ? `<span class="tag">${b.icon} ${U.esc(b.name)}</span>` : '<span class="tag">❔ ？？？</span>').join('')}</div>`;
+    const pool2 = G.game.enemyPool(13, o.key).slice().sort((a, b) => b[1] - a[1]).slice(0, 8);
+    h += `<div style="margin-top:10px;font-weight:700">👹 よく現れる魔物</div><div style="margin-top:4px">${pool2.map(([e]) => G.save.data.codex.enemies[e.id] ? `<span class="tag">${e.icon} ${U.esc(e.name)}</span>` : '<span class="tag">❔ ？？？</span>').join('')}</div>`;
+    return h;
+  }
+  const bossCache = {};
+  // every guardian is shown at the same reference point (normal difficulty, area 7) so the numbers can be compared across the list
+  const BOSS_REF = 7;
+  function bossStats(o) {
+    if (bossCache[o.id]) return bossCache[o.id];
+    const R = G.Run, GM = G.game, keepRun = R.cur, keepArea = GM.area;
+    R.cur = { id: 'normal', lv: 0 }; GM.area = BOSS_REF;
+    try {
+      const m = G.bosses.buildModelOnly(o.id, BOSS_REF); if (!m) return null;
+      const b = m.boss;
+      const box = new THREE.Box3().setFromObject(m.root);
+      const names = [...new Set(b.parts.map((p) => p.def && p.def.name).filter((n) => n && n !== o.name))].slice(0, 5);
+      return (bossCache[o.id] = { hp: Math.round(b.maxHp), dmg: b.dmgScale, size: box.max.y - box.min.y, weak: names });
+    } finally { R.cur = keepRun; GM.area = keepArea; }
+  }
+  function bossHpMax() {
+    let mx = 1;
+    for (const b of G.BOSSES) if (!(G.RETIRED_BOSSES || []).includes(b.id)) { const st = bossStats(b); if (st) mx = Math.max(mx, st.hp); }
+    return mx * 1.1;
+  }
+  function mount3d(host, o) {
+    if (!renderer) {
+      canvas = document.createElement('canvas');
+      try {
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      } catch (e) { renderer = null; host.innerHTML = `<div class="cd-icon">${o.icon}</div>`; return; }
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+      renderer.setSize(380, 260);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xb0a8a0, 0x302820, 1.2));
+      const k = new THREE.DirectionalLight(0xffe0c0, 2.2); k.position.set(2, 3, 2); scene.add(k);
+      const r2 = new THREE.DirectionalLight(0x8090c0, 1.0); r2.position.set(-2, 1, -2); scene.add(r2);
+      scene.environment = G.envTex || null;
+      cam = new THREE.PerspectiveCamera(35, 380 / 260, 0.01, 100);
+    }
+    host.appendChild(canvas);
+    if (model) scene.remove(model);
+    animState = null;
+    if (tab === 'boss') {
+      const m = G.bosses.buildModelOnly(o.id, BOSS_REF);
+      if (!m) { host.innerHTML = `<div class="cd-icon">${o.icon}</div>`; return; }
+      const r = m.root; r.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(r); const c = box.getCenter(new THREE.Vector3()); const sz = box.getSize(new THREE.Vector3());
+      r.position.sub(c);
+      const g = new THREE.Group(); g.add(r); model = g;
+      const s = Math.max(sz.x, sz.y, sz.z);
+      cam.position.set(0, s * 0.18, s * 1.55); cam.lookAt(0, 0, 0); cam.far = s * 10; cam.updateProjectionMatrix();
+      scene.add(model); if (!raf) loop(); return;
+    }
+    if (tab === 'weapon' || tab === 'melee') {
+      model = tab === 'melee' ? G.weapons.meleeDisplayModel(o) : G.weapons.displayModel(o);
+      const box = new THREE.Box3().setFromObject(model); const c = box.getCenter(new THREE.Vector3()); const sz = box.getSize(new THREE.Vector3()).length();
+      model.position.sub(c);
+      const g = new THREE.Group(); g.add(model); model = g;
+      cam.position.set(0, sz * 0.25, sz * 1.6); cam.lookAt(0, 0, 0);
+    } else {
+      const m = G.enemies.buildModel(o);
+      model = m.group;
+      const h = m.h, s = Math.max(h, m.r * 2.5);
+      model.position.y = -h * 0.5;
+      const g = new THREE.Group(); g.add(model); model = g;
+      cam.position.set(0, h * 0.15, s * 2.2); cam.lookAt(0, 0, 0);
+      animState = m;
+      if (m.worm) { m.J.segs.forEach((sg, i) => sg.position.set(0, 0.8 - i * 0.05, -0.6 * (i + 1))); }
+    }
+    scene.add(model);
+    if (!raf) loop();
+  }
+  function loop() {
+    raf = requestAnimationFrame(loop);
+    if (!document.getElementById('cx-3d')) { cancelAnimationFrame(raf); raf = 0; return; }
+    const t = performance.now() / 1000;
+    if (model) model.rotation.y = t * 0.6;
+    if (animState && animState.animate && !animState.worm) animState.animate({ walk: t * 6, mv: 1, atk: Math.max(0, Math.sin(t * 1.3)) * 0.6, wind: 0, flinch: 0, t });
+    renderer.render(scene, cam);
+  }
+})();

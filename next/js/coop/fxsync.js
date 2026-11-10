@@ -1,0 +1,332 @@
+'use strict';
+// Co-op: what one player does with skills, ultimates and throwables is seen by the others.
+//  - the big effects (explosions, rings, flashes, beams, lightning, bubbles, smoke) made by your own actions are replayed on their screens;
+//  - your projectiles (grenades, rockets, arrows, orbs ...) fly on their screens too, as pictures only: the damage is worked out where they are thrown;
+//  - zones and ultimate auras you leave on the ground are drawn on their screens (their damage is yours);
+//  - a grenade that goes off beside someone else's character hurts them as it would hurt its thrower (G.GRENADE_SELF: 2% of its damage).
+(function () {
+  const K = G.Coop;
+  const V = G.U.V;
+  const U = G.U;
+  const r2 = (v) => Math.round(v * 100) / 100;
+
+  K.installFx = function () {
+    const C = G.combat, FX = G.fx, A = G.abilities, P = G.player, GM = G.game;
+    K.own = 0;
+    const own = () => K.live && !K._fxNet && !K._noMirror && (K.own > 0 || !!C.curSk);
+    const withOwn = (fn) => function () { K.own++; try { return fn.apply(this, arguments); } finally { K.own--; } };
+    const enc = (v) => {
+      if (v && v.isVector3) return { $v: [r2(v.x), r2(v.y), r2(v.z)] };
+      if (v && v === G.player) return { $p: K.id }; // (an effect that follows its caster follows his figure on the other screens)
+      if (Array.isArray(v)) return { $a: v.map(enc) };
+      if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v;
+      if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) return K.plain(v);
+      return null;
+    };
+    const dec = (v) => (v && v.$v ? V(...v.$v) : v && v.$p !== undefined ? (K.players.get(v.$p) || { pos: V(0, -999, 0) }) : v && v.$a ? v.$a.map(dec) : v && typeof v === 'object' ? K.unplain(v) : v);
+    const q = [];
+    const push = (m) => { if (q.length < 60) q.push(m); };
+
+    // ---------------- effects ----------------
+    for (const fn of ['explosion', 'ring', 'flash', 'beam', 'lightning', 'bubble', 'smoke', 'fireBurst', 'dust', 'sparks']) {
+      const f = FX[fn];
+      FX[fn] = function () {
+        if (own() && !(K._vxDepth > 0)) push(['f', fn, Array.prototype.map.call(arguments, enc)]);
+        return f.apply(FX, arguments);
+      };
+    }
+    // the mesh effects (vfx.js) go the same way; what one of them makes on its own (a nova's spikes, its bolts) is not sent again
+    const VX = G.vfx;
+    for (const fn of ['nova', 'wave', 'pillar', 'slash', 'spikes', 'meteor', 'bell', 'shield', 'motes', 'area', 'wall', 'tube', 'fan', 'vortex']) {
+      const f = VX[fn]; if (!f) continue;
+      VX[fn] = function () {
+        if (own() && !(K._vxDepth > 0)) push(['v', fn, Array.prototype.map.call(arguments, enc)]);
+        K._vxDepth = (K._vxDepth || 0) + 1;
+        try { return f.apply(VX, arguments); } finally { K._vxDepth--; }
+      };
+    }
+    // the 秘伝's pictures (一閃's shaft of light, 飛燕's flying crescent: classes.js) come only from the player's own blows
+    for (const fn of ['focusBeam', 'skySlash']) {
+      const f = VX[fn]; if (!f) continue;
+      VX[fn] = function () {
+        if (K.live && !K._fxNet && !K._noMirror && !(K._vxDepth > 0)) push(['v', fn, Array.prototype.map.call(arguments, enc)]);
+        K._vxDepth = (K._vxDepth || 0) + 1;
+        try { return f.apply(VX, arguments); } finally { K._vxDepth--; }
+      };
+    }
+    // a held beam (a guardian's sweeping laser): its position goes out 20 times a second and the other screens hold their own copy
+    const vray = VX.ray, rays = new Map(); let rid = 0;
+    VX.ray = function (col, c2, al) {
+      const h = vray.call(VX, col, c2, al);
+      if (own() && !(K._vxDepth > 0)) {
+        const id = K.id + '-' + (++rid), set0 = h.set; let last = 0;
+        h.set = function (a, b, r, rv) { set0.call(h, a, b, r, rv); const now = performance.now(); if (now - last > 45) { last = now; push(['vr', { id, a: K.vec(a), b: K.vec(b), r: r2(r), rv: rv == null ? null : r2(rv), c: col, c2: c2 ?? null, al: al ?? null }]); } };
+      }
+      return h;
+    };
+    // the same for an upright sheet of light
+    const vcurt = VX.curtain, curts = new Map();
+    VX.curtain = function (col) {
+      const h = vcurt.call(VX, col);
+      if (own() && !(K._vxDepth > 0)) {
+        const id = K.id + '-k' + (++rid), set0 = h.set; let last = 0;
+        h.set = function (a, b, ha, hb) { set0.call(h, a, b, ha, hb); const now = performance.now(); if (now - last > 45) { last = now; push(['vk', { id, a: K.vec(a), b: K.vec(b), ha: r2(ha), hb: r2(hb), c: col }]); } };
+      }
+      return h;
+    };
+    const putCurtain = (m) => { let h = curts.get(m.id); if (!h || h.gone) { K._fxNet = true; try { h = vcurt.call(VX, m.c); } finally { K._fxNet = false; } curts.set(m.id, h); } h.set(V(...m.a), V(...m.b), m.ha, m.hb); if (curts.size > 40) for (const [k, v] of curts) if (v.gone) curts.delete(k); };
+    const putRay = (m) => { let h = rays.get(m.id); if (!h || h.gone) { K._fxNet = true; try { h = vray.call(VX, m.c, m.c2 ?? undefined, m.al ?? undefined); } finally { K._fxNet = false; } rays.set(m.id, h); } h.set(V(...m.a), V(...m.b), m.r, m.rv ?? undefined); if (rays.size > 40) for (const [k, v] of rays) if (v.gone) rays.delete(k); };
+    // sounds go the same way, a few at a time: skills, the guardian's attacks, and on the host the foes' growls and swings (the guests' foes are puppets and make none)
+    let sndN = 0;
+    for (const fn of ['monster', 'magic', 'whoosh', 'attackWind', 'rumble', 'mech', 'shieldBreak', 'thunder', 'bell', 'chain', 'zap', 'fire', 'stoneGrind', 'swing', 'impact', 'spit', 'ice']) {
+      const f = G.sfx[fn]; if (!f) continue;
+      G.sfx[fn] = function () {
+        if ((own() || (K.ownS > 0 && !K._fxNet)) && sndN < 10) { sndN++; push(['s', fn, Array.prototype.map.call(arguments, enc)]); }
+        return f.apply(G.sfx, arguments);
+      };
+    }
+    // what the guardian does happens only on the host: its effects are sent, as for a skill (its fall and the last guardian's change of form run on every machine)
+    const bu = G.bosses.update;
+    G.bosses.update = function (dt) {
+      const b = G.bosses.active;
+      if (!(K.role === 'host' && K.live && b && !b.dead && b.state !== 'transform')) return bu.call(G.bosses, dt);
+      K.own++; try { return bu.call(G.bosses, dt); } finally { K.own--; }
+    };
+    if (K.role === 'host') {
+      const Ep = G.enemies.Enemy.prototype, up = Ep.update;
+      Ep.update = function (dt) { K.ownS = (K.ownS || 0) + 1; try { return up.call(this, dt); } finally { K.ownS--; } };
+    }
+    // a melee weapon's sparks and swings
+    const wu = G.weapons.update;
+    G.weapons.update = function (dt) { const m = P.meleeMode && G.weapons.meleeBusy && G.weapons.meleeBusy(); if (m) K.own++; try { return wu.call(G.weapons, dt); } finally { if (m) K.own--; } };
+    // ---------------- throwables and skills: the scopes that are not skills ----------------
+    A.releaseGrenade = withOwn(A.releaseGrenade);
+    A.grenadeEffect = withOwn(A.grenadeEffect);
+    A.applyItem = withOwn(A.applyItem);
+    A.summonSkeleton = withOwn(A.summonSkeleton);
+
+    // ---------------- projectiles ----------------
+    const PJ = ['kind', 'look', 'grav', 'life', 'radius', 'fuse', 'bounce', 'sticky', 'explode'];
+    const sp = C.spawnProjectile;
+    C.spawnProjectile = function (o) {
+      const p = sp.call(C, o);
+      if (K.live && !K._pjNet && o.owner === 'player' && !o.mine && o.pos && o.vel) {
+        const m = { pos: enc(o.pos), vel: enc(o.vel), who: K.id };
+        for (const k of PJ) if (o[k] !== undefined && typeof o[k] !== 'function' && typeof o[k] !== 'object') m[k] = o[k];
+        push(['p', m]);
+      }
+      return p;
+    };
+    const putProjectile = (m) => {
+      const o = { owner: 'remote', dmg: 0, info: { src: 'explosion', remoteViz: true }, pos: V(...m.pos.$v), vel: V(...m.vel.$v) };
+      for (const k of PJ) if (m[k] !== undefined) o[k] = m[k];
+      o.life = Math.min(o.life || 6, 8);
+      K._pjNet = true;
+      try { sp.call(C, o); } finally { K._pjNet = false; }
+    };
+    // ---------------- explosions ----------------
+    const ex = C.explode;
+    C.explode = function (pos, r, dmg, info) {
+      if (info && info.remoteViz) return; // a picture of someone else's shot: the real blast is theirs
+      if (!K.live) return ex.call(C, pos, r, dmg, info);
+      // (a foe's blast is sent on its own: not twice)
+      if (info && info.enemy) { K._noMirror = (K._noMirror || 0) + 1; try { return ex.call(C, pos, r, dmg, info); } finally { K._noMirror--; } }
+      K.own++;
+      try {
+        if (info && info.grenade && !info.isCluster && !info.noSelf) push(['x', { p: K.vec(pos), r: r2(r * (1 + P.stats.explosionRadius)), d: r2(dmg), who: K.id }]);
+        return ex.call(C, pos, r, dmg, info);
+      } finally { K.own--; }
+    };
+    // a grenade of someone else: 2% of its damage (G.GRENADE_SELF), as for its own thrower
+    const friendly = (m) => {
+      if (!K.ff || P.dead || GM.state === 'dead' || !G.world) return;
+      const d = P.pos.distanceTo(V(...m.p));
+      if (d < m.r) C.damagePlayer(m.d * G.GRENADE_SELF / ((C.ENEMY_DMG || 1) * Math.max(0.1, 1 + P.stats.enemyDmg)), { src: 'explosion', pos: V(...m.p) });
+    };
+
+    // a decoy draws the foes, whoever set it down (the foes are the host's)
+    const ad = C.addDecoy;
+    C.addDecoy = function (pos, dur, x) {
+      const r = ad.call(C, pos, dur, x);
+      if (K.live && !K._net) push(['d', { p: K.vec(pos), dur: r2(dur) }]);
+      return r;
+    };
+    // ---------------- things a skill sets down: walls (they stop everyone), the bolt turret ----------------
+    const Wp = G.world.constructor.prototype, ac = Wp.addCollider;
+    let lastCol = null;
+    Wp.addCollider = function () { const c = ac.apply(this, arguments); if (K.live && C.curSk && !K._net) lastCol = c; return c; };
+    C.walls.push = function (o) {
+      const r = Array.prototype.push.call(this, o);
+      if (K.live && lastCol && !K._net) { const c = lastCol; push(['wl', { b: [c.x0, c.y0, c.z0, c.x1, c.y1, c.z1].map(r2), t: r2(o.t) }]); }
+      lastCol = null;
+      return r;
+    };
+    const putWall = (a) => {
+      const [x0, y0, z0, x1, y1, z1] = a.b, w = G.world, col = ac.call(w, x0, y0, z0, x1, y1, z1, { surf: 'stone' });
+      const mesh = new THREE.Mesh(G.Props.PG.box, w.mats.block); mesh.scale.set(x1 - x0, y1 - y0, z1 - z0); mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); G.scene.add(mesh);
+      G.fx.dust(V((x0 + x1) / 2, y0, (z0 + z1) / 2), V(0, 1, 0), 0x8a8070, 12);
+      Array.prototype.push.call(C.walls, { t: a.t, remove() { col.alive = false; G.scene.remove(mesh); G.fx.debris(V((x0 + x1) / 2, y0 + 1, (z0 + z1) / 2), G.world.mats.block, 10, 0.3, 4); } });
+    };
+    const tu = C.spawnTurret;
+    C.spawnTurret = function (pos, dur, dmg) { const r = tu.call(C, pos, dur, dmg); if (K.live && !K._net) push(['tu', { p: K.vec(pos), t: r2(dur) }]); return r; };
+    const putTurret = (a) => { K._net = true; let r; try { r = tu.call(C, V(...a.p), a.t, 0); } finally { K._net = false; } if (r) { r.update = function () {}; r.info = () => null; } };
+    // ---------------- zones ----------------
+    const zn = C.zone, vz = [];
+    C.zone = function (pos, r, dur, kind, dps, opts) {
+      const z = zn.call(C, pos, r, dur, kind, dps, opts);
+      if (K.live && !(opts && opts.enemy) && !K._net) push(['z', { p: K.vec(pos), r: r2(r), dur: r2(dur), k: kind, who: K.id, fol: opts && opts.follow ? 1 : 0, hps: (opts && opts.hps) || 0 }]);
+      return z;
+    };
+    const zoneVisual = (z, dt) => { G.vfx.zoneTick(z, dt); };
+
+    // ---------------- ultimate auras ----------------
+    const sentAura = new WeakSet(), vAuras = [];
+    let auraT = 0;
+    const scanAuras = () => {
+      for (const a of A.auras) {
+        if (sentAura.has(a)) continue;
+        sentAura.add(a);
+        const m = { id: Math.random().toString(36).slice(2, 8), k: a.kind, t: r2(a.t), r: r2(a.r || 3), col: a.col || 0, fol: a.follow ? 1 : 0, who: K.id, heal: a.heal || 0 };
+        if (a.c) m.c = K.vec(a.c);
+        if (a.pt) m.pt = K.vec(a.pt);
+        a._cid = m.id;
+        push(['a', m]);
+      }
+      auraT -= 0.1;
+    };
+    const beamUpdates = () => {
+      for (const a of A.auras) if (a.kind === 'beam' && a._cid) push(['b', { id: a._cid, pt: K.vec(a.pt) }]);
+    };
+    const auraVisual = (a, dt) => {
+      const rp = K.players.get(a.who), c = a.k === 'beam' && a.pt ? a.pt : a.fol && rp ? rp.pos : a.c ? a.c : rp ? rp.pos : P.pos;
+      G.vfx.auraTick(a, c, dt); // (the same look as the caster's own: vfx.js)
+      // the sanctuary heals everyone inside it
+      if (a.k === 'holy' && a.heal && !P.dead && Math.hypot(P.pos.x - c.x, P.pos.z - c.z) < a.r) C.heal(P.stats.maxHp * a.heal * dt, true);
+      if (a.k === 'stomp') { a.tick = (a.tick || 0) - dt; if (a.tick <= 0) { a.tick = 1.5; G.vfx.nova(c.clone(), a.r, 0.25, { style: 'shock', dome: false }); } }
+    };
+
+    // ---------------- allies and mines: pictures on the others' screens ----------------
+    const myAllies = [], theirAllies = new Map(), theirMines = new Map();
+    const bm = G.enemies.buildModel;
+    G.enemies.buildModel = function (def, opts) {
+      const m = bm.call(G.enemies, def, opts);
+      if (K.live && opts && opts.ally && !K._net) myAllies.push({ m, id: K.id + '-' + Math.random().toString(36).slice(2, 7), did: def.id, walk: 0, lp: m.group.position.clone() });
+      return m;
+    };
+    const sendAllies = () => {
+      for (let i = myAllies.length - 1; i >= 0; i--) {
+        const a = myAllies[i], g = a.m.group;
+        if (!g.parent) { myAllies.splice(i, 1); push(['ax', a.id]); continue; }
+        const mc = G.Rooms2.mercAlly;
+        push(['al', { id: a.id, d: a.did, p: K.vec(g.position), y: r2(g.rotation.y), mc: mc && !mc.dead && mc.ent && mc.ent.pos.distanceTo(g.position) < 0.6 ? 1 : 0, who: K.id }]);
+      }
+      const seen = new Set();
+      for (const m of C.mines) {
+        if (!m._mid) { m._mid = K.id + '-' + Math.random().toString(36).slice(2, 7); push(['mn', { id: m._mid, p: K.vec(m.pos) }]); }
+        seen.add(m._mid);
+      }
+      for (const id of K._myM || []) if (!seen.has(id)) push(['mx', id]);
+      K._myM = seen;
+    };
+    const putAlly = (a) => {
+      let t = theirAllies.get(a.id);
+      if (!t) {
+        const def = G.ENEMY_BY_ID[a.d]; if (!def) return;
+        K._net = true; let m; try { m = bm.call(G.enemies, def, { ally: true }); } finally { K._net = false; }
+        G.scene.add(m.group); t = { m, walk: 0, to: V(...a.p), yaw: a.y, seen: 0 }; m.group.position.copy(t.to); theirAllies.set(a.id, t);
+      }
+      t.to.set(...a.p); t.yaw = a.y; t.seen = 0; t.mc = a.mc; t.who = a.who; t.id = a.id;
+    };
+    // a guest's mercenary is one more target for the host's foes; its wounds go back to its owner
+    if (K.role === 'host') {
+      const Ep = G.enemies.Enemy.prototype, tg = Ep.target;
+      Ep.target = function () {
+        const r = tg.call(this);
+        if (!K.live || !r.isPlayer) return r;
+        let best = null, bd = this.pos.distanceTo(r.pos) * 0.85;
+        for (const t of theirAllies.values()) { if (!t.mc) continue; const d = t.to.distanceTo(this.pos); if (d < bd) { bd = d; best = t; } }
+        if (!best) return r;
+        const t = best;
+        return { pos: t.to, eye: V(t.to.x, t.to.y + 1.3, t.to.z), vel: V(), invisible: false, isPlayer: false, ally: { hurt(v) { K.send({ t: 'fx', e: [['ah', t.id, r2(v)]] }, t.who); } } };
+      };
+    }
+    const dropAlly = (id) => { const t = theirAllies.get(id); if (t) { G.scene.remove(t.m.group); theirAllies.delete(id); } };
+    const mineMesh = () => { const m = new THREE.Mesh(G.Props.PG.cyl, new THREE.MeshStandardMaterial({ color: 0x3a3c40, emissive: 0x401008, roughness: 0.5 })); m.scale.set(0.2, 0.06, 0.2); return m; };
+    const tickViz = (dt) => {
+      for (const [id, t] of theirAllies) {
+        t.seen += dt; if (t.seen > 1.2) { dropAlly(id); continue; }
+        const g = t.m.group, px = g.position.x, pz = g.position.z;
+        g.position.lerp(t.to, Math.min(1, dt * 12)); g.rotation.y = t.yaw;
+        const sp = Math.hypot(g.position.x - px, g.position.z - pz) / (dt || 1);
+        t.walk += sp > 0.3 ? dt * 9 : 0;
+        if (t.m.animate) t.m.animate({ walk: t.walk, moving: sp > 0.3, atk: 0, t: GM.time, flinch: 0, state: 'chase' });
+      }
+    };
+
+    // ---------------- sending and receiving ----------------
+    const base = K.onFrame;
+    let sendT = 0;
+    K.onFrame = function (dt) {
+      if (base) base(dt);
+      if (!K.live) return;
+      sendT -= dt;
+      sndN = 0;
+      scanAuras();
+      // time slowed or stopped by a guest's ultimate must slow the real foes: the host is told
+      if (K.role === 'guest' && GM.chronoT > 0 && !(K._chT > 0)) K.send({ t: 'cr', d: r2(GM.chronoT), s: GM.chronoSlow });
+      K._chT = GM.chronoT;
+      if (sendT <= 0) {
+        sendT = 0.05;
+        if (A.auras.some((a) => a.kind === 'beam')) { K._bT = (K._bT || 0) + 1; if (K._bT % 3 === 0) beamUpdates(); }
+        K._alT = (K._alT || 0) + 1; if (K._alT % 2 === 0) sendAllies();
+        if (q.length) { K.send({ t: 'fx', e: q.splice(0, 60) }); }
+      }
+      tickViz(dt);
+      for (let i = vz.length - 1; i >= 0; i--) {
+        const z = vz[i]; z.t += dt;
+        const rp = K.players.get(z.who); if (z.fol && rp) z.pos.copy(rp.pos);
+        zoneVisual(z, dt);
+        // a healing field heals whoever stands in it
+        if (z.hps && !P.dead && Math.hypot(P.pos.x - z.pos.x, P.pos.z - z.pos.z) < z.r) C.heal(z.hps * dt, true);
+        if (z.t >= z.dur) { G.vfx.zoneEnd(z); vz.splice(i, 1); }
+      }
+      for (let i = vAuras.length - 1; i >= 0; i--) {
+        const a = vAuras[i]; a.t -= dt; a.age += dt;
+        auraVisual(a, dt);
+        if (a.t <= 0) { G.vfx.auraEnd(a); vAuras.splice(i, 1); }
+      }
+    };
+    K.handlers.fx = function (m, from) {
+      for (const [kind, a, b] of m.e) {
+        try {
+          if (kind === 'f') { K._fxNet = true; try { FX[a](...b.map(dec)); } finally { K._fxNet = false; } if (a === 'explosion' && b[0] && b[0].$v) G.sfx.explosion(V(...b[0].$v), (b[1] || 4) / 4); }
+          else if (kind === 'v') { K._fxNet = true; try { if (G.vfx[a]) G.vfx[a](...b.map(dec)); } finally { K._fxNet = false; } }
+          else if (kind === 'vr') putRay(a);
+          else if (kind === 'vk') putCurtain(a);
+          else if (kind === 's') { K._fxNet = true; try { G.sfx[a](...b.map(dec)); } finally { K._fxNet = false; } }
+          else if (kind === 'p') putProjectile(a);
+          else if (kind === 'x') friendly(a);
+          else if (kind === 'wl') putWall(a);
+          else if (kind === 'tu') putTurret(a);
+          else if (kind === 'ah') { const mc = G.Rooms2.mercAlly; if (mc && !mc.dead && mc.hurt) mc.hurt(b); }
+          else if (kind === 'al') putAlly(a);
+          else if (kind === 'ax') dropAlly(a);
+          else if (kind === 'mn') { const m = mineMesh(); m.position.set(...a.p); m.position.y += 0.05; G.scene.add(m); theirMines.set(a.id, m); }
+          else if (kind === 'mx') { const m = theirMines.get(a); if (m) { G.scene.remove(m); theirMines.delete(a); } }
+          else if (kind === 'd') { K._net = true; try { ad.call(C, V(...a.p), a.dur, 0); } finally { K._net = false; } }
+          else if (kind === 'z') {
+            vz.push({ pos: V(...a.p), r: a.r, dur: a.dur, t: 0, kind: a.k, who: a.who, fol: a.fol, hps: a.hps });
+            // what pulls or blinds has to work on the real foes
+            if (K.role === 'host' && (a.k === 'gravity' || a.k === 'smoke')) { K._net = true; try { zn.call(C, V(...a.p), a.r, a.dur, a.k, 0, {}); } finally { K._net = false; } }
+          }
+          else if (kind === 'a') vAuras.push({ id: a.id, k: a.k, t: a.t, r: a.r, col: a.col, fol: a.fol, who: a.who, heal: a.heal, c: a.c ? V(...a.c) : null, pt: a.pt ? V(...a.pt) : null, age: 0 });
+          else if (kind === 'b') { const v = vAuras.find((x) => x.id === a.id); if (v) { if (!v.pt) v.pt = V(...a.pt); else v.pt.lerp(V(...a.pt), 0.5); } }
+        } catch (e) { console.error(e); }
+      }
+      if (K.role === 'host') K.relay(m, from);
+    };
+    K.handlers.cr = function (m) { if (K.role === 'host') { GM.chronoT = Math.max(GM.chronoT || 0, m.d); GM.chronoSlow = Math.max(GM.chronoSlow || 0, m.s); G.ui.toastSmall('⌛ 仲間が時間を操った'); } };
+    K.vizCount = () => vz.length + vAuras.length;
+    K.clearViz = function () { for (const id of [...theirAllies.keys()]) dropAlly(id); for (const m of theirMines.values()) G.scene.remove(m); theirMines.clear(); myAllies.length = 0; for (const z of vz) G.vfx.zoneEnd(z); vz.length = 0; for (const a of vAuras) G.vfx.auraEnd(a); vAuras.length = 0; };
+  };
+})();

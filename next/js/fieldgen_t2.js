@@ -47,8 +47,8 @@
         for (let k = 0; k <= nb; k++) { const u = a0 + 0.3 + k * bw; slab('trim', u - 0.13, u + 0.13, y, y + 0.55, 0, deep, { uv: 1.2, grad: false }); }
         if (PGs.boneEnds) for (let k = 0; k < nb; k++) {
           const u = a0 + 0.3 + (k + 0.5) * bw, d = 0.13;
-          if (alongX) w.batch.geo('bone', PGs.boneEnds, Mx(u, y, c + face * d, bw - 0.3, 0.3, 0.2, 0, face > 0 ? 0 : Math.PI, 0), { tint: [0.62, 0.58, 0.5] });
-          else w.batch.geo('bone', PGs.boneEnds, Mx(c + face * d, y, u, bw - 0.3, 0.3, 0.2, 0, face > 0 ? Math.PI / 2 : -Math.PI / 2, 0), { tint: [0.62, 0.58, 0.5] });
+          if (alongX) P().inst(w, 'bone', PGs.boneEnds, Mx(u, y, c + face * d, bw - 0.3, 0.3, 0.2, 0, face > 0 ? 0 : Math.PI, 0), [0.62, 0.58, 0.5]);
+          else P().inst(w, 'bone', PGs.boneEnds, Mx(c + face * d, y, u, bw - 0.3, 0.3, 0.2, 0, face > 0 ? Math.PI / 2 : -Math.PI / 2, 0), [0.62, 0.58, 0.5]);
         }
       }
       for (let u = a0 + 0.55; u < a1 - 0.4; u += 0.55) if (rng.chance(0.7)) {

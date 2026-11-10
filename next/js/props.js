@@ -48,15 +48,37 @@
       // the ends of long bones stacked in a niche, a stretch one long and one high (set to the niche's size): knobs in rows, none like the next
       const ends = []; let sd = 7;
       const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
-      for (let j = 0; j < 4; j++) for (let i = 0; i < 9; i++) {
-        const r = 0.042 + rnd() * 0.016, g = new THREE.SphereGeometry(1, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2); g.rotateX(Math.PI / 2);
-        ends.push(Ge.xf(g, [(i + 0.5 + (j % 2) * 0.5) / 9.5 - 0.5 + (rnd() - 0.5) * 0.02, (j + 0.5) / 4 + (rnd() - 0.5) * 0.04, (rnd() - 0.5) * 0.3], null, [r, r * 2.2, 1]));
+      for (let j = 0; j < 3; j++) for (let i = 0; i < 8; i++) {
+        const r = 0.048 + rnd() * 0.018, g = new THREE.SphereGeometry(1, 5, 2, 0, Math.PI * 2, 0, Math.PI / 2); g.rotateX(Math.PI / 2);
+        ends.push(Ge.xf(g, [(i + 0.5 + (j % 2) * 0.5) / 8.5 - 0.5 + (rnd() - 0.5) * 0.02, (j + 0.5) / 3 + (rnd() - 0.5) * 0.05, (rnd() - 0.5) * 0.3], null, [r, r * 2.6, 1]));
       }
       PG.boneEnds = Ge.merge(ends);
     }
     for (const k in PG) PG[k].userData.shared = true;
   };
   P.PG = PG;
+  // Many of one thing (the skulls of an ossuary, the ends of its bones): each kind is drawn as instances of one shape, by stretches of the
+  // world some 24 m across (what is out of sight is then left out), instead of being written vertex by vertex into the world's own mesh -
+  // which took a second for a nave of them. They cast no shadow (they lie in niches).
+  P.inst = function (w, mk, geo, m4, tint) {
+    const I = w._inst || (w._inst = new Map()), e = m4.elements, key = mk + geo.uuid + '|' + Math.floor(e[12] / 24) + '|' + Math.floor(e[14] / 24);
+    let q = I.get(key); if (!q) I.set(key, q = { mk, geo, m: [], c: [] });
+    q.m.push(m4); q.c.push(tint || null);
+    if (!w._instQ) {
+      w._instQ = true;
+      w.deferred.push((grp) => {
+        w._instQ = false; const col = new THREE.Color();
+        for (const q2 of I.values()) {
+          if (!q2.m.length) continue;
+          const im = new THREE.InstancedMesh(q2.geo, w.mats[q2.mk] || w.mats.wall, q2.m.length);
+          for (let i = 0; i < q2.m.length; i++) { im.setMatrixAt(i, q2.m[i]); if (q2.c[i]) im.setColorAt(i, col.setRGB(q2.c[i][0], q2.c[i][1], q2.c[i][2])); else if (im.instanceColor) im.setColorAt(i, col.setRGB(1, 1, 1)); }
+          im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.castShadow = false; im.receiveShadow = true; im.matrixAutoUpdate = false;
+          grp.add(im);
+        }
+        I.clear();
+      });
+    }
+  };
   const rr = (rng, a, b) => rng ? rng.range(a, b) : a + Math.random() * (b - a);
 
   // ---------- light fixtures ----------
@@ -157,7 +179,7 @@
   };
   P.skull = function (w, x, y, z, ry, s) {
     s = s || 1;
-    if (PG.skullB) { w.batch.geo('bone', PG.skullB, M(x, y, z, s, s, s, 0, ry, 0)); w.batch.geo('dark', PG.skullD, M(x, y, z, s, s, s, 0, ry, 0)); return; }
+    if (PG.skullB) { const m4 = M(x, y, z, s, s, s, 0, ry, 0); P.inst(w, 'bone', PG.skullB, m4); P.inst(w, 'dark', PG.skullD, m4); return; }
     w.batch.geo('bone', PG.sph, M(x, y + 0.1 * s, z, 0.1 * s, 0.09 * s, 0.12 * s, 0, ry, 0));
     w.batch.geo('bone', PG.cbox, M(x + Math.sin(ry) * 0.06 * s, y + 0.04 * s, z + Math.cos(ry) * 0.06 * s, 0.1 * s, 0.05 * s, 0.07 * s, 0, ry, 0));
     w.batch.geo('dark', PG.sph, M(x + Math.sin(ry) * 0.09 * s - Math.cos(ry) * 0.035 * s, y + 0.11 * s, z + Math.cos(ry) * 0.09 * s + Math.sin(ry) * 0.035 * s, 0.025 * s, 0.025 * s, 0.025 * s));
@@ -441,6 +463,10 @@
     CHM.bossGold = new THREE.MeshStandardMaterial({ color: 0xffdf70, metalness: 0.48, roughness: 0.14, emissive: 0x6a4408, emissiveIntensity: 0.55 });
     CHM.royalVelvet = new THREE.MeshStandardMaterial({ color: 0x5a0838, roughness: 0.7, emissive: 0x240014, emissiveIntensity: 0.4 });
     CHM.amethyst = new THREE.MeshStandardMaterial({ color: 0xe058ff, emissive: 0x9018c8, emissiveIntensity: 0.95, roughness: 0.08, metalness: 0.2 });
+    // (what the chests of this world are fitted with: old brass gone dull, black iron, sealing wax)
+    CHM.oldBrass = new THREE.MeshStandardMaterial({ color: 0x8c7036, metalness: 0.8, roughness: 0.5 });
+    CHM.blackIron = new THREE.MeshStandardMaterial({ color: 0x33363b, metalness: 0.7, roughness: 0.55 });
+    CHM.wax = new THREE.MeshStandardMaterial({ color: 0x6e1414, roughness: 0.45 });
   };
   P.chest = function (w, x, z, y, ry, tier) {
     if (!CHM.ruby) P.initChestMats();
@@ -449,57 +475,55 @@
       const g = new THREE.Group();
       const add = (parent, geo, m, sx, sy, sz, px, py, pz, rx, ry2, rz) => { const o = new THREE.Mesh(geo, m); o.scale.set(sx, sy, sz); o.position.set(px || 0, py || 0, pz || 0); o.rotation.set(rx || 0, ry2 || 0, rz || 0); parent.add(o); return o; };
       const T = tier || 0;
-      // tier 0: weathered wood · tier 1: stained wood & steel · tier 2: ornate gilded royal chest · tier 3: boss-exclusive guardian reliquary
-      const bodyM = T >= 3 ? CHM.obsidian : T >= 2 ? w.mats.gold : T === 1 ? w.mats.woodDark : w.mats.wood;
-      const bandM = T >= 3 ? CHM.bossGold : T >= 2 ? CHM.velvet : w.mats.iron;
-      const goldM = T >= 3 ? CHM.bossGold : w.mats.gold;
+      // Chests of this world: oak and iron. A better one is of darker wood, bound closer and fitted with steel; the best in old brass, a
+      // cross let into its lid; a guardian's is an iron coffer on feet, in chains, under a seal. No crowns, no jewels, nothing that shines
+      // of itself - what tells them apart from afar is their size, their metal, and a faint glow of the brass (the two best).
+      const iron = w.mats.iron, brass = CHM.oldBrass, dark = w.mats.dark;
+      const bodyM = T >= 3 ? CHM.blackIron : T >= 1 ? w.mats.woodDark : w.mats.wood;
+      const bandM = T >= 2 ? brass : T === 1 ? CHM.steel : iron;
       const sc = T >= 3 ? 1.38 : T >= 2 ? 1.22 : T === 1 ? 1.08 : 1;
       const inner = new THREE.Group(); inner.scale.setScalar(sc); g.add(inner);
       add(inner, PG.cbox, bodyM, 1.1, 0.55, 0.7, 0, 0.275, 0);
+      add(inner, PG.cbox, bodyM, 1.16, 0.07, 0.76, 0, 0.035, 0);                       // (a plinth round its foot)
       const lidG = new THREE.Group(); lidG.position.set(0, 0.55, -0.35); inner.add(lidG);
       add(lidG, PG.cyl, bodyM, 0.35, 1.1, 0.35, 0, 0, 0.35, 0, 0, Math.PI / 2);
-      add(lidG, PG.cbox, bodyM, 1.1, 0.02, 0.7, 0, 0, 0.35);
-      for (const bx of [-0.4, 0.4]) { add(inner, PG.cbox, bandM, 0.08, 0.57, 0.72, bx, 0.28, 0); add(lidG, PG.cyl, bandM, 0.36, 0.08, 0.36, bx, 0, 0.35, 0, 0, Math.PI / 2); }
+      add(lidG, PG.cbox, bodyM, 1.12, 0.035, 0.72, 0, 0.005, 0.35);                    // (the lid's rim)
+      // straps over lid and body, a stud or two on each
+      for (const bx of T >= 1 ? [-0.4, 0, 0.4] : [-0.36, 0.36]) {
+        if (bx === 0 && T < 3) { add(lidG, PG.cyl, bandM, 0.358, 0.07, 0.358, 0, 0, 0.35, 0, 0, Math.PI / 2); continue; } // (the middle one stops at the lock)
+        add(inner, PG.cbox, bandM, 0.075, 0.57, 0.72, bx, 0.28, 0); add(lidG, PG.cyl, bandM, 0.358, 0.075, 0.358, bx, 0, 0.35, 0, 0, Math.PI / 2);
+        for (const sy of [0.14, 0.42]) add(inner, PG.sph, bandM, 0.022, 0.022, 0.016, bx, sy, 0.362);
+      }
       if (T >= 1) {
-        // corner caps & studs
-        const capM = T >= 2 ? goldM : CHM.steel;
-        for (const cx of [-0.53, 0.53]) for (const cz of [-0.33, 0.33]) add(inner, PG.cbox, capM, 0.09, 0.57, 0.09, cx, 0.28, cz);
-        for (let i = 0; i < 5; i++) add(inner, PG.sph, capM, 0.025, 0.025, 0.025, -0.3 + i * 0.15, 0.08, 0.36);
+        // corner irons, a ring to carry it by at each end
+        for (const cx of [-0.53, 0.53]) for (const cz of [-0.33, 0.33]) add(inner, PG.cbox, bandM, 0.09, 0.57, 0.09, cx, 0.28, cz);
+        for (const sx of [-1, 1]) { add(inner, PG.torus, iron, 0.075, 0.075, 0.075, sx * 0.575, 0.27, 0, 0, Math.PI / 2, 0); add(inner, PG.cbox, iron, 0.03, 0.05, 0.09, sx * 0.56, 0.34, 0); }
       }
       if (T >= 2) {
-        // gilded trims, velvet stripe, crown & jewels
-        add(inner, PG.cbox, T >= 3 ? CHM.royalVelvet : CHM.velvet, 1.12, 0.08, 0.72, 0, 0.5, 0);
-        add(inner, PG.cbox, goldM, 1.2, 0.06, 0.78, 0, 0.03, 0);
-        const crown = new THREE.Group(); crown.position.set(0, 0.36, 0.35); lidG.add(crown);
-        const crSc = T >= 3 ? 1.32 : 1, spN = T >= 3 ? 7 : 5;
-        add(crown, PG.cyl8, goldM, 0.16 * crSc, 0.08 * crSc, 0.16 * crSc);
-        for (let i = 0; i < spN; i++) { const a = i / spN * Math.PI * 2; add(crown, PG.cone, goldM, 0.035 * crSc, (T >= 3 ? 0.2 : 0.14), 0.035 * crSc, Math.cos(a) * 0.13 * crSc, 0.1 * crSc, Math.sin(a) * 0.13 * crSc); }
-        const jewels = T >= 3 ? [CHM.amethyst, CHM.ruby, CHM.amethyst, CHM.ruby] : [CHM.ruby, CHM.sapph, CHM.emer, CHM.ruby];
-        jewels.forEach((m, i) => add(inner, PG.oct, m, 0.05, 0.065, 0.03, -0.36 + i * 0.24, 0.3, 0.37));
-        add(lidG, PG.oct, T >= 3 ? CHM.amethyst : CHM.ruby, 0.07, 0.09, 0.04, 0, 0.2, 0.72);
-        if (T >= 3) {
-          add(inner, PG.cbox, CHM.obsidian, 1.34, 0.05, 0.9, 0, -0.02, 0);
-          add(inner, PG.cbox, goldM, 0.1, 0.57, 0.73, 0, 0.28, 0);
-          add(lidG, PG.cyl, goldM, 0.365, 0.1, 0.365, 0, 0, 0.35, 0, 0, Math.PI / 2);
-          for (const cx of [-0.55, 0.55]) for (const cz of [-0.35, 0.35]) {
-            add(inner, PG.cone, goldM, 0.06, 0.22, 0.06, cx * 1.06, 0.62, cz * 1.06, cz * 0.4, 0, -cx * 0.4);
-          }
-          add(crown, PG.oct, CHM.amethyst, 0.09, 0.15, 0.09, 0, 0.2, 0);
-          add(crown, PG.torus, goldM, 0.16, 0.16, 0.08, 0, 0.2, 0, 0.8, 0.4, 0);
-          for (const sx of [-0.56, 0.56]) add(inner, PG.oct, CHM.amethyst, 0.03, 0.08, 0.08, sx, 0.3, 0);
-        }
-        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: T >= 3 ? 0xff78e8 : 0xffc860, transparent: true, opacity: T >= 3 ? 0.5 : 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
-        halo.scale.set(T >= 3 ? 3.2 : 2.4, T >= 3 ? 2.2 : 1.6, 1); halo.position.y = T >= 3 ? 0.68 : 0.55; g.add(halo); it.halo = halo;
+        // rails of the same metal along the rim and the foot; a cross let into the lid
+        add(inner, PG.cbox, bandM, 1.13, 0.04, 0.73, 0, 0.52, 0); add(inner, PG.cbox, bandM, 1.18, 0.035, 0.78, 0, 0.075, 0);
+        add(lidG, PG.cbox, bandM, 0.42, 0.014, 0.05, 0, 0.35, 0.35); add(lidG, PG.cbox, bandM, 0.05, 0.014, 0.26, 0, 0.35, 0.35);
       }
-      const lockM = T >= 2 ? goldM : T === 1 ? CHM.steel : w.mats.brass;
-      add(inner, PG.cbox, lockM, 0.14, 0.18, 0.06, 0, 0.5, 0.37);
-      if (T >= 3) add(inner, PG.oct, CHM.amethyst, 0.055, 0.07, 0.04, 0, 0.5, 0.41);
-      else if (T === 1) add(inner, PG.oct, CHM.sapph, 0.04, 0.05, 0.03, 0, 0.5, 0.41);
+      // the lock: a plate, its keyhole, the hasp coming down from the lid
+      add(inner, PG.cbox, bandM, 0.17, 0.2, 0.035, 0, 0.44, 0.362);
+      add(inner, PG.cyl8, dark, 0.016, 0.012, 0.016, 0, 0.455, 0.381, Math.PI / 2, 0, 0); add(inner, PG.cbox, dark, 0.012, 0.04, 0.012, 0, 0.428, 0.381);
+      add(lidG, PG.cbox, bandM, 0.07, 0.15, 0.03, 0, -0.03, 0.722);
+      if (T >= 3) {
+        // the guardians': on four feet, two chains across it to a great padlock, sealed with wax
+        for (const cx of [-0.47, 0.47]) for (const cz of [-0.28, 0.28]) add(inner, PG.cbox, CHM.blackIron, 0.14, 0.09, 0.14, cx, -0.045, cz);
+        for (const s2 of [-1, 1]) for (let i = 0; i < 7; i++) { const t = i / 6, lx = s2 * (0.52 - t * 0.44), ly = 0.5 - t * 0.14; add(inner, PG.torus, iron, 0.034, 0.034, 0.034, lx, ly, 0.385, i % 2 ? Math.PI / 2 : 0, 0, s2 * 0.3); }
+        add(inner, PG.cbox, CHM.steel, 0.2, 0.2, 0.07, 0, 0.3, 0.41); add(inner, PG.torus, CHM.steel, 0.07, 0.07, 0.07, 0, 0.41, 0.41);
+        add(inner, PG.cyl8, CHM.wax, 0.05, 0.02, 0.05, 0.06, 0.26, 0.45, Math.PI / 2, 0, 0);
+      }
+      if (T >= 2) {
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: T >= 3 ? 0xff9a58 : 0xffc878, transparent: true, opacity: T >= 3 ? 0.2 : 0.14, blending: THREE.AdditiveBlending, depthWrite: false }));
+        halo.scale.set(T >= 3 ? 2.6 : 2.0, T >= 3 ? 1.8 : 1.4, 1); halo.position.y = T >= 3 ? 0.6 : 0.5; g.add(halo); it.halo = halo;
+      }
       g.position.set(x, y, z); g.rotation.y = ry;
       g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
       grp.add(g); it.mesh = g; it.lid = lidG;
       // subtle glint light
-      w.lightSources.push({ pos: new THREE.Vector3(x, y + 0.9, z), color: tier >= 3 ? '#ff88e8' : tier >= 2 ? '#ffd070' : tier === 1 ? '#a0c0ff' : '#ffc890', intensity: tier >= 3 ? 8 : tier >= 2 ? 5 : 3, range: tier >= 3 ? 8 : tier >= 2 ? 6 : 5, flame: 0, emit: false, ph: 0, prio: tier >= 3 ? 1.4 : 0.8, steady: true, chest: it });
+      w.lightSources.push({ pos: new THREE.Vector3(x, y + 0.9, z), color: tier >= 3 ? '#ff9a58' : tier >= 2 ? '#ffd070' : '#ffc890', intensity: tier >= 3 ? 8 : tier >= 2 ? 5 : 3, range: tier >= 3 ? 8 : tier >= 2 ? 6 : 5, flame: 0, emit: false, ph: 0, prio: tier >= 3 ? 1.4 : 0.8, steady: true, chest: it });
     });
     const cs = tier >= 3 ? 1.38 : tier >= 2 ? 1.22 : tier === 1 ? 1.08 : 1;
     w.addCollider(x - 0.55 * cs, y, z - 0.55 * cs, x + 0.55 * cs, y + 0.75 * cs, z + 0.55 * cs, { surf: tier >= 2 ? 'metal' : 'wood' });

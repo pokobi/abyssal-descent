@@ -1928,6 +1928,84 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
 
+  // ---- what is thrown (grenfx.js), in metres about its middle: lists of parts { g, m (which of grenfx's materials), tag }. A part
+  // with a tag is one grenfx moves by itself (the water skin that wobbles, the rings that turn, a light that blinks) ----
+  const GREN = {}, grenC = {};
+  const gq = (m, list, tag) => ({ g: Geo.merge(Array.isArray(list) ? list : [list]), m, tag: tag || null });
+  const can = (r, h) => hl([[0.0005, -h / 2], [r * 0.9, -h / 2], [r, -h / 2 + 0.006], [r * 1.03, -h / 2 + 0.012], [r, -h / 2 + 0.018], [r, -h * 0.18], [r * 1.025, -h * 0.15], [r, -h * 0.12], [r, h * 0.12], [r * 1.025, h * 0.15], [r, h * 0.18], [r, h / 2 - 0.018], [r * 1.03, h / 2 - 0.012], [r, h / 2 - 0.006], [r * 0.9, h / 2], [0.0005, h / 2]], 1, 1, 18);
+  const gband = (r, y, hh) => hl([[r * 1.008, y - hh / 2], [r * 1.02, y - hh / 2 + 0.002], [r * 1.02, y + hh / 2 - 0.002], [r * 1.008, y + hh / 2]], 1, 1, 18);
+  const fuze = (top) => hl([[0.0005, top - 0.004], [0.03, top - 0.004], [0.031, top + 0.006], [0.022, top + 0.012], [0.022, top + 0.034], [0.015, top + 0.042], [0.0005, top + 0.042]], 1, 1, 12);
+  // the spoon down the side from the fuze, the ring of the pin
+  const spoon = (top, r) => {
+    const l = ext([[0.0, top + 0.046], [0.028, top + 0.044], [r + 0.012, top - 0.03], [r + 0.016, top - 0.1], [r + 0.011, top - 0.1], [r + 0.007, top - 0.032], [0.025, top + 0.038], [0.0, top + 0.04]], 0.022, 0.002);
+    const ring = new THREE.TorusGeometry(0.02, 0.003, 5, 14); ring.rotateY(0.5); ring.translate(-0.036, top + 0.028, 0);
+    return { lever: l, ring: Geo.merge([ring, prism(0.003, 0.05, [-0.008, top + 0.028, 0], [0, 0, HX], 5)]) };
+  };
+  const dots = (r, y, n, rad, a0) => { const l = []; for (let i = 0; i < n; i++) { const a = (a0 || 0) + i / n * Math.PI * 2, g = new THREE.CylinderGeometry(rad, rad, 0.004, 8); g.rotateX(HX); g.rotateY(-a + HX); g.translate(Math.cos(a) * (r + 0.001), y, Math.sin(a) * (r + 0.001)); l.push(g); } return l; };
+  // the fragmentation grenade: cast iron cut into squares, a brass fuze, a spoon and a pin
+  GREN.g_frag = () => {
+    const g = new THREE.LatheGeometry(spl([[0.0005, -0.1], [0.045, -0.096], [0.072, -0.06], [0.08, -0.01], [0.076, 0.04], [0.058, 0.08], [0.034, 0.096], [0.0005, 0.099]], 26), 32), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), a = Math.atan2(z, x), cut = (Math.abs(Math.sin(a * 4)) < 0.2 || Math.abs(Math.sin(y * 62 + 0.6)) < 0.22) && Math.abs(y) < 0.085 ? 0.9 : 1; ps.setX(i, x * cut); ps.setZ(i, z * cut); }
+    g.computeVertexNormals(); const s = spoon(0.1, 0.07);
+    return [gq('iron', g), gq('brassOld', [fuze(0.1), s.ring]), gq('tin', s.lever)];
+  };
+  // the incendiary: a tin painted red, a glass let into its side with the oil behind it, a yellow band, a fuze and spoon
+  GREN.g_fire = () => { const s = spoon(0.088, 0.05); return [gq('cRed', can(0.05, 0.17)), gq('cYellow', gband(0.05, 0.052, 0.014)), gq('iron', [gband(0.05, -0.03, 0.062), fuze(0.088)]), gq('oil', ball(0.03, [0, -0.03, 0.036], [0.8, 0.85, 0.55])), gq('tin', s.lever), gq('brassOld', s.ring)]; };
+  // the water skin: a bladder of hide tied at the neck with a blue rag (the bladder: one in radius, it wobbles)
+  GREN.g_water = () => [
+    gq('hide', new THREE.LatheGeometry(spl([[0.0005, -1], [0.55, -0.95], [0.92, -0.6], [1.0, -0.1], [0.86, 0.4], [0.5, 0.8], [0.26, 1.02], [0.2, 1.12], [0.0005, 1.14]], 22), 18), 'bag'),
+    gq('cBlue', [new THREE.TorusGeometry(0.25, 0.07, 6, 14).rotateX(HX).translate(0, 1.04, 0), ext([[0, 0], [0.5, 0.12], [0.62, -0.25], [0.3, -0.42], [0.1, -0.1]], 0.03, 0).translate(0.15, 1.05, 0), ext([[0, 0], [-0.4, 0.2], [-0.56, -0.2], [-0.2, -0.36]], 0.03, 0).translate(-0.15, 1.05, 0.05),
+      hl([[0.95, -0.28], [1.0, -0.26], [1.01, -0.1], [0.97, -0.08]], 1, 1, 18)], 'onbag'),
+    gq('rope', hl([[0.0005, 1.12], [0.16, 1.12], [0.22, 1.2], [0.2, 1.3], [0.0005, 1.28]], 1, 1, 10), 'onbag')];
+  // the freezing can: bare tin with two blue bands, rime on its shoulder, a fuze that shows a cold light
+  GREN.g_cryo = () => {
+    const rime = []; for (let i = 0; i < 14; i++) { const a = i * 2.4, r = 0.049 + (i % 3) * 0.002, g = new THREE.OctahedronGeometry(0.006 + (i % 4) * 0.003, 0); g.rotateX(i); g.translate(Math.cos(a) * r, 0.045 + (i % 5) * 0.008, Math.sin(a) * r); rime.push(g); }
+    const s = spoon(0.082, 0.048);
+    return [gq('tin', [can(0.048, 0.16), fuze(0.082), s.lever]), gq('cBlue', [gband(0.048, 0.036, 0.018), gband(0.048, -0.04, 0.018)]), gq('ice', rime), gq('gBlue', ball(0.008, [0, 0.127, 0])), gq('brassOld', s.ring)];
+  };
+  // the shock charge: an insulator of glazed clay in three skirts, wound with copper wire, two rods out of its head
+  GREN.g_shock = () => {
+    const coil = []; for (let i = 0; i < 7; i++) coil.push(new THREE.TorusGeometry(0.039, 0.0035, 4, 16).rotateX(HX + 0.06).translate(0, -0.052 + i * 0.009, 0));
+    return [gq('ceramicW', hl([[0.0005, -0.08], [0.04, -0.08], [0.046, -0.07], [0.036, -0.06], [0.036, 0.008], [0.056, 0.016], [0.058, 0.024], [0.034, 0.034], [0.034, 0.044], [0.05, 0.052], [0.052, 0.06], [0.03, 0.07], [0.028, 0.082], [0.0005, 0.084]], 1, 1, 18)),
+      gq('copper', coil), gq('tin', [prism(0.005, 0.06, [0.014, 0.11, 0], null, 6), prism(0.005, 0.06, [-0.014, 0.11, 0], null, 6)]), gq('gYellow', [ball(0.007, [0.014, 0.142, 0]), ball(0.007, [-0.014, 0.142, 0])])];
+  };
+  // the gas can: brass gone green, vents in a ring about its middle, a green band, a fuze and spoon
+  GREN.g_toxic = () => { const s = spoon(0.084, 0.05); return [gq('verdigris', can(0.05, 0.16)), gq('cGreen', gband(0.05, 0.05, 0.016)), gq('dark', dots(0.05, 0, 8, 0.0065).concat(dots(0.05, -0.022, 8, 0.0065, 0.39))), gq('gGreen', gband(0.05, -0.052, 0.004)), gq('iron', fuze(0.084)), gq('tin', s.lever), gq('brassOld', s.ring)]; };
+  // the limpet: an iron puck with teeth round its rim, set in a pad of dark glue that has run (its light: grenfx's own)
+  GREN.g_sticky = () => {
+    const teeth = []; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; teeth.push(spike(0.011, 0.03, [Math.cos(a) * 0.072, -0.012, Math.sin(a) * 0.072], [Math.PI * 0.72, -a + HX, 0], 4)); }
+    return [gq('iron', [hl([[0.0005, -0.022], [0.066, -0.022], [0.072, -0.014], [0.072, 0.012], [0.062, 0.022], [0.03, 0.026], [0.0005, 0.026]], 1, 1, 18)].concat(teeth)),
+      gq('goo', [ball(0.078, [0, -0.024, 0], [1, 0.3, 1]), ball(0.02, [0.068, -0.036, 0.02], [1, 0.6, 1]), ball(0.016, [-0.05, -0.04, 0.05], [1, 0.7, 1]), ball(0.018, [-0.03, -0.038, -0.064], [1, 0.6, 1])]), gq('tin', new THREE.TorusGeometry(0.02, 0.004, 4, 10).rotateX(HX).translate(0, 0.027, 0))];
+  };
+  // the flash charge: a steel tube pierced in two rings, capped at both ends, two pale bands, a fuze and spoon
+  GREN.g_flash = () => { const s = spoon(0.084, 0.044); return [gq('tin', [can(0.044, 0.16), fuze(0.084), s.lever]), gq('cWhite', [gband(0.044, 0.058, 0.01), gband(0.044, -0.058, 0.01)]), gq('dark', dots(0.044, 0.024, 6, 0.008).concat(dots(0.044, -0.024, 6, 0.008, 0.52))), gq('brassOld', s.ring)]; };
+  // the void charge: a ball of black glass in a cage of two iron hoops (they turn), a seam of violet light about it
+  GREN.g_hole = () => [gq('black', new THREE.SphereGeometry(0.072, 20, 14)), gq('gPurple', [new THREE.TorusGeometry(0.0725, 0.0022, 4, 28).rotateX(HX + 0.3), ball(0.006, [0, 0.02, 0.071])]),
+    gq('iron', new THREE.TorusGeometry(0.105, 0.006, 5, 28), 'ring0'), gq('iron', new THREE.TorusGeometry(0.09, 0.005, 5, 26), 'ring1')];
+  // the nail bomb: a ball of clay with nails driven into it all round, tied crosswise with cord
+  GREN.g_nail = () => {
+    const g = new THREE.IcosahedronGeometry(0.072, 2), ps = g.attributes.position; for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), k = 1 + 0.05 * Math.sin(x * 70 + y * 40) + 0.04 * Math.sin(z * 90 + x * 30); ps.setXYZ(i, x * k, y * k * 0.94, z * k); } g.computeVertexNormals();
+    const nails = []; for (let i = 0; i < 13; i++) { const a = i * 2.4, b = Math.asin(((i * 5) % 13) / 6.5 - 1), d = [Math.cos(a) * Math.cos(b), Math.sin(b), Math.sin(a) * Math.cos(b)]; nails.push(Geo.rod([d[0] * 0.055, d[1] * 0.055, d[2] * 0.055], [d[0] * 0.1, d[1] * 0.1, d[2] * 0.1], 0.0035, 5, 0.003), ball(0.0075, [d[0] * 0.1, d[1] * 0.1, d[2] * 0.1], [1, 1, 1])); }
+    return [gq('clay', g), gq('tin', nails), gq('rope', [new THREE.TorusGeometry(0.074, 0.005, 4, 22).rotateX(0.2), new THREE.TorusGeometry(0.074, 0.005, 4, 22).rotateY(HX).rotateZ(0.15)])];
+  };
+  // the shatter charge: a pale crystal of six sides held in a cage of steel - four bows between two rings - a light at its heart
+  GREN.g_shatter = () => {
+    const cr = Geo.merge([new THREE.ConeGeometry(0.05, 0.085, 6).toNonIndexed().translate(0, 0.0425, 0), new THREE.ConeGeometry(0.05, 0.085, 6).toNonIndexed().rotateX(Math.PI).translate(0, -0.0425, 0)]); cr.computeVertexNormals();
+    const cage = [new THREE.TorusGeometry(0.022, 0.004, 4, 12).rotateX(HX).translate(0, 0.098, 0), new THREE.TorusGeometry(0.022, 0.004, 4, 12).rotateX(HX).translate(0, -0.098, 0)];
+    for (let i = 0; i < 4; i++) { const a = i * HX + 0.4, c = Math.cos(a), s = Math.sin(a); cage.push(tubeR([[c * 0.022, 0.098, s * 0.022], [c * 0.06, 0.055, s * 0.06], [c * 0.068, 0, s * 0.068], [c * 0.06, -0.055, s * 0.06], [c * 0.022, -0.098, s * 0.022]], 0.0035, 4, 12)); }
+    return [gq('crystal', cr), gq('tin', cage), gq('gWhite', ball(0.012, [0, 0, 0]))];
+  };
+  // dynamite: three sticks in waxed paper, their ends folded in, bound twice with cord (the fuse and its spark: grenfx's own)
+  GREN.g_dyna = () => {
+    const st = [], pos = [[-0.056, -0.015], [0, 0.03], [0.056, -0.015]], tie = (y) => tubeR([[-0.084, y, -0.015], [-0.07, y, 0.02], [0, y, 0.062], [0.07, y, 0.02], [0.084, y, -0.015], [0.06, y, -0.046], [0, y, -0.03], [-0.06, y, -0.046], [-0.084, y, -0.015]], 0.004, 4, 28);
+    for (const p of pos) st.push(Geo.xf(hl([[0.0005, -0.112], [0.012, -0.112], [0.02, -0.12], [0.028, -0.116], [0.028, 0.116], [0.02, 0.12], [0.012, 0.112], [0.0005, 0.112]], 1, 1, 12), [p[0], 0, p[1]]));
+    return [gq('paperOld', st), gq('rope', [tie(-0.07), tie(-0.062), tie(0.07), tie(0.078)]), gq('dark', [ball(0.01, [0, 0.114, 0.03], [1, 0.5, 1])])];
+  };
+  // the decoy: a hand bell of old brass on a turned wooden handle, its clapper showing
+  GREN.g_decoy = () => [gq('brassOld', [hl([[0.0005, 0.045], [0.02, 0.045], [0.03, 0.03], [0.038, -0.01], [0.05, -0.045], [0.07, -0.062], [0.072, -0.07], [0.064, -0.07], [0.046, -0.05], [0.032, -0.012], [0.0005, 0.03]], 1, 1, 20), new THREE.TorusGeometry(0.036, 0.0025, 4, 20).rotateX(HX).translate(0, 0.0, 0)]),
+    gq('wood', hl([[0.0005, 0.045], [0.012, 0.045], [0.01, 0.06], [0.016, 0.075], [0.017, 0.1], [0.011, 0.118], [0.015, 0.128], [0.0005, 0.134]], 1, 1, 10)), gq('iron', [ball(0.014, [0, -0.062, 0]), prism(0.003, 0.06, [0, -0.03, 0], null, 5)])];
+  X.grenGeo = function (id) { if (grenC[id] !== undefined) return grenC[id]; let r = null; try { r = GREN[id] ? GREN[id]() : null; } catch (e) { console.warn('gfx: no grenade', id, e); (X.propErr = X.propErr || {})[id] = String(e && e.stack).slice(0, 300); r = null; } return (grenC[id] = r); };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

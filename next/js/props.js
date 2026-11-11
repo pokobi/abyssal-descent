@@ -58,8 +58,6 @@
       PG.boneEnds = Ge.merge(ends);
     }
     for (const k in PG) PG[k].userData.shared = true;
-    // (the carved statues take a moment each to cut, gfx.js: one a frame behind the title, before a world asks for them)
-    if (G.GFX && G.GFX.propGeo && typeof setTimeout === 'function') { const names = ['statue0', 'statue1', 'statue2', 'statue3'], step = () => { const n = names.shift(); if (!n) return; try { G.GFX.propGeo(n); } catch (e) { /* made when asked for */ } setTimeout(step, 30); }; setTimeout(step, 300); }
   };
   P.PG = PG;
   // Many of one thing (the skulls of an ossuary, the ends of its bones): each kind is drawn as instances of one shape, by stretches of the
@@ -131,12 +129,17 @@
       }
       return !ground;
     };
-    const tint = B.grassTint ? null : null;
+    const tint = null;
+    // (kept clear: where the pedlar's stands and the basin will be set down, and round whatever can be used - a chest, an altar, a ware)
+    const keep = []; for (const q of w.miniSlots || []) keep.push([q.x, q.z, 2.0]); if (w.miniHeal) keep.push([w.miniHeal.x, w.miniHeal.z, 2.2]);
+    for (const it of w.interactables || []) if (it && it.pos) keep.push([it.pos.x, it.pos.z, 1.4]);
+    for (const q of w.shopSlots || []) keep.push([q.x, q.z, 1.8]);
+    const clearOf = (x, z) => { for (const k of keep) { const dx = x - k[0], dz = z - k[1]; if (dx * dx + dz * dz < k[2] * k[2]) return false; } return true; };
     for (let x = x0; x < x1; x += step) for (let z = z0; z < z1; z += step) {
       const drift = hsh(Math.floor(x / 6), Math.floor(z / 6), 11) * 0.6 + hsh(Math.floor(x / 2.5), Math.floor(z / 2.5), 12) * 0.4;
       if (hsh(x, z, 13) > (0.25 + drift * 0.75) * thin) continue;
       const px = x + (hsh(x, z, 14) - 0.5) * step, pz = z + (hsh(x, z, 15) - 0.5) * step, y = gy(px, pz);
-      if (!(y > -50) || blocked(px, pz, y)) continue;
+      if (!(y > -50) || !clearOf(px, pz) || blocked(px, pz, y)) continue;
       P.tuft(w, px, y, pz, 0.75 + drift * 0.55, tint, drift > 0.55 ? 2 : 1, 0.6, w.groundTop ? gy : null);
     }
   };

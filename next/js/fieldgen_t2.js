@@ -43,6 +43,11 @@
       if (a1 - a0 > 1.4) {
         slab('trim', a0 + 0.16, a1 - 0.16, y - 0.13, y, 0, deep + 0.05, { uv: 1.2, grad: false });
         slab('trim', a0 + 0.16, a1 - 0.16, y + 0.55, y + 0.69, 0, deep - 0.04, { uv: 1.2, grad: false });
+        { // (each row of niches is a ledge out of the wall: it stops you and can be stood on, like the wall it is built out of)
+          const lo = c + face * 0, hi = c + face * (deep + 0.05), x0 = Math.min(lo, hi), x1 = Math.max(lo, hi);
+          const col = alongX ? w.addCollider(a0 + 0.16, y - 0.13, x0, a1 - 0.16, y + 0.69, x1, { surf: 'stone' }) : w.addCollider(x0, y - 0.13, a0 + 0.16, x1, y + 0.69, a1 - 0.16, { surf: 'stone' });
+          col.vis = true;
+        }
         const nb = Math.max(1, Math.round((a1 - a0 - 0.6) / 2.4)), bw = (a1 - a0 - 0.6) / nb;
         for (let k = 0; k <= nb; k++) { const u = a0 + 0.3 + k * bw; slab('trim', u - 0.13, u + 0.13, y, y + 0.55, 0, deep, { uv: 1.2, grad: false }); }
         if (PGs.boneEnds) for (let k = 0; k < nb; k++) {

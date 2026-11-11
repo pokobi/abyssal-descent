@@ -27,6 +27,8 @@
     // x of a side's terrace: s = -1 west (its wall at x = 0), +1 east (its wall at x = W); u: distance from that wall
     const X = (s, u) => (s < 0 ? u : W - u);
     const box = (mk, s, u0, u1, y0, y1, za, zb, o) => { const a = X(s, u0), b = X(s, u1); w.solid(mk, Math.min(a, b), y0, za, Math.max(a, b), y1, zb, o || { uv: 2.5 }); };
+    // (the same box as a thing to run into: for what stands out of a wall far enough to be one - a pilaster, a buttress)
+    const hard = (s, u0, u1, y0, y1, za, zb) => { const a = X(s, u0), b = X(s, u1), c = w.addCollider(Math.min(a, b), y0, za, Math.max(a, b), y1, zb, { surf: 'stone' }); c.vis = true; return c; };
     const vis = (mk, s, u0, u1, y0, y1, za, zb, o) => { const a = X(s, u0), b = X(s, u1); w.visual(mk, Math.min(a, b), y0, za, Math.max(a, b), y1, zb, o || { uv: 1 }); };
 
     // ---- the plan along the nave (z): for each side, what stands where
@@ -298,6 +300,7 @@
         vis('trim', s, 0, 0.78, y0, y0 + 0.36, z - 0.56, z + 0.56, { uv: 2 });
         vis('trim', s, 0, 0.8, SPR - 0.5, SPR - 0.22, z - 0.58, z + 0.58, { uv: 2 });
         vis('trim', s, 0, 0.96, SPR - 0.22, SPR + 0.1, z - 0.7, z + 0.7, { uv: 2 });
+        hard(s, 0, 0.62, y0, SPR - 0.5, z - 0.42, z + 0.42); hard(s, 0, 0.96, SPR - 0.5, SPR + 0.1, z - 0.7, z + 0.7);
       }
       // flat buttresses up the terraces' faces at the same bays (not where a stair, a chapel's gate or a fall is); a corbel under each slab
       const clear = (s, lv, z) => !stairs.some((q) => q.s === s && q.lv === lv && z > q.za - 1.2 && z < q.zb + 1.2) && !falls.some((f) => f.s === s && z > f.za - 1 && z < f.zb + 1) && !(gap && z > gap[0] - 0.6 && z < gap[1] + 0.6)
@@ -308,12 +311,14 @@
           vis('trim', s, D1, D1 + 0.3, 0, T1 - SL - 0.3, z - 0.4, z + 0.4, { uv: 2 });
           vis('trim', s, D1, D1 + 0.42, 0, 0.4, z - 0.5, z + 0.5, { uv: 2 });
           vis('trim', s, D1, D1 + 0.5, T1 - SL - 0.3, T1 - SL, z - 0.5, z + 0.5, { uv: 2 });
+          hard(s, D1, D1 + 0.3, 0, T1 - SL - 0.3, z - 0.4, z + 0.4); hard(s, D1, D1 + 0.5, T1 - SL - 0.3, T1 - SL, z - 0.5, z + 0.5);
           // a torch on every other one, the two sides turn about
           if ((nb + (s > 0 ? 1 : 0)) % 2 === 0) P().torch(w, X(s, D1 + 0.3), 2.7, z, s < 0 ? 'px' : 'nx');
         }
         if (clear(s, 1, z)) {
           vis('trim', s, D2, D2 + 0.26, T1, T2 - SL - 0.26, z - 0.36, z + 0.36, { uv: 2 });
           vis('trim', s, D2, D2 + 0.44, T2 - SL - 0.26, T2 - SL, z - 0.46, z + 0.46, { uv: 2 });
+          hard(s, D2, D2 + 0.26, T1, T2 - SL - 0.26, z - 0.36, z + 0.36); hard(s, D2, D2 + 0.44, T2 - SL - 0.26, T2 - SL, z - 0.46, z + 0.46);
         }
       }
     }

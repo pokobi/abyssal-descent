@@ -70,6 +70,7 @@
       w.visual('iron', across === 'x' ? mx - 1.3 : mx - 0.06, 2.3, across === 'z' ? mz - 1.3 : mz - 0.06, across === 'x' ? mx + 1.3 : mx + 0.06, 2.5, across === 'z' ? mz + 1.3 : mz + 0.06, { uv: 1 });
     }
     F.ironBands(w, x - s, z - s, x + s, z + s, [3.4, 4.9], 0, h);
+    { const hw = 1.42, dp = 0.62, c = d[0] ? w.addCollider(Math.min(mx, mx + d[0] * dp), 0.5, mz - hw, Math.max(mx, mx + d[0] * dp), 2.3, mz + hw, { surf: 'metal' }) : w.addCollider(mx - hw, 0.5, Math.min(mz, mz + d[1] * dp), mx + hw, 2.3, Math.max(mz, mz + d[1] * dp), { surf: 'metal' }); c.vis = true; }   // (the doors swung open stop you)
     F.ironBands(w, x - 1.2, z - 1.2, x + 1.2, z + 1.2, [h + 1.6, h + 4.2, h + 6.8].filter((y) => y < HT - 0.5), h + 0.4, HT);
     w.addLight(x + d[0] * (s + 1.4), 1.6, z + d[1] * (s + 1.4), { flame: 0.5, intensity: 10, range: 12, color: '#ff6a20', prio: 1.1 });
     w.lavaZones.push({ x0: mx - 0.5, z0: mz - 0.5, x1: mx + 0.5, z1: mz + 0.5, y: 1, decor: true });

@@ -1607,7 +1607,7 @@
     if (o.kind === 'weapon' || o.kind === 'melee') {
       disp = o.kind === 'melee' ? G.weapons.meleeDisplayModel(o.obj) : G.weapons.displayModel(o.obj);
       const box = new THREE.Box3().setFromObject(disp); const c = box.getCenter(V()); disp.position.sub(c);
-      const wrap = new THREE.Group(); wrap.add(disp); wrap.scale.setScalar(s.big ? 1.75 : 1.3); disp = wrap; disp.position.y = s.big ? 0.55 : 0.45; // the weapon island shows its guns larger
+      const wrap = new THREE.Group(); wrap.add(disp); { const L = Math.max(box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z), cap = s.big ? 2.1 : 1.42; let k = s.big ? 1.75 : 1.3; if (L * k > cap) k = cap / L; wrap.scale.setScalar(k); } disp = wrap;   // (a long gun is shown a little smaller: it must not hide the ware on the next stand) disp.position.y = s.big ? 0.55 : 0.45; // the weapon island shows its guns larger
     } else {
       disp = new THREE.Group();
       const PG = G.Props.PG;

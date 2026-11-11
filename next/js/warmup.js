@@ -121,10 +121,19 @@
     });
     return kit;
   };
+  // the shapes that take a moment to cut the first time they are asked for (the carved statues, gfx.js propGeo): made here, behind
+  // the loading screen, a breath between each - not in the middle of a fight, where each held a frame for a quarter of a second
+  async function warmShapes() {
+    const GP = G.GFX && G.GFX.propGeo; if (!GP) return;
+    for (const n of ['statue0', 'statue1', 'statue2', 'statue3', 'tuft', 'shelf', 'book', 'rack', 'cage', 'wellhead', 'brazier', 'sconce', 'chandelier']) { try { GP(n); } catch (e) { /* made when asked for */ } await new Promise((r) => setTimeout(r, 0)); }
+    // (and each class's clothes over the common figure: melted once here, so that the first frame of a run does not stop to do it)
+    if (G.avatar && G.avatar.buildFigure && G.Classes && G.Classes.BY) for (const c in G.Classes.BY) { try { const F = G.avatar.buildFigure(); G.avatar.dress(F.J, c); } catch (e) { /* when it is first worn */ } await new Promise((r) => setTimeout(r, 0)); }
+  }
   W.bootAsync = async function () {
     const r = G.renderer; if (!r) return;
     const t0 = now();
     const tmp = W.enemyModels();
+    try { await warmShapes(); } catch (e) { /* ignore */ }
     try { await W.worldAsync(8000); } catch (e) { /* ignore */ }
     if (tmp) { G.scene.remove(tmp); }
     try { warmViewmodel(r); } catch (e) { /* ignore */ }

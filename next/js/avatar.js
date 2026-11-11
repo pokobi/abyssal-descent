@@ -57,36 +57,52 @@
     const m = (parent, g, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const o = new THREE.Mesh((g === PG.box && PG.rbox) || g, mat); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; parent.add(o); return o; };
     const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
     const root = new THREE.Group(), J = { M };
+    // (a body of masses like a foe's - ribs over a belly, shoulders, a skull with brow, jaw and nose, arms with their swells, hands
+    // with fingers, thighs, calves, boots - melted into one surface joint by joint, gfx.js; its cloth and hide carry their own grain)
+    const TX = (n) => (G.GFX && G.GFX.tex ? G.GFX.tex(n) : null), grain = (mat, n, uvk) => { const t = TX(n); if (t) { mat.map = t.map; mat.normalMap = t.normalMap; mat.roughnessMap = t.orm; mat.aoMap = t.orm; mat.userData.uvk = uvk; } };
+    grain(M.suit, 'weave', 6); grain(M.glove, 'leather', 5); grain(M.boot, 'leather', 4);
     J.body = j(root, 0, 0.95, 0);                                       // pelvis pivot
-    m(J.body, taper(0.88, 0.9), M.suit, 0.32, 0.2, 0.21, 0, 0.01, 0);  // hips
+    m(J.body, PG.sph, M.suit, 0.178, 0.15, 0.128, 0, -0.02, 0);        // hips
     J.chest = j(J.body, 0, 0.12, 0);
-    m(J.chest, taper(0.76, 0.86), M.suit, 0.42, 0.52, 0.23, 0, 0.27, 0); // torso, wider at the shoulders
-    m(J.chest, PG.cyl8, M.skin, 0.05, 0.08, 0.05, 0, 0.55, 0);           // neck
-    for (const s of [-1, 1]) m(J.chest, PG.sph, M.suit, 0.095, 0.09, 0.1, s * 0.23, 0.47, 0); // shoulders
+    m(J.chest, PG.sph, M.suit, 0.15, 0.28, 0.1, 0, 0.25, 0);           // the trunk's core
+    m(J.chest, PG.sph, M.suit, 0.2, 0.2, 0.125, 0, 0.33, 0.005);       // ribs
+    m(J.chest, PG.sph, M.suit, 0.16, 0.16, 0.11, 0, 0.12, 0.01);       // belly
+    m(J.chest, PG.sph, M.suit, 0.16, 0.07, 0.09, 0, 0.5, -0.01);       // the yoke of the shoulders
+    for (const s of [-1, 1]) m(J.chest, PG.sph, M.suit, 0.085, 0.075, 0.09, s * 0.215, 0.47, 0);
+    m(J.chest, PG.cyl8, M.skin, 0.048, 0.1, 0.05, 0, 0.555, 0.005);    // neck
     J.head = j(J.chest, 0, 0.58, 0);
-    m(J.head, PG.sph, M.skin, 0.115, 0.132, 0.12, 0, 0.12, 0);
-    for (const s of [-1, 1]) m(J.head, PG.sph, M.eye, 0.016, 0.014, 0.01, s * 0.042, 0.135, 0.108);
-    J.hood = m(J.head, PG.sph, M.hair, 0.122, 0.085, 0.128, 0, 0.18, -0.012); // hair (a class's hat hides it)
+    m(J.head, PG.sph, M.skin, 0.105, 0.125, 0.115, 0, 0.125, -0.005);  // skull
+    m(J.head, PG.box, M.skin, 0.13, 0.07, 0.11, 0, 0.04, 0.03);        // jaw
+    m(J.head, PG.box, M.skin, 0.16, 0.03, 0.05, 0, 0.152, 0.085, 0.2); // brow
+    m(J.head, PG.sph, M.skin, 0.02, 0.035, 0.028, 0, 0.1, 0.116);      // nose
+    for (const s of [-1, 1]) { m(J.head, PG.sph, M.skin, 0.02, 0.032, 0.014, s * 0.108, 0.115, 0.0); m(J.head, PG.sph, M.eye, 0.014, 0.009, 0.008, s * 0.042, 0.128, 0.102); }
+    m(J.head, PG.box, M.eye, 0.05, 0.006, 0.006, 0, 0.055, 0.086);     // mouth
+    J.hood = m(J.head, PG.sph, M.hair, 0.112, 0.085, 0.125, 0, 0.185, -0.02); // hair (a class's hat hides it)
     J.arms = [];
     for (const s of [-1, 1]) {
       const sh = j(J.chest, s * 0.25, 0.48, 0);
-      m(sh, GE.limb, M.suit, 0.1, 0.16, 0.1, 0, -0.15, 0);
+      m(sh, PG.sph, M.suit, 0.066, 0.1, 0.07, 0, -0.04, 0); m(sh, PG.sph, M.suit, 0.056, 0.17, 0.06, 0, -0.16, 0);
       const el = j(sh, 0, -0.3, 0);
-      m(el, GE.limb, M.suit, 0.088, 0.15, 0.088, 0, -0.14, 0);
+      m(el, PG.sph, M.suit, 0.05, 0.13, 0.054, 0, -0.1, 0.004); m(el, PG.cyl8, M.suit, 0.04, 0.26, 0.042, 0, -0.15, 0);
       const hand = j(el, 0, -0.3, 0);
-      m(hand, PG.box, M.glove, 0.07, 0.09, 0.075);
-      m(hand, PG.box, M.glove, 0.025, 0.05, 0.03, -s * 0.04, 0.01, 0.025, 0, 0, -s * 0.4); // thumb
+      m(hand, PG.sph, M.glove, 0.042, 0.052, 0.03);
+      for (let i = 0; i < 3; i++) m(hand, PG.sph, M.glove, 0.014, 0.04, 0.016, (i - 1) * 0.027, -0.062, 0.01);
+      m(hand, PG.sph, M.glove, 0.015, 0.03, 0.016, -s * 0.043, -0.018, 0.02);   // thumb
       J.arms.push({ sh, el, hand });
     }
     J.legs = [];
     for (const s of [-1, 1]) {
       const hip = j(J.body, s * 0.1, -0.06, 0);
-      m(hip, GE.limb, M.suit, 0.13, 0.23, 0.13, 0, -0.21, 0);
+      m(hip, PG.sph, M.suit, 0.09, 0.25, 0.098, 0, -0.19, 0.005);
       const kn = j(hip, 0, -0.43, 0);
-      m(kn, GE.limb, M.suit, 0.11, 0.21, 0.11, 0, -0.2, 0);
-      m(kn, PG.box, M.boot, 0.12, 0.12, 0.17, 0, -0.39, 0.02);          // boot
-      m(kn, PG.box, M.boot, 0.11, 0.07, 0.09, 0, -0.42, 0.12);          // toe
+      m(kn, PG.sph, M.suit, 0.066, 0.16, 0.074, 0, -0.13, -0.014); m(kn, PG.cyl8, M.suit, 0.05, 0.36, 0.054, 0, -0.2, 0);
+      m(kn, PG.cyl8, M.boot, 0.06, 0.17, 0.064, 0, -0.3, 0);           // the boot's leg
+      m(kn, PG.box, M.boot, 0.1, 0.1, 0.16, 0, -0.4, 0.015);            // boot
+      m(kn, PG.sph, M.boot, 0.05, 0.04, 0.07, 0, -0.425, 0.1);          // toe
       J.legs.push({ hip, kn });
+    }
+    if (G.GFX && G.GFX.fuse && G.Post && G.Post.active) {
+      try { G.GFX.fuse(root, { keep: [J.hood] }, null, 'avatar', { still: true, pick: (c) => c !== J.hood && c.material !== M.eye }); root.traverse((o) => { if (o.isMesh) o.castShadow = true; }); } catch (e) { /* the body stays as it was built */ }
     }
     return { root, J };
   };
@@ -113,12 +129,12 @@
   // ---- the class's clothes over the common figure (also the bodies of team-mates in co-op, and the class screen's preview).
   // Colours per class: suit (under the clothes), main (the class's own colour), dark, accent (its brightest, the class colour itself), leather.
   const PAL = {
-    soldier: { suit: 0x55603a, main: 0x66733f, dark: 0x3c4428, accent: 0x9ab070, leather: 0x3b2f22 },
-    assault: { suit: 0x2c2b2e, main: 0xc0382a, dark: 0x5a1a14, accent: 0xff6a50, leather: 0x2a2420 },
-    sniper: { suit: 0x223247, main: 0x2f5c96, dark: 0x182638, accent: 0x5aa8ff, leather: 0x262a32 },
-    blade: { suit: 0x2b2430, main: 0xe08a24, dark: 0x2e2a44, accent: 0xffb040, leather: 0x2a2420 },
-    heavy: { suit: 0x3a332c, main: 0x8a5a36, dark: 0x4a3020, accent: 0xc08a5a, leather: 0x5a3c26 },
-    mage: { suit: 0x2a1c3e, main: 0x6b3fb5, dark: 0x3a2266, accent: 0xb07aff, leather: 0x231a2c },
+    soldier: { suit: 0x4a5236, main: 0x565f38, dark: 0x30361f, accent: 0x8a9a60, leather: 0x32281c },
+    assault: { suit: 0x2a282a, main: 0x7a2a22, dark: 0x3e1814, accent: 0xc04a36, leather: 0x241e1a },
+    sniper: { suit: 0x1e2a38, main: 0x2c4466, dark: 0x141e2c, accent: 0x5a8ac8, leather: 0x20242a },
+    blade: { suit: 0x26202a, main: 0x7c4a20, dark: 0x24202e, accent: 0xd08a3a, leather: 0x241e1a },
+    heavy: { suit: 0x302a24, main: 0x6a4630, dark: 0x3a261a, accent: 0xa87850, leather: 0x4a3222 },
+    mage: { suit: 0x221a30, main: 0x3c2c5a, dark: 0x2a1c48, accent: 0x9a70e0, leather: 0x1e1826 },
   };
   AV.PAL = PAL;
   AV.dress = function (J, cls) {
@@ -133,7 +149,7 @@
     // the suit, the gloves and the boots take the class's colours
     if (J.M) { J.M.suit.color.setHex(P.suit); J.M.glove.color.setHex(P.leather); J.M.boot.color.setHex(P.leather); }
     const main = mat('main', P.main), dark = mat('dark', P.dark), acc = mat('acc', P.accent, { roughness: 0.55 }), lea = mat('lea', P.leather, { roughness: 0.7 });
-    const steel = mat('steel', 0x9aa0a8, { roughness: 0.32, metalness: 0.85 }), black = mat('black', 0x16130f, { roughness: 0.7 });
+    const steel = mat('steel', 0x6a6e74, { roughness: 0.55, metalness: 0.8 }), black = mat('black', 0x16130f, { roughness: 0.7 });
     const H = J.head, Ch = J.chest, B = J.body, A = J.arms, L = J.legs;
     switch (cls) {
       case 'soldier': {
@@ -145,7 +161,7 @@
         add(H, PG.box, black, 0.17, 0.025, 0.02, 0, 0.215, 0.135);
         const lens = mat('lens', 0xffc040, { emissive: 0x5a3a00, roughness: 0.2 });
         for (const s of [-1, 1]) add(H, PG.cyl8, lens, 0.03, 0.02, 0.03, s * 0.045, 0.218, 0.142, Math.PI / 2);
-        add(Ch, taper(0.9, 0.95), dark, 0.45, 0.34, 0.29, 0, 0.31, 0);
+        add(Ch, PG.sph, dark, 0.235, 0.2, 0.158, 0, 0.31, 0);
         for (const x of [-0.12, 0, 0.12]) add(Ch, PG.box, main, 0.085, 0.11, 0.05, x, 0.2, 0.16);
         add(Ch, PG.box, main, 0.07, 0.08, 0.04, 0.13, 0.4, 0.16);
         add(Ch, PG.box, black, 0.36, 0.05, 0.25, 0, 0.06, 0);
@@ -164,7 +180,7 @@
         const lens = mat('lens', 0xffc040, { emissive: 0x6a4000, roughness: 0.2 });
         for (const s of [-1, 1]) add(H, PG.cyl8, lens, 0.034, 0.02, 0.034, s * 0.048, 0.228, 0.115, Math.PI / 2);
         add(H, PG.cyl8, dark, 0.118, 0.07, 0.124, 0, 0.055, 0.004);
-        add(Ch, taper(0.88, 0.95), dark, 0.43, 0.3, 0.27, 0, 0.32, 0);
+        add(Ch, PG.sph, dark, 0.225, 0.18, 0.148, 0, 0.32, 0);
         for (const s of [-1, 1]) add(Ch, PG.box, main, 0.03, 0.3, 0.02, s * 0.12, 0.32, 0.14);
         add(Ch, PG.box, black, 0.05, 0.62, 0.03, 0, 0.28, 0.15, 0, 0, 0.62);
         const brass = mat('brass', 0xc8a050, { roughness: 0.35, metalness: 0.8 });
@@ -196,7 +212,7 @@
         add(H, PG.sph, J.M ? J.M.hair : black, 0.04, 0.05, 0.04, 0, 0.27, -0.06);
         add(H, PG.cyl8, wh, 0.123, 0.026, 0.129, 0, 0.17, 0);
         add(H, PG.box, wh, 0.02, 0.14, 0.035, 0.02, 0.13, -0.14, 0.45, 0, 0.15); add(H, PG.box, wh, 0.02, 0.12, 0.035, -0.02, 0.13, -0.14, 0.55, 0, -0.2);
-        add(Ch, taper(0.86, 0.94), main, 0.46, 0.56, 0.27, 0, 0.25, 0);
+        add(Ch, PG.sph, main, 0.235, 0.3, 0.15, 0, 0.27, 0); add(Ch, PG.sph, main, 0.2, 0.09, 0.12, 0, 0.49, -0.005);
         add(Ch, PG.box, dark, 0.11, 0.3, 0.02, 0, 0.36, 0.135);
         for (const s of [-1, 1]) add(Ch, PG.box, wh, 0.025, 0.24, 0.02, s * 0.05, 0.4, 0.14, 0, 0, s * 0.35);
         add(Ch, PG.box, wh, 0.37, 0.065, 0.26, 0, 0.06, 0);
@@ -215,14 +231,12 @@
         // a great helm with a visor slit and a brown crest, a breastplate, layered pauldrons, a brown tabard and cape, vambraces, greaves
         J.hood.visible = false;
         const bronze = mat('bronze', 0xb08850, { roughness: 0.35, metalness: 0.8 });
-        add(H, PG.cyl8, steel, 0.14, 0.27, 0.15, 0, 0.13, 0);
-        add(H, GE.dome, steel, 0.14, 0.07, 0.15, 0, 0.265, 0);
-        add(H, PG.box, black, 0.19, 0.022, 0.02, 0, 0.15, 0.147);
-        add(H, PG.box, black, 0.02, 0.08, 0.02, 0, 0.09, 0.147);
-        add(H, PG.box, main, 0.03, 0.1, 0.24, 0, 0.35, -0.01);
-        add(Ch, taper(0.84, 0.92), steel, 0.46, 0.4, 0.3, 0, 0.34, 0);
+        const hg = G.GFX && G.GFX.foeGear ? G.GFX.foeGear('helm') : null;   // (the great helm the cursed knights wear, to a man's measure: gfx.js)
+        if (hg) { const hj = new THREE.Group(); hj.position.set(0, 0.005, 0); hj.scale.setScalar(0.82); H.add(hj); J.dressed.push(hj); const HM = { steel, trim: bronze, dark: black, mail: mat('mail', 0x2e2e33, { roughness: 0.75, metalness: 0.6 }) }; for (const q of hg) { const o = new THREE.Mesh(q.g, HM[q.m] || steel); o.castShadow = true; o.frustumCulled = false; hj.add(o); } }
+        else { add(H, PG.cyl8, steel, 0.14, 0.27, 0.15, 0, 0.13, 0); add(H, GE.dome, steel, 0.14, 0.07, 0.15, 0, 0.265, 0); add(H, PG.box, black, 0.19, 0.022, 0.02, 0, 0.15, 0.147); add(H, PG.box, black, 0.02, 0.08, 0.02, 0, 0.09, 0.147); add(H, PG.box, main, 0.03, 0.1, 0.24, 0, 0.35, -0.01); }
+        add(Ch, PG.sph, steel, 0.24, 0.24, 0.17, 0, 0.34, 0.01); add(Ch, PG.sph, steel, 0.06, 0.2, 0.05, 0, 0.34, 0.15);
         add(Ch, PG.box, steel, 0.38, 0.1, 0.27, 0, 0.1, 0);
-        for (const s of [-1, 1]) { add(Ch, PG.sph, steel, 0.2, 0.14, 0.2, s * 0.3, 0.52, 0); add(Ch, PG.sph, steel, 0.18, 0.1, 0.18, s * 0.31, 0.44, 0); add(Ch, PG.box, lea, 0.21, 0.02, 0.21, s * 0.3, 0.47, 0); }
+        for (const s of [-1, 1]) { add(Ch, PG.sph, steel, 0.15, 0.1, 0.155, s * 0.28, 0.5, 0, 0, 0, -s * 0.3); add(Ch, PG.sph, steel, 0.125, 0.085, 0.135, s * 0.32, 0.43, 0, 0, 0, -s * 0.5); }
         add(Ch, PG.oct, acc, 0.07, 0.012, 0.07, 0, 0.38, 0.155, Math.PI / 2);
         add(Ch, PG.box, lea, 0.4, 0.06, 0.29, 0, 0.03, 0); add(Ch, PG.box, bronze, 0.06, 0.05, 0.02, 0, 0.03, 0.15);
         add(B, PG.box, main, 0.26, 0.48, 0.02, 0, -0.16, 0.135); add(B, PG.box, main, 0.26, 0.48, 0.02, 0, -0.16, -0.135);
@@ -241,7 +255,7 @@
         add(H, PG.cone, hood, 0.07, 0.17, 0.06, 0, 0.2, -0.17, -2.1);
         add(H, PG.sph, mat('shade', 0x0a0810, { roughness: 1 }), 0.119, 0.135, 0.123, 0, 0.12, 0.004); // (the face lost in the hood's shadow)
         for (const s of [-1, 1]) add(H, PG.sph, new THREE.MeshBasicMaterial({ color: P.accent }), 0.02, 0.013, 0.01, s * 0.042, 0.135, 0.124);
-        add(Ch, taper(0.8, 0.88), main, 0.44, 0.52, 0.27, 0, 0.27, 0);
+        add(Ch, PG.sph, main, 0.225, 0.29, 0.15, 0, 0.27, 0);
         for (const s of [-1, 1]) add(Ch, PG.box, gold, 0.025, 0.22, 0.02, s * 0.05, 0.42, 0.137, 0, 0, s * 0.4);
         add(Ch, PG.box, gold, 0.03, 0.34, 0.02, 0, 0.17, 0.137);
         add(Ch, GE.cape, dark, 0.28, 0.16, 0.19, 0, 0.47, 0);
@@ -257,6 +271,14 @@
         for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2; const o = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: P.accent })); o.scale.setScalar(0.05); o.position.set(Math.cos(a) * 0.5, Math.sin(a * 2) * 0.1, Math.sin(a) * 0.5); o.frustumCulled = false; g.add(o); }
         break;
       }
+    }
+    // (what was put on is melted joint by joint like the body under it: gfx.js)
+    if (G.GFX && G.GFX.fuse && G.Post && G.Post.active) {
+      try {
+        const top = J.body.parent, was = new Set(), put = new Set(J.dressed); top.traverse((o) => { if (o.isMesh) was.add(o); });
+        G.GFX.fuse(top, {}, null, 'avatar', { still: true, pick: (c) => put.has(c) });
+        top.traverse((o) => { if (o.isMesh && !was.has(o)) { o.frustumCulled = false; J.dressed.push(o); } });
+      } catch (e) { /* as it was built */ }
     }
     if (J === AV._J) AV.mats = mats(root);
   };

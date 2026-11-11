@@ -222,7 +222,7 @@
       const m = new THREE.MeshStandardMaterial({ color: 0x3a2a2a, emissive: 0x1a0c08, roughness: 1, flatShading: true, fog: false });
       for (let i = 0; i < 34; i++) {
         const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.9, 150), h = rng.range(12, 46), s = rng.range(5, 12);
-        const t = new THREE.Mesh(PG().box, m); t.scale.set(s, h, s * rng.range(0.6, 1.4)); t.position.set(W / 2 + Math.cos(a) * r, h / 2 - 2, D / 2 + Math.sin(a) * r); t.rotation.y = rng.range(0, 3); grp.add(t);
+        const t = new THREE.Mesh(PG().box, m); t.scale.set(s, h + 70, s * rng.range(0.6, 1.4)); t.position.set(W / 2 + Math.cos(a) * r, (h - 70) / 2 - 2, D / 2 + Math.sin(a) * r);   // (down into the dark below the bridge: no foot left hanging in the air) t.rotation.y = rng.range(0, 3); grp.add(t);
         if (rng.chance(0.4)) { const c = new THREE.Mesh(PG().cone, m); c.scale.set(s * 0.6, s, s * 0.6); c.position.set(t.position.x, h - 2 + s / 2, t.position.z); grp.add(c); }
       }
     });

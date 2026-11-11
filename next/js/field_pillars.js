@@ -9,7 +9,7 @@
   const P = () => G.Props, PG = () => G.Props.PG;
   const Mx = (x, y, z, sx, sy, sz, rx, ry, rz) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)), V(sx, sy, sz));
 
-  G.Tex.BIOMES.pillars = { name: '沈む石柱の海', stone: '#8a8498', stone2: '#76708a', floor: '#7a7488', trim: '#a69ebc', rock: '#4a4458', wood: '#5a4a5a', fog: '#120c1c', fogD: 0.014, hemiS: '#7a6aa8', hemiG: '#1a1024', amb: 0.5, moon: '#c8b8ff', moonI: 1.0, torch: '#c890ff', cloth: '#3a2a5a', accent: 'bones', outdoor: 'sky', sky: ['#020106', '#0c0718', '#22163a'], sunDir: [0.2, 0.8, -0.4], sunCol: [0.7, 0.62, 1.0], cloudCol: 0x2a1a44, isletGrass: 0x3a3048, stars: true };
+  G.Tex.BIOMES.pillars = { name: '沈む石柱の海', stone: '#868a92', stone2: '#72767e', floor: '#767a82', trim: '#a0a4ac', rock: '#44484e', wood: '#54504c', fog: '#0a0e14', fogD: 0.014, hemiS: '#6a7890', hemiG: '#12141a', amb: 0.5, moon: '#b8c8e0', moonI: 1.0, torch: '#a8c8e8', cloth: '#2a3040', accent: 'bones', outdoor: 'sky', sky: ['#010204', '#060a12', '#141c2a'], sunDir: [0.2, 0.8, -0.4], sunCol: [0.62, 0.7, 0.9], cloudCol: 0x1a2230, isletGrass: 0x30363c, stars: true };
   const C = 4;           // a pillar's width (the grid it stands on)
   const SINK = 13;       // how far a pillar goes down
   const DOWN_Y = -SINK;

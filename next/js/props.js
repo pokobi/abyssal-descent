@@ -150,7 +150,15 @@
     const d = { px: [1, 0], nx: [-1, 0], pz: [0, 1], nz: [0, -1] }[dir];
     const ry = Math.atan2(d[0], d[1]);
     put(w, 'sconce', x, y, z, ry);   // (a plate nailed to the wall, a bent arm, a ring with claws, a brand wound with pitched rag: gfx.js)
-    w.addLight(x + d[0] * 0.38, y + 0.5, z + d[1] * 0.38, { flame: 1 });
+    // (the light stands a step out from the wall, the flame on the brand: as a point at the flame it lit the wall a hand away to white)
+    w.addLight(x + d[0] * 0.8, y + 0.6, z + d[1] * 0.8, { flame: 1, fp: new THREE.Vector3(x + d[0] * 0.38, y + 0.5, z + d[1] * 0.38) });
+    // (the wall behind a brand is black with its soot. So too the flame is seen against it: the wall a hand from the flame is lit
+    // brighter than the flame is drawn, and the flame was lost in it)
+    if (G.Tex.spr.soot) {
+      const k = w._soot || (w._soot = { g: new THREE.PlaneGeometry(1, 1), m: new THREE.MeshBasicMaterial({ map: G.Tex.spr.soot, color: 0x100b07, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }) });
+      const sm = new THREE.Mesh(k.g, k.m); sm.position.set(x + d[0] * 0.014, y + 1.25, z + d[1] * 0.014); sm.rotation.y = ry; sm.scale.set(1.8 + hsh(x, z, 3) * 0.3, 3.2, 1); sm.renderOrder = 1; sm.matrixAutoUpdate = false; sm.updateMatrix();
+      w.group.add(sm);
+    }
   };
   P.brazier = function (w, x, y, z, s, collide) {
     s = s || 1;
@@ -163,8 +171,8 @@
     for (let i = 0; i < n; i++) {
       const ox = rr(rng, -0.25, 0.25), oz = rr(rng, -0.25, 0.25), h = rr(rng, 0.12, 0.35);
       put(w, 'candle', x + ox, y + h / 2, z + oz, hsh(x + ox, z + oz) * 6.28, 0.035, { sy: h, inst: true });
-      if (i === 0 && light !== false) w.addLight(x + ox, y + h + 0.05, z + oz, { flame: 0.35, intensity: 2.5, range: 5, prio: 0.5 });
-      else w.lightSources.push({ pos: new THREE.Vector3(x + ox, y + h + 0.05, z + oz), color: '#ffb060', intensity: 0, range: 0, flame: 0.3, emit: true, noLight: true, ph: Math.random() * 99, prio: 0.0001 });
+      if (i === 0 && light !== false) w.addLight(x + ox, y + h + 0.014, z + oz, { flame: 0.35, intensity: 2.5, range: 5, prio: 0.5 });
+      else w.lightSources.push({ pos: new THREE.Vector3(x + ox, y + h + 0.014, z + oz), color: '#ffb060', intensity: 0, range: 0, flame: 0.3, emit: true, noLight: true, ph: Math.random() * 99, prio: 0.0001 });
     }
   };
   P.chandelier = function (w, x, y, z, top) {
@@ -175,8 +183,8 @@
     for (let i = 0; i < 8; i++) {
       const a = i / 8 * Math.PI * 2;
       put(w, 'candle', x + Math.cos(a) * 1.1, y + 0.15 + (i % 3) * 0.015, z + Math.sin(a) * 1.1, a * 3, 0.036, { sy: 0.22 + (i % 3) * 0.035 });
-      if (i % 4 === 0) w.addLight(x + Math.cos(a) * 1.1, y + 0.35, z + Math.sin(a) * 1.1, { flame: 0.4, intensity: 10, range: 14, prio: 1.2 });
-      else w.lightSources.push({ pos: new THREE.Vector3(x + Math.cos(a) * 1.1, y + 0.35, z + Math.sin(a) * 1.1), color: '#ffb060', intensity: 0, range: 0, flame: 0.35, emit: true, noLight: true, ph: Math.random() * 99, prio: 0.0001 });
+      if (i % 4 === 0) w.addLight(x + Math.cos(a) * 1.1, y + 0.274 + (i % 3) * 0.0325, z + Math.sin(a) * 1.1, { flame: 0.4, intensity: 10, range: 14, prio: 1.2 });
+      else w.lightSources.push({ pos: new THREE.Vector3(x + Math.cos(a) * 1.1, y + 0.274 + (i % 3) * 0.0325, z + Math.sin(a) * 1.1), color: '#ffb060', intensity: 0, range: 0, flame: 0.35, emit: true, noLight: true, ph: Math.random() * 99, prio: 0.0001 });
     }
   };
   P.chain = function (w, x, y, z, len) {

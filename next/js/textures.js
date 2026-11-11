@@ -307,11 +307,19 @@
     }, false);
     T.spr.flame = pixTex(256, (u, v, o) => {
       const [k, x, y] = cell4(u, v), h = (y + 1) / 2;                      // (h: 0 at its root, 1 at its tip)
-      const sway = Math.sin(h * 4.2 + k * 1.9) * 0.2 * h + (_vn(h * 3, k * 5, 7) - 0.5) * 0.3 * h;
-      const w = 0.8 * Math.pow(1 - h, 0.75) * (0.35 + 0.65 * Math.min(1, h * 5)) * (0.85 + 0.3 * _vn(h * 6 + k, 3, 9));
-      const d = Math.abs(x - sway) / Math.max(0.001, w);
-      let I = d < 1 ? 1 - d * d : 0; I *= Math.pow(1 - h, 0.35) * _ss(0, 0.08, h) * (0.72 + 0.4 * _fb(x * 4 + k * 3, y * 4 - k, 11, 3)); I = Math.min(1, I * 1.25);
-      o[0] = 1; o[1] = 0.38 + 0.6 * _ss(0.15, 0.8, I); o[2] = 0.08 + 0.75 * _ss(0.55, 1, I); o[3] = Math.pow(I, 1.15);   // (white at its heart, yellow, orange at its skin)
+      // (not a drop of flame with a clean edge: the place is bent more and more toward the tip, so that it leans and forks, and noise
+      // running upward tears it, most at the tip and the sides)
+      // three tongues of unequal height from one root, each wandering more the higher it goes; uneven within
+      let I = 0;
+      for (let j = 0; j < 3; j++) {
+        const top = 0.56 + _h2(j, k, 3) * 0.42; if (h >= top) continue;
+        const t = h / top, cx = (j - 1) * 0.2 * (1 - 0.6 * t) + (_fb(h * 2.4 + j * 7 + k * 3, j * 5 + k, 7, 3) - 0.5) * 1.1 * h;
+        const w = (0.34 - 0.08 * (j % 2)) * Math.pow(1 - t, 0.8) * (0.3 + 0.7 * Math.min(1, t * 5)), d = Math.abs(x - cx) / Math.max(0.001, w);
+        if (d < 1) I = Math.max(I, (1 - d * d) * (1 - Math.pow(t, 2.4)));
+      }
+      I = Math.max(0, I * (0.5 + 0.95 * _fb(x * 5 + k * 3, h * 6 - k * 2, 11, 4)) - 0.04) * _ss(0, 0.06, h);
+      I = Math.min(1, I * 1.15);
+      o[0] = 0.62 + 0.38 * _ss(0, 0.3, I); o[1] = 0.1 + 0.88 * _ss(0.12, 0.8, I); o[2] = 0.02 + 0.85 * _ss(0.55, 1, I); o[3] = _ss(0, 0.62, I);   // (white at its heart, yellow, orange, dull red where it is thinnest)
     }, false);
     // a bullet's mark in stone: the hole, the crater broken out around it (lighter where the break is fresh), cracks, and soot
     const holePic = (kind) => pixTex(128, (u, v, o) => {
@@ -370,6 +378,12 @@
       const c = 0.72 + 0.28 * _fb(x * 4, y * 4, 55, 3);
       o[0] = o[1] = o[2] = c; o[3] = al * 0.95;
     });
+    // the soot a brand leaves on the wall it hangs on: black behind the flame, drawn upward and thinning
+    T.spr.soot = pixTex(128, (u, v, o) => {
+      const x = u * 2 - 1, y = 1 - v * 2, h = Math.min(1, Math.max(0, (y + 0.75) / 1.75)), n = _fb(x * 3, y * 3, 91, 4);
+      const core = 0.36 + 0.16 * h, a = _ss(core + 0.62, core - 0.04, Math.abs(x) + (n - 0.5) * 0.55) * _ss(-1, -0.6, y + (n - 0.5) * 0.2) * _ss(1, 0.1, y + (n - 0.5) * 0.3);   // (dark outright behind the flame and above it, thinning to nothing over a long way)
+      o[0] = o[1] = o[2] = 1; o[3] = Math.min(0.97, a * (0.85 + 0.3 * n) * 1.12);
+    }, false);
     T.spr.ring = canvasTex(256, (g, s) => {
       g.strokeStyle = 'rgba(255,255,255,1)'; g.lineWidth = s * 0.04;
       g.beginPath(); g.arc(s / 2, s / 2, s * 0.46, 0, 6.28); g.stroke();

@@ -36,6 +36,17 @@
       float a = t.a * vColor.a * fogv;
       gl_FragColor = vec4(vColor.rgb * t.rgb * a, a);
     }`;
+  // (flame: it is light, and it also hides what is behind it. Added to the picture only, a flame before a wall lit brighter than itself -
+  // the wall its own torch hangs on - was not seen at all. So: its light is added, and what is behind is dimmed by how thick it is there)
+  const FS_COVER = `
+    uniform sampler2D map; uniform float uFogD; uniform float uCover; varying vec4 vColor; varying float vDepth;
+    ${PUV}
+    void main(){
+      vec4 t = texture2D(map, puv());
+      float fogv = exp(-uFogD * uFogD * vDepth * vDepth);
+      float a = t.a * vColor.a * fogv;
+      gl_FragColor = vec4(vColor.rgb * t.rgb * a, a * uCover);
+    }`;
   const FS_NORM = `
     uniform sampler2D map; uniform float uFogD; uniform vec3 uFogC; uniform float uLit; varying vec4 vColor; varying float vDepth;
     ${PUV}
@@ -65,10 +76,11 @@
       g.setAttribute('position', this.pos); g.setAttribute('aColor', this.col); g.setAttribute('aSize', this.siz); g.setAttribute('aRot', this.rota);
       g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
       this.mat = new THREE.ShaderMaterial({
-        uniforms: { map: { value: tex }, uScale: { value: 400 }, uFogD: { value: 0.02 }, uFogC: { value: new THREE.Color() }, uAtlas: { value: this.atlas }, uLit: { value: 1 } },
-        vertexShader: VS, fragmentShader: additive ? FS_ADD : FS_NORM,
-        transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+        uniforms: { map: { value: tex }, uScale: { value: 400 }, uFogD: { value: 0.02 }, uFogC: { value: new THREE.Color() }, uAtlas: { value: this.atlas }, uLit: { value: 1 }, uCover: { value: o.cover || 0 } },
+        vertexShader: VS, fragmentShader: o.cover ? FS_COVER : additive ? FS_ADD : FS_NORM,
+        transparent: true, depthWrite: false, blending: o.cover ? THREE.CustomBlending : additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       });
+      if (o.cover) { this.mat.blendSrc = THREE.OneFactor; this.mat.blendDst = THREE.OneMinusSrcAlphaFactor; this.mat.blendEquation = THREE.AddEquation; }
       this.pts = new THREE.Points(g, this.mat);
       this.pts.frustumCulled = false; this.pts.renderOrder = additive ? 10 : 9;
       g.setDrawRange(0, 0);
@@ -217,7 +229,7 @@
   FX.init = function (sc, cam) {
     scene = sc; camera = cam;
     FX.add = new PSys(4000, true, G.Tex.spr.soft);
-    FX.flame = new PSys(2500, true, G.Tex.spr.flame, { atlas: 2, tilt: 0.4, spin: 0.7 });   // (tongues of flame: four of them, each standing a little its own way)
+    FX.flame = new PSys(2500, true, G.Tex.spr.flame, { atlas: 2, tilt: 0.26, spin: 0.45, cover: 0.92 });   // (tongues of flame: four of them, each standing a little its own way)
     FX.norm = new PSys(3000, false, G.Tex.spr.smoke, { atlas: 2, tilt: Math.PI, spin: 0.9 });  // (puffs of smoke and dust: four of them, turned any way and turning)
     FX.streak = new Streaks(1400, true); FX.drops = new Streaks(500, false);
     scene.add(FX.add.pts, FX.flame.pts, FX.norm.pts, FX.streak.mesh, FX.drops.mesh);
@@ -413,9 +425,15 @@
     }
   };
   // a single flame lick (call repeatedly for torches)
+  // (a flame is brighter than the wall it lights: drawn no brighter than white, it was lost before a wall a hand away from it)
+  const FLAME_K = 4;
   FX.flameLick = function (x, y, z, s, color) {
-    const c = rgb(color || 0xff9a40);
-    FX.flame.spawn(x + rs(0.05 * s), y, z + rs(0.05 * s), rs(0.15), 0.9 + Math.random() * 0.6, rs(0.15), 0.35 + Math.random() * 0.25, 0.32 * s, 0.08 * s, c.r * 1.4, c.g * 1.2, c.b, 0.9, -0.6, 1.5, c.r * 1.2, c.g * 0.5, c.b * 0.2);
+    const c = rgb(color || 0xff9a40), S = 0.3 * Math.pow(s, 1.15);
+    // (the flame itself stands where it burns, its root at the wick: a tongue that the next replaces before it is gone. It was a puff
+    // sent up half a metre, which over a candle is a string of small flames in the air)
+    FX.flame.spawn(x + rs(0.02 * s), y + S * 0.4, z + rs(0.02 * s), rs(0.04 * s), 0.14 * s, rs(0.04 * s), 0.3 + Math.random() * 0.16, S * (1.05 + Math.random() * 0.3), S * 0.8, (c.r * 0.6 + 0.4) * FLAME_K, (c.g * 0.6 + 0.4) * FLAME_K * 0.8, (c.b * 0.5 + 0.25) * FLAME_K * 0.5, 0.9, 0, 0, c.r * 1.2, c.g * 0.6, c.b * 0.25);
+    // (tongues torn off it and carried up: a fire of some size throws more of them, and higher)
+    if (Math.random() < Math.min(0.7, 0.12 + s * 0.22)) FX.flame.spawn(x + rs(0.05 * s), y + S * 0.6, z + rs(0.05 * s), rs(0.12 * s), (0.7 + Math.random() * 0.6) * s, rs(0.12 * s), 0.3 + Math.random() * 0.25, S * 0.6, S * 0.12, c.r * 1.4, c.g * 1.1, c.b * 0.8, 0.8, -0.4, 1.2, c.r * 1.2, c.g * 0.45, c.b * 0.15);
     if (Math.random() < 0.08) FX.add.spawn(x, y + 0.1, z, rs(0.4), 1.2 + Math.random(), rs(0.4), 0.8 + Math.random() * 0.6, 0.03, 0.01, 1.5, 0.8, 0.3, 1, -0.2, 0.3);
     if (Math.random() < 0.06) FX.norm.spawn(x, y + 0.4 * s, z, rs(0.1), 0.6, rs(0.1), 1.5, 0.15 * s, 0.6 * s, 0.1, 0.09, 0.08, 0.25, -0.1, 0.5);
   };
@@ -423,7 +441,7 @@
     const c = rgb(color || 0xff8a3a);
     for (let i = 0; i < 18; i++) {
       const a = Math.random() * 6.28, d = Math.random() * r;
-      FX.flame.spawn(p.x + Math.cos(a) * d, p.y + Math.random() * 0.5, p.z + Math.sin(a) * d, rs(0.5), 1.5 + Math.random() * 2, rs(0.5), 0.4 + Math.random() * 0.4, 0.6, 0.2, c.r * 1.3, c.g * 1.1, c.b, 0.85, -1, 1, c.r, c.g * 0.4, c.b * 0.2);
+      FX.flame.spawn(p.x + Math.cos(a) * d, p.y + Math.random() * 0.5, p.z + Math.sin(a) * d, rs(0.5), 1.5 + Math.random() * 2, rs(0.5), 0.4 + Math.random() * 0.4, 0.7, 0.24, (c.r * 0.6 + 0.4) * 2.6, (c.g * 0.6 + 0.4) * 2.1, (c.b * 0.5 + 0.25) * 1.3, 0.85, -1, 1, c.r, c.g * 0.4, c.b * 0.2);
     }
   };
   FX.explosion = function (p, r, color, opts) {
@@ -431,9 +449,12 @@
     const c = rgb(color || 0xff9a40);
     const k = Math.max(0.4, r / 4);
     // the blast itself as a body: a boiling fireball (fire colours) or a burst of light (any other colour), 0.85 of the blast radius at most
-    if (G.vfx && G.vfx.fireball) { if (c.r > c.b * 1.4 && c.r >= c.g * 0.9) G.vfx.fireball(p, r, color || 0xffffff); else G.vfx.burst(p, r * 0.85, color); }
+    const fiery = c.r > c.b * 1.4 && c.r >= c.g * 0.9;
+    if (G.vfx && G.vfx.fireball) { if (fiery) G.vfx.fireball(p, r, color || 0xffffff); else G.vfx.burst(p, r * 0.85, color); }
     // core flash & fireball
-    for (let i = 0; i < 28 * k; i++) {
+    // (flames thrown out: only where the blast is not fire - a blast of fire has its ball for a body, and tongues of flame before a
+    // ball that is white-hot are dark spots on it)
+    if (!fiery || !(G.vfx && G.vfx.fireball)) for (let i = 0; i < 28 * k; i++) {
       const dir = new THREE.Vector3(rs(1), rs(1) * 0.7 + 0.3, rs(1)).normalize();
       const s = r * (1.5 + Math.random() * 2.5);
       FX.flame.spawn(p.x, p.y, p.z, dir.x * s, dir.y * s, dir.z * s, 0.35 + Math.random() * 0.35, r * 0.45, r * 0.15, c.r * 1.6, c.g * 1.3, c.b * 1.1, 1, -1, 5, c.r * 0.9, c.g * 0.3, c.b * 0.1);

@@ -2238,8 +2238,9 @@
       if (!s.emit || !s.flame) continue;
       const d2 = s.pos.distanceToSquared(cp);
       if (d2 > 45 * 45) continue;
-      let a = (flameAcc.get(s) || 0) + dt * 16 * Math.min(2.5, s.flame) * (d2 > 25 * 25 ? 0.4 : 1);
-      while (a >= 1) { a -= 1; G.fx.flameLick(s.pos.x, s.pos.y, s.pos.z, s.flame, w.mats.biome.flame); }
+      let a = (flameAcc.get(s) || 0) + dt * Math.max(9, 16 * Math.min(2.5, s.flame)) * (d2 > 25 * 25 ? 0.4 : 1);   // (a small flame too is whole: never fewer than nine tongues a second)
+      const fp = s.fp || s.pos;   // (fp: where the flame is, when the light it gives is set apart from it)
+      while (a >= 1) { a -= 1; G.fx.flameLick(fp.x, fp.y, fp.z, s.flame, w.mats.biome.flame); }
       flameAcc.set(s, a);
     }
     GM._ambT = (GM._ambT || 0) - dt;

@@ -249,13 +249,14 @@
   // run fn with everything it builds raised by y (solids, visuals, colliders, lights, merged geometry and the meshes it defers)
   T.at = function (w, y, fn) {
     if (!y) return fn();
-    const B = w.batch, box = B.box, geo = B.geo, ac = w.addCollider, al = w.addLight, dpush = w.deferred.push;
+    const B = w.batch, box = B.box, geo = B.geo, ac = w.addCollider, al = w.addLight, dpush = w.deferred.push, y0at = w._atY || 0;
+    w._atY = y0at + y;   // (how far up what is built just now stands: what places itself by its own matrix reads it - props.js P.inst)
     B.box = function (mk, x0, y0, z0, x1, y1, z1, o) { o = Object.assign({}, o || {}); o.gradBase = (o.gradBase ?? Math.min(0, y0)) + y; return box.call(this, mk, x0, y0 + y, z0, x1, y1 + y, z1, o); };
     B.geo = function (mk, g, mat, o) { const m2 = new THREE.Matrix4().makeTranslation(0, y, 0).multiply(mat); if (o && o.gradBase != null) o = Object.assign({}, o, { gradBase: o.gradBase + y }); return geo.call(this, mk, g, m2, o); };
     w.addCollider = function (x0, y0, z0, x1, y1, z1, o) { return ac.call(this, x0, y0 + y, z0, x1, y1 + y, z1, o); };
     w.addLight = function (x, yy, z, o) { return al.call(this, x, yy + y, z, o); };
     w.deferred.push = function (f) { return dpush.call(this, (grp) => { const g = new THREE.Group(); g.position.y = y; f(g); grp.add(g); }); };
-    try { return fn(); } finally { B.box = box; B.geo = geo; w.addCollider = ac; w.addLight = al; delete w.deferred.push; }
+    try { return fn(); } finally { B.box = box; B.geo = geo; w.addCollider = ac; w.addLight = al; delete w.deferred.push; if (dpush !== Array.prototype.push) w.deferred.push = dpush; w._atY = y0at; }
   };
   // the ground over a rectangle: its height if it is flat enough to lay something on it, else null (0 where the area has no ground of its own)
   T.flat = function (w, x0, z0, x1, z1, tol) {

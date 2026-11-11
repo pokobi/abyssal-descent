@@ -130,11 +130,11 @@
   // Colours per class: suit (under the clothes), main (the class's own colour), dark, accent (its brightest, the class colour itself), leather.
   const PAL = {
     soldier: { suit: 0x4a5236, main: 0x565f38, dark: 0x30361f, accent: 0x8a9a60, leather: 0x32281c },
-    assault: { suit: 0x2a282a, main: 0x7a2a22, dark: 0x3e1814, accent: 0xc04a36, leather: 0x241e1a },
+    assault: { suit: 0x2a282a, main: 0x6a2a24, dark: 0x3a1a16, accent: 0x9c4636, leather: 0x241e1a },
     sniper: { suit: 0x1e2a38, main: 0x2c4466, dark: 0x141e2c, accent: 0x5a8ac8, leather: 0x20242a },
-    blade: { suit: 0x26202a, main: 0x7c4a20, dark: 0x24202e, accent: 0xd08a3a, leather: 0x241e1a },
+    blade: { suit: 0x26202a, main: 0x6a4426, dark: 0x24202e, accent: 0xa87a40, leather: 0x241e1a },
     heavy: { suit: 0x302a24, main: 0x6a4630, dark: 0x3a261a, accent: 0xa87850, leather: 0x4a3222 },
-    mage: { suit: 0x221a30, main: 0x3c2c5a, dark: 0x2a1c48, accent: 0x9a70e0, leather: 0x1e1826 },
+    mage: { suit: 0x211c2c, main: 0x33294a, dark: 0x261e3a, accent: 0x7a64ac, leather: 0x1e1826 },
   };
   AV.PAL = PAL;
   AV.dress = function (J, cls) {
@@ -250,7 +250,7 @@
       case 'mage': {
         // a purple hood with the face in shadow and two glowing eyes, a robe trimmed with gold, a capelet, bell sleeves, a sash, a book; orbs
         J.hood.visible = false;
-        const hood = mat('hood', P.main, { side: THREE.DoubleSide }), gold = mat('gold', 0xd4ae5a, { roughness: 0.35, metalness: 0.7 });
+        const hood = mat('hood', P.main, { side: THREE.DoubleSide }), gold = mat('gold', 0x8c7036, { roughness: 0.5, metalness: 0.8 });
         add(H, GE.hood, hood, 0.16, 0.175, 0.165, 0, 0.13, -0.012);
         add(H, PG.cone, hood, 0.07, 0.17, 0.06, 0, 0.2, -0.17, -2.1);
         add(H, PG.sph, mat('shade', 0x0a0810, { roughness: 1 }), 0.119, 0.135, 0.123, 0, 0.12, 0.004); // (the face lost in the hood's shadow)

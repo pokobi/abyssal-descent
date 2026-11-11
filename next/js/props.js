@@ -64,12 +64,13 @@
   // world some 24 m across (what is out of sight is then left out), instead of being written vertex by vertex into the world's own mesh -
   // which took a second for a nave of them. They cast no shadow (they lie in niches).
   P.inst = function (w, mk, geo, m4, tint) {
+    if (w._atY) m4 = new THREE.Matrix4().makeTranslation(0, w._atY, 0).multiply(m4);   // (placed inside a raised stretch, terrain.js T.at: the raise goes into its own matrix)
     const I = w._inst || (w._inst = new Map()), e = m4.elements, key = mk + geo.uuid + '|' + Math.floor(e[12] / 24) + '|' + Math.floor(e[14] / 24);
     let q = I.get(key); if (!q) I.set(key, q = { mk, geo, m: [], c: [] });
     q.m.push(m4); q.c.push(tint || null);
     if (!w._instQ) {
       w._instQ = true;
-      w.deferred.push((grp) => {
+      Array.prototype.push.call(w.deferred, (grp) => {   // (into the area's own group, whatever raised stretch is being built just now)
         w._instQ = false; const col = new THREE.Color();
         for (const q2 of I.values()) {
           if (!q2.m.length) continue;

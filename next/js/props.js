@@ -155,9 +155,23 @@
     // (the wall behind a brand is black with its soot. So too the flame is seen against it: the wall a hand from the flame is lit
     // brighter than the flame is drawn, and the flame was lost in it)
     if (G.Tex.spr.soot) {
-      const k = w._soot || (w._soot = { g: new THREE.PlaneGeometry(1, 1), m: new THREE.MeshBasicMaterial({ map: G.Tex.spr.soot, color: 0x100b07, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }) });
-      const sm = new THREE.Mesh(k.g, k.m); sm.position.set(x + d[0] * 0.014, y + 1.25, z + d[1] * 0.014); sm.rotation.y = ry; sm.scale.set(1.8 + hsh(x, z, 3) * 0.3, 3.2, 1); sm.renderOrder = 1; sm.matrixAutoUpdate = false; sm.updateMatrix();
-      w.group.add(sm);
+      // (kept to the wall it is on: the box that holds a point just inside the wall behind the brand says how far that wall goes; what
+      // of the sheet would stand past its edge is cut off, picture and all. No such box, or too little of it left: no soot)
+      const px = x - d[0] * 0.06, pz = z - d[1] * 0.06, py = y + 0.9; let wall = null;
+      for (let i = w.colliders.length - 1; i >= 0; i--) { const c = w.colliders[i]; if (px >= c.x0 && px <= c.x1 && pz >= c.z0 && pz <= c.z1 && py >= c.y0 && py <= c.y1) { wall = c; break; } }
+      if (wall) {
+        const W = 1.8 + hsh(x, z, 3) * 0.3, U0 = (d[0] ? z : x) - W / 2, U1 = U0 + W, V0 = y - 0.35, V1 = y + 2.85;
+        const u0 = Math.max(U0, (d[0] ? wall.z0 : wall.x0) + 0.03), u1 = Math.min(U1, (d[0] ? wall.z1 : wall.x1) - 0.03), v0 = Math.max(V0, wall.y0 + 0.03), v1 = Math.min(V1, wall.y1 - 0.03);
+        if (u1 - u0 > 0.5 && v1 - v0 > 1.0) {
+          const mt = w._sootM || (w._sootM = new THREE.MeshBasicMaterial({ map: G.Tex.spr.soot, color: 0x100b07, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+          const g = new THREE.PlaneGeometry(1, 1), uv = g.attributes.uv, a0 = (u0 - U0) / W, a1 = (u1 - U0) / W, b0 = (v0 - V0) / (V1 - V0), b1 = (v1 - V0) / (V1 - V0);
+          uv.setXY(0, a0, b1); uv.setXY(1, a1, b1); uv.setXY(2, a0, b0); uv.setXY(3, a1, b0);
+          const sm = new THREE.Mesh(g, mt), uc = (u0 + u1) / 2;
+          sm.position.set(d[0] ? x + d[0] * 0.014 : uc, (v0 + v1) / 2, d[0] ? uc : z + d[1] * 0.014); sm.rotation.y = ry; sm.scale.set(u1 - u0, v1 - v0, 1); sm.renderOrder = 1; sm.matrixAutoUpdate = false; sm.updateMatrix();
+          sm.userData.decal = true;
+          w.group.add(sm);
+        }
+      }
     }
   };
   P.brazier = function (w, x, y, z, s, collide) {
@@ -353,8 +367,9 @@
       if (color) mat.color.set(color);
       const m = new THREE.Mesh(geo, mat);
       m.position.set(x + d[0] * 0.16, y, z + d[1] * 0.16); m.rotation.y = ry;
-      if (bg) { m.scale.y = len; const dv = new THREE.Mesh(bg[1].g, mat.clone()); dv.material.color.multiplyScalar(0.35); m.add(dv); }
+      if (bg) { m.scale.y = len; const dv = new THREE.Mesh(bg[1].g, mat.clone()); dv.material.color.multiplyScalar(0.35); m.add(dv); dv.userData.noAudit = true; }
       m.castShadow = true; m.receiveShadow = true;
+      m.userData.noAudit = true;   // (cloth that hangs and sways: walked through, and never taken for a wall - the check of what is seen against what stops you leaves it out)
       grp.add(m);
       w.animated.push({ kind: 'banner', m, ph: Math.random() * 10 });
     });

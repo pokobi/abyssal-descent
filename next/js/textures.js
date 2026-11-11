@@ -265,6 +265,23 @@
     });
   };
 
+  // a picture made a pixel at a time: fn(u, v, out) writes red, green, blue and alpha (0..1) for the point u, v (0..1, v downward)
+  function pixTex(size, fn, srgb) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d'), im = g.createImageData(size, size), d = im.data, o = [0, 0, 0, 0];
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      o[0] = o[1] = o[2] = o[3] = 0; fn((x + 0.5) / size, (y + 0.5) / size, o);
+      const i = (y * size + x) * 4; d[i] = o[0] * 255; d[i + 1] = o[1] * 255; d[i + 2] = o[2] * 255; d[i + 3] = o[3] * 255;
+    }
+    g.putImageData(im, 0, 0);
+    const t = new THREE.CanvasTexture(c); if (srgb !== false) t.colorSpace = THREE.SRGBColorSpace; return t;
+  }
+  // (noise for those pictures: the same every time)
+  const _h2 = (x, y, s) => { const n = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
+  const _vn = (x, y, s) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), a = _h2(xi, yi, s), b = _h2(xi + 1, yi, s), c = _h2(xi, yi + 1, s), d = _h2(xi + 1, yi + 1, s); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
+  const _fb = (x, y, s, n) => { let v = 0, a = 0.5, t = 0; for (let i = 0; i < (n || 4); i++) { v += a * _vn(x, y, s + i * 13); t += a; x = x * 2.03 + 5.1; y = y * 2.03 + 1.7; a *= 0.5; } return v / t; };
+  const _ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  T.pixTex = pixTex; T.pn = { h2: _h2, vn: _vn, fb: _fb, ss: _ss };
   function makeSprites() {
     T.spr = {};
     T.spr.soft = canvasTex(64, (g, s) => {
@@ -272,37 +289,86 @@
       gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.7)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
       g.fillStyle = gr; g.fillRect(0, 0, s, s);
     }, false);
-    T.spr.smoke = canvasTex(128, (g, s) => {
-      for (let i = 0; i < 26; i++) {
-        const x = s / 2 + (Math.random() - 0.5) * s * 0.4, y = s / 2 + (Math.random() - 0.5) * s * 0.4, r = s * (0.12 + Math.random() * 0.22);
-        const gr = g.createRadialGradient(x, y, 0, x, y, r);
-        gr.addColorStop(0, 'rgba(255,255,255,0.22)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-        g.fillStyle = gr; g.fillRect(0, 0, s, s);
+    // ---- (the pictures of smoke, flame and of the marks things leave: made a pixel at a time, so that they have a shape. Smoke and
+    // flame are sheets of four, of which each particle is one; a particle's top is the bottom of its cell here)
+    const cell4 = (u, v) => { const cx = u < 0.5 ? 0 : 1, cy = v < 0.5 ? 0 : 1; return [cx + cy * 2, (u * 2 - cx) * 2 - 1, (v * 2 - cy) * 2 - 1]; };
+    T.spr.smoke = pixTex(256, (u, v, o) => {
+      const [k, x, y] = cell4(u, v);
+      const n = _fb(x * 3 + k * 7, y * 3, 5, 4), n2 = _fb(x * 7 - k * 3, y * 7 + k, 6, 3), wx = x + (n - 0.5) * 0.22, wy = y + (n2 - 0.5) * 0.22;   // (the puffs are not round: the place is bent by noise)
+      let dens = 0, shA = 0, wA = 0;                                       // (a heap of soft swells, each a little lighter on one side)
+      for (let i = 0; i < 13; i++) {
+        const a = _h2(i, k, 1) * 6.283, d = Math.sqrt(_h2(i, k, 2)) * 0.44, r = 0.2 + _h2(i, k, 3) * 0.27;
+        const dx = (wx - Math.cos(a) * d) / r, dy = (wy - Math.sin(a) * d) / r, q = dx * dx + dy * dy; if (q >= 1) continue;
+        const h = Math.pow(1 - q, 0.85); dens = 1 - (1 - dens) * (1 - h * 0.78); shA += (0.5 + dy * 0.5) * h * h; wA += h * h;
       }
+      const sh = wA > 0 ? shA / wA : 0.5, edge = _ss(0.97, 0.55, Math.hypot(x, y) + (n - 0.5) * 0.3);
+      const c = Math.min(1, Math.max(0, 0.5 + (sh - 0.5) * 0.7 + (n2 - 0.5) * 0.5));
+      o[0] = o[1] = o[2] = 0.58 + 0.42 * c; o[3] = Math.min(1, Math.pow(dens, 1.35) * (0.42 + 0.7 * n2) * edge * 0.95);
     }, false);
-    T.spr.flame = canvasTex(64, (g, s) => {
-      const gr = g.createRadialGradient(s / 2, s * 0.6, 0, s / 2, s * 0.55, s / 2);
-      gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(0.3, 'rgba(255,200,120,0.8)'); gr.addColorStop(1, 'rgba(255,120,40,0)');
-      g.fillStyle = gr; g.beginPath(); g.ellipse(s / 2, s * 0.55, s * 0.32, s * 0.45, 0, 0, Math.PI * 2); g.fill();
+    T.spr.flame = pixTex(256, (u, v, o) => {
+      const [k, x, y] = cell4(u, v), h = (y + 1) / 2;                      // (h: 0 at its root, 1 at its tip)
+      const sway = Math.sin(h * 4.2 + k * 1.9) * 0.2 * h + (_vn(h * 3, k * 5, 7) - 0.5) * 0.3 * h;
+      const w = 0.8 * Math.pow(1 - h, 0.75) * (0.35 + 0.65 * Math.min(1, h * 5)) * (0.85 + 0.3 * _vn(h * 6 + k, 3, 9));
+      const d = Math.abs(x - sway) / Math.max(0.001, w);
+      let I = d < 1 ? 1 - d * d : 0; I *= Math.pow(1 - h, 0.35) * _ss(0, 0.08, h) * (0.72 + 0.4 * _fb(x * 4 + k * 3, y * 4 - k, 11, 3)); I = Math.min(1, I * 1.25);
+      o[0] = 1; o[1] = 0.38 + 0.6 * _ss(0.15, 0.8, I); o[2] = 0.08 + 0.75 * _ss(0.55, 1, I); o[3] = Math.pow(I, 1.15);   // (white at its heart, yellow, orange at its skin)
     }, false);
-    T.spr.hole = canvasTex(64, (g, s) => {
-      const gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-      gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.18, 'rgba(10,8,6,0.95)'); gr.addColorStop(0.3, 'rgba(40,35,30,0.6)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = gr; g.fillRect(0, 0, s, s);
-      g.strokeStyle = 'rgba(20,16,12,0.5)'; g.lineWidth = 1;
-      for (let i = 0; i < 6; i++) { const a = Math.random() * 6.28; g.beginPath(); g.moveTo(s / 2, s / 2); g.lineTo(s / 2 + Math.cos(a) * s * 0.4, s / 2 + Math.sin(a) * s * 0.4); g.stroke(); }
-    });
-    T.spr.scorch = canvasTex(128, (g, s) => {
-      for (let i = 0; i < 40; i++) {
-        const a = Math.random() * 6.28, d = Math.random() * s * 0.3, x = s / 2 + Math.cos(a) * d, y = s / 2 + Math.sin(a) * d, r = s * (0.08 + Math.random() * 0.2);
-        const gr = g.createRadialGradient(x, y, 0, x, y, r);
-        gr.addColorStop(0, 'rgba(0,0,0,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = gr; g.fillRect(0, 0, s, s);
+    // a bullet's mark in stone: the hole, the crater broken out around it (lighter where the break is fresh), cracks, and soot
+    const holePic = (kind) => pixTex(128, (u, v, o) => {
+      const x = u * 2 - 1, y = v * 2 - 1, r = Math.hypot(x, y), a = Math.atan2(y, x), ca = Math.cos(a), sa = Math.sin(a);
+      const rin = 0.11 + _fb(ca * 1.6 + 3, sa * 1.6 + 3, 21, 3) * 0.07;
+      let al = 0.4 * _ss(0.95, 0.2, r) * (0.55 + 0.7 * _fb(x * 3, y * 3, 25, 3)), cr = 0.02, cg = 0.018, cb = 0.016;   // soot
+      if (kind === 'stone') {
+        const rcr = 0.36 + (_fb(ca * 2.5 + 9, sa * 2.5 + 9, 23, 3) - 0.5) * 0.34;
+        if (r < rcr) { const t = r / rcr, f = 0.045 + 0.08 * _fb(x * 9, y * 9, 27, 3) + 0.07 * t * t + (y / rcr) * 0.02, k = _ss(1, 0.84, t); al += (0.92 - al) * k; cr += (f - cr) * k; cg += (f * 0.93 - cg) * k; cb += (f * 0.84 - cb) * k; }
+        for (let i = 0; i < 5; i++) {
+          const c0 = _h2(i, 1, 31) * 6.283, len = 0.5 + _h2(i, 2, 31) * 0.42; let da = a - c0; da = Math.atan2(Math.sin(da), Math.cos(da));
+          const dd = Math.abs(da + (_vn(r * 6, i * 3, 33) - 0.5) * 0.4) * r;
+          if (r > rin && r < len && dd < 0.013 * (1 - r / len) + 0.005) { al = Math.max(al, 0.75 * (1 - r / len) + 0.15); cr *= 0.25; cg *= 0.25; cb *= 0.25; }
+        }
+      } else if (kind === 'metal') {
+        // a dent, its lip turned up bright on the side the light is, and scores thrown outward
+        const rd = 0.25 + (_fb(ca * 2 + 7, sa * 2 + 7, 61, 3) - 0.5) * 0.08;
+        if (r < rd * 1.3) { const k = _ss(rd * 1.3, rd * 1.05, r); al += (0.9 - al) * k; cr = cg = cb = 0.05; }
+        const lip = Math.exp(-Math.pow((r - rd) / 0.035, 2)), lit = 0.16 + 0.42 * Math.max(0, sa * 0.8 + 0.3) + 0.12 * _vn(a * 5, 3, 63);
+        al = Math.max(al, lip * 0.95); cr += (lit - cr) * lip; cg += (lit * 0.98 - cg) * lip; cb += (lit - cb) * lip;
+        for (let i = 0; i < 7; i++) {
+          const c0 = _h2(i, 1, 65) * 6.283, len = 0.45 + _h2(i, 2, 65) * 0.4; let da = a - c0; da = Math.atan2(Math.sin(da), Math.cos(da));
+          if (r > rd * 1.2 && r < len && Math.abs(da) * r < 0.006) { const k = 0.6 * (1 - r / len); al = Math.max(al, k); cr = cg = cb = 0.34; }
+        }
+      } else {
+        // in wood: split along the grain, pale splinters at the lips of the split
+        const gx = x, gy = y * 0.42, gr = Math.hypot(gx, gy), rs2 = 0.2 + (_fb(x * 5, y * 1.5, 71, 3) - 0.5) * 0.12;
+        if (gr < rs2 * 1.5) { const k = _ss(rs2 * 1.5, rs2, gr), f = 0.3 + 0.25 * _vn(x * 30, y * 3, 73); al += (0.9 - al) * k; cr += (f - cr) * k; cg += (f * 0.72 - cg) * k; cb += (f * 0.45 - cb) * k; }
+        if (gr < rs2 * 0.8) { const k = _ss(rs2 * 0.8, rs2 * 0.5, gr); cr *= 1 - k * 0.8; cg *= 1 - k * 0.8; cb *= 1 - k * 0.8; }
+        if (Math.abs(x) < 0.012 + 0.01 * _vn(y * 9, 1, 75) && Math.abs(y) < 0.78) { al = Math.max(al, 0.8 * (1 - Math.abs(y) / 0.78)); cr *= 0.3; cg *= 0.3; cb *= 0.3; }
       }
+      if (r < rin * 1.3) { const k = _ss(rin * 1.3, rin * 0.8, r); al += (1 - al) * k; cr *= 1 - k; cg *= 1 - k; cb *= 1 - k; }   // the hole itself
+      o[0] = cr; o[1] = cg; o[2] = cb; o[3] = Math.min(1, al);
     });
-    T.spr.splat = canvasTex(128, (g, s) => {
-      g.fillStyle = '#fff';
-      for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, d = Math.random() * s * 0.3; g.globalAlpha = 0.5 + Math.random() * 0.5; g.beginPath(); g.arc(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, s * (0.03 + Math.random() * 0.1), 0, 6.28); g.fill(); }
+    T.spr.hole = holePic('stone'); T.spr.holeM = holePic('metal'); T.spr.holeW = holePic('wood');
+    // where fire stood: black at its heart, thrown outward in streaks, its edge nowhere a circle
+    T.spr.scorch = pixTex(128, (u, v, o) => {
+      const x = u * 2 - 1, y = v * 2 - 1, r = Math.hypot(x, y), a = Math.atan2(y, x), ca = Math.cos(a), sa = Math.sin(a);
+      const reach = 0.42 + _fb(ca * 3 + 5, sa * 3 + 5, 41, 4) * 0.55, fine = _vn(ca * 9 + 20, sa * 9 + 20, 43);
+      let al = _ss(reach, reach * 0.2, r) * 0.85 + 0.34 * _ss(reach * 1.3, reach * 0.5, r) * fine;
+      al *= (0.7 + 0.45 * _fb(x * 5, y * 5, 45, 3)) * _ss(1, 0.82, r);
+      o[0] = 0.014; o[1] = 0.012; o[2] = 0.01; o[3] = Math.min(0.9, al);
+    });
+    // what is spilt where a thing is struck: a pool, runs thrown out of it each ending in a bead, and spots
+    T.spr.splat = pixTex(128, (u, v, o) => {
+      const x = u * 2 - 1, y = v * 2 - 1, r = Math.hypot(x, y), a = Math.atan2(y, x), ca = Math.cos(a), sa = Math.sin(a);
+      const rb = 0.24 + _fb(ca * 2 + 4, sa * 2 + 4, 51, 3) * 0.24;
+      let al = _ss(rb, rb * 0.8, r);
+      for (let i = 0; i < 10; i++) {                                        // (runs: wide where they leave the pool, thin at their ends, none straight)
+        const len = 0.34 + _h2(i, 2, 51) * 0.5, c0 = i / 10 * 6.283 + (_h2(i, 1, 51) - 0.5) * 0.8 + (r / len - 0.5) * (_h2(i, 7, 51) - 0.5) * 0.5; let da = a - c0; da = Math.atan2(Math.sin(da), Math.cos(da));
+        const along = r * Math.cos(da), across = Math.abs(r * Math.sin(da)), t = along / len;
+        if (along > 0 && t < 1) { const wd = 0.008 + 0.06 * Math.pow(1 - t, 1.8); al = Math.max(al, _ss(wd, wd * 0.6, across)); }
+        const e0 = i / 10 * 6.283 + (_h2(i, 1, 51) - 0.5) * 0.8 + 0.5 * (_h2(i, 7, 51) - 0.5) * 0.5, bd = Math.hypot(x - Math.cos(e0) * len, y - Math.sin(e0) * len), br = 0.014 + _h2(i, 3, 51) * 0.02; al = Math.max(al, _ss(br, br * 0.65, bd));
+      }
+      for (let i = 0; i < 22; i++) { const pa = _h2(i, 4, 53) * 6.283, pq = 0.35 + _h2(i, 5, 53) * 0.58, pr = (0.008 + _h2(i, 6, 53) * 0.022) * (1.3 - pq), pd = Math.hypot(x - Math.cos(pa) * pq, y - Math.sin(pa) * pq * 0.9); al = Math.max(al, _ss(pr, pr * 0.6, pd)); }
+      const c = 0.72 + 0.28 * _fb(x * 4, y * 4, 55, 3);
+      o[0] = o[1] = o[2] = c; o[3] = al * 0.95;
     });
     T.spr.ring = canvasTex(256, (g, s) => {
       g.strokeStyle = 'rgba(255,255,255,1)'; g.lineWidth = s * 0.04;

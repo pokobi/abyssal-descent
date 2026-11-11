@@ -349,32 +349,10 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   X.rboxCount = () => cache.size;
 
-  // ---- the small pictures the effects are drawn with (textures.js paints them with plain gradients): the same pictures with their
-  // edges broken up and their insides uneven, as smoke and fire are. Painted here and put back into the same canvases. ----
-  const SPR = {
-    smoke: [256, `
-vec4 spr(vec2 uv){ vec2 p = uv * 2. - 1.; float r = length(p), n = fbm(uv, 4., 3.), n2 = fbm(uv, 9., 7.);
-  float e = 1. - smoothstep(.3 + n * .36, .6 + n * .4, r);
-  return vec4(vec3(.8 + n2 * .2), e * (.32 + n2 * .5) * .9); }`],
-    flame: [128, `
-vec4 spr(vec2 uv){ vec2 p = vec2((uv.x - .5) * 2., uv.y); float n = fbm(uv, 5., 2.), n2 = fbm(uv, 12., 5.);
-  float w = .66 * sin(3.14159 * pow(clamp(p.y * 1.04, 0., 1.), .5)) * (1. - p.y * .3);
-  float d = abs(p.x) + (n - .5) * .34 * (.3 + p.y);
-  float b = (1. - smoothstep(w * .3, w, d)) * smoothstep(.02, .14, p.y) * (1. - smoothstep(.74, 1., p.y + (n2 - .5) * .3));
-  vec3 c = mix(vec3(1., .47, .16), vec3(1., .8, .47), b); c = mix(c, vec3(1., .98, .9), b * b * (1. - p.y) * .9);
-  return vec4(c, b); }`],
-    hole: [128, `
-vec4 spr(vec2 uv){ vec2 p = uv * 2. - 1.; float r = length(p); vec2 q = p / max(r, 1e-4);
-  float e = .5 + .28 * vnoise(q * 2.2 + 10., 64., 1.) + .13 * vnoise(q * 6. + 20., 64., 2.);
-  float chip = 1. - smoothstep(e - .16, e, r), hole = 1. - smoothstep(.1, .2, r), ring = (1. - smoothstep(.2, .34, r)) * (1. - hole);
-  float cr = smoothstep(.93, 1., vnoise(q * 3.3 + 40., 64., 4.)) * (1. - smoothstep(.3, .85, r)) * smoothstep(.15, .3, r);
-  vec3 c = mix(vec3(.24, .22, .2), vec3(.07, .06, .055), ring); c = mix(c, vec3(0.), hole); c *= .8 + .4 * vnoise(uv * 24., 64., 9.);
-  return vec4(c, max(chip * .88, cr * .55)); }`],
-    scorch: [256, `
-vec4 spr(vec2 uv){ vec2 p = uv * 2. - 1.; float r = length(p), n = fbm(uv, 4., 3.), n2 = fbm(uv, 14., 5.);
-  float e = 1. - smoothstep(.22 + n * .4, .58 + n * .42, r);
-  return vec4(vec3(.02, .018, .015), e * (.45 + n2 * .45)); }`],
-  };
+  // ---- the small pictures the effects are drawn with were repainted here over the plain gradients textures.js made. They are now
+  // painted whole in textures.js (smoke and flame as sheets of four, the marks by what was struck), so nothing is repainted: a
+  // picture named here would be painted over the one textures.js made. ----
+  const SPR = {};
   const sprMat = (body) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: 'precision highp float; varying vec2 vUv;\n' + X.NOISE + body + '\nvoid main(){ gl_FragColor = spr(vUv); }', depthTest: false, depthWrite: false });
   X.upgradeSprites = function (renderer) {
     const spr = G.Tex && G.Tex.spr; if (!spr) return;

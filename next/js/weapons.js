@@ -4,7 +4,7 @@
   const W = (G.weapons = { adsT: 0, dirty: true, ver: 0, curStats: null });
   const U = G.U, I = G.input;
   const V = G.U.V;
-  let vmScene, vmCam, vmRoot, vmLight, flashSprite, flashSprite2, mats, P;
+  let vmScene, vmCam, vmRoot, vmLight, flashSprite, flashSprite2, flashJet, mats, P;
   let model = null; // current viewmodel {group, muzzle, sightY, mag, bolt, ...}
 
   // ---------------- stats ----------------
@@ -162,21 +162,39 @@
       tank: mk({ color: 0x6a2a1a, metalness: 0.6, roughness: 0.5 }),
     };
     W.mats = mats;
-    const fl = G.Tex.canvasTex(256, (g, s) => {
-      g.translate(s / 2, s / 2); g.globalCompositeOperation = 'lighter';
-      let sd = 7; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
-      for (let i = 0; i < 11; i++) {
-        const a = i / 11 * 6.283 + (rnd() - 0.5) * 0.5, len = s * (0.2 + rnd() * 0.28), w = s * (0.03 + rnd() * 0.035);
-        g.save(); g.rotate(a);
-        const gr = g.createLinearGradient(0, 0, len, 0); gr.addColorStop(0, 'rgba(255,236,190,0.95)'); gr.addColorStop(0.35, 'rgba(255,170,70,0.6)'); gr.addColorStop(1, 'rgba(255,110,30,0)'); g.fillStyle = gr;
-        g.beginPath(); g.moveTo(0, -w); g.quadraticCurveTo(len * 0.5, -w * 0.5, len, 0); g.quadraticCurveTo(len * 0.5, w * 0.5, 0, w); g.fill(); g.restore();
+    // The flash at the muzzle. Seen from behind the gun it is a burst of flame thrown out to all sides, never twice the same: four
+    // pictures of it, of which each frame of a shot is one, turned any way. Before the muzzle a jet of flame stands out along the
+    // barrel (two leaves crossed, so that it has a length from any side). Around both, a faint glow - not a disc of orange.
+    const pn = G.Tex.pn, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    const fl = G.Tex.pixTex(256, (u, v, o) => {
+      const cx = u < 0.5 ? 0 : 1, cy = v < 0.5 ? 0 : 1, k = cx + cy * 2, x = (u * 2 - cx) * 2 - 1, y = (v * 2 - cy) * 2 - 1, r = Math.hypot(x, y), a = Math.atan2(y, x);
+      let I = Math.exp(-r * r / 0.022) * 1.15;                                       // the white heart
+      const n = 5 + (k % 3);
+      for (let i = 0; i < n; i++) {                                                 // tongues: thick where they leave it, drawn to a point, of unequal length
+        const c0 = i / n * 6.283 + (pn.h2(i, k, 81) - 0.5) * 0.9, len = 0.36 + pn.h2(i, k, 82) * 0.58, wd = 0.1 + pn.h2(i, k, 83) * 0.13;
+        const da = wrap(a - c0 + (pn.vn(r * 4, i + k * 7, 84) - 0.5) * 0.5 * r), along = r * Math.cos(da), t = along / len;
+        if (along > 0 && t < 1) { const w = wd * Math.pow(1 - t, 0.7), e = 1 - Math.abs(r * Math.sin(da)) / w; if (e > 0) I = Math.max(I, Math.pow(e, 0.8) * (1 - t * t * t)); }
       }
-      const r = g.createRadialGradient(0, 0, 0, 0, 0, s * 0.2); r.addColorStop(0, 'rgba(255,252,236,1)'); r.addColorStop(0.5, 'rgba(255,200,120,0.55)'); r.addColorStop(1, 'rgba(255,150,60,0)'); g.fillStyle = r; g.fillRect(-s / 2, -s / 2, s, s);
+      I = Math.min(1, I * (0.7 + 0.6 * pn.fb(x * 5 + k * 3, y * 5 - k, 85, 3))) * pn.ss(0.98, 0.8, r);
+      o[0] = 1; o[1] = 0.4 + 0.58 * pn.ss(0.15, 0.75, I); o[2] = 0.08 + 0.8 * pn.ss(0.5, 1, I); o[3] = Math.pow(I, 1.2);
     }, false);
+    fl.repeat.set(0.5, 0.5);
+    const halo = G.Tex.pixTex(64, (u, v, o) => { const r = Math.hypot(u * 2 - 1, v * 2 - 1); o[0] = o[1] = o[2] = 1; o[3] = Math.exp(-r * r * 4.5) * pn.ss(1, 0.6, r) * 0.45; }, false);
     flashSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: fl, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-    flashSprite2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xff9a40, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-    flashSprite.visible = flashSprite2.visible = false;
-    vmScene.add(flashSprite, flashSprite2);
+    flashSprite2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: halo, color: 0xff9440, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    {
+      // (the jet: a tongue of the flames' own picture, its root at the muzzle, its tip a length before it)
+      const jm = new THREE.MeshBasicMaterial({ map: G.Tex.spr.flame, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, side: THREE.DoubleSide, fog: false });
+      flashJet = new THREE.Group(); const inner = new THREE.Group(); flashJet.add(inner); flashJet.userData.inner = inner; flashJet.userData.leaves = [];
+      for (let i = 0; i < 2; i++) {
+        const pg = new THREE.PlaneGeometry(1, 1); pg.translate(0, -0.5, 0); pg.rotateX(Math.PI / 2); if (i) pg.rotateZ(Math.PI / 2);
+        const m = new THREE.Mesh(pg, jm); m.frustumCulled = false; inner.add(m); flashJet.userData.leaves.push(m);
+      }
+      flashJet.userData.cell = (k) => { for (const m of flashJet.userData.leaves) { const uv = m.geometry.attributes.uv, cx = k % 2, cy = Math.floor(k / 2); uv.setXY(0, cx * 0.5 + 0.01, cy * 0.5 + 0.49); uv.setXY(1, cx * 0.5 + 0.49, cy * 0.5 + 0.49); uv.setXY(2, cx * 0.5 + 0.01, cy * 0.5 + 0.01); uv.setXY(3, cx * 0.5 + 0.49, cy * 0.5 + 0.01); uv.needsUpdate = true; } };
+      flashJet.userData.cell(0);
+    }
+    flashSprite.visible = flashSprite2.visible = flashJet.visible = false;
+    vmScene.add(flashSprite, flashSprite2, flashJet);
   };
   W.setEnv = function (env) { if (vmScene) vmScene.environment = env; };
   W.resize = function (a) { if (vmCam) { vmCam.aspect = a; vmCam.updateProjectionMatrix(); } };
@@ -1259,7 +1277,7 @@
     if (s.proj && s.sound !== 'nail') G.sfx.launcher(s.sound); else if (s.sound === 'tesla') { G.sfx.zap(null); G.sfx.gun('nail', { vol: 0.5 }); } else if (s.sound === 'rail') G.sfx.launcher('rail'); else G.sfx.gun(s.sound, { suppressed: silent, auto: s.auto || s.autoShot, id: w.def.id, trait: w.def.trait, rar: w.def.rarity });
     const hider = model && model.flashHider ? 0.4 : 1; // (フラッシュハイダー: a smaller muzzle flash)
     if (!silent) G.fx.flash(muzzle, 0xffb060, (s.sound === 'shotgun' ? 45 : 25) * hider, 0.06, hider < 1 ? 7 : 10);
-    anim.flash = silent ? 0.02 : hider < 1 ? 0.03 : 0.05;
+    anim.flash = silent ? 0.02 : hider < 1 ? 0.03 : 0.05; anim.flashS = silent ? 0.35 : hider < 1 ? 0.6 : 1;   // (a suppressor: a spark of it; a flash hider: a small one without its jet)
     const crouchRec = P.crouching && P.grounded ? 1 - (s.crouchRecoil || 0) : 1;
     const rec = s.recoil * crouchRec * (1 - W.adsT * 0.35);
     P.addRecoil(THREE.MathUtils.degToRad(rec * 0.55) * (0.8 + Math.random() * 0.4), THREE.MathUtils.degToRad(rec * 0.22) * (Math.random() - 0.5));
@@ -1269,8 +1287,10 @@
     P.addShake(Math.min(0.12, rec * 0.012));
     // shell ejection
     if (!s.proj && !s.flame && s.sound !== 'tesla' && s.sound !== 'rail' && s.sound !== 'revolver' && Math.random() < 0.8) {
-      const ej = G.camera.localToWorld(V(0.18, -0.12, -0.35));
-      G.fx.debris(ej, G.world.mats.brass, 1, 0.025, 2.5);
+      // (a spent case: out to the right and up, a little back, with the speed the shooter has)
+      const ej = G.camera.localToWorld(V(0.17, -0.11, -0.36)), q = G.camera.quaternion, ev = V(1, 0, 0).applyQuaternion(q).multiplyScalar(1.7 + Math.random() * 0.9);
+      ev.addScaledVector(V(0, 1, 0), 1.4 + Math.random() * 0.8).addScaledVector(V(0, 0, 1).applyQuaternion(q), 0.2 + Math.random() * 0.5); if (P.vel) ev.add(P.vel);
+      G.fx.casing(ej, ev, s.sound === 'shotgun' ? 'shell' : s.sound === 'pistol' || s.sound === 'smg' ? 'small' : 'rifle');
     }
     G.buffs.emit('onShoot', { weapon: w });
     if (G.abilities.shadows) G.abilities.shadowCopy(s.dmg * (s.pellets || 1) * 0.5, false); // (影分身: the shadows fire with you)
@@ -1387,7 +1407,7 @@
       else if (surf === 'metal') { G.fx.sparks(wh.point, wh.normal, 8, 0xffd090, 6); }
       else if (surf === 'wood') { G.fx.dust(wh.point, wh.normal, 0x6a4a30, 3); }
       else { G.fx.dust(wh.point, wh.normal, 0x8a8070, 3); if (Math.random() < 0.5) G.fx.sparks(wh.point, wh.normal, 3, 0xffc080, 4); }
-      G.fx.decal(wh.point, wh.normal, 'hole', s.sound === 'shotgun' ? 0.08 : 0.12);
+      G.fx.decal(wh.point, wh.normal, surf === 'metal' ? 'holeM' : surf === 'wood' ? 'holeW' : 'hole', (s.sound === 'shotgun' ? 0.1 : s.sound === 'sniper' || s.sound === 'dmr' ? 0.2 : 0.15) * (0.85 + Math.random() * 0.3));
       if (Math.random() < 0.5 || pellets === 1) G.sfx.impact(wh.point, surf);
       if (depth < 1 && P.has('o_ricochetwall') && Math.random() < 0.3) {
         const t2 = G.enemies.nearest(wh.point, 18);
@@ -1549,13 +1569,17 @@
       anim.flash -= dt;
       g.updateMatrixWorld(true);
       const mp = g.localToWorld(model.muzzle.clone());
-      flashSprite.position.copy(mp); flashSprite2.position.copy(mp);
-      flashSprite.material.rotation = Math.random() * 6.28;
-      const sz = (s.sound === 'shotgun' ? 0.22 : s.sound === 'smg' || s.sound === 'pistol' ? 0.12 : 0.16) * (1 - W.adsT * 0.6);
-      flashSprite.scale.setScalar(sz * (0.8 + Math.random() * 0.4)); flashSprite2.scale.setScalar(sz * 1.8);
-      flashSprite.visible = flashSprite2.visible = true;
+      flashSprite.position.copy(mp); flashSprite2.position.copy(mp); flashJet.position.copy(mp);
+      const fk = Math.floor(Math.random() * 4);
+      flashSprite.material.rotation = Math.random() * 6.28; flashSprite.material.map.offset.set((fk % 2) * 0.5, Math.floor(fk / 2) * 0.5);
+      const heavy = s.sound === 'shotgun' || s.sound === 'sniper' || s.sound === 'revolver';
+      const sz = (heavy ? 0.24 : s.sound === 'smg' || s.sound === 'pistol' ? 0.13 : 0.17) * (1 - W.adsT * 0.6) * (anim.flashS || 1);
+      flashSprite.scale.setScalar(sz * (1.1 + Math.random() * 0.6)); flashSprite2.scale.setScalar(sz * 2.9);
+      g.getWorldQuaternion(flashJet.quaternion); flashJet.userData.inner.rotation.z = Math.random() * 6.28; flashJet.userData.cell(Math.floor(Math.random() * 4));
+      flashJet.scale.set(sz * 0.75, sz * 0.75, sz * (heavy ? 3.2 : 2.3) * (0.75 + Math.random() * 0.5));
+      flashSprite.visible = flashSprite2.visible = true; flashJet.visible = (anim.flashS || 1) > 0.5;
       vmLight.position.copy(mp); vmLight.intensity = 6;
-    } else { flashSprite.visible = flashSprite2.visible = false; vmLight.intensity = 0; }
+    } else { flashSprite.visible = flashSprite2.visible = flashJet.visible = false; vmLight.intensity = 0; }
     if (model.stockParts && model.stockParts.length) { const sv = W.adsT < 0.35; for (const o of model.stockParts) o.visible = sv; }
     // scope overlay
     const scoped = !!model.scopeOptic && !model.pip && W.adsT > 0.9;

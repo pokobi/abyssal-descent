@@ -7,36 +7,51 @@
 
   // ---------------- particles ----------------
   const VS = `
-    attribute float aSize; attribute vec4 aColor;
-    varying vec4 vColor; varying float vDepth;
+    attribute float aSize; attribute vec4 aColor; attribute vec2 aRot;
+    varying vec4 vColor; varying float vDepth; varying vec3 vRot;
     uniform float uScale;
     void main(){
       vColor = aColor;
+      vRot = vec3(cos(aRot.x), sin(aRot.x), aRot.y);
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
       vDepth = -mv.z;
       gl_PointSize = aSize * uScale / max(0.1, -mv.z);
       gl_Position = projectionMatrix * mv;
     }`;
+  // (the picture of a particle: turned by its own angle; where the sheet holds four pictures, the one that is this particle's)
+  const PUV = `
+    uniform float uAtlas; varying vec3 vRot;
+    vec2 puv() {
+      vec2 q = gl_PointCoord - 0.5; q = vec2(q.x * vRot.x - q.y * vRot.y, q.x * vRot.y + q.y * vRot.x) + 0.5;
+      if (uAtlas < 1.5) return q;
+      q = clamp(q, 0.015, 0.985); float v = floor(vRot.z + 0.5);
+      return (vec2(mod(v, 2.0), floor(v * 0.5)) + q) * 0.5;
+    }`;
   const FS_ADD = `
     uniform sampler2D map; uniform float uFogD; varying vec4 vColor; varying float vDepth;
+    ${PUV}
     void main(){
-      vec4 t = texture2D(map, gl_PointCoord);
+      vec4 t = texture2D(map, puv());
       float fogv = exp(-uFogD * uFogD * vDepth * vDepth);
       float a = t.a * vColor.a * fogv;
       gl_FragColor = vec4(vColor.rgb * t.rgb * a, a);
     }`;
   const FS_NORM = `
-    uniform sampler2D map; uniform float uFogD; uniform vec3 uFogC; varying vec4 vColor; varying float vDepth;
+    uniform sampler2D map; uniform float uFogD; uniform vec3 uFogC; uniform float uLit; varying vec4 vColor; varying float vDepth;
+    ${PUV}
     void main(){
-      vec4 t = texture2D(map, gl_PointCoord);
+      vec4 t = texture2D(map, puv());
       float fogv = exp(-uFogD * uFogD * vDepth * vDepth);
-      vec3 c = mix(uFogC, vColor.rgb * t.rgb, fogv);
+      vec3 c = mix(uFogC, vColor.rgb * t.rgb * uLit, fogv);   // (uLit: how light the place is - dust is not its own light)
       gl_FragColor = vec4(c, t.a * vColor.a);
       if (gl_FragColor.a < 0.01) discard;
     }`;
   class PSys {
-    constructor(max, additive, tex) {
-      this.max = max; this.n = 0;
+    // o.atlas: 2 = the picture is a sheet of four; o.tilt: how far a particle may be turned at birth (radians either way); o.spin: how fast it may turn
+    constructor(max, additive, tex, o) {
+      o = o || {};
+      this.max = max; this.n = 0; this.atlas = o.atlas || 1; this.tilt = o.tilt || 0; this.spin = o.spin || 0;
+      this.rot = new Float32Array(max * 2); this.spn = new Float32Array(max);
       this.p = new Float32Array(max * 3); this.v = new Float32Array(max * 3);
       this.life = new Float32Array(max); this.ml = new Float32Array(max);
       this.s0 = new Float32Array(max); this.s1 = new Float32Array(max);
@@ -46,10 +61,11 @@
       this.pos = new THREE.BufferAttribute(new Float32Array(max * 3), 3); this.pos.setUsage(THREE.DynamicDrawUsage);
       this.col = new THREE.BufferAttribute(new Float32Array(max * 4), 4); this.col.setUsage(THREE.DynamicDrawUsage);
       this.siz = new THREE.BufferAttribute(new Float32Array(max), 1); this.siz.setUsage(THREE.DynamicDrawUsage);
-      g.setAttribute('position', this.pos); g.setAttribute('aColor', this.col); g.setAttribute('aSize', this.siz);
+      this.rota = new THREE.BufferAttribute(new Float32Array(max * 2), 2); this.rota.setUsage(THREE.DynamicDrawUsage);
+      g.setAttribute('position', this.pos); g.setAttribute('aColor', this.col); g.setAttribute('aSize', this.siz); g.setAttribute('aRot', this.rota);
       g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
       this.mat = new THREE.ShaderMaterial({
-        uniforms: { map: { value: tex }, uScale: { value: 400 }, uFogD: { value: 0.02 }, uFogC: { value: new THREE.Color() } },
+        uniforms: { map: { value: tex }, uScale: { value: 400 }, uFogD: { value: 0.02 }, uFogC: { value: new THREE.Color() }, uAtlas: { value: this.atlas }, uLit: { value: 1 } },
         vertexShader: VS, fragmentShader: additive ? FS_ADD : FS_NORM,
         transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       });
@@ -68,9 +84,10 @@
       this.c[i4] = r; this.c[i4 + 1] = gg; this.c[i4 + 2] = b; this.c[i4 + 3] = a;
       this.c1[i3] = r1 ?? r; this.c1[i3 + 1] = g1 ?? gg; this.c1[i3 + 2] = b1 ?? b;
       this.grav[i] = grav || 0; this.drag[i] = drag || 0;
+      if (this.tilt || this.atlas > 1) { this.rot[i * 2] = this.tilt ? (Math.random() * 2 - 1) * this.tilt : 0; this.rot[i * 2 + 1] = this.atlas > 1 ? Math.floor(Math.random() * 4) : 0; this.spn[i] = this.spin ? (Math.random() * 2 - 1) * this.spin : 0; }
     }
     update(dt) {
-      const P = this.p, Vv = this.v, pa = this.pos.array, ca = this.col.array, sa = this.siz.array;
+      const P = this.p, Vv = this.v, pa = this.pos.array, ca = this.col.array, sa = this.siz.array, R = this.rot, ra = this.rota.array, turns = this.tilt || this.atlas > 1;
       let i = 0;
       while (i < this.n) {
         this.life[i] -= dt;
@@ -81,6 +98,7 @@
             for (let k = 0; k < 3; k++) { P[i * 3 + k] = P[j * 3 + k]; Vv[i * 3 + k] = Vv[j * 3 + k]; this.c1[i * 3 + k] = this.c1[j * 3 + k]; }
             for (let k = 0; k < 4; k++) this.c[i * 4 + k] = this.c[j * 4 + k];
             this.life[i] = this.life[j]; this.ml[i] = this.ml[j]; this.s0[i] = this.s0[j]; this.s1[i] = this.s1[j]; this.grav[i] = this.grav[j]; this.drag[i] = this.drag[j];
+            R[i * 2] = R[j * 2]; R[i * 2 + 1] = R[j * 2 + 1]; this.spn[i] = this.spn[j];
           }
           continue;
         }
@@ -94,6 +112,7 @@
         ca[i4] = this.c[i4] + (this.c1[i3] - this.c[i4]) * t; ca[i4 + 1] = this.c[i4 + 1] + (this.c1[i3 + 1] - this.c[i4 + 1]) * t; ca[i4 + 2] = this.c[i4 + 2] + (this.c1[i3 + 2] - this.c[i4 + 2]) * t;
         ca[i4 + 3] = this.c[i4 + 3] * fade;
         sa[i] = this.s0[i] + (this.s1[i] - this.s0[i]) * t;
+        if (turns) { R[i * 2] += this.spn[i] * dt; ra[i * 2] = R[i * 2]; ra[i * 2 + 1] = R[i * 2 + 1]; }
         i++;
       }
       this.pts.geometry.setDrawRange(0, this.n);
@@ -104,10 +123,93 @@
         this.col.updateRange.offset = 0; this.col.updateRange.count = n * 4;
         this.siz.updateRange.offset = 0; this.siz.updateRange.count = n;
         this.pos.needsUpdate = true; this.col.needsUpdate = true; this.siz.needsUpdate = true;
+        if (turns) { this.rota.updateRange.offset = 0; this.rota.updateRange.count = n * 2; this.rota.needsUpdate = true; }
       }
       this._had = this.n > 0;
     }
     clear() { this.n = 0; this.pts.geometry.setDrawRange(0, 0); }
+  }
+
+  // Things thrown off that are seen as a line: a spark, a drop. Each is a strip from where it was a moment ago to where it is, as wide
+  // as it is told, brightest at its head. lit: it is its own light (a spark, added to the picture); not lit: it hides what is behind it (a drop).
+  const SK_VS = `
+    attribute vec3 iHead; attribute vec3 iTail; attribute vec4 iCol;
+    varying vec3 vC; varying vec2 vQ; varying float vDepth;
+    void main(){
+      vec3 h = (modelViewMatrix * vec4(iHead, 1.0)).xyz, t = (modelViewMatrix * vec4(iTail, 1.0)).xyz;
+      vec3 ax = h - t; float L = length(ax);
+      vec3 c = mix(t, h, position.y), al = L > 1e-5 ? ax / L : vec3(0.0, 1.0, 0.0);
+      vec3 sd = normalize(cross(al, c) + vec3(1e-6, 0.0, 0.0));
+      float w = max(iCol.a, -c.z * 0.0011);                       // (never thinner than a pixel or so)
+      vec3 mv = c + sd * position.x * w + al * (position.y - 0.5) * w;
+      vC = iCol.rgb; vQ = position.xy; vDepth = -mv.z;
+      gl_Position = projectionMatrix * vec4(mv, 1.0);
+    }`;
+  const SK_FS = (lit) => `
+    uniform float uFogD; uniform vec3 uFogC; uniform float uLit; varying vec3 vC; varying vec2 vQ; varying float vDepth;
+    void main(){
+      float a = 1.0 - abs(vQ.x) * 2.0; a *= a;
+      float along = (0.12 + 0.88 * vQ.y * vQ.y) * smoothstep(1.0, 0.86, vQ.y) * smoothstep(0.0, 0.1, vQ.y);
+      float fogv = exp(-uFogD * uFogD * vDepth * vDepth);
+      ${lit ? 'gl_FragColor = vec4(vC * a * along * fogv, 1.0);' : 'gl_FragColor = vec4(mix(uFogC, vC * uLit, fogv), smoothstep(0.0, 0.5, a) * smoothstep(0.0, 0.2, vQ.y) * smoothstep(1.0, 0.8, vQ.y)); if (gl_FragColor.a < 0.02) discard;'}
+    }`;
+  class Streaks {
+    constructor(max, lit) {
+      this.max = max; this.n = 0; this.lit = lit;
+      this.p = new Float32Array(max * 3); this.v = new Float32Array(max * 3); this.c = new Float32Array(max * 3);
+      this.life = new Float32Array(max); this.ml = new Float32Array(max); this.w = new Float32Array(max); this.grav = new Float32Array(max); this.drag = new Float32Array(max); this.len = new Float32Array(max);
+      const g = new THREE.InstancedBufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0]), 3)); g.setIndex([0, 1, 2, 0, 2, 3]);
+      const ia = (k) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(max * k), k); a.setUsage(THREE.DynamicDrawUsage); return a; };
+      this.head = ia(3); this.tail = ia(3); this.col = ia(4);
+      g.setAttribute('iHead', this.head); g.setAttribute('iTail', this.tail); g.setAttribute('iCol', this.col);
+      g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5); g.instanceCount = 0;
+      this.mat = new THREE.ShaderMaterial({
+        uniforms: { uFogD: { value: 0.02 }, uFogC: { value: new THREE.Color() }, uLit: { value: 1 } }, vertexShader: SK_VS, fragmentShader: SK_FS(lit),
+        transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: lit ? THREE.AdditiveBlending : THREE.NormalBlending,
+      });
+      this.mesh = new THREE.Mesh(g, this.mat); this.mesh.frustumCulled = false; this.mesh.renderOrder = lit ? 10 : 9;
+    }
+    // len: how many seconds of its flight the line is long
+    spawn(x, y, z, vx, vy, vz, life, w, r, g, b, grav, drag, len) {
+      if (FX.keep < 1 && Math.random() > FX.keep) return;
+      let i = this.n; if (i >= this.max) i = Math.floor(Math.random() * this.max); else this.n++;
+      const i3 = i * 3;
+      this.p[i3] = x; this.p[i3 + 1] = y; this.p[i3 + 2] = z; this.v[i3] = vx; this.v[i3 + 1] = vy; this.v[i3 + 2] = vz;
+      this.c[i3] = r; this.c[i3 + 1] = g; this.c[i3 + 2] = b;
+      this.life[i] = life; this.ml[i] = life; this.w[i] = w; this.grav[i] = grav || 0; this.drag[i] = drag || 0; this.len[i] = len || 0.04;
+    }
+    update(dt) {
+      const P = this.p, Vv = this.v, C = this.c, ha = this.head.array, ta = this.tail.array, ca = this.col.array;
+      let i = 0;
+      while (i < this.n) {
+        this.life[i] -= dt;
+        if (this.life[i] <= 0) {
+          const j = --this.n;
+          if (i !== j) {
+            for (let k = 0; k < 3; k++) { P[i * 3 + k] = P[j * 3 + k]; Vv[i * 3 + k] = Vv[j * 3 + k]; C[i * 3 + k] = C[j * 3 + k]; }
+            this.life[i] = this.life[j]; this.ml[i] = this.ml[j]; this.w[i] = this.w[j]; this.grav[i] = this.grav[j]; this.drag[i] = this.drag[j]; this.len[i] = this.len[j];
+          }
+          continue;
+        }
+        const i3 = i * 3, i4 = i * 4, d = 1 - this.drag[i] * dt;
+        Vv[i3] *= d; Vv[i3 + 1] = Vv[i3 + 1] * d - this.grav[i] * dt; Vv[i3 + 2] *= d;
+        P[i3] += Vv[i3] * dt; P[i3 + 1] += Vv[i3 + 1] * dt; P[i3 + 2] += Vv[i3 + 2] * dt;
+        const age = this.ml[i] - this.life[i], back = Math.min(this.len[i], age), t = age / this.ml[i];
+        ha[i3] = P[i3]; ha[i3 + 1] = P[i3 + 1]; ha[i3 + 2] = P[i3 + 2];
+        ta[i3] = P[i3] - Vv[i3] * back; ta[i3 + 1] = P[i3 + 1] - Vv[i3 + 1] * back; ta[i3 + 2] = P[i3 + 2] - Vv[i3 + 2] * back;
+        if (this.lit) { const f = 1 - t, f2 = f * f; ca[i4] = C[i3] * (0.3 + 0.7 * f); ca[i4 + 1] = C[i3 + 1] * f; ca[i4 + 2] = C[i3 + 2] * f2; ca[i4 + 3] = this.w[i] * (0.5 + 0.5 * f); }   // (a spark cools as it flies: white to orange to red, and thins)
+        else { ca[i4] = C[i3]; ca[i4 + 1] = C[i3 + 1]; ca[i4 + 2] = C[i3 + 2]; ca[i4 + 3] = this.w[i] * (t > 0.8 ? (1 - t) * 5 : 1); }
+        i++;
+      }
+      this.mesh.geometry.instanceCount = this.n;
+      if (this.n > 0 || this._had) {
+        const n = Math.max(this.n, 1);
+        for (const [a, k] of [[this.head, 3], [this.tail, 3], [this.col, 4]]) { a.updateRange.offset = 0; a.updateRange.count = n * k; a.needsUpdate = true; }
+      }
+      this._had = this.n > 0;
+    }
+    clear() { this.n = 0; this.mesh.geometry.instanceCount = 0; }
   }
 
   const pools = {};
@@ -115,9 +217,10 @@
   FX.init = function (sc, cam) {
     scene = sc; camera = cam;
     FX.add = new PSys(4000, true, G.Tex.spr.soft);
-    FX.flame = new PSys(2500, true, G.Tex.spr.flame);
-    FX.norm = new PSys(3000, false, G.Tex.spr.smoke);
-    scene.add(FX.add.pts, FX.flame.pts, FX.norm.pts);
+    FX.flame = new PSys(2500, true, G.Tex.spr.flame, { atlas: 2, tilt: 0.4, spin: 0.7 });   // (tongues of flame: four of them, each standing a little its own way)
+    FX.norm = new PSys(3000, false, G.Tex.spr.smoke, { atlas: 2, tilt: Math.PI, spin: 0.9 });  // (puffs of smoke and dust: four of them, turned any way and turning)
+    FX.streak = new Streaks(1400, true); FX.drops = new Streaks(500, false);
+    scene.add(FX.add.pts, FX.flame.pts, FX.norm.pts, FX.streak.mesh, FX.drops.mesh);
 
     // tracers
     pools.tracer = [];
@@ -134,6 +237,8 @@
       scorch: new THREE.MeshBasicMaterial({ map: G.Tex.spr.scorch, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }),
       crack: new THREE.MeshBasicMaterial({ map: G.Tex.spr.crack, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, opacity: 0.8 }),
     };
+    if (G.Tex.spr.holeM) dmats.holeM = new THREE.MeshBasicMaterial({ map: G.Tex.spr.holeM, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });   // (in metal: a dent with a bright lip)
+    if (G.Tex.spr.holeW) dmats.holeW = new THREE.MeshBasicMaterial({ map: G.Tex.spr.holeW, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });   // (in wood: a hole with splinters)
     FX.dmats = dmats;
     for (let i = 0; i < 140; i++) {
       const m = new THREE.Mesh(dg, dmats.hole); m.visible = false; m.renderOrder = 2; scene.add(m);
@@ -181,10 +286,29 @@
     for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(sg, bmat()); m.visible = false; scene.add(m); pools.bubble.push({ m, t: 0, ml: 0.25, follow: null }); }
     // debris
     pools.debris = [];
-    const dbg = new THREE.BoxGeometry(1, 1, 1);
+    // (a chip of what was broken: three broken lumps, not a box)
+    const dbgs = [0, 1, 2].map((k) => {
+      const g = new THREE.IcosahedronGeometry(0.6, 0), ps = g.attributes.position, h = (x, y, z) => { const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + k * 5.1) * 43758.5453; return n - Math.floor(n); };
+      for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), f = 0.62 + h(x, y, z) * 0.75; ps.setXYZ(i, x * f * (k === 1 ? 1.3 : 1), y * f * (k === 2 ? 0.55 : 0.85), z * f); }
+      g.computeVertexNormals(); return g;
+    });
     for (let i = 0; i < 90; i++) {
-      const m = new THREE.Mesh(dbg, null); m.visible = false; m.castShadow = false; scene.add(m);
+      const m = new THREE.Mesh(dbgs[i % 3], null); m.visible = false; m.castShadow = false; scene.add(m);
       pools.debris.push({ m, v: V3(), av: V3(), t: 0, floor: 0 });
+    }
+    // spent cases: a drawn brass case with its rim (rifle, pistol), a shotgun's hull with its brass head
+    pools.casing = []; pools.casingIdx = 0;
+    {
+      const brass = new THREE.MeshStandardMaterial({ color: 0xb08a3c, metalness: 1, roughness: 0.34 }), hull = new THREE.MeshStandardMaterial({ color: 0x6a1c16, roughness: 0.6 });
+      const lat = (pts) => new THREE.LatheGeometry(pts.map((q) => new THREE.Vector2(q[0], q[1])), 10);
+      const cg = { rifle: lat([[0, -0.5], [0.105, -0.5], [0.105, -0.47], [0.09, -0.455], [0.09, -0.44], [0.105, -0.425], [0.1, 0.18], [0.07, 0.3], [0.068, 0.5], [0.058, 0.5], [0.058, 0.3]]),
+        small: lat([[0, -0.5], [0.21, -0.5], [0.21, -0.44], [0.185, -0.42], [0.185, -0.38], [0.2, -0.36], [0.2, 0.5], [0.175, 0.5], [0.175, -0.2]]),
+        head: lat([[0, -0.5], [0.16, -0.5], [0.16, -0.46], [0.148, -0.45], [0.148, -0.22], [0, -0.22]]), body: lat([[0.144, -0.22], [0.144, 0.5], [0.12, 0.5], [0.12, 0.3]]) };
+      for (let i = 0; i < 28; i++) {
+        const g = new THREE.Group(), a = new THREE.Mesh(cg.rifle, brass), b = new THREE.Mesh(cg.body, hull); g.add(a, b); g.visible = false; scene.add(g);
+        pools.casing.push({ m: g, a, b, cg, v: V3(), av: V3(), t: 0, floor: 0, hits: 0 });
+      }
+      pools.casingMats = [brass, hull];
     }
     // flash lights (constant count => no shader recompiles)
     pools.flash = [];
@@ -215,6 +339,8 @@
     if (pools.beam[0]) show(pools.beam[0].m);
     if (pools.bubble[0]) show(pools.bubble[0].m);
     if (pools.debris[0]) show(pools.debris[0].m, (G.world && G.world.mats && G.world.mats.rock) || FX.dmats.hole);
+    if (pools.casing && pools.casing[0]) { show(pools.casing[0].m); pools.casing[0].b.visible = true; }
+    if (FX.streak) { FX.streak.spawn(0, -500, 0, 0, 1, 0, 0.05, 0.01, 1, 1, 1, 0, 0, 0.04); FX.drops.spawn(0, -500, 0, 0, 1, 0, 0.05, 0.01, 1, 1, 1, 0, 0, 0.04); FX.streak.update(0.001); FX.drops.update(0.001); }
     const sr = FX.srKeep(); sr.visible = true;
     const vxBack = G.vfx && G.vfx.warmShow ? G.vfx.warmShow() : null;
     const gmBack = G.Gim && G.Gim.warmShow ? G.Gim.warmShow() : null; // (the fields' devices: gimmick.js)
@@ -227,13 +353,16 @@
   };
 
   FX.setFog = function (color, density) {
-    for (const s of [FX.add, FX.flame, FX.norm]) { s.mat.uniforms.uFogD.value = density; s.mat.uniforms.uFogC.value.set(color); }
+    for (const s of [FX.add, FX.flame, FX.norm, FX.streak, FX.drops]) { s.mat.uniforms.uFogD.value = density; s.mat.uniforms.uFogC.value.set(color); }
     if (G.vfx && G.vfx.setFog) G.vfx.setFog(color, density);
   };
+  // how light the place is (0..1): what dust, smoke and drops are seen by - they are not lights of their own
+  FX.setLit = function (k) { for (const s of [FX.norm, FX.drops]) s.mat.uniforms.uLit.value = k; };
   FX.clear = function () {
     if (G.GrenFX) G.GrenFX.clear();
     if (G.vfx && G.vfx.clear) G.vfx.clear();
-    FX.add.clear(); FX.flame.clear(); FX.norm.clear();
+    FX.add.clear(); FX.flame.clear(); FX.norm.clear(); FX.streak.clear(); FX.drops.clear();
+    for (const d of pools.casing || []) { d.t = 0; d.m.visible = false; }
     for (const d of pools.decal) d.m.visible = false;
     for (const t of pools.tele) { t.outer.visible = t.inner.visible = false; t.active = false; }
     for (const t of pools.teleL) { t.m.visible = false; t.active = false; }
@@ -253,14 +382,17 @@
     count = count || 8; speed = speed || 7;
     for (let i = 0; i < count; i++) {
       const vx = (n ? n.x : 0) * speed * 0.6 + rs(speed * 0.6), vy = (n ? n.y : 0) * speed * 0.6 + rs(speed * 0.5) + 1.5, vz = (n ? n.z : 0) * speed * 0.6 + rs(speed * 0.6);
-      FX.add.spawn(p.x, p.y, p.z, vx, vy, vz, 0.18 + Math.random() * 0.3, 0.06, 0.01, c.r * 1.5, c.g * 1.4, c.b * 1.2, 1, 14, 1.5);
+      const k = 0.5 + Math.random();
+      FX.streak.spawn(p.x, p.y, p.z, vx * k, vy * k, vz * k, 0.16 + Math.random() * 0.34, 0.007 + Math.random() * 0.009, c.r * 2.4, c.g * 2.0, c.b * 1.5, 13, 1.3, 0.035 + Math.random() * 0.03);
     }
+    FX.add.spawn(p.x, p.y, p.z, 0, 0, 0, 0.08, 0.06 + Math.min(0.3, count * 0.012), 0.02, c.r * 1.6, c.g * 1.4, c.b * 1.2, 0.9, 0, 0);
   };
   FX.dust = function (p, n, color, amount) {
     const c = rgb(color || 0x8a8070);
     amount = amount || 4;
     for (let i = 0; i < amount; i++) {
-      FX.norm.spawn(p.x, p.y, p.z, (n ? n.x : 0) * 1.5 + rs(0.6), (n ? n.y : 0) * 1.5 + rs(0.5) + 0.3, (n ? n.z : 0) * 1.5 + rs(0.6), 0.6 + Math.random() * 0.6, 0.15, 0.6 + Math.random() * 0.4, c.r, c.g, c.b, 0.55, -0.2, 2.5);
+      const k = 1.2 + Math.random() * 2.2;
+      FX.norm.spawn(p.x, p.y, p.z, (n ? n.x : 0) * k + rs(0.5), (n ? n.y : 0) * k + rs(0.4) + 0.25, (n ? n.z : 0) * k + rs(0.5), 0.7 + Math.random() * 0.7, 0.1, 0.5 + Math.random() * 0.45, c.r, c.g, c.b, 0.42, -0.15, 3.2);
     }
     // chips
     for (let i = 0; i < amount; i++) FX.norm.spawn(p.x, p.y, p.z, (n ? n.x : 0) * 3 + rs(2), (n ? n.y : 0) * 3 + Math.random() * 2, (n ? n.z : 0) * 3 + rs(2), 0.5, 0.05, 0.04, c.r * 0.6, c.g * 0.6, c.b * 0.6, 1, 12, 0.5);
@@ -270,9 +402,9 @@
     amount = amount || 8;
     for (let i = 0; i < amount; i++) {
       const s = 1.5 + Math.random() * 3;
-      FX.norm.spawn(p.x, p.y, p.z, (d ? d.x : 0) * s + rs(1.5), (d ? d.y : 0) * s + rs(1) + 1, (d ? d.z : 0) * s + rs(1.5), 0.35 + Math.random() * 0.4, 0.09, 0.05, c.r, c.g, c.b, 0.95, 9.8, 0.5);
+      FX.drops.spawn(p.x, p.y, p.z, (d ? d.x : 0) * s + rs(1.5), (d ? d.y : 0) * s + rs(1) + 1, (d ? d.z : 0) * s + rs(1.5), 0.35 + Math.random() * 0.4, 0.008 + Math.random() * 0.012, c.r * 0.8, c.g * 0.8, c.b * 0.8, 9.8, 0.5, 0.014 + Math.random() * 0.02);
     }
-    FX.norm.spawn(p.x, p.y, p.z, 0, 0.2, 0, 0.4, 0.2, 0.7, c.r * 0.8, c.g * 0.8, c.b * 0.8, 0.5, 0, 2);
+    for (let i = 0; i < 2; i++) FX.norm.spawn(p.x, p.y, p.z, (d ? d.x : 0) * 0.8 + rs(0.3), 0.2 + rs(0.2), (d ? d.z : 0) * 0.8 + rs(0.3), 0.3 + Math.random() * 0.2, 0.14, 0.5 + Math.random() * 0.25, c.r * 0.85, c.g * 0.85, c.b * 0.85, 0.42, 0.6, 2.5);
   };
   FX.smoke = function (p, amount, size, color, rise, life) {
     const c = rgb(color || 0x3a3632);
@@ -405,7 +537,7 @@
     m.scale.set(s, s, s);
     m.visible = true;
     // scorch / cracks / splats fade away instead of staying for good
-    d.t = d.ml = kind === 'hole' ? 20 : kind === 'scorch' ? 12 : kind === 'crack' ? 14 : 22;
+    d.t = d.ml = kind === 'hole' || kind === 'holeM' || kind === 'holeW' ? 20 : kind === 'scorch' ? 12 : kind === 'crack' ? 14 : 22;
   };
   FX.ring = function (p, r, color, dur, opts) {
     const o = pools.ring.find((x) => x.t <= 0) || pools.ring[0];
@@ -500,6 +632,18 @@
     }
   };
 
+  // a spent case thrown out of the gun: p where, v how (the gun's right and up), kind 'rifle' | 'small' | 'shell'
+  const CASE_LEN = { rifle: 0.03, small: 0.016, shell: 0.046 };
+  FX.casing = function (p, v, kind) {
+    if (!pools.casing) return;
+    const d = pools.casing[pools.casingIdx++ % pools.casing.length], L = CASE_LEN[kind] || CASE_LEN.rifle;
+    d.a.geometry = kind === 'shell' ? d.cg.head : kind === 'small' ? d.cg.small : d.cg.rifle; d.b.visible = kind === 'shell';
+    d.m.scale.setScalar(L); d.m.position.copy(p); d.m.rotation.set(rs(0.5), rs(3.1), Math.PI / 2 + rs(0.5));
+    d.v.copy(v); d.av.set(rs(14), rs(8), rs(22));
+    d.t = 3 + Math.random(); d.hits = 0; d.m.visible = true; d.r = L * (kind === 'small' ? 0.22 : 0.13);
+    d.floor = G.world ? G.world.floorBelow(p.x, p.y + 0.3, p.z) : 0;
+  };
+
   // ---------------- DOM damage numbers ----------------
   const tmpV = new THREE.Vector3();
   FX.project = function (p, out) {
@@ -533,6 +677,7 @@
     const sc = h * 0.5 / Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5);
     const sys = FX._sys || (FX._sys = [FX.add, FX.flame, FX.norm]);
     for (let i = 0; i < 3; i++) { const s = sys[i]; s.mat.uniforms.uScale.value = sc; s.update(dt); }
+    FX.streak.update(dt); FX.drops.update(dt);
     for (const t of pools.tracer) if (t.t > 0) { t.t -= dt; t.m.material.opacity = Math.max(0, t.t / t.ml); if (t.t <= 0) t.m.visible = false; }
     for (const d of pools.decal) if (d.m.visible) { d.t -= dt; if (d.t <= 0) d.m.visible = false; else if (d.t < 4 && d.op !== undefined) d.m.material.opacity = d.op * d.t / 4; }
     for (let i = FX.shocks.length - 1; i >= 0; i--) { const o = FX.shocks[i]; if (o.dead) { FX.shocks.splice(i, 1); continue; } o.life -= dt; if (o.life <= 0) { o.dispose(); FX.shocks.splice(i, 1); } }
@@ -572,6 +717,20 @@
       d.m.rotation.x += d.av.x * dt; d.m.rotation.y += d.av.y * dt; d.m.rotation.z += d.av.z * dt;
       if (d.m.position.y < d.floor + d.m.scale.y * 0.5) { d.m.position.y = d.floor + d.m.scale.y * 0.5; d.v.y *= -0.3; d.v.x *= 0.6; d.v.z *= 0.6; d.av.multiplyScalar(0.6); }
       if (d.t < 0.5) d.m.scale.multiplyScalar(1 - dt * 3);
+      if (d.t <= 0) d.m.visible = false;
+    }
+    for (const d of pools.casing) if (d.t > 0) {
+      d.t -= dt;
+      if (d.hits < 3) {
+        d.v.y -= 9.8 * dt; d.m.position.addScaledVector(d.v, dt);
+        d.m.rotation.x += d.av.x * dt; d.m.rotation.y += d.av.y * dt; d.m.rotation.z += d.av.z * dt;
+        if (d.m.position.y < d.floor + d.r) {   // (it rings on the floor, skips twice, and lies on its side)
+          d.m.position.y = d.floor + d.r; d.hits++;
+          if (d.hits >= 3 || Math.abs(d.v.y) < 0.5) { d.hits = 3; d.m.rotation.x = 0; d.m.rotation.z = Math.PI / 2; }
+          else { d.v.y *= -0.38; d.v.x = d.v.x * 0.55 + rs(0.3); d.v.z = d.v.z * 0.55 + rs(0.3); d.av.multiplyScalar(0.5); }
+        }
+      }
+      if (d.t < 0.4) d.m.scale.multiplyScalar(Math.max(0, 1 - dt * 4));
       if (d.t <= 0) d.m.visible = false;
     }
     for (const f of pools.flash) if (f.t > 0) { f.t -= dt; f.l.intensity = f.i0 * Math.max(0, f.t / f.ml); if (f.t <= 0) f.l.intensity = 0; }

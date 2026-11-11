@@ -158,6 +158,7 @@
     scene.fog.color.set(B.fog); scene.fog.density = B.fogD * qk.fogK;
     scene.background = new THREE.Color(B.fog);
     G.fx.setFog(B.fog, B.fogD * qk.fogK);
+    G.fx.setLit(Math.min(1, Math.max(0.38, 0.22 + (B.amb || 0.6) * 0.8)));   // (dust and smoke are seen by the light of the place)
     GM.qualityMaterials();
     hemi.color.set(B.hemiS); hemi.groundColor.set(B.hemiG); hemi.intensity = (0.75 + B.amb * 0.6) * (B.hemiI || 1);
     amb.color.set(B.hemiS); amb.intensity = B.amb * 1.3;

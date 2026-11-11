@@ -1700,6 +1700,14 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
     return [fpart('bone', bone, 4), { g: boxUV(Geo.merge([g]), 3), m: 'skin' }];
   };
+  // a headsman's axe at a giant's measure, forward from the fist: a haft bound with hide at the grip, a socket with langets, a
+  // broad bearded blade drawn to a long edge, a spike behind it
+  GEAR.headaxe = () => [
+    fpart('wood', tubeR([[0, 0.02, -0.7], [0.01, 0, 0.6], [0, -0.01, 1.8], [0, 0, 2.75]], (t) => 0.095 - t * 0.02, 8, 16), 1.5),
+    fpart('leather', [toZ(hl(wrapPts(-0.35, 0.35, 0.105, 9), 1, 1))], 3),
+    fpart('iron', [toZ(hl([[0.0005, 2.05], [0.11, 2.05], [0.105, 2.75], [0.07, 2.84], [0.0005, 2.84]], 1, 1, 10)), toZ(rbx(0.04, 0.7, 0.06, 0.01, 0.1, 1.7, 0)), toZ(rbx(0.04, 0.7, 0.06, 0.01, -0.1, 1.7, 0)), toZ(spike(0.07, 0.5, [0, 2.4, 0.3], [HX, 0, 0], 4))], 1.5),
+    fpart('blade', Geo.xf(ext([[2.1, 0.08], [2.7, 0.08], [2.95, 0.5], [3.02, 1.05], [2.6, 1.3], [2.0, 1.36], [1.55, 1.2], [1.35, 0.95], [1.9, 0.8], [2.0, 0.45]], 0.07, 0.03), null, [0, -HX, 0]), 1.5),
+  ];
   X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
 
   // ---- the furniture of the halls (props.js), in metres, standing on the origin and looking to +z: lists of parts { g, m (which of

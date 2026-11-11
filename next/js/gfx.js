@@ -1684,6 +1684,22 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     fpart('blade', Geo.xf(ext([[0.06, 0.2], [0.5, 0.21], [0.52, 0.17], [0.5, -0.03], [0.44, -0.05], [0.4, -0.035], [0.3, -0.055], [0.24, -0.04], [0.12, -0.05], [0.06, -0.02]], 0.014, 0.005, [arcPts(0.45, 0.15, 0.022, 0, Math.PI * 2, 10).slice(1)]), null, [0, -HX, 0]), 4),
     fpart('dark', [rbx(0.02, 0.05, 0.03, 0.005, 0, 0.08, 0.07)], 4),
   ];
+  // a wing of skin, one long: an arm to the wrist, four long fingers fanned from it with the web between them, cut in scallops
+  // along its edge, a web from the last finger back to the flank, a hooked thumb. It reaches out along +x, the web falls to -z
+  GEAR.batwing = () => {
+    const W = [0.6, 0.42, -0.05], sh = [0, 0, 0], el = [0.34, 0.2, 0.02], tips = [[1.0, 0.58, -0.12], [1.02, 0.12, -0.42], [0.82, -0.22, -0.62], [0.52, -0.38, -0.7], [0.06, -0.26, -0.5]];
+    const bone = [tubeR([sh, el, W], (t) => 0.034 - t * 0.012, 6, 10), ball(0.036, el), ball(0.03, W), spike(0.014, 0.1, [W[0] + 0.02, W[1] + 0.07, W[2] + 0.02], [0.2, 0, -0.4], 5)];
+    for (let i = 0; i < 4; i++) { const t = tips[i], m = [(W[0] + t[0]) / 2 + 0.02, (W[1] + t[1]) / 2 + 0.03, (W[2] + t[2]) / 2]; bone.push(tubeR([W, m, t], (k) => 0.018 - k * 0.014, 5, 10)); }
+    const pos = [], tri = (a, b, c) => pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    const lerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+    for (let i = 0; i < 4; i++) {   // (between each finger and the next - the last web runs to the flank - in strips, its edge drawn in toward the wrist)
+      const A = tips[i], Bt = tips[i + 1], root = i === 3 ? lerp(sh, W, 0.25) : W, n = 5;
+      const edge = (k) => { const p = lerp(A, Bt, k), dip = Math.sin(Math.PI * k) * 0.2; return lerp(p, root, dip); };
+      for (let j = 0; j < n; j++) { const e0 = edge(j / n), e1 = edge((j + 1) / n); tri(root, e0, e1); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    return [fpart('bone', bone, 4), { g: boxUV(Geo.merge([g]), 3), m: 'skin' }];
+  };
   X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
 
   // ---- the furniture of the halls (props.js), in metres, standing on the origin and looking to +z: lists of parts { g, m (which of
@@ -2353,7 +2369,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
             const gm = S.mesh(fn, [lo[0] - pad, lo[1] - pad, lo[2] - pad], [hi[0] + pad, hi[1] + pad, hi[2] + pad], cell);
             if (gm.attributes.position && gm.attributes.position.count >= 12) {
               // (the texture at one grain on every part, whatever its size)
-              const ps = gm.attributes.position, nr = gm.attributes.normal, uv = gm.attributes.uv, uvk = o.free ? 2.4 / L : uvm;   // (a guardian's part is metres across: the texture by the part, not by the metre)
+              const ps = gm.attributes.position, nr = gm.attributes.normal, uv = gm.attributes.uv, uvk = o.free ? (mat.userData && mat.userData.uvk) || 2.4 / L : uvm;   // (a guardian's part is metres across: the texture by the part, not by the metre)
               for (let n = 0; n < ps.count; n++) { const ax = Math.abs(nr.getX(n)), ay = Math.abs(nr.getY(n)), az = Math.abs(nr.getZ(n)), x = ps.getX(n) * uvk, y = ps.getY(n) * uvk, z = ps.getZ(n) * uvk; if (ax >= ay && ax >= az) uv.setXY(n, z, y); else if (ay >= az) uv.setXY(n, x, z); else uv.setXY(n, x, y); }
               geo = gm;
             }

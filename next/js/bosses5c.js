@@ -44,7 +44,7 @@
     look: () => ({ s: 1.5, float: true, hood: true, cloth: true, cape: true, weapon: 'staff', orb: 0xffe060, eyes: 0xfff0a0, m: { body: M('#2a2a30', { map: tex().cloth.map, roughness: 0.9 }), cloth: M('#d8d0b0', { map: tex().cloth.map, side: THREE.DoubleSide, roughness: 0.95 }), skin: M('#c8c0a8') } }),
     // a halo of light over the head and three sparks circling the torso
     deco: (b, J) => {
-      const s = 1.5, halo = mesh(J.head, PG().torus, glowM(0xffe060, 2.2), 1.1 * s, 1.1 * s, 1.1 * s, 0, 1.1 * s, -0.1 * s, Math.PI / 2, 0, 0);
+      const s = 1.5, halo = mesh(J.head, PG().torus, glowM(0xffe060, 1.3), 1.1 * s, 1.1 * s, 0.35 * s, 0, 1.1 * s, -0.1 * s, Math.PI / 2, 0, 0);
       b._orbs = [0, 1, 2].map((i) => { const o = joint(J.torso, 0, 1.0 * s, 0); smesh(o, PG().sph, glowM(0xfff0a0, 3), 0.2 * s, 0.2 * s, 0.2 * s, 2.0 * s, 0, 0); o.rotation.y = i * Math.PI * 2 / 3; return o; });
       b._halo = halo;
     },
@@ -71,8 +71,11 @@
     deco: (b, J) => {
       const s = 2.1;
       J.head.scale.setScalar(1.35);
-      smesh(J.head, PG().box, M('#4a2c20', { map: tex().skin.map }), 0.5 * s, 0.4 * s, 0.55 * s, 0, 0.05 * s, 0.4 * s);
-      smesh(J.head, PG().torus, mat('#b8a060', { metalness: 0.9, roughness: 0.3 }), 0.14 * s, 0.14 * s, 0.14 * s, 0, -0.1 * s, 0.68 * s, 0, 0, 0);
+      const mz = M('#4a2c20', { map: tex().skin.map }), dk = mat('#070606'); if (BS.h.regrain) BS.h.regrain(mz, false);
+      smesh(J.head, PG().sph, mz, 0.27 * s, 0.22 * s, 0.32 * s, 0, 0.08 * s, 0.4 * s); smesh(J.head, PG().sph, mz, 0.24 * s, 0.13 * s, 0.26 * s, 0, -0.09 * s, 0.36 * s);
+      smesh(J.head, PG().sph, mz, 0.3 * s, 0.1 * s, 0.14 * s, 0, 0.3 * s, 0.22 * s);
+      for (const sx of [-1, 1]) { const n = new THREE.Mesh(PG().sph, dk); n.scale.set(0.05 * s, 0.035 * s, 0.03 * s); n.position.set(sx * 0.1 * s, 0.06 * s, 0.7 * s); J.head.add(n); smesh(J.head, PG().cone, mz, 0.09 * s, 0.26 * s, 0.05 * s, sx * 0.34 * s, 0.34 * s, -0.02 * s, -0.2, 0, -sx * 1.25); }
+      smesh(J.head, PG().torus, mat('#6e5c30', { metalness: 0.85, roughness: 0.5 }), 0.12 * s, 0.12 * s, 0.1 * s, 0, -0.06 * s, 0.7 * s, 0, 0, 0);
     },
     attacks: [
       { k: 'swipe', pose: 'swing', wind: 0.5, r: 6, arc: -0.05, dmg: 30, knock: 10, max: 8, w: 3, combo: 3, rec: 0.35, cry: 'roar' },
@@ -92,7 +95,7 @@
     hp: 7000, rig: 'human', speed: 3.4, radius: 1.4, range: 14, keepAway: true, stride: 3, pitch: 0.85, cd: 1.1, blood: 0x103a5a,
     look: () => ({ s: 1.6, float: true, hood: true, cloth: true, cape: true, weapon: 'staff', orb: 0x4aa0ff, eyes: 0x80c0ff, m: { body: M('#10182a', { map: tex().cloth.map, roughness: 0.95 }), cloth: M('#1a3060', { map: tex().cloth.map, side: THREE.DoubleSide, roughness: 0.95 }), skin: M('#8aa0c0') } }),
     // a crown of blue flames
-    deco: (b, J) => { const s = 1.6; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; smesh(J.head, PG().cone, glowM(0x4aa0ff, 2.6), 0.1 * s, 0.55 * s, 0.1 * s, Math.cos(a) * 0.38 * s, 0.75 * s, Math.sin(a) * 0.38 * s); } },
+    deco: (b, J) => { const s = 1.6; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; smesh(J.head, PG().cone, glowM(0x4aa0ff, 1.4), 0.06 * s, 0.5 * s, 0.06 * s, Math.cos(a) * 0.38 * s, 0.75 * s, Math.sin(a) * 0.38 * s); } },
     tick: (b, dt) => { if (Math.random() < dt * 14) { const p = b.J.head.getWorldPosition(V()); G.fx.flameLick(p.x + U.rand(-0.3, 0.3), p.y + 0.9, p.z + U.rand(-0.3, 0.3), 1.2, 0x4a9cff); } },
     attacks: [
       { k: 'volley', pose: 'cast', wind: 0.55, n: 5, spread: 0.5, salvos: 2, gap: 0.4, proj: 'soul', speed: 20, dmg: 16, elem: 'fire', w: 3 },
@@ -118,9 +121,11 @@
     look: () => ({ s: 2.8, horns: true, spikes: true, eyes: [0x60c0ff], m: { body: M('#6a665c', { map: tex().rock.map, normalMap: tex().rock.normalMap, roughness: 0.95 }), claw: M('#1a1a20'), horn: M('#d8d0b8') } }),
     // ragged bone wings
     deco: (b, J) => {
-      const s = 2.8, bone = M('#c8c0a8', { roughness: 0.8 }), skin = mat('#2a2a38', { roughness: 0.9, side: THREE.DoubleSide });
+      const s = 2.8, bone = M('#8a8474', { roughness: 0.8 }), skin = mat('#22222c', { roughness: 0.9, side: THREE.DoubleSide });
       for (const sx of [-1, 1]) {
         const w = joint(J.body, sx * 0.7 * s, 0.7 * s, 0.3 * s);
+        // (a wing of skin on its fingers, torn: gfx.js; the slabs it was where there is none)
+        if (BS.h.gearOn && BS.h.gearOn(w, 'batwing', { bone, skin }, 0, 0, 0, 0.25, 0, sx * 0.55, [sx * 2.9 * s, 2.9 * s, 2.9 * s])) continue;
         smesh(w, PG().cyl8, bone, 0.1 * s, 2.6 * s, 0.1 * s, sx * 1.1 * s, 0.4 * s, 0, 0, 0, -sx * 1.2);
         for (let i = 0; i < 4; i++) smesh(w, PG().box, skin, 0.04 * s, 1.6 * s, 0.8 * s, sx * (0.6 + i * 0.5) * s, (0.2 - i * 0.1) * s, (-0.2 - i * 0.2) * s, 0, 0, -sx * (1.2 - i * 0.12));
       }

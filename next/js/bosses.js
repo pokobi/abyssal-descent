@@ -921,7 +921,7 @@
   const CLS = (BS.CLS = { colossus: Colossus, wyrm: Wyrm, archon: Archon, executioner: Executioner, broodmother: BroodMother });
   BS.Boss = Boss; BS.h = { mat, mesh, smesh, joint, V };
   // the still parts of a guardian's body, joint by joint, into one surface each (with the full look on; made once for each shape)
-  BS.melt = function (b) { if (b && b.root && G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(b.root, {}, null, 'guardian', { still: true, free: true, round: 0.28, blend: 0.03, pick: (c) => c.userData.st === 1 }); } catch (e) { /* it stays as built */ } } return b; };
+  BS.melt = function (b) { if (b && b.root && G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(b.root, {}, null, 'guardian', { still: true, free: true, round: 0.28, blend: 0.022, pick: (c) => c.userData.st === 1 }); } catch (e) { /* it stays as built */ } } return b; };
   BS.order = ['colossus', 'wyrm', 'archon', 'executioner', 'broodmother'];
   BS.forArea = function (area) { return BS.order[(Math.floor(area / 5) - 1) % BS.order.length]; };
   BS.has = (id) => !!CLS[id];

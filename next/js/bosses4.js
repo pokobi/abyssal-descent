@@ -21,7 +21,7 @@
   function regrain(m, quad) {
     if (!m || !m.map || m.userData.regrained || !GX().tex) return; const T = tex();
     const n = m.map === T.skin.map ? (quad === 'chitin' ? 'chitin' : quad ? 'fur' : 'leather') : m.map === T.cloth.map ? 'weave' : m.map === T.metal.map ? 'steel' : m.map === T.rock.map ? 'rock' : m.map === T.planks.map ? 'walnut' : null, t = n ? GX().tex(n) : null;
-    if (!t) return; m.userData.regrained = true; m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; if (n !== 'steel') m.roughness = 1; m.color.multiplyScalar(1.3);
+    if (!t) return; m.userData.regrained = true; m.userData.uvk = { weave: 2.2, leather: 1.3, fur: 0.8, chitin: 0.7, steel: 1.2, rock: 0.5, walnut: 1.5 }[n];   // (the grain at a guardian's size) m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; if (n !== 'steel') m.roughness = 1; m.color.multiplyScalar(1.3);
   }
   // (the lit colours of a blade, a crown: kept as a tinge on dark steel - a faint glow of the same hue - not as bright paint)
   const sober = (m, k) => { if (!m || m.userData.sober) return m; m.userData.sober = true; const c = m.color, l = Math.max(c.r, c.g, c.b) || 1, g = 0.3 / l; { const r0 = c.r * g, g0 = c.g * g, b0 = c.b * g, y = (r0 + g0 + b0) / 3; c.setRGB(y + (r0 - y) * 0.3 + 0.1, y + (g0 - y) * 0.3 + 0.1, y + (b0 - y) * 0.3 + 0.11); } if (m.emissive) m.emissive.multiplyScalar(0.6); if (m.emissive) m.emissiveIntensity = Math.min(m.emissiveIntensity, k === undefined ? 0.5 : k); m.roughness = Math.max(m.roughness, 0.42); return m; };
@@ -31,7 +31,10 @@
     for (const q of d) { const m = new THREE.Mesh(q.g, MM[q.m] || MM.def); m.castShadow = true; g.add(m); }
     return g;
   };
+  let robeFine = null;
+  const fineRobe = () => { if (robeFine) return robeFine; const g0 = GX().foeGeo && GX().foeGeo('robe'); if (!g0) return null; robeFine = g0.clone(); const uv = robeFine.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 9, uv.getY(i) * 5); return robeFine; };
   const putG = (parent, geo, mt, x, y, z, sx, sy, sz, rx, ry, rz) => { const m = new THREE.Mesh(geo, mt); m.position.set(x, y, z); m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); m.rotation.set(rx || 0, ry || 0, rz || 0); m.castShadow = true; parent.add(m); return m; };
+  BS.h.gearOn = gearOn; BS.h.putG = putG; BS.h.regrain = regrain;
   // humanoid: hips / torso / head / arms / legs, a weapon in the right hand; can float instead of walk
   // (a body of masses - ribs over a belly, shoulders, a head with brow and jaw, arms with their swells, hands with fingers, thighs and
   // calves - or, of bone, a man's whole skeleton to its measure; plate where it is armoured; a great helm, a hood with a skull far back
@@ -47,7 +50,7 @@
     const skin = M.skin || M.body, arm = M.armor, dark = mat('#070606'), iron = mat('#3a3838', { metalness: 0.8, roughness: 0.6 }), hide = mat('#2a1c14', { roughness: 0.8 });
     if (K) putG(hips, K.pelvis, M.body, 0, -0.02 * s, 0, k * 1.3, k, k); else smesh(hips, PG().sph, arm || M.body, 0.62 * s, 0.34 * s, 0.44 * s);
     if (o.cloth) {
-      if (o.float && FG && FG('robe')) putG(hips, FG('robe'), M.cloth, 0, -1.2 * s, 0, 0.8 * s, 2.5 * s, 0.62 * s);
+      if (o.float && fineRobe()) putG(hips, fineRobe(), M.cloth, 0, -1.2 * s, 0, 0.8 * s, 2.5 * s, 0.62 * s);
       else if (!gearOn(hips, 'tatter', { cloth: M.cloth }, 0, 0.1 * s, 0.42 * s, 0.04, 0, 0, [4.6 * s, 4.2 * s, 3 * s])) smesh(hips, PG().box, M.cloth, 1.2 * s, (o.float ? 2.2 : 1.3) * s, 0.06 * s, 0, -(o.float ? 1.1 : 0.7) * s, 0.4 * s);
       else gearOn(hips, 'tatter', { cloth: M.cloth }, 0, 0.1 * s, -0.42 * s, 0.04, Math.PI, 0, [5 * s, 3.6 * s, 3 * s]);
     }
@@ -110,7 +113,7 @@
         const um = robed ? M.cloth : skin;
         smesh(sh, PG().sph, um, 0.25 * s, 0.3 * s, 0.26 * s, 0, -0.06 * s, 0); smesh(sh, PG().sph, um, 0.21 * s, 0.5 * s, 0.23 * s, 0, -0.5 * s, 0);
         const fm = arm || um;
-        if (robed && FG && FG('robe')) putG(el, FG('robe'), M.cloth, 0, -0.5 * s, 0, 0.3 * s, 1.0 * s, 0.3 * s);
+        if (robed && fineRobe()) putG(el, fineRobe(), M.cloth, 0, -0.5 * s, 0, 0.3 * s, 1.0 * s, 0.3 * s);
         smesh(el, PG().sph, fm, 0.19 * s, 0.36 * s, 0.2 * s, 0, -0.3 * s, 0.01 * s); smesh(el, PG().cyl8, fm, 0.14 * s, 0.9 * s, 0.15 * s, 0, -0.45 * s, 0);
         if (arm) { putG(el, PG().sph, arm, 0, 0, 0, 0.22 * s, 0.22 * s, 0.24 * s); putG(el, PG().cyl8, arm, 0, -0.5 * s, 0, 0.19 * s, 0.6 * s, 0.2 * s); putG(el, PG().cyl8, arm, 0, -0.84 * s, 0, 0.215 * s, 0.14 * s, 0.225 * s); }
         smesh(hand, PG().sph, skin, 0.17 * s, 0.2 * s, 0.12 * s);

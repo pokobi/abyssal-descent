@@ -21,7 +21,8 @@
   function regrain(m, quad) {
     if (!m || !m.map || m.userData.regrained || !GX().tex) return; const T = tex();
     const n = m.map === T.skin.map ? (quad === 'chitin' ? 'chitin' : quad ? 'fur' : 'leather') : m.map === T.cloth.map ? 'weave' : m.map === T.metal.map ? 'steel' : m.map === T.rock.map ? 'rock' : m.map === T.planks.map ? 'walnut' : null, t = n ? GX().tex(n) : null;
-    if (!t) return; m.userData.regrained = true; m.userData.uvk = { weave: 2.2, leather: 1.3, fur: 0.8, chitin: 0.7, steel: 1.2, rock: 0.5, walnut: 1.5 }[n];   // (the grain at a guardian's size) m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; if (n !== 'steel') m.roughness = 1; m.color.multiplyScalar(1.3);
+    if (!t) return; m.userData.regrained = true; m.userData.uvk = { weave: 2.2, leather: 1.3, fur: 0.8, chitin: 0.7, steel: 1.2, rock: 0.5, walnut: 1.5 }[n];   // (the grain at a guardian's size)
+    m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; if (n !== 'steel') m.roughness = 1; m.color.multiplyScalar(1.3);
   }
   // (the lit colours of a blade, a crown: kept as a tinge on dark steel - a faint glow of the same hue - not as bright paint)
   const sober = (m, k) => { if (!m || m.userData.sober) return m; m.userData.sober = true; const c = m.color, l = Math.max(c.r, c.g, c.b) || 1, g = 0.3 / l; { const r0 = c.r * g, g0 = c.g * g, b0 = c.b * g, y = (r0 + g0 + b0) / 3; c.setRGB(y + (r0 - y) * 0.3 + 0.1, y + (g0 - y) * 0.3 + 0.1, y + (b0 - y) * 0.3 + 0.11); } if (m.emissive) m.emissive.multiplyScalar(0.6); if (m.emissive) m.emissiveIntensity = Math.min(m.emissiveIntensity, k === undefined ? 0.5 : k); m.roughness = Math.max(m.roughness, 0.42); return m; };

@@ -290,7 +290,7 @@
     const b = y + 1.8 * s;
     // (carved figures, gfx.js: a knight on his sword, a mourner in a hood, an angel of the graveyard, a knight broken off at the neck)
     put(w, 'statue' + [0, 1, 2, 0, 1, 3, 2][Math.floor(hsh(x, z) * 7)], x, b, z, ry, s * 1.2);
-    w.addCollider(x - 0.45 * s, b, z - 0.45 * s, x + 0.45 * s, b + 2.1 * s, z + 0.45 * s);
+    w.addCollider(x - 0.5 * s, b, z - 0.5 * s, x + 0.5 * s, b + 2.45 * s, z + 0.5 * s);
     if (rng && rng.chance(0.4)) { const bc = rng.chance(0.5); P.candles(w, x + 0.6 * s, y + 0.5 * s, z + 0.95 * s, rng, bc); }
   };
   P.bookshelf = function (w, x, z, y, alongX, rng) {

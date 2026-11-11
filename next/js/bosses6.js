@@ -468,7 +468,8 @@
         } else {
           if (!S.done) {
             S.done = true; h.pos.set(S.at.x, 0.85, S.at.z); h.yaw = S.yaw; h.pitch = 0; h.curl = 0;
-            G.fx.explosion(S.c.clone().setY(0.6), 3.4, this.col(), { decal: false, noSmoke: true, noRing: true }); G.vfx.nova(S.c.clone().setY(0), R, 0.12, { style: 'dark', dome: false, ground: this.col() }); // (the shock ring = R, what it hurts) G.fx.dust(S.c.clone().setY(0.3), V(0, 1, 0), 0x6a3a5a, 26);
+            G.fx.explosion(S.c.clone().setY(0.6), 3.4, this.col(), { decal: false, noSmoke: true, noRing: true }); G.vfx.nova(S.c.clone().setY(0), R, 0.12, { style: 'dark', dome: false, ground: this.col() }); // (the shock ring = R, what it hurts)
+            G.fx.dust(S.c.clone().setY(0.3), V(0, 1, 0), 0x6a3a5a, 26);
             G.fx.decal(S.c.clone().setY(0.03), V(0, 1, 0), 'crack', 8, true);
             G.sfx.explosion(S.c, 1.6); P.addShake(0.75); G.sfx.rumble && G.sfx.rumble(0.8, 0.6);
             if (Math.hypot(P.pos.x - S.c.x, P.pos.z - S.c.z) < R && P.pos.y < 3.4) { this.hit(30, 'aoe', S.c.clone()); const kd = P.pos.clone().sub(S.c).setY(0); if (kd.lengthSq() < 0.01) kd.set(1, 0, 0); kd.normalize(); P.vel.addScaledVector(kd, 12); P.vel.y = Math.max(P.vel.y, 6); }
@@ -1176,7 +1177,8 @@
           c.L.position.lerpVectors(c.from, c.tgt, (lt - AIM) / FLY);
           for (let i = 0; i < 3; i++) G.fx.add.spawn(c.L.position.x, c.L.position.y, c.L.position.z, U.rand(-1, 1), U.rand(-1, 1), U.rand(-1, 1), 0.4, 0.5, 0.05, 0.9, 0.7, 1.4, 1, 0, 0.5);
         } else {
-          G.fx.explosion(c.tgt.clone().setY(Y2 + 0.6), 2.2, VIO, { decal: false, noSmoke: true, noRing: true }); G.vfx.nova(c.tgt.clone().setY(Y2), R, 0.1, { style: 'dark', dome: false, ground: VIO }); // (the reticle's ring: touching it hurts) G.fx.flash(c.tgt.clone().setY(Y2 + 2), 0xe0c8ff, 100, 0.3, 25);
+          G.fx.explosion(c.tgt.clone().setY(Y2 + 0.6), 2.2, VIO, { decal: false, noSmoke: true, noRing: true }); G.vfx.nova(c.tgt.clone().setY(Y2), R, 0.1, { style: 'dark', dome: false, ground: VIO }); // (the reticle's ring: touching it hurts)
+          G.fx.flash(c.tgt.clone().setY(Y2 + 2), 0xe0c8ff, 100, 0.3, 25);
           if (G.sfx.lanceHit) G.sfx.lanceHit(c.tgt); P.addShake(0.35);
           if (Math.hypot(P.pos.x - c.tgt.x, P.pos.z - c.tgt.z) < R + 0.4 && P.pos.y < Y2 + 3) this.hit(18, 'aoe', c.tgt.clone());
           a.g.remove(c.L); a.g.remove(c.ret); a.g.remove(c.line); a.cur = null; a.i++;

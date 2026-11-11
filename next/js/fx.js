@@ -240,7 +240,9 @@
 
     // tracers
     pools.tracer = [];
-    const tg = new THREE.BoxGeometry(1, 1, 1); tg.translate(0, 0, -0.5);
+    const tgBar = new THREE.BoxGeometry(1, 1, 1); tgBar.translate(0, 0, -0.5); pools.tracerBar = tgBar;   // (a bar: what stands still - the pieces of a bolt of lightning)
+    // (a spindle a unit long behind its head at the origin: widest just behind the head, a point at its tail: what flies)
+    const tg = pools.tracerFly = new THREE.LatheGeometry([new THREE.Vector2(0, 0), new THREE.Vector2(0.5, -0.1), new THREE.Vector2(0.22, -0.45), new THREE.Vector2(0, -1)], 6); tg.rotateX(Math.PI / 2);
     for (let i = 0; i < 240; i++) {
       const m = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: 0xffd8a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false; m.frustumCulled = false; scene.add(m); pools.tracer.push({ m, t: 0, ml: 0 });
@@ -481,19 +483,23 @@
     f.l.position.copy(p); f.l.color.set(color || 0xffb060); f.l.distance = dist || 12;
     f.i0 = (intensity || 30) * (G.LIGHT_K || 1); f.l.intensity = f.i0; f.t = dur || 0.08; f.ml = f.t;
   };
-  FX.tracer = function (a, b, color, width, life) {
+  // a streak that flies from a to b in the time it is given (a shot's tracer, a link thrown from one thing to another)
+  const TRZ = new THREE.Vector3(0, 0, -1);
+  // (still: the whole stretch at once, fading - a bolt of lightning's pieces, the short pieces of a blade's trail; anything under three metres is still)
+  FX.tracer = function (a, b, color, width, life, still) {
     const t = pools.tracer.find((x) => x.t <= 0) || pools.tracer[0];
-    const m = t.m;
-    m.position.copy(a);
-    const len = a.distanceTo(b);
-    m.lookAt(b);
-    m.scale.set(width || 0.025, width || 0.025, len);
+    const m = t.m, len = a.distanceTo(b);
+    t.still = !!still || len < 3;
+    t.a = (t.a || new THREE.Vector3()).copy(a); t.d = (t.d || new THREE.Vector3()).copy(b).sub(a); if (len > 1e-6) t.d.multiplyScalar(1 / len); t.len = len;
+    t.w = (width || 0.025) * (t.still ? 1.25 : 1.6); t.streak = t.still ? len : Math.min(len * 0.45, 9);
+    m.geometry = t.still ? pools.tracerBar : pools.tracerFly;
+    m.quaternion.setFromUnitVectors(TRZ, t.back = (t.back || new THREE.Vector3()).copy(t.d).negate());
+    if (t.still) { m.position.copy(b); m.scale.set(t.w, t.w, Math.max(0.001, len)); } else { m.position.copy(a); m.scale.set(t.w, t.w, 0.001); }
     m.material.color.set(color || 0xffd8a0);
     m.material.opacity = 1;
     m.visible = true; t.t = t.ml = life || 0.06;
   };
-  // a tracer that covers exactly the stretch a -> b (FX.tracer's box grows from its first point AWAY from the second one)
-  FX.seg = function (a, b, color, width, life) { FX.tracer(b, b.clone().multiplyScalar(2).sub(a), color, width, life); };
+  FX.seg = function (a, b, color, width, life) { FX.tracer(a, b, color, width, life, true); };
   // a bolt from a to b: a white-hot core inside a coloured glow, jagged (most in the middle), with a forked branch or two, and a second
   // flicker a moment later along a fresh path
   FX.lightning = function (a, b, color) {
@@ -703,7 +709,11 @@
     const sys = FX._sys || (FX._sys = [FX.add, FX.flame, FX.norm]);
     for (let i = 0; i < 3; i++) { const s = sys[i]; s.mat.uniforms.uScale.value = sc; s.update(dt); }
     FX.streak.update(dt); FX.drops.update(dt);
-    for (const t of pools.tracer) if (t.t > 0) { t.t -= dt; t.m.material.opacity = Math.max(0, t.t / t.ml); if (t.t <= 0) t.m.visible = false; }
+    for (const t of pools.tracer) if (t.t > 0) {
+      t.t -= dt; const k = Math.min(1, 1 - t.t / t.ml);
+      if (t.d && !t.still) { const head = t.len * Math.min(1, k * 1.12 + 0.12), st = Math.min(t.streak, head); t.m.position.copy(t.a).addScaledVector(t.d, head); t.m.scale.set(t.w, t.w, Math.max(0.001, st)); }
+      t.m.material.opacity = t.still ? 1 - k : 1 - k * k * k; if (t.t <= 0) t.m.visible = false;
+    }
     for (const d of pools.decal) if (d.m.visible) { d.t -= dt; if (d.t <= 0) d.m.visible = false; else if (d.t < 4 && d.op !== undefined) d.m.material.opacity = d.op * d.t / 4; }
     for (let i = FX.shocks.length - 1; i >= 0; i--) { const o = FX.shocks[i]; if (o.dead) { FX.shocks.splice(i, 1); continue; } o.life -= dt; if (o.life <= 0) { o.dispose(); FX.shocks.splice(i, 1); } }
     for (const r of pools.ring) if (r.t > 0) {

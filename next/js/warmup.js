@@ -126,8 +126,6 @@
   async function warmShapes() {
     const GP = G.GFX && G.GFX.propGeo; if (!GP) return;
     for (const n of ['statue0', 'statue1', 'statue2', 'statue3', 'tuft', 'crate', 'shelf', 'book', 'rack', 'cage', 'wellhead', 'brazier', 'sconce', 'chandelier']) { try { GP(n); } catch (e) { /* made when asked for */ } await new Promise((r) => setTimeout(r, 0)); }
-    // (the carved heads of the guardians: gfx.js foeGear)
-    if (G.GFX.foeGear) for (const n of ['wyrmhead', 'wyrmjaw', 'wyrmseg', 'broodabd', 'broodceph', 'broodfang', 'broodleg1', 'broodleg2']) { try { G.GFX.foeGear(n); } catch (e) { /* made when asked for */ } await new Promise((r) => setTimeout(r, 0)); }
     // (and each class's clothes over the common figure: melted once here, so that the first frame of a run does not stop to do it)
     if (G.avatar && G.avatar.buildFigure && G.Classes && G.Classes.BY) for (const c in G.Classes.BY) { try { const F = G.avatar.buildFigure(); G.avatar.dress(F.J, c); } catch (e) { /* when it is first worn */ } await new Promise((r) => setTimeout(r, 0)); }
   }
@@ -135,10 +133,11 @@
     const r = G.renderer; if (!r) return;
     const t0 = now();
     const tmp = W.enemyModels();
-    try { await warmShapes(); } catch (e) { /* ignore */ }
+    // (shaders first - the world, then the gun in the hands; the carved shapes after them)
     try { await W.worldAsync(8000); } catch (e) { /* ignore */ }
     if (tmp) { G.scene.remove(tmp); }
     try { warmViewmodel(r); } catch (e) { /* ignore */ }
+    try { await warmShapes(); } catch (e) { /* ignore */ }
     try { if (G.Icons && G.Icons.warm) G.Icons.warm(); } catch (e) { /* ignore */ }
     try { if (G.PStatus && G.PStatus.warm) G.PStatus.warm(); } catch (e) { /* ignore */ }
     try { if (G.StatusUI && G.StatusUI.warm) G.StatusUI.warm(); } catch (e) { /* ignore */ }

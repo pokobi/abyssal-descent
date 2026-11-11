@@ -227,10 +227,12 @@
   };
   function buildOboro(b) {
     const r = b.root;
+    const TXg = (n) => (G.GFX && G.GFX.tex ? G.GFX.tex(n) : null), grain = (m, n, k) => { const t = TXg(n); if (t) { m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; m.userData.uvk = k; m.color.multiplyScalar(1.25); } return m; };
+    b.meltRound = 0.86; b.meltBlend = 0.035;
     const M = {
-      cloth: mat('#17161d', { roughness: 0.92, map: tex().cloth.map }), dark: mat('#0a090d', { roughness: 0.7 }),
-      plate: mat('#2a2830', { metalness: 0.6, roughness: 0.4 }), mask: mat('#ece6da', { roughness: 0.35 }), sash: mat('#7a121c', { roughness: 0.8 }),
-      steel: mat('#d8dce6', { metalness: 1, roughness: 0.15, emissive: 0x202838, emissiveIntensity: 0.4 }), gold: mat('#b8902a', { metalness: 0.8, roughness: 0.3 }),
+      cloth: grain(mat('#17161d', { roughness: 0.92, map: tex().cloth.map }), 'weave', 7), dark: mat('#0a090d', { roughness: 0.7 }),
+      plate: grain(mat('#2a2830', { metalness: 0.6, roughness: 0.6 }), 'steel', 4), mask: grain(mat('#a8a090', { roughness: 0.5 }), 'bone', 5), sash: grain(mat('#5a1016', { roughness: 0.9 }), 'weave', 8),
+      steel: mat('#9a9ca4', { metalness: 1, roughness: 0.32, emissive: 0x202838, emissiveIntensity: 0.25 }), gold: mat('#8c7036', { metalness: 0.8, roughness: 0.45 }),
       eye: glowM(0xff2238, 2.6),
     };
     b.M = M;
@@ -466,9 +468,11 @@
   };
   function buildFox(b) {
     const r = b.root;
+    const TXg = (n) => (G.GFX && G.GFX.tex ? G.GFX.tex(n) : null), grain = (m, n, k) => { const t = TXg(n); if (t) { m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; m.userData.uvk = k; m.color.multiplyScalar(1.25); } return m; };
+    b.meltRound = 0.86; b.meltBlend = 0.035;
     const M = {
-      fur: mat('#f0e6d6', { roughness: 0.9 }), fur2: mat('#d8c8ae', { roughness: 0.92 }), dark: mat('#1c1416'),
-      red: glowM(0xff3040, 1.4), eye: glowM(0xffb020, 3), fire: glowM(0x60c0ff, 2.6), tipM: mat('#ffffff', { emissive: 0x7ad0ff, emissiveIntensity: 1.6 }),
+      fur: grain(mat('#a39c90', { roughness: 0.9 }), 'fur', 2.2), fur2: grain(mat('#857c6e', { roughness: 0.92 }), 'fur', 2.2), dark: mat('#1c1416'),
+      red: mat('#6e1418', { roughness: 0.7 }), eye: glowM(0xffb020, 3), fire: glowM(0x60c0ff, 2.0), tipM: mat('#c8ccd0', { emissive: 0x7ad0ff, emissiveIntensity: 0.9 }),
     };
     b.M = M;
     const body = joint(r, 0, 1.0, 0);
@@ -639,10 +643,11 @@
   };
   function buildDoll(b) {
     const r = b.root;
+    b.meltRound = 0.6; b.meltBlend = 0.02;
     const M = {
-      porc: mat('#f1ece4', { roughness: 0.25, metalness: 0.05 }), lac: mat('#8a1018', { roughness: 0.3, metalness: 0.2 }), black: mat('#121012', { roughness: 0.35 }),
-      brass: mat('#c49a3a', { metalness: 0.9, roughness: 0.28 }), steel: mat('#cfd4dc', { metalness: 1, roughness: 0.18 }), eye: glowM(0xff4020, 1.6),
-      key: mat('#e8c050', { metalness: 0.9, roughness: 0.2, emissive: 0x6a4010, emissiveIntensity: 0.6 }),
+      porc: mat('#b4ac9e', { roughness: 0.3, metalness: 0.05 }), lac: mat('#5e0e14', { roughness: 0.35, metalness: 0.2 }), black: mat('#121012', { roughness: 0.35 }),
+      brass: mat('#8c7036', { metalness: 0.9, roughness: 0.45 }), steel: mat('#8e9096', { metalness: 1, roughness: 0.35 }), eye: glowM(0xff4020, 1.6),
+      key: mat('#9c7c38', { metalness: 0.9, roughness: 0.38, emissive: 0x6a4010, emissiveIntensity: 0.3 }),
     };
     b.M = M;
     // the single wheel it rides on
@@ -837,10 +842,12 @@
   };
   function buildImp(b) {
     const r = b.root;
+    const TXg = (n) => (G.GFX && G.GFX.tex ? G.GFX.tex(n) : null), grain = (m, n, k) => { const t = TXg(n); if (t) { m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; m.userData.uvk = k; m.color.multiplyScalar(1.25); } return m; };
+    b.meltRound = 0.86; b.meltBlend = 0.035;
     const M = {
-      skin: mat('#2c3456', { roughness: 0.6, map: tex().skin.map }), belly: mat('#5a6890', { roughness: 0.7 }), horn: mat('#e8d090', { metalness: 0.3, roughness: 0.4 }),
-      wing: mat('#24183a', { roughness: 0.8, side: THREE.DoubleSide }), gold: mat('#d0a030', { metalness: 0.9, roughness: 0.25 }), drum: mat('#6a1a14', { roughness: 0.6 }),
-      eye: glowM(0x60e8ff, 3.2), mouth: glowM(0xfff080, 2.6), bolt: glowM(0x90d8ff, 3),
+      skin: grain(mat('#262c40', { roughness: 0.6, map: tex().skin.map }), 'leather', 3), belly: grain(mat('#42485c', { roughness: 0.7 }), 'leather', 3), horn: mat('#a89870', { metalness: 0.1, roughness: 0.55 }),
+      wing: mat('#1c1826', { roughness: 0.8, side: THREE.DoubleSide }), gold: mat('#8c7036', { metalness: 0.9, roughness: 0.42 }), drum: mat('#4e1612', { roughness: 0.7 }),
+      eye: glowM(0x60e8ff, 2.6), mouth: glowM(0xfff080, 1.4), bolt: glowM(0x90d8ff, 2.2),
     };
     b.M = M;
     const body = joint(r, 0, 0, 0);

@@ -986,8 +986,20 @@
 
   const CLS = (BS.CLS = { colossus: Colossus, wyrm: Wyrm, archon: Archon, executioner: Executioner, broodmother: BroodMother });
   BS.Boss = Boss; BS.h = { mat, mesh, smesh, joint, V };
+  // every guardian's surfaces: the old hand-drawn hide, cloth, metal, rock and boards changed for the baked ones of gfx.js, at a
+  // grain that suits a body some metres high (a material that has been given its own already is left alone)
+  BS.regrainAll = function (b) {
+    const GX = G.GFX, T = G.Tex && G.Tex.tex; if (!GX || !GX.tex || !T || !b || !b.root) return;
+    const K = { leather: 1.3, weave: 2.2, steel: 1.2, rock: 0.5, walnut: 1.5 }, seen = new Set();
+    b.root.traverse((o) => {
+      const m = o.material; if (!m || Array.isArray(m) || seen.has(m) || !m.map || m.userData.regrained || m.userData.uvk) return; seen.add(m);
+      const n = m.map === T.skin.map || m.map === T.scales.map ? 'leather' : m.map === T.cloth.map ? 'weave' : m.map === T.metal.map ? 'steel' : m.map === T.rock.map ? 'rock' : m.map === T.planks.map ? 'walnut' : null, t = n ? GX.tex(n) : null;
+      if (!t) return;
+      m.userData.regrained = true; m.userData.uvk = K[n]; m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; if (n !== 'steel') m.roughness = 1; else m.roughness = Math.max(m.roughness, 0.55); m.color.multiplyScalar(1.3); m.needsUpdate = true;
+    });
+  };
   // the still parts of a guardian's body, joint by joint, into one surface each (with the full look on; made once for each shape)
-  BS.melt = function (b) { if (b && b.root && G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(b.root, {}, null, 'guardian', { still: true, free: true, round: 0.28, blend: 0.022, pick: (c) => c.userData.st === 1 }); } catch (e) { /* it stays as built */ } } return b; };
+  BS.melt = function (b) { if (b && b.root && G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { BS.regrainAll(b); G.GFX.fuse(b.root, {}, null, 'guardian', { still: true, free: true, round: b.meltRound || 0.28, blend: b.meltBlend || 0.022, pick: (c) => c.userData.st === 1 }); } catch (e) { /* it stays as built */ } } return b; };
   BS.order = ['colossus', 'wyrm', 'archon', 'executioner', 'broodmother'];
   BS.forArea = function (area) { return BS.order[(Math.floor(area / 5) - 1) % BS.order.length]; };
   BS.has = (id) => !!CLS[id];

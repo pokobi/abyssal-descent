@@ -1671,6 +1671,19 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       Geo.xf(side([[0.19, 0.13], [0.18, 0.22], [0.13, 0.3], [0, 0.345], [-0.13, 0.3], [-0.18, 0.22], [-0.19, 0.13], [-0.17, 0.13], [-0.16, 0.21], [-0.12, 0.28], [0, 0.32], [0.12, 0.28], [0.16, 0.21], [0.17, 0.13]], 0.022, 0.005))], 3),
     fpart('mail', hl([[0.0005, 0.3], [0.1, 0.27], [0.158, 0.18], [0.166, 0.08], [0.152, -0.02], [0.162, -0.06], [0.2, -0.12], [0.238, -0.175], [0.226, -0.185], [0.0005, -0.16]], 1, 1.03, 20), 9),
   ];
+  // a staff, up the y axis from the hand: a crooked length of wood, three claws of bone at its head closed about a light (the light
+  // is the bearer's: a ball 0.12 in radius at y 1.2)
+  GEAR.staff = () => {
+    const claws = []; for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.4, c = Math.cos(a), sn = Math.sin(a); claws.push(tubeR([[c * 0.02, 1.02, sn * 0.02], [c * 0.13, 1.1, sn * 0.13], [c * 0.16, 1.22, sn * 0.16], [c * 0.09, 1.34, sn * 0.09]], (t) => 0.018 - t * 0.014, 5, 10)); }
+    return [fpart('wood', [tubeR([[0.01, -0.64, 0], [-0.012, -0.2, 0.01], [0.014, 0.3, -0.008], [-0.008, 0.75, 0.006], [0, 1.04, 0]], (t) => 0.026 - t * 0.006, 7, 20), ball(0.036, [0, 1.03, 0], [1, 0.8, 1])], 4),
+      fpart('bone', claws.concat([ringY(0.5, 0.027, 0.006), ringY(0.54, 0.027, 0.006)]), 5)];
+  };
+  // a cleaver, forward from the hand: a short grip, a broad blade with a thick back, a hole at its end, its edge notched
+  GEAR.cleaver = () => [
+    fpart('wood', toZ(hl(wrapPts(-0.07, 0.07, 0.02, 6), 0.85, 1.1)), 6),
+    fpart('blade', Geo.xf(ext([[0.06, 0.2], [0.5, 0.21], [0.52, 0.17], [0.5, -0.03], [0.44, -0.05], [0.4, -0.035], [0.3, -0.055], [0.24, -0.04], [0.12, -0.05], [0.06, -0.02]], 0.014, 0.005, [arcPts(0.45, 0.15, 0.022, 0, Math.PI * 2, 10).slice(1)]), null, [0, -HX, 0]), 4),
+    fpart('dark', [rbx(0.02, 0.05, 0.03, 0.005, 0, 0.08, 0.07)], 4),
+  ];
   X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
 
   // ---- the furniture of the halls (props.js), in metres, standing on the origin and looking to +z: lists of parts { g, m (which of

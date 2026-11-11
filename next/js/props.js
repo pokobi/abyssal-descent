@@ -119,10 +119,17 @@
     const x0 = (w.xo || 0) + 1.5, x1 = (w.xo || 0) + (w.Wn || w.W) - 1.5, z0 = (w.zo || 0) + 1.5, z1 = (w.zo || 0) + (w.Dn || w.D) - 1.5, step = 1.25;
     const cells = (x1 - x0) * (z1 - z0) / (step * step), thin = Math.min(1, 4200 / Math.max(1, cells));   // (a very large field: fewer to the metre)
     const gy = w.groundTop ? (x, z) => w.groundTop(x, z) : () => 0;
+    // (grass grows only where there is ground at that height under it - not over a pit, not off the edge of a terrace - and nothing
+    // standing on or laid over that ground)
     const blocked = (x, z, y) => {
-      const a = w.hash.get(w._hkey(Math.floor(x / 4), Math.floor(z / 4))); if (!a) return false;   // (world.js keeps its colliders by cells of 4 m)
-      for (const c of a) { if (c.alive === false || x < c.x0 - 0.15 || x > c.x1 + 0.15 || z < c.z0 - 0.15 || z > c.z1 + 0.15) continue; if (c.y1 > y + 0.03 && c.y0 < y + 1.2) return true; }
-      return false;
+      const a = w.hash.get(w._hkey(Math.floor(x / 4), Math.floor(z / 4))); if (!a) return true;   // (world.js keeps its colliders by cells of 4 m)
+      let ground = false;
+      for (const c of a) {
+        if (c.alive === false || x < c.x0 - 0.15 || x > c.x1 + 0.15 || z < c.z0 - 0.15 || z > c.z1 + 0.15) continue;
+        if (c.y1 > y + 0.03 && c.y0 < y + 1.2) return true;
+        if (Math.abs(c.y1 - y) <= 0.03 && x > c.x0 + 0.2 && x < c.x1 - 0.2 && z > c.z0 + 0.2 && z < c.z1 - 0.2) ground = true;
+      }
+      return !ground;
     };
     const tint = B.grassTint ? null : null;
     for (let x = x0; x < x1; x += step) for (let z = z0; z < z1; z += step) {

@@ -15,38 +15,101 @@
   const glowM = (c, k) => mat('#000', { emissive: c, emissiveIntensity: k || 2.2 });
 
   // ================================================================ rigs
+  // (what the rigs are built of, gfx.js: the old hand-drawn surfaces of a guardian's materials changed for the baked ones; things shaped
+  // there - bones, helms, blades, shields, cloaks - hung on a joint at the guardian's measure)
+  const GX = () => G.GFX || {};
+  function regrain(m, quad) {
+    if (!m || !m.map || m.userData.regrained || !GX().tex) return; const T = tex();
+    const n = m.map === T.skin.map ? (quad ? 'fur' : 'leather') : m.map === T.cloth.map ? 'weave' : m.map === T.metal.map ? 'steel' : m.map === T.rock.map ? 'rock' : m.map === T.planks.map ? 'walnut' : null, t = n ? GX().tex(n) : null;
+    if (!t) return; m.userData.regrained = true; m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; if (n !== 'steel') m.roughness = 1; m.color.multiplyScalar(1.3);
+  }
+  const gearOn = (parent, name, MM, x, y, z, rx, ry, rz, sc) => {
+    const d = GX().foeGear ? GX().foeGear(name) : null; if (!d) return null;
+    const g = joint(parent, x, y, z); g.rotation.set(rx || 0, ry || 0, rz || 0); if (Array.isArray(sc)) g.scale.set(sc[0], sc[1], sc[2]); else g.scale.setScalar(sc);
+    for (const q of d) { const m = new THREE.Mesh(q.g, MM[q.m] || MM.def); m.castShadow = true; g.add(m); }
+    return g;
+  };
+  const putG = (parent, geo, mt, x, y, z, sx, sy, sz, rx, ry, rz) => { const m = new THREE.Mesh(geo, mt); m.position.set(x, y, z); m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); m.rotation.set(rx || 0, ry || 0, rz || 0); m.castShadow = true; parent.add(m); return m; };
   // humanoid: hips / torso / head / arms / legs, a weapon in the right hand; can float instead of walk
+  // (a body of masses - ribs over a belly, shoulders, a head with brow and jaw, arms with their swells, hands with fingers, thighs and
+  // calves - or, of bone, a man's whole skeleton to its measure; plate where it is armoured; a great helm, a hood with a skull far back
+  // in it, a crown of points; a sword, a staff with a claw about its light, cleavers, a kite shield, a cloak. The joints, what a shot
+  // hits and how it moves are as they were)
   function rigHuman(b, o) {
     const s = o.s || 1, r = b.root, M = o.m;
+    for (const k2 in M) regrain(M[k2], false);
     const hipY = o.float ? 2.6 * s : 2.3 * s;
     const hips = joint(r, 0, hipY, 0);
-    const bone = o.bones;
-    smesh(hips, PG().box, M.armor || M.body, 1.1 * s, 0.5 * s, 0.7 * s);
-    if (o.cloth) smesh(hips, PG().box, M.cloth, 1.2 * s, (o.float ? 2.2 : 1.3) * s, 0.06 * s, 0, -(o.float ? 1.1 : 0.7) * s, 0.4 * s);
+    const bone = o.bones, K = bone && GX().bones ? GX().bones() : null, k = 2.42 * s, FG = GX().foeGeo, PP = PG();
+    const skin = M.skin || M.body, arm = M.armor, dark = mat('#070606'), iron = mat('#3a3838', { metalness: 0.8, roughness: 0.6 }), hide = mat('#2a1c14', { roughness: 0.8 });
+    if (K) putG(hips, K.pelvis, M.body, 0, -0.02 * s, 0, k * 1.3, k, k); else smesh(hips, PG().sph, arm || M.body, 0.62 * s, 0.34 * s, 0.44 * s);
+    if (o.cloth) {
+      if (o.float && FG && FG('robe')) putG(hips, FG('robe'), M.cloth, 0, -1.2 * s, 0, 0.8 * s, 2.5 * s, 0.62 * s);
+      else if (!gearOn(hips, 'tatter', { cloth: M.cloth }, 0, 0.1 * s, 0.42 * s, 0.04, 0, 0, [4.6 * s, 4.2 * s, 3 * s])) smesh(hips, PG().box, M.cloth, 1.2 * s, (o.float ? 2.2 : 1.3) * s, 0.06 * s, 0, -(o.float ? 1.1 : 0.7) * s, 0.4 * s);
+      else gearOn(hips, 'tatter', { cloth: M.cloth }, 0, 0.1 * s, -0.42 * s, 0.04, Math.PI, 0, [5 * s, 3.6 * s, 3 * s]);
+    }
     const torso = joint(hips, 0, 0.3 * s, 0);
-    if (bone) { for (let i = 0; i < 4; i++) smesh(torso, PG().torus, M.body, 0.55 * s - i * 0.05 * s, 0.4 * s, 0.38 * s, 0, (0.5 + i * 0.32) * s, 0, Math.PI / 2, 0, 0); smesh(torso, PG().cyl8, M.body, 0.1 * s, 1.6 * s, 0.1 * s, 0, 0.9 * s, -0.25 * s); }
-    else smesh(torso, PG().box, M.body, 1.35 * s, 1.5 * s, 0.85 * s, 0, 0.85 * s, 0);
-    if (M.armor && !bone) smesh(torso, PG().box, M.armor, 1.45 * s, 1.0 * s, 0.95 * s, 0, 1.05 * s, 0);
+    if (K) { putG(torso, K.lumbar, M.body, 0, 0, -0.05 * k, k, k * 1.26, k); putG(torso, K.chest, M.body, 0, 0.2 * k * 1.26, 0.01 * k, k * 1.5, k * 1.26, k * 1.15); putG(torso, K.neck, M.body, 0, 0.535 * k * 1.26, -0.05 * k, k); }
+    else if (bone) { for (let i = 0; i < 4; i++) smesh(torso, PG().torus, M.body, 0.55 * s - i * 0.05 * s, 0.4 * s, 0.38 * s, 0, (0.5 + i * 0.32) * s, 0, Math.PI / 2, 0, 0); smesh(torso, PG().cyl8, M.body, 0.1 * s, 1.6 * s, 0.1 * s, 0, 0.9 * s, -0.25 * s); }
+    else {
+      smesh(torso, PG().sph, M.body, 0.74 * s, 0.66 * s, 0.5 * s, 0, 1.15 * s, 0.02 * s); smesh(torso, PG().sph, M.body, 0.6 * s, 0.55 * s, 0.44 * s, 0, 0.45 * s, 0.03 * s);
+      smesh(torso, PG().sph, M.body, 0.62 * s, 0.26 * s, 0.4 * s, 0, 1.65 * s, -0.03 * s); smesh(torso, PG().cyl8, skin, 0.2 * s, 0.4 * s, 0.2 * s, 0, 1.85 * s, 0);
+      for (const sx of [-1, 1]) smesh(torso, PG().sph, M.body, 0.3 * s, 0.26 * s, 0.3 * s, sx * 0.72 * s, 1.52 * s, 0);
+    }
+    if (arm && !bone) {
+      smesh(torso, PG().sph, arm, 0.8 * s, 0.62 * s, 0.56 * s, 0, 1.12 * s, 0.04 * s); smesh(torso, PG().sph, arm, 0.2 * s, 0.5 * s, 0.2 * s, 0, 1.1 * s, 0.48 * s);
+      smesh(torso, PG().sph, arm, 0.74 * s, 0.6 * s, 0.46 * s, 0, 1.1 * s, -0.1 * s);
+      for (let i = 0; i < 2; i++) smesh(torso, PG().cyl8, arm, (0.64 + i * 0.03) * s, 0.2 * s, (0.48 + i * 0.02) * s, 0, (0.46 - i * 0.18) * s, 0.02 * s);
+      smesh(torso, PG().cyl8, arm, 0.3 * s, 0.24 * s, 0.3 * s, 0, 1.72 * s, 0);
+    }
     if (o.hunch) torso.rotation.x = 0.35;
-    if (o.cape) smesh(torso, PG().box, M.cloth, 1.4 * s, 2.6 * s, 0.06 * s, 0, 0.2 * s, -0.5 * s, 0.12);
-    for (const sx of [-1, 1]) if (M.armor) smesh(torso, PG().sph, M.armor, 0.5 * s, 0.38 * s, 0.5 * s, sx * 0.85 * s, 1.55 * s, 0);
+    if (o.cape && !gearOn(torso, 'cape', { cloth: M.cloth }, 0, 1.78 * s, -0.5 * s, 0.12, 0, 0, [2.1 * s, 2.7 * s, 2.4 * s])) smesh(torso, PG().box, M.cloth, 1.4 * s, 2.6 * s, 0.06 * s, 0, 0.2 * s, -0.5 * s, 0.12);
+    for (const sx of [-1, 1]) if (arm) { smesh(torso, PG().sph, arm, 0.5 * s, 0.36 * s, 0.5 * s, sx * 0.85 * s, 1.58 * s, 0, 0, 0, -sx * 0.3); smesh(torso, PG().sph, arm, 0.42 * s, 0.28 * s, 0.44 * s, sx * 1.0 * s, 1.36 * s, 0, 0, 0, -sx * 0.55); }
     const head = joint(torso, 0, 1.9 * s, 0.05 * s);
-    if (bone) { smesh(head, PG().sph, M.body, 0.42 * s, 0.48 * s, 0.46 * s, 0, 0.2 * s, 0); smesh(head, PG().box, M.body, 0.34 * s, 0.14 * s, 0.3 * s, 0, -0.1 * s, 0.1 * s); }
-    else if (o.helm) { smesh(head, PG().box, M.armor, 0.62 * s, 0.75 * s, 0.66 * s, 0, 0.2 * s, 0); smesh(head, PG().box, mat('#050505'), 0.5 * s, 0.06 * s, 0.02 * s, 0, 0.25 * s, 0.34 * s); }
-    else if (o.hood) { smesh(head, PG().sph, mat('#060406'), 0.4 * s, 0.45 * s, 0.4 * s, 0, 0.2 * s, 0.05 * s); smesh(head, PG().cone, M.cloth, 0.55 * s, 1.0 * s, 0.6 * s, 0, 0.35 * s, -0.05 * s, -0.15); }
-    else smesh(head, PG().box, M.skin || M.body, 0.55 * s, 0.65 * s, 0.55 * s, 0, 0.2 * s, 0);
-    const eyeM = glowM(o.eyes || 0xff3010, 2.6);
-    for (const sx of [-1, 1]) smesh(head, PG().sph, eyeM, 0.07 * s, 0.05 * s, 0.03 * s, sx * 0.13 * s, 0.24 * s, (bone ? 0.42 : o.hood ? 0.4 : 0.3) * s);
-    if (o.crown) for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; smesh(head, PG().cone, M.gold || glowM(0xffc040, 1), 0.08 * s, 0.32 * s, 0.08 * s, Math.cos(a) * 0.3 * s, 0.6 * s, Math.sin(a) * 0.3 * s); }
-    if (o.horns) for (const sx of [-1, 1]) smesh(head, PG().cone, M.horn || M.body, 0.1 * s, 0.7 * s, 0.1 * s, sx * 0.3 * s, 0.6 * s, -0.05 * s, -0.3, 0, -sx * 0.5);
+    const kh = 3.0 * s; let eyeY = 0.24 * s, eyeX = 0.13 * s, eyeZ = (bone ? 0.42 : o.hood ? 0.4 : 0.3) * s, topY = 0.6 * s;
+    if (K) { putG(head, K.skull, M.body, 0, 0.05 * s, 0, kh); putG(head, K.jaw, M.body, 0, 0.05 * s - 0.008 * kh, 0, kh, kh, kh, 0.12); eyeX = 0.031 * kh; eyeY = 0.05 * s + 0.038 * kh; eyeZ = 0.05 * kh; topY = 0.05 * s + 0.17 * kh; }
+    else if (bone) { smesh(head, PG().sph, M.body, 0.42 * s, 0.48 * s, 0.46 * s, 0, 0.2 * s, 0); smesh(head, PG().box, M.body, 0.34 * s, 0.14 * s, 0.3 * s, 0, -0.1 * s, 0.1 * s); }
+    else if (o.helm) {
+      if (gearOn(head, 'helm', { steel: arm, trim: M.gold || iron, dark, mail: mat('#2e2e33', { metalness: 0.6, roughness: 0.75 }) }, 0, -0.1 * s, 0, 0, 0, 0, 1.9 * s)) { eyeX = 0.135 * s; eyeY = 0.22 * s; eyeZ = 0.33 * s; }
+      else { smesh(head, PG().box, arm, 0.62 * s, 0.75 * s, 0.66 * s, 0, 0.2 * s, 0); smesh(head, PG().box, mat('#050505'), 0.5 * s, 0.06 * s, 0.02 * s, 0, 0.25 * s, 0.34 * s); }
+    }
+    else if (o.hood) {
+      smesh(head, PG().sph, M.cloth, 0.44 * s, 0.48 * s, 0.46 * s, 0, 0.22 * s, -0.05 * s); smesh(head, PG().cone, M.cloth, 0.3 * s, 0.75 * s, 0.3 * s, 0, 0.62 * s, -0.32 * s, -0.9);
+      smesh(head, PG().sph, M.cloth, 0.5 * s, 0.22 * s, 0.42 * s, 0, -0.18 * s, -0.02 * s);
+      putG(head, PG().sph, dark, 0, 0.17 * s, 0.2 * s, 0.33 * s, 0.38 * s, 0.2 * s);
+      if (PP.skullB) { putG(head, PP.skullB, skin, 0, -0.1 * s, 0.05 * s, 2.3 * s); putG(head, PP.skullD, dark, 0, -0.1 * s, 0.05 * s, 2.3 * s); eyeX = 0.083 * s; eyeY = 0.125 * s; eyeZ = 0.27 * s; }
+    }
+    else {
+      smesh(head, PG().sph, skin, 0.3 * s, 0.34 * s, 0.32 * s, 0, 0.26 * s, -0.02 * s); smesh(head, PG().box, skin, 0.36 * s, 0.22 * s, 0.32 * s, 0, 0.02 * s, 0.07 * s);
+      smesh(head, PG().box, skin, 0.46 * s, 0.09 * s, 0.16 * s, 0, 0.36 * s, 0.22 * s, 0.25); smesh(head, PG().sph, skin, 0.06 * s, 0.1 * s, 0.08 * s, 0, 0.2 * s, 0.31 * s);
+      putG(head, PG().box, dark, 0, 0.03 * s, 0.235 * s, 0.2 * s, 0.035 * s, 0.03 * s);
+      for (const sx of [-1, 1]) putG(head, PG().sph, dark, sx * 0.13 * s, 0.25 * s, 0.26 * s, 0.085 * s, 0.065 * s, 0.05 * s);
+      eyeZ = 0.3 * s;
+    }
+    const eyeM = glowM(o.eyes || 0xff3010, 2.6), er = (K ? 0.045 : o.helm ? 0.04 : 0.05) * s;
+    for (const sx of [-1, 1]) smesh(head, PG().sph, eyeM, er, er * 0.7, er * 0.6, sx * eyeX, eyeY, eyeZ);
+    if (o.crown) {
+      const gold = M.gold || mat('#8c7036', { metalness: 0.9, roughness: 0.4 });
+      smesh(head, PG().cyl8, gold, 0.3 * s, 0.11 * s, 0.33 * s, 0, topY - 0.06 * s, -0.02 * s);
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + 0.39, hh = (i % 2 ? 0.2 : 0.36) * s; smesh(head, PG().cone, gold, 0.05 * s, hh, 0.035 * s, Math.cos(a) * 0.28 * s, topY - 0.01 * s + hh / 2, -0.02 * s + Math.sin(a) * 0.31 * s, Math.sin(a) * 0.12, -a, -Math.cos(a) * 0.12); }
+    }
+    if (o.horns) for (const sx of [-1, 1]) { const hm = M.horn || M.body; smesh(head, PG().cone, hm, 0.14 * s, 0.6 * s, 0.14 * s, sx * 0.3 * s, topY - 0.02 * s, -0.06 * s, -0.25, 0, -sx * 0.85); smesh(head, PG().cone, hm, 0.09 * s, 0.6 * s, 0.09 * s, sx * 0.62 * s, topY + 0.33 * s, -0.12 * s, -0.3, 0, -sx * 0.15); smesh(head, PG().sph, hm, 0.1 * s, 0.1 * s, 0.1 * s, sx * 0.5 * s, topY + 0.1 * s, -0.09 * s); }
     const arms = [];
     for (const sx of [-1, 1]) {
-      const sh = joint(torso, sx * 0.85 * s, 1.5 * s, 0);
-      if (bone) smesh(sh, PG().cyl8, M.body, 0.1 * s, 1.0 * s, 0.1 * s, 0, -0.5 * s, 0); else smesh(sh, PG().box, M.skin || M.body, 0.38 * s, 1.0 * s, 0.38 * s, 0, -0.5 * s, 0);
+      const sh = joint(torso, sx * 0.85 * s, 1.5 * s, 0), pos = sx > 0;
       const el = joint(sh, 0, -1.0 * s, 0);
-      if (bone) smesh(el, PG().cyl8, M.body, 0.08 * s, 0.95 * s, 0.08 * s, 0, -0.45 * s, 0); else smesh(el, PG().box, M.armor || M.skin || M.body, 0.36 * s, 0.95 * s, 0.36 * s, 0, -0.45 * s, 0);
       const hand = joint(el, 0, -0.95 * s, 0.05 * s);
-      smesh(hand, PG().box, M.skin || M.body, 0.28 * s, 0.3 * s, 0.28 * s);
+      if (K) { putG(sh, pos ? K.humP : K.humN, M.body, 0, 0, 0, k, k * 1.37, k); putG(el, K.forearm, M.body, 0, 0, 0, k, k * 1.3, k); putG(hand, K.hand, M.body, 0, 0.05 * s, 0, k, k, k, 0, pos ? 0 : Math.PI, 0); }
+      else if (bone) { smesh(sh, PG().cyl8, M.body, 0.1 * s, 1.0 * s, 0.1 * s, 0, -0.5 * s, 0); smesh(el, PG().cyl8, M.body, 0.08 * s, 0.95 * s, 0.08 * s, 0, -0.45 * s, 0); smesh(hand, PG().box, skin, 0.28 * s, 0.3 * s, 0.28 * s); }
+      else {
+        smesh(sh, PG().sph, skin, 0.25 * s, 0.3 * s, 0.26 * s, 0, -0.06 * s, 0); smesh(sh, PG().sph, skin, 0.21 * s, 0.5 * s, 0.23 * s, 0, -0.5 * s, 0);
+        const fm = arm || skin;
+        smesh(el, PG().sph, fm, 0.19 * s, 0.36 * s, 0.2 * s, 0, -0.3 * s, 0.01 * s); smesh(el, PG().cyl8, fm, 0.14 * s, 0.9 * s, 0.15 * s, 0, -0.45 * s, 0);
+        if (arm) { smesh(el, PG().sph, arm, 0.22 * s, 0.22 * s, 0.24 * s); smesh(el, PG().cyl8, arm, 0.2 * s, 0.6 * s, 0.21 * s, 0, -0.5 * s, 0); }
+        smesh(hand, PG().sph, skin, 0.17 * s, 0.2 * s, 0.12 * s);
+        for (let i = 0; i < 3; i++) smesh(hand, PG().sph, skin, 0.05 * s, 0.15 * s, 0.06 * s, (i - 1) * 0.1 * s, -0.22 * s, 0.03 * s);
+        smesh(hand, PG().sph, skin, 0.055 * s, 0.11 * s, 0.06 * s, -sx * 0.16 * s, -0.06 * s, 0.07 * s);
+      }
       arms.push({ sh, el, hand });
     }
     // weapon (right hand)
@@ -55,24 +118,32 @@
     let tip = null;
     if (wp === 'greatsword' || wp === 'sword') {
       const L = (wp === 'greatsword' ? 4.2 : 2.6) * s;
-      smesh(R, PG().cyl8, M.grip || mat('#2a1a10'), 0.06 * s, 0.6 * s, 0.06 * s, 0, 0, 0.1 * s, Math.PI / 2);
-      smesh(R, PG().box, M.gold || M.armor, 0.7 * s, 0.1 * s, 0.12 * s, 0, 0, 0.42 * s);
-      smesh(R, PG().box, M.blade || mat('#b8bcc4', { metalness: 1, roughness: 0.25 }), 0.08 * s, 0.24 * s, L, 0, 0, 0.45 * s + L / 2);
+      if (!gearOn(R, 'greatsword', { leather: M.grip || hide, iron: M.gold || arm || iron, blade: M.blade || mat('#8a8c92', { metalness: 1, roughness: 0.35 }), dark }, 0, 0, 0.1 * s, 0, 0, 0, (L + 0.35 * s) / 1.32)) {
+        smesh(R, PG().cyl8, M.grip || mat('#2a1a10'), 0.06 * s, 0.6 * s, 0.06 * s, 0, 0, 0.1 * s, Math.PI / 2);
+        smesh(R, PG().box, M.gold || M.armor, 0.7 * s, 0.1 * s, 0.12 * s, 0, 0, 0.42 * s);
+        smesh(R, PG().box, M.blade || mat('#b8bcc4', { metalness: 1, roughness: 0.25 }), 0.08 * s, 0.24 * s, L, 0, 0, 0.45 * s + L / 2);
+      }
       tip = joint(R, 0, 0, 0.45 * s + L);
     } else if (wp === 'staff') {
-      smesh(R, PG().cyl8, mat('#2a1a20', { map: tex().planks.map }), 0.07 * s, 4.2 * s, 0.07 * s, 0, 0.6 * s, 0);
+      const wood = mat('#2a1a20', { map: tex().planks.map }); regrain(wood, false);
+      if (!gearOn(R, 'staff', { wood, bone: mat('#b8ac90', { roughness: 0.6 }), dark }, 0, 0, 0, 0, 0, 0, 2.33 * s)) smesh(R, PG().cyl8, wood, 0.07 * s, 4.2 * s, 0.07 * s, 0, 0.6 * s, 0);
       tip = joint(R, 0, 2.8 * s, 0);
-      smesh(tip, PG().sph, glowM(o.orb || 0x9a50ff, 3), 0.28 * s, 0.28 * s, 0.28 * s);
+      smesh(tip, PG().sph, glowM(o.orb || 0x9a50ff, 3), 0.22 * s, 0.22 * s, 0.22 * s);
     } else if (wp === 'cleavers') {
-      for (const hnd of [arms[0].hand, R]) { smesh(hnd, PG().cyl8, mat('#2a1a10'), 0.05 * s, 0.4 * s, 0.05 * s, 0, 0, 0.1 * s, Math.PI / 2); smesh(hnd, PG().box, mat('#7a7a7a', { metalness: 0.9, roughness: 0.5 }), 0.06 * s, 0.6 * s, 1.0 * s, 0, 0.2 * s, 0.75 * s); }
+      for (const hnd of [arms[0].hand, R]) if (!gearOn(hnd, 'cleaver', { wood: hide, blade: mat('#6a6a6c', { metalness: 0.9, roughness: 0.55 }), dark }, 0, 0, 0.1 * s, 0, 0, 0, 2.3 * s)) { smesh(hnd, PG().cyl8, mat('#2a1a10'), 0.05 * s, 0.4 * s, 0.05 * s, 0, 0, 0.1 * s, Math.PI / 2); smesh(hnd, PG().box, mat('#7a7a7a', { metalness: 0.9, roughness: 0.5 }), 0.06 * s, 0.6 * s, 1.0 * s, 0, 0.2 * s, 0.75 * s); }
       tip = joint(R, 0, 0, 1.2 * s);
     }
-    if (o.shield) smesh(arms[0].hand, PG().box, M.armor, 0.15 * s, 1.6 * s, 1.1 * s, -0.15 * s, 0, 0.2 * s);
+    if (o.shield && !gearOn(arms[0].hand, 'kite', { paint: mat('#241a1c', { roughness: 0.85 }), steel: arm || iron }, -0.2 * s, 0.1 * s, 0.2 * s, 0, -Math.PI / 2, 0, 1.8 * s)) smesh(arms[0].hand, PG().box, M.armor, 0.15 * s, 1.6 * s, 1.1 * s, -0.15 * s, 0, 0.2 * s);
     const legs = [];
     for (const sx of [-1, 1]) {
-      const hp = joint(hips, sx * 0.38 * s, -0.2 * s, 0);
-      if (bone) smesh(hp, PG().cyl8, M.body, 0.11 * s, 2.1 * s, 0.11 * s, 0, -1.05 * s, 0); else smesh(hp, PG().box, M.armor || M.body, 0.5 * s, 2.1 * s, 0.5 * s, 0, -1.05 * s, 0);
-      if (!o.float) smesh(hp, PG().box, M.armor || M.body, 0.55 * s, 0.25 * s, 0.8 * s, 0, -2.1 * s, 0.15 * s);
+      const hp = joint(hips, sx * 0.38 * s, -0.2 * s, 0), lm = arm || M.body, pos = sx > 0;
+      if (K) { putG(hp, pos ? K.femP : K.femN, M.body, 0, 0, 0, k, k * 0.94, k); putG(hp, pos ? K.shinP : K.shinN, M.body, 0, -0.46 * k * 0.94, 0, k, k * 0.94, k); if (!o.float) putG(hp, K.foot, M.body, 0, -0.832 * k * 0.94, 0, k); }
+      else if (bone) { smesh(hp, PG().cyl8, M.body, 0.11 * s, 2.1 * s, 0.11 * s, 0, -1.05 * s, 0); if (!o.float) smesh(hp, PG().box, M.body, 0.55 * s, 0.25 * s, 0.8 * s, 0, -2.1 * s, 0.15 * s); }
+      else {
+        smesh(hp, PG().sph, lm, 0.3 * s, 0.62 * s, 0.32 * s, 0, -0.55 * s, 0.01 * s); smesh(hp, PG().sph, lm, 0.2 * s, 0.2 * s, 0.23 * s, 0, -1.06 * s, 0.04 * s);
+        smesh(hp, PG().sph, lm, 0.22 * s, 0.42 * s, 0.24 * s, 0, -1.45 * s, -0.04 * s); smesh(hp, PG().cyl8, lm, 0.15 * s, 1.0 * s, 0.16 * s, 0, -1.55 * s, 0);
+        if (!o.float) { smesh(hp, PG().box, lm, 0.42 * s, 0.24 * s, 0.7 * s, 0, -2.0 * s, 0.12 * s); smesh(hp, PG().sph, lm, 0.2 * s, 0.14 * s, 0.26 * s, 0, -2.03 * s, 0.46 * s); }
+      }
       legs.push(hp);
     }
     const J = { hips, torso, head, arms, legs, tip, hipY };
@@ -94,43 +165,70 @@
     return J;
   }
   // quadruped (hound / cerberus / behemoth): body, 1-3 necks + heads with jaws, four legs, a tail
+  // (a beast of masses: a barrel of ribs, a tucked belly, haunches, a hump over the shoulders; a skull with a brow, cheeks, a long
+  // muzzle and fangs; legs with a thigh, a thin shank and clawed feet; a ridge of spines, an iron collar with its broken chain)
   function rigQuad(b, o) {
     const s = o.s || 1, r = b.root, M = o.m;
-    const bodyY = 1.7 * s;
+    for (const k2 in M) regrain(M[k2], true);
+    const bodyY = 1.7 * s, dark = mat('#070606'), tooth = M.claw || mat('#e8e0c8'), hornM = M.horn || M.body;
     const body = joint(r, 0, bodyY, 0);
-    smesh(body, PG().box, M.body, 1.4 * s, 1.2 * s, 2.8 * s);
-    smesh(body, PG().box, M.body, 1.6 * s, 1.45 * s, 1.2 * s, 0, 0.12 * s, 0.9 * s);
-    if (o.spikes) for (let i = 0; i < 6; i++) smesh(body, PG().cone, M.horn || M.body, 0.12 * s, 0.6 * s, 0.12 * s, 0, 0.75 * s, (1.1 - i * 0.42) * s, -0.4);
-    if (o.collar) for (let i = 0; i < 6; i++) smesh(body, PG().torus, mat('#5a5a5a', { metalness: 0.9, roughness: 0.4 }), 0.25 * s, 0.25 * s, 0.25 * s, Math.sin(i) * 0.6 * s, 0.4 * s, 1.5 * s, 0, i, 0);
+    smesh(body, PG().sph, M.body, 0.8 * s, 0.76 * s, 1.08 * s, 0, -0.02 * s, 0.55 * s);       // ribs
+    smesh(body, PG().sph, M.body, 0.6 * s, 0.56 * s, 0.9 * s, 0, 0.1 * s, -0.42 * s);         // the belly, tucked up
+    smesh(body, PG().sph, M.body, 0.7 * s, 0.68 * s, 0.76 * s, 0, 0.05 * s, -1.05 * s);       // haunches
+    smesh(body, PG().sph, M.body, 0.6 * s, 0.52 * s, 0.62 * s, 0, 0.48 * s, 0.9 * s);         // the hump of the shoulders
+    smesh(body, PG().sph, M.body, 0.52 * s, 0.52 * s, 0.62 * s, 0, 0.4 * s, 1.3 * s, -0.5);   // the neck's root
+    for (const sx of [-1, 1]) { smesh(body, PG().sph, M.body, 0.3 * s, 0.6 * s, 0.46 * s, sx * 0.56 * s, -0.05 * s, 0.95 * s); smesh(body, PG().sph, M.body, 0.34 * s, 0.64 * s, 0.52 * s, sx * 0.5 * s, 0.0, -1.0 * s); }
+    if (o.spikes) for (let i = 0; i < 9; i++) { const hh = (0.5 + (i * 7 % 4) * 0.14 - Math.abs(i - 3) * 0.03) * s; smesh(body, PG().cone, hornM, 0.11 * s, hh, 0.16 * s, 0, 0.68 * s + (i < 3 ? (i * 0.12) * s : 0.26 * s - (i - 3) * 0.04 * s), (1.25 - i * 0.33) * s, -0.5); }
+    if (o.collar) {
+      const im = mat('#3e3c3c', { metalness: 0.85, roughness: 0.55 });
+      smesh(body, PG().torus, im, 0.62 * s, 0.62 * s, 1.1 * s, 0, 0.42 * s, 1.5 * s, 0.45, 0, 0);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; smesh(body, PG().cone, im, 0.07 * s, 0.26 * s, 0.07 * s, Math.cos(a) * 0.7 * s, 0.42 * s + Math.sin(a) * 0.64 * s, 1.5 * s - Math.sin(a) * 0.3 * s, 0, 0, a - Math.PI / 2); }
+      for (let i = 0; i < 5; i++) smesh(body, PG().torus, im, 0.12 * s, 0.16 * s, 0.7 * s, 0.08 * s * (i % 2), -0.28 * s - i * 0.2 * s, 1.72 * s, i % 2 ? 0 : 0.2, i % 2 ? Math.PI / 2 : 0, 0);
+    }
     const heads = [];
     const nh = o.heads || 1;
     for (let i = 0; i < nh; i++) {
       const off = nh === 1 ? 0 : (i - (nh - 1) / 2) * 0.75 * s;
       const neck = joint(body, off, 0.45 * s, 1.4 * s);
       neck.rotation.y = nh === 1 ? 0 : (i - (nh - 1) / 2) * -0.3;
-      smesh(neck, PG().box, M.body, 0.55 * s, 0.6 * s, 1.0 * s, 0, 0.15 * s, 0.4 * s, -0.5);
+      smesh(neck, PG().sph, M.body, 0.36 * s, 0.4 * s, 0.66 * s, 0, 0.17 * s, 0.42 * s, -0.5);
       const head = joint(neck, 0, 0.45 * s, 0.95 * s);
-      smesh(head, PG().box, M.body, 0.62 * s, 0.55 * s, 0.75 * s);
-      smesh(head, PG().box, M.body, 0.4 * s, 0.25 * s, 0.6 * s, 0, 0.0, 0.62 * s);
+      smesh(head, PG().sph, M.body, 0.36 * s, 0.33 * s, 0.44 * s, 0, 0.03 * s, 0.04 * s);                 // skull
+      smesh(head, PG().box, M.body, 0.58 * s, 0.14 * s, 0.28 * s, 0, 0.2 * s, 0.3 * s, 0.25);             // brow
+      for (const sx of [-1, 1]) smesh(head, PG().sph, M.body, 0.2 * s, 0.2 * s, 0.28 * s, sx * 0.2 * s, -0.1 * s, 0.2 * s);   // cheeks
+      smesh(head, PG().box, M.body, 0.36 * s, 0.26 * s, 0.62 * s, 0, -0.02 * s, 0.64 * s);                // muzzle
+      smesh(head, PG().box, M.body, 0.27 * s, 0.21 * s, 0.34 * s, 0, 0.0, 0.98 * s);                      // its end
+      putG(head, PG().sph, dark, 0, 0.04 * s, 1.16 * s, 0.11 * s, 0.09 * s, 0.08 * s);                    // nose
       const jaw = joint(head, 0, -0.18 * s, 0.25 * s);
-      smesh(jaw, PG().box, M.body, 0.38 * s, 0.14 * s, 0.75 * s, 0, 0, 0.35 * s);
-      for (const sx of [-1, 1]) for (let t = 0; t < 2; t++) smesh(jaw, PG().cone, mat('#e8e0c8'), 0.04 * s, 0.14 * s, 0.04 * s, sx * 0.14 * s, 0.1 * s, (0.45 + t * 0.2) * s);
+      smesh(jaw, PG().box, M.body, 0.3 * s, 0.13 * s, 0.82 * s, 0, 0, 0.37 * s);
+      putG(jaw, PG().box, dark, 0, 0.07 * s, 0.4 * s, 0.22 * s, 0.03 * s, 0.62 * s);                      // the dark of the mouth
+      for (const sx of [-1, 1]) {
+        for (let t = 0; t < 4; t++) smesh(head, PG().cone, tooth, 0.035 * s, (t === 3 ? 0.22 : 0.12) * s, 0.035 * s, sx * 0.135 * s, -0.19 * s, (0.5 + t * 0.19) * s, Math.PI);
+        for (let t = 0; t < 3; t++) smesh(jaw, PG().cone, tooth, 0.032 * s, (t === 2 ? 0.17 : 0.1) * s, 0.032 * s, sx * 0.115 * s, 0.11 * s, (0.4 + t * 0.17) * s);
+      }
       const eyeM = glowM(o.eyes ? o.eyes[i % o.eyes.length] : 0xff4010, 2.8);
-      for (const sx of [-1, 1]) smesh(head, PG().sph, eyeM, 0.07 * s, 0.06 * s, 0.04 * s, sx * 0.24 * s, 0.14 * s, 0.32 * s);
-      for (const sx of [-1, 1]) { if (o.horns) smesh(head, PG().cone, M.horn || M.body, 0.12 * s, 0.8 * s, 0.12 * s, sx * 0.28 * s, 0.45 * s, -0.15 * s, -0.7, 0, -sx * 0.3); else smesh(head, PG().cone, M.body, 0.1 * s, 0.35 * s, 0.06 * s, sx * 0.22 * s, 0.38 * s, -0.15 * s, -0.2); }
+      for (const sx of [-1, 1]) smesh(head, PG().sph, eyeM, 0.06 * s, 0.045 * s, 0.035 * s, sx * 0.2 * s, 0.12 * s, 0.42 * s);
+      for (const sx of [-1, 1]) {
+        if (o.horns) { smesh(head, PG().cone, hornM, 0.15 * s, 0.6 * s, 0.15 * s, sx * 0.34 * s, 0.4 * s, -0.12 * s, -0.5, 0, -sx * 0.9); smesh(head, PG().cone, hornM, 0.1 * s, 0.7 * s, 0.1 * s, sx * 0.7 * s, 0.72 * s, -0.02 * s, 0.5, 0, -sx * 0.1); smesh(head, PG().sph, hornM, 0.11 * s, 0.11 * s, 0.11 * s, sx * 0.58 * s, 0.5 * s, -0.16 * s); }
+        else smesh(head, PG().cone, M.body, 0.13 * s, 0.42 * s, 0.07 * s, sx * 0.24 * s, 0.38 * s, -0.16 * s, -0.55, 0, -sx * 0.2);
+      }
       heads.push({ neck, head, jaw });
     }
     const legs = [];
     for (const [lx, lz] of [[-0.6, 1.0], [0.6, 1.0], [-0.6, -1.0], [0.6, -1.0]]) {
+      const rear = lz < 0;
       const hp = joint(body, lx * s, -0.35 * s, lz * s);
-      smesh(hp, PG().box, M.body, 0.42 * s, 1.0 * s, 0.5 * s, 0, -0.45 * s, 0);
+      smesh(hp, PG().sph, M.body, (rear ? 0.26 : 0.22) * s, 0.58 * s, (rear ? 0.38 : 0.3) * s, 0, -0.4 * s, rear ? -0.05 * s : 0);
       const kn = joint(hp, 0, -0.9 * s, 0);
-      smesh(kn, PG().box, M.body, 0.32 * s, 0.9 * s, 0.36 * s, 0, -0.4 * s, 0.05 * s);
-      smesh(kn, PG().box, M.claw || M.body, 0.4 * s, 0.14 * s, 0.55 * s, 0, -0.85 * s, 0.12 * s);
+      smesh(kn, PG().cyl8, M.body, 0.13 * s, 0.86 * s, 0.15 * s, 0, -0.42 * s, rear ? 0.05 * s : 0.02 * s, rear ? -0.14 : 0.05);
+      smesh(kn, PG().sph, M.body, 0.16 * s, 0.26 * s, 0.19 * s, 0, -0.12 * s, 0);
+      smesh(kn, PG().sph, M.body, 0.2 * s, 0.13 * s, 0.3 * s, 0, -0.82 * s, 0.12 * s);
+      for (const cx of [-0.11, 0, 0.11]) smesh(kn, PG().cone, M.claw || dark, 0.04 * s, 0.17 * s, 0.04 * s, cx * s, -0.87 * s, 0.42 * s, Math.PI / 2 + 0.35);
       legs.push({ hp, kn });
     }
     const tail = joint(body, 0, 0.3 * s, -1.4 * s);
-    for (let i = 0; i < 4; i++) smesh(tail, PG().box, M.body, 0.2 * s - i * 0.03 * s, 0.2 * s - i * 0.03 * s, 0.5 * s, 0, i * 0.12 * s, -0.3 * s - i * 0.42 * s, 0.3);
+    smesh(tail, PG().sph, M.body, 0.2 * s, 0.2 * s, 0.34 * s, 0, 0.02 * s, -0.2 * s);
+    smesh(tail, PG().cone, M.body, 0.17 * s, 1.9 * s, 0.17 * s, 0, 0.28 * s, -1.0 * s, -Math.PI / 2 - 0.28);
     const J = { body, heads, legs, tail, bodyY };
     J.hits = [{ n: body, r: 1.15 * s, part: 'body', o: V(0, 0, 0.5 * s) }, { n: body, r: 1.0 * s, part: 'body', o: V(0, 0, -0.8 * s) }];
     for (const h of heads) J.hits.push({ n: h.head, r: 0.48 * s, part: 'head' });

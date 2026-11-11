@@ -1962,6 +1962,20 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     return [{ g, m: 'tuft' }];
   };
+  // the mouth of a furnace, one wide and one high, standing out of the wall at z = 0: an arched frame of iron, the fire behind it,
+  // a grate of bars before the fire, its two doors swung open on their hinges, a hood over it
+  PROP.furnacemouth = () => {
+    const outer = [[0.6, 0], [0.6, 0.6]].concat(arcPts(0, 0.6, 0.6, 0, Math.PI, 16).slice(1), [[-0.6, 0]]), inner = [[0.44, 0.06], [0.44, 0.55]].concat(arcPts(0, 0.55, 0.44, 0, Math.PI, 14).slice(1), [[-0.44, 0.06]]);
+    const ir = [ext(outer, 0.18, 0.025, [inner]).translate(0, 0, 0.09), rbx(1.5, 0.07, 0.5, 0.02, 0, 1.3, 0.22, [0.3, 0, 0]), rbx(1.3, 0.05, 0.34, 0.015, 0, 0.0, 0.2)];
+    for (let i = 0; i < 6; i++) ir.push(prism(0.02, 0.5, [-0.36 + i * 0.144, 0.3, 0.15], null, 6));
+    ir.push(prism(0.022, 0.86, [0, 0.54, 0.15], [0, 0, HX], 6));
+    for (const sx of [-1, 1]) {
+      ir.push(Geo.xf(rbx(0.44, 0.98, 0.035, 0.012, 0.22, 0.5, 0), [sx * 0.62, 0.02, 0.18], [0, sx > 0 ? -1.15 : Math.PI + 1.15, 0]));
+      for (const y of [0.22, 0.8]) ir.push(prism(0.03, 0.14, [sx * 0.62, y, 0.18], null, 8));
+    }
+    const fire = ext(inner, 0.01, 0).translate(0, 0, 0.03);
+    return [ppart('iron', ir, 1.5, [0.5, 0.46, 0.42]), { g: fire, m: 'lava', tint: null }];
+  };
   // ---- ice. An icicle (in place of a cone one in radius and one high about its middle, its point up): knotted, a little bent,
   // runnels down it. A sheath of ice about a pillar (in place of a rod): spread at its foot, its upper edge ragged. A block of ice
   // (in place of a box): its corners gone, its faces uneven. Ice run down a wall and frozen (one wide, one high, one thick, its

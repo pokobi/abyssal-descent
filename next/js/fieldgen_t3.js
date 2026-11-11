@@ -49,6 +49,12 @@
     text: { sub: '— 水路の奥へ —', icon: '🌊', obj: '水に沈んだ回廊を進め — 石の扉をくぐると戦いが始まる' },
   };
 
+  // iron straps about a square stack at the heights ys, an angle iron up each corner from y0 to y1 (to look at)
+  F.ironBands = function (w, x0, z0, x1, z1, ys, y0, y1) {
+    const o = 0.05, t = [0.5, 0.46, 0.42];
+    for (const y of ys) { w.visual('iron', x0 - o, y, z0 - o, x1 + o, y + 0.16, z0, { uv: 1, tint: t }); w.visual('iron', x0 - o, y, z1, x1 + o, y + 0.16, z1 + o, { uv: 1, tint: t }); w.visual('iron', x0 - o, y, z0, x0, y + 0.16, z1, { uv: 1, tint: t }); w.visual('iron', x1, y, z0, x1 + o, y + 0.16, z1, { uv: 1, tint: t }); }
+    for (const [cx, cz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) w.visual('iron', cx - 0.09, y0, cz - 0.09, cx + 0.09, y1, cz + 0.09, { uv: 1, tint: t });
+  };
   // ---------------------------------------------------------------- 溶鉱の深層
   // a furnace: a brick mass with a glowing mouth, a chimney up to the vault, its light and its roar
   function furnace(w, rng, x, z, face, HT) {
@@ -58,8 +64,13 @@
     w.solid('block', x - 1.2, h + 0.4, z - 1.2, x + 1.2, HT, z + 1.2, { uv: 2 });
     const d = { pz: [0, 1], nz: [0, -1], px: [1, 0], nx: [-1, 0] }[face];
     const mx = x + d[0] * (s + 0.02), mz = z + d[1] * (s + 0.02), across = d[0] ? 'z' : 'x';
-    w.visual('lava', across === 'x' ? mx - 1.1 : mx - 0.02, 0.6, across === 'z' ? mz - 1.1 : mz - 0.02, across === 'x' ? mx + 1.1 : mx + 0.02, 2.3, across === 'z' ? mz + 1.1 : mz + 0.02, { uv: 1, grad: false });
-    w.visual('iron', across === 'x' ? mx - 1.3 : mx - 0.06, 2.3, across === 'z' ? mz - 1.3 : mz - 0.06, across === 'x' ? mx + 1.3 : mx + 0.06, 2.5, across === 'z' ? mz + 1.3 : mz + 0.06, { uv: 1 });
+    // (the mouth: an arched iron frame, the fire behind a grate, doors swung open, a hood - gfx.js; iron bands and corner irons about the stack)
+    if (!P().put(w, 'furnacemouth', mx, 0.5, mz, { pz: 0, nz: Math.PI, px: Math.PI / 2, nx: -Math.PI / 2 }[face], 1, { sx: 2.2, sy: 1.75, sz: 1.5 })) {
+      w.visual('lava', across === 'x' ? mx - 1.1 : mx - 0.02, 0.6, across === 'z' ? mz - 1.1 : mz - 0.02, across === 'x' ? mx + 1.1 : mx + 0.02, 2.3, across === 'z' ? mz + 1.1 : mz + 0.02, { uv: 1, grad: false });
+      w.visual('iron', across === 'x' ? mx - 1.3 : mx - 0.06, 2.3, across === 'z' ? mz - 1.3 : mz - 0.06, across === 'x' ? mx + 1.3 : mx + 0.06, 2.5, across === 'z' ? mz + 1.3 : mz + 0.06, { uv: 1 });
+    }
+    F.ironBands(w, x - s, z - s, x + s, z + s, [3.4, 4.9], 0, h);
+    F.ironBands(w, x - 1.2, z - 1.2, x + 1.2, z + 1.2, [h + 1.6, h + 4.2, h + 6.8].filter((y) => y < HT - 0.5), h + 0.4, HT);
     w.addLight(x + d[0] * (s + 1.4), 1.6, z + d[1] * (s + 1.4), { flame: 0.5, intensity: 10, range: 12, color: '#ff6a20', prio: 1.1 });
     w.lavaZones.push({ x0: mx - 0.5, z0: mz - 0.5, x1: mx + 0.5, z1: mz + 0.5, y: 1, decor: true });
   }

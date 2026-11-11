@@ -119,7 +119,8 @@
   // a small smelter on a bay: a brick stack with a glowing mouth and its chimney up into the dark
   function smelter(w, rng, x, z, y) {
     w.solid('block', x, y, z, x + 3.2, y + 3.4, z + 3.2, { uv: 2 });
-    w.visual('glow', x + 1.0, y + 0.4, z + 3.2, x + 2.2, y + 1.5, z + 3.24, { uv: 1, grad: false, tint: [1, 0.45, 0.1] });
+    if (!P().put(w, 'furnacemouth', x + 1.6, y + 0.3, z + 3.2, 0, 1, { sx: 1.25, sy: 1.2, sz: 1.1 })) w.visual('glow', x + 1.0, y + 0.4, z + 3.2, x + 2.2, y + 1.5, z + 3.24, { uv: 1, grad: false, tint: [1, 0.45, 0.1] });
+    if (F.ironBands) { F.ironBands(w, x, z, x + 3.2, z + 3.2, [y + 2.3], y, y + 3.4); F.ironBands(w, x + 0.9, z + 0.9, x + 2.3, z + 2.3, [y + 5, y + 7.6].filter((v) => v < HT - 0.5), y + 3.4, HT); }
     w.solid('block', x + 0.9, y + 3.4, z + 0.9, x + 2.3, HT, z + 2.3, { uv: 2 });
     w.addLight(x + 1.6, y + 1.2, z + 4, { flame: 0.6, intensity: 8, range: 9, color: '#ff7a30', prio: 0.9 });
   }

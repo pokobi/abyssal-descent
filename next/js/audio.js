@@ -262,14 +262,33 @@
     else if (c === 'snap') { p.tail *= 0.2; p.crack *= 1.4; p.bd *= 0.6; p.tg *= 0.8; }
     return { p, h, c, cf: 3000 + hr(h, 3) * 3200 };
   }
+  // How heavy each kind of gun sounds over its recording (the recordings were all taken some paces off: they carry the crack of a
+  // shot, not its weight, and so a shotgun came out little heavier than a pistol). rate: the recording played slower - lower and
+  // longer; w: the blow under it (a sub-bass thump and the low body of the report); tail: seconds of the place ringing after it.
+  const GUNW = {
+    pistol: { rate: 1, w: 0.45, tail: 0 }, smg: { rate: 1, w: 0.3, tail: 0 }, minigun: { rate: 1, w: 0.25, tail: 0 }, nail: { rate: 1, w: 0.2, tail: 0 },
+    rifle: { rate: 0.97, w: 0.65, tail: 0.25 }, lmg: { rate: 0.95, w: 0.85, tail: 0.3 }, dmr: { rate: 0.92, w: 1.25, tail: 0.55 },
+    revolver: { rate: 0.9, w: 1.3, tail: 0.45 }, shotgun: { rate: 0.84, w: 1.9, tail: 0.8 }, sniper: { rate: 0.86, w: 2.0, tail: 1.1 },
+  };
   A.gun = function (kind, opts) {
     if (!ctx || !voice(1)) return;
     opts = opts || {};
     // (a recording where there is one for this kind of gun; each named gun plays it at a pitch of its own, a little off the next gun's)
-    if (smp('gun_' + (opts.suppressed ? 'suppressed' : GUN[kind] ? kind : 'rifle'), null, opts.vol, opts.id && !opts.suppressed ? 0.95 + hr(hs(opts.id), 1) * 0.1 : 1)) {
+    const GW = (!opts.suppressed && GUNW[kind]) || { rate: 1, w: opts.suppressed ? 0.25 : 0.8, tail: 0 };
+    if (smp('gun_' + (opts.suppressed ? 'suppressed' : GUN[kind] ? kind : 'rifle'), null, opts.vol, (opts.id && !opts.suppressed ? 0.95 + hr(hs(opts.id), 1) * 0.1 : 1) * GW.rate)) {
       // (under the recording, the push in the chest: a microphone some paces off does not carry it)
-      { const gp = GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle, t = ctx.currentTime, lo = dest(null, 0.1, gunBus); lo.gain.value = opts.vol || 1;
-        tn({ t, f0: gp.thump[0] * 0.55, f1: gp.thump[1] * 0.8, d: 0.08 + gp.tg * 0.08, g: gp.tg * 0.5, to: lo, type: 'sine' }); }
+      { const gp = GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle, t = ctx.currentTime, lo = dest(null, 0.1, gunBus), k = GW.w, v = opts.vol || 1; lo.gain.value = v;
+        tn({ t, f0: gp.thump[0] * 0.55, f1: gp.thump[1] * 0.8, d: 0.08 + gp.tg * 0.08, g: gp.tg * 0.5, to: lo, type: 'sine' });
+        if (k > 0.6) {
+          tn({ t, f0: 64, f1: 30, d: 0.13 + k * 0.09, g: 0.5 * k, to: lo, type: 'sine' });                                              // the blow
+          tn({ t: t + 0.004, f0: 118, f1: 46, d: 0.09 + k * 0.05, g: 0.28 * k, to: lo, type: 'triangle', lp: 300 });                    // its knock
+          nz({ t, buf: 'pink', f: [['lowpass', 300, 0.7, 80, 0.18 + k * 0.12]], g: 0.42 * k, a: 0.002, d: 0.2 + k * 0.15, to: lo });   // the low body of the report
+        }
+        if (GW.tail > 0) {   // (the place ringing after a heavy shot: dark, long; out of doors one far return as well)
+          const e = dest(null, 0.9, gunBus); e.gain.value = v * 0.6;
+          nz({ t: t + 0.04, buf: 'pink', f: [['lowpass', 1100, 0.6, 180, GW.tail]], g: 0.16 * k, a: 0.04, d: GW.tail, to: e });
+          if (outdoor()) nz({ t: t + 0.28, buf: 'pink', f: [['lowpass', 800, 0.6, 160, GW.tail * 0.8]], g: 0.09 * k, a: 0.06, d: GW.tail * 0.9, to: e });
+        } }
       if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35);
       if (kind === 'sniper') A.mech('bolt', 0.4);
       if (kind === 'revolver') A.mech('click', 0.2);

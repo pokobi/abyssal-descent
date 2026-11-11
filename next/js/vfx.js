@@ -548,13 +548,72 @@
     }`;
   function fireMat(tint) { return mk(FIRE_VS, FIRE_FS, { uA: { value: 1 }, uHeat: { value: 1 }, uSeed: { value: Math.random() }, uTint: { value: col3(tint ?? 0xffffff) } }, { blending: THREE.AdditiveBlending }); }
   VX.fireMat = fireMat; VX.shellMat = (c1, c2, style) => shellMat(c1, c2, style);
-  // a fireball for a blast: swells to 0.85 r (the blast hurts out to r), then cools and rises. tint: a colour the flame is multiplied by (white = plain fire)
+  // ---- the body of a blast. Not a glowing ball: a mass of puffs, round swells with sharp creases between them, that rolls upward as
+  // it is seen. All of it burns white at first; then the crowns of the puffs go to soot while fire still shows in the creases, and at
+  // the end it is black smoke that is eaten away in holes. It hides what is behind it (it is not added to the picture as light is).
+  const BLAST_N = `
+    float h31(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yzx + 33.33); return fract((p.x + p.y) * p.z); }
+    float vn3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(h31(i), h31(i + vec3(1.0, 0.0, 0.0)), f.x), mix(h31(i + vec3(0.0, 1.0, 0.0)), h31(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+                 mix(mix(h31(i + vec3(0.0, 0.0, 1.0)), h31(i + vec3(1.0, 0.0, 1.0)), f.x), mix(h31(i + vec3(0.0, 1.0, 1.0)), h31(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z); }
+    float bil(float n) { float x = 2.0 * n - 1.0; return sqrt(x * x + 0.012); }
+    float puff(vec3 p) { float v = 0.0, a = 0.56; for (int i = 0; i < 3; i++) { v += a * bil(vn3(p)); p = p * 2.13 + vec3(7.1, 3.3, 5.7); a *= 0.38; } return v; }
+  `;
+  const BLAST_VS = `uniform float uT; uniform float uSeed; uniform float uBoil; uniform float uRoll;
+    varying vec3 vN; varying vec3 vV; varying vec3 vD; varying float vH; varying float vDepth;
+    ${BLAST_N}
+    float hgt(vec3 d) { return puff(d * 1.9 + vec3(uSeed * 13.0, uSeed * 5.0 - uRoll, uSeed * 3.0)); }
+    vec3 at(vec3 d, out float h) { h = hgt(d); return d * (1.0 + (h - 0.4) * uBoil); }
+    void main() {
+      vec3 d = normalize(position);
+      vec3 t1 = normalize(cross(d, abs(d.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(d, t1);
+      float h, h1, h2;
+      vec3 p0 = at(d, h), p1 = at(normalize(d + t1 * 0.05), h1), p2 = at(normalize(d + t2 * 0.05), h2);
+      vec3 n = normalize(cross(p1 - p0, p2 - p0));
+      vD = d; vH = h;
+      vec4 mv = modelViewMatrix * vec4(p0, 1.0);
+      vN = normalize(normalMatrix * n); vV = normalize(-mv.xyz); vDepth = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }`;
+  const BLAST_FS = `uniform float uT; uniform float uA; uniform float uCool; uniform float uSeed; uniform float uRoll; uniform vec3 uTint; ${FOG_U}
+    varying vec3 vN; varying vec3 vV; varying vec3 vD; varying float vH;
+    ${BLAST_N}
+    void main() {
+      vec3 N = normalize(vN), V = normalize(vV);
+      float facing = clamp(dot(N, V), 0.0, 1.0);
+      float fine = vn3(vD * 5.5 + vec3(uSeed * 9.0, -uRoll * 2.4, 1.7)) * 0.62 + vn3(vD * 12.0 + vec3(3.1, -uRoll * 3.6, uSeed * 4.0)) * 0.38;
+      float hh = clamp(vH * 1.25, 0.0, 1.0), deep = (1.0 - hh) * (1.0 - hh);
+      // how hot: all of it at first; the crowns of the puffs cool in a third of a second, the creases stay alight three times as long
+      float temp = 1.5 * (1.0 - uCool / (0.4 + deep * 2.0)) - hh * 0.62 + (fine - 0.5) * 0.7 - (1.0 - facing) * (1.0 - facing) * 0.95;
+      vec3 fire = mix(vec3(0.3, 0.02, 0.004), vec3(1.5, 0.3, 0.03), smoothstep(0.1, 0.42, temp));
+      fire = mix(fire, vec3(2.5, 1.05, 0.2), smoothstep(0.42, 0.8, temp));
+      fire = mix(fire, vec3(2.7, 1.9, 0.9), smoothstep(0.95, 1.7, temp));
+      fire *= uTint;
+      // soot: nearly black; lit from the fire in the creases beside it, and a little from above
+      vec3 up = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+      float sky = dot(N, up) * 0.5 + 0.5, lit = clamp(1.0 - uCool / 1.9, 0.0, 1.0);
+      vec3 soot = vec3(0.03, 0.027, 0.025) * (0.25 + 1.3 * sky * sky) * (0.55 + 0.9 * fine) * (0.7 + 0.6 * hh);
+      soot += vec3(0.3, 0.06, 0.008) * uTint * lit * (0.06 + 0.94 * deep * deep) * (0.4 + 0.6 * (1.0 - sky));
+      float f = smoothstep(-0.04, 0.24, temp);
+      vec3 col = mix(soot, fire, f);
+      // eaten away as it thins, in holes; soft at its outline
+      float th = 1.0 - uA, q = fine * 0.55 + vH * 0.6;
+      float dis = smoothstep(th * 1.35 - 0.3, th * 1.35 - 0.04, q);
+      float a = smoothstep(0.02, 0.46, facing + (fine - 0.5) * 0.3) * mix(0.93, 1.0, f) * dis * min(1.0, uA * 2.5);
+      ${fogAdd}
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(mix(uFogC, col, fogv), clamp(a, 0.0, 1.0));
+    }`;
+  function blastMat() { return mk(BLAST_VS, BLAST_FS, { uA: { value: 1 }, uCool: { value: 0 }, uSeed: { value: Math.random() }, uBoil: { value: 0.4 }, uRoll: { value: 0 }, uTint: { value: col3(0xffffff) } }, {}); }
+  let blastGeo = null;
+  // a fireball for a blast: swells to about 0.85 r (the blast hurts out to r), then cools, rises and thins to smoke. tint: a colour the flame is multiplied by (white = plain fire)
   const fbPool = [];
   VX.fireball = function (p, r, tint) {
     let o = fbPool.find((x) => !x.on);
-    if (!o) { if (fbPool.length >= 14) o = fbPool[0]; else { const m = new THREE.Mesh(sphGeo, fireMat()); m.frustumCulled = false; m.renderOrder = 9; scene.add(m); o = { m }; fbPool.push(o); } }
-    o.on = true; o.t = 0; o.r = r; o.pos = p.clone(); o.m.visible = true;
-    o.m.material.uniforms.uTint.value.set(tint ?? 0xffffff); o.m.material.uniforms.uSeed.value = Math.random();
+    if (!o) { if (fbPool.length >= 14) o = fbPool[0]; else { const m = new THREE.Mesh(blastGeo, blastMat()); m.frustumCulled = false; m.renderOrder = 9; scene.add(m); o = { m }; fbPool.push(o); } }
+    o.on = true; o.t = 0; o.r = r; o.pos = p.clone(); o.m.visible = true; o.spin = Math.random() * 6.283;
+    o.m.material.uniforms.uTint.value.set(tint ?? 0xffffff); o.m.material.uniforms.uSeed.value = Math.random(); o.m.rotation.y = o.spin; o.hold = null;
+    return o;
   };
   // a burst of light for a blast that is not fire (purple, blue, green ...): a glowing shell that swells to r and fades
   const bsPool = [];
@@ -574,14 +633,16 @@
     }
     for (const o of fbPool) {
       if (!o.on) continue;
-      o.t += dt;
-      const k = o.t, grow = Math.min(1, k / 0.12), cool = Math.max(0, (k - 0.1) / 0.55);
-      const R = o.r * (0.25 + 0.6 * (1 - Math.pow(1 - grow, 3))) * (1 + cool * 0.15);
-      o.m.scale.setScalar(Math.max(0.05, R));
-      o.m.position.set(o.pos.x, o.pos.y + cool * o.r * 0.35, o.pos.z);
-      o.m.material.uniforms.uHeat.value = Math.max(0, 1 - cool * 1.1);
-      o.m.material.uniforms.uA.value = Math.max(0, 1 - cool);
-      if (cool >= 1) { o.on = false; o.m.visible = false; }
+      o.t += dt; if (o.hold != null) o.t = o.hold;   // (hold: for looking at one moment of it)
+      // (out in a tenth of a second; the crowns of the puffs are soot in a third of one and the creases burn for most of one; then smoke, going up)
+      const k = o.t, grow = Math.min(1, k / 0.13), cool = Math.max(0, (k - 0.07) / 0.5), fade = Math.max(0, (k - 0.55) / 0.85), u = o.m.material.uniforms;
+      const late = Math.min(2.6, cool), R = o.r * (0.2 + 0.5 * (1 - Math.pow(1 - grow, 3))) * (1 + late * 0.08);
+      o.m.scale.set(Math.max(0.05, R), Math.max(0.05, R * (1 + late * 0.12)), Math.max(0.05, R));
+      o.m.position.set(o.pos.x, o.pos.y + late * o.r * 0.2, o.pos.z);
+      u.uCool.value = cool; u.uA.value = Math.max(0, 1 - fade);
+      u.uBoil.value = 0.22 + 0.24 * Math.min(1, k / 0.3);                     // (smooth as it bursts out, lumpier as it slows)
+      u.uRoll.value = k * 0.55 + Math.min(1, k / 0.2) * 0.25;                // (the puffs roll upward)
+      if (fade >= 1) { o.on = false; o.m.visible = false; }
     }
   }
 
@@ -967,6 +1028,7 @@
     areaGeo = new THREE.PlaneGeometry(2, 2, 1, 1); areaGeo.rotateX(-Math.PI / 2);
     domeGeo = new THREE.SphereGeometry(1, 40, 14, 0, Math.PI * 2, 0, Math.PI / 2);
     sphGeo = new THREE.SphereGeometry(1, 28, 18);
+    blastGeo = new THREE.IcosahedronGeometry(1, 14);
     cylGeo = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true);
     coneGeo = new THREE.ConeGeometry(1, 1, 28, 1, true);
     VX.geo = { area: areaGeo, dome: domeGeo, sph: sphGeo, cyl: cylGeo, cone: coneGeo };
@@ -975,7 +1037,7 @@
     add(new THREE.Mesh(areaGeo, areaMat('fire'))); add(new THREE.Mesh(areaGeo, areaMat('poison')));
     add(new THREE.Mesh(domeGeo, shellMat(0xffffff, 0xffffff, 'energy')));
     add(new THREE.Mesh(cylGeo, beamMat(0xffffff))); add(new THREE.Mesh(areaGeo, curtMat(0xffffff)));
-    add(new THREE.Mesh(sphGeo, fireMat()));
+    add(new THREE.Mesh(sphGeo, fireMat())); add(new THREE.Mesh(blastGeo, blastMat()));
     add(new THREE.Mesh(arcGeo(0.5, 1, 1, 4), mk(SLASH_VS, SLASH_FS, { uP: { value: 0 }, uA: { value: 0 }, uC: { value: col3(0xffffff) }, uTail: { value: 0.5 } }, { blending: THREE.AdditiveBlending, side: THREE.DoubleSide })));
     add(new THREE.Mesh(waveGeo(4, 2), mk(WAVE_VS, WAVE_FS, { uA: { value: 0 }, uHalf: { value: 2 } }, { side: THREE.DoubleSide })));
     add(new THREE.Mesh(arcGeo(0.5, 1, 1, 4), crescentMat(0xffffff)));

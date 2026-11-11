@@ -305,8 +305,10 @@
       const c = Math.min(1, Math.max(0, 0.5 + (sh - 0.5) * 0.7 + (n2 - 0.5) * 0.5));
       o[0] = o[1] = o[2] = 0.58 + 0.42 * c; o[3] = Math.min(1, Math.pow(dens, 1.35) * (0.42 + 0.7 * n2) * edge * 0.95);
     }, false);
-    T.spr.flame = pixTex(256, (u, v, o) => {
-      const [k, x, y] = cell4(u, v), h = (y + 1) / 2;                      // (h: 0 at its root, 1 at its tip)
+    // (mode 'heat': how hot, in grey - the particles' sheet of four, coloured by each flame; 'col': painted white to orange - the
+    // jet at a gun's muzzle; 'one': a single tongue in grey - a pilot light)
+    const flamePic = (mode) => (u, v, o) => {
+      const [k, x, y] = mode === 'one' ? [1, u * 2 - 1, v * 2 - 1] : cell4(u, v), h = (y + 1) / 2;                      // (h: 0 at its root, 1 at its tip)
       // (not a drop of flame with a clean edge: the place is bent more and more toward the tip, so that it leans and forks, and noise
       // running upward tears it, most at the tip and the sides)
       // three tongues of unequal height from one root, each wandering more the higher it goes; uneven within
@@ -319,8 +321,11 @@
       }
       I = Math.max(0, I * (0.5 + 0.95 * _fb(x * 5 + k * 3, h * 6 - k * 2, 11, 4)) - 0.04) * _ss(0, 0.06, h);
       I = Math.min(1, I * 1.15);
-      o[0] = 0.62 + 0.38 * _ss(0, 0.3, I); o[1] = 0.1 + 0.88 * _ss(0.12, 0.8, I); o[2] = 0.02 + 0.85 * _ss(0.55, 1, I); o[3] = _ss(0, 0.62, I);   // (white at its heart, yellow, orange, dull red where it is thinnest)
-    }, false);
+      if (mode === 'col') { o[0] = 0.62 + 0.38 * _ss(0, 0.3, I); o[1] = 0.1 + 0.88 * _ss(0.12, 0.8, I); o[2] = 0.02 + 0.85 * _ss(0.55, 1, I); }   // (white at its heart, yellow, orange, dull red where it is thinnest)
+      else o[0] = o[1] = o[2] = Math.pow(I, 1.6);
+      o[3] = _ss(0, 0.62, I);
+    };
+    T.spr.flame = pixTex(256, flamePic('heat'), false); T.spr.flameCol = pixTex(256, flamePic('col'), false); T.spr.flame1 = pixTex(128, flamePic('one'), false);
     // a bullet's mark in stone: the hole, the crater broken out around it (lighter where the break is fresh), cracks, and soot
     const holePic = (kind) => pixTex(128, (u, v, o) => {
       const x = u * 2 - 1, y = v * 2 - 1, r = Math.hypot(x, y), a = Math.atan2(y, x), ca = Math.cos(a), sa = Math.sin(a);

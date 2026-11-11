@@ -184,7 +184,7 @@
     flashSprite2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: halo, color: 0xff9440, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     {
       // (the jet: a tongue of the flames' own picture, its root at the muzzle, its tip a length before it)
-      const jm = new THREE.MeshBasicMaterial({ map: G.Tex.spr.flame, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, side: THREE.DoubleSide, fog: false });
+      const jm = new THREE.MeshBasicMaterial({ map: G.Tex.spr.flameCol || G.Tex.spr.flame, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, side: THREE.DoubleSide, fog: false });
       flashJet = new THREE.Group(); const inner = new THREE.Group(); flashJet.add(inner); flashJet.userData.inner = inner; flashJet.userData.leaves = [];
       for (let i = 0; i < 2; i++) {
         const pg = new THREE.PlaneGeometry(1, 1); pg.translate(0, -0.5, 0); pg.rotateX(Math.PI / 2); if (i) pg.rotateZ(Math.PI / 2);
@@ -469,12 +469,12 @@
         break;
       }
       case 'flame': {
-        if (GP) { putParts(); M.muzzle.set(0, 0.03, -0.56); M.sightY = 0.09; M.ironY = 0.09; M.railY = 0.06; M.fore.set(0, -0.05, -0.28); M.grip.set(0, -0.06, 0.12); { const pilot = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.flame, color: 0x7aaaff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); pilot.scale.setScalar(0.04); pilot.position.set(0, 0.0, -0.57); g.add(pilot); M.extra.push(pilot); } break; }
+        if (GP) { putParts(); M.muzzle.set(0, 0.03, -0.56); M.sightY = 0.09; M.ironY = 0.09; M.railY = 0.06; M.fore.set(0, -0.05, -0.28); M.grip.set(0, -0.06, 0.12); { const pilot = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.flame1 || G.Tex.spr.flame, color: 0x7aaaff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); pilot.scale.setScalar(0.04); pilot.position.set(0, 0.0, -0.57); g.add(pilot); M.extra.push(pilot); } break; }
         box(0.05, 0.07, 0.3, 0, 0.02, 0); cyl(0.02, 0.36, 0, 0.03, -0.33, metal); cyl(0.03, 0.05, 0, 0.03, -0.52, mats.brass);
         M.mag = cyl(0.05, 0.3, 0, -0.07, -0.12, mats.tank);
         box(0.034, 0.1, 0.045, 0, -0.08, 0.12, poly, 0.3); box(0.04, 0.07, 0.2, 0, 0.0, 0.3, poly);
         M.muzzle.set(0, 0.03, -0.56); M.sightY = 0.09; M.ironY = 0.09; M.railY = 0.06; M.fore.set(0, -0.05, -0.28); M.grip.set(0, -0.06, 0.12);
-        const pilot = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.flame, color: 0x7aaaff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+        const pilot = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.flame1 || G.Tex.spr.flame, color: 0x7aaaff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
         pilot.scale.setScalar(0.04); pilot.position.set(0, 0.0, -0.57); g.add(pilot); M.extra.push(pilot);
         break;
       }

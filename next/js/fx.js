@@ -44,8 +44,12 @@
     void main(){
       vec4 t = texture2D(map, puv());
       float fogv = exp(-uFogD * uFogD * vDepth * vDepth);
-      float a = t.a * vColor.a * fogv;
-      gl_FragColor = vec4(vColor.rgb * t.rgb * a, a * uCover);
+      float a = t.a * vColor.a * fogv, heat = t.r;
+      // (its own colour, deep, at the skin; toward the heart brighter and paler - never so bright at the skin that every colour is white)
+      float m = max(vColor.r, max(vColor.g, vColor.b)); vec3 n = vColor.rgb / max(m, 1e-4);
+      vec3 c = mix(pow(n, vec3(2.2)) * m * 0.5, pow(n, vec3(1.25)) * m, smoothstep(0.0, 0.45, heat));   // (deep at the skin, its full colour within)
+      c = mix(c, mix(n, vec3(1.0, 0.95, 0.82), 0.55) * m, smoothstep(0.55, 1.0, heat));                 // (pale toward the heart)
+      gl_FragColor = vec4(c * a, a * uCover);
     }`;
   const FS_NORM = `
     uniform sampler2D map; uniform float uFogD; uniform vec3 uFogC; uniform float uLit; varying vec4 vColor; varying float vDepth;
@@ -428,10 +432,10 @@
   // (a flame is brighter than the wall it lights: drawn no brighter than white, it was lost before a wall a hand away from it)
   const FLAME_K = 4;
   FX.flameLick = function (x, y, z, s, color) {
-    const c = rgb(color || 0xff9a40), S = 0.3 * Math.pow(s, 1.15);
+    const c = rgb(color || 0xff9a40), S = 0.3 * Math.pow(s, 1.15), FK = FLAME_K * (s > 1 ? 1 / Math.sqrt(s) : 1);   // (a great fire is many tongues over one another: each is drawn the dimmer, or a bed of them is white)
     // (the flame itself stands where it burns, its root at the wick: a tongue that the next replaces before it is gone. It was a puff
     // sent up half a metre, which over a candle is a string of small flames in the air)
-    FX.flame.spawn(x + rs(0.02 * s), y + S * 0.4, z + rs(0.02 * s), rs(0.04 * s), 0.14 * s, rs(0.04 * s), 0.3 + Math.random() * 0.16, S * (1.05 + Math.random() * 0.3), S * 0.8, (c.r * 0.6 + 0.4) * FLAME_K, (c.g * 0.6 + 0.4) * FLAME_K * 0.8, (c.b * 0.5 + 0.25) * FLAME_K * 0.5, 0.9, 0, 0, c.r * 1.2, c.g * 0.6, c.b * 0.25);
+    FX.flame.spawn(x + rs(0.02 * s), y + S * 0.4, z + rs(0.02 * s), rs(0.04 * s), 0.14 * s, rs(0.04 * s), 0.3 + Math.random() * 0.16, S * (1.05 + Math.random() * 0.3), S * 0.8, c.r * FK, c.g * FK, c.b * FK, 0.9, 0, 0, c.r * 1.2, c.g * 0.6, c.b * 0.25);
     // (tongues torn off it and carried up: a fire of some size throws more of them, and higher)
     if (Math.random() < Math.min(0.7, 0.12 + s * 0.22)) FX.flame.spawn(x + rs(0.05 * s), y + S * 0.6, z + rs(0.05 * s), rs(0.12 * s), (0.7 + Math.random() * 0.6) * s, rs(0.12 * s), 0.3 + Math.random() * 0.25, S * 0.6, S * 0.12, c.r * 1.4, c.g * 1.1, c.b * 0.8, 0.8, -0.4, 1.2, c.r * 1.2, c.g * 0.45, c.b * 0.15);
     if (Math.random() < 0.08) FX.add.spawn(x, y + 0.1, z, rs(0.4), 1.2 + Math.random(), rs(0.4), 0.8 + Math.random() * 0.6, 0.03, 0.01, 1.5, 0.8, 0.3, 1, -0.2, 0.3);
@@ -441,7 +445,7 @@
     const c = rgb(color || 0xff8a3a);
     for (let i = 0; i < 18; i++) {
       const a = Math.random() * 6.28, d = Math.random() * r;
-      FX.flame.spawn(p.x + Math.cos(a) * d, p.y + Math.random() * 0.5, p.z + Math.sin(a) * d, rs(0.5), 1.5 + Math.random() * 2, rs(0.5), 0.4 + Math.random() * 0.4, 0.7, 0.24, (c.r * 0.6 + 0.4) * 2.6, (c.g * 0.6 + 0.4) * 2.1, (c.b * 0.5 + 0.25) * 1.3, 0.85, -1, 1, c.r, c.g * 0.4, c.b * 0.2);
+      FX.flame.spawn(p.x + Math.cos(a) * d, p.y + Math.random() * 0.5, p.z + Math.sin(a) * d, rs(0.5), 1.5 + Math.random() * 2, rs(0.5), 0.4 + Math.random() * 0.4, 0.7, 0.24, c.r * 2.8, c.g * 2.8, c.b * 2.8, 0.85, -1, 1, c.r, c.g * 0.4, c.b * 0.2);
     }
   };
   FX.explosion = function (p, r, color, opts) {

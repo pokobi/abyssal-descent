@@ -193,11 +193,16 @@
     // ---------------------------------------------------------------- the model (everything under root; root faces +z, towards the tiles)
     build() {
       const r = this.root, s = 1;
+      // (a body of swells and plates: the lumps of twelve faces and the boxes it was built of are balls and boxes with their edges
+      // softened, which run into one another where they meet; its iron and cloth are the baked ones, at a grain for a body of forty
+      // metres; the halo is a round ring, the wings are blades drawn to a point)
+      const TXg = (n) => (G.GFX && G.GFX.tex ? G.GFX.tex(n) : null), grain = (m, n, k) => { const t = TXg(n); if (t) { m.map = t.map; m.normalMap = t.normalMap; m.roughnessMap = t.orm; m.aoMap = t.orm; m.userData.uvk = k; m.color.multiplyScalar(1.25); m.needsUpdate = true; } return m; };
+      this.meltRound = 0.5; this.meltBlend = 0.03;
       const M = this.M = {
-        body: mat('#2c282a', { map: tex().metal.map, metalness: 0.6, roughness: 0.6, emissive: 0x161214, emissiveIntensity: 0.7 }),
-        armor: mat('#4a4446', { map: tex().metal.map, normalMap: tex().metal.normalMap, metalness: 0.65, roughness: 0.55, emissive: 0x1c1618, emissiveIntensity: 0.7 }),
-        dark: mat('#161314', { metalness: 0.85, roughness: 0.5, emissive: 0x0e0a0c, emissiveIntensity: 0.6 }),
-        cloth: mat('#3e0e14', { map: tex().cloth.map, side: THREE.DoubleSide, roughness: 0.95, emissive: 0x16060a, emissiveIntensity: 0.5 }),
+        body: grain(mat('#2c282a', { map: tex().metal.map, metalness: 0.6, roughness: 0.6, emissive: 0x161214, emissiveIntensity: 0.7 }), 'steel', 0.14),
+        armor: grain(mat('#4a4446', { map: tex().metal.map, normalMap: tex().metal.normalMap, metalness: 0.65, roughness: 0.55, emissive: 0x1c1618, emissiveIntensity: 0.7 }), 'steel', 0.11),
+        dark: grain(mat('#161314', { metalness: 0.85, roughness: 0.5, emissive: 0x0e0a0c, emissiveIntensity: 0.6 }), 'steel', 0.16),
+        cloth: grain(mat('#3e0e14', { map: tex().cloth.map, side: THREE.DoubleSide, roughness: 0.95, emissive: 0x16060a, emissiveIntensity: 0.5 }), 'weave', 0.25),
         glow: glowM(0xc88a3a, 1.1), eye: glowM(0xff5a28, 2.6), halo: glowM(0xd89040, 1.5), core: glowM(VIO, 2.6),
         rock: mat('#34302e', { map: tex().rock && tex().rock.map, roughness: 0.95, emissive: 0x120e0c, emissiveIntensity: 0.5 }),
       };
@@ -209,14 +214,15 @@
       for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; smesh(waist, PG().box, M.cloth, 4.2, 18, 0.25, Math.sin(a) * 7.4, -10, Math.cos(a) * 5.6, 0.12, a, 0); } // tattered skirt plates
       const chest = joint(waist, 0, 8, 0);
       smesh(chest, PG().cyl8, M.body, 6.2, 8, 4.8, 0, 2, 0);
-      for (let i = 0; i < 4; i++) smesh(chest, PG().box, M.armor, 9 - i * 0.6, 1.1, 1.2, 0, -0.6 + i * 1.9, 4.6 - i * 0.05, -0.1); // the belly bands
-      const ribs = mesh(chest, PG().dode, M.armor, 9.5, 7.2, 6, 0, 10.5, 0);
+      for (let i = 0; i < 4; i++) smesh(chest, PG().cyl8, M.armor, 6.5 - i * 0.12, 1.1, 5.1 - i * 0.1, 0, -0.6 + i * 1.9, 0.1); // the belly bands: lames about the waist
+      const ribs = mesh(chest, PG().sph, M.armor, 9.3, 6.9, 5.9, 0, 10.5, 0);
       const plates = [ribs];
       for (const sx of [-1, 1]) {
-        plates.push(mesh(chest, PG().box, M.armor, 6.4, 6.2, 1.6, sx * 3.4, 11, 5.4, -0.18, sx * 0.32, 0));
+        plates.push(mesh(chest, PG().sph, M.armor, 3.6, 3.5, 1.1, sx * 3.4, 11, 5.2, -0.18, sx * 0.32, 0));
         plates.push(mesh(chest, PG().box, M.glow, 0.25, 6.4, 0.3, sx * 0.4, 11, 6.35, -0.18, 0, 0));
-        smesh(chest, PG().box, M.dark, 1.2, 9, 1.2, sx * 8.4, 9, -1, 0, 0, sx * 0.18);
+        smesh(chest, PG().sph, M.dark, 1.1, 5, 1.6, sx * 8.4, 9, -1, 0, 0, sx * 0.18);
       }
+      plates.push(mesh(chest, PG().sph, M.armor, 0.85, 5.6, 1.0, 0, 10.6, 5.2, -0.1)); // the keel of the breast, between its two plates
       plates.push(mesh(chest, PG().torus, M.glow, 3.2, 3.2, 3.2, 0, 11.5, 6.0)); // the sigil on the breastplate
       smesh(chest, PG().cyl8, M.armor, 4.6, 3.4, 4.2, 0, 16.6, 0); // gorget
       // the void core under the breastplate (the second form's weak point)
@@ -229,16 +235,19 @@
       const sh = [];
       for (const sx of [-1, 1]) {
         const j = joint(chest, sx * 12.5, 15, 0);
-        smesh(j, PG().dode, M.armor, 4.8, 3.8, 4.8);
-        smesh(j, PG().dode, M.dark, 3.6, 2.6, 3.6, sx * 0.6, -2.4, 0);
+        smesh(j, PG().sph, M.armor, 4.9, 3.5, 4.9);
+        smesh(j, PG().sph, M.armor, 5.3, 1.3, 5.3, sx * 0.5, -1.5, 0, 0, 0, -sx * 0.25);   // a lame under the dome of it
+        smesh(j, PG().sph, M.dark, 3.6, 2.6, 3.6, sx * 0.6, -2.6, 0);
         for (let i = 0; i < 3; i++) smesh(j, PG().cone, M.glow, 0.7, 4.5 - i, 0.7, sx * (1 + i * 1.4), 3.6 - i * 0.6, -0.6 + i * 0.5, 0, 0, -sx * (0.3 + i * 0.25));
         sh.push(j);
       }
       // head: a crowned helm with a burning third eye
       const head = joint(chest, 0, 19.5, 0.6);
-      smesh(head, PG().dode, M.armor, 3.4, 4.4, 3.6, 0, 1.6, 0);
-      smesh(head, PG().box, M.body, 4.4, 2.6, 0.8, 0, 1.0, 3.0, -0.12);
-      for (const sx of [-1, 1]) { smesh(head, PG().box, M.eye, 1.2, 0.35, 0.3, sx * 1.15, 1.9, 3.45, 0, 0, sx * 0.2); smesh(head, PG().box, M.armor, 0.5, 3.4, 2.6, sx * 3.1, 0.8, 0.4, 0, 0, sx * 0.25); }
+      smesh(head, PG().sph, M.armor, 3.3, 4.2, 3.5, 0, 1.7, 0);
+      smesh(head, PG().sph, M.body, 2.5, 1.7, 0.9, 0, 0.9, 2.75, -0.12);                // the face plate
+      smesh(head, PG().sph, M.armor, 2.9, 0.7, 1.1, 0, 2.5, 2.7, -0.2);                 // the brow over the eyes
+      smesh(head, PG().sph, M.armor, 0.5, 1.9, 0.9, 0, 0.6, 3.5, -0.1);                 // the ridge down the face
+      for (const sx of [-1, 1]) { smesh(head, PG().box, M.eye, 1.2, 0.35, 0.3, sx * 1.15, 1.9, 3.45, 0, 0, sx * 0.2); smesh(head, PG().sph, M.armor, 0.5, 2.1, 1.7, sx * 3.1, 0.8, 0.4, 0, 0, sx * 0.25); }
       const jewel = mesh(head, PG().oct3, M.eye, 0.75, 1.05, 0.5, 0, 3.4, 3.15);
       const crown = joint(head, 0, 4.6, 0);
       smesh(crown, PG().torus, M.glow, 3.1, 3.1, 3.1, 0, 0, 0, Math.PI / 2);
@@ -247,10 +256,12 @@
       for (const sx of [-1, 1]) { const hj = joint(horns, sx * 2.6, 1.2, 0); hj.rotation.z = -sx * 0.7; hj.rotation.x = -0.4; smesh(hj, PG().cone, M.dark, 0.9, 6.5, 0.9, 0, 3.2, 0); smesh(hj, PG().cone, M.core, 0.35, 2, 0.35, 0, 6.6, 0); }
       horns.visible = false;
       // the burning halo and the wings of blades behind it
-      const halo = mesh(chest, PG().torus, M.halo, 12.5, 12.5, 2.2, 0, 21, -6);
-      const halo2 = mesh(chest, PG().torus, M.glow, 9, 9, 1.2, 0, 21, -6.2);
+      const haloG = Sovereign._haloG || (Sovereign._haloG = new THREE.TorusGeometry(1, 0.07, 12, 120));   // (a round ring, not eight flats bent in a circle)
+      const halo = mesh(chest, haloG, M.halo, 12.5, 12.5, 12.5, 0, 21, -6);
+      const halo2 = mesh(chest, haloG, M.glow, 9, 9, 6, 0, 21, -6.2);
+      const bladeG = Sovereign._bladeG || (Sovereign._bladeG = (() => { const g = new THREE.CylinderGeometry(0.12, 1, 1, 4, 1); g.rotateY(Math.PI / 4); g.scale(0.36, 1, 1.56); return g; })());   // (a blade: four faces drawn from a broad foot to a point)
       const wings = [];
-      for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) wings.push(mesh(chest, PG().box, M.dark, 0.6, 22 - i * 2, 2.2, sx * (8 + i * 3.4), 14 - i * 0.6, -6, 0, 0, -sx * (0.45 + i * 0.2)));
+      for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) wings.push(mesh(chest, bladeG, M.dark, 1, 22 - i * 2, 1, sx * (8 + i * 3.4), 14 - i * 0.6, -6, 0, 0, -sx * (0.45 + i * 0.2)));
       // a cape hanging into the dark
       for (const sx of [-1, 1]) smesh(chest, PG().plane, M.cloth, 11, 34, 1, sx * 6.5, -2, -4.6, 0.12, sx * 0.25, 0);
       // gravity rings (second form)
@@ -258,7 +269,7 @@
       const grav = [0, 1, 2].map((i) => { const g = joint(chest, 0, 10, 0); const m = mesh(g, ringG, ringM, 12 + i * 2.5, 12 + i * 2.5, 12 + i * 2.5, 0, 0, 0, Math.PI / 2); m.castShadow = false; g.rotation.set(0.5 * i - 0.5, i, 0.3); g.visible = false; return g; });
       // arms (shoulder -> elbow -> wrist, laid out every frame) and the great hands
       const bone = (rr) => { const g = joint(r); const m = mesh(g, tapered, M.armor, rr, 1, rr); m.castShadow = false; smesh(g, PG().cyl8, M.dark, rr * 1.25, 0.1, rr * 1.25, 0, 0.82, 0); smesh(g, PG().cyl8, M.glow, rr * 1.12, 0.03, rr * 1.12, 0, 0.9, 0); return g; };
-      this.arms = [-1, 1].map((sx) => ({ sx, up: bone(2.6), fo: bone(2.0), el: mesh(r, PG().dode, M.dark, 2.8, 2.8, 2.8) }));
+      this.arms = [-1, 1].map((sx) => ({ sx, up: bone(2.6), fo: bone(2.0), el: mesh(r, PG().sph, M.dark, 2.7, 2.7, 2.7) }));
       this.hands = [-1, 1].map((sx, i) => this.buildHand(sx, i));
       this.J = { body, waist, chest, head, jewel, crown, horns, halo, halo2, wings, sh, core, coreRim, coreGlow, plates, grav };
       this.J.height = 30 * s;
@@ -266,23 +277,24 @@
     buildHand(sx, i) {
       const M = this.M, g = joint(this.root);
       g.rotation.order = 'YXZ';
-      smesh(g, PG().box, M.armor, 5.4, 1.6, 5.2);
-      smesh(g, PG().box, M.dark, 4.4, 0.6, 4.2, 0, 1.0, -0.2);
+      smesh(g, PG().rbox, M.armor, 5.4, 1.6, 5.2);
+      smesh(g, PG().sph, M.armor, 2.5, 0.9, 2.4, 0, 0.7, -0.2);                         // the plate on the back of the hand
+      for (let k = 0; k < 4; k++) smesh(g, PG().sph, M.dark, 0.62, 0.6, 0.62, (k - 1.5) * 1.3, 0.15, 2.45);   // the knuckles
       smesh(g, PG().box, M.glow, 0.3, 0.2, 4.0, 0, 1.36, -0.2);
       smesh(g, PG().cyl8, M.dark, 2.3, 2.4, 2.3, 0, 0, -3.2, Math.PI / 2);
       smesh(g, PG().torus, M.glow, 2.4, 2.4, 2.4, 0, 0, -2.4);
       const fingers = [];
       for (let k = 0; k < 4; k++) {
         const f1 = joint(g, (k - 1.5) * 1.3, -0.1, 2.5); f1.rotation.y = (k - 1.5) * 0.06;
-        smesh(f1, PG().box, M.armor, 1.05, 1.05, 2.8, 0, 0, 1.4);
+        smesh(f1, PG().rbox, M.armor, 1.05, 1.05, 2.8, 0, 0, 1.4); smesh(f1, PG().sph, M.dark, 0.56, 0.56, 0.56, 0, 0, 2.8);
         const f2 = joint(f1, 0, 0, 2.8);
-        smesh(f2, PG().box, M.body, 0.9, 0.9, 2.3, 0, 0, 1.15);
+        smesh(f2, PG().rbox, M.body, 0.9, 0.9, 2.3, 0, 0, 1.15);
         smesh(f2, PG().cone, M.glow, 0.42, 1.5, 0.42, 0, 0, 2.9, Math.PI / 2);
         fingers.push([f1, f2]);
       }
       const t1 = joint(g, -sx * 2.9, -0.1, 0.4); t1.rotation.y = -sx * 0.9;
-      smesh(t1, PG().box, M.armor, 1.2, 1.2, 2.6, 0, 0, 1.3);
-      const t2 = joint(t1, 0, 0, 2.6); smesh(t2, PG().box, M.body, 1, 1, 2, 0, 0, 1); smesh(t2, PG().cone, M.glow, 0.45, 1.4, 0.45, 0, 0, 2.5, Math.PI / 2);
+      smesh(t1, PG().rbox, M.armor, 1.2, 1.2, 2.6, 0, 0, 1.3);
+      const t2 = joint(t1, 0, 0, 2.6); smesh(t2, PG().rbox, M.body, 1, 1, 2, 0, 0, 1); smesh(t2, PG().cone, M.glow, 0.45, 1.4, 0.45, 0, 0, 2.5, Math.PI / 2);
       fingers.push([t1, t2]);
       const rockM = mesh(g, PG().dode, M.rock, 2.2, 2.2, 2.2, 0, -2.6, 2.2); rockM.visible = false; // what it scoops out of the dark to throw
       const rest = V(this.home.x + sx * 22, 4, this.home.z + 14);

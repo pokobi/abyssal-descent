@@ -182,6 +182,37 @@
   W.resize = function (a) { if (vmCam) { vmCam.aspect = a; vmCam.updateProjectionMatrix(); } };
 
   const FIN = { black: [0x45484e, 0x2a2b2e], tan: [0x45484e, 0x8a7a5a], steel: [0x9a9da2, 0x333333], wood: [0x45484e, null], brass: [0xa88850, 0x5a3a24], gold: [0xffcf40, 0x2c1016], bone: [0xc8bca0, 0x3a3028], rust: [0x6a4a36, 0x3a2a20] };
+  // The iron sights as they are looked through: the top of the front post, the middle of the rear sight's hole (or, where it is a
+  // notch, the top of its ears) and the eye lie in one line, and that line goes through the middle of the screen. The guns were
+  // reshaped and their sights no longer stood where the old numbers said: so the line is taken from the shapes themselves. The rear
+  // sight is moved up or down to the height of the front one, and the gun is held with the post's top just under the point of aim.
+  function alignIrons(g, M) {
+    g.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(g.matrixWorld).invert(), t = new THREE.Vector3(), P3 = [];
+    for (const o of M.irons) { if (!o || !o.geometry) continue; const ps = o.geometry.attributes.position; for (let i = 0; i < ps.count; i++) { t.fromBufferAttribute(ps, i).applyMatrix4(o.matrixWorld).applyMatrix4(inv); P3.push([t.x, t.y, t.z, o, i]); } }
+    if (!P3.length) return;
+    let z0 = 1e9, z1 = -1e9; for (const q of P3) { if (q[2] < z0) z0 = q[2]; if (q[2] > z1) z1 = q[2]; }
+    // (the post's top: the highest point of the front sight on the gun's centre line - the ears that guard it stand higher, to either side)
+    const F = P3.filter((q) => q[2] < z0 + 0.03); let yF = -1e9, fw = 0; for (const q of F) fw = Math.max(fw, Math.abs(q[0]));
+    for (const q of F) if (Math.abs(q[0]) < Math.max(0.0022, fw * 0.25) && q[1] > yF) yF = q[1];
+    if (yF < -1e8) for (const q of F) if (q[1] > yF) yF = q[1];
+    if (z1 - z0 > 0.06) {
+      const R = P3.filter((q) => q[2] > z1 - 0.03); let xw = 0, yTop = -1e9; for (const q of R) { xw = Math.max(xw, Math.abs(q[0])); if (q[1] > yTop) yTop = q[1]; }
+      const ys = R.filter((q) => Math.abs(q[0]) < Math.max(0.002, xw * 0.2)).map((q) => q[1]).sort((a, b) => a - b);
+      let gap = 0, mid = yTop; for (let i = 0; i + 1 < ys.length; i++) if (ys[i + 1] - ys[i] > gap) { gap = ys[i + 1] - ys[i]; mid = (ys[i + 1] + ys[i]) / 2; }
+      const dy = yF - (gap > 0.004 ? mid : yTop);   // (a hole in it: its middle; a notch: the top of its ears)
+      if (Math.abs(dy) > 0.0004 && Math.abs(dy) < 0.04) {
+        const byMesh = new Map(); for (const q of R) { let a = byMesh.get(q[3]); if (!a) byMesh.set(q[3], a = []); a.push(q[4]); }
+        for (const [o, idx] of byMesh) {
+          if (idx.length === o.geometry.attributes.position.count) { o.position.y += dy; continue; }   // (the whole of this part is the rear sight)
+          const key = 'al' + dy.toFixed(4), src = o.geometry; let ng = src.userData[key];              // (front and rear in one piece: a copy of it with the rear lifted, made once)
+          if (!ng) { ng = src.clone(); const ps = ng.attributes.position; for (const i of idx) ps.setY(i, ps.getY(i) + dy); ps.needsUpdate = true; ng.computeBoundingSphere(); ng.computeBoundingBox(); src.userData[key] = ng; }
+          o.geometry = ng;
+        }
+      }
+    }
+    M.sightY = yF; M.ironY = yF; M.ironsAligned = true;
+  }
   function buildGun(def, atts, showHands) {
     const g = new THREE.Group();
     const isLeg = def.rarity === 'legendary' || def.rarity === 'mythic' || !!def.mythic;
@@ -700,6 +731,7 @@
       const gm = M.mag.geometry; if (!gm.boundingBox) gm.computeBoundingBox(); const sz = gm.boundingBox.getSize(new THREE.Vector3()); M.mag.userData.box = [sz.x, sz.y, sz.z]; M.mag.userData.shaped = true;
     }
     const AMMO_COL = { a_hollow: 0xd8b070, a_ap: 0x4a90e0, a_fire: 0xff6a20, a_cryo: 0x7ad8ff, a_toxic: 0x70e040, a_shock: 0xf0e040, a_explo: 0xff3030, a_rico: 0xc0c0c8, a_silver: 0xeef2ff, a_slug: 0x9a6a3a, a_pierce: 0xa060e8, a_bleed: 0xc02030, a_vamp: 0x9020b0, a_tracer: 0xff8040, a_hunter: 0x88a850 };
+    if (M.irons && M.irons.length) alignIrons(g, M);
     // ---- attachments ----
     const atop = (id) => G.ATT_BY_ID[id] && G.ATT_BY_ID[id].visual;
     if (atts.optic && G.Optics) {
@@ -952,6 +984,7 @@
   }
   W.buildGun = buildGun;
   // display model for shop / codex (no hands)
+  W.dbgModel = () => model;   // (the gun in hand, for the tools that measure it: docs/tools)
   W.displayModel = function (def, atts) { if (!mats) return new THREE.Group(); const m = buildGun(def, atts || {}, false); m.group.rotation.order = 'ZXY'; m.group.rotation.set(0.18, Math.PI * 0.56, 0.38); return m.group; };
 
   W.equip = function (immediate) {
@@ -1453,7 +1486,7 @@
     anim.kick = U.damp(anim.kick, 0, 14, dt);
     const sightY = model.sightY;
     const adsZ = model.lensZ !== undefined ? -(model.lensR || 0.028) * 2.32 - model.lensZ : model.winZ !== undefined ? -model.winH / G.Optics.DOT_T - model.winZ : -0.44;
-    const adsPos = V(0, -sightY - (model.dotSight || model.scopeOptic ? 0 : 0.012), adsZ);
+    const adsPos = V(0, -sightY - (model.dotSight || model.scopeOptic ? 0 : model.ironsAligned ? 0.0012 : 0.012), adsZ);   // (the post's top a hair under the point of aim)
     const p = hipPos.clone().lerp(adsPos, ads);
     let rx = 0, ry = 0, rz = 0;
     // bob

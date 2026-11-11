@@ -891,7 +891,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     ME.push(rb(0.02, 0.006, 0.026, 0.0012, 0, RY + 0.003, ff));
     for (const sx of [-1, 1]) IR.push(rb(0.003, SL - RY + 0.006, 0.014, 0.001, sx * 0.008, (SL + RY) / 2 + 0.003, ff));
     ME.push(rb(0.022, 0.006, 0.026, 0.0012, 0, RY + 0.003, fr));
-    IR.push(Geo.xf(ext(rrect(0, SL - 0.002, 0.017, (SL - RY) * 2 - 0.002, 0.003, 2), 0.004, 0.0006, [circle(0, SL, 0.003, 12)]), [0, 0, -fr]));
+    IR.push(Geo.xf(ext(rrect(0, SL - 0.002, 0.019, (SL - RY) * 2 - 0.002, 0.003, 2), 0.004, 0.0006, [circle(0, SL, 0.0056, 16)]), [0, 0, -fr]));   // (a ring to look through, not a pinhole)
     // magazine: curved, a raised panel and ribs on its sides, a floor plate
     const MG = smg ? [side([[0.031, -0.03], [0.031, -0.2], [0.063, -0.2], [0.063, -0.03]], 0.019, 0.002), side([[0.029, -0.196], [0.029, -0.208], [0.065, -0.208], [0.065, -0.196]], 0.023, 0.002)]
       : [side([[0.021, -0.03], [0.024, -0.09], [0.031, -0.15], [0.043, -0.205], [0.046, -0.214], [0.107, -0.197], [0.106, -0.187], [0.093, -0.14], [0.082, -0.09], [0.076, -0.03]], 0.0225, 0.002),

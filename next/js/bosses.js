@@ -368,21 +368,28 @@
     constructor(def, level, world) {
       super(def, level, world);
       this.maxHp = Math.round(3800 * this.hpScale); this.hp = this.maxHp;
-      const skin = mat('#5a4a5a', { map: G.Tex.tex.scales.map, normalMap: G.Tex.tex.scales.normalMap, roughness: 0.45 });
-      const belly = mat('#a88a6a', { map: G.Tex.tex.scales.map, roughness: 0.6 });
+      const skin = mat('#4c4448', { map: G.Tex.tex.scales.map, normalMap: G.Tex.tex.scales.normalMap, roughness: 0.45 });
+      const belly = mat('#74624e', { map: G.Tex.tex.scales.map, roughness: 0.6 });
       const tooth = mat('#e8e0c8', { roughness: 0.3 });
-      const eye = mat('#000', { emissive: 0x9aff40, emissiveIntensity: 2.5 });
+      const eye = mat('#000', { emissive: 0xffa838, emissiveIntensity: 1.3 });
       this.headG = new THREE.Group(); this.root.add(this.headG);
-      smesh(this.headG, PG.sph, skin, 1.5, 1.2, 2.0);
-      smesh(this.headG, PG.box, skin, 1.6, 0.6, 1.6, 0, 0.5, 0.6);
-      this.jaw = joint(this.headG, 0, -0.5, 0.5); smesh(this.jaw, PG.box, belly, 1.3, 0.4, 1.9, 0, -0.1, 0.9);
-      for (let i = 0; i < 8; i++) { smesh(this.headG, PG.cone, tooth, 0.12, 0.45, 0.12, -0.9 + i * 0.26, -0.45, 1.75, Math.PI); smesh(this.jaw, PG.cone, tooth, 0.1, 0.35, 0.1, -0.8 + i * 0.23, 0.15, 1.6); }
-      for (const s of [-1, 1]) { smesh(this.headG, PG.sph, eye, 0.18, 0.15, 0.1, s * 0.9, 0.5, 1.2); for (let k = 0; k < 3; k++) smesh(this.headG, PG.cone, belly, 0.15, 1.0, 0.15, s * (0.5 + k * 0.25), 0.9, -0.3 - k * 0.3, -0.8, 0, s * 0.4); }
+      // (the head carved, the body in rings each over the next: gfx.js foeGear. Where it stands, where its jaw hinges and what of it
+      // can be hit are as they were; without those shapes, the ball and boxes it was)
+      const GO = BS.h.gearOn, FG = G.GFX && G.GFX.foeGear, carved = !!(GO && FG && FG('wyrmhead') && FG('wyrmjaw') && FG('wyrmseg'));
+      const MM = { skin, belly, tooth, eye, def: skin, bone: mat('#b0a488', { roughness: 0.62 }), maw: mat('#3a0e0c', { roughness: 0.55 }) };
+      if (carved) { GO(this.headG, 'wyrmhead', MM, 0, 0, 0, 0, 0, 0, 1); this.jaw = joint(this.headG, 0, -0.5, 0.5); GO(this.jaw, 'wyrmjaw', MM, 0, 0, 0, 0, 0, 0, 1); }
+      else {
+        smesh(this.headG, PG.sph, skin, 1.5, 1.2, 2.0);
+        smesh(this.headG, PG.box, skin, 1.6, 0.6, 1.6, 0, 0.5, 0.6);
+        this.jaw = joint(this.headG, 0, -0.5, 0.5); smesh(this.jaw, PG.box, belly, 1.3, 0.4, 1.9, 0, -0.1, 0.9);
+        for (let i = 0; i < 8; i++) { smesh(this.headG, PG.cone, tooth, 0.12, 0.45, 0.12, -0.9 + i * 0.26, -0.45, 1.75, Math.PI); smesh(this.jaw, PG.cone, tooth, 0.1, 0.35, 0.1, -0.8 + i * 0.23, 0.15, 1.6); }
+        for (const s of [-1, 1]) { smesh(this.headG, PG.sph, eye, 0.18, 0.15, 0.1, s * 0.9, 0.5, 1.2); for (let k = 0; k < 3; k++) smesh(this.headG, PG.cone, belly, 0.15, 1.0, 0.15, s * (0.5 + k * 0.25), 0.9, -0.3 - k * 0.3, -0.8, 0, s * 0.4); }
+      }
       this.segs = [];
       for (let i = 0; i < 22; i++) {
         const g = new THREE.Group(); const r = 1.35 - i * 0.04;
-        smesh(g, PG.sph, skin, r, r, r * 0.8);
-        smesh(g, PG.cone, belly, 0.2, 0.7, 0.2, 0, r * 0.95, 0);
+        if (carved) GO(g, 'wyrmseg', MM, 0, 0, 0, 0, 0, 0, [r, r, r * 0.8]);
+        else { smesh(g, PG.sph, skin, r, r, r * 0.8); smesh(g, PG.cone, belly, 0.2, 0.7, 0.2, 0, r * 0.95, 0); }
         this.root.add(g); this.segs.push(g);
       }
       this.headPart = this.part({ name: def.name, hitW: [{ n: this.headG, r: 1.6, part: 'head' }], radius: 1.6, height: 2.5 });
@@ -840,23 +847,25 @@
       this.maxHp = Math.round(3900 * this.hpScale); this.hp = this.maxHp;
       const chit = mat('#2a2220', { map: G.Tex.tex.scales.map, normalMap: G.Tex.tex.scales.normalMap, roughness: 0.4 });
       const mark = mat('#5a0a08', { emissive: 0xa02010, emissiveIntensity: 1.0 });
-      const eye = mat('#000', { emissive: 0xff3020, emissiveIntensity: 2.4 });
+      const eye = mat('#000', { emissive: 0xc82a18, emissiveIntensity: 1.5 });
+      // (carved: gfx.js foeGear. Its joints, what of it can be hit and the mark on its back are as they were)
+      const GO = BS.h.gearOn, FG = G.GFX && G.GFX.foeGear, carved = !!(GO && FG && FG('broodabd') && FG('broodceph') && FG('broodfang') && FG('broodleg1') && FG('broodleg2')), MM = { chit, eye, def: chit };
       this.body = joint(this.root, 0, 2.2, 0);
       this.abd = joint(this.body, 0, 0.5, -2.2);
-      smesh(this.abd, PG.sph, chit, 2.0, 1.7, 2.4);
+      if (carved) GO(this.abd, 'broodabd', MM, 0, 0, 0, 0, 0, 0, 1); else smesh(this.abd, PG.sph, chit, 2.0, 1.7, 2.4);
       this.weak = mesh(this.abd, PG.sph, mark, 0.9, 0.7, 1.0, 0, 1.3, -0.4);
       const ceph = joint(this.body, 0, 0, 0.6);
-      smesh(ceph, PG.sph, chit, 1.3, 1.0, 1.4);
-      for (let i = 0; i < 8; i++) smesh(ceph, PG.sph, eye, 0.12, 0.12, 0.1, (i % 4 - 1.5) * 0.25, 0.45 + (i > 3 ? 0.2 : 0), 1.2);
+      if (carved) GO(ceph, 'broodceph', MM, 0, 0, 0, 0, 0, 0, 1);
+      else { smesh(ceph, PG.sph, chit, 1.3, 1.0, 1.4); for (let i = 0; i < 8; i++) smesh(ceph, PG.sph, eye, 0.12, 0.12, 0.1, (i % 4 - 1.5) * 0.25, 0.45 + (i > 3 ? 0.2 : 0), 1.2); }
       this.fangs = [];
-      for (const s of [-1, 1]) { const f = joint(ceph, s * 0.35, -0.5, 1.1); smesh(f, PG.cone, chit, 0.15, 0.7, 0.15, 0, -0.3, 0.1, Math.PI - 0.3); this.fangs.push(f); }
+      for (const s of [-1, 1]) { const f = joint(ceph, s * 0.35, -0.5, 1.1); if (carved) GO(f, 'broodfang', MM, 0, -0.2, 0.15, 0, 0, s * 0.18, 1); else smesh(f, PG.cone, chit, 0.15, 0.7, 0.15, 0, -0.3, 0.1, Math.PI - 0.3); this.fangs.push(f); }
       this.legs = [];
       for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
         const hip = joint(this.body, s * 0.9, 0.1, 1.0 - i * 0.6); hip.rotation.y = s * (0.5 - i * 0.35) + (s < 0 ? Math.PI : 0);
         const up = joint(hip, 0, 0, 0); up.rotation.z = 0.8;
-        smesh(up, PG.box, chit, 2.4, 0.2, 0.2, 1.2, 0, 0);
+        if (carved) GO(up, 'broodleg1', MM, 0, 0, 0, 0, 0, 0, 1); else smesh(up, PG.box, chit, 2.4, 0.2, 0.2, 1.2, 0, 0);
         const kn = joint(up, 2.4, 0, 0); kn.rotation.z = -2.1;
-        smesh(kn, PG.box, chit, 3.0, 0.15, 0.15, 1.5, 0, 0);
+        if (carved) GO(kn, 'broodleg2', MM, 0, 0, 0, 0, 0, 0, 1); else smesh(kn, PG.box, chit, 3.0, 0.15, 0.15, 1.5, 0, 0);
         this.legs.push({ up, hip, ph: i * 1.3 + (s > 0 ? Math.PI : 0) });
       }
       this.main = this.part({ name: def.name, hitW: [{ n: ceph, r: 1.3, part: 'body' }, { n: this.abd, r: 1.9, part: 'body' }, { n: this.abd, r: 0.9, part: 'head', o: V(0, 1.3, -0.4) }], radius: 2.5, height: 4 });

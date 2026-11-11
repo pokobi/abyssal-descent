@@ -1686,6 +1686,96 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     fpart('iron', [toZ(hl([[0.0005, 2.05], [0.11, 2.05], [0.105, 2.75], [0.07, 2.84], [0.0005, 2.84]], 1, 1, 10)), toZ(rbx(0.04, 0.7, 0.06, 0.01, 0.1, 1.7, 0)), toZ(rbx(0.04, 0.7, 0.06, 0.01, -0.1, 1.7, 0)), toZ(spike(0.07, 0.5, [0, 2.4, 0.3], [HX, 0, 0], 4))], 1.5),
     fpart('blade', Geo.xf(ext([[2.1, 0.08], [2.7, 0.08], [2.95, 0.5], [3.02, 1.05], [2.6, 1.3], [2.0, 1.36], [1.55, 1.2], [1.35, 0.95], [1.9, 0.8], [2.0, 0.45]], 0.07, 0.03), null, [0, -HX, 0]), 1.5),
   ];
+  // ---- the great worm (bosses.js Wyrm), at its own measure: the head some three metres through, forward along +z, the jaw's hinge
+  // at (0, -0.5, 0.5). A skull drawn out into a snout with a hook at its end, a ridge over each eye and one down the middle, plates
+  // of the neck each over the next, a flat roof to the mouth; teeth of unequal length along the lips, long ones in front; horns
+  // swept back from behind the eyes. The jaw: two bones and a chin, flat above, a trough for the tongue. A ring of the body: a
+  // barrel with a collar at its hinder edge, a spine on its back with a smaller one each side, a paler belly.
+  const wyTeeth = (list, up) => list.map(([x, z, h, r]) => spike(r, h, [x, up ? 0.02 + h / 2 : -0.45 - h / 2, z], [up ? 0 : Math.PI, 0, (up ? -1 : 1) * Math.sign(x) * 0.16], 5));
+  GEAR.wyrmhead = () => {
+    const S = X.S, sm = S.smin;
+    const fn = (x, y, z) => {
+      const ax = Math.abs(x);
+      let d = S.ell(x, y, z, 0, 0.2, -0.3, 1.45, 1.15, 1.6);
+      d = sm(d, S.cone(x, y, z, 0, 0.25, 0.5, 0, 0.02, 2.45, 1.05, 0.5), 0.35);
+      d = sm(d, S.cap(ax, y, z, 0.92, 0.95, 0.2, 0.62, 0.72, 1.9, 0.26), 0.22);
+      d = sm(d, S.cap(x, y, z, 0, 1.25, -1.0, 0, 0.55, 2.2, 0.15), 0.2);
+      d = sm(d, S.cone(x, y, z, 0, 0.05, 2.4, 0, -0.6, 2.85, 0.42, 0.06), 0.18);
+      for (let i = 0; i < 3; i++) d = sm(d, S.tor(x, y, z, 0, 0.2, -0.7 - i * 0.5, 0, -0.243, 0.97, 1.4 - i * 0.05, 0.25 - i * 0.03), 0.14);
+      d = S.cut(d, S.sph(ax, y, z, 1.05, 0.55, 1.25, 0.27), 0.09);
+      d = S.cut(d, S.box(x, y, z, 0, -1.45, 1.3, 2.3, 1.0, 1.9, 0.1), 0.14);
+      d = S.cut(d, S.cap(ax, y, z, 0.24, 0.2, 2.15, 0.36, 0.3, 1.9, 0.065), 0.04);
+      return d + Math.sin(x * 5.1 + z * 2.3) * Math.sin(y * 6.3 - z * 3.1) * 0.022;
+    };
+    const up = [], w = (z) => 1.05 - (z - 0.5) * 0.28;
+    [[0.7, 0.5], [1.1, 0.7], [1.5, 0.46], [1.9, 0.6], [2.25, 0.4]].forEach(([z, h]) => { for (const s of [-1, 1]) up.push([s * (w(z) - 0.08), z, h, 0.11]); });
+    for (const s of [-1, 1]) up.push([s * 0.2, 2.52, 0.52, 0.1]);
+    const horns = [];
+    for (const s of [-1, 1]) for (const [a, b, c, r] of [[[0.75, 1.0, -0.4], [1.0, 1.5, -1.0], [1.05, 1.75, -1.75], 0.19], [[1.1, 0.6, -0.7], [1.5, 0.95, -1.3], [1.6, 1.05, -2.0], 0.17], [[1.2, 0.05, -0.8], [1.6, 0.15, -1.4], [1.7, 0.1, -2.0], 0.15]])
+      horns.push(tubeR([[s * a[0], a[1], a[2]], [s * b[0], b[1], b[2]], [s * c[0], c[1], c[2]]], (t) => r * (1 - t) + 0.02, 6, 9));
+    return [fpart('skin', [S.mesh(fn, [-1.8, -0.75, -2.3], [1.8, 1.75, 3.0], 0.085)], 0.6), fpart('tooth', wyTeeth(up, false), 2), fpart('bone', horns, 1.5),
+      fpart('eye', [ball(0.1, [0.98, 0.56, 1.3]), ball(0.1, [-0.98, 0.56, 1.3]), ball(0.065, [0.96, 0.8, 0.72]), ball(0.065, [-0.96, 0.8, 0.72])], 2), fpart('maw', [ball(1, [0, -0.47, 1.0], [0.85, 0.04, 1.5])], 1)];
+  };
+  GEAR.wyrmjaw = () => {
+    const S = X.S, sm = S.smin;
+    const fn = (x, y, z) => {
+      const ax = Math.abs(x);
+      let d = S.cone(x, y, z, 0, -0.25, -0.3, 0, -0.18, 2.0, 0.95, 0.42);
+      d = sm(d, S.cap(ax, y, z, 0.85, -0.1, -0.6, 0.5, -0.1, 1.5, 0.26), 0.2);
+      d = sm(d, S.sph(x, y, z, 0, -0.22, 2.0, 0.4), 0.2);
+      d = S.cut(d, S.box(x, y, z, 0, 1.05, 0.8, 2.0, 1.0, 2.2, 0.08), 0.12);
+      d = S.cut(d, S.cap(x, y, z, 0, 0.15, -0.2, 0, 0.12, 1.5, 0.3), 0.14);
+      return d + Math.sin(x * 5.3 + z * 2.1) * Math.sin(y * 6.1 + z * 2.7) * 0.02;
+    };
+    const lo = [], w = (z) => 0.92 - (z + 0.3) * 0.22;
+    [[0.2, 0.42], [0.7, 0.58], [1.2, 0.4], [1.65, 0.5]].forEach(([z, h]) => { for (const s of [-1, 1]) lo.push([s * (w(z) - 0.2), z, h, 0.1]); });
+    for (const s of [-1, 1]) lo.push([s * 0.17, 2.08, 0.42, 0.09]);
+    return [fpart('belly', [S.mesh(fn, [-1.3, -1.35, -1.05], [1.3, 0.25, 2.55], 0.085)], 0.6), fpart('tooth', wyTeeth(lo, true), 2), fpart('maw', [ball(1, [0, 0.03, 0.8], [0.66, 0.04, 1.25])], 1)];
+  };
+  GEAR.wyrmseg = () => {
+    const sp = [tubeR([[0, 0.95, 0.1], [0, 1.5, 0.3], [0, 1.85, 0.75]], (t) => 0.16 * (1 - t) + 0.015, 6, 8)];
+    for (const s of [-1, 1]) sp.push(tubeR([[s * 0.55, 0.8, 0.1], [s * 0.85, 1.15, 0.25], [s * 0.95, 1.3, 0.6]], (t) => 0.1 * (1 - t) + 0.012, 5, 7));
+    return [fpart('skin', [lathe([[0.6, -1.05], [0.9, -0.9], [1.0, -0.45], [1.02, 0.0], [1.0, 0.35], [0.94, 0.62], [1.06, 0.68], [1.07, 0.82], [0.86, 0.98], [0.55, 1.08]], 22)], 0.7),
+      fpart('bone', sp, 1.5), fpart('belly', [ball(1, [0, -0.6, 0], [0.68, 0.44, 0.84])], 0.7)];
+  };
+  // ---- the brood mother (bosses.js BroodMother), at its own measure: the abdomen an egg with grooves across its back and
+  // spinnerets behind, drawn in to the waist in front; the fore-body a low carapace with a pit in its middle, the head rising before
+  // it, the roots of the fangs under that; eight eyes, two of them large; a fang that curves in; legs in two lengths, each thick at
+  // its root and drawn to a point, with the swell of a joint and a few bristles.
+  GEAR.broodabd = () => {
+    const S = X.S, sm = S.smin, ss = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const fn = (x, y, z) => {
+      let d = S.ell(x, y, z, 0, 0, 0, 2.0, 1.7, 2.4);
+      d = sm(d, S.cone(x, y, z, 0, -0.5, -2.1, 0, -0.95, -2.9, 0.5, 0.12), 0.3);
+      d = sm(d, S.cone(x, y, z, 0, -0.15, 1.9, 0, -0.4, 2.65, 0.75, 0.38), 0.3);
+      let g = 0; for (const zi of [-1.35, -0.55, 0.25, 1.05]) g += Math.exp(-(z - zi) * (z - zi) / 0.018);
+      return d + g * 0.07 * ss(-0.5, 0.5, y) + Math.sin(x * 4.3 + z * 3.1) * Math.sin(y * 5.1 - z * 2.3) * 0.025;
+    };
+    return [fpart('chit', [S.mesh(fn, [-2.25, -2.0, -3.1], [2.25, 1.95, 2.9], 0.11)], 0.5)];
+  };
+  GEAR.broodceph = () => {
+    const S = X.S, sm = S.smin;
+    const fn = (x, y, z) => {
+      const ax = Math.abs(x);
+      let d = S.ell(x, y, z, 0, -0.05, -0.1, 1.3, 0.85, 1.4);
+      d = sm(d, S.ell(x, y, z, 0, 0.3, 0.75, 0.75, 0.6, 0.7), 0.3);
+      d = S.cut(d, S.ell(x, y, z, 0, 0.98, -0.35, 0.3, 0.25, 0.5), 0.2);
+      d = sm(d, S.cap(ax, y, z, 0.36, -0.3, 1.0, 0.36, -0.78, 1.36, 0.3), 0.15);
+      for (let i = 0; i < 4; i++) d = sm(d, S.sph(ax, y, z, 1.0, -0.2, 0.75 - i * 0.6, 0.3), 0.14);   // the hips
+      return d + Math.sin(x * 6.1 + z * 4.3) * Math.sin(y * 7.3 - z * 3.7) * 0.015;
+    };
+    const eyes = []; for (const s of [-1, 1]) { eyes.push(ball(0.12, [s * 0.2, 0.52, 1.36])); eyes.push(ball(0.075, [s * 0.47, 0.5, 1.2])); eyes.push(ball(0.07, [s * 0.36, 0.76, 1.12])); eyes.push(ball(0.06, [s * 0.14, 0.82, 1.14])); }
+    return [fpart('chit', [S.mesh(fn, [-1.5, -1.2, -1.6], [1.5, 1.05, 1.75], 0.075)], 0.7), fpart('eye', eyes, 2)];
+  };
+  GEAR.broodfang = () => [fpart('chit', [tubeR([[0, 0.0, 0.2], [0, -0.5, 0.42], [0, -0.95, 0.2], [0, -1.15, -0.1]], (t) => 0.17 * (1 - t) + 0.02, 7, 12)], 1.5)];
+  GEAR.broodleg1 = () => {
+    const br = []; for (let i = 0; i < 5; i++) br.push(spike(0.025, 0.3, [0.5 + i * 0.42, 0.24 - i * 0.012, (i % 2 ? 0.08 : -0.08)], [0.3 * (i % 2 ? 1 : -1), 0, -0.5], 4));
+    return [fpart('chit', [tubeR([[0, 0, 0], [0.9, 0.12, 0], [1.8, 0.07, 0], [2.4, 0, 0]], (t) => 0.27 - t * 0.1, 8, 12), ball(0.24, [2.4, 0, 0]), ball(0.3, [0, 0, 0])].concat(br), 1.2)];
+  };
+  GEAR.broodleg2 = () => {
+    const br = []; for (let i = 0; i < 6; i++) br.push(spike(0.02, 0.26, [0.4 + i * 0.4, 0.16 - i * 0.018, (i % 2 ? 0.06 : -0.06)], [0.3 * (i % 2 ? 1 : -1), 0, -0.5], 4));
+    return [fpart('chit', [tubeR([[0, 0, 0], [1.2, -0.1, 0], [2.4, -0.04, 0], [3.0, 0.06, 0]], (t) => 0.17 - t * 0.14, 7, 14), ball(0.14, [1.5, -0.09, 0])].concat(br), 1.2)];
+  };
   X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
 
   // ---- the furniture of the halls (props.js), in metres, standing on the origin and looking to +z: lists of parts { g, m (which of

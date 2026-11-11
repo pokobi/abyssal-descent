@@ -100,6 +100,39 @@
     return true;
   }
   P.put = put; P.hsh = hsh;
+  // grass: a tuft at (x, y, z) and n more about it within r (gy(x, z): the ground's height there, where it is not flat)
+  P.tuft = function (w, x, y, z, s, tint, n, r, gy) {
+    if (!(G.GFX && G.GFX.propGeo && G.GFX.propGeo('tuft'))) return false;
+    n = n === undefined ? 6 : n; r = r || 1.3;
+    for (let i = 0; i <= n; i++) {
+      const a = hsh(x, z, i) * 6.283, d = i ? (0.25 + hsh(x, z, i + 20) * 0.75) * r : 0, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, k = (s || 1) * (0.55 + hsh(px, pz, 3) * 0.6), c = 0.8 + hsh(px, pz, 5) * 0.4;
+      put(w, 'tuft', px, gy && i ? gy(px, pz) : y, pz, hsh(px, pz, 7) * 6.283, k * 0.5, { sy: k * 0.44, inst: true, tint: tint ? [tint[0] * c, tint[1] * c, tint[2] * c] : [c, c, c * 0.95] });
+    }
+    return true;
+  };
+
+  // grass over the open ground of a field of turf (world.js calls it once everything stands): a grid of places, each moved a little
+  // by where it is; thick in drifts and thin between them; none on a path, a floor of boards, under a wall or beside water
+  P.meadow = function (w) {
+    const B = w.mats && w.mats.biome; if (!B || B.floorTex !== 'grass' || w._meadow) return; w._meadow = true;
+    if (!(G.GFX && G.GFX.propGeo && G.GFX.propGeo('tuft'))) return;
+    const x0 = (w.xo || 0) + 1.5, x1 = (w.xo || 0) + (w.Wn || w.W) - 1.5, z0 = (w.zo || 0) + 1.5, z1 = (w.zo || 0) + (w.Dn || w.D) - 1.5, step = 1.25;
+    const cells = (x1 - x0) * (z1 - z0) / (step * step), thin = Math.min(1, 4200 / Math.max(1, cells));   // (a very large field: fewer to the metre)
+    const gy = w.groundTop ? (x, z) => w.groundTop(x, z) : () => 0;
+    const blocked = (x, z, y) => {
+      const a = w.hash.get(w._hkey(Math.floor(x / 4), Math.floor(z / 4))); if (!a) return false;   // (world.js keeps its colliders by cells of 4 m)
+      for (const c of a) { if (c.alive === false || x < c.x0 - 0.15 || x > c.x1 + 0.15 || z < c.z0 - 0.15 || z > c.z1 + 0.15) continue; if (c.y1 > y + 0.03 && c.y0 < y + 1.2) return true; }
+      return false;
+    };
+    const tint = B.grassTint ? null : null;
+    for (let x = x0; x < x1; x += step) for (let z = z0; z < z1; z += step) {
+      const drift = hsh(Math.floor(x / 6), Math.floor(z / 6), 11) * 0.6 + hsh(Math.floor(x / 2.5), Math.floor(z / 2.5), 12) * 0.4;
+      if (hsh(x, z, 13) > (0.25 + drift * 0.75) * thin) continue;
+      const px = x + (hsh(x, z, 14) - 0.5) * step, pz = z + (hsh(x, z, 15) - 0.5) * step, y = gy(px, pz);
+      if (!(y > -50) || blocked(px, pz, y)) continue;
+      P.tuft(w, px, y, pz, 0.75 + drift * 0.55, tint, drift > 0.55 ? 2 : 1, 0.6, w.groundTop ? gy : null);
+    }
+  };
 
   // ---------- light fixtures ----------
   // wall torch. dir: outward normal from wall ('px','nx','pz','nz')

@@ -260,17 +260,24 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
 }`;
   SRC.skin = [1.1, hide(10, 101)];
   SRC.scales = [1.3, hide(18, 107)];
-  SRC.grass = [1.2, `
+  // (the turf of a field left to itself: short blades lying this way and that in clumps, dry among the green, moss in the damp, bare
+  // earth showing in ragged patches - not round blots)
+  SRC.grass = [0.7, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
-  float n = fbm(uv, 8., 131.), m = fbm(uv, 3., 134.), fine = fbm(uv, 64., 5.);
-  float b1 = vnA(vec2(uv.x * 220. + fbm3(uv, 20., 7.) * 14., uv.y * 40.), vec2(220., 40.), 3.), b2 = vnA(vec2(uv.x * 60., uv.y * 260.), vec2(60., 260.), 9.);
-  float blade = b1 * .6 + b2 * .4;
-  float dry = smoothstep(.56, .8, m), dirt = smoothstep(.62, .7, fbm(uv, 5., 140.) + (fine - .5) * .2);
-  vec3 g = vec3(.27 + n * .2 + blade * .14 + dry * .3, .42 + n * .28 + blade * .2 + dry * .12, .15 + n * .12 + blade * .04);
-  vec3 soil = vec3(.42, .34, .24) * (.75 + n * .5 + (fine - .5) * .3);
+  float n = fbm(uv, 8., 131.), m = fbm(uv, 3., 134.), fine = fbm(uv, 64., 5.), clump = fbm(uv, 24., 31.);
+  float b1 = vnA(vec2(uv.x * 260. + fbm3(uv, 20., 7.) * 4., uv.y * 64.), vec2(260., 64.), 3.), b2 = vnA(vec2(uv.x * 70. + fbm3(uv, 16., 8.) * 2., uv.y * 300.), vec2(70., 300.), 9.);
+  float blade = mix(b1, b2, smoothstep(.42, .58, clump));
+  float dry = smoothstep(.42, .74, m + (n - .5) * .45);
+  float dirt = smoothstep(.6, .72, fbm(uv, 6., 140.) * .62 + fbm(uv, 26., 141.) * .38 + (fine - .5) * .12) * .85;
+  float moss = smoothstep(.58, .8, fbm(uv, 12., 150.)) * (1. - dry);
+  vec3 g = mix(vec3(.40, .52, .26), vec3(.56, .64, .32), n);
+  g = mix(g, vec3(.74, .68, .42), dry * .7);
+  g = mix(g, vec3(.30, .42, .22), moss * .35);
+  g *= .86 + blade * .4;
+  vec3 soil = vec3(.46, .385, .29) * (.72 + n * .45 + (fine - .5) * .3);
   col = S(mix(g, soil, dirt));
-  h = mix(.38 + blade * .42 + n * .2, .2 + n * .2 + (fine - .5) * .15, dirt);
-  rough = mix(.92, 1., dirt); metal = 0.;
+  h = mix(.36 + blade * .2 + n * .3 + (fine - .5) * .12, .2 + n * .22 + (fine - .5) * .15, dirt);
+  rough = mix(.93, 1., dirt); metal = 0.;
 }`];
   SRC.marble = [0.5, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
@@ -1925,6 +1932,19 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const t = new THREE.ConeGeometry(0.8, 0.5, 6).toNonIndexed(); t.translate(0, 0.75, 0);
     const m = Geo.merge([g, t]), ps = m.attributes.position; for (let i = 0; i < ps.count; i++) { const y = ps.getY(i); if (y > 0.9) { ps.setX(i, 0.22); ps.setZ(i, -0.12); } else { const x = ps.getX(i), z = ps.getZ(i); ps.setX(i, x * (1 + 0.12 * Math.sin(Math.atan2(z, x) * 3 + 1))); } }
     m.computeVertexNormals(); return [{ g: m, m: 'ice' }];
+  };
+  // a tuft of grass, one high and about one across: blades from one root, each bent outward and drawn to a point, dark at the foot
+  PROP.tuft = () => {
+    const L = [], C = [];
+    for (let i = 0; i < 8; i++) {
+      const a = i * 2.4, len = 0.5 + ((i * 7) % 5) * 0.12, lean = 0.2 + ((i * 3) % 4) * 0.17, w = 0.016 + (i % 3) * 0.006;
+      const g = sheet(0, len, (v) => w * (1 - v * v * 0.96) + 0.001, (x, v) => v * v * lean + x * 1.5 * (i % 2 ? 1 : -1) * v, 3, 1, 0);
+      Geo.xf(g, [Math.cos(a) * 0.08 * (i % 4), 0, Math.sin(a) * 0.08 * (i % 4)], [0, a, 0]); L.push(g);
+    }
+    const g = Geo.merge(L), ps = g.attributes.position, col = new Float32Array(ps.count * 3);
+    for (let i = 0; i < ps.count; i++) { const k = 0.34 + 0.66 * Math.min(1, ps.getY(i) / 0.7); col[i * 3] = k; col[i * 3 + 1] = k; col[i * 3 + 2] = k * 0.9; }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return [{ g, m: 'tuft' }];
   };
   X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
 

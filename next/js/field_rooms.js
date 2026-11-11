@@ -19,7 +19,7 @@
     T.crags(w, rng, 'W', -2, D + 2, sd0, sd1, 6, 9, gy); T.crags(w, rng, 'E', -2, D + 2, sd0, sd1, 6, 9, gy);
     let a = -2; for (const g of [...LG.gateXs(W, o.gates || 1), W + 8]) { if (g - 6 > a + 0.5) T.crags(w, rng, 'N', a, g - 6, 1.5, 3, 7, 10, gy); a = g + 6; }
     T.crags(w, rng, 'S', -2, W / 2 - 7.5, o.keep ? 0.3 : 1.5, o.keep ? 0.6 : 3, 6, 9, gy); T.crags(w, rng, 'S', W / 2 + 7.5, W + 2, o.keep ? 0.3 : 1.5, o.keep ? 0.6 : 3, 6, 9, gy);
-    for (let i = 0; i < 40; i++) { const x = rng.range(4, W - 4), z = rng.range(4, D - 4); if (!clear(o, x, z, 0.5)) continue; for (let k = 0; k < 2; k++) w.batch.geo('vine', PG().plane, P().M(x, 0.2, z, 0.7, 0.45, 1, 0, k * Math.PI / 2 + rng.range(0, 1), 0), { su: 0.6, sv: 0.5, tint: [1.15, 1.05, 0.62] }); }
+    for (let i = 0; i < 40; i++) { const x = rng.range(4, W - 4), z = rng.range(4, D - 4); if (!clear(o, x, z, 0.5)) continue; const r0 = rng.range(0, 1), r1 = rng.range(0, 1); if (!P().tuft(w, x, 0, z, 1, [1.25, 1.1, 0.66], 3, 0.9)) for (let k = 0; k < 2; k++) w.batch.geo('vine', PG().plane, P().M(x, 0.2, z, 0.7, 0.45, 1, 0, k * Math.PI / 2 + (k ? r1 : r0), 0), { su: 0.6, sv: 0.5, tint: [1.15, 1.05, 0.62] }); }
     w.addLight(W / 2, 6, D / 2, { flame: 0, intensity: 6, range: 24, color: '#ffd8b0', emit: false, prio: 0.8 });
   };
   // ---- a round chamber cut in the rock at the foot of a shaft, the night sky high above, chains hanging down

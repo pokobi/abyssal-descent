@@ -828,7 +828,8 @@
       // grass tufts & wildflowers (decor only)
       for (let i = 0; i < 70; i++) {
         const x = rng.range(3, W - 3), z = rng.range(3, D - 3);
-        for (let k = 0; k < 2; k++) w.batch.geo('vine', G.Props.PG.plane, G.Props.M(x, 0.25, z, 0.6, 0.5, 1, 0, k * Math.PI / 2 + rng.range(0, 1), 0), { su: 0.6, sv: 0.5 });
+        const r0 = rng.range(0, 1), r1 = rng.range(0, 1);   // (the dice as they were thrown)
+        if (!G.Props.tuft(w, x, 0, z, 1, null, 9, 1.6)) for (let k = 0; k < 2; k++) w.batch.geo('vine', G.Props.PG.plane, G.Props.M(x, 0.25, z, 0.6, 0.5, 1, 0, k * Math.PI / 2 + (k ? r1 : r0), 0), { su: 0.6, sv: 0.5 });
       }
     }
     if (B === 'sky' || B === 'void') {

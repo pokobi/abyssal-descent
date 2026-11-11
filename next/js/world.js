@@ -919,6 +919,7 @@
 
     flushDeferred() { const d = this.deferred; this.deferred = []; for (const f of d) f(this.group); }
     finalize(scene, quality) {
+      if (G.Props && G.Props.meadow && quality !== 'low') { try { G.Props.meadow(this); } catch (e) { /* no grass */ } }   // (grass over the open turf: props.js)
       for (const f of this.deferred) f(this.group);
       this.deferred = [];
       this.mergeStatic();

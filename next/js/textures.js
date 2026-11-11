@@ -582,6 +582,16 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
       M.block = std(t.marble, B.stone2, 0.4, 0, 0.8); M.wall = std(t.ashlar, B.stone, 0.55, 0, 0.8);
       M.trim = std(t.metal, B.trim, 0.32, B.trimMetal ?? 0.85, 0.4); // (trimMetal: a less mirror-like gilt where there is little to reflect)
     }
+    // (grass in tufts, props.js: the colour of the turf it stands in; it leans with the wind, more at its tips, each tuft in its own time)
+    M.tuft = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x7e8a50).multiply(new THREE.Color(B.grassTint || '#ffffff')), roughness: 1, side: THREE.DoubleSide, vertexColors: true });
+    M.tuft.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = T.lavaT;
+      sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  #ifdef USE_INSTANCING
+  { float ph = instanceMatrix[3].x * 0.7 + instanceMatrix[3].z * 0.9, k = transformed.y * transformed.y;
+    transformed.x += (sin(uTime * 1.3 + ph) * 0.09 + sin(uTime * 3.1 + ph * 2.3) * 0.03) * k; transformed.z += sin(uTime * 1.7 + ph * 1.3) * 0.05 * k; }
+  #endif`);
+    };
     M.leaf = new THREE.MeshStandardMaterial({ color: B.leaf ?? (B.outdoor === 'sky' ? 0x8ab05a : 0x4f6a2a), roughness: 0.9, flatShading: true });
     M.cloud = new THREE.MeshBasicMaterial({ map: T.spr.cloud, color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
     // (the look of water is all in its shader: waterize below; deep green-blue, glossy, its own alpha)

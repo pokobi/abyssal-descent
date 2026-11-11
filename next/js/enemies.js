@@ -51,14 +51,14 @@
     let orn = null;
     switch (def.orn) {
       case 'horns': orn = new THREE.MeshStandardMaterial({ color: 0x3a3028, roughness: 0.5 }); break;
-      case 'ember': orn = new THREE.MeshStandardMaterial({ color: 0x2a1008, emissive: 0xff6a20, emissiveIntensity: 1.8 }); break;
-      case 'ice': orn = new THREE.MeshStandardMaterial({ color: 0xcfefff, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.85, emissive: 0x204060 }); break;
-      case 'spikes': orn = new THREE.MeshStandardMaterial({ color: 0x8aa040, emissive: 0x2a4000, roughness: 0.4 }); break;
-      case 'sparks': orn = new THREE.MeshStandardMaterial({ color: 0x202020, emissive: 0xffe070, emissiveIntensity: 1.6 }); break;
-      case 'wisps': orn = new THREE.MeshStandardMaterial({ color: 0x0a0810, emissive: 0x6020a0, emissiveIntensity: 0.8 }); break;
-      case 'bones': orn = new THREE.MeshStandardMaterial({ color: 0xe0d8c0, roughness: 0.6 }); break;
-      case 'crystal': orn = new THREE.MeshStandardMaterial({ color: 0x80b8ff, emissive: 0x2050a0, emissiveIntensity: 0.9, roughness: 0.05, metalness: 0.3 }); break;
-      case 'abyss': orn = new THREE.MeshStandardMaterial({ color: 0x0a0408, emissive: 0x8a0a1a, emissiveIntensity: 1.2, roughness: 0.3 }); break;
+      case 'ember': orn = new THREE.MeshStandardMaterial({ color: 0x2a1008, emissive: 0xff5a18, emissiveIntensity: 1.3 }); break;
+      case 'ice': orn = new THREE.MeshStandardMaterial({ color: 0x6e8a9c, roughness: 0.16, metalness: 0.1, transparent: true, opacity: 0.88, emissive: 0x0a1822, flatShading: true }); break;
+      case 'spikes': orn = new THREE.MeshStandardMaterial({ color: 0x464e28, emissive: 0x0c1200, roughness: 0.55 }); break;
+      case 'sparks': orn = new THREE.MeshStandardMaterial({ color: 0x202020, emissive: 0xffe070, emissiveIntensity: 1.3 }); break;
+      case 'wisps': orn = new THREE.MeshStandardMaterial({ color: 0x0a0810, emissive: 0x3a2060, emissiveIntensity: 0.7 }); break;
+      case 'bones': orn = new THREE.MeshStandardMaterial({ color: 0xa89e88, roughness: 0.7 }); break;
+      case 'crystal': orn = new THREE.MeshStandardMaterial({ color: 0x48648c, emissive: 0x122c54, emissiveIntensity: 0.5, roughness: 0.12, metalness: 0.3, flatShading: true }); break;
+      case 'abyss': orn = new THREE.MeshStandardMaterial({ color: 0x0a0408, emissive: 0x5a0610, emissiveIntensity: 0.5, roughness: 0.4 }); break;
     }
     return { skin, sec, eye, dark, tooth, orn, all: [skin, sec, eye, dark, tooth].concat(orn ? [orn] : []) };
   }
@@ -938,16 +938,23 @@
     if (!M.orn) return;
     const o = m.orn, head = o.head, back = o.back;
     const z0 = o.backZ[0], z1 = o.backZ[1];
+    // (what marks a variant: grown out of the body, not stuck on it - horns in two lengths that curve, embers sunk in cracks, ice and
+    // crystal in six-sided spikes of unequal height, a ridge of spines, bones lashed to the back, thorns of the dark. The dice are
+    // thrown as often as before)
+    const GP = G.GFX && G.GFX.propGeo, crys = GP && GP('crystal') ? GP('crystal')[0].g : PG.oct3, lb = GP && GP('longbone') ? GP('longbone')[0].g : null;
     switch (def.orn) {
-      case 'horns': for (const s of [-1, 1]) { mesh(head, PG.cone, M.orn, 0.06, 0.4, 0.06, s * 0.14, 0.18, -0.05, -0.6, 0, s * 0.5); } break;
-      case 'ember': for (let i = 0; i < 6; i++) mesh(back, PG.sph, M.orn, 0.08, 0.04, 0.08, U.rand(-0.15, 0.15), o.backY, U.lerp(z0, z1, i / 5)); break;
-      case 'ice': for (let i = 0; i < 5; i++) mesh(back, PG.oct3, M.orn, 0.08, 0.28, 0.08, U.rand(-0.12, 0.12), o.backY + 0.1, U.lerp(z0, z1, i / 4), U.rand(-0.5, 0.5), 0, U.rand(-0.5, 0.5)); break;
-      case 'spikes': for (let i = 0; i < 6; i++) mesh(back, PG.cone, M.orn, 0.05, 0.24, 0.05, 0, o.backY + 0.08, U.lerp(z0, z1, i / 5), -0.5); break;
-      case 'sparks': for (let i = 0; i < 4; i++) mesh(back, PG.sph, M.orn, 0.04, 0.04, 0.04, U.rand(-0.2, 0.2), o.backY + U.rand(0, 0.1), U.lerp(z0, z1, i / 3)); break;
-      case 'wisps': for (let i = 0; i < 3; i++) mesh(back, PG.cone, M.orn, 0.08, 0.35, 0.08, U.rand(-0.15, 0.15), o.backY + 0.12, U.lerp(z0, z1, i / 2), -0.8 + U.rand(-0.3, 0.3)); break;
-      case 'bones': for (let i = 0; i < 4; i++) mesh(back, PG.box, M.orn, 0.3, 0.04, 0.08, 0, o.backY + 0.02, U.lerp(z0, z1, i / 3)); mesh(head, PG.box, M.orn, 0.2, 0.05, 0.15, 0, 0.14, 0.05); break;
-      case 'crystal': for (let i = 0; i < 6; i++) mesh(back, PG.oct3, M.orn, 0.09, 0.35, 0.09, U.rand(-0.18, 0.18), o.backY + 0.15, U.lerp(z0, z1, i / 5), U.rand(-0.6, 0.6), 0, U.rand(-0.6, 0.6)); break;
-      case 'abyss': for (let i = 0; i < 7; i++) mesh(back, PG.cone, M.orn, 0.07, 0.4, 0.07, U.rand(-0.2, 0.2), o.backY + 0.1, U.lerp(z0, z1, i / 6), -0.6 + U.rand(-0.4, 0.4), 0, U.rand(-0.4, 0.4)); for (const s of [-1, 1]) mesh(head, PG.cone, M.orn, 0.05, 0.35, 0.05, s * 0.12, 0.2, -0.05, -0.7, 0, s * 0.6); break;
+      case 'horns': for (const s of [-1, 1]) { mesh(head, PG.cone, M.orn, 0.06, 0.28, 0.06, s * 0.14, 0.15, -0.045, -0.4, 0, -s * 0.7); mesh(head, PG.cone, M.orn, 0.036, 0.26, 0.036, s * 0.215, 0.31, -0.105, -0.55, 0, -s * 0.12); } break;
+      case 'ember': for (let i = 0; i < 6; i++) { const x = U.rand(-0.15, 0.15), z = U.lerp(z0, z1, i / 5); mesh(back, PG.sph, M.dark, 0.11, 0.03, 0.09, x, o.backY - 0.004, z, 0, i, 0); mesh(back, PG.sph, M.orn, 0.07, 0.03, 0.045, x, o.backY, z, 0, i, 0); } break;
+      case 'ice': for (let i = 0; i < 5; i++) { const x = U.rand(-0.12, 0.12), rx = U.rand(-0.5, 0.5), rz = U.rand(-0.5, 0.5), z = U.lerp(z0, z1, i / 4), h = 0.2 + (i % 3) * 0.09; mesh(back, crys, M.orn, 0.055, h * 0.55, 0.055, x, o.backY + h * 0.3, z, rx, i, rz); mesh(back, crys, M.orn, 0.035, h * 0.3, 0.035, x + 0.06, o.backY + h * 0.12, z + 0.04, rx + 0.5, i * 2, rz - 0.4); } break;
+      case 'spikes': for (let i = 0; i < 6; i++) { const z = U.lerp(z0, z1, i / 5), h = 0.2 + Math.sin(i * 0.9 + 0.6) * 0.09; mesh(back, PG.cone, M.orn, 0.045, h, 0.06, 0, o.backY + h * 0.4, z, -0.5); for (const s of [-1, 1]) mesh(back, PG.cone, M.orn, 0.028, h * 0.6, 0.035, s * 0.09, o.backY + h * 0.2, z + 0.03, -0.5, 0, -s * 0.5); } break;
+      case 'sparks': for (let i = 0; i < 4; i++) { const x = U.rand(-0.2, 0.2), y = o.backY + U.rand(0, 0.1), z = U.lerp(z0, z1, i / 3); mesh(back, PG.sph, M.dark, 0.05, 0.03, 0.05, x, y - 0.01, z); mesh(back, PG.sph, M.orn, 0.03, 0.03, 0.03, x, y + 0.012, z); } break;
+      case 'wisps': for (let i = 0; i < 3; i++) { const x = U.rand(-0.15, 0.15), z = U.lerp(z0, z1, i / 2), rx = -0.8 + U.rand(-0.3, 0.3); mesh(back, PG.cone, M.orn, 0.07, 0.34, 0.05, x, o.backY + 0.12, z, rx); mesh(back, PG.cone, M.orn, 0.035, 0.2, 0.03, x + 0.07, o.backY + 0.08, z - 0.03, rx - 0.3, 0, -0.5); } break;
+      case 'bones':
+        for (let i = 0; i < 4; i++) { const z = U.lerp(z0, z1, i / 3); if (lb) mesh(back, lb, M.orn, 0.02, 0.36 - (i % 2) * 0.05, 0.02, 0, o.backY + 0.06, z, 0, 0.12 * (i % 2 ? 1 : -1), Math.PI / 2); else mesh(back, PG.box, M.orn, 0.3, 0.04, 0.08, 0, o.backY + 0.02, z); }
+        if (lb) { mesh(back, PG.box, M.dark, 0.02, 0.012, Math.abs(z1 - z0) + 0.12, 0.07, o.backY + 0.085, (z0 + z1) / 2); mesh(back, PG.box, M.dark, 0.02, 0.012, Math.abs(z1 - z0) + 0.12, -0.07, o.backY + 0.085, (z0 + z1) / 2); }   // (the cords they are lashed with)
+        mesh(head, PG.sph, M.orn, 0.08, 0.02, 0.07, 0, 0.125, 0.045, 0.2); for (const s of [-1, 1]) mesh(head, PG.cone, M.orn, 0.02, 0.09, 0.02, s * 0.07, 0.2, 0.0, -0.3, 0, -s * 0.3); break;
+      case 'crystal': for (let i = 0; i < 6; i++) { const h = 0.24 + (i * 7 % 4) * 0.07; mesh(back, crys, M.orn, 0.06, h * 0.55, 0.06, U.rand(-0.18, 0.18), o.backY + h * 0.35, U.lerp(z0, z1, i / 5), U.rand(-0.6, 0.6), i, U.rand(-0.6, 0.6)); } break;
+      case 'abyss': for (let i = 0; i < 7; i++) { const h = 0.22 + (i % 3) * 0.08; mesh(back, PG.cone, M.orn, 0.045, h, 0.032, U.rand(-0.2, 0.2), o.backY + h * 0.3, U.lerp(z0, z1, i / 6), -0.6 + U.rand(-0.4, 0.4), 0, U.rand(-0.4, 0.4)); } for (const s of [-1, 1]) { mesh(head, PG.cone, M.orn, 0.05, 0.22, 0.05, s * 0.12, 0.16, -0.04, -0.5, 0, -s * 0.8); mesh(head, PG.cone, M.orn, 0.035, 0.26, 0.035, s * 0.215, 0.34, -0.11, -0.6, 0, -s * 0.1); } break;
     }
   }
 

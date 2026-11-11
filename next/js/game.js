@@ -2248,8 +2248,8 @@
       GM._ambT = U.rand(0.6, 2.2);
       if (Math.random() < 0.5 && !w.mats.biome.outdoor) G.sfx.drip(V(cp.x + U.rand(-15, 15), 2, cp.z + U.rand(-15, 15)));
       if (w.mats.biome.outdoor && Math.random() < 0.5) G.sfx.wind && G.sfx.wind(w.mats.biome.outdoor === 'sky' ? 1 : 0.6);
-      let near = null, nd = 1e9; for (const s of w.lightSources) if (s.flame > 0.8) { const d = s.pos.distanceToSquared(cp); if (d < nd) { nd = d; near = s; } }
-      if (near && nd < 64) G.sfx.crackle(near.pos);
+      let near = null, nd = 1e9; for (const s of w.lightSources) if (s.flame > 0.8) { const d = (s.fp || s.pos).distanceToSquared(cp); if (d < nd) { nd = d; near = s; } }   // (a fire is heard from where it burns, not from where its light is set)
+      if (near && nd < 64) G.sfx.crackle(near.fp || near.pos);
       if (w.lavaZones.length && Math.random() < 0.5) { const z = U.pick(w.lavaZones); G.sfx.lava(V((z.x0 + z.x1) / 2, z.y || 0, (z.z0 + z.z1) / 2)); }
     }
     if (skyDome) skyDome.position.copy(cp);

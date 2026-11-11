@@ -10,21 +10,23 @@
   const Mx = (x, y, z, sx, sy, sz, rx, ry, rz) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)), V(sx, sy, sz));
 
   // ---------------------------------------------------------------- 凍てつく霊廟
+  // (ice in its own shapes, gfx.js; the plain cone, rod and box where there is none)
+  const IG = (name, fb) => { const d = G.GFX && G.GFX.propGeo ? G.GFX.propGeo(name) : null; return d ? d[0].g : fb; };
   // a pillar in a sheath of ice, icicles hanging from where it meets the vault
   function icePillar(w, rng, x, z, h) {
     P().pillarRound(w, x, z, 0, h, 0.5, false, rng);
-    w.batch.geo('ice', PG().cyl8, Mx(x, h * 0.3, z, 0.78, h * 0.6, 0.78, 0, rng.range(0, 3), 0));
-    for (let i = 0; i < 4; i++) { const a = i * 1.57 + rng.range(-0.3, 0.3); w.batch.geo('ice', PG().cone, Mx(x + Math.cos(a) * 0.9, h - 1.3, z + Math.sin(a) * 0.9, 0.18, rng.range(1.2, 2.4), 0.18, Math.PI, 0, 0)); }
+    w.batch.geo('ice', IG('icesheath', PG().cyl8), Mx(x, h * 0.3, z, 0.78, h * 0.6, 0.78, 0, rng.range(0, 3), 0));
+    for (let i = 0; i < 4; i++) { const a = i * 1.57 + rng.range(-0.3, 0.3); w.batch.geo('ice', IG('icicle', PG().cone), Mx(x + Math.cos(a) * 0.9, h - 1.3, z + Math.sin(a) * 0.9, 0.18, rng.range(1.2, 2.4), 0.18, Math.PI, a * 3, 0)); }
   }
   // a statue frozen in a block of ice
   function frozenStatue(w, rng, x, z) {
     P().statue(w, x, z, 0, rng.range(0, 6), rng, rng.range(0.9, 1.15));
-    w.batch.geo('ice', PG().box, Mx(x, 1.45, z, 2.1, 2.9, 2.1, 0, rng.range(-0.3, 0.3), 0));
+    w.batch.geo('ice', IG('iceblock', PG().box), Mx(x, 1.45, z, 2.1, 2.9, 2.1, 0, rng.range(-0.3, 0.3), 0));
     w.addCollider(x - 1.0, 0, z - 1.0, x + 1.0, 2.9, z + 1.0, { surf: 'stone' });
   }
   // icicles all over the vault (visual; the ones that fall are the field's hazard, see F.tickIcicles)
   function vaultIcicles(w, rng, W, D, y, n) {
-    for (let i = 0; i < n; i++) w.batch.geo('ice', PG().cone, Mx(rng.range(3, W - 3), y - 0.9, rng.range(3, D - 3), rng.range(0.15, 0.35), rng.range(1.2, 3.2), rng.range(0.15, 0.35), Math.PI, 0, 0));
+    for (let i = 0; i < n; i++) w.batch.geo('ice', IG('icicle', PG().cone), Mx(rng.range(3, W - 3), y - 0.9, rng.range(3, D - 3), rng.range(0.15, 0.35), rng.range(1.2, 3.2), rng.range(0.15, 0.35), Math.PI, i * 1.7, 0));
   }
   // (the mausoleum's area itself: field_frozen.js, the frozen lake whose ice breaks; it builds with these pieces)
   F._frozen = { icePillar, frozenStatue, vaultIcicles };
@@ -61,13 +63,13 @@
     road(w, rng, W, AD, D) {
       const nook = FB.roadHall(w, rng, W, AD, D, false), cx = W / 2;
       for (let z = AD + 8; z < D - 6; z += 7) for (const sx of [-1, 1]) { if (sx < 0 && Math.abs(z - nook.nz) < 7) continue; P().crystals(w, cx + sx * 5.6, 0, z, rng, rng.range(0.9, 1.4)); }
-      for (let i = 0; i < 30; i++) w.batch.geo('ice', PG().cone, Mx(cx + rng.range(-6, 6), 12.2, rng.range(AD + 4, D - 2), rng.range(0.15, 0.3), rng.range(1, 2.4), rng.range(0.15, 0.3), Math.PI, 0, 0));
+      for (let i = 0; i < 30; i++) w.batch.geo('ice', IG('icicle', PG().cone), Mx(cx + rng.range(-6, 6), 12.2, rng.range(AD + 4, D - 2), rng.range(0.15, 0.3), rng.range(1, 2.4), rng.range(0.15, 0.3), Math.PI, 0, 0));
       return nook;
     },
     ring(w, rng, W, AD) { F.ceiling(w, rng, 0, 0, W, AD, 24, { chandeliers: 2 }); vaultIcicles(w, rng, W, AD, 24, 50); },
     dress(w, rng, W, AD) {
       for (const [x, z] of [[5, 5], [W - 5, 5], [5, AD - 9], [W - 5, AD - 9]]) P().crystals(w, x, 0, z, rng, 2);
-      for (let z = 8; z < AD - 4; z += 9) for (const side of [0, W]) w.visual('ice', side === 0 ? 0 : W - 0.03, rng.range(3, 8), z, side === 0 ? 0.03 : W, rng.range(12, 18), z + rng.range(1.5, 3), { uv: 2, grad: false });
+      for (let z = 8; z < AD - 4; z += 9) for (const side of [0, W]) { const y0 = rng.range(3, 8), y1 = rng.range(12, 18), z1 = z + rng.range(1.5, 3); if (!P().put(w, 'icefall', side === 0 ? 0.02 : W - 0.02, y0, (z + z1) / 2, side === 0 ? Math.PI / 2 : -Math.PI / 2, 1, { sx: (z1 - z) * 1.5, sy: y1 - y0, sz: 0.3 })) w.visual('ice', side === 0 ? 0 : W - 0.03, y0, z, side === 0 ? 0.03 : W, y1, z1, { uv: 2, grad: false }); }
     },
     text: { sub: '— 霊廟の奥へ —', icon: '❄️', obj: '凍てつく回廊を進め — 石の扉をくぐると戦いが始まる' },
   };

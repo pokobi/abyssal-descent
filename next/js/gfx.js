@@ -546,6 +546,22 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   col = S(vec3(.7 + (n1 - .5) * .22 + (n2 - .5) * .16 + (n3 - .5) * .08) * (1. - cr * .45) * (1. - ck * .25));
   rough = .92 + (n3 - .5) * .12; metal = 0.;
 }`],
+    // (old ice: deep and blue-grey, long cracks through it and hairlines, bubbles caught in it, rime lying on it in patches)
+    ice: [512, 0.5, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 3., 1.), n2 = fbm(uv, 14., 2.), fine = fbm(uv, 80., 3.);
+  vec3 v = voro(uv + (vec2(fbm(uv, 5., 8.), fbm(uv, 5., 9.)) - .5) * .2, 4., 5.);
+  float crack = 1. - smoothstep(.0, .012, v.y - v.x);
+  float hair = smoothstep(.86, .95, ridge(uv, 12., 6.)) * .6;
+  vec3 b = voro(uv, 46., 11.); float bub = smoothstep(.12, .0, b.x) * step(.55, b.z);
+  float frost = smoothstep(.55, .8, fbm(uv, 7., 14.) + (fine - .5) * .3);
+  vec3 deep = mix(vec3(.30, .44, .56), vec3(.52, .68, .78), n1 * .6 + n2 * .4);
+  vec3 c = deep + (crack * .5 + hair * .35 + bub * .4) * vec3(.5, .5, .48);
+  c = mix(c, vec3(.9, .94, .97), frost * .55);
+  col = S(c);
+  h = .5 + (n2 - .5) * .12 - crack * .1 + frost * .06 + (fine - .5) * .04;
+  rough = .12 + frost * .6 + crack * .2; metal = 0.;
+}`],
     weave: [512, 1.0, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   float n = 40.; vec2 p = uv * n; float wa = sin(p.x * 6.2831853) * .5 + .5, we = sin(p.y * 6.2831853) * .5 + .5;
@@ -1946,6 +1962,26 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     return [{ g, m: 'tuft' }];
   };
+  // ---- ice. An icicle (in place of a cone one in radius and one high about its middle, its point up): knotted, a little bent,
+  // runnels down it. A sheath of ice about a pillar (in place of a rod): spread at its foot, its upper edge ragged. A block of ice
+  // (in place of a box): its corners gone, its faces uneven. Ice run down a wall and frozen (one wide, one high, one thick, its
+  // back at z = 0): in ribs, ending in a row of points
+  PROP.icicle = () => {
+    const g = new THREE.LatheGeometry(spl([[0.0005, 0.5], [0.09, 0.44], [0.17, 0.3], [0.3, 0.16], [0.42, 0.0], [0.62, -0.2], [0.72, -0.34], [1.0, -0.46], [1.08, -0.5], [0.0005, -0.5]], 22), 9), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), a = Math.atan2(z, x), k = 1 + 0.13 * Math.sin(a * 3 + y * 7) + 0.06 * Math.sin(y * 19); ps.setX(i, x * k + Math.sin(y * 4.2) * 0.07 * (y + 0.5)); ps.setZ(i, z * k); }
+    g.computeVertexNormals(); return [{ g, m: 'ice' }];
+  };
+  PROP.icesheath = () => {
+    const g = new THREE.LatheGeometry([[1.3, -0.5], [1.14, -0.42], [1.03, -0.22], [1.0, 0.1], [0.97, 0.36], [0.86, 0.5]].map((q) => new THREE.Vector2(q[0], q[1])), 26), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), a = Math.atan2(z, x), k = 1 + 0.07 * Math.sin(a * 5) + 0.04 * Math.sin(a * 11 + y * 3); ps.setXYZ(i, x * k, y > 0.3 ? y + 0.1 * Math.sin(a * 4 + 1) - 0.08 : y, z * k); }
+    g.computeVertexNormals(); return [{ g, m: 'ice' }];
+  };
+  PROP.iceblock = () => {
+    const b = new THREE.BoxGeometry(1, 1, 1, 3, 3, 3), ps = b.attributes.position;
+    for (let i = 0; i < ps.count; i++) { let x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i); const r = Math.hypot(x, y, z), cut = Math.max(0, r - 0.62) * 0.55, n = Math.sin(x * 12.9 + y * 78.2 + z * 37.7) * 43758.5; const j = (n - Math.floor(n) - 0.5) * 0.05; x *= 1 - cut + j; z *= 1 - cut - j; if (y > -0.49) y *= 1 - cut * 0.8; ps.setXYZ(i, x, y, z); }
+    const g = b.toNonIndexed(); g.computeVertexNormals(); return [{ g, m: 'ice' }];
+  };
+  PROP.icefall = () => [{ g: boxUV(Geo.merge([sheet(0, 1, () => 0.5, (x, v, u) => (0.25 + 0.75 * Math.pow(Math.abs(Math.sin(u * 6.3 + 0.8)), 0.6)) * (0.3 + 0.7 * v), 8, 24, 0, (u) => 0.45 * Math.abs(Math.sin(u * 9.4 + 1.2)) + 0.18 * Math.sin(u * 23) + 0.1)]), 0.4), m: 'ice' }];
   X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
 
   // ---- what is thrown (grenfx.js), in metres about its middle: lists of parts { g, m (which of grenfx's materials), tag }. A part

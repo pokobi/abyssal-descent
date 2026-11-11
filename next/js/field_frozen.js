@@ -84,7 +84,7 @@
     for (let x = 8; x < W - 6; x += 12) if (Math.abs(x - W / 2) > 6) { P().sarcophagus(w, x, D - 5, 0, rng.chance(0.5), rng); occ.mark(x - 1.6, D - 6.2, x + 1.6, D - 3.8); }
     for (let i = 0; i < 6; i++) w.addLight(rng.range(lx0, lx1), -1, rng.range(lz0, lz1), { flame: 0, intensity: 5, range: 9, color: '#6ac8ff', emit: false, prio: 0.4 });
     // hoarfrost on the walls
-    for (let z = 8; z < D - 4; z += 7) for (const side of [0, W]) w.visual('ice', side === 0 ? 0 : W - 0.03, rng.range(2, 6), z, side === 0 ? 0.03 : W, rng.range(8, 12), z + rng.range(1, 3), { uv: 2, grad: false });
+    for (let z = 8; z < D - 4; z += 7) for (const side of [0, W]) { const y0 = rng.range(2, 6), y1 = rng.range(8, 12), z1 = z + rng.range(1, 3); if (!P().put(w, 'icefall', side === 0 ? 0.02 : W - 0.02, y0, (z + z1) / 2, side === 0 ? Math.PI / 2 : -Math.PI / 2, 1, { sx: (z1 - z) * 1.5, sy: y1 - y0, sz: 0.3 })) w.visual('ice', side === 0 ? 0 : W - 0.03, y0, z, side === 0 ? 0.03 : W, y1, z1, { uv: 2, grad: false }); }   // (ice run down the wall and frozen in ribs: gfx.js)
     w.icicles = { y: HT, next: 4 };
     // what is laid afterwards: not on the ice (it would go down with it); on the shores, landings and islands
     occ.mark(lx0, lz0, lx1, lz1, 2);

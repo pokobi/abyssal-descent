@@ -603,6 +603,7 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     M.voidglow = new THREE.MeshStandardMaterial({ color: 0x16020f, emissive: 0xff2a8a, emissiveIntensity: 1.1, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     M.ice = new THREE.MeshStandardMaterial({ color: 0xbfe0f0, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.85, normalMap: t.rock.normalMap });
     M.ice.normalScale.set(0.4, 0.4);
+    { const it = G.GFX && G.GFX.tex ? G.GFX.tex('ice') : null; if (it) { M.ice.map = it.map; M.ice.normalMap = it.normalMap; M.ice.roughnessMap = it.orm; M.ice.color.setHex(0xdfe8ee); M.ice.roughness = 1; M.ice.opacity = 0.88; M.ice.normalScale.set(0.8, 0.8); } }   // (old ice with its cracks and rime: gfx.js)
     // field gimmicks
     M.moss = std(t.grass, '#6f9a3a', 0.85, 0, 1.4);
     M.mud = std(t.rock, '#4a3524', 0.45, 0.05, 1.6);

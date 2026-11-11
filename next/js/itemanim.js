@@ -27,11 +27,11 @@
       cloth: mk({ color: 0xf0ece0, roughness: 0.95 }),
       glass: mk({ color: 0xd8f0ff, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.35 }),
       cork: mk({ color: 0x8a6a40, roughness: 0.9 }),
-      gold: mk({ color: 0xe0b050, metalness: 1, roughness: 0.25 }),
+      gold: mk({ color: 0xb08a3a, metalness: 0.9, roughness: 0.32 }), wax: mk({ color: 0x6e1414, roughness: 0.45 }), cord: mk({ color: 0x7a6a4a, roughness: 1 }), stone: mk({ color: 0x5a5a58, roughness: 1 }),
       paper: mk({ color: 0xd8c8a0, roughness: 0.9, side: THREE.DoubleSide }),
-      red: mk({ color: 0xc01020, roughness: 0.4 }), green: mk({ color: 0x3a8a2a, roughness: 0.8, side: THREE.DoubleSide }),
-      heart: mk({ color: 0x6a0a14, roughness: 0.4, emissive: 0x200004 }),
-      shroom: mk({ color: 0xc02a20, roughness: 0.6 }), stem: mk({ color: 0xe8e0c8, roughness: 0.8 }),
+      red: mk({ color: 0x7a1c1c, roughness: 0.5 }), green: mk({ color: 0x3a5a2a, roughness: 0.85, side: THREE.DoubleSide }),
+      heart: mk({ color: 0x4a0c12, roughness: 0.35 }),
+      shroom: mk({ color: 0x74322a, roughness: 0.7 }), stem: mk({ color: 0xb8ab8e, roughness: 0.85 }),
       plate: mk({ color: 0x8a8e96, metalness: 0.8, roughness: 0.35 }), cell: mk({ color: 0x3060a0, emissive: 0x2050c0, emissiveIntensity: 1.2 }),
       glow: new THREE.MeshBasicMaterial({ color: 0xfff0c0 }),
     };
@@ -43,9 +43,12 @@
   function sph(p, m, sx, sy, sz, x, y, z) { const o = new THREE.Mesh(PGg().sph, m); o.scale.set(sx, sy, sz); o.position.set(x || 0, y || 0, z || 0); p.add(o); return o; }
   function hand(p, right) {
     const g = new THREE.Group(); p.add(g);
-    box(g, M.glove, 0.05, 0.075, 0.075);
-    box(g, M.glove, 0.055, 0.035, 0.06, right ? -0.022 : 0.022, 0, -0.01);
+    // (a gloved hand closed round what it holds, a pad over its knuckles: gfx.js. The third thing in it is still the forearm)
+    const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right, true) : null, W = G.weapons.mats;
+    if (hs) g.add(new THREE.Mesh(hs.hand, M.glove), new THREE.Mesh(hs.pad, W.poly || M.gun));
+    else { box(g, M.glove, 0.05, 0.075, 0.075); box(g, M.glove, 0.055, 0.035, 0.06, right ? -0.022 : 0.022, 0, -0.01); }
     const arm = new THREE.Mesh(PGg().cyl8, M.sleeve); arm.scale.set(0.038, 0.42, 0.038); arm.rotation.x = Math.PI / 2 - 0.35; arm.rotation.z = right ? 0.25 : -0.45; arm.position.set(right ? 0.06 : -0.08, -0.08, 0.2); g.add(arm);
+    if (hs) g.add(new THREE.Mesh(hs.strap, M.sleeve));
     return g;
   }
 
@@ -54,39 +57,44 @@
     mats();
     const g = new THREE.Group();
     const liq = LIQ[id] || 0x80ff80;
+    const IG = G.GFX && G.GFX.itemGeo, putG = (p, name) => { const d = IG ? IG(name) : null; if (!d || !d.length) return false; for (const q of d) p.add(new THREE.Mesh(q.g, M[q.m] || M.gun)); return true; };
     if (kind === 'throw') {
       const gid = id || 'g_frag';
       if (G.GrenFX && G.ITEM_BY_ID[gid]) g.add(G.GrenFX.build(gid, 0.42)); // the same model as the one that flies
       else if (gid === 'g_dyna') { for (let i = 0; i < 3; i++) cyl(g, M.red, 0.016, 0.14, (i - 1) * 0.034, 0); }
       else { sph(g, M.gun, 0.035, 0.045, 0.035); cyl(g, M.steel, 0.012, 0.03, 0, 0.045); box(g, M.steel, 0.006, 0.05, 0.012, 0.02, 0.03, 0, 0, 0, -0.3); }
     } else if (kind === 'bandage') {
-      const roll = new THREE.Group(); g.add(roll); cyl(roll, M.cloth, 0.03, 0.06, 0, 0, 0, 0, 0, Math.PI / 2); g.userData.roll = roll;
+      const roll = new THREE.Group(); g.add(roll); if (!putG(roll, 'bandage')) cyl(roll, M.cloth, 0.03, 0.06, 0, 0, 0, 0, 0, Math.PI / 2); g.userData.roll = roll;
     } else if (kind === 'drink') {
-      cyl(g, M.glass, 0.028, 0.11); const l = cyl(g, new THREE.MeshStandardMaterial({ color: liq, emissive: liq, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 }), 0.024, 0.08, 0, -0.012); g.userData.liq = l;
-      cyl(g, M.glass, 0.012, 0.04, 0, 0.07); cyl(g, M.cork, 0.013, 0.018, 0, 0.095);
+      const lm = new THREE.MeshStandardMaterial({ color: liq, emissive: liq, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 });
+      if (putG(g, 'drink')) g.userData.liq = cyl(g, lm, 0.024, 0.08, 0, -0.012);   // (a phial with its cork, wax and tag: gfx.js. The liquor goes down as it did)
+      else { cyl(g, M.glass, 0.028, 0.11); g.userData.liq = cyl(g, lm, 0.024, 0.08, 0, -0.012); cyl(g, M.glass, 0.012, 0.04, 0, 0.07); cyl(g, M.cork, 0.013, 0.018, 0, 0.095); }
     } else if (kind === 'inject') {
       const s = new THREE.Group(); g.add(s); s.rotation.x = Math.PI / 2;
-      cyl(s, M.glass, 0.012, 0.12); cyl(s, new THREE.MeshBasicMaterial({ color: liq }), 0.01, 0.09, 0, -0.01);
-      cyl(s, M.steel, 0.002, 0.05, 0, -0.085); const pl = cyl(s, M.steel, 0.005, 0.06, 0, 0.09); cyl(s, M.steel, 0.016, 0.004, 0, 0.12);
-      g.userData.plunger = pl;
+      if (putG(s, 'inject')) {   // (a syringe of brass and glass, its plunger on a thumb ring: gfx.js)
+        cyl(s, new THREE.MeshBasicMaterial({ color: liq }), 0.01, 0.09, 0, -0.012);
+        const pl = new THREE.Group(); putG(pl, 'plunger'); pl.position.y = 0.09; s.add(pl); g.userData.plunger = pl;
+      } else {
+        cyl(s, M.glass, 0.012, 0.12); cyl(s, new THREE.MeshBasicMaterial({ color: liq }), 0.01, 0.09, 0, -0.01);
+        cyl(s, M.steel, 0.002, 0.05, 0, -0.085); const pl = cyl(s, M.steel, 0.005, 0.06, 0, 0.09); cyl(s, M.steel, 0.016, 0.004, 0, 0.12);
+        g.userData.plunger = pl;
+      }
     } else if (kind === 'eat') {
-      if (id === 'h_apple') { sph(g, M.gold, 0.045, 0.042, 0.045); cyl(g, M.wood, 0.004, 0.025, 0, 0.045); }
-      else if (id === 'h_troll') { sph(g, M.heart, 0.05, 0.06, 0.045); cyl(g, M.heart, 0.012, 0.04, 0.015, 0.05); }
-      else if (id === 'u_berserk') { const c = sph(g, M.shroom, 0.05, 0.03, 0.05, 0, 0.03); cyl(g, M.stem, 0.016, 0.05, 0, -0.005); g.userData.cap = c; }
-      else { for (let i = 0; i < 5; i++) { const lf = new THREE.Mesh(PGg().plane, M.green); lf.scale.set(0.03, 0.08, 1); lf.position.set(U.rand(-0.015, 0.015), 0.03, 0); lf.rotation.set(0, i, U.rand(-0.6, 0.6)); g.add(lf); } }
+      const FG = G.GFX && G.GFX.foeGeo;
+      if (id === 'h_apple') { if (!putG(g, 'apple')) { sph(g, M.gold, 0.045, 0.042, 0.045); cyl(g, M.wood, 0.004, 0.025, 0, 0.045); } }
+      else if (id === 'h_troll') { if (!putG(g, 'heart')) { sph(g, M.heart, 0.05, 0.06, 0.045); cyl(g, M.heart, 0.012, 0.04, 0.015, 0.05); } }
+      else if (id === 'u_berserk') {
+        if (FG && FG('cap')) { const c = new THREE.Mesh(FG('cap'), M.shroom); c.scale.set(0.05, 0.045, 0.05); c.position.y = 0.035; g.add(c); const st = new THREE.Mesh(FG('stem'), M.stem); st.scale.set(0.014, 0.055, 0.014); st.position.y = -0.008; g.add(st); g.userData.cap = c; }
+        else { const c = sph(g, M.shroom, 0.05, 0.03, 0.05, 0, 0.03); cyl(g, M.stem, 0.016, 0.05, 0, -0.005); g.userData.cap = c; }
+      }
+      else if (!putG(g, 'herb')) { for (let i = 0; i < 5; i++) { const lf = new THREE.Mesh(PGg().plane, M.green); lf.scale.set(0.03, 0.08, 1); lf.position.set(U.rand(-0.015, 0.015), 0.03, 0); lf.rotation.set(0, i, U.rand(-0.6, 0.6)); g.add(lf); } }
     } else if (kind === 'plate') {
-      box(g, M.plate, 0.14, 0.16, 0.012); box(g, M.steel, 0.15, 0.015, 0.014, 0, 0.07);
+      if (!putG(g, 'plate')) { box(g, M.plate, 0.14, 0.16, 0.012); box(g, M.steel, 0.15, 0.015, 0.014, 0, 0.07); }
     } else {
-      // gadgets
-      if (id === 'u_map') { const p = new THREE.Mesh(PGg().plane, M.paper); p.scale.set(0.16, 0.12, 1); g.add(p); }
-      else if (id === 'u_lucky') { cyl(g, M.gold, 0.025, 0.006, 0, 0, 0, Math.PI / 2); }
-      else if (id === 'u_wind') { cyl(g, M.paper, 0.018, 0.12, 0, 0, 0, 0, 0, Math.PI / 2); cyl(g, M.wood, 0.006, 0.14, 0, 0, 0, 0, 0, Math.PI / 2); }
-      else if (id === 'u_feather') { const f = new THREE.Mesh(PGg().cone, M.cloth); f.scale.set(0.02, 0.14, 0.006); g.add(f); }
-      else if (id === 'u_sand') { const c1 = new THREE.Mesh(PGg().cone, M.glass); c1.scale.set(0.03, 0.04, 0.03); c1.position.y = 0.02; c1.rotation.x = Math.PI; g.add(c1); const c2 = c1.clone(); c2.rotation.x = 0; c2.position.y = -0.02; g.add(c2); cyl(g, M.wood, 0.034, 0.006, 0, 0.042); cyl(g, M.wood, 0.034, 0.006, 0, -0.042); }
-      else if (id === 'u_ammo') { box(g, new THREE.MeshStandardMaterial({ color: 0x4a5a2a, roughness: 0.8 }), 0.12, 0.07, 0.07); box(g, M.brass, 0.1, 0.01, 0.05, 0, 0.04); }
-      else if (id === 'u_lantern') { box(g, M.gun, 0.06, 0.08, 0.06); sph(g, new THREE.MeshBasicMaterial({ color: 0x80d0ff }), 0.02, 0.025, 0.02); }
-      else if (id === 'u_whet') { box(g, new THREE.MeshStandardMaterial({ color: 0x6a6a6a, roughness: 1 }), 0.12, 0.025, 0.04); }
-      else { box(g, M.gun, 0.08, 0.06, 0.06); box(g, M.brass, 0.03, 0.02, 0.065, 0, 0.02); }
+      // gadgets (shaped in gfx.js: a map, a scroll, a feather, an hourglass, a case of cartridges, a lantern, a whetstone; a coin)
+      if (id === 'u_lucky') { const cg = G.GFX && G.GFX.wareGeo ? G.GFX.wareGeo('coin') : null; if (cg) { const c = new THREE.Mesh(cg[0].g, M.gold); c.scale.setScalar(0.3); g.add(c); } else cyl(g, M.gold, 0.025, 0.006, 0, 0, 0, Math.PI / 2); }
+      else if (!putG(g, { u_map: 1, u_wind: 1, u_feather: 1, u_sand: 1, u_ammo: 1, u_lantern: 1, u_whet: 1 }[id] ? id : 'device')) { box(g, M.gun, 0.08, 0.06, 0.06); box(g, M.brass, 0.03, 0.02, 0.065, 0, 0.02); }
+      if (id === 'u_lantern') sph(g, new THREE.MeshBasicMaterial({ color: 0xc8e4ff }), 0.014, 0.022, 0.014);
       const gl = sph(g, M.glow, 0.001, 0.001, 0.001); g.userData.flash = gl;
     }
     g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });

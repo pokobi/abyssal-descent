@@ -2068,6 +2068,56 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   WARE.coin = () => [gq('gold', [hl([[0.0005, -0.008], [0.082, -0.008], [0.09, -0.012], [0.09, 0.012], [0.082, 0.008], [0.0005, 0.008]], 1, 1, 16).rotateX(HX), rbx(0.016, 0.1, 0.006, 0.002, 0, 0, 0.009), rbx(0.1, 0.016, 0.006, 0.002, 0, 0, 0.009), new THREE.TorusGeometry(0.045, 0.006, 4, 16).translate(0, 0, -0.008)])];
   X.wareGeo = function (name) { if (wareC[name] !== undefined) return wareC[name]; let r = null; try { r = WARE[name] ? WARE[name]() : null; } catch (e) { console.warn('gfx: no ware', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } return (wareC[name] = r); };
 
+  // ---- what is held in the hand while it is used (itemanim.js), in metres about the grip: lists of parts { g, m (which of
+  // itemanim's materials) }. What moves by itself - the liquor going down, the plunger - stays itemanim's own ----
+  const ITEM = {}, itemC = {};
+  // a phial: straight sides, a shoulder, a neck with a lip; a cork under wax, a cord about the neck
+  ITEM.drink = () => [
+    gq('glass', hl([[0.0005, -0.055], [0.026, -0.055], [0.03, -0.048], [0.03, 0.022], [0.024, 0.036], [0.013, 0.046], [0.013, 0.078], [0.017, 0.082], [0.017, 0.088], [0.011, 0.088], [0.011, 0.05], [0.0005, 0.05]], 1, 1, 16)),
+    gq('cork', hl([[0.0005, 0.076], [0.0105, 0.076], [0.012, 0.1], [0.0005, 0.102]], 1, 1, 10)), gq('wax', hl([[0.0125, 0.086], [0.0185, 0.09], [0.017, 0.1], [0.011, 0.106], [0.0005, 0.107]], 1, 1, 10)),
+    gq('cord', [new THREE.TorusGeometry(0.0145, 0.002, 4, 12).rotateX(HX).translate(0, 0.06, 0), rbx(0.022, 0.028, 0.0015, 0.0005, 0.026, 0.04, 0.012, [0, 0.4, 0.5])])];
+  // a syringe of brass and glass, drawn along y: a barrel between two caps, finger rests, a needle
+  ITEM.inject = () => [
+    gq('glass', hl([[0.0005, -0.06], [0.012, -0.06], [0.012, 0.06], [0.0005, 0.06]], 1, 1, 12)),
+    gq('brass', [hl([[0.0005, -0.072], [0.004, -0.072], [0.006, -0.062], [0.0135, -0.06], [0.0135, -0.05], [0.0125, -0.05]], 1, 1, 12), hl([[0.0125, 0.05], [0.0135, 0.05], [0.0135, 0.062], [0.0005, 0.064]], 1, 1, 12),
+      rbx(0.062, 0.004, 0.014, 0.002, 0, 0.06, 0), new THREE.TorusGeometry(0.0128, 0.0012, 4, 12).rotateX(HX).translate(0, 0.0, 0), new THREE.TorusGeometry(0.0128, 0.0012, 4, 12).rotateX(HX).translate(0, -0.025, 0)]),
+    gq('steel', prism(0.0012, 0.05, [0, -0.097, 0], null, 5))];
+  // its plunger, about where itemanim holds it: a rod, a thumb ring
+  ITEM.plunger = () => [gq('brass', [prism(0.004, 0.07, [0, 0, 0], null, 6), new THREE.TorusGeometry(0.012, 0.003, 5, 12).translate(0, 0.047, 0), hl([[0.0005, -0.036], [0.0105, -0.036], [0.0105, -0.03], [0.0005, -0.03]], 1, 1, 10)])];
+  // a roll of linen, wound about x: the turns show at its ends, the loose end hangs
+  ITEM.bandage = () => {
+    const g = hl([[0.0005, -0.03], [0.008, -0.03], [0.012, -0.027], [0.016, -0.03], [0.02, -0.027], [0.024, -0.03], [0.03, -0.028], [0.03, 0.028], [0.024, 0.03], [0.02, 0.027], [0.016, 0.03], [0.012, 0.027], [0.008, 0.03], [0.0005, 0.03]], 1, 1, 16); g.rotateZ(HX);
+    return [gq('cloth', [g, sheet(-0.07, 0, () => 0.028, (x, v) => 0.03 - (1 - v) * (1 - v) * 0.02, 4, 1, 0.0015)])];
+  };
+  // an apple with its stalk and a leaf; a heart cut out of something large; a sprig of herbs tied with thread
+  ITEM.apple = () => [gq('gold', new THREE.LatheGeometry(spl([[0.0005, 0.028], [0.012, 0.036], [0.034, 0.034], [0.046, 0.008], [0.04, -0.026], [0.022, -0.04], [0.008, -0.036], [0.0005, -0.03]], 18), 16)),
+    gq('wood', tubeR([[0, 0.03, 0], [0.003, 0.046, 0], [0.01, 0.058, 0]], 0.0025, 4, 4)), gq('green', Geo.xf(sheet(-0.035, 0, (v) => 0.014 * Math.sin(Math.PI * (0.1 + 0.9 * v)), (x) => -x * x * 12, 4, 2, 0), [0.012, 0.05, 0], [0.4, 0.3, -1.9]))];
+  ITEM.heart = () => {
+    const g = new THREE.SphereGeometry(0.05, 16, 12), ps = g.attributes.position; for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), k = 1 + 0.07 * Math.sin(x * 60 + y * 30) + (y < 0 ? y * 4 : 0) * 0.5; ps.setXYZ(i, x * k + (y > 0.01 ? Math.sign(x) * 0.008 : 0), y * 1.2, z * k * 0.86); } g.computeVertexNormals();
+    return [gq('heart', [g, tubeR([[0.012, 0.045, 0], [0.018, 0.07, 0.004], [0.03, 0.082, 0.004]], 0.009, 5, 5), tubeR([[-0.012, 0.045, 0], [-0.016, 0.072, -0.004]], 0.007, 5, false)])];
+  };
+  ITEM.herb = () => {
+    const lf = []; for (let i = 0; i < 7; i++) lf.push(Geo.xf(sheet(-0.09 + (i % 3) * 0.012, 0, (v) => 0.0035 + 0.012 * Math.pow(Math.sin(Math.PI * (1 - v) * 0.92), 0.7), (x) => -x * x * 14, 5, 2, 0), [(i - 3) * 0.006, 0.01, 0], [Math.PI + (i % 2 ? 0.25 : -0.2), i * 0.9, (i - 3) * 0.2]));
+    return [gq('green', lf), gq('cord', [new THREE.TorusGeometry(0.011, 0.0025, 4, 10).rotateX(HX).translate(0, 0.0, 0), prism(0.004, 0.05, [0, -0.02, 0], null, 5)])];
+  };
+  // a plate of armour to slip in: bent, rimmed, riveted
+  ITEM.plate = () => {
+    const bend = (x) => -2.2 * x * x, rv = []; for (const sx of [-1, 1]) for (const sy of [-1, 0, 1]) rv.push(ball(0.004, [sx * 0.058, sy * 0.062, bend(0.058) + 0.006], [1, 1, 0.5]));
+    return [gq('plate', sheet(-0.08, 0.08, (v) => 0.07 - Math.pow(Math.abs(v - 0.5) * 2, 4) * 0.012, bend, 8, 8, 0.008)), gq('steel', [sheet(0.066, 0.08, () => 0.066, (x) => bend(x) + 0.003, 1, 8, 0.004), sheet(-0.08, -0.066, () => 0.062, (x) => bend(x) + 0.003, 1, 8, 0.004)].concat(rv))];
+  };
+  // the small gear: a map with curling edges, a scroll, a quill feather, an hourglass, a case of cartridges, a hand lantern, a whetstone, a box
+  ITEM.u_map = () => [gq('paper', sheet(-0.06, 0.06, () => 0.08, (x, v, u) => Math.pow(Math.abs(u), 3) * 0.02 + Math.sin(v * 6) * 0.003, 6, 8, 0)), gq('gun', [rbx(0.05, 0.002, 0.002, 0.0005, -0.02, 0.02, 0.002, [0, 0, 0.5]), rbx(0.04, 0.002, 0.002, 0.0005, 0.02, -0.01, 0.002, [0, 0, -0.7]), new THREE.TorusGeometry(0.008, 0.0012, 3, 10).translate(0.03, 0.022, 0.002)])];
+  ITEM.u_wind = () => [gq('paper', hl([[0.0005, -0.06], [0.016, -0.06], [0.018, -0.055], [0.018, 0.055], [0.016, 0.06], [0.0005, 0.06]], 1, 1, 12).rotateZ(HX)), gq('wood', [prism(0.005, 0.15, [0, 0, 0], [0, 0, HX], 6), ball(0.009, [-0.076, 0, 0]), ball(0.009, [0.076, 0, 0])]), gq('wax', hl([[0.0005, 0], [0.01, 0], [0.012, 0.003], [0.0005, 0.005]], 1, 1, 10).rotateX(HX).translate(0, 0, 0.018))];
+  ITEM.u_feather = () => [gq('cloth', [sheet(-0.07, 0.07, (v) => 0.003 + 0.02 * Math.pow(Math.sin(Math.PI * (0.04 + 0.9 * v)), 0.6) * (v > 0.12 ? 1 : 0.15), (x) => -x * x * 5, 12, 2, 0), prism(0.0015, 0.16, [0, -0.005, 0.001], null, 4)])];
+  ITEM.u_sand = () => [gq('glass', [hl([[0.0005, 0.002], [0.006, 0.004], [0.026, 0.03], [0.028, 0.04], [0.0005, 0.04]], 1, 1, 14), hl([[0.0005, -0.04], [0.028, -0.04], [0.026, -0.03], [0.006, -0.004], [0.0005, -0.002]], 1, 1, 14)]),
+    gq('wood', [hl([[0.0005, 0.04], [0.035, 0.04], [0.037, 0.044], [0.035, 0.05], [0.0005, 0.05]], 1, 1, 14), hl([[0.0005, -0.05], [0.035, -0.05], [0.037, -0.044], [0.035, -0.04], [0.0005, -0.04]], 1, 1, 14)].concat([0, 1, 2].map((i) => prism(0.003, 0.082, [Math.cos(i * 2.094) * 0.031, 0, Math.sin(i * 2.094) * 0.031], null, 5)))),
+    gq('paper', hl([[0.0005, -0.038], [0.022, -0.038], [0.012, -0.022], [0.0005, -0.016]], 1, 1, 10))];
+  ITEM.u_ammo = () => [gq('gun', [rbx(0.12, 0.062, 0.07, 0.006, 0, -0.004, 0), rbx(0.124, 0.014, 0.074, 0.004, 0, 0.03, 0), tubeR([[-0.03, 0.037, 0], [-0.025, 0.055, 0], [0.025, 0.055, 0], [0.03, 0.037, 0]], 0.003, 4, 10)]), gq('brass', [rbx(0.014, 0.022, 0.004, 0.001, 0, 0.018, 0.036), rbx(0.09, 0.004, 0.002, 0.0005, 0, -0.008, 0.0355)])];
+  ITEM.u_lantern = () => { const o = []; for (const q of (X.wareGeo && X.wareGeo('revive')) || []) { const g = q.g.clone(); g.scale(0.36, 0.36, 0.36); o.push({ g, m: q.m === 'iron' ? 'gun' : 'glass', tag: null }); } return o; };
+  ITEM.u_whet = () => [gq('stone', [rbx(0.12, 0.022, 0.04, 0.005, 0, 0, 0)])];
+  ITEM.device = () => [gq('gun', rbx(0.08, 0.055, 0.06, 0.006, 0, 0, 0)), gq('brass', [rbx(0.03, 0.02, 0.064, 0.003, 0, 0.018, 0), rbx(0.084, 0.006, 0.064, 0.002, 0, -0.018, 0), ball(0.005, [0, 0.018, 0.033])])];
+  X.itemGeo = function (name) { if (itemC[name] !== undefined) return itemC[name]; let r = null; try { r = ITEM[name] ? ITEM[name]() : null; } catch (e) { console.warn('gfx: no item', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } return (itemC[name] = r); };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

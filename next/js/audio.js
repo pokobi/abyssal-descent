@@ -442,8 +442,7 @@
   // ---------- movement ----------
   A.step = function (surface, intensity) {
     if (!ctx) return;
-    const bio = G.world && G.world.mats && G.world.mats.biome;
-    const sk = surface === 'stone' && bio && bio.floorTex === 'grass' ? 'grass' : surface || 'stone';
+    const sk = surface || 'stone';   // (turf is told from stone by what is underfoot: player.js surfaceBelow)
     if (smp('step_' + sk, null, 0.35 * intensity, 0.92 + intensity * 0.08) || (sk !== 'wood' && sk !== 'metal' && sk !== 'water' && smp('step_stone', null, 0.35 * intensity))) return; // (a floor with no recording of its own is synthesized: boards must not sound of stone)
     if (!voice(0.3)) return;
     const t = ctx.currentTime, out = dest(null, 0.15);

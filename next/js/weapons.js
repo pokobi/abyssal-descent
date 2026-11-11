@@ -238,11 +238,11 @@
     const metal = mats.gun.clone(); metal.color.setHex(fin[0]);
     const poly = fin[1] === null ? mats.wood : mats.poly.clone(); if (fin[1] !== null) poly.color.setHex(fin[1]);
     if (def.finish === 'gold' || isLeg) {
-      metal.map = null; metal.metalness = 0.46; metal.roughness = 0.20;
-      if (def.id === 'y_maw') { metal.color.setHex(0x281832); metal.emissive.setHex(0x180624); metal.emissiveIntensity = 0.45; poly.color.setHex(0xd8a840); }
-      else if (def.id === 'y_storm') { metal.color.setHex(0xe8f4ff); metal.emissive.setHex(0x286898); metal.emissiveIntensity = 0.48; poly.color.setHex(0xc89a38); }
-      else if (def.id === 'm_hell') { metal.color.setHex(0xd88828); metal.emissive.setHex(0x581c04); metal.emissiveIntensity = 0.48; poly.color.setHex(0x220c0a); }
-      else { metal.color.setHex(0xffcf40); metal.emissive.setHex(0x7a4c08); metal.emissiveIntensity = 0.50; poly.color.setHex(0x321016); poly.emissive.setHex(0x140408); poly.emissiveIntensity = 0.25; }
+      metal.metalness = 0.9; metal.roughness = 0.42;   // (old gilt, worn: the steel's own grain under it, no light of its own to speak of)
+      if (def.id === 'y_maw') { metal.color.setHex(0x241a2a); metal.emissive.setHex(0x120618); metal.emissiveIntensity = 0.2; poly.color.setHex(0x8c7036); }
+      else if (def.id === 'y_storm') { metal.color.setHex(0xb8c4cc); metal.emissive.setHex(0x16303e); metal.emissiveIntensity = 0.2; poly.color.setHex(0x8c7036); }
+      else if (def.id === 'm_hell') { metal.color.setHex(0x9a6428); metal.emissive.setHex(0x2c0e02); metal.emissiveIntensity = 0.22; poly.color.setHex(0x220c0a); }
+      else { metal.color.setHex(0x86693a); metal.emissive.setHex(0x120a02); metal.emissiveIntensity = 0.12; poly.color.setHex(0x2a1014); poly.emissive.setHex(0x0a0204); poly.emissiveIntensity = 0.1; }
     }
     const woodOr = isLeg ? poly : (def.finish === 'wood' || def.arch === 'shotgun' || def.arch === 'crossbow' || def.arch === 'dmr' ? mats.wood : poly);
     const PG = G.Props.PG;
@@ -513,10 +513,12 @@
       }
     }
     if (isLeg) {
-      const gBright = new THREE.MeshStandardMaterial({ color: 0xfff0a0, metalness: 0.5, roughness: 0.12, emissive: 0xb88214, emissiveIntensity: 0.72 });
-      const gRoyal = new THREE.MeshStandardMaterial({ color: 0xffcf40, metalness: 0.46, roughness: 0.20, emissive: 0x7a4c08, emissiveIntensity: 0.52 });
+      const legN0 = g.children.length;
+      const gBright = new THREE.MeshStandardMaterial({ color: 0x8e7238, metalness: 0.95, roughness: 0.46, emissive: 0x140c02, emissiveIntensity: 0.15 });
+      const gRoyal = new THREE.MeshStandardMaterial({ color: 0x64502a, metalness: 0.95, roughness: 0.52, emissive: 0x0e0802, emissiveIntensity: 0.12 });
       const cHex = def.id === 'y_maw' ? 0xe830ff : def.id === 'y_echo' ? 0x58f8ff : (def.id === 'y_storm' || def.trait === 'shock' || def.trait === 'chainHit') ? 0x50e4ff : (def.trait === 'incendiary' || def.trait === 'explosiveRounds' || def.trait === 'cluster') ? 0xff4014 : def.trait === 'lifesteal' ? 0xff1840 : def.id === 'c_sylv' ? 0x40ff88 : 0xff2818;
-      const gCore = new THREE.MeshStandardMaterial({ color: cHex, metalness: 0.15, roughness: 0.08, emissive: cHex, emissiveIntensity: 2.1 });
+      const dull = (c, sat, lit) => { const k = new THREE.Color(c), h = {}; k.getHSL(h, THREE.SRGBColorSpace); return k.setHSL(h.h, Math.min(h.s, sat), Math.min(h.l, lit), THREE.SRGBColorSpace); };   // (as the eye sees them, not in the light's own measure)
+      const gCore = new THREE.MeshStandardMaterial({ color: dull(cHex, 0.55, 0.14), metalness: 0.3, roughness: 0.36, emissive: new THREE.Color(cHex).multiplyScalar(0.3), emissiveIntensity: 0.03 });   // (enamel let into the gilt: dark, its colour only where the light catches it)
       const crest = (x, y, z, sc) => {
         const bz = new THREE.Mesh(PG.oct, gBright); bz.scale.set(0.018 * sc, 0.008 * sc, 0.018 * sc); bz.rotation.z = Math.PI / 2; bz.position.set(x, y, z); g.add(bz);
         const gm = new THREE.Mesh(PG.oct3, gCore); gm.scale.set(0.010 * sc, 0.013 * sc, 0.013 * sc); gm.position.set(x, y, z); g.add(gm);
@@ -721,6 +723,15 @@
           break;
         }
       }
+      // (what the gilders hung on it: none of it a lamp. Each gun's own pieces - a blade, wings, a stone - were lights of white, cyan and
+      // magenta; they are dulled to enamel and worn metal, with the faintest light of their colour left, and their square edges are softened)
+      const seenM = new Set();
+      for (let i = legN0; i < g.children.length; i++) g.children[i].traverse((o) => {
+        if (!o.isMesh) return;
+        if (o.geometry === PG.box && PG.rbox) o.geometry = PG.rbox;
+        const m = o.material; if (!m || seenM.has(m) || !m.isMeshStandardMaterial) return; seenM.add(m);
+        if (m.emissiveIntensity > 0.25) { m.color.copy(dull(m.color, 0.3, 0.3)); m.emissive.multiplyScalar(0.35); m.emissiveIntensity = 0.03; m.roughness = Math.max(m.roughness, 0.32); if (m.transparent && m.opacity < 0.9) m.opacity = Math.min(1, m.opacity + 0.3); }
+      });
     }
     // ---- per-gun mount points: [y, z] of the rear of the body (stock), whether the gun has a stock of its own, half-width of the receiver,
     // barrel radius, and [y, z] of the under-barrel rail ----

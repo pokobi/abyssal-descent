@@ -689,6 +689,14 @@
     const add = (geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const mm = new THREE.Mesh(geo, mat); mm.scale.set(sx, sy, sz); mm.position.set(x || 0, y || 0, z || 0); mm.rotation.set(rx || 0, ry || 0, rz || 0); g.add(mm); return mm; };
     g = new THREE.Group();
     const glow = (c, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.setScalar(s); g.add(sp); return sp; };
+    // (the shots that are things - a rocket, a shell, an arrow, a nail, a harpoon, a spear, a boulder - are shaped in gfx.js shotGeo;
+    // their glows are as they were. Without those shapes, the rods and cones below)
+    const SG = G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo(kind) : null;
+    if (SG) {
+      for (const q of SG) { const mm = add(q.g, mats[q.m] || mats.iron, 1, 1, 1); mm.castShadow = true; }
+      if (kind === 'rocket') glow(0xffa050, 0.6).position.z = 0.35; else if (kind === 'spear') glow(0xffe0a0, 0.5).position.z = -1;
+      g.userData.kind = kind; G.scene.add(g); return g;
+    }
     switch (kind) {
       case 'rocket': add(PG.cyl8, mats.iron, 0.07, 0.6, 0.07, 0, 0, 0, Math.PI / 2); add(PG.cone, mats.iron, 0.07, 0.18, 0.07, 0, 0, -0.38, -Math.PI / 2); glow(0xffa050, 0.6).position.z = 0.35; break;
       case 'grenade': add(PG.sph, mats.iron, 0.09, 0.11, 0.09); add(PG.cyl8, mats.brass, 0.03, 0.05, 0.03, 0, 0.11, 0); break;

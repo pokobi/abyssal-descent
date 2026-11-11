@@ -676,7 +676,7 @@
   // a clump of leaves: a ball pushed in and out, not a twenty-sided stone
   function leafClump(k) {
     const key = 'leaf' + k; if (_shape[key]) return _shape[key];
-    const g = new THREE.IcosahedronGeometry(1, 3), ps = g.attributes.position;
+    const g = new THREE.IcosahedronGeometry(1, 2), ps = g.attributes.position;   // (320 faces: seventy trees of six clumps stand beyond a town's walls)
     for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), f = 0.74 + 0.4 * _vn(x * 2.2 + 5 + k * 3, z * 2.2 + y * 1.7 + 5, 50 + k) + 0.12 * _vn(x * 6 + 9, y * 6 + z * 5 + 9, 60 + k); ps.setXYZ(i, x * f, y * f * (y < 0 ? 0.7 : 1), z * f); }
     // (its faces do not share their corners, so each would be lit flat: every corner looks the way it lies from the middle, a little toward its face)
     g.computeVertexNormals(); const nr = g.attributes.normal, v = new THREE.Vector3(), q = new THREE.Vector3();
@@ -686,7 +686,7 @@
   function treeTrunk() {
     if (_shape.trunk) return _shape.trunk;
     const g = new THREE.CylinderGeometry(0.42, 1, 1, 9, 6), ps = g.attributes.position;
-    for (let i = 0; i < ps.count; i++) { const y = ps.getY(i) + 0.5, flare = y < 0.12 ? 1 + (0.12 - y) * 5 : 1; ps.setXYZ(i, ps.getX(i) * flare + Math.sin(y * 4.1) * 0.22 * y, ps.getY(i), ps.getZ(i) * flare + Math.cos(y * 3.3) * 0.16 * y); }
+    for (let i = 0; i < ps.count; i++) { const y = ps.getY(i) + 0.5, flare = y < 0.07 ? 1 + (0.07 - y) * 4 : 1; ps.setXYZ(i, ps.getX(i) * flare + Math.sin(y * 4.1) * 0.3 * y * y, ps.getY(i), ps.getZ(i) * flare + (Math.cos(y * 3.3) - 1) * 0.3 * y * y); }
     g.computeVertexNormals(); return (_shape.trunk = g);
   }
   LG.hangRock = hangRock; LG.hangTurf = hangTurf;
@@ -696,7 +696,7 @@
     const g = new THREE.Group(); g.position.set(x, y, z);
     // (a trunk that flares at its foot and leans as it rises, boughs out of it to the crowns, crowns of leaves in clumps - it was a
     // post with six twenty-sided stones on it. The dice are thrown as before)
-    const tr = new THREE.Mesh(treeTrunk(), w.mats.woodDark); tr.scale.set(0.36 * s, 4.4 * s, 0.36 * s); tr.position.y = 2.2 * s; tr.rotation.y = _hn(x, z, 7) * 6.28; g.add(tr);
+    const tr = new THREE.Mesh(treeTrunk(), w.mats.woodDark); tr.scale.set(0.27 * s, 4.4 * s, 0.27 * s); tr.position.y = 2.2 * s; tr.rotation.y = _hn(x, z, 7) * 6.28; g.add(tr);
     for (let i = 0; i < 6; i++) {
       const f = new THREE.Mesh(leafClump(i % 3), w.mats.leaf);
       const r = rng.range(1.2, 2.0) * s;

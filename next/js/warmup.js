@@ -125,7 +125,7 @@
   // the loading screen, a breath between each - not in the middle of a fight, where each held a frame for a quarter of a second
   async function warmShapes() {
     const GP = G.GFX && G.GFX.propGeo; if (!GP) return;
-    for (const n of ['statue0', 'statue1', 'statue2', 'statue3', 'tuft', 'shelf', 'book', 'rack', 'cage', 'wellhead', 'brazier', 'sconce', 'chandelier']) { try { GP(n); } catch (e) { /* made when asked for */ } await new Promise((r) => setTimeout(r, 0)); }
+    for (const n of ['statue0', 'statue1', 'statue2', 'statue3', 'tuft', 'crate', 'shelf', 'book', 'rack', 'cage', 'wellhead', 'brazier', 'sconce', 'chandelier']) { try { GP(n); } catch (e) { /* made when asked for */ } await new Promise((r) => setTimeout(r, 0)); }
     // (the carved heads of the guardians: gfx.js foeGear)
     if (G.GFX.foeGear) for (const n of ['wyrmhead', 'wyrmjaw', 'wyrmseg', 'broodabd', 'broodceph', 'broodfang', 'broodleg1', 'broodleg2']) { try { G.GFX.foeGear(n); } catch (e) { /* made when asked for */ } await new Promise((r) => setTimeout(r, 0)); }
     // (and each class's clothes over the common figure: melted once here, so that the first frame of a run does not stop to do it)

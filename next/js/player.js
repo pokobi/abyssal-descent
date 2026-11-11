@@ -488,7 +488,14 @@
       if (G.Strata.onRope) return 'metal';
       const a = G.world.query(this.pos.x - 0.1, this.pos.y - 0.1, this.pos.z - 0.1, this.pos.x + 0.1, this.pos.y + 0.01, this.pos.z + 0.1);
       let best = null; for (const c of a) if (!best || c.y1 > best.y1) best = c;
-      return best ? best.surf : 'stone';
+      const w = G.world, surf = best ? best.surf : 'stone';
+      // (where the ground is turf: the ground itself is turf, what is built on it or paved over it is not)
+      if (surf === 'stone' && w.mats && w.mats.biome && w.mats.biome.floorTex === 'grass' && (!best || !best.mk || best.mk === 'floor')) {
+        const x = this.pos.x, z = this.pos.z, y = this.pos.y;
+        for (const q of w.paved || []) if (x >= q[0] && x <= q[2] && z >= q[1] && z <= q[3] && Math.abs(y - q[4]) < 0.3) return 'stone';
+        return 'grass';
+      }
+      return surf;
     }
     // deep water (the drowned town, w.deepWater): hold jump and you swim up to the surface, chest out of the water, and at the top you hop
     // up out of it (held, you bob: up, a hop, back into the water, a hop... ). Moving at a wall's top while you hold jump, you climb onto

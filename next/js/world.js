@@ -147,10 +147,11 @@
       if (x1 - x0 < 0.001 || y1 - y0 < 0.001 || z1 - z0 < 0.001) return null;
       this.batch.box(mk, x0, y0, z0, x1, y1, z1, o);
       const c = this.addCollider(x0, y0, z0, x1, y1, z1, { surf: o.surf || (mk.startsWith('wood') ? 'wood' : mk === 'iron' ? 'metal' : mk === 'ice' ? 'ice' : 'stone'), noGrapple: o.noGrapple, tag: o.tag });
-      c.vis = true; if (this._gateFrame) c.gateFrame = true; // (drawn: it hides what is behind it; a bare addCollider is unseen)
+      c.vis = true; c.mk = mk; if (this._gateFrame) c.gateFrame = true; // (drawn: it hides what is behind it; a bare addCollider is unseen. mk: what it is built of)
       return c;
     }
-    visual(mk, x0, y0, z0, x1, y1, z1, o) { this.batch.box(mk, x0, y0, z0, x1, y1, z1, o); if (this.visBoxes && !this._gateFrame && y1 - y0 > 0.02) this.visBoxes.push([Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1), Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)]); }
+    visual(mk, x0, y0, z0, x1, y1, z1, o) { this.batch.box(mk, x0, y0, z0, x1, y1, z1, o); if (Math.abs(y1 - y0) <= 0.12 && Math.abs(x1 - x0) > 0.6 && Math.abs(z1 - z0) > 0.6 && !mk.startsWith('wood') && mk !== 'floor' && mk !== 'rug') (this.paved || (this.paved = [])).push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), Math.max(y0, y1)]);   // (paving laid over the ground: what a step on it sounds of, player.js surfaceBelow)
+      if (this.visBoxes && !this._gateFrame && y1 - y0 > 0.02) this.visBoxes.push([Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1), Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)]); }
     query(x0, y0, z0, x1, y1, z1, out) {
       out = out || [];
       this.stamp++;

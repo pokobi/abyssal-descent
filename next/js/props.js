@@ -449,6 +449,14 @@
     const ry = rng && rng.chance(0.5) ? 0 : 0;
     w.deferred.push((grp) => {
       const g = new THREE.Group();
+      // (boards, battens, iron corners: gfx.js propGeo 'crate'; without it, the box with its bands)
+      const cg = G.GFX && G.GFX.propGeo ? G.GFX.propGeo('crate') : null;
+      if (cg) {
+        for (const q of cg) { const m = new THREE.Mesh(q.g, w.mats[q.m] || w.mats.wood); m.scale.setScalar(s); g.add(m); }
+        g.position.set(x, y, z); g.rotation.y = ry;
+        g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
+        grp.add(g); d.mesh = g; return;
+      }
       const body = new THREE.Mesh(PG.cbox, w.mats.wood); body.scale.set(s, s, s); body.position.y = s / 2;
       g.add(body);
       for (const sy of [0.04, s - 0.04]) for (const ax of [0, 1]) {
@@ -469,7 +477,7 @@
     w.deferred.push((grp) => {
       const g = new THREE.Group();
       const body = new THREE.Mesh(PG.barrel, explosive ? w.mats.ceramic : w.mats.wood);
-      if (explosive) { body.material = w.mats.wood.clone(); body.material.color.set('#7a3020'); }
+      if (explosive) { body.material = w.mats.wood.clone(); body.material.color.set('#5e2a1c'); }
       body.scale.set(1, 1.1, 1); g.add(body);
       for (const hy of [0.15, 0.55, 0.95]) {
         // (a flat iron hoop, sitting on the swell where it is)

@@ -1776,6 +1776,39 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const br = []; for (let i = 0; i < 6; i++) br.push(spike(0.02, 0.26, [0.4 + i * 0.4, 0.16 - i * 0.018, (i % 2 ? 0.06 : -0.06)], [0.3 * (i % 2 ? 1 : -1), 0, -0.5], 4));
     return [fpart('chit', [tubeR([[0, 0, 0], [1.2, -0.1, 0], [2.4, -0.04, 0], [3.0, 0.06, 0]], (t) => 0.17 - t * 0.14, 7, 14), ball(0.14, [1.5, -0.09, 0])].concat(br), 1.2)];
   };
+  // ---- what flies: a rocket, a launcher's shell, an arrow or bolt, a nail, a harpoon, a thrown spear, a boulder (combat.js, the
+  // models of the shots). Forward is -z, at their own measure, about where their middles were. [{ g, m }]: m names one of the world's
+  // materials (iron, brass, woodDark, cloth2, rock)
+  const SHOT = {}, shotC = {};
+  const vane = (w, h, len, y, z, a) => { const g = new THREE.BoxGeometry(w, h, len); g.translate(0, y, z); g.rotateZ(a); return g; };
+  SHOT.rocket = () => {
+    const fins = []; for (let i = 0; i < 4; i++) fins.push(vane(0.004, 0.075, 0.13, 0.072, 0.26, i * Math.PI / 2));
+    return [{ g: Geo.merge([lathe([[0.0005, -0.34], [0.03, -0.34], [0.043, -0.3], [0.03, -0.27], [0.045, -0.24], [0.045, 0.24], [0.041, 0.36], [0.03, 0.45], [0.014, 0.5], [0.0005, 0.515]], 16)].concat(fins)), m: 'iron' },
+      { g: Geo.merge([lathe([[0.0465, 0.2], [0.0465, 0.235], [0.045, 0.235], [0.045, 0.2]], 16), lathe([[0.0465, -0.2], [0.0465, -0.17], [0.045, -0.17], [0.045, -0.2]], 16)]), m: 'brass' }];
+  };
+  SHOT.grenade = () => [{ g: lathe([[0.0005, -0.105], [0.046, -0.105], [0.05, -0.09], [0.05, 0.01], [0.044, 0.06], [0.028, 0.1], [0.0005, 0.118]], 14), m: 'iron' }, { g: lathe([[0.052, -0.09], [0.052, -0.06], [0.05, -0.06], [0.05, -0.09]], 14), m: 'brass' }];
+  SHOT.arrow = () => {
+    const head = new THREE.ConeGeometry(0.02, 0.09, 4); head.rotateY(Math.PI / 4); head.scale(1, 1, 0.22); head.rotateX(-Math.PI / 2); head.translate(0, 0, -0.39);
+    const vs = []; for (let i = 0; i < 3; i++) vs.push(vane(0.0018, 0.03, 0.11, 0.021, 0.27, i * Math.PI * 2 / 3));
+    return [{ g: lathe([[0.0005, -0.35], [0.0065, -0.35], [0.0065, 0.345], [0.0005, 0.345]], 7), m: 'woodDark' }, { g: Geo.merge([head, lathe([[0.008, 0.3], [0.008, 0.345], [0.0065, 0.345], [0.0065, 0.3]], 7)]), m: 'iron' }, { g: Geo.merge(vs), m: 'cloth2' }];
+  };
+  SHOT.bolt = SHOT.arrow;
+  SHOT.nail = () => [{ g: lathe([[0.0005, -0.062], [0.0105, -0.062], [0.0105, -0.056], [0.0042, -0.054], [0.0042, 0.04], [0.0005, 0.062]], 6), m: 'iron' }];
+  SHOT.harpoon = () => {
+    const barbs = []; for (const sgn of [-1, 1]) { const b = new THREE.ConeGeometry(0.012, 0.16, 4); b.rotateX(Math.PI / 2 + sgn * 0.0); b.rotateY(sgn * 0.42); b.translate(sgn * 0.035, 0, -0.5); barbs.push(b); }
+    return [{ g: Geo.merge([lathe([[0.0005, -0.5], [0.011, -0.5], [0.011, 0.5], [0.019, 0.52], [0.012, 0.58], [0.0005, 0.66]], 8)].concat(barbs)), m: 'iron' }];
+  };
+  SHOT.spear = () => {
+    const blade = lathe([[0.016, 0.88], [0.022, 0.9], [0.05, 1.02], [0.036, 1.14], [0.012, 1.25], [0.0005, 1.29]], 10); blade.scale(1, 0.26, 1);
+    return [{ g: lathe([[0.0005, -0.9], [0.013, -0.9], [0.015, 0.0], [0.013, 0.9], [0.0005, 0.9]], 8), m: 'woodDark' }, { g: Geo.merge([blade, lathe([[0.018, 0.78], [0.02, 0.9], [0.013, 0.9], [0.013, 0.78]], 8), lathe([[0.0005, -0.96], [0.012, -0.93], [0.016, -0.9], [0.016, -0.84], [0.013, -0.84]], 8)]), m: 'iron' }];
+  };
+  SHOT.boulder = () => {
+    const g = new THREE.IcosahedronGeometry(1, 2), ps = g.attributes.position, h = (x, y, z) => { const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return n - Math.floor(n); };
+    const q = (v) => Math.round(v * 2.2) / 2.2;   // (broken in flats: corners that lie near one another are pushed alike)
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), f = 0.8 + 0.34 * h(q(x), q(y), q(z)) + 0.06 * h(x * 9, y * 9, z * 9); ps.setXYZ(i, x * f * 0.6, y * f * 0.55, z * f * 0.6); }
+    g.computeVertexNormals(); return [{ g: boxUV(g, 1.2), m: 'rock' }];
+  };
+  X.shotGeo = function (kind) { if (shotC[kind] !== undefined) return shotC[kind]; let r = null; try { r = SHOT[kind] ? SHOT[kind]() : null; } catch (e) { console.warn('gfx: no shot', kind, e); (X.gearErr = X.gearErr || {})['shot_' + kind] = String(e); r = null; } return (shotC[kind] = r); };
   X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
 
   // ---- the furniture of the halls (props.js), in metres, standing on the origin and looking to +z: lists of parts { g, m (which of
@@ -2101,6 +2134,22 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const g = b.toNonIndexed(); g.computeVertexNormals(); return [{ g, m: 'ice' }];
   };
   PROP.icefall = () => [{ g: boxUV(Geo.merge([sheet(0, 1, () => 0.5, (x, v, u) => (0.25 + 0.75 * Math.pow(Math.abs(Math.sin(u * 6.3 + 0.8)), 0.6)) * (0.3 + 0.7 * v), 8, 24, 0, (u) => 0.45 * Math.abs(Math.sin(u * 9.4 + 1.2)) + 0.18 * Math.sin(u * 23) + 0.1)]), 0.4), m: 'ice' }];
+  // a crate, a metre each way, standing on y = 0: boards with gaps (a dark box inside shows through them), a frame and a brace on
+  // each of its four sides, boards over the top, iron caps at the corners, nail heads
+  PROP.crate = () => {
+    const bd = [], fr = [], ir = [];
+    for (let i = 0; i < 4; i++) { const y = 0.1325 + i * 0.245;
+      for (const sg of [-1, 1]) { bd.push(rbx(0.97, 0.225, 0.03, 0.006, 0, y, sg * 0.485)); bd.push(rbx(0.03, 0.225, 0.97, 0.006, sg * 0.485, y, 0)); }
+      bd.push(rbx(0.97, 0.03, 0.225, 0.006, 0, 0.985, -0.3675 + i * 0.245)); }
+    for (const sg of [-1, 1]) {
+      for (const y of [0.05, 0.95]) { fr.push(rbx(1.0, 0.09, 0.028, 0.005, 0, y, sg * 0.514)); fr.push(rbx(0.028, 0.09, 1.0, 0.005, sg * 0.514, y, 0)); }
+      for (const e of [-1, 1]) { fr.push(rbx(0.09, 0.82, 0.028, 0.005, e * 0.455, 0.5, sg * 0.514)); fr.push(rbx(0.028, 0.82, 0.09, 0.005, sg * 0.514, 0.5, e * 0.455)); }
+      fr.push(rbx(1.1, 0.085, 0.026, 0.004, 0, 0.5, sg * 0.512, [0, 0, sg * 0.78])); fr.push(rbx(0.026, 0.085, 1.1, 0.004, sg * 0.512, 0.5, 0, [sg * 0.78, 0, 0]));
+      for (const e of [-1, 1]) for (const y of [0.05, 0.95]) { ir.push(ball(0.013, [e * 0.455, y, sg * 0.53])); ir.push(ball(0.013, [sg * 0.53, y, e * 0.455])); }
+    }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0.06, 0.94]) ir.push(rbx(0.125, 0.125, 0.125, 0.012, sx * 0.475, y, sz * 0.475));
+    return [ppart('wood', bd, 1.2), ppart('woodDark', fr.concat([rbx(0.93, 0.95, 0.93, 0.004, 0, 0.485, 0)]), 1.2), ppart('iron', ir, 2)];
+  };
   X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
 
   // ---- what is thrown (grenfx.js), in metres about its middle: lists of parts { g, m (which of grenfx's materials), tag }. A part

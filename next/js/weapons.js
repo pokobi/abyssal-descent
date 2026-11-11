@@ -725,7 +725,7 @@
       o.scale.set(r, len, r); o.position.copy(a).addScaledVector(d, 0.5); o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); (parent || g).add(o); return o;
     };
     // (shaped in gfx.js attGeo: turned muzzle pieces with their ports, grips with swells, clamps. The boxes and rods they were stay as the fallback)
-    const AGf = G.GFX && G.GFX.attGeo, attPut = (name, at, MM, r) => { const d = AGf ? AGf(name, r) : null; if (!d) return false; for (const q of d) { const o = new THREE.Mesh(q.g, MM[q.m] || AM.dark); o.position.set(at.x, at.y, at.z); g.add(o); } return true; };
+    const AGf = G.GFX && G.GFX.attGeo, attPut = (name, at, MM, r, parent) => { const d = AGf ? AGf(name, r) : null; if (!d) return false; for (const q of d) { const o = new THREE.Mesh(q.g, MM[q.m] || AM.dark); o.position.set(at.x, at.y, at.z); (parent || g).add(o); } return true; };
     if (atts.barrel) {
       // the barrel parts sit behind the muzzle (over the barrel's exposed length); on a pistol the barrel ends inside the slide, so they go in front of it
       const id = atts.barrel, mz = M.muzzle, fwd = !!MP.fwd, kL = fwd ? 0.55 : 1, zz = (z) => (fwd ? -z : z);
@@ -805,8 +805,11 @@
       if (v === 'drum' || v === 'infdrum') {
         const inf = v === 'infdrum', cy = -bh * 0.5 - 0.012, rim = inf ? glowM(0xb070ff) : AM.steel2;
         body(1, 0, 0);
-        vc(dr, 0.05, 0, cy, 0, metal, sg); vc(dr * 1.05, 0.008, 0, cy + 0.022, 0, rim, sg); vc(dr * 1.05, 0.008, 0, cy - 0.022, 0, rim, sg); vc(dr * 0.5, 0.006, 0, cy - 0.027, 0, AM.dark, sg);
-        for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; box(0.006, 0.04, 0.012, Math.cos(a) * dr, cy, Math.sin(a) * dr, AM.dark, 0, -a, 0, sg); }
+        const d0 = sg.children.length;
+        if (attPut('drum', V(0, cy - dr * 0.55, 0), { metal, rim, dark: AM.dark }, dr, sg)) { for (let i = d0; i < sg.children.length; i++) sg.children[i].rotation.y = Math.PI / 2 - sg.rotation.y; } else {   // (its faces look to the gun's sides, whichever way the magazine itself is turned)   // (a drum on its side under the magazine, its axis along the bore: gfx.js)
+          vc(dr, 0.05, 0, cy, 0, metal, sg); vc(dr * 1.05, 0.008, 0, cy + 0.022, 0, rim, sg); vc(dr * 1.05, 0.008, 0, cy - 0.022, 0, rim, sg); vc(dr * 0.5, 0.006, 0, cy - 0.027, 0, AM.dark, sg);
+          for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; box(0.006, 0.04, 0.012, Math.cos(a) * dr, cy, Math.sin(a) * dr, AM.dark, 0, -a, 0, sg); }
+        }
       } else if (v === 'ext') {
         body(1.5, 0, -bh * 0.25); mb(bw * 1.16, 0.008, bd * 1.12, 0, -bh * 1.0 - 0.004, 0, AM.steel2);
         for (let i = 0; i < 3; i++) mb(bw * 1.04, 0.004, bd * 1.04, 0, -bh * 0.1 - i * bh * 0.28, 0, AM.dark);
@@ -879,20 +882,35 @@
     const stockFrom = g.children.length;
     if (atts.stock) {
       const v = atop(atts.stock), ry = MP.rear[0], rz = MP.rear[1], has = MP.stock, rub = mats.poly;
-      if (v === 'heavy' || v === 'tac' || v === 'cheek') {
-        const L = has ? 0.07 : 0.22;
-        box(0.044, has ? 0.092 : 0.055, L, 0, ry - 0.008, rz + L / 2 - 0.004, poly);
-        if (!has) box(0.04, 0.09, 0.05, 0, ry - 0.045, rz + L - 0.02, poly, -0.25);
-        box(0.05, 0.098, 0.024, 0, ry - 0.012, rz + L + 0.008, rub); box(0.052, 0.004, 0.026, 0, ry - 0.012 + 0.047, rz + L + 0.008, AM.dark);
-        if (v === 'cheek') box(0.036, 0.022, has ? 0.12 : 0.15, 0, ry + 0.042, rz + (has ? 0.02 : 0.08), rub);
-        if (v === 'tac') { box(0.008, 0.034, 0.024, 0.027, ry - 0.016, rz + 0.025, AM.dark); for (let i = 0; i < 4; i++) box(0.046, 0.003, 0.006, 0, ry + 0.034, rz + 0.012 + i * 0.012, AM.steel2); }
+      if (AGf && AGf('pad')) {
+        // (shaped in gfx.js: a pad bowed to the shoulder, a comb for the cheek, a fixed stock or one of bent wire where the gun has none.
+        // On a gun that has a stock they sit close on it instead of standing out behind it)
+        const MMs = { poly, rub, dark: AM.dark, steel: AM.steel2 };
+        if (v === 'heavy' || v === 'tac' || v === 'cheek') {
+          const L = has ? 0.03 : 0.2;
+          if (has) attPut('spacer', V(0, ry - 0.008, rz + L), MMs, L); else attPut('fixed', V(0, ry, rz - 0.004), MMs);
+          attPut('pad', V(0, ry - (has ? 0.008 : 0.035), rz + L), MMs);
+          if (v === 'cheek') attPut('cheek', V(0, ry + (has ? 0.032 : 0.018), rz + (has ? -0.11 : 0.03)), MMs);
+          if (v === 'tac') { box(0.008, 0.034, 0.024, 0.027, ry - 0.016, rz + (has ? 0.012 : 0.025), AM.dark); for (let i = 0; i < 4; i++) box(0.046, 0.003, 0.006, 0, ry + (has ? 0.037 : 0.021), rz + 0.004 + i * (has ? 0.006 : 0.012), AM.steel2); }
+        } else if (has) attPut('skelpad', V(0, ry - 0.008, rz), MMs);
+        else attPut('wire', V(0, ry, rz), MMs, 0.24);
       } else {
-        const L = has ? 0.14 : 0.24, rk = v === 'skel';
-        rod(V(0, ry + 0.012, rz - 0.01), V(0, ry + 0.004, rz + L), 0.0055, AM.steel2);
-        rod(V(0, ry - 0.028, rz - 0.01), V(0, ry - 0.046, rz + L), 0.0055, AM.steel2);
-        if (rk) rod(V(0, ry + 0.012, rz + 0.01), V(0, ry - 0.046, rz + L * 0.78), 0.0035, AM.dark);
-        box(0.04, 0.082, 0.012, 0, ry - 0.021, rz + L + 0.006, AM.steel2); box(0.042, 0.07, 0.006, 0, ry - 0.021, rz + L + 0.015, rub);
-        box(0.014, 0.012, 0.04, 0, ry - 0.007, rz + 0.01, AM.dark);
+        if (v === 'heavy' || v === 'tac' || v === 'cheek') {
+          const L = has ? 0.07 : 0.22;
+          box(0.044, has ? 0.092 : 0.055, L, 0, ry - 0.008, rz + L / 2 - 0.004, poly);
+          if (!has) box(0.04, 0.09, 0.05, 0, ry - 0.045, rz + L - 0.02, poly, -0.25);
+          box(0.05, 0.098, 0.024, 0, ry - 0.012, rz + L + 0.008, rub); box(0.052, 0.004, 0.026, 0, ry - 0.012 + 0.047, rz + L + 0.008, AM.dark);
+          if (v === 'cheek') box(0.036, 0.022, has ? 0.12 : 0.15, 0, ry + 0.042, rz + (has ? 0.02 : 0.08), rub);
+          if (v === 'tac') { box(0.008, 0.034, 0.024, 0.027, ry - 0.016, rz + 0.025, AM.dark); for (let i = 0; i < 4; i++) box(0.046, 0.003, 0.006, 0, ry + 0.034, rz + 0.012 + i * 0.012, AM.steel2); }
+        } else {
+          const L = has ? 0.14 : 0.24, rk = v === 'skel';
+          rod(V(0, ry + 0.012, rz - 0.01), V(0, ry + 0.004, rz + L), 0.0055, AM.steel2);
+          rod(V(0, ry - 0.028, rz - 0.01), V(0, ry - 0.046, rz + L), 0.0055, AM.steel2);
+          if (rk) rod(V(0, ry + 0.012, rz + 0.01), V(0, ry - 0.046, rz + L * 0.78), 0.0035, AM.dark);
+          box(0.04, 0.082, 0.012, 0, ry - 0.021, rz + L + 0.006, AM.steel2); box(0.042, 0.07, 0.006, 0, ry - 0.021, rz + L + 0.015, rub);
+          box(0.014, 0.012, 0.04, 0, ry - 0.007, rz + 0.01, AM.dark);
+        }
+    
       }
     }
     M.stockParts = g.children.slice(stockFrom); // the add-on stock reaches back past the eye on some guns: it is hidden while aiming down the sights

@@ -2167,6 +2167,20 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     for (const sx of [-1, 1]) { st.push(tubeR([[sx * 0.016, -0.016, -0.004], [sx * 0.03, -0.042, -0.065]], 0.0048, 6, false), tubeR([[sx * 0.03, -0.042, -0.065], [sx * 0.04, -0.062, -0.115]], 0.0034, 6, false)); dk.push(Geo.rod([sx * 0.029, -0.04, -0.06], [sx * 0.031, -0.044, -0.07], 0.0062, 6), rbx(0.012, 0.007, 0.02, 0.003, sx * 0.04, -0.065, -0.119)); }
     return [aq('steel', st), aq('dark', dk)];
   };
+  // a drum under the magazine, its axis along the bore: a turned case, a rim at each face, a winding key and ribs on its front
+  ATT.drum = (r) => {
+    const dk = [lathe([[0.0005, 0.028], [r * 0.2, 0.028], [r * 0.22, 0.034], [r * 0.1, 0.038], [0.0005, 0.038]], 10)];
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; dk.push(rb(0.004, r * 0.3, 0.003, 0.001, Math.cos(a) * r * 0.75, Math.sin(a) * r * 0.75, 0.0255, [0, 0, a + HX])); }
+    return [aq('metal', lathe([[0.0005, -0.028], [r * 0.55, -0.028], [r * 0.6, -0.024], [r * 0.92, -0.024], [r, -0.018], [r, 0.018], [r * 0.92, 0.024], [r * 0.6, 0.024], [r * 0.55, 0.028], [0.0005, 0.028]], 24)), aq('rim', [ringF(r * 1.025, -0.019, 0.004), ringF(r * 1.025, 0.019, 0.004)]), aq('dark', dk)];
+  };
+  // stocks. A butt pad bowed to the shoulder on its plate; a spacer before it; a comb for the cheek; a fixed stock with a hole through
+  // it, for a gun that has none; a stock of bent wire; a skeleton pad. Each from the origin back (+z)
+  ATT.pad = () => [aq('rub', side([[0.0, 0.05], [-0.012, 0.052], [-0.022, 0.03], [-0.026, 0], [-0.022, -0.04], [-0.014, -0.056], [0.0, -0.05]], 0.046, 0.006)), aq('dark', rb(0.05, 0.104, 0.006, 0.002, 0, -0.002, 0.003))];
+  ATT.spacer = (L) => [aq('poly', sec([[-0.018, -0.046], [0.018, -0.046], [0.022, -0.036], [0.022, 0.034], [0.016, 0.044], [-0.016, 0.044], [-0.022, 0.034], [-0.022, -0.036]], -L, 0, 0.004))];
+  ATT.cheek = () => [aq('rub', sec([[-0.019, 0], [-0.021, 0.014], [-0.013, 0.025], [0.013, 0.025], [0.021, 0.014], [0.019, 0]], -0.13, 0, 0.004)), aq('dark', [prism(0.004, 0.046, [0, 0.008, 0.03], [0, 0, HX], 6), prism(0.004, 0.046, [0, 0.008, 0.1], [0, 0, HX], 6)])];
+  ATT.fixed = () => [aq('poly', side([[0, 0.02], [-0.2, 0.016], [-0.2, -0.085], [-0.17, -0.09], [-0.05, -0.04], [0, -0.035]], 0.04, 0.008, [[[-0.06, -0.022], [-0.16, -0.056], [-0.16, -0.006], [-0.06, -0.002]]]))];
+  ATT.wire = (L) => [aq('steel', [tubeR([[0, 0.012, -0.01], [0, 0.008, L * 0.5], [0, 0.004, L - 0.01], [0, -0.004, L], [0, -0.038, L], [0, -0.046, L - 0.01], [0, -0.038, L * 0.5], [0, -0.028, -0.01]], 0.0052, 6, 30)]), aq('dark', [rbx(0.016, 0.014, 0.04, 0.004, 0, -0.008, 0.012), tubeR([[0, 0.01, 0.012], [0, -0.04, L * 0.76]], 0.0034, 5, false)]), aq('rub', rbx(0.04, 0.076, 0.012, 0.005, 0, -0.021, L + 0.007))];
+  ATT.skelpad = () => [aq('steel', side([[0.0, 0.046], [-0.03, 0.044], [-0.036, 0.03], [-0.036, -0.044], [-0.028, -0.052], [0.0, -0.048]], 0.036, 0.004, [[[-0.006, 0.03], [-0.026, 0.028], [-0.026, -0.034], [-0.006, -0.036]]])), aq('rub', rb(0.04, 0.092, 0.006, 0.002, 0, -0.002, -0.039))];
   X.attGeo = function (name, r) { const k = name + (r ? '|' + r.toFixed(4) : ''); if (attC[k] !== undefined) return attC[k]; let o = null; try { o = ATT[name] ? ATT[name](r) : null; } catch (e) { console.warn('gfx: no attachment', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); o = null; } return (attC[k] = o); };
 
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted

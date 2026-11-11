@@ -6,7 +6,7 @@
 //  * Entity icons (attachments, guns, melee weapons, armour) are specific drawings, carried in text as private-use characters
 //    (G.Icons.ch(key)) that the same observer swaps in. Attachments are drawn here by hand (side views of the actual parts).
 //  * Canvas text (3D labels, shop sprites) draws the same shapes through Path2D: G.Icons.fillText / drawIcon.
-// Emoji not in the table (coins, plain text symbols) are left as they are on purpose.
+// Emoji not in the table (plain text symbols: arrows, marks) are left as they are on purpose.
 // ---------------------------------------------------------------------------------------------------------------------------
 (function () {
   const IC = (G.Icons = {});
@@ -344,6 +344,17 @@
   const OS = () => [{ d: PATHS.shield || '', c: '#8fdcff', o: 0.62, ring: '#d8f4ff' }, { d: PATHS.shield || '', c: '#ffffff', o: 0.2, s: 0.6, x: 102, y: 90 }];
   IC.def = function (key, layers, fallback) { SPEC[key] = layers; if (fallback) FALLBACK[key] = fallback; delete SVG[key]; return key; };
   IC.has = (key) => !!SPEC[key];
+  // (emoji that still reached the page as the system's own coloured pictures: the coin - a disc with a raised rim and a lozenge struck
+  // in it, drawn here - and those that had no drawing yet, given the nearest of the silhouettes there are)
+  PATHS['coin'] = 'M20 256a236 236 0 1 1 472 0a236 236 0 1 1 -472 0z M60 256a196 196 0 1 0 392 0a196 196 0 1 0 -392 0z M80 256a176 176 0 1 1 352 0a176 176 0 1 1 -352 0z M256 150L170 256L256 362L342 256z';
+  Object.assign(EMO, {
+    '🪙': ['coin', '#e2b24a'], '💠': ['cut-diamond', '#8fd0ff'], '🔧': ['spanner', '#c8c0b0'], '🌌': ['night-sky', '#9a8ad8'], '🗂': ['card-joker', '#e8c870'],
+    '🕊': ['swallow', '#e8e4d8'], '🏚': ['house', '#b09a7a'], '☣': ['biohazard', '#a8d848'], '🔢': ['histogram', '#e8c870'], '⚫': ['plain-circle', '#4a4a50'], '⚪': ['plain-circle', '#e0dcd0'],
+    '⬛': ['stone-block', '#5a5650'], '♨': ['fog', '#ffb070'], '🌡': ['flame', '#ff9a6a'], '🔸': ['cut-diamond', '#ffa040'], '📋': ['scroll-unfurled', '#d8c8a0'], '➕': ['heart-plus', '#72d46a'],
+    '🦊': ['wolf-head', '#ff9a50'], '🐗': ['rhinoceros-horn', '#c8a880'], '🐂': ['rhinoceros-horn', '#d8b890'], '🌳': ['sprout', '#7ac860'], '🌇': ['sunrise', '#ffb060'], '🌐': ['vortex', '#b8a0ff'],
+    '🌸': ['flower-star', '#ffa8c8'], '🐝': ['cricket', '#f0c840'], '🤐': ['silenced', '#b0b8c0'], '🐚': ['snail', '#d8c8b0'], '🧟': ['hooded-figure', '#9ab890'], '🎃': ['drama-masks', '#e89a40'],
+    '🫧': ['water-drop', '#a0d8f0'], '😇': ['angel-outfit', '#fff0b0'], '🗽': ['moai', '#b0b0a8'], '🫕': ['bubbling-flask', '#c8a060'], '🛞': ['gears', '#b0a898'], '⛏': ['warhammer', '#c0b8a8'],
+  });
   for (const e in EMO) { const [n, c] = EMO[e]; if (PATHS[n]) SPEC['e:' + e] = [big(n, c)]; }
 
   // private-use characters stand for entity icons inside ordinary strings

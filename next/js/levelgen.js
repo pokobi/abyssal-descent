@@ -622,31 +622,87 @@
           sp.position.set(cx + Math.cos(a) * r, rng.range(-38, -10), cz + Math.sin(a) * r); sp.scale.setScalar(rng.range(40, 110)); grp.add(sp);
           w.animated.push({ kind: 'cloud', m: sp, sp: rng.range(0.5, 2) });
         }
-        const rockM = w.mats.rock, grassM = new THREE.MeshStandardMaterial({ color: w.mats.biome.isletGrass ?? 0x8ab05a, roughness: 0.9, flatShading: true });
+        const rockM = w.mats.rock, grassM = new THREE.MeshStandardMaterial({ color: w.mats.biome.isletGrass ?? 0x8ab05a, roughness: 0.95 });
         for (let i = 0; i < 14; i++) {
           const a = rng.range(0, Math.PI * 2), r0 = rng.range(Math.max(W, D) * 0.8, 170), s = rng.range(5, 16), r = Math.max(r0, Math.hypot(W, D) / 2 + s * 1.2 + 8); // (clear of the area's corners, its tree and all: never over the floor)
           const g = new THREE.Group(); g.position.set(cx + Math.cos(a) * r, rng.range(-12, 25), cz + Math.sin(a) * r);
-          const rk = new THREE.Mesh(PG.cone, rockM); rk.scale.set(s, s * 1.4, s); rk.rotation.x = Math.PI; rk.position.y = -s * 0.7; g.add(rk);
-          const top = new THREE.Mesh(PG.cyl, grassM); top.scale.set(s, s * 0.12, s); g.add(top);
+          // (rock in ledges under a rim that is no circle, turf with a lip over it: it was a cone point down with a disc on it)
+          const rk = new THREE.Mesh(hangRock(i % 4), rockM); rk.scale.set(s, s, s); g.add(rk);
+          const top = new THREE.Mesh(hangTurf(i % 4), grassM); top.scale.set(s, s, s); g.add(top);
           if (rng.chance(0.6)) tree(g, w, 0, 0, 0, rng, s * 0.15);
           grp.add(g); w.animated.push({ kind: 'islet', m: g, y0: g.position.y, ph: rng.range(0, 6) });
         }
         // the play area itself is an island: hang rock below its rim
-        if (!w.noRim) { const rim = new THREE.Mesh(PG.cone, rockM); rim.scale.set(Math.max(W, D) * 0.62, 34, Math.max(W, D) * 0.62); rim.rotation.x = Math.PI; rim.position.set(cx, -31, cz); grp.add(rim); } // (noRim: islands each carry their own rock)
+        if (!w.noRim) { const rim = new THREE.Mesh(hangRock(5), rockM); rim.scale.set(Math.max(W, D) * 0.66, 34 / 1.4, Math.max(W, D) * 0.66); rim.position.set(cx, -14, cz); grp.add(rim); } // (noRim: islands each carry their own rock)
       }
     });
   }
   // stylised tree (trunk + clustered foliage)
+  // (shapes made once, by a noise of their own: nothing here throws the area's dice)
+  const _hn = (x, y, s) => { const n = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
+  const _vn = (x, y, s) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy); return _hn(xi, yi, s) * (1 - u) * (1 - v) + _hn(xi + 1, yi, s) * u * (1 - v) + _hn(xi, yi + 1, s) * (1 - u) * v + _hn(xi + 1, yi + 1, s) * u * v; };
+  const _shape = {};
+  // the rim of an island seen from above: not a circle. a: the angle, k: which island
+  const rimR = (a, k) => { const N = 6; let v = 0; for (let j = 1; j <= 3; j++) { const q = a / (Math.PI * 2) * (N * j); const i0 = Math.floor(q), f = q - i0, u = f * f * (3 - 2 * f); v += (_hn(i0 % (N * j), j, 20 + k) * (1 - u) + _hn((i0 + 1) % (N * j), j, 20 + k) * u) / j; } return 0.8 + v * 0.2; };
+  // rock hanging under an island: its top at y = 0 with the island's rim, down 1.4 to a point; in ledges, torn, never a cone
+  function hangRock(k) {
+    const key = 'rock' + k; if (_shape[key]) return _shape[key];
+    const NA = 40, NT = 16, pos = [], uv = [], idx = [];
+    for (let j = 0; j <= NT; j++) {
+      const t = j / NT, step = Math.floor(t * 5) / 5, tt = t * 0.55 + step * 0.45;                      // (ledges: it narrows in steps)
+      for (let i = 0; i <= NA; i++) {
+        const a = i / NA * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+        const lump = _vn(i % NA / NA * 9 + (i === NA ? 0 : 0), t * 5, 30 + k) * (i === NA ? 1 : 1);
+        const l2 = _vn((i % NA) / NA * 9, t * 5, 30 + k), l3 = _vn((NA - (i % NA)) / NA * 9, t * 5, 30 + k), wgt = (i % NA) / NA, lm = l2 * (1 - wgt * wgt * wgt * wgt) + l3 * (wgt * wgt * wgt * wgt);   // (the noise closed round the seam)
+        const r = rimR(a, k) * Math.pow(1 - tt, 0.62) * (0.82 + 0.36 * lm) * (1 - 0.04 * Math.sin(a * 3 + k));
+        const lean = t * t * 0.18;
+        pos.push(ca * r + lean * Math.cos(k * 2.1), -t * 1.4, sa * r + lean * Math.sin(k * 2.1)); uv.push(i / NA * 4, t * 2);
+      }
+    }
+    for (let j = 0; j < NT; j++) for (let i = 0; i < NA; i++) { const a = j * (NA + 1) + i, b = a + 1, c = a + NA + 1, d = c + 1; idx.push(a, b, c, b, d, c); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    return (_shape[key] = g);
+  }
+  // the turf on it: the same rim, a low mound, a lip that hangs a little over the rock
+  function hangTurf(k) {
+    const key = 'turf' + k; if (_shape[key]) return _shape[key];
+    const NA = 40, pos = [0, 0.1, 0], idx = [];
+    for (const [rr, y] of [[0.6, 0.09], [1.03, 0.04], [1.05, -0.03], [0.98, -0.09]]) for (let i = 0; i < NA; i++) { const a = i / NA * Math.PI * 2, r = rimR(a, k) * rr; pos.push(Math.cos(a) * r, y + (rr < 1 ? _hn(i, 3, 40 + k) * 0.03 : 0), Math.sin(a) * r); }
+    for (let i = 0; i < NA; i++) idx.push(0, 1 + (i + 1) % NA, 1 + i);
+    for (let j = 0; j < 3; j++) for (let i = 0; i < NA; i++) { const a = 1 + j * NA + i, b = 1 + j * NA + (i + 1) % NA, c = a + NA, d = b + NA; idx.push(a, b, c, b, d, c); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    return (_shape[key] = g);
+  }
+  // a clump of leaves: a ball pushed in and out, not a twenty-sided stone
+  function leafClump(k) {
+    const key = 'leaf' + k; if (_shape[key]) return _shape[key];
+    const g = new THREE.IcosahedronGeometry(1, 3), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), f = 0.74 + 0.4 * _vn(x * 2.2 + 5 + k * 3, z * 2.2 + y * 1.7 + 5, 50 + k) + 0.12 * _vn(x * 6 + 9, y * 6 + z * 5 + 9, 60 + k); ps.setXYZ(i, x * f, y * f * (y < 0 ? 0.7 : 1), z * f); }
+    // (its faces do not share their corners, so each would be lit flat: every corner looks the way it lies from the middle, a little toward its face)
+    g.computeVertexNormals(); const nr = g.attributes.normal, v = new THREE.Vector3(), q = new THREE.Vector3();
+    for (let i = 0; i < ps.count; i++) { v.fromBufferAttribute(ps, i).normalize(); q.fromBufferAttribute(nr, i); v.lerp(q, 0.25).normalize(); nr.setXYZ(i, v.x, v.y, v.z); }
+    return (_shape[key] = g);
+  }
+  function treeTrunk() {
+    if (_shape.trunk) return _shape.trunk;
+    const g = new THREE.CylinderGeometry(0.42, 1, 1, 9, 6), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const y = ps.getY(i) + 0.5, flare = y < 0.12 ? 1 + (0.12 - y) * 5 : 1; ps.setXYZ(i, ps.getX(i) * flare + Math.sin(y * 4.1) * 0.22 * y, ps.getY(i), ps.getZ(i) * flare + Math.cos(y * 3.3) * 0.16 * y); }
+    g.computeVertexNormals(); return (_shape.trunk = g);
+  }
+  LG.hangRock = hangRock; LG.hangTurf = hangTurf;
   function tree(grp, w, x, y, z, rng, s) {
     s = s || 1;
     const PG = G.Props.PG;
     const g = new THREE.Group(); g.position.set(x, y, z);
-    const tr = new THREE.Mesh(PG.cyl8, w.mats.woodDark); tr.scale.set(0.28 * s, 4.2 * s, 0.28 * s); tr.position.y = 2.1 * s; g.add(tr);
+    // (a trunk that flares at its foot and leans as it rises, boughs out of it to the crowns, crowns of leaves in clumps - it was a
+    // post with six twenty-sided stones on it. The dice are thrown as before)
+    const tr = new THREE.Mesh(treeTrunk(), w.mats.woodDark); tr.scale.set(0.36 * s, 4.4 * s, 0.36 * s); tr.position.y = 2.2 * s; tr.rotation.y = _hn(x, z, 7) * 6.28; g.add(tr);
     for (let i = 0; i < 6; i++) {
-      const f = new THREE.Mesh(PG.ico, w.mats.leaf);
+      const f = new THREE.Mesh(leafClump(i % 3), w.mats.leaf);
       const r = rng.range(1.2, 2.0) * s;
-      f.scale.set(r, r * 0.85, r); f.position.set(rng.range(-1.3, 1.3) * s, (3.6 + rng.range(0, 2.2)) * s, rng.range(-1.3, 1.3) * s); f.rotation.set(rng.range(0, 3), rng.range(0, 3), 0);
+      f.scale.set(r, r * 0.8, r); f.position.set(rng.range(-1.3, 1.3) * s, (3.6 + rng.range(0, 2.2)) * s, rng.range(-1.3, 1.3) * s); f.rotation.set(rng.range(0, 3) * 0.12, rng.range(0, 3), 0);
       g.add(f);
+      if (i < 4) { const b = new THREE.Mesh(PG.cyl8, w.mats.woodDark), fy = 2.6 * s, dx = f.position.x, dy = f.position.y - fy, dz = f.position.z, L = Math.hypot(dx, dy, dz); b.scale.set(0.085 * s, L, 0.085 * s); b.position.set(dx / 2, fy + dy / 2, dz / 2); b.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / L, dy / L, dz / L)); g.add(b); }   // a bough to it
     }
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     grp.add(g);

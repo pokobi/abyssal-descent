@@ -665,7 +665,10 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     if (B.marble) {
       M.floor = std(t.marble, B.floor, 0.35, 0, 0.8); M.cobble = std(t.marble, B.floor, 0.4, 0, 0.8);
       M.block = std(t.marble, B.stone2, 0.4, 0, 0.8); M.wall = std(t.ashlar, B.stone, 0.55, 0, 0.8);
-      M.trim = std(t.metal, B.trim, 0.32, B.trimMetal ?? 0.85, 0.4); // (trimMetal: a less mirror-like gilt where there is little to reflect)
+      // (the gate posts, the cornices, the statues - what 'trim' is - are cut of a honey-coloured marble: as gilt iron, and with the
+      // rust of the iron's picture on it, a post seven metres high was a brown thing blotched with red in a hall of white stone.
+      // Gold stays where gold is put: M.gold)
+      M.trim = std(t.marble, '#' + new THREE.Color(B.trim).lerp(new THREE.Color(B.stone), 0.5).getHexString(), 0.42, 0, 0.8);
     }
     // (grass in tufts, props.js: the colour of the turf it stands in; it leans with the wind, more at its tips, each tuft in its own time)
     M.tuft = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x7e8a50).multiply(new THREE.Color(B.grassTint || '#ffffff')), roughness: 1, side: THREE.DoubleSide, vertexColors: true });

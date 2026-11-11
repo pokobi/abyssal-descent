@@ -2118,6 +2118,57 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   ITEM.device = () => [gq('gun', rbx(0.08, 0.055, 0.06, 0.006, 0, 0, 0)), gq('brass', [rbx(0.03, 0.02, 0.064, 0.003, 0, 0.018, 0), rbx(0.084, 0.006, 0.064, 0.002, 0, -0.018, 0), ball(0.005, [0, 0.018, 0.033])])];
   X.itemGeo = function (name) { if (itemC[name] !== undefined) return itemC[name]; let r = null; try { r = ITEM[name] ? ITEM[name]() : null; } catch (e) { console.warn('gfx: no item', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } return (itemC[name] = r); };
 
+  // ---- what is fitted to a gun (weapons.js), in the gun's own measure (forward is -z): lists of parts { g, m }. A muzzle piece
+  // starts at the muzzle and runs forward of it, r its radius there; what hangs under the barrel hangs from the origin ----
+  const ATT = {}, attC = {};
+  const aq = (m, list) => ({ g: Geo.merge(Array.isArray(list) ? list : [list]), m });
+  const ringF = (r, f, t) => lathe([[r - t, f - t], [r, f - t * 0.4], [r, f + t * 0.4], [r - t, f + t]], 16);
+  const suppBody = (r) => lathe([[0.0005, 0.004], [r * 0.92, 0.004], [r, 0.012], [r, 0.03], [r * 0.955, 0.033], [r * 0.955, 0.037], [r, 0.04], [r, 0.07], [r * 0.955, 0.073], [r * 0.955, 0.077], [r, 0.08], [r, 0.11], [r * 0.955, 0.113], [r * 0.955, 0.117], [r, 0.12], [r, 0.152], [r * 0.9, 0.162], [r * 0.5, 0.164], [r * 0.42, 0.15], [0.0005, 0.15]], 20);
+  // a silencer: a tube with three grooves turned in it, a collar at its root, the bore sunk in its nose; one with lit grooves
+  ATT.supp = (r) => [aq('dark', suppBody(r)), aq('steel', lathe([[r * 0.7, -0.004], [r * 1.1, -0.002], [r * 1.1, 0.01], [r, 0.012]], 20))];
+  ATT.supp2 = (r) => ATT.supp(r).concat([aq('glow', [0.035, 0.075, 0.115].map((f) => lathe([[r * 0.962, f - 0.0018], [r * 0.975, f], [r * 0.962, f + 0.0018]], 20)))]);
+  // a compensator: a short sleeve with ports cut in its top and sides
+  ATT.comp = (r) => [aq('steel', lathe([[0.0005, 0], [r * 0.9, 0], [r, 0.006], [r, 0.05], [r * 0.92, 0.055], [r * 0.5, 0.056], [r * 0.45, 0.045], [0.0005, 0.045]], 18)),
+    aq('dark', [rb(0.012, 0.004, 0.011, 0.001, 0, r * 0.985, 0.018), rb(0.012, 0.004, 0.011, 0.001, 0, r * 0.985, 0.036), rb(0.004, 0.011, 0.011, 0.001, r * 0.985, 0.003, 0.018), rb(0.004, 0.011, 0.011, 0.001, -r * 0.985, 0.003, 0.018), rb(0.004, 0.011, 0.011, 0.001, r * 0.985, 0.003, 0.036), rb(0.004, 0.011, 0.011, 0.001, -r * 0.985, 0.003, 0.036)])];
+  // a muzzle brake: a block wider than it is high, three slots through its sides, two over the top
+  ATT.brake = (r) => {
+    const w = r * 1.18, h = r * 0.88, dk = [lathe([[0.0005, 0.0704], [r * 0.5, 0.0704], [0.0005, 0.071]], 12)];
+    for (const sx of [-1, 1]) for (const f of [0.018, 0.036, 0.054]) dk.push(rb(0.004, h * 1.3, 0.009, 0.001, sx * w, 0, f));
+    for (const f of [0.024, 0.048]) dk.push(rb(w * 1.2, 0.004, 0.009, 0.001, 0, h, f));
+    return [aq('steel', sec([[-w, -h * 0.6], [-w * 0.7, -h], [w * 0.7, -h], [w, -h * 0.6], [w, h * 0.6], [w * 0.7, h], [-w * 0.7, h], [-w, h * 0.6]], 0, 0.07, 0.003)), aq('dark', dk)];
+  };
+  // a flash hider: four prongs out of a collar, tied by a ring at their tips
+  ATT.flash = (r) => {
+    const pr = []; for (let i = 0; i < 4; i++) { const a = i * HX + Math.PI / 4; pr.push(rb(0.0075, 0.0075, 0.052, 0.002, Math.cos(a) * r * 0.86, Math.sin(a) * r * 0.86, 0.05, [0, 0, a])); }
+    return [aq('steel', [lathe([[0.0005, 0], [r * 0.95, 0], [r * 0.98, 0.004], [r * 0.98, 0.024], [r * 0.6, 0.026], [0.0005, 0.02]], 16), ringF(r * 1.08, 0.075, 0.004)]), aq('dark', pr)];
+  };
+  // an amplifier: a bell out of a collar, a lit band where it begins
+  ATT.amp = (r) => [aq('dark', lathe([[0.0005, 0], [r, 0], [r, 0.03], [r * 1.02, 0.032], [r * 0.9, 0.036], [0.0005, 0.03]], 16)), aq('steel', lathe([[r * 0.95, 0.03], [r * 1.25, 0.045], [r * 2.05, 0.098], [r * 2.12, 0.1], [r * 2.0, 0.1], [r * 1.2, 0.05], [r * 0.9, 0.036]], 20)), aq('glow', lathe([[r * 1.04, 0.027], [r * 1.1, 0.03], [r * 1.04, 0.033]], 16))];
+  // a fire nozzle: a fat collar, a lip, a lit ring inside the lip
+  ATT.nozzle = () => [aq('dark', lathe([[0.0005, 0], [0.03, 0], [0.034, 0.01], [0.034, 0.045], [0.03, 0.05], [0.026, 0.03], [0.0005, 0.03]], 18)), aq('steel', lathe([[0.034, 0.045], [0.044, 0.05], [0.046, 0.06], [0.04, 0.066], [0.03, 0.06], [0.03, 0.05]], 18)), aq('glow', lathe([[0.03, 0.06], [0.038, 0.0645], [0.03, 0.062]], 18))];
+  // a choke: a sleeve drawn in at its mouth, knurled at its root
+  ATT.choke = (r) => {
+    const kn = []; for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; kn.push(rb(0.003, 0.003, 0.008, 0.0008, Math.cos(a) * (r + 0.0085), Math.sin(a) * (r + 0.0085), 0.007, [0, 0, a])); }
+    return [aq('steel', lathe([[0.0005, 0], [r + 0.006, 0], [r + 0.008, 0.003], [r + 0.008, 0.011], [r + 0.006, 0.013], [r + 0.005, 0.04], [r + 0.008, 0.042], [r + 0.008, 0.048], [r + 0.003, 0.05], [r * 0.8, 0.05], [r * 0.75, 0.04], [0.0005, 0.04]], 18)), aq('dark', kn)];
+  };
+  // a bayonet under the muzzle: a blade with a ridge, a ring about the barrel
+  ATT.bayonet = (r) => { const b = straight([[0.0, 0.011, 0.011, 0.0046], [0.12, 0.0105, 0.0105, 0.0042], [0.17, 0.007, 0.007, 0.003]], [0.2, 0]); b.rotateX(-HX); b.translate(0, -0.03, 0.05); return [aq('blade', b), aq('dark', [rb(0.012, 0.02, 0.05, 0.003, 0, -0.03, -0.075), new THREE.TorusGeometry(r + 0.005, 0.004, 5, 14).translate(0, 0, 0.04)])]; };
+  // the clamp a thing hangs from under the barrel: len long
+  const mountG = (len) => [sec([[-0.016, 0.002], [0.016, 0.002], [0.018, -0.004], [0.016, -0.012], [-0.016, -0.012], [-0.018, -0.004]], -len / 2, len / 2, 0.002), prism(0.0035, 0.04, [0, -0.005, -len * 0.28], [0, 0, HX], 6), prism(0.0035, 0.04, [0, -0.005, len * 0.28], [0, 0, HX], 6)];
+  const vgripG = () => hl([[0.0005, -0.103], [0.016, -0.103], [0.019, -0.098], [0.019, -0.09], [0.0165, -0.086], [0.0175, -0.075], [0.0155, -0.066], [0.0175, -0.055], [0.0155, -0.046], [0.0175, -0.035], [0.0155, -0.026], [0.017, -0.014], [0.012, -0.01], [0.0005, -0.01]], 0.9, 1.1, 14);
+  // a vertical grip with swells for the fingers; the same with a gyro wheel before it; a hand stop; an angled grip; a laser; a bipod
+  ATT.vgrip = () => [aq('dark', mountG(0.06).concat([hl([[0.0005, -0.106], [0.017, -0.106], [0.02, -0.1], [0.0195, -0.094], [0.0005, -0.094]], 0.9, 1.1, 14)])), aq('poly', vgripG())];
+  ATT.gyro = () => ATT.vgrip().concat([aq('steel', prism(0.026, 0.014, [0, -0.016, -0.045], [0, 0, HX], 16)), aq('glow', new THREE.TorusGeometry(0.0265, 0.002, 4, 20).rotateY(HX).translate(0, -0.016, -0.045)), aq('dark', prism(0.008, 0.02, [0, -0.016, -0.045], [0, 0, HX], 8))]);
+  ATT.handstop = () => [aq('dark', mountG(0.07)), aq('poly', side([[0.034, -0.01], [0.036, -0.02], [0.012, -0.05], [-0.008, -0.053], [-0.03, -0.03], [-0.036, -0.01]], 0.028, 0.005))];
+  ATT.agrip = () => [aq('dark', mountG(0.08)), aq('poly', side([[0.046, -0.01], [0.05, -0.02], [0.012, -0.062], [-0.028, -0.072], [-0.04, -0.062], [-0.022, -0.032], [-0.046, -0.01]], 0.03, 0.006))];
+  ATT.laser = () => [aq('dark', mountG(0.07).concat([rbx(0.026, 0.03, 0.075, 0.005, 0, -0.02, -0.004), rbx(0.006, 0.008, 0.016, 0.002, 0.016, -0.02, 0.015)])), aq('steel', [lathe([[0.0005, 0.04], [0.011, 0.04], [0.012, 0.043], [0.012, 0.054], [0.009, 0.056], [0.0005, 0.05]], 12).translate(0, -0.02, 0), tubeR([[0.012, -0.03, 0.03], [0.02, -0.02, 0.05], [0.014, 0.0, 0.07]], 0.002, 4, 8)])];
+  ATT.bipod = () => {
+    const st = [], dk = mountG(0.05).concat([rbx(0.042, 0.016, 0.026, 0.004, 0, -0.016, 0)]);
+    for (const sx of [-1, 1]) { st.push(tubeR([[sx * 0.016, -0.016, -0.004], [sx * 0.03, -0.042, -0.065]], 0.0048, 6, false), tubeR([[sx * 0.03, -0.042, -0.065], [sx * 0.04, -0.062, -0.115]], 0.0034, 6, false)); dk.push(Geo.rod([sx * 0.029, -0.04, -0.06], [sx * 0.031, -0.044, -0.07], 0.0062, 6), rbx(0.012, 0.007, 0.02, 0.003, sx * 0.04, -0.065, -0.119)); }
+    return [aq('steel', st), aq('dark', dk)];
+  };
+  X.attGeo = function (name, r) { const k = name + (r ? '|' + r.toFixed(4) : ''); if (attC[k] !== undefined) return attC[k]; let o = null; try { o = ATT[name] ? ATT[name](r) : null; } catch (e) { console.warn('gfx: no attachment', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); o = null; } return (attC[k] = o); };
+
   // ---- a body built of blocks, given one skin: the boxes, balls, rods and cones hung on a joint (they move as one anyway) are melted
   // into one surface for each joint and material. The joints, what moves them and what a shot hits are untouched. A part the model
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----

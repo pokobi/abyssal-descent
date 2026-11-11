@@ -724,6 +724,8 @@
       const d = new THREE.Vector3().subVectors(b, a), len = d.length(), o = new THREE.Mesh(PG.cyl8, m || AM.steel2);
       o.scale.set(r, len, r); o.position.copy(a).addScaledVector(d, 0.5); o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); (parent || g).add(o); return o;
     };
+    // (shaped in gfx.js attGeo: turned muzzle pieces with their ports, grips with swells, clamps. The boxes and rods they were stay as the fallback)
+    const AGf = G.GFX && G.GFX.attGeo, attPut = (name, at, MM, r) => { const d = AGf ? AGf(name, r) : null; if (!d) return false; for (const q of d) { const o = new THREE.Mesh(q.g, MM[q.m] || AM.dark); o.position.set(at.x, at.y, at.z); g.add(o); } return true; };
     if (atts.barrel) {
       // the barrel parts sit behind the muzzle (over the barrel's exposed length); on a pistol the barrel ends inside the slide, so they go in front of it
       const id = atts.barrel, mz = M.muzzle, fwd = !!MP.fwd, kL = fwd ? 0.55 : 1, zz = (z) => (fwd ? -z : z);
@@ -743,37 +745,52 @@
     }
     if (atts.muzzle) {
       const id = atts.muzzle, v = atop(id), mz = M.muzzle, r0 = Math.max(0.017, bR + 0.006);
+      const MMz = { dark: AM.dark, steel: AM.steel2, blade: mats.steel, glow: glowM(v === 'supp2' ? 0xb070ff : v === 'amp' ? 0xff9a2a : 0xff7a20) };
       if (v === 'supp' || v === 'supp2') {
         const r = Math.max(0.021, bR + 0.01), pur = v === 'supp2';
+        if (!attPut(v, mz, MMz, r)) {
         cyl(r, 0.16, mz.x, mz.y, mz.z - 0.08, AM.dark); cyl(r * 1.08, 0.014, mz.x, mz.y, mz.z - 0.006, AM.steel2); cyl(r * 0.86, 0.012, mz.x, mz.y, mz.z - 0.16, AM.steel2);
         for (let i = 0; i < 3; i++) cyl(r * 1.04, 0.006, mz.x, mz.y, mz.z - 0.04 - i * 0.04, pur ? glowM(0xb070ff) : AM.steel2);
+        }
         M.muzzle = V(mz.x, mz.y, mz.z - 0.165); M.suppressed = true;
       } else if (v === 'comp') {
+        if (!attPut('comp', mz, MMz, r0)) {
         cyl(r0, 0.055, mz.x, mz.y, mz.z - 0.027, AM.steel2); box(0.04, 0.007, 0.022, mz.x, mz.y + r0, mz.z - 0.03, AM.dark);
         for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) box(0.004, 0.012, 0.01, mz.x + sx * r0, mz.y + 0.004, mz.z - 0.02 - i * 0.02, AM.dark);
+        }
         M.muzzle = V(mz.x, mz.y, mz.z - 0.055);
       } else if (v === 'brake') {
+        if (!attPut('brake', mz, MMz, r0)) {
         box(r0 * 2.3, r0 * 1.7, 0.07, mz.x, mz.y, mz.z - 0.035, AM.steel2);
         for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) box(0.004, r0 * 1.3, 0.008, mz.x + sx * r0 * 1.15, mz.y, mz.z - 0.015 - i * 0.017, AM.dark);
         for (let i = 0; i < 2; i++) box(r0 * 1.3, 0.004, 0.008, mz.x, mz.y + r0 * 0.85, mz.z - 0.02 - i * 0.03, AM.dark);
+        }
         M.muzzle = V(mz.x, mz.y, mz.z - 0.07);
       } else if (v === 'flash') {
+        if (!attPut('flash', mz, MMz, r0)) {
         cyl(r0 * 0.95, 0.025, mz.x, mz.y, mz.z - 0.012, AM.steel2);
         for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; box(0.006, 0.006, 0.05, mz.x + Math.cos(a) * r0 * 0.9, mz.y + Math.sin(a) * r0 * 0.9, mz.z - 0.048, AM.dark, 0, 0, a); }
         cyl(r0 * 1.1, 0.006, mz.x, mz.y, mz.z - 0.075, AM.steel2);
+        }
         M.muzzle = V(mz.x, mz.y, mz.z - 0.075); M.flashHider = true;
       } else if (v === 'amp') {
+        if (!attPut('amp', mz, MMz, r0)) {
         cyl(r0, 0.03, mz.x, mz.y, mz.z - 0.015, AM.dark);
         const bell = new THREE.Mesh(PG.cone, AM.steel2); bell.scale.set(r0 * 2.1, 0.07, r0 * 2.1); bell.rotation.x = Math.PI / 2; bell.position.set(mz.x, mz.y, mz.z - 0.065); g.add(bell);
         cyl(r0 * 1.8, 0.008, mz.x, mz.y, mz.z - 0.034, glowM(0xff9a2a));
+        }
         M.muzzle = V(mz.x, mz.y, mz.z - 0.1);
       } else if (v === 'nozzle') {
+        if (!attPut('nozzle', mz, MMz, r0)) {
         cyl(0.034, 0.05, mz.x, mz.y, mz.z - 0.025, AM.dark); cyl(0.044, 0.012, mz.x, mz.y, mz.z - 0.056, AM.steel2); cyl(0.04, 0.006, mz.x, mz.y, mz.z - 0.064, glowM(0xff7a20));
+        }
         M.muzzle = V(mz.x, mz.y, mz.z - 0.065);
       } else if (v === 'choke') {
+        if (!attPut('choke', mz, MMz, bR)) {
         cyl(bR + 0.005, 0.05, mz.x, mz.y, mz.z - 0.025, AM.steel2); cyl(bR + 0.008, 0.008, mz.x, mz.y, mz.z - 0.046, AM.dark); cyl(bR + 0.008, 0.008, mz.x, mz.y, mz.z - 0.004, AM.dark);
+        }
         M.muzzle = V(mz.x, mz.y, mz.z - 0.05);
-      } else if (v === 'bayonet') box(0.004, 0.02, 0.2, mz.x, mz.y - 0.03, mz.z - 0.05, mats.steel);
+      } else if (v === 'bayonet') { if (!attPut('bayonet', mz, MMz, bR)) box(0.004, 0.02, 0.2, mz.x, mz.y - 0.03, mz.z - 0.05, mats.steel); }
     }
     // ---- magazine: rebuilt as one group so every part travels with it in the reload animation ----
     const ammoCol = atts.ammo ? AMMO_COL[atts.ammo] : null;
@@ -824,26 +841,37 @@
     // ---- under-barrel ----
     if (atts.under) {
       const id = atts.under, v = atop(id), ux = 0, uy = MP.under[0], uz = MP.under[1];
+      const UA = V(ux, uy, uz), MMu = { dark: AM.dark, steel: AM.steel2, poly, glow: glowM(0x60b8ff) };
       const mount = (len) => { box(0.03, 0.01, len, ux, uy - 0.004, uz, AM.dark); for (let i = 0; i < 3; i++) box(0.032, 0.012, 0.004, ux, uy - 0.006, uz - len / 2 + len * (i + 0.5) / 3, AM.steel2); };
       if (v === 'vgrip' || v === 'gyro') {
+        if (!attPut(v, UA, MMu)) {
         mount(0.06); vc(0.016, 0.085, ux, uy - 0.05, uz, poly); vc(0.019, 0.012, ux, uy - 0.098, uz, AM.dark);
         for (let i = 0; i < 3; i++) vc(0.0175, 0.005, ux, uy - 0.03 - i * 0.02, uz, AM.dark);
         if (v === 'gyro') { const gd = vc(0.026, 0.014, ux, uy - 0.016, uz - 0.045, AM.steel2); gd.rotation.z = Math.PI / 2; const gr = vc(0.027, 0.006, ux, uy - 0.016, uz - 0.045, glowM(0x60b8ff)); gr.rotation.z = Math.PI / 2; }
+        }
         M.fore = V(ux, uy - 0.1, uz);
       } else if (v === 'handstop') {
+        if (!attPut('handstop', UA, MMu)) {
         mount(0.07); box(0.03, 0.04, 0.012, ux, uy - 0.025, uz - 0.02, poly, -0.3); box(0.03, 0.012, 0.045, ux, uy - 0.044, uz - 0.005, poly);
+        }
       } else if (v === 'agrip') {
+        if (!attPut('agrip', UA, MMu)) {
         mount(0.08); box(0.028, 0.05, 0.034, ux, uy - 0.03, uz - 0.01, poly, -0.55); box(0.03, 0.01, 0.04, ux, uy - 0.058, uz - 0.03, AM.dark, -0.55);
+        }
         M.fore = V(ux, uy - 0.06, uz - 0.02);
       } else if (v === 'laser') {
+        if (!attPut('laser', UA, MMu)) {
         mount(0.07); box(0.026, 0.03, 0.075, ux, uy - 0.02, uz - 0.004, AM.dark); cyl(0.011, 0.02, ux, uy - 0.02, uz - 0.045, AM.steel2);
+        }
         const l = new THREE.Mesh(PG.sph, mats.glow); l.scale.setScalar(0.0045); l.position.set(ux, uy - 0.02, uz - 0.056); g.add(l); M.laser = V(ux, uy - 0.02, uz - 0.058);
         box(0.007, 0.006, 0.012, 0.0, uy - 0.037, uz + 0.01, glowM(0x60e060));
       } else if (v === 'bipod') {
+        if (!attPut('bipod', UA, MMu)) {
         mount(0.05); box(0.04, 0.014, 0.024, ux, uy - 0.014, uz, AM.dark);
         for (const sx of [-1, 1]) {
           const a = V(sx * 0.016, uy - 0.016, uz - 0.004), b = V(sx * 0.04, uy - 0.062, uz - 0.115);
           rod(a, b, 0.0036, AM.steel2); box(0.012, 0.006, 0.02, b.x, b.y - 0.003, b.z - 0.004, AM.dark);
+        }
         }
       }
     }

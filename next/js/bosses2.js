@@ -19,35 +19,66 @@
     const n = Math.max(2, Math.ceil(a.distanceTo(b) / (w * 1.6)));
     for (let i = 0; i <= n; i++) G.fx.telegraph(a.clone().lerp(b, i / n).setY(0.02), w, t, col);
   }
+  // (a figure in plate, or in a long coat: ribs and a waist, shoulders, arms with their swells and hands, thighs and shins - plate
+  // laid over them where it is a knight (a keeled breast, lames, shoulder cops, a great helm, pointed shoes) or the skirts of a coat, a
+  // cowl and a broad hat where it is a hunter; a cloak in folds. Only the four materials it was given: some of these bodies fade
+  // away, material by material. The joints are as they were)
+  const gearOf = (parent, name, MM, x, y, z, rx, ry, rz, sc) => {
+    const d = G.GFX && G.GFX.foeGear ? G.GFX.foeGear(name) : null; if (!d) return null;
+    const g = joint(parent, x, y, z); g.rotation.set(rx || 0, ry || 0, rz || 0); if (Array.isArray(sc)) g.scale.set(sc[0], sc[1], sc[2]); else g.scale.setScalar(sc);
+    for (const q of d) { const m = new THREE.Mesh(q.g, MM[q.m] || MM.def); m.castShadow = true; g.add(m); }
+    return g;
+  };
   function humanoid(root, o) {
-    const J = {};
+    const J = {}, s = o.s, A = o.armor, T = o.trim, hunter = o.kind === 'hunter';
     J.body = joint(root, 0, o.hip, 0);
-    smesh(J.body, PG.box, o.armor, 0.9 * o.s, 0.5 * o.s, 0.6 * o.s, 0, 0, 0);
-    J.torso = joint(J.body, 0, 0.25 * o.s, 0);
-    smesh(J.torso, PG.box, o.armor, 1.2 * o.s, 1.1 * o.s, 0.7 * o.s, 0, 0.55 * o.s, 0);
-    smesh(J.torso, PG.box, o.trim, 1.3 * o.s, 0.18 * o.s, 0.75 * o.s, 0, 1.05 * o.s, 0);
-    for (const sx of [-1, 1]) smesh(J.torso, PG.sph, o.trim, 0.32 * o.s, 0.26 * o.s, 0.32 * o.s, sx * 0.72 * o.s, 1.05 * o.s, 0);
-    if (o.cape) smesh(J.torso, PG.box, o.cape, 1.1 * o.s, 1.8 * o.s, 0.05 * o.s, 0, 0.1 * o.s, -0.4 * o.s, 0.12);
-    J.head = joint(J.torso, 0, 1.45 * o.s, 0);
-    smesh(J.head, PG.box, o.armor, 0.5 * o.s, 0.6 * o.s, 0.55 * o.s);
-    smesh(J.head, PG.box, o.glow, 0.36 * o.s, 0.06 * o.s, 0.05 * o.s, 0, 0.05 * o.s, 0.28 * o.s);
-    if (o.crest) smesh(J.head, PG.cone, o.trim, 0.12 * o.s, 0.6 * o.s, 0.12 * o.s, 0, 0.5 * o.s, -0.05 * o.s);
+    smesh(J.body, PG.sph, A, 0.5 * s, 0.3 * s, 0.36 * s, 0, 0, 0);
+    smesh(J.body, PG.cyl8, T, 0.47 * s, 0.12 * s, 0.35 * s, 0, 0.16 * s, 0);                                                        // belt
+    if (hunter) { for (const a of [-0.9, -0.3, 0.3, 0.9, 2.2, 3.14, 4.1]) gearOf(J.body, 'tatter', { cloth: o.cape }, Math.sin(a) * 0.42 * s, 0.1 * s, Math.cos(a) * 0.3 * s, 0.05, a, 0, [3.4 * s, 3.6 * s, 3 * s]); }   // the coat's skirts
+    else for (const sx of [-1, 1]) smesh(J.body, PG.box, A, 0.36 * s, 0.5 * s, 0.06 * s, sx * 0.24 * s, -0.3 * s, 0.26 * s, -0.14, 0, 0);    // tassets
+    J.torso = joint(J.body, 0, 0.25 * s, 0);
+    smesh(J.torso, PG.sph, A, 0.6 * s, 0.5 * s, 0.4 * s, 0, 0.72 * s, 0.02 * s); smesh(J.torso, PG.sph, A, 0.48 * s, 0.4 * s, 0.33 * s, 0, 0.28 * s, 0.02 * s);
+    smesh(J.torso, PG.sph, A, 0.5 * s, 0.2 * s, 0.3 * s, 0, 1.08 * s, -0.02 * s); smesh(J.torso, PG.cyl8, A, 0.16 * s, 0.3 * s, 0.16 * s, 0, 1.25 * s, 0);
+    if (!hunter) {
+      smesh(J.torso, PG.sph, A, 0.14 * s, 0.38 * s, 0.14 * s, 0, 0.72 * s, 0.36 * s);                                                // the keel of the breast
+      for (let i = 0; i < 2; i++) smesh(J.torso, PG.cyl8, T, (0.5 + i * 0.02) * s, 0.06 * s, (0.36 + i * 0.015) * s, 0, (0.36 - i * 0.16) * s, 0.02 * s);
+      smesh(J.torso, PG.cyl8, T, 0.24 * s, 0.14 * s, 0.24 * s, 0, 1.16 * s, 0);                                                      // gorget
+      for (const sx of [-1, 1]) { smesh(J.torso, PG.sph, T, 0.34 * s, 0.25 * s, 0.34 * s, sx * 0.72 * s, 1.07 * s, 0, 0, 0, -sx * 0.3); smesh(J.torso, PG.sph, A, 0.28 * s, 0.19 * s, 0.3 * s, sx * 0.82 * s, 0.92 * s, 0, 0, 0, -sx * 0.55); }
+    } else {
+      smesh(J.torso, PG.sph, o.cape, 0.72 * s, 0.24 * s, 0.46 * s, 0, 1.08 * s, 0);                                                  // the cape of the coat on the shoulders
+      for (const sx of [-1, 1]) smesh(J.torso, PG.sph, A, 0.26 * s, 0.24 * s, 0.27 * s, sx * 0.7 * s, 1.02 * s, 0);
+      smesh(J.torso, PG.box, T, 0.1 * s, 0.9 * s, 0.05 * s, 0.14 * s, 0.6 * s, 0.36 * s, 0, 0, -0.45);                                // a bandolier
+    }
+    if (o.cape && !gearOf(J.torso, 'cape', { cloth: o.cape }, 0, 1.18 * s, -0.36 * s, 0.12, 0, 0, [1.55 * s, 1.95 * s, 1.8 * s])) smesh(J.torso, PG.box, o.cape, 1.1 * s, 1.8 * s, 0.05 * s, 0, 0.1 * s, -0.4 * s, 0.12);
+    J.head = joint(J.torso, 0, 1.45 * s, 0);
+    if (hunter) {
+      smesh(J.head, PG.sph, A, 0.24 * s, 0.28 * s, 0.26 * s, 0, 0.02 * s, 0); smesh(J.head, PG.sph, o.cape, 0.3 * s, 0.2 * s, 0.3 * s, 0, -0.22 * s, 0.02 * s);   // a cowl over the mouth
+      if (!gearOf(J.head, 'hat', { felt: o.cape, cord: T }, 0, 0.12 * s, 0, 0, 0.6, 0.06, 1.55 * s)) smesh(J.head, PG.cone, o.cape, 0.4 * s, 0.4 * s, 0.4 * s, 0, 0.35 * s, 0);
+      for (const sx of [-1, 1]) smesh(J.head, PG.sph, o.glow, 0.035 * s, 0.025 * s, 0.02 * s, sx * 0.09 * s, 0.03 * s, 0.24 * s);
+    } else {
+      if (!gearOf(J.head, 'helm', { steel: A, trim: T, dark: A, mail: T }, 0, -0.26 * s, 0, 0, 0, 0, 1.55 * s)) smesh(J.head, PG.box, A, 0.5 * s, 0.6 * s, 0.55 * s);
+      smesh(J.head, PG.box, o.glow, 0.3 * s, 0.03 * s, 0.03 * s, 0, 0.0, 0.29 * s);
+      if (o.crest) { smesh(J.head, PG.cone, T, 0.08 * s, 0.5 * s, 0.08 * s, 0, 0.5 * s, -0.05 * s); for (const sx of [-1, 1]) smesh(J.head, PG.box, T, 0.03 * s, 0.34 * s, 0.26 * s, sx * 0.3 * s, 0.22 * s, -0.1 * s, -0.5, 0, sx * 0.25); }   // a spike, two wings on the helm
+    }
     J.arms = [];
     for (const sx of [-1, 1]) {
-      const sh = joint(J.torso, sx * 0.78 * o.s, 0.95 * o.s, 0);
-      smesh(sh, PG.cyl8, o.armor, 0.17 * o.s, 0.8 * o.s, 0.17 * o.s, 0, -0.4 * o.s, 0);
-      const el = joint(sh, 0, -0.8 * o.s, 0);
-      smesh(el, PG.cyl8, o.trim, 0.16 * o.s, 0.75 * o.s, 0.16 * o.s, 0, -0.37 * o.s, 0);
-      const hand = joint(el, 0, -0.78 * o.s, 0);
+      const sh = joint(J.torso, sx * 0.78 * s, 0.95 * s, 0);
+      smesh(sh, PG.sph, A, 0.2 * s, 0.24 * s, 0.21 * s, 0, -0.05 * s, 0); smesh(sh, PG.sph, A, 0.17 * s, 0.4 * s, 0.18 * s, 0, -0.4 * s, 0);
+      const el = joint(sh, 0, -0.8 * s, 0);
+      smesh(el, PG.sph, T, 0.17 * s, 0.17 * s, 0.18 * s); smesh(el, PG.cyl8, T, 0.14 * s, 0.6 * s, 0.15 * s, 0, -0.38 * s, 0); smesh(el, PG.cyl8, T, 0.17 * s, 0.1 * s, 0.18 * s, 0, -0.66 * s, 0);
+      const hand = joint(el, 0, -0.78 * s, 0);
+      smesh(hand, PG.sph, A, 0.14 * s, 0.16 * s, 0.11 * s); for (let i = 0; i < 3; i++) smesh(hand, PG.sph, A, 0.042 * s, 0.11 * s, 0.05 * s, (i - 1) * 0.085 * s, -0.17 * s, 0.03 * s);
       J.arms.push({ sh, el, hand });
     }
     J.legs = [];
     for (const sx of [-1, 1]) {
-      const hp = joint(J.body, sx * 0.3 * o.s, -0.1 * o.s, 0);
-      smesh(hp, PG.cyl8, o.armor, 0.2 * o.s, 1.0 * o.s, 0.2 * o.s, 0, -0.5 * o.s, 0);
-      const kn = joint(hp, 0, -1.0 * o.s, 0);
-      smesh(kn, PG.cyl8, o.trim, 0.18 * o.s, 1.0 * o.s, 0.18 * o.s, 0, -0.5 * o.s, 0);
-      smesh(kn, PG.box, o.armor, 0.3 * o.s, 0.16 * o.s, 0.45 * o.s, 0, -1.0 * o.s, 0.08 * o.s);
+      const hp = joint(J.body, sx * 0.3 * s, -0.1 * s, 0);
+      smesh(hp, PG.sph, A, 0.22 * s, 0.52 * s, 0.24 * s, 0, -0.46 * s, 0.01 * s);
+      const kn = joint(hp, 0, -1.0 * s, 0);
+      smesh(kn, PG.sph, T, 0.19 * s, 0.19 * s, 0.21 * s, 0, 0, 0.03 * s);
+      smesh(kn, PG.sph, T, 0.17 * s, 0.34 * s, 0.19 * s, 0, -0.36 * s, -0.03 * s); smesh(kn, PG.cyl8, T, 0.13 * s, 0.9 * s, 0.14 * s, 0, -0.5 * s, 0);
+      smesh(kn, PG.box, A, 0.28 * s, 0.16 * s, 0.45 * s, 0, -1.0 * s, 0.08 * s);
+      if (!hunter) smesh(kn, PG.cone, A, 0.12 * s, 0.26 * s, 0.09 * s, 0, -1.02 * s, 0.42 * s, Math.PI / 2);
       J.legs.push({ hp, kn });
     }
     return J;
@@ -63,13 +94,16 @@
       const c = world.arenaCenter;
       const mk = (light) => {
         const g = new THREE.Group(); this.root.add(g);
-        const armor = light ? mat('#d8c890', { metalness: 0.85, roughness: 0.25 }) : mat('#22202a', { metalness: 0.7, roughness: 0.3 });
-        const trim = light ? mat('#fff0c0', { metalness: 1, roughness: 0.2, emissive: 0x403010 }) : mat('#5a3a8a', { metalness: 0.8, roughness: 0.3, emissive: 0x200a40 });
+        const armor = light ? mat('#8c8468', { metalness: 0.85, roughness: 0.5 }) : mat('#1e1c22', { metalness: 0.7, roughness: 0.55 });
+        const trim = light ? mat('#b4a070', { metalness: 1, roughness: 0.4, emissive: 0x2a2008 }) : mat('#34313a', { metalness: 0.8, roughness: 0.5, emissive: 0x0c0618 });
         const glow = mat('#000', { emissive: light ? 0xffe080 : 0xa050ff, emissiveIntensity: 3 });
-        const cape = mat(light ? '#e8e0d0' : '#14101a', { side: THREE.DoubleSide });
+        const cape = mat(light ? '#8a8272' : '#14101a', { side: THREE.DoubleSide, roughness: 1 });
         const J = humanoid(g, { s: 1.15, hip: 2.3, armor, trim, glow, cape, crest: light });
-        if (light) { const l = mesh(J.arms[1].hand, PG.cone, trim, 0.16, 3.4, 0.16, 0, 0, 1.4, Math.PI / 2); l.userData.lance = true; smesh(J.arms[0].hand, PG.box, armor, 0.1, 1.3, 0.9, 0, 0, 0.2); }
-        else { for (const a of J.arms) smesh(a.hand, PG.box, trim, 0.06, 0.08, 1.4, 0, 0, 0.7); }
+        if (light) {
+          const l = mesh(J.arms[1].hand, PG.cone, trim, 0.1, 3.4, 0.1, 0, 0, 1.4, Math.PI / 2); l.userData.lance = true;
+          smesh(J.arms[1].hand, PG.cone, armor, 0.3, 0.34, 0.3, 0, 0, 0.3, Math.PI / 2); smesh(J.arms[1].hand, PG.cyl8, armor, 0.07, 1.0, 0.07, 0, 0, -0.4, Math.PI / 2);     // the lance's guard, its butt
+          if (!gearOf(J.arms[0].hand, 'kite', { paint: armor, steel: trim }, -0.14, 0.1, 0.2, 0, -Math.PI / 2, 0, 1.45)) smesh(J.arms[0].hand, PG.box, armor, 0.1, 1.3, 0.9, 0, 0, 0.2);
+        } else { for (const a of J.arms) if (!gearOf(a.hand, 'greatsword', { leather: armor, iron: trim, blade: trim, dark: armor }, 0, 0, 0.05, 0, 0, 0, 1.15)) smesh(a.hand, PG.box, trim, 0.06, 0.08, 1.4, 0, 0, 0.7); }
         const k = { light, g, J, pos: c.clone().add(V(light ? -6 : 6, 0, -4)), yaw: Math.PI, hp: each, maxHp: each, down: false, reviveT: 0, act: null, cd: U.rand(1.5, 3), walk: 0, name: light ? '光の騎士ソル' : '影の騎士ウンブラ', glowM: glow };
         const part = this.part({ name: k.name, shared: false, hitW: [{ n: J.torso, r: 0.95, part: 'body', o: V(0, 0.55, 0) }, { n: J.body, r: 0.8, part: 'body' }, { n: J.head, r: 0.5, part: 'head' }], radius: 1, height: 3.6, showBar: true, blood: light ? 0xffe0a0 : 0x6020a0 });
         Object.defineProperty(part, 'hp', { get: () => k.hp, set: (v) => { k.hp = v; } });
@@ -399,8 +433,14 @@
       this.trimM = mat('#3a3044', { roughness: 0.4, metalness: 0.6, transparent: true });
       this.glowM = mat('#000', { emissive: 0xff2030, emissiveIntensity: 3, transparent: true });
       this.capeM = mat('#0c0a10', { side: THREE.DoubleSide, transparent: true });
-      this.J = humanoid(this.root, { s: 0.95, hip: 1.9, armor: this.armorM, trim: this.trimM, glow: this.glowM, cape: this.capeM });
-      smesh(this.J.arms[1].hand, PG.box, this.trimM, 0.12, 0.16, 1.3, 0, 0, 0.5);
+      this.J = humanoid(this.root, { s: 0.95, hip: 1.9, armor: this.armorM, trim: this.trimM, glow: this.glowM, cape: this.capeM, kind: 'hunter' });
+      { // (a long gun: a stock, a lock, an eight-sided barrel with its bands, a glass along it)
+        const h = this.J.arms[1].hand, A = this.armorM, T = this.trimM;
+        smesh(h, PG.box, A, 0.07, 0.13, 0.5, 0, -0.03, -0.2, 0.12); smesh(h, PG.box, A, 0.08, 0.1, 0.5, 0, 0, 0.25);
+        smesh(h, PG.cyl8, T, 0.035, 1.25, 0.035, 0, 0.03, 0.72, Math.PI / 2); smesh(h, PG.cyl8, T, 0.022, 0.5, 0.022, 0, 0.11, 0.3, Math.PI / 2);
+        for (const z of [0.5, 0.9, 1.25]) smesh(h, PG.cyl8, A, 0.045, 0.04, 0.045, 0, 0.03, z, Math.PI / 2);
+        smesh(h, PG.box, T, 0.09, 0.07, 0.14, 0, 0.02, 0.06);
+      }
       this.muzzle = joint(this.J.arms[1].hand, 0, 0, 1.2);
       this.mats = [this.armorM, this.trimM, this.glowM, this.capeM];
       this.body = this.part({ name: def.name, hitW: [{ n: this.J.torso, r: 0.75, part: 'body', o: V(0, 0.5, 0) }, { n: this.J.body, r: 0.6, part: 'body' }, { n: this.J.head, r: 0.42, part: 'head' }], radius: 0.8, height: 3 });

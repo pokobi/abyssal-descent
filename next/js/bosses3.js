@@ -295,41 +295,59 @@
   // ======================================================================
   // 10) THE ABYSS KING — final boss of every 50 areas. Phase 1: the crowned giant. At 0 HP he is reborn as the Avatar of the Abyss
   //     (phase 2; shielded by void anchors, beams blocked by pillars), and at 35% the edge of the world falls away (phase 3).
+  // (a king in black plate: a keeled breast over lames, a great collar, shoulders in three lames with a row of spikes, a mantle in
+  // folds from them and a skirt of cloth in tatters; a closed helm with a slit of light, a crown of tall points about it and its
+  // stone at the brow; arms and legs with their swells, cops at elbow and knee, gauntlets, pointed shoes. Only the materials it was
+  // given - it fades with them. The joints, the crown and its stone are as they were)
+  const gearOf = (parent, name, MM, x, y, z, rx, ry, rz, sc) => {
+    const d = G.GFX && G.GFX.foeGear ? G.GFX.foeGear(name) : null; if (!d) return null;
+    const g = joint(parent, x, y, z); g.rotation.set(rx || 0, ry || 0, rz || 0); if (Array.isArray(sc)) g.scale.set(sc[0], sc[1], sc[2]); else g.scale.setScalar(sc);
+    for (const q of d) { const m = new THREE.Mesh(q.g, MM[q.m] || MM.def); m.castShadow = true; g.add(m); }
+    return g;
+  };
   function giant(root, o) {
-    const J = {}, s = o.s;
+    const J = {}, s = o.s, A = o.armor, T = o.trim;
     J.body = joint(root, 0, o.hip, 0);
-    smesh(J.body, PG.box, o.armor, 1.0 * s, 0.55 * s, 0.65 * s);
-    smesh(J.body, PG.box, o.cape, 1.1 * s, 0.9 * s, 0.7 * s, 0, -0.55 * s, 0); // tassets
+    smesh(J.body, PG.sph, A, 0.55 * s, 0.32 * s, 0.38 * s);
+    smesh(J.body, PG.cyl8, T, 0.52 * s, 0.1 * s, 0.37 * s, 0, 0.16 * s, 0);
+    { let any = false; for (const a of [-1.0, -0.35, 0.35, 1.0, 2.1, 3.14, 4.2]) any = !!gearOf(J.body, 'tatter', { cloth: o.cape }, Math.sin(a) * 0.46 * s, 0.08 * s, Math.cos(a) * 0.32 * s, 0.05, a, 0, [3.4 * s, 3.2 * s, 3 * s]) || any; if (!any) smesh(J.body, PG.box, o.cape, 1.1 * s, 0.9 * s, 0.7 * s, 0, -0.55 * s, 0); }
+    for (const sx of [-1, 1]) smesh(J.body, PG.box, A, 0.38 * s, 0.5 * s, 0.06 * s, sx * 0.26 * s, -0.32 * s, 0.3 * s, -0.14, 0, 0);
     J.torso = joint(J.body, 0, 0.25 * s, 0);
-    smesh(J.torso, PG.box, o.armor, 1.3 * s, 1.2 * s, 0.8 * s, 0, 0.6 * s, 0);
-    smesh(J.torso, PG.box, o.trim, 1.4 * s, 0.16 * s, 0.85 * s, 0, 1.15 * s, 0);
-    smesh(J.torso, PG.box, o.trim, 0.12 * s, 1.0 * s, 0.86 * s, 0, 0.6 * s, 0);
-    for (const sx of [-1, 1]) { smesh(J.torso, PG.sph, o.armor, 0.42 * s, 0.34 * s, 0.42 * s, sx * 0.78 * s, 1.15 * s, 0); for (let k = 0; k < 3; k++) smesh(J.torso, PG.cone, o.trim, 0.06 * s, 0.35 * s, 0.06 * s, sx * (0.68 + k * 0.12) * s, 1.45 * s, 0); }
-    smesh(J.torso, PG.box, o.cape, 1.3 * s, 2.3 * s, 0.05 * s, 0, -0.1 * s, -0.45 * s, 0.1);
+    smesh(J.torso, PG.sph, A, 0.66 * s, 0.54 * s, 0.44 * s, 0, 0.78 * s, 0.02 * s); smesh(J.torso, PG.sph, A, 0.52 * s, 0.44 * s, 0.36 * s, 0, 0.3 * s, 0.02 * s);
+    smesh(J.torso, PG.sph, A, 0.15 * s, 0.42 * s, 0.15 * s, 0, 0.78 * s, 0.4 * s);                                                   // the keel of the breast
+    smesh(J.torso, PG.sph, T, 0.035 * s, 0.4 * s, 0.035 * s, 0, 0.78 * s, 0.545 * s);                                                // a gilt line down it
+    for (let i = 0; i < 3; i++) smesh(J.torso, PG.cyl8, i === 1 ? T : A, (0.54 + i * 0.02) * s, 0.07 * s, (0.39 + i * 0.012) * s, 0, (0.42 - i * 0.13) * s, 0.02 * s);
+    smesh(J.torso, PG.cyl8, T, 0.56 * s, 0.1 * s, 0.4 * s, 0, 1.2 * s, 0); smesh(J.torso, PG.cyl8, A, 0.3 * s, 0.24 * s, 0.3 * s, 0, 1.32 * s, 0);   // the collar, the gorget
+    for (const sx of [-1, 1]) {
+      for (let k = 0; k < 3; k++) smesh(J.torso, PG.sph, k === 1 ? T : A, (0.42 - k * 0.05) * s, (0.3 - k * 0.04) * s, (0.42 - k * 0.04) * s, sx * (0.78 + k * 0.1) * s, (1.17 - k * 0.14) * s, 0, 0, 0, -sx * (0.25 + k * 0.2));
+      for (let k = 0; k < 3; k++) smesh(J.torso, PG.cone, T, 0.05 * s, (0.4 - k * 0.07) * s, 0.05 * s, sx * (0.66 + k * 0.14) * s, (1.52 - k * 0.07) * s, 0, 0, 0, -sx * (0.2 + k * 0.25));
+    }
+    if (!gearOf(J.torso, 'cape', { cloth: o.cape }, 0, 1.3 * s, -0.4 * s, 0.1, 0, 0, [1.7 * s, 2.5 * s, 1.9 * s])) smesh(J.torso, PG.box, o.cape, 1.3 * s, 2.3 * s, 0.05 * s, 0, -0.1 * s, -0.45 * s, 0.1);
     J.head = joint(J.torso, 0, 1.5 * s, 0);
-    smesh(J.head, PG.box, o.armor, 0.5 * s, 0.62 * s, 0.56 * s);
-    smesh(J.head, PG.box, o.glow, 0.36 * s, 0.05 * s, 0.05 * s, 0, 0.05 * s, 0.29 * s);
+    if (!gearOf(J.head, 'helm', { steel: A, trim: T, dark: A, mail: A }, 0, -0.27 * s, 0, 0, 0, 0, 1.55 * s)) smesh(J.head, PG.box, A, 0.5 * s, 0.62 * s, 0.56 * s);
+    smesh(J.head, PG.box, o.glow, 0.3 * s, 0.03 * s, 0.03 * s, 0, -0.01 * s, 0.29 * s);
     J.crown = joint(J.head, 0, 0.36 * s, 0);
-    smesh(J.crown, PG.cyl8, o.trim, 0.33 * s, 0.12 * s, 0.33 * s);
-    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; smesh(J.crown, PG.cone, o.trim, 0.06 * s, 0.32 * s, 0.06 * s, Math.cos(a) * 0.3 * s, 0.2 * s, Math.sin(a) * 0.3 * s); }
-    J.gem = mesh(J.crown, PG.oct, o.gem, 0.1 * s, 0.14 * s, 0.1 * s, 0, 0.05 * s, 0.33 * s);
+    smesh(J.crown, PG.cyl8, T, 0.31 * s, 0.1 * s, 0.33 * s, 0, -0.16 * s, 0);
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2 + 0.31, hh = (k % 2 ? 0.26 : 0.5) * s; smesh(J.crown, PG.cone, T, 0.05 * s, hh, 0.03 * s, Math.cos(a) * 0.3 * s, -0.11 * s + hh / 2, Math.sin(a) * 0.32 * s, Math.sin(a) * 0.16, -a, -Math.cos(a) * 0.16); }
+    J.gem = mesh(J.crown, PG.oct, o.gem, 0.08 * s, 0.12 * s, 0.07 * s, 0, -0.14 * s, 0.335 * s);
     J.arms = [];
     for (const sx of [-1, 1]) {
       const sh = joint(J.torso, sx * 0.85 * s, 1.0 * s, 0);
-      smesh(sh, PG.cyl8, o.armor, 0.2 * s, 0.85 * s, 0.2 * s, 0, -0.42 * s, 0);
+      smesh(sh, PG.sph, A, 0.22 * s, 0.26 * s, 0.23 * s, 0, -0.06 * s, 0); smesh(sh, PG.sph, A, 0.19 * s, 0.42 * s, 0.2 * s, 0, -0.42 * s, 0);
       const el = joint(sh, 0, -0.85 * s, 0);
-      smesh(el, PG.cyl8, o.trim, 0.18 * s, 0.8 * s, 0.18 * s, 0, -0.4 * s, 0);
+      smesh(el, PG.sph, T, 0.19 * s, 0.19 * s, 0.2 * s); smesh(el, PG.cyl8, A, 0.16 * s, 0.62 * s, 0.17 * s, 0, -0.4 * s, 0); smesh(el, PG.cyl8, T, 0.19 * s, 0.1 * s, 0.2 * s, 0, -0.7 * s, 0);
       const hand = joint(el, 0, -0.82 * s, 0);
-      smesh(hand, PG.box, o.armor, 0.22 * s, 0.22 * s, 0.22 * s);
+      smesh(hand, PG.sph, A, 0.15 * s, 0.17 * s, 0.12 * s); for (let i = 0; i < 3; i++) smesh(hand, PG.sph, A, 0.045 * s, 0.12 * s, 0.055 * s, (i - 1) * 0.09 * s, -0.18 * s, 0.03 * s);
       J.arms.push({ sh, el, hand });
     }
     J.legs = [];
     for (const sx of [-1, 1]) {
       const hp = joint(J.body, sx * 0.32 * s, -0.1 * s, 0);
-      smesh(hp, PG.cyl8, o.armor, 0.24 * s, 1.05 * s, 0.24 * s, 0, -0.52 * s, 0);
+      smesh(hp, PG.sph, A, 0.25 * s, 0.56 * s, 0.27 * s, 0, -0.5 * s, 0.01 * s);
       const kn = joint(hp, 0, -1.05 * s, 0);
-      smesh(kn, PG.cyl8, o.trim, 0.2 * s, 1.0 * s, 0.2 * s, 0, -0.5 * s, 0);
-      smesh(kn, PG.box, o.armor, 0.34 * s, 0.18 * s, 0.5 * s, 0, -1.0 * s, 0.1 * s);
+      smesh(kn, PG.sph, T, 0.21 * s, 0.21 * s, 0.23 * s, 0, 0, 0.03 * s);
+      smesh(kn, PG.sph, A, 0.19 * s, 0.36 * s, 0.21 * s, 0, -0.38 * s, -0.03 * s); smesh(kn, PG.cyl8, A, 0.15 * s, 0.9 * s, 0.16 * s, 0, -0.5 * s, 0);
+      smesh(kn, PG.box, A, 0.32 * s, 0.18 * s, 0.5 * s, 0, -1.0 * s, 0.1 * s); smesh(kn, PG.cone, A, 0.13 * s, 0.3 * s, 0.1 * s, 0, -1.02 * s, 0.47 * s, Math.PI / 2);
       J.legs.push({ hp, kn });
     }
     return J;
@@ -341,22 +359,26 @@
       this.maxHp = Math.round(5200 * this.hpScale); this.hp = this.maxHp;
       this.waves = []; this.fx = []; this.anchors = []; this.orbs = []; this.echoes = [];
       this.form = 1;
-      this.armorM = mat('#16121c', { roughness: 0.35, metalness: 0.7, transparent: true });
-      this.trimM = mat('#c8a040', { roughness: 0.3, metalness: 1, transparent: true });
-      this.capeM = mat('#2a0838', { roughness: 0.8, side: THREE.DoubleSide, transparent: true });
-      this.glowM = mat('#000', { emissive: 0xb050ff, emissiveIntensity: 3.5, transparent: true });
+      this.armorM = mat('#16131a', { roughness: 0.55, metalness: 0.7, transparent: true });
+      this.trimM = mat('#8c7036', { roughness: 0.45, metalness: 1, transparent: true });
+      this.capeM = mat('#1e0a22', { roughness: 0.95, side: THREE.DoubleSide, transparent: true });
+      this.glowM = mat('#000', { emissive: 0xb050ff, emissiveIntensity: 2.6, transparent: true });
       this.gemM = mat('#300040', { emissive: 0xd060ff, emissiveIntensity: 3, roughness: 0.1, transparent: true });
       this.kingG = joint(this.root, 0, 0, 0);
       this.J = giant(this.kingG, { s: 2.3, hip: 4.6, armor: this.armorM, trim: this.trimM, cape: this.capeM, glow: this.glowM, gem: this.gemM });
       // the greatsword
       const hand = this.J.arms[1].hand;
       this.sword = joint(hand, 0, 0, 0.2);
-      smesh(this.sword, PG.box, this.trimM, 0.18, 0.18, 1.1, 0, 0, -0.2);
-      smesh(this.sword, PG.box, this.trimM, 1.4, 0.18, 0.22, 0, 0, 0.4);
-      smesh(this.sword, PG.box, mat('#2a2030', { metalness: 0.9, roughness: 0.2 }), 0.42, 0.1, 6.6, 0, 0, 3.8);
-      smesh(this.sword, PG.box, this.glowM, 0.08, 0.12, 6.2, 0, 0, 3.8);
+      // (a king's sword: a wheel pommel, a guard drawn down at its ends, a broad blade with a ridge, the light a thin line in its fuller)
+      if (gearOf(this.sword, 'greatsword', { leather: this.armorM, iron: this.trimM, blade: this.bladeM = mat('#2e2a34', { metalness: 0.9, roughness: 0.4, transparent: true }), dark: this.glowM }, 0, 0, 0.35, 0, 0, 0, 5.3)) { /* shaped */ }
+      else {
+        smesh(this.sword, PG.box, this.trimM, 0.18, 0.18, 1.1, 0, 0, -0.2);
+        smesh(this.sword, PG.box, this.trimM, 1.4, 0.18, 0.22, 0, 0, 0.4);
+        smesh(this.sword, PG.box, mat('#2a2030', { metalness: 0.9, roughness: 0.2 }), 0.42, 0.1, 6.6, 0, 0, 3.8);
+        smesh(this.sword, PG.box, this.glowM, 0.08, 0.12, 6.2, 0, 0, 3.8);
+      }
       this.sword.rotation.x = Math.PI / 2;
-      this.kmats = [this.armorM, this.trimM, this.capeM, this.glowM, this.gemM];
+      this.kmats = [this.armorM, this.trimM, this.capeM, this.glowM, this.gemM].concat(this.bladeM ? [this.bladeM] : []);
       // a halo above the crown and a rune circle that follows him across the floor
       this.haloK = mesh(this.J.head, PG.torus, this.glowM, 0.55 * 2.3, 0.55 * 2.3, 0.55 * 2.3, 0, 1.3 * 2.3, -0.2, Math.PI / 2);
       const rt = new THREE.Mesh(new THREE.RingGeometry(5.2, 6, 6, 1), new THREE.MeshBasicMaterial({ color: 0xa040ff, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
@@ -564,8 +586,8 @@
     }
     buildAvatar() {
       const av = this.avatar = joint(this.root, 0, 0, 0);
-      const ob = mat('#0c0810', { roughness: 0.25, metalness: 0.6 });
-      const crack = this.crackM = mat('#000', { emissive: 0xa040ff, emissiveIntensity: 3 });
+      const ob = mat('#0c0810', { roughness: 0.42, metalness: 0.6 });
+      const crack = this.crackM = mat('#000', { emissive: 0x9038e0, emissiveIntensity: 2 });
       const eyeW = mat('#f0e8ff', { roughness: 0.2 }), iris = mat('#000', { emissive: 0xff2060, emissiveIntensity: 4 });
       this.coreM = mat('#200030', { emissive: 0xff40c0, emissiveIntensity: 4, roughness: 0.05 });
       // torso & wisp tail
@@ -581,7 +603,7 @@
       for (const [x, y, sc] of [[-0.55, 0.2, 0.32], [0.55, 0.2, 0.32], [0, 0.85, 0.42]]) { smesh(head, PG.sph, eyeW, sc, sc, sc * 0.6, x, y, 0.82); smesh(head, PG.sph, iris, sc * 0.45, sc * 0.45, sc * 0.3, x, y, 0.98); }
       // halo of eyes
       this.halo = joint(av, 0, 5.2, -1.6);
-      smesh(this.halo, PG.torus, crack, 4.2, 4.2, 4.2);
+      smesh(this.halo, PG.torus, crack, 4.2, 4.2, 1.4);
       for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; const g = joint(this.halo, Math.cos(a) * 4.2, Math.sin(a) * 4.2, 0); smesh(g, PG.sph, eyeW, 0.42, 0.42, 0.3); smesh(g, PG.sph, iris, 0.2, 0.2, 0.15, 0, 0, 0.18); }
       // four arms
       this.avArms = [];

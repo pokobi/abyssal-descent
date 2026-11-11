@@ -362,8 +362,8 @@
       this.armorM = mat('#16131a', { roughness: 0.55, metalness: 0.7, transparent: true });
       this.trimM = mat('#8c7036', { roughness: 0.45, metalness: 1, transparent: true });
       this.capeM = mat('#1e0a22', { roughness: 0.95, side: THREE.DoubleSide, transparent: true });
-      this.glowM = mat('#000', { emissive: 0xb050ff, emissiveIntensity: 2.6, transparent: true });
-      this.gemM = mat('#300040', { emissive: 0xd060ff, emissiveIntensity: 3, roughness: 0.1, transparent: true });
+      this.glowM = mat('#000', { emissive: 0x7a34c8, emissiveIntensity: 1.7, transparent: true });
+      this.gemM = mat('#300040', { emissive: 0xa848e0, emissiveIntensity: 2.2, roughness: 0.1, transparent: true });
       this.kingG = joint(this.root, 0, 0, 0);
       this.J = giant(this.kingG, { s: 2.3, hip: 4.6, armor: this.armorM, trim: this.trimM, cape: this.capeM, glow: this.glowM, gem: this.gemM });
       // the greatsword
@@ -380,7 +380,7 @@
       this.sword.rotation.x = Math.PI / 2;
       this.kmats = [this.armorM, this.trimM, this.capeM, this.glowM, this.gemM].concat(this.bladeM ? [this.bladeM] : []);
       // a halo above the crown and a rune circle that follows him across the floor
-      this.haloK = mesh(this.J.head, PG.torus, this.glowM, 0.55 * 2.3, 0.55 * 2.3, 0.55 * 2.3, 0, 1.3 * 2.3, -0.2, Math.PI / 2);
+      this.haloK = mesh(this.J.head, PG.torus, this.glowM, 0.55 * 2.3, 0.55 * 2.3, 0.14 * 2.3, 0, 1.3 * 2.3, -0.2, Math.PI / 2);   // (a thin ring, not a tube of light)
       const rt = new THREE.Mesh(new THREE.RingGeometry(5.2, 6, 6, 1), new THREE.MeshBasicMaterial({ color: 0xa040ff, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
       const rt2 = new THREE.Mesh(new THREE.RingGeometry(3.6, 3.9, 48, 1), rt.material);
       this.rune = new THREE.Group(); this.rune.add(rt); this.rune.add(rt2); rt.rotation.x = rt2.rotation.x = -Math.PI / 2; this.own(this.rune);

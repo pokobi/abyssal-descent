@@ -194,12 +194,12 @@
     build() {
       const r = this.root, s = 1;
       const M = this.M = {
-        body: mat('#3a0e32', { map: tex().metal.map, metalness: 0.6, roughness: 0.45, emissive: 0x2e0a26, emissiveIntensity: 0.8 }),
-        armor: mat('#6a1652', { map: tex().metal.map, normalMap: tex().metal.normalMap, metalness: 0.65, roughness: 0.4, emissive: 0x3a0c30, emissiveIntensity: 0.8 }),
-        dark: mat('#1e0618', { metalness: 0.85, roughness: 0.32, emissive: 0x1e0418, emissiveIntensity: 0.7 }),
-        cloth: mat('#8a1048', { map: tex().cloth.map, side: THREE.DoubleSide, roughness: 0.9, emissive: 0x2a0418, emissiveIntensity: 0.5 }),
-        glow: glowM(0xff7ab8, 1.6), eye: glowM(PINK, 3.2), halo: glowM(PINK, 2.2), core: glowM(VIO, 3.5),
-        rock: mat('#3a2434', { map: tex().rock && tex().rock.map, roughness: 0.95, emissive: 0x200a18, emissiveIntensity: 0.5 }),
+        body: mat('#2c282a', { map: tex().metal.map, metalness: 0.6, roughness: 0.6, emissive: 0x161214, emissiveIntensity: 0.7 }),
+        armor: mat('#4a4446', { map: tex().metal.map, normalMap: tex().metal.normalMap, metalness: 0.65, roughness: 0.55, emissive: 0x1c1618, emissiveIntensity: 0.7 }),
+        dark: mat('#161314', { metalness: 0.85, roughness: 0.5, emissive: 0x0e0a0c, emissiveIntensity: 0.6 }),
+        cloth: mat('#3e0e14', { map: tex().cloth.map, side: THREE.DoubleSide, roughness: 0.95, emissive: 0x16060a, emissiveIntensity: 0.5 }),
+        glow: glowM(0xc88a3a, 1.1), eye: glowM(0xff5a28, 2.6), halo: glowM(0xd89040, 1.5), core: glowM(VIO, 2.6),
+        rock: mat('#34302e', { map: tex().rock && tex().rock.map, roughness: 0.95, emissive: 0x120e0c, emissiveIntensity: 0.5 }),
       };
       this.glows = [M.glow, M.eye, M.halo];
       const body = joint(r, 0, 0, 0); body.scale.setScalar(SC);
@@ -247,8 +247,8 @@
       for (const sx of [-1, 1]) { const hj = joint(horns, sx * 2.6, 1.2, 0); hj.rotation.z = -sx * 0.7; hj.rotation.x = -0.4; smesh(hj, PG().cone, M.dark, 0.9, 6.5, 0.9, 0, 3.2, 0); smesh(hj, PG().cone, M.core, 0.35, 2, 0.35, 0, 6.6, 0); }
       horns.visible = false;
       // the burning halo and the wings of blades behind it
-      const halo = mesh(chest, PG().torus, M.halo, 12.5, 12.5, 6, 0, 21, -6);
-      const halo2 = mesh(chest, PG().torus, M.glow, 9, 9, 3, 0, 21, -6.2);
+      const halo = mesh(chest, PG().torus, M.halo, 12.5, 12.5, 2.2, 0, 21, -6);
+      const halo2 = mesh(chest, PG().torus, M.glow, 9, 9, 1.2, 0, 21, -6.2);
       const wings = [];
       for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) wings.push(mesh(chest, PG().box, M.dark, 0.6, 22 - i * 2, 2.2, sx * (8 + i * 3.4), 14 - i * 0.6, -6, 0, 0, -sx * (0.45 + i * 0.2)));
       // a cape hanging into the dark

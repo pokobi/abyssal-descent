@@ -195,6 +195,86 @@
   }
   const vr = (v, p) => v * (1 + (Math.random() * 2 - 1) * p);
 
+  // ---------- things struck, scraped and spoken (the new set) ----------
+  // A thing struck rings in modes of its own. One short burst of noise (the contact) goes through a narrow band at each mode - as
+  // narrow as that mode rings long - so one burst makes all of it, and every strike comes out a little different, as noise does.
+  // m: [[Hz, level, seconds to die away (-60 dB)], ...]; o: { g: the contact's own click, hp: its lowest Hz, d: how long the contact
+  // lasts, at: the strikes (seconds after t, ascending: a rattle is one burst each), lv: their levels }
+  // (the bursts are written into a buffer of their own, fresh noise each time, rather than shaped by automation: a sound asked for
+  // "now" is often a few ms late reaching the audio thread, and a burst under a millisecond long, automated, would be over before it began)
+  function strike(t, out, m, o) {
+    o = o || {};
+    const sr = ctx.sampleRate, d = o.d || 0.003, at = o.at || [0], lv = o.lv || [], te = d / 4, nr = Math.max(1, Math.round(0.0007 * sr)), nd = Math.round(te * 8 * sr);
+    let last = -1; const starts = [];
+    for (let i = 0; i < at.length; i++) { last = Math.max(at[i], last + 0.003); starts.push(last); }
+    const buf = ctx.createBuffer(1, Math.ceil((last + 0.0007 + te * 8) * sr) + 2, sr), b = buf.getChannelData(0);
+    for (let i = 0; i < starts.length; i++) {
+      const k = lv[i] === undefined ? 1 : lv[i], i0 = Math.round(starts[i] * sr);
+      for (let j = 0; j < nr + nd && i0 + j < b.length; j++) b[i0 + j] += (Math.random() * 2 - 1) * k * (j < nr ? j / nr : Math.exp(-(j - nr) / (te * sr)));
+    }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const e = src;
+    if (o.g) { const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = o.hp || 2000; hp.Q.value = 0.7; const cg = ctx.createGain(); cg.gain.value = o.g; e.connect(hp); hp.connect(cg); cg.connect(out); }
+    // (a burst of white noise of energy length Le leaves a band that rings with time constant tau at an amplitude of 2*sqrt(Le/(3*sr))/tau)
+    const L = 2 * Math.sqrt((d / 8 + 0.00023) / (3 * sr));
+    let long = 0;
+    for (const [f0, g, t60] of m) {
+      const f = Math.min(sr * 0.45, f0 * vr(1, 0.02)), tau = (t60 * vr(1, 0.12)) / 6.9, bp = ctx.createBiquadFilter(), mg = ctx.createGain();
+      bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = Math.max(0.7, Math.min(700, Math.PI * f * tau));
+      mg.gain.value = (g * vr(1, 0.2) * tau) / L;
+      e.connect(bp); bp.connect(mg); mg.connect(out); long = Math.max(long, t60);
+    }
+    src.start(t);
+    // (the source ends with its buffer; the bands ring on after it by themselves)
+  }
+  // A part sliding over another (a bolt drawn back, a magazine leaving its well, a hand on leather): noise in a band that moves as it
+  // goes, its level jagged - friction is a run of little catches, and no two runs alike. o: { buf, q, rough (0..1) }
+  function scrape(t, out, f0, f1, d, g, o) {
+    o = o || {};
+    const n = Math.max(8, Math.round(d * 500)), c = new Float32Array(n), r = o.rough === undefined ? 0.6 : o.rough;
+    let s = 1;
+    for (let i = 0; i < n; i++) { const x = i / (n - 1); s += (1 - r + r * 2 * Math.random() * Math.random() * 2 - s) * 0.6; c[i] = g * Math.pow(Math.sin(Math.PI * x), 0.6) * Math.max(0, s); }
+    c[n - 1] = 0;
+    // (the level is written into the noise itself, a buffer of its own: a level curve automated from "now" was at times dropped whole
+    // when the call reached the audio thread a little late, and the sound with it)
+    const sr = ctx.sampleRate, len = Math.max(2, Math.ceil(d * sr)), buf = ctx.createBuffer(1, len, sr), b = buf.getChannelData(0), from = (o.buf === 'pink' ? pink : white).getChannelData(0);
+    for (let j = 0, k = Math.floor(Math.random() * from.length); j < len; j++, k++) { const x = (j / len) * (n - 1), i = Math.floor(x), w = x - i; b[j] = from[k % from.length] * (c[i] * (1 - w) + (i + 1 < n ? c[i + 1] : 0) * w); }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = o.q || 1.5; bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + d);
+    src.connect(bp); bp.connect(out);
+    src.start(t);
+  }
+  // A throat: the folds buzzing (a sawtooth whose pitch runs along p: [[0..1 of d, Hz], ...], wavering), breath with it, through a
+  // mouth - bands at the formants, moving along fm: [[0..1, [F1, F2, F3]], ...]; its level along a jagged curve (a voice is never
+  // steady). o: { d, g, a (rise, 0..1 of d), p, fm, q, fg, breath, vib: [Hz, depth], rough (0..1), det (a second fold, cents off) }
+  function throat(t, out, o) {
+    const d = o.d, n = Math.max(16, Math.round(d * 240)), c = new Float32Array(n), a = o.a || 0.2;
+    let s = 1;
+    for (let i = 0; i < n; i++) { const x = i / (n - 1), env = Math.min(1, x / a) * Math.min(1, (1 - x) / 0.35); s += (1 - (o.rough || 0) * Math.random() - s) * 0.5; c[i] = o.g * Math.pow(env, 1.4) * s; }
+    c[n - 1] = 0;
+    // (the level as a run of short ramps, not one automated curve: see scrape)
+    const mix = ctx.createGain(); mix.gain.setValueAtTime(0, t); for (let i = 1; i < n; i++) mix.gain.linearRampToValueAtTime(c[i], t + (i / (n - 1)) * d);
+    const srcs = [], folds = [];
+    for (const cents of o.det ? [0, o.det] : [0]) {
+      const os = ctx.createOscillator(), k = Math.pow(2, cents / 1200); os.type = o.type || 'sawtooth';
+      os.frequency.setValueAtTime(o.p[0][1] * k, t); for (const [x, f] of o.p.slice(1)) os.frequency.linearRampToValueAtTime(f * k, t + x * d);
+      const og = ctx.createGain(); og.gain.value = cents ? 0.6 : 1; os.connect(og); og.connect(mix); srcs.push(os); folds.push(os);
+    }
+    if (o.vib) { const l = ctx.createOscillator(); l.frequency.value = vr(o.vib[0], 0.15); const lg = ctx.createGain(); lg.gain.value = o.p[0][1] * o.vib[1]; l.connect(lg); for (const os of folds) lg.connect(os.frequency); srcs.push(l); }
+    let br = null;
+    if (o.breath) { br = ctx.createBufferSource(); br.buffer = pink; const bg = ctx.createGain(); bg.gain.value = o.breath; br.connect(bg); bg.connect(mix); }
+    for (let i = 0; i < o.fm[0][1].length; i++) {
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = o.q[i];
+      bp.frequency.setValueAtTime(o.fm[0][1][i], t); for (const [x, F] of o.fm.slice(1)) bp.frequency.linearRampToValueAtTime(F[i], t + x * d);
+      const fg = ctx.createGain(); fg.gain.value = o.fg[i]; mix.connect(bp); bp.connect(fg); fg.connect(out);
+    }
+    for (const s2 of srcs) { s2.start(t); s2.stop(t + d + 0.05); }
+    if (br) { br.start(t, Math.random() * 1.5); br.stop(t + d + 0.05); }
+  }
+
+  // (the new set's remade sounds: each one's level, so that it stands as loud against the rest as the old one did)
+  const NV = { supp: 0.5, ric: 0.4, imp: 0.65, cer: 0.45, stn: 0.25, wail: 0.1, gurgle: 0.04, slosh: 0.16, coin: 1, hover: 0.13, click: 1, select: 0.85, deny: 0.85, error: 3.0, ready: 0.6, zap: 0.45, magic: 0.62 };
+
   // ---------- recorded sounds (snd/, listed in sndbank.js) ----------
   // Where a sound has recordings, one of them is the sound: a different one each time, its pitch and level a little off the last, put
   // in the same place and the same room as everything else. Where it has none - or they have not arrived yet, or the old set of sounds
@@ -296,6 +376,22 @@
     }
     const gv = gunVoice(GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle, opts.suppressed ? {} : opts), p = gv.p;
     const t = ctx.currentTime;
+    if (opts.suppressed && NEW()) {
+      // (the new set) a suppressed shot is the gas let out through the baffles - a dull puff and a knock in the hands, no crack - and
+      // over it the action working, which is most of what is heard of it: the carrier (or the slide) back and home, ringing a little.
+      // [the puff's Hz, how heavy, how loud the action]
+      const SK = { pistol: [950, 0.9, 1.15], revolver: [800, 1.1, 0.6], smg: [850, 0.85, 1], rifle: [620, 1.1, 1], dmr: [560, 1.2, 0.9], sniper: [500, 1.3, 0.8], shotgun: [420, 1.4, 0.8], lmg: [600, 1.15, 1.05], minigun: [800, 0.8, 0.9], nail: [1100, 0.7, 0.9] }[kind] || [700, 1, 1];
+      const [pf, w, act] = SK, out = dest(null, 0.15, gunBus); out.gain.value = (opts.vol || 1) * NV.supp;
+      nz({ t, buf: 'pink', f: [['bandpass', vr(pf, 0.1), 0.8, pf * 0.45, 0.07], ['lowpass', 2600]], g: 0.9 * w, a: 0.0015, d: vr(0.08, 0.15) * w, to: out });   // the gas: pfft
+      tn({ t, f0: vr(150, 0.08), f1: 62, d: 0.06 + 0.03 * w, g: 0.55 * w, to: out, type: 'sine' });                                                       // the knock
+      tn({ t, f0: 62, f1: 34, d: 0.09, g: 0.3 * w, to: out, type: 'sine' });                                                                                 // the weight under it
+      strike(t, out, [[vr(1500, 0.06), 0.09 * act, 0.05], [vr(2650, 0.06), 0.07 * act, 0.06], [vr(4100, 0.06), 0.04 * act, 0.04], [vr(5900, 0.06), 0.02 * act, 0.03]],
+        { g: 0.12 * act, hp: 2500, at: [vr(0.012, 0.2), vr(0.045, 0.15)], lv: [0.7, 1] });                                                                  // the action
+      if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35);
+      if (kind === 'sniper') A.mech('bolt', 0.4);
+      if (kind === 'revolver') A.mech('click', 0.2);
+      return;
+    }
     const out = dest(null, p.wet * 0.9, gunBus);
     out.gain.value = opts.vol || 1;
     const pr = vr(1, 0.06);
@@ -411,12 +507,65 @@
   };
 
   // mechanical sounds: reload parts
+  // (the new set: each part's level, so that it stands as loud against the rest as the old one did)
+  const MECHV = { magIn: 0.78, boltBack: 0.7, boltFwd: 0.72, pump: 0.66, shell: 1.5, click: 1.25, empty: 1.1, switch: 0.56, cell: 0.65, grab: 0.9 };
   A.mech = function (kind, delay, vol) {
     if (!ctx || !voice(0.4)) return;
     if (!delay && smp('mech_' + kind, null, vol)) return;
     if (delay && SB.bank['mech_' + kind] && usable('mech_' + kind)) { setTimeout(() => A.mech(kind, 0, vol), delay * 1000); return; }
     const t = ctx.currentTime + (delay || 0);
     const out = dest(null, 0.25); out.gain.value = vol || 1;
+    if (NEW()) {
+      // the new set: steel meeting steel rings in modes of its own, high and short (the gun in the hands damps it); what slides scrapes
+      out.gain.value *= MECHV[kind] || 1;
+      const S = (tt, m, g, hp, at, lv) => strike(tt, out, m, { g, hp: hp || 2500, at, lv });
+      const K = (tt, f, g) => tn({ t: tt, f0: vr(f, 0.1), f1: f * 0.6, d: vr(0.045, 0.15), g, to: out, type: 'sine' });   // (the knock of it in the hands: low, dull)
+      switch (kind) {
+        case 'magOut':   // the catch pressed, the magazine sliding out of its well, the rounds in it shifting
+          S(t, [[vr(3100, 0.05), 0.06, 0.04], [vr(5200, 0.05), 0.04, 0.03]], 0.2, 3000);
+          scrape(t + 0.012, out, vr(1500, 0.1), 900, vr(0.07, 0.15), 0.16, { q: 1.8, rough: 0.7 });
+          S(t + vr(0.06, 0.15), [[vr(1150, 0.06), 0.08, 0.06], [vr(2600, 0.06), 0.06, 0.05], [vr(4300, 0.06), 0.03, 0.04]], 0.08, 2000, [0, vr(0.018, 0.3)], [1, 0.5]); break;
+        case 'magIn':    // pushed into the well, seated with a knock, the catch snapping over it
+          scrape(t, out, vr(800, 0.1), 1500, vr(0.055, 0.15), 0.14, { q: 1.6, rough: 0.6 });
+          S(t + 0.05, [[vr(430, 0.06), 0.22, 0.045], [vr(1350, 0.06), 0.13, 0.08], [vr(2480, 0.06), 0.09, 0.065], [vr(3900, 0.06), 0.05, 0.05]], 0.3); K(t + 0.05, 190, 0.2);
+          S(t + 0.05 + vr(0.045, 0.25), [[vr(2900, 0.05), 0.08, 0.05], [vr(4700, 0.05), 0.06, 0.035], [vr(6800, 0.05), 0.03, 0.025]], 0.28, 3500); break;
+        case 'boltBack': // drawn back over the spring, stopping hard at the rear
+          scrape(t, out, vr(1700, 0.1), 1100, vr(0.075, 0.12), 0.16, { q: 2, rough: 0.6 });
+          S(t + 0.068, [[vr(620, 0.06), 0.18, 0.04], [vr(1900, 0.06), 0.12, 0.09], [vr(3300, 0.06), 0.08, 0.07], [vr(5100, 0.06), 0.04, 0.05]], 0.26); K(t + 0.068, 230, 0.12); break;
+        case 'boltFwd':  // run home by the spring, slamming shut and locking (two knocks very close)
+          scrape(t, out, vr(1200, 0.1), 1900, vr(0.055, 0.12), 0.16, { q: 2, rough: 0.5 });
+          S(t + 0.055, [[vr(480, 0.06), 0.15, 0.05], [vr(2150, 0.06), 0.085, 0.11], [vr(3500, 0.06), 0.06, 0.085], [vr(5600, 0.06), 0.03, 0.06]], 0.28, 2500, [0, vr(0.011, 0.3)], [1, 0.55]); K(t + 0.055, 210, 0.18); break;
+        case 'bolt': A.mech('boltBack', delay); A.mech('boltFwd', (delay || 0) + 0.2); break;
+        case 'pump':     // the fore-end racked back and run forward: wood sliding on steel, the action stopping each way
+          scrape(t, out, vr(800, 0.1), 520, vr(0.1, 0.12), 0.14, { buf: 'pink', q: 1.4, rough: 0.7 });
+          S(t + 0.09, [[vr(380, 0.06), 0.15, 0.05], [vr(1250, 0.06), 0.075, 0.08], [vr(2300, 0.06), 0.05, 0.06]], 0.18, 2000); K(t + 0.09, 170, 0.2);
+          scrape(t + 0.15, out, vr(650, 0.1), 1000, vr(0.08, 0.12), 0.12, { buf: 'pink', q: 1.4, rough: 0.6 });
+          S(t + 0.235, [[vr(420, 0.06), 0.16, 0.05], [vr(1500, 0.06), 0.085, 0.1], [vr(2700, 0.06), 0.055, 0.075], [vr(4200, 0.06), 0.025, 0.05]], 0.24, 2000); K(t + 0.235, 180, 0.22); break;
+        case 'shell':    // a shell pushed into the tube against its spring, the rim ticking past the catch
+          S(t, [[vr(1800, 0.06), 0.08, 0.035], [vr(3200, 0.06), 0.05, 0.025]], 0.09, 1500);
+          S(t + vr(0.045, 0.2), [[vr(2600, 0.05), 0.05, 0.04], [vr(4400, 0.05), 0.03, 0.03]], 0.06, 2500); break;
+        case 'click':    // a hammer cocked, a small catch: two ticks close together
+          S(t, [[vr(1500, 0.06), 0.05, 0.03], [vr(2700, 0.05), 0.07, 0.05], [vr(4400, 0.05), 0.05, 0.035], [vr(6900, 0.05), 0.02, 0.025]], 0.08, 2500, [0, vr(0.016, 0.3)], [0.6, 1]); break;
+        case 'empty':    // the hammer falling on nothing: one dry snap, a little spring ringing
+          S(t, [[vr(700, 0.06), 0.09, 0.02], [vr(1900, 0.06), 0.04, 0.03], [vr(3300, 0.05), 0.06, 0.06], [vr(5400, 0.05), 0.03, 0.04]], 0.1, 3000); break;
+        case 'cylinder': { // the cylinder turned: the pawl ticking over its notches, and the steel turning under it
+          const at = [0], lv = [vr(0.8, 0.25)];
+          for (let i = 1; i < 6; i++) { at.push(at[i - 1] + vr(0.035, 0.15)); lv.push(vr(0.8, 0.25)); }
+          S(t, [[vr(2500, 0.05), 0.05, 0.03], [vr(4100, 0.05), 0.035, 0.02]], 0.1, 3000, at, lv);
+          scrape(t, out, 2000, 1700, at[5] + 0.03, 0.04, { q: 2, rough: 0.3 }); break; }
+        case 'switch':   // the gun taken up: leather and the hand, and its steel knocking as it comes up
+          scrape(t, out, vr(900, 0.15), 600, vr(0.11, 0.15), 0.18, { buf: 'pink', q: 1, rough: 0.8 });
+          S(t + 0.095, [[vr(350, 0.06), 0.2, 0.04], [vr(1600, 0.06), 0.1, 0.07], [vr(2900, 0.06), 0.06, 0.05]], 0.22, 2000); K(t + 0.095, 200, 0.1); break;
+        case 'cell':     // a heavy cell shoved home: a deep knock, the latch over it, a low hum settling
+          scrape(t, out, vr(600, 0.1), 900, 0.04, 0.07, { q: 1.5, rough: 0.5 });
+          S(t + 0.035, [[vr(260, 0.06), 0.16, 0.06], [vr(900, 0.06), 0.08, 0.12], [vr(1850, 0.06), 0.045, 0.1], [vr(3100, 0.06), 0.022, 0.07]], 0.16, 1800); K(t + 0.035, 150, 0.16);
+          S(t + 0.035 + vr(0.05, 0.2), [[vr(2600, 0.05), 0.035, 0.04], [vr(4300, 0.05), 0.022, 0.03]], 0.11, 3000);
+          nz({ t: t + 0.06, f: [['bandpass', vr(400, 0.08), 1.2]], g: 0.07, a: 0.03, d: 0.22, to: out }); break;
+        case 'grab':     // a hand closing on it: leather and cloth
+          scrape(t, out, vr(1400, 0.15), 800, vr(0.08, 0.2), 0.045, { buf: 'pink', q: 0.9, rough: 0.85 }); break;
+      }
+      return;
+    }
     const clack = (tt, f, g, q) => {
       nz({ t: tt, f: [['bandpass', vr(f, 0.08), q || 6]], g, d: 0.035, to: out });
       nz({ t: tt, f: [['highpass', 2500]], g: g * 0.35, d: 0.008, to: out });
@@ -641,6 +790,20 @@
   A.ricochet = function (pos) {
     if (!ctx || !voice(0.3) || Math.random() < 0.5) return;
     const t = ctx.currentTime, out = dest(pos, 0.3); out.gain.value = 0.3;
+    if (NEW()) {
+      // (the new set) a bullet glancing off: the knock of it, then the whine of it tumbling away - a falling note that throbs as it
+      // turns over - and the air it tears
+      const f = vr(3000, 0.25), d = vr(0.3, 0.25), f1 = f * vr(0.55, 0.15), t1 = t + 0.008;
+      out.gain.value *= NV.ric;
+      strike(t, out, [[vr(2300, 0.1), 0.1, 0.03], [vr(4100, 0.1), 0.06, 0.02]], { g: 0.3, hp: 3000 });
+      const o = ctx.createOscillator(), am = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain(), env = envGain(t1, 0.02, 0.12, d, out);
+      o.type = 'triangle'; o.frequency.setValueAtTime(f, t1); o.frequency.exponentialRampToValueAtTime(f1, t1 + d);
+      lfo.frequency.setValueAtTime(vr(48, 0.3), t1); lfo.frequency.linearRampToValueAtTime(vr(26, 0.3), t1 + d);
+      am.gain.value = 0.6; lg.gain.value = 0.4; lfo.connect(lg); lg.connect(am.gain); o.connect(am); am.connect(env);
+      o.start(t1); lfo.start(t1); o.stop(t1 + d + 0.05); lfo.stop(t1 + d + 0.05);
+      nz({ t: t1, f: [['bandpass', f * 0.9, 4, f1, d]], g: 0.15, a: 0.02, d, to: out });
+      return;
+    }
     nz({ t, f: [['bandpass', 2800, 6, 1400, 0.25]], g: 0.3, d: 0.25, to: out });
   };
   A.impact = function (pos, surface) {
@@ -648,6 +811,15 @@
     const t = ctx.currentTime, out = dest(pos, 0.3); out.gain.value = 0.45;
     if (surface === 'wood') { nz({ t, f: [['bandpass', 700, 2]], g: 0.5, d: 0.05, to: out }); tn({ t, f0: 220, f1: 120, d: 0.05, g: 0.2, to: out }); }
     else if (surface === 'metal') { nz({ t, f: [['bandpass', 2400, 5]], g: 0.4, d: 0.05, to: out }); tn({ t, f0: vr(1500, 0.1), d: 0.12, g: 0.06, to: out }); }
+    else if (NEW()) {
+      // (the new set) a bullet into stone: the crack of it and the stone's short hard knock (stone hardly rings), a puff of grit, and a
+      // few chips falling after it
+      out.gain.value *= NV.imp;
+      strike(t, out, [[vr(950, 0.15), 0.26, 0.03], [vr(1750, 0.15), 0.16, 0.025], [vr(3100, 0.15), 0.07, 0.018]], { g: 0.22, hp: 1500, d: 0.002 });
+      nz({ t: t + 0.003, buf: 'pink', f: [['bandpass', vr(2400, 0.2), 0.8]], g: 0.18, a: 0.003, d: vr(0.09, 0.3), to: out });
+      const n = Math.floor(Math.random() * 4);
+      if (n) { const at = [], lv = []; for (let i = 0; i < n; i++) { at.push(0.01 + Math.random() * 0.2); lv.push(0.3 + Math.random() * 0.7); } at.sort((a, b) => a - b); strike(t + 0.04, out, [[vr(2600, 0.2), 0.05, 0.02], [vr(4000, 0.2), 0.025, 0.015]], { at, lv }); }
+    }
     else { nz({ t, f: [['bandpass', vr(1600, 0.2), 1.2]], g: 0.45, d: 0.04, to: out }); nz({ t: t + 0.01, buf: 'pink', f: [['lowpass', 2500]], g: 0.25, d: 0.08, to: out }); if (NEW()) for (let i = 0; i < 2; i++) nz({ t: t + 0.05 + Math.random() * 0.18, f: [['bandpass', vr(3200, 0.3), 4]], g: 0.05, d: 0.02, to: out }); } // (chips of stone falling)
   };
   A.explosion = function (pos, size) {
@@ -764,6 +936,32 @@
     if (smp('mon_' + kind, pos, 0.75 * vol, pitch, 0.45)) return;
     if (!voice(1)) return;
     const t = ctx.currentTime, out = dest(pos, 0.45); out.gain.value *= 0.75 * vol;
+    if (NEW() && (kind === 'wail' || kind === 'gurgle' || kind === 'slosh')) {
+      out.gain.value *= NV[kind];
+      if (kind === 'wail') {
+        // (the new set) the dead keening: a hollow voice, much breath in it, rising and falling away; its vowel opening from oo to ah
+        // and closing again, a second voice a little off it
+        const f = vr(250, 0.1) * pitch, d = vr(1.15, 0.15), sp = Math.sqrt(pitch);
+        throat(t, out, { d, g: 0.5, a: 0.22, p: [[0, f * 0.82], [vr(0.28, 0.2), f * 1.06], [0.6, f * vr(0.98, 0.04)], [1, f * vr(0.68, 0.1)]],
+          fm: [[0, [330 * sp, 820 * sp, 2400 * sp]], [0.45, [vr(720, 0.1) * sp, vr(1150, 0.1) * sp, 2550 * sp]], [1, [380 * sp, 860 * sp, 2300 * sp]]],
+          q: [6, 7, 9], fg: [1, 0.55, 0.18], breath: 0.6, vib: [5.2, 0.025], rough: 0.25, det: vr(14, 0.3) });
+      } else if (kind === 'gurgle') {
+        // (the new set) a thick liquid working in a throat: bloops (a bubble forming in it - a low note that climbs as it closes), never
+        // evenly spaced, over a wet churn
+        let tt = t + 0.01;
+        for (let i = 0, n = 4 + Math.floor(Math.random() * 4); i < n; i++) { const f = vr(240, 0.35) * pitch; tn({ t: tt, f0: f, f1: f * vr(1.9, 0.2), fd: vr(0.05, 0.3), a: 0.006, d: vr(0.08, 0.3), g: vr(0.45, 0.35), to: out, type: 'sine' }); tt += vr(0.07, 0.5); }
+        scrape(t, out, vr(420, 0.15) * pitch, vr(260, 0.15) * pitch, tt - t + 0.05, 0.5, { buf: 'pink', q: 2.2, rough: 0.9 });
+      } else {
+        // (the new set) a slime dragging itself: a wet squelch (thick, so low and uneven), the sticky snap of it parting from the
+        // floor, now and then a bloop
+        scrape(t, out, vr(700, 0.2) * pitch, vr(300, 0.2) * pitch, vr(0.3, 0.2), 0.9, { buf: 'pink', q: 2, rough: 0.85 });
+        const at = [], lv = []; let a0 = vr(0.06, 0.4);
+        for (let i = 0, k = 1 + Math.floor(Math.random() * 3); i < k; i++) { at.push(a0); lv.push(vr(0.7, 0.4)); a0 += vr(0.07, 0.5); }
+        strike(t, out, [[vr(1250, 0.2) * pitch, 0.12, 0.035], [vr(2100, 0.2) * pitch, 0.06, 0.025]], { at, lv, d: 0.005 });
+        if (Math.random() < 0.7) { const f = vr(170, 0.3) * pitch; tn({ t: t + vr(0.12, 0.4), f0: f, f1: f * 1.8, fd: 0.06, a: 0.008, d: 0.1, g: 0.35, to: out, type: 'sine' }); }
+      }
+      return;
+    }
     const vox = (f, d, g, formants, type) => {
       // saw/noise source shaped by formant filters
       const osc = ctx.createOscillator(); osc.type = type || 'sawtooth';
@@ -817,6 +1015,22 @@
   A.magic = function (pos, kind) {
     if (!ctx || smp('magic', pos, 0.6, kind === 'dark' ? 0.7 : 1, 0.6) || !voice(0.6)) return;
     const t = ctx.currentTime, out = dest(pos, 0.6); out.gain.value = 0.6;
+    if (NEW()) {
+      // (the new set) a working of power: breath drawn through a throat - a whispered vowel opening (hoo to haa: two bands moving
+      // apart), swelling and falling - over a low swell of air; the dark one deeper and slower
+      out.gain.value *= NV.magic;
+      const dk = kind === 'dark', d = vr(dk ? 0.6 : 0.5, 0.15), k = dk ? 0.62 : 1;
+      const src = ctx.createBufferSource(); src.buffer = pink; const env = ctx.createGain();
+      const pk = t + d * vr(0.25, 0.2); env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(vr(1, 0.15), pk); env.gain.setTargetAtTime(0, pk, d * 0.17);
+      src.connect(env);
+      for (const [f0, f1, q, g] of [[320, vr(720, 0.1), 5, 1.4], [800, vr(1150, 0.1), 7, 0.9], [2500, vr(2700, 0.1), 9, 0.25]]) {
+        const bp = ctx.createBiquadFilter(), gg = ctx.createGain(); bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(f0 * k, t); bp.frequency.linearRampToValueAtTime(f1 * k, t + d * 0.6); bp.frequency.linearRampToValueAtTime(f0 * k * 1.1, t + d);
+        gg.gain.value = g; env.connect(bp); bp.connect(gg); gg.connect(out);
+      }
+      src.start(t, Math.random() * 1.2); src.stop(t + d + 0.05);
+      nz({ t, buf: 'brown', f: [['lowpass', dk ? 260 : 400]], g: 0.4, a: d * 0.3, d: d * 0.8, to: out });
+      return;
+    }
     // low, airy and organic - no pure beeps
     nz({ t, buf: 'pink', f: [['bandpass', kind === 'dark' ? 300 : 600, 2, kind === 'dark' ? 150 : 1200, 0.5]], g: 0.6, a: 0.1, d: 0.5, to: out });
     nz({ t, buf: 'brown', f: [['lowpass', 400]], g: 0.4, a: 0.05, d: 0.4, to: out });
@@ -824,6 +1038,28 @@
   A.zap = function (pos) {
     if (!ctx || !voice(0.3)) return;
     const t = ctx.currentTime, out = dest(pos, 0.35); out.gain.value = 0.55;
+    if (NEW()) {
+      // (the new set) an arc: a crackle of sharp snaps never evenly spaced (thick at first, thinning), the raw buzz of the current
+      // under it, and the knock of the air it splits
+      out.gain.value *= NV.zap;
+      const sr = ctx.sampleRate, span = vr(0.16, 0.25), len = Math.ceil((span + 0.01) * sr), buf = ctx.createBuffer(1, len, sr), b = buf.getChannelData(0);
+      for (let i = 0, n = 26 + Math.floor(Math.random() * 22); i < n; i++) {
+        const i0 = Math.floor(Math.pow(Math.random(), 1.8) * span * sr), k = Math.pow(Math.random(), 2) * (1 - i0 / len * 0.6), te = (0.00015 + Math.random() * 0.0004) * sr;
+        for (let j = 0; j < te * 6 && i0 + j < len; j++) b[i0 + j] += (Math.random() * 2 - 1) * k * Math.exp(-j / te);
+      }
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1000;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = vr(2600, 0.2); bp.Q.value = 2;
+      const g1 = ctx.createGain(), g2 = ctx.createGain(); g1.gain.value = 0.6; g2.gain.value = 2.2;
+      src.connect(hp); hp.connect(g1); g1.connect(out); src.connect(bp); bp.connect(g2); g2.connect(out); src.start(t);
+      // the buzz: a raw low tone, its level as jagged as the arc
+      const f = vr(118, 0.08), o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), bg = ctx.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * vr(0.9, 0.05), t + span);
+      lp.type = 'bandpass'; lp.frequency.value = vr(1300, 0.15); lp.Q.value = 0.9;
+      bg.gain.setValueAtTime(0, t); for (let i = 1, n = Math.round(span * 200); i <= n; i++) bg.gain.linearRampToValueAtTime(0.16 * (1 - i / n) * (0.4 + Math.random() * 0.6), t + (i / n) * span);
+      o.connect(lp); lp.connect(bg); bg.connect(out); o.start(t); o.stop(t + span + 0.05);
+      nz({ t, buf: 'brown', f: [['lowpass', 260]], g: 0.4, d: 0.12, to: out });
+      return;
+    }
     for (let i = 0; i < 6; i++) nz({ t: t + Math.random() * 0.12, f: [['highpass', 1500], ['lowpass', 5000]], g: 0.25, d: 0.02, to: out });
     nz({ t, buf: 'brown', f: [['lowpass', 260]], g: 0.4, d: 0.15, to: out });
   };
@@ -854,6 +1090,29 @@
   A.breakObj = function (pos, mat) {
     if (!ctx || smp('break_' + (mat === 'wood' || mat === 'ceramic' ? mat : 'stone'), pos, 0.8, 1, 0.4)) return;
     const t = ctx.currentTime, out = dest(pos, 0.4);
+    // shards / rubble: n pieces landing over sp seconds, each a strike of one set of notes (a set per size)
+    const pieces = (t0, n, sp, m, g, hp) => { const at = [], lv = []; for (let i = 0; i < n; i++) { at.push(0.015 + Math.pow(Math.random(), 1.4) * sp); lv.push(0.3 + Math.random() * 0.7); } at.sort((a, b) => a - b); strike(t0, out, m, { g, hp, at, lv }); };
+    if (mat === 'ceramic' && NEW()) {
+      // (the new set) a fired pot breaking: the whole of it cracking (it rings high and short), shards of three sizes falling and
+      // clinking (each size its own notes), the dull knock of what was in it, and grit running out after
+      out.gain.value *= NV.cer;
+      strike(t, out, [[vr(1500, 0.12), 0.14, 0.07], [vr(2700, 0.12), 0.11, 0.06], [vr(4300, 0.12), 0.07, 0.045], [vr(6400, 0.12), 0.04, 0.03]], { g: 0.45, hp: 2000 });
+      nz({ t, buf: 'pink', f: [['lowpass', 700]], g: 0.35, d: 0.07, to: out });
+      for (const [fb, n, sp] of [[2300, 3, 0.25], [3600, 4, 0.3], [5600, 3, 0.34]]) { const f = vr(fb, 0.15); pieces(t, n + Math.floor(Math.random() * 4), sp, [[f, 0.07, 0.05], [f * vr(1.62, 0.05), 0.04, 0.035]], 0.08, 3000); }
+      scrape(t + 0.03, out, 4000, 2500, vr(0.22, 0.2), 0.05, { q: 0.8, rough: 0.9 });
+      return;
+    }
+    if (mat !== 'wood' && NEW()) {
+      // (the new set) stone giving way: a hard crack, the low knock of the mass, rubble of two sizes knocking down (stone hardly rings:
+      // short, low notes), and grit running
+      out.gain.value *= NV.stn;
+      strike(t, out, [[vr(650, 0.12), 0.3, 0.05], [vr(1250, 0.12), 0.18, 0.035], [vr(2200, 0.12), 0.09, 0.025]], { g: 0.5, hp: 1500 });
+      tn({ t, f0: vr(110, 0.1), f1: 48, d: vr(0.22, 0.2), g: 0.6, to: out, type: 'sine' });
+      nz({ t, buf: 'pink', f: [['lowpass', 900]], g: 0.6, d: 0.2, to: out });
+      for (const [fb, n, sp, g] of [[700, 3, 0.5, 0.2], [1600, 4, 0.55, 0.1]]) { const f = vr(fb, 0.2); pieces(t + 0.05, n + Math.floor(Math.random() * 4), sp, [[f, g, 0.04], [f * vr(1.9, 0.1), g * 0.5, 0.03]], 0.1, 1800); }
+      scrape(t + 0.05, out, 3000, 1800, vr(0.45, 0.2), 0.05, { buf: 'pink', q: 0.8, rough: 0.9 });
+      return;
+    }
     if (mat === 'wood') {
       nz({ t, f: [['bandpass', 600, 1.5]], g: 0.7, d: 0.12, to: out });
       for (let i = 0; i < 6; i++) nz({ t: t + Math.random() * 0.15, f: [['bandpass', vr(1100, 0.4), 3]], g: 0.25, d: 0.04, to: out });
@@ -883,6 +1142,15 @@
   A.coin = function (n) {
     if (!ctx || !voice(0.3)) return;
     const t = ctx.currentTime, out = dest(null, 0.25); out.gain.value = 0.28;
+    if (NEW()) {
+      // (the new set) a coin landing on stone: a thin disc rings in modes far from one another; a bounce or two after the first
+      // strike; old gold, so dull and short
+      const b = vr(2100, 0.08), at = [0], lv = [1];
+      if (Math.random() < 0.8) { at.push(vr(0.06, 0.25)); lv.push(vr(0.45, 0.3)); if (Math.random() < 0.6) { at.push(at[1] + vr(0.04, 0.25)); lv.push(vr(0.2, 0.3)); } }
+      out.gain.value *= NV.coin;
+      strike(t, out, [[b, 0.08, 0.22], [b * 1.47, 0.06, 0.18], [b * 2.09, 0.045, 0.14], [b * 2.71, 0.03, 0.1], [b * 3.62, 0.015, 0.07]], { g: 0.1, hp: 4000, at, lv });
+      return;
+    }
     const base = vr(2100, 0.08);
     [1, 1.43, 2.12].forEach((m, i) => tn({ t, f0: base * m, d: 0.12 - i * 0.02, g: 0.08, to: out }));
     nz({ t, f: [['bandpass', 3800, 4]], g: 0.15, d: 0.02, to: out });
@@ -897,10 +1165,38 @@
     nz({ t, buf: 'pink', f: [['bandpass', 900, 1.5]], g: 0.3, d: 0.08, to: out });
     A.mech('grab', 0.03);
   };
+  // (the new set) what is pressed and chosen is a thing of the world - a stone piece set down, an iron catch, a coin, a page - not a tone
+  const UIN = {
+    // a page brushed
+    hover: (t, out) => { out.gain.value = 0.18 * NV.hover; scrape(t, out, vr(2600, 0.1), 1800, vr(0.035, 0.2), 0.3, { q: 1.2, rough: 0.6 }); },
+    // a small iron catch ticking against wood
+    click: (t, out) => {
+      out.gain.value = 0.35 * NV.click;
+      strike(t, out, [[vr(1050, 0.05), 0.1, 0.035], [vr(2380, 0.05), 0.06, 0.025], [vr(3900, 0.05), 0.03, 0.018]], { g: 0.12, hp: 2500, d: 0.002 });
+      tn({ t, f0: vr(210, 0.05), f1: 150, d: 0.04, g: 0.2, to: out, type: 'sine' });
+    },
+    // a stone piece set down hard on stone, and a coin
+    select: (t, out) => {
+      out.gain.value = 0.6 * NV.select;
+      tn({ t, f0: vr(140, 0.06), f1: 70, d: vr(0.2, 0.1), g: 0.6, to: out, type: 'sine' });
+      strike(t, out, [[vr(520, 0.05), 0.25, 0.05], [vr(1240, 0.05), 0.12, 0.035], [vr(2300, 0.05), 0.06, 0.025]], { g: 0.2, hp: 1500 });
+      A.coin();
+    },
+    // a muffled knock on a shut lid
+    deny: (t, out) => { out.gain.value = 0.3 * NV.deny; strike(t, out, [[vr(170, 0.04), 0.35, 0.07], [vr(410, 0.05), 0.14, 0.045], [vr(980, 0.05), 0.05, 0.025]], { g: 0.06, hp: 800, d: 0.01 }); },
+    // a locked iron latch rattled: two dull clanks
+    error: (t, out) => {
+      out.gain.value = 0.45 * NV.error;
+      strike(t, out, [[vr(330, 0.05), 0.25, 0.07], [vr(1020, 0.05), 0.1, 0.09], [vr(1780, 0.05), 0.06, 0.06], [vr(2650, 0.05), 0.03, 0.04]], { g: 0.1, hp: 1500, d: 0.008, at: [0, vr(0.12, 0.1)], lv: [1, 0.8] });
+    },
+    // a small catch snapping home, a little ring after it
+    ready: (t, out) => { out.gain.value = 0.18 * NV.ready; strike(t, out, [[vr(1900, 0.03), 0.05, 0.18], [vr(3050, 0.03), 0.035, 0.12], [vr(4700, 0.03), 0.02, 0.08]], { g: 0.1, hp: 3000 }); },
+  };
   A.ui = function (kind) {
     if (!ctx) return;
     if (kind === 'buy' ? smp('coins', null, 0.6) : kind === 'rare' ? false : smp('ui_' + kind, null, 0.5, 1, 0.08)) return;
     const t = ctx.currentTime, out = dest(null, 0.12);
+    if (NEW() && UIN[kind]) { UIN[kind](t, out); return; }
     switch (kind) {
       case 'hover': out.gain.value = 0.18; nz({ t, f: [['bandpass', 1800, 3]], g: 0.3, d: 0.02, to: out }); break;
       case 'click': out.gain.value = 0.35; nz({ t, f: [['bandpass', 1100, 2]], g: 0.4, d: 0.03, to: out }); tn({ t, f0: 220, f1: 140, d: 0.05, g: 0.2, to: out }); break;

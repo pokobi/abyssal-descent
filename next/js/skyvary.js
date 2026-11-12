@@ -29,44 +29,59 @@
     feather: { kind: 'dot', n: 260, col: 0xfff6e8, a: 0.8, vel: [0.3, -0.7, 0.15], sway: 1.4, size: 0.09 },
     drip: { kind: 'rain', n: 140, col: 0x9fc8d0, a: 0.4, vel: [0, -14, 0], len: 0.35 },
   };
+  // the clouds of a mood (game.js draws them in the sky dome): [cover 0..1, how dark and thick the deck is, high cirrus, scud running
+  // under a rain deck, wind speed, size of the heaps]
+  const CL = {
+    night: [0.28, 0.3, 0.35, 0, 1, 1],      // a clear night: a few clouds drifting past the moon, streaks high up
+    thin: [0.22, 0.35, 0.3, 0, 0.8, 1],
+    mist: [0.6, 0.3, 0, 0, 0.5, 0.8],       // (a fog over the ground: the sky is a pale dome over it)
+    rain: [0.98, 0.88, 0, 0.6, 2.2, 0.72],  // a low dark deck, scud running under it
+    snow: [0.93, 0.45, 0, 0.25, 1.1, 0.8],  // a heavy pale deck
+    smoke: [0.55, 0.55, 0, 0.15, 1.1, 0.9], // smoke and cloud over fires, lit from below
+    ash: [0.75, 0.5, 0, 0.2, 0.7, 0.85],    // a veil of ash
+    storm: [0.94, 0.92, 0, 0.5, 2.0, 0.7],  // thunderheads
+    dusk: [0.42, 0.3, 0.4, 0, 0.7, 1],     // broken heaps and long streaks catching a low sun
+    dawn: [0.55, 0.45, 0.25, 0, 0.6, 0.85], // a grey morning deck with breaks in it
+    day: [0.32, 0.12, 0.25, 0, 0.6, 1.15],   // fair-weather heaps in a high sky
+  };
   const D = (id, name, w, o) => Object.assign({ id, name, w }, o || {});
   S.V = {
     // 地上
     grave: [
-      D('clear', '月夜', 4),
-      D('mist', '濃霧', 2, { fogD: 3.0, fog: '#3a4452', k: 0.7, amb: 0.92, sunK: 0.4, stars: false }),
-      D('rain', '雨夜', 2, { fogD: 1.5, fog: '#10141c', k: 0.5, moonI: 0.55, amb: 0.88, sky: ['#05070c', '#0c1018', '#1a2230'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true }),
-      D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp] }),
-      D('snow', '雪夜', 1, { fogD: 1.8, fog: '#3a4250', k: 0.55, amb: 1.12, moonI: 0.85, sky: ['#0c1018', '#1c2430', '#3a4454'], stars: false, sunK: 0.3, p: [P.snow], el: 'ice' }),
-      D('redmoon', '赤い月', 1, { moon: '#ff8a70', k: 0.55, fog: '#2a1418', hemiS: '#a06070', sky: ['#060208', '#1e0a12', '#3a1420'], sunCol: [1.0, 0.32, 0.22] }),
+      D('clear', '月夜', 4, { cl: CL.night }),
+      D('mist', '濃霧', 2, { fogD: 3.0, fog: '#3a4452', k: 0.7, amb: 0.92, sunK: 0.4, stars: false, cl: CL.mist }),
+      D('rain', '雨夜', 2, { fogD: 1.5, fog: '#10141c', k: 0.5, moonI: 0.55, amb: 0.88, sky: ['#05070c', '#0c1018', '#1a2230'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
+      D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp], cl: CL.thin }),
+      D('snow', '雪夜', 1, { fogD: 1.8, fog: '#3a4250', k: 0.55, amb: 1.12, moonI: 0.85, sky: ['#0c1018', '#1c2430', '#3a4454'], stars: false, sunK: 0.3, p: [P.snow], el: 'ice', cl: CL.snow }),
+      D('redmoon', '赤い月', 1, { moon: '#ff8a70', k: 0.55, fog: '#2a1418', hemiS: '#a06070', sky: ['#060208', '#1e0a12', '#3a1420'], sunCol: [1.0, 0.32, 0.22], cl: CL.thin }),
     ],
     hamlet: [
-      D('clear', '月夜', 4),
-      D('mist', '濃霧', 3, { fogD: 3.0, fog: '#3c464c', k: 0.7, amb: 0.94, sunK: 0.4, stars: false }),
-      D('rain', '雨夜', 2, { fogD: 1.4, fog: '#0e1218', k: 0.5, moonI: 0.5, amb: 0.86, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true }),
-      D('fire', '遠い火の手', 1, { fog: '#3a1a10', k: 0.4, hemiS: '#b07050', sky: ['#05060c', '#1a1018', '#5a2410'], p: [P.ember], el: 'fire' }),
-      D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp] }),
+      D('clear', '月夜', 4, { cl: CL.night }),
+      D('mist', '濃霧', 3, { fogD: 3.0, fog: '#3c464c', k: 0.7, amb: 0.94, sunK: 0.4, stars: false, cl: CL.mist }),
+      D('rain', '雨夜', 2, { fogD: 1.4, fog: '#0e1218', k: 0.5, moonI: 0.5, amb: 0.86, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
+      D('fire', '遠い火の手', 1, { fog: '#3a1a10', k: 0.4, hemiS: '#b07050', sky: ['#05060c', '#1a1018', '#5a2410'], p: [P.ember], el: 'fire', cl: CL.smoke, under: ['#ff5a1e', 0.05] }),
+      D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp], cl: CL.thin }),
     ],
     dusk: [
-      D('clear', '黄昏', 4),
-      D('ash', '灰の降る黄昏', 2, { fog: '#9a8478', k: 0.5, fogD: 1.5, amb: 0.9, sky: ['#3a3a4a', '#9a7466', '#c8a080'], sunK: 0.55, p: [P.ash] }),
-      D('storm', '雷雲', 2, { fog: '#4a4458', k: 0.6, fogD: 1.3, amb: 0.78, moonI: 0.55, sky: ['#1a1c2c', '#4a4454', '#8a6a5c'], sunK: 0.2, p: [P.drizzle], flash: true, el: 'water', bolt: true }),
-      D('sand', '砂塵', 1, { fog: '#c89a68', k: 0.55, fogD: 2.4, sunK: 0.5, p: [P.dust] }),
+      D('clear', '黄昏', 4, { cl: CL.dusk }),
+      D('ash', '灰の降る黄昏', 2, { fog: '#9a8478', k: 0.5, fogD: 1.5, amb: 0.9, sky: ['#3a3a4a', '#9a7466', '#c8a080'], sunK: 0.55, p: [P.ash], cl: CL.ash, haze: 1.8 }),
+      D('storm', '雷雲', 2, { fog: '#4a4458', k: 0.6, fogD: 1.3, amb: 0.78, moonI: 0.55, sky: ['#1a1c2c', '#4a4454', '#8a6a5c'], sunK: 0.2, p: [P.drizzle], flash: true, el: 'water', bolt: true, cl: CL.storm }),
+      D('sand', '砂塵', 1, { fog: '#c89a68', k: 0.55, fogD: 2.4, sunK: 0.5, p: [P.dust], cl: [0.2, 0.2, 0.3, 0, 1.4, 1], haze: 2.5 }),
     ],
     battlefield: [
-      D('clear', '夜明け前', 4),
-      D('mist', '朝霧', 3, { fogD: 2.6, fog: '#8a9098', k: 0.65, amb: 1.05, sunK: 0.5 }),
-      D('rain', '冷たい雨', 2, { fogD: 1.5, fog: '#3a4048', k: 0.55, moonI: 0.6, amb: 0.88, sky: ['#14181e', '#2c323a', '#565c62'], sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true }),
-      D('crimson', '赤い朝焼け', 1, { fog: '#7a4a40', k: 0.45, hemiS: '#c08070', sky: ['#1e1a24', '#6a3a34', '#d08060'], sunCol: [1.0, 0.55, 0.38] }),
-      D('crows', '灰の舞う', 1, { fog: '#6a6460', k: 0.4, fogD: 1.3, p: [P.ash] }),
+      D('clear', '夜明け前', 4, { cl: CL.dawn }),
+      D('mist', '朝霧', 3, { fogD: 2.6, fog: '#8a9098', k: 0.65, amb: 1.05, sunK: 0.5, cl: CL.mist, haze: 1.5 }),
+      D('rain', '冷たい雨', 2, { fogD: 1.5, fog: '#3a4048', k: 0.55, moonI: 0.6, amb: 0.88, sky: ['#14181e', '#2c323a', '#565c62'], sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
+      D('crimson', '赤い朝焼け', 1, { fog: '#7a4a40', k: 0.45, hemiS: '#c08070', sky: ['#1e1a24', '#6a3a34', '#d08060'], sunCol: [1.0, 0.55, 0.38], cl: CL.dusk }),
+      D('crows', '灰の舞う', 1, { fog: '#6a6460', k: 0.4, fogD: 1.3, p: [P.ash], cl: CL.ash }),
     ],
     // 入口
     shaft: [
-      D('clear', '月夜', 4),
-      D('dim', '雲の夜', 2, { moonI: 0.6, amb: 0.85, stars: false, sky: ['#030408', '#0a0e18', '#161c28'], sunK: 0.2 }),
-      D('mist', '底の霧', 2, { fogD: 2.2, fog: '#2a3240', k: 0.6, amb: 0.95 }),
-      D('rain', '吹き込む雨', 1, { fogD: 1.4, fog: '#10141c', k: 0.5, moonI: 0.5, amb: 0.88, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true }),
-      D('snow', '舞い込む雪', 1, { fogD: 1.6, fog: '#3a4250', k: 0.5, amb: 1.08, moonI: 0.85, stars: false, sunK: 0.3, p: [P.snow], el: 'ice' }),
+      D('clear', '月夜', 4, { cl: CL.night }),
+      D('dim', '雲の夜', 2, { moonI: 0.6, amb: 0.85, stars: false, sky: ['#030408', '#0a0e18', '#161c28'], sunK: 0.2, cl: [0.82, 0.6, 0, 0.1, 0.9, 0.85] }),
+      D('mist', '底の霧', 2, { fogD: 2.2, fog: '#2a3240', k: 0.6, amb: 0.95, cl: CL.night }),
+      D('rain', '吹き込む雨', 1, { fogD: 1.4, fog: '#10141c', k: 0.5, moonI: 0.5, amb: 0.88, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
+      D('snow', '舞い込む雪', 1, { fogD: 1.6, fog: '#3a4250', k: 0.5, amb: 1.08, moonI: 0.85, stars: false, sunK: 0.3, p: [P.snow], el: 'ice', cl: CL.snow }),
     ],
     mine: [
       D('base', '', 5),
@@ -86,10 +101,10 @@
       D('damp', '湿った闇', 2, { fog: '#121a20', k: 0.5, amb: 0.85, p: [P.drip] }),
     ],
     castle: [
-      D('base', '血月', 4),
-      D('rain', '雨の城壁', 2, { fogD: 1.35, fog: '#1a0c10', k: 0.5, moonI: 0.6, amb: 0.88, sky: ['#060205', '#1a060c', '#3a0e14'], stars: false, sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true }),
-      D('mist', '霧の城', 2, { fogD: 2.8, fog: '#3a1c22', k: 0.6, sunK: 0.45 }),
-      D('ash', '火の粉の夜', 1, { p: [P.ember], el: 'fire' }),
+      D('base', '血月', 4, { cl: CL.thin }),
+      D('rain', '雨の城壁', 2, { fogD: 1.35, fog: '#1a0c10', k: 0.5, moonI: 0.6, amb: 0.88, sky: ['#060205', '#1a060c', '#3a0e14'], stars: false, sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
+      D('mist', '霧の城', 2, { fogD: 2.8, fog: '#3a1c22', k: 0.6, sunK: 0.45, cl: CL.mist }),
+      D('ash', '火の粉の夜', 1, { p: [P.ember], el: 'fire', cl: CL.smoke, under: ['#ff4a18', 0.05] }),
     ],
     // 中層
     halls: [
@@ -120,17 +135,17 @@
       D('aurora', '極光', 1, { hemiS: '#6ad0b8', k: 0.45, hemiG: '#2a1a40', p: [P.wisp] }),
     ],
     pillars: [
-      D('clear', '闇夜', 4),
-      D('mist', '昇る靄', 2, { fogD: 2.2, fog: '#2a1a3a', k: 0.6, amb: 1.0 }),
-      D('wisp', '鬼火の群れ', 2, { hemiS: '#8a6aff', k: 0.4, p: [P.wisp] }),
-      D('ash', '灰の降る闇', 1, { fog: '#2a2430', k: 0.4, fogD: 1.3, p: [P.ash] }),
-      D('storm', '紫電', 1, { fog: '#1a1028', k: 0.5, moonI: 0.6, amb: 0.85, sky: ['#020106', '#0a0614', '#1c1030'], p: [P.drizzle], flash: true, el: 'water', bolt: true }),
+      D('clear', '闇夜', 4, { cl: CL.thin }),
+      D('mist', '昇る靄', 2, { fogD: 2.2, fog: '#2a1a3a', k: 0.6, amb: 1.0, cl: CL.mist }),
+      D('wisp', '鬼火の群れ', 2, { hemiS: '#8a6aff', k: 0.4, p: [P.wisp], cl: CL.thin }),
+      D('ash', '灰の降る闇', 1, { fog: '#2a2430', k: 0.4, fogD: 1.3, p: [P.ash], cl: CL.ash }),
+      D('storm', '紫電', 1, { fog: '#1a1028', k: 0.5, moonI: 0.6, amb: 0.85, sky: ['#020106', '#0a0614', '#1c1030'], stars: false, p: [P.drizzle], flash: true, el: 'water', bolt: true, cl: CL.storm }),
     ],
     sanctum: [
-      D('base', '偽りの空', 4),
-      D('dusk', '暮れない夕刻', 2, { fog: '#c8a0b0', k: 0.5, sky: ['#4a3a6a', '#c88a9a', '#f0c8b0'], hemiS: '#d0a0b8', k2: 0.3 }),
-      D('white', '白昼の虚無', 2, { fog: '#e8ecf4', k: 0.6, fogD: 1.6, amb: 1.1, stars: false, sunK: 0.6, sky: ['#d8e0f0', '#eef2fa', '#ffffff'] }),
-      D('feather', '羽の降る', 1, { p: [P.feather] }),
+      D('base', '偽りの空', 4, { cl: CL.day }),
+      D('dusk', '暮れない夕刻', 2, { fog: '#c8a0b0', k: 0.5, sky: ['#4a3a6a', '#c88a9a', '#f0c8b0'], hemiS: '#d0a0b8', k2: 0.3, cl: CL.dusk }),
+      D('white', '白昼の虚無', 2, { fog: '#e8ecf4', k: 0.6, fogD: 1.6, amb: 1.1, stars: false, sunK: 0.6, sky: ['#d8e0f0', '#eef2fa', '#ffffff'], cl: [0.85, 0.08, 0, 0, 0.4, 0.8], haze: 2 }),
+      D('feather', '羽の降る', 1, { p: [P.feather], cl: CL.day }),
     ],
   };
 
@@ -159,10 +174,15 @@
     if (v.hemiG) o.hemiG = mixHex(B.hemiG, v.hemiG, k);
     if (v.moon) o.moon = mixHex(B.moon, v.moon, k);
     if (v.hemiI) o.hemiI = v.hemiI;
-    if (B.outdoor && v.sky) o.sky = v.sky;
-    if (B.outdoor && v.stars === false) o.stars = false;
-    if (B.outdoor && v.sunCol) o.sunCol = v.sunCol;
-    if (B.outdoor && v.sunK != null) o.sunCol = (o.sunCol || [1.0, 0.85, 0.6]).map((c) => c * v.sunK); // (a veiled moon / sun)
+    const open = B.outdoor || B.sky;   // (a field with a sky over it: the roofless shaft too)
+    if (open) o.body = B.night || B.stars ? 'moon' : 'sun';   // (what hangs in it, before an overcast mood puts the stars out)
+    if (open && v.sky) o.sky = v.sky;
+    if (open && v.stars === false) o.stars = false;
+    if (open && v.sunCol) o.sunCol = v.sunCol;
+    if (open && v.sunK != null) o.sunCol = (o.sunCol || [1.0, 0.85, 0.6]).map((c) => c * v.sunK); // (a veiled moon / sun)
+    if (open && v.cl) o.cl = v.cl;
+    if (open && v.haze) o.haze = v.haze;
+    if (open && v.under) o.under = v.under;
     return o;
   };
 
@@ -250,26 +270,29 @@
   };
   S.stop = function () {
     for (const m of live) { if (scene) scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
-    live = []; flash = null; cur = null;
+    live = []; flash = null; cur = null; S.flashA = 0;
     if (flashEl) flashEl.style.opacity = 0;
   };
   S.current = () => cur;
+  // the flash as the sky dome draws it (game.js): how strong it is now (0..1) and where in the clouds (a new place for each flash)
+  S.flashA = 0; S.flashDir = [0, 1, 0];
+  const flashAt = () => { const a = Math.random() * Math.PI * 2, y = 0.18 + Math.random() * 0.45; S.flashDir = [Math.cos(a), y, Math.sin(a)]; };
   // a bolt that strikes (weather.js): the pale flash over the screen right now, the ambient one put back
-  S.flashNow = function () { if (!flash) return; flash.t = 0; flash.next = Math.max(flash.next, 6 + Math.random() * 8); };
+  S.flashNow = function () { if (!flash) return; flash.t = 0; flash.next = Math.max(flash.next, 6 + Math.random() * 8); flashAt(); };
   S.update = function (dt, cam) {
     if (!live.length && !flash) return;
     const px = G.renderer ? G.renderer.getDrawingBufferSize(DB).y / 900 : 1, fd = scene && scene.fog && scene.fog.density ? scene.fog.density : 0;
     for (const m of live) { const u = m.material.uniforms; u.uT.value += dt; u.uCam.value.copy(cam.position); if (u.uPx) { u.uPx.value = px; u.uFogD.value = fd; } }
     if (flash) {
       flash.next -= dt;
-      if (flash.next <= 0) { flash.next = 9 + Math.random() * 16; flash.t = 0; if (G.sfx.thunder) G.sfx.thunder(1.2 + Math.random() * 2.5); }
+      if (flash.next <= 0) { flash.next = 9 + Math.random() * 16; flash.t = 0; flashAt(); if (G.sfx.thunder) G.sfx.thunder(1.2 + Math.random() * 2.5); }
       if (flash.t >= 0) {
         flash.t += dt;
         // two quick pulses, then gone: a pale overlay, never strong enough to hide anything
         const t = flash.t, a = t < 0.08 ? t / 0.08 : t < 0.16 ? 1 - (t - 0.08) / 0.08 : t < 0.26 ? (t - 0.16) / 0.1 * 0.7 : Math.max(0, 0.7 - (t - 0.26) / 0.35);
         if (!flashEl) { flashEl = document.createElement('div'); flashEl.id = 'sky-flash'; flashEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:5;background:#dfe8ff;mix-blend-mode:screen;opacity:0'; document.body.appendChild(flashEl); }
-        flashEl.style.opacity = (a * 0.22).toFixed(3);
-        if (t > 0.7) { flash.t = -1; flashEl.style.opacity = 0; }
+        flashEl.style.opacity = (a * 0.22).toFixed(3); S.flashA = a;
+        if (t > 0.7) { flash.t = -1; flashEl.style.opacity = 0; S.flashA = 0; }
       }
     }
   };

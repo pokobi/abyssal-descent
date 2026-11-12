@@ -440,13 +440,37 @@
   };
 
   // ---------- movement ----------
+  // (the new set: the level of each synthesized floor, so that it stands as loud as a recorded step on stone)
+  const STEPK = { water: 2, metal: 0.85, ice: 2.2 };
+  // an iron plate struck (a step, a landing): its modes are not multiples of one another (a struck plate's), each a damped tone with
+  // a band of noise round it (rough, not a chime), each dying in its own time and a little off every time; where the boot lands some
+  // modes are hardly struck - and a loose grating rattles after it. k: how long it rings
+  function plate(t, out, k) {
+    const f0 = vr(300, 0.12);
+    for (const [m, g, d] of [[1, 0.12, 0.7], [1.59, 0.09, 0.52], [2.14, 0.07, 0.4], [2.83, 0.05, 0.3], [3.61, 0.035, 0.2], [4.7, 0.025, 0.14]]) {
+      if (m > 1.5 && Math.random() < 0.25) continue;
+      const f = f0 * m * vr(1, 0.02), gg = g * vr(1, 0.3), dd = d * k * vr(1, 0.15);
+      tn({ t: t + 0.003, f0: f, f1: f * 0.997, d: dd, g: gg, a: 0.002, to: out });
+      nz({ t: t + 0.002, f: [['bandpass', f, 6]], g: gg * 12, a: 0.002, d: dd * 0.45, to: out });
+    }
+    nz({ t: t + 0.004, f: [['bandpass', vr(2800, 0.2), 4]], g: 0.25, d: 0.025, to: out });
+    if (Math.random() < 0.6) for (let i = 0, c = 1 + Math.floor(Math.random() * 2); i < c; i++) nz({ t: t + 0.05 + i * 0.035 + Math.random() * 0.03, f: [['bandpass', vr(1900, 0.25), 5]], g: 0.15, d: 0.025, to: out });
+  }
+  // the rime on ice crunching under a sole: a few grains of sound, never the same; a thin squeak now and then, a crack more rarely
+  function rime(t, out) {
+    nz({ t, f: [['bandpass', vr(2000, 0.2), 1.0]], g: 0.4, a: 0.002, d: 0.05, to: out });
+    for (let i = 0, c = 2 + Math.floor(Math.random() * 3); i < c; i++) nz({ t: t + 0.004 + Math.random() * 0.045, f: [['bandpass', vr(3200, 0.3), 2]], g: 0.25, d: 0.008, to: out });
+    if (Math.random() < 0.3) { const f = vr(1600, 0.3); tn({ t: t + 0.02, f0: f, f1: f * 0.8, d: 0.05, g: 0.03, to: out }); }
+    if (Math.random() < 0.12) nz({ t: t + 0.03, f: [['highpass', 4200]], g: 0.1, d: 0.012, to: out });
+  }
   A.step = function (surface, intensity) {
     if (!ctx) return;
     const sk = surface || 'stone';   // (turf is told from stone by what is underfoot: player.js surfaceBelow)
-    if (smp('step_' + sk, null, 0.35 * intensity, 0.92 + intensity * 0.08) || (sk !== 'wood' && sk !== 'metal' && sk !== 'water' && smp('step_stone', null, 0.35 * intensity))) return; // (a floor with no recording of its own is synthesized: boards must not sound of stone)
-    if (!voice(0.3)) return;
+    if (smp('step_' + sk, null, 0.35 * intensity, 0.92 + intensity * 0.08) || (sk !== 'wood' && sk !== 'metal' && sk !== 'water' && sk !== 'ice' && smp('step_stone', null, 0.35 * intensity))) return; // (a floor with no recording of its own is synthesized: boards must not sound of stone)
+    const n = NEW();
+    if (!voice(n && surface === 'metal' ? 0.6 : 0.3)) return;
     const t = ctx.currentTime, out = dest(null, 0.15);
-    out.gain.value = 0.35 * intensity;
+    out.gain.value = 0.35 * intensity * (n ? STEPK[surface] || 1 : 1);
     if (surface === 'wood') {
       nz({ t, f: [['bandpass', vr(500, 0.15), 1.4]], g: 0.6, d: 0.07, to: out });
       tn({ t, f0: vr(130, 0.1), f1: 80, d: 0.06, g: 0.4, to: out });
@@ -458,9 +482,19 @@
       bubbles(t + 0.03, 1 + Math.floor(Math.random() * 3), out, 420, 1250, 0.05);
       nz({ t: t + 0.06, f: [['highpass', 3600]], g: 0.05, a: 0.01, d: 0.12, to: out });
       if (Math.random() < 0.6) { const f = vr(2600, 0.3); tn({ t: t + 0.14 + Math.random() * 0.12, f0: f, f1: f * 1.3, fd: 0.012, d: 0.02, g: 0.02, to: out }); }
-    } else if (surface === 'metal') {
+    } else if (surface === 'metal' && !n) {
       nz({ t, f: [['bandpass', vr(900, 0.1), 3]], g: 0.4, d: 0.08, to: out });
       tn({ t, f0: vr(380, 0.05), d: 0.1, g: 0.08, to: out });
+    } else if (surface === 'metal') {
+      // an iron plate or grating under a boot: the heel's dull thud, then the plate rings
+      nz({ t, buf: 'pink', f: [['lowpass', vr(600, 0.15), 0.8]], g: 0.75, d: 0.05, to: out });
+      tn({ t, f0: vr(150, 0.08), f1: 85, d: 0.06, g: 0.3, to: out });
+      plate(t, out, 0.85 + intensity * 0.2);
+    } else if (surface === 'ice' && n) {
+      // ice: a hard, short knock, and the rime under the sole
+      nz({ t, buf: 'pink', f: [['bandpass', vr(950, 0.2), 1.2]], g: 0.9, d: 0.035, to: out });
+      tn({ t, f0: vr(190, 0.1), f1: 120, d: 0.03, g: 0.18, to: out });
+      rime(t, out);
     } else {
       // stone + grit
       nz({ t, buf: 'pink', f: [['lowpass', vr(900, 0.2), 0.9]], g: 0.75, d: 0.06, to: out });
@@ -474,9 +508,17 @@
     nz({ t, buf: 'pink', f: [['bandpass', 700, 0.8]], g: 0.3, d: 0.09, to: out });
     nz({ t: t + 0.02, f: [['bandpass', 1500, 0.6, 600, 0.2]], g: 0.12, a: 0.03, d: 0.18, to: out });
   };
+  const LANDK = { metal: 1.2, ice: 0.5 };   // (the level of that layer under a landing's own thud)
   A.land = function (intensity, surface) {
     if (ctx && surface === 'water') { A.splash(null, 0.55 + Math.min(1, intensity) * 0.8); return; } // (a splash, with its own thump when it is a big one)
-    if (!ctx || smp(surface === 'wood' ? 'land_wood' : 'land', null, Math.min(1.2, 0.3 + intensity * 0.9), 1.1 - Math.min(0.25, intensity * 0.25))) return;
+    if (!ctx) return;
+    // (the new set: on iron the plate rings under the thud of the landing, on ice the rime crunches - as the steps there do)
+    if (NEW() && (surface === 'metal' || surface === 'ice') && voice(0.8)) {
+      const t = ctx.currentTime, o2 = dest(null, 0.2), k = Math.min(1.2, 0.3 + intensity * 0.9);
+      o2.gain.value = k * (surface === 'metal' ? LANDK.metal : LANDK.ice);
+      if (surface === 'metal') plate(t + 0.004, o2, 1 + Math.min(1, intensity) * 0.5); else { rime(t, o2); rime(t + 0.03, o2); }
+    }
+    if (smp(surface === 'wood' ? 'land_wood' : 'land', null, Math.min(1.2, 0.3 + intensity * 0.9), 1.1 - Math.min(0.25, intensity * 0.25))) return;
     const t = ctx.currentTime, out = dest(null, 0.25);
     out.gain.value = Math.min(1.2, 0.3 + intensity * 0.9);
     tn({ t, f0: 110, f1: 45, d: 0.12 + intensity * 0.1, g: 0.8, to: out, type: 'triangle', lp: 300 });

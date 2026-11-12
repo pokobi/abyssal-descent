@@ -15,15 +15,17 @@
   const P = {
     rain: { kind: 'rain', n: 1500, col: 0x9fb4cc, a: 0.34, vel: [1.2, -24, 0.6], len: 0.9 },
     drizzle: { kind: 'rain', n: 700, col: 0x9fb4cc, a: 0.26, vel: [0.6, -18, 0.3], len: 0.6 },
-    snow: { kind: 'dot', n: 1100, col: 0xf2f6ff, a: 0.85, vel: [0.5, -1.6, 0.2], sway: 0.9, size: 0.09 },
-    frost: { kind: 'dot', n: 650, col: 0xe0f0ff, a: 0.7, vel: [0.1, -0.9, 0.1], sway: 0.6, size: 0.06 },
-    ash: { kind: 'dot', n: 800, col: 0x8a8580, a: 0.7, vel: [0.7, -0.8, 0.3], sway: 0.7, size: 0.07 },
+    // (dot sizes: pixels at 1 m on a 900-high screen / 900; max: the ceiling in such pixels (a nearer one fades instead of growing);
+    // shape 1: a flat tumbling flake; tone: how much the flakes differ in shade; tw: how much a mote glints now and then)
+    snow: { kind: 'dot', n: 1500, col: 0xe8eef6, a: 0.8, vel: [0.5, -1.6, 0.2], sway: 0.9, size: 0.06, max: 7, tone: 0.3 },
+    frost: { kind: 'dot', n: 900, col: 0xdce6f0, a: 0.65, vel: [0.1, -0.9, 0.1], sway: 0.6, size: 0.045, max: 6, tone: 0.3 },
+    ash: { kind: 'dot', n: 1400, col: 0x4a4440, a: 0.85, vel: [0.7, -0.8, 0.3], sway: 0.7, size: 0.065, max: 9, shape: 1, tone: 0.8 },
     ember: { kind: 'dot', n: 380, col: 0xff8a30, a: 1.0, vel: [0.4, 1.3, 0.2], sway: 0.8, size: 0.06, add: true },
     emberStorm: { kind: 'dot', n: 900, col: 0xff7a28, a: 1.0, vel: [1.2, 1.8, 0.4], sway: 1.1, size: 0.06, add: true },
     blueEmber: { kind: 'dot', n: 420, col: 0x5aa8ff, a: 1.0, vel: [0.2, 1.2, 0.2], sway: 0.8, size: 0.06, add: true },
-    wisp: { kind: 'dot', n: 70, col: 0x9fd0ff, a: 0.9, vel: [0.2, 0.15, 0.1], sway: 2.2, size: 0.22, add: true },
+    wisp: { kind: 'dot', n: 70, col: 0x9ab8cc, a: 0.75, vel: [0.2, 0.15, 0.1], sway: 2.2, size: 0.22, max: 12, add: true },
     spore: { kind: 'dot', n: 260, col: 0x9ae060, a: 0.75, vel: [0.1, 0.25, 0.05], sway: 1.2, size: 0.07, add: true },
-    dust: { kind: 'dot', n: 300, col: 0xd8c8a8, a: 0.45, vel: [0.15, -0.1, 0.05], sway: 0.9, size: 0.035, add: true },
+    dust: { kind: 'dot', n: 500, col: 0xc8b898, a: 0.5, vel: [0.15, -0.1, 0.05], sway: 0.9, size: 0.03, max: 4.5, tone: 0.5, tw: 0.6, add: true },
     feather: { kind: 'dot', n: 260, col: 0xfff6e8, a: 0.8, vel: [0.3, -0.7, 0.15], sway: 1.4, size: 0.09 },
     drip: { kind: 'rain', n: 140, col: 0x9fc8d0, a: 0.4, vel: [0, -14, 0], len: 0.35 },
   };
@@ -167,19 +169,41 @@
   // ---------------------------------------------------------------- particles around the camera
   // Each field is one draw: the particles live in a box centred on the camera and wrap around it as you move (the shader does the
   // falling, the sway and the wrap), fading out near the box's edge so nothing pops in.
+  // A dot's size comes from its distance, but never past uMax: a nearer one is out of focus, so it stays at the ceiling and fades as
+  // it would have spread (and right before the eye, to nothing) - it was a white disc of forty to eighty pixels. One smaller
+  // than a pixel and a half stays that size and fades instead. uPx: the drawing buffer's height / 900. The area's fog takes the far ones.
   const DOT_VS = `uniform float uT; uniform vec3 uBox; uniform vec3 uCam; uniform vec3 uVel; uniform float uSway; uniform float uSize;
-    attribute float aPh; varying float vA;
+    uniform float uMax; uniform float uPx; uniform float uFogD; uniform float uTone; uniform float uTw; uniform float uShape;
+    attribute float aPh; varying float vA; varying float vSh; varying vec3 vRot;
     void main() {
       vec3 p = position * uBox + uVel * uT + vec3(sin(uT * 0.7 + aPh * 6.283) * uSway, sin(uT * 0.45 + aPh * 3.1) * uSway * 0.4, cos(uT * 0.6 + aPh * 5.0) * uSway);
       vec3 o = uCam - uBox * 0.5; p = mod(p - o, uBox) + o;
       vec3 d = (p - uCam) / (uBox * 0.5); float r = max(abs(d.x), max(abs(d.y), abs(d.z)));
       vA = 1.0 - smoothstep(0.7, 1.0, r);
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
-      gl_PointSize = uSize * (0.75 + 0.5 * fract(aPh * 7.3)) * 900.0 / max(1.0, -mv.z);
+      float z = -mv.z, want = uSize * (0.75 + 0.5 * fract(aPh * 7.3)) * 900.0 / max(0.05, z);
+      float s = clamp(want, 1.5, uMax);
+      vA *= (want < s ? (want * want) / (s * s) : s / want) * smoothstep(0.35, 1.4, z);
+      vA *= exp(-pow(uFogD * z, 2.0));
+      vSh = 1.0 + uTone * (fract(aPh * 5.13) - 0.5);
+      if (uTw > 0.0) { float g = 0.5 + 0.5 * sin(uT * (0.8 + fract(aPh * 9.7)) + aPh * 41.0); vSh *= 1.0 - uTw + uTw * 2.2 * g * g * g; }
+      float ang = aPh * 6.283 + uT * (0.6 + 1.6 * fract(aPh * 13.1)), tilt = 0.3 + 0.7 * abs(sin(uT * (0.9 + fract(aPh * 3.7)) + aPh * 17.0));
+      vRot = vec3(cos(ang), sin(ang), uShape > 0.5 ? tilt * (0.55 + 0.45 * fract(aPh * 2.9)) : 1.0);
+      gl_PointSize = s * uPx;
       gl_Position = projectionMatrix * mv;
     }`;
-  const DOT_FS = `uniform vec3 uC; uniform float uA; varying float vA;
-    void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.15, d) * uA * vA; if (a < 0.01) discard; gl_FragColor = vec4(uC, a); }`;
+  // snow and motes: a soft round point; a flake (uShape 1): flat and ragged, turning as it falls
+  const DOT_FS = `uniform vec3 uC; uniform float uA; uniform float uShape; varying float vA; varying float vSh; varying vec3 vRot;
+    void main() {
+      vec2 q = gl_PointCoord - 0.5; float a;
+      if (uShape > 0.5) {
+        q = vec2(vRot.x * q.x - vRot.y * q.y, vRot.y * q.x + vRot.x * q.y); q.y /= vRot.z;
+        float e = length(q) * (1.0 + 0.18 * sin(atan(q.y, q.x) * 3.0 + vSh * 23.0));
+        a = smoothstep(0.5, 0.32, e);
+      } else a = exp(-dot(q, q) * 12.0);
+      a *= uA * vA; if (a < 0.01) discard;
+      gl_FragColor = vec4(uC * vSh, a);
+    }`;
   const LINE_VS = `uniform float uT; uniform vec3 uBox; uniform vec3 uCam; uniform vec3 uVel; uniform float uLen;
     attribute float aEnd; varying float vA;
     void main() {
@@ -194,6 +218,7 @@
     void main() { float a = uA * vA; if (a < 0.01) discard; gl_FragColor = vec4(uC, a); }`;
   const BOX = [44, 26, 44];
   let live = [], scene = null, flash = null, flashEl = null, cur = null;
+  const DB = new THREE.Vector2();
   function make(spec, k) {
     const n = Math.max(8, Math.round(spec.n * k)), rnd = (() => { let s = 99991; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
     const uni = { uT: { value: 0 }, uBox: { value: new THREE.Vector3(...BOX) }, uCam: { value: new THREE.Vector3() }, uVel: { value: new THREE.Vector3(...spec.vel) }, uC: { value: new THREE.Color(spec.col) }, uA: { value: spec.a } };
@@ -209,7 +234,8 @@
       const pos = new Float32Array(n * 3), ph = new Float32Array(n);
       for (let i = 0; i < n; i++) { pos.set([rnd(), rnd(), rnd()], i * 3); ph[i] = rnd(); }
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aPh', new THREE.BufferAttribute(ph, 1));
-      uni.uSway = { value: spec.sway || 0 }; uni.uSize = { value: spec.size || 0.06 };
+      uni.uSway = { value: spec.sway || 0 }; uni.uSize = { value: spec.size || 0.06 }; uni.uMax = { value: spec.max || 5 + 70 * (spec.size || 0.06) };
+      uni.uPx = { value: 1 }; uni.uFogD = { value: 0 }; uni.uTone = { value: spec.tone || 0 }; uni.uTw = { value: spec.tw || 0 }; uni.uShape = { value: spec.shape || 0 };
       m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: uni, vertexShader: DOT_VS, fragmentShader: DOT_FS, transparent: true, depthWrite: false, blending: spec.add ? THREE.AdditiveBlending : THREE.NormalBlending }));
     }
     m.frustumCulled = false; m.renderOrder = 6;
@@ -232,7 +258,8 @@
   S.flashNow = function () { if (!flash) return; flash.t = 0; flash.next = Math.max(flash.next, 6 + Math.random() * 8); };
   S.update = function (dt, cam) {
     if (!live.length && !flash) return;
-    for (const m of live) { const u = m.material.uniforms; u.uT.value += dt; u.uCam.value.copy(cam.position); }
+    const px = G.renderer ? G.renderer.getDrawingBufferSize(DB).y / 900 : 1, fd = scene && scene.fog && scene.fog.density ? scene.fog.density : 0;
+    for (const m of live) { const u = m.material.uniforms; u.uT.value += dt; u.uCam.value.copy(cam.position); if (u.uPx) { u.uPx.value = px; u.uFogD.value = fd; } }
     if (flash) {
       flash.next -= dt;
       if (flash.next <= 0) { flash.next = 9 + Math.random() * 16; flash.t = 0; if (G.sfx.thunder) G.sfx.thunder(1.2 + Math.random() * 2.5); }

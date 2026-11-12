@@ -9,9 +9,23 @@
   const DXI = DIRS.map((d) => (d[0] && d[1] ? dirIdx(d[0], 0) : -1)), DZI = DIRS.map((d) => (d[0] && d[1] ? dirIdx(0, d[1]) : -1));
 
   // ---------------- geometry batching ----------------
+  // A growing typed array that reads like the plain array it replaces (push(...), length): an area writes a million and more vertices into
+  // the batch, and plain arrays of numbers took most of an area's build in pushes and in the garbage of growing. Each value is rounded to
+  // 32 bits once, as Float32BufferAttribute did with the plain array, so the mesh comes out the same.
+  class Grow {
+    constructor(T) { this.T = T; this.a = new T(1024); this.length = 0; }
+    // room for n more; returns the array to write into from this.length on (the caller moves length on itself)
+    need(n) {
+      const L = this.length + n; if (L <= this.a.length) return this.a;
+      let c = this.a.length * 2; while (c < L) c *= 2;
+      const b = new this.T(c); b.set(this.a.subarray(0, this.length)); return (this.a = b);
+    }
+    push() { const n = arguments.length, a = this.need(n); let k = this.length; for (let j = 0; j < n; j++) a[k++] = arguments[j]; return (this.length = k); }
+    out() { return this.a.slice(0, this.length); }
+  }
   class Batch {
     constructor() { this.g = {}; }
-    _grp(k) { return this.g[k] || (this.g[k] = { p: [], n: [], u: [], c: [], i: [] }); }
+    _grp(k) { return this.g[k] || (this.g[k] = { p: new Grow(Float32Array), n: new Grow(Float32Array), u: new Grow(Float32Array), c: new Grow(Float32Array), i: new Grow(Uint32Array) }); }
     // world-space UV box. o: {uv: meters per repeat, tint: [r,g,b], grad: bool, skip: {top,bottom,...}}
     box(mk, x0, y0, z0, x1, y1, z1, o) {
       o = o || {};
@@ -46,6 +60,36 @@
       const G0 = this._grp(mk);
       const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
       const base = G0.p.length / 3;
+      // the shapes of the props run to thousands of vertices each and an area sets down a million or more: read the plain arrays and do the
+      // sums of Vector3.applyMatrix4 / applyMatrix3 / normalize in place (the same operations in the same order, so the same numbers)
+      const plain = (a) => !a || (!a.isInterleavedBufferAttribute && !a.normalized && a.array);
+      if (plain(pos) && plain(nor) && plain(uv) && pos.itemSize === 3 && nor.itemSize === 3 && (!uv || uv.itemSize === 2)) {
+        const pa = pos.array, na = nor.array, ua = uv ? uv.array : null, e = mat.elements, nm = new THREE.Matrix3().getNormalMatrix(mat).elements;
+        const tint = o.tint || [1, 1, 1], t0 = tint[0], t1 = tint[1], t2 = tint[2];
+        const su = o.su || 1, sv = o.sv || 1;
+        const yb = o.gradBase ?? -999;
+        const cnt = pos.count, P3 = G0.p.need(cnt * 3), N3 = G0.n.need(cnt * 3), U2 = G0.u.need(cnt * 2), C3 = G0.c.need(cnt * 3);
+        let k3 = G0.p.length, k2 = G0.u.length;
+        for (let i = 0; i < cnt; i++, k3 += 3, k2 += 2) {
+          const i3 = i * 3, x = pa[i3], y = pa[i3 + 1], z = pa[i3 + 2];
+          const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+          const vx = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w, vy = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w, vz = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
+          const ax = na[i3], ay = na[i3 + 1], az = na[i3 + 2];
+          let nx = nm[0] * ax + nm[3] * ay + nm[6] * az, ny = nm[1] * ax + nm[4] * ay + nm[7] * az, nz = nm[2] * ax + nm[5] * ay + nm[8] * az;
+          const k = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1); nx *= k; ny *= k; nz *= k;
+          P3[k3] = vx; P3[k3 + 1] = vy; P3[k3 + 2] = vz; N3[k3] = nx; N3[k3 + 1] = ny; N3[k3 + 2] = nz;
+          if (ua) { U2[k2] = ua[i * 2] * su; U2[k2 + 1] = ua[i * 2 + 1] * sv; } else { U2[k2] = vx * 0.5; U2[k2 + 1] = vy * 0.5; }
+          let f = 1;
+          if (yb > -999) f = 0.62 + 0.38 * Math.min(1, Math.max(0, (vy - yb) / 2.6));
+          C3[k3] = t0 * f; C3[k3 + 1] = t1 * f; C3[k3 + 2] = t2 * f;
+        }
+        G0.p.length = G0.n.length = G0.c.length = k3; G0.u.length = k2;
+        const nI = geo.index ? geo.index.array.length : cnt, I1 = G0.i.need(nI); let ki = G0.i.length;
+        if (geo.index) { const ix = geo.index.array; for (let i = 0; i < nI; i++) I1[ki++] = base + ix[i]; }
+        else for (let i = 0; i < cnt; i++) I1[ki++] = base + i;
+        G0.i.length = ki;
+        return;
+      }
       const v = new THREE.Vector3(), n = new THREE.Vector3();
       const nm = new THREE.Matrix3().getNormalMatrix(mat);
       const tint = o.tint || [1, 1, 1];
@@ -69,11 +113,12 @@
         const d = this.g[k];
         if (!d.p.length) continue;
         const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.Float32BufferAttribute(d.p, 3));
-        g.setAttribute('normal', new THREE.Float32BufferAttribute(d.n, 3));
-        g.setAttribute('uv', new THREE.Float32BufferAttribute(d.u, 2));
-        g.setAttribute('color', new THREE.Float32BufferAttribute(d.c, 3));
-        g.setIndex(d.p.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(d.i, 1) : new THREE.Uint16BufferAttribute(d.i, 1));
+        g.setAttribute('position', new THREE.BufferAttribute(d.p.out(), 3));
+        g.setAttribute('normal', new THREE.BufferAttribute(d.n.out(), 3));
+        g.setAttribute('uv', new THREE.BufferAttribute(d.u.out(), 2));
+        g.setAttribute('color', new THREE.BufferAttribute(d.c.out(), 3));
+        const ix = d.i.a.subarray(0, d.i.length);
+        g.setIndex(d.p.length / 3 > 65535 ? new THREE.BufferAttribute(ix.slice(), 1) : new THREE.BufferAttribute(Uint16Array.from(ix), 1));
         g.computeBoundingSphere(); g.computeBoundingBox();
         const m = new THREE.Mesh(g, mats.vc ? (mats.vc[k] || mats.vc.wall) : (mats[k] || mats.wall));
         m.castShadow = shadows !== false && k !== 'water' && k !== 'lava' && k !== 'web' && k !== 'vine';

@@ -191,7 +191,7 @@
   //    lying some metres deep over the field: in a thick mist, only a pale dome is left above); under the horizon, the fog's colour.
   // Low quality: the colours and the glow only (uDetail 0); medium: no cirrus and no galaxy (uDetail 1). The field's colours stay the
   // field's: what is added is drawn out of them.
-  let skyDome = null, skyNoise = null;
+  let skyDome = null, skyMesh = null, skyNoise = null, skyGen = 0;
   // the clouds' noise, baked once on the GPU (tiles both ways): r heaps of cloud (a soft noise with rounded billows), g the finer
   // billows that eat at their edges, b long fibres for cirrus (stretched where they are read), a ragged rolls for scud
   const SKY_BAKE = `precision highp float; varying vec2 vUv;
@@ -217,7 +217,7 @@
     if (skyNoise) return skyNoise;
     const rt = new THREE.WebGLRenderTarget(512, 512, { depthBuffer: false, stencilBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
     rt.texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    const m = new THREE.ShaderMaterial({ vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }', fragmentShader: SKY_BAKE, depthTest: false, depthWrite: false });
+    const m = new THREE.ShaderMaterial({ name: 'sky-bake', vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }', fragmentShader: SKY_BAKE, depthTest: false, depthWrite: false });
     const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m), sc = new THREE.Scene(); q.frustumCulled = false; sc.add(q);
     const prev = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(sc, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)); renderer.setRenderTarget(prev);
     m.dispose(); q.geometry.dispose();
@@ -238,6 +238,7 @@
       vec2 dh = normalize(d.xz + vec2(1e-5, 0.)), sh = normalize(s.xz + vec2(1e-5, 0.));
       float az = dot(dh, sh), low = 1. - smoothstep(.05, .6, s.y), isSun = step(.5, uBody.x) * step(uBody.x, 1.5);
       vec3 hue = sunc / max(.001, max(sunc.r, max(sunc.g, sunc.b)));
+      vec3 bc = vec3(0.); float bA = 0.;   // (the banks of cloud on the horizon: their colour and cover, laid on last)
       // ---- the air
       float wS = smoothstep(-.4, 1., az);
       vec3 Hs = hor * mix(vec3(1.), .55 + .6 * hue, .45 * low) * (1. + .3 * low);
@@ -245,6 +246,10 @@
       vec3 H = mix(Ha, Hs, wS);
       vec3 col = mix(H, mid, 1. - exp(-hp * 6.));
       col = mix(col, top, smoothstep(.12, .95, hp));
+      // (the colour is strongest in the low band toward the sun or moon; higher up and on the far side the sky is greyer, as it is)
+      // (by day and at dusk the high sky goes to a grey blue: the field's violets and pinks stay low, toward the sun)
+      float sat0 = mix(.5, .3, isSun);
+      col = mix(vec3(lum(col)) * mix(vec3(1.), vec3(.93, .98, 1.1), isSun), col, sat0 + (1. - sat0) * exp(-hp * 6.) * (.3 + .7 * wS));
       // the earth's shadow on the far side of a low sun: a dull band on the horizon, a band of rose over it
       float bv = (1. - wS) * low * isSun;
       col = mix(col, mix(mid, top, .4) * .8, bv * .45 * (1. - smoothstep(.0, .07, hp)));
@@ -252,6 +257,7 @@
       // the glow of the air round the body, and the haze low down toward it
       vec3 glow = sunc * (pow(m0, 5.) * .04 + pow(m0, 32.) * (.09 - .04 * step(1.5, uBody.x)) + pow(m0, 350.) * .3) * uHaze * (1. - .5 * uBody2.y);
       glow += sunc * hor * exp(-hp * 8.) * pow(max(az, 0.), 3.) * low * .45;
+      glow += isSun * sunc * hue * (pow(m0, 40.) * .42 + pow(m0, 9.) * .08) * (.35 + .9 * low) * uHaze;   // (a sun's glare through the haze, wider and warmer the lower it is)
       col += glow;
       if (uDetail < .5) {
         col += sunc * pow(m0, 1800.) * 1.5;   // (low quality: no clouds, no stars, a small disc - and no tone mapping to soften a big one)
@@ -292,7 +298,7 @@
         if (uBody.x > .5 && uBody.x < 1.5) {
           float ld = sqrt(max(0., 1. - br * br));
           float ex = smoothstep(.02, .5, s.y);   // (low down, through more air: dimmer, redder - a disc one can look at)
-          col += sunc * mix(vec3(1., .4, .13), vec3(1.), ex) * (uBody.w * mix(.15, 1., ex * ex) * disc * (.45 + .55 * ld) + pow(m0, 600.) * mix(1.2, 2., ex) + pow(m0, 90.) * .3 * uHaze);
+          col += sunc * mix(vec3(1., .55, .28), vec3(1.), ex) * (uBody.w * mix(.5, 1., ex) * disc * (.45 + .55 * ld) + pow(m0, 600.) * 2.2 + pow(m0, 90.) * .35 * uHaze);
         } else if (uBody.x > 1.5) {
           vec3 n = vec3(bq, sqrt(max(0., 1. - dot(bq, bq))));
           float ph = uBody.z, nl = dot(n, vec3(sin(ph) * .8, -sin(ph) * .6, cos(ph)));
@@ -303,32 +309,63 @@
           vec3 mc = mix(vec3(lum(sunc)) * vec3(1.03, .99, .92), sunc, uBody2.x);
           col += mc * uBody.w * disc * alb * (lit + .02);
         }
+        // ---- the clouds' shade and light: the shade lit by the sky overhead, greyer and cooler than the sky's own colours, against
+        // the warm of the sun on them; the light as bright beside the sky as sun- or moonlit cloud is (the moon's is the night's whole light)
+        vec3 amb = mix(mix(mid, top, .4), H, .25) * .85; amb = mix(vec3(lum(amb)), amb, .55) * mix(vec3(1.), top / max(.0001, lum(top)), .12);
+        float skyL = lum(top) * .3 + lum(mid) * .5 + lum(H) * .2;
+        vec3 litC = sunc * mix(vec3(1.), hue, low * isSun) * skyL * (isSun > .5 ? 2.4 : 3.2) * (.6 + .4 * m0);
+        litC *= mix(vec3(1.), H / max(.0001, max(H.r, max(H.g, H.b))), .3);   // (the light that reaches them has come through the same air)
+        vec2 wv = uCl2.xy * (uT * uCl2.z);
+        // ---- banks of cloud standing on the horizon, far beyond the hills: a crest that catches the light over a flat dark base, lost
+        // in the haze low down. Their shape comes from a ring drawn round the noise (no seam, nothing repeats all the way round)
+        // (the same scale round the horizon as up it: heads that are round, not columns. They lie beyond the ground fog: drawn after it)
+        if (uBody2.z > .001 && h > -.01 && h < .25) {   // (only low over the horizon, where they can be)
+          float by = hp - .008;   // (their flat base, a little over the horizon: hidden behind the hills, showing in the gaps)
+          // where banks stand (some tens of degrees wide; they taper to nothing at their ends) and how high their body is there; on it,
+          // heads: round domes some five degrees across and, on those, smaller ones (a cauliflower outline: no peaks, no columns)
+          float pres = smoothstep(.3, .65, texture2D(tN, dh * .9 + vec2(.13, .71)).a);
+          float prof = texture2D(tN, dh * .9 + vec2(.52, .27) + wv * .02).r, bil = texture2D(tN, dh * 7. + vec2(.31, hp * 7.) + wv * .1).g;
+          float ang = atan(d.z, d.x) / 6.2831853, top = pres * (.012 + .05 * smoothstep(.15, .85, prof));
+          if (by < pres * .21) for (int o = 0; o < 2; o++) {   // (over the tallest head they can have here, or where there are none: nothing to work out)
+            float N = o == 0 ? 72. : 260., cw = 6.2831853 / N, t = ang * N, dm = 0.;
+            for (int j = -1; j <= 1; j++) {
+              float ci = floor(t) + float(j); vec3 r = h3(vec3(mod(ci, N), N, 3.7));
+              float rad = .55 + .55 * r.y, dx = t - (ci + .5 + (r.x - .5) * .6);
+              dm = max(dm, (sqrt(max(rad * rad - dx * dx, 0.)) + (r.z - .5) * .5) * cw);
+            }
+            top += dm * pres * (o == 0 ? smoothstep(.1, .7, prof) : .8);
+          }
+          bA = smoothstep(.0, .0025, top - by) * smoothstep(-.003, .006, by) * uBody2.z * step(.004, top);
+          float th = clamp(by / max(top, .02), 0., 1.);
+          bc = amb * (.55 + .2 * th) + litC * (.15 + .8 * th) * (.75 + .5 * pow(max(az, 0.), 2.)) * (.65 + .7 * bil) + litC * pow(m0, 6.) * 1.2 * th;
+          bc = mix(bc, H + glow, .15 + .3 * (1. - th));
+        }
         // ---- clouds
         float ca = 0., cs = 0.;
         if (uCl.x > .001) {
           float hh = hp + .045;
-          vec2 cp = d.xz / hh, wv = uCl2.xy * (uT * uCl2.z), uv = cp * uCl2.w + wv;
-          // their shade is lit by the sky overhead: greyer and cooler than the sky's own colours, against the warm of the sun on them
-          vec3 amb = mix(mix(mid, top, .4), H, .25) * .85; amb = mix(vec3(lum(amb)), amb, .55) * mix(vec3(1.), top / max(.0001, lum(top)), .12);
-          // the light on them, as bright beside the sky as sun- or moonlit cloud is (the moon's light is the night sky's whole light)
-          float skyL = lum(top) * .3 + lum(mid) * .5 + lum(H) * .2;
-          vec3 litC = sunc * mix(vec3(1.), hue, low * isSun) * skyL * (isSun > .5 ? 2.4 : 3.2) * (.6 + .4 * m0);
-          litC *= mix(vec3(1.), H / max(.0001, max(H.r, max(H.g, H.b))), .3);   // (the light that reaches them has come through the same air)
+          vec2 cp = d.xz / hh, uv = cp * uCl2.w + wv;
           float far = 1. - exp(-.07 / hh);
           // the sky's broad reaches: some clearer, some more clouded
           vec4 nl = texture2D(tN, uv * .23 + wv * .3 + .61);
           float cov = clamp(uCl.x + (nl.a - .5) * .7 * (1. - uCl.x * uCl.x), 0., 1.);
-          // a heavy deck ends somewhere: low toward a low sun, its edge, and the light coming in under it
-          cov -= .9 * low * isSun * pow(max(az, 0.), 2.) * (1. - smoothstep(.03, .32, hp)) * smoothstep(.6, .9, uCl.x);
+          // a heavy deck ends somewhere: low toward a low sun, its edge, and the light coming in under it - and nowhere else
+          float gap = .9 * low * isSun * pow(max(az, 0.), 2.) * (1. - smoothstep(.03, .32, hp)) * smoothstep(.6, .9, uCl.x);
+          cov = clamp(cov - gap, 0., 1.);
           // high cirrus: fibres drawn out along the wind, in patches, catching the light
           if (uCl.z > .001 && uDetail > 1.5) {   // (medium quality: no cirrus)
             vec2 cq = cp * .4, rq = vec2(dot(cq, uCl2.xy), dot(cq, vec2(-uCl2.y, uCl2.x)));
-            float fi = texture2D(tN, vec2(rq.x * .2, rq.y * .6) + (nl.rg - .5) * .08 + wv * .9).b;   // (fibres that bend and fray, not ruled lines)
-            float cia = smoothstep(.45, .9, fi) * smoothstep(.5, .8, nl.r) * uCl.z * smoothstep(.0, .14, h) * (1. - far * .6);
-            col = mix(col, amb + litC * (.55 + 1.5 * pow(m0, 6.)), cia * .45);
+            vec2 cw = texture2D(tN, vec2(rq.x * .035, rq.y * .12) + wv * .3 + .17).ga - .5;   // (a slow bend along the streaks, here and there a hook)
+            rq.y += cw.x * .35 + cw.y * abs(cw.y) * .9;
+            // (a smooth noise drawn out a dozen times along the wind: fine streaks side by side, long and short - not the closed
+            // loops a ridged noise makes)
+            float fi = texture2D(tN, vec2(rq.x * .16, rq.y * 2.) + wv * .9 + .41).a;
+            float cia = smoothstep(.6, .78, fi) * (.35 + .65 * smoothstep(-.2, .3, cw.y)) * smoothstep(.5, .8, nl.r) * uCl.z * smoothstep(.0, .14, h) * (1. - far * .85);
+            col = mix(col, amb + litC * (.55 + 1.5 * pow(m0, 6.)), cia * .5);
           }
           float gd = texture2D(tN, uv * 3.3 + wv * .45 + .37).g;
           float t0 = .72 - .84 * pow(cov, 1.4), sf = .05 + .22 * uCl.y;   // (from a few heaps to a deck closed from horizon to horizon)
+          t0 = mix(t0, -.7, smoothstep(.85, .97, uCl.x) * (1. - smoothstep(.0, .25, gap)));   // (a closed deck: no stray hole in it)
           vec2 uw = uv + (nl.gb - .5) * .05;   // (the heaps bent a little by the broad noise: no two alike)
           float xr = texture2D(tN, uw).r, x = xr - (1. - gd) * .45 * (1. - xr);   // (the fine billows eat at the thin edges, hardly at the cores)
           // how deep into the cloud this is (its edge thin and bright against the light, its core and base in its own shade), and how
@@ -348,58 +385,73 @@
           cc = mix(cc, H + glow, far * .8);
           ca = den * smoothstep(-.005, .05, h) * (1. - far * .5 * (1. - oc));
           cs = thick * (.75 + .25 * gd) * (.25 + .75 * smoothstep(.25, .95, xr) * smoothstep(.2, .8, nl.r));   // (what a flash inside lights up: the bulk of the cloud, in great uneven masses)
-          col = mix(col, cc, ca);
+          col = mix(col, cc, ca); bA *= 1. - ca;   // (the cloud layer passes in front of the banks)
           // scud under a rain deck: ragged rolls, lower and faster, darker
           if (uCl.w > .001) {
             float sd = texture2D(tN, d.xz / (hp + .03) * uCl2.w * 1.7 + wv * 2.6).a;
-            float sa = smoothstep(.52, .76, sd) * uCl.w * smoothstep(.0, .05, h) * (1. - far * .4);
-            col = mix(col, amb * .55 + H * .12, sa * .8); ca = max(ca, sa);
+            float sa = smoothstep(.5, .8, sd) * uCl.w * smoothstep(.0, .05, h) * (1. - far * .5);
+            col = mix(col, col * .78 + amb * .04, sa * .7); ca = max(ca, sa); cs = mix(cs, cs * .85, sa);   // (in a flash: lit as the deck behind it)
           }
         }
         // ---- a lightning flash: the clouds lit from inside round where it is, the whole sky a little
         if (uFlash.w > 0.) col += vec3(.75, .82, 1.) * uFlash.w * (exp(-(1. - dot(d, normalize(uFlash.xyz))) * 6.) * (.05 + ca * (.06 + .75 * cs)) + .02 * ca) * smoothstep(-.02, .1, h);
       }
       // ---- the ground fog seen through (a layer some metres deep: the longer the way through it, the more it veils), and under the horizon
-      float fl = 12. / max(h, .02), tr = exp(-uFogD * uFogD * fl * fl);
-      col = mix(fogc, col, tr * smoothstep(-.01, .03, h));
+      float fl = 7. / max(h, .02), tr = exp(-uFogD * uFogD * fl * fl), fv = tr * smoothstep(-.01, .03, h);
+      col = mix(fogc, col, fv);
+      if (bA > 0.) col = mix(col, mix(fogc, bc, max(fv, .75)), bA);
+      col += vec3(.75, .82, 1.) * uFlash.w * .05 * (1. - fv) * step(.5, uDetail);   // (a flash lights the low murk too)
       gl_FragColor = vec4(col, 1.0);
       #include <colorspace_fragment>
     }`;
-  // the field's clouds (from its sky mood): cover, darkness of the deck, cirrus, scud, wind speed (1: some 0.006 layer heights a second) and
-  // the scale of the heaps; under: a glow from below (fires on the ground)
-  const SKY_CL = [0.3, 0.3, 0.3, 0, 1, 1];
+  // the field's clouds (from its sky mood): cover, darkness of the deck, cirrus, scud, wind speed (1: some 0.006 layer heights a second),
+  // the scale of the heaps and the banks on the horizon; under: a glow from below (fires on the ground)
+  const SKY_CL = [0.3, 0.3, 0.3, 0, 1, 1, 0];   // (the seventh: how much of the horizon has banks of cloud standing on it)
   function skyBody(B) {
     if (B.outdoor === 'void') return 0; // (the last guardian's void: the eclipse is a thing of its own, levelgen.js)
     return (B.body || ((B.night || B.stars) ? 'moon' : 'sun')) === 'moon' ? 2 : 1;
   }
-  function setSky(B) {
-    if (skyDome) { scene.remove(skyDome); skyDome.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); skyDome = null; }
-    if (!B.outdoor && !(B.sky && B.sunDir)) return; // (the great shaft is roofless: its night sky shows through the opening)
-    const c = (h) => new THREE.Color(h);
-    const sd = new THREE.Vector3(...B.sunDir).normalize();
-    const cl = Object.assign([], SKY_CL, B.cl || []), body = skyBody(B), key = B.name || '';
-    // the wind's way and the moon's phase: fixed for the field (from its name: no dice of the area are thrown here)
-    const hk = (U.hashStr ? U.hashStr('sky:' + key) : 7) >>> 0, wa = (hk % 6283) / 1000, sunc = new THREE.Vector3(...(B.sunCol || [1.0, 0.85, 0.6]));
-    const tint = body === 2 && Math.max(sunc.x, sunc.y, sunc.z) / Math.max(0.001, Math.min(sunc.x, sunc.y, sunc.z)) > 2.5 ? 0.9 : 0.25;  // (a blood-red moon keeps its colour; a pale one is near white)
-    const phase = B.phase ?? (tint > 0.5 ? 0 : 0.25 + ((hk >>> 8) % 1000) / 1000 * 1.1);
-    const ug = B.under ? c(B.under[0]) : null;
+  // The dome and its material are made once and kept; each area only sets their values. (A material thrown away takes its shader
+  // with it, and the next open-air area had to compile that again, all at once, in the middle of the change of area.)
+  function skyMake() {
+    if (skyMesh) return skyMesh;
+    const C = () => new THREE.Color(), V4 = (x, y, z, w) => new THREE.Vector4(x || 0, y || 0, z || 0, w || 0);
     const mat = new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false, depthTest: true, fog: false,
+      name: 'sky', side: THREE.BackSide, depthWrite: false, depthTest: true, fog: false,
       uniforms: {
-        top: { value: c(B.sky[0]) }, mid: { value: c(B.sky[1]) }, hor: { value: c(B.sky[2]) }, sun: { value: sd }, fogc: { value: c(B.fog) }, sunc: { value: sunc },
-        tN: { value: skyNoiseTex() }, uT: { value: GM.time }, uDetail: { value: 2 }, uPix: { value: 0.0015 }, uStars: { value: B.stars ? 1 : 0 }, uHaze: { value: B.haze || 1 }, uFogD: { value: scene.fog.density },
-        uCl: { value: new THREE.Vector4(cl[0], cl[1], cl[2], cl[3]) }, uCl2: { value: new THREE.Vector4(Math.cos(wa), Math.sin(wa), cl[4] * 0.006 * cl[5] * 0.12, cl[5] * 0.12) },
-        uBody: { value: new THREE.Vector4(body, body === 2 ? 0.023 : 0.013, phase, body === 2 ? (tint > 0.5 ? 0.4 : 1.9) : 40) }, uBody2: { value: new THREE.Vector4(tint, tint > 0.5 ? 1 : 0, 0, 0) },
-        uFlash: { value: new THREE.Vector4(0, 1, 0, 0) }, uUnder: { value: ug ? new THREE.Vector4(ug.r, ug.g, ug.b, B.under[1]) : new THREE.Vector4() },
+        top: { value: C() }, mid: { value: C() }, hor: { value: C() }, sun: { value: new THREE.Vector3(0, 1, 0) }, fogc: { value: C() }, sunc: { value: new THREE.Vector3(1, 0.85, 0.6) },
+        tN: { value: skyNoiseTex() }, uT: { value: 0 }, uDetail: { value: 2 }, uPix: { value: 0.0015 }, uStars: { value: 0 }, uHaze: { value: 1 }, uFogD: { value: 0 },
+        uCl: { value: V4() }, uCl2: { value: V4(1) }, uBody: { value: V4(1, 0.013, 0, 40) }, uBody2: { value: V4() }, uFlash: { value: V4(0, 1) }, uUnder: { value: V4() },
       },
       vertexShader: SKY_VS, fragmentShader: SKY_FS,
     });
-    skyDome = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), mat);
-    skyDome.renderOrder = 50; skyDome.frustumCulled = false;   // (after the solid world: only the sky that shows is shaded)
-    scene.add(skyDome);
-    scene.background = c(B.sky[2]);
+    skyMesh = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), mat);
+    skyMesh.renderOrder = 50; skyMesh.frustumCulled = false;   // (after the solid world: only the sky that shows is shaded)
+    return skyMesh;
+  }
+  function setSky(B) {
+    if (skyDome) { scene.remove(skyDome); skyDome = null; }
+    skyGen++;
+    if (!B.outdoor && !(B.sky && B.sunDir)) return; // (the great shaft is roofless: its night sky shows through the opening)
+    const m = skyMake(), u = m.material.uniforms;
+    const cl = Object.assign([], SKY_CL, B.cl || []), body = skyBody(B), key = B.name || '';
+    // the wind's way and the moon's phase: fixed for the field (from its name: no dice of the area are thrown here)
+    const hk = (U.hashStr ? U.hashStr('sky:' + key) : 7) >>> 0, wa = (hk % 6283) / 1000, sunc = u.sunc.value.set(...(B.sunCol || [1.0, 0.85, 0.6]));
+    const tint = body === 2 && Math.max(sunc.x, sunc.y, sunc.z) / Math.max(0.001, Math.min(sunc.x, sunc.y, sunc.z)) > 2.5 ? 0.9 : 0.25;  // (a blood-red moon keeps its colour; a pale one is near white)
+    const phase = B.phase ?? (tint > 0.5 ? 0 : 0.25 + ((hk >>> 8) % 1000) / 1000 * 1.1);
+    u.top.value.set(B.sky[0]); u.mid.value.set(B.sky[1]); u.hor.value.set(B.sky[2]); u.fogc.value.set(B.fog); u.sun.value.set(...B.sunDir).normalize();
+    u.uT.value = GM.time % 3600; u.uStars.value = B.stars ? 1 : 0; u.uHaze.value = B.haze || 1; u.uFogD.value = scene.fog.density;
+    u.uCl.value.set(cl[0], cl[1], cl[2], cl[3]); u.uCl2.value.set(Math.cos(wa), Math.sin(wa), cl[4] * 0.006 * cl[5] * 0.12, cl[5] * 0.12);
+    u.uBody.value.set(body, body === 2 ? 0.023 : 0.013, phase, body === 2 ? (tint > 0.5 ? 0.4 : 1.9) : 40); u.uBody2.value.set(tint, tint > 0.5 ? 1 : 0, cl[6], 0);
+    u.uFlash.value.set(0, 1, 0, 0);
+    if (B.under) { const ug = new THREE.Color(B.under[0]); u.uUnder.value.set(ug.r, ug.g, ug.b, B.under[1]); } else u.uUnder.value.set(0, 0, 0, 0);
+    m.visible = true; skyDome = m; scene.add(m);
+    scene.background = new THREE.Color(B.sky[2]);
     skyTick();
   }
+  // behind the loading screen (warmup.js): the dome's shader and the clouds' noise made now, not with the first open-air area. The dome
+  // is put in the scene for the shaders to be compiled with it; what is returned takes it out again (if the area has no sky)
+  GM.skyWarm = function () { const m = skyMake(); if (m.parent) return null; scene.add(m); return () => { if (m !== skyDome && m.parent) m.parent.remove(m); }; };
   // every frame: the sky's clock, the size of a pixel (the stars stay points when the view zooms), quality, lightning, the fog's thickness
   const skyPx = new THREE.Vector2();
   function skyTick() {
@@ -490,7 +542,7 @@
   GM.setDarkness = function (on) {
     if (on) {
       if (GM._dark) return;
-      GM._dark = { dome: skyDome, env: scene.environment, lk: G.LIGHT_K, sky: skyDome ? ['top', 'mid', 'hor', 'fogc'].map((u) => skyDome.material.uniforms[u].value.clone()) : null, sunc: skyDome ? skyDome.material.uniforms.sunc.value.clone() : null, starsVis: skyDome ? skyDome.material.uniforms.uStars.value : null };
+      GM._dark = { dome: skyGen, env: scene.environment, lk: G.LIGHT_K, sky: skyDome ? ['top', 'mid', 'hor', 'fogc'].map((u) => skyDome.material.uniforms[u].value.clone()) : null, sunc: skyDome ? skyDome.material.uniforms.sunc.value.clone() : null, starsVis: skyDome ? skyDome.material.uniforms.uStars.value : null };
       scene.environment = null; G.LIGHT_K = LIGHT_K * 0.22;
       // the hands / weapon have their own lights: dim those too (the lamp still catches them a little)
       const vs = G.weapons.vmScene;
@@ -501,7 +553,7 @@
       scene.environment = d.env; G.LIGHT_K = d.lk;
       const vs = G.weapons.vmScene;
       if (vs) { if (d.vmEnv !== undefined) vs.environment = d.vmEnv; for (const [o, i] of d.vmL || []) o.intensity = i; }
-      if (skyDome && d.sky && d.dome === skyDome) { ['top', 'mid', 'hor', 'fogc'].forEach((u, i) => skyDome.material.uniforms[u].value.copy(d.sky[i])); skyDome.material.uniforms.sunc.value.copy(d.sunc); if (d.starsVis !== null) skyDome.material.uniforms.uStars.value = d.starsVis; }
+      if (skyDome && d.sky && d.dome === skyGen) { ['top', 'mid', 'hor', 'fogc'].forEach((u, i) => skyDome.material.uniforms[u].value.copy(d.sky[i])); skyDome.material.uniforms.sunc.value.copy(d.sunc); if (d.starsVis !== null) skyDome.material.uniforms.uStars.value = d.starsVis; }
       GM._dark = null;
     }
   };

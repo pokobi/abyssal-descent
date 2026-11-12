@@ -133,9 +133,12 @@
     const r = G.renderer; if (!r) return;
     const t0 = now();
     const tmp = W.enemyModels();
+    // (the open-air sky: its shader and its clouds' noise, here and not with the first open-air area - game.js skyWarm)
+    let skyOff = null; try { if (G.game && G.game.skyWarm) skyOff = G.game.skyWarm(); } catch (e) { /* made with the first sky */ }
     // (shaders first - the world, then the gun in the hands; the carved shapes after them)
     try { await W.worldAsync(8000); } catch (e) { /* ignore */ }
     if (tmp) { G.scene.remove(tmp); }
+    if (skyOff) skyOff();
     try { warmViewmodel(r); } catch (e) { /* ignore */ }
     try { await warmShapes(); } catch (e) { /* ignore */ }
     try { if (G.Icons && G.Icons.warm) G.Icons.warm(); } catch (e) { /* ignore */ }
@@ -176,7 +179,9 @@
   W.boot = function () {
     const r = G.renderer; if (!r) return;
     const t0 = now();
+    let skyOff = null; try { if (G.game && G.game.skyWarm) skyOff = G.game.skyWarm(); } catch (e) { /* made with the first sky */ }
     try { W.world(); } catch (e) { /* ignore */ }
+    if (skyOff) skyOff();
     try { warmViewmodel(r); } catch (e) { /* ignore */ }
     try { if (G.Icons && G.Icons.warm) G.Icons.warm(); } catch (e) { /* ignore */ }
     try { if (G.PStatus && G.PStatus.warm) G.PStatus.warm(); } catch (e) { /* ignore */ }

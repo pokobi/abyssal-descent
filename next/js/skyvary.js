@@ -30,20 +30,23 @@
     drip: { kind: 'rain', n: 140, col: 0x9fc8d0, a: 0.4, vel: [0, -14, 0], len: 0.35 },
   };
   // the clouds of a mood (game.js draws them in the sky dome): [cover 0..1, how dark and thick the deck is, high cirrus, scud running
-  // under a rain deck, wind speed, size of the heaps]
+  // under a rain deck, wind speed, size of the heaps, banks of cloud standing on the far horizon]
   const CL = {
-    night: [0.28, 0.3, 0.35, 0, 1, 1],      // a clear night: a few clouds drifting past the moon, streaks high up
-    thin: [0.22, 0.35, 0.3, 0, 0.8, 1],
-    mist: [0.6, 0.3, 0, 0, 0.5, 0.8],       // (a fog over the ground: the sky is a pale dome over it)
-    rain: [0.98, 0.88, 0, 0.6, 2.2, 0.72],  // a low dark deck, scud running under it
-    snow: [0.93, 0.45, 0, 0.25, 1.1, 0.8],  // a heavy pale deck
-    smoke: [0.55, 0.55, 0, 0.15, 1.1, 0.9], // smoke and cloud over fires, lit from below
-    ash: [0.75, 0.5, 0, 0.2, 0.7, 0.85],    // a veil of ash
-    storm: [0.94, 0.92, 0, 0.5, 2.0, 0.7],  // thunderheads
-    dusk: [0.42, 0.3, 0.4, 0, 0.7, 1],     // broken heaps and long streaks catching a low sun
-    dawn: [0.55, 0.45, 0.25, 0, 0.6, 0.85], // a grey morning deck with breaks in it
-    day: [0.32, 0.12, 0.25, 0, 0.6, 1.15],   // fair-weather heaps in a high sky
+    night: [0.28, 0.3, 0.35, 0, 1, 1, 0],      // a clear night: a few clouds drifting past the moon, streaks high up
+    thin: [0.22, 0.35, 0.3, 0, 0.8, 1, 0],
+    mist: [0.6, 0.3, 0, 0, 0.5, 0.8, 0],          // (a fog over the ground: the sky is a pale dome over it)
+    rain: [0.98, 0.88, 0, 0.6, 2.2, 0.72, 0],     // a low dark deck, scud running under it
+    snow: [0.93, 0.45, 0, 0.25, 1.1, 0.8, 0],     // a heavy pale deck
+    smoke: [0.55, 0.55, 0, 0.15, 1.1, 0.9, 0], // smoke and cloud over fires, lit from below
+    ash: [0.75, 0.5, 0, 0.2, 0.7, 0.85, 0],    // a veil of ash
+    storm: [0.94, 0.92, 0, 0.5, 2.0, 0.7, 0],     // thunderheads
+    dusk: [0.42, 0.3, 0.4, 0, 0.7, 1, 0],         // broken heaps and long streaks catching a low sun
+    dawn: [0.55, 0.45, 0.25, 0, 0.6, 0.85, 0],  // a grey morning deck with breaks in it
+    day: [0.32, 0.12, 0.25, 0, 0.6, 1.15, 0],     // fair-weather heaps in a high sky
   };
+  // the blood moon's sky: the field's red is too bright a glow for the sky itself. Nearly black, a dark red-brown; the red left round the
+  // moon (its own light) and in a sooty copper band low on the horizon
+  const BLOOD = ['#040203', '#120708', '#3a1810'];
   const D = (id, name, w, o) => Object.assign({ id, name, w }, o || {});
   S.V = {
     // 地上
@@ -59,14 +62,14 @@
       D('clear', '月夜', 4, { cl: CL.night }),
       D('mist', '濃霧', 3, { fogD: 3.0, fog: '#3c464c', k: 0.7, amb: 0.94, sunK: 0.4, stars: false, cl: CL.mist }),
       D('rain', '雨夜', 2, { fogD: 1.4, fog: '#0e1218', k: 0.5, moonI: 0.5, amb: 0.86, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
-      D('fire', '遠い火の手', 1, { fog: '#3a1a10', k: 0.4, hemiS: '#b07050', sky: ['#05060c', '#1a1018', '#5a2410'], p: [P.ember], el: 'fire', cl: CL.smoke, under: ['#ff5a1e', 0.05] }),
+      D('fire', '遠い火の手', 1, { fog: '#3a1a10', k: 0.4, hemiS: '#b07050', sky: ['#05060c', '#16100f', '#46240f'], p: [P.ember], el: 'fire', cl: CL.smoke, under: ['#a84a1c', 0.05] }),
       D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp], cl: CL.thin }),
     ],
     dusk: [
       D('clear', '黄昏', 4, { cl: CL.dusk }),
       D('ash', '灰の降る黄昏', 2, { fog: '#9a8478', k: 0.5, fogD: 1.5, amb: 0.9, sky: ['#3a3a4a', '#9a7466', '#c8a080'], sunK: 0.55, p: [P.ash], cl: CL.ash, haze: 1.8 }),
       D('storm', '雷雲', 2, { fog: '#4a4458', k: 0.6, fogD: 1.3, amb: 0.78, moonI: 0.55, sky: ['#1a1c2c', '#4a4454', '#8a6a5c'], sunK: 0.2, p: [P.drizzle], flash: true, el: 'water', bolt: true, cl: CL.storm }),
-      D('sand', '砂塵', 1, { fog: '#c89a68', k: 0.55, fogD: 2.4, sunK: 0.5, p: [P.dust], cl: [0.2, 0.2, 0.3, 0, 1.4, 1], haze: 2.5 }),
+      D('sand', '砂塵', 1, { fog: '#c89a68', k: 0.55, fogD: 2.4, sunK: 0.5, p: [P.dust], cl: [0.2, 0.2, 0.3, 0, 1.4, 1, 0], haze: 2.5 }),
     ],
     battlefield: [
       D('clear', '夜明け前', 4, { cl: CL.dawn }),
@@ -78,7 +81,7 @@
     // 入口
     shaft: [
       D('clear', '月夜', 4, { cl: CL.night }),
-      D('dim', '雲の夜', 2, { moonI: 0.6, amb: 0.85, stars: false, sky: ['#030408', '#0a0e18', '#161c28'], sunK: 0.2, cl: [0.82, 0.6, 0, 0.1, 0.9, 0.85] }),
+      D('dim', '雲の夜', 2, { moonI: 0.6, amb: 0.85, stars: false, sky: ['#030408', '#0a0e18', '#161c28'], sunK: 0.2, cl: [0.82, 0.6, 0, 0.1, 0.9, 0.85, 0] }),
       D('mist', '底の霧', 2, { fogD: 2.2, fog: '#2a3240', k: 0.6, amb: 0.95, cl: CL.night }),
       D('rain', '吹き込む雨', 1, { fogD: 1.4, fog: '#10141c', k: 0.5, moonI: 0.5, amb: 0.88, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
       D('snow', '舞い込む雪', 1, { fogD: 1.6, fog: '#3a4250', k: 0.5, amb: 1.08, moonI: 0.85, stars: false, sunK: 0.3, p: [P.snow], el: 'ice', cl: CL.snow }),
@@ -101,10 +104,10 @@
       D('damp', '湿った闇', 2, { fog: '#121a20', k: 0.5, amb: 0.85, p: [P.drip] }),
     ],
     castle: [
-      D('base', '血月', 4, { cl: CL.thin }),
-      D('rain', '雨の城壁', 2, { fogD: 1.35, fog: '#1a0c10', k: 0.5, moonI: 0.6, amb: 0.88, sky: ['#060205', '#1a060c', '#3a0e14'], stars: false, sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
-      D('mist', '霧の城', 2, { fogD: 2.8, fog: '#3a1c22', k: 0.6, sunK: 0.45, cl: CL.mist }),
-      D('ash', '火の粉の夜', 1, { p: [P.ember], el: 'fire', cl: CL.smoke, under: ['#ff4a18', 0.05] }),
+      D('base', '血月', 4, { cl: CL.thin, sky: BLOOD }),
+      D('rain', '雨の城壁', 2, { fogD: 1.35, fog: '#1a0c10', k: 0.5, moonI: 0.6, amb: 0.88, sky: ['#040203', '#0e0607', '#2a1210'], stars: false, sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
+      D('mist', '霧の城', 2, { fogD: 2.8, fog: '#3a1c22', k: 0.6, sunK: 0.45, cl: CL.mist, sky: BLOOD }),
+      D('ash', '火の粉の夜', 1, { p: [P.ember], el: 'fire', cl: CL.smoke, under: ['#9a3c16', 0.05], sky: BLOOD }),
     ],
     // 中層
     halls: [
@@ -143,8 +146,8 @@
     ],
     sanctum: [
       D('base', '偽りの空', 4, { cl: CL.day }),
-      D('dusk', '暮れない夕刻', 2, { fog: '#c8a0b0', k: 0.5, sky: ['#4a3a6a', '#c88a9a', '#f0c8b0'], hemiS: '#d0a0b8', k2: 0.3, cl: CL.dusk }),
-      D('white', '白昼の虚無', 2, { fog: '#e8ecf4', k: 0.6, fogD: 1.6, amb: 1.1, stars: false, sunK: 0.6, sky: ['#d8e0f0', '#eef2fa', '#ffffff'], cl: [0.85, 0.08, 0, 0, 0.4, 0.8], haze: 2 }),
+      D('dusk', '暮れない夕刻', 2, { fog: '#b8a0a4', k: 0.5, sky: ['#3a3848', '#9a8286', '#d8b498'], hemiS: '#d0a0b8', k2: 0.3, cl: CL.dusk }),
+      D('white', '白昼の虚無', 2, { fog: '#e8ecf4', k: 0.6, fogD: 1.6, amb: 1.1, stars: false, sunK: 0.6, sky: ['#d8e0f0', '#eef2fa', '#ffffff'], cl: [0.85, 0.08, 0, 0, 0.4, 0.8, 0], haze: 2 }),
       D('feather', '羽の降る', 1, { p: [P.feather], cl: CL.day }),
     ],
   };

@@ -570,42 +570,31 @@
   function scenery(w, rng, W, D, OUT) {
     const cx = W / 2, cz = D / 2;
     w.deferred.push((grp) => {
-      const PG = G.Props.PG;
       if (OUT === 'ruins') {
-        const mtn = new THREE.MeshStandardMaterial({ color: w.mats.biome.mtnCol ?? 0x8a7890, emissive: w.mats.biome.mtnEm ?? (w.mats.biome.night ? 0x05070d : 0x3a2a3a), roughness: 1, flatShading: true, fog: false });
-        // two ranges of mountains round the whole horizon, the nearer dark, the farther higher and paler with distance: each a band of
-        // ground folded up to a broken ridge - shoulders, saddles and peaks, no two alike - where single cones used to stand in a ring.
-        // (the same throws of the dice as the cones took, so that everything thrown after them falls as before: they give the heights)
+        // two ranges of mountains round the whole horizon (mountains() below). The dice are thrown as they were for the cones that
+        // once stood in a ring, so that everything thrown after them falls as before: the heights they give turn the ranges and lift
+        // or lower them a little, so that no two areas show the same horizon
         const hs = [];
         for (let i = 0; i < 26; i++) { rng.range(-0.1, 0.1); rng.range(170, 230); hs.push(rng.range(35, 90)); rng.range(30, 60); rng.range(30, 60); }
-        const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
-        const range = (R, k, off, mat) => {
-          const N = 260, rows = [[-70, -1, 0], [-40, 0.3, 0.3], [-16, 0.72, 0.8], [0, 1, 1], [18, 0.7, 0.8], [44, 0.3, 0.3], [70, -1, 0]], pos = [], idx = [];
-          for (let j = 0; j < rows.length; j++) for (let i = 0; i < N; i++) {
-            const t = i / N * 26 + off, i0 = Math.floor(t), f = t - i0, sm = f * f * (3 - 2 * f);
-            const base = hs[i0 % 26] * (1 - sm) + hs[(i0 + 1) % 26] * sm;
-            const sn = (q, n) => { const u = i / q, u0 = Math.floor(u), ff = u - u0, s2 = ff * ff * (3 - 2 * ff); return (hash(u0 * n + off) * (1 - s2) + hash((u0 + 1) * n + off) * s2) - 0.5; };   // (smooth, not a row of teeth)
-            const jag = (hash(i * 1.37 + off * 9) - 0.5) * 5 + sn(4, 2.11) * 20 + sn(11, 5.3) * 30;
-            const H = Math.max(8, base * k + jag * rows[j][2]), a = i / N * Math.PI * 2;
-            const rr = R + rows[j][0] + (j > 0 && j < 6 ? (hash(i * 3.3 + j * 7 + off) - 0.5) * 9 : 0);
-            pos.push(cx + Math.cos(a) * rr, rows[j][1] < 0 ? -12 : H * rows[j][1] - 8, cz + Math.sin(a) * rr);
-          }
-          for (let j = 0; j + 1 < rows.length; j++) for (let i = 0; i < N; i++) { const a0 = j * N + i, b0 = j * N + (i + 1) % N, c0 = a0 + N, d0 = b0 + N; idx.push(a0, b0, c0, b0, d0, c0); }
-          const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-          const m = new THREE.Mesh(g, mat); m.frustumCulled = false; grp.add(m);
-        };
-        mtn.side = THREE.DoubleSide;
-        // (whole slopes catch the light where the cones' narrow faces did not: held down to a silhouette against the sky, whatever the field's colour for them)
-        { const lum = (c) => c.r * 0.3 + c.g * 0.6 + c.b * 0.1, lc = lum(mtn.color), le = lum(mtn.emissive); if (lc > 0.07) mtn.color.multiplyScalar(0.07 / lc); if (le > 0.012) mtn.emissive.multiplyScalar(0.012 / le); }
-        const far = mtn.clone(), haze = new THREE.Color(w.mats.biome.fog || 0x202428); far.color.lerp(haze, 0.45).multiplyScalar(0.8); far.emissive.lerp(haze, 0.5);   // (paler with distance: toward the colour of the air, not a colour of its own)
-        range(215, 1.0, 0, mtn);
-        range(285, 1.45, 5.3, far);
+        mountains(w, grp, cx, cz, hs);
         // tree line beyond the city walls (not where the area hangs over the abyss: w.noGround)
         if (!w.noGround) for (let i = 0; i < 70; i++) {
           const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.75, Math.max(W, D) * 1.3);
           tree(grp, w, cx + Math.cos(a) * r, -0.5, cz + Math.sin(a) * r, rng, rng.range(1.2, 2.2));
         }
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ color: w.mats.biome.groundCol ?? (w.mats.biome.night ? 0x1c2416 : 0x3e4a26), roughness: 1 }));
+        // (the ground beyond the walls: in a grassy field, the field's own turf - its picture, in broad patches lighter and darker - not
+        // one flat colour; over the abyss, far below, a plain dark floor)
+        let ground;
+        if (w.mats.biome.floorTex === 'grass' && !w.noGround) {
+          const gg = new THREE.PlaneGeometry(900, 900, 40, 40), uv = gg.attributes.uv, ps = gg.attributes.position, col = new Float32Array(ps.count * 3);
+          for (let i = 0; i < ps.count; i++) {
+            uv.setXY(i, uv.getX(i) * 150, uv.getY(i) * 150);
+            const x = ps.getX(i), y = ps.getY(i), v = 0.66 + 0.42 * (0.5 + 0.5 * (0.7 * _gn(x / 75, y / 75, 0, 0, 91) + 0.3 * _gn(x / 23, y / 23, 0, 0, 92)));
+            col[i * 3] = v * 1.02; col[i * 3 + 1] = v; col[i * 3 + 2] = v * 0.94;
+          }
+          gg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+          ground = new THREE.Mesh(gg, w.mats.vc.floor); ground.receiveShadow = true;
+        } else ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ color: w.mats.biome.groundCol ?? (w.mats.biome.night ? 0x1c2416 : 0x3e4a26), roughness: 1 }));
         ground.rotation.x = -Math.PI / 2; ground.position.set(cx, w.noGround ? -140 : -0.6, cz); grp.add(ground);
       } else {
         // sea of clouds far below + floating islets
@@ -629,6 +618,7 @@
           // (rock in ledges under a rim that is no circle, turf with a lip over it: it was a cone point down with a disc on it)
           const rk = new THREE.Mesh(hangRock(i % 4), rockM); rk.scale.set(s, s, s); g.add(rk);
           const top = new THREE.Mesh(hangTurf(i % 4), grassM); top.scale.set(s, s, s); g.add(top);
+          const fr = hangFringe(i % 4), TM = treeMats(w); for (const [geo, m] of [[fr.roots, TM.twig], [fr.leaf, TM.leaf]]) { const o = new THREE.Mesh(geo, m); o.scale.set(s, s, s); g.add(o); }
           if (rng.chance(0.6)) tree(g, w, 0, 0, 0, rng, s * 0.15);
           grp.add(g); w.animated.push({ kind: 'islet', m: g, y0: g.position.y, ph: rng.range(0, 6) });
         }
@@ -637,26 +627,211 @@
       }
     });
   }
-  // stylised tree (trunk + clustered foliage)
   // (shapes made once, by a noise of their own: nothing here throws the area's dice)
   const _hn = (x, y, s) => { const n = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
   const _vn = (x, y, s) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy); return _hn(xi, yi, s) * (1 - u) * (1 - v) + _hn(xi + 1, yi, s) * u * (1 - v) + _hn(xi, yi + 1, s) * (1 - u) * v + _hn(xi + 1, yi + 1, s) * u * v; };
   const _shape = {};
+  // an integer hash, 0..1
+  const _ih = (x, y, s) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(s | 0, 1442695041); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+  const _GD = [1, 0, 0.7071, 0.7071, 0, 1, -0.7071, 0.7071, -1, 0, -0.7071, -0.7071, 0, -1, 0.7071, -0.7071];
+  // gradient noise, about -1..1; it repeats every Pu along u (and every Pv along v) when they are given (whole numbers)
+  function _gn(u, v, Pu, Pv, s) {
+    const ui = Math.floor(u), vi = Math.floor(v), fu = u - ui, fv = v - vi;
+    let a0 = ui, a1 = ui + 1, b0 = vi, b1 = vi + 1;
+    if (Pu) { a0 = ((ui % Pu) + Pu) % Pu; a1 = (a0 + 1) % Pu; }
+    if (Pv) { b0 = ((vi % Pv) + Pv) % Pv; b1 = (b0 + 1) % Pv; }
+    const k00 = ((_ih(a0, b0, s) * 8) | 0) * 2, k10 = ((_ih(a1, b0, s) * 8) | 0) * 2, k01 = ((_ih(a0, b1, s) * 8) | 0) * 2, k11 = ((_ih(a1, b1, s) * 8) | 0) * 2;
+    const n00 = _GD[k00] * fu + _GD[k00 + 1] * fv, n10 = _GD[k10] * (fu - 1) + _GD[k10 + 1] * fv, n01 = _GD[k01] * fu + _GD[k01 + 1] * (fv - 1), n11 = _GD[k11] * (fu - 1) + _GD[k11 + 1] * (fv - 1);
+    const su = fu * fu * fu * (fu * (fu * 6 - 15) + 10), sv = fv * fv * fv * (fv * (fv * 6 - 15) + 10);
+    const x0 = n00 + (n10 - n00) * su, x1 = n01 + (n11 - n01) * su;
+    return (x0 + (x1 - x0) * sv) * 1.4;
+  }
+  const _cl = (x, a, b) => (x < a ? a : x > b ? b : x);
+  const _ss = (a, b, x) => { const t = _cl((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  // a little generator of its own for the shapes (seeded by the shape, never by the area)
+  const _prng = (seed) => { let s = (seed >>> 0) || 1; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = Math.imul(s ^ (s >>> 15), s | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+
+  // ================================================================ the far country
+  // How it looks in each field: the build of its ranges (style), the bare rock, what grows on the lower slopes (vegK how much, vegY up
+  // to about where), the snow (from snowY up, snowK how much), and the trees beyond the walls (con: the share of conifers, dead: of dead
+  // ones; the rest broad-leaved)
+  const FARLOOK = {
+    dusk: { style: 'alpine', rock: '#8a7664', veg: '#5a5834', vegK: 0.55, vegY: 42, snowY: 80, snowK: 0.85, con: 0, dead: 0.1 },
+    ruins: { style: 'alpine', rock: '#8a7664', veg: '#5a5834', vegK: 0.55, vegY: 42, snowY: 80, snowK: 0.85, con: 0, dead: 0 },
+    hamlet: { style: 'alpine', rock: '#6c6862', veg: '#1e2c1e', vegK: 0.95, vegY: 60, snowY: 84, snowK: 0.75, con: 0.55, dead: 0.15 },
+    grave: { style: 'alpine', rock: '#686662', veg: '#222c20', vegK: 0.85, vegY: 50, snowY: 90, snowK: 0.6, con: 0.25, dead: 0.55 },
+    castle: { style: 'jagged', rock: '#54403c', veg: '#2c221a', vegK: 0.45, vegY: 32, snowY: 999, snowK: 0, con: 0.25, dead: 0.75 },
+    bloodmoon: { style: 'jagged', rock: '#54403c', veg: '#2c221a', vegK: 0.45, vegY: 32, snowY: 999, snowK: 0, con: 0.25, dead: 0.75 },
+    battlefield: { style: 'hills', rock: '#76726a', veg: '#4c4e36', vegK: 0.9, vegY: 66, snowY: 86, snowK: 0.7, con: 0.15, dead: 0.5 },
+    sanctum: { style: 'alpine', rock: '#8a8478', veg: '#7a8a6a', vegK: 0.6, vegY: 45, snowY: 999, snowK: 0, con: 0, dead: 0 },
+    sky: { style: 'alpine', rock: '#8a8478', veg: '#7a8a6a', vegK: 0.6, vegY: 45, snowY: 999, snowK: 0, con: 0, dead: 0 },
+    crimson: { style: 'jagged', rock: '#40283a', veg: '#2a1626', vegK: 0.2, vegY: 20, snowY: 999, snowK: 0, con: 0, dead: 1 },
+  };
+  const farLook = (w) => FARLOOK[w.biome] || FARLOOK[w.field] || { style: 'alpine', rock: w.mats.biome.rock || '#6a6660', veg: w.mats.biome.grassTint || '#3a4a2c', vegK: 0.6, vegY: 45, snowY: 88, snowK: 0.6, con: 0.2, dead: 0.2 };
+
+  // ---- the mountains: one height field over a ring R0..R1 m out from the middle, made once a build and kept. Not a wall of range
+  // round the field: a country of peaks laid out over the ground (noise over x and z, not along the ring), some nearer, some farther,
+  // so that ridge stands behind ridge and the valleys between them run back into the range; the farther, the higher they rise (H0 at
+  // the ring's inside to H1 at its outside). Over the massifs (cells of cB m: broad valleys, peaks sharpened by the power pk) lies
+  // ridged noise (cells of cD m, A m high: about a third of its cell, the slopes of a real range and not needles): spurs and the gullies
+  // between them that water and ice cut, sharp along their ridges and smooth in the hollows (each finer octave counts only where the
+  // coarser made a ridge), more of it on the heights. The foot rises out of the plain over 45 m; a skirt from it straight down into the
+  // dark, for the fields over the abyss. N x M: columns round x rows out (closer near the inside)
+  const MTN = {
+    alpine: { R0: 160, R1: 360, H0: 58, H1: 140, cB: 210, cD: 55, A: 26, oct: 5, sharp: 1.25, rid: 1, pk: 1.3, N: 1000, M: 44, seed: 11 },
+    jagged: { R0: 160, R1: 360, H0: 60, H1: 135, cB: 170, cD: 42, A: 28, oct: 5, sharp: 1.8, rid: 1, pk: 1.55, N: 1000, M: 44, seed: 51 },
+    hills: { R0: 160, R1: 360, H0: 30, H1: 128, cB: 260, cD: 80, A: 14, oct: 5, sharp: 1, rid: 0.35, pk: 1.15, N: 1000, M: 44, seed: 31 },
+  };
+  function mtnGeo(style) {
+    const key = 'mtn_' + style; if (_shape[key]) return _shape[key];
+    const p = MTN[style], N = p.N, M = p.M, rows = M + 2, S = p.seed;
+    const pos = new Float32Array(N * rows * 3), col = new Float32Array(N * rows * 3), Y = new Float32Array(N * rows);
+    for (let j = 0; j < rows; j++) {
+      const t = j ? Math.pow((j - 1) / M, 1.25) : 0, r = j ? p.R0 + (p.R1 - p.R0) * t : p.R0 - 3;
+      const Hr = p.H0 + (p.H1 - p.H0) * _ss(p.R0 + 10, p.R1 - 30, r), mask = _ss(p.R0, p.R0 + 45, r);
+      for (let i = 0; i < N; i++) {
+        const th = i / N * Math.PI * 2, x = Math.cos(th) * r, z = Math.sin(th) * r, q = (j * N + i) * 3;
+        let y = -170, rv = 0;
+        if (j) {
+          // (the massifs, the ground bent first so that nothing lines up)
+          const wx = x + 45 * _gn(x / 320, z / 320, 0, 0, S + 1), wz = z + 45 * _gn(x / 320 + 7.3, z / 320 - 2.1, 0, 0, S + 2);
+          let f = 0, a = 1, fq = 1 / p.cB, n = 0; for (let o = 0; o < 4; o++) { f += _gn(wx * fq, wz * fq, 0, 0, S + 3 + o) * a; n += a; a *= 0.5; fq *= 2.03; }
+          const P = Math.pow(_cl(0.5 + 0.62 * f / n, 0, 1), p.pk);
+          // (the spurs and gullies)
+          let sum = 0, amp = 1, g = 1 / p.cD, wgt = 1, nrm = 0, fb = 0;
+          for (let o = 0; o < p.oct; o++) { const gg = _gn(wx * g + 31.7, wz * g - 12.9, 0, 0, S + 10 + o); let nn = 1 - Math.abs(gg); nn *= nn; nn *= wgt; wgt = _cl(nn * 2.2, 0, 1); sum += nn * amp; fb += gg * amp; nrm += amp; amp *= 0.5; g *= 2.02; }
+          rv = _cl(sum / nrm / 0.62, 0, 1);
+          const sh = p.rid * Math.pow(rv, p.sharp) + (1 - p.rid) * _cl(0.5 + 0.6 * fb / nrm, 0, 1);
+          y = mask * (Hr * (0.05 + 0.95 * P) + p.A * (sh - 0.3) * (0.3 + 0.7 * P));
+          col[q + 2] = 0.5 + 0.5 * _gn(wx / 90, wz / 90, 0, 0, S + 30);
+        }
+        pos[q] = x; pos[q + 1] = y; pos[q + 2] = z; Y[j * N + i] = y; col[q + 1] = rv;
+      }
+    }
+    // (the hollows darker, the ridges lighter: how far a point stands above or below its neighbours)
+    for (let j = 0; j < rows; j++) for (let i = 0; i < N; i++) {
+      const c = j * N + i, l = j * N + (i + N - 1) % N, rr = j * N + (i + 1) % N, dn = Math.max(1, j - 1) * N + i, up = Math.min(rows - 1, j + 1) * N + i;
+      col[c * 3] = j === 0 ? 0.6 : _cl(0.84 + (Y[c] - (Y[l] + Y[rr] + Y[dn] + Y[up]) / 4) * 0.1, 0.38, 1.12);
+    }
+    const idx = new Uint32Array(N * (rows - 1) * 6); let n = 0;
+    for (let j = 0; j < rows - 1; j++) for (let i = 0; i < N; i++) {
+      const a = j * N + i, b = j * N + (i + 1) % N, c = a + N, d = b + N;
+      // (each quad split along the diagonal that keeps to the ground: a ridge is not cut across)
+      if (Math.abs(Y[a] - Y[d]) < Math.abs(Y[b] - Y[c])) { idx[n++] = a; idx[n++] = b; idx[n++] = d; idx[n++] = a; idx[n++] = d; idx[n++] = c; }
+      else { idx[n++] = a; idx[n++] = b; idx[n++] = c; idx[n++] = b; idx[n++] = d; idx[n++] = c; }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeVertexNormals(); g.userData.shared = true;
+    return (_shape[key] = g);
+  }
+  // The far country's own shading (mountains and the far towers): the light comes from the scene's own lights, read every frame (the
+  // mood of the area, the dread of a guardian's road, the area's sky all move them); the sun's direction is the one the sky draws its
+  // disc in. Rock with strata in it and a grain of crags; grass, scrub or forest on the gentler and lower slopes; snow above its line,
+  // lying in the gullies and blown off the steep; and then the air: the farther, the more of the horizon's colour, and toward the
+  // foot a layer of mist the colour of the fog that the ground before it fades into. Not fogged by the scene: it does its own air.
+  const FAR_VS = `varying vec3 vWP; varying vec3 vN; varying vec3 vC; varying vec2 vU;
+    void main() {
+      vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; vC = color; vU = uv;
+      vec3 n = normalMatrix * normal; mat3 vm = mat3(viewMatrix); vN = vec3(dot(vm[0], n), dot(vm[1], n), dot(vm[2], n));
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`;
+  const FAR_FS = `uniform vec3 uSun; uniform vec3 uSunC; uniform vec3 uSkyC; uniform vec3 uGndC; uniform vec3 uHor; uniform vec3 uFog;
+    uniform vec3 uRock; uniform vec3 uVeg; uniform vec3 uSnow; uniform vec4 uLine; uniform vec4 uAir; uniform float uKind; uniform float uFogD;
+    varying vec3 vWP; varying vec3 vN; varying vec3 vC; varying vec2 vU;
+    float fh(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+    float fn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(fh(i), fh(i + vec2(1.0, 0.0)), f.x), mix(fh(i + vec2(0.0, 1.0)), fh(i + vec2(1.0, 1.0)), f.x), f.y); }
+    void main() {
+      vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
+      float y = vWP.y; vec2 p = vWP.xz; vec3 alb; float ao;
+      if (uKind < 0.5) {
+        ao = vC.x;
+        float b0 = fn(p * 0.13), bx = fn(p * 0.13 + vec2(0.2, 0.0)), bz = fn(p * 0.13 + vec2(0.0, 0.2)), b1 = fn(p * 0.5 + 9.0), b1x = fn(p * 0.5 + vec2(9.2, 9.0)), b1z = fn(p * 0.5 + vec2(9.0, 9.2));
+        N = normalize(N + vec3(b0 - bx, 0.0, b0 - bz) * 2.4 + vec3(b1 - b1x, 0.0, b1 - b1z) * 0.9);
+        float slope = 1.0 - N.y;
+        float n1 = fn(p * 0.017 + 3.1), n2 = fn(p * 0.071 + 7.7), n3 = fn(p * 0.29 + 1.3);
+        float strata = fn(vec2(y * 0.21 + n1 * 5.0, n2 * 2.0 + p.x * 0.004));
+        vec3 rock = uRock * (0.58 + 0.55 * n2) * (0.8 + 0.38 * strata) * (0.72 + 0.56 * vC.z);
+        float veg = uLine.z * smoothstep(0.52, 0.27, slope + (n1 - 0.5) * 0.32) * smoothstep(uLine.w + 20.0, uLine.w - 14.0, y + (n2 - 0.5) * 34.0 + vC.y * 18.0);
+        alb = mix(rock, uVeg * (0.5 + 0.9 * n3) * (0.75 + 0.5 * n1), veg);
+        float sn = uLine.y * smoothstep(uLine.x - 8.0, uLine.x + 16.0, y + (n1 - 0.5) * 44.0 + (1.0 - ao) * 34.0) * smoothstep(0.7, 0.38, slope + (n2 - 0.5) * 0.28 + vC.y * 0.14);
+        alb = mix(alb, uSnow * (0.82 + 0.18 * n3), sn); ao = mix(ao, 1.0, sn * 0.55);
+      } else {
+        // (the far towers: the colour they were made with; courses of stone; on the walls, some of the windows dark)
+        alb = vC; ao = 1.0;
+        if (vU.x >= 0.0) {
+          vec2 c = floor(vU / vec2(2.6, 5.2)), f = fract(vU / vec2(2.6, 5.2));
+          float on = step(0.66, fh(c + 17.0)), big = step(0.75, fh(c + 31.0)), hw = mix(0.06, 0.15, big), tp = mix(0.6, 0.7, big);
+          float win = on * step(abs(f.x - 0.5), hw) * step(0.3, f.y) * step(f.y, tp);
+          win = max(win, on * big * step(length(vec2((f.x - 0.5) / hw, (f.y - tp) / 0.08)), 1.0));
+          float streak = smoothstep(0.55, 1.0, fn(vec2(vU.x * 1.3, vU.y * 0.06))) * 0.18;
+          alb *= (1.0 - 0.78 * win) * (1.0 - streak) * (0.9 + 0.1 * smoothstep(0.0, 0.12, fract(vU.y / 0.66))) * (0.8 + 0.4 * fn(vU * vec2(0.4, 0.15)));
+        }
+      }
+      float ndl = max(dot(N, uSun), 0.0);
+      vec3 col = alb * (uSunC * ndl + mix(uGndC, uSkyC, N.y * 0.5 + 0.5) * 0.7) * ao;
+      float d = length(vWP - cameraPosition);
+      float fd = uFogD * d, haze = max(uAir.y * (1.0 - exp(-max(d - 120.0, 0.0) * uAir.x)), 0.6 * (1.0 - exp(-fd * fd)));
+      float mist = uAir.w * exp(-max(y + 4.0, 0.0) / uAir.z);
+      vec3 air = mix(uFog, uHor, smoothstep(-10.0, 90.0, y));
+      col = mix(col, air, clamp(haze + mist, 0.0, 1.0));
+      gl_FragColor = vec4(col, 1.0);
+      #include <colorspace_fragment>
+    }`;
+  // (one set of uniforms an area, shared by its mountains and its far towers; kind 0: mountain, 1: masonry)
+  function farMat(w, kind) {
+    let F = w._far;
+    if (!F) {
+      const look = farLook(w), B0 = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome;
+      const u = {
+        uSun: { value: new THREE.Vector3(...(B0.sunDir || [0.3, 0.6, -0.5])).normalize() }, uSunC: { value: new THREE.Color(0, 0, 0) }, uSkyC: { value: new THREE.Color(0, 0, 0) }, uGndC: { value: new THREE.Color(0, 0, 0) },
+        uHor: { value: new THREE.Color(B0.sky ? B0.sky[2] : B0.fog) }, uFog: { value: new THREE.Color(B0.fog) },
+        uRock: { value: new THREE.Color(look.rock) }, uVeg: { value: new THREE.Color(look.veg) }, uSnow: { value: new THREE.Color('#d2d6de') },
+        uLine: { value: new THREE.Vector4(look.snowY, look.snowK, look.vegK, look.vegY) }, uAir: { value: new THREE.Vector4(0.004, 0.55, 12, 0.8) }, uFogD: { value: 0 },
+      };
+      const mk = (k) => new THREE.ShaderMaterial({ uniforms: Object.assign({}, u, { uKind: { value: k } }), vertexShader: FAR_VS, fragmentShader: FAR_FS, vertexColors: true, side: THREE.DoubleSide, fog: false });
+      F = w._far = { u, mtn: mk(0), bld: mk(1) }; F.mtn.name = 'far_mountain'; F.bld.name = 'far_masonry';
+    }
+    return kind ? F.bld : F.mtn;
+  }
+  const _fl = { sun: null, hemi: null, amb: null }, _fc = new THREE.Color();
+  function farSync(renderer, scene, camera, geometry, material) {
+    const u = material.uniforms;
+    if (!_fl.sun || _fl.sun.parent !== scene) { _fl.sun = _fl.hemi = _fl.amb = null; for (const c of scene.children) { if (c.isDirectionalLight && !_fl.sun) _fl.sun = c; else if (c.isHemisphereLight && !_fl.hemi) _fl.hemi = c; else if (c.isAmbientLight && !_fl.amb) _fl.amb = c; } }
+    const K = 1 / Math.PI, h = _fl.hemi, a = _fl.amb;
+    if (_fl.sun) u.uSunC.value.copy(_fl.sun.color).multiplyScalar(_fl.sun.intensity * K);
+    u.uSkyC.value.setRGB(0, 0, 0); u.uGndC.value.setRGB(0, 0, 0);
+    if (h) { u.uSkyC.value.copy(h.color).multiplyScalar(h.intensity * K); u.uGndC.value.copy(h.groundColor).multiplyScalar(h.intensity * K); }
+    if (a) { _fc.copy(a.color).multiplyScalar(a.intensity * K); u.uSkyC.value.add(_fc); u.uGndC.value.add(_fc); }
+    if (scene.background && scene.background.isColor) u.uHor.value.copy(scene.background);
+    if (scene.fog) { u.uFog.value.copy(scene.fog.color); u.uFogD.value = scene.fog.isFogExp2 ? scene.fog.density : 0; }
+  }
+  LG.farMat = farMat; LG.farSync = farSync;
+  function mountains(w, grp, cx, cz, hs) {
+    if (G.save && G.save.data && G.save.data.settings && G.save.data.settings.quality === 'low') return;   // (past the 110 m the low setting draws at all)
+    const look = farLook(w), mat = farMat(w, 0);
+    const m = new THREE.Mesh(mtnGeo(look.style), mat);
+    m.position.set(cx, 0, cz); m.rotation.y = (hs[3] - 35) / 55 * Math.PI * 2; m.scale.set(hs[7] < 62.5 ? 1 : -1, 0.88 + (hs[5] - 35) / 55 * 0.24, 1);
+    m.frustumCulled = false; m.onBeforeRender = farSync; grp.add(m);
+  }
+
+  // ================================================================ the floating islands
   // the rim of an island seen from above: not a circle. a: the angle, k: which island
   const rimR = (a, k) => { const N = 6; let v = 0; for (let j = 1; j <= 3; j++) { const q = a / (Math.PI * 2) * (N * j); const i0 = Math.floor(q), f = q - i0, u = f * f * (3 - 2 * f); v += (_hn(i0 % (N * j), j, 20 + k) * (1 - u) + _hn((i0 + 1) % (N * j), j, 20 + k) * u) / j; } return 0.8 + v * 0.2; };
-  // rock hanging under an island: its top at y = 0 with the island's rim, down 1.4 to a point; in ledges, torn, never a cone
+  // rock hanging under an island: its top at y = 0 with the island's rim, down 1.4 to a point; in ledges that are not level (each
+  // breaks off a little higher or lower round the island, an overhang under it), the rock between split into ribs by the cracks that
+  // run down it, torn and lumpy, never a cone
   function hangRock(k) {
     const key = 'rock' + k; if (_shape[key]) return _shape[key];
-    const NA = 40, NT = 16, pos = [], uv = [], idx = [];
+    const NA = 72, NT = 22, pos = [], uv = [], idx = [];
     for (let j = 0; j <= NT; j++) {
-      const t = j / NT, step = Math.floor(t * 5) / 5, tt = t * 0.55 + step * 0.45;                      // (ledges: it narrows in steps)
+      const t = j / NT;
       for (let i = 0; i <= NA; i++) {
-        const a = i / NA * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
-        const lump = _vn(i % NA / NA * 9 + (i === NA ? 0 : 0), t * 5, 30 + k) * (i === NA ? 1 : 1);
-        const l2 = _vn((i % NA) / NA * 9, t * 5, 30 + k), l3 = _vn((NA - (i % NA)) / NA * 9, t * 5, 30 + k), wgt = (i % NA) / NA, lm = l2 * (1 - wgt * wgt * wgt * wgt) + l3 * (wgt * wgt * wgt * wgt);   // (the noise closed round the seam)
-        const r = rimR(a, k) * Math.pow(1 - tt, 0.62) * (0.82 + 0.36 * lm) * (1 - 0.04 * Math.sin(a * 3 + k));
+        const a = i / NA * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), u = i / NA;
+        const lv = 0.07 * _gn(u * 6, 0.5, 6, 0, 60 + k), step = Math.floor(_cl(t + lv, 0, 0.999) * 5) / 5, tt = t * 0.55 + step * 0.45;   // (ledges: it narrows in steps)
+        const lm = 0.5 + 0.5 * _gn(u * 9, t * 5, 9, 0, 30 + k), rib = 1 - Math.abs(_gn(u * 28, t * 2.5, 28, 0, 50 + k)), rb = rib * rib;
+        const r = rimR(a, k) * Math.pow(1 - tt, 0.62) * (0.82 + 0.36 * lm) * (0.93 + 0.1 * rb) * (1 - 0.04 * Math.sin(a * 3 + k));
         const lean = t * t * 0.18;
-        pos.push(ca * r + lean * Math.cos(k * 2.1), -t * 1.4, sa * r + lean * Math.sin(k * 2.1)); uv.push(i / NA * 4, t * 2);
+        pos.push(ca * r + lean * Math.cos(k * 2.1), -t * 1.4, sa * r + lean * Math.sin(k * 2.1)); uv.push(u * 8, t * 3);
       }
     }
     for (let j = 0; j < NT; j++) for (let i = 0; i < NA; i++) { const a = j * (NA + 1) + i, b = a + 1, c = a + NA + 1, d = c + 1; idx.push(a, b, c, b, d, c); }
@@ -673,38 +848,348 @@
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
     return (_shape[key] = g);
   }
-  // a clump of leaves: a ball pushed in and out, not a twenty-sided stone
-  function leafClump(k) {
-    const key = 'leaf' + k; if (_shape[key]) return _shape[key];
-    const g = new THREE.IcosahedronGeometry(1, 2), ps = g.attributes.position;   // (320 faces: seventy trees of six clumps stand beyond a town's walls)
-    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), f = 0.74 + 0.4 * _vn(x * 2.2 + 5 + k * 3, z * 2.2 + y * 1.7 + 5, 50 + k) + 0.12 * _vn(x * 6 + 9, y * 6 + z * 5 + 9, 60 + k); ps.setXYZ(i, x * f, y * f * (y < 0 ? 0.7 : 1), z * f); }
-    // (its faces do not share their corners, so each would be lit flat: every corner looks the way it lies from the middle, a little toward its face)
-    g.computeVertexNormals(); const nr = g.attributes.normal, v = new THREE.Vector3(), q = new THREE.Vector3();
-    for (let i = 0; i < ps.count; i++) { v.fromBufferAttribute(ps, i).normalize(); q.fromBufferAttribute(nr, i); v.lerp(q, 0.25).normalize(); nr.setXYZ(i, v.x, v.y, v.z); }
-    return (_shape[key] = g);
-  }
-  function treeTrunk() {
-    if (_shape.trunk) return _shape.trunk;
-    const g = new THREE.CylinderGeometry(0.42, 1, 1, 9, 6), ps = g.attributes.position;
-    for (let i = 0; i < ps.count; i++) { const y = ps.getY(i) + 0.5, flare = y < 0.07 ? 1 + (0.07 - y) * 4 : 1; ps.setXYZ(i, ps.getX(i) * flare + Math.sin(y * 4.1) * 0.3 * y * y, ps.getY(i), ps.getZ(i) * flare + (Math.cos(y * 3.3) - 1) * 0.3 * y * y); }
-    g.computeVertexNormals(); return (_shape.trunk = g);
+  // what hangs from an island's edge: roots out of the rock (cards of bare twigs, hanging), and the island's growth draped over its lip
+  // (cards of twigs in leaf); both stir in the wind like the trees. Unit size, as the island's rock and turf
+  function hangFringe(k) {
+    const key = 'fringe' + k; if (_shape[key]) return _shape[key];
+    const R = _prng(k * 61 + 9), rnd = (a, b) => a + (b - a) * R(), out = {};
+    for (const [kind, n] of [['roots', 30], ['leaf', 22]]) {
+      const P = [], Nn = [], Uv = [], C = [], I = [];
+      for (let m = 0; m < n; m++) {
+        const a = (m + rnd(0.1, 0.9)) / n * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), rr = rimR(a, k) * (kind === 'roots' ? rnd(0.86, 0.97) : rnd(0.98, 1.04));
+        const foot = [ca * rr, kind === 'roots' ? rnd(-0.12, -0.04) : 0.03, sa * rr], out2 = kind === 'roots' ? 0.18 : 0.75;
+        let d = [ca * out2 + rnd(-0.15, 0.15), -1, sa * out2 + rnd(-0.15, 0.15)]; const dl = Math.hypot(...d); d = d.map((v) => v / dl);
+        const len = kind === 'roots' ? rnd(0.4, 0.85) : rnd(0.12, 0.22), wd = len * (kind === 'roots' ? 0.26 : 0.9), side = [-sa, 0, ca], q = kind === 'roots' ? 3 : (m % 2), qu = (q % 2) * 0.5, qv = (q >> 1) * 0.5;
+        const o = P.length / 3;
+        for (const [sx, sy] of [[-1, 0], [-1, 1], [1, 0], [1, 1]]) {
+          const px = foot[0] + d[0] * len * sy + side[0] * wd / 2 * sx, py = foot[1] + d[1] * len * sy, pz = foot[2] + d[2] * len * sy + side[2] * wd / 2 * sx;
+          P.push(px, py, pz); const nl = Math.hypot(ca, 0.5, sa); Nn.push(ca / nl, 0.5 / nl, sa / nl); Uv.push(qu + 0.004 + (sx + 1) / 2 * 0.492, qv + 0.004 + sy * 0.492);
+          const ao = (0.55 + 0.45 * (1 - sy * 0.6)) * (kind === 'roots' ? 0.5 : 1); C.push(ao, ao * 0.92, ao * 0.82);
+        }
+        I.push(o, o + 2, o + 1, o + 1, o + 2, o + 3);
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(Uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I); g.userData.shared = true;
+      out[kind] = g;
+    }
+    return (_shape[key] = out);
   }
   LG.hangRock = hangRock; LG.hangTurf = hangTurf;
-  function tree(grp, w, x, y, z, rng, s) {
-    s = s || 1;
-    const PG = G.Props.PG;
-    const g = new THREE.Group(); g.position.set(x, y, z);
-    // (a trunk that flares at its foot and leans as it rises, boughs out of it to the crowns, crowns of leaves in clumps - it was a
-    // post with six twenty-sided stones on it. The dice are thrown as before)
-    const tr = new THREE.Mesh(treeTrunk(), w.mats.woodDark); tr.scale.set(0.27 * s, 4.4 * s, 0.27 * s); tr.position.y = 2.2 * s; tr.rotation.y = _hn(x, z, 7) * 6.28; g.add(tr);
-    for (let i = 0; i < 6; i++) {
-      const f = new THREE.Mesh(leafClump(i % 3), w.mats.leaf);
-      const r = rng.range(1.2, 2.0) * s;
-      f.scale.set(r, r * 0.8, r); f.position.set(rng.range(-1.3, 1.3) * s, (3.6 + rng.range(0, 2.2)) * s, rng.range(-1.3, 1.3) * s); f.rotation.set(rng.range(0, 3) * 0.12, rng.range(0, 3), 0);
-      g.add(f);
-      if (i < 4) { const b = new THREE.Mesh(PG.cyl8, w.mats.woodDark), fy = 2.6 * s, dx = f.position.x, dy = f.position.y - fy, dz = f.position.z, L = Math.hypot(dx, dy, dz); b.scale.set(0.085 * s, L, 0.085 * s); b.position.set(dx / 2, fy + dy / 2, dz / 2); b.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / L, dy / L, dz / L)); g.add(b); }   // a bough to it
+
+  // ================================================================ trees
+  // Broad-leaved, conifers and dead ones, three forms of each, each at three levels of detail (0: in the field, 1: beyond the walls
+  // but near them, 2: far off), made once and kept. The wood is tubes along a grown skeleton: a trunk that flares into roots at its
+  // foot, leans and forks; boughs off it that rise and bend up toward the light; branches off those, twigs on a dead tree. The leaves
+  // are cards with a picture of a twig in leaf on them, cut out by its alpha, many to a tree and at every angle: lit as one crown, not as
+  // flat cards (their normals lean out from the crown's middle), darker deep in it and underneath, and stirred by the wind at their tips.
+  // A conifer is whorls of sprays round a straight stem; a dead tree carries cards of bare twigs instead of leaves.
+  const TREE = { atlas: null, bark: null, mats: {} };
+  // the picture of the leaves: four cards in one (0, 1: twigs in leaf, 2: a spray of a conifer, 3: bare twigs). Each card's foot is
+  // at the top middle of its quarter and it grows down (the texture is read with row 0 at v = 0); between the leaves the colour is
+  // the leaves' own, so that a far card does not darken at its edges as the picture is made smaller
+  function leafAtlas() {
+    if (TREE.atlas) return TREE.atlas;
+    const S = 512, Q = S / 2, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const g = cv.getContext('2d'), R = _prng(907), rnd = (a, b) => a + (b - a) * R();
+    const leaf = (x, y, ang, len, wid, c) => {
+      g.save(); g.translate(x, y); g.rotate(ang);
+      g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(wid * 0.95, len * 0.18, wid * 0.75, len * 0.72, 0, len); g.bezierCurveTo(-wid * 0.75, len * 0.72, -wid * 0.95, len * 0.18, 0, 0);
+      const gr = g.createLinearGradient(0, 0, 0, len); gr.addColorStop(0, `rgb(${c[0] * 0.7 | 0},${c[1] * 0.72 | 0},${c[2] * 0.66 | 0})`); gr.addColorStop(0.55, `rgb(${c[0]},${c[1]},${c[2]})`); gr.addColorStop(1, `rgb(${Math.min(255, c[0] * 1.08) | 0},${Math.min(255, c[1] * 1.06) | 0},${c[2] * 0.95 | 0})`);
+      g.fillStyle = gr; g.fill();
+      g.strokeStyle = 'rgba(60,66,40,0.45)'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(0, 1); g.quadraticCurveTo(wid * 0.08, len * 0.5, 0, len * 0.9); g.stroke();
+      g.restore();
+    };
+    const stem = (pts, w0, w1, col) => { g.strokeStyle = col; g.lineCap = 'round'; for (let i = 1; i < pts.length; i++) { g.lineWidth = w0 + (w1 - w0) * i / pts.length; g.beginPath(); g.moveTo(pts[i - 1][0], pts[i - 1][1]); g.lineTo(pts[i][0], pts[i][1]); g.stroke(); } };
+    const leafCol = () => { const k = rnd(0.82, 1.08), y = rnd(-12, 14); return [Math.min(255, (176 + y) * k), Math.min(255, 196 * k), Math.min(255, (148 - y * 0.6) * k)]; };
+    // twigs in leaf: a stem that bends as it grows, eight side twigs off it, small leaves crowded alternate along them all and fanned
+    // at every end, so that the leaves fill most of the card (a card that is mostly air thins to nothing as it is made smaller)
+    const twig = (ox, oy, seed) => {
+      const R2 = _prng(seed), r2 = (a, b) => a + (b - a) * R2();
+      const main = []; let x = ox + Q / 2, y = oy + 3, a = Math.PI / 2 + r2(-0.12, 0.12);
+      for (let i = 0; i <= 10; i++) { main.push([x, y, a]); a += r2(-0.1, 0.1); x += Math.cos(a) * 20; y += Math.sin(a) * 20; }
+      const sides = [];
+      for (let k = 1; k <= 8; k++) {
+        const t = 0.06 + k * 0.1, f = t * 10, i0 = Math.min(9, Math.floor(f)), m0 = main[i0], m1 = main[i0 + 1], b = [m0[0] + (m1[0] - m0[0]) * (f - i0), m0[1] + (m1[1] - m0[1]) * (f - i0)];
+        const sd = k % 2 ? 1 : -1, L = r2(52, 88) * (1 - t * 0.5); let px = b[0], py = b[1], an = m0[2] + sd * r2(0.6, 0.95); const pts = [[px, py]];
+        for (let i = 0; i < 4; i++) { an += r2(-0.12, 0.12) - sd * 0.1; px += Math.cos(an) * L / 4; py += Math.sin(an) * L / 4; pts.push([px, py]); }
+        sides.push(pts);
+      }
+      stem(main, 3.6, 1.4, 'rgb(92,82,64)'); for (const s of sides) stem(s, 2.0, 0.9, 'rgb(96,86,66)');
+      const lv = [];
+      const along = (pts, every, sz) => { for (let i = 1; i < pts.length; i++) { const p = pts[i], q = pts[i - 1], an = Math.atan2(p[1] - q[1], p[0] - q[0]), seg = Math.hypot(p[0] - q[0], p[1] - q[1]); for (let d = 0; d < seg; d += every) { const t = d / seg, sd = lv.length % 2 ? 1 : -1; lv.push([q[0] + (p[0] - q[0]) * t, q[1] + (p[1] - q[1]) * t, an - Math.PI / 2 + sd * r2(0.5, 1.0), r2(21, 30) * sz, r2(9.5, 13.5) * sz]); } } };
+      along(main.map((m) => [m[0], m[1]]), 5.5, 1); for (const s of sides) along(s, 5.2, 0.95);
+      for (const end of [main[10], ...sides.map((s) => s[s.length - 1])]) for (let k = 0; k < 5; k++) lv.push([end[0], end[1], r2(-0.4, 0.4) + (k - 2) * 0.55, r2(18, 26), r2(8, 12)]);
+      // (painted from the foot outward, the ends last: the nearer leaves over the farther; one in eight shows its paler underside)
+      for (const l of lv) { const c = leafCol(); if (R2() < 0.12) { c[0] = Math.min(255, c[0] * 1.12); c[1] = Math.min(255, c[1] * 1.04); c[2] = Math.min(255, c[2] * 1.22); } leaf(l[0], l[1], l[2], l[3], l[4], c); }
+    };
+    const clip = (ox, oy, f) => { g.save(); g.beginPath(); g.rect(ox + 1, oy + 1, Q - 2, Q - 2); g.clip(); f(); g.restore(); };
+    clip(0, 0, () => twig(0, 0, 11)); clip(Q, 0, () => twig(Q, 0, 23));
+    // a spray of a conifer: a stem down the middle, needles off it both ways, side shoots with their own; it narrows to its tip
+    {
+      const ox = 0, oy = Q, mx = ox + Q / 2;
+      const needle = (x, y, an, L, c) => { g.strokeStyle = c; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(an) * L, y + Math.sin(an) * L); g.stroke(); };
+      const shoot = (x0, y0, an0, L0, depth) => {
+        let x = x0, y = y0, an = an0; const n = Math.round(L0 / 3);
+        for (let i = 0; i < n; i++) {
+          const t = i / n, L = (depth ? 15 : 24) * (1 - t * 0.65) * rnd(0.85, 1.1), k = rnd(0.75, 1.05), c = `rgb(${150 * k | 0},${178 * k | 0},${148 * k | 0})`;
+          needle(x, y, an + 1.05 + rnd(-0.15, 0.15), L, c); needle(x, y, an - 1.05 + rnd(-0.15, 0.15), L, c);
+          if (!depth && i % 9 === 4 && t < 0.75) { const sd = (i % 18 === 4) ? 1 : -1; shoot(x, y, an + sd * 0.75, L0 * 0.38 * (1 - t), 1); }
+          an += rnd(-0.04, 0.04); x += Math.cos(an) * 3; y += Math.sin(an) * 3;
+        }
+        g.strokeStyle = 'rgb(84,70,54)'; g.lineWidth = depth ? 1.2 : 2.2; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x, y); g.stroke();
+      };
+      clip(ox, oy, () => shoot(mx, oy + 3, Math.PI / 2, Q - 10, 0));
     }
-    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    // bare twigs: a stem that forks and forks again, finer each time
+    {
+      const ox = Q, oy = Q;
+      const fork = (x, y, an, L, wd, d) => {
+        const x2 = x + Math.cos(an) * L, y2 = y + Math.sin(an) * L, mx = (x + x2) / 2 + rnd(-3, 3), my = (y + y2) / 2 + rnd(-3, 3);
+        g.strokeStyle = `rgb(${120 + d * 6},${112 + d * 6},${102 + d * 6})`; g.lineWidth = wd; g.lineCap = 'round'; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(mx, my, x2, y2); g.stroke();
+        if (d >= 5 || x2 < ox + 4 || x2 > ox + Q - 4 || y2 > oy + Q - 4) return;
+        const n = d < 2 ? 3 : 2; for (let i = 0; i < n; i++) fork(x2, y2, an + (i - (n - 1) / 2) * rnd(0.45, 0.8) + rnd(-0.15, 0.15), L * rnd(0.6, 0.78), Math.max(0.9, wd * 0.62), d + 1);
+      };
+      clip(ox, oy, () => fork(ox + Q / 2, oy + 2, Math.PI / 2 + rnd(-0.1, 0.1), 70, 5, 0));
+    }
+    const im = g.getImageData(0, 0, S, S), d = im.data;
+    // (the colour of each quarter's leaves into its empty places: the picture's edges keep the leaves' colour as it is made smaller)
+    for (let q = 0; q < 4; q++) {
+      const x0 = (q % 2) * Q, y0 = (q >> 1) * Q; let r = 0, gg = 0, b = 0, n = 0;
+      for (let y = y0; y < y0 + Q; y++) for (let x = x0; x < x0 + Q; x++) { const i = (y * S + x) * 4; if (d[i + 3] > 200) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; } }
+      if (!n) continue; r /= n; gg /= n; b /= n;
+      for (let y = y0; y < y0 + Q; y++) for (let x = x0; x < x0 + Q; x++) { const i = (y * S + x) * 4, a = d[i + 3] / 255; if (a < 1) { d[i] = d[i] * a + r * (1 - a); d[i + 1] = d[i + 1] * a + gg * (1 - a); d[i + 2] = d[i + 2] * a + b * (1 - a); } }
+    }
+    const t = new THREE.DataTexture(new Uint8Array(d.buffer.slice(0)), S, S, THREE.RGBAFormat);
+    t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
+    return (TREE.atlas = t);
+  }
+  // bark: plates split by fissures that run along the trunk, the plates rough and here and there grey with lichen (a colour picture
+  // and its normal map; both repeat round the trunk and along it)
+  function barkTex() {
+    if (TREE.bark) return TREE.bark;
+    const S = 256, H = new Float32Array(S * S), L = new Float32Array(S * S);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const u = x / S, v = y / S, ph = u * 9 + 0.55 * _gn(u * 3, v * 2, 3, 2, 72) + 0.22 * _gn(u * 9, v * 5, 9, 5, 73);
+      const f = Math.abs(Math.sin(ph * Math.PI)), cr = Math.abs(Math.sin((v * 5 + 0.6 * _gn(u * 9, v * 5, 9, 5, 74)) * Math.PI));
+      H[y * S + x] = _ss(0.05, 0.6, f) * (0.7 + 0.3 * _ss(0.02, 0.3, cr)) + 0.09 * _gn(u * 32, v * 32, 32, 32, 75);
+      L[y * S + x] = _ss(0.35, 0.65, _gn(u * 10, v * 10, 10, 10, 79) * 0.5 + 0.5);
+    }
+    const map = G.Tex.pixTex(S, (u, v, o) => {
+      const i = Math.min(S - 1, v * S | 0) * S + Math.min(S - 1, u * S | 0), h = H[i], l = L[i] * _ss(0.4, 0.8, h);
+      const k = 0.38 + 0.72 * h; o[0] = (0.47 * k) * (1 - l) + 0.55 * l; o[1] = (0.41 * k) * (1 - l) + 0.56 * l; o[2] = (0.35 * k) * (1 - l) + 0.48 * l; o[3] = 1;
+    }, true);
+    const nrm = G.Tex.pixTex(S, (u, v, o) => {
+      const x = Math.min(S - 1, u * S | 0), y = Math.min(S - 1, v * S | 0), hx = H[y * S + (x + 1) % S] - H[y * S + (x + S - 1) % S], hy = H[((y + 1) % S) * S + x] - H[((y + S - 1) % S) * S + x];
+      const nx = -hx * 3.2, ny = hy * 3.2, k = 1 / Math.hypot(nx, ny, 1); o[0] = nx * k * 0.5 + 0.5; o[1] = ny * k * 0.5 + 0.5; o[2] = k * 0.5 + 0.5; o[3] = 1;
+    }, false);
+    for (const t of [map, nrm]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; }
+    return (TREE.bark = { map, nrm });
+  }
+  // the materials of a field's trees (kept: one set a field): bark, dead bark, leaves, bare twigs. The leaves' and twigs' cards stir
+  // in the wind at their tips and sway a little all over; seen from behind they are lit as from in front (they are a crown, not sheets)
+  function treeMats(w) {
+    const B = w.mats.biome, key = w.biome || '-';
+    if (TREE.mats[key]) return TREE.mats[key];
+    const at = leafAtlas(), bk = barkTex();
+    const card = (c) => {
+      const m = new THREE.MeshStandardMaterial({ map: at, color: c, roughness: 0.82, metalness: 0, side: THREE.DoubleSide, alphaTest: 0.4, alphaToCoverage: true, vertexColors: true });
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uTime = G.Tex.lavaT;
+        sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  { float k = fract(uv.y * 2.0), ph = position.x * 0.31 + position.z * 0.27 + position.y * 0.11;
+    transformed.x += sin(uTime * 1.9 + ph * 1.7) * 0.045 * k + sin(uTime * 0.8 + ph) * 0.02;
+    transformed.z += sin(uTime * 1.5 + ph * 2.1) * 0.04 * k + cos(uTime * 0.7 + ph) * 0.018;
+    transformed.y += sin(uTime * 2.3 + ph * 2.7) * 0.02 * k; }`);
+        sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+  { vec2 tx = vMapUv * 512.0; float lod = log2(max(max(length(dFdx(tx)), length(dFdy(tx))), 1.0)); diffuseColor.a *= 1.0 + lod * 0.3; }`).replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+  #ifdef DOUBLE_SIDED
+    normal *= faceDirection;
+  #endif`);
+      };
+      m.extensions = { derivatives: true }; m.customProgramCacheKey = () => 'leafcard2';
+      return m;
+    };
+    // (the field's leaf colour, brought to the brightness of real leaves: the old flat clumps were painted darker to look like foliage)
+    const lc = new THREE.Color(B.leaf ?? (B.outdoor === 'sky' ? 0x8ab05a : 0x4f6a2a)), lum = lc.r * 0.2126 + lc.g * 0.7152 + lc.b * 0.0722;
+    lc.multiplyScalar(_cl(lum * 2.6, 0.048, 0.1) / Math.max(1e-4, lum) / 0.55);
+    const bark = (c) => { const m = new THREE.MeshStandardMaterial({ map: bk.map, normalMap: bk.nrm, color: c, roughness: 0.93, metalness: 0, vertexColors: true }); m.normalScale.set(1.3, 1.3); return m; };
+    const M = { leaf: card(lc), twig: card(new THREE.Color('#8a8279')), bark: bark('#b8ac9e'), dead: bark('#bdbdc0') };
+    for (const k in M) M[k].name = 'tree_' + k;   // (named for the tools that list what is drawn where)
+    return (TREE.mats[key] = M);
+  }
+  // a tree's skeleton: limbs [{pts, rad, lvl}] and the places for its leaves [{p, d, lvl, len}] (kind: 'broad' | 'dead' | 'conifer')
+  function treeSkel(kind, seed) {
+    const R = _prng(seed * 7919 + 13), rnd = (a, b) => a + (b - a) * R();
+    const limbs = [], tips = [];
+    const nz = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    const grow = (p, d, len, r0, r1, n, up, wob, lvl) => {
+      const pts = [p.slice()], rad = [r0]; let q = p.slice(), dd = d.slice();
+      for (let k = 1; k <= n; k++) {
+        dd = nz([dd[0] + rnd(-wob, wob), dd[1] + up / n + rnd(-wob, wob) * 0.5, dd[2] + rnd(-wob, wob)]);
+        q = [q[0] + dd[0] * len / n, q[1] + dd[1] * len / n, q[2] + dd[2] * len / n]; pts.push(q.slice()); rad.push(r0 + (r1 - r0) * Math.pow(k / n, 0.85));
+      }
+      const L = { pts, rad, lvl }; limbs.push(L); return L;
+    };
+    // (a point a fraction t along a limb: where, which way, how thick)
+    const at = (L, t) => { const n = L.pts.length - 1, f = _cl(t, 0, 1) * n, i = Math.min(n - 1, Math.floor(f)), k = f - i, a = L.pts[i], b = L.pts[i + 1]; return { p: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k], d: nz([b[0] - a[0], b[1] - a[1], b[2] - a[2]]), r: L.rad[i] + (L.rad[i + 1] - L.rad[i]) * k }; };
+    if (kind === 'conifer') {
+      const H = rnd(8.2, 9.6), T = grow([0, -0.25, 0], nz([rnd(-0.03, 0.03), 1, rnd(-0.03, 0.03)]), H + 0.25, 0.22, 0.015, 10, 0, 0.01, 0);
+      let a0 = rnd(0, 6.28);
+      for (let y = 1.15; y < H - 0.25; y += rnd(0.36, 0.48)) {
+        const rel = (y - 1.15) / (H - 1.4), n = rel > 0.8 ? 4 : 5; a0 += rnd(0.5, 1.2);
+        for (let b = 0; b < n; b++) {
+          const az = a0 + b * 6.283 / n + rnd(-0.25, 0.25), e = -0.32 + 0.42 * rel + rnd(-0.08, 0.08), len = (2.5 * Math.pow(1 - rel, 0.85) + 0.3) * rnd(0.85, 1.12);
+          tips.push({ p: at(T, (y + 0.25) / (H + 0.25)).p, d: [Math.cos(az) * Math.cos(e), Math.sin(e), Math.sin(az) * Math.cos(e)], lvl: 1, len, rel });
+        }
+      }
+      tips.push({ p: T.pts[T.pts.length - 1], d: [0, 1, 0], lvl: 0, len: 0.7, rel: 1 });
+      return { limbs, tips, C: [0, H * 0.48, 0], Rc: H * 0.5, axis: true };
+    }
+    const dead = kind === 'dead', H = rnd(6.0, 7.0) * (dead ? 0.95 : 1), fork = rnd(1.7, 2.3);
+    const T = grow([0, -0.3, 0], nz([rnd(-0.1, 0.1), 1, rnd(-0.1, 0.1)]), H + 0.3, 0.25, 0.045, 10, 0, dead ? 0.07 : 0.045, 0);
+    const nP = dead ? 7 : 8, a0 = rnd(0, 6.28), fill = [];
+    for (let i = 0; i < nP; i++) {
+      const h = fork + (H * 0.86 - fork) * (i + rnd(0.15, 0.85)) / nP, b = at(T, (h + 0.3) / (H + 0.3)), az = a0 + i * 2.39996 + rnd(-0.35, 0.35);
+      const el = 0.98 - 0.55 * i / (nP - 1) + rnd(-0.1, 0.1), d = [Math.sin(el) * Math.cos(az), Math.cos(el), Math.sin(el) * Math.sin(az)];
+      const broken = dead && R() < 0.3, len = (3.3 - 1.7 * i / (nP - 1)) * rnd(0.85, 1.12) * (broken ? 0.4 : 1);
+      const P = grow(b.p, d, len, b.r * 0.62, broken ? b.r * 0.3 : 0.022, broken ? 2 : 5, dead ? 0.15 : 0.38, dead ? 0.2 : 0.12, 1);
+      if (broken) continue;
+      tips.push({ p: P.pts[P.pts.length - 1], d: at(P, 1).d, lvl: 1, len });
+      for (let m = 0; m < 10; m++) fill.push([P, rnd(0.25, 1), 0.9]);
+      for (const [t2, sd] of [[rnd(0.22, 0.32), 1], [rnd(0.42, 0.52), -1], [rnd(0.62, 0.72), 1], [rnd(0.8, 0.9), -1]]) {
+        const q = at(P, t2), ca = Math.cos(sd * rnd(0.7, 1.1)), sa = Math.sin(sd * rnd(0.7, 1.1));
+        const d2 = nz([q.d[0] * ca - q.d[2] * sa, q.d[1] + rnd(0.15, 0.4), q.d[0] * sa + q.d[2] * ca]), l2 = len * rnd(0.42, 0.55);
+        const S2 = grow(q.p, d2, l2, q.r * 0.62, 0.012, 3, dead ? 0.05 : 0.25, dead ? 0.22 : 0.15, 2);
+        tips.push({ p: S2.pts[S2.pts.length - 1], d: at(S2, 1).d, lvl: 2, len: l2 });
+        tips.push({ p: at(S2, 0.5).p, d: at(S2, 0.5).d, lvl: 3, len: l2 });
+        for (let m = 0; m < 4; m++) fill.push([S2, rnd(0.25, 1), 0.55]);
+        if (dead) for (let k = 0; k < 2; k++) { const q3 = at(S2, rnd(0.45, 0.9)), c3 = Math.cos(k ? 0.8 : -0.8), s3 = Math.sin(k ? 0.8 : -0.8); grow(q3.p, nz([q3.d[0] * c3 - q3.d[2] * s3, q3.d[1] + 0.2, q3.d[0] * s3 + q3.d[2] * c3]), l2 * 0.5, q3.r * 0.6, 0.006, 2, 0.1, 0.25, 4); }
+      }
+    }
+    tips.push({ p: T.pts[T.pts.length - 1], d: [0, 1, 0], lvl: 1, len: 1.2 });
+    let C = [0, 0, 0]; for (const t of tips) { C[0] += t.p[0]; C[1] += t.p[1]; C[2] += t.p[2]; } C = C.map((v) => v / tips.length);
+    // (leaves through the crown: a little out from a point along a bough or a branch, away from the crown's middle; lvl 5)
+    for (const [lb, t, off] of fill) { const q = at(lb, t); let o = nz([rnd(-1, 1), rnd(-0.6, 1), rnd(-1, 1)]); const out = [q.p[0] - C[0], q.p[1] - C[1], q.p[2] - C[2]]; if (o[0] * out[0] + o[1] * out[1] + o[2] * out[2] < 0) o = [-o[0], -o[1], -o[2]]; const r = rnd(0.15, off); tips.push({ p: [q.p[0] + o[0] * r, q.p[1] + o[1] * r, q.p[2] + o[2] * r], d: nz([q.d[0] + o[0], q.d[1] + o[1], q.d[2] + o[2]]), lvl: 5, len: 1 }); }
+    C = [0, 0, 0]; for (const t of tips) { C[0] += t.p[0]; C[1] += t.p[1]; C[2] += t.p[2]; } C = C.map((v) => v / tips.length);
+    let Rc = 0.5; for (const t of tips) Rc = Math.max(Rc, Math.hypot(t.p[0] - C[0], t.p[1] - C[1], t.p[2] - C[2]));
+    return { limbs, tips, C, Rc };
+  }
+  // the levels of detail: per limb level, how many sides round and how many of its rings (0 = left out); the cards: how many at each
+  // kind of place (lvl 1: a bough's end, 2: a branch's, 3: the middle of a branch), how big, folded down their middle or flat
+  const TLOD = [
+    { sides: [10, 6, 3, 0, 3], rings: [12, 6, 4, 0, 3], flare: true, cards: [2, 1, 0, 1], size: 1.45, fold: true, con: 2 },
+    { sides: [7, 5, 3, 0, 0], rings: [7, 4, 2, 0, 0], flare: true, cards: [1, 1, 0, 0.5], size: 1.85, fold: false, con: 1 },
+    { sides: [5, 4, 0, 0, 0], rings: [4, 2, 0, 0, 0], flare: false, cards: [1, 1, 0, 0.25], size: 2.7, fold: false, con: 1 },
+  ];
+  function treeGeo(kind, vi, lod) {
+    const key = 'tree_' + kind + vi + '_' + lod; if (_shape[key]) return _shape[key];
+    const sk = treeSkel(kind, vi * 31 + (kind === 'dead' ? 7 : kind === 'conifer' ? 3 : 1)), L = TLOD[lod], R = _prng(vi * 977 + lod * 13 + 5), rnd = (a, b) => a + (b - a) * R();
+    const P = [], N = [], U = [], C = [], I = [];
+    // ---- the wood: each limb a tube, its rings carried along it without twisting (parallel transport)
+    for (const lb of sk.limbs) {
+      const sides = L.sides[lb.lvl], nr = Math.min(L.rings[lb.lvl], lb.pts.length); if (!sides || !nr) continue;
+      let pts = [], rad = []; for (let k = 0; k < nr; k++) { const f = Math.round(k * (lb.pts.length - 1) / (nr - 1)); pts.push(lb.pts[f]); rad.push(lb.rad[f]); }
+      // (the trunk's foot: rings put in where the roots spread from it)
+      if (lb.lvl === 0 && L.flare) { const p0 = pts[0], p1 = pts[1], at = (y) => { const k = (y - p0[1]) / (p1[1] - p0[1]); return [p0[0] + (p1[0] - p0[0]) * k, y, p0[2] + (p1[2] - p0[2]) * k]; }; pts.splice(1, 0, at(0.06), at(0.32)); rad.splice(1, 0, rad[0], rad[0] * 0.96); }
+      const n = pts.length, base = P.length / 3, uRep = lb.lvl ? 1 : 2;
+      let Tn = null, Nn = null, vAcc = 0;
+      for (let k = 0; k < n; k++) {
+        const a = pts[Math.max(0, k - 1)], b = pts[Math.min(n - 1, k + 1)], T = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], tl = Math.hypot(T[0], T[1], T[2]) || 1; T[0] /= tl; T[1] /= tl; T[2] /= tl;
+        if (!Nn) { Nn = Math.abs(T[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]; }
+        const dt = Nn[0] * T[0] + Nn[1] * T[1] + Nn[2] * T[2]; Nn = [Nn[0] - T[0] * dt, Nn[1] - T[1] * dt, Nn[2] - T[2] * dt]; const nl = Math.hypot(Nn[0], Nn[1], Nn[2]) || 1; Nn = [Nn[0] / nl, Nn[1] / nl, Nn[2] / nl];
+        const Bn = [T[1] * Nn[2] - T[2] * Nn[1], T[2] * Nn[0] - T[0] * Nn[2], T[0] * Nn[1] - T[1] * Nn[0]];
+        if (k) { const q = pts[k - 1]; vAcc += Math.hypot(pts[k][0] - q[0], pts[k][1] - q[1], pts[k][2] - q[2]) * uRep / (2 * Math.PI * Math.max(0.03, rad[k])) * 0.7; }
+        const r0 = k === n - 1 && lb.lvl ? 0 : rad[k], y = pts[k][1];
+        for (let s = 0; s <= sides; s++) {
+          const an = s / sides * Math.PI * 2, ca = Math.cos(an), sa = Math.sin(an);
+          // (the roots: five lobes swelling out of the foot, and the bark's furrows a little in the outline of the trunk)
+          let rr = r0;
+          if (lb.lvl === 0) { const fl = L.flare ? _ss(0.55, -0.05, y) : 0, lobe = Math.pow(Math.max(0, Math.cos(an * 5 + vi)), 2); rr *= (1 + fl * (0.3 + 0.6 * lobe)) * (1 + 0.035 * Math.sin(an * 11 + y * 3)); }
+          const ox = Nn[0] * ca + Bn[0] * sa, oy = Nn[1] * ca + Bn[1] * sa, oz = Nn[2] * ca + Bn[2] * sa;
+          P.push(pts[k][0] + ox * rr, y + oy * rr, pts[k][2] + oz * rr); N.push(ox, oy, oz); U.push(s / sides * uRep, vAcc);
+          const ao = (0.62 + 0.38 * _ss(-0.2, 1.4, y)) * (lb.lvl ? 0.9 : 1), moss = lb.lvl === 0 ? _ss(1.2, 0, y) * Math.max(0, oz) * 0.25 : 0;
+          // (a conifer's stem dark and grey under its sprays, not the warm brown of a broad-leaved tree's bark)
+          const ck = kind === 'conifer' ? [0.5, 0.5, 0.52] : [1, 1, 1];
+          C.push(ao * (1 - moss * 0.3) * ck[0], ao * (1 - moss * 0.05) * ck[1], ao * (1 - moss * 0.45) * ck[2]);
+        }
+        if (k) for (let s = 0; s < sides; s++) { const a = base + (k - 1) * (sides + 1) + s, b = a + 1, c = a + sides + 1, d = c + 1; I.push(a, b, c, b, d, c); }
+      }
+    }
+    const wood = new THREE.BufferGeometry();
+    wood.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); wood.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); wood.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); wood.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); wood.setIndex(I);
+    wood.userData.shared = true;
+    // ---- the cards
+    const lp = [], ln = [], lu = [], lc = [], li = [], Cc = sk.C, Rc = sk.Rc;
+    const cardAt = (foot, up, side, len, wd, q, fold) => {
+      // (foot: where its stem is; up: the way it grows; side: across it; q: which picture; fold: its halves tilted back)
+      const nrm = [up[1] * side[2] - up[2] * side[1], up[2] * side[0] - up[0] * side[2], up[0] * side[1] - up[1] * side[0]];
+      const qu = (q % 2) * 0.5, qv = (q >> 1) * 0.5, base = lp.length / 3, tilt = fold ? 0.32 : 0, hw = wd / 2;
+      const pts = fold ? [[0, 0], [0, 1], [-1, 0], [-1, 1], [1, 0], [1, 1]] : [[-1, 0], [-1, 1], [1, 0], [1, 1]];
+      const hue = [1 + rnd(-0.08, 0.06), 1 + rnd(-0.04, 0.05), 1 + rnd(-0.1, 0.05)];
+      for (const [sx, sy] of pts) {
+        const ex = sx * hw, back = Math.abs(sx) * hw * tilt, px = foot[0] + up[0] * len * sy + side[0] * ex - nrm[0] * back, py = foot[1] + up[1] * len * sy + side[1] * ex - nrm[1] * back, pz = foot[2] + up[2] * len * sy + side[2] * ex - nrm[2] * back;
+        lp.push(px, py, pz); lu.push(qu + 0.004 + (sx + 1) / 2 * 0.492, qv + 0.004 + sy * 0.492);
+        // (lit as part of the crown: the normal leans out from the crown's middle - or from a conifer's stem - and a little up)
+        let ox = px - Cc[0], oy = py - Cc[1], oz = pz - Cc[2]; if (sk.axis) oy = oy * 0.25 + Rc * 0.35;
+        const ol = Math.hypot(ox, oy, oz) || 1, dir = (nrm[0] * ox + nrm[1] * oy + nrm[2] * oz) < 0 ? -1 : 1;
+        const nx = nrm[0] * dir * 0.3 + ox / ol * 0.7, ny = nrm[1] * dir * 0.3 + oy / ol * 0.7 + 0.2, nz2 = nrm[2] * dir * 0.3 + oz / ol * 0.7, nl = Math.hypot(nx, ny, nz2) || 1;
+        ln.push(nx / nl, ny / nl, nz2 / nl);
+        const dd = Math.hypot(px - Cc[0], (py - Cc[1]) * (sk.axis ? 0.3 : 1), pz - Cc[2]) / Rc, ao = (0.42 + 0.58 * _ss(0.1, 1.0, dd)) * (0.78 + 0.22 * _ss(-0.9, 0.5, (py - Cc[1]) / Rc));
+        lc.push(ao * hue[0], ao * hue[1], ao * hue[2]);
+      }
+      if (fold) li.push(base, base + 2, base + 1, base + 1, base + 2, base + 3, base, base + 1, base + 4, base + 1, base + 5, base + 4);
+      else li.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+    };
+    const nz = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    const across = (up) => { const r = nz([rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)]), s = [up[1] * r[2] - up[2] * r[1], up[2] * r[0] - up[0] * r[2], up[0] * r[1] - up[1] * r[0]]; return nz(s); };
+    if (kind === 'conifer') {
+      // (sprays along each branch, lying a little tilted, two crossed on the nearer trees; the farther trees keep every other whorl)
+      sk.tips.forEach((t, i) => {
+        if (lod === 2 && i % 2) return;
+        const d = t.d, flat = Math.abs(d[1]) > 0.95 ? [1, 0, 0] : nz([-d[2], 0, d[0]]), n = lod === 0 ? 2 : 1, len = t.len * (lod === 2 ? 1.25 : 1.08);
+        for (let k = 0; k < n; k++) {
+          // (tilted well up about the branch, so that from the side the spray shows its face and not its edge: on the nearer trees one
+          // low and one steep, crossed; on the farther one steep, leaning this way or that)
+          const tl = n === 2 ? (k ? -rnd(0.95, 1.2) : rnd(0.3, 0.5)) : (i % 2 ? 1 : -1) * rnd(0.95, 1.25), c = Math.cos(tl), s = Math.sin(tl), up = [0, 1, 0];
+          const side = nz([flat[0] * c + up[0] * s, flat[1] * c + up[1] * s, flat[2] * c + up[2] * s]);
+          cardAt([t.p[0] - d[0] * 0.15, t.p[1] - 0.05, t.p[2] - d[2] * 0.15], d, side, len, len * (lod === 2 ? 0.75 : 0.62), 2, false);
+        }
+      });
+    } else {
+      const q0 = kind === 'dead' ? 3 : -1;
+      let nf = 0;
+      for (const t of sk.tips) {
+        // (the leaves through the crown: every one on the nearest trees, every other or every fourth farther off)
+        if (t.lvl === 5) { nf++; if ((nf * L.cards[3]) % 1 >= L.cards[3] - 1e-6 && L.cards[3] < 1) continue; if (kind === 'dead' && nf % 3) continue; }
+        const cnt = t.lvl === 1 ? L.cards[0] : t.lvl === 2 ? L.cards[1] : t.lvl === 3 ? L.cards[2] : 1; if (!cnt) continue;
+        for (let k = 0; k < (kind === 'dead' ? 1 : cnt); k++) {
+          const out = nz([t.p[0] - Cc[0], t.p[1] - Cc[1] + 0.4, t.p[2] - Cc[2]]), up = nz([t.d[0] * 0.55 + out[0] * 0.45 + rnd(-0.35, 0.35), t.d[1] * 0.55 + out[1] * 0.45 + rnd(-0.3, 0.35), t.d[2] * 0.55 + out[2] * 0.45 + rnd(-0.35, 0.35)]);
+          const sz = L.size * rnd(0.85, 1.12) * (kind === 'dead' ? 1.2 : 1), q = q0 >= 0 ? q0 : (R() < 0.5 ? 0 : 1);
+          cardAt([t.p[0] - up[0] * sz * 0.22, t.p[1] - up[1] * sz * 0.22, t.p[2] - up[2] * sz * 0.22], up, across(up), sz, sz, q, L.fold && kind !== 'dead');
+        }
+      }
+    }
+    let leaf = null;
+    if (li.length) { leaf = new THREE.BufferGeometry(); leaf.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); leaf.setAttribute('normal', new THREE.Float32BufferAttribute(ln, 3)); leaf.setAttribute('uv', new THREE.Float32BufferAttribute(lu, 2)); leaf.setAttribute('color', new THREE.Float32BufferAttribute(lc, 3)); leaf.setIndex(li); leaf.userData.shared = true; }
+    return (_shape[key] = { wood, leaf });
+  }
+  LG.treeGeo = treeGeo;
+  LG._nat = { mtnGeo, leafAtlas, barkTex, treeMats, hangFringe };   // (for the tools that measure them)
+  // a tree where it stands (x, y, z in grp; s its size). opt (for the tools): {kind, lod}
+  function tree(grp, w, x, y, z, rng, s, opt) {
+    s = s || 1;
+    // (the dice as they were thrown for the six clumps of leaves of the old tree: thrown still, so that everything after falls as before)
+    for (let i = 0; i < 6; i++) { rng.range(1.2, 2.0); rng.range(-1.3, 1.3); rng.range(0, 2.2); rng.range(-1.3, 1.3); rng.range(0, 3); rng.range(0, 3); }
+    // (on an island it stands in the island's group; how far it is from where anyone walks decides how finely it is made)
+    const isl = grp !== w.group && grp.position, wx = x + (isl ? grp.position.x : 0), wz = z + (isl ? grp.position.z : 0);
+    const dEdge = Math.hypot(Math.max(0, -wx, wx - w.W), Math.max(0, -wz, wz - w.D));
+    const lo = !!(G.save && G.save.data && G.save.data.settings && G.save.data.settings.quality === 'low');   // (the low setting: one level coarser)
+    const lod = opt && opt.lod != null ? opt.lod : Math.min(2, (dEdge < 1 ? 0 : dEdge < 30 ? 1 : 2) + (lo ? 1 : 0));
+    const look = farLook(w), h = _hn(wx * 0.37, wz * 0.29, 3);
+    const kind = opt && opt.kind ? opt.kind : isl ? 'broad' : h < look.dead ? 'dead' : h < look.dead + look.con ? 'conifer' : 'broad';
+    const T = treeGeo(kind, Math.floor(_hn(wx * 0.71, wz * 0.53, 9) * 3), lod), M = treeMats(w);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = _hn(x, z, 7) * 6.28; g.scale.setScalar(s);
+    const add = (geo, m) => { const o = new THREE.Mesh(geo, m); o.castShadow = lod === 0; o.receiveShadow = true; g.add(o); };
+    add(T.wood, kind === 'dead' ? M.dead : M.bark); if (T.leaf) add(T.leaf, kind === 'dead' ? M.twig : M.leaf);
     grp.add(g);
     return g;
   }

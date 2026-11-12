@@ -270,17 +270,182 @@
     return hi - lo <= (tol ?? 0.3) ? hi : null;
   };
 
+  // ---------------------------------------------------------------- boulders
+  // A boulder is broken rock, not a die. Six forms, picked by where the stone lies (a row of them is not one stone over and over),
+  // each made once and kept: two blocks split along a dozen planes, a slab in two layers, a split shard, a rounded boulder of granite,
+  // a stone lying on another. Each is cut out of an ellipsoid by planes (a convex solid: its faces the fracture faces), its edges worn
+  // round (the more where two or three faces meet), and then its skin: the faces broken off lately stay flat and pale, the old ones
+  // weathered lumpy and darker. In the unit space the dodecahedron had (about -1..1, its middle 0.55 sy over the given y; the bottom
+  // goes into the ground). The two kinds of face are two meshes, so that each takes its own shade (the batch tints a whole mesh).
+  // (made by noise and generators of their own: the area's dice are thrown only for the turn and lean, as before)
+  const _rh = (x, y, z, s) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 1103515245) ^ Math.imul(s | 0, 1442695041); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+  const _rn = (x, y, z, s) => {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), fx = x - xi, fy = y - yi, fz = z - zi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w2 = fz * fz * (3 - 2 * fz);
+    const L = (a, b, t) => a + (b - a) * t, c = (i, j, k) => _rh(xi + i, yi + j, zi + k, s);
+    return L(L(L(c(0, 0, 0), c(1, 0, 0), u), L(c(0, 1, 0), c(1, 1, 0), u), v), L(L(c(0, 0, 1), c(1, 0, 1), u), L(c(0, 1, 1), c(1, 1, 1), u), v), w2);
+  };
+  const _rp = (seed) => { let s = (seed >>> 0) || 1; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = Math.imul(s ^ (s >>> 15), s | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+  // the convex solid inside planes [nx, ny, nz, d] (n . p <= d), as faces {n, pts (counter-clockwise seen from outside), k: which plane}
+  function solid(planes) {
+    const B = 4, box = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].map((n, k) => ({ n, k: -1 - k, pts: null }));
+    for (const f of box) {
+      const n = f.n, u = Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], a = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]], b = [n[1] * a[2] - n[2] * a[1], n[2] * a[0] - n[0] * a[2], n[0] * a[1] - n[1] * a[0]];
+      f.pts = [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([p, q]) => [n[0] * B + (a[0] * p + b[0] * q) * B, n[1] * B + (a[1] * p + b[1] * q) * B, n[2] * B + (a[2] * p + b[2] * q) * B]);
+      // (counter-clockwise seen from outside: turned round if it came out the other way)
+      const e1 = f.pts[1].map((v, i) => v - f.pts[0][i]), e2 = f.pts[2].map((v, i) => v - f.pts[0][i]), cx = e1[1] * e2[2] - e1[2] * e2[1], cy = e1[2] * e2[0] - e1[0] * e2[2], cz = e1[0] * e2[1] - e1[1] * e2[0];
+      if (cx * n[0] + cy * n[1] + cz * n[2] < 0) f.pts.reverse();
+    }
+    let faces = box;
+    planes.forEach((pl, k) => {
+      const [nx, ny, nz, d] = pl, out = [], cap = [];
+      for (const f of faces) {
+        const res = [], P = f.pts;
+        for (let i = 0; i < P.length; i++) {
+          const a = P[i], b = P[(i + 1) % P.length], da = nx * a[0] + ny * a[1] + nz * a[2] - d, db = nx * b[0] + ny * b[1] + nz * b[2] - d;
+          if (da <= 1e-9) res.push(a);
+          if (Math.abs(da) <= 1e-9) cap.push(a);
+          if ((da < -1e-9 && db > 1e-9) || (da > 1e-9 && db < -1e-9)) { const t = da / (da - db), p = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; res.push(p); cap.push(p); }
+        }
+        if (res.length >= 3) out.push({ n: f.n, k: f.k, pts: res });
+      }
+      // (the new face: the points where the plane cut the old edges, in order round their middle)
+      const uniq = []; for (const p of cap) if (!uniq.some((q) => Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]) + Math.abs(q[2] - p[2]) < 1e-7)) uniq.push(p);
+      if (uniq.length >= 3) {
+        const c = [0, 0, 0]; for (const p of uniq) { c[0] += p[0] / uniq.length; c[1] += p[1] / uniq.length; c[2] += p[2] / uniq.length; }
+        const u = Math.abs(ny) < 0.9 ? [0, 1, 0] : [1, 0, 0], a = [ny * u[2] - nz * u[1], nz * u[0] - nx * u[2], nx * u[1] - ny * u[0]], al = Math.hypot(...a); a[0] /= al; a[1] /= al; a[2] /= al;
+        const b = [ny * a[2] - nz * a[1], nz * a[0] - nx * a[2], nx * a[1] - ny * a[0]];
+        uniq.sort((p, q) => Math.atan2((p[0] - c[0]) * b[0] + (p[1] - c[1]) * b[1] + (p[2] - c[2]) * b[2], (p[0] - c[0]) * a[0] + (p[1] - c[1]) * a[1] + (p[2] - c[2]) * a[2]) - Math.atan2((q[0] - c[0]) * b[0] + (q[1] - c[1]) * b[1] + (q[2] - c[2]) * b[2], (q[0] - c[0]) * a[0] + (q[1] - c[1]) * a[1] + (q[2] - c[2]) * a[2]));
+        out.push({ n: [nx, ny, nz], k, pts: uniq });
+      }
+      faces = out;
+    });
+    return faces;
+  }
+  // planes round an ellipsoid (ax, ay, az) along directions spread over the sphere, each a little inside it (cut: 0.8..0.97 of the
+  // ellipsoid's reach that way); extra: planes given outright
+  function cutPlanes(R, n, ax, ay, az, cut, extra, steep) {
+    const P = [], off = R() * 6.28;
+    for (let i = 0; i < n; i++) {
+      const y0 = 1 - (i + 0.5) / n * 2, r = Math.sqrt(Math.max(0, 1 - y0 * y0)), a = i * 2.39996 + off;
+      let d = [Math.cos(a) * r + (R() - 0.5) * 0.35, y0 * (steep || 1) + (R() - 0.5) * 0.35, Math.sin(a) * r + (R() - 0.5) * 0.35]; const l = Math.hypot(...d); d = d.map((v) => v / l);
+      const reach = Math.sqrt(ax * ax * d[0] * d[0] + ay * ay * d[1] * d[1] + az * az * d[2] * d[2]);
+      P.push([d[0], d[1], d[2], reach * (cut[0] + (cut[1] - cut[0]) * R())]);
+    }
+    return P.concat(extra || []);
+  }
+  // one stone of a form: the solid, its edges worn round, its skin; into the lists of the fresh and the weathered faces
+  // (worn: how far in its edges are worn; lump: how lumpy its weathered skin; off: where it sits; fresh: the share of faces broken lately)
+  function stone(out, planes, o) {
+    const faces = solid(planes), R = _rp(o.seed * 131 + 7), off = o.off || [0, 0, 0], worn = o.worn ?? 0.06, ww = o.ww ?? 0.16, lump = o.lump ?? 0.05;
+    const fresh = {}; for (const f of faces) if (f.k >= 0 && fresh[f.k] === undefined) fresh[f.k] = f.n[1] < 0.55 && R() < (o.fresh ?? 0.5);
+    // (a point's slack inside each plane: on a face one is 0, by an edge a second is small, by a corner a third: worn the more)
+    const shape = (p) => {
+      let s1 = 9, s2 = 9, s3 = 9, k1 = 0;
+      planes.forEach(([nx, ny, nz, d], i) => { const s = d - (nx * p[0] + ny * p[1] + nz * p[2]); if (s < s1) { s3 = s2; s2 = s1; s1 = s; k1 = i; } else if (s < s2) { s3 = s2; s2 = s; } else if (s < s3) s3 = s; });
+      const e2 = Math.max(0, 1 - s2 / ww), e3 = Math.max(0, 1 - s3 / ww), l = Math.hypot(p[0], p[1] * 1.2, p[2]) || 1;
+      const nrm = _rn(p[0] * 3.1 + o.seed, p[1] * 3.1, p[2] * 3.1, 5) - 0.5, fine = _rn(p[0] * 9 + 3, p[1] * 9, p[2] * 9 + o.seed, 6) - 0.5;
+      const lp = lump * (fresh[k1] ? 0.3 : 1), k = 1 - (worn * (e2 * e2 + 0.8 * e3 * e3)) / l + (lp * nrm + lp * 0.35 * fine) * (0.4 + 0.6 * Math.min(1, s2 / ww + 0.2));
+      return [p[0] * k + off[0], p[1] * k + off[1], p[2] * k + off[2]];
+    };
+    for (const f of faces) {
+      if (f.k < 0) continue;
+      const P = f.pts, c = [0, 0, 0]; for (const p of P) { c[0] += p[0] / P.length; c[1] += p[1] / P.length; c[2] += p[2] / P.length; }
+      const tris = [];
+      for (let i = 0; i < P.length; i++) {
+        const a = P[i], b = P[(i + 1) % P.length], m = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2];
+        if (o.lo) { tris.push([c, a, b]); continue; }
+        const mca = m(c, a), mab = m(a, b), mbc = m(b, c);
+        tris.push([c, mca, mbc], [mca, a, mab], [mbc, mab, b], [mca, mab, mbc]);
+      }
+      const L = fresh[f.k] ? out.fresh : f.n[1] > 0.62 ? out.top : out.old, ax = Math.abs(f.n[0]), ay = Math.abs(f.n[1]), az = Math.abs(f.n[2]);
+      const axis = ay >= ax && ay >= az ? 1 : ax >= az ? 0 : 2;
+      for (const t of tris) for (const p of t) { const q = shape(p); q.push(axis); L.push(q); }
+      if (fresh[f.k]) out.nf += tris.length; else out.no += tris.length;
+    }
+  }
+  // the lists into meshes: normals shared where the faces meet (worn edges shade round), cut flat on a face; uv by the face's way
+  function stoneGeo(out) {
+    const key = (p) => Math.round(p[0] * 1e4) + ',' + Math.round(p[1] * 1e4) + ',' + Math.round(p[2] * 1e4), acc = new Map();
+    const all = out.fresh.concat(out.old, out.top);
+    for (let i = 0; i < all.length; i += 3) {
+      const a = all[i], b = all[i + 1], c = all[i + 2], e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+      for (const p of [a, b, c]) { const k = key(p), v = acc.get(k); if (v) { v[0] += n[0]; v[1] += n[1]; v[2] += n[2]; } else acc.set(k, n.slice()); }
+    }
+    // (a corner shared by the triangles of one face is one vertex: an area sets down some hundreds of stones, and the batch writes
+    // every vertex of each)
+    const mk = (list) => {
+      if (!list.length) return null;
+      const at = new Map(), P = [], N = [], U = [], I = [];
+      for (const p of list) {
+        const k = key(p) + ',' + p[3]; let i = at.get(k);
+        if (i === undefined) {
+          const n = acc.get(key(p)), l = Math.hypot(n[0], n[1], n[2]) || 1, ax = p[3];
+          i = P.length / 3; at.set(k, i); P.push(p[0], p[1], p[2]); N.push(n[0] / l, n[1] / l, n[2] / l); U.push(ax === 0 ? p[2] : p[0], ax === 1 ? p[2] : p[1]);
+        }
+        I.push(i);
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setIndex(I);
+      g.userData.shared = true; return g;
+    };
+    return { fresh: mk(out.fresh), old: mk(out.old), top: mk(out.top) };
+  }
+  // the six forms (kept). bands: how far the stone reaches across x and z in slices of its height, for colliders made to it later
+  // (lo: for the low setting, each face a fan without its smaller faces: about a quarter of the triangles, the same stone)
+  const LUMPS = [];
+  function lumpForm(v, lo) {
+    const key = v + (lo ? 6 : 0); if (LUMPS[key]) return LUMPS[key];
+    const R = _rp(v * 977 + 31), out = { fresh: [], old: [], top: [], nf: 0, no: 0 }, st = stone;
+    const stone2 = (o2, pl, o) => st(o2, pl, Object.assign({ lo }, o));
+    if (v === 0) stone2(out, cutPlanes(R, 12, 0.98, 0.9, 0.9, [0.8, 0.96], [[0, -1, 0, 0.95]]), { seed: 1, fresh: 0.55 });
+    else if (v === 1) stone2(out, cutPlanes(R, 11, 1.0, 0.78, 0.82, [0.78, 0.95], [[0, -1, 0, 0.95]]), { seed: 2, fresh: 0.5, worn: 0.05 });
+    else if (v === 2) {
+      // a slab in two layers, the upper drawn back from the lower's edge: bedding of sedimentary rock
+      stone2(out, cutPlanes(R, 9, 1.0, 0.6, 0.95, [0.82, 0.97], [[0, -1, 0, 0.95], [0, 1, 0, -0.08]], 0.4), { seed: 3, fresh: 0.6, worn: 0.04, ww: 0.1, lump: 0.03 });
+      stone2(out, cutPlanes(R, 8, 0.86, 0.5, 0.8, [0.82, 0.96], [[0, -1, 0, 0.1], [0, 1, 0, 0.48]], 0.4), { seed: 4, fresh: 0.5, worn: 0.05, ww: 0.1, lump: 0.03, off: [0.06, -0.02, -0.05] });
+    } else if (v === 3) {
+      // a split shard: steep faces, a ridge for a top, leaning a little
+      stone2(out, cutPlanes(R, 9, 0.72, 1.0, 0.62, [0.84, 0.97], [[0, -1, 0, 0.95], [0.55, 0.83, 0.1, 0.62], [-0.5, 0.85, -0.15, 0.6]], 0.45), { seed: 5, fresh: 0.7, worn: 0.035, ww: 0.1, lump: 0.025, off: [0.05, 0, 0] });
+    } else if (v === 4) {
+      // granite: many small faces, worn deep and round, its skin weathered all over
+      stone2(out, cutPlanes(R, 16, 0.95, 0.86, 0.95, [0.86, 0.97], [[0, -1, 0, 0.95]]), { seed: 6, fresh: 0.15, worn: 0.12, ww: 0.3, lump: 0.06 });
+    } else {
+      // a stone lying on another
+      stone2(out, cutPlanes(R, 10, 1.0, 0.62, 0.92, [0.8, 0.95], [[0, -1, 0, 0.95], [0, 1, 0, 0.18]]), { seed: 7, fresh: 0.5, worn: 0.05 });
+      stone2(out, cutPlanes(R, 9, 0.55, 0.42, 0.5, [0.8, 0.95]), { seed: 8, fresh: 0.5, worn: 0.05, off: [0.18, 0.5, -0.12] });
+    }
+    // (no bigger than the die it replaces: drawn in, all of it alike, until it reaches no farther than 0.95 across or up)
+    { let m = 0.95; for (const L of [out.fresh, out.old, out.top]) for (const p of L) m = Math.max(m, Math.abs(p[0]), Math.abs(p[2]), p[1]); const k = 0.95 / m; if (k < 1) for (const L of [out.fresh, out.old, out.top]) for (const p of L) { p[0] *= k; p[1] *= k; p[2] *= k; } }
+    const g = stoneGeo(out), bands = [[-1, -0.4], [-0.4, 0.2], [0.2, 0.6], [0.6, 1.2]].map(([y0, y1]) => {
+      let x0 = 9, x1 = -9, z0 = 9, z1 = -9, top = -9;
+      for (const gg of [g.fresh, g.old, g.top]) if (gg) { const p = gg.attributes.position.array; for (let i = 0; i < p.length; i += 3) if (p[i + 1] >= y0 && p[i + 1] < y1) { x0 = Math.min(x0, p[i]); x1 = Math.max(x1, p[i]); z0 = Math.min(z0, p[i + 2]); z1 = Math.max(z1, p[i + 2]); top = Math.max(top, p[i + 1]); } }
+      return x1 < x0 ? null : { y0, y1: Math.min(y1, top), x0, x1, z0, z1 };
+    }).filter(Boolean);
+    return (LUMPS[key] = { fresh: g.fresh, old: g.old, top: g.top, bands, tris: out.nf + out.no });
+  }
+  T.LUMP_FORMS = 6;
+  T.lumpForm = lumpForm;
+  // which form lies at x, z (by the place alone)
+  T.lumpAt = (x, z) => Math.min(5, Math.floor(_rh(Math.round(x * 7.3), Math.round(z * 5.1), 3, 77) * 6));
   // ---------------------------------------------------------------- crags
-  // a boulder: a rough lump of rock (visual), its collider the box round its lower part
-  const lump = new THREE.DodecahedronGeometry(1, 0);
+  // a boulder: a lump of broken rock (visual; its form by where it lies: lumpForm above), its collider the boxes round it
   T.boulder = function (w, x, y, z, sx, sy, sz, rng, o) {
     o = o || {};
     const tl = o.collide === false ? 0.4 : 0.2; // (a solid one leans less: its boxes stand upright)
     const ax = rng.range(-tl, tl), yaw = rng.range(0, 6.3), az = rng.range(-tl, tl);
-    w.batch.geo(o.mk || 'rock', lump, new THREE.Matrix4().compose(V(x, y + sy * 0.55, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(ax, yaw, az)), V(sx, sy, sz)), { su: 0.5, sv: 0.5, tint: o.tint });
-    // (the lump is a dodecahedron of radius 1 scaled by sx / sy / sz, its middle 0.55 sy up: round, so its collider is three boxes, a
-    // broad one through its middle (to its faces, 0.79 out) and narrower ones above and below where it rounds off: you neither walk
-    // into the rock nor bump into air beside it; the top one ends where its top is). Returns its colliders.
+    const F = lumpForm(T.lumpAt(x, z), Math.max(sx, sy, sz) < 0.7 || !!(G.save && G.save.data && G.save.data.settings && G.save.data.settings.quality === 'low')), mat = new THREE.Matrix4().compose(V(x, y + sy * 0.55, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(ax, yaw, az)), V(sx, sy, sz));
+    // (a stone smaller than 0.7 m, and every stone at the low setting, in its lighter make: the same stone, its faces not split)
+    // (its foot darker, damp and earthy, by the batch's grade up from the stone's foot - the tint lifts its top back to what it was;
+    // the faces broken lately paler and a little cooler than the old weathered skin)
+    const t0 = o.tint || [1, 1, 1], gb = y - sy * 0.4 - 0.15, k = 1 / (0.62 + 0.38 * Math.min(1, (y + sy * 1.5 - gb) / 2.6));
+    if (F.old) w.batch.geo(o.mk || 'rock', F.old, mat, { su: 0.5, sv: 0.5, tint: [t0[0] * k * 0.9, t0[1] * k * 0.9, t0[2] * k * 0.88], gradBase: gb });
+    if (F.fresh) w.batch.geo(o.mk || 'rock', F.fresh, mat, { su: 0.5, sv: 0.5, tint: [t0[0] * k * 1.12, t0[1] * k * 1.12, t0[2] * k * 1.15], gradBase: gb });
+    // (its faces that look up hold soil: in a green field, moss and lichen on them; elsewhere the weathered skin)
+    if (F.top) { const mo = w.mats.biome.floorTex === 'grass' || w.mats.biome.accent === 'grass'; w.batch.geo(o.mk || 'rock', F.top, mat, { su: 0.5, sv: 0.5, tint: mo ? [t0[0] * k * 0.74, t0[1] * k * 0.86, t0[2] * k * 0.56] : [t0[0] * k * 0.9, t0[1] * k * 0.9, t0[2] * k * 0.88], gradBase: gb }); }
+    // (the colliders are still those made for the dodecahedron the lump used to be, of radius 1 scaled by sx / sy / sz, its middle
+    // 0.55 sy up: three boxes, a broad one through its middle (to its faces, 0.79 out) and narrower ones above and below where it
+    // rounded off; the top one ends where its top was. The forms reach out otherwise now: lumpForm(T.lumpAt(x, z)).bands gives each
+    // form's reach in slices of its height, for colliders made to it). Returns its colliders.
     const cols = [];
     if (o.collide !== false) {
       // (turned about y by yaw, a lump longer one way than the other is that much wider across x or z: the boxes take its turned size)

@@ -216,16 +216,80 @@
     for (const sx of [-1, 1]) P().statue(w, x + sx * (span / 2 + pw / 2), z + d / 2 + 0.6, 0, 0, rng, 0.75);
   }
 
-  // far beyond the city walls: the broken towers of the rest of the city against the sunset (visual only)
+  // far beyond the city walls: the rest of the city against the sunset (visual only). Towers that taper a little as they rise, some
+  // still roofed - a parapet of merlons on corbels and a steep slated spire - the rest broken off, their tops ragged and one corner
+  // fallen deeper; at the foot of some a long hall under a gabled roof; all of it rising out of the dark under the bridge into the
+  // haze, shaded by the far country's own light (levelgen.js farMat: the windows dark in the walls, the air before it all).
+  // The same throws of the dice as the boxes and cones took, so that everything thrown after them falls as before.
   function skyline(w, rng, W, D) {
     w.deferred.push((grp) => {
-      const m = new THREE.MeshStandardMaterial({ color: 0x3a2a2a, emissive: 0x1a0c08, roughness: 1, flatShading: true, fog: false });
+      const P = [], N = [], C = [], Uv = [], I = [];
+      const hsh = (a, b, k) => { const n = Math.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453; return n - Math.floor(n); };
+      const STONE = new THREE.Color('#77655a'), ROOF = new THREE.Color('#3c3232'), DARK = new THREE.Color('#2a2224');
+      // a quad a b c d (counter-clockwise seen from outside); col its colour, uv its facade coordinates [u0, v0, u1, v1] or none
+      const quad = (a, b, c, d, col, uv) => {
+        const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+        let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; const l = Math.hypot(...n) || 1; n = n.map((v) => v / l);
+        const o = P.length / 3, pts = [a, b, c, d], us = uv ? [[uv[0], uv[1]], [uv[2], uv[1]], [uv[2], uv[3]], [uv[0], uv[3]]] : null;
+        pts.forEach((p, i) => { P.push(p[0], p[1], p[2]); N.push(n[0], n[1], n[2]); const k = 0.55 + 0.45 * Math.min(1, Math.max(0, (p[1] + 30) / 40)); C.push(col.r * k, col.g * k, col.b * k); if (us) Uv.push(us[i][0], us[i][1]); else Uv.push(-1, -1); });
+        I.push(o, o + 1, o + 2, o, o + 2, o + 3);
+      };
+      const tri = (a, b, c, col) => { const o = P.length / 3, e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]; let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; const l = Math.hypot(...n) || 1; for (const p of [a, b, c]) { P.push(...p); N.push(n[0] / l, n[1] / l, n[2] / l); C.push(col.r, col.g, col.b); Uv.push(-1, -1); } I.push(o, o + 1, o + 2); };
+      // a box ring of 4 walls round a footprint (half sizes hx, hz at the bottom, narrowing by taper to the top), turned by ry about x, z
+      const box = (x, z, hx, hz, ry, y0, y1, col, taper, tops, uvOn) => {
+        const c = Math.cos(ry), s = Math.sin(ry), at = (u, v, y, k) => { const px = u * (1 - k), pz = v * (1 - k); return [x + px * c - pz * s, y, z + px * s + pz * c]; };
+        const cr = [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]], tp = taper || 0;
+        let u0 = 0;
+        for (let e = 0; e < 4; e++) {
+          const A = cr[e], B = cr[(e + 1) % 4], len = Math.hypot(B[0] - A[0], B[1] - A[1]), segs = tops ? Math.max(2, Math.round(len / 2.2)) : 1;
+          for (let j = 0; j < segs; j++) {
+            const t0 = j / segs, t1 = (j + 1) / segs, ya = tops ? tops(e, j, segs) : y1;
+            const kb = 0, kt = tp * (ya - y0) / Math.max(1, y1 - y0);
+            const pa = [A[0] + (B[0] - A[0]) * t0, A[1] + (B[1] - A[1]) * t0], pb = [A[0] + (B[0] - A[0]) * t1, A[1] + (B[1] - A[1]) * t1];
+            // (counter-clockwise from outside: the corners go round the other way, so the quad runs b, a at the bottom)
+            quad(at(pb[0], pb[1], y0, kb), at(pa[0], pa[1], y0, kb), at(pa[0], pa[1], ya, kt), at(pb[0], pb[1], ya, kt), col, uvOn ? [u0 + len * t1, y0, u0 + len * t0, ya] : null);
+          }
+          u0 += len;
+        }
+        return at;
+      };
       for (let i = 0; i < 34; i++) {
-        const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.9, 150), h = rng.range(12, 46), s = rng.range(5, 12);
-        const t = new THREE.Mesh(PG().box, m); t.scale.set(s, h + 70, s * rng.range(0.6, 1.4)); t.position.set(W / 2 + Math.cos(a) * r, (h - 70) / 2 - 2, D / 2 + Math.sin(a) * r);   // (down into the dark below the bridge: no foot left hanging in the air)
-        t.rotation.y = rng.range(0, 3); grp.add(t);
-        if (rng.chance(0.4)) { const c = new THREE.Mesh(PG().cone, m); c.scale.set(s * 0.6, s, s * 0.6); c.position.set(t.position.x, h - 2 + s / 2, t.position.z); grp.add(c); }
+        const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.9, 150), h = rng.range(12, 46), s = rng.range(5, 12), k = rng.range(0.6, 1.4), ry = rng.range(0, 3), roofed = rng.chance(0.4);
+        const x = W / 2 + Math.cos(a) * r, z = D / 2 + Math.sin(a) * r, y0 = -72, y1 = h - 2, hx = s / 2, hz = s * k / 2, q = hsh(x, z, 1), col = STONE.clone().multiplyScalar(0.82 + 0.3 * hsh(x, z, 2));
+        if (roofed) {
+          box(x, z, hx, hz, ry, y0, y1, col, 0.06, null, true);
+          // (the parapet on corbels, a little out from the wall; its merlons; a steep slated spire inside it)
+          const ox = hx * 0.94 + 0.45, oz = hz * 0.94 + 0.45, py = y1 + 1.3;
+          box(x, z, ox, oz, ry, y1 - 0.2, py, col, 0, null, false);
+          const c = Math.cos(ry), sn = Math.sin(ry), rot = (u, v, y) => [x + u * c - v * sn, y, z + u * sn + v * c];
+          quad(rot(-ox, -oz, y1 - 0.2), rot(ox, -oz, y1 - 0.2), rot(hx * 0.94, -hz * 0.94, y1 - 1.1), rot(-hx * 0.94, -hz * 0.94, y1 - 1.1), DARK, null);
+          quad(rot(ox, oz, y1 - 0.2), rot(-ox, oz, y1 - 0.2), rot(-hx * 0.94, hz * 0.94, y1 - 1.1), rot(hx * 0.94, hz * 0.94, y1 - 1.1), DARK, null);
+          for (const [u, v, len, alongX] of [[0, -oz, ox * 2, true], [0, oz, ox * 2, true], [-ox, 0, oz * 2, false], [ox, 0, oz * 2, false]]) {
+            const n = Math.max(2, Math.floor(len / 1.7));
+            for (let m = 0; m < n; m++) { const t = -len / 2 + (m + 0.5) * len / n, mx = alongX ? t : u, mz = alongX ? v : t; const p = rot(mx, mz, 0); box(p[0], p[2], alongX ? 0.42 : 0.28, alongX ? 0.28 : 0.42, ry, py, py + 1.1, col, 0, null, false); }
+          }
+          const rh = Math.max(hx, hz) * (1.5 + 0.8 * q), ix = ox - 0.35, iz = oz - 0.35, apex = rot(0, 0, py + rh), e = py - 0.3;
+          const RC = ROOF.clone().multiplyScalar(0.85 + 0.3 * hsh(x, z, 3));
+          tri(rot(ix, -iz, e), rot(-ix, -iz, e), apex, RC); tri(rot(ix, iz, e), rot(ix, -iz, e), apex, RC); tri(rot(-ix, iz, e), rot(ix, iz, e), apex, RC); tri(rot(-ix, -iz, e), rot(-ix, iz, e), apex, RC);
+        } else {
+          // (broken off: the top ragged, a run of it fallen deeper at one corner)
+          const deep = Math.floor(q * 4);
+          box(x, z, hx, hz, ry, y0, y1, col, 0.05, (e, j, n) => y1 - 1.2 * hsh(x + e, z + j, 4) * 3 - (e === deep && j >= n / 2 ? 3 + 7 * hsh(x, z, 5) * (j + 1) / n : 0) - (e === (deep + 1) % 4 && j < n / 2 ? 2 + 5 * hsh(x, z, 6) * (n / 2 - j) / n : 0), true);
+        }
+        // (a long hall at its foot under a gabled roof, on one side of it)
+        if (hsh(x, z, 7) < 0.45) {
+          const c = Math.cos(ry), sn = Math.sin(ry), side = hsh(x, z, 8) < 0.5 ? 1 : -1, L = s * (1.4 + hsh(x, z, 9)), wd = s * 0.42, eave = Math.min(y1 - 4, 4 + 6 * hsh(x, z, 10)), ridge = eave + wd * 0.9;
+          const cx = x + (hx + L / 2) * side * c, cz = z + (hx + L / 2) * side * sn;
+          box(cx, cz, L / 2, wd, ry, y0, eave, col.clone().multiplyScalar(0.92), 0, null, true);
+          const rot = (u, v, y) => [cx + u * c - v * sn, y, cz + u * sn + v * c], RC = ROOF.clone().multiplyScalar(0.9);
+          quad(rot(L / 2 + 0.3, -wd - 0.4, eave - 0.3), rot(-L / 2 - 0.3, -wd - 0.4, eave - 0.3), rot(-L / 2 - 0.3, 0, ridge), rot(L / 2 + 0.3, 0, ridge), RC, null);
+          quad(rot(-L / 2 - 0.3, wd + 0.4, eave - 0.3), rot(L / 2 + 0.3, wd + 0.4, eave - 0.3), rot(L / 2 + 0.3, 0, ridge), rot(-L / 2 - 0.3, 0, ridge), RC, null);
+          tri(rot(L / 2, wd, eave), rot(L / 2, -wd, eave), rot(L / 2, 0, ridge), col); tri(rot(-L / 2, -wd, eave), rot(-L / 2, wd, eave), rot(-L / 2, 0, ridge), col);
+        }
       }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(Uv, 2)); g.setIndex(I);
+      const m = new THREE.Mesh(g, LG.farMat(w, 1)); m.onBeforeRender = LG.farSync; m.frustumCulled = false; grp.add(m);
     });
   }
 

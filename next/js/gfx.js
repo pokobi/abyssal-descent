@@ -337,6 +337,44 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
     return g;
   };
+  // the same box drawn with fewer faces, for what is set down by the hundred (the furniture of the halls): each face's flat, one strip
+  // across each rounded edge, one triangle at each corner. The corners carry the same normals as makeRbox(.., 1) gives them, so the round
+  // of the edges is lit the same; the edge's middle lies a third of r inside the round (a millimetre or two) - 44 triangles, not 108
+  X.makeCbox = function (w, h, d, r) {
+    r = Math.min(r, w / 2 - 1e-5, h / 2 - 1e-5, d / 2 - 1e-5);
+    if (!(r > 1e-5)) return new THREE.BoxGeometry(w, h, d);
+    const D = [w / 2, h / 2, d / 2], pos = [], nor = [], uv = [], idx = [], at = {};
+    // the corner (sx, sy, sz) of the face looking along axis ax: its own vertex, normal the face's
+    const vtx = (ax, sx, sy, sz) => {
+      const key = ax + ',' + sx + ',' + sy + ',' + sz; if (at[key] !== undefined) return at[key];
+      const s = [sx, sy, sz], p = [0, 0, 0], n = [0, 0, 0];
+      for (let k = 0; k < 3; k++) p[k] = k === ax ? s[k] * D[k] : s[k] * (D[k] - r);
+      n[ax] = s[ax]; const u = (ax + 1) % 3, v = (ax + 2) % 3;
+      pos.push(p[0], p[1], p[2]); nor.push(n[0], n[1], n[2]); uv.push(p[u] / (2 * D[u]) + 0.5, p[v] / (2 * D[v]) + 0.5);
+      return (at[key] = pos.length / 3 - 1);
+    };
+    // a triangle wound to look outward (the box is about the origin and convex)
+    const tri = (a, b, c) => {
+      const P = (i) => [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]], A = P(a), B = P(b), C = P(c);
+      const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+      const cx = e1[1] * e2[2] - e1[2] * e2[1], cy = e1[2] * e2[0] - e1[0] * e2[2], cz = e1[0] * e2[1] - e1[1] * e2[0];
+      if (cx * (A[0] + B[0] + C[0]) + cy * (A[1] + B[1] + C[1]) + cz * (A[2] + B[2] + C[2]) >= 0) idx.push(a, b, c); else idx.push(a, c, b);
+    };
+    const quad = (a, b, c, d2) => { tri(a, b, c); tri(a, c, d2); };
+    const S = (ax, s, t, sa, sb) => { const o = [0, 0, 0]; o[ax] = s; o[(ax + 1) % 3] = sa; o[(ax + 2) % 3] = sb; return vtx(ax, o[0], o[1], o[2]); };
+    for (let ax = 0; ax < 3; ax++) for (const s of [-1, 1]) quad(S(ax, s, 0, -1, -1), S(ax, s, 0, 1, -1), S(ax, s, 0, 1, 1), S(ax, s, 0, -1, 1));   // the flats
+    for (let a = 0; a < 3; a++) {   // the edges: between the face along a and the face along b, running along c
+      const b = (a + 1) % 3, c = (a + 2) % 3;
+      for (const sa of [-1, 1]) for (const sb of [-1, 1]) {
+        const v = (ax, sc) => { const o = [0, 0, 0]; o[a] = sa; o[b] = sb; o[c] = sc; return vtx(ax, o[0], o[1], o[2]); };
+        quad(v(a, -1), v(a, 1), v(b, 1), v(b, -1));
+      }
+    }
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) tri(vtx(0, sx, sy, sz), vtx(1, sx, sy, sz), vtx(2, sx, sy, sz));   // the corners
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    return g;
+  };
   // the same, kept: boxes of one size share one geometry (sizes are rounded to the millimetre / to a hundredth for big ones)
   const cache = new Map();
   X.rbox = function (w, h, d, r, n) {
@@ -630,6 +668,29 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     for (const g of parts) { const c = g.attributes.position.count; pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2); o += c; }
     const out = new THREE.BufferGeometry();
     out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    return out;
+  };
+  // the same triangles with their corners shared: corners that agree to the bit in every attribute (place, normal, uv, colour) become
+  // one vertex and the triangles index them. Drawn exactly as before (the same numbers at every corner of every triangle), with a third
+  // to a sixth of the vertices for the world's mesh to copy and the card to transform. Geometry that is indexed already is returned as is
+  Geo.weld = function (g) {
+    if (!g || g.index || !g.attributes.position) return g;
+    const names = Object.keys(g.attributes), A = names.map((k) => g.attributes[k]);
+    for (const a of A) if (a.isInterleavedBufferAttribute || !a.array || a.array.BYTES_PER_ELEMENT !== 4) return g;
+    const n = g.attributes.position.count, bits = A.map((a) => new Uint32Array(a.array.buffer, a.array.byteOffset, a.array.length)), sz = A.map((a) => a.itemSize);
+    const same = (i, j) => { for (let k = 0; k < bits.length; k++) { const b = bits[k], s = sz[k]; for (let c = 0; c < s; c++) if (b[i * s + c] !== b[j * s + c]) return false; } return true; };
+    const map = new Map(), remap = new Uint32Array(n), keep = [];
+    for (let i = 0; i < n; i++) {
+      let h = 0x811c9dc5; for (let k = 0; k < bits.length; k++) { const b = bits[k], s = sz[k]; for (let c = 0; c < s; c++) h = Math.imul(h ^ b[i * s + c], 0x01000193) >>> 0; }
+      let lst = map.get(h), hit = -1;
+      if (lst) { for (const u of lst) if (same(keep[u], i)) { hit = u; break; } } else map.set(h, lst = []);
+      if (hit < 0) { hit = keep.length; keep.push(i); lst.push(hit); }
+      remap[i] = hit;
+    }
+    const out = new THREE.BufferGeometry();
+    names.forEach((nm, k) => { const s = sz[k], src = A[k].array, dst = new src.constructor(keep.length * s); for (let u = 0; u < keep.length; u++) for (let c = 0; c < s; c++) dst[u * s + c] = src[keep[u] * s + c]; out.setAttribute(nm, new THREE.BufferAttribute(dst, s, A[k].normalized)); });
+    out.setIndex(new THREE.BufferAttribute(keep.length > 65535 ? remap : Uint16Array.from(remap), 1));
+    out.userData = g.userData;
     return out;
   };
   const chain = (x, y, z, pts, r0, r1, k) => S.chain(x, y, z, pts, r0, r1, k || 0.004);
@@ -1815,6 +1876,11 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // the world's materials), tint }. What is carved - the statues - is cut from a field like the hands and the skull ----
   const PROP = {}, propC = {};
   const ppart = (m, list, k, tint) => ({ g: boxUV(Geo.merge(Array.isArray(list) ? list : [list]), k || 0.5), m, tint: tint || null });
+  // (what is set down by the hundred is drawn with no more faces than it shows at a few metres: a box with its edges rounded in one strip
+  // (makeCbox), a ball of w around and h down; a bar of iron with no ends where they are hidden in what holds it)
+  const cbx = (w, h, d, r, x, y, z, rot) => Geo.xf(X.makeCbox(w, h, d, r), [x, y, z], rot);
+  const ballN = (r, at, s, ws, hs) => { const g = new THREE.SphereGeometry(r, ws, hs); if (s) g.scale(s[0], s[1], s[2]); g.translate(at[0], at[1], at[2]); return g; };
+  const bar = (r, len, at, rot, seg) => { const g = new THREE.CylinderGeometry(r, r, len, seg || 6, 1, true).toNonIndexed(); g.computeVertexNormals(); return Geo.xf(g, at, rot); };
   const arcPts = (cx, cy, r, a0, a1, n) => { const p = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } return p; };
   const turnY = (g, a) => { g.rotateY(a); return g; };
   // a knight of stone, both hands on the pommel of a sword stood before him, a cloak down his back. headless: broken off at the neck
@@ -1842,7 +1908,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       d = sm(d, S.box(x, y, z, 0, 0.9, -0.16, 0.27 + (1.6 - y) * 0.07, 0.66, 0.03, 0.02) + Math.sin(x * 34) * 0.008, 0.05);   // the cloak
       return d;
     };
-    return [ppart('trim', [S.mesh(fn, [-0.55, 0, -0.3], [0.55, 2.12, 0.42], 0.024), rbx(0.085, 1.1, 0.032, 0.008, 0, 0.56, 0.315), rbx(0.38, 0.045, 0.05, 0.012, 0, 1.115, 0.315)], 0.7, [0.95, 0.95, 0.92])];
+    return [ppart('trim', [S.mesh(fn, [-0.55, 0, -0.3], [0.55, 2.12, 0.42], 0.024), cbx(0.085, 1.1, 0.032, 0.008, 0, 0.56, 0.315), cbx(0.38, 0.045, 0.05, 0.012, 0, 1.115, 0.315)], 0.7, [0.95, 0.95, 0.92])];
   };
   PROP.statue0 = knight(false); PROP.statue3 = knight(true);
   // a mourner: a robe to the ground in folds, the arms crossed on the breast, the head bowed in a deep hood, a face far back in it
@@ -1883,20 +1949,20 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // headstones: a round-headed slab on a foot, lines of an inscription, a cross cut over them; a cross with a ring; a pointed slab
   const moss3 = (pts) => pts.map((p) => ball(p[3], [p[0], p[1], p[2]], [1, p[4], p[5]]));
   PROP.grave0 = () => [
-    ppart('block', [ext([[0.34, 0], [0.34, 0.72]].concat(arcPts(0, 0.72, 0.34, 0, Math.PI, 14).slice(1), [[-0.34, 0]]), 0.16, 0.022), rbx(0.86, 0.12, 0.3, 0.03, 0, 0.06, 0)], 0.9),
-    ppart('dark', [rbx(0.3, 0.014, 0.01, 0.002, 0, 0.7, 0.078), rbx(0.42, 0.014, 0.01, 0.002, 0, 0.62, 0.078), rbx(0.36, 0.014, 0.01, 0.002, 0.02, 0.54, 0.078), rbx(0.22, 0.014, 0.01, 0.002, -0.05, 0.46, 0.078),
-      rbx(0.03, 0.17, 0.01, 0.002, 0, 0.9, 0.078), rbx(0.11, 0.03, 0.01, 0.002, 0, 0.925, 0.078)], 1),
+    ppart('block', [ext([[0.34, 0], [0.34, 0.72]].concat(arcPts(0, 0.72, 0.34, 0, Math.PI, 14).slice(1), [[-0.34, 0]]), 0.16, 0.022), cbx(0.86, 0.12, 0.3, 0.03, 0, 0.06, 0)], 0.9),
+    ppart('dark', [cbx(0.3, 0.014, 0.01, 0.002, 0, 0.7, 0.078), cbx(0.42, 0.014, 0.01, 0.002, 0, 0.62, 0.078), cbx(0.36, 0.014, 0.01, 0.002, 0.02, 0.54, 0.078), cbx(0.22, 0.014, 0.01, 0.002, -0.05, 0.46, 0.078),
+      cbx(0.03, 0.17, 0.01, 0.002, 0, 0.9, 0.078), cbx(0.11, 0.03, 0.01, 0.002, 0, 0.925, 0.078)], 1),
     ppart('moss', moss3([[-0.22, 0.14, 0.07, 0.12, 0.7, 0.3], [0.25, 0.3, 0.075, 0.09, 1.2, 0.25], [0.1, 1.03, 0, 0.14, 0.3, 0.6], [-0.3, 0.75, -0.02, 0.08, 1.4, 0.9]]), 1, [0.4, 0.46, 0.36])];
   PROP.grave1 = () => {
     const c = [[0.07, 0], [0.085, 0.78], [0.3, 0.76], [0.33, 0.8], [0.33, 0.92], [0.3, 0.96], [0.085, 0.94], [0.075, 1.2], [0.11, 1.24], [-0.11, 1.24], [-0.075, 1.2], [-0.085, 0.94], [-0.3, 0.96], [-0.33, 0.92], [-0.33, 0.8], [-0.3, 0.76], [-0.085, 0.78], [-0.07, 0]];
     const ring = new THREE.TorusGeometry(0.2, 0.035, 6, 24); ring.scale(1, 1, 1.3); ring.translate(0, 0.86, 0);
-    return [ppart('block', [ext(c, 0.14, 0.02), ring, rbx(0.5, 0.14, 0.34, 0.03, 0, 0.07, 0), rbx(0.36, 0.1, 0.26, 0.025, 0, 0.19, 0)], 0.9),
+    return [ppart('block', [ext(c, 0.14, 0.02), ring, cbx(0.5, 0.14, 0.34, 0.03, 0, 0.07, 0), cbx(0.36, 0.1, 0.26, 0.025, 0, 0.19, 0)], 0.9),
       ppart('moss', moss3([[0.2, 0.15, 0.1, 0.11, 0.6, 0.5], [-0.2, 0.94, 0.03, 0.09, 0.5, 0.7], [0.0, 1.25, 0, 0.1, 0.3, 0.7]]), 1, [0.4, 0.46, 0.36])];
   };
   PROP.grave2 = () => {
     const o = [[0.3, 0], [0.3, 0.5], [0.33, 0.52], [0.33, 0.58], [0.28, 0.6]].concat(arcPts(-0.18, 0.6, 0.46, 0, 1.17, 8).slice(1), arcPts(0.18, 0.6, 0.46, Math.PI - 1.17, Math.PI, 8), [[-0.33, 0.58], [-0.33, 0.52], [-0.3, 0.5], [-0.3, 0]]);
-    return [ppart('trim', [ext(o, 0.22, 0.025), rbx(0.8, 0.1, 0.4, 0.03, 0, 0.05, 0)], 0.9),
-      ppart('dark', [rbx(0.34, 0.012, 0.01, 0.002, 0, 0.44, 0.108), rbx(0.4, 0.012, 0.01, 0.002, 0, 0.37, 0.108), rbx(0.28, 0.012, 0.01, 0.002, 0, 0.3, 0.108), ext(arcPts(0, 0.72, 0.1, 0, Math.PI * 2, 16).slice(1), 0.01, 0, [arcPts(0, 0.72, 0.075, 0, Math.PI * 2, 12).slice(1)]).translate(0, 0, 0.108)], 1),
+    return [ppart('trim', [ext(o, 0.22, 0.025), cbx(0.8, 0.1, 0.4, 0.03, 0, 0.05, 0)], 0.9),
+      ppart('dark', [cbx(0.34, 0.012, 0.01, 0.002, 0, 0.44, 0.108), cbx(0.4, 0.012, 0.01, 0.002, 0, 0.37, 0.108), cbx(0.28, 0.012, 0.01, 0.002, 0, 0.3, 0.108), ext(arcPts(0, 0.72, 0.1, 0, Math.PI * 2, 16).slice(1), 0.01, 0, [arcPts(0, 0.72, 0.075, 0, Math.PI * 2, 12).slice(1)]).translate(0, 0, 0.108)], 1),
       ppart('moss', moss3([[-0.26, 0.1, 0.12, 0.13, 0.5, 0.4], [0.22, 0.55, 0.1, 0.08, 1.1, 0.3]]), 1, [0.4, 0.46, 0.36])];
   };
   // a candle: one high, one about - a little guttered at its head, wax run down one side and set at the foot
@@ -1912,21 +1978,21 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // The wall is at the origin, the brand stands out to +z (its flame at about z 0.38, y 0.5)
   PROP.sconce = () => {
     const iron = [ext([[0.07, -0.16], [0.085, -0.02], [0.06, 0.13], [0, 0.2], [-0.06, 0.13], [-0.085, -0.02], [-0.07, -0.16], [0, -0.23]], 0.016, 0.004).translate(0, 0, 0.008),
-      tubeR([[0, -0.04, 0.01], [0, -0.07, 0.14], [0, -0.01, 0.26], [0, 0.04, 0.3]], 0.017, 6, 12), tubeR([[0, -0.2, 0.012], [0, -0.14, 0.12], [0, -0.07, 0.17]], 0.011, 5, 8)];
-    for (const y of [-0.1, 0.1]) iron.push(ball(0.014, [0, y, 0.018], [1, 1, 0.6]));
-    const ring = new THREE.TorusGeometry(0.058, 0.011, 6, 16); ring.rotateX(HX); ring.translate(0, 0.06, 0.3); iron.push(ring);
+      tubeR([[0, -0.04, 0.01], [0, -0.07, 0.14], [0, -0.01, 0.26], [0, 0.04, 0.3]], 0.017, 6, 8), tubeR([[0, -0.2, 0.012], [0, -0.14, 0.12], [0, -0.07, 0.17]], 0.011, 5, 6)];
+    for (const y of [-0.1, 0.1]) iron.push(ballN(0.014, [0, y, 0.018], [1, 1, 0.6], 8, 5));
+    const ring = new THREE.TorusGeometry(0.058, 0.011, 5, 14); ring.rotateX(HX); ring.translate(0, 0.06, 0.3); iron.push(ring);
     for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; iron.push(tubeR([[Math.cos(a) * 0.058, 0.06, 0.3 + Math.sin(a) * 0.058], [Math.cos(a) * 0.075, 0.16, 0.31 + Math.sin(a) * 0.075], [Math.cos(a) * 0.06, 0.24, 0.325 + Math.sin(a) * 0.06]], 0.008, 4, 6)); }
     const brand = tubeR([[0, -0.12, 0.26], [0, 0.1, 0.31], [0, 0.34, 0.365]], (t) => 0.03 + t * 0.012, 7, 6);
-    const head = [ball(0.07, [0, 0.42, 0.385], [1, 1.35, 1])]; for (let i = 0; i < 4; i++) { const r = new THREE.TorusGeometry(0.064 - Math.abs(i - 1.5) * 0.006, 0.012, 5, 12); r.rotateX(HX + 0.22 + (i % 2) * 0.12); r.translate(0, 0.365 + i * 0.035, 0.372 + i * 0.008); head.push(r); }
+    const head = [ballN(0.07, [0, 0.42, 0.385], [1, 1.35, 1], 10, 7)]; for (let i = 0; i < 4; i++) { const r = new THREE.TorusGeometry(0.064 - Math.abs(i - 1.5) * 0.006, 0.012, 5, 10); r.rotateX(HX + 0.22 + (i % 2) * 0.12); r.translate(0, 0.365 + i * 0.035, 0.372 + i * 0.008); head.push(r); }
     return [ppart('iron', iron, 3), ppart('woodDark', brand, 2), ppart('dark', head, 3, [0.16, 0.1, 0.07])];
   };
   // a brazier: three legs of wrought iron bowed out and tied with a ring, a basket of bars on them, coals heaped in it. One high
   PROP.brazier = () => {
     const iron = [], coal = [];
-    for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.3, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 0.4, 0, s * 0.4], [c * 0.3, 0.08, s * 0.3], [c * 0.13, 0.36, s * 0.13], [c * 0.16, 0.56, s * 0.16], [c * 0.3, 0.72, s * 0.3]], 0.022, 6, 14), ball(0.035, [c * 0.4, 0.02, s * 0.4], [1.3, 0.6, 1.3])); }
-    const tie = new THREE.TorusGeometry(0.14, 0.014, 6, 18); tie.rotateX(HX); tie.translate(0, 0.37, 0); iron.push(tie);
-    for (const [y, r, t] of [[0.72, 0.31, 0.018], [0.86, 0.39, 0.014], [1.0, 0.43, 0.02]]) { const g = new THREE.TorusGeometry(r, t, 6, 28); g.rotateX(HX); g.translate(0, y, 0); iron.push(g); }
-    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 0.2, 0.7, s * 0.2], [c * 0.31, 0.72, s * 0.31], [c * 0.39, 0.86, s * 0.39], [c * 0.43, 1.0, s * 0.43], [c * 0.45, 1.06, s * 0.45]], 0.011, 4, 10)); }
+    for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.3, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 0.4, 0, s * 0.4], [c * 0.3, 0.08, s * 0.3], [c * 0.13, 0.36, s * 0.13], [c * 0.16, 0.56, s * 0.16], [c * 0.3, 0.72, s * 0.3]], 0.022, 6, 10), ballN(0.035, [c * 0.4, 0.02, s * 0.4], [1.3, 0.6, 1.3], 10, 6)); }
+    const tie = new THREE.TorusGeometry(0.14, 0.014, 5, 16); tie.rotateX(HX); tie.translate(0, 0.37, 0); iron.push(tie);
+    for (const [y, r, t] of [[0.72, 0.31, 0.018], [0.86, 0.39, 0.014], [1.0, 0.43, 0.02]]) { const g = new THREE.TorusGeometry(r, t, 5, 24); g.rotateX(HX); g.translate(0, y, 0); iron.push(g); }
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 0.2, 0.7, s * 0.2], [c * 0.31, 0.72, s * 0.31], [c * 0.39, 0.86, s * 0.39], [c * 0.43, 1.0, s * 0.43], [c * 0.45, 1.06, s * 0.45]], 0.011, 4, 7)); }
     iron.push(hl([[0.0005, 0.69], [0.2, 0.69], [0.22, 0.705], [0.2, 0.72], [0.0005, 0.72]], 1, 1, 16));
     for (let i = 0; i < 11; i++) { const a = i * 2.4, r = 0.06 + (i % 4) * 0.075, g = new THREE.DodecahedronGeometry(0.075 + (i % 3) * 0.022, 0); g.rotateX(i); g.rotateY(i * 2); g.translate(Math.cos(a) * r, 0.8 + (i % 3) * 0.045 - r * 0.12, Math.sin(a) * r); coal.push(g); }
     return [ppart('iron', iron, 3), ppart('dark', coal, 3, [0.3, 0.12, 0.05])];
@@ -1935,8 +2001,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // stand at 1.1 from its middle, their feet at 0.025
   PROP.chandelier = () => {
     const iron = [];
-    for (const [r, hh, t] of [[1.1, 0.07, 0.014], [0.6, 0.05, 0.012]]) iron.push(hl([[r - t, -hh / 2], [r + t, -hh / 2], [r + t * 1.6, 0], [r + t, hh / 2], [r - t, hh / 2], [r - t * 1.6, 0], [r - t, -hh / 2]], 1, 1, 40));
-    for (let i = 0; i < 4; i++) { const a = i * HX, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 1.1, 0, s * 1.1], [c * 0.6, 0.02, s * 0.6], [c * 0.2, 0.1, s * 0.2]], 0.014, 5, 8), tubeR([[c * 1.1, 0.03, s * 1.1], [c * 0.6, 0.62, s * 0.6], [c * 0.06, 1.2, s * 0.06]], 0.011, 5, false)); }
+    for (const [r, hh, t] of [[1.1, 0.07, 0.014], [0.6, 0.05, 0.012]]) iron.push(hl([[r - t, -hh / 2], [r + t, -hh / 2], [r + t * 1.6, 0], [r + t, hh / 2], [r - t, hh / 2], [r - t * 1.6, 0], [r - t, -hh / 2]], 1, 1, r > 1 ? 32 : 28));
+    for (let i = 0; i < 4; i++) { const a = i * HX, c = Math.cos(a), s = Math.sin(a); iron.push(tubeR([[c * 1.1, 0, s * 1.1], [c * 0.6, 0.02, s * 0.6], [c * 0.2, 0.1, s * 0.2]], 0.014, 5, 6), tubeR([[c * 1.1, 0.03, s * 1.1], [c * 0.6, 0.62, s * 0.6], [c * 0.06, 1.2, s * 0.06]], 0.011, 5, false)); }
     iron.push(ball(0.07, [0, 1.2, 0], [1, 1.2, 1]), ball(0.09, [0, 0.1, 0], [1, 0.6, 1]), spike(0.035, 0.2, [0, -0.02, 0], [Math.PI, 0, 0], 6));
     for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, c = Math.cos(a) * 1.1, s = Math.sin(a) * 1.1; iron.push(Geo.xf(hl([[0.0005, 0.0], [0.03, 0.0], [0.075, 0.02], [0.08, 0.03], [0.07, 0.03], [0.03, 0.015], [0.0005, 0.015]], 1, 1, 10), [c, 0.01, s])); iron.push(Geo.xf(new THREE.TorusGeometry(0.03, 0.008, 4, 8, Math.PI), [c * 1.04, -0.03, s * 1.04], [0, -a + HX, 0])); }
     return [ppart('iron', iron, 3)];
@@ -1958,42 +2024,42 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // a bookcase: two sides, a plinth, a cornice, four shelves, a back. Two long, the shelves' tops at 0.12 + 0.58 n
   PROP.shelf = () => {
     const L = 2.0, D = 0.45, H = 2.4, w = [];
-    for (const s of [-1, 1]) w.push(rbx(0.07, H - 0.06, D, 0.012, s * (L / 2 - 0.035), (H - 0.06) / 2, 0));
-    w.push(rbx(L, 0.1, D + 0.02, 0.012, 0, 0.05, 0.01), rbx(L + 0.1, 0.07, D + 0.07, 0.014, 0, H - 0.035, 0.02), rbx(L + 0.04, 0.05, D + 0.04, 0.012, 0, H - 0.09, 0.012));
-    for (let i = 0; i < 4; i++) w.push(rbx(L - 0.12, 0.04, D - 0.03, 0.006, 0, 0.1 + i * 0.58, 0));
-    w.push(rbx(L - 0.1, H - 0.12, 0.025, 0.004, 0, H / 2, -D / 2 + 0.014));
+    for (const s of [-1, 1]) w.push(cbx(0.07, H - 0.06, D, 0.012, s * (L / 2 - 0.035), (H - 0.06) / 2, 0));
+    w.push(cbx(L, 0.1, D + 0.02, 0.012, 0, 0.05, 0.01), cbx(L + 0.1, 0.07, D + 0.07, 0.014, 0, H - 0.035, 0.02), cbx(L + 0.04, 0.05, D + 0.04, 0.012, 0, H - 0.09, 0.012));
+    for (let i = 0; i < 4; i++) w.push(cbx(L - 0.12, 0.04, D - 0.03, 0.006, 0, 0.1 + i * 0.58, 0));
+    w.push(cbx(L - 0.1, H - 0.12, 0.025, 0.004, 0, H / 2, -D / 2 + 0.014));
     return [ppart('woodDark', w, 0.8)];
   };
   // a book: one thick (x), one high, one deep, standing on the origin, its rounded spine to +z with two bands on it; the leaves a little
   // lower than the boards
   PROP.book = () => {
     const c = ext([[-0.5, 0.5], [-0.5, -0.46], [-0.42, -0.52], [0, -0.55], [0.42, -0.52], [0.5, -0.46], [0.5, 0.5], [0.36, 0.5], [0.36, -0.44], [-0.36, -0.44], [-0.36, 0.5]], 1, 0.012); c.rotateX(-HX); c.translate(0, 0.5, 0);
-    const bands = [rbx(1.06, 0.03, 0.07, 0.01, 0, 0.22, 0.5), rbx(1.06, 0.03, 0.07, 0.01, 0, 0.78, 0.5)];
+    const bands = [cbx(1.06, 0.03, 0.07, 0.01, 0, 0.22, 0.5), cbx(1.06, 0.03, 0.07, 0.01, 0, 0.78, 0.5)];
     return [{ g: boxUV(Geo.merge([c].concat(bands)), 3), m: 'bone' }, { g: boxUV(Geo.xf(new THREE.BoxGeometry(0.72, 0.95, 0.9), [0, 0.485, -0.02]), 3), m: 'bone', tint: [0.8, 0.74, 0.58] }];
   };
   // a long table of four boards on four legs, aprons under the top, a stretcher low between the ends. 2.2 by 1.0, its top at 0.86
   PROP.table = () => {
     const top = [], dk = [];
-    for (let i = 0; i < 4; i++) top.push(rbx(2.2 - (i % 2) * 0.05, 0.07, 0.244, 0.012, (i % 2 ? 0.02 : -0.01), 0.825, -0.375 + i * 0.25));
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) dk.push(rbx(0.11, 0.79, 0.11, 0.018, sx * 0.98, 0.395, sz * 0.38));
-    for (const sz of [-1, 1]) dk.push(rbx(1.9, 0.12, 0.04, 0.008, 0, 0.72, sz * 0.38));
-    for (const sx of [-1, 1]) dk.push(rbx(0.04, 0.12, 0.7, 0.008, sx * 0.98, 0.72, 0), rbx(0.05, 0.07, 0.7, 0.01, sx * 0.98, 0.18, 0));
-    dk.push(rbx(1.92, 0.07, 0.05, 0.01, 0, 0.18, 0));
+    for (let i = 0; i < 4; i++) top.push(cbx(2.2 - (i % 2) * 0.05, 0.07, 0.244, 0.012, (i % 2 ? 0.02 : -0.01), 0.825, -0.375 + i * 0.25));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) dk.push(cbx(0.11, 0.79, 0.11, 0.018, sx * 0.98, 0.395, sz * 0.38));
+    for (const sz of [-1, 1]) dk.push(cbx(1.9, 0.12, 0.04, 0.008, 0, 0.72, sz * 0.38));
+    for (const sx of [-1, 1]) dk.push(cbx(0.04, 0.12, 0.7, 0.008, sx * 0.98, 0.72, 0), cbx(0.05, 0.07, 0.7, 0.01, sx * 0.98, 0.18, 0));
+    dk.push(cbx(1.92, 0.07, 0.05, 0.01, 0, 0.18, 0));
     return [ppart('wood', top, 0.7), ppart('woodDark', dk, 0.8)];
   };
   // a bench: a board two long on two board legs, a rail between them. Its seat at 0.48
-  PROP.bench = () => [ppart('woodDark', [rbx(2.0, 0.06, 0.36, 0.012, 0, 0.45, 0), rbx(0.05, 0.42, 0.3, 0.01, -0.75, 0.21, 0), rbx(0.05, 0.42, 0.3, 0.01, 0.75, 0.21, 0), rbx(1.5, 0.07, 0.04, 0.008, 0, 0.24, 0)], 0.8)];
+  PROP.bench = () => [ppart('woodDark', [cbx(2.0, 0.06, 0.36, 0.012, 0, 0.45, 0), cbx(0.05, 0.42, 0.3, 0.01, -0.75, 0.21, 0), cbx(0.05, 0.42, 0.3, 0.01, 0.75, 0.21, 0), cbx(1.5, 0.07, 0.04, 0.008, 0, 0.24, 0)], 0.8)];
   // what lies on a table: an open book with a pen and an inkpot; three books in a heap and a cup; a platter, a knife, two scrolls
   PROP.tablet0 = () => {
     const quill = ext([[0, 0], [0.012, 0.03], [0.02, 0.2], [0.004, 0.26], [-0.014, 0.2], [-0.008, 0.03]], 0.003, 0); quill.rotateX(-HX + 0.25); quill.rotateY(0.6); quill.translate(0.33, 0.07, 0.02);
-    return [ppart('bone', [rbx(0.44, 0.012, 0.3, 0.004, 0, 0.006, 0)], 3, [0.35, 0.16, 0.12]),
-      ppart('bone', [rbx(0.2, 0.03, 0.28, 0.008, -0.105, 0.03, 0, [0, 0, 0.07]), rbx(0.2, 0.03, 0.28, 0.008, 0.105, 0.03, 0, [0, 0, -0.07]), quill], 3, [0.82, 0.76, 0.6]),
+    return [ppart('bone', [cbx(0.44, 0.012, 0.3, 0.004, 0, 0.006, 0)], 3, [0.35, 0.16, 0.12]),
+      ppart('bone', [cbx(0.2, 0.03, 0.28, 0.008, -0.105, 0.03, 0, [0, 0, 0.07]), cbx(0.2, 0.03, 0.28, 0.008, 0.105, 0.03, 0, [0, 0, -0.07]), quill], 3, [0.82, 0.76, 0.6]),
       ppart('dark', [hl([[0.0005, 0], [0.035, 0], [0.04, 0.03], [0.022, 0.055], [0.022, 0.065], [0.0005, 0.065]], 1, 1, 10).translate(0.33, 0, 0.02),
-        rbx(0.14, 0.002, 0.004, 0.001, -0.1, 0.047, 0.06, [0, 0.1, 0.07]), rbx(0.15, 0.002, 0.004, 0.001, -0.105, 0.047, 0.02, [0, 0.05, 0.07]), rbx(0.12, 0.002, 0.004, 0.001, -0.11, 0.047, -0.02, [0, -0.05, 0.07]), rbx(0.15, 0.002, 0.004, 0.001, 0.105, 0.047, 0.05, [0, 0, -0.07]), rbx(0.1, 0.002, 0.004, 0.001, 0.09, 0.047, 0.0, [0, 0.08, -0.07])], 3)];
+        cbx(0.14, 0.002, 0.004, 0.001, -0.1, 0.047, 0.06, [0, 0.1, 0.07]), cbx(0.15, 0.002, 0.004, 0.001, -0.105, 0.047, 0.02, [0, 0.05, 0.07]), cbx(0.12, 0.002, 0.004, 0.001, -0.11, 0.047, -0.02, [0, -0.05, 0.07]), cbx(0.15, 0.002, 0.004, 0.001, 0.105, 0.047, 0.05, [0, 0, -0.07]), cbx(0.1, 0.002, 0.004, 0.001, 0.09, 0.047, 0.0, [0, 0.08, -0.07])], 3)];
   };
   PROP.tablet1 = () => [
-    ppart('bone', [rbx(0.3, 0.05, 0.22, 0.01, 0, 0.025, 0), rbx(0.26, 0.04, 0.2, 0.01, 0.02, 0.115, 0.01, [0, 0.5, 0])], 3, [0.3, 0.2, 0.14]),
-    ppart('bone', [rbx(0.28, 0.045, 0.21, 0.01, -0.01, 0.073, 0, [0, -0.25, 0])], 3, [0.16, 0.22, 0.3]),
+    ppart('bone', [cbx(0.3, 0.05, 0.22, 0.01, 0, 0.025, 0), cbx(0.26, 0.04, 0.2, 0.01, 0.02, 0.115, 0.01, [0, 0.5, 0])], 3, [0.3, 0.2, 0.14]),
+    ppart('bone', [cbx(0.28, 0.045, 0.21, 0.01, -0.01, 0.073, 0, [0, -0.25, 0])], 3, [0.16, 0.22, 0.3]),
     ppart('iron', [hl([[0.0005, 0], [0.04, 0], [0.042, 0.008], [0.012, 0.02], [0.01, 0.06], [0.03, 0.075], [0.042, 0.13], [0.04, 0.132], [0.027, 0.08], [0.0005, 0.072]], 1, 1, 12).translate(0.32, 0, 0.08)], 4, [1.1, 1.05, 0.95])];
   PROP.tablet2 = () => {
     const o = {}; borrow(o, X.meleeParts && X.meleeParts('knife') ? X.meleeParts('knife').parts : [], [0.02, 0.022, 0.03], [HX, 0, 1.2]);
@@ -2004,13 +2070,13 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // bars over the top, a door frame in its front with a lock, a ring to hang it by
   PROP.cage = () => {
     const s = 1.4, h = 2.2, hs = s / 2, ir = [], n = 7;
-    for (let i = 0; i <= n; i++) { const t = -hs + i / n * s, r = i === 0 || i === n ? 0.028 : 0.014; for (const [bx, bz] of [[t, -hs], [t, hs], [-hs, t], [hs, t]]) ir.push(prism(r, h - 0.14, [bx, h / 2 + 0.03, bz], null, 6)); }
-    for (const y of [0.13, 0.8, 1.5, h - 0.05]) for (const [x, z, w, d] of [[0, -hs, s + 0.07, 0.04], [0, hs, s + 0.07, 0.04], [-hs, 0, 0.04, s + 0.07], [hs, 0, 0.04, s + 0.07]]) ir.push(rbx(w, y > 2 ? 0.09 : 0.035, d, 0.006, x, y, z));
-    for (let i = 1; i < n; i++) ir.push(prism(0.012, s, [-hs + i / n * s, h - 0.03, 0], [HX, 0, 0], 5));
-    ir.push(rbx(0.055, 1.62, 0.055, 0.008, -0.3, 0.92, hs + 0.02), rbx(0.055, 1.62, 0.055, 0.008, 0.3, 0.92, hs + 0.02), rbx(0.66, 0.055, 0.055, 0.008, 0, 1.72, hs + 0.02), rbx(0.13, 0.17, 0.06, 0.012, 0.3, 0.95, hs + 0.055));
+    for (let i = 0; i <= n; i++) { const t = -hs + i / n * s, end = i === 0 || i === n, r = end ? 0.028 : 0.014; for (const [bx, bz] of end ? [[t, -hs], [t, hs]] : [[t, -hs], [t, hs], [-hs, t], [hs, t]]) ir.push(bar(r, h - 0.14, [bx, h / 2 + 0.03, bz], null, 6)); }
+    for (const y of [0.13, 0.8, 1.5, h - 0.05]) for (const [x, z, w, d] of [[0, -hs, s + 0.07, 0.04], [0, hs, s + 0.07, 0.04], [-hs, 0, 0.04, s + 0.07], [hs, 0, 0.04, s + 0.07]]) ir.push(cbx(w, y > 2 ? 0.09 : 0.035, d, 0.006, x, y, z));
+    for (let i = 1; i < n; i++) ir.push(bar(0.012, s, [-hs + i / n * s, h - 0.03, 0], [HX, 0, 0], 5));
+    ir.push(cbx(0.055, 1.62, 0.055, 0.008, -0.3, 0.92, hs + 0.02), cbx(0.055, 1.62, 0.055, 0.008, 0.3, 0.92, hs + 0.02), cbx(0.66, 0.055, 0.055, 0.008, 0, 1.72, hs + 0.02), cbx(0.13, 0.17, 0.06, 0.012, 0.3, 0.95, hs + 0.055));
     for (const y of [0.4, 1.4]) ir.push(prism(0.022, 0.12, [-0.3, y, hs + 0.05], null, 6));
-    const ring = new THREE.TorusGeometry(0.08, 0.014, 6, 14); ring.translate(0, h + 0.07, 0); ir.push(ring, rbx(0.16, 0.03, 0.16, 0.006, 0, h + 0.005, 0));
-    return [ppart('iron', ir, 2), ppart('dark', ball(0.014, [0.3, 0.93, hs + 0.086], [1, 1.6, 0.4]), 2)];
+    const ring = new THREE.TorusGeometry(0.08, 0.014, 6, 14); ring.translate(0, h + 0.07, 0); ir.push(ring, cbx(0.16, 0.03, 0.16, 0.006, 0, h + 0.005, 0));
+    return [ppart('iron', ir, 2), ppart('dark', ballN(0.014, [0.3, 0.93, hs + 0.086], [1, 1.6, 0.4], 8, 6), 2)];
   };
   // over a well 1.3 in radius: a coping on its wall, two posts and a beam, a pitched roof of boards with its ridge, a windlass with
   // its rope and crank, a bucket hung from it
@@ -2018,9 +2084,9 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const r = 1.3, st = [], wd = [], ir = [], lt = [];
     const oct = (rr) => arcPts(0, 0, rr / Math.cos(Math.PI / 8), Math.PI / 8, Math.PI / 8 + Math.PI * 2, 8).slice(1);
     const cop = ext(oct(r + 0.07), 0.14, 0.02, [oct(r - 0.3)]); cop.rotateX(-HX); cop.translate(0, 0.93, 0); st.push(cop);
-    for (const s of [-1, 1]) { wd.push(rbx(0.2, 2.15, 0.2, 0.025, s * (r - 0.15), 0.9 + 1.075, 0), rbx(0.1, 0.6, 0.1, 0.015, s * (r - 0.42), 2.72, 0, [0, 0, s * 0.75])); }
-    wd.push(rbx(2 * r + 0.3, 0.16, 0.18, 0.02, 0, 2.98, 0), rbx(2 * r + 0.7, 0.1, 0.1, 0.015, 0, 3.42, 0));
-    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) lt.push(rbx(2 * r + 0.62, 0.035, 0.17, 0.006, 0, 3.36 - i * 0.075, s * (0.09 + i * 0.15), [s * 0.46, 0, 0]));
+    for (const s of [-1, 1]) { wd.push(cbx(0.2, 2.15, 0.2, 0.025, s * (r - 0.15), 0.9 + 1.075, 0), cbx(0.1, 0.6, 0.1, 0.015, s * (r - 0.42), 2.72, 0, [0, 0, s * 0.75])); }
+    wd.push(cbx(2 * r + 0.3, 0.16, 0.18, 0.02, 0, 2.98, 0), cbx(2 * r + 0.7, 0.1, 0.1, 0.015, 0, 3.42, 0));
+    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) lt.push(cbx(2 * r + 0.62, 0.035, 0.17, 0.006, 0, 3.36 - i * 0.075, s * (0.09 + i * 0.15), [s * 0.46, 0, 0]));
     wd.push(prism(0.085, 2 * r - 0.5, [0, 2.2, 0], [0, 0, HX], 10));
     for (let i = 0; i < 7; i++) { const g = new THREE.TorusGeometry(0.095, 0.018, 5, 12); g.rotateY(HX); g.translate(-0.12 + i * 0.04, 2.2, 0); lt.push(g); }
     lt.push(prism(0.016, 0.72, [0, 1.76, 0.09], null, 6));
@@ -2031,7 +2097,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   // a weapon rack two long: two posts, a rail above with pegs, a rest below; two pikes, a great sword point down, an axe, a shield
   PROP.rack = () => {
-    const wd = [rbx(0.09, 1.66, 0.09, 0.014, -0.94, 0.94, -0.1), rbx(0.09, 1.66, 0.09, 0.014, 0.94, 0.94, -0.1), rbx(1.96, 0.1, 0.07, 0.012, 0, 1.55, -0.1), rbx(1.96, 0.07, 0.12, 0.012, 0, 0.5, -0.08)];
+    const wd = [cbx(0.09, 1.66, 0.09, 0.014, -0.94, 0.94, -0.1), cbx(0.09, 1.66, 0.09, 0.014, 0.94, 0.94, -0.1), cbx(1.96, 0.1, 0.07, 0.012, 0, 1.55, -0.1), cbx(1.96, 0.07, 0.12, 0.012, 0, 0.5, -0.08)];
     for (let i = -5; i <= 5; i++) wd.push(prism(0.014, 0.1, [i * 0.17, 1.55, -0.04], [HX, 0, 0], 6));
     const o = {};
     if (X.foeGear) {
@@ -2045,9 +2111,9 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // the floor of a spike trap, two square: four iron plates, a hole for each spike (six by six), a frame of flat bar, nails
   PROP.spikeplate = () => {
     const s = 2, ir = [], dk = [];
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) ir.push(rbx(s / 2 - 0.02, 0.024, s / 2 - 0.02, 0.004, sx * s / 4, 0.012, sz * s / 4));
-    for (const [x, z, w, d] of [[0, -s / 2 + 0.03, s, 0.07], [0, s / 2 - 0.03, s, 0.07], [-s / 2 + 0.03, 0, 0.07, s], [s / 2 - 0.03, 0, 0.07, s]]) ir.push(rbx(w, 0.036, d, 0.006, x, 0.018, z));
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const k of [0.1, 0.5, 0.9]) { ir.push(ball(0.014, [sx * (s / 2 - 0.03), 0.036, sz * k * (s / 2 - 0.06)], [1, 0.5, 1]), ball(0.014, [sx * k * (s / 2 - 0.06), 0.036, sz * (s / 2 - 0.03)], [1, 0.5, 1])); }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) ir.push(cbx(s / 2 - 0.02, 0.024, s / 2 - 0.02, 0.004, sx * s / 4, 0.012, sz * s / 4));
+    for (const [x, z, w, d] of [[0, -s / 2 + 0.03, s, 0.07], [0, s / 2 - 0.03, s, 0.07], [-s / 2 + 0.03, 0, 0.07, s], [s / 2 - 0.03, 0, 0.07, s]]) ir.push(cbx(w, 0.036, d, 0.006, x, 0.018, z));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const k of [0.1, 0.5, 0.9]) { ir.push(ballN(0.014, [sx * (s / 2 - 0.03), 0.036, sz * k * (s / 2 - 0.06)], [1, 0.5, 1], 8, 5), ballN(0.014, [sx * k * (s / 2 - 0.06), 0.036, sz * (s / 2 - 0.03)], [1, 0.5, 1], 8, 5)); }
     for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { const g = new THREE.CylinderGeometry(0.062, 0.062, 0.004, 10); g.translate(-s / 2 + (i + 0.5) * s / 6, 0.026, -s / 2 + (j + 0.5) * s / 6); dk.push(g); }
     return [ppart('iron', ir, 1, [0.5, 0.45, 0.4]), ppart('dark', dk, 1)];
   };
@@ -2058,9 +2124,9 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   PROP.stake = () => { const g = Geo.merge([Geo.xf(new THREE.BoxGeometry(1, 0.86, 1), [0, 0.43, 0]), Geo.xf(new THREE.ConeGeometry(0.72, 0.16, 4).toNonIndexed(), [0, 0.93, 0], [0, Math.PI / 4, 0])]); g.computeVertexNormals(); return [{ g: boxUV(g, 1), m: 'woodDark' }]; };
   // a drain in the floor, one square: a frame, six bars, the dark under them
   PROP.drain = () => {
-    const ir = [rbx(1, 0.03, 0.08, 0.006, 0, 0.015, -0.46), rbx(1, 0.03, 0.08, 0.006, 0, 0.015, 0.46), rbx(0.08, 0.03, 1, 0.006, -0.46, 0.015, 0), rbx(0.08, 0.03, 1, 0.006, 0.46, 0.015, 0)];
-    for (let i = 0; i < 6; i++) ir.push(rbx(0.05, 0.022, 0.86, 0.008, -0.34 + i * 0.136, 0.014, 0));
-    return [ppart('iron', ir, 1, [0.45, 0.45, 0.45]), ppart('dark', rbx(0.86, 0.004, 0.86, 0.001, 0, 0.004, 0), 1)];
+    const ir = [cbx(1, 0.03, 0.08, 0.006, 0, 0.015, -0.46), cbx(1, 0.03, 0.08, 0.006, 0, 0.015, 0.46), cbx(0.08, 0.03, 1, 0.006, -0.46, 0.015, 0), cbx(0.08, 0.03, 1, 0.006, 0.46, 0.015, 0)];
+    for (let i = 0; i < 6; i++) ir.push(cbx(0.05, 0.022, 0.86, 0.008, -0.34 + i * 0.136, 0.014, 0));
+    return [ppart('iron', ir, 1, [0.45, 0.45, 0.45]), ppart('dark', cbx(0.86, 0.004, 0.86, 0.001, 0, 0.004, 0), 1)];
   };
   // ---- (3) cloth, bones, crystal ----
   // a banner one long hanging from the origin, 1.1 wide: in folds, its foot cut to two tails and frayed (uv across and down it, as
@@ -2068,17 +2134,17 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   PROP.banner = () => {
     const g = sheet(-1, 0, () => 0.55, (x, v, u) => Math.sin(u * 6.5) * 0.03 * (1 - v * 0.7) + Math.sin(u * 2.3 + 1) * 0.02 * (1 - v), 12, 14, 0, (u) => 0.16 * (1 - Math.abs(u)) * (1 - Math.abs(u)) * 1.6 + 0.03 * Math.sin(u * 23) - 0.02);
     const ps = g.attributes.position, uv = new Float32Array(ps.count * 2); for (let i = 0; i < ps.count; i++) { uv[i * 2] = ps.getX(i) / 1.1 + 0.5; uv[i * 2 + 1] = ps.getY(i) + 1; } g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    const dv = Geo.merge([ext(arcPts(0, -0.36, 0.2, 0, Math.PI * 2, 24).slice(1), 0.004, 0, [arcPts(0, -0.36, 0.15, 0, Math.PI * 2, 20).slice(1)]), rbx(0.05, 0.42, 0.004, 0.001, 0, -0.36, 0), rbx(0.26, 0.05, 0.004, 0.001, 0, -0.3, 0)]); dv.translate(0, 0, 0.035);
+    const dv = Geo.merge([ext(arcPts(0, -0.36, 0.2, 0, Math.PI * 2, 24).slice(1), 0.004, 0, [arcPts(0, -0.36, 0.15, 0, Math.PI * 2, 20).slice(1)]), cbx(0.05, 0.42, 0.004, 0.001, 0, -0.36, 0), cbx(0.26, 0.05, 0.004, 0.001, 0, -0.3, 0)]); dv.translate(0, 0, 0.035);
     return [{ g, m: 'cloth' }, { g: dv, m: 'dark' }];
   };
   // a rug one square: its field, a border let into it, a fringe at both ends
   PROP.rug = () => {
-    const fr = []; for (let i = 0; i < 24; i++) for (const s of [-1, 1]) fr.push(rbx(0.012, 0.008, 0.07, 0.002, -0.48 + i / 23 * 0.96, 0.005, s * 0.535, [0, (i % 3 - 1) * 0.15, 0]));
-    return [ppart('cloth2', rbx(1, 0.018, 1, 0.004, 0, 0.009, 0), 1), ppart('cloth2', [rbx(0.9, 0.004, 0.04, 0.001, 0, 0.02, -0.42), rbx(0.9, 0.004, 0.04, 0.001, 0, 0.02, 0.42), rbx(0.04, 0.004, 0.88, 0.001, -0.43, 0.02, 0), rbx(0.04, 0.004, 0.88, 0.001, 0.43, 0.02, 0),
-      Geo.xf(rbx(0.2, 0.004, 0.2, 0.001, 0, 0.02, 0), null, [0, Math.PI / 4, 0])], 1, [1.9, 1.6, 1.0]), ppart('cloth2', fr, 1, [1.6, 1.4, 1.1])];
+    const fr = []; for (let i = 0; i < 24; i++) for (const s of [-1, 1]) fr.push(cbx(0.012, 0.008, 0.07, 0.002, -0.48 + i / 23 * 0.96, 0.005, s * 0.535, [0, (i % 3 - 1) * 0.15, 0]));
+    return [ppart('cloth2', cbx(1, 0.018, 1, 0.004, 0, 0.009, 0), 1), ppart('cloth2', [cbx(0.9, 0.004, 0.04, 0.001, 0, 0.02, -0.42), cbx(0.9, 0.004, 0.04, 0.001, 0, 0.02, 0.42), cbx(0.04, 0.004, 0.88, 0.001, -0.43, 0.02, 0), cbx(0.04, 0.004, 0.88, 0.001, 0.43, 0.02, 0),
+      Geo.xf(cbx(0.2, 0.004, 0.2, 0.001, 0, 0.02, 0), null, [0, Math.PI / 4, 0])], 1, [1.9, 1.6, 1.0]), ppart('cloth2', fr, 1, [1.6, 1.4, 1.1])];
   };
   // a long bone, one long and one in radius about its middle: a thin shaft, knobbed ends. Ribs: two bows of bone lying on the floor
-  PROP.longbone = () => [{ g: new THREE.LatheGeometry([[0.0005, -0.5], [1.3, -0.5], [1.75, -0.465], [1.6, -0.42], [1.0, -0.36], [0.85, 0], [1.0, 0.36], [1.6, 0.42], [1.75, 0.465], [1.3, 0.5], [0.0005, 0.5]].map((q) => new THREE.Vector2(q[0], q[1])), 8), m: 'bone' }];
+  PROP.longbone = () => [{ g: new THREE.LatheGeometry([[0.0005, -0.5], [1.3, -0.5], [1.75, -0.465], [1.6, -0.42], [1.0, -0.36], [0.85, 0], [1.0, 0.36], [1.6, 0.42], [1.75, 0.465], [1.3, 0.5], [0.0005, 0.5]].map((q) => new THREE.Vector2(q[0], q[1])), 6), m: 'bone' }];
   PROP.ribs = () => { const l = []; for (let i = 0; i < 3; i++) { const g = new THREE.TorusGeometry(0.17 - i * 0.02, 0.011, 4, 10, 2.3); g.rotateX(-HX + 0.15); g.rotateY(i * 0.5); g.translate(i * 0.06, 0.012, i * 0.05); l.push(g); } return [ppart('bone', l, 3)]; };
   // a crystal, two high and one in radius about its middle: a six-sided column, its faces unequal, drawn to a point off its axis
   PROP.crystal = () => {
@@ -2104,11 +2170,11 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // a grate of bars before the fire, its two doors swung open on their hinges, a hood over it
   PROP.furnacemouth = () => {
     const outer = [[0.6, 0], [0.6, 0.6]].concat(arcPts(0, 0.6, 0.6, 0, Math.PI, 16).slice(1), [[-0.6, 0]]), inner = [[0.44, 0.06], [0.44, 0.55]].concat(arcPts(0, 0.55, 0.44, 0, Math.PI, 14).slice(1), [[-0.44, 0.06]]);
-    const ir = [ext(outer, 0.18, 0.025, [inner]).translate(0, 0, 0.09), rbx(1.5, 0.07, 0.5, 0.02, 0, 1.3, 0.22, [0.3, 0, 0]), rbx(1.3, 0.05, 0.34, 0.015, 0, 0.0, 0.2)];
+    const ir = [ext(outer, 0.18, 0.025, [inner]).translate(0, 0, 0.09), cbx(1.5, 0.07, 0.5, 0.02, 0, 1.3, 0.22, [0.3, 0, 0]), cbx(1.3, 0.05, 0.34, 0.015, 0, 0.0, 0.2)];
     for (let i = 0; i < 6; i++) ir.push(prism(0.02, 0.5, [-0.36 + i * 0.144, 0.3, 0.15], null, 6));
     ir.push(prism(0.022, 0.86, [0, 0.54, 0.15], [0, 0, HX], 6));
     for (const sx of [-1, 1]) {
-      ir.push(Geo.xf(rbx(0.44, 0.98, 0.035, 0.012, 0.22, 0.5, 0), [sx * 0.62, 0.02, 0.18], [0, sx > 0 ? -1.15 : Math.PI + 1.15, 0]));
+      ir.push(Geo.xf(cbx(0.44, 0.98, 0.035, 0.012, 0.22, 0.5, 0), [sx * 0.62, 0.02, 0.18], [0, sx > 0 ? -1.15 : Math.PI + 1.15, 0]));
       for (const y of [0.22, 0.8]) ir.push(prism(0.03, 0.14, [sx * 0.62, y, 0.18], null, 8));
     }
     const fire = ext(inner, 0.01, 0).translate(0, 0, 0.03);
@@ -2139,18 +2205,18 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   PROP.crate = () => {
     const bd = [], fr = [], ir = [];
     for (let i = 0; i < 4; i++) { const y = 0.1325 + i * 0.245;
-      for (const sg of [-1, 1]) { bd.push(rbx(0.97, 0.225, 0.03, 0.006, 0, y, sg * 0.485)); bd.push(rbx(0.03, 0.225, 0.97, 0.006, sg * 0.485, y, 0)); }
-      bd.push(rbx(0.97, 0.03, 0.225, 0.006, 0, 0.985, -0.3675 + i * 0.245)); }
+      for (const sg of [-1, 1]) { bd.push(cbx(0.97, 0.225, 0.03, 0.006, 0, y, sg * 0.485)); bd.push(cbx(0.03, 0.225, 0.97, 0.006, sg * 0.485, y, 0)); }
+      bd.push(cbx(0.97, 0.03, 0.225, 0.006, 0, 0.985, -0.3675 + i * 0.245)); }
     for (const sg of [-1, 1]) {
-      for (const y of [0.05, 0.95]) { fr.push(rbx(1.0, 0.09, 0.028, 0.005, 0, y, sg * 0.514)); fr.push(rbx(0.028, 0.09, 1.0, 0.005, sg * 0.514, y, 0)); }
-      for (const e of [-1, 1]) { fr.push(rbx(0.09, 0.82, 0.028, 0.005, e * 0.455, 0.5, sg * 0.514)); fr.push(rbx(0.028, 0.82, 0.09, 0.005, sg * 0.514, 0.5, e * 0.455)); }
-      fr.push(rbx(1.1, 0.085, 0.026, 0.004, 0, 0.5, sg * 0.512, [0, 0, sg * 0.78])); fr.push(rbx(0.026, 0.085, 1.1, 0.004, sg * 0.512, 0.5, 0, [sg * 0.78, 0, 0]));
-      for (const e of [-1, 1]) for (const y of [0.05, 0.95]) { ir.push(ball(0.013, [e * 0.455, y, sg * 0.53])); ir.push(ball(0.013, [sg * 0.53, y, e * 0.455])); }
+      for (const y of [0.05, 0.95]) { fr.push(cbx(1.0, 0.09, 0.028, 0.005, 0, y, sg * 0.514)); fr.push(cbx(0.028, 0.09, 1.0, 0.005, sg * 0.514, y, 0)); }
+      for (const e of [-1, 1]) { fr.push(cbx(0.09, 0.82, 0.028, 0.005, e * 0.455, 0.5, sg * 0.514)); fr.push(cbx(0.028, 0.82, 0.09, 0.005, sg * 0.514, 0.5, e * 0.455)); }
+      fr.push(cbx(1.1, 0.085, 0.026, 0.004, 0, 0.5, sg * 0.512, [0, 0, sg * 0.78])); fr.push(cbx(0.026, 0.085, 1.1, 0.004, sg * 0.512, 0.5, 0, [sg * 0.78, 0, 0]));
+      for (const e of [-1, 1]) for (const y of [0.05, 0.95]) { ir.push(ballN(0.013, [e * 0.455, y, sg * 0.53], null, 8, 5)); ir.push(ballN(0.013, [sg * 0.53, y, e * 0.455], null, 8, 5)); }
     }
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0.06, 0.94]) ir.push(rbx(0.125, 0.125, 0.125, 0.012, sx * 0.475, y, sz * 0.475));
-    return [ppart('wood', bd, 1.2), ppart('woodDark', fr.concat([rbx(0.93, 0.95, 0.93, 0.004, 0, 0.485, 0)]), 1.2), ppart('iron', ir, 2)];
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0.06, 0.94]) ir.push(cbx(0.125, 0.125, 0.125, 0.012, sx * 0.475, y, sz * 0.475));
+    return [ppart('wood', bd, 1.2), ppart('woodDark', fr.concat([cbx(0.93, 0.95, 0.93, 0.004, 0, 0.485, 0)]), 1.2), ppart('iron', ir, 2)];
   };
-  X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
+  X.propGeo = function (name) { if (propC[name] !== undefined) return propC[name]; let r = null; const t0 = performance.now(); try { r = PROP[name] ? PROP[name]() : null; if (r) for (const q of r) if (q && q.g) q.g = Geo.weld(q.g); } catch (e) { console.warn('gfx: no prop', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } X.stats.prop = (X.stats.prop || 0) + (performance.now() - t0); return (propC[name] = r); };
 
   // ---- what is thrown (grenfx.js), in metres about its middle: lists of parts { g, m (which of grenfx's materials), tag }. A part
   // with a tag is one grenfx moves by itself (the water skin that wobbles, the rings that turn, a light that blinks) ----

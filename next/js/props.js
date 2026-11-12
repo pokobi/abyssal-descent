@@ -19,6 +19,9 @@
     PG.ico = new THREE.IcosahedronGeometry(1, 0);
     PG.oct3 = new THREE.OctahedronGeometry(1, 0);
     PG.torus = new THREE.TorusGeometry(1, 0.12, 8, 24);
+    // (a link of a hung chain - by the hundred in a hall: 6 about its bar, 16 about the link; seven to eleven centimetres across, so
+    // the facets are under two millimetres)
+    PG.link = new THREE.TorusGeometry(1, 0.12, 6, 16);
     PG.box = new THREE.BoxGeometry(1, 1, 1);
     PG.rbox = G.GFX ? G.GFX.makeRbox(1, 1, 1, 0.13, 2) : PG.box; // (a unit box with its edges softened: the parts of bodies, stretched to size like the plain one)
     PG.plane = new THREE.PlaneGeometry(1, 1);
@@ -57,6 +60,12 @@
       }
       PG.boneEnds = Ge.merge(ends);
     }
+    // (a broken stone: the same twelve flat faces, its corners shared within a face - drawn the same, with half the vertices)
+    if (G.GFX && G.GFX.Geo && G.GFX.Geo.weld) {
+      // (its three triangles to a face were each given their own normal, equal but for the last bits: one normal to the face, then shared)
+      const dd = PG.dode.clone(), dn = dd.attributes.normal;
+      for (let f = 0; f + 9 <= dn.count; f += 9) { let x = 0, y = 0, z = 0; for (let i = f; i < f + 9; i++) { x += dn.getX(i); y += dn.getY(i); z += dn.getZ(i); } const k = 1 / Math.hypot(x, y, z); for (let i = f; i < f + 9; i++) dn.setXYZ(i, x * k, y * k, z * k); }
+      PG.dodeW = G.GFX.Geo.weld(dd); if (PG.boneEnds) PG.boneEnds = G.GFX.Geo.weld(PG.boneEnds); }   // (and the stacked bone ends, drawn only as instances)
     for (const k in PG) PG[k].userData.shared = true;
   };
   P.PG = PG;
@@ -204,7 +213,7 @@
   };
   P.chain = function (w, x, y, z, len) {
     const n = Math.max(1, Math.floor(len / 0.18));
-    for (let i = 0; i < n; i++) w.batch.geo('iron', PG.torus, M(x, y + i * 0.18 + 0.09, z, 0.07, 0.11, 0.07, 0, i % 2 ? Math.PI / 2 : 0, 0));
+    for (let i = 0; i < n; i++) w.batch.geo('iron', PG.link, M(x, y + i * 0.18 + 0.09, z, 0.07, 0.11, 0.07, 0, i % 2 ? Math.PI / 2 : 0, 0));
   };
 
   // ---------- architecture ----------
@@ -233,7 +242,7 @@
       w.solid('trim', x - b, top - 0.36, z - b, x + b, top, z + b);
     } else {
       // jagged top + rubble at base
-      w.batch.geo('trim', PG.dode, M(x, top, z, r * 0.95, 0.25, r * 0.95, rr(rng, 0, 1), rr(rng, 0, 3), 0));
+      w.batch.geo('trim', PG.dodeW || PG.dode, M(x, top, z, r * 0.95, 0.25, r * 0.95, rr(rng, 0, 1), rr(rng, 0, 3), 0));
       P.rubble(w, x + rr(rng, -1.5, 1.5), y0, z + rr(rng, -1.5, 1.5), rng, 0.8);
     }
   };
@@ -244,7 +253,7 @@
     for (let i = 0; i < n; i++) {
       const sz = rr(rng, 0.12, 0.38) * s;
       const ox = rr(rng, -0.6, 0.6) * s, oz = rr(rng, -0.6, 0.6) * s;
-      w.batch.geo(mk || 'block', PG.dode, M(x + ox, y + sz * 0.5, z + oz, sz, sz * rr(rng, 0.5, 1), sz * rr(rng, 0.7, 1.2), rr(rng, 0, 3), rr(rng, 0, 3), 0), { su: 0.3, sv: 0.3 });
+      w.batch.geo(mk || 'block', PG.dodeW || PG.dode, M(x + ox, y + sz * 0.5, z + oz, sz, sz * rr(rng, 0.5, 1), sz * rr(rng, 0.7, 1.2), rr(rng, 0, 3), rr(rng, 0, 3), 0), { su: 0.3, sv: 0.3 });
       maxH = Math.max(maxH, sz);
     }
     if (s > 1.2) w.addCollider(x - 0.5 * s, y, z - 0.5 * s, x + 0.5 * s, y + maxH * 0.9, z + 0.5 * s);

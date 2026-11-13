@@ -251,18 +251,26 @@
       ['grass', () => gen(S, grass({ seed: 131 }), { normal: 2.5 })],
       ['marble', () => gen(S, marble({ seed: 141 }), { normal: 1.2 })],
     ];
-    T.tex = {};
-    let i = 0;
-    return new Promise((resolve) => {
-      const step = () => {
-        if (i >= tasks.length) { makeSprites(); resolve(); return; }
-        const [k, f] = tasks[i++];
-        T.tex[k] = f();
-        progress && progress(i / tasks.length, k);
-        setTimeout(step, 0);
-      };
-      step();
-    });
+    T.tex = {}; T.cpuMake = {}; T.stats = {};
+    // (the GPU makes every one of these again, finer, as soon as there is a renderer (gfx.js upgradeTextures), and nothing ever reads
+    // the CPU's: making them cost the loading screen three to four seconds for nothing. So each starts as a stand-in of one pixel, and
+    // the CPU's picture is made only for what the GPU could not make: T.cpuFill)
+    const t0 = performance.now();
+    for (const [k, f] of tasks) { T.cpuMake[k] = f; T.tex[k] = stub(); }
+    makeSprites();
+    T.stats.init = Math.round(performance.now() - t0);
+    progress && progress(1, 'sprites');
+    return Promise.resolve();
+  };
+  function stub() {
+    const one = (px, srgb) => { const t = new THREE.DataTexture(new Uint8Array(px), 1, 1, THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; };
+    return { map: one([170, 166, 160, 255], true), normalMap: one([128, 128, 255, 255], false), stub: true };
+  }
+  // the CPU's picture of k in place of its stand-in (the same object: whatever holds it follows)
+  T.cpuFill = function (k) {
+    const t = T.tex[k], f = T.cpuMake && T.cpuMake[k]; if (!t || !t.stub || !f) return;
+    const t0 = performance.now(), n = f(); t.map.dispose(); t.normalMap.dispose(); t.map = n.map; t.normalMap = n.normalMap; t.stub = false;
+    T.stats.cpu = (T.stats.cpu || 0) + Math.round(performance.now() - t0);
   };
 
   // a picture made a pixel at a time: fn(u, v, out) writes red, green, blue and alpha (0..1) for the point u, v (0..1, v downward)
@@ -632,6 +640,7 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
   }
   T.materials = function (biomeKey) {
     if (matCache[biomeKey]) return matCache[biomeKey];
+    for (const k in T.tex) if (T.tex[k].stub) T.cpuFill(k); // (what the GPU did not make: gfx.js upgradeTextures)
     const B = T.BIOMES[biomeKey];
     const std = (tex, color, rough, metal, nscale, extra) => {
       const m = new THREE.MeshStandardMaterial(Object.assign({

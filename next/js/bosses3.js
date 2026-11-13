@@ -362,8 +362,8 @@
       this.armorM = mat('#16131a', { roughness: 0.55, metalness: 0.7, transparent: true });
       this.trimM = mat('#8c7036', { roughness: 0.45, metalness: 1, transparent: true });
       this.capeM = mat('#1e0a22', { roughness: 0.95, side: THREE.DoubleSide, transparent: true });
-      this.glowM = mat('#000', { emissive: 0x7a34c8, emissiveIntensity: 1.7, transparent: true });
-      this.gemM = mat('#300040', { emissive: 0xa848e0, emissiveIntensity: 2.2, roughness: 0.1, transparent: true });
+      this.glowM = mat('#000', { emissive: 0x8a3a1c, emissiveIntensity: 1.5, transparent: true });   // (its seams burn a deep ember, not a violet light)
+      this.gemM = mat('#2a0c08', { emissive: 0xa0401c, emissiveIntensity: 1.8, roughness: 0.1, transparent: true });
       this.kingG = joint(this.root, 0, 0, 0);
       this.J = giant(this.kingG, { s: 2.3, hip: 4.6, armor: this.armorM, trim: this.trimM, cape: this.capeM, glow: this.glowM, gem: this.gemM });
       // the greatsword
@@ -381,7 +381,7 @@
       this.kmats = [this.armorM, this.trimM, this.capeM, this.glowM, this.gemM].concat(this.bladeM ? [this.bladeM] : []);
       // a halo above the crown and a rune circle that follows him across the floor
       this.haloK = mesh(this.J.head, PG.torus, this.glowM, 0.55 * 2.3, 0.55 * 2.3, 0.14 * 2.3, 0, 1.3 * 2.3, -0.2, Math.PI / 2);   // (a thin ring, not a tube of light)
-      const rt = new THREE.Mesh(new THREE.RingGeometry(5.2, 6, 6, 1), new THREE.MeshBasicMaterial({ color: 0xa040ff, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const rt = new THREE.Mesh(new THREE.RingGeometry(5.2, 6, 64, 1), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xa040ff), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
       const rt2 = new THREE.Mesh(new THREE.RingGeometry(3.6, 3.9, 48, 1), rt.material);
       this.rune = new THREE.Group(); this.rune.add(rt); this.rune.add(rt2); rt.rotation.x = rt2.rotation.x = -Math.PI / 2; this.own(this.rune);
       this.body = this.part({ name: def.name, hitW: [{ n: this.J.torso, r: 1.6, part: 'body', o: V(0, 1.3, 0) }, { n: this.J.body, r: 1.3, part: 'body' }, { n: this.J.legs[0].kn, r: 0.7, part: 'body', o: V(0, -1, 0) }, { n: this.J.legs[1].kn, r: 0.7, part: 'body', o: V(0, -1, 0) }], radius: 2, height: 9 });
@@ -393,7 +393,7 @@
       const seat = world.throneSeat || V(world.arenaCenter.x, 0, 6);
       this.pos.set(seat.x, 0, seat.z + 1.5); this.yaw = 0;
       this.state = 'rise'; this.stT = 0; this.cd = 2;
-      this.light = { pos: this.pos.clone(), color: '#a040ff', intensity: 10, range: 22, flame: 0, emit: false, ph: 0, prio: 5 };
+      this.light = { pos: this.pos.clone(), color: '#c06030', intensity: 10, range: 22, flame: 0, emit: false, ph: 0, prio: 5 };
       world.lightSources.push(this.light);
       G.ui.toast('👑 深淵の王が玉座から立ち上がる……', 'warn');
     }
@@ -563,7 +563,7 @@
       if (t > 1.6 && !this._tint) { this._tint = true; G.game.tintScene && G.game.tintScene('#6a28c0', 0.4); G.fx.flash(this.pos.clone().setY(6), 0xc060ff, 120, 0.6, 60); G.sfx.thunder && G.sfx.thunder(1); }
       if (t > 1.6 && t < 5) {
         // a pillar of the void swallows him
-        if (!this.pillar) { this.pillar = new THREE.Mesh(new THREE.CylinderGeometry(2, 3.5, 60, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0x8030ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); this.pillar.position.set(this.pos.x, 30, this.pos.z); this.own(this.pillar); }
+        if (!this.pillar) { this.pillar = new THREE.Mesh(new THREE.CylinderGeometry(2, 3.5, 60, 24, 1, true), new THREE.MeshBasicMaterial({ color: G.fx.tone(0x8030ff), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); this.pillar.position.set(this.pos.x, 30, this.pos.z); this.own(this.pillar); }
         this.pillar.material.opacity = Math.min(0.5, (t - 1.6) * 0.4) * (t > 4.2 ? Math.max(0, 1 - (t - 4.2) / 0.8) : 1);
         this.pillar.rotation.y += dt * 2;
         if (Math.random() < dt * 6) { const a = Math.random() * 6.28, d = U.rand(6, 28); const q = V(c.x + Math.cos(a) * d, 0.04, c.z + Math.sin(a) * d); G.fx.decal(q, V(0, 1, 0), 'crack', U.rand(3, 6), true); G.fx.lightning(q.clone().setY(30), q, 0xb060ff); }
@@ -694,7 +694,7 @@
       if (!a.warned) { a.warned = true; G.ui.toastSmall('⚠ 虚無の烈風 — しゃがんで踏ん張るか、柱の陰へ！'); G.sfx.whoosh && G.sfx.whoosh(1.4, 0.35, true); G.sfx.magic(o, 'dark'); }
       if (a.t < WIND) {
         if (Math.random() < dt * 70) { const an = Math.random() * 6.28, r = U.rand(2, 10); G.fx.norm.spawn(o.x + Math.cos(an) * r, U.rand(0.3, 2.5), o.z + Math.sin(an) * r, Math.cos(an) * 10, 0.2, Math.sin(an) * 10, 0.9, 0.2, 0.9, 0.55, 0.35, 0.85, 0.45, 0, 0.6); }
-        if (!a.ring) { a.ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.4, 48), new THREE.MeshBasicMaterial({ color: 0xc080ff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); a.ring.rotation.x = -Math.PI / 2; a.ring.position.set(o.x, 0.1, o.z); this.own(a.ring); }
+        if (!a.ring) { a.ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.4, 48), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xc080ff), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); a.ring.rotation.x = -Math.PI / 2; a.ring.position.set(o.x, 0.1, o.z); this.own(a.ring); }
         a.ring.scale.setScalar(1 + a.t / WIND * 3);
         return;
       }
@@ -719,7 +719,7 @@
       G.sfx.thunder && G.sfx.thunder(1); P.addShake(0.8);
       G.game.tintScene && G.game.tintScene('#a01850', 0.2);
       const c = this.world.arenaCenter;
-      const m = this.edgeRing = new THREE.Mesh(new THREE.CylinderGeometry(this.edgeR(), this.edgeR(), 14, 64, 1, true), new THREE.MeshBasicMaterial({ color: 0x6020c0, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+      const m = this.edgeRing = new THREE.Mesh(new THREE.CylinderGeometry(this.edgeR(), this.edgeR(), 14, 64, 1, true), new THREE.MeshBasicMaterial({ color: G.fx.tone(0x6020c0), transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
       m.position.set(c.x, 7, c.z); this.own(m);
       G.ui.toast('☠ 外周（紫の壁の外）は虚無 — 内側で戦え', 'warn');
     }
@@ -821,7 +821,7 @@
       } else if (a.k === 'pull') {
         if (!a.vx) {
           a.vx = true; G.ui.toastSmall('⚠ 深淵の渦 — 中心から離れろ！（スプリント）'); G.sfx.magic(c, 'dark');
-          const m = a.ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 4.5, 48), new THREE.MeshBasicMaterial({ color: 0x8030ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+          const m = a.ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 4.5, 48), new THREE.MeshBasicMaterial({ color: G.fx.tone(0x8030ff), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
           m.rotation.x = -Math.PI / 2; m.position.set(this.pos.x, 0.08, this.pos.z); this.own(m);
         }
         const vc = a.ring.position;

@@ -315,8 +315,10 @@
       const pos = e.centerPos();
       switch (id) {
         case 'boil': case 'thaw':
-          G.fx.sparks(pos, null, 14, id === 'boil' ? 0xffc080 : 0xffd0e0, 6);
-          if (id === 'boil') G.fx.smoke && G.fx.smoke(pos, 6, 1.2, 0xe8e8f0, 0.5, 1.0);
+          // (boil: water flashing to steam on something hot; thaw: ice melting off in steam and running water)
+          G.fx.steam(pos, id === 'boil' ? 12 : 8, id === 'boil' ? 1.2 : 0.9);
+          if (id === 'thaw') { G.fx.iceBurst(pos, 6, 2, 0.8); for (let i = 0; i < 10; i++) G.fx.drops.spawn(pos.x + G.U.rand(-0.3, 0.3), pos.y + G.U.rand(-0.2, 0.4), pos.z + G.U.rand(-0.3, 0.3), G.U.rand(-0.6, 0.6), G.U.rand(0, 1.2), G.U.rand(-0.6, 0.6), 0.6, 0.012, 0.55, 0.6, 0.64, 9.8, 0.3, 0.03); }
+          else G.fx.sparks(pos, null, 5, 0xffc080, 4);
           break;
         case 'freeze': {
           const s = e.st, now = G.game.time;
@@ -327,18 +329,18 @@
             s.frozen = Math.max(s.frozen || 0, t); e._elFrozen = true; s.frostStacks = 0;
             e.freezeImmuneUntil = now + t + 4;
           } else s.elSlow = Math.max(s.elSlow || 0, 2);
-          G.sfx.ice(e.pos); G.fx.sparks(pos, null, 16, 0xd0f0ff, 5);
+          G.sfx.ice(e.pos); G.fx.iceBurst(pos, 14, 3.5);
           break;
         }
         case 'shatter': {
           e.st.frozen = 0; e._elFrozen = false;
-          G.fx.sparks(pos, null, 26, 0xe8f8ff, 9); G.sfx.ice(e.pos);
+          G.fx.iceBurst(pos, 30, 7, 1.5); G.fx.dust(pos, null, 0x9aa0a4, 4); G.sfx.ice(e.pos);
           rxHit(e, EL.scale(120) * EL.effMul('shatter'), 'shatter');
           break;
         }
         case 'blast': {
           const r = 4 * (1 + sx('rxBlastR'));
-          G.fx.explosion(pos, r, 0xff6aa8, { decal: false }); G.sfx.explosion(pos, 0.7);
+          G.fx.explosion(pos, r, 0xff8a40, { decal: false }); G.fx.arcsOn(pos, r * 0.3, 1.2, 4); G.sfx.explosion(pos, 0.7);
           const dmg = EL.scale(90) * EL.effMul('blast');
           for (const o of G.enemies.inRadius(e.pos, r)) {
             const d = o.pos.clone().sub(e.pos).setY(0); if (d.lengthSq() < 0.01) d.set(1, 0, 0);
@@ -350,13 +352,13 @@
           const s = e.st;
           s.leak = 4; s.leakK = EL.scale(14) * EL.effMul('leak') * (1 + sx('rxLeak')); s.leakT = 0;
           if (e.alive) C.status(e, 'shock', 1);
-          G.fx.sparks(pos, null, 12, 0xb0c8ff, 6);
+          G.fx.arcsOn(pos, (e.radius || 0.6) * 0.9, (e.height || 1.6) * 0.7, 5); for (let i = 0; i < 8; i++) G.fx.drops.spawn(pos.x, pos.y, pos.z, G.U.rand(-2, 2), G.U.rand(0.5, 2.5), G.U.rand(-2, 2), 0.5, 0.01, 0.55, 0.6, 0.64, 9.8, 0.3, 0.025);
           break;
         }
         case 'brittle': {
           const s = e.st;
           s.brittle = 8; s.brittleK = (e.boss ? 0.15 : 0.25) * (1 + EL.effK(EL.mastery()) * 0.5) * cls() + sx('rxBrittle');
-          G.fx.sparks(pos, null, 12, 0xd8c8ff, 5);
+          G.fx.arcsOn(pos, (e.radius || 0.6) * 0.8, (e.height || 1.6) * 0.6, 3); G.fx.iceBurst(pos, 8, 2.5, 0.8);
           break;
         }
         case 'swirl': {
@@ -398,7 +400,7 @@
       if (s.leakT <= 0) {
         s.leakT = 0.5;
         rxHit(e, s.leakK || EL.scale(14), 'leak', { silent: false });
-        G.fx.sparks(e.centerPos(), null, 4, 0xb0c8ff, 4);
+        G.fx.arcsOn(e.centerPos(), (e.radius || 0.6) * 0.8, (e.height || 1.6) * 0.6, 2);
         // it runs on into foes that are wet
         const r = 6 + (P.has('rx_leakR') ? 3 : 0);
         for (const o of G.enemies.inRadius(e.pos, r)) {
@@ -448,11 +450,33 @@
   EL.dropCrystal = function (pos, el) {
     if (!G.scene) return;
     const col = EL.BY[el] ? EL.BY[el].hex : 0xe0a640;
-    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9 }));
+    const m = EL.crystalModel(col);
     const floor = G.world && G.world.floorBelow ? G.world.floorBelow(pos.x, pos.y + 1, pos.z) : pos.y;
     m.position.set(pos.x, floor + 0.7, pos.z);
     G.scene.add(m);
     EL.crystals.push({ m, el, t: 10, base: floor + 0.7 });
+  };
+  // (a cluster of three rough crystals grown from one root: not a gem that glows. Its element in a dull tint, a little light from within)
+  let crysGeo = null;
+  EL.crystalModel = function (col) {
+    if (!crysGeo) {
+      const parts = [[0, 0, 0, 0, 0.17, 0.5], [0.1, -0.05, 0.03, 0.5, 0.11, 0.32], [-0.08, -0.06, -0.05, -0.45, 0.1, 0.28]].map(([x, y, z, tilt, rw, h]) => {
+        const g = new THREE.CylinderGeometry(rw * 0.55, rw, h, 6, 1); g.translate(0, h / 2, 0);
+        const tip = new THREE.ConeGeometry(rw * 0.55, h * 0.35, 6, 1); tip.translate(0, h + h * 0.175, 0);
+        const parts2 = [g, tip].map((q) => { q.rotateZ(tilt); q.rotateY(tilt * 2.3); q.translate(x, y, z); return q.toNonIndexed(); });
+        return parts2;
+      }).flat();
+      const n = parts.reduce((a, g) => a + g.attributes.position.count, 0), pos = new Float32Array(n * 3); let k = 0;
+      for (const g of parts) { pos.set(g.attributes.position.array, k * 3); k += g.attributes.position.count; g.dispose(); }
+      crysGeo = new THREE.BufferGeometry(); crysGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); crysGeo.computeVertexNormals(); crysGeo.translate(0, -0.25, 0);
+      // (each face its own shade: clouded, flawed, darker where it is thick - a mineral, not a cut of paper)
+      const cl = new Float32Array(n * 3); for (let f = 0; f < n / 3; f++) { const hsh = Math.sin(f * 12.9898 + 4.1) * 43758.5453, v = 0.35 + 0.75 * (hsh - Math.floor(hsh)); for (let q = 0; q < 9; q++) cl[f * 9 + q] = v; } crysGeo.setAttribute('color', new THREE.BufferAttribute(cl, 3));
+    }
+    const base = (G.vfx && G.vfx.crystalMat) ? G.vfx.crystalMat.clone() : new THREE.MeshStandardMaterial({ roughness: 0.2, flatShading: true });
+    const c = G.fx.tone ? G.fx.tone(col) : new THREE.Color(col);
+    base.color.copy(c).multiplyScalar(0.3).lerp(new THREE.Color(0x2a2826), 0.45); base.emissive.copy(c).multiplyScalar(0.035); base.roughness = 0.75; base.metalness = 0; base.vertexColors = true; base.needsUpdate = true; base.transparent = false; base.opacity = 1;   // (dark-hearted mineral, its colour deep in it, a sheen on its faces)
+    const m = new THREE.Mesh(crysGeo, base); m.scale.setScalar(1.15);
+    return m;
   };
   EL.pickCrystal = function (c) {
     const sh = 40 * (1 + sx('rxCrystal'));
@@ -471,9 +495,9 @@
       const d = c.m.position.distanceTo(P.chestPos());
       if (pull && d < 9) c.m.position.lerp(P.chestPos(), Math.min(1, dt * 4));
       else c.m.position.y = c.base + Math.sin(c.t * 3) * 0.12;
-      if (c.t < 2) c.m.material.opacity = 0.9 * c.t / 2;
+      if (c.t < 2) c.m.scale.setScalar(1.15 * Math.max(0.05, c.t / 2));
       if (!P.dead && d < 1.7) { EL.pickCrystal(c); c.t = 0; }
-      if (c.t <= 0) { G.scene.remove(c.m); c.m.geometry.dispose(); c.m.material.dispose(); EL.crystals.splice(i, 1); }
+      if (c.t <= 0) { G.scene.remove(c.m); c.m.material.dispose(); EL.crystals.splice(i, 1); } // (the shape is shared: only its own material goes)
     }
     EL.tickPlayer(dt);
     EL.bossTick();

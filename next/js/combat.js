@@ -250,7 +250,7 @@
         e.shield -= sd; shieldDealt = sd;
         dmg = P.has('o_shieldpierce') ? dmg * 0.25 : 0;
         if (src !== 'dot' && !info.silent) {
-          if (!e._bubT || G.game.time - e._bubT > 0.08) { e._bubT = G.game.time; G.fx.bubble(e.centerPos(), e.radius * G.enemies.shieldK, 0xbfe2ff, e.centerRef); }
+          if (!e._bubT || G.game.time - e._bubT > 0.08) { e._bubT = G.game.time; G.fx.bubble(e.centerPos(), e.radius * G.enemies.shieldK, 0xbfe2ff, e.centerRef, pos); }
           if (src === 'bullet') { G.fx.sparks(pos, null, 7, 0xcfe8ff, 6); G.sfx.hitShield(pos); }
         }
       }
@@ -383,7 +383,7 @@
         s.frostStacks = (s.frostStacks || 0) + stacks; s.frost = 4;
         // freezing follows the same rule: bosses only get slowed, and a thawed foe can't be refrozen right away
         if (s.frostStacks >= 5 && (e.boss || G.game.time < (e.freezeImmuneUntil || 0))) { s.frostStacks = 4; break; }
-        if (s.frostStacks >= 5) { s.frozen = 2.0; e.freezeImmuneUntil = G.game.time + 2.0 + 4; s.frostStacks = 0; G.sfx.ice(e.pos); G.fx.sparks(e.centerPos(), null, 14, 0xd0f0ff, 5); }
+        if (s.frostStacks >= 5) { s.frozen = 2.0; e.freezeImmuneUntil = G.game.time + 2.0 + 4; s.frostStacks = 0; G.sfx.ice(e.pos); G.fx.iceBurst(e.centerPos(), 12, 3.5); }
         if (G.Elem) G.Elem.fromStatus(e, 'ice'); // (chilling leaves ice on the foe)
         break;
       case 'poison': {
@@ -392,7 +392,7 @@
         s.poisonStacks = Math.min(max, (s.poisonStacks || 0) + stacks); s.poison = 5;
         if (P.has('x_toxburst') && s.poisonStacks >= 5) {
           s.poisonStacks = 0;
-          G.fx.smoke(e.centerPos(), 10, 1.5, 0x6a9a2a, 0.5, 1.2);
+          G.fx.gas(e.centerPos(), 10, 1.5);
           for (const o of C.inRadius(e.pos, 4)) { C.damageEnemy(o, C.scale(30), { src: 'buff', proc: true, silent: o !== e }); if (o !== e) C.status(o, 'poison', 2); }
         }
         break;
@@ -406,7 +406,7 @@
           if (P.has('h_overcurrent')) { const t = C.nearest(e.pos, 8, e); if (t) { G.fx.lightning(e.centerPos(), t.centerPos()); C.status(t, 'shock', 1); } }
           s._shockLock = false;
         }
-        G.fx.sparks(e.centerPos(), null, 5, 0xfff0a0, 4);
+        G.fx.arcsOn(e.centerPos(), e.radius * 0.8, e.height * 0.7, 3); G.fx.sparks(e.centerPos(), null, 2, 0xffd8a8, 3);
         if (G.Elem) G.Elem.fromStatus(e, 'volt'); // (shock leaves volt on the foe)
         break;
       case 'slow': s.slow = 4; break;
@@ -431,8 +431,8 @@
       if (s.poison > 0 && s.poisonStacks > 0) C.damageEnemy(e, (s.poisonPow || C.scale(2.4)) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
     }
     if (s.burn > 0) { s.burn -= dt; if (s.burn <= 0) s.burnLv = 0; if (Math.random() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8); }
-    if (s.poison > 0) { s.poison -= dt; if (s.poison <= 0) s.poisonStacks = 0; if (Math.random() < dt * 5) G.fx.norm.spawn(e.pos.x, e.pos.y + e.height * 0.6, e.pos.z, U.rand(-0.3, 0.3), -0.5, U.rand(-0.3, 0.3), 0.8, 0.12, 0.3, 0.45, 0.7, 0.15, 0.7, 2, 0.5); }
-    if (s.shock > 0 && Math.random() < dt * 8) G.fx.sparks(e.centerPos(), null, 2, 0xfff0a0, 3);
+    if (s.poison > 0) { s.poison -= dt; if (s.poison <= 0) s.poisonStacks = 0; if (Math.random() < dt * 16) G.fx.drops.spawn(e.pos.x + U.rand(-0.3, 0.3) * e.radius, e.pos.y + e.height * U.rand(0.3, 0.8), e.pos.z + U.rand(-0.3, 0.3) * e.radius, 0, -0.2, 0, 0.6, 0.02, 0.24, 0.27, 0.07, 9.8, 0.3, 0.05); if (Math.random() < dt * 8) G.fx.norm.spawn(e.pos.x + U.rand(-0.6, 0.6) * e.radius, e.pos.y + 0.15, e.pos.z + U.rand(-0.6, 0.6) * e.radius, U.rand(-0.3, 0.3), 0.08, U.rand(-0.3, 0.3), 2.0, 0.45, 1.8, 0.34, 0.36, 0.14, 0.55, 0.04, 1.2); } // (it drips a sick fluid; a murk pools at its feet)
+    if (s.shock > 0 && Math.random() < dt * 24) G.fx.arcsOn(e.centerPos(), e.radius * 0.75, e.height * 0.75, Math.random() < 0.4 ? 2 : 1); // (arcs running over it, one after another)
     if (s.shock <= 0) s.shockLv = 0;
   };
   C.speedMul = function (e) {
@@ -452,7 +452,7 @@
     const d = (s.poisonPow || C.scale(2.4)) * s.poisonStacks * s.poison * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0));
     s.poison = 0; s.poisonStacks = 0;
     C.damageEnemy(e, d, { src: 'dot', elem: 'poison' });
-    G.fx.smoke(e.centerPos(), 10, 1.4, 0x6a9a2a, 0.5, 1.0);
+    G.fx.gas(e.centerPos(), 10, 1.4);
   };
   C.spreadStatus = function (e, r) {
     const s = e.st;
@@ -688,7 +688,7 @@
     if (kind.startsWith('gl_')) { g = G.GrenFX.build(kind.slice(3)); g.userData.kind = kind; G.scene.add(g); return g; } // a throwable's own model
     const add = (geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const mm = new THREE.Mesh(geo, mat); mm.scale.set(sx, sy, sz); mm.position.set(x || 0, y || 0, z || 0); mm.rotation.set(rx || 0, ry || 0, rz || 0); g.add(mm); return mm; };
     g = new THREE.Group();
-    const glow = (c, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.setScalar(s); g.add(sp); return sp; };
+    const glow = (c, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: G.fx.tone ? G.fx.tone(c) : c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.setScalar(s); g.add(sp); return sp; };
     // (the shots that are things - a rocket, a shell, an arrow, a nail, a harpoon, a spear, a boulder - are shaped in gfx.js shotGeo;
     // their glows are as they were. Without those shapes, the rods and cones below)
     const SG = G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo(kind) : null;
@@ -709,20 +709,20 @@
       case 'sickle': { if (!C._sickGeo) C._sickGeo = new THREE.TorusGeometry(0.42, 0.06, 4, 14, Math.PI * 1.25); const b = new THREE.Mesh(C._sickGeo, mats.iron); g.add(b); add(PG.box, mats.woodDark, 0.05, 0.42, 0.05, 0.42, -0.2, 0); glow(0xff8030, 0.5); break; } // (the scarecrow's: spun as it flies)
       case 'spear': add(PG.cyl8, mats.woodDark, 0.03, 1.8, 0.03, 0, 0, 0, Math.PI / 2); add(PG.cone, mats.iron, 0.07, 0.35, 0.07, 0, 0, -1.05, -Math.PI / 2); glow(0xffe0a0, 0.5).position.z = -1; break;
       // the magic ones: a body you can see (boiling fire, a fresnel shell, a crystal) inside the glow; the hit size is SHOT_VIS below
-      case 'icespear': { add(PG.oct3, new THREE.MeshStandardMaterial({ color: 0xd0f0ff, emissive: 0x4a90c0, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.9 }), 0.14, 0.14, 1.0); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0.05, 0.05, 0.7); glow(0xbfe8ff, 1.0); break; }
-      case 'orb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0xb060ff, 0xffd0ff, 'energy')); sh.scale.setScalar(0.32); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0xffe8ff }), 0.12, 0.12, 0.12); glow(0xc070ff, 0.8); break; }
-      case 'soul': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6ab8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.28); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0xf0f8ff }), 0.1, 0.1, 0.1); glow(0x9fd8ff, 0.6); break; }
+      case 'icespear': { add(PG.oct3, new THREE.MeshStandardMaterial({ color: 0xd4e0e8, emissive: 0x2a3e4a, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.9 }), 0.14, 0.14, 1.0); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0.05, 0.05, 0.7); glow(0xbfe8ff, 1.0); break; }
+      case 'orb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6a5e68, 0xb0a4ac, 'energy')); sh.scale.setScalar(0.32); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x9a8e96 }), 0.12, 0.12, 0.12); glow(0xc070ff, 0.5); break; }
+      case 'soul': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6ab8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.28); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x8a96a2 }), 0.1, 0.1, 0.1); glow(0x9fd8ff, 0.4); break; }
       case 'fireball': { const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.42); g.add(fb); glow(0xff8a30, 1.3); glow(0xffe0a0, 0.4); break; }
       case 'bigfire': { add(PG.dode, new THREE.MeshStandardMaterial({ color: 0x2a1a12, emissive: 0x801800, emissiveIntensity: 0.9, roughness: 0.9, flatShading: true }), 0.55, 0.55, 0.55); const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.95); g.add(fb); glow(0xff7a20, 2.6); glow(0xffe0a0, 0.9); break; }
-      case 'spit': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x6a9a20, emissive: 0x2a4a00, roughness: 0.2 }), 0.14, 0.14, 0.14); break;
-      case 'acid': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x9ac020, emissive: 0x4a6a00, roughness: 0.2 }), 0.3, 0.3, 0.3); glow(0x9ad040, 1.0); break;
+      case 'spit': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x4e5420, emissive: 0x141800, roughness: 0.2 }), 0.14, 0.14, 0.14); break;
+      case 'acid': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x5c6224, emissive: 0x1c2200, roughness: 0.2 }), 0.3, 0.3, 0.3); glow(0x9ad040, 0.8); break;
       case 'web': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.9 }), 0.16, 0.16, 0.16); break;
       case 'spore': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x8aa040, emissive: 0x1a2a00, roughness: 0.9, transparent: true, opacity: 0.8 }), 0.25, 0.25, 0.25); break;
       case 'boulder': add(PG.dode, mats.rock, 0.6, 0.55, 0.6); break;
       case 'rock': { const sp = new THREE.Group(); g.add(sp); g.userData.spin = sp; const st = new THREE.Mesh(PG.dode, mats.rock); st.scale.setScalar(0.26); sp.add(st); break; } // a tumbling stone: scale = the held one, radius = what hits
       case 'frostorb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x9ad8ff, 0xffffff, 'ice')); sh.scale.setScalar(0.38); g.add(sh); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xe8f8ff }), 0.14, 0.14, 0.14); glow(0xbfe8ff, 1.0); break; }
-      case 'waterorb': { add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x2f8dff, emissive: 0x0a3a80, roughness: 0.05, transparent: true, opacity: 0.8 }), 0.22, 0.22, 0.22); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4aa8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.26); g.add(sh); glow(0x5fb0ff, 0.9); break; }
-      case 'darkorb': { add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x0a0410 }), 0.24, 0.24, 0.24); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x8a30ff, 0xe0b0ff, 'spiral')); sh.scale.setScalar(0.34); g.add(sh); glow(0xa040ff, 1.1); break; }
+      case 'waterorb': { add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x46606c, emissive: 0x0a1a22, roughness: 0.05, transparent: true, opacity: 0.8 }), 0.22, 0.22, 0.22); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4aa8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.26); g.add(sh); glow(0x5fb0ff, 0.9); break; }
+      case 'darkorb': { add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x0a0410 }), 0.24, 0.24, 0.24); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4a3e4a, 0x9a8c96, 'spiral')); sh.scale.setScalar(0.34); g.add(sh); glow(0x6a5a6a, 0.8); break; }
       default: glow(0xffffff, 0.4);
     }
     g.userData.kind = kind;
@@ -760,16 +760,16 @@
   function trail(p, dt) {
     if (p.look) { G.GrenFX.trail(p, dt); return; }
     // a player's projectile with an element leaves a trail of its colour
-    if (p.owner === 'player' && p.info && p.info.el && G.Elem && G.Elem.BY[p.info.el] && Math.random() < 0.8) { const c = new THREE.Color(G.Elem.BY[p.info.el].hex); G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.32, 0.22, 0.02, c.r, c.g, c.b, 0.9, 0, 1); }
+    if (p.owner === 'player' && p.info && p.info.el && G.Elem && G.Elem.BY[p.info.el] && Math.random() < 0.8) { const c = G.fx.tone ? G.fx.tone(G.Elem.BY[p.info.el].hex) : new THREE.Color(G.Elem.BY[p.info.el].hex); G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.32, 0.22, 0.02, c.r, c.g, c.b, 0.9, 0, 1); }
     switch (p.kind) {
       case 'rocket': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(0, 0.5), U.rand(-0.3, 0.3), 1.2, 0.2, 1.0, 0.5, 0.48, 0.45, 0.5, -0.3, 1); G.fx.flame.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.08, 0.35, 0.1, 1.5, 0.9, 0.4, 1, 0, 0); break;
       case 'fireball': case 'bigfire': G.fx.flameLick(p.pos.x, p.pos.y - 0.1, p.pos.z, p.kind === 'bigfire' ? 2.5 : 1.0); break;
-      case 'orb': case 'darkorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.25, 0.02, 0.6, 0.3, 1.0, 0.8, 0, 1); break;
-      case 'soul': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.5, 0.8, 1.0, 0.8, 0, 1); break;
-      case 'waterorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.4, 0.4), U.rand(-0.6, 0), U.rand(-0.4, 0.4), 0.35, 0.18, 0.02, 0.25, 0.6, 1.0, 0.8, 4, 1); break;
-      case 'frostorb': case 'icespear': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.2, 0.02, 0.7, 0.9, 1.0, 0.8, 0, 1); break;
+      case 'orb': case 'darkorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.22, 0.02, 0.5, 0.42, 0.55, 0.8, 0, 1); break;
+      case 'soul': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.58, 0.68, 0.78, 0.8, 0, 1); break;
+      case 'waterorb': G.fx.drops.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.6, 0.6), U.rand(-0.6, 0.4), U.rand(-0.6, 0.6), 0.4, 0.012, 0.5, 0.58, 0.62, 9.8, 0.3, 0.03); break; // (water shed as it flies: drops)
+      case 'frostorb': case 'icespear': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.4, 0.1), U.rand(-0.3, 0.3), 0.6, 0.12, 0.45, 0.78, 0.82, 0.86, 0.4, 0.2, 1); break; // (cold air trailing off it)
       case 'rock': { const sp = p.mesh.userData.spin; if (sp) { sp.rotation.x += dt * 11; sp.rotation.z += dt * 6; } if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.2, 0.2), U.rand(-0.1, 0.3), U.rand(-0.2, 0.2), 0.45, 0.06, 0.16, 0.55, 0.52, 0.47, 0.5, -0.1, 1); break; }
-      case 'acid': case 'spit': if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, -1, 0, 0.5, 0.08, 0.04, 0.5, 0.7, 0.1, 0.9, 5, 0); break;
+      case 'acid': case 'spit': if (Math.random() < 0.5) G.fx.drops.spawn(p.pos.x, p.pos.y, p.pos.z, 0, -1, 0, 0.5, 0.014, 0.26, 0.28, 0.08, 9.8, 0.2, 0.03); break;
       case 'bolt': case 'harpoon': case 'spear': case 'arrow': if (Math.random() < 0.4) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.04, 0.08, 0.7, 0.7, 0.7, 0.25, 0, 0); break;
     }
   }
@@ -873,7 +873,7 @@
   }
   function interceptors(p) {
     const pl = G.player;
-    if (pl.wardT > 0 && p.pos.distanceTo(pl.chestPos()) < 3.2) { G.fx.bubble(pl.chestPos(), 3.2, 0xd0b0ff); G.fx.sparks(p.pos, null, 8, 0xd0b0ff, 4); return true; }
+    if (pl.wardT > 0 && p.pos.distanceTo(pl.chestPos()) < 3.2) { G.fx.bubble(pl.chestPos(), 3.2, 0xd0b0ff, null, p.pos); G.fx.sparks(p.pos, null, 6, 0xffd8b0, 4); return true; }
     if (pl.has('z_orbs')) {
       for (const o of pl.orbPositions || []) if (o.distanceTo(p.pos) < 0.7) { G.fx.sparks(p.pos, null, 10, 0xd0e0ff, 5); G.sfx.hitShield(p.pos); return true; }
     }

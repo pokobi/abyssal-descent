@@ -1286,7 +1286,7 @@
     if (want && S.healHl === undefined) S.healHl = null;
     if (want && !S.healHl) {
       const h = w.miniHeal, g = new THREE.Group(); g.position.copy(h);
-      const col = 0x60ff90;
+      const col = G.fx.tone ? G.fx.tone(0xe0c080).getHex() : 0xd8b878;   // (a pale gold: the light of the water, not a green beacon)
       const outline = new THREE.Mesh(G.Props.PG.oct, new THREE.MeshBasicMaterial({ color: col, side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false })); outline.scale.set(0.9, 1.04, 0.9); outline.position.y = 0.45; outline.renderOrder = 4; g.add(outline);
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false })); glow.scale.set(3, 2.2, 1); glow.position.y = 0.8; glow.renderOrder = 5; g.add(glow);
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 8, 12, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); beam.position.y = 4; g.add(beam);
@@ -1297,7 +1297,8 @@
     if (!hl) return;
     hl.k = U.damp(hl.k, want ? 1 : 0, want ? 2 : 6, dt);
     const pulse = 0.7 + 0.3 * Math.sin(GM.time * 3);
-    hl.outline.material.opacity = 0.9 * hl.k * pulse; hl.glow.material.opacity = 0.4 * hl.k * pulse; hl.beam.material.opacity = 0.16 * hl.k * pulse; hl.ring.material.opacity = 0.6 * hl.k * pulse;
+    hl.outline.material.opacity = 0.45 * hl.k * pulse; hl.glow.material.opacity = 0.35 * hl.k * pulse; hl.beam.material.opacity = 0.08 * hl.k * pulse; hl.ring.material.opacity = 0;
+    if (want && Math.random() < dt * 10) { const h = G.world.miniHeal, a = Math.random() * 6.283, d = Math.random() * 0.7; G.fx.add.spawn(h.x + Math.cos(a) * d, h.y + 0.6 + Math.random() * 0.3, h.z + Math.sin(a) * d, 0, 0.35 + Math.random() * 0.4, 0, 1.6, 0.05, 0.02, 0.85, 0.7, 0.4, 0.85, -0.05, 0.4); }   // (motes of light rising off the water)
     hl.ring.scale.setScalar(1 + 0.1 * Math.sin(GM.time * 3)); hl.beam.rotation.y += dt * 0.6;
     if (!want && hl.k < 0.01) { w.group.remove(hl.g); hl.beam.geometry.dispose(); hl.ring.geometry.dispose(); hl.outline.material.dispose(); S.healHl = null; }
   }
@@ -2567,7 +2568,7 @@
       if (it.type !== 'chest' || !it.mesh) continue;
       const want = GM.areaCleared && !it.opened;
       if (want && !it.hl) {
-        const col = it.tier >= 3 ? 0xff68d8 : it.tier >= 2 ? 0xffc040 : it.tier ? 0x80c0ff : 0xffe0a0;
+        const col = it.tier >= 3 ? 0xd06a40 : it.tier >= 2 ? 0xe0a848 : it.tier ? 0xa8b4c0 : 0xd8c098;   // (old gold leaking from it; its worth in the tint: pale, steel, gold, copper-red)
         const g = new THREE.Group(); g.position.copy(it.pos).setY(it.pos.y - 0.5);
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
         glow.scale.set(3.6, 2.4, 1); glow.position.y = 0.5; glow.renderOrder = 5; g.add(glow);
@@ -2583,9 +2584,10 @@
         const h = it.hl;
         h.k = U.damp(h.k, want ? 1 : 0, want ? 1.5 : 6, dt);
         const pulse = 0.7 + 0.3 * Math.sin(GM.time * 3.2 + it.pos.x), rp = (GM.time * 0.7 + it.pos.x * 0.37) % 1;
-        h.glow.material.opacity = 0.6 * h.k * pulse;
-        h.beam.material.opacity = 0.28 * h.k * pulse;
-        h.ring.material.opacity = 0.8 * h.k * pulse; h.rip.material.opacity = 0.7 * h.k * (1 - rp); h.rip.scale.setScalar(1 + rp * 2.2);
+        h.glow.material.opacity = 0.4 * h.k * pulse; h.glow.scale.set(2.4, 1.6, 1);
+        h.beam.material.opacity = 0.18 * h.k * pulse;
+        h.ring.material.opacity = 0; h.rip.material.opacity = 0; h.rip.scale.setScalar(1 + rp * 2.2);   // (no lit rings on the floor: the light from its seams, and the shaft over it that finds it from afar)
+        if (want && Math.random() < dt * 6) G.fx.add.spawn(it.pos.x + (Math.random() - 0.5) * 0.6, it.pos.y - 0.1, it.pos.z + (Math.random() - 0.5) * 0.6, 0, 0.3 + Math.random() * 0.3, 0, 1.2, 0.04, 0.015, 0.8, 0.62, 0.32, 0.85, -0.05, 0.4);
         h.ring.scale.setScalar(1 + 0.08 * Math.sin(GM.time * 2.4));
         h.beam.rotation.y += dt * 0.5;
         if (!want && h.k < 0.01) { w.group.remove(h.g); h.beam.geometry.dispose(); h.ring.geometry.dispose(); h.rip.geometry.dispose(); it.hl = null; }

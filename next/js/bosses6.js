@@ -58,11 +58,11 @@
     if (w.ledgeWall || !w.ledgeZ) return;
     const z = w.ledgeZ;
     w.addCollider(0, -40, z - 0.3, w.W, 80, z + 0.3, { surf: 'metal', noGrapple: true });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w.W, 30), new THREE.MeshBasicMaterial({ color: 0xff4a9a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, map: G.Tex.spr.soft }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w.W, 30), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xff4a9a), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, map: G.Tex.spr.soft }));
     m.position.set(w.W / 2, 6, z); w.group.add(m);
     w.ledgeWall = { m, t: 0 };
     G.sfx.magic && G.sfx.magic(V(w.W / 2, 1, z), 'dark'); G.sfx.rumble && G.sfx.rumble(1, 0.8);
-    for (let x = 2; x < w.W; x += 3) G.fx.smoke(V(x, 0.3, z), 2, 1.2, 0xff4a9a, 2, 1.2);
+    for (let x = 2; x < w.W; x += 3) G.fx.smoke(V(x, 0.3, z), 2, 1.2, 0x4a3a38, 2, 1.2);
     G.ui.toastSmall('🔒 背後の足場が紅い光の壁に閉ざされた');
   };
   TR.update = function (dt) {
@@ -126,7 +126,7 @@
   };
 
   // ================================================================ the guardian
-  const PINK = 0xff4a9a, VIO = 0xb070ff;
+  const PINK = 0xc8503a, VIO = 0x9488a8;   // (its fire a deep ember, its void a pale ash-violet: no vivid pink or purple light)
   const HP1 = 10000, HP2 = 6000; // the crowned giant, then the Avatar of the Void (together the old single bar of 16000)
   // the sky stage the Avatar fights on: a round platform Y2 m above the tiles, PR m across, the Avatar circling it ORB m out
   const Y2 = 150, PR = 28, ORB = 56;
@@ -229,7 +229,7 @@
       const core = joint(chest, 0, 11, 3.2);
       smesh(core, PG().sph, mat('#000', { color: 0x050008, roughness: 1 }), 2.9, 2.9, 2.9);
       const coreRim = mesh(core, PG().torus, M.core, 3.3, 3.3, 5, 0, 0, 0.6);
-      const coreGlow = mesh(core, PG().sph, new THREE.MeshBasicMaterial({ color: VIO, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }), 4.2, 4.2, 4.2);
+      const coreGlow = mesh(core, PG().sph, new THREE.MeshBasicMaterial({ color: G.fx.tone(VIO), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }), 4.2, 4.2, 4.2);
       core.visible = false;
       // shoulders: great spiked pauldrons
       const sh = [];
@@ -265,7 +265,7 @@
       // a cape hanging into the dark
       for (const sx of [-1, 1]) smesh(chest, PG().plane, M.cloth, 11, 34, 1, sx * 6.5, -2, -4.6, 0.12, sx * 0.25, 0);
       // gravity rings (second form)
-      const ringG = new THREE.TorusGeometry(1, 0.012, 4, 72), ringM = new THREE.MeshBasicMaterial({ color: VIO, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+      const ringG = new THREE.TorusGeometry(1, 0.012, 4, 72), ringM = new THREE.MeshBasicMaterial({ color: G.fx.tone(VIO), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
       const grav = [0, 1, 2].map((i) => { const g = joint(chest, 0, 10, 0); const m = mesh(g, ringG, ringM, 12 + i * 2.5, 12 + i * 2.5, 12 + i * 2.5, 0, 0, 0, Math.PI / 2); m.castShadow = false; g.rotation.set(0.5 * i - 0.5, i, 0.3); g.visible = false; return g; });
       // arms (shoulder -> elbow -> wrist, laid out every frame) and the great hands
       const bone = (rr) => { const g = joint(r); const m = mesh(g, tapered, M.armor, rr, 1, rr); m.castShadow = false; smesh(g, PG().cyl8, M.dark, rr * 1.25, 0.1, rr * 1.25, 0, 0.82, 0); smesh(g, PG().cyl8, M.glow, rr * 1.12, 0.03, rr * 1.12, 0, 0.9, 0); return g; };
@@ -732,7 +732,7 @@
       smesh(spin, PG().oct3, glowM(col, 1.8), 0.95, 1.7, 0.95);
       smesh(spin, PG().oct3, this.M.dark, 0.62, 1.15, 0.62);
       for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2; smesh(spin, PG().cone, glowM(col, 2.2), 0.18, 0.7, 0.18, Math.cos(a) * 1.6, Math.sin(i) * 0.4, Math.sin(a) * 1.6, 0, 0, Math.PI); }
-      const ring = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.65, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.65, 32), new THREE.MeshBasicMaterial({ color: G.fx.tone(col), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
       ring.rotation.x = -Math.PI / 2; ring.position.y = -1.8; g.add(ring);
       const hp = Math.round((this.form === 2 ? 700 : 520) * this.hpScale);
       const p = this.part({ name: '虚晶の造物', shared: false, hp, maxHp: hp, hitW: [{ r: 1.2, part: 'body', w: pos.clone() }], radius: 1.2, height: 2.4, showBar: true, blood: col });
@@ -881,7 +881,7 @@
         flush(PR);
       }
       w.killY = Y2 - 30; TR.stage = S; this.segT = 9;
-      for (const [x, z] of [[0, 0], [16, 0], [-16, 0], [0, 16], [0, -16]]) w.lightSources.push({ pos: V(S.c.x + x, Y2 + 6, S.c.z + z), color: '#c0a8ff', intensity: x || z ? 6 : 10, range: 18, flame: 0, emit: false, ph: 0, prio: 4, steady: true });
+      for (const [x, z] of [[0, 0], [16, 0], [-16, 0], [0, 16], [0, -16]]) w.lightSources.push({ pos: V(S.c.x + x, Y2 + 6, S.c.z + z), color: '#c8bca8', intensity: x || z ? 6 : 10, range: 18, flame: 0, emit: false, ph: 0, prio: 4, steady: true });
     }
     // which floor segment a point is on (null: off the platform)
     segAt(x, z) {
@@ -1066,7 +1066,7 @@
         a.r = PR + 4; a.ang = Math.random() * 6.28; a.spin = (Math.random() < 0.5 ? 1 : -1) * 0.5;
         a.g = new THREE.Group(); G.scene.add(a.g);
         const core = glowM(0xd8b8ff, 3);
-        a.sh = []; for (let i = 0; i < a.K; i++) { const sh = new THREE.Group(); smesh(sh, PG().oct3, core, 0.5, 1.1, 0.5).castShadow = false; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: VIO, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(2.6, 3.6, 1); sh.add(sp); a.g.add(sh); a.sh.push(sh); }
+        a.sh = []; for (let i = 0; i < a.K; i++) { const sh = new THREE.Group(); smesh(sh, PG().oct3, core, 0.5, 1.1, 0.5).castShadow = false; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: G.fx.tone(VIO), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.set(2.6, 3.6, 1); sh.add(sp); a.g.add(sh); a.sh.push(sh); }
         a.ring = new THREE.Mesh(new THREE.RingGeometry(0.985, 1, 128), addM(VIO, 0)); a.ring.rotation.x = -Math.PI / 2; a.ring.position.set(S.c.x, Y2 + 0.06, S.c.z); a.g.add(a.ring);
         a.from = this.hands.map((h) => h.pos.clone());
         if (G.sfx.starRing) G.sfx.starRing(); G.ui.toastSmall('⚠ 星環 — 迫る星の輪の隙間を抜けて外へ');
@@ -1291,7 +1291,7 @@
   }
   const PL = new THREE.PlaneGeometry(1, 1);
   // a glowing, see-through, unlit material (the sky stage's effects)
-  const addM = (col, op, map) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, map: map || null, fog: false });
+  const addM = (col, op, map) => new THREE.MeshBasicMaterial({ color: G.fx.tone(col), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, map: map || null, fog: false });
   // throw away an attack's meshes (shared prototype geometries stay)
   function dropG(g) {
     const shared = new Set([PL, ...Object.values(PG())]);
@@ -1317,7 +1317,7 @@
   let _stars = null;
   const starTex = () => _stars || (_stars = canvasTex(2048, 1024, (x, w, h) => {
     x.fillStyle = '#020106'; x.fillRect(0, 0, w, h);
-    for (const [cx, cy, r, col] of [[400, 380, 420, 'rgba(120,50,200,0.22)'], [1300, 600, 520, 'rgba(60,70,190,0.16)'], [1750, 300, 360, 'rgba(200,60,150,0.14)'], [900, 760, 300, 'rgba(90,40,160,0.18)']]) { const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); }
+    for (const [cx, cy, r, col] of [[400, 380, 420, 'rgba(70,64,80,0.18)'], [1300, 600, 520, 'rgba(50,58,74,0.14)'], [1750, 300, 360, 'rgba(84,60,56,0.12)'], [900, 760, 300, 'rgba(60,54,70,0.15)']]) { const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); }
     for (let i = 0; i < 3200; i++) { const b = Math.random(), r = b > 0.985 ? 1.8 : b > 0.9 ? 1.1 : 0.6; x.fillStyle = `rgba(${220 + Math.random() * 35 | 0},${210 + Math.random() * 45 | 0},255,${0.35 + b * 0.65})`; x.beginPath(); x.arc(Math.random() * w, Math.random() * h, r, 0, Math.PI * 2); x.fill(); }
   }));
   // the black hole: sizes, the accretion disk (spiral arms winding in, hotter and brighter inwards, dark at the horizon) and the lensing ring
@@ -1336,7 +1336,7 @@
         float lum = pow(k, 1.1) * (0.3 + 0.7 * arms) * (0.75 + 0.25 * fine); // (the outer arms carry more of the light)
         float al = 1.3 * lum * smoothstep(uIn, uIn + 0.45, r) * smoothstep(uOut, uOut - 2.5, r) * uA;
         if (al < 0.01) discard;
-        vec3 c = mix(vec3(0.38, 0.14, 0.8), vec3(0.88, 0.66, 1.0), pow(k, 2.0)); // (violet throughout: the centre does not shout)
+        vec3 c = mix(vec3(0.42, 0.13, 0.04), vec3(1.0, 0.8, 0.55), pow(k, 2.0)); // (matter falling in is hot: dull red outside, toward white within)
         gl_FragColor = vec4(c * (0.75 + 0.75 * pow(k, 2.0)), al * (1.0 - 0.35 * pow(k, 4.0)));
       }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
@@ -1352,7 +1352,7 @@
         float flick = 0.85 + 0.15 * sin(atan(p.y, p.x) * 5.0 + uT * 4.0);
         float al = (ring * 1.1 + halo) * flick * uA * smoothstep(1.0, 0.8, r);
         if (al < 0.01) discard;
-        gl_FragColor = vec4(mix(vec3(0.75, 0.5, 1.0), vec3(1.0, 0.95, 1.0), ring), al);
+        gl_FragColor = vec4(mix(vec3(0.9, 0.7, 0.5), vec3(1.0, 0.95, 0.9), ring), al);
       }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
   });
@@ -1361,12 +1361,15 @@
     const g = new THREE.Group(); g.position.set(c.x, c.y + 0.07, c.z); parent.add(g);
     const disc = new THREE.Mesh(PL, addM(0xc890ff, 0, sigilTex())); disc.rotation.x = -Math.PI / 2; disc.scale.set(R * 2, R * 2, 1); g.add(disc);
     const disc2 = new THREE.Mesh(PL, addM(0xffffff, 0, sigilTex())); disc2.rotation.x = -Math.PI / 2; disc2.scale.set(R * 1.25, R * 1.25, 1); disc2.position.y = 0.02; g.add(disc2);
+    // (no rune disc or hexagram drawn: what it is reads off the floor - grit dragged in, a dark pit, a ridge at its edge, vfx.js area)
+    disc.visible = disc2.visible = false; const ground = G.vfx.area(new THREE.Vector3(c.x, c.y, c.z), R, 'gravity', Infinity, { lease: 0.3 });
     const edge = new THREE.Mesh(new THREE.RingGeometry(R - 0.14, R + 0.14, 96), addM(0xe0c0ff, 0)); edge.rotation.x = -Math.PI / 2; edge.position.y = 0.03; g.add(edge);
     const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 1, 64, 1, true), addM(0xb070ff, 0, gradTex())); g.add(wall);
     const pil = []; for (let i = 0; i < 6; i++) { const an = i / 6 * Math.PI * 2; const m = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 1, 8, 1, true), addM(0xf0e0ff, 0)); m.position.set(Math.cos(an) * R * 0.87, 0, Math.sin(an) * R * 0.87); g.add(m); pil.push(m); }
     return {
       g,
       tick(dt, k, after) {
+        if (after < 0.4) ground.touch();
         if (after >= 0) { const f = Math.max(0, 1 - after / 0.6); for (const m of [disc, disc2, edge, ...pil]) m.material.opacity = f; wall.material.opacity = 0.6 * f; wall.scale.y = 4 + after * 50; wall.position.y = wall.scale.y / 2; return; }
         disc.rotation.z += dt * (0.4 + k * 1.8); disc2.rotation.z -= dt * (0.8 + k * 2.4);
         const pulse = 0.75 + 0.25 * Math.sin(G.game.time * (8 + k * 14));

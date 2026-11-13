@@ -526,14 +526,14 @@
       this.main.isInvuln = () => this.wards.some((w) => w.alive) || this.teleporting;
       this.main.dmgMul = (info) => (info.head ? 1.5 : 1);
       this.wardGroup = new THREE.Group(); this.root.add(this.wardGroup);
-      this.wardMat = mat('#e8d8c8', { emissive: 0x6040a0, emissiveIntensity: 0.5, roughness: 0.3 });
+      this.wardMat = mat('#e8d8c8', { emissive: 0x403a48, emissiveIntensity: 0.5, roughness: 0.3 });
       this.wards = [];
       this.spawnWards();
       this.pos.set(world.arenaCenter.x, 7, world.arenaCenter.z);
-      this.bubble = new THREE.Mesh(new THREE.SphereGeometry(3.2, 32, 16), new THREE.MeshBasicMaterial({ color: 0x9a7aff, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
+      this.bubble = new THREE.Mesh(new THREE.SphereGeometry(3.2, 32, 16), new THREE.MeshBasicMaterial({ color: G.fx.tone(0x9a7aff), transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
       this.root.add(this.bubble);
       this.beam = { on: false };
-      world.lightSources.push(this.light = { pos: V(), color: '#c080ff', intensity: 25, range: 22, flame: 0, emit: false, ph: 0, prio: 5, steady: true });
+      world.lightSources.push(this.light = { pos: V(), color: '#c89878', intensity: 25, range: 22, flame: 0, emit: false, ph: 0, prio: 5, steady: true });
     }
     spawnWards() {
       for (const w of this.wards) { w.alive = false; if (w.m) this.wardGroup.remove(w.m); }

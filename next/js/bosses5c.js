@@ -44,8 +44,8 @@
     look: () => ({ s: 1.5, float: true, hood: true, cloth: true, cape: true, weapon: 'staff', orb: 0xffe060, eyes: 0xfff0a0, m: { body: M('#2a2a30', { map: tex().cloth.map, roughness: 0.9 }), cloth: M('#d8d0b0', { map: tex().cloth.map, side: THREE.DoubleSide, roughness: 0.95 }), skin: M('#c8c0a8') } }),
     // a halo of light over the head and three sparks circling the torso
     deco: (b, J) => {
-      const s = 1.5, halo = mesh(J.head, PG().torus, glowM(0xffe060, 1.3), 1.1 * s, 1.1 * s, 0.35 * s, 0, 1.1 * s, -0.1 * s, Math.PI / 2, 0, 0);
-      b._orbs = [0, 1, 2].map((i) => { const o = joint(J.torso, 0, 1.0 * s, 0); smesh(o, PG().sph, glowM(0xfff0a0, 3), 0.2 * s, 0.2 * s, 0.2 * s, 2.0 * s, 0, 0); o.rotation.y = i * Math.PI * 2 / 3; return o; });
+      const s = 1.5, halo = mesh(J.head, PG().torus, glowM(0xa88440, 0.55), 1.1 * s, 1.1 * s, 0.35 * s, 0, 1.1 * s, -0.1 * s, Math.PI / 2, 0, 0);
+      b._orbs = [0, 1, 2].map((i) => { const o = joint(J.torso, 0, 1.0 * s, 0); smesh(o, PG().sph, glowM(0xc8a870, 1.1), 0.2 * s, 0.2 * s, 0.2 * s, 2.0 * s, 0, 0); o.rotation.y = i * Math.PI * 2 / 3; return o; });
       b._halo = halo;
     },
     tick: (b, dt) => { if (b._orbs) b._orbs.forEach((o, i) => { o.rotation.y += dt * (1.4 + b.phase * 0.4); o.position.y = 1.2 + Math.sin(b.t * 2 + i) * 0.25; }); if (b._halo) b._halo.rotation.z += dt * 0.8; if (Math.random() < dt * 4) G.fx.sparks(b.pos.clone().setY(3.4), null, 1, 0xfff0a0, 3); },

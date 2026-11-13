@@ -96,7 +96,7 @@
         const g = new THREE.Group(); this.root.add(g);
         const armor = light ? mat('#8c8468', { metalness: 0.85, roughness: 0.5 }) : mat('#1e1c22', { metalness: 0.7, roughness: 0.55 });
         const trim = light ? mat('#b4a070', { metalness: 1, roughness: 0.4, emissive: 0x2a2008 }) : mat('#34313a', { metalness: 0.8, roughness: 0.5, emissive: 0x0c0618 });
-        const glow = mat('#000', { emissive: light ? 0xffe080 : 0xa050ff, emissiveIntensity: 3 });
+        const glow = mat('#000', { emissive: light ? 0xd8b060 : 0x6a5878, emissiveIntensity: 2 });   // (light: old gold; shadow: a cold ash-violet, faint)
         const cape = mat(light ? '#8a8272' : '#14101a', { side: THREE.DoubleSide, roughness: 1 });
         const J = humanoid(g, { s: 1.15, hip: 2.3, armor, trim, glow, cape, crest: light });
         if (light) {
@@ -116,9 +116,9 @@
         return k;
       };
       this.K = [mk(true), mk(false)];
-      this.linkBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe0ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
+      this.linkBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xffe0ff), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
       G.scene.add(this.linkBeam);
-      this.light = { pos: V(), color: '#e0c0ff', intensity: 10, range: 12, flame: 0, emit: false, ph: 0, prio: 5 };
+      this.light = { pos: V(), color: '#d8ccc0', intensity: 10, range: 12, flame: 0, emit: false, ph: 0, prio: 5 };
       world.lightSources.push(this.light);
       this.comboCd = 14;
     }
@@ -309,7 +309,7 @@
         this.pylons.push(py);
       }
       this.state = 'guarded'; this.cd = 2.5;
-      this.light = { pos: c.clone().setY(7), color: '#ff2040', intensity: 26, range: 26, flame: 0, emit: false, ph: 0, prio: 5 };
+      this.light = { pos: c.clone().setY(7), color: '#c83a24', intensity: 26, range: 26, flame: 0, emit: false, ph: 0, prio: 5 };
       world.lightSources.push(this.light);
       this.beat = 0;
     }
@@ -373,7 +373,7 @@
       if (a.k === 'pulse') {
         if (!a.wave) {
           a.wave = { r: 2 }; G.ui.toastSmall('⚠ 鼓動の波 — ジャンプで越えろ！');
-          const m = new THREE.Mesh(new THREE.RingGeometry(0.93, 1, 64), new THREE.MeshBasicMaterial({ color: 0xff3050, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+          const m = new THREE.Mesh(new THREE.RingGeometry(0.93, 1, 64), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xff3050), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
           m.rotation.x = -Math.PI / 2; m.position.set(c.x, 0.3, c.z); G.scene.add(m); a.wave.mesh = m; G.sfx.explosion(c, 1.2); P.addShake(0.3);
         }
         const w = a.wave; w.r += dt * 14 * sp; w.mesh.scale.setScalar(w.r); w.mesh.material.opacity = Math.max(0, 1 - w.r / 34);

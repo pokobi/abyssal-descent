@@ -13,8 +13,8 @@
   const C = () => G.combat;
   const tex = () => G.Tex.tex;
   const glowM = (c, k) => mat('#000', { emissive: c, emissiveIntensity: k || 2.2 });
-  const addM = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o ?? 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
-  const sprite = (parent, c, s, o) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, transparent: true, opacity: o ?? 0.9, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.setScalar(s); parent.add(sp); return sp; };
+  const addM = (c, o) => new THREE.MeshBasicMaterial({ color: G.fx.tone(c), transparent: true, opacity: o ?? 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+  const sprite = (parent, c, s, o) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: G.fx.tone(c), transparent: true, opacity: o ?? 0.9, blending: THREE.AdditiveBlending, depthWrite: false })); sp.scale.setScalar(s); parent.add(sp); return sp; };
   // distance (horizontal) from p to the segment a-b
   const segDist = (p, a, b) => { const abx = b.x - a.x, abz = b.z - a.z, l2 = abx * abx + abz * abz || 1e-6; const t = U.clamp(((p.x - a.x) * abx + (p.z - a.z) * abz) / l2, 0, 1); return Math.hypot(p.x - (a.x + abx * t), p.z - (a.z + abz * t)); };
   const flat = (v) => { v.y = 0; const l = Math.hypot(v.x, v.z) || 1; v.x /= l; v.z /= l; return v; };

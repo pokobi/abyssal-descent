@@ -981,6 +981,22 @@
 
   // ---------------- enemy entity ----------------
   const TINT = new THREE.Color(), FLASH = new THREE.Color(), AURA_C = new THREE.Color(), MUTC = new THREE.Color();
+  // the mark a marked foe bears: two strokes of red paint crossed, ragged, run a little (one material for all, kept)
+  let _daubM = null;
+  const daubMat = () => {
+    if (_daubM) return _daubM;
+    const T = G.Tex, fb = T.pn.fb;
+    const tex = T.pixTex(64, (u, v, o) => {
+      const x = u * 2 - 1, y = v * 2 - 1, n = fb(u * 6, v * 6, 81, 3), n2 = fb(u * 14, v * 3, 83, 2);
+      const d1 = Math.abs(x - y) / 1.414, d2 = Math.abs(x + y) / 1.414, w = 0.11 + 0.06 * (n - 0.5);
+      const along = Math.max(Math.abs(x + y), Math.abs(x - y)) / 1.414;
+      let a = Math.max(1 - Math.min(1, d1 / w), 1 - Math.min(1, d2 / w)) * (along < 0.75 + 0.15 * n ? 1 : 0) * (0.75 + 0.5 * n2);
+      if (y > 0.1 && Math.abs(x - 0.18 * Math.sin(u * 9)) < 0.03 && y < 0.55 + 0.3 * n) a = Math.max(a, 0.7); // (a run down from it)
+      o[0] = 0.55; o[1] = 0.05; o[2] = 0.03; o[3] = Math.min(1, Math.max(0, a * 1.4 - 0.1));
+    });
+    return (_daubM = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  };
+  E.daubMat = () => daubMat();
   const ELITE_MODS = [
     { id: 'fast', name: '俊足', icon: '💨' }, { id: 'bomb', name: '爆死', icon: '💥' },
     { id: 'vamp', name: '吸血', icon: '🩸' }, { id: 'armored', name: '装甲', icon: '🛡️' }, { id: 'rage', name: '狂暴', icon: '😡' },
@@ -1038,14 +1054,13 @@
       // born with an element: the body glows with it
       if (def.auFix && G.Elem) { const c = new THREE.Color(G.Elem.BY[def.auFix].hex).multiplyScalar(0.35); for (const m of this.model.M.all) if (m.emissive) m.emissive.add(c); }
       if (this.elite) {
-        const ring = new THREE.Mesh(new THREE.RingGeometry(this.radius * 1.1, this.radius * 1.35, 32), new THREE.MeshBasicMaterial({ color: 0xffc040, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+        const ring = new THREE.Mesh(new THREE.RingGeometry(this.radius * 1.12, this.radius * 1.3, 48), new THREE.MeshBasicMaterial({ color: G.fx.tone ? G.fx.tone(0xc89a40).multiplyScalar(0.55) : 0x8a6a2a, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); // (a dull band of old gold, not a lit hoop)
         ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; this.model.group.add(ring); this.ring = ring;
         for (const m of this.model.M.all) if (m.emissive && m !== this.model.M.eye) { m.emissive.add(new THREE.Color(0x2a1a00)); }
       }
-      if (def.aura) {
-        const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 3.5, 40), new THREE.MeshBasicMaterial({ color: 0x8a0a2a, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; this.model.group.add(ring); this.auraRing = ring;
-      }
+      // (the abyss's aura, where it hurts: a dark murk on the floor about it to its reach, its edge a dull red - vfx.js area, held while
+      // it lives: animate touches it)
+      if (def.aura && G.vfx && G.vfx.area) this.auraArea = G.vfx.area(this.pos.clone(), 3.5, 'dark', Infinity, { follow: this, col: [0x4a1010, 0x9a2a20], alpha: 0.8, lease: 0.3 });
       // spawn effect
       G.fx.ring(this.pos, this.radius * 2.2, 0x9a2a1a, 0.8);
       G.fx.smoke(this.pos.clone().setY(this.pos.y + 0.3), 10, 1.2, 0x1a1012, 1.2, 1.2);
@@ -1093,6 +1108,9 @@
       }
       if (this.ring) this.ring.visible = false;
       if (this.auraRing) this.auraRing.visible = false;
+      if (this.auraArea) { this.auraArea.end(0.5); this.auraArea = null; }
+      if (this._coatK) this.coat(null); // (a frozen foe's rime cracks off as it falls; any coat goes with the body)
+      this.unpose(); if (this._daub) { G.scene.remove(this._daub); this._daub = null; }
       if (this.bar) { this.bar.el.style.display = 'none'; this.bar.used = false; this.bar = null; }
       return true;
     }
@@ -1739,6 +1757,7 @@
       const fin = (v) => (Number.isFinite(v) ? v : 0);
       if (m.J && !m.worm) m.animate({ walk: fin(this.walk), mv: fin(this.mv), atk: fin(this.atk), wind: fin(this.wind), flinch: fin(this.flinch), t: this.animT, stunned, throwing: this.attackState && this.attackState.throwing });
       if (m.worm) this.animateWorm(dt);
+      this.pose(dt);
       if (this.atk > 0 && !this.attackState) this.atk = Math.max(0, this.atk - dt * 3);
       // hit flash & status tint: every condition recolours the body so it reads at a glance
       const flash = Math.max(0, 1 - (G.game.time - this.lastHitT) * 8);
@@ -1748,20 +1767,24 @@
       let aura = null, auraK = 0;
       const addT = (r, g, b, k) => { tint.r += r * k; tint.g += g * k; tint.b += b * k; };
       const want = (c, k) => { if (k > auraK) { aura = c; auraK = k; } };
-      if (this.cursed) { addT(0.16, 0.0, 0.24, 0.75 + 0.25 * Math.sin(gt * 3 + ph)); want(0x9a30ff, 0.55); }
-      if (this.mut) { MUTC.set(this.mutCol); addT(MUTC.r * 0.18, MUTC.g * 0.18, MUTC.b * 0.18, 0.7 + 0.3 * Math.sin(gt * 4 + ph)); want(this.mutCol, 0.6); }
+      // (each condition shows on the body as what it is: smouldering, sick, rimed, blackened. No halo of colour: what rises off it and
+      // runs over it is in updateAura)
+      const flick = 0.55 + 0.25 * Math.sin(gt * 9.3 + ph) + 0.2 * Math.sin(gt * 23.1 + ph * 3);
+      if (this.cursed) { addT(-0.1, -0.1, -0.09, 1); want(0x1a141a, 0.55); }
+      if (this.mut) { if (G.fx.tone) G.fx.tone(this.mutCol, MUTC); else MUTC.set(this.mutCol); addT(MUTC.r * 0.12, MUTC.g * 0.12, MUTC.b * 0.12, 0.7 + 0.3 * Math.sin(gt * 4 + ph)); want(this.mutCol, 0.6); }
       if (this.stalker) { addT(-0.2, -0.2, -0.2, 1); want(0x300008, 0.95); }
-      if (this.champion) { addT(0.22, 0.02, 0.0, 0.8); want(0xff3018, 0.6); }
+      if (this.champion) { addT(0.16, 0.035, 0.0, 0.8); want(0xff3018, 0.6); }
       if (this.tgtFx) { const k = 0.6 + 0.4 * Math.sin(gt * 6 + ph); this.tgtFx.om.color.setHex(this.tgtFx.col).multiplyScalar(0.7 + 0.6 * k); this.tgtFx.beam.material.opacity = 0.22 + 0.25 * k; }
-      if (S.burn > 0) { addT(0.55, 0.2, 0.0, pulse); want(0xff6a10, 0.9); }
-      if (S.poison > 0) { addT(0.08, 0.38, 0.0, pulse * Math.min(1, 0.4 + (S.poisonStacks || 1) * 0.12)); want(0x70e020, 0.8); }
-      if (S.frozen > 0) { addT(0.2, 0.4, 0.6, 1); want(0xa0e0ff, 1); }
-      else if (S.frost > 0) { addT(0.05, 0.16, 0.3, Math.min(1, 0.3 + (S.frostStacks || 0) * 0.15)); want(0x80c8ff, 0.7); }
-      if (S.shock > 0) { addT(0.35, 0.35, 0.15, Math.random()); want(0xfff0a0, 0.85); }
-      if (S.stun > 0 && !(S.frozen > 0)) { addT(0.2, 0.18, 0.02, 0.6); want(0xffe040, 0.7); }
-      if (S.slow > 0) addT(0.0, 0.06, 0.14, 1);
-      if (S.mark > 0) { addT(0.3, 0.06, 0.06, pulse); want(0xff4040, 0.5); }
-      if (S.fear > 0) { addT(0.12, 0.0, 0.18, pulse); want(0x8040c0, 0.6); }
+      if (S.burn > 0) { addT(0.34, 0.085, 0.0, flick); want(0xff6a10, 0.9); }
+      if (S.poison > 0) { addT(0.07, 0.085, 0.0, Math.min(1, 0.5 + (S.poisonStacks || 1) * 0.12)); want(0x70e020, 0.8); }
+      if (S.frozen > 0) { addT(0.16, 0.19, 0.22, 1); want(0xa0e0ff, 1); }
+      else if (S.frost > 0) { addT(0.05, 0.065, 0.085, Math.min(1, 0.3 + (S.frostStacks || 0) * 0.15)); want(0x80c8ff, 0.7); }
+      if (S.shock > 0) { addT(0.1, 0.14, 0.24, Math.random() < 0.15 ? 1 : 0); want(0xfff0a0, 0.85); }
+      if (S.stun > 0 && !(S.frozen > 0)) want(0xffe040, 0.7);
+      if (S.slow > 0) addT(0.0, 0.02, 0.05, 1);
+      if (S.mark > 0) { addT(0.3, 0.035, 0.02, pulse); want(0xff4040, 0.5); }
+      if (S.fear > 0) { addT(0.11, 0.115, 0.13, 0.7 + 0.3 * Math.sin(gt * 13 + ph)); want(0x8040c0, 0.6); }   // (blanched)
+      { const ck = S.frozen > 0 ? 'rime' : S.poison > 0 ? 'poison' : S.frost > 0 ? 'frost' : null; if (ck !== (this._coatK || null)) this.coat(ck); }
       for (const mat of m.M.all) {
         if (mat === m.M.eye || !mat.emissive) continue;
         if (!mat.userData.base) mat.userData.base = mat.emissive.clone();
@@ -1773,37 +1796,76 @@
       const def = this.def;
       if (def.orn === 'ember' && Math.random() < dt * 6) G.fx.flameLick(this.pos.x + U.rand(-0.3, 0.3), this.pos.y + this.height * 0.7, this.pos.z + U.rand(-0.3, 0.3), 0.6);
       if (def.orn === 'wisps' && Math.random() < dt * 8) G.fx.norm.spawn(this.pos.x, this.pos.y + this.height * 0.7, this.pos.z, U.rand(-0.3, 0.3), 0.5, U.rand(-0.3, 0.3), 1, 0.2, 0.6, 0.05, 0.02, 0.08, 0.6, -0.2, 1);
-      if (def.orn === 'sparks' && Math.random() < dt * 4) G.fx.sparks(this.centerPos(), null, 2, 0xffe080, 3);
-      if (def.orn === 'ice' && Math.random() < dt * 3) G.fx.norm.spawn(this.pos.x, this.pos.y + this.height * 0.5, this.pos.z, 0, -0.3, 0, 1, 0.15, 0.5, 0.85, 0.92, 1, 0.4, 0, 1);
+      if (def.orn === 'sparks' && Math.random() < dt * 4) G.fx.arcsOn(this.centerPos(), this.radius * 0.7, this.height * 0.6, 1);
+      if (def.orn === 'ice' && Math.random() < dt * 3) G.fx.norm.spawn(this.pos.x, this.pos.y + this.height * 0.5, this.pos.z, 0, -0.3, 0, 1, 0.15, 0.5, 0.78, 0.82, 0.86, 0.36, 0.05, 1);
       if (this.auraRing) this.auraRing.rotation.z += dt;
+      if (this.auraArea) this.auraArea.touch();
       if (this.ring) this.ring.rotation.z -= dt * 2;
     }
-    // soft additive glow around the body (status / curse aura) + small tell-tale particles
+    // what shows about a body in each condition, read from six metres without the bar's marks (col / k, the strongest condition's
+    // colour, are no longer drawn as a halo: each condition is the thing it is, in its shape, its movement and how much of it there is).
+    // Burning: flames on it (combat.js). Poisoned: a murk in blotches on it (coat), drips and a murk at its feet (combat.js). Shocked:
+    // arcs running over it (combat.js). Frozen: rimed over (coat). Chilled: frost settling on what faces up (coat), cold air pouring off it.
     updateAura(dt, col, k) {
-      const m = this.model;
-      if (!this.auraSpr) {
-        if (!col) return;
-        this.auraSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
-        m.group.add(this.auraSpr);
+      const S = this.st, gt = G.game.time, p = this.pos, h = this.height, r = this.radius, R = Math.random;
+      if (this.auraSpr) this.auraSpr.visible = false;
+      if (this.cloaked) return;
+      const rx = () => (R() - 0.5) * r * 1.3, ry = () => p.y + h * (0.25 + R() * 0.65);
+      if (S.frozen > 0 && R() < dt * 9) G.fx.norm.spawn(p.x + rx(), ry(), p.z + rx(), 0, -0.25, 0, 1.4, 0.2, 0.8, 0.8, 0.84, 0.88, 0.34, 0.15, 1.5);
+      if (S.frozen > 0 && R() < dt * 4) G.fx.add.spawn(p.x + rx(), ry(), p.z + rx(), 0, 0, 0, 0.22, 0.05, 0.02, 0.75, 0.8, 0.86, 0.9, 0, 0);
+      else if (S.frost > 0 && R() < dt * (6 + (S.frostStacks || 0) * 2)) G.fx.norm.spawn(p.x + rx() * 0.7, p.y + h * (0.55 + R() * 0.4), p.z + rx() * 0.7, 0, -0.35, 0, 1.3, 0.15, 0.75, 0.8, 0.84, 0.88, 0.36, 0.2, 1.2);
+      // stunned: no stars. Dust shaken off it hangs and drifts round its head; at its feet, a ring of dust where it sagged
+      if (S.stun > 0 && !(S.frozen > 0)) {
+        if (R() < dt * 20) { const a = gt * 2.2 + R() * 6.283, rr = Math.max(0.3, r * 0.75); G.fx.norm.spawn(p.x + Math.cos(a) * rr, p.y + h * (0.88 + R() * 0.18), p.z + Math.sin(a) * rr, -Math.sin(a) * 0.7, -0.05, Math.cos(a) * 0.7, 1.1, 0.16, 0.42, 0.52, 0.49, 0.44, 0.42, 0.05, 0.6); }
+        if (R() < dt * 12) { const a = R() * 6.283, rr = r * (0.9 + R() * 0.4); G.fx.norm.spawn(p.x + Math.cos(a) * rr, p.y + 0.08, p.z + Math.sin(a) * rr, Math.cos(a) * 0.5, 0.15, Math.sin(a) * 0.5, 1.2, 0.25, 0.7, 0.5, 0.47, 0.42, 0.4, 0.1, 1.5); }
       }
-      const sp = this.auraSpr, gt = G.game.time;
-      const target = col ? 0.32 + 0.3 * k : 0;
-      sp.material.opacity = U.damp(sp.material.opacity, target * (0.85 + 0.15 * Math.sin(gt * 6 + (this.phase || 0))), 8, dt);
-      if (col) sp.material.color.lerp(AURA_C.set(col), Math.min(1, dt * 8));
-      const h = this.height, r = this.radius;
-      sp.position.set(0, h * 0.5, 0);
-      sp.scale.set(Math.max(r * 3.4, h * 0.9), h * 1.5, 1);
-      sp.visible = sp.material.opacity > 0.01 && !this.cloaked;
-      // stun stars & curse wisps
-      const S = this.st;
-      if (S.stun > 0 && !(S.frozen > 0) && Math.random() < dt * 14) {
-        const a = gt * 6 + Math.random() * 6.28, rr = Math.max(0.35, this.radius * 0.7);
-        G.fx.add.spawn(this.pos.x + Math.cos(a) * rr, this.pos.y + this.height + 0.25, this.pos.z + Math.sin(a) * rr, -Math.sin(a) * 1.5, 0.2, Math.cos(a) * 1.5, 0.35, 0.08, 0.02, 1, 0.9, 0.3, 1, 0, 0);
-      }
-      if (this.cursed && Math.random() < dt * 7) G.fx.norm.spawn(this.pos.x + U.rand(-this.radius, this.radius), this.pos.y + U.rand(0, this.height * 0.6), this.pos.z + U.rand(-this.radius, this.radius), 0, U.rand(0.8, 1.6), 0, 1.0, 0.18, 0.5, 0.35, 0.05, 0.55, 0.85, -0.2, 1);
-      if (this.champion && Math.random() < dt * 6) G.fx.add.spawn(this.pos.x + U.rand(-this.radius, this.radius), this.pos.y + U.rand(0, this.height), this.pos.z + U.rand(-this.radius, this.radius), 0, U.rand(1, 2), 0, 0.6, 0.08, 0.02, 1, 0.3, 0.1, 0.9, 0, 0);
-      if (S.frost > 0 && !(S.frozen > 0) && Math.random() < dt * 4) G.fx.norm.spawn(this.pos.x + U.rand(-0.3, 0.3), this.pos.y + this.height * U.rand(0.3, 0.9), this.pos.z + U.rand(-0.3, 0.3), 0, -0.2, 0, 1, 0.1, 0.4, 0.8, 0.92, 1, 0.6, 0, 1);
+      // cursed: black smoke pouring up off it; a champion: embers going up off it
+      if (this.cursed && R() < dt * 16) G.fx.norm.spawn(p.x + rx(), p.y + R() * h * 0.8, p.z + rx(), 0, 0.7 + R() * 0.7, 0, 1.3, 0.35, 1.15, 0.13, 0.12, 0.125, 0.8, -0.2, 1); // (grey-black: black alone is lost against a dark ground)
+      if (this.champion && R() < dt * 6) G.fx.add.spawn(p.x + rx(), p.y + R() * h, p.z + rx(), 0, 1 + R(), 0, 0.6, 0.05, 0.02, 1.0, 0.4, 0.1, 0.9, -0.2, 0.3);
+      // marked: a cross daubed in red on its chest (always the side toward the eye: it is painted on it, front and back)
+      if (S.mark > 0) {
+        if (!this._daub) { this._daub = new THREE.Sprite(daubMat()); this._daub.renderOrder = 6; G.scene.add(this._daub); }
+        const c = this.centerPos(), cam = G.camera.position, dx = cam.x - c.x, dz = cam.z - c.z, l = Math.hypot(dx, dz) || 1, sz = Math.max(0.3, Math.min(0.7, r * 0.75));
+        this._daub.position.set(c.x + dx / l * r * 0.75, p.y + h * 0.66, c.z + dz / l * r * 0.75); this._daub.scale.set(sz, sz, 1); this._daub.visible = true;
+      } else if (this._daub) this._daub.visible = false;
+      // marked: blood running down it; afraid: it is pale, and its breath comes fast in grey puffs
+      if (S.mark > 0 && R() < dt * 9) G.fx.drops.spawn(p.x + rx() * 0.5, p.y + h * (0.45 + R() * 0.4), p.z + rx() * 0.5, 0, -0.3, 0, 0.6, 0.028, 0.34, 0.02, 0.015, 9.8, 0.3, 0.06);
+      if (S.fear > 0 && R() < dt * 12) { const f = this.yaw || 0; G.fx.norm.spawn(p.x + Math.sin(f) * r * 0.6, p.y + h * 0.88, p.z + Math.cos(f) * r * 0.6, Math.sin(f) * 1.2 + (R() - 0.5) * 0.4, 0.2, Math.cos(f) * 1.2 + (R() - 0.5) * 0.4, 0.9, 0.18, 0.75, 0.74, 0.76, 0.78, 0.6, -0.15, 2); }
       if (this.cursedRing) { this.cursedRing.rotation.z -= dt * 0.8; this.cursedRing.material.opacity = 0.35 + 0.15 * Math.sin(gt * 3 + (this.phase || 0)); }
+    }
+    // how it stands, seen: stunned, the body sags forward and sways in a slow circle; afraid, it shrinks back from you, low, and
+    // trembles. Laid over its own pose by adding to its inner frame and taking the same back (whatever else turns that frame keeps
+    // its own); the hit spots ride on the body as they always do. Nothing of how it moves, aims or strikes changes.
+    pose(dt) {
+      const I = this.model && this.model.inner; if (!I || this.model.worm) return;
+      const S = this.st, gt = G.game.time, ph = this.phase || 0;
+      const free = this.state !== 'revive' && this.state !== 'spawn' && !this.dyingVisual;
+      const ws = free && S.stun > 0 && !(S.frozen > 0) ? 1 : 0, wf = free && S.fear > 0 && !(S.frozen > 0) ? 1 : 0;
+      this._sk = (this._sk || 0) + (ws - (this._sk || 0)) * Math.min(1, dt * 5); this._fk = (this._fk || 0) + (wf - (this._fk || 0)) * Math.min(1, dt * 6);
+      const sk = this._sk, fk = this._fk, h = this.height || 1.6;
+      const rx = sk * (0.2 + 0.06 * Math.sin(gt * 2.2 + ph)) - fk * 0.14;
+      const rz = sk * 0.08 * Math.cos(gt * 2.2 + ph) + fk * 0.03 * Math.sin(gt * 47 + ph * 3);
+      const px = fk * 0.014 * Math.sin(gt * 53 + ph), pz = -fk * 0.12, py = -fk * 0.07 * h;
+      const o = this._po || (this._po = [0, 0, 0, 0, 0]);
+      I.rotation.x += rx - o[0]; I.rotation.z += rz - o[1]; I.position.x += px - o[2]; I.position.z += pz - o[3]; I.position.y += py - o[4];
+      o[0] = rx; o[1] = rz; o[2] = px; o[3] = pz; o[4] = py;
+    }
+    // (the pose laid over it, taken back: when it falls)
+    unpose() { const I = this.model && this.model.inner, o = this._po; if (!I || !o) return; I.rotation.x -= o[0]; I.rotation.z -= o[1]; I.position.x -= o[2]; I.position.z -= o[3]; I.position.y -= o[4]; this._po = null; this._sk = this._fk = 0; }
+    // a coat over every part of it while a condition holds: 'rime' (frozen: a pale, rough, half-clear skin of ice), 'frost' (chilled:
+    // frost on what faces up), 'poison' (a sick murk in blotches). A thing over its surface, a little proud of it; when the rime goes
+    // it cracks off in chips
+    coat(kind) {
+      const m = this.model, was = this._coatK;
+      for (const hm of this._coat || []) if (hm.parent) hm.parent.remove(hm);
+      if (was === 'rime' && (this._coat || []).length) G.fx.iceBurst(this.centerPos(), 10, 2.5);
+      this._coat = null; this._coatK = kind || null;
+      const V = G.vfx, mat = !kind || !V ? null : kind === 'rime' ? V.rimeMat : V.coatMat && V.coatMat[kind];
+      if (!mat) return;
+      const list = [];
+      m.group.traverse((o) => { if (!o.isMesh || !o.geometry || o.userData.tgtHull || o.userData.rime || (o.material && (o.material.transparent || o.material.blending === THREE.AdditiveBlending))) return; list.push(o); });
+      const sc = kind === 'rime' ? 1.045 : 1.03;
+      this._coat = list.map((o) => { const hm = new THREE.Mesh(o.geometry, mat); hm.userData.rime = true; hm.raycast = () => {}; hm.scale.setScalar(sc); hm.castShadow = false; o.add(hm); return hm; });
     }
     // hunt targets / champions: a bright silhouette outline, a sky beam seen through walls, a big nameplate (see updateBars)
     markTarget(champ) {
@@ -1841,7 +1903,7 @@
     makeCurseRing(col) {
       if (this.cursedRing) return;
       const r = this.radius;
-      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.2, r * 1.65, 6), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.2, r * 1.65, 48), new THREE.MeshBasicMaterial({ color: 0x140c10, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide })); // (a scorched ring on the floor, not a lit hexagon; col no longer drawn)
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; this.model.group.add(ring); this.cursedRing = ring;
     }
     animateWorm(dt) {
@@ -1913,6 +1975,8 @@
     remove() {
       this.removed = true;
       G.scene.remove(this.model.group);
+      if (this._daub) { G.scene.remove(this._daub); this._daub = null; } // (the daub is the scene's, not the body's: it goes with it)
+      if (this.auraArea) { this.auraArea.end(0.2); this.auraArea = null; }
       for (const m of this.model.M.all) m.dispose();
       if (this.bar) { this.bar.el.style.display = 'none'; this.bar.used = false; this.bar = null; }
       if (this.tele) G.fx.endTelegraph(this.tele);

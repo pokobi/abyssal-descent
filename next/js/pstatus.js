@@ -50,7 +50,10 @@
       let k = (look ? look.glow : 0.16) + Math.sin(t * (look ? (look.inv ? 11 : 3) : 5)) * (look && look.inv ? 0.2 : 0.07) + (look ? guardT * 0.4 : 0);
       if (top === 'burn') k = 0.14 + Math.random() * 0.14;
       if (top === 'shock') k = Math.random() < 0.3 ? 0.45 : 0.08;
-      glowC.setRGB(d.rgb[0] * k, d.rgb[1] * k, d.rgb[2] * k);
+      // (the arms and the gun take only a little of it, its colour taken down: a warmth or a chill on them, not a lit model)
+      glowC.setRGB(d.rgb[0], d.rgb[1], d.rgb[2]); if (G.fx.tone) G.fx.tone(glowC.getHex(), glowC); glowC.multiplyScalar(k * 0.09);
+      // (and in place of a colour over the gun: a few faint motes of that light rising off the hand that holds it)
+      { const P = G.player; if (P && P.handPos && Math.random() < dt * 9) { const h = P.handPos(), c = glowC.clone().multiplyScalar(7); G.fx.add.spawn(h.x + U.rand(-0.15, 0.15), h.y + U.rand(-0.12, 0.05), h.z + U.rand(-0.15, 0.15), U.rand(-0.05, 0.05), U.rand(0.15, 0.35), U.rand(-0.05, 0.05), U.rand(0.5, 0.9), 0.012, 0.004, Math.min(1, c.r), Math.min(1, c.g), Math.min(1, c.b), 0.8, -0.05, 0.6); } }
       for (const m of vmMats) m.emissive.copy(m.userData.baseE).add(glowC);
       lastTint = top;
     } else {
@@ -180,10 +183,11 @@
     ensureBubble();
     if (bubble.parent !== G.scene) { G.scene.add(bubble); G.scene.add(shards); }
     const U2 = bubble.userData, inv = !!look.inv;
-    U2.m1.material.color.set(look.hex); U2.m2.material.color.set(look.hex2); U2.m3.material.color.set(look.hex); U2.halo.material.color.set(look.hex2); shards.userData.mat.color.set(inv ? 0xc8f4ff : look.hex);
+    const tn = (c, m) => (G.fx.tone ? G.fx.tone(c, m.color) : m.color.set(c));
+    tn(look.hex, U2.m1.material); tn(look.hex2, U2.m2.material); tn(look.hex, U2.m3.material); tn(look.hex2, U2.halo.material); tn(inv ? 0xc8f4ff : look.hex, shards.userData.mat);
     const tp = G.avatar && G.avatar.tpK > 0.4;
     bubble.visible = tp; shards.visible = true;
-    U2.m3.visible = U2.halo.visible = inv;
+    U2.m2.visible = U2.m3.visible = U2.halo.visible = false;   // (no wire lattice or hoop: the ward is a faint shimmer of its light, and the plates)
     bubble.position.set(P.pos.x, P.pos.y + 0.95, P.pos.z); bubble.rotation.y += dt * (inv ? 1.4 : 0.6);
     U2.m3.rotation.y -= dt * 2.2; U2.m3.rotation.x += dt * 0.7;
     U2.halo.position.y = Math.sin(t * 2.4) * 0.7; U2.halo.material.opacity = 0.5 + pulse * 0.4;
@@ -191,7 +195,7 @@
     // first person: the plates circle below and above the eye line so they frame the view instead of crossing it
     shards.position.set(P.pos.x, P.pos.y + (tp ? 1.0 : 0.55), P.pos.z);
     const r = tp ? 1.35 : 1.25;
-    shards.userData.mat.opacity = tp ? 0.85 : 0.55;
+    shards.userData.mat.opacity = tp ? 0.5 : 0.3;
     shards.children.forEach((h, i) => {
       h.visible = inv || !h.userData.hi;
       const hi = h.userData.hi, a = h.userData.a + t * (inv ? (hi ? -2.6 : 2.2) : 1.6), rr = r * (hi ? 1.15 : 1);

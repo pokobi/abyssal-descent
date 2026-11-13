@@ -40,9 +40,9 @@
     smoke: [0.55, 0.55, 0, 0.15, 1.1, 0.9, 0], // smoke and cloud over fires, lit from below
     ash: [0.75, 0.5, 0, 0.2, 0.7, 0.85, 0],    // a veil of ash
     storm: [0.94, 0.92, 0, 0.5, 2.0, 0.7, 0],     // thunderheads
-    dusk: [0.42, 0.3, 0.4, 0, 0.7, 1, 0],         // broken heaps and long streaks catching a low sun
-    dawn: [0.55, 0.45, 0.25, 0, 0.6, 0.85, 0],  // a grey morning deck with breaks in it
-    day: [0.32, 0.12, 0.25, 0, 0.6, 1.15, 0],     // fair-weather heaps in a high sky
+    dusk: [0.42, 0.3, 0.4, 0, 0.7, 1, 1],         // broken heaps and long streaks catching a low sun, far banks hazed on the horizon
+    dawn: [0.55, 0.45, 0.25, 0, 0.6, 0.85, 0.8],  // a grey morning deck with breaks in it
+    day: [0.32, 0.12, 0.25, 0, 0.6, 1.15, 1],     // fair-weather heaps in a high sky
   };
   // the blood moon's sky: the field's red is too bright a glow for the sky itself. Nearly black, a dark red-brown; the red left round the
   // moon (its own light) and in a sooty copper band low on the horizon
@@ -69,7 +69,7 @@
       D('clear', '黄昏', 4, { cl: CL.dusk }),
       D('ash', '灰の降る黄昏', 2, { fog: '#9a8478', k: 0.5, fogD: 1.5, amb: 0.9, sky: ['#3a3a4a', '#9a7466', '#c8a080'], sunK: 0.55, p: [P.ash], cl: CL.ash, haze: 1.8 }),
       D('storm', '雷雲', 2, { fog: '#4a4458', k: 0.6, fogD: 1.3, amb: 0.78, moonI: 0.55, sky: ['#1a1c2c', '#4a4454', '#8a6a5c'], sunK: 0.2, p: [P.drizzle], flash: true, el: 'water', bolt: true, cl: CL.storm }),
-      D('sand', '砂塵', 1, { fog: '#c89a68', k: 0.55, fogD: 2.4, sunK: 0.5, p: [P.dust], cl: [0.2, 0.2, 0.3, 0, 1.4, 1, 0], haze: 2.5 }),
+      D('sand', '砂塵', 1, { fog: '#c89a68', k: 0.55, fogD: 2.4, sunK: 0.5, p: [P.dust], cl: [0.2, 0.2, 0.3, 0, 1.4, 1, 0.4], haze: 2.5 }),
     ],
     battlefield: [
       D('clear', '夜明け前', 4, { cl: CL.dawn }),

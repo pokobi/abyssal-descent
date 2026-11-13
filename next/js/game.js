@@ -239,6 +239,9 @@
       float az = dot(dh, sh), low = 1. - smoothstep(.05, .6, s.y), isSun = step(.5, uBody.x) * step(uBody.x, 1.5);
       vec3 hue = sunc / max(.001, max(sunc.r, max(sunc.g, sunc.b)));
       vec3 bc = vec3(0.); float bA = 0.;   // (the banks of cloud on the horizon: their colour and cover, laid on last)
+      // (the angle round the horizon, 0..1, from whichever of two wraps is smooth here: the texture's level of detail does not jump
+      // where the angle wraps round, which drew a thin upright line)
+      float az1 = atan(d.z, d.x) / 6.2831853, az2 = fract(az1 + 1.), azS = fwidth(az1) <= fwidth(az2) ? az1 : az2;
       // ---- the air
       float wS = smoothstep(-.4, 1., az);
       vec3 Hs = hor * mix(vec3(1.), .55 + .6 * hue, .45 * low) * (1. + .3 * low);
@@ -316,29 +319,34 @@
         vec3 litC = sunc * mix(vec3(1.), hue, low * isSun) * skyL * (isSun > .5 ? 2.4 : 3.2) * (.6 + .4 * m0);
         litC *= mix(vec3(1.), H / max(.0001, max(H.r, max(H.g, H.b))), .3);   // (the light that reaches them has come through the same air)
         vec2 wv = uCl2.xy * (uT * uCl2.z);
-        // ---- banks of cloud standing on the horizon, far beyond the hills: a crest that catches the light over a flat dark base, lost
-        // in the haze low down. Their shape comes from a ring drawn round the noise (no seam, nothing repeats all the way round)
-        // (the same scale round the horizon as up it: heads that are round, not columns. They lie beyond the ground fog: drawn after it)
-        if (uBody2.z > .001 && h > -.01 && h < .25) {   // (only low over the horizon, where they can be)
-          float by = hp - .008;   // (their flat base, a little over the horizon: hidden behind the hills, showing in the gaps)
-          // where banks stand (some tens of degrees wide; they taper to nothing at their ends) and how high their body is there; on it,
-          // heads: round domes some five degrees across and, on those, smaller ones (a cauliflower outline: no peaks, no columns)
-          float pres = smoothstep(.3, .65, texture2D(tN, dh * .9 + vec2(.13, .71)).a);
-          float prof = texture2D(tN, dh * .9 + vec2(.52, .27) + wv * .02).r, bil = texture2D(tN, dh * 7. + vec2(.31, hp * 7.) + wv * .1).g;
-          float ang = atan(d.z, d.x) / 6.2831853, top = pres * (.012 + .05 * smoothstep(.15, .85, prof));
-          if (by < pres * .21) for (int o = 0; o < 2; o++) {   // (over the tallest head they can have here, or where there are none: nothing to work out)
-            float N = o == 0 ? 72. : 260., cw = 6.2831853 / N, t = ang * N, dm = 0.;
-            for (int j = -1; j <= 1; j++) {
-              float ci = floor(t) + float(j); vec3 r = h3(vec3(mod(ci, N), N, 3.7));
-              float rad = .55 + .55 * r.y, dx = t - (ci + .5 + (r.x - .5) * .6);
-              dm = max(dm, (sqrt(max(rad * rad - dx * dx, 0.)) + (r.z - .5) * .5) * cw);
-            }
-            top += dm * pres * (o == 0 ? smoothstep(.1, .7, prof) : .8);
+        // ---- far cumulus standing on the horizon beyond the hills, as such clouds look from tens of kilometres: hazed and pale, hardly
+        // brighter or darker than the sky behind them; only the lit edges of their heads read, their bases are lost in the haze. A
+        // section of cloud standing upright: a noise read round the horizon (azimuth) and up it (elevation) at one scale, cloud where it
+        // passes a threshold that rises with height, so the outline is the noise's own (no line, no arc). Where banks stand and how high
+        // they reach comes from a much slower noise round the horizon. Over the false sky's sea of cloud they rise out of it.
+        if (uBody2.z > .001 && h > -.07 && h < .16) {
+          float base = uBody2.w > .5 ? -.05 : -.006;   // (their foot: under the far hills, or down in the sea of cloud)
+          // (on some third to a half of the horizon: read from a blurred level of the noise, so that a bank tapers away over many
+          // degrees - read sharp, it ended in an upright edge)
+          float pres = smoothstep(.38, .62, texture2D(tN, dh * .4 + vec2(.13, .71), 3.).a);
+          float Hm = .03 + .08 * pow(texture2D(tN, dh * .8 + vec2(.52, .27), 2.).r, 1.5);   // (two to six degrees, now and then eight)
+          float e = h - base;
+          if (pres > .01 && e < Hm * 1.2) {
+            // (24 times round, the finer octaves 3 and 6 times that: whole numbers, so the noise meets itself where the angle wraps round)
+            vec2 q = vec2(azS * 24., e * 3.82) + wv * .004;   // (the same scale up as across)
+            float n = texture2D(tN, q).r * .62 + texture2D(tN, q * 3. + .31).g * .26 + texture2D(tN, q * 6. + .57).g * .12;
+            float nu = texture2D(tN, q + vec2(0., .02)).r * .62 + texture2D(tN, q * 3. + .31 + vec2(0., .06)).g * .26 + texture2D(tN, q * 6. + .57).g * .12;
+            // (solid low down, more and more broken toward the tops; toward the ends of a bank the cloud thins out by the noise, not
+            // along a line: no slopes like a hill's)
+            float k = clamp(e / (Hm * (.15 + .85 * pres)), 0., 1.2), thr = .1 + .66 * pow(k, 2.5) + (1. - pres) * .25;
+            float den = smoothstep(thr, thr + .1, n);
+            // light: the tops (where the cloud thins upward) and the side toward the sun or moon brighter, lower down greyer
+            float lit = clamp((n - nu) * 9. + .35, 0., 1.) * (.55 + .45 * pow(max(az, 0.) * .5 + .5, 2.)) * smoothstep(.0, .7, k);
+            vec3 cl = mix(vec3(lum(amb)) * .9, amb, .5) + litC * (.2 + .7 * lit);
+            vec3 air = mix(fogc, H + glow, smoothstep(-.01, .03, h));
+            bc = mix(cl, air, .84 - .08 * k);   // (most of the way into the colour of the air)
+            bA = den * smoothstep(.0, .35, k) * smoothstep(.01, .3, pres) * uBody2.z;   // (the foot lost in the haze altogether)
           }
-          bA = smoothstep(.0, .0025, top - by) * smoothstep(-.003, .006, by) * uBody2.z * step(.004, top);
-          float th = clamp(by / max(top, .02), 0., 1.);
-          bc = amb * (.55 + .2 * th) + litC * (.15 + .8 * th) * (.75 + .5 * pow(max(az, 0.), 2.)) * (.65 + .7 * bil) + litC * pow(m0, 6.) * 1.2 * th;
-          bc = mix(bc, H + glow, .15 + .3 * (1. - th));
         }
         // ---- clouds
         float ca = 0., cs = 0.;
@@ -356,11 +364,16 @@
           if (uCl.z > .001 && uDetail > 1.5) {   // (medium quality: no cirrus)
             vec2 cq = cp * .4, rq = vec2(dot(cq, uCl2.xy), dot(cq, vec2(-uCl2.y, uCl2.x)));
             vec2 cw = texture2D(tN, vec2(rq.x * .035, rq.y * .12) + wv * .3 + .17).ga - .5;   // (a slow bend along the streaks, here and there a hook)
-            rq.y += cw.x * .35 + cw.y * abs(cw.y) * .9;
+            rq.y += cw.x * .18 + cw.y * abs(cw.y) * .5;
             // (a smooth noise drawn out a dozen times along the wind: fine streaks side by side, long and short - not the closed
             // loops a ridged noise makes)
             float fi = texture2D(tN, vec2(rq.x * .16, rq.y * 2.) + wv * .9 + .41).a;
-            float cia = smoothstep(.6, .78, fi) * (.35 + .65 * smoothstep(-.2, .3, cw.y)) * smoothstep(.5, .8, nl.r) * uCl.z * smoothstep(.0, .14, h) * (1. - far * .85);
+            // (along each fibre: where it breaks off, thickens and thins; across: finer threads fraying off it)
+            // (each fibre its own: where it breaks, how thick and how dense, read at its own place across the streaks)
+            float brk = texture2D(tN, vec2(rq.x * 2.6, rq.y * 7.) + .23).r, fr = texture2D(tN, vec2(rq.x * 1.1, rq.y * 11.) + .67).g;
+            float wdt = .8 - .22 * brk;
+            float cia = smoothstep(wdt - .08, wdt + .05, fi + (fr - .5) * .1) * smoothstep(.2, .55, brk) * (.3 + .7 * fr * fr)
+              * (.35 + .65 * smoothstep(-.2, .3, cw.y)) * smoothstep(.5, .8, nl.r) * uCl.z * smoothstep(.0, .14, h) * (1. - far * .85);
             col = mix(col, amb + litC * (.55 + 1.5 * pow(m0, 6.)), cia * .5);
           }
           float gd = texture2D(tN, uv * 3.3 + wv * .45 + .37).g;
@@ -385,7 +398,9 @@
           cc = mix(cc, H + glow, far * .8);
           ca = den * smoothstep(-.005, .05, h) * (1. - far * .5 * (1. - oc));
           cs = thick * (.75 + .25 * gd) * (.25 + .75 * smoothstep(.25, .95, xr) * smoothstep(.2, .8, nl.r));   // (what a flash inside lights up: the bulk of the cloud, in great uneven masses)
-          col = mix(col, cc, ca); bA *= 1. - ca;   // (the cloud layer passes in front of the banks)
+          // (the cloud layer passes in front of the banks; low down it is so drawn out toward the horizon that it would cut them in
+          // upright strips: there, only as much as it shows itself)
+          col = mix(col, cc, ca); bA *= 1. - ca * (1. - far);
           // scud under a rain deck: ragged rolls, lower and faster, darker
           if (uCl.w > .001) {
             float sd = texture2D(tN, d.xz / (hp + .03) * uCl2.w * 1.7 + wv * 2.6).a;
@@ -399,7 +414,7 @@
       // ---- the ground fog seen through (a layer some metres deep: the longer the way through it, the more it veils), and under the horizon
       float fl = 7. / max(h, .02), tr = exp(-uFogD * uFogD * fl * fl), fv = tr * smoothstep(-.01, .03, h);
       col = mix(fogc, col, fv);
-      if (bA > 0.) col = mix(col, mix(fogc, bc, max(fv, .75)), bA);
+      if (bA > 0.) col = mix(col, mix(fogc, bc, max(fv, .8)), bA);
       col += vec3(.75, .82, 1.) * uFlash.w * .05 * (1. - fv) * step(.5, uDetail);   // (a flash lights the low murk too)
       gl_FragColor = vec4(col, 1.0);
       #include <colorspace_fragment>
@@ -423,7 +438,7 @@
         tN: { value: skyNoiseTex() }, uT: { value: 0 }, uDetail: { value: 2 }, uPix: { value: 0.0015 }, uStars: { value: 0 }, uHaze: { value: 1 }, uFogD: { value: 0 },
         uCl: { value: V4() }, uCl2: { value: V4(1) }, uBody: { value: V4(1, 0.013, 0, 40) }, uBody2: { value: V4() }, uFlash: { value: V4(0, 1) }, uUnder: { value: V4() },
       },
-      vertexShader: SKY_VS, fragmentShader: SKY_FS,
+      vertexShader: SKY_VS, fragmentShader: SKY_FS, extensions: { derivatives: true },
     });
     skyMesh = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), mat);
     skyMesh.renderOrder = 50; skyMesh.frustumCulled = false;   // (after the solid world: only the sky that shows is shaded)
@@ -445,6 +460,7 @@
     u.uBody.value.set(body, body === 2 ? 0.023 : 0.013, phase, body === 2 ? (tint > 0.5 ? 0.4 : 1.9) : 40); u.uBody2.value.set(tint, tint > 0.5 ? 1 : 0, cl[6], 0);
     u.uFlash.value.set(0, 1, 0, 0);
     if (B.under) { const ug = new THREE.Color(B.under[0]); u.uUnder.value.set(ug.r, ug.g, ug.b, B.under[1]); } else u.uUnder.value.set(0, 0, 0, 0);
+    u.uBody2.value.w = B.outdoor === 'sky' ? 1 : 0;   // (an island in the air: under the horizon is more sky, a sea of cloud)
     m.visible = true; skyDome = m; scene.add(m);
     scene.background = new THREE.Color(B.sky[2]);
     skyTick();

@@ -39,16 +39,10 @@
   F.deadTree = function (w, x, z, rng, s) {
     s = s || 1;
     w.addCollider(x - 0.3 * s, 0, z - 0.3 * s, x + 0.3 * s, 4.5 * s, z + 0.3 * s, { surf: 'wood' });
-    const trunk = Mx(x, 2.2 * s, z, 0.32 * s, 4.4 * s, 0.32 * s, rng.range(-0.08, 0.08), 0, rng.range(-0.08, 0.08));
-    w.batch.geo('woodDark', PG().cyl8, trunk);
-    const n = rng.int(4, 6);
-    for (let i = 0; i < n; i++) {
-      const a = rng.range(0, Math.PI * 2), y = rng.range(2.4, 4.2) * s, L = rng.range(1.2, 2.4) * s, tilt = rng.range(0.6, 1.1);
-      const cx = x + Math.cos(a) * L * 0.42 * Math.sin(tilt), cz = z + Math.sin(a) * L * 0.42 * Math.sin(tilt);
-      w.batch.geo('woodDark', PG().cyl8, Mx(cx, y + L * 0.3, cz, 0.12 * s, L, 0.12 * s, Math.sin(a) * tilt, 0, -Math.cos(a) * tilt));
-      // twigs
-      w.batch.geo('woodDark', PG().cyl8, Mx(cx + Math.cos(a) * L * 0.3, y + L * 0.55, cz + Math.sin(a) * L * 0.3, 0.05 * s, L * 0.5, 0.05 * s, Math.sin(a + 0.8) * 0.9, 0, -Math.cos(a + 0.8) * 0.9));
-    }
+    // (a dead tree of levelgen.js; the dice thrown as the old sticks threw them: everything thrown after falls as before)
+    rng.range(-0.08, 0.08); rng.range(-0.08, 0.08); const n = rng.int(4, 6);
+    for (let i = 0; i < n; i++) { rng.range(0, Math.PI * 2); rng.range(2.4, 4.2); rng.range(1.2, 2.4); rng.range(0.6, 1.1); }
+    w.deferred.push((grp) => G.LevelGen.tree(grp, w, x, 0, z, new G.RNG(1), s * 0.8, { kind: 'dead', lod: 0 }));
   };
   F.tombs = function (w, x0, z0, x1, z1, rng, facing) {
     // two rows of graves with mounds and the odd candle
@@ -123,6 +117,8 @@
     for (let z = z0 + 5; z < z1 - 2; z += opts.beamStep || 7) {
       if (opts.ruined && rng.chance(0.3)) continue;
       w.visual('woodDark', x0, y - 0.7, z - 0.35, x1, y, z + 0.35, { uv: 2 });
+      // (its ends rest on stone corbels in the side walls, two courses each standing out farther: drawn only, nothing thrown for them)
+      if (LG.mason) { const M = LG.mason(w); for (const [xf, s] of [[x0, 1], [x1, -1]]) for (let k = 0; k < 2; k++) { const yb = y - 1.62 + k * 0.46, o0 = 0.12 + k * 0.24, o1 = 0.34 + k * 0.26, v = M.var(xf, yb, z); M.hexa('trim', [[xf - s * 0.04, yb, z - 0.3], [xf - s * 0.04, yb, z + 0.3], [xf - s * 0.04, yb + 0.45, z - 0.3], [xf - s * 0.04, yb + 0.45, z + 0.3], [xf + s * o0, yb, z - 0.3], [xf + s * o0, yb, z + 0.3], [xf + s * o1, yb + 0.45, z - 0.3], [xf + s * o1, yb + 0.45, z + 0.3]], 0.015, { gy: 0, top: y, tint: [v[0] * 0.85, v[1] * 0.85, v[2] * 0.85], n: 0.004, chip: 0.15, chipS: 0.04 }); } }
       if (rng.chance(0.5)) P().chain(w, rng.range(x0 + 4, x1 - 4), y - rng.range(2.5, 5), z, rng.range(2.5, 4.5));
     }
     const nch = opts.chandeliers ?? 2;

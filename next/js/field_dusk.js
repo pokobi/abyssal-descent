@@ -62,12 +62,14 @@
       occ.mark(gx - 3, h.z0 - 1.5, gx + 3, h.z1 + 1);
     }
     // the parapets along the deck's edges (gaps where they fell), the lip of the landings over the dark
-    for (const ex of [dx0, dx1 - 0.45]) for (let z = ZN; z < ZS; z += 2) { if (rng.chance(0.18) || (gap && z + 2 > gap.z0 && z < gap.z1)) continue; w.solid('wall', ex, 0, z, ex + 0.45, 1.0, z + 1.8, { uv: 1.5 }); w.visual('trim', ex - 0.05, 1.0, z - 0.05, ex + 0.5, 1.1, z + 1.85, { uv: 1 }); }
+    const par = { [dx0]: [], [dx1 - 0.45]: [] };   // (which stretches of each parapet stand: drawn below)
+    for (const ex of [dx0, dx1 - 0.45]) for (let z = ZN; z < ZS; z += 2) { if (rng.chance(0.18) || (gap && z + 2 > gap.z0 && z < gap.z1)) continue; w.solid('wall', ex, 0, z, ex + 0.45, 1.0, z + 1.8, { uv: 1.5 }); par[ex].push(z); }
+    DK().parapetDress(w, par, ZN, ZS);
     for (const [z0, z1] of [[ZN - 0.45, ZN], [ZS, ZS + 0.45]]) for (const [a, b] of [[0, dx0], [dx1, W]]) w.solid('wall', a, 0, z0, b, 1.0, z1, { uv: 1.5 });
     occ.mark(0, ZN, dx0 + 1, ZS, 2); occ.mark(dx1 - 1, ZN, W, ZS, 2); if (gap) occ.mark(dx0, gap.z0 - 1, dx1, gap.z1 + 1, 2);
     H.perimeter(w, rng, W, D, { gates, h: 6.5, walls: false, beams: 0, stub: 4 });
-    { let ax = -1; for (const g of [...LG.gateXs(W, gates), W + 7]) { const e = g - 6.5; if (e > ax) w.solid('rock', ax, -1, -3, e, 9, 0, { uv: 6, grad: false }); ax = g + 6.5; } }
-    for (const [a, b] of [[-3, cx - 7], [cx + 7, W + 3]]) w.solid('rock', a, -1, D, b, 8, D + 3, { uv: 6, grad: false });
+    { let ax = -1; for (const g of [...LG.gateXs(W, gates), W + 7]) { const e = g - 6.5; if (e > ax) { w.solid('rock', ax, -1, -3, e, 9, 0, { uv: 6, grad: false }); DK().cliffFace(w, ax, e, 0, 1, 9); } ax = g + 6.5; } }
+    for (const [a, b] of [[-3, cx - 7], [cx + 7, W + 3]]) { w.solid('rock', a, -1, D, b, 8, D + 3, { uv: 6, grad: false }); DK().cliffFace(w, a, b, D, -1, 8); }
     // ---- the city on the deck: the avenue in the middle, ruined houses along the sides, the great pillars, columns, statues
     const sideX = [[dx0 + 1.2, cx - 6.5], [cx + 6.5, dx1 - 1.2]];
     for (const [a, b] of sideX) for (let z = ZN + 4; z < ZS - 8;) {

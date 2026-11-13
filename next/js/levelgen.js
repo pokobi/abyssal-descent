@@ -224,10 +224,14 @@
     // opts.notches (strata fields): [{side: 'N' | 'S' | 'W' | 'E', a0, a1, y0, y1}] niches carved out of a wall, from its inner face to the outside
     // (a0..a1: the extent along the wall, x for N / S, z for W / E)
     const nts = opts.notches || [];
+    // the kind of enclosure (wallKind): what the walls are drawn as. The cemetery's and the village's walls are drawn stone by stone
+    // (dressWalls): their boxes only stop you. The others are drawn as the boxes they are, dressed by dressWalls with what a wall has
+    const K = wallKind(w), own = K === 'cemetery' || K === 'village', faces = [], bts = [];
+    const wbox = (side, x0, y0, z0, x1, y1, z1, a, b) => { faces.push({ side, a0: a, a1: b, y0, y1 }); return own ? hard(w, 'block', x0, y0, z0, x1, y1, z1) : w.solid('block', x0, y0, z0, x1, y1, z1, { uv: 4 }); };
     const wallBlock = (side, xa, xb, ya, yb) => {
       const alongX = side === 'N' || side === 'S';
       const t0 = side === 'N' ? -WALL_T : side === 'S' ? D : side === 'W' ? -WALL_T : W, t1 = t0 + WALL_T;
-      const box = (a, b, y0, y1) => (alongX ? w.solid('block', a, y0, t0, b, y1, t1, { uv: 4 }) : w.solid('block', t0, y0, a, t1, y1, b, { uv: 4 }));
+      const box = (a, b, y0, y1) => (alongX ? wbox(side, a, y0, t0, b, y1, t1, a, b) : wbox(side, t0, y0, a, t1, y1, b, a, b));
       const hit = nts.filter((n) => n.side === side && n.a1 > xa && n.a0 < xb && n.y1 > ya && n.y0 < yb);
       const xs = [xa, xb];
       for (const n of hit) xs.push(Math.max(xa, Math.min(xb, n.a0)), Math.max(xa, Math.min(xb, n.a1)));
@@ -267,7 +271,8 @@
       const wins = opts.windows || [];
       const sideWall = (xa, xb) => {
         let z = sideZ0;
-        for (const [a, b, y0, y1] of wins) { w.solid('block', xa, 0, z, xb, H, a, { uv: 4 }); w.solid('block', xa, 0, a, xb, y0, b, { uv: 4 }); w.solid('block', xa, y1, a, xb, H, b, { uv: 4 }); z = b; }
+        const sd = xa < 0 ? 'W' : 'E';
+        for (const [a, b, y0, y1] of wins) { wbox(sd, xa, 0, z, xb, H, a, z, a); wbox(sd, xa, 0, a, xb, y0, b, a, b); wbox(sd, xa, y1, a, xb, H, b, a, b); z = b; }
         wallBlock(xa < 0 ? 'W' : 'E', z, D, 0, H);
       };
       sideWall(-WALL_T, 0); sideWall(W, W + WALL_T);
@@ -277,7 +282,7 @@
       for (const [a, b, c, d] of [[-WALL_T, -WALL_T, W + WALL_T, 0], [-WALL_T, D, W + WALL_T, D + WALL_T], [-WALL_T, sideZ0, 0, D], [W, sideZ0, W + WALL_T, D]]) w.solid('rock', a, H, b, c, TOP, d, { uv: 6, noGrapple: true, grad: false });
     } else if (OUT === 'ruins') {
       // crenellated city walls under an open sky
-      const mer = (x0, z0, x1, z1) => w.solid('block', x0, H, z0, x1, H + 1.0, z1, { uv: 2, noGrapple: true });
+      const mer = (x0, z0, x1, z1) => { const c = hard(w, 'block', x0, H, z0, x1, H + 1.0, z1, { noGrapple: true }); if (c && !own) (w._mers || (w._mers = [])).push(c); return c; };   // (a cemetery's or a village's wall has no parapet: its boxes are left undrawn)
       for (let x = -WALL_T + 0.3; x < W + WALL_T - 1; x += 1.8) { if (!opts.openNorth) mer(x, -WALL_T, x + 0.9, -WALL_T + 0.7); mer(x, D + WALL_T - 0.7, x + 0.9, D + WALL_T); }
       for (let z = 0.3; z < D - 1; z += 1.8) { mer(-WALL_T, z, -WALL_T + 0.7, z + 0.9); mer(W + WALL_T - 0.7, z, W + WALL_T, z + 0.9); }
     } else {
@@ -292,23 +297,15 @@
         for (let z = 4; z < bz - 2; z += 4) { w.solid('block', -0.05, 0, z - 0.3, 0.45, 1.3, z + 0.3, { uv: 1 }); w.solid('block', W - 0.45, 0, z - 0.3, W + 0.05, 1.3, z + 0.3, { uv: 1 }); }
       }
     }
-    if (OUT !== 'sky') {
-      // flush cornice band
-      w.visual('trim', -0.02, H - 0.6, sideZ0, 0.0, H, D, { uv: 1 });
-      w.visual('trim', W, H - 0.6, sideZ0, W + 0.02, H, D, { uv: 1 });
-      w.visual('trim', 0, H - 0.6, D - 0.02, W, H, D, { uv: 1 });
-      // plinth band at floor
-      w.visual('trim', -0.06, 0, sideZ0, 0, 0.5, D, { uv: 1 }); w.visual('trim', W, 0, sideZ0, W + 0.06, 0.5, D, { uv: 1 });
-      w.visual('trim', 0, 0, D, W, 0.5, D + 0.06, { uv: 1 });
-    }
-    if (!opts.openNorth) w.visual('trim', 0, H - 0.6, -0.02, W, H, 0, { uv: 1 });
-    // buttresses + torches
+    // buttresses + torches (their boxes as they were; what is drawn of them is the kind's: a pilaster with its base and capital
+    // indoors, a buttress with its sloped weathering out of doors, dressWalls)
     const butt = (x, z, side) => {
-      const bw = 0.7, bd = 0.9, bh = H - 2.5;
-      if (side === 'W') { w.solid('wall', 0, 0, z - bw, bd, bh, z + bw, { uv: 3 }); w.solid('trim', 0, bh, z - bw - 0.05, bd + 0.08, bh + 0.35, z + bw + 0.05, { uv: 1 }); }
-      if (side === 'E') { w.solid('wall', W - bd, 0, z - bw, W, bh, z + bw, { uv: 3 }); w.solid('trim', W - bd - 0.08, bh, z - bw - 0.05, W, bh + 0.35, z + bw + 0.05, { uv: 1 }); }
-      if (side === 'S') { w.solid('wall', x - bw, 0, D - bd, x + bw, bh, D, { uv: 3 }); w.solid('trim', x - bw - 0.05, bh, D - bd - 0.08, x + bw + 0.05, bh + 0.35, D, { uv: 1 }); }
-      if (side === 'N') { w.solid('wall', x - bw, 0, 0, x + bw, bh, bd, { uv: 3 }); w.solid('trim', x - bw - 0.05, bh, 0, x + bw + 0.05, bh + 0.35, bd + 0.08, { uv: 1 }); }
+      const bw = 0.7, bd = 0.9, bh = H - 2.5, sh = own ? (m, ...a) => hard(w, m, ...a) : (m, ...a) => w.solid(m, ...a, { uv: 3 }), cap = (...a) => hard(w, 'trim', ...a);
+      bts.push({ side, a: side === 'W' || side === 'E' ? z : x, bh });
+      if (side === 'W') { sh('wall', 0, 0, z - bw, bd, bh, z + bw); cap(0, bh, z - bw - 0.05, bd + 0.08, bh + 0.35, z + bw + 0.05); }
+      if (side === 'E') { sh('wall', W - bd, 0, z - bw, W, bh, z + bw); cap(W - bd - 0.08, bh, z - bw - 0.05, W, bh + 0.35, z + bw + 0.05); }
+      if (side === 'S') { sh('wall', x - bw, 0, D - bd, x + bw, bh, D); cap(x - bw - 0.05, bh, D - bd - 0.08, x + bw + 0.05, bh + 0.35, D); }
+      if (side === 'N') { sh('wall', x - bw, 0, 0, x + bw, bh, bd); cap(x - bw - 0.05, bh, 0, x + bw + 0.05, bh + 0.35, bd + 0.08); }
     };
     const sp = 8;
     for (let z = sp; z < D - 2; z += sp) {
@@ -330,9 +327,10 @@
       if (gxs.every((g) => Math.abs(x - sp / 2 - g) > 4.8) && !notched('N', x - sp / 2, 0.3) && !opts.openNorth) P().torch(w, x - sp / 2, 3.3, 0, 'pz');
     }
     } // (end of the walls: a bare perimeter skips everything above)
+    { const tg = LG._tag; LG._tag = 'walls'; try { dressWalls(w, mason(w), K, { W, D, H, TOP, faces, bts, gxs, opts, bare, sideZ0: opts.voidArena ? opts.arenaD : 0, wins: opts.windows || [] }); } finally { LG._tag = tg; } }
     // entrance gate (decorative, closed portcullis on the south wall)
     // the entrance gate sits on whatever ground the south end has (boss roads start far below)
-    w._gfY = opts.southY || 0; gateFrame(w, W / 2, D, 'S', opts.southY || 0); w._gfY = 0;
+    gateFrame(w, W / 2, D, 'S', opts.southY || 0, OUT === 'sky');
     if (OUT !== 'sky') w.deferred.push((grp) => { const pc = portcullis(w, 4.6, 5.4); pc.position.set(W / 2, opts.southY || 0, D - 0.15); grp.add(pc); });
     if (OUT) scenery(w, rng, W, D, OUT);
     // exit gates (real openings + tunnels); type labels are attached when the area is cleared
@@ -372,6 +370,384 @@
       for (let k = 0; k < 2; k++) { const cx = W * (k + 1) / 3 + rng.range(-3, 3); P().chandelier(w, cx, by - 4.5, bz, by - 0.1); }
     }
   }
+  // an iron bar of a railing with its spear point (a three-sided rod 1.62 m and a point; made once): positions, normals
+  let _barGeo = null;
+  const barGeo = () => {
+    if (_barGeo) return _barGeo;
+    const P = [], N = [], r = 0.017, L = 1.62, tip = 1.8, ring = (y, rr) => [0, 1, 2].map((i) => [Math.cos(i * 2.094 + 0.52) * rr, y, Math.sin(i * 2.094 + 0.52) * rr]);
+    const tri = (a, b, c) => { const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]; let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]; const mx = (a[0] + b[0] + c[0]) / 3, mz = (a[2] + b[2] + c[2]) / 3; if (n[0] * mx + n[2] * mz < 0) { n = n.map((x) => -x); [b, c] = [c, b]; } const l = Math.hypot(...n) || 1; for (const p of [a, b, c]) { P.push(...p); N.push(n[0] / l, n[1] / l, n[2] / l); } };
+    const r0 = ring(0, r), r1 = ring(L, r), r2 = ring(L + 0.04, r * 2.3), t = [0, tip, 0];
+    for (let i = 0; i < 3; i++) { const j = (i + 1) % 3; tri(r0[i], r0[j], r1[j]); tri(r0[i], r1[j], r1[i]); tri(r2[i], r2[j], t); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+    return (_barGeo = g);
+  };
+  // the cemetery's wall: a stone wall to 2.45 m with its coping, piers to 4.15 m with their caps, railings with spear points between
+  // them on the coping, the buttresses with their weathering; every so often a wall tomb (the wall raised under a gable, an arched niche,
+  // a tablet); the ground running on outside. The box behind it all (WALL_T thick, the wall's height) only stops you.
+  function cemeteryWall(w, M, T, side, runs, bs, X) {
+    const { hx, prof, frus, along, hs, cut, tnt, og, ax } = X, lo = M.lo, Hh = Math.max(2.6, Math.min(X.H, 4.6)), WH = Math.min(2.45, Hh * 0.53), PH = Hh - 0.45;
+    const vis = (a0, y0, d0, a1, y1, d1, mk, uv) => { const p = T(a0, y0, d0), q = T(a1, y1, d1); w.visual(mk || 'block', Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.min(p[2], q[2]), Math.max(p[0], q[0]), Math.max(p[1], q[1]), Math.max(p[2], q[2]), { uv: uv || 2.5 }); if (y0 < 0.05 && d1 > 0.005) { const r = T(a0, y0, 0); M.foot(r[0], r[1], r[2], q[0], q[1], q[2]); } };
+    const o = (a, y, k, f, extra) => og(0, Hh, Object.assign({ tint: tnt(a, y, k, f), n: 0.007, chip: 0.25, chipS: 0.06 }, extra));
+    const bar = barGeo(), mtx = new THREE.Matrix4(), sc = new THREE.Matrix4(), XA = new THREE.Vector3(1, 0, 0), ZA = new THREE.Vector3(0, 0, 1), dC = -0.36, ob = { tint: [0.45, 0.42, 0.4], world: true, gy: 0, one: true };
+    for (const [a0, a1] of runs) {
+      // the wall tombs along this run (by the place), and where the piers stand
+      // (the piers stand where the buttresses and the torches do, every 4 m: 8k on a buttress, 8k + 4 with a torch on it; a tomb now and
+      // then in a bay between, 8k + 2 or 8k + 6)
+      const tombs = [];
+      for (let t = Math.ceil((a0 - 2) / 4) * 4 + 2; t < a1 - 1.8; t += 4) if (t > a0 + 1.8 && hs(t, side.charCodeAt(0), 60) < 0.2 && !tombs.some((u) => t - u < 12)) tombs.push(t);
+      const busy = tombs.map((t) => [t - 1.62, t + 1.62]);
+      vis(a0, 0, -0.72, a1, WH, 0);
+      // (the coping: a stone gone here and there, the wall's top showing)
+      along(a0, a1, 0.8, 1.3, 62, (s0, s1) => hs(s0, 3, 74) < 0.06 ? null : hx(T, 'trim', [[s0, WH - 0.02, -0.8], [s1, WH - 0.02, -0.8], [s0, WH + 0.22, -0.44], [s1, WH + 0.22, -0.44], [s0, WH - 0.02, 0.08], [s1, WH - 0.02, 0.08], [s0, WH + 0.22, -0.28], [s1, WH + 0.22, -0.28]], 0.02, o(s0, WH, 63, 0.95)));
+      // the piers: at the ends of the run and every 3.4 - 3.9 m, not on a buttress or a tomb
+      const piers = [a0 + 0.34, a1 - 0.34];
+      for (let p = Math.ceil(a0 / 4) * 4; p < a1; p += 4) if (p > a0 + 1.0 && p < a1 - 1.0) piers.push(p);
+      for (const t of tombs) piers.push(t - 1.62, t + 1.62);
+      piers.sort((p, q) => p - q);
+      for (const p of piers) {
+        // (now and then a pier has lost its cap, its top broken lower)
+        if (hs(p, 4, 75) < 0.1) { vis(p - 0.32, 0, -0.68, p + 0.32, PH - 0.12 - 0.25 * hs(p, 5, 76), 0.06); continue; }
+        vis(p - 0.32, 0, -0.68, p + 0.32, PH, 0.06);
+        frus(T, 'trim', p - 0.42, p + 0.42, 0.16, PH - 0.02, p - 0.42, p + 0.42, 0.16, PH + 0.16, -0.8, 0.02, o(p, PH, 64));
+        hx(T, 'trim', [[p - 0.38, PH + 0.16, -0.76], [p + 0.38, PH + 0.16, -0.76], [p - 0.07, PH + 0.52, -0.38], [p + 0.07, PH + 0.52, -0.38], [p - 0.38, PH + 0.16, 0.12], [p + 0.38, PH + 0.16, 0.12], [p - 0.07, PH + 0.52, -0.24], [p + 0.07, PH + 0.52, -0.24]], 0.02, o(p, PH, 65));
+      }
+      // the railings: from pier to pier along the coping, unless a buttress or a tomb is between them
+      for (let i = 0; i + 1 < piers.length; i++) {
+        const p = piers[i] + 0.34, q = piers[i + 1] - 0.34; if (q - p < 0.4 || busy.some(([b0, b1]) => b1 > p + 0.05 && b0 < q - 0.05)) continue;
+        const y0 = WH + 0.16, n = Math.max(2, Math.round((q - p) / 0.15)), k = (PH - 0.1 - y0) / 1.62;
+        // (a bay here and there with bars gone and bars bent: by the place)
+        const bad = hs(p, 6, 77) < 0.16;
+        for (let j = 0; j <= n; j++) {
+          const u = p + 0.06 + (q - p - 0.12) * j / n, c = T(u, y0, dC), hb = hs(u, 7, 78);
+          if (bad && hb < 0.3) continue;
+          const bend = bad && hb < 0.55 ? (hb - 0.42) * 0.9 : 0;
+          mtx.makeRotationAxis(ax ? XA : ZA, bend).multiply(sc.makeScale(1, k, 1)).setPosition(c[0], c[1], c[2]);
+          M.geo('iron', bar, mtx, ob);
+        }
+        for (const yy of [y0 + 0.22, PH - 0.42]) { const pa = T(p, yy, dC - 0.025), pb = T(q, yy + 0.05, dC + 0.025); M.box('iron', Math.min(pa[0], pb[0]), pa[1], Math.min(pa[2], pb[2]), Math.max(pa[0], pb[0]), pb[1], Math.max(pa[2], pb[2]), 0, { tint: [0.42, 0.4, 0.38] }); }
+      }
+      // the buttresses: their shafts (the box is not drawn) and sloped weatherings
+      for (const q of bs) if (q.a > a0 - 0.1 && q.a < a1 + 0.1) {
+        vis(q.a - 0.7, 0, 0, q.a + 0.7, q.bh, 0.9);
+        frus(T, 'trim', q.a - 0.76, q.a + 0.76, 1.0, q.bh - 0.12, q.a - 0.76, q.a + 0.76, 1.0, q.bh + 0.03, -0.04, 0.02, o(q.a, q.bh, 66));
+        frus(T, 'trim', q.a - 0.72, q.a + 0.72, 0.94, q.bh + 0.03, q.a - 0.72, q.a + 0.72, 0.1, Math.min(WH + 0.3, q.bh + 0.95), -0.04, 0.03, o(q.a, q.bh, 67));
+      }
+      // the wall tombs: the wall raised under a gable, an arched niche, a tablet
+      for (const t of tombs) {
+        const TH = Math.min(Hh - 1.2, 3.3);
+        vis(t - 1.3, 0, -0.72, t + 1.3, TH, 0.14);
+        hx(T, 'block', [[t - 1.3, TH - 0.01, -0.72], [t + 1.3, TH - 0.01, -0.72], [t - 0.03, TH + 0.72, -0.72], [t + 0.03, TH + 0.72, -0.72], [t - 1.3, TH - 0.01, 0.14], [t + 1.3, TH - 0.01, 0.14], [t - 0.03, TH + 0.72, 0.14], [t + 0.03, TH + 0.72, 0.14]], 0.01, o(t, TH, 68));
+        for (const s2 of [-1, 1]) hx(T, 'trim', [[t + s2 * 1.46, TH - 0.06, -0.8], [t, TH + 0.68, -0.8], [t + s2 * 1.46, TH + 0.16, -0.8], [t, TH + 0.92, -0.8], [t + s2 * 1.46, TH - 0.06, 0.22], [t, TH + 0.68, 0.22], [t + s2 * 1.46, TH + 0.16, 0.22], [t, TH + 0.92, 0.22]], 0.02, o(t + s2, TH, 69));
+        // (the niche: dark within, a ring of wedge stones over it, its jambs)
+        const nr = 0.46, ny = 1.95;
+        hx(T, 'dark', [[t - nr, 0.62, 0.145], [t + nr, 0.62, 0.145], [t - nr, ny, 0.145], [t + nr, ny, 0.145], [t - nr, 0.62, 0.15], [t + nr, 0.62, 0.15], [t - nr, ny, 0.15], [t + nr, ny, 0.15]], 0, {});
+        for (let j = 0; j < 7; j++) {
+          const b0 = Math.PI * j / 7, b1 = Math.PI * (j + 1) / 7, c0 = Math.cos(b0), s0 = Math.sin(b0), c1 = Math.cos(b1), s1 = Math.sin(b1);
+          hx(T, 'dark', [[t + c0 * 0.02, ny, 0.145], [t + c1 * 0.02, ny, 0.145], [t + c0 * nr, ny + s0 * nr, 0.145], [t + c1 * nr, ny + s1 * nr, 0.145], [t + c0 * 0.02, ny, 0.15], [t + c1 * 0.02, ny, 0.15], [t + c0 * nr, ny + s0 * nr, 0.15], [t + c1 * nr, ny + s1 * nr, 0.15]], 0, {});
+          const R1 = nr + 0.2 + (j === 3 ? 0.06 : 0);
+          hx(T, 'trim', [[t + c0 * nr, ny + s0 * nr, 0.12], [t + c1 * nr, ny + s1 * nr, 0.12], [t + c0 * R1, ny + s0 * R1, 0.12], [t + c1 * R1, ny + s1 * R1, 0.12], [t + c0 * nr, ny + s0 * nr, 0.2], [t + c1 * nr, ny + s1 * nr, 0.2], [t + c0 * R1, ny + s0 * R1, 0.2], [t + c1 * R1, ny + s1 * R1, 0.2]], 0.015, o(t + j, ny, 70));
+        }
+        for (const s2 of [-1, 1]) prof(T, 'trim', s2 < 0 ? t - nr - 0.2 : t + nr, s2 < 0 ? t - nr : t + nr + 0.2, 0.5, 0.12, 0.2, ny, 0.12, 0.2, 0.015, o(t + s2, 1, 71));
+        prof(T, 'trim', t - nr - 0.3, t + nr + 0.3, 0.42, 0.1, 0.24, 0.62, 0.1, 0.24, 0.015, o(t, 0.5, 72));
+        prof(T, 'trim', t - 0.5, t + 0.5, ny + 0.9, 0.13, 0.17, Math.min(TH - 0.15, ny + 1.25), 0.13, 0.17, 0.012, o(t, 3, 73, 1.08, { chip: 0.05 }));
+      }
+      // the ground outside, running on from the wall's back down to the country (the area's ground far out lies 0.6 m lower)
+      M.quad('floor', T(a0, -0.02, -0.7), T(a1, -0.02, -0.7), T(a1, -0.62, -16), T(a0, -0.62, -16), { n: [0, 1, 0], uv: 4, gy: -5 });
+    }
+  }
+  // a stake of a palisade, 1 m (scaled to its height): a six-sided pole, its top cut to a point; positions, normals, uv (made once)
+  let _stakeGeo = null;
+  const stakeGeo = () => {
+    if (_stakeGeo) return _stakeGeo;
+    const g = new THREE.CylinderGeometry(0.0001, 1, 0.1, 6, 1, true); g.translate(0, 0.95, 0);
+    const b = new THREE.CylinderGeometry(1, 1, 0.9, 6, 1, true); b.translate(0, 0.45, 0);
+    const P = [], N = [], U = [];
+    for (const q of [b, g]) { const n = q.toNonIndexed(); n.computeVertexNormals(); P.push(...n.attributes.position.array); N.push(...n.attributes.normal.array); U.push(...n.attributes.uv.array); }
+    const o = new THREE.BufferGeometry(); o.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); o.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); o.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+    return (_stakeGeo = o);
+  };
+  // the village's edge: bay by bay (8 m, buttress to buttress, its torch in the middle) the back of a house under its roof, a garden
+  // wall of field stone with a thicket grown up behind it, or a palisade of stakes. The box behind (4.2 m) only stops you
+  function villageWall(w, M, T, side, runs, bs, X) {
+    const { hx, prof, frus, along, hs, tnt, og } = X, lo = M.lo;
+    const vis = (a0, y0, d0, a1, y1, d1, mk, uv, tint) => { const p = T(a0, y0, d0), q = T(a1, y1, d1); w.visual(mk || 'block', Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.min(p[2], q[2]), Math.max(p[0], q[0]), Math.max(p[1], q[1]), Math.max(p[2], q[2]), { uv: uv || 2.5, tint }); if (y0 < 0.05 && d1 > 0.005) { const r = T(a0, y0, 0); M.foot(r[0], r[1], r[2], q[0], q[1], q[2]); } };
+    const o = (a, y, k, f, extra) => og(0, 5, Object.assign({ tint: tnt(a, y, k, f), n: 0.012, chip: 0.35, chipS: 0.07 }, extra));
+    const sk = stakeGeo(), mtx = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e3 = new THREE.Euler(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3();
+    for (const [a0, a1] of runs) {
+      for (let b0 = Math.floor(a0 / 8) * 8; b0 < a1; b0 += 8) {
+        const s0 = Math.max(a0, b0), s1 = Math.min(a1, b0 + 8); if (s1 - s0 < 0.4) continue;
+        const r = hs(b0 + 4, side.charCodeAt(0), 80), kind = r < 0.45 ? 'house' : r < 0.78 ? 'garden' : 'pal', mid = b0 + 4;
+        if (kind === 'house') {
+          // the back wall of a house, its eaves over the lane, the roof going up and back to the ridge, a gable at each end, a shuttered window
+          const eav = 4.5 + 0.8 * hs(b0, 1, 81), ridge = eav + 2.3 + 0.5 * hs(b0, 2, 82), dR = -3.4, ov = 0.5;
+          vis(s0 + 0.04, 0, -0.62, s1 - 0.04, eav, 0, 'wall', 2.2);
+          const rf = (u0, u1) => hx(T, 'woodDark', [[u0, eav - 0.18, ov], [u1, eav - 0.18, ov], [u0, ridge - 0.02, dR], [u1, ridge - 0.02, dR], [u0, eav - 0.02, ov], [u1, eav - 0.02, ov], [u0, ridge + 0.14, dR], [u1, ridge + 0.14, dR]], 0.02, o(u0, eav, 83, 0.62, { uv: 0.7, n: 0.02, chip: 0 }));
+          along(s0 - 0.25, s1 + 0.25, 1.6, 2.6, 84, (u0, u1) => rf(u0, u1));
+          hx(T, 'woodDark', [[s0 - 0.3, eav - 0.36, ov - 0.05], [s1 + 0.3, eav - 0.36, ov - 0.05], [s0 - 0.3, eav - 0.12, ov - 0.05], [s1 + 0.3, eav - 0.12, ov - 0.05], [s0 - 0.3, eav - 0.36, ov + 0.06], [s1 + 0.3, eav - 0.36, ov + 0.06], [s0 - 0.3, eav - 0.12, ov + 0.06], [s1 + 0.3, eav - 0.12, ov + 0.06]], 0.015, o(s0, eav, 85, 0.7, { chip: 0 }));
+          for (const g of [s0, s1]) { const gu = g === s0 ? s0 + 0.04 : s1 - 0.48; hx(T, 'wall', [[gu, eav - 0.02, -0.62], [gu + 0.44, eav - 0.02, -0.62], [gu, ridge - 0.04, dR - 0.03], [gu + 0.44, ridge - 0.04, dR - 0.03], [gu, eav - 0.02, 0], [gu + 0.44, eav - 0.02, 0], [gu, ridge - 0.04, dR + 0.03], [gu + 0.44, ridge - 0.04, dR + 0.03]], 0.02, o(gu, eav, 86, 1, { uv: 2.2, uvFix: true })); }
+          if (s1 - s0 > 3.4) {
+            const wu = s0 + 1.2 + (s1 - s0 - 3.6) * hs(b0, 3, 87), wy = 2.0;
+            hx(T, 'dark', [[wu, wy, 0.004], [wu + 0.8, wy, 0.004], [wu, wy + 0.95, 0.004], [wu + 0.8, wy + 0.95, 0.004], [wu, wy, 0.012], [wu + 0.8, wy, 0.012], [wu, wy + 0.95, 0.012], [wu + 0.8, wy + 0.95, 0.012]], 0, {});
+            prof(T, 'woodDark', wu - 0.22, wu + 1.02, wy + 0.95, -0.05, 0.08, wy + 1.13, -0.05, 0.08, 0.015, o(wu, wy, 88, 0.7, { chip: 0 }));
+            prof(T, 'trim', wu - 0.08, wu + 0.88, wy - 0.12, -0.05, 0.1, wy, -0.05, 0.08, 0.015, o(wu, wy, 89, 0.85));
+            // (a shutter hanging open, a little askew)
+            hx(T, 'woodDark', [[wu - 0.48, wy + 0.04, 0.03], [wu - 0.06, wy + 0.02, 0.07], [wu - 0.48, wy + 0.92, 0.03], [wu - 0.06, wy + 0.93, 0.07], [wu - 0.48, wy + 0.04, 0.07], [wu - 0.06, wy + 0.02, 0.11], [wu - 0.48, wy + 0.92, 0.07], [wu - 0.06, wy + 0.93, 0.11]], 0.012, o(wu, wy, 90, 0.75, { chip: 0, uv: 0.8 }));
+          }
+          if (hs(b0, 4, 91) < 0.4) { const cu = s0 + 1 + (s1 - s0 - 2) * hs(b0, 5, 92), dc = -1.6, yr = eav + (ridge - eav) * (ov - dc) / (ov - dR); vis(cu - 0.42, yr - 0.5, dc - 0.42, cu + 0.42, ridge + 1.1, dc + 0.42, 'wall', 1.6); prof(T, 'trim', cu - 0.5, cu + 0.5, ridge + 1.1, dc - 0.5, dc + 0.5, ridge + 1.24, dc - 0.5, dc + 0.5, 0.015, o(cu, ridge, 93, 0.8)); }
+        } else if (kind === 'garden') {
+          // a wall of field stone, its top of stones set on edge, the thicket grown up behind it over the box; a pier for the torch
+          const gh = 1.5 + 0.35 * hs(b0, 6, 94);
+          vis(s0, 0, -0.6, s1, gh, 0, 'block', 1.4, [0.78, 0.76, 0.72]);
+          along(s0, s1, 0.18, 0.34, 95, (u0, u1, i) => { const hh = 0.18 + 0.16 * hs(u0, i, 96), lean = (hs(u0, i, 97) - 0.5) * 0.08; hx(T, 'trim', [[u0, gh - 0.02, -0.58], [u1, gh - 0.02, -0.58], [u0 + lean, gh + hh, -0.54], [u1 + lean, gh + hh, -0.54], [u0, gh - 0.02, 0.02], [u1, gh - 0.02, 0.02], [u0 + lean, gh + hh, -0.04], [u1 + lean, gh + hh, -0.04]], 0.02, o(u0, gh, 98, 0.8, { n: 0.02, uv: 0.8 })); });
+          if (mid > s0 + 0.5 && mid < s1 - 0.5) { vis(mid - 0.34, 0, -0.62, mid + 0.34, 3.7, 0.08, 'block', 1.4, [0.78, 0.76, 0.72]); hx(T, 'trim', [[mid - 0.42, 3.68, -0.72], [mid + 0.42, 3.68, -0.72], [mid - 0.1, 4.0, -0.38], [mid + 0.1, 4.0, -0.38], [mid - 0.42, 3.68, 0.16], [mid + 0.42, 3.68, 0.16], [mid - 0.1, 4.0, -0.18], [mid + 0.1, 4.0, -0.18]], 0.02, o(mid, 3.7, 99)); }
+          if (!M.mat.leafcard) { const TM = treeMats(w); M.mat.leafcard = TM.leaf; M.mat.twigcard = TM.twig; }
+          const i0 = T(0, 0, 0), i1 = T(0, 0, 1), inX = i1[0] - i0[0], inZ = i1[2] - i0[2];
+          for (let u = s0 + 0.2; u < s1 - 0.1; u += 0.5 + 0.35 * hs(u, 7, 100)) for (let k = 0; k < 3; k++) {
+            // (cards of leaves in layers, the farther higher; now and then a card of bare bramble stems among them)
+            const hh = 2.2 + 1.2 * k + 1.0 * hs(u, k, 101), dd = -0.75 - 0.75 * k - 0.6 * hs(u, k + 2, 102), wd = 1.5 + 1.3 * hs(u, k + 4, 103), an = (hs(u, k + 6, 104) - 0.5) * 1.8, y0 = Math.max(-0.1, hh - wd * 1.6);
+            const ca = Math.cos(an) * wd / 2, sa = Math.sin(an) * wd / 2, tw = hs(u, k + 8, 105) < 0.18, q = tw ? 3 : hs(u, k + 9, 106) < 0.5 ? 0 : 1;
+            const ns = (hs(u, k + 10, 107) - 0.5) * 0.8, nr0 = [inX * 0.7 + inZ * ns, 0.55, inZ * 0.7 - inX * ns], nl = Math.hypot(...nr0), nrm = [nr0[0] / nl, nr0[1] / nl, nr0[2] / nl], v = 0.8 + 0.25 * hs(u, k + 11, 108);
+            M.quad(tw ? 'twigcard' : 'leafcard', T(u - ca, y0, dd - sa), T(u + ca, y0, dd + sa), T(u + ca, hh, dd + sa), T(u - ca, hh, dd - sa), { uvq: [(q % 2) * 0.5 + 0.004, (q >> 1) * 0.5 + 0.004, (q % 2) * 0.5 + 0.496, (q >> 1) * 0.5 + 0.496], nrm, gy: -1, tint: [v, v, v] });
+          }
+        } else {
+          // the palisade: stakes driven side by side, their tops cut to points, two rails behind; a stake fallen out here and there
+          for (let u = s0 + 0.13; u < s1 - 0.1; u += 0.25) {
+            // (one here and there broken off short: none quite gone, the box behind stops you there all the same)
+            const h0 = hs(u, 8, 105);
+            const hh = (h0 < 0.1 ? 2.0 + h0 * 8 : 3.6 + 0.7 * hs(u, 9, 106)), rr = 0.135 + 0.03 * hs(u, 10, 107), c = T(u, 0, -0.16);
+            e3.set((hs(u, 11, 108) - 0.5) * 0.06, hs(u, 12, 109) * 3, (hs(u, 13, 110) - 0.5) * 0.06); q4.setFromEuler(e3);
+            if (!M.mat.stake) M.mat.stake = treeMats(w).dead;   // (logs, their weathered bark: the dead trees' own)
+            mtx.compose(v3.set(c[0], -0.05, c[2]), q4, s3.set(rr, hh, rr)); M.geo('stake', sk, mtx, { tint: tnt(u, 1, 111, 0.7), su: 1, sv: hh * 0.9, gy: 0, one: true });
+          }
+          for (const yy of [1.0, 2.9]) prof(T, 'woodDark', s0, s1, yy, -0.5, -0.3, yy + 0.16, -0.5, -0.3, 0.02, o(s0, yy, 112, 0.7, { chip: 0, uv: 1 }));
+        }
+      }
+      // the buttresses: rough piers of field stone with their weatherings
+      for (const q of bs) if (q.a > a0 - 0.1 && q.a < a1 + 0.1) {
+        vis(q.a - 0.7, 0, 0, q.a + 0.7, q.bh, 0.9, 'block', 1.4, [0.8, 0.78, 0.74]);
+        frus(T, 'trim', q.a - 0.72, q.a + 0.72, 0.94, q.bh - 0.02, q.a - 0.72, q.a + 0.72, 0.1, q.bh + 0.8, -0.04, 0.03, o(q.a, q.bh, 113, 0.72));
+      }
+      M.quad('floor', T(a0, -0.02, -0.6), T(a1, -0.02, -0.6), T(a1, -0.62, -16), T(a0, -0.62, -16), { n: [0, 1, 0], uv: 4, gy: -5 });
+    }
+  }
+  // ---------------- what a wall has (dressWalls) ----------------
+  // A.faces: what of each side's inner face stands ({side, a0, a1, y0, y1}; a along the side: x for N / S, z for W / E), A.bts: the
+  // buttresses ({side, a, bh}). Nothing here stops anyone: it is all drawn on or against the boxes that do (the cemetery's and the
+  // village's walls are drawn here whole, their boxes left undrawn). By kind (wallKind):
+  //   hall, crypt  a battered plinth, the buttresses as pilasters (a moulded base, a capital, a flat strip on up to the cornice), a
+  //                string course, a corbel table under a moulded cornice where the wall meets the ceiling or the rock, patches of
+  //                later repair in other stone
+  //   works        the same in brick, an iron wall plate under the cornice;   sky  the pilasters and a cornice of marble
+  //   cavern       a plinth, buttresses with sloped weatherings, rough capping stones where the cavern's rock begins
+  //   fort         a plinth, buttresses with weatherings, a string course, the wall walk carried out on corbels, the parapet
+  //                of merlons (some broken, some gone), patches
+  //   rock, mine   the stretches of wall about the gates: a rough plinth, rough capping
+  //   cemetery     a stone wall to 2.5 m with its coping, stone piers with caps, iron railings with spear points between them, now
+  //                and then a wall tomb; outside, the ground running on
+  //   village      the backs of houses with their roofs, garden walls of field stone with a thicket behind, a palisade of stakes
+  function dressWalls(w, M, K, A) {
+    const { W, D, H, faces, bts, gxs, opts } = A, lo = M.lo, sy = opts.southY || 0;
+    const T_ = { N: (a, y, d) => [a, y, d], S: (a, y, d) => [a, y, D - d], W: (a, y, d) => [d, y, a], E: (a, y, d) => [W - d, y, a] };
+    // eight corners in a side's frame: [a, y, d] each, bit 0 along, bit 1 up, bit 2 out
+    const hx = (T, mk, Q, ch, o) => M.hexa(mk, Q.map((q) => T(q[0], q[1], q[2])), ch, o);
+    // a stone from a0 to a1 along a side: its foot from d b0 (back) to f0 (front) at y0, its top from b1 to f1 at y1
+    const prof = (T, mk, a0, a1, y0, b0, f0, y1, b1, f1, ch, o) => hx(T, mk, [[a0, y0, b0], [a1, y0, b0], [a0, y1, b1], [a1, y1, b1], [a0, y0, f0], [a1, y0, f0], [a0, y1, f1], [a1, y1, f1]], ch, o);
+    // a block narrowing or swelling as it rises: foot a0..a1, out to f0 at y0; top c0..c1, out to f1 at y1; its back at d back
+    const frus = (T, mk, a0, a1, f0, y0, c0, c1, f1, y1, back, ch, o) => hx(T, mk, [[a0, y0, back], [a1, y0, back], [c0, y1, back], [c1, y1, back], [a0, y0, f0], [a1, y0, f0], [c0, y1, f1], [c1, y1, f1]], ch, o);
+    const hs = (a, b, k) => _hn(a * 0.731 + 0.3 + b * 0.017, b * 1.37 + 0.1, 40 + k);
+    // lengths of stone along a..b, each lo..hi long (by the place)
+    const along = (a, b, lo_, hi_, k, fn) => { let s = a, i = 0; while (s < b - 0.05) { let e = s + lo_ + (hi_ - lo_) * hs(s, k, 1); if (b - e < lo_ * 0.6) e = b; fn(s, Math.min(e, b), i++); s = e; } };
+    const runsOf = (side, test) => { const L = faces.filter((f) => f.side === side && test(f)).map((f) => [f.a0, f.a1]).sort((p, q) => p[0] - q[0]); const out = []; for (const [a, b] of L) { const l = out[out.length - 1]; if (l && a <= l[1] + 0.01) l[1] = Math.max(l[1], b); else out.push([a, b]); } return out; };
+    const cut = (runs, holes) => { let out = runs; for (const [h0, h1] of holes) { const n = []; for (const [a, b] of out) { if (h1 <= a || h0 >= b) { n.push([a, b]); continue; } if (h0 > a) n.push([a, h0]); if (h1 < b) n.push([h1, b]); } out = n; } return out.filter(([a, b]) => b - a > 0.3); };
+    const clip = (runs, l0, l1) => runs.map(([a, b]) => [Math.max(a, l0), Math.min(b, l1)]).filter(([a, b]) => b - a > 0.3);
+    const B = w.mats.biome, own = K === 'cemetery' || K === 'village';
+    const CF = {
+      hall: { pl: 'trim', pil: 1, band: 1, corb: 1, corn: 1, patch: 1, t: 0.84 }, crypt: { pl: 'trim', pil: 1, band: 1, corb: 1, corn: 1, patch: 1, t: 0.8 },
+      works: { pl: 'trim', pil: 1, band: 1, corn: 1, iron: 1, t: 0.74 }, sky: { pl: 'trim', pil: 1, corn: 1, t: 0.96 },
+      cavern: { pl: 'trim', but: 1, rough: 1, patch: 1, t: 0.72 }, fort: { pl: 'trim', but: 1, band: 1, walk: 1, patch: 1, t: 0.8 },
+      rock: { pl: 'trim', rough: 1, t: 0.7 }, mine: { pl: 'trim', rough: 1, t: 0.62 }, cemetery: { but: 1, t: 0.8 }, village: { but: 1, t: 0.74 },
+    }[K] || {};
+    const tt = CF.t || 0.85, tnt = (a, y, k, f) => { const v = M.var(a, y, k); const q = tt * (f || 1); return [v[0] * q, v[1] * q, v[2] * q]; };
+    const og = (y0, top, o) => Object.assign({ gy: y0, top }, o);
+    // (a guardian's field: beyond its arena the approach road has walls and rock of its own, standing over the perimeter's: nothing
+    // laid there, nor at the road's far end)
+    const zMax = w.arenaD ? w.arenaD + 3 : Infinity;
+    for (const side of ['N', 'S', 'W', 'E']) {
+      if (side === 'S' && w.arenaD) continue;
+      const T = T_[side], ax = side === 'N' || side === 'S';
+      // (the foot of the south side: its own ground in a bare field (the castle's keep, the shaft's rim); in a guardian's field it stands down on the road, far below: nothing laid there)
+      const foot = side === 'S' ? (A.bare ? sy : sy ? null : 0) : 0, top = side === 'S' && A.bare ? sy + H : H;
+      const l0 = ax ? (own ? -0.75 : 0) : A.sideZ0, l1 = ax ? (own ? W + 0.75 : W) : Math.min(D, zMax);
+      const gates = side === 'N' ? gxs.map((g) => [g - (own ? 4.62 : 4.75), g + (own ? 4.62 : 4.75)]) : side === 'S' ? [[W / 2 - (own ? 4.62 : 4.75), W / 2 + (own ? 4.62 : 4.75)]] : [];
+      const bs = bts.filter((b) => b.side === side && (ax || b.a < zMax));
+      // (a bare field's stretch about a gate: its courses run into the gate's frame; a scrap of it left beside the frame, too short to
+      // carry them, is left plain)
+      const keep = (R) => (A.bare ? R.filter(([a, b]) => b - a >= 1.3) : R);
+      const footR = foot === null ? [] : keep(cut(clip(runsOf(side, (f) => f.y0 <= foot + 0.01 && f.y1 >= foot + 1), l0, l1), A.bare ? gates.map(([a, b]) => [a + 0.13, b - 0.13]) : gates));
+      const topR = keep(clip(runsOf(side, (f) => Math.abs(f.y1 - top) < 0.02), l0, l1));
+      if (!footR.length && !topR.length) continue;
+      // (the way in at the south is a gate in a wall that does not open: behind its closed portcullis the wall's face stands, drawn here
+      // where the cemetery's and the village's walls are otherwise left to their own pieces)
+      if (own && side === 'S' && foot !== null) w.visual('block', W / 2 - 2.64, foot, D, W / 2 + 2.64, foot + Math.max(H, 7.4), D + 0.7, { uv: 2.5 });
+      if (K === 'cemetery') { cemeteryWall(w, M, T, side, footR, bs, { hx, prof, frus, along, hs, cut, tnt, og, H, ax, W, D }); continue; }
+      if (K === 'village') { villageWall(w, M, T, side, footR, bs, { hx, prof, frus, along, hs, cut, tnt, og, H, ax, W, D }); continue; }
+      // ---- the plinth: a battered course along the foot, sloped back to the wall; around each buttress its own base
+      if (CF.pl && foot !== null) {
+        for (const [a, b] of cut(footR, bs.map((q) => [q.a - 0.86, q.a + 0.86]))) along(a, b, 1.1, 1.9, 2, (s0, s1, i) => {
+          const r = CF.rough ? 0.05 * hs(s0, 3, 4) : 0;
+          prof(T, CF.pl, s0, s1, foot - 0.02, -0.04, 0.3 + r, foot + 0.74 + r, -0.04, 0.07, CF.rough ? 0.035 : 0.025, og(foot, top, { tint: tnt(s0, foot, 5), n: CF.rough ? 0.014 : 0.005, chip: CF.rough ? 0.35 : 0.12, chipS: 0.06, foot: true }));
+        });
+      }
+      // ---- the buttresses: pilasters (base, capital, a strip on up) or buttresses (sloped weatherings)
+      const cTop = top - (CF.corb ? 1.06 : CF.corn ? 0.44 : 0);
+      for (const q of bs) {
+        const a = q.a, bh = q.bh, by = 0, o = (k) => og(by, top, { tint: tnt(a, k, 7), n: 0.004, chip: 0.1, chipS: 0.05 });
+        frus(T, 'trim', a - 0.86, a + 0.86, 1.06, by - 0.02, a - 0.86, a + 0.86, 1.06, by + 0.42, -0.03, 0.025, Object.assign(o(1), { foot: true }));
+        frus(T, 'trim', a - 0.86, a + 0.86, 1.06, by + 0.42, a - 0.73, a + 0.73, 0.93, by + 0.68, -0.03, 0.02, o(2));
+        if (CF.pil) {
+          frus(T, 'trim', a - 0.72, a + 0.72, 0.92, bh - 0.32, a - 0.9, a + 0.9, 1.1, bh + 0.36, -0.03, 0.03, o(3));
+          frus(T, 'trim', a - 0.95, a + 0.95, 1.15, bh + 0.36, a - 0.95, a + 0.95, 1.15, bh + 0.52, -0.03, 0.02, o(4));
+          if (cTop - bh - 0.52 > 0.4) prof(T, K === 'works' ? 'wall' : 'trim', a - 0.5, a + 0.5, bh + 0.52, -0.03, 0.17, cTop, -0.03, 0.17, 0.02, og(by, top, { tint: tnt(a, 6, 8, K === 'works' ? 1.1 : 0.95), n: 0.003, uvFix: K === 'works', uv: K === 'works' ? 3 : 1.5 }));
+          if (CF.iron && !lo) for (const yy of [bh * 0.35, bh * 0.7]) frus(T, 'iron', a - 0.16, a + 0.16, 0.95, yy - 0.16, a - 0.16, a + 0.16, 0.95, yy + 0.16, 0.85, 0, og(by, top, { tint: [0.5, 0.45, 0.42] }));   // (the plates of the tie rods through it)
+        } else {
+          if (bh > 4.2) { const ym = bh * 0.46; frus(T, 'trim', a - 0.74, a + 0.74, 1.0, ym - 0.04, a - 0.71, a + 0.71, 0.9, ym + 0.24, -0.03, 0.02, o(5)); }
+          frus(T, 'trim', a - 0.76, a + 0.76, 1.02, bh - 0.14, a - 0.76, a + 0.76, 1.02, bh + 0.02, -0.03, 0.02, o(6));
+          frus(T, 'trim', a - 0.72, a + 0.72, 0.94, bh + 0.02, a - 0.72, a + 0.72, 0.1, bh + 0.98, -0.03, 0.03, o(9));
+        }
+      }
+      // ---- the string course
+      const bandY = K === 'fort' ? Math.min(2.6, H * 0.36) : Math.min(5.2, H * 0.33);   // (indoors over the torches, 3.3 - 4.3 m)
+      // (not on the short stretches of wall a bare field keeps about its gates: a course a few metres long and ending in the air is no course)
+      if (CF.band && !A.bare && foot !== null && top - foot > bandY + 2.2) for (const [a, b] of cut(footR, bs.map((q) => [q.a - 0.72, q.a + 0.72]))) along(a, b, 1.3, 2.1, 9, (s0, s1) => prof(T, 'trim', s0, s1, foot + bandY, -0.04, 0.1, foot + bandY + 0.24, -0.04, 0.03, 0.02, og(foot, top, { tint: tnt(s0, bandY, 10), n: 0.004, chip: 0.1, chipS: 0.04 })));
+      // ---- the top: corbel table and cornice / rough capping / the fort's wall walk on its corbels
+      // (over a gate on the north side, the sign hangs out in front of the wall from 6.4 to 13 m: nothing that stands out there)
+      const signHoles = side === 'N' && top - 1.1 < 13.4 ? gxs.map((g) => [g - 3.5, g + 3.5]) : [];
+      const tR = cut(topR, signHoles);
+      if (CF.corn) for (const [a, b] of tR) along(a, b, 1.2, 1.9, 11, (s0, s1) => prof(T, 'trim', s0, s1, top - 0.44, -0.04, 0.14, top - 0.01, -0.04, 0.4, 0.025, og(foot || 0, top, { tint: tnt(s0, top, 12), n: 0.004, chip: 0.1, chipS: 0.05 })));
+      if (CF.corb) for (const [a, b] of cut(tR, bs.map((q) => [q.a - 0.66, q.a + 0.66]))) {
+        const n = Math.max(1, Math.round((b - a) / 0.95));
+        for (let i = 0; i < n; i++) { const c = a + (i + 0.5) * (b - a) / n; frus(T, 'trim', c - 0.12, c + 0.12, 0.05, top - 1.06, c - 0.12, c + 0.12, 0.3, top - 0.44, -0.04, 0.015, og(foot || 0, top, { tint: tnt(c, top, 13, 0.96), n: 0.004 })); }
+      }
+      if (CF.iron) for (const [a, b] of tR) along(a, b, 2.4, 3.6, 14, (s0, s1) => { M.hexa('iron', [T(s0, top - 1.0, -0.02), T(s1, top - 1.0, -0.02), T(s0, top - 0.62, -0.02), T(s1, top - 0.62, -0.02), T(s0, top - 1.0, 0.12), T(s1, top - 1.0, 0.12), T(s0, top - 0.62, 0.12), T(s1, top - 0.62, 0.12)], 0.01, og(foot || 0, top, { tint: [0.42, 0.38, 0.36], uv: 1 })); });
+      if (CF.rough) for (const [a, b] of tR) along(a, b, 0.7, 1.4, 15, (s0, s1) => { const r = hs(s0, 5, 16); prof(T, 'trim', s0, s1, top - 0.32 - 0.12 * r, -0.04, 0.06 + 0.1 * r, top - 0.01, -0.04, 0.04 + 0.12 * hs(s1, 6, 17), 0.035, og(foot || 0, top, { tint: tnt(s0, top, 18, 0.92), n: 0.02, chip: 0.45, chipS: 0.09 })); });
+      if (CF.walk && !A.bare) for (const [a, b] of tR) {
+        const n = Math.max(1, Math.round((b - a) / 1.4));
+        for (let i = 0; i < n; i++) { const c = a + (i + 0.5) * (b - a) / n; frus(T, 'trim', c - 0.17, c + 0.17, 0.06, top - 0.95, c - 0.17, c + 0.17, 0.44, top - 0.2, -0.04, 0.02, og(0, top, { tint: tnt(c, top, 19, 0.95), n: 0.006, chip: 0.2, chipS: 0.05 })); }
+        along(a, b, 1.3, 2.0, 20, (s0, s1) => prof(T, 'trim', s0, s1, top - 0.2, -0.04, 0.5, top + 0.12, -0.04, 0.53, 0.025, og(0, top, { tint: tnt(s0, top, 21, 0.92), n: 0.006, chip: 0.25, chipS: 0.07 })));
+      }
+      // ---- patches of later repair: a few courses of smaller stones of another colour, laid where the face had fallen
+      if (CF.patch && !lo && foot !== null) for (const [a, b] of cut(footR, bs.map((q) => [q.a - 1.6, q.a + 1.6]))) {
+        for (let c = a + 2 + 9 * hs(a, side.charCodeAt(0), 22); c < b - 2; c += 11 + 8 * hs(c, 2, 23)) {
+          const wd = 1.6 + 1.6 * hs(c, 3, 24), yb = foot + Math.max(4.6, Math.min(top - 4, 4.6 + 3 * hs(c, 4, 25))), nh = 3 + Math.floor(4 * hs(c, 5, 26)), f = hs(c, 6, 27) < 0.5 ? 1.12 : 0.84;
+          if (yb + nh * 0.3 > top - 1.2) continue;
+          let y = yb;
+          for (let r = 0; r < nh; r++) {
+            const h = 0.24 + 0.1 * hs(c, r, 28), sh = (hs(c, r, 29) - 0.5) * 0.5, wr = wd * (1 - Math.abs(r - nh / 2) / nh * 0.6);
+            along(c - wr / 2 + sh, c + wr / 2 + sh, 0.32, 0.62, 30 + r, (s0, s1) => prof(T, 'trim', s0 + 0.01, s1 - 0.01, y + 0.01, -0.03, 0.02 + 0.015 * hs(s0, r, 31), y + h - 0.01, -0.03, 0.02 + 0.015 * hs(s1, r, 32), 0.018, og(foot, top, { tint: tnt(s0, y, 33, f * 0.92), n: 0.006, chip: 0.25, chipS: 0.04 })));
+            y += h;
+          }
+        }
+      }
+    }
+    // ---- the windows' heads (opts.windows, both side walls): a round arch over each, the corners above it filled through the wall
+    for (const [a, b, y0, y1] of A.wins) for (const side of ['W', 'E']) {
+      const T = T_[side], R = (b - a) / 2, cA = (a + b) / 2, yc = y1 - R, segs = lo ? 4 : 8;
+      for (let j = 0; j < segs; j++) {
+        // (the fill: between the arch and the square head, quarter by quarter, through the wall's thickness)
+        const b0 = Math.PI * j / segs, b1 = Math.PI * (j + 1) / segs, p = (t) => [cA + Math.cos(t) * R, yc + Math.sin(t) * R], sq = (t) => { const c = Math.cos(t), s = Math.sin(t), m = Math.max(Math.abs(c), Math.abs(s)); return [cA + c / m * R, yc + s / m * R]; };
+        const P0 = p(b0), P1 = p(b1), Q0 = sq(b0), Q1 = sq(b1);
+        hx(T, 'block', [[P0[0], P0[1], -2.95], [P1[0], P1[1], -2.95], [Q0[0], Q0[1] + 0.01, -2.95], [Q1[0], Q1[1] + 0.01, -2.95], [P0[0], P0[1], 0.0], [P1[0], P1[1], 0.0], [Q0[0], Q0[1] + 0.01, 0.0], [Q1[0], Q1[1] + 0.01, 0.0]], 0, og(0, H, { tint: [0.9, 0.9, 0.9], uv: 4 }));
+      }
+      // (the ring of wedge stones round it on the face, and a sill)
+      const n = 9;
+      for (let j = 0; j < n; j++) { const b0 = Math.PI * j / n, b1 = Math.PI * (j + 1) / n, r1 = R + 0.5 + (j === 4 ? 0.14 : 0); hx(T, 'trim', [[cA + Math.cos(b0) * R, yc + Math.sin(b0) * R, -0.05], [cA + Math.cos(b1) * R, yc + Math.sin(b1) * R, -0.05], [cA + Math.cos(b0) * r1, yc + Math.sin(b0) * r1, -0.05], [cA + Math.cos(b1) * r1, yc + Math.sin(b1) * r1, -0.05], [cA + Math.cos(b0) * R, yc + Math.sin(b0) * R, 0.06], [cA + Math.cos(b1) * R, yc + Math.sin(b1) * R, 0.06], [cA + Math.cos(b0) * r1, yc + Math.sin(b0) * r1, 0.06], [cA + Math.cos(b1) * r1, yc + Math.sin(b1) * r1, 0.06]], 0.02, og(0, H, { tint: tnt(j, cA, 34), n: 0.004, chip: 0.15, chipS: 0.04 })); }
+      for (const s2 of [-1, 1]) prof(T, 'trim', s2 < 0 ? a - 0.42 : b, s2 < 0 ? a : b + 0.42, y0 - 0.3, -0.05, 0.06, yc, -0.05, 0.06, 0.02, og(0, H, { tint: tnt(s2, a, 35) }));
+    }
+    // ---- the city wall's parapet (the merlons of the open-sky perimeter, w._mers): a breastwork along the outer edge, the merlons on it
+    if (w._mers && w._mers.length) crenels(w, M, w._mers.filter((c) => c.z0 < zMax), H, { W, D, hs, tnt, og });
+    // the stretches of wall a bare field keeps about its gates, in a fortified field (the bridge, the castle, the battlefield's cliff):
+    // a parapet of merlons along their outer edge (the box under it is the wall top: no merlons of its own)
+    if (K === 'fort' && A.bare) for (const side of ['N', 'S']) {
+      const T = T_[side], top = side === 'S' ? sy + H : H, L = faces.filter((f) => f.side === side && Math.abs(f.y1 - top) < 0.02).map((f) => [Math.max(f.a0, -3), Math.min(f.a1, W + 3)]).sort((p, q) => p[0] - q[0]);
+      const R = []; for (const [a, b] of L) { const l = R[R.length - 1]; if (l && a <= l[1] + 0.01) l[1] = Math.max(l[1], b); else R.push([a, b]); }
+      for (const [a, b] of R) if (b - a > 1.5) FORT.parapet(w, T, a, b, top, -3, -2.35, { gy: side === 'S' ? sy : 0 });
+    }
+  }
+  // the merlons of a wall's parapet, each drawn over its box (cols: the boxes; each 0.9 wide, 1 m high, set into the outer edge of the wall
+  // top): a breastwork 0.85 high along between them, its sill sloped out, and the merlons on it 1.2 wide - wider than the crenels, as they
+  // were built - with their coping and a loop. Now and then one is broken down or gone, by the place
+  function crenels(w, M, cols, H, X) {
+    const { hs, tnt, og } = X, lo = M.lo;
+    for (const c of cols) {
+      const alongX = c.x1 - c.x0 > c.z1 - c.z0 + 0.05 || (Math.abs(c.x1 - c.x0 - 0.9) < 0.05 && Math.abs(c.z1 - c.z0 - 0.7) < 0.05);
+      const a = alongX ? (c.x0 + c.x1) / 2 : (c.z0 + c.z1) / 2;
+      // (its frame: across the wall from its outer face (d0) to its inner (d1))
+      const outerNeg = alongX ? c.z0 < 0 : c.x0 < 0, o0 = alongX ? (outerNeg ? c.z0 : c.z1) : (outerNeg ? c.x0 : c.x1), sgn = outerNeg ? 1 : -1;
+      const T = alongX ? (u, y, d) => [u, y, o0 + sgn * d] : (u, y, d) => [o0 + sgn * d, y, u];
+      const h = hs(a, o0, 50), gone = h < 0.1, broken = !gone && h < 0.28, y0 = c.y0, sill = y0 + 0.85;
+      const o = (k, f) => og(y0 - 8, y0 + 2, { tint: tnt(a, y0, k, f || 1), n: 0.008, chip: 0.3, chipS: 0.07 });
+      // the breastwork under it and on to the next (its sill sloped down to the outside)
+      const brk = gone ? 0.25 + 0.4 * hs(a, 1, 51) : 0;
+      M.hexa('trim', [T(a - 0.9, y0 - 0.02, 0), T(a + 0.9, y0 - 0.02, 0), T(a - 0.9, sill - brk - 0.06, 0), T(a + 0.9, sill - brk - 0.06 - (gone ? 0.15 : 0), 0), T(a - 0.9, y0 - 0.02, 0.72), T(a + 0.9, y0 - 0.02, 0.72), T(a - 0.9, sill - brk, 0.72), T(a + 0.9, sill - brk, 0.72)], 0.03, o(52));
+      if (gone) continue;
+      const top = sill + (broken ? 0.45 + 0.4 * hs(a, 2, 53) : 1.12), tl = broken ? 0.25 * (hs(a, 3, 54) - 0.5) : 0;
+      M.hexa('trim', [T(a - 0.6, sill - 0.02, 0.01), T(a + 0.6, sill - 0.02, 0.01), T(a - 0.6, top + tl, 0.01), T(a + 0.6, top - tl, 0.01), T(a - 0.6, sill - 0.02, 0.71), T(a + 0.6, sill - 0.02, 0.71), T(a - 0.6, top + tl, 0.71), T(a + 0.6, top - tl, 0.71)], 0.035, o(55));
+      if (!broken) {
+        // (its coping: a cap overhanging a little, its top weathered to a low ridge)
+        M.hexa('trim', [T(a - 0.65, top, -0.04), T(a + 0.65, top, -0.04), T(a - 0.5, top + 0.2, 0.25), T(a + 0.5, top + 0.2, 0.25), T(a - 0.65, top, 0.76), T(a + 0.65, top, 0.76), T(a - 0.5, top + 0.2, 0.47), T(a + 0.5, top + 0.2, 0.47)], 0.02, o(56, 0.95));
+        if (!lo && hs(a, 4, 57) < 0.6) { const p0 = T(a - 0.04, sill + 0.25, 0.715), p1 = T(a + 0.04, sill + 0.95, 0.73); M.box('dark', p0[0], p0[1], p0[2], p1[0], p1[1], p1[2], 0, {}); }
+      }
+    }
+  }
+
+  // ---------------- a fortified wall's pieces, for the fields that build their walls themselves (the castle's curtain and towers,
+  // the gatehouses on the bridge ...): each in a frame T(a, y, d) - a along the wall, y up, d out from the face it stands on. They are
+  // drawn only (mason); the boxes that stop you are the field's own
+  const FORT = (LG.fort = {
+    // a merlon at a on the sill at y, the parapet's thickness from d0 (its back) to d1 (the face looked at), wd wide, ht high: its coping,
+    // a loop in its face now and then; now and then broken down to a ragged stump, or gone (by the place)
+    merlon(w, T, a, y, d0, d1, wd, ht, o) {
+      o = o || {}; const M = mason(w), p = T(a, y, d1), h = _hn(p[0] * 0.71 + p[2] * 0.13, p[2] * 0.53 - p[0] * 0.07, 50), dmg = o.dmg ?? 1;
+      if (h < 0.08 * dmg) return 'gone';
+      const broken = h < 0.24 * dmg, top = y + (broken ? ht * (0.35 + 0.35 * _hn(p[0], p[2], 53)) : ht), tl = broken ? 0.22 * (_hn(p[0], p[2], 54) - 0.5) : 0, hw = wd / 2, far = !!o.far;
+      const tn = (k, f) => { const v = M.var(p[0], y, p[2] + k); const q = (o.t || 0.86) * (f || 1); return [v[0] * q, v[1] * q, v[2] * q]; };
+      const og = (k, f) => ({ gy: o.gy ?? y - 6, top: y + ht, tint: tn(k, f), n: 0.008, chip: far ? 0 : 0.3, chipS: 0.07, uv: 1.4 });
+      M.hexa('trim', [T(a - hw, y - 0.02, d0), T(a + hw, y - 0.02, d0), T(a - hw, top + tl, d0), T(a + hw, top - tl, d0), T(a - hw, y - 0.02, d1), T(a + hw, y - 0.02, d1), T(a - hw, top + tl, d1), T(a + hw, top - tl, d1)], far ? 0 : 0.035, og(55));
+      if (broken) return 'broken';
+      const dd = d1 - d0, c0 = d0 + dd * 0.38, c1 = d0 + dd * 0.62, ov = Math.sign(dd) * 0.05;
+      M.hexa('trim', [T(a - hw - 0.05, top, d0 - ov), T(a + hw + 0.05, top, d0 - ov), T(a - hw + 0.12, top + 0.2, c0), T(a + hw - 0.12, top + 0.2, c0), T(a - hw - 0.05, top, d1 + ov), T(a + hw + 0.05, top, d1 + ov), T(a - hw + 0.12, top + 0.2, c1), T(a + hw - 0.12, top + 0.2, c1)], 0, og(56, 0.95));   // (the cap: its sloped faces make its edges; none taken off)
+      if (!M.lo && o.loop !== false && _hn(p[0], p[2], 57) < 0.55) { const s = Math.sign(dd) || 1, q0 = T(a - 0.04, y + 0.22, d1 + s * 0.004), q1 = T(a + 0.04, y + ht - 0.3, d1 + s * 0.016); M.box('dark', q0[0], q0[1], q0[2], q1[0], q1[1], q1[2], 0, {}); }
+      return 'whole';
+    },
+    // a parapet from a0 to a1 on a wall top at y: the breastwork up to the sill (its top sloped down toward d0), on it merlons every pitch,
+    // each 0.64 of it wide (wider than the crenels between, as they were built); o: { pitch, sill (its height), ht (the merlons'), dmg }
+    parapet(w, T, a0, a1, y, d0, d1, o) {
+      o = o || {}; const M = mason(w), P = o.pitch || 1.8, n = Math.max(1, Math.round((a1 - a0) / P)), pp = (a1 - a0) / n, sill = y + (o.sill ?? 0.85), ht = o.ht ?? 1.05;
+      for (let i = 0; i < n; i++) {
+        const a = a0 + (i + 0.5) * pp, b0 = a0 + i * pp, b1 = b0 + pp, p = T(a, y, d1), v = M.var(p[0], y, p[2] + 3), t = o.t || 0.86;
+        const st = FORT.merlon(w, T, a, sill, d0, d1, pp * 0.64, ht, o), gone = st === 'gone', dz = gone ? 0.2 + 0.4 * _hn(p[0], p[2], 51) : 0;
+        M.hexa('trim', [T(b0, y - 0.02, d0), T(b1, y - 0.02, d0), T(b0, sill - dz - 0.07, d0), T(b1, sill - dz - 0.07 - (gone ? 0.12 : 0), d0), T(b0, y - 0.02, d1), T(b1, y - 0.02, d1), T(b0, sill - dz, d1), T(b1, sill - dz, d1)], 0, { gy: o.gy ?? y - 6, top: sill, tint: [v[0] * t * 0.95, v[1] * t * 0.95, v[2] * t * 0.95], n: 0.008, chip: o.far ? 0 : gone ? 0.6 : 0.2, chipS: 0.08, uv: 1.4 });
+      }
+    },
+    // corbels on a face (d 0 the face, out from it) from a0 to a1 about every step, from y - 0.8 up to y, carrying a course from y to
+    // y + 0.28 that stands out by out
+    corbels(w, T, a0, a1, y, out, o) {
+      o = o || {}; const M = mason(w), st = o.step || 1.3, n = Math.max(1, Math.round((a1 - a0) / st)), t = o.t || 0.84;
+      const tn = (a, k) => { const p = T(a, y, 0), v = M.var(p[0], y + k, p[2]); return [v[0] * t, v[1] * t, v[2] * t]; };
+      for (let i = 0; i < n; i++) {
+        const c = a0 + (i + 0.5) * (a1 - a0) / n, hw = o.wd || 0.17;
+        // (courses, each standing out farther than the one under it: two, or one far off)
+        const nk = o.far || o.one ? 1 : 2, kh = 0.8 / nk;
+        for (let k = 0; k < nk; k++) { const yb = y - 0.8 + k * kh, f0 = out * (0.2 + 0.8 * k / nk), f1 = out * (0.2 + 0.8 * (k + 1) / nk); M.hexa('trim', [T(c - hw, yb, -0.04), T(c + hw, yb, -0.04), T(c - hw, yb + kh - 0.01, -0.04), T(c + hw, yb + kh - 0.01, -0.04), T(c - hw, yb, f0 * 0.8), T(c + hw, yb, f0 * 0.8), T(c - hw, yb + kh - 0.01, f1), T(c + hw, yb + kh - 0.01, f1)], o.ch || 0, { gy: o.gy ?? y - 6, top: y, tint: tn(c, k), n: 0.004 }); }
+      }
+      if (o.course !== false) { let s = a0, i = 0; while (s < a1 - 0.05) { const e = Math.min(a1, s + 1.3 + 0.7 * _hn(s, y, 58 + i)); M.hexa('trim', [T(s, y, -0.04), T(e, y, -0.04), T(s, y + 0.28, -0.04), T(e, y + 0.28, -0.04), T(s, y, out + 0.06), T(e, y, out + 0.06), T(s, y + 0.28, out + 0.1), T(e, y + 0.28, out + 0.1)], o.far ? 0 : 0.012, { gy: o.gy ?? y - 6, top: y + 0.3, tint: tn(s, 9), n: 0.006, chip: 0.2, chipS: 0.06 }); s = e; i++; } }
+    },
+    // a battered plinth along a face from a0 to a1: its foot at y standing out by out, h high, sloped back to the face
+    talus(w, T, a0, a1, y, h, out, o) {
+      o = o || {}; const M = mason(w), t = o.t || 0.82; let s = a0, i = 0;
+      while (s < a1 - 0.05) { const e = Math.min(a1, s + 1.1 + 0.8 * _hn(s, y, 59 + i)), p = T(s, y, 0), v = M.var(p[0], y, p[2]); M.hexa('trim', [T(s, y - 0.05, -0.04), T(e, y - 0.05, -0.04), T(s, y + h, -0.04), T(e, y + h, -0.04), T(s, y - 0.05, out), T(e, y - 0.05, out), T(s, y + h, 0.05), T(e, y + h, 0.05)], o.far ? 0 : 0.03, { gy: y, top: y + h, tint: [v[0] * t, v[1] * t, v[2] * t], n: 0.008, chip: 0.2, chipS: 0.07, foot: !o.far }); s = e; i++; }
+    },
+  });
   // ---------------- boss approach: a low canyon road, a flight of stairs, and the fortress high above ----------------
   const ROAD_LOW = -15;
   function bossRoad(w, rng, W, AD, D, bossId, facade) {
@@ -604,6 +980,9 @@
         sea.material.map.repeat && sea.material.map.repeat.set(1, 1);
         sea.rotation.x = -Math.PI / 2; sea.position.set(cx, -40, cz); grp.add(sea);
         const under = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshBasicMaterial({ color: w.mats.biome.cloudCol ? 0x0a0614 : 0xe8f0ff, fog: false }));
+        // (what shows of it through the sea of cloud at the horizon is the air's colour: the fog's, as the sky's mood has it now - a dark
+        // board there was a black band along the edge of the world)
+        under.onBeforeRender = (r, sc) => { if (sc && sc.fog) under.material.color.copy(sc.fog.color); };
         under.rotation.x = -Math.PI / 2; under.position.set(cx, -42, cz); grp.add(under);
         for (let i = 0; i < 60; i++) {
           const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.cloud, color: cc, transparent: true, opacity: rng.range(0.5, 0.9), depthWrite: false, fog: false }));
@@ -736,7 +1115,7 @@
       gl_Position = projectionMatrix * viewMatrix * wp;
     }`;
   const FAR_FS = `uniform vec3 uSun; uniform vec3 uSunC; uniform vec3 uSkyC; uniform vec3 uGndC; uniform vec3 uHor; uniform vec3 uFog;
-    uniform vec3 uRock; uniform vec3 uVeg; uniform vec3 uSnow; uniform vec4 uLine; uniform vec4 uAir; uniform float uKind; uniform float uFogD;
+    uniform vec3 uRock; uniform vec3 uVeg; uniform vec3 uSnow; uniform vec4 uLine; uniform vec4 uAir; uniform float uKind; uniform float uFogD; uniform float uFogCap;
     varying vec3 vWP; varying vec3 vN; varying vec3 vC; varying vec2 vU;
     float fh(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
     float fn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(fh(i), fh(i + vec2(1.0, 0.0)), f.x), mix(fh(i + vec2(0.0, 1.0)), fh(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -770,7 +1149,7 @@
       float ndl = max(dot(N, uSun), 0.0);
       vec3 col = alb * (uSunC * ndl + mix(uGndC, uSkyC, N.y * 0.5 + 0.5) * 0.7) * ao;
       float d = length(vWP - cameraPosition);
-      float fd = uFogD * d, haze = max(uAir.y * (1.0 - exp(-max(d - 120.0, 0.0) * uAir.x)), 0.6 * (1.0 - exp(-fd * fd)));
+      float fd = uFogD * d, haze = max(uAir.y * (1.0 - exp(-max(d - 120.0, 0.0) * uAir.x)), uFogCap * (1.0 - exp(-fd * fd)));
       float mist = uAir.w * exp(-max(y + 4.0, 0.0) / uAir.z);
       vec3 air = mix(uFog, uHor, smoothstep(-10.0, 90.0, y));
       col = mix(col, air, clamp(haze + mist, 0.0, 1.0));
@@ -787,9 +1166,10 @@
         uHor: { value: new THREE.Color(B0.sky ? B0.sky[2] : B0.fog) }, uFog: { value: new THREE.Color(B0.fog) },
         uRock: { value: new THREE.Color(look.rock) }, uVeg: { value: new THREE.Color(look.veg) }, uSnow: { value: new THREE.Color('#d2d6de') },
         uLine: { value: new THREE.Vector4(look.snowY, look.snowK, look.vegK, look.vegY) }, uAir: { value: new THREE.Vector4(0.004, 0.55, 12, 0.8) }, uFogD: { value: 0 },
+        uFogCap: { value: 0.6 },
       };
       const mk = (k) => new THREE.ShaderMaterial({ uniforms: Object.assign({}, u, { uKind: { value: k } }), vertexShader: FAR_VS, fragmentShader: FAR_FS, vertexColors: true, side: THREE.DoubleSide, fog: false });
-      F = w._far = { u, mtn: mk(0), bld: mk(1) }; F.mtn.name = 'far_mountain'; F.bld.name = 'far_masonry';
+      F = w._far = { u, mtn: mk(0), bld: mk(1) }; F.mtn.name = 'far_mountain'; F.bld.name = 'far_masonry'; F.mtn.userData.w = F.bld.userData.w = w;
     }
     return kind ? F.bld : F.mtn;
   }
@@ -804,6 +1184,19 @@
     if (a) { _fc.copy(a.color).multiplyScalar(a.intensity * K); u.uSkyC.value.add(_fc); u.uGndC.value.add(_fc); }
     if (scene.background && scene.background.isColor) u.uHor.value.copy(scene.background);
     if (scene.fog) { u.uFog.value.copy(scene.fog.color); u.uFogD.value = scene.fog.isFogExp2 ? scene.fog.density : 0; }
+    // the area's sky mood (skyvary.js, w.sky): the horizon the air takes the far country into is the mood's, not the field's own table
+    // (an overcast or a blood-red mood paints its own), and in a mood of thick fog the air may take the far country wholly, as it takes
+    // all else (the cap is for the field's own clear air, where the ranges are to be seen)
+    const w = material.userData.w;
+    if (w && G.Sky && G.Sky.env) {
+      if (material.userData.skyV !== w.sky || !material.userData.horC) {
+        material.userData.skyV = w.sky;
+        const B0 = w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome, B = G.Sky.env(B0, w.sky) || B0;
+        material.userData.horC = new THREE.Color(B.sky ? B.sky[2] : B.fog);
+        material.userData.fogCap = 0.6 + 0.4 * _ss(1.15, 2.2, (B.fogD || 0) / Math.max(1e-6, B0.fogD || 1e-6));
+      }
+      u.uHor.value.copy(material.userData.horC); u.uFogCap.value = material.userData.fogCap;
+    }
   }
   LG.farMat = farMat; LG.farSync = farSync;
   function mountains(w, grp, cx, cz, hs) {
@@ -1194,24 +1587,340 @@
     return g;
   }
   LG.tree = tree;
-  function gateFrame(w, x, z, side, y0) {
-    if (y0) { const sv = w.solid.bind(w), vv = w.visual.bind(w); const sh = (f) => (m, a, b, c, d2, e, f2, o) => f(m, a, b + y0, c, d2, e + y0, f2, o); w.solid = sh(sv); w.visual = sh(vv); try { gateFrame(w, x, z, side, 0); } finally { w.solid = sv; w.visual = vv; } return; }
-    w._gateFrame = true; try { gateFrame0(w, x, z, side); } finally { w._gateFrame = false; }
+
+  // ================================================================ masonry: the walls and gates as they are built
+  // A box drawn is a block of wall; what a box can't be - a merlon with its coping, a wedge of an arch, a corbel, a battered plinth, a
+  // stake of a palisade - is built here, stone by stone: each stone a solid of eight corners (bit 0 along it, bit 1 up, bit 2 across),
+  // its arrises taken off (ch), a corner of it now and then broken off, no two quite alike (a hash of where it stands: nothing here
+  // throws the area's dice). They go into one mesh per material for the whole area, with colours of their own: each stone a little
+  // different, darker at the foot, under an open sky streaked by the rain and green with moss low down where the sun does not come.
+  // On the low setting the stones lose their worked edges.
+  const QLOW = () => !!(G.save && G.save.data && G.save.data.settings && G.save.data.settings.quality === 'low');
+  const _HF = [[0, 2, 6, 4], [1, 3, 7, 5], [0, 1, 5, 4], [2, 3, 7, 6], [0, 1, 3, 2], [4, 5, 7, 6]];
+  const _HE = (() => { const m = new Map(); _HF.forEach((f, fi) => { for (let k = 0; k < 4; k++) { const a = f[k], b = f[(k + 1) % 4], key = Math.min(a, b) * 8 + Math.max(a, b); if (!m.has(key)) m.set(key, [a, b, fi]); else m.get(key).push(fi); } }); return [...m.values()]; })();
+  const _HC = [0, 1, 2, 3, 4, 5, 6, 7].map((c) => _HF.map((f, fi) => (f.includes(c) ? fi : -1)).filter((fi) => fi >= 0));
+  function mason(w) {
+    if (w._mason) return w._mason;
+    // (LG._noDress, for the tools that weigh what this costs: a mason that lays nothing)
+    if (LG._noDress) { const n = () => {}; return (w._mason = { lo: true, by: {}, mat: {}, var: () => [1, 1, 1], hexa: n, blk: n, box: n, geo: n, quad: n, foot: n, build: n }); }
+    const M = { g: {}, mat: {}, lo: QLOW(), out: !!w.mats.biome.outdoor, tris: 0, n: 0, by: {}, sun: w.mats.biome.sunDir || null };   // (mat: materials of its own by name, the leaves' cards)
+    const tally = (n) => { const k = LG._tag || 'other'; M.by[k] = (M.by[k] || 0) + n; };   // (what the triangles went to, by the piece being built: w.perimInfo)
+    const grp = (mk) => M.g[mk] || (M.g[mk] = { p: [], n: [], u: [], c: [], i: [] });
+    const nz3 = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    // the colour of a point of a stone: tint (the stone's own), darker low down, rain-streaked and mossy outdoors
+    // (fw: the face's own colour, worked out once at its middle - the rain and the moss; then each point darkened by how low it stands)
+    const _fw = [0, 0, 0];
+    const faceW = (x, y, z, nx, ny, nz, t, o) => { const c = shade(x, y, z, nx, ny, nz, t, o, true); _fw[0] = c[0]; _fw[1] = c[1]; _fw[2] = c[2]; return _fw; };
+    const low = (y, o) => 0.74 + 0.26 * _ss(-0.1, 1.8, y - (o.gy ?? 0));
+    const shade = (x, y, z, nx, ny, nz, t, o, noLow) => {
+      const gy = o.gy ?? 0, h = y - gy;
+      let m = noLow ? 1 : 0.74 + 0.26 * _ss(-0.1, 1.8, h);
+      let r = 1, g = 1, b = 1;
+      if (M.out && Math.abs(ny) < 0.6) {
+        const u = Math.abs(nx) > Math.abs(nz) ? z : x, st = _ss(0.58, 0.86, _vn(u * 2.7 + 13, y * 0.22, 5)) * _ss(-0.5, 2.5, (o.top ?? y + 3) - y);
+        m *= 1 - 0.16 * st;
+        const shd = M.sun ? (nx * M.sun[0] + nz * M.sun[2] < 0.1 ? 1 : 0.3) : 0.6, ms = _ss(0.5, 0.78, _vn(x * 0.9 + z * 0.9, y * 0.9, 7)) * shd * (1 - _ss(0.4, 1.6, h));
+        r *= 1 - 0.12 * ms; b *= 1 - 0.2 * ms; m *= 1 - 0.06 * ms;
+      } else if (M.out && ny > 0.6) { const ms = _ss(0.55, 0.8, _vn(x * 1.3 + 3, z * 1.3, 9)) * 0.7; r *= 1 - 0.1 * ms; b *= 1 - 0.16 * ms; m *= 0.93; }
+      if (ny < -0.6) m *= 0.82;   // (an underside: in its own shade)
+      return [t[0] * m * r, t[1] * m * g, t[2] * m * b];
+    };
+    // the variety of one stone, from where it is: brightness and a little warmth either way
+    M.var = (x, y, z, k) => { const a = _hn(x * 3.1 + 0.7, z * 2.9 + y * 1.7, 11 + (k || 0)), b = _hn(x * 1.7, z * 3.7 - y * 2.3, 13 + (k || 0)); const v = 0.86 + 0.24 * a, wm = (b - 0.5) * 0.08; return [v * (1 + wm), v, v * (1 - wm)]; };
+    // P: eight corners [x, y, z]. o: { tint, n (how far its corners wander), chip (0..1: the chance of a broken corner), uv, gy, top }
+    // what stands out at a wall's foot beyond the box that stops you (a plinth, a base, a gate pier's foot): its outline, up to 0.6 m over
+    // its own foot, into w.footOut ({x0, z0, x1, z1, y0, y1}) - where the dust and gravel along the foot (props.js P.dress) should go round
+    // it, not under it. Only a record: nothing stops anyone there
+    M.foot = (x0, y0, z0, x1, y1, z1) => { (w.footOut || (w.footOut = [])).push({ x0: Math.min(x0, x1), z0: Math.min(z0, z1), x1: Math.max(x0, x1), z1: Math.max(z0, z1), y0: Math.min(y0, y1), y1: Math.min(Math.max(y0, y1), Math.min(y0, y1) + 0.6) }); };
+    // (scratch for the stone being made: its corners, their broken bits, the index of each face's point at each corner)
+    const QX = new Float64Array(8), QY = new Float64Array(8), QZ = new Float64Array(8), CH = new Float64Array(8), VV = new Int32Array(48), FO = new Int32Array(24), FN = new Float64Array(18);
+    let _G = null, _cx = 0, _cy = 0, _cz = 0, _nt = 0;
+    // a triangle wound outward (against where the stone's middle is), seen from the point (rx, ry, rz) on its outside
+    const tri = (a, b, c, rx, ry, rz) => {
+      const A = _G.p, pa = a * 3, pb = b * 3, pc = c * 3;
+      const ux = A[pb] - A[pa], uy = A[pb + 1] - A[pa + 1], uz = A[pb + 2] - A[pa + 2], vx = A[pc] - A[pa], vy = A[pc + 1] - A[pa + 1], vz = A[pc + 2] - A[pa + 2];
+      if ((uy * vz - uz * vy) * (rx - _cx) + (uz * vx - ux * vz) * (ry - _cy) + (ux * vy - uy * vx) * (rz - _cz) >= 0) _G.i.push(a, b, c); else _G.i.push(a, c, b);
+      _nt++;
+    };
+    M.hexa = (mk, P, ch, o) => {
+      o = o || {}; const G0 = grp(mk);
+      if (o.foot) { let a = [9e9, 9e9, 9e9], b = [-9e9, -9e9, -9e9]; for (const p of P) for (let i = 0; i < 3; i++) { a[i] = Math.min(a[i], p[i]); b[i] = Math.max(b[i], p[i]); } M.foot(a[0], a[1], a[2], b[0], b[1], b[2]); }
+      if (M.lo) ch = 0;
+      let cx = 0, cy = 0, cz = 0; for (let c = 0; c < 8; c++) { cx += P[c][0] / 8; cy += P[c][1] / 8; cz += P[c][2] / 8; }
+      const seed = cx * 1.37 + cy * 2.11 + cz * 0.73, nA = M.lo ? 0 : (o.n ?? 0.006);
+      // the corners, wandered a little; one broken off now and then
+      let anyChip = false;
+      for (let c = 0; c < 8; c++) {
+        QX[c] = P[c][0] + (_hn(seed, c, 21) - 0.5) * 2 * nA; QY[c] = P[c][1] + (_hn(seed, c, 22) - 0.5) * 2 * nA; QZ[c] = P[c][2] + (_hn(seed, c, 23) - 0.5) * 2 * nA;
+        CH[c] = !M.lo && o.chip && _hn(seed, c, 24) < o.chip ? (0.35 + 0.65 * _hn(seed, c, 25)) * (o.chipS || 0.07) : 0; if (CH[c]) anyChip = true;
+      }
+      const t = o.tint || [1, 1, 1], uvS = 1 / (o.uv || 1.5), uo = o.uvFix ? 0 : _hn(seed, 1, 26) * 3, vo = o.uvFix ? 0 : _hn(seed, 2, 26) * 3;
+      for (let fi = 0; fi < 6; fi++) {
+        const f = _HF[fi], a = f[0], b = f[1], c = f[2], d = f[3];
+        // (Newell's normal of the face, turned outward)
+        let nx = 0, ny = 0, nz = 0;
+        for (let k = 0; k < 4; k++) { const p = f[k], q = f[(k + 1) & 3]; nx += (QY[p] - QY[q]) * (QZ[p] + QZ[q]); ny += (QZ[p] - QZ[q]) * (QX[p] + QX[q]); nz += (QX[p] - QX[q]) * (QY[p] + QY[q]); }
+        const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+        const fx = (QX[a] + QX[b] + QX[c] + QX[d]) / 4, fy = (QY[a] + QY[b] + QY[c] + QY[d]) / 4, fz = (QZ[a] + QZ[b] + QZ[c] + QZ[d]) / 4;
+        const flip = nx * (fx - cx) + ny * (fy - cy) + nz * (fz - cz) < 0;
+        if (flip) { nx = -nx; ny = -ny; nz = -nz; }
+        for (let k = 0; k < 4; k++) FO[fi * 4 + k] = flip ? f[3 - k] : f[k];
+        const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+        const fw = faceW(fx, fy, fz, nx, ny, nz, t, o), fr = fw[0], fg = fw[1], fb = fw[2];
+        for (let k = 0; k < 4; k++) {
+          const cI = FO[fi * 4 + k], nI = FO[fi * 4 + ((k + 1) & 3)], pI = FO[fi * 4 + ((k + 3) & 3)], px = QX[cI], py = QY[cI], pz = QZ[cI];
+          let ex = QX[nI] - px, ey = QY[nI] - py, ez = QZ[nI] - pz, l = Math.hypot(ex, ey, ez) || 1; ex /= l; ey /= l; ez /= l;
+          let qx = QX[pI] - px, qy = QY[pI] - py, qz = QZ[pI] - pz; l = Math.hypot(qx, qy, qz) || 1; qx /= l; qy /= l; qz /= l;
+          const e = ch + CH[cI];
+          let x = px + (ex + qx) * e, y = py + (ey + qy) * e, z = pz + (ez + qz) * e;
+          if (CH[cI]) { let tx = cx - px, ty = cy - py, tz = cz - pz; l = Math.hypot(tx, ty, tz) || 1; const k6 = CH[cI] * 0.6 / l; x += tx * k6; y += ty * k6; z += tz * k6; }
+          VV[fi * 8 + cI] = G0.p.length / 3;
+          G0.p.push(x, y, z); G0.n.push(nx, ny, nz);
+          if (ax >= ay && ax >= az) G0.u.push(z * uvS + uo, y * uvS + vo); else if (ay >= az) G0.u.push(x * uvS + uo, z * uvS + vo); else G0.u.push(x * uvS + uo, y * uvS + vo);
+          const lw = low(y, o); G0.c.push(fr * lw, fg * lw, fb * lw);
+        }
+        const v0 = VV[fi * 8 + FO[fi * 4]], v1 = VV[fi * 8 + FO[fi * 4 + 1]], v2 = VV[fi * 8 + FO[fi * 4 + 2]], v3 = VV[fi * 8 + FO[fi * 4 + 3]];
+        G0.i.push(v0, v1, v2, v0, v2, v3);
+      }
+      _G = G0; _cx = cx; _cy = cy; _cz = cz; _nt = 12;
+      if (ch > 0 || anyChip) {
+        for (const [a, b, fA, fB] of _HE) {
+          if (ch <= 0 && !CH[a] && !CH[b]) continue;   // (no arris taken off: only the edges by a broken corner have a face)
+          const Aa = VV[fA * 8 + a], Ab = VV[fA * 8 + b], Ba = VV[fB * 8 + a], Bb = VV[fB * 8 + b], rx = (QX[a] + QX[b]) / 2, ry = (QY[a] + QY[b]) / 2, rz = (QZ[a] + QZ[b]) / 2;
+          tri(Aa, Ab, Bb, rx, ry, rz); tri(Aa, Bb, Ba, rx, ry, rz);
+        }
+        for (let c = 0; c < 8; c++) { if (ch <= 0 && !CH[c]) continue; const f3 = _HC[c]; tri(VV[f3[0] * 8 + c], VV[f3[1] * 8 + c], VV[f3[2] * 8 + c], QX[c], QY[c], QZ[c]); }
+      }
+      const nt = _nt; _G = null;
+      M.tris += nt; M.n++; tally(nt);
+    };
+    // an upright block: centre (x, z), half sizes, turned by ry about the vertical, y0..y1; tl: a lean [about x, about z]
+    M.blk = (mk, x, y0, z, hx, y1, hz, ry, ch, o, tl) => {
+      const c = Math.cos(ry || 0), s = Math.sin(ry || 0), lx = tl ? tl[0] : 0, lz = tl ? tl[1] : 0, P = [];
+      for (let k = 0; k < 8; k++) { const a = k & 1 ? hx : -hx, up = k & 2 ? 1 : 0, b = k & 4 ? hz : -hz, y = up ? y1 : y0, hgt = y - y0; P.push([x + a * c + b * s + lz * hgt, y, z - a * s + b * c + lx * hgt]); }
+      M.hexa(mk, P, ch, o);
+    };
+    M.box = (mk, x0, y0, z0, x1, y1, z1, ch, o) => { const P = []; for (let k = 0; k < 8; k++) P.push([k & 1 ? x1 : x0, k & 2 ? y1 : y0, k & 4 ? z1 : z0]); M.hexa(mk, P, ch, o); };
+    // any shape (a geometry with positions and normals) put down by a matrix, coloured as the stones are
+    // (o.one: a small thing - a bar, a stake: its weather worked out once, at its foot, and only the darkening low down point by point)
+    const _nm3 = new THREE.Matrix3();
+    M.geo = (mk, geo, mat, o) => {
+      o = o || {}; const G0 = grp(mk), base = G0.p.length / 3, pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
+      const e = mat.elements, nm = _nm3.getNormalMatrix(mat).elements, t = o.tint || [1, 1, 1], uvS = 1 / (o.uv || 1);
+      const PA = pos.array, NA = nor.array, UA = uv ? uv.array : null, su = o.su || 1, sv = o.sv || 1;
+      let oc = null; if (o.one) { const c = shade(e[12], e[13], e[14], 0.7, 0, 0.7, t, o, true); oc = [c[0], c[1], c[2]]; }
+      for (let i = 0; i < pos.count; i++) {
+        const px = PA[i * 3], py = PA[i * 3 + 1], pz = PA[i * 3 + 2], ax = NA[i * 3], ay = NA[i * 3 + 1], az = NA[i * 3 + 2];
+        const x = e[0] * px + e[4] * py + e[8] * pz + e[12], y = e[1] * px + e[5] * py + e[9] * pz + e[13], z = e[2] * px + e[6] * py + e[10] * pz + e[14];
+        let nx = nm[0] * ax + nm[3] * ay + nm[6] * az, ny = nm[1] * ax + nm[4] * ay + nm[7] * az, nz = nm[2] * ax + nm[5] * ay + nm[8] * az; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+        G0.p.push(x, y, z); G0.n.push(nx, ny, nz);
+        if (UA && !o.world) G0.u.push(UA[i * 2] * su, UA[i * 2 + 1] * sv); else G0.u.push((Math.abs(nx) > Math.abs(nz) ? z : x) * uvS, (Math.abs(ny) > 0.7 ? (Math.abs(nx) > Math.abs(nz) ? x : z) : y) * uvS);
+        if (oc) { const lw = low(y, o); G0.c.push(oc[0] * lw, oc[1] * lw, oc[2] * lw); } else { const cc = shade(x, y, z, nx, ny, nz, t, o); G0.c.push(cc[0], cc[1], cc[2]); }
+      }
+      const n = geo.index ? geo.index.count : pos.count;
+      if (geo.index) { const ix = geo.index.array; if (o.flip) for (let i = 0; i < n; i += 3) G0.i.push(base + ix[i], base + ix[i + 2], base + ix[i + 1]); else for (let i = 0; i < n; i++) G0.i.push(base + ix[i]); }
+      else for (let i = 0; i < n; i++) G0.i.push(base + i);
+      M.tris += n / 3; M.n++; tally(n / 3);
+    };
+    // a flat quad strip of four corners (a patch of ground, a board), one-sided, wound to face n
+    // (o.uvq: [u0, v0, u1, v1] the picture laid on it whole, a card of leaves from the atlas; o.nrm: the normal it is lit by)
+    M.quad = (mk, a, b, c, d, o) => {
+      o = o || {}; const G0 = grp(mk), base = G0.p.length / 3, uvS = 1 / (o.uv || 2), t = o.tint || [1, 1, 1];
+      const u = sub(b, a), v = sub(d, a); let n = nz3([u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]);
+      const flip = o.n && n[0] * o.n[0] + n[1] * o.n[1] + n[2] * o.n[2] < 0; if (flip) n = [-n[0], -n[1], -n[2]];
+      const nn = o.nrm || n, Q = o.uvq;
+      [a, b, c, d].forEach((p, i) => { G0.p.push(p[0], p[1], p[2]); G0.n.push(nn[0], nn[1], nn[2]); if (Q) G0.u.push(i === 0 || i === 3 ? Q[0] : Q[2], i < 2 ? Q[1] : Q[3]); else if (Math.abs(n[1]) > 0.7) G0.u.push(p[0] * uvS, p[2] * uvS); else G0.u.push((Math.abs(n[0]) > Math.abs(n[2]) ? p[2] : p[0]) * uvS, p[1] * uvS); const cc = shade(p[0], p[1], p[2], nn[0], nn[1], nn[2], t, o); G0.c.push(cc[0], cc[1], cc[2]); });
+      if (flip) G0.i.push(base, base + 2, base + 1, base, base + 3, base + 2); else G0.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      M.tris += 2; tally(2);
+    };
+    M.build = (root) => {
+      if (M.built) return; M.built = true;
+      for (const mk in M.g) {
+        const d = M.g[mk]; if (!d.i.length) continue;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(d.p), 3)); g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(d.n), 3));
+        g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(d.u), 2)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(d.c), 3));
+        g.setIndex(new THREE.BufferAttribute(d.p.length / 3 > 65535 ? new Uint32Array(d.i) : new Uint16Array(d.i), 1));
+        g.computeBoundingSphere(); g.computeBoundingBox();
+        const vc = w.mats.vc || {}, m = new THREE.Mesh(g, M.mat[mk] || vc[mk] || w.mats[mk] || vc.block);
+        m.castShadow = mk !== 'dark' && !M.mat[mk]; m.receiveShadow = true; m.matrixAutoUpdate = false; m.updateMatrix();
+        root.add(m);
+      }
+      w.perimInfo = { tris: Math.round(M.tris), parts: M.n, by: Object.fromEntries(Object.entries(M.by).map(([k, v]) => [k, Math.round(v)])) };
+      M.g = {};
+    };
+    w._mason = M;
+    // (into the world's own list: not through a wrapper that raises what is built onto a terrain, Terrain.at - the stones stand where they are put)
+    Array.prototype.push.call(w.deferred, (root) => M.build(root));
+    return M;
+  }
+  LG.mason = mason;
+  // a box that stops you and is seen (as w.solid makes it) but is drawn here by other means (its stones, mason above)
+  function hard(w, mk, x0, y0, z0, x1, y1, z1, o) {
+    if (x1 - x0 < 0.001 || y1 - y0 < 0.001 || z1 - z0 < 0.001) return null;
+    o = o || {};
+    const c = w.addCollider(x0, y0, z0, x1, y1, z1, { surf: o.surf || (mk.startsWith('wood') ? 'wood' : mk === 'iron' ? 'metal' : mk === 'ice' ? 'ice' : 'stone'), noGrapple: o.noGrapple, tag: o.tag });
+    c.vis = true; c.mk = mk; if (w._gateFrame) c.gateFrame = true;
+    return c;
+  }
+  LG.hard = hard;
+  // the kind of enclosure a field is built with (its walls and its gates: perimeter, gateFrame)
+  const WALLKIND = { grave: 'cemetery', hamlet: 'village', dusk: 'fort', ruins: 'fort', castle: 'fort', bloodmoon: 'fort', battlefield: 'fort', crimson: 'fort', foundry: 'works', forge: 'works', flooded: 'cavern', mine: 'mine', shaft: 'rock', pillars: 'rock', sanctum: 'sky', sky: 'sky', void: 'sky', catacombs: 'crypt', frozen: 'crypt' };
+  const wallKind = (w) => WALLKIND[w.biome] || (w.mats.biome.outdoor === 'ruins' ? 'fort' : w.mats.biome.outdoor === 'sky' ? 'sky' : 'hall');
+  LG.wallKind = wallKind;
+
+  // ---------------- the gates
+  // The frame keeps the boxes it always stood on (two piers 2.6..4.2 m either side, a lintel 7.2..8.6, a cornice to 8.9 with the fire
+  // tray on it, two corbels in the opening's top corners 6.0..7.2: they stop you as they did), and is drawn as the gate of its field:
+  //   arch   - a round arch of wedge stones over chamfered jambs, its keystone standing out, imposts at the springing, a hood moulding
+  //            round it, a moulded cornice; 'fort' adds a row of corbels under the cornice; the jambs keep the portcullis's slots
+  //   rustic - a village gate: rough-dressed piers of uneven stones and a low segmental arch, a timber beam set in at its springing
+  //   portal - a mausoleum's door: a square opening between panelled piers, consoles under an architrave, a frieze with its plaque,
+  //            a cornice (the cemetery's gate, the crypts')
+  //   mine   - a pit's mouth: the rustic piers with a frame of squared timber set in the opening
+  // (noBack: no wall behind it - the sky's open south edge: no slots for a portcullis drawn in the air)
+  function gateFrame(w, x, z, side, y0, noBack) {
+    w._gateFrame = true; try { gateFrame0(w, x, z, side, y0 || 0, noBack); } finally { w._gateFrame = false; }
   }
   // (the frame's own parts carry w._gateFrame: a sign hung over the gate is placed clear of what is over the frame, not of the frame, areas.js AR.signPlace)
-  function gateFrame0(w, x, z, side) {
+  function gateFrame0(w, x, z, side, y0, noBack) {
     const s = side === 'S' ? -1 : 1; // inward direction
     const zz = z, d = 1.3;
     const za = side === 'S' ? zz - d : zz, zb = side === 'S' ? zz : zz + d;
-    w.solid('trim', x - 4.2, 0, za, x - 2.6, 7.2, zb, { uv: 2 });
-    w.solid('trim', x + 2.6, 0, za, x + 4.2, 7.2, zb, { uv: 2 });
-    w.solid('block', x - 4.4, 7.2, za - 0.1 * s, x + 4.4, 8.6, zb + 0.1 * s, { uv: 2 });
-    w.solid('trim', x - 4.6, 8.6, za - 0.15, x + 4.6, 8.9, zb + 0.15, { uv: 1 });
-    w.visual('trim', x - 0.5, 6.4, side === 'S' ? za - 0.1 : zb, x + 0.5, 7.6, side === 'S' ? za : zb + 0.1, { uv: 1 });
+    hard(w, 'trim', x - 4.2, y0, za, x - 2.6, y0 + 7.2, zb);
+    hard(w, 'trim', x + 2.6, y0, za, x + 4.2, y0 + 7.2, zb);
+    hard(w, 'block', x - 4.4, y0 + 7.2, za - 0.1 * s, x + 4.4, y0 + 8.6, zb + 0.1 * s);
+    hard(w, 'trim', x - 4.6, y0 + 8.6, za - 0.15, x + 4.6, y0 + 8.9, zb + 0.15);
     // corbel steps inside the opening
-    w.solid('block', x - 2.6, 6.0, za, x - 1.9, 7.2, zb, { uv: 2 }); w.solid('block', x + 1.9, 6.0, za, x + 2.6, 7.2, zb, { uv: 2 });
-    G.Props.torch(w, x - 3.4, 4.2 + (w._gfY || 0), side === 'S' ? za : zb, side === 'S' ? 'nz' : 'pz');
-    G.Props.torch(w, x + 3.4, 4.2 + (w._gfY || 0), side === 'S' ? za : zb, side === 'S' ? 'nz' : 'pz');
+    hard(w, 'block', x - 2.6, y0 + 6.0, za, x - 1.9, y0 + 7.2, zb); hard(w, 'block', x + 1.9, y0 + 6.0, za, x + 2.6, y0 + 7.2, zb);
+    G.Props.torch(w, x - 3.4, 4.2 + y0, side === 'S' ? za : zb, side === 'S' ? 'nz' : 'pz');
+    G.Props.torch(w, x + 3.4, 4.2 + y0, side === 'S' ? za : zb, side === 'S' ? 'nz' : 'pz');
+    const k = wallKind(w), style = k === 'cemetery' || k === 'crypt' ? 'portal' : k === 'village' ? 'rustic' : k === 'mine' ? 'mine' : 'arch';
+    // (the frame's own coordinates: u across the opening from its middle, y up from its foot, d out from the wall's face)
+    const T = (u, y, dd) => [x + u, y0 + y, z + s * dd];
+    const tg = LG._tag; LG._tag = 'gate'; try { gateDraw(w, mason(w), T, style, k, y0, noBack); } finally { LG._tag = tg; }
+  }
+  // the gate's stones, in its own frame T(u, y, d)
+  function gateDraw(w, M, T, style, kind, y0, noBack) {
+    const ST = kind === 'works' ? 'wall' : 'trim', lo = M.lo, opt = (o) => Object.assign(kind === 'works' ? { gy: y0, top: y0 + 8.9, uv: 2.5, uvFix: true } : { gy: y0, top: y0 + 8.9, uv: 1.4 }, o);
+    const rough = style === 'rustic' || style === 'mine', ch = rough ? 0.03 : 0.03, nA = rough ? 0.005 : 0.006, chip = rough ? 0.3 : 0.12;
+    const tintOf = (u, y, dd, k) => { const v = M.var(u + T(0, 0, 0)[0], y, dd + T(0, 0, 0)[2], k); const r = rough ? 0.84 : 1; return [v[0] * r, v[1] * r, v[2] * r]; };
+    // a stone of the frame: corners in (u, y, d) for both sides at once (sg: +1 the right, -1 the left, mirrored)
+    const st = (Pl, sg, o) => { const P = Pl.map((q) => T(q[0] * sg, q[1], q[2])); M.hexa(o && o.mk || ST, P, o && o.ch !== undefined ? o.ch : ch, opt(Object.assign({ n: nA, chip: rough ? 0.14 : chip, chipS: rough ? 0.04 : 0.05, tint: tintOf(Pl[0][0] * sg, Pl[0][1], Pl[0][2], 3) }, o))); };
+    const bx = (u0, y0_, d0, u1, y1, d1) => [[u0, y0_, d0], [u1, y0_, d0], [u0, y1, d0], [u1, y1, d0], [u0, y0_, d1], [u1, y0_, d1], [u0, y1, d1], [u1, y1, d1]];
+    const IN = 2.6, OUT = 4.4, DP = 1.3, TOPC = 8.6;
+    const hsh = (a, b) => _hn(T(0, 0, 0)[0] * 0.37 + a, T(0, 0, 0)[2] * 0.41 + b, 31);
+    // ---- the piers: a plinth, then courses up to the springing (rustic: of uneven height and length; the jamb's arris chamfered)
+    const SPR = style === 'portal' ? 6.0 : style === 'arch' ? 4.8 : 5.3;
+    for (const sg of [-1, 1]) {
+      st(bx(IN - 0.06, 0, -0.02, OUT + 0.1, 0.5, DP + 0.12), sg, { ch: 0.04, foot: true });
+      st([[IN - 0.02, 0.5, 0], [OUT + 0.06, 0.5, 0], [IN, 0.68, 0], [OUT, 0.68, 0], [IN - 0.02, 0.5, DP + 0.08], [OUT + 0.06, 0.5, DP + 0.08], [IN, 0.68, DP], [OUT, 0.68, DP]], sg, { ch: 0.02 }); // (its weathering, sloped back to the pier)
+      let y = 0.68, i = 0;
+      while (y < SPR - 0.05) {
+        const hgt = Math.min(SPR - y, rough ? 0.36 + 0.3 * hsh(i * 1.3 + sg, 1) : 0.55), y1 = y + hgt;
+        // (two stones a course, the joint between them swapping side course by course; in the rustic piers anywhere)
+        const cut = rough ? IN + 0.5 + 0.8 * hsh(i, 2 + sg) : (i % 2 ? IN + 0.62 : IN + 1.05);
+        // (rough stones stand out from the face or back into it a little, each its own)
+        const f1 = rough ? (hsh(i, 3 + sg) - 0.5) * 0.04 : 0, f2 = rough ? (hsh(i, 5 + sg) - 0.5) * 0.04 : 0;
+        st(bx(IN, y, 0, cut, y1, DP + f1), sg); st(bx(cut, y, 0, OUT, y1, DP + f2), sg);
+        y = y1; i++;
+      }
+    }
+    if (style === 'portal') { portalDraw(w, M, T, st, bx, ST, opt, tintOf); return; }
+    // ---- the imposts: a moulded course at the springing, standing out a little on the front and into the opening
+    for (const sg of [-1, 1]) {
+      st([[IN - 0.04, SPR, -0.01], [OUT + 0.06, SPR, -0.01], [IN - 0.1, SPR + 0.26, -0.01], [OUT + 0.1, SPR + 0.26, -0.01], [IN - 0.04, SPR, DP + 0.04], [OUT + 0.06, SPR, DP + 0.04], [IN - 0.1, SPR + 0.26, DP + 0.1], [OUT + 0.1, SPR + 0.26, DP + 0.1]], sg, { ch: 0.02 });
+    }
+    // ---- the arch: wedge stones over the opening, the keystone standing out; rustic: a flatter (segmental) arch of rougher stones
+    const S0 = SPR + 0.26;
+    let yc, R, a0;
+    if (style === 'arch') { R = IN; yc = S0; a0 = 0; }
+    else { const rise = 1.45; R = (IN * IN + rise * rise) / (2 * rise); yc = S0 + rise - R; a0 = Math.asin((S0 - yc) / R); }
+    const TH = rough ? 0.62 : 0.72, n = style === 'arch' ? 15 : 11, a1 = Math.PI - a0;
+    const crown = yc + R + TH;
+    for (let j = 0; j < n; j++) {
+      const b0 = a0 + (a1 - a0) * j / n, b1 = a0 + (a1 - a0) * (j + 1) / n, key = j === (n - 1) / 2;
+      const r1 = R + TH + (key ? 0.2 : rough ? (hsh(j, 5) - 0.5) * 0.18 : 0), dO = DP + (key ? 0.08 : 0.03), r0 = R - (key ? 0.04 : 0);
+      const P = [];
+      for (let kk = 0; kk < 8; kk++) { const b = kk & 1 ? b1 : b0, r = kk & 2 ? r1 : r0, dd = kk & 4 ? dO : -0.02; P.push(T(Math.cos(b) * r, yc + Math.sin(b) * r, dd)); }
+      M.hexa(ST, P, ch, opt({ n: nA, chip, chipS: 0.05, tint: tintOf(j, 7, 0, 4) }));
+    }
+    // ---- a hood moulding round the arch (the dressed gates)
+    if (style === 'arch' && !lo) {
+      // (from 22 degrees over the springing round to the other side: the torches hang under its ends)
+      const RH = R + TH + 0.02, m = 10, h0 = 0.38, hs1 = Math.PI - 2 * h0;
+      for (let j = 0; j < m; j++) {
+        const b0 = h0 + hs1 * j / m - 0.004, b1 = h0 + hs1 * (j + 1) / m + 0.004, P = [];
+        for (let kk = 0; kk < 8; kk++) { const b = kk & 1 ? b1 : b0, r = kk & 2 ? RH + 0.14 : RH, dd = kk & 4 ? DP + 0.07 : 0; P.push(T(Math.cos(b) * r, yc + Math.sin(b) * r, dd)); }
+        M.hexa(ST, P, 0.02, opt({ n: 0.003, tint: tintOf(j, 9, 1, 6) }));
+      }
+      // (its two ends turned down onto little carved stops)
+      for (const sg of [-1, 1]) { const ux = Math.cos(h0) * RH, uy = yc + Math.sin(h0) * RH; st(bx(ux - 0.02, uy - 0.24, DP - 0.05, ux + 0.17, uy + 0.04, DP + 0.09), sg, { ch: 0.025 }); }
+    }
+    // ---- the masonry over the haunches up to the cornice: courses, their inner ends against the arch's back
+    // (below where the arch's first stone has its back, the skewback: the line it is cut along, out from the jamb)
+    const ySk = yc + (R + TH) * Math.sin(a0), cot = a0 > 0.01 ? Math.cos(a0) / Math.sin(a0) : 0;
+    const ext = (y) => { if (a0 > 0.01 && y < ySk) return IN + (y - S0) * cot + 0.05; const dy = y - yc, Re = R + TH + (style === 'arch' && !lo ? 0.2 : 0.02); return dy >= Re ? 0 : Math.sqrt(Math.max(0, Re * Re - dy * dy)); };
+    let yy = S0, ci = 0;
+    while (yy < TOPC - 0.04) {
+      const h = Math.min(TOPC - yy, rough ? 0.34 + 0.3 * hsh(ci, 7) : 0.5), y1 = yy + h, uA = ext(yy) - 0.05, uB = ext(y1) - 0.05;
+      if (uA <= 0.05 && uB <= 0.05) {
+        // (a course over the crown, across the whole front: three or four stones, their joints off those of the course below)
+        const cuts = [-OUT, -1.3 - hsh(ci, 8) * 0.8, 0.6 + hsh(ci, 9) * 0.9, OUT];
+        for (let q = 0; q + 1 < cuts.length; q++) st(bx(cuts[q], yy, 0, cuts[q + 1], y1, DP), 1);
+      } else for (const sg of [-1, 1]) {
+        const ua = Math.max(0.02, uA), ub = Math.max(0.02, uB), mid = Math.max(ua, ub) + 0.5 + 0.6 * hsh(ci, 10 + sg);
+        if (mid < OUT - 0.4) {
+          st([[ua, yy, 0], [mid, yy, 0], [ub, y1, 0], [mid, y1, 0], [ua, yy, DP], [mid, yy, DP], [ub, y1, DP], [mid, y1, DP]], sg);
+          st(bx(mid, yy, 0, OUT, y1, DP), sg);
+        } else st([[ua, yy, 0], [OUT, yy, 0], [ub, y1, 0], [OUT, y1, 0], [ua, yy, DP], [OUT, yy, DP], [ub, y1, DP], [OUT, y1, DP]], sg);
+      }
+      yy = y1; ci++;
+    }
+    // ---- the cornice (or, rustic, rough cap stones), on the fort's gate a row of corbels under it
+    if (kind === 'fort' && !lo) for (let u = -OUT + 0.35; u < OUT - 0.2; u += 0.62) {
+      if (Math.abs(u) < 0.5) continue;
+      M.hexa(ST, [T(u - 0.14, 8.12, DP), T(u + 0.14, 8.12, DP), T(u - 0.14, 8.6, DP), T(u + 0.14, 8.6, DP), T(u - 0.14, 8.12, DP + 0.08), T(u + 0.14, 8.12, DP + 0.08), T(u - 0.14, 8.6, DP + 0.3), T(u + 0.14, 8.6, DP + 0.3)], 0, opt({ tint: tintOf(u, 8, 2, 7) }));
+    }
+    const cc = rough ? [-4.6, -2.2 - hsh(1, 11), 0.1 + hsh(2, 11), 2.4 + hsh(3, 11) * 0.6, 4.6] : [-4.6, -2.7, -0.9, 0.9, 2.7, 4.6];
+    const fb = kind === 'fort' && !lo ? 0.32 : 0.05;   // (the fort's cornice stands out over its corbels)
+    for (let q = 0; q + 1 < cc.length; q++) {
+      const ua = cc[q], ub = cc[q + 1], f = rough ? 0.1 : 0.17;
+      M.hexa(ST, [T(ua, TOPC, -0.15), T(ub, TOPC, -0.15), T(ua - (q === 0 ? f : 0), 8.9, -0.15), T(ub + (q === cc.length - 2 ? f : 0), 8.9, -0.15), T(ua, TOPC, DP + fb), T(ub, TOPC, DP + fb), T(ua - (q === 0 ? f : 0), 8.9, DP + fb + f + 0.06), T(ub + (q === cc.length - 2 ? f : 0), 8.9, DP + fb + f + 0.06)], rough ? 0.04 : 0.025, opt({ n: nA, chip: rough ? 0.4 : 0.15, tint: tintOf(q, 10, 2, 8) }));
+    }
+    // ---- the portcullis's slots in the passage's sides (where it comes down, behind the frame)
+    if (!noBack) for (const sg of [-1, 1]) { const a = T(sg * 2.47, 0, -0.27), b = T(sg * 2.505, 6.0, -0.04); M.box('dark', a[0], a[1], a[2], b[0], b[1], b[2], 0, {}); }
+    if (style === 'mine') {
+      // (the beam set in at the springing: a squared oak timber, its ends on the piers)
+      M.blk('woodDark', T(0, 0, DP * 0.5)[0], y0 + S0 - 0.02, T(0, 0, DP * 0.5)[2], OUT - 0.25, y0 + S0 + 0.36, 0.19, 0, lo ? 0 : 0.03, { n: 0.01, tint: [0.92, 0.88, 0.82], gy: y0 });
+    }
+    if (style === 'mine') {
+      // (a timber set in the mouth: two legs, a cap over them, boards laid over the cap to the arch)
+      for (const sg of [-1, 1]) { const p = T(sg * 2.47, 0, DP - 0.2); M.blk('woodDark', p[0], y0, p[2], 0.14, y0 + 5.0, 0.15, 0, lo ? 0 : 0.03, { n: 0.012, gy: y0 }, [0, -sg * 0.02]); }
+      const pc = T(0, 0, DP - 0.2); M.blk('woodDark', pc[0], y0 + 5.0, pc[2], 2.62, y0 + 5.36, 0.2, 0, lo ? 0 : 0.03, { n: 0.012, gy: y0 });
+    }
+  }
+  // the mausoleum's door: panelled piers, consoles in the opening's top corners, an architrave of three faces, a frieze with its plaque, a cornice
+  function portalDraw(w, M, T, st, bx, ST, opt, tintOf) {
+    const IN = 2.6, OUT = 4.4, DP = 1.3;
+    // a capital band round each pier under the architrave, and a panel sunk in its face (its raised border)
+    for (const sg of [-1, 1]) {
+      st(bx(IN - 0.06, 6.0, -0.01, OUT + 0.08, 6.32, DP + 0.08), sg, { ch: 0.02 });
+      st(bx(IN, 6.32, 0, OUT, 7.2, DP), sg);
+      if (!M.lo) for (const [u0, y0_, u1, y1] of [[IN + 0.3, 1.2, IN + 0.38, 5.6], [OUT - 0.38, 1.2, OUT - 0.3, 5.6], [IN + 0.3, 1.12, OUT - 0.3, 1.2], [IN + 0.3, 5.6, OUT - 0.3, 5.68]]) st(bx(u0, y0_, DP - 0.02, u1, y1, DP + 0.018), sg, { ch: 0.008, n: 0.002, chip: 0, tint: [0.7, 0.68, 0.65] });
+      // (the console: narrow at its foot, swelling out to carry the architrave)
+      st([[IN, 6.0, 0], [IN - 0.16, 6.0, 0], [IN, 7.2, 0], [IN - 0.7, 7.2, 0], [IN, 6.0, DP + 0.02], [IN - 0.16, 6.0, DP + 0.02], [IN, 7.2, DP + 0.06], [IN - 0.7, 7.2, DP + 0.06]], sg, { ch: 0.025 });
+    }
+    // the architrave: three faces, each standing out a little more than the one below
+    const run = (y0_, y1, f0, f1, cuts, k) => { for (let q = 0; q + 1 < cuts.length; q++) { const ua = cuts[q], ub = cuts[q + 1]; M.hexa(ST, [T(ua, y0_, -0.1), T(ub, y0_, -0.1), T(ua, y1, -0.1), T(ub, y1, -0.1), T(ua, y0_, DP + f0), T(ub, y0_, DP + f0), T(ua, y1, DP + f1), T(ub, y1, DP + f1)], 0.015, opt({ n: 0.003, tint: tintOf(q, k, 3, 9) })); } };
+    run(7.2, 7.38, 0.04, 0.04, [-OUT - 0.04, -1.4, 1.6, OUT + 0.04], 1); run(7.38, 7.56, 0.07, 0.07, [-OUT - 0.04, -0.2, OUT + 0.04], 2); run(7.56, 7.74, 0.1, 0.1, [-OUT - 0.04, 1.1, OUT + 0.04], 3);
+    // the frieze and its plaque
+    run(7.74, 8.36, 0.0, 0.0, [-OUT, -2.1, 2.3, OUT], 4);
+    M.hexa(ST, [T(-1.5, 7.86, DP - 0.02), T(1.5, 7.86, DP - 0.02), T(-1.5, 8.24, DP - 0.02), T(1.5, 8.24, DP - 0.02), T(-1.5, 7.86, DP + 0.05), T(1.5, 7.86, DP + 0.05), T(-1.5, 8.24, DP + 0.05), T(1.5, 8.24, DP + 0.05)], 0.02, opt({ n: 0.002, tint: [0.78, 0.76, 0.72] }));
+    // the cornice: a bed moulding, then the corona standing well out
+    run(8.36, 8.56, 0.04, 0.16, [-OUT - 0.1, -1.7, 1.2, OUT + 0.1], 5);
+    run(8.56, 8.9, 0.3, 0.32, [-4.6, -2.2, 0.4, 2.8, 4.6], 6);
   }
   function portcullis(w, wd, h) {
     const g = new THREE.Group();

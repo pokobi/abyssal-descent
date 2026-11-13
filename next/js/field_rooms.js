@@ -55,7 +55,7 @@
     { let ax = -2; for (const g of [...LG.gateXs(W, o.gates || 1), W + 7]) { if (g - 5.5 > ax) w.solid('rock', ax, -20, -3, g - 5.5, 12, 0, { uv: 6, grad: false }); ax = g + 5.5; } }
     for (const [a, b] of [[-2, W / 2 - 7.5], [W / 2 + 7.5, W + 2]]) w.solid('rock', a, -20, D, b, 10, D + 3, { uv: 6, grad: false });
     for (const x of [0, W - 0.4]) for (let z = 1; z < D - 1; z += 2) if (rng.chance(0.75)) w.solid('block', x, 0, z, x + 0.4, 0.8, z + 1.6, { uv: 1.5 });
-    for (let k = 0; k < 16; k++) { const sx = k % 2 ? -1 : 1, x = sx < 0 ? -rng.range(2, 9) : W + rng.range(2, 9), z = rng.range(0, D), h = rng.range(-6, 4); w.visual('block', x - 1.6, -40, z - 1.6, x + 1.6, h, z + 1.6, { uv: 3 }); }
+    for (let k = 0; k < 16; k++) { const sx = k % 2 ? -1 : 1, x = sx < 0 ? -Math.max(4, rng.range(2, 9)) : W + Math.max(4, rng.range(2, 9)), z = rng.range(0, D), h = rng.range(-6, 4); w.visual('block', x - 1.6, -40, z - 1.6, x + 1.6, h, z + 1.6, { uv: 3 }); }   // (the pillars in the dark stand 2.4 m and more clear of the platform's edge: nothing to jump for that is not there)
     w.killY = -9; w.noRim = true;
     for (let z = 6; z < D; z += 12) for (const x of [-4, W + 4]) w.addLight(x, -6, z, { flame: 0, intensity: 12, range: 16, color: '#7a4ad8', emit: false, prio: 0.5 });
   };

@@ -319,8 +319,53 @@
     skyline(w, rng, W, D);
     return { nz, side: -1, nx: cx - hw - 2.4 };
   }
+  // the parapets along the bridge's deck (par[x]: the z of each 1.8 m stretch that stands, 0.45 thick, 1 m high, the boxes the field laid):
+  // the narrow slots between neighbours filled (one wall, as it was built), a coping of long stones along the top, weathered to a low
+  // ridge and standing out over both faces; where a stretch has fallen the coping ends broken and its stones lie on the deck below it
+  function parapetDress(w, par, ZN, ZS) {
+    const M = LG.mason(w), lo = M.lo, hs = (a, b, k) => { const n = Math.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453; return n - Math.floor(n); };
+    for (const k in par) {
+      const ex = +k, zs = par[k].slice().sort((a, b) => a - b);
+      // (the runs of stretches standing side by side)
+      const runs = []; for (const z of zs) { const r = runs[runs.length - 1]; if (r && z - r[1] < 2.01) r[1] = z; else runs.push([z, z]); }
+      for (const [r0, r1] of runs) {
+        const z0 = r0, z1 = r1 + 1.8;
+        for (let z = r0; z < r1; z += 2) w.visual('wall', ex, 0, z + 1.8, ex + 0.45, 1.0, z + 2, { uv: 1.5 });
+        // the coping: a broken end where the run stops short of the bridge's end
+        const brA = z0 > ZN + 0.5, brB = z1 < ZS - 0.5;
+        let z = z0;
+        while (z < z1 - 0.05) {
+          const e = Math.min(z1, z + 1.1 + 0.6 * hs(ex, z, 1)), first = z === z0, last = e >= z1 - 0.01, v = M.var(ex, 1, z), t = 0.88;
+          const ra = first && brA ? 0.25 + 0.3 * hs(ex, z, 2) : 0, rb = last && brB ? 0.25 + 0.3 * hs(ex, z, 3) : 0;
+          const P = [[ex - 0.07, 0.98, z + ra * 0.3], [ex - 0.07, 0.98, e - rb * 0.3], [ex + 0.08, 1.16, z + ra], [ex + 0.08, 1.16, e - rb], [ex + 0.52, 0.98, z + ra * 0.3], [ex + 0.52, 0.98, e - rb * 0.3], [ex + 0.37, 1.16, z + ra], [ex + 0.37, 1.16, e - rb]];
+          // (bit 0 along z, bit 1 up, bit 2 across x: the hexahedron's corners in that order)
+          M.hexa('trim', P, 0.02, { gy: 0, top: 1.2, tint: [v[0] * t, v[1] * t, v[2] * t], n: 0.008, chip: first || last ? 0.5 : 0.18, chipS: 0.07, uv: 1.4 });
+          z = e;
+        }
+        // (the coping of the fallen stretch beyond a broken end: a stone or two lying on the deck by the foot of the parapet)
+        if (!lo) for (const [zz, sg] of [[z0, -1], [z1, 1]]) {
+          if ((sg < 0 && !brA) || (sg > 0 && !brB) || hs(ex, zz, 4) < 0.3) continue;
+          const side = ex < w.W / 2 ? 1 : -1, cx = ex + 0.225 + side * (0.55 + 0.4 * hs(ex, zz, 5)), cz = zz + sg * (0.5 + 0.6 * hs(ex, zz, 6)), v = M.var(cx, 0, cz);
+          M.blk('trim', cx, -0.02, cz, 0.2, 0.17, 0.5, (hs(ex, zz, 7) - 0.5) * 1.4, 0.02, { gy: 0, top: 0.2, tint: [v[0] * 0.8, v[1] * 0.8, v[2] * 0.8], n: 0.01, chip: 0.6, chipS: 0.06, uv: 1.4, foot: true }, [(hs(ex, zz, 8) - 0.5) * 0.3, (hs(ex, zz, 9) - 0.5) * 0.3]);
+        }
+      }
+    }
+  }
+  // the face of a cliff the field lays as a box of rock (a0..a1 along x at z = zf, its face looking along nz, h high over the deck): lumps
+  // of broken rock sunk into it here and there, and along its top, so that its edges are not a box's (drawn only, by the place)
+  function cliffFace(w, a0, a1, zf, nz, h) {
+    const T = G.Terrain; if (!T || !T.boulder) return;
+    const R = new G.RNG((Math.round(a0 * 13 + a1 * 7 + zf * 3) >>> 0) + 991);   // (dice of its own: the area's are not touched)
+    for (let a = a0 + 0.8; a < a1 - 0.6; a += R.range(2.2, 3.6)) {
+      // (sunk into the face: a lump reaches 0.95 of its size either way, so its middle stands that far back, less the 0.3 m it may stand out)
+      const s = R.range(1.2, 2.2), y = R.range(-0.6, h * 0.55), sz = s * R.range(0.8, 1.1);
+      T.boulder(w, a, y, zf - nz * (sz * 0.95 - 0.3), s * R.range(0.9, 1.3), s * R.range(0.8, 1.2), sz, R, { collide: false });
+      const s2 = R.range(1.4, 2.4);
+      T.boulder(w, a + R.range(-0.8, 0.8), h - s2 * 0.75, zf - nz * R.range(0.4, 1.4), s2 * R.range(1, 1.4), s2 * R.range(0.7, 1.0), s2 * R.range(1, 1.4), R, { collide: false });
+    }
+  }
   // (the fallen city's area itself: field_dusk.js, the city on the great bridge; it builds with these pieces)
-  F._dusk = { ruinBlock, fallenColumn, arch, skyline };
+  F._dusk = { ruinBlock, fallenColumn, arch, skyline, parapetDress, cliffFace };
   F.SHELL.dusk = {
     outdoor: true, wallH: 4.5, road: roadDusk,
     ring(w, rng, W, AD, last) {

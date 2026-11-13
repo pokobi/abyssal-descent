@@ -62,14 +62,17 @@
         wall(x0, z0, x1, z1);
       };
       // a wall's top, and the moss at the waterline round it (on the wall only: inside it is open water, not a floor of moss)
-      const wall = (x0, z0, x1, z1) => { w.solid('wall', x0, BED, z0, x1, TOP, z1, { uv: 2.5 }); w.visual('moss', x0 - 0.05, -0.2, z0 - 0.05, x1 + 0.05, 0.25, z1 + 0.05, { uv: 2, grad: false, skip: { top: true, bottom: true } }); };
+      // (its top's two long edges laid with kerb stones, worn round, flush with the walk: LG.coping; nothing stops you there but the wall)
+      const wall = (x0, z0, x1, z1) => { w.solid('wall', x0, BED, z0, x1, TOP, z1, { uv: 2.5 }); w.visual('moss', x0 - 0.05, -0.2, z0 - 0.05, x1 + 0.05, 0.25, z1 + 0.05, { uv: 2, grad: false, skip: { top: true, bottom: true } });
+        const ax = x1 - x0 >= z1 - z0; if ((ax ? x1 - x0 : z1 - z0) < 1) return;
+        for (const e of ax ? [z0, z1] : [x0, x1]) { const sg = e === (ax ? z0 : x0) ? 1 : -1; const tg = LG._tag; LG._tag = 'kerbs'; try { LG.coping(w, ax ? (a, y, d) => [a, y, e + sg * d] : (a, y, d) => [e + sg * d, y, a], ax ? x0 : z0, ax ? x1 : z1, TOP - 0.28, TOP + 0.008, -0.04, 0.36, { len: [2.4, 3.4], plain: true }); } finally { LG._tag = tg; } } };
       seg(b.x0, b.z0, b.x1, b.z0 + WT, 'N'); seg(b.x0, b.z1 - WT, b.x1, b.z1, 'S');
       seg(b.x0, b.z0 + WT, b.x0 + WT, b.z1 - WT, 'W'); seg(b.x1 - WT, b.z0 + WT, b.x1, b.z1 - WT, 'E');
       // the steps down into the flooded inside (and up out of it)
       H.stairs(w, 'N', b.z1 - WT, b.x0 + WT + 1.2, 1.6, BED, TOP, 'trim');
       // a drowned room's leavings: a statue up to its chest, a pillar to the vault
       if (rng.chance(0.4)) P().statue(w, (b.x0 + b.x1) / 2 + 1, (b.z0 + b.z1) / 2, BED, rng.range(0, 6), rng, 1.2);
-      else if (rng.chance(0.5)) P().pillarSquare(w, (b.x0 + b.x1) / 2 + 1.5, (b.z0 + b.z1) / 2, BED, HT - BED, 1.1);
+      else if (rng.chance(0.5)) LG.pillar(w, (b.x0 + b.x1) / 2 + 1.5, (b.z0 + b.z1) / 2, BED, HT - BED, 1.1);
     }
     // ---- the crossings: a tree over the blocks (every block reached dry), more where the layout wants them; the landings joined
     const links = new Set(), lk = (a, b) => (a < b ? a + ':' + b : b + ':' + a);
@@ -112,7 +115,7 @@
     for (const b of blk) if (!b.roof && rng.chance(0.4)) P().brazier(w, b.x0 + WT / 2, TOP, b.z0 + WT / 2, 0.8, true);
     for (const b of blk) if (b.roof && rng.chance(0.6)) P().brazier(w, (b.x0 + b.x1) / 2, b.y, (b.z0 + b.z1) / 2, 0.9, true);
     for (let i = 0; i < 8; i++) { const x = rng.range(4, W - 4), z = rng.range(wz0 + 2, wz1 - 2); if (blk.some((b) => x > b.x0 - 1 && x < b.x1 + 1 && z > b.z0 - 1 && z < b.z1 + 1)) continue; if (rng.chance(0.5)) P().barrel(w, x, z, -0.35, rng); else P().crate(w, x, z, -0.3, rng); }
-    for (let x = 10; x < W - 6; x += 12) { P().pillarSquare(w, x, 6, 0, HT, 1.1); P().torch(w, x, 3.4, 6.7, 'pz'); }
+    for (let x = 10; x < W - 6; x += 12) { LG.pillar(w, x, 6, 0, HT, 1.1); P().torch(w, x, 3.4, 6.7, 'pz'); }
     for (let z = 10; z < D - 6; z += 9) { if (rng.chance(0.5)) P().vines(w, 0, rng.range(8, 13), z, 'px', rng.range(3, 6), rng); if (rng.chance(0.5)) P().vines(w, W, rng.range(8, 13), z + 4, 'nx', rng.range(3, 6), rng); }
     w.animated.push({ kind: 'uvflow', mat: w.mats.water, sp: [0, -0.05] });
     // the ground of the town for what is laid afterwards: the walls' and roofs' tops (nothing goes into the water)

@@ -2,8 +2,10 @@
 // 溶鉱の深層 (foundry, the middle tier), on a framework of its own: a works over a lake of molten iron, and its machines still run.
 // There is no floor: iron-plated work bays stand up out of the glowing melt at two heights, joined by catwalks (always a way across),
 // and between them the machines move: carriages that shuttle across a gap and back, lifts that rise from a low bay to a high one,
-// belts that carry whoever stands on them. Fall in and the heat throws you back to where you stood (15% of your HP). The hanging
-// crucibles (gimmick_b.js) still pour over the low bays. Way in at the south, the gates on the landing at the north.
+// belts that carry whoever stands on them. The melt is lava as the halls' trench is (fields.js, player.js): fall in and you stand in it
+// up to your ankles, burning, until you climb out by one of the iron ladders on the bays' sides and the landings' faces. A foe that
+// goes in is lost (its body laid out on the ground by the edge). The hanging crucibles (gimmick_b.js) still pour over the low bays.
+// Way in at the south, the gates on the landing at the north.
 (function () {
   const LG = G.LevelGen, H = LG._, F = G.FieldGen, FB = F._, U = G.U, V = U.V;
   const P = () => G.Props, PG = () => G.Props.PG;
@@ -25,7 +27,23 @@
     // ---- the landings, the melt below everything else
     w.solid('floor', 0, -1, 0, W, 0, pz0, { uv: 4 }); w.solid('rock', 0, -14, 0, W, -1, pz0, { uv: 6, grad: false });
     w.solid('floor', 0, -1, pz1, W, 0, D, { uv: 4 }); w.solid('rock', 0, -14, pz1, W, -1, D, { uv: 6, grad: false });
-    w.visual('lava', 0, MELT - 0.1, pz0, W, MELT, pz1, { uv: 4, grad: false, skip: { bottom: true } });
+    // (the melt: a bed of it you stand in, a field of lava on it - its burning, its bubbles and its sound are the halls' trench's, fields.js -
+    // drawn as it was, its top at MELT. Nothing stops you there but its bed: no dice are thrown for any of it)
+    const MY = MELT - 0.03;
+    { const c = w.addCollider(0, w.killY, pz0, W, MY, pz1, { surf: 'stone', noGrapple: true }); c.melt = true; }
+    if (G.Fields) G.Fields.add(w, 'lava', 0, pz0, W, pz1, { y: MY, noLight: true }); else w.visual('lava', 0, MY, pz0, W, MELT, pz1, { uv: 4, grad: false, skip: { bottom: true } });
+    w.melt = { y: MY, z0: pz0, z1: pz1 };
+    const inMelt = (x, z) => z > pz0 && z < pz1 && x > 0 && x < W;
+    // for the foes it is still a drop they will not walk off into (single-storey edges: world.js edgeSafe), and where one that goes in is
+    // laid out when it burns (nearestGround, settleBody): over the melt, what is under you is "the void" to them
+    w.voidBelow = function (x, y, z) { const f = this.floorBelow(x, y + 0.5, z); return f < this.killY || (inMelt(x, z) && f < MY + 0.5); };
+    w.edgeSafe = function (p, nx, nz, airborne) {
+      if (!inMelt(nx, nz) || this.floorBelow(nx, p.y + 0.5, nz) >= MY + 0.5) return true;
+      return !!airborne && this.floorBelow(p.x, p.y + 0.5, p.z) < MY + 0.5;
+    };
+    // (the nav keeps two storeys a cell - a catwalk over the melt, the melt under it - and the melt's is no way across for it: navHazard)
+    w.navLayers = 2; w.navHazard = (x, y, z) => inMelt(x, z) && y < MY + 0.5;
+    w.unsafeGround = (x, z) => inMelt(x, z) && G.player && G.player.pos.y < MY + 0.5;   // (the melt is never the place you are put back on)
     for (let x = 6; x < W; x += 13) for (let z = pz0 + 5; z < pz1; z += 13) w.addLight(x, MELT + 1.5, z, { flame: 0, intensity: 14, range: 15, color: '#ff6a20', emit: false, prio: 0.7 });
     w.solid('trim', 0, -0.4, pz0 - 0.4, W, 0.2, pz0, { uv: 1 }); w.solid('trim', 0, -0.4, pz1, W, 0.2, pz1 + 0.4, { uv: 1 });
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT + 2, beams: 0 });
@@ -109,12 +127,49 @@
       if (rng.chance(0.6)) P().brazier(w, b.x0 + 1.2, b.y, b.z1 - 1.2, 0.8, true);
     }
     for (let i = 0; i < 6; i++) { const x = rng.range(6, W - 6), z = rng.range(pz0, pz1); w.batch.geo('iron', PG().cyl8, new THREE.Matrix4().compose(V(x, HT - 5, z), new THREE.Quaternion(), V(0.12, 10, 0.12))); }
-    for (let x = 10; x < W - 6; x += 12) { P().pillarSquare(w, x, 5.5, 0, HT, 1.1); P().torch(w, x, 3.4, 6.2, 'pz'); }
+    for (let x = 10; x < W - 6; x += 12) { LG.pillar(w, x, 5.5, 0, HT, 1.1); P().torch(w, x, 3.4, 6.2, 'pz'); }
+    meltLadders(w, bays, walks, pz0, pz1, W, MY);
     // what is laid afterwards goes on the bays and the landings only
     occ.mark(0, pz0, W, pz1, 2);
     for (const b of bays) if (!b.cru) occ.mark(b.x0 + 0.5, b.z0 + 0.5, b.x1 - 0.5, b.z1 - 0.5, 0);
     w.groundTop = (x, z) => { if (z < pz0 || z > pz1) return 0; const b = bays.find((q) => x > q.x0 && x < q.x1 && z > q.z0 && z < q.z1); return b ? b.y : null; };
     return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
+  }
+  // the iron ladders out of the melt (strata.js climbs them: w.ladders): on each side of a bay that faces open melt, where no catwalk,
+  // carriage, lift or stair is, two places along it tried, the nearer its middle first; on the landings' faces every 12 m. Each is two
+  // iron stiles from the melt up past the edge, rungs every 0.3 m, bolted to the side by brackets. Nothing stops you on them: you climb
+  // while you hold forward or jump in front of one, and at its head you step off onto the bay (dir)
+  function meltLadders(w, bays, walks, pz0, pz1, W, MY) {
+    w.ladders = w.ladders || [];
+    const free = (x, z, r) => !walks.some((k) => x > k.x0 - r && x < k.x1 + r && z > k.z0 - r && z < k.z1 + r) && !(w.movers || []).some((m) => x > Math.min(m.x0, m.x0 + m.dx) - r && x < Math.max(m.x1, m.x1 + m.dx) + r && z > Math.min(m.z0, m.z0 + m.dz) - r && z < Math.max(m.z1, m.z1 + m.dz) + r);
+    const vb = (x0, y0, z0, x1, y1, z1) => w.visual('iron', Math.min(x0, x1), y0, Math.min(z0, z1), Math.max(x0, x1), y1, Math.max(z0, z1), { uv: 1, tint: [0.62, 0.58, 0.55] });
+    // (the top must be clear to step onto: nothing standing on the bay a metre and a half in)
+    const clearTop = (x, z, y) => w.boxFree(x - 0.35, y + 0.1, z - 0.35, x + 0.35, y + 1.8, z + 0.35);
+    const put = (x, z, y1, dir) => {
+      const ex = x + dir[0] * 1.0, ez = z + dir[1] * 1.0;
+      if (!free(x, z, 2.2) || !clearTop(ex, ez, y1)) return false;
+      w.ladders.push({ x, z, y0: MY, y1, dir });
+      // (the stiles a hand off the side, the rungs between them)
+      const fx = x + dir[0] * 0.38, fz = z + dir[1] * 0.38, ax = dir[0] ? 0 : 1, az = dir[0] ? 1 : 0;
+      for (const sd of [-0.28, 0.28]) vb(fx + ax * sd - 0.035, MY - 0.2, fz + az * sd - 0.035, fx + ax * sd + 0.035, y1 + 1.0, fz + az * sd + 0.035);
+      for (let y = MY + 0.3; y < y1 + 0.95; y += 0.3) vb(fx - ax * 0.28 - dir[0] * 0.02, y, fz - az * 0.28 - dir[1] * 0.02, fx + ax * 0.28 + dir[0] * 0.02, y + 0.035, fz + az * 0.28 + dir[1] * 0.02);
+      // (its brackets: from each stile to the side, top and bottom)
+      for (const by of [MY + 1.6, y1 - 0.6]) for (const sd of [-0.28, 0.28]) vb(fx + ax * sd - 0.03 * ax, by, fz + az * sd - 0.03 * az, fx + ax * sd + 0.03 * ax + dir[0] * 0.08, by + 0.06, fz + az * sd + 0.03 * az + dir[1] * 0.08);
+      return true;
+    };
+    for (const b of bays) {
+      // (the four sides: where its face is, the way onto the bay, the run along it)
+      for (const [fx, fz, dir, a0, a1, alongX] of [[null, b.z0 - 0.45, [0, 1], b.x0, b.x1, true], [null, b.z1 + 0.45, [0, -1], b.x0, b.x1, true], [b.x0 - 0.45, null, [1, 0], b.z0, b.z1, false], [b.x1 + 0.45, null, [-1, 0], b.z0, b.z1, false]]) {
+        const m = (a0 + a1) / 2;
+        for (const a of [m + 1.6, m - 2.4]) {
+          const x = alongX ? a : fx, z = alongX ? fz : a;
+          if (z < pz0 + 0.5 || z > pz1 - 0.5 || x < 0.6 || x > W - 0.6) continue;
+          if (put(x, z, b.y, dir)) break;
+        }
+      }
+    }
+    // the landings' faces (their lips at pz0 and pz1, 0 m up)
+    for (let x = 7; x < W - 4; x += 12) { put(x, pz0 + 0.45, 0.2, [0, -1]); put(x + 5, pz1 - 0.45, 0.2, [0, 1]); }
   }
   // a small smelter on a bay: a brick stack with a glowing mouth and its chimney up into the dark
   function smelter(w, rng, x, z, y) {
@@ -162,6 +217,15 @@
       if (m.mesh) m.mesh.position.set((m.x0 + m.x1) / 2 + nx, m.y + ny, (m.z0 + m.z1) / 2 + nz);
       if (ride) { Pl.pos.x += ddx; Pl.pos.z += ddz; Pl.pos.y = c.y1; }
       for (const e of foes) { e.pos.x += ddx; e.pos.z += ddz; e.pos.y = c.y1; }
+    }
+    // the melt: a foe that is in it (thrown in, or fallen) is lost, its body laid out on the nearest ground by the edge, as one thrown
+    // into the void (enemies.js); it cannot climb out
+    if (w.melt) for (const e of G.enemies.list) {
+      if (!e.alive || e._rep || e.boss || e.custom || (e.def && e.def.flyer) || e.pos.y > w.melt.y + 0.4 || e.pos.z < w.melt.z0 || e.pos.z > w.melt.z1) continue;
+      if (w.floorBelow(e.pos.x, e.pos.y + 0.5, e.pos.z) > w.melt.y + 0.5) continue;
+      const g = w.nearestGround(e.pos.x, 0, e.pos.z);
+      if (g) { G.fx.smoke(e.pos.clone().setY(e.pos.y + 0.4), 8, 1, 0x1a1412, 0.8, 1); e.pos.copy(g); if (e.vel) e.vel.set(0, 0, 0); }
+      e.hp = 0; G.combat.killEnemy(e, { src: 'fall' }, 0);
     }
     // belts: whoever stands on one is carried along it (through the world's own movement, so walls still stop you)
     if (Pl && !Pl.dead && Pl.grounded && w.belts) for (const b of w.belts) {

@@ -97,7 +97,7 @@
   S.castle = function (w, rng, W, D, o) {
     H.floors(w, W, D, null, 'floor');
     H.perimeter(w, rng, W, D, { gates: o.gates, h: 13, top: 16, beams: 0 });
-    for (const sx of [-1, 1]) for (let z = 6; z < D - 4; z += 6) { const x = W / 2 + sx * (W / 2 - 5); if (clear(o, x, z, 0.8)) P().pillarSquare(w, x, z, 0, 13, 1.0); P().banner(w, sx < 0 ? 0 : W, 10, z + 3, sx < 0 ? 'px' : 'nx', 5, 0x5a0a0a); }
+    for (const sx of [-1, 1]) for (let z = 6; z < D - 4; z += 6) { const x = W / 2 + sx * (W / 2 - 5); if (clear(o, x, z, 0.8)) LG.pillar(w, x, z, 0, 13, 1.0); P().banner(w, sx < 0 ? 0 : W, 10, z + 3, sx < 0 ? 'px' : 'nx', 5, 0x5a0a0a); }
     for (const x of [0, W]) for (let z = 4; z < D - 4; z += 6) w.visual('dark', x === 0 ? 0 : W - 0.03, 5, z, x === 0 ? 0.03 : W, 11, z + 1.4, { uv: 1, grad: false });
   };
   // ---- a hall the water has come into: the floor under a hand's depth of it, falls from the walls, the dark vault

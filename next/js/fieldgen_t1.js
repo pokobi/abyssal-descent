@@ -346,6 +346,7 @@
         if (!lo) for (const [zz, sg] of [[z0, -1], [z1, 1]]) {
           if ((sg < 0 && !brA) || (sg > 0 && !brB) || hs(ex, zz, 4) < 0.3) continue;
           const side = ex < w.W / 2 ? 1 : -1, cx = ex + 0.225 + side * (0.55 + 0.4 * hs(ex, zz, 5)), cz = zz + sg * (0.5 + 0.6 * hs(ex, zz, 6)), v = M.var(cx, 0, cz);
+          if (!w.query(cx - 0.3, -0.3, cz - 0.6, cx + 0.3, -0.02, cz + 0.6).some((c) => c.y1 > -0.05 && c.y1 < 0.05 && c.x0 <= cx - 0.3 && c.x1 >= cx + 0.3 && c.z0 <= cz - 0.6 && c.z1 >= cz + 0.6)) continue;   // (only on the deck: not over a hole where it fell in)
           M.blk('trim', cx, -0.02, cz, 0.2, 0.17, 0.5, (hs(ex, zz, 7) - 0.5) * 1.4, 0.02, { gy: 0, top: 0.2, tint: [v[0] * 0.8, v[1] * 0.8, v[2] * 0.8], n: 0.01, chip: 0.6, chipS: 0.06, uv: 1.4, foot: true }, [(hs(ex, zz, 8) - 0.5) * 0.3, (hs(ex, zz, 9) - 0.5) * 0.3]);
         }
       }

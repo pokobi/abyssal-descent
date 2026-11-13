@@ -184,7 +184,8 @@
     const rail = (s, u, y, za, zb, gaps) => {
       let z = za;
       const gs = gaps.filter((g) => g[1] > za && g[0] < zb).sort((a, b) => a[0] - b[0]);
-      const seg = (a, b) => { if (b - a < 0.6) return; box('wall', s, u - 0.35, u, y, y + 0.95, a, b, { uv: 2 }); box('trim', s, u - 0.42, u + 0.07, y + 0.95, y + 1.05, a, b, { uv: 1 }); };
+      // (the band on top: its box stops you as before, drawn as a coping of long stones weathered to a low ridge, LG.coping)
+      const seg = (a, b) => { if (b - a < 0.6) return; box('wall', s, u - 0.35, u, y, y + 0.95, a, b, { uv: 2 }); hard(s, u - 0.42, u + 0.07, y + 0.95, y + 1.05, a, b); const x0 = Math.min(X(s, u - 0.42), X(s, u + 0.07)), tg = LG._tag; LG._tag = 'copings'; try { LG.coping(w, (aa, yy, d) => [x0 + d, yy, aa], a, b, y + 0.92, y + 1.08, 0, 0.49, { ridge: 0.05, plain: true }); } finally { LG._tag = tg; } };
       for (const g of gs) { seg(z, Math.max(z, g[0])); z = Math.max(z, g[1]); }
       seg(z, zb);
     };
@@ -205,8 +206,11 @@
           if (!open) continue;
           const a = Math.min(X(s, D2), X(s, D1)), b = Math.max(X(s, D2), X(s, D1)), c = Math.min(X(s, 0), X(s, D2)), d = Math.max(X(s, 0), X(s, D2));
           const zz = zEnd === q.za ? [zEnd, zEnd + 0.35] : [zEnd - 0.35, zEnd];
-          w.solid('wall', a, T1, zz[0], b, T1 + 0.95, zz[1], { uv: 2 }); w.solid('trim', a, T1 + 0.95, zz[0] - 0.04, b, T1 + 1.05, zz[1] + 0.04, { uv: 1 });
-          w.solid('wall', c, T2, zz[0], d, T2 + 0.95, zz[1], { uv: 2 }); w.solid('trim', c, T2 + 0.95, zz[0] - 0.04, d, T2 + 1.05, zz[1] + 0.04, { uv: 1 });
+          for (const [p0, p1, yT] of [[a, b, T1], [c, d, T2]]) {
+            w.solid('wall', p0, yT, zz[0], p1, yT + 0.95, zz[1], { uv: 2 });
+            const cb = w.addCollider(p0, yT + 0.95, zz[0] - 0.04, p1, yT + 1.05, zz[1] + 0.04, { surf: 'stone' }); cb.vis = true; cb.mk = 'trim';
+            LG._tag = 'copings'; LG.coping(w, (aa, yy, dd) => [aa, yy, zz[0] - 0.04 + dd], p0, p1, yT + 0.92, yT + 1.08, 0, 0.43, { ridge: 0.05, plain: true }); LG._tag = null;
+          }
         }
       }
     }
@@ -330,7 +334,7 @@
     for (const q of t2top) if (q.zb - q.za > 6) for (const z of [q.za + 2.2, q.zb - 2.2]) if (rng.chance(0.5)) w.platTops.push({ x0: Math.min(X(q.s, 0.6), X(q.s, D2 - 0.8)), z0: z - 1.2, x1: Math.max(X(q.s, 0.6), X(q.s, D2 - 0.8)), z1: z + 1.2, y: T2, cx: X(q.s, 1.6), cz: z });
     for (const q of t1top) if (q.zb - q.za > 10 && rng.chance(0.6)) { const z = rng.range(q.za + 3, q.zb - 3); if (stairs.some((st) => st.s === q.s && st.lv === 1 && z > st.za - 1.5 && z < st.zb + 1.5)) continue; w.platTops.push({ x0: Math.min(X(q.s, D2 + 0.8), X(q.s, D1 - 1)), z0: z - 1.2, x1: Math.max(X(q.s, D2 + 0.8), X(q.s, D1 - 1)), z1: z + 1.2, y: T1, cx: X(q.s, D2 + 2), cz: z }); }
     // ---- the vestibule (north): pillars, braziers by the gates; the stair hall (south): torches, a sarcophagus either side
-    for (let x = 7; x < W - 5; x += 10) { if (LG.gateXs(W, gates || 1).some((g) => Math.abs(g - x) < 7)) continue; P().pillarSquare(w, x, 7, 0, VAULT, 1.1); occ.mark(x - 1.2, 6, x + 1.2, 8); }
+    for (let x = 7; x < W - 5; x += 10) { if (LG.gateXs(W, gates || 1).some((g) => Math.abs(g - x) < 7)) continue; LG.pillar(w, x, 7, 0, VAULT, 1.1); occ.mark(x - 1.2, 6, x + 1.2, 8); }
     for (const sx of [-1, 1]) { const x = W / 2 + sx * rng.range(7, 10), z = D - 5; P().sarcophagus(w, x, z, 0, true, rng); occ.mark(x - 1.6, z - 1.2, x + 1.6, z + 1.2); }
     for (let x = 5; x < W - 3; x += 8) if (Math.abs(x - W / 2) > 5) P().torch(w, x, 3.2, D, 'nz');
     for (const g of LG.gateXs(W, gates || 1)) { P().brazier(w, g - 4.5, 0, 4.5, 1, true); P().brazier(w, g + 4.5, 0, 4.5, 1, true); }

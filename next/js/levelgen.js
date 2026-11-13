@@ -36,6 +36,8 @@
       if (side === 'N' || side === 'S') w.solid(mk || 'trim', c - wd / 2, h0, Math.min(a, b), c + wd / 2, top, Math.max(a, b), { uv: 1.5 });
       else w.solid(mk || 'trim', Math.min(a, b), h0, c - wd / 2, Math.max(a, b), top, c + wd / 2, { uv: 1.5 });
     }
+    // (the boxes stay as they were, drawn; over each a tread stone with its nosing and its wear: stepTreads)
+    stepTreads(w, side, e, c, wd, h0, h1, mk, n, rise, run, sg);
     return n * run;
   }
   LG.stairsLen = (h) => Math.max(1, Math.round(h / 0.25)) * 0.5;
@@ -51,10 +53,12 @@
       if (s < a1) segs.push([s, a1]);
       for (const [p, q] of segs) {
         if (q - p < 0.2) continue;
-        if (side === 'N') { w.solid(mk || 'wall', p, y, z0, q, y + H, z0 + T, { uv: 2 }); w.visual('trim', p, y + H, z0 - 0.04, q, y + H + 0.1, z0 + T + 0.04, { uv: 1 }); w.addCollider(p, y + H, z0, q, y + H + 0.1, z0 + T); }
-        if (side === 'S') { w.solid(mk || 'wall', p, y, z1 - T, q, y + H, z1, { uv: 2 }); w.visual('trim', p, y + H, z1 - T - 0.04, q, y + H + 0.1, z1 + 0.04, { uv: 1 }); w.addCollider(p, y + H, z1 - T, q, y + H + 0.1, z1); }
-        if (side === 'W') { w.solid(mk || 'wall', x0, y, p, x0 + T, y + H, q, { uv: 2 }); w.visual('trim', x0 - 0.04, y + H, p, x0 + T + 0.04, y + H + 0.1, q, { uv: 1 }); w.addCollider(x0, y + H, p, x0 + T, y + H + 0.1, q); }
-        if (side === 'E') { w.solid(mk || 'wall', x1 - T, y, p, x1, y + H, q, { uv: 2 }); w.visual('trim', x1 - T - 0.04, y + H, p, x1 + 0.04, y + H + 0.1, q, { uv: 1 }); w.addCollider(x1 - T, y + H, p, x1, y + H + 0.1, q); }
+        // (its coping: stones a little wider than the wall, their tops weathered to a low ridge: coping())
+        const ay = w._atY || 0, cp = (T2) => _tagged('copings', () => coping(w, T2, p, q, y + ay + H - 0.03, y + ay + H + 0.12, -0.05, T + 0.05, { ridge: 0.05, plain: true }));
+        if (side === 'N') { w.solid(mk || 'wall', p, y, z0, q, y + H, z0 + T, { uv: 2 }); cp((a, yy, d) => [a, yy, z0 + d]); w.addCollider(p, y + H, z0, q, y + H + 0.1, z0 + T); }
+        if (side === 'S') { w.solid(mk || 'wall', p, y, z1 - T, q, y + H, z1, { uv: 2 }); cp((a, yy, d) => [a, yy, z1 - T + d]); w.addCollider(p, y + H, z1 - T, q, y + H + 0.1, z1); }
+        if (side === 'W') { w.solid(mk || 'wall', x0, y, p, x0 + T, y + H, q, { uv: 2 }); cp((a, yy, d) => [x0 + d, yy, a]); w.addCollider(x0, y + H, p, x0 + T, y + H + 0.1, q); }
+        if (side === 'E') { w.solid(mk || 'wall', x1 - T, y, p, x1, y + H, q, { uv: 2 }); cp((a, yy, d) => [x1 - T + d, yy, a]); w.addCollider(x1 - T, y + H, p, x1, y + H + 0.1, q); }
       }
     };
     edge('N', x0, x1); edge('S', x0, x1); edge('W', z0 + T, z1 - T); edge('E', z0 + T, z1 - T);
@@ -69,8 +73,12 @@
     const mk = opts.mk || 'wall';
     w.solid(mk, x0, 0, z0, x1, h - 0.25, z1, { uv: 3 });
     w.solid('trim', x0 - 0.06, h - 0.25, z0 - 0.06, x1 + 0.06, h, z1 + 0.06, { uv: 2, grad: false });
-    // plinth band at base
-    w.visual('trim', x0 - 0.04, 0, z0 - 0.04, x1 + 0.04, 0.35, z1 + 0.04, { uv: 1.5 });
+    // its edge: kerb stones round the top, worn round and standing a little out over the face (the slab under them as it was); at its
+    // foot a battered plinth (in place of a flat band)
+    { const ay = w._atY || 0, ST = sideT(x0 - 0.06, z0 - 0.06, x1 + 0.06, z1 + 0.06);
+      _tagged('platforms', () => { for (const k of ['N', 'S', 'W', 'E']) { const q = ST[k], ns = k === 'N' || k === 'S';
+        coping(w, q.T, ns ? q.a0 - 0.05 : q.a0 + 0.4, ns ? q.a1 + 0.05 : q.a1 - 0.4, h + ay - 0.3, h + ay + 0.01, -0.44, 0.05, { len: [0.7, 1.2] });
+        FORT.talus(w, (a, yy, d) => q.T(a, yy, d - 0.06), ns ? q.a0 : q.a0 + 0.06, ns ? q.a1 : q.a1 - 0.06, ay, 0.42, 0.18, { t: 0.78 }); } }); }
     const gaps = [];
     const wd = opts.stairW || 2.6;
     for (const s of sides) {
@@ -97,8 +105,9 @@
     const segs = broken ? [[0, len * 0.4], [len * 0.55, len]] : [[0, len]];
     for (const [a, b] of segs) {
       const hh = h * rng.range(0.85, 1.0);
-      if (alongX) { w.solid('wall', x + a, 0, z - T / 2, x + b, hh, z + T / 2, { uv: 2.5 }); w.solid('trim', x + a - 0.05, hh, z - T / 2 - 0.05, x + b + 0.05, hh + 0.12, z + T / 2 + 0.05, { uv: 1 }); }
-      else { w.solid('wall', x - T / 2, 0, z + a, x + T / 2, hh, z + b, { uv: 2.5 }); w.solid('trim', x - T / 2 - 0.05, hh, z + a - 0.05, x + T / 2 + 0.05, hh + 0.12, z + b + 0.05, { uv: 1 }); }
+      const ay = w._atY || 0;
+      if (alongX) { w.solid('wall', x + a, 0, z - T / 2, x + b, hh, z + T / 2, { uv: 2.5 }); hard(w, 'trim', x + a - 0.05, hh, z - T / 2 - 0.05, x + b + 0.05, hh + 0.12, z + T / 2 + 0.05); _tagged('copings', () => coping(w, (u, yy, d) => [u, yy, z - T / 2 + d], x + a - 0.05, x + b + 0.05, hh + ay - 0.04, hh + ay + 0.13, -0.06, T + 0.06, { ridge: 0.05 })); }
+      else { w.solid('wall', x - T / 2, 0, z + a, x + T / 2, hh, z + b, { uv: 2.5 }); hard(w, 'trim', x - T / 2 - 0.05, hh, z + a - 0.05, x + T / 2 + 0.05, hh + 0.12, z + b + 0.05); _tagged('copings', () => coping(w, (u, yy, d) => [x - T / 2 + d, yy, u], z + a - 0.05, z + b + 0.05, hh + ay - 0.04, hh + ay + 0.13, -0.06, T + 0.06, { ridge: 0.05 })); }
     }
     if (broken) P().rubble(w, alongX ? x + len * 0.47 : x, 0, alongX ? z : z + len * 0.47, rng, 0.9);
   }
@@ -119,9 +128,11 @@
       const len = a1 - a0;
       const door = side === doorSide ? [a0 + len / 2 - 0.9, a0 + len / 2 + 0.9] : null;
       const win = !door && len > 4 && rng.chance(0.7) ? [a0 + len / 2 - 0.7, a0 + len / 2 + 0.7] : null;
+      let o0 = Infinity, o1 = -Infinity;   // (the doorway as the pieces left out of the wall make it)
       for (let s = a0; s < a1 - 0.01; s += 1) {
         const e = Math.min(a1, s + 1);
         const mid = (s + e) / 2;
+        if (door && mid > door[0] && mid < door[1]) { o0 = Math.min(o0, s); o1 = Math.max(o1, e); }
         const top = ruined ? H * (0.55 + 0.45 * rng.next()) : H;
         const B = (yA, yB) => {
           if (yB - yA < 0.05) return;
@@ -133,9 +144,9 @@
         B(0, top);
       }
       if (door) {
-        // wooden lintel
-        if (horiz) w.visual('woodDark', door[0] - 0.15, 2.5, fixed - 0.03, door[1] + 0.15, 2.7, fixed + T + 0.03, { uv: 1 });
-        else w.visual('woodDark', fixed - 0.03, 2.5, door[0] - 0.15, fixed + T + 0.03, 2.7, door[1] + 0.15, { uv: 1 });
+        // a timber frame in the doorway: posts in its jambs, a lintel over them let into the wall either side
+        const cu = (o0 + o1) / 2, ay = w._atY || 0;
+        if (o1 > o0) _tagged('doors', () => doorFrame(w, horiz ? (u, y, d) => [cu + u, y + ay, fixed + d] : (u, y, d) => [fixed + d, y + ay, cu + u], (o1 - o0) / 2, 2.5, T));
       }
     };
     for (const s of ['N', 'S', 'W', 'E']) wallSeg(s);
@@ -168,8 +179,8 @@
     for (let i = 0; i < n; i++) {
       const px = alongX ? x + i * step : x, pz = alongX ? z : z + i * step;
       if (round) P().pillarRound(w, px, pz, 0, h, 0.42, brokenIdx.has(i), rng);
-      else if (brokenIdx.has(i)) { P().pillarSquare(w, px, pz, 0, h * rng.range(0.35, 0.6), 0.85); P().rubble(w, px + 1, 0, pz + 1, rng, 0.8); }
-      else P().pillarSquare(w, px, pz, 0, h, 0.85);
+      else if (brokenIdx.has(i)) { pillar(w, px, pz, 0, h * rng.range(0.35, 0.6), 0.85, null, { broken: true }); P().rubble(w, px + 1, 0, pz + 1, rng, 0.8); }
+      else pillar(w, px, pz, 0, h, 0.85);
     }
     // architrave across intact neighbours
     for (let i = 0; i < n - 1; i++) {
@@ -191,12 +202,13 @@
     for (const [a, b] of ops) { if (a > s) w.solid('wall', s, 0, z0, a, H, z1, { uv: 3 }); s = b; }
     if (s < W) w.solid('wall', s, 0, z0, W, H, z1, { uv: 3 });
     for (const [a, b] of ops) {
-      // corbelled arch: stepped blocks narrowing up to a lintel
-      w.solid('trim', a, 3.4, z0 - 0.08, a + 0.7, 3.8, z1 + 0.08, { uv: 1 }); w.solid('trim', b - 0.7, 3.4, z0 - 0.08, b, 3.8, z1 + 0.08, { uv: 1 });
-      w.solid('block', a, 3.8, z0, a + 1.3, 4.25, z1, { uv: 2 }); w.solid('block', b - 1.3, 3.8, z0, b, 4.25, z1, { uv: 2 });
-      w.solid('block', a, 4.25, z0, a + 1.8, 4.7, z1, { uv: 2 }); w.solid('block', b - 1.8, 4.25, z0, b, 4.7, z1, { uv: 2 });
-      w.solid('wall', a, 4.7, z0, b, H, z1, { uv: 3 });
-      w.visual('trim', (a + b) / 2 - 0.35, 4.5, z0 - 0.1, (a + b) / 2 + 0.35, 5.3, z1 + 0.1, { uv: 1 }); // keystone
+      // (the corbels in the opening's corners and the wall over it stop you as they did; what is drawn is an arch of wedge stones springing
+      // from the jambs at 3.4 m, the wall over it laid round its back: archDraw)
+      hard(w, 'trim', a, 3.4, z0 - 0.08, a + 0.7, 3.8, z1 + 0.08); hard(w, 'trim', b - 0.7, 3.4, z0 - 0.08, b, 3.8, z1 + 0.08);
+      hard(w, 'block', a, 3.8, z0, a + 1.3, 4.25, z1); hard(w, 'block', b - 1.3, 3.8, z0, b, 4.25, z1);
+      hard(w, 'block', a, 4.25, z0, a + 1.8, 4.7, z1); hard(w, 'block', b - 1.8, 4.25, z0, b, 4.7, z1);
+      hard(w, 'wall', a, 4.7, z0, b, H, z1);
+      { const ay = w._atY || 0, m = (a + b) / 2; _tagged('arches', () => archDraw(w, mason(w), (u, y, d) => [m + u, y + ay, z0 - 0.08 + d], (b - a) / 2, 3.4, 2.0, T + 0.16, H, { fill: 'wall', out: (b - a) / 2 })); }
       // jamb pilasters
       w.solid('trim', a - 0.25, 0, z0 - 0.2, a, 3.4, z1 + 0.2, { uv: 1.5 }); w.solid('trim', b, 0, z0 - 0.2, b + 0.25, 3.4, z1 + 0.2, { uv: 1.5 });
       P().torch(w, a - 0.6, 3.0, z1, 'pz'); P().torch(w, b + 0.6, 3.0, z0, 'nz');
@@ -748,6 +760,272 @@
       while (s < a1 - 0.05) { const e = Math.min(a1, s + 1.1 + 0.8 * _hn(s, y, 59 + i)), p = T(s, y, 0), v = M.var(p[0], y, p[2]); M.hexa('trim', [T(s, y - 0.05, -0.04), T(e, y - 0.05, -0.04), T(s, y + h, -0.04), T(e, y + h, -0.04), T(s, y - 0.05, out), T(e, y - 0.05, out), T(s, y + h, 0.05), T(e, y + h, 0.05)], o.far ? 0 : 0.03, { gy: y, top: y + h, tint: [v[0] * t, v[1] * t, v[2] * t], n: 0.008, chip: 0.2, chipS: 0.07, foot: !o.far }); s = e; i++; }
     },
   });
+
+  // ================================================================ the big shapes inside a field: steps, copings, pillars, arches
+  // As the walls: the boxes that stop you are kept as they were (drawn or not, said at each), what is drawn is built here (mason).
+  // What is built under Terrain.at (raised onto a terrain) stands at w._atY over what it is given.
+  const _tagged = (tag, fn) => { const t = LG._tag; LG._tag = tag; try { return fn(); } finally { LG._tag = t; } };
+
+  // ---- a step's tread stone (laid over the box of each step, which stays as it was): its front edge rounded and standing a little out
+  // over the riser below, its top worn hollow in the middle and most at the front, where feet go. One shape for each width, shared
+  const _tread = {};
+  function treadGeo(wd, wood) {
+    const key = Math.round(wd * 20) + (wood ? 'w' : ''); if (_tread[key]) return _tread[key];
+    const R = 0.5, t = 0.012, us = [-1, 0, 1];
+    // (the section from the back of the tread over the nosing to under it: z out along the run, y up from the box's top)
+    const prof = wood ? [[0, t, 0], [R - 0.03, t, 0.2], [R + 0.012, t - 0.01, 0.2], [R + 0.025, t - 0.04, 0], [R - 0.02, t - 0.045, 0]]
+      : [[0, t, 0.35], [R - 0.045, t, 1], [R - 0.004, t - 0.013, 1], [R + 0.022, t - 0.036, 0.7], [R + 0.03, t - 0.066, 0.3], [R - 0.03, t - 0.072, 0]];
+    const P = [], I = [], nP = prof.length, nU = us.length;
+    for (let j = 0; j < nU; j++) {
+      const u = us[j], wear = (wood ? 0.004 : 0.013) * (1 - u * u);
+      for (const [z, y, k] of prof) P.push(u * wd / 2, y - wear * k, z - (z > R - 0.05 ? wear * k * 0.9 : 0));
+    }
+    for (let j = 0; j + 1 < nU; j++) for (let i = 0; i + 1 < nP; i++) { const a = j * nP + i, b = a + 1, c = a + nP, d = c + 1; I.push(a, b, c, b, d, c); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+    // (the two ends, flat: the section closed down to the back under the tread)
+    const q = g.toNonIndexed(), pos = Array.from(q.attributes.position.array), nor = Array.from(q.attributes.normal.array);
+    for (const [j, sx] of [[0, -1], [nU - 1, 1]]) {
+      const pts = prof.map((_, i) => [P[(j * nP + i) * 3], P[(j * nP + i) * 3 + 1], P[(j * nP + i) * 3 + 2]]); pts.push([sx * wd / 2, t - 0.072, 0]);
+      for (let i = 1; i + 1 < pts.length; i++) { const tri = sx < 0 ? [pts[0], pts[i + 1], pts[i]] : [pts[0], pts[i], pts[i + 1]]; for (const p of tri) { pos.push(...p); nor.push(sx, 0, 0); } }
+    }
+    const o = new THREE.BufferGeometry(); o.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); o.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    return (_tread[key] = o);
+  }
+  // the treads of a flight laid by stairs() (its arguments, and what it worked out)
+  function stepTreads(w, side, e, c, wd, h0, h1, mk, n, rise, run, sg) {
+    if (run !== 0.5 || wd < 0.6) return;
+    const M = mason(w), wood = (mk || '').startsWith('wood'), g = treadGeo(wd, wood), ay = w._atY || 0, ns = side === 'N' || side === 'S';
+    const m = new THREE.Matrix4(), flip = (ns ? sg : -sg) < 0;
+    _tagged('stairs', () => {
+      for (let i = 0; i < n; i++) {
+        const top = h1 - i * rise + ay, a = e + sg * i * run, wx = ns ? c : a, wz = ns ? a : c, j = _hn(wx * 1.7 + 0.3, wz * 1.3 + top, 61);
+        // (local x across the flight, z out along it to the nosing; each stone set a hair off true)
+        const tw = (j - 0.5) * 0.006, cs = Math.cos(tw), sn = Math.sin(tw);
+        if (ns) m.set(cs, 0, sn * sg, wx, 0, 1, 0, top + (j - 0.5) * 0.004, -sn, 0, cs * sg, wz, 0, 0, 0, 1);
+        else m.set(-sn, 0, cs * sg, wx, 0, 1, 0, top + (j - 0.5) * 0.004, cs, 0, sn * sg, wz, 0, 0, 0, 1);
+        const v = M.var(wx, top, wz, 7), k = wood ? 0.95 : 0.9;
+        M.geo(mk || 'trim', g, m, { tint: [v[0] * k, v[1] * k, v[2] * k], gy: h0 + ay - 1, world: true, uv: wood ? 1.2 : 1.4, flip, one: true });
+      }
+      // the strings: at each side a closed string of masonry rising with the flight, flush with the side of its boxes (which it hides: a
+      // flight seen from the side was one flat face cut in teeth), its top 0.2 m over the line of the nosings, laid in courses; of wood, a
+      // beam along the same line. Inside the flight's width: the boxes are behind it
+      if (wood || n < 3) return;
+      const SW = Math.min(0.24, wd * 0.1), Ch = 0.7, Lz = n * run, base = h0 + ay;
+      const topAt = (z) => (z <= run ? h1 + ay : h1 + ay - (z / run - 1) * rise) + 0.2, zAt = (y) => (y >= h1 + ay + 0.2 ? run : run * (1 + (h1 + ay + 0.2 - y) / rise));
+      const W3 = (u, y, z) => (ns ? [c + u, y, e + sg * z] : [e + sg * z, y, c + u]);
+      for (const sx of [-1, 1]) {
+        const u0 = sx * (wd / 2 + 0.006), u1 = sx * (wd / 2 - SW);
+        // (course by course up from the floor, each as far out as the line of the nosings lets it, its stones 1.3 - 2.1 m long, the joints of
+        // one course off those of the next)
+        for (let k = 0; ; k++) {
+          const y0 = base + k * Ch, ze = Math.min(Lz, zAt(y0)); if (y0 >= topAt(0) - 0.05 || ze < 0.1) break;
+          let z0 = 0, q = 0;
+          while (z0 < ze - 0.05) {
+            let z1 = Math.min(ze, z0 + (q === 0 && k % 2 ? 0.7 : 1.3 + 0.8 * _hn(c + sx + z0, e + k, 69 + q))); if (ze - z1 < 0.4) z1 = ze;
+            const t0 = Math.min(y0 + Ch, topAt(z0)), t1 = Math.min(y0 + Ch, topAt(z1)), vv = M.var(c + sx, y0, e + z0, 9 + k);
+            M.hexa(mk || 'trim', [W3(u0, y0, z0), W3(u0, y0, z1), W3(u0, t0, z0), W3(u0, t1, z1), W3(u1, y0, z0), W3(u1, y0, z1), W3(u1, t0, z0), W3(u1, t1, z1)], 0, { gy: base, top: base + 5, tint: [vv[0] * 0.84, vv[1] * 0.84, vv[2] * 0.84], n: 0.003, uv: 1.6, chip: 0.12, chipS: 0.03 });
+            z0 = z1; q++;
+          }
+        }
+      }
+    });
+  }
+
+  // ---- a coping or a kerb: stones along an edge (T(a, y, d): a along it, d across, 0 at the face looked at, out positive), from a0 to a1,
+  // y0..y1, d0..d1; their edges taken off and worn, a stone now and then chipped, the joints between them open a little. o: {mk, ridge
+  // (its top weathered up to a low ridge across), len: [min, max], t: brightness, foot}
+  function coping(w, T, a0, a1, y0, y1, d0, d1, o) {
+    o = o || {}; const M = mason(w), mk = o.mk || 'trim', L = o.len || [0.8, 1.4], rg = o.ridge || 0, t = o.t || 0.9;
+    let s = a0, i = 0;
+    while (s < a1 - 0.05) {
+      let e = s + L[0] + (L[1] - L[0]) * _hn(s * 1.3, y1 + d0, 62 + i); if (a1 - e < L[0] * 0.5) e = a1; e = Math.min(e, a1);
+      const g = 0.004, p = T((s + e) / 2, y1, d1), v = M.var(p[0], y1, p[2], 5), dm = (d0 + d1) / 2;
+      const P = [T(s + g, y0, d0), T(e - g, y0, d0), T(s + g, y1, d0), T(e - g, y1, d0), T(s + g, y0, d1), T(e - g, y0, d1), T(s + g, y1, d1), T(e - g, y1, d1)];
+      if (rg) { P[2] = T(s + g, y1 - rg, d0); P[3] = T(e - g, y1 - rg, d0); P[6] = T(s + g, y1 - rg, d1); P[7] = T(e - g, y1 - rg, d1); M.hexa(mk, P, M.lo || o.plain ? 0 : 0.02, { gy: o.gy ?? y0 - 1, top: y1, tint: [v[0] * t, v[1] * t, v[2] * t], n: 0.005, chip: 0.25, chipS: 0.05, uv: 1.4, foot: o.foot });
+        // (the ridge: a second low stone along the middle of the top, the weathered crown)
+        M.hexa(mk, [T(s + g, y1 - rg - 0.002, dm - (d1 - d0) * 0.32), T(e - g, y1 - rg - 0.002, dm - (d1 - d0) * 0.32), T(s + g, y1, dm - (d1 - d0) * 0.08), T(e - g, y1, dm - (d1 - d0) * 0.08), T(s + g, y1 - rg - 0.002, dm + (d1 - d0) * 0.32), T(e - g, y1 - rg - 0.002, dm + (d1 - d0) * 0.32), T(s + g, y1, dm + (d1 - d0) * 0.08), T(e - g, y1, dm + (d1 - d0) * 0.08)], 0, { gy: o.gy ?? y0 - 1, top: y1, tint: [v[0] * t, v[1] * t, v[2] * t], n: 0.003, uv: 1.4 }); }
+      else M.hexa(mk, P, M.lo || o.plain ? 0 : 0.03, { gy: o.gy ?? y0 - 1, top: y1, tint: [v[0] * t, v[1] * t, v[2] * t], n: 0.006, chip: o.plain ? 0.2 : 0.3, chipS: 0.055, uv: 1.4, foot: o.foot });
+      s = e; i++;
+    }
+  }
+  // frames for the four sides of a box from x0..x1, z0..z1 (looking out of it: d out positive); the north and south sides run its full length
+  const sideT = (x0, z0, x1, z1) => ({ N: { T: (a, y, d) => [a, y, z0 - d], a0: x0, a1: x1 }, S: { T: (a, y, d) => [a, y, z1 + d], a0: x0, a1: x1 }, W: { T: (a, y, d) => [x0 - d, y, a], a0: z0, a1: z1 }, E: { T: (a, y, d) => [x1 + d, y, a], a0: z0, a1: z1 } });
+
+  // ---- a pillar of stone (the boxes P.pillarSquare makes, the same, stopping you as they did; not drawn as boxes): its plinth, a base
+  // moulding, the shaft in courses of stone, a capital flaring to its abacus. The shaft by the field: of square ashlar with its arrises
+  // taken off (halls, works, forts, caverns), octagonal (crypts), round drums (the sky). o.broken: no capital, the top course ragged
+  const _oct = {};
+  function octGeo(drum) {
+    const key = drum ? 'd' : 'o'; if (_oct[key]) return _oct[key];
+    // (a course of unit apothem from y 0 to 1, its top and bottom edges bevelled 0.03 of a unit; the drum is round, 16 sides)
+    const n = drum ? 16 : 8, R = drum ? 1 : 1 / Math.cos(Math.PI / 8), b = 0.035, rows = [[0, R - b], [b, R], [1 - b, R], [1, R - b]], P = [], I = [];
+    for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2 + (drum ? 0 : Math.PI / 8); for (const [y, r] of rows) P.push(Math.cos(a) * r, y, Math.sin(a) * r); }
+    for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { const a = i * 4 + k, c = a + 4; I.push(a, a + 1, c, a + 1, c + 1, c); }
+    let g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I);
+    if (!drum) g = g.toNonIndexed();   // (the octagon's faces are flat: their own normals)
+    g.computeVertexNormals();
+    return (_oct[key] = g);
+  }
+  function pillar(w, x, z, y0, h, s, mk, o) {
+    o = o || {}; s = s || 0.9; mk = mk || 'block';
+    const b = s / 2 + 0.15;
+    hard(w, 'trim', x - b, y0, z - b, x + b, y0 + 0.45, z + b);
+    hard(w, 'trim', x - b + 0.08, y0 + 0.45, z - b + 0.08, x + b - 0.08, y0 + 0.6, z + b - 0.08);
+    hard(w, mk, x - s / 2, y0 + 0.6, z - s / 2, x + s / 2, y0 + h - 0.5, z + s / 2);
+    hard(w, 'trim', x - b + 0.08, y0 + h - 0.5, z - b + 0.08, x + b - 0.08, y0 + h - 0.35, z + b - 0.08);
+    hard(w, 'trim', x - b, y0 + h - 0.35, z - b, x + b, y0 + h, z + b);
+    _tagged('pillar', () => pillarDraw(w, mason(w), x, z, y0 + (w._atY || 0), h, s, b, mk, o));
+  }
+  LG.pillar = pillar; LG.coping = coping;
+  function pillarDraw(w, M, x, z, Y, h, s, b, mk, o) {
+    const K = wallKind(w), style = o.style || (K === 'crypt' ? 'oct' : K === 'sky' ? 'drum' : 'square'), lo = M.lo;
+    const sq = (hw, ya, hwb, yb) => [[x - hw, ya, z - hw], [x + hw, ya, z - hw], [x - hwb, yb, z - hwb], [x + hwb, yb, z - hwb], [x - hw, ya, z + hw], [x + hw, ya, z + hw], [x - hwb, yb, z + hwb], [x + hwb, yb, z + hwb]];
+    const v0 = M.var(x, Y, z, 3), tn = (k) => { const q = 0.92 + 0.12 * _hn(x + k, z, 63); return [v0[0] * q, v0[1] * q, v0[2] * q]; }, og = (k, e) => Object.assign({ gy: Y, top: Y + h, tint: tn(k), n: 0.004, chip: 0.15, chipS: 0.045, uv: 1.4 }, e);
+    // the plinth and the base moulding over it (a fillet, then a hollow drawing in to the shaft)
+    M.hexa('trim', sq(b, Y - 0.01, b, Y + 0.45), 0.035, og(1));
+    M.hexa('trim', sq(b - 0.03, Y + 0.45, b - 0.07, Y + 0.51), 0.012, og(2, { chip: 0 }));
+    M.hexa('trim', sq(b - 0.08, Y + 0.51, s / 2 + 0.035, Y + 0.6), 0.01, og(2, { chip: 0 }));
+    // the shaft, course by course (a broken one: up to its top, the last course ragged)
+    const sy0 = Y + 0.6, sy1 = o.broken ? Y + h : Y + h - 0.5;
+    const nC = Math.max(1, Math.round((sy1 - sy0) / (style === 'drum' ? 0.8 : 0.62))), ch = (sy1 - sy0) / nC, mtx = new THREE.Matrix4();
+    for (let k = 0; k < nC; k++) {
+      const ya = sy0 + k * ch, yb = ya + ch, last = k === nC - 1, j = _hn(x * 0.7 + k, z * 0.9 - k, 64);
+      if (style === 'square') {
+        const hw = s / 2 - 0.004 + (j - 0.5) * 0.012, P = sq(hw, ya + 0.003, hw, yb - 0.003);
+        if (o.broken && last) for (const c of [2, 3, 6, 7]) P[c][1] -= 0.05 + 0.12 * _hn(x + c, z + k, 65);
+        M.hexa(mk, P, lo || ya > Y + 3.2 ? 0 : 0.035, og(10 + k, { tint: tn(10 + k), chip: o.broken && last ? 0.7 : ya > Y + 3.2 ? 0.06 : 0.18, chipS: 0.06, uv: 1.6 }));
+      } else {
+        // (a course of the octagon or a drum: its middle a little off the line now and then, as drums settle)
+        const off = style === 'drum' && o.broken ? (j - 0.5) * 0.05 : 0, rr = style === 'drum' ? s / 2 * 1.02 : s / 2;
+        mtx.makeRotationY(style === 'drum' ? j * 3 : 0).premultiply(new THREE.Matrix4().makeTranslation(x + off, ya, z + off * 0.6)).multiply(new THREE.Matrix4().makeScale(rr, (o.broken && last ? ch * 0.82 : ch), rr));
+        M.geo(mk, octGeo(style === 'drum'), mtx, { tint: tn(10 + k), gy: Y, top: Y + h, world: true, uv: 1.6, one: true });
+      }
+    }
+    if (o.broken) return;
+    // the capital: a neck ring, the bell flaring out to the abacus, the abacus
+    const hy = Y + h;
+    M.hexa('trim', sq(s / 2 + 0.03, hy - 0.5, s / 2 + 0.03, hy - 0.44), 0.01, og(3, { chip: 0 }));
+    M.hexa('trim', sq(s / 2 + 0.02, hy - 0.44, b - 0.07, hy - 0.35), 0.012, og(3, { chip: 0 }));
+    M.hexa('trim', sq(b, hy - 0.35, b, hy), 0.035, og(4));
+  }
+
+  // ---- an arch over an opening in a wall (archWall): frame T(u, y, d), u across from the middle, d through the wall 0..dep; the arch
+  // springs at y0 from the jambs at u = ±half, rises to its crown, and the wall over it up to top is laid in courses round its back
+  function archDraw(w, M, T, half, y0, rise, dep, top, o) {
+    o = o || {}; const ST = o.mk || 'trim', FILL = o.fill || 'block', lo = M.lo, opt = (k) => ({ gy: o.gy ?? 0, top, tint: (() => { const p = T(k, y0, 0), v = M.var(p[0], y0 + k, p[2], 8); return [v[0] * 0.92, v[1] * 0.92, v[2] * 0.92]; })(), n: 0.006, chip: 0.15, chipS: 0.05, uv: 1.4 });
+    const R = (half * half + rise * rise) / (2 * rise), yc = y0 + rise - R, a0 = Math.asin(Math.max(-1, Math.min(1, (y0 - yc) / R))), a1 = Math.PI - a0, TH = 0.62, n = 13;
+    for (let j = 0; j < n; j++) {
+      const b0 = a0 + (a1 - a0) * j / n, b1 = a0 + (a1 - a0) * (j + 1) / n, key = j === (n - 1) / 2, r1 = R + TH + (key ? 0.16 : 0), d0 = key ? -0.06 : -0.02, d1 = dep + (key ? 0.06 : 0.02), P = [];
+      for (let kk = 0; kk < 8; kk++) { const bb = kk & 1 ? b1 : b0, r = kk & 2 ? r1 : R, dd = kk & 4 ? d1 : d0; P.push(T(Math.cos(bb) * r, yc + Math.sin(bb) * r, dd)); }
+      M.hexa(ST, P, lo ? 0 : 0.03, opt(j));
+    }
+    // (the fill over the haunches and the crown, course by course, its inner ends against the arch's back; the skewback cut below
+    // where the arch's first stone has its back)
+    const ySk = yc + (R + TH) * Math.sin(a0), cot = a0 > 0.01 ? Math.cos(a0) / Math.sin(a0) : 0, Re = R + TH + 0.02;
+    const ext = (y) => { if (a0 > 0.01 && y < ySk) return half + (y - y0) * cot + 0.03; const dy = y - yc; return dy >= Re ? 0 : Math.sqrt(Math.max(0, Re * Re - dy * dy)); };
+    const OUT = o.out || half + 1.2;
+    let yy = y0, ci = 0;
+    while (yy < top - 0.04) {
+      const hh = Math.min(top - yy, 0.5), y1 = yy + hh, uA = ext(yy), uB = ext(y1);
+      for (const sg of [-1, 1]) {
+        if (uA <= 0.02 && uB <= 0.02 && sg > 0) break;
+        // (no further out than the opening's sides: past them the wall beside it is drawn as it was)
+        const ua = Math.min(OUT, Math.max(0.0, uA)), ub = Math.min(OUT, Math.max(0.0, uB)), oa = uA <= 0.02 && uB <= 0.02 ? -OUT : sg * ua, ob = uA <= 0.02 && uB <= 0.02 ? -OUT : sg * ub;
+        if (ua >= OUT - 0.02 && ub >= OUT - 0.02) continue;
+        if (uA <= 0.02 && uB <= 0.02) M.hexa(FILL, [T(-OUT, yy, 0), T(OUT, yy, 0), T(-OUT, y1, 0), T(OUT, y1, 0), T(-OUT, yy, dep), T(OUT, yy, dep), T(-OUT, y1, dep), T(OUT, y1, dep)], 0, Object.assign(opt(30 + ci), { chip: 0, uv: 2.5, uvFix: true }));
+        else { const e = sg * OUT; M.hexa(FILL, [T(oa, yy, 0), T(e, yy, 0), T(ob, y1, 0), T(e, y1, 0), T(oa, yy, dep), T(e, yy, dep), T(ob, y1, dep), T(e, y1, dep)], 0, Object.assign(opt(30 + ci), { chip: 0, uv: 2.5, uvFix: true })); }
+      }
+      yy = y1; ci++;
+    }
+  }
+
+  // ---- the edge of a floor over the void (floors() with a pit): the floor drawn as one surface whose edge does not follow the grid of its
+  // cells - the line through the middle of each step, broken a little by the place - its paving's thickness along the edge, and the rock
+  // under it falling away (into the dark of a chasm, or narrowing down under an island in the sky). The boxes stay, undrawn
+  function pitFloor(w, W, D, cells, mk, deep) {
+    // (deep: a chasm in a field with walls round it - past the map's edge is wall, the floor runs on to it; else, in the sky, the void)
+    const M = mason(w), lo = M.lo, at = (i, j) => { if (!deep && (i < 0 || j < 0 || i >= W || j >= D)) return 0; i = Math.max(0, Math.min(W - 1, i)); j = Math.max(0, Math.min(D - 1, j)); return cells[j * W + i]; };
+    const X = (i) => (deep ? (i < 0 ? 0 : i >= W ? W : i + 0.5) : i + 0.5), Z = (j) => (deep ? (j < 0 ? 0 : j >= D ? D : j + 0.5) : j + 0.5);
+    const G0 = { p: [], n: [], u: [], c: [], i: [] }, S = { p: [], n: [], u: [], c: [], i: [] }, RK = { p: [], n: [], u: [], c: [], i: [] };
+    const vmap = new Map(), JIT = deep ? 0.12 : 0.3;
+    const col = (x, z) => { const m = 0.93 + 0.1 * _vn(x * 0.35, z * 0.35, 3) + 0.04 * _vn(x * 1.7, z * 1.7, 4); return [m, m, m * 0.99]; };
+    // a point of the top: on an edge between a floor sample and a pit one, moved along that edge by the place (so the line is not straight)
+    const vtx = (x, z, key) => {
+      if (key !== undefined && vmap.has(key)) return vmap.get(key);
+      const k = G0.p.length / 3; G0.p.push(x, 0, z); G0.n.push(0, 1, 0); G0.u.push(x / 4, -z / 4); const c = col(x, z); G0.c.push(c[0], c[1], c[2]);
+      if (key !== undefined) vmap.set(key, k); return k;
+    };
+    const edgeP = (ia, ja, ib, jb) => {
+      // (the crossing on the edge from sample a (floor) to b (pit): half way, then slid along it by up to JIT of its length either way)
+      const xa = X(ia), za = Z(ja), xb = X(ib), zb = Z(jb), hh = _hn(xa * 1.31 + xb * 0.7, za * 1.17 + zb * 0.53, 66), t = 0.5 + (hh - 0.5) * 2 * JIT;
+      const key = 'e' + Math.min(ia * 4099 + ja, ib * 4099 + jb) + ':' + Math.max(ia * 4099 + ja, ib * 4099 + jb);
+      return [vtx(xa + (xb - xa) * t, za + (zb - za) * t, key), xa + (xb - xa) * t, za + (zb - za) * t];
+    };
+    const corner = (i, j) => vtx(X(i), Z(j), 'c' + (i * 4099 + j));
+    const segs = [];   // (the edge's pieces, each [x, z, x, z] with the floor on its left looking from the first point to the second)
+    const tri = (a, b, c) => G0.i.push(a, c, b);   // (wound to face up)
+    for (let j = -1; j < D; j++) {
+      for (let i = -1; i < W; i++) {
+        const s00 = at(i, j), s10 = at(i + 1, j), s11 = at(i + 1, j + 1), s01 = at(i, j + 1), code = s00 | (s10 << 1) | (s11 << 2) | (s01 << 3);
+        if (!code) continue;
+        if (code === 15) {
+          // (a run of whole squares along the row: one quad)
+          let i2 = i + 1; while (i2 < W - 1 && at(i2, j) && at(i2 + 1, j) && at(i2 + 1, j + 1) && at(i2, j + 1)) i2++;
+          const a = corner(i, j), b = corner(i2, j), c = corner(i2, j + 1), d = corner(i, j + 1); tri(a, b, c); tri(a, c, d);
+          i = i2 - 1; continue;
+        }
+        // (the corners of the square in order round it: 00, 10, 11, 01; and the edges between them)
+        const C = [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]], V = [s00, s10, s11, s01], poly = [];
+        for (let k = 0; k < 4; k++) {
+          const k2 = (k + 1) & 3;
+          if (V[k]) poly.push({ v: corner(C[k][0], C[k][1]) });
+          if (V[k] !== V[k2]) { const [fa, fb] = V[k] ? [C[k], C[k2]] : [C[k2], C[k]], e = edgeP(fa[0], fa[1], fb[0], fb[1]); poly.push({ v: e[0], x: e[1], z: e[2], out: !V[k] }); }
+        }
+        if (poly.length >= 3) for (let k = 1; k + 1 < poly.length; k++) tri(poly[0].v, poly[k].v, poly[k + 1].v);
+        // (its piece of the edge: from the crossing where the floor begins (going round) to where it ends)
+        const cr = poly.filter((q) => q.x !== undefined);
+        if (cr.length === 2) { const [p, q] = cr[0].out ? [cr[1], cr[0]] : [cr[0], cr[1]]; segs.push([q.x, q.z, p.x, p.z]); }
+        else if (cr.length === 4) { for (let k = 0; k < 4; k += 2) { const p = cr[k], q = cr[k + 1]; segs.push(p.out ? [p.x, p.z, q.x, q.z] : [q.x, q.z, p.x, p.z]); } }
+      }
+    }
+    // the edge: the paving's broken thickness, then the rock under it. Each point of the edge is shared by the two pieces that meet at it
+    // and pushed in along the mean of their outward ways (pushed along each piece's own, two pieces at an angle left a crack between them)
+    const push = (B, x, y, z, nx, ny, nz, u, v, c) => { B.p.push(x, y, z); B.n.push(nx, ny, nz); B.u.push(u, v); B.c.push(c, c, c); return B.p.length / 3 - 1; };
+    const pk = (x, z) => Math.round(x * 2000) + ',' + Math.round(z * 2000), PT = new Map();
+    const pt = (x, z) => { const k = pk(x, z); let q = PT.get(k); if (!q) { q = { x, z, nx: 0, nz: 0, ix: null }; PT.set(k, q); } return q; };
+    const SG = segs.map(([x0, z0, x1, z1]) => { let dx = x1 - x0, dz = z1 - z0; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L; const a = pt(x0, z0), b = pt(x1, z1); for (const q of [a, b]) { q.nx += -dz; q.nz += dx; } return { a, b }; });
+    const bands = deep ? [[0, 0], [-0.42, 0.06], [-4, 0.5], [-9, 0.9], [-14.5, 1.1]] : [[0, 0], [-0.42, 0.06], [-1.8, 0.7], [-4.2, 2.1], [-8, 4.2]];
+    for (const q of PT.values()) {
+      const l = Math.hypot(q.nx, q.nz) || 1; q.nx /= l; q.nz /= l;
+      const r = _hn(q.x * 3.1, q.z * 2.7, 67);
+      // (the paving's face: from the top down 0.42, its foot a little in; then the rock, band by band, drawn in by the place)
+      q.ix = bands.map(([y, inw], k) => {
+        const j = k > 1 ? (_vn(q.x * 0.6 + k, q.z * 0.6, 68) - 0.3) * 0.9 : k === 1 ? 0.04 + 0.08 * r : 0, yy = y + (k > 1 ? (r - 0.5) * 0.6 : 0), d = inw + j;
+        const x = q.x - q.nx * d, z = q.z - q.nz * d, uu = (q.x + q.z) * 0.5;
+        return k <= 1 ? [push(S, x, yy, z, q.nx, k ? -0.2 : 0, q.nz, uu, -yy, k ? 0.75 : 0.9), k === 1 ? push(RK, x, yy, z, q.nx, 0, q.nz, uu / 2, -yy / 2, 0.85) : -1] : [-1, push(RK, x, yy, z, q.nx, 0, q.nz, uu / 2, -yy / 2, 0.85)];
+      });
+    }
+    for (const { a, b } of SG) {
+      S.i.push(a.ix[0][0], b.ix[1][0], b.ix[0][0], a.ix[0][0], a.ix[1][0], b.ix[1][0]);
+      for (let k = 1; k + 1 < bands.length; k++) { const a0 = a.ix[k][1], b0 = b.ix[k][1], a1 = a.ix[k + 1][1], b1 = b.ix[k + 1][1]; RK.i.push(a0, b1, b0, a0, a1, b1); }
+    }
+    // (into the mason's lists: the top as floor, the paving's edge as the floor's stone, the rock as rock; normals of the rock worked out)
+    const add = (mk2, B, flat, plain) => {
+      if (!B.i.length) return;
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(B.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(B.n, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(B.u, 2)); g.setIndex(B.i);
+      if (!flat) g.computeVertexNormals();
+      M.geo(mk2, g, new THREE.Matrix4().makeTranslation(0, w._atY || 0, 0), { tint: [1, 1, 1], gy: -3, plain });
+    };
+    _tagged('floor', () => { add(mk, G0, true, true); add(mk, S, false); add('rock', RK, false); });
+  }
+
+  // ---- a doorway's frame of timber (a house's): two posts inside the opening's jambs, a lintel over them out past the posts, set in the
+  // wall's thickness; and a window's: its sill stone, a lintel. T(u, y, d): u across, d through the wall 0..dep
+  function doorFrame(w, T, half, h, dep, o) {
+    o = o || {}; const M = mason(w), mk = o.mk || 'woodDark';
+    for (const sg of [-1, 1]) M.hexa(mk, [T(sg * half, 0, -0.03), T(sg * (half - 0.12), 0, -0.03), T(sg * half, h, -0.03), T(sg * (half - 0.12), h, -0.03), T(sg * half, 0, dep + 0.03), T(sg * (half - 0.12), 0, dep + 0.03), T(sg * half, h, dep + 0.03), T(sg * (half - 0.12), h, dep + 0.03)], M.lo ? 0 : 0.015, { gy: 0, top: h, tint: [0.85, 0.82, 0.78], n: 0.008, uv: 1 });
+    M.hexa(mk, [T(-half - 0.25, h, -0.05), T(half + 0.25, h, -0.05), T(-half - 0.25, h + 0.24, -0.05), T(half + 0.25, h + 0.24, -0.05), T(-half - 0.25, h, dep + 0.05), T(half + 0.25, h, dep + 0.05), T(-half - 0.25, h + 0.24, dep + 0.05), T(half + 0.25, h + 0.24, dep + 0.05)], M.lo ? 0 : 0.02, { gy: 0, top: h, tint: [0.8, 0.77, 0.74], n: 0.012, uv: 1 });
+  }
   // ---------------- boss approach: a low canyon road, a flight of stairs, and the fortress high above ----------------
   const ROAD_LOW = -15;
   function bossRoad(w, rng, W, AD, D, bossId, facade) {
@@ -1617,7 +1895,8 @@
       const gy = o.gy ?? 0, h = y - gy;
       let m = noLow ? 1 : 0.74 + 0.26 * _ss(-0.1, 1.8, h);
       let r = 1, g = 1, b = 1;
-      if (M.out && Math.abs(ny) < 0.6) {
+      if (o.plain) { /* (a floor: its own colour, no rain nor moss) */ }
+      else if (M.out && Math.abs(ny) < 0.6) {
         const u = Math.abs(nx) > Math.abs(nz) ? z : x, st = _ss(0.58, 0.86, _vn(u * 2.7 + 13, y * 0.22, 5)) * _ss(-0.5, 2.5, (o.top ?? y + 3) - y);
         m *= 1 - 0.16 * st;
         const shd = M.sun ? (nx * M.sun[0] + nz * M.sun[2] < 0.1 ? 1 : 0.3) : 0.6, ms = _ss(0.5, 0.78, _vn(x * 0.9 + z * 0.9, y * 0.9, 7)) * shd * (1 - _ss(0.4, 1.6, h));
@@ -1720,6 +1999,7 @@
       }
       const n = geo.index ? geo.index.count : pos.count;
       if (geo.index) { const ix = geo.index.array; if (o.flip) for (let i = 0; i < n; i += 3) G0.i.push(base + ix[i], base + ix[i + 2], base + ix[i + 1]); else for (let i = 0; i < n; i++) G0.i.push(base + ix[i]); }
+      else if (o.flip) for (let i = 0; i < n; i += 3) G0.i.push(base + i, base + i + 2, base + i + 1);
       else for (let i = 0; i < n; i++) G0.i.push(base + i);
       M.tris += n / 3; M.n++; tally(n / 3);
     };
@@ -1934,6 +2214,8 @@
 
   // floor slabs (top flagstone + deep rock) skipping pit cells
   function floors(w, W, D, pit, mk) {
+    // (with a pit: the cells this lays, for the floor drawn over them all at once, its edge not on the grid: pitFloor)
+    const cells = pit ? new Uint8Array(W * D) : null;
     for (let z = 0; z < D; z++) {
       let x = 0;
       while (x < W) {
@@ -1946,7 +2228,10 @@
         else z2 = D;
         let fresh = true;
         for (let zz = z; zz < z2; zz++) for (let k = x; k < x2; k++) if (w._fmask[zz * W + k]) fresh = false;
-        if (fresh) {
+        if (fresh && pit) {
+          hard(w, mk, x, -0.4, z, x2, 0, z2); hard(w, 'rock', x, -14, z, x2, -0.4, z2);
+          for (let zz = z; zz < z2; zz++) for (let k = x; k < x2; k++) { w._fmask[zz * W + k] = 1; cells[zz * W + k] = 1; }
+        } else if (fresh) {
           w.solid(mk, x, -0.4, z, x2, 0, z2, { uv: 4, grad: false });
           w.solid('rock', x, -14, z, x2, -0.4, z2, { uv: 5, grad: false });
           for (let zz = z; zz < z2; zz++) for (let k = x; k < x2; k++) w._fmask[zz * W + k] = 1;
@@ -1955,6 +2240,7 @@
       }
       if (!pit) break;
     }
+    if (pit) pitFloor(w, W, D, cells, mk, w.mats.biome.outdoor !== 'sky');
   }
 
   // ---------------- area kinds ----------------
@@ -2307,7 +2593,7 @@
       for (let k = 0; k < 3; k++) {
         const r = occ.place(rng, 10, 9, 2); if (!r) continue;
         for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) P().sarcophagus(w, r.x0 + 2.5 + a * 5, r.z0 + 2.2 + b * 4.5, 0, true, rng);
-        P().pillarSquare(w, r.x0 + 5, r.z0 + 4.5, 0, 6, 0.8);
+        pillar(w, r.x0 + 5, r.z0 + 4.5, 0, 6, 0.8);
       }
     }
     structures(w, rng, occ, W, D, 5 + Math.floor(W * D / 900) + rng.int(0, 3));
@@ -2564,7 +2850,7 @@
         if (rng.chance(0.4)) P().rubble(w, (x + x1) / 2, 0, gz1 + rng.range(1, 3), rng, rng.range(0.8, 1.6));
       }
       // the arch
-      for (const sx of [-1, 1]) P().pillarSquare(w, cx + sx * (gate + 1.5), gz1 - 0.2, 0, 15, 2.2);
+      for (const sx of [-1, 1]) pillar(w, cx + sx * (gate + 1.5), gz1 - 0.2, 0, 15, 2.2);
       w.solid('block', cx - gate - 2.4, 12.4, gz0 - 0.6, cx + gate + 2.4, 15, gz1 + 0.6, { uv: 2 });
       w.solid('block', cx - gate, 6.6, gz0, cx + gate, 12.4, gz1, { uv: 3 });
       w.solid('trim', cx - gate - 2.8, 15, gz0 - 0.8, cx + gate + 2.8, 15.6, gz1 + 0.8, { uv: 1 });
@@ -2629,7 +2915,7 @@
       for (let i = 0; i < n; i++) {
         const a = i / n * Math.PI * 2 + Math.PI / 8;
         const x = Math.round(cx + Math.cos(a) * 20), z = Math.round(cz + Math.sin(a) * 20);
-        P().pillarSquare(w, x, z, 0, 12, 2.0); w.bossPillars.push(new THREE.Vector3(x, 0, z));
+        pillar(w, x, z, 0, 12, 2.0); w.bossPillars.push(new THREE.Vector3(x, 0, z));
       }
       w.visual('trim', cx - 9, 0, cz - 9, cx + 9, 0.04, cz + 9, { uv: 2, grad: false });
       for (let i = 0; i < 3; i++) {
@@ -2646,7 +2932,7 @@
       const off = rng.range(12, 15), step = rng.pick([14, 15, 16]);
       for (let z = 12; z <= AD - 14; z += step) for (const sx of [-1, 1]) {
         const x = Math.round(cx + sx * off), zz = Math.round(z);
-        P().pillarSquare(w, x, zz, 0, 13, 1.8); w.bossPillars.push(new THREE.Vector3(x, 0, zz));
+        pillar(w, x, zz, 0, 13, 1.8); w.bossPillars.push(new THREE.Vector3(x, 0, zz));
       }
       for (let z = 12 + step / 2; z <= AD - 14; z += step) for (const sx of [-1, 1]) if (rng.chance(0.2)) P().statue(w, cx + sx * (off + 6), z, 0, sx < 0 ? Math.PI / 2 : -Math.PI / 2, rng, 0.9);
       w.visual('cloth', cx - 3, 0.01, 6, cx + 3, 0.04, AD - 6, { uv: 3, grad: false });
@@ -2666,7 +2952,7 @@
       pts.forEach((p, i) => {
         const tall = i < 6; // most stand tall enough to hide behind / grapple to
         const h = tall ? rng.range(10, 14) : rng.range(2, 3.5);
-        P().pillarSquare(w, p.x, p.z, 0, h, tall ? rng.range(1.6, 2.2) : rng.range(1.0, 1.3));
+        pillar(w, p.x, p.z, 0, h, tall ? rng.range(1.6, 2.2) : rng.range(1.0, 1.3));
         if (tall) w.bossPillars.push(new THREE.Vector3(p.x, 0, p.z)); else P().rubble(w, p.x + rng.range(-1.5, 1.5), 0, p.z + rng.range(-1.5, 1.5), rng, 0.8);
       });
       for (let i = 0; i < 1; i++) {
@@ -2693,7 +2979,7 @@
       for (let i = 0; i < 6; i++) {
         const a = i / 6 * Math.PI * 2 + Math.PI / 6;
         const x = Math.round(cx + Math.cos(a) * 15), z = Math.round(cz + Math.sin(a) * 15);
-        P().pillarSquare(w, x, z, 0, 12, 1.9); w.bossPillars.push(new THREE.Vector3(x, 0, z));
+        pillar(w, x, z, 0, 12, 1.9); w.bossPillars.push(new THREE.Vector3(x, 0, z));
       }
       // stands in the corners (stepped, climbable)
       for (const [x0, z0, sx, sz] of [[0, 0, 1, 1], [W, 0, -1, 1], [0, AD, 1, -1], [W, AD, -1, -1]]) for (let k = 0; k < 2; k++) {
@@ -2710,13 +2996,13 @@
       for (let i = 0; i < 4; i++) {
         const a = i / 4 * Math.PI * 2 + Math.PI / 4;
         const x = Math.round(cx + Math.cos(a) * 13), z = Math.round(cz + Math.sin(a) * 13);
-        P().pillarSquare(w, x, z, 0, 13, 1.9); w.bossPillars.push(new THREE.Vector3(x, 0, z));
+        pillar(w, x, z, 0, 13, 1.9); w.bossPillars.push(new THREE.Vector3(x, 0, z));
       }
       for (let i = 0; i < 4; i++) {
         const a = i / 4 * Math.PI * 2;
         const x = Math.round(cx + Math.cos(a) * 25), z = Math.round(cz + Math.sin(a) * 25);
         if (z > AD - 10 || z < 8) continue;
-        P().pillarSquare(w, x, z, 0, 11, 1.7); w.bossPillars.push(new THREE.Vector3(x, 0, z));
+        pillar(w, x, z, 0, 11, 1.7); w.bossPillars.push(new THREE.Vector3(x, 0, z));
       }
       for (let i = 0; i < 4; i++) {
         const a = i / 4 * Math.PI * 2 + Math.PI / 4, x = cx + Math.cos(a) * 27, z = cz + Math.sin(a) * 27;
@@ -2734,10 +3020,10 @@
       for (let i = 0; i < 4; i++) {
         const sx = i % 2 ? 1 : -1, sz = i < 2 ? 1 : -1;
         const x = Math.round(cx + sx * 15), z = Math.round(cz + sz * 14);
-        P().pillarSquare(w, x, z, 0, 12, 2.0); w.bossPillars.push(new THREE.Vector3(x, 0, z));
+        pillar(w, x, z, 0, 12, 2.0); w.bossPillars.push(new THREE.Vector3(x, 0, z));
         if (rng.chance(0.7)) lowWall(w, rng, x + sx * 2.5 - (sx < 0 ? 3 : 0), z + sz * 0.5, 3, true, rng.range(0.8, 1.0));
       }
-      for (let i = 0; i < 2; i++) { const sx = i ? 1 : -1, x = Math.round(cx + sx * 27); P().pillarSquare(w, x, Math.round(cz), 0, 10, 1.6); w.bossPillars.push(new THREE.Vector3(x, 0, Math.round(cz))); }
+      for (let i = 0; i < 2; i++) { const sx = i ? 1 : -1, x = Math.round(cx + sx * 27); pillar(w, x, Math.round(cz), 0, 10, 1.6); w.bossPillars.push(new THREE.Vector3(x, 0, Math.round(cz))); }
       // the cross: flagstone paths through the middle
       w.visual('trim', cx - 2.2, 0.005, 8, cx + 2.2, 0.04, AD - 8, { uv: 2, grad: false });
       w.visual('trim', 8, 0.005, cz - 2.2, W - 8, 0.04, cz + 2.2, { uv: 2, grad: false });
@@ -2788,7 +3074,7 @@
       for (let i = 0; i < 8; i++) {
         const a2 = i / 8 * Math.PI * 2 + Math.PI / 8;
         const x = Math.round(cx + Math.cos(a2) * 18), z = Math.round(cz + Math.sin(a2) * 18);
-        P().pillarSquare(w, x, z, 0, i % 2 ? 13 : 9, 2.2); w.bossPillars.push(new THREE.Vector3(x, 0, z));
+        pillar(w, x, z, 0, i % 2 ? 13 : 9, 2.2); w.bossPillars.push(new THREE.Vector3(x, 0, z));
         w.addLight(x, 2, z, { flame: 0, intensity: 3, range: 8, color: '#a050ff', emit: false, prio: 0.6 });
       }
       // the throne at the north of the island

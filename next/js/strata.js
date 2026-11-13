@@ -412,7 +412,7 @@
     return w;
   }
   function F_ceiling(w, rng, W, D, HT, ruined) {
-    FG.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, ruined });
+    FG.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, ruined, coffers: !!ruined });   // (the great halls: none - their triangles are spent)
     if (ruined) {
       for (let i = 0; i < 14; i++) {
         const x = rng.range(6, W - 12), z = rng.range(8, D - 14), sx = rng.range(3.5, 7.5), sz = rng.range(3.5, 7.5);

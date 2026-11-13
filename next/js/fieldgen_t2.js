@@ -121,10 +121,24 @@
   function tower(w, rng, x, z, s, h) {
     w.solid('block', x - s, 0, z - s, x + s, h, z + s, { uv: 3 });
     w.solid('trim', x - s - 0.25, h, z - s - 0.25, x + s + 0.25, h + 0.35, z + s + 0.25, { uv: 2, noGrapple: true });
-    for (let k = -s; k < s - 0.4; k += 1.4) for (const [a, b] of [[x + k, z - s - 0.25], [x + k, z + s - 0.35], [x - s - 0.25, z + k], [x + s - 0.35, z + k]]) w.solid('block', a, h + 0.35, b, a + 0.7, h + 1.25, b + 0.6, { uv: 1, noGrapple: true });
-    w.addCollider(x - s, h + 0.35, z - s, x + s, h + 6, z + s, { noGrapple: true });
+    // (its merlons: the boxes that stop you as they were, drawn as merlons with their copings; corbels under the cap, a battered foot:
+    // towerDraw, by the place)
+    for (let k = -s; k < s - 0.4; k += 1.4) for (const [a, b] of [[x + k, z - s - 0.25], [x + k, z + s - 0.35], [x - s - 0.25, z + k], [x + s - 0.35, z + k]]) LG.hard(w, 'block', a, h + 0.35, b, a + 0.7, h + 1.25, b + 0.6, { noGrapple: true });
+    towerDraw(w, x, z, s, h);
+    w.addCollider(x - s, h + 0.35, z - s, x + s, h + 6, z + s, { noGrapple: true }).noFire = true;   // (no fire bed hung in the air on its top, fireTops: nobody gets up there)
     for (const [dx, dz] of [[0, 1], [1, 0], [-1, 0]]) w.visual('glow', x + dx * (s + 0.02) - (dz ? 0.12 : 0.02), h * 0.6, z + dz * (s + 0.02) - (dx ? 0.12 : 0.02), x + dx * (s + 0.02) + (dz ? 0.12 : 0.02), h * 0.6 + 1.2, z + dz * (s + 0.02) + (dx ? 0.12 : 0.02), { uv: 1, grad: false });
     P().banner(w, x, h - 1, z + s + 0.01, 'pz', 4, RED);
+  }
+  function towerDraw(w, x, z, s, h) {
+    const FT = LG.fort; if (!FT) return; const ay = w._atY || 0, tg = LG._tag; LG._tag = 'towers';
+    try {
+      // (each face: a along it, d out from it)
+      const faces = [(a, y, d) => [a, y, z - s - d], (a, y, d) => [a, y, z + s + d], (a, y, d) => [x - s - d, y, a], (a, y, d) => [x + s + d, y, a]];
+      faces.forEach((T, i) => { const c = i < 2 ? x : z; FT.corbels(w, T, c - s, c + s, h + ay, 0.25, { step: 0.95, course: false, wd: 0.15, gy: ay }); FT.talus(w, T, c - s - (i < 2 ? 0.3 : 0), c + s + (i < 2 ? 0.3 : 0), ay, 1.4, 0.3, {}); });
+      // (the merlons over their boxes: d 0 at the back, 0.6 at the face that looks out)
+      const rows = [(a, y, d) => [a, y, z - s + 0.35 - d], (a, y, d) => [a, y, z + s - 0.35 + d], (a, y, d) => [x - s + 0.35 - d, y, a], (a, y, d) => [x + s - 0.35 + d, y, a]];
+      for (let k = -s; k < s - 0.4; k += 1.4) rows.forEach((T, i) => FT.merlon(w, T, (i < 2 ? x : z) + k + 0.35, h + 0.35 + ay, 0, 0.6, 0.7, 0.72, { gy: ay, dmg: 0, loop: false }));
+    } finally { LG._tag = tg; }
   }
   // the great hall: roofless walls with tall windows, doors on three sides, long tables, the lord's seat under his banners
   function greatHall(w, rng, R) {
@@ -132,7 +146,9 @@
     const seg = (horiz, fixed, a0, a1, door) => {
       for (let s = a0; s < a1 - 0.01; s += 1) {
         const e = Math.min(a1, s + 1), m = (s + e) / 2, hh = HH * (0.7 + 0.3 * Math.abs(Math.sin(m * 0.9 + x0)));
-        const B = (y0, y1) => { if (y1 - y0 < 0.05) return; if (horiz) w.solid('wall', s, y0, fixed, e, y1, fixed + T, { uv: 2.5 }); else w.solid('wall', fixed, y0, s, fixed + T, y1, e, { uv: 2.5 }); };
+        // (each piece up to its broken top, what is left of its last course on it: LG.ruinTop, drawn only)
+        const B = (y0, y1) => { if (y1 - y0 < 0.05) return; if (horiz) w.solid('wall', s, y0, fixed, e, y1, fixed + T, { uv: 2.5 }); else w.solid('wall', fixed, y0, s, fixed + T, y1, e, { uv: 2.5 });
+          if (y1 >= hh - 0.01 && LG.ruinTop) { const ay = w._atY || 0, tg = LG._tag; LG._tag = 'ruins'; try { LG.ruinTop(w, horiz ? (a, yy, d) => [a, yy, fixed + d] : (a, yy, d) => [fixed + d, yy, a], s, e, y1 + ay, 0, T, ay); } finally { LG._tag = tg; } } };
         if (door && Math.abs(m - door) < 1.6) { B(3.6, hh); continue; }
         if (!door && Math.round(m) % 4 === 0 && m > a0 + 2 && m < a1 - 2) { B(0, 2.4); B(5.4, hh); continue; } // tall window
         B(0, hh);

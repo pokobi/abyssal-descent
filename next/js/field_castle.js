@@ -118,9 +118,12 @@
       }
       // the south wall behind the keep's bailey and the stretches of curtain between the gates: the parapet along their tops
       // (not about the way in: its gate frame stands there, and the stretch of wall round it rises higher)
-      for (const [a0, a1] of [[-1.2, W / 2 - 7.7], [W / 2 + 7.7, W + 1.2]]) { for (const [p0, p1] of [[a0, Math.min(a1, cx - 15.3)], [Math.max(a0, cx + 15.3), a1]]) if (p1 - p0 > 1.5) FT.parapet(w, (a, y, d) => [a, y, D + 1.2 - d], p0, p1, TOPY + CUR, 0, 0.6, { gy: TOPY });   // (none where the keep's wall rises right behind it)
-        FT.corbels(w, (a, y, d) => [a, y, D - d], Math.max(0, a0), Math.min(W, a1), TOPY + CUR - 0.16, 0.42, { step: 1.5 }); }
-      { let ax = -1.2; for (const g of [...LG.gateXs(W, gates), W + 7]) { const e = g - 5.5; if (e > ax + 1.5) FT.parapet(w, (a, y, d) => [a, y, -1.2 + d], ax, e, CUR + 1, 0, 0.6); ax = g + 5.5; } }
+      // (the corbels only under the parapet: in front of the keep a row of them carrying nothing read as a shelf along the wall)
+      for (const [a0, a1] of [[-1.2, W / 2 - 7.7], [W / 2 + 7.7, W + 1.2]]) for (const [p0, p1] of [[a0, Math.min(a1, cx - 15.3)], [Math.max(a0, cx + 15.3), a1]]) if (p1 - p0 > 1.5) {
+        FT.parapet(w, (a, y, d) => [a, y, D + 1.2 - d], p0, p1, TOPY + CUR, 0, 0.6, { gy: TOPY, breach: true });   // (none where the keep's wall rises right behind it)
+        if (Math.min(W, p1) - Math.max(0, p0) > 1) FT.corbels(w, (a, y, d) => [a, y, D - d], Math.max(0, p0), Math.min(W, p1), TOPY + CUR - 0.16, 0.42, { step: 1.5 });
+      }
+      { let ax = -1.2; for (const g of [...LG.gateXs(W, gates), W + 7]) { const e = g - 5.5; if (e > ax + 1.5) FT.parapet(w, (a, y, d) => [a, y, -1.2 + d], ax, e, CUR + 1, 0, 0.6, { breach: true }); ax = g + 5.5; } }
       LG._tag = 'castle.retaining';
       // the parapets on the retaining walls: a coping along their tops, their merlons
       { const M = LG.mason(w); for (const [x0, x1, y, e] of rpar) { const v = M.var(x0, y, e); M.hexa('trim', [[x0 - 0.02, y + 0.98, e - 0.06], [x0 + 1.82, y + 0.98, e - 0.06], [x0 - 0.02, y + 1.12, e + 0.12], [x0 + 1.82, y + 1.12, e + 0.12], [x0 - 0.02, y + 0.98, e + 0.46], [x0 + 1.82, y + 0.98, e + 0.46], [x0 - 0.02, y + 1.12, e + 0.28], [x0 + 1.82, y + 1.12, e + 0.28]], 0, { gy: y, top: y + 1.2, tint: [v[0] * 0.85, v[1] * 0.85, v[2] * 0.85], n: 0.008, chip: 0.25, chipS: 0.06, uv: 1.4 }); } }

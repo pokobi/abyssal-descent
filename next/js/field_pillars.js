@@ -81,8 +81,11 @@
       const x0 = i * C + 0.13, x1 = (i + 1) * C - 0.13, z0 = cz0 + k * C + 0.13, z1 = cz0 + (k + 1) * C - 0.13, top = ht[id(i, k)], tt = 0.82 + rng.next() * 0.3;
       if (c === 1) {
         w.solid('block', x0, -40, z0, x1, top - 0.3, z1, { uv: 3, grad: false, tint: [tt, tt, tt * 1.04] });
-        w.solid('floor', x0 - 0.04, top - 0.3, z0 - 0.04, x1 + 0.04, top, z1 + 0.04, { uv: 2, tint: [tt, tt, tt] });
-        w.visual('trim', x0 + 0.25, top, z0 + 0.25, x1 - 0.25, top + 0.03, z0 + 0.4, { uv: 1, grad: false }); // (a worn edge line on its top)
+        // (its cap: the box that stops you as it was, drawn as a stone with its edges worn off over a moulding, headDraw. The pale line that
+        // lay on its top is gone; its box is kept in w.visBoxes for what reads them, areas.js)
+        LG.hard(w, 'floor', x0 - 0.04, top - 0.3, z0 - 0.04, x1 + 0.04, top, z1 + 0.04);
+        headDraw(w, (x0 + x1) / 2, top, (z0 + z1) / 2, x1 - x0, tt);
+        if (w.visBoxes) w.visBoxes.push([x0 + 0.25, top, z0 + 0.25, x1 - 0.25, top + 0.03, z0 + 0.4]);
         if (top > 0.2 || rng.chance(0.3)) w.platTops.push({ x0: x0 + 0.4, z0: z0 + 0.4, x1: x1 - 0.4, z1: z1 - 0.4, y: top, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2 });
         continue;
       }
@@ -93,7 +96,9 @@
       w.deferred.push((grp) => {
         const g = new THREE.Group();
         const body = new THREE.Mesh(PG().box, w.mats.block); body.scale.set(x1 - x0, 40 + top - 0.3, z1 - z0); body.position.y = -(40 + top - 0.3) / 2 - 0.3; g.add(body);
-        const cap = new THREE.Mesh(PG().box, w.mats.floor); cap.scale.set(x1 - x0 + 0.1, 0.3, z1 - z0 + 0.1); cap.position.y = -0.15; g.add(cap);
+        // (its head as the standing ones have it: the same stone and moulding, headGeo, its picture laid by where it stands)
+        const hg = headGeo(x1 - x0), cap = new THREE.Mesh(worldUV(hg.cap, (x0 + x1) / 2, top, (z0 + z1) / 2, 2), w.mats.floor); g.add(cap);
+        g.add(new THREE.Mesh(worldUV(hg.mould, (x0 + x1) / 2, top, (z0 + z1) / 2, 3), w.mats.block));
         // the seams that light up: a ring of light round the cap and a cross over its top
         const gm = glowMat(), sx = x1 - x0, sz = z1 - z0;
         for (const [ox, oz, ex, ez] of [[0, sz / 2 + 0.06, sx + 0.14, 0.05], [0, -sz / 2 - 0.06, sx + 0.14, 0.05], [sx / 2 + 0.06, 0, 0.05, sz + 0.14], [-sx / 2 - 0.06, 0, 0.05, sz + 0.14], [0, 0, sx * 0.8, 0.07], [0, 0, 0.07, sz * 0.8]]) {
@@ -132,6 +137,51 @@
     return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
   }
   F.gen.pillars = genPillars;
+
+  // ---------------------------------------------------------------- a pillar's head
+  // The cap (its box: s + 0.08 wide, 0.3 deep under the top) a stone with its edges taken off; under it a hollow moulding flaring out to
+  // it from the shaft, and a ring round the shaft's neck. One shape for each width (all the pillars of a field are one width), laid at
+  // (0, top, 0): the standing pillars' into the mason (headDraw), the sinking ones' as meshes of their own that sink with them.
+  const _heads = {};
+  // (a solid of convex faces, each a list of points, wound outward from cen; flat normals)
+  const solid = (faces, cen) => {
+    const pos = [];
+    const tri = (a, b, c) => { const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2], nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const mx = (a[0] + b[0] + c[0]) / 3 - cen[0], my = (a[1] + b[1] + c[1]) / 3 - cen[1], mz = (a[2] + b[2] + c[2]) / 3 - cen[2];
+      if (nx * mx + ny * my + nz * mz < 0) pos.push(...a, ...c, ...b); else pos.push(...a, ...b, ...c); };
+    for (const f of faces) for (let i = 1; i + 1 < f.length; i++) tri(f[0], f[i], f[i + 1]);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+  };
+  const hexFaces = (P) => [[0, 1, 3, 2], [4, 5, 7, 6], [0, 1, 5, 4], [2, 3, 7, 6], [0, 2, 6, 4], [1, 3, 7, 5]].map((f) => f.map((i) => P[i]));
+  function headGeo(s) {
+    const key = Math.round(s * 100); if (_heads[key]) return _heads[key];
+    // the cap: a box of half sizes hx, hy, hx about (0, -0.15, 0), its edges taken off by b
+    const hx = s / 2 + 0.04, hy = 0.15, b = 0.035, H = [hx, hy, hx], cy = -0.15, faces = [];
+    const Vc = (c, ax) => { const p = []; for (let i = 0; i < 3; i++) p.push(c[i] * (i === ax ? H[i] : H[i] - b)); p[1] += cy; return p; };
+    for (let ax = 0; ax < 3; ax++) for (const sg of [-1, 1]) { const u = (ax + 1) % 3, v = (ax + 2) % 3; faces.push([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([p, q]) => { const c = [0, 0, 0]; c[ax] = sg; c[u] = p; c[v] = q; return Vc(c, ax); })); }
+    for (let a1 = 0; a1 < 3; a1++) for (let a2 = a1 + 1; a2 < 3; a2++) { const t = 3 - a1 - a2; for (const s1 of [-1, 1]) for (const s2 of [-1, 1]) { const c0 = [0, 0, 0], c1 = [0, 0, 0]; c0[a1] = c1[a1] = s1; c0[a2] = c1[a2] = s2; c0[t] = -1; c1[t] = 1; faces.push([Vc(c0, a1), Vc(c1, a1), Vc(c1, a2), Vc(c0, a2)]); } }
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) { const c = [sx, sy, sz]; faces.push([Vc(c, 0), Vc(c, 1), Vc(c, 2)]); }
+    const cap = solid(faces, [0, cy, 0]);
+    // the moulding: the hollow flaring out to just under the cap's edge, and the ring round the neck below it
+    const sq = (a, ya, c, yc) => [[-a, ya, -a], [a, ya, -a], [-c, yc, -c], [c, yc, -c], [-a, ya, a], [a, ya, a], [-c, yc, c], [c, yc, c]], h2 = s / 2;
+    const fl = solid(hexFaces(sq(h2, -0.54, h2 + 0.035, -0.3)), [0, -0.42, 0]), ring = solid(hexFaces(sq(h2 + 0.028, -0.68, h2 + 0.028, -0.6)), [0, -0.64, 0]);
+    const mp = [...fl.attributes.position.array, ...ring.attributes.position.array], mn = [...fl.attributes.normal.array, ...ring.attributes.normal.array];
+    const mould = new THREE.BufferGeometry(); mould.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3)); mould.setAttribute('normal', new THREE.Float32BufferAttribute(mn, 3));
+    return (_heads[key] = { cap, mould });
+  }
+  // a copy of g with its picture laid by where it stands (at x, y, z), as the mason lays it (uv: metres a repeat)
+  function worldUV(g, x, y, z, uv) {
+    const q = g.clone(), P = q.attributes.position.array, N = q.attributes.normal.array, U = [];
+    for (let i = 0; i < P.length; i += 3) { const px = P[i] + x, py = P[i + 1] + y, pz = P[i + 2] + z, ax = Math.abs(N[i]), ay = Math.abs(N[i + 1]), az = Math.abs(N[i + 2]); U.push((ax > az ? pz : px) / uv, (ay > 0.7 ? (ax > az ? px : pz) : py) / uv); }
+    q.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); return q;
+  }
+  // a standing pillar's head into the mason (by its own tint, tt)
+  function headDraw(w, x, top, z, s, tt) {
+    const M = LG.mason(w), hg = headGeo(s), ay = w._atY || 0, m = new THREE.Matrix4().makeTranslation(x, top + ay, z), tg = LG._tag; LG._tag = 'heads';
+    M.geo('floor', hg.cap, m, { world: true, uv: 2, tint: [tt, tt, tt], gy: top + ay - 4, plain: true, one: true });
+    M.geo('block', hg.mould, m, { world: true, uv: 3, tint: [tt, tt, tt * 1.04], gy: top + ay - 4, one: true });
+    LG._tag = tg;
+  }
 
   // ---------------------------------------------------------------- the pillars that sink
   // up -> warn (its seams light up: 1.6 s; foes stop counting it as ground) -> sink (2.4 s) -> down (some seconds, no collider)

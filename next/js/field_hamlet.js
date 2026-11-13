@@ -188,6 +188,7 @@
     if (!twoUp) {
       // the flat roof (walkable), its edge a little proud of the walls
       w.solid('woodDark', x0 - 0.1, R1, z0 - 0.1, x1 + 0.1, R1 + 0.25, z1 + 0.1, { uv: 2 });
+      eaves(w, x0, z0, x1, z1, R1);
       return;
     }
     // two storeys: the upper floor (a stair up along the inside of the west or east wall, its well left open), the steep roof over it
@@ -202,8 +203,8 @@
     // the roof: a ceiling slab and the two pitches over it
     w.solid('woodDark', x0 - 0.1, h - 0.25, z0 - 0.1, x1 + 0.1, h, z1 + 0.1, { uv: 2, noGrapple: true });
     const along = (x1 - x0) >= (z1 - z0), cxm = (x0 + x1) / 2, czm = (z0 + z1) / 2;
-    if (along) for (const s of [-1, 1]) w.batch.geo('woodDark', PG().box, Mx(cxm, h + 1.0, czm + s * (z1 - z0) / 4, x1 - x0 + 0.5, 0.18, (z1 - z0) / 2 * 1.16, s * 0.55, 0, 0));
-    else for (const s of [-1, 1]) w.batch.geo('woodDark', PG().box, Mx(cxm + s * (x1 - x0) / 4, h + 1.0, czm, (x1 - x0) / 2 * 1.16, 0.18, z1 - z0 + 0.5, 0, 0, -s * 0.55));
+    if (along) for (const s of [-1, 1]) { const m = Mx(cxm, h + 1.0, czm + s * (z1 - z0) / 4, x1 - x0 + 0.5, 0.18, (z1 - z0) / 2 * 1.16, s * 0.55, 0, 0); w.batch.geo('woodDark', PG().box, m); shingles(w, m); }
+    else for (const s of [-1, 1]) { const m = Mx(cxm + s * (x1 - x0) / 4, h + 1.0, czm, (x1 - x0) / 2 * 1.16, 0.18, z1 - z0 + 0.5, 0, 0, -s * 0.55); w.batch.geo('woodDark', PG().box, m); shingles(w, m); }
     w.addCollider(x0, h, z0, x1, h + 2.1, z1, { noGrapple: true });
     // ---- the gable walls under the two pitches, a ridge beam, a chimney of stone (to look at)
     {
@@ -219,8 +220,66 @@
       const ce = (Math.round(x0 * 7 + z0 * 3) % 2) ? 1 : -1, kx = along ? cxm + ce * (len / 2 - 1.3) : cxm + 0.9, kz = along ? czm + 0.9 : czm + ce * (len / 2 - 1.3);
       w.visual('block', kx - 0.42, h - 0.2, kz - 0.42, kx + 0.42, h + rise + 0.9, kz + 0.42, { uv: 1.4 });
       w.visual('trim', kx - 0.52, h + rise + 0.9, kz - 0.52, kx + 0.52, h + rise + 1.05, kz + 0.52, { uv: 1 });
+      // (a band of stone round the stack under its cap, and the cap's top sloped up to the pots: drawn only)
+      if (LG.mason) { const M = LG.mason(w), ay = w._atY || 0, y = h + rise + ay, v = M.var(kx, y, kz, 24), t = [v[0] * 0.86, v[1] * 0.86, v[2] * 0.86], tg = LG._tag; LG._tag = 'roofs';
+        M.box('trim', kx - 0.47, y + 0.42, kz - 0.47, kx + 0.47, y + 0.54, kz + 0.47, M.lo ? 0 : 0.012, { gy: ay, top: y + 1.1, tint: t, n: 0.004, chip: 0.25, chipS: 0.03 });
+        M.hexa('trim', [[kx - 0.5, y + 1.05, kz - 0.5], [kx + 0.5, y + 1.05, kz - 0.5], [kx - 0.3, y + 1.13, kz - 0.3], [kx + 0.3, y + 1.13, kz - 0.3], [kx - 0.5, y + 1.05, kz + 0.5], [kx + 0.5, y + 1.05, kz + 0.5], [kx - 0.3, y + 1.13, kz + 0.3], [kx + 0.3, y + 1.13, kz + 0.3]], 0, { gy: ay, top: y + 1.1, tint: [t[0] * 0.8, t[1] * 0.8, t[2] * 0.8], n: 0.003 });
+        LG._tag = tg; }
       for (const [ox, oz] of [[-0.18, -0.18], [0.18, 0.18]]) w.batch.geo('dark', PG().cyl8, Mx(kx + ox, h + rise + 1.22, kz + oz, 0.11, 0.34, 0.11), { tint: [0.5, 0.3, 0.22] });
     }
+  }
+  // (a number 0..1 from a place, the same each time: what is drawn by the place, not by the dice)
+  const _hn = (x, y, s) => { const n = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
+  // a pitch of a steep roof (m: the matrix of its board, the unit box scaled - x along the eaves, z down the slope) laid with wooden
+  // shingles: courses from the eaves to the ridge, each lapping the one below with its lower edge lifted, broken into lengths, the joints
+  // of one course off the next, now and then a shingle gone; barge boards along its two ends. Drawn only, by the place
+  function shingles(w, m) {
+    if (!LG.mason) return; const M = LG.mason(w), e = m.elements, ay = w._atY || 0, tg = LG._tag; LG._tag = 'roofs';
+    // (a point of the board: u 0..1 along it, t its own height (0.5 its top), v -0.5..0.5 across it)
+    const P = (u, t, v) => { const x = u - 0.5; return [e[0] * x + e[4] * t + e[8] * v + e[12], e[1] * x + e[5] * t + e[9] * v + e[13] + ay, e[2] * x + e[6] * t + e[10] * v + e[14]]; };
+    const lenU = Math.hypot(e[0], e[1], e[2]), lenV = Math.hypot(e[8], e[9], e[10]), thick = Math.hypot(e[4], e[5], e[6]);
+    const down = P(0.5, 0.5, 0.5)[1] < P(0.5, 0.5, -0.5)[1] ? 1 : -1, rows = Math.max(4, Math.round(lenV / 0.34)), dv = 1 / rows;
+    const tLo = 0.5 + 0.045 / thick, tUp = 0.5 + 0.01 / thick, tB = 0.5 - 0.02 / thick, gu = 0.005 / lenU, Q = [];
+    const UP = [e[4] / thick, e[5] / thick, e[6] / thick], DN = [down * e[8] / lenV, down * e[9] / lenV, down * e[10] / lenV];
+    for (let r = 0; r < rows; r++) {
+      const va = down * (r ? 0.5 - r * dv : 0.5 + 0.03 / lenV), vb = down * Math.max(-0.5, 0.5 - (r + 1) * dv - dv * 0.4);
+      let u = -0.012 - (r % 2 ? 0.45 / lenU : 0);
+      while (u < 1.012) {
+        const u1 = Math.min(1.012, u + (0.7 + 0.8 * _hn(e[12] + r * 0.7, e[14] + u * 9, 81)) / lenU), ua = Math.max(-0.012, u);
+        const p0 = P((ua + u1) / 2, 0.5, va);
+        if (u1 - ua > 0.08 / lenU && _hn(p0[0] * 2.1, p0[2] * 1.7 + r, 82) > 0.035) {
+          const v = M.var(p0[0], p0[1], p0[2], 23), sh = 0.8 + 0.3 * _hn(p0[0] * 3.3, p0[2] * 2.9 + r, 83), tn = [v[0] * sh, v[1] * sh * 0.97, v[2] * sh * 0.93];
+          // (its face, sloping up from its lifted lower edge, and that edge's end grain, a little darker)
+          // (its face lighter at the lifted edge, darker up where the course above lies over it: the courses read from above)
+          const lo = [tn[0] * 1.12, tn[1] * 1.12, tn[2] * 1.12], hi = [tn[0] * 0.5, tn[1] * 0.5, tn[2] * 0.5];
+          Q.push([P(ua + gu, tLo, va), P(u1 - gu, tLo, va), P(u1 - gu, tUp, vb), P(ua + gu, tUp, vb), UP, [lo, lo, hi, hi]], [P(ua + gu, tB, va), P(u1 - gu, tB, va), P(u1 - gu, tLo, va), P(ua + gu, tLo, va), DN, [tn[0] * 0.7, tn[1] * 0.7, tn[2] * 0.7]]);
+        }
+        u = u1;
+      }
+    }
+    M.quads('woodDark', Q, 0.9);
+    // (the barge boards: a plank down each end of the pitch, under its edge)
+    const bt = 0.04 / lenU, bd = 0.32 / thick;
+    for (const [u0, u1] of [[-0.012 - bt, -0.012], [1.012, 1.012 + bt]]) { const p = P(u0, 0, 0), v = M.var(p[0], p[1], p[2], 25); M.hexa('woodDark', [P(u0, 0.5 - bd, -0.51), P(u1, 0.5 - bd, -0.51), P(u0, 0.5 - bd, 0.51), P(u1, 0.5 - bd, 0.51), P(u0, tLo + 0.1, -0.51), P(u1, tLo + 0.1, -0.51), P(u0, tLo + 0.1, 0.51), P(u1, tLo + 0.1, 0.51)], 0, { gy: -50, top: 99, tint: [v[0] * 0.75, v[1] * 0.72, v[2] * 0.7], n: 0.003, uv: 1 }); }
+    LG._tag = tg;
+  }
+  // the eaves of a flat roof (its slab from y over the walls x0..x1, z0..z1, standing 0.1 out): the ends of its joists under it, standing out
+  // of the walls past the slab's edge, all round. Drawn only, by the place
+  function eaves(w, x0, z0, x1, z1, y) {
+    if (!LG.mason) return; const M = LG.mason(w), ay = w._atY || 0, Y = y + ay, tg = LG._tag; LG._tag = 'roofs';
+    const sides = [[x0, x1, (a) => [a, z0], 0, -1], [x0, x1, (a) => [a, z1], 0, 1], [z0 + 0.3, z1 - 0.3, (a) => [x0, a], 1, -1], [z0 + 0.3, z1 - 0.3, (a) => [x1, a], 1, 1]], Q = [];
+    for (const [a0, a1, at, ax, sg] of sides) {
+      const n = Math.max(2, Math.round((a1 - a0 - 0.3) / 0.6));
+      for (let i = 0; i <= n; i++) {
+        const a = a0 + 0.15 + (a1 - a0 - 0.3) * i / n, [px, pz] = at(a), v = M.var(px, Y, pz, 26), t = 0.82 + 0.16 * _hn(px * 1.9, pz * 2.3, 84), tn = [v[0] * t, v[1] * t, v[2] * t];
+        // (a joist's end: its end, its underside and its two sides, in the frame of its wall - s along the wall, o out of it)
+        const W3 = (s, yy, o) => (ax === 0 ? [a + s, yy, pz + sg * o] : [px + sg * o, yy, a + s]), out = ax === 0 ? [0, 0, sg] : [sg, 0, 0], al = ax === 0 ? [1, 0, 0] : [0, 0, 1], y0 = Y - 0.17, y1 = Y - 0.005;
+        Q.push([W3(-0.05, y0, 0.26), W3(0.05, y0, 0.26), W3(0.05, y1, 0.26), W3(-0.05, y1, 0.26), out, tn], [W3(-0.05, y0, 0), W3(0.05, y0, 0), W3(0.05, y0, 0.26), W3(-0.05, y0, 0.26), [0, -1, 0], tn],
+          [W3(-0.05, y0, 0), W3(-0.05, y1, 0), W3(-0.05, y1, 0.26), W3(-0.05, y0, 0.26), [-al[0], 0, -al[2]], tn], [W3(0.05, y0, 0), W3(0.05, y1, 0), W3(0.05, y1, 0.26), W3(0.05, y0, 0.26), al, tn]);
+      }
+    }
+    M.quads('woodDark', Q, 0.8);
+    LG._tag = tg;
   }
   F.gen.hamlet = genHamlet;
 })();

@@ -204,8 +204,9 @@
   // a broken column lying on its side (along x or z)
   function fallenColumn(w, rng, x, z, alongX) {
     const L = rng.range(3.5, 5.5), r = 0.45;
-    if (alongX) { w.batch.geo('trim', PG().cyl8, Mx(x, r, z, r, L, r, 0, 0, Math.PI / 2)); w.addCollider(x - L / 2, 0, z - r, x + L / 2, r * 2, z + r, { surf: 'stone' }); }
-    else { w.batch.geo('trim', PG().cyl8, Mx(x, r, z, r, L, r, Math.PI / 2, 0, 0)); w.addCollider(x - r, 0, z - L / 2, x + r, r * 2, z + L / 2, { surf: 'stone' }); }
+    // (drawn as its drums lying in a line where it fell, LG.fallenDrums; its box as it was)
+    if (alongX) { if (LG.fallenDrums) LG.fallenDrums(w, x, z, true, L, r); else w.batch.geo('trim', PG().cyl8, Mx(x, r, z, r, L, r, 0, 0, Math.PI / 2)); w.addCollider(x - L / 2, 0, z - r, x + L / 2, r * 2, z + r, { surf: 'stone' }); }
+    else { if (LG.fallenDrums) LG.fallenDrums(w, x, z, false, L, r); else w.batch.geo('trim', PG().cyl8, Mx(x, r, z, r, L, r, Math.PI / 2, 0, 0)); w.addCollider(x - r, 0, z - L / 2, x + r, r * 2, z + L / 2, { surf: 'stone' }); }
     P().rubble(w, x + (alongX ? L / 2 + 0.6 : 0), 0, z + (alongX ? 0 : L / 2 + 0.6), rng, 0.8);
   }
   // a triumphal arch across a way along z (piers either side, a walkway on top that burns: see fireTops)
@@ -306,7 +307,7 @@
       if (sx < 0 && Math.abs(z - nz) < 4) continue;
       P().pillarRound(w, cx + sx * (hw + 1.2), z, 0, rng.chance(0.2) ? rng.range(2, 4) : 7, 0.45, false, rng);
     }
-    for (let z = gz1 + 8; z < D - 6; z += 15) for (const sx of [-1, 1]) { if (sx < 0 && Math.abs(z - nz) < 6) continue; w.solid('block', cx + sx * (side - 1.4) - 1, 0, z - 1, cx + sx * (side - 1.4) + 1, 1, z + 1, { uv: 1 }); P().statue(w, cx + sx * (side - 1.4), z, 1, sx < 0 ? Math.PI / 2 : -Math.PI / 2, rng, 0.9); }
+    for (let z = gz1 + 8; z < D - 6; z += 15) for (const sx of [-1, 1]) { if (sx < 0 && Math.abs(z - nz) < 6) continue; w.solid('block', cx + sx * (side - 1.4) - 1, 0, z - 1, cx + sx * (side - 1.4) + 1, 1, z + 1, { uv: 1 }); if (LG.pedestal) LG.pedestal(w, cx + sx * (side - 1.4), z, 1, 0, 1, { cap: false }); P().statue(w, cx + sx * (side - 1.4), z, 1, sx < 0 ? Math.PI / 2 : -Math.PI / 2, rng, 0.9); }
     for (let z = gz1 + 12; z < D - 6; z += 18) for (const sx of [-1, 1]) P().brazier(w, cx + sx * (hw - 0.8), 0, z, 0.9, true);
     // the great arch over the gate
     const gate = 3.2;
@@ -315,6 +316,9 @@
     w.solid('block', cx - gate - 2.4, 6.4, gz0 - 0.5, cx + gate + 2.4, 9.5, gz1 + 0.5, { uv: 3 });
     w.solid('trim', cx - gate - 2.7, 9.5, gz0 - 0.8, cx + gate + 2.7, 10.0, gz1 + 0.8, { uv: 2, noGrapple: true });
     w.addCollider(cx - gate - 2.7, 10, gz0 - 0.8, cx + gate + 2.7, 13, gz1 + 0.8, { noGrapple: true });
+    // (its opening drawn with a round head: an arch of wedge stones through the gate's depth, the corners over its haunches filled up to the
+    // lintel's boxes - they stand in the opening's box, which still lets you through there; LG.archDraw)
+    if (LG.archDraw) LG.archDraw(w, (u, y, d) => [cx + u, y, gz0 - 0.58 + d], gate, 3.8, 2.6, gz1 - gz0 + 1.16, 6.4, { fill: 'block', out: gate, gy: 0 });
     for (const sx of [-1, 1]) w.addLight(cx + sx * (gate + 1.2), 6, gz1 + 1.5, { flame: 0.3, intensity: 7, range: 11, color: '#ffa050', prio: 1.2 });
     w.bossGate = { x: cx, z0: gz0, z1: gz1, w: gate * 2 };
     w.deferred.push((grp) => { const pc = H.portcullis(w, gate * 2 - 0.2, 6.2); pc.position.set(cx, 5.8, gz1 - 0.2); grp.add(pc); w.bossGate.pc = pc; });
@@ -374,7 +378,9 @@
     ring(w, rng, W, AD, last) {
       // a broken balustrade with column stumps round the field (low: the sunset stays in view)
       const gaps = last ? [] : LG.gateXs(W, 3).map((g) => [g - 2.6, g + 2.6]);
-      const bal = (x0, z0, x1, z1) => { w.solid('block', x0, 0, z0, x1, 1.2, z1, { uv: 1 }); w.visual('trim', x0 - 0.05, 1.2, z0 - 0.05, x1 + 0.05, 1.32, z1 + 0.05, { uv: 1 }); };
+      // (drawn as a balustrade with a baluster gone here and there, LG.balustrade; its old coping's box kept for what reads the drawn boxes)
+      const bal = (x0, z0, x1, z1) => { if (!LG.balustrade) { w.solid('block', x0, 0, z0, x1, 1.2, z1, { uv: 1 }); w.visual('trim', x0 - 0.05, 1.2, z0 - 0.05, x1 + 0.05, 1.32, z1 + 0.05, { uv: 1 }); return; }
+        LG.hard(w, 'block', x0, 0, z0, x1, 1.2, z1); LG.balustrade(w, x0, z0, x1, z1, 1.2, { toward: [W / 2, AD / 2], broken: true }); if (w.visBoxes) w.visBoxes.push([x0 - 0.05, 1.2, z0 - 0.05, x1 + 0.05, 1.32, z1 + 0.05]); };
       let x = 0.2; for (const [a, b] of gaps) { if (a > x) bal(x, 0.2, a, 0.7); x = b; } if (x < W - 0.2) bal(x, 0.2, W - 0.2, 0.7);
       bal(0.2, 0.7, 0.7, AD); bal(W - 0.7, 0.7, W - 0.2, AD);
       for (let z = 8; z < AD - 4; z += 12) for (const px of [1.5, W - 1.5]) P().pillarRound(w, px, z, 0, rng.range(2.5, 6), 0.45, true, rng);

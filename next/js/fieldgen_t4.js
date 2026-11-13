@@ -157,9 +157,9 @@
       if (kind2 === 'ring' || kind2 === 'shrine') {
         const n = q.great ? 10 : big ? 8 : 6, rr = q.r - 2;
         for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + rng.range(-0.1, 0.1), x = q.x + Math.cos(a) * rr, z = q.z + Math.sin(a) * rr; if (occ.free(x - 0.8, z - 0.8, x + 0.8, z + 0.8)) { P().pillarRound(w, x, z, 0, rng.range(4, 7), 0.42, rng.chance(0.25), rng); occ.mark(x - 0.8, z - 0.8, x + 0.8, z + 0.8); } }
-        if (kind2 === 'shrine') { w.solid('trim', q.x - 1.2, 0, q.z - 1.2, q.x + 1.2, 1.0, q.z + 1.2, { uv: 1 }); P().brazier(w, q.x, 1.0, q.z, 1.1); occ.mark(q.x - 1.8, q.z - 1.8, q.x + 1.8, q.z + 1.8); }
+        if (kind2 === 'shrine') { w.solid('trim', q.x - 1.2, 0, q.z - 1.2, q.x + 1.2, 1.0, q.z + 1.2, { uv: 1 }); if (LG.pedestal) LG.pedestal(w, q.x, q.z, 1.2, 0, 1.0); P().brazier(w, q.x, 1.0, q.z, 1.1); occ.mark(q.x - 1.8, q.z - 1.8, q.x + 1.8, q.z + 1.8); }
       } else if (kind2 === 'statues') {
-        for (let i = 0; i < (big ? 4 : 3); i++) { const a = rng.range(0, 6.28), d = rng.range(0, q.r - 3), x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d; if (occ.free(x - 1.4, z - 1.4, x + 1.4, z + 1.4)) { occ.mark(x - 1.4, z - 1.4, x + 1.4, z + 1.4); w.solid('block', x - 1, 0, z - 1, x + 1, 0.8, z + 1, { uv: 1 }); P().statue(w, x, z, 0.8, rng.range(0, 6), rng, 1); } }
+        for (let i = 0; i < (big ? 4 : 3); i++) { const a = rng.range(0, 6.28), d = rng.range(0, q.r - 3), x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d; if (occ.free(x - 1.4, z - 1.4, x + 1.4, z + 1.4)) { occ.mark(x - 1.4, z - 1.4, x + 1.4, z + 1.4); w.solid('block', x - 1, 0, z - 1, x + 1, 0.8, z + 1, { uv: 1 }); if (LG.pedestal) LG.pedestal(w, x, z, 1, 0, 0.8, { cap: false }); P().statue(w, x, z, 0.8, rng.range(0, 6), rng, 1); } }
       } else {
         for (let i = 0; i < (big ? 5 : 4); i++) { const a = rng.range(0, 6.28), d = rng.range(1, q.r - 2), x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d; if (occ.free(x - 1, z - 1, x + 1, z + 1)) { occ.mark(x - 1, z - 1, x + 1, z + 1); const ts = rng.int(1, 1e9), sc = rng.range(0.7, 1.0); w.deferred.push((grp) => LG.tree(grp, w, x, 0, z, new G.RNG(ts), sc)); w.addCollider(x - 0.25, 0, z - 0.25, x + 0.25, 4, z + 0.25, { surf: 'wood' }); } }
       }
@@ -170,6 +170,7 @@
         if (occ.free(x - 2.5, z - 2.5, x + 2.5, z + 2.5)) {
           occ.mark(x - 2.5, z - 2.5, x + 2.5, z + 2.5);
           w.solid('block', x - 2.4, y - 0.5, z - 2.4, x + 2.4, y, z + 2.4, { uv: 2 }); w.solid('trim', x - 2.5, y - 0.7, z - 2.5, x + 2.5, y - 0.5, z + 2.5, { uv: 1 });
+          slabKerb(w, x, y, z);
           w.platTops.push({ x0: x - 2.1, z0: z - 2.1, x1: x + 2.1, z1: z + 2.1, y, cx: x, cz: z });
           const vx = x + (rng.chance(0.5) ? 3.6 : -3.6);
           if (Math.hypot(vx - q.x, z - q.z) < q.r - 1.4) G.Fields.add(w, 'vent', vx - 1, z - 1, vx + 1, z + 1);
@@ -179,8 +180,16 @@
     }
     // the gate terrace: a colonnade along its edge over the drop, golden lamps
     for (let x = 6; x < W - 4; x += 7) if (LG.gateXs(W, gates || 1).every((g) => Math.abs(g - x) > 6) && Math.abs(x - W / 2) > 14) { P().pillarRound(w, x, 17, 0, 7, 0.42, false, rng); occ.mark(x - 1, 16, x + 1, 18); }
-    for (let x = 3; x < W - 3; x += 8) { const c = pit[18 * W + Math.floor(x)]; if (c) { w.solid('block', x - 0.2, 0, 17.6, x + 0.2, 1.0, 17.99, { uv: 1 }); } }
+    for (let x = 3; x < W - 3; x += 8) { const c = pit[18 * W + Math.floor(x)]; if (c) { w.solid('block', x - 0.2, 0, 17.6, x + 0.2, 1.0, 17.99, { uv: 1 }); if (LG.pedestal) LG.pedestal(w, x, 17.795, 0.2, 0, 1.0, { k: 0.45 }); } }
     return FB.finish(w, rng, occ, W, D, area, kind, extraChests);
+  }
+  // a floating slab's edge (its boxes as they were): kerb stones round its top, a little proud of its sides, worn (drawn only, by the place)
+  function slabKerb(w, x, y, z) {
+    if (!LG.coping) return; const ay = w._atY || 0, Y = y + ay, tg = LG._tag; LG._tag = 'kerbs';
+    try {
+      for (const [T, a0, a1] of [[(a, yy, d) => [a, yy, z - 2.4 - d], x - 2.45, x + 2.45], [(a, yy, d) => [a, yy, z + 2.4 + d], x - 2.45, x + 2.45], [(a, yy, d) => [x - 2.4 - d, yy, a], z - 2.05, z + 2.05], [(a, yy, d) => [x + 2.4 + d, yy, a], z - 2.05, z + 2.05]])
+        LG.coping(w, T, a0, a1, Y - 0.3, Y + 0.008, -0.36, 0.05, { len: [0.9, 1.5], gy: Y - 8 });
+    } finally { LG._tag = tg; }
   }
   F.gen.sanctum = genSanctum;
   // the sanctuary's guardian approach: a long bridge over the clouds to a white gate; the field itself is a great island
@@ -192,7 +201,9 @@
     w.solid('floor', cx - hw - 6, -1, nz - 5, cx - hw, 0, nz + 6, { uv: 2 });
     w.deferred.push((grp) => { const m = new THREE.Mesh(PG().box, w.mats.rock); m.scale.set(hw * 2, 5, D - gz1); m.position.set(cx, -3.6, (gz1 + D) / 2); grp.add(m); /* (no wider than the bridge: a ledge of it beside the balustrade would be a floor nothing holds up) */ const b = new THREE.Mesh(PG().cone, w.mats.rock); b.scale.set(2.9, 13, 5.4); b.rotation.x = Math.PI; b.position.set(cx - hw - 3, -1.05 - 6.5, nz + 0.5); grp.add(b); /* (under the balcony's floor, no wider than it) */ });
     // balustrades along the bridge (open at the balcony), statues and golden lamps
-    const bal = (x0, z0, x1, z1) => { w.solid('block', x0, 0, z0, x1, 1.0, z1, { uv: 1 }); w.visual('trim', x0 - 0.04, 1.0, z0 - 0.04, x1 + 0.04, 1.08, z1 + 0.04, { uv: 1 }); };
+    // (drawn as a balustrade toward the road, LG.balustrade; its old coping's box kept for what reads the drawn boxes)
+    const bal = (x0, z0, x1, z1) => { if (!LG.balustrade) { w.solid('block', x0, 0, z0, x1, 1.0, z1, { uv: 1 }); w.visual('trim', x0 - 0.04, 1.0, z0 - 0.04, x1 + 0.04, 1.08, z1 + 0.04, { uv: 1 }); return; }
+      LG.hard(w, 'block', x0, 0, z0, x1, 1.0, z1); LG.balustrade(w, x0, z0, x1, z1, 1.0, { toward: [cx, (z0 + z1) / 2] }); if (w.visBoxes) w.visBoxes.push([x0 - 0.04, 1.0, z0 - 0.04, x1 + 0.04, 1.08, z1 + 0.04]); };
     bal(cx + hw - 0.4, gz1, cx + hw, D); bal(cx - hw, gz1, cx - hw + 0.4, nz - 5); bal(cx - hw, nz + 6, cx - hw + 0.4, D);
     bal(cx - hw - 6, nz - 5.4, cx - hw, nz - 5); bal(cx - hw - 6, nz + 6, cx - hw, nz + 6.4); bal(cx - hw - 6.4, nz - 5, cx - hw - 6, nz + 6);
     for (let z = gz1 + 8; z < D - 4; z += 12) { P().brazier(w, cx + hw - 1.2, 0, z, 0.9, true); if (Math.abs(z - nz) > 8) P().brazier(w, cx - hw + 1.2, 0, z + 6, 0.9, true); }

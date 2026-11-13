@@ -114,13 +114,17 @@
     opts = opts || {};
     w.solid('block', x0 - 3, y, z0 - 3, x1 + 3, y + 1.2, z1 + 3, { uv: 4 });
     w.ceilingY = y;
+    const zsB = [];
     for (let z = z0 + 5; z < z1 - 2; z += opts.beamStep || 7) {
       if (opts.ruined && rng.chance(0.3)) continue;
+      zsB.push(z);
       w.visual('woodDark', x0, y - 0.7, z - 0.35, x1, y, z + 0.35, { uv: 2 });
       // (its ends rest on stone corbels in the side walls, two courses each standing out farther: drawn only, nothing thrown for them)
       if (LG.mason) { const M = LG.mason(w); for (const [xf, s] of [[x0, 1], [x1, -1]]) for (let k = 0; k < 2; k++) { const yb = y - 1.62 + k * 0.46, o0 = 0.12 + k * 0.24, o1 = 0.34 + k * 0.26, v = M.var(xf, yb, z); M.hexa('trim', [[xf - s * 0.04, yb, z - 0.3], [xf - s * 0.04, yb, z + 0.3], [xf - s * 0.04, yb + 0.45, z - 0.3], [xf - s * 0.04, yb + 0.45, z + 0.3], [xf + s * o0, yb, z - 0.3], [xf + s * o0, yb, z + 0.3], [xf + s * o1, yb + 0.45, z - 0.3], [xf + s * o1, yb + 0.45, z + 0.3]], 0.015, { gy: 0, top: y, tint: [v[0] * 0.85, v[1] * 0.85, v[2] * 0.85], n: 0.004, chip: 0.15, chipS: 0.04 }); } }
       if (rng.chance(0.5)) P().chain(w, rng.range(x0 + 4, x1 - 4), y - rng.range(2.5, 5), z, rng.range(2.5, 4.5));
     }
+    // (between the beams the ceiling is coffered: joists of dark wood framed into them every 7 m, LG.coffers; drawn only, no dice)
+    if (LG.coffers && opts.coffers !== false) LG.coffers(w, x0, z0, x1, z1, y, zsB, 7);
     const nch = opts.chandeliers ?? 2;
     for (let i = 0; i < nch; i++) P().chandelier(w, rng.range(x0 + 10, x1 - 10), y - rng.range(4, 6), rng.range(z0 + 12, z1 - 12), y - 0.7);
   };

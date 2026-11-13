@@ -1046,8 +1046,71 @@
   W.reloadBlocksSprint = function () { const w = P.weapon; return !!(w && w.reloading && !P.has('m_sprintreload')); };
 
   // ---------------- update / firing ----------------
-  const anim = { kick: 0, kickR: 0, swayX: 0, swayY: 0, reload: 0, melee: 0, throwT: 0, inspect: 0, flash: 0, spinA: 0 };
+  const anim = { kick: 0, kv: 0, kw: 30, kickR: 0, swayX: 0, swayY: 0, reload: 0, melee: 0, throwT: 0, inspect: 0, flash: 0, spinA: 0 };
   W.anim = anim;
+  // ---- recoil: each kind of gun's own (degrees, from the hip, standing; aimed down the sights it is 0.7 of this) ----
+  // v: up per shot; first: the first shot of a string (x); hb: the gun's lean to one side per shot (which side is the gun's own), turning
+  // over a string at hw (radians a shot: cos(shots * hw)); hr: the wander either way per shot; g0 -> g1 over hk shots: the climb of each
+  // shot through a long string (an LMG bucks at first and then settles); ret: the share of the climb that comes back when the firing
+  // stops, at retK (1/s, critically damped), after delay s; tau: how fast the kick is laid on (s); vk: the gun's own visible kick.
+  const RP = (o) => Object.assign({ v: 1, first: 1, hb: 0.1, hw: 0.3, hr: 0.2, g0: 1, g1: 1, hk: 8, ret: 0.6, retK: 9, delay: 0.08, tau: 0.025, vk: 0.5 }, o);
+  W.RECOIL = {
+    pistol: RP({ v: 1.6, first: 1.15, hb: 0.06, hw: 0.5, hr: 0.28, ret: 0.8, retK: 22, delay: 0.03, tau: 0.018, vk: 0.6 }),   // sharp, and straight back down
+    revolver: RP({ v: 4.2, hb: 0.25, hw: 0.4, hr: 0.55, ret: 0.75, retK: 9, delay: 0.07, tau: 0.03, vk: 1.15 }),   // one big heave
+    smg: RP({ v: 0.45, hb: 0.05, hw: 0.5, hr: 0.32, g0: 0.6, g1: 0.9, hk: 4, ret: 0.55, retK: 12, delay: 0.06, tau: 0.015, vk: 0.38 }),   // small, quick, all over the place
+    rifle: RP({ v: 0.78, hb: 0.1, hw: 0.24, hr: 0.16, g0: 0.55, g1: 0.8, hk: 4, ret: 0.5, retK: 9, delay: 0.08, tau: 0.022, vk: 0.48 }),   // a climb that builds over the first shots, then holds its pace
+    burst: RP({ v: 0.85, hb: 0.08, hw: 0.3, hr: 0.14, g0: 0.55, g1: 0.9, hk: 3, ret: 0.6, retK: 10, delay: 0.07, tau: 0.02, vk: 0.48 }),
+    dmr: RP({ v: 1.7, hb: 0.15, hw: 0.3, hr: 0.3, g1: 0.85, hk: 8, ret: 0.75, retK: 14, delay: 0.05, tau: 0.03, vk: 0.8 }),
+    sniper: RP({ v: 6.0, hb: 0.4, hr: 0.8, ret: 0.7, retK: 5.5, delay: 0.1, tau: 0.05, vk: 1.4 }),   // one big kick, slow to come back
+    shotgun: RP({ v: 6.0, hb: 0.35, hr: 1.0, ret: 0.72, retK: 6, delay: 0.09, tau: 0.045, vk: 1.4 }),
+    autoshotgun: RP({ v: 2.2, first: 1.15, hb: 0.2, hw: 0.4, hr: 0.7, g1: 0.8, hk: 6, ret: 0.6, retK: 8, delay: 0.08, tau: 0.035, vk: 0.9 }),
+    lmg: RP({ v: 0.7, hb: 0.12, hw: 0.15, hr: 0.26, g0: 1.25, g1: 0.5, hk: 5, ret: 0.5, retK: 7, delay: 0.1, tau: 0.03, vk: 0.55 }),   // heavy: bucks at first, settles
+    minigun: RP({ v: 0.26, hb: 0.05, hw: 0.12, hr: 0.14, g0: 1.9, g1: 0.5, hk: 6, ret: 0.55, retK: 6, delay: 0.12, tau: 0.035, vk: 0.2 }),
+    crossbow: RP({ v: 2.2, hb: 0.1, hr: 0.3, ret: 0.7, retK: 7, delay: 0.08, tau: 0.04, vk: 0.7 }),
+    rocket: RP({ v: 6.5, hb: 0.3, hr: 0.8, ret: 0.8, retK: 4.5, delay: 0.12, tau: 0.06, vk: 1.4 }),
+    gl: RP({ v: 3.8, hb: 0.2, hr: 0.6, ret: 0.75, retK: 6, delay: 0.1, tau: 0.045, vk: 1.0 }),
+    flame: RP({ v: 0.035, hb: 0, hw: 1, hr: 0.05, ret: 0.6, retK: 6, delay: 0.15, tau: 0.04, vk: 0.05 }),   // the push of the jet
+    rail: RP({ v: 8.0, hb: 0.3, hr: 0.9, ret: 0.75, retK: 4.5, delay: 0.12, tau: 0.055, vk: 1.5 }),
+    nail: RP({ v: 0.34, hb: 0.04, hw: 0.35, hr: 0.12, g0: 0.7, g1: 0.9, hk: 4, ret: 0.6, retK: 11, delay: 0.06, tau: 0.018, vk: 0.32 }),
+    harpoon: RP({ v: 3.2, hb: 0.1, hr: 0.4, ret: 0.75, retK: 7, delay: 0.08, tau: 0.04, vk: 0.9 }),
+    tesla: RP({ v: 0.45, hb: 0.02, hw: 0.8, hr: 0.22, g0: 0.7, g1: 0.9, hk: 4, ret: 0.65, retK: 12, delay: 0.06, tau: 0.015, vk: 0.28 }),
+  };
+  W.RECOIL_FLOOR = { v: 0.4, h: 0.35 };   // however many parts reduce it, the climb and the sway never go under this share of the gun's own
+  W.TOUCH_RECOIL = 0.6;   // a phone: a finger pulls the aim back down less well than a mouse
+  // how the way you stand takes the recoil: aimed down the sights 0.7, crouched 0.8 (a bipod takes off its share more), on the move up to
+  // +25%, in the air +35%, sliding +10%
+  W.recoilStance = function (s) {
+    let k = 1 - W.adsT * 0.3;
+    if (!P.grounded) k *= 1.35;
+    else if (P.sliding) k *= 1.1;
+    else { if (P.crouching) k *= 0.8 * (1 - (s.crouchRecoil || 0)); k *= 1 + 0.25 * Math.min(1, (P.speedH || 0) / 6); }
+    return k;
+  };
+  // the view's kick of one shot (and the gun's visible kick with it). The attachments each work on their own part of it: s.recV the climb,
+  // s.recH the sway, s.recFirst the first shots of a string, s.recStack how it builds over a long string, s.recRet how much comes back and how
+  // fast, s.recKick the gun's visible kick; s.recoil (the gun's make, 安定, gear) on all of it
+  W.recoilShot = function (w, s) {
+    const d = w.def, pr = W.RECOIL[d.arch] || W.RECOIL.rifle, t = G.game.time;
+    const since = t - (w.rcT === undefined ? -99 : w.rcT);
+    const h = (w.rcH || 0) * Math.exp(-Math.max(0, since - pr.delay) * 6);   // how far into a string of fire this shot is
+    w.rcH = h + 1; w.rcT = t;
+    const gen = s.recoil / ((G.WEAPON_ARCH[d.arch] || d).recoil || s.recoil || 1), st = W.recoilStance(s);
+    const stack = 1 - (1 - (s.recStack || 1)) * Math.min(1, h / 6), firstAtt = 1 - (1 - (s.recFirst || 1)) * Math.max(0, 1 - h / 3);
+    const g = pr.g1 + (pr.g0 - pr.g1) * Math.exp(-h / pr.hk), first = h < 0.5 ? pr.first : 1;
+    const touch = window.G_MOBILE ? W.TOUCH_RECOIL : 1;
+    const mV = Math.max(W.RECOIL_FLOOR.v, gen * (s.recV || 1) * stack * firstAtt), mH = Math.max(W.RECOIL_FLOOR.h, gen * (s.recH || 1) * stack);
+    const v = pr.v * g * first * mV * st * touch * (0.88 + Math.random() * 0.24);
+    w.rcN = (w.rcN || 0) * 0.5 + (Math.random() * 2 - 1) * 0.87;
+    if (w.rcSide === undefined) { let hs = 0; for (const c of d.id) hs = (hs * 31 + c.charCodeAt(0)) | 0; w.rcSide = hs & 1 ? 1 : -1; }
+    const hz = (pr.hb * w.rcSide * Math.cos(h * pr.hw) + pr.hr * w.rcN) * g * mH * st * touch;
+    const rr = s.recRet || 1, ret = Math.min(0.92, pr.ret * rr);
+    P.addRecoil(THREE.MathUtils.degToRad(v), -THREE.MathUtils.degToRad(hz), { tau: pr.tau, ret, retH: ret * 0.5, k: pr.retK * Math.pow(rr, 0.7), delay: pr.delay });
+    // the gun itself: thrown back and up at the same pace, home a little slower than it went
+    const J = pr.vk * st * (s.recKick || 1) * Math.sqrt(Math.max(0.3, gen * (s.recV || 1))) * (h < 0.5 ? 1.1 : 1);
+    anim.kw = 0.75 / pr.tau; anim.kv += J * anim.kw / 0.46;
+    if (anim.kick > 1.6) anim.kick = 1.6;
+    anim.kickR = THREE.MathUtils.clamp(hz * 0.05 + (Math.random() - 0.5) * 0.02 * pr.vk, -0.08, 0.08);
+  };
   // ---- the ミシック guns' lasting effects ----
   // 蜂群 (hive): each bee sits on a foe and every 3 s hops to the nearest other foe within 10 m and stings it
   W.bees = [];
@@ -1289,11 +1352,11 @@
     const hider = model && model.flashHider ? 0.4 : 1; // (フラッシュハイダー: a smaller muzzle flash)
     if (!silent) G.fx.flash(muzzle, 0xffb060, (s.sound === 'shotgun' ? 45 : 25) * hider, 0.06, hider < 1 ? 7 : 10);
     anim.flash = silent ? 0.02 : hider < 1 ? 0.03 : 0.05; anim.flashS = silent ? 0.35 : hider < 1 ? 0.6 : 1;   // (a suppressor: a spark of it; a flash hider: a small one without its jet)
+    // (the spread a string of fire builds and the jolt of the screen go by the gun's recoil number as they always have: s.bloomRec keeps
+    // the part of it the recoil attachments took off before they each got a kind of recoil of their own; the view's kick: W.recoilShot)
     const crouchRec = P.crouching && P.grounded ? 1 - (s.crouchRecoil || 0) : 1;
-    const rec = s.recoil * crouchRec * (1 - W.adsT * 0.35);
-    P.addRecoil(THREE.MathUtils.degToRad(rec * 0.55) * (0.8 + Math.random() * 0.4), THREE.MathUtils.degToRad(rec * 0.22) * (Math.random() - 0.5));
-    anim.kick = Math.min(1.4, anim.kick + 0.35 + rec * 0.08);
-    anim.kickR = (Math.random() - 0.5) * rec * 0.02;
+    const rec = s.recoil * (s.bloomRec || 1) * crouchRec * (1 - W.adsT * 0.35);
+    W.recoilShot(w, s);
     w.bloom = Math.min(6, w.bloom + rec * 0.12);
     P.addShake(Math.min(0.12, rec * 0.012));
     // shell ejection
@@ -1498,8 +1561,7 @@
     if (G.Strata.doors.length) for (const dr of G.Strata.doorsNear(o, reach, f, 0.85)) G.Strata.hitDoor(dr, s.dmg, 'bullet');
     if (G.Gim && G.Gim.list.length) G.Gim.swing(o, reach, f, 0.85, 'flame');
     if (wh && Math.random() < 0.2) G.fx.decal(wh.point, wh.normal, 'scorch', 0.6);
-    P.addRecoil(0.0004, (Math.random() - 0.5) * 0.0008);
-    anim.kick = Math.min(0.4, anim.kick + 0.05);
+    W.recoilShot(w, s);
     G.buffs.emit('onShoot', { weapon: w });
   };
 
@@ -1514,7 +1576,9 @@
     // sway from mouse
     anim.swayX = U.damp(anim.swayX, U.clamp(-I.mx * 0.0006, -0.05, 0.05), 10, dt);
     anim.swayY = U.damp(anim.swayY, U.clamp(I.my * 0.0006, -0.05, 0.05), 10, dt);
-    anim.kick = U.damp(anim.kick, 0, 14, dt);
+    // the gun's kick: a spring a little short of critical damping, at the pace of the view's kick (W.recoilShot): back, the muzzle up,
+    // and home with a hint of a settle
+    { const k = anim.kw || 30, T = Math.min(dt, 0.05), n = Math.max(1, Math.ceil(k * T / 0.12)), h = T / n; for (let i = 0; i < n; i++) { anim.kv += (-k * k * anim.kick - 2 * 0.68 * k * anim.kv) * h; anim.kick += anim.kv * h; } if (anim.kick < -0.25) { anim.kick = -0.25; anim.kv = Math.max(0, anim.kv); } if (anim.kick > 1.6) { anim.kick = 1.6; anim.kv = Math.min(0, anim.kv); } }
     const sightY = model.sightY;
     const adsZ = model.lensZ !== undefined ? -(model.lensR || 0.028) * 2.32 - model.lensZ : model.winZ !== undefined ? -model.winH / G.Optics.DOT_T - model.winZ : -0.44;
     const adsPos = V(0, -sightY - (model.dotSight || model.scopeOptic ? 0 : model.ironsAligned ? 0.0012 : 0.012), adsZ);   // (the post's top a hair under the point of aim)

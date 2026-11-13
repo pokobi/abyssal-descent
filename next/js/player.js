@@ -74,7 +74,7 @@
       this.sliding = false; this.slideT = 0; this.slideEndT = -10;
       this.mantle = null; this.airDashUsed = false;
       this.fov = 75; this.shake = 0; this.bobPhase = 0; this.bobAmt = 0; this.stepDist = 0; this.footL = false;
-      this.recoilRecover = 0; this.hurtKick = 0;
+      this.rc = null; this.hurtKick = 0;
       this.speedH = 0;
       this.grapple = { state: 'none', t: 0, point: V(), hook: V(), endT: -10, enemy: null, normal: V(0, 1, 0) };
       this.grappleCd = 0;
@@ -175,7 +175,34 @@
       sp.vx += dx * m * 2.6; sp.vy += dy * m * 2.2; sp.vz += dz * m * 2.6;
       sp.vp += (dz * 0.8 - dy * 0.5 + (Math.random() - 0.5) * 0.4) * m * 1.9; sp.vr += (dx * 1.4 + (Math.random() - 0.5) * 0.5) * m * 1.9;
     }
-    addRecoil(p, y) { this.pitch += p; this.yaw += y; this.recoilRecover += p * 0.55; }
+    // A shot's kick on the view (radians: p up, y sideways; see W.recoilShot). It is not put on at once but over a few frames, at the
+    // gun's own pace (o.tau: a pistol snaps up, a rocket heaves); a share of it (o.ret up, o.retH sideways) is kept to come back once the
+    // firing stops (after o.delay s), eased in and out at o.k (a critically damped return: no spring snapping it back). The rest stays:
+    // that much the shooter pulls back down by hand.
+    addRecoil(p, y, o) {
+      o = o || {};
+      const rc = this.rc || (this.rc = { pp: 0, py: 0, tau: 0.02, x: 0, y: 0, vx: 0, vy: 0, k: 9, delay: 0.08 });
+      rc.pp += p; rc.py += y; rc.tau = o.tau || 0.02; rc.k = o.k || 9; rc.delay = o.delay || 0.08;
+      rc.x += p * (o.ret === undefined ? 0.5 : o.ret); rc.y += y * (o.retH === undefined ? 0.25 : o.retH); rc.vx = 0; rc.vy = 0;
+    }
+    resetRecoil() { this.rc = null; }
+    // the view's recoil, each frame (postMove): the kick still to be laid on, then (the firing over) what comes back
+    updateRecoil(dt) {
+      const rc = this.rc; if (!rc) return;
+      if (rc.pp || rc.py) {
+        const k = 1 - Math.exp(-dt / rc.tau), a = rc.pp * k, b = rc.py * k;
+        this.pitch += a; this.yaw += b; rc.pp -= a; rc.py -= b;
+        if (Math.abs(rc.pp) < 1e-6 && Math.abs(rc.py) < 1e-6) { this.pitch += rc.pp; this.yaw += rc.py; rc.pp = 0; rc.py = 0; }
+      }
+      if (G.game.time - this.lastShotT > rc.delay && (rc.x > 1e-6 || Math.abs(rc.y) > 1e-6)) {
+        const w = rc.k, T = Math.min(dt, 0.05), n = Math.max(1, Math.ceil(w * T / 0.12)), h = T / n;
+        for (let i = 0; i < n; i++) {
+          rc.vx += (-w * w * rc.x - 2 * w * rc.vx) * h; let dx = rc.vx * h; if (rc.x + dx < 0) dx = -rc.x; rc.x += dx; this.pitch += dx;
+          if (rc.y) { rc.vy += (-w * w * rc.y - 2 * w * rc.vy) * h; let dy = rc.vy * h; if (Math.sign(rc.y + dy) !== Math.sign(rc.y)) dy = -rc.y; rc.y += dy; this.yaw += dy; }
+        }
+      }
+      if (!rc.pp && !rc.py && rc.x <= 1e-6 && Math.abs(rc.y) <= 1e-6) this.rc = null;
+    }
     // ---- inventory: items are grouped by category slot (4 heal / 5 guard / 6 boost / 7 tool) ----
     itemCount(id) { return this.bag ? G.Inv.countAll(this, 'item', id) : 0; }
     // the items sitting in a consumable pocket (key 4 / key 5 / G)
@@ -233,7 +260,7 @@
       this.lastSafe.copy(this.pos);
       this.history = [];
       this.st = {};
-      this.eyeOff = 0; this.landDip = 0;
+      this.eyeOff = 0; this.landDip = 0; this.rc = null;
       if (this.slideLoop) { this.slideLoop.stop(); this.slideLoop = null; }
     }
 
@@ -298,11 +325,13 @@
       }
 
       // ---- slide ----
-      if (this.grounded && crouchHit && this.speedH > 7.0 && !this.sliding && !this.pileState) this.startSlide();
+      // (only out of a run: crouch pressed while sprinting slides, however slow the run still is; crouch at any other time is a crouch,
+      // however fast a blast, a slope, a skill or the ice has you going)
+      if (this.grounded && crouchHit && this.sprinting && !this.sliding && !this.pileState && !(this.elFrozen > 0)) this.startSlide(wx, wz);
       if (this.sliding) {
         this.slideT += dt;
         if (!wantCrouch && !S.crouchToggle && this.slideT > 0.25) this.endSlide();
-        else if (this.speedH < 4.5 || this.slideT > 1.25 || !this.grounded && this.slideT > 0.3) this.endSlide();
+        else if (this.speedH < (this.slideEndV || 4.5) || this.slideT > 1.25 || !this.grounded && this.slideT > 0.3) this.endSlide();
       }
       // ---- crouch state (head room check) ----
       const wantLow = wantCrouch || this.sliding;
@@ -413,6 +442,15 @@
       this.postMove(dt, wl, false);
     }
     walkSpeed() { return 6.2 * (1 + this.stats.moveSpeed + this.clsMove()) * this.moveMul(); }
+    // what is holding your run down right now (the same factors as the speed target above: slowed, frozen, wading, mud / thorns / deep
+    // ground), as one share of it; your gear and class are not in it. A slide out of the run is held down with it (see startSlide)
+    runDrag() {
+      let k = 1;
+      if (this.st.slow > 0) k *= Math.max(0.4, 0.7 - 0.1 * ((this.st.slowLv || 1) - 1));
+      if (this.elFrozen > 0) k = 0;
+      if (this.inWater) k *= 0.9;
+      return k * (this.fieldSpeed || 1);
+    }
     clsMove() { return G.Classes ? G.Classes.moveAdd() : 0; } // 連斬 (剣士)
     moveMul() { const mm = G.weapons.meleeMoveMul(); if (mm) return mm; const cs = G.weapons.curStats; return cs ? cs.moveMul : 1; }
 
@@ -561,8 +599,8 @@
       this.landDip = U.damp(this.landDip, 0, 7, dt);
       this.shake = Math.max(0, this.shake - dt * 1.6);
       this.hurtKick = Math.max(0, this.hurtKick - dt * 3);
-      // recoil recovery
-      if (this.recoilRecover > 0 && G.game.time - this.lastShotT > 0.08) { const r = Math.min(this.recoilRecover, dt * 2.2); this.pitch -= r; this.recoilRecover -= r; }
+      // recoil: the kick laid on, what comes back
+      this.updateRecoil(dt);
       this.pitch = U.clamp(this.pitch, -1.55, 1.55);
       const cam = G.camera;
       const bobK = S.bob * this.bobAmt * (G.weapons.adsT > 0.5 ? 0.25 : 1);
@@ -644,8 +682,11 @@
       const slow = G.game.timeScale < 1 ? 1 : 1;
       const wheel = G.abilities.wheelOpen && G.abilities.wheelOpen();
       if (!wheel) {
-        this.yaw -= I.mx * sens * slow;
-        this.pitch -= I.my * sens * (S.invertY ? -1 : 1);
+        const dy = -I.mx * sens * slow, dp = -I.my * sens * (S.invertY ? -1 : 1);
+        this.yaw += dy; this.pitch += dp;
+        // pulling against the recoil by hand takes that much off what would come back by itself (no return past where you brought it)
+        const rc = this.rc;
+        if (rc) { if (dp < 0 && rc.x > 0) rc.x = Math.max(0, rc.x + dp); if (dy * rc.y < 0) rc.y = Math.sign(rc.y) * Math.max(0, Math.abs(rc.y) - Math.abs(dy)); }
       }
       this.pitch = U.clamp(this.pitch, -1.55, 1.55);
       // keep yaw bounded without any visible reset (pure modulo of a full turn)
@@ -668,12 +709,22 @@
     }
 
     // ---- slide ----
-    startSlide() {
+    // wx, wz: the way the keys push (flat, unit; 0 when none)
+    startSlide(wx, wz) {
       this.sliding = true; this.slideT = 0; this.crouching = true;
-      this._slideRun = !!(this.sprinting || this.sprintToggle); // a slide out of a run: the run carries on when the slide is over
-      const hs = Math.hypot(this.vel.x, this.vel.z) || 1;
-      const boost = Math.max(hs, 12.8 * (1 + this.stats.slideBoost));
-      this.vel.x *= boost / hs; this.vel.z *= boost / hs;
+      this._slideRun = true; // a slide only comes out of a run: the run carries on when the slide is over
+      // which way: the way you are going; barely moving yet (the first step of a run), the way you push, or face
+      const hs = Math.hypot(this.vel.x, this.vel.z);
+      let dx = -Math.sin(this.yaw), dz = -Math.cos(this.yaw);
+      if (hs > 0.5) { dx = this.vel.x / hs; dz = this.vel.z / hs; } else if (wx || wz) { dx = wx; dz = wz; }
+      // how fast: the slide's own speed (滑走 and gear change it), held down when the run itself is held down by more than a wade or thorns
+      // (slowed, mud, deep ground: no slide out of it faster than out of a free run). Out of the first step of a run it starts at 60% of
+      // that, rising to all of it at 7 m/s (the run's own pace: a slide out of a run at 7 m/s or more is as it always was), so it is never
+      // ahead of where the run would have got. It ends when it has lost 40% of its speed (at 4.5 m/s at most)
+      const top = 12.8 * (1 + this.stats.slideBoost) * Math.pow(Math.min(1, this.runDrag() / 0.8), 2);
+      const sp = Math.max(hs, top * (0.6 + 0.4 * Math.min(1, hs / 7)));
+      this.vel.x = dx * sp; this.vel.z = dz * sp; this.speedH = sp;
+      this.slideEndV = Math.min(4.5, sp * 0.6);
       G.sfx.whoosh(0.25, 0.4);
       this.slideLoop = G.sfx.loop('slide');
       this.fovKick = 4;

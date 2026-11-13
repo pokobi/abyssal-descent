@@ -29,11 +29,16 @@
     Wt.streams = (w && w.streams) || [];
     Wt.flooded = !!(w && w.biome === 'flooded');
     uwReset(); // (a new place: whatever was under the water before is gone, its fog with it)
-    // the surface seen from below: a pale shifting sheet over your head (the water's own plane is drawn from above only)
-    if (w && w.deepWater) for (const d of w.deepWater) {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(d.x1 - d.x0, d.z1 - d.z0), new THREE.MeshBasicMaterial({ color: 0x9ad8d0, map: (w.mats.water && w.mats.water.map) || null, transparent: true, opacity: 0.34, depthWrite: false }));
-      m.rotation.x = Math.PI / 2; m.position.set((d.x0 + d.x1) / 2, d.y - 0.015, (d.z0 + d.z1) / 2); m.userData.noAudit = true; m.renderOrder = 2;
-      w.group.add(m);
+    if (w && w.mats && w.mats.water) w.mats.water.visible = true;
+    // the surface seen from below on low quality: a dim shifting sheet over your head (the water's own plane is drawn from above only;
+    // with the frame passes, post.js draws it); and the specks that drift in the water
+    if (w && w.deepWater) {
+      for (const d of w.deepWater) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(d.x1 - d.x0, d.z1 - d.z0), new THREE.MeshBasicMaterial({ color: 0x4a7a72, map: (w.mats.water && w.mats.water.map) || null, transparent: true, opacity: 0.3, depthWrite: false }));
+        m.rotation.x = Math.PI / 2; m.position.set((d.x0 + d.x1) / 2, d.y - 0.015, (d.z0 + d.z1) / 2); m.userData.noAudit = true; m.renderOrder = 2;
+        m.visible = !(G.Post && G.Post.active); w.group.add(m); UW.sheets.push(m);
+      }
+      UW.motes = motes(w);
     }
   };
   // is p in the water (inside a pool, near its surface)? returns the pool
@@ -94,43 +99,136 @@
   };
 
   // ---------------------------------------------------------------- under the water (the deep water of the drowned town, w.deepWater)
-  // With your eyes below its surface the water closes round you: a thick blue-green haze (darker the deeper), a tint over the screen with
-  // light drifting through it (#underwater, style.css), every sound muffled (audio.js A.underwater), the surface a pale sheet overhead,
-  // bubbles rising from you. Out again, the place's own fog comes back. (Hold jump to swim up to the surface: player.js)
-  const UW = { on: false, saved: null, el: null, bubT: 0 }, UW_FOG = new THREE.Color('#0e3c3b');
-  Wt.camUnder = function () {
+  // Murky fresh water, as it is to the eye: what is near keeps its colours, a few metres off it goes blue-green and dark and is gone;
+  // deeper is darker. Overhead the surface: a round window of light (bent, shaking with the ripples), the water's dark mirror round it.
+  // Light comes down in slanting shafts and throws a moving web on what lies under it, strongest near the surface. Specks drift in it,
+  // your breath goes up in bubbles, the mud stirs by the bottom. With the eyes at the surface (standing on the bed, the water is at eye
+  // height) a line crosses the screen, the water under it and the air over it. Going in, a churn of bubbles; coming out, drops on the
+  // eyes that run off. On medium quality a lighter frame of it (no shafts, no blur); on low only the haze and a tint (no frame passes).
+  // (The frame's part is in post.js, given what it needs here as G.Post.water. Every sound muffled: audio.js A.underwater.)
+  const UW = { mode: 0, saved: null, el: null, bubT: 0, mudT: 0, since: 9, drops: 0, dive: 0, sheets: [], motes: null, wasUnder: false };
+  const UW_FOG = new THREE.Color('#0b241f'), UW_TMP = new THREE.Color(), UW_SD = new THREE.Vector3();
+  const UW_P = { mode: 0, e: 0, sy: 0, dens: 0.3, lk: 0.5, col: new THREE.Color(), light: new THREE.Color(), air: new THREE.Color(), sdir: new THREE.Vector3(0, -1, 0), drops: 0, since: 9, dive: 0 };
+  const surfAt = (d) => d.y + 0.01;   // (the face of the deep water)
+  // the deep water the eyes are over or in, and how high over its surface they are
+  Wt.camWater = function () {
     const w = G.world, c = G.camera && G.camera.position; if (!w || !w.deepWater || !c) return null;
-    for (const d of w.deepWater) if (c.x > d.x0 && c.x < d.x1 && c.z > d.z0 && c.z < d.z1 && c.y < d.y - 0.03) return d;
+    for (const d of w.deepWater) if (c.x > d.x0 && c.x < d.x1 && c.z > d.z0 && c.z < d.z1 && c.y < d.y + 2) return { d, e: c.y - surfAt(d) };
     return null;
   };
-  Wt.underOn = () => UW.on;
+  Wt.camUnder = function () { const q = Wt.camWater(); return q && q.e < -0.04 ? q.d : null; };
+  Wt.underOn = () => UW.mode === 2;
+  Wt.waterMode = () => UW.mode;
+  // specks drifting in the water round the eyes: a box of them that wraps as you move, fogged as the water fogs, never over the surface
+  const MOTE_VS = `uniform vec3 uCam; uniform float uT; uniform float uOn; uniform float uSy; uniform float uDens; uniform float uPx; uniform vec2 uFlow;
+    attribute float aPh; varying float vA;
+    void main() {
+      vec3 B = vec3(12.0, 4.0, 12.0);
+      vec3 p = position * B + vec3(uFlow.x, 0.0, uFlow.y) * uT * 0.3 + vec3(sin(uT * 0.21 + aPh * 6.3), sin(uT * 0.17 + aPh * 4.1) * 0.6, cos(uT * 0.19 + aPh * 5.2)) * 0.35;
+      vec3 o = uCam - B * 0.5; p = mod(p - o, B) + o;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0); float z = -mv.z, f = uDens * z;
+      vA = uOn * step(p.y, uSy - 0.02) * exp(-f * f) * smoothstep(0.25, 0.9, z) * (0.35 + 0.65 * fract(aPh * 7.7));
+      gl_PointSize = vA > 0.001 ? clamp(0.035 * (0.6 + fract(aPh * 3.3)) * 900.0 / max(z, 0.1), 1.2, 5.0) * uPx : 0.0;
+      gl_Position = vA > 0.001 ? projectionMatrix * mv : vec4(2.0, 2.0, 2.0, 1.0);
+    }`;
+  const MOTE_FS = `uniform vec3 uC; varying float vA;
+    void main() { vec2 q = gl_PointCoord - 0.5; float a = exp(-dot(q, q) * 10.0) * vA * 0.55; if (a < 0.004) discard; gl_FragColor = vec4(uC, a); }`;
+  function motes(w) {
+    const n = Math.round(((G.save && G.save.data.settings.quality) === 'high' ? 420 : 240) * (document.documentElement.classList.contains('m') ? 0.6 : 1));
+    let s = 7919; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const pos = new Float32Array(n * 3), ph = new Float32Array(n);
+    for (let i = 0; i < n; i++) { pos[i * 3] = rnd(); pos[i * 3 + 1] = rnd(); pos[i * 3 + 2] = rnd(); ph[i] = rnd(); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aPh', new THREE.BufferAttribute(ph, 1));
+    const m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uCam: { value: new THREE.Vector3() }, uT: { value: 0 }, uOn: { value: 0 }, uSy: { value: 0 }, uDens: { value: 0.3 }, uPx: { value: 1 }, uFlow: { value: new THREE.Vector2() }, uC: { value: new THREE.Color() } },
+      vertexShader: MOTE_VS, fragmentShader: MOTE_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.frustumCulled = false; m.renderOrder = 5; m.userData.noAudit = true;   // (in the scene from the start, drawn as nothing until under: its shader is made with the area's)
+    w.group.add(m);
+    return m;
+  }
+  // (low quality, no frame passes: a tint laid over the world instead - a plain one, darker at the edges)
   function uwEl() {
     if (UW.el) return UW.el;
     const wrap = document.getElementById('canvas-wrap'); if (!wrap) return null;
-    const el = document.createElement('div'); el.id = 'underwater'; wrap.appendChild(el); // (over the world, under the HUD)
-    return (UW.el = el);
+    const el = document.createElement('div'); el.id = 'uw-tint';
+    el.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .2s;background:radial-gradient(ellipse at 50% 35%, rgba(20,60,56,.10), rgba(2,16,16,.55) 80%)';
+    wrap.appendChild(el); return (UW.el = el);
   }
-  function uwOff(restore) {
-    if (!UW.on) return;
-    UW.on = false;
-    if (restore && UW.saved) { const sc = G.scene; sc.fog.color.copy(UW.saved.c); sc.fog.density = UW.saved.d; G.fx.setFog(sc.fog.color, sc.fog.density); }
-    UW.saved = null; if (UW.el) UW.el.classList.remove('on'); if (G.sfx.underwater) G.sfx.underwater(false);
+  function uwFog(on) {
+    const sc = G.scene;
+    if (on && !UW.saved) UW.saved = { c: sc.fog.color.clone(), d: sc.fog.density };
+    if (!on && UW.saved) { sc.fog.color.copy(UW.saved.c); sc.fog.density = UW.saved.d; G.fx.setFog(sc.fog.color, sc.fog.density); UW.saved = null; }
   }
-  function uwReset() { uwOff(false); }
+  function uwSet(mode) {
+    const w = G.world, post = !!(G.Post && G.Post.active);
+    if (mode === UW.mode) return;
+    if (mode === 2) { if (UW.mode !== 2) { UW.dive = 1; UW.since = 0; diveBurst(); } }
+    else if (UW.mode === 2) { UW.drops = 1; UW.since = 0; }
+    UW.mode = mode;
+    uwFog(mode === 2);
+    if (G.sfx.underwater) G.sfx.underwater(mode === 2);
+    // the water's face: drawn from above as itself; at the surface the frame draws it (the line across the screen); from below, on low
+    // quality, a pale sheet overhead stands for it
+    if (w && w.mats && w.mats.water) w.mats.water.visible = mode !== 1;
+    for (const m of UW.sheets) m.visible = !post;
+    const el = uwEl(); if (el) el.style.opacity = mode === 2 && !post ? 1 : 0;
+  }
+  function uwReset() {
+    UW.sheets = []; UW.motes = null; UW.drops = 0; UW.dive = 0; UW.since = 9;
+    if (UW.mode) { UW.mode = 0; uwFog(false); if (G.sfx.underwater) G.sfx.underwater(false); }
+    UW.saved = null; if (UW.el) UW.el.style.opacity = 0;
+    if (G.Post) G.Post.water = null;
+  }
+  // going in: a churn of bubbles round the eyes
+  function diveBurst() {
+    const c = G.camera.position, N = G.fx.norm;
+    for (let i = 0; i < 26; i++) { const a = R() * 6.28, r = rnd(0.15, 0.7); N.spawn(c.x + Math.cos(a) * r, c.y + rnd(-0.6, 0.1), c.z + Math.sin(a) * r, rnd(-0.3, 0.3), rnd(0.6, 1.6), rnd(-0.3, 0.3), rnd(0.5, 1.0), rnd(0.012, 0.03), 0.004, 0.72, 0.82, 0.82, 0.5, -1.4, 0.8); }
+  }
   function updateUnder(dt) {
-    const GM = G.game, d = GM.state === 'playing' ? Wt.camUnder() : null, sc = G.scene;
-    if (!d) { if (GM.state !== 'paused') uwOff(true); return; }
-    if (!UW.on) { UW.on = true; UW.saved = { c: sc.fog.color.clone(), d: sc.fog.density }; const el = uwEl(); if (el) el.classList.add('on'); if (G.sfx.underwater) G.sfx.underwater(true); }
-    const c = G.camera.position, depth = Math.max(0, d.y - c.y);
-    sc.fog.color.copy(UW_FOG).multiplyScalar(Math.max(0.5, 1 - depth * 0.15));
-    sc.fog.density = Math.max(UW.saved.d, 0.075 + depth * 0.012);
-    G.fx.setFog(sc.fog.color, sc.fog.density);
-    // bubbles rise from you now and then (up to the surface)
-    UW.bubT -= dt;
+    const GM = G.game, w = G.world;
+    if (GM.state === 'paused') return;
+    const post = !!(G.Post && G.Post.active), st = GM.state, q = st === 'playing' || st === 'inv' || st === 'buff' || st === 'dead' ? Wt.camWater() : null;   // (the world goes on behind a menu)
+    // 2: under; 1: the eyes at the surface (only with the frame passes: on low it stays above or under)
+    const mode = !q ? 0 : q.e < -0.08 || (!post && q.e < -0.04) ? 2 : post && q.e < 0.1 ? 1 : 0;
+    uwSet(mode);
+    UW.since += dt; UW.drops = Math.max(0, UW.drops - dt * 0.6); UW.dive = Math.max(0, UW.dive - dt * 2.2);
+    const P = UW_P, sc = G.scene, c = G.camera.position;
+    if (mode || UW.drops > 0 || UW.dive > 0) {
+      const d = q ? q.d : null, depth = q ? Math.max(0, -q.e) : 0, sy = d ? surfAt(d) : 0;
+      // the water's colour: dark blue-green, darker the deeper and the darker the place
+      const air = UW.saved ? UW.saved.c : sc.fog.color, L = GM.lights, hemi = L && L.hemi;
+      P.air.copy(air);
+      // (the light that comes down through the surface: the place's own, some times the water's colour - the brightest thing down there)
+      P.light.copy(air).multiplyScalar(1.6); if (hemi) P.light.add(UW_TMP.copy(hemi.color).multiplyScalar(hemi.intensity * 0.05));
+      P.light.multiplyScalar(2.5).add(UW_TMP.copy(UW_FOG).multiplyScalar(1.5));
+      { const l = P.light.r * 0.2126 + P.light.g * 0.7152 + P.light.b * 0.0722; P.light.lerp(UW_TMP.setRGB(l, l, l), 0.3); }   // (not a glowing cyan)
+      P.col.copy(UW_FOG).multiplyScalar(Math.max(0.45, 1 - depth * 0.22));
+      P.dens = 0.3 + depth * 0.05; P.lk = 0.6; P.mode = mode; P.e = q ? q.e : 1; P.sy = sy;
+      if (L && L.moon) { UW_SD.copy(L.moon.target.position).sub(L.moon.position).normalize(); if (UW_SD.y > -0.3) UW_SD.set(0, -1, 0); P.sdir.copy(UW_SD); }
+      P.drops = UW.drops; P.since = UW.since; P.dive = UW.dive;
+      if (G.Post) G.Post.water = P;
+      if (mode === 2) { sc.fog.color.copy(P.col); sc.fog.density = P.dens; G.fx.setFog(sc.fog.color, sc.fog.density); }
+    } else if (G.Post) G.Post.water = null;
+    // the specks in the water
+    const M = UW.motes;
+    if (M) {
+      const u = M.material.uniforms; u.uOn.value = mode ? 1 : 0;
+      if (mode) { u.uCam.value.copy(c); u.uT.value = GM.time % 1000; u.uSy.value = P.sy; u.uDens.value = P.dens; u.uPx.value = G.renderer ? G.renderer.getPixelRatio() : 1; const f = U2() && U2().uFlow.value; if (f) u.uFlow.value.copy(f); u.uC.value.copy(P.light).multiplyScalar(4).add(UW_TMP.copy(P.col).multiplyScalar(1.2)); }
+    }
+    if (mode !== 2) return;
+    const depth = P.sy - c.y, Pl = G.player, mv = Pl && Pl.speedH ? Pl.speedH : 0;
+    // your breath: a few small bubbles now and then, up to the surface, more when you move
+    UW.bubT -= dt * (1 + mv * 0.25);
     if (UW.bubT <= 0) {
-      UW.bubT = 0.35 + Math.random() * 0.7;
-      const f = G.player.forward ? G.player.forward() : new THREE.Vector3(0, 0, -1);
-      for (let k = 0, n = 2 + Math.floor(Math.random() * 3); k < n; k++) G.fx.norm.spawn(c.x + f.x * 0.45 + (Math.random() - 0.5) * 0.12, c.y - 0.25, c.z + f.z * 0.45 + (Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.2, 1.1 + Math.random() * 0.6, (Math.random() - 0.5) * 0.2, Math.min(1.6, depth / 1.2 + 0.4), 0.035, 0.05, 0.85, 0.97, 1, 0.75, -0.6, 0.4);
+      UW.bubT = 0.5 + R() * 0.9;
+      const f = Pl.forward ? Pl.forward() : V(0, 0, -1), up = Math.max(0.3, depth - 0.1);
+      for (let k = 0, n = 2 + Math.floor(R() * 4); k < n; k++) { const sp = rnd(0.7, 1.1); G.fx.norm.spawn(c.x + f.x * 0.35 + rnd(-0.06, 0.06), c.y - 0.18, c.z + f.z * 0.35 + rnd(-0.06, 0.06), rnd(-0.08, 0.08), sp, rnd(-0.08, 0.08), Math.min(2.2, up / sp), rnd(0.008, 0.022), 0.003, 0.7, 0.8, 0.8, 0.5, -0.5, 0.5); }
+    }
+    // the mud by the bottom stirs where you go
+    const bed = w && w.floorBelow ? w.floorBelow(c.x, c.y, c.z) : -99;
+    UW.mudT -= dt;
+    if (c.y - bed < 1.9 && mv > 0.5 && UW.mudT <= 0) {
+      UW.mudT = 0.12;
+      for (let k = 0; k < 2; k++) G.fx.norm.spawn(Pl.pos.x + rnd(-0.4, 0.4), bed + 0.05, Pl.pos.z + rnd(-0.4, 0.4), rnd(-0.15, 0.15), rnd(0.05, 0.25), rnd(-0.15, 0.15), rnd(1.6, 2.8), rnd(0.25, 0.45), 0.35, 0.16, 0.15, 0.1, 0.28, -0.02, 1.4);
     }
   }
 

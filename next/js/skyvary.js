@@ -26,7 +26,10 @@
     wisp: { kind: 'dot', n: 70, col: 0x9ab8cc, a: 0.75, vel: [0.2, 0.15, 0.1], sway: 2.2, size: 0.22, max: 12, add: true },
     spore: { kind: 'dot', n: 260, col: 0x9ae060, a: 0.75, vel: [0.1, 0.25, 0.05], sway: 1.2, size: 0.07, add: true },
     dust: { kind: 'dot', roof: true, n: 500, col: 0xc8b898, a: 0.5, vel: [0.15, -0.1, 0.05], sway: 0.9, size: 0.03, max: 4.5, tone: 0.5, tw: 0.6, add: true },
-    bank: { kind: 'bank', n: 44, a: 0.85, wind: [0.45, 0.18] },   // (drifts of ground fog)
+    // (drifts of ground fog, and a thin layer on the ground: in no mood now - over the place's own thick fog they hardly showed, a few
+    // levels in 255 - kept for a fog that is thinner than its drifts)
+    bank: { kind: 'bank', n: 44, a: 0.85, wind: [0.45, 0.18] },
+    bankLow: { kind: 'bank', low: true, n: 70, a: 0.7, wind: [0.3, 0.12] },   // (and the thin layer lying on the ground under them)
     feather: { kind: 'dot', roof: true, n: 260, col: 0xfff6e8, a: 0.8, vel: [0.3, -0.7, 0.15], sway: 1.4, size: 0.09 },
     drip: { kind: 'rain', n: 140, col: 0x9fc8d0, a: 0.4, vel: [0, -14, 0], len: 0.35, layers: false },
   };
@@ -53,7 +56,7 @@
     // 地上
     grave: [
       D('clear', '月夜', 4, { cl: CL.night }),
-      D('mist', '濃霧', 2, { fogD: 3.0, fog: '#3a4452', k: 0.7, amb: 0.92, sunK: 0.4, stars: false, cl: CL.mist, p: [P.bank] }),
+      D('mist', '濃霧', 2, { fogD: 3.0, fog: '#3a4452', k: 0.7, amb: 0.92, sunK: 0.4, stars: false, cl: CL.mist }),
       D('rain', '雨夜', 2, { fogD: 1.5, fog: '#10141c', k: 0.5, moonI: 0.55, amb: 0.88, sky: ['#05070c', '#0c1018', '#1a2230'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
       D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp], cl: CL.thin }),
       D('snow', '雪夜', 1, { fogD: 1.8, fog: '#3a4250', k: 0.55, amb: 1.12, moonI: 0.85, sky: ['#0c1018', '#1c2430', '#3a4454'], stars: false, sunK: 0.3, p: [P.snow], el: 'ice', cl: CL.snow }),
@@ -61,7 +64,7 @@
     ],
     hamlet: [
       D('clear', '月夜', 4, { cl: CL.night }),
-      D('mist', '濃霧', 3, { fogD: 3.0, fog: '#3c464c', k: 0.7, amb: 0.94, sunK: 0.4, stars: false, cl: CL.mist, p: [P.bank] }),
+      D('mist', '濃霧', 3, { fogD: 3.0, fog: '#3c464c', k: 0.7, amb: 0.94, sunK: 0.4, stars: false, cl: CL.mist }),
       D('rain', '雨夜', 2, { fogD: 1.4, fog: '#0e1218', k: 0.5, moonI: 0.5, amb: 0.86, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
       D('fire', '遠い火の手', 1, { fog: '#3a1a10', k: 0.4, hemiS: '#b07050', sky: ['#05060c', '#16100f', '#46240f'], p: [P.ember], el: 'fire', cl: CL.smoke, under: ['#a84a1c', 0.05] }),
       D('wisp', '鬼火の夜', 1, { hemiS: '#6aa0ff', k: 0.35, p: [P.wisp], cl: CL.thin }),
@@ -74,7 +77,7 @@
     ],
     battlefield: [
       D('clear', '夜明け前', 4, { cl: CL.dawn }),
-      D('mist', '朝霧', 3, { fogD: 2.6, fog: '#8a9098', k: 0.65, amb: 1.05, sunK: 0.5, cl: CL.mist, haze: 1.5, p: [P.bank] }),
+      D('mist', '朝霧', 3, { fogD: 2.6, fog: '#8a9098', k: 0.65, amb: 1.05, sunK: 0.5, cl: CL.mist, haze: 1.5 }),
       D('rain', '冷たい雨', 2, { fogD: 1.5, fog: '#3a4048', k: 0.55, moonI: 0.6, amb: 0.88, sky: ['#14181e', '#2c323a', '#565c62'], sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
       D('crimson', '赤い朝焼け', 1, { fog: '#7a4a40', k: 0.45, hemiS: '#c08070', sky: ['#1e1a24', '#6a3a34', '#d08060'], sunCol: [1.0, 0.55, 0.38], cl: Object.assign([], CL.dusk, { 6: 0.5 }) }),   // (fewer far banks: lit red they would stand out)
       D('crows', '灰の舞う', 1, { fog: '#6a6460', k: 0.4, fogD: 1.3, p: [P.ash], cl: CL.ash }),
@@ -83,7 +86,7 @@
     shaft: [
       D('clear', '月夜', 4, { cl: CL.night }),
       D('dim', '雲の夜', 2, { moonI: 0.6, amb: 0.85, stars: false, sky: ['#030408', '#0a0e18', '#161c28'], sunK: 0.2, cl: [0.82, 0.6, 0, 0.1, 0.9, 0.85, 0] }),
-      D('mist', '底の霧', 2, { fogD: 2.2, fog: '#2a3240', k: 0.6, amb: 0.95, cl: CL.night, p: [P.bank] }),
+      D('mist', '底の霧', 2, { fogD: 2.2, fog: '#2a3240', k: 0.6, amb: 0.95, cl: CL.night }),
       D('rain', '吹き込む雨', 1, { fogD: 1.4, fog: '#10141c', k: 0.5, moonI: 0.5, amb: 0.88, sky: ['#04060a', '#0a0e16', '#18202a'], stars: false, sunK: 0.1, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
       D('snow', '舞い込む雪', 1, { fogD: 1.6, fog: '#3a4250', k: 0.5, amb: 1.08, moonI: 0.85, stars: false, sunK: 0.3, p: [P.snow], el: 'ice', cl: CL.snow }),
     ],
@@ -107,7 +110,7 @@
     castle: [
       D('base', '血月', 4, { cl: CL.thin, sky: BLOOD }),
       D('rain', '雨の城壁', 2, { fogD: 1.35, fog: '#1a0c10', k: 0.5, moonI: 0.6, amb: 0.88, sky: ['#040203', '#0e0607', '#2a1210'], stars: false, sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
-      D('mist', '霧の城', 2, { fogD: 2.8, fog: '#3a1c22', k: 0.6, sunK: 0.45, cl: CL.mist, sky: BLOOD, p: [P.bank] }),
+      D('mist', '霧の城', 2, { fogD: 2.8, fog: '#3a1c22', k: 0.6, sunK: 0.45, cl: CL.mist, sky: BLOOD }),
       D('ash', '火の粉の夜', 1, { p: [P.ember], el: 'fire', cl: CL.smoke, under: ['#9a3c16', 0.05], sky: BLOOD }),
     ],
     // 中層
@@ -140,7 +143,7 @@
     ],
     pillars: [
       D('clear', '闇夜', 4, { cl: CL.thin }),
-      D('mist', '昇る靄', 2, { fogD: 2.2, fog: '#2a1a3a', k: 0.6, amb: 1.0, cl: CL.mist, p: [P.bank] }),
+      D('mist', '昇る靄', 2, { fogD: 2.2, fog: '#2a1a3a', k: 0.6, amb: 1.0, cl: CL.mist }),
       D('wisp', '鬼火の群れ', 2, { hemiS: '#8a6aff', k: 0.4, p: [P.wisp], cl: CL.thin }),
       D('ash', '灰の降る闇', 1, { fog: '#2a2430', k: 0.4, fogD: 1.3, p: [P.ash], cl: CL.ash }),
       D('storm', '紫電', 1, { fog: '#1a1028', k: 0.5, moonI: 0.6, amb: 0.85, sky: ['#020106', '#0a0614', '#1c1030'], stars: false, p: [P.drizzle], flash: true, el: 'water', bolt: true, cl: CL.storm }),
@@ -291,16 +294,19 @@
   const RAIN_FS = `uniform float uA; varying float vA; varying vec3 vCol;
     void main() { float a = uA * vA; if (a < 0.004) discard; gl_FragColor = vec4(vCol, a); }`;
   // a splash: each point lands somewhere new near the eye (fixed in the world, wrapping round as you move), on the ground or the roof
-  const SPL_VS = `uniform float uT; uniform vec3 uCam; uniform float uProj; uniform float uFogD; uniform float uRate;
+  const SPL_VS = `uniform float uT; uniform vec3 uCam; uniform float uProj; uniform float uFogD; uniform float uRate; uniform vec4 uWz[8];
     ${ROOF_GLSL}
     ${LIT_GLSL}
-    attribute float aPh; varying float vA; varying float vF; varying float vAsp; varying vec3 vCol;
+    attribute float aPh; varying float vA; varying float vF; varying float vAsp; varying vec3 vCol; varying float vWet;
     float h1(float n) { return fract(sin(n) * 43758.5453); }
     void main() {
       float cyc = uT * uRate + aPh * 17.0, c = floor(cyc); vF = fract(cyc);
       vec2 q = vec2(h1(aPh * 91.7 + c * 1.31), h1(aPh * 53.3 + c * 2.17)) * 14.0;
       vec2 o = uCam.xz - 7.0, xz = mod(q - o, 14.0) + o;
       float y = roofTop(xz);
+      // (on water: inside one of the area's pools, at its surface)
+      vWet = 0.0; for (int i = 0; i < 8; i++) { vec4 z = uWz[i]; if (z.z > z.x && xz.x > z.x && xz.x < z.z && xz.y > z.y && xz.y < z.w) vWet = 1.0; }
+      if (vWet > 0.5) y = max(y, 0.04);   // (on the water's face, not on its bed: the pools lie at the ground's height)
       vec3 p = vec3(xz.x, y + 0.02, xz.y);
       vec4 mv = modelViewMatrix * vec4(p, 1.0); float z = -mv.z;
       vA = step(-30.0, y) * (1.0 - smoothstep(4.0, 7.0, length(xz - uCam.xz))) * exp(-pow(uFogD * z, 2.0)) * smoothstep(0.6, 1.4, z);
@@ -309,20 +315,31 @@
       gl_PointSize = clamp(0.34 * uProj / max(z, 0.1), 1.0, 56.0);
       gl_Position = projectionMatrix * mv;
     }`;
-  const SPL_FS = `uniform float uA; varying float vA; varying float vF; varying float vAsp; varying vec3 vCol;
+  const SPL_FS = `uniform float uA; varying float vA; varying float vF; varying float vAsp; varying vec3 vCol; varying float vWet;
     void main() {
-      vec2 q = gl_PointCoord - 0.5; q.y /= vAsp; float r = length(q) * 2.0;
-      float R = 0.15 + 0.75 * vF, ring = exp(-pow((r - R) / (0.08 + 0.1 * vF), 2.0)) * (1.0 - vF) * (1.0 - vF) * 0.45;
-      float spray = exp(-r * r * 70.0) * (1.0 - smoothstep(0.0, 0.25, vF)) * 0.9;
-      float a = (ring + spray) * vA * uA; if (a < 0.004) discard;
+      vec2 p = gl_PointCoord - 0.5, q = vec2(p.x, p.y / vAsp); float r = length(q) * 2.0, a;
+      if (vWet > 0.5) {
+        // on water: a ring spreading and a fainter one after it, a dimple where the drop went in
+        float R = 0.12 + 0.8 * vF, R2 = max(0.0, R - 0.3);
+        a = exp(-pow((r - R) / (0.06 + 0.08 * vF), 2.0)) * (1.0 - vF) * (1.0 - vF) * 0.55 + exp(-pow((r - R2) / 0.06, 2.0)) * step(0.3, vF) * (1.0 - vF) * 0.25
+          + exp(-r * r * 90.0) * (1.0 - smoothstep(0.0, 0.15, vF)) * 0.6;
+      } else {
+        // on stone or earth: a little crown of spray thrown up and falling back, gone quickly; no ring
+        float k = 1.0 - smoothstep(0.0, 0.35, vF), s = 0.0;
+        for (int i = 0; i < 5; i++) { float an = float(i) * 1.2566 + 0.4, sp = 0.18 + 0.06 * float(i - (i / 2) * 2);
+          vec2 c = vec2(cos(an) * sp * vF * 2.2, -0.1 - (vF * 1.4 - vF * vF * 2.2) * 0.45); s += exp(-dot(p - c, p - c) * 900.0); }
+        a = (s * 0.9 + exp(-r * r * 140.0) * 0.5) * k;
+      }
+      a *= vA * uA; if (a < 0.004) discard;
       gl_FragColor = vec4(vCol, a);
     }`;
   // a bolt of lightning: a branching path from the clouds, drawn as ribbons turned to the eye - a thin white core in a pale glow
-  const BOLT_VS = `attribute vec3 aDir; attribute float aOff; attribute float aW; attribute float aB; varying float vX; varying float vB;
+  const BOLT_VS = `uniform float uPix; uniform float uFogD; attribute vec3 aDir; attribute float aOff; attribute float aW; attribute float aB; varying float vX; varying float vB;
     void main() {
       vec4 mv = modelViewMatrix * vec4(position, 1.0); vec3 t = (modelViewMatrix * vec4(aDir, 0.0)).xyz;
       vec3 side = normalize(cross(t, mv.xyz) + vec3(1e-5, 0.0, 0.0));
-      mv.xyz += side * aOff * aW; vX = aOff; vB = aB;
+      float w = max(aW, -mv.z * uPix * 1.6), f = uFogD * -mv.z;
+      mv.xyz += side * aOff * w; vX = aOff; vB = aB * (aW / w) * mix(0.35, 1.0, exp(-f * f));   // (far off: as thin as near, only dimmer and veiled)
       gl_Position = projectionMatrix * mv;
     }`;
   const BOLT_FS = `uniform float uI; uniform vec3 uC; varying float vX; varying float vB;
@@ -349,7 +366,7 @@
   // over as they go. Each is a quad turned to the eye, standing on the ground where the roof map (above) says it is open all round it
   // - not where it would cut into a wall or a roof - fading to nothing where it meets the ground and near the eye, so that no edge of
   // it is ever seen; its body is the clouds' noise (game.js), read where it is in the world, so that it does not turn with the eye.
-  const BANK_VS = `uniform float uT; uniform vec3 uCam; uniform vec2 uWind;
+  const BANK_VS = `uniform float uT; uniform vec3 uCam; uniform vec2 uWind; uniform float uLow;
     ${ROOF_GLSL}
     attribute vec2 aCorner; attribute vec4 aSeed; varying vec2 vUv; varying float vA; varying vec3 vW; varying float vG;
     void main() {
@@ -358,13 +375,13 @@
       for (int k = 0; k < 6; k++) { float an = float(k) * 1.0472; float t = roofTop(c + vec2(cos(an), sin(an)) * R * 0.85); open *= step(t, g + 2.2); }   // (a slope of the ground may rise under it; a wall or a roof may not)
       vec3 ctr = vec3(c.x, g + aSeed.y, c.y);
       vec3 toC = vec3(uCam.x - ctr.x, 0.0, uCam.z - ctr.z); toC /= max(0.001, length(toC)); vec3 rt = vec3(-toC.z, 0.0, toC.x);
-      vec3 p = ctr + rt * aCorner.x * R + vec3(0.0, aCorner.y * R * 0.32, 0.0);
+      vec3 p = ctr + rt * aCorner.x * R + vec3(0.0, aCorner.y * R * mix(0.32, 0.1, uLow), 0.0);
       float d = length(ctr - uCam);
       vW = p; vG = g; vUv = aCorner;
       vA = open * smoothstep(R * 0.6, R * 1.6, d) * (1.0 - smoothstep(45.0, 70.0, d)) * smoothstep(0.0, 6.0, min(min(c.x, c.y), min(uRoof.x - c.x, uRoof.y - c.y)));
       gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
     }`;
-  const BANK_FS = `uniform sampler2D tN; uniform vec3 uC; uniform float uA; uniform float uT; uniform vec2 uWind;
+  const BANK_FS = `uniform sampler2D tN; uniform vec3 uC; uniform float uA; uniform float uT; uniform vec2 uWind; uniform float uLow;
     varying vec2 vUv; varying float vA; varying vec3 vW; varying float vG;
     ${ROOF_GLSL}
     void main() {
@@ -373,7 +390,7 @@
       float n = texture2D(tN, f * 0.035 + vec2(0.0, vW.y * 0.04)).r, n2 = texture2D(tN, f * 0.09 + vec2(0.31, vW.y * 0.1) + uT * 0.004).g;
       a *= smoothstep(0.32, 0.8, n * 0.65 + n2 * 0.35);
       float gh = vW.y - roofTop(vW.xz);   // (over the ground or whatever stands there, at this very spot: no line where it meets them)
-      a *= smoothstep(0.0, 1.4, gh) * (1.0 - smoothstep(2.2, 4.5, vW.y - vG));
+      a *= mix(smoothstep(0.0, 1.4, gh) * (1.0 - smoothstep(2.2, 4.5, vW.y - vG)), smoothstep(0.0, 0.18, gh) * (1.0 - smoothstep(0.3, 0.8, vW.y - vG)), uLow);
       a *= vA * uA; if (a < 0.003) discard;
       gl_FragColor = vec4(uC, a);
     }`;
@@ -381,13 +398,13 @@
     const tex = G.game && G.game.skyNoiseRT ? G.game.skyNoiseRT.texture : null; if (!tex || !roof) return null;
     const n = Math.max(6, Math.round(spec.n * k)), pos = new Float32Array(n * 12), cor = new Float32Array(n * 8), seed = new Float32Array(n * 16), idx = [];
     for (let i = 0; i < n; i++) {
-      const x = rnd(), z = rnd(), R = 4.5 + rnd() * 5, sd = [R, R * 0.3 + 0.4 + rnd() * 0.5, rnd(), rnd()];
+      const x = rnd(), z = rnd(), R = spec.low ? 3 + rnd() * 3 : 4.5 + rnd() * 5, sd = [R, spec.low ? 0.25 + rnd() * 0.2 : R * 0.3 + 0.4 + rnd() * 0.5, rnd(), rnd()];
       [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([u, v], j) => { pos.set([x, 0, z], i * 12 + j * 3); cor.set([u, v], i * 8 + j * 2); seed.set(sd, i * 16 + j * 4); });
       const o = i * 4; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2);
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCorner', new THREE.BufferAttribute(cor, 2)); g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4)); g.setIndex(idx);
-    const uni = Object.assign({ uT: { value: 0 }, uCam: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector2(...(spec.wind || [0.5, 0.2])) }, tN: { value: tex }, uC: { value: new THREE.Color() }, uA: { value: spec.a } }, roofUni(true));
+    const uni = Object.assign({ uT: { value: 0 }, uCam: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector2(...(spec.wind || [0.5, 0.2])) }, tN: { value: tex }, uC: { value: new THREE.Color() }, uA: { value: spec.a }, uLow: { value: spec.low ? 1 : 0 } }, roofUni(true));
     const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: uni, vertexShader: BANK_VS, fragmentShader: BANK_FS, transparent: true, depthWrite: false }));
     m.userData.bank = true; return m;
   }
@@ -403,7 +420,9 @@
         const ns = Math.max(8, Math.round(spec.splash * k)), g = new THREE.BufferGeometry(), pos = new Float32Array(ns * 3), ph = new Float32Array(ns);
         for (let i = 0; i < ns; i++) ph[i] = rnd();
         g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aPh', new THREE.BufferAttribute(ph, 1));
-        const uni = Object.assign({ uT: { value: 0 }, uCam: { value: new THREE.Vector3() }, uProj: { value: 600 }, uFogD: { value: 0 }, uRate: { value: 2.6 }, uA: { value: spec.a * 0.6 } }, roofUni(true), litUni());
+        // (the area's pools, for the splashes to know water from ground)
+        const wz = (G.world && G.world.waterZones || []).slice(0, 8), uWz = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => wz[i] ? new THREE.Vector4(wz[i].x0, wz[i].z0, wz[i].x1, wz[i].z1) : new THREE.Vector4());
+        const uni = Object.assign({ uT: { value: 0 }, uCam: { value: new THREE.Vector3() }, uProj: { value: 600 }, uFogD: { value: 0 }, uRate: { value: 2.6 }, uA: { value: spec.a * 0.6 }, uWz: { value: uWz } }, roofUni(true), litUni());
         const m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: uni, vertexShader: SPL_VS, fragmentShader: SPL_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
         m.userData.splash = true; out.push(m);
       }
@@ -420,10 +439,12 @@
     for (const m of out) { m.frustumCulled = false; m.renderOrder = m.userData.bank ? 5 : 6; }
     return out;
   }
+  const bankHor = new THREE.Color();
   S.start = function (sc, v) {
     S.stop(); scene = sc; cur = v || null;
     if (!v) return;
     const w = G.world, B = w && w.mats ? (w.envOverride ? Object.assign({}, w.mats.biome, w.envOverride) : w.mats.biome) : null;
+    if (B) { const E = S.env(B, v); bankHor.set(E.sky ? E.sky[2] : E.fog); }
     const open = !!(B && (B.outdoor || B.sky));   // (a field under the sky: what falls from it stops at roofs)
     roof = open ? roofFor(w) : null;
     const q = (G.save && G.save.data.settings.quality) || 'high', k = (q === 'low' ? 0.35 : q === 'med' ? 0.65 : 1) * (document.documentElement.classList.contains('m') ? 0.6 : 1);
@@ -431,7 +452,7 @@
     flash = v.flash ? { next: 6 + Math.random() * 10, t: -1 } : null;
     // (the bolt's shader, made now with the area - in its place in the scene, a thing of no size - not with the first bolt)
     if (v.bolt) {
-      if (!boltMat) boltMat = new THREE.ShaderMaterial({ uniforms: { uI: { value: 0 }, uC: { value: new THREE.Color(0xa8b8d8) } }, vertexShader: BOLT_VS, fragmentShader: BOLT_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      if (!boltMat) boltMat = new THREE.ShaderMaterial({ uniforms: { uI: { value: 0 }, uC: { value: new THREE.Color(0xa8b8d8) }, uPix: { value: 0.0015 }, uFogD: { value: 0 } }, vertexShader: BOLT_VS, fragmentShader: BOLT_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
       const g = boltGeo([[new THREE.Vector3(0, -500, 0), new THREE.Vector3(0, -500.01, 0), 0.001, 0]]), m = new THREE.Mesh(g, boltMat); m.frustumCulled = false; m.userData.boltWarm = true; scene.add(m); live.push(m);
     }
   };
@@ -491,6 +512,7 @@
       if (Math.random() < 0.6) { const j = Math.floor(br.length * (0.3 + Math.random() * 0.4)), L2 = L * 0.45, e2 = br[j].clone().add(new THREE.Vector3(rs(L2), -L2 * 0.7, rs(L2))); add(wander(br[j], e2, 0.14, 6), 0.03, 0.25); }
     }
     const m = new THREE.Mesh(boltGeo(segs), boltMat.clone()); m.frustumCulled = false; m.renderOrder = 7;
+    if (G.camera) { const d = top.clone().sub(G.camera.position).normalize(); S.flashDir = [d.x, Math.max(0.15, d.y), d.z]; }   // (the clouds lit from inside where it came down)
     scene.add(m); bolts.push({ m, t: 0, re: Math.random() < 0.7 ? 2 : 1 });
   };
   // its light over the time it lives: the stroke, dark, the restrike(s), gone
@@ -527,7 +549,7 @@
         for (let i = 0; i < 4; i++) { const l = lamps[i] && lamps[i][1]; if (l) { u.uLP.value[i].set(l.position.x, l.position.y, l.position.z, Math.min(l.distance || 14, 10) * 0.65); u.uLC.value[i].set(l.color.r * l.intensity * 0.02, l.color.g * l.intensity * 0.02, l.color.b * l.intensity * 0.02, 0); } else u.uLP.value[i].w = 0; }
         u.uFlash.value = S.flashA || 0;
       }
-      if (m.userData.bank && fogc) { u.uC.value.copy(fogc).multiplyScalar(1.6); if (hemi) u.uC.value.r += hemi.color.r * hemi.intensity * 0.01, u.uC.value.g += hemi.color.g * hemi.intensity * 0.01, u.uC.value.b += hemi.color.b * hemi.intensity * 0.01; }   // (the fog's colour, catching a little of the sky's light)
+      if (m.userData.bank && fogc) { u.uC.value.copy(fogc).lerp(bankHor, 0.55).multiplyScalar(1.35); if (hemi) u.uC.value.r += hemi.color.r * hemi.intensity * 0.01, u.uC.value.g += hemi.color.g * hemi.intensity * 0.01, u.uC.value.b += hemi.color.b * hemi.intensity * 0.01; }   // (the fog's colour toward the horizon's, catching a little of the sky's light)
       const rn = m.userData.rain;
       if (rn) {
         // the wind: the way the rain slants sways with the gusts, and it thickens and thins with them
@@ -539,7 +561,7 @@
       }
     }
     for (const b of bolts.slice()) {
-      b.t += dt; b.m.material.uniforms.uI.value = boltI(b.t, b.re);
+      b.t += dt; b.m.material.uniforms.uI.value = boltI(b.t, b.re); b.m.material.uniforms.uPix.value = 2 * Math.tan(cam.fov * Math.PI / 360) / Math.max(1, R ? R.getDrawingBufferSize(DB).y : 900); b.m.material.uniforms.uFogD.value = fd;
       if (b.t > 0.34) { scene.remove(b.m); b.m.geometry.dispose(); b.m.material.dispose(); bolts.splice(bolts.indexOf(b), 1); }
     }
     if (flash) {

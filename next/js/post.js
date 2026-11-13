@@ -86,6 +86,142 @@ vec3 aces(vec3 c){
   c *= 1. / .6; c = I * c; c = RRT(c); c = O * c; return clamp(c, 0., 1.);
 }
 float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+// ---- under the water (water.js sets Post.water each frame). uWat: mode (1: the eyes at the surface - a line across the screen, the
+// water below it; 2: under), the eyes' height over the surface (m, < 0 under), detail (1 medium, 2 high), sway. uWatT: time, drops
+// left on the eyes after coming up (0..1), the time since going in or coming out, the burst of bubbles of going in (0..1). uWatD: the
+// water's thickness (as the scene's fog: exp2), the surface's height, how much light comes down through it, how dark it is deep down
+uniform vec4 uWat; uniform vec4 uWatT; uniform vec4 uWatD; uniform vec3 uWatC; uniform vec3 uWatL; uniform vec3 uWatA; uniform vec3 uWatS;
+uniform mat4 uCamW; uniform vec3 uCamP; uniform mat4 uVP; uniform sampler2D tCaus;
+float wFog(float z){ float f = uWatD.x * z; return 1. - exp(-f * f); }
+// the web of light thrown on what lies under rippling water: the bright edges of a cellular pattern, bent by a slow noise, two of them
+// drifting across each other (tCaus: r the edges, g and b smooth noise; baked once, post.js bakeCaus)
+float wCaus(vec2 p, float t){
+  vec2 w = (texture2D(tCaus, p * .09 + vec2(t * .011, t * .007)).gb - .5) * .45;
+  float a = texture2D(tCaus, p * .31 + w + vec2(t * .019, -t * .011)).r, b = texture2D(tCaus, p * .23 - w + vec2(-t * .015, t * .017) + .5).r;
+  return a * .62 + b * .38;
+}
+float wHash(vec2 p){ vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+// where on the screen the picture is bent: the slow sway of seeing through moving water (under it), the drops running down the eyes
+// after coming up, the bubbles of going in
+vec2 wBend(vec2 uv){
+  vec2 o = vec2(0.);
+  if (uWat.x > 1.5) o += vec2(sin(uv.y * 9. + uWatT.x * 1.3) + sin(uv.y * 23. - uWatT.x * 2.1) * .4, cos(uv.x * 7. + uWatT.x * 1.1) + cos(uv.x * 19. + uWatT.x * 1.7) * .4) * .0011 * uWat.w;
+  if (uWatT.y > .001) {
+    // drops on the eyes: small round lenses (each turns over what is behind it), a few running down and leaving a trail, fewer as
+    // they go; one to a cell, its own size, place and pace
+    vec2 asp = vec2(res.x / res.y, 1.);
+    for (int k = 0; k < 2; k++) {
+      float sc = k == 0 ? 11. : 19.;
+      vec2 cq = uv * asp * sc, ci = floor(cq);
+      float h = wHash(ci + float(k) * 17.), h2 = wHash(ci + 5.3 + float(k) * 3.), h3 = wHash(ci + 9.1);
+      float run = step(.7, h2) * uWatT.z * (.15 + .5 * h3);   // (some slide down)
+      vec2 c0 = vec2(.25 + .5 * h, .3 + .5 * h3 + run * sc * .35);
+      vec2 f = cq - ci - vec2(c0.x, fract(c0.y)) ; f.y = f.y * (1. - .35 * step(.7, h2));
+      float r = (.12 + .16 * h2) * step(1. - uWatT.y * (k == 0 ? .5 : .65), h), d = length(f);
+      float lens = smoothstep(r, r * .8, d);
+      o += -f / sc / asp * 1.4 * lens;
+      // (the trail a running drop leaves above it)
+      float tr = step(.7, h2) * smoothstep(.06, .0, abs(cq.x - ci.x - c0.x)) * step(0., f.y) * step(f.y, run * sc * .35) * .5;
+      o += vec2(.0015, 0.) * tr;
+    }
+  }
+  if (uWatT.w > .001) {
+    vec2 bq = vec2(uv.x * res.x / res.y * 9., uv.y * 9. - uWatT.z * 7.), ci = floor(bq), f = fract(bq) - .5;
+    float h = wHash(ci), rr = .12 + .22 * wHash(ci + 3.1), d = length(f - (vec2(wHash(ci + 7.7), h) - .5) * .4);
+    o += (f / max(d, .01)) * smoothstep(rr, rr * .5, d) * step(.55, h) * uWatT.w * .006;
+  }
+  return uv + o;
+}
+// what is seen, under the water: its haze (only where the scene's own fog is not already the water's), the surface from below, the light
+float wUnder = 0.;
+vec3 wView(vec2 uv, vec3 c){
+  float t = uWatT.x, sy = uWatD.y, e = uWat.y, md = uWat.x;
+  float dz = texture2D(tDepth, uv).x, sky = step(.99999, dz);
+  vec4 v4 = projInv * vec4(uv * 2. - 1., min(dz, .99999) * 2. - 1., 1.); vec3 vp = v4.xyz / v4.w;
+  vec3 rd = normalize(mat3(uCamW) * vp);
+  float vz = mix(-vp.z, 400., sky), dist = mix(length(vp), 400., sky);
+  vec3 wp = uCamP + rd * dist;
+  vec3 N = cross(dFdx(wp), dFdy(wp)); N = N / max(length(N), 1e-6); N *= -sign(dot(N, rd) + 1e-6);   // (the face's own side toward the eye)
+  // where the sight begins: in the water or in the air. With the eyes at the surface it is a line across the screen, swaying a little
+  // (the water on the eyes rises and falls along the line: slow swells across it, a few small bumps, never still)
+  float s = -1.;
+  if (md < 1.5) {
+    float ph = atan(rd.x, rd.z);
+    s = e + rd.y * .15 - (sin(ph * 5. + t * 1.4) * .0035 + sin(ph * 11. - t * 2.3) * .0015 + (texture2D(tCaus, vec2(ph * .6, t * .05)).g - .5) * .012 + sin(t * .9) * .002);
+  }
+  float fw = max(fwidth(s), 1e-5), under = md > 1.5 ? 1. : 1. - smoothstep(-fw * 1.5, fw * 1.5, s);
+  wUnder = under;
+  float fz = wFog(vz);
+  // under the water: farther things lose their edges and their colour
+  vec3 cu = c;
+  if (uWat.z > 1.5) {
+    vec2 px = (1. + fz * 2.5) / res;
+    vec3 bl = (texture2D(tScene, uv + vec2(px.x, 0.)).rgb + texture2D(tScene, uv - vec2(px.x, 0.)).rgb + texture2D(tScene, uv + vec2(0., px.y)).rgb + texture2D(tScene, uv - vec2(0., px.y)).rgb) * .25;
+    cu = mix(cu, bl, fz * .5);
+  }
+  float tS = rd.y > .002 ? max(0., -e) / rd.y : 1e5;
+  if (tS < dist) {
+    // the surface from below: overhead, a round window of the light and the air beyond (bent, squeezed; wider light at its rim), and
+    // outside it the water's own dark mirror. Its ripples shake the window's edge
+    vec2 hp = uCamP.xz + rd.xz * tS;
+    vec2 g = (texture2D(tCaus, hp * .21 + vec2(t * .03, t * .02)).gb - .5) * .7 + (texture2D(tCaus, hp * .53 - vec2(t * .05, -t * .04)).gb - .5) * .35;
+    float ct = clamp(rd.y + (rd.x * g.x + rd.z * g.y) * .07, 0., 1.);
+    float win = smoothstep(.64, .68, ct), rim = exp(-pow((ct - .662) / .015, 2.));
+    vec3 bent = texture2D(tScene, uv + g * .02).rgb;
+    float rip = texture2D(tCaus, hp * .9 + g * .5 + vec2(t * .03, -t * .02)).b;   // (soft swells of brightness, not the web: that is on what is lit)
+    vec3 winC = bent * (md > 1.5 ? .35 : .8) + mix(uWatL, uWatA * 3., .35) * (.6 + 1.6 * ct * ct) * (.75 + .5 * rip);
+    vec3 tir = uWatC * (.42 + .28 * wCaus(hp * 1.3, t)) + uWatL * .05;
+    cu = mix(mix(tir, winC, win) + uWatL * rim * .35, uWatC, wFog(tS));
+  } else {
+    if (md < 1.5) cu = mix(cu, uWatC, fz);   // (at the surface the scene's fog is the air's: the water's laid on here)
+    cu = mix(cu, uWatC, sky);
+    // the web of light on what lies under the water, brighter the nearer the surface and the more it faces up
+    float hb = sy - wp.y;
+    float k = uWatD.z * step(0., hb) * exp(-max(hb, 0.) * .45) * (1. - fz) * clamp(N.y * .75 + .3, 0., 1.) * (1. - sky);
+    cu *= 1. + (wCaus(wp.xz + uWatS.xz * max(hb, 0.) * .35, t) * 2. - .55) * k * 1.6;
+    // (the light on it came down through the water too: the deeper it lies, the less red is left in it)
+    cu *= exp(-vec3(.32, .07, .11) * clamp(hb, 0., 3.) * (1. - sky));
+    // (the haze is paler toward the light overhead, darker below)
+    cu += uWatL * .25 * fz * smoothstep(-.3, .8, rd.y);
+  }
+  // shafts of light slanting down from the surface, moving with its swell (sampled along the line of sight, high quality)
+  if (uWat.z > 1.5) {
+    float T = min(dist, 8.), sh = 0., j = .5;   // (no jitter: the pattern is smooth, a scatter of samples only made grain of it)
+    for (int i = 0; i < 6; i++) {
+      float ti = (float(i) + j) / 6. * T; vec3 sp = uCamP + rd * ti; float h = sy - sp.y;
+      vec2 sq = (sp.xz - uWatS.xz / max(-uWatS.y, .3) * max(h, 0.)) * .15 + vec2(t * .006, t * .004);   // (up along the light to the surface: the swell there makes the shaft)
+      sh += smoothstep(.45, .78, texture2D(tCaus, sq).b) * exp(-max(h, 0.) * .3) * exp(-ti * .25) * step(0., h);
+    }
+    cu += uWatL * sh / 6. * T * 1.1 * uWatD.z * (.5 + .5 * smoothstep(-.4, .6, rd.y));
+  }
+  // red goes first, then green: the far end of what is seen is blue-green
+  cu *= exp(-vec3(.13, .025, .05) * min(vz, 8.) * (1. - sky));
+  cu = mix(vec3(dot(cu, vec3(.2126, .7152, .0722))), cu, 1. - fz * .4);
+  // above the line (the eyes at the surface): looking down past it, the water's face stretching away - a dark mirror at a glance
+  vec3 ca = c;
+  if (md < 1.5 && rd.y < -.001) {
+    float tA = max(e, 0.) / -rd.y;
+    if (tA < dist) {
+      float fr = .55 + .45 * pow(1. - min(1., -rd.y * 4.), 3.);
+      vec2 hp = uCamP.xz + rd.xz * tA, g = (texture2D(tCaus, hp * .35 + vec2(t * .05, t * .03)).gb - .5) * .06;
+      vec4 rp = uVP * vec4(uCamP + normalize(vec3(rd.x + g.x, -rd.y, rd.z + g.y)) * 25., 1.);   // (what stands over the water, seen in it)
+      vec2 ru = rp.xy / rp.w * .5 + .5;
+      vec3 refl = texture2D(tScene, clamp(ru, vec2(.001), vec2(.999))).rgb * .55 + uWatA * .6;
+      refl = mix(uWatA * 1.2, refl, step(.0, rp.w) * step(abs(ru.x - .5), .5) * step(abs(ru.y - .5), .5));
+      ca = mix(mix(c, uWatC, wFog(dist - tA)), refl, fr);
+    }
+  }
+  vec3 o = mix(ca, cu, under);
+  // the line itself: the water's edge clinging to the eyes - a band that bends what is behind it, darker in its body, a thin light
+  // along its top
+  if (md < 1.5) {
+    float men = exp(-pow(s / (fw * 7.), 2.)), hl = exp(-pow((s - fw * 6.) / (fw * 2.), 2.));
+    vec3 sm = texture2D(tScene, uv - vec2(0., clamp(s / fw, -8., 8.) * 1.5 / res.y)).rgb;
+    float br = .5 + .5 * sin(atan(rd.x, rd.z) * 23. + t * 2.);   // (its light broken along it)
+    o = mix(o, sm * .55 + uWatC * .35, men * .8) + (uWatL * .5 + uWatA) * hl * .45 * br;
+  }
+  return o;
+}
 // motion blur: where this point of the world was on the screen a frame ago (its depth, taken back through this frame's camera and
 // forward through the last one's), and the picture smeared along that. What is held is laid on afterwards, sharp, as the eye keeps it
 vec3 world(vec2 uv){
@@ -118,6 +254,8 @@ vec3 air(vec2 uv){
 }
 void main(){
   vec2 uv = vUv, cc = uv - .5;
+  bool wat = uWat.x > .5 || uWatT.y > .001 || uWatT.w > .001;
+  if (wat) uv = wBend(uv);
   vec3 c = world(uv);
   float lum = dot(c, vec3(.2126, .7152, .0722));
   vec3 aoS = texture2D(tAO, uv).rgb;
@@ -125,7 +263,18 @@ void main(){
   // wear: an edge that stands out catches a little more light, a crease holds a little more dark
   float cv = aoS.b * 2. - 1.; c *= 1. + cv * (cv > 0. ? .6 : .32) * cavAmt * step(.001, aoAmt);
   c += air(uv);
-  if (gunOn > .5) { vec4 g = texture2D(tGun, uv); c = c * (1. - clamp(g.a, 0., 1.)) + g.rgb; }
+  if (uWat.x > .5) c = wView(uv, c);
+  if (gunOn > .5) {
+    vec4 g = texture2D(tGun, uv);
+    // what is held, under the water: the same colour of the water on it, the same web of light playing over it
+    if (wUnder > .001) {
+      float k = 1. + (wCaus(uv * vec2(res.x / res.y, 1.) * 4.5, uWatT.x) * 1.6 - .5) * .45 * uWatD.z;
+      vec3 gw = g.rgb * vec3(.44, .74, .7) * k + uWatC * clamp(g.a, 0., 1.) * .6;
+      g.rgb = mix(g.rgb, gw, wUnder);
+    }
+    c = c * (1. - clamp(g.a, 0., 1.)) + g.rgb;
+  }
+  if (uWatT.w > .001) c = mix(c, c * .7 + uWatL * 1.5, uWatT.w * .25);   // (going in: a pale churn for a moment)
   c += texture2D(tBloom, uv).rgb * bloomAmt;
   c *= exposure;
   c = aces(c);
@@ -144,12 +293,26 @@ void main(){
   gl_FragColor = vec4(mix(c * 12.92, pow(c, vec3(1. / 2.4)) * 1.055 - .055, step(.0031308, c)), 1.);
 }`;
 
+  const CAUS_FS = `precision highp float; varying vec2 vUv;
+float hs(vec2 p){ vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+float vn(vec2 uv, float P, float s){ vec2 x = uv * P, i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
+  return mix(mix(hs(mod(i, P) + s), hs(mod(i + vec2(1., 0.), P) + s), f.x), mix(hs(mod(i + vec2(0., 1.), P) + s), hs(mod(i + 1., P) + s), f.x), f.y); }
+float fb(vec2 uv, float P, float s){ return vn(uv, P, s) * .55 + vn(uv, P * 2., s + 3.) * .3 + vn(uv, P * 4., s + 7.) * .15; }
+float edge(vec2 uv, float P, float s){ vec2 x = uv * P, i = floor(x), f = fract(x); float d1 = 9., d2 = 9.;
+  for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++) { vec2 o = vec2(float(z), float(y)), c = mod(i + o, P); float d = length(o + .2 + .6 * vec2(hs(c + s), hs(c + s + 7.7)) - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; }
+  return d2 - d1; }
+void main(){
+  vec2 uv = vUv, w = vec2(fb(uv, 4., 11.), fb(uv, 4., 23.)) - .5;
+  float e1 = edge(uv + w * .08, 6., 1.), e2 = edge(uv - w * .06, 10., 5.);
+  float r = exp(-e1 * 11.) * .72 + exp(-e2 * 15.) * .28;
+  gl_FragColor = vec4(r, fb(uv, 5., 31.), fb(uv, 7., 41.), 1.);
+}`;
   const Post = G.Post = { active: false, ao: true, bloom: true, msaa: 4, set: { aoAmt: 0.75, aoRadius: 0.75, aoStrength: 1, bloomAmt: 0.07, thresh: 0.95, grade: 1, gain: 1.2, mblur: 0.5, cav: 0.7, air: 0.02 } };
   Post.mblurOn = () => !!(G.save && G.save.data && G.save.data.settings.motionBlur !== false); // (the setting: on unless turned off)
   Post.stats = { n: 0, ms: 0 }; // (warm draws: how many, how long)
   let R = null, quad, cam, scn, rtScene, rtGun, rtAO, rtAO2, rtPip, pipSize = 0, mips = [], W = 0, H = 0, curMsaa = -1;
   const mk = (fs, u) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: fs, uniforms: u, depthTest: false, depthWrite: false });
-  let mAO, mBlur, mPre, mDown, mUp, mFin, mPip;
+  let mAO, mBlur, mPre, mDown, mUp, mFin, mPip, mCaus;
   const draw = (mat, target) => { quad.material = mat; R.setRenderTarget(target); R.render(scn, cam); };
   const col = new THREE.Color(), v2 = new THREE.Vector2();
 
@@ -164,8 +327,20 @@ void main(){
     mUp = mk(UP_FS, { tSrc: T(), tAdd: T(), texel: V2(), mixk: { value: 0.5 } });
     mPip = mk(PIP_FS, { tScene: T(), part: V2() });
     mFin = mk(FIN_FS, { tScene: T(), tGun: T(), gunOn: { value: 0 }, tAO: T(), tBloom: T(), time: { value: 0 }, aoAmt: { value: 1 }, bloomAmt: { value: 0.05 }, exposure: { value: 1 }, res: V2(), grade: { value: 1 }, tDepth: T(), reproj: M4(), mblur: { value: 0 }, cavAmt: { value: 0 }, airK: { value: 0 }, projInv: M4(),
-      aL: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, aC: { value: Array.from({ length: 12 }, () => new THREE.Vector4(1, 1, 1, 10)) } });
+      aL: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, aC: { value: Array.from({ length: 12 }, () => new THREE.Vector4(1, 1, 1, 10)) },
+      uWat: { value: new THREE.Vector4() }, uWatT: { value: new THREE.Vector4() }, uWatD: { value: new THREE.Vector4(0.3, 0, 0, 0) }, uWatC: { value: new THREE.Color() }, uWatL: { value: new THREE.Color() }, uWatA: { value: new THREE.Color() }, uWatS: { value: new THREE.Vector3(0, -1, 0) },
+      uCamW: M4(), uCamP: { value: new THREE.Vector3() }, uVP: M4(), tCaus: T() });
+    mCaus = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: CAUS_FS, depthTest: false, depthWrite: false });
   };
+  // the web of light's pattern, baked once (a tile 256 wide, repeating): r the bright edges where cells meet, bent; g, b smooth noise
+  let rtCaus = null;
+  function bakeCaus() {
+    if (rtCaus || !R) return rtCaus;
+    rtCaus = new THREE.WebGLRenderTarget(256, 256, { depthBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
+    draw(mCaus, rtCaus);
+    return rtCaus;
+  }
+  Post.caustics = () => (bakeCaus() ? rtCaus.texture : null);
   const hdr = (w, h, o) => new THREE.WebGLRenderTarget(w, h, Object.assign({ type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }, o || {}));
   Post.resize = function () {
     if (!R) return;
@@ -208,6 +383,7 @@ void main(){
   Post.warm = function () {
     if (!Post.active || !rtScene) return;
     const prev = R.getRenderTarget();
+    try { bakeCaus(); } catch (e) { /* (made when first under the water) */ }
     try { post(null, false, 0, true); } catch (e) { /* (a driver that will not: the frame then falls back by itself) */ }
     R.setRenderTarget(prev);
   };
@@ -277,6 +453,17 @@ void main(){
       prevVP.copy(curVP); mbLast.copy(mbP); mbHas = true;
     } else if (!warming) mbHas = false;
     u.tDepth.value = depth; u.mblur.value = mb; u.cavAmt.value = Post.ao && camera && !warming ? s.cav : 0;
+    // under the water (water.js): its colour and thickness, where the surface is, the light through it; drops and bubbles on the eyes
+    const Wd = Post.water;
+    if (Wd && camera && !warming && (Wd.mode || Wd.drops > 0 || Wd.dive > 0)) {
+      const tc = Post.caustics(); u.tCaus.value = tc;
+      const q = G.save && G.save.data && G.save.data.settings, hi = q && q.quality === 'high';
+      u.uWat.value.set(tc ? Wd.mode : 0, Wd.e, hi ? 2 : 1, q && q.bob === 0 ? 0 : 1);
+      u.uWatT.value.set(time % 600, Wd.drops, Wd.since, Wd.dive); u.uWatD.value.set(Wd.dens, Wd.sy, Wd.lk, 0);
+      u.uWatC.value.copy(Wd.col); u.uWatL.value.copy(Wd.light); u.uWatA.value.copy(Wd.air); u.uWatS.value.copy(Wd.sdir);
+      u.uCamW.value.copy(camera.matrixWorld); u.uCamP.value.setFromMatrixPosition(camera.matrixWorld); u.projInv.value.copy(camera.projectionMatrixInverse);
+      u.uVP.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    } else { u.uWat.value.x = 0; u.uWatT.value.y = 0; u.uWatT.value.w = 0; }
     if (warming) u.airK.value = 0; else airLights(camera, time);
     draw(mFin, warming ? rtAO2 : null);
   }

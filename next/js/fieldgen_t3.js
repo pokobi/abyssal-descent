@@ -98,7 +98,8 @@
       for (const sx of [-1, 1]) {
         const x = cx + sx * 5.6;
         w.solid('iron', x - 0.6, 0, AD + 6, x + 0.6, 0.35, D - 4, { uv: 1 });
-        w.visual('lava', x - 0.45, 0.35, AD + 6, x + 0.45, 0.37, D - 4, { uv: 2, grad: false });
+        // (the iron in it is lava as the melt is, fields.js: step in it and it burns)
+        if (G.Fields) G.Fields.add(w, 'lava', x - 0.45, AD + 6, x + 0.45, D - 4, { y: 0.35, noLight: true }); else w.visual('lava', x - 0.45, 0.35, AD + 6, x + 0.45, 0.37, D - 4, { uv: 2, grad: false });
       }
       for (let z = AD + 10; z < D - 6; z += 14) w.addLight(cx, 1, z, { flame: 0, intensity: 8, range: 12, color: '#ff6a20', emit: false, prio: 0.8 });
       return nook;

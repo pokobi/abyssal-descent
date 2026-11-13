@@ -18,8 +18,8 @@
   R.TIERS = [
     ['grave', 'hamlet', 'dusk', 'battlefield'], // 地上
     ['gate', 'catacombs', 'castle', 'shaft'], // 入口
-    ['halls', 'flooded', 'foundry', 'mine'], // 中層
-    ['ruin', 'frozen', 'sanctum', 'pillars'], // 深層
+    ['halls', 'flooded', 'frozen', 'mine'], // 中層
+    ['ruin', 'foundry', 'sanctum', 'pillars'], // 深層
   ];
   R.tierOf = (f) => R.TIERS.findIndex((t) => t.includes(f));
   R.baseOf = (f) => { const t = R.TIERS[R.tierOf(f)]; return t ? t[0] : f; };

@@ -649,7 +649,7 @@
       }
       // ---- patches of later repair: a few courses of smaller stones of another colour, laid where the face had fallen
       if (CF.patch && !lo && foot !== null) for (const [a, b] of cut(footR, bs.map((q) => [q.a - 1.6, q.a + 1.6]))) {
-        for (let c = a + 2 + 9 * hs(a, side.charCodeAt(0), 22); c < b - 2; c += 11 + 8 * hs(c, 2, 23)) {
+        for (let c = a + 2 + 9 * hs(a, side.charCodeAt(0), 22); c < b - 2; c += 18 + 14 * hs(c, 2, 23)) {
           const wd = 1.6 + 1.6 * hs(c, 3, 24), yb = foot + Math.max(4.6, Math.min(top - 4, 4.6 + 3 * hs(c, 4, 25))), nh = 3 + Math.floor(4 * hs(c, 5, 26)), f = hs(c, 6, 27) < 0.5 ? 1.12 : 0.84;
           if (yb + nh * 0.3 > top - 1.2) continue;
           let y = yb;
@@ -806,26 +806,32 @@
         const v = M.var(wx, top, wz, 7), k = wood ? 0.95 : 0.9;
         M.geo(mk || 'trim', g, m, { tint: [v[0] * k, v[1] * k, v[2] * k], gy: h0 + ay - 1, world: true, uv: wood ? 1.2 : 1.4, flip, one: true });
       }
-      // the strings: at each side a closed string of masonry rising with the flight, flush with the side of its boxes (which it hides: a
-      // flight seen from the side was one flat face cut in teeth), its top 0.2 m over the line of the nosings, laid in courses; of wood, a
-      // beam along the same line. Inside the flight's width: the boxes are behind it
-      if (wood || n < 3) return;
-      const SW = Math.min(0.24, wd * 0.1), Ch = 0.7, Lz = n * run, base = h0 + ay;
-      const topAt = (z) => (z <= run ? h1 + ay : h1 + ay - (z / run - 1) * rise) + 0.2, zAt = (y) => (y >= h1 + ay + 0.2 ? run : run * (1 + (h1 + ay + 0.2 - y) / rise));
+      // the sides: at each side the flight's side wall of masonry, flush with the side of its boxes (a flight seen from the side was one flat
+      // face cut in teeth), its top following the steps - each step's end a stone of its own, as on an old stair of stone - laid in courses
+      // two risers high, the joints of one course off those of the next, a hair of joint between the stones. Of wood: none
+      if (wood || n < 2) return;
+      const Ch = (n > 16 ? 3 : 2) * rise, base = h0 + ay, top = (i) => h1 + ay - i * rise;
       const W3 = (u, y, z) => (ns ? [c + u, y, e + sg * z] : [e + sg * z, y, c + u]);
       for (const sx of [-1, 1]) {
-        const u0 = sx * (wd / 2 + 0.006), u1 = sx * (wd / 2 - SW);
-        // (course by course up from the floor, each as far out as the line of the nosings lets it, its stones 1.3 - 2.1 m long, the joints of
-        // one course off those of the next)
+        // (a side against a wall or a slab is not seen: none there)
+        { const pa = W3(sx * (wd / 2 + 0.06), base + (h1 - h0) * 0.5, n * run * 0.3), pb = W3(sx * (wd / 2 + 0.3), base + (h1 - h0) * 0.5 + 0.1, n * run * 0.7);
+          if (w.query(Math.min(pa[0], pb[0]), pa[1], Math.min(pa[2], pb[2]), Math.max(pa[0], pb[0]), pb[1], Math.max(pa[2], pb[2])).some((q) => q.vis && !q.ghost)) continue; }
+        const u0 = sx * (wd / 2 + 0.015), u1 = sx * (wd / 2 - 0.12), g = 0.003;
+        const stone = (z0, z1, y0, y1, k) => { const vv = M.var(c + sx * 1.3 + z0, y0, e + z1 * 0.7, 9 + k), q = 0.74 + 0.2 * _hn(c + sx + z0 * 3.1, y0 * 2.3 + e, 71);
+          M.hexa(mk || 'trim', [W3(u0, y0 + g, z0 + g), W3(u0, y0 + g, z1 - g), W3(u0, y1 - g, z0 + g), W3(u0, y1 - g, z1 - g), W3(u1, y0 + g, z0 + g), W3(u1, y0 + g, z1 - g), W3(u1, y1 - g, z0 + g), W3(u1, y1 - g, z1 - g)], 0, { gy: base, top: base + 5, tint: [vv[0] * q, vv[1] * q, vv[2] * q * 0.98], n: 0.004, uv: 1.6, chip: 0.1, chipS: 0.035 }); };
         for (let k = 0; ; k++) {
-          const y0 = base + k * Ch, ze = Math.min(Lz, zAt(y0)); if (y0 >= topAt(0) - 0.05 || ze < 0.1) break;
-          let z0 = 0, q = 0;
-          while (z0 < ze - 0.05) {
-            let z1 = Math.min(ze, z0 + (q === 0 && k % 2 ? 0.7 : 1.3 + 0.8 * _hn(c + sx + z0, e + k, 69 + q))); if (ze - z1 < 0.4) z1 = ze;
-            const t0 = Math.min(y0 + Ch, topAt(z0)), t1 = Math.min(y0 + Ch, topAt(z1)), vv = M.var(c + sx, y0, e + z0, 9 + k);
-            M.hexa(mk || 'trim', [W3(u0, y0, z0), W3(u0, y0, z1), W3(u0, t0, z0), W3(u0, t1, z1), W3(u1, y0, z0), W3(u1, y0, z1), W3(u1, t0, z0), W3(u1, t1, z1)], 0, { gy: base, top: base + 5, tint: [vv[0] * 0.84, vv[1] * 0.84, vv[2] * 0.84], n: 0.003, uv: 1.6, chip: 0.12, chipS: 0.03 });
-            z0 = z1; q++;
+          const y0 = base + k * Ch, y1 = y0 + Ch; if (y0 >= top(0) - 0.02) break;
+          // (the steps this course reaches: those whose tops stand over its bed; the ones that stand over its head too in long stones, the
+          // last one or two each a stone to its own top)
+          let iEnd = 0; while (iEnd < n && top(iEnd) > y0 + 0.02) iEnd++;
+          let z0 = 0, i = 0, q = 0;
+          const full = (ii) => top(ii) >= y1 - 0.02;
+          while (i < iEnd && full(i)) {
+            let j = i + 1, lim = (k % 2 ? 3 : 4) + Math.floor(3 * _hn(c + sx + i, e + k, 70 + q));
+            while (j < iEnd && full(j) && j - i < lim) j++;
+            stone(i * run, j * run, y0, y1, k); i = j; q++;
           }
+          for (; i < iEnd; i++) stone(i * run, (i + 1) * run, y0, Math.min(y1, top(i)) - 0.004, k);
         }
       }
     });
@@ -848,6 +854,50 @@
       s = e; i++;
     }
   }
+  // ---- a face of coursed masonry laid over a box's side (the box stays, drawn or not): stones in courses of ch, 0.7 - 1.5 m long, the joints
+  // of one course off the next, a hair of joint between them, standing out by out; faces: which of 'N' 'S' 'W' 'E' (sideT's). Each stone its
+  // own shade. o: {mk, ch, t (brightness), top: a function (a) -> the face's top along it (a ragged top), ragged: true}
+  function ashlar(w, x0, y0, z0, x1, y1, z1, faces, o) {
+    o = o || {}; const M = mason(w), ST = sideT(x0, z0, x1, z1), ch = o.ch || 0.5, mk = o.mk || 'trim', out = o.out ?? 0.015, g = 0.003, tb = o.t || 0.86;
+    for (const f of faces) {
+      const q = ST[f]; if (!q) continue;
+      for (let k = 0, y = y0; y < y1 - 0.02; k++, y += ch) {
+        const ya = y, yb = Math.min(y1, y + ch);
+        let a = q.a0, i = 0;
+        while (a < q.a1 - 0.03) {
+          let b = Math.min(q.a1, a + (i === 0 && k % 2 ? 0.45 : 0.7 + 0.8 * _hn(a * 1.7 + k, x0 + z0 + ya, 72))); if (q.a1 - b < 0.3) b = q.a1;
+          const tA = o.top ? Math.min(yb, o.top(a)) : yb, tB = o.top ? Math.min(yb, o.top(b)) : yb;
+          if (tA > ya + 0.05 || tB > ya + 0.05) {
+            const v = M.var(a + x0, ya, b + z0, 12 + k), s2 = tb * (0.86 + 0.2 * _hn(a * 3.3 + z1, ya * 1.9 + x1, 73)), dd = out * (0.6 + 0.8 * _hn(a, ya, 74));
+            M.hexa(mk, [q.T(a + g, ya + g, -0.06), q.T(b - g, ya + g, -0.06), q.T(a + g, Math.max(ya + 0.02, tA) - g, -0.06), q.T(b - g, Math.max(ya + 0.02, tB) - g, -0.06), q.T(a + g, ya + g, dd), q.T(b - g, ya + g, dd), q.T(a + g, Math.max(ya + 0.02, tA) - g, dd), q.T(b - g, Math.max(ya + 0.02, tB) - g, dd)], 0, { gy: o.gy ?? y0, top: y1, tint: [v[0] * s2, v[1] * s2, v[2] * s2 * 0.98], n: 0.004, chip: 0.25, chipS: 0.035, uv: 1.5 });
+          }
+          a = b; i++;
+        }
+      }
+    }
+  }
+  LG.ashlar = ashlar;
+  // ---- the broken top of a stretch of ruined wall (a along it from a0 to a1 at y, its thickness d0..d1 in T(a, y, d)): the last course half
+  // gone - a stone or two still on it, one shifted, one leaning out - and, now and then, one fallen at its foot (gy: the ground). The box
+  // under it stays as it was; these stand on it (drawn only)
+  function ruinTop(w, T, a0, a1, y, d0, d1, gy, o) {
+    o = o || {}; const M = mason(w), mk = o.mk || 'wall', L = a1 - a0, p0 = T(a0, y, d0), h = (k) => _hn(p0[0] * 1.31 + k * 0.7, p0[2] * 1.17 + y, 75 + k);
+    const n = L < 0.6 ? 1 : 1 + (h(1) < 0.55 ? 1 : 0), th = Math.abs(d1 - d0), dm = (d0 + d1) / 2;
+    for (let i = 0; i < n; i++) {
+      const len = Math.min(L * 0.8, 0.32 + 0.4 * h(2 + i)), a = a0 + (L - len) * (n === 1 ? h(3) : i ? 0.75 + 0.2 * h(4) : 0.05 * h(5)), hh = 0.18 + 0.12 * h(6 + i);
+      const sh = (h(8 + i) - 0.5) * th * 0.35, tw = (h(10 + i) - 0.5) * 0.25, lean = h(12 + i) < 0.3 ? (h(13 + i) - 0.5) * 0.5 : 0;
+      const c = T(a + len / 2, y, dm + sh), v = M.var(c[0], y, c[2], 15 + i), k = 0.86 + 0.14 * h(14 + i);
+      // (the stone's turn about the vertical: the wall's way, a little off)
+      const ax = T(a1, y, dm)[0] - T(a0, y, dm)[0], az = T(a1, y, dm)[2] - T(a0, y, dm)[2], ry = Math.atan2(-az, ax) + tw;
+      M.blk(mk, c[0], y - 0.01, c[2], len / 2, y + hh, th * 0.42, ry, 0, { gy: o.gy ?? gy, top: y + hh, tint: [v[0] * k, v[1] * k, v[2] * k], n: 0.01, chip: 0.5, chipS: 0.06, uv: 1.6 }, [lean, lean * 0.5]);
+    }
+    // (a stone fallen from it, lying at the foot on one side or the other, turned and tilted)
+    if (h(20) < (o.fall ?? 0.22) && y - gy > 1.2) {
+      const side = h(21) < 0.5 ? -1 : 1, a = a0 + L * h(22), off = side < 0 ? d0 - 0.35 - 0.6 * h(23) : d1 + 0.35 + 0.6 * h(23), c = T(a, gy, off), v = M.var(c[0], gy, c[2], 19), s = 0.2 + 0.12 * h(24);
+      M.blk(mk, c[0], gy - 0.03, c[2], s * 1.5, gy + s * 1.1, s, h(25) * 3, 0, { gy, top: gy + 0.4, tint: [v[0] * 0.8, v[1] * 0.8, v[2] * 0.8], n: 0.012, chip: 0.6, chipS: 0.06, uv: 1.6, foot: true }, [(h(26) - 0.5) * 0.5, (h(27) - 0.5) * 0.5]);
+    }
+  }
+  LG.ruinTop = ruinTop;
   // frames for the four sides of a box from x0..x1, z0..z1 (looking out of it: d out positive); the north and south sides run its full length
   const sideT = (x0, z0, x1, z1) => ({ N: { T: (a, y, d) => [a, y, z0 - d], a0: x0, a1: x1 }, S: { T: (a, y, d) => [a, y, z1 + d], a0: x0, a1: x1 }, W: { T: (a, y, d) => [x0 - d, y, a], a0: z0, a1: z1 }, E: { T: (a, y, d) => [x1 + d, y, a], a0: z0, a1: z1 } });
 
@@ -882,18 +932,20 @@
     const sq = (hw, ya, hwb, yb) => [[x - hw, ya, z - hw], [x + hw, ya, z - hw], [x - hwb, yb, z - hwb], [x + hwb, yb, z - hwb], [x - hw, ya, z + hw], [x + hw, ya, z + hw], [x - hwb, yb, z + hwb], [x + hwb, yb, z + hwb]];
     const v0 = M.var(x, Y, z, 3), tn = (k) => { const q = 0.92 + 0.12 * _hn(x + k, z, 63); return [v0[0] * q, v0[1] * q, v0[2] * q]; }, og = (k, e) => Object.assign({ gy: Y, top: Y + h, tint: tn(k), n: 0.004, chip: 0.15, chipS: 0.045, uv: 1.4 }, e);
     // the plinth and the base moulding over it (a fillet, then a hollow drawing in to the shaft)
-    M.hexa('trim', sq(b, Y - 0.01, b, Y + 0.45), 0.035, og(1));
-    M.hexa('trim', sq(b - 0.03, Y + 0.45, b - 0.07, Y + 0.51), 0.012, og(2, { chip: 0 }));
-    M.hexa('trim', sq(b - 0.08, Y + 0.51, s / 2 + 0.035, Y + 0.6), 0.01, og(2, { chip: 0 }));
+    M.hexa('trim', sq(b, Y - 0.01, b, Y + 0.45), o.lite ? 0 : 0.035, og(1, o.lite ? { chip: 0.35 } : {}));
+    if (o.lite) M.hexa('trim', sq(b - 0.03, Y + 0.45, s / 2 + 0.035, Y + 0.6), 0, og(2, { chip: 0 }));
+    else { M.hexa('trim', sq(b - 0.03, Y + 0.45, b - 0.07, Y + 0.51), 0.012, og(2, { chip: 0 })); M.hexa('trim', sq(b - 0.08, Y + 0.51, s / 2 + 0.035, Y + 0.6), 0.01, og(2, { chip: 0 })); }
     // the shaft, course by course (a broken one: up to its top, the last course ragged)
     const sy0 = Y + 0.6, sy1 = o.broken ? Y + h : Y + h - 0.5;
-    const nC = Math.max(1, Math.round((sy1 - sy0) / (style === 'drum' ? 0.8 : 0.62))), ch = (sy1 - sy0) / nC, mtx = new THREE.Matrix4();
+    // (o.lite, a hall of many pillars: the shaft above head height in courses of a metre, the mouldings without worked arrises)
+    const cs = [sy0]; { let y = sy0; while (y < sy1 - 0.05) { const st = style === 'drum' ? 0.8 : o.lite && y > Y + 3.2 ? 1.0 : 0.62; y = Math.min(sy1, y + st); if (sy1 - y < 0.3) y = sy1; cs.push(y); } }
+    const nC = cs.length - 1, mtx = new THREE.Matrix4();
     for (let k = 0; k < nC; k++) {
-      const ya = sy0 + k * ch, yb = ya + ch, last = k === nC - 1, j = _hn(x * 0.7 + k, z * 0.9 - k, 64);
+      const ya = cs[k], yb = cs[k + 1], ch = yb - ya, last = k === nC - 1, j = _hn(x * 0.7 + k, z * 0.9 - k, 64);
       if (style === 'square') {
         const hw = s / 2 - 0.004 + (j - 0.5) * 0.012, P = sq(hw, ya + 0.003, hw, yb - 0.003);
         if (o.broken && last) for (const c of [2, 3, 6, 7]) P[c][1] -= 0.05 + 0.12 * _hn(x + c, z + k, 65);
-        M.hexa(mk, P, lo || ya > Y + 3.2 ? 0 : 0.035, og(10 + k, { tint: tn(10 + k), chip: o.broken && last ? 0.7 : ya > Y + 3.2 ? 0.06 : 0.18, chipS: 0.06, uv: 1.6 }));
+        M.hexa(mk, P, lo || o.lite || ya > Y + 3.2 ? 0 : 0.035, og(10 + k, { tint: tn(10 + k), chip: o.broken && last ? 0.7 : ya > Y + 3.2 ? 0.06 : 0.25, chipS: 0.06, uv: 1.6 }));
       } else {
         // (a course of the octagon or a drum: its middle a little off the line now and then, as drums settle)
         const off = style === 'drum' && o.broken ? (j - 0.5) * 0.05 : 0, rr = style === 'drum' ? s / 2 * 1.02 : s / 2;
@@ -904,9 +956,9 @@
     if (o.broken) return;
     // the capital: a neck ring, the bell flaring out to the abacus, the abacus
     const hy = Y + h;
-    M.hexa('trim', sq(s / 2 + 0.03, hy - 0.5, s / 2 + 0.03, hy - 0.44), 0.01, og(3, { chip: 0 }));
-    M.hexa('trim', sq(s / 2 + 0.02, hy - 0.44, b - 0.07, hy - 0.35), 0.012, og(3, { chip: 0 }));
-    M.hexa('trim', sq(b, hy - 0.35, b, hy), 0.035, og(4));
+    M.hexa('trim', sq(s / 2 + 0.03, hy - 0.5, s / 2 + 0.03, hy - 0.44), o.lite ? 0 : 0.01, og(3, { chip: 0 }));
+    M.hexa('trim', sq(s / 2 + 0.02, hy - 0.44, b - 0.07, hy - 0.35), o.lite ? 0 : 0.012, og(3, { chip: 0 }));
+    M.hexa('trim', sq(b, hy - 0.35, b, hy), o.lite ? 0 : 0.035, og(4, o.lite ? { chip: 0.3 } : {}));
   }
 
   // ---- an arch over an opening in a wall (archWall): frame T(u, y, d), u across from the middle, d through the wall 0..dep; the arch
@@ -2333,8 +2385,9 @@
       for (let i = 0; i < 3; i++) {
         const ax = rng.chance(0.5); const len = rng.int(8, 16);
         const r = occ.place(rng, ax ? len : 2, ax ? 2 : len, 1); if (!r) continue;
-        w.visual('lava', r.x0, 0.0, r.z0, r.x1, 0.03, r.z1, { uv: 4, grad: false, skip: { bottom: true } });
-        w.lavaZones.push({ x0: r.x0, z0: r.z0, x1: r.x1, z1: r.z1 });
+        // (a channel of lava as the halls' trench is, fields.js: its burning, its bubbles and its sound)
+        if (G.Fields) G.Fields.add(w, 'lava', r.x0, r.z0, r.x1, r.z1, { y: 0, noLight: true });
+        else { w.visual('lava', r.x0, 0.0, r.z0, r.x1, 0.03, r.z1, { uv: 4, grad: false, skip: { bottom: true } }); w.lavaZones.push({ x0: r.x0, z0: r.z0, x1: r.x1, z1: r.z1 }); }
         w.addLight((r.x0 + r.x1) / 2, 0.6, (r.z0 + r.z1) / 2, { flame: 0, intensity: 14, range: 12, color: '#ff6a20', prio: 1.1, emit: false });
         // iron rims
         if (ax) { w.visual('iron', r.x0, 0, r.z0 - 0.1, r.x1, 0.06, r.z0, { uv: 1 }); w.visual('iron', r.x0, 0, r.z1, r.x1, 0.06, r.z1 + 0.1, { uv: 1 }); }

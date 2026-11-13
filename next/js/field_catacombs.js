@@ -219,6 +219,7 @@
       const s = st.s, lo = st.lv ? T1 : 0, hi = st.lv ? T2 : T1, u = st.lv ? D2 : D1, wd = 2.2;
       const cx = X(s, u + wd / 2);
       box('trim', s, u, u + wd, lo, hi, st.za, st.za + 2.4, { uv: 1.5 }); // (the landing)
+      { const xa = Math.min(X(s, u), X(s, u + wd)), xb = Math.max(X(s, u), X(s, u + wd)); LG._tag = 'stairs'; LG.ashlar(w, xa, lo, st.za, xb, hi, st.za + 2.4, ['N', s < 0 ? 'E' : 'W'], { gy: lo }); LG._tag = null; }   // (its faces to the nave: coursed stone)
       H.stairs(w, 'S', st.za + 2.4, cx, wd, lo, hi, 'trim');
       // its outer side railed on the landing
       box('wall', s, u + wd - 0.3, u + wd, hi, hi + 0.95, st.za, st.za + 2.4, { uv: 2 });

@@ -182,7 +182,9 @@
       const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
       // boiling lava: bubbles swell and pop in a splash of droplets, steam and embers drift off it (looks and sounds only; the hit area is unchanged)
       if (f.kind === 'lava') {
-        const ddx = Math.max(f.x0 - cam.x, 0, cam.x - f.x1), ddz = Math.max(f.z0 - cam.z, 0, cam.z - f.z1), dist = Math.hypot(ddx, ddz);
+        // (f.vdist: a lake of melt under the whole area, the foundry's - heard by how far above it you are too, k m a metre over head height;
+        // a patch on the floor, the halls' trench: by the way across alone, as before)
+        const ddx = Math.max(f.x0 - cam.x, 0, cam.x - f.x1), ddz = Math.max(f.z0 - cam.z, 0, cam.z - f.z1), dist = Math.hypot(ddx, ddz, f.vdist ? Math.max(0, cam.y - f.y - 1.6) * f.vdist : 0);
         if (dist < boilNear) { boilNear = dist; boilBlue = !!f.blue; }
         if (dist < 45 && Math.abs(cam.y - f.y) < 28) boilLava(f, dt, dist);
       }

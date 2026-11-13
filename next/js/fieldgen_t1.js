@@ -170,7 +170,9 @@
       const fixed = side === 'N' ? z0 : side === 'S' ? z1 - T : side === 'W' ? x0 : x1 - T;
       for (let s = a0; s < a1 - 0.01; s += 1) {
         const e = Math.min(a1, s + 1), m = (s + e) / 2, hh = top * (0.6 + 0.4 * Math.abs(Math.sin(m * 1.7 + x0)));
-        const B = (y0, y1) => { if (y1 - y0 < 0.05) return; if (horiz) w.solid('wall', s, y0, fixed, e, y1, fixed + T, { uv: 2.5 }); else w.solid('wall', fixed, y0, s, fixed + T, y1, e, { uv: 2.5 }); };
+        // (each piece of the wall up to its broken top; on the top, what is left of its last course, now and then a stone fallen at its foot: LG.ruinTop)
+        const B = (y0, y1) => { if (y1 - y0 < 0.05) return; if (horiz) w.solid('wall', s, y0, fixed, e, y1, fixed + T, { uv: 2.5 }); else w.solid('wall', fixed, y0, s, fixed + T, y1, e, { uv: 2.5 });
+          if (y1 > 2 && LG.ruinTop) { const ay = w._atY || 0, tg = LG._tag; LG._tag = 'ruins'; try { LG.ruinTop(w, horiz ? (a, yy, d) => [a, yy, fixed + d] : (a, yy, d) => [fixed + d, yy, a], s, e, y1 + ay, 0, T, ay); } finally { LG._tag = tg; } } };
         if (doors[side] && Math.abs(m - mid) < 1.1) { if (hh > 3.2) B(3.0, hh); continue; }
         if (Math.abs(m - mid) > 1.6 && Math.round(m) % 3 === 0 && hh > h2 + 1.6) { B(0, h2 + 0.6); B(h2 + 1.8, hh); continue; } // upper window
         B(0, hh);

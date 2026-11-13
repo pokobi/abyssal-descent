@@ -3,10 +3,16 @@
 // short transients and a dark convolution reverb so it reads as physical rather than "beepy".
 (function () {
   const A = (G.sfx = {});
-  let muffle = null;
-  // your head under the water (water.js): every sound dull and far, as through the water
-  A.underwater = function (on) { if (!muffle || !ctx) return; muffle.frequency.setTargetAtTime(on ? 620 : 22000, ctx.currentTime, on ? 0.05 : 0.12); };
-  let ctx = null, master, dry, revSend, reverb, gunBus, shaper, eqLo, eqHi, irOld, irIn, irOut;
+  let muffle = null, gunMuf = null, uw = false;
+  // your head under the water (water.js): every sound dull and far, as through the water (in the new set the water round you answers a
+  // little too: more of the room, and never the far echo of open ground)
+  A.underwater = function (on) {
+    if (!muffle || !ctx) return; uw = !!on;
+    for (const m of [muffle, gunMuf]) if (m) m.frequency.setTargetAtTime(on ? 620 : 22000, ctx.currentTime, on ? 0.05 : 0.12);
+    if (gunDry) gunDry.gain.setTargetAtTime(on ? 1.6 : 1, ctx.currentTime, 0.05);
+    A.applySet();
+  };
+  let ctx = null, master, dry, revSend, reverb, gunBus, shaper, eqLo, eqHi, irOld, irIn, irOut, gunDry, gunOut;
   let white, pink, brown;
   let voices = 0;
   const MAXV = 56;
@@ -75,10 +81,11 @@
   // put the chosen set in force (the reverb, the tone of the whole): at the start, when the setting changes, when the ground changes
   A.applySet = function () {
     if (!ctx || !reverb) return;
-    const n = NEW(), o = outdoor();
-    reverb.buffer = n ? (o ? irOut : irIn) : irOld; revSend.gain.value = n && o ? 0.4 : 0.55;
+    const n = NEW(), o = outdoor() && !(n && uw);
+    reverb.buffer = n ? (o ? irOut : irIn) : irOld; revSend.gain.value = (n && o ? 0.4 : 0.55) * (n && uw ? 1.35 : 1);
     eqLo.gain.value = n ? 2.5 : 0; eqHi.gain.value = n ? 2 : 0;
-    A._setKey = n + '|' + o;
+    if (n && A._setKey !== n + '|' + outdoor()) shotWarm(!outdoor());   // (the guns in your hands, ready for the new place before they are fired)
+    A._setKey = n + '|' + outdoor();
   };
   A.init = function () {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -105,17 +112,23 @@
     shaper.curve = curve;
     gunBus = ctx.createGain(); gunBus.gain.value = 0.9;
     gunBus.connect(shaper); shaper.connect(dry);
+    // (the new set's shots go a way of their own to the limiter, round the compressor: it caught the front of every shot and held it
+    // some 8 dB down, then lifted what hung on after it, and a shot came out as soft and long as the hum of the room. What the room gives
+    // back of a shot still goes the common way)
+    gunDry = ctx.createGain(); gunOut = ctx.createGain(); gunOut.gain.value = A.volume;
+    gunMuf = ctx.createBiquadFilter(); gunMuf.type = 'lowpass'; gunMuf.frequency.value = 22000; gunMuf.Q.value = 0.5;
+    gunDry.connect(gunOut); gunOut.connect(gunMuf); gunMuf.connect(lim);
     white = makeNoise('white', 2); pink = makeNoise('pink', 2); brown = makeNoise('brown', 3);
     A.applySet();
     A.startAmbience();
     preloadSamples();
   };
-  A.setVolume = (v) => { A.volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); };
+  A.setVolume = (v) => { A.volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); if (gunOut) gunOut.gain.setTargetAtTime(v, ctx.currentTime, 0.05); };
   A.suspend = () => { if (ctx && ctx.state === 'running') ctx.suspend(); };
   A.resume = () => { if (ctx && ctx.state === 'suspended') ctx.resume(); };
   A.now = () => (ctx ? ctx.currentTime : 0);
   // (tests: a meter on everything before the master volume, so a muted game can still be measured)
-  A.tap = () => { if (!ctx) return null; if (!A._tap) { A._tap = ctx.createAnalyser(); A._tap.fftSize = 2048; dry.connect(A._tap); } return A._tap; };
+  A.tap = () => { if (!ctx) return null; if (!A._tap) { A._tap = ctx.createAnalyser(); A._tap.fftSize = 2048; dry.connect(A._tap); gunDry.connect(A._tap); } return A._tap; };
 
   // ---------- routing helpers ----------
   // returns {node, wet} destination for a sound; positional when pos given
@@ -290,7 +303,14 @@
   };
   A.fetchSample = fetchBuf;
   // (all of them asked for at the start, so that a sound's first playing is already the recording)
-  const preloadSamples = () => { try { for (const k in SB.bank) for (const f of SB.bank[k].f) fetchBuf(f); } catch (e) { /* none, then */ } };
+  // (when the guns' recordings are in, the takes of the guns in your hands are made in the time the page has to spare: see shotWarm)
+  const preloadSamples = () => {
+    try {
+      const guns = [];
+      for (const k in SB.bank) for (const f of SB.bank[k].f) { const q = fetchBuf(f); if (k.startsWith('gun_')) guns.push(q); }
+      Promise.all(guns).then(() => { if (NEW()) shotWarm(!outdoor()); });
+    } catch (e) { /* none, then */ }
+  };
   // key, where (or nothing: in the head), level, speed, how much of the room (or the bank's own)
   const smp = (key, pos, vol, rate, wet) => {
     if (!ctx || !usable(key)) return false;
@@ -342,56 +362,277 @@
     else if (c === 'snap') { p.tail *= 0.2; p.crack *= 1.4; p.bd *= 0.6; p.tg *= 0.8; }
     return { p, h, c, cf: 3000 + hr(h, 3) * 3200 };
   }
-  // How heavy each kind of gun sounds over its recording (the recordings were all taken some paces off: they carry the crack of a
-  // shot, not its weight, and so a shotgun came out little heavier than a pistol). rate: the recording played slower - lower and
-  // longer; w: the blow under it (a sub-bass thump and the low body of the report); tail: seconds of the place ringing after it.
-  const GUNW = {
-    pistol: { rate: 1, w: 0.45, tail: 0 }, smg: { rate: 1, w: 0.3, tail: 0 }, minigun: { rate: 1, w: 0.25, tail: 0 }, nail: { rate: 1, w: 0.2, tail: 0 },
-    rifle: { rate: 0.97, w: 0.65, tail: 0.25 }, lmg: { rate: 0.95, w: 0.85, tail: 0.3 }, dmr: { rate: 0.92, w: 1.25, tail: 0.55 },
-    revolver: { rate: 0.9, w: 1.3, tail: 0.45 }, shotgun: { rate: 0.84, w: 1.9, tail: 0.8 }, sniper: { rate: 0.86, w: 2.0, tail: 1.1 },
+  // ---------- the new set's shot, in layers ----------
+  // A shot as the one firing it hears it, in the order it happens: the front of the blast (a step in the pressure - its edge is the
+  // crack of the shot: broad, its top at 2-8 kHz, over in a few ms), a supersonic round's own crack (an N-shaped wave a third of a ms
+  // long), the blast itself (the gas breaking out round the muzzle: rough, 0.6-4 kHz, some tens of ms, driven a little hard), the push in
+  // the chest (60-150 Hz and short: held long, it covers everything over it and the shot comes out dull), the steel of the action working
+  // in the hands (parts striking parts, each ringing in modes of its own, 5-80 ms after), and the place answering (a room: hard early
+  // returns off the stone; open ground: a far, low roll). Under it the recording of the real gun (a microphone some paces off: the body
+  // of the report), its rumble below 60 Hz taken off - a microphone that near takes the swell of the pressure itself, which ate the
+  // headroom and was heard as nothing but dullness. All of it is written into one buffer: a few takes of each kind for each place, made
+  // when first fired and then played in turn, each a little different - so a shot is one source, however many layers it has.
+  // fc: the front's top (Hz), fl: its level, ft: how fast it dies (s); nw: the round's crack, nd: its length (s); fw: the step in the
+  // pressure, fT: its first (positive) part (s); bf: the blast's middle (Hz), bl: its level, b1 / b2: how fast it dies (s: the burst,
+  // what hangs on after it), dr: how hard it is driven; bo: the push (Hz), bg: its level, bd: how fast it dies (s); act: the action,
+  // ag: its level; rv: the recording's level, rr: its speed; er: a room's returns; tail: open ground's roll (s), tl: its level;
+  // cas: the empty case falling ([how often, s after]); len: the take (s); lv: the whole; wet: how much of it goes to the room's reverb
+  const SHOT = {
+    pistol: { fc: 4300, fl: 0.55, ft: 0.0015, nw: 0.22, nd: 0.00024, fw: 0.5, fT: 0.0006, bf: 1500, bl: 0.5, b1: 0.007, b2: 0.028, dr: 2.2, bo: 125, bg: 0.32, bd: 0.028, act: 'slide', ag: 0.55, rv: 0.7, rr: 1, er: 0.3, tail: 0.7, tl: 0.2, cas: [1, 0.42], len: 0.26, lv: 0.82, wet: 0.2 },
+    revolver: { fc: 3500, fl: 0.6, ft: 0.0019, nw: 0, nd: 0, fw: 0.75, fT: 0.0009, bf: 1100, bl: 0.65, b1: 0.009, b2: 0.045, dr: 2.6, bo: 95, bg: 0.48, bd: 0.042, act: 'frame', ag: 0.5, rv: 0.75, rr: 0.95, er: 0.35, tail: 0.9, tl: 0.28, len: 0.4, lv: 1, wet: 0.24 },
+    smg: { fc: 4700, fl: 0.5, ft: 0.0013, nw: 0.15, nd: 0.00022, fw: 0.42, fT: 0.0005, bf: 1700, bl: 0.45, b1: 0.006, b2: 0.02, dr: 2, bo: 135, bg: 0.26, bd: 0.02, act: 'blowback', ag: 0.45, rv: 0.65, rr: 1, er: 0.25, tail: 0.5, tl: 0.15, cas: [0.35, 0.4], len: 0.2, lv: 0.78, wet: 0.16 },
+    rifle: { fc: 3900, fl: 0.6, ft: 0.0016, nw: 0.45, nd: 0.0003, fw: 0.6, fT: 0.0007, bf: 1300, bl: 0.6, b1: 0.008, b2: 0.032, dr: 2.4, bo: 108, bg: 0.4, bd: 0.032, act: 'carrier', ag: 0.5, rv: 0.7, rr: 0.98, er: 0.3, tail: 0.9, tl: 0.26, cas: [0.6, 0.45], len: 0.26, lv: 0.78, wet: 0.2 },
+    dmr: { fc: 3600, fl: 0.65, ft: 0.0018, nw: 0.55, nd: 0.00034, fw: 0.7, fT: 0.0008, bf: 1150, bl: 0.65, b1: 0.009, b2: 0.042, dr: 2.6, bo: 96, bg: 0.48, bd: 0.04, act: 'carrier', ag: 0.5, rv: 0.75, rr: 0.96, er: 0.33, tail: 1.1, tl: 0.32, cas: [1, 0.5], len: 0.3, lv: 0.85, wet: 0.24 },
+    sniper: { fc: 3100, fl: 0.7, ft: 0.002, nw: 0.7, nd: 0.0004, fw: 0.85, fT: 0.001, bf: 950, bl: 0.75, b1: 0.011, b2: 0.055, dr: 2.8, bo: 82, bg: 0.58, bd: 0.055, act: 'ring', ag: 0.45, rv: 0.8, rr: 0.95, er: 0.38, tail: 1.5, tl: 0.42, cas: [1, 0.68], len: 0.42, lv: 1, wet: 0.3 },
+    shotgun: { fc: 3000, fl: 0.8, ft: 0.0021, nw: 0.1, nd: 0.0003, fw: 0.9, fT: 0.0012, bf: 850, bl: 0.8, b1: 0.012, b2: 0.05, dr: 2.6, bo: 85, bg: 0.55, bd: 0.05, sat: 2.2, act: 'clank', ag: 0.45, rv: 0.8, rr: 0.93, er: 0.38, tail: 1.2, tl: 0.4, len: 0.34, lv: 1, wet: 0.28 },
+    lmg: { fc: 3700, fl: 0.6, ft: 0.0016, nw: 0.45, nd: 0.0003, fw: 0.65, fT: 0.0007, bf: 1200, bl: 0.6, b1: 0.008, b2: 0.032, dr: 2.5, bo: 100, bg: 0.42, bd: 0.032, act: 'heavy', ag: 0.55, rv: 0.7, rr: 0.96, er: 0.3, tail: 0.8, tl: 0.24, cas: [0.4, 0.45], len: 0.24, lv: 0.88, wet: 0.18 },
+    minigun: { fc: 4500, fl: 0.45, ft: 0.0012, nw: 0.3, nd: 0.00025, fw: 0.4, fT: 0.0005, bf: 1600, bl: 0.4, b1: 0.005, b2: 0.016, dr: 2, bo: 128, bg: 0.22, bd: 0.016, act: 'rotary', ag: 0.4, rv: 0.6, rr: 1.04, er: 0.2, tail: 0.4, tl: 0.1, cas: [0.25, 0.4], len: 0.14, lv: 0.8, wet: 0.12 },
+    // (launched, not fired: the transient of the launch itself; the rest - the rocket's motor going away, the chain - after it)
+    rocket: { fc: 2600, fl: 0.45, ft: 0.002, nw: 0, nd: 0, fw: 0.6, fT: 0.0014, bf: 900, bl: 0.75, b1: 0.02, b2: 0.12, hold: 0.4, dr: 2.2, bo: 60, bg: 0.6, bd: 0.07, act: 'tube', ag: 0.45, rv: 0, rr: 1, er: 0.3, tail: 1.2, tl: 0.35, len: 0.5, lv: 0.55, wet: 0.3 },
+    gl: { fc: 2000, fl: 0.3, ft: 0.002, nw: 0, nd: 0, fw: 0.65, fT: 0.002, bf: 650, bl: 0.5, b1: 0.012, b2: 0.04, dr: 1.8, bo: 95, bg: 0.55, bd: 0.05, act: 'breech', ag: 0.55, rv: 0, rr: 1, er: 0.3, tail: 0.7, tl: 0.2, len: 0.3, lv: 0.56, wet: 0.25 },
+    rail: { fc: 5500, fl: 0.6, ft: 0.0012, nw: 0.9, nd: 0.0005, fw: 0.4, fT: 0.0007, bf: 2500, bl: 0.5, b1: 0.006, b2: 0.05, dr: 2.5, bo: 60, bg: 0.6, bd: 0.08, sat: 2.3, act: 'rails', ag: 0.6, rv: 0, rr: 1, er: 0.35, tail: 1.5, tl: 0.4, len: 0.6, lv: 1, wet: 0.3 },
+    harpoon: { fc: 2500, fl: 0.35, ft: 0.0016, nw: 0, nd: 0, fw: 0.4, fT: 0.001, bf: 900, bl: 0.5, b1: 0.01, b2: 0.03, dr: 1.8, bo: 120, bg: 0.35, bd: 0.04, act: 'spring', ag: 0.7, rv: 0, rr: 1, er: 0.3, tail: 0.5, tl: 0.12, len: 0.4, lv: 0.65, wet: 0.2 },
+    nail: { fc: 5200, fl: 0.25, ft: 0.001, nw: 0, nd: 0, fw: 0.12, fT: 0.0004, bf: 2600, bl: 0.22, b1: 0.004, b2: 0.022, dr: 1.2, bo: 165, bg: 0.16, bd: 0.014, act: 'piston', ag: 0.8, rv: 0, rr: 1, er: 0.2, tail: 0.3, tl: 0.04, len: 0.16, lv: 0.85, wet: 0.12 },
   };
+  // A suppressed shot: the gas let out through the baffles (a dull puff, no front to it; a supersonic round still cracks, less), the
+  // push smaller - and over it the action working, which is most of what is heard of it. [how heavy, the puff's Hz, its level]
+  const SUPP = { pistol: [0.9, 950, 1], revolver: [1.1, 800, 0.9], smg: [0.85, 850, 1], rifle: [1.1, 620, 1.08], dmr: [1.2, 560, 0.9], sniper: [1.3, 500, 1], shotgun: [1.4, 420, 0.9], lmg: [1.15, 600, 1], minigun: [0.8, 800, 1], nail: [0.7, 1100, 1] };
+  const suppOf = (kind) => {
+    const p = SHOT[kind] || SHOT.rifle, [k, pf, sl] = SUPP[kind] || [1, 700, 1];
+    return Object.assign({}, p, { fc: 2600, fl: 0.08 * k, nw: p.nw * 0.5, fw: 0.16 * k, fT: p.fT * 1.8, bf: pf, bl: 0.55 * k, b1: 0.009 * k, b2: 0.03 * k, dr: 1.3, bg: p.bg * 0.55, bd: p.bd * 0.8, ag: p.ag * 1.3, rv: 0, er: p.er * 0.45, tail: p.tail * 0.3, tl: p.tl * 0.2, lv: p.lv * 0.6 * sl, wet: 0.1 });
+  };
+  // The actions, as what happens in them: ['s', s after the shot, from Hz, to Hz, how long (s), level] a part sliding over another;
+  // ['r', s after, modes [[Hz, level, s to die away], ...], level, the contact's click] a part striking another and ringing
+  const ACT = {
+    // a slide drawn back by the recoil to its stop on the frame, the case thrown out, the slide run home and locking
+    slide: [['s', 0.004, 1700, 2500, 0.008, 0.1], ['r', 0.012, [[1250, 1, 0.05], [2480, 0.7, 0.06], [3900, 0.45, 0.045], [5600, 0.25, 0.03]], 1, 0.5],
+      ['r', 0.028, [[5200, 0.35, 0.05], [7600, 0.2, 0.04]], 0.45, 0.15], ['s', 0.032, 2300, 1500, 0.01, 0.08],
+      ['r', 0.045, [[1600, 0.9, 0.045], [3100, 0.65, 0.05], [4700, 0.4, 0.04]], 1, 0.6], ['r', 0.049, [[3600, 0.4, 0.025], [6100, 0.25, 0.02]], 0.6, 0.3]],
+    // a revolver's frame and cylinder ringing after the blow (the cylinder's gap spits a little of its own)
+    frame: [['r', 0.002, [[880, 0.35, 0.16], [2150, 0.5, 0.22], [3470, 0.4, 0.18], [5200, 0.2, 0.12]], 0.8, 0], ['r', 0.006, [[4100, 0.3, 0.03], [6600, 0.15, 0.02]], 0.6, 0.4]],
+    // an open bolt thrown back against its plate and run forward again
+    blowback: [['s', 0.003, 1400, 2200, 0.008, 0.08], ['r', 0.012, [[980, 1, 0.04], [2100, 0.7, 0.05], [3500, 0.45, 0.035]], 1, 0.5], ['r', 0.04, [[1300, 0.8, 0.035], [2700, 0.6, 0.04], [4300, 0.35, 0.03]], 0.9, 0.5]],
+    // a bolt carrier unlocking, run back into its buffer (the spring in it twanging), the case out, run home and locking: two knocks
+    carrier: [['s', 0.007, 1500, 2500, 0.012, 0.09], ['r', 0.022, [[820, 0.7, 0.05], [1900, 1, 0.07], [3300, 0.6, 0.05], [4900, 0.3, 0.035], [640, 0.25, 0.12]], 1, 0.5],
+      ['s', 0.048, 2300, 1400, 0.01, 0.07], ['r', 0.06, [[1450, 0.9, 0.05], [2900, 0.7, 0.06], [4400, 0.4, 0.04]], 1, 0.6], ['r', 0.064, [[3700, 0.4, 0.03], [5800, 0.2, 0.02]], 0.6, 0.3]],
+    // a heavy bolt to the rear, the belt's links rattling over the feed tray, the bolt slamming forward
+    heavy: [['s', 0.008, 1300, 2100, 0.014, 0.09], ['r', 0.028, [[640, 0.9, 0.06], [1500, 1, 0.07], [2700, 0.6, 0.06], [4100, 0.3, 0.04]], 1, 0.5],
+      ['r', 0.04, [[4500, 0.25, 0.02], [6300, 0.15, 0.015]], 0.4, 0.3], ['r', 0.047, [[4700, 0.2, 0.02]], 0.35, 0.3], ['r', 0.055, [[4300, 0.18, 0.02]], 0.3, 0.3],
+      ['r', 0.07, [[900, 0.9, 0.05], [2000, 0.8, 0.06], [3400, 0.4, 0.04]], 1, 0.5]],
+    // turned by a motor: the bolt's cam ticking in its track, a link dropping
+    rotary: [['r', 0.003, [[2600, 0.6, 0.025], [4300, 0.4, 0.02]], 0.7, 0.4], ['r', 0.011, [[5200, 0.3, 0.03]], 0.4, 0.2]],
+    // a bolt action does not move: the barrel and the receiver ring after the blow
+    ring: [['r', 0.002, [[1280, 0.45, 0.2], [3300, 0.5, 0.28], [5150, 0.3, 0.2], [7400, 0.15, 0.12]], 0.8, 0]],
+    // a pump gun's receiver clanking with the blow (the pump itself is worked after it: mech 'pump')
+    clank: [['r', 0.003, [[700, 0.6, 0.09], [1650, 0.7, 0.12], [2900, 0.45, 0.1], [4500, 0.25, 0.07]], 0.9, 0.3]],
+    // a self-loader's bolt back and home
+    autoshot: [['s', 0.01, 1200, 2000, 0.014, 0.09], ['r', 0.034, [[700, 0.8, 0.06], [1700, 1, 0.07], [3000, 0.5, 0.05]], 1, 0.5], ['r', 0.074, [[1100, 0.9, 0.05], [2500, 0.7, 0.06], [4000, 0.35, 0.04]], 1, 0.6]],
+    // a launch tube ringing with the blast; a grenade launcher's breech; a rail gun's rails singing as the slug leaves them; a harpoon's spring
+    tube: [['r', 0.003, [[600, 0.5, 0.15], [1450, 0.6, 0.2], [2600, 0.4, 0.15]], 0.9, 0.3]],
+    breech: [['r', 0.002, [[900, 0.4, 0.08], [2300, 0.5, 0.1], [3900, 0.3, 0.07]], 0.9, 0.5]],
+    rails: [['r', 0.001, [[1900, 0.5, 0.3], [4300, 0.5, 0.35], [7100, 0.35, 0.25], [9800, 0.2, 0.2]], 0.8, 0.4]],
+    spring: [['r', 0.002, [[420, 0.4, 0.25], [1300, 0.5, 0.2], [2900, 0.4, 0.12]], 1, 0.6], ['s', 0.004, 1500, 3000, 0.03, 0.08]],
+    // a nail driven by air: the piston slamming down, the air let out, the piston back
+    piston: [['r', 0, [[1700, 1, 0.05], [3500, 0.7, 0.06], [5600, 0.4, 0.04]], 1, 0.8], ['s', 0.004, 4200, 6500, 0.045, 0.22], ['r', 0.028, [[2100, 0.6, 0.04], [4200, 0.4, 0.03]], 0.8, 0.5]],
+  };
+  // (tanh, near enough and quick: for driving a whole take sample by sample)
+  const ftanh = (x) => (x <= -3 ? -1 : x >= 3 ? 1 : (x * (27 + x * x)) / (27 + 9 * x * x));
+  // (a filter run over an array in place: the cookbook's biquad - 'lp', 'hp', or 'bp' with its peak at 0 dB)
+  function bqRun(x, type, f, q, sr) {
+    const w = (2 * Math.PI * Math.min(f, sr * 0.45)) / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * q), a0 = 1 + al;
+    let b0, b1, b2;
+    if (type === 'lp') { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = b0; } else if (type === 'hp') { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = b0; } else { b0 = al; b1 = 0; b2 = -al; }
+    b0 /= a0; b1 /= a0; b2 /= a0; const a1 = (-2 * cs) / a0, a2 = (1 - al) / a0;
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) { const v = x[i], y = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = v; y2 = y1; y1 = y; x[i] = y; }
+    return x;
+  }
+  // a part struck, written into a take (from sample i0): each mode a decaying sine a little off its Hz, with a phase of its own (a
+  // recursive oscillator: a multiply-add a sample), the contact a click of noise. pan: -1 (left) .. 1 (right)
+  function ringIn(L, R, i0, modes, g, click, pan, sr) {
+    const n0 = L.length, gl = g * Math.min(1, 1 - pan), gr = g * Math.min(1, 1 + pan), ra = Math.max(1, Math.round(0.00025 * sr));
+    for (const [f0, a, t60] of modes) {
+      const f = Math.min(sr * 0.45, f0 * vr(1, 0.02)), k = Math.exp(-6.9 / (t60 * vr(1, 0.12) * sr)), w = (2 * Math.PI * f) / sr, c = 2 * Math.cos(w) * k, k2 = k * k;
+      const m = a * vr(1, 0.2), ph = Math.random() * 6.283, n = Math.min(n0 - i0, Math.ceil(t60 * 1.3 * sr));
+      let ym1 = Math.sin(ph - w) / k, y0 = Math.sin(ph);
+      for (let j = 0; j < n; j++) { const v = y0 * m * (j < ra ? j / ra : 1); L[i0 + j] += v * gl; R[i0 + j] += v * gr; const y = c * y0 - k2 * ym1; ym1 = y0; y0 = y; }
+    }
+    if (click) {
+      const n = Math.min(n0 - i0, Math.round(0.0012 * sr)), te = 0.00018 * sr; let last = 0;
+      for (let j = 0; j < n; j++) { const w = Math.random() * 2 - 1, v = (w - last) * 0.5 * click * Math.exp(-j / te); last = w; L[i0 + j] += v * gl; R[i0 + j] += v * gr; }
+    }
+  }
+  // a part sliding over another, written into a take: noise in a band, its level jagged (friction is a run of little catches)
+  function slideIn(L, R, i0, f0, f1, d, g, pan, sr) {
+    const n = Math.max(8, Math.min(L.length - i0, Math.round(d * sr))), x = new Float32Array(n), gl = g * Math.min(1, 1 - pan), gr = g * Math.min(1, 1 + pan);
+    let s = 1; for (let j = 0; j < n; j++) { if (j % 24 === 0) s += (0.4 + Math.random() * 1.2 - s) * 0.6; x[j] = (Math.random() * 2 - 1) * s * Math.pow(Math.sin((Math.PI * j) / n), 0.6); }
+    bqRun(x, 'bp', Math.sqrt(f0 * f1), 1.6, sr);
+    for (let j = 0; j < n; j++) { L[i0 + j] += x[j] * gl * 2.5; R[i0 + j] += x[j] * gr * 2.5; }
+  }
+  // (work arrays kept from take to take and cleared: made new each time, a take left some MB behind it, and the collector's pauses
+  // came with it)
+  const scr = [];
+  const work = (k, n) => { if (!scr[k] || scr[k].length < n) scr[k] = new Float32Array(Math.ceil(n * 1.25)); const a = scr[k].subarray(0, n); a.fill(0); return a; };
+  // one take of a shot (stereo): the layers above; recs: the recordings of this kind that have arrived; room: inside
+  function shotTake(kind, p, recs, room) {
+    const sr = ctx.sampleRate, at = (s) => Math.round(s * sr), rec = recs.length ? recs[Math.floor(Math.random() * recs.length)] : null;
+    const rr = p.rr * vr(1, 0.02), recN = rec ? Math.min(at(0.9), Math.floor((rec.length - 2) / rr)) : 0, len = Math.max(at(p.len), recN) + at(0.002);
+    const buf = ctx.createBuffer(2, len, sr), L = buf.getChannelData(0), R = buf.getChannelData(1), D = work(0, len), B = work(1, len);
+    const boost = rec || !p.rv ? 1 : 1.3;   // (no recording yet: the blast carries more)
+    if (rec) {
+      const s = rec.getChannelData(0), x = D.subarray(0, recN);
+      for (let i = 0; i < recN; i++) { const q = i * rr, k = Math.floor(q), w = q - k; x[i] = s[k] * (1 - w) + s[k + 1] * w; }
+      bqRun(x, 'hp', 60, 0.7, sr); bqRun(x, 'hp', 60, 0.7, sr);
+      let pk = 0; for (let i = 0; i < recN; i++) pk = Math.max(pk, Math.abs(x[i]));
+      const g = p.rv / (pk || 1), fo = Math.min(recN, at(0.06));
+      for (let i = 0; i < recN; i++) x[i] *= g * (i > recN - fo ? (recN - i) / fo : 1);
+    }
+    // the front: a burst of noise rising in a tenth of a ms, its top at fc
+    { const n = at(p.ft * 7), x = new Float32Array(n), a = Math.max(2, at(0.00012));
+      for (let i = 0; i < n; i++) x[i] = (Math.random() * 2 - 1) * (i < a ? i / a : Math.exp(-(i - a) / (p.ft * sr)));
+      const y = Float32Array.from(x); bqRun(x, 'hp', 1500, 0.7, sr); bqRun(y, 'bp', p.fc * vr(1, 0.06), 1.1, sr);
+      for (let i = 0; i < n; i++) D[i] += (x[i] * 0.6 + y[i] * 1.4) * p.fl; }
+    // the round's crack: up at once, down through nothing to as far below, up again at once
+    if (p.nw) { const i0 = at(0.0002), n = Math.max(4, at(p.nd * vr(1, 0.1))); for (let i = 0; i <= n; i++) D[i0 + i] += p.nw * (1 - (2 * i) / n); }
+    // the step in the pressure (a blast wave's own shape: up at once, falling through nothing into a pull as deep, and back)
+    if (p.fw) { const T = p.fT * vr(1, 0.08) * sr, n = Math.min(len, Math.ceil(T * 9)); for (let i = 0; i < n; i++) B[i] += p.fw * (1 - i / T) * Math.exp(-i / T); }
+    // the blast: rough noise round bf, dying fast and then slowly, driven
+    { const n = Math.min(len - at(0.0003), at(p.b2 * 6 + 0.01)), x = work(2, n), a = at(0.0006), k1 = Math.exp(-1 / (p.b1 * vr(1, 0.1) * sr)), k2 = Math.exp(-1 / (p.b2 * vr(1, 0.1) * sr)), hold = p.hold || 0.15;
+      let e1 = 1 - hold, e2 = hold;
+      for (let i = 0; i < n; i++) { let e; if (i < a) e = i / a; else { e = e1 + e2; e1 *= k1; e2 *= k2; } x[i] = (Math.random() * 2 - 1) * e; }
+      bqRun(x, 'bp', p.bf * vr(1, 0.08), 0.55, sr); bqRun(x, 'hp', 350, 0.7, sr);
+      let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(x[i]));
+      const d = (p.dr * vr(1, 0.1)) / (pk || 1), td = ftanh(p.dr), i0 = at(0.0003), g = (p.bl * boost) / td; for (let i = 0; i < n; i++) B[i0 + i] += g * ftanh(d * x[i]); }
+    // the push: a low tone sagging as it dies, a little of its octave with it (to be felt on small speakers too)
+    if (p.bg) { const n = Math.min(len, at(p.bd * 6)), a = at(0.0012), f0 = p.bo * vr(1, 0.05), kd = Math.exp(-1 / (p.bd * sr)), kf = Math.exp(-1 / (0.018 * sr)); let ph = 0, e = 1, sag = 0.38;
+      for (let i = 0; i < n; i++) { ph += (2 * Math.PI * f0 * (0.62 + sag)) / sr; sag *= kf; const v = Math.sin(ph) + 0.22 * Math.sin(2 * ph); if (i < a) D[i] += p.bg * (i / a) * v; else { D[i] += p.bg * e * v; e *= kd; } } }
+    for (let i = 0; i < len; i++) { const v = D[i] + B[i]; L[i] = v; R[i] = v; }
+    // the place: in a room, hard returns off the stone close round (dulled a little, the push not in them); on open ground the ground's one
+    { let lp = 0, lp2 = 0; for (let i = 0; i < len; i++) { lp += (B[i] + D[i] - lp) * 0.45; lp2 += (lp - lp2) * 0.45; B[i] = lp2; }
+      bqRun(B, 'hp', 250, 0.7, sr);
+      const taps = room ? [[4.6, 0.34, -0.5], [7.4, 0.3, 0.6], [11.8, 0.24, -0.2], [16.5, 0.2, 0.7], [22.5, 0.12, -0.7], [30, 0.08, 0.3], [41, 0.05, -0.3], [55, 0.035, 0.5]] : [[3.4, 0.5, 0]];
+      for (const [ms, g, pan] of taps) {
+        const d = at((ms * vr(1, 0.12)) / 1000), gg = g * p.er * (Math.random() < 0.3 ? -1 : 1), gl = gg * Math.min(1, 1 - pan), gr = gg * Math.min(1, 1 + pan);
+        for (let i = 0; i + d < len; i++) { const v = B[i]; L[i + d] += v * gl; R[i + d] += v * gr; }
+      } }
+    // (the shot driven into its top, as a microphone that near is: its edge stays as sharp, its peaks lose a few dB, and what follows
+    // them - the blast, the push - stands that much nearer them; each take comes to the same top, how loud a kind is is lv)
+    { let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
+      const d = (p.sat || 1.8) / (pk || 1), td = ftanh(p.sat || 1.8); for (let i = 0; i < len; i++) { L[i] = ftanh(d * L[i]) / td; R[i] = ftanh(d * R[i]) / td; } }
+    // the action, in the hands a little to the right (over the drive: steel ringing is not driven)
+    for (const e of ACT[p.act] || []) {
+      const i0 = at(e[1] * vr(1, 0.06)); if (i0 >= len) continue;
+      if (e[0] === 's') slideIn(L, R, i0, e[2], e[3], e[4], e[5] * p.ag, 0.25, sr); else ringIn(L, R, i0, e[2], e[3] * p.ag * 0.6, e[4], 0.25, sr);
+    }
+    let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
+    if (pk > 1) for (let i = 0; i < len; i++) { L[i] /= pk; R[i] /= pk; }
+    return buf;
+  }
+  // open ground's answer to a shot: the far, low roll of it thrown back from all round (it swells as the returns come in, then dies),
+  // and a few far returns of the blast itself. Shared by all the guns, played faster for a short one (a few takes, made once)
+  const tails = [], cases = [];
+  function tailTake() {
+    if (tails.length >= 3) return tails[Math.floor(Math.random() * tails.length)];
+    const sr = ctx.sampleRate, len = Math.round(2 * sr), buf = ctx.createBuffer(2, len, sr);
+    for (let c = 0; c < 2; c++) {
+      const b = buf.getChannelData(c), x = new Float32Array(len);
+      for (let i = 0; i < len; i++) x[i] = Math.random() * 2 - 1;
+      bqRun(x, 'lp', 520, 0.6, sr); bqRun(x, 'lp', 520, 0.6, sr); bqRun(x, 'hp', 70, 0.7, sr);
+      let pk = 0;
+      for (let i = 0; i < len; i++) { const t = i / sr, r = Math.min(1, Math.max(0, (t - 0.04) / 0.12)); x[i] *= r * r * (3 - 2 * r) * Math.exp(-Math.max(0, t - 0.16) / 0.36); pk = Math.max(pk, Math.abs(x[i])); }
+      for (let i = 0; i < len; i++) b[i] = (x[i] / (pk || 1)) * 0.7;
+      for (const [tt, g] of [[vr(0.22, 0.2), 0.9], [vr(0.38, 0.2), 0.6], [vr(0.62, 0.2), 0.35]]) {
+        const i0 = Math.round((tt + (c ? vr(0.006, 0.5) : 0)) * sr), n = Math.round(0.08 * sr), y = new Float32Array(n);
+        for (let j = 0; j < n; j++) y[j] = (Math.random() * 2 - 1) * Math.min(1, j / (0.004 * sr)) * Math.exp(-j / (0.02 * sr));
+        bqRun(y, 'lp', 1100, 0.7, sr); bqRun(y, 'hp', 150, 0.7, sr);
+        let q = 0; for (let j = 0; j < n; j++) q = Math.max(q, Math.abs(y[j]));
+        for (let j = 0; j < n && i0 + j < len; j++) b[i0 + j] += (y[j] / (q || 1)) * g;
+      }
+    }
+    tails.push(buf); return buf;
+  }
+  // an empty brass case thrown out to the right, landing on the floor and bouncing: a thin tube ringing high, quieter each time
+  function caseTake() {
+    if (cases.length >= 4) return cases[Math.floor(Math.random() * cases.length)];
+    const sr = ctx.sampleRate, len = Math.round(0.5 * sr), buf = ctx.createBuffer(2, len, sr), L = buf.getChannelData(0), R = buf.getChannelData(1), f = vr(1, 0.08);
+    let t = 0;
+    for (const lv of [1, vr(0.55, 0.2), vr(0.3, 0.25), vr(0.15, 0.3)]) {
+      ringIn(L, R, Math.round(t * sr), [[3900 * f, 0.6, 0.12], [6400 * f, 0.45, 0.09], [9100 * f, 0.25, 0.06], [11800 * f, 0.12, 0.04]], lv, 0.6, 0.6, sr);
+      t += vr(0.1, 0.25) * (1.15 - lv * 0.4);
+    }
+    let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
+    for (let i = 0; i < len; i++) { L[i] /= pk || 1; R[i] /= pk || 1; }
+    cases.push(buf); return buf;
+  }
+  const shotSets = {}, shotLast = {};
+  let lastTail = -9;
+  const shotQ = [];
+  let shotIdle = false;
+  A.shotStats = { made: 0, ms: 0, max: 0, log: [], clear() { for (const k in shotSets) delete shotSets[k]; } };   // (how many takes were written, the time they took, the longest: for the measurements)
+  // what a shot of this kind is, here and now: its layers, the recordings of it that have arrived (until they have, its takes are of
+  // the layers alone, kept apart), and the key its takes are kept under
+  function shotPlan(kind, supp, auto, room) {
+    let p = supp ? suppOf(kind) : SHOT[kind] || SHOT.rifle;
+    if (auto) p = Object.assign({}, p, { act: 'autoshot', len: 0.3, lv: p.lv * 0.85 });   // (a self-loading shotgun: its bolt works, there is no pump)
+    const bk = p.rv && usable('gun_' + kind) ? SB.bank['gun_' + kind] : null, recs = bk ? bk.f.map((f) => bufs[f] || (fetchBuf(f), null)).filter(Boolean) : [];
+    return { kind, p, recs, room, key: (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out') + (recs.length ? ':r' : '') };
+  }
+  function shotMake(pl) {
+    const t0 = performance.now(), b = shotTake(pl.kind, pl.p, pl.recs, pl.room), ms = performance.now() - t0, S = A.shotStats;
+    S.made++; S.ms += ms; S.max = Math.max(S.max, ms); S.log.push(pl.key + ' ' + ms.toFixed(1)); if (S.log.length > 200) S.log.shift();
+    (shotSets[pl.key] || (shotSets[pl.key] = [])).push(b); return b;
+  }
+  // (a kind's first take is written when it is first fired, or before, when the place changes and it is in your hands; the rest when the
+  // page has time to spare, one or two at a time: a take is some ms of work)
+  function shotFill() {
+    if (shotIdle || !shotQ.length) return;
+    shotIdle = true;
+    const run = (dl) => {
+      const t0 = performance.now(), budget = dl && !dl.didTimeout && dl.timeRemaining ? dl.timeRemaining() - 2 : 6;
+      do {
+        const [kind, supp, auto, room] = shotQ.shift(), pl = shotPlan(kind, supp, auto, room), set = shotSets[pl.key];
+        if (pl.p.rv && !pl.recs.length && usable('gun_' + kind)) continue;   // (its recordings are still on their way: made when it is fired)
+        if (!set || set.length < 5) shotMake(pl);
+      } while (shotQ.length && performance.now() - t0 < budget);
+      shotIdle = false; shotFill();
+    };
+    if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 500 }); else setTimeout(run, 50);
+  }
+  function shotWarm(room) {
+    const P = G.player;
+    for (const w of (P && P.weapons) || []) { const k = w && w.def && w.def.sound; if (SHOT[k]) shotQ.push([k, false, !!(k === 'shotgun' && w.def.autoShot), room]); }
+    shotFill();
+  }
+  function newShot(kind, opts) {
+    const supp = !!opts.suppressed, room = !outdoor(), auto = kind === 'shotgun' && !!opts.auto, v = Math.pow(opts.vol || 1, 0.4), t = ctx.currentTime;
+    const pl = shotPlan(kind, supp, auto, room), p = pl.p, set = shotSets[pl.key];
+    let buf;
+    if (!set || !set.length) { buf = shotMake(pl); for (let i = 0; i < 4; i++) shotQ.push([kind, supp, auto, room]); shotFill(); }
+    else { let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === shotLast[pl.key]) i = (i + 1) % set.length; shotLast[pl.key] = i; buf = set[i]; }
+    // (each named gun a little off the next one's pitch)
+    const out = dest(null, p.wet, gunDry), src = ctx.createBufferSource();
+    out.gain.value = v * p.lv * vr(1, 0.05); src.buffer = buf; src.playbackRate.value = (opts.id && !supp ? 0.97 + hr(hs(opts.id), 1) * 0.06 : 1) * vr(1, 0.015);
+    src.connect(out); src.start(t);
+    // (on open ground the roll after it; in fast fire each shot's share of it is smaller, so that the fire rolls as one shot would)
+    if (!room && p.tail) {
+      const share = Math.max(0.2, Math.min(1, (t - lastTail) / 0.4)), e = dest(null, 0, gunDry), s2 = ctx.createBufferSource(); lastTail = t;
+      e.gain.value = v * p.lv * p.tl * share * 0.8; s2.buffer = tailTake(); s2.playbackRate.value = Math.min(2, 1.5 / p.tail) * vr(1, 0.04); s2.connect(e); s2.start(t);
+    }
+    if (p.cas && opts.id && Math.random() < p.cas[0]) {   // (your own gun's empties only: a shot asked for without a gun's id is another's - a guardian's, a friend's)
+      const e = dest(null, 0.1, gunDry), s3 = ctx.createBufferSource();
+      e.gain.value = v * (room ? 0.06 : 0.03) * vr(1, 0.2); s3.buffer = caseTake(); s3.playbackRate.value = vr(1, 0.05); s3.connect(e); s3.start(t + p.cas[1] * vr(1, 0.15));
+    }
+    if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35, 0.7);
+    if (kind === 'sniper') { A.mech('boltBack', 0.4, 0.7); A.mech('boltFwd', 0.6, 0.7); }
+    if (kind === 'revolver') A.mech('click', 0.2, 0.75);
+  }
   A.gun = function (kind, opts) {
     if (!ctx || !voice(1)) return;
     opts = opts || {};
-    // (a recording where there is one for this kind of gun; each named gun plays it at a pitch of its own, a little off the next gun's)
-    const GW = (!opts.suppressed && GUNW[kind]) || { rate: 1, w: opts.suppressed ? 0.25 : 0.8, tail: 0 };
-    if (smp('gun_' + (opts.suppressed ? 'suppressed' : GUN[kind] ? kind : 'rifle'), null, opts.vol, (opts.id && !opts.suppressed ? 0.95 + hr(hs(opts.id), 1) * 0.1 : 1) * GW.rate)) {
-      // (under the recording, the push in the chest: a microphone some paces off does not carry it)
-      { const gp = GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle, t = ctx.currentTime, lo = dest(null, 0.1, gunBus), k = GW.w, v = opts.vol || 1; lo.gain.value = v;
-        tn({ t, f0: gp.thump[0] * 0.55, f1: gp.thump[1] * 0.8, d: 0.08 + gp.tg * 0.08, g: gp.tg * 0.5, to: lo, type: 'sine' });
-        if (k > 0.6) {
-          tn({ t, f0: 64, f1: 30, d: 0.13 + k * 0.09, g: 0.5 * k, to: lo, type: 'sine' });                                              // the blow
-          tn({ t: t + 0.004, f0: 118, f1: 46, d: 0.09 + k * 0.05, g: 0.28 * k, to: lo, type: 'triangle', lp: 300 });                    // its knock
-          nz({ t, buf: 'pink', f: [['lowpass', 300, 0.7, 80, 0.18 + k * 0.12]], g: 0.42 * k, a: 0.002, d: 0.2 + k * 0.15, to: lo });   // the low body of the report
-        }
-        if (GW.tail > 0) {   // (the place ringing after a heavy shot: dark, long; out of doors one far return as well)
-          const e = dest(null, 0.9, gunBus); e.gain.value = v * 0.6;
-          nz({ t: t + 0.04, buf: 'pink', f: [['lowpass', 1100, 0.6, 180, GW.tail]], g: 0.16 * k, a: 0.04, d: GW.tail, to: e });
-          if (outdoor()) nz({ t: t + 0.28, buf: 'pink', f: [['lowpass', 800, 0.6, 160, GW.tail * 0.8]], g: 0.09 * k, a: 0.06, d: GW.tail * 0.9, to: e });
-        } }
-      if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35);
-      if (kind === 'sniper') A.mech('bolt', 0.4);
-      if (kind === 'revolver') A.mech('click', 0.2);
-      return;
-    }
+    if (NEW()) { newShot(kind, opts); return; }
+    // (the old set, as it was)
     const gv = gunVoice(GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle, opts.suppressed ? {} : opts), p = gv.p;
     const t = ctx.currentTime;
-    if (opts.suppressed && NEW()) {
-      // (the new set) a suppressed shot is the gas let out through the baffles - a dull puff and a knock in the hands, no crack - and
-      // over it the action working, which is most of what is heard of it: the carrier (or the slide) back and home, ringing a little.
-      // [the puff's Hz, how heavy, how loud the action]
-      const SK = { pistol: [950, 0.9, 1.15], revolver: [800, 1.1, 0.6], smg: [850, 0.85, 1], rifle: [620, 1.1, 1], dmr: [560, 1.2, 0.9], sniper: [500, 1.3, 0.8], shotgun: [420, 1.4, 0.8], lmg: [600, 1.15, 1.05], minigun: [800, 0.8, 0.9], nail: [1100, 0.7, 0.9] }[kind] || [700, 1, 1];
-      const [pf, w, act] = SK, out = dest(null, 0.15, gunBus); out.gain.value = (opts.vol || 1) * NV.supp;
-      nz({ t, buf: 'pink', f: [['bandpass', vr(pf, 0.1), 0.8, pf * 0.45, 0.07], ['lowpass', 2600]], g: 0.9 * w, a: 0.0015, d: vr(0.08, 0.15) * w, to: out });   // the gas: pfft
-      tn({ t, f0: vr(150, 0.08), f1: 62, d: 0.06 + 0.03 * w, g: 0.55 * w, to: out, type: 'sine' });                                                       // the knock
-      tn({ t, f0: 62, f1: 34, d: 0.09, g: 0.3 * w, to: out, type: 'sine' });                                                                                 // the weight under it
-      strike(t, out, [[vr(1500, 0.06), 0.09 * act, 0.05], [vr(2650, 0.06), 0.07 * act, 0.06], [vr(4100, 0.06), 0.04 * act, 0.04], [vr(5900, 0.06), 0.02 * act, 0.03]],
-        { g: 0.12 * act, hp: 2500, at: [vr(0.012, 0.2), vr(0.045, 0.15)], lv: [0.7, 1] });                                                                  // the action
-      if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35);
-      if (kind === 'sniper') A.mech('bolt', 0.4);
-      if (kind === 'revolver') A.mech('click', 0.2);
-      return;
-    }
     const out = dest(null, p.wet * 0.9, gunBus);
     out.gain.value = opts.vol || 1;
     const pr = vr(1, 0.06);
@@ -403,17 +644,6 @@
     nz({ t, buf: 'pink', f: [['lowpass', p.body * pr, 0.9, p.body * 0.35, p.bd]], g: p.bg, a: 0.001, d: p.bd, to: out });
     // low thump (chest punch)
     tn({ t, f0: p.thump[0] * pr, f1: p.thump[1], d: 0.09 + p.tg * 0.12, g: p.tg, to: out, type: 'triangle', lp: 400 });
-    if (NEW()) {
-      // the weight under the shot; the metal of the action; the place answering back (a room: two quick dark returns, open ground: one far echo)
-      tn({ t, f0: 62 * pr, f1: 34, d: 0.11 + p.tg * 0.06, g: p.tg * 0.5, to: out, type: 'sine' });
-      if (!opts.suppressed) {
-        tn({ t: t + 0.006, f0: vr(2300, 0.08), d: 0.035, g: 0.04 + p.crack * 0.05, to: out, type: 'triangle' });
-        tn({ t: t + 0.008, f0: vr(3650, 0.08), d: 0.025, g: 0.025 + p.crack * 0.04, to: out, type: 'sine' });
-        const fast = kind === 'minigun' || kind === 'smg' || kind === 'nail';
-        if (outdoor()) { if (!fast) { const e = dest(null, 0.9, dry); e.gain.value = 0.2 * (opts.vol || 1); nz({ t: t + 0.17 + Math.random() * 0.04, buf: 'pink', f: [['lowpass', 1300, 0.7, 300, 0.4]], g: p.bg * 0.5, a: 0.02, d: 0.35 + p.tail * 0.5, to: e }); } }
-        else { const e = dest(null, 0.5, dry); e.gain.value = 0.3 * (opts.vol || 1); for (const [dl, gg] of fast ? [[0.036, 0.42]] : [[0.034, 0.5], [0.071, 0.3]]) nz({ t: t + dl, buf: 'pink', f: [['lowpass', p.body * 0.5, 0.8, p.body * 0.2, p.bd]], g: p.bg * gg, a: 0.002, d: p.bd * 1.2, to: e }); }
-      }
-    }
     // decaying tail, through reverb mostly
     if (p.tail > 0.1) {
       const tail = dest(null, 1.2, dry); tail.gain.value = 0.35;
@@ -442,6 +672,17 @@
     if (!ctx) return;
     if ((kind === 'rocket' || kind === 'rail' || kind === 'crossbow') && smp('launch_' + kind)) return;
     if (!voice(1)) return;
+    if (NEW() && SHOT[kind]) {
+      // (the new set: the launch itself in layers, as a shot is; then what goes on after it, its low end shorter than it was - it held
+      // the whole of it under a dull roar)
+      newShot(kind, {});
+      const t = ctx.currentTime, out = dest(null, 0.5);
+      if (kind === 'rocket') { nz({ t: t + 0.01, buf: 'pink', f: [['bandpass', 1500, 0.7, 500, 0.6]], g: 0.45, a: 0.04, d: 0.55, to: out }); nz({ t, f: [['bandpass', 900, 1.2, 2500, 0.5]], g: 0.35, a: 0.05, d: 0.5, to: out }); }
+      else if (kind === 'gl') A.mech('click', 0.3);
+      else if (kind === 'rail') { nz({ t, f: [['bandpass', 1800, 1.5]], g: 0.3, d: 0.12, to: out }); tn({ t, f0: 3400, f1: 900, d: 0.35, g: 0.05, to: out, type: 'sine' }); }
+      else if (kind === 'harpoon') A.chain(0.5, 0.25);
+      return;
+    }
     const t = ctx.currentTime, out = dest(null, 0.6);
     if (kind === 'rocket') {
       nz({ t, buf: 'pink', f: [['lowpass', 1800, 0.7, 300, 0.5]], g: 0.9, a: 0.01, d: 0.6, to: out });
@@ -492,7 +733,7 @@
     const g = ctx.createGain(); g.gain.value = 0.0001;
     const out = dest(null, kind === 'flame' ? 0.4 : 0.15);
     let lfo = null;
-    if (kind === 'flame') { f.type = 'lowpass'; f.frequency.value = 1400; f.Q.value = 0.5; }
+    if (kind === 'flame') { f.type = 'lowpass'; f.frequency.value = NEW() ? 2600 : 1400; f.Q.value = 0.5; }
     else if (kind === 'slide') { f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 0.7; }
     else if (kind === 'spin') { f.type = 'bandpass'; f.frequency.value = 300; f.Q.value = 4; }
     else if (kind === 'wind') { f.type = 'bandpass'; f.frequency.value = 600; f.Q.value = 0.8; }

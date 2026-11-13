@@ -325,11 +325,13 @@
         // passes a threshold that rises with height, so the outline is the noise's own (no line, no arc). Where banks stand and how high
         // they reach comes from a much slower noise round the horizon. Over the false sky's sea of cloud they rise out of it.
         if (uBody2.z > .001 && h > -.07 && h < .16) {
-          float base = uBody2.w > .5 ? -.05 : -.006;   // (their foot: under the far hills, or down in the sea of cloud)
+          // (their foot: some two degrees under the horizon, behind the far hills - from a tower or a bridge too there is no line
+          // where they stand - or down in the sea of cloud)
+          float base = uBody2.w > .5 ? -.05 : -.035;
           // (on some third to a half of the horizon: read from a blurred level of the noise, so that a bank tapers away over many
           // degrees - read sharp, it ended in an upright edge)
           float pres = smoothstep(.38, .62, texture2D(tN, dh * .4 + vec2(.13, .71), 3.).a);
-          float Hm = .03 + .08 * pow(texture2D(tN, dh * .8 + vec2(.52, .27), 2.).r, 1.5);   // (two to six degrees, now and then eight)
+          float Hm = (uBody2.w > .5 ? .03 : .05) + .08 * pow(texture2D(tN, dh * .8 + vec2(.52, .27), 2.).r, 1.5);   // (two to six degrees over the horizon, now and then eight)
           float e = h - base;
           if (pres > .01 && e < Hm * 1.2) {
             // (24 times round, the finer octaves 3 and 6 times that: whole numbers, so the noise meets itself where the angle wraps round)
@@ -342,10 +344,10 @@
             float den = smoothstep(thr, thr + .1, n);
             // light: the tops (where the cloud thins upward) and the side toward the sun or moon brighter, lower down greyer
             float lit = clamp((n - nu) * 9. + .35, 0., 1.) * (.55 + .45 * pow(max(az, 0.) * .5 + .5, 2.)) * smoothstep(.0, .7, k);
-            vec3 cl = mix(vec3(lum(amb)) * .9, amb, .5) + litC * (.2 + .7 * lit);
+            vec3 cl = mix(vec3(lum(amb)) * .9, amb, .5) + litC * (.15 + .45 * lit);   // (far off: hardly brighter than the sky behind)
             vec3 air = mix(fogc, H + glow, smoothstep(-.01, .03, h));
             bc = mix(cl, air, .84 - .08 * k);   // (most of the way into the colour of the air)
-            bA = den * smoothstep(.0, .35, k) * smoothstep(.01, .3, pres) * uBody2.z;   // (the foot lost in the haze altogether)
+            bA = den * smoothstep(.0, .6, k) * smoothstep(.01, .3, pres) * uBody2.z;   // (the foot lost in the haze altogether, slowly)
           }
         }
         // ---- clouds

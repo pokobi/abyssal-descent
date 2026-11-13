@@ -135,8 +135,10 @@ void main(){
   c = mix(vec3(l), c, 1. + .05 * grade);
   c += vec3(-.004, .001, .008) * (1. - smoothstep(0., .35, l)) * grade;
   c *= mix(vec3(1.), vec3(1.025, 1.0, .965), smoothstep(.35, .95, l) * grade);
-  float v = smoothstep(1.0, .3, length(cc * vec2(1., res.y / res.x * 1.25)));
-  c *= mix(1., mix(.82, 1., v), grade);
+  // (the corners fall off along a curve with no bend in it anywhere - a smoothstep's start drew an ellipse on a bright even sky - and
+  // less where the picture is bright)
+  float vr = length(cc * vec2(1., res.y / res.x * 1.25)), v = exp(-vr * vr * 1.1);
+  c *= mix(1., mix(.82, 1., v), grade * mix(1., .45, smoothstep(.5, .95, l)));
   c += (hash(gl_FragCoord.xy + fract(time) * 917.) - .5) * .009 * (1. - l * .6) * grade;
   c = max(c, 0.);
   gl_FragColor = vec4(mix(c * 12.92, pow(c, vec3(1. / 2.4)) * 1.055 - .055, step(.0031308, c)), 1.);

@@ -96,12 +96,16 @@
     const P = G.player, C = G.combat, p = b.p, r = W.BOLT_R;
     if (b.tele) G.fx.endTelegraph(b.tele);
     W.strikes++;
-    // the thick lower bolt with its flash, shock ring and sparks (fx.js strike), and the rest of it up into the clouds
-    const top = V(p.x + U.rand(-1, 1), p.y + 13.5, p.z + U.rand(-1, 1));
-    G.fx.strike(p.clone().setY(p.y + 0.05), 0xd8e4ff, true);
-    G.fx.lightning(V(p.x + U.rand(-5, 5), p.y + 42, p.z + U.rand(-5, 5)), top, 0xcfe0ff);
-    G.fx.lightning(V(p.x + U.rand(-6, 6), p.y + 40, p.z + U.rand(-6, 6)), top, 0xb8ccff);
+    // the bolt from the clouds down to the ground, branching (skyvary.js), the blue-white light it throws on the ground and the walls
+    // round it - again, weaker, when it strikes a second time - the shock ring and the sparks
+    const g = p.clone().setY(p.y + 0.05);
+    if (G.Sky && G.Sky.bolt) G.Sky.bolt(V(p.x + U.rand(-9, 9), p.y + 46, p.z + U.rand(-9, 9)), g);
+    else G.fx.strike(g, 0xd8e4ff, true);
+    G.fx.flash(p.clone().setY(p.y + 1.5), 0xd8e4ff, 90, 0.16, 24);
+    setTimeout(() => G.fx.flash(p.clone().setY(p.y + 1.5), 0xd8e4ff, 55, 0.1, 20), 95);
+    G.fx.ring(g, 3.2, 0xd8e4ff, 0.3);
     G.fx.sparks(p.clone().setY(p.y + 0.2), V(0, 1, 0), 18, 0xd8e4ff, 7);
+    if (G.sfx.zap) G.sfx.zap(p);
     if (G.Sky && G.Sky.flashNow) G.Sky.flashNow();
     if (G.sfx.thunder) G.sfx.thunder(0);
     P.addShake && P.addShake(Math.max(0, 0.35 - P.pos.distanceTo(p) * 0.02));

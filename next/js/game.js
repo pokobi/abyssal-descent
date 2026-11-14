@@ -1911,7 +1911,10 @@
       }
       else if (o.kind === 'skill') ware('skill');
       else if (o.kind === 'attachment') ware('attachment');
-      else if (o.kind === 'item') { if (o.obj.cat === 'grenade' && G.GrenFX) disp.add(G.GrenFX.build(o.obj.id, 1.25)); else ware('potion'); }
+      else if (o.kind === 'item') {   // (a consumable as the thing it is - a roll of gauze, a kit, a flask - itemanim.js display; a flask where it has no shape)
+        if (o.obj.cat === 'grenade' && G.GrenFX) disp.add(G.GrenFX.build(o.obj.id, 1.25));
+        else { const sh = G.ItemAnim && G.ItemAnim.display ? G.ItemAnim.display(o.obj.id, { fit: 0.3 }) : null; if (sh) disp.add(sh); else ware('potion'); }
+      }
       else ware('buff');
       disp.position.y = 0.45; disp.scale.setScalar(1.5);
     }

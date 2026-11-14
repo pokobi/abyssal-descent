@@ -128,16 +128,16 @@
     const mk = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 2.4; return m; };
     // (the finer surfaces of gfx.js where there are any: a blade's ground steel, the hide of a wrapped grip)
     const sx = (name, ns) => { const t = G.GFX && G.GFX.tex ? G.GFX.tex(name) : null; return t ? { map: t.map, normalMap: t.normalMap, roughnessMap: t.orm, normalScale: new THREE.Vector2(ns, ns) } : null; };
-    const blade = mk(Object.assign({ color: 0xdce2ec, metalness: 0.52, roughness: 0.18, emissive: 0x242a34, emissiveIntensity: 0.25 }, sx('steel', 0.45) ? Object.assign({ roughness: 0.34, color: 0xf0f4fa }, sx('steel', 0.45)) : {}));
+    const blade = mk(Object.assign({ color: 0x8e9298, metalness: 0.95, roughness: 0.3 }, sx('steel', 0.45) ? Object.assign({ roughness: 0.42, color: 0x9a9ea4 }, sx('steel', 0.45)) : {}));   // (steel: grey and metal through, not white)
     const dark = mk({ color: 0x241e1c, metalness: 0.3, roughness: 0.62 });
     const wrap = mk(Object.assign({ color: 0x3a1a14, roughness: 0.9, map: G.Tex.tex.cloth.map }, sx('leather', 1) ? Object.assign({ color: 0x5a2c20, roughness: 1 }, sx('leather', 1)) : {}));
-    const gold = mk({ color: 0xd9b25a, metalness: 0.82, roughness: 0.28, emissive: 0x3a2606, emissiveIntensity: 0.35 });   // (old gold: fittings, not a lamp)
-    const goldBr = mk({ color: 0xf0d48a, metalness: 0.86, roughness: 0.2, emissive: 0x4a3208, emissiveIntensity: 0.4 });
+    const gold = mk({ color: 0xb8954e, metalness: 0.85, roughness: 0.36 });   // (old gold: fittings, not a lamp)
+    const goldBr = mk({ color: 0xc8aa6a, metalness: 0.86, roughness: 0.3 });
     let bladeM = blade;
-    if (def.model === 'frostknife') bladeM = mk({ color: 0xbfe8ff, metalness: 0.3, roughness: 0.05, emissive: 0x3898ff, emissiveIntensity: 1.15, transparent: true, opacity: 0.94 });
-    if (def.model === 'emberblade') bladeM = mk({ color: 0xff6018, metalness: 0.35, roughness: 0.18, emissive: 0xff4808, emissiveIntensity: 1.8 });
-    if (def.model === 'holy') bladeM = mk({ color: 0xfff8e8, metalness: 0.45, roughness: 0.10, emissive: 0xffdf80, emissiveIntensity: 1.1 });
-    if (def.model === 'twin') bladeM = mk({ color: 0x68f040, metalness: 0.4, roughness: 0.18, emissive: 0x28b810, emissiveIntensity: 1.2 });
+    if (def.model === 'frostknife') bladeM = mk({ color: 0x9ab2bc, metalness: 0.3, roughness: 0.1, emissive: 0x24485c, emissiveIntensity: 0.12, transparent: true, opacity: 0.94 });
+    if (def.model === 'emberblade') bladeM = mk({ color: 0x6e3a26, metalness: 0.8, roughness: 0.34, emissive: 0x8a2808, emissiveIntensity: 0.15 });
+    if (def.model === 'holy') bladeM = mk({ color: 0xb8b2a2, metalness: 0.85, roughness: 0.26, emissive: 0x6a5a30, emissiveIntensity: 0.1 });
+    if (def.model === 'twin') bladeM = mk({ color: 0x5a6a48, metalness: 0.75, roughness: 0.3, emissive: 0x2a4a14, emissiveIntensity: 0.12 });
     // (a part is a box cut to its size with its edges rounded a little, as on the guns)
     const box = (p, w, h, d, x, y, z, m, rx, ry, rz) => { const rg = G.GFX && G.GFX.rbox ? G.GFX.rbox(w, h, d, Math.min(0.003, Math.min(Math.abs(w), Math.abs(h), Math.abs(d)) * 0.2)) : null; const o = new THREE.Mesh(rg || PG.box, m); if (!rg) o.scale.set(w, h, d); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); p.add(o); return o; };
     const cyl = (p, rad, len, x, y, z, m) => { const o = new THREE.Mesh(PG.cyl8, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); p.add(o); return o; };
@@ -220,7 +220,7 @@
     // weapon pivot = grip, local +Y = blade direction
     const wg = new THREE.Group(); r.add(wg);
     let tipY = 0.3, glow = null;
-    const gemM = (col, em) => mk({ color: col, metalness: 0.15, roughness: 0.08, emissive: em || col, emissiveIntensity: 2.0 });
+    const gemM = (col, em) => { const c = new THREE.Color(col), h = {}; c.getHSL(h, THREE.SRGBColorSpace); c.setHSL(h.h, h.s * 0.45, h.l * 0.55, THREE.SRGBColorSpace); return mk({ color: c, metalness: 0.15, roughness: 0.14, emissive: c, emissiveIntensity: 0.12 }); };   // (stones dull and dark: none shines)
     // (the weapons shaped in gfx.js - blades lofted to an edge, turned grips, cut guards: a list of parts, each given its material here)
     const NP = G.GFX && G.GFX.meleeParts ? G.GFX.meleeParts : null, MMb = { blade: bladeM, dark, steel: mats.steel, wrap, gold, goldBr, wood: mats.wood };
     const has = (key) => !!(NP && NP(key));

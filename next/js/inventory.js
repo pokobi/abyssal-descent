@@ -484,8 +484,10 @@
     const w = G.world; if (!w) return;
     const d = IV.def(it);
     const g = new THREE.Group();
-    const sack = new THREE.Mesh(G.Props.PG.sph, new THREE.MeshStandardMaterial({ color: 0x6a5238, roughness: 0.9 }));
-    sack.scale.set(0.22, 0.16, 0.2); sack.position.y = 0.14; g.add(sack);
+    // (a consumable lies there as the thing it is, laid down, a little larger than life to be seen: itemanim.js display. Anything else: a sack)
+    const shown = it.type === 'item' && G.ItemAnim && G.ItemAnim.display ? G.ItemAnim.display(it.id, { k: 2, min: 0.12, max: 0.36, lie: true, yaw: Math.random() * 6.28 }) : null;
+    if (shown) g.add(shown);
+    else { const sack = new THREE.Mesh(G.Props.PG.sph, new THREE.MeshStandardMaterial({ color: 0x6a5238, roughness: 0.9 })); sack.scale.set(0.22, 0.16, 0.2); sack.position.y = 0.14; g.add(sack); }
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.34, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(G.ui.R(d && d.rarity || 'common')), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; g.add(ring);
     const tex = G.Tex.textTex(d ? d.icon : '❔', { size: 48 });

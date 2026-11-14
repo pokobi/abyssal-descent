@@ -33,6 +33,24 @@
       cRed: s(0x74201a, { roughness: 0.65, metalness: 0.3 }), cBlue: s(0x26406c, { roughness: 0.7, metalness: 0.2 }), cYellow: s(0x9a8222, { roughness: 0.7, metalness: 0.2 }), cGreen: s(0x33562a, { roughness: 0.7, metalness: 0.2 }), cWhite: s(0xa6a69c, { roughness: 0.7, metalness: 0.1 }),
       gBlue: e(0x60b0ff), gYellow: e(0xffe040, 1.4), gRed: e(0xff2010, 2), gPurple: e(0xa050ff, 1.6), gOrange: e(0xff8020, 1.8), gGreen: e(0x70ff40, 1.1), gHoly: e(0xfff0b0, 1.2), gWhite: e(0xffffff, 1.2),
     };
+    // (what the shaped ones are made of, given the surfaces of gfx.js: sand-cast iron with its pits and rust, paint chipped to the metal,
+    // worn steel and brass, hide, cord, clay; the colours dull. Nothing on them glows but what really burns: the dynamite's fuse, and
+    // the match smouldering in the limpet's fuze)
+    const X = G.GFX || {}, it = (n) => (X.itemTex ? X.itemTex(n) : null), ex = (n) => (X.tex ? X.tex(n) : null);
+    const sf = (t, metal) => (t ? Object.assign({ map: t.map, normalMap: t.normalMap, roughnessMap: t.orm, aoMap: t.orm }, metal ? { metalnessMap: t.orm, metalness: 1 } : {}) : {});
+    const cast = it('castIron'), paint = it('paintWorn'), steelT = ex('steel'), hideT = ex('leather'), weave = ex('weave'), rock = ex('rock'), poly = ex('polymer');
+    const pt = (c) => s(c, Object.assign({ roughness: 1 }, sf(paint, true)));
+    Object.assign(M, {
+      iron: s(0x8a8e88, Object.assign({ roughness: 1 }, sf(cast, true))), verdigris: s(0x5c6852, Object.assign({ roughness: 1 }, sf(cast, true))),
+      tin: s(0x8a8c88, Object.assign({ roughness: 0.7, metalness: 0.8 }, sf(steelT))), brassOld: s(0x8a6e38, Object.assign({ roughness: 0.75, metalness: 0.85 }, sf(steelT))), copper: s(0x7a4a2e, Object.assign({ roughness: 0.7, metalness: 0.85 }, sf(steelT))),
+      cRed: pt(0x5e2a20), cBlue: pt(0x34465a), cYellow: pt(0x75683a), cGreen: pt(0x3a4a2e), cWhite: pt(0x8e8c84),
+      paperOld: s(0x38211a, Object.assign({ roughness: 1, metalness: 0 }, hideT ? { normalMap: hideT.normalMap, roughnessMap: hideT.orm, normalScale: new THREE.Vector2(0.5, 0.5) } : {})),
+      hide: s(0x3e2c1e, Object.assign({ roughness: 0.75, metalness: 0 }, hideT ? { normalMap: hideT.normalMap, normalScale: new THREE.Vector2(0.25, 0.25) } : {})), rope: s(0x6a5a40, Object.assign({ roughness: 1, metalness: 0 }, sf(weave))),
+      clay: s(0x6a4a36, Object.assign({ roughness: 1, metalness: 0 }, sf(rock))), ceramicW: s(0x9a9080, Object.assign({ roughness: 0.4, metalness: 0 }, poly ? { normalMap: poly.normalMap, normalScale: new THREE.Vector2(0.4, 0.4) } : {})),
+      goo: s(0x2a3016, { roughness: 0.3, metalness: 0 }), oil: s(0x5a3410, { roughness: 0.2, metalness: 0, transparent: true, opacity: 0.9 }),
+      glass: s(0x8a9898, { roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.35 }), ice: s(0x8aa4ac, { roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.85 }),
+      ember: e(0xc85a20, 0.9),
+    });
     return M;
   }
   const PG = () => G.Props.PG;
@@ -61,9 +79,8 @@
         else if (q.tag === 'ring1') { o.rotation.set(2.1, 1.0, 0); g.add(o); (ud.rings = ud.rings || [])[1] = o; }
         else g.add(o);
       }
-      if (id === 'g_fire') ud.glow = sph(g, M.gOrange, 0.008, 0, 0.133, 0);
-      if (id === 'g_sticky') ud.led = sph(g, M.gRed, 0.011, 0, 0.033, 0);
-      if (id === 'g_dyna') { ud.fuseLine = cyl(g, M.tape, 0.004, 0.1, 0.008, 0.16, 0.03, 0, 0, 0.35); ud.fuse = sph(g, M.gOrange, 0.011, -0.008, 0.21, 0.03); }
+      if (id === 'g_sticky') ud.led = sph(g, M.ember, 0.0055, 0, 0.033, 0);   // (a slow match smouldering in its fuze: it flickers)
+      if (id === 'g_dyna') { ud.fuseLine = cyl(g, M.tape, 0.004, 0.1, 0.008, 0.16, 0.03, 0, 0, 0.35); ud.fuse = sph(g, M.gOrange, 0.0075, -0.008, 0.21, 0.03); }
     } else switch (id) {
       case 'g_fire': { // a red incendiary can: a fuel window shows the oil inside, a white-hot cap (it takes in the old fire bottle and thermite)
         cyl(g, M.red, 0.052, 0.17); cyl(g, M.orange, 0.054, 0.03, 0, 0.045); cyl(g, M.oil, 0.044, 0.07, 0, -0.025);

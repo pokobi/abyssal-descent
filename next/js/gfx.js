@@ -2497,30 +2497,37 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   const dots = (r, y, n, rad, a0) => { const l = []; for (let i = 0; i < n; i++) { const a = (a0 || 0) + i / n * Math.PI * 2, g = new THREE.CylinderGeometry(rad, rad, 0.004, 8); g.rotateX(HX); g.rotateY(-a + HX); g.translate(Math.cos(a) * (r + 0.001), y, Math.sin(a) * (r + 0.001)); l.push(g); } return l; };
   // the fragmentation grenade: cast iron in eight columns and five rows of square knobs, the grooves between them cut with sloping
-  // sides (as a mould leaves them), a band about its waist; the fuze of steel, the spoon, the pin and its ring
+  // sides (as a mould leaves them); the faces of the knobs flat, to catch the light. Its points are laid where the grooves and their
+  // walls are (an even grid misses the narrow grooves across it); the fuze of steel, the spoon, the pin and its ring
+  const FRAG = spl([[0.0005, -0.1], [0.045, -0.096], [0.072, -0.06], [0.08, -0.01], [0.076, 0.04], [0.058, 0.08], [0.034, 0.096], [0.0005, 0.099]], 60);
+  const fragR = (y) => { for (let i = 1; i < FRAG.length; i++) if (FRAG[i].y >= y) { const a = FRAG[i - 1], b = FRAG[i], k = (y - a.y) / Math.max(1e-6, b.y - a.y); return a.x + (b.x - a.x) * k; } return 0.0005; };
   GREN.g_frag = () => {
-    const g = new THREE.LatheGeometry(spl([[0.0005, -0.1], [0.045, -0.096], [0.072, -0.06], [0.08, -0.01], [0.076, 0.04], [0.058, 0.08], [0.034, 0.096], [0.0005, 0.099]], 30), 44), ps = g.attributes.position;
-    for (let i = 0; i < ps.count; i++) {
-      const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), a = Math.atan2(z, x), ca = Math.abs(((a / (Math.PI / 4)) % 1 + 1) % 1 - 0.5) * 2, cy = Math.abs((((y + 0.082) / 0.034) % 1 + 1) % 1 - 0.5) * 2;
-      const grv = Math.max(Math.max(0, 1 - (1 - ca) / 0.16), Math.max(0, 1 - (1 - cy) / 0.2)), k = Math.abs(y) < 0.084 ? 1 - 0.085 * Math.min(1, grv * 1.6) : 1;
-      ps.setX(i, x * k); ps.setZ(i, z * k);
-    }
-    g.computeVertexNormals(); const s = spoon(0.1, 0.07);
-    return [gq('iron', g), gq('tin', [fuze(0.1), s.lever]), gq('brassOld', s.ring)];
+    const ROW = [0, 0.13, 0.27, 0.73, 0.87], COL = [0, 0.12, 0.25, 0.5, 0.75, 0.88], Y0 = -0.082, RH = 0.034, ys = [-0.1, -0.097, -0.092, -0.087], fy = [], fa = [];
+    for (let r = 0; r < 5; r++) for (const f of ROW) { ys.push(Y0 + (r + f) * RH); fy.push(f); }
+    ys.push(Y0 + 5 * RH); fy.push(0); for (const y of [0.092, 0.096, 0.099]) ys.push(y);
+    const as = []; for (let c = 0; c < 8; c++) for (const f of COL) { as.push((c + f) / 8 * Math.PI * 2); fa.push(f); } as.push(Math.PI * 2); fa.push(0);
+    const gw = (f, w) => { const d = Math.min(f, 1 - f); return d < 1e-4 ? 1 : d <= w + 1e-4 ? 0.4 : 0; };
+    const pos = [], idx = [], na = as.length;
+    ys.forEach((y, i) => { const inRow = i >= 4 && i < 4 + 26, fr = inRow ? fy[i - 4] : 1, R = fragR(y); as.forEach((a, j) => { const g = inRow ? Math.max(gw(fr, 0.13), gw(fa[j], 0.12)) : 0, k = 1 - 0.1 * g; pos.push(Math.cos(a) * R * k, y, Math.sin(a) * R * k); }); });
+    for (let i = 0; i + 1 < ys.length; i++) for (let j = 0; j + 1 < na; j++) { const a = i * na + j, b = a + 1, c = a + na, d = c + 1; idx.push(a, c, b, b, c, d); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const uv = []; for (let i = 0; i < ys.length; i++) for (let j = 0; j < na; j++) uv.push(as[j] / (Math.PI * 2) * 3, ys[i] * 12); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const s = spoon(0.1, 0.07);
+    return [gq('iron', g.toNonIndexed()), gq('tin', [fuze(0.1), s.lever]), gq('brassOld', s.ring)];
   };
   // the incendiary: a tin painted a dull red, a glass let into its side with the oil behind it, a band of brass, a fuze and spoon
-  GREN.g_fire = () => { const s = spoon(0.088, 0.05); return [gq('paperOld', can(0.05, 0.17)), gq('brassOld', gband(0.05, 0.052, 0.014)), gq('iron', [gband(0.05, -0.03, 0.062), fuze(0.088)]), gq('oil', ball(0.03, [0, -0.03, 0.036], [0.8, 0.85, 0.55])), gq('tin', s.lever), gq('brassOld', s.ring)]; };
+  GREN.g_fire = () => { const s = spoon(0.088, 0.05); return [gq('cRed', can(0.05, 0.17)), gq('brassOld', gband(0.05, 0.052, 0.014)), gq('iron', [gband(0.05, -0.03, 0.062), fuze(0.088)]), gq('oil', ball(0.03, [0, -0.03, 0.036], [0.8, 0.85, 0.55])), gq('tin', s.lever), gq('brassOld', s.ring)]; };
   // the water skin: a bladder of hide tied at the neck with a blue rag (the bladder: one in radius, it wobbles)
   GREN.g_water = () => [
     gq('hide', new THREE.LatheGeometry(spl([[0.0005, -1], [0.55, -0.95], [0.92, -0.6], [1.0, -0.1], [0.86, 0.4], [0.5, 0.8], [0.26, 1.02], [0.2, 1.12], [0.0005, 1.14]], 22), 18), 'bag'),
     gq('cBlue', [new THREE.TorusGeometry(0.25, 0.07, 6, 14).rotateX(HX).translate(0, 1.04, 0), ext([[0, 0], [0.5, 0.12], [0.62, -0.25], [0.3, -0.42], [0.1, -0.1]], 0.03, 0).translate(0.15, 1.05, 0), ext([[0, 0], [-0.4, 0.2], [-0.56, -0.2], [-0.2, -0.36]], 0.03, 0).translate(-0.15, 1.05, 0.05),
       hl([[0.95, -0.28], [1.0, -0.26], [1.01, -0.1], [0.97, -0.08]], 1, 1, 18)], 'onbag'),
     gq('rope', hl([[0.0005, 1.12], [0.16, 1.12], [0.22, 1.2], [0.2, 1.3], [0.0005, 1.28]], 1, 1, 10), 'onbag')];
-  // the freezing can: bare tin with two blue bands, rime on its shoulder, a fuze that shows a cold light
+  // the freezing can: bare tin with two blue bands, rime on its shoulder, a fuze
   GREN.g_cryo = () => {
-    const rime = []; for (let i = 0; i < 14; i++) { const a = i * 2.4, r = 0.049 + (i % 3) * 0.002, g = new THREE.OctahedronGeometry(0.006 + (i % 4) * 0.003, 0); g.rotateX(i); g.translate(Math.cos(a) * r, 0.045 + (i % 5) * 0.008, Math.sin(a) * r); rime.push(g); }
+    const rime = []; for (let i = 0; i < 26; i++) { const a = i * 2.4, y = 0.04 + (i % 7) * 0.0055, r = Math.min(0.0485, 0.0485 - Math.max(0, y - 0.066) * 0.9) + 0.0006, g = new THREE.IcosahedronGeometry(0.0022 + (i % 4) * 0.0011, 0); g.scale(1.4, 0.7, 1); g.rotateY(-a); g.translate(Math.cos(a) * r, y, Math.sin(a) * r); rime.push(g); }
     const s = spoon(0.082, 0.048);
-    return [gq('tin', [can(0.048, 0.16), fuze(0.082), s.lever]), gq('cBlue', [gband(0.048, 0.036, 0.018), gband(0.048, -0.04, 0.018)]), gq('ice', rime), gq('gBlue', ball(0.008, [0, 0.127, 0])), gq('brassOld', s.ring)];
+    return [gq('tin', [can(0.048, 0.16), fuze(0.082), s.lever, prism(0.008, 0.004, [0, 0.127, 0], null, 10)]), gq('cBlue', [gband(0.048, 0.036, 0.018), gband(0.048, -0.04, 0.018)]), gq('ice', rime), gq('brassOld', s.ring)];
   };
   // the shock charge: an insulator of glazed clay in three skirts, wound with copper wire, two rods out of its head with brass terminals
   GREN.g_shock = () => {
@@ -2553,7 +2560,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const cr = Geo.merge([new THREE.ConeGeometry(0.05, 0.085, 6).toNonIndexed().translate(0, 0.0425, 0), new THREE.ConeGeometry(0.05, 0.085, 6).toNonIndexed().rotateX(Math.PI).translate(0, -0.0425, 0)]); cr.computeVertexNormals();
     const cage = [new THREE.TorusGeometry(0.022, 0.004, 4, 12).rotateX(HX).translate(0, 0.098, 0), new THREE.TorusGeometry(0.022, 0.004, 4, 12).rotateX(HX).translate(0, -0.098, 0)];
     for (let i = 0; i < 4; i++) { const a = i * HX + 0.4, c = Math.cos(a), s = Math.sin(a); cage.push(tubeR([[c * 0.022, 0.098, s * 0.022], [c * 0.06, 0.055, s * 0.06], [c * 0.068, 0, s * 0.068], [c * 0.06, -0.055, s * 0.06], [c * 0.022, -0.098, s * 0.022]], 0.0035, 4, 12)); }
-    return [gq('glass', cr), gq('tin', cage)];
+    return [gq('ice', cr), gq('tin', cage)];
   };
   // dynamite: three sticks in waxed paper, their ends folded in, bound twice with cord (the fuse and its spark: grenfx's own)
   GREN.g_dyna = () => {
@@ -2705,13 +2712,70 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   col = S(mix(paint, tin, bare)); h = .55 - bare * .12 + (n3 - .5) * .03;
   rough = mix(.72 + (n2 - .5) * .14, .42 + rust * .4, bare); metal = bare * (1. - rust * .8);
 }`],
+    // sand-cast iron: the grain of the mould on it, pits, blotches of rust (its metalness from the map)
+    castIron: [512, 0.7, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float sd = vnoise(uv * 260., 260., 1.), sd2 = vnoise(uv * 120., 120., 2.), n1 = fbm(uv, 4., 3.), n2 = fbm(uv, 14., 4.);
+  vec3 pv = voro(uv, 34., 5.); float pit = smoothstep(.16, .04, pv.x) * step(.72, pv.z);
+  float rust = smoothstep(.58, .82, fbm(uv, 6., 6.) + (n2 - .5) * .3);
+  h = .5 + (sd - .5) * .14 + (sd2 - .5) * .1 - pit * .25 + (n1 - .5) * .1;
+  vec3 c = vec3(.62 + (n1 - .5) * .14 + (sd - .5) * .08) * vec3(1., .99, .96);
+  c = mix(c, vec3(.36, .22, .14), rust * .55); c *= 1. - pit * .35;
+  col = S(c); rough = .78 + (sd - .5) * .14 + rust * .12; metal = .55 * (1. - rust);
+}`],
+    // paint on metal (pale, the material's colour tints it): chipped and scratched to the metal, rust where it shows, grimed
+    paintWorn: [512, 0.5, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 4., 1.), n2 = fbm(uv, 18., 2.), n3 = vnoise(uv * 140., 140., 3.);
+  float chip = smoothstep(.6, .64, fbm(uv, 6., 4.) * .7 + n2 * .3);
+  float scr = smoothstep(.83, .95, ridge(uv, 5., 5.)) * smoothstep(.45, .7, fbm(uv, 3., 6.));
+  float bare = max(chip, scr * .9), rust = smoothstep(.5, .78, fbm(uv, 9., 7.)) * bare, grime = smoothstep(.5, .8, n1);
+  vec3 paint = vec3(.8 + (n3 - .5) * .05) * (.9 + (n2 - .5) * .1) * (1. - grime * .25);
+  vec3 mc = mix(vec3(.42, .42, .4), vec3(.3, .18, .11), rust);
+  col = S(mix(paint, mc, bare)); h = .55 - bare * .1 + (n3 - .5) * .03;
+  rough = mix(.66 + (n2 - .5) * .14 + grime * .1, .45 + rust * .4, bare); metal = bare * (1. - rust * .8);
+}`],
+    // a brown salt glaze in its own colours: the skin of orange peel the salt leaves, mottled light and dark, iron spots
+    saltGlaze: [512, 0.6, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float op = vnoise(uv * 160., 160., 1.), op2 = vnoise(uv * 320., 320., 2.), n1 = fbm(uv, 3., 3.), n2 = fbm(uv, 8., 4.);
+  vec3 sp = voro(uv, 140., 5.); float spot = smoothstep(.16, .04, sp.x) * step(.86, sp.z);
+  h = .5 + (op - .5) * .22 + (op2 - .5) * .08;
+  vec3 c = mix(vec3(.32, .19, .1), vec3(.5, .32, .17), smoothstep(.25, .8, n1 * .8 + n2 * .2)) * (.97 + (op - .5) * .06);
+  c = mix(c, vec3(.16, .09, .05), spot * .6);
+  col = S(c); rough = .3 + (op - .5) * .08 + (1. - n1) * .1; metal = 0.;
+}`],
+    // a heart's flesh in its own colours: the grain of the muscle, veins over it, fat in places; wet
+    flesh: [512, 0.6, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float fib = vnA(vec2(uv.x * 90., uv.y * 9.), vec2(90., 9.), 1.), n1 = fbm(uv, 4., 2.), n2 = fbm(uv, 16., 3.);
+  float vein = smoothstep(.9, .97, ridge(uv + (vec2(fbm(uv, 4., 7.), fbm(uv, 4., 8.)) - .5) * .2, 4., 6.));
+  float fat = smoothstep(.62, .8, fbm(uv, 3., 9.));
+  h = .5 + (fib - .5) * .06 + (n2 - .5) * .14 + vein * .1 + fat * .08;
+  vec3 c = mix(vec3(.26, .06, .06), vec3(.38, .1, .09), n1) * (.94 + fib * .1);
+  c = mix(c, vec3(.18, .05, .09), vein * .7); c = mix(c, vec3(.56, .46, .28), fat * .6);
+  col = S(c); rough = .3 + (n2 - .5) * .2 + fat * .2; metal = 0.;
+}`],
+    // an apple's skin, gold ripening to russet, in its own colours: streaks from the stalk, pale lenticels, rough russet patches
+    appleSkin: [256, 0.4, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 3., 1.), n2 = fbm(uv, 12., 2.);
+  vec3 lv = voro(uv, 40., 3.); float len = smoothstep(.14, .05, lv.x) * step(.5, lv.z);
+  float rus = smoothstep(.55, .8, fbm(uv, 5., 4.) + (n2 - .5) * .3), str = vnA(vec2(uv.x * 30., uv.y * 3.), vec2(30., 3.), 5.);
+  vec3 c = mix(vec3(.56, .38, .12), vec3(.68, .5, .18), n1 * .6 + str * .4);
+  c = mix(c, vec3(.46, .3, .14), rus * .7); c = mix(c, vec3(.84, .74, .48), len * .6);
+  h = .5 + (n2 - .5) * .1 - len * .1 + rus * .06;
+  col = S(c); rough = mix(.38, .78, rus) + (n2 - .5) * .1; metal = 0.;
+}`],
   };
   const isurfC = {};
   X.itemTex = function (name) {
     if (isurfC[name] !== undefined) return isurfC[name];
     const src = ISURF[name], renderer = G.renderer; if (!src || !renderer) return null;
     isurfC[name] = null;
+    const t0 = performance.now();
     try { const rts = X.bake(renderer, src[0], src[2], { normal: src[1], ao: 2 }); isurfC[name] = { map: rts[0].texture, normalMap: rts[1].texture, orm: rts[2].texture }; } catch (e) { console.warn('gfx: no item surface', name, e); }
+    const ms = Math.round(performance.now() - t0); X.stats.surf += ms; (X.stats.item = X.stats.item || {})[name] = ms;
     return isurfC[name];
   };
   // a strip of cloth along a line: at each of n+1 steps s (0..1) its middle c(s), the way across it a(s) (unit), its half width
@@ -2899,14 +2963,17 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       gq('cork', corkG(0.0049, 0.046, 0.008)), gq('wax', waxG(0.0072, 0.0465, 0.008, 0.004)),
       gq('cord', wire([[0.019, 0.028, 0], [0.022, 0.036, 0.003], [0.014, 0.05, 0.005], [0, 0.056, 0.005], [-0.014, 0.05, 0.005], [-0.022, 0.036, 0.003], [-0.019, 0.028, 0]], 0.0011, 4, 20))];
   };
-  // a flask of stoneware: brown salt glaze dipped over its shoulder and run unevenly towards the foot, the clay bare below; a cord about
-  // its neck, a cork
+  // a flask of stoneware: brown salt glaze over it, mottled, its foot left bare (the clay shows where the glaze stops, unevenly); a
+  // darker slip dipped over its neck and shoulder that has run down in drips; a cord about its neck, a cork
   ITEM.stoneware = () => {
-    const P = [[0.0005, -0.055], [0.022, -0.055], [0.0275, -0.052], [0.031, -0.043], [0.0325, -0.028], [0.031, -0.006], [0.026, 0.014], [0.0165, 0.029], [0.0095, 0.035], [0.0088, 0.05], [0.0108, 0.0525], [0.011, 0.057], [0.0078, 0.058]];
-    const clay = Geo.lathe(P, 22), glz = Geo.lathe(P.filter((p) => p[1] > -0.046).map((p) => [p[0] + 0.0004, p[1]]), 22), gp = glz.attributes.position;
+    const P = [[0.0005, -0.055], [0.022, -0.055], [0.024, -0.0535], [0.0242, -0.051], [0.0275, -0.05], [0.031, -0.043], [0.0325, -0.028], [0.031, -0.006], [0.026, 0.014], [0.0165, 0.029], [0.0095, 0.035], [0.0088, 0.05], [0.0108, 0.0525], [0.011, 0.057], [0.0078, 0.058]];
+    const clay = Geo.lathe(P, 24), glz = Geo.lathe(P.filter((p) => p[1] > -0.046).map((p) => [p[0] + 0.0004, p[1]]), 24), gp = glz.attributes.position;
     for (let i = 0; i < gp.count; i++) { const x = gp.getX(i), z = gp.getZ(i), y = gp.getY(i); if (y < -0.04) { const a = Math.atan2(z, x); gp.setY(i, y + 0.004 + 0.004 * Math.sin(a * 3 + 1) + 0.003 * Math.sin(a * 7) - 0.006 * Math.max(0, Math.sin(a * 5 + 2)) * Math.max(0, Math.sin(a * 2))); } }
     glz.computeVertexNormals();
-    return [gq('clay', clay), gq('glaze', glz), gq('cork', corkG(0.0074, 0.054, 0.009)), gq('cord', tieG(0.0094, 0.042, 0.02))];
+    const top = P.filter((p) => p[1] > -0.012), dip = Geo.lathe(top.map((p) => [p[0] + 0.0008, p[1]]), 40), dp = dip.attributes.position;
+    for (let i = 0; i < dp.count; i++) { const x = dp.getX(i), z = dp.getZ(i), y = dp.getY(i); if (y < 0) { const a = Math.atan2(z, x), drip = Math.pow(Math.max(0, Math.sin(a * 6 + 0.7)), 6) * 0.022 + Math.pow(Math.max(0, Math.sin(a * 11 + 2.1)), 8) * 0.012; dp.setY(i, y + 0.006 * Math.sin(a * 4) - drip); const r = Math.hypot(x, z), rr = r - Math.max(0, -dp.getY(i) - 0.012) * 0.12; dp.setX(i, x / r * rr); dp.setZ(i, z / r * rr); } }
+    dip.computeVertexNormals();
+    return [gq('clay', clay), gq('glaze', glz), gq('glazeDk', dip), gq('cork', corkG(0.0074, 0.054, 0.009)), gq('cord', tieG(0.0094, 0.042, 0.02))];
   };
   // a bottle of brown glass with flat sides, ribbed at its edges as a poison bottle is, a label on its face, a cork
   ITEM.tonic = () => {
@@ -2931,21 +2998,82 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   ITEM.sleeveArm = () => [gq('sleeve', ringTube(-0.004, 0.34, 12, 18, (z, a) => (0.033 + 0.012 * Math.min(1, z / 0.25)) * (1 + 0.06 * Math.sin(a * 4 + z * 50) * Math.min(1, z * 12) + 0.03 * Math.sin(a * 7 - z * 80)) * (0.92 + 0.08 * Math.abs(Math.cos(a))) + (z < 0.03 ? 0.004 * Math.sin(Math.PI * Math.max(0, z) / 0.03) : 0), 6, 16))];
   // which vessel each draught comes in (the rest: the phial)
   X.VESSEL = { h_elixir: 'phial', h_water: 'ampulla', h_ambrosia: 'stoneware', u_iron: 'tonic', u_invis: 'vial', h_fairy: 'fairy' };
-  // an apple with its stalk and a leaf; a heart cut out of something large; a sprig of herbs tied with thread
-  ITEM.apple = () => [gq('gold', new THREE.LatheGeometry(spl([[0.0005, 0.028], [0.012, 0.036], [0.034, 0.034], [0.046, 0.008], [0.04, -0.026], [0.022, -0.04], [0.008, -0.036], [0.0005, -0.03]], 18), 16)),
-    gq('wood', tubeR([[0, 0.03, 0], [0.003, 0.046, 0], [0.01, 0.058, 0]], 0.0025, 4, 4)), gq('green', Geo.xf(sheet(-0.035, 0, (v) => 0.014 * Math.sin(Math.PI * (0.1 + 0.9 * v)), (x) => -x * x * 12, 4, 2, 0), [0.012, 0.05, 0], [0.4, 0.3, -1.9]))];
-  ITEM.heart = () => {
-    const g = new THREE.SphereGeometry(0.05, 16, 12), ps = g.attributes.position; for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), k = 1 + 0.07 * Math.sin(x * 60 + y * 30) + (y < 0 ? y * 4 : 0) * 0.5; ps.setXYZ(i, x * k + (y > 0.01 ? Math.sign(x) * 0.008 : 0), y * 1.2, z * k * 0.86); } g.computeVertexNormals();
-    return [gq('heart', [g, tubeR([[0.012, 0.045, 0], [0.018, 0.07, 0.004], [0.03, 0.082, 0.004]], 0.009, 5, 5), tubeR([[-0.012, 0.045, 0], [-0.016, 0.072, -0.004]], 0.007, 5, false)])];
+  // ---- the golden apple: an apple ripened to gold and russet (its skin: appleSkin), its shoulders a little uneven, the hollow of its
+  // stalk and its eye with the dry sepals in it, a woody stalk, one leaf with its midrib ----
+  ITEM.apple = () => {
+    const g = new THREE.LatheGeometry(spl([[0.0005, -0.033], [0.006, -0.0345], [0.013, -0.037], [0.024, -0.034], [0.036, -0.022], [0.043, -0.004], [0.044, 0.01], [0.04, 0.024], [0.03, 0.033], [0.016, 0.034], [0.007, 0.028], [0.0005, 0.024]], 26), 28), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), a = Math.atan2(z, x), k = 1 + 0.035 * Math.sin(a * 5 + 0.4) * Math.max(0, -y / 0.03) + 0.02 * Math.sin(a * 3 + 1.3) * Math.max(0, y / 0.03) + 0.01 * Math.sin(a * 2); ps.setX(i, x * k); ps.setZ(i, z * k); }
+    g.computeVertexNormals();
+    const sep = []; for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; sep.push(wire([[Math.cos(a) * 0.0015, -0.0335, Math.sin(a) * 0.0015], [Math.cos(a) * 0.004, -0.0352, Math.sin(a) * 0.004], [Math.cos(a + 0.3) * 0.0062, -0.0345, Math.sin(a + 0.3) * 0.0062]], 0.0009, 3, 4)); }
+    const leaf = Geo.xf(sheet(-0.042, 0, (v) => 0.013 * Math.pow(Math.sin(Math.PI * (0.06 + 0.92 * v)), 0.8), (x, v) => -x * x * 16 + Math.sin(v * 7) * 0.0008, 7, 4, 0), [0.003, 0.043, 0.002], [0.5, 0.4, -2.0]);
+    return [gq('appleSkin', g), gq('stalk', [tubeR([[0, 0.025, 0], [0.0012, 0.036, 0.0005], [0.004, 0.047, 0.001]], (t) => 0.0018 - t * 0.0006, 5, 6)].concat(sep)), gq('leaf', leaf), gq('stalk', wire([[0.003, 0.043, 0.002], [0.016, 0.054, 0.012], [0.03, 0.06, 0.02]], 0.0006, 3, 6))];
   };
+  // ---- the troll's heart: too large for a man's, its apex turned aside; the ventricles' swell and the groove between them, the atria
+  // over them, the great vessels cut short (their bores dark), a coronary down its face (the fat lies in its flesh: the surface) ----
+  const heartAt = (dx, dy, dz) => {
+    const l = Math.hypot(dx, dy, dz) || 1, x = dx / l, y = dy / l, z = dz / l;
+    let r = 0.05 * (1 - 0.42 * Math.pow(Math.max(0, -y), 1.6)) * (1 + 0.06 * Math.max(0, x) * Math.max(0, -y + 0.3) + 0.05 * Math.max(0, z));
+    r -= 0.0035 * Math.exp(-Math.pow((x * 0.8 + z * 0.6 - 0.15 + y * 0.25) / 0.09, 2)) * Math.max(0, z + 0.3);
+    return [x * r - Math.max(0, -y) * 0.016 * (1 - y), y * r * 1.18, z * r * 0.88];
+  };
+  ITEM.heart = () => {
+    const g = new THREE.SphereGeometry(1, 30, 22), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const p = heartAt(ps.getX(i), ps.getY(i), ps.getZ(i)); ps.setXYZ(i, p[0], p[1], p[2]); }
+    g.computeVertexNormals();
+    const at = (u, v) => heartAt(Math.cos(u) * Math.cos(v), Math.sin(v), Math.sin(u) * Math.cos(v)), out = (p, k) => p.map((c) => c * k);
+    const cor = []; for (const [u0, u1, w] of [[1.25, 1.05, 0.0018], [1.9, 2.15, 0.0012]]) { const pts = []; for (let i = 0; i <= 6; i++) { const v = 0.7 - i * 0.25; pts.push(out(at(u0 + (u1 - u0) * i / 6, v), 1.012)); } cor.push(tubeR(pts, (t) => w - t * w * 0.6, 4, 14)); }
+    const fat = []; for (let i = 0; i < 9; i++) { const u = i * 0.73 + (i % 2) * 0.2, v = 0.52 + (i % 3) * 0.04, p = out(at(u, v), 0.982); const b = ball(0.0042 + (i % 3) * 0.0014, [0, 0, 0], [1.6, 0.28, 1.1]); const n = new THREE.Vector3(p[0], p[1] * 0.6, p[2]).normalize(); b.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n)); b.translate(p[0], p[1], p[2]); fat.push(b); }
+    const ves = [tubeR([[0.002, 0.045, 0.004], [0.003, 0.064, 0.005], [-0.005, 0.074, 0.0], [-0.014, 0.072, -0.008], [-0.019, 0.064, -0.012]], 0.0088, 10, 16), tubeR([[0.014, 0.04, 0.02], [0.016, 0.064, 0.026], [0.012, 0.076, 0.03]], 0.009, 10, 8), tubeR([[0.03, 0.03, -0.012], [0.034, 0.064, -0.014]], 0.0075, 8, 6), tubeR([[-0.026, 0.034, -0.026], [-0.03, 0.05, -0.036]], 0.0058, 8, 6)];
+    const bores = [[[-0.019, 0.064, -0.012], [-0.4, -0.7, -0.45], 0.007], [[0.012, 0.076, 0.03], [-0.25, 0.75, 0.3], 0.007], [[0.034, 0.064, -0.014], [0.1, 1, -0.05], 0.0056], [[-0.03, 0.05, -0.036], [-0.2, 0.75, -0.55], 0.0042]].map(([p, n, r]) => { const d = new THREE.CircleGeometry(r, 12), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(n[0], n[1], n[2]).normalize()); d.applyQuaternion(q); const nn = new THREE.Vector3(n[0], n[1], n[2]).normalize(); d.translate(p[0] + nn.x * 0.0004, p[1] + nn.y * 0.0004, p[2] + nn.z * 0.0004); return d; });
+    return [gq('flesh', [g]), gq('vessel', ves.concat(cor.slice(0, 1))), gq('lumen', bores)];
+  };
+  // ---- a plate of armour to slip into a vest: forged steel dished a little both ways, its top edge rolled over, its other edges
+  // turned, hammer marks over its face, a lining of leather riveted at its sides, the armourer's stamp ----
+  ITEM.plate = () => {
+    const W = 0.075, H = 0.09, bend = (x, y) => -2.4 * x * x - 1.2 * y * y, ham = (x, y) => 0.0006 * Math.sin(x * 260 + Math.sin(y * 190) * 2) * Math.sin(y * 230 + x * 70);
+    const face = sheet(-H, H, (v) => W * (0.92 + 0.08 * v) - Math.pow(Math.abs(v - 0.5) * 2, 6) * 0.006, (x, v) => { const y = -H + 2 * H * v; return bend(x, y) + ham(x, y); }, 12, 12, 0.004);
+    const edge = (y, k) => { const pts = []; for (let i = 0; i <= 12; i++) { const x = (i / 12 * 2 - 1) * W * (0.92 + 0.08 * k) * 0.99; pts.push([x, y, bend(x, y) - 0.0015]); } return tubeR(pts, 0.0036, 6, false); };
+    const side = (sx) => { const pts = []; for (let i = 0; i <= 10; i++) { const y = -H + 2 * H * i / 10, x = sx * (W * (0.92 + 0.08 * i / 10) - 0.001); pts.push([x, y, bend(x, y) - 0.001]); } return tubeR(pts, 0.0022, 5, false); };
+    const rv = []; for (const sx of [-1, 1]) for (const k of [-0.6, 0, 0.6]) { const y = k * H, x = sx * (W * (0.92 + 0.08 * (k + 1) / 2) - 0.007); rv.push(ball(0.0034, [x, y, bend(x, y) + 0.001], [1, 1, 0.55]), hl([[0.0005, 0], [0.0052, 0], [0.0052, 0.0008], [0.0005, 0.001]], 1, 1, 10).rotateX(HX).translate(x, y, bend(x, y) - 0.0005)); }
+    const lining = []; for (const sx of [-1, 1]) lining.push(sheet(-H * 0.94, H * 0.94, () => 0.006, (x, v) => { const y = -H + 2 * H * v, xx = sx * (W * (0.92 + 0.08 * v) - 0.004); return bend(xx, y) - 0.0045; }, 8, 1, 0.002).translate(sx * (W * 0.96 - 0.004), 0, 0));
+    const stamp = [new THREE.TorusGeometry(0.008, 0.0009, 4, 18).translate(0, H * 0.55, bend(0, H * 0.55) + 0.0004), rbx(0.0016, 0.009, 0.0008, 0.0003, 0, H * 0.55, bend(0, H * 0.55) + 0.0004)];
+    return [gq('plateSteel', [face, edge(H, 1), edge(-H, 0), side(-1), side(1)].concat(stamp)), gq('brassOld', rv), gq('leather', lining)];
+  };
+  // ---- the smith-god's hammer: a cross-peen hammer, its head forged and chamfered, the face a little domed and bright with use, the
+  // peen drawn to a rounded edge, a band of old gold let into it; the handle of ash through the eye, wedged, dark where it is held ----
+  ITEM.smithHammer = () => {
+    const head = [rbx(0.07, 0.036, 0.034, 0.005, 0, 0, 0), hl([[0.0005, -0.048], [0.0175, -0.048], [0.0195, -0.045], [0.0195, -0.034], [0.017, -0.03], [0.0005, -0.03]], 1, 1, 18).rotateZ(-HX).translate(0, 0, 0),
+      ext([[0.033, 0.018], [0.058, 0.009], [0.066, 0.004], [0.068, 0], [0.066, -0.004], [0.058, -0.009], [0.033, -0.018]], 0.034, 0.003)];
+    const face = hl([[0.0005, -0.0505], [0.0185, -0.0495], [0.0192, -0.048], [0.0005, -0.0478]], 1, 1, 18).rotateZ(-HX);
+    const band = [rbx(0.008, 0.0372, 0.0352, 0.0052, 0.012, 0, 0), rbx(0.008, 0.0372, 0.0352, 0.0052, -0.012, 0, 0)];
+    const handle = hl([[0.0005, -0.33], [0.0155, -0.33], [0.017, -0.31], [0.0165, -0.27], [0.0135, -0.2], [0.0122, -0.1], [0.0128, -0.03], [0.0118, 0.02], [0.0005, 0.02]], 0.72, 1, 14).rotateY(HX);
+    return [gq('forged', head), gq('steel', face), gq('goldOld', band), gq('wood', [handle, rbx(0.004, 0.003, 0.02, 0.001, 0, 0.0195, 0)]), gq('steel', rbx(0.0016, 0.004, 0.022, 0.0006, 0.004, 0.0205, 0))];
+  };
+  // ---- the master's repair kit: a roll of oiled leather laid open, its pockets holding an awl, a pair of pliers, a needle and a spool
+  // of waxed thread, a small hammer; the rest of it still rolled up at one end, its tie hanging ----
+  ITEM.toolRoll = () => {
+    const L = 0.2, D = 0.11, R = 0.016, x0 = L / 2 - 0.035;
+    // (the sheet flat on the ground along x, its far end rolled up round z, getting tighter)
+    const sheetL = strip(18, 6, (s) => { const d = -L / 2 + s * (L + 0.06); if (d <= x0) return [d, 0.0012 * Math.sin(s * 9), 0]; const ph = (d - x0) / R, r = R * (1 - 0.1 * ph / 6.3); return [x0 + Math.sin(ph) * r, R - Math.cos(ph) * r, 0]; }, () => [0, 0, 1], () => D / 2, 18);
+    const flap = rbx(x0 + L / 2 - 0.01, 0.003, 0.04, 0.0012, (x0 - L / 2) / 2, 0.0028, D / 2 - 0.022);
+    const seams = [-0.06, -0.025, 0.01].map((x) => rbx(0.0012, 0.0036, 0.038, 0.0004, x, 0.003, D / 2 - 0.022));
+    const lay = (g, x, z) => g.rotateX(HX).translate(x, 0.0075, z);   // (a tool drawn up y, laid across the roll in its pocket)
+    const awlW = lay(hl([[0.0005, -0.04], [0.006, -0.04], [0.0075, -0.03], [0.0072, -0.01], [0.0055, 0], [0.0005, 0]], 1, 1, 10), -0.078, 0.012);
+    const awlS = [lay(prism(0.0011, 0.04, [0, 0.02, 0], null, 5), -0.078, 0.012), lay(spike(0.0011, 0.006, [0, 0.043, 0], null, 4), -0.078, 0.012)];
+    const jaw = (sz) => ext([[-0.002, -0.032], [0.002, -0.032], [0.0028, 0.008], [0.0012, 0.03], [-0.0012, 0.03], [-0.0028, 0.008]], 0.004, 0.0006).rotateZ(sz * 0.1).translate(sz * 0.0026, 0, 0);
+    const pliers = [jaw(1), jaw(-1), prism(0.003, 0.008, [0, 0.006, 0], [HX, 0, 0], 8)].map((g) => g.rotateX(-HX).rotateY(HX).rotateX(HX).translate(-0.042, 0.0065, 0.008));
+    const mhH = lay(hl([[0.0005, -0.055], [0.0042, -0.055], [0.0036, 0], [0.0005, 0]], 0.8, 1, 8), -0.008, 0.02), mhHead = rbx(0.01, 0.01, 0.026, 0.002, -0.008, 0.0075, -0.012);
+    const spool = hl([[0.0005, -0.009], [0.009, -0.009], [0.009, -0.0075], [0.0062, -0.0068], [0.0062, 0.0068], [0.009, 0.0075], [0.009, 0.009], [0.0005, 0.009]], 1, 1, 14).rotateX(HX).translate(0.04, 0.0105, -0.01);
+    const thread = [hl([[0.0062, -0.0066], [0.0078, -0.006], [0.008, 0.006], [0.0062, 0.0066]], 1, 1, 14).rotateX(HX).translate(0.04, 0.0105, -0.01), wire([[0.048, 0.006, -0.01], [0.058, 0.002, 0.004], [0.052, 0.0016, 0.02], [0.066, 0.0016, 0.03]], 0.0006, 3, 10)];
+    const needle = prism(0.0004, 0.034, [0.03, 0.002, 0.03], [HX, 0, 0.3], 4);
+    const tie = strip(8, 1, (s) => [x0 + 0.004 + s * 0.03, 0.002 + Math.max(0, 0.02 - s * 0.06), -0.012 - s * 0.034 + Math.sin(s * 5) * 0.004], () => [0, 0, 1], () => 0.004, 18);
+    return [gq('leather', [sheetL, tie]), gq('leatherDk', [flap].concat(seams)), gq('wood', [awlW, mhH]), gq('steel', awlS.concat(pliers, [mhHead, needle])),
+      gq('cord', [spool].concat(thread)), gq('brassOld', [-0.065, -0.03, 0.005].map((x) => ball(0.0026, [x, 0.0045, D / 2 - 0.004], [1, 0.5, 1])))];
+  };
+  // a sprig of herbs tied with thread
   ITEM.herb = () => {
     const lf = []; for (let i = 0; i < 7; i++) lf.push(Geo.xf(sheet(-0.09 + (i % 3) * 0.012, 0, (v) => 0.0035 + 0.012 * Math.pow(Math.sin(Math.PI * (1 - v) * 0.92), 0.7), (x) => -x * x * 14, 5, 2, 0), [(i - 3) * 0.006, 0.01, 0], [Math.PI + (i % 2 ? 0.25 : -0.2), i * 0.9, (i - 3) * 0.2]));
     return [gq('green', lf), gq('cord', [new THREE.TorusGeometry(0.011, 0.0025, 4, 10).rotateX(HX).translate(0, 0.0, 0), prism(0.004, 0.05, [0, -0.02, 0], null, 5)])];
-  };
-  // a plate of armour to slip in: bent, rimmed, riveted
-  ITEM.plate = () => {
-    const bend = (x) => -2.2 * x * x, rv = []; for (const sx of [-1, 1]) for (const sy of [-1, 0, 1]) rv.push(ball(0.004, [sx * 0.058, sy * 0.062, bend(0.058) + 0.006], [1, 1, 0.5]));
-    return [gq('plate', sheet(-0.08, 0.08, (v) => 0.07 - Math.pow(Math.abs(v - 0.5) * 2, 4) * 0.012, bend, 8, 8, 0.008)), gq('steel', [sheet(0.066, 0.08, () => 0.066, (x) => bend(x) + 0.003, 1, 8, 0.004), sheet(-0.08, -0.066, () => 0.062, (x) => bend(x) + 0.003, 1, 8, 0.004)].concat(rv))];
   };
   // the small gear: a map with curling edges, a scroll, a quill feather, an hourglass, a case of cartridges, a hand lantern, a whetstone, a box
   ITEM.u_map = () => [gq('paper', sheet(-0.06, 0.06, () => 0.08, (x, v, u) => Math.pow(Math.abs(u), 3) * 0.02 + Math.sin(v * 6) * 0.003, 6, 8, 0)), gq('gun', [rbx(0.05, 0.002, 0.002, 0.0005, -0.02, 0.02, 0.002, [0, 0, 0.5]), rbx(0.04, 0.002, 0.002, 0.0005, 0.02, -0.01, 0.002, [0, 0, -0.7]), new THREE.TorusGeometry(0.008, 0.0012, 3, 10).translate(0.03, 0.022, 0.002)])];

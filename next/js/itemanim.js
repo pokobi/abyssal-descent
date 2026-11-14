@@ -52,11 +52,20 @@
       glassBrown: mk({ color: 0x3a200c, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.6, depthWrite: false }),
       rubber: mk({ color: 0x1e1b18, roughness: 0.75 }), ink: mk({ color: 0x14110e, roughness: 0.6 }), dark: mk({ color: 0x0c0a08, roughness: 1 }),
       // stoneware glazed and bare, cork, sealing wax, string
-      glaze: mk(Object.assign({ color: 0x5a3820, roughness: 0.34, metalness: 0 }, poly ? { map: poly.map, normalMap: poly.normalMap, normalScale: new THREE.Vector2(0.35, 0.35) } : {})),   // (salt glaze: mottled, its skin like orange peel)
-      clay: mk(Object.assign({ color: 0x8c6c4e, roughness: 1 }, sf(rock))),
+      glaze: mk(Object.assign({ color: 0xffffff, roughness: 1, metalness: 0 }, sf(it('saltGlaze')))),   // (salt glaze: mottled, its skin like orange peel)
+      glazeDk: mk(Object.assign({ color: 0x2c1a10, roughness: 0.26, metalness: 0 }, poly ? { normalMap: poly.normalMap, normalScale: new THREE.Vector2(0.3, 0.3) } : {})),
+      clay: mk(Object.assign({ color: 0xa4856a, roughness: 1 }, sf(rock))),
       cork: mk(Object.assign({ color: 0x8e6c48, roughness: 1 }, sf(hide))),
       wax: mk({ color: 0x40120e, roughness: 0.55 }),
       cord: mk(Object.assign({ color: 0x7a6a4a, roughness: 1 }, sf(weave))),
+      // the golden apple's skin, stalk and leaf; the troll's heart - its flesh, its vessels, their bores, the fat on it
+      appleSkin: mk(Object.assign({ color: 0xffffff, roughness: 1 }, sf(it('appleSkin')))), stalk: mk(Object.assign({ color: 0x3e2a1a, roughness: 1 }, sf(hide))),
+      leaf: mk({ color: 0x4a5430, roughness: 0.7, side: THREE.DoubleSide }),
+      flesh: mk(Object.assign({ color: 0xe0d0d0, roughness: 1.3 }, sf(it('flesh')))), vessel: mk({ color: 0x3a1018, roughness: 0.34 }), fat: mk({ color: 0x6a5a3a, roughness: 0.5 }), lumen: mk({ color: 0x160606, roughness: 0.6 }),
+      // forged steel and iron, old gold, a darker leather (the plate, the hammer, the tool roll)
+      plateSteel: mk(Object.assign({ color: 0x86888a, metalness: 0.85, roughness: 0.8 }, sf(steelT))),
+      forged: mk(Object.assign({ color: 0x6a6c68, roughness: 1 }, (() => { const t = it('castIron'); return t ? Object.assign(sf(t), { metalnessMap: t.orm, metalness: 1 }) : {}; })())),
+      goldOld: mk(Object.assign({ color: 0x8e7238, metalness: 0.85, roughness: 0.6 }, sf(steelT))), leatherDk: mk(Object.assign({ color: 0x2e1e14, roughness: 1, side: THREE.DoubleSide }, sf(hide))),
       // (the rest, as they were)
       cloth: mk({ color: 0xf0ece0, roughness: 0.95 }),
       gold: mk({ color: 0xb08a3a, metalness: 0.9, roughness: 0.32 }), stone: mk({ color: 0x5a5a58, roughness: 1 }),
@@ -195,6 +204,32 @@
   IA.hand = (p, right) => { mats(); return hand(p, right); };
   // one of gfx.js's item shapes, made of these materials (to show a thing as it lies, apart from its use)
   IA.shape = (name, id) => { mats(); const g = new THREE.Group(); putG(g, name, id); return g; };
+  // an item as it is shown in the world - on a shop's stand, lying on the ground - rather than in the hand: its own shape (the kit and
+  // the tools have shapes of their own here), grown from its true size by k (between min and max across) or fitted to fit across, its
+  // middle at the origin; lie: laid down on its side if it stands taller than it is wide, its foot at y = 0. null for what has none
+  const SHOWN = { h_medkit: 'kit', u_hammer: 'smithHammer', u_repair: 'toolRoll' };
+  IA.display = function (id, o) {
+    mats(); o = o || {};
+    const it = G.ITEM_BY_ID[id]; if (!it) return null;
+    let m = null;
+    try {
+      if (it.cat === 'grenade') m = G.GrenFX ? G.GrenFX.build(id, 0.42) : null;
+      else if (SHOWN[id]) { m = new THREE.Group(); if (!putG(m, SHOWN[id], id)) m = null; }
+      else { const k = LOOK[id] || IA.kindOf(id); if (k !== 'device') m = buildItem(k, id); }
+    } catch (e) { m = null; }
+    if (!m) return null;
+    const wrap = new THREE.Group(), inner = new THREE.Group(); wrap.add(inner); inner.add(m);
+    const box = new THREE.Box3().setFromObject(m), sz = box.getSize(new V3()), L = Math.max(sz.x, sz.y, sz.z) || 0.1;
+    m.position.sub(box.getCenter(new V3()));
+    const s = o.fit ? o.fit / L : Math.min(o.max || 9, Math.max(o.min || 0, L * (o.k || 1))) / L; inner.scale.setScalar(s);
+    if (o.lie) {
+      if (sz.y > Math.max(sz.x, sz.z) * 1.15) inner.rotation.z = Math.PI / 2;
+      inner.rotation.y = o.yaw || 0; wrap.updateMatrixWorld(true);
+      const b2 = new THREE.Box3().setFromObject(inner); inner.position.y -= b2.min.y;
+    }
+    wrap.traverse((q) => { if (q.isMesh) { q.castShadow = true; q.frustumCulled = true; } });
+    return wrap;
+  };
   // every item's model once, and the arms they are used with (warmup.js: their shapes and surfaces made behind the loading screen)
   IA.warm = function (p) {
     mats();

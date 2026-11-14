@@ -538,10 +538,14 @@
     // deep water (the drowned town, w.deepWater): hold jump and you swim up to the surface, chest out of the water, and at the top you hop
     // up out of it (held, you bob: up, a hop, back into the water, a hop... ). Moving at a wall's top while you hold jump, you climb onto
     // it (tryMantle). Let go and you sink back, slowly.
+    // Water with no bed under it (d.open, the frozen lake): going in through its face throws up a splash with its sound (in the drowned
+    // town the landing on the bed does that).
     swim(dt) {
       const w = G.world; this.swimming = false;
+      const py = this._swY; this._swY = this.pos.y;
       if (!w || !w.deepWater || this.pileState || this.grapple.state === 'attached' || this.liftVy != null || this.mantle) return;
       const d = w.deepWater.find((q) => this.pos.x > q.x0 && this.pos.x < q.x1 && this.pos.z > q.z0 && this.pos.z < q.z1);
+      if (d && d.open && py !== undefined && py > d.y && this.pos.y <= d.y && this.vel.y < -3.5 && G.Water) G.Water.splash(V(this.pos.x, d.y, this.pos.z), Math.min(1.2, 0.2 - this.vel.y * 0.08), { silent: false }); // (not the fall back from a hop at the face)
       if (!d || this.pos.y > d.y - 0.3) return;
       this.swimming = true;
       const top = d.y - G.SWIM_FLOAT;
@@ -575,7 +579,9 @@
       this.speedH = Math.hypot(this.vel.x, this.vel.z);
       // hazards / surfaces
       this.inWater = false;
-      for (const z of w.waterZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < 0.2) this.inWater = true;
+      // (a pool's own face, z.y: the frozen lake's water lies 1.2 m under the ice; and the deep water under a lid of ice is water too)
+      for (const z of w.waterZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2) this.inWater = true;
+      if (!this.inWater && w.deepWater) for (const d of w.deepWater) if (this.pos.x > d.x0 && this.pos.x < d.x1 && this.pos.z > d.z0 && this.pos.z < d.z1 && this.pos.y < d.y + 0.2) this.inWater = true;
       if (this.grounded && !G.Strata.onRope) for (const z of w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
         this._lavaT = (this._lavaT || 0) - dt;
         if (this._lavaT <= 0) { this._lavaT = 0.4; G.combat.damagePlayer(5 + G.game.area * 0.6, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }

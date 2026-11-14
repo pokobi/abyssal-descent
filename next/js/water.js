@@ -30,6 +30,9 @@
     Wt.flooded = !!(w && w.biome === 'flooded');
     uwReset(); // (a new place: whatever was under the water before is gone, its fog with it)
     if (w && w.mats && w.mats.water) w.mats.water.visible = true;
+    // (water under a roof - the frozen hall's lake, w.waterRoofed - mirrors the dark vault over it: the room's light-map, whose warm band
+    // reads as an evening sky in a glancing look over the water, is all but taken off it there)
+    if (w && w.mats && w.mats.water) w.mats.water.envMapIntensity = w.waterRoofed ? 0.06 : 1;
     // the surface seen from below on low quality: a dim shifting sheet over your head (the water's own plane is drawn from above only;
     // with the frame passes, post.js draws it); and the specks that drift in the water
     if (w && w.deepWater) {
@@ -108,12 +111,24 @@
   // (The frame's part is in post.js, given what it needs here as G.Post.water. Every sound muffled: audio.js A.underwater.)
   const UW = { mode: 0, saved: null, el: null, bubT: 0, mudT: 0, since: 9, drops: 0, dive: 0, sheets: [], motes: null, wasUnder: false };
   const UW_FOG = new THREE.Color('#0b241f'), UW_TMP = new THREE.Color(), UW_SD = new THREE.Vector3();
-  const UW_P = { mode: 0, e: 0, sy: 0, dens: 0.3, lk: 0.5, col: new THREE.Color(), light: new THREE.Color(), air: new THREE.Color(), sdir: new THREE.Vector3(0, -1, 0), drops: 0, since: 9, dive: 0 };
+  const UW_P = { mode: 0, e: 0, sy: 0, dens: 0.3, lk: 0.5, col: new THREE.Color(), light: new THREE.Color(), air: new THREE.Color(), sdir: new THREE.Vector3(0, -1, 0), drops: 0, since: 9, dive: 0, lid: 0, open: new THREE.Vector4() };
   const surfAt = (d) => d.y + 0.01;   // (the face of the deep water)
-  // the deep water the eyes are over or in, and how high over its surface they are
+  // the deep water the eyes are over or in, and how high over its surface they are. open: water with a lid of ice over it (d.lid, the
+  // frozen lake) is open to the light only in its holes (the pools of w.waterZones marked lake): the one the eyes are under, or the
+  // nearest within 6 m (x0, z0, x1, z1), or none (an empty box): only through that one is the light overhead drawn (post.js)
+  const NONE = { x0: 1e6, z0: 1e6, x1: 1e6, z1: 1e6 };
+  function openOver(c) {
+    let best = NONE, bd = 6;
+    for (const z of Wt.zones) {
+      if (!z.lake) continue;
+      const dx = Math.max(z.x0 - c.x, 0, c.x - z.x1), dz = Math.max(z.z0 - c.z, 0, c.z - z.z1), dd = Math.hypot(dx, dz);
+      if (dd < bd) { bd = dd; best = z; }
+    }
+    return best;
+  }
   Wt.camWater = function () {
     const w = G.world, c = G.camera && G.camera.position; if (!w || !w.deepWater || !c) return null;
-    for (const d of w.deepWater) if (c.x > d.x0 && c.x < d.x1 && c.z > d.z0 && c.z < d.z1 && c.y < d.y + 2) return { d, e: c.y - surfAt(d) };
+    for (const d of w.deepWater) if (c.x > d.x0 && c.x < d.x1 && c.z > d.z0 && c.z < d.z1 && c.y < d.y + 2) return { d, e: c.y - surfAt(d), open: d.lid ? openOver(c) : null };
     return null;
   };
   Wt.camUnder = function () { const q = Wt.camWater(); return q && q.e < -0.04 ? q.d : null; };
@@ -205,6 +220,8 @@
       P.dens = 0.3 + depth * 0.05; P.lk = 0.6; P.mode = mode; P.e = q ? q.e : 1; P.sy = sy;
       if (L && L.moon) { UW_SD.copy(L.moon.target.position).sub(L.moon.position).normalize(); if (UW_SD.y > -0.3) UW_SD.set(0, -1, 0); P.sdir.copy(UW_SD); }
       P.drops = UW.drops; P.since = UW.since; P.dive = UW.dive;
+      // (a lid of ice over it: the hole the light comes through, post.js)
+      const o = q && q.open; P.lid = o ? 1 : 0; if (o) P.open.set(o.x0, o.z0, o.x1, o.z1);
       if (G.Post) G.Post.water = P;
       if (mode === 2) { sc.fog.color.copy(P.col); sc.fog.density = P.dens; G.fx.setFog(sc.fog.color, sc.fog.density); }
     } else if (G.Post) G.Post.water = null;

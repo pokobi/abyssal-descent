@@ -89,10 +89,13 @@ float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx +
 // ---- under the water (water.js sets Post.water each frame). uWat: mode (1: the eyes at the surface - a line across the screen, the
 // water below it; 2: under), the eyes' height over the surface (m, < 0 under), detail (1 medium, 2 high), sway. uWatT: time, drops
 // left on the eyes after coming up (0..1), the time since going in or coming out, the burst of bubbles of going in (0..1). uWatD: the
-// water's thickness (as the scene's fog: exp2), the surface's height, how much light comes down through it, how dark it is deep down
-uniform vec4 uWat; uniform vec4 uWatT; uniform vec4 uWatD; uniform vec3 uWatC; uniform vec3 uWatL; uniform vec3 uWatA; uniform vec3 uWatS;
+// water's thickness (as the scene's fog: exp2), the surface's height, how much light comes down through it, a lid of ice over it (1:
+// the frozen lake). uWatO: under a lid, the hole the light comes through (x0, z0, x1, z1 on the surface; an empty box: none near)
+uniform vec4 uWat; uniform vec4 uWatT; uniform vec4 uWatD; uniform vec3 uWatC; uniform vec3 uWatL; uniform vec3 uWatA; uniform vec3 uWatS; uniform vec4 uWatO;
 uniform mat4 uCamW; uniform vec3 uCamP; uniform mat4 uVP; uniform sampler2D tCaus;
 float wFog(float z){ float f = uWatD.x * z; return 1. - exp(-f * f); }
+// is the surface over this point open to the air (1), or under the ice (0)? Without a lid, open everywhere
+float wOpen(vec2 p){ if (uWatD.w < .5) return 1.; vec2 q = min(p - uWatO.xy, uWatO.zw - p); return smoothstep(-.04, .12, min(q.x, q.y)); }
 // the web of light thrown on what lies under rippling water: the bright edges of a cellular pattern, bent by a slow noise, two of them
 // drifting across each other (tCaus: r the edges, g and b smooth noise; baked once, post.js bakeCaus)
 float wCaus(vec2 p, float t){
@@ -171,13 +174,16 @@ vec3 wView(vec2 uv, vec3 c){
     float rip = texture2D(tCaus, hp * .9 + g * .5 + vec2(t * .03, -t * .02)).b;   // (soft swells of brightness, not the web: that is on what is lit)
     vec3 winC = bent * (md > 1.5 ? .35 : .8) + mix(uWatL, uWatA * 3., .35) * (.6 + 1.6 * ct * ct) * (.75 + .5 * rip);
     vec3 tir = uWatC * (.42 + .28 * wCaus(hp * 1.3, t)) + uWatL * .05;
-    cu = mix(mix(tir, winC, win) + uWatL * rim * .35, uWatC, wFog(tS));
+    // (under the ice: no window and no mirror, the underside of the ice the whole way, a dull even light through it, a little uneven)
+    float op = wOpen(hp);
+    vec3 lidC = uWatC * (.95 + .3 * rip) + uWatL * .035 * (.7 + .6 * texture2D(tCaus, hp * .17).g);
+    cu = mix(mix(lidC, mix(tir, winC, win) + uWatL * rim * .35, op), uWatC, wFog(tS));
   } else {
     if (md < 1.5) cu = mix(cu, uWatC, fz);   // (at the surface the scene's fog is the air's: the water's laid on here)
     cu = mix(cu, uWatC, sky);
     // the web of light on what lies under the water, brighter the nearer the surface and the more it faces up
     float hb = sy - wp.y;
-    float k = uWatD.z * step(0., hb) * exp(-max(hb, 0.) * .45) * (1. - fz) * clamp(N.y * .75 + .3, 0., 1.) * (1. - sky);
+    float k = uWatD.z * step(0., hb) * exp(-max(hb, 0.) * .45) * (1. - fz) * clamp(N.y * .75 + .3, 0., 1.) * (1. - sky) * wOpen(wp.xz);
     cu *= 1. + (wCaus(wp.xz + uWatS.xz * max(hb, 0.) * .35, t) * 2. - .55) * k * 1.6;
     // (the light on it came down through the water too: the deeper it lies, the less red is left in it)
     cu *= exp(-vec3(.32, .07, .11) * clamp(hb, 0., 3.) * (1. - sky));
@@ -190,7 +196,7 @@ vec3 wView(vec2 uv, vec3 c){
     for (int i = 0; i < 6; i++) {
       float ti = (float(i) + j) / 6. * T; vec3 sp = uCamP + rd * ti; float h = sy - sp.y;
       vec2 sq = (sp.xz - uWatS.xz / max(-uWatS.y, .3) * max(h, 0.)) * .15 + vec2(t * .006, t * .004);   // (up along the light to the surface: the swell there makes the shaft)
-      sh += smoothstep(.45, .78, texture2D(tCaus, sq).b) * exp(-max(h, 0.) * .3) * exp(-ti * .25) * step(0., h);
+      sh += smoothstep(.45, .78, texture2D(tCaus, sq).b) * exp(-max(h, 0.) * .3) * exp(-ti * .25) * step(0., h) * wOpen(sp.xz - uWatS.xz / max(-uWatS.y, .3) * max(h, 0.));
     }
     cu += uWatL * sh / 6. * T * 1.1 * uWatD.z * (.5 + .5 * smoothstep(-.4, .6, rd.y));
   }
@@ -328,7 +334,7 @@ void main(){
     mPip = mk(PIP_FS, { tScene: T(), part: V2() });
     mFin = mk(FIN_FS, { tScene: T(), tGun: T(), gunOn: { value: 0 }, tAO: T(), tBloom: T(), time: { value: 0 }, aoAmt: { value: 1 }, bloomAmt: { value: 0.05 }, exposure: { value: 1 }, res: V2(), grade: { value: 1 }, tDepth: T(), reproj: M4(), mblur: { value: 0 }, cavAmt: { value: 0 }, airK: { value: 0 }, projInv: M4(),
       aL: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, aC: { value: Array.from({ length: 12 }, () => new THREE.Vector4(1, 1, 1, 10)) },
-      uWat: { value: new THREE.Vector4() }, uWatT: { value: new THREE.Vector4() }, uWatD: { value: new THREE.Vector4(0.3, 0, 0, 0) }, uWatC: { value: new THREE.Color() }, uWatL: { value: new THREE.Color() }, uWatA: { value: new THREE.Color() }, uWatS: { value: new THREE.Vector3(0, -1, 0) },
+      uWat: { value: new THREE.Vector4() }, uWatT: { value: new THREE.Vector4() }, uWatD: { value: new THREE.Vector4(0.3, 0, 0, 0) }, uWatC: { value: new THREE.Color() }, uWatL: { value: new THREE.Color() }, uWatA: { value: new THREE.Color() }, uWatS: { value: new THREE.Vector3(0, -1, 0) }, uWatO: { value: new THREE.Vector4() },
       uCamW: M4(), uCamP: { value: new THREE.Vector3() }, uVP: M4(), tCaus: T() });
     mCaus = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: CAUS_FS, depthTest: false, depthWrite: false });
   };
@@ -459,7 +465,7 @@ void main(){
       const tc = Post.caustics(); u.tCaus.value = tc;
       const q = G.save && G.save.data && G.save.data.settings, hi = q && q.quality === 'high';
       u.uWat.value.set(tc ? Wd.mode : 0, Wd.e, hi ? 2 : 1, q && q.bob === 0 ? 0 : 1);
-      u.uWatT.value.set(time % 600, Wd.drops, Wd.since, Wd.dive); u.uWatD.value.set(Wd.dens, Wd.sy, Wd.lk, 0);
+      u.uWatT.value.set(time % 600, Wd.drops, Wd.since, Wd.dive); u.uWatD.value.set(Wd.dens, Wd.sy, Wd.lk, Wd.lid || 0); if (Wd.open) u.uWatO.value.copy(Wd.open);
       u.uWatC.value.copy(Wd.col); u.uWatL.value.copy(Wd.light); u.uWatA.value.copy(Wd.air); u.uWatS.value.copy(Wd.sdir);
       u.uCamW.value.copy(camera.matrixWorld); u.uCamP.value.setFromMatrixPosition(camera.matrixWorld); u.projInv.value.copy(camera.projectionMatrixInverse);
       u.uVP.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);

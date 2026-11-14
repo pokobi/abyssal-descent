@@ -1654,6 +1654,7 @@
       } else this.swimUpT = 0;
       // vertical / ground
       this.vel.y -= 22 * dt;
+      if (deepQ && deepQ.open && this.vel.y < -E.SINK_OPEN) this.vel.y = -E.SINK_OPEN; // (water with no bed, the frozen lake: a body sinks through it, it does not fall)
       let ny = this.pos.y + this.vel.y * dt;
       // rising (a blow, a leap): the head stops under what is over it. Without this the wall test (pushOut) found the body's centre inside
       // the slab the head had entered and threw it sideways to the slab's edge: a tall foe struck in a low room, out through its wall
@@ -2108,6 +2109,7 @@
   // better place after a dive that could not reach you; how soon it tries again when it broke one off
   E.SWIM_RISE = 1.4; E.SWIM_KEEP = 0.5; // m/s: a foe rising up the deep water to climb out onto a ledge; s it keeps rising after it stops pressing
   E.SWIM_GIVEUP = 1.5; E.SWIM_SINK = 3; // s afloat at the surface, still not out, before it lets go and sinks; s it then stays down
+  E.SINK_OPEN = 5; // m/s: the fastest a foe sinks in water with no bed under it (the frozen lake)
   // ---- the air a flyer may be in, worked out once for each area's ground plan: over the floor you can walk to from where you came in (or
   // from where you stand), and a little beyond it: 2 m over a wall, a pillar or the rock beside it, 6 m out over the void beside it. A
   // flyer never moves out of it (physics, fly): not into the rock round a mine's tunnels, not over the wall round a field, not out over the

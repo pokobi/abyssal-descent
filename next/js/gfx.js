@@ -1387,25 +1387,107 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     mpart('blade', straight([[0.072, 0.018, 0.018, 0.0072], [0.2, 0.018, 0.018, 0.007], [0.262, 0.0105, 0.0105, 0.0052]], [0.30, 0])),
   ] });
   const slimHilt = () => hl([[0.0005, -0.055], [0.013, -0.055], [0.0155, -0.03], [0.014, 0], [0.0155, 0.03], [0.013, 0.055], [0.0005, 0.055]], 0.85, 1.12);
-  // the knife of ice: a crystal of a blade with a core, a crescent guard, three bands and a gem
-  MP.frostknife = () => ({ tipY: 0.335, parts: [
-    mpart('hilt', slimHilt()),
-    mpart('goldBr', [ringY(-0.03, 0.0158, 0.0032), ringY(0, 0.0152, 0.0032), ringY(0.03, 0.0158, 0.0032), side([[0.03, 0.074], [0.046, 0.094], [0.04, 0.098], [0.022, 0.082], [0.012, 0.072], [-0.012, 0.072], [-0.022, 0.082], [-0.04, 0.098], [-0.046, 0.094], [-0.03, 0.074], [-0.014, 0.056], [0.014, 0.056]], 0.022, 0.004)]),
-    mpart('gem', gemG(0.014, 0.022, 0.014, [0, -0.07, 0])),
-    mpart('blade', straight([[0.07, 0.016, 0.016, 0.0095], [0.115, 0.021, 0.021, 0.0095], [0.245, 0.0135, 0.0135, 0.0072]], [0.335, 0])),
-    mpart('gem', straight([[0.085, 0.0042, 0.0042, 0.0125], [0.24, 0.003, 0.003, 0.0095]], [0.285, 0])),
-  ] });
-  // one of the twin fangs: a waved blade with a vein of venom down it
+  // (an element is told by what the weapon is made of and what has happened to it, not by light: frost on blued steel, steel discoloured
+  // by heat and sooted, a stained fuller and green bronze, polished steel inlaid with gold, copper wire and driven studs. A weapon of
+  // higher rank is told from its plain kin by finer work - pierced iron, inlay, mounts of old gold - not by size or glow)
+  // the edge of a blade (front: its edge at +b; back: at -a for a two-edged one) as a band wf(y) wide, laid a hair proud of its faces:
+  // the bright bevel where it is sharpened, or the hardened edge of a sword of the east
+  const edgeBand = (rows, wf, back) => loft(rows.map((r) => { const a = r[1], b = r[2], T = r[3], tb = r[4] || 0, rk = r[6] === undefined ? (tb ? 0.3 : 0.5) : r[6], zr = -a + (a + b) * rk, w = Math.min(typeof wf === 'function' ? wf(r[0]) : wf, (back ? a + zr : b - zr) * 0.9), h = T / 2 * w / Math.max(0.002, back ? zr + a : b - zr) + 0.00024, e = back ? a : b; return { c: [r[0], r[5] || 0], n: [0, back ? 1 : -1], a: -(e - w), b: e, T: h * 2, tb: h * 2, rk: 0.02 }; }), null);
+  // hoarfrost: n small grains on the two faces (x = +-xr) between y0 and y1, thickest towards y0
+  const rimeOn = (n, y0, y1, xr, z0, z1, sd) => { const o = []; for (let i = 0; i < n; i++) { const f = Math.abs(Math.sin(i * 12.9898 + sd) * 43758.5453) % 1, f2 = Math.abs(Math.sin(i * 78.233 + sd * 3) * 12345.678) % 1, y = y0 + (y1 - y0) * Math.pow(f, 1.7), z = z0 + (z1 - z0) * f2, sx = i % 2 ? 1 : -1, s = 0.0009 + 0.0017 * (1 - (y - y0) / (y1 - y0)) * (0.5 + f2), q = new THREE.IcosahedronGeometry(s, 0); q.scale(0.35, 1.4, 1.3); q.translate(sx * xr, y, z); o.push(q); } return o; };
+  // copper wire wound round a bar of radius r about y, from y0 to y1, n turns
+  const helixY = (r, y0, y1, n, wr) => { const pts = []; for (let i = 0; i <= n * 10; i++) { const t = i / (n * 10), a = t * n * Math.PI * 2; pts.push([Math.cos(a) * r, y0 + (y1 - y0) * t, Math.sin(a) * r]); } return tubeR(pts, wr, 4, false); };
+  // a wheel pommel: a disc in the blade's plane (its axis across, x), at y, radius r, thickness t
+  const wheel = (y, r, t) => hl([[0.0005, -t / 2], [r * 0.66, -t / 2], [r * 0.92, -t / 2 + t * 0.12], [r, -t * 0.15], [r, t * 0.15], [r * 0.92, t / 2 - t * 0.12], [r * 0.66, t / 2], [0.0005, t / 2]], 1, 1, 28).rotateZ(HX).translate(0, y, 0);
+  // a cross-guard: a round bar along z at y, its quillons tapering and turned a little towards the blade, knobbed at their ends
+  const quillons = (y, L, r, up) => [tubeR([[0, y + up, -L], [0, y + up * 0.3, -L * 0.6], [0, y, 0], [0, y + up * 0.3, L * 0.6], [0, y + up, L]], (t) => r * (0.72 + 0.28 * Math.sin(Math.PI * t)), 7, 20), ball(r * 1.25, [0, y + up, -L], [1, 1, 1.15]), ball(r * 1.25, [0, y + up, L], [1, 1, 1.15])];
+  // the knife of ice: blued steel gone dark with cold, two edges ground bright, rime grown over its forte and its guard, splinters of
+  // ice frozen to the guard; a guard and pommel of iron, the grip bound in hide
+  MP.frostknife = () => {
+    const rows = [[0.07, 0.016, 0.016, 0.0072], [0.115, 0.019, 0.019, 0.0078], [0.245, 0.0135, 0.0135, 0.0066]];
+    return { tipY: 0.335, parts: [
+      mpart('leather', hl(wrapPts(-0.055, 0.052, 0.0146, 10), 0.86, 1.12)),
+      mpart('iron', [hl([[0.0005, -0.084], [0.011, -0.082], [0.0152, -0.072], [0.0118, -0.06], [0.0005, -0.057]]), ringY(-0.055, 0.0152, 0.0028), ringY(0.054, 0.0156, 0.003),
+        side([[0.036, 0.06], [0.041, 0.065], [0.038, 0.072], [-0.038, 0.072], [-0.041, 0.065], [-0.036, 0.06], [-0.012, 0.057], [0.012, 0.057]], 0.02, 0.003)]),
+      mpart('blued', straight(rows, [0.335, 0])),
+      mpart('blade', [edgeBand(rows, 0.0042, false), edgeBand(rows, 0.0042, true)]),
+      mpart('rime', rimeOn(70, 0.072, 0.16, 0.0034, -0.016, 0.016, 1).concat(rimeOn(20, 0.06, 0.074, 0.0105, -0.038, 0.038, 2), [spike(0.0024, 0.024, [0, 0.082, 0.03], [-0.35, 0, 0], 4), spike(0.0018, 0.018, [0, 0.08, -0.026], [0.4, 0, 0], 4), spike(0.0016, 0.014, [0.004, 0.077, 0.012], [-0.2, 0, 0.3], 4)])),
+    ] };
+  };
+  // one of the twin fangs: a waved blade of plain steel, its fuller stained dark with what is put in it, fittings of bronze gone green,
+  // the grip bound in black hide, a dark stone in the pommel
   MP.twin = () => {
     const wav = (t) => Math.sin(t * Math.PI * 3) * 0.006 * (1 - t), rows = [], core = [];
-    for (let i = 0; i <= 12; i++) { const t = i / 12; rows.push([0.078 + t * 0.2, 0.019 - t * 0.008, 0.019 - t * 0.008, 0.0075 - t * 0.002, 0, wav(t)]); core.push([0.085 + t * 0.17, 0.0036, 0.0036, 0.0118 - t * 0.003, 0, wav(t * 0.85)]); }
+    for (let i = 0; i <= 12; i++) { const t = i / 12; rows.push([0.078 + t * 0.2, 0.019 - t * 0.008, 0.019 - t * 0.008, 0.0075 - t * 0.002, 0, wav(t)]); core.push([0.085 + t * 0.17, 0.0034, 0.0034, 0.0079 - t * 0.002, 0, wav(t * 0.85)]); }
     return { tipY: 0.31, parts: [
-      mpart('hilt', slimHilt()),
-      mpart('gold', [ringY(-0.032, 0.0158, 0.003), ringY(0, 0.0152, 0.003), ringY(0.032, 0.0158, 0.003), rbx(0.024, 0.016, 0.04, 0.005, 0, 0.063, 0)]),
-      mpart('goldBr', side([[0.02, 0.066], [0.05, 0.088], [0.046, 0.094], [0.016, 0.078], [-0.016, 0.078], [-0.046, 0.094], [-0.05, 0.088], [-0.02, 0.066]], 0.016, 0.004)),
-      mpart('gem', [gemG(0.014, 0.022, 0.014, [0, -0.07, 0]), gemG(0.009, 0.009, 0.011, [0.0125, 0.064, 0]), gemG(0.009, 0.009, 0.011, [-0.0125, 0.064, 0])]),
-      mpart('blade', straight(rows, [0.31, 0])),
-      mpart('gem', straight(core, [0.275, 0])),
+      mpart('leather', slimHilt()),
+      mpart('verdigris', [ringY(-0.032, 0.0158, 0.003), ringY(0, 0.0152, 0.003), ringY(0.032, 0.0158, 0.003), rbx(0.024, 0.016, 0.04, 0.005, 0, 0.063, 0),
+        side([[0.02, 0.066], [0.05, 0.088], [0.046, 0.094], [0.016, 0.078], [-0.016, 0.078], [-0.046, 0.094], [-0.05, 0.088], [-0.02, 0.066]], 0.016, 0.004)]),
+      mpart('stain', [ball(0.0105, [0, -0.07, 0], [1, 1.25, 1]), ball(0.005, [0.0125, 0.064, 0], [0.6, 1, 1]), ball(0.005, [-0.0125, 0.064, 0], [0.6, 1, 1])]),
+      mpart('blade', [straight(rows, [0.31, 0])]),
+      mpart('stain', straight(core, [0.275, 0])),
+    ] };
+  };
+  // the long swords of the east, by their rank. 'katana': a plain iron guard, a copper collar, black cord over the grip; 'ember' (the
+  // blade of fire): the steel blued, bronzed and straw-coloured by heat towards its collar and sooted along its back, a guard of
+  // blackened iron cut to a flame's edge, red cord; 'kusa' (the mythic one): a guard of iron pierced in four lobes and rimmed with gold,
+  // mounts of old gold, a groove down the blade. Each its hardened edge, frosted, its line waving
+  const sori = (y) => { const u = Math.max(0, (y - 0.14) / 0.69); return 0.052 * u * u; };
+  const KAT = (() => { const rows = []; for (let i = 0; i <= 14; i++) { const y = 0.14 + 0.62 * i / 14; rows.push([y, 0.015, 0.019, 0.0068, 0.005, sori(y)]); } rows.push([0.795, 0.0115, 0.0145, 0.0054, 0.0036, sori(0.795)]); return rows; })();
+  const katana = (k) => {
+    const tip = [0.83, sori(0.83) + 0.009], men = [];
+    for (let i = 0; i < 5; i++) for (const sx of [-1, 1]) men.push(gemG(0.0035, 0.012, 0.0085, [sx * 0.0128, -0.092 + i * 0.04, 0]));
+    const ham = (y) => 0.0055 + 0.0022 * Math.sin(y * 88) + 0.0011 * Math.sin(y * 233 + 1);
+    let tsuba;
+    if (k === 'katana') tsuba = [hl([[0.0005, 0.1], [0.035, 0.1], [0.0375, 0.1015], [0.0375, 0.1065], [0.035, 0.108], [0.0005, 0.108]], 0.86, 1.12, 26)];
+    else if (k === 'ember') { const o = []; for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2, r = 0.033 + 0.0045 * Math.pow(Math.abs(Math.sin(a * 3.5)), 0.6); o.push([Math.cos(a) * r * 0.86, Math.sin(a) * r * 1.12]); } tsuba = [ext(o, 0.007, 0.0012).rotateX(HX).translate(0, 0.104, 0)]; }
+    else { const o = [], holes = []; for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; o.push([Math.cos(a) * 0.0375 * 0.86, Math.sin(a) * 0.0375 * 1.12]); }
+      for (let j = 0; j < 4; j++) { const a0 = j * HX + Math.PI / 4, h = []; for (let i = 0; i < 12; i++) { const t = i / 12 * Math.PI * 2, rr = 0.0058 * (1 + 0.35 * Math.cos(t)), cx = Math.cos(a0) * 0.024 * 0.86, cy = Math.sin(a0) * 0.024 * 1.12, aa = a0 + Math.cos(t) * 0.0; h.push([cx + Math.cos(t + a0) * rr * 1.3, cy + Math.sin(t + a0) * rr * 0.8]); } holes.push(h.reverse()); }
+      tsuba = [ext(o, 0.0068, 0.0012, holes).rotateX(HX).translate(0, 0.104, 0)]; }
+    const P = [
+      mpart(k === 'ember' ? 'wrapRed' : 'wrap', hl(wrapPts(-0.118, 0.098, 0.0165, 12), 0.8, 1.18)),
+      mpart(k === 'kusa' ? 'gold' : 'iron', [hl([[0.0005, -0.132], [0.015, -0.132], [0.0175, -0.124], [0.0175, -0.114], [0.0005, -0.114]], 0.8, 1.2), hl([[0.0005, 0.088], [0.0172, 0.088], [0.0178, 0.096], [0.0005, 0.0975]], 0.8, 1.2)]),
+      mpart(k === 'kusa' ? 'gold' : 'dark', men),
+      mpart('iron', tsuba),
+      mpart(k === 'kusa' ? 'gold' : 'copper', [rbx(0.0125, 0.03, 0.036, 0.003, 0, 0.124, -0.001)].concat(k === 'kusa' ? [new THREE.TorusGeometry(0.0375, 0.0016, 4, 40).scale(0.86, 1.12, 1).rotateX(HX).translate(0, 0.104, 0), hl([[0.0005, 0.0985], [0.026, 0.0985], [0.026, 0.1002], [0.0005, 0.1002]], 0.86, 1.12, 20), hl([[0.0005, 0.1078], [0.026, 0.1078], [0.026, 0.1095], [0.0005, 0.1095]], 0.86, 1.12, 20)] : [])),
+      mpart(k === 'ember' ? 'heat' : 'blade', straight(KAT, tip)),
+      mpart('hamon', edgeBand(KAT, ham, false)),
+    ];
+    if (k === 'kusa') for (const sx of [-1, 1]) P.push(mpart('dark', strip(20, 1, (s) => { const y = 0.16 + s * 0.48; return [sx * 0.00305, y, sori(y) + 0.0092]; }, () => [0, 0, 1], (s) => 0.0021 * Math.min(1, s * 8, (1 - s) * 8), 40)));
+    if (k === 'ember') { const bp = P[5], ps = bp.g.attributes.position, col = []; for (let i = 0; i < ps.count; i++) { const y = ps.getY(i) + bp.at[1], z = ps.getZ(i) + bp.at[2], t = (y - 0.13) / 0.66, back = Math.max(0, Math.min(1, (z - sori(y) + 0.004) / 0.019)), band = (c0, c1, k2) => [c0[0] + (c1[0] - c0[0]) * k2, c0[1] + (c1[1] - c0[1]) * k2, c0[2] + (c1[2] - c0[2]) * k2];
+        const T = [[0, [0.86, 0.72, 0.42]], [0.07, [0.72, 0.46, 0.24]], [0.13, [0.46, 0.3, 0.44]], [0.2, [0.3, 0.38, 0.56]], [0.3, [0.62, 0.64, 0.66]], [1, [0.7, 0.71, 0.72]]]; let c = T[T.length - 1][1];
+        for (let j = 1; j < T.length; j++) if (t <= T[j][0]) { c = band(T[j - 1][1], T[j][1], Math.max(0, (t - T[j - 1][0]) / (T[j][0] - T[j - 1][0]))); break; }
+        const soot = 1 - 0.6 * back * (0.6 + 0.4 * Math.sin(y * 70 + z * 300)) * (t < 0.5 ? 1 : 0.5); col.push(c[0] * soot, c[1] * soot, c[2] * soot); }
+      bp.g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); }
+    return { tipY: 0.83, parts: P };
+  };
+  MP.katana = () => katana('katana'); MP.emberblade = () => katana('ember'); MP.kusanagi = () => katana('kusa');
+  // the holy sword: a broad blade polished bright, a line of letters inlaid in gold down its middle and a cross at its forte; a plain
+  // cross-guard with knobbed ends, a gold cross let into its middle; a grip of pale hide bound with gold wire; a wheel pommel, a cross on it
+  MP.holy = () => {
+    const rows = [[0.115, 0.024, 0.024, 0.0082], [0.2, 0.026, 0.026, 0.0082], [0.7, 0.022, 0.022, 0.0076], [0.79, 0.016, 0.016, 0.006]], inl = [];
+    for (let i = 0; i < 16; i++) { const y = 0.25 + i * 0.022, h = 0.006 + (i * 7 % 5) * 0.0016, w = 0.0018 + (i * 3 % 4) * 0.0009; for (const sx of [-1, 1]) inl.push(rbx(0.0006, h, w, 0.0002, sx * 0.0041, y, ((i * 5) % 3 - 1) * 0.0014)); }
+    for (const sx of [-1, 1]) inl.push(rbx(0.0006, 0.04, 0.0034, 0.0002, sx * 0.0041, 0.17, 0), rbx(0.0006, 0.0034, 0.022, 0.0002, sx * 0.0041, 0.18, 0), rbx(0.0007, 0.024, 0.0042, 0.0002, sx * 0.0128, 0.104, 0), rbx(0.0007, 0.0042, 0.018, 0.0002, sx * 0.0128, 0.106, 0), rbx(0.0008, 0.018, 0.0034, 0.0002, sx * 0.0092, -0.13, 0), rbx(0.0008, 0.0034, 0.018, 0.0002, sx * 0.0092, -0.13, 0));
+    return { tipY: 0.88, parts: [
+      mpart('leatherW', hl(wrapPts(-0.11, 0.092, 0.0152, 12), 0.86, 1.1)),
+      mpart('gold', [helixY(0.0158, -0.105, 0.088, 9, 0.0011)].concat(inl)),
+      mpart('steel', [wheel(-0.13, 0.026, 0.018), ringY(-0.112, 0.016, 0.003), ringY(0.094, 0.0162, 0.0032), rbx(0.024, 0.026, 0.034, 0.005, 0, 0.104, 0)].concat(quillons(0.104, 0.105, 0.0078, 0.012))),
+      mpart('blade', straight(rows, [0.88, 0])),
+    ] };
+  };
+  // the rapier: a thin stiff blade; a swept hilt of steel - quillons with knobbed ends, a bow over the knuckles, two rings about the
+  // ricasso and the bars that sweep from them to the bow; a pommel and the ferrules of old gold, the grip bound in wire
+  MP.rapier = () => {
+    const bow = [], q = (t) => [0, -0.078 + 0.148 * t, -0.012 - 0.046 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.04)), 0.7)];
+    for (let i = 0; i < 12; i++) bow.push(Geo.rod(q(i / 12), q((i + 1) / 12), 0.0032, 6));
+    const rings = [], bars = [];
+    for (const sx of [-1, 1]) { rings.push(new THREE.TorusGeometry(0.026, 0.0028, 5, 22).rotateY(HX).rotateX(0.0).translate(sx * 0.014, 0.084, 0)); bars.push(tubeR([[sx * 0.004, 0.058, -0.06], [sx * 0.03, 0.04, -0.05], [sx * 0.038, 0.02, -0.036], [sx * 0.01, -0.03, -0.052]], 0.0026, 5, 14), tubeR([[sx * 0.008, 0.06, 0.02], [sx * 0.034, 0.05, 0.03], [sx * 0.022, 0.07, 0.024]], 0.0024, 5, 10)); }
+    return { tipY: 0.89, parts: [
+      mpart('dark', hl(wrapPts(-0.07, 0.05, 0.0135, 14), 0.9, 1.08)),
+      mpart('goldBr', [hl([[0.0005, -0.104], [0.011, -0.1], [0.0155, -0.088], [0.012, -0.074], [0.0005, -0.07]]), ringY(-0.069, 0.0138, 0.0026), ringY(0.05, 0.0138, 0.0026)]),
+      mpart('steel', [tubeR([[0, 0.058, -0.088], [0, 0.058, 0], [0, 0.058, 0.088]], (t) => 0.0044 * (0.7 + 0.3 * Math.sin(Math.PI * t)), 6, false), ball(0.0068, [0, 0.058, -0.09]), ball(0.0068, [0, 0.058, 0.09]), rbx(0.012, 0.022, 0.018, 0.004, 0, 0.06, 0)].concat(bow, rings, bars)),
+      mpart('steel', rbx(0.009, 0.08, 0.012, 0.002, 0, 0.14, 0)),
+      mpart('blade', straight([[0.09, 0.009, 0.009, 0.0068], [0.3, 0.0075, 0.0075, 0.006], [0.8, 0.004, 0.004, 0.004]], [0.89, 0])),
     ] };
   };
   // the kukri: the blade leans back from the grip, then breaks forward and swells
@@ -1424,55 +1506,6 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     mpart('steel', straight(MACH.map((r) => r.concat([0, 0.1])), [0.522, -0.024])),
     mpart('blade', straight(machEdge(0.0065), [0.522, -0.024])),
   ] });
-  // the long sword of the east: a wound grip with its ornaments, a round guard, a collar, a curved blade with a ridge
-  const katana = (em) => {
-    const sori = (y) => { const u = Math.max(0, (y - 0.14) / 0.69); return 0.052 * u * u; }, rows = [], spine = [];
-    for (let i = 0; i <= 14; i++) { const y = 0.14 + 0.62 * i / 14; rows.push([y, 0.015, 0.019, 0.0068, 0.005, sori(y)]); spine.push([y, 0.0152, -0.002, 0.0082, 0.006, sori(y), 0.5]); }
-    rows.push([0.795, 0.0115, 0.0145, 0.0054, 0.0036, sori(0.795)]); spine.push([0.795, 0.0118, -0.002, 0.0064, 0.0044, sori(0.795), 0.5]);
-    const tip = [0.83, sori(0.83) + 0.009], men = [];
-    for (let i = 0; i < 5; i++) for (const sx of [-1, 1]) men.push(gemG(0.0035, 0.012, 0.0085, [sx * 0.0128, -0.092 + i * 0.04, 0]));
-    const P = [
-      mpart('wrap', hl(wrapPts(-0.118, 0.098, 0.0165, 12), 0.8, 1.18)),
-      mpart('gold', [hl([[0.0005, -0.132], [0.015, -0.132], [0.0175, -0.124], [0.0175, -0.114], [0.0005, -0.114]], 0.8, 1.2), hl([[0.0005, 0.1], [0.036, 0.1], [0.04, 0.104], [0.036, 0.108], [0.0005, 0.108]], 0.86, 1.12, 22)]),
-      mpart(em ? 'gold' : 'dark', men),
-      mpart('goldBr', rbx(0.0125, 0.03, 0.036, 0.003, 0, 0.124, -0.001)),
-      mpart('blade', straight(rows, tip), true),
-    ];
-    if (em) {
-      P.push(mpart('spine', straight(spine, [0.822, sori(0.822) + 0.011])));
-      P.push(mpart('goldBr', side([[0.03, 0.108], [0.062, 0.128], [0.056, 0.136], [0.026, 0.12], [-0.026, 0.12], [-0.056, 0.136], [-0.062, 0.128], [-0.03, 0.108]], 0.014, 0.004)));
-      P.push(mpart('gem', gemG(0.014, 0.014, 0.014, [0, 0.134, 0])));
-      const fl = []; for (let i = 0; i < 3; i++) { const y = 0.28 + i * 0.16; fl.push(spike(0.008, 0.05, [0, y + 0.012, sori(y) + 0.024], [0.75, 0, 0], 4)); }
-      P.push(mpart('blade', fl));
-    }
-    return { tipY: 0.83, parts: P };
-  };
-  MP.katana = () => katana(false); MP.emberblade = () => katana(true);
-  // the holy sword: a broad blade with light in its fuller, a winged guard in two layers, gems at the cross and the pommel
-  MP.holy = () => ({ tipY: 0.88, parts: [
-    mpart('trim', hl([[0.0005, -0.115], [0.0155, -0.115], [0.0165, -0.06], [0.0155, 0], [0.0165, 0.06], [0.0155, 0.095], [0.0005, 0.095]], 0.86, 1.1)),
-    mpart('goldBr', [ringY(-0.085, 0.0172, 0.0036), ringY(-0.047, 0.0172, 0.0036), ringY(-0.009, 0.0168, 0.0036), ringY(0.029, 0.0172, 0.0036), ringY(0.067, 0.0172, 0.0036),
-      hl([[0.0005, -0.142], [0.012, -0.14], [0.02, -0.128], [0.014, -0.116], [0.0005, -0.114]]),
-      side([[0.062, 0.13], [0.132, 0.158], [0.128, 0.17], [0.07, 0.152], [0.04, 0.156], [-0.04, 0.156], [-0.07, 0.152], [-0.128, 0.17], [-0.132, 0.158], [-0.062, 0.13]], 0.016, 0.004),
-      prism(0.026, 0.038, [0, 0.118, 0], [0, 0, HX], 8)]),
-    mpart('gold', [side([[0.045, 0.098], [0.11, 0.118], [0.118, 0.132], [0.105, 0.14], [0.05, 0.128], [0.03, 0.14], [-0.03, 0.14], [-0.05, 0.128], [-0.105, 0.14], [-0.118, 0.132], [-0.11, 0.118], [-0.045, 0.098]], 0.03, 0.006),
-      rbx(0.016, 0.09, 0.056, 0.004, 0, 0.185, 0), straight([[0.2, 0.009, 0.009, 0.0125], [0.7, 0.006, 0.006, 0.011]], [0.74, 0])]),
-    mpart('gem', [gemG(0.016, 0.024, 0.016, [0, -0.146, 0]), gemG(0.012, 0.02, 0.02, [0.0185, 0.118, 0]), gemG(0.012, 0.02, 0.02, [-0.0185, 0.118, 0])]),
-    mpart('blade', straight([[0.165, 0.025, 0.025, 0.0085], [0.2, 0.027, 0.027, 0.0085], [0.7, 0.022, 0.022, 0.0078], [0.79, 0.016, 0.016, 0.006]], [0.88, 0]), true),
-    mpart('sun', straight([[0.21, 0.0034, 0.0034, 0.0152], [0.66, 0.0026, 0.0026, 0.013]], [0.7, 0])),
-  ] });
-  // the rapier: a thin stiff blade, a cup, quillons with a bead at each end, a bow over the knuckles
-  MP.rapier = () => {
-    const bow = [], q = (t) => [0, -0.078 + 0.148 * t, -0.012 - 0.046 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.04)), 0.7)];
-    for (let i = 0; i < 12; i++) bow.push(Geo.rod(q(i / 12), q((i + 1) / 12), 0.0034, 6));
-    return { tipY: 0.89, parts: [
-      mpart('dark', hl(wrapPts(-0.07, 0.05, 0.0135, 14), 0.9, 1.08)),
-      mpart('gold', hl([[0.004, 0.05], [0.03, 0.055], [0.046, 0.07], [0.05, 0.09], [0.0468, 0.09], [0.0425, 0.072], [0.028, 0.0595], [0.004, 0.0565]], 1, 1, 24)),
-      mpart('goldBr', [hl([[0.0005, -0.102], [0.012, -0.099], [0.016, -0.086], [0.012, -0.073], [0.0005, -0.07]]), Geo.rod([0, 0.058, -0.086], [0, 0.058, 0.086], 0.0045, 8), ball(0.0075, [0, 0.058, -0.088]), ball(0.0075, [0, 0.058, 0.088])].concat(bow)),
-      mpart('gold', rbx(0.011, 0.1, 0.014, 0.003, 0, 0.14, 0)),
-      mpart('blade', straight([[0.09, 0.009, 0.009, 0.0068], [0.3, 0.0075, 0.0075, 0.006], [0.8, 0.004, 0.004, 0.004]], [0.89, 0])),
-    ] };
-  };
   // the axe: a head forged to a flared bit, a spike behind and one on top, bands on the haft
   MP.axe = () => {
     const bit = []; for (let i = 0; i <= 10; i++) { const t = i / 10; bit.push([0.3 + 0.23 * t, 0.008, 0.012 + 0.036 * Math.pow(Math.sin(Math.PI * t), 0.75), 0.016, 0.016, -0.1, 0.06]); }
@@ -1483,47 +1516,76 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       mpart('blade', [straight(bit), spike(0.014, 0.075, [0, 0.42, 0.066], [HX, 0, 0], 4), spike(0.011, 0.065, [0, 0.528, 0], null, 4)]),
     ] };
   };
-  // the arming sword that goes with the buckler: a wound grip, a wheel pommel, a cross, a blade with a fuller
+  // the arming sword that goes with the buckler: a wound grip, a wheel pommel, a cross of round bars turned towards the blade with
+  // knobbed ends, a blade with a fuller
   MP.buckler = () => ({ tipY: 0.51, parts: [
     mpart('wrap', hl(wrapPts(-0.058, 0.058, 0.016, 8), 0.84, 1.14)),
-    mpart('steel', [hl([[0.0005, -0.094], [0.012, -0.092], [0.019, -0.077], [0.012, -0.062], [0.0005, -0.06]], 0.62, 1.15), side([[0.078, 0.06], [0.083, 0.068], [0.078, 0.08], [0.02, 0.078], [-0.02, 0.078], [-0.078, 0.08], [-0.083, 0.068], [-0.078, 0.06], [-0.02, 0.062], [0.02, 0.062]], 0.02, 0.005)]),
+    mpart('steel', [wheel(-0.076, 0.021, 0.016), ringY(-0.06, 0.0152, 0.0026), ringY(0.058, 0.0156, 0.0028), rbx(0.02, 0.022, 0.028, 0.005, 0, 0.068, 0)].concat(quillons(0.068, 0.082, 0.0062, 0.008))),
     mpart('blade', straight([[0.08, 0.022, 0.022, 0.0075], [0.36, 0.019, 0.019, 0.0068], [0.44, 0.014, 0.014, 0.0055]], [0.51, 0])),
-    mpart('dark', straight([[0.09, 0.005, 0.005, 0.0085], [0.36, 0.0035, 0.0035, 0.0076]], [0.4, 0])),
+    mpart('dark', straight([[0.09, 0.0028, 0.0028, 0.00762], [0.36, 0.002, 0.002, 0.0069]], [0.4, 0])),
   ] });
-  // a hammer's head: a faceted block banded with steel, an eight-sided face in front, a spike behind
+  // a hammer's head, forged: eight-sided along its length, chamfered, drawn in to a neck before the face; the face a little domed and
+  // scored across to bite; iron straps down the haft riveted through it; a beak behind (or a second face), a spike on its crown
+  const maulHead = (yh, w, d, beak) => {
+    const r = w * 0.5, prof = [[0.0005, -d / 2 - 0.004], [r * 0.82, -d / 2], [r * 0.96, -d / 2 + 0.004], [r * 0.96, -d / 2 + 0.016], [r * 0.78, -d / 2 + 0.03], [r * 0.78, -d * 0.2], [r * 1.06, -d * 0.12], [r * 1.06, d * 0.1]];
+    if (beak) prof.push([r * 0.8, d * 0.2], [r * 0.32, d * 0.3], [0.0005, d * 0.31]); else prof.push([r * 0.78, d * 0.2], [r * 0.78, d / 2 - 0.03], [r * 0.96, d / 2 - 0.016], [r * 0.96, d / 2 - 0.004], [r * 0.82, d / 2], [0.0005, d / 2 + 0.004]);
+    const body = Geo.lathe(prof, 8); body.rotateY(Math.PI / 8); body.rotateX(HX); body.translate(0, yh, 0); body.computeVertexNormals();
+    const score = []; for (const f of beak ? [-1] : [-1, 1]) for (let i = -1; i <= 1; i++) { score.push(rbx(r * 1.5, 0.0016, 0.0016, 0.0005, 0, yh + i * r * 0.42, f * (d / 2 + 0.0036)), rbx(0.0016, r * 1.5, 0.0016, 0.0005, i * r * 0.42, yh, f * (d / 2 + 0.0036))); }
+    const ext2 = beak ? [tubeR([[0, yh, d * 0.26], [0, yh - 0.004, d * 0.42], [0, yh - 0.022, d * 0.58]], (t) => r * 0.42 * (1 - t) + 0.0012, 8, 12)] : [];
+    return { body: [body].concat(ext2), score };
+  };
   const maul = (yh, w, d, haft0, haft1, bands, top) => {
-    const P = [
+    const h = maulHead(yh, w, d, top), lg = [], rv = [];
+    for (const sx of [-1, 1]) { lg.push(rbx(0.005, 0.13, 0.02, 0.0018, sx * 0.0215, yh - w * 0.5 - 0.06, 0)); for (const y of [yh - w * 0.5 - 0.02, yh - w * 0.5 - 0.1]) rv.push(ball(0.0034, [sx * 0.0245, y, 0], [0.6, 1, 1])); }
+    return [
       mpart('wood', hl([[0.0005, haft0], [0.021, haft0], [0.0195, haft0 + 0.03], [0.0185, (haft0 + haft1) / 2], [0.0205, haft1], [0.0005, haft1]], 0.88, 1.12)),
-      mpart('steel', bands.map((y) => ringY(y, 0.0205, 0.0045)).concat([rbx(w * 1.08, w * 1.08, 0.02, 0.004, 0, yh, -d * 0.27), rbx(w * 1.08, w * 1.08, 0.02, 0.004, 0, yh, d * 0.2), prism(w * 0.64, 0.04, [0, yh, -d * 0.58], [HX, 0, 0], 8)]).concat(top ? [spike(0.022, 0.06, [0, yh + w / 2 + 0.028, 0], null, 4)] : [])),
-      mpart('dark', rbx(w, w, d, w * 0.16, 0, yh, -0.01)),
-      mpart('blade', [prism(w * 0.52, 0.012, [0, yh, -d * 0.58 - 0.024], [HX, 0, 0], 8), spike(w * 0.38, d * 0.55, [0, yh, d * 0.5 + d * 0.22], [HX, 0, 0], 4)]),
+      mpart('steel', bands.map((y) => ringY(y, 0.0205, 0.0045)).concat(lg, rv, top ? [spike(0.016, 0.055, [0, yh + w * 0.5 + 0.024, 0], null, 8)] : [])),
+      mpart('iron', h.body),
+      mpart('dark', h.score),
     ];
-    return P;
   };
   MP.tower = () => ({ tipY: 0.33, parts: maul(0.27, 0.07, 0.14, -0.09, 0.26, [-0.06, 0.12], false) });
   MP.hammer = () => ({ tipY: 0.58, parts: maul(0.49, 0.088, 0.18, -0.11, 0.5, [-0.09, 0.12, 0.38], true) });
-  // the hammer of thunder: a great banded head, a ram and a coil of lightning at each face, a drum at each side, a crystal on its crown
+  // the hammer of thunder: a great forged head of iron bound with three bands of copper driven full of studs, its faces steel in rims of
+  // copper; a rod of copper on its crown wound with wire to take the lightning; the haft wound with copper wire where it is held and
+  // below the head, iron straps riveted with copper
   MP.thunder = () => {
-    const gold = [-0.08, 0.04, 0.16, 0.28, 0.38].map((y) => ringY(y, 0.0212, 0.005)).concat([rbx(0.066, 0.036, 0.08, 0.008, 0, 0.41, 0), rbx(0.122, 0.026, 0.236, 0.006, 0, 0.55, 0), rbx(0.122, 0.024, 0.236, 0.006, 0, 0.45, 0)]);
-    const br = [rbx(0.054, 0.026, 0.054, 0.008, 0, -0.12, 0), rbx(0.034, 0.13, 0.246, 0.006, 0, 0.5, 0), prism(0.028, 0.02, [0, 0.57, 0], null, 8)], gm = [gemG(0.02, 0.03, 0.02, [0, -0.15, 0]), gemG(0.02, 0.042, 0.02, [0, 0.6, 0])];
-    for (const s of [-1, 1]) {
-      br.push(prism(0.058, 0.03, [0, 0.5, s * 0.128], [HX, 0, 0], 8), prism(0.044, 0.016, [s * 0.062, 0.5, 0], [0, 0, HX], 8), rbx(0.016, 0.022, 0.14, 0.004, s * 0.064, 0.54, 0, [0, s * 0.18, 0]));
-      const coil = new THREE.TorusGeometry(0.056, 0.007, 8, 22); coil.translate(0, 0.5, s * 0.095); gm.push(coil, prism(0.032, 0.012, [0, 0.5, s * 0.142], [HX, 0, 0], 8), gemG(0.012, 0.022, 0.022, [s * 0.07, 0.5, 0]));
-    }
+    const h = maulHead(0.5, 0.112, 0.225, false), bands = [], studs = [], lg = [];
+    for (const z of [-0.06, 0, 0.06]) { const b = Geo.lathe([[0.066, -0.009], [0.0675, -0.006], [0.0675, 0.006], [0.066, 0.009]], 8); b.rotateY(Math.PI / 8); b.rotateX(HX); b.translate(0, 0.5, z); bands.push(b); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; studs.push(ball(0.0042, [Math.cos(a) * 0.066, 0.5 + Math.sin(a) * 0.066, z], [1, 1, 0.7])); } }
+    for (const f of [-1, 1]) bands.push(new THREE.TorusGeometry(0.047, 0.004, 5, 24).translate(0, 0.5, f * 0.1065));
+    for (const sx of [-1, 1]) { lg.push(rbx(0.005, 0.15, 0.022, 0.0018, sx * 0.0232, 0.37, 0)); for (const y of [0.42, 0.34]) studs.push(ball(0.0036, [sx * 0.0262, y, 0], [0.6, 1, 1])); }
     return { tipY: 0.62, parts: [
-      mpart('tsteel', [hl([[0.0005, -0.13], [0.021, -0.13], [0.02, 0.1], [0.021, 0.44], [0.0005, 0.44]], 0.9, 1.1), rbx(0.112, 0.112, 0.225, 0.016, 0, 0.5, 0)]),
-      mpart('gold', gold), mpart('goldBr', br), mpart('gem', gm),
+      mpart('wood', hl([[0.0005, -0.13], [0.021, -0.13], [0.02, 0.1], [0.021, 0.44], [0.0005, 0.44]], 0.9, 1.1)),
+      mpart('copper', [helixY(0.0212, -0.1, 0.12, 14, 0.0014), helixY(0.0212, 0.24, 0.36, 8, 0.0014), prism(0.0042, 0.07, [0, 0.59, 0], null, 8), helixY(0.0056, 0.565, 0.61, 6, 0.0009), ringY(-0.12, 0.022, 0.004)].concat(bands, studs)),
+      mpart('iron', h.body.concat(lg, [hl([[0.0005, -0.152], [0.018, -0.15], [0.024, -0.14], [0.022, -0.128], [0.0005, -0.126]])])),
+      mpart('steel', spike(0.004, 0.012, [0, 0.631, 0], null, 6)),
+      mpart('dark', h.score),
     ] };
   };
-  // the spear: a leaf of a head with a rib down it, lugs under it, a socket, bands and a shoe on the shaft
+  // the spear: a leaf of a head with a rib, a socket of iron riveted to the shaft, bands of iron, a shoe
   MP.spear = () => ({ tipY: 1.25, parts: [
     mpart('wood', hl([[0.0005, -0.36], [0.0165, -0.36], [0.017, 0.3], [0.0155, 0.95], [0.0005, 0.95]], 1, 1, 12)),
-    mpart('gold', [ringY(-0.2, 0.0175, 0.0042), ringY(0.25, 0.0175, 0.0042), ringY(0.65, 0.0168, 0.0042), ringY(0.9, 0.0162, 0.0042), hl([[0.0005, 0.93], [0.019, 0.93], [0.021, 0.95], [0.016, 0.99], [0.011, 1.003], [0.0005, 1.003]], 0.9, 1.1),
-      straight([[1.0, 0.0045, 0.0045, 0.0135], [1.14, 0.003, 0.003, 0.0112]], [1.18, 0])]),
-    mpart('goldBr', [rbx(0.012, 0.016, 0.062, 0.005, 0, 0.984, -0.04, [-0.45, 0, 0]), rbx(0.012, 0.016, 0.062, 0.005, 0, 0.984, 0.04, [0.45, 0, 0])]),
+    mpart('iron', [ringY(-0.2, 0.0175, 0.0038), ringY(0.25, 0.0175, 0.0038), ringY(0.65, 0.0168, 0.0038), ringY(0.9, 0.0162, 0.0038), hl([[0.0005, 0.93], [0.0185, 0.93], [0.0205, 0.95], [0.016, 0.99], [0.011, 1.003], [0.0005, 1.003]], 0.9, 1.1, 10),
+      prism(0.0028, 0.044, [0, 0.948, 0], [0, 0, HX], 6), spike(0.0155, 0.075, [0, -0.397, 0], [Math.PI, 0, 0], 8)]),
+    mpart('steel', straight([[1.0, 0.004, 0.004, 0.0128], [1.14, 0.0028, 0.0028, 0.0108]], [1.18, 0])),
     mpart('blade', straight([[0.995, 0.008, 0.008, 0.009], [1.05, 0.023, 0.023, 0.0105], [1.12, 0.02, 0.02, 0.009], [1.2, 0.01, 0.01, 0.006]], [1.25, 0])),
-    mpart('steel', spike(0.0155, 0.075, [0, -0.397, 0], [Math.PI, 0, 0], 8)),
   ] });
+  // the spear of the abyss: the same reach, finer work - a long head with a strong rib, its forte blued and a line of gold inlaid down the
+  // rib on each face, two wings below it; a long faceted socket with collars inlaid in gold and straps riveted down the shaft; the shaft
+  // stained black, bound in hide where it is held, iron bands each with a thread of gold; a shoe of iron
+  MP.abyss = () => {
+    const rows = [[0.992, 0.006, 0.006, 0.0105], [1.04, 0.026, 0.026, 0.0122], [1.11, 0.023, 0.023, 0.011], [1.19, 0.011, 0.011, 0.0072]], inl = [], lg = [], rv = [];
+    for (const sx of [-1, 1]) { inl.push(strip(10, 1, (s) => [sx * (0.0063 - s * 0.0024), 1.02 + s * 0.16, 0], () => [0, 0, 1], () => 0.0007, 40)); lg.push(rbx(0.0045, 0.1, 0.012, 0.0015, sx * 0.0178, 0.885, 0)); rv.push(ball(0.0026, [sx * 0.0204, 0.86, 0], [0.6, 1, 1]), ball(0.0026, [sx * 0.0204, 0.91, 0], [0.6, 1, 1])); }
+    const wings = side([[0.004, 0.962], [0.044, 0.975], [0.05, 0.986], [0.03, 0.984], [0.004, 0.978], [-0.004, 0.978], [-0.03, 0.984], [-0.05, 0.986], [-0.044, 0.975], [-0.004, 0.962]], 0.007, 0.0016);
+    return { tipY: 1.25, parts: [
+      mpart('darkWood', hl([[0.0005, -0.36], [0.0165, -0.36], [0.017, 0.3], [0.0155, 0.95], [0.0005, 0.95]], 1, 1, 12)),
+      mpart('leather', [hl(wrapPts(-0.1, 0.14, 0.0182, 10), 1, 1, 12), hl(wrapPts(0.36, 0.52, 0.018, 7), 1, 1, 12)]),
+      mpart('iron', [ringY(-0.2, 0.0178, 0.004), ringY(0.25, 0.0178, 0.004), ringY(0.65, 0.017, 0.004), hl([[0.0005, 0.84], [0.0185, 0.84], [0.0195, 0.85], [0.0175, 0.93], [0.0215, 0.94], [0.0215, 0.955], [0.017, 0.975], [0.011, 0.995], [0.0005, 0.995]], 1, 1, 8), wings, spike(0.016, 0.085, [0, -0.402, 0], [Math.PI, 0, 0], 8)].concat(lg)),
+      mpart('gold', [ringY(-0.2, 0.0182, 0.0012), ringY(0.25, 0.0182, 0.0012), ringY(0.65, 0.0174, 0.0012), ringY(0.932, 0.0215, 0.0014), ringY(0.86, 0.0198, 0.0012), ringY(-0.355, 0.0168, 0.0016)].concat(inl, rv)),
+      mpart('blued', straight([[0.992, 0.0062, 0.0062, 0.0108], [1.03, 0.022, 0.022, 0.0124]], null)),
+      mpart('blade', straight(rows, [1.25, 0])),
+    ] };
+  };
   // a scythe's blade along its curve: the same turns the old one took, the back outward, the edge inward
   const crescent = (n, w0, dw, step, r0, dr, y0, z0, mk) => {
     const pts = []; let cy = y0, cz = z0; pts.push([cy, cz, r0]);
@@ -1537,21 +1599,47 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     return { tipY: 0.92, parts: [
       mpart('dark', hl([[0.0005, -0.255], [0.0185, -0.255], [0.0175, 0.3], [0.0185, 0.895], [0.0005, 0.895]], 1, 1, 12)),
       mpart('bone', [ringY(-0.15, 0.0195, 0.005), ringY(0.15, 0.019, 0.005), ringY(0.45, 0.019, 0.005), ringY(0.72, 0.0192, 0.005), rbx(0.04, 0.066, 0.092, 0.012, 0, Y, 0.01), spike(0.016, 0.09, [0, Y + 0.012, 0.095], [HX + 0.15, 0, 0], 5)]),
-      mpart('gem', [gemG(0.006, 0.011, 0.011, [0.0205, Y + 0.005, -0.01]), gemG(0.006, 0.011, 0.011, [-0.0205, Y + 0.005, -0.01])]),
+      mpart('iron', [ball(0.0055, [0.0205, Y + 0.005, -0.01], [0.55, 1, 1]), ball(0.0055, [-0.0205, Y + 0.005, -0.01], [0.55, 1, 1])]),
       mpart('blade', cres(5, 0.076, 0.009, 0.11, -0.06, 0.12, Y + 0.015, -0.02, bl)),
       mpart('dark', cres(5, 0.076, 0.009, 0.11, -0.06, 0.12, Y + 0.015, -0.02, bk)),
     ] };
   };
+  // the devourer: a war scythe of blackened steel, its edge honed bright, its back and the bands of its black snath inlaid with old gold,
+  // a collar of iron with its horns and hook, a dark stone set in it and in the butt
   MP.devour = () => {
     const Y = 0.88, bl = (t, w) => ({ a: w * 0.4, b: w * 0.52, T: 0.011 - t * 0.004, tb: 0.008 - t * 0.003 }), bk = (t, w) => ({ a: w * 0.44, b: -w * 0.1, T: 0.016 - t * 0.006, tb: 0.012 - t * 0.005, rk: 0.5 }), mid = (t, w) => ({ a: w * 0.12, b: w * 0.08, T: 0.0135 - t * 0.005, tb: 0 });
     const halo = new THREE.TorusGeometry(0.058, 0.007, 8, 24); halo.rotateY(HX); halo.translate(0, Y + 0.01, -0.02);
     return { tipY: 0.95, parts: [
-      mpart('void', [hl([[0.0005, -0.27], [0.0195, -0.27], [0.0185, 0.3], [0.0195, 0.91], [0.0005, 0.91]], 1, 1, 12), rbx(0.046, 0.085, 0.11, 0.012, 0, Y, 0.01), cres(6, 0.088, 0.010, 0.105, -0.06, 0.115, Y + 0.02, -0.02, mid)]),
-      mpart('gold', [0, 1, 2, 3, 4, 5].map((i) => ringY(-0.14 + i * 0.2, 0.0205, 0.0052)).concat([rbx(0.054, 0.03, 0.13, 0.006, 0, Y + 0.032, 0.01), rbx(0.054, 0.024, 0.11, 0.006, 0, Y - 0.032, 0.01), cres(6, 0.088, 0.010, 0.105, -0.06, 0.115, Y + 0.02, -0.02, bk)])),
-      mpart('goldBr', [halo, spike(0.022, 0.11, [0, Y + 0.02, 0.11], [HX + 0.25, 0, 0], 5), spike(0.02, 0.08, [0, Y + 0.085, 0.01], null, 5), spike(0.013, 0.09, [0, Y - 0.055, -0.18], [-2.4, 0, 0], 5)]),
-      mpart('gem', [gemG(0.022, 0.042, 0.022, [0, -0.29, 0]), gemG(0.03, 0.03, 0.03, [0, Y + 0.01, -0.02])]),
-      mpart('edge', [cres(6, 0.088, 0.010, 0.105, -0.06, 0.115, Y + 0.02, -0.02, bl), spike(0.016, 0.08, [0, Y - 0.02, 0.09], [HX - 0.25, 0, 0], 5)]),
+      mpart('blackSteel', [hl([[0.0005, -0.27], [0.0195, -0.27], [0.0185, 0.3], [0.0195, 0.91], [0.0005, 0.91]], 1, 1, 12), rbx(0.046, 0.085, 0.11, 0.012, 0, Y, 0.01), cres(6, 0.088, 0.010, 0.105, -0.06, 0.115, Y + 0.02, -0.02, mid)]),
+      mpart('gold', [0, 1, 2, 3, 4, 5].map((i) => ringY(-0.14 + i * 0.2, 0.0205, 0.0052)).concat([rbx(0.054, 0.03, 0.13, 0.006, 0, Y + 0.032, 0.01), rbx(0.054, 0.024, 0.11, 0.006, 0, Y - 0.032, 0.01), ])),
+      mpart('blackSteel', cres(6, 0.088, 0.010, 0.105, -0.06, 0.115, Y + 0.02, -0.02, bk)),
+      mpart('iron', [halo, spike(0.022, 0.11, [0, Y + 0.02, 0.11], [HX + 0.25, 0, 0], 5), spike(0.02, 0.08, [0, Y + 0.085, 0.01], null, 5), spike(0.013, 0.09, [0, Y - 0.055, -0.18], [-2.4, 0, 0], 5)]),
+      mpart('dark', [gemG(0.022, 0.042, 0.022, [0, -0.29, 0]), gemG(0.03, 0.03, 0.03, [0, Y + 0.01, -0.02])]),
+      mpart('blade', [cres(6, 0.088, 0.010, 0.105, -0.06, 0.115, Y + 0.02, -0.02, bl), spike(0.016, 0.08, [0, Y - 0.02, 0.09], [HX - 0.25, 0, 0], 5)]),
     ] };
+  };
+  // the gauntlet of the gold-maker, over the right fist of gfx.js (its back to +x, its fingers curled round to -z, the wrist down to +z):
+  // steel plates gilt and worn - a flared cuff with a rolled rim, three lames over the back of the hand, a ridged knuckle plate with a
+  // boss on each knuckle, three lames over the fingers, two over the thumb - riveted, an engraved line along each lame; the left is its
+  // mirror (melee.js)
+  MP.midas = () => {
+    const lame = (cx, cy, cz, nx, nz, len, wid, th) => { const a = Math.atan2(-nz, nx); return rbx(th, len, wid, Math.min(th, wid) * 0.45, cx, cy, cz, [0, a, 0]); };
+    const gilt = [], dk = [], rv = [];
+    // the cuff, along the wrist from the back of the hand towards the elbow
+    const wr = new THREE.Vector3(0.046, -0.066, 0.08), dr = new THREE.Vector3(0.016, -0.036, 0.052).normalize();
+    const cuff = hl([[0.033, -0.012], [0.0352, -0.006], [0.0372, 0.024], [0.0405, 0.05], [0.0425, 0.056], [0.0418, 0.061], [0.0395, 0.06]], 1, 0.86, 22), rim = new THREE.TorusGeometry(0.0415, 0.0024, 5, 24).scale(1, 0.86, 1).rotateX(HX).translate(0, 0.0585, 0);
+    for (const g of [cuff, rim]) { g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dr)); g.translate(wr.x - dr.x * 0.012, wr.y - dr.y * 0.012, wr.z - dr.z * 0.012); }
+    gilt.push(cuff); dk.push(rim);
+    // the back of the hand: three lames overlapping towards the knuckles
+    for (let i = 0; i < 3; i++) { const z = 0.042 - i * 0.017; gilt.push(lame(0.049 - i * 0.0012, -0.004 - i * 0.002, z, 1, 0.12, 0.084 - i * 0.004, 0.02, 0.0042)); dk.push(lame(0.0514 - i * 0.0012, -0.004 - i * 0.002, z, 1, 0.12, 0.07, 0.0012, 0.0012)); for (const y of [-0.036, 0.034]) rv.push(ball(0.0024, [0.0515 - i * 0.0012, y - i * 0.002, z], [0.6, 1, 1])); }
+    // the knuckle plate, ridged, a boss over each knuckle
+    gilt.push(lame(0.041, 0.0, -0.016, 0.72, -0.69, 0.092, 0.018, 0.0052));
+    for (const y of [0.031, 0.01, -0.011, -0.031]) gilt.push(ball(0.0074, [0.044, y, -0.02], [0.75, 0.95, 0.75]));
+    // the fingers: a lame over each joint's back, round the curl
+    for (const [x, z, nx, nz, w] of [[0.031, -0.034, 0.62, -0.78, 0.014], [0.006, -0.046, 0.08, -1, 0.012], [-0.019, -0.04, -0.62, -0.78, 0.011]]) { gilt.push(lame(x, 0.0, z, nx, nz, 0.088, w, 0.0042)); dk.push(lame(x + nx * 0.0023, 0.0, z + nz * 0.0023, nx, nz, 0.074, 0.0011, 0.0011)); }
+    // the thumb: two lames along it
+    gilt.push(rbx(0.015, 0.024, 0.0045, 0.002, 0.004, 0.051, 0.029, [0, -0.5, 0.35]), rbx(0.013, 0.022, 0.0042, 0.002, -0.016, 0.058, 0.014, [0, -1.1, 0.3]));
+    return { tipY: 0.0, parts: [mpart('gilt', gilt), mpart('giltDk', dk.concat(rv))] };
   };
   const mCache = {};
   X.meleeParts = function (model) { if (mCache[model] !== undefined) return mCache[model]; let r = null; try { r = MP[model] ? MP[model]() : null; } catch (e) { console.warn('gfx: no hand weapon', model, e); r = null; } return (mCache[model] = r); };
@@ -2513,10 +2601,10 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
     const uv = []; for (let i = 0; i < ys.length; i++) for (let j = 0; j < na; j++) uv.push(as[j] / (Math.PI * 2) * 3, ys[i] * 12); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     const s = spoon(0.1, 0.07);
-    return [gq('iron', g.toNonIndexed()), gq('tin', [fuze(0.1), s.lever]), gq('brassOld', s.ring)];
+    return [gq('iron', g.toNonIndexed()), gq('tin', fuze(0.1)), gq('tin', s.lever, 'spoon'), gq('brassOld', s.ring, 'pin')];
   };
   // the incendiary: a tin painted a dull red, a glass let into its side with the oil behind it, a band of brass, a fuze and spoon
-  GREN.g_fire = () => { const s = spoon(0.088, 0.05); return [gq('cRed', can(0.05, 0.17)), gq('brassOld', gband(0.05, 0.052, 0.014)), gq('iron', [gband(0.05, -0.03, 0.062), fuze(0.088)]), gq('oil', ball(0.03, [0, -0.03, 0.036], [0.8, 0.85, 0.55])), gq('tin', s.lever), gq('brassOld', s.ring)]; };
+  GREN.g_fire = () => { const s = spoon(0.088, 0.05); return [gq('cRed', can(0.05, 0.17)), gq('brassOld', gband(0.05, 0.052, 0.014)), gq('iron', [gband(0.05, -0.03, 0.062), fuze(0.088)]), gq('oil', ball(0.03, [0, -0.03, 0.036], [0.8, 0.85, 0.55])), gq('tin', s.lever, 'spoon'), gq('brassOld', s.ring, 'pin')]; };
   // the water skin: a bladder of hide tied at the neck with a blue rag (the bladder: one in radius, it wobbles)
   GREN.g_water = () => [
     gq('hide', new THREE.LatheGeometry(spl([[0.0005, -1], [0.55, -0.95], [0.92, -0.6], [1.0, -0.1], [0.86, 0.4], [0.5, 0.8], [0.26, 1.02], [0.2, 1.12], [0.0005, 1.14]], 22), 18), 'bag'),
@@ -2527,7 +2615,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   GREN.g_cryo = () => {
     const rime = []; for (let i = 0; i < 26; i++) { const a = i * 2.4, y = 0.04 + (i % 7) * 0.0055, r = Math.min(0.0485, 0.0485 - Math.max(0, y - 0.066) * 0.9) + 0.0006, g = new THREE.IcosahedronGeometry(0.0022 + (i % 4) * 0.0011, 0); g.scale(1.4, 0.7, 1); g.rotateY(-a); g.translate(Math.cos(a) * r, y, Math.sin(a) * r); rime.push(g); }
     const s = spoon(0.082, 0.048);
-    return [gq('tin', [can(0.048, 0.16), fuze(0.082), s.lever, prism(0.008, 0.004, [0, 0.127, 0], null, 10)]), gq('cBlue', [gband(0.048, 0.036, 0.018), gband(0.048, -0.04, 0.018)]), gq('ice', rime), gq('brassOld', s.ring)];
+    return [gq('tin', [can(0.048, 0.16), fuze(0.082), prism(0.008, 0.004, [0, 0.127, 0], null, 10)]), gq('tin', s.lever, 'spoon'), gq('cBlue', [gband(0.048, 0.036, 0.018), gband(0.048, -0.04, 0.018)]), gq('ice', rime), gq('brassOld', s.ring, 'pin')];
   };
   // the shock charge: an insulator of glazed clay in three skirts, wound with copper wire, two rods out of its head with brass terminals
   GREN.g_shock = () => {
@@ -2536,7 +2624,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       gq('copper', coil), gq('tin', [prism(0.005, 0.06, [0.014, 0.11, 0], null, 6), prism(0.005, 0.06, [-0.014, 0.11, 0], null, 6)]), gq('brassOld', [prism(0.0075, 0.007, [0.014, 0.142, 0], null, 6), prism(0.0075, 0.007, [-0.014, 0.142, 0], null, 6), prism(0.0058, 0.004, [0.014, 0.147, 0], null, 8), prism(0.0058, 0.004, [-0.014, 0.147, 0], null, 8)])];
   };
   // the gas can: brass gone green, vents in a ring about its middle, a green band, a fuze and spoon
-  GREN.g_toxic = () => { const s = spoon(0.084, 0.05); return [gq('verdigris', can(0.05, 0.16)), gq('cGreen', gband(0.05, 0.05, 0.016)), gq('dark', dots(0.05, 0, 8, 0.0065).concat(dots(0.05, -0.022, 8, 0.0065, 0.39))), gq('cGreen', gband(0.05, -0.052, 0.006)), gq('iron', fuze(0.084)), gq('tin', s.lever), gq('brassOld', s.ring)]; };
+  GREN.g_toxic = () => { const s = spoon(0.084, 0.05); return [gq('verdigris', can(0.05, 0.16)), gq('cGreen', gband(0.05, 0.05, 0.016)), gq('dark', dots(0.05, 0, 8, 0.0065).concat(dots(0.05, -0.022, 8, 0.0065, 0.39))), gq('cGreen', gband(0.05, -0.052, 0.006)), gq('iron', fuze(0.084)), gq('tin', s.lever, 'spoon'), gq('brassOld', s.ring, 'pin')]; };
   // the limpet: an iron puck with teeth round its rim, set in a pad of dark glue that has run (its light: grenfx's own)
   GREN.g_sticky = () => {
     const teeth = []; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; teeth.push(spike(0.011, 0.03, [Math.cos(a) * 0.072, -0.012, Math.sin(a) * 0.072], [Math.PI * 0.72, -a + HX, 0], 4)); }
@@ -2544,7 +2632,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       gq('goo', [ball(0.078, [0, -0.024, 0], [1, 0.3, 1]), ball(0.02, [0.068, -0.036, 0.02], [1, 0.6, 1]), ball(0.016, [-0.05, -0.04, 0.05], [1, 0.7, 1]), ball(0.018, [-0.03, -0.038, -0.064], [1, 0.6, 1])]), gq('tin', new THREE.TorusGeometry(0.02, 0.004, 4, 10).rotateX(HX).translate(0, 0.027, 0))];
   };
   // the flash charge: a steel tube pierced in two rings, capped at both ends, two pale bands, a fuze and spoon
-  GREN.g_flash = () => { const s = spoon(0.084, 0.044); return [gq('tin', [can(0.044, 0.16), fuze(0.084), s.lever]), gq('cWhite', [gband(0.044, 0.058, 0.01), gband(0.044, -0.058, 0.01)]), gq('dark', dots(0.044, 0.024, 6, 0.008).concat(dots(0.044, -0.024, 6, 0.008, 0.52))), gq('brassOld', s.ring)]; };
+  GREN.g_flash = () => { const s = spoon(0.084, 0.044); return [gq('tin', [can(0.044, 0.16), fuze(0.084)]), gq('tin', s.lever, 'spoon'), gq('cWhite', [gband(0.044, 0.058, 0.01), gband(0.044, -0.058, 0.01)]), gq('dark', dots(0.044, 0.024, 6, 0.008).concat(dots(0.044, -0.024, 6, 0.008, 0.52))), gq('brassOld', s.ring, 'pin')]; };
   // the void charge: a heavy ball of iron in two halves joined at a seam, a lens of black glass let into its face, in a cage of two iron
   // hoops (they turn)
   GREN.g_hole = () => [gq('iron', new THREE.SphereGeometry(0.072, 24, 16)), gq('dark', [new THREE.TorusGeometry(0.0726, 0.0024, 4, 32).rotateX(HX + 0.3), new THREE.TorusGeometry(0.0726, 0.0024, 4, 32).rotateX(HX - 0.3)]), gq('black', [ball(0.022, [0, 0.0, 0.062], [1, 1, 0.45])]), gq('tin', [new THREE.TorusGeometry(0.023, 0.0028, 5, 18).translate(0, 0, 0.066)]),
@@ -2746,15 +2834,17 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   col = S(c); rough = .3 + (op - .5) * .08 + (1. - n1) * .1; metal = 0.;
 }`],
     // a heart's flesh in its own colours: the grain of the muscle, veins over it, fat in places; wet
-    flesh: [512, 0.6, `
+    flesh: [512, 1.1, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
-  float fib = vnA(vec2(uv.x * 90., uv.y * 9.), vec2(90., 9.), 1.), n1 = fbm(uv, 4., 2.), n2 = fbm(uv, 16., 3.);
-  float vein = smoothstep(.9, .97, ridge(uv + (vec2(fbm(uv, 4., 7.), fbm(uv, 4., 8.)) - .5) * .2, 4., 6.));
-  float fat = smoothstep(.62, .8, fbm(uv, 3., 9.));
-  h = .5 + (fib - .5) * .06 + (n2 - .5) * .14 + vein * .1 + fat * .08;
-  vec3 c = mix(vec3(.26, .06, .06), vec3(.38, .1, .09), n1) * (.94 + fib * .1);
-  c = mix(c, vec3(.18, .05, .09), vein * .7); c = mix(c, vec3(.56, .46, .28), fat * .6);
-  col = S(c); rough = .3 + (n2 - .5) * .2 + fat * .2; metal = 0.;
+  float fib = vnA(vec2(uv.x * 140., uv.y * 12.), vec2(140., 12.), 1.), fib2 = vnA(vec2(uv.x * 60., uv.y * 5.), vec2(60., 5.), 4.), n1 = fbm(uv, 4., 2.), n2 = fbm(uv, 16., 3.), n3 = fbm(uv, 40., 5.);
+  vec3 lb = voro(uv + (vec2(fbm(uv, 3., 14.), fbm(uv, 3., 15.)) - .5) * .3, 6., 11.); float lobe = smoothstep(.0, .7, lb.y - lb.x);
+  float vein = smoothstep(.88, .97, ridge(uv + (vec2(fbm(uv, 4., 7.), fbm(uv, 4., 8.)) - .5) * .25, 4., 6.)), vein2 = smoothstep(.9, .98, ridge(uv * 1.0 + .3, 11., 9.)) * .6;
+  float fat = smoothstep(.6, .78, fbm(uv, 3., 9.) + (n2 - .5) * .25);
+  float wet = smoothstep(.35, .7, fbm(uv, 6., 13.));
+  h = .5 + (fib - .5) * .12 + (fib2 - .5) * .1 + lobe * .05 + (n2 - .5) * .16 + (n3 - .5) * .06 + max(vein, vein2) * .12 + fat * .1;
+  vec3 c = mix(vec3(.22, .05, .05), vec3(.36, .09, .08), n1 * .7 + lobe * .3) * (.86 + fib * .2);
+  c = mix(c, vec3(.13, .04, .08), max(vein, vein2) * .75); c = mix(c, vec3(.5, .4, .24), fat * .7);
+  col = S(c); rough = mix(.62, .2, wet) + (n3 - .5) * .14 + fat * .1; metal = 0.;
 }`],
     // an apple's skin, gold ripening to russet, in its own colours: streaks from the stalk, pale lenticels, rough russet patches
     appleSkin: [256, 0.4, `
@@ -3014,10 +3104,11 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const l = Math.hypot(dx, dy, dz) || 1, x = dx / l, y = dy / l, z = dz / l;
     let r = 0.05 * (1 - 0.42 * Math.pow(Math.max(0, -y), 1.6)) * (1 + 0.06 * Math.max(0, x) * Math.max(0, -y + 0.3) + 0.05 * Math.max(0, z));
     r -= 0.0035 * Math.exp(-Math.pow((x * 0.8 + z * 0.6 - 0.15 + y * 0.25) / 0.09, 2)) * Math.max(0, z + 0.3);
+    r *= 1 + 0.025 * Math.sin(x * 9 + y * 7) * Math.sin(z * 8 - y * 5) + 0.012 * Math.sin(x * 23 + z * 19 + y * 11) - 0.03 * Math.max(0, y - 0.55) * (1 + Math.sin(Math.atan2(z, x) * 7));
     return [x * r - Math.max(0, -y) * 0.016 * (1 - y), y * r * 1.18, z * r * 0.88];
   };
   ITEM.heart = () => {
-    const g = new THREE.SphereGeometry(1, 30, 22), ps = g.attributes.position;
+    const g = new THREE.SphereGeometry(1, 40, 28), ps = g.attributes.position;
     for (let i = 0; i < ps.count; i++) { const p = heartAt(ps.getX(i), ps.getY(i), ps.getZ(i)); ps.setXYZ(i, p[0], p[1], p[2]); }
     g.computeVertexNormals();
     const at = (u, v) => heartAt(Math.cos(u) * Math.cos(v), Math.sin(v), Math.sin(u) * Math.cos(v)), out = (p, k) => p.map((c) => c * k);

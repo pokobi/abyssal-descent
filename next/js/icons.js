@@ -942,8 +942,13 @@
   II.v_neck = [...Array.from({ length: 13 }, (_, i) => { const t = i / 12, a = Math.PI * (0.08 + 0.84 * t); return EV(EL(256 + Math.cos(a) * 190, 120 + Math.sin(a) * 210, 20, 15) + EL(256 + Math.cos(a) * 190, 120 + Math.sin(a) * 210, 9, 6), gold); }), L(PG(256, 330, 320, 400, 256, 480, 192, 400), gold), L(PG(256, 360, 296, 400, 256, 448, 216, 400), '#4a1416')];
   // a rusted sceptre: an iron rod gone to rust, rings of old gold, a crown of points at its head
   II.v_scepter = Z([L(R(240, 160, 32, 330, 14), '#6a4630'), ...[200, 300, 420].map((y) => L(R(228, y, 56, 22, 8), gold)), L(PG(196, 160, 316, 160, 330, 90, 300, 120, 286, 66, 256, 104, 226, 66, 212, 120, 182, 90), gold), L(O(256, 132, 18), '#4e1c18'), L(O(256, 492, 20), gold)], 1, 30);
-  // a small idol of ebony: a squat figure seated on a block, a tall headdress, its hands on its knees, a face cut plain
-  II.v_idol = [L(R(140, 420, 232, 56, 10), '#2a1e16'), L('M170 420C164 360 176 300 206 270L306 270C336 300 348 360 342 420Z', '#3a2a1e'), L(R(156, 360, 200, 36, 16), '#46342a'), L(O(256, 214, 62), '#3a2a1e'), L(PG(204, 186, 308, 186, 290, 60, 222, 60), '#32241a'), L(R(226, 206, 60, 10, 4), '#1e1610'), L(R(240, 232, 32, 8, 3), '#1e1610')];
+  // a small idol of ebony: a figure seated on a block carved in the round - a long head with its eyes and mouth cut in, the arms down
+  // to the hands joined on the belly, the knees drawn up
+  II.v_idol = [L(R(146, 436, 220, 44, 8), '#241a12'), L(EL(214, 396, 46, 40), '#3a2a1e'), L(EL(298, 396, 46, 40), '#3a2a1e'),
+    L('M206 372C192 314 196 262 222 240L290 240C316 262 320 314 306 372Z', '#33251a'), L(R(240, 222, 32, 26, 8), '#2e2218'),
+    L('M206 256C178 290 186 340 238 344L244 324C210 320 206 292 224 268Z', '#46342a'), L('M306 256C334 290 326 340 274 344L268 324C302 320 306 292 288 268Z', '#46342a'), L(EL(256, 334, 26, 16), '#4a382a'),
+    L(EL(256, 152, 58, 80), '#3a2a1e'), L(EL(234, 150, 15, 6), '#140e0a'), L(EL(278, 150, 15, 6), '#140e0a'), L(R(240, 196, 32, 8, 3), '#140e0a'), L(R(252, 150, 8, 34, 3), '#2a1e14'),
+    L(R(208, 82, 96, 16, 6), '#2a1e14')];
   // the golden chalice: a deep bowl, a knop on its stem, a broad foot
   II.v_chalice = [L('M136 70L376 70C376 190 330 250 256 260C182 250 136 190 136 70Z', gold), L(R(148, 70, 216, 26, 10), '#a68a48'), L(R(240, 256, 32, 150, 10), goldDk), L(EL(256, 320, 44, 26), gold), L('M150 470L362 470C352 430 300 404 256 404C212 404 160 430 150 470Z', gold), L(R(144, 462, 224, 22, 10), goldDk)];
   // the saint's skull, gilded and worn (bone through the gilding)

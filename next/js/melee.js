@@ -131,27 +131,36 @@
     const blade = mk(Object.assign({ color: 0x8e9298, metalness: 0.95, roughness: 0.3 }, sx('steel', 0.45) ? Object.assign({ roughness: 0.42, color: 0x9a9ea4 }, sx('steel', 0.45)) : {}));   // (steel: grey and metal through, not white)
     const dark = mk({ color: 0x241e1c, metalness: 0.3, roughness: 0.62 });
     const wrap = mk(Object.assign({ color: 0x3a1a14, roughness: 0.9, map: G.Tex.tex.cloth.map }, sx('leather', 1) ? Object.assign({ color: 0x5a2c20, roughness: 1 }, sx('leather', 1)) : {}));
-    const gold = mk({ color: 0xb8954e, metalness: 0.85, roughness: 0.36 });   // (old gold: fittings, not a lamp)
-    const goldBr = mk({ color: 0xc8aa6a, metalness: 0.86, roughness: 0.3 });
+    const gold = mk({ color: 0x96783e, metalness: 0.85, roughness: 0.42 });   // (old gold: fittings, not a lamp)
+    const goldBr = mk({ color: 0xa68a56, metalness: 0.86, roughness: 0.36 });
     let bladeM = blade;
     if (def.model === 'frostknife') bladeM = mk({ color: 0x9ab2bc, metalness: 0.3, roughness: 0.1, emissive: 0x24485c, emissiveIntensity: 0.12, transparent: true, opacity: 0.94 });
     if (def.model === 'emberblade') bladeM = mk({ color: 0x6e3a26, metalness: 0.8, roughness: 0.34, emissive: 0x8a2808, emissiveIntensity: 0.15 });
-    if (def.model === 'holy') bladeM = mk({ color: 0xb8b2a2, metalness: 0.85, roughness: 0.26, emissive: 0x6a5a30, emissiveIntensity: 0.1 });
-    if (def.model === 'twin') bladeM = mk({ color: 0x5a6a48, metalness: 0.75, roughness: 0.3, emissive: 0x2a4a14, emissiveIntensity: 0.12 });
+    if (def.model === 'holy') bladeM = mk(Object.assign({ color: 0xa8acb0, metalness: 0.95, roughness: 0.24 }, sx('steel', 0.3) || {}));   // (polished bright: its gold is in the inlay)
+    if (def.model === 'twin') bladeM = mk(Object.assign({ color: 0x868a84, metalness: 0.92, roughness: 0.4 }, sx('steel', 0.45) || {}));   // (plain steel: the venom is in its stained fuller)
     // (a part is a box cut to its size with its edges rounded a little, as on the guns)
     const box = (p, w, h, d, x, y, z, m, rx, ry, rz) => { const rg = G.GFX && G.GFX.rbox ? G.GFX.rbox(w, h, d, Math.min(0.003, Math.min(Math.abs(w), Math.abs(h), Math.abs(d)) * 0.2)) : null; const o = new THREE.Mesh(rg || PG.box, m); if (!rg) o.scale.set(w, h, d); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); p.add(o); return o; };
     const cyl = (p, rad, len, x, y, z, m) => { const o = new THREE.Mesh(PG.cyl8, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); p.add(o); return o; };
     const cone = (p, rad, len, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); o.rotation.x = rx || 0; p.add(o); return o; };
     const flatTip = (p, w, len, d, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(w * 0.58, len, d * 0.58); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, Math.PI / 4, 0); p.add(o); return o; };
     const isMidas = def.id === 'm_midas' || def.trait === 'midas';
-    const gDeep = isMidas ? mk({ color: 0xd89218, metalness: 0.42, roughness: 0.28, emissive: 0x523004, emissiveIntensity: 0.45 }) : null;
-    const gGold = isMidas ? mk({ color: 0xffcf40, metalness: 0.45, roughness: 0.22, emissive: 0x7a4c08, emissiveIntensity: 0.52 }) : null;
-    const gBright = isMidas ? mk({ color: 0xffe878, metalness: 0.48, roughness: 0.16, emissive: 0x9a6810, emissiveIntensity: 0.62 }) : null;
-    const gSpike = isMidas ? mk({ color: 0xfff8c0, metalness: 0.52, roughness: 0.10, emissive: 0xc88e18, emissiveIntensity: 0.82 }) : null;
-    const gTrim = isMidas ? mk({ color: 0x3a1014, metalness: 0.35, roughness: 0.45, emissive: 0x1a0406, emissiveIntensity: 0.25 }) : null;
-    const gGem = isMidas ? mk({ color: 0xff2414, metalness: 0.15, roughness: 0.08, emissive: 0xff3c14, emissiveIntensity: 2.1 }) : null;
+    const gDeep = isMidas ? mk({ color: 0x8a6a2c, metalness: 0.85, roughness: 0.4 }) : null;
+    const gGold = isMidas ? mk(Object.assign({ color: 0x8a6e36, metalness: 0.88, roughness: 0.44 }, sx('steel', 0.4) || {})) : null;
+    const gBright = isMidas ? mk({ color: 0xb8964c, metalness: 0.88, roughness: 0.32 }) : null;
+    const gSpike = isMidas ? mk({ color: 0xc4a464, metalness: 0.9, roughness: 0.3 }) : null;
+    const gTrim = isMidas ? mk({ color: 0x2e1c14, metalness: 0.35, roughness: 0.6 }) : null;
+    const gGem = isMidas ? mk({ color: 0x4a1210, metalness: 0.15, roughness: 0.2, emissive: 0x4a1210, emissiveIntensity: 0.1 }) : null;
+    const NPg = G.GFX && G.GFX.meleeParts ? G.GFX.meleeParts : null;
     const fist = (p, right) => {
       const s = right ? 1 : -1;
+      if (isMidas && NPg && NPg('midas') && G.GFX.hand) {
+        // (a gauntlet of gilt plates over the gloved fist: gfx.js midas, mirrored for the left hand)
+        const hs = G.GFX.hand(right, true), hand = new THREE.Mesh(hs.hand, mats.glove); p.add(hand, new THREE.Mesh(hs.strap, mats.sleeve));
+        const gp = new THREE.Group(); if (!right) gp.scale.x = -1; p.add(gp);
+        for (const q of NPg('midas').parts) { const o = new THREE.Mesh(q.g, q.m === 'gilt' ? gGold : gDeep); o.position.set(q.at[0], q.at[1], q.at[2]); gp.add(o); }
+        const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); arm.userData.sleeve = true; p.add(arm);
+        return hand;
+      }
       if (isMidas) {
         // sculpted golden armored fist core + continuous tapered side cheek-guards
         const palm = box(p, 0.056, 0.042, 0.064, 0, -0.001, 0.000, gDeep);
@@ -223,6 +232,21 @@
     const gemM = (col, em) => { const c = new THREE.Color(col), h = {}; c.getHSL(h, THREE.SRGBColorSpace); c.setHSL(h.h, h.s * 0.45, h.l * 0.55, THREE.SRGBColorSpace); return mk({ color: c, metalness: 0.15, roughness: 0.14, emissive: c, emissiveIntensity: 0.12 }); };   // (stones dull and dark: none shines)
     // (the weapons shaped in gfx.js - blades lofted to an edge, turned grips, cut guards: a list of parts, each given its material here)
     const NP = G.GFX && G.GFX.meleeParts ? G.GFX.meleeParts : null, MMb = { blade: bladeM, dark, steel: mats.steel, wrap, gold, goldBr, wood: mats.wood };
+    {
+      // (what the shaped weapons are made of besides: forged iron, copper, bone, hide pale and dark, steel blued or blackened, rime,
+      // steel coloured by heat (by its vertices), the frosted hardened edge, a dark stain, bronze gone green, wood stained black)
+      const it = (n) => (G.GFX && G.GFX.itemTex ? G.GFX.itemTex(n) : null), cast = it('castIron'), stl = sx('steel', 0.45), hide = sx('leather', 1);
+      const castM = (c) => mk(Object.assign({ color: c, roughness: 1 }, cast ? { map: cast.map, normalMap: cast.normalMap, roughnessMap: cast.orm, metalnessMap: cast.orm, metalness: 1 } : { metalness: 0.7, roughness: 0.6 }));
+      Object.assign(MMb, {
+        iron: castM(0x6e706c), verdigris: castM(0x5c6a50),
+        copper: mk(Object.assign({ color: 0x8a5434, metalness: 0.9, roughness: 0.5 }, stl || {})), bone: mk({ color: 0xbcae92, metalness: 0, roughness: 0.6 }),
+        leather: mk(Object.assign({ color: 0x3a2618, roughness: 1 }, hide || {})), leatherW: mk(Object.assign({ color: 0x8a7a60, roughness: 1 }, hide || {})), wrapRed: mk(Object.assign({ color: 0x4a1c16, roughness: 1 }, hide || {})),
+        blued: mk(Object.assign({ color: 0x3c4856, metalness: 0.95, roughness: 0.42 }, stl || {})), blackSteel: mk(Object.assign({ color: 0x2a2c30, metalness: 0.92, roughness: 0.46 }, stl || {})),
+        rime: mk({ color: 0x5e6a74, metalness: 0, roughness: 1 }), heat: mk(Object.assign({ color: 0xffffff, metalness: 0.9, roughness: 0.46, vertexColors: true }, stl || {})),
+        hamon: mk(Object.assign({ color: 0xc4c8cc, metalness: 0.8, roughness: 0.62 }, stl || {})), stain: mk({ color: 0x1a2412, metalness: 0.3, roughness: 0.22 }),
+        darkWood: mk(Object.assign({ color: 0x2a1c14, roughness: 1 }, sx('walnut', 0.5) || {})),
+      });
+    }
     const has = (key) => !!(NP && NP(key));
     const put = (p, key, MM) => { const d = NP(key); for (const q of d.parts) { const o = new THREE.Mesh(q.g, MM[q.m] || dark); o.position.set(q.at[0], q.at[1], q.at[2]); if (q.glow) o.userData.glow = true; p.add(o); } return d.tipY; };
     const knife = (p, len, m) => {
@@ -235,7 +259,7 @@
       return 0.067 + len + 0.055;
     };
     switch (def.model) {
-      case 'fists': if (isMidas) glow = 0xffd040; break;
+      case 'fists': break;
       case 'knife': tipY = has('knife') ? put(wg, 'knife', MMb) : knife(wg, 0.18, bladeM); break;
       case 'sknife': {
         if (has('sknife')) { tipY = put(wg, 'sknife', MMb); break; }
@@ -247,8 +271,8 @@
         tipY = 0.30; break;
       }
       case 'frostknife': {
-        const iceGem = gemM(0x70e8ff, 0x30b8ff), iceHil = mk({ color: 0x385878, metalness: 0.5, roughness: 0.25, emissive: 0x102840, emissiveIntensity: 0.4 });
-        if (has('frostknife')) { tipY = put(wg, 'frostknife', Object.assign({ hilt: iceHil, gem: iceGem }, MMb)); glow = 0x80d0ff; break; }
+        const iceGem = gemM(0x70e8ff, 0x30b8ff), iceHil = mk({ color: 0x2c3a48, metalness: 0.5, roughness: 0.4 });
+        if (has('frostknife')) { tipY = put(wg, 'frostknife', Object.assign({ hilt: iceHil, gem: iceGem }, MMb)); break; }
         cyl(wg, 0.015, 0.11, 0, 0, 0, iceHil);
         for (const y of [-0.03, 0, 0.03]) box(wg, 0.032, 0.006, 0.032, 0, y, 0, goldBr);
         const pm = new THREE.Mesh(PG.oct3, iceGem); pm.scale.set(0.014, 0.022, 0.014); pm.position.set(0, -0.068, 0); wg.add(pm);
@@ -257,10 +281,10 @@
         box(wg, 0.007, 0.20, 0.038, 0, 0.17, 0, bladeM);
         box(wg, 0.010, 0.17, 0.010, 0, 0.16, 0, iceGem);
         flatTip(wg, 0.008, 0.065, 0.038, 0, 0.30, 0, bladeM);
-        tipY = 0.33; glow = 0x80d0ff; break;
+        tipY = 0.33; break;
       }
       case 'twin': {
-        const vGem = gemM(0x50ff30, 0x30e818), vObs = mk({ color: 0x142214, metalness: 0.4, roughness: 0.35, emissive: 0x061204, emissiveIntensity: 0.3 });
+        const vGem = gemM(0x50ff30, 0x30e818), vObs = mk({ color: 0x142214, metalness: 0.4, roughness: 0.45 });
         const buildVenom = (p) => {
           if (has('twin')) return put(p, 'twin', Object.assign({ hilt: vObs, gem: vGem }, MMb));
           cyl(p, 0.015, 0.11, 0, 0, 0, vObs);
@@ -280,7 +304,7 @@
         };
         tipY = buildVenom(wg);
         const lg = new THREE.Group(); l.add(lg); buildVenom(lg); lg.rotation.set(-0.9, 0, -0.2); l.userData.knife = lg;
-        glow = 0x50ff30; break;
+        break;
       }
       case 'kukri': {
         if (has('kukri')) { tipY = put(wg, 'kukri', MMb); break; }
@@ -299,9 +323,10 @@
       }
       case 'katana': case 'emberblade': {
         const em = def.model === 'emberblade';
-        const spineM = em ? mk({ color: 0x1a0806, metalness: 0.45, roughness: 0.35, emissive: 0x280600, emissiveIntensity: 0.4 }) : dark;
+        if (def.id === 'm_kusanagi' && has('kusanagi')) { tipY = put(wg, 'kusanagi', MMb); break; }
+        const spineM = em ? mk({ color: 0x1a0806, metalness: 0.45, roughness: 0.45 }) : dark;
         const fGem = em ? gemM(0xff3810, 0xff5010) : null;
-        if (has(em ? 'emberblade' : 'katana')) { tipY = put(wg, em ? 'emberblade' : 'katana', Object.assign({ spine: spineM, gem: fGem }, MMb)); if (em) glow = 0xff6a20; break; }
+        if (has(em ? 'emberblade' : 'katana')) { tipY = put(wg, em ? 'emberblade' : 'katana', Object.assign({ spine: spineM, gem: fGem }, MMb)); break; }
         cyl(wg, 0.016, 0.22, 0, -0.01, 0, wrap);
         box(wg, 0.026, 0.018, 0.032, 0, -0.125, 0, gold);
         for (let i = 0; i < 5; i++) box(wg, 0.034, 0.008, 0.028, 0, -0.09 + i * 0.038, 0, em ? gold : dark, 0.35);
@@ -315,12 +340,12 @@
         box(wg, 0.009, 0.62, 0.012, 0, 0.45, 0.008, spineM, 0.03);
         if (em) for (let i = 0; i < 3; i++) box(wg, 0.008, 0.045, 0.018, 0, 0.28 + i * 0.16, 0.016, bladeM, -0.45);
         flatTip(wg, 0.007, 0.075, 0.034, 0, 0.79, -0.016, bladeM, 0.05);
-        tipY = 0.83; if (em) glow = 0xff6a20; bl.userData.glow = true; break;
+        tipY = 0.83; break;
       }
       case 'holy': {
         const hGem = gemM(0xff3018, 0xff4818), hSun = gemM(0xfff8b0, 0xffd850);
-        const hTrim = mk({ color: 0x381018, metalness: 0.35, roughness: 0.4, emissive: 0x180408, emissiveIntensity: 0.3 });
-        if (has('holy')) { tipY = put(wg, 'holy', Object.assign({ trim: hTrim, gem: hGem, sun: hSun }, MMb)); glow = 0xfff0c0; break; }
+        const hTrim = mk({ color: 0x381018, metalness: 0.35, roughness: 0.5 });
+        if (has('holy')) { tipY = put(wg, 'holy', Object.assign({ trim: hTrim, gem: hGem, sun: hSun }, MMb)); break; }
         // royal pommel with sun-ruby core & golden wings
         const pBez = new THREE.Mesh(PG.oct, goldBr); pBez.scale.set(0.022, 0.016, 0.022); pBez.position.set(0, -0.125, 0); pBez.rotation.z = Math.PI / 2; wg.add(pBez);
         const pGem = new THREE.Mesh(PG.oct3, hGem); pGem.scale.set(0.016, 0.024, 0.016); pGem.position.set(0, -0.132, 0); wg.add(pGem);
@@ -342,7 +367,7 @@
         box(wg, 0.012, 0.56, 0.018, 0, 0.46, 0, gold);
         box(wg, 0.015, 0.50, 0.008, 0, 0.44, 0, hSun);
         flatTip(wg, 0.009, 0.095, 0.050, 0, 0.835, 0, bladeM);
-        tipY = 0.88; glow = 0xfff0c0; bl.userData.glow = true; break;
+        tipY = 0.88; break;
       }
       case 'rapier': {
         if (has('rapier')) { tipY = put(wg, 'rapier', MMb); break; }
@@ -398,8 +423,8 @@
         tipY = 0.58; break;
       }
       case 'thunder': {
-        const tGem = gemM(0x60f0ff, 0x30c8ff), tSteel = mk({ color: 0x262c38, metalness: 0.48, roughness: 0.28, emissive: 0x0a1424, emissiveIntensity: 0.35 });
-        if (has('thunder')) { tipY = put(wg, 'thunder', Object.assign({ tsteel: tSteel, gem: tGem }, MMb)); glow = 0x70e8ff; break; }
+        const tGem = gemM(0x60f0ff, 0x30c8ff), tSteel = mk({ color: 0x262c38, metalness: 0.6, roughness: 0.45 });
+        if (has('thunder')) { tipY = put(wg, 'thunder', Object.assign({ tsteel: tSteel, gem: tGem }, MMb)); break; }
         // braided obsidian-and-gold haft + storm-crystal pommel & flared golden collar
         cyl(wg, 0.020, 0.64, 0, 0.19, 0, tSteel);
         for (const y of [-0.08, 0.04, 0.16, 0.28, 0.38]) box(wg, 0.046, 0.016, 0.046, 0, y, 0, gold);
@@ -426,9 +451,10 @@
         // top lightning-spire crown
         const crB = new THREE.Mesh(PG.oct, goldBr); crB.scale.set(0.028, 0.020, 0.028); crB.position.set(0, 0.57, 0); wg.add(crB);
         const crS = new THREE.Mesh(PG.oct3, tGem); crS.scale.set(0.020, 0.042, 0.020); crS.position.set(0, 0.60, 0); wg.add(crS);
-        tipY = 0.62; glow = 0x70e8ff; break;
+        tipY = 0.62; break;
       }
       case 'spear': {
+        if (def.id === 'm_abyss' && has('abyss')) { tipY = put(wg, 'abyss', MMb); break; }
         if (has('spear')) { tipY = put(wg, 'spear', MMb); break; }
         cyl(wg, 0.016, 1.32, 0, 0.30, 0, mats.wood);
         for (const y of [-0.20, 0.25, 0.65, 0.90]) box(wg, 0.038, 0.018, 0.038, 0, y, 0, gold);
@@ -442,9 +468,9 @@
       case 'scythe': {
         const isDev = def.id === 'm_devour' || def.trait === 'devour';
         if (isDev) {
-          const sGem = gemM(0xff1868, 0xff2080), sVoid = mk({ color: 0x1c0818, metalness: 0.45, roughness: 0.3, emissive: 0x180214, emissiveIntensity: 0.4 });
-          const sEdge = mk({ color: 0xff3888, metalness: 0.35, roughness: 0.12, emissive: 0xe01868, emissiveIntensity: 1.75 });
-          if (has('devour')) { tipY = put(wg, 'devour', Object.assign({ void: sVoid, gem: sGem, edge: sEdge }, MMb)); glow = 0xff2078; break; }
+          const sGem = gemM(0xff1868, 0xff2080), sVoid = mk({ color: 0x1c1418, metalness: 0.6, roughness: 0.45 });
+          const sEdge = mk({ color: 0x8e9298, metalness: 0.9, roughness: 0.32 });
+          if (has('devour')) { tipY = put(wg, 'devour', Object.assign({ void: sVoid, gem: sGem, edge: sEdge }, MMb)); break; }
           // armored obsidian-and-gold snath + abyssal soul-crystal pommel
           cyl(wg, 0.019, 1.18, 0, 0.32, 0, sVoid);
           for (let i = 0; i < 6; i++) box(wg, 0.044, 0.018, 0.044, 0, -0.14 + i * 0.20, 0, gold);
@@ -471,11 +497,11 @@
           }
           // inner soul-ripper hook
           flatTip(bg, 0.014, 0.09, 0.036, 0, -0.055, -0.18, goldBr, -2.4);
-          tipY = 0.95; glow = 0xff2078; break;
+          tipY = 0.95; break;
         }
-        const boneM = mk({ color: 0xd8ceb8, metalness: 0.25, roughness: 0.4, emissive: 0x241e18, emissiveIntensity: 0.25 });
+        const boneM = mk({ color: 0xbcae92, metalness: 0, roughness: 0.6 });
         const rGem = gemM(0xff2030, 0xff1020);
-        if (has('scythe')) { tipY = put(wg, 'scythe', Object.assign({ bone: boneM, gem: rGem }, MMb)); glow = 0xd02040; break; }
+        if (has('scythe')) { tipY = put(wg, 'scythe', Object.assign({ bone: boneM, gem: rGem }, MMb)); break; }
         cyl(wg, 0.018, 1.15, 0, 0.32, 0, dark);
         for (const y of [-0.15, 0.15, 0.45, 0.72]) box(wg, 0.038, 0.018, 0.038, 0, y, 0, boneM);
         const bg = new THREE.Group(); bg.position.set(0, 0.88, 0); wg.add(bg);
@@ -490,7 +516,7 @@
           box(bg, 0.007, w * 0.74, step + 0.025, 0, my - Math.cos(rx) * w * 0.15, mz - Math.sin(rx) * w * 0.15, bladeM, rx);
           cy += Math.sin(rx) * step; cz -= Math.cos(rx) * step;
         }
-        tipY = 0.92; glow = 0xd02040; break;
+        tipY = 0.92; break;
       }
     }
     fist(r, true);
@@ -575,15 +601,17 @@
     if (m === 'spear' || m === 'scythe') return 'baton';
     return 'twirl';
   };
-  // a melee weapon with an element: a thin glowing skin of its colour over the weapon (pulsing), and the slash trail in that colour
+  // a melee weapon with an element: the slash trail in a dark shade of its colour, and a faint skin of that colour over it. A weapon whose
+  // element is its own shows it in what it is made of (gfx.js: frost, heat, copper): its skin is all but unseen
   function elFilm(m, el) {
     if (!m || !el || !G.Elem.BY[el]) return;
-    const hex = G.Elem.BY[el].hex;
-    m.glow = hex; m.el = el;
-    const mat = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false });
+    const hex = G.Elem.BY[el].hex, dim = new THREE.Color(hex), h = {}; dim.getHSL(h, THREE.SRGBColorSpace); dim.setHSL(h.h, h.s * 0.4, h.l * 0.3, THREE.SRGBColorSpace);
+    m.glow = dim.getHex(); m.el = el;
+    // (its pulse, melee update, is scaled by the opacity it is made with: a core's skin as it was, a weapon's own one a twentieth of it)
+    const mat = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: m.def && m.def.el === el ? 0.006 : 0.12, blending: THREE.AdditiveBlending, depthWrite: false });
     const meshes = []; m.wg.traverse((o) => { if (o.isMesh) meshes.push(o); });
     for (const o of meshes) { const f = new THREE.Mesh(o.geometry, mat); f.scale.setScalar(1.05); f.renderOrder = 2; o.add(f); }
-    m.film = mat;
+    m.film = mat; m.filmK = mat.opacity / 0.12;
   }
   W.melee = {
     equip(immediate) {
@@ -755,8 +783,8 @@
     const fl = G.world.floorBelow(pos.x, pos.y + 0.3, pos.z), ground = V(pos.x, fl > -50 ? fl : pos.y, pos.z);
     C.zone(ground, 4.5, 6, 'gravity', 0);
     const m = new THREE.Group();
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0x2a1840, emissive: 0x6a30c0, emissiveIntensity: 0.8, metalness: 0.6, roughness: 0.35 }));
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.45, 6), new THREE.MeshStandardMaterial({ color: 0xd8c8ff, emissive: 0x9a6aff, emissiveIntensity: 1.4, metalness: 0.9, roughness: 0.2 }));
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0x241c22, emissive: 0x3a2a4a, emissiveIntensity: 0.12, metalness: 0.6, roughness: 0.45 }));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.45, 6), new THREE.MeshStandardMaterial({ color: 0x8a8e96, emissive: 0x4a3a6a, emissiveIntensity: 0.12, metalness: 0.9, roughness: 0.32 }));
     tip.position.y = -1.3; tip.rotation.x = Math.PI; m.add(shaft); m.add(tip);
     m.position.copy(pos); m.quaternion.setFromUnitVectors(V(0, -1, 0), f.clone().normalize());
     G.scene.add(m);
@@ -1065,7 +1093,7 @@
       prevTip = tp;
     } else prevTip = null;
     if (mm.glow && Math.random() < dt * (mm.el ? 14 : 6)) spawnGlow(mm.glow, mm.el ? 0.55 : 0.4);
-    if (mm.film) mm.film.opacity = 0.12 + Math.sin(G.game.time * 5) * 0.05 + (striking ? 0.12 : 0);
+    if (mm.film) mm.film.opacity = (0.12 + Math.sin(G.game.time * 5) * 0.05 + (striking ? 0.12 : 0)) * (mm.filmK || 1);
     W.isScoped = false;
     W.vmRoot.visible = G.game.state !== 'dead' && G.avatar.tpK < (G.avatar.returning ? 0.55 : 0.3);
     G.ui.scope(false);

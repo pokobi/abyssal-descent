@@ -480,6 +480,16 @@
   };
   // ---------------- things on the ground ----------------
   IV.ground = [];
+  // the picture of the ring about a thing on the ground (white, its colour from the material): a sharp line at 0.86 of its radius and a
+  // soft faint band about the line, nothing inside it. Made once
+  let ringTex = null, ringGeo = null;
+  function groundRingTex() {
+    if (ringTex) return ringTex;
+    const n = 128, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'), im = g.createImageData(n, n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const r = Math.hypot(x + 0.5 - n / 2, y + 0.5 - n / 2) / (n / 2), a = r >= 1 ? 0 : Math.min(1, Math.exp(-Math.pow((r - 0.86) / 0.04, 2)) + 0.14 * Math.exp(-Math.pow((r - 0.86) / 0.11, 2))) * Math.min(1, (1 - r) * 12), i = (y * n + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = 255; im.data[i + 3] = Math.round(a * 255); }
+    g.putImageData(im, 0, 0); ringTex = new THREE.CanvasTexture(c); ringTex.colorSpace = THREE.SRGBColorSpace; return ringTex;
+  }
+  const groundRingGeo = () => ringGeo || (ringGeo = new THREE.CircleGeometry(0.38, 40));
   IV.dropToGround = function (it, pos) {
     const w = G.world; if (!w) return;
     const d = IV.def(it);
@@ -488,7 +498,9 @@
     const shown = it.type === 'item' && G.ItemAnim && G.ItemAnim.display ? G.ItemAnim.display(it.id, { k: 2, min: 0.12, max: 0.36, lie: true, yaw: Math.random() * 6.28 }) : null;
     if (shown) g.add(shown);
     else { const sack = new THREE.Mesh(G.Props.PG.sph, new THREE.MeshStandardMaterial({ color: 0x6a5238, roughness: 0.9 })); sack.scale.set(0.22, 0.16, 0.2); sack.position.y = 0.14; g.add(sack); }
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.34, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(G.ui.R(d && d.rarity || 'common')), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+    // (the ring about it: a thin line of its rarity's colour, dulled, a little soft at its sides so that it still reads from afar)
+    const rc = new THREE.Color(G.ui.R(d && d.rarity || 'common')), hsl = {}; rc.getHSL(hsl, THREE.SRGBColorSpace); rc.setHSL(hsl.h, hsl.s * 0.7, Math.min(hsl.l, 0.66) * 0.95, THREE.SRGBColorSpace);
+    const ring = new THREE.Mesh(groundRingGeo(), new THREE.MeshBasicMaterial({ color: rc, map: groundRingTex(), transparent: true, opacity: 1, side: THREE.DoubleSide, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; g.add(ring);
     const tex = G.Tex.textTex(d ? d.icon : '❔', { size: 48 });
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));

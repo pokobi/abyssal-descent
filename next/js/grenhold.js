@@ -29,8 +29,53 @@
     const item = G.ItemAnim.build('throw', id); item.scale.setScalar(1.1); grp.add(item); grp.userData.item = item;
     const hd = G.ItemAnim.hand(grp, true); hd.position.set(0.005, -0.04, 0.02);
     G.weapons.vmScene.add(grp);
+    pinStart();
   }
   function setPose(p) { if (!grp) return; grp.position.set(p[0], p[1], p[2]); grp.rotation.set(p[3], p[4], p[5]); }
+
+  // ---------------- the pin ----------------
+  // As it is taken up, the other hand comes up from below, takes the ring of the pin, pulls it out and goes down again with it; at the
+  // throw the spoon flies off. Only what is seen: the hold's own timing is not touched (a throw started before the pin is out hurries
+  // the hand). The hand and the ring hang on grp, so they go wherever grp goes (put away, cancelled). Grenades with no pin: nothing.
+  // (Sound, for whoever makes it: the fingers on the ring at PIN_GRAB, the pin drawn at PIN_OUT, the spoon's ring as it flies at the throw)
+  const PIN_GRAB = 0.16, PIN_OUT = 0.22, PIN_AWAY = 0.42, PIN_END = 0.62;
+  let pin = null, spoonFly = null;
+  function pinStart() {
+    pin = null; if (!grp || !G.ItemAnim.hand) return;
+    let ring = null, spoon = null;
+    grp.userData.item.traverse((o) => { if (o.userData && o.userData.pin) { ring = o.userData.pin; spoon = o.userData.spoon || null; } });
+    if (!ring) return;
+    const lh = G.ItemAnim.hand(grp, false); lh.visible = false; lh.rotation.set(0.25, 0.95, -0.35);
+    pin = { lh, ring, spoon, t: 0, out: false, at: null };
+  }
+  const _pv = V(), smooth = (k) => k * k * (3 - 2 * k);
+  function pinTick(dt, hurry) {
+    if (!pin || !grp) return;
+    pin.t += dt * (hurry ? 4 : 1);
+    const t = pin.t, lh = pin.lh;
+    if (!pin.at) { grp.updateMatrixWorld(true); const g = pin.ring.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); pin.at = g.boundingSphere.center.clone().applyMatrix4(pin.ring.matrixWorld); grp.worldToLocal(pin.at); }
+    // (where the fist is, from the ring: out to the left of it and a little beyond, the first finger through the ring - never between
+    // the eye and the grenade)
+    const g0 = pin.at.clone().add(V(-0.042, -0.012, -0.012)), s0 = g0.clone().add(V(-0.14, -0.22, -0.02)), p1 = g0.clone().add(V(-0.12, -0.01, -0.01)), p2 = p1.clone().add(V(-0.1, -0.3, 0.02));
+    if (t < PIN_GRAB) _pv.lerpVectors(s0, g0, smooth(t / PIN_GRAB));
+    else if (t < PIN_OUT) _pv.copy(g0);
+    else if (t < PIN_AWAY) _pv.lerpVectors(g0, p1, smooth((t - PIN_OUT) / (PIN_AWAY - PIN_OUT)));
+    else _pv.lerpVectors(p1, p2, smooth(Math.min(1, (t - PIN_AWAY) / (PIN_END - PIN_AWAY))));
+    lh.position.copy(_pv); lh.visible = t < PIN_END;
+    if (!pin.out && t >= PIN_OUT) { pin.out = true; lh.attach(pin.ring); }
+  }
+  // the spoon thrown off at the release: a copy of it spins away out of the view
+  function spoonOff() {
+    if (!pin || !pin.spoon || !G.weapons.vmScene) return;
+    const sp = pin.spoon; grp.updateMatrixWorld(true);
+    const m = new THREE.Mesh(sp.geometry, sp.material); sp.matrixWorld.decompose(m.position, m.quaternion, m.scale);
+    G.weapons.vmScene.add(m); spoonFly = { m, v: V(0.7, 1.1, -0.5), t: 0 };
+  }
+  function spoonTick(dt) {
+    if (!spoonFly) return;
+    const s = spoonFly; s.t += dt; s.v.y -= 6 * dt; s.m.position.addScaledVector(s.v, dt); s.m.rotation.x += dt * 22; s.m.rotation.z += dt * 9;
+    if (s.t > 0.45) { s.m.parent && s.m.parent.remove(s.m); spoonFly = null; }
+  }
 
   // ---------------- arc guide ----------------
   const NDOT = 48;
@@ -140,6 +185,7 @@
   }
 
   GH.update = function (dt) {
+    spoonTick(dt);
     if (!h) return;
     const p = P(), W = G.weapons;
     // anything that takes the hands away cancels the readied grenade
@@ -175,6 +221,7 @@
         h.thrown = true;
         const id = h.id;
         if (!(p.has('g_refund') && Math.random() < 0.3)) p.takeItem(id);
+        spoonOff();
         if (grp && grp.userData.item) grp.userData.item.visible = false;
         G.abilities.releaseGrenade(id, h.under);
         showHint(false);
@@ -187,5 +234,6 @@
       if (k >= 1) { if (grp) grp.parent && grp.parent.remove(grp); grp = null; h = null; hideGuide(); showHint(false); return; }
     }
     setPose(h.pose);
+    pinTick(dt, h.ph === 'wind' || h.ph === 'throw');
   };
 })();

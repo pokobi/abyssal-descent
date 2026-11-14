@@ -43,7 +43,7 @@
     Object.assign(M, {
       iron: s(0x8a8e88, Object.assign({ roughness: 1 }, sf(cast, true))), verdigris: s(0x5c6852, Object.assign({ roughness: 1 }, sf(cast, true))),
       tin: s(0x8a8c88, Object.assign({ roughness: 0.7, metalness: 0.8 }, sf(steelT))), brassOld: s(0x8a6e38, Object.assign({ roughness: 0.75, metalness: 0.85 }, sf(steelT))), copper: s(0x7a4a2e, Object.assign({ roughness: 0.7, metalness: 0.85 }, sf(steelT))),
-      cRed: pt(0x5e2a20), cBlue: pt(0x34465a), cYellow: pt(0x75683a), cGreen: pt(0x3a4a2e), cWhite: pt(0x8e8c84),
+      cRed: pt(0x4c2c24), cBlue: pt(0x34465a), cYellow: pt(0x75683a), cGreen: pt(0x3a4a2e), cWhite: pt(0x8e8c84),
       paperOld: s(0x38211a, Object.assign({ roughness: 1, metalness: 0 }, hideT ? { normalMap: hideT.normalMap, roughnessMap: hideT.orm, normalScale: new THREE.Vector2(0.5, 0.5) } : {})),
       hide: s(0x3e2c1e, Object.assign({ roughness: 0.75, metalness: 0 }, hideT ? { normalMap: hideT.normalMap, normalScale: new THREE.Vector2(0.25, 0.25) } : {})), rope: s(0x6a5a40, Object.assign({ roughness: 1, metalness: 0 }, sf(weave))),
       clay: s(0x6a4a36, Object.assign({ roughness: 1, metalness: 0 }, sf(rock))), ceramicW: s(0x9a9080, Object.assign({ roughness: 0.4, metalness: 0 }, poly ? { normalMap: poly.normalMap, normalScale: new THREE.Vector2(0.4, 0.4) } : {})),
@@ -77,7 +77,7 @@
         else if (q.tag === 'onbag') (bag || g).add(o);
         else if (q.tag === 'ring0') { o.rotation.x = 1.2; g.add(o); (ud.rings = ud.rings || [])[0] = o; }
         else if (q.tag === 'ring1') { o.rotation.set(2.1, 1.0, 0); g.add(o); (ud.rings = ud.rings || [])[1] = o; }
-        else g.add(o);
+        else { g.add(o); if (q.tag === 'pin') ud.pin = o; else if (q.tag === 'spoon') ud.spoon = o; }   // (the pin's ring and the spoon: grenhold.js)
       }
       if (id === 'g_sticky') ud.led = sph(g, M.ember, 0.0055, 0, 0.033, 0);   // (a slow match smouldering in its fuze: it flickers)
       if (id === 'g_dyna') { ud.fuseLine = cyl(g, M.tape, 0.004, 0.1, 0.008, 0.16, 0.03, 0, 0, 0.35); ud.fuse = sph(g, M.gOrange, 0.0075, -0.008, 0.21, 0.03); }
@@ -148,6 +148,7 @@
     if (sp) { sp.rotation.x += dt * (id === 'g_dyna' ? 9 : id === 'g_water' ? 6 : 14); sp.rotation.z += dt * 3; }
     if (ud.rings) { ud.rings[0].rotation.z += dt * 8; ud.rings[1].rotation.x += dt * 6; }
     if (ud.led) ud.led.visible = Math.sin(G.game.time * 30) > 0;
+    if (ud.pin && ud.pin.visible) { ud.pin.visible = false; if (ud.spoon) ud.spoon.visible = false; }   // (thrown: its pin pulled, its spoon flown)
     switch (id) {
       case 'g_fire': if (r < 0.7) G.fx.flame.spawn(x, y, z, U.rand(-0.2, 0.2), 0.4, U.rand(-0.2, 0.2), 0.25, 0.12, 0.03, 1.5, 0.7, 0.25, 1, -1, 1); break;
       case 'g_water': { // the bag wobbles and drips

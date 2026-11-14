@@ -178,7 +178,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   float pf = facets(uv + id * .19, 30., 13., 1.4, .14 + i3 * .12);
   float face = .56 + (i3 - .5) * .08 + pil + pf * (.04 + i4 * .04) + q.x * (i4 - .5) * .07 + q.y * (i5 - .5) * .06 + (mid - .5) * .12 + (fine - .5) * .06 + (grit - .5) * .025;
   float pt = pits(uv + id * .31, 46., 8., .1 * step(.5, i1)); face -= pt * .035;
-  float ero = fbm(uv, 13., 21.), hm = .38 + (grit - .5) * .05 - smoothstep(.45, .75, ero) * .16, isM;
+  float ero = fbm3(uv, 13., 21.), hm = .38 + (grit - .5) * .05 - smoothstep(.45, .75, ero) * .16, isM;
   float chip = smoothstep(.58, .64, fbm3(uv + id, 16., 9.));
   h = lay(ed, face, .0025 + i2 * .004, chip, .006 + i3 * .008, hm, isM);
   // colour: each stone from its own bed (a little warmer or greyer, lighter or darker), mottled, a fresh break pale, grime toward the
@@ -190,10 +190,10 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   float brk = clamp(1. - ed / (.006 + i3 * .008), 0., 1.) * chip;
   stone *= 1. + brk * .1 - pt * .12 - smoothstep(.012, .0, ed) * (1. - brk) * .1;
   stone *= 1. - streak(uv, 16., 31.) * .16 - smoothstep(.3, -.6, q.y) * (1. - q.x * q.x) * .05;
-  float dirt = smoothstep(.34, .24, hm), moss = smoothstep(.62, .8, fbm(uv, 6., 12.)) * dirt;
+  float dirt = smoothstep(.34, .24, hm), moss = smoothstep(.62, .8, fbm3(uv, 6., 12.)) * dirt;
   vec3 mort = vec3(.56, .545, .51) * (.8 + grit * .25 + (fine - .5) * .3 + (mid - .5) * .2);
   mort = mix(mort, vec3(.3, .27, .23) * (.8 + fine * .4), dirt * .8); mort = mix(mort, vec3(.33, .38, .24), moss * .6);
-  float damp = smoothstep(.5, .76, fbm(uv, 3., 3.) + (mid - .5) * .25);
+  float damp = smoothstep(.5, .76, fbm3(uv, 3., 3.) + (mid - .5) * .25);
   vec3 c = mix(stone, mort, isM) * mix(vec3(1.), vec3(.8, .82, .76), damp * .75);
   col = S(c * 1.26);
   rough = mix(.9 - brk * .08 + (fine - .5) * .1, .98, isM) - damp * .14; metal = 0.;
@@ -207,83 +207,125 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   float i1 = hash12(vec2(id * 41.7, 1.)), i2 = hash12(vec2(id * 13.3, 2.)), i3 = hash12(vec2(id * 7.1, 3.)), i4 = hash12(vec2(id * 3.7, 4.)), i5 = hash12(vec2(id * 29.9, 5.));
   float e1 = fbm3(uv, 28., 5.), e2 = vnoise(uv * 170., 170., 6.);
   float d = -sdRB(lc, hs, .0015 + i1 * .005) + (e1 - .5) * .0026 + (e2 - .5) * .001;
-  float mw = .001 + .0009 * fbm3(uv, 9., 8.), ed = d - mw;
+  float mw = .0013 + .0011 * fbm3(uv, 9., 8.), ed = d - mw;
   vec2 q = lc / hs;
   float mid = fbm(uv + id * .73, 10., 4.), fine = fbm(uv, 48., 5.), grit = vnoise(uv * 520., 520., 7.);
   float marg = smoothstep(.007, .01, ed + (e1 - .5) * .002), peck = vnoise(uv * 330. + id * 31., 330., 12.);
   float sug = vnoise(vec2(uv.x * 2. + uv.y, uv.y * 2. - uv.x) * 230., 230., 15.);
   float face = .6 + (i3 - .5) * .04 + q.x * (i4 - .5) * .03 + q.y * (i5 - .5) * .03 + (mid - .5) * .085 + (fine - .5) * .04 + (grit - .5) * .012 + marg * (peck - .5) * .02 + (sug - .5) * .02 * (.4 + i2);
   // (a skin scaled away in small patches, most about the corners and low on the block: a crisp edge, the break rough)
-  float scl = smoothstep(.72, .75, fbm(uv + id * 1.37, 26., 14.) + abs(q.x * q.y) * .14 - q.y * .04 + (i3 - .5) * .16) * step(.74, i2);
-  face -= scl * (.022 + (fine - .5) * .02 + (grit - .5) * .015);
+  float scl = smoothstep(.72, .75, fbm3(uv + id * 1.37, 26., 14.) + abs(q.x * q.y) * .14 - q.y * .04 + (i3 - .5) * .16) * step(.6, i2);
+  face -= scl * (.032 + (fine - .5) * .025 + (grit - .5) * .02);
   // (a hairline crack in one block in eight: up from a bed joint, leaning, wandering, dying out part way)
   float ca = 1.5708 + (i4 - .5) * 1.1; vec2 cdir = vec2(cos(ca), sin(ca)), cn = vec2(-cdir.y, cdir.x);
   float al = dot(lc, cdir), ac = dot(lc, cn) - (i2 - .5) * hs.x + (vnoise(vec2(al * 300., id * 50.), 999., 41.) - .5) * .003 + (vnoise(vec2(al * 60., id * 50.), 999., 42.) - .5) * .014;
   float cr = step(.875, i5) * smoothstep(.0016, .0004, abs(ac)) * smoothstep(-hs.y + (.5 + i3) * hs.y, -hs.y + (.3 + i3) * hs.y, al);
   face -= cr * .06;
-  float ero = fbm(uv, 11., 21.), hm = .45 + (grit - .5) * .03 - smoothstep(.5, .78, ero) * .14, isM;
+  float ero = fbm3(uv, 11., 21.), hm = .4 + (grit - .5) * .03 - smoothstep(.5, .78, ero) * .14, isM;
   float chip = smoothstep(.62, .67, fbm3(uv + id, 14., 9.));
   h = lay(ed, face, .0012 + i2 * .002, chip, .004 + i3 * .006, hm, isM);
-  float v = .74 + (i1 - .5) * .26 + (i4 > .93 ? .07 : 0.) + (i4 < .06 ? -.1 : 0.);
+  float v = .74 + (i1 - .5) * .36 + (i4 > .93 ? .09 : 0.) + (i4 < .06 ? -.13 : 0.);
   vec3 tone = mix(vec3(1., .955, .9), vec3(.955, .96, .965), i2); tone = mix(tone, vec3(1., .93, .83), step(.88, i3) * .55);
-  vec3 stone = tone * v * (1. + (mid - .5) * .2 + (fine - .5) * .12 + (grit - .5) * .06 + marg * (peck - .5) * .035 + (sug - .5) * .05);
+  vec3 stone = tone * v * (1. + (mid - .5) * .3 + (fine - .5) * .15 + (grit - .5) * .06 + marg * (peck - .5) * .035 + (sug - .5) * .05);
   float brk = clamp(1. - ed / (.004 + i3 * .006), 0., 1.) * chip;
   stone *= 1. + brk * .1 + scl * .03 - cr * .35 - smoothstep(.008, .0, ed) * (1. - brk) * .06;
-  stone = mix(stone, stone * vec3(1.03, .98, .93), scl * .35);
+  stone = mix(stone, stone * vec3(1.04, .98, .92), scl * .55);
   stone *= (1. - streak(uv, 12., 31.) * .14 - smoothstep(.1, -.9, q.y) * .08 * (.5 + i2)) * (1.03 - marg * .03);
   float dirt = smoothstep(.4, .33, hm);
   vec3 mort = vec3(.7, .68, .64) * (.84 + grit * .28 + (fine - .5) * .2);
   mort = mix(mort, vec3(.34, .31, .27) * (.8 + fine * .4), dirt * .75);
   // (the damp and grime of the wall itself, in broad patches that do not stop at the joints)
-  float damp = smoothstep(.5, .76, fbm(uv, 3., 3.) + (mid - .5) * .25), grime = smoothstep(.52, .8, fbm(uv, 8., 44.)) * (.6 + .4 * i3);
-  vec3 c = mix(stone, mort, isM) * mix(vec3(1.), vec3(.8, .82, .76), damp * .8) * (1. - grime * .14);
-  col = S(c * 1.14);
+  float damp = smoothstep(.5, .76, fbm3(uv, 3., 3.) + (mid - .5) * .25), grime = smoothstep(.52, .8, fbm3(uv, 8., 44.)) * (.6 + .4 * i3);
+  vec3 c = mix(stone, mort, isM) * mix(vec3(1.), vec3(.74, .77, .7), damp * .9) * (1. - grime * .22);
+  c = mix(c, c * vec3(.8, .88, .72), smoothstep(.62, .84, fbm3(uv, 5., 45.)) * damp * .7);
+  col = S(c * 1.135);
   rough = mix(.86 - brk * .06 + scl * .08 + (fine - .5) * .1, .97, isM) - damp * .14; metal = 0.;
 }`];
-  SRC.flag = [1.15, `
+  // (a floor of laid slabs, four courses to a repeat as before: each slab its own stone and its own wear - dished where feet went,
+  // some sunk or tilted a little, one in five cracked across with the parts not quite level, corners broken; tight joints filled
+  // with packed earth and grit, the damp lying in the hollows. No dark lines drawn across a slab)
+  SRC.flag = [1.15, MASON + `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
-  float d, id; vec2 lp; vec2 w = uv + (vec2(fbm3(uv, 6., 1.), fbm3(uv, 6., 2.)) - .5) * .012;
-  ashlar(w, 4., 3., 37., d, id, lp);
-  float big = fbm(uv, 2., 3.), mid = fbm(uv, 12., 4.), fine = fbm(uv, 48., 5.), grit = fbm(uv, 200., 6.), chipN = fbm(uv, 24., 13.);
-  float joint = smoothstep(.0015, .0075, d + (chipN - .5) * .007);
-  float dish = smoothstep(.0, .1, d);
-  float slab = .52 + (id - .5) * .2 + dish * .05 + (mid - .5) * .17 + (fine - .5) * .07 + (grit - .5) * .035;
-  vec3 vc = voro(uv, 6., 9.); float crack = (1. - smoothstep(.0, .012, vc.y - vc.x)) * step(.66, id); slab -= crack * .14;
-  vec3 pit = voro(uv, 60., 8.); slab -= smoothstep(.2, .0, pit.x) * .05 * step(.55, pit.z);
-  h = mix(.3 + grit * .06, slab, joint);
-  float wet = smoothstep(.52, .7, fbm(uv, 3., 31.) + (.5 - slab) * .5);                 // worn smooth and damp where it lies low
-  vec3 stone = vec3(.78 + id * .16) * mix(vec3(1., .99, .97), vec3(.96, .98, 1.), hash12(vec2(id * 53., 9.)));
-  stone *= .8 + mid * .32 + (fine - .5) * .2;
-  stone = mix(stone, stone * vec3(.72, .76, .7), smoothstep(.55, .75, fbm(uv, 5., 17.)) * .6);
-  stone *= 1. - wet * .22;
-  col = S(mix(vec3(.4, .39, .37) * (.7 + fine * .6), stone, joint) * (1. - crack * .5));
-  rough = mix(1., .94 + (fine - .5) * .1 - wet * .42, joint); metal = 0.;
+  vec2 w = uv + (vec2(fbm3(uv, 6., 1.), fbm3(uv, 6., 2.)) - .5) * .006;
+  vec2 lc, hs; float id; units(w, 4., 3., .7, .1, 37., lc, hs, id);
+  float i1 = hash12(vec2(id * 41.7, 1.)), i2 = hash12(vec2(id * 13.3, 2.)), i3 = hash12(vec2(id * 7.1, 3.)), i4 = hash12(vec2(id * 3.7, 4.)), i5 = hash12(vec2(id * 29.9, 5.));
+  float e1 = fbm3(uv, 24., 5.), e2 = vnoise(uv * 140., 140., 6.);
+  float d = -sdRB(lc, hs, .004 + i1 * .012) + (e1 - .5) * .008 + (e2 - .5) * .002;
+  float mw = .0016 + .0016 * fbm3(uv, 9., 8.), ed = d - mw;
+  vec2 q = lc / hs;
+  float mid = fbm(uv + id * .73, 8., 4.), fine = fbm(uv, 40., 5.), grit = vnoise(vec2(uv.x * 2. + uv.y, uv.y * 2. - uv.x) * 200., 200., 7.);
+  float sink = (i3 - .5) * .05 + q.x * (i4 - .5) * .025 + q.y * (i5 - .5) * .025;
+  float dish = (1. - q.x * q.x) * (1. - q.y * q.y) * (.02 + i2 * .05);
+  // the crack: a wandering line across the slab, the part beyond it a little higher or lower
+  float ca = i4 * 3.1416; vec2 cdir = vec2(cos(ca), sin(ca)), cn = vec2(-cdir.y, cdir.x);
+  float cd = dot(lc - hs * (vec2(i2, i5) - .5) * .8, cn) + (vnoise(vec2(dot(lc, cdir) * 160., id * 40.), 9973., 43.) - .5) * .004 + (vnoise(vec2(dot(lc, cdir) * 30., id * 40.), 9973., 44.) - .5) * .012;
+  float crk = step(.8, i1), cr = crk * smoothstep(.0016, .0004, abs(cd));
+  float face = .58 + sink - dish + crk * step(0., cd) * (i3 - .5) * .05 + (mid - .5) * .07 + (fine - .5) * .035 + (grit - .5) * .015;
+  float pt = pits(uv + id * .3, 50., 8., .06); face -= pt * .03 + cr * .08;
+  float hm = .34 + (grit - .5) * .04, isM;
+  float chip = smoothstep(.58, .64, fbm3(uv + id, 14., 9.));
+  float cw = step(.45, hash12(vec2(id * 7. + sign(q.x), sign(q.y) + 3.)));
+  chip = max(chip, smoothstep(.62, .92, min(abs(q.x), abs(q.y))) * cw);
+  h = lay(ed, face, .002 + i2 * .003, chip, .006 + i3 * .01, hm, isM);
+  // colour: each slab its own (warmer, greyer, now and then a much paler or darker one: a replacement); the worn ones paler and
+  // smoother in their dish; grime toward the joints; damp in the hollows; earth and grit in the joints, moss here and there
+  float v = .66 + (i1 - .5) * .22 + (i5 > .92 ? .1 : 0.) + (i5 < .07 ? -.12 : 0.);
+  vec3 tone = mix(vec3(1., .96, .915), vec3(.955, .96, .965), i2); tone = mix(tone, vec3(1., .93, .84), step(.88, i3) * .5);
+  float worn = smoothstep(.4, .8, i4) * dish / (.02 + i2 * .05);
+  vec3 stone = tone * v * (1. + (mid - .5) * .2 + (fine - .5) * .12 + (grit - .5) * .07);
+  stone *= 1. + worn * .08 - smoothstep(.02, .0, ed) * .1 - pt * .1 - cr * .45;
+  float damp = smoothstep(.55, .8, fbm3(uv, 3., 31.) + dish * 3. - sink * 2.);
+  stone *= 1. - damp * .2;
+  vec3 mort = vec3(.32, .28, .23) * (.75 + fine * .5 + (grit - .5) * .25);
+  mort = mix(mort, vec3(.27, .31, .19), smoothstep(.62, .8, fbm3(uv, 6., 12.)) * .5);
+  col = S(mix(stone, mort, isM) * 1.19);
+  rough = mix(.92 - worn * .2 - damp * .3 + (fine - .5) * .08, 1., isM); metal = 0.;
 }`];
-  SRC.cobble = [1.4, `
+  // (a paving of broken flags as the old road was laid: big flat stones of every shape, their tops nearly level and only a little rounded
+  // at the edge; narrow joints, one to two and a half centimetres, sunk and packed with earth, grit and moss; each stone its own colour,
+  // the ones where feet go worn smoother and paler. No white rims, no honeycomb of dark lines)
+  SRC.cobble = [1.25, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
-  vec2 w = uv + (vec2(fbm3(uv, 6., 1.), fbm3(uv, 6., 2.)) - .5) * .03;
+  vec2 w = uv + (vec2(fbm3(uv, 6., 1.), fbm3(uv, 6., 2.)) - .5) * .03 + (vec2(fbm3(uv, 19., 3.), fbm3(uv, 19., 4.)) - .5) * .006;
   vec3 v = voro(w, 7., 41.); float e = v.y - v.x;
-  float mid = fbm(uv, 12., 4.), fine = fbm(uv, 48., 5.), grit = fbm(uv, 180., 6.);
-  float stone = smoothstep(.02, .13, e);                         // 0 in the gaps, rising onto the dome of each stone
-  float dome = sqrt(clamp(e * 1.6, 0., 1.));
-  h = mix(.12 + grit * .1, .45 + dome * .4 + (mid - .5) * .12 + (fine - .5) * .08, stone);
-  vec3 c = vec3(.72 + v.z * .24) * mix(vec3(1., .98, .95), vec3(.94, .97, 1.), hash12(vec2(v.z * 77., 5.)));
-  c *= .8 + mid * .3 + (fine - .5) * .2 + dome * .1;
-  float moss = smoothstep(.55, .75, fbm(uv, 4., 21.)) * (1. - stone);
-  vec3 gap = mix(vec3(.44, .42, .38), vec3(.36, .44, .27), moss) * (.6 + fine * .7);
-  col = S(mix(gap, c, stone));
-  rough = mix(1., .8 - dome * .12 + (fine - .5) * .12, stone); metal = 0.;
+  float i1 = hash12(vec2(v.z * 41.7, 1.)), i2 = hash12(vec2(v.z * 13.3, 2.)), i3 = hash12(vec2(v.z * 7.1, 3.)), i4 = hash12(vec2(v.z * 3.7, 4.));
+  float mid = fbm(uv, 12., 4.), fine = fbm(uv, 48., 5.), grit = vnoise(vec2(uv.x * 2. + uv.y, uv.y * 2. - uv.x) * 220., 220., 6.);
+  // (the joint: e is about twice the distance to it in cells of a seventh of the repeat; ragged along its length)
+  float ew = e + (fine - .5) * .025 + (grit - .5) * .01;
+  float gw = .035 + .045 * fbm3(uv, 7., 9.);
+  float st = smoothstep(gw, gw + .02, ew);
+  float edge = smoothstep(gw, gw + .16, ew);
+  // (a flat top, tilted or sunk a little stone by stone, its edge rounded over a short way, never domed)
+  float top = .56 + (i3 - .5) * .07 + (i2 - .5) * .03 * (v.x * 3.) + (mid - .5) * .06 + (fine - .5) * .05 + (grit - .5) * .02 - (1. - edge) * .05;
+  float gap = .4 + fbm3(uv, 30., 7.) * .06 + (grit - .5) * .03;
+  h = mix(gap, top, st);
+  float worn = smoothstep(.45, .85, fbm3(uv, 2., 22.)) * (.5 + i4 * .5);
+  float val = .62 + (i1 - .5) * .24 + (i3 > .93 ? .07 : 0.) + (i3 < .08 ? -.08 : 0.);
+  vec3 tone = mix(vec3(1., .96, .91), vec3(.95, .96, .97), i2); tone = mix(tone, vec3(1., .92, .82), step(.82, i4) * .4);
+  vec3 c = tone * val * (1. + (mid - .5) * .24 + (fine - .5) * .16 + (grit - .5) * .08);
+  c *= (1. + worn * .1) * (.86 + .14 * edge);
+  float moss = smoothstep(.55, .75, fbm3(uv, 4., 21.)) * (1. - st);
+  vec3 ga = mix(vec3(.31, .27, .22), vec3(.26, .31, .18), moss) * (.7 + fine * .5);
+  col = S(mix(ga, c, st) * 1.37);
+  rough = mix(1., .88 - worn * .22 + (fine - .5) * .1, st); metal = 0.;
 }`];
-  SRC.smooth = [0.6, `
+  // (fine dressed limestone - cornices, copings, posts: a soft cloud of tone, a fine grit, a few small hollows weathered out of every
+  // size, a faint wandering vein, the skin flaked in a patch here and there, grime in broad stains. No ruled lines, no rows of dots)
+  SRC.smooth = [0.6, MASON + `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
-  float big = fbm(uv, 3., 53.), mid = fbm(uv, 14., 4.), fine = fbm(uv, 56., 5.), grit = fbm(uv, 200., 6.);
-  vec3 pit = voro(uv, 34., 8.); float p = smoothstep(.13, .0, pit.x) * step(.78, pit.z);
-  vec3 vc = voro(uv, 3., 9.); float crack = (1. - smoothstep(.0, .006, vc.y - vc.x)) * smoothstep(.55, .65, fbm(uv, 3., 33.));
-  h = .6 + (mid - .5) * .16 + (fine - .5) * .09 + (grit - .5) * .05 - p * .08 - crack * .1;
-  vec3 c = vec3(.86) * (.84 + mid * .24 + (fine - .5) * .14);
-  c = mix(c, c * vec3(.8, .8, .78), smoothstep(.55, .78, big) * .6);
-  col = S(c * (1. - crack * .35) * (1. - p * .25));
-  rough = .9 + (fine - .5) * .16 - smoothstep(.5, .7, big) * .12; metal = 0.;
+  float big = fbm3(uv, 3., 53.), mid = fbm(uv, 12., 4.), fine = fbm(uv, 48., 5.), grit = vnoise(vec2(uv.x * 2. + uv.y, uv.y * 2. - uv.x) * 260., 260., 6.);
+  float pt = pits(uv, 26., 8., .07) * (.5 + .5 * smoothstep(.4, .7, big));
+  float vr = 1. - abs(fbm(uv + vec2(fbm3(uv, 2., 7.), fbm3(uv, 2., 8.)) * .2, 3., 9.) * 2. - 1.);
+  float vein = smoothstep(.955, .99, vr) * smoothstep(.45, .65, fbm3(uv, 4., 10.));
+  float scl = smoothstep(.69, .71, fbm3(uv, 10., 14.) + (fine - .5) * .08);
+  h = .6 + (mid - .5) * .12 + (fine - .5) * .06 + (grit - .5) * .03 - pt * .06 - scl * (.025 + (grit - .5) * .02) - vein * .01;
+  vec3 c = vec3(.86) * (.86 + mid * .2 + (fine - .5) * .1 + (grit - .5) * .06);
+  c = mix(c, c * vec3(.8, .8, .78), smoothstep(.55, .78, big) * .55);
+  c *= 1. - pt * .14 - vein * .1;
+  c = mix(c, c * vec3(1.03, .99, .94), scl * .5);
+  c *= 1. - streak(uv, 10., 15.) * .12;
+  col = S(c);
+  rough = .9 + (fine - .5) * .14 - smoothstep(.5, .7, big) * .12 + scl * .05; metal = 0.;
 }`];
   // (living rock, as a cliff or the wall of a working shows it: one whole face. Beds of uneven thickness run across it, bent by the
   // broad lie of the rock; each bed a gentle scoop between two lips, the lip of the one below standing out over a short steep face,
@@ -296,7 +338,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   vec2 w1 = vec2(fbm3(uv, 3., 1.), fbm3(uv, 3., 2.)) - .5, q = uv + w1 * .08;
   float big = fbm(q, 3., 61.), mid = fbm(q, 9., 4.), fine = fbm(uv, 36., 5.), grit = vnoise(vec2(uv.x * 2. + uv.y, uv.y * 2. - uv.x) * 190., 190., 6.);
   // the beds: a measure up the face, bent; five to a repeat, and finer ones within them
-  float bc = q.y * 5. + (big - .5) * 1.4 + (mid - .5) * .3, bi = floor(bc), bf = fract(bc), b0 = mod(bi, 5.);
+  float bc = q.y * 5. + (big - .5) * 2.6 + sin(q.x * 6.2831853 + big * 3.) * .5 + (mid - .5) * .4, bi = floor(bc), bf = fract(bc), b0 = mod(bi, 5.);
   float pw = 3. + hash12(vec2(b0, 81.)) * 4.;
   float beds = scoop(bc, pw) * (.22 + hash12(vec2(b0, 82.)) * .2) + scoop(bc * 3. + (fine - .5) * .3, 3.) * .06;
   // the joints across the beds: a step now and then, not through every bed
@@ -305,7 +347,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   float joints = scoop(jc, 7.) * .16 * jm;
   // folds: soft creases running with the beds
   float cr = 1. - abs(fbmA(vec2(q.x, q.y + (big - .5) * .2), vec2(4., 12.), 85.) * 2. - 1.);
-  float face = .62 + beds + joints + cr * cr * .06 + (big - .5) * .1 + (mid - .5) * .06 + (fine - .5) * .03 + (grit - .5) * .012;
+  float ff = facets(uv, 70., 90., 1.4, .06), hc = smoothstep(.955, .985, ridge(uv, 22., 91.)) * smoothstep(.5, .68, fbm3(uv, 6., 92.));
+  float face = .62 + beds + joints + cr * cr * .06 + (big - .5) * .1 + (mid - .5) * .06 + (fine - .5) * .03 + (grit - .5) * .012 + ff * .025 - hc * .015;
   float pt = pits(uv, 52., 73., .07); face -= pt * .025;
   // a bed open along its lip in stretches: a slot with earth in it
   float open = smoothstep(.55, .7, fbm3(vec2(q.x, b0 * .17), 5., 86.)) * smoothstep(.9, .975, bf + (fine - .5) * .015);
@@ -316,32 +359,65 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   vec3 tone = mix(vec3(1., .965, .925), vec3(.965, .965, .965), hash12(vec2(b0, 89.))); tone = mix(tone, vec3(1., .94, .86), step(.78, hash12(vec2(b0, 90.))) * .6);
   vec3 c = tone * v * (1. + (big - .5) * .26 + (mid - .5) * .18 + (fine - .5) * .12 + (grit - .5) * .05);
   float lip = smoothstep(.75, .97, bf), under = smoothstep(.55, .9, bf) * (1. - lip);
-  c *= (1. + lip * .08) * (1. - under * .12) * (1. - pt * .06) * (1. - smoothstep(.88, .99, fract(jc)) * jm * .1);
-  c *= 1. + step(.94, grit) * .14 - step(grit, .05) * .18;
+  c *= (1. + lip * .08 + ff * .04) * (1. - under * .12) * (1. - pt * .06 - hc * .15) * (1. - smoothstep(.88, .99, fract(jc)) * jm * .1);
+  c *= 1. + step(.94, grit) * .06 - step(grit, .05) * .1;
   float run = streak(uv, 14., 77.) * smoothstep(.2, .95, bf);
-  c = mix(c, c * vec3(1.05, .87, .7), smoothstep(.6, .8, fbm(uv, 7., 76.)) * run * .7);
+  c = mix(c, c * vec3(1.05, .87, .7), smoothstep(.6, .8, fbm3(uv, 7., 76.)) * run * .7);
   c *= 1. - run * .18;
   vec3 earth = vec3(.3, .27, .23) * (.8 + fine * .5);
   col = S(mix(c, earth, open * .85) * 1.2);
   rough = mix(.92 - lip * .05 - run * .12 + (fine - .5) * .08, 1., open); metal = 0.;
 }`];
-  SRC.planks = [1.2, `
+  // (old boards, five to a repeat as before, made of colour more than of lines: each board its own tone; long soft bands of lighter and
+  // darker running down it, uneven in width and depth; a plain-sawn board shows one or two flame-shaped figures where only now and then a
+  // ring is dark enough to read as a line, a quarter-sawn one a few straight streaks; knots; the weather greying it in patches and at its
+  // ends; checks near the ends along the grain; nails with rust run out round them. The relief is the fibres raised by the weather, the
+  // checks and a little cupping of the board - not the grain drawn as lines. Narrow shallow gaps)
+  SRC.planks = [0.8, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
-  float n = 5., px = uv.x * n, pid = mod(floor(px), n), fx = fract(px), pr = hash12(vec2(pid, 71.)), pr2 = hash12(vec2(pid, 8.));
+  float n = 5., px = uv.x * n, k = floor(px), pid = mod(k, n), fx = px - k;
+  float pr = hash12(vec2(pid, 71.)), pr2 = hash12(vec2(pid, 8.)), pr3 = hash12(vec2(pid, 9.)), pr4 = hash12(vec2(pid, 10.));
   float pv = fract(uv.y + pr), seg = floor(pv * 2.), fy = fract(pv * 2.);
-  float edge = min(min(fx, 1. - fx) / n, min(fy, 1. - fy) * .5);
-  vec2 g = vec2(uv.x, uv.y + pr * 7.31 + seg * .37);
-  float grain = fbmA(g, vec2(60., 3.), 2.), fine = fbmA(g, vec2(260., 12.), 4.), warp = fbmA(g, vec2(10., 2.), 5.);
-  float rings = sin((uv.x * n * 4. + warp * 5. + pr * 20.) * 6.2831853) * .5 + .5;
-  vec3 kn = voro(g, 4., 6. + pid); float knot = smoothstep(.1, .0, kn.x) * step(.75, kn.z);
-  float gap = smoothstep(.0, .005, edge), wear = fbm(uv, 5., 9.);
-  h = (.55 + (grain - .5) * .34 + (fine - .5) * .1 + (rings - .5) * .07 - knot * .12 + (pr - .5) * .1) * mix(.25, 1., gap);
-  float c = (.58 + grain * .3 + rings * .1) * (.82 + pr2 * .32);
-  vec3 wood = vec3(c, c * .8, c * .62);
-  wood = mix(wood, wood * .5, knot);
-  wood = mix(wood, vec3(c * .82), smoothstep(.5, .78, wear) * .5);                  // greyed where it has weathered
-  col = S(wood * mix(.3, 1., gap));
-  rough = .86 + (fine - .5) * .2 - knot * .15; metal = 0.;
+  float sd = hash12(vec2(pid * 7. + seg, 13.)), sd2 = hash12(vec2(pid * 7. + seg, 14.)), sd3 = hash12(vec2(pid * 7. + seg, 15.)), sd4 = hash12(vec2(pid * 7. + seg, 16.));
+  float gx = min(fx, 1. - fx) / n, gy = min(fy, 1. - fy) * .5;
+  float edge = min(gx, gy) + (vnoise(uv * vec2(40., 160.), 9973., 3.) - .5) * .001;
+  float gap = smoothstep(.0003, .0013, edge), arr = smoothstep(.0, .005, edge);
+  // the long bands of the grain: soft, of every width, the board's own
+  float band = vnA(vec2(fx * 7. + pid * 3.1, pv * 1.5), vec2(999., 1.5), pid + 20.) * .6 + vnA(vec2(fx * 19. + pid, pv * 3.), vec2(999., 3.), pid + 21.) * .4;
+  // the figure: plain-sawn (flame-shaped arches about a centre line) or quarter-sawn (straight), a ring dark enough to read only now and then
+  float plain = step(.45, sd4), cx = .3 + .4 * sd, py = sd2 * 1.4 - .2;
+  float arch = abs(fx - cx) * 2.6 + max(0., py - fy) * (1.2 + sd3) - max(0., fy - py) * .05;
+  float t = mix(fx * (5. + pr * 4.) + (band - .5) * .5, arch * (4. + pr * 3.) - fy * .2, plain) + (vnA(vec2(fx * 4., pv * 8.), vec2(999., 8.), pid + 30.) - .5) * .6;
+  float rid = floor(t), rf = fract(t), dark = step(.62, hash12(vec2(rid, pid + seg * 7. + 31.)));
+  float line = smoothstep(.0, .12, rf) * (1. - smoothstep(.2, .45, rf)) * dark;
+  float soft = smoothstep(.0, .5, rf) * (1. - smoothstep(.5, 1., rf));
+  // knots, one length in three
+  vec2 kd = vec2((fx - (.25 + .5 * sd3)) / n, (fy - (.25 + .5 * sd)) * .5);
+  float kr = length(kd * vec2(1., .45)), kn = step(.5, sd2) * smoothstep(.006, .002, kr), kh = step(.5, sd2) * smoothstep(.02, .004, kr);
+  // the weather: greyed in patches, more toward the ends of a length and on the soft wood
+  float wth = clamp(pr2 * .5 + fbm3(uv, 3., 60.) * .6 + smoothstep(.2, .0, gy * 2.) * .25 - .2, 0., 1.);
+  // checks: short splits along the grain, near the ends of a length
+  float cxp = hash12(vec2(pid, 50. + seg)), end = smoothstep(.22, .0, min(fy, 1. - fy));
+  float chk = step(.35, hash12(vec2(pid, 51. + seg))) * smoothstep(.0012, .0003, abs(fx - cxp + (vnoise(vec2(pv * 30., pid), 9973., 52.) - .5) * .05) / n) * end;
+  float fib = vnA(vec2(fx * 90. + (band - .5) * 3., pv * 3.), vec2(999., 3.), pid + 40.), fib2 = vnA(vec2(fx * 220. + (band - .5) * 6., pv * 6.), vec2(999., 6.), pid + 41.);
+  float fib3 = vnA(vec2(fx * 46. + pid * 7., pv * 1.5), vec2(999., 1.5), pid + 44.);
+  float cup = (1. - (2. * fx - 1.) * (2. * fx - 1.)) * (pr4 - .5) * .05;
+  h = .55 + cup + ((fib - .5) * .06 + (fib2 - .5) * .035 + (fib3 - .5) * .03) * (.5 + wth) - chk * .12 - kh * .03 + line * .006;
+  h = mix(.3, h * (.94 + .06 * arr), gap);
+  vec3 base = mix(vec3(.6, .47, .35), vec3(.5, .4, .32), pr) * (.8 + pr2 * .34);
+  vec3 wood = base * (1. + (band - .5) * .34 + (soft - .5) * .08 - line * .16 + (fib - .5) * .09 + (fib2 - .5) * .06 + (fib3 - .5) * .12 - kh * .1);
+  wood = mix(wood, vec3(.3, .22, .16), kn * .8);
+  vec3 grey = vec3(.57, .55, .52) * (.86 + (band - .5) * .12 + (fib - .5) * .1);
+  wood = mix(wood, grey, wth * .65);
+  float na = step(.5, fx), nb = step(.5, fy);
+  vec2 nd = vec2((fx - (.28 + .44 * na)) / n, (fy - (.055 + .89 * nb)) * .5), nr = nd * vec2(1., .35);
+  float nail = smoothstep(.0032, .002, length(nd));
+  float rust = exp(-dot(nr, nr) / .00003) * step(.3, hash12(vec2(pid + na, seg + nb + 60.)));
+  wood = mix(wood, wood * vec3(.72, .52, .38), rust * .6);
+  wood = mix(wood, vec3(.16, .13, .11), nail);
+  wood *= (1. - chk * .5) * mix(.7, 1., arr);
+  col = S(mix(vec3(.24, .2, .16), wood, gap) * 1.42);
+  rough = mix(1., .84 + wth * .1 + rust * .06 - nail * .2, gap); metal = 0.;
 }`];
   SRC.metal = [0.9, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
@@ -387,37 +463,73 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
 }`;
   SRC.skin = [1.1, hide(10, 101)];
   SRC.scales = [1.3, hide(18, 107)];
-  // (the turf of a field left to itself: short blades lying this way and that in clumps, dry among the green, moss in the damp, bare
-  // earth showing in ragged patches - not round blots)
-  SRC.grass = [0.7, `
+  // (rough pasture as seen from standing height: what reads is the variation over a third of a metre to a couple of metres - clumps of
+  // denser, darker grass and thinner, paler ones between, patches gone to straw, bare earth showing in ragged spots, a trodden way
+  // flattened and worn. The single tufts are only a faint grain within that, their lean every way, not a pebbly surface; nothing in it
+  // catches a light as a point)
+  SRC.grass = [0.35, `
+vec2 rot2(vec2 p, float a){ float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
+// one tuft to each cell of the sward, leaning its own way; its blades a few thin strokes along the lean, fading toward its rim
+float sward(vec2 uv, float per, float sd, vec2 fr, out float cid){
+  vec2 p = uv * per, i = floor(p), f = fract(p); float best = 9., v = 0.; cid = 0.;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y)), c = mod(i + g, per), r = g + hash22(c + sd) - f; float d = dot(r, r);
+    if (d < best) { best = d; cid = hash12(c + sd + 3.); vec2 q = rot2(r, cid * 6.2831853); float n = vnoise(q * fr + cid * 37., 9973., sd + 1.); v = (1. - abs(n * 2. - 1.)) * smoothstep(.95, .2, length(r)); }
+  }
+  return v;
+}
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
-  float n = fbm(uv, 8., 131.), m = fbm(uv, 3., 134.), fine = fbm(uv, 64., 5.), clump = fbm(uv, 24., 31.);
-  float b1 = vnA(vec2(uv.x * 260. + fbm3(uv, 20., 7.) * 4., uv.y * 64.), vec2(260., 64.), 3.), b2 = vnA(vec2(uv.x * 70. + fbm3(uv, 16., 8.) * 2., uv.y * 300.), vec2(70., 300.), 9.);
-  float blade = mix(b1, b2, smoothstep(.42, .58, clump));
-  float dry = smoothstep(.42, .74, m + (n - .5) * .45);
-  float dirt = smoothstep(.6, .72, fbm(uv, 6., 140.) * .62 + fbm(uv, 26., 141.) * .38 + (fine - .5) * .12) * .85;
-  float moss = smoothstep(.58, .8, fbm(uv, 12., 150.)) * (1. - dry);
-  vec3 g = mix(vec3(.40, .52, .26), vec3(.56, .64, .32), n);
-  g = mix(g, vec3(.74, .68, .42), dry * .7);
-  g = mix(g, vec3(.30, .42, .22), moss * .35);
-  g *= .86 + blade * .4;
-  vec3 soil = vec3(.46, .385, .29) * (.72 + n * .45 + (fine - .5) * .3);
-  col = S(mix(g, soil, dirt));
-  h = mix(.36 + blade * .2 + n * .3 + (fine - .5) * .12, .2 + n * .22 + (fine - .5) * .15, dirt);
-  rough = mix(.93, 1., dirt); metal = 0.;
+  float c1; float bl = sward(uv, 90., 3., vec2(3.2, .6), c1);
+  float fine = fbm3(uv, 60., 5.), grit = vnoise(vec2(uv.x * 2. + uv.y, uv.y * 2. - uv.x) * 300., 300., 6.);
+  // (the middle scales: clumps (a third of a metre), patches (a metre or two), and the broad drifts)
+  float clump = fbm(uv, 11., 170.), patchy = fbm3(uv, 4., 171.), drift = fbm3(uv, 2., 131.);
+  float dense = smoothstep(.4, .68, clump);
+  float dry = smoothstep(.46, .7, drift * .55 + patchy * .45 + (1. - dense) * .12);
+  float bn = fbm3(uv, 7., 140.) * .7 + fbm3(uv, 23., 142.) * .3;
+  float bare = smoothstep(.62, .7, bn + (1. - dense) * .06), thin = smoothstep(.5, .64, bn) * (1. - bare);
+  // a trodden way: long, narrow, wandering across the turf
+  float path = smoothstep(.62, .72, fbmA(vec2(uv.x + fbm3(uv, 3., 172.) * .3, uv.y), vec2(9., 2.), 173.)) * (1. - bare);
+  float moss = smoothstep(.62, .82, fbm3(uv, 9., 150.)) * (1. - dry);
+  vec3 live = mix(vec3(.28, .31, .17), vec3(.36, .38, .21), patchy);
+  vec3 hay = mix(vec3(.5, .45, .3), vec3(.42, .37, .26), clump);
+  vec3 g = mix(live, hay, dry);
+  g = mix(g, vec3(.25, .29, .16), moss * .45);
+  g *= .84 + dense * .1 - (1. - dense) * .04;
+  g = mix(g, g * vec3(1.05, 1., .86), path * .5);
+  vec3 soil = vec3(.34, .29, .22) * (.74 + fine * .4 + (grit - .5) * .2);
+  // between the tufts a little shade and earth; the grain of the tufts is faint
+  float cover = clamp(.78 + dense * .2 - thin * .5 - path * .35 + (bl - .5) * .14, 0., 1.);
+  vec3 c = mix(soil * .78, g * (.96 + (bl - .5) * .12 + (c1 - .5) * .06 + (fine - .5) * .08), cover);
+  c = mix(c, soil, bare);
+  col = S(c * vec3(1.83, 1.92, 1.9));
+  h = .34 + dense * .22 + patchy * .06 - path * .1 + (bl - .5) * .05 * cover - bare * .14 + (fine - .5) * .03;
+  rough = 1.; metal = 0.;
 }`];
+  // (marble blocks, two by two to a repeat as before: the veins run with the bed of the stone - each block cut its own way - in two
+  // orders, folded, coming and going; a cloud of tone; polished faces and patches the weather has made dull and sugary; a fine joint
+  // with a little shade, not a drawn frame)
   SRC.marble = [0.5, `
 void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
-  vec2 t = fract(uv * 2.); float seam = min(min(t.x, 1. - t.x), min(t.y, 1. - t.y)); float joint = smoothstep(.004, .012, seam);
-  float id = hash12(floor(uv * 2.) + 141.);
-  vec2 w = uv + (vec2(fbm3(uv, 4., 1.), fbm3(uv, 4., 2.)) - .5) * .25 + id * .37;
-  float v1 = smoothstep(.72, .96, ridge(w, 3., 5.)), v2 = smoothstep(.8, .97, ridge(w + .31, 7., 9.));
-  float cloud = fbm(w, 4., 3.), fine = fbm(uv, 80., 6.);
-  float c = .86 + cloud * .12 - v1 * .3 - v2 * .14;
-  vec3 m = vec3(c * .99, c * .98, c) * mix(vec3(1.), vec3(1., .97, .92), smoothstep(.5, .8, fbm(w, 2., 11.)) * .5);
-  col = S(mix(vec3(.45, .43, .4), m, joint));
-  h = mix(.3, .52 + (fine - .5) * .03 - v1 * .04, joint);
-  rough = mix(1., .82 + v1 * .18 + (fine - .5) * .1, joint); metal = 0.;
+  vec2 t = fract(uv * 2.); float id = hash12(floor(uv * 2.) + 141.);
+  float seam = min(min(t.x, 1. - t.x), min(t.y, 1. - t.y)) * .5 + (vnoise(uv * 36., 36., 3.) - .5) * .0005;
+  float joint = smoothstep(.0008, .0024, seam), arr = smoothstep(.0, .005, seam);
+  float a = (id - .5) * 1.4 + .6; vec2 dir = vec2(cos(a), sin(a)), nrm = vec2(-dir.y, dir.x);
+  vec2 w = t + (vec2(fbm3(uv, 3., 1.), fbm3(uv, 3., 2.)) - .5) * .35 + id * 3.7;
+  float s = dot(w, nrm) * 3. + (fbm3(uv, 4., 5.) - .5) * 1.4 + sin(dot(w, dir) * 4. + id * 9.) * .25;
+  float wd = .012 + .022 * fbm3(uv, 5., 6.);
+  s += (fbm3(uv, 14., 12.) - .5) * .35;
+  float v1 = smoothstep(wd, wd * .3, abs(fract(s) - .5)) * smoothstep(.35, .65, fbm3(uv + id, 4., 7.));
+  float s2 = dot(w, nrm + dir * .4) * 11. + (fbm3(uv, 9., 8.) - .5) * 2.5;
+  float v2 = smoothstep(.014, .004, abs(fract(s2) - .5)) * smoothstep(.45, .7, fbm3(uv + id * 2., 7., 9.));
+  float cloud = fbm(w, 4., 3.), fine = fbm(uv, 80., 6.), grit = vnoise(vec2(uv.x * 2. + uv.y, uv.y * 2. - uv.x) * 300., 300., 10.);
+  float wz = smoothstep(.56, .74, fbm3(uv, 3., 17.) + (fine - .5) * .15);
+  float halo = smoothstep(wd * 6., 0., abs(fract(s) - .5)) * smoothstep(.35, .65, fbm3(uv + id, 4., 7.));
+  float c = .87 + cloud * .1 - v1 * .17 - halo * .05 - v2 * .08 + (grit - .5) * .03 * wz;
+  vec3 m = vec3(c * .99, c * .98, c) * mix(vec3(1.), vec3(1., .97, .92), smoothstep(.5, .8, fbm3(w, 2., 11.)) * .5);
+  m = mix(m, m * vec3(.97, .95, .9), wz * .5);
+  col = S(mix(vec3(.6, .58, .54) * (.8 + fine * .4), m, joint) * mix(.75, 1., arr));
+  h = mix(.3, .52 + (fine - .5) * .02 - v1 * .03 + (grit - .5) * .03 * wz, joint);
+  rough = mix(1., .78 + v1 * .1 + wz * .2 + (fine - .5) * .08, joint); metal = 0.;
 }`];
 
   // bake the lot and write each into the texture objects textures.js made (same objects: whatever already points at them follows)
@@ -716,6 +828,27 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
 }`],
   };
   const texCache = {};
+  // (molten iron and the blue fire of the ruins, as an emissive picture: a skin of cooled crust broken into plates of every size, a
+  // little drawn out along the flow (x), dark and dull, a faint glow where a plate is thin; between them the cracks, narrow, bright at
+  // their hearts, now and then a wider seam. In grey: the material's emissive colour gives the hue)
+  EX.lava = [512, 1.2, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  vec2 P = vec2(6., 9.), w = uv * P + (vec2(fbm3(uv, 4., 1.), fbm3(uv, 4., 2.)) - .5) * vec2(1.4, 1.8) + (vec2(fbm3(uv, 16., 3.), fbm3(uv, 16., 4.)) - .5) * .35;
+  vec2 i = floor(w), f = fract(w); float d1 = 9., d2 = 9., id = 0.;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y)), c = mod(i + g, P), r = (g + hash22(c + 77.) - f) * vec2(.75, 1.); float d = dot(r, r);
+    if (d < d1) { d2 = d1; d1 = d; id = hash12(c + 78.); } else if (d < d2) d2 = d;
+  }
+  float e = sqrt(d2) - sqrt(d1) + (fbm3(uv, 40., 5.) - .5) * .06;
+  float wide = .03 + .07 * smoothstep(.6, .9, fbm3(uv, 3., 6.));
+  float crack = smoothstep(wide, .0, e), core = smoothstep(wide * .35, .0, e);
+  float thin = smoothstep(.55, .85, fbm3(uv, 6., 7.) + (id - .5) * .3);
+  float grain = fbm3(uv * vec2(1., 1.), 30., 8.);
+  float I = mix(.03 + thin * .12 + (grain - .5) * .04, 1., crack * .7 + core * .3);
+  col = S(vec3(I));
+  h = .6 - crack * .4 + (id - .5) * .08 + (grain - .5) * .08;
+  rough = .9; metal = 0.;
+}`];
   X.EXSRC = EX;
   X.mirror = (g) => mirror(g);
   // a surface by name: { map, normalMap, orm } (made at first asking; null where there is no GPU to make it)

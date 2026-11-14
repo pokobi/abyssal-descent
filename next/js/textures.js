@@ -638,6 +638,27 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     };
     m.needsUpdate = true;
   }
+  // the colour of a world material varied in broad patches by place (the world's position, two scales of some 9 and 27 m and one of
+  // 3 m): lighter and darker by k, and toward tint where it is lighter. The strength is m.userData.macro (the tools set it to 0)
+  function macro(m, k, tint) {
+    if (!m) return;
+    const U = m.userData.macro = { value: k }, TU = { value: new THREE.Vector3(tint[0], tint[1], tint[2]) };
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uMacro = U; sh.uniforms.uMacroT = TU;
+      sh.vertexShader = 'varying vec3 vMW;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  vMW = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+      sh.fragmentShader = `uniform float uMacro; uniform vec3 uMacroT; varying vec3 vMW;
+float mH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float mN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(mH(i), mH(i + vec2(1.0, 0.0)), f.x), mix(mH(i + vec2(0.0, 1.0)), mH(i + vec2(1.0, 1.0)), f.x), f.y); }
+` + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+  {
+    vec2 mp = vec2(vMW.x + vMW.y * 0.7, vMW.z - vMW.y * 0.5);
+    float mv = (mN(mp * 0.11) - 0.5) * 0.9 + (mN(mp * 0.037 + 7.3) - 0.5) * 1.1 + (mN(mp * 0.31 + 3.1) - 0.5) * 0.35;
+    diffuseColor.rgb *= (1.0 + mv * uMacro) * mix(vec3(1.0), uMacroT, clamp(0.5 + mv * 1.6, 0.0, 1.0) * step(0.001, uMacro));
+  }`);
+    };
+    m.customProgramCacheKey = () => 'macro1';
+  }
   T.materials = function (biomeKey) {
     if (matCache[biomeKey]) return matCache[biomeKey];
     for (const k in T.tex) if (T.tex[k].stub) T.cpuFill(k); // (what the GPU did not make: gfx.js upgradeTextures)
@@ -694,8 +715,10 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     // (the look of water is all in its shader: waterize below; deep green-blue, glossy, its own alpha)
     M.water = new THREE.MeshStandardMaterial({ color: 0x14363a, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 1 });
     waterize(M.water);
-    M.lava = new THREE.MeshStandardMaterial({ color: 0x2a0800, emissive: 0xff5a10, emissiveIntensity: 1.6, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
-    M.bluefire = new THREE.MeshStandardMaterial({ color: 0x06102a, emissive: 0x2a86ff, emissiveIntensity: 1.7, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
+    // (molten iron and blue fire: plates of crust and the glowing cracks between them - gfx.js EX.lava; the rock's picture if there is no GPU)
+    const LV = (G.GFX && G.GFX.tex ? G.GFX.tex('lava') : null) || t.rock;
+    M.lava = new THREE.MeshStandardMaterial({ color: 0x2a0800, emissive: 0xff5a10, emissiveIntensity: 1.6, emissiveMap: LV.map, roughness: 0.9, normalMap: LV.normalMap });
+    M.bluefire = new THREE.MeshStandardMaterial({ color: 0x06102a, emissive: 0x2a86ff, emissiveIntensity: 1.7, emissiveMap: LV.map, roughness: 0.9, normalMap: LV.normalMap });
     boil(M.lava, false); boil(M.bluefire, true);
     M.voidglow = new THREE.MeshStandardMaterial({ color: 0x16020f, emissive: 0xff2a8a, emissiveIntensity: 1.1, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     M.ice = new THREE.MeshStandardMaterial({ color: 0xbfe0f0, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.85, normalMap: t.rock.normalMap });
@@ -711,11 +734,21 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     M.web = new THREE.MeshBasicMaterial({ map: T.spr.web, transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0.3 });
     M.candle = new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.6, emissive: 0x302010 });
     M.glow = new THREE.MeshBasicMaterial({ color: 0xffb060 });
+    // (the state the stone of a field is in: one picture for every field, the field's own colour, sheen and roughness laid on it -
+    // the flooded halls wet, dark and glossy; the foundries blackened by soot and heat; the mausoleum rimed with frost; the catacombs
+    // in dry dust; the mine in damp earth. The values before are kept in userData.base, for the tools to compare)
+    { const ST = { flooded: [[0.68, 0.72, 0.71], 0.7], foundry: [[0.72, 0.68, 0.65], 1.05], frozen: [[1.07, 1.1, 1.17], 1.08], catacombs: [[1.05, 1.02, 0.96], 1.08], mine: [[0.82, 0.78, 0.72], 0.82] }[biomeKey];
+      if (ST) for (const k of ['wall', 'block', 'floor', 'cobble', 'rock', 'trim']) { const m = M[k]; m.userData.base = { color: m.color.getHex(), rough: m.roughness }; m.color.multiply(new THREE.Color(ST[0][0], ST[0][1], ST[0][2])); m.roughness = Math.min(1, m.roughness * ST[1]); } }
     // vertex-coloured variants for merged static geometry; plain ones are used by standalone meshes
     M.vc = {};
     for (const k in M) { const m = M[k]; if (m && m.isMaterial) { if (m.isMeshStandardMaterial) { const c = m.clone(); c.vertexColors = true; M.vc[k] = c; } else M.vc[k] = m; } }
     boil(M.vc.lava, false); boil(M.vc.bluefire, true); // the copies the world is actually drawn with
     waterize(M.vc.water);
+    // (broad patches across the world, metres wide, so that a picture repeated every few metres is not read as a pattern: the turf
+    // greener and drier in drifts, the stone lighter and darker; macro below)
+    { const turf = B.floorTex === 'grass';
+      macro(M.vc.floor, turf ? 0.3 : 0.16, turf ? [1.14, 1.0, 0.78] : [1.03, 1.0, 0.96]); macro(M.vc.cobble, 0.15, [1.03, 1.0, 0.96]);
+      macro(M.vc.wall, 0.14, [1.03, 1.0, 0.95]); macro(M.vc.block, 0.14, [1.03, 1.0, 0.95]); macro(M.vc.rock, 0.18, [1.05, 1.0, 0.92]); }
     M.biome = B;
     matCache[biomeKey] = M;
     return M;

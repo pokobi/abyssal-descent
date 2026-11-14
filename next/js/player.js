@@ -632,6 +632,31 @@
       G.ui.fadeFlash();
     }
 
+    // An open fire the body is in (w.fireSpots, props.js: a brazier's flames over its coals, a torch's on its brand): a mild burn, for
+    // you alone - the foes do not walk round them. A spot is a column (x, z, r) from y0 to y1 where the flames are drawn; the body is a box.
+    // Those a body standing on the floor under them does not reach are left out, once, the first time (a torch high on a wall: only a jump
+    // right under it would put the head in it - not something stepped into by mistake)
+    // (a body can stand under or in it: the floor under the flames - a brazier's own basket, for one stood on - with room for a body over it,
+    // and the flames lower than its head)
+    fireReach(w, f) {
+      const fl = w.floorBelow(f.x, f.y1, f.z);
+      if (!(fl > -50) || f.y0 - fl >= this.standH) return false;
+      const h = Math.min(0.3, this.hw);
+      return w.boxFree(f.x - h, fl + 0.05, f.z - h, f.x + h, fl + Math.max(0.3, Math.min(this.standH, f.y0 - fl)) - 0.05, f.z + h) && w.groundAt(V(f.x, fl + 0.3, f.z), h, 0.5) > fl - 0.1;
+    }
+    fireTouch(w, dt) {
+      if (!w._fireReach) {
+        w._fireReach = true;
+        for (const f of w.fireSpots) f.off = !this.fireReach(w, f);
+      }
+      const p = this.pos, hw = this.hw, top = p.y + this.height;
+      let hot = false;
+      for (const f of w.fireSpots) if (!f.off && Math.abs(p.x - f.x) < hw + f.r && Math.abs(p.z - f.z) < hw + f.r && p.y < f.y1 && top > f.y0) { hot = true; break; }
+      if (!hot) return;
+      this._fireT = (this._fireT || 0) - dt;
+      if (this._fireT <= 0) { this._fireT = 0.5; G.combat.damagePlayer(1.5 + G.game.area * 0.15, { src: 'aoe', elem: 'fire' }); }
+      this.st.burn = Math.max(this.st.burn || 0, 2); this.st.burnMul = Math.max(this.st.burnMul || 1, 1); this.st.burnLv = Math.max(this.st.burnLv || 1, 1);
+    }
     postMove(dt, wl, mantling) {
       const S = G.save.data.settings, w = G.world;
       this.speedH = Math.hypot(this.vel.x, this.vel.z);
@@ -640,17 +665,19 @@
       // (a pool's own face, z.y: the frozen lake's water lies 1.2 m under the ice; and the deep water under a lid of ice is water too)
       for (const z of w.waterZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2) this.inWater = true;
       if (!this.inWater && w.deepWater) for (const d of w.deepWater) if (this.pos.x > d.x0 && this.pos.x < d.x1 && this.pos.z > d.z0 && this.pos.z < d.z1 && this.pos.y < d.y + 0.2) this.inWater = true;
-      if (this.grounded && !G.Strata.onRope) for (const z of w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
+      // (w.hotZones: lava seen where there is no field of it - a casting room's grates, fields.js addHot: it burns as shallow lava does)
+      if (this.grounded && !G.Strata.onRope) for (const z of w.hotZones ? w.lavaZones.concat(w.hotZones) : w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
         this._lavaT = (this._lavaT || 0) - dt;
-        // (z.deep: a lake or a pit of melt you only end up in by a fall - the foundry's deep melt, the great spiral's bottom - hurts in full.
+        // (z.lavaDeep: a lake or a pit of melt you only end up in by a fall - the foundry's deep melt, the great spiral's bottom - hurts in full.
         // Anything else lying on the ground, easily stepped in by mistake - a patch, a trench, a trough, blue fire - hurts half as much)
-        const deep = !!z.deep;
+        const deep = !!z.lavaDeep;
         if (this._lavaT <= 0) { this._lavaT = 0.4; G.combat.damagePlayer(deep ? 5 + G.game.area * 0.6 : 2.5 + G.game.area * 0.3, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }
         // deep lava sets you alight with a fierce, long burn (it hurts several times more than an ordinary one); shallow lava with a short,
         // mild one (a fiercer burn already on you is not softened by it)
         if (deep) { this.st.burn = Math.max(this.st.burn || 0, 5); this.st.burnMul = 4; this.st.burnLv = Math.max(this.st.burnLv || 1, 3); }
         else { this.st.burn = Math.max(this.st.burn || 0, 2); this.st.burnMul = Math.max(this.st.burnMul || 1, 1.5); this.st.burnLv = Math.max(this.st.burnLv || 1, 1); }
       }
+      if (w.fireSpots && w.fireSpots.length) this.fireTouch(w, dt);
       // footsteps
       if (this.grounded && this.speedH > 1.2 && !this.sliding) {
         this.stepDist += this.speedH * dt;

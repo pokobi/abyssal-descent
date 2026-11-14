@@ -56,9 +56,16 @@
       F.add(w, kind, r.x0, r.z0, r.x1, r.z1, { y });
     }
   };
+  // Lava that is drawn already (a casting room's melt under its grates, field_rooms.js) but was never a field: only what it does - it
+  // burns you as shallow lava does (player.js postMove) and leaves fire on you (envTick). Not a field: no bubbles, sound or light of its own,
+  // and not in w.lavaZones (what is laid out round the lava, and the ambient sound, stay as they were). pOnly: on a foe's way - foes are left alone
+  F.addHot = function (w, x0, z0, x1, z1, y, pOnly) {
+    (w.hotZones || (w.hotZones = [])).push({ kind: 'lava', x0, z0, x1, z1, y: y || 0, pOnly: !!pOnly });
+  };
   F.add = function (w, kind, x0, z0, x1, z1, opts) {
-    // (deep: a lava lake or pit you only end up in by a fall, which burns in full; any other lava is shallow and milder, player.js postMove)
-    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue), deep: !!(opts && opts.deep) };
+    // (opts.deep -> lavaDeep: a lava lake or pit you only end up in by a fall, which burns in full; any other lava is shallow and milder,
+    // player.js postMove. Not z.deep: that is the depth of water over its bed, zoneAt and water.js)
+    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue), lavaDeep: !!(opts && opts.deep) };
     w.fields = w.fields || [];
     w.fields.push(f);
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -130,6 +137,7 @@
     const zones = [];
     for (const z of w.waterZones) zones.push([z, 'water']);
     for (const z of w.lavaZones) zones.push([z, 'fire']);
+    for (const z of w.hotZones || []) zones.push([z, 'fire']);
     for (const f of w.fields || []) if (f.kind === 'ice' || (f.kind === 'oil' && f.burnT > 0)) zones.push([f, ZEL[f.kind]]);
     const ice = iceFloors(w);
     if (!zones.length && !w.deepWater && !ice) return;
@@ -147,7 +155,7 @@
     for (const e of G.enemies.list) {
       if (!e.alive || e._rep || e.custom || e.flyer || e.burrowed) continue;
       let el = null;
-      for (const [z, k] of zones) { if (zoneAt(z, e.pos, 0.5)) { el = k; break; } }
+      for (const [z, k] of zones) { if (!z.pOnly && zoneAt(z, e.pos, 0.5)) { el = k; break; } } // (pOnly: lava on a foe's way, addHot - it would burn them as they walk)
       // (the guardians are left out of the deep water and the floors of ice, as out of the weather)
       if (!el && !e.boss && underDeep(w, e.pos, 0.5)) el = 'water';
       if (!el && !e.boss && ice && e.grounded !== false && onIce(w, e.pos, Math.min(0.5, (e.radius || 0.5) * 0.6))) el = 'ice';

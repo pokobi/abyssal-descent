@@ -1820,6 +1820,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     put(w, 'sconce', x, y, z, ry);   // (a plate nailed to the wall, a bent arm, a ring with claws, a brand wound with pitched rag: gfx.js)
     // (the light stands a step out from the wall, the flame on the brand: as a point at the flame it lit the wall a hand away to white)
     w.addLight(x + d[0] * 0.8, y + 0.6, z + d[1] * 0.8, { flame: 1, fp: new THREE.Vector3(x + d[0] * 0.38, y + 0.5, z + d[1] * 0.38) });
+    // (the flame on the brand burns a body in it: a torch low by a floor. One a body standing under it does not reach is left out, player.js fireReach)
+    (w.fireSpots || (w.fireSpots = [])).push({ k: 'torch', x: x + d[0] * 0.38, z: z + d[1] * 0.38, r: 0.12, y0: y + 0.45, y1: y + 0.9 });
     // (the wall behind a brand is black with its soot. So too the flame is seen against it: the wall a hand from the flame is lit
     // brighter than the flame is drawn, and the flame was lost in it)
     if (G.Tex.spr.soot) {
@@ -1853,6 +1855,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     put(w, 'brazier', x, y, z, hsh(x, z) * 2, s);   // (three legs of wrought iron, a basket of bars, coals: gfx.js)
     if (collide !== false) w.addCollider(x - 0.42 * s, y, z - 0.42 * s, x + 0.42 * s, y + 1.05 * s, z + 0.42 * s, { surf: 'metal' });
     w.addLight(x, y + 1.0 * s, z, { flame: 2.2 * s, intensity: 16 * s, range: 16 * s, prio: 1.4 });
+    // (its flames, over the coals: they burn whoever stands in them - on the basket, or jumping over it. player.js fireTouch)
+    (w.fireSpots || (w.fireSpots = [])).push({ k: 'brazier', x, z, r: 0.3 * s, y0: y + 0.9 * s, y1: y + 1.9 * s });
   };
   P.candles = function (w, x, y, z, rng, light) {
     const n = 3 + Math.floor(rr(rng, 0, 4));

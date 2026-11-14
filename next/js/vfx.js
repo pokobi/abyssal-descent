@@ -813,7 +813,9 @@
         const p = follow.pos || follow, k = Math.min(1, this.t / 0.2), left = this.dur - this.t;
         m.position.set(p.x, p.y + (o.lift ?? 1), p.z);
         m.scale.setScalar(this.r * (0.6 + 0.4 * k) * (1 + 0.025 * Math.sin(this.t * 6)));
-        m.material.uniforms.uA.value = (o.alpha ?? 0.45) * 0.42 * k * Math.min(1, left / 0.3) * (1 + (this.t < 0.3 ? (0.3 - this.t) * 4 : 0));
+        // (from afar its rim is a thin line on the screen: a little more of it past 6 m, so a ward held 15 m off still reads)
+        const cam = G.camera, far = cam ? Math.min(1, Math.max(0, (cam.position.distanceTo(m.position) - 6) / 9)) : 0;
+        m.material.uniforms.uA.value = (o.alpha ?? 0.45) * 0.42 * k * Math.min(1, left / 0.3) * (1 + (this.t < 0.3 ? (0.3 - this.t) * 4 : 0)) * (1 + 0.45 * far);
         return left > 0;
       },
       dispose() { scene.remove(m); m.material.dispose(); this.dead = true; },

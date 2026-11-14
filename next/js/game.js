@@ -1297,8 +1297,11 @@
     if (!hl) return;
     hl.k = U.damp(hl.k, want ? 1 : 0, want ? 2 : 6, dt);
     const pulse = 0.7 + 0.3 * Math.sin(GM.time * 3);
-    hl.outline.material.opacity = 0.45 * hl.k * pulse; hl.glow.material.opacity = 0.35 * hl.k * pulse; hl.beam.material.opacity = 0.08 * hl.k * pulse; hl.ring.material.opacity = 0;
-    if (want && Math.random() < dt * 10) { const h = G.world.miniHeal, a = Math.random() * 6.283, d = Math.random() * 0.7; G.fx.add.spawn(h.x + Math.cos(a) * d, h.y + 0.6 + Math.random() * 0.3, h.z + Math.sin(a) * d, 0, 0.35 + Math.random() * 0.4, 0, 1.6, 0.05, 0.02, 0.85, 0.7, 0.4, 0.85, -0.05, 0.4); }   // (motes of light rising off the water)
+    // (the basin's own shape and the motes rising off it say where to heal: no outline round it. From afar, and through what stands
+    // between, the warm glow and the shaft over it grow a little, so a low-health player still finds it 12 m off)
+    const far = G.camera ? U.clamp((G.camera.position.distanceTo(hl.g.position) - 5) / 8, 0, 1) : 0;
+    hl.outline.material.opacity = 0; hl.glow.material.opacity = (0.18 + 0.22 * far) * hl.k * pulse; hl.beam.material.opacity = (0.05 + 0.04 * far) * hl.k * pulse; hl.ring.material.opacity = 0;
+    if (want && Math.random() < dt * 14) { const h = G.world.miniHeal, a = Math.random() * 6.283, d = Math.random() * 0.6; G.fx.add.spawn(h.x + Math.cos(a) * d, h.y + 0.6 + Math.random() * 0.3, h.z + Math.sin(a) * d, 0, 0.35 + Math.random() * 0.4, 0, 2.0, 0.08, 0.03, 0.85, 0.7, 0.4, 0.85, -0.05, 0.4); }   // (motes of light rising off the water: with no outline round it, these and the faint shaft are what say "heal here")
     hl.ring.scale.setScalar(1 + 0.1 * Math.sin(GM.time * 3)); hl.beam.rotation.y += dt * 0.6;
     if (!want && hl.k < 0.01) { w.group.remove(hl.g); hl.beam.geometry.dispose(); hl.ring.geometry.dispose(); hl.outline.material.dispose(); S.healHl = null; }
   }
@@ -2579,7 +2582,7 @@
         const g = new THREE.Group(); g.position.copy(it.pos).setY(it.pos.y - 0.5);
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
         glow.scale.set(3.6, 2.4, 1); glow.position.y = 0.5; glow.renderOrder = 5; g.add(glow);
-        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 11, 12, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false }));
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.35, 9, 12, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false }));
         beam.position.y = 5.5; beam.renderOrder = 5; g.add(beam);
         const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
         ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; ring.renderOrder = 5; g.add(ring);
@@ -2592,7 +2595,7 @@
         h.k = U.damp(h.k, want ? 1 : 0, want ? 1.5 : 6, dt);
         const pulse = 0.7 + 0.3 * Math.sin(GM.time * 3.2 + it.pos.x), rp = (GM.time * 0.7 + it.pos.x * 0.37) % 1;
         h.glow.material.opacity = 0.4 * h.k * pulse; h.glow.scale.set(2.4, 1.6, 1);
-        h.beam.material.opacity = 0.18 * h.k * pulse;
+        h.beam.material.opacity = 0.07 * h.k * pulse;   // (a thin pale shaft over it, still found from afar)
         h.ring.material.opacity = 0; h.rip.material.opacity = 0; h.rip.scale.setScalar(1 + rp * 2.2);   // (no lit rings on the floor: the light from its seams, and the shaft over it that finds it from afar)
         if (want && Math.random() < dt * 6) G.fx.add.spawn(it.pos.x + (Math.random() - 0.5) * 0.6, it.pos.y - 0.1, it.pos.z + (Math.random() - 0.5) * 0.6, 0, 0.3 + Math.random() * 0.3, 0, 1.2, 0.04, 0.015, 0.8, 0.62, 0.32, 0.85, -0.05, 0.4);
         h.ring.scale.setScalar(1 + 0.08 * Math.sin(GM.time * 2.4));

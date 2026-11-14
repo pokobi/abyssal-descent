@@ -511,7 +511,7 @@
     }
     // the dark below, glowing violet-red far down
     w.visual('voidglow', -40, -34, -60, W + 40, -33.9, LEDGE, { uv: 6, grad: false }); // (on past the open north side, under the guardian)
-    for (let z = 8; z < LEDGE; z += 18) for (let x = 8; x < W; x += 20) w.addLight(x, -20, z, { flame: 0, intensity: 14, range: 20, color: '#ff3a8a', emit: false, prio: 0.6, steady: true });
+    for (let z = 8; z < LEDGE; z += 18) for (let x = 8; x < W; x += 20) w.addLight(x, -20, z, { flame: 0, intensity: 14, range: 20, color: '#9a4a30', emit: false, prio: 0.6, steady: true });
     // the entrance ledge: braziers and a low parapet
     for (const sx of [-1, 1]) { P().brazier(w, cx + sx * 12, 0, LEDGE + 3, 1.2); LG.pillar(w, cx + sx * 20, LEDGE + 2, 0, 9, 1.4); }
     w.visual('trim', 4, 0, LEDGE - 0.3, W - 4, 0.3, LEDGE, { uv: 1 });

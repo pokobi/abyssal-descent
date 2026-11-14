@@ -143,6 +143,7 @@
     try { await warmShapes(); } catch (e) { /* ignore */ }
     try { if (G.Icons && G.Icons.warm) G.Icons.warm(); } catch (e) { /* ignore */ }
     try { if (G.PStatus && G.PStatus.warm) G.PStatus.warm(); } catch (e) { /* ignore */ }
+    try { const b = document.getElementById('buff-vig'); if (b && !b.className) { b.className = 'shield inv'; b.style.setProperty('--lc', '200,140,90'); b.style.opacity = 0.02; setTimeout(() => { if (b.className === 'shield inv') b.className = 'ult'; setTimeout(() => { if (b.className === 'ult') { b.className = ''; b.style.opacity = 0; } }, 250); }, 250); } } catch (e) { /* ignore */ }   // (the screen-edge looks drawn once, faintly, behind the loading screen: their first painting costs here, not on the first invulnerability)
     try { if (G.StatusUI && G.StatusUI.warm) G.StatusUI.warm(); } catch (e) { /* ignore */ }
     if (W.log) console.log('[warm] bootAsync', (now() - t0).toFixed(0) + 'ms');
   };

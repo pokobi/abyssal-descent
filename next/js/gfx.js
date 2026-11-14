@@ -103,7 +103,56 @@ void main(){
     u.mode.value = 0; renderer.setRenderTarget(out[1]); renderer.render(scene, cam);
     u.mode.value = 1; renderer.setRenderTarget(out[2]); renderer.render(scene, cam);
     renderer.setRenderTarget(prev); renderer.autoClear = ac; mat.dispose(); hgt.dispose();
+    for (const t of out) RT_OF.set(t.texture, t);
     return out;
+  };
+  // ---- a baked surface lives in the GPU memory of the renderer that baked it (the game's). Another renderer - the class screen's
+  // figure, the weapon cards - has its own WebGL context, cannot see that texture, and samples it as black (colour, normal and
+  // roughness / occlusion all zero: cloth, leather and gun metal come out as black shapes). X.portable gives such a renderer a copy:
+  // each baked texture read back from the game's renderer once (cached), the materials of a model swapped for clones that use the
+  // copies (cached per renderer and material; the game's own materials are left as they are)
+  const RT_OF = new WeakMap(), PORT_T = new Map(), PORT_M = new WeakMap();
+  const PORT_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap', 'displacementMap', 'lightMap', 'clearcoatMap', 'clearcoatNormalMap', 'clearcoatRoughnessMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'transmissionMap', 'thicknessMap', 'iridescenceMap', 'anisotropyMap'];
+  function portTex(t) {
+    if (PORT_T.has(t)) return PORT_T.get(t);
+    const rt = RT_OF.get(t), main = G.renderer; let d = null;
+    if (rt && main) {
+      try {
+        const w = rt.width, h = rt.height, b = new Uint8Array(w * h * 4);
+        main.readRenderTargetPixels(rt, 0, 0, w, h, b);   // (the rows as the target holds them: sampled the same way, flipY off)
+        d = new THREE.DataTexture(b, w, h, THREE.RGBAFormat, THREE.UnsignedByteType);
+        d.colorSpace = t.colorSpace; d.wrapS = t.wrapS; d.wrapT = t.wrapT; d.anisotropy = t.anisotropy || 1;
+        d.generateMipmaps = true; d.minFilter = THREE.LinearMipmapLinearFilter; d.magFilter = THREE.LinearFilter;
+        d.repeat.copy(t.repeat); d.offset.copy(t.offset); d.center.copy(t.center); d.rotation = t.rotation; d.matrixAutoUpdate = t.matrixAutoUpdate; d.matrix.copy(t.matrix); d.channel = t.channel;
+        d.needsUpdate = true;
+      } catch (e) { d = null; }
+    }
+    PORT_T.set(t, d); return d;
+  }
+  function portMat(m, mm) {
+    if (!m) return m;
+    const had = mm.get(m); if (had) return had;
+    let c = null;
+    for (const k of PORT_SLOTS) {
+      const t = m[k]; if (!t || !RT_OF.has(t)) continue;
+      const d = portTex(t); if (!d) continue;
+      if (!c) { c = m.clone(); c.onBeforeCompile = m.onBeforeCompile; c.customProgramCacheKey = m.customProgramCacheKey; }
+      c[k] = d;
+    }
+    mm.set(m, c || m); if (c) mm.set(c, c);
+    return c || m;
+  }
+  X.portable = function (root, renderer) {
+    if (!root || !renderer || renderer === G.renderer) return root;
+    let mm = PORT_M.get(renderer); if (!mm) PORT_M.set(renderer, (mm = new WeakMap()));
+    root.traverse((o) => { if (o.material) o.material = Array.isArray(o.material) ? o.material.map((m) => portMat(m, mm)) : portMat(o.material, mm); });
+    return root;
+  };
+  // the baked surfaces of a model read back now, ahead of its preview (behind the loading screen): how many were read, in what time
+  X.portRead = function (root) {
+    const t0 = performance.now(); let n = 0;
+    if (root) root.traverse((o) => { const ms = !o.material ? [] : Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) for (const k of PORT_SLOTS) { const t = m && m[k]; if (t && RT_OF.has(t) && !PORT_T.has(t)) { portTex(t); n++; } } });
+    return { n, ms: Math.round(performance.now() - t0) };
   };
 
   // ---- the world's surfaces. Each keeps the layout of the one it replaces (rows and columns of stone, the way the planks run, the

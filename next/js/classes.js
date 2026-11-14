@@ -493,16 +493,19 @@
     try { PV.cv = document.createElement('canvas'); PV.cv.className = 'cls-cv'; PV.r = new THREE.WebGLRenderer({ canvas: PV.cv, antialias: true, alpha: true }); } catch (e) { PV.r = null; return false; }
     PV.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); PV.r.outputColorSpace = THREE.SRGBColorSpace; PV.r.toneMapping = THREE.ACESFilmicToneMapping;
     PV.scene = new THREE.Scene();
-    PV.scene.add(new THREE.HemisphereLight(0xd8d0c4, 0x3a3228, 2.2));
-    const key = new THREE.DirectionalLight(0xffe8d0, 3.2); key.position.set(2.5, 3.5, 3); PV.scene.add(key);
-    PV.rim = new THREE.DirectionalLight(0xffffff, 2.4); PV.rim.position.set(-3, 2, -3); PV.scene.add(PV.rim);
+    // (lit as a figure by a lamp in a dark vault: a warm key from in front and a little above, a weak cool fill from the other side,
+    // a dim sky / floor bounce, and an edge light from behind to part it from the dark - the class's colour only a touch in it)
+    PV.scene.add(new THREE.HemisphereLight(0xc4bcb0, 0x2a241c, 0.85));
+    const key = new THREE.DirectionalLight(0xffe2c4, 3.4); key.position.set(1.4, 3.0, 3.6); PV.scene.add(key);
+    const fill = new THREE.DirectionalLight(0x98a2ae, 0.55); fill.position.set(-3.2, 0.8, 2.2); PV.scene.add(fill);
+    PV.rim = new THREE.DirectionalLight(0xe8dcc8, 2.6); PV.rim.position.set(-2.2, 2.6, -3.2); PV.scene.add(PV.rim);
     PV.disc = new THREE.Mesh(new THREE.CircleGeometry(0.75, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 }));
     PV.disc.rotation.x = -Math.PI / 2; PV.disc.position.y = 0.005; PV.scene.add(PV.disc);
     PV.cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
     // something for the metal to reflect (a dim room with a warm light above): without it plate and steel come out black
     try {
       const env = new THREE.Scene(), pm = new THREE.PMREMGenerator(PV.r);
-      env.add(new THREE.Mesh(new THREE.SphereGeometry(10, 16, 12), new THREE.MeshBasicMaterial({ color: 0x8a7f6c, side: THREE.BackSide })));
+      env.add(new THREE.Mesh(new THREE.SphereGeometry(10, 16, 12), new THREE.MeshBasicMaterial({ color: 0x4e473c, side: THREE.BackSide })));   // (dim: the walls of a vault, not a studio's white)
       const lamp = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: 0xfff0d8 })); lamp.position.set(0, 8, 2); lamp.rotation.x = Math.PI / 2; env.add(lamp);
       const side = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ color: 0x9a9080 })); side.position.set(-8, 2, 0); side.rotation.y = Math.PI / 2; env.add(side);
       PV.scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
@@ -539,7 +542,9 @@
     if (PV.cv.parentNode !== host) { host.innerHTML = ''; host.appendChild(PV.cv); }
     if (PV.fig) PV.scene.remove(PV.fig.root);
     PV.fig = figureOf(c); PV.scene.add(PV.fig.root); PV.cls = c;
-    PV.disc.material.color.set(c.col); PV.rim.color.set(c.col);
+    // (the baked cloth, leather and gun surfaces belong to the game's renderer: this one is given copies, or they come out black)
+    if (G.GFX && G.GFX.portable) G.GFX.portable(PV.fig.root, PV.r);
+    PV.disc.material.color.set(c.col); PV.rim.color.set(0xe8dcc8).lerp(new THREE.Color(c.col), 0.22);
     if (!PV.raf) PV.raf = requestAnimationFrame(pvLoop);
   }
   CL._pv = PV;

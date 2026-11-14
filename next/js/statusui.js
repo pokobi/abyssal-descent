@@ -292,6 +292,7 @@
     PV.items = list.map((it, i) => {
       const cv = root.querySelector(`canvas[data-pv="${it.id}"]`); if (!cv) return null;
       let model; try { model = it.kind === 'melee' ? G.weapons.meleeDisplayModel(it.def) : G.weapons.displayModel(it.def, it.atts); } catch (e) { return null; }
+      if (G.GFX && G.GFX.portable) G.GFX.portable(model, PV.r);   // (the game's baked surfaces copied for this renderer: black otherwise)
       const box = visBox(model), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
       model.position.sub(c);
       const g = new THREE.Group(); g.add(model);
@@ -310,12 +311,17 @@
       const g = new THREE.Group();
       if (d) g.add(G.weapons.displayModel(d, {}));
       if (G.MELEE && G.MELEE[0]) g.add(G.weapons.meleeDisplayModel(G.MELEE[0]));
+      if (G.GFX && G.GFX.portable) G.GFX.portable(g, PV.r);
       PV.scene.add(g); PV.scene.updateMatrixWorld(true);
       PV.cam.position.set(0, 0.1, 1.2); PV.cam.lookAt(0, 0, 0);
       PV.r.compile(PV.scene, PV.cam);
       PV.r.render(PV.scene, PV.cam);
       PV.scene.remove(g);
     } catch (e) { /* ignore */ }
+    // the class screen's figure (classes.js) wears baked cloth and leather: read back for its renderer when the page is idle, after the
+    // loading screen, so that neither the boot nor the first opening of that screen pays for it (about 10 ms)
+    const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
+    idle(() => { try { const X = G.GFX; if (!X || !X.portRead || !X.tex) return; const g = new THREE.Group(); for (const n of ['weave', 'leather']) { const t = X.tex(n); if (t) g.add(new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.orm }))); } X.portRead(g); } catch (e) { /* read when the screen opens */ } }, { timeout: 8000 });
   };
   SU.unmount = function () { if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = 0; PV.items = []; };
 })();

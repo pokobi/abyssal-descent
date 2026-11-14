@@ -10,15 +10,56 @@
   // which animation each item uses (its length and the moment its effect lands come from this)
   const KIND = {
     h_bandage: 'bandage', h_medkit: 'inject', h_regen: 'inject', u_adren: 'inject',
-    h_elixir: 'drink', h_water: 'drink', u_rage: 'drink', u_iron: 'drink', u_focus: 'drink', u_invis: 'drink', h_fairy: 'drink',
+    h_elixir: 'drink', h_water: 'drink', u_rage: 'drink', u_iron: 'drink', u_focus: 'drink', u_invis: 'drink', h_fairy: 'drink', h_ambrosia: 'drink',
     h_apple: 'eat', h_troll: 'eat', h_herb: 'eat', u_berserk: 'eat',
     u_plate: 'plate',
   };
-  // what is seen, where it is not the kind's own (the timing stays the kind's): the god's wine is drunk from its flask
+  // what is seen, where it is not the kind's own (the timing stays the kind's)
   const LOOK = { h_ambrosia: 'drink' };
   IA.kindOf = (id) => KIND[id] || 'device';
-  const DUR = { throw: 0.5, bandage: 1.15, drink: 0.85, inject: 0.75, eat: 0.8, plate: 0.75, device: 0.62 };
-  const APPLY = { throw: 0.42, bandage: 0.82, drink: 0.62, inject: 0.55, eat: 0.6, plate: 0.68, device: 0.5 };
+  // ---- how long a use takes. DUR: each kind's length in seconds; DUR_ID: an item with a length of its own (the kit's dose takes
+  // longer than a syringe's). The length is multiplied by IA.useMul (never below MUL_MIN); the grenade's throw is not
+  const DUR = { throw: 0.5, bandage: 3.0, drink: 2.4, inject: 2.2, eat: 2.6, plate: 3.0, device: 2.0 };
+  const DUR_ID = { h_medkit: 4.0 };
+  const MUL_MIN = 0.5;
+  // what a use's length is multiplied by - the one place for anything that makes using quicker (a perk adds a line here)
+  IA.useMul = function (id, kind) {
+    const p = G.player; let m = 1;
+    if (kind === 'bandage' && p && p.has && p.has('d_healboost')) m *= 0.85;   // (治癒の才: the bandage goes on quicker)
+    return m;
+  };
+  IA.durOf = (id, kind) => { kind = kind || IA.kindOf(id); const d = DUR_ID[id] || DUR[kind] || 1; return kind === 'throw' ? d : d * Math.max(MUL_MIN, IA.useMul(id, kind)); };
+  // ---- the stages of each motion: where each begins, as a fraction of the motion, and apply: where the effect lands. Every motion
+  // below is placed by these numbers alone, so a shorter use shortens every stage alike (none is skipped). IA.stages(id) gives them
+  // in seconds: the sounds of a use are laid on the same moments
+  const PLAN = {
+    throw: { apply: 0.42, at: [['draw', 0], ['release', 0.42]] },
+    // the roll taken up and the arm held out; its end drawn off onto the wrist; wound on, turn by turn (each turn* where the roll
+    // comes over the top of the arm again); the end pressed down twice; the hand away and the arm down
+    bandage: { apply: 0.88, fore: [0.12, 0.9], at: [['draw', 0], ['unwind', 0.15], ['wind', 0.26], ['turn2', 0.4188], ['turn3', 0.5776], ['turn4', 0.7365], ['pin', 0.8], ['press2', 0.845], ['lower', 0.9]] },
+    // the kit (hanging from the other fist) brought up; the hand to its flap; the stud undone; the flap thrown back; into it and the
+    // syrette out; brought over the arm; the needle in; the tube squeezed flat; out; the hand away with it; the arm down
+    kit: { apply: 0.77, fore: [0.08, 0.86], at: [['draw', 0], ['reach', 0.07], ['unclasp', 0.15], ['open', 0.21], ['takeOut', 0.32], ['ready', 0.46], ['jab', 0.56], ['squeeze', 0.6], ['out', 0.74], ['away', 0.79], ['lower', 0.86]] },
+    // the syringe up; its needle's cap put into the other fist and pulled off (capOff), the cap let fall; brought over the arm; in;
+    // the plunger pushed home; out; the syringe tossed aside; the arm down
+    syringe: { apply: 0.75, fore: [0.12, 0.86], at: [['draw', 0], ['uncap', 0.14], ['capOff', 0.27], ['aim', 0.34], ['capDrop', 0.4], ['jab', 0.44], ['push', 0.5], ['out', 0.72], ['toss', 0.78], ['lower', 0.86]] },
+    // the vessel up; the other hand to its cork, twisting it, the cork out (pop), the hand away with it; to the mouth; three
+    // swallows, the vessel tipped further each time; down
+    drink: { apply: 0.84, at: [['draw', 0], ['reach', 0.16], ['twist', 0.25], ['pop', 0.36], ['away', 0.41], ['raise', 0.46], ['gulp1', 0.58], ['gulp2', 0.67], ['gulp3', 0.76], ['lower', 0.86]] },
+    // up; to the mouth; three bites (each the moment the teeth go in; the hand pulls away, tearing, and holds it while it is chewed); down
+    eat: { apply: 0.8, at: [['draw', 0], ['raise', 0.14], ['bite1', 0.3], ['bite2', 0.48], ['bite3', 0.66], ['lower', 0.84]] },
+    // up; turned over and looked at; to the chest; its edge into the vest; pushed down twice; home (seat); two pats on it (each the
+    // moment the hand meets it); down
+    plate: { apply: 0.72, at: [['draw', 0], ['look', 0.12], ['insert', 0.3], ['slip', 0.42], ['push1', 0.48], ['push2', 0.6], ['seat', 0.7], ['pat1', 0.81], ['pat2', 0.89], ['lower', 0.93]] },
+    device: { apply: 0.7, at: [['draw', 0], ['use', 0.22], ['lower', 0.78]] },
+  };
+  for (const k in PLAN) PLAN[k].a = Object.fromEntries(PLAN[k].at);
+  const planOf = (id, kind) => (kind === 'inject' ? (id === 'h_medkit' ? 'kit' : 'syringe') : PLAN[kind] ? kind : 'device');
+  // an item's use in seconds: { dur, apply, stages: [[name, s], ...] } (with the multiplier, as it would be used now)
+  IA.stages = function (id) {
+    const kind = IA.kindOf(id), pl = PLAN[planOf(id, kind)], d = IA.durOf(id, kind), r = (v) => Math.round(v * 1000) / 1000;
+    return { plan: planOf(id, kind), dur: r(d), apply: r(pl.apply * d), stages: pl.at.map(([n, f]) => [n, r(f * d)]) };
+  };
   // what each draught or dose looks like in its glass: [colour, how much of the light it lets through]. Muted; nothing glows
   const LIQ = { h_elixir: [0x4e0c10, 0.88], h_water: [0xb4c0b8, 0.32], u_rage: [0x5e2010, 0.86], u_iron: [0x261810, 0.94], u_focus: [0x26344e, 0.82], u_invis: [0xc0c8cc, 0.3], h_fairy: [0xd4d0c4, 0.62], h_regen: [0x5e6c2e, 0.72], u_adren: [0x8e7020, 0.76], h_medkit: [0x6a5a3a, 0.8] };
 
@@ -94,6 +135,7 @@
       if (q.at) o.position.set(q.at[0], q.at[1], q.at[2]);
       if (mat.transparent) o.renderOrder = q.m === 'liq' ? 1 : 2;
       p.add(o); if (q.tag) { tags[q.tag] = o; o.userData.part = q; }
+      (tags['m:' + q.m] = tags['m:' + q.m] || []).push(o);   // (and every part by its material, in order: the cork of a vessel, the kit's flap)
     }
     return tags;
   }
@@ -163,7 +205,7 @@
       const roll = new THREE.Group(); g.add(roll); if (!putG(roll, 'bandage')) cyl(roll, M.cloth, 0.03, 0.06, 0, 0, 0, 0, 0, HX); g.userData.roll = roll;
     } else if (kind === 'drink') {
       const vs = (G.GFX && G.GFX.VESSEL && G.GFX.VESSEL[id]) || 'phial', tg = putG(g, vs, id);
-      if (tg) g.userData.liq = tg.liq || null;
+      if (tg) { g.userData.liq = tg.liq || null; g.userData.cork = (tg['m:cork'] || []).concat(tg['m:wax'] || []); }
       else { const lm = liqMat(id); cyl(g, M.glass, 0.028, 0.11); g.userData.liq = cyl(g, lm, 0.024, 0.08, 0, -0.012); g.userData.liq.userData.base = 0.08; cyl(g, M.glass, 0.012, 0.04, 0, 0.07); cyl(g, M.cork, 0.013, 0.018, 0, 0.095); }
     } else if (kind === 'inject') {
       // held in the fist, the needle out past the thumb (the shapes are drawn needle down: turned over): a glass syringe, or the kit's syrette
@@ -173,6 +215,9 @@
         const tg = putG(s, 'inject', id);
         if (tg) { const pl = new THREE.Group(); putG(pl, 'plunger'); pl.position.y = 0.028; s.add(pl); g.userData.plunger = pl; g.userData.liq = tg.liq || null; if (tg.liq) tg.liq.scale.y = 0.028 - 0.0062 + 0.0305; }
         else { cyl(s, M.glass, 0.012, 0.12); cyl(s, liqMat(id), 0.01, 0.09, 0, -0.01); cyl(s, M.steel, 0.002, 0.05, 0, -0.085); const pl = cyl(s, M.steel, 0.005, 0.06, 0, 0.09); cyl(s, M.steel, 0.016, 0.004, 0, 0.12); g.userData.plunger = pl; g.userData.old = true; }
+        // the needle's case: a nickelled tube over the needle and onto its hub, closed at its end (pulled off before the dose)
+        const cg = new THREE.LatheGeometry([[0.0005, -0.0948], [0.0019, -0.0946], [0.0026, -0.0932], [0.0027, -0.06], [0.0031, -0.055], [0.0037, -0.0532], [0.0039, -0.0505], [0.0034, -0.0502], [0.003, -0.0525], [0.0021, -0.058], [0.0021, -0.092], [0.0005, -0.0925]].map((p) => new THREE.Vector2(p[0], p[1])), 14);
+        const cap = new THREE.Mesh(cg, M.nickel); s.add(cap); g.userData.cap = cap;
       }
     } else if (kind === 'eat') {
       const FG = G.GFX && G.GFX.foeGeo;
@@ -199,7 +244,7 @@
   // ------------------------------------------------ playback
   IA.busy = () => !!cur;
   // what is still left of the current motion: [seconds until the effect lands (0 once applied), seconds until the motion ends]
-  IA.left = (id) => (cur && (!id || cur.id === id) ? [cur.applied ? 0 : Math.max(0, APPLY[cur.kind] * cur.dur - cur.t), Math.max(0, cur.dur - cur.t)] : null);
+  IA.left = (id) => (cur && (!id || cur.id === id) ? [cur.applied ? 0 : Math.max(0, cur.apply * cur.dur - cur.t), Math.max(0, cur.dur - cur.t)] : null);
   IA.build = (kind, id) => { mats(); return buildItem(kind, id); };
   IA.hand = (p, right) => { mats(); return hand(p, right); };
   // one of gfx.js's item shapes, made of these materials (to show a thing as it lies, apart from its use)
@@ -253,27 +298,58 @@
     c.fore = F;
   }
   // the dose: the left forearm held out (the kit hanging by its strap from the fist, for the kit's syrette), the right hand brings the
-  // needle in from above and puts it in the top of the forearm (see jabStep)
+  // needle in from above and puts it in the top of the forearm (see jabAt)
   function playInject(c) {
-    const F = foreArm(root, new V3(-0.075, -0.11, -0.46), new V3(-0.32, -0.27, -0.2), new V3(-0.15, 1, 0.3), c.id === 'h_medkit' ? -1.2 : -0.4);
+    // (held low enough that the other arm, coming over it, passes under the middle of the view)
+    const F = foreArm(root, new V3(-0.08, -0.165, -0.46), new V3(-0.33, -0.32, -0.2), new V3(-0.15, 1, 0.3), c.id === 'h_medkit' ? -1.2 : -0.4);
     if (c.id === 'h_medkit') {
-      const pouch = new THREE.Group(); F.userData.hand.add(pouch); putG(pouch, 'kit');
-      // (it hangs straight down from the fist, its face to the eye)
+      const pouch = new THREE.Group(); F.userData.hand.add(pouch); const tg = putG(pouch, 'kit') || {};
+      // (it hangs straight down from the fist, its face to the eye; a little lower on its strap than gfx.js draws it, so that the
+      // other hand has room at its mouth under the fist: the strap let out to match)
       F.updateMatrixWorld(true); const hq = new QT(); F.userData.hand.getWorldQuaternion(hq);
       const want = new QT().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new V3(0.94, 0, -0.34), new V3(0, 1, 0), new V3(0.34, 0, 0.94)));
-      pouch.quaternion.copy(hq.invert().multiply(want));
+      const hqi = hq.clone().invert(); pouch.quaternion.copy(hqi).multiply(want);
+      const dk = 0.05; pouch.position.copy(new V3(0, -dk, 0).applyQuaternion(hqi));
+      const strap = (tg['m:leather'] || [])[0]; if (strap) { const s = 1 + dk / 0.085; strap.scale.y = s; strap.position.y = -0.056 + 0.056 * s; }
+      // its flap closed over its mouth to begin with (gfx.js draws it thrown back: that one is hidden): a panel over the top hinged at
+      // its back edge, a drop down its face hinged at the front edge, a brass stud at the foot of the drop; what is in it hidden until
+      // the flap is back
+      const Wk = 0.1, Dk = 0.036, y0 = -0.05, cv = tg['m:canvas'] || [];
+      if (cv[1]) cv[1].visible = false;
+      const flap = new THREE.Group(); flap.position.set(0, y0 + 0.004, -Dk / 2 - 0.001); pouch.add(flap);
+      const RB = G.GFX && G.GFX.makeRbox, slab = (w, h, d, r) => (RB ? RB(w, h, d, r, 1) : new THREE.BoxGeometry(w, h, d));
+      const top = new THREE.Mesh(slab(Wk * 0.98, 0.0032, Dk + 0.006, 0.0014), M.canvas); top.position.set(0, 0.0026, Dk / 2 + 0.003); flap.add(top);
+      const hinge2 = new THREE.Group(); hinge2.position.set(0, 0.0026, Dk + 0.0056); flap.add(hinge2);
+      const drop = new THREE.Mesh(slab(Wk * 0.96, 0.026, 0.0032, 0.0014), M.canvas); drop.position.set(0, -0.012, 0.0004); hinge2.add(drop);
+      const edge = new THREE.Mesh(slab(Wk * 0.97, 0.0024, 0.0036, 0.001), M.canvasDk); edge.position.set(0, -0.0246, 0.0004); hinge2.add(edge);
+      const stud = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0046, 0.003, 12).rotateX(HX), M.brassOld); stud.position.set(0, -0.0196, 0.0026); hinge2.add(stud);
+      const tab = new THREE.Object3D(); tab.position.set(0, -0.022, 0.006); hinge2.add(tab);
+      const inside = []; for (const k of ['linen', 'rollEnd', 'glassBrown', 'cork', 'steel', 'label', 'dark']) for (const o of tg['m:' + k] || []) inside.push(o);
+      // (where the hand goes into it: the middle of its mouth, a little towards the eye)
+      c.kit = { pouch, flap, hinge2, tab, inside, mouth: new V3(0.012, y0 + 0.004, 0.004) };
     }
     F.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = false; } });
     c.fore = F;
-    // where the needle goes in: the top of the forearm, a third of the way to the elbow; it comes down into it from above and to the right
+    // where the needle goes in: the top of the forearm, a third of the way to the elbow; it comes into it from the right, a little
+    // from above (low: the fist that holds it stands well back from the skin, and the view's middle is kept clear)
     const z = 0.085, a = HX - 0.2, r = G.GFX && G.GFX.armR ? G.GFX.armR(z, a) : 0.03;
-    c.j = { T: new V3(Math.cos(a) * r, Math.sin(a) * r, z), D: new V3(-0.72, -0.55, -0.3).normalize() };
+    c.j = { T: new V3(Math.cos(a) * r, Math.sin(a) * r, z), D: new V3(-0.88, -0.36, -0.3).normalize() };
+  }
+  // the drink: the other (right) hand comes to the vessel's cork, twists it and draws it, and goes with it (see drinkStep)
+  function playDrink(c) {
+    const ud = c.item.userData, cork = (ud.cork || []).filter((o) => o.isMesh);
+    if (!cork.length) return;
+    c.item.updateMatrixWorld(true); c.g.updateMatrixWorld(true);
+    const bx = new THREE.Box3(); for (const o of cork) bx.expandByObject(o);
+    const inv = new THREE.Matrix4().copy(c.g.matrixWorld).invert(), C = bx.getCenter(new V3()).applyMatrix4(inv);
+    const rh = hand(c.g, true); rh.userData.arm.scale.z = 0.7; rh.visible = false;
+    c.dr = { rh, cork, C, base: cork.map((o) => o.position.clone()), top: bx.max.clone().applyMatrix4(inv).y - C.y };
   }
   IA.play = function (kind, id, onApply, onDone) {
     if (cur || !G.weapons.vmRoot) return false;
     mats();
     if (!root) { root = new THREE.Group(); G.weapons.vmScene.add(root); }
-    const vis = LOOK[id] || kind;
+    const vis = LOOK[id] || kind, plan = planOf(id, kind);
     const g = new THREE.Group(); root.add(g);
     const item = vis === 'bandage' ? new THREE.Group() : buildItem(vis, id); g.add(item);
     const BS = vis === 'throw' ? 1.3 : vis === 'inject' ? 1.35 : 1.5; item.scale.setScalar(BS); item.userData.bs = BS;
@@ -282,9 +358,17 @@
     if (vis !== 'bandage') { h = hand(g, rightHanded); h.position.set(rightHanded ? 0.005 : -0.005, -0.04, 0.02); }
     if (vis === 'inject') { h.position.set(0, 0, 0); item.position.set(0, 0, 0); }
     if (h && (vis === 'drink' || vis === 'eat')) h.userData.arm.scale.z = 0.4;
-    cur = { kind, vis, id, t: 0, dur: DUR[kind] * (kind === 'bandage' && P().has && P().has('d_healboost') ? 0.85 : 1), applied: false, onApply, onDone, g, item, fore: null };
+    const pl = PLAN[plan];
+    cur = { kind, vis, plan, id, t: 0, dur: IA.durOf(id, kind), apply: pl.apply, A: pl.a, applied: false, onApply, onDone, g, item, hand: h, fore: null, rel: [] };
     if (vis === 'bandage') playBandage(cur);
     if (vis === 'inject') playInject(cur);
+    if (vis === 'drink') playDrink(cur);
+    if (plan === 'kit') item.visible = false;
+    if (vis === 'plate') item.position.y = 0.075;   // (held by its lower edge, not over its face)   // (the syrette is in the kit until it is taken out)
+    // what is let go of on the way: [what, at, from when it falls, its speed then] (taken into the room where it was at that moment)
+    if (plan === 'syringe' && item.userData.cap) cur.rel.push({ obj: item.userData.cap, k: pl.a.capOff + 0.01, fall: pl.a.capDrop, v: new V3(0.02, 0.05, 0.03) });
+    if (plan === 'syringe') cur.rel.push({ obj: item, k: pl.a.toss + 0.05, fall: pl.a.toss + 0.05, v: new V3(0.9, 0.5, 0.25), spin: new V3(9, 3, 14) });
+    if (plan === 'plate') cur.rel.push({ obj: item, k: pl.a.seat, fall: 9, v: new V3() });
     g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
     if (vis === 'drink') G.sfx.mech('click', 0, 0.6);
     if (vis === 'bandage') G.sfx.whoosh(0.5, 0.25);
@@ -294,41 +378,74 @@
   const P = () => G.player;
   const L = (a, b, k) => a + (b - a) * k;
   const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+  // easings of a stretch of motion: in and out (a hand's own pace: it gathers speed and settles), out (sets off fast and settles:
+  // a reach that arrives), in (gathers: a push, a jab), smoother in and out
+  const EASE = { q: ease, o: (t) => 1 - Math.pow(1 - t, 3), i: (t) => t * t * t, s: (t) => t * t * t * (t * (t * 6 - 15) + 10), l: (t) => t };
+  const seg = (k, a, b) => U.clamp((k - a) / Math.max(1e-4, b - a), 0, 1);
   function path(keys, k) {
-    // keys: [[t, x, y, z, rx, ry, rz], ...]
+    // keys: [[t, x, y, z, rx, ry, rz, easing to this key (EASE; q when left out)], ...]
     let i = 0; while (i < keys.length - 2 && k > keys[i + 1][0]) i++;
-    const a = keys[i], b = keys[i + 1], u = ease(U.clamp((k - a[0]) / Math.max(1e-4, b[0] - a[0]), 0, 1));
+    const a = keys[i], b = keys[i + 1], u = EASE[b[7] || 'q'](U.clamp((k - a[0]) / Math.max(1e-4, b[0] - a[0]), 0, 1));
     return [1, 2, 3, 4, 5, 6].map((j) => L(a[j], b[j], u));
   }
-  const PATHS = {
-    throw: [[0, 0.2, -0.21, -0.3, 0, 0, 0], [0.3, 0.2, 0.03, -0.26, 0.9, 0, -0.2], [0.45, 0.04, 0.0, -0.6, -0.6, 0, 0.1], [1, 0.14, -0.36, -0.5, -0.8, 0, 0]],
-    drink: [[0, -0.12, -0.24, -0.34, 0, 0, 0], [0.3, -0.02, -0.04, -0.3, 0.6, 0, -0.1], [0.72, 0, 0.0, -0.28, 1.6, 0, -0.1], [1, -0.12, -0.28, -0.3, 0.2, 0, 0]],
-    eat: [[0, -0.1, -0.26, -0.35, 0, 0, 0], [0.38, -0.01, -0.03, -0.29, 0.3, 0, 0], [0.68, -0.01, -0.04, -0.29, 0.3, 0, 0], [1, -0.1, -0.31, -0.32, 0, 0, 0]],
-    plate: [[0, -0.18, -0.24, -0.34, 0, 0.3, 0], [0.35, -0.02, -0.02, -0.32, -0.3, 0, 0], [0.7, 0, -0.24, -0.2, -1.2, 0, 0], [1, -0.05, -0.41, -0.2, -1.2, 0, 0]],
-    device: [[0, 0.14, -0.26, -0.35, 0, 0, 0], [0.38, 0.02, 0.04, -0.36, 0.2, 0.5, 0], [0.62, 0.02, 0.05, -0.36, 0.2, 2.2, 0], [1, 0.14, -0.31, -0.35, 0, 0, 0]],
-  };
-  // ---- the bandage wound on. Its timing: 0 - 0.15 the arm comes up and the roll to its wrist; to 0.8 the roll goes round the arm, the
-  // cloth coming off it onto the arm turn by turn (the roll spins, grows less, the cloth between them taut); at 0.82 (the effect) the end is
-  // torn and tucked in; then the hand goes and the arm goes down
+  // a hand never stands quite still: the slow drift of a held arm (breath, the weight of it), millimetres, set by the use's own clock
+  const _life = new V3();
+  const life = (c, a) => _life.set(Math.sin(c.t * 1.9 + 0.3) * a, Math.sin(c.t * 2.6 + 1.1) * a * 0.8 + Math.sin(c.t * 0.9) * a * 0.5, Math.sin(c.t * 1.4 + 2.2) * a * 0.5);
+  // the vessel's, the food's and the plate's ways, by the stages of PLAN (the throw's as it was)
+  function keysFor(plan) {
+    const a = PLAN[plan] && PLAN[plan].a;
+    if (plan === 'throw') return [[0, 0.2, -0.21, -0.3, 0, 0, 0], [0.3, 0.2, 0.03, -0.26, 0.9, 0, -0.2], [0.45, 0.04, 0.0, -0.6, -0.6, 0, 0.1], [1, 0.14, -0.36, -0.5, -0.8, 0, 0]];
+    if (plan === 'drink') return [
+      [0, -0.17, -0.4, -0.33, 0.55, 0.1, 0.25], [a.reach - 0.01, -0.095, -0.14, -0.36, 0.1, 0.35, -0.04, 'o'],   // (up from the belt, turned to the eye)
+      [a.raise, -0.088, -0.138, -0.355, 0.12, 0.42, -0.03, 's'],
+      [a.gulp1 - 0.01, -0.03, -0.098, -0.215, 1.08, 0.12, -0.14, 'q'],   // (the lip at the mouth, below the eye: tipped)
+      [a.gulp2 - 0.01, -0.03, -0.092, -0.212, 1.3, 0.12, -0.14, 's'], [a.gulp3 - 0.01, -0.03, -0.086, -0.209, 1.52, 0.12, -0.14, 's'],
+      [a.lower - 0.005, -0.03, -0.08, -0.206, 1.78, 0.12, -0.14, 's'], [1, -0.16, -0.4, -0.3, 0.3, 0, 0.18, 'i']];
+    if (plan === 'eat') return [
+      [0, -0.16, -0.42, -0.36, 0.4, 0, 0.1], [a.raise - 0.01, -0.1, -0.15, -0.37, 0.12, 0.2, 0, 'o'],
+      [a.bite1 - 0.06, -0.05, -0.125, -0.29, 0.3, 0.25, -0.05, 'q'], [a.lower, -0.05, -0.125, -0.29, 0.28, 0.25, -0.05, 'l'], [1, -0.15, -0.44, -0.33, 0, 0, 0, 'i']];
+    if (plan === 'plate') return [
+      [0, -0.22, -0.46, -0.4, 0.3, 0.3, 0], [a.look, -0.125, -0.175, -0.42, 0, 0.25, 0, 'o'],
+      [a.look + 0.09, -0.115, -0.165, -0.41, 0.08, -1.05, 0.06, 'q'], [a.insert, -0.1, -0.17, -0.41, 0, 0.05, 0, 'q'],   // (turned over: its lining looked at, and back)
+      [a.slip, -0.02, -0.14, -0.27, -1.0, 0, 0, 'q'], [a.push1, -0.008, -0.15, -0.25, -1.15, 0, 0, 'q'],   // (to the chest; its edge into the vest)
+      [a.push1 + 0.06, -0.008, -0.19, -0.238, -1.2, 0, 0, 'i'], [a.push2, -0.008, -0.185, -0.239, -1.2, 0, 0, 'o'],
+      [a.push2 + 0.06, -0.008, -0.232, -0.228, -1.22, 0, 0, 'i'], [a.seat + 0.02, -0.008, -0.229, -0.229, -1.22, 0, 0, 'o'],
+      [a.pat1 - 0.04, -0.025, -0.1, -0.24, -0.55, 0.1, 0, 'q'], [a.pat1, -0.012, -0.142, -0.226, -0.62, 0.1, 0, 'i'],   // (the hand up off it, and down on it: two pats)
+      [a.pat2 - 0.04, -0.025, -0.104, -0.24, -0.55, 0.1, 0, 'o'], [a.pat2, -0.012, -0.142, -0.226, -0.62, 0.1, 0, 'i'],
+      [a.lower, -0.03, -0.125, -0.24, -0.5, 0.1, 0, 'o'], [1, -0.17, -0.46, -0.3, -0.3, 0, 0, 'i']];
+    return [[0, 0.14, -0.26, -0.35, 0, 0, 0], [a.use, 0.04, -0.06, -0.36, 0.2, 0.5, 0, 'o'], [a.use + 0.2, 0.03, -0.055, -0.36, 0.25, 1.4, 0, 'q'], [a.lower, 0.03, -0.06, -0.36, 0.2, 2.2, 0, 'q'], [1, 0.14, -0.31, -0.35, 0, 0, 0, 'i']];
+  }
+  // ---- the bandage wound on (PLAN.bandage): the arm comes up and the roll to its wrist; its end drawn off onto the wrist (the roll
+  // pulled out from it and back, turning the other way); wound on turn by turn, quicker over the top of the arm and slower under it,
+  // the cloth coming off the roll onto the arm (the roll spins, grows less, the cloth between them taut); the end pressed down twice;
+  // the hand goes and the arm goes down
   const NZ = new V3(0, 0, -1), _P = new V3(), _N = new V3(), _T = new V3(), _C = new V3(), _X = new V3(), _Z = new V3(), _m = new THREE.Matrix4(), _q = new QT(), _q2 = new QT();
   function bandStep(c, k) {
-    const B = c.b; if (!B.path) return;
-    const n = B.path.length - 1, s = U.clamp((k - 0.15) / 0.65, 0, 1), f = s * n, i0 = Math.min(n - 1, Math.floor(f)), t = f - i0, A = B.path[i0], Z = B.path[i0 + 1];
-    const l = (j) => A[j] + (Z[j] - A[j]) * t;
+    const B = c.b, A = c.A; if (!B.path) return;
+    const NT = 3.4, u = seg(k, A.wind, A.pin), n = B.path.length - 1;
+    const f = Math.min(NT, NT * u + 0.075 * Math.sin(Math.PI * 2 * NT * u) * Math.min(1, u * 8)), s = f / NT;   // (turns: f; not even in pace)
+    const fi = s * n, i0 = Math.min(n - 1, Math.floor(fi)), t = fi - i0, Pa = B.path[i0], Z = B.path[i0 + 1];
+    const l = (j) => Pa[j] + (Z[j] - Pa[j]) * t;
     _P.set(l(0), l(1), l(2)); _N.set(l(3), l(4), l(5)).normalize(); _T.set(l(6), l(7), l(8)).normalize();
-    if (B.wrap) B.wrap.geometry.setDrawRange(0, (k >= 0.8 ? n : Math.round(f)) * B.seg);
+    if (B.wrap) B.wrap.geometry.setDrawRange(0, (k >= A.pin ? n : Math.round(fi)) * B.seg);
     const kr = 1 - 0.32 * s, rr = B.R * kr;
     _C.copy(_P).addScaledVector(_N, rr + 0.003).addScaledVector(_T, 0.028);
+    // (drawing the end off: the roll pulled out from the wrist along the way it will go, and back, twice the second time shorter)
+    const uw = seg(k, A.unwind, A.wind), pull = uw > 0 && uw < 1 ? Math.sin(Math.PI * Math.min(1, uw * 1.6)) * 0.034 * (uw < 0.62 ? 1 : 0) + Math.max(0, Math.sin(Math.PI * (uw - 0.62) / 0.38)) * 0.016 : 0;
+    _C.addScaledVector(_T, pull).addScaledVector(_N, pull * 0.35);
+    // (pressing the end down: the hand in on it, twice)
+    const up = seg(k, A.pin, A.lower), press = up > 0 && up < 1 ? Math.max(0, Math.sin(Math.PI * 2 * up)) * 0.007 : 0;
+    _C.addScaledVector(_N, -press);
     // (the hand's frame: its back ahead of the roll the way it goes round and a little out from the arm, its grip along the arm with its
     // wrist to the elbow's side, so that its forearm comes from where the shoulder is)
     _X.copy(_T).addScaledVector(_N, 0.35); _Z.crossVectors(_X, NZ).normalize(); _X.crossVectors(NZ, _Z).normalize(); _m.makeBasis(_X, NZ, _Z); _q.setFromRotationMatrix(_m);
-    let w = 1; if (k < 0.15) w = ease(k / 0.15); else if (k > 0.8) w = 1 - ease(Math.min(1, (k - 0.8) / 0.14));
+    let w = 1; if (k < A.unwind) w = EASE.s(seg(k, 0.03, A.unwind)); else if (k > A.lower) w = 1 - EASE.s(seg(k, A.lower, A.lower + 0.08));
     _q2.setFromEuler(new THREE.Euler(0.3, 0.2, -0.6));
     B.RH.position.lerpVectors(B.rest, _C, w); B.RH.quaternion.slerpQuaternions(_q2, _q, w);
-    if (k > 0.8) B.RH.position.addScaledVector(_N, (1 - w) * 0.05);
-    B.spin.rotation.y = -s * B.Ltot / B.R; B.roll.scale.set(1, kr, kr);
-    // the cloth from the last of what is on to the roll, pulled straight
-    const show = s > 0.002 && k < 0.82; B.taut.visible = show;
+    if (k > A.lower) B.RH.position.addScaledVector(_N, (1 - w) * 0.05);
+    B.spin.rotation.y = -s * B.Ltot / B.R + uw * 1.1; B.roll.scale.set(1, kr, kr);
+    // the cloth from the last of what is on (from its very end while it is drawn off) to the roll, pulled straight
+    const show = (k >= A.unwind + 0.01 && k < A.pin + 0.02); B.taut.visible = show;
     if (show) {
       const ps = B.taut.geometry.attributes.position, hw = B.W / 2, q = _C.clone().addScaledVector(_N, -rr);
       ps.setXYZ(0, _P.x, _P.y, _P.z - hw); ps.setXYZ(1, _P.x, _P.y, _P.z + hw); ps.setXYZ(2, q.x, q.y, q.z - hw); ps.setXYZ(3, q.x, q.y, q.z + hw); ps.needsUpdate = true;
@@ -337,31 +454,106 @@
     }
     sleeveTo(B.sl, B.rh, ELB_R);
   }
-  // ---- the dose. 0 - 0.3 the hand comes in over the arm; to 0.38 the needle goes in; to 0.65 the dose is given (the plunger goes down,
-  // the tube is squeezed flat); then out, and away
+  // ---- the dose. The hand's turn for a needle along Y (its +y), its forearm running back, down and out to the right (towards where
+  // the shoulder is)
   const _Tw = new V3(), _Dw = new V3(), _pIn = new V3(), _pNear = new V3(), _qIn = new QT(), _qRest = new QT().setFromEuler(new THREE.Euler(0.5, 0.6, -0.9)), _pRest = new V3(0.26, -0.34, -0.3), SLV_R = new V3(0.85, -0.45, 0.3).normalize();
-  function jabStep(c, k) {
-    const J = c.j, F = c.fore, g = c.g; F.updateMatrixWorld(true);
-    _Tw.copy(J.T).applyMatrix4(F.matrixWorld); _Dw.copy(J.D);
-    // (the needle out along the hand's +y, the way it goes in; the hand turned about it so that its forearm runs back, down and out to the
-    // right, towards where the shoulder is)
-    const Y = _Dw, Wv = SLV_R.clone().addScaledVector(Y, 0.55), Zw = Wv.addScaledVector(Y, -Wv.dot(Y)).normalize(), Xw = new V3().crossVectors(Y, Zw);
-    _qIn.setFromRotationMatrix(_m.makeBasis(Xw, Y, Zw));
+  function qAlong(Y, out) {
+    Y = Y.clone().normalize(); const Wv = SLV_R.clone().addScaledVector(Y, 0.55), Zw = Wv.addScaledVector(Y, -Wv.dot(Y)).normalize(), Xw = new V3().crossVectors(Y, Zw);
+    return out.setFromRotationMatrix(new THREE.Matrix4().makeBasis(Xw, Y, Zw));
+  }
+  // where the hand stands with its needle just short of the skin (near) and in it (in)
+  function jabAt(c) {
+    const J = c.j, F = c.fore; F.updateMatrixWorld(true);
+    _Tw.copy(J.T).applyMatrix4(F.matrixWorld); _Dw.copy(J.D); qAlong(_Dw, _qIn);
     const tip = (c.item.userData.tip || 0.12) * c.item.userData.bs;
     _pIn.copy(_Tw).addScaledVector(_Dw, 0.006 - tip); _pNear.copy(_pIn).addScaledVector(_Dw, -0.07);
-    let a, b, u, qa = _qIn, qb = _qIn;
-    if (k < 0.3) { a = _pRest; b = _pNear; u = ease(k / 0.3); qa = _qRest; }
-    else if (k < 0.38) { a = _pNear; b = _pIn; u = ease((k - 0.3) / 0.08); }
-    else if (k < 0.65) { a = _pIn; b = _pIn; u = 0; }
-    else if (k < 0.78) { a = _pIn; b = _pNear; u = ease((k - 0.65) / 0.13); }
-    else { a = _pNear; b = _pRest; u = ease((k - 0.78) / 0.22); qb = _qRest; }
-    g.position.lerpVectors(a, b, u); g.quaternion.slerpQuaternions(qa, qb, u);
-    const pk = U.clamp((k - 0.4) / 0.24, 0, 1), ud = c.item.userData;
+  }
+  // a way through the room for the hand: [[at, place (V3), turn (QT), easing], ...]
+  const _pa = new V3(), _qa = new QT();
+  function handWay(c, keys, k) {
+    let i = 0; while (i < keys.length - 2 && k > keys[i + 1][0]) i++;
+    const a = keys[i], b = keys[i + 1], u = EASE[b[3] || 'q'](U.clamp((k - a[0]) / Math.max(1e-4, b[0] - a[0]), 0, 1));
+    c.g.position.lerpVectors(a[1], b[1], u); c.g.quaternion.slerpQuaternions(a[2], b[2], u);
+  }
+  // the syringe (PLAN.syringe): up; the cap into the other fist and pulled off; over the arm, in, the plunger home, out; tossed aside
+  const _fist = new V3(), _qHold = new QT(), _qCap = new QT(), _pHold = new V3(), _pCap = new V3(), _pCapOut = new V3(), _pToss = new V3(), _qToss = new QT();
+  function syringeStep(c, k) {
+    const A = c.A, ud = c.item.userData, bs = ud.bs; jabAt(c);
+    c.fore.userData.hand.getWorldPosition(_fist);
+    qAlong(new V3(-0.25, 0.95, -0.2), _qHold); _pHold.set(0.105, -0.1, -0.37);
+    // (the cap pushed into the fist from its right, the needle pointing left and a little away; then drawn straight back out)
+    const Yc = new V3(-0.93, 0.12, -0.34).normalize(); qAlong(Yc, _qCap);
+    _pCap.copy(_fist).addScaledVector(Yc, -0.072 * bs).add(new V3(0.004, 0.006, 0.01)); _pCapOut.copy(_pCap).addScaledVector(Yc, -0.07);
+    _pToss.set(0.3, -0.3, -0.26); _qToss.setFromEuler(new THREE.Euler(0.9, 0.4, -1.4));
+    const near2 = _pNear.clone().addScaledVector(_Dw, -0.03);
+    handWay(c, [[0, _pRest, _qRest], [A.uncap - 0.01, _pHold, _qHold, 'o'], [A.uncap + 0.08, _pCapOut, _qCap, 'q'], [A.capOff - 0.03, _pCap, _qCap, 'o'],
+      [A.capOff + 0.005, _pCap, _qCap, 'l'], [A.aim - 0.01, _pCapOut, _qCap, 'o'], [A.jab - 0.04, near2, _qIn, 'q'], [A.jab, _pNear, _qIn, 's'], [A.jab + 0.05, _pIn, _qIn, 'i'],
+      [A.out, _pIn, _qIn, 'l'], [A.out + 0.05, _pNear, _qIn, 'o'], [A.toss, _pNear.clone().add(new V3(0.03, 0.03, 0.01)), _qIn, 'q'], [A.toss + 0.05, _pNear.clone().add(new V3(0.1, 0.02, 0.03)), _qIn, 'i'], [A.lower, _pToss, _qToss, 'o'], [1, _pRest, _qRest, 'q']], k);
+    // (the plunger home in one steady push, slowing as it bottoms)
+    const pk = EASE.o(seg(k, A.push + 0.01, A.out - 0.02));
     if (ud.plunger) {
       if (ud.old) ud.plunger.position.y = 0.09 - pk * 0.07;
       else { ud.plunger.position.y = 0.028 - pk * 0.052; if (ud.liq) ud.liq.scale.y = Math.max(0.001, ud.plunger.position.y - 0.0062 + 0.0305); }
     }
-    if (ud.squeeze) ud.squeeze.scale.z = 1 - pk * 0.72;
+  }
+  // the kit's syrette (PLAN.kit): the hand to the flap's stud, undoes it, throws the flap back; into the kit, the syrette out; over the
+  // arm, in, the tube squeezed flat, out; away with it
+  const _tabW = new V3(), _mouthW = new V3(), _qKit = new QT(), _qKit2 = new QT(), _pA = new V3(), _pB = new V3(), _pC = new V3(), _pD = new V3(), _pE = new V3();
+  function kitStep(c, k) {
+    const A = c.A, K = c.kit, ud = c.item.userData; jabAt(c);
+    // the flap: lifted off its stud, then over and back (the drop flopping down behind once it is past the top)
+    const u1 = seg(k, A.unclasp + 0.02, A.open), u2 = seg(k, A.open, A.takeOut - 0.03);
+    K.flap.rotation.x = -0.32 * EASE.o(u1) - 2.42 * EASE.q(u2); K.hinge2.rotation.x = 2.3 * EASE.i(seg(u2, 0.35, 1));
+    const inOpen = K.flap.rotation.x < -0.9; for (const o of K.inside) o.visible = inOpen;
+    K.tab.getWorldPosition(_tabW); K.pouch.localToWorld(_mouthW.copy(K.mouth));
+    qAlong(new V3(-0.35, 0.82, -0.45), _qKit); qAlong(new V3(-0.1, 0.78, -0.62), _qKit2);
+    // (at the flap: the fist just in front of and below its edge. Into the kit from in front of it, leaning in, the heel of the hand to
+    // its mouth, clear of the fist that holds it)
+    const reachO = new V3(0.012, -0.032, 0.03), lift = new V3(0.0, 0.012, 0.012);
+    _pA.copy(_tabW).add(reachO); _pB.copy(_pA).add(lift);
+    _pC.copy(_mouthW).add(new V3(0.024, 0.03, 0.085)); _pD.copy(_mouthW).add(new V3(0.01, 0.012, 0.056)); _pE.copy(_pC).add(new V3(0.035, 0.02, 0.03));
+    const follow = _pB.clone().add(new V3(0.006, 0.008, 0.03));   // (the flap flicked over: the hand comes back off it, towards the eye)
+    handWay(c, [[0, _pRest, _qRest], [A.reach, _pRest, _qRest, 'l'], [A.unclasp, _pA, _qKit, 'o'], [A.open, _pB, _qKit, 'i'], [A.open + 0.06, follow, _qKit, 'q'],
+      [A.takeOut - 0.01, _pC, _qKit2, 'q'], [A.takeOut + 0.06, _pD, _qKit2, 'i'], [A.takeOut + 0.08, _pD, _qKit2, 'l'], [A.ready, _pE, _qKit2, 'o'],
+      [A.jab - 0.02, _pNear, _qIn, 'q'], [A.squeeze, _pIn, _qIn, 'i'], [A.out, _pIn, _qIn, 'l'], [A.away, _pNear, _qIn, 'o'], [1, _pRest, _qRest, 'q']], k);
+    c.item.visible = k >= A.takeOut + 0.07;   // (it comes out of the kit in the hand)
+    if (ud.squeeze) ud.squeeze.scale.z = 1 - EASE.o(seg(k, A.squeeze + 0.01, A.out - 0.02)) * 0.72;
+  }
+  // the drink (PLAN.drink): the vessel's way (keysFor), the swallows, the cork drawn by the other hand
+  const _o = new V3(), OFF = new V3(0.27, -0.3, 0.13), OFF2 = new V3(0.24, -0.34, 0.2);
+  function drinkStep(c, k) {
+    const A = c.A, g = c.g, ud = c.item.userData;
+    let lv = 0;
+    for (const n of ['gulp1', 'gulp2', 'gulp3']) {
+      const a = A[n], u = seg(k, a - 0.01, a + 0.075);
+      if (u > 0 && u < 1) { const b = Math.sin(Math.PI * u); g.rotation.x += 0.08 * b; g.position.z += 0.005 * b; g.position.y += 0.003 * b; }   // (tipped up into the mouth and eased back: one swallow)
+      lv += EASE.s(seg(k, a + 0.005, a + 0.06));
+    }
+    const up = seg(k, A.pop, A.away); if (up > 0.55 && up < 1) g.position.y -= 0.006 * Math.sin(Math.PI * (up - 0.55) / 0.45);   // (the jolt as the cork gives)
+    if (ud.liq && k > A.gulp1 - 0.02) ud.liq.scale.y = (ud.liq.userData.base || 1) * Math.max(0.04, 1 - lv * 0.3);
+    const D = c.dr; if (!D) return;
+    // (the right hand: in to the cork; holds it and twists it, back and forth; draws it - slowly, then it gives; away with it)
+    if (k < A.reach) _o.copy(OFF); else if (k < A.twist) _o.copy(OFF).multiplyScalar(1 - EASE.o(seg(k, A.reach, A.twist)));
+    else if (k < A.pop) _o.set(0, 0, 0);
+    else if (k < A.away) _o.set(0, 0.034 * EASE.i(seg(k, A.pop, A.away)), 0.004 * seg(k, A.pop, A.away));
+    else _o.set(0, 0.034, 0.004).lerp(OFF2, EASE.q(seg(k, A.away, A.raise + 0.05)));
+    const tw = k > A.twist && k < A.pop ? Math.sin(Math.PI * 4 * seg(k, A.twist, A.pop)) * 0.32 : 0;
+    D.rh.visible = k >= A.reach && k < A.raise + 0.05;
+    D.rh.position.copy(D.C).add(_o).add(new V3(0.004, 0.006, 0.006)); D.rh.rotation.set(0.15, -0.5 + tw, 0.18);
+    const bs = ud.bs || 1;
+    D.cork.forEach((o, i) => { o.visible = k < A.raise + 0.05; o.position.copy(D.base[i]).addScaledVector(_o, k >= A.pop ? 1 / bs : 0); o.rotation.y = tw * 1.3; });
+  }
+  // the bites (PLAN.eat): in to the mouth, the teeth in (the bite), pulled away tearing, held while it is chewed; it grows less each time
+  function eatStep(c, k) {
+    const A = c.A, g = c.g; let n = 0, sc = 1;
+    for (const b of [A.bite1, A.bite2, A.bite3]) {
+      const ua = seg(k, b - 0.045, b), ut = seg(k, b, b + 0.055), uc = seg(k, b + 0.055, b + 0.15);
+      if (ua > 0 && ut < 1) { const push = ut > 0 ? 1 - EASE.o(ut) : EASE.i(ua); g.position.z += 0.05 * push; g.position.y -= 0.05 * push; g.rotation.x += 0.25 * push; }
+      if (ut > 0 && ut < 1) { g.rotation.z += 0.16 * Math.sin(Math.PI * ut); g.rotation.x -= 0.1 * Math.sin(Math.PI * ut); }
+      if (uc > 0 && uc < 1) g.position.y += -0.004 * Math.sin(Math.PI * uc) + 0.0025 * Math.sin(Math.PI * 6 * uc) * (1 - uc);   // (held a little lower, the jaw working)
+      if (k >= b) { n++; sc -= 0.13 * Math.min(1, (k - b) / 0.01); }
+    }
+    c.item.scale.setScalar(sc * c.item.userData.bs);
   }
   // ------------------------------------------------ searching a chest / corpse: both hands dig in front of you, in a loop
   // (the gun is lowered meanwhile). Faster as the search nears its end; the hands sink in and out smoothly.
@@ -404,7 +596,25 @@
     if (on && Math.sin(t) > 0.97 && Math.random() < 0.5) G.sfx.whoosh && G.sfx.whoosh(0.08, 0.6 + Math.random() * 0.3, true);
     if (!on && rum.k < 0.02) { root.remove(rum.g); rum = null; }
   }
-  function drop(c) { root.remove(c.g); if (c.fore) root.remove(c.fore); if (c.b && c.b.sl) root.remove(c.b.sl); }
+  function drop(c) { root.remove(c.g); if (c.fore) root.remove(c.fore); if (c.b && c.b.sl) root.remove(c.b.sl); for (const r of c.rel) if (r.obj.parent === root) root.remove(r.obj); }
+  // the whole pose of a use at moment k of it (a function of k alone: a use can be set to any moment of it)
+  function pose(c, k) {
+    const v = c.vis, pl = c.plan;
+    // the other arm comes up into view and goes down again (the kit held higher while it is opened and gone into: lowered to the dose)
+    if (c.fore) {
+      const fr = PLAN[pl].fore || [0.15, 0.86], fk = k < fr[0] ? EASE.s(k / fr[0]) : k > fr[1] ? EASE.s(Math.max(0, (1 - k) / (1 - fr[1]))) : 1, b = c.fore.userData.base;
+      const up = pl === 'kit' ? 0.075 * (1 - EASE.s(seg(k, c.A.ready - 0.05, c.A.jab - 0.03))) : 0;
+      c.fore.position.set(b.x, b.y - (1 - fk) * 0.32 + up, b.z + (1 - fk) * 0.05);
+    }
+    if (pl === 'kit') kitStep(c, k);
+    else if (pl === 'syringe') syringeStep(c, k);
+    else if (v !== 'bandage') { const p = path(c.keys, k); c.g.position.set(p[0], p[1], p[2]); c.g.rotation.set(p[3], p[4], p[5]); }
+    if (v === 'drink') drinkStep(c, k);
+    if (v === 'eat') eatStep(c, k);
+    if (v === 'device' && c.item.userData.flash) { const fk = Math.max(0, 1 - Math.abs(k - (c.A.use + 0.25)) * 8); c.item.userData.flash.scale.setScalar(0.001 + fk * 0.05); }
+    if (v === 'throw' && k > 0.45) c.item.visible = false;
+    if (v === 'bandage') bandStep(c, k);
+  }
   IA.update = function (dt) {
     const holding = G.GrenHold && G.GrenHold.active();
     const searching = !!(G.game && G.game.search) && !cur;
@@ -413,20 +623,24 @@
     if (!cur) return;
     const c = cur;
     c.t += dt;
-    const k = Math.min(1, c.t / c.dur), v = c.vis;
-    if (v === 'inject') jabStep(c, k);
-    else if (v !== 'bandage') { const p = path(PATHS[v], k); c.g.position.set(p[0], p[1], p[2]); c.g.rotation.set(p[3], p[4], p[5]); }
-    // per-kind flourishes
-    if (v === 'drink' && c.item.userData.liq && k > 0.45 && k < 0.75) { const lq = c.item.userData.liq; lq.scale.y = (lq.userData.base || 1) * Math.max(0.02, 1 - (k - 0.45) / 0.3); }
-    if (v === 'eat' && k > 0.38 && k < 0.68) { const s = 1 - (k - 0.38) / 0.3 * 0.55; c.item.scale.setScalar(s * c.item.userData.bs); }
-    if (v === 'plate' && k > 0.6) c.item.scale.setScalar(c.item.userData.bs * Math.max(0.01, 1 - (k - 0.6) * 2.5));
-    if (v === 'device' && c.item.userData.flash) { const fk = Math.max(0, 1 - Math.abs(k - 0.5) * 8); c.item.userData.flash.scale.setScalar(0.001 + fk * 0.05); }
-    if (v === 'throw' && k > 0.45) c.item.visible = false;
-    // the other arm comes up into view and goes down again
-    if (c.fore) { const fk = k < 0.15 ? ease(k / 0.15) : k > 0.86 ? ease(Math.max(0, (1 - k) / 0.14)) : 1, b = c.fore.userData.base; c.fore.position.set(b.x, b.y - (1 - fk) * 0.32, b.z + (1 - fk) * 0.05); }
-    if (v === 'bandage') bandStep(c, k);
-    if (!c.applied && k >= APPLY[c.kind]) {
+    const k = Math.min(1, c.t / c.dur);
+    if (!c.keys) c.keys = keysFor(c.plan);
+    // what is let go of: posed at the moment it leaves the hand, taken into the room there; it falls from its own moment on
+    for (const r of c.rel) {
+      if (!r.p0 && k >= r.k) { pose(c, r.k); root.updateMatrixWorld(true); root.attach(r.obj); r.p0 = r.obj.position.clone(); r.e0 = r.obj.rotation.clone(); }
+    }
+    pose(c, k);
+    // (a held arm drifts a little, never quite still: both arms together where both are in it)
+    const lf = life(c, 0.0016); c.g.position.add(lf); if (c.fore) c.fore.position.add(lf);
+    for (const r of c.rel) {
+      if (!r.p0) continue;
+      const t = Math.max(0, (k - r.fall) * c.dur); r.obj.visible = t < 0.6;
+      r.obj.position.copy(r.p0).addScaledVector(r.v, t); r.obj.position.y -= 4.9 * t * t;
+      if (r.spin) r.obj.rotation.set(r.e0.x + r.spin.x * t, r.e0.y + r.spin.y * t, r.e0.z + r.spin.z * t);
+    }
+    if (!c.applied && k >= c.apply) {
       c.applied = true;
+      const v = c.vis;
       if (v === 'drink') G.sfx.drink && G.sfx.drink();
       if (v === 'eat') G.sfx.melee && G.sfx.melee(false);
       if (v === 'inject') G.sfx.mech('click', 0, 1);

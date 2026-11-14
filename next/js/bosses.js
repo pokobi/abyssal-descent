@@ -530,7 +530,8 @@
       this.wards = [];
       this.spawnWards();
       this.pos.set(world.arenaCenter.x, 7, world.arenaCenter.z);
-      this.bubble = new THREE.Mesh(new THREE.SphereGeometry(3.2, 32, 16), new THREE.MeshBasicMaterial({ color: G.fx.tone(0x9a7aff), transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
+      // (its ward: no glass ball - patches of bent light drifting over it, gone at its silhouette: vfx.js shellMat 'rim')
+      this.bubble = new THREE.Mesh(new THREE.SphereGeometry(3.2, 32, 16), G.vfx.shellMat(0x9a7aff, 0xd8d0e0, 'rim')); this.bubble.material.uniforms.uA.value = 0.5;
       this.root.add(this.bubble);
       this.beam = { on: false };
       world.lightSources.push(this.light = { pos: V(), color: '#c89878', intensity: 25, range: 22, flame: 0, emit: false, ph: 0, prio: 5, steady: true });
@@ -560,7 +561,7 @@
       this.shield = this.wards.filter((w) => w.alive).length;
       if (!this.shield) { this.vulnT -= dt; if (this.vulnT <= 0) { this.spawnWards(); G.sfx.magic(this.pos, 'dark'); G.ui.toast('護符眼が再生した', 'warn'); } }
       this.bubble.visible = this.shield > 0;
-      this.bubble.material.opacity = 0.08 + Math.sin(this.t * 3) * 0.03;
+      this.bubble.material.uniforms.uA.value = 0.45 + Math.sin(this.t * 3) * 0.12;
       // wards orbit
       let i = 0;
       for (const w of this.wards) { const a = this.t * 0.8 + w.idx / 6 * Math.PI * 2; w.m.position.set(Math.cos(a) * 6, Math.sin(this.t * 1.5 + w.idx) * 1.2, Math.sin(a) * 6); i++; }

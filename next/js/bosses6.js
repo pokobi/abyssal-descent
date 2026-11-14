@@ -58,7 +58,7 @@
     if (w.ledgeWall || !w.ledgeZ) return;
     const z = w.ledgeZ;
     w.addCollider(0, -40, z - 0.3, w.W, 80, z + 0.3, { surf: 'metal', noGrapple: true });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w.W, 30), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xff4a9a), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, map: G.Tex.spr.soft }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w.W, 30), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xa84a28), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, map: G.Tex.spr.soft }));
     m.position.set(w.W / 2, 6, z); w.group.add(m);
     w.ledgeWall = { m, t: 0 };
     G.sfx.magic && G.sfx.magic(V(w.W / 2, 1, z), 'dark'); G.sfx.rumble && G.sfx.rumble(1, 0.8);
@@ -72,19 +72,19 @@
       const m = t.mesh;
       if (t.state === 'warn') {
         t.timer -= dt; const k = 1 - t.timer / t.warn, pulse = 0.55 + 0.45 * Math.sin(gt * 18);
-        m.material.emissive.setRGB((0.3 + 0.7 * k) * pulse, 0.03, (0.1 + 0.3 * k) * pulse);
+        m.material.emissive.setRGB((0.28 + 0.62 * k) * pulse, (0.05 + 0.2 * k) * pulse, 0.01);
         m.position.y = -0.5 + Math.sin(gt * 45 + t.i * 2) * 0.03 * k;
         if (Math.random() < dt * 8) G.fx.dust(V(t.x0 + Math.random() * (t.x1 - t.x0), 0.2, t.z0 + Math.random() * (t.z1 - t.z0)), V(0, 1, 0), 0x8a3a5a, 2);
-        if (t.timer <= 0) { t.state = 'fall'; t.vy = 0.5; w.removeCollider(t.col); m.material.emissive.setRGB(0.5, 0.05, 0.15); G.sfx.stoneGrind && Math.random() < 0.5 && G.sfx.stoneGrind(V(t.cx, 0, t.cz), 0.5); }
+        if (t.timer <= 0) { t.state = 'fall'; t.vy = 0.5; w.removeCollider(t.col); m.material.emissive.setRGB(0.45, 0.12, 0.02); G.sfx.stoneGrind && Math.random() < 0.5 && G.sfx.stoneGrind(V(t.cx, 0, t.cz), 0.5); }
       } else if (t.state === 'fall') {
         t.vy += 30 * dt; t.dy -= t.vy * dt; m.position.y = -0.5 + t.dy; m.rotation.x += dt * 0.9 * t.rot; m.rotation.z += dt * 0.5 * t.rot;
         if (t.dy < -28) { t.state = 'down'; m.visible = false; }
       } else if (t.state === 'wait') {
         t.timer -= dt;
-        if (t.timer <= 0) { t.state = 'rise'; t.dy = -11; m.visible = true; m.rotation.set(0, 0, 0); m.material.emissive.setRGB(0.25, 0.08, 0.2); m.position.y = -0.5 + t.dy; }
+        if (t.timer <= 0) { t.state = 'rise'; t.dy = -11; m.visible = true; m.rotation.set(0, 0, 0); m.material.emissive.setRGB(0.18, 0.06, 0.02); m.position.y = -0.5 + t.dy; }
       } else if (t.state === 'rise') {
         t.dy += 10 * dt; m.position.y = -0.5 + Math.min(0, t.dy);
-        if (t.dy >= 0) { t.dy = 0; t.state = 'up'; m.position.y = -0.5; m.material.emissive.setRGB(0, 0, 0); if (t.col) t.col.alive = true; G.fx.dust(V(t.cx, 0.1, t.cz), V(0, 1, 0), 0x8a3a5a, 6); }
+        if (t.dy >= 0) { t.dy = 0; t.state = 'up'; m.position.y = -0.5; m.material.emissive.setRGB(0, 0, 0); if (t.col) t.col.alive = true; G.fx.dust(V(t.cx, 0.1, t.cz), V(0, 1, 0), 0x6a5e54, 6); }
       }
     }
   };
@@ -188,7 +188,7 @@
     avatarLook() {
       const J = this.J;
       J.crown.visible = false; J.plates.forEach((m) => { m.visible = false; }); J.core.visible = true; J.horns.visible = true; J.grav.forEach((g) => { g.visible = true; });
-      for (const m of this.glows) m.emissive.set(m === this.M.eye ? 0xe0c0ff : VIO);
+      for (const m of this.glows) m.emissive.set(m === this.M.eye ? 0xd0a070 : VIO);
     }
     // ---------------------------------------------------------------- the model (everything under root; root faces +z, towards the tiles)
     build() {
@@ -912,14 +912,14 @@
         const m = g.mesh;
         if (g.state === 'warn') {
           g.timer -= dt; const k = 1 - g.timer / g.warn, pulse = 0.55 + 0.45 * Math.sin(gt * 16 + g.k);
-          m.material.emissive.setRGB((0.25 + 0.45 * k) * pulse, 0.05 * pulse, (0.4 + 0.6 * k) * pulse); m.position.y = Math.sin(gt * 40 + g.k * 2) * 0.03 * k;
+          m.material.emissive.setRGB((0.28 + 0.6 * k) * pulse, (0.05 + 0.18 * k) * pulse, 0.01); m.position.y = Math.sin(gt * 40 + g.k * 2) * 0.03 * k;
           if (Math.random() < dt * 6) { const r = U.rand(Math.max(0.5, g.r0), g.r1), an = g.r0 === 0 ? Math.random() * 6.28 : U.rand(g.a0, g.a1); G.fx.add.spawn(S.c.x + Math.cos(an) * r, Y2 + 0.1, S.c.z + Math.sin(an) * r, 0, U.rand(1, 3), 0, 0.8, 0.12, 0.02, 0.6, 0.4, 1.2, 0.9, -0.2, 0.3); }
-          if (g.timer <= 0) { g.state = 'fall'; g.vy = 0.5; for (const c of g.cols) this.world.removeCollider(c); m.material.emissive.setRGB(0.3, 0.1, 0.5); }
+          if (g.timer <= 0) { g.state = 'fall'; g.vy = 0.5; for (const c of g.cols) this.world.removeCollider(c); m.material.emissive.setRGB(0.4, 0.11, 0.02); }
         } else if (g.state === 'fall') {
           g.vy += 26 * dt; g.dy -= g.vy * dt; m.position.y = g.dy; m.rotation.y += dt * 0.25 * g.rot;
           if (g.dy < -40) { g.state = 'down'; m.visible = false; }
         } else if (g.state === 'wait') {
-          g.timer -= dt; if (g.timer <= 0) { g.state = 'rise'; g.dy = -14; m.visible = true; m.rotation.y = 0; m.material.emissive.setRGB(0.15, 0.05, 0.3); m.position.y = g.dy; }
+          g.timer -= dt; if (g.timer <= 0) { g.state = 'rise'; g.dy = -14; m.visible = true; m.rotation.y = 0; m.material.emissive.setRGB(0.16, 0.05, 0.02); m.position.y = g.dy; }
         } else if (g.state === 'rise') {
           g.dy += 12 * dt; m.position.y = Math.min(0, g.dy);
           if (g.dy >= 0) { g.dy = 0; g.state = 'up'; m.position.y = 0; m.material.emissive.setRGB(0, 0, 0); for (const c of g.cols) c.alive = true; }
@@ -1286,8 +1286,9 @@
   // the jewel and the core breathe
   function M_pulse(b) {
     const k = 0.75 + 0.25 * Math.sin(b.t * 3);
-    b.M.eye.emissiveIntensity = 3.2 * k; b.M.halo.emissiveIntensity = 2.2 * (0.85 + 0.15 * Math.sin(b.t * 1.3));
-    b.M.core.emissiveIntensity = 3.5 * (0.8 + 0.2 * Math.sin(b.t * 5));
+    // (its crown's ring and its eye: old gold catching a little light, not a lit ring)
+    b.M.eye.emissiveIntensity = 1.6 * k; b.M.halo.emissiveIntensity = 0.75 * (0.85 + 0.15 * Math.sin(b.t * 1.3));
+    b.M.core.emissiveIntensity = 1.8 * (0.8 + 0.2 * Math.sin(b.t * 5));
   }
   const PL = new THREE.PlaneGeometry(1, 1);
   // a glowing, see-through, unlit material (the sky stage's effects)

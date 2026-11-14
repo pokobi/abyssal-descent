@@ -463,26 +463,42 @@
     G.scene.add(m);
     EL.crystals.push({ m, el, t: 10, base: floor + 0.7 });
   };
-  // (a cluster of three rough crystals grown from one root: not a gem that glows. Its element in a dull tint, a little light from within)
-  let crysGeo = null;
+  // (晶壁: a growth of crystal on a broken lump of rock - seven six-sided columns of unequal girth and length, each ending in a point,
+  // leaning out from one root. Each face its own shade, darker toward the root and where it is thick: a mineral with body, not a pane.
+  // The colour is in the vertices, so one shape is made per element and kept)
+  const crysGeos = {};
+  const _hc = (i, k) => { const n = Math.sin(i * 12.9898 + k * 78.233 + 4.1) * 43758.5453; return n - Math.floor(n); };
   EL.crystalModel = function (col) {
-    if (!crysGeo) {
-      const parts = [[0, 0, 0, 0, 0.17, 0.5], [0.1, -0.05, 0.03, 0.5, 0.11, 0.32], [-0.08, -0.06, -0.05, -0.45, 0.1, 0.28]].map(([x, y, z, tilt, rw, h]) => {
-        const g = new THREE.CylinderGeometry(rw * 0.55, rw, h, 6, 1); g.translate(0, h / 2, 0);
-        const tip = new THREE.ConeGeometry(rw * 0.55, h * 0.35, 6, 1); tip.translate(0, h + h * 0.175, 0);
-        const parts2 = [g, tip].map((q) => { q.rotateZ(tilt); q.rotateY(tilt * 2.3); q.translate(x, y, z); return q.toNonIndexed(); });
-        return parts2;
-      }).flat();
-      const n = parts.reduce((a, g) => a + g.attributes.position.count, 0), pos = new Float32Array(n * 3); let k = 0;
-      for (const g of parts) { pos.set(g.attributes.position.array, k * 3); k += g.attributes.position.count; g.dispose(); }
-      crysGeo = new THREE.BufferGeometry(); crysGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); crysGeo.computeVertexNormals(); crysGeo.translate(0, -0.25, 0);
-      // (each face its own shade: clouded, flawed, darker where it is thick - a mineral, not a cut of paper)
-      const cl = new Float32Array(n * 3); for (let f = 0; f < n / 3; f++) { const hsh = Math.sin(f * 12.9898 + 4.1) * 43758.5453, v = 0.35 + 0.75 * (hsh - Math.floor(hsh)); for (let q = 0; q < 9; q++) cl[f * 9 + q] = v; } crysGeo.setAttribute('color', new THREE.BufferAttribute(cl, 3));
+    const key = col >>> 0;
+    if (!crysGeos[key]) {
+      const tint = (G.fx.tone ? G.fx.tone(col) : new THREE.Color(col)).lerp(new THREE.Color(0x8a8680), 0.3).multiplyScalar(0.62);
+      const rock = new THREE.Color(0x3a3530), parts = [];
+      const lump = new THREE.IcosahedronGeometry(0.24, 1), lp = lump.attributes.position;
+      for (let i = 0; i < lp.count; i++) { const x = lp.getX(i), y = lp.getY(i), z = lp.getZ(i), f = 0.78 + 0.4 * _hc(i, 3); lp.setXYZ(i, x * f * 1.15, Math.max(-0.05, y * f * 0.42), z * f); }
+      parts.push([lump.toNonIndexed(), rock, 0.5]);
+      const cols = [[0, 0, 0.13, 0.62], [0.9, 0.55, 0.09, 0.42], [2.1, 0.62, 0.1, 0.46], [3.0, 0.48, 0.07, 0.33], [4.0, 0.7, 0.08, 0.3], [5.1, 0.42, 0.11, 0.5], [5.9, 0.85, 0.06, 0.24]];
+      for (const [an, tilt, rw, h] of cols) {
+        const pr = new THREE.CylinderGeometry(rw * 0.9, rw, h, 6, 1); pr.translate(0, h / 2, 0);
+        const tp = new THREE.ConeGeometry(rw * 0.9, rw * 2.2, 6, 1); tp.translate(0, h + rw * 1.1, 0);
+        for (const g of [pr, tp]) { g.rotateY(_hc(an, 9) * 1.0); g.rotateZ(tilt); g.rotateY(an); g.translate(Math.cos(an) * rw * 0.6, 0.04, Math.sin(an) * rw * 0.6); parts.push([g.toNonIndexed(), tint, 1]); }
+      }
+      let n = 0; for (const [g] of parts) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), cl = new Float32Array(n * 3); let k = 0, f = 0;
+      for (const [g, c, kind] of parts) {
+        const ps = g.attributes.position.array; pos.set(ps, k * 3);
+        for (let v = 0; v < g.attributes.position.count; v += 3, f++) {
+          const sh = kind === 1 ? 0.5 + 0.75 * _hc(f, 1) : 0.6 + 0.5 * _hc(f, 2);
+          for (let q = 0; q < 3; q++) { const y = ps[(v + q) * 3 + 1], root = kind === 1 ? 0.45 + 0.55 * Math.min(1, Math.max(0, y / 0.5)) : 1, j = (k + v + q) * 3; cl[j] = c.r * sh * root; cl[j + 1] = c.g * sh * root; cl[j + 2] = c.b * sh * root; }
+        }
+        k += g.attributes.position.count; g.dispose();
+      }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(cl, 3)); geo.computeVertexNormals(); geo.translate(0, -0.32, 0);
+      crysGeos[key] = geo;
     }
-    const base = (G.vfx && G.vfx.crystalMat) ? G.vfx.crystalMat.clone() : new THREE.MeshStandardMaterial({ roughness: 0.2, flatShading: true });
+    const base = (G.vfx && G.vfx.crystalMat) ? G.vfx.crystalMat.clone() : new THREE.MeshStandardMaterial({ roughness: 0.45, flatShading: true, vertexColors: true });
     const c = G.fx.tone ? G.fx.tone(col) : new THREE.Color(col);
-    base.color.copy(c).multiplyScalar(0.3).lerp(new THREE.Color(0x2a2826), 0.45); base.emissive.copy(c).multiplyScalar(0.035); base.roughness = 0.75; base.metalness = 0; base.vertexColors = true; base.needsUpdate = true; base.transparent = false; base.opacity = 1;   // (dark-hearted mineral, its colour deep in it, a sheen on its faces)
-    const m = new THREE.Mesh(crysGeo, base); m.scale.setScalar(1.15);
+    base.color.setRGB(1, 1, 1); base.emissive.copy(c).multiplyScalar(0.025); base.roughness = 0.42; base.metalness = 0; base.vertexColors = true; base.transparent = false; base.opacity = 1; base.needsUpdate = true;
+    const m = new THREE.Mesh(crysGeos[key], base); m.scale.setScalar(1.15);
     return m;
   };
   EL.pickCrystal = function (c) {

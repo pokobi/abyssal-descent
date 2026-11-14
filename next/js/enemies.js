@@ -1871,7 +1871,7 @@
     // hunt targets / champions: a bright silhouette outline, a sky beam seen through walls, a big nameplate (see updateBars)
     markTarget(champ) {
       if (this.tgtFx) return;
-      const col = champ ? 0xff3a1a : 0xffc830;
+      const col = champ ? 0xd04a24 : 0xd8a840;   // (an ember red, an old gold: still plain at a distance, not a neon)
       const om = new THREE.MeshBasicMaterial({ color: col, side: THREE.BackSide, fog: false });
       const hulls = [];
       this.model.group.traverse((o) => {

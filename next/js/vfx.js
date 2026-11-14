@@ -140,7 +140,7 @@
       // its edge, readable from afar on any floor: what it is made of gathers along where it ends - a settled lip (sediment, tar,
       // congealed blood, thick rime, a ridge of grit, a line of foam, a scorched ring), never thinner than two pixels; wet kinds catch
       // the light in a thin sheen just inside it. A warm light rim is only for the grounds that help (heal, holy).
-      float pxa = max(fwidth(d), 0.003), lw = max(0.09, pxa * 2.5), lx = (d - (uR - lw * 0.9 - rag * 0.5)) / lw;
+      float pxa = max(fwidth(d), 0.003), lw = max(k == 1 ? 0.16 : 0.09, pxa * (k == 1 ? 4.0 : 2.5)), lx = (d - (uR - lw * 0.9 - rag * 0.5)) / lw;
       float lip = exp(-lx * lx) * inside * (0.75 + 0.25 * vnoise(vec2(ang * max(uR, 0.5) * 3.0, 9.0 + uSeed)));
       float sx = (d - (uR - lw * 2.3 - rag * 0.5)) / max(lw * 0.45, pxa * 1.2), sheen = exp(-sx * sx) * inside;
       vec3 lc = body, le = vec3(0.0); float la = 0.0, ls = 0.0;
@@ -157,6 +157,7 @@
       else if (k == 13) { lc = vec3(0.02); la = 0.8; le = mix(uC1, vec3(1.0), 0.5) * 0.07; ls = 0.5; }            // shock: a scorched ring
       else if (k == 0) { la = 0.0; }
       if (la > 0.0) { body = mix(body, lc, lip); ba = max(ba, lip * la); em += le * lip + vec3(0.5, 0.5, 0.46) * ls * sheen * 0.16 * (0.35 + uLit); }
+      if (k == 1) { float cx2 = (d - (uR - lw * 2.4 - rag * 0.5)) / max(lw * 0.5, pxa * 1.6), crust = exp(-cx2 * cx2) * inside; body = mix(body, vec3(0.5, 0.48, 0.3) * (0.45 + 0.6 * uLit), crust); ba = max(ba, crust * 0.85); }
       em += uC2 * edge * uFlash * 0.4 * inside;
       ${fogAdd}
       float a = clamp(ba, 0.0, 0.92) * uA;
@@ -221,13 +222,40 @@
       else if (s == 5) { pat = sin(ang * 3.0 + h * 9.0 - uT * 6.0) * 0.5 + 0.5; }                                  // spiral bands (vortex funnel)
       else if (s == 6) pat = 0.0;                                                                                     // a ward: its rim only
       vec3 col = mix(uC, uC2, clamp(pat, 0.0, 1.0));
-      float a = (s == 6 ? pow(f, 2.2) * (0.75 + 0.25 * fbm(vec2(ang * 4.0, h * 5.0 - uT))) : s == 0 ? pow(f, 1.6) * 0.4 + pat * 0.35 * (0.3 + f) : f * 0.85 + pat * 0.45 * (0.3 + f)) * uA;   // (plain energy: a soft haze, no hard bright rim)
+      float ward = 0.0;
+      if (s == 6) {   // (a ward: no outline - patches of bent light drifting over it, strongest a little inside its silhouette, gone at it)
+        float band = smoothstep(0.02, 0.15, f) * (1.0 - smoothstep(0.3, 0.6, f));
+        float blot = smoothstep(0.55, 0.85, fbm(vec2(ang * 2.6 + uT * 0.35 + uSeed * 9.0, h * 3.2 - uT * 0.55)));
+        ward = band * blot * 0.5;
+      }
+      float a = (s == 6 ? ward : s == 0 ? pow(f, 1.6) * 0.4 + pat * 0.35 * (0.3 + f) : f * 0.85 + pat * 0.45 * (0.3 + f)) * uA;   // (plain energy: a soft haze, no hard bright rim)
       ${fogAdd}
       col *= fogv;
       if (a < 0.01) discard;
       gl_FragColor = vec4(col * (1.0 + f * 0.6), clamp(a, 0.0, 1.0));
     }`;
   const SHELL_STYLE = { energy: 0, ice: 1, emp: 2, holy: 3, fire: 4, blood: 4, spiral: 5, rim: 6 };
+  const SMOKEBALL_FS = `uniform float uT; uniform float uA; uniform vec3 uC; uniform vec3 uC2; uniform float uSeed; uniform float uLit; ${FOG_U}
+    varying vec3 vN; varying vec3 vV; varying vec3 vO;
+    ${NOISE}
+    void main() {
+      float face = abs(dot(normalize(vN), normalize(vV)));
+      vec3 q = vO * 2.4 + vec3(uSeed * 7.0, -uT * 1.3, uT * 0.7);   // (from the ball's own surface, no seam round it)
+      float n = fbm(q.xy) * 0.55 + fbm(q.zy + 3.1) * 0.45, n2 = fbm(q.xz * 2.2 - uT * 1.9) * 0.5 + fbm(q.yz * 2.1 + 5.3) * 0.5;
+      float a = smoothstep(0.0, 0.2, face + (n - 0.5) * 0.12) * (0.82 + 0.18 * n2) * uA;   // (dense to its edge: the light it carries shows only as a fringe round it)
+      float ember = smoothstep(0.6, 0.82, n2) * smoothstep(0.3, 0.8, face) * (1.0 - smoothstep(0.35, 0.6, n));
+      vec3 smoke = mix(vec3(0.004, 0.0035, 0.004), vec3(0.085, 0.077, 0.078), smoothstep(0.3, 0.78, n)) * (0.5 + 0.5 * uLit);   // (folds of it: lit crowns, near-black between)
+      ${fogAdd}
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(mix(uFogC, smoke, fogv) * a + vec3(0.55, 0.16, 0.05) * ember * 0.6 * a * fogv, a);
+    }`;
+  // (the shot it is the body of - a group marked with its kind, combat.js - carries a glow of its own beside it; a ball of smoke does
+  // not shine, so at its first drawing that glow is taken down to an ember's - else it shows as a lit ring round the dark ball)
+  function smokeBallMat() {
+    const m = premul(mk(SHELL_VS, SMOKEBALL_FS, { uA: { value: 1 }, uC: { value: col3(0x202020) }, uC2: { value: col3(0x404040) }, uSeed: { value: Math.random() }, uLit: LIT }, {}));
+    m.onBeforeRender = function (r, sc, cam, geo, obj) { const g = obj && obj.parent; if (!g || g.isScene || !g.userData.kind || g.userData.smokeDim) return; g.userData.smokeDim = true; for (const ch of g.children) if (ch.isSprite && ch.material) { ch.material.opacity *= 0.2; ch.scale.multiplyScalar(0.8); } };
+    return m;
+  }
   let domeGeo = null, sphGeo = null, cylGeo = null, coneGeo = null;
   function shellMat(c1, c2, style) {
     return mk(SHELL_VS, SHELL_FS, { uA: { value: 1 }, uC: { value: col3(c1) }, uC2: { value: col3(c2 ?? 0xffffff) }, uStyle: { value: SHELL_STYLE[style] ?? 0 }, uSeed: { value: Math.random() } },
@@ -621,7 +649,7 @@
       gl_FragColor = vec4(col * fogv * 1.6, clamp(a, 0.0, 1.0));
     }`;
   function fireMat(tint) { return mk(FIRE_VS, FIRE_FS, { uA: { value: 1 }, uHeat: { value: 1 }, uSeed: { value: Math.random() }, uTint: { value: col3(tint ?? 0xffffff) } }, { blending: THREE.AdditiveBlending }); }
-  VX.fireMat = fireMat; VX.shellMat = (c1, c2, style) => shellMat(tone(c1), tone(c2 ?? 0xffffff), style);
+  VX.fireMat = fireMat; VX.shellMat = (c1, c2, style) => (style === 'spiral' ? smokeBallMat() : shellMat(tone(c1), tone(c2 ?? 0xffffff), style));
   // ---- the body of a blast. Not a glowing ball: a mass of puffs, round swells with sharp creases between them, that rolls upward as
   // it is seen. All of it burns white at first; then the crowns of the puffs go to soot while fire still shows in the creases, and at
   // the end it is black smoke that is eaten away in holes. It hides what is behind it (it is not added to the picture as light is).
@@ -898,7 +926,8 @@
     const rp = () => { const a = R() * 6.28, d = Math.sqrt(R()) * r; return [p.x + Math.cos(a) * d, p.z + Math.sin(a) * d]; };
     switch (z.kind) {
       case 'fire': for (let n = 0; n < r * r * dt * 2.4 * k; n++) { const [x, zz] = rp(); G.fx.flameLick(x, p.y + 0.05, zz, 1.3 + R()); } break;
-      case 'poison': case 'acid': if (R() < dt * r * (z.kind === 'poison' ? 5 : 3)) { const [x, zz] = rp(); if (z.kind === 'poison') { G.fx.norm.spawn(x, p.y + 0.3, zz, R() * 0.4 - 0.2, 0.12, R() * 0.4 - 0.2, 3.0, 1.0, 3.4, 0.32, 0.33, 0.17, 0.36 * k, -0.02, 0.5); if (R() < 0.5) { const [x2, z2] = rp(); G.fx.norm.spawn(x2, p.y + 0.1, z2, 0, 0.05, 0, 2.2, 0.6, 2.2, 0.3, 0.31, 0.16, 0.28 * k, 0, 0.5); } } else G.fx.norm.spawn(x, p.y + 0.12, zz, 0, 0.35, 0, 1.0, 0.25, 0.9, 0.4, 0.4, 0.22, 0.22 * k, -0.08, 0.5); } break; // (poison: a murk that hangs low and spreads; acid: fumes off its fizzing)
+      case 'poison': case 'acid': if (z.kind === 'poison') for (let n = 0, m = dt * r * 4 * k; n < m || R() < m - n; n++) { if (n > 4) break; const a = R() * 6.283, d = r * (0.84 + R() * 0.1); G.fx.norm.spawn(p.x + Math.cos(a) * d, p.y + 0.18, p.z + Math.sin(a) * d, -Math.cos(a) * 0.12, 0.05, -Math.sin(a) * 0.12, 2.4, 0.5, 1.2, 0.28, 0.29, 0.14, 0.4, 0, 0.6); } // (the murk banks up along its edge)
+        if (R() < dt * r * (z.kind === 'poison' ? 5 : 3)) { const [x, zz] = rp(); if (z.kind === 'poison') { G.fx.norm.spawn(x, p.y + 0.3, zz, R() * 0.4 - 0.2, 0.12, R() * 0.4 - 0.2, 3.0, 1.0, 3.4, 0.32, 0.33, 0.17, 0.36 * k, -0.02, 0.5); if (R() < 0.5) { const [x2, z2] = rp(); G.fx.norm.spawn(x2, p.y + 0.1, z2, 0, 0.05, 0, 2.2, 0.6, 2.2, 0.3, 0.31, 0.16, 0.28 * k, 0, 0.5); } } else G.fx.norm.spawn(x, p.y + 0.12, zz, 0, 0.35, 0, 1.0, 0.25, 0.9, 0.4, 0.4, 0.22, 0.22 * k, -0.08, 0.5); } break; // (poison: a murk that hangs low and spreads; acid: fumes off its fizzing)
       case 'smoke': if (R() < dt * r * 6) { const [x, zz] = rp(); G.fx.norm.spawn(x, p.y + 0.5, zz, 0, 0.2, 0, 2.5, 1.5, 4, 0.5, 0.5, 0.5, 0.6 * k, -0.02, 0.3); } break;
       case 'heal': case 'holy': for (let n = 0, m = dt * (6 + r * 4); n < m || R() < m - n; n++) { if (n > 5) break; const [x, zz] = rp(); const c = z.kind === 'heal' ? 0.9 : 1.15; G.fx.add.spawn(x, p.y + 0.05 + R() * 0.4, zz, R() * 0.16 - 0.08, 0.45 + R() * 0.55, R() * 0.16 - 0.08, 1.5 + R() * 0.6, 0.07, 0.035, c, c * 0.8, c * 0.5, 0.85, -0.05, 0.4); } break; // (motes of light rising out of it: where it helps, seen from afar)
       case 'frost': if (R() < dt * r * 3) { const [x, zz] = rp(); G.fx.norm.spawn(x, p.y + 0.1, zz, R() * 0.3 - 0.15, 0.08, R() * 0.3 - 0.15, 2.0, 0.5, 1.8, 0.78, 0.82, 0.86, 0.22 * k, 0.02, 0.5); } break; // (cold air: a low mist that creeps out)
@@ -1153,6 +1182,7 @@
     if (G.enemies && G.enemies.daubMat) { const sp = new THREE.Sprite(G.enemies.daubMat()); add(sp); }   // (the mark daubed on a marked foe)
     VX.bellMat = new THREE.MeshStandardMaterial({ color: 0x5c4a30, metalness: 0.85, roughness: 0.48, side: THREE.DoubleSide });
     add(new THREE.Mesh(sphGeo, VX.bellMat));
+    add(new THREE.Mesh(sphGeo, smokeBallMat()));   // (a shot of darkness: VX.shellMat('spiral'))
     VX.rimeMat = new THREE.MeshStandardMaterial({ color: 0xd0dae2, emissive: 0x0c1216, roughness: 0.45, metalness: 0, transparent: true, opacity: 0.55, depthWrite: false });
     VX.crystalMat = new THREE.MeshStandardMaterial({ color: 0xb0a890, emissive: 0x2a2620, roughness: 0.35, metalness: 0, flatShading: true, vertexColors: true });
     add(new THREE.Mesh(sphGeo, VX.rimeMat)); add(new THREE.Mesh(sphGeo, VX.crystalMat));

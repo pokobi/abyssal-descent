@@ -485,8 +485,8 @@
     const sg = new THREE.SphereGeometry(1, 24, 16);
     const bmat = () => new THREE.ShaderMaterial({
       uniforms: { uC: { value: new THREE.Color(0xbfe2ff) }, uA: { value: 1 } },
-      vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }',
-      fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0-abs(dot(vN,vV)), 6.0); gl_FragColor = vec4(uC*f*uA*0.35, f*uA*0.3); }',   // (a ward struck: a faint shimmer at its rim, no glass ball)
+      vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vO; void main(){ vO = position; vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }',
+      fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec3 vN; varying vec3 vV; varying vec3 vO; void main(){ float f = 1.0 - abs(dot(normalize(vN), normalize(vV))); float band = smoothstep(0.15, 0.55, f) * (1.0 - smoothstep(0.7, 0.98, f)); float pt = 0.5 + 0.5 * sin(vO.x * 9.0 + vO.y * 7.0) * sin(vO.z * 8.0 - vO.y * 5.0); gl_FragColor = vec4(uC * band * pt * 0.4, uA); }',   // (a ward struck: a faint shimmer at its rim, no glass ball)
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     });
     for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(sg, bmat()); m.visible = false; scene.add(m); pools.bubble.push({ m, t: 0, ml: 0.25, follow: null }); }
@@ -960,6 +960,7 @@
   };
   FX.bubble = function (pos, r, color, follow, hit) {
     if (hit) { const nrm = new THREE.Vector3().subVectors(hit, pos); if (nrm.lengthSq() < 1e-6) nrm.set(0, 1, 0); nrm.normalize(); FX.ripple(pos.clone().addScaledVector(nrm, r), nrm, Math.min(1.4, 0.5 + r * 0.4), color); FX.sparks(pos.clone().addScaledVector(nrm, r), nrm, 3, 0xffe0c0, 3); return; }
+    if (camera && r < 2.5) { const tc = new THREE.Vector3().subVectors(camera.position, pos).normalize(); for (let i = 0; i < 2; i++) { const nn = tc.clone().add(new THREE.Vector3(rs(0.7), rs(0.7), rs(0.7))).normalize(); FX.ripple(pos.clone().addScaledVector(nn, r), nn, Math.min(1.2, 0.4 + r * 0.35), color); } }
     const o = pools.bubble.find((x) => x.t <= 0) || pools.bubble[0];
     o.m.position.copy(pos); o.m.scale.setScalar(r); o.r = r;
     FX.tone(color || 0xbfe2ff, o.m.material.uniforms.uC.value);

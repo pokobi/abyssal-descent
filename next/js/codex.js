@@ -328,9 +328,8 @@
       scene.add(new THREE.HemisphereLight(0xb0a8a0, 0x302820, 1.2));
       const k = new THREE.DirectionalLight(0xffe0c0, 2.2); k.position.set(2, 3, 2); scene.add(k);
       const r2 = new THREE.DirectionalLight(0x8090c0, 1.0); r2.position.set(-2, 1, -2); scene.add(r2);
-      // the game's reflections (G.envTex) live in the game renderer's own context and read as black here: the same room baked again
-      // for this renderer (a small sphere into PMREM, done once)
-      try { scene.environment = G.Tex && G.Tex.makeEnv ? G.Tex.makeEnv(renderer) : null; } catch (e) { scene.environment = null; }
+      // the game's reflections (G.envTex) live in the game renderer's own context and read as black here: a copy for this renderer
+      scene.environment = G.StatusUI && G.StatusUI.envFor ? G.StatusUI.envFor(renderer) : null;
       cam = new THREE.PerspectiveCamera(35, 380 / 260, 0.01, 100);
     }
     host.appendChild(canvas);

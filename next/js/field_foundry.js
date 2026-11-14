@@ -189,9 +189,9 @@
     { const c = w.addCollider(x + 0.8, y + 0.3, z + 3.2, x + 2.4, y + 1.6, z + 3.55, { surf: 'metal' }); c.vis = true; }   // (its doors stand out)
     if (F.ironBands) { F.ironBands(w, x, z, x + 3.2, z + 3.2, [y + 2.3], y, y + 3.4); F.ironBands(w, x + 0.9, z + 0.9, x + 2.3, z + 2.3, [y + 5, y + 7.6].filter((v) => v < HT - 0.5), y + 3.4, HT); }
     w.solid('block', x + 0.9, y + 3.4, z + 0.9, x + 2.3, HT, z + 2.3, { uv: 2 });
-    w.addLight(x + 1.6, y + 1.2, z + 4, { flame: 0.6, intensity: 8, range: 9, color: '#ff7a30', prio: 0.9 });
-    // (the flame that light draws before the doors burns a body in it, player.js fireTouch; the fire in the mouth is behind the doors' box)
-    (w.fireSpots || (w.fireSpots = [])).push({ k: 'mouth', x: x + 1.6, z: z + 4, r: 0.12, y0: y + 1.15, y1: y + 1.5 });
+    // (the light stands out before the doors, where it lights the bay; its flame (fp) burns low in the mouth, on the fire's floor between
+    // the fire and the grate - behind the doors' box, out of reach, so it burns no one: no w.fireSpots column)
+    w.addLight(x + 1.6, y + 1.2, z + 4, { flame: 0.6, intensity: 8, range: 9, color: '#ff7a30', prio: 0.9, fp: new THREE.Vector3(x + 1.6, y + 0.42, z + 3.3) });
   }
   // a moving plate: (x0..x1, z0..z1) at y, travelling (dx, dy, dz) and back, stopping at each end; carries what stands on it
   function mover(w, x0, z0, x1, z1, y, dx, dy, dz, rng) {

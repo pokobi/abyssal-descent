@@ -238,6 +238,36 @@
 
   // ---------------- 3D weapon previews ----------------
   const PV = { r: null, scene: null, cam: null, items: [], raf: 0, W: 448, H: 256 };
+  // The game's reflections (G.envTex, a PMREM map) live in the game renderer's own context: another renderer samples them as black.
+  // SU.envFor(renderer) gives that renderer a copy: the map's half-float texels read straight back from the game's context (a few ms,
+  // no shader). Baking the room again in the new context (G.Tex.makeEnv) is the fallback only: its blur shader takes seconds to compile
+  let envData = null;
+  function envRead() {
+    if (envData) return envData;
+    const main = G.renderer, t = G.envTex; if (!main || !t || !t.image) return null;
+    const gl = main.getContext(), wt = main.properties.get(t).__webglTexture, w = t.image.width, h = t.image.height;
+    if (!wt || !w || !h || typeof WebGL2RenderingContext === 'undefined' || !(gl instanceof WebGL2RenderingContext)) return null;
+    const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING), fb = gl.createFramebuffer();
+    try {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, wt, 0);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) return null;
+      const b = new Uint16Array(w * h * 4); while (gl.getError()) { /* clear older errors */ }
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.HALF_FLOAT, b);
+      if (gl.getError()) return null;
+      let lit = 0; for (let i = 0; i < b.length; i += 4 * 97) if (b[i] & 0x7fff) lit++;
+      if (!lit) return null;   // (nothing read: the fallback)
+      return (envData = { b, w, h, cs: t.colorSpace });
+    } finally { gl.bindFramebuffer(gl.FRAMEBUFFER, prev); gl.deleteFramebuffer(fb); }
+  }
+  SU.envFor = function (renderer) {
+    let e = null; try { e = envRead(); } catch (err) { e = null; }
+    if (e) {
+      const d = new THREE.DataTexture(e.b, e.w, e.h, THREE.RGBAFormat, THREE.HalfFloatType);
+      d.mapping = THREE.CubeUVReflectionMapping; d.colorSpace = e.cs; d.minFilter = d.magFilter = THREE.LinearFilter; d.generateMipmaps = false; d.needsUpdate = true;
+      return d;
+    }
+    try { return G.Tex && G.Tex.makeEnv ? G.Tex.makeEnv(renderer) : null; } catch (err) { return null; }
+  };
   function pvInit() {
     if (PV.r) return true;
     try {
@@ -251,7 +281,7 @@
     const k = new THREE.DirectionalLight(0xffe8d0, 3.6); k.position.set(2, 3, 3); PV.scene.add(k);
     const r2 = new THREE.DirectionalLight(0x8090c0, 1.1); r2.position.set(-3, 1, -2); PV.scene.add(r2);
     const f = new THREE.DirectionalLight(0xffffff, 1.4); f.position.set(0, 0.5, 4); PV.scene.add(f);
-    PV.scene.environment = G.envTex || null;
+    PV.scene.environment = SU.envFor(PV.r);   // (the game's reflections copied for this renderer: black otherwise)
     PV.cam = new THREE.PerspectiveCamera(28, PV.W / PV.H, 0.01, 100);
     return true;
   }

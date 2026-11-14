@@ -181,8 +181,9 @@
     P.yaw = Math.atan2(-(b.pos.x - P.pos.x), -(b.pos.z - P.pos.z)); P.pitch = 0.12;
     lockHud(true);
     ov(); OV.className = 'on';
+    guideReset();
     banner(`⚔ 決闘`, `${b.def.name}との一騎打ち`);
-    G.ui.toast(`⚔ 決闘！ 金色に光った瞬間に ${D.keyName()} でパリィ`, 'warn');
+    // (the rule is not a toast any more: the guide stays up, large, until the first blow can come - see hud)
   }
   function leaveMe() {
     const P = G.player;
@@ -192,6 +193,7 @@
       prevTok = null;
     }
     lockHud(false);
+    if (OV) guideReset();
     if (OV) { OV.className = 'fx'; clearTimeout(OV._t); OV._t = setTimeout(() => { if (OV.className === 'fx') OV.className = ''; }, 1400); }
   }
   function lockHud(on) {
@@ -199,7 +201,8 @@
     document.documentElement.classList.toggle('duel-me', on);
   }
   // the key that parries
-  D.keyName = () => (isM() ? '構えボタン（🔄）' : G.K ? G.K('reload') : 'R');
+  // (on a phone it is the round 🔄 button - the one marked 構え is the other one, so it is named by its picture)
+  D.keyName = () => (isM() ? '🔄ボタン' : G.K ? G.K('reload') : 'R');
   // the moment the key really went down (a slow frame must not make a press late: it is dated back to its keydown, a quarter second at most)
   D._kt = 0;
   window.addEventListener('keydown', (e) => { if (!e.repeat && G.BIND && G.BIND.reload && G.BIND.reload.includes(e.code)) D._kt = performance.now(); }, true);
@@ -488,12 +491,76 @@
 html.duel-me #hud-br { filter: grayscale(0.6); }
 html.duel-me .mb[data-id="reload"] { box-shadow: 0 0 0 3px #ffc840, 0 0 22px rgba(255,190,40,0.9) !important; background: rgba(120,80,10,0.75) !important; }
 html.duel-me .mb:not([data-id="reload"]):not([data-id="pause"]):not([data-id="jump"]) { opacity: 0.3 !important; }
+#duel-ov .dv-guide { position: absolute; left: 50%; bottom: calc(7vh + 84px); transform: translate(-50%, 0); display: none; font-size: 15px; padding: 0.85em 1.9em 1em; color: var(--text, #ece4d2); text-align: center; white-space: nowrap; background: linear-gradient(180deg, rgba(26,22,17,0.9), rgba(9,8,6,0.94)); box-shadow: var(--frame, inset 0 0 0 2px rgba(201,164,92,0.6)), 0 12px 34px rgba(0,0,0,0.55); }
+#duel-ov .dv-guide.on { display: block; transition: top .3s ease; animation: dgIn .42s cubic-bezier(.2,.9,.3,1.15) .15s both; }
+#duel-ov .dv-guide.on.go { animation: dgGo .3s ease-in forwards; }
+#duel-ov .dv-guide::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: var(--s-tl) left top / 22px no-repeat, var(--s-tr) right top / 22px no-repeat, var(--s-br) right bottom / 22px no-repeat, var(--s-bl) left bottom / 22px no-repeat; }
+#duel-ov .dv-guide::after { content: ''; position: absolute; inset: -5px; border: 1px solid rgba(201,164,92,0.75); pointer-events: none; animation: dgEdge 1.2s ease-in-out infinite; }
+@keyframes dgEdge { 0%, 100% { opacity: 0.4; box-shadow: 0 0 6px rgba(201,164,92,0.12); } 50% { opacity: 1; box-shadow: 0 0 0 1px rgba(201,164,92,0.35), 0 0 24px rgba(214,170,80,0.42); } }
+@keyframes dgIn { 0% { opacity: 0; transform: translate(-50%, 28px) scale(1.14); filter: brightness(1.9); } 60% { opacity: 1; } 100% { opacity: 1; transform: translate(-50%, 0) scale(1); filter: none; } }
+@keyframes dgGo { 0% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), var(--dy, 0px)) scale(0.32); } }
+#duel-ov .dg-h { display: flex; align-items: center; justify-content: center; gap: 0.9em; font-family: var(--display, serif); font-size: 1.3em; letter-spacing: 0.55em; color: var(--gold2, #ecd49a); text-shadow: 0 1px 0 #000, 0 0 12px rgba(201,164,92,0.35); margin-bottom: 0.3em; }
+#duel-ov .dg-h b { font-weight: 700; margin-right: -0.55em; }
+#duel-ov .dg-h::before, #duel-ov .dg-h::after { content: ''; height: 1px; width: 4.5em; background: linear-gradient(90deg, rgba(201,164,92,0), rgba(201,164,92,0.9)); }
+#duel-ov .dg-h::after { transform: scaleX(-1); }
+#duel-ov .dg-row { display: flex; align-items: center; justify-content: center; gap: 1.3em; }
+#duel-ov .dg-main { display: flex; align-items: center; gap: 0.4em; font-size: 1.8em; font-weight: 700; letter-spacing: 0.04em; text-shadow: 0 2px 0 #000, 0 0 14px rgba(0,0,0,0.7); }
+#duel-ov .dg-main em { font-style: normal; color: #f0d491; }
+#duel-ov .dg-cd { display: flex; flex-direction: column; align-items: center; padding-left: 1.2em; border-left: 1px solid rgba(201,164,92,0.45); line-height: 1; }
+#duel-ov .dg-cd small { font-size: 0.8em; color: var(--dim, #b1a58d); letter-spacing: 0.15em; }
+#duel-ov .dg-cd span { display: flex; align-items: baseline; gap: 0.15em; margin-top: 0.1em; }
+#duel-ov .dg-cd span small { letter-spacing: 0; }
+#duel-ov .dg-n { display: inline-block; font-family: 'Cinzel', var(--display, serif); font-size: 2.9em; font-weight: 700; color: #f3dfa6; text-shadow: 0 2px 0 #000, 0 0 16px rgba(214,170,80,0.5); }
+#duel-ov .dg-n.tk { animation: dgTick .4s ease-out; }
+@keyframes dgTick { 0% { transform: scale(1.45); color: #fff6d8; } 100% { transform: scale(1); } }
+#duel-ov .dg-bar { height: 3px; margin-top: 0.75em; background: rgba(0,0,0,0.6); box-shadow: 0 0 0 1px rgba(201,164,92,0.28); }
+#duel-ov .dg-bar i { display: block; height: 100%; width: 100%; margin: 0 auto; background: linear-gradient(90deg, #7d6536, #ecd49a, #7d6536); }
+#duel-ov .dg-more { display: none; margin-top: 0.7em; padding-top: 0.55em; border-top: 1px solid rgba(201,164,92,0.25); text-align: left; font-size: 0.98em; line-height: 1.7; color: #d9cdb3; text-shadow: 0 1px 0 #000; }
+#duel-ov .dv-guide.more .dg-more { display: block; }
+#duel-ov .dg-more div { padding-left: 1.2em; background: var(--loz) left 0.62em / 7px no-repeat; }
+#duel-ov .dg-more b { color: #f0d89c; font-weight: 700; }
+#duel-ov .dv-key { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 1.9em; height: 1.75em; padding: 0 0.45em 0.1em; font-family: 'Cinzel', var(--serif, serif); font-weight: 700; font-size: 1em; line-height: 1; color: #f3dc9e; background: linear-gradient(180deg, #4d4438, #29231c 60%, #1d1914); border: 1px solid #0a0908; border-bottom-width: 0.14em; border-radius: 0.16em; text-shadow: 0 1px 0 #000; vertical-align: middle; animation: dgKey 1.2s ease-in-out infinite; }
+@keyframes dgKey { 0%, 100% { box-shadow: inset 0 0 0 1px rgba(236,212,154,0.22), 0 0 0 1px rgba(201,164,92,0.55), 0 0 6px rgba(201,164,92,0.2); } 50% { box-shadow: inset 0 0 0 1px rgba(236,212,154,0.5), 0 0 0 2px rgba(236,212,154,0.95), 0 0 18px rgba(214,170,80,0.6); } }
+#duel-ov .dv-key.big { font-size: 1.2em; min-width: 2.1em; height: 1.95em; margin: 0 0.12em; }
+#duel-ov .dv-key.mbk { border-radius: 50%; width: 1.95em; min-width: 0; padding: 0; }
+#duel-ov .dv-key.mbk .mi { font-size: 0.9em; display: inline-flex; }
+#duel-ov .dv-low.wait { visibility: hidden; }
+#duel-ov .dv-low.me { width: min(600px, 88vw); font-size: 15px; padding: 7px 16px 8px; box-sizing: border-box; background: linear-gradient(180deg, rgba(24,21,16,0.9), rgba(9,8,6,0.92)); box-shadow: var(--frame-thin, inset 0 0 0 1px rgba(201,164,92,0.5)), 0 6px 18px rgba(0,0,0,0.5); }
+#duel-ov .dv-low.me .dv-lt { display: flex; align-items: center; justify-content: center; gap: 0.45em; flex-wrap: wrap; }
+#duel-ov .dv-low.me .dv-key { font-size: 1.45em; }
+#duel-ov .dv-low .lt-b b { font-family: 'Cinzel', var(--serif, serif); }
+#duel-ov .dv-low .lt-n { flex-basis: 100%; font-size: 0.9em; }
+#duel-ov .dv-low.arrive { animation: dvArrive .62s ease-out; }
+@keyframes dvArrive { 0%, 40% { opacity: 0; transform: translateX(-50%) scale(0.92); } 64% { opacity: 1; transform: translateX(-50%) scale(1.12); filter: brightness(1.7); } 100% { opacity: 1; transform: translateX(-50%) scale(1); filter: none; } }
+#duel-ov .dv-arrow { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: none; overflow: visible; }
+#duel-ov .dv-arrow.on { display: block; }
+#duel-ov .dv-arrow path { fill: none; stroke: #ecd49a; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 1px #000); }
+#duel-ov .dv-arrow .da-p { stroke-dasharray: 7 6; animation: daRun .6s linear infinite; }
+#duel-ov .dv-arrow .da-h { fill: #ecd49a; stroke-width: 1; }
+@keyframes daRun { to { stroke-dashoffset: -13; } }
+#duel-ov .dv-ring { position: absolute; display: none; box-sizing: border-box; border-radius: 50%; border: 2px solid #ecd49a; box-shadow: 0 0 14px rgba(214,170,80,0.6); animation: daRing 1s ease-out infinite; }
+#duel-ov .dv-ring.on { display: block; }
+@keyframes daRing { 0% { transform: scale(1); opacity: 0.95; } 100% { transform: scale(1.6); opacity: 0; } }
+html.m #duel-ov .dv-banner { top: 19%; }
+html.m #duel-ov .dv-banner b { font-size: 38px; }
+html.m #duel-ov .dv-banner span { font-size: 12px; }
+html.m #duel-ov .dv-guide { font-size: 9px; bottom: calc(7vh + 50px); padding: 0.65em 1.4em 0.75em; }
+html.m #duel-ov .dg-h { margin-bottom: 0.15em; }
+html.m #duel-ov .dg-bar { margin-top: 0.55em; }
+html.m #duel-ov .dg-more { font-size: 1.12em; line-height: 1.5; margin-top: 0.5em; padding-top: 0.4em; }
+html.m #duel-ov .dv-low.me { width: auto; max-width: 70vw; font-size: 13px; padding: 5px 12px 6px; }
+html.m #duel-ov .dv-low.me .dv-lt { white-space: nowrap; }
+html.m #duel-ov .dv-low.me .dv-key { font-size: 1.3em; }
 `;
       document.head.appendChild(CSS);
     }
     if (!OV) {
       OV = document.createElement('div'); OV.id = 'duel-ov';
-      OV.innerHTML = '<div class="dv-frame"></div><div class="dv-bar t"></div><div class="dv-bar b"></div><div class="dv-flash"></div><div class="dv-banner"></div><div class="dv-pop"></div><div class="dv-low"><div class="dv-lt"></div><div class="dv-time"><i></i></div></div>';
+      OV.innerHTML = '<div class="dv-frame"></div><div class="dv-bar t"></div><div class="dv-bar b"></div><div class="dv-flash"></div><div class="dv-banner"></div><div class="dv-pop"></div><div class="dv-low"><div class="dv-lt"></div><div class="dv-time"><i></i></div></div>'
+        + '<div class="dv-guide"><div class="dg-h"><b>決闘</b></div><div class="dg-row"><div class="dg-main"><span><em>金色</em>に光った瞬間に</span><span class="dg-k"></span><span>でパリィ</span></div>'
+        + '<div class="dg-cd"><small>開始まで</small><span><b class="dg-n"></b><small>秒</small></span></div></div><div class="dg-bar"><i></i></div>'
+        + '<div class="dg-more"><div><b>押しっぱなしは効かない</b> — 光る前から押していると失敗する</div><div>パリィのたびに白いゲージが削れる。削り切ると<b>ブレイク</b> — 総攻撃の好機</div><div>失敗すると一撃を受ける。時間切れなら白いゲージが盾として残る</div></div></div>'
+        + '<svg class="dv-arrow"><path class="da-p"></path><path class="da-h"></path></svg><div class="dv-ring"></div>';
       document.body.appendChild(OV);
     }
     return OV;
@@ -502,14 +569,97 @@ html.duel-me .mb:not([data-id="reload"]):not([data-id="pause"]):not([data-id="ju
   function flashScreen(k) { const el = ov().querySelector('.dv-flash'); el.className = 'dv-flash'; void el.offsetWidth; el.className = 'dv-flash ' + k; }
   function pop(t, big) { const el = ov().querySelector('.dv-pop'); el.textContent = t; el.className = 'dv-pop'; void el.offsetWidth; el.className = 'dv-pop show' + (big ? ' big' : ''); }
   D.flashScreen = flashScreen; D.pop = pop;
+  // the parry key drawn as a key: a keycap with the bound key's name, or on a phone the round button with its own picture
+  const mbBtn = () => document.querySelector('.mb[data-id="reload"]');
+  const keyCap = (k) => {
+    if (!isM()) return `<kbd class="dv-key ${k || ''}">${U.esc(D.keyName())}</kbd>`;
+    const i = mbBtn() && mbBtn().querySelector('.mi');
+    return `<span class="dv-key mbk ${k || ''}"><span class="mi">${i ? i.innerHTML : '🔄'}</span></span>`;
+  };
+  const keySig = () => (isM() ? 'm' : D.keyName());
+  // ---- the guide: from the call of the duel to its first blow the duellist alone is shown, large, what to press and when, with the
+  // seconds left; the first duel of a run adds three lines on the rules. When the fight starts it shrinks down into the band.
+  const GD = { on: false, d: null, key: '', n: -1, total: 1, told: null };
+  function guideReset() {
+    GD.on = false; GD.d = null;
+    const g = OV.querySelector('.dv-guide'); clearTimeout(g._t); g.className = 'dv-guide'; g.style.top = ''; g.style.bottom = '';
+    OV.querySelector('.dv-low').classList.remove('wait', 'arrive');
+    OV.querySelector('.dv-arrow').classList.remove('on'); OV.querySelector('.dv-ring').classList.remove('on');
+  }
+  function guideOpen(d) {
+    const g = OV.querySelector('.dv-guide'), run = (G.game && G.game.run) || 'x', more = GD.told !== run;
+    GD.told = run; GD.on = true; GD.d = d; GD.n = -1; GD.key = ''; GD.total = Math.max(0.5, d.readUntil - d.t); GD.high = undefined;
+    clearTimeout(g._t); g.className = 'dv-guide' + (more ? ' more' : ''); void g.offsetWidth; g.classList.add('on');
+    OV.querySelector('.dv-low').classList.add('wait');
+  }
+  function guideTick(d, wait) {
+    const g = OV.querySelector('.dv-guide');
+    if (GD.key !== keySig()) { GD.key = keySig(); g.querySelector('.dg-k').innerHTML = keyCap('big'); }
+    if (GD.n !== wait) { const n = g.querySelector('.dg-n'); n.textContent = wait; if (GD.n >= 0) { n.classList.remove('tk'); void n.offsetWidth; n.classList.add('tk'); } GD.n = wait; }
+    g.querySelector('.dg-bar i').style.width = U.clamp((d.readUntil - d.t) / GD.total * 100, 0, 100).toFixed(1) + '%';
+    // its height: low above the band, unless the guardian stands there on the screen (a small one, further off) - then high, under the banner
+    const H = innerHeight, gh = g.offsetHeight, lowT = H - H * 0.07 - (isM() ? 50 : 84) - gh, highT = H * 0.31, sp = onScreen(d.b);
+    const over = (t) => (sp ? Math.max(0, Math.min(t + gh, sp.y1) - Math.max(t, sp.y0)) : 0);
+    if (GD.high === undefined) GD.high = over(highT) < over(lowT);
+    else if (GD.high ? over(highT) > over(lowT) + 24 : over(lowT) > over(highT) + 24) GD.high = !GD.high;
+    g.style.bottom = 'auto'; g.style.top = (GD.high ? highT : lowT).toFixed(0) + 'px';
+    const ar = OV.querySelector('.dv-arrow'), ring = OV.querySelector('.dv-ring'), btn = isM() && mbBtn(), r = btn && btn.getBoundingClientRect();
+    if (!r || !r.width) { g.style.left = ''; ar.classList.remove('on'); ring.classList.remove('on'); return; }
+    // a phone: the guide stands clear of the button, and a running arrow arcs from the guide's edge (level with the button's picture in it) to the button itself
+    const gw = g.offsetWidth, cx = Math.max(gw / 2 + 8, Math.min(innerWidth / 2, r.left - 56 - gw / 2));
+    g.style.left = cx.toFixed(0) + 'px';
+    const k = g.querySelector('.dg-k .dv-key'), a = k && k.getBoundingClientRect(), gr = g.getBoundingClientRect(); if (!a || !a.width) return;
+    const ax = gr.right + 6, ay = a.top + a.height / 2, bx0 = r.left + r.width / 2, by0 = r.top + r.height / 2, rr = r.width / 2 + 7;
+    const ang = Math.atan2(ay - by0, ax - bx0), bx = bx0 + Math.cos(ang) * rr, by = by0 + Math.sin(ang) * rr, qx = (ax + bx) / 2, qy = Math.min(ay, by) - 22;
+    let tx = bx - qx, ty = by - qy; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+    ar.querySelector('.da-p').setAttribute('d', `M${ax.toFixed(1)} ${ay.toFixed(1)} Q${qx.toFixed(1)} ${qy.toFixed(1)} ${(bx - tx * 6).toFixed(1)} ${(by - ty * 6).toFixed(1)}`);
+    ar.querySelector('.da-h').setAttribute('d', `M${bx.toFixed(1)} ${by.toFixed(1)} L${(bx - tx * 12 - ty * 7).toFixed(1)} ${(by - ty * 12 + tx * 7).toFixed(1)} L${(bx - tx * 12 + ty * 7).toFixed(1)} ${(by - ty * 12 - tx * 7).toFixed(1)} Z`);
+    ar.classList.add('on');
+    Object.assign(ring.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }); ring.classList.add('on');
+  }
+  // where the guardian's body is on the screen, top to bottom in px (from its feet to as far above its middle again); null when it is out of view
+  const sv = new THREE.Vector3();
+  function onScreen(b) {
+    if (!b || !b.main || !G.camera) return null;
+    const c = b.main.centerPos(), fy = b.root ? b.root.position.y : b.pos.y || 0, W = innerWidth, H = innerHeight, out = [];
+    for (const y of [fy, c.y * 2 - fy]) { sv.set(c.x, y, c.z).project(G.camera); if (sv.z > 1) return null; out.push([(sv.x + 1) / 2 * W, (1 - sv.y) / 2 * H]); }
+    const x = (out[0][0] + out[1][0]) / 2, y0 = Math.min(out[0][1], out[1][1]) - 12, y1 = Math.max(out[0][1], out[1][1]) + 12;
+    return x < -40 || x > W + 40 ? null : { x, y0, y1 };
+  }
+  function guideClose(toBand) {
+    const g = OV.querySelector('.dv-guide'), low = OV.querySelector('.dv-low');
+    GD.on = false; GD.d = null;
+    low.classList.remove('wait');
+    OV.querySelector('.dv-arrow').classList.remove('on'); OV.querySelector('.dv-ring').classList.remove('on');
+    if (!toBand || !g.classList.contains('on')) { g.className = 'dv-guide'; return; }
+    // into the band: it flies to the band's place, shrinking, and the band comes up as it lands
+    const a = g.getBoundingClientRect(), b = low.getBoundingClientRect();
+    g.style.setProperty('--dx', (b.left + b.width / 2 - (a.left + a.width / 2)).toFixed(0) + 'px');
+    g.style.setProperty('--dy', (b.top + b.height / 2 - (a.top + a.height / 2)).toFixed(0) + 'px');
+    g.classList.add('go');
+    low.classList.remove('arrive'); void low.offsetWidth; low.classList.add('arrive');
+    clearTimeout(g._t); g._t = setTimeout(() => { if (!GD.on) g.className = 'dv-guide'; }, 340);
+  }
   function hud(d, lim) {
     ov();
-    const left = Math.max(0, lim - d.fightT), fight = d.st === 'fight', wait = Math.max(0, Math.ceil(d.readUntil - d.t));
-    const lt = OV.querySelector('.dv-lt'), tm = OV.querySelector('.dv-time i');
-    const txt = !D.mine() ? `⚔ ${U.esc(D.nameOf(d.who))} が決闘中（残り ${Math.ceil(left)}秒）${d.note ? '　' + U.esc(d.note) : ''}`
-      : fight ? `⚔ 決闘中 — 金色に光ったら ${U.esc(D.keyName())}　残り ${Math.ceil(left)}秒${d.note ? '　' + U.esc(d.note) : ''}` : `⚔ 決闘開始まで ${wait}秒`;
-    if (lt._t !== txt) { lt.innerHTML = txt; lt._t = txt; }
-    tm.style.width = (fight || !D.mine() ? left / lim * 100 : 100).toFixed(1) + '%';
+    const left = Math.max(0, lim - d.fightT), fight = d.st === 'fight', wait = Math.max(0, Math.ceil(d.readUntil - d.t)), mine = D.mine();
+    const low = OV.querySelector('.dv-low'), lt = OV.querySelector('.dv-lt'), tm = OV.querySelector('.dv-time i');
+    low.classList.toggle('me', mine && fight);
+    if (mine && fight) {
+      // the band in the fight: the key, drawn as a key, is the largest thing in it
+      const sig = 'f|' + keySig() + '|' + d.note;
+      if (lt._t !== sig) { lt.innerHTML = `<span>⚔ 決闘中 — 金色に光ったら</span>${keyCap()}<span class="lt-b">残り <b class="lt-s"></b>秒</span>${d.note ? `<span class="lt-n">${U.esc(d.note)}</span>` : ''}`; lt._t = sig; lt._s = -1; }
+      const s = Math.ceil(left); if (lt._s !== s) { lt.querySelector('.lt-s').textContent = s; lt._s = s; }
+      // (a phone: the band keeps to the left of the round button it names)
+      const r = isM() && mbBtn() && mbBtn().getBoundingClientRect();
+      low.style.left = r && r.width ? Math.max(low.offsetWidth / 2 + 8, Math.min(innerWidth / 2, r.left - 14 - low.offsetWidth / 2)).toFixed(0) + 'px' : '';
+    } else {
+      const txt = !mine ? `⚔ ${U.esc(D.nameOf(d.who))} が決闘中（残り ${Math.ceil(left)}秒）${d.note ? '　' + U.esc(d.note) : ''}` : `⚔ 決闘開始まで ${wait}秒`;
+      if (lt._t !== txt) { lt.innerHTML = txt; lt._t = txt; }
+      low.style.left = '';
+    }
+    tm.style.width = (fight || !mine ? left / lim * 100 : 100).toFixed(1) + '%';
+    if (mine && !fight) { if (!GD.on || GD.d !== d) guideOpen(d); guideTick(d, wait); } else if (GD.on) guideClose(mine && fight);
   }
   // the white gauge under the guardian's health bar
   let wEl = null, wLbl = null;

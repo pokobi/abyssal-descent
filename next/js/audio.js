@@ -659,12 +659,12 @@
     if (!set || !set.length) { buf = shotMake(pl); for (let i = 0; i < 4; i++) shotQ.push([kind, supp, auto, room]); shotFill(); }
     else { let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === shotLast[pl.key]) i = (i + 1) % set.length; shotLast[pl.key] = i; buf = set[i]; }
     // (each named gun a little off the next one's pitch)
-    const out = dest(null, p.wet, gunDry), src = ctx.createBufferSource();
+    const at = opts.pos || null, out = dest(at, p.wet, gunDry), src = ctx.createBufferSource();
     out.gain.value = v * p.lv * vr(1, 0.05); src.buffer = buf; src.playbackRate.value = (opts.id && !supp ? 0.97 + hr(hs(opts.id), 1) * 0.06 : 1) * vr(1, 0.015);
     src.connect(out); src.start(t);
     // (on open ground the roll after it; in fast fire each shot's share of it is smaller, so that the fire rolls as one shot would)
     if (!room && p.tail) {
-      const share = Math.max(0.2, Math.min(1, (t - lastTail) / 0.4)), e = dest(null, 0, gunDry), s2 = ctx.createBufferSource(); lastTail = t;
+      const share = Math.max(0.2, Math.min(1, (t - lastTail) / 0.4)), e = dest(at, 0, gunDry), s2 = ctx.createBufferSource(); lastTail = t;
       e.gain.value = v * p.lv * p.tl * share * 0.8; s2.buffer = tailTake(); s2.playbackRate.value = Math.min(2, 1.5 / p.tail) * vr(1, 0.04); s2.connect(e); s2.start(t);
     }
     if (p.cas && opts.id && t - lastCase > 0.15 && Math.random() < p.cas[0]) {   // (your own gun's empties only: a shot asked for without a gun's id is another's - a guardian's, a friend's)
@@ -672,6 +672,7 @@
       const e = dest(null, 0.1, gunDry), s3 = ctx.createBufferSource();
       e.gain.value = v * (room ? 0.035 : 0.018) * vr(1, 0.2); s3.buffer = caseTake(); s3.playbackRate.value = vr(1, 0.05); s3.connect(e); s3.start(t + p.cas[1] * vr(1, 0.15));
     }
+    if (at) return;   // (another's gun: its working is not in your hands)
     if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35, 0.7);
     if (kind === 'sniper') { A.mech('boltBack', 0.4, 0.7); A.mech('boltFwd', 0.6, 0.7); }
     if (kind === 'revolver') A.mech('click', 0.2, 0.75);
@@ -947,20 +948,15 @@
   };
   A.jump = function () {
     if (!ctx || smp('jump', null, 0.35)) return;
+    if (NEW()) { SN.jump(); return; }
     const t = ctx.currentTime, out = dest(null, 0.1); out.gain.value = 0.35;
     nz({ t, buf: 'pink', f: [['bandpass', 700, 0.8]], g: 0.3, d: 0.09, to: out });
     nz({ t: t + 0.02, f: [['bandpass', 1500, 0.6, 600, 0.2]], g: 0.12, a: 0.03, d: 0.18, to: out });
   };
-  const LANDK = { metal: 1.2, ice: 0.5 };   // (the level of that layer under a landing's own thud)
   A.land = function (intensity, surface) {
     if (ctx && surface === 'water') { A.splash(null, 0.55 + Math.min(1, intensity) * 0.8); return; } // (a splash, with its own thump when it is a big one)
     if (!ctx) return;
-    // (the new set: on iron the plate rings under the thud of the landing, on ice the rime crunches - as the steps there do)
-    if (NEW() && (surface === 'metal' || surface === 'ice') && voice(0.8)) {
-      const t = ctx.currentTime, o2 = dest(null, 0.2), k = Math.min(1.2, 0.3 + intensity * 0.9);
-      o2.gain.value = k * (surface === 'metal' ? LANDK.metal : LANDK.ice);
-      if (surface === 'metal') plate(t + 0.004, o2, 1 + Math.min(1, intensity) * 0.5); else { rime(t, o2); rime(t + 0.03, o2); }
-    }
+    if (NEW()) { if (voice(0.6)) SN.land(Math.max(0, Math.min(1, intensity)), surface === 'dirt' ? 'grass' : surface || 'stone'); return; }
     if (smp(surface === 'wood' ? 'land_wood' : 'land', null, Math.min(1.2, 0.3 + intensity * 0.9), 1.1 - Math.min(0.25, intensity * 0.25))) return;
     const t = ctx.currentTime, out = dest(null, 0.25);
     out.gain.value = Math.min(1.2, 0.3 + intensity * 0.9);
@@ -1201,8 +1197,161 @@
   };
 
   // ---------- player state ----------
+  // ---------- the body, the hands, the interface (the new set) ----------
+  // What happens to a body in gear, and what the hands do: weight and leather and iron, a breath - not tones. Each sound is written
+  // into a buffer by its build(L, R, sr, at) (knockIn, ringIn, slideIn and the helpers here), a few takes of each kept and played in
+  // turn, a little different each time. fxPlay: [key, how many takes, length (s), build, level, where (null: in the head), room, speed,
+  // a last low-pass over the whole (Hz: so that nothing of it reaches far over 6 kHz)]
+  const fxSets = {};
+  function fxPlay(key, n, secs, build, gain, pos, wet, rate, lp) {
+    const set = fxSets[key] || (fxSets[key] = []);
+    let b;
+    if (set.length < n) {
+      const sr = ctx.sampleRate; b = ctx.createBuffer(2, Math.max(1, Math.round(secs * sr)), sr);
+      const L = b.getChannelData(0), R = b.getChannelData(1);
+      build(L, R, sr, (s) => Math.round(s * sr));
+      if (lp) for (const c of [L, R]) { bqRun(c, 'lp', lp, 0.7, sr); bqRun(c, 'lp', lp, 0.7, sr); }
+      let pk = 0; for (let i = 0; i < L.length; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
+      for (let i = 0; i < L.length; i++) { L[i] /= pk || 1; R[i] /= pk || 1; }
+      set.push(b);
+    } else b = set[Math.floor(Math.random() * set.length)];
+    const out = dest(pos || null, wet === undefined ? 0.15 : wet), src = ctx.createBufferSource();
+    out.gain.value = gain; src.buffer = b; src.playbackRate.value = rate || vr(1, 0.03); src.connect(out); src.start();
+    return out;
+  }
+  // breath through a throat (noise through two formants): let out with effort (quick to rise, falling away), or drawn in (a slow swell)
+  function breathIn(L, R, i0, d, g, out, sr) {
+    const n = Math.min(L.length - i0, Math.round(d * sr)); if (n <= 0) return;
+    const x = new Float32Array(n);
+    for (let j = 0; j < n; j++) { const u = j / n, e = out ? Math.min(1, u / 0.08) * Math.pow(1 - u, 1.6) : Math.pow(Math.sin(Math.PI * Math.min(1, u * 1.1)), 1.5); x[j] = (Math.random() * 2 - 1) * e; }
+    const y = Float32Array.from(x);
+    bqRun(x, 'bp', out ? vr(520, 0.15) : vr(700, 0.15), 2.2, sr); bqRun(y, 'bp', out ? vr(1150, 0.15) : vr(1500, 0.15), 3, sr);
+    for (let j = 0; j < n; j++) { const v = (x[j] * 1.6 + y[j]) * g * 4; L[i0 + j] += v; R[i0 + j] += v; }
+  }
+  // the gear on a body jolted: buckles and plates ticking, leather and cloth shifting
+  function gearIn(L, R, i0, g, sr) {
+    for (let i = 0, n = 2 + Math.floor(Math.random() * 3); i < n; i++) { const f = vr(1900, 0.3); ringIn(L, R, Math.min(L.length - 1, i0 + Math.round(Math.random() * 0.06 * sr)), [[f, 0.4, 0.04], [f * 1.63, 0.2, 0.03]], g * (0.4 + Math.random() * 0.6), 0.4, Math.random() * 1.2 - 0.6, sr); }
+    slideIn(L, R, i0, 900, 500, 0.09, g * 0.9, 0, sr);
+  }
+  // the weight of a thing landing on a body or a body on the ground: a low tone sagging from f0 to f1 as it dies (tau s), driven -
+  // its overtones (twice and three times it) carry it to small speakers, where the tone itself is not heard
+  function lowIn(L, R, i0, f0, f1, tau, g, sr) {
+    const n = Math.min(L.length - i0, Math.round(tau * 6 * sr)); if (n <= 0) return;
+    const kd = Math.exp(-1 / (tau * sr)), kf = Math.exp(-1 / (0.03 * sr)), a = Math.max(1, Math.round(0.0015 * sr)), td = ftanh(2);
+    let ph = 0, e = 1, q = 1;
+    for (let j = 0; j < n; j++) { ph += (2 * Math.PI * (f1 + (f0 - f1) * q)) / sr; q *= kf; const v = (g * ftanh(2 * Math.sin(ph))) / td * (j < a ? j / a : e); if (j >= a) e *= kd; L[i0 + j] += v; R[i0 + j] += v; }
+  }
+  // a short burst of noise under lp Hz (a body, a sole, earth), dying in d s
+  function thudIn(L, R, i0, lp, d, g, sr) {
+    const n = Math.min(L.length - i0, Math.round(d * 6 * sr)); if (n <= 0) return;
+    const x = new Float32Array(n), te = d * sr, k = g * Math.sqrt(12000 / lp);
+    for (let j = 0; j < n; j++) x[j] = (Math.random() * 2 - 1) * Math.min(1, j / (0.0008 * sr)) * Math.exp(-j / te);
+    bqRun(x, 'lp', lp, 0.7, sr); bqRun(x, 'lp', lp, 0.7, sr);
+    for (let j = 0; j < n; j++) { L[i0 + j] += x[j] * k; R[i0 + j] += x[j] * k; }
+  }
+  // each sound's level (so that it stands as loud against the rest as the old one did)
+  const BV = { hurt: 0.48, heal: 0.038, drink: 0.021, jump: 0.026, land: 0.62, ok: 0.165, level: 0.31, clear: 0.47, focus: 0.053, focusFull: 0.125, invOn: 0.17, invHum: 0.037, invTick: 0.19, invOff: 0.114,
+    timeIn: 0.7, timeOut: 0.335, timeTick: 0.16, tick: 0.215, duel: 0.33 };
+  // (a landing's level by what is underfoot and how far it fell: light, middling, heavy)
+  const LANDG = { stone: [0.75, 0.85, 0.85], wood: [0.98, 0.93, 0.78], grass: [0.74, 0.76, 0.74], ice: [0.8, 0.9, 0.85], metal: [1, 1.3, 1.15] };
+  const SN = {
+    // struck: the blow landing on the body, flesh and cloth under it, the gear jolted, the breath knocked out (heavier, lower)
+    hurt(amount) {
+      const k = Math.min(1, 0.4 + amount / 40);
+      fxPlay('hurt8', 5, 0.45, (L, R, sr, at) => {
+        lowIn(L, R, 0, vr(100, 0.08), 55, 0.05, 0.55, sr); lowIn(L, R, 0, vr(270, 0.08), 165, 0.06, 0.65, sr);
+        thudIn(L, R, 0, 520, 0.03, 1.3, sr); knockIn(L, R, 0, vr(230, 0.1), 1, 0, sr); knockIn(L, R, 0, vr(340, 0.1), 0.6, 0, sr);
+        gearIn(L, R, at(0.015), 0.1, sr); breathIn(L, R, at(0.05), vr(0.18, 0.15), 0.12, true, sr);
+      }, (0.75 + 0.25 * k) * BV.hurt, null, 0.1, (k > 0.8 ? 0.92 : 1) * vr(1, 0.04), 2500);
+    },
+    // mended: a long breath drawn in, the gear settling, the chest easing and the breath let out
+    heal() {
+      fxPlay('heal4', 3, 0.8, (L, R, sr, at) => {
+        breathIn(L, R, 0, vr(0.5, 0.1), 0.8, false, sr); slideIn(L, R, at(0.05), 450, 260, 0.35, 1, 0, sr);
+        thudIn(L, R, at(0.4), 500, 0.06, 0.9, sr); lowIn(L, R, at(0.4), vr(110, 0.08), 70, 0.08, 0.35, sr); breathIn(L, R, at(0.5), 0.24, 0.35, true, sr);
+      }, BV.heal, null, 0.3, undefined, 4500);
+    },
+    // a draught: the flask's lip at the teeth, then gulps (each a wet knock and the throat's low swallow)
+    drink() {
+      fxPlay('drink', 3, 0.7, (L, R, sr, at) => {
+        ringIn(L, R, 0, [[vr(2300, 0.1), 0.3, 0.05], [vr(3900, 0.1), 0.15, 0.04]], 0.3, 0.5, 0.2, sr);
+        for (let i = 0; i < 4; i++) { const i0 = at(0.08 + i * vr(0.12, 0.1)); thudIn(L, R, i0, 700, 0.02, 0.6, sr); knockIn(L, R, i0 + at(0.01), vr(150, 0.1), 0.35, 0, sr); }
+      }, BV.drink, null, 0.1);
+    },
+    // off the ground: the boot pushing off, the gear lifting, cloth through the air, a short breath
+    jump() {
+      fxPlay('jump', 4, 0.32, (L, R, sr, at) => {
+        slideIn(L, R, 0, 700, 1100, 0.035, 0.6, 0, sr); thudIn(L, R, 0, 500, 0.008, 0.5, sr); gearIn(L, R, at(0.02), 0.3, sr);
+        slideIn(L, R, at(0.03), 1500, 600, 0.14, 0.3, 0, sr); breathIn(L, R, at(0.01), 0.1, 0.25, true, sr);
+      }, BV.jump, null, 0.1);
+    },
+    // down again (k 0..1: how far it fell): the body's weight, the soles on what is there - stone gritting, boards booming and creaking,
+    // turf and earth, an iron plate ringing, ice crunching (and cracking under a heavy fall) - the gear clattering, a grunt from a high one
+    land(k, s) {
+      const b = k < 0.35 ? 0 : k < 0.7 ? 1 : 2, soft = s === 'grass';
+      fxPlay('land7:' + s + b, 3, s === 'metal' ? 1.1 : 0.6, (L, R, sr, at) => {
+        lowIn(L, R, 0, vr(110, 0.06), 45, 0.022 * (1 + 0.3 * b), 1 + 0.25 * b, sr);
+        if (s !== 'metal') lowIn(L, R, 0, vr(260, 0.08), 180, 0.03 * (1 + 0.3 * b), 0.3 * (1 + 0.25 * b), sr);
+        thudIn(L, R, 0, soft ? 700 : 1100, 0.012, 0.7 * (1 + 0.25 * b), sr);
+        // (the floor and the room booming on under it a little while, as the old landing did)
+        thudIn(L, R, at(0.01), 130, 0.13 + 0.04 * b, 0.13 + 0.07 * b, sr);
+        if (s === 'stone' || s === 'ice') for (let i = 0; i < 6 + b * 4; i++) ringIn(L, R, at(0.004 + Math.random() * 0.08), [[vr(3200, 0.3), 0.2, 0.012]], 0.07, 0.4, Math.random() - 0.5, sr);
+        if (s === 'wood') { ringIn(L, R, 0, [[vr(170, 0.08), 0.6, 0.16], [vr(410, 0.08), 0.4, 0.12], [vr(890, 0.08), 0.15, 0.08]], 0.4, 0.2, 0, sr); slideIn(L, R, at(0.06), 600, 420, 0.1, 0.06, 0, sr); }
+        if (s === 'metal') { const f0 = vr(300, 0.1); ringIn(L, R, at(0.002), [[f0, 0.5, 0.85], [f0 * 1.59, 0.4, 0.65], [f0 * 2.14, 0.3, 0.5], [f0 * 2.83, 0.2, 0.35], [f0 * 3.61, 0.12, 0.25]], [0.55, 1.3, 2.6][b], 0.2, 0, sr); }
+        if (s === 'ice') { for (let i = 0; i < 4 + b * 3; i++) ringIn(L, R, at(Math.random() * 0.05), [[vr(3600, 0.3), 0.3, 0.03]], 0.1, 0.4, Math.random() - 0.5, sr); if (b === 2) iceCrackIn(L, R, at(0.01), 0.3, 0, sr); }
+        if (soft) slideIn(L, R, at(0.004), 3000, 2200, 0.1, 0.07, 0, sr);
+        gearIn(L, R, at(0.006), 0.1 + 0.06 * b, sr);
+        if (b === 2) breathIn(L, R, at(0.04), 0.18, 0.15, true, sr);
+      }, BV.land * [0.55, 0.8, 1][b] * (LANDG[s] || LANDG.stone)[b], null, 0.25, undefined, 7000);
+    },
+    // the interface. Done: an iron latch closing firmly on its keeper
+    ok() { fxPlay('ui:ok2', 3, 0.25, (L, R, sr, at) => { knockIn(L, R, 0, vr(420, 0.08), 0.8, 0, sr); ringIn(L, R, 0, [[vr(1150, 0.05), 0.4, 0.06], [vr(2500, 0.05), 0.2, 0.04]], 0.5, 0.2, 0, sr); knockIn(L, R, at(0.03), vr(700, 0.08), 0.4, 0, sr); }, BV.ok, null, 0.08, undefined, 5000); },
+    // risen in strength: a hammer on an anvil, twice, the old iron ringing low after it
+    level() {
+      fxPlay('ui:level4', 2, 1.5, (L, R, sr, at) => {
+        for (const [tt, g] of [[0, 1], [0.2, 0.75]]) { lowIn(L, R, at(tt), vr(120, 0.05), 70, 0.07, g * 0.45, sr); knockIn(L, R, at(tt), vr(300, 0.05), g, 0, sr); ringIn(L, R, at(tt), [[vr(310, 0.03), 0.8, 1], [vr(620, 0.03), 0.45, 0.7], [vr(1430, 0.03), 0.25, 0.5], [vr(2410, 0.03), 0.1, 0.35]], g * 0.7, 0.2, 0, sr); }
+      }, BV.level, null, 0.25, undefined, 4000);
+    },
+    // a place cleared: a great stone settling into its bed, and deep iron ringing a long while under it
+    clear() {
+      fxPlay('ui:clear2', 1, 2.2, (L, R, sr, at) => {
+        lowIn(L, R, 0, 70, 42, 0.35, 1.1, sr); knockIn(L, R, 0, 90, 1, 0, sr); slideIn(L, R, 0, 320, 200, 0.6, 0.5, 0, sr); thudIn(L, R, 0, 400, 0.05, 0.8, sr);
+        ringIn(L, R, at(0.02), [[180, 0.5, 1.8], [412, 0.35, 1.4], [757, 0.2, 1], [1190, 0.08, 0.6]], 0.8, 0.1, 0, sr);
+      }, BV.clear, null, 0.4, undefined, 4000);
+    },
+    // a working gathering in the hands: an iron ratchet ticking one notch higher each time; full, a heavy catch locking and ringing
+    focus(k) {
+      if (k < 4) fxPlay('focus' + Math.min(3, Math.max(0, k | 0)), 2, 0.12, (L, R, sr) => { knockIn(L, R, 0, 600 + k * 70, 0.5, 0, sr); const f = 1400 + k * 160; ringIn(L, R, 0, [[f, 0.4, 0.03], [f * 1.7, 0.2, 0.02]], 0.6, 0.5, 0, sr); }, BV.focus, null, 0.05, 1);
+      else fxPlay('focusFull', 2, 0.5, (L, R, sr) => { knockIn(L, R, 0, vr(380, 0.05), 0.9, 0, sr); ringIn(L, R, 0, [[vr(700, 0.03), 0.5, 0.3], [vr(1650, 0.03), 0.4, 0.22], [vr(2900, 0.03), 0.2, 0.14]], 0.8, 0.5, 0, sr); }, BV.focusFull, null, 0.05);
+    },
+    // warded: old bronze struck soft and humming low under the hand; ticking dully as it runs down; let go with a scrape and a clank
+    invulnOn() { fxPlay('invOn2', 2, 1.2, (L, R, sr, at) => { knockIn(L, R, 0, vr(250, 0.05), 0.8, 0, sr); ringIn(L, R, 0, [[vr(262, 0.03), 0.5, 0.9], [vr(620, 0.03), 0.4, 0.8], [vr(1100, 0.03), 0.25, 0.6], [vr(1750, 0.03), 0.1, 0.4]], 0.8, 0, 0, sr); breathIn(L, R, at(0.02), 0.4, 0.2, false, sr); }, BV.invOn, null, 0.6, undefined, 3500); },
+    invulnHum() { fxPlay('invHum', 2, 0.45, (L, R, sr) => ringIn(L, R, 0, [[vr(262, 0.03), 0.4, 0.4], [vr(620, 0.03), 0.25, 0.35]], 0.6, 0, 0, sr), BV.invHum, null, 0.5); },
+    invulnTick(k) { fxPlay('invTick' + Math.round(k * 3), 2, 0.12, (L, R, sr) => { knockIn(L, R, 0, 500 + k * 400, 0.6, 0, sr); ringIn(L, R, 0, [[1200 + k * 600, 0.3, 0.04]], 0.4, 0.4, 0, sr); }, BV.invTick * (0.8 + 0.4 * k), null, 0.3, 1); },
+    invulnOff() { fxPlay('invOff2', 2, 0.5, (L, R, sr, at) => { slideIn(L, R, 0, 1400, 700, 0.18, 0.4, 0, sr); knockIn(L, R, at(0.16), vr(320, 0.05), 0.7, 0, sr); ringIn(L, R, at(0.16), [[vr(500, 0.03), 0.3, 0.2], [vr(1200, 0.03), 0.2, 0.15]], 0.5, 0, 0, sr); }, BV.invOff, null, 0.5, undefined, 3500); },
+    // time held back: heavy gears catching and grinding down; let go, they run free; while held, a clock's escapement ticks slow
+    timeIn(k) {
+      const g = 0.55 + 0.45 * k;
+      fxPlay('timeIn2', 2, 1.3, (L, R, sr, at) => { slideIn(L, R, 0, 900, 280, 0.7, 0.5, 0, sr); for (const [tt, f, v] of [[0, 260, 1], [0.12, 210, 0.8], [0.3, 160, 0.9], [0.62, 120, 0.7]]) { knockIn(L, R, at(tt), f, v, 0, sr); ringIn(L, R, at(tt), [[f * 2.3, 0.3, 0.12], [f * 4.1, 0.15, 0.08]], v * 0.5, 0.1, 0, sr); } }, BV.timeIn * g, null, 0.7, undefined, 4000);
+      if (k >= 0.8) A.bell();
+    },
+    timeOut(k) { fxPlay('timeOut2', 2, 0.7, (L, R, sr, at) => { lowIn(L, R, 0, 50, 75, 0.15, 0.7, sr); slideIn(L, R, 0, 300, 1100, 0.5, 0.35, 0, sr); lowIn(L, R, at(0.45), 85, 48, 0.07, 1, sr); knockIn(L, R, at(0.45), vr(260, 0.05), 0.7, 0, sr); ringIn(L, R, at(0.45), [[600, 0.3, 0.12], [1380, 0.2, 0.08]], 0.4, 0.1, 0, sr); }, BV.timeOut * (0.5 + 0.4 * k), null, 0.6, undefined, 4000); },
+    timeTick(k) { fxPlay('timeTick2', 3, 0.2, (L, R, sr, at) => { knockIn(L, R, 0, vr(1100, 0.05), 0.5, 0, sr); ringIn(L, R, 0, [[vr(2300, 0.05), 0.3, 0.05], [vr(3700, 0.05), 0.15, 0.03]], 0.4, 0.3, 0, sr); lowIn(L, R, at(0.01), 150, 95, 0.03, 0.9, sr); knockIn(L, R, at(0.01), vr(140, 0.05), 0.6, 0, sr); }, BV.timeTick * (0.5 + 0.4 * k), null, 0.35); },
+    // a pendulum clock: tick and tock, the urgent one higher and harder, the last seconds a slow deep tock
+    tick(lvl, sec) {
+      const f = lvl === 2 ? 500 : lvl === 1 ? 1200 : 900, up = lvl === 1 ? (1200 + (5 - (sec || 5)) * 80) / 1200 : 1;
+      fxPlay('tock' + lvl, 3, 0.15, (L, R, sr) => { knockIn(L, R, 0, f, 0.7, 0, sr); knockIn(L, R, 0, f * 0.28, 0.35, 0, sr); ringIn(L, R, 0, [[f * 2.3, 0.3, 0.04], [f * 3.9, 0.12, 0.025]], 0.5, 0.5, 0, sr); }, BV.tick * (lvl === 2 ? 0.6 : lvl === 1 ? 3.8 : 0.9), null, 0.05, up);
+    },
+    // a duel's turn passing: one short strike of a hammer on iron (two, quick, when the turn is yours)
+    duelTurn(mine) {
+      fxPlay('duelT' + (mine ? 1 : 0), 2, 0.5, (L, R, sr, at) => {
+        for (const tt of mine ? [0, 0.11] : [0]) { knockIn(L, R, at(tt), vr(mine ? 420 : 340, 0.04), 0.9, 0, sr); ringIn(L, R, at(tt), [[vr(mine ? 980 : 800, 0.02), 0.5, 0.3], [vr(mine ? 2260 : 1840, 0.02), 0.35, 0.22], [vr(mine ? 3800 : 3100, 0.02), 0.12, 0.12]], 0.7, 0.6, 0, sr); }
+      }, BV.duel, null, 0.2, undefined, 6000);
+    },
+  };
   A.hurt = function (amount) {
     if (!ctx || smp('hurt', null, Math.min(1, 0.4 + amount / 40), 1, 0.1)) return;
+    if (NEW()) { SN.hurt(amount); return; }
     const t = ctx.currentTime, out = dest(null, 0.1);
     const k = Math.min(1, 0.4 + amount / 40);
     out.gain.value = k;
@@ -1219,6 +1368,7 @@
   };
   A.heal = function () {
     if (!ctx || smp('heal', null, 0.5, 1, 0.4)) return;
+    if (NEW()) { SN.heal(); return; }
     const t = ctx.currentTime, out = dest(null, 0.4); out.gain.value = 0.5;
     nz({ t, buf: 'pink', f: [['bandpass', 500, 1, 1800, 0.5]], g: 0.3, a: 0.15, d: 0.4, to: out });
     nz({ t: t + 0.05, f: [['bandpass', 1200, 3]], g: 0.15, a: 0.05, d: 0.25, to: out }); // liquid
@@ -1226,6 +1376,7 @@
   };
   A.drink = function () {
     if (!ctx) return;
+    if (NEW()) { SN.drink(); return; }
     const t = ctx.currentTime, out = dest(null, 0.1); out.gain.value = 0.5;
     for (let i = 0; i < 4; i++) nz({ t: t + i * 0.12, f: [['bandpass', vr(700, 0.2), 4, 400, 0.08]], g: 0.4, d: 0.08, to: out });
   };
@@ -1573,6 +1724,7 @@
   A.ui = function (kind) {
     if (!ctx) return;
     if (kind === 'buy' ? smp('coins', null, 0.6) : kind === 'rare' ? false : smp('ui_' + kind, null, 0.5, 1, 0.08)) return;
+    if (NEW() && (kind === 'ok' || kind === 'level' || kind === 'clear')) { SN[kind](); return; }
     const t = ctx.currentTime, out = dest(null, 0.12);
     if (NEW() && UIN[kind]) { UIN[kind](t, out); return; }
     switch (kind) {
@@ -1594,6 +1746,7 @@
   // ---- time slowing / stopping: a falling sweep going in, a low hum and slow clock ticks while it lasts, a rising sweep coming out ----
   A.timeIn = function (k) {
     if (!ctx || !voice(1.3)) return;
+    if (NEW()) { SN.timeIn(k); return; }
     const t = ctx.currentTime, out = dest(null, 0.7), g = 0.55 + 0.45 * k; out.gain.value = 0.9;
     tn({ t, f0: 560, f1: 40, d: 1.15, g: 0.5 * g, to: out, type: 'sine' });
     tn({ t, f0: 280, f1: 36, d: 1.25, g: 0.32 * g, to: out, type: 'sawtooth', lp: 700 });
@@ -1603,6 +1756,7 @@
   };
   A.timeOut = function (k) {
     if (!ctx || !voice(0.9)) return;
+    if (NEW()) { SN.timeOut(k); return; }
     const t = ctx.currentTime, out = dest(null, 0.6), g = 0.5 + 0.4 * k; out.gain.value = 0.8;
     tn({ t, f0: 60, f1: 1000, d: 0.55, g: 0.34 * g, to: out, type: 'sine' });
     nz({ t, buf: 'white', f: [['bandpass', 600, 2, 6500, 0.5]], g: 0.2 * g, a: 0.05, d: 0.5, to: out });
@@ -1610,6 +1764,7 @@
   };
   A.timeTick = function (k) {
     if (!ctx) return;
+    if (NEW()) { SN.timeTick(k); return; }
     const t = ctx.currentTime, out = dest(null, 0.35); out.gain.value = 0.5 + 0.4 * k;
     nz({ t, f: [['bandpass', 2300 + Math.random() * 400, 6]], g: 0.3, d: 0.03, to: out });
     tn({ t, f0: 1500, f1: 900, d: 0.06, g: 0.1, to: out, type: 'triangle' });
@@ -1629,6 +1784,8 @@
     tdr.out.gain.setTargetAtTime(0.05 + 0.1 * k, now, 0.15); tdr.o1.frequency.setTargetAtTime(46 - 14 * k, now, 0.3);
     if (!tdr.w) tdr.w = setInterval(() => { if (performance.now() - tdr.t > 300) { tdr.out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.12); clearInterval(tdr.w); tdr.w = 0; } }, 120);
   };
+  // a duel's turn passing: one short strike of a hammer on iron; two, quick, when the turn is yours (the new set; the old one: a click)
+  A.duelTurn = function (mine) { if (!ctx) return; if (!NEW()) { A.ui('click'); return; } if (voice(0.5)) SN.duelTurn(!!mine); };
   // the duel's warning flash: a bright, high blade-ring "shing!" (a scrape sweeping up into inharmonic steel partials that hang a moment)
   A.shing = function () {
     if (!ctx) return;
@@ -1679,6 +1836,7 @@
   // quickening ticks as it is about to run out, and a falling "glass" tone when it ends
   A.invulnOn = function () {
     if (!ctx) return;
+    if (NEW()) { SN.invulnOn(); return; }
     const t = ctx.currentTime, out = dest(null, 0.8); out.gain.value = 0.45;
     [523, 659, 784, 1046].forEach((f, i) => tn({ t: t + i * 0.05, f0: f, f1: f * 1.01, d: 0.7, g: 0.12, to: out, type: 'triangle', lp: 4000 }));
     nz({ t, buf: 'pink', f: [['bandpass', 2500, 2, 6000, 0.4]], g: 0.25, a: 0.08, d: 0.5, to: out });
@@ -1686,12 +1844,14 @@
   };
   A.invulnHum = function () {
     if (!ctx) return;
+    if (NEW()) { SN.invulnHum(); return; }
     const t = ctx.currentTime, out = dest(null, 0.6); out.gain.value = 0.16;
     tn({ t, f0: vr(1568, 0.05), d: 0.35, g: 0.12, to: out, type: 'sine' });
     tn({ t: t + 0.04, f0: vr(2093, 0.05), d: 0.3, g: 0.07, to: out, type: 'sine' });
   };
   A.invulnTick = function (k) {
     if (!ctx) return;
+    if (NEW()) { SN.invulnTick(Math.max(0, Math.min(1, k || 0))); return; }
     // k: 0 → 1 as the end approaches (higher and louder)
     const t = ctx.currentTime, out = dest(null, 0.3); out.gain.value = 0.35 + k * 0.25;
     const f = 880 + k * 660;
@@ -1700,6 +1860,7 @@
   };
   A.invulnOff = function () {
     if (!ctx) return;
+    if (NEW()) { SN.invulnOff(); return; }
     const t = ctx.currentTime, out = dest(null, 0.6); out.gain.value = 0.45;
     [1046, 784, 587, 392].forEach((f, i) => tn({ t: t + i * 0.06, f0: f, f1: f * 0.9, d: 0.35, g: 0.12, to: out, type: 'triangle', lp: 3000 }));
     nz({ t, buf: 'white', f: [['bandpass', 3500, 6]], g: 0.18, d: 0.12, to: out });
@@ -1749,6 +1910,7 @@
   A.gravDrop = function () {
     if (!ctx || !voice(1.1)) return;
     const t = ctx.currentTime, out = dest(null, 0.5); out.gain.value = 0.85;
+    if (NEW()) { nz({ t, buf: 'pink', f: [['bandpass', 4000, 0.7, 500, 0.9]], g: 0.62, a: 0.1, d: 0.85, to: out }); nz({ t, buf: 'brown', f: [['lowpass', 320]], g: 0.55, a: 0.25, d: 0.8, to: out }); return; }   // (the new set: the air tearing past and roaring, no whistle)
     tn({ t, f0: 1500, f1: 160, d: 0.9, g: 0.16, to: out, type: 'sine' });
     tn({ t, f0: 1520, f1: 170, d: 0.9, g: 0.08, to: out, type: 'triangle' });
     nz({ t, buf: 'pink', f: [['bandpass', 4000, 0.7, 500, 0.9]], g: 0.5, a: 0.1, d: 0.85, to: out });
@@ -1793,6 +1955,7 @@
   A.riftFall = function () {
     if (!ctx || !voice(0.9)) return;
     const t = ctx.currentTime, out = dest(null, 0.7); out.gain.value = 0.8;
+    if (NEW()) { nz({ t, f: [['highpass', 600]], g: 0.6, d: 0.35, to: out }); scrape(t, out, 2600, 300, 0.32, 0.5, { q: 2, rough: 0.85 }); tn({ t, f0: 75, f1: 40, d: 0.5, g: 0.85, to: out, type: 'sine' }); return; }   // (the new set: stone grinding down in place of the sweep)
     nz({ t, buf: 'white', f: [['highpass', 600]], g: 0.6, d: 0.35, to: out });
     tn({ t, f0: 2600, f1: 300, d: 0.3, g: 0.12, to: out, type: 'square', lp: 4000 });
     tn({ t, f0: 75, f1: 40, d: 0.5, g: 0.5, to: out, type: 'sine' });
@@ -1807,6 +1970,7 @@
   A.lanceHit = function (pos) {
     if (!ctx || !voice(1.2)) return;
     const t = ctx.currentTime, out = dest(pos, 0.8); out.gain.value = 1;
+    if (NEW()) { tn({ t, f0: 300, f1: 40, d: 0.6, g: 0.6, to: out, type: 'sine' }); nz({ t, f: [['bandpass', 1500, 0.8, 300, 0.8]], g: 0.7, d: 0.9, to: out }); strike(t, out, [[vr(420, 0.05), 0.3, 0.5], [vr(980, 0.05), 0.2, 0.4], [vr(1850, 0.05), 0.1, 0.3]], { g: 0.2, hp: 1200 }); return; }   // (the new set: struck iron ringing low in place of the falling tone)
     tn({ t, f0: 300, f1: 40, d: 0.6, g: 0.6, to: out, type: 'sine' });
     nz({ t, f: [['bandpass', 1500, 0.8, 300, 0.8]], g: 0.7, d: 0.9, to: out });
     tn({ t, f0: 1760, f1: 880, d: 0.7, g: 0.1, to: out, type: 'triangle' });
@@ -2154,6 +2318,7 @@
   // 一点集中 (狙撃手): k = 1..3 a soft rising blip as the gauge fills, 4 = full (a small two-note chime)
   A.focus = function (k) {
     if (!ctx) return;
+    if (NEW()) { SN.focus(k); return; }
     const t = ctx.currentTime, out = dest(null, 0.05);
     if (k < 4) { out.gain.value = 0.2; tn({ t, f0: 640 + k * 170, d: 0.05, g: 0.25, to: out, type: 'sine' }); }
     else { out.gain.value = 0.3; tn({ t, f0: 1180, d: 0.16, g: 0.22, to: out, type: 'triangle' }); tn({ t: t + 0.07, f0: 1770, d: 0.24, g: 0.18, to: out, type: 'triangle' }); }
@@ -2161,6 +2326,7 @@
   // clock tick for timed challenges: 0 = normal, 1 = urgent (higher, louder), 2 = half-second tock in the last seconds
   A.tick = function (lvl, sec) {
     if (!ctx || smp('tick', null, lvl === 2 ? 0.35 : lvl === 1 ? 0.95 : 0.6, lvl === 1 ? 1.3 : lvl === 2 ? 0.8 : 1, 0.05)) return;
+    if (NEW()) { SN.tick(lvl, sec); return; }
     const t = ctx.currentTime, out = dest(null, 0.05); out.gain.value = lvl === 2 ? 0.35 : lvl === 1 ? 0.95 : 0.6;
     const f = lvl === 2 ? 900 : lvl === 1 ? 1500 + (5 - (sec || 5)) * 120 : 1150;
     nz({ t, buf: 'white', f: [['bandpass', f * 2, 8]], g: 0.5, d: 0.025, to: out });

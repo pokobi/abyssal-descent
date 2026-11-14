@@ -500,7 +500,7 @@
           a.fired = true;
           const dir = a.aim.clone().sub(m).normalize();
           const wh = G.world.raycast(m, dir, 200); const end2 = wh ? wh.point : m.clone().addScaledVector(dir, 200);
-          G.fx.beam(m, end2, 0xffd0d0, 0.08, 0.2); G.sfx.gun('sniper', {});
+          G.fx.beam(m, end2, 0xffd0d0, 0.08, 0.2); G.sfx.gun('sniper', { pos: m });
           // hit if the player is still on the locked line
           const pc = P.chestPos(); const t = pc.clone().sub(m).dot(dir);
           if (t > 0 && (!wh || t < wh.t) && pc.clone().sub(m.clone().addScaledVector(dir, t)).length() < 0.9) this.hurtPlayer(34, 'ranged', m);
@@ -514,7 +514,7 @@
           const m = this.muzzleW(), dir = P.chestPos().sub(m).normalize();
           dir.x += U.rand(-0.03, 0.03); dir.y += U.rand(-0.02, 0.02); dir.normalize();
           C.spawnProjectile({ kind: 'nail', pos: m, vel: dir.multiplyScalar(48), grav: 0, owner: 'enemy', dmg: 9 * this.dmgScale, radius: 0.2, attacker: this.body, life: 3 });
-          G.sfx.gun('smg', { vol: 0.6 });
+          G.sfx.gun('smg', { vol: 0.6, pos: m });
         }
         if (a.n >= 9 && a.t > a.next) end();
       } else if (a.k === 'grapple') {

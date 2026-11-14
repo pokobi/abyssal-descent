@@ -920,7 +920,7 @@
             G.sfx.whoosh(0.8, 0.6); break;
           case 'hunter': {
             const m = e.pos.clone().setY(e.h * 0.7), dir = e.aim.clone().sub(m).normalize();
-            const wh = G.world.raycast(m, dir, 200); G.fx.beam(m, wh ? wh.point : m.clone().addScaledVector(dir, 120), 0xffd0ff, 0.08, 0.2); G.sfx.gun('sniper', {});
+            const wh = G.world.raycast(m, dir, 200); G.fx.beam(m, wh ? wh.point : m.clone().addScaledVector(dir, 120), 0xffd0ff, 0.08, 0.2); G.sfx.gun('sniper', { pos: m });
             const pc = P.chestPos(), tt = pc.clone().sub(m).dot(dir);
             if (tt > 0 && (!wh || tt < wh.t) && pc.clone().sub(m.clone().addScaledVector(dir, tt)).length() < 0.9) this.hurtPlayer(30, 'ranged', m);
             break;

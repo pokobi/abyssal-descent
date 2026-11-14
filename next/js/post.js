@@ -258,11 +258,130 @@ vec3 air(vec2 uv){
   }
   return s * airK;
 }
+// ---- frozen solid (pstatus.js sets Post.frost each frame): the view through a shell of ice. tFrz: its pattern, baked once (r the
+// relief of its faces, g frost, b bubbles, a old cracks). uFrz: x how far it has closed in (0..1), y the time since it broke away (s;
+// < 0: not breaking), z time, w detail (1 medium, 2 high). uFrzW: x how clouded the presses of jump have left it. uFrzC: the cracks of
+// those presses (x, y on the screen, age s, size)
+uniform vec4 uFrz; uniform vec4 uFrzW; uniform vec4 uFrzC[6]; uniform sampler2D tFrz;
+float fTh = 0., fFr = 0., fBu = 0., fCr = 0., fCl = 0., fTap = 0., fG = 0., fGe = 0., fGb = 0., fM = 1., fEd = 0., fFront = 0.; vec2 fSp = vec2(.5);
+vec2 fzA(){ return vec2(res.x / res.y, 1.); }
+vec2 fzQ(vec2 p){ return (p - .5) * fzA() * .62 + .5; }
+// the shell at p, closed in as far as k: (thickness 0..1, frost, bubbles, old cracks). Thick and white at the edges of the view, thin
+// in its middle (the foes stay in sight); its front comes in from the edges unevenly, the frost reaching ahead of the ice
+vec4 fzField(vec2 p, float k){
+  vec2 a = fzA(), q = (p - .5) * a;
+  vec4 T = texture2D(tFrz, q * .62 + .5), T2 = texture2D(tFrz, q * 1.45 + vec2(.31, .77));
+  vec2 e2 = abs(q) / (a * .5);
+  float em = mix(length(e2) * .74, max(e2.x, e2.y), .55);
+  float front = mix(1.3, -.08, k) - (T.r - .5) * .45 - T2.g * .18;
+  float cov = smoothstep(front - .012, front + .05, em);
+  fFront = cov * (1. - cov) * 4. * step(k, .999);
+  float th = cov * (.1 + .9 * smoothstep(.12, 1.1, em)) * (.72 + .56 * T.r);
+  return vec4(clamp(th, 0., 1.), max(T.g, T2.g * .7) * cov, T2.b * cov, T.a * cov);
+}
+// breaking away (t s): the shell in pieces (cells of a broken pane, 6 by 4 across), each flying out from the middle faster and
+// faster and turning a little; which piece covers p, and where on it (q). m: covered (fading out); fEd: near a piece's broken edge
+vec2 fzSeed(vec2 c){ return c + .5 + (vec2(hash(c), hash(c + 4.7)) - .5) * .8; }
+vec2 fzShard(vec2 p, float t, out float m){
+  vec2 a = fzA(), GS = vec2(6., 4.); m = 0.; fEd = 0.;
+  vec2 i0 = floor(p * GS);
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 ci = i0 + vec2(float(x), float(y)), sc = fzSeed(ci) / GS;
+    vec2 dir = (sc - .5) * a; float dl = length(dir); dir = dl > .02 ? dir / dl : vec2(hash(ci + 1.3) - .5, .5);
+    float ang = (hash(ci + 9.1) - .5) * t * 2.4, ca = cos(ang), sa = sin(ang);
+    vec2 d = (p - sc - dir / a * (t * .8 + t * t * 5.2)) * a; d = vec2(ca * d.x + sa * d.y, -sa * d.x + ca * d.y);
+    vec2 q = sc + d / a, qg = q * GS, qi = floor(qg);
+    // (the nearest seed to q in the pane at rest: is it this piece's?)
+    float d1 = 9., d2 = 9.; vec2 best = vec2(-99.);
+    for (int v = -1; v <= 1; v++) for (int u = -1; u <= 1; u++) { vec2 cj = qi + vec2(float(u), float(v)); float dd = length((qg - fzSeed(cj)) / GS * a); if (dd < d1) { d2 = d1; d1 = dd; best = cj; } else if (dd < d2) d2 = dd; }
+    if (best == ci) { m = 1. - smoothstep(.22, .46, t); fEd = exp(-(d2 - d1) * res.y * .35); return q; }
+  }
+  return p;
+}
+// what the presses of jump have done to it: from where each struck, a crushed white spot, cracks running out nearly straight, each
+// splitting once part-way, a broken ring of them, the ice clouding white round it
+void fzCracks(vec2 p){
+  vec2 a = fzA();
+  for (int i = 0; i < 6; i++) {
+    vec4 C = uFrzC[i]; if (C.w <= 0.) continue;
+    vec2 d = (p - C.xy) * a; float r = length(d), an = atan(d.y, d.x), sd = C.w * 13.7 + float(i) * 3.1;
+    float grow = min(1., C.z * 9.), L = (.07 + .36 * grow) * (.75 + .35 * C.w), px = res.y;
+    float u = an / 6.2832 * 8. + sin(r * 9. + sd) * .04, k = floor(u + .5);
+    float sa = (k + (hash(vec2(k, sd)) - .5) * .5) / 8. * 6.2832, Lk = L * (.45 + .55 * hash(vec2(k + .3, sd)));
+    vec2 dirA = vec2(cos(sa), sin(sa));
+    float along = dot(d, dirA), pd = abs(d.x * dirA.y - d.y * dirA.x);
+    float line = exp(-pd * px * .8) * step(0., along) * (1. - smoothstep(Lk * .8, Lk, along)) * (1. - along / max(Lk, 1e-3) * .55);
+    // (its one split: off part-way along, turned 20-35 degrees one way)
+    float sg = hash(vec2(k + 7.1, sd)) < .5 ? -1. : 1., s2 = sa + sg * (.35 + .25 * hash(vec2(k + 2.2, sd)));
+    vec2 B = dirA * Lk * (.35 + .2 * hash(vec2(k + 5.5, sd))), d2 = d - B, dirB = vec2(cos(s2), sin(s2));
+    float al2 = dot(d2, dirB), pd2 = abs(d2.x * dirB.y - d2.y * dirB.x), L2 = Lk * .45;
+    line = max(line, exp(-pd2 * px * .8) * step(0., al2) * (1. - smoothstep(L2 * .7, L2, al2)) * .8 * grow);
+    float rr = abs(r - L * .38), arc = step(.5, hash(vec2(floor(an * 2.6 + sd), sd + 1.))) * grow;
+    fTap += line * (.65 + .35 * C.w) + exp(-rr * px * .7) * arc * .55 + exp(-r * px * .09) * .9 * grow;
+    fCl += exp(-r * r / max(L * L * .14, 1e-4)) * min(1., C.z * 4.) * .45 * C.w;
+  }
+}
+// ahead of the frame: the shell's thickness here, and the light bent through it - by the relief of its faces (two scales), a little
+// lens toward the thick edges - and, while it breaks away, through each piece where it has flown
+vec2 fzPrep(vec2 uv){
+  float k = uFrz.x; fSp = uv; fM = 1.;
+  if (uFrz.y >= 0.) { fSp = fzShard(uv, uFrz.y, fM); k = 1.; }
+  if (fM <= 0.) return uv;
+  vec4 F = fzField(fSp, k) * fM;
+  fTh = F.x; fFr = F.y; fBu = F.z; fCr = F.w;
+  fzCracks(fSp); fTap *= fM; fCl *= fM;
+  vec2 a = fzA(), q = fzQ(fSp), q2 = q * 2.35 + .13, e = vec2(.004, 0.);
+  vec2 gr = vec2(texture2D(tFrz, q + e).r - texture2D(tFrz, q - e).r, texture2D(tFrz, q + e.yx).r - texture2D(tFrz, q - e.yx).r);
+  vec2 g2 = vec2(texture2D(tFrz, q2 + e).r - texture2D(tFrz, q2 - e).r, texture2D(tFrz, q2 + e.yx).r - texture2D(tFrz, q2 - e.yx).r);
+  return uv + ((gr * 1.1 + g2 * .55) / a + (uv - .5) * .03) * fTh * (uFrz.y >= 0. ? .15 : 1.);
+}
+// thick ice scatters what is behind it: a soft blur, wider where it is thicker or clouded
+vec3 fzBlur(vec2 uv, vec3 c){
+  float rad = fTh * .014 + fCl * .012; vec2 a = vec2(res.y / res.x, 1.); vec3 s = c; float n = 1.;
+  int N = uFrz.w > 1.5 ? 8 : 4;
+  for (int i = 0; i < 8; i++) { if (i >= N) break; float an = float(i) * 2.399 + .5, rr = rad * sqrt((float(i) + .5) / float(N)); s += texture2D(tScene, uv + vec2(cos(an), sin(an)) * rr * a).rgb; n += 1.; }
+  return s / n;
+}
+// the hands and what they hold, shut in a block of the ice: the block is their outline grown out and smoothed (a lump, not a copy of
+// their shape), its edge uneven; what is in it seen bent through it. fGe: its edge
+vec4 fzGun(vec2 uv, vec4 g){
+  if (uFrz.y >= 0.) return g;
+  vec2 a = vec2(res.y / res.x, 1.); float sum = g.a, n = 1.;
+  int N = uFrz.w > 1.5 ? 24 : 8;
+  for (int i = 0; i < 24; i++) { if (i >= N) break; float an = float(i) * 2.399 + .3, rr = .062 * sqrt((float(i) + .5) / float(N)); sum += texture2D(tGun, uv + vec2(cos(an), sin(an)) * rr * a).a; n += 1.; }
+  vec2 q = uv * vec2(res.x / res.y, 1.) * 1.3;
+  vec4 T = texture2D(tFrz, q);
+  float m = sum / n, th0 = .07 + T.r * .12;
+  float blk = smoothstep(th0 - .04, th0 + .12, m) * smoothstep(0., .5, uFrz.x);
+  fGb = blk; fG = blk * (.36 + .22 * T.r);
+  fGe = blk * (1. - smoothstep(th0 + .06, th0 + .3, m)) * .6;
+  vec2 e = vec2(.004, 0.), gr = vec2(texture2D(tFrz, q + e).r - texture2D(tFrz, q - e).r, texture2D(tFrz, q + e.yx).r - texture2D(tFrz, q - e.yx).r);
+  return texture2D(tGun, uv + gr * .06 * blk);
+}
+// after the grade: the ice's own body (blue-grey, paler where light comes through it), the frost white on the thick of it, bubbles,
+// old cracks, the front of the ice as it closes in, a piece's broken edge as it flies, the block's edge, the presses' cracks and white
+vec3 fzLook(vec3 c){
+  // (where the hands are shut in their block, the block stands for the shell: what is in it stays in sight, bent and cold)
+  float th = clamp(max(fTh * (1. - fGb * .6), fG), 0., 1.);
+  float l = dot(c, vec3(.2126, .7152, .0722));
+  vec3 iceC = mix(vec3(.36, .43, .49), vec3(.76, .82, .86), smoothstep(0., .65, l));
+  c = mix(c, iceC * (.5 + .65 * l) + vec3(.03, .04, .05), th * .55);
+  vec3 wh = vec3(.86, .89, .91);
+  float fr = fFr * smoothstep(.28, .85, fTh) * (1. - fGb * .75);
+  float thk = smoothstep(.3, .85, fTh);
+  c = mix(c, vec3(.74, .78, .81) * (.75 + .35 * l), smoothstep(.6, 1., th) * .3);   // (the thick of it, at the edges: whiter)
+  c += wh * (fr * .55 + fBu * .2 * fTh + fCr * .16 * thk + fG * fCr * .3) + wh * (fFront * .35 + fEd * .55 * fM + fGe * .5);
+  return mix(c, wh, clamp(fCl * .55 + fTap * .8 + uFrzW.x * th * .22, 0., .9));
+}
 void main(){
   vec2 uv = vUv, cc = uv - .5;
   bool wat = uWat.x > .5 || uWatT.y > .001 || uWatT.w > .001;
   if (wat) uv = wBend(uv);
+  // frozen solid: the shell of ice the view is seen through
+  bool frz = uFrz.x > .001 || uFrz.y >= 0.;
+  if (frz) uv = fzPrep(uv);
   vec3 c = world(uv);
+  if (frz && fTh > .03) c = fzBlur(uv, c);
   float lum = dot(c, vec3(.2126, .7152, .0722));
   vec3 aoS = texture2D(tAO, uv).rgb;
   c *= mix(1., aoS.r, aoAmt * (1. - smoothstep(.6, 5., lum) * .7));
@@ -272,6 +391,7 @@ void main(){
   if (uWat.x > .5) c = wView(uv, c);
   if (gunOn > .5) {
     vec4 g = texture2D(tGun, uv);
+    if (frz) g = fzGun(uv, g);
     // what is held, under the water: the same colour of the water on it, the same web of light playing over it
     if (wUnder > .001) {
       float k = 1. + (wCaus(uv * vec2(res.x / res.y, 1.) * 4.5, uWatT.x) * 1.6 - .5) * .45 * uWatD.z;
@@ -295,6 +415,7 @@ void main(){
   float vr = length(cc * vec2(1., res.y / res.x * 1.25)), v = exp(-vr * vr * 1.1);
   c *= mix(1., mix(.82, 1., v), grade * mix(1., .45, smoothstep(.5, .95, l)));
   c += (hash(gl_FragCoord.xy + fract(time) * 917.) - .5) * .009 * (1. - l * .6) * grade;
+  if (frz) c = fzLook(c);
   c = max(c, 0.);
   gl_FragColor = vec4(mix(c * 12.92, pow(c, vec3(1. / 2.4)) * 1.055 - .055, step(.0031308, c)), 1.);
 }`;
@@ -313,12 +434,56 @@ void main(){
   float r = exp(-e1 * 11.) * .72 + exp(-e2 * 15.) * .28;
   gl_FragColor = vec4(r, fb(uv, 5., 31.), fb(uv, 7., 41.), 1.);
 }`;
+  // the shell of ice's pattern (Post.frost), baked once: r the relief of its faces (slow swells and the ridges where it froze in
+  // layers), g frost - fern frost: needles grown along a slowly turning grain, each with twigs off it at 50-60 degrees, in two sizes,
+  // patchy - b small bubbles frozen in, a old cracks (the edges of large cells, broken off in places)
+  const FROST_FS = `precision highp float; varying vec2 vUv;
+float hs(vec2 p){ vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+float vn(vec2 uv, float P, float s){ vec2 x = uv * P, i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
+  return mix(mix(hs(mod(i, P) + s), hs(mod(i + vec2(1., 0.), P) + s), f.x), mix(hs(mod(i + vec2(0., 1.), P) + s), hs(mod(i + 1., P) + s), f.x), f.y); }
+float fb(vec2 uv, float P, float s){ return vn(uv, P, s) * .5 + vn(uv, P * 2., s + 3.) * .28 + vn(uv, P * 4., s + 7.) * .14 + vn(uv, P * 8., s + 9.) * .08; }
+// fern frost: in each cell a needle through a point, along the grain there (a slowly turning direction over the tile) with a cell's own
+// slant, twigs off it on both sides, shorter toward its tip; some cells bare
+float fern(vec2 uv, float P, float s, float w){
+  vec2 x = uv * P, i = floor(x), f = fract(x); float acc = 0.;
+  for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++) {
+    vec2 o = vec2(float(z), float(y)), c = mod(i + o, P);
+    if (hs(c + s + 8.8) < .3) continue;
+    vec2 sp = o + .5 + (vec2(hs(c + s), hs(c + s + 7.7)) - .5) * .8, d = f - sp;
+    float g = (vn((i + o + .5) / P, 3., s + 2.) - .5) * 7. + (hs(c + s + 3.3) - .5) * .9;
+    vec2 dir = vec2(cos(g), sin(g)), nr = vec2(-dir.y, dir.x);
+    float along = dot(d, dir), perp = dot(d, nr), len = .55 + .6 * hs(c + s + 5.1);
+    float fade = 1. - smoothstep(len * .55, len, abs(along));
+    float spine = exp(-abs(perp) * w) * fade;
+    // twigs: off the spine every st, leaning forward 55 degrees, one side or both
+    float st = .06 + .05 * hs(c + s + 9.1), a0 = along - abs(perp) * .7, a0q = floor(a0 / st) * st, rs = a0 - a0q;
+    float bd = min(rs, st - rs) * .82, bl = (len - abs(a0q)) * .32 * (.6 + .4 * hs(vec2(a0q, c.x) + s));
+    float br = exp(-bd * w * 1.15) * step(abs(perp) * 1.22, bl) * fade * step(.25, hs(vec2(a0q * 13., c.y) + s + sign(perp)));
+    acc = max(acc, max(spine, br * .8) * (.55 + .45 * hs(c + s + 1.9)));
+  }
+  return acc;
+}
+float cells(vec2 uv, float P, float s){ vec2 x = uv * P, i = floor(x), f = fract(x); float d1 = 9., d2 = 9.;
+  for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++) { vec2 o = vec2(float(z), float(y)), c = mod(i + o, P); float d = length(o + .2 + .6 * vec2(hs(c + s), hs(c + s + 7.7)) - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; }
+  return d2 - d1; }
+void main(){
+  vec2 uv = vUv;
+  float sw = fb(uv, 3., 11.), rd = 1. - abs(fb(uv, 6., 17.) * 2. - 1.);
+  float rel = sw * .7 + rd * rd * .3;
+  float pch = smoothstep(.35, .7, fb(uv, 4., 23.));
+  float fr = max(fern(uv, 14., 1., 95.), fern(uv, 27., 21., 120.) * .75) * (.35 + .65 * pch);
+  vec2 x = uv * 34., i = floor(x), f = fract(x) - .5 - (vec2(hs(i + 61.), hs(i + 67.)) - .5) * .5;
+  float rb = .05 + .1 * hs(i + 71.), d = length(f), bub = step(.72, hs(i + 77.)) * (smoothstep(rb, rb * .7, d) * .25 + exp(-pow((d - rb * .85) / (rb * .2), 2.)) * .75);
+  float e = cells(uv + (vec2(fb(uv, 3., 5.), fb(uv, 3., 9.)) - .5) * .1, 5., 3.);
+  float ck = exp(-e * 70.) * step(.4, vn(uv, 6., 13.));
+  gl_FragColor = vec4(rel, fr, bub, ck);
+}`;
   const Post = G.Post = { active: false, ao: true, bloom: true, msaa: 4, set: { aoAmt: 0.75, aoRadius: 0.75, aoStrength: 1, bloomAmt: 0.07, thresh: 0.95, grade: 1, gain: 1.2, mblur: 0.5, cav: 0.7, air: 0.02 } };
   Post.mblurOn = () => !!(G.save && G.save.data && G.save.data.settings.motionBlur !== false); // (the setting: on unless turned off)
   Post.stats = { n: 0, ms: 0 }; // (warm draws: how many, how long)
   let R = null, quad, cam, scn, rtScene, rtGun, rtAO, rtAO2, rtPip, pipSize = 0, mips = [], W = 0, H = 0, curMsaa = -1;
   const mk = (fs, u) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: fs, uniforms: u, depthTest: false, depthWrite: false });
-  let mAO, mBlur, mPre, mDown, mUp, mFin, mPip, mCaus;
+  let mAO, mBlur, mPre, mDown, mUp, mFin, mPip, mCaus, mFrostB;
   const draw = (mat, target) => { quad.material = mat; R.setRenderTarget(target); R.render(scn, cam); };
   const col = new THREE.Color(), v2 = new THREE.Vector2();
 
@@ -335,8 +500,10 @@ void main(){
     mFin = mk(FIN_FS, { tScene: T(), tGun: T(), gunOn: { value: 0 }, tAO: T(), tBloom: T(), time: { value: 0 }, aoAmt: { value: 1 }, bloomAmt: { value: 0.05 }, exposure: { value: 1 }, res: V2(), grade: { value: 1 }, tDepth: T(), reproj: M4(), mblur: { value: 0 }, cavAmt: { value: 0 }, airK: { value: 0 }, projInv: M4(),
       aL: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, aC: { value: Array.from({ length: 12 }, () => new THREE.Vector4(1, 1, 1, 10)) },
       uWat: { value: new THREE.Vector4() }, uWatT: { value: new THREE.Vector4() }, uWatD: { value: new THREE.Vector4(0.3, 0, 0, 0) }, uWatC: { value: new THREE.Color() }, uWatL: { value: new THREE.Color() }, uWatA: { value: new THREE.Color() }, uWatS: { value: new THREE.Vector3(0, -1, 0) }, uWatO: { value: new THREE.Vector4() },
-      uCamW: M4(), uCamP: { value: new THREE.Vector3() }, uVP: M4(), tCaus: T() });
+      uCamW: M4(), uCamP: { value: new THREE.Vector3() }, uVP: M4(), tCaus: T(),
+      uFrz: { value: new THREE.Vector4(0, -1, 0, 1) }, uFrzW: { value: new THREE.Vector4() }, uFrzC: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) }, tFrz: T() });
     mCaus = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: CAUS_FS, depthTest: false, depthWrite: false });
+    mFrostB = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FROST_FS, depthTest: false, depthWrite: false });
   };
   // the web of light's pattern, baked once (a tile 256 wide, repeating): r the bright edges where cells meet, bent; g, b smooth noise
   let rtCaus = null;
@@ -347,6 +514,15 @@ void main(){
     return rtCaus;
   }
   Post.caustics = () => (bakeCaus() ? rtCaus.texture : null);
+  // the shell of ice's pattern (frozen solid), baked once (a tile 512 wide, repeating)
+  let rtFrost = null;
+  function bakeFrost() {
+    if (rtFrost || !R) return rtFrost;
+    rtFrost = new THREE.WebGLRenderTarget(512, 512, { depthBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
+    draw(mFrostB, rtFrost);
+    return rtFrost;
+  }
+  Post.frostTex = () => (bakeFrost() ? rtFrost.texture : null);
   const hdr = (w, h, o) => new THREE.WebGLRenderTarget(w, h, Object.assign({ type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }, o || {}));
   Post.resize = function () {
     if (!R) return;
@@ -390,6 +566,7 @@ void main(){
     if (!Post.active || !rtScene) return;
     const prev = R.getRenderTarget();
     try { bakeCaus(); } catch (e) { /* (made when first under the water) */ }
+    try { bakeFrost(); mFin.uniforms.tFrz.value = rtFrost.texture; } catch (e) { /* (made when first frozen) */ }
     try { post(null, false, 0, true); } catch (e) { /* (a driver that will not: the frame then falls back by itself) */ }
     R.setRenderTarget(prev);
   };
@@ -470,6 +647,13 @@ void main(){
       u.uCamW.value.copy(camera.matrixWorld); u.uCamP.value.setFromMatrixPosition(camera.matrixWorld); u.projInv.value.copy(camera.projectionMatrixInverse);
       u.uVP.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     } else { u.uWat.value.x = 0; u.uWatT.value.y = 0; u.uWatT.value.w = 0; }
+    // frozen solid (pstatus.js): the shell of ice, how far closed, breaking away, the cracks of the presses of jump
+    const Fz = Post.frost;
+    if (Fz && camera && !warming && Post.frostTex()) {
+      const q = G.save && G.save.data && G.save.data.settings;
+      u.tFrz.value = rtFrost.texture; u.uFrz.value.set(Fz.k, Fz.thaw, time % 600, q && q.quality === 'high' ? 2 : 1); u.uFrzW.value.set(Fz.cloud, 0, 0, 0);
+      for (let i = 0; i < 6; i++) { const t = Fz.taps[i], c = u.uFrzC.value[i]; if (t) c.set(t.x, t.y, t.age, t.s); else c.set(0, 0, 0, 0); }
+    } else u.uFrz.value.set(0, -1, 0, 1);
     if (warming) u.airK.value = 0; else airLights(camera, time);
     draw(mFin, warming ? rtAO2 : null);
   }

@@ -270,6 +270,9 @@
       const w = G.world, S = G.save.data.settings, st = this.stats;
       const t = G.game.time;
       if (this.dead) return this.updateDeadCam(dt);
+      // frozen solid (凍結, element.js): only the look. A fresh press of jump cracks the ice; every other input of this frame is held
+      // back (input.js I.hold: the weapons, the skills, the items, the bag read nothing pressed), jump too, once its press is taken here
+      if (this.elFrozen > 0) { const tap = I.hit('jump'); I.hold(); if (tap && G.Elem) G.Elem.tapFrozen(); }
       this.updateLook(dt);
       // timers
       this.coyote -= dt; this.jumpBuf -= dt; this.grappleCd = Math.max(0, this.grappleCd - dt);
@@ -548,11 +551,35 @@
       if (d && d.open && py !== undefined && py > d.y && this.pos.y <= d.y && this.vel.y < -3.5 && G.Water) G.Water.splash(V(this.pos.x, d.y, this.pos.z), Math.min(1.2, 0.2 - this.vel.y * 0.08), { silent: false }); // (not the fall back from a hop at the face)
       if (!d || this.pos.y > d.y - 0.3) return;
       this.swimming = true;
+      // (frozen in the water: held where it is, afloat; neither sinking nor drifting)
+      if (this.elFrozen > 0) { this.vel.y = 0; const k = Math.exp(-dt * 4); this.vel.x *= k; this.vel.z *= k; return; }
       const top = d.y - G.SWIM_FLOAT;
       if (I.down('jump')) {
         if (this.pos.y < top - 0.05) this.vel.y = Math.max(this.vel.y, this.vel.y + (G.SWIM_UP - this.vel.y) * Math.min(1, 7 * dt));
         else if (this.vel.y < G.SWIM_HOP * 0.5) { this.vel.y = G.SWIM_HOP; this.grounded = false; if (G.Water) G.Water.splash(this.pos, 0.7, { silent: true }); } // (at the top: a hop out of the water)
       } else if (this.vel.y < -G.SWIM_SINK) this.vel.y = -G.SWIM_SINK; // (the water holds you back as you sink)
+    }
+    // Every action under way is put down at once (frozen solid, element.js; for anything else that must stop the hands): a reload, an item
+    // being used (a heal not yet taken is given back), a throwable being readied or aimed, the item wheel, a hold on something (a chest,
+    // a body, a gate), a queue of items, a slide, a run, the grapple, the bag. Aiming and firing need nothing: they stop with the input.
+    stopActions(why) {
+      const A = G.abilities, IA = G.ItemAnim, GM = G.game;
+      for (const w of this.weapons || []) if (w && w.reloading) { w.reloading = false; w.reloadT = 0; }
+      if (IA && IA.busy && IA.busy()) {
+        const hg = this.healGauge, l = hg && IA.left ? IA.left(hg.id) : null;
+        if (l && l[0] > 0) { IA.abort(); this.healGauge = null; if (G.Inv && G.Inv.give) G.Inv.give(this, 'item', hg.id, 1); if (G.ui.refreshItems) G.ui.refreshItems(); }
+        else if (IA.left && IA.left() && IA.left()[0] <= 0) IA.abort();
+      }
+      if (G.GrenHold && G.GrenHold.active && G.GrenHold.active()) G.GrenHold.putAway(true);
+      if (A) {
+        if (A.press) { if (A.press.wheel && G.ui.itemWheelClose) G.ui.itemWheelClose(); A.press = null; }
+        if (A.cancelUseQueue) A.cancelUseQueue();
+      }
+      if (GM.search && GM.cancelSearch) GM.cancelSearch();
+      if (this.sliding) this.endSlide();
+      this.sprintToggle = false; this.sprinting = false; this._sjRun = false; this.crouchToggle = false;
+      if (this.grapple.state === 'attached' || this.grapple.state === 'firing') this.detachGrapple(false);
+      if (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen()) G.InvUI.close();
     }
     fellInPit() {
       const wf = G.world.fallFrac || 0.15;

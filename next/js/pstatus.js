@@ -133,7 +133,7 @@
     shards.userData.mat = sm;
   }
   PS.warm = function () {
-    ensureDom();
+    ensureDom(); frostDom();
     if (!bvig) { bvig = document.createElement('div'); bvig.id = 'buff-vig'; bvig.style.opacity = 0; document.body.appendChild(bvig); }
     ensureBubble();
     if (G.scene && bubble.parent !== G.scene) { G.scene.add(bubble); G.scene.add(shards); }
@@ -253,9 +253,145 @@
     if (G.weapons.vmScene) G.weapons.vmScene.traverse((o) => ghostMesh(o, op));
     if (G.avatar && G.avatar.root) G.avatar.root.traverse((o) => ghostMesh(o, op));
   }
+  // ---- frozen solid (凍結, element.js) ----
+  // The view shut in ice. On medium and high quality the frame draws it (post.js, from Post.frost, set here every frame): the shell
+  // closes in from the edges in 0.3 s; through it the world is bent, clouded and blue-grey, thick and white at the edges and thin in the
+  // middle (the foes stay in sight); the hands and the gun are shut in a block of it. Each press of jump runs a crack out from where it
+  // struck (on a phone the jump button; else a place on the ice toward the edges) and clouds it more, and the view jolts a little.
+  // Thawed, the shell breaks into pieces that fly off the screen and the view is clear at once. On low quality (no frame passes) a
+  // picture of the same is laid over the screen (#frz-vig, painted once at the start) and the cracks are drawn on it. Under it all: 凍結
+  // and the key to press, the time left as a thin bar; on a phone the jump button marked; the hands and the gun a cold white.
+  const FR = { on: false, t: 0, k: 0, thaw: -1, cloud: 0, taps: [] };
+  let frEl = null, frPic = null, frCrk = null, frMsg = null, frBar = null, frKey = null, frJump = null, frCss = false;
+  const FW = 1280, FHt = 720;
+  // (how far toward the edge a point of the screen is: 0 in the middle, 1 at the edges, more in the corners; as post.js has it)
+  const edgeOf = (u, v) => { const ex = Math.abs(u - 0.5) * 2, ey = Math.abs(v - 0.5) * 2; return Math.hypot(ex, ey) * 0.74 * 0.45 + Math.max(ex, ey) * 0.55; };
+  function frostCss() {
+    if (frCss) return; frCss = true;
+    const st = document.createElement('style'); st.id = 'frz-css';
+    st.textContent = `#frz-vig { position: absolute; inset: 0; pointer-events: none; opacity: 0; transform-origin: 50% 50%; --r: 0%;
+  -webkit-mask-image: radial-gradient(ellipse 72% 72% at 50% 50%, transparent var(--r), #000 calc(var(--r) + 18%)); mask-image: radial-gradient(ellipse 72% 72% at 50% 50%, transparent var(--r), #000 calc(var(--r) + 18%)); }
+#frz-vig canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#frz-vig.on { opacity: 1; transition: opacity .15s ease-out; }
+#frz-vig.brk { opacity: 0; transform: scale(1.22); transition: opacity .38s ease-in, transform .38s ease-in; }
+#frz-msg { position: absolute; left: 50%; bottom: 25%; transform: translateX(-50%); min-width: 300px; padding: 9px 22px 10px; text-align: center; pointer-events: none;
+  background: linear-gradient(180deg, rgba(22,26,30,.82), rgba(14,16,19,.86)); border: 1px solid rgba(196,208,216,.45); border-radius: 4px;
+  box-shadow: 0 4px 22px rgba(0,0,0,.55), inset 0 1px 0 rgba(230,236,240,.12); color: #e6eaed; opacity: 0; transition: opacity .15s; }
+#frz-msg.on { opacity: 1; }
+#frz-msg b { font-family: 'Cinzel', 'Noto Sans JP', serif; font-weight: 900; font-size: 19px; letter-spacing: 3px; color: #eef2f4; text-shadow: 0 1px 3px #000; }
+#frz-msg span { font-size: 15px; color: #c9d2d8; margin-left: 8px; }
+#frz-msg kbd { display: inline-block; padding: 1px 8px; margin: 0 4px; border: 1px solid rgba(214,222,228,.6); border-bottom-width: 2px; border-radius: 3px; background: rgba(214,222,228,.1); font-family: inherit; font-size: 14px; color: #f1f4f6; }
+#frz-msg i { display: block; height: 3px; margin-top: 8px; background: rgba(214,222,228,.16); border-radius: 2px; overflow: hidden; }
+#frz-msg i em { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #aebcc6, #e8edf0); transform-origin: 0 50%; }
+#frz-msg.tap b { animation: frzTap .16s ease-out; }
+@keyframes frzTap { 0% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 100% { transform: none; } }
+.mb.frz { border-color: rgba(232,238,242,.95); background: rgba(196,208,216,.3); box-shadow: 0 0 0 3px rgba(214,222,228,.25), 0 2px 10px rgba(0,0,0,.5); animation: frzBtn .7s ease-in-out infinite alternate; }
+@keyframes frzBtn { from { box-shadow: 0 0 0 2px rgba(214,222,228,.2), 0 2px 10px rgba(0,0,0,.5); } to { box-shadow: 0 0 0 7px rgba(214,222,228,.32), 0 2px 10px rgba(0,0,0,.5); } }`;
+    document.head.appendChild(st);
+  }
+  // the picture of the shell, for low quality: the ice's body pale and thick at the edges and thin to the middle, clouded patches, frost
+  // grown from points toward the edges (six arms, branches off each at 60 degrees), bubbles. Painted once (a fixed seed: always the same)
+  function paintFrost(cv) {
+    cv.width = FW; cv.height = FHt;
+    const x = cv.getContext('2d'); let sd = 7919;
+    const R = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    const at = () => { for (let i = 0; i < 30; i++) { const u = R(), v = R(), e = edgeOf(u, v); if (R() < Math.pow(Math.min(1, e), 2.2)) return [u * FW, v * FHt, e]; } return [R() * FW, 0, 1]; };
+    const g = x.createRadialGradient(FW / 2, FHt / 2, FHt * 0.18, FW / 2, FHt / 2, FW * 0.6);
+    g.addColorStop(0, 'rgba(120,134,146,0.06)'); g.addColorStop(0.42, 'rgba(140,154,166,0.2)'); g.addColorStop(0.72, 'rgba(176,188,198,0.58)'); g.addColorStop(1, 'rgba(214,221,226,0.9)');
+    x.fillStyle = g; x.fillRect(0, 0, FW, FHt);
+    for (let i = 0; i < 90; i++) { const [px, py, e] = at(), r = 30 + R() * 110, b = x.createRadialGradient(px, py, 0, px, py, r); b.addColorStop(0, `rgba(226,232,236,${(0.06 + 0.16 * e).toFixed(3)})`); b.addColorStop(1, 'rgba(226,232,236,0)'); x.fillStyle = b; x.fillRect(px - r, py - r, r * 2, r * 2); }
+    x.lineCap = 'round';
+    const grain = (px, py) => Math.sin(px * 0.004 + 1.3) * 2.2 + Math.cos(py * 0.005 - 0.7) * 2.6 + Math.sin((px + py) * 0.0021) * 1.5;
+    for (let i = 0; i < 520; i++) {
+      const [px, py, e] = at(), L = (14 + R() * 46) * (0.55 + Math.min(1, e) * 0.6), an = grain(px, py) + (R() - 0.5) * 0.7, dx = Math.cos(an), dy = Math.sin(an);
+      x.strokeStyle = `rgba(236,240,243,${(0.14 + 0.36 * Math.min(1, e) * (0.4 + 0.6 * R())).toFixed(3)})`; x.lineWidth = 0.6 + R() * 0.9;
+      x.beginPath();
+      { const ox = px - dx * L * 0.5, oy = py - dy * L * 0.5;
+        x.moveTo(ox, oy); x.lineTo(ox + dx * L, oy + dy * L);
+        const sides = R() < 0.6 ? [-1, 1] : [R() < 0.5 ? -1 : 1];
+        for (let s = L * 0.08; s < L * 0.92; s += L * (0.07 + R() * 0.06)) { const bl = (L - s) * (0.22 + R() * 0.14); for (const sg of sides) { const b2 = an + sg * 0.96; x.moveTo(ox + dx * s, oy + dy * s); x.lineTo(ox + dx * s + Math.cos(b2) * bl, oy + dy * s + Math.sin(b2) * bl); } } }
+      x.stroke();
+    }
+    for (let i = 0; i < 160; i++) { const [px, py, e] = at(), r = 1.5 + R() * 4.5; x.strokeStyle = `rgba(232,238,242,${(0.15 + 0.3 * R()).toFixed(3)})`; x.lineWidth = 1; x.beginPath(); x.arc(px, py, r, 0, 6.283); x.stroke(); }
+  }
+  // a crack on the low-quality picture: (u, v) where it struck, its arms run out with a little wander, a ring part-way out, the white
+  function crackAt(u, v, s) {
+    if (!frCrk) return;
+    const x = frCrk.getContext('2d'), px = u * FW, py = v * FHt, L = (0.16 + 0.3 * s) * FHt, R = Math.random;
+    const g = x.createRadialGradient(px, py, 0, px, py, L * 0.55); g.addColorStop(0, 'rgba(230,236,240,0.5)'); g.addColorStop(1, 'rgba(230,236,240,0)'); x.fillStyle = g; x.fillRect(px - L, py - L, L * 2, L * 2);
+    x.strokeStyle = 'rgba(244,247,249,0.85)'; x.lineCap = 'round';
+    for (let k = 0; k < 9; k++) {
+      let an = (k + R() * 0.6) / 9 * 6.283, cx = px, cy = py; const len = L * (0.45 + R() * 0.55);
+      x.lineWidth = 1.6; x.beginPath(); x.moveTo(cx, cy);
+      for (let d = 0; d < len; d += 14) { an += (R() - 0.5) * 0.35; cx += Math.cos(an) * 14; cy += Math.sin(an) * 14; x.lineTo(cx, cy); }
+      x.stroke();
+    }
+    x.lineWidth = 1.1; x.beginPath(); for (let a = 0; a < 6.283; a += 0.25) { if (R() < 0.45) continue; const r = L * (0.38 + R() * 0.06); x.moveTo(px + Math.cos(a) * r, py + Math.sin(a) * r); x.arc(px, py, r, a, a + 0.25); } x.stroke();
+  }
+  function frostDom() {
+    if (frEl) return;
+    frostCss();
+    frEl = document.createElement('div'); frEl.id = 'frz-vig';
+    frPic = document.createElement('canvas'); paintFrost(frPic);
+    frCrk = document.createElement('canvas'); frCrk.width = FW; frCrk.height = FHt;
+    frEl.appendChild(frPic); frEl.appendChild(frCrk); (document.getElementById('canvas-wrap') || document.body).appendChild(frEl); // (over the world, under the HUD)
+    frMsg = document.createElement('div'); frMsg.id = 'frz-msg';
+    frMsg.innerHTML = '<b>凍結</b><span><kbd></kbd>連打で解除</span><i><em></em></i>';
+    frKey = frMsg.querySelector('kbd'); frBar = frMsg.querySelector('em');
+    (G.ui.el && G.ui.el.hud || document.body).appendChild(frMsg);
+  }
+  PS.frostWarm = function () { frostDom(); };
+  // where a press of jump struck the ice: the jump button on a phone, else somewhere on the ice toward the edges
+  function tapSpot() {
+    const b = document.querySelector('#m-btns .mb[data-id="jump"]');
+    if (b && b.offsetParent) { const r = b.getBoundingClientRect(); return [(r.left + r.width / 2) / innerWidth, (r.top + r.height / 2) / innerHeight]; }
+    const a = Math.random() * 6.283, d = 0.55 + Math.random() * 0.35;
+    return [0.5 + Math.cos(a) * d * 0.5, 0.5 + Math.sin(a) * d * 0.5];
+  }
+  // a press of jump while frozen (element.js EL.onFrostTap): a crack from where it struck, the ice clouding, the view jolted
+  PS.frostTap = function () {
+    const [u, v] = tapSpot(), s = 0.6 + Math.random() * 0.4;
+    FR.taps.unshift({ x: u, y: 1 - v, age: 0, s }); if (FR.taps.length > 6) FR.taps.length = 6;   // (post.js: y up)
+    FR.cloud = Math.min(1, FR.cloud + 0.14);
+    if (!(G.Post && G.Post.active)) crackAt(u, v, s);
+    const P = G.player; if (P && P.addShake) P.addShake(0.16);
+    if (frMsg) { frMsg.classList.remove('tap'); void frMsg.offsetWidth; frMsg.classList.add('tap'); }
+  };
+  function updateFrost(dt, P) {
+    const fz = P.elFrozen > 0 && !P.dead, post = !!(G.Post && G.Post.active);
+    if (fz && !FR.on) { frostDom(); FR.on = true; FR.t = 0; FR.thaw = -1; FR.cloud = 0; FR.taps = []; if (frCrk) frCrk.getContext('2d').clearRect(0, 0, FW, FHt); frEl.classList.remove('brk'); }
+    if (!fz && FR.on) { FR.on = false; FR.thaw = 0; FR.k = 1; }
+    if (FR.on) { FR.t += dt; const k = Math.min(1, FR.t / 0.3); FR.k = 1 - Math.pow(1 - k, 2); }
+    else if (FR.thaw >= 0) { FR.thaw += dt; if (FR.thaw > 0.5) { FR.thaw = -1; FR.k = 0; FR.taps = []; } }
+    for (const t of FR.taps) t.age += dt;
+    const show = FR.on || FR.thaw >= 0;
+    if (G.Post) G.Post.frost = show ? FR : null;
+    // low quality: the picture over the screen, closing in from the edges (a shrinking clear oval), breaking off scaled out and faded
+    if (frEl) {
+      const low = show && !post;
+      if (low && FR.on) { frEl.classList.add('on'); frEl.classList.remove('brk'); frEl.style.setProperty('--r', (Math.max(0, 1 - FR.k) * 100).toFixed(1) + '%'); }
+      else if (low && FR.thaw >= 0) { frEl.style.setProperty('--r', '0%'); frEl.classList.add('brk'); frEl.classList.remove('on'); }
+      else if (!low) { frEl.classList.remove('on'); if (!show) frEl.classList.remove('brk'); }
+    }
+    // the word, the key, the time left
+    if (frMsg) {
+      frMsg.classList.toggle('on', FR.on);
+      if (FR.on) {
+        const kn = G.K ? G.K('jump') : 'Space'; if (frKey.textContent !== kn) frKey.textContent = kn;
+        frBar.style.transform = `scaleX(${Math.max(0, Math.min(1, P.elFrozen / (P.frzT0 || 1))).toFixed(3)})`;
+      }
+    }
+    if (!frJump || !frJump.isConnected) frJump = document.querySelector('#m-btns .mb[data-id="jump"]');
+    if (frJump) frJump.classList.toggle('frz', FR.on);
+  }
+  PS.frostState = () => FR;
+  if (G.Elem) G.Elem.onFrostTap = () => PS.frostTap();
+  // (the hands and the gun while frozen: a cold white on them, frost motes off the hand)
+  const FROZEN = { rgb: [0.78, 0.85, 0.9], col: '200,214,224', glow: 0.32, mote: [0.85, 0.9, 0.94] };
   PS.update = function (dt) {
     const P = G.player; if (!P || !P.st) return;
     ensureDom();
+    updateFrost(dt, P);
     const s = P.st, act = [];
     for (const k of ORDER) {
       const v = s[k] > 0 ? s[k] : 0;
@@ -290,7 +426,7 @@
       // the element on you and what a reaction left on you (element.js)
       { const EL = G.Elem, au = EL && EL.playerAura();
         if (au) { const left = Math.max(0, P.au.t - G.game.time), D = EL.BY[au]; want.push({ key: 'el', cls: 'bad st-el', icon: D.icon, name: D.name + '属性', col: D.col, frac: Math.min(1, left / EL.SELF_T), t: left, badge: '' }); }
-        if (P.elFrozen > 0) want.push({ key: 'elfz', cls: 'bad st-el', icon: '🧊', name: '凍結', col: '#9fe0ff', frac: Math.min(1, P.elFrozen), t: P.elFrozen, badge: '' });
+        if (P.elFrozen > 0) want.push({ key: 'elfz', cls: 'bad st-el', icon: '🧊', name: '凍結', col: '#c8d4dc', frac: Math.min(1, P.elFrozen / (P.frzT0 || 1)), t: P.elFrozen, badge: '' });
         if (P.elLeak > 0) want.push({ key: 'ellk', cls: 'bad st-el', icon: '⚡', name: '漏電', col: '#7aa8ff', frac: Math.min(1, P.elLeak / 3), t: P.elLeak, badge: '' });
         if (P.elBrittle > 0) want.push({ key: 'elbr', cls: 'bad st-el', icon: '💔', name: '脆化', col: '#d0b8ff', frac: Math.min(1, P.elBrittle / 5), t: P.elBrittle, badge: '' }); }
       const keep = new Set(want.map((w) => w.key));
@@ -340,7 +476,8 @@
     const look = lookId ? PS.LOOKS[lookId] : null;
     updateLook(lookId, look, dt, t, P, lookTmp);
     updateInvis(dt, t, P);
-    const vis = invOn ? look : top ? PS.DEFS[top] : look;
+    const frozen = P.elFrozen > 0 && !P.dead;
+    const vis = frozen ? FROZEN : invOn ? look : top ? PS.DEFS[top] : look;
     // ---- recolour the held weapon (gun or melee) and the hands ----
     const key = G.weapons.vmKey;
     if (key) {
@@ -348,7 +485,7 @@
       if (vis) { tmpC.setRGB(...vis.rgb); key.color.copy(baseKey).lerp(tmpC, invOn ? 0.7 + Math.sin(t * 12) * 0.15 : 0.55 + Math.sin(t * 6) * 0.1); }
       else key.color.lerp(baseKey, Math.min(1, dt * 6));
     }
-    tintViewmodel(invOn ? lookId : top || lookId, t, dt, invOn || !top ? look : null);
+    if (frozen) tintViewmodel('frozen', t, dt, FROZEN); else tintViewmodel(invOn ? lookId : top || lookId, t, dt, invOn || !top ? look : null);
     const AV = G.avatar;
     if (AV && AV.mats) for (const m of AV.mats) { if (!m.emissive) continue; if (vis) { const k = invOn ? 0.6 + Math.sin(t * 10) * 0.2 : top ? 0.35 : 0.45 + guardT * 0.4; m.emissive.setRGB(vis.rgb[0] * k, vis.rgb[1] * k, vis.rgb[2] * k); } else m.emissive.setRGB(0, 0, 0); }
     // motes rising from the hands / body while a buff look is active
@@ -386,5 +523,7 @@
     if (bubble) { bubble.visible = false; shards.visible = false; }
     const gp = document.getElementById('guard-pop'); if (gp) gp.classList.remove('on');
     guardT = 0; endId = null; ghostK = 0;
+    FR.on = false; FR.thaw = -1; FR.k = 0; FR.taps = []; if (G.Post) G.Post.frost = null;
+    if (frEl) frEl.classList.remove('on', 'brk'); if (frMsg) frMsg.classList.remove('on'); if (frJump) frJump.classList.remove('frz');
   };
 })();

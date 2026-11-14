@@ -89,12 +89,42 @@
     B.inv = inv;
   }
 
+  // frozen solid (凍結 on their own screen, ps & 64): shut in ice - a rime over every part of them and what they hold (the foes' own,
+  // vfx.js rimeMat, as enemies.js coat lays it), a rough lump of clear ice round the whole body, the pose held as it was. When it goes
+  // it breaks off in chips and a cold puff
+  let lumpGeo = null;
+  function iceLump() {
+    if (lumpGeo) return lumpGeo;
+    const g = new THREE.IcosahedronGeometry(1, 2), pa = g.attributes.position;
+    for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), h = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453, k = 0.86 + 0.22 * (h - Math.floor(h)); pa.setXYZ(i, x * k, y * k, z * k); }
+    g.computeVertexNormals(); g.userData.shared = true;
+    return (lumpGeo = g);
+  }
+  function frozenLook(B, rp, on) {
+    if (on === !!B.frz) return;
+    if (on) {
+      const mat = G.vfx && G.vfx.rimeMat; B.frz = [];
+      if (!mat) return;
+      const list = [];
+      B.root.traverse((o) => { if (o.isMesh && o.geometry && !o.userData.rime && !(o.material && (o.material.transparent || o.material.blending === THREE.AdditiveBlending))) list.push(o); });
+      for (const o of list) { const hm = new THREE.Mesh(o.geometry, mat); hm.userData.rime = true; hm.raycast = () => {}; hm.scale.setScalar(1.05); hm.castShadow = false; o.add(hm); B.frz.push(hm); }
+      const lump = new THREE.Mesh(iceLump(), mat); lump.userData.rime = true; lump.raycast = () => {}; lump.castShadow = false;
+      lump.scale.set(0.62, 1.12, 0.62); lump.position.y = 0.98; B.root.add(lump); B.frz.push(lump);
+      G.fx.iceBurst(V(rp.pos.x, rp.pos.y + 1.1, rp.pos.z), 12, 2.4, 1.1);
+    } else {
+      for (const hm of B.frz) if (hm.parent) hm.parent.remove(hm);
+      B.frz = null;
+      if (!rp.dead) G.fx.iceBurst(V(rp.pos.x, rp.pos.y + 1.1, rp.pos.z), 26, 4.2, 1.5);
+    }
+  }
   K.animBody = function (B, rp, dt) {
     if (B.J.orbs) G.avatar.orbTick(B.J, dt, null); // (a mage's orbs keep turning)
     effects(B, rp, dt);
     const J = B.J, k = Math.min(1, dt * 12), t = G.game.time;
     const sp = Math.hypot(rp.vel.x, rp.vel.z), amp = Math.min(1, sp / 5.5), air = !rp.gnd && Math.abs(rp.vel.y) > 0.5;
     holdModel(B, rp);
+    frozenLook(B, rp, !!(rp.ps & 64) && !rp.dead);
+    if (B.frz) return; // (frozen: held in the pose it had)
     if (rp.sw && B.sw === 0) {
       B.sw = 1; B.swT = 0;
       // the swing itself: a short arc in front of them

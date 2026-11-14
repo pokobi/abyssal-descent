@@ -62,6 +62,8 @@
 
   window.addEventListener('keydown', (e) => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+    // (frozen solid: the bag stays shut - its keys open it straight from here, game.js; the menu still opens)
+    if (I.frozen && I.frozen() && ((B.status || []).includes(e.code) || (B.inventory || []).includes(e.code))) { e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (!e.repeat) I.pressed[e.code] = true;
     I.keys[e.code] = true;
     if (I.locked || G.game && (G.game.state === 'playing' || G.game.state === 'buff' || G.game.state === 'inv')) {
@@ -165,12 +167,28 @@
       }).catch(() => {});
     }
   };
+  // ---- a hold on the game's input: the player frozen solid (凍結, element.js), set by player.js at the start of its update. From I.hold()
+  // to the end of that frame every key bound to an action reads as up (pressed, released: none) and the mouse buttons and the wheel as
+  // still; the look (mx, my) goes on, and keys bound to nothing (Esc, the menu's I) too. What the keys and buttons really are is kept and
+  // is back at the end of the frame: a key held all through is still held after, and works again at once. I.frozen: is the player frozen
+  // (the bag's keys are held back too, above)
+  let held = null;
+  I.frozen = () => !!(G.player && G.player.elFrozen > 0 && !G.player.dead);
+  I.holding = () => !!held;
+  I.hold = function () {
+    if (held) return;
+    held = { keys: I.keys, mouse: I.mouse };
+    const mask = (o) => { const r = {}; for (const c in o) if (!bound.has(c)) r[c] = o[c]; return r; };
+    I.keys = mask(I.keys); I.pressed = mask(I.pressed); I.released = mask(I.released);
+    I.mouse = [false, false, false, false, false]; I.mpressed = [false, false, false, false, false]; I.mreleased = [false, false, false, false, false]; I.wheel = 0;
+  };
   I.endFrame = function () {
+    if (held) { I.keys = held.keys; I.mouse = held.mouse; held = null; }
     I.pressed = {}; I.released = {}; I.mx = 0; I.my = 0; I.wheel = 0;
     I.mpressed = [false, false, false, false, false]; I.mreleased = [false, false, false, false, false];
   };
-  I.clear = function () { I.keys = {}; I.mouse = [false, false, false, false, false]; I.endFrame(); };
+  I.clear = function () { held = null; I.keys = {}; I.mouse = [false, false, false, false, false]; I.endFrame(); };
   // after a menu closes: drop edge events and mouse buttons, but keep movement keys that are still physically held
   if (G.save && G.save.data) I.applyBinds(); else bound = new Set(Object.values(B).flat());
-  I.softClear = function () { I.mouse = [false, false, false, false, false]; I.endFrame(); };
+  I.softClear = function () { if (held) held.mouse = [false, false, false, false, false]; I.mouse = [false, false, false, false, false]; I.endFrame(); };
 })();

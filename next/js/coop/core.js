@@ -120,7 +120,7 @@
       pl: P.pileState === 'charge' ? 1 : P.pileState === 'fall' ? 2 : 0, gr: P.grapple && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? 1 : 0,
       bl: (P.buffs.get('z_blades') || 0) * 2 + (P.bladesT > 0 ? P.bladesN || 6 : 0),
       hk: P.grapple && P.grapple.hook && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? [f(P.grapple.hook.x), f(P.grapple.hook.y), f(P.grapple.hook.z)] : 0,
-      ps: (P.st.burn > 0 ? 1 : 0) | (P.st.poison > 0 ? 2 : 0) | (P.st.shock > 0 ? 4 : 0) | (P.st.slow > 0 ? 8 : 0) | (P.invisT > 0 || P.smokeT > 0 ? 16 : 0) | (P.wardT > 0 ? 32 : 0),
+      ps: (P.st.burn > 0 ? 1 : 0) | (P.st.poison > 0 ? 2 : 0) | (P.st.shock > 0 ? 4 : 0) | (P.st.slow > 0 ? 8 : 0) | (P.invisT > 0 || P.smokeT > 0 ? 16 : 0) | (P.wardT > 0 ? 32 : 0) | (P.elFrozen > 0 ? 64 : 0),
       tb: [...P.temps.values()].filter((t) => t.icon).slice(0, 4).map((t) => t.icon).join(''), k: P.cls, bz: P.temps.has('ult_bastion') ? 1 : 0 });
   };
   K.handlers.p = function (m) {

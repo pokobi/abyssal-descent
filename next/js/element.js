@@ -269,9 +269,16 @@
     if (!cur || EL.auraLeft(e) < EL.AURA_T - 1) EL.setAura(e, el, EL.AURA_T); // (kept topped up: re-sent to co-op screens once a second at most)
     return true;
   };
-  EL.envPlayer = function (el, wait) {
+  // react (the ground's water and ice, fields.js): water and ice on you together freeze you there as they would a foe (EL.freezePlayer);
+  // in the grace after a thaw the new one only takes the other's place. No other pair reacts from the ground or the sky
+  EL.envPlayer = function (el, wait, react) {
     if (!P || P.dead || !el || !EL.BY[el] || !EL.BY[el].aura) return false;
     const cur = EL.playerAura(), now = G.game.time, dur = EL.SELF_T * Math.max(0.1, 1 - sx('elSelfT'));
+    if (react && cur && cur !== el && (pair(cur, el) || {}).id === 'freeze') {
+      if (EL.freezePlayer()) return true;
+      if (P.elFrozen > 0) return false;
+      P._envBare = 0; P.au = { el, t: now + dur }; return true;
+    }
     if (cur && cur !== el && !(el === 'water' && cur === 'fire')) { P._envBare = 0; return false; }
     if (!cur && wait) { if (!P._envBare) { P._envBare = now; return false; } if (now - P._envBare < wait) return false; }
     P._envBare = 0;
@@ -502,7 +509,7 @@
     EL.tickPlayer(dt);
     EL.bossTick();
   };
-  EL.clear = function () { for (const c of EL.crystals) { if (G.scene) G.scene.remove(c.m); } EL.crystals.length = 0; if (P) { P.au = null; P.elFrozen = 0; P.elLeak = 0; P.elBrittle = 0; } };
+  EL.clear = function () { for (const c of EL.crystals) { if (G.scene) G.scene.remove(c.m); } EL.crystals.length = 0; if (P) { P.au = null; if (P.elFrozen > 0) EL.thawPlayer(true); P.elFrozen = 0; P.frzEl = 0; P.frzGrace = 0; P.elLeak = 0; P.elBrittle = 0; } };
 
   // ---------------------------------------------------------------- the player's side
   EL.playerAura = () => (P && P.au && P.au.t > G.game.time ? P.au.el : null);
@@ -516,24 +523,65 @@
     if (cur === el) { P.au.t = G.game.time + dur; return mul; }
     const r = pair(cur, el);
     if (!r) return mul;
+    // (frozen already, or the grace after a thaw: no freeze; the blow's element takes the other's place)
+    if (r.id === 'freeze' && !EL.canFreeze()) { if (!(P.elFrozen > 0)) P.au = { el, t: G.game.time + dur }; return mul; }
     P.au = null;
     const soft = Math.max(0.1, 1 - sx('elSelfRes'));
     const res = Math.max(EL.selfRes(cur), EL.selfRes(el));
     const sc = 1 + 0.1 * Math.max(0, (G.game.area || 1) - 1);
     const rx = EL.RX[r.id];
-    G.ui.toastSmall(`${EL.BY[cur].icon}${EL.BY[el].icon} ${rx.name}`);
+    if (r.id !== 'freeze') G.ui.toastSmall(`${EL.BY[cur].icon}${EL.BY[el].icon} ${rx.name}`); // (frozen: the screen says it, pstatus.js)
     switch (r.id) {
       case 'boil': case 'thaw': mul *= 1 + ((r.amp >= 2 ? 1.5 : 1.3) - 1) * soft; break;
-      case 'freeze': P.elFrozen = 1; G.sfx.ice(P.pos); break;
+      case 'freeze': EL.freezePlayer(); break;
       case 'blast': setTimeout(() => { if (P && !P.dead) C.damagePlayer(20 * sc * (1 - res) * soft, { src: 'react', fixed: true }); }, 0); P.addShake(0.4); break;
       case 'leak': P.elLeak = 3; P.elLeakK = 4 * sc * (1 - res) * soft; P.elLeakT = 0.5; break;
       case 'brittle': P.elBrittle = 5; break;
     }
     return mul;
   };
+  // ---------------------------------------------------------------- frozen solid
+  // Water and ice on you together freeze you, as they freeze a foe: from a blow that brings the other one, or from the ground (wet,
+  // stepping out onto ice; on ice, going into water), anywhere. For T s you can only look about: player.js holds every other input for
+  // the frame (G.input.hold) and puts down whatever was under way (P.stopActions). Each fresh press of jump cracks the ice: TAP s off,
+  // but it never ends before MIN of its whole length. Thawed, GRACE s in which nothing freezes you again (elements still land). No
+  // shatter on you: the blows land as they would. What it looks like: pstatus.js (and post.js); on the other screens: coop/body.js.
+  EL.PFZ = { T: 2.8, TAP: 0.22, MIN: 0.5, GRACE: 2 };
+  const sfx = (k, a, alt) => { const f = G.sfx && G.sfx[k]; if (f) f(a); else if (alt) alt(); }; // (a sound of the ice when audio.js has it, else the plain ice)
+  EL.canFreeze = () => !!P && !P.dead && !(P.elFrozen > 0) && !(P.invulnT > 0) && G.game.time >= (P.frzGrace || 0);
+  EL.freezePlayer = function () {
+    if (!EL.canFreeze()) return false;
+    const F = EL.PFZ;
+    P.au = null; P.elFrozen = F.T; P.frzT0 = F.T; P.frzEl = 0; P.frzTaps = 0;
+    if (P.stopActions) P.stopActions('freeze');
+    sfx('frostCrack', 1, () => G.sfx.ice(P.pos)); sfx('frostMuffle', true);
+    if (G.fx.iceBurst) G.fx.iceBurst(P.chestPos(), 16, 2.4, 1.1);
+    if (EL.onPlayerFreeze) EL.onPlayerFreeze(true);
+    return true;
+  };
+  // a fresh press of jump while frozen
+  EL.tapFrozen = function () {
+    if (!P || !(P.elFrozen > 0)) return;
+    const F = EL.PFZ;
+    P.elFrozen = Math.max(P.elFrozen - F.TAP, P.frzT0 * F.MIN - P.frzEl, 0);
+    P.frzTaps = (P.frzTaps || 0) + 1;
+    sfx('frostCrack', 0.45 + Math.min(0.4, P.frzTaps * 0.04), () => G.sfx.ice(P.pos));
+    if (EL.onFrostTap) EL.onFrostTap();
+    if (P.elFrozen <= 0) EL.thawPlayer();
+  };
+  EL.thawPlayer = function (quiet) {
+    if (!P) return;
+    const was = P.elFrozen > 0 || P.frzEl > 0;
+    P.elFrozen = 0; P.frzEl = 0;
+    if (!was) return;
+    P.frzGrace = G.game.time + EL.PFZ.GRACE;
+    sfx('frostMuffle', false);
+    if (!quiet && !P.dead) { sfx('frostBreak', undefined, () => G.sfx.ice(P.pos)); if (G.fx.iceBurst) G.fx.iceBurst(P.chestPos(), 30, 4.5, 1.5); }
+    if (EL.onPlayerFreeze) EL.onPlayerFreeze(false);
+  };
   EL.tickPlayer = function (dt) {
     if (!P) return;
-    if (P.elFrozen > 0) P.elFrozen -= dt;
+    if (P.elFrozen > 0) { if (P.dead) EL.thawPlayer(true); else { P.elFrozen -= dt; P.frzEl = (P.frzEl || 0) + dt; if (P.elFrozen <= 0) EL.thawPlayer(); } }
     if (P.elBrittle > 0) P.elBrittle -= dt;
     if (P.elLeak > 0) {
       P.elLeak -= dt; P.elLeakT -= dt;

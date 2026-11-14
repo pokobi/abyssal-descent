@@ -139,7 +139,8 @@
       if (!el && ice && P.grounded && onIce(w, P.pos, P.hw - 0.02)) el = 'ice';
       if (el) {
         if (el === 'water' && P.st.burn > 0) { P.st.burn = 0; G.fx.smoke && G.fx.smoke(P.pos.clone().setY(P.pos.y + 0.5), 6, 0.6, 0x9aa4aa, 0.5, 0.8); }
-        if (EL.envPlayer(el) && !seen.k['el:' + el]) { seen.k['el:' + el] = true; G.ui.toastSmall(ELTIP[el]); }
+        // (water and ice from the ground freeze you if the other is on you, element.js; the rest is only laid on)
+        if (EL.envPlayer(el, 0, el === 'water' || el === 'ice') && !seen.k['el:' + el]) { seen.k['el:' + el] = true; G.ui.toastSmall(ELTIP[el]); }
       }
     }
     for (const e of G.enemies.list) {

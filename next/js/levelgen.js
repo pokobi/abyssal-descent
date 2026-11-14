@@ -895,8 +895,8 @@
   // ---- a ceiling of timber coffers (F.ceiling): between its great beams along x (zs: their middles along z, each 0.7 wide), joists of
   // dark wood along z every step in x, framed into the beams, each with a fillet either side where it meets the boards, so that the flat
   // of the ceiling is a grid of sunk panels. Drawn only (nothing thrown); under the slab at y
-  function coffers(w, x0, z0, x1, z1, y, zs, step, only) {
-    // (only: [xa, xb] - the joists only there, where the ceiling is seen)
+  function coffers(w, x0, z0, x1, z1, y, zs, step, only, frost) {
+    // (only: [xa, xb] - the joists only there, where the ceiling is seen; frost: a frozen hall's, hoarfrost and icicles on them)
     const M = mason(w), ay = w._atY || 0, Y = y + ay, xs = []; for (let x = x0 + step; x < x1 - step * 0.5; x += step) if (!only || (x > only[0] && x < only[1])) xs.push(x);
     const ze = [z0, ...zs, z1].sort((p, q) => p - q);
     _tagged('ceiling', () => {
@@ -907,10 +907,224 @@
         const Q = [[[x - 0.15, Y - 0.4, a], [x + 0.15, Y - 0.4, a], [x + 0.15, Y - 0.4, b], [x - 0.15, Y - 0.4, b], D, c]];
         for (const sg of [-1, 1]) { const xs = x + sg * 0.15; Q.push([[xs, Y - 0.4, a], [xs, Y - 0.12, a], [xs, Y - 0.12, b], [xs, Y - 0.4, b], [sg, 0, 0], c], [[xs, Y - 0.12, a], [xs + sg * 0.1, Y + 0.005, a], [xs + sg * 0.1, Y + 0.005, b], [xs, Y - 0.12, b], [sg * 0.7, -0.7, 0], c2]); }
         M.quads('woodDark', Q, 1.2);
+        if (frost) joistFrost(w, M, x, a, b, Y - 0.4);
       }
     });
   }
   LG.coffers = coffers;
+  // ================================================================ ice and frost in a frozen hall
+  // The ice is the hall's own (the sheaths' and the lake's: w.mats.vc.ice - pale blue, a little see-through, its relief and gloss from
+  // the ice picture), coloured point by point: whiter where it is thick or at an edge, bluer where it is thin. A curtain of it on a wall
+  // in a thinner make of the same (icecurtain: more see-through, the stone showing through where it is thin). Hoarfrost (rime) white and
+  // matte, thickest under the beams, fading up their sides into the dark of the wood. Everything here is drawn only.
+  const iceMk = (M, w, kind) => {
+    if (kind === 'ice') return 'ice';
+    if (M.mat[kind]) return kind;
+    let m;
+    if (kind === 'icecurtain') { m = ((w.mats.vc && w.mats.vc.ice) || w.mats.ice).clone(); m.vertexColors = true; m.transparent = true; m.opacity = 0.7; }
+    else { const im = w.mats.ice || {}; m = new THREE.MeshStandardMaterial({ normalMap: im.normalMap || null, color: 0xd8e0e6, roughness: 0.93, metalness: 0, vertexColors: true }); if (m.normalMap) m.normalScale.set(0.9, 0.9); m.envMapIntensity = 0.15; }
+    m.name = kind; M.mat[kind] = m; return kind;
+  };
+  // an icicle: a ring at its root (radius 1, y 0) narrowing through a waist (its ring turned half a side) to its point (y -1); four
+  // sides, no top (it hangs from something). Shared
+  let _icl = null;
+  const icicleGeo = () => {
+    if (_icl) return _icl;
+    const P = [], I = [], n = 4;
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; P.push(Math.cos(a), 0, Math.sin(a)); }
+    for (let i = 0; i < n; i++) { const a = (i + 0.5) / n * Math.PI * 2; P.push(Math.cos(a) * 0.42, -0.38, Math.sin(a) * 0.42); }
+    P.push(0, -1, 0);
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; I.push(i, j, n + i, j, n + j, n + i, n + i, n + j, 2 * n); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+    // (wound to face out: flipped if it came the other way)
+    const p = g.attributes.position, nr = g.attributes.normal; if (nr.getX(0) * p.getX(0) + nr.getZ(0) * p.getZ(0) < 0) { const ix = g.index.array; for (let k = 0; k < ix.length; k += 3) { const t = ix[k + 1]; ix[k + 1] = ix[k + 2]; ix[k + 2] = t; } g.computeVertexNormals(); }
+    return (_icl = g);
+  };
+  const _icm = new THREE.Matrix4(), _icq = new THREE.Quaternion(), _ice = new THREE.Euler(), _icv = new THREE.Vector3(), _ics = new THREE.Vector3();
+  // one icicle of the hall's ice hanging from (x, y, z): its root r wide, len long, leaning a little (by the place)
+  function icicle(M, x, y, z, r, len, k) {
+    const h = (j) => _hn(x * 3.1 + j, z * 2.7 + y, 90 + k + j);
+    _ice.set((h(1) - 0.5) * 0.12, h(2) * 6.3, (h(3) - 0.5) * 0.12); _icq.setFromEuler(_ice);
+    _icm.compose(_icv.set(x, y, z), _icq, _ics.set(r, len, r));
+    const t = 0.9 + 0.1 * h(4);
+    M.geo('ice', icicleGeo(), _icm, { tint: [t * 0.97, t, t], gy: y - 30, world: true, uv: 0.8, one: true });
+  }
+  // (a triangle of a list P, wound so that f(its normal) >= 0)
+  const putTri = (P, I, a, b, c, f) => { const ux = P[b * 3] - P[a * 3], uy = P[b * 3 + 1] - P[a * 3 + 1], uz = P[b * 3 + 2] - P[a * 3 + 2], vx = P[c * 3] - P[a * 3], vy = P[c * 3 + 1] - P[a * 3 + 1], vz = P[c * 3 + 2] - P[a * 3 + 2];
+    if (f(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) >= 0) I.push(a, b, c); else I.push(a, c, b); };
+  // the colour of rime as it thins into dark wood (the rime's colour times this comes to the wood's)
+  const RIMEWOOD = [0.08, 0.066, 0.056];
+  // ---- hoarfrost on the beams of a frozen ceiling (F.ceiling o.frost; the beams x0..x1 at each z of zs, 0.7 wide, 0.7 deep under y):
+  // in patches along them, a gap between now and then, its ends ragged; white under them, up their sides from the lower edge a little
+  // way and fading out into the wood by a ragged line - most of the wood dark still. A few icicles of very different lengths off their
+  // lower edges, the long ones toward the walls where the cold comes in
+  function beamFrost(w, x0, x1, y, zs) {
+    const M = mason(w), mk = iceMk(M, w, 'rime'), ay = w._atY || 0, Y = y + ay, hw = 0.35, dp = 0.7;
+    _tagged('ceiling', () => {
+      for (const z of zs) {
+        const Q = [], hb = (x, k) => _hn(x * 1.7 + z, z * 0.31 + k, 93 + k);
+        let s = x0;
+        while (s < x1 - 0.05) {
+          const e = Math.min(x1, s + 0.6 + 1.3 * hb(s, 1));
+          if (hb(s, 2) < 0.7) {
+            // (its four corners each its own: the ends cut aslant and not alike, the white thicker here, thinner there)
+            const yb = Y - dp - 0.01 - 0.015 * hb(s, 3), cc = (q) => { const k = 0.6 + 0.3 * hb(s + q, 4); return [k * 0.95, k * 0.98, k]; };
+            const xa = [s + 0.04 + 0.3 * hb(s, 5), s + 0.04 + 0.3 * hb(s, 6)], xb = [e - 0.04 - 0.3 * hb(e, 7), e - 0.04 - 0.3 * hb(e, 8)];
+            if (Math.min(xb[0] - xa[0], xb[1] - xa[1]) > 0.15) {
+              const C4 = [cc(1), cc(2), cc(3), cc(4)];
+              // (thickest on the lower edges: a strip in from each along the underside, white at the edge and fading into the wood toward
+              // the middle, and up the side from it, fading the same way)
+              [-1, 1].forEach((sg, q) => {
+                const zz = z + sg * (hw + 0.01), zi = (x, k) => z + sg * (hw - 0.07 - 0.13 * hb(x, 12 + k + sg)), up = (x, k) => Y - dp + 0.03 + 0.17 * hb(x, 9 + k + sg), ca = C4[q ? 3 : 0], cb = C4[q ? 2 : 1];
+                Q.push([[xa[q], yb, zz], [xb[q], yb, zz], [xb[q], yb + 0.004, zi(xb[q], 1)], [xa[q], yb + 0.004, zi(xa[q], 0)], [0, -1, 0], [ca, cb, RIMEWOOD, RIMEWOOD]]);
+                Q.push([[xa[q], yb, zz], [xb[q], yb, zz], [xb[q], up(xb[q], 1), zz], [xa[q], up(xa[q], 0), zz], [0, 0, sg], [ca, cb, RIMEWOOD, RIMEWOOD]]);
+              });
+            }
+          }
+          s = e;
+        }
+        M.quads(mk, Q, 1.1);
+        let x = x0 + 1 + 2 * hb(x0, 9), i = 0;
+        while (x < x1 - 0.6) {
+          const r = hb(x, 10), sg = hb(x, 11) < 0.5 ? -1 : 1, edge = Math.min(x - x0, x1 - x) < 4 ? 1 : 0;
+          const len = 0.25 + 1.5 * r * r * r + 0.6 * edge * hb(x, 12);
+          icicle(M, x, Y - dp - 0.02, z + sg * (hw - 0.04 - 0.05 * hb(x, 14)), 0.04 + 0.03 * hb(x, 15) + len * 0.03, len, i++);
+          x += 2.2 + 3.3 * hb(x, 16);
+        }
+      }
+    });
+  }
+  LG.beamFrost = beamFrost;
+  // the same on a joist of the coffers (x, a..b along z, its underside at yb): sparser, now and then an icicle
+  function joistFrost(w, M, x, a, b, yb) {
+    const mk = iceMk(M, w, 'rime'), h = (q, k) => _hn(x * 0.9 + q, q * 1.3, 97 + k), Q = [];
+    let s = a;
+    while (s < b - 0.05) {
+      const e = Math.min(b, s + 0.9 + 1.5 * h(s, 1));
+      if (h(s, 2) < 0.45) {
+        const y0 = yb - 0.012, k = 0.66 + 0.2 * h(s, 3), cw = [k * 0.96, k * 0.99, k], sa = s + 0.1 + 0.2 * h(s, 4), ea = e - 0.1 - 0.2 * h(e, 5);
+        if (ea - sa > 0.2) for (const sg of [-1, 1]) {
+          Q.push([[x + sg * 0.16, y0, sa], [x + sg * 0.16, y0, ea], [x + sg * (0.09 - 0.05 * h(ea, 9 + sg)), y0 + 0.003, ea], [x + sg * (0.09 - 0.05 * h(sa, 9 + sg)), y0 + 0.003, sa], [0, -1, 0], [cw, cw, RIMEWOOD, RIMEWOOD]]);
+          Q.push([[x + sg * 0.16, y0, sa], [x + sg * 0.16, y0, ea], [x + sg * 0.16, yb + 0.03 + 0.08 * h(ea, 6 + sg), ea], [x + sg * 0.16, yb + 0.03 + 0.08 * h(sa, 6 + sg), sa], [sg, 0, 0], [cw, cw, RIMEWOOD, RIMEWOOD]]);
+        }
+      }
+      s = e;
+    }
+    M.quads(mk, Q, 1.1);
+    if (h(a, 8) < 0.35) { const z = a + (b - a) * (0.25 + 0.5 * h(a, 9)), r = h(z, 10); icicle(M, x + (h(z, 11) - 0.5) * 0.2, yb - 0.01, z, 0.03 + 0.02 * r, 0.2 + 0.9 * r * r, 40); }
+  }
+  // ---- the head of a pillar sheathed in ice (fieldgen_t4.js icePillar: the sheath from the floor to about 0.6 of h, its upper edge
+  // ragged, the stone shaft on up to its capital at h): the sheath's own ice built up over its top and on up the shaft in a lumpy
+  // collar - one ice with the sheath - short icicles off its lip; runs of ice up the shaft to the capital, and a crust round the capital's
+  // underside. h: the pillar's height; the shaft 0.5 round
+  function icePillarHead(w, x, z, h) {
+    const M = mason(w), ay = w._atY || 0, Y = ay, n = 16, hh = (a, k) => _hn(x * 1.3 + a, z * 1.7 + k, 101 + k);
+    _tagged('ice', () => {
+      // the collar: rings round the pillar, from over the sheath's lip up the shaft, each a little lumpy and ragged (radius, height)
+      const R = [[0.7, 0.5 * h], [0.82, 0.525 * h], [0.78, 0.56 * h], [0.68, 0.595 * h], [0.58, 0.63 * h], [0.53, 0.665 * h]];
+      const P = [], I = [], C = [];
+      R.forEach(([r, yy], j) => {
+        for (let i = 0; i < n; i++) {
+          const a = i / n * Math.PI * 2, k = 1 + 0.12 * (hh(i, j) - 0.5) * (j ? 1 : 0.3) + 0.08 * Math.sin(a * 3 + x), lift = j >= 3 ? (hh(i, j + 7) - 0.4) * 0.5 * (j - 2) : (hh(i, j + 7) - 0.5) * 0.12;
+          const rr = j === R.length - 1 ? 0.53 : r * k;
+          P.push(x + Math.cos(a) * rr, Y + yy + lift, z + Math.sin(a) * rr);
+          // (whiter where it bulges thickest, a little bluer where it thins up the shaft)
+          const c = (0.9 + 0.1 * hh(i, j + 20)) * (j === 1 || j === 2 ? 1 : j >= 4 ? 0.9 : 0.95); C.push(c * 0.97, c, c);
+        }
+      });
+      for (let j = 0; j + 1 < R.length; j++) for (let i = 0; i < n; i++) { const a = j * n + i, b = j * n + (i + 1) % n, c = a + n, d = b + n; I.push(a, c, b, b, c, d); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+      // (wound outward: a point of the first ring and its normal)
+      { const nr = g.attributes.normal; if ((P[0] - x) * nr.getX(n) + (P[2] - z) * nr.getZ(n) < 0) { const ix = g.index.array; for (let k = 0; k < ix.length; k += 3) { const t = ix[k + 1]; ix[k + 1] = ix[k + 2]; ix[k + 2] = t; } g.computeVertexNormals(); } }
+      g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+      M.geo('ice', g, new THREE.Matrix4(), { tint: [1, 1, 1], gy: Y - 20, world: true, uv: 2, vcol: true });
+      // its lip's icicles, down the outside of the sheath
+      for (let i = 0; i < 6; i++) { const a = (i + hh(i, 30) * 0.6) / 6 * Math.PI * 2, r = 0.74 + 0.06 * hh(i, 31), len = 0.3 + 1.2 * Math.pow(hh(i, 32), 2); icicle(M, x + Math.cos(a) * r, Y + 0.51 * h + 0.1 * hh(i, 34), z + Math.sin(a) * r, 0.05 + 0.04 * hh(i, 35), len, 60 + i); }
+      // the runs up the shaft to the capital: bands hugging it, wandering a little, now wider, now thinner
+      const Q = [];
+      for (let k = 0; k < 4; k++) {
+        const a0 = (k + 0.3 * hh(k, 40)) / 4 * Math.PI * 2, y0 = Y + 0.66 * h, y1 = Y + h - 0.5, rows = 5;
+        for (let j = 0; j < rows; j++) {
+          const ya = y0 + (y1 - y0) * j / rows, yb = y0 + (y1 - y0) * (j + 1) / rows;
+          const at = (q) => a0 + 0.12 * Math.sin(q * 2.1 + k), wd = (q) => 0.07 + 0.08 * _hn(q * 1.9, x + k, 110 + k), th = (q) => 0.035 + 0.03 * _hn(q * 2.3, z + k, 112 + k);
+          const pt = (q, side, out) => { const a = at(q) + side * wd(q) / 0.53, r = 0.5 + (out ? th(q) : 0.005); return [x + Math.cos(a) * r, q, z + Math.sin(a) * r]; };
+          const pA = pt(ya, -1, 1), pB = pt(ya, 1, 1), pC = pt(yb, 1, 1), pD = pt(yb, -1, 1), am = at((ya + yb) / 2);
+          Q.push([pA, pB, pC, pD, [Math.cos(am), 0, Math.sin(am)], [0.97, 1, 1]]);
+          for (const side of [-1, 1]) { const e0 = pt(ya, side, 0), e1 = pt(yb, side, 0), f0 = pt(ya, side, 1), f1 = pt(yb, side, 1), as = am + side * 1.4; Q.push([e0, f0, f1, e1, [Math.cos(as), 0, Math.sin(as)], [0.88, 0.92, 0.95]]); }
+        }
+      }
+      M.quads('ice', Q, 2);
+      // the crust under the capital: a ragged ring of ice under its abacus
+      const Q2 = [], rc = 0.62, yc = Y + h - 0.62;
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2, b = (i + 1) / n * Math.PI * 2, d0 = 0.12 + 0.22 * hh(i, 50), d1 = 0.12 + 0.22 * hh((i + 1) % n, 50);
+        const p = (ang, r, yy) => [x + Math.cos(ang) * r, yy, z + Math.sin(ang) * r];
+        Q2.push([p(a, rc + 0.06, yc - d0), p(b, rc + 0.06, yc - d1), p(b, rc + 0.08, yc + 0.28), p(a, rc + 0.08, yc + 0.28), [Math.cos((a + b) / 2), 0, Math.sin((a + b) / 2)], [[0.95, 0.98, 1], [0.95, 0.98, 1], [0.9, 0.94, 0.96], [0.9, 0.94, 0.96]]]);
+        Q2.push([p(a, 0.5, yc - d0 * 0.6), p(b, 0.5, yc - d1 * 0.6), p(b, rc + 0.06, yc - d1), p(a, rc + 0.06, yc - d0), [0, -1, 0], [0.9, 0.94, 0.97]]);
+      }
+      M.quads('ice', Q2, 2);
+    });
+  }
+  LG.icePillarHead = icePillarHead;
+  // ---- ice run down a wall and frozen there: a curtain of the hall's ice hung on the stone. Its top uneven and so thin that it fades into
+  // the stone; spreading and wandering as it goes down and thickening, in vertical ribs where the water ran most, its two sides thinning
+  // away into the wall too; from its foot the ribs hang on as icicles of different lengths, grown out of it (the same sheet drawn on down
+  // to their points), the longest with a round point of ice under them. wallX: the wall's face, nx: which way it faces (+1, -1); zc,
+  // width: across the wall; y0..y1: the curtain's foot and top (the icicles hang below the foot). Its colour by thickness - bluish and
+  // see-through where thin, clouded white where thick - with how much it lets through (alpha) point by point: one mesh of its own for
+  // all the curtains of the area (the material the hall's ice, w.mats.vc.ice, taking its alpha from its points)
+  function iceRun(w, wallX, nx, zc, width, y0, y1) {
+    const ay = w._atY || 0, H = y1 - y0, hh = (a, k) => _hn(zc * 1.3 + a, y1 * 0.7 + k, 120 + k);
+    const NU = 16, NV = 9, ribs = [], nr = 7 + Math.floor(hh(0, 3) * 4);
+    for (let k = 0; k < nr; k++) ribs.push({ c: (k + 0.2 + 0.6 * hh(k, 4)) / nr, w: 0.025 + 0.03 * hh(k, 5), t: 0.025 + 0.05 * hh(k, 6), L: (0.15 + 0.85 * Math.pow(hh(k, 7), 1.3)) * Math.min(2.2, 0.3 * H + 0.5) });
+    const rib = (u, f) => { let s = 0; for (const r of ribs) s = Math.max(s, f(r) * Math.exp(-Math.pow((u - r.c) / r.w, 2))); return s; };
+    const half = (v) => width / 2 * (0.45 + 0.55 * Math.pow(Math.min(1, Math.max(0, v)), 0.6)) * (1 + 0.1 * Math.sin(v * 6 + zc));
+    // (its top and its foot across it: a few points eased between, so that the top is uneven without being toothed)
+    const KT = [0, 1, 2, 3, 4, 5].map((q) => 0.02 + 0.16 * hh(q, 1)), KF = [0, 1, 2, 3, 4, 5].map((q) => 0.8 + 0.12 * hh(q, 2));
+    const ease = (K, u) => { const f = Math.max(0, Math.min(0.999, u)) * 5, k = Math.floor(f), t = f - k, sm = t * t * (3 - 2 * t); return K[k] + (K[k + 1] - K[k]) * sm; };
+    const top = [], foot = [], bot = [];
+    for (let i = 0; i <= NU; i++) { const u = i / NU, ed = Math.abs(u - 0.5) * 2; top.push(ease(KT, u) + 0.1 * ed * ed); foot.push(ease(KF, u) - 0.08 * ed * ed); bot.push(foot[i] + rib(u, (r) => r.L) / H); }
+    const thick = (u, v, i) => {
+      const uu = (u - 0.5) * 2, edge = Math.sqrt(Math.max(0, 1 - uu * uu)), grow = _ss(top[i], top[i] + 0.35, v);
+      let d = (0.008 + 0.02 * grow) * edge + rib(u, (r) => r.t) * (0.3 + 0.7 * grow);
+      if (v > foot[i]) d *= Math.pow(Math.max(0, 1 - (v - foot[i]) / Math.max(1e-3, bot[i] - foot[i])), 0.6);
+      return d;
+    };
+    // (into the area's one list of curtains, built into a mesh when the area is: its triangles counted with the mason's, as 'ice')
+    if (!w._icurt) {
+      const L = (w._icurt = { P: [], C: [], I: [] });
+      Array.prototype.push.call(w.deferred, (root) => {
+        if (!L.I.length) return;
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(L.P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(L.C, 4)); g.setIndex(L.I); g.computeVertexNormals();
+        const U = []; for (let i = 0; i < L.P.length; i += 3) U.push(L.P[i + 2] / 2.5, L.P[i + 1] / 2.5); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+        g.computeBoundingSphere();
+        const base = (w.mats.vc && w.mats.vc.ice) || w.mats.ice, m = base.clone(); m.vertexColors = true; m.transparent = true; m.opacity = 0.92; m.depthWrite = false; m.name = 'icecurtain';
+        const mesh = new THREE.Mesh(g, m); mesh.receiveShadow = true; mesh.castShadow = false; mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.name = 'icecurtain';
+        root.add(mesh); w._icurt = null;
+      });
+    }
+    const L = w._icurt, P = L.P, C = L.C, I = L.I, b0 = P.length / 3, Pl = [], Il = [];
+    for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) {
+      const u = i / NU, v = top[i] + (bot[i] - top[i]) * j / NV, d = thick(u, v, i), uu = (u - 0.5) * 2, edge = Math.sqrt(Math.max(0, 1 - uu * uu)), grow = _ss(top[i], top[i] + 0.3, v);
+      Pl.push(wallX + nx * (0.004 + d), ay + y1 - v * H, zc + uu * half(v));
+      const k = Math.min(1, d / 0.05) * 0.85 + (j === NV ? 0.15 : 0), hang = v > foot[i] ? 1 : 0;
+      const al = Math.max((0.45 + 0.55 * _ss(0, 0.035, d)) * _ss(0, 0.3, edge), hang * 0.88) * grow;
+      C.push(0.62 + 0.38 * k, 0.72 + 0.28 * k, 0.82 + 0.18 * k, al);
+    }
+    for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) { const a = j * (NU + 1) + i, b = a + 1, c = a + NU + 1, d = c + 1; putTri(Pl, Il, a, c, b, (x) => x * nx); putTri(Pl, Il, b, c, d, (x) => x * nx); }
+    // (the lower edge back to the wall: its thickness seen from below)
+    const lb = Pl.length / 3;
+    for (let i = 0; i <= NU; i++) { const k = NV * (NU + 1) + i; Pl.push(wallX + nx * 0.003, Pl[k * 3 + 1] + 0.01, Pl[k * 3 + 2]); C.push(0.82, 0.88, 0.92, 0.8); }
+    for (let i = 0; i < NU; i++) { const a = NV * (NU + 1) + i, b = a + 1, c = lb + i, d = c + 1; putTri(Pl, Il, a, b, c, (x, y) => -y); putTri(Pl, Il, b, d, c, (x, y) => -y); }
+    for (const q of Pl) P.push(q); for (const q of Il) I.push(q + b0);
+    const M = mason(w); M.tris += Il.length / 3; M.by.ice = (M.by.ice || 0) + Il.length / 3;
+    // (a round point of ice on the four longest: their tips carried on)
+    _tagged('ice', () => {
+      const LR = ribs.slice().sort((p, q) => q.L - p.L).slice(0, 4);
+      for (const [k, r] of LR.entries()) { const i = Math.round(r.c * NU), uu = (i / NU - 0.5) * 2, v = bot[i] - (bot[i] - foot[i]) * 0.35; if (bot[i] - foot[i] < 0.08) continue; icicle(M, wallX + nx * (0.004 + r.t * 0.5), ay + y1 - v * H, zc + uu * half(Math.min(1, v)), r.t * 0.55, 0.25 + 0.5 * hh(k, 11), 80 + k); }
+    });
+  }
+  LG.iceRun = iceRun;
   // ---- a fallen column (its box, along x or z, L long, r high and wide, stays as it was): its drums lying in a line where it fell, each
   // a little apart, turned and askew, the last broken short. Drawn only, by the place
   let _lyDrum = null;
@@ -2051,7 +2265,7 @@
   function mason(w) {
     if (w._mason) return w._mason;
     // (LG._noDress, for the tools that weigh what this costs: a mason that lays nothing)
-    if (LG._noDress) { const n = () => {}; return (w._mason = { lo: true, by: {}, mat: {}, var: () => [1, 1, 1], hexa: n, blk: n, box: n, geo: n, quad: n, foot: n, build: n }); }
+    if (LG._noDress) { const n = () => {}; return (w._mason = { lo: true, by: {}, mat: {}, var: () => [1, 1, 1], hexa: n, blk: n, box: n, geo: n, quad: n, quads: n, foot: n, build: n }); }
     const M = { g: {}, mat: {}, lo: QLOW(), out: !!w.mats.biome.outdoor, tris: 0, n: 0, by: {}, sun: w.mats.biome.sunDir || null };   // (mat: materials of its own by name, the leaves' cards)
     const tally = (n) => { const k = LG._tag || 'other'; M.by[k] = (M.by[k] || 0) + n; };   // (what the triangles went to, by the piece being built: w.perimInfo)
     const grp = (mk) => M.g[mk] || (M.g[mk] = { p: [], n: [], u: [], c: [], i: [] });
@@ -2158,7 +2372,7 @@
     M.geo = (mk, geo, mat, o) => {
       o = o || {}; const G0 = grp(mk), base = G0.p.length / 3, pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
       const e = mat.elements, nm = _nm3.getNormalMatrix(mat).elements, t = o.tint || [1, 1, 1], uvS = 1 / (o.uv || 1);
-      const PA = pos.array, NA = nor.array, UA = uv ? uv.array : null, su = o.su || 1, sv = o.sv || 1;
+      const PA = pos.array, NA = nor.array, UA = uv ? uv.array : null, su = o.su || 1, sv = o.sv || 1, VC = o.vcol && geo.attributes.color ? geo.attributes.color.array : null;
       let oc = null; if (o.one) { const c = shade(e[12], e[13], e[14], 0.7, 0, 0.7, t, o, true); oc = [c[0], c[1], c[2]]; }
       for (let i = 0; i < pos.count; i++) {
         const px = PA[i * 3], py = PA[i * 3 + 1], pz = PA[i * 3 + 2], ax = NA[i * 3], ay = NA[i * 3 + 1], az = NA[i * 3 + 2];
@@ -2166,7 +2380,8 @@
         let nx = nm[0] * ax + nm[3] * ay + nm[6] * az, ny = nm[1] * ax + nm[4] * ay + nm[7] * az, nz = nm[2] * ax + nm[5] * ay + nm[8] * az; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
         G0.p.push(x, y, z); G0.n.push(nx, ny, nz);
         if (UA && !o.world) G0.u.push(UA[i * 2] * su, UA[i * 2 + 1] * sv); else G0.u.push((Math.abs(nx) > Math.abs(nz) ? z : x) * uvS, (Math.abs(ny) > 0.7 ? (Math.abs(nx) > Math.abs(nz) ? x : z) : y) * uvS);
-        if (oc) { const lw = low(y, o); G0.c.push(oc[0] * lw, oc[1] * lw, oc[2] * lw); } else { const cc = shade(x, y, z, nx, ny, nz, t, o); G0.c.push(cc[0], cc[1], cc[2]); }
+        let k0 = 1, k1 = 1, k2 = 1; if (VC) { k0 = VC[i * 3]; k1 = VC[i * 3 + 1]; k2 = VC[i * 3 + 2]; }
+        if (oc) { const lw = low(y, o); G0.c.push(oc[0] * lw * k0, oc[1] * lw * k1, oc[2] * lw * k2); } else { const cc = shade(x, y, z, nx, ny, nz, t, o); G0.c.push(cc[0] * k0, cc[1] * k1, cc[2] * k2); }
       }
       const n = geo.index ? geo.index.count : pos.count;
       if (geo.index) { const ix = geo.index.array; if (o.flip) for (let i = 0; i < n; i += 3) G0.i.push(base + ix[i], base + ix[i + 2], base + ix[i + 1]); else for (let i = 0; i < n; i++) G0.i.push(base + ix[i]); }

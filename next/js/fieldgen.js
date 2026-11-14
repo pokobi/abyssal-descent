@@ -124,7 +124,9 @@
       if (rng.chance(0.5)) P().chain(w, rng.range(x0 + 4, x1 - 4), y - rng.range(2.5, 5), z, rng.range(2.5, 4.5));
     }
     // (between the beams the ceiling is coffered: joists of dark wood framed into them every 7 m, LG.coffers; drawn only, no dice)
-    if (LG.coffers && opts.coffers !== false) LG.coffers(w, x0, z0, x1, z1, y, zsB, 7, opts.cofferX);
+    if (LG.coffers && opts.coffers !== false) LG.coffers(w, x0, z0, x1, z1, y, zsB, 7, opts.cofferX, opts.frost);
+    // (a frozen hall: hoarfrost on the beams, icicles off them; drawn only, no dice)
+    if (opts.frost && LG.beamFrost) LG.beamFrost(w, x0, x1, y, zsB);
     const nch = opts.chandeliers ?? 2;
     for (let i = 0; i < nch; i++) P().chandelier(w, rng.range(x0 + 10, x1 - 10), y - rng.range(4, 6), rng.range(z0 + 12, z1 - 12), y - 0.7);
   };

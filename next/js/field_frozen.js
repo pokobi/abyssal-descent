@@ -56,11 +56,16 @@
     w.waterRoofed = true;
     for (const r of isl) { w.solid('block', r.x0, -10, r.z0, r.x1, 0.6, r.z1, { uv: 3 }); w.solid('trim', r.x0 - 0.1, 0.6, r.z0 - 0.1, r.x1 + 0.1, 0.85, r.z1 + 0.1, { uv: 1.5 }); }
     w.iceTiles = [];
+    // (which cell of the grid is what: a tile's index, -1 an island, -2 the channel; and whether there is ice beyond each side of it.
+    // Only for the broken edges drawn round a hole, iceRims)
+    const cell = new Int32Array(nX * nZ).fill(-1);
+    w.iceGrid = { ix0, iz0, nX, nZ, cell, beyond: [ix0 - lx0 > 0.01, lx1 - (ix0 + nX * TS) > 0.01, iz0 - lz0 > 0.01, lz1 - (iz0 + nZ * TS) > 0.01] };
     let cx0 = Infinity, cx1 = -Infinity;
     for (let k = 0; k < nZ; k++) for (let i = 0; i < nX; i++) {
       const x0 = ix0 + i * TS, z0 = iz0 + k * TS, cx = x0 + TS / 2, cz = z0 + TS / 2;
       if (isl.some((r) => cx > r.x0 && cx < r.x1 && cz > r.z0 && cz < r.z1)) continue;
-      if (chan && cx > chan.x0 && cx < chan.x1) { cx0 = Math.min(cx0, x0); cx1 = Math.max(cx1, x0 + TS); continue; }
+      if (chan && cx > chan.x0 && cx < chan.x1) { cx0 = Math.min(cx0, x0); cx1 = Math.max(cx1, x0 + TS); cell[k * nX + i] = -2; continue; }
+      cell[k * nX + i] = w.iceTiles.length;
       const col = w.addCollider(x0, -0.5, z0, x0 + TS, 0, z0 + TS, { surf: 'ice', noGrapple: true });
       // (zone: its open water while it is broken, put in w.waterZones and taken out again by setTile)
       w.iceTiles.push({ k: w.iceTiles.length, x0, z0, x1: x0 + TS, z1: z0 + TS, col, hp: 2, t: 0, mesh: null, crack: null, zone: { x0, z0, x1: x0 + TS, z1: z0 + TS, y: WY, deep: DEEP, lake: true } });
@@ -83,13 +88,14 @@
       });
       im.instanceMatrix.needsUpdate = true; cm.instanceMatrix.needsUpdate = true;
       grp.add(im); grp.add(cm); w.iceMesh = { im, cm, Z };
+      iceRims(w, grp);
       grp.add(floeSample(w, W / 2, D / 2));
     });
     // ---- the hall: walls, the vault with its icicles, ice-sheathed pillars on the shore, frozen statues, braziers burning blue-white
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0 });
-    F.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: rng.int(0, 2) });
+    F.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: rng.int(0, 2), frost: true });
     FZ().vaultIcicles(w, rng, W, D, HT, 60);
-    for (let z = lz0 + 4; z < lz1 - 2; z += 10) for (const x of [SH / 2, W - SH / 2]) { FZ().icePillar(w, rng, x, z, HT); occ.mark(x - 2, z - 2, x + 2, z + 2); }
+    for (let z = lz0 + 4; z < lz1 - 2; z += 10) for (const x of [SH / 2, W - SH / 2]) { FZ().icePillar(w, rng, x, z, HT); if (LG.icePillarHead) LG.icePillarHead(w, x, z, HT); occ.mark(x - 2, z - 2, x + 2, z + 2); }
     for (const r of isl) {
       const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
       P().sarcophagus(w, cx, cz, 0.85, true, rng);
@@ -101,8 +107,13 @@
     for (const g of LG.gateXs(W, gates)) { P().brazier(w, g - 5, 0, 4.5, 1, true); P().brazier(w, g + 5, 0, 4.5, 1, true); }
     for (let x = 8; x < W - 6; x += 12) if (Math.abs(x - W / 2) > 6) { P().sarcophagus(w, x, D - 5, 0, rng.chance(0.5), rng); occ.mark(x - 1.6, D - 6.2, x + 1.6, D - 3.8); }
     for (let i = 0; i < 6; i++) w.addLight(rng.range(lx0, lx1), -1, rng.range(lz0, lz1), { flame: 0, intensity: 5, range: 9, color: '#6ac8ff', emit: false, prio: 0.4 });
-    // hoarfrost on the walls
-    for (let z = 8; z < D - 4; z += 7) for (const side of [0, W]) { const y0 = rng.range(2, 6), y1 = rng.range(8, 12), z1 = z + rng.range(1, 3); if (!P().put(w, 'icefall', side === 0 ? 0.02 : W - 0.02, y0, (z + z1) / 2, side === 0 ? Math.PI / 2 : -Math.PI / 2, 1, { sx: (z1 - z) * 1.5, sy: y1 - y0, sz: 0.3 })) w.visual('ice', side === 0 ? 0 : W - 0.03, y0, z, side === 0 ? 0.03 : W, y1, z1, { uv: 2, grad: false }); }   // (ice run down the wall and frozen in ribs: gfx.js)
+    // ice run down the walls and frozen there: thin where it came from, spreading and thickening downward in ribs, a heavy lip at its
+    // foot with icicles off it (levelgen.js LG.iceRun; the same throws of the dice as the sheets it replaces)
+    for (let z = 8; z < D - 4; z += 7) for (const side of [0, W]) {
+      const y0 = rng.range(2, 6), y1 = rng.range(8, 12), z1 = z + rng.range(1, 3);
+      if (LG.iceRun) LG.iceRun(w, side, side === 0 ? 1 : -1, (z + z1) / 2, (z1 - z) * 1.5, y0, y1);
+      else if (!P().put(w, 'icefall', side === 0 ? 0.02 : W - 0.02, y0, (z + z1) / 2, side === 0 ? Math.PI / 2 : -Math.PI / 2, 1, { sx: (z1 - z) * 1.5, sy: y1 - y0, sz: 0.3 })) w.visual('ice', side === 0 ? 0 : W - 0.03, y0, z, side === 0 ? 0.03 : W, y1, z1, { uv: 2, grad: false });
+    }
     w.icicles = { y: HT, next: 4 };
     // what is laid afterwards: not on the ice (it would go down with it); on the shores, landings and islands
     occ.mark(lx0, lz0, lx1, lz1, 2);
@@ -119,6 +130,80 @@
     M.im.setMatrixAt(t.i, s === 'gone' ? M.Z : t.m);
     for (let k = 0; k < 4; k++) M.cm.setMatrixAt(t.i * 4 + k, s === 'crack' ? t.cm[k] : M.Z);
     M.im.instanceMatrix.needsUpdate = true; M.cm.instanceMatrix.needsUpdate = true;
+    rimLook(w, t);
+  }
+  // ---------------------------------------------------------------- the broken edges of a hole
+  // A hole is not cut square: round it the ice breaks back in a ragged edge, a little lower than the ice and sloping down to it, and
+  // under that the break goes down through the ice's thickness, white and clouded, wet and darker toward the water. Drawn on each side
+  // of a broken tile where ice still stands beyond it (a tile, or the ice round the grid; not an island's stone, not the channel), in
+  // the hole's own square, at most 0.22 m in from its side (0.42 at a cut corner): the hole that lets you through is the tile's square
+  // as it was. Four shapes
+  // of edge (by the place), each in an instanced mesh, every side of every tile a slot (shrunk away while not shown). Looks only
+  const RIMV = 4;
+  let _rimG = null;
+  function rimGeos() {
+    if (_rimG) return _rimG;
+    _rimG = [];
+    for (let v = 0; v < RIMV; v++) {
+      let s = (v * 2654435761 + 97) >>> 0; const R = () => { s = (s + 0x6D2B79F5) >>> 0; let t = Math.imul(s ^ (s >>> 15), s | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      // (its width along the side: a few points from almost nothing to 0.2 m, eased between; the start's corner cut aslant, the end
+      // narrowing into the next side's cut corner)
+      const n = 19, K = [0, 0.2, 0.4, 0.6, 0.8, 1].map(() => 0.004 + 0.196 * Math.pow(R(), 1.4)), cc = 0.22 + 0.2 * R(), A = [], E = [], YE = [], B1 = [], B2 = [];
+      for (let j = 0; j < n; j++) {
+        const a = j === 0 ? -0.01 : j === n - 1 ? TS + 0.01 : (j + (R() - 0.5) * 0.6) * TS / (n - 1), f = Math.max(0, Math.min(0.999, a / TS)) * 5, k = Math.floor(f), t = f - k, sm = t * t * (3 - 2 * t);
+        let e = K[k] + (K[k + 1] - K[k]) * sm + (R() - 0.5) * 0.03;
+        if (a < cc) e = Math.max(e, cc - a + 0.01 * R());
+        if (a > TS - 0.35) e = Math.min(e, 0.004 + (TS - a) * 0.12);
+        e = Math.max(0.004, Math.min(0.22, e));
+        A.push(a); E.push(e); YE.push(-Math.min(0.07, 0.002 + e * (0.15 + 0.3 * R()))); B1.push((R() - 0.3) * 0.05); B2.push((R() - 0.5) * 0.06);
+      }
+      // (local: x along the side, y up, z into the hole. The top: at the side's line the ice's own height, chipped down toward the hole;
+      // its picture as the tile's. The broken face: white where it was broken, wetter and darker toward the water)
+      const P = [], U = [], C = [], I = [], up = (x, y) => y, inF = (x, y, z) => z;
+      for (let j = 0; j < n; j++) { P.push(A[j], -0.002, 0, A[j], YE[j], E[j]); U.push(A[j] / TS, 1, A[j] / TS, 1 - E[j] / TS); C.push(1, 1, 1, 1, 1, 1); }
+      for (let j = 0; j + 1 < n; j++) { const a = j * 2, b = a + 1, c = a + 2, d = a + 3; putT(P, I, a, b, c, up); putT(P, I, b, d, c, up); }
+      const nTop = I.length, f0 = P.length / 3;
+      for (let j = 0; j < n; j++) {
+        const k = 0.95 + 0.05 * R();
+        P.push(A[j], YE[j], E[j], A[j], -0.22, E[j] + B1[j], A[j], -0.5, Math.max(0.004, E[j] * 0.6 + B2[j])); U.push(0, 0, 0, 0, 0, 0);
+        // (white only just under the top, clearer and bluer down through the ice)
+        C.push(0.84 * k, 0.9 * k, 0.94 * k, 0.62 * k, 0.72 * k, 0.8 * k, 0.33, 0.41, 0.48);
+      }
+      for (let j = 0; j + 1 < n; j++) for (let r = 0; r < 2; r++) { const a = f0 + j * 3 + r, b = a + 1, c = a + 3, d = b + 3; putT(P, I, a, c, b, inF); putT(P, I, b, c, d, inF); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I);
+      g.computeVertexNormals(); g.addGroup(0, nTop, 0); g.addGroup(nTop, I.length - nTop, 1);
+      _rimG.push(g);
+    }
+    return _rimG;
+  }
+  // (a triangle of a list P, wound so that f(its normal) >= 0)
+  const putT = (P, I, a, b, c, f) => { const ux = P[b * 3] - P[a * 3], uy = P[b * 3 + 1] - P[a * 3 + 1], uz = P[b * 3 + 2] - P[a * 3 + 2], vx = P[c * 3] - P[a * 3], vy = P[c * 3 + 1] - P[a * 3 + 1], vz = P[c * 3 + 2] - P[a * 3 + 2];
+    if (f(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) >= 0) I.push(a, b, c); else I.push(a, c, b); };
+  // (each side's frame: s 0 the -x side, 1 +x, 2 -z, 3 +z; its corner and its turn, x along the side, z into the hole)
+  const RIMF = [[(t) => [t.x0, t.z1], Math.PI / 2], [(t) => [t.x1, t.z0], -Math.PI / 2], [(t) => [t.x0, t.z0], 0], [(t) => [t.x1, t.z1], Math.PI]];
+  function iceRims(w, grp) {
+    const L = w.iceTiles; if (!L || !L.length || !w.iceGrid) return;
+    const G0 = rimGeos(), cnt = new Array(RIMV).fill(0), slots = [];
+    L.forEach((t) => { t.rim = []; for (let s = 0; s < 4; s++) { const h = Math.sin(t.x0 * 12.9898 + t.z0 * 78.233 + s * 37.719) * 43758.5453, v = Math.floor((h - Math.floor(h)) * RIMV); t.rim.push({ v, i: cnt[v]++ }); } });
+    const mat = [w.mats.ice, floeSide()], Z = new THREE.Matrix4().makeScale(0, 0, 0);   // (its top the ice's own; its broken face white)
+    const meshes = G0.map((g, v) => { const m = new THREE.InstancedMesh(g, mat, Math.max(1, cnt[v])); for (let i = 0; i < cnt[v]; i++) m.setMatrixAt(i, Z); m.castShadow = false; m.receiveShadow = true; m.frustumCulled = false; grp.add(m); return m; });
+    L.forEach((t) => t.rim.forEach((r, s) => { const [o, ry] = RIMF[s], p = o(t); r.m = new THREE.Matrix4().makeTranslation(p[0], 0, p[1]).multiply(new THREE.Matrix4().makeRotationY(ry)); }));
+    w.iceRim = { meshes, Z };
+    for (const t of L) if (t.hp <= 0) rimLook(w, t);
+  }
+  // is there ice that holds beyond side s of tile t (another tile not broken, or the ice round the grid)?
+  function iceBeyond(w, t, s) {
+    const g = w.iceGrid, i = Math.round((t.x0 - g.ix0) / TS) + (s === 0 ? -1 : s === 1 ? 1 : 0), k = Math.round((t.z0 - g.iz0) / TS) + (s === 2 ? -1 : s === 3 ? 1 : 0);
+    if (i < 0) return g.beyond[0]; if (i >= g.nX) return g.beyond[1]; if (k < 0) return g.beyond[2]; if (k >= g.nZ) return g.beyond[3];
+    const c = g.cell[k * g.nX + i]; return c >= 0 && w.iceTiles[c].hp > 0;
+  }
+  // the edges round tile t and round its neighbours, as they stand now
+  function rimLook(w, t) {
+    const R = w.iceRim, g = w.iceGrid; if (!R || !t.rim || !g) return;
+    const one = (q) => { for (let s = 0; s < 4; s++) { const r = q.rim[s], on = q.hp <= 0 && iceBeyond(w, q, s); R.meshes[r.v].setMatrixAt(r.i, on ? r.m : R.Z); R.meshes[r.v].instanceMatrix.needsUpdate = true; } };
+    one(t);
+    const i = Math.round((t.x0 - g.ix0) / TS), k = Math.round((t.z0 - g.iz0) / TS);
+    for (const [di, dk] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) { const ii = i + di, kk = k + dk; if (ii < 0 || kk < 0 || ii >= g.nX || kk >= g.nZ) continue; const c = g.cell[kk * g.nX + ii]; if (c >= 0) one(w.iceTiles[c]); }
   }
   // a broken tile's open water in the area's pools (w.waterZones: water.js and fields.js see it as water open to the air), or taken out
   function openWater(w, t, on) {

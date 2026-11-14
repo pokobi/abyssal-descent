@@ -9,16 +9,16 @@
       mods: { buffChoices: 1 }, minus: 'なし', favName: 'なし', fav: null,
       look: 'オリーブ色の戦闘服とヘルメット', role: '何でもこなす基準のクラス' },
     { id: 'assault', name: '突撃兵', icon: '💨', col: '#ff6a50', gun: 's_wasp', melee: 'm_basic', skill: 'dash', ult: 'ult_berserk', grapple: 15,
-      mods: { moveSpeed: 0.1 }, minus: '20m以上の敵への与ダメ-20%', favName: 'SMG・ショットガン（銃と部品）、機動・連射・装填の加護',
+      mods: { moveSpeed: 0.1 }, minus: '20m以上の敵への与ダメ-20%', favName: 'SMG・ショットガン（作業台でもおすすめ）、機動・連射・装填の加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun' || o.arch === 'autoshotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
     { id: 'sniper', name: '狙撃手', icon: '🎯', col: '#5aa8ff', gun: 'n_scout', atts: { optic: 'o_x2' }, melee: 'm_basic', skill: 'decoy', ult: 'ult_shadow', grapple: 18,
-      mods: {}, minus: 'ADSせずに撃つ（腰だめ）と拡散+40%', favName: '狙撃銃・DMR（銃と部品）、会心・ヘッドショットの加護',
+      mods: {}, minus: 'ADSせずに撃つ（腰だめ）と拡散+40%', favName: '狙撃銃・DMR（作業台でもおすすめ）、会心・ヘッドショットの加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'sniper' || o.arch === 'dmr'), look: '青いフード付きマントとマスク、右目の照準鏡', role: '遠くから急所を撃つ' },
     { id: 'blade', name: '剣士', icon: '⚔️', col: '#ffb040', gun: 'p_viper', melee: 'm_machete', skill: 'haste', ult: 'ult_bladestorm', grapple: 15,
-      mods: { magSize: -0.25, moveSpeed: 0.1 }, minus: '銃の装弾数-25%', favName: '近接武器（武器と部品）、近接の加護',
+      mods: { magSize: -0.25, moveSpeed: 0.1 }, minus: '銃の装弾数-25%', favName: '近接武器（作業台でもおすすめ）、近接の加護',
       fav: (o) => o.kind === 'melee', look: '橙の羽織と紺の袴、白い鉢巻、背中に鞘', role: '近接で斬り込む' },
     { id: 'heavy', name: '重装兵', icon: '🛡️', col: '#c08a5a', gun: 'g_breacher', melee: 'm_woodshield', skill: 'thornarmor', ult: 'ult_bastion', grapple: 28,
-      mods: { armor: 0.1, maxHp: 20, moveSpeed: -0.12, slideBoost: -0.4 }, minus: '移動速度-12%、スライディングの距離-40%', favName: '防具・盾、近接の部品、防御の加護',
+      mods: { armor: 0.1, maxHp: 20, moveSpeed: -0.12, slideBoost: -0.4 }, minus: '移動速度-12%、スライディングの距離-40%', favName: '防具・盾、防御の加護（作業台のおすすめは近接武器）',
       fav: (o) => o.kind === 'armor' || (o.kind === 'melee' && !!o.guard && o.guard[0] >= 0.75), look: '板金の鎧と大きな肩当て、茶色の陣羽織とマント、顔まで覆う兜', role: '前に立って受け止める' },
     { id: 'mage', name: '術士', icon: '🔮', col: '#b07aff', gun: 't_rivet', atts: { core: 'c_water' }, melee: 'm_basic', skill: 'fireball', ult: 'ult_tsunami', grapple: 20,
       mods: { elIcd: 0.4, maxHp: -15 }, minus: '最大HP-15', favName: '属性コア・属性のスキル、属性・状態異常・スキル強化の加護',
@@ -423,7 +423,7 @@
   };
   CL.boonFav = (b, cls) => { const x = BOON[cls || (G.player && G.player.cls)]; return !!x && !!b && b.cat !== 'curse' && !b.skill && x[1](b); };
   CL.boonW = (b) => (CL.boonFav(b) ? BOON[G.player.cls][0] : 1);
-  // weapon parts: the kinds of part that drop more often (parts.js)
+  // weapon parts: the kinds of weapon the workbench marks as recommended for the class (parts.js; parts themselves have no kind)
   const PART = { assault: { smg: 1.5, sg: 1.5 }, sniper: { sr: 2 }, blade: { ml: 2 }, heavy: { ml: 1.5 } };
   CL.partW = (fam) => { const x = G.player && PART[G.player.cls]; return (x && x[fam]) || 1; };
   CL.pick = function (r, list) { if (!list.length) return undefined; if (list.every((o) => CL.weight(o) === 1)) return r.pick(list); return r.weighted(list, (o) => CL.weight(o)); };

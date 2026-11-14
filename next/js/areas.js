@@ -682,15 +682,16 @@
           consume: () => { G.Inv.remove(P.bag, it); } });
       }
     }
-    for (const c of G.Inv.pcs(P)) for (const o of c.items) {
-      if (o.type === 'part' && G.PART_BY_ID && G.PART_BY_ID[o.id]) {
-        const d = G.PART_BY_ID[o.id];
-        for (let k = 0; k < (o.n || 1); k++) {
-          out.push({ uid: `prt:${o.uid}:${k}`, cat: 'part', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: d.name, badge: '',
-            sub: d.desc || '', d, it: o,
-            consume: () => { if (o.n > 1) { o.n--; G.Inv.changed(c); } else G.Inv.remove(c, o); } });
-        }
+    // weapon parts (a count per rarity, inventory.js P.parts); a legendary part has no rarity above it, so it is not offered
+    if (G.Parts) for (const r of G.Parts.R) {
+      const d = G.PART_BY_ID[G.Parts.id(r)];
+      if (!G.Parts.next(r)) continue;
+      for (let k = 0; k < G.Parts.count(r); k++) {
+        out.push({ uid: `prt:${r}:${k}`, cat: 'part', rarity: r, tier: G.RARITY[r].tier, icon: d.icon, name: d.name, badge: '',
+          sub: d.desc || '', d, consume: () => { G.Inv.takeParts(P, r, 1); } });
       }
+    }
+    for (const c of G.Inv.pcs(P)) for (const o of c.items) {
       if (o.type === 'item' && G.ITEM_BY_ID[o.id]) {
         const d = G.ITEM_BY_ID[o.id];
         for (let k = 0; k < (o.n || 1); k++) {
@@ -781,19 +782,14 @@
       return;
     }
     if (a.cat === 'part') {
-      const PT = G.Parts, r = RAR_BY_TIER[targetTier];
-      const fams = [...new Set([a.d.fam, b.d.fam])];
-      let mine = fams.filter((f) => PT.has(f, r)).map((f) => G.PART_BY_ID[PT.id(f, r)]);
-      if (tA >= 4) mine = mine.filter((x) => x.id !== a.d.id && x.id !== b.d.id); // (legendary with legendary: never the same part back)
-      const rest = PT.FAMS.filter((f) => !fams.includes(f.id) && PT.has(f.id, r)), others = [];
-      while (others.length < 3 && rest.length) { const f = U.weighted(rest, (x) => (G.Classes ? G.Classes.partW(x.id) : 1), Math.random); others.push(G.PART_BY_ID[PT.id(f.id, r)]); rest.splice(rest.indexOf(f), 1); } // (the class's kinds of part x1.5 - x2)
-      const cands = mine.concat(others).slice(0, 3);
-      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: `<span class="cd-line">${U.esc(d.desc || '')}</span>`, onPick: () => {
+      // two parts of a rarity -> one of the next (a part has no kind of weapon, so there is just the one result)
+      const PT = G.Parts, to = PT.next(a.rarity), d = to && G.PART_BY_ID[PT.id(to)];
+      const opts = d ? [{ icon: d.icon, label: `${d.short}（${G.RARITY[d.rarity].name}）`, sub: `<span class="cd-line">${U.esc(d.desc || '')}</span>`, onPick: () => {
         consumeBoth();
-        G.Inv.give(P, 'part', d.id, 1); G.ui.refreshItems();
-        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}（${G.RARITY[d.rarity].name}）`, 'good'); G.ui.itemCard(d, '[部品練成]');
-      } }));
-      alchChoiceModal(`🔧 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
+        G.Inv.addParts(P, d.rarity, 1, true); G.ui.refreshItems();
+        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[部品練成]');
+      } }] : [];
+      alchChoiceModal(`🔧 練成結果（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、1つ上のレアリティの武器の部品を練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
     if (a.cat === 'att') {

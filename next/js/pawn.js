@@ -125,6 +125,13 @@
     if (it.type === 'item' && d.cat === 'grenade' && G.GrenHold && G.GrenHold.active()) G.GrenHold.putAway(true);
     pay(unit * n, d.name + (n > 1 ? ` ×${n}` : ''));
   }
+  // weapon parts are a count per rarity (inventory.js P.parts), not things in the bag
+  const partUnit = (r) => G.Inv.value(G.Inv.make('part', G.Parts.id(r), 1));
+  function sellParts(r, n) {
+    const p = P(), d = G.PART_BY_ID[G.Parts.id(r)]; n = Math.min(n || 1, G.Parts.count(r));
+    if (n <= 0 || !G.Inv.takeParts(p, r, n)) return;
+    pay(partUnit(r) * n, d.name + (n > 1 ? ` ×${n}` : ''));
+  }
   function rows() {
     const p = P(), IV = G.Inv, out = [];
     const guns = G.weapons.gunsInOrder();
@@ -142,6 +149,12 @@
       const unit = IV.value(Object.assign({}, it, { n: 1 })), ask = it.type === 'armor' && !!(it.ench && it.ench.length); // enchanted armour is confirmed first
       const sub = it.type === 'armor' ? `${G.ARMOR_SLOT_BY_ID[d.slot].name}防具・防御力${d.def}${it.ench && it.ench.length ? '・' + it.ench.map(G.enchantText).join(' ') : ''}` : it.type === 'valuable' ? '金品（売却専用）' : it.type === 'att' ? 'アタッチメント（インベントリ）' : IV.isArm(it) ? `${it.type === 'gun' ? '銃' : '近接武器'}（インベントリ）${it.gun && it.gun.lv ? '・強化+' + it.gun.lv : ''}` : d.passive ? '所持品（常時効果）' : cat === 'grenade' ? '投擲物' : '消耗品';
       out.push({ cat, icon: it.type === 'armor' ? G.armorIcon(d) : d.icon, el: G.Elem.itemTag(it), rc: d.rarity, name: d.name + (it.n > 1 ? ` ×${it.n}` : ''), sub, v: unit, n: it.n, act: () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, 1), 0); } else { sellInst(it, 1); PW.open(); } }, actAll: it.n > 1 ? () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, it.n), 0); } else { sellInst(it, it.n); PW.open(); } } : null });
+    }
+    if (G.Parts) for (const r of G.Parts.R) {
+      const n = G.Parts.count(r); if (!n) continue;
+      const d = G.PART_BY_ID[G.Parts.id(r)], NEED = G.Parts.NEED;
+      out.push({ cat: 'part', icon: d.icon, el: '', rc: r, name: d.name + (n > 1 ? ` ×${n}` : ''), sub: n >= NEED ? `武器の部品（${NEED}つ揃っている：作業台で武器にできる）` : '武器の部品', v: partUnit(r), n,
+        act: () => { sellParts(r, 1); PW.open(); }, actAll: n > 1 ? () => { sellParts(r, n); PW.open(); } : null });
     }
     return out;
   }
@@ -213,9 +226,9 @@
       };
     }
     if (tab === 'part') {
-      const parts = p.bag.items.filter((o) => o.type === 'part');
-      const count = parts.reduce((n, o) => n + (o.n || 1), 0);
-      const sum = parts.reduce((s, o) => s + IV.value(o), 0);
+      const parts = G.Parts ? G.Parts.R.filter((r) => G.Parts.count(r) > 0) : [];
+      const count = parts.reduce((n, r) => n + G.Parts.count(r), 0);
+      const sum = parts.reduce((s, r) => s + partUnit(r) * G.Parts.count(r), 0);
       return {
         label: `🔧 部品を一括売却（${count}点 +${fmt(sum)}🪙）`,
         count,
@@ -223,9 +236,9 @@
         act: () => {
           if (!parts.length) return;
           // (a set of three is a weapon at the workbench: worth a second look before it goes for a few coins)
-          const sets = parts.filter((o) => (o.n || 1) >= 3).length;
-          confirmBulk('🔧 部品を一括売却しますか？', `部品 <b>${count}点</b>`, sum, sets ? `3つ揃って組み立てられる部品 <b>${sets}種</b>` : '', () => {
-            for (const o of parts.slice()) IV.remove(p.bag, o);
+          const sets = parts.filter((r) => G.Parts.count(r) >= G.Parts.NEED).length;
+          confirmBulk('🔧 部品を一括売却しますか？', `武器の部品 <b>${count}点</b>`, sum, sets ? `${G.Parts.NEED}つ揃って組み立てられるレアリティ <b>${sets}種</b>` : '', () => {
+            for (const r of parts) IV.takeParts(p, r, G.Parts.count(r));
             pay(sum, `部品${count}点`);
             G.ui.toast(`🔧 部品 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
           });

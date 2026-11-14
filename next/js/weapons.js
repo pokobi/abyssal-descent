@@ -1035,9 +1035,10 @@
   };
   W.switchTo = function (i) {
     if (G.player && G.player.duelLock) return; // a duel (duel.js) keeps the melee weapon in hand
-    if (P.meleeMode && P.weapons[i]) { P.meleeMode = false; if (W.melee) W.melee.show(false); if (i === P.wIdx) { G.sfx.mech('switch'); W.equip(false); return; } }
+    if (P.meleeMode && P.weapons[i]) { P.beginHands('switch'); P.meleeMode = false; if (W.melee) W.melee.show(false); if (i === P.wIdx) { G.sfx.mech('switch'); W.equip(false); return; } }
     if (i === P.wIdx || !P.weapons[i]) return;
-    const old = P.weapon; if (old) { old.reloading = false; old.charge = 0; old.spin = 0; old.burstQ = 0; }
+    P.beginHands('switch');   // (a reload, an item, a throwable, a search ... are put down: player.js stopActions)
+    const old = P.weapon; if (old) { W.interruptReload(old); old.charge = 0; old.spin = 0; old.burstQ = 0; }
     P.wIdx = i;
     G.sfx.mech('switch');
     W.equip(false);
@@ -1192,7 +1193,11 @@
     if (W.gd && W.gd.k) W.hideGuardUI();
     if (W.switchT > 0) { W.switchT -= dt; }
     // ADS
-    const wantAds = I.mouse[2] && !G.GrenHold.active() && W.switchT <= 0 && anim.melee <= 0 && !P.mantle;
+    // (not while an item is in the hands or something is being searched: both hands are busy)
+    const wantAds = I.mouse[2] && !G.GrenHold.active() && W.switchT <= 0 && anim.melee <= 0 && !P.mantle && !G.ItemAnim.busy() && !G.game.search;
+    // the sights come up: a small sound of the grip, not again within 0.25 s (aiming in and out quickly)
+    if (wantAds && !W._wantAds && W.adsT < 0.5 && G.game.time - (W._adsSndT === undefined ? -9 : W._adsSndT) > 0.25) { W._adsSndT = G.game.time; G.sfx.mech('grab'); }
+    W._wantAds = wantAds;
     if (wantAds && P.sprinting) P.sprintToggle = false;
     const adsRate = 1 / Math.max(0.05, s.adsTime);
     W.adsT = U.clamp(W.adsT + (wantAds ? 1 : -1.4) * adsRate * dt, 0, 1);
@@ -1254,11 +1259,21 @@
 
   W.startReload = function (w, s) {
     if (w.reloading || w.mag >= s.mag || s.noReload) return; // (永劫の弾倉: never)
+    if (P.handsBlocked()) return;
+    P.beginHands('reload');   // (an item, a throwable, a search ... are put down: player.js stopActions)
     let dur = s.reload;
     if (w.mag === 0 && P.has('s_tactical')) dur *= 0.6;
     w.reloading = true; w.reloadT = dur; w.reloadDur = dur; w.reloadEvents = 0;
     w.burstQ = 0; w.charge = 0;
     G.buffs.emit('onReload', { weapon: w, empty: w.mag === 0 });
+  };
+  // A reload cut short (another action began, the gun was put away): it starts over the next time. A gun loaded shell by shell keeps
+  // the shells already in: as many of those it was short as the share of the time spent (the last tenth is the pump).
+  W.interruptReload = function (w) {
+    if (!w || !w.reloading) return;
+    const s = W.stats(w);
+    if (s.reloadSeq === 'shells' && w.reloadDur > 0) { const k = 1 - w.reloadT / w.reloadDur, miss = Math.max(0, s.mag - w.mag); w.mag += Math.min(miss, Math.floor(miss * k / 0.9)); }
+    w.reloading = false; w.reloadT = 0;
   };
   W.reloadSounds = function (w, s) {
     const k = 1 - w.reloadT / w.reloadDur;
@@ -1301,6 +1316,7 @@
     return sp;
   };
   W.shoot = function (w, s) {
+    if (G.game.search) G.game.cancelSearch('撃ったので探索を中断した');
     const st = P.stats, t = G.game.time;
     // ammo
     // 無尽 (eternal): after 4 s of unbroken fire the rounds stop running out until the next reload
@@ -1540,6 +1556,7 @@
 
   // flamethrower: cone damage tick
   W.fireFlame = function (w, s) {
+    if (G.game.search) G.game.cancelSearch('撃ったので探索を中断した');
     if (!(P.stats.infAmmo > 0) && Math.random() >= s.ammoSave) w.mag--;
     P.lastShotT = G.game.time;
     const o = G.camera.position.clone(), f = P.forward();

@@ -39,6 +39,11 @@
   W.gd = gd;
   const GUARD_MIN = 0.25, GUARD_REST = 1.6, GUARD_REGEN = 0.09; // seconds without a blocked hit before it refills; share of the gauge per second (the same for every weapon)
   W.guarding = () => !!(gd.on && P && P.meleeMode);
+  W.meleePhase = () => (ms.draw ? 'draw' : ms.ph);   // what the melee weapon is doing: idle / light / hwind / hrec / draw
+  // a swing or a heavy blow cut short (frozen solid, another action began: player.js stopActions): it ends where it is, no blow lands
+  W.stopSwing = () => { if (ms.ph !== 'idle') { ms.ph = 'idle'; ms.t = 0; ms.lungeT = 0; ms.hitDone = true; } };
+  W.endDraw = () => { ms.draw = null; };
+  W.dropGuard = () => { if (gd.on) { gd.on = false; gd.lock = true; } };   // (up again once the key is let go and pressed again)
   function guardTick(dt, blocked) {
     // in a duel (duel.js) the key only parries: no guard is raised, a press shows a quick parry stance
     if (G.Duel && G.Duel.mine()) {
@@ -58,7 +63,7 @@
     const held = !!g && I.down('reload') && !blocked && ms.ph === 'idle' && !P.dead;
     if (held && !gd.on && !gd.lock && gd.g < GUARD_MIN) { gd.lock = true; gd.flash = 1; G.sfx.ui('deny'); }
     const want = held && !gd.lock;
-    if (want && !gd.on) G.sfx.mech('boltBack', 0, 0.5);
+    if (want && !gd.on) { G.sfx.mech('boltBack', 0, 0.5); P.beginHands('melee'); }
     if (gd.on && !want) W.guardEndT = G.game.time; // (盾打ち: the moment the guard comes down)
     gd.on = want;
     gd.k = U.damp(gd.k, gd.on ? 1 : 0, 16, dt);
@@ -602,7 +607,8 @@
   W.setMelee = function () {
     P = G.player;
     if (P.meleeMode) return;
-    const old = P.weapon; if (old) { old.reloading = false; old.charge = 0; old.spin = 0; old.burstQ = 0; }
+    P.beginHands('switch');   // (a reload, an item, a throwable, a search ... are put down: player.js stopActions)
+    const old = P.weapon; if (old) { W.interruptReload(old); old.charge = 0; old.spin = 0; old.burstQ = 0; }
     if (W.flameLoop) { W.flameLoop.stop(); W.flameLoop = null; }
     if (W.spinLoop) { W.spinLoop.stop(); W.spinLoop = null; }
     P.meleeMode = true;
@@ -633,7 +639,7 @@
   W.gunSlots = () => { const o = W.order(); return [o[0] || null, o[1] || null]; };
   W.keyLabel = (t) => { const i = W.order().indexOf(t); return i < 0 ? '' : i < 3 ? `[${i + 1}] ` : '[⇕] '; };
   W.curTok = () => (G.player.meleeMode ? 'm' : G.player.weapon);
-  W.selectTok = function (t) { if (t === 'm') W.setMelee(); else if (t) W.switchTo(G.player.weapons.indexOf(t)); };
+  W.selectTok = function (t) { if (G.player.handsBlocked()) return; if (t === 'm') W.setMelee(); else if (t) W.switchTo(G.player.weapons.indexOf(t)); }; // (not in the pile driver's slam)
   W.tokInfo = function (t) {
     if (t === 'm') { const d = G.player.melee.def; return { icon: d.icon, name: d.name, rarity: d.rarity, sub: '近接' }; }
     return { icon: t.def.icon, name: t.def.name, rarity: t.def.rarity, sub: t.lv ? '+' + t.lv : '' };
@@ -694,6 +700,7 @@
     // 剣鬼: every 4th light blow comes out as a heavy one, with no wind-up
     if (P.has('k_demon')) { W.demonN = (W.demonN || 0) + 1; if (W.demonN >= 4) { W.demonN = 0; startHeavy(s); ms.dur = 0.01; G.fx.sparks(G.camera.position.clone().addScaledVector(P.forward(), 1.2), null, 10, 0xff6a5a, 4); return; } }
     const kind = W.meleeKind(P.melee.def);
+    P.beginHands('melee');   // (a search is put down)
     ms.ph = 'light'; ms.t = 0; ms.dur = s.swing; ms.hitDone = false; ms.combo++;
     ms.side = ms.combo % 2 ? 1 : -1;
     if (P.has('k_throw') && ms.combo % 3 === 0) setTimeout(() => throwDagger(s), 60);
@@ -702,6 +709,7 @@
     if (P.weapon) P.weapon.reloading = false;
   }
   function startHeavy(s) {
+    P.beginHands('melee');
     ms.ph = 'hwind'; ms.t = 0; ms.dur = s.heavy[1]; ms.hitDone = false; ms.parried = false;
     if (G.game.time < (W.fastHeavyUntil || 0)) { ms.dur *= 0.5; W.fastHeavyUntil = 0; } // (溜め返し)
     G.sfx.mech('boltBack', 0, 0.35);

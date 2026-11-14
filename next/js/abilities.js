@@ -753,7 +753,11 @@
     if (pr.wheel) {
       const id = G.ui.itemWheelClose();
       if (id) { if (pr.slot === 'g') { P.grenadeSel = id; G.GrenHold.refresh(); } else P.isel[pr.slot] = id; G.sfx.ui('click'); G.ui.refreshItems(); }
-    } else if (pr.slot === 'g') G.GrenHold.toggle();
+    } else if (pr.slot === 'g') {
+      // readying a throwable takes the hands: what else had them is put down (player.js stopActions); the key again puts it away
+      if (!G.GrenHold.active() && Object.values(P.grenades || {}).some((n) => n > 0)) { if (P.handsBlocked()) { A.press = null; return; } P.beginHands('grenade'); }
+      G.GrenHold.toggle();
+    }
     else A.useSlot(pr.slot);
     A.press = null;
   };
@@ -791,14 +795,19 @@
     if (d.revive) { G.ui.toastSmall('🧚 所持しているだけで効果を発揮'); return; }
     if (d.heal && P.hp >= P.stats.maxHp && !d.temp && !d.maxHp && !d.os && !d.cleanse && !d.ambrosia) { G.ui.toastSmall('❤️ HPは満タン'); G.sfx.ui('deny'); return; }
     if (d.forge) { const w = P.meleeMode || !P.weapon ? P.melee : P.weapon; if (!w || w.id === (G.BARE_MELEE || 'fists') || (w.lv || 0) >= G.Areas.forgeCap(w)) { G.ui.toastSmall('🔨 強化できる武器を持っていない（上限に達している）'); G.sfx.ui('deny'); return; } }
-    if (G.ItemAnim.busy()) return;
+    // the same item already in the hands: the key again changes nothing. Another one: the one in the hands is put down (given back if it
+    // has not taken effect yet) and this one is used (player.js stopActions)
+    if (G.ItemAnim.busy() && G.ItemAnim.left(id)) return;
+    if (P.handsBlocked() || !P.itemCount(id)) return;
     if (d.chest) {
       const w = G.world; const f = P.forward(); f.y = 0; f.normalize(); const pt = P.pos.clone().addScaledVector(f, 2.5);
       if (!(w.boxFree(pt.x - 0.7, pt.y + 0.05, pt.z - 0.7, pt.x + 0.7, pt.y + 1, pt.z + 0.7) && w.groundAt(V(pt.x, pt.y + 0.3, pt.z), 0.3, 1) > -Infinity)) { G.ui.toastSmall('🗺️ ここには出せない'); return; }
     }
+    P.beginHands(fromQueue ? 'queue' : 'item');
     if (!P.takeItem(id)) return;
     G.ui.refreshItems();
-    G.ItemAnim.play(G.ItemAnim.kindOf(id), id, () => A.applyItem(id));
+    A.usingId = id;   // (what is in the hands: given back if it is put down before it takes effect)
+    G.ItemAnim.play(G.ItemAnim.kindOf(id), id, () => A.applyItem(id), () => { if (A.usingId === id) A.usingId = null; });
     // centre gauge until the healing is done (the motion, plus any heal-over-time that follows)
     if (d.heal) P.healGauge = { t: 0, id, over: d.over || 0, icon: it.icon };
   };

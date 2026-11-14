@@ -560,27 +560,49 @@
       } else if (this.vel.y < -G.SWIM_SINK) this.vel.y = -G.SWIM_SINK; // (the water holds you back as you sink)
     }
     // Every action under way is put down at once (frozen solid, element.js; for anything else that must stop the hands): a reload, an item
-    // being used (a heal not yet taken is given back), a throwable being readied or aimed, the item wheel, a hold on something (a chest,
+    // being used (one that has not taken effect yet is given back), a melee swing, a throwable being readied or aimed, the item wheel, a hold on something (a chest,
     // a body, a gate), a queue of items, a slide, a run, the grapple, the bag. Aiming and firing need nothing: they stop with the input.
-    stopActions(why) {
-      const A = G.abilities, IA = G.ItemAnim, GM = G.game;
-      for (const w of this.weapons || []) if (w && w.reloading) { w.reloading = false; w.reloadT = 0; }
-      if (IA && IA.busy && IA.busy()) {
-        const hg = this.healGauge, l = hg && IA.left ? IA.left(hg.id) : null;
-        if (l && l[0] > 0) { IA.abort(); this.healGauge = null; if (G.Inv && G.Inv.give) G.Inv.give(this, 'item', hg.id, 1); if (G.ui.refreshItems) G.ui.refreshItems(); }
-        else if (IA.left && IA.left() && IA.left()[0] <= 0) IA.abort();
+    // With keep (an action that takes the hands is starting: 'reload', 'item', 'queue', 'grenade', 'melee', 'switch', 'search', 'pile', or
+    // one a module adds to handsHooks, such as a revive): only what takes the hands is put down, all of it but that one - one at a time,
+    // the one started last goes on. The run, the slide, the grapple, the item wheel and the bag are left as they are; what was cut short
+    // says so (a line in the feed, a click). An item cut short before it takes effect is given back, used or not; a reload starts over the next time
+    // (a gun loaded shell by shell keeps the shells already in: weapons.js interruptReload).
+    stopActions(why, keep) {
+      const A = G.abilities, IA = G.ItemAnim, GM = G.game, W = G.weapons, hands = !!keep, cut = [];
+      if (keep !== 'reload') for (const w of this.weapons || []) if (w && w.reloading) { if (W.interruptReload) W.interruptReload(w); else { w.reloading = false; w.reloadT = 0; } if (w === this.weapon) cut.push('🔄 リロードを中断'); }
+      if (IA && IA.busy && IA.busy()) {   // (an item starting: the one already in the hands is another one, useItemId)
+        const id = A && A.usingId, l = IA.left ? IA.left() : null, it = id && G.ITEM_BY_ID[id];
+        IA.abort(); if (A) A.usingId = null;
+        if (l && l[0] > 0 && id) {
+          if (this.healGauge && this.healGauge.id === id) this.healGauge = null;
+          if (G.Inv && G.Inv.give) G.Inv.give(this, 'item', id, 1); if (G.ui.refreshItems) G.ui.refreshItems();
+          if (it) cut.push(`${it.icon} ${it.name}を中断（使わずに戻した）`);
+        }
       }
-      if (G.GrenHold && G.GrenHold.active && G.GrenHold.active()) G.GrenHold.putAway(true);
+      if (keep !== 'grenade' && G.GrenHold && G.GrenHold.active && G.GrenHold.active()) G.GrenHold.putAway(true);
       if (A) {
-        if (A.press) { if (A.press.wheel && G.ui.itemWheelClose) G.ui.itemWheelClose(); A.press = null; }
-        if (A.cancelUseQueue) A.cancelUseQueue();
+        if (!hands && A.press) { if (A.press.wheel && G.ui.itemWheelClose) G.ui.itemWheelClose(); A.press = null; }
+        if (keep !== 'queue' && A.cancelUseQueue) A.cancelUseQueue();
       }
-      if (GM.search && GM.cancelSearch) GM.cancelSearch();
+      if (keep !== 'search' && GM.search && GM.cancelSearch) { GM.cancelSearch(); if (hands) cut.push('探索を中断'); }
+      if (keep !== 'melee' && W.stopSwing) { W.stopSwing(); if (W.dropGuard) W.dropGuard(); }
+      for (const k in this.handsHooks || {}) if (k !== keep) { const h = this.handsHooks[k]; if (h.active()) { h.stop(); if (hands && h.word) cut.push(h.word); } }
+      if (hands) {
+        if (keep !== 'switch') { if (W.switchT > 0) W.switchT = 0; if (W.endDraw) W.endDraw(); }
+        const cw = this.weapon; if (cw) { cw.charge = 0; cw.burstQ = 0; } // (a railgun's charge, the rest of a burst: not kept either)
+        // (said in the feed at the side: the middle of the screen is where the new action's own ring and label come up)
+        if (cut.length) { G.sfx.mech('click', 0, 0.5); for (const c of cut) G.ui.feed(c); }
+        return;
+      }
       if (this.sliding) this.endSlide();
       this.sprintToggle = false; this.sprinting = false; this._sjRun = false; this.crouchToggle = false;
       if (this.grapple.state === 'attached' || this.grapple.state === 'firing') this.detachGrapple(false);
       if (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen()) G.InvUI.close();
     }
+    // An action that takes the hands begins (kind: see stopActions): whatever else had them is put down. handsBlocked: none can begin now
+    // (the pile driver's slam has the whole body).
+    beginHands(kind) { this.stopActions('start', kind); }
+    handsBlocked() { return !!this.pileState; }
     fellInPit() {
       const wf = G.world.fallFrac || 0.15;
       let dmg = this.has('m_feather') ? 0 : Math.round(this.stats.maxHp * wf);
@@ -943,6 +965,7 @@
       };
     }
     startPile() {
+      this.beginHands('pile'); // (the slam takes the whole body: a reload, an item, a throwable, a search ... are put down)
       this.pileState = 'charge';
       this.pileStartY = this.pos.y;
       this.pileT = this.pileTMax = this.stats.pileFast ? 0.16 : 0.32;

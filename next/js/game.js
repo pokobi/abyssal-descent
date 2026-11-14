@@ -2130,6 +2130,8 @@
   GM.searchDur = (base) => base;
   GM.search = null;
   GM.startSearch = function (it, pos, base, icon, onDone, label) {
+    if (P.handsBlocked()) return; // (both hands go into it: not in the pile driver's slam; a reload, an item ... are put down, player.js stopActions)
+    P.beginHands('search');
     GM.search = { it, pos: pos.clone(), t: 0, dur: GM.searchDur(base), icon, onDone, label: label || '探索中…', pryT: 0 };
     G.sfx.mech('boltBack', 0, 0.8);
   };

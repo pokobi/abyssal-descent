@@ -131,7 +131,11 @@
 
     // ---------------- teammates on the screen; getting one back up ----------------
     const REVIVE = 5; // seconds of holding the key
-    let rvT = 0, rvWho = null;
+    let rvT = 0, rvWho = null, rvHeld = false;
+    // reviving takes the hands like a reload or a bandage (player.js stopActions): starting it puts those down, and starting one of them
+    // puts the revive down (the key has to be let go and held again)
+    P.handsHooks = P.handsHooks || {};
+    P.handsHooks.revive = { active: () => rvT > 0, stop: () => { rvT = 0; rvHeld = true; }, word: '起こすのを中断' };
     const specOrder = () => [...K.players.values()].filter((p) => p.id !== K.id && !p.dead);
     let specI = 0;
     window.addEventListener('mousedown', () => { if (K.live && P.dead && P.revives <= 0) specI++; });
@@ -183,7 +187,10 @@
         rv.style.display = 'block';
         rv.children[0].textContent = `${G.K('interact')} 長押しで ${near.name} を起こす`;
         if (rvWho !== near.id) { rvWho = near.id; rvT = 0; }
-        rvT = I.down('interact') ? rvT + dt : 0;
+        if (!I.down('interact')) rvHeld = false;
+        const rvOn = I.down('interact') && !rvHeld && !P.handsBlocked();
+        if (rvOn && rvT <= 0) P.beginHands('revive');
+        rvT = rvOn ? rvT + dt : 0;
         rv.children[1].firstChild.style.width = Math.min(100, rvT / REVIVE * 100) + '%';
         if (rvT >= REVIVE) { rvT = 0; G.sfx.heal(); K.send({ t: 'rv', to: near.id, n: K.name }); K.feed(`${U.esc(near.name)} を起こした`, true); }
       } else if (rv.style.display !== 'none') { rv.style.display = 'none'; rvT = 0; rvWho = null; }

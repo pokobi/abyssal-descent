@@ -2507,7 +2507,9 @@
         if (Math.random() < 0.18) G.fx.add.spawn(x, r.y + 0.3, z, U.rand(-1, 1), U.rand(2, 5.5), U.rand(-1, 1), U.rand(0.8, 1.7), 0.05, 0.01, 1.7, 0.6, 0.15, 1, -0.4, 0.4);
         // solid (non-additive) flame bodies so the fire still reads as deep orange-red against a bright sky
         if (Math.random() < 0.5) G.fx.norm.spawn(x, r.y + 0.25, z, U.rand(-0.3, 0.3), U.rand(2.2, 4.2), U.rand(-0.3, 0.3), U.rand(0.35, 0.6), U.rand(0.6, 1.0), 0.12, 1.0, U.rand(0.25, 0.45), 0.04, 0.85, -1.2, 1);
-        if (Math.random() < 0.16) G.fx.norm.spawn(x, r.y + 1.8, z, U.rand(-0.3, 0.3), U.rand(1.2, 2.2), U.rand(-0.3, 0.3), 2.6, 0.8, 3.0, 0.05, 0.04, 0.04, 0.55, -0.2, 0.3);
+        // (the smoke off the bed: grey, climbing and spreading thin as it goes - not a black lump in a grey sky. Far off and in a thick fog it
+        // takes the fog's colour and is fainter)
+        if (Math.random() < 0.16) { const fg = scene.fog, fd = Math.hypot(x - cp.x, z - cp.z), fk = Math.min(0.6, fg.density * 7 + fd / 160), fa = (1 - 0.5 * Math.min(1, fd / 70)) * (1 - 0.4 * Math.min(1, fg.density * 18)), c0 = 0.17, c1 = 0.3; G.fx.norm.spawn(x, r.y + 1.8, z, U.rand(-0.3, 0.3), U.rand(1.0, 1.8), U.rand(-0.3, 0.3), U.rand(3.2, 4.6), 0.7, 3.6, c0 + (fg.color.r - c0) * fk, c0 * 0.95 + (fg.color.g - c0 * 0.95) * fk, c0 * 0.9 + (fg.color.b - c0 * 0.9) * fk, 0.55 * fa, -0.25, 0.35, c1 + (fg.color.r - c1) * Math.min(1, fk + 0.3), c1 + (fg.color.g - c1) * Math.min(1, fk + 0.3), c1 + (fg.color.b - c1) * Math.min(1, fk + 0.3)); }
       }
     }
   }

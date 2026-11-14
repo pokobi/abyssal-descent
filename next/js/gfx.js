@@ -1414,11 +1414,15 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     mpart('gold', [rbx(0.024, 0.008, 0.04, 0.003, 0, -0.066, 0), hl([[0.0005, 0.054], [0.0175, 0.054], [0.0185, 0.062], [0.0165, 0.072], [0.0005, 0.072]], 0.8, 1.3)]),
     mpart('blade', straight([[0.072, 0.016, 0.02, 0.0068, 0.0048, 0.004], [0.13, 0.016, 0.022, 0.0068, 0.0048, 0.008], [0.19, 0.017, 0.027, 0.0066, 0.0046, 0.008], [0.25, 0.018, 0.036, 0.0064, 0.0044, 0], [0.305, 0.016, 0.036, 0.006, 0.004, -0.012], [0.35, 0.011, 0.026, 0.005, 0.003, -0.024]], [0.39, -0.034])),
   ] });
-  // the machete: a long plain blade that widens to a heavy end
+  // the machete: a thin blade ground flat from near its spine to the edge, widening to a heavy end; the flats of plain steel, the edge
+  // bevel bright where it has been sharpened; a bolster at its root; a grip of two wooden scales on the tang, three rivets through them
+  const MACH = [[0.074, 0.017, 0.022, 0.0034, 0.003], [0.09, 0.017, 0.024, 0.0033, 0.0029], [0.2, 0.017, 0.028, 0.0032, 0.0028], [0.32, 0.017, 0.034, 0.0031, 0.0027], [0.42, 0.0165, 0.039, 0.003, 0.0026], [0.47, 0.011, 0.04, 0.0028, 0.0022], [0.5, -0.002, 0.035, 0.0024, 0.0016]];
+  const machEdge = (w) => MACH.map(([y, a, b, T]) => { const dr = -a + (a + b) * 0.1, d1 = b - w, h = T / 2 * w / (b - dr) + 0.00022; return [y, -d1, b, h * 2, h * 2, 0, 0.02]; });
   MP.machete = () => ({ tipY: 0.52, parts: [
-    mpart('dark', hl([[0.0005, -0.066], [0.0175, -0.066], [0.0185, -0.05], [0.016, -0.03], [0.0172, -0.005], [0.016, 0.02], [0.0172, 0.045], [0.016, 0.062], [0.0005, 0.062]], 0.8, 1.2)),
-    mpart('steel', [rbx(0.024, 0.014, 0.04, 0.005, 0, -0.072, -0.004), rbx(0.022, 0.012, 0.052, 0.004, 0, 0.068, 0)]),
-    mpart('blade', straight([[0.076, 0.018, 0.024, 0.0058, 0.0042], [0.25, 0.018, 0.03, 0.0056, 0.004], [0.4, 0.018, 0.04, 0.0054, 0.0038], [0.46, 0.012, 0.04, 0.005, 0.0034], [0.5, -0.004, 0.034, 0.004, 0.0024]], [0.52, -0.026])),
+    mpart('wood', hl([[0.0005, -0.068], [0.0168, -0.068], [0.019, -0.06], [0.0172, -0.045], [0.0158, -0.02], [0.0166, 0.01], [0.0158, 0.04], [0.0165, 0.058], [0.0005, 0.06]], 0.68, 1.22)),
+    mpart('steel', [rbx(0.0034, 0.124, 0.0428, 0.0008, 0, -0.004, 0), rbx(0.0072, 0.014, 0.046, 0.0022, 0, 0.066, 0.0015)].concat([-0.046, -0.012, 0.024].map((y) => prism(0.0029, 0.0236, [0, y, 0], [0, 0, HX], 8)))),
+    mpart('steel', straight(MACH.map((r) => r.concat([0, 0.1])), [0.522, -0.024])),
+    mpart('blade', straight(machEdge(0.0065), [0.522, -0.024])),
   ] });
   // the long sword of the east: a wound grip with its ornaments, a round guard, a collar, a curved blade with a ridge
   const katana = (em) => {
@@ -2492,15 +2496,20 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     return { lever: l, ring: Geo.merge([ring, prism(0.003, 0.05, [-0.008, top + 0.028, 0], [0, 0, HX], 5)]) };
   };
   const dots = (r, y, n, rad, a0) => { const l = []; for (let i = 0; i < n; i++) { const a = (a0 || 0) + i / n * Math.PI * 2, g = new THREE.CylinderGeometry(rad, rad, 0.004, 8); g.rotateX(HX); g.rotateY(-a + HX); g.translate(Math.cos(a) * (r + 0.001), y, Math.sin(a) * (r + 0.001)); l.push(g); } return l; };
-  // the fragmentation grenade: cast iron cut into squares, a brass fuze, a spoon and a pin
+  // the fragmentation grenade: cast iron in eight columns and five rows of square knobs, the grooves between them cut with sloping
+  // sides (as a mould leaves them), a band about its waist; the fuze of steel, the spoon, the pin and its ring
   GREN.g_frag = () => {
-    const g = new THREE.LatheGeometry(spl([[0.0005, -0.1], [0.045, -0.096], [0.072, -0.06], [0.08, -0.01], [0.076, 0.04], [0.058, 0.08], [0.034, 0.096], [0.0005, 0.099]], 26), 32), ps = g.attributes.position;
-    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), a = Math.atan2(z, x), cut = (Math.abs(Math.sin(a * 4)) < 0.2 || Math.abs(Math.sin(y * 62 + 0.6)) < 0.22) && Math.abs(y) < 0.085 ? 0.9 : 1; ps.setX(i, x * cut); ps.setZ(i, z * cut); }
+    const g = new THREE.LatheGeometry(spl([[0.0005, -0.1], [0.045, -0.096], [0.072, -0.06], [0.08, -0.01], [0.076, 0.04], [0.058, 0.08], [0.034, 0.096], [0.0005, 0.099]], 30), 44), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) {
+      const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), a = Math.atan2(z, x), ca = Math.abs(((a / (Math.PI / 4)) % 1 + 1) % 1 - 0.5) * 2, cy = Math.abs((((y + 0.082) / 0.034) % 1 + 1) % 1 - 0.5) * 2;
+      const grv = Math.max(Math.max(0, 1 - (1 - ca) / 0.16), Math.max(0, 1 - (1 - cy) / 0.2)), k = Math.abs(y) < 0.084 ? 1 - 0.085 * Math.min(1, grv * 1.6) : 1;
+      ps.setX(i, x * k); ps.setZ(i, z * k);
+    }
     g.computeVertexNormals(); const s = spoon(0.1, 0.07);
-    return [gq('iron', g), gq('brassOld', [fuze(0.1), s.ring]), gq('tin', s.lever)];
+    return [gq('iron', g), gq('tin', [fuze(0.1), s.lever]), gq('brassOld', s.ring)];
   };
-  // the incendiary: a tin painted red, a glass let into its side with the oil behind it, a yellow band, a fuze and spoon
-  GREN.g_fire = () => { const s = spoon(0.088, 0.05); return [gq('cRed', can(0.05, 0.17)), gq('cYellow', gband(0.05, 0.052, 0.014)), gq('iron', [gband(0.05, -0.03, 0.062), fuze(0.088)]), gq('oil', ball(0.03, [0, -0.03, 0.036], [0.8, 0.85, 0.55])), gq('tin', s.lever), gq('brassOld', s.ring)]; };
+  // the incendiary: a tin painted a dull red, a glass let into its side with the oil behind it, a band of brass, a fuze and spoon
+  GREN.g_fire = () => { const s = spoon(0.088, 0.05); return [gq('paperOld', can(0.05, 0.17)), gq('brassOld', gband(0.05, 0.052, 0.014)), gq('iron', [gband(0.05, -0.03, 0.062), fuze(0.088)]), gq('oil', ball(0.03, [0, -0.03, 0.036], [0.8, 0.85, 0.55])), gq('tin', s.lever), gq('brassOld', s.ring)]; };
   // the water skin: a bladder of hide tied at the neck with a blue rag (the bladder: one in radius, it wobbles)
   GREN.g_water = () => [
     gq('hide', new THREE.LatheGeometry(spl([[0.0005, -1], [0.55, -0.95], [0.92, -0.6], [1.0, -0.1], [0.86, 0.4], [0.5, 0.8], [0.26, 1.02], [0.2, 1.12], [0.0005, 1.14]], 22), 18), 'bag'),
@@ -2513,14 +2522,14 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const s = spoon(0.082, 0.048);
     return [gq('tin', [can(0.048, 0.16), fuze(0.082), s.lever]), gq('cBlue', [gband(0.048, 0.036, 0.018), gband(0.048, -0.04, 0.018)]), gq('ice', rime), gq('gBlue', ball(0.008, [0, 0.127, 0])), gq('brassOld', s.ring)];
   };
-  // the shock charge: an insulator of glazed clay in three skirts, wound with copper wire, two rods out of its head
+  // the shock charge: an insulator of glazed clay in three skirts, wound with copper wire, two rods out of its head with brass terminals
   GREN.g_shock = () => {
     const coil = []; for (let i = 0; i < 7; i++) coil.push(new THREE.TorusGeometry(0.039, 0.0035, 4, 16).rotateX(HX + 0.06).translate(0, -0.052 + i * 0.009, 0));
     return [gq('ceramicW', hl([[0.0005, -0.08], [0.04, -0.08], [0.046, -0.07], [0.036, -0.06], [0.036, 0.008], [0.056, 0.016], [0.058, 0.024], [0.034, 0.034], [0.034, 0.044], [0.05, 0.052], [0.052, 0.06], [0.03, 0.07], [0.028, 0.082], [0.0005, 0.084]], 1, 1, 18)),
-      gq('copper', coil), gq('tin', [prism(0.005, 0.06, [0.014, 0.11, 0], null, 6), prism(0.005, 0.06, [-0.014, 0.11, 0], null, 6)]), gq('gYellow', [ball(0.007, [0.014, 0.142, 0]), ball(0.007, [-0.014, 0.142, 0])])];
+      gq('copper', coil), gq('tin', [prism(0.005, 0.06, [0.014, 0.11, 0], null, 6), prism(0.005, 0.06, [-0.014, 0.11, 0], null, 6)]), gq('brassOld', [prism(0.0075, 0.007, [0.014, 0.142, 0], null, 6), prism(0.0075, 0.007, [-0.014, 0.142, 0], null, 6), prism(0.0058, 0.004, [0.014, 0.147, 0], null, 8), prism(0.0058, 0.004, [-0.014, 0.147, 0], null, 8)])];
   };
   // the gas can: brass gone green, vents in a ring about its middle, a green band, a fuze and spoon
-  GREN.g_toxic = () => { const s = spoon(0.084, 0.05); return [gq('verdigris', can(0.05, 0.16)), gq('cGreen', gband(0.05, 0.05, 0.016)), gq('dark', dots(0.05, 0, 8, 0.0065).concat(dots(0.05, -0.022, 8, 0.0065, 0.39))), gq('gGreen', gband(0.05, -0.052, 0.004)), gq('iron', fuze(0.084)), gq('tin', s.lever), gq('brassOld', s.ring)]; };
+  GREN.g_toxic = () => { const s = spoon(0.084, 0.05); return [gq('verdigris', can(0.05, 0.16)), gq('cGreen', gband(0.05, 0.05, 0.016)), gq('dark', dots(0.05, 0, 8, 0.0065).concat(dots(0.05, -0.022, 8, 0.0065, 0.39))), gq('cGreen', gband(0.05, -0.052, 0.006)), gq('iron', fuze(0.084)), gq('tin', s.lever), gq('brassOld', s.ring)]; };
   // the limpet: an iron puck with teeth round its rim, set in a pad of dark glue that has run (its light: grenfx's own)
   GREN.g_sticky = () => {
     const teeth = []; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; teeth.push(spike(0.011, 0.03, [Math.cos(a) * 0.072, -0.012, Math.sin(a) * 0.072], [Math.PI * 0.72, -a + HX, 0], 4)); }
@@ -2529,8 +2538,9 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   };
   // the flash charge: a steel tube pierced in two rings, capped at both ends, two pale bands, a fuze and spoon
   GREN.g_flash = () => { const s = spoon(0.084, 0.044); return [gq('tin', [can(0.044, 0.16), fuze(0.084), s.lever]), gq('cWhite', [gband(0.044, 0.058, 0.01), gband(0.044, -0.058, 0.01)]), gq('dark', dots(0.044, 0.024, 6, 0.008).concat(dots(0.044, -0.024, 6, 0.008, 0.52))), gq('brassOld', s.ring)]; };
-  // the void charge: a ball of black glass in a cage of two iron hoops (they turn), a seam of violet light about it
-  GREN.g_hole = () => [gq('black', new THREE.SphereGeometry(0.072, 20, 14)), gq('gPurple', [new THREE.TorusGeometry(0.0725, 0.0022, 4, 28).rotateX(HX + 0.3), ball(0.006, [0, 0.02, 0.071])]),
+  // the void charge: a heavy ball of iron in two halves joined at a seam, a lens of black glass let into its face, in a cage of two iron
+  // hoops (they turn)
+  GREN.g_hole = () => [gq('iron', new THREE.SphereGeometry(0.072, 24, 16)), gq('dark', [new THREE.TorusGeometry(0.0726, 0.0024, 4, 32).rotateX(HX + 0.3), new THREE.TorusGeometry(0.0726, 0.0024, 4, 32).rotateX(HX - 0.3)]), gq('black', [ball(0.022, [0, 0.0, 0.062], [1, 1, 0.45])]), gq('tin', [new THREE.TorusGeometry(0.023, 0.0028, 5, 18).translate(0, 0, 0.066)]),
     gq('iron', new THREE.TorusGeometry(0.105, 0.006, 5, 28), 'ring0'), gq('iron', new THREE.TorusGeometry(0.09, 0.005, 5, 26), 'ring1')];
   // the nail bomb: a ball of clay with nails driven into it all round, tied crosswise with cord
   GREN.g_nail = () => {
@@ -2538,12 +2548,12 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const nails = []; for (let i = 0; i < 13; i++) { const a = i * 2.4, b = Math.asin(((i * 5) % 13) / 6.5 - 1), d = [Math.cos(a) * Math.cos(b), Math.sin(b), Math.sin(a) * Math.cos(b)]; nails.push(Geo.rod([d[0] * 0.055, d[1] * 0.055, d[2] * 0.055], [d[0] * 0.1, d[1] * 0.1, d[2] * 0.1], 0.0035, 5, 0.003), ball(0.0075, [d[0] * 0.1, d[1] * 0.1, d[2] * 0.1], [1, 1, 1])); }
     return [gq('clay', g), gq('tin', nails), gq('rope', [new THREE.TorusGeometry(0.074, 0.005, 4, 22).rotateX(0.2), new THREE.TorusGeometry(0.074, 0.005, 4, 22).rotateY(HX).rotateZ(0.15)])];
   };
-  // the shatter charge: a pale crystal of six sides held in a cage of steel - four bows between two rings - a light at its heart
+  // the shatter charge: a pale crystal of six sides held in a cage of steel - four bows between two rings
   GREN.g_shatter = () => {
     const cr = Geo.merge([new THREE.ConeGeometry(0.05, 0.085, 6).toNonIndexed().translate(0, 0.0425, 0), new THREE.ConeGeometry(0.05, 0.085, 6).toNonIndexed().rotateX(Math.PI).translate(0, -0.0425, 0)]); cr.computeVertexNormals();
     const cage = [new THREE.TorusGeometry(0.022, 0.004, 4, 12).rotateX(HX).translate(0, 0.098, 0), new THREE.TorusGeometry(0.022, 0.004, 4, 12).rotateX(HX).translate(0, -0.098, 0)];
     for (let i = 0; i < 4; i++) { const a = i * HX + 0.4, c = Math.cos(a), s = Math.sin(a); cage.push(tubeR([[c * 0.022, 0.098, s * 0.022], [c * 0.06, 0.055, s * 0.06], [c * 0.068, 0, s * 0.068], [c * 0.06, -0.055, s * 0.06], [c * 0.022, -0.098, s * 0.022]], 0.0035, 4, 12)); }
-    return [gq('crystal', cr), gq('tin', cage), gq('gWhite', ball(0.012, [0, 0, 0]))];
+    return [gq('glass', cr), gq('tin', cage)];
   };
   // dynamite: three sticks in waxed paper, their ends folded in, bound twice with cord (the fuse and its spark: grenfx's own)
   GREN.g_dyna = () => {
@@ -2619,26 +2629,308 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   X.wareGeo = function (name) { if (wareC[name] !== undefined) return wareC[name]; let r = null; try { r = WARE[name] ? WARE[name]() : null; } catch (e) { console.warn('gfx: no ware', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } return (wareC[name] = r); };
 
   // ---- what is held in the hand while it is used (itemanim.js), in metres about the grip: lists of parts { g, m (which of
-  // itemanim's materials) }. What moves by itself - the liquor going down, the plunger - stays itemanim's own ----
+  // itemanim's materials), tag, at }. A part with a tag is one itemanim moves by itself (the liquor that goes down from its foot at
+  // 'at', the plunger, the tube that is squeezed flat, the bandage that is wound on) ----
   const ITEM = {}, itemC = {};
-  // a phial: straight sides, a shoulder, a neck with a lip; a cork under wax, a cord about the neck
-  ITEM.drink = () => [
-    gq('glass', hl([[0.0005, -0.055], [0.026, -0.055], [0.03, -0.048], [0.03, 0.022], [0.024, 0.036], [0.013, 0.046], [0.013, 0.078], [0.017, 0.082], [0.017, 0.088], [0.011, 0.088], [0.011, 0.05], [0.0005, 0.05]], 1, 1, 16)),
-    gq('cork', hl([[0.0005, 0.076], [0.0105, 0.076], [0.012, 0.1], [0.0005, 0.102]], 1, 1, 10)), gq('wax', hl([[0.0125, 0.086], [0.0185, 0.09], [0.017, 0.1], [0.011, 0.106], [0.0005, 0.107]], 1, 1, 10)),
-    gq('cord', [new THREE.TorusGeometry(0.0145, 0.002, 4, 12).rotateX(HX).translate(0, 0.06, 0), rbx(0.022, 0.028, 0.0015, 0.0005, 0.026, 0.04, 0.012, [0, 0.4, 0.5])])];
-  // a syringe of brass and glass, drawn along y: a barrel between two caps, finger rests, a needle
-  ITEM.inject = () => [
-    gq('glass', hl([[0.0005, -0.06], [0.012, -0.06], [0.012, 0.06], [0.0005, 0.06]], 1, 1, 12)),
-    gq('brass', [hl([[0.0005, -0.072], [0.004, -0.072], [0.006, -0.062], [0.0135, -0.06], [0.0135, -0.05], [0.0125, -0.05]], 1, 1, 12), hl([[0.0125, 0.05], [0.0135, 0.05], [0.0135, 0.062], [0.0005, 0.064]], 1, 1, 12),
-      rbx(0.062, 0.004, 0.014, 0.002, 0, 0.06, 0), new THREE.TorusGeometry(0.0128, 0.0012, 4, 12).rotateX(HX).translate(0, 0.0, 0), new THREE.TorusGeometry(0.0128, 0.0012, 4, 12).rotateX(HX).translate(0, -0.025, 0)]),
-    gq('steel', prism(0.0012, 0.05, [0, -0.097, 0], null, 5))];
-  // its plunger, about where itemanim holds it: a rod, a thumb ring
-  ITEM.plunger = () => [gq('brass', [prism(0.004, 0.07, [0, 0, 0], null, 6), new THREE.TorusGeometry(0.012, 0.003, 5, 12).translate(0, 0.047, 0), hl([[0.0005, -0.036], [0.0105, -0.036], [0.0105, -0.03], [0.0005, -0.03]], 1, 1, 10)])];
-  // a roll of linen, wound about x: the turns show at its ends, the loose end hangs
-  ITEM.bandage = () => {
-    const g = hl([[0.0005, -0.03], [0.008, -0.03], [0.012, -0.027], [0.016, -0.03], [0.02, -0.027], [0.024, -0.03], [0.03, -0.028], [0.03, 0.028], [0.024, 0.03], [0.02, 0.027], [0.016, 0.03], [0.012, 0.027], [0.008, 0.03], [0.0005, 0.03]], 1, 1, 16); g.rotateZ(HX);
-    return [gq('cloth', [g, sheet(-0.07, 0, () => 0.028, (x, v) => 0.03 - (1 - v) * (1 - v) * 0.02, 4, 1, 0.0015)])];
+  // (the surfaces they need that the rest of the game has not got, baked the same way when first asked for: [size, normal strength,
+  // GLSL]. Pale where the material's colour is to tint them; the tin of the kit is painted in its own colours)
+  const ISURF = {
+    // unbleached cotton gauze: a loose plain weave, each thread its own thickness and swelling along its length, fuzz over it, the
+    // gaps dark with the turn beneath, handled grey in patches
+    linen: [512, 0.55, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float N = 64.; vec2 p = uv * N, c = floor(p), f = fract(p);
+  float tw = .5 + .32 * vnA(vec2(c.x, uv.y * 7.), vec2(N, 7.), 1.), tf = .5 + .32 * vnA(vec2(uv.x * 7., c.y), vec2(7., N), 2.);
+  float ow = mod(c.x + c.y, 2.);
+  float qw = clamp(abs(f.x - .5) / (tw * .5), 0., 1.), qf = clamp(abs(f.y - .5) / (tf * .5), 0., 1.);
+  float aw = sqrt(1. - qw * qw), af = sqrt(1. - qf * qf);
+  float hw = aw * mix(.42, .62 + .38 * sin(f.y * 3.14159), ow), hf = af * mix(.42, .62 + .38 * sin(f.x * 3.14159), 1. - ow);
+  float th = max(hw, hf), gap = step(.999, qw) * step(.999, qf);
+  float fz = vnoise(uv * 320., 320., 5.), n1 = fbm(uv, 3., 7.), n2 = fbm(uv, 10., 8.);
+  float dirt = smoothstep(.52, .78, n1 * .7 + n2 * .3);
+  h = .3 + th * .5 + (fz - .5) * .08 - gap * .12;
+  vec3 c0 = vec3(.88, .83, .72) * (.9 + (n2 - .5) * .14) * (.86 + th * .18) * (.96 + (fz - .5) * .1);
+  c0 = mix(c0, vec3(.6, .55, .45), dirt * .5);
+  c0 = mix(c0, vec3(.34, .3, .24), gap * .8);
+  col = S(c0); rough = .94; metal = 0.;
+}`],
+    // the end of a roll of it: the turns wound tight in a spiral, the cut threads showing end on, the seams between turns dark
+    rollEnd: [256, 0.8, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  vec2 q = uv - .5; float r = length(q) * 2., a = atan(q.y, q.x) / 6.2831853;
+  float w = (fbm(uv, 5., 3.) - .5) * .7, s = r * 17. - a + w, d = abs(fract(s) - .5);
+  float seam = smoothstep(.3, .5, d), fib = vnoise(vec2(a * 900., r * 68.), 900., 6.), n1 = fbm(uv, 4., 9.);
+  h = .6 - seam * .45 + (fib - .5) * .18 - smoothstep(.85, 1., r) * .2;
+  vec3 c = vec3(.84, .79, .68) * (.92 + (fib - .5) * .16) * (.95 + (n1 - .5) * .1);
+  c = mix(c, vec3(.42, .38, .31), seam * .7);
+  c = mix(c, vec3(.62, .57, .47), smoothstep(.6, 1., r) * .35);
+  col = S(c); rough = .95; metal = 0.;
+}`],
+    // a forearm's skin: fine creases, pores, a few hairs along it, weathered and grimed in patches
+    skin: [256, 0.45, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 3., 1.), n2 = fbm(uv, 14., 2.), pr = vnoise(uv * 180., 180., 3.);
+  vec3 v = voro(uv, 46., 4.); float cl = smoothstep(.0, .07, v.y - v.x);
+  float hair = smoothstep(.95, .995, vnA(vec2(uv.x * 140., uv.y * 9.), vec2(140., 9.), 6.)) * smoothstep(.45, .7, fbm(uv, 5., 7.));
+  float grime = smoothstep(.55, .85, fbm(uv, 4., 9.) + (n2 - .5) * .3);
+  h = .5 + cl * .07 - smoothstep(.72, .95, pr) * .12 + (n2 - .5) * .1;
+  vec3 c = mix(vec3(.66, .54, .46), vec3(.55, .43, .36), n1);
+  c *= .93 + (n2 - .5) * .14; c = mix(c, vec3(.4, .32, .26), grime * .45); c = mix(c, vec3(.22, .16, .12), hair * .55);
+  col = S(c); rough = .58 + (n2 - .5) * .16 + grime * .22; metal = 0.;
+}`],
+    // a paper label, foxed and darkened to its edges, four lines of brown ink in a hand and a heading (laid on 0..1 once, not repeated)
+    label: [256, 0.3, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 4., 1.), n2 = fbm(uv, 30., 2.);
+  float row = uv.y * 6., ri = floor(row), ry = fract(row);
+  float word = step(.42, vnA(vec2(uv.x * 9., ri * 3.), vec2(9., 18.), 3.)) * step(.5, ri) * step(ri, 3.5) * step(.08, uv.x) * step(uv.x, .92);
+  float pen = smoothstep(.55, .9, sin(uv.x * 210. + sin(uv.x * 37. + ri) * 2.) * .5 + .5) * smoothstep(.2, .08, abs(ry - .5 + sin(uv.x * 70. + ri * 3.) * .09));
+  float big = step(3.5, ri) * step(ri, 4.5) * smoothstep(.3, .14, abs(ry - .45)) * step(.18, uv.x) * step(uv.x, .82) * smoothstep(.35, .7, sin(uv.x * 120.) * .5 + .5);
+  float ink = max(word * pen, big) * (.75 + n2 * .25);
+  float edge = smoothstep(.0, .12, min(min(uv.x, 1. - uv.x), min(uv.y, 1. - uv.y)));
+  vec3 fx = voro(uv, 9., 5.); float fox = smoothstep(.12, .0, fx.x) * step(.7, fx.z);
+  vec3 c = mix(vec3(.5, .42, .3), vec3(.8, .73, .58), edge * .6 + n1 * .4);
+  c = mix(c, vec3(.5, .36, .22), fox * .5); c = mix(c, vec3(.17, .12, .09), ink * .85);
+  h = .5 + (n2 - .5) * .2 - ink * .05; col = S(c); rough = .9 - ink * .2; metal = 0.;
+}`],
+    // tinplate painted a dull green-grey: the paint chipped and scratched to the metal, the metal browned with rust where it shows
+    kitTin: [512, 0.5, `
+void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
+  float n1 = fbm(uv, 4., 1.), n2 = fbm(uv, 16., 2.), n3 = vnoise(uv * 120., 120., 3.);
+  float chip = smoothstep(.62, .66, fbm(uv, 7., 4.) * .7 + n2 * .3);
+  float scr = smoothstep(.82, .95, ridge(uv, 6., 5.)) * smoothstep(.4, .7, fbm(uv, 3., 6.));
+  float bare = max(chip, scr * .9), rust = smoothstep(.55, .8, fbm(uv, 9., 7.)) * bare;
+  vec3 paint = vec3(.30, .32, .24) * (.88 + (n1 - .5) * .2 + (n3 - .5) * .06);
+  vec3 tin = mix(vec3(.62, .62, .6), vec3(.36, .22, .14), rust * .8);
+  col = S(mix(paint, tin, bare)); h = .55 - bare * .12 + (n3 - .5) * .03;
+  rough = mix(.72 + (n2 - .5) * .14, .42 + rust * .4, bare); metal = bare * (1. - rust * .8);
+}`],
   };
+  const isurfC = {};
+  X.itemTex = function (name) {
+    if (isurfC[name] !== undefined) return isurfC[name];
+    const src = ISURF[name], renderer = G.renderer; if (!src || !renderer) return null;
+    isurfC[name] = null;
+    try { const rts = X.bake(renderer, src[0], src[2], { normal: src[1], ao: 2 }); isurfC[name] = { map: rts[0].texture, normalMap: rts[1].texture, orm: rts[2].texture }; } catch (e) { console.warn('gfx: no item surface', name, e); }
+    return isurfC[name];
+  };
+  // a strip of cloth along a line: at each of n+1 steps s (0..1) its middle c(s), the way across it a(s) (unit), its half width
+  // w(s), m faces across; off(u, s) moves a point of it (a torn hem). uv: along and across, in metres x k
+  const strip = (n, m, c, a, w, k, off) => {
+    const pos = [], uv = [], idx = []; let L = 0, pv = null;
+    for (let i = 0; i <= n; i++) {
+      const s = i / n, C = c(s), A = a(s), W = w(s); if (pv) L += Math.hypot(C[0] - pv[0], C[1] - pv[1], C[2] - pv[2]); pv = C;
+      for (let j = 0; j <= m; j++) { const u = j / m * 2 - 1, o = off ? off(u, s) : null; pos.push(C[0] + A[0] * u * W + (o ? o[0] : 0), C[1] + A[1] * u * W + (o ? o[1] : 0), C[2] + A[2] * u * W + (o ? o[2] : 0)); uv.push(L * k, (u + 1) * W * k); }
+    }
+    for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) { const a0 = i * (m + 1) + j, b = a0 + 1, c0 = a0 + m + 1, d = c0 + 1; idx.push(a0, c0, b, b, c0, d); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  };
+  // a tube about z: at nz+1 steps from z0 to z1, nr+1 points round at radius rf(z, a) (a: 0 out to +x, up to +y); uv round 0..ku,
+  // along z x kv. The normals across its seam are joined
+  const ringTube = (z0, z1, nz, nr, rf, ku, kv) => {
+    const pos = [], uv = [], idx = [];
+    for (let i = 0; i <= nz; i++) { const z = z0 + (z1 - z0) * i / nz; for (let j = 0; j <= nr; j++) { const a = j / nr * Math.PI * 2, r = rf(z, a); pos.push(Math.cos(a) * r, Math.sin(a) * r, z); uv.push(j / nr * ku, z * kv); } }
+    for (let i = 0; i < nz; i++) for (let j = 0; j < nr; j++) { const a0 = i * (nr + 1) + j, b = a0 + 1, c = a0 + nr + 1, d = c + 1; idx.push(a0, b, c, b, d, c); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    const nm = g.attributes.normal; for (let i = 0; i <= nz; i++) { const a0 = i * (nr + 1), b = a0 + nr, x = nm.getX(a0) + nm.getX(b), y = nm.getY(a0) + nm.getY(b), z = nm.getZ(a0) + nm.getZ(b), l = Math.hypot(x, y, z) || 1; nm.setXYZ(a0, x / l, y / l, z / l); nm.setXYZ(b, x / l, y / l, z / l); }
+    return g;
+  };
+  // the uv of a lathe's surface in metres: round it (a whole number of repeats, so its seam does not show) and up it, x k
+  const latheUV = (g, R, k) => { const ps = g.attributes.position, uv = g.attributes.uv, nu = Math.max(1, Math.round(Math.PI * 2 * R * k)); for (let i = 0; i < ps.count; i++) uv.setXY(i, uv.getX(i) * nu, ps.getY(i) * k); return g; };
+  // a piece of a label wrapped round a body of radius r about y: from angle a0 to a1 (0 looks to +z), y0 to y1; uv 0..1 over it
+  const wrapLabel = (r, a0, a1, y0, y1, n) => { const g = ringTube(0, 1, 1, n || 12, () => r, 1, 1), ps = g.attributes.position, uv = g.attributes.uv; for (let i = 0; i < ps.count; i++) { const j = i % ((n || 12) + 1), t = j / (n || 12), a = a0 + (a1 - a0) * t, v = ps.getZ(i); ps.setXYZ(i, Math.sin(a) * r, y0 + (y1 - y0) * v, Math.cos(a) * r); uv.setXY(i, t, v); } g.computeVertexNormals(); return g; };
+  // a wire bent along points (a pin, a loop of string)
+  const wire = (pts, r, seg, sm) => tubeR(pts, r, seg || 4, sm);
+  // a cork pushed into a neck of radius r at y, its top standing h above, a little crushed; sealing wax over it and down the lip
+  const corkG = (r, y, h) => hl([[0.0005, y - 0.012], [r * 0.92, y - 0.012], [r, y - 0.004], [r * 1.03, y + h * 0.4], [r * 1.07, y + h * 0.85], [r * 0.95, y + h], [0.0005, y + h * 1.02]], 1, 1, 14);
+  const waxG = (r, y, h, drip) => { const g = hl([[r * 0.99, y - 0.0015], [r * 1.05, y - 0.0008], [r * 1.07, y + h * 0.3], [r * 1.04, y + h * 0.75], [r * 0.9, y + h + 0.0006], [r * 0.5, y + h + 0.0011], [0.0005, y + h + 0.0012]], 1, 1, 18), ps = g.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), z = ps.getZ(i), yy = ps.getY(i), a = Math.atan2(z, x), lo = yy < y + h * 0.2 ? 1 : 0; ps.setY(i, yy - lo * (drip || 0.006) * Math.max(0, Math.sin(a * 3 + 1)) * Math.max(0, Math.sin(a * 5))); const k = 1 + 0.03 * Math.sin(a * 7 + yy * 300); ps.setX(i, x * k); ps.setZ(i, z * k); }
+    g.computeVertexNormals(); return g; };
+  // a band of string twice round a neck at y, radius r, its knot and two ends hanging
+  const tieG = (r, y, len) => { const out = []; for (const dy of [0, 0.0024]) out.push(new THREE.TorusGeometry(r, 0.0011, 4, 18).rotateX(HX).translate(0, y + dy, 0)); out.push(ball(0.0024, [0, y + 0.0012, r + 0.0012], [1.2, 1, 0.8])); for (const sx of [-1, 1]) out.push(wire([[sx * 0.001, y + 0.001, r + 0.0018], [sx * 0.0028, y - len * 0.45, r + 0.0014 + len * 0.05], [sx * (0.002 + len * 0.1), y - len, r + 0.001 + len * 0.12]], 0.0009, 4, 8)); return out; };
+  // ---- a roll of gauze bandage, wound about x: W wide, R across. Its turns show at its ends (rollEnd); wound by hand, it is not quite
+  // round, and threads have come loose at its edges ----
+  const BW = 0.05, BR = 0.0185, BK = 25;
+  const rollK = (a, x) => 1 + 0.014 * Math.sin(a * 3 + 1) + 0.007 * Math.sin(a * 7 + 2) + 0.003 * Math.sin(x * 260 + a * 5);
+  const rollWob = (g) => { const ps = g.attributes.position; for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), k = rollK(Math.atan2(z, y), x); ps.setY(i, y * k); ps.setZ(i, z * k); } g.computeVertexNormals(); return g; };
+  const rollParts = (R, W) => {
+    const body = latheUV(Geo.lathe([[R - 0.0012, -W / 2], [R - 0.0004, -W / 2 + 0.0007], [R, -W / 2 + 0.0022], [R * 1.004, -W * 0.22], [R * 1.005, 0], [R * 1.004, W * 0.22], [R, W / 2 - 0.0022], [R - 0.0004, W / 2 - 0.0007], [R - 0.0012, W / 2]], 32), R, BK);
+    body.rotateZ(HX); rollWob(body);
+    const ends = [];
+    for (const sx of [-1, 1]) { const d = new THREE.CircleGeometry(R - 0.0012, 32); d.attributes.position.setZ(0, -0.0007); d.rotateY(sx * HX); d.translate(sx * W / 2, 0, 0); rollWob(d); ends.push(d); }
+    return { body, ends };
+  };
+  const frays = (R, W, n, seed) => { const out = []; for (let i = 0; i < n; i++) { const a = seed + i * 2.39, sx = i % 2 ? 1 : -1, r = R * rollK(a, sx * W / 2) - 0.0009, c = Math.cos(a), s = Math.sin(a), l = 0.003 + (i % 3) * 0.0022;
+    out.push(wire([[sx * (W / 2 - 0.001), c * r, s * r], [sx * (W / 2 + l * 0.6), c * (r + l * 0.3), s * (r + l * 0.3)], [sx * (W / 2 + l), c * (r - l * 0.2) + 0.001, s * (r - l * 0.2)]], 0.0003, 3, 4)); } return out; };
+  // the whole roll as it comes out of a pouch: its free end off the top, round the front and hanging, torn across, a few threads loose
+  // from the tear; a safety pin of brass through it to fasten it with when it is on
+  ITEM.bandage = () => {
+    const R = BR, W = BW, rp = rollParts(R, W), zf = R * rollK(HX, 0) + 0.0007;
+    const c = (s) => { if (s < 0.18) { const p = -0.25 - 0.65 * s / 0.18; return [0, Math.sin(p) * zf, Math.cos(p) * zf]; } const t = (s - 0.18) / 0.82; return [Math.sin(t * 3) * 0.0025 * t, Math.sin(-0.9) * zf - t * 0.034, Math.cos(-0.9) * zf - t * 0.004 + t * t * 0.007 + t * t * t * 0.006 + Math.sin(t * 4) * 0.0012 * t]; };
+    const a = (s) => { const t = Math.max(0, s - 0.18) / 0.82, q = 0.5 * t * t; return [Math.cos(q), 0.06 * t, -Math.sin(q)]; };
+    const torn = (u) => 0.0016 * Math.sin(u * 23 + 1) + 0.0012 * Math.sin(u * 53) + 0.0008 * Math.sin(u * 97 + 2) + 0.0006 * Math.sin(u * 151);
+    const tail = strip(16, 16, c, a, (s) => W / 2 * (1 - 0.03 * s), BK, (u, s) => [0, s > 0.999 ? torn(u) : 0, Math.sin(u * 3.1) * 0.0012 * Math.max(0, s - 0.18)]);
+    const loose = [], t1 = c(1), A1 = a(1);
+    for (let i = 0; i < 5; i++) { const u = -0.8 + i * 0.4 + 0.07 * Math.sin(i * 3), x = t1[0] + A1[0] * u * W / 2, y = t1[1] + torn(u), z = t1[2] + A1[2] * u * W / 2, l = 0.005 + (i % 3) * 0.004;
+      loose.push(wire([[x, y + 0.001, z], [x + 0.001 * Math.sin(i), y - l * 0.5, z + 0.0012], [x + 0.002 * Math.cos(i * 2), y - l, z + 0.0006 * i]], 0.00028, 3, 5)); }
+    const pq = c(0.18 + 0.82 * 0.36), py = pq[1], pz = pq[2] + 0.0011, pin = [
+      wire([[-0.0128, py + 0.0017, pz], [0.0112, py + 0.0017, pz + 0.0002]], 0.00055, 5, false),
+      wire([[-0.0128, py - 0.0017, pz], [-0.005, py - 0.0016, pz - 0.0016], [0.004, py - 0.0016, pz - 0.0016], [0.0112, py - 0.0014, pz]], 0.00055, 5, 10),
+      new THREE.TorusGeometry(0.0018, 0.00055, 4, 10).translate(-0.0136, py, pz), new THREE.TorusGeometry(0.0018, 0.00055, 4, 10).translate(-0.0136, py, pz + 0.0011),
+      rbx(0.0046, 0.0044, 0.0019, 0.0007, 0.0126, py + 0.0002, pz + 0.0003)];
+    return [gq('linen', [rp.body, tail].concat(loose, frays(R, W, 8, 0.4))), gq('rollEnd', rp.ends), gq('brassOld', pin)];
+  };
+  // the roll alone, as it is held while it is wound on (itemanim winds it off: it turns, it grows less)
+  ITEM.bandRoll = () => { const rp = rollParts(BR, BW * 0.9); return [gq('linen', [rp.body].concat(frays(BR, BW * 0.9, 6, 1.1))), gq('rollEnd', rp.ends)]; };
+
+  // ---- the forearm that is seen to (itemanim's other arm), bare to where its sleeve is rolled back: the wrist at the origin, running
+  // along +z to the elbow at 0.26. armR(z, a): how far its skin stands from that line (a: 0 out to the thumb side, +x; the back of the
+  // arm up +y) - flat and narrow at the wrist, the muscle swelling on the outer side towards the elbow ----
+  const armR = (z, a) => {
+    const t = Math.min(1, Math.max(0, z / 0.26)), w = 0.0255 + 0.016 * Math.pow(Math.sin(Math.min(1, t * 1.25) * HX), 1.4), h = 0.0185 + 0.0145 * Math.pow(Math.sin(Math.min(1, t * 1.3) * HX), 1.2);
+    const c = Math.cos(a), s = Math.sin(a), r = 1 / Math.sqrt(c * c / (w * w) + s * s / (h * h));
+    return r + 0.0045 * Math.pow(Math.max(0, Math.cos(a - 0.7)), 2) * Math.sin(Math.PI * Math.min(1, t * 1.15)) + 0.0012 * Math.sin(a * 3 + z * 40) * t;
+  };
+  // (the rolled sleeve: how far it stands off the arm along it - a fat roll, a crease, a second roll, then the sleeve going on to the elbow)
+  const SLV = [[0.188, 0.0006], [0.2, 0.007], [0.212, 0.0125], [0.226, 0.0135], [0.238, 0.0095], [0.246, 0.0062], [0.256, 0.0115], [0.272, 0.0122], [0.29, 0.0085], [0.31, 0.0088], [0.4, 0.0095]];
+  const slvOff = (z) => { for (let i = 1; i < SLV.length; i++) if (z <= SLV[i][0]) { const k = (z - SLV[i - 1][0]) / (SLV[i][0] - SLV[i - 1][0]); return SLV[i - 1][1] + (SLV[i][1] - SLV[i - 1][1]) * k; } return SLV[SLV.length - 1][1]; };
+  X.armR = armR; X.BAND = { R: BR, W: BW * 0.9, K: BK };
+  ITEM.forearm = () => [
+    gq('skin', ringTube(-0.016, 0.205, 18, 24, armR, 1, 4.5)),
+    gq('sleeve', ringTube(0.188, 0.4, 16, 24, (z, a) => armR(Math.min(z, 0.26), a) + slvOff(z) * (1 + 0.16 * Math.sin(a * 5 + z * 90) + 0.1 * Math.sin(a * 9 - z * 60)), 7, 14))];
+  // ---- the bandage as it goes on that forearm: once straight round above the wrist, then on in a spiral towards the elbow, each turn
+  // over half the one before. Its triangles lie in the order it is wound (itemanim shows more of it as it goes); path: where the middle
+  // of the band lies at each step [point, outward, the way it runs], for the roll in the hand to follow. Its edges are shaded darker
+  // (vertex colours), where one turn lies over the next ----
+  ITEM.bandWrap = () => {
+    const W = BW * 0.9, z0 = 0.05, per = 28, n = Math.round(3.4 * per), m = 6, pitch = W * 0.56, T2 = Math.PI * 2;
+    const pos = [], uv = [], col = [], idx = [], path = []; let L = 0, pv = null;
+    for (let i = 0; i <= n; i++) {
+      const th = i / per * T2, zc = z0 + pitch * Math.max(0, th - T2) / T2, lift = 0.0012 + 0.0017 * th / T2, a = HX + th, c = Math.cos(a), s = Math.sin(a);
+      const rc = armR(zc, a) + lift, P = [c * rc, s * rc, zc];
+      if (pv) L += Math.hypot(P[0] - pv[0], P[1] - pv[1], P[2] - pv[2]); pv = P;
+      for (let j = 0; j <= m; j++) { const e = j / m - 0.5, rim = j === 0 || j === m, z = zc + e * W + (rim ? 0.0006 * Math.sin(i * 1.9 + j) : 0), r = armR(z, a) + lift - (j === 0 ? 0.0003 : j === m ? 0.0013 : 0) + (j === 1 ? 0.0004 : 0); pos.push(c * r, s * r, z); uv.push(L * BK, (e + 0.5) * W * BK);
+        const k = (j === 0 ? 0.6 : j === m ? 0.74 : j === m - 1 ? 0.9 : 1) * (0.94 + 0.06 * Math.sin(i * 0.7 + j * 2.1)); col.push(k, k * 0.98, k * 0.95); }
+      const dz = th > T2 ? pitch / T2 : 0, tl = Math.hypot(rc, dz);
+      path.push([P[0], P[1], P[2], c, s, 0, -s * rc / tl, c * rc / tl, dz / tl]);
+    }
+    for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) { const a0 = i * (m + 1) + j, b = a0 + 1, c0 = a0 + m + 1, d = c0 + 1; idx.push(a0, c0, b, b, c0, d); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+    return [{ g, m: 'linenV', tag: 'wrap', path, seg: m * 6, W, L }];
+  };
+
+  // ---- a glass syringe, drawn along y with its needle down: a barrel of thick glass marked in black, nickelled ferrules at its ends, a
+  // flange for two fingers, a Luer tip with its lock, the needle on a brass hub. What it holds from its foot at 'at' (itemanim makes it
+  // as tall as the plunger leaves it); the plunger apart ----
+  ITEM.inject = () => {
+    const ticks = []; for (let i = 0; i <= 10; i++) { const y = -0.025 + i * 0.005, w = (i % 2 ? 0.0036 : 0.0068) / 0.0073; ticks.push(wrapLabel(0.00735, -0.25, -0.25 + w, y - 0.00028, y + 0.00028, 3)); }
+    return [
+      gq('glass', Geo.lathe([[0.0005, -0.042], [0.0017, -0.042], [0.0021, -0.034], [0.0045, -0.033], [0.0071, -0.0315], [0.0072, -0.029], [0.0072, 0.031], [0.0068, 0.0325], [0.0061, 0.0325], [0.006, 0.031], [0.006, -0.029], [0.0055, -0.0305], [0.0008, -0.031], [0.0005, -0.031]], 18)),
+      gq('nickel', [hl([[0.0071, -0.0335], [0.0079, -0.0335], [0.0081, -0.0315], [0.0079, -0.026], [0.0071, -0.026]], 1, 1, 18), hl([[0.0071, 0.026], [0.0079, 0.026], [0.0081, 0.03], [0.0081, 0.0325], [0.0071, 0.0325]], 1, 1, 18),
+        hl([[0.0005, 0.0322], [0.0158, 0.0322], [0.0166, 0.0335], [0.0158, 0.0352], [0.0005, 0.0352]], 1, 0.4, 20), hl([[0.0024, -0.0425], [0.0043, -0.0425], [0.0045, -0.04], [0.0045, -0.0355], [0.0036, -0.0335], [0.0024, -0.0335]], 1, 1, 12)]),
+      gq('brassOld', hl([[0.0005, -0.0525], [0.0011, -0.0525], [0.0025, -0.047], [0.0031, -0.0428], [0.0033, -0.0405], [0.0005, -0.0405]], 1, 1, 10)),
+      gq('steel', [prism(0.00034, 0.034, [0, -0.0695, 0], null, 5), spike(0.00034, 0.0028, [0, -0.0878, 0], [Math.PI, 0, 0.2], 4)]),
+      gq('ink', ticks),
+      { g: Geo.lathe([[0.0005, 0], [0.0058, 0], [0.0058, 1], [0.0005, 1]], 14), m: 'liq', tag: 'liq', at: [0, -0.0305, 0] },
+    ];
+  };
+  // its plunger, from the face of its seal (y = 0) up: a seal of black rubber, a nickelled rod, a thumb rest and a ring for the thumb
+  ITEM.plunger = () => [gq('rubber', hl([[0.0005, -0.0062], [0.0057, -0.0062], [0.00595, -0.0052], [0.00575, -0.0034], [0.00595, -0.0016], [0.0057, 0], [0.0005, 0]], 1, 1, 14)),
+    gq('nickel', [prism(0.0017, 0.066, [0, 0.026, 0], null, 6), hl([[0.0005, 0.058], [0.0072, 0.058], [0.0076, 0.0602], [0.0072, 0.0622], [0.0005, 0.0622]], 1, 1, 14), new THREE.TorusGeometry(0.0078, 0.0016, 5, 16).translate(0, 0.0708, 0)])];
+  // ---- a syrette: a little tube of soft tin squeezed flat to give what it holds, crimped shut at its back, printed round its middle;
+  // a short glass neck, the needle under a loop of wire that pierced its seal ----
+  ITEM.syrette = () => {
+    const tube = hl([[0.0005, -0.016], [0.0042, -0.0158], [0.0061, -0.012], [0.0064, 0.016], [0.0062, 0.022], [0.0055, 0.0262], [0.0005, 0.0265]], 1, 1, 16), ps = tube.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const y = ps.getY(i), t = Math.max(0, Math.min(1, (y - 0.01) / 0.016)); ps.setX(i, ps.getX(i) * (1 + t * 0.5) * (1 + 0.04 * Math.sin(y * 900))); ps.setZ(i, ps.getZ(i) * (1 - t * 0.86)); }
+    tube.computeVertexNormals();
+    const crimp = []; for (let i = 0; i < 4; i++) crimp.push(rbx(0.0186, 0.0007, 0.0021, 0.0002, 0, 0.0218 + i * 0.0012, 0));
+    return [
+      { g: Geo.merge([tube].concat(crimp)), m: 'tin', tag: 'squeeze' },
+      gq('label', wrapLabel(0.00648, -1.6, 1.6, -0.006, 0.01, 12)),
+      gq('glass', hl([[0.0005, -0.026], [0.0016, -0.026], [0.0022, -0.02], [0.0036, -0.0168], [0.0043, -0.0158], [0.0005, -0.0158]], 1, 1, 10)),
+      gq('brassOld', hl([[0.0005, -0.031], [0.001, -0.031], [0.0022, -0.0275], [0.0024, -0.0255], [0.0005, -0.0255]], 1, 1, 8)),
+      gq('steel', [prism(0.0003, 0.022, [0, -0.041, 0], null, 5), spike(0.0003, 0.0024, [0, -0.0532, 0], [Math.PI, 0, 0.2], 4), wire([[0.0026, -0.0262, 0], [0.004, -0.031, 0], [0, -0.0335, 0.0004], [-0.004, -0.031, 0], [-0.0026, -0.0262, 0]], 0.00028, 3, 8)]),
+    ];
+  };
+  // ---- the first-aid kit as it is used: a pouch of khaki canvas, its seams piped, a faded red cross on its face; it hangs by its
+  // leather strap from the fist that holds it (the grip up y through the origin), its flap thrown back, what is in it showing at its
+  // mouth - a roll of gauze, a bottle of iodine, the finger rings of the scissors, a dressing in its paper ----
+  ITEM.kit = () => {
+    const W = 0.1, H = 0.068, D = 0.036, y0 = -0.05, cy = y0 - H / 2;
+    const body = X.makeRbox(W, H, D, 0.009, 2), ps = body.attributes.position;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), k = 1 + 0.08 * Math.max(0, 1 - Math.abs(y) / (H / 2)) * Math.max(0, 1 - Math.abs(x) / (W / 2)); ps.setXYZ(i, x + 0.0012 * Math.sin(y * 160 + x * 70), y + cy + (y > H / 2 - 0.002 ? 0.0015 * Math.sin(x * 90) : 0), z * k); }
+    body.computeVertexNormals(); boxUV(body, 18);
+    const pipe = [], e = (pts) => pipe.push(wire(pts, 0.0016, 5, 12));
+    for (const sz of [-1, 1]) e([[-W / 2 + 0.003, y0 - 0.001, sz * (D / 2 - 0.002)], [-W / 2 - 0.0006, cy, sz * (D / 2 + 0.001)], [-W / 2 + 0.004, y0 - H + 0.0015, sz * (D / 2 - 0.001)], [W / 2 - 0.004, y0 - H + 0.0015, sz * (D / 2 - 0.001)], [W / 2 + 0.0006, cy, sz * (D / 2 + 0.001)], [W / 2 - 0.003, y0 - 0.001, sz * (D / 2 - 0.002)]]);
+    e([[-W / 2 + 0.004, y0 + 0.0008, D / 2 - 0.001], [0, y0 + 0.0022, D / 2 + 0.0004], [W / 2 - 0.004, y0 + 0.0008, D / 2 - 0.001]]);
+    // the flap thrown back over the back of it, a brass stud at its edge; the strap up from the back into the fist, sewn on
+    const flap = strip(8, 6, (s) => [0, y0 + 0.004 - Math.sin(s * 2.6) * 0.012 - s * s * 0.03, -D / 2 - 0.004 - Math.sin(s * 2.4) * 0.012], () => [1, 0, 0], (s) => W / 2 * (0.98 - 0.1 * s * s), 18);
+    const strap = strip(10, 2, (s) => [0, y0 - 0.006 + s * 0.085, -D / 2 - 0.0022 + Math.sin(s * 3) * 0.006 * (1 - s) + s * 0.013], () => [1, 0, 0], () => 0.0095, 18);
+    const brass = [hl([[0.0005, 0], [0.0042, 0], [0.0046, 0.0015], [0.003, 0.003], [0.0005, 0.0032]], 1, 1, 10).rotateX(-HX).translate(0, y0 - 0.028, -D / 2 - 0.0125), rbx(0.022, 0.0035, 0.004, 0.001, 0, y0 + 0.004, -D / 2 - 0.0036)];
+    // the cross, painted and worn, and the bottle, the gauze and the scissors at the mouth
+    const cross = [rbx(0.03, 0.009, 0.001, 0.0003, 0, cy + 0.002, D / 2 * 1.075), rbx(0.009, 0.03, 0.001, 0.0003, 0, cy + 0.002, D / 2 * 1.075)];
+    const rp = rollParts(0.012, 0.034); for (const g of [rp.body].concat(rp.ends)) { g.rotateZ(HX); g.translate(-0.026, y0 + 0.006, 0.002); }
+    const bott = [hl([[0.0005, -0.03], [0.0085, -0.03], [0.0095, -0.028], [0.0095, 0.0], [0.0075, 0.005], [0.0045, 0.008], [0.0045, 0.014], [0.0055, 0.015], [0.0055, 0.018], [0.0005, 0.018]], 1, 1, 14).translate(0.014, y0 + 0.002, -0.004)];
+    const cork = corkG(0.0042, y0 + 0.0182, 0.006).translate(0.014, 0, -0.004);
+    const sc = []; for (const sx of [-1, 1]) sc.push(new THREE.TorusGeometry(0.0062, 0.0014, 5, 14).rotateY(0.2).translate(0.036 + sx * 0.0068, y0 + 0.012, 0.004 + sx * 0.002), wire([[0.036 + sx * 0.004, y0 + 0.006, 0.004], [0.036 + sx * 0.0015, y0 - 0.01, 0.004]], 0.0012, 5, false));
+    return [gq('canvas', [body]), gq('canvas', [flap]), gq('leather', strap), gq('brassOld', brass), gq('canvasDk', pipe), gq('cross', cross),
+      gq('linen', rp.body), gq('rollEnd', rp.ends), gq('glassBrown', bott), gq('cork', cork), gq('steel', sc), gq('label', rbx(0.026, 0.02, 0.003, 0.001, -0.004, y0 + 0.002, -0.011, [0.2, 0, 0.1])), gq('dark', rbx(W - 0.012, 0.003, D - 0.01, 0.001, 0, y0 + 0.0003, 0))];
+  };
+
+  // ---- what is drunk from: each its own vessel. Glass is thick (its inner face is drawn too), what it holds stands in it from its
+  // foot at 'at' up to how full it is (itemanim lowers it as it is drunk); a cork, wax over it, a label of paper, a string ----
+  const VLIQ = (pts, at, seg) => ({ g: Geo.lathe(pts, seg || 16), m: 'liq', tag: 'liq', at });
+  // an apothecary's phial: a round shoulder, a lip; corked, waxed, tied, labelled in a hand
+  ITEM.phial = () => [
+    gq('glass', Geo.lathe([[0.0005, -0.05], [0.017, -0.05], [0.0205, -0.047], [0.0215, -0.04], [0.0215, 0.018], [0.0195, 0.026], [0.012, 0.034], [0.0085, 0.04], [0.0085, 0.058], [0.0105, 0.061], [0.0105, 0.065], [0.0075, 0.066], [0.006, 0.066], [0.006, 0.04], [0.011, 0.033], [0.0185, 0.024], [0.0195, 0.016], [0.0195, -0.04], [0.017, -0.044], [0.0005, -0.0445]], 18)),
+    VLIQ([[0.0005, 0], [0.0166, 0], [0.0188, 0.004], [0.0188, 0.05], [0.0005, 0.05]], [0, -0.0443, 0]),
+    gq('label', wrapLabel(0.0218, -0.95, 0.95, -0.034, 0.008, 14)),
+    gq('cork', corkG(0.0061, 0.058, 0.012)), gq('wax', waxG(0.0098, 0.06, 0.012, 0.007)),
+    gq('cord', tieG(0.0089, 0.044, 0.016).concat([rbx(0.016, 0.022, 0.0006, 0.0002, 0.006, 0.02, 0.024, [0.15, 0.35, 0.2])])),
+  ];
+  ITEM.drink = ITEM.phial;
+  // a pilgrim's flask of pewter: a round body flattened like a lens, a raised rim about it, a cross and a ring struck on its face, two
+  // loops at its shoulders with a cord through them, a short neck, a cork
+  ITEM.ampulla = () => {
+    const lens = new THREE.SphereGeometry(0.031, 22, 14), ps = lens.attributes.position; for (let i = 0; i < ps.count; i++) { const y = ps.getY(i); ps.setXYZ(i, ps.getX(i), y * 1.12 - 0.008, ps.getZ(i) * 0.42 * (1 - 0.15 * Math.max(0, y / 0.031))); } lens.computeVertexNormals();
+    const face = []; for (const sz of [-1, 1]) face.push(rbx(0.0034, 0.024, 0.0016, 0.0005, 0, -0.008, sz * 0.0128), rbx(0.017, 0.0034, 0.0016, 0.0005, 0, -0.004, sz * 0.0128), new THREE.TorusGeometry(0.0205, 0.0009, 4, 28).scale(1, 1.12, 1).translate(0, -0.008, sz * 0.0113));
+    return [gq('pewter', [lens, new THREE.TorusGeometry(0.0312, 0.0021, 6, 36).scale(1, 1.12, 1).translate(0, -0.008, 0), hl([[0.0062, 0.022], [0.0068, 0.03], [0.0058, 0.038], [0.0061, 0.043], [0.0076, 0.045], [0.0076, 0.048], [0.005, 0.0485]], 1, 1, 14),
+        new THREE.TorusGeometry(0.0062, 0.0017, 5, 10, Math.PI).rotateZ(-0.5).translate(0.0145, 0.026, 0), new THREE.TorusGeometry(0.0062, 0.0017, 5, 10, Math.PI).rotateZ(0.5 + Math.PI).rotateY(Math.PI).translate(-0.0145, 0.026, 0)].concat(face)),
+      gq('cork', corkG(0.0049, 0.046, 0.008)), gq('wax', waxG(0.0072, 0.0465, 0.008, 0.004)),
+      gq('cord', wire([[0.019, 0.028, 0], [0.022, 0.036, 0.003], [0.014, 0.05, 0.005], [0, 0.056, 0.005], [-0.014, 0.05, 0.005], [-0.022, 0.036, 0.003], [-0.019, 0.028, 0]], 0.0011, 4, 20))];
+  };
+  // a flask of stoneware: brown salt glaze dipped over its shoulder and run unevenly towards the foot, the clay bare below; a cord about
+  // its neck, a cork
+  ITEM.stoneware = () => {
+    const P = [[0.0005, -0.055], [0.022, -0.055], [0.0275, -0.052], [0.031, -0.043], [0.0325, -0.028], [0.031, -0.006], [0.026, 0.014], [0.0165, 0.029], [0.0095, 0.035], [0.0088, 0.05], [0.0108, 0.0525], [0.011, 0.057], [0.0078, 0.058]];
+    const clay = Geo.lathe(P, 22), glz = Geo.lathe(P.filter((p) => p[1] > -0.046).map((p) => [p[0] + 0.0004, p[1]]), 22), gp = glz.attributes.position;
+    for (let i = 0; i < gp.count; i++) { const x = gp.getX(i), z = gp.getZ(i), y = gp.getY(i); if (y < -0.04) { const a = Math.atan2(z, x); gp.setY(i, y + 0.004 + 0.004 * Math.sin(a * 3 + 1) + 0.003 * Math.sin(a * 7) - 0.006 * Math.max(0, Math.sin(a * 5 + 2)) * Math.max(0, Math.sin(a * 2))); } }
+    glz.computeVertexNormals();
+    return [gq('clay', clay), gq('glaze', glz), gq('cork', corkG(0.0074, 0.054, 0.009)), gq('cord', tieG(0.0094, 0.042, 0.02))];
+  };
+  // a bottle of brown glass with flat sides, ribbed at its edges as a poison bottle is, a label on its face, a cork
+  ITEM.tonic = () => {
+    const ribs = []; for (const sx of [-1, 1]) for (let i = 0; i < 5; i++) ribs.push(rbx(0.0012, 0.05, 0.0012, 0.0004, sx * 0.0198, -0.012, -0.009 + i * 0.0045));
+    return [gq('glassBrown', [X.makeRbox(0.04, 0.072, 0.024, 0.006, 2).translate(0, -0.016, 0), hl([[0.006, 0.016], [0.011, 0.022], [0.0068, 0.03], [0.0068, 0.042], [0.0088, 0.044], [0.0088, 0.049], [0.0055, 0.0495]], 1, 1, 14)].concat(ribs)),
+      { g: X.makeRbox(0.034, 0.05, 0.018, 0.004, 1).translate(0, 0.025, 0), m: 'liq', tag: 'liq', at: [0, -0.049, 0] },
+      gq('label', rbx(0.03, 0.038, 0.0007, 0.0002, 0, -0.018, 0.0123)), gq('cork', corkG(0.0052, 0.044, 0.01))];
+  };
+  // a slim vial of clear glass with a ground glass stopper, a paper tag tied to its neck
+  ITEM.vial = () => [
+    gq('glass', [Geo.lathe([[0.0005, -0.05], [0.004, -0.0495], [0.0072, -0.046], [0.0082, -0.04], [0.0082, 0.03], [0.0088, 0.033], [0.0088, 0.036], [0.0062, 0.0365], [0.0062, 0.033], [0.007, 0.03], [0.007, -0.04], [0.006, -0.0445], [0.0005, -0.045]], 16),
+      hl([[0.0005, 0.024], [0.0055, 0.024], [0.0061, 0.036], [0.0075, 0.038], [0.008, 0.042], [0.0062, 0.05], [0.0005, 0.052]], 1, 1, 14)]),
+    VLIQ([[0.0005, 0], [0.006, 0], [0.0068, 0.004], [0.0068, 0.06], [0.0005, 0.06]], [0, -0.0445, 0]),
+    gq('cord', tieG(0.0086, 0.028, 0.01)), gq('label', rbx(0.012, 0.018, 0.0006, 0.0002, 0.006, 0.012, 0.012, [0.1, 0.5, -0.3]))];
+  // a small round bottle with a long neck, sealed (the fairy's: what is in it is pale and clouded)
+  ITEM.fairy = () => [
+    gq('glass', Geo.lathe([[0.0005, -0.03], [0.012, -0.03], [0.019, -0.022], [0.021, -0.008], [0.018, 0.006], [0.0085, 0.014], [0.0058, 0.02], [0.0058, 0.044], [0.0074, 0.046], [0.0074, 0.049], [0.0045, 0.0495], [0.0042, 0.02], [0.0068, 0.0145], [0.0165, 0.006], [0.0192, -0.008], [0.0172, -0.021], [0.011, -0.0265], [0.0005, -0.027]], 18)),
+    VLIQ([[0.0005, 0], [0.0108, 0], [0.0168, 0.005], [0.0188, 0.019], [0.0165, 0.032], [0.0005, 0.032]], [0, -0.0262, 0]),
+    gq('cork', corkG(0.0041, 0.044, 0.008)), gq('wax', waxG(0.0068, 0.045, 0.008, 0.005)), gq('cord', tieG(0.0063, 0.03, 0.012))];
+  // the sleeve of the arm that holds a thing, from the glove's cuff (the origin) back along +z towards the elbow: a cuff turned back,
+  // the cloth loose and creased about the forearm
+  ITEM.sleeveArm = () => [gq('sleeve', ringTube(-0.004, 0.34, 12, 18, (z, a) => (0.033 + 0.012 * Math.min(1, z / 0.25)) * (1 + 0.06 * Math.sin(a * 4 + z * 50) * Math.min(1, z * 12) + 0.03 * Math.sin(a * 7 - z * 80)) * (0.92 + 0.08 * Math.abs(Math.cos(a))) + (z < 0.03 ? 0.004 * Math.sin(Math.PI * Math.max(0, z) / 0.03) : 0), 6, 16))];
+  // which vessel each draught comes in (the rest: the phial)
+  X.VESSEL = { h_elixir: 'phial', h_water: 'ampulla', h_ambrosia: 'stoneware', u_iron: 'tonic', u_invis: 'vial', h_fairy: 'fairy' };
   // an apple with its stalk and a leaf; a heart cut out of something large; a sprig of herbs tied with thread
   ITEM.apple = () => [gq('gold', new THREE.LatheGeometry(spl([[0.0005, 0.028], [0.012, 0.036], [0.034, 0.034], [0.046, 0.008], [0.04, -0.026], [0.022, -0.04], [0.008, -0.036], [0.0005, -0.03]], 18), 16)),
     gq('wood', tubeR([[0, 0.03, 0], [0.003, 0.046, 0], [0.01, 0.058, 0]], 0.0025, 4, 4)), gq('green', Geo.xf(sheet(-0.035, 0, (v) => 0.014 * Math.sin(Math.PI * (0.1 + 0.9 * v)), (x) => -x * x * 12, 4, 2, 0), [0.012, 0.05, 0], [0.4, 0.3, -1.9]))];
@@ -2666,7 +2958,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   ITEM.u_lantern = () => { const o = []; for (const q of (X.wareGeo && X.wareGeo('revive')) || []) { const g = q.g.clone(); g.scale(0.36, 0.36, 0.36); o.push({ g, m: q.m === 'iron' ? 'gun' : 'glass', tag: null }); } return o; };
   ITEM.u_whet = () => [gq('stone', [rbx(0.12, 0.022, 0.04, 0.005, 0, 0, 0)])];
   ITEM.device = () => [gq('gun', rbx(0.08, 0.055, 0.06, 0.006, 0, 0, 0)), gq('brass', [rbx(0.03, 0.02, 0.064, 0.003, 0, 0.018, 0), rbx(0.084, 0.006, 0.064, 0.002, 0, -0.018, 0), ball(0.005, [0, 0.018, 0.033])])];
-  X.itemGeo = function (name) { if (itemC[name] !== undefined) return itemC[name]; let r = null; try { r = ITEM[name] ? ITEM[name]() : null; } catch (e) { console.warn('gfx: no item', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } return (itemC[name] = r); };
+  X.itemGeo = function (name) { if (itemC[name] !== undefined) return itemC[name]; let r = null; try { r = ITEM[name] ? ITEM[name]() : null; if (r) for (const q of r) if (q && q.g) { q.g = Geo.weld(q.g); q.g.computeBoundingSphere(); } } catch (e) { console.warn('gfx: no item', name, e); (X.propErr = X.propErr || {})[name] = String(e && e.stack).slice(0, 300); r = null; } return (itemC[name] = r); };
 
   // ---- what is fitted to a gun (weapons.js), in the gun's own measure (forward is -z): lists of parts { g, m }. A muzzle piece
   // starts at the muzzle and runs forward of it, r its radius there; what hangs under the barrel hangs from the origin ----

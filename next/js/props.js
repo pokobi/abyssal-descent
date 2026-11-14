@@ -100,6 +100,7 @@
   // a thing shaped in gfx.js (propGeo: parts by material) set down in the world's own mesh: turned by ry, sized by s (o.sy: its height
   // apart; o.rx, o.rz: leaning; o.inst: drawn as instances - for what there is much of)
   function put(w, name, x, y, z, ry, s, o) {
+    if (name === 'furnacemouth') (w._furnaces || (w._furnaces = [])).push([x, y, z, ry || 0, (o && o.sx) || s || 1, (o && o.sy) || s || 1]);   // (for P.dress: the heat and soot about each mouth)
     const parts = G.GFX && G.GFX.propGeo ? G.GFX.propGeo(name) : null; if (!parts) return false;
     o = o || {}; s = s || 1;
     const m = M(x, y, z, o.sx || s, o.sy || s, o.sz || o.sx || s, o.rx || 0, ry || 0, o.rz || 0);
@@ -397,7 +398,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     R *= .6 + .4 * smoothstep(3.14, 2.75, aa);
     float inside = smoothstep(R + .025, R - .025, rq + (vnoise(q * 6. + li, 1000., 60.) - .5) * .04);
     float vein = smoothstep(.028, .0, abs(q.x)) * step(-.15, q.y) * .6 + smoothstep(.02, .0, abs(abs(q.x) * cos(1.3) - q.y * sin(1.3))) * step(0., abs(q.x) * sin(1.3) + q.y * cos(1.3)) * .4;
-    vec3 g = li > 2.5 ? vec3(.4, .32, .18) : mix(vec3(.27, .32, .15), vec3(.36, .39, .19), n2);
+    vec3 g = li > 2.5 ? vec3(.3, .24, .14) : mix(vec3(.12, .155, .08), vec3(.18, .22, .11), n2);
     a = inside; c = g * (1. + vein * .35) * (1. - smoothstep(.6, 1., rq / max(R, .01)) * .2) * (.9 + .2 * hash12(vec2(li, 61.))); h = .5 + inside * (.05 - rq * .04) - vein * .03;
     edge = 1.;
   } else if (k < 12.5) {
@@ -494,10 +495,54 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       return done(g, 0.1);
     };
     S.chunk = [chunk(1), chunk(2)];
+    // a piece of cut stone: a block with its edges and corners taken off (eight corners, three points each: six faces, twelve bevels,
+    // eight corner facets), its corners wandered a little, one knocked well in where it broke off the wall
+    const cut = (k) => {
+      const hx = 0.5, hy = 0.36, hz = 0.42, P = [], V = [], brk = Math.floor(h3(k, 2, 7, 1) * 8);
+      for (let ci = 0; ci < 8; ci++) {
+        const sx = ci & 1 ? 1 : -1, sy = ci & 2 ? 1 : -1, sz = ci & 4 ? 1 : -1, c = 0.05 + 0.04 * h3(ci, k, 3, 1), j = (q) => 1 + (h3(ci, k, q, 2) - 0.5) * 0.16, kn = ci === brk ? 0.55 : ci === (brk + 5) % 8 ? 0.8 : 1;
+        const X = sx * hx * j(1) * kn, Y = sy * hy * j(2) * kn, Z = sz * hz * j(3) * kn;
+        V.push([[X, Y - sy * c, Z - sz * c], [X - sx * c, Y, Z - sz * c], [X - sx * c, Y - sy * c, Z]]);   // (on its x face, y face, z face)
+      }
+      // (each face shaded as one: the normal of the whole quad (across its diagonals) given to both its triangles - its corners do not
+      // lie quite in a plane, and two triangles each shaded its own way showed a fold across the face)
+      const N = [], tri = (a, b, c, n) => { const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2]; let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const mx = a[0] + b[0] + c[0], my = a[1] + b[1] + c[1], mz = a[2] + b[2] + c[2]; if (nx * mx + ny * my + nz * mz >= 0) P.push(...a, ...b, ...c); else { P.push(...a, ...c, ...b); nx = -nx; ny = -ny; nz = -nz; } if (n) { const s = n[0] * nx + n[1] * ny + n[2] * nz >= 0 ? 1 : -1; nx = n[0] * s; ny = n[1] * s; nz = n[2] * s; } const l = Math.hypot(nx, ny, nz) || 1; for (let k = 0; k < 3; k++) N.push(nx / l, ny / l, nz / l); };
+      const quad = (a, b, c, d) => { const ex = c[0] - a[0], ey = c[1] - a[1], ez = c[2] - a[2], fx = d[0] - b[0], fy = d[1] - b[1], fz = d[2] - b[2], n = [ey * fz - ez * fy, ez * fx - ex * fz, ex * fy - ey * fx]; tri(a, b, c, n); tri(a, c, d, n); };
+      const C = (sx, sy, sz) => (sx > 0 ? 1 : 0) + (sy > 0 ? 2 : 0) + (sz > 0 ? 4 : 0);
+      for (const s of [-1, 1]) {
+        quad(V[C(s, -1, -1)][0], V[C(s, 1, -1)][0], V[C(s, 1, 1)][0], V[C(s, -1, 1)][0]);
+        quad(V[C(-1, s, -1)][1], V[C(1, s, -1)][1], V[C(1, s, 1)][1], V[C(-1, s, 1)][1]);
+        quad(V[C(-1, -1, s)][2], V[C(1, -1, s)][2], V[C(1, 1, s)][2], V[C(-1, 1, s)][2]);
+      }
+      for (const a of [-1, 1]) for (const b of [-1, 1]) {
+        quad(V[C(-1, a, b)][1], V[C(1, a, b)][1], V[C(1, a, b)][2], V[C(-1, a, b)][2]);   // (edges along x: between the y and z faces)
+        quad(V[C(a, -1, b)][0], V[C(a, 1, b)][0], V[C(a, 1, b)][2], V[C(a, -1, b)][2]);
+        quad(V[C(a, b, -1)][0], V[C(a, b, 1)][0], V[C(a, b, 1)][1], V[C(a, b, -1)][1]);
+      }
+      for (let ci = 0; ci < 8; ci++) tri(V[ci][0], V[ci][1], V[ci][2]);
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+      const U = new Float32Array(P.length / 3 * 2); for (let i = 0; i < U.length / 2; i++) { U[i * 2] = P[i * 3] + P[i * 3 + 2] * 0.7; U[i * 2 + 1] = P[i * 3 + 1] + P[i * 3 + 2] * 0.3; } g.setAttribute('uv', new THREE.BufferAttribute(U, 2));
+      return done(g, 0.3, true);
+    };
+    S.cut = [cut(1), cut(2), cut(3)];
+    // a broken lump of rock: a dodecahedron's points pushed in and out, a few cut flat where it split (flat-shaded: facets)
+    const lump = (k) => {
+      const g = new THREE.DodecahedronGeometry(0.5, 0).toNonIndexed(), p = g.attributes.position, key = (x, y, z) => Math.round(x * 40) + ',' + Math.round(y * 40) + ',' + Math.round(z * 40), mv = new Map();
+      const cutN = [h3(k, 5, 1, 0) - 0.5, h3(k, 5, 2, 0) * 0.6 - 0.1, h3(k, 5, 3, 0) - 0.5], cl = Math.hypot(...cutN) || 1;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i), q = key(x, y, z); let r = mv.get(q);
+        if (r === undefined) { r = 0.78 + 0.4 * h3(Math.round(x * 40), Math.round(y * 40), Math.round(z * 40), k); mv.set(q, r); }
+        let X = x * r * 1.1, Y = y * r * 0.72, Z = z * r * 0.92; const dd = (X * cutN[0] + Y * cutN[1] + Z * cutN[2]) / cl - 0.22;
+        if (dd > 0) { X -= cutN[0] / cl * dd; Y -= cutN[1] / cl * dd; Z -= cutN[2] / cl * dd; }   // (split flat on one side)
+        p.setXYZ(i, X, Y, Z);
+      }
+      return done(g, 0.25);
+    };
+    S.lump = [lump(1), lump(2), lump(3)];
     // a piece of a flagstone: six uneven sides, a hand thick
     {
       const sh = new THREE.Shape(); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + (h3(i, 4, 1, 0) - 0.5) * 0.6, r = 0.36 + h3(i, 4, 2, 0) * 0.2; if (i) sh.lineTo(Math.cos(a) * r, Math.sin(a) * r); else sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
-      const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, steps: 1 }); g.rotateX(-Math.PI / 2);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.7, bevelEnabled: true, bevelThickness: 0.15, bevelSize: 0.05, bevelSegments: 1, steps: 1 }); g.rotateX(-Math.PI / 2);   // (its edges taken off)
       S.slab = done(g, 0.35);
     }
     // a bone broken off: a tapering shaft of five sides
@@ -575,7 +620,9 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const std = (o) => { const m = new THREE.MeshStandardMaterial(Object.assign({ roughness: K.rough, metalness: 0 }, o)); m.envMapIntensity = 0.35; return m; };
     M.heap = std({ map: T && T.map, normalMap: T && T.normalMap, aoMap: T && T.orm, aoMapIntensity: 0.9, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     // (the rim of a heap, where it thins to nothing on the floor: blended, not dithered - a dither stood out as dots close by and crawled as one moved)
-    M.heapRim = std({ map: T && T.map, normalMap: T && T.normalMap, aoMap: T && T.orm, aoMapIntensity: 0.9, vertexColors: true, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    // (it writes its depth, as the solid part does: else the frame's pass that brightens an edge standing out (post.js, the bend of the
+    // surface) saw the solid part end in a step over the floor, and drew a bright line along it)
+    M.heapRim = std({ map: T && T.map, normalMap: T && T.normalMap, aoMap: T && T.orm, aoMapIntensity: 0.9, vertexColors: true, transparent: true, depthWrite: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     M.band = std({ map: T && T.map, normalMap: T && T.normalMap, vertexColors: true, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });   // (its edge is the vertices' alpha, wandering by noise: the grain is in its picture)
     if (D) {
       const dm = (rough, env) => { const m = std({ map: D.map, normalMap: D.normalMap, alphaMap: D.orm, roughness: rough, vertexColors: true, transparent: true, depthWrite: false, alphaTest: 0.045, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); m.envMapIntensity = env; return m; };
@@ -588,7 +635,9 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       M.wall = std({ map: WT.map, normalMap: WT.normalMap, alphaMap: WT.orm, roughness: 0.9, vertexColors: true, transparent: true, depthWrite: false, alphaTest: 0.03, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
       M.leafW = std({ map: WT.map, normalMap: WT.normalMap, alphaMap: WT.orm, roughness: 0.78, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide });
       M.web = std({ map: WT.map, alphaMap: WT.orm, roughness: 0.7, vertexColors: true, transparent: true, depthWrite: false, alphaTest: 0.02, side: THREE.DoubleSide });
-      M.wall.name = 'wallmark'; M.leafW.name = 'vine'; M.web.name = 'web';   // (by name: what tells a drawn thing from one you stand on - nothing of these stops anyone)
+      M.wall.name = 'wallmark'; M.leafW.name = 'vine'; M.web.name = 'web';
+      // (roots: thin solid tubes, dry grey-brown to dark brown by their points' colour; the soil's grain along them)
+      M.root = std({ map: T && T.map, vertexColors: true, roughness: 0.93 }); M.root.name = 'vine';   // (by name: what tells a drawn thing from one you stand on - nothing of these stops anyone)
     }
     M.snowI = std({ map: T && T.map, normalMap: T && T.normalMap, roughness: 0.8, color: 0xffffff });
     return (DR.mats[key] = M);
@@ -756,13 +805,15 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     for (const k of keep) { const r = k[2] + 0.25; stamp(k[0] - r, k[1] - r, k[0] + r, k[1] + r, k[0], k[1], r); }
     for (const q of zones) stamp(q.x0 - 0.25, q.z0 - 0.25, q.x1 + 0.25, q.z1 + 0.25, 0, 0, 0);
     const clearOf = (x, z) => { const i = Math.floor((x - KX0) * 2), j = Math.floor((z - KZ0) * 2); return i < 0 || j < 0 || i >= KW || j >= KD || !KG[j * KW + i]; };
-    // the floors the nav reaches in the metre cell at (x, z), each storey's (into NF)
-    const NF = [];
+    // the floors the nav reaches in the metre cell at (x, z), each storey's: worked out once a cell and kept (not to be changed by who
+    // asks: a fresh array to change)
+    const NF0 = [], NFC = new Map();
     const navFloors = (x, z) => {
-      NF.length = 0; if (!w.nf || !w.navIdx) return NF;
-      const i0 = w.navIdx(x, z); if (i0 < 0) return NF;
-      for (let l = 0, N = w.N || 0; l < (w.L || 1); l++) { const n = l * N + i0; if (!(w.nf[n] > -50) || w.nb[n] || (w.reachMask && !w.reachMask[n])) continue; NF.push(w.nf[n]); }
-      return NF;
+      if (!w.nf || !w.navIdx) return NF0;
+      const i0 = w.navIdx(x, z); if (i0 < 0) return NF0;
+      let a = NFC.get(i0); if (a) return a; a = [];
+      for (let l = 0, N = w.N || 0; l < (w.L || 1); l++) { const n = l * N + i0; if (!(w.nf[n] > -50) || w.nb[n] || (w.reachMask && !w.reachMask[n])) continue; a.push(w.nf[n]); }
+      NFC.set(i0, a); return a;
     };
     const navAt = (x, z, f, tol) => { for (const v of navFloors(x, z)) if (Math.abs(v - f) <= tol) return true; return false; };
     // (is the floor at (x, z) the one at f: on uneven ground a look at the colliders, on flat floors the nav's cell or its own floor)
@@ -791,6 +842,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       for (let gx = Math.floor(c.x0 / 4); gx <= Math.floor(c.x1 / 4); gx++) for (let gz = Math.floor(c.z0 / 4); gz <= Math.floor(c.z1 / 4); gz++) { const k = gx * 4096 + gz; (FOC.get(k) || FOC.set(k, []).get(k)).push(c); }
     }
     const inFoot = (x, z, y) => { const L = FOC.get(Math.floor(x / 4) * 4096 + Math.floor(z / 4)); if (L) for (const c of L) if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y > c.y0 && y < c.y1) return true; return false; };
+    // (the top of the plinth at (x, z) over the floor at y: -Infinity if none)
+    const footTop = (x, z, y) => { let t = -Infinity; const L = FOC.get(Math.floor(x / 4) * 4096 + Math.floor(z / 4)); if (L) for (const c of L) if (x > c.x0 - 0.05 && x < c.x1 + 0.05 && z > c.z0 - 0.05 && z < c.z1 + 0.05 && y > c.y0 - 0.1 && y < c.y1 && c.y1 > t) t = c.y1; return t; };
     st.footOut = FO.length;
     const tgHigh = (c, x, z) => { const g = c.tg, hf = g.hf, cx = Math.floor(x - g.ox), cz = Math.floor(z - g.oz); if (cx < 0 || cz < 0 || cx >= hf.W || cz >= hf.D) return false; const i = cz * hf.W + cx; return !!hf.m[i] && hf.h[i] >= c.y1 - 0.6; };
     const spans = (c, x, z) => { for (const nf of navFloors(x, z)) if (c.y0 <= nf + 0.1 && c.y1 >= nf + 0.25) return true; return false; };
@@ -1091,7 +1144,9 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       if (mk === 'wall') mk = it.mk ? wallMk(it.mk) : kind === 'mine' ? 'rock' : 'block';
       if (mk === 'floor' && kind === 'out') mk = 'cobble';
       if (!(mk in w.mats) && !MT[mk]) continue;
-      const geo = Array.isArray(SH[L.g]) ? SH[L.g][Math.floor(u4 * SH[L.g].length) % SH[L.g].length] : SH[L.g];
+      // (a block fallen from a wall: a piece of cut stone, or out of rock a broken lump)
+      const gk = L.g === 'chunk' && t !== 'icechunk' ? (mk === 'rock' ? 'lump' : 'cut') : L.g;
+      const geo = Array.isArray(SH[gk]) ? SH[gk][Math.floor(u4 * SH[gk].length) % SH[gk].length] : SH[gk];
       const fy = L.fy[0] + u4 * (L.fy[1] - L.fy[0]);
       let tint = L.tint ? L.tint.map((v) => v * (0.8 + 0.4 * u2)) : null;
       if (t === 'leaf') { const c = LEAFC[Math.floor(u4 * LEAFC.length) % LEAFC.length], k = 0.7 + 0.5 * u2; tint = [c[0] * k, c[1] * k, c[2] * k]; }
@@ -1109,8 +1164,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     // cracks in a wall or a roof, a few cobwebs in the corners, small stalactites from a low roof with the floor wet under them. All of
     // it from the faces found above (boxes that are drawn, a floor reached in front of them), the fires, and the roofs over the floors
     st.wallTris = 0; st.wallMarks = 0; st.ivy = 0; st.leaves = 0; st.roots = 0; st.webs = 0; st.stal = 0; st.ceil = 0;
-    const WB = DB(), LB = DB(), NB = DB(), WP = new Float32Array(12), WU = new Float32Array(8);
-    let WQn = 0; const WQMAX = Math.round((HEAVY ? 1100 : 1800) * (QK < 1 ? 0.8 : 1)), LMAX = Math.round(3000 * QK);
+    const WB = DB(), LB = DB(), NB = DB(), RB = DB(), WP = new Float32Array(12), WU = new Float32Array(8);
+    let WQn = 0; const WQMAX = Math.round((HEAVY ? 1100 : kind === 'wet' ? 3400 : 1800) * (QK < 1 ? 0.8 : 1)), LMAX = Math.round(3000 * QK);
     // (a few of each kind of mark, where they are: for looking at them)
     const MREC = w._dressMarks = {}, rec = (k, x, y, z, nx, nz, f) => { const L = MREC[k] || (MREC[k] = []); if (L.length < 8) L.push([x, y, z, nx, nz, f]); };
     dressWalls();   // (in a function of its own: P.dress itself kept small enough for the engine to compile it fully)
@@ -1151,7 +1206,11 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     w.deferred.push((grp) => {
       const out = heapMeshes().concat([mesh(BP, BU, BC, BI, 4, MT.band, 1)]);
       for (const k in DM) { const q = DM[k]; out.push(mesh(q.P, q.U, q.C, q.I, 4, MT[k], 2)); }
-      out.push(mesh(WB.P, WB.U, WB.C, WB.I, 4, MT.wall, 2), mesh(LB.P, LB.U, LB.C, LB.I, 4, MT.leafW), mesh(NB.P, NB.U, NB.C, NB.I, 4, MT.web, 3));
+      const lm = mesh(LB.P, LB.U, LB.C, LB.I, 4, MT.leafW), rm = mesh(RB.P, RB.U, RB.C, RB.I, 4, MT.root);
+      // (the leaves' normals turned a little up: they take the light of the sky as well as the brand's, and do not go brown by it alone)
+      if (lm) { const n = lm.geometry.attributes.normal; for (let i = 0; i < n.count; i++) { const x = n.getX(i), y = n.getY(i) + 0.45, z = n.getZ(i), l = Math.hypot(x, y, z) || 1; n.setXYZ(i, x / l, y / l, z / l); } }
+      if (rm) rm.castShadow = true;   // (a root stands off the wall and its shadow falls on it)
+      out.push(mesh(WB.P, WB.U, WB.C, WB.I, 4, MT.wall, 2), lm, rm, mesh(NB.P, NB.U, NB.C, NB.I, 4, MT.web, 3));
       for (const m of out) if (m) { if (m.material === MT.dry || m.material === MT.damp || m.material === MT.water || m.material === MT.wall || m.material === MT.web) m.userData.decal = true; grp.add(m); }
       const e = new THREE.Euler(), qq = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), m4 = new THREE.Matrix4(), col = new THREE.Color();
       for (const q of DI.values()) {
@@ -1193,12 +1252,32 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       const FLAT = { wall: 1, block: 1, trim: 1, floor: 1, cobble: 1, rock: 1, wood: 1, woodDark: 1 };   // (drawn as its box: its underside is where the box's is)
       let ceilC = null;   // (the box whose underside ceilAt found last)
       const ceilAt = (x, z, ylo, yhi) => { let best = Infinity; ceilC = null; const a = cellAll(x, z); if (a) for (const d of a) { if (d.y0 < ylo || d.y0 > yhi || x < d.x0 || x > d.x1 || z < d.z0 || z > d.z1 || !okSolid(d) || d.tg || !d.vis || !FLAT[d.mk]) continue; if (d.y0 < best) { best = d.y0; ceilC = d; } } return best; };
+      // (the small things drawn on a wall - a window's pane, its frame, sill and shutters, a plaque: drawn-only boxes under 1.7 m either
+      // way, and thin against the wall - filed by 2 m cells. A long plate or a tall post is not one of them: a mark goes on behind it)
+      const FX = new Map();
+      for (const v of w.visBoxes || []) { const ex = v[3] - v[0], ez = v[5] - v[2], ey = v[4] - v[1]; if (ey < 0.03 || ey > 1.7 || Math.max(ex, ez) > 1.7 || Math.min(ex, ez) > 0.4) continue; for (let gx = Math.floor(v[0] / 2); gx <= Math.floor(v[3] / 2); gx++) for (let gz = Math.floor(v[2] / 2); gz <= Math.floor(v[5] / 2); gz++) { const kk = gx * 4096 + gz; (FX.get(kk) || FX.set(kk, []).get(kk)).push(v); } }
+      // (the part of u0..u1 x v0..v1 on face F clear of them: cut off above one if it lies above its middle, below it else; null if none left)
+      const VC = [0, 0];
+      const clearFix = (F, u0, u1, v0, v1) => {
+        if (!FX.size) { VC[0] = v0; VC[1] = v1; return VC; }
+        const sg = F.nx || F.nz, b0 = Math.min(F.pl - 0.06 * sg, F.pl + 0.3 * sg), b1 = Math.max(F.pl - 0.06 * sg, F.pl + 0.3 * sg);
+        for (let ga = Math.floor(u0 / 2); ga <= Math.floor(u1 / 2); ga++) for (let gq = Math.floor(b0 / 2); gq <= Math.floor(b1 / 2); gq++) {
+          const L = FX.get(F.nx ? gq * 4096 + ga : ga * 4096 + gq); if (!L) continue;
+          for (const v of L) {
+            const n0 = F.nx ? v[0] : v[2], n1 = F.nx ? v[3] : v[5], a0 = F.nx ? v[2] : v[0], a1 = F.nx ? v[5] : v[3];
+            if (n1 < b0 || n0 > b1 || a1 < u0 || a0 > u1 || v[4] < v0 || v[1] > v1) continue;
+            if ((v0 + v1) / 2 > (v[1] + v[4]) / 2) v0 = Math.max(v0, v[4] + 0.03); else v1 = Math.min(v1, v[1] - 0.03);
+          }
+        }
+        if (v1 - v0 < 0.06) return null; VC[0] = v0; VC[1] = v1; return VC;
+      };
       // a mark on face F (looking along nx, nz from its plane pl): along it from ua to ub, up it from va to vb; picture cell k (fl: turned
-      // over); cut where the face ends (F.a0..a1, F.y0..y1); not where something stands against the face
+      // over); cut where the face ends (F.a0..a1, F.y0..y1); not where something stands against the face, nor over a window
       const mark = (F, ua, ub, va, vb, k, fl, r, g, b, A, off, free) => {
         if (WQn >= WQMAX) return false;
-        const u0 = Math.max(ua, F.a0 + 0.02), u1 = Math.min(ub, F.a1 - 0.02), v0 = Math.max(va, F.y0), v1 = Math.min(vb, F.y1);
+        const ei = F.foot ? 0 : 0.02, u0 = Math.max(ua, F.a0 + ei), u1 = Math.min(ub, F.a1 - ei); let v0 = Math.max(va, F.y0), v1 = Math.min(vb, F.y1);   // (a plinth's stones: the mark runs to their ends - else a pale seam at each joint)
         if (u1 - u0 < 0.1 || v1 - v0 < 0.06) return false;
+        { const vc = clearFix(F, u0, u1, v0, v1); if (!vc) return false; v0 = vc[0]; v1 = vc[1]; }
         const nx = F.nx, nz = F.nz, d = F.pl + (nx || nz) * (off || 0.03), o = F.pl + (nx || nz) * 0.09, um = (u0 + u1) / 2, vm = (v0 + v1) / 2, ul = u0 + (u1 - u0) * 0.2, ur = u1 - (u1 - u0) * 0.2, vl = v0 + (v1 - v0) * 0.3;
         if (!free && (solidPt(nx ? o : um, vm, nx ? um : o) || solidPt(nx ? o : ul, vl, nx ? ul : o) || solidPt(nx ? o : ur, vl, nx ? ur : o))) return false;
         const s0 = (u0 - ua) / (ub - ua), s1 = (u1 - ua) / (ub - ua), t0 = (v0 - va) / (vb - va), t1 = (v1 - va) / (vb - va), S0 = fl ? 1 - s0 : s0, S1 = fl ? 1 - s1 : s1;
@@ -1217,6 +1296,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
           WP[i * 3] = nx ? d : a; WP[i * 3 + 1] = y; WP[i * 3 + 2] = nx ? a : d; WU[i * 2] = cellU(k, fl ? (1 - CQ[i][0]) / 2 : (CQ[i][0] + 1) / 2); WU[i * 2 + 1] = cellV(k, (CQ[i][1] + 1) / 2);
         }
         if (solidPt(nx ? o : ac, yc, nx ? ac : o)) return false;
+        { const r0 = Math.max(hw, hh) * 1.05, vc = clearFix(F, ac - r0, ac + r0, yc - r0, yc + r0); if (!vc || vc[0] > yc - r0 + 0.01 || vc[1] < yc + r0 - 0.01) return false; }   // (a crack or a flake over a window: none)
         q4(WB, WP, WU, r, g, b, A, nx, 0, nz); WQn++; st.wallMarks++; st['c' + k] = (st['c' + k] || 0) + 1; rec(k, nx ? F.pl : ac, yc, nx ? ac : F.pl, nx, nz, F.y0); return true;
       };
       // a mark on a roof, looking down: centred at (x, z) under the roof at cy, sz across, turned by ry; only where the roof is all there
@@ -1239,18 +1319,21 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         WU[0] = cellU(12, 0); WU[1] = cellV(12, v0); WU[2] = cellU(12, 1); WU[3] = WU[1]; WU[4] = WU[2]; WU[5] = cellV(12, v1); WU[6] = WU[0]; WU[7] = WU[5];
         q4(Bq, WP, WU, tn[0], tn[1], tn[2], 1, nx, ny, nz);
       };
-      const STEM = [0.95, 0.9, 0.85], ROOT = [2.2, 1.85, 1.5];
+      const STEM = [0.95, 0.9, 0.85], RTMAX = Math.round(8000 * QK);   // (the roots' triangles, all told)
       // (the tops of what the mason laid (levelgen.js mason: a wall of field stones, a dyke, a pier - drawn by its stones, not as its
       // box, and often lower than the box that stops you): the highest of its points in each half-metre cell. Inside a wall's box, a
       // little behind its face, it says where the wall drawn there ends - nothing is laid on the air above it)
       const MG = w._mason && w._mason.g, MX0 = -8, MZ0 = -8, MW = Math.ceil(((w.W || 100) + 16) * 2), MD = Math.ceil(((w.D || 100) + 16) * 2);
       let MTOP = null;
-      const STONE = { wall: 1, block: 1, trim: 1, rock: 1, cobble: 1, floor: 1 };   // (stone only: the iron railing on a wall's coping is no wall to run down)
-      if (MG) for (const k in MG) { const P = MG[k].p; if (!P || !P.length || !STONE[k]) continue; if (!MTOP) MTOP = new Float32Array(MW * MD).fill(-1e9); for (let i = 0; i < P.length; i += 3) { const ci = Math.floor((P[i] - MX0) * 2), cj = Math.floor((P[i + 2] - MZ0) * 2); if (ci < 0 || cj < 0 || ci >= MW || cj >= MD) continue; const o = cj * MW + ci; if (P[i + 1] > MTOP[o]) MTOP[o] = P[i + 1]; } }
+      const STONE = { wall: 1, block: 1, trim: 1, rock: 1, cobble: 1, floor: 1 };   // (stone only: the iron railing on a wall's coping is no wall to run down. Every other point: a stone's corners each stand in three of its faces)
+      if (MG) for (const k in MG) { const P = MG[k].p; if (!P || !P.length || !STONE[k]) continue; if (!MTOP) MTOP = new Float32Array(MW * MD).fill(-1e9); for (let i = 0; i < P.length; i += 6) { const ci = ((P[i] - MX0) * 2) | 0, cj = ((P[i + 2] - MZ0) * 2) | 0; if (ci < 0 || cj < 0 || ci >= MW || cj >= MD) continue; const o = cj * MW + ci; if (P[i + 1] > MTOP[o]) MTOP[o] = P[i + 1]; } }
       const mTop = (x, z) => { if (!MTOP) return -1e9; const ci = Math.floor((x - MX0) * 2), cj = Math.floor((z - MZ0) * 2); return ci < 0 || cj < 0 || ci >= MW || cj >= MD ? -1e9 : MTOP[cj * MW + ci]; };
       // (along the face from a0 to a1: the lowest of the stones' tops there - a half-metre cell with no point of a stone in it says nothing)
       const MD4 = [0.03, 0.15, 0.32, 0.5];   // (how far in behind the face the stones are looked for: a pier's corners may stand at its face)
-      const drawnTop = (F, a0, a1, f, y) => { let t = Infinity; for (let a = a0; a <= a1 + 0.01; a += 0.25) { let m = -1e9; for (const d of MD4) m = Math.max(m, mTop(F.nx ? F.pl - F.nx * d : a, F.nx ? a : F.pl - F.nz * d)); if (m > -1e8) t = Math.min(t, m); } return t < Infinity && t > f + 0.3 && t < y ? t - 0.04 : y; };
+      const drawnTop = (F, a0, a1, f, y) => { if (!MTOP) return y; let t = Infinity; for (let a = a0; a <= a1 + 0.01; a += 0.5) { let m = -1e9; for (const d of MD4) m = Math.max(m, mTop(F.nx ? F.pl - F.nx * d : a, F.nx ? a : F.pl - F.nz * d)); if (m > -1e8) t = Math.min(t, m); } return t < Infinity && t > f + 0.3 && t < y ? t - 0.04 : y; };
+      // (the drawn-only boxes by 4 m cells, made when first asked for)
+      let VBI = null; const NOV = [];
+      const visAt = (x, z) => { if (!VBI) { VBI = new Map(); for (const v of w.visBoxes || []) for (let gx = Math.floor(v[0] / 4); gx <= Math.floor(v[3] / 4); gx++) for (let gz = Math.floor(v[2] / 4); gz <= Math.floor(v[5] / 4); gz++) { const kk = gx * 4096 + gz; (VBI.get(kk) || VBI.set(kk, []).get(kk)).push(v); } } return VBI.get(Math.floor(x / 4) * 4096 + Math.floor(z / 4)) || NOV; };
       // ---- the soot over each brand (P.torch gave where they are): a tongue up the wall from just over the flame, dark only near it,
       // its edge soft; each its own size, lean and darkness
       for (const q of w._soot || []) {
@@ -1262,7 +1345,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         // (the lowest top of the boxes the brand is fixed to, at its flame: a pier's, under a railing's taller one)
         { const px = q.x - nx * 0.06, pz = q.z - nz * 0.06, py = q.y + 0.5, L = cellAll(px, pz); if (L) for (const d of L) if (d.vis && !d.ghost && d.alive !== false && px > d.x0 && px < d.x1 && pz > d.z0 && pz < d.z1 && py > d.y0 && py < d.y1) { F.y1 = Math.min(F.y1, d.y1 - 0.03); if (nx) { F.a0 = Math.max(F.a0, d.z0 + 0.01); F.a1 = Math.min(F.a1, d.z1 - 0.01); } else { F.a0 = Math.max(F.a0, d.x0 + 0.01); F.a1 = Math.min(F.a1, d.x1 - 0.01); } }
           // (and a drawn-only box there - a pier set over the line of a railing - its top and its sides)
-          for (const v of w.visBoxes || []) if (px > v[0] && px < v[3] && pz > v[2] && pz < v[5] && py > v[1] && py < v[4] && v[4] < F.y1 + 0.03) { F.y1 = Math.min(F.y1, v[4] - 0.03); if (nx) { F.a0 = Math.max(F.a0, v[2] + 0.01); F.a1 = Math.min(F.a1, v[5] - 0.01); } else { F.a0 = Math.max(F.a0, v[0] + 0.01); F.a1 = Math.min(F.a1, v[3] - 0.01); } } }
+          for (const v of visAt(px, pz)) if (px > v[0] && px < v[3] && pz > v[2] && pz < v[5] && py > v[1] && py < v[4] && v[4] < F.y1 + 0.03) { F.y1 = Math.min(F.y1, v[4] - 0.03); if (nx) { F.a0 = Math.max(F.a0, v[2] + 0.01); F.a1 = Math.min(F.a1, v[5] - 0.01); } else { F.a0 = Math.max(F.a0, v[0] + 0.01); F.a1 = Math.min(F.a1, v[3] - 0.01); } } }
         // (a brand on a pier of the mason's, the wall either side of it lower - a railing over it: the soot kept to the stone that stands
         // as high as the flame and more)
         if (MTOP) {
@@ -1272,18 +1355,19 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         // (the brand stands against the wall it is on: what is in front of it there is the brand itself)
         if (mark(F, ua, ua + Wd, V0, V0 + Hs, h3 < 0.5 ? 0 : 1, hsh(q.x, q.z, 6) < 0.5, 1, 1, 1, 0.78 + 0.17 * h2, 0.025, true)) { if (!w._dressSoot) w._dressSoot = []; if (w._dressSoot.length < 20) w._dressSoot.push([q.x, q.y, q.z, nx, nz]); }
       }
-      w._sootDone = true;
+      w._sootDone = true; st.tw_soot = Math.round(performance.now() - tw);
       // ---- the faces, joined where boxes run on one into the next along one plane (so that a mark goes on over the joint)
       const FL = new Map();
       for (const [c, nx, nz, pl, a0, a1] of faces) {
         if (c.tg || c.mk === 'rock') continue;   // (rock stands out of its box and back by tens of centimetres: nothing flat lies on it)
         const key = nx + ',' + nz + ',' + Math.round(pl * 200); let L = FL.get(key); if (!L) FL.set(key, L = []);
-        L.push({ nx, nz, pl, a0, a1, y0: c.y0, y1: c.y1, foot: !!c.foot });
+        const dep = nx ? c.x1 - c.x0 : c.z1 - c.z0;
+        L.push({ nx, nz, pl, a0, a1, y0: c.y0, y1: c.y1, foot: !!c.foot, pil: a1 - a0 < 1.9 && dep < 1.9 });   // (pil: a free-standing pier)
       }
       const WS = [];
       for (const L of FL.values()) {
         L.sort((p, q) => p.a0 - q.a0 || p.y0 - q.y0); let cur = null;
-        for (const f of L) { if (cur && f.a0 <= cur.a1 + 0.05 && Math.abs(f.y0 - cur.y0) < 0.15 && Math.abs(f.y1 - cur.y1) < 0.6 && f.foot === cur.foot) { cur.a1 = Math.max(cur.a1, f.a1); cur.y1 = Math.min(cur.y1, f.y1); } else { cur = Object.assign({}, f); WS.push(cur); } }
+        for (const f of L) { if (cur && f.a0 <= cur.a1 + (f.foot ? 0.15 : 0.05) && Math.abs(f.y0 - cur.y0) < 0.15 && Math.abs(f.y1 - cur.y1) < 0.6 && f.foot === cur.foot) { cur.a1 = Math.max(cur.a1, f.a1); cur.y1 = Math.min(cur.y1, f.y1); cur.pil = cur.pil && f.pil && cur.a1 - cur.a0 < 1.9; } else { cur = Object.assign({}, f); WS.push(cur); } }
       }
       const SUN = B.sunDir || null, OUT = kind === 'out' || !!B.outdoor;
       // (by the kind of place, the chance in each 3 m of wall of: damp from the foot; a run down it indoors; moss)
@@ -1310,7 +1394,14 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
             const ox = nx ? F.pl + nx * 0.5 : am, oz = nx ? am : F.pl + nz * 0.5, open = OUT && !roofed(ox, f, oz);
             const inPl = FO.length && !F.foot && inFoot(nx ? F.pl + nx * 0.07 : am, nx ? am : F.pl + nz * 0.07, f + 0.05);   // (behind a plinth: the damp is the plinth's)
             // damp risen from the foot: lobes along it, a tide line at their top (strong under the ground and in the drowned halls)
-            if (!inPl && ff(1) < DK * WK) {
+            if (kind === 'wet') {
+              // (in the drowned halls along every wall: overlapping, so that it reads as one band with its lobes; weed green at the foot.
+              // Behind a plinth: from the plinth's top up)
+              const fb = inPl ? Math.max(f, footTop(nx ? F.pl + nx * 0.07 : am, nx ? am : F.pl + nz * 0.07, f + 0.05) - 0.02) : f;
+              const hd = Math.min(H, 0.6 + 0.8 * ff(2)), wd = 3.4 + 0.8 * ff(3), ac = am + (ff(4) - 0.5) * 0.6, G4 = inPl ? { nx, nz, pl: F.pl, a0: F.a0, a1: F.a1, y0: fb, y1: top } : G2;
+              mark(G4, ac - wd / 2, ac + wd / 2, fb - 0.06, fb + hd / 0.62, 4, ff(5) < 0.5, 0.9, 0.95, 0.85, 1, 0.03);
+              mark(G4, am - 1.65, am + 1.65, fb - 0.05, fb + 0.3 + 0.2 * ff(7), 14, ff(8) < 0.5, 0.85, 1.3, 0.9, 1, 0.034);
+            } else if (!inPl && ff(1) < DK * WK) {
               const hd = Math.min(H, (0.3 + 0.7 * ff(2)) * (kind === 'wet' ? 1.3 : 1)), wd = 2.2 + 1.6 * ff(3), ac = am + (ff(4) - 0.5) * 1.2;
               mark(G2, ac - wd / 2, ac + wd / 2, f - 0.06, f + hd / 0.62, 4, ff(5) < 0.5, 1, 1, 1, (0.7 + 0.3 * ff(6)) * (kind === 'wet' || kind === 'mine' ? 1 : 0.85), 0.03);
             }
@@ -1346,10 +1437,27 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
             // ivy up a wall out of doors
             if (IVY && open && !F.foot && H > 1.3 && ivyN < (HEAVY ? 16 : 24) && st.leaves < LMAX && ff(60) < IVY * QK) { if (ivy(G2, am + (ff(61) - 0.5) * 2, f, top, sd * 1.7 + b * 3.7 + li)) ivyN++; }
             // roots out of a crack high on a wall, under the ground
-            if ((kind === 'crypt' || kind === 'mine') && !F.foot && H > 2.0 && st.roots < 30 && ff(70) < 0.07) {
+            if ((kind === 'crypt' || kind === 'mine') && !F.foot && !F.pil && F.a1 - F.a0 > 2.4 && H > 2.0 && st.roots < 30 && (st.rootTris || 0) < RTMAX && ff(70) < 0.07) {
               const ac = am + (ff(71) - 0.5) * 2, yo = Math.min(top - 0.1, f + 2.2 + 1.4 * ff(72));
-              if (markR(G2, ac, yo + 0.04, 0.42, 0.09, (ff(73) - 0.5) * 0.5, 6, ff(74) < 0.5, 1, 1, 1, 0.85, 0.031)) { rootsWall(G2, ac, yo, f, sd + b * 5.1); st.roots++; }
+              if (markR(G2, ac, yo + 0.04, 0.6, 0.13, (ff(73) - 0.5) * 0.5, 6, ff(74) < 0.5, 1, 1, 1, 0.9, 0.031)) { markR(G2, ac, yo + 0.02, 0.24, 0.17, (ff(75) - 0.5) * 0.6, 7, ff(76) < 0.5, 1, 1, 1, 0.9, 0.03); rootsWall(G2, ac, yo, f, sd + b * 5.1); st.roots++; }
             }
+          }
+        }
+      }
+      st.tw_faces = Math.round(performance.now() - tw);
+      // ---- the water's edge (the drowned halls): where a wall stands in the water, the damp from the water's level up, its tide line,
+      // the weed along the level
+      if (kind === 'wet') for (const F of WS) {
+        if (F.foot) continue;
+        for (const q of w.waterZones || []) {
+          const wy = q.y !== undefined ? q.y : 0, ox = F.nx ? F.pl + F.nx * 0.5 : 0, oz = F.nz ? F.pl + F.nz * 0.5 : 0;
+          if (wy < F.y0 - 0.05 || wy > F.y1 - 0.3) continue;
+          if (F.nx ? ox < q.x0 || ox > q.x1 || F.a1 < q.z0 || F.a0 > q.z1 : oz < q.z0 || oz > q.z1 || F.a1 < q.x0 || F.a0 > q.x1) continue;
+          const lo = Math.max(F.a0, F.nx ? q.z0 : q.x0), hi = Math.min(F.a1, F.nx ? q.z1 : q.x1), sd = Math.round(F.pl * 100) * 0.37, G2 = { nx: F.nx, nz: F.nz, pl: F.pl, a0: F.a0, a1: F.a1, y0: Math.max(F.y0, wy - 0.4), y1: Math.min(F.y1, wy + 2.2) };
+          for (let a = lo + 1.6; a < hi; a += 3) {
+            const h1 = hsh(a, sd, 900), h2 = hsh(a, sd, 901);
+            mark(G2, a - 2, a + 2, wy - 0.35, wy + (0.5 + 0.7 * h1) / 0.62, 4, h2 < 0.5, 0.9, 0.95, 0.85, 1, 0.03);
+            mark(G2, a - 1.65, a + 1.65, wy - 0.12, wy + 0.18 + 0.14 * h2, 14, h1 < 0.5, 0.8, 1.15, 0.85, 0.95, 0.034);
           }
         }
       }
@@ -1358,9 +1466,9 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       const heatAt = (lx, ly, lz, f, rr, sd) => {
         for (const F of WS) {
           const dp = (F.nx ? lx - F.pl : lz - F.pl) * (F.nx || F.nz), la = F.nx ? lz : lx;
-          if (dp < 0.05 || dp > rr || la < F.a0 + 0.2 || la > F.a1 - 0.2 || F.y0 > f + 0.3 || F.y1 < ly + 0.8) continue;
-          const k = 1 - dp / rr, wd = 1.5 + 1.0 * k + 0.4 * hsh(lx, lz, 700 + sd), G2 = { nx: F.nx, nz: F.nz, pl: F.pl, a0: F.a0, a1: F.a1, y0: Math.max(F.y0, f), y1: Math.min(F.y1, f + 7) };
-          mark(G2, la - wd / 2, la + wd / 2, Math.max(f, ly - 0.6), ly + 2.4 + 1.4 * k, 8, hsh(lx, lz, 701 + sd) < 0.5, 1, 1, 1, Math.min(0.9, 0.35 + 0.6 * k), 0.033);
+          if (dp < -0.15 || dp > rr || la < F.a0 + 0.2 || la > F.a1 - 0.2 || F.y0 > f + 0.3 || F.y1 < ly + 0.8) continue;
+          const k = 1 - Math.max(0, dp) / rr, wd = 1.5 + 1.0 * k + 0.4 * hsh(lx, lz, 700 + sd), G2 = { nx: F.nx, nz: F.nz, pl: F.pl, a0: F.a0, a1: F.a1, y0: Math.max(F.y0, f), y1: Math.min(F.y1, f + 7) };
+          mark(G2, la - wd / 2, la + wd / 2, Math.max(f, ly - 0.6), ly + 2.4 + 1.4 * k, 8, hsh(lx, lz, 701 + sd) < 0.5, 1, 1, 1, Math.min(0.9, 0.35 + 0.6 * k), 0.033, dp < 0.6);
         }
       };
       for (const L of w.lightSources || []) {
@@ -1370,13 +1478,34 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         heatAt(lx, ly, lz, f === null ? ly - 1 : f, 2.4, 0);
         const cy = ceilAt(lx, lz, ly + 0.9, ly + 6); if (cy < Infinity) ceilMark(lx, cy, lz, 1.6 + 1.2 * hsh(lx, lz, 702), 15, Math.min(0.85, 0.45 + 0.1 * (6 - (cy - ly))), hsh(lx, lz, 703) * 6.283);
       }
+      // the furnaces (from where each mouth is put): the face over the mouth burnt and sooted - as wide as the furnace, up to its top -
+      // the floor before it sooted, the roof over it
+      for (const q of w._furnaces || []) {
+        const [x, y, z, ry, sx, sy] = q, nx = Math.round(Math.sin(ry)), nz = Math.round(Math.cos(ry)), mh = 1.4 * sy, a = nx ? z : x, pl = nx ? x : z;
+        // (the box the mouth is set in: its sides and its top bound the face)
+        let bx = null; const L = cellAll(x - nx * 0.15, z - nz * 0.15); if (L) for (const d of L) { const px = x - nx * 0.15, pz = z - nz * 0.15, py = y + mh * 0.5; if (px > d.x0 && px < d.x1 && pz > d.z0 && pz < d.z1 && py > d.y0 && py < d.y1 && d.vis && !d.ghost) { bx = d; break; } }
+        if (!bx) continue;
+        let f = null; for (const v of navFloors(x + nx * 1.2, z + nz * 1.2)) if (v <= y + 0.5 && (f === null || v > f)) f = v; if (f === null) f = y;
+        const F = { nx, nz, pl: nx ? (nx > 0 ? bx.x1 : bx.x0) : (nz > 0 ? bx.z1 : bx.z0), a0: (nx ? bx.z0 : bx.x0) + 0.02, a1: (nx ? bx.z1 : bx.x1) - 0.02, y0: Math.max(bx.y0, f), y1: Math.min(bx.y1, f + 8) };
+        if (Math.abs(F.pl - pl) > 0.3) continue;
+        const wd = Math.min(F.a1 - F.a0, 1.8 + 1.2 * sx), h1 = hsh(x, z, 910);
+        mark(F, a - wd / 2, a + wd / 2, y + mh * 0.35, Math.min(F.y1, y + mh + 2.6 + 1.2 * h1), 8, h1 < 0.5, 1, 1, 1, 0.95, 0.034, true);
+        mark(F, a - wd * 0.4, a + wd * 0.4, y + mh * 0.6, y + mh + 1.6, 15, h1 > 0.5, 1, 1, 1, 0.7, 0.036, true);
+        // (the soot the mouth breathes out: a broad tongue from its top up the face, black over the mouth, thinning upward)
+        mark(F, a - wd * 0.42, a + wd * 0.42, y + mh * 0.62, Math.min(F.y1, y + mh * 0.62 + 2.6 + 0.8 * h1), h1 < 0.5 ? 0 : 1, h1 < 0.3, 1, 1, 1, 0.95, 0.038, true);
+        decal(x + nx * 1.0, z + nz * 1.0, f, 'soot', 1.6 + 0.6 * h1, h1 * 6.283, 0.85);
+        const cy = ceilAt(x + nx * 0.6, z + nz * 0.6, y + mh + 0.4, y + mh + 6); if (cy < Infinity) ceilMark(x + nx * 0.6, cy, z + nz * 0.6, 2.2, 15, 0.8, h1 * 6.283);
+        st.furn = (st.furn || 0) + 1;
+      }
       if (kind === 'forge') for (const q of w.lavaZones || []) {
+        if (q.decor) continue;   // (a furnace's mouth: above)
         const sx = q.x1 - q.x0, sz = q.z1 - q.z0, n = Math.max(1, Math.round(Math.max(sx, sz) / 2.2));
         for (let i = 0; i < n && WQn < WQMAX; i++) {
           const t = (i + 0.5) / n, x = sx >= sz ? q.x0 + sx * t : (q.x0 + q.x1) / 2, z = sx >= sz ? (q.z0 + q.z1) / 2 : q.z0 + sz * t, y = q.y !== undefined ? q.y : 0;
           heatAt(x, y + 0.3, z, y, 1.6 + Math.min(sx, sz) / 2, i + 3);
         }
       }
+      st.tw_fire = Math.round(performance.now() - tw);
       // ---- the roofs low enough to be seen over the floors reached: small stalactites (the caves, the drowned halls) with the floor wet
       // under them, roots hanging from a crack (the mines, the catacombs)
       if (kind === 'mine' || kind === 'wet' || kind === 'crypt' || kind === 'forge') {
@@ -1402,10 +1531,10 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
                 decal(x, z, f, kind === 'wet' ? 'puddle' : 'drips', 0.7 + 0.5 * hsh(x, z, 732), hsh(x, z, 733) * 6.283, 0.8);
                 if (!w._dressCeil) w._dressCeil = []; if (w._dressCeil.length < 30) w._dressCeil.push([x, z, f, cy, 's']);
               }
-            } else if ((kind === 'crypt' || kind === 'mine') && u < 0.62 && st.roots < 30) {
+            } else if ((kind === 'crypt' || kind === 'mine') && u < 0.62 && st.roots < 30 && (st.rootTris || 0) < RTMAX) {
               const rough = ceilC && ceilC.mk === 'rock';   // (rock overhead stands in and out by tens of centimetres: the roots come out of it, no crack drawn)
               if (!rough && !ceilMark(x, cy, z, 0.9 + 0.5 * hsh(x, z, 736), 6, 0.8, hsh(x, z, 737) * 6.283)) continue;
-              const nR = 5 + Math.floor(hsh(x, z, 738) * 5);
+              const nR = 3 + Math.floor(hsh(x, z, 738) * 3);
               for (let j = 0; j < nR; j++) {
                 const rx = x + (hsh(x, z, 800 + j) - 0.5) * 0.7, rz = z + (hsh(x, z, 810 + j) - 0.5) * 0.7; if (Math.abs(ceilAt(rx, rz, cy - 0.1, cy + 0.1) - cy) > 0.06) continue;
                 const len = Math.min(hc - 2.0, 0.35 + 1.3 * Math.pow(hsh(x, z, 820 + j), 1.4)); if (len < 0.15) continue;
@@ -1416,6 +1545,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
           }
         }
       }
+      st.tw_ceil = Math.round(performance.now() - tw);
       // ---- cobwebs: few, in the angle of two walls under a roof - high up, or low by the floor; thin, seen only where the light falls
       let webN = 0;
       for (const cn of corners) {
@@ -1461,13 +1591,13 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
               const ua = Math.sin(turn), uy = Math.cos(turn), ra = uy, ry = -ua, reach = 0.03 + lsz * 0.4 + 0.16 * hsh(i * 3 + j, sd, 18), slide = (hsh(i * 3 + j, sd, 19) - 0.5) * 0.08;
               const ca = na + side * pa * reach + ua * lsz * 0.3 + (da / dl) * slide, cy = ny + side * py * reach + uy * lsz * 0.3 + (dy / dl) * slide;
               if (ca < F.a0 + 0.05 || ca > F.a1 - 0.05 || cy > top - 0.04) continue;
-              const ob = 0.04 + 0.025 * hsh(i, j, sd + 8), lift = 0.02 + 0.06 * hsh(i, j, sd + 9), lr = hsh(i * 3 + j, sd, 10), li = lr < 0.92 ? Math.floor(lr / 0.92 * 3) % 3 : 3, su = (li & 1) * 0.5, sv = (li >> 1) * 0.5;
+              const ob = 0.04 + 0.025 * hsh(i, j, sd + 8), lift = 0.02 + 0.06 * hsh(i, j, sd + 9), lr = hsh(i * 3 + j, sd, 10), li = lr < 0.9 ? Math.floor(lr / 0.9 * 3) % 3 : 3, su = (li & 1) * 0.5, sv = (li >> 1) * 0.5;
               for (let c = 0; c < 4; c++) {
                 const ka = CQ[c][0] * lsz / 2, ky = CQ[c][1] * lsz / 2, a2 = ca + ra * ka + ua * ky, y2 = cy + ry * ka + uy * ky, P3 = pt(a2, y2, ob + (CQ[c][1] > 0 ? lift : 0));
                 WP[c * 3] = P3[0]; WP[c * 3 + 1] = P3[1]; WP[c * 3 + 2] = P3[2]; WU[c * 2] = 0.75 + (su + 0.02 + (CQ[c][0] + 1) / 2 * 0.46) / 4; WU[c * 2 + 1] = 0.5 + (sv + 0.02 + (CQ[c][1] + 1) / 2 * 0.46) / 4;
               }
-              const k = 0.72 + 0.42 * hsh(i * 5 + j, sd, 11), old = hsh(i * 5 + j, sd, 12) < 0.04, dk = dep === 0 && t < 0.25 ? 0.85 : 1;
-              q4(LB, WP, WU, (old ? 1.25 : 0.94 + 0.12 * hk) * k * dk, (old ? 0.95 : 1) * k * dk, (old ? 0.62 : 0.88 + 0.2 * hsh(i, j, sd + 13)) * k * dk, 1, nx, 0.15, nz);
+              const k = 0.8 + 0.35 * hsh(i * 5 + j, sd, 11), hb = hsh(i * 5 + j, sd, 12), brn = li < 3 && hb < 0.18, dk = dep === 0 && t < 0.25 ? 0.85 : 1;   // (brn: going olive-brown)
+              q4(LB, WP, WU, (brn ? 1.18 : 0.95 + 0.08 * hk) * k * dk, (brn ? 1.0 : 1) * k * dk, (brn ? 0.72 : 0.92 + 0.16 * hsh(i, j, sd + 13)) * k * dk, 1, nx, 0.15, nz);
               st.leaves++;
             }
             // a branch, now and then, climbing aslant
@@ -1478,32 +1608,65 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         st.ivy++; if (!w._dressIvy) w._dressIvy = []; if (w._dressIvy.length < 30) w._dressIvy.push([nx ? F.pl : ac, f, nx ? ac : F.pl, nx, nz]);
         return true;
       }
-      // roots come out of a crack high on face F at (ac, yo): a few strands down the wall, hanging off it as they go, thinning
-      function rootsWall(F, ac, yo, f, sd) {
-        const nx = F.nx, nz = F.nz, n = 3 + Math.floor(hsh(ac, sd, 20) * 4), si = Math.floor(sd * 3) & 1023;
-        for (let j = 0; j < n; j++) {
-          const a0 = ac + (hsh(j, sd, 21) - 0.5) * 0.7, len = Math.min(yo - f - 1.0, 0.3 + 1.2 * Math.pow(hsh(j, sd, 22), 1.5)), wd = 0.02 + 0.02 * hsh(j, sd, 23); if (len < 0.15) continue;
-          const m = Math.max(2, Math.round(len / 0.18)); let a = a0, y = yo, o = 0.03;
-          for (let i = 0; i < m; i++) {
-            const t = (i + 1) / m, na = a0 + (n1d(t * 1.4 + j * 1.7, si + j * 11) - 0.5) * 0.22 * t, ny = yo - len * t, no = 0.03 + 0.07 * t * t;
-            if (na < F.a0 + 0.04 || na > F.a1 - 0.04) break;
-            const da = na - a, dy = ny - y, dl = Math.hypot(da, dy) || 1, pa = -dy / dl, py = da / dl;
-            const A = [nx ? F.pl + nx * o : a, y, nx ? a : F.pl + nz * o], Bp = [nx ? F.pl + nx * no : na, ny, nx ? na : F.pl + nz * no];
-            strip(LB, A[0], A[1], A[2], Bp[0], Bp[1], Bp[2], wd * (1 - 0.6 * (i / m)), wd * (1 - 0.6 * t), nx ? 0 : pa, py, nx ? pa : 0, nx, 0, nz, 0, Math.min(1, dl / 0.4), ROOT);
-            a = na; y = ny; o = no;
+      // a tube through the points P (x y z each) with the radii R, four-sided, closed at its far end in a point; coloured c (into RB)
+      function tube(Pt, R, c) {
+        const n = Pt.length / 3, b = RB.P.n / 3, P = RB.P.need(n * 12 + 3), U = RB.U.need(n * 8 + 2), C = RB.C.need(n * 16 + 4);
+        let vacc = 0;
+        for (let i = 0; i < n; i++) {
+          const i0 = Math.max(0, i - 1) * 3, i1 = Math.min(n - 1, i + 1) * 3; let tx = Pt[i1] - Pt[i0], ty = Pt[i1 + 1] - Pt[i0 + 1], tz = Pt[i1 + 2] - Pt[i0 + 2]; const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+          // (two directions across it: from the world's x (or z, for a root along x), made square to it)
+          let ax = Math.abs(tx) < 0.8 ? 1 : 0, ay = 0, az = ax ? 0 : 1; const dt = ax * tx + az * tz; ax -= tx * dt; ay -= ty * dt; az -= tz * dt; const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
+          const bx = ty * az - tz * ay, by = tz * ax - tx * az, bz = tx * ay - ty * ax;
+          if (i) vacc += Math.hypot(Pt[i * 3] - Pt[i * 3 - 3], Pt[i * 3 + 1] - Pt[i * 3 - 2], Pt[i * 3 + 2] - Pt[i * 3 - 1]);
+          for (let k = 0; k < 4; k++) {
+            const th = (k + 0.5) * Math.PI / 2, cs = Math.cos(th) * R[i], sn = Math.sin(th) * R[i];
+            P[RB.P.n++] = Pt[i * 3] + ax * cs + bx * sn; P[RB.P.n++] = Pt[i * 3 + 1] + ay * cs + by * sn; P[RB.P.n++] = Pt[i * 3 + 2] + az * cs + bz * sn;
+            U[RB.U.n++] = k * 0.06; U[RB.U.n++] = vacc * 0.8; C[RB.C.n++] = c[0]; C[RB.C.n++] = c[1]; C[RB.C.n++] = c[2]; C[RB.C.n++] = 1;
           }
         }
+        const e = (n - 1) * 3, tip = b + n * 4; P[RB.P.n++] = Pt[e] + (Pt[e] - Pt[e - 3]) * 0.3; P[RB.P.n++] = Pt[e + 1] + (Pt[e + 1] - Pt[e - 2]) * 0.3; P[RB.P.n++] = Pt[e + 2] + (Pt[e + 2] - Pt[e - 1]) * 0.3;
+        U[RB.U.n++] = 0; U[RB.U.n++] = vacc * 0.8; C[RB.C.n++] = c[0]; C[RB.C.n++] = c[1]; C[RB.C.n++] = c[2]; C[RB.C.n++] = 1;
+        const I = RB.I.need((n - 1) * 24 + 12);
+        for (let i = 0; i < n - 1; i++) for (let k = 0; k < 4; k++) { const a0 = b + i * 4 + k, a1 = b + i * 4 + ((k + 1) & 3), b0 = a0 + 4, b1 = a1 + 4; I[RB.I.n++] = a0; I[RB.I.n++] = a1; I[RB.I.n++] = b1; I[RB.I.n++] = a0; I[RB.I.n++] = b1; I[RB.I.n++] = b0; }
+        for (let k = 0; k < 4; k++) { I[RB.I.n++] = b + (n - 1) * 4 + k; I[RB.I.n++] = b + (n - 1) * 4 + ((k + 1) & 3); I[RB.I.n++] = tip; }
+        st.wallTris += (n - 1) * 8 + 4; st.rootTris = (st.rootTris || 0) + (n - 1) * 8 + 4;
       }
-      // a root hanging from a roof at (x, y, z), len long: two strips crossed, swaying as it goes down, thinning
-      function hang(x, y, z, len, wd, si) {
-        const m = Math.max(2, Math.round(len / 0.2)); let px = x, py = y, pz = z;
-        for (let i = 0; i < m; i++) {
-          const t0 = i / m, t1 = (i + 1) / m, qx = x + (n1d(t1 * 1.5, si) - 0.5) * 0.22 * t1 * len, qz = z + (n1d(t1 * 1.5, si + 37) - 0.5) * 0.22 * t1 * len, qy = y - len * t1;
-          const w0 = wd * (1 - 0.7 * t0), w1 = wd * (1 - 0.7 * t1), v1 = Math.min(1, len / m / 0.4);
-          strip(LB, px, py, pz, qx, qy, qz, w0, w1, 1, 0, 0, 0, 0, 1, 0, v1, ROOT); strip(LB, px, py, pz, qx, qy, qz, w0, w1, 0, 0, 1, 1, 0, 0, 0, v1, ROOT);
-          px = qx; py = qy; pz = qz;
+      // (the colour of a root: dry grey-brown to dark brown, as the shader works in it)
+      function rootCol(h) { return [0.21 + (0.085 - 0.21) * h, 0.18 + (0.068 - 0.18) * h, 0.14 + (0.05 - 0.14) * h]; }
+      // one root from (x, y, z) going (dx, dy, dz) with a wander, len long, r thick at its start, thinning to a hair; it branches now and
+      // then, thinner. off(x, y, z): how far the point is to be held off the wall (null: in the air, hanging)
+      function root(x, y, z, dx, dy, dz, len, r, si, dep, off) {
+        const m = Math.max(2, Math.round(len / 0.16)), Pt = [], R = [], c = rootCol(hsh(si, dep, 950));
+        let px = x, py = y, pz = z;
+        for (let i = 0; i <= m; i++) {
+          const t = i / m;
+          if (i) {
+            const sw = (off ? 0.3 : 0.5) * len / m;
+            px += dx * len / m + (n1d(t * 2.3 + dep * 3.1, si) - 0.5) * sw; py += dy * len / m; pz += dz * len / m + (n1d(t * 2.3 + dep * 3.1, si + 41) - 0.5) * sw;
+            if (off) { const q = off(px, py, pz, t); px = q[0]; pz = q[2]; }
+          }
+          Pt.push(px, py, pz); R.push(Math.max(0.0025, r * (1 - 0.82 * Math.pow(t, 0.8))));
+          // (a branch, thinner, off at a slant; and the rootlets, short hairs)
+          if (dep < 2 && i > 0 && i < m - 1 && hsh(i, si + dep * 7, 951) < (dep ? 0.1 : 0.22) && (st.rootTris || 0) < RTMAX) {
+            const sgn = hsh(i, si, 952) < 0.5 ? -1 : 1, bl = len * (1 - t) * (0.35 + 0.4 * hsh(i, si, 953));
+            if (bl > 0.12) root(px, py, pz, dx * 0.7 + (off ? 0 : sgn * 0.5), dy * 0.85, dz * 0.7 + sgn * 0.5 * (off ? 0 : 1), bl, R[R.length - 1] * 0.6, (si + i * 13 + 7) & 1023, dep + 1, off);
+          }
+        }
+        tube(Pt, R, c);
+      }
+      // roots come out of a crack high on face F at (ac, yo): a few down the wall, thick where they come out and thinning, standing a
+      // little off the wall (their shadow falls on it), the lower part hanging away from it
+      function rootsWall(F, ac, yo, f, sd) {
+        const nx = F.nx, nz = F.nz, n = 2 + Math.floor(hsh(ac, sd, 20) * 3), si = Math.floor(sd * 3) & 1023;
+        for (let j = 0; j < n; j++) {
+          const fan = (j - (n - 1) / 2) / Math.max(1, n - 1), a0 = ac + fan * 0.35 + (hsh(j, sd, 21) - 0.5) * 0.12, len = Math.min(yo - f - 1.0, 0.5 + 1.2 * Math.pow(hsh(j, sd, 22), 1.3)), r = 0.02 + 0.016 * hsh(j, sd, 23); if (len < 0.2) continue;
+          const off = (x, y, z, t) => { const o = r + 0.015 + 0.08 * t * t; let a = nx ? z : x; a = Math.min(F.a1 - 0.05, Math.max(F.a0 + 0.05, a)); return nx ? [F.pl + nx * o, y, a] : [a, y, F.pl + nz * o]; };
+          const p0 = off(nx ? 0 : a0, yo, nx ? a0 : 0, 0); if (!j) rec('rw', p0[0], yo - 0.5, p0[2], nx, nz, f);
+          root(p0[0], yo, p0[2], nx ? 0 : fan * 0.3, -1, nx ? fan * 0.3 : 0, len, r, (si + j * 31) & 1023, 0, off);
         }
       }
+      // a root hanging from a roof at (x, y, z), len long: thick where it comes out, swaying as it goes down, branching thinner
+      function hang(x, y, z, len, wd, si) { const a = (si % 64) / 64 * 6.283; root(x, y, z, Math.cos(a) * 0.22, -1, Math.sin(a) * 0.22, len, wd * 0.9, si & 1023, 0, null); }
     } else if (w._soot) { for (const q of w._soot) sootOld(w, q); w._sootDone = true; }
     }
     // ---- (the heaps and the film: helpers that close over this world)

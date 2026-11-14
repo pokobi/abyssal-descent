@@ -745,6 +745,133 @@
   for (const [k, col, b] of [['fire', '#ff6a3a', 'flame'], ['water', '#3f9dff', 'water-drop'], ['ice', '#a8ecff', 'snowflake-2'], ['volt', '#b88cff', 'power-lightning'], ['wind', '#4fd8c0', 'tornado'], ['earth', '#e0a640', 'rock']]) {
     if (PATHS['cut-diamond'] && PATHS[b]) ATT['c_' + k] = [big('cut-diamond', col), badge(b, col)];
   }
+  // ======================================================================================================
+  // Consumables: drawn as the things they are, side on, in their own dull colours (gauze is unbleached, a draught the colour of what is
+  // in its glass, iron is grey) - not as the emoji of what they do. One silhouette each, its parts told apart by their fills
+  // ======================================================================================================
+  const EL = (cx, cy, rx, ry) => `M${cx - rx} ${cy}a${rx} ${ry} 0 1 0 ${2 * rx} 0a${rx} ${ry} 0 1 0 ${-2 * rx} 0Z`;
+  const ring = (cx, cy, r0, r1, c) => EV(O(cx, cy, r0) + O(cx, cy, r1), c);
+  // a pin grenade's fuze on top of a body whose top is at y: the fuze, the spoon down its side, the ring of the pin
+  const fuzeSet = (y, x1) => [
+    L(PG(x1 - 14, y - 4, x1 + 12, y - 12, x1 + 44, y + 40, x1 + 46, y + 170, x1 + 30, y + 168, x1 + 26, y + 46), '#83878a'),
+    L(R(214, y - 58, 84, 62, 10), '#9a8456'), L(R(226, y - 82, 60, 30, 8), '#8a7650'),
+    ring(198, y - 50, 36, 22, '#a8905a'),
+  ];
+  const can = (c, top) => L(R(164, top, 184, 450 - top, 30), c);
+  const II = {};
+  // a roll of gauze: its end with the turns showing, the free end hanging torn, a safety pin through it
+  II.h_bandage = [
+    L('M236 286L372 286C374 330 366 372 372 420L360 436L348 420L336 442L322 424L308 444L296 424L282 440L268 420L254 438L244 420C240 380 240 334 236 286Z', '#c2b597'),
+    L('M172 96L364 96A76 110 0 0 1 364 316L172 316Z', '#d4cab0'),
+    L(EL(172, 206, 76, 110), '#e2dac4'),
+    EV(EL(172, 206, 62, 90) + EL(172, 206, 52, 76) + EL(172, 206, 38, 56) + EL(172, 206, 28, 42), '#a2947a'),
+    L(EL(172, 206, 13, 20), '#857660'),
+    L(R(266, 338, 92, 11, 5), '#a88c52'), L(O(268, 343, 11), '#a88c52'), L(R(344, 334, 22, 18, 5), '#a88c52'),
+  ];
+  // the first-aid kit: a canvas pouch, its flap and buckle, a faded red cross, a strap to carry it
+  II.h_medkit = [
+    L('M190 168C190 76 322 76 322 168L294 168C294 108 218 108 218 168Z', '#6a4a30'),
+    L(R(86, 158, 340, 272, 46), '#998764'),
+    L('M98 172L414 172L402 262C340 286 172 286 110 262Z', '#857350'),
+    L(R(230, 236, 52, 42, 8), '#a88c50'), L(R(243, 247, 26, 20, 4), '#46382a'),
+    L('M236 310h40v28h28v40h-28v28h-40v-28h-28v-40h28z', '#7c3a2e'),
+  ];
+  // a glass syringe: thumb ring, plunger, flange, the barrel with what is in it and its marks, the needle
+  II.h_regen = Z([
+    ring(256, 58, 30, 16, '#aeaca2'), L(R(248, 84, 16, 72, 4), '#a09e96'), L(R(170, 150, 172, 24, 11), '#b2b0a6'),
+    L(R(204, 168, 104, 214, 16), '#aab6b2'), L(R(216, 240, 80, 132, 8), '#6a7a3a'), L(R(212, 226, 88, 18, 4), '#2a2622'),
+    ...[0, 1, 2, 3, 4].map((i) => L(R(214, 254 + i * 24, i % 2 ? 20 : 34, 6, 2), '#34342e')),
+    L(PG(224, 380, 288, 380, 272, 406, 240, 406), '#b2b0a6'), L(R(240, 404, 32, 24, 6), '#a0844a'), L(PG(252, 426, 260, 426, 258, 500, 254, 500), '#c8c8c0'),
+  ], 0.95, -38);
+  // the elixir: an apothecary's phial, dark with what is in it, a label in a hand, waxed over its cork
+  II.h_elixir = [
+    L('M224 104L288 104L288 156C300 178 352 196 352 248L352 420C352 448 336 462 310 462L202 462C176 462 160 448 160 420L160 248C160 196 212 178 224 156Z', '#5a2628'),
+    L(R(174, 252, 14, 170, 7), '#b8bcb2', { o: 0.55 }),
+    L(R(184, 286, 150, 114, 6), '#cfc09a'), ...[0, 1, 2].map((i) => L(R(204, 318 + i * 24, i === 1 ? 90 : 110, 7, 3), '#5c4a36')),
+    L('M210 108C210 74 302 74 302 108L310 132L202 132Z', '#6a2620'), L(R(232, 58, 48, 36, 8), '#9c7650'),
+  ];
+  // holy water: a pilgrim's flask of pewter, a cross struck on it, a cord through its loops
+  II.h_water = [
+    L('M146 214C120 120 168 34 256 26C344 34 392 120 366 214L346 208C368 130 330 52 256 48C182 52 144 130 166 208Z', '#86765a'),
+    ring(176, 196, 34, 20, '#8e8c82'), ring(336, 196, 34, 20, '#8e8c82'),
+    L(R(222, 112, 68, 64, 10), '#97958b'), L(R(210, 100, 92, 24, 9), '#a2a096'), L(R(230, 62, 52, 42, 8), '#9c7650'),
+    L(O(256, 306, 148), '#a2a096'), ring(256, 306, 148, 124, '#87857b'),
+    L(R(242, 212, 28, 188, 6), '#78766c'), L(R(186, 268, 140, 28, 6), '#78766c'),
+  ];
+  // the god's wine: a stoneware flask, brown glaze run unevenly over its shoulder, bare clay below, a cord at its neck
+  II.h_ambrosia = [
+    L('M198 150L314 150C330 172 392 212 392 304C392 404 340 462 256 462C172 462 120 404 120 304C120 212 182 172 198 150Z', '#663a1e'),
+    L('M126 352C170 380 208 346 256 370C304 394 344 350 386 360C378 420 330 462 256 462C182 462 136 420 126 352Z', '#a3825c'),
+    L(R(212, 92, 88, 66, 14), '#663a1e'), L(R(200, 80, 112, 26, 10), '#704424'), L(R(222, 36, 68, 50, 10), '#9c7650'),
+    L(R(204, 128, 104, 16, 8), '#84745a'), L(R(156, 230, 18, 110, 9), '#a86e46', { o: 0.6 }),
+  ];
+  // iron-skin tonic: a flat bottle of brown glass ribbed at its edges, a label, a cork
+  II.u_iron = [
+    L('M226 96L286 96L286 150C320 160 362 170 362 210L362 430C362 452 346 464 324 464L188 464C166 464 150 452 150 430L150 210C150 170 192 160 226 150Z', '#4e2c14'),
+    L(R(158, 220, 12, 230, 6), '#2e1a0c'), L(R(342, 220, 12, 230, 6), '#2e1a0c'),
+    L(R(184, 250, 144, 160, 8), '#cfc09a'), ...[0, 1, 2, 3].map((i) => L(R(202, 282 + i * 26, i === 0 ? 108 : 86, 8, 3), '#5c4a36')),
+    L(R(222, 84, 68, 22, 8), '#5a3418'), L(R(232, 44, 48, 44, 8), '#9c7650'),
+  ];
+  // the vanishing draught: a slim vial of clear glass, a ground stopper, a tag on a string
+  II.u_invis = [
+    L(R(212, 108, 88, 360, 44), '#9aa6a8'), L(R(224, 220, 64, 236, 32), '#bcc6c4'), L(R(222, 120, 14, 300, 7), '#dfe6e4', { o: 0.6 }),
+    L(R(206, 92, 100, 28, 10), '#a6b2b4'), L(O(256, 70, 34), '#aab6b8'),
+    L('M300 150L356 176L340 236L286 212Z', '#cfc09a'),
+  ];
+  // the fairy's bottle: round, long in the neck, sealed; what is in it pale and clouded
+  II.h_fairy = [
+    L(R(230, 112, 52, 120, 12), '#a6aaa4'), L(O(256, 334, 132), '#a6aaa4'), L(EL(256, 360, 108, 96), '#d4d0c2'),
+    L(R(174, 300, 16, 80, 8), '#e4e6e2', { o: 0.6 }), L('M218 116C218 84 294 84 294 116L300 136L212 136Z', '#6a2620'), L(R(234, 62, 44, 36, 8), '#9c7650'),
+  ];
+  // a plate of armour to slip into a vest: bent, rimmed, riveted
+  II.u_plate = [
+    L('M118 118C200 92 312 92 394 118L374 420C302 448 210 448 138 420Z', '#868c90'),
+    L('M150 140C214 122 298 122 362 140L346 396C292 416 220 416 166 396Z', '#9aa0a4'),
+    ...[[150, 150], [362, 150], [168, 400], [344, 400]].map(([x, y]) => L(O(x, y, 13), '#5e6266')),
+  ];
+  // the grenades, side on, the fuze up: each its own body
+  const knobs = () => { const o = []; for (const [y, hw] of [[198, 96], [252, 122], [308, 128], [364, 116], [414, 86]]) { const w = hw * 1.7 / 4; for (let i = 0; i < 4; i++) o.push(L(R(256 - hw * 0.85 + i * w + 4, y - 22, w - 8, 44, 10), '#737a68')); } return o; };
+  II.g_frag = [...fuzeSet(146, 290), L(EL(256, 300, 130, 156), '#555c4e'), ...knobs()];
+  II.g_fire = [...fuzeSet(140, 300), can('#68321f', 140), L(R(156, 196, 200, 30, 8), '#8e7638'), L(R(206, 296, 100, 96, 16), '#a2662a'), L(R(222, 306, 16, 70, 8), '#d8a060', { o: 0.5 })];
+  II.g_cryo = [...fuzeSet(140, 300), can('#848c8e', 140), L(R(156, 222, 200, 26, 8), '#4a6680'), L(R(156, 372, 200, 26, 8), '#4a6680'), ...[[184, 168], [214, 156], [260, 160], [300, 150], [326, 170], [236, 182]].map(([x, y]) => L(O(x, y, 11), '#cfd8dc'))];
+  II.g_shock = [
+    L(R(226, 62, 16, 120, 6), '#929290'), L(R(272, 62, 16, 120, 6), '#929290'), L(O(234, 58, 15), '#a48450'), L(O(280, 58, 15), '#a48450'),
+    L(R(204, 160, 104, 280, 20), '#bfb396'), L(EL(256, 190, 98, 36), '#c6ba9c'), L(EL(256, 280, 112, 40), '#c6ba9c'), L(EL(256, 380, 124, 44), '#c6ba9c'), L(EL(256, 440, 104, 26), '#b4a88c'),
+    ...[0, 1, 2].map((i) => L(R(198, 304 + i * 20, 116, 11, 5), '#9a5e36')),
+  ];
+  II.g_toxic = [...fuzeSet(140, 300), can('#56664a', 140), L(R(156, 196, 200, 28, 8), '#3a5430'), ...[188, 228, 268, 308].map((x) => L(O(x + 6, 300, 13), '#232a20')), ...[208, 248, 288].map((x) => L(O(x + 6, 340, 13), '#232a20')), L(R(156, 400, 200, 10, 5), '#6a8a48')];
+  II.g_sticky = [
+    L('M70 360C80 300 180 290 256 290C332 290 432 300 442 360C452 410 360 430 256 430C152 430 60 410 70 360Z', '#44502a'),
+    ...[-3, -2, -1, 0, 1, 2, 3].map((i) => L(PG(256 + i * 44 - 14, 300, 256 + i * 44 + 14, 300, 256 + i * 50, 262), '#5a5e5a')),
+    L(R(136, 250, 240, 80, 26), '#545856'), L(EL(256, 252, 120, 28), '#6a6e6a'), L(O(256, 250, 16), '#5a2a22'),
+  ];
+  II.g_water = [
+    L('M256 470C150 470 96 400 104 322C112 242 180 192 222 172L222 124L290 124L290 172C332 192 400 242 408 322C416 400 362 470 256 470Z', '#644630'),
+    L(R(200, 118, 112, 42, 14), '#44526c'), L('M300 130L362 112L376 160L318 156Z', '#44526c'), L('M212 130L150 104L132 150L194 156Z', '#3e4a62'),
+    L(R(214, 92, 84, 30, 10), '#84745a'), L(R(140, 300, 20, 100, 10), '#8a6a4c', { o: 0.6 }),
+  ];
+  II.g_flash = [...fuzeSet(140, 290), L(R(176, 140, 160, 314, 20), '#959b9f'), L(R(168, 176, 176, 22, 8), '#bdbdb2'), L(R(168, 410, 176, 22, 8), '#bdbdb2'), ...[204, 238, 272, 306].map((x) => L(O(x, 260, 13), '#2a2e32')), ...[221, 255, 289].map((x) => L(O(x, 330, 13), '#2a2e32'))];
+  II.g_hole = [
+    L(O(256, 292, 142), '#33333a'), L(O(256, 292, 40), '#141418'), L(O(244, 280, 12), '#4a4a54'),
+    Object.assign(EV(EL(256, 292, 206, 62) + EL(256, 292, 188, 46), '#68686e'), { gr: 24 }),
+    Object.assign(EV(EL(256, 292, 176, 54) + EL(256, 292, 160, 40), '#5e5e64'), { gr: -38 }),
+  ];
+  II.g_nail = [
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => Object.assign(L(R(248, 90, 16, 120, 4), '#95958f'), { gr: i * 45 + 10 })),
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => Object.assign(L(R(236, 80, 40, 18, 6), '#a6a69e'), { gr: i * 45 + 10 })),
+    L(O(256, 256, 138), '#73543c'), EV(EL(256, 256, 140, 30) + EL(256, 256, 140, 16), '#84745a'),
+  ];
+  II.g_shatter = [
+    L(PG(256, 92, 344, 196, 344, 336, 256, 440, 168, 336, 168, 196), '#93acb0'), L(PG(256, 92, 300, 196, 300, 336, 256, 440), '#b2c6c8'),
+    ...[[180, 120, 'M200 100C120 160 120 360 200 420L216 412C142 356 142 166 216 108Z'], [332, 120, 'M312 100C392 160 392 360 312 420L296 412C370 356 370 166 296 108Z']].map((q) => L(q[2], '#7e858c')),
+    L(R(204, 80, 104, 26, 10), '#868d94'), L(R(204, 414, 104, 26, 10), '#868d94'),
+  ];
+  II.g_dyna = [
+    L('M262 118C262 84 300 60 336 46L346 62C312 76 282 94 282 120Z', '#3a3430'), L(O(342, 52, 13), '#9a5a2e'),
+    L(R(136, 116, 76, 336, 34), '#6e2e22'), L(R(218, 104, 76, 348, 34), '#7a3426'), L(R(300, 116, 76, 336, 34), '#6e2e22'),
+    L(R(126, 184, 260, 20, 9), '#98804a'), L(R(126, 370, 260, 20, 9), '#98804a'),
+  ];
+  IC.itemIcons = II;
   IC.applyData = function () {
     IC.def('ui:os', OS());
     for (const [k, layers] of Object.entries(ATT)) IC.def('att:' + k, layers);
@@ -771,8 +898,12 @@
       d.icon = IC.ch(key, d.icon);
     }
     // a few items whose emoji is shared with something else get their own drawing
-    const ITEMX = { h_medkit: ['medical-pack', '#e8484a'], v_casket: ['locked-chest', '#ffd34a'] };
-    for (const list of [G.ITEMS, G.VALUABLES]) if (list) for (const it of list) { const x = ITEMX[it.id]; if (x && PATHS[x[0]]) { IC.def('item:' + it.id, [big(x[0], x[1])]); it.icon = IC.ch('item:' + it.id, it.icon); } }
+    const ITEMX = { h_apple: ['shiny-apple', '#b8933a'], h_troll: ['heart-organ', '#7e3632'], u_hammer: ['flat-hammer', '#a08c6c'], u_repair: ['spanner', '#a2a29a'], v_casket: ['locked-chest', '#ffd34a'] };
+    for (const list of [G.ITEMS, G.VALUABLES]) if (list) for (const it of list) {
+      const d = II[it.id], x = ITEMX[it.id];
+      if (d) { IC.def('item:' + it.id, d); it.icon = IC.ch('item:' + it.id, it.icon); }
+      else if (x && PATHS[x[0]]) { IC.def('item:' + it.id, [big(x[0], x[1])]); it.icon = IC.ch('item:' + it.id, it.icon); }
+    }
     if (G.ARMOR_SLOTS) for (const s of G.ARMOR_SLOTS) { const n = ARMOR[s.id] && ARMOR[s.id].plate; if (n) { IC.def('aslot:' + s.id, [big(n, '#9a8a70')]); s.icon = IC.ch('aslot:' + s.id, s.icon); } }
   };
   IC.warm = function () {

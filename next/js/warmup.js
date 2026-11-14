@@ -158,7 +158,7 @@
       // every sight once (their glass, their glowing stones, the open hoods seen from inside are shaders of their own)
       if (G.WEAPON_BY_ID.n_scout) for (const a of G.ATTACHMENTS || []) if (a.slot === 'optic') { try { tmp.add(Wp.displayModel(G.WEAPON_BY_ID.n_scout, { optic: a.id })); } catch (e) { /* ignore */ } }
       if (G.MELEE && G.MELEE[0]) { try { tmp.add(Wp.meleeDisplayModel(G.MELEE[0])); } catch (e) { /* ignore */ } }
-      if (G.ItemAnim) for (const k of ['throw', 'bandage', 'drink', 'inject', 'eat', 'plate', 'device']) { try { tmp.add(G.ItemAnim.build(k, null)); } catch (e) { /* ignore */ } }
+      if (G.ItemAnim) { if (G.ItemAnim.warm) { try { G.ItemAnim.warm(tmp); } catch (e) { /* ignore */ } } else for (const k of ['throw', 'bandage', 'drink', 'inject', 'eat', 'plate', 'device']) { try { tmp.add(G.ItemAnim.build(k, null)); } catch (e) { /* ignore */ } } }
       if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id, 0.42)); } catch (e) { /* ignore */ } }
       if (G.ItemAnim) { try { const h = new THREE.Group(); G.ItemAnim.hand(h, true); tmp.add(h); } catch (e) { /* ignore */ } }
       // see-through hands and gun (影の舞, the invisibility draught: pstatus.js ghostMesh): their shader variants, once

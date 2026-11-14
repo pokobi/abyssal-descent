@@ -25,6 +25,8 @@
   // what a use's length is multiplied by - the one place for anything that makes using quicker (a perk adds a line here)
   IA.useMul = function (id, kind) {
     const p = G.player; let m = 1;
+    // (手際 / 野戦の心得: their shares add up - 1 - 0.15 x stacks - 0.25)
+    if (p && p.stats && p.stats.useFast > 0) m *= 1 - p.stats.useFast;
     if (kind === 'bandage' && p && p.has && p.has('d_healboost')) m *= 0.85;   // (治癒の才: the bandage goes on quicker)
     return m;
   };

@@ -312,6 +312,8 @@
     for (const b of G.BOSSES) if (!(G.RETIRED_BOSSES || []).includes(b.id)) { const st = bossStats(b); if (st) mx = Math.max(mx, st.hp); }
     return mx * 1.1;
   }
+  // the game's baked surfaces copied for this renderer (they live in the game renderer's context and come out black here: gfx.js)
+  const port = (root) => (G.GFX && G.GFX.portable ? G.GFX.portable(root, renderer) : root);
   function mount3d(host, o) {
     if (!renderer) {
       canvas = document.createElement('canvas');
@@ -326,7 +328,9 @@
       scene.add(new THREE.HemisphereLight(0xb0a8a0, 0x302820, 1.2));
       const k = new THREE.DirectionalLight(0xffe0c0, 2.2); k.position.set(2, 3, 2); scene.add(k);
       const r2 = new THREE.DirectionalLight(0x8090c0, 1.0); r2.position.set(-2, 1, -2); scene.add(r2);
-      scene.environment = G.envTex || null;
+      // the game's reflections (G.envTex) live in the game renderer's own context and read as black here: the same room baked again
+      // for this renderer (a small sphere into PMREM, done once)
+      try { scene.environment = G.Tex && G.Tex.makeEnv ? G.Tex.makeEnv(renderer) : null; } catch (e) { scene.environment = null; }
       cam = new THREE.PerspectiveCamera(35, 380 / 260, 0.01, 100);
     }
     host.appendChild(canvas);
@@ -335,7 +339,7 @@
     if (tab === 'boss') {
       const m = G.bosses.buildModelOnly(o.id, BOSS_REF);
       if (!m) { host.innerHTML = `<div class="cd-icon">${o.icon}</div>`; return; }
-      const r = m.root; r.updateMatrixWorld(true);
+      const r = m.root; port(r); r.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(r); const c = box.getCenter(new THREE.Vector3()); const sz = box.getSize(new THREE.Vector3());
       r.position.sub(c);
       const g = new THREE.Group(); g.add(r); model = g;
@@ -344,14 +348,14 @@
       scene.add(model); if (!raf) loop(); return;
     }
     if (tab === 'weapon' || tab === 'melee') {
-      model = tab === 'melee' ? G.weapons.meleeDisplayModel(o) : G.weapons.displayModel(o);
+      model = port(tab === 'melee' ? G.weapons.meleeDisplayModel(o) : G.weapons.displayModel(o));
       const box = new THREE.Box3().setFromObject(model); const c = box.getCenter(new THREE.Vector3()); const sz = box.getSize(new THREE.Vector3()).length();
       model.position.sub(c);
       const g = new THREE.Group(); g.add(model); model = g;
       cam.position.set(0, sz * 0.25, sz * 1.6); cam.lookAt(0, 0, 0);
     } else {
       const m = G.enemies.buildModel(o);
-      model = m.group;
+      model = port(m.group);
       const h = m.h, s = Math.max(h, m.r * 2.5);
       model.position.y = -h * 0.5;
       const g = new THREE.Group(); g.add(model); model = g;

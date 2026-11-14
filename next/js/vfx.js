@@ -157,7 +157,10 @@
       else if (k == 13) { lc = vec3(0.02); la = 0.8; le = mix(uC1, vec3(1.0), 0.5) * 0.07; ls = 0.5; }            // shock: a scorched ring
       else if (k == 0) { la = 0.0; }
       if (la > 0.0) { body = mix(body, lc, lip); ba = max(ba, lip * la); em += le * lip + vec3(0.5, 0.5, 0.46) * ls * sheen * 0.16 * (0.35 + uLit); }
-      if (k == 1) { float cx2 = (d - (uR - lw * 2.4 - rag * 0.5)) / max(lw * 0.5, pxa * 1.6), crust = exp(-cx2 * cx2) * inside; body = mix(body, vec3(0.5, 0.48, 0.3) * (0.45 + 0.6 * uLit), crust); ba = max(ba, crust * 0.85); }
+      // (poison: a dried lip that comes and goes, nearer and further from the edge, as the edge of a spill)
+      if (k == 1) { float bk = vnoise(vec2(ang * max(uR, 0.5) * 1.1 + uSeed * 5.0, 2.0)), bk2 = vnoise(vec2(ang * max(uR, 0.5) * 3.7 - uSeed * 3.0, 6.0));
+        float cw = max(lw * (0.2 + 0.8 * bk2), pxa * 1.4), cx2 = (d - (uR - lw * (1.6 + 1.6 * bk) - rag * 0.5)) / cw, crust = exp(-cx2 * cx2) * inside * smoothstep(0.38, 0.62, bk) * (0.4 + 0.6 * bk2);
+        body = mix(body, vec3(0.3, 0.29, 0.18) * (0.45 + 0.6 * uLit), crust); ba = max(ba, crust * 0.6); }
       em += uC2 * edge * uFlash * 0.4 * inside;
       ${fogAdd}
       float a = clamp(ba, 0.0, 0.92) * uA;
@@ -224,9 +227,10 @@
       vec3 col = mix(uC, uC2, clamp(pat, 0.0, 1.0));
       float ward = 0.0;
       if (s == 6) {   // (a ward: no outline - patches of bent light drifting over it, strongest a little inside its silhouette, gone at it)
-        float band = smoothstep(0.02, 0.15, f) * (1.0 - smoothstep(0.3, 0.6, f));
-        float blot = smoothstep(0.55, 0.85, fbm(vec2(ang * 2.6 + uT * 0.35 + uSeed * 9.0, h * 3.2 - uT * 0.55)));
-        ward = band * blot * 0.5;
+        float face = 1.0 - smoothstep(0.5, 0.88, f);   // (over its whole face, gone before its silhouette: no ring to read as a ball)
+        float blot = smoothstep(0.5, 0.82, fbm(vec2(ang * 4.2 + uT * 0.6 + uSeed * 9.0, h * 5.0 - uT * 0.9)));
+        float film = fbm(vec2(ang * 1.5 - uT * 0.22 + uSeed * 4.0, h * 2.0 + uT * 0.16));   // (a thin film flowing slowly over all of it)
+        ward = face * (blot * 0.42 + smoothstep(0.4, 0.8, film) * 0.12);
       }
       float a = (s == 6 ? ward : s == 0 ? pow(f, 1.6) * 0.4 + pat * 0.35 * (0.3 + f) : f * 0.85 + pat * 0.45 * (0.3 + f)) * uA;   // (plain energy: a soft haze, no hard bright rim)
       ${fogAdd}
@@ -235,6 +239,15 @@
       gl_FragColor = vec4(col * (1.0 + f * 0.6), clamp(a, 0.0, 1.0));
     }`;
   const SHELL_STYLE = { energy: 0, ice: 1, emp: 2, holy: 3, fire: 4, blood: 4, spiral: 5, rim: 6 };
+  const SMOKEBALL_VS = `uniform float uT; uniform float uSeed; varying vec3 vN; varying vec3 vV; varying vec3 vO; varying float vDepth;
+    ${NOISE}
+    void main() {
+      vO = position;
+      float n = vnoise(position.xy * 2.3 + vec2(uT * 1.7, uSeed * 7.0)) + vnoise(position.zy * 2.1 - vec2(uT * 1.3, uSeed * 3.0));
+      vec3 p = position * (0.9 + (n - 0.8) * 0.3);   // (folds of smoke standing out past a round ball, rolling)
+      vec4 mv = modelViewMatrix * vec4(p, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vDepth = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }`;
   const SMOKEBALL_FS = `uniform float uT; uniform float uA; uniform vec3 uC; uniform vec3 uC2; uniform float uSeed; uniform float uLit; ${FOG_U}
     varying vec3 vN; varying vec3 vV; varying vec3 vO;
     ${NOISE}
@@ -242,7 +255,7 @@
       float face = abs(dot(normalize(vN), normalize(vV)));
       vec3 q = vO * 2.4 + vec3(uSeed * 7.0, -uT * 1.3, uT * 0.7);   // (from the ball's own surface, no seam round it)
       float n = fbm(q.xy) * 0.55 + fbm(q.zy + 3.1) * 0.45, n2 = fbm(q.xz * 2.2 - uT * 1.9) * 0.5 + fbm(q.yz * 2.1 + 5.3) * 0.5;
-      float a = smoothstep(0.0, 0.2, face + (n - 0.5) * 0.12) * (0.82 + 0.18 * n2) * uA;   // (dense to its edge: the light it carries shows only as a fringe round it)
+      float a = smoothstep(0.0, 0.3, face + (n - 0.5) * 0.35) * (0.8 + 0.2 * n2) * uA;   // (dense to its edge: the light it carries shows only as a fringe round it)
       float ember = smoothstep(0.6, 0.82, n2) * smoothstep(0.3, 0.8, face) * (1.0 - smoothstep(0.35, 0.6, n));
       vec3 smoke = mix(vec3(0.004, 0.0035, 0.004), vec3(0.085, 0.077, 0.078), smoothstep(0.3, 0.78, n)) * (0.5 + 0.5 * uLit);   // (folds of it: lit crowns, near-black between)
       ${fogAdd}
@@ -252,7 +265,7 @@
   // (the shot it is the body of - a group marked with its kind, combat.js - carries a glow of its own beside it; a ball of smoke does
   // not shine, so at its first drawing that glow is taken down to an ember's - else it shows as a lit ring round the dark ball)
   function smokeBallMat() {
-    const m = premul(mk(SHELL_VS, SMOKEBALL_FS, { uA: { value: 1 }, uC: { value: col3(0x202020) }, uC2: { value: col3(0x404040) }, uSeed: { value: Math.random() }, uLit: LIT }, {}));
+    const m = premul(mk(SMOKEBALL_VS, SMOKEBALL_FS, { uA: { value: 1 }, uC: { value: col3(0x202020) }, uC2: { value: col3(0x404040) }, uSeed: { value: Math.random() }, uLit: LIT }, {}));
     m.onBeforeRender = function (r, sc, cam, geo, obj) { const g = obj && obj.parent; if (!g || g.isScene || !g.userData.kind || g.userData.smokeDim) return; g.userData.smokeDim = true; for (const ch of g.children) if (ch.isSprite && ch.material) { ch.material.opacity *= 0.2; ch.scale.multiplyScalar(0.8); } };
     return m;
   }
@@ -800,7 +813,7 @@
         const p = follow.pos || follow, k = Math.min(1, this.t / 0.2), left = this.dur - this.t;
         m.position.set(p.x, p.y + (o.lift ?? 1), p.z);
         m.scale.setScalar(this.r * (0.6 + 0.4 * k) * (1 + 0.025 * Math.sin(this.t * 6)));
-        m.material.uniforms.uA.value = (o.alpha ?? 0.45) * 0.16 * k * Math.min(1, left / 0.3) * (1 + (this.t < 0.3 ? (0.3 - this.t) * 4 : 0));
+        m.material.uniforms.uA.value = (o.alpha ?? 0.45) * 0.42 * k * Math.min(1, left / 0.3) * (1 + (this.t < 0.3 ? (0.3 - this.t) * 4 : 0));
         return left > 0;
       },
       dispose() { scene.remove(m); m.material.dispose(); this.dead = true; },

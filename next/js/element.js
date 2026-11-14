@@ -471,7 +471,8 @@
   EL.crystalModel = function (col) {
     const key = col >>> 0;
     if (!crysGeos[key]) {
-      const tint = (G.fx.tone ? G.fx.tone(col) : new THREE.Color(col)).lerp(new THREE.Color(0x8a8680), 0.3).multiplyScalar(0.62);
+      const MIN = { fire: 0x6e4434, water: 0x3e586a, ice: 0x9aa6ae, volt: 0x5a6484, wind: 0x5a7468, earth: 0x86703e };
+      const elId = (EL.LIST.find((x) => x.hex === col) || {}).id, tint = new THREE.Color(MIN[elId] || 0x7a746c);
       const rock = new THREE.Color(0x3a3530), parts = [];
       const lump = new THREE.IcosahedronGeometry(0.24, 1), lp = lump.attributes.position;
       for (let i = 0; i < lp.count; i++) { const x = lp.getX(i), y = lp.getY(i), z = lp.getZ(i), f = 0.78 + 0.4 * _hc(i, 3); lp.setXYZ(i, x * f * 1.15, Math.max(-0.05, y * f * 0.42), z * f); }

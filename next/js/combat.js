@@ -764,7 +764,8 @@
     switch (p.kind) {
       case 'rocket': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(0, 0.5), U.rand(-0.3, 0.3), 1.2, 0.2, 1.0, 0.5, 0.48, 0.45, 0.5, -0.3, 1); G.fx.flame.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.08, 0.35, 0.1, 1.5, 0.9, 0.4, 1, 0, 0); break;
       case 'fireball': case 'bigfire': G.fx.flameLick(p.pos.x, p.pos.y - 0.1, p.pos.z, p.kind === 'bigfire' ? 2.5 : 1.0); break;
-      case 'orb': case 'darkorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.22, 0.02, 0.5, 0.42, 0.55, 0.8, 0, 1); break;
+      case 'orb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.22, 0.02, 0.5, 0.42, 0.55, 0.8, 0, 1); break;
+      case 'darkorb': if (Math.random() < 0.85) G.fx.norm.spawn(p.pos.x + U.rand(-0.1, 0.1), p.pos.y + U.rand(-0.1, 0.1), p.pos.z + U.rand(-0.1, 0.1), U.rand(-0.25, 0.25), U.rand(-0.05, 0.3), U.rand(-0.25, 0.25), U.rand(0.7, 1.2), 0.25, U.rand(0.55, 0.9), 0.04, 0.036, 0.038, 0.6, -0.12, 1.4); if (Math.random() < 0.12) G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.4, 0.4), U.rand(0, 0.5), U.rand(-0.4, 0.4), 0.45, 0.035, 0.01, 0.65, 0.2, 0.05, 0.9, -0.2, 0.6); break; // (dark smoke behind it, an ember now and then)
       case 'soul': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.58, 0.68, 0.78, 0.8, 0, 1); break;
       case 'waterorb': G.fx.drops.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.6, 0.6), U.rand(-0.6, 0.4), U.rand(-0.6, 0.6), 0.4, 0.012, 0.5, 0.58, 0.62, 9.8, 0.3, 0.03); break; // (water shed as it flies: drops)
       case 'frostorb': case 'icespear': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.4, 0.1), U.rand(-0.3, 0.3), 0.6, 0.12, 0.45, 0.78, 0.82, 0.86, 0.4, 0.2, 1); break; // (cold air trailing off it)

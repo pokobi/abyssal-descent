@@ -229,10 +229,16 @@
     const h = w.miniHeal;
     w.addCollider(h.x - 0.7, h.y, h.z - 0.7, h.x + 0.7, h.y + 0.9, h.z + 0.7);
     const bg = new THREE.Group(); bg.position.copy(h);
-    const base = new THREE.Mesh(G.Props.PG.oct, w.mats.trim); base.scale.set(0.75, 0.9, 0.75); base.position.y = 0.45; bg.add(base);
-    const water = new THREE.Mesh(G.Props.PG.cyl, new THREE.MeshBasicMaterial({ color: 0x60ff90, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })); water.scale.set(0.6, 0.02, 0.6); water.position.y = 0.92; bg.add(water);
+    // (a basin of carved stone on a stem - a foot, a waisted stem, a bowl with a thick lip and two bands cut round it - inside the same
+    // 0.7 m it always took; dark clear water standing in it; a breath of steam off the water now and then; a faint gold light over it)
+    const prof = [[0.56, 0], [0.6, 0.05], [0.52, 0.13], [0.3, 0.19], [0.22, 0.3], [0.22, 0.48], [0.3, 0.55], [0.5, 0.64], [0.64, 0.76], [0.69, 0.86], [0.66, 0.91], [0.6, 0.9], [0.56, 0.84], [0.4, 0.8], [0.001, 0.78]];
+    const bowl = new THREE.Mesh(new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 28), w.mats.trim); bg.add(bowl);
+    for (const [r, y, tb] of [[0.3, 0.55, 0.028], [0.66, 0.8, 0.022], [0.53, 0.1, 0.03]]) { const band = new THREE.Mesh(new THREE.TorusGeometry(r, tb, 6, 32), w.mats.trim); band.rotation.x = Math.PI / 2; band.position.y = y; bg.add(band); }
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.58, 32), new THREE.MeshStandardMaterial({ color: 0x060c0e, emissive: 0x140f06, roughness: 0.12, metalness: 0, envMapIntensity: 0.35, transparent: true, opacity: 0.94, depthWrite: false }));
+    water.rotation.x = -Math.PI / 2; water.position.y = 0.86; bg.add(water);
+    water.onBeforeRender = () => { const t = G.game.time; if (t - (water.userData.t || 0) < 0.22) return; water.userData.t = t; const a = Math.random() * 6.283, d = Math.random() * 0.45; G.fx.norm.spawn(h.x + Math.cos(a) * d, h.y + 0.9, h.z + Math.sin(a) * d, (Math.random() - 0.5) * 0.08, 0.18 + Math.random() * 0.12, (Math.random() - 0.5) * 0.08, 2.2, 0.12, 0.55, 0.74, 0.73, 0.7, 0.16, -0.03, 0.4); };
     w.group.add(bg);
-    w.lightSources.push({ pos: h.clone().add(V(0, 1.4, 0)), color: '#70ff9a', intensity: 4, range: 5, flame: 0, emit: false, ph: 0, prio: 1.5, steady: true });
+    w.lightSources.push({ pos: h.clone().add(V(0, 1.3, 0)), color: '#d8b070', intensity: 1.4, range: 3.4, flame: 0, emit: false, ph: 0, prio: 1.5, steady: true });
     S.healPos = h.clone().setY(h.y + 1.0);
   }
   function buildStand(w, x, z, y) {

@@ -31,7 +31,7 @@
     // drawn as it was, its top at MELT. Nothing stops you there but its bed: no dice are thrown for any of it)
     const MY = MELT - 0.03;
     { const c = w.addCollider(0, w.killY, pz0, W, MY, pz1, { surf: 'stone', noGrapple: true }); c.melt = true; }
-    if (G.Fields) { G.Fields.add(w, 'lava', 0, pz0, W, pz1, { y: MY, noLight: true }); w.fields[w.fields.length - 1].vdist = 4.5; } else w.visual('lava', 0, MY, pz0, W, MELT, pz1, { uv: 4, grad: false, skip: { bottom: true } });
+    if (G.Fields) { G.Fields.add(w, 'lava', 0, pz0, W, pz1, { y: MY, noLight: true, deep: true }); w.fields[w.fields.length - 1].vdist = 4.5; } else w.visual('lava', 0, MY, pz0, W, MELT, pz1, { uv: 4, grad: false, skip: { bottom: true } });
     w.melt = { y: MY, z0: pz0, z1: pz1 };
     const inMelt = (x, z) => z > pz0 && z < pz1 && x > 0 && x < W;
     // for the foes it is still a drop they will not walk off into (single-storey edges: world.js edgeSafe), and where one that goes in is

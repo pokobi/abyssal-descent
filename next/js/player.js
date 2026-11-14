@@ -269,6 +269,8 @@
       this._rfT = (this._rfT || 0) - dt; if (this._rfT <= 0) { this._rfT = 0.5; if (!(G.InvUI && G.InvUI.isOpen())) this.refillPockets(); }
       const w = G.world, S = G.save.data.settings, st = this.stats;
       const t = G.game.time;
+      // the pile driver's label follows its state, whatever ended it (the slam, a fall into the pit, a respawn, being carried off by a guardian ...)
+      G.ui.pileIndicator(!!this.pileState && !this.dead);
       if (this.dead) return this.updateDeadCam(dt);
       // frozen solid (凍結, element.js): only the look. A fresh press of jump cracks the ice; every other input of this frame is held
       // back (input.js I.hold: the weapons, the skills, the items, the bag read nothing pressed), jump too, once its press is taken here
@@ -602,6 +604,13 @@
     // An action that takes the hands begins (kind: see stopActions): whatever else had them is put down. handsBlocked: none can begin now
     // (the pile driver's slam has the whole body).
     beginHands(kind) { this.stopActions('start', kind); }
+    // A skill or an ultimate has gone off (abilities.js castSkill, ultimates.js castUlt): a reload under way is put down, as by any other action
+    // (it starts over the next time; a gun loaded shell by shell keeps the shells already in). Nothing else is: an item, a throwable, the run, a jump and the grapple go on
+    cutReload() {
+      const W = G.weapons; let cut = false;
+      for (const w of this.weapons || []) if (w && w.reloading) { if (W.interruptReload) W.interruptReload(w); else { w.reloading = false; w.reloadT = 0; } if (w === this.weapon && !(W.stats && w.mag >= W.stats(w).mag)) cut = true; }
+      if (cut) { G.sfx.mech('click', 0, 0.5); G.ui.feed('🔄 リロードを中断'); } // (not said when the skill itself filled the gun: 過負荷's x_reload)
+    }
     handsBlocked() { return !!this.pileState; }
     fellInPit() {
       const wf = G.world.fallFrac || 0.15;
@@ -633,9 +642,14 @@
       if (!this.inWater && w.deepWater) for (const d of w.deepWater) if (this.pos.x > d.x0 && this.pos.x < d.x1 && this.pos.z > d.z0 && this.pos.z < d.z1 && this.pos.y < d.y + 0.2) this.inWater = true;
       if (this.grounded && !G.Strata.onRope) for (const z of w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
         this._lavaT = (this._lavaT || 0) - dt;
-        if (this._lavaT <= 0) { this._lavaT = 0.4; G.combat.damagePlayer(5 + G.game.area * 0.6, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }
-        // lava sets you alight with a fierce, long burn (it hurts several times more than an ordinary one)
-        this.st.burn = Math.max(this.st.burn || 0, 5); this.st.burnMul = 4; this.st.burnLv = Math.max(this.st.burnLv || 1, 3);
+        // (z.deep: a lake or a pit of melt you only end up in by a fall - the foundry's deep melt, the great spiral's bottom - hurts in full.
+        // Anything else lying on the ground, easily stepped in by mistake - a patch, a trench, a trough, blue fire - hurts half as much)
+        const deep = !!z.deep;
+        if (this._lavaT <= 0) { this._lavaT = 0.4; G.combat.damagePlayer(deep ? 5 + G.game.area * 0.6 : 2.5 + G.game.area * 0.3, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }
+        // deep lava sets you alight with a fierce, long burn (it hurts several times more than an ordinary one); shallow lava with a short,
+        // mild one (a fiercer burn already on you is not softened by it)
+        if (deep) { this.st.burn = Math.max(this.st.burn || 0, 5); this.st.burnMul = 4; this.st.burnLv = Math.max(this.st.burnLv || 1, 3); }
+        else { this.st.burn = Math.max(this.st.burn || 0, 2); this.st.burnMul = Math.max(this.st.burnMul || 1, 1.5); this.st.burnLv = Math.max(this.st.burnLv || 1, 1); }
       }
       // footsteps
       if (this.grounded && this.speedH > 1.2 && !this.sliding) {
@@ -976,7 +990,6 @@
       if (this.stats.techShield) G.combat.timedShield(20 * this.stats.techShield, 6, 120);
       G.sfx.whoosh(0.35, 0.6, true);
       G.sfx.magic(this.pos, 'dark');
-      G.ui.pileIndicator(true);
     }
     pileImpact() {
       const st = this.stats;
@@ -1012,7 +1025,6 @@
       this.landDip = -0.45;
       this.pileState = null;
       this.pileLandT = 0.45;
-      G.ui.pileIndicator(false);
       G.buffs.emit('onSkill', { skill: { id: 'pile' } });
       if (st.pileBounce && !this._pileBounced) { this._pileBounced = true; this.vel.y = 12; this.grounded = false; this.pileFree = true; }
       else this._pileBounced = false;

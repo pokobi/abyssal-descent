@@ -179,7 +179,8 @@
     el.style.opacity = on ? 1 : 0; UI.el.crosshair.style.opacity = on ? 0 : UI.el.crosshair.style.opacity;
   };
   UI.scopeRange = function (txt, foe) { const t = UI._x8rng; if (!t) return; if (t.textContent !== txt) t.textContent = txt; const c = foe ? '#ff5038' : '#ffb040'; if (t.getAttribute('fill') !== c) t.setAttribute('fill', c); };
-  UI.pileIndicator = function (on) { UI.el.pileInd.classList.toggle('hidden', !on); };
+  // (set every frame from the player's own state, player.js update: the DOM is touched only when it changes)
+  UI.pileIndicator = function (on) { on = !!on; if (UI._pileOn === on) return; UI._pileOn = on; UI.el.pileInd.classList.toggle('hidden', !on); };
   UI.grappleHint = function (pv, state, cd) {
     const ch = UI.el.crosshair, gi = UI.el.grappleInd;
     const ok = pv && pv.ok && state === 'none' && cd <= 0;

@@ -644,7 +644,7 @@
         G.sfx.whoosh(0.6, 1.0, true); P.fovKick = 12; for (let i = 0; i < 20; i++) G.fx.norm.spawn(P.pos.x, P.pos.y, P.pos.z, U.rand(-3, 3), U.rand(-1, 0), U.rand(-3, 3), 0.6, 0.3, 1.2, 0.8, 0.8, 0.8, 0.4, 0, 2); break;
       default: ok = false;
     }
-    if (ok) { A.consume(sk); G.sfx.ui('skill'); }
+    if (ok) { A.consume(sk); G.sfx.ui('skill'); if (P.cutReload) P.cutReload(); } // (a skill that went off puts down a reload under way: player.js cutReload)
   }
 
   // ---------------- ally skeletons ----------------

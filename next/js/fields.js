@@ -57,7 +57,8 @@
     }
   };
   F.add = function (w, kind, x0, z0, x1, z1, opts) {
-    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue) };
+    // (deep: a lava lake or pit you only end up in by a fall, which burns in full; any other lava is shallow and milder, player.js postMove)
+    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue), deep: !!(opts && opts.deep) };
     w.fields = w.fields || [];
     w.fields.push(f);
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;

@@ -170,7 +170,7 @@
       w.solid('block', wl, T.y, zr, wl + 0.8, -0.5, z1, { uv: 2 }); w.solid('block', er - 0.8, T.y, zr, er, -0.5, z1, { uv: 2 });
       if (zr === Zn) w.solid('block', wl, T.y, zr, er, -0.5, zr + 0.8, { uv: 2 });
       if (z1 === Zs) w.solid('block', wl, T.y, z1 - 0.8, er, -0.5, z1, { uv: 2 });
-      G.Fields.add(w, 'lava', wl + 0.8, zr + (zr === Zn ? 0.8 : 0), er - 0.8, z1 - (z1 === Zs ? 0.8 : 0), { blue: ruined, y: T.y, noLight: true });
+      G.Fields.add(w, 'lava', wl + 0.8, zr + (zr === Zn ? 0.8 : 0), er - 0.8, z1 - (z1 === Zs ? 0.8 : 0), { blue: ruined, y: T.y, noLight: true, deep: true });
       zr = z1;
     }
     for (let z = Zn + 6; z < Zs - 2; z += 12) w.addLight((cl(WL[0], z) + cl(ER[0], z)) / 2, 0.4, z, { flame: 0, intensity: 16, range: 15, color: ruined ? '#3a8aff' : '#ff6a20', prio: 1.1, emit: false });

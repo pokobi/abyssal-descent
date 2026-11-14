@@ -172,6 +172,8 @@
     };
     const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nv = new THREE.Vector3();
     const faceMk = o.skirtMk || 'rock';
+    // the faces down the drops: [x0, z0, x1, z1, top at 0, top at 1, foot at 0, foot at 1, nx, nz] (drawn after, as one surface)
+    const FQ = [];
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
       const i = z * W + x; if (!m[i]) continue;
       const hc = h[i];
@@ -186,11 +188,65 @@
       G0.i.push(base, base + 3, base + 2, base, base + 2, base + 1);
       // the drops on its four sides (down to the lower cell, or to the grid's base where there is no ground of this grid)
       const lo = (t) => (t == null ? (o.skirt === false ? null : hf.base) : t < hc - cl ? t : null);
-      const L = lo(top(x - 1, z)), R = lo(top(x + 1, z)), N = lo(top(x, z - 1)), S = lo(top(x, z + 1));
-      if (L != null) w.visual(faceMk, ox + x - 0.02, L, oz + z, ox + x, hc + 0.02, oz + z + 1, { uv: 3, grad: false, skip: { px: true, top: true, bottom: true } });
-      if (R != null) w.visual(faceMk, ox + x + 1, R, oz + z, ox + x + 1.02, hc + 0.02, oz + z + 1, { uv: 3, grad: false, skip: { nx: true, top: true, bottom: true } });
-      if (N != null) w.visual(faceMk, ox + x, N, oz + z - 0.02, ox + x + 1, hc + 0.02, oz + z, { uv: 3, grad: false, skip: { pz: true, top: true, bottom: true } });
-      if (S != null) w.visual(faceMk, ox + x, S, oz + z + 1, ox + x + 1, hc + 0.02, oz + z + 1.02, { uv: 3, grad: false, skip: { nz: true, top: true, bottom: true } });
+      const tL = top(x - 1, z), tR = top(x + 1, z), tN = top(x, z - 1), tS = top(x, z + 1);
+      const L = lo(tL), R = lo(tR), N = lo(tN), S = lo(tS);
+      // (each face from the top surface's own edge down to the lower surface's edge, or to the grid's base: no step at its top or foot)
+      const ft = (t, xx, zz) => (t == null ? hf.base : corner(xx, zz, t));
+      if (L != null) FQ.push([ox + x, oz + z, ox + x, oz + z + 1, y00, y01, ft(tL, x, z), ft(tL, x, z + 1), -1, 0]);
+      if (R != null) FQ.push([ox + x + 1, oz + z, ox + x + 1, oz + z + 1, y10, y11, ft(tR, x + 1, z), ft(tR, x + 1, z + 1), 1, 0]);
+      if (N != null) FQ.push([ox + x, oz + z, ox + x + 1, oz + z, y00, y10, ft(tN, x, z), ft(tN, x + 1, z), 0, -1]);
+      if (S != null) FQ.push([ox + x, oz + z + 1, ox + x + 1, oz + z + 1, y01, y11, ft(tS, x, z + 1), ft(tS, x + 1, z + 1), 0, 1]);
+      // (the boxes the drops used to be, for what reads the drawn boxes - areas.js, the signs over the gates)
+      if (w.visBoxes) { if (L != null) w.visBoxes.push([ox + x - 0.02, L, oz + z, ox + x, hc + 0.02, oz + z + 1]); if (R != null) w.visBoxes.push([ox + x + 1, R, oz + z, ox + x + 1.02, hc + 0.02, oz + z + 1]); if (N != null) w.visBoxes.push([ox + x, N, oz + z - 0.02, ox + x + 1, hc + 0.02, oz + z]); if (S != null) w.visBoxes.push([ox + x, S, oz + z + 1, ox + x + 1, hc + 0.02, oz + z + 1.02]); }
+    }
+    // the drops as one face of rock: each 1 m piece of it a quad, its upright edges shaded with the mean of the pieces that meet there and
+    // face the same way, so a run of them stepping round a bend in 1 m teeth is lit as one bent face (the teeth were flat bands, each lit
+    // by itself); a little darker and damper toward the foot. Nothing it stands for is changed: the cells' boxes are the same
+    {
+      const F2 = w.batch._grp(faceMk), NS = new Map(), key = (x, z) => x * 4099 + z;
+      for (const q of FQ) for (const k of [key(q[0], q[1]), key(q[2], q[3])]) { const L = NS.get(k); if (L) L.push(q[8], q[9]); else NS.set(k, [q[8], q[9]]); }
+      const nAt = (x, z, nx, nz) => { const L = NS.get(key(x, z)); let sx = 0, sz = 0; for (let i = 0; i < L.length; i += 2) if (L[i] * nx + L[i + 1] * nz > -0.01) { sx += L[i]; sz += L[i + 1]; } const l = Math.hypot(sx, sz); return l > 0.3 ? [sx / l, sz / l] : [nx, nz]; };
+      const tq = o.tint || [1, 1, 1], uS = 1 / 3;
+      for (const [x0, z0, x1, z1, t0, t1, b0, b1, nx, nz] of FQ) {
+        const n0 = nAt(x0, z0, nx, nz), n1 = nAt(x1, z1, nx, nz), base = F2.p.length / 3, au = nx !== 0 ? 2 : 0;
+        const pts = [[x0, Math.min(b0, t0 - 0.05), z0, n0], [x1, Math.min(b1, t1 - 0.05), z1, n1], [x1, t1 + 0.01, z1, n1], [x0, t0 + 0.01, z0, n0]];
+        for (const [px, py, pz, nn] of pts) {
+          F2.p.push(px, py, pz); F2.n.push(nn[0], 0, nn[1]); F2.u.push((au ? pz : px) * uS, py * uS);
+          const f = (0.82 + n(px * 0.31 + 3.1, pz * 0.31 + py * 0.17) * 0.28) * (0.84 + 0.16 * Math.min(1, Math.max(0, (py - Math.min(b0, b1)) / 1.6)));
+          F2.c.push(tq[0] * f, tq[1] * f, tq[2] * f);
+        }
+        // (wound to face out: along +z or -x seen from outside, as the quad's points run)
+        const out = (x1 - x0) * nz - (z1 - z0) * nx > 0;
+        if (out) F2.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else F2.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+      }
+      // (where two pieces meet in an inside corner - a tooth's notch, seen from below - a piece across it from the middle of the one to the
+      // middle of the other, and a cap of rock over it at the lower of their tops: the notches of a run stepping round a bend half filled,
+      // its teeth half as deep. It stands in the low cell's corner, out to 0.35 m from the boxes)
+      const ends = new Map();
+      FQ.forEach((q, i) => { for (const e of [0, 1]) { const k = key(q[e * 2], q[e * 2 + 1]); const L = ends.get(k); if (L) L.push(i, e); else ends.set(k, [i, e]); } });
+      const at = (q, e, t) => [q[0] + (q[2] - q[0]) * (e ? 1 - t : t), q[1] + (q[3] - q[1]) * (e ? 1 - t : t)];
+      const yAt = (q, e, t, top) => { const k = e ? 1 - t : t; return top ? q[4] + (q[5] - q[4]) * k : q[6] + (q[7] - q[6]) * k; };
+      for (const L of ends.values()) for (let a = 0; a < L.length; a += 2) for (let b = a + 2; b < L.length; b += 2) {
+        const A = FQ[L[a]], ea = L[a + 1], B = FQ[L[b]], eb = L[b + 1];
+        if (A[8] * B[8] + A[9] * B[9] !== 0) continue;   // (square to each other only)
+        const P = [A[ea * 2], A[ea * 2 + 1]], Bo = [B[(1 - eb) * 2], B[(1 - eb) * 2 + 1]];
+        if ((Bo[0] - P[0]) * A[8] + (Bo[1] - P[1]) * A[9] <= 0) continue;   // (B runs off in front of A: an inside corner)
+        const Q1 = at(A, ea, 0.5), Q2 = at(B, eb, 0.5), tA = yAt(A, ea, 0.5, true), tB = yAt(B, eb, 0.5, true), bA = yAt(A, ea, 0.5, false), bB = yAt(B, eb, 0.5, false);
+        const top = Math.min(tA, tB) + 0.01, bot = Math.max(bA, bB) - 0.02; if (top - bot < 0.3) continue;
+        let nx = A[8] + B[8], nz = A[9] + B[9]; const l = Math.hypot(nx, nz); nx /= l; nz /= l;
+        const base = F2.p.length / 3, dl = Math.hypot(Q2[0] - Q1[0], Q2[1] - Q1[1]) || 1, ux = (Q2[0] - Q1[0]) / dl, uz = (Q2[1] - Q1[1]) / dl;
+        for (const [px, py, pz] of [[Q1[0], bot, Q1[1]], [Q2[0], bot, Q2[1]], [Q2[0], top, Q2[1]], [Q1[0], top, Q1[1]]]) {
+          F2.p.push(px, py, pz); F2.n.push(nx, 0, nz); F2.u.push((px * ux + pz * uz) * uS, py * uS);
+          const f = (0.82 + n(px * 0.31 + 3.1, pz * 0.31 + py * 0.17) * 0.28) * (0.84 + 0.16 * Math.min(1, Math.max(0, (py - bot) / 1.6)));
+          F2.c.push(tq[0] * f, tq[1] * f, tq[2] * f);
+        }
+        if ((Q2[0] - Q1[0]) * nz - (Q2[1] - Q1[1]) * nx > 0) F2.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else F2.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+        // (its cap: the triangle over the notch, facing up)
+        const c0 = F2.p.length / 3, f = 0.8 + n(P[0] * 0.31, P[1] * 0.31) * 0.28;
+        for (const [px, pz] of [Q1, Q2, P]) { F2.p.push(px, top, pz); F2.n.push(0, 1, 0); F2.u.push(px * uS, -pz * uS); F2.c.push(tq[0] * f, tq[1] * f, tq[2] * f); }
+        const cr = (Q2[0] - Q1[0]) * (P[1] - Q1[1]) - (Q2[1] - Q1[1]) * (P[0] - Q1[0]);
+        if (cr < 0) F2.i.push(c0, c0 + 1, c0 + 2); else F2.i.push(c0, c0 + 2, c0 + 1);
+      }
     }
   };
   T.mesh = function (w, hf, o) {

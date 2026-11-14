@@ -180,7 +180,8 @@
     for (const gx of LG.gateXs(W, gates || 1)) occ.mark(gx - 6, 0, gx + 6, 9, 2);
     occ.mark(W / 2 - 13, 8, W / 2 + 13, 16, 2);
     occ.mark(0, 0, W, 2, 2); occ.mark(0, D - 2, W, D, 2); occ.mark(0, 0, 2, D, 2); occ.mark(W - 2, 0, W, D, 2);
-    F_ceiling(w, rng, W, D, HT, ruined);
+    // (the ceiling's coffers only over the chasm, where it is seen from every storey: over the halves only the top storey looks up at it)
+    { let a = W, b = 0; for (let z = Zn; z < Zs; z++) { a = Math.min(a, cl(WL[0], z)); b = Math.max(b, cl(ER[0], z)); } F_ceiling(w, rng, W, D, HT, ruined, [a - 2, b + 2]); }
 
     // per storey and half: what lies on it (occupancy), the holes cut in it, the railings around them
     const lv = { W: [], E: [] };
@@ -411,8 +412,8 @@
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
     return w;
   }
-  function F_ceiling(w, rng, W, D, HT, ruined) {
-    FG.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, ruined, coffers: !!ruined });   // (the great halls: none - their triangles are spent)
+  function F_ceiling(w, rng, W, D, HT, ruined, cofferX) {
+    FG.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, ruined, cofferX });
     if (ruined) {
       for (let i = 0; i < 14; i++) {
         const x = rng.range(6, W - 12), z = rng.range(8, D - 14), sx = rng.range(3.5, 7.5), sz = rng.range(3.5, 7.5);

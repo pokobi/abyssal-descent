@@ -360,9 +360,12 @@
       for (let i = 0; i < 6; i++) w.visual('trim', gx0, -0.25 * (i + 1) - 0.01, tz + 1 + i * 0.01, gx1, -0.25 * i, tz + 2.5 - i * 0.25, { uv: 1 });
       for (let k = 0; k < 2; k++) P().torch(w, k ? gx1 : gx0, 3.0, -6, k ? 'nx' : 'px');
       const exit = { idx, x: gx, z: -1, gx0, gx1, open: false, portcullis: null, col: null, type: null };
+      // (an exit opened at once - a room's, as you come in - has its portcullis up at once: it stayed down until the next frame lifted it,
+      // a grille across a way already open, nothing behind it to stop you)
+      { let ot = 0; Object.defineProperty(exit, 'openT', { get: () => ot, set: (v) => { ot = v; if (v >= 1.99 && exit.portcullis) exit.portcullis.position.y = 5.6; }, enumerable: true, configurable: true }); }
       exit.col = w.addCollider(gx0, 0, -0.35, gx1, gh, 0.05, { surf: 'metal', tag: 'portcullis' });
       w.deferred.push((grp) => {
-        const pc = portcullis(w, gx1 - gx0, gh); pc.position.set(gx, 0, -0.15); grp.add(pc); exit.portcullis = pc;
+        const pc = portcullis(w, gx1 - gx0, gh); pc.position.set(gx, exit.open && exit.openT >= 1.99 ? 5.6 : 0, -0.15); grp.add(pc); exit.portcullis = pc;
         const pm = new THREE.Mesh(new THREE.PlaneGeometry(gx1 - gx0, gh), new THREE.MeshBasicMaterial({ map: G.Tex.spr.portal, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.0 }));
         pm.position.set(gx, gh / 2, tz + 0.3); grp.add(pm); exit.glow = pm;
       });
@@ -636,10 +639,13 @@
       // (over a gate on the north side, the sign hangs out in front of the wall from 6.4 to 13 m: nothing that stands out there)
       const signHoles = side === 'N' && top - 1.1 < 13.4 ? gxs.map((g) => [g - 3.5, g + 3.5]) : [];
       const tR = cut(topR, signHoles);
-      if (CF.corn) for (const [a, b] of tR) along(a, b, 1.2, 1.9, 11, (s0, s1) => prof(T, 'trim', s0, s1, top - 0.44, -0.04, 0.14, top - 0.01, -0.04, 0.4, 0.025, og(foot || 0, top, { tint: tnt(s0, top, 12), n: 0.004, chip: 0.1, chipS: 0.05 })));
+      // (a cornice and its corbels far up a tall wall - 9 m and more over its foot - without their arrises taken off: a hand's breadth
+      // of bevel that far off is under a pixel, and a great hall's triangles go to what is near)
+      const far = top - (foot || 0) > 9;
+      if (CF.corn) for (const [a, b] of tR) along(a, b, 1.2, 1.9, 11, (s0, s1) => prof(T, 'trim', s0, s1, top - 0.44, -0.04, 0.14, top - 0.01, -0.04, 0.4, far ? 0 : 0.025, og(foot || 0, top, { tint: tnt(s0, top, 12), n: 0.004, chip: 0.1, chipS: 0.05 })));
       if (CF.corb) for (const [a, b] of cut(tR, bs.map((q) => [q.a - 0.66, q.a + 0.66]))) {
         const n = Math.max(1, Math.round((b - a) / 0.95));
-        for (let i = 0; i < n; i++) { const c = a + (i + 0.5) * (b - a) / n; frus(T, 'trim', c - 0.12, c + 0.12, 0.05, top - 1.06, c - 0.12, c + 0.12, 0.3, top - 0.44, -0.04, 0.015, og(foot || 0, top, { tint: tnt(c, top, 13, 0.96), n: 0.004 })); }
+        for (let i = 0; i < n; i++) { const c = a + (i + 0.5) * (b - a) / n; frus(T, 'trim', c - 0.12, c + 0.12, 0.05, top - 1.06, c - 0.12, c + 0.12, 0.3, top - 0.44, -0.04, far ? 0 : 0.015, og(foot || 0, top, { tint: tnt(c, top, 13, 0.96), n: 0.004 })); }
       }
       if (CF.iron) for (const [a, b] of tR) along(a, b, 2.4, 3.6, 14, (s0, s1) => { M.hexa('iron', [T(s0, top - 1.0, -0.02), T(s1, top - 1.0, -0.02), T(s0, top - 0.62, -0.02), T(s1, top - 0.62, -0.02), T(s0, top - 1.0, 0.12), T(s1, top - 1.0, 0.12), T(s0, top - 0.62, 0.12), T(s1, top - 0.62, 0.12)], 0.01, og(foot || 0, top, { tint: [0.42, 0.38, 0.36], uv: 1 })); });
       if (CF.rough) for (const [a, b] of tR) along(a, b, 0.7, 1.4, 15, (s0, s1) => { const r = hs(s0, 5, 16); prof(T, 'trim', s0, s1, top - 0.32 - 0.12 * r, -0.04, 0.06 + 0.1 * r, top - 0.01, -0.04, 0.04 + 0.12 * hs(s1, 6, 17), 0.035, og(foot || 0, top, { tint: tnt(s0, top, 18, 0.92), n: 0.02, chip: 0.45, chipS: 0.09 })); });
@@ -648,15 +654,18 @@
         for (let i = 0; i < n; i++) { const c = a + (i + 0.5) * (b - a) / n; frus(T, 'trim', c - 0.17, c + 0.17, 0.06, top - 0.95, c - 0.17, c + 0.17, 0.44, top - 0.2, -0.04, 0.02, og(0, top, { tint: tnt(c, top, 19, 0.95), n: 0.006, chip: 0.2, chipS: 0.05 })); }
         along(a, b, 1.3, 2.0, 20, (s0, s1) => prof(T, 'trim', s0, s1, top - 0.2, -0.04, 0.5, top + 0.12, -0.04, 0.53, 0.025, og(0, top, { tint: tnt(s0, top, 21, 0.92), n: 0.006, chip: 0.25, chipS: 0.07 })));
       }
-      // ---- patches of later repair: a few courses of smaller stones of another colour, laid where the face had fallen
+      // ---- patches of later repair: a few courses of smaller stones laid where the face had fallen. Cut of the wall's own stone (its
+      // material and picture, 'block', a small piece of the picture on each: the pale smooth stone of the trim read as paper laid on the
+      // wall), a shade either way for the newer stone, the stones barely proud of the face - the face mended, not a collage laid on it
       if (CF.patch && !lo && foot !== null) for (const [a, b] of cut(footR, bs.map((q) => [q.a - 1.6, q.a + 1.6]))) {
         for (let c = a + 2 + 9 * hs(a, side.charCodeAt(0), 22); c < b - 2; c += 18 + 14 * hs(c, 2, 23)) {
-          const wd = 1.6 + 1.6 * hs(c, 3, 24), yb = foot + Math.max(4.6, Math.min(top - 4, 4.6 + 3 * hs(c, 4, 25))), nh = 3 + Math.floor(4 * hs(c, 5, 26)), f = hs(c, 6, 27) < 0.5 ? 1.12 : 0.84;
+          const wd = 1.6 + 1.6 * hs(c, 3, 24), yb = foot + Math.max(4.6, Math.min(top - 4, 4.6 + 3 * hs(c, 4, 25))), nh = 3 + Math.floor(4 * hs(c, 5, 26)), f = hs(c, 6, 27) < 0.5 ? 1.05 : 0.95;
           if (yb + nh * 0.3 > top - 1.2) continue;
+          (w._repairs || (w._repairs = [])).push({ p: T(c, yb + nh * 0.15, 0), q: T(c, yb + nh * 0.15, 6), foot });   // (where they are: for the tools that look at them)
           let y = yb;
           for (let r = 0; r < nh; r++) {
             const h = 0.24 + 0.1 * hs(c, r, 28), sh = (hs(c, r, 29) - 0.5) * 0.5, wr = wd * (1 - Math.abs(r - nh / 2) / nh * 0.6);
-            along(c - wr / 2 + sh, c + wr / 2 + sh, 0.32, 0.62, 30 + r, (s0, s1) => prof(T, 'trim', s0 + 0.01, s1 - 0.01, y + 0.01, -0.03, 0.02 + 0.015 * hs(s0, r, 31), y + h - 0.01, -0.03, 0.02 + 0.015 * hs(s1, r, 32), 0.018, og(foot, top, { tint: tnt(s0, y, 33, f * 0.92), n: 0.006, chip: 0.25, chipS: 0.04 })));
+            along(c - wr / 2 + sh, c + wr / 2 + sh, 0.32, 0.62, 30 + r, (s0, s1) => { const q = f * (0.97 + 0.06 * hs(s0, r, 34)); prof(T, 'block', s0 + 0.008, s1 - 0.008, y + 0.008, -0.03, 0.005 + 0.008 * hs(s0, r, 31), y + h - 0.008, -0.03, 0.005 + 0.008 * hs(s1, r, 32), 0.012, og(foot, top, { tint: [q, q, q * 0.98], n: 0.004, chip: 0.15, chipS: 0.03, uv: 6 })); });
             y += h;
           }
         }
@@ -886,8 +895,9 @@
   // ---- a ceiling of timber coffers (F.ceiling): between its great beams along x (zs: their middles along z, each 0.7 wide), joists of
   // dark wood along z every step in x, framed into the beams, each with a fillet either side where it meets the boards, so that the flat
   // of the ceiling is a grid of sunk panels. Drawn only (nothing thrown); under the slab at y
-  function coffers(w, x0, z0, x1, z1, y, zs, step) {
-    const M = mason(w), ay = w._atY || 0, Y = y + ay, xs = []; for (let x = x0 + step; x < x1 - step * 0.5; x += step) xs.push(x);
+  function coffers(w, x0, z0, x1, z1, y, zs, step, only) {
+    // (only: [xa, xb] - the joists only there, where the ceiling is seen)
+    const M = mason(w), ay = w._atY || 0, Y = y + ay, xs = []; for (let x = x0 + step; x < x1 - step * 0.5; x += step) if (!only || (x > only[0] && x < only[1])) xs.push(x);
     const ze = [z0, ...zs, z1].sort((p, q) => p - q);
     _tagged('ceiling', () => {
       for (const x of xs) for (let i = 0; i + 1 < ze.length; i++) {
@@ -1777,24 +1787,41 @@
     t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
     return (TREE.atlas = t);
   }
-  // bark: plates split by fissures that run along the trunk, the plates rough and here and there grey with lichen (a colour picture
-  // and its normal map; both repeat round the trunk and along it)
+  // bark as it grows: the trunk's skin in long rough plates, the furrows between them shallow valleys that wander along the trunk, join
+  // and part (the soft hollow where a stretched noise passes its middle: no line drawn, no spacing kept), here and there a scale flaked
+  // off to the paler, smoother bark under it; its colour uneven in broad patches, grey lichen on the plates, green moss in places and
+  // down the hollows. Told by the colour and the shallow relief of the surface - the furrows only a little darker, never ink (a colour
+  // picture and its normal map; both repeat round the trunk and along it)
   function barkTex() {
     if (TREE.bark) return TREE.bark;
-    const S = 256, H = new Float32Array(S * S), L = new Float32Array(S * S);
+    const S = 256, H = new Float32Array(S * S), C = new Float32Array(S * S * 3);
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-      const u = x / S, v = y / S, ph = u * 9 + 0.55 * _gn(u * 3, v * 2, 3, 2, 72) + 0.22 * _gn(u * 9, v * 5, 9, 5, 73);
-      const f = Math.abs(Math.sin(ph * Math.PI)), cr = Math.abs(Math.sin((v * 5 + 0.6 * _gn(u * 9, v * 5, 9, 5, 74)) * Math.PI));
-      H[y * S + x] = _ss(0.05, 0.6, f) * (0.7 + 0.3 * _ss(0.02, 0.3, cr)) + 0.09 * _gn(u * 32, v * 32, 32, 32, 75);
-      L[y * S + x] = _ss(0.35, 0.65, _gn(u * 10, v * 10, 10, 10, 79) * 0.5 + 0.5);
+      const u = x / S, v = y / S, i = y * S + x;
+      // (the furrows: wide soft hollows, the long ones wandering by a warp of their own, finer ones that come and go between them)
+      const wu = 0.3 * _gn(u * 3, v * 1, 3, 1, 81) + 0.1 * _gn(u * 9, v * 3, 9, 3, 82);
+      const f1 = 1 - _ss(0, 0.42, Math.abs(_gn(u * 6 + wu * 2, v * 1, 6, 1, 83) + 0.12 * _gn(u * 18, v * 4, 18, 4, 84)));
+      const f2 = (1 - _ss(0, 0.3, Math.abs(_gn(u * 12 + wu * 3, v * 2, 12, 2, 86)))) * _ss(-0.1, 0.5, _gn(u * 4, v * 2, 4, 2, 85));
+      const fiss = Math.max(f1 * f1, f2 * f2 * 0.6);
+      // (the plates: rough, their grain along the trunk; a scale flaked off where a patchy noise is high, a shallow step down)
+      const pl = 0.55 * _gn(u * 20, v * 6, 20, 6, 89) + 0.3 * _gn(u * 40, v * 14, 40, 14, 90) + 0.15 * _gn(u * 80, v * 30, 80, 30, 97);
+      const fl = _ss(0.38, 0.52, _gn(u * 10, v * 4, 10, 4, 91) + 0.2 * _gn(u * 30, v * 12, 30, 12, 92)) * (1 - fiss);
+      H[i] = 0.6 + 0.08 * pl - 0.3 * fiss - 0.07 * fl;
+      // (the colour: grey-brown outer bark, uneven in broad patches; the hollows a little darker; the flakes paler and warmer)
+      const b = 0.84 + 0.2 * (0.5 + 0.5 * _gn(u * 2, v * 1, 2, 1, 93)) + 0.08 * _gn(u * 7, v * 3, 7, 3, 98), wm = 0.06 * _gn(u * 3, v * 2, 3, 2, 94), k = b * (1 - 0.16 * fiss) * (1 + 0.05 * pl);
+      let r = 0.45 * k * (1 + wm), g = 0.4 * k, bl = 0.34 * k * (1 - wm);
+      r += (0.58 * b - r) * fl * 0.6; g += (0.46 * b - g) * fl * 0.6; bl += (0.36 * b - bl) * fl * 0.6;
+      // (lichen: pale grey-green on the plates; moss: green in broad patches, the more down the hollows)
+      const li = _ss(0.45, 0.75, _gn(u * 8, v * 5, 8, 5, 95)) * (1 - fiss * 0.6) * (1 - fl) * 0.45, mo = _ss(0.4, 0.85, _gn(u * 3, v * 2, 3, 2, 96)) * (0.4 + 0.6 * fiss) * 0.6;
+      r += (0.56 - r) * li; g += (0.58 - g) * li; bl += (0.5 - bl) * li;
+      r += (0.32 * k - r) * mo; g += (0.38 * k - g) * mo; bl += (0.22 * k - bl) * mo;
+      C[i * 3] = r; C[i * 3 + 1] = g; C[i * 3 + 2] = bl;
     }
     const map = G.Tex.pixTex(S, (u, v, o) => {
-      const i = Math.min(S - 1, v * S | 0) * S + Math.min(S - 1, u * S | 0), h = H[i], l = L[i] * _ss(0.4, 0.8, h);
-      const k = 0.38 + 0.72 * h; o[0] = (0.47 * k) * (1 - l) + 0.55 * l; o[1] = (0.41 * k) * (1 - l) + 0.56 * l; o[2] = (0.35 * k) * (1 - l) + 0.48 * l; o[3] = 1;
+      const i = Math.min(S - 1, v * S | 0) * S + Math.min(S - 1, u * S | 0); o[0] = C[i * 3]; o[1] = C[i * 3 + 1]; o[2] = C[i * 3 + 2]; o[3] = 1;
     }, true);
     const nrm = G.Tex.pixTex(S, (u, v, o) => {
       const x = Math.min(S - 1, u * S | 0), y = Math.min(S - 1, v * S | 0), hx = H[y * S + (x + 1) % S] - H[y * S + (x + S - 1) % S], hy = H[((y + 1) % S) * S + x] - H[((y + S - 1) % S) * S + x];
-      const nx = -hx * 3.2, ny = hy * 3.2, k = 1 / Math.hypot(nx, ny, 1); o[0] = nx * k * 0.5 + 0.5; o[1] = ny * k * 0.5 + 0.5; o[2] = k * 0.5 + 0.5; o[3] = 1;
+      const nx = -hx * 2.4, ny = hy * 2.4, k = 1 / Math.hypot(nx, ny, 1); o[0] = nx * k * 0.5 + 0.5; o[1] = ny * k * 0.5 + 0.5; o[2] = k * 0.5 + 0.5; o[3] = 1;
     }, false);
     for (const t of [map, nrm]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; }
     return (TREE.bark = { map, nrm });

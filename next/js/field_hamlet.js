@@ -210,9 +210,13 @@
     {
       const hw = (along ? z1 - z0 : x1 - x0) / 2, rise = hw * 0.62, len = along ? x1 - x0 : z1 - z0;
       if (!house.tri) { const sh = new THREE.Shape(); sh.moveTo(-1, 0); sh.lineTo(1, 0); sh.lineTo(0, 1); sh.closePath(); house.tri = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, steps: 1 }); house.tri.translate(0, 0, -0.5); house.tri.userData.shared = true; }
+      // (the gable under the roof's boards, its sloped edges a little under their underside: it stood 3 - 9 cm proud of the roof all down
+      // its slope, a pale band of plaster along the roof's end. The boards: their middle 1.0 over the wall top, half their width from the
+      // ridge, at 0.55 rad, 0.18 thick)
+      const tn = Math.tan(0.55), un = 1.0 - 0.09 / Math.cos(0.55), gH = un + hw / 2 * tn - 0.03, gW = Math.min(hw - 0.05, hw / 2 + un / tn - 0.02);
       for (const e of [-1, 1]) {
-        if (along) w.batch.geo('wall', house.tri, Mx(cxm + e * (len / 2 - 0.16), h, czm, hw - 0.05, rise - 0.12, 0.3, 0, Math.PI / 2, 0), { su: 2, sv: 1.2 });
-        else w.batch.geo('wall', house.tri, Mx(cxm, h, czm + e * (len / 2 - 0.16), hw - 0.05, rise - 0.12, 0.3, 0, 0, 0), { su: 2, sv: 1.2 });
+        if (along) w.batch.geo('wall', house.tri, Mx(cxm + e * (len / 2 - 0.16), h, czm, gW, gH, 0.3, 0, Math.PI / 2, 0), { su: 2, sv: 1.2 });
+        else w.batch.geo('wall', house.tri, Mx(cxm, h, czm + e * (len / 2 - 0.16), gW, gH, 0.3, 0, 0, 0), { su: 2, sv: 1.2 });
       }
       if (along) w.visual('woodDark', x0 - 0.3, h + rise - 0.22, czm - 0.11, x1 + 0.3, h + rise + 0.04, czm + 0.11, { uv: 1.2, grad: false });
       else w.visual('woodDark', cxm - 0.11, h + rise - 0.22, z0 - 0.3, cxm + 0.11, h + rise + 0.04, z1 + 0.3, { uv: 1.2, grad: false });
@@ -260,7 +264,7 @@
     M.quads('woodDark', Q, 0.9);
     // (the barge boards: a plank down each end of the pitch, under its edge)
     const bt = 0.04 / lenU, bd = 0.32 / thick;
-    for (const [u0, u1] of [[-0.012 - bt, -0.012], [1.012, 1.012 + bt]]) { const p = P(u0, 0, 0), v = M.var(p[0], p[1], p[2], 25); M.hexa('woodDark', [P(u0, 0.5 - bd, -0.51), P(u1, 0.5 - bd, -0.51), P(u0, 0.5 - bd, 0.51), P(u1, 0.5 - bd, 0.51), P(u0, tLo + 0.1, -0.51), P(u1, tLo + 0.1, -0.51), P(u0, tLo + 0.1, 0.51), P(u1, tLo + 0.1, 0.51)], 0, { gy: -50, top: 99, tint: [v[0] * 0.75, v[1] * 0.72, v[2] * 0.7], n: 0.003, uv: 1 }); }
+    for (const [u0, u1] of [[-0.012 - bt, -0.012], [1.012, 1.012 + bt]]) { const p = P(u0, 0, 0), v = M.var(p[0], p[1], p[2], 25); M.hexa('woodDark', [P(u0, 0.5 - bd, -0.51), P(u1, 0.5 - bd, -0.51), P(u0, 0.5 - bd, 0.51), P(u1, 0.5 - bd, 0.51), P(u0, tLo + 0.1, -0.51), P(u1, tLo + 0.1, -0.51), P(u0, tLo + 0.1, 0.51), P(u1, tLo + 0.1, 0.51)], 0, { gy: -50, top: 99, tint: [v[0] * 0.5, v[1] * 0.43, v[2] * 0.37], n: 0.003, uv: 1 }); }   // (weathered dark wood, as the roof's and the frame's: a pale board stood out in the moonlight)
     LG._tag = tg;
   }
   // the eaves of a flat roof (its slab from y over the walls x0..x1, z0..z1, standing 0.1 out): the ends of its joists under it, standing out

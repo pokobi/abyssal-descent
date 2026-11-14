@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14110e">
-<title>銃声の聴き比べ</title>
+<title>銃声の聴き比べ 第2回</title>
 <style>
   :root {
     --bg: #14110e; --panel: #1d1914; --line: #4a3d2a; --gold: #c9a45c; --gold2: #e6c98a; --text: #e9e2d2; --dim: #9a8f7c; --on: #3a2f1c;
@@ -21,7 +21,7 @@
   h2 { font-size: 13px; font-weight: 600; color: var(--dim); margin: 0 0 6px; letter-spacing: 0.08em; }
   .row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
   .row.v { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  @media (min-width: 720px) { .row.v { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  @media (min-width: 720px) { .row.v { grid-template-columns: repeat(9, minmax(0, 1fr)); } }
   button { appearance: none; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-height: 48px; padding: 8px 10px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   button:hover { border-color: var(--gold); }
   button:active { transform: translateY(1px); }
@@ -29,7 +29,7 @@
   button.fire { font-size: 18px; font-weight: 700; min-height: 64px; border-color: var(--gold); }
   .vb { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 64px; }
   .vb b { font-size: 22px; line-height: 1; }
-  .vb span { font-size: 12px; color: var(--dim); }
+  .vb span { font-size: 12px; color: var(--dim); text-align: center; line-height: 1.3; }
   .vb.on span { color: var(--gold2); }
   .vol { display: flex; align-items: center; gap: 12px; }
   .vol input { flex: 1; min-width: 0; accent-color: var(--gold); height: 32px; }
@@ -40,7 +40,7 @@
 <body>
 <main>
   <div id="now" aria-live="polite"></div>
-  <h1>銃声の聴き比べ</h1>
+  <h1>銃声の聴き比べ 第2回</h1>
   <section>
     <h2>版</h2>
     <div class="row v" id="vers"></div>
@@ -80,7 +80,7 @@
   // (this page's own state: nothing of it is saved, the game's settings are left as they are)
   G.save.data.settings.sound = 'new';
   A.volume = 0.8;
-  const VERS = [[1, '今の版'], [2, '低い一発'], [3, '長い反響'], [4, '金属音'], [5, '録音が芯'], [6, '厚い胴鳴り']];
+  const VERS = [[1, '0', '今のゲーム'], ['A', 'A', '前回の2'], ['B', 'B', '鋭い頭'], ['C', 'C', '厚い胴'], ['D', 'D', '密な音'], ['E', 'E', 'まわりが沈む'], ['F', 'F', '全部'], ['G', 'G', '全部＋長い残り'], ['H', 'H', '乾いた強打']];
   const MODES = [['one', '単発'], ['three', '3発'], ['auto', '連射（1秒）']];
   const PLACES = [['in', '屋内'], ['out', '屋外']];
   const GUNS = [['rifle', 'アサルトライフル', 630, 'a_ranger'], ['pistol', '拳銃', 400, 'starter'], ['shotgun', '散弾銃', 72, 'g_breacher'], ['sniper', '狙撃銃', 46, 'n_scout']];
@@ -113,11 +113,21 @@
     timers = [];
     const g = GUNS.find((q) => q[0] === S.gun), dt = 60 / g[2], m = mode || S.mode;
     const n = m === 'one' ? 1 : m === 'three' ? 3 : Math.floor(1 / dt + 1e-6) + 1;
-    shot();
-    for (let i = 1; i < n; i++) timers.push(setTimeout(shot, i * dt * 1000));
+    // (one shot after another at the gun's rate; when the page is held up - a version's takes being written - the shots that are late
+    // are still kept at least 0.6 of a beat apart: timers set all at once fired together after a hold-up, and two shots piled into one)
+    const t0 = performance.now(), gap = dt * 600;
+    let k = 0, last = -1e9;
+    const next = () => {
+      const now = performance.now();
+      if (now - last < gap) { timers.push(setTimeout(next, gap - (now - last))); return; }
+      last = now; shot();
+      if (++k < n) timers.push(setTimeout(next, Math.max(0, t0 + k * dt * 1000 - performance.now())));
+    };
+    next();
   }
   function draw() {
-    $('now').innerHTML = '版 ' + S.v + ' ' + label(VERS, S.v) + ' ／ ' + label(MODES, S.mode) + ' ／ ' + label(PLACES, S.place) + ' ／ 銃声 ' + S.vol + '％ ／ ' + label(GUNS, S.gun);
+    const ver = VERS.find((q) => q[0] === S.v);
+    $('now').innerHTML = '版 ' + ver[1] + ' ' + ver[2] + ' ／ ' + label(MODES, S.mode) + ' ／ ' + label(PLACES, S.place) + ' ／ 銃声 ' + S.vol + '％ ／ ' + label(GUNS, S.gun);
     for (const b of document.querySelectorAll('[data-k]')) b.classList.toggle('on', String(S[b.dataset.k]) === b.dataset.val);
     $('volv').textContent = S.vol + '％';
   }
@@ -130,7 +140,7 @@
     $(parent).appendChild(b);
     return b;
   }
-  for (const [v, nm] of VERS) btn('vers', 'v', v, '<b>' + v + '</b><span>' + nm + '</span>', 'vb', () => { S.v = v; draw(); fire('one'); });
+  for (const [v, k, nm] of VERS) btn('vers', 'v', v, '<b>' + k + '</b><span>' + nm + '</span>', 'vb', () => { S.v = v; draw(); fire('one'); });
   for (const [m, nm] of MODES) btn('modes', 'mode', m, nm, '', () => { S.mode = m; draw(); fire(m); });
   for (const [p, nm] of PLACES) btn('places', 'place', p, nm, '', () => { S.place = p; draw(); wake(); setWorld(); });
   for (const [k, nm] of GUNS) btn('guns', 'gun', k, nm, '', () => { S.gun = k; draw(); fire('one'); });
@@ -145,8 +155,8 @@
   btn('others', 'amb', true, '環境音', '', () => { S.amb = !S.amb; wake(); setWorld(); draw(); });
   document.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    const n = +e.key;
-    if (n >= 1 && n <= 6) { S.v = n; draw(); fire('one'); }
+    const ver = VERS.find((q) => q[1].toLowerCase() === e.key.toLowerCase());
+    if (ver && !e.shiftKey) { S.v = ver[0]; draw(); fire('one'); }
     else if (e.code === 'Space' && !/^(BUTTON|INPUT)$/.test(e.target.tagName)) { e.preventDefault(); fire(); }
   });
   draw();

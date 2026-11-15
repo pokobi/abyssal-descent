@@ -19,8 +19,8 @@
   IA.kindOf = (id) => KIND[id] || 'device';
   // ---- how long a use takes. DUR: each kind's length in seconds; DUR_ID: an item with a length of its own (the kit's dose takes
   // longer than a syringe's). The length is multiplied by IA.useMul (never below MUL_MIN); the grenade's throw is not
-  const DUR = { throw: 0.5, bandage: 3.0, drink: 2.4, inject: 2.2, eat: 2.6, plate: 3.0, device: 2.0 };
-  const DUR_ID = { h_medkit: 4.0 };
+  const DUR = { throw: 0.5, bandage: 1.95, drink: 1.55, inject: 1.45, eat: 1.7, plate: 1.95, device: 1.3 };
+  const DUR_ID = { h_medkit: 2.6 };
   const MUL_MIN = 0.5;
   // what a use's length is multiplied by - the one place for anything that makes using quicker (a perk adds a line here)
   IA.useMul = function (id, kind) {

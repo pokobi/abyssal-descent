@@ -14,7 +14,7 @@
   // your head under the water (water.js): every sound dull and far, as through the water (in the new set the water round you answers a
   // little too: more of the room, and never the far echo of open ground)
   A.underwater = function (on) { if (!muffle || !ctx) return; uw = !!on; applyMuffle(on ? 0.05 : 0.12); };
-  let ctx = null, master, dry, revSend, reverb, gunBus, shaper, eqLo, eqHi, irOld, irIn, irOut, gunDry, gunOut, limN = null;
+  let ctx = null, master, dry, revSend, reverb, gunBus, shaper, eqLo, eqHi, irOld, irIn, irOut, gunDry, gunOut;
   let white, pink, brown;
   let voices = 0;
   const MAXV = 56;
@@ -98,8 +98,13 @@
     muffle = ctx.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 22000; muffle.Q.value = 0.5; // (closed under the water: A.underwater)
     eqLo = ctx.createBiquadFilter(); eqLo.type = 'lowshelf'; eqLo.frequency.value = 90; eqLo.gain.value = 0;
     eqHi = ctx.createBiquadFilter(); eqHi.type = 'highshelf'; eqHi.frequency.value = 7500; eqHi.gain.value = 0;
-    const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08; limN = lim; // (a ceiling: nothing clips)
-    master.connect(muffle); muffle.connect(eqLo); eqLo.connect(eqHi); eqHi.connect(comp); comp.connect(lim); lim.connect(ctx.destination);
+    const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08; // (a ceiling: nothing clips)
+    // (after the limiter, a last soft edge just under 0 dBFS: a front sharper than the limiter's attack, the shots turned up, still never
+    // goes over - it bends only what is left over -0.35 dBFS, and bends it into the last 0.35 dB)
+    const edge = ctx.createWaveShaper(), ec = new Float32Array(4097);
+    for (let i = 0; i < 4097; i++) { const x = i / 2048 - 1, a = Math.abs(x); ec[i] = a <= 0.96 ? x : Math.sign(x) * (0.96 + 0.0395 * Math.tanh((a - 0.96) / 0.0395)); }
+    edge.curve = ec;
+    master.connect(muffle); muffle.connect(eqLo); eqLo.connect(eqHi); eqHi.connect(comp); comp.connect(lim); lim.connect(edge); edge.connect(ctx.destination);
     dry = ctx.createGain(); dry.gain.value = 1; dry.connect(master);
     reverb = ctx.createConvolver(); irOld = makeIR(2.8, 2.6); reverb.buffer = irOld;
     irIn = makeIR2(3.0, { rt: 2.3, hf: 0.5, hfFall: 1.3, er: 12, erSpan: 0.07 }); irOut = makeIR2(1.8, { rt: 1.0, hf: 0.35, hfFall: 2.6, er: 5, erSpan: 0.12, slap: 0.21, tailG: 0.6 });
@@ -297,6 +302,7 @@
   // in the same place and the same room as everything else. Where it has none - or they have not arrived yet, or the old set of sounds
   // is chosen in the settings - smp() reports "not played" and the caller goes on to the synthesized sound, as it always did.
   const SB = { bank: (window.G && window.G.SND) || {}, files: {} }, bufs = {}, asked = {}, lastOf = {};
+  let gunsIn = Promise.resolve();   // (the guns' recordings all in: see preloadSamples)
   const usable = (key) => !!SB.bank[key] && NEW() && !A.noSamples;   // (A.noSamples: the synthesized sounds only, to measure the one against the other)
   A.samplesOn = () => NEW() && Object.keys(bufs).length > 0;
   const fetchBuf = (f) => {
@@ -312,7 +318,7 @@
     try {
       const guns = [];
       for (const k in SB.bank) for (const f of SB.bank[k].f) { const q = fetchBuf(f); if (k.startsWith('gun_')) guns.push(q); }
-      Promise.all(guns).then(() => { if (NEW()) shotWarm(!outdoor()); });
+      gunsIn = Promise.all(guns); gunsIn.then(() => { if (NEW()) shotWarm(!outdoor()); });
     } catch (e) { /* none, then */ }
   };
   // key, where (or nothing: in the head), level, speed, how much of the room (or the bank's own)
@@ -540,11 +546,13 @@
         const v = (ftanh(2.2 * (Math.sin(ph) + 0.3 * Math.sin(2 * ph))) / td) * (i > n - fo ? (n - i) / fo : 1);
         if (i < a) D[i] += p.bg * (i / a) * v; else { D[i] += p.bg * e * v; e *= kd; }
       } }
-    // (soundcheck.html's seasonings only: a wide head, a short body under it, the low blow driven with the rest)
+    // (a plan's: a wide head, a short body under it, the low blow driven with the rest - see GUNP)
     if (p.headx && !p.headpost) headIn(D, 0, p.headx, p.headt || 0.0025, sr, null, p.headd);
     if (p.bodyx) bodyIn(D, at(0.0004), p, sr);
     if (p.lowx && p.lowpre) { const i0 = at(0.0015 + (p.lowd || 0)), lt = p.lowt || 0.07; lowIn(D, B, i0, 105, 58, lt, p.lowx * 0.5, sr, p.lowa); lowIn(D, B, i0, 230, 125, lt * 0.8, (p.low2x || 0) * 0.5, sr, p.lowa); }
     for (let i = 0; i < len; i++) { const v = D[i] + B[i]; L[i] = v; R[i] = v; D[i] = v; }
+    // (a plan's: a shotgun's burst of small cracks driven with the rest - the room answers it too)
+    if (p.popx && p.poppre) popIn(L, R, at(0.0003), p, sr, D);
     // the place. A room: hard early returns off the stone close round (dulled a little, the push not in them), and a low bloom after
     // them (the room's air answering, its low end in it). Open ground: the ground's one return, and the slap of the shot off something far
     { const H = B; for (let i = 0; i < len; i++) H[i] = D[i];
@@ -567,20 +575,20 @@
     // them - the blast, the body - stands that much nearer them; each take comes to the same top, how loud a kind is is lv)
     { let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
       const d = (p.sat || 1.8) / (pk || 1), td = ftanh(p.sat || 1.8);
-      if (p.satlp) satLow(L, R, len, d, td, pk || 1, p.satlp, sr);
-      else for (let i = 0; i < len; i++) { L[i] = ftanh(d * L[i]) / td; R[i] = ftanh(d * R[i]) / td; } }
-    // (soundcheck.html's seasonings only: what the drive lifted after the report cut away - held dryt[0] s, then dying in dryt[1] s - and
-    // the head laid over the drive, so that it is not squashed with the rest)
-    if (p.dryt) { const h = at(p.dryt[0]), k = Math.exp(-1 / (p.dryt[1] * sr)); let e = 1; for (let i = h; i < len; i++) { e *= k; L[i] *= e; R[i] *= e; } }
+      for (let i = 0; i < len; i++) { L[i] = ftanh(d * L[i]) / td; R[i] = ftanh(d * R[i]) / td; } }
+    // (a plan's: the head laid over the drive, so that it is not squashed with the rest; a shotgun's burst of small cracks)
     if (p.headx && p.headpost) headIn(L, 0, p.headx, p.headt || 0.0025, sr, R, p.headd);
+    if (p.popx && !p.poppre) popIn(L, R, at(0.0003), p, sr);
+    // (a plan's: the top over some 6 kHz taken down a little, so that the louder shot is no harder on the ear than the published one)
+    if (p.hicut) { bqRun(L, 'lp', p.hicut, 0.6, sr); bqRun(R, 'lp', p.hicut, 0.6, sr); }
     // the action, in the hands a little to the right (over the drive: steel ringing is not driven)
     for (const e of p.actx ? (ACT[p.act] || []).concat(p.actx) : ACT[p.act] || []) {
-      const i0 = at(e[1] * vr(1, 0.06)); if (i0 >= len || (p.actcut && e[1] > p.actcut)) continue;
+      const i0 = at(e[1] * vr(1, 0.06)); if (i0 >= len) continue;
       if (e[0] === 's') slideIn(L, R, i0, e[2], e[3], e[4], e[5] * p.ag, 0.25, sr);
       else if (e[0] === 'k') knockIn(L, R, i0, e[2], e[3] * p.ag * 0.6, 0.25, sr);
       else ringIn(L, R, i0, e[2], e[3] * p.ag * 0.6, e[4], 0.25, sr);
     }
-    // (a low blow of its own over the drive, its overtones with it: soundcheck.html's seasonings only)
+    // (a plan's: a low blow of its own over the drive, its overtones with it)
     if (p.lowx && !p.lowpre) { const i0 = at(0.0015 + (p.lowd || 0)); lowIn(L, R, i0, 105, 58, p.lowt || 0.07, p.lowx, sr, p.lowa); lowIn(L, R, i0, 230, 125, (p.lowt || 0.07) * 0.8, p.low2x || 0, sr, p.lowa); }
     let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
     if (pk > 1) for (let i = 0; i < len; i++) { L[i] /= pk; R[i] /= pk; }
@@ -627,52 +635,71 @@
   const shotQ = [];
   let shotIdle = false;
   A.shotStats = { made: 0, ms: 0, max: 0, log: [], clear() { for (const k in shotSets) delete shotSets[k]; } };   // (how many takes were written, the time they took, the longest: for the measurements)
-  // ---------- the shots seasoned another way (soundcheck.html only) ----------
-  // A.gunFlavor picks how a shot is made, to be heard side by side with the game's own: 1 is the game's shot as it is (the game never
-  // changes it, and with it nothing below is used); 'A'-'H' change the plan of a take, each by what it is after (round 2: A is round 1's
-  // low blow, the others built on it). headx / headt: a wide head (1-4 kHz) and how fast it dies (s); bodyx: a short body under it -
-  // bodyf (Hz), bodyh (s held), bodyt (s to die), bodyc (s, cut), bodyn (its share of noise), bodylo / bodyhi (its band, Hz); lowpre: the
-  // low blow driven with the rest, lowd / lowa: its start and its rise (s); satlp: what the drive adds kept under this Hz; duck: the rest
-  // of the sound pulled down as the shot goes off [dB, s held, s to come back]; dryt: what follows cut [s held, s to die]; headpost: the
-  // head laid over the drive, headd: the head driven; headroom: dB its first 6 ms may go over the ceiling, limrel: the master limiter's
-  // release (s) while it plays; topdb: the ceiling lowered (dB); actcut: the action's parts after this (s) left out. pcut: the push cut at
-  // (s); mv, cg, actx: (round 1)
-  A.gunFlavor = 1;
-  // A. round 1's 2, the low blow: the push (60-120 Hz) stronger and longer, and a low blow of its own laid over the drive
-  const fA = (p) => ({ bg: p.bg * 1.6, bd: p.bd * 1.6, bo: Math.max(p.bo, 100), pcut: 0.24, bbf: p.bbf * 0.75, lowx: 0.55, low2x: 0.45, lowt: 0.075 });
-  // F. a dry, short, dense report: the head (1-4 kHz) and a tight body (100-250 Hz) up together, the low blow smaller and driven with
-  // them, the whole driven hard (its added overtones kept under 4.5 kHz), what follows it short and dry, the steel of the action little;
-  // the rest of the sound pulled down as it goes off
-  const fF = (p) => ({ bg: p.bg * 1.15, bo: Math.max(p.bo, 100), pcut: 0.11, bbf: p.bbf * 0.75, lowx: 0.3, low2x: 0.55, lowt: 0.045, lowpre: 1, lowd: 0.002, lowa: 0.004,
-    headx: 0.9, headt: 0.004, headd: 3, headpost: 1, fl: p.fl * 1.3, nw: p.nw * 1.2, bodyx: 1.2, bodyf: 150, bodya: 0.003, bodyh: 0.01, bodyt: 0.03, bodyc: 0.1, bodyn: 0.7, bodylo: 100, bodyhi: 260,
-    sat: 5, satlp: 4500, dryt: [0.05, 0.03], b2: p.b2 * 0.6, hold: (p.hold || 0.1) * 0.5, bb2: p.bb2 * 0.7, er: p.er * 0.6, wet: p.wet * 0.45, ech: p.ech * 0.6, tl: p.tl * 0.5, ag: p.ag * 0.6, actcut: 0.03, duck: [-10, 0.04, 0.1], headroom: 1, limrel: 0.015 });
-  const FLV = {
-    A: fA,
-    // B. A's low end, and the head not lowered under it: a wide head laid over the drive, the front and the crack fuller, the low blow
-    // rising just after them (so that its peak is not piled on theirs); the head let over the ceiling, for the limiter to take quickly
-    B: (p) => Object.assign(fA(p), { headx: 0.8, headt: 0.0025, headd: 2.5, headpost: 1, fl: p.fl * 1.4, nw: p.nw * 1.3, lowd: 0.003, lowa: 0.004, headroom: 1, limrel: 0.015 }),
-    // C. A, and a body (120-500 Hz) under it, held some 20 ms and dying over the next hundred (its ceiling lower: in fast fire one body
-    // still rings under the next)
-    C: (p) => Object.assign(fA(p), { bodyx: 1.3, bodyf: 180, bodyh: 0.02, bodyt: 0.04, bodyc: 0.12, bodyn: 0.6, bodylo: 120, bodyhi: 500, topdb: -0.8 }),
-    // D. A driven hard, the low blow with the rest: overtones packed in (those over 4.5 kHz cut)
-    D: (p) => Object.assign(fA(p), { lowpre: 1, sat: 5, satlp: 4500 }),
-    // E. A as it is (not rounded), the rest of the sound pulled down the moment it goes off and let back up
-    E: (p) => Object.assign(fA(p), { duck: [-10, 0.05, 0.12] }),
-    F: fF,
-    // G. F, and the place answering long: in a room much more of the room, on open ground the far slap and the roll louder and longer
-    G: (p, room) => Object.assign(fF(p), { dryt: null }, room ? { wet: p.wet * 5, er: p.er * 1.8 } : { ech: p.ech * 2.5, tail: p.tail * 2.2, tl: p.tl * 2.8 }),
-    // H. F pushed further: what follows cut shorter, the head and the body stronger (the recording and the blast less, so that the body
-    // fills what the drive leaves), driven deeper
-    H: (p) => Object.assign(fF(p), { headx: 1.15, headd: 4, headt: 0.005, bodya: 0.004, lowd: 0.003, actcut: 0.025, bodyx: 2, bodyt: 0.022, bodyc: 0.08, lowx: 0.12, low2x: 0.8, rv: p.rv * 0.5, bl: p.bl * 0.6, sat: 9, dryt: [0.035, 0.018], headroom: 1.5, pcut: 0.09, b2: p.b2 * 0.4, hold: (p.hold || 0.1) * 0.3, bb2: p.bb2 * 0.5,
-      er: p.er * 0.35, wet: p.wet * 0.25, ech: p.ech * 0.35, tl: p.tl * 0.3, ag: p.ag * 0.4, duck: [-14, 0.04, 0.1] }),
+  // ---------- each gun's own shot (the game's, and soundcheck.html's round 3) ----------
+  // A take as shotTake makes it from SHOT alone is the shot as it was published ('pub'). Each kind has plans laid over that: 2 is the
+  // game's own, 1 a milder and 3 a stronger one the same way (soundcheck.html sets them side by side). A.gunFlavor: 0 the game's own
+  // (each kind's 2), 'pub' the published shot, 1-3 a kind's plan (one it has not falls back to its 2).
+  // What a plan sets over SHOT's: lowx / low2x: a low blow laid over the drive (105 Hz falling to 58, 230 to 125), lowt: how fast it
+  // dies (s); pcut: the push cut at (s); headx: a wide head (1-4 kHz), headt: how fast it dies (s), headd: driven, headpost: laid over
+  // the drive; bodyx: a short body under it - bodyf (Hz), bodya (s to rise), bodyh (s held), bodyt (s to die), bodyc (s, cut), bodyn
+  // (its share of noise), bodylo / bodyhi (its band, Hz); popx: a shotgun's burst of small cracks, popn how many, popT over how long
+  // (s); mv: the working of the action after it (the pump, the bolt) louder; hicut: the top cut (Hz, 9 kHz unless a plan says). lvl: dB of loudness over the published take (K-weighted,
+  // its first 300 ms); duck: the rest of the sound pulled down as your own shot goes off [dB, s held, s to come back]
+  A.gunFlavor = 0;
+  // (every shot of the new set this much louder than the published one: soundcheck.html's round 2 was heard best at 120 %)
+  const GUNV = 1.2;
+  const O = Object.assign;
+  // round 2's A, k as much of it: the push (60-120 Hz) stronger and longer, the body lower, a low blow of its own over the drive
+  const lowB = (p, k, t) => ({ bg: p.bg * (1 + 0.6 * k), bd: p.bd * (1 + 0.6 * k), bo: Math.max(p.bo, 100), pcut: 0.24, bbf: p.bbf * 0.75, lowx: 0.55 * k, low2x: 0.45 * k, lowt: t || 0.075 });
+  // a handgun: short, but the weight of its round in it - a body at 150-300 Hz and the low blow's upper part (230 Hz) strong, the low
+  // one short and a little after the head; the head kept full over the drive (w: how heavy - a revolver more than a pistol)
+  const hand = (p, k, w) => O(lowB(p, 0.6 * k * w, 0.035 + 0.015 * w), { lowd: 0.002, low2x: 0.8 * k * w, pcut: 0.09 + 0.03 * w, bbf: 250 - 50 * w, bb: p.bb * (1 + 0.25 * k), bodyx: 0.9 * k * w, bodyf: 200 - 30 * w, bodya: 0.002,
+    bodyh: 0.005 + 0.004 * w, bodyt: 0.014 + 0.008 * w, bodyc: 0.06 + 0.02 * w, bodyn: 0.5, bodylo: 100, bodyhi: 320, headx: 0.8 * k, headt: 0.003, headd: 2.5, headpost: 1, mv: 1 + 0.3 * k,
+    lvl: 0.5 + 1.1 * k * w, duck: [-5 - 4 * k * w, 0.035 + 0.01 * w, 0.08 + 0.04 * k * w] });
+  // a long gun fired once: a big low blow a little after a strong, full head; a room rings more, open ground rolls it far and long
+  const longG = (p, k, room) => O(lowB(p, 0.82 * k, 0.09 + 0.02 * k), { lowd: 0.003, lowa: 0.003, pcut: 0.3, headx: 1.2 * k, headt: 0.0035, headd: 3, headpost: 1, fl: p.fl * (1 + 0.3 * k), nw: p.nw * (1 + 0.4 * k), len: 0.55, mv: 1.2,
+    lvl: 0.8 + 1.2 * k, duck: [-9 - 5.5 * k, 0.05 + 0.035 * k, 0.15 + 0.13 * k] }, room ? { er: p.er * (1 + 0.25 * k), wet: p.wet * (1 + 0.3 * k) } : { ech: p.ech * (1 + 0.6 * k), tail: p.tail * (1 + 0.6 * k), tl: p.tl * (1 + 0.9 * k) });
+  // a shotgun: the report bursting - a scatter of small cracks over its first 15-25 ms, driven with the rest - over a big body (80-250
+  // Hz) that opens after it and holds longer than any other gun's (the blast's own front lower, so that the burst leads); a room rings
+  // with it, open ground throws it back wide; the pump after it plain to hear
+  // (pushed further, more of the burst than of the body: the body takes the room the burst needs)
+  const scat = (p, k, room) => O({ bbf: p.bbf * 0.8, bg: p.bg * (1 + 0.15 * k), bd: p.bd * (1 + 0.25 * k), lowx: 0.15 * Math.min(k, 1.2), low2x: 0.3 * Math.min(k, 1.2), lowt: 0.12 + 0.02 * k, lowd: 0.004, lowa: 0.006, pcut: 0.3,
+    bodyx: 0.6 * Math.min(k, 1.3), bodyf: 140, bodya: 0.004, bodyh: 0.016 + 0.004 * k, bodyt: 0.05 + 0.01 * k, bodyc: 0.18 + 0.02 * k, bodyn: 0.45, bodylo: 80, bodyhi: 230,
+    popx: 1.2 + 1.8 * k, popn: Math.round(16 + 14 * k), popT: 0.012 + 0.008 * k, poppre: 1, popk: 0.15, popd: 0.0004, hold: 0.08, b2: p.b2 * 0.8, fl: p.fl * 0.5,
+    len: 0.5, mv: 1.5, lvl: 0.8 + 1.3 * k, duck: [-9 - 5 * k, 0.05 + 0.025 * k, 0.15 + 0.07 * k] },
+    room ? { er: p.er * (1 + 0.4 * k), wet: p.wet * (1 + 0.35 * k) } : { ech: p.ech * (1 + 0.7 * k), tail: p.tail * (1 + 0.35 * k), tl: p.tl * (1 + 0.7 * k) });
+  const GUNP = {
+    // the assault rifle: round 2's E - the low blow, and the rest pulled down as it goes off (3: a little more of both)
+    rifle: { 2: (p) => O(lowB(p, 1), { lvl: 1, duck: [-10, 0.05, 0.12] }), 3: (p) => O(lowB(p, 1.3), { lvl: 1.8, duck: [-12, 0.05, 0.13] }) },
+    // the submachine gun: the rifle's way, lighter and thinner - a smaller, shorter low blow, the rest pulled down less and for less
+    smg: { 2: (p) => O(lowB(p, 0.45, 0.045), { pcut: 0.13, bbf: p.bbf * 0.85, lvl: 0.3, duck: [-6, 0.03, 0.07] }), 3: (p) => O(lowB(p, 0.65, 0.055), { pcut: 0.16, bbf: p.bbf * 0.8, lvl: 0.7, duck: [-7, 0.035, 0.08] }) },
+    pistol: { 1: (p) => hand(p, 0.6, 1), 2: (p) => hand(p, 1, 1), 3: (p) => hand(p, 1.6, 1) },
+    // (the revolver: the pistol's way, heavier and lower)
+    revolver: { 1: (p) => hand(p, 0.6, 1.3), 2: (p) => hand(p, 1, 1.3), 3: (p) => hand(p, 1.6, 1.3) },
+    sniper: { 1: (p, r) => longG(p, 0.6, r), 2: (p, r) => longG(p, 1, r), 3: (p, r) => longG(p, 1.6, r) },
+    // (the marksman's rifle: between the rifle and the sniper's)
+    dmr: { 2: (p, r) => longG(p, 0.55, r) },
+    shotgun: { 1: (p, r) => scat(p, 0.6, r), 2: (p, r) => scat(p, 1, r), 3: (p, r) => scat(p, 1.6, r) },
+    // (the machine gun: the rifle's way, heavier, its weight holding on through the fire)
+    lmg: { 1: (p) => O(lowB(p, 1.1, 0.08), { bbf: p.bbf * 0.72, lvl: 1.1, duck: [-10, 0.05, 0.12] }), 2: (p) => O(lowB(p, 1.5, 0.085), { bbf: p.bbf * 0.7, lvl: 1.8, duck: [-11, 0.05, 0.13] }),
+      3: (p) => O(lowB(p, 1.75, 0.095), { bbf: p.bbf * 0.68, lvl: 2.2, duck: [-13, 0.055, 0.14] }) },
+    // (the rotary gun: the submachine gun's way, lighter still)
+    minigun: { 2: (p) => O(lowB(p, 0.35, 0.04), { pcut: 0.1, lvl: 0, duck: [-5, 0.02, 0.05] }) },
+    // (what is launched: the launch given weight - not pulled down round it, as a friend's launch cannot be told from your own)
+    rocket: { 2: (p) => O(lowB(p, 0.9, 0.12), { bo: p.bo, pcut: 0.3, lvl: 1 }) },
+    gl: { 2: (p) => O(lowB(p, 0.8, 0.08), { bo: p.bo, lvl: 1 }) },
+    rail: { 2: (p) => O(lowB(p, 1.1, 0.12), { bo: p.bo, pcut: 0.3, lvl: 1.5 }) },
+    harpoon: { 2: (p) => O(lowB(p, 0.5, 0.05), { lvl: 0.5 }) },
+    nail: { 2: (p) => O(lowB(p, 0.3, 0.03), { pcut: 0.08, lvl: 0, duck: [-4, 0.02, 0.05] }) },
   };
-  // (each one's loudness over its first 300 ms, dB over the game's own take of that gun there: brought to it by one gain on the whole,
-  // nothing rounded, as far as the ceiling lets it - see levelTo. A is set as round 1 set it)
-  const FLVK = { B: 2, C: 2, D: 2, E: 2, F: 3.5, G: [1.8, 3.5], H: 4 };   // ([in a room, on open ground]: a room's reverb adds to it)
-  // (the master's limiter starts at -1.5 dBFS and the page plays at 0.8: a take's peak times its level kept under that, with some
-  // room left for the reverb and the place's own sound laid on it)
-  const FLVTOP = 1;
-  let limFast = false;   // (the limiter's release shortened by a seasoning, to be put back)
+  // (the published take's loudness, K-weighted energy of its first 300 ms in dB at 48 kHz, by kind and place: the mean of 60 takes made
+  // with the recordings, written down here so that a plan's take is set to it without published takes being made first)
+  const KPUB = { 'pistol:in': 23.7, 'pistol:out': 23.5, 'revolver:in': 25.3, 'revolver:out': 25.2, 'smg:in': 22.7, 'smg:out': 23, 'rifle:in': 24.6, 'rifle:out': 24.6, 'dmr:in': 24.8, 'dmr:out': 24.9,
+    'sniper:in': 25.7, 'sniper:out': 25.7, 'shotgun:in': 25.4, 'shotgun:out': 25.4, 'shotgun:a:in': 27, 'shotgun:a:out': 27.2, 'lmg:in': 24.7, 'lmg:out': 24.6, 'minigun:in': 22.6, 'minigun:out': 22.5,
+    'rocket:in': 27.9, 'rocket:out': 28.2, 'gl:in': 25.9, 'gl:out': 26, 'rail:in': 25.7, 'rail:out': 25.7, 'harpoon:in': 24.1, 'harpoon:out': 24.1, 'nail:in': 22, 'nail:out': 21.8 };
+  // (a take's peaks after its gain kept under this, its level and GUNV in: the master's limiter starts at -1.5 dBFS and the game plays at
+  // 0.8, so that a shot's own peak stays under it with a little room for the place's sound laid on it; SHAVE: dB the peaks may be taken down)
+  const TOP = 1.15, SHAVE = 3;
   // (A wide head: noise between 1 and 4 kHz, up at once and dying in a few ms - a burst, not a tick - written into X from i0; hd: driven,
   // so that it fills its few ms at the same peak, what the drive adds over 4.5 kHz cut)
   function headIn(X, i0, g, tau, sr, Y, hd) {
@@ -695,23 +722,31 @@
     const nz = p.bodyn || 0.5;
     for (let j = 0; j < n; j++) { const e = (j < a ? j / a : j < a + h ? 1 : Math.exp(-(j - a - h) / k)) * (j > n - fo ? (n - j) / fo : 1); X[i0 + j] += p.bodyx * e * (x[j] * (1 - nz) + (y[j] / (pk || 1)) * nz * 1.6); }
   }
-  // (The drive, its added overtones kept under lp Hz: the take normalized, driven, and only the difference the drive made low-passed back in)
-  function satLow(L, R, len, d, td, pk, lp, sr) {
-    for (const C of [L, R]) {
-      const h = new Float32Array(len);
-      for (let i = 0; i < len; i++) { const c = C[i] / pk; h[i] = ftanh(d * C[i]) / td - c; C[i] = c; }
-      bqRun(h, 'lp', lp, 0.7, sr); bqRun(h, 'lp', lp, 0.7, sr);
-      for (let i = 0; i < len; i++) C[i] += h[i];
+  // (A shotgun's report bursting: not one crack but a scatter of small ones over its first popT s - the load and the gas leaving the
+  // muzzle in pulses - each a burst of noise of some popd s, thicker and stronger at first (popk: how much), each a little to one side
+  // or the other; all of it kept between 500 Hz and 4 kHz, nothing of it high enough to hurt. M: their sum written there too)
+  function popIn(L, R, i0, p, sr, M) {
+    const T = p.popT || 0.018, n = Math.min(L.length - i0, Math.round((T + 0.006) * sr)), pk0 = p.popk || 1, pd = p.popd || 0.0003; if (n <= 0) return;
+    const x = new Float32Array(n), y = new Float32Array(n);
+    for (let k = 0; k < p.popn; k++) {
+      const j0 = Math.round(T * Math.pow(Math.random(), 1 + 0.6 * pk0) * sr), te = pd * (0.4 + Math.random()) * sr, m = Math.round(te * 6), a = (0.35 + 0.65 * Math.random()) * Math.exp((-1.2 * pk0 * j0) / (T * sr)) * (Math.random() < 0.5 ? -1 : 1), pan = Math.random() * 1.2 - 0.6, gl = Math.min(1, 1 - pan), gr = Math.min(1, 1 + pan);
+      for (let j = 0; j < m && j0 + j < n; j++) { const v = (Math.random() * 2 - 1) * a * Math.exp(-j / te); x[j0 + j] += v * gl; y[j0 + j] += v * gr; }
     }
+    for (const z of [x, y]) { bqRun(z, 'hp', 500, 0.7, sr); bqRun(z, 'hp', 500, 0.7, sr); bqRun(z, 'lp', 4000, 0.7, sr); bqRun(z, 'lp', 4000, 0.7, sr); }
+    let pk = 0; for (let j = 0; j < n; j++) pk = Math.max(pk, Math.abs(x[j]), Math.abs(y[j]));
+    const g = p.popx / (pk || 1); for (let j = 0; j < n; j++) { L[i0 + j] += x[j] * g; R[i0 + j] += y[j] * g; if (M) M[i0 + j] += (x[j] + y[j]) * 0.5 * g; }
   }
-  // (The rest of the sound - the place's own, steps, voices, all that goes the common way - pulled down as a shot goes off, and back)
+  // (The rest of the sound - the place's own, steps, voices, all that goes the common way - pulled down as your own shot goes off, and
+  // back. In fast fire each shot pulls it down less (no deeper than DUCKCAP), holds it less and lets it back sooner: the fire never shuts
+  // the rest out - foes' steps and voices still come through it - and it is back soon after the fire stops)
+  const DUCKCAP = -6;
+  let duckT = -9;
   function duckOthers(t, dk) {
-    const g = dry.gain, lo = Math.pow(10, dk[0] / 20);
-    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(lo, t + 0.003); g.setValueAtTime(lo, t + 0.003 + dk[1]); g.setTargetAtTime(1, t + 0.003 + dk[1], dk[2]);
+    const k = Math.min(1, Math.max(0, (t - duckT - 0.06) / 0.34)), db = dk[0] * k + Math.max(dk[0], DUCKCAP) * (1 - k), hold = dk[1] * (0.4 + 0.6 * k), back = dk[2] * (0.5 + 0.5 * k);
+    duckT = t;
+    const g = dry.gain, lo = Math.pow(10, db / 20);
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(lo, t + 0.003); g.setValueAtTime(lo, t + 0.003 + hold); g.setTargetAtTime(1, t + 0.003 + hold, back);
   }
-  // A seasoned take is brought to the loudness of the game's own takes of that gun there (K-weighted, its first 300 ms): the game's
-  // takes of it are made once for that (three, kept apart), and each seasoned take is measured and set to them
-  const KREF = {};
   function kEnergy(b) {
     const sr = b.sampleRate, n = Math.min(b.length, Math.round(0.3 * sr)), L = b.getChannelData(0), R = b.getChannelData(1), x = new Float32Array(n);
     for (let i = 0; i < n; i++) x[i] = (L[i] + R[i]) * 0.5;
@@ -723,44 +758,39 @@
     for (let i = 0; i < n; i++) { const v = x[i], y = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = v; y2 = y1; y1 = y; e += y * y; }
     return e;
   }
-  function levelTo(b, pl) {
-    const rk = pl.key.replace(/:f\w+$/, '');
-    if (!KREF[rk]) {
-      const keep = A.gunFlavor; A.gunFlavor = 1;
-      try { const q = shotPlan(pl.kind, false, pl.auto, pl.room); let e = 0; for (let i = 0; i < 3; i++) e += kEnergy(shotTake(q.kind, q.p, q.recs, q.room)); KREF[rk] = e / 3; } finally { A.gunFlavor = keep; }
-    }
-    // (set to it; where that takes its peaks over the top, they are rounded off - as the drive does - and it is set again: left to the
-    // limiter, a peakier take was pulled down whole for some 80 ms after each peak, and came out quieter)
-    const C = [b.getChannelData(0), b.getChannelData(1)];
-    if (pl.lvl !== undefined) {
-      // (headroom: the head - its first 6 ms - may go that many dB over the ceiling, for the limiter to take quickly; what follows may not)
-      const h6 = pl.p.headroom ? Math.round(0.006 * b.sampleRate) : 0;
-      let pk = 0, ph = 0; for (const d of C) for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (i < h6) ph = Math.max(ph, a); else pk = Math.max(pk, a); }
-      const ceil = FLVTOP * Math.pow(10, (pl.p.topdb || 0) / 20), top = Math.min(ceil / (pl.p.lv * (pk || 1)), ph ? (ceil * Math.pow(10, pl.p.headroom / 20)) / (pl.p.lv * ph) : Infinity);
-      const k = kEnergy(b) || 1e-12, g = Math.max(Math.sqrt(KREF[rk] / k), Math.min(Math.sqrt((KREF[rk] * Math.pow(10, pl.lvl / 10)) / k), top));
-      for (const d of C) for (let i = 0; i < d.length; i++) d[i] *= g; return;
-    }
-    for (let k = 0; k < 4; k++) {
-      const g = Math.sqrt(KREF[rk] / (kEnergy(b) || 1e-12));
-      let pk = 0;
-      for (const d of C) for (let i = 0; i < d.length; i++) { d[i] *= g; pk = Math.max(pk, Math.abs(d[i])); }
-      if (pk <= 1) break;
-      for (const d of C) for (let i = 0; i < d.length; i++) { const v = d[i], a = Math.abs(v); if (a > 0.7) d[i] = Math.sign(v) * (0.7 + 0.3 * ftanh((a - 0.7) / 0.3)); }
-    }
+  // A planned take brought to its loudness: lvl dB over the published take's (KPUB), by one gain on the whole; its peaks then kept under
+  // the top by a gain that dips round them - down a fraction of a ms before each (looking ahead), back in 12 ms - so that the limiter
+  // never has to hold the shot down after its front; where that would take the front down more than SHAVE dB, the whole is set lower
+  function levelTake(b, pl) {
+    const kp = KPUB[pl.kk]; if (kp === undefined) return;
+    const C = [b.getChannelData(0), b.getChannelData(1)], n = b.length, sr = b.sampleRate, top = TOP / (pl.p.lv * pl.gv);
+    let pk = 0; for (const d of C) for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i]));
+    const g = Math.min(Math.pow(10, (kp + 10 * Math.log10(sr / 48000) + pl.lvl - 10 * Math.log10(kEnergy(b) || 1e-12)) / 20), (top * Math.pow(10, SHAVE / 20)) / (pk || 1));
+    const q = work(0, n), ka = Math.exp(-1 / (0.0004 * sr)), kr = Math.exp(-1 / (0.012 * sr));
+    for (let i = 0; i < n; i++) { const m = Math.max(Math.abs(C[0][i]), Math.abs(C[1][i])) * g; q[i] = m > top ? top / m : 1; }
+    for (let i = n - 2; i >= 0; i--) q[i] = Math.min(q[i], 1 - (1 - q[i + 1]) * ka);
+    let lo = 1; for (let i = 1; i < n; i++) { q[i] = Math.min(q[i], 1 - (1 - q[i - 1]) * kr); lo = Math.min(lo, q[i]); }
+    for (const d of C) for (let i = 0; i < n; i++) d[i] *= g * q[i];
+    A.shotStats.shave = Math.max(A.shotStats.shave || 0, -20 * Math.log10(lo));
   }
-  // what a shot of this kind is, here and now: its layers, the recordings of it that have arrived (until they have, its takes are of
-  // the layers alone, kept apart), and the key its takes are kept under
-  function shotPlan(kind, supp, auto, room) {
-    let p = supp ? suppOf(kind) : SHOT[kind] || SHOT.rifle;
-    if (auto) p = Object.assign({}, p, { act: 'autoshot', len: 0.3, lv: p.lv * 0.85 });   // (a self-loading shotgun: its bolt works, there is no pump)
-    const fv = !supp && A.gunFlavor !== 1 && FLV[A.gunFlavor];
-    if (fv) p = Object.assign({}, p, fv(p, room));
+  // what a shot of this kind is, here and now: its layers (the plan fl picks laid over them), the recordings of it that have arrived
+  // (until they have, its takes are of the layers alone, kept apart), its loudness, what it pulls down, and the key its takes are kept under
+  function shotPlan(kind, supp, auto, room, fl) {
+    if (fl === undefined) fl = A.gunFlavor;
+    const base = SHOT[kind] || SHOT.rifle, P = fl === 'pub' ? null : GUNP[kind], n = P ? (P[fl] ? fl : P[2] ? 2 : 0) : 0, q = n ? P[n](base, room) : null;
+    let p = supp ? suppOf(kind) : q ? O({ hicut: 9000 }, base, q) : base;
+    if (auto) p = O({}, p, { act: 'autoshot', len: 0.3, lv: p.lv * 0.85 });   // (a self-loading shotgun: its bolt works, there is no pump)
+    // (a suppressed shot is not changed by the plan, only pulled down round less)
+    const duck = q && q.duck ? (supp ? [q.duck[0] * 0.35, q.duck[1] * 0.6, q.duck[2] * 0.6] : q.duck) : null;
     const bk = p.rv && usable('gun_' + kind) ? SB.bank['gun_' + kind] : null, recs = bk ? bk.f.map((f) => bufs[f] || (fetchBuf(f), null)).filter(Boolean) : [];
-    return { kind, p, recs, room, auto, fv: !!fv, lvl: fv ? [].concat(FLVK[A.gunFlavor])[room ? 0 : 1] ?? FLVK[A.gunFlavor] : undefined, key: (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out') + (recs.length ? ':r' : '') + (fv ? ':f' + A.gunFlavor : '') };
+    return { kind, p, recs, room, auto, n, lvl: q && !supp ? q.lvl || 0 : null, duck, gv: fl === 'pub' ? 1 : GUNV, kk: kind + (auto ? ':a' : '') + (room ? ':in' : ':out'),
+      key: (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out') + (recs.length ? ':r' : '') + (n && !supp ? ':' + n : '') };
   }
+  // (for the measurements: docs/tools/gf3_*.js)
+  A.shotLab = { plan: shotPlan, take: (pl) => shotTake(pl.kind, pl.p, pl.recs, pl.room), kEnergy, level: levelTake, KPUB, GUNP };
   function shotMake(pl) {
     const t0 = performance.now(), b = shotTake(pl.kind, pl.p, pl.recs, pl.room), S = A.shotStats;
-    if (pl.fv) levelTo(b, pl);
+    if (pl.lvl !== null) levelTake(b, pl);
     const ms = performance.now() - t0;
     S.made++; S.ms += ms; S.max = Math.max(S.max, ms); S.log.push(pl.key + ' ' + ms.toFixed(1)); if (S.log.length > 200) S.log.shift();
     (shotSets[pl.key] || (shotSets[pl.key] = [])).push(b); return b;
@@ -773,7 +803,7 @@
     const run = (dl) => {
       const t0 = performance.now(), budget = dl && !dl.didTimeout && dl.timeRemaining ? dl.timeRemaining() - 2 : 6;
       do {
-        const [kind, supp, auto, room] = shotQ.shift(), pl = shotPlan(kind, supp, auto, room), set = shotSets[pl.key];
+        const [kind, supp, auto, room, fl] = shotQ.shift(), pl = shotPlan(kind, supp, auto, room, fl), set = shotSets[pl.key];
         if (pl.p.rv && !pl.recs.length && usable('gun_' + kind)) { if (!set || !set.length) shotMake(pl); continue; }   // (its recordings are still on their way: one take of the layers alone, to fire with until they come)
         if (!set || set.length < 5) shotMake(pl);
       } while (shotQ.length && performance.now() - t0 < budget);
@@ -786,27 +816,30 @@
     // (a gun with something on its muzzle may be suppressed: its suppressed takes are made too - a few ms of spare time, if not)
     for (const w of (P && P.weapons) || []) {
       const d = w && w.def, k = d && (d.sound === 'tesla' ? 'nail' : d.sound); if (!SHOT[k]) continue;
-      const auto = !!(k === 'shotgun' && d.autoShot); shotQ.push([k, false, auto, room]); if (d.trait === 'silent' || (w.atts && w.atts.muzzle)) shotQ.push([k, true, auto, room]);
+      const auto = !!(k === 'shotgun' && d.autoShot); shotQ.push([k, false, auto, room, 0]); if (d.trait === 'silent' || (w.atts && w.atts.muzzle)) shotQ.push([k, true, auto, room, 0]);
     }
     shotFill();
   }
+  // (soundcheck.html: the plans of a kind made ready before they are fired, in the time the page has to spare)
+  A.shotPrep = function (kind, fls, room) { if (!ctx || !NEW()) return; gunsIn.then(() => { for (const fl of fls) shotQ.push([kind, false, false, room, fl]); shotFill(); }); };
   function newShot(kind, opts) {
-    const supp = !!opts.suppressed, room = !outdoor(), auto = kind === 'shotgun' && !!opts.auto, v = Math.pow(opts.vol || 1, 0.4), t = ctx.currentTime;
-    const pl = shotPlan(kind, supp, auto, room), p = pl.p, set = shotSets[pl.key];
+    const supp = !!opts.suppressed, room = !outdoor(), auto = kind === 'shotgun' && !!opts.auto, v = Math.pow(opts.vol || 1, 0.4), t = ctx.currentTime, fl = A.gunFlavor;
+    const pl = shotPlan(kind, supp, auto, room, fl), p = pl.p, set = shotSets[pl.key];
     let buf;
-    if (!set || !set.length) { buf = shotMake(pl); for (let i = 0; i < 4; i++) shotQ.push([kind, supp, auto, room]); shotFill(); }
+    if (!set || !set.length) { buf = shotMake(pl); for (let i = 0; i < 4; i++) shotQ.push([kind, supp, auto, room, fl]); shotFill(); }
     else { let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === shotLast[pl.key]) i = (i + 1) % set.length; shotLast[pl.key] = i; buf = set[i]; }
     // (each named gun a little off the next one's pitch)
     const at = opts.pos || null, out = dest(at, p.wet, gunDry), src = ctx.createBufferSource();
-    out.gain.value = v * p.lv * vr(1, 0.05); src.buffer = buf; src.playbackRate.value = (opts.id && !supp ? 0.97 + hr(hs(opts.id), 1) * 0.06 : 1) * vr(1, 0.015);
+    out.gain.value = v * p.lv * pl.gv * vr(1, 0.05); src.buffer = buf; src.playbackRate.value = (opts.id && !supp ? 0.97 + hr(hs(opts.id), 1) * 0.06 : 1) * vr(1, 0.015);
     src.connect(out); src.start(t);
-    if (p.duck && !at) duckOthers(t, p.duck);
-    // (soundcheck.html's F-H: the limiter let go of what it takes in 15 ms, not 80; back as it was when another version is fired)
-    if (limN && !at && (p.limrel ? !limFast : limFast)) { limN.release.value = p.limrel || 0.08; limFast = !!p.limrel; }
+    // (the rest pulled down round your own shot only: one asked for from a place - a foe's, a guardian's - or with no gun's id - a friend's -
+    // is another's, and leaves the rest as it is)
+    const own = !at && !!opts.id;
+    if (own && pl.duck) duckOthers(t, pl.duck);
     // (on open ground the roll after it; in fast fire each shot's share of it is smaller, so that the fire rolls as one shot would)
     if (!room && p.tail) {
       const share = Math.max(0.2, Math.min(1, (t - lastTail) / 0.4)), e = dest(at, 0, gunDry), s2 = ctx.createBufferSource(); lastTail = t;
-      e.gain.value = v * p.lv * p.tl * share * 0.8; s2.buffer = tailTake(); s2.playbackRate.value = Math.min(2, 1.5 / p.tail) * vr(1, 0.04); s2.connect(e); s2.start(t);
+      e.gain.value = v * p.lv * p.tl * share * 0.8 * pl.gv; s2.buffer = tailTake(); s2.playbackRate.value = Math.min(2, 1.5 / p.tail) * vr(1, 0.04); s2.connect(e); s2.start(t);
     }
     if (p.cas && opts.id && t - lastCase > 0.15 && Math.random() < p.cas[0]) {   // (your own gun's empties only: a shot asked for without a gun's id is another's - a guardian's, a friend's)
       lastCase = t;
@@ -815,9 +848,9 @@
     }
     if (at) return;   // (another's gun: its working is not in your hands)
     const mv = p.mv || 1;
-    if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35, 0.7 * mv);
-    if (kind === 'sniper') { A.mech('boltBack', 0.4, 0.7 * mv); A.mech('boltFwd', 0.6, 0.7 * mv); }
-    if (kind === 'revolver') A.mech('click', 0.2, 0.75 * mv);
+    if (kind === 'shotgun' && !opts.auto) A.mech('pump', 0.35, 0.7 * mv, own);
+    if (kind === 'sniper') { A.mech('boltBack', 0.4, 0.7 * mv, own); A.mech('boltFwd', 0.6, 0.7 * mv, own); }
+    if (kind === 'revolver') A.mech('click', 0.2, 0.75 * mv, own);
   }
   A.gun = function (kind, opts) {
     if (!ctx || !voice(1)) return;
@@ -988,16 +1021,17 @@
     for (let i = 0; i < len; i++) { L[i] /= pk || 1; R[i] /= pk || 1; }
     set.push(buf); return buf;
   }
-  A.mech = function (kind, delay, vol) {
+  // (own: the working of your own gun after a shot - it goes the guns' way, and is not pulled down with the rest round the shot)
+  A.mech = function (kind, delay, vol, own) {
     if (!ctx || !voice(0.4)) return;
     if (!delay && smp('mech_' + kind, null, vol)) return;
-    if (delay && SB.bank['mech_' + kind] && usable('mech_' + kind)) { setTimeout(() => A.mech(kind, 0, vol), delay * 1000); return; }
+    if (delay && SB.bank['mech_' + kind] && usable('mech_' + kind)) { setTimeout(() => A.mech(kind, 0, vol, own), delay * 1000); return; }
     const t = ctx.currentTime + (delay || 0);
     if (NEW()) {
-      if (kind === 'bolt') { A.mech('boltBack', delay, vol); A.mech('boltFwd', (delay || 0) + 0.2, vol); return; }
+      if (kind === 'bolt') { A.mech('boltBack', delay, vol, own); A.mech('boltFwd', (delay || 0) + 0.2, vol, own); return; }
       if (kind === 'switch') shotWarm(!outdoor());   // (a gun taken up: its shots made ready before it is fired)
       const arch = handArch(), b = mechTake(kind, arch); if (!b) return;
-      const out = dest(null, 0.08), src = ctx.createBufferSource();
+      const out = dest(null, 0.08, own ? gunDry : undefined), src = ctx.createBufferSource();
       out.gain.value = (vol || 1) * (MECHV[kind] || 0.4) * Math.sqrt(WT[arch] || 1) * vr(1, 0.08); src.buffer = b; src.playbackRate.value = vr(1, 0.025);
       src.connect(out); src.start(t);
       return;

@@ -654,7 +654,7 @@
   // A take as shotTake makes it from SHOT alone is the shot as it was published ('pub'). Each kind has plans laid over that: round 3's
   // 2, with 1 a milder and 3 a stronger one the same way; round 4's A / B / C over 2 (see R4 below). The game's own is a kind's B where it
   // has one (every gun but the assault rifle and the submachine gun), its 2 where not - unless GDEF names another (round 5: C for all but
-  // the pistol, the assault rifle and the submachine gun). A.gunFlavor: 0 the game's own, 'pub' the published shot, 1-3 / 'A'-'F' a
+  // the pistol, the assault rifle and the submachine gun). A.gunFlavor: 0 the game's own, 'pub' the published shot, 1-3 / 'A'-'K' a
   // kind's plan (one it has not falls back to the game's own).
   // What a plan sets over SHOT's: lowx / low2x: a low blow laid over the drive (105 Hz falling to 58, 230 to 125), lowt: how fast it
   // dies (s); pcut: the push cut at (s); headx: a wide head (1-4 kHz), headt: how fast it dies (s), headd: driven, headpost: laid over
@@ -818,6 +818,23 @@
   r6('revolver', (v, k, q, p, r) => O(q, sprP(1, r), popP(q, p, k, { bst: tx(k, [0.0025, 0.02, r ? 0.055 : 0.1]), kf0: 180, kf1: 55, kt: 0.026, lnt: 0.035, clip: r ? 12.5 : 10 })));
   r6('lmg', (v, k, q, p, r) => O(q, sprP(1, r, { spn: 5, sp1: 0.025, spf: 5, sf0: 0.07, sf1: 0.35, sfg: r ? 0.15 : 0.5, sft: 0.2, len: qv(q, p, 'len') }),
     popP(q, p, k, { bst: [0.0015, 0.009, 0.02].map((x) => x * [1, 1.05, 1.1][k]), kf0: 170, kf1: 55, kt: 0.018, lnt: 0.02, bsc: 0.006, bsp: 0.6, clip: 12.5, bsx: [2, 2.2, 2.4][k], airt: q.airt * 0.5 })));
+  // Round 7, C and round 6 put together: J and K. Round 6's burst was liked and so was C's low end, its note and all. J / K keep C's low
+  // blow, push and body as they are (no kick, no lump of low noise) and lay the burst over them - G's in J, I's (longer, more of it) in
+  // K - with its fast first slope all but left out and its rise slower, so that its top does not stand on the low blow's. A take is set
+  // to its loudness by what is heard most, the burst, and the low end goes down with it: the low blow is made that much bigger, to be as
+  // loud under the burst as it is in C. FUSE, by kind, for J and K: the burst's share of G's / I's, the low blow's of C's, the burst's
+  // rise (s; 0: as in round 6, a machine gun's burst being short as it is)
+  const FUSE = { shotgun: [[0.4, 1.65, 0.005], [0.6, 1.8, 0.005]], sniper: [[0.5, 1, 0.004], [0.7, 1.1, 0.004]], revolver: [[0.6, 1.15, 0.004], [0.8, 1.25, 0.004]], lmg: [[1.4, 1.25, 0], [1.8, 1.4, 0]] };
+  for (const kind in FUSE) ['J', 'K'].forEach((v, k) => {
+    GUNP[kind][v] = (p, r) => {
+      const c = GUNP[kind].C(p, r), g = GUNP[kind][k ? 'I' : 'G'](p, r), [bm, low, rise] = FUSE[kind][k], o = O({}, g, { kx: 0, lnx: 0, bsx: g.bsx * bm });
+      // (what C has not set is left to the shot's own, not set to nothing)
+      for (const key of ['lowx', 'low2x', 'bg', 'bd', 'pcut', 'bodyn', 'bodyx', 'bb', 'clip', 'topx']) { if (c[key] === undefined) delete o[key]; else o[key] = c[key]; }
+      o.lowx *= low; if (o.low2x) o.low2x *= low;
+      if (rise) { o.bsa = rise; o.bsw3 = [0.05, 0.5, 0.45]; }
+      return o;
+    };
+  });
   // (the version each kind is played at in the game, where it is not its B or its 2)
   const GDEF = { shotgun: 'C', sniper: 'C', revolver: 'C', lmg: 'C', dmr: 'C', minigun: 'C', rocket: 'C', gl: 'C', rail: 'C', harpoon: 'C', nail: 'C' };
   // (the published take's loudness, K-weighted energy of its first 300 ms in dB at 48 kHz, by kind and place: the mean of 60 takes made

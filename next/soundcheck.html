@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14110e">
-<title>銃声の聴き比べ 第6回</title>
+<title>銃声の聴き比べ 第7回</title>
 <style>
   :root {
     --bg: #14110e; --panel: #1d1914; --line: #4a3d2a; --gold: #c9a45c; --gold2: #e6c98a; --text: #e9e2d2; --dim: #9a8f7c; --on: #3a2f1c;
@@ -44,7 +44,7 @@
 <body>
 <main>
   <div id="now" aria-live="polite"></div>
-  <h1>銃声の聴き比べ 第6回</h1>
+  <h1>銃声の聴き比べ 第7回</h1>
   <section>
     <h2>銃</h2>
     <div class="row g" id="guns"></div>
@@ -96,10 +96,10 @@
   G.save.data.settings.sound = 'new';
   A.volume = 0.8;
   // each gun's versions: [the plan in audio.js (A.gunFlavor), the mark on its button, its name (in the line on top), what its button
-  // says under the mark when not its name]. 'pub' is the shot before round 3, C round 4's (the game's own), G / H / I round 6's (round 5's D / E / F are left in audio.js, off the page).
+  // says under the mark when not its name]. C is round 4's (the game's own), G / I round 6's, J / K round 7's: C's low end with G's / I's burst over it (the shot before round 3, round 5's D / E / F and round 6's H are left in audio.js, off the page).
   // The assault rifle, the submachine gun and the pistol: the one they passed with (the rifle's and the submachine gun's 2, the
   // pistol's B), to compare the rest with
-  const R5 = [['pub', '前', '変える前'], ['C', 'C', '第4回', '第4回（既定）'], ['G', 'G', '弾ける'], ['H', 'H', '弾ける 強'], ['I', 'I', '弾ける 最大']], OK = [[2, '合格', '', '比べる用']], OKB = [['B', '合格', '', '比べる用']];
+  const R5 = [['C', 'C', '第4回', '第4回（既定）'], ['G', 'G', '弾ける'], ['I', 'I', '弾ける 最大'], ['J', 'J', '融合'], ['K', 'K', '融合 強']], OK = [[2, '合格', '', '比べる用']], OKB = [['B', '合格', '', '比べる用']];
   const GUNS = [
     ['rifle', 'アサルトライフル', 630, 'a_ranger', OK],
     ['smg', 'SMG', 870, 's_wasp', OK],

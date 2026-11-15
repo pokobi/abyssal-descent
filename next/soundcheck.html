@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14110e">
-<title>銃声の聴き比べ 第3回</title>
+<title>銃声の聴き比べ 第4回</title>
 <style>
   :root {
     --bg: #14110e; --panel: #1d1914; --line: #4a3d2a; --gold: #c9a45c; --gold2: #e6c98a; --text: #e9e2d2; --dim: #9a8f7c; --on: #3a2f1c;
@@ -20,7 +20,7 @@
   h2 { font-size: 13px; font-weight: 600; color: var(--dim); margin: 0 0 6px; letter-spacing: 0.08em; }
   .row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
   .row.g { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
-  .row.v { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .row.v { grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); }
   button { appearance: none; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-height: 48px; padding: 8px 10px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   button:hover { border-color: var(--gold); }
   button:active { transform: translateY(1px); }
@@ -44,7 +44,7 @@
 <body>
 <main>
   <div id="now" aria-live="polite"></div>
-  <h1>銃声の聴き比べ 第3回</h1>
+  <h1>銃声の聴き比べ 第4回</h1>
   <section>
     <h2>銃</h2>
     <div class="row g" id="guns"></div>
@@ -95,25 +95,28 @@
   // (this page's own state: nothing of it is saved, the game's settings are left as they are)
   G.save.data.settings.sound = 'new';
   A.volume = 0.8;
-  // each gun's versions: [the plan in audio.js (A.gunFlavor), the mark on its button, its name]. 'pub' is the published shot; the
-  // plan 2 is the game's own
-  const PUB = ['pub', '前', '変える前'], MID = [[1, '1', '控えめ'], [2, '2', '中（既定）'], [3, '3', '派手']];
+  // each gun's versions: [the plan in audio.js (A.gunFlavor), the mark on its button, its name (in the line on top), what its button
+  // says under the mark when not its name]. 'pub' is the shot before round 3, 2 round 3's, A / B / C round 4's; B is the game's own.
+  // The assault rifle and the submachine gun: the one they passed with, to compare the rest with
+  const R4 = [['pub', '前', '変える前'], [2, '今', '第3回'], ['A', 'A', '明るく'], ['B', 'B', '明るく派手', '明るく派手（既定）'], ['C', 'C', 'さらに派手']], OK = [[2, '合格', '', '比べる用']];
   const GUNS = [
-    ['rifle', 'アサルトライフル', 630, 'a_ranger', [PUB, [2, 'E', '既定'], [3, 'E+', 'E を少し強く']]],
-    ['smg', 'SMG', 870, 's_wasp', [PUB, [2, '既定', 'E を軽く薄く'], [3, '厚', 'もう少し厚く']]],
-    ['pistol', '拳銃', 400, 'starter', [PUB].concat(MID)],
-    ['shotgun', '散弾銃', 72, 'g_breacher', [PUB].concat(MID)],
-    ['sniper', '狙撃銃', 46, 'n_scout', [PUB].concat(MID)],
-    ['revolver', 'リボルバー', 150, 'r_judge', [PUB].concat(MID)],
-    ['lmg', 'LMG', 680, 'l_bulwark', [PUB].concat(MID)],
+    ['rifle', 'アサルトライフル', 630, 'a_ranger', OK],
+    ['smg', 'SMG', 870, 's_wasp', OK],
+    ['pistol', '拳銃', 400, 'starter', R4],
+    ['shotgun', '散弾銃', 72, 'g_breacher', R4],
+    ['sniper', '狙撃銃', 46, 'n_scout', R4],
+    ['revolver', 'リボルバー', 150, 'r_judge', R4],
+    ['lmg', 'LMG', 680, 'l_bulwark', R4],
   ];
   const MODES = [['one', '単発'], ['three', '3発'], ['auto', '連射（1秒）']];
   const PLACES = [['in', '屋内'], ['out', '屋外']];
-  const S = { v: 2, mode: 'one', place: 'in', gun: 'rifle', vol: 100, amb: true };
+  const S = { v: 'B', mode: 'one', place: 'in', gun: 'shotgun', vol: 100, amb: true };
   const $ = (id) => document.getElementById(id);
   const label = (list, k) => (list.find((q) => q[0] === k) || [])[1];
   const gun = () => GUNS.find((q) => q[0] === S.gun);
-  const ver = () => gun()[4].find((q) => q[0] === S.v) || gun()[4][2];
+  // (a gun's own version: B where it has one)
+  const defV = () => (gun()[4].some((q) => q[0] === 'B') ? 'B' : gun()[4][0][0]);
+  const ver = () => gun()[4].find((q) => q[0] === S.v) || gun()[4].find((q) => q[0] === defV());
 
   function setWorld() {
     const out = S.place === 'out';
@@ -165,15 +168,16 @@
   }
   function drawVers() {
     $('vers').textContent = '';
-    for (const [v, k, nm] of gun()[4]) btn('vers', 'v', v, '<b>' + k + '</b><span>' + nm + '</span>', 'vb', () => { S.v = v; draw(); fire('one'); });
+    for (const [v, k, nm, sub] of gun()[4]) btn('vers', 'v', v, '<b>' + k + '</b><span>' + (sub || nm) + '</span>', 'vb', () => { S.v = v; draw(); fire('one'); });
   }
   function draw() {
     const vv = ver();
-    $('now').textContent = gun()[1] + ' 版 ' + vv[1] + ' ' + vv[2] + ' ／ ' + label(MODES, S.mode) + ' ／ ' + label(PLACES, S.place) + ' ／ 銃声 ' + S.vol + '％';
+    $('now').textContent = gun()[1] + ' 版 ' + vv[1] + (vv[2] ? ' ' + vv[2] : '') + ' ／ ' + label(MODES, S.mode) + ' ／ ' + label(PLACES, S.place) + ' ／ 銃声 ' + S.vol + '％';
     for (const b of document.querySelectorAll('[data-k]')) b.classList.toggle('on', String(S[b.dataset.k]) === b.dataset.val);
     $('volv').textContent = S.vol + '％';
   }
-  for (const [k, nm] of GUNS) btn('guns', 'gun', k, nm, '', () => { S.gun = k; if (!gun()[4].some((q) => q[0] === S.v)) S.v = 2; drawVers(); draw(); prep(); fire('one'); });
+  // (a gun picked keeps the version picked, when it has it; coming from a gun with one only, it starts at its own)
+  for (const [k, nm] of GUNS) btn('guns', 'gun', k, nm, '', () => { const one = gun()[4].length < 2; S.gun = k; if (one || !gun()[4].some((q) => q[0] === S.v)) S.v = defV(); drawVers(); draw(); prep(); fire('one'); });
   drawVers();
   for (const [m, nm] of MODES) btn('modes', 'mode', m, nm, '', () => { S.mode = m; draw(); fire(m); });
   for (const [p, nm] of PLACES) btn('places', 'place', p, nm, '', () => { S.place = p; draw(); wake(); setWorld(); prep(); });
@@ -186,10 +190,10 @@
   btn('others', '', '', '敵の声', '', () => { wake(); A.monster({ x: 0, y: 1.6, z: -9 }, 'snarl', 1, 1); });
   btn('others', '', '', '敵の銃声', '', () => { wake(); A.gunFlavor = 0; for (let i = 0; i < 4; i++) setTimeout(() => A.gun('smg', { vol: 0.6, pos: { x: 9, y: 1.5, z: -18 } }), i * 110); });
   btn('others', 'amb', true, '環境音', '', () => { S.amb = !S.amb; wake(); setWorld(); draw(); });
-  // keys: 0-3 the versions in their order (0 the published one), space fires
+  // keys: 0-4 the versions in their order (0 the one before round 3), space fires
   document.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    const i = '0123'.indexOf(e.key), vs = gun()[4];
+    const i = '01234'.indexOf(e.key), vs = gun()[4];
     if (i >= 0 && i < vs.length && !e.shiftKey) { S.v = vs[i][0]; draw(); fire('one'); }
     else if (e.code === 'Space' && !/^(BUTTON|INPUT)$/.test(e.target.tagName)) { e.preventDefault(); fire(); }
   });

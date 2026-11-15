@@ -3298,11 +3298,40 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // moves by itself (anything its animate() moves, anything it keeps hold of) is left as it is; so is a part too thin to survive ----
   const fuseCache = new Map(), HARD = { golem: 1, beetle: 1, knight: 1, gargoyle: 1 }, NOFUSE = { skeleton: 1, mimic: 1, slime: 1, eye: 1 };
   const POSES = [{ walk: 0.7, mv: 1, atk: 0, wind: 0, flinch: 0, t: 1.3 }, { walk: 2.9, mv: 1, atk: 1, wind: 0, flinch: 0, t: 2.7, throwing: true }, { walk: 4.1, mv: 0, atk: 0, wind: 1, flinch: 1, t: 4.1, stunned: true }, { walk: 5.3, mv: 0.5, atk: 0.5, wind: 0.5, flinch: 0.5, t: 7.9 }];
+  // What the melting of one kind of body came to (o.recipe names the kind: enemies.js buildModel), kept so that the next body of that
+  // kind skips the search - which parts its animate() moves, what it keeps hold of, the key of every melted shape - and is given the
+  // same melted shapes in the same places at once. A step: { g: the joint (its place in the body's traversal), m: the material (its
+  // place in [skin, sec, ...model.mats]), rm: the parts it replaces (places in the traversal), ck: what each of them must be, geo }.
+  // A body that is not built exactly alike (a part chosen by a throw of the dice, another count) fails the check and is melted the
+  // long way, as before.
+  const recipes = new Map();
+  const recipeFits = (R, all, fixed) => {
+    if (all.length !== R.n) return false;
+    for (const s of R.steps) {
+      const g = all[s.g], mat = fixed[s.m]; if (!g || g.isMesh || !mat) return false;
+      for (let i = 0; i < s.rm.length; i++) {
+        const c = all[s.rm[i]], k = s.ck[i];
+        if (!c || !c.isMesh || c.parent !== g || c.material !== mat || c.geometry !== k[0] || !c.visible || c.children.length) return false;
+        if (c.position.x !== k[1] || c.position.y !== k[2] || c.position.z !== k[3] || c.scale.x !== k[4] || c.scale.y !== k[5] || c.scale.z !== k[6] || c.quaternion.x !== k[7] || c.quaternion.y !== k[8] || c.quaternion.z !== k[9] || c.quaternion.w !== k[10]) return false;
+      }
+    }
+    return true;
+  };
   X.fuse = function (inner, model, M, plan, o) {
     const S = X.S, PG = G.Props && G.Props.PG; if (!S || !PG || NOFUSE[plan]) return 0;
     o = o || {};
     const kind = new Map([[PG.box, 0], [PG.rbox, 0], [PG.sph, 1], [PG.cyl, 2], [PG.cyl8, 2], [PG.cone, 3]]);
     const all = []; inner.traverse((v) => all.push(v));
+    // (a kind melted before: its steps again, after every part they touch is checked to be where and what it was)
+    const rk = o.recipe && M ? o.recipe : null, rfix = rk ? [M.skin, M.sec].concat((model && model.mats) || []) : null;
+    if (rk) {
+      const R = recipes.get(rk);
+      if (R && recipeFits(R, all, rfix)) {
+        for (const s of R.steps) { const g = all[s.g], nm = new THREE.Mesh(s.geo, rfix[s.m]); nm.castShadow = true; g.add(nm); for (const i of s.rm) g.remove(all[i]); }
+        return R.made;
+      }
+    }
+    const rec = rk ? { n: all.length, steps: [], made: 0 } : null, at = rk ? new Map(all.map((v, i) => [v, i])) : null;
     // what the model keeps hold of
     const held = new Set(), seen = new Set();
     const walk = (v, d) => {
@@ -3390,10 +3419,12 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
         }
         if (!geo) continue;
         const nm = new THREE.Mesh(geo, mat); nm.castShadow = true; g.add(nm);
+        if (rec) { const rm = use.filter((q) => q.c).map((q) => q.c); rec.steps.push({ g: at.get(g), m: fixed.indexOf(mat), geo, rm: rm.map((c) => at.get(c)), ck: rm.map((c) => [c.geometry, c.position.x, c.position.y, c.position.z, c.scale.x, c.scale.y, c.scale.z, c.quaternion.x, c.quaternion.y, c.quaternion.z, c.quaternion.w]) }); }
         for (const q of use) if (q.c) g.remove(q.c);
         made++;
       }
     }
+    if (rec) { rec.made = made; recipes.set(rk, rec); }
     return made;
   };
 })();

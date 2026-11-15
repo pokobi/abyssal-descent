@@ -965,7 +965,8 @@
     const inner = new THREE.Group(); root.add(inner);
     const m = B[def.plan](inner, M, opts, def);
     // (the blocks hung on each joint melted into one surface: gfx.js. Only with the full look on: it costs a moment at a body's first making)
-    if (G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(inner, m, M, def.plan); } catch (e) { /* the body stays as it was built */ } }
+    // (the kind named: a second body of it takes the first one's melting as it was found, gfx.js recipes)
+    if (G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(inner, m, M, def.plan, { recipe: (def.id || def.plan) + (opts.ally ? '|ally' : '') }); } catch (e) { /* the body stays as it was built */ } }
     addOrnaments(m, def, M);
     const s = def.size * (opts.scale || 1);
     inner.scale.setScalar(s);
@@ -997,6 +998,27 @@
     return (_daubM = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
   };
   E.daubMat = () => daubMat();
+  // the materials a foe is given beside its body, made in one place: the foe's own (below) and the warm-up's samples (E.warmSamples)
+  // are then the same, and so need the same shaders
+  const eliteRingMat = () => new THREE.MeshBasicMaterial({ color: G.fx.tone ? G.fx.tone(0xc89a40).multiplyScalar(0.55) : 0x8a6a2a, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }); // (a dull band of old gold, not a lit hoop)
+  const hullMat = (col) => new THREE.MeshBasicMaterial({ color: col, side: THREE.BackSide, fog: false });
+  const beamMat = (col) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false });
+  const curseRingMat = () => new THREE.MeshBasicMaterial({ color: 0x140c10, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }); // (a scorched ring on the floor, not a lit hexagon)
+  // What a foe can turn into after it is built, as samples for the warm-up (warmup.js) to keep alive for good: a foe that goes unseen
+  // (its materials all made see-through: another shader for each), the elite's band, a marked foe's outline and beam, the curse ring.
+  // A shader no living material uses any more is thrown away: without these, every unseen mantis made its own again as it came
+  // (a third of a second the first time, some 20 ms after), and the first marked target of a session made one.
+  E.warmSamples = function () {
+    const g = new THREE.Group(), seen = new Set();
+    for (const d of G.ENEMIES || []) {
+      if (!d.cloak) continue;
+      const k = d.plan + '|' + d.variant; if (seen.has(k)) continue; seen.add(k);
+      try { const m = E.buildModel(d, { scale: 1 }); for (const x of m.M.all) x.transparent = true; g.add(m.group); } catch (e) { /* made when it first comes */ }
+    }
+    const PGl = G.Props.PG;
+    for (const mat of [eliteRingMat(), hullMat(0xd04a24), beamMat(0xd04a24), curseRingMat()]) g.add(new THREE.Mesh(PGl.box, mat));
+    return g;
+  };
   const ELITE_MODS = [
     { id: 'fast', name: '俊足', icon: '💨' }, { id: 'bomb', name: '爆死', icon: '💥' },
     { id: 'vamp', name: '吸血', icon: '🩸' }, { id: 'armored', name: '装甲', icon: '🛡️' }, { id: 'rage', name: '狂暴', icon: '😡' },
@@ -1054,7 +1076,7 @@
       // born with an element: the body glows with it
       if (def.auFix && G.Elem) { const c = new THREE.Color(G.Elem.BY[def.auFix].hex).multiplyScalar(0.35); for (const m of this.model.M.all) if (m.emissive) m.emissive.add(c); }
       if (this.elite) {
-        const ring = new THREE.Mesh(new THREE.RingGeometry(this.radius * 1.12, this.radius * 1.3, 48), new THREE.MeshBasicMaterial({ color: G.fx.tone ? G.fx.tone(0xc89a40).multiplyScalar(0.55) : 0x8a6a2a, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); // (a dull band of old gold, not a lit hoop)
+        const ring = new THREE.Mesh(new THREE.RingGeometry(this.radius * 1.12, this.radius * 1.3, 48), eliteRingMat());
         ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; this.model.group.add(ring); this.ring = ring;
         for (const m of this.model.M.all) if (m.emissive && m !== this.model.M.eye) { m.emissive.add(new THREE.Color(0x2a1a00)); }
       }
@@ -1872,7 +1894,7 @@
     markTarget(champ) {
       if (this.tgtFx) return;
       const col = champ ? 0xd04a24 : 0xd8a840;   // (an ember red, an old gold: still plain at a distance, not a neon)
-      const om = new THREE.MeshBasicMaterial({ color: col, side: THREE.BackSide, fog: false });
+      const om = hullMat(col);
       const hulls = [];
       this.model.group.traverse((o) => {
         if (!o.isMesh || o.userData.tgtHull || !o.geometry || (o.material && (o.material.transparent || o.material.blending === THREE.AdditiveBlending))) return;
@@ -1883,7 +1905,7 @@
         h.scale.setScalar(1.12); h.castShadow = false; h.renderOrder = -1; o.add(h);
       }
       const top = this.height * (this.model.scale || 1) + 0.6;
-      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false }));
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 40, 10, 1, true), beamMat(col));
       beam.position.y = top + 20; beam.renderOrder = 6; beam.raycast = () => {}; this.model.group.add(beam);
       this.tgtFx = { om, beam, col };
     }
@@ -1904,7 +1926,7 @@
     makeCurseRing(col) {
       if (this.cursedRing) return;
       const r = this.radius;
-      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.2, r * 1.65, 48), new THREE.MeshBasicMaterial({ color: 0x140c10, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide })); // (a scorched ring on the floor, not a lit hexagon; col no longer drawn)
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.2, r * 1.65, 48), curseRingMat()); // (col no longer drawn)
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; this.model.group.add(ring); this.cursedRing = ring;
     }
     animateWorm(dt) {

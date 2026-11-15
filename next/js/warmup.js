@@ -71,6 +71,12 @@
     const tmp = new THREE.Group(); tmp.position.set(0, -800, 0);
     const seen = new Set();
     for (const d of G.ENEMIES) { const k = d.plan + '|' + d.variant; if (seen.has(k)) continue; seen.add(k); try { tmp.add(G.enemies.buildModel(d, { scale: 1 }).group); } catch (e) { /* ignore */ } }
+    // (a field's own foe is built from its own plan, and some are shaped by which one they are - the miner, the pikeman: each of them is
+    // built once, so that none has its body melted for the first time as it comes. Built and let go: its materials are those of the
+    // one kept above, and the warm-up of every area need not draw it again)
+    if (!W._fieldFoes) { W._fieldFoes = true; for (const d of G.ENEMIES) if (d.fieldFoe) { try { G.enemies.buildModel(d, { scale: 1 }); } catch (e) { /* made when it first comes */ } } }
+    // (and what a foe may turn into once it is out - unseen, elite, marked, cursed: enemies.js warmSamples)
+    if (G.enemies.warmSamples) { try { tmp.add(G.enemies.warmSamples()); } catch (e) { /* ignore */ } }
     if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id)); } catch (e) { /* ignore */ } } // every throwable's materials, so the first throw doesn't stall
     return tmp;
   }

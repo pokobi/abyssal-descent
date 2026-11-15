@@ -414,21 +414,38 @@
       case 'root': s.root = stacks; break;
     }
   };
+  // The gap a 144 Hz screen gave a wait of iv that was started afresh each time (the screen the game's feel was set on): whole 1/144 s
+  // frames until it was spent - iv made up to a whole number of them, and where it was a whole number already, often one more (the
+  // floating point leaves a crumb: 0.5 s was 73 frames, 0.507 s). The ticks below keep those gaps at every frame rate.
+  const H144 = 1 / 144, w144 = new Map();
+  function wait144(iv) {
+    let r = w144.get(iv); if (r !== undefined) return r;
+    let t = iv, n = 0; while (t > 0 && n < 100000) { t -= H144; n++; }
+    r = n * H144; if (w144.size > 512) w144.clear(); w144.set(iv, r); return r;
+  }
+  const TICK144 = wait144(0.5);
   C.updateStatus = function (e, dt) {
     const s = e.st;
     if (G.Elem) G.Elem.tick(e, dt);
     for (const k of ['stun', 'fear', 'root', 'slow', 'wade', 'mark', 'frozen', 'shock', 'vuln']) if (s[k] > 0) s[k] -= dt;
     if (s.frost > 0) { s.frost -= dt; if (s.frost <= 0) s.frostStacks = 0; }
     if (s.nailT > 0) { s.nailT -= dt; if (s.nailT <= 0) s.nails = 0; }
-    s.tick = (s.tick || 0) - dt;
-    if (s.tick <= 0) {
-      s.tick = 0.5;
-      if (s.burn > 0) {
+    // the burning / poison ticks, every "0.5 s" on the foe's own clock: the 73 frames a 144 Hz screen counted for it (TICK144). The time
+    // past a tick is carried to the next (no frame rate stretches the gap: a 30 Hz screen gave 0.53 s, a 60 Hz one 0.52 s). A tick counts
+    // if the status still covered the moment it fell due (at: how far into this frame that was; a status covers the frame it was put on
+    // from that frame's start to its end, the end included): never a 9th on the frame a burn's time runs out on, as at 120 Hz.
+    // (A foe's first tick falls at the end of its first frame.)
+    if (s.tick === undefined) s.tick = dt;
+    s.tick -= dt;
+    if (s.tick <= 1e-9) {
+      const at = dt + s.tick;
+      s.tick = Math.max(s.tick, -TICK144) + TICK144;
+      if (s.burn > 0 && s.burn - at > -1e-7) {
         C.damageEnemy(e, s.burnDps * 0.5, { src: 'dot', elem: 'fire' });
         G.fx.flameLick(e.pos.x, e.pos.y + e.height * 0.5, e.pos.z, 1.2);
         if (P.has('x_spread') && Math.random() < 0.35) { const t = C.nearest(e.pos, 4, e); if (t && !(t.st.burn > 0)) C.status(t, 'burn', 1); }
       }
-      if (s.poison > 0 && s.poisonStacks > 0) C.damageEnemy(e, (s.poisonPow || C.scale(2.4)) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
+      if (s.poison > 0 && s.poison - at > -1e-7 && s.poisonStacks > 0) C.damageEnemy(e, (s.poisonPow || C.scale(2.4)) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
     }
     if (s.burn > 0) { s.burn -= dt; if (s.burn <= 0) s.burnLv = 0; if (Math.random() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8); }
     if (s.poison > 0) { s.poison -= dt; if (s.poison <= 0) s.poisonStacks = 0; if (Math.random() < dt * 16) G.fx.drops.spawn(e.pos.x + U.rand(-0.3, 0.3) * e.radius, e.pos.y + e.height * U.rand(0.3, 0.8), e.pos.z + U.rand(-0.3, 0.3) * e.radius, 0, -0.2, 0, 0.6, 0.02, 0.24, 0.27, 0.07, 9.8, 0.3, 0.05); if (Math.random() < dt * 8) G.fx.norm.spawn(e.pos.x + U.rand(-0.6, 0.6) * e.radius, e.pos.y + 0.15, e.pos.z + U.rand(-0.6, 0.6) * e.radius, U.rand(-0.3, 0.3), 0.08, U.rand(-0.3, 0.3), 2.0, 0.45, 1.8, 0.34, 0.36, 0.14, 0.55, 0.04, 1.2); } // (it drips a sick fluid; a murk pools at its feet)
@@ -774,19 +791,36 @@
       case 'bolt': case 'harpoon': case 'spear': case 'arrow': if (Math.random() < 0.4) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.04, 0.08, 0.7, 0.7, 0.7, 0.25, 0, 0); break;
     }
   }
-  const tmpD = V();
+  const tmpD = V(), tmpS = V();
+  // The game's feel was set on a 144 Hz screen (H144, above), and the rounds' flight is kept to what that screen gave at every rate:
+  //  - a round under gravity moved each frame by its speed after that frame's gravity. On a 144 Hz screen that is the exact arc of a
+  //    launch grav/288 m/s lower than the real one; a frame of dt now moves by that speed plus grav·dt·(dt − 1/144)/2 upward (nothing
+  //    at 144 Hz), which flies that same arc whatever dt is (a 30 Hz screen dropped them short, a 240 Hz one carried them long);
+  //  - the rounds that bounce and roll (grenades, the launcher's, the clusters) bounce on the frame they meet the floor, and roll as many
+  //    small bounces: they move in fixed steps of 1/144 s instead, so where they bounce, where they come to rest and when they blow are
+  //    those of a 144 Hz screen at any rate. (On a faster screen, a frame with no step of its own draws it between its last two.)
   function updateProjectiles(dt) {
     const pdt = dt;
     for (let i = C.projectiles.length - 1; i >= 0; i--) {
-      const p = C.projectiles[i];
+      const p = C.projectiles[i]; if (!p) continue;
       const sdt = p.owner === 'enemy' ? pdt * G.game.enemyTimeScale : pdt;
+      if (p.bounce && p.fuse !== undefined) {
+        p.acc = (p.acc || 0) + sdt;
+        let gone = false;
+        for (let n = 0; p.acc >= H144 * 0.9999 && n < 40 && !gone; n++) { p.acc -= H144; (p.prev || (p.prev = V())).copy(p.pos); gone = stepProjectile(p, H144); }
+        if (!gone && sdt < H144 * 0.9999 && p.prev && !p.stuck) p.mesh.position.lerpVectors(p.prev, p.pos, U.clamp(p.acc / H144, 0, 1));
+      } else stepProjectile(p, sdt);
+    }
+  }
+  // one step of dt for a round: true when it is gone (blown, spent, stuck as a mine)
+  function stepProjectile(p, sdt) {
       p.t += sdt; p.life -= sdt;
       if (p.stuck) {
         if (p.stuckTo && p.stuckTo.alive) p.pos.copy(p.stuckTo.centerPos()).add(p.stuckOff);
         p.mesh.position.copy(p.pos);
-        if (p.fuse !== undefined) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); remove(i); } }
-        else if (p.life <= 0) remove(i);
-        continue;
+        if (p.fuse !== undefined) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); return remove(p); } }
+        else if (p.life <= 0) return remove(p);
+        return false;
       }
       // homing
       if (p.homing) {
@@ -795,20 +829,22 @@
         const tp = p.owner === 'enemy' ? G.player.chestPos() : tgt ? tgt.centerPos() : null;
         if (tp) {
           const desired = tp.sub(p.pos).normalize().multiplyScalar(p.vel.length());
-          p.vel.lerp(desired, Math.min(1, p.homing * sdt));
+          p.vel.lerp(desired, sdt === H144 ? Math.min(1, p.homing * sdt) : 1 - Math.pow(Math.max(0, 1 - p.homing * H144), sdt / H144)); // (as far round a frame of a 144 Hz screen turned it, at any rate)
         }
       }
       p.vel.y -= p.grav * sdt;
-      const step = p.vel.length() * sdt;
+      const arc = p.grav && sdt !== H144; // (no lift to add on a 1/144 s frame: the old sums, to the last bit)
+      if (arc) { tmpS.copy(p.vel).multiplyScalar(sdt); tmpS.y += p.grav * sdt * (sdt - H144) / 2; }
+      const step = arc ? tmpS.length() : p.vel.length() * sdt;
       if (step <= 1e-6) {
         p.mesh.position.copy(p.pos);
         let fin = false;
         if (p.fuse !== undefined) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); fin = true; } }
         if (!fin && p.life <= 0) { if (p.explode) detonate(p); fin = true; }
-        if (fin) remove(i);
-        continue;
+        if (fin) return remove(p);
+        return false;
       }
-      tmpD.copy(p.vel).divideScalar(p.vel.length());
+      if (arc) tmpD.copy(tmpS).divideScalar(step); else tmpD.copy(p.vel).divideScalar(p.vel.length());
       let done = false, bounced = false;
       // world
       const wh = G.world.raycast(p.pos, tmpD, step + p.radius * 0.5);
@@ -819,7 +855,7 @@
         const e = enemyHit.e;
         p.hit.add(e);
         const hp = p.pos.clone().addScaledVector(tmpD, enemyHit.t);
-        if (p.sticky) { p.stuck = true; p.stuckTo = e; p.stuckOff = hp.clone().sub(e.centerPos()); p.pos.copy(hp); G.sfx.bounce(hp, 4); continue; }
+        if (p.sticky) { p.stuck = true; p.stuckTo = e; p.stuckOff = hp.clone().sub(e.centerPos()); p.pos.copy(hp); G.sfx.bounce(hp, 4); return false; }
         if (p.explode) { p.pos.copy(hp); detonate(p); done = true; }
         else {
           const info = Object.assign({ src: 'bullet', head: enemyHit.part === 'head', headMul: p.headMul || 2, dir: tmpD.clone(), pos: hp, part: enemyHit.part, weapon: p.weapon }, p.info || {});
@@ -844,14 +880,14 @@
           p.pos.addScaledVector(n, 0.05);
           if (Math.abs(vn) > 2) G.sfx.bounce(p.pos, Math.abs(vn));
           if (p.vel.length() < 1.2 && n.y > 0.5) { p.vel.set(0, 0, 0); p.grav = 0; p.rest = true; }
-        } else if (p.sticky) { p.stuck = true; p.pos.addScaledVector(wh.normal, 0.05); G.sfx.bounce(p.pos, 3); continue; }
-        else if (p.mine) { p.vel.set(0, 0, 0); p.grav = 0; p.armed = 0.6; p.pos.y += 0.05; C.mines.push({ pos: p.pos.clone(), mesh: p.mesh, dmg: p.dmg, r: p.explode || 4, armed: 0.6, info: p.info }); C.projectiles.splice(i, 1); continue; }
+        } else if (p.sticky) { p.stuck = true; p.pos.addScaledVector(wh.normal, 0.05); G.sfx.bounce(p.pos, 3); return false; }
+        else if (p.mine) { p.vel.set(0, 0, 0); p.grav = 0; p.armed = 0.6; p.pos.y += 0.05; C.mines.push({ pos: p.pos.clone(), mesh: p.mesh, dmg: p.dmg, r: p.explode || 4, armed: 0.6, info: p.info }); const j = C.projectiles.indexOf(p); if (j >= 0) C.projectiles.splice(j, 1); return true; }
         else {
           if (p.explode) detonate(p);
           else {
             if (!(G.Water && G.Water.shot(wh.point))) { G.fx.sparks(wh.point, wh.normal, 5, 0xffd0a0, 4); G.fx.dust(wh.point, wh.normal, 0x8a8070, 3); } // (into the water: a splash)
             if (p.onHitWorld) p.onHitWorld(wh);
-            if (p.kind === 'bolt' || p.kind === 'harpoon' || p.kind === 'spear' || p.kind === 'arrow' || p.kind === 'nail') { p.stuck = true; p.life = Math.min(p.life, 4); p.mesh.position.copy(p.pos); continue; }
+            if (p.kind === 'bolt' || p.kind === 'harpoon' || p.kind === 'spear' || p.kind === 'arrow' || p.kind === 'nail') { p.stuck = true; p.life = Math.min(p.life, 4); p.mesh.position.copy(p.pos); return false; }
           }
           done = true;
         }
@@ -868,9 +904,9 @@
       if (!done && p.fuse !== undefined && !p.stuck) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); done = true; } }
       if (!done && p.life <= 0) { if (p.explode) detonate(p); done = true; }
       if (p.pos.y < G.world.killY - 10) done = true;
-      if (done) remove(i);
-    }
-    function remove(i) { const p = C.projectiles[i]; releaseMesh(p.mesh); C.projectiles.splice(i, 1); if (p.onEnd) p.onEnd(p); }
+      if (done) return remove(p);
+      return false;
+    function remove(p) { const j = C.projectiles.indexOf(p); if (j < 0) return true; releaseMesh(p.mesh); C.projectiles.splice(j, 1); if (p.onEnd) p.onEnd(p); return true; }
   }
   function interceptors(p) {
     const pl = G.player;
@@ -941,13 +977,19 @@
     const pl = G.player;
     for (let i = C.zones.length - 1; i >= 0; i--) {
       const z = C.zones[i];
+      if (!z._tk) { z._tk = 1; if (z.tick <= 0) z.tick = dt; } // (its first tick falls at the end of its first frame)
       z.t += dt; z.tick -= dt;
       if (z.follow) z.pos.set(pl.pos.x, pl.pos.y, pl.pos.z);
       const p = z.pos, r = z.r;
       G.vfx.zoneTick(z, dt); // (its look: a ground area drawn exactly to r, and what rises from it: vfx.js, shared with the co-op pictures)
-      if (z.tick <= 0) {
-        z.tick = z.interval || 0.5;
-        const dmg = z.dps * z.tick;
+      // its ticks, every interval of its own time from its first frame - the gap a 144 Hz screen counted for it (wait144: 0.5 s was
+      // 0.507 s there). The time past one is carried to the next, and one counts while the area still lasts at the moment it falls due
+      // (its end not included): as many as a 144 Hz screen gave, at every frame rate
+      const iv = z.interval || 0.5, gap = wait144(iv);
+      if (z.tick <= 1e-9 && z.t + z.tick >= z.dur - 1e-7) z.tick = 1; // (falls due only at or after its end: none)
+      if (z.tick <= 1e-9) {
+        z.tick = Math.max(z.tick, -gap) + gap;
+        const dmg = z.dps * iv;
         if (z.enemy) {
           // hazard to the player
           if (Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r && Math.abs(pl.pos.y - p.y) < 2) {
@@ -966,7 +1008,7 @@
             else if (z.kind === 'whirl') C.damageEnemy(e, dmg, { src: 'skill', sk: z.sk, proc: true, noMarker: true });
             else if (z.kind === 'arrowrain' || z.kind === 'grasp' || z.kind === 'holy') { C.damageEnemy(e, dmg * (z.kind === 'holy' && e.def.undead ? 3 : 1), { src: 'skill', sk: z.sk, proc: true, noMarker: true }); if (z.kind === 'grasp') e.st.root = Math.max(e.st.root || 0, 0.6); }
           }
-          if (z.kind === 'heal' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) { C.heal(z.hps * z.tick, true); pl.healZoneT = 0.6; }
+          if (z.kind === 'heal' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) { C.heal(z.hps * iv, true); pl.healZoneT = 0.6; }
           if (z.kind === 'smoke' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) pl.smokeT = 0.6;
         }
       }

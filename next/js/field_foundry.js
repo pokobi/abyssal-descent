@@ -37,9 +37,16 @@
     // for the foes it is still a drop they will not walk off into (single-storey edges: world.js edgeSafe), and where one that goes in is
     // laid out when it burns (nearestGround, settleBody): over the melt, what is under you is "the void" to them
     w.voidBelow = function (x, y, z) { const f = this.floorBelow(x, y + 0.5, z); return f < this.killY || (inMelt(x, z) && f < MY + 0.5); };
+    // (the ground is looked at all the way from the body's centre out to the point asked about - its front - not at that point alone: a
+    // gap narrower than a body, as the half metre between a bay's edge and a lift standing in the gap, was crossed with the front on the
+    // far side and the centre out over the melt. Steps of 0.4 m: the narrowest gap here is that half metre)
     w.edgeSafe = function (p, nx, nz, airborne) {
-      if (!inMelt(nx, nz) || this.floorBelow(nx, p.y + 0.5, nz) >= MY + 0.5) return true;
-      return !!airborne && this.floorBelow(p.x, p.y + 0.5, p.z) < MY + 0.5;
+      const ex = nx - p.x, ez = nz - p.z, n = Math.max(1, Math.ceil(Math.hypot(ex, ez) / 0.4));
+      for (let k = n; k >= 1; k--) {
+        const x = p.x + ex * k / n, z = p.z + ez * k / n;
+        if (inMelt(x, z) && this.floorBelow(x, p.y + 0.5, z) < MY + 0.5) return !!airborne && this.floorBelow(p.x, p.y + 0.5, p.z) < MY + 0.5;
+      }
+      return true;
     };
     // (the nav keeps two storeys a cell - a catwalk over the melt, the melt under it - and the melt's is no way across for it: navHazard)
     // (and the molten iron in the molds on the bays: moldR, below)
@@ -224,7 +231,7 @@
       const c = m.col, top0 = c.y1;
       const on = (p, r) => p.x > c.x0 - r && p.x < c.x1 + r && p.z > c.z0 - r && p.z < c.z1 + r && Math.abs(p.y - top0) < 0.2;
       const ride = Pl && !Pl.dead && Pl.grounded && on(Pl.pos, hw * 0.6);
-      const foes = G.enemies.list.filter((e) => e.alive && !e._rep && !e.def.flyer && on(e.pos, 0.2));
+      const foes = G.enemies.list.filter((e) => e.alive && !e._rep && !e.def.flyer && on(e.pos, 0)); // (its centre on the plate: one beside it stands on the bay, and was carried off out over the melt)
       c.x0 = m.x0 + nx; c.x1 = m.x1 + nx; c.z0 = m.z0 + nz; c.z1 = m.z1 + nz; c.y0 = m.y - 0.35 + ny; c.y1 = m.y + ny;
       m.ox = nx; m.oy = ny; m.oz = nz;
       if (m.mesh) m.mesh.position.set((m.x0 + m.x1) / 2 + nx, m.y + ny, (m.z0 + m.z1) / 2 + nz);

@@ -6,6 +6,13 @@
   const w0 = () => G.world;
   const V = G.U.V;
   let P, C, PG;
+  // The game's feel was set on a 144 Hz screen. A share a that was taken once a frame there (a chance to act, how far it turns toward
+  // where it looks) is, for a frame of dt, 1 − (1 − a)^(144·dt): the same per second at every frame rate, and a itself at 144 Hz
+  const H144 = 1 / 144;
+  const per144 = (a, dt) => (dt === H144 ? a : 1 - Math.pow(Math.max(0, 1 - a), dt / H144)); // (a itself on a 1/144 s frame, to the last bit)
+  // a shove dies away as e^(−6t). On a 144 Hz screen it moved with its speed already died for the frame: that carried it this share
+  // of the exact distance (about 98%) - its exact path, so scaled, is that screen's at any rate (physics)
+  const KB_K = 6, KB_Q = H144 / (Math.exp(KB_K * H144) - 1);
 
   // ---------------- materials ----------------
   const PLANCOL = {
@@ -1143,6 +1150,7 @@
       C.updateStatus(this, dt);
       if (!this.alive) return;
       const sdt = dt * G.game.enemyTimeScale;
+      this._fdt = sdt; // (this frame's length, for the chances its choices take: tryAttack)
       if (this.hasteT > 0) this.hasteT -= sdt;
       if (this.mut) G.Depth.tickEnemy(this, sdt);
       this.flinch = Math.max(0, this.flinch - sdt * 3);
@@ -1194,7 +1202,7 @@
       // dodge when aimed at
       if ((def.dodge) && this.dodgeCd <= 0 && !this.attackState && st.stun <= 0 && this.hasLOS && distH < 30) {
         const f = P.forward(); const to = this.centerPos().sub(G.camera.position).normalize();
-        if (f.dot(to) > 0.995 && Math.random() < 0.5) {
+        if (f.dot(to) > 0.995 && Math.random() < per144(0.5, sdt)) {
           this.dodgeCd = 2.2;
           const side = V(-to.z, 0, to.x).multiplyScalar(Math.random() < 0.5 ? -1 : 1);
           if (def.blink || def.variant === 'shadow') this.blink(side, 5);
@@ -1206,7 +1214,7 @@
       // face movement or target
       const faceT = this.attackState || distH < 12 || def.ai === 'ranged';
       const wantYaw = faceT && !(st.fear > 0) ? Math.atan2(toT.x, toT.z) : (mx || mz) ? Math.atan2(mx, mz) : this.yaw;
-      if (!(st.stun > 0 || st.frozen > 0) && !(this.attackState && this.attackState.lockYaw)) this.yaw += U.wrapAngle(wantYaw - this.yaw) * Math.min(1, dt * (this.big ? 4 : 8));
+      if (!(st.stun > 0 || st.frozen > 0) && !(this.attackState && this.attackState.lockYaw)) this.yaw += U.wrapAngle(wantYaw - this.yaw) * per144(Math.min(1, H144 * (this.big ? 4 : 8)), dt);
       this.physics(sdt, mx, mz, speed);
       // anti-stuck: wanted to move for a while but barely did -> sidestep / hop
       this._stT = (this._stT || 0) + dt;
@@ -1324,7 +1332,7 @@
       if (['lunge', 'pounce', 'slash', 'slam', 'bounce', 'dashslash', 'charge'].includes(k) && this.barredFrom(tgt)) return; // no melee through prison bars
       switch (k) {
         case 'lunge': if (distH < 6.5 && Math.abs(dy) < 2.5) begin(0.35); break;
-        case 'pounce': if (distH < def.range && Math.abs(dy) < 3) begin(0.4); else if (distH < 18 && Math.random() < 0.02) begin(0.4, { web: true }); break;
+        case 'pounce': if (distH < def.range && Math.abs(dy) < 3) begin(0.4); else if (distH < 18 && Math.random() < per144(0.02, this._fdt || H144)) begin(0.4, { web: true }); break; // (its web: a 2% chance a frame of a 144 Hz screen, about one every 0.35 s it waits, at any rate)
         case 'slash': if (distH < atkRange + this.radius && Math.abs(dy) < 2) begin(0.45); break;
         case 'slam': if (distH < atkRange + this.radius * 0.5 && Math.abs(dy) < 2.5) begin(0.9); break;
         case 'bounce': if (distH < 6 && Math.abs(dy) < 2.5) begin(0.45); break;
@@ -1557,11 +1565,13 @@
     physics(dt, mx, mz, speed) {
       const w = G.world;
       const fly = this.flyer || (this.attackState && this.attackState.kind === 'swoop');
-      // knockback decay
-      const kd = Math.exp(-6 * dt);
+      // knockback decay: what the shove (vel, a blow, a leap, a dodge) carries it this frame is its exact path over the frame, in the
+      // share of it a 144 Hz screen gave (KB_Q); at 144 Hz that is the speed already died for the frame, as it always was
+      const kd = Math.exp(-KB_K * dt), kq = dt > 1e-6 && dt !== H144 ? (1 - kd) * KB_Q / dt : kd;
+      const kvx = this.vel.x * kq, kvz = this.vel.z * kq;
       this.vel.x *= kd; this.vel.z *= kd;
       if (this.kbT > 0) this.kbT -= dt;
-      let dx = mx * speed + this.vel.x, dz = mz * speed + this.vel.z;
+      let dx = mx * speed + kvx, dz = mz * speed + kvz;
       // separation
       for (const o of E.list) {
         if (o === this || !o.alive || o.custom) continue;
@@ -1639,15 +1649,19 @@
       // the void (chasms, the gaps between the sky islands): a walker never steps, leaps or is jostled out over an edge on its own;
       // only a blow of yours (knockback) can throw it off
       const edge = !w.trench && !(this.kbT > 0), air = !this.grounded, sx = this.pos.x, sz = this.pos.z;
+      // (each test looks at the ground where the body's front would be; a frame that moves it further than about its own radius - a long
+      // frame on a slow PC, a leap - is looked at all along the way, never only at its end: else a leap could clear a gap on paper and
+      // leave the body over it)
+      const er = Math.min(this.radius, 0.6) + 0.15;
       if (edge) {
-        const r = Math.min(this.radius, 0.6) + 0.15;
-        if (dx && !w.edgeSafe(this.pos, this.pos.x + dx * dt + Math.sign(dx) * r, this.pos.z, air)) { dx = 0; this.vel.x = 0; }
-        if (dz && !w.edgeSafe(this.pos, this.pos.x, this.pos.z + dz * dt + Math.sign(dz) * r, air)) { dz = 0; this.vel.z = 0; }
-        if (dx && dz && !w.edgeSafe(this.pos, this.pos.x + dx * dt + Math.sign(dx) * r * 0.7, this.pos.z + dz * dt + Math.sign(dz) * r * 0.7, air)) { if (Math.abs(dx) < Math.abs(dz)) dx = 0; else dz = 0; } // (round an outer corner of the edge)
+        const r = er;
+        if (dx && !this.edgeWay(w, this.pos, dx * dt, 0, Math.sign(dx) * r, 0, er, air)) { dx = 0; this.vel.x = 0; }
+        if (dz && !this.edgeWay(w, this.pos, 0, dz * dt, 0, Math.sign(dz) * r, er, air)) { dz = 0; this.vel.z = 0; }
+        if (dx && dz && !this.edgeWay(w, this.pos, dx * dt, dz * dt, Math.sign(dx) * r * 0.7, Math.sign(dz) * r * 0.7, er, air)) { if (Math.abs(dx) < Math.abs(dz)) dx = 0; else dz = 0; } // (round an outer corner of the edge)
       }
       this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.6, this.pos.y + this.height);
       // (nor is it shoved out over the edge by a wall it slid along: a railing's end, a pillar by the brink)
-      if (edge && (this.pos.x !== sx || this.pos.z !== sz) && !w.edgeSafe((this._eq || (this._eq = V())).set(sx, this.pos.y, sz), this.pos.x, this.pos.z, air)) { this.pos.x = sx; this.pos.z = sz; }
+      if (edge && (this.pos.x !== sx || this.pos.z !== sz) && !this.edgeWay(w, (this._eq || (this._eq = V())).set(sx, this.pos.y, sz), this.pos.x - sx, this.pos.z - sz, 0, 0, er, air)) { this.pos.x = sx; this.pos.z = sz; }
       // nor ever on to floor you cannot walk to (a ledge a blow lifts it on to, a pit it is shoved down into, a wall's top): whatever moves
       // it (its own steps, a shove, a blow), it stops where that floor begins. Over the void a blow still throws it off (a fall).
       if ((this.pos.x !== sx || this.pos.z !== sz) && !this.boss && E.walkOk(sx, sz, this.pos.y) && !E.walkOk(this.pos.x, this.pos.z, this.pos.y)) {
@@ -1677,7 +1691,9 @@
       // vertical / ground
       this.vel.y -= 22 * dt;
       if (deepQ && deepQ.open && this.vel.y < -E.SINK_OPEN) this.vel.y = -E.SINK_OPEN; // (water with no bed, the frozen lake: a body sinks through it, it does not fall)
-      let ny = this.pos.y + this.vel.y * dt;
+      // (in the air out of the water it rises and falls as it did on a 144 Hz screen, at any rate: by the speed after this frame's gravity,
+      // and 22·dt·(dt − 1/144)/2 more - nothing at 144 Hz. A leap so goes as high and as far, and lands when it did, on any screen)
+      let ny = this.pos.y + this.vel.y * dt + (deepQ || this.grounded ? 0 : 11 * dt * (dt - H144));
       // rising (a blow, a leap): the head stops under what is over it. Without this the wall test (pushOut) found the body's centre inside
       // the slab the head had entered and threw it sideways to the slab's edge: a tall foe struck in a low room, out through its wall
       if (this.vel.y > 0 && !this.boss && !this.tramp && !deepQ) {
@@ -1710,6 +1726,13 @@
         G.sfx.bounce(this.pos, 9); G.sfx.lava(this.pos);
       }
       this.clampBounds();
+    }
+    // world.edgeSafe all along a move from p by (ex, ez), the point looked at (ox, oz) ahead of the body's centre: in pieces no longer
+    // than step (one piece - the end alone, as before - for a move shorter than that, as nearly every move of a frame at 60 Hz and up is)
+    edgeWay(w, p, ex, ez, ox, oz, step, air) {
+      const n = Math.max(1, Math.ceil(Math.hypot(ex, ez) / step - 1e-9));
+      for (let k = n; k >= 1; k--) if (!w.edgeSafe(p, p.x + ex * k / n + ox, p.z + ez * k / n + oz, air)) return false;
+      return true;
     }
     clampBounds() { const w = G.world; this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.5); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); }
     // would this body, at (x, z) at its height, be over a roof (something whose underside is over the head room of the floor there and

@@ -1219,7 +1219,13 @@
     const busy = W.switchT > 0 || w.reloading || anim.melee > 0 || anim.throwT > 0 || P.mantle || P.pileState || G.ItemAnim.busy() || G.GrenHold.active() || G.abilities.wheelOpen();
     const trig = I.mouse[0], press = I.mpressed[0];
     if (press) W.trigBuf = 0.12; else W.trigBuf = Math.max(0, (W.trigBuf || 0) - dt);
+    // The wait between shots. A shot that falls due inside a frame goes off in it, and the part of the frame after that moment counts
+    // towards the next wait (due()): every frame rate then fires at the gun's own rate (a 30 Hz screen no longer loses up to a frame a
+    // shot). Only a wait that ran out in this frame carries anything: a gun that was ready already (a fresh pull, a shot that waited on
+    // a reload) starts its next wait from this frame, never early. (A wait within a float crumb of nothing is spent: COOL_EPS)
+    const cool0 = W.cool || 0;
     W.cool = Math.max(-0.05, (W.cool || 0) - dt);
+    const due = () => (cool0 > COOL_EPS ? Math.max(W.cool, -dt) : 0);
     if ((trig || W.trigBuf > 0) && P.sprinting) { P.lastShotT = t; P.sprinting = false; }
     // minigun spin / rail charge
     if (s.spinup) {
@@ -1238,26 +1244,44 @@
     const interval = 60 / s.rpm / (s.trait === 'rampUp' || w.def.trait === 'rampUp' ? 1 + Math.min(0.6, w.ramp) : 1);
     if (w.def.trait === 'rampUp') { if (trig) w.ramp += dt * 0.25; else w.ramp = Math.max(0, w.ramp - dt); }
     if (s.flame) {
-      if (trig) { if (!W.flameLoop) W.flameLoop = G.sfx.loop('flame'); if (W.cool <= 0) { W.cool += interval; W.fireFlame(w, s); } }
+      if (trig) { if (!W.flameLoop) W.flameLoop = G.sfx.loop('flame'); if (W.cool <= COOL_EPS) { W.cool = due() + interval; W.fireFlame(w, s); } }
       else if (W.flameLoop) { W.flameLoop.stop(); W.flameLoop = null; }
     } else if (s.charge) {
       if (trig) {
         w.charge += dt;
         if (Math.random() < 0.5) { const mp = W.muzzleWorld(); G.fx.add.spawn(mp.x, mp.y, mp.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.15, 0.05, 0.01, 0.6, 0.8, 1, 0.8, 0, 0); }
-        if (w.charge >= s.charge && W.cool <= 0) { W.cool = interval; w.charge = 0; W.shoot(w, s); }
+        // it fires the moment both the charge and the wait are done: the later of the two, if it came in this frame, and what of the
+        // frame was left after it goes on into the next wait and the next charge
+        if (w.charge >= s.charge && W.cool <= COOL_EPS) {
+          const oc = w.charge - s.charge < dt ? w.charge - s.charge : Infinity, ow = cool0 > COOL_EPS ? -W.cool : Infinity, o = Math.min(oc, ow), k = o < Infinity ? U.clamp(o, 0, dt) : 0;
+          W.cool = wait144(interval) - k; w.charge = k; W.shoot(w, s);
+        }
       } else w.charge = Math.max(0, w.charge - dt * 2);
     } else if (s.burst) {
-      if ((press || W.trigBuf > 0) && w.burstQ <= 0 && W.cool <= 0) { w.burstQ = s.burst; W.trigBuf = 0; W.burstHits = 0; }
-      if (w.burstQ > 0 && W.cool <= 0) { w.burstQ--; W.cool += interval; W.shoot(w, s); if (w.burstQ <= 0) W.cool += s.burstDelay; if (w.mag <= 0) w.burstQ = 0; }
+      if ((press || W.trigBuf > 0) && w.burstQ <= 0 && W.cool <= COOL_EPS) { w.burstQ = s.burst; W.trigBuf = 0; W.burstHits = 0; }
+      // (a burst's first shot used to carry a whole frame when the gun was already ready - a fresh pull - so every burst after it came a
+      // frame early, and at 120 Hz the rounding put a shot either side of a second's mark: due() carries only a wait that ran out now)
+      if (w.burstQ > 0 && W.cool <= COOL_EPS) { w.burstQ--; W.cool = due() + interval; W.shoot(w, s); if (w.burstQ <= 0) W.cool += s.burstDelay; if (w.mag <= 0) w.burstQ = 0; }
     } else if (s.auto) {
-      if (trig && W.cool <= 0 && (!s.spinup || w.spin >= s.spinup)) { W.cool += interval; W.shoot(w, s); }
+      if (trig && W.cool <= COOL_EPS && (!s.spinup || w.spin >= s.spinup)) { W.cool = due() + interval; W.shoot(w, s); }
     } else {
-      if (W.trigBuf > 0 && W.cool <= 0) { W.trigBuf = 0; W.cool = interval; W.shoot(w, s); }
+      if (W.trigBuf > 0 && W.cool <= COOL_EPS) { W.trigBuf = 0; W.cool = due() + wait144(interval); W.shoot(w, s); }
     }
     if (W.cool < 0 && !trig) W.cool = 0;
     W.animate(dt, s);
   };
 
+  // The wait a 144 Hz screen gave a gun that fires a shot a pull (and the charged one), the screen the game's feel was set on: it
+  // started the wait afresh at each shot and counted whole frames until it was spent, so the wait was the gun's interval made up to a
+  // whole number of 1/144 s frames (and where it was a whole number already, often one more: the floating point leaves a crumb - 0.75 s
+  // was 109 frames). Every frame rate now waits that, carrying the rest of a frame: the rate a 144 Hz screen fired at.
+  // (The guns that fire while held always carried the rest of the frame: their rate was the interval's own, and stays so.)
+  const COOL_EPS = 1e-9, H144 = 1 / 144, w144 = new Map();
+  function wait144(iv) {
+    let r = w144.get(iv); if (r !== undefined) return r;
+    let t = iv, n = 0; while (t > 0 && n < 100000) { t -= H144; n++; }
+    r = n * H144; if (w144.size > 512) w144.clear(); w144.set(iv, r); return r;
+  }
   W.startReload = function (w, s) {
     if (w.reloading || w.mag >= s.mag || s.noReload) return; // (永劫の弾倉: never)
     if (P.handsBlocked()) return;

@@ -30,7 +30,7 @@
     const fairy = P.itemCount ? P.itemCount('h_fairy') : 0;
     if (fairy > 0) out.push({ kind: 'revive', icon: '🧚', name: '妖精の小瓶', n: fairy > 1 ? fairy : 0, ready: true, frac: 1, note: '死亡時に自動で全快復活' });
     if (P.has('d_phoenix') && !P.phoenixUsed) out.push({ kind: 'revive', icon: '🐦', name: '不死鳥', ready: true, frac: 1, note: '1回だけ全快復活＋大爆発' });
-    if (P.has('d_secondwind') && !(P.buffState.d_secondwind && P.buffState.d_secondwind.used)) out.push({ kind: 'revive', icon: '💗', name: '不屈', ready: true, frac: 1, note: '倒れてもHP50%で復活（エリア毎）' });
+    if (P.has('d_secondwind') && !(P.buffState.d_secondwind && P.buffState.d_secondwind.used)) out.push({ kind: 'revive', icon: '💗', name: '不屈', ready: true, frac: 1, note: '倒れてもHP50%で復活（エリアごと）' });
     if (P.has('e_miser') && P.miserArea !== G.game.area) { const ok = run && run.coins >= 5000; out.push({ kind: 'revive', icon: '🧳', name: '守銭奴の執念', ready: ok, frac: ok ? 1 : Math.min(0.99, (run ? run.coins : 0) / 5000), note: ok ? 'コイン半分で復活' : '5,000🪙以上で有効' }); }
     const und = P.has('d_undying'), grit = P.has('d_grit');
     if (und || grit) {

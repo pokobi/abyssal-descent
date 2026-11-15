@@ -57,7 +57,7 @@
   add('t_spray', '乱射', '🌧️', 'uncommon', 'trade', '連射速度+30%、拡散+30%。', { mods: { fireRate: 0.3, spread: 0.3 } });
   add('t_jugg', '重戦車', '🐘', 'rare', 'trade', '最大HP+60、移動速度-10%。', { mods: { maxHp: 60, moveSpeed: -0.1 } });
   add('t_sprinter', '韋駄天', '⚡', 'uncommon', 'trade', '移動速度+20%、最大HP-15。', { mods: { moveSpeed: 0.2, maxHp: -15 } });
-  add('t_blood', '血の契約', '🩸', 'rare', 'trade', '吸血+5%、自然再生を失う。', { mods: { lifesteal: 0.05, hpRegen: -99 } });
+  add('t_blood', '血の契約', '🩸', 'rare', 'trade', '吸血+5%、自然再生を失う。', { mods: { lifesteal: 0.05, noRegen: 1 } });
   add('t_bigmag', '大容量主義', '🛢️', 'uncommon', 'trade', '装弾数+80%、リロード速度-25%。', { mods: { magSize: 0.8, reloadSpeed: -0.25 } });
   add('t_quick', '早業', '🤹', 'uncommon', 'trade', 'リロード速度+50%、装弾数-20%。', { mods: { reloadSpeed: 0.5, magSize: -0.2 } });
   add('t_sniper', '狙撃の構え', '🔭', 'rare', 'trade', 'ADS中の与ダメ+30%、腰だめの拡散+40%。', { mods: { adsDmg: 0.3, hipSpread: 0.4 } });
@@ -101,7 +101,7 @@
   add('k_multi', '連続撃破報酬', '🏅', 'common', 'economy', 'マルチキルのコインボーナス+100%。', { flag: true });
   add('k_headpop', '爆頭', '🎇', 'epic', 'offense', 'ヘッドショットで撃破すると頭部が爆発し、半径4mにダメージ。', { hooks: { onKill(c) { if (c.head) C.explode(c.pos, 4, sc(60), { src: 'buff', proc: true, color: 0xffcc66 }); } } });
   add('k_elite', '精鋭狩り', '👑', 'rare', 'defense', '精鋭を撃破するたび、最大HP+6（永続）。', { hooks: { onKill(c) { if (c.e.elite) { P.permMaxHp += 6; P.recalc(); C.heal(6); G.ui.toast('👑 最大HP+6', 'good'); } } } });
-  add('k_asura', '修羅', '⚔️', 'epic', 'offense', 'エリア内の撃破数×0.6%与ダメ上昇（最大+40%）。エリア毎にリセット。', {
+  add('k_asura', '修羅', '⚔️', 'epic', 'offense', 'エリア内の撃破数×0.6%与ダメ上昇（最大+40%）。エリアごとにリセット。', {
     hooks: { onAreaStart(c, n, s) { s.k = 0; }, onKill(c, n, s) { s.k = (s.k || 0) + 1; }, preHit(c, n, s) { c.bonus += Math.min(0.4, (s.k || 0) * 0.006); } }, counter: (s) => s.k || 0,
   });
   add('k_magfull', '弾倉吸収', '🔋', 'rare', 'offense', 'ヘッドショットで撃破するとマガジンが全回復。', { hooks: { onKill(c) { if (c.head) C.refill(1); } } });
@@ -187,7 +187,7 @@
   add('m_trail', '炎の足跡', '👣', 'rare', 'element', 'スプリント中、足跡に炎を残す。', { hooks: { tick(dt, n, s) { if (P.sprinting && P.grounded) { s.t = (s.t || 0) - dt; if (s.t <= 0) { s.t = 0.25; C.zone(P.pos.clone(), 1.6, 2.5, 'fire', sc(14), { proc: true }); } } } } });
 
   // ---------- defense ----------
-  add('d_secondwind', '不屈', '💗', 'legendary', 'defense', '致死ダメージを1回だけ耐え、HP50%で復活する（エリア毎に再使用可）。', { hooks: { onAreaStart(c, n, s) { s.used = 0; } }, flag: true });
+  add('d_secondwind', '不屈', '💗', 'legendary', 'defense', '致死ダメージを1回だけ耐え、HP50%で復活する（エリアごとに再使用可）。', { hooks: { onAreaStart(c, n, s) { s.used = 0; } }, flag: true });
   add('d_thorns', '茨', '🌵', 'uncommon', 'defense', '近接攻撃してきた敵へ被ダメの150%を反射。', { max: 3, hooks: { onDamaged(c, n) { if (c.src === 'melee' && c.attacker && c.attacker.alive) C.damageEnemy(c.attacker, c.raw * 1.5 * n + sc(5), { src: 'buff', proc: true }); } } });
   add('d_adren', '窮地の加速', '🫀', 'uncommon', 'defense', 'HP30%以下の時、移動速度+25%・連射速度+20%。', { hooks: { tick(dt, n, s) { const low = P.hp < P.stats.maxHp * 0.3; if (low !== !!s.on) { s.on = low; if (low) C.temp('d_adren', 9999, { moveSpeed: 0.25, fireRate: 0.2 }, '🫀'); else C.untemp('d_adren'); } } } });
   add('d_rest', '休息', '🛌', 'common', 'defense', 'エリア開始時にHPを25%回復。', { max: 2, hooks: { onAreaStart(c, n) { C.heal(P.stats.maxHp * 0.25 * n); } } });
@@ -507,9 +507,9 @@
     onHit(c) { if (c.src === 'melee' && !c.heavy && c.e && c.e.alive && now() - (G.weapons.guardEndT ?? -9) < 0.5) C.stun(c.e, 1); } } });
   add('k_chainheavy', '溜め返し', '🔁', 'rare', 'melee', '重撃を当てると、4秒以内の次の重撃の溜め時間-50%。', { hooks: { onMeleeHit(c) { if (c.heavy) G.weapons.fastHeavyUntil = now() + 4; } } });
   add('k_steel', '斬鉄', '⚔️', 'rare', 'melee', '近接攻撃が、前面の装甲による軽減を無視し、精鋭の「装甲」のシールドに2倍のダメージを与える。', { hooks: { preHit(c) { if (isM(c) && c.e && c.e.eliteMod && c.e.eliteMod.id === 'armored') c.shieldBonus += 1; } } });
-  add('k_weaponway', '武器の真髄', '📜', 'epic', 'melee', '持っている近接武器の種類で効果が変わる。刀剣：会心率+20%／打撃：重撃で1.2秒スタン／長柄：リーチ+1m／大鎌：与ダメの3%を吸収／ナイフ：攻撃の間隔-15%／斧：重撃の範囲+50%／格闘：近接ダメージ+30%。', { hooks: {
+  add('k_weaponway', '武器の真髄', '📜', 'epic', 'melee', '持っている近接武器の種類で効果が変わる。刀剣：会心率+20%／打撃：重撃で1.2秒スタン／長柄：リーチ+1m／大鎌：与ダメの3%を吸血で回復／ナイフ：攻撃の間隔-15%／斧：重撃の範囲+50%／格闘：近接ダメージ+30%。', { hooks: {
     preHit(c) { if (!isM(c)) return; const k = P.melee && P.melee.def.mcat; if (k === 'blade' && Math.random() < 0.2) c.forceCrit = true; if (k === 'fist') c.bonus += 0.3; },
-    onHit(c) { if (c.src !== 'melee' || c.proc || !c.e) return; const k = P.melee && P.melee.def.mcat; if (k === 'scythe') C.leech(c.dmg || 0, 0.03); if (k === 'blunt' && c.heavy && c.e.alive) C.stun(c.e, 1.2); } } });
+    onHit(c) { if (c.src !== 'melee' || c.proc || !c.e) return; const k = P.melee && P.melee.def.mcat; if (k === 'scythe') C.leech((c.dmg || 0) * 0.03, 0.03); if (k === 'blunt' && c.heavy && c.e.alive) C.stun(c.e, 1.2); } } });
   add('k_zanshin', '残心', '🧘', 'epic', 'melee', '近接で敵を倒すと、近接武器のガードが全回復し、2秒間被ダメ-40%。', { hooks: {
     onKill(c, n, s) { if (c.src !== 'melee') return; if (G.weapons.guardRefill) G.weapons.guardRefill(); s.until = now() + 2; },
     preDamaged(c, n, s) { if (now() < (s.until || 0)) c.red += 0.4; } } });

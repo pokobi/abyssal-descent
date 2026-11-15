@@ -163,13 +163,16 @@
       const apply = (mods, n) => { for (const k in mods) { if (typeof mods[k] === 'number') s[k] = (s[k] || 0) + mods[k] * n; } };
       for (const [id, n] of this.buffs) { const b = G.BUFF_BY_ID[id]; if (b && b.mods) apply(b.mods, n); }
       for (const [, t] of this.temps) apply(t.mods, 1);
+      // (healing over time from items and skills rides on temps; 'noRegen' (血の契約) takes away only the lasting regen, never these)
+      let tempRegen = 0; for (const [, t] of this.temps) tempRegen += (t.mods && t.mods.hpRegen) || 0;
       if (G.Classes) apply(G.Classes.mods(this), 1);
       if (this.devMods) apply(this.devMods, 1);
       G.Inv.applyArmor(this, s);
       s.maxHp = Math.max(10, Math.round((s.maxHp + (this.permMaxHp || 0)) * Math.max(0.2, 1 + s.maxHpPct)));
       s.cdr = Math.min(0.6, s.cdr);
       s.critChance = Math.min(1, s.critChance);
-      s.hpRegen = Math.max(0, s.hpRegen);
+      s.hpRegen = Math.max(0, s.noRegen > 0 ? tempRegen : s.hpRegen);
+      s.healMul = Math.max(-0.75, s.healMul);   // (stacked heal cuts never take healing away whole)
       this.stats = s;
       if (this.hp > s.maxHp) this.hp = s.maxHp;
       if (G.weapons) G.weapons.dirty = true;

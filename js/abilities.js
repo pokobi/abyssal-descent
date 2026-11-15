@@ -172,7 +172,7 @@
       if (k >= 1) {
         G.world.depenetrate(P.pos, P.hw, P.height);
         if (L.e.alive) {
-          const d = C.damageEnemy(L.e, L.dmg, { src: 'skill', sk: L.sk, head: false, forceCrit: false, pos: L.e.centerPos() }); C.heal(d * (L.vamp || 0.3)); G.fx.blood(L.e.centerPos(), null, L.e.bloodColor, 20);
+          const d = C.damageEnemy(L.e, L.dmg, { src: 'skill', sk: L.sk, head: false, forceCrit: false, pos: L.e.centerPos() }); C.leech(d * (L.vamp || 0.3), L.vamp || 0.3); G.fx.blood(L.e.centerPos(), null, L.e.bloodColor, 20);
           G.vfx.slash(L.e.centerPos(), L.e.pos.clone().sub(L.from).setY(0).normalize(), 1.9, 2.4, 0xff3050, { tilt: 0.7, dur: 0.14 });
           if (L.cleave) { G.vfx.nova(L.e.pos.clone(), 4, 0.12, { style: 'blood', dome: false }); for (const e of G.enemies.inRadius(L.e.pos, 4)) if (e !== L.e) C.damageEnemy(e, L.dmg * 0.6, { src: 'skill', sk: L.sk }); }
           if (L.reset && !L.e.alive && L.slot) { L.slot.cd = 0; G.ui.toastSmall('🔁 連撃：クールタイムリセット'); }

@@ -25,11 +25,12 @@
 
   // ---------------- player-side helpers used by buffs/skills ----------------
   // life drain is paid out of a refilling pool tied to max HP: damage grows far faster than HP over a run,
-  // so a flat % of damage was weak early and near-immortal late. pool: refills (lifesteal% x 1.5) of max HP per second, holds 20%.
+  // so a flat % of damage was weak early and near-immortal late. pool: refills (lifesteal% x 1.5) of max HP per second, at most 10%, holds 20%.
+  // every drain - hits, skills, the lunge, the mist - is paid out of this one pool.
   C.leech = function (amount, ls) {
     if (!P || P.dead || amount <= 0) return;
     const mx = P.stats.maxHp, now = G.game.time;
-    const rate = mx * Math.max(0.03, ls || P.stats.lifesteal) * 1.5, cap = mx * 0.2;
+    const rate = mx * Math.min(0.1, Math.max(0.03, ls || P.stats.lifesteal) * 1.5), cap = mx * 0.2;
     P._lsB = Math.min(cap, (P._lsB ?? cap) + Math.max(0, now - (P._lsT ?? now)) * rate); P._lsT = now;
     const h = Math.min(amount, P._lsB); P._lsB -= h;
     if (h > 0) C.heal(h, true);
@@ -94,7 +95,7 @@
     if (st.techFrost && Math.random() < 0.35 * st.techFrost) C.status(e, 'frost', 2);
     if (st.techShock && Math.random() < 0.25 * st.techShock && e.alive) C.chain(e, 2, dealt * 0.3, 8, { src: 'skill', proc: true, noTech: true });
     if (st.techStun && e.alive && !e.boss && Math.random() < 0.15) C.stun(e, 0.6);
-    if (st.techVamp) C.heal(dealt * 0.04 * st.techVamp, true);
+    if (st.techVamp) C.leech(dealt * 0.04 * st.techVamp);
   };
   C.coins = function (amount, pos, reason, isBonus) {
     if (!G.game.run || C._noCoins) return;

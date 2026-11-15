@@ -26,7 +26,7 @@
     ['headMul', '首狩り', '🎯', [0.2, 0.35, 0.5], (v) => `ヘッドショット倍率+${Math.round(v * 100)}%`],
     ['armor', '鎧', '🛡️', [0.04, 0.07, 0.1], (v) => `被ダメ-${Math.round(v * 100)}%`],
     ['hpRegen', '再生', '💚', [0.6, 1.0, 1.6], (v) => `毎秒HP+${v}回復`],
-    ['lifesteal', '吸血', '🩸', [0.02, 0.03, 0.045], (v) => `与ダメの${(v * 100).toFixed(1)}%を回復`],
+    ['lifesteal', '吸血', '🩸', [0.02, 0.03, 0.045], (v) => `吸血+${(v * 100).toFixed(1)}%`],
     ['cdr', '瞑想', '⏳', [0.06, 0.1, 0.15], (v) => `スキルのクールタイム-${Math.round(v * 100)}%`],
     ['elMastery', '属性熟練', '🔮', [20, 35, 55], (v) => `属性熟練+${v}（属性反応が強くなる）`],
     ['coinMul', '強欲', '🪙', [0.1, 0.18, 0.28], (v) => `コイン獲得量+${Math.round(v * 100)}%`],
@@ -196,14 +196,14 @@
   add('d_shieldregen', '魔力障壁', '🔵', 'rare', 'defense', '4秒間被弾しないとオーバーシールドが25まで自動再生する。', { hooks: { tick(dt) { if (G.game.time - P.lastHurtT > 4 && P.os < 25) P.os = Math.min(25, P.os + dt * 10); } } });
   add('d_angel', '守護天使', '👼', 'rare', 'defense', '被弾後1秒間、被ダメ-60%。', { hooks: { preDamaged(c) { if (G.game.time - P.lastHurtT < 1) c.red += 0.6; } } });
   add('d_supply', '補給', '💉', 'uncommon', 'defense', '空のマガジンをリロードするとHP+6。', { max: 3, hooks: { onReload(c, n) { if (c.empty) C.heal(6 * n); } } });
-  add('d_vampcrit', '吸血会心', '🦇', 'rare', 'defense', '会心時、与ダメの8%を回復。', { hooks: { onHit(c) { if (c.crit && !c.proc) C.leech(c.dmg * 0.08, 0.08); } } });
+  add('d_vampcrit', '吸血会心', '🦇', 'rare', 'defense', '会心時、与ダメの8%を吸血で回復。', { hooks: { onHit(c) { if (c.crit && !c.proc) C.leech(c.dmg * 0.08, 0.08); } } });
   add('d_coldblood', '冷血', '🧊', 'uncommon', 'defense', '冷気状態の敵からの被ダメ-30%。', { hooks: { preDamaged(c) { if (c.attacker && c.attacker.st && c.attacker.st.frost > 0) c.red += 0.3; } } });
   add('d_ranged', '弾除け', '🪨', 'uncommon', 'defense', '遠距離攻撃の被ダメ-25%。', { max: 2, hooks: { preDamaged(c, n) { if (c.src === 'ranged') c.red += 0.25 * n; } } });
   add('d_melee', '堅牢', '🧱', 'uncommon', 'defense', '近接攻撃の被ダメ-20%。', { max: 2, hooks: { preDamaged(c, n) { if (c.src === 'melee') c.red += 0.2 * n; } } });
   add('d_blast', '爆風耐性', '💣', 'common', 'defense', '爆発・範囲攻撃の被ダメ-50%。', { hooks: { preDamaged(c) { if (c.src === 'explosion' || c.src === 'aoe') c.red += 0.5; } } });
   add('d_laststand', '最後の抵抗', '⚔️', 'rare', 'defense', 'HP25%以下で被ダメ-35%。', { hooks: { preDamaged(c) { if (P.hp < P.stats.maxHp * 0.25) c.red += 0.35; } } });
   add('d_phoenix', '不死鳥', '🐦', 'mythic', 'defense', '周回中1回だけ、死亡時にHP全快で復活し周囲に大爆発を起こす。', { flag: true });
-  add('d_vampaura', '吸血の霧', '🌫️', 'epic', 'defense', '周囲6mの敵から毎秒生命力を吸収する。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.5; let tot = 0; for (const e of C.inRadius(P.pos, 6)) { C.damageEnemy(e, sc(4) * n, { src: 'buff', proc: true, silent: true }); tot += Math.max(1.2, G.player.stats.maxHp * 0.003); } if (tot) C.heal(tot * n, true); } } });
+  add('d_vampaura', '吸血の霧', '🌫️', 'epic', 'defense', '周囲6mの敵から毎秒、吸血で生命力を奪う。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.5; let tot = 0; for (const e of C.inRadius(P.pos, 6)) { C.damageEnemy(e, sc(4) * n, { src: 'buff', proc: true, silent: true }); tot += Math.max(1.2, G.player.stats.maxHp * 0.003); } if (tot) C.leech(tot * n); } } });
   add('d_iron', '鉄の皮膚', '🪖', 'legendary', 'defense', '1回の被ダメが最大HPの25%を超えなくなる。', { flag: true });
   add('d_cleanse', '浄化の加護', '✨', 'uncommon', 'defense', '状態異常の持続時間-60%。', { flag: true });
 
@@ -430,7 +430,7 @@
   add('sa_frost', '凍結の術式', '❄️', 'rare', 'skill', 'スキル・アルティメットの命中時、21%で冷気を付与する。', { mods: { techFrost: 0.6 }, max: 2 });
   add('sa_shock', '雷鳴の術式', '⚡', 'rare', 'skill', 'スキル・アルティメットの命中時、15%で近くの2体へ雷撃が連鎖する。', { mods: { techShock: 0.6 }, max: 2 });
   add('sa_stun', '衝撃の術式', '💫', 'uncommon', 'skill', 'スキル・アルティメットの命中時、15%で0.6秒スタン（ボス無効）。', { mods: { techStun: 1 } });
-  add('sa_vamp', '吸命の術式', '🩸', 'rare', 'skill', 'スキル・アルティメットの与ダメの2%を回復。', { mods: { techVamp: 0.5 }, max: 3 });
+  add('sa_vamp', '吸命の術式', '🩸', 'rare', 'skill', 'スキル・アルティメットの与ダメの2%を吸血で回復。', { mods: { techVamp: 0.5 }, max: 3 });
   add('sa_shield', '術式障壁', '🛡️', 'uncommon', 'skill', 'スキルを使う度に、6秒間だけ持続するシールド+12（最大120）。', { mods: { techShield: 0.6 }, max: 2 });
   [0.12, 0.2, 0.3].forEach((v, i) => add('ua_dmg' + (i + 1), '終の一撃 ' + PT[i][0], '🌟', PT[i][1], 'ult', `アルティメットのダメージ+${Math.round(v * 100)}%`, { mods: { ultDmg: v }, max: 3 }));
   [0.06, 0.1].forEach((v, i) => add('ua_cd' + (i + 1), '覚醒の刻 ' + PT[i][0], '⏳', PT[i + 1][1], 'ult', `アルティメットのクールタイム-${Math.round(v * 100)}%`, { mods: { ultCd: v }, max: 2 }));

@@ -51,7 +51,7 @@
   const OH = {
     oh_burn: '命中した敵を炎上させる。', oh_frost: '命中した敵に冷気を付与し鈍らせる。', oh_poison: '命中した敵を毒に侵す。',
     oh_shock: '命中時35%で近くの敵2体へ雷撃が連鎖する。', oh_stun: '命中した敵を0.8秒スタンさせる（同じ敵には2秒に1回・ボス無効）。',
-    oh_vamp: 'このスキルの与ダメの6%を回復する。', oh_mark: '命中した敵に3秒間の刻印（受けるダメージ+60%）。',
+    oh_vamp: 'このスキルの与ダメの6%を吸血で回復する。', oh_mark: '命中した敵に3秒間の刻印（受けるダメージ+60%）。',
     oh_blast: '命中時30%で小爆発（与ダメの40%）が起きる。', oh_exec: 'HP12%以下になった通常敵を即死させる。',
     oc_heal: '使用時、HP12＋最大HPの4%を回復。', oc_shield: '使用時、6秒間だけ持続するシールド+25。', oc_dmg: '使用後4秒間、与ダメ+15%。',
     oc_haste: '使用後3秒間、移動速度+25%。', oc_ammo: '使用時、構えている武器のマガジンを満タンにする。', oc_echo: '使用時20%でクールタイムが発生しない。',
@@ -67,7 +67,7 @@
     if (m.oh_poison) C.status(e, 'poison', 2 * m.oh_poison);
     if (m.oh_mark && e.alive) { if (!(e.st.mark > 0)) e.st.markMul = 1.6; C.status(e, 'mark', 3); }
     if (m.oh_stun && e.alive && !e.boss && G.game.time - (e._skStunT || -9) > 2) { e._skStunT = G.game.time; C.stun(e, 0.8 * m.oh_stun); }
-    if (m.oh_vamp) C.heal(dealt * 0.06 * m.oh_vamp, true);
+    if (m.oh_vamp) C.leech(dealt * 0.06 * m.oh_vamp);
     if (m.oh_shock && e.alive && Math.random() < 0.35 * m.oh_shock) C.chain(e, 2, dealt * 0.3, 8, base);
     if (m.oh_blast && G.game.time - (e._skBlastT || -9) > 0.6 && Math.random() < 0.3 * m.oh_blast) { e._skBlastT = G.game.time; C.explode(e.centerPos(), 3, dealt * 0.4, Object.assign({ small: true, color: 0xffa050 }, base)); }
     if (m.oh_exec && e.alive && !e.boss && e.hp < e.maxHp * 0.12 * m.oh_exec) { G.fx.dmgNum(e.centerPos(), '処刑', 'crit'); C.damageEnemy(e, e.hp + e.shield + 1, base); }

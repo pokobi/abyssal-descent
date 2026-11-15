@@ -590,6 +590,9 @@
     if (brb && !p.brpre) { addIn(L, brb, br0, 1); addIn(R, brb, br0, 1); }
     if (p.edx && !p.edpost) edgeIn(L, R, at(p.ed0 || 0), p, sr);
     if (p.airx) airIn(L, R, at(p.air0 || 0.003), p, sr);
+    // (round 6's: the low blow as a short falling kick and a lump of low noise, and the report bursting on into its tail, over the drive)
+    if (p.kx) kickIn(L, R, at(p.kd || 0.001), p, sr);
+    if (p.bsx && p.bspre) { const [yl, yr] = burstIn(len, p, sr); for (let i = 0; i < len; i++) { L[i] += yl[i] * p.bsx; R[i] += yr[i] * p.bsx; } }
     // (a plan's: the top over some 6 kHz taken down a little, so that the louder shot is no harder on the ear than the published one)
     if (p.hicut) { bqRun(L, 'lp', p.hicut, 0.6, sr); bqRun(R, 'lp', p.hicut, 0.6, sr); }
     // the action, in the hands a little to the right (over the drive: steel ringing is not driven)
@@ -794,6 +797,27 @@
   r5('lmg', (v, k, q, p, r) => O(q, sharpP(q, p, k, false, { edh: 0.0024, edc: 0.0045, edf: 0.45, topx: 0.62, clip: 5, vly: 0.2, brx: q.brx * 0.25, br0: 0.011, lowx: q.lowx * 0.3, low2x: (q.low2x || 0) * 0.5, lowt: q.lowt * 0.7,
     airx: q.airx * [1, 1, 1][k], airt: q.airt * [0.42, 0.5, 0.55][k], tl: qv(q, p, 'tl') * [0.7, 1, 1][k] }),
     sprP(k, r, { spside: 1, spn: [0, 5, 8][k], sp1: [0, 0.025, 0.035][k], spf: [0, 5, 8][k], sf0: 0.07, sf1: [0, 0.35, 0.5][k], sfg: r ? [0, 0.15, 0.3][k] : [0, 0.5, 0.55][k], sft: [0, 0.2, 0.3][k], len: qv(q, p, 'len') })));
+  // Round 6, over C. C was heard as a ball bouncing and stopping: its low blow and push are tones (some 60-140 Hz) that ring on for a
+  // tenth of a second and more, while over 1 kHz it was gone 20 dB down within 30-40 ms - the note left alone. G / H / I take the note out
+  // of the low end and let the report burst on: the low blow a short falling kick and a lump of low noise (kickIn), the push short and
+  // small, the body all noise; over it a burst of broad noise going on from the head into its tail with no gap, wider as it goes (burstIn).
+  // One thing grows from G to I: G (k 0) keeps the weight, H (1) half of it, I (2) the least of it, the burst and its tail the more.
+  // The take is bent less (clip) and kept a little further under the limiter (topx): it is made loud by the burst, not by its peak.
+  const R6 = { G: 0, H: 1, I: 2 };
+  const popP = (q, p, k, o) => O({ lowx: 0, low2x: 0, bg: qv(q, p, 'bg') * [0.45, 0.28, 0.14][k], bd: Math.min(qv(q, p, 'bd'), 0.022), pcut: 0.07, bodyn: 1, bodyx: (q.bodyx || 0) * [1, 0.6, 0.3][k],
+    bb: qv(q, p, 'bb') * [1, 0.75, 0.5][k], kx: 0.5 * [1, 0.5, 0.22][k], lnx: 0.42 * [1, 0.5, 0.22][k], kf0: 160, kf1: 45, kft: 0.007, kt: 0.03, lnt: 0.045, vly: undefined, edx: 0, spside: 0,
+    bspre: 1, bsx: [1.6, 1.8, 2][k], bsK: q.lvl, bsa: 0.002, bsw3: [0.2, 0.45, 0.35], bsd: 0.04, bsp: 0.8, bsc: 0.012, clip: 10, topx: 0.9 }, o);
+  // (each gun's burst: its three slopes (s) - a shotgun's long and loud, a sniper's longest, a revolver's shorter, a machine gun's short
+  // enough to be gone before the next shot's head; tl: the roll on open ground)
+  // (the burst's share by kind, place (in a room, on open ground) and version, so that G, H and I come out as loud as C, K-weighted)
+  const BSM = { shotgun: [[2.46, 1.83, 1.44], [1.19, 0.94, 0.88]], sniper: [[1.52, 1.39, 1.35], [0.61, 0.63, 0.63]], revolver: [[1.65, 1.92, 1.56], [0.87, 0.77, 0.71]], lmg: [[1.44, 1.47, 1.58], [1.1, 1.12, 1.17]] };
+  const r6 = (kind, f) => { for (const v of ['G', 'H', 'I']) GUNP[kind][v] = (p, r) => { const o = f(v, R6[v], GUNP[kind].C(p, r), p, r); o.bsx *= BSM[kind][r ? 0 : 1][R6[v]]; return o; }; };
+  const tx = (k, a) => a.map((x) => x * [1, 1.15, 1.35][k]);
+  r6('shotgun', (v, k, q, p, r) => O(q, sprP(1, r), popP(q, p, k, { bst: tx(k, [0.004, 0.03, r ? 0.075 : 0.14]), kf0: 150, kt: 0.035, lnt: 0.05, clip: r ? 12.5 : 10, popn: 34, popT: 0.028, popk: 0.25, popd: 0.00012, popw: 1.3, popw0: 0.25, popc: 0.012 })));
+  r6('sniper', (v, k, q, p, r) => O(q, sprP(1, r, r ? {} : { sf1: 0.9, sft: 0.45, sfg: 1.15, spg: 0.25, len: 1 }), popP(q, p, k, { bst: tx(k, [0.003, 0.035, r ? 0.09 : 0.2]), kf0: 140, kt: 0.04, lnt: 0.055 })));
+  r6('revolver', (v, k, q, p, r) => O(q, sprP(1, r), popP(q, p, k, { bst: tx(k, [0.0025, 0.02, r ? 0.055 : 0.1]), kf0: 180, kf1: 55, kt: 0.026, lnt: 0.035, clip: r ? 12.5 : 10 })));
+  r6('lmg', (v, k, q, p, r) => O(q, sprP(1, r, { spn: 5, sp1: 0.025, spf: 5, sf0: 0.07, sf1: 0.35, sfg: r ? 0.15 : 0.5, sft: 0.2, len: qv(q, p, 'len') }),
+    popP(q, p, k, { bst: [0.0015, 0.009, 0.02].map((x) => x * [1, 1.05, 1.1][k]), kf0: 170, kf1: 55, kt: 0.018, lnt: 0.02, bsc: 0.006, bsp: 0.6, clip: 12.5, bsx: [2, 2.2, 2.4][k], airt: q.airt * 0.5 })));
   // (the version each kind is played at in the game, where it is not its B or its 2)
   const GDEF = { shotgun: 'C', sniper: 'C', revolver: 'C', lmg: 'C', dmr: 'C', minigun: 'C', rocket: 'C', gl: 'C', rail: 'C', harpoon: 'C', nail: 'C' };
   // (the published take's loudness, K-weighted energy of its first 300 ms in dB at 48 kHz, by kind and place: the mean of 60 takes made
@@ -906,6 +930,52 @@
     if (top && p.edsh) { const k = Math.min(L.length - 1, Math.round(p.edsh * sr)), fi = Math.round((p.edfi || 0) * sr), f0 = p.edf === undefined ? 1 : p.edf; for (const X of [L, R]) { X.copyWithin(k, 0, X.length - k); X.fill(0, 0, k); for (let j = 0; j < fi && k + j < X.length; j++) X[k + j] *= f0 + (1 - f0) * (j / fi); } }
     if (top) { A.shotStats.edfit = Math.min(A.shotStats.edfit === undefined ? 1 : A.shotStats.edfit, fitIn(L, R, x, x, i0, top, sr)); return; }
     for (let j = 0; j < n; j++) { L[i0 + j] += x[j]; R[i0 + j] += x[j]; }
+  }
+  // (Round 6's low blow, with no note in it: a kick - a tone falling from kf0 to kf1 Hz in some kft s, dying in kt s, so that it is gone
+  // before an ear can take a pitch from it - and a lump of noise under 170 Hz dying in lnt s, the weight of it; kx / lnx: their peaks)
+  function kickIn(L, R, i0, p, sr) {
+    const n = Math.min(L.length - i0, Math.round(Math.max(p.kt, p.lnt || 0) * 6 * sr)); if (n <= 8) return;
+    const a = Math.max(1, Math.round(0.0008 * sr)), kd = Math.exp(-1 / (p.kt * sr)), kf = Math.exp(-1 / ((p.kft || 0.007) * sr)), f0 = p.kf0 || 160, f1 = p.kf1 || 45;
+    let ph = 0, e = 1, q = 1;
+    for (let j = 0; j < n; j++) { ph += (2 * Math.PI * (f1 + (f0 - f1) * q)) / sr; q *= kf; const v = p.kx * Math.sin(ph) * (j < a ? j / a : e); if (j >= a) e *= kd; L[i0 + j] += v; R[i0 + j] += v; }
+    if (!p.lnx) return;
+    const x = work(3, n), te = p.lnt * sr, ra = Math.round(0.002 * sr);
+    for (let j = 0; j < n; j++) x[j] = (Math.random() * 2 - 1) * (j < ra ? j / ra : Math.exp(-(j - ra) / te));
+    bqRun(x, 'lp', 170, 0.7, sr); bqRun(x, 'lp', 170, 0.7, sr); bqRun(x, 'hp', 38, 0.7, sr);
+    let pk = 0; for (let j = 0; j < n; j++) pk = Math.max(pk, Math.abs(x[j]));
+    const g = p.lnx / (pk || 1); for (let j = 0; j < n; j++) { L[i0 + j] += x[j] * g; R[i0 + j] += x[j] * g; }
+  }
+  // (Round 6's burst: the report going on from its head into its tail with no gap - broad noise from bslo to bshi Hz, up at once and
+  // falling smoothly through three slopes (bst: their times, bsw3: their shares), growing darker as it goes (bsd s to go over to its
+  // darker part, under a third of bshi); in the middle at the head, and the further it goes the more each side is a noise of its own
+  // (bsp wide by bsc s): it bursts round you, not inside your head. bsx at its peak)
+  function burstIn(len, p, sr) {
+    const t = p.bst, w3 = p.bsw3 || [0.5, 0.32, 0.18], n = Math.min(len, Math.round(t[2] * 7 * sr));
+    const lo = p.bslo || 700, hi = p.bshi || 11000, N = [new Float32Array(n), new Float32Array(n), new Float32Array(n)], M = [];
+    for (const z of N) { for (let j = 0; j < n; j++) z[j] = Math.random() * 2 - 1; bqRun(z, 'hp', lo, 0.7, sr); bqRun(z, 'hp', lo, 0.7, sr); }
+    for (const z of N) { const y = Float32Array.from(z); bqRun(z, 'lp', hi, 0.7, sr); bqRun(y, 'lp', hi * 0.3, 0.7, sr); bqRun(y, 'lp', hi * 0.3, 0.7, sr); M.push(y); }
+    const a = Math.max(1, Math.round((p.bsa || 0.0002) * sr)), k = t.map((x) => Math.exp(-1 / (x * sr))), kdk = Math.exp(-1 / ((p.bsd || 0.03) * sr)), sp = p.bsp === undefined ? 0.8 : p.bsp, sc = (p.bsc || 0.01) * sr;
+    const yl = new Float32Array(len), yr = new Float32Array(len);
+    let e0 = w3[0], e1 = w3[1], e2 = w3[2], dk = 1, pk = 0;
+    for (let j = 0; j < n; j++) {
+      const e = j < a ? (j / a) * (w3[0] + w3[1] + w3[2]) : e0 + e1 + e2, u = 1 - dk, w = sp * Math.min(1, j / sc), c = Math.sqrt(1 - w * w * 0.5);
+      if (j >= a) { e0 *= k[0]; e1 *= k[1]; e2 *= k[2]; } dk *= kdk;
+      const s = (i) => N[i][j] * (1 - u) + M[i][j] * u * 1.6;
+      yl[j] = e * (s(0) * c + s(1) * w * 0.7); yr[j] = e * (s(0) * c + s(2) * w * 0.7);
+      pk = Math.max(pk, Math.abs(yl[j]), Math.abs(yr[j]));
+    }
+    for (let j = 0; j < n; j++) { yl[j] /= pk || 1; yr[j] /= pk || 1; }
+    return [yl, yr];
+  }
+  // (the burst laid into a take after its level is set: as loud as the take wants to reach its loudness (bsK dB over the published take's)
+  // and its peak lets it go no further - the burst fills it out where it has room under its top (fitIn), at most bsx of the top)
+  function burstPost(b, pl) {
+    const p = pl.p, sr = b.sampleRate, L = b.getChannelData(0), R = b.getChannelData(1), top = (TOP * (pl.topx || 1)) / (p.lv * pl.gv), [yl, yr] = burstIn(b.length, p, sr);
+    const want = Math.pow(10, (KPUB[pl.kk] + 10 * Math.log10(sr / 48000) + p.bsK) / 10), have = kEnergy(b), eb = kEnergy({ sampleRate: sr, length: b.length, getChannelData: (c) => (c ? yr : yl) });
+    const g = Math.min(p.bsx * top, Math.sqrt(Math.max(0, want - have) / (eb || 1e-12)));
+    for (let j = 0; j < yl.length; j++) { yl[j] *= g; yr[j] *= g; }
+    A.shotStats.bsg = 20 * Math.log10(g / top + 1e-9);
+    fitIn(L, R, yl, yr, 0, top, sr);
   }
   // (yl / yr laid into a take from i0, turned down where the sum would go over top: a gain under 1 round each such place only - down a
   // third of a ms before it, back in 8 ms - so that what is laid in never takes the take over its top. Returns the share of it that went
@@ -1048,6 +1118,7 @@
     const t0 = performance.now(), b = shotTake(pl.kind, pl.p, pl.recs, pl.room), S = A.shotStats;
     if (pl.lvl !== null) levelTake(b, pl);
     if (pl.lvl !== null && pl.p.edx && pl.p.edpost) edgeIn(b.getChannelData(0), b.getChannelData(1), Math.round((pl.p.ed0 || 0) * b.sampleRate), pl.p, b.sampleRate, (TOP * (pl.p.edtx || pl.topx || 1)) / (pl.p.lv * pl.gv));
+    if (pl.lvl !== null && pl.p.bsx && !pl.p.bspre) burstPost(b, pl);
     if (pl.lvl !== null && (pl.p.spn || pl.p.spf)) spreadIn(b, pl);
     const ms = performance.now() - t0;
     S.made++; S.ms += ms; S.max = Math.max(S.max, ms); S.log.push(pl.key + ' ' + ms.toFixed(1)); if (S.log.length > 200) S.log.shift();

@@ -17,7 +17,7 @@
     vault: { name: '宝物庫', icon: '💰', hint: '大量の宝箱（ミミック注意）', color: '#f0c040', w: 1.0, min: 3 },
     shrine: { name: '祈りの祠', icon: '⛩️', hint: '全回復＋強化を一つ', color: '#60d0c0', w: 0.9, min: 3 },
     forge: { name: '鍛冶場', icon: '⚒️', hint: '武器とスキルを鍛える', color: '#e08040', w: 0.9, min: 3 },
-    alchemy: { name: '練成所', icon: '⚗️', hint: '防具や持ち物を掛け合わせて練成', color: '#58d898', w: 0.85, min: 3 },
+    alchemy: { name: '練成所', icon: '⚗️', hint: '防具や品を掛け合わせて練成', color: '#58d898', w: 0.85, min: 3 },
     cursed: { name: '呪いの闘技場', icon: '☠️', hint: '強化された敵／報酬: 加護×2', color: '#d0405a', w: 0.8, min: 4 },
     boss: { name: '守護者の間', icon: '👿', hint: '守護者が待ち構える', color: '#ff5030', w: 0, min: 5 },
   };
@@ -1046,7 +1046,7 @@
             <div class="ai-sub">${U.esc(x.sub)}${x.subHTML ? ' ' + x.subHTML : ''}</div>
           </div>
         </button>`;
-      }).join('') : `<div class="alch-empty">練成できる持ち物がない</div>`;
+      }).join('') : `<div class="alch-empty">練成できる物がない</div>`;
       gridEl.querySelectorAll('.alch-item').forEach((b) => {
         b.addEventListener('mouseenter', () => G.sfx.ui('hover'));
         b.onclick = () => {

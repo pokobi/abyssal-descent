@@ -1081,7 +1081,7 @@
     let cd = 0; const sk = C.curSk;
     return C.addAlly({
       t: dur, mesh: g,
-      info() { return { icon: '🏹', name: '自動弩', t: this.t, tMax: dur }; },
+      info() { return { icon: '🏹', name: '自動弩砲', t: this.t, tMax: dur }; },
       update(dt) {
         cd -= dt;
         const e = G.enemies.nearest(pos, 32);

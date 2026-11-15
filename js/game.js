@@ -790,7 +790,7 @@
     GM.route = []; GM.rewardPending = null;
     GM.enterArea(1, 'combat');
     if (G.Warm && !GM._uiWarmed) { GM._uiWarmed = true; G.Warm.ui(); }
-    setTimeout(() => { G.ui.itemCard(G.ITEM_BY_ID.h_bandage, `[${G.K('item1')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.h_medkit, `[${G.K('item2')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.g_frag, `[${G.K('grenade')} で構え→クリックで投擲]`, { noBanner: true }); G.ui.toastSmall(`💡 ${G.K('status')}：持ち物・装備・ステータス`); }, 3200);
+    setTimeout(() => { G.ui.itemCard(G.ITEM_BY_ID.h_bandage, `[${G.K('item1')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.h_medkit, `[${G.K('item2')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.g_frag, `[${G.K('grenade')} で構え→クリックで投擲]`, { noBanner: true }); G.ui.toastSmall(`💡 ${G.K('status')}：インベントリ・装備・ステータス`); }, 3200);
   };
   // ---------------- attachments: stash & moving between weapons ----------------
   GM.stashAtts = function (w) { if (!w) return; for (const sl in w.atts) if (w.atts[sl]) P.attStash.push(w.atts[sl]); w.atts = {}; w.ver++; };
@@ -879,7 +879,7 @@
     P.resetRun();
     P.buffs = new Map((d.buffs || []).filter(([id]) => G.BUFF_BY_ID[id]));
     // 鋸刃 (the bleeding boon) was removed with bleeding: a run saved with it is paid back in coins
-    { const RET = { h_bleed: 150, s_dodge_1: 150, s_dodge_2: 250, s_dodge_3: 400 }; const gone = (d.buffs || []).reduce((n, [id, c]) => n + (RET[id] ? RET[id] * (c || 1) : 0), 0); if (gone && GM.run) { GM.run.coins += gone; setTimeout(() => G.ui.toast(`🪙 廃止された加護を ${gone} コインで返却しました`, 'good'), 1500); } }
+    { const RET = { h_bleed: 150, s_dodge_1: 150, s_dodge_2: 250, s_dodge_3: 400 }; const gone = (d.buffs || []).reduce((n, [id, c]) => n + (RET[id] ? RET[id] * (c || 1) : 0), 0); if (gone && GM.run) { GM.run.coins += gone; setTimeout(() => G.ui.toast(`🪙 失われた加護の代わりに ${gone} コインを受け取った`, 'good'), 1500); } }
     P.buffState = d.buffState || {};
     P.permMaxHp = d.permMaxHp || 0;
     P.perks = (d.perks || []).filter((id) => G.Classes && G.Classes.PERK[id]);
@@ -908,7 +908,7 @@
       P.inv = inv;
       P.attStash = (d.attStash || []).filter((a) => G.ATT_BY_ID[a]);
     }
-    if (P.retiredCoins > 0 && GM.run) { const rc = P.retiredCoins; GM.run.coins += rc; setTimeout(() => G.ui.toast(`🪙 廃止された消耗品を ${rc} コインに換えた`, 'good'), 1500); }
+    if (P.retiredCoins > 0 && GM.run) { const rc = P.retiredCoins; GM.run.coins += rc; setTimeout(() => G.ui.toast(`🪙 失われた消耗品の代わりに ${rc} コインを受け取った`, 'good'), 1500); }
     P.retiredCoins = 0;
     P.grenadeSel = d.grenadeSel || Object.keys(P.grenades)[0] || 'g_frag';
     P.isel = Object.assign({ c1: null, c2: null }, d.isel && d.isel.c1 !== undefined ? d.isel : {});
@@ -968,7 +968,7 @@
       if (kind === 'shrine') { G.Areas.setupShrine(); GM.objective = { icon: '⛩️', text: () => `祭壇で祈れ（${G.K('interact')}）`, done: true }; }
       if (G.Rooms2.KINDS.includes(kind)) G.Rooms2.setup(kind);
       if (kind === 'forge') { G.Areas.setupForge(); GM.objective = { icon: '⚒️', text: () => `金床で武器を鍛えろ（${G.K('interact')}）`, done: true }; }
-      if (kind === 'alchemy') { G.Areas.setupAlchemy(); GM.objective = { icon: '⚗️', text: () => { const cz = G.world && G.world.interactables.find((i) => i.type === 'cauldron'), left = Math.max(0, 2 - (cz && cz.used || 0)); return left > 0 ? `練成釜で装備や持ち物を練成しろ（残り${left}回 · ${G.K('interact')}）` : '練成を終えたら次の門へ進め'; }, done: true }; }
+      if (kind === 'alchemy') { G.Areas.setupAlchemy(); GM.objective = { icon: '⚗️', text: () => { const cz = G.world && G.world.interactables.find((i) => i.type === 'cauldron'), left = Math.max(0, 2 - (cz && cz.used || 0)); return left > 0 ? `練成釜で装備や品を練成しろ（残り${left}回 · ${G.K('interact')}）` : '練成を終えたら次の門へ進め'; }, done: true }; }
       G.Areas.openGates(true); GM.areaCleared = true;
       G.ui.banner(T.name, `— ${T.hint} —`);
     } else if (kind === 'trial') {
@@ -1131,6 +1131,12 @@
     // hand the drawn kinds out wave by wave (the marked foes of a hunt take the toughest ones left)
     let at = 0;
     for (const wv of plan) { wv.defs = []; for (let i = 0; i < wv.n; i++) wv.defs.push(defs[at++ % defs.length]); }
+    // pact_horde: one more foe in every wave, at most 10 extra per area. Drawn with a stream of its own so the area's seeded rolls stay the same with or without the pact.
+    if (P.has('pact_horde')) {
+      const hr = new G.RNG((GM.seed ^ U.hashStr('horde' + n)) >>> 0);
+      let extra = 10;
+      for (const wv of plan) { if (extra <= 0) break; wv.defs.push(hr.weighted(pool, (p) => p[1])[0]); wv.n++; extra--; }
+    }
     plan.overflow = overflow;
     return plan;
   };
@@ -1789,7 +1795,7 @@
     }
     return null;
   };
-  GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、そのエリアに入った最初から再開する（持ち物・加護・敵はその時点に戻り、HP全快・クールタイムはリセット）。' };
+  GM.REVIVE = { id: 'revive_ticket', name: '封魂の灯籠', icon: '🪔', rarity: 'legendary', kind: 'revive', desc: '彷徨う魂を封じた灯籠。魂の灯火が一つ増える。灯火は命尽きた時に燃え、そのエリアに入った最初から再開する（インベントリ・加護・敵はその時点に戻り、HP全快・クールタイムはリセット）。' };
   GM.revivePrice = () => GM.price(4200 + GM.area * 160);
   GM.SVC_FORGE = { id: 'svc_forge', name: '鍛冶屋の出張', icon: '⚒️', rarity: 'rare', desc: '所持している銃か近接武器を1つ選んで強化値+1（ダメージ×1.13）。' };
   GM.SVC_TOME = { id: 'svc_tome', name: 'スキル強化の書', icon: '📘', rarity: 'epic', desc: '所持スキルを1つ選んでレベル+1（効果量UP・クールタイム-2%）。価格は、選んだスキルの今の Lv で決まる。' };
@@ -2066,7 +2072,7 @@
       const info = describeOffer(o);
       G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, kc: o.kind === 'item' && G.InvUI.kindCls ? G.InvUI.kindCls({ type: 'item', id: ob.id }) : '', el: G.Elem.tagOf(ob), name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
     } else if (best.type === 'sell') {
-      G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・部品・防具・消耗品・投擲物・スキル・金品を売却できる。', action: '売る' });
+      G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `品を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・部品・防具・消耗品・投擲物・スキル・金品を売却できる。', action: '売る' });
     } else if (best.type === 'reroll') {
       const cost = GM.rerollCost();
       G.ui.showInteract({ key: 'reroll' + coins, icon: '🎲', name: '運命の祭壇', cat: 'ショップの品揃えを入れ替える', desc: '売れ残った商品を全て新しいものに入れ替える。使う度に価格が上がる。', price: cost, afford: coins >= cost, action: 'リロール' });
@@ -2096,7 +2102,7 @@
       const c = best.c, e = c.e;
       const S = GM.search && GM.search.it === c ? GM.search : null;
       const n = c.cont.items.length;
-      G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `亡骸を漁る — ${GM.searchDur(1).toFixed(1)}秒`, desc: S ? '漁っている… 目を離したり離れると最初から' : c.searched ? (n ? '中身を確認できる' : '何も残っていない') : '一度押すと漁り始める。', action: c.searched ? (n ? '開く' : null) : S ? '漁っている…' : '漁る' });
+      G.ui.showInteract({ key: 'corpse' + (S ? 's' : '') + n + (c.searched ? 'o' : ''), icon: '💀', name: `${e.def.name}の亡骸`, rc: '#a89a88', cat: c.searched ? (n ? `中身 ${n}個` : '空っぽ') : `亡骸を漁る — ${GM.searchDur(1).toFixed(1)}秒`, desc: S ? '漁っている… 視点を大きく外したり離れると最初からやり直し' : c.searched ? (n ? '中身を確認できる' : '何も残っていない') : '一度押すと漁り始める。', action: c.searched ? (n ? '開く' : null) : S ? '漁っている…' : '漁る' });
       if (I.hit('interact') && !S) {
         if (c.searched) { if (n) G.InvUI.open(c.cont, c); }
         else GM.startSearch(c, (c.box ? c.box.getCenter(V()) : e.pos.clone().setY(e.pos.y + 0.45)), 1, '💀', () => { c.searched = true; if (e.clearTarget) e.clearTarget(); G.sfx.ui('open'); G.InvUI.open(c.cont, c); }, '亡骸を漁っている…');
@@ -2180,7 +2186,7 @@
       const d = ob, S = G.ARMOR_SLOT_BY_ID[d.slot], cur = P.equip[d.slot] && G.ARMOR_BY_ID[P.equip[d.slot].id];
       cat = `🛡️ 防具（${S.name}・${G.ARMOR_MAT_BY_ID[d.mat].name}） · ${G.RARITY[d.rarity].name}`;
       stats = `<div>🛡️ 防御力 <b>${d.def}</b>${cur ? ` (${cur.def})` : ''}　⚖️ 重さ <b>${d.weight || 'なし'}</b></div>` + d.fixed.map((f) => `<div style="color:#ffd890">◆ ${f.desc}</div>`).join('') + (o.inst ? o.inst.ench.map((e) => `<div style="color:#c9a0ff">✦ ${G.enchantText(e)}</div>`).join('') : '');
-      note = cur ? `装備中: ${cur.name}（購入品はインベントリへ）` : '購入品はインベントリへ（持ち物画面で装備）';
+      note = cur ? `装備中: ${cur.name}（購入品はインベントリへ）` : `購入品はインベントリへ（${G.K('status')} で開いて装備）`;
       return { cat, stats, note, action };
     }
     if (o.kind === 'weapon') {
@@ -2218,9 +2224,9 @@
       else note = '購入時に装着する武器を選択';
     } else if (o.kind === 'item') {
       cat = `${G.ITEM_CAT[ob.cat].icon} ${G.ITEM_CAT[ob.cat].name}`;
-      if (!P.canAddItem(ob.id)) note = '⚠ 持ち物がいっぱいで持てない';
+      if (!P.canAddItem(ob.id)) note = '⚠ インベントリがいっぱいで持てない';
       const have = ob.cat === 'grenade' ? P.grenades[ob.id] || 0 : P.itemCount(ob.id);
-      if (ob.slot === 'c') cat += `　[${G.K('item1')} / ${G.K('item2')}キー: 消耗品]`; else if (ob.passive) cat += '　[常時：持っているだけで発動]'; else if (ob.kit) cat += ob.data.forge ? '　[持ち物画面で武器へドラッグして強化]' : '　[持ち物画面で防具へドラッグして修復]';
+      if (ob.slot === 'c') cat += `　[${G.K('item1')} / ${G.K('item2')}キー: 消耗品]`; else if (ob.passive) cat += '　[常時：持っているだけで発動]'; else if (ob.kit) cat += ob.data.forge ? '　[インベントリで武器へドラッグして強化]' : '　[インベントリで防具へドラッグして修復]';
       if (have) note += ` 所持 ×${have}`;
     } else if (o.kind === 'ult') {
       cat = `🌟 アルティメット（${G.input.skillKey(0)}） · CT ${ob.cd}秒`;
@@ -2292,7 +2298,7 @@
         }));
       }
       if (o.kind === 'melee') { G.Pawn.tradeIn(P.melee, true); P.melee = G.weapons.makeMelee(ob.id); P.melee.lv = o.lv || 0; done(); if (P.meleeMode) G.weapons.melee.equip(false); else G.weapons.setMelee(); return; }
-      if (o.kind === 'item') { if (!P.canAddItem(ob.id)) return deny('持ち物がいっぱい'); P.addItem(ob.id, 1); return done(); }
+      if (o.kind === 'item') { if (!P.canAddItem(ob.id)) return deny('インベントリがいっぱい'); P.addItem(ob.id, 1); return done(); }
       if (o.kind === 'weapon') {
         const mkW = () => { const nw = G.weapons.make(ob.id); nw.lv = o.lv || 0; nw.ver++; nw.mag = G.weapons.stats(nw).mag; return nw; };
         if (P.weapons.length < P.stats.weaponSlots) { P.weapons.push(mkW()); done(); G.weapons.switchTo(P.weapons.length - 1); return; }
@@ -2306,7 +2312,7 @@
       }
       if (o.kind === 'attachment') {
         const ok = G.weapons.gunsInOrder().concat(ob.slot === 'core' && P.melee ? [P.melee] : []).map((pw) => [pw, P.weapons.indexOf(pw)]).filter(([pw]) => G.attOk(ob, pw)); // (a 属性コア fits the melee weapon too)
-        if (!ok.length) { P.attStash.push(ob.id); done(); G.ui.toastSmall('🔩 インベントリに入れた（持ち物画面で装着）'); return; }
+        if (!ok.length) { P.attStash.push(ob.id); done(); G.ui.toastSmall('🔩 インベントリに入れた（インベントリで装着）'); return; }
         const apply = (pw) => { const prev = pw.atts[ob.slot]; if (prev && prev !== ob.id) { P.attStash.push(prev); setTimeout(() => G.ui.toastSmall(`🗃️ 外した ${G.ATT_BY_ID[prev].icon} ${G.ATT_BY_ID[prev].name} はインベントリへ`), 400); } pw.atts[ob.slot] = ob.id; pw.ver++; G.weapons.dirty = true; if (pw === P.weapon) G.weapons.equip(true); if (pw === P.melee) G.weapons.melee.rebuild(); done(); };
         if (ok.length === 1) return apply(ok[0][0]);
         return modal('装着する武器を選択', `${ob.icon} <b>${ob.name}</b>（${G.ATT_SLOTS[ob.slot].name}）`, ok.map(([pw]) => ({ icon: pw.def.icon, label: G.weapons.keyLabel(pw) + pw.def.name, sub: pw.atts[ob.slot] ? '交換: ' + G.ATT_BY_ID[pw.atts[ob.slot]].name + '（外したものはインベントリへ）' : '空きスロット', onPick: () => apply(pw) })));

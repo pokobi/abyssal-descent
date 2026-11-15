@@ -41,7 +41,7 @@
     if (!PT.FAMS.some((f) => PT.famOk(f.id, r))) continue; // a rarity no kind has a weapon of has no part either (no ミシック parts)
     const rn = G.RARITY[r].name;
     G.PARTS.push({ id: `pt_${r}`, kind: 'part', rarity: r, name: `武器の部品（${rn}）`, short: '武器の部品', icon: PT.ICON, value: Math.round(WPRICE[r] * 0.03),
-      desc: `武器を組み立てるための部品。${rn}の部品を${PT.NEED}つ集めると、作業台で${rn}の武器を1つ作れる（武器の系統はその場で選ぶ）。下のレアリティの部品${PT.NEED}つで、1つ上のレアリティの部品にもできる。持ち物の枠は取らない。` });
+      desc: `武器を組み立てるための部品。${rn}の部品を${PT.NEED}つ集めると、作業台で${rn}の武器を1つ作れる（武器の系統はその場で選ぶ）。下のレアリティの部品${PT.NEED}つで、1つ上のレアリティの部品にもできる。インベントリの枠は取らない。` });
   }
   G.PART_BY_ID = Object.fromEntries(G.PARTS.map((p) => [p.id, p]));
   PT.R = G.PARTS.map((p) => p.rarity); // the rarities parts come in, lowest first

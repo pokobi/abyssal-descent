@@ -46,7 +46,7 @@
 
   // ---------------------------------------------------------------- steps
   // ch: the chapter. check(s, dt) returns progress 0..1 (or true when done); setup(s) runs when the step starts.
-  const CH = ['📘 はじめに', '🏃 動き', '⚔️ 戦い', '🎒 道具と持ち物', '🌟 成長と進行'];
+  const CH = ['📘 はじめに', '🏃 動き', '⚔️ 戦い', '🎒 道具とインベントリ', '🌟 成長と進行'];
   const STEPS = [
     { ch: 0, title: '進め方', info: true,
       body: () => ul('ここでは<b>倒されない</b>（HPは自動で戻る）', pc(`${NEXT()} 次へ　${k('ホイール長押し')} この手順を飛ばす`, `${k('次へ')} で進む　${k('飛ばす')} でその手順を飛ばす（パネルのボタン）`), pc(`${k('Esc')} ポーズ（チュートリアルの終了もここから）`, `${k('⏸')} ポーズ（チュートリアルの終了もここから）`)) },
@@ -105,10 +105,10 @@
       goal: (s) => parts([[`${G.input.skillKey(1)} でスキル`, s.a], [`${G.input.skillKey(0)} でアルティメット`, s.b]]),
       setup: (s) => { P.skills[1] = G.abilities.makeSlot('dash'); if (G.ui.buildAbilityRow) G.ui.buildAbilityRow(); s.ch = P.skills[1].charges; const u = P.skills[0]; if (u) u.cd = 0; },
       check: (s) => { const sk = P.skills[1], u = P.skills[0]; if (sk && (sk.cd > 0 || sk.charges < s.ch)) s.a = true; if (u && u.cd > 0) s.b = true; return (s.a ? 0.5 : 0) + (s.b ? 0.5 : 0); } },
-    { ch: 3, title: '持ち物・アタッチメント',
-      body: () => ul(pc(`${K('status')} 持ち物を開く／閉じる（${k('Esc')} でも閉じる）`, `${K('status')} 持ち物を開く／画面の ${k('✕ 閉じる')} で閉じる`), pc(`<b>ドラッグ</b>で動かす　${k('R')} 回転　${k('右クリック')} メニュー（武器は長押しで捨てる）　${k('ダブルクリック')} 使う・装備`, `<b>ドラッグ</b>で動かす　<b>長押し</b>でメニュー　<b>ダブルタップ</b>で使う・装備`), '枠の外へドラッグで捨てる　<b>⇅ 整理</b>で並べ替え', '<b>レッドドット</b>を渡した。銃の枠へドラッグ（付く場所が光る）'),
+    { ch: 3, title: 'インベントリ・アタッチメント',
+      body: () => ul(pc(`${K('status')} インベントリを開く／閉じる（${k('Esc')} でも閉じる）`, `${K('status')} インベントリを開く／画面の ${k('✕ 閉じる')} で閉じる`), pc(`<b>ドラッグ</b>で動かす　${k('R')} 回転　${k('右クリック')} メニュー（武器は長押しで捨てる）　${k('ダブルクリック')} 使う・装備`, `<b>ドラッグ</b>で動かす　<b>長押し</b>でメニュー　<b>ダブルタップ</b>で使う・装備`), '枠の外へドラッグで捨てる　<b>⇅ 整理</b>で並べ替え', '<b>レッドドット</b>を渡した。銃の枠へドラッグ（付く場所が光る）'),
       tip: () => '開いている間も、ゲームは止まらない。',
-      goal: (s) => parts([['持ち物を開く', s.o], ['レッドドットを銃に付ける', P.weapons.some((w) => w.atts.optic === 'o_reddot')]]),
+      goal: (s) => parts([['インベントリを開く', s.o], ['レッドドットを銃に付ける', P.weapons.some((w) => w.atts.optic === 'o_reddot')]]),
       setup: () => { if (!P.weapons.some((w) => w.atts.optic === 'o_reddot') && !P.attStash.includes('o_reddot')) { G.Inv.noAuto = true; P.attStash.push('o_reddot'); G.Inv.noAuto = false; } },
       check: (s) => { if (invOpen()) s.o = true; const att = P.weapons.some((w) => w.atts.optic === 'o_reddot'); return (s.o ? 0.4 : 0) + (att ? 0.6 : 0); } },
 
@@ -168,7 +168,7 @@
     { ch: 4, title: '画面の見方', info: true, hud: true,
       body: () => ul('光っている枠が、それぞれの表示', '🪔 魂の灯火：倒れた時に1つ使って、そのエリアの最初から復活') },
     { ch: 4, title: '守護者と保存', info: true, finish: true,
-      body: () => ul('<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は商人だけの<b>準備の間</b>', `進行は自動で保存。操作は ${pc(k('Esc'), k('⏸'))} →「操作方法」で確認できる`) },
+      body: () => ul('<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は<b>商人の間</b>', `進行は自動で保存。操作は ${pc(k('Esc'), k('⏸'))} →「操作方法」で確認できる`) },
   ];
   // the screen regions the "画面の見方" step outlines: [selector(s), label, where the label goes (default: below / above)]
   const HUD_MAP = [

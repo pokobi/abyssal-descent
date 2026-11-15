@@ -21,7 +21,7 @@
     { id: 'haste', name: '疾風', icon: '💨', col: 0x80ffb0, desc: '自分と周囲の仲間の移動速度を上げる。' },
     { id: 'leech', name: '吸魂', icon: '🩸', col: 0xc01030, desc: '攻撃を当てると少し回復する。' },
     { id: 'gravity', name: '重力', icon: '🧲', col: 0x9060ff, desc: '定期的にプレイヤーを引き寄せる。' },
-    { id: 'mirror', name: '鏡面', icon: '🪞', col: 0xd0e8ff, desc: '数秒ごとに青く光る。光っている間（約2秒）に銃で撃つと、一部が自分に跳ね返る。' },
+    { id: 'mirror', name: '鏡面', icon: '🪞', col: 0xd0e8ff, desc: '7〜10秒ごとに青く光る。光っている間（約2秒）に銃で撃つと、一部が自分に跳ね返る。' },
     { id: 'splitter', name: '分裂', icon: '🧬', col: 0xa0e040, desc: '倒されると小さな分身を2体生む。' },
     { id: 'frenzy', name: '狂乱', icon: '😈', col: 0xff3030, desc: 'HPが40%を切ると速く、攻撃間隔も短くなる。' },
     { id: 'nullify', name: '無効化', icon: '🚫', col: 0xb0b0b0, desc: '状態異常・属性とスタンを一切受けない。' },
@@ -336,8 +336,8 @@
 
   // codex entries (mutations & anomalies are "discovered" when first met)
   D.CODEX = [
-    { id: 'mut_pileres', name: '衝撃耐性 Ⅰ〜Ⅲ', icon: '🪨', rarity: 'epic', desc: 'パイルドライバーの衝撃を受け流す。Ⅰ: -30% / Ⅱ: -55% / Ⅲ: -75%。\n（深層で現れ、深くなるほど高レベルが出る。地面から2m以上浮いている飛行型も衝撃波が半減する）', cat: '耐性' },
-    ...D.MUTS.map((m) => ({ id: 'mut_' + m.id, name: '変異: ' + m.name, icon: m.icon, rarity: 'epic', desc: m.desc + '\n（深層で、深く潜るほど多くの敵に付く。さらに深いと複数重なることも）', cat: '変異' })),
+    { id: 'mut_pileres', name: '衝撃耐性 Ⅰ〜Ⅲ', icon: '🪨', rarity: 'epic', desc: 'パイルドライバーの衝撃を受け流す。Ⅰ: -30% / Ⅱ: -55% / Ⅲ: -75%。\n（深く潜るほど現れやすく、高レベルのものが出る。地面から2m以上浮いている飛行型も衝撃波が半減する）', cat: '耐性' },
+    ...D.MUTS.map((m) => ({ id: 'mut_' + m.id, name: '変異: ' + m.name, icon: m.icon, rarity: 'epic', desc: m.desc + '\n（深く潜るほど多くの敵に付き、複数重なることもある）', cat: '変異' })),
     ...D.ANOMS.map((a) => ({ id: 'anom_' + a.id, name: '異変: ' + a.name, icon: a.icon, rarity: 'legendary', desc: a.desc + '\n（深層の戦闘エリアで発生することがある）', cat: '異変' })),
   ];
 })();

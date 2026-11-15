@@ -801,7 +801,7 @@
         <button class="btn" id="t-help">🎮 操作方法</button>
       </div>
       <div class="title-rec">🏆 クリア ${['easy', 'normal', 'hard'].map((k) => `<b style="color:${(rec.clears || {})[k] ? G.Run.DIFFS[k].col : '#5a5048'}">${G.Run.DIFFS[k].name}${(rec.clears || {})[k] ? '✓' : ''}</b>`).join(' ')}${(() => { const m = G.Run.maxExtra(), c = m - ((rec.clears || {})['extra' + m] ? 0 : 1); return c > 0 ? `　<b style="color:${G.Run.DIFFS.extra.col}">エクストラ ${c}✓</b>` : ''; })()}　|　💀 最多撃破 <b>${rec.bestKills}</b>　|　🎲 挑戦回数 <b>${rec.runs}</b>　|　☠ 累計撃破 <b>${rec.totalKills}</b></div>
-      <div class="title-foot">クリックでゲーム開始時にマウスがロックされます　·　推奨: フルスクリーン（Ctrl+W 等の誤操作防止）</div>
+      <div class="title-foot">クリックでゲーム開始時にマウスがロックされます</div>
     </div>`);
     let diffPick = null;
     const go = () => { G.sfx.init(); G.sfx.ui('select'); G.game.startRun(diffPick, slotPick); };
@@ -880,13 +880,13 @@
         ${k('左クリック', '射撃 ／ 近接武器時は連撃')}${k('右クリック', 'ADS（照準） ／ 近接武器時は重撃（隙大）')}
         ${k(G.K('reload'), 'リロード（近接武器では押している間 防御：正面の攻撃を軽減、照準右のゲージを消費）')}${k(G.K('w3'), `近接武器に持ち替え（${G.K('w3')}は近接武器の固定枠・持っている間は移動が速い）`)}
         ${k(G.K('grapple'), `グラップル（押し続けて巻き取り / 離すと解除 / ${G.K('jump')}で跳躍解除）`)}${k(G.K('interact'), 'インタラクト（購入・宝箱・出口）')}
-        ${k(G.input.skillKey(0), 'アルティメット（CT約2分）')}${k([1, 2, 3].map((i) => G.input.skillKey(i)).join(' / '), 'スキル（持ち物画面でドラッグして入れ替え）')}
+        ${k(G.input.skillKey(0), 'アルティメット（CT約2分）')}${k([1, 2, 3].map((i) => G.input.skillKey(i)).join(' / '), 'スキル（インベントリでドラッグして入れ替え）')}
         ${k(G.K('grenade'), '投擲物を投げる（長押しで選択ホイール）')}${k(G.K('cycleGrenade'), '投擲物の切替')}
-        ${k(['item1', 'item2'].map(G.K).join(' / '), '消耗品の使用（どちらの枠にも入る）・長押しで選択ホイール')}${k(['w1', 'w2', 'w3'].map(G.K).join('・') + ' / ホイール', '武器の切替（ホイールは全武器を順に）')}${k(G.K('status'), '銃1・銃2の入れ替え（持ち物画面で銃どうしをドラッグ）')}
-        ${k(G.K('status') + ' / ' + G.K('inventory'), '持ち物・装備・ステータスの画面（防具・アタッチメントの付け替え、武器1/2の入れ替え、持ち物の整理、加護や効果の一覧）')}${k('Esc / I', 'ポーズ（Iはもう一度押すと再開）')}
+        ${k(['item1', 'item2'].map(G.K).join(' / '), '消耗品の使用（どちらの枠にも入る）・長押しで選択ホイール')}${k(['w1', 'w2', 'w3'].map(G.K).join('・') + ' / ホイール', '武器の切替（ホイールは全武器を順に）')}${k(G.K('status'), '銃1・銃2の入れ替え（インベントリで銃どうしをドラッグ）')}
+        ${k(G.K('status') + ' / ' + G.K('inventory'), 'インベントリ・装備・ステータスの画面（防具・アタッチメントの付け替え、武器1/2の入れ替え、インベントリの整理、加護や効果の一覧）')}${k('Esc / I', 'ポーズ（Iはもう一度押すと再開）')}
       </div>
       <h3>🗺️ 流れ</h3>
-      <div style="font-size:13.5px;line-height:1.7;color:#ddd3c0">エリアの目標を達成すると北の3つの門が開き、行き先（戦闘・精鋭・射的・邂逅・商人・宝物庫・祠・鍛冶場・呪いの闘技場 など）を自由に選べます。門の前には旅の商人（または古の交換石機）も店を出します。7エリアごとに守護者（ボス）が待ち構え（その手前の6つ目は、商人だけの準備の間）、最後の守護者を倒すとクリアです。敵はエリアが進むほど強く（Lv表示）、一部はシールドを持ちます（EMP・電撃・爆発が有効）。コインは撃破・クリア・ボーナス・宝箱・破壊可能オブジェクトから得られます。</div>
+      <div style="font-size:13.5px;line-height:1.7;color:#ddd3c0">エリアの目標を達成すると北の3つの門が開き、行き先（戦闘・精鋭・射的・邂逅・商人・宝物庫・祠・鍛冶場・呪いの闘技場 など）を自由に選べます。門の前には旅の商人（または古の交換石機）も店を出します。7エリアごとに守護者（ボス）が待ち構え（その手前の6つ目は商人の間）、最後の守護者を倒すとクリアです。敵はエリアが進むほど強く（Lv表示）、一部はシールドを持ちます（EMP・電撃・爆発が有効）。コインは撃破・クリア・ボーナス・宝箱・破壊可能オブジェクトから得られます。</div>
       <div style="margin-top:18px;text-align:right"><button class="btn" id="h-back">↩ 戻る</button></div></div>`, 'dim');
     s.querySelector('#h-back').onclick = () => { G.sfx.ui('click'); back(); };
   };
@@ -906,7 +906,7 @@
       <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（低解像度・影なし・簡易ライト）</option><option value="med">中（解像度1.0倍・影は軽め）</option><option value="high">高</option></select><span></span></div>
       ${rowC('dmgNums', '🔢 ダメージ表記')}${rowC('crouchToggle', '🧎 しゃがみ切替式')}${rowC('autoSprint', `🏃 常に走る（${G.K('sprint')}で歩く）`)}${rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')}${rowC('invertY', '↕️ 上下反転')}${rowC('fullscreen', '⛶ 開始時フルスクリーン')}${rowC('showFps', '📈 FPS表示')}${rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認')}
       ${rowC('motionBlur', '💨 モーションブラー（画質が中・高の時）')}
-      <div class="set-row"><span>🔊 音の種類</span><select id="s-sound"><option value="new">新しい音</option><option value="classic">元の音</option></select><span></span></div>
+      <div class="set-row"><span>🔊 音の種類</span><select id="s-sound"><option value="new">録音素材</option><option value="classic">合成音</option></select><span></span></div>
       <div class="set-row"><span>⌨️ キー配置</span><button class="btn small" id="s-keys">キー設定を開く</button><span></span></div>
       <div class="set-row"><span>🗑️ データのリセット</span><button class="btn small" id="s-reset">リセットする…</button><span></span></div>
       <div style="margin-top:18px;text-align:right"><button class="btn" id="s-back">↩ 戻る</button></div></div>`, 'dim');
@@ -1272,7 +1272,7 @@
       <div class="death-title" style="font-size:44px">FALLEN</div><div style="color:var(--dim);margin-top:-2px;letter-spacing:4px">致命傷: ${U.esc(cause || '不明')}</div>
       <div class="revive-ticket">🪔</div>
       <div style="font-size:15px;color:#ecdcb8">魂の灯火を燃やし、深淵より還りますか？ <b style="color:var(--gold2)">残り ${left} 灯</b></div>
-      <div style="font-size:12px;color:var(--dim);margin-top:4px">このエリアの入口から再開します（持ち物・加護・敵は入った時点に戻る／HP全快・クールタイムリセット）</div>
+      <div style="font-size:12px;color:var(--dim);margin-top:4px">このエリアの入口から再開します（インベントリ・加護・敵は入った時点に戻る／HP全快・クールタイムリセット）</div>
       <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap">
         <button class="btn primary" id="rv-yes">🪔 灯火を燃やす（Enter）</button><button class="btn" id="rv-no">💀 闇に還る</button>
       </div></div>`, 'dim');

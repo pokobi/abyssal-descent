@@ -69,7 +69,7 @@
           if (s.revive) return { icon: GM.REVIVE.icon, label: `${GM.REVIVE.name}（${fmt(s.price)}🪙）`, sub: GM.REVIVE.desc, disabled: coins() < s.price, run: () => { pay(s.price); s.n--; P.revives++; G.ui.toast('🪔 魂の灯火が一つ灯った', 'good'); return { reopen: true }; } };
           const S = null;
           const full = !P.canAddItem(s.it.id);
-          return { icon: s.it.icon, label: `${s.it.name}（${fmt(s.price)}🪙）　残り${s.n}`, sub: `${s.it.passive ? '[常時] ' : s.it.cat === 'grenade' ? `[${G.K('grenade')}:投擲] ` : `[${G.K('item1')}/${G.K('item2')}:消耗品] `}${s.it.desc}　所持 ${s.it.cat === 'grenade' ? (P.grenades[s.it.id] || 0) : P.itemCount(s.it.id)}${full ? '（持ち物がいっぱい）' : ''}`, disabled: coins() < s.price || full, run: () => { pay(s.price); s.n--; P.addItem(s.it.id, 1); return { reopen: true }; } };
+          return { icon: s.it.icon, label: `${s.it.name}（${fmt(s.price)}🪙）　残り${s.n}`, sub: `${s.it.passive ? '[常時] ' : s.it.cat === 'grenade' ? `[${G.K('grenade')}:投擲] ` : `[${G.K('item1')}/${G.K('item2')}:消耗品] `}${s.it.desc}　所持 ${s.it.cat === 'grenade' ? (P.grenades[s.it.id] || 0) : P.itemCount(s.it.id)}${full ? '（インベントリがいっぱい）' : ''}`, disabled: coins() < s.price || full, run: () => { pay(s.price); s.n--; P.addItem(s.it.id, 1); return { reopen: true }; } };
         });
         const tc = GM.price(60 + GM.area * 8);
         out.push({ icon: w.stoneVendor ? '✨' : '🩹', label: w.stoneVendor ? `癒しの光を浴びる（${fmt(tc)}🪙）` : `手当てを受ける（${fmt(tc)}🪙）`, sub: treated ? '一度だけ' : 'HPを40%回復（一度だけ）', disabled: treated || coins() < tc || P.hp >= P.stats.maxHp, run: () => { pay(tc); treated = true; C.heal(P.stats.maxHp * 0.4); G.sfx.heal(); return { reopen: true }; } });

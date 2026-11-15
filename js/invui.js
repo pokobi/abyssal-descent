@@ -913,7 +913,13 @@
       for (const e of it.ench || []) body += `<div class="ivt-en">✦ ${G.enchantText(e)}</div>`;
       { const f = IV.durFrac(it), col = f > 0.5 ? '#6ee06a' : f > 0.2 ? '#f0b040' : '#ff4a3a';
         body += `<div class="ivt-r">🔧 耐久 <b style="color:${col}">${Math.ceil(IV.durOf(it))} / ${IV.durMax(it)}</b>（${Math.round(f * 100)}%）</div>`; }
-    } else body += `<div class="ivt-d">${U.esc(d.desc || '')}</div>`;
+    } else {
+      body += `<div class="ivt-d">${U.esc(d.desc || '')}</div>`;
+      // (a weapon's own description is one line of character: what its trait does is told here, with the numbers)
+      const T = d.trait && G.WEAPON_TRAITS && G.WEAPON_TRAITS[d.trait];
+      if (T && it.type !== 'melee') body += `<div class="ivt-fx">${T.icon} ${T.name}：${T.desc}</div>`;
+      else if (d.traitDesc) body += `<div class="ivt-fx">✦ ${d.traitDesc}</div>`;
+    }
     if (it.type === 'melee') body += `<div class="ivt-r">${G.weapons.guardStats(d).map(([k, v]) => `${k} <b>${v}</b>`).join('　')}</div><div class="ivt-r">⚒️ 強化 ${G.ui.forgeBar((it.gun && it.gun.lv) || 0, G.ui.forgeCap(d))}　ダブルクリック／近接枠へドラッグで装備</div>`;
     body += `<div class="ivt-v">売値 ${U.fmt(IV.value(it))}🪙</div>`;
     return body;

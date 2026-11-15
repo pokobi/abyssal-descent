@@ -78,7 +78,7 @@
         GM.applyPlayerSnap(m.snap);
         if (m.snap.coins !== undefined) GM.run.coins = m.snap.coins;
         G.weapons.dirty = true; G.weapons.equip(true); G.ui.refreshWeapon(); G.ui.refreshItems();
-        K.msg('🔗 復帰した — 持ち物は最後の状態に戻っている');
+        K.msg('🔗 復帰した — インベントリは最後の状態に戻っている');
       }
       const fp = K.fingerprint();
       K.fpOk = fp === m.fp;

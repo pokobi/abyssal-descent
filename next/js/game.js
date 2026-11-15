@@ -2057,7 +2057,7 @@
     if (best.type === 'offer') {
       const o = best.o, ob = o.obj;
       const info = describeOffer(o);
-      G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, el: G.Elem.tagOf(ob), name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
+      G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, kc: o.kind === 'item' && G.InvUI.kindCls ? G.InvUI.kindCls({ type: 'item', id: ob.id }) : '', el: G.Elem.tagOf(ob), name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
     } else if (best.type === 'sell') {
       G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・部品・防具・消耗品・投擲物・スキル・金品を売却できる。', action: '売る' });
     } else if (best.type === 'reroll') {
@@ -2097,7 +2097,7 @@
       return;
     } else if (best.type === 'loot') {
       const g = best.g, d = G.Inv.def(g.it);
-      G.ui.showInteract({ key: 'loot' + g.it.uid, icon: d.icon, el: G.Elem.itemTag(g.it), name: d.name + (g.it.n > 1 ? ` ×${g.it.n}` : ''), rc: G.ui.R(d.rarity), cat: '地面に落ちている', desc: '', action: '拾う' });
+      G.ui.showInteract({ key: 'loot' + g.it.uid, icon: d.icon, kc: G.InvUI.kindCls ? G.InvUI.kindCls(g.it) : '', el: G.Elem.itemTag(g.it), name: d.name + (g.it.n > 1 ? ` ×${g.it.n}` : ''), rc: G.ui.R(d.rarity), cat: '地面に落ちている', desc: '', action: '拾う' });
       if (I.hit('interact')) G.Inv.pickUp(g);
       return;
     } else if (best.type === 'chestOpen') {

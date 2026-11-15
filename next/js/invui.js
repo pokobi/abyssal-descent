@@ -94,6 +94,30 @@
   // ---------------- render ----------------
   const R = (r) => G.ui.R(r || 'common');
   const px = (n) => Math.round(n) + 'px';
+  // what a thing is for, read from its data so a new item sorts itself: 'val' (sold for coins), 'use' (spent: its use is
+  // 'heal', 'throw' or 'boost' - everything else that is used up), 'gear' (worn, mounted, wielded or built with).
+  // The cell shows it by its ground and a mark in the top-left corner (css: item kinds); the rarity keeps the frame.
+  UIV.kindOf = function (it) {
+    if (!it) return null;
+    if (it.type === 'valuable') return { k: 'val' };
+    if (it.type === 'item') { const d = IV.def(it); return { k: 'use', u: d && d.cat === 'grenade' ? 'throw' : d && d.cat === 'heal' ? 'heal' : 'boost' }; }
+    return { k: 'gear' };
+  };
+  UIV.kindCls = function (it) { const k = UIV.kindOf(it); return !k ? '' : k.u ? 'k-' + k.k + ' u-' + k.u : 'k-' + k.k; };
+  // the filter over the bag: everything not of the picked kind is dimmed where it lies (nothing moves, so places stay learnt)
+  const KINDS = [['all', '全部'], ['gear', '装備'], ['use', '消耗品'], ['val', '金品']];
+  let KF = 'all';
+  function kindBar() {
+    return `<div class="iv-kf" role="tablist">${KINDS.map(([k, n], i) => `<button class="${k === KF ? 'on' : ''}" data-kf="${k}" title="${n}を明るく表示（${i + 1} キー）"><i class="kfm k-${k}${k === 'use' ? ' u-heal' : ''}"></i>${n}<small>${i + 1}</small></button>`).join('')}</div>`;
+  }
+  function setKf(k) {
+    if (!root || !KINDS.some((o) => o[0] === k)) return;
+    KF = k;
+    const sc = root.querySelector('.iv-screen'); if (sc) sc.dataset.kf = k;
+    root.querySelectorAll('.iv-kf button').forEach((b) => b.classList.toggle('on', b.dataset.kf === k));
+    G.sfx.ui('click');
+  }
+  UIV.setKind = setKf;
   function itemEl(it, where, cell) {
     cell = cell || CS;
     const d = IV.def(it); if (!d) return '';
@@ -102,7 +126,7 @@
     const ench = it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : '';
     const fit = it.type === 'att' && attFits(it);
     const dur = it.type === 'armor' ? durBar(it) : IV.isArm(it) ? G.ui.forgeBar((it.gun && it.gun.lv) || 0, G.ui.forgeCap(d), 0, 'thin') : ''; // (a weapon: its forge level against the cap)
-    return `<div class="iv-it t-${it.type}${fit ? ' iv-fit' : ''}" data-uid="${it.uid}" data-where="${where}" style="--rc:${R(d.rarity)};left:${it.x * cell}px;top:${it.y * cell}px;width:${w * cell - 3}px;height:${h * cell - 3}px">
+    return `<div class="iv-it t-${it.type} ${UIV.kindCls(it)}${fit ? ' iv-fit' : ''}" data-uid="${it.uid}" data-where="${where}" style="--rc:${R(d.rarity)};left:${it.x * cell}px;top:${it.y * cell}px;width:${w * cell - 3}px;height:${h * cell - 3}px">
       <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${G.Elem.badge(G.Elem.itemTag(it))}${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
   }
   // armour durability: a thin bar along the bottom of the cell (green > amber > red)
@@ -117,7 +141,7 @@
   function attFits(it) { const a = G.ATT_BY_ID[it.id]; return !!a && armsAll().some((w) => !w.atts[a.slot] && G.attOk(a, w)); }
   function gridEl(c, key, cell) {
     cell = cell || CS;
-    return `<div class="iv-grid" data-grid="${key}" data-cs="${cell}" style="width:${c.cols * cell}px;height:${c.rows * cell}px;--cs:${cell}px">${c.items.map((it) => itemEl(it, key, cell)).join('')}</div>`;
+    return `<div class="iv-grid${cell < 34 ? ' sm' : ''}" data-grid="${key}" data-cs="${cell}" style="width:${c.cols * cell}px;height:${c.rows * cell}px;--cs:${cell}px">${c.items.map((it) => itemEl(it, key, cell)).join('')}</div>`;
   }
   function eqBox(S, cls) {
     const it = P.equip[S.id], d = it && IV.def(it);
@@ -184,7 +208,8 @@
     const footH = Math.round(24 * SC), hW = Math.round(IH * 0.31), hS = Math.round(IH * 0.15), hI = IH - hW - hS - footH - 3 * gap;
     CS = Math.floor(Math.max(24, 0.9 * Math.min((mw - 30 * SC) / IV.BAG[0], (hI - 86 * SC) / (IV.BAG[1] + 1))));
     // looting: only the inventory, big and centred (bag next to the chest / corpse) so it never looks like the Tab screen
-    if (loot) CS = Math.floor(Math.max(26, Math.min((IW * 0.95 - 90 * SC - 250 * SC) / (IV.BAG[0] + C.cols * 1.3), (IH * 0.88 - 150 * SC) / (IV.BAG[1] + 1), (IH * 0.88 - 150 * SC) / (C.rows * 1.3))));
+    // (the bag panel has a row of kind filters over the bag here: 30 px of the height are kept for it)
+    if (loot) CS = Math.floor(Math.max(26, Math.min((IW * 0.95 - 90 * SC - 250 * SC) / (IV.BAG[0] + C.cols * 1.3), (IH * 0.88 - 180 * SC) / (IV.BAG[1] + 1), (IH * 0.88 - 150 * SC) / (C.rows * 1.3))));
     document.body.style.setProperty('--s', (MB ? Math.max(SC, 0.5) : SC).toFixed(3));
     document.body.classList.add('inv-open');
     document.body.classList.toggle('inv-loot', loot);
@@ -199,12 +224,13 @@
       : '';
     const ov = G.ui.el.statusOv;
     if (loot || MB) G.ui.statusOverlay(false); else G.ui.statusOverlay(true, true, true);
-    const invPanel = `<div class="iv-panel iv-invpanel"><div class="iv-ph"><b>🎒 インベントリ</b>${loot ? partsBox(true) : ''}<span>${P.bag.items.length}個　·　金品の価値 <b>${U.fmt(valTotal)}</b>🪙<button class="iv-sort" id="iv-sort" title="種類 → レアリティ順に並べて左上へ詰める">⇅ 整理</button></span></div><div class="iv-bagwrap">${gridEl(P.bag, 'bag')}</div><div class="iv-specs">${specs}</div></div>`;
+    // (the kind filter: in the title line of the Tab screen; on a line of its own when looting, where the title line holds the parts)
+    const invPanel = `<div class="iv-panel iv-invpanel"><div class="iv-ph"><b>🎒 インベントリ</b>${loot ? partsBox(true) : kindBar()}<span>${P.bag.items.length}個　·　金品の価値 <b>${U.fmt(valTotal)}</b>🪙<button class="iv-sort" id="iv-sort" title="種類 → レアリティ順に並べて左上へ詰める">⇅ 整理</button></span></div>${loot ? `<div class="iv-kfrow">${kindBar()}</div>` : ''}<div class="iv-bagwrap">${gridEl(P.bag, 'bag')}</div><div class="iv-specs">${specs}</div></div>`;
     if (loot) {
       const eqPanel = `<div class="iv-panel iv-eqpanel"><div class="iv-ph"><b>🛡 装備</b><span>防御 <b>${Math.round(def)}</b></span></div><div class="iv-eqgrid">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.hands)}${eqBox(SL.legs)}${eqBox(SL.feet)}</div></div>`;
-      root.innerHTML = `<div class="iv-screen loot" style="--cs:${CS}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px"><div class="iv-lootrow">${eqPanel}${invPanel}${left}</div><div class="iv-lootnote">ドラッグで移動・入れ替え　<b>ダブルクリック</b> 反対側へ移す／使う　<b>右クリック</b> メニュー　<b>R</b> 回転　<b>${G.K('interact')}</b>・<b>Esc</b> 閉じる　（装備の確認は ${G.K('status')} キー）</div></div>`;
+      root.innerHTML = `<div class="iv-screen loot" data-kf="${KF}" style="--cs:${CS}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px"><div class="iv-lootrow">${eqPanel}${invPanel}${left}</div><div class="iv-lootnote">ドラッグで移動・入れ替え　<b>ダブルクリック</b> 反対側へ移す／使う　<b>右クリック</b> メニュー　<b>R</b> 回転　<b>1〜4</b> 種類で絞る　<b>${G.K('interact')}</b>・<b>Esc</b> 閉じる　（装備の確認は ${G.K('status')} キー）</div></div>`;
     } else
-    root.innerHTML = `<div class="iv-screen" style="--cs:${CS}px;--sw:${sw}px;--aw:${aw}px;--hw:${hW}px;--hs:${hS}px;--ft:${footH}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px">
+    root.innerHTML = `<div class="iv-screen" data-kf="${KF}" style="--cs:${CS}px;--sw:${sw}px;--aw:${aw}px;--hw:${hW}px;--hs:${hS}px;--ft:${footH}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px">
       <div class="iv-cell-st">${left}</div>
       <div class="iv-armorcol">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.legs)}${eqBox(SL.feet)}${help}${mercChip()}</div>
       <div class="iv-weaprow">${weaponBoxes()}</div>
@@ -219,6 +245,7 @@
     else if (srt) srt.onclick = () => { closeMenu(); IV.acts = (IV.acts || 0) + 1; const ok = IV.sortContainer(P.bag); G.sfx.ui(ok ? 'select' : 'deny'); if (!ok) G.ui.toastSmall('🎒 並べ替えできなかった'); render(); };
     const all = root.querySelector('#iv-all');
     if (all) all.onclick = () => { takeAll(); };
+    root.querySelectorAll('.iv-kf button').forEach((b) => { b.onclick = () => { closeMenu(); setKf(b.dataset.kf); }; });
     root.querySelectorAll('.iv-it').forEach((el) => wire(el));
     root.querySelectorAll('.iv-pt').forEach((el) => wirePart(el));
     root.querySelectorAll('.iv-wbox[data-wslot]').forEach((el) => wireBox(el, 'w'));
@@ -714,6 +741,10 @@
   window.addEventListener('keydown', (e) => {
     if (!root) return;
     if (drag && e.code === 'KeyR' && drag.f.it) { e.preventDefault(); e.stopPropagation(); drag.rot = !drag.rot; moveGhost(drag.x, drag.y); return; }
+    // 1-4: the kind filter (all / gear / consumables / valuables); a digit bound to moving keeps moving
+    if (!drag && !e.repeat && /^Digit[1-4]$/.test(e.code) && !e.ctrlKey && !e.altKey && !e.metaKey && !['forward', 'back', 'left', 'right', 'jump', 'sprint', 'crouch'].some((a) => (G.BIND[a] || []).includes(e.code))) {
+      e.preventDefault(); setKf(KINDS[+e.code.slice(5) - 1][0]); return;
+    }
     if (e.code === 'Escape' || G.BIND.status.includes(e.code) || (G.BIND.inventory && G.BIND.inventory.includes(e.code)) || (IV.openCont && G.BIND.interact.includes(e.code))) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) { if (e.code === 'Escape') G.game.escCloseT = performance.now(); UIV.close(); } }
   }, true);
 

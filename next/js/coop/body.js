@@ -127,12 +127,8 @@
     if (B.frz) return; // (frozen: held in the pose it had)
     if (rp.sw && B.sw === 0) {
       B.sw = 1; B.swT = 0;
-      // the swing itself: a short arc in front of them
-      const y = rp.yaw, fx = -Math.sin(y), fz = -Math.cos(y), o = rp.pos;
-      for (let i = 0; i < 4; i++) {
-        const a0 = -0.9 + i * 0.5, a1 = a0 + 0.5, c = (a) => V(o.x + (fx * Math.cos(a) - fz * Math.sin(a)) * 1.5, o.y + 1.3 - i * 0.05, o.z + (fz * Math.cos(a) + fx * Math.sin(a)) * 1.5);
-        G.fx.seg(c(a0), c(a1), 0xfff0d0, 0.035, 0.12);
-      }
+      // the swing itself: the trail one's own swing leaves (melee.js), along a short arc in front of them
+      if (G.weapons.remoteSwingTrail) G.weapons.remoteSwingTrail(rp.pos, rp.yaw, rp.w);
     } else if (!rp.sw) B.sw = 0;
     B.swT += dt;
     B.ph += dt * (2.2 + sp * 1.15) * (rp.cr ? 0.7 : 1);

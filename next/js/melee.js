@@ -145,7 +145,8 @@
     const flatTip = (p, w, len, d, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(w * 0.58, len, d * 0.58); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, Math.PI / 4, 0); p.add(o); return o; };
     const isMidas = def.id === 'm_midas' || def.trait === 'midas';
     const gDeep = isMidas ? mk({ color: 0x8a6a2c, metalness: 0.85, roughness: 0.4 }) : null;
-    const gGold = isMidas ? mk(Object.assign({ color: 0x8a6e36, metalness: 0.88, roughness: 0.44 }, sx('steel', 0.4) || {})) : null;
+    const gGold = isMidas ? mk(Object.assign({ color: 0x8a7444, metalness: 0.86, roughness: 0.56 }, sx('steel', 0.4) || {})) : null;   // (old gold: worn dull, its reflection of the sky held down)
+    if (gGold) gGold.envMapIntensity = 1.2;
     const gBright = isMidas ? mk({ color: 0xb8964c, metalness: 0.88, roughness: 0.32 }) : null;
     const gSpike = isMidas ? mk({ color: 0xc4a464, metalness: 0.9, roughness: 0.3 }) : null;
     const gTrim = isMidas ? mk({ color: 0x2e1c14, metalness: 0.35, roughness: 0.6 }) : null;
@@ -155,9 +156,11 @@
       const s = right ? 1 : -1;
       if (isMidas && NPg && NPg('midas') && G.GFX.hand) {
         // (a gauntlet of gilt plates over the gloved fist: gfx.js midas, mirrored for the left hand)
-        const hs = G.GFX.hand(right, true), hand = new THREE.Mesh(hs.hand, mats.glove); p.add(hand, new THREE.Mesh(hs.strap, mats.sleeve));
+        // (the glove under it black-brown, so the old gold stands off it; the engraved lines and rivets dark gold)
+        if (!buildMelee.midasGlove || buildMelee.midasGlove.map !== mats.glove.map) { const gm = mats.glove.clone(); gm.color.multiplyScalar(0.42); buildMelee.midasGlove = gm; buildMelee.midasLine = mk({ color: 0x4e3a1c, metalness: 0.75, roughness: 0.58 }); }
+        const hs = G.GFX.hand(right, true), hand = new THREE.Mesh(hs.hand, buildMelee.midasGlove); p.add(hand, new THREE.Mesh(hs.strap, mats.sleeve));
         const gp = new THREE.Group(); if (!right) gp.scale.x = -1; p.add(gp);
-        for (const q of NPg('midas').parts) { const o = new THREE.Mesh(q.g, q.m === 'gilt' ? gGold : gDeep); o.position.set(q.at[0], q.at[1], q.at[2]); gp.add(o); }
+        for (const q of NPg('midas').parts) { const o = new THREE.Mesh(q.g, q.m === 'gilt' ? gGold : buildMelee.midasLine); o.position.set(q.at[0], q.at[1], q.at[2]); gp.add(o); }
         const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); arm.userData.sleeve = true; p.add(arm);
         return hand;
       }
@@ -243,9 +246,17 @@
         leather: mk(Object.assign({ color: 0x3a2618, roughness: 1 }, hide || {})), leatherW: mk(Object.assign({ color: 0x8a7a60, roughness: 1 }, hide || {})), wrapRed: mk(Object.assign({ color: 0x4a1c16, roughness: 1 }, hide || {})),
         blued: mk(Object.assign({ color: 0x3c4856, metalness: 0.95, roughness: 0.42 }, stl || {})), blackSteel: mk(Object.assign({ color: 0x2a2c30, metalness: 0.92, roughness: 0.46 }, stl || {})),
         rime: mk({ color: 0x5e6a74, metalness: 0, roughness: 1 }), heat: mk(Object.assign({ color: 0xffffff, metalness: 0.9, roughness: 0.46, vertexColors: true }, stl || {})),
-        hamon: mk(Object.assign({ color: 0xc4c8cc, metalness: 0.8, roughness: 0.62 }, stl || {})), stain: mk({ color: 0x1a2412, metalness: 0.3, roughness: 0.22 }),
+        hamon: mk(Object.assign({ color: 0xc4c8cc, metalness: 0.8, roughness: 0.62 }, stl || {})), stain: mk({ color: 0x1a2412, metalness: 0.3, roughness: 0.22 }), groove: mk({ color: 0x16120e, metalness: 0.2, roughness: 1 }),
         darkWood: mk(Object.assign({ color: 0x2a1c14, roughness: 1 }, sx('walnut', 0.5) || {})),
       });
+      // (the knife of ice: its blade in a surface of its own, blued steel under hoarfrost (gfx.js frostBlade), as cast iron's maps are laid;
+      // splinters of clear ice. The hammer of thunder: old copper, red-brown and gone green at its edges, by its vertices)
+      if (def.model === 'frostknife') {
+        const fb = G.GFX && G.GFX.frostBlade ? G.GFX.frostBlade() : null;
+        MMb.frostBlade = fb ? mk({ color: 0xffffff, map: fb.map, normalMap: fb.normalMap, normalScale: new THREE.Vector2(0.7, 0.7), roughnessMap: fb.orm, metalnessMap: fb.orm, roughness: 1, metalness: 1 }) : MMb.blued;
+        MMb.ice = mk({ color: 0x56636a, metalness: 0, roughness: 0.12, transparent: true, opacity: 0.4, depthWrite: false });
+      }
+      if (def.model === 'thunder') MMb.oldCopper = mk(Object.assign({ color: 0xffffff, metalness: 0.62, roughness: 0.68, vertexColors: true }, stl || {}));
     }
     const has = (key) => !!(NP && NP(key));
     const put = (p, key, MM) => { const d = NP(key); for (const q of d.parts) { const o = new THREE.Mesh(q.g, MM[q.m] || dark); o.position.set(q.at[0], q.at[1], q.at[2]); if (q.glow) o.userData.glow = true; p.add(o); } return d.tipY; };
@@ -601,24 +612,48 @@
     if (m === 'spear' || m === 'scythe') return 'baton';
     return 'twirl';
   };
-  // a melee weapon with an element: the slash trail in a dark shade of its colour, and a faint skin of that colour over it. A weapon whose
-  // element is its own shows it in what it is made of (gfx.js: frost, heat, copper): its skin is all but unseen
+  // a melee weapon with an element: its motes in a dark shade of that colour, the trail of its swing tinted by it (trailStyle), and - an
+  // element put on by a 属性コア - a faint skin of that colour over it. A weapon whose element is its own shows it in what it is made of
+  // (gfx.js: frost on blued steel, steel coloured by heat, old copper): no skin
   function elFilm(m, el) {
     if (!m || !el || !G.Elem.BY[el]) return;
     const hex = G.Elem.BY[el].hex, dim = new THREE.Color(hex), h = {}; dim.getHSL(h, THREE.SRGBColorSpace); dim.setHSL(h.h, h.s * 0.4, h.l * 0.3, THREE.SRGBColorSpace);
     m.glow = dim.getHex(); m.el = el;
-    // (its pulse, melee update, is scaled by the opacity it is made with: a core's skin as it was, a weapon's own one a twentieth of it)
-    const mat = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: m.def && m.def.el === el ? 0.006 : 0.12, blending: THREE.AdditiveBlending, depthWrite: false });
+    if (m.def && m.def.el === el) return;
+    const mat = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false });
     const meshes = []; m.wg.traverse((o) => { if (o.isMesh) meshes.push(o); });
     for (const o of meshes) { const f = new THREE.Mesh(o.geometry, mat); f.scale.setScalar(1.05); f.renderOrder = 2; o.add(f); }
-    m.film = mat; m.filmK = mat.opacity / 0.12;
+    m.film = mat;
   }
+  // ---- the trail a swing leaves (fx.js bladeTrail): a thin streak of the air the edge has cut, gone in about a tenth of a second. Its
+  // colour is that of the metal at the point (steel, iron), dark, an element mixed in faintly (embers, rime, a dull blue-white, a murky
+  // green for venom, old gold for the holy blade); its width and its life go by the weapon's weight: the heavy ones (axe, hammers,
+  // scythes) broad and short, the light ones (knives, the rapier, the twin fangs) thin and quick. [width at the point (m), life (s), opacity]
+  const TRAIL_W = { light: [0.018, 0.065, 0.5], mid: [0.03, 0.09, 0.52], heavy: [0.06, 0.085, 0.55] };
+  const TRAIL_K = { knife: 'light', sknife: 'light', frostknife: 'light', twin: 'light', rapier: 'light', kukri: 'light', axe: 'heavy', hammer: 'heavy', thunder: 'heavy', scythe: 'heavy', tower: 'heavy' };
+  const TRAIL_C = { hammer: 0x6a6c6a, thunder: 0x6a6c6a, tower: 0x6a6c6a, axe: 0x72757a };
+  const TRAIL_T = { fire: 0x7a3a22, ice: 0xb8c0c4, volt: 0x8e9aac, water: 0x52687a, wind: 0x7c867a, earth: 0x7c6a46, poison: 0x58644a, holy: 0x8c7646 };
+  W.trailStyle = function (def, el) {
+    const k = TRAIL_W[TRAIL_K[def.model] || 'mid'], c = new THREE.Color(def.id === 'm_devour' ? 0x5c5e62 : TRAIL_C[def.model] || 0x7e8288);
+    const tint = TRAIL_T[el] || (def.elem === 'poison' ? TRAIL_T.poison : def.model === 'holy' ? TRAIL_T.holy : null);
+    if (tint) c.lerp(new THREE.Color(tint), 0.4);
+    return { col: c.getHex(), w: k[0], life: k[1], a: k[2] };
+  };
+  // someone else's swing (co-op: their figure, js/coop/body.js): the same trail, along a short arc before them at the pace of a blow,
+  // a little wider so that it reads from across a room
+  W.remoteSwingTrail = function (pos, yaw, id) {
+    const def = G.MELEE_BY_ID[id]; if (!def || def.model === 'fists') return;
+    const st = W.trailStyle(def, def.el || null), fx = -Math.sin(yaw), fz = -Math.cos(yaw), path = [];
+    for (let i = 0; i <= 10; i++) { const a = 0.95 - i * 0.19; path.push(V(pos.x + (fx * Math.cos(a) - fz * Math.sin(a)) * 1.2, pos.y + 1.5 - i * 0.045, pos.z + (fz * Math.cos(a) + fx * Math.sin(a)) * 1.2)); }
+    G.fx.bladeSweep(path, st.col, Math.max(st.w * 1.5, 0.028), st.life * 1.3, st.a, 0.13);
+  };
   W.melee = {
     equip(immediate) {
       P = G.player;
       if (mm) W.vmRoot.remove(mm.group);
       mm = buildMelee(P.melee.def);
       elFilm(mm, G.Elem.wEl(P.melee));
+      mm.trail = W.trailStyle(P.melee.def, mm.el || null);
       W.vmRoot.add(mm.group);
       W.switchT = 0;
       ms.ph = 'idle'; ms.t = 0;
@@ -748,9 +783,10 @@
     const c = new THREE.Color(col);
     G.fx.add.spawn(tp.x, tp.y, tp.z, U.rand(-0.3, 0.3), U.rand(0, 0.6), U.rand(-0.3, 0.3), 0.35, 0.05 * k, 0.01, c.r, c.g, c.b, 0.9, 0, 0);
   }
-  function tipWorld() {
-    mm.wg.updateMatrixWorld(true);
-    const p = mm.wg.localToWorld(V(0, mm.tipY, 0));
+  function tipWorld(left) {
+    mm.group.updateMatrixWorld(true);
+    const k2 = left ? mm.l.userData.knife : null;
+    const p = (k2 || mm.wg).localToWorld(V(0, mm.tipY, 0));
     if (mm.def.model === 'fists') { mm.r.updateMatrixWorld(true); p.copy(mm.r.localToWorld(V(0, 0, -0.05))); }
     p.z *= 0.9;
     return G.camera.localToWorld(p);
@@ -930,7 +966,7 @@
   const ease = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
   function lerp6(A, B, k) { return [L(A[0], B[0], k), L(A[1], B[1], k), L(A[2], B[2], k), L(A[3], B[3], k), L(A[4], B[4], k), L(A[5], B[5], k)]; }
-  let prevTip = null;
+  let wasStriking = false;
   function animateMelee(dt, s) {
     if (!mm) return;
     const def = mm.def, kind = W.meleeKind(def);
@@ -1084,16 +1120,17 @@
     mm.l.rotation.set(fist ? Lp[3] - 0.25 * spr : 0, Lp[4], fist ? Lp[5] : 0);
     if (twin && mm.l.userData.knife) mm.l.userData.knife.rotation.set(Lp[3] || -0.95, 0, Lp[5] || -0.25);
     if (twin && ms.ph === 'idle') { mm.l.userData.knife.rotation.set(-0.95 + spinX, 0, -0.25); mm.l.userData.knife.position.y = tossY; }
-    // slash trail
+    // the trail of the swing (trailStyle): from the point of the blade, and from the left one of the twin fangs; the heavy blow's a little
+    // wider, the draw flourish's faint and short (no long chords across a spin)
     if (striking && !fist) {
-      const tp = tipWorld();
-      // the draw flourish leaves only a faint, short-lived streak (a full slash trail would smear across the screen)
-      if (prevTip && prevTip.distanceTo(tp) > 0.02) { if (spinX || spinZ || tossY) { if (prevTip.distanceTo(tp) < 0.6) G.fx.tracer(prevTip, tp, mm.glow || 0xb8c4d8, 0.008, 0.05); } else G.fx.tracer(prevTip, tp, mm.glow || 0xe8eef8, ms.ph === 'hrec' ? 0.05 : 0.03, 0.14); }
-      if (mm.el && prevTip && prevTip.distanceTo(tp) > 0.02 && !(spinX || spinZ || tossY)) { G.fx.tracer(prevTip, tp, mm.glow, 0.03, 0.16); spawnGlow(mm.glow, 0.7); } // (an element: a wide afterimage of its colour)
-      prevTip = tp;
-    } else prevTip = null;
+      if (!wasStriking) { G.fx.bladeCut('own'); G.fx.bladeCut('ownL'); }
+      const st = mm.trail || W.trailStyle(def, null), fl = !!(spinX || spinZ || tossY), w = st.w * (fl ? 0.45 : ms.ph === 'hrec' ? 1.3 : 1), life = fl ? 0.05 : st.life, a = st.a * (fl ? 0.5 : 1);
+      G.fx.bladeTrail('own', tipWorld(), st.col, w, life, a, fl ? 0.3 : 0);
+      if (twin && mm.l.userData.knife) G.fx.bladeTrail('ownL', tipWorld(true), st.col, w, life, a, fl ? 0.3 : 0);
+    }
+    wasStriking = striking && !fist;
     if (mm.glow && Math.random() < dt * (mm.el ? 14 : 6)) spawnGlow(mm.glow, mm.el ? 0.55 : 0.4);
-    if (mm.film) mm.film.opacity = (0.12 + Math.sin(G.game.time * 5) * 0.05 + (striking ? 0.12 : 0)) * (mm.filmK || 1);
+    if (mm.film) mm.film.opacity = 0.12 + Math.sin(G.game.time * 5) * 0.05 + (striking ? 0.12 : 0);
     W.isScoped = false;
     W.vmRoot.visible = G.game.state !== 'dead' && G.avatar.tpK < (G.avatar.returning ? 0.55 : 0.3);
     G.ui.scope(false);

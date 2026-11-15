@@ -422,6 +422,13 @@
       const m = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: 0xffd8a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false; m.frustumCulled = false; scene.add(m); pools.tracer.push({ m, t: 0, ml: 0 });
     }
+    // blades' trails (FX.bladeTrail): soft across (an alpha ramp over the width), their colour and fading in their vertices
+    {
+      const n = 32, d = new Uint8Array(n * 4); for (let i = 0; i < n; i++) { const e = (i + 0.5) / n * 2 - 1, k = Math.pow(Math.max(0, 1 - e * e), 1.8); d.set([255, Math.round(k * 255), 255, 255], i * 4); }
+      const at = new THREE.DataTexture(d, 1, n); at.magFilter = at.minFilter = THREE.LinearFilter; at.needsUpdate = true;
+      pools.bladeMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, alphaMap: at });
+      pools.blade = []; for (let i = 0; i < 6; i++) pools.blade.push(btMake());
+    }
     // decals
     pools.decal = []; pools.decalIdx = 0;
     const dg = new THREE.PlaneGeometry(1, 1);
@@ -548,6 +555,7 @@
       m.visible = true; m.frustumCulled = false;
     };
     if (pools.tracer[0]) show(pools.tracer[0].m);
+    if (pools.blade && pools.blade[0]) show(pools.blade[0].m);
     if (pools.decal[0]) show(pools.decal[0].m, FX.dmats.hole);
     if (pools.decal[1]) show(pools.decal[1].m, FX.dmats.scorch);
     if (pools.decal[2]) show(pools.decal[2].m, FX.dmats.crack);
@@ -736,6 +744,74 @@
     m.visible = true; t.t = t.ml = life || 0.06;
   };
   FX.seg = function (a, b, color, width, life) { FX.tracer(a, b, color, width, life, true); };
+  // ---- a blade's trail: where its edge has just cut the air. Not light: a faint smear of the blade's own colour laid over the scene
+  // (normal blending), thin and soft across, gone in about a tenth of a second. Each point narrows and fades with its age, so the streak
+  // is widest by the blade and thins to nothing behind it. Points come one a frame (bladeTrail: the swing in your hands) or along a
+  // path over a time (bladeSweep: the swing of someone else's figure); between them it is drawn smooth (Catmull-Rom, four pieces each)
+  const BT_RAW = 28, BT_SUB = 4, BT_V = (BT_RAW - 1) * BT_SUB + 1, btSP = [], btSA = new Float32Array(BT_V), _bt = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  for (let i = 0; i < BT_V; i++) btSP.push(new THREE.Vector3());
+  let btNow = 0;
+  function btMake() {
+    const g = new THREE.BufferGeometry(), idx = [], uv = new Float32Array(BT_V * 4);
+    for (let i = 0; i < BT_V; i++) { uv.set([0.5, 0, 0.5, 1], i * 4); if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(BT_V * 6), 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(BT_V * 8), 4).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx); g.setDrawRange(0, 0);
+    const m = new THREE.Mesh(g, pools.bladeMat); m.visible = false; m.frustumCulled = false; m.renderOrder = 3; scene.add(m);
+    return { m, pts: [], key: null, col: new THREE.Color(), w: 0.02, life: 0.1, a: 0.3, sw: null, last: -1 };
+  }
+  const btFree = () => pools.blade.find((x) => !x.pts.length && !x.sw) || pools.blade.reduce((a, b) => (b.last < a.last ? b : a));
+  const btSet = (t, color, width, life, alpha) => { t.col.set(color); t.w = width; t.life = Math.max(0.02, life); t.a = alpha; };
+  // one point more of the trail named key (a new trail when that one has faded; maxGap: a jump longer than that starts it afresh)
+  FX.bladeTrail = function (key, p, color, width, life, alpha, maxGap) {
+    if (!pools.blade) return;
+    let t = pools.blade.find((x) => x.key === key && x.pts.length && btNow - x.last < x.life);
+    if (!t) { t = btFree(); t.pts.length = 0; t.sw = null; t.key = key; }
+    btSet(t, color, width, life, alpha);
+    const L = t.pts[t.pts.length - 1];
+    if (L) { const d = L.p.distanceTo(p); if (d < 0.004) return; if (maxGap && d > maxGap) t.pts.length = 0; }
+    t.pts.push({ p: p.clone(), t: btNow }); if (t.pts.length > BT_RAW) t.pts.shift(); t.last = btNow; t.m.visible = true;
+  };
+  // the trail named key ends here: the next point begins another (the one left fades where it is)
+  FX.bladeCut = function (key) { if (pools.blade) for (const t of pools.blade) if (t.key === key) t.key = null; };
+  // a whole stroke along path (points in the world) in dur seconds
+  FX.bladeSweep = function (path, color, width, life, alpha, dur) {
+    if (!pools.blade || !path || path.length < 2) return;
+    const t = btFree(); t.pts.length = 0; t.key = null; btSet(t, color, width, life, alpha); t.last = btNow;
+    t.sw = { path: path.map((v) => v.clone()), dur: Math.max(0.01, dur), t: 0 }; t.m.visible = true;
+  };
+  function btUpdate(t, dt, cam) {
+    if (t.sw) {
+      const s = t.sw; s.t += dt; const k = Math.min(1, s.t / s.dur), f = k * (s.path.length - 1), i = Math.min(s.path.length - 2, Math.floor(f));
+      const p = _bt[0].copy(s.path[i]).lerp(s.path[i + 1], f - i), L = t.pts[t.pts.length - 1];
+      if (!L || L.p.distanceTo(p) > 0.004) { t.pts.push({ p: p.clone(), t: btNow }); if (t.pts.length > BT_RAW) t.pts.shift(); t.last = btNow; }
+      if (k >= 1) t.sw = null;
+    }
+    const P = t.pts;
+    while (P.length > 1 && btNow - P[1].t >= t.life) P.shift();
+    if (P.length && btNow - P[P.length - 1].t >= t.life && !t.sw) P.length = 0;
+    if (P.length < 2) { t.m.visible = false; t.m.geometry.setDrawRange(0, 0); return; }
+    const n = P.length; let v = 0;
+    for (let i = 0; i < n - 1; i++) {
+      const p0 = P[Math.max(0, i - 1)].p, p1 = P[i].p, p2 = P[i + 1].p, p3 = P[Math.min(n - 1, i + 2)].p;
+      for (let j = 0; j < BT_SUB; j++) {
+        const u = j / BT_SUB, u2 = u * u, u3 = u2 * u, a = -0.5 * u3 + u2 - 0.5 * u, b = 1.5 * u3 - 2.5 * u2 + 1, c = -1.5 * u3 + 2 * u2 + 0.5 * u, d = 0.5 * u3 - 0.5 * u2;
+        btSP[v].set(p0.x * a + p1.x * b + p2.x * c + p3.x * d, p0.y * a + p1.y * b + p2.y * c + p3.y * d, p0.z * a + p1.z * b + p2.z * c + p3.z * d);
+        btSA[v] = P[i].t + (P[i + 1].t - P[i].t) * u; v++;
+      }
+    }
+    btSP[v].copy(P[n - 1].p); btSA[v] = P[n - 1].t; v++;
+    const pos = t.m.geometry.attributes.position, col = t.m.geometry.attributes.color, pa = pos.array, ca = col.array, e = cam.matrixWorld.elements;
+    const tg = _bt[1], vw = _bt[2], sd = _bt[3]; let sx = 0, sy = 1, sz = 0;
+    for (let j = 0; j < v; j++) {
+      tg.copy(btSP[Math.min(v - 1, j + 1)]).sub(btSP[Math.max(0, j - 1)]); vw.set(e[12], e[13], e[14]).sub(btSP[j]);
+      sd.crossVectors(tg, vw); const l = sd.length(); if (l > 1e-9) { sx = sd.x / l; sy = sd.y / l; sz = sd.z / l; }
+      const age = Math.min(1, Math.max(0, (btNow - btSA[j]) / t.life)), w = t.w * 0.5 * Math.pow(1 - age, 0.9), al = t.a * Math.pow(1 - age, 1.1), q = btSP[j], o = j * 6, c = j * 8;
+      pa[o] = q.x - sx * w; pa[o + 1] = q.y - sy * w; pa[o + 2] = q.z - sz * w; pa[o + 3] = q.x + sx * w; pa[o + 4] = q.y + sy * w; pa[o + 5] = q.z + sz * w;
+      ca[c] = ca[c + 4] = t.col.r; ca[c + 1] = ca[c + 5] = t.col.g; ca[c + 2] = ca[c + 6] = t.col.b; ca[c + 3] = ca[c + 7] = al;
+    }
+    pos.needsUpdate = true; col.needsUpdate = true; t.m.geometry.setDrawRange(0, (v - 1) * 6); t.m.visible = true;
+  }
   // ---- electric arcs. The path of a discharge: from a to b by halving each stretch and pushing its middle aside by a share of its
   // length, five or six times over (so it is crooked at every scale, the way a spark's channel is), the ends where they were asked.
   const _pv = new THREE.Vector3(), _pd = new THREE.Vector3();
@@ -1031,6 +1107,7 @@
       if (t.d && !t.still) { const head = t.len * Math.min(1, k * 1.12 + 0.12), st = Math.min(t.streak, head); t.m.position.copy(t.a).addScaledVector(t.d, head); t.m.scale.set(t.w, t.w, Math.max(0.001, st)); }
       t.m.material.opacity = t.still ? 1 - k : 1 - k * k * k; if (t.t <= 0) t.m.visible = false;
     }
+    if (pools.blade) { btNow += dt; for (const t of pools.blade) if (t.pts.length || t.sw) btUpdate(t, dt, cam); }
     for (const d of pools.decal) if (d.m.visible) { d.t -= dt; if (d.t <= 0) d.m.visible = false; else if (d.t < 4 && d.op !== undefined) d.m.material.opacity = d.op * d.t / 4; }
     for (let i = FX.shocks.length - 1; i >= 0; i--) { const o = FX.shocks[i]; if (o.dead) { FX.shocks.splice(i, 1); continue; } o.life -= dt; if (o.life <= 0) { o.dispose(); FX.shocks.splice(i, 1); } }
     for (const r of pools.ring) if (r.t > 0) {

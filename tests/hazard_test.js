@@ -11,6 +11,86 @@ const path = require('path');
 const { serve, launch, sleep } = require('./coop/cdp');
 const ROOT = path.resolve(__dirname, '..');
 const PORT = +process.env.COOP_PORT || 9993;
+
+// ---- in the page (section 6): lava and open fire ----
+// enter an area of a field (kind: combat / event ...) on a fixed seed; and H.stand(at, s): the body held at a point for s seconds of game
+// time, the fire / lava hits on it counted (src 'aoe'; nothing is taken off), and the burn on it at the end
+async function hotEnter(a) {
+  const [field, kind, seed] = a, H = window.__H, GM = G.game, P = G.player, C = G.combat, R = G.Run;
+  R._f0 = R._f0 || R.field; R.field = () => field; G.Sky.force = ((G.Sky.V[field] || [])[0] || {}).id;
+  G.enemies.clear(); GM.seed = seed; GM.area = 11; GM.transitioning = false; G.ui.clearScreen(); GM.state = 'playing'; GM.enterArea(12, kind);
+  G.enemies.clear(); GM.objective = null; GM.waves = null; GM.dev = { speed: 1, god: true }; GM.areaCleared = false;
+  if (G.Warm && G.Warm.world) G.Warm.world();
+  await H.sl(500);
+  H.stand = async (at, s) => {
+    const hits = [], d0 = C.damagePlayer, own = Object.prototype.hasOwnProperty.call(P, 'postMove'), pm = P.postMove;
+    C.damagePlayer = function (amt, info) { if (info && info.src === 'aoe') hits.push([+amt.toFixed(3), GM.time]); return 0; };
+    P.postMove = function () { this.pos.copy(at); this.vel.set(0, 0, 0); return pm.apply(this, arguments); };
+    P.st = {}; P._lavaT = 0; P._fireT = 0; P.au = null; P.pos.copy(at); P.vel.set(0, 0, 0);
+    try { await H.sl(s * 1000); } finally { if (own) P.postMove = pm; else delete P.postMove; C.damagePlayer = d0; }
+    const st = { burn: +(P.st.burn || 0).toFixed(2), burnMul: P.st.burnMul || 0, burnLv: P.st.burnLv || 0 };
+    P.st = {};
+    const gaps = hits.slice(1).map((h, i) => h[1] - hits[i][1]).sort((x, y) => x - y);
+    return { n: hits.length, amts: [...new Set(hits.map((h) => h[0]))], gap: gaps.length ? +gaps[gaps.length >> 1].toFixed(2) : 0, st };
+  };
+  return 1;
+}
+// a spot in a lava zone the feet stand on at its face, and the body held there 3 s
+async function hotLavaIn(z) {
+  const w = G.world, V = (x, y, q) => new THREE.Vector3(x, y, q);
+  let at = null;
+  for (let i = 0; i < 400 && !at; i++) { const x = z.x0 + 0.5 + Math.random() * Math.max(0.01, z.x1 - z.x0 - 1), q = z.z0 + 0.5 + Math.random() * Math.max(0.01, z.z1 - z.z0 - 1); const g = w.groundAt(V(x, (z.y || 0) + 0.5, q), 0.3, 1.2); if (Math.abs(g - (z.y || 0)) < 0.15 && w.boxFree(x - 0.4, g + 0.05, q - 0.4, x + 0.4, g + 1.9, q + 0.4)) at = V(x, g + 0.01, q); }
+  if (!at) return { err: 'no foothold' };
+  const r = await window.__H.stand(at, 3); r.area = G.game.area; return r;
+}
+async function hotLava() {
+  const out = {};
+  await hotEnter(['foundry', 'combat', 777]);
+  { const w = G.world, z = w.lavaZones.find((q) => q.lavaDeep && q.x0 === 0 && q.x1 === w.W); out.deep = z ? await hotLavaIn(z) : { err: 'no melt' }; }
+  for (const f of ['foundry', 'ruin', 'halls']) {
+    if (f !== 'foundry') await hotEnter([f, 'combat', 777]);
+    const z = G.world.lavaZones.find((q) => !q.lavaDeep && !q.decor);
+    if (!z) continue;
+    out.shallow = await hotLavaIn(z); out.shallow.where = f + (z.blue ? ' blue fire' : '') + ' y' + (z.y || 0); break;
+  }
+  if (!out.shallow) out.shallow = { err: 'no shallow lava in foundry / ruin / halls' };
+  return JSON.stringify(out);
+}
+async function hotFire() {
+  await hotEnter(['gate', 'combat', 4242]);
+  const w = G.world, P = G.player, V = (x, y, z) => new THREE.Vector3(x, y, z), spots = w.fireSpots || [];
+  const br = spots.find((f) => f.k === 'brazier'); if (!br) return JSON.stringify({ err: 'no brazier' });
+  const k = br.r / 0.3, base = br.y0 - 0.9 * k;
+  const out = { area: G.game.area };
+  out.top = await window.__H.stand(V(br.x, base + 1.05 * k + 0.01, br.z), 3);
+  out.side = await window.__H.stand(V(br.x + 0.42 * k + P.hw + 0.02, base, br.z), 2);
+  // (fireTouch has run by now: each spot marked on / off once)
+  const tr = spots.filter((f) => f.k === 'torch'), high = tr.filter((f) => f.y0 - w.floorBelow(f.x, f.y0, f.z) >= P.standH);
+  out.torches = { all: tr.length, high: high.length, highOn: high.filter((f) => f.off !== true).length, ran: !!w._fireReach };
+  return JSON.stringify(out);
+}
+async function hotGrate() {
+  await hotEnter(['foundry', 'event', 4242]);
+  const w = G.world, V = (x, y, z) => new THREE.Vector3(x, y, z), H = window.__H;
+  if (w.biome !== 'foundry' || w.field) return JSON.stringify({ err: 'not the works hall: ' + w.biome + ' / ' + w.field });
+  const hz = (w.hotZones || [])[0]; if (!hz) return JSON.stringify({ err: 'no grate' });
+  const cx = (hz.x0 + hz.x1) / 2, cz = (hz.z0 + hz.z1) / 2;
+  const out = { area: G.game.area };
+  out.me = await H.stand(V(cx, hz.y + 0.01, cz), 3);
+  // a foe on the grate, a foe on the floor away from it; then the same grate without its mark (pOnly): fire on the foe, as on any lava
+  const def = G.ENEMIES.find((d) => !d.flyer && !d.el && !d.boss) || G.ENEMIES[0];
+  const mk = (x, z) => { const e = G.enemies.spawn(def, 9, V(x, 0, z), { noLoot: true }); e.state = 'idle'; e.speed = 0; e.atkCd = 99; e.au = null; return e; };
+  const ox = cx < w.W / 2 ? w.W / 2 : w.W / 2 - 2, oz = w.D / 2;
+  const a = mk(cx, cz), b = mk(ox, oz);
+  const t0 = G.game.time; while (G.game.time - t0 < 1) { a.pos.set(cx, hz.y, cz); b.pos.set(ox, 0, oz); await H.sl(30); }
+  out.foeOn = G.Elem.auraOf(a) || null; out.foeOff = G.Elem.auraOf(b) || null;
+  G.enemies.clear();
+  hz.pOnly = false;
+  const c = mk(cx, cz); const t1 = G.game.time; while (G.game.time - t1 < 1) { c.pos.set(cx, hz.y, cz); await H.sl(30); }
+  out.foeUnmarked = G.Elem.auraOf(c) || null; hz.pOnly = true; G.enemies.clear();
+  return JSON.stringify(out);
+}
+
 (async () => {
   const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
   const fails = [];
@@ -18,8 +98,10 @@ const PORT = +process.env.COOP_PORT || 9993;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'hard', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(600);
     // helpers in the page: enter an area of a field (with a mood), cells next to the void, a walker / flyer of the area's level
     await p.eval(`(() => {
@@ -35,8 +117,8 @@ const PORT = +process.env.COOP_PORT || 9993;
           for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (w.voidBelow(px + dx, 0.5, pz + dz)) { v = [dx / 2, dz / 2]; break; }
           if (v) out.push({ x: px, y: w.nf[i], z: pz, vx: v[0], vz: v[1] }); }
         return out; };
-      // a spot on dry, plain ground (no water, lava or field patch under it)
-      H.dry = (x, z, k) => { const w = G.world, y = w.nf[k]; return ![...w.waterZones, ...w.lavaZones, ...(w.fields || [])].some((q) => x > q.x0 - 1.5 && x < q.x1 + 1.5 && z > q.z0 - 1.5 && z < q.z1 + 1.5 && y < (q.y || 0) + 0.4); };
+      // a spot on dry, plain ground (no water, lava or field patch under it, not a floor of ice: the frozen lake's ice leaves ice of its own)
+      H.dry = (x, z, k) => { const w = G.world, y = w.nf[k]; return ![...w.waterZones, ...w.lavaZones, ...(w.fields || [])].some((q) => x > q.x0 - 1.5 && x < q.x1 + 1.5 && z > q.z0 - 1.5 && z < q.z1 + 1.5 && y < (q.y || 0) + 0.4) && !w.query(x - 1, y - 0.1, z - 1, x + 1, y + 0.01, z + 1).some((c) => c.surf === 'ice'); };
       H.walkers = () => G.ENEMIES.filter((d) => !d.special && !d.flyer && !d.hover && !d.custom && !d.boss && !d.burrow && (!d.fields || d.fields.includes(G.world.field)) && (d.unlockK ?? 0) <= 2);
       H.falls = 0; const k0 = G.combat.killEnemy; G.combat.killEnemy = function (e, info, o) { if (info && info.src === 'fall') H.falls++; return k0.apply(this, arguments); };
       return 1; })()`);
@@ -245,6 +327,51 @@ const PORT = +process.env.COOP_PORT || 9993;
       })()`).then(JSON.parse);
       check(!r.bad.length, `a guardian's hall always draws the field's own sky, whatever is asked (${r.bad.slice(0, 4).join(', ')})`);
       check(r.isBoss && r.mood === 'clear' && !r.me && !r.pending, `the graveyard's guardian hall stays under the plain moon even with rain asked for: no element on you, no bolt (${JSON.stringify(r)})`);
+    }
+    // ---------------- 6) lava and open fire: how much they hurt, the burn they leave, which lava is deep ----------------
+    {
+      await p.eval([hotEnter, hotLavaIn, hotLava, hotFire, hotGrate].map((f) => 'window.' + f.name + ' = ' + f.toString() + ';').join('\n') + ' 1');
+      // which lava is deep (lavaDeep: the foundry's lake of melt, the great spiral's bottom - nothing else)
+      for (const field of ['foundry', 'halls', 'ruin']) {
+        const r = JSON.parse(await p.eval('hotEnter(' + JSON.stringify([field, 'combat', 777]) + ').then(() => JSON.stringify(G.world.lavaZones.map((z) => ({ deep: !!z.lavaDeep, y: +(z.y || 0).toFixed(2), full: z.x0 === 0 && z.x1 === G.world.W, decor: !!z.decor }))))'));
+        const want = (z) => (field === 'foundry' ? z.full : z.y < -0.5);
+        const wrong = r.filter((z) => z.deep !== want(z));
+        console.log(field, 'lava zones:', JSON.stringify(r.map((z) => (z.deep ? 'deep' : 'shallow') + (z.decor ? '/decor' : '') + ' y' + z.y)));
+        check(r.some((z) => z.deep) && !wrong.length, `${field}: lavaDeep only on ${field === 'foundry' ? 'the lake of melt under the works' : 'the bottom of the great spiral'} (${r.filter((z) => z.deep).length} deep, ${r.length - r.filter((z) => z.deep).length} shallow${wrong.length ? ', wrong: ' + JSON.stringify(wrong) : ''})`);
+      }
+      // standing in deep lava (the foundry's melt) and in shallow lava (anything else on the ground)
+      const lava = JSON.parse(await p.eval('hotLava()'));
+      console.log('lava:', JSON.stringify(lava));
+      for (const [k, dmg, st, what] of [['deep', [5, 0.6], [5, 4, 3], "the foundry's lake of melt"], ['shallow', [2.5, 0.3], [2, 1.5, 1], 'shallow lava (' + (lava.shallow && lava.shallow.where) + ')']]) {
+        const r = lava[k];
+        if (!r || r.err) { check(false, `${k} lava: set up (${r && r.err})`); continue; }
+        const want = +(dmg[0] + dmg[1] * r.area).toFixed(3);
+        // (the ticks carry what a frame overshoots over to the next, so that the count is the same at any refresh rate: one gap is a frame
+        // shorter or longer than the interval, and their middle may fall a frame under it - 0.4 s is 0.383 / 0.4 at 60 Hz)
+        check(r.n >= 4 && r.amts.length === 1 && Math.abs(r.amts[0] - want) < 0.01 && r.gap > 0.37 && r.gap < 0.5, `${what}: ${want} (${dmg[0]}+${dmg[1]}a) every 0.4 s while you stand in it (${r.n} hits of ${JSON.stringify(r.amts)}, every ${r.gap} s)`);
+        check(r.st.burn > st[0] - 0.5 && r.st.burn <= st[0] && r.st.burnMul === st[1] && r.st.burnLv === st[2], `${what}: it sets you alight at ${st.join('/')} (burn / its strength / its level: ${JSON.stringify(r.st)})`);
+      }
+      // a brazier: on its basket, fire; right beside it, none. A torch out of reach is left out
+      const fire = JSON.parse(await p.eval('hotFire()'));
+      console.log('fire:', JSON.stringify(fire));
+      if (fire.err) check(false, 'brazier: set up (' + fire.err + ')');
+      else {
+        const want = +(1.5 + 0.15 * fire.area).toFixed(3);
+        check(fire.top.n >= 4 && fire.top.amts.length === 1 && Math.abs(fire.top.amts[0] - want) < 0.01 && fire.top.gap > 0.47 && fire.top.gap < 0.6, `standing on a brazier's basket: ${want} (1.5+0.15a) fire every 0.5 s (${fire.top.n} hits of ${JSON.stringify(fire.top.amts)}, every ${fire.top.gap} s)`);
+        check(fire.top.st.burn > 1.5 && fire.top.st.burn <= 2 && fire.top.st.burnMul === 1 && fire.top.st.burnLv === 1, `... and a mild burn (${JSON.stringify(fire.top.st)})`);
+        check(fire.side.n === 0 && !fire.side.st.burn, `right beside the brazier: nothing (${fire.side.n} hits)`);
+        check(fire.torches.high > 0 && fire.torches.highOn === 0, `torches out of reach (flame 1.8 m or more over the floor) are left out: ${fire.torches.high} of ${fire.torches.all}, ${fire.torches.highOn} left in`);
+      }
+      // a hall of the works (the foundry's room): its grates burn you as shallow lava does; a foe on them gets no element
+      const grate = JSON.parse(await p.eval('hotGrate()'));
+      console.log('grate:', JSON.stringify(grate));
+      if (grate.err) check(false, 'grate: set up (' + grate.err + ')');
+      else {
+        const want = +(2.5 + 0.3 * grate.area).toFixed(3);
+        check(grate.me.n >= 4 && grate.me.amts.length === 1 && Math.abs(grate.me.amts[0] - want) < 0.01 && grate.me.gap > 0.37 && grate.me.gap < 0.5, `the works' grates: ${want} (2.5+0.3a) every 0.4 s, as shallow lava (${grate.me.n} hits of ${JSON.stringify(grate.me.amts)}, every ${grate.me.gap} s)`);
+        check(grate.me.st.burn > 1.5 && grate.me.st.burn <= 2 && grate.me.st.burnMul === 1.5 && grate.me.st.burnLv === 1, `... and the shallow burn (${JSON.stringify(grate.me.st)})`);
+        check(!grate.foeOn && !grate.foeOff && grate.foeUnmarked === 'fire', `a foe on the grate gets no element, nor one on the floor by it (${grate.foeOn}, ${grate.foeOff}; the same grate unmarked: ${grate.foeUnmarked})`);
+      }
     }
     check(p.errs.length === 0, `no page errors${p.errs.length ? ' — ' + p.errs.slice(0, 3).join(' | ').slice(0, 500) : ''}`);
   } catch (e) { console.log('crashed', e && e.message || e); fails.push('crashed'); }

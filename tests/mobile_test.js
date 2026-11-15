@@ -31,9 +31,12 @@ const PORT = +process.env.COOP_PORT || 9981;
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?mobile=1`);
     await p.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await p.until("window.G && G.game && G.game.state === 'title' && window.__mobile", 90000);
+    // (the title is up before the boot is over: the loading screen still covers it, its shaders and the faces of the text are still being
+    // made, and the game's frames have not begun - game.js boot. A player cannot start a run then; the test waits for the same moment)
+    await p.booted();
     await p.eval("G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; G.game.startRun({ id: 'normal', lv: 0 }, 0); G.game.dev = { god: true, speed: 1 }; 1");
-    await p.until("G.game.state === 'playing' && document.documentElement.classList.contains('m-play')", 20000);
-    await sleep(800);
+    // (the run going: its area's shaders made (_warming), and its frames running - the game's time moving)
+    await p.until("document.documentElement.classList.contains('m-play')", 60000); await p.running('playing'); await p.gameFor(0.3);   // (a phone keeps playing: no pointer lock to lose)
     const W = await p.eval('innerWidth'), H = await p.eval('innerHeight');
     console.log('screen', W, H, 'field', await p.eval('G.world.biome + (G.world.layout ? "/" + G.world.layout : "")'));
     check(await p.eval('document.querySelectorAll("#m-tiles .ab").length') >= 9, 'skills and items are placed as buttons of their own');
@@ -43,36 +46,48 @@ const PORT = +process.env.COOP_PORT || 9981;
     const yaw = () => p.eval('G.player.yaw');
     const fire = await p.eval('(() => { const r = document.querySelector("[data-id=fire]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
     const lx = W * 0.6, ly = H * 0.3;
+    // (MDBG=1: what lies under the first finger, and what its pointerdown reached)
+    const dbgAt = (x, y) => p.eval(`(() => { const path = (el) => { const a = []; for (let e = el; e && e !== document.body && a.length < 6; e = e.parentElement) a.push(e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\\s+/).slice(0, 3).join('.') : '')); return a.join(' < '); };
+      return JSON.stringify({ top: path(document.elementFromPoint(${x}, ${y})), state: G.game.state, trans: !!G.game.transitioning, t: +G.game.time.toFixed(2), locked: G.input.locked, pd: (window.__pdLog || []).slice(-4) }); })()`);
+    // (MDBG: every frame's state, the keys pressed in it, the bag, a search - the last 90 frames)
+    if (process.env.MDBG) await p.eval(`window.__fr = []; (() => { const I = G.input, ef = I.endFrame; I.endFrame = function () { __fr.push([+G.game.time.toFixed(2), G.game.state, !!G.game._warming, G.InvUI.isOpen(), !!G.game.search, Object.keys(I.pressed).join('+'), document.getElementById('screens') ? document.getElementById('screens').children.length : -1]); if (__fr.length > 90) __fr.shift(); return ef.apply(this, arguments); }; })(); 1`);
+    if (process.env.MDBG) await p.eval("window.__pdLog = []; window.addEventListener('pointerdown', (e) => __pdLog.push([e.pointerId, e.pointerType, e.target.id || e.target.className || e.target.tagName, Math.round(e.clientX), Math.round(e.clientY)]), true); 1");
+    if (process.env.MDBG) console.log('   dbg before', await dbgAt(lx, ly));
     await touch('touchStart', [[1, lx, ly]]);
     await touch('touchMove', [[1, lx + 40, ly]]);
-    await sleep(250);
+    await p.gameFor(0.1);   // (frames, not the clock: the move is taken by the next frame)
+    if (process.env.MDBG) console.log('   dbg after', await dbgAt(lx, ly));
     const y1 = await yaw();
     await touch('touchMove', [[1, lx + 80, ly]]);
-    await sleep(250);
-    const y2 = await yaw();
+    let y2 = y1;
+    for (let i = 0; i < 12 && Math.abs(y2 - y1) <= 0.01; i++) { await p.gameFor(0.05); y2 = await yaw(); }
     check(Math.abs(y2 - y1) > 0.01, 'the first finger aims');
     // a second finger on the fire button, dragging: the aim stays with the first
+    // (the gun's recoil is held off while the fingers are compared: it sways the view by itself, a little either way - since its rework
+    // more than this check's margin - and what is tested here is which finger steers. Back on once the fingers are up)
+    const tr0 = await p.eval('G.weapons.TOUCH_RECOIL'); await p.eval('G.weapons.TOUCH_RECOIL = 0; G.player.resetRecoil && G.player.resetRecoil(); 1');
     await touch('touchStart', [[1, lx + 80, ly], [2, fire[0], fire[1]]]);
     await sleep(100);
     check(await p.eval('G.input.mouse[0] === true || !!G.input.mpressed[0]'), 'the second finger fires');
     const y3 = await yaw();
     await touch('touchMove', [[1, lx + 80, ly], [2, fire[0] + 30, fire[1] - 20]]);
-    await sleep(250);
+    await p.gameFor(0.1);   // (the gun fires all the while: a longer wait lets its recoil sway the view more)
     const y4 = await yaw();
     check(Math.abs(y4 - y3) < 0.008, `moving the fire finger does not move the aim (${(y4 - y3).toFixed(4)})`);
     // a third and fourth finger change nothing, the first still aims
     await touch('touchStart', [[1, lx + 80, ly], [2, fire[0] + 30, fire[1] - 20], [3, W * 0.55, H * 0.6]]);
     await touch('touchMove', [[1, lx + 80, ly], [2, fire[0] + 30, fire[1] - 20], [3, W * 0.55 + 50, H * 0.6]]);
-    await sleep(250);
+    await p.gameFor(0.1);
     const y5 = await yaw();
     check(Math.abs(y5 - y4) < 0.008, 'neither does a third finger on the look area (the gun recoils a little) ' + (y5 - y4).toFixed(4));
     await touch('touchMove', [[1, lx + 120, ly], [2, fire[0] + 30, fire[1] - 20], [3, W * 0.55 + 50, H * 0.6]]);
     let y6 = y5;
-    for (let i = 0; i < 12 && Math.abs(y6 - y5) <= 0.01; i++) { await sleep(150); y6 = await yaw(); }
+    for (let i = 0; i < 12 && Math.abs(y6 - y5) <= 0.01; i++) { await p.gameFor(0.05); y6 = await yaw(); }
     check(Math.abs(y6 - y5) > 0.01, 'the first finger still aims with three down');
     await touch('touchEnd', []);
     await sleep(200);
     check(await p.eval('G.input.mouse[0] === false'), 'all fingers up: firing stops');
+    await p.eval(`G.weapons.TOUCH_RECOIL = ${tr0}; 1`);
     // the first finger lifts: the next one takes over, with no jump (driven by pointer events: the touch protocol can only lift all fingers at once)
     const hand = await p.eval(`(() => { const L = document.getElementById('m-look'), ev = (t, id, x, y) => L.dispatchEvent(new PointerEvent(t, { pointerId: id, clientX: x, clientY: y, bubbles: true, cancelable: true })), I = G.input;
       ev('pointerdown', 101, 100, 50); ev('pointerdown', 102, 200, 50); I.mx = 0;
@@ -84,11 +99,14 @@ const PORT = +process.env.COOP_PORT || 9981;
     check(hd.jump === 0, 'lifting it causes no jump');
     check(hd.after !== 0 && Math.abs(hd.after) < 60, 'the next finger takes over from where it is');
     // tapping: empty ground does nothing, a chest is searched
+    // (the view is put by hand: what the gun's recoil from the firing above still had to bring back is dropped, or it goes on
+    // easing the view down for a moment - player.js updateRecoil)
+    await p.eval('G.player.resetRecoil && G.player.resetRecoil(); 1');
     const y8 = await yaw();
     await p.eval('G.player.pitch = 0.5; 1');
-    await sleep(150);
+    await p.gameFor(0.1);
     await touch('touchStart', [[5, W * 0.7, H * 0.4]]); await touch('touchEnd', []);
-    await sleep(400);
+    await p.gameFor(0.25);
     check(Math.abs(await p.eval('G.player.pitch') - 0.5) < 0.01 && Math.abs(await yaw() - y8) < 0.01, 'a tap on nothing leaves the view where it was');
     // beside the chest, 2 m from it on the floor it stands on (a chest can stand below the entrance's level: the sunken market of the dusk city),
     // on free ground, turned towards it and a little past it (so the tap is what turns the view onto it)
@@ -101,42 +119,53 @@ const PORT = +process.env.COOP_PORT || 9981;
       }
       if (!at) at = [it.pos.x + 2, fy, it.pos.z];
       P.pos.set(at[0], at[1] + 0.02, at[2]); P.vel.set(0, 0, 0); P.yaw = Math.atan2(-(it.pos.x - at[0]), -(it.pos.z - at[2])) + 0.3; P.pitch = -0.55; G.game.dev.freeze = true; })(); 1`);
-    await sleep(400);
-    const pt = await p.eval("(() => { const it = G.world.interactables.find((x) => x.type === 'chest'), v = it.pos.clone().project(G.camera); return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight]; })()");
-    console.log('chest on screen at', pt.map(Math.round));
+    // (the camera follows on the next frames: waited for by the game's time, not the clock)
+    await p.gameFor(0.3);
+    // (the chest has to show where a finger reaches the view: not under a panel of the HUD at the top or a button. Where the field puts it
+    // too high or too low, the view is tipped a little until it does - what is tested, a tap on it, stays the same)
+    const chestPt = "(() => { const it = G.world.interactables.find((x) => x.type === 'chest'), v = it.pos.clone().project(G.camera), x = (v.x + 1) / 2 * innerWidth, y = (1 - v.y) / 2 * innerHeight, e = document.elementFromPoint(x, y); return [x, y, !!e && e.id === 'm-look'] })()";
+    let pt = await p.eval(chestPt);
+    for (let i = 0; i < 8 && !pt[2]; i++) { await p.eval(`G.player.pitch += ${pt[1] < H / 2 ? 0.1 : -0.1}; 1`); await p.gameFor(0.2); pt = await p.eval(chestPt); }
+    console.log('chest on screen at', pt.slice(0, 2).map(Math.round));
     // (a tap is a finger down and up within 280 ms, mobile.js; a slow frame of the headless browser can hold the two touch events further apart
     // than that, and then no tap was made at all: it is made again, once. A tap that was made and found nothing still fails.)
     await p.eval("window.__tapLog = []; (() => { const L = document.getElementById('m-look'); if (!L.__tl) { L.__tl = true; for (const t of ['pointerdown', 'pointerup']) L.addEventListener(t, () => window.__tapLog.push([t, performance.now()]), true); } })(); 1");
     const tapChest = async (id) => {
       await p.eval('window.__tapLog.length = 0; 1');
       await touch('touchStart', [[id, pt[0], pt[1]]]); await touch('touchEnd', []);
-      await sleep(500);
+      await p.until('!!G.game.search || G.world.interactables.find((x) => x.type === "chest").opened', 2500).catch(() => {}); await sleep(100);
       const lg = await p.eval('JSON.stringify(window.__tapLog)').then(JSON.parse), d = lg.find((e) => e[0] === 'pointerdown'), u = lg.find((e) => e[0] === 'pointerup');
       return d && u ? u[1] - d[1] : -1;
     };
     let gap = await tapChest(6);
     if (!(await p.eval('!!G.game.search || G.world.interactables.find((x) => x.type === "chest").opened')) && !(gap >= 0 && gap < 270)) { console.log(`   (the finger was held ${Math.round(gap)} ms: no tap was made; tapping again)`); gap = await tapChest(7); }
+    if (process.env.MDBG) console.log('   dbg chest frames', await p.eval('JSON.stringify(window.__fr.slice(-40))'));
     check(await p.eval('!!G.game.search || G.world.interactables.find((x) => x.type === "chest").opened'), `a tap on a chest starts searching it (finger held ${Math.round(gap)} ms) ` + await p.eval('JSON.stringify([G.game.state, G.player.dead, G.input.locked, G.world.interactables.find((x) => x.type === "chest").pos.distanceTo(G.camera.position), G.player.yaw, G.player.pitch])'));
     await p.eval('G.game.cancelSearch && G.game.cancelSearch(); 1');
     // a melee weapon's guard stays up as long as the reload button is held, and drops when it is let go
     await p.eval('if (G.InvUI.isOpen()) G.InvUI.close(); G.game.cancelSearch && G.game.cancelSearch(); 1'); // (the chest may have been searched to the end by now, its contents open on the screen: keys would go to them)
     await sleep(150);
+    if (process.env.MDBG) await p.eval(`window.__swLog = []; (() => { const W = G.weapons, st = W.selectTok, I = G.input; W.selectTok = function (t) { __swLog.push(['selectTok', t === 'm' ? 'm' : 'gun', G.game.state]); return st.apply(this, arguments); };
+      window.addEventListener('keydown', (e) => __swLog.push(['keydown', e.code, G.game.state, !!I.locked, G.InvUI.isOpen()]), true);
+      const ef = I.endFrame; I.endFrame = function () { if (I.pressed.Digit3) __swLog.push(['frame sees Digit3', G.game.state, G.player.meleeMode, !!G.game.search, G.InvUI.isOpen()]); return ef.apply(this, arguments); }; })(); 1`);
     await p.eval('G.game.dev.freeze = false; G.game.state = "playing"; G.ui.clearScreen(); window.__mobile.tapKey(G.BIND.w3[0]); 1');
-    await sleep(700);
+    await p.until('G.player.meleeMode === true', 5000).catch(() => {});   // (by the state: a slow frame of the headless browser takes its time)
+    await sleep(300);
     const rl = await p.eval('(() => { const r = document.querySelector("[data-id=reload]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
+    if (process.env.MDBG) console.log('   dbg switch', await p.eval('JSON.stringify(window.__swLog)'), '\n   frames', await p.eval('JSON.stringify(window.__fr.slice(-45))'));
     check(await p.eval('G.player.meleeMode === true'), 'the melee weapon is in hand ' + await p.eval('JSON.stringify([G.game.state, !!G.game.search, G.player.dead, G.player.pileState, G.player.grapple.state, G.player.melee && G.player.melee.id, G.player.weapons.length])'));
     await touch('touchStart', [[8, rl[0], rl[1]]]);
     // (the headless game runs slowly: give the guard up to 3 s of real time to come up)
     for (let i = 0; i < 30 && !(await p.eval('G.weapons.guarding() === true')); i++) await sleep(100);
     check(await p.eval('G.weapons.guarding() === true'), 'holding the reload button keeps the guard up');
     await touch('touchEnd', []);
-    await sleep(400);
+    await p.until('G.weapons.guarding() === false', 3000).catch(() => {});
     check(await p.eval('G.weapons.guarding() === false'), 'and it drops when the finger lifts');
     await p.eval('window.__mobile.tapKey(G.BIND.w1[0]); 1');
-    await sleep(500);
+    await p.until('G.player.meleeMode === false && G.weapons.switchT <= 0', 5000).catch(() => {});
     const mag0 = await p.eval('G.player.weapon.mag = Math.max(0, G.player.weapon.mag - 5); G.player.weapon.mag');
     await touch('touchStart', [[9, rl[0], rl[1]]]); await touch('touchEnd', []);
-    await sleep(300);
+    await p.until('G.player.meleeMode === false && !!G.player.weapon.reloading', 3000).catch(() => {});
     check(await p.eval('G.player.meleeMode === false && !!G.player.weapon.reloading'), 'a gun still reloads from a tap on the same button');
     // the layout editor
     await p.eval('G.game.state = "modal"; G.ui.settings(() => {}); 1');
@@ -191,7 +220,7 @@ const PORT = +process.env.COOP_PORT || 9981;
     await sleep(500);
     const pb = await p.eval('(() => { const r = document.querySelector("[data-id=pause]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
     await touch('touchStart', [[12, pb[0], pb[1]]]); await touch('touchEnd', []);
-    await sleep(500);
+    await p.until("G.game.state === 'paused'", 3000).catch(() => {});
     check(await p.eval('G.game.state') === 'paused', 'and it still works after a press that never ended');
     await p.eval('G.game.resume(); 1');
     await sleep(500);
@@ -206,7 +235,7 @@ const PORT = +process.env.COOP_PORT || 9981;
     await p.until('G.game.state === "playing"', 4000).catch(() => {});
     check(await p.eval('G.game.state') === 'playing', 'and a pause with no menu');
     await touch('touchStart', [[13, pb[0], pb[1]]]); await touch('touchEnd', []);
-    await sleep(500);
+    await p.until("G.game.state === 'paused'", 3000).catch(() => {});
     check(await p.eval('G.game.state') === 'paused', 'and the pause button still answers after all that');
     await p.eval('G.game.resume(); 1');
     await sleep(500);
@@ -217,6 +246,7 @@ const PORT = +process.env.COOP_PORT || 9981;
     await t.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await t.send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: false });
     await t.until("window.G && G.game && G.game.state === 'title' && window.__mobile", 90000);
+    await t.booted();
     await t.eval('G.renderer.compile = () => {}; G.Warm = null; G.Tutorial.start(); 1');
     await t.until("G.game.state === 'playing' && !!document.querySelector('#tut.on [data-a]')", 30000);
     await sleep(500);

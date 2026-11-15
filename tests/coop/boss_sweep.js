@@ -15,8 +15,10 @@ const secs = (+process.argv[2] || 14) / SPEED, ids = process.argv.slice(3).lengt
     const q = '&local=1&lat=50&jit=20', room = 'B' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(300);
     const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
+    await g.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     const off = 'G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
     await h.eval(off); await g.eval(off);
@@ -25,6 +27,7 @@ const secs = (+process.argv[2] || 14) / SPEED, ids = process.argv.slice(3).lengt
     await g.eval(`(0, eval)(${JSON.stringify(bot)}); window.__cbDmg = 5; 1`);
     await h.eval('G.Coop.stat = true; G.Coop.begin(); G.game.dev = { god: true, speed: ' + SPEED + ' }; 1');
     await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
+    for (const pg of [h, g]) await pg.running();
     await g.eval('G.game.dev = { speed: ' + SPEED + ' }; 1'); // (the guest keeps taking damage: that the guardians' blows reach it is part of the check)
     for (const id of ids) {
       const e0 = h.errs.length + g.errs.length, row = { id };

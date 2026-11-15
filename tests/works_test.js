@@ -14,8 +14,10 @@ const PORT = +process.env.COOP_PORT || 9983;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(500);
     const enter = async (field, n, want) => {
       for (let t = 0; t < 8; t++) {

@@ -7,6 +7,10 @@
   const LIGHT_K = 6;
   let renderer, scene, camera, hemi, amb, moon, P;
   let last = performance.now(), fpsAcc = 0, fpsN = 0;
+  // how many of a thing that comes `rate` times a second come in a frame of dt (x = rate * dt): its whole part, plus one more with the
+  // chance of the rest. Under one a frame it draws as `Math.random() < x` always did; over one (more than one a frame: a slow frame, a low
+  // frame rate) the count is not cut down to one a frame.
+  const spawnN = (x) => { const f = Math.floor(x); return f + (Math.random() < x - f ? 1 : 0); };
 
   // ---------------- boot ----------------
   async function boot() {
@@ -27,6 +31,9 @@
     document.getElementById('canvas-wrap').appendChild(renderer.domElement);
     renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); G.ui.toast('⚠ グラフィックスコンテキストが失われました。ページを再読み込みしてください。', 'warn'); });
     G.renderer = renderer;
+    // the finer surfaces (gfx.js) are baked on the GPU now that there is one, and the frame's passes (post.js) made ready
+    if (G.GFX) G.GFX.upgradeTextures(renderer, G.save.data.settings.quality === 'high' ? 1024 : 512);
+    if (G.Post) { try { G.Post.init(renderer); } catch (e) { G.Post.failed = true; } }
     scene = G.scene = new THREE.Scene();
     camera = G.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 400);
     camera.rotation.order = 'YXZ';
@@ -47,6 +54,7 @@
     G.weapons.init(renderer); G.weapons.setEnv(G.envTex);
     G.avatar.init(scene);
     G.combat.init(); G.Elem.init(); G.enemies.init(); G.Areas.init(); G.Depth.init(); G.Rooms2.init(); G.MidSave.init(); Object.assign(G.Areas.TYPES, G.Rooms2.TYPES); G.abilities.init(); G.bosses.init(); G.ui.init(); G.bindBuffs(); G.Dev && G.Dev.init();
+    GM.hookFpsCapSetting();
     I.el = renderer.domElement;
     renderer.domElement.addEventListener('click', () => { if (GM.state === 'playing' && !I.locked) I.requestLock(); });
     G.on('lockchange', onLock);
@@ -80,16 +88,20 @@
     GM.toTitle();
     ldText.textContent = '描画を準備中…';
     await new Promise((r) => setTimeout(r, 30));
+    if (G.Post && G.Post.active) { G.Post.resize(); G.Post.warm(); }
     if (G.Warm) { if (G.Warm.bootAsync) await G.Warm.bootAsync(); else G.Warm.boot(); } // title world + every enemy kind, viewmodel, previews: behind the loading screen, without blocking the page
+    // (the faces of the text, asked for at the start: ui.js. Waited for here a while, so that they do not arrive in the middle of play)
+    if (G.ui.fontsReady) { ldText.textContent = '書体を準備中…'; await Promise.race([G.ui.fontsReady, new Promise((r) => setTimeout(r, 6000))]); }
     setTimeout(() => document.getElementById('loading').classList.add('done'), 300);
     requestAnimationFrame(frame);
   }
   // graphics settings. High is the full look and is never touched; medium and low trade looks for speed in earnest:
   // render scale, shadows, number of live lights, particle amount, normal maps, draw distance (with the fog thickened to hide it)
   const QP = {
-    low: { pr: 0.6, far: 110, fogK: 1.45, lights: 3, keep: 0.25, shadow: false, nm: false },
-    med: { pr: 1.0, far: 220, fogK: 1.12, lights: 5, keep: 0.6, shadow: true, size: 1024, soft: false, nm: true },
-    high: { pr: 1.5, far: 400, fogK: 1, lights: 8, keep: 1, shadow: true, size: 2048, soft: true, nm: true },
+    low: { pr: 0.6, far: 110, fogK: 1.45, lights: 3, keep: 0.25, shadow: false, nm: false, post: false },
+    med: { pr: 1.0, far: 220, fogK: 1.12, lights: 5, keep: 0.6, shadow: true, size: 1024, soft: false, nm: true, post: true, msaa: 2 },
+    high: { pr: 1.5, far: 400, fogK: 1, lights: 8, keep: 1, shadow: true, size: 2048, soft: true, nm: true, post: true, msaa: 4 },
+    // (post: the frame goes through post.js - contact shadow, glow, grade; msaa: its samples, the screen's own smoothing does not reach it)
   };
   GM.QP = QP;
   // normal maps off on low (kept on the material so high / medium bring them back)
@@ -117,6 +129,7 @@
     if (GM._fogBase !== undefined) { scene.fog.density = GM._fogBase * q.fogK; G.fx.setFog(scene.fog.color.getStyle(), scene.fog.density); }
     G.LightPool.active = q.lights;
     G.fx.keep = q.keep;
+    if (G.Post) { G.Post.active = !!q.post && !G.Post.failed; G.Post.msaa = q.msaa || 0; if (!G.Post.active) renderer.setRenderTarget(null); }
     GM.qualityMaterials();
     scene.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => m.needsUpdate = true); } });
     onResize();
@@ -150,6 +163,7 @@
     scene.fog.color.set(B.fog); scene.fog.density = B.fogD * qk.fogK;
     scene.background = new THREE.Color(B.fog);
     G.fx.setFog(B.fog, B.fogD * qk.fogK);
+    G.fx.setLit(Math.min(1, Math.max(0.38, 0.22 + (B.amb || 0.6) * 0.8)));   // (dust and smoke are seen by the light of the place)
     GM.qualityMaterials();
     hemi.color.set(B.hemiS); hemi.groundColor.set(B.hemiG); hemi.intensity = (0.75 + B.amb * 0.6) * (B.hemiI || 1);
     amb.color.set(B.hemiS); amb.intensity = B.amb * 1.3;
@@ -165,38 +179,316 @@
     G.abilities.rebuildVisuals();
   }
 
-  // open-air stages get a gradient sky dome with a sun disc; dungeons keep the fogged void
-  let skyDome = null;
-  function setSky(B) {
-    if (skyDome) { scene.remove(skyDome); skyDome.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); skyDome = null; }
-    if (!B.outdoor) return;
-    const c = (h) => new THREE.Color(h);
-    const sd = new THREE.Vector3(...B.sunDir).normalize();
-    const mat = new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
-      uniforms: { top: { value: c(B.sky[0]) }, mid: { value: c(B.sky[1]) }, hor: { value: c(B.sky[2]) }, sun: { value: sd }, fogc: { value: c(B.fog) }, sunc: { value: new THREE.Vector3(...(B.sunCol || [1.0, 0.85, 0.6])) } },
-      vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 hor; uniform vec3 sun; uniform vec3 fogc; uniform vec3 sunc; varying vec3 vD;
-        void main(){ float h = vD.y; vec3 col = h > 0.0 ? mix(mix(hor, mid, smoothstep(0.0, 0.25, h)), top, smoothstep(0.25, 0.9, h)) : mix(hor, fogc, smoothstep(0.0, -0.15, h));
-          float sd = max(dot(normalize(vD), sun), 0.0);
-          col += sunc * (pow(sd, 900.0) * 3.0 + pow(sd, 12.0) * 0.35);
-          gl_FragColor = vec4(col, 1.0);
-          #include <colorspace_fragment>
-        }`,
-    });
-    skyDome = new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), mat);
-    skyDome.renderOrder = -10; skyDome.frustumCulled = false;
-    if (B.stars) {
-      // starfield on the upper hemisphere (rides along with the dome)
-      const n = 900, pos = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) { const u = Math.random() * 2 * Math.PI, v = Math.acos(1 - Math.random() * 0.95); pos[i * 3] = Math.sin(v) * Math.cos(u) * 280; pos[i * 3 + 1] = Math.cos(v) * 280; pos[i * 3 + 2] = Math.sin(v) * Math.sin(u) * 280; }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const st = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xd8d8d8, size: 1.6, sizeAttenuation: false, transparent: false, depthTest: true, depthWrite: false, fog: false }));
-      st.renderOrder = -9; st.frustumCulled = false; skyDome.add(st);
-    }
-    scene.add(skyDome);
-    scene.background = c(B.sky[2]);
+  // ---------------- the sky of the open-air fields (dungeons keep the fogged void) ----------------
+  // One dome, drawn at infinity (the draw distance never cuts it) after everything solid, so that only the sky that shows is shaded.
+  // Along each line of sight d it lays down, in this order:
+  //  - the air: the field's three colours (zenith, middle, horizon) as scattered light lies - the horizon brighter and warmer toward a
+  //    low sun or moon and cooler and duller on the far side, a haze and a tighter aureole round the body; a low sun's far side gets the
+  //    earth's shadow, a dull band on the horizon under a band of rose
+  //  - stars of many brightnesses (few bright, a great many faint), each its own hue, twinkling (more near the horizon), lost in the haze
+  //    low down and under a bright sky or near the moon; a faint band of the galaxy across them
+  //  - the moon (a disc with dark seas, lit highlands and a phase; the blood moon dark copper as in an eclipse) or the sun (a hot disc
+  //    darkening to its limb, in its glare)
+  //  - high streaks of cirrus, then the clouds: one layer seen from below (the line of sight meets a flat sheet, so they crowd toward the
+  //    horizon), from a noise baked once into a texture and drifting with the wind; lit on the side of the body with a bright rim against
+  //    it, dark under where thick, faded into the horizon's colour far off; under a rain deck, ragged scud running faster beneath it
+  //  - a lightning flash lights the clouds from inside; the ground fog veils it all, more the lower one looks (a sky seen through a fog
+  //    lying some metres deep over the field: in a thick mist, only a pale dome is left above); under the horizon, the fog's colour.
+  // Low quality: the colours and the glow only (uDetail 0); medium: no cirrus and no galaxy (uDetail 1). The field's colours stay the
+  // field's: what is added is drawn out of them.
+  let skyDome = null, skyMesh = null, skyNoise = null, skyGen = 0;
+  // the clouds' noise, baked once on the GPU (tiles both ways): r heaps of cloud (a soft noise with rounded billows), g the finer
+  // billows that eat at their edges, b long fibres for cirrus (stretched where they are read), a ragged rolls for scud
+  const SKY_BAKE = `precision highp float; varying vec2 vUv;
+    float hs(vec2 p){ vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+    vec2 gr(vec2 i, float P, float s){ float a = hs(mod(i, P) + s * 17.31) * 6.2831853; return vec2(cos(a), sin(a)); }
+    float pn(vec2 x, float P, float s){ vec2 i = floor(x), f = fract(x), u = f * f * f * (f * (f * 6. - 15.) + 10.);
+      return mix(mix(dot(gr(i, P, s), f), dot(gr(i + vec2(1., 0.), P, s), f - vec2(1., 0.)), u.x), mix(dot(gr(i + vec2(0., 1.), P, s), f - vec2(0., 1.)), dot(gr(i + 1., P, s), f - 1.), u.x), u.y); }
+    float fb(vec2 uv, float P, float s, int n){ float a = 0., w = .5, t = 0.; for (int k = 0; k < 8; k++) { if (k >= n) break; a += w * pn(uv * P, P, s + float(k)); t += w; w *= .5; P *= 2.; } return a / t; }
+    float wo(vec2 uv, float P, float s){ vec2 x = uv * P, i = floor(x), f = fract(x); float d = 9.;
+      for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++) { vec2 o = vec2(float(z), float(y)), c = mod(i + o, P); d = min(d, length(o + .15 + .7 * vec2(hs(c + s), hs(c + s + 7.7)) - f)); } return d; }
+    void main(){
+      vec2 uv = vUv, wp = vec2(fb(uv, 3., 41., 4), fb(uv, 3., 43., 4));   // (the place bent by a slow noise: swirls, not round blobs)
+      vec2 u2 = uv + wp * .09;
+      float n = clamp(fb(u2, 4., 1., 7) * 1.25 + .5, 0., 1.);
+      float wf = (1. - wo(u2, 6., 3.)) * .625 + (1. - wo(u2, 12., 5.)) * .25 + (1. - wo(u2, 24., 9.)) * .125;
+      float r = clamp(((n - (wf - 1.)) / (2. - wf) - .23) / .74, 0., 1.);
+      float g = clamp((1. - abs(fb(uv + wp * .05, 12., 51., 5)) * 2.4) * .35 + (1. - wo(uv + wp * .03, 16., 13.)) * .4 + (1. - wo(uv, 32., 17.)) * .25, 0., 1.);
+      float b = clamp(1. - abs(fb(uv + wp * .14, 8., 23., 6)) * 1.8, 0., 1.); b *= b;
+      float a = clamp(fb(uv, 6., 31., 6) * 1.3 + .5, 0., 1.);
+      gl_FragColor = vec4(r, g, b, a);
+    }`;
+  function skyNoiseTex() {
+    if (skyNoise) return skyNoise;
+    const rt = new THREE.WebGLRenderTarget(512, 512, { depthBuffer: false, stencilBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
+    rt.texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const m = new THREE.ShaderMaterial({ name: 'sky-bake', vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }', fragmentShader: SKY_BAKE, depthTest: false, depthWrite: false });
+    const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m), sc = new THREE.Scene(); q.frustumCulled = false; sc.add(q);
+    const prev = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(sc, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)); renderer.setRenderTarget(prev);
+    m.dispose(); q.geometry.dispose();
+    GM.skyNoiseRT = rt; // (development: the baked noise can be read back, docs/tools/sky_shots.js)
+    return (skyNoise = rt.texture);
   }
+  const SKY_VS = `varying vec3 vD;
+    void main(){ vD = position; vec4 p = projectionMatrix * vec4(mat3(viewMatrix) * position, 1.0); gl_Position = p.xyww; }`;
+  const SKY_FS = `uniform vec3 top; uniform vec3 mid; uniform vec3 hor; uniform vec3 sun; uniform vec3 fogc; uniform vec3 sunc;
+    uniform float uT; uniform float uDetail; uniform float uPix; uniform float uStars; uniform float uHaze; uniform float uFogD;
+    uniform vec4 uCl; uniform vec4 uCl2; uniform vec4 uBody; uniform vec4 uBody2; uniform vec4 uFlash; uniform vec4 uUnder;
+    uniform sampler2D tN; varying vec3 vD;
+    float lum(vec3 c){ return dot(c, vec3(.2126, .7152, .0722)); }
+    vec3 h3(vec3 p){ p = fract(p * vec3(.1031, .1030, .0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
+    void main(){
+      vec3 d = normalize(vD), s = normalize(sun);
+      float h = d.y, hp = max(h, 0.), mu = dot(d, s), m0 = max(mu, 0.);
+      vec2 dh = normalize(d.xz + vec2(1e-5, 0.)), sh = normalize(s.xz + vec2(1e-5, 0.));
+      float az = dot(dh, sh), low = 1. - smoothstep(.05, .6, s.y), isSun = step(.5, uBody.x) * step(uBody.x, 1.5);
+      vec3 hue = sunc / max(.001, max(sunc.r, max(sunc.g, sunc.b)));
+      vec3 bc = vec3(0.); float bA = 0.;   // (the banks of cloud on the horizon: their colour and cover, laid on last)
+      // (the angle round the horizon, 0..1, from whichever of two wraps is smooth here: the texture's level of detail does not jump
+      // where the angle wraps round, which drew a thin upright line)
+      float az1 = atan(d.z, d.x) / 6.2831853, az2 = fract(az1 + 1.), azS = fwidth(az1) <= fwidth(az2) ? az1 : az2;
+      // ---- the air
+      float wS = smoothstep(-.4, 1., az);
+      vec3 Hs = hor * mix(vec3(1.), .55 + .6 * hue, .45 * low) * (1. + .3 * low);
+      vec3 Ha = mix(hor, mid, .3) * (1. - .25 * low);
+      vec3 H = mix(Ha, Hs, wS);
+      vec3 col = mix(H, mid, 1. - exp(-hp * 6.));
+      col = mix(col, top, smoothstep(.12, .95, hp));
+      // (the colour is strongest in the low band toward the sun or moon; higher up and on the far side the sky is greyer, as it is)
+      // (by day and at dusk the high sky goes to a grey blue: the field's violets and pinks stay low, toward the sun)
+      float sat0 = mix(.5, .3, isSun);
+      col = mix(vec3(lum(col)) * mix(vec3(1.), vec3(.93, .98, 1.1), isSun), col, sat0 + (1. - sat0) * exp(-hp * 6.) * (.3 + .7 * wS));
+      // the earth's shadow on the far side of a low sun: a dull band on the horizon, a band of rose over it
+      float bv = (1. - wS) * low * isSun;
+      col = mix(col, mix(mid, top, .4) * .8, bv * .45 * (1. - smoothstep(.0, .07, hp)));
+      col += hor * hue * bv * .22 * smoothstep(.03, .08, hp) * (1. - smoothstep(.1, .22, hp));
+      // the glow of the air round the body, and the haze low down toward it
+      vec3 glow = sunc * (pow(m0, 5.) * .04 + pow(m0, 32.) * (.09 - .04 * step(1.5, uBody.x)) + pow(m0, 350.) * .3) * uHaze * (1. - .5 * uBody2.y);
+      glow += sunc * hor * exp(-hp * 8.) * pow(max(az, 0.), 3.) * low * .45;
+      glow += isSun * sunc * hue * (pow(m0, 40.) * .42 + pow(m0, 9.) * .08) * (.35 + .9 * low) * uHaze;   // (a sun's glare through the haze, wider and warmer the lower it is)
+      col += glow;
+      if (uDetail < .5) {
+        col += sunc * pow(m0, 1800.) * 1.5;   // (low quality: no clouds, no stars, a small disc - and no tone mapping to soften a big one)
+      } else {
+        vec3 base = col;
+        // ---- stars (on the faces of a cube round the eye: a cell, maybe a star in it, at a place and of a brightness of its own)
+        if (uStars > 0.) {
+          vec3 a = abs(d); vec2 fu; float fc, am;
+          if (a.x >= a.y && a.x >= a.z) { fu = d.yz / a.x; fc = d.x > 0. ? 1. : 2.; am = a.x; }
+          else if (a.y >= a.z) { fu = d.xz / a.y; fc = d.y > 0. ? 3. : 4.; am = a.y; }
+          else { fu = d.xy / a.z; fc = d.z > 0. ? 5. : 6.; am = a.z; }
+          vec3 mwn = normalize(vec3(.42, .38, .82));
+          float mb = dot(d, mwn), band = exp(-mb * mb / .022);
+          vec2 g = fu * 130., ci = floor(g), f = g - ci;
+          vec3 r = h3(vec3(ci, fc * 31.7)), r2 = h3(vec3(ci + 71.3, fc * 7.1));
+          float pres = step(r.x, .028 * (1. + 2.2 * band));
+          float I = .018 * pow(max(r.y, .0015), -.84);
+          float pw = uPix * 130. / (am * am);
+          float sg = max(pw * .6, .006) * (1. + .1 * log(1. + I * 4.));
+          vec2 q = (f - .2 - .6 * r2.xy) / sg;
+          float st = exp(-dot(q, q)) * pres * I;
+          st *= 1. + (.2 + .45 * (1. - smoothstep(.12, .55, hp))) * sin(uT * (2.6 + 5. * r2.z) + r.z * 40.) * sin(uT * (1.1 + 2. * r.z) + r2.x * 30.);
+          vec3 sc = mix(mix(vec3(.74, .84, 1.12), vec3(1.), smoothstep(.0, .45, r.z)), vec3(1.12, .93, .74), smoothstep(.72, 1., r.z));
+          // the galaxy's band: a faint glow, torn by dark lanes
+          vec3 mw = vec3(0.);
+          if (uDetail > 1.5) {   // (medium quality: no galaxy)
+            vec2 mq = vec2(atan(dot(d, normalize(cross(mwn, vec3(0., 1., 0.)))), dot(d, normalize(cross(mwn, cross(mwn, vec3(0., 1., 0.)))))) * 1.3, mb * 4.);
+            float mt = texture2D(tN, mq * .35).r, ml = texture2D(tN, mq * .9 + .5).a;
+            mw = vec3(1., .96, .9) * band * (.4 + .9 * mt) * (1. - .7 * smoothstep(.5, .7, ml) * smoothstep(.25, .0, abs(mb))) * .0035;
+          }
+          float sky = lum(base), ext = smoothstep(.0, .3, h);
+          col += (sc * max(st - sky * 4., 0.) + mw * max(0., 1. - sky * 60.)) * ext * uStars;
+        }
+        // ---- the sun or the moon
+        vec3 up = abs(s.y) > .99 ? vec3(1., 0., 0.) : vec3(0., 1., 0.), bR = normalize(cross(s, up)), bU = cross(bR, s);
+        vec2 bq = vec2(dot(d, bR), dot(d, bU)) / uBody.y;
+        float br = length(bq), aa = uPix / uBody.y * 1.3, disc = (1. - smoothstep(1. - aa, 1. + aa, br)) * step(0., mu);
+        if (uBody.x > .5 && uBody.x < 1.5) {
+          float ld = sqrt(max(0., 1. - br * br));
+          float ex = smoothstep(.02, .5, s.y);   // (low down, through more air: dimmer, redder - a disc one can look at)
+          col += sunc * mix(vec3(1., .55, .28), vec3(1.), ex) * (uBody.w * mix(.5, 1., ex) * disc * (.45 + .55 * ld) + pow(m0, 600.) * 2.2 + pow(m0, 90.) * .35 * uHaze);
+        } else if (uBody.x > 1.5) {
+          vec3 n = vec3(bq, sqrt(max(0., 1. - dot(bq, bq))));
+          float ph = uBody.z, nl = dot(n, vec3(sin(ph) * .8, -sin(ph) * .6, cos(ph)));
+          float lit = smoothstep(-.04, .1, nl) * (.82 + .18 * nl);
+          float mar = texture2D(tN, bq * .16 + vec2(.37, .61)).a, cr = texture2D(tN, bq * .7 + vec2(.13, .29)).g;
+          float alb = 1. - .42 * smoothstep(.5, .62, mar) - .16 * (cr - .5);
+          lit *= mix(1., .55 + .45 * smoothstep(-.9, .9, dot(bq, vec2(.7, .7))), uBody2.y);
+          vec3 mc = mix(vec3(lum(sunc)) * vec3(1.03, .99, .92), sunc, uBody2.x);
+          col += mc * uBody.w * disc * alb * (lit + .02);
+        }
+        // ---- the clouds' shade and light: the shade lit by the sky overhead, greyer and cooler than the sky's own colours, against
+        // the warm of the sun on them; the light as bright beside the sky as sun- or moonlit cloud is (the moon's is the night's whole light)
+        vec3 amb = mix(mix(mid, top, .4), H, .25) * .85; amb = mix(vec3(lum(amb)), amb, .55) * mix(vec3(1.), top / max(.0001, lum(top)), .12);
+        float skyL = lum(top) * .3 + lum(mid) * .5 + lum(H) * .2;
+        vec3 litC = sunc * mix(vec3(1.), hue, low * isSun) * skyL * (isSun > .5 ? 2.4 : 3.2) * (.6 + .4 * m0);
+        litC *= mix(vec3(1.), H / max(.0001, max(H.r, max(H.g, H.b))), .3);   // (the light that reaches them has come through the same air)
+        vec2 wv = uCl2.xy * (uT * uCl2.z);
+        // ---- far cumulus standing on the horizon beyond the hills, as such clouds look from tens of kilometres: hazed and pale, hardly
+        // brighter or darker than the sky behind them; only the lit edges of their heads read, their bases are lost in the haze. A
+        // section of cloud standing upright: a noise read round the horizon (azimuth) and up it (elevation) at one scale, cloud where it
+        // passes a threshold that rises with height, so the outline is the noise's own (no line, no arc). Where banks stand and how high
+        // they reach comes from a much slower noise round the horizon. Over the false sky's sea of cloud they rise out of it.
+        if (uBody2.z > .001 && h > -.07 && h < .16) {
+          // (their foot: some two degrees under the horizon, behind the far hills - from a tower or a bridge too there is no line
+          // where they stand - or down in the sea of cloud)
+          float base = uBody2.w > .5 ? -.05 : -.035;
+          // (on some third to a half of the horizon: read from a blurred level of the noise, so that a bank tapers away over many
+          // degrees - read sharp, it ended in an upright edge)
+          float pres = smoothstep(.38, .62, texture2D(tN, dh * .4 + vec2(.13, .71), 3.).a);
+          float Hm = (uBody2.w > .5 ? .03 : .05) + .08 * pow(texture2D(tN, dh * .8 + vec2(.52, .27), 2.).r, 1.5);   // (two to six degrees over the horizon, now and then eight)
+          float e = h - base;
+          if (pres > .01 && e < Hm * 1.2) {
+            // (24 times round, the finer octaves 3 and 6 times that: whole numbers, so the noise meets itself where the angle wraps round)
+            vec2 q = vec2(azS * 24., e * 3.82) + wv * .004;   // (the same scale up as across)
+            float n = texture2D(tN, q).r * .62 + texture2D(tN, q * 3. + .31).g * .26 + texture2D(tN, q * 6. + .57).g * .12;
+            float nu = texture2D(tN, q + vec2(0., .02)).r * .62 + texture2D(tN, q * 3. + .31 + vec2(0., .06)).g * .26 + texture2D(tN, q * 6. + .57).g * .12;
+            // (solid low down, more and more broken toward the tops; toward the ends of a bank the cloud thins out by the noise, not
+            // along a line: no slopes like a hill's)
+            float k = clamp(e / (Hm * (.15 + .85 * pres)), 0., 1.2), thr = .1 + .66 * pow(k, 2.5) + (1. - pres) * .25;
+            float den = smoothstep(thr, thr + .1, n);
+            // light: the tops (where the cloud thins upward) and the side toward the sun or moon brighter, lower down greyer
+            float lit = clamp((n - nu) * 9. + .35, 0., 1.) * (.55 + .45 * pow(max(az, 0.) * .5 + .5, 2.)) * smoothstep(.0, .7, k);
+            vec3 cl = mix(vec3(lum(amb)) * .9, amb, .5) + litC * (.15 + .45 * lit);   // (far off: hardly brighter than the sky behind)
+            vec3 air = mix(fogc, H + glow, smoothstep(-.01, .03, h));
+            bc = mix(cl, air, .84 - .08 * k);   // (most of the way into the colour of the air)
+            bA = den * smoothstep(.0, .6, k) * smoothstep(.01, .3, pres) * uBody2.z;   // (the foot lost in the haze altogether, slowly)
+          }
+        }
+        // ---- clouds
+        float ca = 0., cs = 0.;
+        if (uCl.x > .001) {
+          float hh = hp + .045;
+          vec2 cp = d.xz / hh, uv = cp * uCl2.w + wv;
+          float far = 1. - exp(-.07 / hh);
+          // the sky's broad reaches: some clearer, some more clouded
+          vec4 nl = texture2D(tN, uv * .23 + wv * .3 + .61);
+          float cov = clamp(uCl.x + (nl.a - .5) * .7 * (1. - uCl.x * uCl.x), 0., 1.);
+          // a heavy deck ends somewhere: low toward a low sun, its edge, and the light coming in under it - and nowhere else
+          float gap = .9 * low * isSun * pow(max(az, 0.), 2.) * (1. - smoothstep(.03, .32, hp)) * smoothstep(.6, .9, uCl.x);
+          cov = clamp(cov - gap, 0., 1.);
+          // high cirrus: fibres drawn out along the wind, in patches, catching the light
+          if (uCl.z > .001 && uDetail > 1.5) {   // (medium quality: no cirrus)
+            vec2 cq = cp * .4, rq = vec2(dot(cq, uCl2.xy), dot(cq, vec2(-uCl2.y, uCl2.x)));
+            vec2 cw = texture2D(tN, vec2(rq.x * .035, rq.y * .12) + wv * .3 + .17).ga - .5;   // (a slow bend along the streaks, here and there a hook)
+            rq.y += cw.x * .18 + cw.y * abs(cw.y) * .5;
+            // (a smooth noise drawn out a dozen times along the wind: fine streaks side by side, long and short - not the closed
+            // loops a ridged noise makes)
+            float fi = texture2D(tN, vec2(rq.x * .16, rq.y * 2.) + wv * .9 + .41).a;
+            // (along each fibre: where it breaks off, thickens and thins; across: finer threads fraying off it)
+            // (each fibre its own: where it breaks, how thick and how dense, read at its own place across the streaks)
+            float brk = texture2D(tN, vec2(rq.x * 2.6, rq.y * 7.) + .23).r, fr = texture2D(tN, vec2(rq.x * 1.1, rq.y * 11.) + .67).g;
+            float wdt = .8 - .22 * brk;
+            float cia = smoothstep(wdt - .08, wdt + .05, fi + (fr - .5) * .1) * smoothstep(.2, .55, brk) * (.3 + .7 * fr * fr)
+              * (.35 + .65 * smoothstep(-.2, .3, cw.y)) * smoothstep(.5, .8, nl.r) * uCl.z * smoothstep(.0, .14, h) * (1. - far * .85);
+            col = mix(col, amb + litC * (.55 + 1.5 * pow(m0, 6.)), cia * .5);
+          }
+          float gd = texture2D(tN, uv * 3.3 + wv * .45 + .37).g;
+          float t0 = .72 - .84 * pow(cov, 1.4), sf = .05 + .22 * uCl.y;   // (from a few heaps to a deck closed from horizon to horizon)
+          t0 = mix(t0, -.7, smoothstep(.85, .97, uCl.x) * (1. - smoothstep(.0, .25, gap)));   // (a closed deck: no stray hole in it)
+          vec2 uw = uv + (nl.gb - .5) * .05;   // (the heaps bent a little by the broad noise: no two alike)
+          float xr = texture2D(tN, uw).r, x = xr - (1. - gd) * .45 * (1. - xr);   // (the fine billows eat at the thin edges, hardly at the cores)
+          // how deep into the cloud this is (its edge thin and bright against the light, its core and base in its own shade), and how
+          // much cloud lies between here and the body (a step toward it in the layer)
+          float den = smoothstep(t0, t0 + sf, x), thick = smoothstep(t0, t0 + .28, x);
+          float xr2 = texture2D(tN, uw + sh * .028).r, x2 = xr2 - (1. - gd) * .45 * (1. - xr2);
+          float sunL = exp(-smoothstep(t0, t0 + .28, x2) * (1.3 + 2.4 * uCl.y));
+          float sil = pow(m0, 5.) * den * (1. - thick) * 2.2;
+          float oc = smoothstep(.6, 1., cov);   // (a closed deck: lit from below by the light of the land and the air, never black)
+          vec3 cb = max(amb, fogc * mix(1.6, .8, smoothstep(.02, .15, lum(fogc))) * oc);
+          vec3 cc = cb * (.85 - (.35 + .35 * uCl.y) * thick * (1. - .5 * oc)) + litC * (sunL * (.5 + .45 * (1. - uCl.y)) + sil);
+          // a closed deck is not one grey: its underside sags and rolls, darker where it hangs lowest; round the hidden body it glows through
+          cc *= mix(1., .35 + 1.3 * (1. - smoothstep(.15, .9, x)), max(uCl.y, .5) * oc);
+          cc += litC * pow(m0, 14.) * .7 * thick * uCl.y;
+          cc = mix(cc, vec3(lum(cc)), .3 * uBody2.x);   // (under a blood-red moon the clouds stay greyer than the sky's own red)
+          cc += uUnder.rgb * uUnder.a * thick * exp(-hp * 4.);
+          cc = mix(cc, H + glow, far * .8);
+          ca = den * smoothstep(-.005, .05, h) * (1. - far * .5 * (1. - oc));
+          cs = thick * (.75 + .25 * gd) * (.25 + .75 * smoothstep(.25, .95, xr) * smoothstep(.2, .8, nl.r));   // (what a flash inside lights up: the bulk of the cloud, in great uneven masses)
+          // (the cloud layer passes in front of the banks; low down it is so drawn out toward the horizon that it would cut them in
+          // upright strips: there, only as much as it shows itself)
+          col = mix(col, cc, ca); bA *= 1. - ca * (1. - far);
+          // scud under a rain deck: ragged rolls, lower and faster, darker
+          if (uCl.w > .001) {
+            float sd = texture2D(tN, d.xz / (hp + .03) * uCl2.w * 1.7 + wv * 2.6).a;
+            float sa = smoothstep(.5, .8, sd) * uCl.w * smoothstep(.0, .05, h) * (1. - far * .5);
+            col = mix(col, col * .78 + amb * .04, sa * .7); ca = max(ca, sa); cs = mix(cs, cs * .85, sa);   // (in a flash: lit as the deck behind it)
+          }
+        }
+        // ---- a lightning flash: the clouds lit from inside round where it is, the whole sky a little
+        if (uFlash.w > 0.) col += vec3(.75, .82, 1.) * uFlash.w * (exp(-(1. - dot(d, normalize(uFlash.xyz))) * 6.) * (.05 + ca * (.06 + .75 * cs)) + .02 * ca) * smoothstep(-.02, .1, h);
+      }
+      // ---- the ground fog seen through (a layer some metres deep: the longer the way through it, the more it veils), and under the horizon
+      float fl = 7. / max(h, .02), tr = exp(-uFogD * uFogD * fl * fl), fv = tr * smoothstep(-.01, .03, h);
+      col = mix(fogc, col, fv);
+      if (bA > 0.) col = mix(col, mix(fogc, bc, max(fv, .8)), bA);
+      col += vec3(.75, .82, 1.) * uFlash.w * .05 * (1. - fv) * step(.5, uDetail);   // (a flash lights the low murk too)
+      gl_FragColor = vec4(col, 1.0);
+      #include <colorspace_fragment>
+    }`;
+  // the field's clouds (from its sky mood): cover, darkness of the deck, cirrus, scud, wind speed (1: some 0.006 layer heights a second),
+  // the scale of the heaps and the banks on the horizon; under: a glow from below (fires on the ground)
+  const SKY_CL = [0.3, 0.3, 0.3, 0, 1, 1, 0];   // (the seventh: how much of the horizon has banks of cloud standing on it)
+  function skyBody(B) {
+    if (B.outdoor === 'void') return 0; // (the last guardian's void: the eclipse is a thing of its own, levelgen.js)
+    return (B.body || ((B.night || B.stars) ? 'moon' : 'sun')) === 'moon' ? 2 : 1;
+  }
+  // The dome and its material are made once and kept; each area only sets their values. (A material thrown away takes its shader
+  // with it, and the next open-air area had to compile that again, all at once, in the middle of the change of area.)
+  function skyMake() {
+    if (skyMesh) return skyMesh;
+    const C = () => new THREE.Color(), V4 = (x, y, z, w) => new THREE.Vector4(x || 0, y || 0, z || 0, w || 0);
+    const mat = new THREE.ShaderMaterial({
+      name: 'sky', side: THREE.BackSide, depthWrite: false, depthTest: true, fog: false,
+      uniforms: {
+        top: { value: C() }, mid: { value: C() }, hor: { value: C() }, sun: { value: new THREE.Vector3(0, 1, 0) }, fogc: { value: C() }, sunc: { value: new THREE.Vector3(1, 0.85, 0.6) },
+        tN: { value: skyNoiseTex() }, uT: { value: 0 }, uDetail: { value: 2 }, uPix: { value: 0.0015 }, uStars: { value: 0 }, uHaze: { value: 1 }, uFogD: { value: 0 },
+        uCl: { value: V4() }, uCl2: { value: V4(1) }, uBody: { value: V4(1, 0.013, 0, 40) }, uBody2: { value: V4() }, uFlash: { value: V4(0, 1) }, uUnder: { value: V4() },
+      },
+      vertexShader: SKY_VS, fragmentShader: SKY_FS, extensions: { derivatives: true },
+    });
+    skyMesh = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), mat);
+    skyMesh.renderOrder = 50; skyMesh.frustumCulled = false;   // (after the solid world: only the sky that shows is shaded)
+    return skyMesh;
+  }
+  function setSky(B) {
+    if (skyDome) { scene.remove(skyDome); skyDome = null; }
+    skyGen++;
+    if (!B.outdoor && !(B.sky && B.sunDir)) return; // (the great shaft is roofless: its night sky shows through the opening)
+    const m = skyMake(), u = m.material.uniforms;
+    const cl = Object.assign([], SKY_CL, B.cl || []), body = skyBody(B), key = B.name || '';
+    // the wind's way and the moon's phase: fixed for the field (from its name: no dice of the area are thrown here)
+    const hk = (U.hashStr ? U.hashStr('sky:' + key) : 7) >>> 0, wa = (hk % 6283) / 1000, sunc = u.sunc.value.set(...(B.sunCol || [1.0, 0.85, 0.6]));
+    const tint = body === 2 && Math.max(sunc.x, sunc.y, sunc.z) / Math.max(0.001, Math.min(sunc.x, sunc.y, sunc.z)) > 2.5 ? 0.9 : 0.25;  // (a blood-red moon keeps its colour; a pale one is near white)
+    const phase = B.phase ?? (tint > 0.5 ? 0 : 0.25 + ((hk >>> 8) % 1000) / 1000 * 1.1);
+    u.top.value.set(B.sky[0]); u.mid.value.set(B.sky[1]); u.hor.value.set(B.sky[2]); u.fogc.value.set(B.fog); u.sun.value.set(...B.sunDir).normalize();
+    u.uT.value = GM.time % 3600; u.uStars.value = B.stars ? 1 : 0; u.uHaze.value = B.haze || 1; u.uFogD.value = scene.fog.density;
+    u.uCl.value.set(cl[0], cl[1], cl[2], cl[3]); u.uCl2.value.set(Math.cos(wa), Math.sin(wa), cl[4] * 0.006 * cl[5] * 0.12, cl[5] * 0.12);
+    u.uBody.value.set(body, body === 2 ? 0.023 : 0.013, phase, body === 2 ? (tint > 0.5 ? 0.4 : 1.9) : 40); u.uBody2.value.set(tint, tint > 0.5 ? 1 : 0, cl[6], 0);
+    u.uFlash.value.set(0, 1, 0, 0);
+    if (B.under) { const ug = new THREE.Color(B.under[0]); u.uUnder.value.set(ug.r, ug.g, ug.b, B.under[1]); } else u.uUnder.value.set(0, 0, 0, 0);
+    u.uBody2.value.w = B.outdoor === 'sky' ? 1 : 0;   // (an island in the air: under the horizon is more sky, a sea of cloud)
+    m.visible = true; skyDome = m; scene.add(m);
+    scene.background = new THREE.Color(B.sky[2]);
+    skyTick();
+  }
+  // behind the loading screen (warmup.js): the dome's shader and the clouds' noise made now, not with the first open-air area. The dome
+  // is put in the scene for the shaders to be compiled with it; what is returned takes it out again (if the area has no sky)
+  GM.skyWarm = function () { const m = skyMake(); if (m.parent) return null; scene.add(m); return () => { if (m !== skyDome && m.parent) m.parent.remove(m); }; };
+  // every frame: the sky's clock, the size of a pixel (the stars stay points when the view zooms), quality, lightning, the fog's thickness
+  const skyPx = new THREE.Vector2();
+  function skyTick() {
+    if (!skyDome) return;
+    const u = skyDome.material.uniforms, q = G.save.data.settings.quality, S = G.Sky;
+    u.uT.value = GM.time % 3600;
+    u.uDetail.value = q === 'low' ? 0 : q === 'med' ? 1 : 2;
+    renderer.getDrawingBufferSize(skyPx);
+    u.uPix.value = 2 * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, skyPx.y);
+    u.uFogD.value = scene.fog.density;
+    const fa = S && S.flashA ? S.flashA : 0; u.uFlash.value.w = fa;
+    if (fa > 0 && S.flashDir) u.uFlash.value.set(S.flashDir[0], S.flashDir[1], S.flashDir[2], fa);
+  }
+  GM.skyTick = skyTick;
 
   // ---------------- stage mood: special areas tint the whole scene ----------------
   const MOODS = {
@@ -273,18 +565,18 @@
   GM.setDarkness = function (on) {
     if (on) {
       if (GM._dark) return;
-      GM._dark = { dome: skyDome, env: scene.environment, lk: G.LIGHT_K, sky: skyDome ? ['top', 'mid', 'hor', 'fogc'].map((u) => skyDome.material.uniforms[u].value.clone()) : null, sunc: skyDome ? skyDome.material.uniforms.sunc.value.clone() : null, starsVis: skyDome && skyDome.children[0] ? skyDome.children[0].visible : null };
+      GM._dark = { dome: skyGen, env: scene.environment, lk: G.LIGHT_K, sky: skyDome ? ['top', 'mid', 'hor', 'fogc'].map((u) => skyDome.material.uniforms[u].value.clone()) : null, sunc: skyDome ? skyDome.material.uniforms.sunc.value.clone() : null, starsVis: skyDome ? skyDome.material.uniforms.uStars.value : null };
       scene.environment = null; G.LIGHT_K = LIGHT_K * 0.22;
       // the hands / weapon have their own lights: dim those too (the lamp still catches them a little)
       const vs = G.weapons.vmScene;
       if (vs) { GM._dark.vmEnv = vs.environment; vs.environment = null; GM._dark.vmL = []; vs.traverse((o) => { if (o.isLight && o.intensity > 0) { GM._dark.vmL.push([o, o.intensity]); o.intensity *= 0.4; } }); }
-      if (skyDome) { for (const u of ['top', 'mid', 'hor', 'fogc']) skyDome.material.uniforms[u].value.multiplyScalar(0.05); skyDome.material.uniforms.sunc.value.multiplyScalar(0.05); if (skyDome.children[0]) skyDome.children[0].visible = false; }
+      if (skyDome) { for (const u of ['top', 'mid', 'hor', 'fogc']) skyDome.material.uniforms[u].value.multiplyScalar(0.05); skyDome.material.uniforms.sunc.value.multiplyScalar(0.05); skyDome.material.uniforms.uStars.value = 0; }
     } else {
       const d = GM._dark; if (!d) return;
       scene.environment = d.env; G.LIGHT_K = d.lk;
       const vs = G.weapons.vmScene;
       if (vs) { if (d.vmEnv !== undefined) vs.environment = d.vmEnv; for (const [o, i] of d.vmL || []) o.intensity = i; }
-      if (skyDome && d.sky && d.dome === skyDome) { ['top', 'mid', 'hor', 'fogc'].forEach((u, i) => skyDome.material.uniforms[u].value.copy(d.sky[i])); skyDome.material.uniforms.sunc.value.copy(d.sunc); if (skyDome.children[0] && d.starsVis !== null) skyDome.children[0].visible = d.starsVis; }
+      if (skyDome && d.sky && d.dome === skyGen) { ['top', 'mid', 'hor', 'fogc'].forEach((u, i) => skyDome.material.uniforms[u].value.copy(d.sky[i])); skyDome.material.uniforms.sunc.value.copy(d.sunc); if (d.starsVis !== null) skyDome.material.uniforms.uStars.value = d.starsVis; }
       GM._dark = null;
     }
   };
@@ -307,7 +599,7 @@
         E.y = ny; E.col.y1 = ny; E.col.y0 = ny - 0.7; E.mesh.position.y = ny;
         if (inXZ && P.pos.y > ny - dy - 0.9 && P.pos.y < ny + 0.6) { P.pos.y = Math.max(P.pos.y, ny); if (P.vel.y < 0) P.vel.y = 0; P.grounded = true; }
         P.addShake(dt * 0.25);
-        if (Math.random() < dt * 30) G.fx.add.spawn(U.rand(E.x0, E.x1), ny - 0.4, U.rand(E.z0, E.z1), U.rand(-0.5, 0.5), -U.rand(1, 3), U.rand(-0.5, 0.5), 0.8, 0.12, 0.02, 0.8, 0.5, 1, 0.9, 2, 0.5);
+        for (let n = spawnN(dt * 30); n > 0; n--) G.fx.add.spawn(U.rand(E.x0, E.x1), ny - 0.4, U.rand(E.z0, E.z1), U.rand(-0.5, 0.5), -U.rand(1, 3), U.rand(-0.5, 0.5), 0.8, 0.12, 0.02, 0.8, 0.5, 1, 0.9, 2, 0.5);
         if (ny >= E.y1) { E.state = 'top'; G.sfx.bell && G.sfx.bell(); G.fx.ring(V((E.x0 + E.x1) / 2, ny + 0.05, (E.z0 + E.z1) / 2), 4, 0xb070ff, 0.6); }
       }
     }
@@ -343,13 +635,13 @@
     hemi.color.copy(F.hemi).lerp(DAWN.hemi, k); hemi.intensity = U.lerp(F.hemiI, 1.2, k);
     amb.intensity = U.lerp(F.amb, 0.9, k);
     moon.color.copy(F.moon).lerp(DAWN.moon, k); moon.intensity = U.lerp(F.moonI, 2.4, k);
-    if (skyDome && F.sky) { ['top', 'mid', 'hor'].forEach((u, i) => skyDome.material.uniforms[u].value.copy(F.sky[i]).lerp(DAWN.sky[i], k)); if (k > 0.5) skyDome.children.forEach((ch) => { ch.visible = false; }); }
+    if (skyDome && F.sky) { ['top', 'mid', 'hor'].forEach((u, i) => skyDome.material.uniforms[u].value.copy(F.sky[i]).lerp(DAWN.sky[i], k)); if (k > 0.5) skyDome.material.uniforms.uStars.value = 0; }
     G.fx.setFog(scene.fog.color, scene.fog.density);
     // the eclipse burns into a rising sun
-    if (w.eclipse) { w.eclipse.children.forEach((ch) => { if (ch.material && ch.material.color) ch.material.color.lerp(new THREE.Color(ch.material.blending === THREE.AdditiveBlending ? '#ffe0a0' : '#fff6d0'), Math.min(1, dt * 1.5)); }); w.eclipse.position.y += dt * 4 * (1 - k); }
+    if (w.eclipse) { w.eclipse.children.forEach((ch) => { if (ch.material && ch.material.color) ch.material.color.lerp(new THREE.Color(ch.material.blending === THREE.AdditiveBlending ? '#ffe0a0' : '#fff6d0'), 1 - Math.exp(-dt * 1.5)); }); w.eclipse.position.y += dt * 4 * (1 - k); }
     if (D.beam) { D.beam.material.opacity = Math.min(0.35, D.t * 0.25) * (D.t > 8 ? Math.max(0, 1 - (D.t - 8) / 4) : 1); D.beam.rotation.y += dt * 0.3; }
     // golden motes rise from the whole island for a while
-    if (D.t < 14 && Math.random() < dt * 60) { const c = w.arenaCenter, a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 26; G.fx.add.spawn(c.x + Math.cos(a) * r, 0.2, c.z + Math.sin(a) * r, 0, U.rand(1, 3), 0, U.rand(2, 4), U.rand(0.08, 0.16), 0.02, 1.2, 1.0, 0.6, 1, -0.3, 0.2); }
+    if (D.t < 14) for (let n = spawnN(dt * 60); n > 0; n--) { const c = w.arenaCenter, a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 26; G.fx.add.spawn(c.x + Math.cos(a) * r, 0.2, c.z + Math.sin(a) * r, 0, U.rand(1, 3), 0, U.rand(2, 4), U.rand(0.08, 0.16), 0.02, 1.2, 1.0, 0.6, 1, -0.3, 0.2); }
   }
   function updateDread(dt) {
     const w = G.world, b = GM.moodBase;
@@ -382,7 +674,7 @@
     if (GM.drone) GM.drone.set(GM.bossEngaged ? 0.35 : k);
     const cp = camera.position;
     // falling ash, embers, dark wisps creeping up from the ground
-    if (Math.random() < dt * (4 + k * 30)) G.fx.norm.spawn(cp.x + U.rand(-12, 12), cp.y + U.rand(3, 8), cp.z + U.rand(-14, 6), U.rand(-0.3, 0.3), -U.rand(0.4, 0.9), U.rand(-0.3, 0.3), 7, 0.05, 0.05, 0.25, 0.22, 0.2, 0.8, 0, 0);
+    for (let n = spawnN(dt * (4 + k * 30)); n > 0; n--) G.fx.norm.spawn(cp.x + U.rand(-12, 12), cp.y + U.rand(3, 8), cp.z + U.rand(-14, 6), U.rand(-0.3, 0.3), -U.rand(0.4, 0.9), U.rand(-0.3, 0.3), 7, 0.05, 0.05, 0.25, 0.22, 0.2, 0.8, 0, 0);
     if (k > 0.25 && Math.random() < dt * k * 22) G.fx.add.spawn(cp.x + U.rand(-10, 10), cp.y + U.rand(-1.5, 1), cp.z + U.rand(-12, 4), U.rand(-0.3, 0.3), U.rand(0.5, 1.4), U.rand(-0.3, 0.3), 2.2, 0.06, 0.01, 1, 0.35, 0.1, 0.9, 0, 0);
     if (k > 0.35 && Math.random() < dt * k * 14) G.fx.norm.spawn(cp.x + U.rand(-8, 8), P.pos.y + 0.05, cp.z + U.rand(-10, 3), U.rand(-0.1, 0.1), U.rand(0.3, 0.7), U.rand(-0.1, 0.1), 2.5, 0.35, 1.2, 0.06, 0.0, 0.05, 0.55, -0.1, 1);
     if (!GM.bossEngaged) {
@@ -707,9 +999,11 @@
       fade.classList.add('on'); GM._warming = true;
       // (what turns up later in the area, as samples: their shaders made now with the rest; the compile is started at once, so they leave at once)
       const kit = G.Warm.lateKit ? G.Warm.lateKit() : null; if (kit) G.scene.add(kit);
-      GM._warmP = G.Warm.worldAsync().then(() => { GM._warming = false; if (!had) fade.classList.remove('on'); });
+      // (and, while the drivers compile, where the gates' signs will hang and their faces: areas.js prepClear - they held the clear's frame)
+      const prep = G.Areas.prepClear ? G.Areas.prepClear(w) : null;
+      GM._warmP = Promise.all([G.Warm.worldAsync(), prep]).then(() => { GM._warming = false; if (!had) fade.classList.remove('on'); });
       if (kit) G.scene.remove(kit);
-    } else if (G.Warm) G.Warm.world();
+    } else { if (G.Warm) G.Warm.world(); if (G.Areas.prepClear) G.Areas.prepClear(w); }
   };
   function layoutName(l) { return { courtyard: '中庭', halls: '回廊', chasm: '大裂谷', terrace: '段丘', crypt: '納骨堂' }[l] || '遺構'; }
 
@@ -985,7 +1279,7 @@
       return;
     }
     fireT += dt; fireTick -= dt; fireWarnT -= dt; fireCool = 0.35;
-    if (Math.random() < dt * (30 + fireLv * 6)) G.fx.flameLick(P.pos.x + U.rand(-0.5, 0.5), P.pos.y + 0.05, P.pos.z + U.rand(-0.5, 0.5), 1.2 + fireLv * 0.08);
+    for (let n = spawnN(dt * (30 + fireLv * 6)); n > 0; n--) G.fx.flameLick(P.pos.x + U.rand(-0.5, 0.5), P.pos.y + 0.05, P.pos.z + U.rand(-0.5, 0.5), 1.2 + fireLv * 0.08);
     if (fireT < 0.25) return;
     if (fireWarnT <= 0) { fireWarnT = 4; G.ui.toast('🔥 高所は炎に包まれている！ 降りろ！', 'warn'); }
     if (fireTick <= 0) { fireTick = 0.5; fireLv++; G.combat.damagePlayer((4 + GM.area * 0.25) * (1 + (fireLv - 1) * 0.5), { src: 'aoe', elem: 'fire', pos: P.pos.clone() }); }
@@ -999,7 +1293,7 @@
     if (want && S.healHl === undefined) S.healHl = null;
     if (want && !S.healHl) {
       const h = w.miniHeal, g = new THREE.Group(); g.position.copy(h);
-      const col = 0x60ff90;
+      const col = G.fx.tone ? G.fx.tone(0xe0c080).getHex() : 0xd8b878;   // (a pale gold: the light of the water, not a green beacon)
       const outline = new THREE.Mesh(G.Props.PG.oct, new THREE.MeshBasicMaterial({ color: col, side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false })); outline.scale.set(0.9, 1.04, 0.9); outline.position.y = 0.45; outline.renderOrder = 4; g.add(outline);
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false })); glow.scale.set(3, 2.2, 1); glow.position.y = 0.8; glow.renderOrder = 5; g.add(glow);
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 8, 12, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); beam.position.y = 4; g.add(beam);
@@ -1010,7 +1304,11 @@
     if (!hl) return;
     hl.k = U.damp(hl.k, want ? 1 : 0, want ? 2 : 6, dt);
     const pulse = 0.7 + 0.3 * Math.sin(GM.time * 3);
-    hl.outline.material.opacity = 0.9 * hl.k * pulse; hl.glow.material.opacity = 0.4 * hl.k * pulse; hl.beam.material.opacity = 0.16 * hl.k * pulse; hl.ring.material.opacity = 0.6 * hl.k * pulse;
+    // (the basin's own shape and the motes rising off it say where to heal: no outline round it. From afar, and through what stands
+    // between, the warm glow and the shaft over it grow a little, so a low-health player still finds it 12 m off)
+    const far = G.camera ? U.clamp((G.camera.position.distanceTo(hl.g.position) - 5) / 8, 0, 1) : 0;
+    hl.outline.material.opacity = 0; hl.glow.material.opacity = (0.18 + 0.22 * far) * hl.k * pulse; hl.beam.material.opacity = (0.05 + 0.04 * far) * hl.k * pulse; hl.ring.material.opacity = 0;
+    if (want && Math.random() < dt * 14) { const h = G.world.miniHeal, a = Math.random() * 6.283, d = Math.random() * 0.6; G.fx.add.spawn(h.x + Math.cos(a) * d, h.y + 0.6 + Math.random() * 0.3, h.z + Math.sin(a) * d, 0, 0.35 + Math.random() * 0.4, 0, 2.0, 0.08, 0.03, 0.85, 0.7, 0.4, 0.85, -0.05, 0.4); }   // (motes of light rising off the water: with no outline round it, these and the faint shaft are what say "heal here")
     hl.ring.scale.setScalar(1 + 0.1 * Math.sin(GM.time * 3)); hl.beam.rotation.y += dt * 0.6;
     if (!want && hl.k < 0.01) { w.group.remove(hl.g); hl.beam.geometry.dispose(); hl.ring.geometry.dispose(); hl.outline.material.dispose(); S.healHl = null; }
   }
@@ -1071,7 +1369,7 @@
           a.p = Math.min(1, a.p + dt / DUR);
           const lk = Math.floor(a.p * 3 + 1e-6) / 3;
           if (lk > (a.lock || 0) && a.p < 1) { a.lock = lk; G.sfx.ui('level'); G.fx.ring(V(a.x, a.y, a.z), 2.8 * lk, 0xffd080, 0.5); }
-          if (Math.random() < dt * (20 + a.p * 40)) { const an = Math.random() * 6.28; G.fx.add.spawn(a.x + Math.cos(an) * 2.7, a.y + 0.1, a.z + Math.sin(an) * 2.7, 0, 2 + a.p * 3, 0, 0.8, 0.15, 0.02, 1.4, 0.8, 0.3, 1, -0.5, 0.5); }
+          for (let n = spawnN(dt * (20 + a.p * 40)); n > 0; n--) { const an = Math.random() * 6.28; G.fx.add.spawn(a.x + Math.cos(an) * 2.7, a.y + 0.1, a.z + Math.sin(an) * 2.7, 0, 2 + a.p * 3, 0, 0.8, 0.15, 0.02, 1.4, 0.8, 0.3, 1, -0.5, 0.5); }
           // chanting that speeds up and climbs as the rite nears completion
           a.chT = (a.chT || 0) - dt;
           if (a.chT <= 0) { a.chT = 0.55 - a.p * 0.33; G.sfx.chant ? G.sfx.chant(a.p, V(a.x, a.y + 1, a.z)) : G.sfx.crackle(P.pos); }
@@ -1170,7 +1468,7 @@
     if (flawless && stage !== 'trial') { const b = Math.round(G.Run.income((80 + n * 10) * (P.has('e_flawless') ? 2 : 1))); setTimeout(() => { G.combat.coins(b, null, '無傷'); G.ui.feed(`🏅 無傷ボーナス +${b}`, 'big'); }, 900); }
     G.buffs.emit('onAreaClear', { flawless, time: t });
     if (stage !== 'trial') G.ui.banner(bossKill && G.Run.isLast(GM.area) ? 'FALLEN' : 'AREA CLEAR', bossKill ? (G.Run.isLast(GM.area) ? '— 最後の守護者は倒れた —' : '— 守護者は倒れた —') : '— 次の道を選べ —');
-    G.sfx.ui('clear');
+    if (G.Areas.later) G.Areas.later(2, () => G.sfx.ui('clear')); else G.sfx.ui('clear'); // (a frame of its own: its first making took 20 ms of the clear's frame)
     if (!(bossKill && G.Run.isLast(GM.area))) G.Areas.openGates(); // the last guardian ends the run: no road onward
     if (stage !== 'boss') setTimeout(() => G.Areas.spawnMiniShop(), 600);
     if (G.save.data.records.bestArea < n) G.save.data.records.bestArea = n;
@@ -1599,29 +1897,35 @@
     if (o.kind === 'weapon' || o.kind === 'melee') {
       disp = o.kind === 'melee' ? G.weapons.meleeDisplayModel(o.obj) : G.weapons.displayModel(o.obj);
       const box = new THREE.Box3().setFromObject(disp); const c = box.getCenter(V()); disp.position.sub(c);
-      const wrap = new THREE.Group(); wrap.add(disp); wrap.scale.setScalar(s.big ? 1.75 : 1.3); disp = wrap; disp.position.y = s.big ? 0.55 : 0.45; // the weapon island shows its guns larger
+      const wrap = new THREE.Group(); wrap.add(disp); { const L = Math.max(box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z), cap = s.big ? 2.1 : 1.42; let k = s.big ? 1.75 : 1.3; if (L * k > cap) k = cap / L; wrap.scale.setScalar(k); } disp = wrap;   // (a long gun is shown a little smaller: it must not hide the ware on the next stand)
+      disp.position.y = s.big ? 0.55 : 0.45; // the weapon island shows its guns larger
     } else {
       disp = new THREE.Group();
       const PG = G.Props.PG;
       const col = new THREE.Color(rc);
       const m = new THREE.MeshStandardMaterial({ color: col, emissive: col.clone().multiplyScalar(0.35), metalness: 0.6, roughness: 0.3 });
-      if (o.kind === 'forge') { const an = new THREE.Mesh(PG.box, G.weapons.mats.steel); an.scale.set(0.42, 0.14, 0.2); disp.add(an); const hm = new THREE.Mesh(PG.box, w.mats.woodDark); hm.scale.set(0.05, 0.05, 0.36); hm.position.set(0.1, 0.16, 0); hm.rotation.y = 0.6; disp.add(hm); const hh = new THREE.Mesh(PG.box, G.weapons.mats.gun); hh.scale.set(0.12, 0.09, 0.09); hh.position.set(0.18, 0.16, -0.12); disp.add(hh); }
-      else if (o.kind === 'tome') { const bk = new THREE.Mesh(PG.box, new THREE.MeshStandardMaterial({ color: 0x2a4aa0, roughness: 0.6, emissive: 0x0a1840 })); bk.scale.set(0.3, 0.07, 0.4); disp.add(bk); const pg = new THREE.Mesh(PG.box, w.mats.candle); pg.scale.set(0.27, 0.05, 0.38); pg.position.x = 0.02; disp.add(pg); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0x80a0ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); gl.scale.setScalar(0.6); disp.add(gl); }
-      else if (o.kind === 'armor') { const M = G.ARMOR_MAT_BY_ID[o.obj.mat]; const am = new THREE.MeshStandardMaterial({ color: new THREE.Color(M.col), metalness: o.obj.mat === 'plate' || o.obj.mat === 'chain' ? 0.8 : 0.1, roughness: 0.5 }); const b = new THREE.Mesh(PG.box, am); b.scale.set(0.3, 0.32, 0.16); disp.add(b); const sh = new THREE.Mesh(PG.box, am); sh.scale.set(0.42, 0.08, 0.18); sh.position.y = 0.15; disp.add(sh); }
-      else if (o.kind === 'relic') { const rm = new THREE.MeshStandardMaterial({ color: 0xd0a050, metalness: 1, roughness: 0.25, emissive: 0x402008 }); const b = new THREE.Mesh(PG.oct, rm); b.scale.set(0.16, 0.24, 0.16); disp.add(b); const rr = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.012, 6, 32), rm); rr.rotation.x = 1.3; disp.add(rr); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xffb040, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false })); gl.scale.setScalar(0.7); disp.add(gl); }
-      else if (o.kind === 'revive') {
-        // soul lantern: iron frame around a pale flame
-        const iron = G.weapons.mats.gun;
-        for (const y of [-0.12, 0.12]) { const p = new THREE.Mesh(PG.box, iron); p.scale.set(0.2, 0.025, 0.2); p.position.y = y; disp.add(p); }
-        for (const [x, z] of [[-0.09, -0.09], [0.09, -0.09], [-0.09, 0.09], [0.09, 0.09]]) { const b = new THREE.Mesh(PG.box, iron); b.scale.set(0.02, 0.24, 0.02); b.position.set(x, 0, z); disp.add(b); }
-        const cap = new THREE.Mesh(PG.cone, iron); cap.scale.set(0.13, 0.1, 0.13); cap.position.y = 0.18; disp.add(cap);
-        const flame = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: 0x9ad8ff })); flame.scale.set(0.05, 0.08, 0.05); disp.add(flame);
-        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0x80c8ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })); halo.scale.setScalar(0.45); disp.add(halo);
+      // (what stands on a shop's stands, shaped in gfx.js wareGeo: an anvil, a tome, a scroll, a breastplate, a medal, a lantern, a
+      // sight, a flask, a rune stone. The part that tells the rarity takes its colour; the rest is iron, hide, glass)
+      const WG = G.GFX && G.GFX.wareGeo, WM2 = G.weapons.mats, mk = (c, o2) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.7 }, o2 || {}));
+      const MM = { rc: m, iron: WM2.gun, steel: WM2.steel, wood: w.mats.woodDark, page: w.mats.candle, leather: mk(0x3a2216), gold: mk(0x9c7a36, { metalness: 0.9, roughness: 0.4 }), glass: mk(0xa8c0c8, { transparent: true, opacity: 0.28, roughness: 0.05 }), stone: mk(0x4a4844, { roughness: 0.95 }), wax: mk(0x6e1414, { roughness: 0.45 }) };
+      const ware = (name) => { const d = WG ? WG(name) : null; if (!d) return false; for (const q of d) disp.add(new THREE.Mesh(q.g, MM[q.m] || WM2.gun)); return true; };
+      const glow = (c, sz, op) => { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false })); gl.scale.setScalar(sz); disp.add(gl); };
+      if (o.kind === 'forge') ware('forge');
+      else if (o.kind === 'tome') { ware('tome'); glow(0x80a0ff, 0.5, 0.3); }
+      else if (o.kind === 'armor') { const A = G.ARMOR_MAT_BY_ID[o.obj.mat]; MM.plate = new THREE.MeshStandardMaterial({ color: new THREE.Color(A.col), metalness: o.obj.mat === 'plate' || o.obj.mat === 'chain' ? 0.8 : 0.1, roughness: 0.5 }); ware('armor'); }
+      else if (o.kind === 'relic') { ware('relic'); glow(0xffb040, 0.6, 0.35); }
+      else if (o.kind === 'revive') {   // (the soul lantern: an iron lantern about a pale flame)
+        ware('revive');
+        const flame = new THREE.Mesh(PG.sph, new THREE.MeshBasicMaterial({ color: 0xc8e4ff })); flame.scale.set(0.04, 0.07, 0.04); disp.add(flame);
+        glow(0x80c8ff, 0.45, 0.7);
       }
-      else if (o.kind === 'skill') { const b = new THREE.Mesh(PG.box, w.mats.woodDark); b.scale.set(0.32, 0.08, 0.42); disp.add(b); const pg = new THREE.Mesh(PG.box, w.mats.candle); pg.scale.set(0.29, 0.07, 0.39); pg.position.y = 0.01; disp.add(pg); const rune = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.015, 6, 24), m); rune.rotation.x = Math.PI / 2; rune.position.y = 0.12; disp.add(rune); }
-      else if (o.kind === 'attachment') { const a = new THREE.Mesh(PG.cyl, G.weapons.mats.gun); a.scale.set(0.05, 0.28, 0.05); a.rotation.z = Math.PI / 2; disp.add(a); const b = new THREE.Mesh(PG.box, G.weapons.mats.steel); b.scale.set(0.12, 0.08, 0.1); b.position.y = 0.06; disp.add(b); }
-      else if (o.kind === 'item') { if (o.obj.cat === 'grenade') { const a = new THREE.Mesh(PG.sph, G.weapons.mats.gun); a.scale.set(0.11, 0.13, 0.11); disp.add(a); } else { const a = new THREE.Mesh(PG.cyl8, new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: 0.8, roughness: 0.1, emissive: col.clone().multiplyScalar(0.3) })); a.scale.set(0.09, 0.2, 0.09); disp.add(a); const nk = new THREE.Mesh(PG.cyl8, w.mats.woodDark); nk.scale.set(0.035, 0.08, 0.035); nk.position.y = 0.14; disp.add(nk); } }
-      else { const orb = new THREE.Mesh(PG.sph, m); orb.scale.setScalar(0.16); disp.add(orb); const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.01, 6, 32), m); r2.rotation.x = 1.2; disp.add(r2); }
+      else if (o.kind === 'skill') ware('skill');
+      else if (o.kind === 'attachment') ware('attachment');
+      else if (o.kind === 'item') {   // (a consumable as the thing it is - a roll of gauze, a kit, a flask - itemanim.js display; a flask where it has no shape)
+        if (o.obj.cat === 'grenade' && G.GrenFX) disp.add(G.GrenFX.build(o.obj.id, 1.25));
+        else { const sh = G.ItemAnim && G.ItemAnim.display ? G.ItemAnim.display(o.obj.id, { fit: 0.3 }) : null; if (sh) disp.add(sh); else ware('potion'); }
+      }
+      else ware('buff');
       disp.position.y = 0.45; disp.scale.setScalar(1.5);
     }
     g.add(disp);
@@ -1760,7 +2064,7 @@
     if (best.type === 'offer') {
       const o = best.o, ob = o.obj;
       const info = describeOffer(o);
-      G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, el: G.Elem.tagOf(ob), name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
+      G.ui.showInteract({ key: 'o' + ob.id + coins + P.wIdx, icon: o.kind === 'armor' ? G.armorIcon(ob) : ob.icon, kc: o.kind === 'item' && G.InvUI.kindCls ? G.InvUI.kindCls({ type: 'item', id: ob.id }) : '', el: G.Elem.tagOf(ob), name: ob.name, rc: G.ui.R(ob.rarity), cat: info.cat, desc: U.esc(ob.desc), stats: info.stats, note: info.note, price: (o.kind === 'forge' || o.kind === 'tome') && !o.free ? GM.priceLabel(o) : o.price, afford: coins >= ((o.kind === 'forge' || o.kind === 'tome') && !o.free ? (o.kind === 'forge' ? GM.forgeRange()[0] : GM.tomeRange()[0]) : o.price), action: info.action || '購入' });
     } else if (best.type === 'sell') {
       G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・部品・防具・消耗品・投擲物・スキル・金品を売却できる。', action: '売る' });
     } else if (best.type === 'reroll') {
@@ -1800,7 +2104,7 @@
       return;
     } else if (best.type === 'loot') {
       const g = best.g, d = G.Inv.def(g.it);
-      G.ui.showInteract({ key: 'loot' + g.it.uid, icon: d.icon, el: G.Elem.itemTag(g.it), name: d.name + (g.it.n > 1 ? ` ×${g.it.n}` : ''), rc: G.ui.R(d.rarity), cat: '地面に落ちている', desc: '', action: '拾う' });
+      G.ui.showInteract({ key: 'loot' + g.it.uid, icon: d.icon, kc: G.InvUI.kindCls ? G.InvUI.kindCls(g.it) : '', el: G.Elem.itemTag(g.it), name: d.name + (g.it.n > 1 ? ` ×${g.it.n}` : ''), rc: G.ui.R(d.rarity), cat: '地面に落ちている', desc: '', action: '拾う' });
       if (I.hit('interact')) G.Inv.pickUp(g);
       return;
     } else if (best.type === 'chestOpen') {
@@ -1839,6 +2143,8 @@
   GM.searchDur = (base) => base;
   GM.search = null;
   GM.startSearch = function (it, pos, base, icon, onDone, label) {
+    if (P.handsBlocked()) return; // (both hands go into it: not in the pile driver's slam; a reload, an item ... are put down, player.js stopActions)
+    P.beginHands('search');
     GM.search = { it, pos: pos.clone(), t: 0, dur: GM.searchDur(base), icon, onDone, label: label || '探索中…', pryT: 0 };
     G.sfx.mech('boltBack', 0, 0.8);
   };
@@ -1863,7 +2169,7 @@
     const it = S.it;
     if (it && it.lid) it.lid.rotation.x = -Math.min(0.12, k * 0.12) + Math.sin(GM.time * (30 + k * 30)) * (0.006 + k * 0.016);
     S.pryT -= dt;
-    if (S.pryT <= 0) { S.pryT = 0.3 - 0.18 * k; G.sfx.chestPry ? G.sfx.chestPry(k, S.pos) : G.sfx.mech('click'); }
+    if (S.pryT <= 0) { S.pryT = 0.3 - 0.18 * k; G.sfx.chestPry ? G.sfx.chestPry(k, S.pos, !(it && it.lid)) : G.sfx.mech('click'); } // (a thing with a lid is pried; anything else is gone through by hand)
     G.ui.holdRing(k, 'pry', { center: S.icon, label: S.label, cls: 'search' });
     if (k >= 1) { GM.search = null; G.ui.holdRing(1, 'done'); S.onDone(); }
   }
@@ -2214,7 +2520,9 @@
         if (Math.random() < 0.18) G.fx.add.spawn(x, r.y + 0.3, z, U.rand(-1, 1), U.rand(2, 5.5), U.rand(-1, 1), U.rand(0.8, 1.7), 0.05, 0.01, 1.7, 0.6, 0.15, 1, -0.4, 0.4);
         // solid (non-additive) flame bodies so the fire still reads as deep orange-red against a bright sky
         if (Math.random() < 0.5) G.fx.norm.spawn(x, r.y + 0.25, z, U.rand(-0.3, 0.3), U.rand(2.2, 4.2), U.rand(-0.3, 0.3), U.rand(0.35, 0.6), U.rand(0.6, 1.0), 0.12, 1.0, U.rand(0.25, 0.45), 0.04, 0.85, -1.2, 1);
-        if (Math.random() < 0.16) G.fx.norm.spawn(x, r.y + 1.8, z, U.rand(-0.3, 0.3), U.rand(1.2, 2.2), U.rand(-0.3, 0.3), 2.6, 0.8, 3.0, 0.05, 0.04, 0.04, 0.55, -0.2, 0.3);
+        // (the smoke off the bed: grey, climbing and spreading thin as it goes - not a black lump in a grey sky. Far off and in a thick fog it
+        // takes the fog's colour and is fainter)
+        if (Math.random() < 0.16) { const fg = scene.fog, fd = Math.hypot(x - cp.x, z - cp.z), fk = Math.min(0.6, fg.density * 7 + fd / 160), fa = (1 - 0.5 * Math.min(1, fd / 70)) * (1 - 0.4 * Math.min(1, fg.density * 18)), c0 = 0.17, c1 = 0.3; G.fx.norm.spawn(x, r.y + 1.8, z, U.rand(-0.3, 0.3), U.rand(1.0, 1.8), U.rand(-0.3, 0.3), U.rand(3.2, 4.6), 0.7, 3.6, c0 + (fg.color.r - c0) * fk, c0 * 0.95 + (fg.color.g - c0 * 0.95) * fk, c0 * 0.9 + (fg.color.b - c0 * 0.9) * fk, 0.55 * fa, -0.25, 0.35, c1 + (fg.color.r - c1) * Math.min(1, fk + 0.3), c1 + (fg.color.g - c1) * Math.min(1, fk + 0.3), c1 + (fg.color.b - c1) * Math.min(1, fk + 0.3)); }
       }
     }
   }
@@ -2227,8 +2535,9 @@
       if (!s.emit || !s.flame) continue;
       const d2 = s.pos.distanceToSquared(cp);
       if (d2 > 45 * 45) continue;
-      let a = (flameAcc.get(s) || 0) + dt * 16 * Math.min(2.5, s.flame) * (d2 > 25 * 25 ? 0.4 : 1);
-      while (a >= 1) { a -= 1; G.fx.flameLick(s.pos.x, s.pos.y, s.pos.z, s.flame, w.mats.biome.flame); }
+      let a = (flameAcc.get(s) || 0) + dt * Math.max(9, 16 * Math.min(2.5, s.flame)) * (d2 > 25 * 25 ? 0.4 : 1);   // (a small flame too is whole: never fewer than nine tongues a second)
+      const fp = s.fp || s.pos;   // (fp: where the flame is, when the light it gives is set apart from it)
+      while (a >= 1) { a -= 1; G.fx.flameLick(fp.x, fp.y, fp.z, s.flame, w.mats.biome.flame); }
       flameAcc.set(s, a);
     }
     GM._ambT = (GM._ambT || 0) - dt;
@@ -2236,11 +2545,11 @@
       GM._ambT = U.rand(0.6, 2.2);
       if (Math.random() < 0.5 && !w.mats.biome.outdoor) G.sfx.drip(V(cp.x + U.rand(-15, 15), 2, cp.z + U.rand(-15, 15)));
       if (w.mats.biome.outdoor && Math.random() < 0.5) G.sfx.wind && G.sfx.wind(w.mats.biome.outdoor === 'sky' ? 1 : 0.6);
-      let near = null, nd = 1e9; for (const s of w.lightSources) if (s.flame > 0.8) { const d = s.pos.distanceToSquared(cp); if (d < nd) { nd = d; near = s; } }
-      if (near && nd < 64) G.sfx.crackle(near.pos);
+      let near = null, nd = 1e9; for (const s of w.lightSources) if (s.flame > 0.8) { const d = (s.fp || s.pos).distanceToSquared(cp); if (d < nd) { nd = d; near = s; } }   // (a fire is heard from where it burns, not from where its light is set)
+      if (near && nd < 64) G.sfx.crackle(near.fp || near.pos);
       if (w.lavaZones.length && Math.random() < 0.5) { const z = U.pick(w.lavaZones); G.sfx.lava(V((z.x0 + z.x1) / 2, z.y || 0, (z.z0 + z.z1) / 2)); }
     }
-    if (skyDome) skyDome.position.copy(cp);
+    if (skyDome) { skyDome.position.copy(cp); skyTick(); }
     updateFinalField(dt);
     if (GM.stage === 'boss') updateDread(dt);
     else if (GM.mood && Math.random() < dt * 10) { const c = GM.mood.p; G.fx.add.spawn(cp.x + U.rand(-12, 12), cp.y + U.rand(-1.5, 4), cp.z + U.rand(-12, 12), U.rand(-0.2, 0.2), U.rand(0.1, 0.5), U.rand(-0.2, 0.2), 3, 0.05, 0.01, c[0], c[1], c[2], 0.7, 0, 0); }
@@ -2276,11 +2585,11 @@
       if (it.type !== 'chest' || !it.mesh) continue;
       const want = GM.areaCleared && !it.opened;
       if (want && !it.hl) {
-        const col = it.tier >= 3 ? 0xff68d8 : it.tier >= 2 ? 0xffc040 : it.tier ? 0x80c0ff : 0xffe0a0;
+        const col = it.tier >= 3 ? 0xd06a40 : it.tier >= 2 ? 0xe0a848 : it.tier ? 0xa8b4c0 : 0xd8c098;   // (old gold leaking from it; its worth in the tint: pale, steel, gold, copper-red)
         const g = new THREE.Group(); g.position.copy(it.pos).setY(it.pos.y - 0.5);
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
         glow.scale.set(3.6, 2.4, 1); glow.position.y = 0.5; glow.renderOrder = 5; g.add(glow);
-        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 11, 12, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false }));
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.35, 9, 12, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false }));
         beam.position.y = 5.5; beam.renderOrder = 5; g.add(beam);
         const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
         ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; ring.renderOrder = 5; g.add(ring);
@@ -2292,9 +2601,10 @@
         const h = it.hl;
         h.k = U.damp(h.k, want ? 1 : 0, want ? 1.5 : 6, dt);
         const pulse = 0.7 + 0.3 * Math.sin(GM.time * 3.2 + it.pos.x), rp = (GM.time * 0.7 + it.pos.x * 0.37) % 1;
-        h.glow.material.opacity = 0.6 * h.k * pulse;
-        h.beam.material.opacity = 0.28 * h.k * pulse;
-        h.ring.material.opacity = 0.8 * h.k * pulse; h.rip.material.opacity = 0.7 * h.k * (1 - rp); h.rip.scale.setScalar(1 + rp * 2.2);
+        h.glow.material.opacity = 0.4 * h.k * pulse; h.glow.scale.set(2.4, 1.6, 1);
+        h.beam.material.opacity = 0.07 * h.k * pulse;   // (a thin pale shaft over it, still found from afar)
+        h.ring.material.opacity = 0; h.rip.material.opacity = 0; h.rip.scale.setScalar(1 + rp * 2.2);   // (no lit rings on the floor: the light from its seams, and the shaft over it that finds it from afar)
+        if (want && Math.random() < dt * 6) G.fx.add.spawn(it.pos.x + (Math.random() - 0.5) * 0.6, it.pos.y - 0.1, it.pos.z + (Math.random() - 0.5) * 0.6, 0, 0.3 + Math.random() * 0.3, 0, 1.2, 0.04, 0.015, 0.8, 0.62, 0.32, 0.85, -0.05, 0.4);
         h.ring.scale.setScalar(1 + 0.08 * Math.sin(GM.time * 2.4));
         h.beam.rotation.y += dt * 0.5;
         if (!want && h.k < 0.01) { w.group.remove(h.g); h.beam.geometry.dispose(); h.ring.geometry.dispose(); h.rip.geometry.dispose(); it.hl = null; }
@@ -2323,14 +2633,81 @@
     }
   }
 
+  // ---------------- frame-rate cap ----------------
+  // The setting fpsCap: 0 = as often as the screen refreshes (the browser's requestAnimationFrame, as it always was), otherwise
+  // the most frames a second. The browser still calls every refresh; a call that comes before the next capped frame is due does
+  // nothing at all (no update, no drawing, no input read), and the frame that does run gets the real time since the last one that ran.
+  // When the cap does not divide the screen's rate (60 on 144 Hz), the due time is accumulated (+ 1/cap each frame run, never
+  // reset from the clock while it keeps up), so the count per second is exact and the refresh nearest each due time is the one
+  // taken: the intervals alternate between the two nearest whole numbers of refreshes (2 and 3 at 144 / 60) and no error piles up.
+  const FPS_CAPS = [30, 60, 90, 120, 144, 165, 240];
+  GM.FPS_CAPS = FPS_CAPS;
+  GM.makeFrameCap = function () {
+    let due = 0;
+    return {
+      // true = leave this refresh out. refMs: the screen's refresh interval (half of it is the leeway: the refresh nearest the due time runs)
+      skip(now, cap, refMs) {
+        if (!(cap > 0)) { due = 0; return false; }
+        const T = 1000 / cap, slack = Math.min(T, refMs > 0 ? refMs : 4) * 0.5;
+        if (due && now < due - slack) return true;
+        // (fallen more than a whole interval behind - a stall, a hidden tab, a machine slower than the cap: start again from now)
+        due = due && now - due < T ? due + T : now + T;
+        return false;
+      },
+      reset() { due = 0; },
+    };
+  };
+  const capGate = GM.makeFrameCap();
+  // the screen's refresh rate: the median interval between the browser's calls (every call, those left out included), measured
+  // all the time; the shortest median seen is kept (a heavy scene slows the calls down, it never makes the screen slower)
+  const hzIv = new Float64Array(90);
+  let hzN = 0, hzLast = 0, hzMs = 0;
+  function measureHz(now) {
+    const d = now - hzLast; hzLast = now;
+    if (!(d > 0.5 && d < 200)) return;
+    hzIv[hzN % hzIv.length] = d; hzN++;
+    if (hzN >= 30 && hzN % 30 === 0) {
+      const a = Array.from(hzIv.subarray(0, Math.min(hzN, hzIv.length))).sort((x, y) => x - y), med = a[a.length >> 1];
+      if (!hzMs || med < hzMs) hzMs = med;
+    }
+  }
+  // measured refresh rate in Hz (0 = not known yet)
+  GM.screenHz = () => (hzMs ? 1000 / hzMs : 0);
+  GM.fpsCap = () => +(G.save.data.settings.fpsCap || 0);
+  // the setting, added to the settings screen next to the graphics quality (same row parts as the others)
+  function fpsCapRow() {
+    const S = G.save.data.settings, q = document.querySelector('#screens #s-quality');
+    if (!q || document.getElementById('s-fpsCap')) return;
+    const hz = GM.screenHz(), cur = GM.fpsCap();
+    const caps = FPS_CAPS.filter((c) => !hz || c <= hz * 1.03 || c === cur);
+    const opts = [`<option value="0">画面に合わせる${hz ? `（${Math.round(hz)}）` : ''}</option>`].concat(caps.map((c) => `<option value="${c}">${c}</option>`)).join('');
+    q.closest('.set-row').insertAdjacentHTML('afterend', `<div class="set-row"><span>⏱️ フレームレートの上限</span><select id="s-fpsCap">${opts}</select><span></span></div>`);
+    const sel = document.getElementById('s-fpsCap');
+    sel.value = String(caps.includes(cur) ? cur : 0);
+    sel.onchange = () => { S.fpsCap = +sel.value; G.save.write(); capGate.reset(); };
+  }
+  GM.hookFpsCapSetting = function () {
+    const settings0 = G.ui.settings;
+    if (!settings0 || settings0._fpsCap) return;
+    G.ui.settings = function (back) { settings0.call(G.ui, back); fpsCapRow(); };
+    G.ui.settings._fpsCap = true;
+  };
+
   // ---------------- main loop ----------------
   function frame(now) {
     requestAnimationFrame(frame);
+    measureHz(now);
+    // (a cap at the screen's own rate or within 3% under it caps nothing: left to the screen, so that a 144 Hz screen that really
+    // refreshes at 144.1 does not drop a frame every few seconds)
+    const cap = GM.fpsCap();
+    if (capGate.skip(now, hzMs && cap * hzMs >= 970 ? 0 : cap, hzMs)) return;
+    GM.frameN = (GM.frameN || 0) + 1;
     const PF = G.Perf; if (PF && PF.on) PF.begin(now);
-    let dt = Math.min(0.05, (now - last) / 1000);
+    const real = (now - last) / 1000;
+    let dt = Math.min(0.05, real);
     last = now;
     if (GM._warming) { I.endFrame(); if (PF && PF.on) PF.end(); return; } // the new area's shaders are compiling: run and draw nothing
-    fpsAcc += dt; fpsN++;
+    fpsAcc += real > 0 && real < 1 ? real : dt; fpsN++;
     if (fpsAcc > 0.5) { G.ui.fps(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
     try {
       if (GM.state === 'playing' || GM.state === 'dead') update(dt);
@@ -2434,7 +2811,13 @@
     G.LightPool.update(dt, w, camera.position, GM.time);
     G.fx.update(dt, camera, renderer);
   }
+  const drawHeld = (r) => G.weapons.render(r);
   function render() {
+    if (G.Post && G.Post.active && !GM.camHook) {
+      const held = GM.state !== 'title' && GM.state !== 'dead';
+      try { G.Post.frame(scene, camera, held ? drawHeld : null, GM.time, held && G.weapons.pipOn()); return; }
+      catch (e) { G.Post.active = false; G.Post.failed = true; renderer.setRenderTarget(null); console.warn('post: off', e); } // (a GPU that will not: the plain frame from here on)
+    }
     renderer.clear();
     if (GM.camHook) { GM.camHook(camera); renderer.render(scene, camera); return; } // (development: a camera placed by hand, to look at effects from any side)
     renderer.render(scene, camera);

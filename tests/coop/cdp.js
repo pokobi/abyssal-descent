@@ -20,6 +20,13 @@ exports.sleep = sleep;
 // (--enable-unsafe-swiftshader); ABYSS_SWIFTSHADER=1 forces it (the old behaviour).
 const GPU_ARGS = process.env.ABYSS_SWIFTSHADER ? ['--use-angle=swiftshader'] : process.platform === 'win32' ? ['--use-angle=d3d11', '--enable-gpu'] : ['--enable-gpu'];
 exports.launch = async function (port) {
+  // (a browser left over from an earlier test on this port would answer in place of the new one: its saved runs and its open pages
+  // would be this test's. Say so instead of going on with it)
+  let old = null; try { old = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json(); } catch (e) { /* free: as it should be */ }
+  if (old) throw new Error(`port ${port} is taken: a browser from an earlier test is still running (end it, then run again)`);
+  // (folders of this kind left behind by a run that was cut short - stopped, timed out - are taken away when they are some hours old;
+  // one a browser still holds is left)
+  try { const T = os.tmpdir(), old = Date.now() - 6 * 3600e3; for (const n of fs.readdirSync(T)) if (n.startsWith('abyss-cdp-')) { const q = path.join(T, n); try { if (fs.statSync(q).mtimeMs < old) fs.rmSync(q, { recursive: true, force: true }); } catch (e) { /* in use */ } } } catch (e) { /* nothing to tidy */ }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'abyss-cdp-'));
   const ch = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--mute-audio', '--no-first-run', ...GPU_ARGS, '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--window-size=480,300', 'about:blank'], { stdio: 'ignore' });
   let ver = null;
@@ -51,10 +58,38 @@ exports.launch = async function (port) {
           return r.result.result.value;
         },
         async until(expr, ms) { const t0 = Date.now(); while (Date.now() - t0 < (ms || 60000)) { let v = null; try { v = await this.eval(expr); } catch (e) { /* page still loading */ } if (v) return v; await sleep(200); } throw new Error('timeout: ' + expr); },
+        // The boot is over: the loading screen gone and the game's frames running (game.js boot). The title (G.game.state 'title') is up
+        // well before that - its shaders and the faces of the text are still being made, the loading screen still covers it, and no frame
+        // has run yet: a player cannot start a run then, and a test that does acts on a game that is not going yet.
+        async booted(ms) { await this.until("!!window.G && !!G.game && !!document.getElementById('loading') && document.getElementById('loading').classList.contains('done')", ms || 180000); },
+        // A run going: its world built, no area being changed to, its shaders made (_warming), and the page's frames coming (three of
+        // them seen). The game state is not asked for unless given (state): on a PC page the run pauses at once, as no pointer lock can
+        // be had headless, and the tests put it back to 'playing' themselves.
+        async running(state, ms) {
+          await this.until(`!!window.G && !!G.game && !!G.game.run && !!G.world && !G.game._warming && !G.game.transitioning${state ? ` && G.game.state === '${state}'` : ''}`, ms || 60000);
+          await this.eval('new Promise((r) => { let n = 0; const f = () => (++n >= 3 ? r(1) : requestAnimationFrame(f)); requestAnimationFrame(f); })');
+        },
+        // n more frames of the page (the game draws and reads its input once a frame: whatever was changed is seen after this)
+        async frames(n) { await this.eval(`new Promise((r) => { let k = 0; const f = () => (++k >= ${n || 3} ? r(1) : requestAnimationFrame(f)); requestAnimationFrame(f); })`); },
+        // the game has run for t more seconds of its own time (frames, not the clock: a slow frame of a busy machine takes its time)
+        async gameFor(t, ms) {
+          const t0 = await this.eval('G.game.time');
+          // (looked at every 30 ms, so that it is not overshot by much; a page whose frames hardly come - a GPU shared with other busy
+          // browsers - is given a minute)
+          try { const T = Date.now(); while (!(await this.eval(`G.game.time >= ${t0} + ${t}`))) { if (Date.now() - T > (ms || 60000)) throw new Error('timeout: ' + t + ' s of game time'); await sleep(30); } } catch (e) {
+            throw new Error(`the game's time stood still (${e.message}): ` + await this.eval("JSON.stringify({ state: G.game.state, time: G.game.time, warming: !!G.game._warming, trans: !!G.game.transitioning, hidden: document.hidden, locked: G.input.locked, screens: [...document.querySelectorAll('#screens > *')].map((s) => s.id || s.className).slice(0, 4) })").catch(() => '?'));
+          }
+        },
         async shot(file) { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(file, Buffer.from(r.result.data, 'base64')); },
         close() { try { ws.close(); } catch (e) { /* gone */ } return fetch(`http://127.0.0.1:${port}/json/close/${t.id}`).catch(() => {}); },
       };
     },
-    close() { ch.kill(); try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 }); } catch (e) { /* chrome still holds it */ } },
+    // (the browser and all it started are ended first, then its folder is taken away: taken away at once, the folder was still held
+    // by the browser's other processes and stayed - some seventy megabytes of it for every run, in the temp folder)
+    close() {
+      try { if (process.platform === 'win32') require('child_process').spawnSync('taskkill', ['/PID', String(ch.pid), '/T', '/F'], { stdio: 'ignore' }); else ch.kill(); } catch (e) { try { ch.kill(); } catch (e2) { /* gone */ } }
+      const nap = (ms) => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch (e) { /* no waiting here */ } };
+      for (let i = 0; i < 12; i++) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* still held: again in a moment */ } if (!fs.existsSync(dir)) break; nap(300); }
+    },
   };
 };

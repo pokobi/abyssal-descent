@@ -17,8 +17,10 @@ const PORT = +process.env.COOP_PORT || 8791;
     const q = usePeer ? '' : `&local=1&lat=${lat}&jit=${jit}`;
     const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(usePeer ? 2500 : 300);
     const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
+    await g.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     check(await h.eval('G.Coop.players.size') === 2, 'guest joined the room');
     // software rendering takes seconds per frame here and proves nothing about the sync: the tests run without drawing unless shots are wanted
@@ -28,6 +30,7 @@ const PORT = +process.env.COOP_PORT || 8791;
     await g.eval(`(0, eval)(${JSON.stringify(bot)}); 1`);
     await h.eval(`G.Coop.begin(); G.game.dev = { god: ${!boss}, speed: 1 }; 1`);
     await g.until('G.game.run && G.game.state === "playing" && G.world && G.game.area >= 1 && G.Coop.fpOk !== undefined', 60000);
+    for (const pg of [h, g]) await pg.running();
     check(await g.eval('G.Coop.fpOk === true'), 'both sides built the same world');
     if (boss) {
       await h.eval(`G.Dev && G.Dev.enable && 0; G.bosses.forArea = () => '${boss}'; G.Coop.go = G.Coop.go; G.game.seed = G.game.seed; 1`);

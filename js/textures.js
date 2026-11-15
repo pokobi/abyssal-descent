@@ -251,20 +251,45 @@
       ['grass', () => gen(S, grass({ seed: 131 }), { normal: 2.5 })],
       ['marble', () => gen(S, marble({ seed: 141 }), { normal: 1.2 })],
     ];
-    T.tex = {};
-    let i = 0;
-    return new Promise((resolve) => {
-      const step = () => {
-        if (i >= tasks.length) { makeSprites(); resolve(); return; }
-        const [k, f] = tasks[i++];
-        T.tex[k] = f();
-        progress && progress(i / tasks.length, k);
-        setTimeout(step, 0);
-      };
-      step();
-    });
+    T.tex = {}; T.cpuMake = {}; T.stats = {};
+    // (the GPU makes every one of these again, finer, as soon as there is a renderer (gfx.js upgradeTextures), and nothing ever reads
+    // the CPU's: making them cost the loading screen three to four seconds for nothing. So each starts as a stand-in of one pixel, and
+    // the CPU's picture is made only for what the GPU could not make: T.cpuFill)
+    const t0 = performance.now();
+    for (const [k, f] of tasks) { T.cpuMake[k] = f; T.tex[k] = stub(); }
+    makeSprites();
+    T.stats.init = Math.round(performance.now() - t0);
+    progress && progress(1, 'sprites');
+    return Promise.resolve();
+  };
+  function stub() {
+    const one = (px, srgb) => { const t = new THREE.DataTexture(new Uint8Array(px), 1, 1, THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; };
+    return { map: one([170, 166, 160, 255], true), normalMap: one([128, 128, 255, 255], false), stub: true };
+  }
+  // the CPU's picture of k in place of its stand-in (the same object: whatever holds it follows)
+  T.cpuFill = function (k) {
+    const t = T.tex[k], f = T.cpuMake && T.cpuMake[k]; if (!t || !t.stub || !f) return;
+    const t0 = performance.now(), n = f(); t.map.dispose(); t.normalMap.dispose(); t.map = n.map; t.normalMap = n.normalMap; t.stub = false;
+    T.stats.cpu = (T.stats.cpu || 0) + Math.round(performance.now() - t0);
   };
 
+  // a picture made a pixel at a time: fn(u, v, out) writes red, green, blue and alpha (0..1) for the point u, v (0..1, v downward)
+  function pixTex(size, fn, srgb) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d'), im = g.createImageData(size, size), d = im.data, o = [0, 0, 0, 0];
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      o[0] = o[1] = o[2] = o[3] = 0; fn((x + 0.5) / size, (y + 0.5) / size, o);
+      const i = (y * size + x) * 4; d[i] = o[0] * 255; d[i + 1] = o[1] * 255; d[i + 2] = o[2] * 255; d[i + 3] = o[3] * 255;
+    }
+    g.putImageData(im, 0, 0);
+    const t = new THREE.CanvasTexture(c); if (srgb !== false) t.colorSpace = THREE.SRGBColorSpace; return t;
+  }
+  // (noise for those pictures: the same every time)
+  const _h2 = (x, y, s) => { const n = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
+  const _vn = (x, y, s) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), a = _h2(xi, yi, s), b = _h2(xi + 1, yi, s), c = _h2(xi, yi + 1, s), d = _h2(xi + 1, yi + 1, s); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
+  const _fb = (x, y, s, n) => { let v = 0, a = 0.5, t = 0; for (let i = 0; i < (n || 4); i++) { v += a * _vn(x, y, s + i * 13); t += a; x = x * 2.03 + 5.1; y = y * 2.03 + 1.7; a *= 0.5; } return v / t; };
+  const _ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  T.pixTex = pixTex; T.pn = { h2: _h2, vn: _vn, fb: _fb, ss: _ss };
   function makeSprites() {
     T.spr = {};
     T.spr.soft = canvasTex(64, (g, s) => {
@@ -272,38 +297,106 @@
       gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.7)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
       g.fillStyle = gr; g.fillRect(0, 0, s, s);
     }, false);
-    T.spr.smoke = canvasTex(128, (g, s) => {
-      for (let i = 0; i < 26; i++) {
-        const x = s / 2 + (Math.random() - 0.5) * s * 0.4, y = s / 2 + (Math.random() - 0.5) * s * 0.4, r = s * (0.12 + Math.random() * 0.22);
-        const gr = g.createRadialGradient(x, y, 0, x, y, r);
-        gr.addColorStop(0, 'rgba(255,255,255,0.22)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-        g.fillStyle = gr; g.fillRect(0, 0, s, s);
+    // ---- (the pictures of smoke, flame and of the marks things leave: made a pixel at a time, so that they have a shape. Smoke and
+    // flame are sheets of four, of which each particle is one; a particle's top is the bottom of its cell here)
+    const cell4 = (u, v) => { const cx = u < 0.5 ? 0 : 1, cy = v < 0.5 ? 0 : 1; return [cx + cy * 2, (u * 2 - cx) * 2 - 1, (v * 2 - cy) * 2 - 1]; };
+    T.spr.smoke = pixTex(256, (u, v, o) => {
+      const [k, x, y] = cell4(u, v);
+      const n = _fb(x * 3 + k * 7, y * 3, 5, 4), n2 = _fb(x * 7 - k * 3, y * 7 + k, 6, 3), wx = x + (n - 0.5) * 0.22, wy = y + (n2 - 0.5) * 0.22;   // (the puffs are not round: the place is bent by noise)
+      let dens = 0, shA = 0, wA = 0;                                       // (a heap of soft swells, each a little lighter on one side)
+      for (let i = 0; i < 13; i++) {
+        const a = _h2(i, k, 1) * 6.283, d = Math.sqrt(_h2(i, k, 2)) * 0.44, r = 0.2 + _h2(i, k, 3) * 0.27;
+        const dx = (wx - Math.cos(a) * d) / r, dy = (wy - Math.sin(a) * d) / r, q = dx * dx + dy * dy; if (q >= 1) continue;
+        const h = Math.pow(1 - q, 0.85); dens = 1 - (1 - dens) * (1 - h * 0.78); shA += (0.5 + dy * 0.5) * h * h; wA += h * h;
       }
+      const sh = wA > 0 ? shA / wA : 0.5, edge = _ss(0.97, 0.55, Math.hypot(x, y) + (n - 0.5) * 0.3);
+      const c = Math.min(1, Math.max(0, 0.5 + (sh - 0.5) * 0.7 + (n2 - 0.5) * 0.5));
+      o[0] = o[1] = o[2] = 0.58 + 0.42 * c; o[3] = Math.min(1, Math.pow(dens, 1.35) * (0.42 + 0.7 * n2) * edge * 0.95);
     }, false);
-    T.spr.flame = canvasTex(64, (g, s) => {
-      const gr = g.createRadialGradient(s / 2, s * 0.6, 0, s / 2, s * 0.55, s / 2);
-      gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(0.3, 'rgba(255,200,120,0.8)'); gr.addColorStop(1, 'rgba(255,120,40,0)');
-      g.fillStyle = gr; g.beginPath(); g.ellipse(s / 2, s * 0.55, s * 0.32, s * 0.45, 0, 0, Math.PI * 2); g.fill();
-    }, false);
-    T.spr.hole = canvasTex(64, (g, s) => {
-      const gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-      gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.18, 'rgba(10,8,6,0.95)'); gr.addColorStop(0.3, 'rgba(40,35,30,0.6)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = gr; g.fillRect(0, 0, s, s);
-      g.strokeStyle = 'rgba(20,16,12,0.5)'; g.lineWidth = 1;
-      for (let i = 0; i < 6; i++) { const a = Math.random() * 6.28; g.beginPath(); g.moveTo(s / 2, s / 2); g.lineTo(s / 2 + Math.cos(a) * s * 0.4, s / 2 + Math.sin(a) * s * 0.4); g.stroke(); }
-    });
-    T.spr.scorch = canvasTex(128, (g, s) => {
-      for (let i = 0; i < 40; i++) {
-        const a = Math.random() * 6.28, d = Math.random() * s * 0.3, x = s / 2 + Math.cos(a) * d, y = s / 2 + Math.sin(a) * d, r = s * (0.08 + Math.random() * 0.2);
-        const gr = g.createRadialGradient(x, y, 0, x, y, r);
-        gr.addColorStop(0, 'rgba(0,0,0,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = gr; g.fillRect(0, 0, s, s);
+    // (mode 'heat': how hot, in grey - the particles' sheet of four, coloured by each flame; 'col': painted white to orange - the
+    // jet at a gun's muzzle; 'one': a single tongue in grey - a pilot light)
+    const flamePic = (mode) => (u, v, o) => {
+      const [k, x, y] = mode === 'one' ? [1, u * 2 - 1, v * 2 - 1] : cell4(u, v), h = (y + 1) / 2;                      // (h: 0 at its root, 1 at its tip)
+      // (not a drop of flame with a clean edge: the place is bent more and more toward the tip, so that it leans and forks, and noise
+      // running upward tears it, most at the tip and the sides)
+      // three tongues of unequal height from one root, each wandering more the higher it goes; uneven within
+      let I = 0;
+      for (let j = 0; j < 3; j++) {
+        const top = 0.56 + _h2(j, k, 3) * 0.42; if (h >= top) continue;
+        const t = h / top, cx = (j - 1) * 0.2 * (1 - 0.6 * t) + (_fb(h * 2.4 + j * 7 + k * 3, j * 5 + k, 7, 3) - 0.5) * 1.1 * h;
+        const w = (0.34 - 0.08 * (j % 2)) * Math.pow(1 - t, 0.8) * (0.3 + 0.7 * Math.min(1, t * 5)), d = Math.abs(x - cx) / Math.max(0.001, w);
+        if (d < 1) I = Math.max(I, (1 - d * d) * (1 - Math.pow(t, 2.4)));
       }
+      I = Math.max(0, I * (0.5 + 0.95 * _fb(x * 5 + k * 3, h * 6 - k * 2, 11, 4)) - 0.04) * _ss(0, 0.06, h);
+      I = Math.min(1, I * 1.15);
+      if (mode === 'col') { o[0] = 0.62 + 0.38 * _ss(0, 0.3, I); o[1] = 0.1 + 0.88 * _ss(0.12, 0.8, I); o[2] = 0.02 + 0.85 * _ss(0.55, 1, I); }   // (white at its heart, yellow, orange, dull red where it is thinnest)
+      else o[0] = o[1] = o[2] = Math.pow(I, 1.6);
+      o[3] = _ss(0, 0.62, I);
+    };
+    T.spr.flame = pixTex(256, flamePic('heat'), false); T.spr.flameCol = pixTex(256, flamePic('col'), false); T.spr.flame1 = pixTex(128, flamePic('one'), false);
+    // a bullet's mark in stone: the hole, the crater broken out around it (lighter where the break is fresh), cracks, and soot
+    const holePic = (kind) => pixTex(128, (u, v, o) => {
+      const x = u * 2 - 1, y = v * 2 - 1, r = Math.hypot(x, y), a = Math.atan2(y, x), ca = Math.cos(a), sa = Math.sin(a);
+      const rin = 0.11 + _fb(ca * 1.6 + 3, sa * 1.6 + 3, 21, 3) * 0.07;
+      let al = 0.4 * _ss(0.95, 0.2, r) * (0.55 + 0.7 * _fb(x * 3, y * 3, 25, 3)), cr = 0.02, cg = 0.018, cb = 0.016;   // soot
+      if (kind === 'stone') {
+        const rcr = 0.36 + (_fb(ca * 2.5 + 9, sa * 2.5 + 9, 23, 3) - 0.5) * 0.34;
+        if (r < rcr) { const t = r / rcr, f = 0.045 + 0.08 * _fb(x * 9, y * 9, 27, 3) + 0.07 * t * t + (y / rcr) * 0.02, k = _ss(1, 0.84, t); al += (0.92 - al) * k; cr += (f - cr) * k; cg += (f * 0.93 - cg) * k; cb += (f * 0.84 - cb) * k; }
+        for (let i = 0; i < 5; i++) {
+          const c0 = _h2(i, 1, 31) * 6.283, len = 0.5 + _h2(i, 2, 31) * 0.42; let da = a - c0; da = Math.atan2(Math.sin(da), Math.cos(da));
+          const dd = Math.abs(da + (_vn(r * 6, i * 3, 33) - 0.5) * 0.4) * r;
+          if (r > rin && r < len && dd < 0.013 * (1 - r / len) + 0.005) { al = Math.max(al, 0.75 * (1 - r / len) + 0.15); cr *= 0.25; cg *= 0.25; cb *= 0.25; }
+        }
+      } else if (kind === 'metal') {
+        // a dent, its lip turned up bright on the side the light is, and scores thrown outward
+        const rd = 0.25 + (_fb(ca * 2 + 7, sa * 2 + 7, 61, 3) - 0.5) * 0.08;
+        if (r < rd * 1.3) { const k = _ss(rd * 1.3, rd * 1.05, r); al += (0.9 - al) * k; cr = cg = cb = 0.05; }
+        const lip = Math.exp(-Math.pow((r - rd) / 0.035, 2)), lit = 0.16 + 0.42 * Math.max(0, sa * 0.8 + 0.3) + 0.12 * _vn(a * 5, 3, 63);
+        al = Math.max(al, lip * 0.95); cr += (lit - cr) * lip; cg += (lit * 0.98 - cg) * lip; cb += (lit - cb) * lip;
+        for (let i = 0; i < 7; i++) {
+          const c0 = _h2(i, 1, 65) * 6.283, len = 0.45 + _h2(i, 2, 65) * 0.4; let da = a - c0; da = Math.atan2(Math.sin(da), Math.cos(da));
+          if (r > rd * 1.2 && r < len && Math.abs(da) * r < 0.006) { const k = 0.6 * (1 - r / len); al = Math.max(al, k); cr = cg = cb = 0.34; }
+        }
+      } else {
+        // in wood: split along the grain, pale splinters at the lips of the split
+        const gx = x, gy = y * 0.42, gr = Math.hypot(gx, gy), rs2 = 0.2 + (_fb(x * 5, y * 1.5, 71, 3) - 0.5) * 0.12;
+        if (gr < rs2 * 1.5) { const k = _ss(rs2 * 1.5, rs2, gr), f = 0.3 + 0.25 * _vn(x * 30, y * 3, 73); al += (0.9 - al) * k; cr += (f - cr) * k; cg += (f * 0.72 - cg) * k; cb += (f * 0.45 - cb) * k; }
+        if (gr < rs2 * 0.8) { const k = _ss(rs2 * 0.8, rs2 * 0.5, gr); cr *= 1 - k * 0.8; cg *= 1 - k * 0.8; cb *= 1 - k * 0.8; }
+        if (Math.abs(x) < 0.012 + 0.01 * _vn(y * 9, 1, 75) && Math.abs(y) < 0.78) { al = Math.max(al, 0.8 * (1 - Math.abs(y) / 0.78)); cr *= 0.3; cg *= 0.3; cb *= 0.3; }
+      }
+      if (r < rin * 1.3) { const k = _ss(rin * 1.3, rin * 0.8, r); al += (1 - al) * k; cr *= 1 - k; cg *= 1 - k; cb *= 1 - k; }   // the hole itself
+      o[0] = cr; o[1] = cg; o[2] = cb; o[3] = Math.min(1, al);
     });
-    T.spr.splat = canvasTex(128, (g, s) => {
-      g.fillStyle = '#fff';
-      for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, d = Math.random() * s * 0.3; g.globalAlpha = 0.5 + Math.random() * 0.5; g.beginPath(); g.arc(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, s * (0.03 + Math.random() * 0.1), 0, 6.28); g.fill(); }
+    T.spr.hole = holePic('stone'); T.spr.holeM = holePic('metal'); T.spr.holeW = holePic('wood');
+    // where fire stood: black at its heart, thrown outward in streaks, its edge nowhere a circle
+    T.spr.scorch = pixTex(128, (u, v, o) => {
+      const x = u * 2 - 1, y = v * 2 - 1, r = Math.hypot(x, y), a = Math.atan2(y, x), ca = Math.cos(a), sa = Math.sin(a);
+      const reach = 0.42 + _fb(ca * 3 + 5, sa * 3 + 5, 41, 4) * 0.55, fine = _vn(ca * 9 + 20, sa * 9 + 20, 43);
+      let al = _ss(reach, reach * 0.2, r) * 0.85 + 0.34 * _ss(reach * 1.3, reach * 0.5, r) * fine;
+      al *= (0.7 + 0.45 * _fb(x * 5, y * 5, 45, 3)) * _ss(1, 0.82, r);
+      o[0] = 0.014; o[1] = 0.012; o[2] = 0.01; o[3] = Math.min(0.9, al);
     });
+    // what is spilt where a thing is struck: a pool, runs thrown out of it each ending in a bead, and spots
+    T.spr.splat = pixTex(128, (u, v, o) => {
+      const x = u * 2 - 1, y = v * 2 - 1, r = Math.hypot(x, y), a = Math.atan2(y, x), ca = Math.cos(a), sa = Math.sin(a);
+      const rb = 0.24 + _fb(ca * 2 + 4, sa * 2 + 4, 51, 3) * 0.24;
+      let al = _ss(rb, rb * 0.8, r);
+      for (let i = 0; i < 10; i++) {                                        // (runs: wide where they leave the pool, thin at their ends, none straight)
+        const len = 0.34 + _h2(i, 2, 51) * 0.5, c0 = i / 10 * 6.283 + (_h2(i, 1, 51) - 0.5) * 0.8 + (r / len - 0.5) * (_h2(i, 7, 51) - 0.5) * 0.5; let da = a - c0; da = Math.atan2(Math.sin(da), Math.cos(da));
+        const along = r * Math.cos(da), across = Math.abs(r * Math.sin(da)), t = along / len;
+        if (along > 0 && t < 1) { const wd = 0.008 + 0.06 * Math.pow(1 - t, 1.8); al = Math.max(al, _ss(wd, wd * 0.6, across)); }
+        const e0 = i / 10 * 6.283 + (_h2(i, 1, 51) - 0.5) * 0.8 + 0.5 * (_h2(i, 7, 51) - 0.5) * 0.5, bd = Math.hypot(x - Math.cos(e0) * len, y - Math.sin(e0) * len), br = 0.014 + _h2(i, 3, 51) * 0.02; al = Math.max(al, _ss(br, br * 0.65, bd));
+      }
+      for (let i = 0; i < 22; i++) { const pa = _h2(i, 4, 53) * 6.283, pq = 0.35 + _h2(i, 5, 53) * 0.58, pr = (0.008 + _h2(i, 6, 53) * 0.022) * (1.3 - pq), pd = Math.hypot(x - Math.cos(pa) * pq, y - Math.sin(pa) * pq * 0.9); al = Math.max(al, _ss(pr, pr * 0.6, pd)); }
+      const c = 0.72 + 0.28 * _fb(x * 4, y * 4, 55, 3);
+      o[0] = o[1] = o[2] = c; o[3] = al * 0.95;
+    });
+    // the soot a brand leaves on the wall it hangs on: black behind the flame, drawn upward and thinning
+    T.spr.soot = pixTex(128, (u, v, o) => {
+      const x = u * 2 - 1, y = 1 - v * 2, h = Math.min(1, Math.max(0, (y + 0.75) / 1.75)), n = _fb(x * 3, y * 3, 91, 4);
+      const core = 0.36 + 0.16 * h, a = _ss(core + 0.62, core - 0.04, Math.abs(x) + (n - 0.5) * 0.55) * _ss(-1, -0.6, y + (n - 0.5) * 0.2) * _ss(1, 0.1, y + (n - 0.5) * 0.3);   // (dark outright behind the flame and above it, thinning to nothing over a long way)
+      o[0] = o[1] = o[2] = 1; o[3] = Math.min(0.97, a * (0.85 + 0.3 * n) * 1.12);
+    }, false);
     T.spr.ring = canvasTex(256, (g, s) => {
       g.strokeStyle = 'rgba(255,255,255,1)'; g.lineWidth = s * 0.04;
       g.beginPath(); g.arc(s / 2, s / 2, s * 0.46, 0, 6.28); g.stroke();
@@ -401,7 +494,7 @@
   // 4: the ruined depths: the same vertical build, collapsed, lit by blue flames (braziers, torches and the patches of blue fire in the floor)
   T.BIOMES.ruin = { name: '蒼炎の廃都', stone: '#666e82', stone2: '#545c70', floor: '#4e566a', trim: '#8690a8', rock: '#40485a', wood: '#403a4e', fog: '#070d19', fogD: 0.018, hemiS: '#5e76ad', hemiG: '#151c30', amb: 0.33, moon: '#7a9ee8', moonI: 0.58, torch: '#4a9cff', flame: 0x4a9cff, cloth: '#142450', accent: 'bones', storeys: true, ruined: true };
   // the very last guardian's field: a crimson-violet sky and stone over a bottomless dark (not a fire / blue-fire place like the others)
-  T.BIOMES.crimson = { name: '終焉の紅月', stone: '#8a4c74', stone2: '#6a3658', floor: '#563052', trim: '#e096c8', rock: '#42243e', wood: '#4a2a40', fog: '#2a0c30', fogD: 0.011, hemiS: '#e088cc', hemiG: '#44124c', amb: 0.62, moon: '#ff62a8', moonI: 1.9, torch: '#ff4a9a', flame: 0xff4a9a, cloth: '#701052', accent: 'bones', outdoor: 'ruins', sky: ['#14010f', '#52103a', '#b0306e'], sunDir: [0.15, 0.32, -0.92], sunCol: [1.0, 0.28, 0.56], stars: true, mtnCol: 0x2e0a28, leaf: 0x2a1030, night: true };
+  T.BIOMES.crimson = { name: '終焉の紅月', stone: '#6a5250', stone2: '#544240', floor: '#463634', trim: '#a88870', rock: '#382a28', wood: '#3e2e28', fog: '#1e1214', fogD: 0.011, hemiS: '#94786a', hemiG: '#241816', amb: 0.62, moon: '#c08060', moonI: 1.9, torch: '#d06a3a', flame: 0xd06a3a, cloth: '#5a1a16', accent: 'bones', outdoor: 'ruins', sky: ['#080606', '#2a1612', '#6a3a2a'], sunDir: [0.15, 0.32, -0.92], sunCol: [0.9, 0.5, 0.36], stars: true, mtnCol: 0x221614, leaf: 0x1e1410, night: true };
   // ---- the eight new fields (two per depth tier; see runplan.js R.TIERS). catacombs / flooded / frozen keep their old tables above ----
   // 地上: a deserted village at night in the mist, and a fallen city at sundown on the rim of the abyss
   T.BIOMES.hamlet = { name: '霧の廃村', stone: '#8a8478', stone2: '#726c62', floor: '#3a4630', trim: '#a29a8c', rock: '#5a564e', wood: '#6a5440', fog: '#1c2228', fogD: 0.013, hemiS: '#6a7a98', hemiG: '#1c1a14', amb: 0.5, moon: '#c0ccec', moonI: 1.45, torch: '#ffb066', cloth: '#4a3a2a', accent: 'grass', outdoor: 'ruins', floorTex: 'grass', grassTint: '#3e4a32', sky: ['#05070d', '#101626', '#28324a'], sunDir: [-0.5, 0.45, -0.7], sunCol: [0.6, 0.7, 1.0], stars: true, mtnCol: 0x161c26, leaf: 0x1e2a1a, night: true };
@@ -545,13 +638,35 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     };
     m.needsUpdate = true;
   }
+  // the colour of a world material varied in broad patches by place (the world's position, two scales of some 9 and 27 m and one of
+  // 3 m): lighter and darker by k, and toward tint where it is lighter. The strength is m.userData.macro (the tools set it to 0)
+  function macro(m, k, tint) {
+    if (!m) return;
+    const U = m.userData.macro = { value: k }, TU = { value: new THREE.Vector3(tint[0], tint[1], tint[2]) };
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uMacro = U; sh.uniforms.uMacroT = TU;
+      sh.vertexShader = 'varying vec3 vMW;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  vMW = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+      sh.fragmentShader = `uniform float uMacro; uniform vec3 uMacroT; varying vec3 vMW;
+float mH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float mN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(mH(i), mH(i + vec2(1.0, 0.0)), f.x), mix(mH(i + vec2(0.0, 1.0)), mH(i + vec2(1.0, 1.0)), f.x), f.y); }
+` + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+  {
+    vec2 mp = vec2(vMW.x + vMW.y * 0.7, vMW.z - vMW.y * 0.5);
+    float mv = (mN(mp * 0.11) - 0.5) * 0.9 + (mN(mp * 0.037 + 7.3) - 0.5) * 1.1 + (mN(mp * 0.31 + 3.1) - 0.5) * 0.35;
+    diffuseColor.rgb *= (1.0 + mv * uMacro) * mix(vec3(1.0), uMacroT, clamp(0.5 + mv * 1.6, 0.0, 1.0) * step(0.001, uMacro));
+  }`);
+    };
+    m.customProgramCacheKey = () => 'macro1';
+  }
   T.materials = function (biomeKey) {
     if (matCache[biomeKey]) return matCache[biomeKey];
+    for (const k in T.tex) if (T.tex[k].stub) T.cpuFill(k); // (what the GPU did not make: gfx.js upgradeTextures)
     const B = T.BIOMES[biomeKey];
     const std = (tex, color, rough, metal, nscale, extra) => {
       const m = new THREE.MeshStandardMaterial(Object.assign({
         map: tex.map, normalMap: tex.normalMap, color: new THREE.Color(color), roughness: rough, metalness: metal || 0, vertexColors: false,
-      }, extra || {}));
+      }, tex.orm ? { roughnessMap: tex.orm, aoMap: tex.orm } : null, extra || {})); // (orm: occlusion and roughness, from gfx.js)
       m.normalScale.set(nscale || 1, nscale || 1);
       m.envMapIntensity = 0.35;
       return m;
@@ -572,7 +687,7 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
       cloth2: std(t.cloth, '#3a3a3a', 0.95, 0, 0.6, { side: THREE.DoubleSide, alphaTest: 0.5 }),
       dark: new THREE.MeshStandardMaterial({ color: 0x050403, roughness: 1 }),
       bone: std(t.smooth, '#d8cdb4', 0.7, 0, 0.5),
-      ceramic: std(t.smooth, '#9a5a3a', 0.55, 0, 0.4),
+      ceramic: std(t.smooth, '#6e4a38', 0.6, 0, 0.4),
       gold: std(t.metal, '#e0b050', 0.3, 1.0, 0.3),
     };
     if (B.floorTex === 'earth') M.floor = std(t.rock, B.floor, 0.95, 0, 1.3); // (bare earth and stone: a mine's floor)
@@ -580,19 +695,35 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     if (B.marble) {
       M.floor = std(t.marble, B.floor, 0.35, 0, 0.8); M.cobble = std(t.marble, B.floor, 0.4, 0, 0.8);
       M.block = std(t.marble, B.stone2, 0.4, 0, 0.8); M.wall = std(t.ashlar, B.stone, 0.55, 0, 0.8);
-      M.trim = std(t.metal, B.trim, 0.32, B.trimMetal ?? 0.85, 0.4); // (trimMetal: a less mirror-like gilt where there is little to reflect)
+      // (the gate posts, the cornices, the statues - what 'trim' is - are cut of a honey-coloured marble: as gilt iron, and with the
+      // rust of the iron's picture on it, a post seven metres high was a brown thing blotched with red in a hall of white stone.
+      // Gold stays where gold is put: M.gold)
+      M.trim = std(t.marble, '#' + new THREE.Color(B.trim).lerp(new THREE.Color(B.stone), 0.5).getHexString(), 0.42, 0, 0.8);
     }
+    // (grass in tufts, props.js: the colour of the turf it stands in; it leans with the wind, more at its tips, each tuft in its own time)
+    M.tuft = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x7e8a50).multiply(new THREE.Color(B.grassTint || '#ffffff')), roughness: 1, side: THREE.DoubleSide, vertexColors: true });
+    M.tuft.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = T.lavaT;
+      sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  #ifdef USE_INSTANCING
+  { float ph = instanceMatrix[3].x * 0.7 + instanceMatrix[3].z * 0.9, k = transformed.y * transformed.y;
+    transformed.x += (sin(uTime * 1.3 + ph) * 0.09 + sin(uTime * 3.1 + ph * 2.3) * 0.03) * k; transformed.z += sin(uTime * 1.7 + ph * 1.3) * 0.05 * k; }
+  #endif`);
+    };
     M.leaf = new THREE.MeshStandardMaterial({ color: B.leaf ?? (B.outdoor === 'sky' ? 0x8ab05a : 0x4f6a2a), roughness: 0.9, flatShading: true });
     M.cloud = new THREE.MeshBasicMaterial({ map: T.spr.cloud, color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
     // (the look of water is all in its shader: waterize below; deep green-blue, glossy, its own alpha)
     M.water = new THREE.MeshStandardMaterial({ color: 0x14363a, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 1 });
     waterize(M.water);
-    M.lava = new THREE.MeshStandardMaterial({ color: 0x2a0800, emissive: 0xff5a10, emissiveIntensity: 1.6, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
-    M.bluefire = new THREE.MeshStandardMaterial({ color: 0x06102a, emissive: 0x2a86ff, emissiveIntensity: 1.7, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
+    // (molten iron and blue fire: plates of crust and the glowing cracks between them - gfx.js EX.lava; the rock's picture if there is no GPU)
+    const LV = (G.GFX && G.GFX.tex ? G.GFX.tex('lava') : null) || t.rock;
+    M.lava = new THREE.MeshStandardMaterial({ color: 0x2a0800, emissive: 0xff5a10, emissiveIntensity: 1.6, emissiveMap: LV.map, roughness: 0.9, normalMap: LV.normalMap });
+    M.bluefire = new THREE.MeshStandardMaterial({ color: 0x06102a, emissive: 0x2a86ff, emissiveIntensity: 1.7, emissiveMap: LV.map, roughness: 0.9, normalMap: LV.normalMap });
     boil(M.lava, false); boil(M.bluefire, true);
     M.voidglow = new THREE.MeshStandardMaterial({ color: 0x16020f, emissive: 0xff2a8a, emissiveIntensity: 1.1, emissiveMap: t.rock.map, roughness: 0.9, normalMap: t.rock.normalMap });
     M.ice = new THREE.MeshStandardMaterial({ color: 0xbfe0f0, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.85, normalMap: t.rock.normalMap });
     M.ice.normalScale.set(0.4, 0.4);
+    { const it = G.GFX && G.GFX.tex ? G.GFX.tex('ice') : null; if (it) { M.ice.map = it.map; M.ice.normalMap = it.normalMap; M.ice.roughnessMap = it.orm; M.ice.color.setHex(0xdfe8ee); M.ice.roughness = 1; M.ice.opacity = 0.88; M.ice.normalScale.set(0.8, 0.8); } }   // (old ice with its cracks and rime: gfx.js)
     // field gimmicks
     M.moss = std(t.grass, '#6f9a3a', 0.85, 0, 1.4);
     M.mud = std(t.rock, '#4a3524', 0.45, 0.05, 1.6);
@@ -600,14 +731,24 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
     M.holy = new THREE.MeshStandardMaterial({ color: 0x1a3a48, emissive: 0x70d8ff, emissiveIntensity: 0.8, emissiveMap: t.cobble.map, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.85 });
     M.oil = new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 0.05, metalness: 0.7, transparent: true, opacity: 0.95 });
     M.vine = new THREE.MeshStandardMaterial({ color: 0x3f6a2a, roughness: 0.9, side: THREE.DoubleSide, alphaTest: 0.5, map: T.leafTex() });
-    M.web = new THREE.MeshBasicMaterial({ map: T.spr.web, transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0.8 });
+    M.web = new THREE.MeshBasicMaterial({ map: T.spr.web, transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0.3 });
     M.candle = new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.6, emissive: 0x302010 });
     M.glow = new THREE.MeshBasicMaterial({ color: 0xffb060 });
+    // (the state the stone of a field is in: one picture for every field, the field's own colour, sheen and roughness laid on it -
+    // the flooded halls wet, dark and glossy; the foundries blackened by soot and heat; the mausoleum rimed with frost; the catacombs
+    // in dry dust; the mine in damp earth. The values before are kept in userData.base, for the tools to compare)
+    { const ST = { flooded: [[0.68, 0.72, 0.71], 0.7], foundry: [[0.72, 0.68, 0.65], 1.05], frozen: [[1.07, 1.1, 1.17], 1.08], catacombs: [[1.05, 1.02, 0.96], 1.08], mine: [[0.82, 0.78, 0.72], 0.82] }[biomeKey];
+      if (ST) for (const k of ['wall', 'block', 'floor', 'cobble', 'rock', 'trim']) { const m = M[k]; m.userData.base = { color: m.color.getHex(), rough: m.roughness }; m.color.multiply(new THREE.Color(ST[0][0], ST[0][1], ST[0][2])); m.roughness = Math.min(1, m.roughness * ST[1]); } }
     // vertex-coloured variants for merged static geometry; plain ones are used by standalone meshes
     M.vc = {};
     for (const k in M) { const m = M[k]; if (m && m.isMaterial) { if (m.isMeshStandardMaterial) { const c = m.clone(); c.vertexColors = true; M.vc[k] = c; } else M.vc[k] = m; } }
     boil(M.vc.lava, false); boil(M.vc.bluefire, true); // the copies the world is actually drawn with
     waterize(M.vc.water);
+    // (broad patches across the world, metres wide, so that a picture repeated every few metres is not read as a pattern: the turf
+    // greener and drier in drifts, the stone lighter and darker; macro below)
+    { const turf = B.floorTex === 'grass';
+      macro(M.vc.floor, turf ? 0.3 : 0.16, turf ? [1.14, 1.0, 0.78] : [1.03, 1.0, 0.96]); macro(M.vc.cobble, 0.15, [1.03, 1.0, 0.96]);
+      macro(M.vc.wall, 0.14, [1.03, 1.0, 0.95]); macro(M.vc.block, 0.14, [1.03, 1.0, 0.95]); macro(M.vc.rock, 0.18, [1.05, 1.0, 0.92]); }
     M.biome = B;
     matCache[biomeKey] = M;
     return M;

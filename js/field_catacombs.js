@@ -27,6 +27,8 @@
     // x of a side's terrace: s = -1 west (its wall at x = 0), +1 east (its wall at x = W); u: distance from that wall
     const X = (s, u) => (s < 0 ? u : W - u);
     const box = (mk, s, u0, u1, y0, y1, za, zb, o) => { const a = X(s, u0), b = X(s, u1); w.solid(mk, Math.min(a, b), y0, za, Math.max(a, b), y1, zb, o || { uv: 2.5 }); };
+    // (the same box as a thing to run into: for what stands out of a wall far enough to be one - a pilaster, a buttress)
+    const hard = (s, u0, u1, y0, y1, za, zb) => { const a = X(s, u0), b = X(s, u1), c = w.addCollider(Math.min(a, b), y0, za, Math.max(a, b), y1, zb, { surf: 'stone' }); c.vis = true; return c; };
     const vis = (mk, s, u0, u1, y0, y1, za, zb, o) => { const a = X(s, u0), b = X(s, u1); w.visual(mk, Math.min(a, b), y0, za, Math.max(a, b), y1, zb, o || { uv: 1 }); };
 
     // ---- the plan along the nave (z): for each side, what stands where
@@ -182,7 +184,8 @@
     const rail = (s, u, y, za, zb, gaps) => {
       let z = za;
       const gs = gaps.filter((g) => g[1] > za && g[0] < zb).sort((a, b) => a[0] - b[0]);
-      const seg = (a, b) => { if (b - a < 0.6) return; box('wall', s, u - 0.35, u, y, y + 0.95, a, b, { uv: 2 }); box('trim', s, u - 0.42, u + 0.07, y + 0.95, y + 1.05, a, b, { uv: 1 }); };
+      // (the band on top: its box stops you as before, drawn as a coping of long stones weathered to a low ridge, LG.coping)
+      const seg = (a, b) => { if (b - a < 0.6) return; box('wall', s, u - 0.35, u, y, y + 0.95, a, b, { uv: 2 }); hard(s, u - 0.42, u + 0.07, y + 0.95, y + 1.05, a, b); const x0 = Math.min(X(s, u - 0.42), X(s, u + 0.07)), tg = LG._tag; LG._tag = 'copings'; try { LG.coping(w, (aa, yy, d) => [x0 + d, yy, aa], a, b, y + 0.92, y + 1.08, 0, 0.49, { ridge: 0.05, plain: true }); } finally { LG._tag = tg; } };
       for (const g of gs) { seg(z, Math.max(z, g[0])); z = Math.max(z, g[1]); }
       seg(z, zb);
     };
@@ -203,8 +206,11 @@
           if (!open) continue;
           const a = Math.min(X(s, D2), X(s, D1)), b = Math.max(X(s, D2), X(s, D1)), c = Math.min(X(s, 0), X(s, D2)), d = Math.max(X(s, 0), X(s, D2));
           const zz = zEnd === q.za ? [zEnd, zEnd + 0.35] : [zEnd - 0.35, zEnd];
-          w.solid('wall', a, T1, zz[0], b, T1 + 0.95, zz[1], { uv: 2 }); w.solid('trim', a, T1 + 0.95, zz[0] - 0.04, b, T1 + 1.05, zz[1] + 0.04, { uv: 1 });
-          w.solid('wall', c, T2, zz[0], d, T2 + 0.95, zz[1], { uv: 2 }); w.solid('trim', c, T2 + 0.95, zz[0] - 0.04, d, T2 + 1.05, zz[1] + 0.04, { uv: 1 });
+          for (const [p0, p1, yT] of [[a, b, T1], [c, d, T2]]) {
+            w.solid('wall', p0, yT, zz[0], p1, yT + 0.95, zz[1], { uv: 2 });
+            const cb = w.addCollider(p0, yT + 0.95, zz[0] - 0.04, p1, yT + 1.05, zz[1] + 0.04, { surf: 'stone' }); cb.vis = true; cb.mk = 'trim';
+            LG._tag = 'copings'; LG.coping(w, (aa, yy, dd) => [aa, yy, zz[0] - 0.04 + dd], p0, p1, yT + 0.92, yT + 1.08, 0, 0.43, { ridge: 0.05, plain: true }); LG._tag = null;
+          }
         }
       }
     }
@@ -213,6 +219,7 @@
       const s = st.s, lo = st.lv ? T1 : 0, hi = st.lv ? T2 : T1, u = st.lv ? D2 : D1, wd = 2.2;
       const cx = X(s, u + wd / 2);
       box('trim', s, u, u + wd, lo, hi, st.za, st.za + 2.4, { uv: 1.5 }); // (the landing)
+      { const xa = Math.min(X(s, u), X(s, u + wd)), xb = Math.max(X(s, u), X(s, u + wd)); LG._tag = 'stairs'; LG.ashlar(w, xa, lo, st.za, xb, hi, st.za + 2.4, ['N', s < 0 ? 'E' : 'W'], { gy: lo }); LG._tag = null; }   // (its faces to the nave: coursed stone)
       H.stairs(w, 'S', st.za + 2.4, cx, wd, lo, hi, 'trim');
       // its outer side railed on the landing
       box('wall', s, u + wd - 0.3, u + wd, hi, hi + 0.95, st.za, st.za + 2.4, { uv: 2 });
@@ -231,6 +238,14 @@
         return;
       }
       w.solid('block', a, T1 - 0.7, za, b, T1, zb, { uv: 2 });
+      // (the arch that carries it: a low arch from terrace to terrace under the deck, the masonry between the two, a rib proud of each face.
+      // To look at; it springs above a head's height)
+      if (G.GFX && G.GFX.archSpandrel) {
+        const half = (b - a) / 2, rise = 1.5, y0 = T1 - 0.7 - rise, mt = new THREE.Matrix4().makeTranslation((a + b) / 2, y0, bz);
+        w.batch.geo('block', G.GFX.archSpandrel(half, rise, 3.1, 24), mt);
+        w.batch.geo('trim', G.GFX.archRib(half, rise, 0.34, 3.5, 24), mt);
+        for (const sx of [a, b]) w.visual('trim', sx - 0.35, y0 - 0.9, bz - 1.75, sx + 0.35, y0, bz + 1.75, { uv: 1.5 });   // (the corbel it springs from)
+      }
       w.solid('wall', a, T1, za, b, T1 + 0.95, za + 0.3, { uv: 2 }); w.solid('trim', a, T1 + 0.95, za - 0.04, b, T1 + 1.05, za + 0.34, { uv: 1 });
       w.solid('wall', a, T1, zb - 0.3, b, T1 + 0.95, zb, { uv: 2 }); w.solid('trim', a, T1 + 0.95, zb - 0.34, b, T1 + 1.05, zb + 0.04, { uv: 1 });
       // skulls along its sides, a lamp hanging under its middle
@@ -262,7 +277,56 @@
         else P().bones(w, x, 0.02, z, rng);
       }
     }
-    for (let z = z0 + 10; z < z1 - 6; z += 16) P().chandelier(w, W / 2, VAULT - 5, z, VAULT);
+    for (let z = z0 + 10; z < z1 - 6; z += 16) { P().chandelier(w, W / 2, VAULT - 7.5, z, VAULT); w.addLight(W / 2, VAULT - 8.2, z, { flame: 0, intensity: 13, range: 21, color: '#ffb46e', prio: 1.1, steady: false }); }
+    // ---- the nave's floor: a way of paler slabs down its middle between two dark lines, a band across it at every bay (laid a finger's
+    // breadth proud of the floor: nothing to stumble on)
+    {
+      const cx = W / 2, hw = Math.min(2.2, NAVE / 2 - 3.4);
+      w.visual('floor', cx - hw, 0, z0 - 6, cx + hw, 0.012, z1 + 5, { uv: 2.2, uo: 0.37, vo: 0.21, tint: [1.22, 1.16, 1.06], grad: false, skip: { bottom: 1 } });
+      for (const sx of [-1, 1]) w.visual('dark', cx + sx * (hw + 0.1) - 0.045, 0, z0 - 6, cx + sx * (hw + 0.1) + 0.045, 0.014, z1 + 5, { uv: 1, grad: false, skip: { bottom: 1 } });
+      for (let z = 4; z < D - 1; z += 8) if (z > z0 - 5 && z < z1 + 4) w.visual('floor', D1 + 0.4, 0, z - 0.3, W - D1 - 0.4, 0.011, z + 0.3, { uv: 2.2, uo: 0.11, tint: [1.2, 1.14, 1.05], grad: false, skip: { bottom: 1 } });
+    }
+    // ---- the vault over it all (to look at: nothing here is in anyone's way). A pointed vault springs from the long walls above the second
+    // terraces; a stone rib crosses under it at every bay, on a pilaster against the wall; a ridge runs along its crown. The faces of both
+    // terraces carry flat buttresses at the same bays, and every other one a torch. No dice are thrown for any of it (it is all by the bay).
+    {
+      const GX = G.GFX, BAY = 8, SPR = T2 + 1.2, AH = VAULT - SPR - 0.55, M4 = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
+      if (GX && GX.archRib) {
+        w.batch.geo('wall', GX.archWeb(W / 2 + 0.15, AH + 0.45, D, 30, 0.28), M4(W / 2, SPR, 0), { gradBase: -999 });
+        const rib = GX.archRib(W / 2 - 0.05, AH, 0.62, 0.86, 30), small = GX.archRib(W / 2 - 0.05, AH + 0.12, 0.3, 0.4, 30);
+        for (let z = BAY / 2, n = 0; z < D - 1; z += BAY, n++) w.batch.geo('trim', rib, M4(W / 2, SPR, z));
+        for (let z = BAY, n = 0; z < D - 1; z += BAY, n++) w.batch.geo('trim', small, M4(W / 2, SPR, z));
+        w.visual('trim', W / 2 - 0.22, SPR + AH - 0.2, 0.2, W / 2 + 0.22, SPR + AH + 0.3, D - 0.2, { uv: 2, grad: false });
+      }
+      // pilasters under the ribs, against the long walls: shaft, a base, a capital in two steps
+      for (let z = BAY / 2; z < D - 1; z += BAY) for (const s of [-1, 1]) {
+        const onTerrace = z > z0 && z < z1 && !(gap && z > gap[0] && z < gap[1]), y0 = onTerrace ? T2 : 0;
+        vis('trim', s, 0, 0.62, y0, SPR - 0.5, z - 0.42, z + 0.42, { uv: 2 });
+        vis('trim', s, 0, 0.78, y0, y0 + 0.36, z - 0.56, z + 0.56, { uv: 2 });
+        vis('trim', s, 0, 0.8, SPR - 0.5, SPR - 0.22, z - 0.58, z + 0.58, { uv: 2 });
+        vis('trim', s, 0, 0.96, SPR - 0.22, SPR + 0.1, z - 0.7, z + 0.7, { uv: 2 });
+        hard(s, 0, 0.62, y0, SPR - 0.5, z - 0.42, z + 0.42); hard(s, 0, 0.96, SPR - 0.5, SPR + 0.1, z - 0.7, z + 0.7);
+      }
+      // flat buttresses up the terraces' faces at the same bays (not where a stair, a chapel's gate or a fall is); a corbel under each slab
+      const clear = (s, lv, z) => !stairs.some((q) => q.s === s && q.lv === lv && z > q.za - 1.2 && z < q.zb + 1.2) && !falls.some((f) => f.s === s && z > f.za - 1 && z < f.zb + 1) && !(gap && z > gap[0] - 0.6 && z < gap[1] + 0.6)
+        && !(lv === 0 && chapels.some((c) => c.s === s && z > c.za - 0.8 && z < c.zb + 0.8)) && !bridges.some((b) => lv === 0 && Math.abs(b - z) < 2.6);
+      let nb = 0;
+      for (let z = z0 + BAY / 2 + (BAY - (z0 % BAY)) % BAY; z < z1 - 1; z += BAY, nb++) for (const s of [-1, 1]) {
+        if (clear(s, 0, z)) {
+          vis('trim', s, D1, D1 + 0.3, 0, T1 - SL - 0.3, z - 0.4, z + 0.4, { uv: 2 });
+          vis('trim', s, D1, D1 + 0.42, 0, 0.4, z - 0.5, z + 0.5, { uv: 2 });
+          vis('trim', s, D1, D1 + 0.5, T1 - SL - 0.3, T1 - SL, z - 0.5, z + 0.5, { uv: 2 });
+          hard(s, D1, D1 + 0.3, 0, T1 - SL - 0.3, z - 0.4, z + 0.4); hard(s, D1, D1 + 0.5, T1 - SL - 0.3, T1 - SL, z - 0.5, z + 0.5);
+          // a torch on every other one, the two sides turn about
+          if ((nb + (s > 0 ? 1 : 0)) % 2 === 0) P().torch(w, X(s, D1 + 0.3), 2.7, z, s < 0 ? 'px' : 'nx');
+        }
+        if (clear(s, 1, z)) {
+          vis('trim', s, D2, D2 + 0.26, T1, T2 - SL - 0.26, z - 0.36, z + 0.36, { uv: 2 });
+          vis('trim', s, D2, D2 + 0.44, T2 - SL - 0.26, T2 - SL, z - 0.46, z + 0.46, { uv: 2 });
+          hard(s, D2, D2 + 0.26, T1, T2 - SL - 0.26, z - 0.36, z + 0.36); hard(s, D2, D2 + 0.44, T2 - SL - 0.26, T2 - SL, z - 0.46, z + 0.46);
+        }
+      }
+    }
     // braziers on the second terraces, candles along the first, webs in the corners
     for (const q of t2top) for (let z = q.za + 4; z < q.zb - 3; z += 14) { P().brazier(w, X(q.s, 1.4), T2, z, 0.9, true); w.addLight(X(q.s, 1.4), T2 + 1.6, z, { flame: 0.5, intensity: 7, range: 11, color: '#ff9a50', prio: 0.7 }); }
     for (const q of t1top) for (let z = q.za + 3; z < q.zb - 2; z += 9) if (rng.chance(0.6)) P().candles(w, X(q.s, D1 - 0.8), T1, z, rng, rng.chance(0.5));
@@ -271,7 +335,7 @@
     for (const q of t2top) if (q.zb - q.za > 6) for (const z of [q.za + 2.2, q.zb - 2.2]) if (rng.chance(0.5)) w.platTops.push({ x0: Math.min(X(q.s, 0.6), X(q.s, D2 - 0.8)), z0: z - 1.2, x1: Math.max(X(q.s, 0.6), X(q.s, D2 - 0.8)), z1: z + 1.2, y: T2, cx: X(q.s, 1.6), cz: z });
     for (const q of t1top) if (q.zb - q.za > 10 && rng.chance(0.6)) { const z = rng.range(q.za + 3, q.zb - 3); if (stairs.some((st) => st.s === q.s && st.lv === 1 && z > st.za - 1.5 && z < st.zb + 1.5)) continue; w.platTops.push({ x0: Math.min(X(q.s, D2 + 0.8), X(q.s, D1 - 1)), z0: z - 1.2, x1: Math.max(X(q.s, D2 + 0.8), X(q.s, D1 - 1)), z1: z + 1.2, y: T1, cx: X(q.s, D2 + 2), cz: z }); }
     // ---- the vestibule (north): pillars, braziers by the gates; the stair hall (south): torches, a sarcophagus either side
-    for (let x = 7; x < W - 5; x += 10) { if (LG.gateXs(W, gates || 1).some((g) => Math.abs(g - x) < 7)) continue; P().pillarSquare(w, x, 7, 0, VAULT, 1.1); occ.mark(x - 1.2, 6, x + 1.2, 8); }
+    for (let x = 7; x < W - 5; x += 10) { if (LG.gateXs(W, gates || 1).some((g) => Math.abs(g - x) < 7)) continue; LG.pillar(w, x, 7, 0, VAULT, 1.1); occ.mark(x - 1.2, 6, x + 1.2, 8); }
     for (const sx of [-1, 1]) { const x = W / 2 + sx * rng.range(7, 10), z = D - 5; P().sarcophagus(w, x, z, 0, true, rng); occ.mark(x - 1.6, z - 1.2, x + 1.6, z + 1.2); }
     for (let x = 5; x < W - 3; x += 8) if (Math.abs(x - W / 2) > 5) P().torch(w, x, 3.2, D, 'nz');
     for (const g of LG.gateXs(W, gates || 1)) { P().brazier(w, g - 4.5, 0, 4.5, 1, true); P().brazier(w, g + 4.5, 0, 4.5, 1, true); }

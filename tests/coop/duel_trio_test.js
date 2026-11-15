@@ -12,16 +12,20 @@ const PORT = +process.env.COOP_PORT || 9977;
     const q = '&local=1&lat=40&jit=20', room = 'T' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(300);
     const a = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=A${q}`);
+    await a.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await a.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     const b = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=B${q}`);
+    await b.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await b.until('window.G && G.Coop && G.Coop.id === 2', 90000);
     const all = [h, a, b];
     const off = 'G.save.data.settings.volume = 0; G.sfx.setVolume && G.sfx.setVolume(0); G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; G.game.dev = { god: true, speed: 1 }; 1';
     for (const p of all) await p.eval(off);
     await h.eval('G.Coop.begin(); 1');
     for (const p of [a, b]) await p.until('G.game.run && G.Coop.fpOk !== undefined', 60000);
+    for (const pg of [h, a, b]) await pg.running();
     for (const p of all) await p.eval("G.bosses.forArea = () => 'oboro'; G.Coop.fpOk = undefined; G.ui.clearScreen(); G.game.state = 'playing'; G.game.dev = { god: true, speed: 1 }; 1");
     await h.eval("G.game.area = 4; G.game.transitioning = false; G.Coop.go(5, 'boss'); 1");
     for (const p of [a, b]) await p.until('G.game.stage === "boss" && G.Coop.fpOk !== undefined', 30000);

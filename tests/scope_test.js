@@ -14,6 +14,7 @@ const PORT = +process.env.COOP_PORT || 9995;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.volume = 0; G.save.write(); G.sfx.setVolume && G.sfx.setVolume(0); G.save.data.settings.askTutorial = false; 1");
     // ---- the numbers
     const zoomOf = (gun, optic) => p.eval(`(() => { const w = G.weapons.make('${gun}'); ${optic ? `w.atts.optic = '${optic}'; w.ver++;` : ''} return Math.round(G.weapons.stats(w).zoom * 100) / 100; })()`);
@@ -84,7 +85,7 @@ const PORT = +process.env.COOP_PORT || 9995;
       check(await p.eval("document.getElementById('scope-overlay').style.opacity === '0'"), 'and lowering the gun lifts it');
     }
     const bare = await vm(null);
-    check(!bare.so && !bare.pip && bare.sy === 0.088, 'with the scope taken off, the rifle shows iron sights, aimed down at their height ' + JSON.stringify(bare));
+    check(!bare.so && !bare.pip && Math.abs(bare.sy - 0.088) < 0.004, 'with the scope taken off, the rifle shows iron sights, aimed down at their height ' + JSON.stringify(bare));   // (taken from the sights' own shape: the top of the front post)
     const s4 = await vm('o_4x');
     check(s4.pip, 'a 4x scope is drawn as a scope with a lens (picture in picture)');
     // aiming: the camera's zoom follows the scope (the lens does the rest on a pip scope)

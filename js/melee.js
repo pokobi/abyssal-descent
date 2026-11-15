@@ -39,6 +39,11 @@
   W.gd = gd;
   const GUARD_MIN = 0.25, GUARD_REST = 1.6, GUARD_REGEN = 0.09; // seconds without a blocked hit before it refills; share of the gauge per second (the same for every weapon)
   W.guarding = () => !!(gd.on && P && P.meleeMode);
+  W.meleePhase = () => (ms.draw ? 'draw' : ms.ph);   // what the melee weapon is doing: idle / light / hwind / hrec / draw
+  // a swing or a heavy blow cut short (frozen solid, another action began: player.js stopActions): it ends where it is, no blow lands
+  W.stopSwing = () => { if (ms.ph !== 'idle') { ms.ph = 'idle'; ms.t = 0; ms.lungeT = 0; ms.hitDone = true; } };
+  W.endDraw = () => { ms.draw = null; };
+  W.dropGuard = () => { if (gd.on) { gd.on = false; gd.lock = true; } };   // (up again once the key is let go and pressed again)
   function guardTick(dt, blocked) {
     // in a duel (duel.js) the key only parries: no guard is raised, a press shows a quick parry stance
     if (G.Duel && G.Duel.mine()) {
@@ -58,7 +63,7 @@
     const held = !!g && I.down('reload') && !blocked && ms.ph === 'idle' && !P.dead;
     if (held && !gd.on && !gd.lock && gd.g < GUARD_MIN) { gd.lock = true; gd.flash = 1; G.sfx.ui('deny'); }
     const want = held && !gd.lock;
-    if (want && !gd.on) G.sfx.mech('boltBack', 0, 0.5);
+    if (want && !gd.on) { G.sfx.mech('boltBack', 0, 0.5); P.beginHands('melee'); }
     if (gd.on && !want) W.guardEndT = G.game.time; // (盾打ち: the moment the guard comes down)
     gd.on = want;
     gd.k = U.damp(gd.k, gd.on ? 1 : 0, 16, dt);
@@ -121,29 +126,44 @@
     const r = new THREE.Group(), l = new THREE.Group();
     root.add(r, l);
     const mk = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 2.4; return m; };
-    const blade = mk({ color: 0xdce2ec, metalness: 0.52, roughness: 0.18, emissive: 0x242a34, emissiveIntensity: 0.25 });
+    // (the finer surfaces of gfx.js where there are any: a blade's ground steel, the hide of a wrapped grip)
+    const sx = (name, ns) => { const t = G.GFX && G.GFX.tex ? G.GFX.tex(name) : null; return t ? { map: t.map, normalMap: t.normalMap, roughnessMap: t.orm, normalScale: new THREE.Vector2(ns, ns) } : null; };
+    const blade = mk(Object.assign({ color: 0x8e9298, metalness: 0.95, roughness: 0.3 }, sx('steel', 0.45) ? Object.assign({ roughness: 0.42, color: 0x9a9ea4 }, sx('steel', 0.45)) : {}));   // (steel: grey and metal through, not white)
     const dark = mk({ color: 0x241e1c, metalness: 0.3, roughness: 0.62 });
-    const wrap = mk({ color: 0x3a1a14, roughness: 0.9, map: G.Tex.tex.cloth.map });
-    const gold = mk({ color: 0xffcf40, metalness: 0.45, roughness: 0.20, emissive: 0x7a4c08, emissiveIntensity: 0.50 });
-    const goldBr = mk({ color: 0xfff0a0, metalness: 0.50, roughness: 0.12, emissive: 0xb88214, emissiveIntensity: 0.72 });
+    const wrap = mk(Object.assign({ color: 0x3a1a14, roughness: 0.9, map: G.Tex.tex.cloth.map }, sx('leather', 1) ? Object.assign({ color: 0x5a2c20, roughness: 1 }, sx('leather', 1)) : {}));
+    const gold = mk({ color: 0x96783e, metalness: 0.85, roughness: 0.42 });   // (old gold: fittings, not a lamp)
+    const goldBr = mk({ color: 0xa68a56, metalness: 0.86, roughness: 0.36 });
     let bladeM = blade;
-    if (def.model === 'frostknife') bladeM = mk({ color: 0xbfe8ff, metalness: 0.3, roughness: 0.05, emissive: 0x3898ff, emissiveIntensity: 1.15, transparent: true, opacity: 0.94 });
-    if (def.model === 'emberblade') bladeM = mk({ color: 0xff6018, metalness: 0.35, roughness: 0.18, emissive: 0xff4808, emissiveIntensity: 1.8 });
-    if (def.model === 'holy') bladeM = mk({ color: 0xfff8e8, metalness: 0.45, roughness: 0.10, emissive: 0xffdf80, emissiveIntensity: 1.1 });
-    if (def.model === 'twin') bladeM = mk({ color: 0x68f040, metalness: 0.4, roughness: 0.18, emissive: 0x28b810, emissiveIntensity: 1.2 });
-    const box = (p, w, h, d, x, y, z, m, rx, ry, rz) => { const o = new THREE.Mesh(PG.box, m); o.scale.set(w, h, d); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); p.add(o); return o; };
+    if (def.model === 'frostknife') bladeM = mk({ color: 0x9ab2bc, metalness: 0.3, roughness: 0.1, emissive: 0x24485c, emissiveIntensity: 0.12, transparent: true, opacity: 0.94 });
+    if (def.model === 'emberblade') bladeM = mk({ color: 0x6e3a26, metalness: 0.8, roughness: 0.34, emissive: 0x8a2808, emissiveIntensity: 0.15 });
+    if (def.model === 'holy') bladeM = mk(Object.assign({ color: 0xa8acb0, metalness: 0.95, roughness: 0.24 }, sx('steel', 0.3) || {}));   // (polished bright: its gold is in the inlay)
+    if (def.model === 'twin') bladeM = mk(Object.assign({ color: 0x868a84, metalness: 0.92, roughness: 0.4 }, sx('steel', 0.45) || {}));   // (plain steel: the venom is in its stained fuller)
+    // (a part is a box cut to its size with its edges rounded a little, as on the guns)
+    const box = (p, w, h, d, x, y, z, m, rx, ry, rz) => { const rg = G.GFX && G.GFX.rbox ? G.GFX.rbox(w, h, d, Math.min(0.003, Math.min(Math.abs(w), Math.abs(h), Math.abs(d)) * 0.2)) : null; const o = new THREE.Mesh(rg || PG.box, m); if (!rg) o.scale.set(w, h, d); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, ry || 0, rz || 0); p.add(o); return o; };
     const cyl = (p, rad, len, x, y, z, m) => { const o = new THREE.Mesh(PG.cyl8, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); p.add(o); return o; };
     const cone = (p, rad, len, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(rad, len, rad); o.position.set(x || 0, y || 0, z || 0); o.rotation.x = rx || 0; p.add(o); return o; };
     const flatTip = (p, w, len, d, x, y, z, m, rx) => { const o = new THREE.Mesh(PG.cone, m); o.scale.set(w * 0.58, len, d * 0.58); o.position.set(x || 0, y || 0, z || 0); o.rotation.set(rx || 0, Math.PI / 4, 0); p.add(o); return o; };
     const isMidas = def.id === 'm_midas' || def.trait === 'midas';
-    const gDeep = isMidas ? mk({ color: 0xd89218, metalness: 0.42, roughness: 0.28, emissive: 0x523004, emissiveIntensity: 0.45 }) : null;
-    const gGold = isMidas ? mk({ color: 0xffcf40, metalness: 0.45, roughness: 0.22, emissive: 0x7a4c08, emissiveIntensity: 0.52 }) : null;
-    const gBright = isMidas ? mk({ color: 0xffe878, metalness: 0.48, roughness: 0.16, emissive: 0x9a6810, emissiveIntensity: 0.62 }) : null;
-    const gSpike = isMidas ? mk({ color: 0xfff8c0, metalness: 0.52, roughness: 0.10, emissive: 0xc88e18, emissiveIntensity: 0.82 }) : null;
-    const gTrim = isMidas ? mk({ color: 0x3a1014, metalness: 0.35, roughness: 0.45, emissive: 0x1a0406, emissiveIntensity: 0.25 }) : null;
-    const gGem = isMidas ? mk({ color: 0xff2414, metalness: 0.15, roughness: 0.08, emissive: 0xff3c14, emissiveIntensity: 2.1 }) : null;
+    const gDeep = isMidas ? mk({ color: 0x8a6a2c, metalness: 0.85, roughness: 0.4 }) : null;
+    const gGold = isMidas ? mk(Object.assign({ color: 0x8a7444, metalness: 0.86, roughness: 0.56 }, sx('steel', 0.4) || {})) : null;   // (old gold: worn dull, its reflection of the sky held down)
+    if (gGold) gGold.envMapIntensity = 1.2;
+    const gBright = isMidas ? mk({ color: 0xb8964c, metalness: 0.88, roughness: 0.32 }) : null;
+    const gSpike = isMidas ? mk({ color: 0xc4a464, metalness: 0.9, roughness: 0.3 }) : null;
+    const gTrim = isMidas ? mk({ color: 0x2e1c14, metalness: 0.35, roughness: 0.6 }) : null;
+    const gGem = isMidas ? mk({ color: 0x4a1210, metalness: 0.15, roughness: 0.2, emissive: 0x4a1210, emissiveIntensity: 0.1 }) : null;
+    const NPg = G.GFX && G.GFX.meleeParts ? G.GFX.meleeParts : null;
     const fist = (p, right) => {
       const s = right ? 1 : -1;
+      if (isMidas && NPg && NPg('midas') && G.GFX.hand) {
+        // (a gauntlet of gilt plates over the gloved fist: gfx.js midas, mirrored for the left hand)
+        // (the glove under it black-brown, so the old gold stands off it; the engraved lines and rivets dark gold)
+        if (!buildMelee.midasGlove || buildMelee.midasGlove.map !== mats.glove.map) { const gm = mats.glove.clone(); gm.color.multiplyScalar(0.42); buildMelee.midasGlove = gm; buildMelee.midasLine = mk({ color: 0x4e3a1c, metalness: 0.75, roughness: 0.58 }); }
+        const hs = G.GFX.hand(right, true), hand = new THREE.Mesh(hs.hand, buildMelee.midasGlove); p.add(hand, new THREE.Mesh(hs.strap, mats.sleeve));
+        const gp = new THREE.Group(); if (!right) gp.scale.x = -1; p.add(gp);
+        for (const q of NPg('midas').parts) { const o = new THREE.Mesh(q.g, q.m === 'gilt' ? gGold : buildMelee.midasLine); o.position.set(q.at[0], q.at[1], q.at[2]); gp.add(o); }
+        const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); arm.userData.sleeve = true; p.add(arm);
+        return hand;
+      }
       if (isMidas) {
         // sculpted golden armored fist core + continuous tapered side cheek-guards
         const palm = box(p, 0.056, 0.042, 0.064, 0, -0.001, 0.000, gDeep);
@@ -196,6 +216,13 @@
         const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.022, 0.34, 0.022); arm.rotation.x = Math.PI / 2 - 0.22; arm.position.set(s * 0.014, -0.048, 0.21); arm.userData.sleeve = true; p.add(arm);
         return palm;
       }
+      // (a gloved hand closed to a fist round the grip: gfx.js)
+      const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right, true) : null;
+      if (hs) {
+        const hand = new THREE.Mesh(hs.hand, mats.glove); p.add(hand, new THREE.Mesh(hs.pad, mats.poly), new THREE.Mesh(hs.strap, mats.sleeve));
+        const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); arm.userData.sleeve = true; p.add(arm);
+        return hand;
+      }
       const palm = box(p, 0.06, 0.08, 0.08, 0, 0, 0, mats.glove);
       box(p, 0.065, 0.04, 0.06, right ? -0.01 : 0.01, 0.035, -0.02, mats.glove);
       const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); arm.userData.sleeve = true; p.add(arm);
@@ -205,7 +232,34 @@
     // weapon pivot = grip, local +Y = blade direction
     const wg = new THREE.Group(); r.add(wg);
     let tipY = 0.3, glow = null;
-    const gemM = (col, em) => mk({ color: col, metalness: 0.15, roughness: 0.08, emissive: em || col, emissiveIntensity: 2.0 });
+    const gemM = (col, em) => { const c = new THREE.Color(col), h = {}; c.getHSL(h, THREE.SRGBColorSpace); c.setHSL(h.h, h.s * 0.45, h.l * 0.55, THREE.SRGBColorSpace); return mk({ color: c, metalness: 0.15, roughness: 0.14, emissive: c, emissiveIntensity: 0.12 }); };   // (stones dull and dark: none shines)
+    // (the weapons shaped in gfx.js - blades lofted to an edge, turned grips, cut guards: a list of parts, each given its material here)
+    const NP = G.GFX && G.GFX.meleeParts ? G.GFX.meleeParts : null, MMb = { blade: bladeM, dark, steel: mats.steel, wrap, gold, goldBr, wood: mats.wood };
+    {
+      // (what the shaped weapons are made of besides: forged iron, copper, bone, hide pale and dark, steel blued or blackened, rime,
+      // steel coloured by heat (by its vertices), the frosted hardened edge, a dark stain, bronze gone green, wood stained black)
+      const it = (n) => (G.GFX && G.GFX.itemTex ? G.GFX.itemTex(n) : null), cast = it('castIron'), stl = sx('steel', 0.45), hide = sx('leather', 1);
+      const castM = (c) => mk(Object.assign({ color: c, roughness: 1 }, cast ? { map: cast.map, normalMap: cast.normalMap, roughnessMap: cast.orm, metalnessMap: cast.orm, metalness: 1 } : { metalness: 0.7, roughness: 0.6 }));
+      Object.assign(MMb, {
+        iron: castM(0x6e706c), verdigris: castM(0x5c6a50),
+        copper: mk(Object.assign({ color: 0x8a5434, metalness: 0.9, roughness: 0.5 }, stl || {})), bone: mk({ color: 0xbcae92, metalness: 0, roughness: 0.6 }),
+        leather: mk(Object.assign({ color: 0x3a2618, roughness: 1 }, hide || {})), leatherW: mk(Object.assign({ color: 0x8a7a60, roughness: 1 }, hide || {})), wrapRed: mk(Object.assign({ color: 0x4a1c16, roughness: 1 }, hide || {})),
+        blued: mk(Object.assign({ color: 0x3c4856, metalness: 0.95, roughness: 0.42 }, stl || {})), blackSteel: mk(Object.assign({ color: 0x2a2c30, metalness: 0.92, roughness: 0.46 }, stl || {})),
+        rime: mk({ color: 0x5e6a74, metalness: 0, roughness: 1 }), heat: mk(Object.assign({ color: 0xffffff, metalness: 0.9, roughness: 0.46, vertexColors: true }, stl || {})),
+        hamon: mk(Object.assign({ color: 0xc4c8cc, metalness: 0.8, roughness: 0.62 }, stl || {})), stain: mk({ color: 0x1a2412, metalness: 0.3, roughness: 0.22 }), groove: mk({ color: 0x16120e, metalness: 0.2, roughness: 1 }),
+        darkWood: mk(Object.assign({ color: 0x2a1c14, roughness: 1 }, sx('walnut', 0.5) || {})),
+      });
+      // (the knife of ice: its blade in a surface of its own, blued steel under hoarfrost (gfx.js frostBlade), as cast iron's maps are laid;
+      // splinters of clear ice. The hammer of thunder: old copper, red-brown and gone green at its edges, by its vertices)
+      if (def.model === 'frostknife') {
+        const fb = G.GFX && G.GFX.frostBlade ? G.GFX.frostBlade() : null;
+        MMb.frostBlade = fb ? mk({ color: 0xffffff, map: fb.map, normalMap: fb.normalMap, normalScale: new THREE.Vector2(0.7, 0.7), roughnessMap: fb.orm, metalnessMap: fb.orm, roughness: 1, metalness: 1 }) : MMb.blued;
+        MMb.ice = mk({ color: 0x56636a, metalness: 0, roughness: 0.12, transparent: true, opacity: 0.4, depthWrite: false });
+      }
+      if (def.model === 'thunder') MMb.oldCopper = mk(Object.assign({ color: 0xffffff, metalness: 0.62, roughness: 0.68, vertexColors: true }, stl || {}));
+    }
+    const has = (key) => !!(NP && NP(key));
+    const put = (p, key, MM) => { const d = NP(key); for (const q of d.parts) { const o = new THREE.Mesh(q.g, MM[q.m] || dark); o.position.set(q.at[0], q.at[1], q.at[2]); if (q.glow) o.userData.glow = true; p.add(o); } return d.tipY; };
     const knife = (p, len, m) => {
       cyl(p, 0.015, 0.11, 0, 0, 0, dark); box(p, 0.022, 0.018, 0.024, 0, -0.06, 0, mats.steel);
       for (let i = 0; i < 3; i++) box(p, 0.032, 0.006, 0.028, 0, -0.032 + i * 0.028, 0, mats.steel);
@@ -216,9 +270,10 @@
       return 0.067 + len + 0.055;
     };
     switch (def.model) {
-      case 'fists': if (isMidas) glow = 0xffd040; break;
-      case 'knife': tipY = knife(wg, 0.18, bladeM); break;
+      case 'fists': break;
+      case 'knife': tipY = has('knife') ? put(wg, 'knife', MMb) : knife(wg, 0.18, bladeM); break;
       case 'sknife': {
+        if (has('sknife')) { tipY = put(wg, 'sknife', MMb); break; }
         cyl(wg, 0.017, 0.12, 0, 0, 0, wrap); box(wg, 0.024, 0.02, 0.026, 0, -0.065, 0, mats.steel);
         box(wg, 0.030, 0.014, 0.078, 0, 0.065, 0, mats.steel);
         box(wg, 0.007, 0.18, 0.036, 0, 0.16, -0.003, bladeM);
@@ -227,7 +282,8 @@
         tipY = 0.30; break;
       }
       case 'frostknife': {
-        const iceGem = gemM(0x70e8ff, 0x30b8ff), iceHil = mk({ color: 0x385878, metalness: 0.5, roughness: 0.25, emissive: 0x102840, emissiveIntensity: 0.4 });
+        const iceGem = gemM(0x70e8ff, 0x30b8ff), iceHil = mk({ color: 0x2c3a48, metalness: 0.5, roughness: 0.4 });
+        if (has('frostknife')) { tipY = put(wg, 'frostknife', Object.assign({ hilt: iceHil, gem: iceGem }, MMb)); break; }
         cyl(wg, 0.015, 0.11, 0, 0, 0, iceHil);
         for (const y of [-0.03, 0, 0.03]) box(wg, 0.032, 0.006, 0.032, 0, y, 0, goldBr);
         const pm = new THREE.Mesh(PG.oct3, iceGem); pm.scale.set(0.014, 0.022, 0.014); pm.position.set(0, -0.068, 0); wg.add(pm);
@@ -236,11 +292,12 @@
         box(wg, 0.007, 0.20, 0.038, 0, 0.17, 0, bladeM);
         box(wg, 0.010, 0.17, 0.010, 0, 0.16, 0, iceGem);
         flatTip(wg, 0.008, 0.065, 0.038, 0, 0.30, 0, bladeM);
-        tipY = 0.33; glow = 0x80d0ff; break;
+        tipY = 0.33; break;
       }
       case 'twin': {
-        const vGem = gemM(0x50ff30, 0x30e818), vObs = mk({ color: 0x142214, metalness: 0.4, roughness: 0.35, emissive: 0x061204, emissiveIntensity: 0.3 });
+        const vGem = gemM(0x50ff30, 0x30e818), vObs = mk({ color: 0x142214, metalness: 0.4, roughness: 0.45 });
         const buildVenom = (p) => {
+          if (has('twin')) return put(p, 'twin', Object.assign({ hilt: vObs, gem: vGem }, MMb));
           cyl(p, 0.015, 0.11, 0, 0, 0, vObs);
           for (const y of [-0.032, 0, 0.032]) box(p, 0.031, 0.006, 0.031, 0, y, 0, gold);
           const pm = new THREE.Mesh(PG.oct3, vGem); pm.scale.set(0.014, 0.022, 0.014); pm.position.set(0, -0.068, 0); p.add(pm);
@@ -258,9 +315,10 @@
         };
         tipY = buildVenom(wg);
         const lg = new THREE.Group(); l.add(lg); buildVenom(lg); lg.rotation.set(-0.9, 0, -0.2); l.userData.knife = lg;
-        glow = 0x50ff30; break;
+        break;
       }
       case 'kukri': {
+        if (has('kukri')) { tipY = put(wg, 'kukri', MMb); break; }
         cyl(wg, 0.016, 0.12, 0, 0, 0, mats.wood); box(wg, 0.026, 0.016, 0.034, 0, -0.065, 0, gold); box(wg, 0.028, 0.018, 0.052, 0, 0.065, 0, gold);
         box(wg, 0.007, 0.14, 0.042, 0, 0.135, -0.008, bladeM, -0.14); box(wg, 0.009, 0.14, 0.010, 0, 0.135, 0.012, dark, -0.14);
         box(wg, 0.007, 0.15, 0.058, 0, 0.265, -0.024, bladeM, 0.16); box(wg, 0.009, 0.15, 0.012, 0, 0.265, 0.000, dark, 0.16);
@@ -268,6 +326,7 @@
         tipY = 0.39; break;
       }
       case 'machete': {
+        if (has('machete')) { tipY = put(wg, 'machete', MMb); break; }
         cyl(wg, 0.017, 0.13, 0, 0, 0, dark); box(wg, 0.026, 0.022, 0.036, 0, -0.07, 0, mats.steel); box(wg, 0.028, 0.014, 0.068, 0, 0.068, 0, mats.steel);
         box(wg, 0.006, 0.38, 0.054, 0, 0.265, -0.006, bladeM); box(wg, 0.009, 0.38, 0.014, 0, 0.265, 0.016, dark);
         flatTip(wg, 0.007, 0.07, 0.054, 0, 0.485, -0.006, bladeM);
@@ -275,8 +334,10 @@
       }
       case 'katana': case 'emberblade': {
         const em = def.model === 'emberblade';
-        const spineM = em ? mk({ color: 0x1a0806, metalness: 0.45, roughness: 0.35, emissive: 0x280600, emissiveIntensity: 0.4 }) : dark;
+        if (def.id === 'm_kusanagi' && has('kusanagi')) { tipY = put(wg, 'kusanagi', MMb); break; }
+        const spineM = em ? mk({ color: 0x1a0806, metalness: 0.45, roughness: 0.45 }) : dark;
         const fGem = em ? gemM(0xff3810, 0xff5010) : null;
+        if (has(em ? 'emberblade' : 'katana')) { tipY = put(wg, em ? 'emberblade' : 'katana', Object.assign({ spine: spineM, gem: fGem }, MMb)); break; }
         cyl(wg, 0.016, 0.22, 0, -0.01, 0, wrap);
         box(wg, 0.026, 0.018, 0.032, 0, -0.125, 0, gold);
         for (let i = 0; i < 5; i++) box(wg, 0.034, 0.008, 0.028, 0, -0.09 + i * 0.038, 0, em ? gold : dark, 0.35);
@@ -290,11 +351,12 @@
         box(wg, 0.009, 0.62, 0.012, 0, 0.45, 0.008, spineM, 0.03);
         if (em) for (let i = 0; i < 3; i++) box(wg, 0.008, 0.045, 0.018, 0, 0.28 + i * 0.16, 0.016, bladeM, -0.45);
         flatTip(wg, 0.007, 0.075, 0.034, 0, 0.79, -0.016, bladeM, 0.05);
-        tipY = 0.83; if (em) glow = 0xff6a20; bl.userData.glow = true; break;
+        tipY = 0.83; break;
       }
       case 'holy': {
         const hGem = gemM(0xff3018, 0xff4818), hSun = gemM(0xfff8b0, 0xffd850);
-        const hTrim = mk({ color: 0x381018, metalness: 0.35, roughness: 0.4, emissive: 0x180408, emissiveIntensity: 0.3 });
+        const hTrim = mk({ color: 0x381018, metalness: 0.35, roughness: 0.5 });
+        if (has('holy')) { tipY = put(wg, 'holy', Object.assign({ trim: hTrim, gem: hGem, sun: hSun }, MMb)); break; }
         // royal pommel with sun-ruby core & golden wings
         const pBez = new THREE.Mesh(PG.oct, goldBr); pBez.scale.set(0.022, 0.016, 0.022); pBez.position.set(0, -0.125, 0); pBez.rotation.z = Math.PI / 2; wg.add(pBez);
         const pGem = new THREE.Mesh(PG.oct3, hGem); pGem.scale.set(0.016, 0.024, 0.016); pGem.position.set(0, -0.132, 0); wg.add(pGem);
@@ -316,9 +378,10 @@
         box(wg, 0.012, 0.56, 0.018, 0, 0.46, 0, gold);
         box(wg, 0.015, 0.50, 0.008, 0, 0.44, 0, hSun);
         flatTip(wg, 0.009, 0.095, 0.050, 0, 0.835, 0, bladeM);
-        tipY = 0.88; glow = 0xfff0c0; bl.userData.glow = true; break;
+        tipY = 0.88; break;
       }
       case 'rapier': {
+        if (has('rapier')) { tipY = put(wg, 'rapier', MMb); break; }
         cyl(wg, 0.014, 0.13, 0, -0.005, 0, dark);
         const pm = new THREE.Mesh(PG.oct3, goldBr); pm.scale.set(0.016, 0.022, 0.016); pm.position.set(0, -0.08, 0); wg.add(pm);
         const cup = new THREE.Mesh(PG.sph, gold); cup.scale.set(0.048, 0.028, 0.048); cup.position.y = 0.075; wg.add(cup);
@@ -331,6 +394,7 @@
         tipY = 0.89; break;
       }
       case 'axe': {
+        if (has('axe')) { tipY = put(wg, 'axe', MMb); break; }
         cyl(wg, 0.018, 0.62, 0, 0.18, 0, mats.wood);
         for (const y of [-0.10, 0.10, 0.32, 0.48]) box(wg, 0.040, 0.016, 0.040, 0, y, 0, mats.steel);
         box(wg, 0.026, 0.12, 0.08, 0, 0.42, 0, dark);
@@ -342,6 +406,7 @@
       }
       case 'buckler': {
         // an arming sword: leather grip, a plain crossguard, a straight double-edged blade with a fuller
+        if (has('buckler')) { tipY = put(wg, 'buckler', MMb); break; }
         cyl(wg, 0.016, 0.12, 0, 0, 0, wrap); box(wg, 0.03, 0.03, 0.03, 0, -0.07, 0, mats.steel);
         box(wg, 0.022, 0.022, 0.15, 0, 0.07, 0, mats.steel);
         box(wg, 0.007, 0.36, 0.044, 0, 0.26, 0, bladeM); box(wg, 0.009, 0.32, 0.012, 0, 0.25, 0, dark);
@@ -350,6 +415,7 @@
       }
       case 'tower': {
         // a short war hammer for the right hand
+        if (has('tower')) { tipY = put(wg, 'tower', MMb); break; }
         cyl(wg, 0.018, 0.34, 0, 0.08, 0, mats.wood);
         for (const y of [-0.06, 0.12]) box(wg, 0.04, 0.016, 0.04, 0, y, 0, mats.steel);
         box(wg, 0.075, 0.075, 0.15, 0, 0.27, -0.01, dark); box(wg, 0.088, 0.088, 0.04, 0, 0.27, -0.08, mats.steel);
@@ -357,6 +423,7 @@
         tipY = 0.33; break;
       }
       case 'hammer': {
+        if (has('hammer')) { tipY = put(wg, 'hammer', MMb); break; }
         cyl(wg, 0.020, 0.62, 0, 0.20, 0, mats.wood);
         for (const y of [-0.09, 0.12, 0.38]) box(wg, 0.044, 0.018, 0.044, 0, y, 0, mats.steel);
         box(wg, 0.09, 0.09, 0.18, 0, 0.49, -0.01, dark);
@@ -367,7 +434,8 @@
         tipY = 0.58; break;
       }
       case 'thunder': {
-        const tGem = gemM(0x60f0ff, 0x30c8ff), tSteel = mk({ color: 0x262c38, metalness: 0.48, roughness: 0.28, emissive: 0x0a1424, emissiveIntensity: 0.35 });
+        const tGem = gemM(0x60f0ff, 0x30c8ff), tSteel = mk({ color: 0x262c38, metalness: 0.6, roughness: 0.45 });
+        if (has('thunder')) { tipY = put(wg, 'thunder', Object.assign({ tsteel: tSteel, gem: tGem }, MMb)); break; }
         // braided obsidian-and-gold haft + storm-crystal pommel & flared golden collar
         cyl(wg, 0.020, 0.64, 0, 0.19, 0, tSteel);
         for (const y of [-0.08, 0.04, 0.16, 0.28, 0.38]) box(wg, 0.046, 0.016, 0.046, 0, y, 0, gold);
@@ -394,9 +462,11 @@
         // top lightning-spire crown
         const crB = new THREE.Mesh(PG.oct, goldBr); crB.scale.set(0.028, 0.020, 0.028); crB.position.set(0, 0.57, 0); wg.add(crB);
         const crS = new THREE.Mesh(PG.oct3, tGem); crS.scale.set(0.020, 0.042, 0.020); crS.position.set(0, 0.60, 0); wg.add(crS);
-        tipY = 0.62; glow = 0x70e8ff; break;
+        tipY = 0.62; break;
       }
       case 'spear': {
+        if (def.id === 'm_abyss' && has('abyss')) { tipY = put(wg, 'abyss', MMb); break; }
+        if (has('spear')) { tipY = put(wg, 'spear', MMb); break; }
         cyl(wg, 0.016, 1.32, 0, 0.30, 0, mats.wood);
         for (const y of [-0.20, 0.25, 0.65, 0.90]) box(wg, 0.038, 0.018, 0.038, 0, y, 0, gold);
         box(wg, 0.032, 0.05, 0.048, 0, 0.96, 0, gold);
@@ -409,8 +479,9 @@
       case 'scythe': {
         const isDev = def.id === 'm_devour' || def.trait === 'devour';
         if (isDev) {
-          const sGem = gemM(0xff1868, 0xff2080), sVoid = mk({ color: 0x1c0818, metalness: 0.45, roughness: 0.3, emissive: 0x180214, emissiveIntensity: 0.4 });
-          const sEdge = mk({ color: 0xff3888, metalness: 0.35, roughness: 0.12, emissive: 0xe01868, emissiveIntensity: 1.75 });
+          const sGem = gemM(0xff1868, 0xff2080), sVoid = mk({ color: 0x1c1418, metalness: 0.6, roughness: 0.45 });
+          const sEdge = mk({ color: 0x8e9298, metalness: 0.9, roughness: 0.32 });
+          if (has('devour')) { tipY = put(wg, 'devour', Object.assign({ void: sVoid, gem: sGem, edge: sEdge }, MMb)); break; }
           // armored obsidian-and-gold snath + abyssal soul-crystal pommel
           cyl(wg, 0.019, 1.18, 0, 0.32, 0, sVoid);
           for (let i = 0; i < 6; i++) box(wg, 0.044, 0.018, 0.044, 0, -0.14 + i * 0.20, 0, gold);
@@ -437,10 +508,11 @@
           }
           // inner soul-ripper hook
           flatTip(bg, 0.014, 0.09, 0.036, 0, -0.055, -0.18, goldBr, -2.4);
-          tipY = 0.95; glow = 0xff2078; break;
+          tipY = 0.95; break;
         }
-        const boneM = mk({ color: 0xd8ceb8, metalness: 0.25, roughness: 0.4, emissive: 0x241e18, emissiveIntensity: 0.25 });
+        const boneM = mk({ color: 0xbcae92, metalness: 0, roughness: 0.6 });
         const rGem = gemM(0xff2030, 0xff1020);
+        if (has('scythe')) { tipY = put(wg, 'scythe', Object.assign({ bone: boneM, gem: rGem }, MMb)); break; }
         cyl(wg, 0.018, 1.15, 0, 0.32, 0, dark);
         for (const y of [-0.15, 0.15, 0.45, 0.72]) box(wg, 0.038, 0.018, 0.038, 0, y, 0, boneM);
         const bg = new THREE.Group(); bg.position.set(0, 0.88, 0); wg.add(bg);
@@ -455,7 +527,7 @@
           box(bg, 0.007, w * 0.74, step + 0.025, 0, my - Math.cos(rx) * w * 0.15, mz - Math.sin(rx) * w * 0.15, bladeM, rx);
           cy += Math.sin(rx) * step; cz -= Math.cos(rx) * step;
         }
-        tipY = 0.92; glow = 0xd02040; break;
+        tipY = 0.92; break;
       }
     }
     fist(r, true);
@@ -472,6 +544,13 @@
   function buildShield(l, kind, mk, mats, PG, box, gold, dark) {
     const sg = new THREE.Group(); l.add(sg); l.userData.shield = sg;
     sg.scale.setScalar(kind === 'buckler' ? 0.5 : 0.52); sg.rotation.y = 0.35; // held a little turned, its face towards the middle of the view
+    // (the shield shaped in gfx.js: a domed round one with rim, boss and studs; a tall plate bent round the arm)
+    const SP = G.GFX && G.GFX.shieldParts ? G.GFX.shieldParts(kind) : null;
+    if (SP) {
+      const MM = { face: kind === 'buckler' ? mk({ color: 0x6a2a20, metalness: 0.25, roughness: 0.55, map: G.Tex.tex.cloth.map }) : mk({ color: 0x3c3f48, metalness: 0.6, roughness: 0.38 }), steel: mats.steel, gold, dark };
+      for (const q of SP.parts) { const o = new THREE.Mesh(q.g, MM[q.m] || dark); o.position.set(q.at[0], q.at[1], q.at[2]); sg.add(o); }
+      return sg;
+    }
     if (kind === 'buckler') {
       const face = mk({ color: 0x6a2a20, metalness: 0.25, roughness: 0.55, map: G.Tex.tex.cloth.map });
       const disk = new THREE.Mesh(PG.cyl, face); disk.scale.set(0.2, 0.03, 0.2); disk.rotation.x = Math.PI / 2; sg.add(disk);
@@ -533,22 +612,48 @@
     if (m === 'spear' || m === 'scythe') return 'baton';
     return 'twirl';
   };
-  // a melee weapon with an element: a thin glowing skin of its colour over the weapon (pulsing), and the slash trail in that colour
+  // a melee weapon with an element: its motes in a dark shade of that colour, the trail of its swing tinted by it (trailStyle), and - an
+  // element put on by a 属性コア - a faint skin of that colour over it. A weapon whose element is its own shows it in what it is made of
+  // (gfx.js: frost on blued steel, steel coloured by heat, old copper): no skin
   function elFilm(m, el) {
     if (!m || !el || !G.Elem.BY[el]) return;
-    const hex = G.Elem.BY[el].hex;
-    m.glow = hex; m.el = el;
-    const mat = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false });
+    const hex = G.Elem.BY[el].hex, dim = new THREE.Color(hex), h = {}; dim.getHSL(h, THREE.SRGBColorSpace); dim.setHSL(h.h, h.s * 0.4, h.l * 0.3, THREE.SRGBColorSpace);
+    m.glow = dim.getHex(); m.el = el;
+    if (m.def && m.def.el === el) return;
+    const mat = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false });
     const meshes = []; m.wg.traverse((o) => { if (o.isMesh) meshes.push(o); });
     for (const o of meshes) { const f = new THREE.Mesh(o.geometry, mat); f.scale.setScalar(1.05); f.renderOrder = 2; o.add(f); }
     m.film = mat;
   }
+  // ---- the trail a swing leaves (fx.js bladeTrail): a thin streak of the air the edge has cut, gone in about a tenth of a second. Its
+  // colour is that of the metal at the point (steel, iron), dark, an element mixed in faintly (embers, rime, a dull blue-white, a murky
+  // green for venom, old gold for the holy blade); its width and its life go by the weapon's weight: the heavy ones (axe, hammers,
+  // scythes) broad and short, the light ones (knives, the rapier, the twin fangs) thin and quick. [width at the point (m), life (s), opacity]
+  const TRAIL_W = { light: [0.018, 0.065, 0.5], mid: [0.03, 0.09, 0.52], heavy: [0.06, 0.085, 0.55] };
+  const TRAIL_K = { knife: 'light', sknife: 'light', frostknife: 'light', twin: 'light', rapier: 'light', kukri: 'light', axe: 'heavy', hammer: 'heavy', thunder: 'heavy', scythe: 'heavy', tower: 'heavy' };
+  const TRAIL_C = { hammer: 0x6a6c6a, thunder: 0x6a6c6a, tower: 0x6a6c6a, axe: 0x72757a };
+  const TRAIL_T = { fire: 0x7a3a22, ice: 0xb8c0c4, volt: 0x8e9aac, water: 0x52687a, wind: 0x7c867a, earth: 0x7c6a46, poison: 0x58644a, holy: 0x8c7646 };
+  W.trailStyle = function (def, el) {
+    const k = TRAIL_W[TRAIL_K[def.model] || 'mid'], c = new THREE.Color(def.id === 'm_devour' ? 0x5c5e62 : TRAIL_C[def.model] || 0x7e8288);
+    const tint = TRAIL_T[el] || (def.elem === 'poison' ? TRAIL_T.poison : def.model === 'holy' ? TRAIL_T.holy : null);
+    if (tint) c.lerp(new THREE.Color(tint), 0.4);
+    return { col: c.getHex(), w: k[0], life: k[1], a: k[2] };
+  };
+  // someone else's swing (co-op: their figure, js/coop/body.js): the same trail, along a short arc before them at the pace of a blow,
+  // a little wider so that it reads from across a room
+  W.remoteSwingTrail = function (pos, yaw, id) {
+    const def = G.MELEE_BY_ID[id]; if (!def || def.model === 'fists') return;
+    const st = W.trailStyle(def, def.el || null), fx = -Math.sin(yaw), fz = -Math.cos(yaw), path = [];
+    for (let i = 0; i <= 10; i++) { const a = 0.95 - i * 0.19; path.push(V(pos.x + (fx * Math.cos(a) - fz * Math.sin(a)) * 1.2, pos.y + 1.5 - i * 0.045, pos.z + (fz * Math.cos(a) + fx * Math.sin(a)) * 1.2)); }
+    G.fx.bladeSweep(path, st.col, Math.max(st.w * 1.5, 0.028), st.life * 1.3, st.a, 0.13);
+  };
   W.melee = {
     equip(immediate) {
       P = G.player;
       if (mm) W.vmRoot.remove(mm.group);
       mm = buildMelee(P.melee.def);
       elFilm(mm, G.Elem.wEl(P.melee));
+      mm.trail = W.trailStyle(P.melee.def, mm.el || null);
       W.vmRoot.add(mm.group);
       W.switchT = 0;
       ms.ph = 'idle'; ms.t = 0;
@@ -565,7 +670,8 @@
   W.setMelee = function () {
     P = G.player;
     if (P.meleeMode) return;
-    const old = P.weapon; if (old) { old.reloading = false; old.charge = 0; old.spin = 0; old.burstQ = 0; }
+    P.beginHands('switch');   // (a reload, an item, a throwable, a search ... are put down: player.js stopActions)
+    const old = P.weapon; if (old) { W.interruptReload(old); old.charge = 0; old.spin = 0; old.burstQ = 0; }
     if (W.flameLoop) { W.flameLoop.stop(); W.flameLoop = null; }
     if (W.spinLoop) { W.spinLoop.stop(); W.spinLoop = null; }
     P.meleeMode = true;
@@ -596,7 +702,7 @@
   W.gunSlots = () => { const o = W.order(); return [o[0] || null, o[1] || null]; };
   W.keyLabel = (t) => { const i = W.order().indexOf(t); return i < 0 ? '' : i < 3 ? `[${i + 1}] ` : '[⇕] '; };
   W.curTok = () => (G.player.meleeMode ? 'm' : G.player.weapon);
-  W.selectTok = function (t) { if (t === 'm') W.setMelee(); else if (t) W.switchTo(G.player.weapons.indexOf(t)); };
+  W.selectTok = function (t) { if (G.player.handsBlocked()) return; if (t === 'm') W.setMelee(); else if (t) W.switchTo(G.player.weapons.indexOf(t)); }; // (not in the pile driver's slam)
   W.tokInfo = function (t) {
     if (t === 'm') { const d = G.player.melee.def; return { icon: d.icon, name: d.name, rarity: d.rarity, sub: '近接' }; }
     return { icon: t.def.icon, name: t.def.name, rarity: t.def.rarity, sub: t.lv ? '+' + t.lv : '' };
@@ -625,7 +731,7 @@
     const blocked = !!ms.draw || W.switchT > 0 || P.mantle || P.pileState || W.anim.throwT > 0 || G.ItemAnim.busy() || G.GrenHold.active() || G.abilities.wheelOpen();
     guardTick(dt, blocked);
     if (P.duelLock) { /* no attacks in a duel (duel.js) */ } else if (ms.ph === 'idle' && !blocked && !gd.on) {
-      if (I.mpressed[2]) startHeavy(s);
+      if (I.mpressed[2] || (W.heldHeavy && I.mouse[2])) { W.heldHeavy = false; startHeavy(s); }   // (heldHeavy: an item put down by this button, abilities.js tickUseCut)
       else if (I.mouse[0]) startLight(s);
     } else if (ms.ph === 'light' && !blocked && !gd.on && ms.t >= ms.dur * 0.8 && (I.mouse[0] || I.mpressed[0])) {
       if (I.mpressed[2]) startHeavy(s); else startLight(s);
@@ -657,6 +763,7 @@
     // 剣鬼: every 4th light blow comes out as a heavy one, with no wind-up
     if (P.has('k_demon')) { W.demonN = (W.demonN || 0) + 1; if (W.demonN >= 4) { W.demonN = 0; startHeavy(s); ms.dur = 0.01; G.fx.sparks(G.camera.position.clone().addScaledVector(P.forward(), 1.2), null, 10, 0xff6a5a, 4); return; } }
     const kind = W.meleeKind(P.melee.def);
+    P.beginHands('melee');   // (a search is put down)
     ms.ph = 'light'; ms.t = 0; ms.dur = s.swing; ms.hitDone = false; ms.combo++;
     ms.side = ms.combo % 2 ? 1 : -1;
     if (P.has('k_throw') && ms.combo % 3 === 0) setTimeout(() => throwDagger(s), 60);
@@ -665,6 +772,7 @@
     if (P.weapon) P.weapon.reloading = false;
   }
   function startHeavy(s) {
+    P.beginHands('melee');
     ms.ph = 'hwind'; ms.t = 0; ms.dur = s.heavy[1]; ms.hitDone = false; ms.parried = false;
     if (G.game.time < (W.fastHeavyUntil || 0)) { ms.dur *= 0.5; W.fastHeavyUntil = 0; } // (溜め返し)
     G.sfx.mech('boltBack', 0, 0.35);
@@ -675,9 +783,10 @@
     const c = new THREE.Color(col);
     G.fx.add.spawn(tp.x, tp.y, tp.z, U.rand(-0.3, 0.3), U.rand(0, 0.6), U.rand(-0.3, 0.3), 0.35, 0.05 * k, 0.01, c.r, c.g, c.b, 0.9, 0, 0);
   }
-  function tipWorld() {
-    mm.wg.updateMatrixWorld(true);
-    const p = mm.wg.localToWorld(V(0, mm.tipY, 0));
+  function tipWorld(left) {
+    mm.group.updateMatrixWorld(true);
+    const k2 = left ? mm.l.userData.knife : null;
+    const p = (k2 || mm.wg).localToWorld(V(0, mm.tipY, 0));
     if (mm.def.model === 'fists') { mm.r.updateMatrixWorld(true); p.copy(mm.r.localToWorld(V(0, 0, -0.05))); }
     p.z *= 0.9;
     return G.camera.localToWorld(p);
@@ -710,8 +819,8 @@
     const fl = G.world.floorBelow(pos.x, pos.y + 0.3, pos.z), ground = V(pos.x, fl > -50 ? fl : pos.y, pos.z);
     C.zone(ground, 4.5, 6, 'gravity', 0);
     const m = new THREE.Group();
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0x2a1840, emissive: 0x6a30c0, emissiveIntensity: 0.8, metalness: 0.6, roughness: 0.35 }));
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.45, 6), new THREE.MeshStandardMaterial({ color: 0xd8c8ff, emissive: 0x9a6aff, emissiveIntensity: 1.4, metalness: 0.9, roughness: 0.2 }));
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0x241c22, emissive: 0x3a2a4a, emissiveIntensity: 0.12, metalness: 0.6, roughness: 0.45 }));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.45, 6), new THREE.MeshStandardMaterial({ color: 0x8a8e96, emissive: 0x4a3a6a, emissiveIntensity: 0.12, metalness: 0.9, roughness: 0.32 }));
     tip.position.y = -1.3; tip.rotation.x = Math.PI; m.add(shaft); m.add(tip);
     m.position.copy(pos); m.quaternion.setFromUnitVectors(V(0, -1, 0), f.clone().normalize());
     G.scene.add(m);
@@ -857,7 +966,7 @@
   const ease = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
   function lerp6(A, B, k) { return [L(A[0], B[0], k), L(A[1], B[1], k), L(A[2], B[2], k), L(A[3], B[3], k), L(A[4], B[4], k), L(A[5], B[5], k)]; }
-  let prevTip = null;
+  let wasStriking = false;
   function animateMelee(dt, s) {
     if (!mm) return;
     const def = mm.def, kind = W.meleeKind(def);
@@ -1011,14 +1120,15 @@
     mm.l.rotation.set(fist ? Lp[3] - 0.25 * spr : 0, Lp[4], fist ? Lp[5] : 0);
     if (twin && mm.l.userData.knife) mm.l.userData.knife.rotation.set(Lp[3] || -0.95, 0, Lp[5] || -0.25);
     if (twin && ms.ph === 'idle') { mm.l.userData.knife.rotation.set(-0.95 + spinX, 0, -0.25); mm.l.userData.knife.position.y = tossY; }
-    // slash trail
+    // the trail of the swing (trailStyle): from the point of the blade, and from the left one of the twin fangs; the heavy blow's a little
+    // wider, the draw flourish's faint and short (no long chords across a spin)
     if (striking && !fist) {
-      const tp = tipWorld();
-      // the draw flourish leaves only a faint, short-lived streak (a full slash trail would smear across the screen)
-      if (prevTip && prevTip.distanceTo(tp) > 0.02) { if (spinX || spinZ || tossY) { if (prevTip.distanceTo(tp) < 0.6) G.fx.tracer(prevTip, tp, mm.glow || 0xb8c4d8, 0.008, 0.05); } else G.fx.tracer(prevTip, tp, mm.glow || 0xe8eef8, ms.ph === 'hrec' ? 0.05 : 0.03, 0.14); }
-      if (mm.el && prevTip && prevTip.distanceTo(tp) > 0.02 && !(spinX || spinZ || tossY)) { G.fx.tracer(prevTip, tp, mm.glow, 0.03, 0.16); spawnGlow(mm.glow, 0.7); } // (an element: a wide afterimage of its colour)
-      prevTip = tp;
-    } else prevTip = null;
+      if (!wasStriking) { G.fx.bladeCut('own'); G.fx.bladeCut('ownL'); }
+      const st = mm.trail || W.trailStyle(def, null), fl = !!(spinX || spinZ || tossY), w = st.w * (fl ? 0.45 : ms.ph === 'hrec' ? 1.3 : 1), life = fl ? 0.05 : st.life, a = st.a * (fl ? 0.5 : 1);
+      G.fx.bladeTrail('own', tipWorld(), st.col, w, life, a, fl ? 0.3 : 0);
+      if (twin && mm.l.userData.knife) G.fx.bladeTrail('ownL', tipWorld(true), st.col, w, life, a, fl ? 0.3 : 0);
+    }
+    wasStriking = striking && !fist;
     if (mm.glow && Math.random() < dt * (mm.el ? 14 : 6)) spawnGlow(mm.glow, mm.el ? 0.55 : 0.4);
     if (mm.film) mm.film.opacity = 0.12 + Math.sin(G.game.time * 5) * 0.05 + (striking ? 0.12 : 0);
     W.isScoped = false;

@@ -30,7 +30,7 @@ window.G = window.G || {};
   const NL = String.fromCharCode(10);
   const NUM = /([+\-−＋]?\d+(?:\.\d+)?(?:%|％|秒|m|体|個|本|倍|回|発|枚|エリア)?)/g;
   // stats where a HIGHER value is worse for whoever has it (so a minus is the good direction)
-  const LOWER_BETTER = /(クールタイム|CT|被ダメ|被弾|反動|拡散|ブレ|リロード時間|装填時間|間隔|消費|コスト|価格|費用|待機|チャージ時間|回転開始時間|ディレイ|状態異常の持続|落下ダメージ|自分に付く|重さ|重量|発動までの時間|隙|硬直|詠唱時間|発動時間|溜め時間|準備時間)/;
+  const LOWER_BETTER = /(クールタイム|CT|被ダメ|被弾|反動|拡散|ブレ|リロード時間|装填時間|間隔|消費|コスト|価格|費用|待機|チャージ時間|回転開始時間|ディレイ|状態異常の持続|落下ダメージ|自分に付く|重さ|重量|発動までの時間|隙|硬直|詠唱時間|発動時間|溜め時間|準備時間|使用時間|巻く時間)/;
   // words just before the number that turn it round: "CT短縮+8%" is a gain, "被ダメ軽減+10%" too
   const REDUCER = /(短縮|軽減|減少|低減|カット|耐性|削減)$/;
   const SEP = /[・、。,，／\n]/; // (／ splits "ナイフ：攻撃の間隔-15%／斧：重撃の範囲+50%")
@@ -134,7 +134,7 @@ window.G = window.G || {};
     data: null,
     defaults() {
       return {
-        settings: { sens: 1.0, adsSens: 0.8, fov: 100, volume: 0.8, quality: 'high', dmgNums: true, crouchToggle: false, sprintToggle: false, autoSprint: false, invertY: false, shake: 1.0, bob: 1.0, fullscreen: true, showFps: false, askTutorial: true },
+        settings: { sens: 1.0, adsSens: 0.8, fov: 100, volume: 0.8, quality: 'high', sound: 'new', dmgNums: true, crouchToggle: false, sprintToggle: false, autoSprint: false, invertY: false, shake: 1.0, bob: 1.0, motionBlur: true, fullscreen: true, showFps: false, askTutorial: true, fpsCap: 0 },
         codex: { enemies: {}, kills: {}, items: {}, buffs: {}, bosses: {} },
         records: { bestArea: 0, bestKills: 0, runs: 0, totalKills: 0, bestCoins: 0 },
       };

@@ -93,7 +93,7 @@
     w.solid('rock', -3, 12, -3, W + 3, 15, GAL, { uv: 6, grad: false });
     { let ax = -3; for (const g of [...LG.gateXs(W, gates), W + 9]) { const e = g - 6; if (e > ax) w.solid('rock', ax, 0, -3, e, 12, 0, { uv: 6, grad: false }); ax = g + 6; } }
     for (const g of LG.gateXs(W, gates)) { P().brazier(w, g - 5, 0, 4.5, 1, true); P().brazier(w, g + 5, 0, 4.5, 1, true); }
-    for (let x = 10; x < W - 6; x += 12) { P().pillarSquare(w, x, GAL - 1.2, 0, 12, 1.1); P().torch(w, x, 3.6, GAL - 2, 'nz'); }
+    for (let x = 10; x < W - 6; x += 12) { LG.pillar(w, x, GAL - 1.2, 0, 12, 1.1); P().torch(w, x, 3.6, GAL - 2, 'nz'); }
     occ.mark(0, GAL - 3, W, GAL + 1, 2);
     // ---- the way round: torches on the shaft wall, a broken parapet on the road's open edge, the things left on it
     const at = (phi, f) => { const ro = R - (R - r0 - WR) * phi / PHI, r = ro - WR * f, a = a0 + phi * dirS; return { x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r, y: TOP * (1 - phi / PHI), a }; };

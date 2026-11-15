@@ -92,7 +92,7 @@
     if (it.type === 'att') return G.ATT_BY_ID[it.id];
     if (it.type === 'gun') return G.WEAPON_BY_ID[it.id]; // a gun out of your hands: on the ground or in a bag / box (its attachments, level and ammo ride along in it.gun)
     if (it.type === 'melee') return G.MELEE_BY_ID[it.id];
-    if (it.type === 'part') return G.PART_BY_ID ? G.PART_BY_ID[it.id] : null; // weapon parts (parts.js): three of a kind make a weapon at a workbench
+    if (it.type === 'part') return G.PART_BY_ID ? G.PART_BY_ID[it.id] || (G.Parts && G.Parts.legacy(it.id)) || null : null; // weapon parts (parts.js): three of a rarity make a weapon at a workbench; an old kind x rarity id reads as its rarity
     return null;
   };
   IV.baseSize = function (it) {
@@ -154,6 +154,7 @@
   };
   // put an item in: tops up existing stacks first, then takes a free spot. returns how many did NOT fit.
   IV.put = function (c, it) {
+    if (it.type === 'part' && c.kind === 'bag' && G.player && c === G.player.bag && IV.addPartItem(G.player, it)) return 0; // (a weapon part put in the bag goes to the parts count instead)
     if (c.accept && !c.accept(it)) return it.n; // the special slots only take their own kind
     if (IV.stacks(it)) {
       const cap = IV.maxStack(it);
@@ -231,13 +232,35 @@
     return d.slot === 'g' ? 'g' : 'c';
   };
   IV.pcs = (P) => (P.spec ? [P.spec.g, P.spec.c1, P.spec.c2] : []).concat(P.bag ? [P.bag] : []);
-  IV.countAll = (P, type, id) => IV.pcs(P).reduce((n, c) => n + IV.count(c, type, id), 0);
-  IV.takeAll = function (P, type, id, n) { n = n || 1; for (const c of IV.pcs(P)) { while (n > 0 && IV.count(c, type, id) > 0) { IV.take(c, type, id, 1); n--; } } return n <= 0; };
+  // ---- weapon parts: not in any grid, only a count per rarity (P.parts); they weigh nothing and take no cell ----
+  const partR = (id) => (G.Parts ? G.Parts.rOf(id) : null);
+  IV.partCount = (P, r) => (P && P.parts && r ? P.parts[r] || 0 : 0);
+  IV.addParts = function (P, r, n, quiet) {
+    if (!P || !r || !(n > 0)) return false;
+    if (!P.parts) P.parts = {};
+    P.parts[r] = (P.parts[r] || 0) + n;
+    if (!quiet && G.ui && G.ui.toastSmall) { const d = G.PART_BY_ID[G.Parts.id(r)]; G.ui.toastSmall(`${d.icon} ${d.name}${n > 1 ? ` ×${n}` : ''} → 部品の欄（${P.parts[r]}個）`); }
+    if (G.save) G.save.mark('items', G.Parts.id(r));
+    if (P.bag) IV.changed(P.bag);
+    return true;
+  };
+  IV.takeParts = function (P, r, n) {
+    n = n || 1;
+    if (IV.partCount(P, r) < n) return false;
+    P.parts[r] -= n;
+    if (P.bag) IV.changed(P.bag);
+    return true;
+  };
+  // a part item (from a corpse, a chest, the ground) into the count; false when it is not a part this game knows
+  IV.addPartItem = function (P, it, quiet) { const d = IV.def(it); return !!d && IV.addParts(P, d.rarity, it.n || 1, quiet); };
+  IV.countAll = (P, type, id) => (type === 'part' ? IV.partCount(P, partR(id)) : IV.pcs(P).reduce((n, c) => n + IV.count(c, type, id), 0));
+  IV.takeAll = function (P, type, id, n) { if (type === 'part') return IV.takeParts(P, partR(id), n); n = n || 1; for (const c of IV.pcs(P)) { while (n > 0 && IV.count(c, type, id) > 0) { IV.take(c, type, id, 1); n--; } } return n <= 0; };
   IV.clearItems = function (P, grenade) {
     for (const c of IV.pcs(P)) c.items = c.items.filter((o) => !(o.type === 'item' && G.ITEM_BY_ID[o.id] && (G.ITEM_BY_ID[o.id].cat === 'grenade') === !!grenade));
   };
   // put something with the player: its special slot first (if there is room), the bag for the rest. returns how many did NOT fit
   IV.stow = function (P, it) {
+    if (it.type === 'part' && P.bag) return IV.addPartItem(P, it) ? 0 : it.n;
     const k = IV.specOf(it);
     if (k && P.spec) {
       const list = k === 'g' ? [P.spec.g] : [P.spec.c1, P.spec.c2];
@@ -277,6 +300,7 @@
     P.spec = {};
     for (const S of IV.SPEC) { const c = IV.container(4, 1, S.name, 'spec'); c.accept = (it) => IV.specOf(it) === (S.id === 'g' ? 'g' : 'c'); P.spec[S.id] = c; }
     P.equip = { head: null, chest: null, legs: null, hands: null, feet: null };
+    P.parts = {};
   };
   // count views used everywhere else
   IV.counts = function (P, grenade) {
@@ -350,13 +374,16 @@
   // ---------------- serialisation (mid-run save) ----------------
   IV.ser = (it) => ({ t: it.type, id: it.id, n: it.n, x: it.x, y: it.y, r: it.rot ? 1 : 0, e: it.ench, d: it.dur, g: it.gun });
   IV.de = (o) => IV.make(o.t, o.id, o.n, Object.assign({ x: o.x, y: o.y, rot: !!o.r, ench: o.e }, (o.d !== undefined && o.d !== null ? { dur: o.d } : {}), o.g ? { gun: o.g } : {}));
-  IV.snap = (P) => ({ bag: P.bag.items.map(IV.ser), spec: Object.fromEntries(Object.entries(P.spec || {}).map(([k, c]) => [k, c.items.map(IV.ser)])), equip: Object.fromEntries(Object.entries(P.equip).map(([k, v]) => [k, v ? IV.ser(v) : null])) });
+  IV.snap = (P) => ({ bag: P.bag.items.map(IV.ser), spec: Object.fromEntries(Object.entries(P.spec || {}).map(([k, c]) => [k, c.items.map(IV.ser)])), equip: Object.fromEntries(Object.entries(P.equip).map(([k, v]) => [k, v ? IV.ser(v) : null])), parts: Object.assign({}, P.parts || {}) });
   IV.load = function (P, d) {
     IV.setupPlayer(P);
+    if (d && d.parts) for (const r in d.parts) { const n = +d.parts[r] || 0; if (n > 0 && partR(r)) P.parts[r] = (P.parts[r] || 0) + n; }
     if (d && d.bag) {
       const retired = (o) => { const pr = o.t === 'item' && G.RETIRED_ITEMS && G.RETIRED_ITEMS[o.id]; if (pr) P.retiredCoins = (P.retiredCoins || 0) + Math.round(pr * 0.5) * (o.n || 1); };
-      for (const o of d.bag) { if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (IV.fits(P.bag, ...IV.size(it), it.x, it.y)) P.bag.items.push(it); else IV.put(P.bag, it); }
-      for (const k in d.spec || {}) for (const o of d.spec[k]) { if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (P.spec[k] && (!P.spec[k].accept || P.spec[k].accept(it)) && IV.fits(P.spec[k], ...IV.size(it), it.x, it.y)) P.spec[k].items.push(it); else IV.stow(P, it); } // (a thing that no longer belongs in that slot, e.g. the forge hammer turned bag tool, goes to the bag)
+      // a run saved when parts still lay in the bag (and had a kind of weapon too): each becomes a part of its rarity in the count
+      const oldPart = (o) => { if (o.t !== 'part') return false; const pd = IV.def({ type: 'part', id: o.id }); if (pd) P.parts[pd.rarity] = (P.parts[pd.rarity] || 0) + (o.n || 1); return true; };
+      for (const o of d.bag) { if (oldPart(o)) continue; if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (IV.fits(P.bag, ...IV.size(it), it.x, it.y)) P.bag.items.push(it); else IV.put(P.bag, it); }
+      for (const k in d.spec || {}) for (const o of d.spec[k]) { if (oldPart(o)) continue; if (!IV.def({ type: o.t, id: o.id })) { retired(o); continue; } const it = IV.de(o); if (P.spec[k] && (!P.spec[k].accept || P.spec[k].accept(it)) && IV.fits(P.spec[k], ...IV.size(it), it.x, it.y)) P.spec[k].items.push(it); else IV.stow(P, it); } // (a thing that no longer belongs in that slot, e.g. the forge hammer turned bag tool, goes to the bag)
       for (const k in d.equip || {}) if (d.equip[k] && G.ARMOR_BY_ID[d.equip[k].id]) P.equip[k] = IV.de(d.equip[k]);
       IV.changed(P.bag);
     }
@@ -453,13 +480,27 @@
   };
   // ---------------- things on the ground ----------------
   IV.ground = [];
+  // the picture of the ring about a thing on the ground (white, its colour from the material): a sharp line at 0.86 of its radius and a
+  // soft faint band about the line, nothing inside it. Made once
+  let ringTex = null, ringGeo = null;
+  function groundRingTex() {
+    if (ringTex) return ringTex;
+    const n = 128, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'), im = g.createImageData(n, n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const r = Math.hypot(x + 0.5 - n / 2, y + 0.5 - n / 2) / (n / 2), a = r >= 1 ? 0 : Math.min(1, Math.exp(-Math.pow((r - 0.86) / 0.04, 2)) + 0.14 * Math.exp(-Math.pow((r - 0.86) / 0.11, 2))) * Math.min(1, (1 - r) * 12), i = (y * n + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = 255; im.data[i + 3] = Math.round(a * 255); }
+    g.putImageData(im, 0, 0); ringTex = new THREE.CanvasTexture(c); ringTex.colorSpace = THREE.SRGBColorSpace; return ringTex;
+  }
+  const groundRingGeo = () => ringGeo || (ringGeo = new THREE.CircleGeometry(0.38, 40));
   IV.dropToGround = function (it, pos) {
     const w = G.world; if (!w) return;
     const d = IV.def(it);
     const g = new THREE.Group();
-    const sack = new THREE.Mesh(G.Props.PG.sph, new THREE.MeshStandardMaterial({ color: 0x6a5238, roughness: 0.9 }));
-    sack.scale.set(0.22, 0.16, 0.2); sack.position.y = 0.14; g.add(sack);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.34, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(G.ui.R(d && d.rarity || 'common')), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+    // (a consumable lies there as the thing it is, laid down, a little larger than life to be seen: itemanim.js display. Anything else: a sack)
+    const shown = it.type === 'item' && G.ItemAnim && G.ItemAnim.display ? G.ItemAnim.display(it.id, { k: 2, min: 0.12, max: 0.36, lie: true, yaw: Math.random() * 6.28 }) : null;
+    if (shown) g.add(shown);
+    else { const sack = new THREE.Mesh(G.Props.PG.sph, new THREE.MeshStandardMaterial({ color: 0x6a5238, roughness: 0.9 })); sack.scale.set(0.22, 0.16, 0.2); sack.position.y = 0.14; g.add(sack); }
+    // (the ring about it: a thin line of its rarity's colour, dulled, a little soft at its sides so that it still reads from afar)
+    const rc = new THREE.Color(G.ui.R(d && d.rarity || 'common')), hsl = {}; rc.getHSL(hsl, THREE.SRGBColorSpace); rc.setHSL(hsl.h, hsl.s * 0.7, Math.min(hsl.l, 0.66) * 0.95, THREE.SRGBColorSpace);
+    const ring = new THREE.Mesh(groundRingGeo(), new THREE.MeshBasicMaterial({ color: rc, map: groundRingTex(), transparent: true, opacity: 1, side: THREE.DoubleSide, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; g.add(ring);
     const tex = G.Tex.textTex(d ? d.icon : '❔', { size: 48 });
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
@@ -490,7 +531,7 @@
     G.world.group.remove(gr.g);
     IV.ground.splice(IV.ground.indexOf(gr), 1);
     const d = IV.def(gr.it); G.sfx.ui('select');
-    G.ui.toastSmall(`${d.icon} ${d.name} を拾った`);
+    if (gr.it.type !== 'part') G.ui.toastSmall(`${d.icon} ${d.name} を拾った`); // (a part has already said where it went)
     return true;
   };
   IV.reset = function () { IV.corpses = []; IV.ground = []; IV.openCont = null; LOOKS.clear(); };

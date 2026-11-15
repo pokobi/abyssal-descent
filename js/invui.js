@@ -10,90 +10,144 @@
   const UIV = (G.InvUI = {});
   let CS = 56, SC = 1;
   let root = null, P = null, GM = null, drag = null, tip = null, menu = null;
-  UIV.isOpen = () => !!root;
+  // The screen is built once and kept. Closing parks it (fully transparent and let through by the pointer, its styles, layout and
+  // paint kept) and every render patches in only what changed (G.ui.morph), so an opening or a change in the bag no longer builds and
+  // lays out the whole screen. The Tab view and the looting view are two screens; the one not in use is kept off the page, so the
+  // page never holds a stale copy that a lookup could find.
+  let shown = false, warming = false, scr = null, geo = '', cellRect = null;
+  const screens = { tab: null, loot: null };
+  UIV.isOpen = () => shown;
   const isMine = (c) => !!c && !!P && (c === P.bag || c.kind === 'spec');
 
   // ---------------- open / close ----------------
+  function ensureRoot() {
+    if (root) return;
+    root = document.createElement('div'); root.id = 'inv-ui';
+    root.style.willChange = 'opacity'; parkRoot(true); // (its own layer: showing it again is only a change of its opacity)
+    G.ui.el.hud.appendChild(root); // inside the HUD layer, so the message areas (toasts, banners ...) can sit above the dark backdrop without being moved
+    root.addEventListener('contextmenu', (e) => e.preventDefault());
+    // (a right click on an item opens the menu in its own handler, which runs first: do not close it again here)
+    root.addEventListener('pointerdown', (e) => { if (e.button === 2 && e.target.closest('.iv-it, .iv-wbox')) return; if (!menu || !menu.contains(e.target)) closeMenu(); });
+    window.addEventListener('resize', onResize);
+  }
+  function parkRoot(on) {
+    if (on) { root.style.opacity = '0'; root.style.pointerEvents = 'none'; } else { root.style.removeProperty('opacity'); root.style.removeProperty('pointer-events'); }
+  }
   UIV.open = function (cont, src) {
     P = G.player; GM = G.game;
     if (!P || !GM.run || P.dead) return;
     IV.openCont = cont || null; IV.openSrc = src || null;
     if (GM.state === 'playing') { GM.state = 'inv'; G.input.exitLock(); }
-    if (!root) {
-      root = document.createElement('div'); root.id = 'inv-ui';
-      G.ui.el.hud.appendChild(root); // inside the HUD layer, so the message areas (toasts, banners ...) can sit above the dark backdrop without being moved
-      root.addEventListener('contextmenu', (e) => e.preventDefault());
-      // (a right click on an item opens the menu in its own handler, which runs first: do not close it again here)
-      root.addEventListener('pointerdown', (e) => { if (e.button === 2 && e.target.closest('.iv-it, .iv-wbox')) return; if (!menu || !menu.contains(e.target)) closeMenu(); });
-      window.addEventListener('resize', onResize);
-    }
+    ensureRoot();
+    const was = shown; shown = true;
     G.sfx.ui('open'); G.ui.showInteract(null); G.ui.holdRing(-1);
-    render();
+    if (!was && window.G_MOBILE && root.scrollTop) root.scrollTop = 0; // (the phone's screen scrolls: every opening starts at the top, as a new screen did)
+    try { render(); } finally { parkRoot(false); }
   };
-  function onResize() { if (root && !drag) render(); }
-  // build the screen once, hidden and silent (both the Tab view and the loot view), so the first real opening has its styles,
-  // fonts and layout ready. Called once per page from G.Warm.ui().
+  function onResize() { if (shown && !drag) render(); }
+  // build the screen once, silent and parked (the looting view, then the Tab view, which stays on the page), so the first real
+  // opening only patches in what changed since. Called once per page from G.Warm.ui(), when the first run starts.
   UIV.warm = function () {
-    if (root || UIV._warm) return;
+    if (shown || UIV._warm) return;
     P = G.player; GM = G.game; if (!P || !GM.run || P.dead) return;
     UIV._warm = true;
     const keepCont = IV.openCont, keepSrc = IV.openSrc, sfxUi = G.sfx.ui;
     G.sfx.ui = () => {};
+    warming = true;
     try {
-      for (const cont of [null, IV.container(6, 4, '', 'box')]) {
+      ensureRoot();
+      for (const cont of [IV.container(6, 4, '', 'box'), null]) {
         IV.openCont = cont; IV.openSrc = null;
-        root = document.createElement('div'); root.id = 'inv-ui'; root.style.visibility = 'hidden';
-        G.ui.el.hud.appendChild(root);
         render(); root.offsetHeight;
-        try { G.StatusUI.unmount(); } catch (e) { /* ignore */ }
-        root.remove(); root = null;
-        const ov = G.ui.el.statusOv; G.ui.statusOverlay(false);
-        for (const k of ['left', 'top', 'width', 'height', 'right', 'bottom']) ov.style.removeProperty(k);
-        document.body.classList.remove('inv-open', 'inv-loot'); document.body.style.removeProperty('--s');
       }
-    } catch (e) { console.warn('inventory warm-up failed', e); root = null; }
+    } catch (e) {
+      console.warn('inventory warm-up failed', e);
+      if (scr) scr.remove(); scr = null; screens.tab = screens.loot = null; geo = ''; // (built again at the first opening)
+    }
+    try { G.StatusUI.unmount(); G.ui.statusSheet(false); } catch (e) { /* ignore */ }
+    document.body.classList.remove('inv-open', 'inv-loot', 'inv-view');
+    warming = false;
     G.sfx.ui = sfxUi; IV.openCont = keepCont; IV.openSrc = keepSrc;
   };
   UIV.close = function () {
-    if (!root) return;
+    if (!shown) return;
     if (drag) endDrag(null);
     closeMenu(); hideTip();
-    window.removeEventListener('resize', onResize);
-    root.remove(); root = null;
-    const ov = G.ui.el.statusOv;
-    G.ui.statusOverlay(false);
-    for (const k of ['left', 'top', 'width', 'height', 'right', 'bottom']) ov.style.removeProperty(k);
-    document.body.classList.remove('inv-open', 'inv-loot'); document.body.style.removeProperty('--s');
+    shown = false;
+    parkRoot(true);
+    G.ui.statusSheet(false); G.StatusUI.unmount();
+    document.body.classList.remove('inv-open', 'inv-loot'); // (the scale --s stays set: only the inventory's own parts read it)
     if (IV.openSrc && IV.openSrc.onClose) IV.openSrc.onClose();
     IV.openCont = null; IV.openSrc = null;
     if (G.game.state === 'inv') G.game.resume();
     G.sfx.ui('click');
     if (UIV.viewOnly) { const back = UIV._peekBack; UIV.viewOnly = false; UIV._peekBack = null; document.body.classList.remove('inv-view'); if (back) back(); }
   };
-  UIV.toggle = () => (root ? UIV.close() : UIV.open(null));
+  UIV.toggle = () => (shown ? UIV.close() : UIV.open(null));
   // look-only inventory over a forced choice (a boon pick, a transmutation result): nothing can be moved, used, equipped or dropped,
   // so going back and forth never changes what is on offer or what the choice will consume; closing it calls onBack
   UIV.viewOnly = false;
   UIV.peek = function (onBack) {
-    if (root) return;
+    if (shown) return;
     UIV.viewOnly = true; UIV._peekBack = onBack || null;
     UIV.open(null);
-    if (!root) { UIV.viewOnly = false; UIV._peekBack = null; if (onBack) onBack(); }
+    if (!shown) { UIV.viewOnly = false; UIV._peekBack = null; if (onBack) onBack(); }
   };
   // walking (or being knocked) away from the corpse / chest you are looting closes it: a body's middle lies a metre or two off its feet, so it gets more room
   UIV.tick = function () {
-    if (!root || !IV.openCont || !IV.openSrc || drag) return;
+    if (!shown || !IV.openCont || !IV.openSrc || drag) return;
     const s = IV.openSrc, at = s.e ? s.e.pos : s.pos; if (!at || !P) return;
     if (Math.hypot(P.pos.x - at.x, P.pos.z - at.z) > (s.e ? 5.5 : 4.5) || Math.abs(P.pos.y - at.y) > 3.5) {
       UIV.close();
       G.ui.toastSmall(s.e ? '💀 亡骸から離れた' : '📦 宝箱から離れた');
     }
   };
-  IV.onChange = () => { if (root && !drag) render(); };
+  // While the inventory is closed, a change in your own bag or pockets (a pickup, an item used) is patched into the parked Tab screen
+  // when the page is idle, so the next opening finds those cells done (a patch touches only the cells that changed). The status
+  // sheet, the page's classes and the 3D previews are left to the opening.
+  let bgDue = false, bgRender = false;
+  const idle = window.requestIdleCallback || ((f) => setTimeout(f, 300));
+  function bgLater() {
+    if (bgDue || !root || !screens.tab) return;
+    bgDue = true;
+    idle(() => {
+      bgDue = false;
+      if (shown || drag || scr !== screens.tab || IV.openCont) return;
+      P = G.player; GM = G.game; if (!P || !GM.run || P.dead) return;
+      bgRender = true;
+      try { render(); } catch (e) { /* the opening renders it again */ } finally { bgRender = false; G.StatusUI.drop(); }
+    }, { timeout: 2000 });
+  }
+  IV.onChange = (c) => { if (shown) { if (!drag) render(); } else if (c && G.player && (c === G.player.bag || c.kind === 'spec')) bgLater(); };
 
   // ---------------- render ----------------
   const R = (r) => G.ui.R(r || 'common');
   const px = (n) => Math.round(n) + 'px';
+  // what a thing is for, read from its data so a new item sorts itself: 'val' (sold for coins), 'use' (spent: its use is
+  // 'heal', 'throw' or 'boost' - everything else that is used up), 'gear' (worn, mounted, wielded or built with).
+  // The cell shows it by its ground and a mark in the top-left corner (css: item kinds); the rarity keeps the frame.
+  UIV.kindOf = function (it) {
+    if (!it) return null;
+    if (it.type === 'valuable') return { k: 'val' };
+    if (it.type === 'item') { const d = IV.def(it); return { k: 'use', u: d && d.cat === 'grenade' ? 'throw' : d && d.cat === 'heal' ? 'heal' : 'boost' }; }
+    return { k: 'gear' };
+  };
+  UIV.kindCls = function (it) { const k = UIV.kindOf(it); return !k ? '' : k.u ? 'k-' + k.k + ' u-' + k.u : 'k-' + k.k; };
+  // the filter over the bag: everything not of the picked kind is dimmed where it lies (nothing moves, so places stay learnt)
+  const KINDS = [['all', '全部'], ['gear', '装備'], ['use', '消耗品'], ['val', '金品']];
+  let KF = 'all';
+  function kindBar() {
+    return `<div class="iv-kf" role="tablist">${KINDS.map(([k, n], i) => `<button class="${k === KF ? 'on' : ''}" data-kf="${k}" title="${n}を明るく表示（${i + 1} キー）"><i class="kfm k-${k}${k === 'use' ? ' u-heal' : ''}"></i>${n}<small>${i + 1}</small></button>`).join('')}</div>`;
+  }
+  function setKf(k) {
+    if (!shown || !KINDS.some((o) => o[0] === k)) return;
+    KF = k;
+    const sc = root.querySelector('.iv-screen'); if (sc) sc.dataset.kf = k;
+    root.querySelectorAll('.iv-kf button').forEach((b) => b.classList.toggle('on', b.dataset.kf === k));
+    if (scr) for (const n of ['invh', 'kf']) if (scr._sec[n]) scr._sec[n]._h = null; // (their buttons were changed here: the next render compares them again)
+    G.sfx.ui('click');
+  }
+  UIV.setKind = setKf;
   function itemEl(it, where, cell) {
     cell = cell || CS;
     const d = IV.def(it); if (!d) return '';
@@ -102,8 +156,8 @@
     const ench = it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : '';
     const fit = it.type === 'att' && attFits(it);
     const dur = it.type === 'armor' ? durBar(it) : IV.isArm(it) ? G.ui.forgeBar((it.gun && it.gun.lv) || 0, G.ui.forgeCap(d), 0, 'thin') : ''; // (a weapon: its forge level against the cap)
-    return `<div class="iv-it t-${it.type}${fit ? ' iv-fit' : ''}" data-uid="${it.uid}" data-where="${where}" style="--rc:${R(d.rarity)};left:${it.x * cell}px;top:${it.y * cell}px;width:${w * cell - 3}px;height:${h * cell - 3}px">
-      <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${G.Elem.badge(G.Elem.itemTag(it))}${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : it.type === 'part' ? '<em class="iv-def">🔩</em>' : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
+    return `<div class="iv-it t-${it.type} ${UIV.kindCls(it)}${fit ? ' iv-fit' : ''}" data-uid="${it.uid}" data-where="${where}" style="--rc:${R(d.rarity)};left:${it.x * cell}px;top:${it.y * cell}px;width:${w * cell - 3}px;height:${h * cell - 3}px">
+      <span class="iv-ic" style="font-size:${px((big >= 2 ? 0.8 : 0.56) * cell)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon}</span>${G.Elem.badge(G.Elem.itemTag(it))}${it.n > 1 ? `<b class="iv-n">${it.n}</b>` : ''}${it.type === 'armor' ? `<em class="iv-def">🛡${d.def}</em>` : ''}${fit ? '<b class="iv-fitb">装着可</b>' : ''}${ench}${it.type === 'valuable' ? `<em class="iv-val">${U.fmt(IV.value(it))}</em>` : ''}${dur}</div>`;
   }
   // armour durability: a thin bar along the bottom of the cell (green > amber > red)
   function durBar(it) {
@@ -114,10 +168,29 @@
   // the weapon behind a socket key: '0' / '1' = the guns, 'm' = the melee weapon (its 属性コア socket)
   const slotW = (i) => (i === 'm' ? P.melee : G.weapons.gunSlots()[+i]);
   const armsAll = () => [...G.weapons.gunsInOrder(), P.melee].filter(Boolean);
-  function attFits(it) { const a = G.ATT_BY_ID[it.id]; return !!a && armsAll().some((w) => !w.atts[a.slot] && G.attOk(a, w)); }
+  // (a render looks these up for every cell and socket: what they need is gathered once per render, in AC)
+  let AC = null;
+  function attCtx() {
+    const atts = [];
+    for (const q of P.bag.items) if (q.type === 'att') atts.push(q);
+    if (IV.openCont) for (const q of IV.openCont.items) if (q.type === 'att') atts.push(q);
+    return { arms: armsAll(), atts, fit: new Map() };
+  }
+  function attFits(it) {
+    const a = G.ATT_BY_ID[it.id]; if (!a) return false;
+    if (!AC) return armsAll().some((w) => !w.atts[a.slot] && G.attOk(a, w));
+    let f = AC.fit.get(it.id);
+    if (f === undefined) { f = AC.arms.some((w) => !w.atts[a.slot] && G.attOk(a, w)); AC.fit.set(it.id, f); }
+    return f;
+  }
+  // an empty socket that a part in the bag (or in what is being looted) would go into
+  function wantsOne(w, sl) {
+    const A = G.ATT_BY_ID, list = AC ? AC.atts : [...P.bag.items, ...(IV.openCont ? IV.openCont.items : [])];
+    return list.some((q) => { const qa = q.type === 'att' && A[q.id]; return qa && qa.slot === sl && G.attOk(qa, w); });
+  }
   function gridEl(c, key, cell) {
     cell = cell || CS;
-    return `<div class="iv-grid" data-grid="${key}" data-cs="${cell}" style="width:${c.cols * cell}px;height:${c.rows * cell}px;--cs:${cell}px">${c.items.map((it) => itemEl(it, key, cell)).join('')}</div>`;
+    return `<div class="iv-grid${cell < 34 ? ' sm' : ''}" data-grid="${key}" data-cs="${cell}" style="width:${c.cols * cell}px;height:${c.rows * cell}px;--cs:${cell}px">${c.items.map((it) => itemEl(it, key, cell)).join('')}</div>`;
   }
   function eqBox(S, cls) {
     const it = P.equip[S.id], d = it && IV.def(it);
@@ -129,8 +202,8 @@
     if (!m || m.id === (G.BARE_MELEE || 'fists')) return '';
     const A = G.ATT_BY_ID, S = G.ATT_SLOTS.core, id = m.atts && m.atts.core, a = id && A[id];
     if (!a && G.ownEl(m)) { const E = G.Elem.BY[m.def.el]; return `<div class="iv-asg iv-masg"><div class="iv-as iv-lock" data-as="m:core" title="${E.name}属性を持つ武器なので、属性コアは付けられない" style="--rc:${E.col}"><span class="iv-asl">${E.icon}</span></div></div>`; }
-    const wantsOne = !a && [...P.bag.items, ...(IV.openCont ? IV.openCont.items : [])].some((q) => { const qa = q.type === 'att' && A[q.id]; return qa && qa.slot === 'core' && G.attOk(qa, m); });
-    return `<div class="iv-asg iv-masg"><div class="iv-as${a ? ' on' : ''}${wantsOne ? ' iv-fitslot' : ''}" data-as="m:core" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:m:core" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div></div>`;
+    const want = !a && wantsOne(m, 'core');
+    return `<div class="iv-asg iv-masg"><div class="iv-as${a ? ' on' : ''}${want ? ' iv-fitslot' : ''}" data-as="m:core" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:m:core" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div></div>`;
   }
   function weaponBoxes() {
     const W = G.weapons, guns = W.gunSlots(), A = G.ATT_BY_ID;
@@ -141,8 +214,8 @@
         const id = w.atts[sl], a = id && A[id], S = G.ATT_SLOTS[sl];
         // a weapon with an element of its own: its 属性コア slot is closed
         if (sl === 'core' && !a && G.ownEl(w)) { const E = G.Elem.BY[w.el || w.def.el]; return `<div class="iv-as iv-lock" data-as="${i}:${sl}" title="${E.name}属性を持つ武器なので、属性コアは付けられない" style="--rc:${E.col}"><span class="iv-asl">${E.icon}</span></div>`; }
-        const wantsOne = !a && [...P.bag.items, ...(IV.openCont ? IV.openCont.items : [])].some((q) => { const qa = q.type === 'att' && A[q.id]; return qa && qa.slot === sl && G.attOk(qa, w); });
-        return `<div class="iv-as${a ? ' on' : ''}${wantsOne ? ' iv-fitslot' : ''}" data-as="${i}:${sl}" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:${i}:${sl}" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div>`;
+        const want = !a && wantsOne(w, sl);
+        return `<div class="iv-as${a ? ' on' : ''}${want ? ' iv-fitslot' : ''}" data-as="${i}:${sl}" style="--rc:${a ? R(a.rarity) : '#3a332a'}">${a ? `<div class="iv-it t-att" data-uid="0" data-where="as:${i}:${sl}" style="--rc:${R(a.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.5)}">${a.icon}</span></div>` : `<span class="iv-asl">${S.icon}<small>${S.name}</small></span>`}</div>`;
       }).join('');
       const dps = Math.round(W.gunDps(w)); // (same number as the status screen: 与ダメ included)
       return `<div class="iv-wbox" data-wslot="${i}" style="--rc:${R(w.def.rarity)}"><div class="iv-wh"><kbd>${i + 1}</kbd><span class="wnm"><b style="color:${R(w.def.rarity)}">${U.esc(w.def.name)}${w.lv ? ' +' + w.lv : ''}${G.Elem.badge(w, 'in')}</b><small>${U.esc(w.def.cat || '')}</small>${G.ui.forgeBar(w.lv, G.ui.forgeCap(w))}</span><span class="wdps"><b>${dps}</b><small>DPS</small></span></div><div class="iv-wpv">${G.StatusUI.preview('gun', w.def, w.atts)}</div><div class="iv-asg">${cells}</div></div>`;
@@ -170,8 +243,49 @@
     const s = R2.mercStats(m), a = R2.mercAlly, hp = a ? a.hp : s.cap, need = m.lv >= R2.MERC.cap ? 0 : R2.mercNeed(m.lv), down = a && a.down > 0;
     return `<div class="iv-merc${down ? ' down' : ''}" data-merc="1"><div class="mc-h"><span>${s.d.icon}</span><b>Lv${m.lv}</b><small>残${m.left}</small></div><div class="pa-hp"><div style="width:${U.clamp(hp / s.full, 0, 1) * 100}%"></div>${s.downs ? `<i class="pa-lock" style="width:${Math.min(100, s.downs * 25)}%"></i>` : ''}<span>${down ? (a.down === Infinity ? '戦闘不能' : 'ダウン ' + Math.ceil(a.down) + '秒') : Math.ceil(hp) + '/' + s.cap}</span></div><div class="pa-xp"><div style="width:${need ? U.clamp((m.xp || 0) / need, 0, 1) * 100 : 100}%"></div><span>${need ? 'XP ' + (m.xp || 0) + '/' + need : 'XP MAX'}</span></div></div>`;
   }
+  // the two screens' frames: the parts marked data-p are patched one by one (each only when its markup changed)
+  const INV_PANEL = (loot) => `<div class="iv-panel iv-invpanel"><div class="iv-ph" data-p="invh"></div>${loot ? '<div class="iv-kfrow" data-p="kf"></div>' : ''}<div class="iv-bagwrap" data-p="bag"></div><div class="iv-specs" data-p="specs"></div></div>`;
+  function makeScreen(loot) {
+    const t = document.createElement('template');
+    t.innerHTML = loot
+      ? `<div class="iv-screen loot"><div class="iv-lootrow"><div class="iv-panel iv-eqpanel" data-p="eq"></div>${INV_PANEL(true)}<div class="iv-panel iv-contp" data-p="cont"></div></div><div class="iv-lootnote" data-p="note"></div></div>`
+      : `<div class="iv-screen"><div class="iv-cell-st"></div><div class="iv-armorcol" data-p="arm"></div><div class="iv-weaprow" data-p="weap"></div><div class="iv-foot-wrap" data-p="foot"></div><div class="iv-skillrow" data-p="skill"></div>${INV_PANEL(false)}</div>`;
+    const s = t.content.firstElementChild; s._sec = {};
+    s.querySelectorAll('[data-p]').forEach((n) => { s._sec[n.dataset.p] = n; n.removeAttribute('data-p'); });
+    return s;
+  }
+  function patch(el, html) { if (el._h !== html) { G.ui.morph(el, html); el._h = html; } }
+  function setAttr(el, k, v) { if (el.getAttribute(k) !== v) el.setAttribute(k, v); }
+  // listeners go on the cells once: a patch keeps the cells that did not change (with theirs) and brings in new ones without
+  function wireAll(s) {
+    for (const el of s.querySelectorAll('.iv-it, .iv-pt, .iv-wbox, .iv-sk, .iv-merc')) {
+      if (el._w) continue;
+      el._w = 1;
+      const c = el.classList;
+      if (c.contains('iv-it')) wire(el);
+      else if (c.contains('iv-pt')) wirePart(el);
+      else if (c.contains('iv-sk')) wireBox(el, 's');
+      else if (c.contains('iv-merc')) wireMerc(el);
+      else if (el.hasAttribute('data-wslot')) wireBox(el, 'w');
+      else if (el.hasAttribute('data-melee')) wireBox(el, 'm');
+    }
+  }
+  function wireMerc(el) {
+    el.addEventListener('mouseenter', (e) => { if (!drag) showTip(G.Rooms2.mercTip(), e, false); });
+    el.addEventListener('mousemove', (e) => { if (!drag && tip) placeTip(e); });
+    el.addEventListener('mouseleave', hideTip);
+  }
+  // what a drag left on the cells (lit targets, the drop outline, the repair / forge previews): taken off when it ends, as a new
+  // screen had none of it
+  function clearMarks() {
+    if (!scr) return;
+    scr.querySelectorAll('.iv-hl, .iv-kitnote').forEach((n) => n.remove());
+    scr.querySelectorAll('.iv-dur.iv-mend').forEach((n) => { n.classList.remove('iv-mend'); n.style.removeProperty('--pf'); });
+    scr.querySelectorAll('.iv-glow, .hover').forEach((n) => n.classList.remove('iv-glow', 'hover'));
+  }
   function render() {
-    if (!root) return;
+    if (!root || (!shown && !warming && !bgRender)) return;
+    closeMenu(); // (a menu was thrown away with the old screen: it may point at an item that has moved)
     const loot = !!IV.openCont, C = IV.openCont;
     // layout: sizes come from the window so nothing is wasted (1920x1080 = 1.0)
     // phone: a taller virtual screen (the root scrolls) and no status column - the status sheet stays in the pause menu
@@ -184,58 +298,104 @@
     const footH = Math.round(24 * SC), hW = Math.round(IH * 0.31), hS = Math.round(IH * 0.15), hI = IH - hW - hS - footH - 3 * gap;
     CS = Math.floor(Math.max(24, 0.9 * Math.min((mw - 30 * SC) / IV.BAG[0], (hI - 86 * SC) / (IV.BAG[1] + 1))));
     // looting: only the inventory, big and centred (bag next to the chest / corpse) so it never looks like the Tab screen
-    if (loot) CS = Math.floor(Math.max(26, Math.min((IW * 0.95 - 90 * SC - 250 * SC) / (IV.BAG[0] + C.cols * 1.3), (IH * 0.88 - 150 * SC) / (IV.BAG[1] + 1), (IH * 0.88 - 150 * SC) / (C.rows * 1.3))));
-    document.body.style.setProperty('--s', (MB ? Math.max(SC, 0.5) : SC).toFixed(3));
-    document.body.classList.add('inv-open');
-    document.body.classList.toggle('inv-loot', loot);
-    const st = P.stats, def = st.defense || 0;
-    const SL = G.ARMOR_SLOT_BY_ID;
-    const valTotal = P.bag.items.filter((o) => o.type === 'valuable').reduce((s, o) => s + IV.value(o), 0);
-    const specs = IV.SPEC.map((S) => `<div class="iv-spec" data-spec="${S.id}"><div class="iv-sph"><span>${S.icon} ${S.name}</span><kbd>${G.K(S.key)}</kbd></div>${gridEl(P.spec[S.id], 'spec:' + S.id)}</div>`).join('');
-    const help = `<div class="iv-hs"><span>🛡 防御 <b>${Math.round(def)}</b></span><span>⚖ 重さ <b>${(st.weight || 0).toFixed(1)}</b></span></div>`;
-    const foot = UIV.viewOnly ? `<div class="iv-foot"><b>👁 確認のみ</b>（ここでは移動・使用・装備はできません）　<b>${G.K('status')}</b>・<b>Esc</b>・<button class="btn small" id="iv-peekback">↩ 選択画面に戻る</button></div>` : `<div class="iv-foot">ドラッグで移動・入れ替え　<b>R</b> 回転　<b>右クリック</b> メニュー（武器は長押しで捨てる）　<b>ダブルクリック</b> 使う／装備　<b>Shift+クリック</b> 反対側へ　枠の外へドラッグ＝捨てる　<b>${G.K('status')}</b>・<b>Esc</b> 閉じる</div>`;
-    const left = loot
-      ? `<div class="iv-panel iv-contp"><div class="iv-ph"><b>${C.kind === 'corpse' ? '💀 ' + U.esc(C.name) + 'の亡骸' : '📦 ' + U.esc(C.name)}</b><button class="btn small" id="iv-all">すべて取る</button></div><div class="iv-contbody">${gridEl(C, 'cont', Math.round(CS * 1.3))}</div></div>`
-      : '';
-    const ov = G.ui.el.statusOv;
-    if (loot || MB) G.ui.statusOverlay(false); else G.ui.statusOverlay(true, true, true);
-    const invPanel = `<div class="iv-panel iv-invpanel"><div class="iv-ph"><b>🎒 インベントリ</b><span>${P.bag.items.length}個　·　金品の価値 <b>${U.fmt(valTotal)}</b>🪙<button class="iv-sort" id="iv-sort" title="種類 → レアリティ順に並べて左上へ詰める">⇅ 整理</button></span></div><div class="iv-bagwrap">${gridEl(P.bag, 'bag')}</div><div class="iv-specs">${specs}</div></div>`;
-    if (loot) {
-      const eqPanel = `<div class="iv-panel iv-eqpanel"><div class="iv-ph"><b>🛡 装備</b><span>防御 <b>${Math.round(def)}</b></span></div><div class="iv-eqgrid">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.hands)}${eqBox(SL.legs)}${eqBox(SL.feet)}</div></div>`;
-      root.innerHTML = `<div class="iv-screen loot" style="--cs:${CS}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px"><div class="iv-lootrow">${eqPanel}${invPanel}${left}</div><div class="iv-lootnote">ドラッグで移動・入れ替え　<b>ダブルクリック</b> 反対側へ移す／使う　<b>右クリック</b> メニュー　<b>R</b> 回転　<b>${G.K('interact')}</b>・<b>Esc</b> 閉じる　（装備の確認は ${G.K('status')} キー）</div></div>`;
-    } else
-    root.innerHTML = `<div class="iv-screen" style="--cs:${CS}px;--sw:${sw}px;--aw:${aw}px;--hw:${hW}px;--hs:${hS}px;--ft:${footH}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px">
-      <div class="iv-cell-st">${left}</div>
-      <div class="iv-armorcol">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.legs)}${eqBox(SL.feet)}${help}${mercChip()}</div>
-      <div class="iv-weaprow">${weaponBoxes()}</div>
-      <div class="iv-foot-wrap">${foot}</div>
-      <div class="iv-skillrow">${eqBox(SL.hands, 'hand')}<div class="iv-sks">${skillBoxes()}</div></div>
-      ${invPanel}
-    </div>`;
-    document.body.classList.toggle('inv-view', UIV.viewOnly);
-    const pb = root.querySelector('#iv-peekback'); if (pb) pb.onclick = () => UIV.close();
-    const srt = root.querySelector('#iv-sort');
-    if (srt && UIV.viewOnly) srt.remove();
-    else if (srt) srt.onclick = () => { closeMenu(); IV.acts = (IV.acts || 0) + 1; const ok = IV.sortContainer(P.bag); G.sfx.ui(ok ? 'select' : 'deny'); if (!ok) G.ui.toastSmall('🎒 並べ替えできなかった'); render(); };
-    const all = root.querySelector('#iv-all');
-    if (all) all.onclick = () => { takeAll(); };
-    root.querySelectorAll('.iv-it').forEach((el) => wire(el));
-    root.querySelectorAll('.iv-wbox[data-wslot]').forEach((el) => wireBox(el, 'w'));
-    root.querySelectorAll('.iv-wbox[data-melee]').forEach((el) => wireBox(el, 'm'));
-    root.querySelectorAll('.iv-sk').forEach((el) => wireBox(el, 's'));
-    root.querySelectorAll('.iv-merc').forEach((el) => {
-      el.addEventListener('mouseenter', (e) => { if (!drag) showTip(G.Rooms2.mercTip(), e, false); });
-      el.addEventListener('mousemove', (e) => { if (!drag && tip) placeTip(e); });
-      el.addEventListener('mouseleave', hideTip);
-    });
-    G.StatusUI.mount(root);
-    // the status sheet fills the left cell (it lives in the HUD layer, so it is placed over it)
-    if (!loot && !MB) {
-      const r = root.querySelector('.iv-cell-st').getBoundingClientRect();
-      ov.style.setProperty('left', r.left + 'px', 'important'); ov.style.setProperty('top', r.top + 'px', 'important');
-      ov.style.setProperty('width', r.width + 'px', 'important'); ov.style.setProperty('height', r.height + 'px', 'important');
-      ov.style.setProperty('right', 'auto', 'important'); ov.style.setProperty('bottom', 'auto', 'important');
+    // (the bag panel has a row of kind filters over the bag here: 30 px of the height are kept for it)
+    if (loot) CS = Math.floor(Math.max(26, Math.min((IW * 0.95 - 90 * SC - 250 * SC) / (IV.BAG[0] + C.cols * 1.3), (IH * 0.88 - 180 * SC) / (IV.BAG[1] + 1), (IH * 0.88 - 150 * SC) / (C.rows * 1.3))));
+    // (the scale is written only when it changed: a new value restyles the whole page)
+    const sv = (MB ? Math.max(SC, 0.5) : SC).toFixed(3);
+    if (!bgRender) {
+      if (document.body.style.getPropertyValue('--s') !== sv) document.body.style.setProperty('--s', sv);
+      document.body.classList.add('inv-open');
+      document.body.classList.toggle('inv-loot', loot);
+      document.body.classList.toggle('inv-view', UIV.viewOnly);
+      // the status column first: its sheet is made before the weapon previews below are queued (statusHTML starts a new queue)
+      if (loot || MB) G.ui.statusSheet(false); else G.ui.statusSheet(true);
     }
+    AC = attCtx();
+    try {
+      const st = P.stats, def = st.defense || 0;
+      const SL = G.ARMOR_SLOT_BY_ID;
+      const valTotal = P.bag.items.filter((o) => o.type === 'valuable').reduce((s, o) => s + IV.value(o), 0);
+      const specs = IV.SPEC.map((S) => `<div class="iv-spec" data-spec="${S.id}"><div class="iv-sph"><span>${S.icon} ${S.name}</span><kbd>${G.K(S.key)}</kbd></div>${gridEl(P.spec[S.id], 'spec:' + S.id)}</div>`).join('') + (loot ? '' : partsBox());
+      // the screen of this view on the page (the other one kept off it)
+      const s = screens[loot ? 'loot' : 'tab'] || (screens[loot ? 'loot' : 'tab'] = makeScreen(loot)), sec = s._sec;
+      if (scr !== s) { if (scr) scr.remove(); if (G.Icons.refresh) G.Icons.refresh(s); root.insertBefore(s, root.firstChild); scr = s; } // (refresh: drawings in the screen kept off the page take the bitmaps made meanwhile)
+      setAttr(s, 'data-kf', KF);
+      setAttr(s, 'style', loot ? `--cs:${CS}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px` : `--cs:${CS}px;--sw:${sw}px;--aw:${aw}px;--hw:${hW}px;--hs:${hS}px;--ft:${footH}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px`);
+      // (the kind filter: in the title line of the Tab screen; on a line of its own when looting, where the title line holds the parts)
+      patch(sec.invh, `<b>🎒 インベントリ</b>${loot ? partsBox(true) : kindBar()}<span>${P.bag.items.length}個　·　金品の価値 <b>${U.fmt(valTotal)}</b>🪙${UIV.viewOnly ? '' : '<button class="iv-sort" id="iv-sort" title="種類 → レアリティ順に並べて左上へ詰める">⇅ 整理</button>'}</span>`);
+      if (loot) patch(sec.kf, kindBar());
+      patch(sec.bag, gridEl(P.bag, 'bag'));
+      patch(sec.specs, specs);
+      if (loot) {
+        patch(sec.eq, `<div class="iv-ph"><b>🛡 装備</b><span>防御 <b>${Math.round(def)}</b></span></div><div class="iv-eqgrid">${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.hands)}${eqBox(SL.legs)}${eqBox(SL.feet)}</div>`);
+        patch(sec.cont, `<div class="iv-ph"><b>${C.kind === 'corpse' ? '💀 ' + U.esc(C.name) + 'の亡骸' : '📦 ' + U.esc(C.name)}</b><button class="btn small" id="iv-all">すべて取る</button></div><div class="iv-contbody">${gridEl(C, 'cont', Math.round(CS * 1.3))}</div>`);
+        patch(sec.note, `ドラッグで移動・入れ替え　<b>ダブルクリック</b> 反対側へ移す／使う　<b>右クリック</b> メニュー　<b>R</b> 回転　<b>1〜4</b> 種類で絞る　<b>${G.K('interact')}</b>・<b>Esc</b> 閉じる　（装備の確認は ${G.K('status')} キー）`);
+      } else {
+        const help = `<div class="iv-hs"><span>🛡 防御 <b>${Math.round(def)}</b></span><span>⚖ 重さ <b>${(st.weight || 0).toFixed(1)}</b></span></div>`;
+        const foot = UIV.viewOnly ? `<div class="iv-foot"><b>👁 確認のみ</b>（ここでは移動・使用・装備はできません）　<b>${G.K('status')}</b>・<b>Esc</b>・<button class="btn small" id="iv-peekback">↩ 選択画面に戻る</button></div>` : `<div class="iv-foot">ドラッグで移動・入れ替え　<b>R</b> 回転　<b>右クリック</b> メニュー（武器は長押しで捨てる）　<b>ダブルクリック</b> 使う／装備　<b>Shift+クリック</b> 反対側へ　枠の外へドラッグ＝捨てる　<b>${G.K('status')}</b>・<b>Esc</b> 閉じる</div>`;
+        patch(sec.arm, `${eqBox(SL.head, 'head')}${eqBox(SL.chest)}${eqBox(SL.legs)}${eqBox(SL.feet)}${help}${mercChip()}`);
+        patch(sec.weap, weaponBoxes());
+        patch(sec.foot, foot);
+        patch(sec.skill, `${eqBox(SL.hands, 'hand')}<div class="iv-sks">${skillBoxes()}</div>`);
+      }
+      wireAll(s);
+      const pb = s.querySelector('#iv-peekback'); if (pb) pb.onclick = () => UIV.close();
+      const srt = s.querySelector('#iv-sort');
+      if (srt) srt.onclick = () => { closeMenu(); IV.acts = (IV.acts || 0) + 1; const ok = IV.sortContainer(P.bag); G.sfx.ui(ok ? 'select' : 'deny'); if (!ok) G.ui.toastSmall('🎒 並べ替えできなかった'); render(); };
+      const all = s.querySelector('#iv-all');
+      if (all) all.onclick = () => { takeAll(); };
+      s.querySelectorAll('.iv-kf button').forEach((b) => { b.onclick = () => { closeMenu(); setKf(b.dataset.kf); }; });
+      // the status sheet fills the left cell (it lives in the HUD layer, so it is placed over it). The cell only moves with the
+      // window: it is measured (which makes the page lay out at once) only when the window changed, not at every opening
+      if (!loot && !MB && !bgRender) {
+        const key = Wd + 'x' + Ht;
+        if (geo !== key || !cellRect) {
+          const r = s.querySelector('.iv-cell-st').getBoundingClientRect(), rc = { left: r.left, top: r.top, width: r.width, height: r.height };
+          if (r.width > 0) { cellRect = rc; geo = key; } // (not kept while the page is not laid out: the HUD hidden)
+          G.ui.statusPlace(rc);
+        } else G.ui.statusPlace(cellRect);
+      }
+    } finally { AC = null; }
+    if (!bgRender) G.StatusUI.mount(root);
+  }
+  // ---------------- weapon parts: a row of counts by rarity (they take no cell; parts.js / inventory.js P.parts) ----------------
+  // (looting: a strip in the inventory's title line, so the bag panel keeps the width of the bag and the corpse still fits beside it)
+  function partsBox(strip) {
+    const PT = G.Parts; if (!PT || !PT.R.length) return '';
+    const chips = PT.R.map((r) => { const n = PT.count(r); return `<button class="iv-pt${n ? ' have' : ''}${n >= PT.NEED ? ' ok' : ''}" data-pr="${r}" style="--rc:${R(r)}"><span class="iv-pti">${PT.ICON}</span><b>${n}</b></button>`; }).join('');
+    if (strip) return `<div class="iv-parts iv-ptstrip"><em>武器の部品</em>${chips}</div>`;
+    return `<div class="iv-spec iv-parts" data-spec="parts"><div class="iv-sph"><span>${PT.ICON} 武器の部品</span></div><div class="iv-ptrow">${chips}</div></div>`;
+  }
+  function partTip(r) {
+    const PT = G.Parts, d = G.PART_BY_ID[PT.id(r)], n = PT.count(r);
+    return `<div class="ivt-h" style="color:${R(r)}">${d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${G.RARITY[r].name} · 武器の部品（枠を取らない）${n ? ` · ×${n}` : ''}</div><div class="ivt-d">${U.esc(d.desc)}</div>`
+      + `<div class="ivt-r">${n >= PT.NEED ? `<b style="color:${R(r)}">${PT.NEED}つ揃っている</b> — 作業台で武器にできる` : `作業台で武器にするには あと <b>${PT.NEED - n}</b> 個`}</div><div class="ivt-v">売値 ${U.fmt(IV.value(IV.make('part', d.id, 1)))}🪙／1個${UIV.viewOnly ? '' : '　クリックでメニュー（捨てる）'}</div>`;
+  }
+  // throw parts on the ground / put them in what is being looted
+  function partOut(r, k, into) {
+    const PT = G.Parts, it = IV.make('part', PT.id(r), k);
+    if (!IV.takeParts(P, r, k)) { G.sfx.ui('deny'); return; }
+    if (into) { const left = IV.put(into, it); if (left > 0) { IV.addParts(P, r, left, true); G.sfx.ui('deny'); G.ui.toastSmall('入りきらない'); } else G.sfx.ui('click'); }
+    else { IV.dropToGround(it, P.pos.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(P.forward().setY(0).normalize(), 0.9)); G.sfx.ui('click'); G.ui.toastSmall(`🗑️ ${G.PART_BY_ID[PT.id(r)].name}${k > 1 ? ` ×${k}` : ''} を捨てた`); }
+    render();
+  }
+  function wirePart(el) {
+    el.addEventListener('mouseenter', (e) => { if (!drag) showTip(partTip(el.dataset.pr), e); });
+    el.addEventListener('mousemove', (e) => { if (!drag && tip) placeTip(e); });
+    el.addEventListener('mouseleave', hideTip);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('click', (e) => {
+      if (UIV.viewOnly) return;
+      const r = el.dataset.pr; // (read when clicked: the chip is kept from render to render)
+      closeMenu(); hideTip();
+      const n = G.Parts.count(r); if (!n) { G.sfx.ui('deny'); return; }
+      const nm = G.PART_BY_ID[G.Parts.id(r)].name, opts = [];
+      if (IV.openCont) { opts.push([`📤 箱へ移す（1個）`, () => partOut(r, 1, IV.openCont)]); if (n > 1) opts.push([`📤 すべて箱へ移す（×${n}）`, () => partOut(r, n, IV.openCont)]); }
+      opts.push([`🗑️ 1個捨てる`, () => partOut(r, 1, null)]);
+      if (n > 1) opts.push([`🗑️ すべて捨てる（×${n}）`, () => partOut(r, n, null)]);
+      popMenu([[`<b style="color:${R(r)}">${U.esc(nm)}</b> ×${n}`, () => {}]].concat(opts), e);
+      const head = menu && menu.firstChild; if (head) head.classList.add('iv-mh');
+    });
   }
   function takeAll() {
     const C = IV.openCont; if (!C) return;
@@ -465,6 +625,7 @@
       return;
     }
     if (it.type === 'armor') add(`.iv-eq[data-eq="${G.ARMOR_BY_ID[it.id].slot}"]`);
+    else if (it.type === 'part') add('.iv-parts');
     else if (it.type === 'att') {
       const a = G.ATT_BY_ID[it.id];
       root.querySelectorAll('.iv-as').forEach((n) => { const [i, sl] = n.dataset.as.split(':'); const w = slotW(i); if (w && sl === a.slot && G.attOk(a, w)) n.classList.add('iv-glow'); });
@@ -535,6 +696,7 @@
     const ws = el.closest('[data-wslot]'); if (ws) return { wslot: +ws.dataset.wslot };
     const sk = el.closest('[data-sk]'); if (sk) return { sk: sk.dataset.sk };
     if (el.closest('[data-melee]')) return drag.f.it ? { melee: true } : null;
+    if (el.closest('.iv-parts')) return drag.f.it && drag.f.it.type === 'part' ? { parts: true } : null;
     if (el.closest('#status-overlay')) return null;
     const grid = el.closest('[data-grid]');
     if (grid && !drag.f.it && (drag.f.wslot !== undefined || drag.f.melee)) return { grid, key: grid.dataset.grid, whole: true }; // a weapon put away: any free cell
@@ -548,6 +710,7 @@
   }
   function canDrop(t) {
     const c = contOf(t.key), it = drag.f.it; if (!c) return false;
+    if (it.type === 'part' && isMine(c) && !isMine(drag.f.from)) return true; // (it goes to the parts count, wherever it is let go)
     if (c.accept && !c.accept(it)) return false;
     const [w, h] = dims();
     if (IV.fits(c, w, h, t.cx, t.cy, c === drag.f.from ? it : null)) return true;
@@ -589,6 +752,7 @@
     IV.acts = (IV.acts || 0) + 1; // something was dragged and dropped (the tutorial watches this)
     const { f, ghost, el } = drag; const it = f.it;
     ghost.remove(); el.classList.remove('iv-dragging'); if (drag.guide) drag.guide.remove();
+    clearMarks();
     const rot = drag.rot; drag = null;
     // guns / skills onto each other
     if (f.melee) {
@@ -644,6 +808,12 @@
       else { G.sfx.ui('deny'); if (it.type === 'armor') G.ui.toastSmall('その部位には装備できない'); }
       render(); return;
     }
+    if (it.type === 'part' && (t.parts || (t.grid && isMine(contOf(t.key)))) && !isMine(f.from)) {
+      IV.remove(f.from, it);
+      const left = IV.stow(P, it);
+      if (left > 0) { it.n = left; IV.put(f.from, it); G.sfx.ui('deny'); } else G.sfx.ui('click');
+      render(); return;
+    }
     if (t.grid) {
       const c = contOf(t.key), [bw, bh] = IV.baseSize(it), [w, h] = rot ? [bh, bw] : [bw, bh];
       if (c.accept && !c.accept(it)) { G.sfx.ui('deny'); G.ui.toastSmall(`その枠には${c.name}しか入らない`); render(); return; }
@@ -663,8 +833,12 @@
     render();
   }
   window.addEventListener('keydown', (e) => {
-    if (!root) return;
+    if (!shown) return;
     if (drag && e.code === 'KeyR' && drag.f.it) { e.preventDefault(); e.stopPropagation(); drag.rot = !drag.rot; moveGhost(drag.x, drag.y); return; }
+    // 1-4: the kind filter (all / gear / consumables / valuables); a digit bound to moving keeps moving
+    if (!drag && !e.repeat && /^Digit[1-4]$/.test(e.code) && !e.ctrlKey && !e.altKey && !e.metaKey && !['forward', 'back', 'left', 'right', 'jump', 'sprint', 'crouch'].some((a) => (G.BIND[a] || []).includes(e.code))) {
+      e.preventDefault(); setKf(KINDS[+e.code.slice(5) - 1][0]); return;
+    }
     if (e.code === 'Escape' || G.BIND.status.includes(e.code) || (G.BIND.inventory && G.BIND.inventory.includes(e.code)) || (IV.openCont && G.BIND.interact.includes(e.code))) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) { if (e.code === 'Escape') G.game.escCloseT = performance.now(); UIV.close(); } }
   }, true);
 
@@ -716,6 +890,7 @@
     menu.innerHTML = opts.map(([l], i) => `<div data-i="${i}">${l}</div>`).join('');
     menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
     root.appendChild(menu);
+    { const r = menu.getBoundingClientRect(); if (r.bottom > innerHeight - 4) menu.style.top = Math.max(4, e.clientY - r.height) + 'px'; if (r.right > innerWidth - 4) menu.style.left = Math.max(4, innerWidth - r.width - 4) + 'px'; } // (kept on screen: the parts row sits low)
     menu.querySelectorAll('[data-i]').forEach((n) => n.onclick = () => { const o = opts[+n.dataset.i]; closeMenu(); o[1](); });
   }
 
@@ -728,7 +903,7 @@
       return G.StatusUI.gunTip(w) + `<div class="ivt-v">ダブルクリック／武器枠へドラッグで装備　売値 ${U.fmt(IV.value(it))}🪙</div>`;
     }
     const rar = G.RARITY[d.rarity];
-    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? (d.data.forge ? '道具（武器へドラッグして使う）' : '補修具（防具へドラッグして使う）') : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント', part: '部品（作業台で3つ組み立て）' }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
+    let body = `<div class="ivt-h" style="color:${R(d.rarity)}">${it.type === 'armor' ? G.armorIcon(d) : d.icon} ${U.esc(d.name)}</div><div class="ivt-s">${rar ? rar.name : ''} · ${{ item: d.cat === 'grenade' ? '投擲物' : d.passive ? '所持品（常時効果）' : d.kit ? (d.data.forge ? '道具（武器へドラッグして使う）' : '補修具（防具へドラッグして使う）') : '消耗品', armor: '防具', valuable: '金品（売却専用）', att: 'アタッチメント', part: `武器の部品（取ると部品の欄へ・枠を取らない）` }[it.type]}${it.n > 1 ? ` · ×${it.n}` : ''}</div>`;
     { const tg = G.Elem.itemTag(it), core = it.gun && it.gun.atts && it.gun.atts.core && G.ATT_BY_ID[it.gun.atts.core];
       if (tg) body += `<div class="ivt-r">${G.Elem.chip(tg)} <span style="color:var(--dim)">${core && !d.el ? `${core.icon} ${U.esc(core.name)}を装着中` : it.type === 'item' ? '当たった敵に付く' : it.type === 'att' && d.slot === 'core' ? '装着した武器の攻撃に付く' : it.type === 'att' ? '状態異常と一緒に付く' : '攻撃に付く'}</span></div>`; }
     if (it.type === 'armor') {

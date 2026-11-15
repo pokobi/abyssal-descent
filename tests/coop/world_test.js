@@ -14,8 +14,10 @@ const secs = +process.argv[2] || 5;
     const q = '&local=1&lat=40&jit=20', room = 'W' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(300);
     const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
+    await g.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     const off = 'G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
     await h.eval(off); await g.eval(off);
@@ -24,6 +26,7 @@ const secs = +process.argv[2] || 5;
     await g.eval(`(0, eval)(${JSON.stringify(bot)}); window.__cbDmg = 30; 1`);
     await h.eval(`G.Coop.diff = { id: 'hard', lv: 0 }; G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1`);
     await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
+    for (const pg of [h, g]) await pg.running();
     await g.eval('G.game.dev = { god: true, speed: 1 }; 1');
     const kinds = JSON.parse(await h.eval('JSON.stringify(Object.keys(G.Areas.TYPES).filter((k) => k !== "boss"))'));
     console.log('kinds', kinds.join(' '));
@@ -88,10 +91,10 @@ const secs = +process.argv[2] || 5;
     check(await g.eval('G.player.hp > 1'), 'holding interact beside a fallen teammate gets them up');
     // ---- chat and ping
     await h.eval("G.Coop.send({ t: 'ch', n: 'Host', i: 0, x: 'テスト' }); 1");
-    await sleep(500);
+    await sleep(500); await g.until("document.getElementById('coop-chat').textContent.includes('テスト')", 8000).catch(() => {});   // (by what arrives: a busy machine is slower)
     check(await g.eval("document.getElementById('coop-chat').textContent.includes('テスト')"), 'a chat line reaches the other player');
     await g.eval("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' })); 1");
-    await sleep(600);
+    await sleep(600); await h.until("document.querySelectorAll('#coop-marks .cm').length >= 2", 8000).catch(() => {});
     check(await h.eval("document.querySelectorAll('#coop-marks .cm').length >= 2"), 'a ping shows up on the other screen');
     check(!h.errs.length, 'no errors on the host ' + h.errs.slice(0, 3).join(' | ').slice(0, 400));
     check(!g.errs.length, 'no errors on the guest ' + g.errs.slice(0, 3).join(' | ').slice(0, 400));

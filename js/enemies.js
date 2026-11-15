@@ -6,11 +6,18 @@
   const w0 = () => G.world;
   const V = G.U.V;
   let P, C, PG;
+  // The game's feel was set on a 144 Hz screen. A share a that was taken once a frame there (a chance to act, how far it turns toward
+  // where it looks) is, for a frame of dt, 1 − (1 − a)^(144·dt): the same per second at every frame rate, and a itself at 144 Hz
+  const H144 = 1 / 144;
+  const per144 = (a, dt) => (dt === H144 ? a : 1 - Math.pow(Math.max(0, 1 - a), dt / H144)); // (a itself on a 1/144 s frame, to the last bit)
+  // a shove dies away as e^(−6t). On a 144 Hz screen it moved with its speed already died for the frame: that carried it this share
+  // of the exact distance (about 98%) - its exact path, so scaled, is that screen's at any rate (physics)
+  const KB_K = 6, KB_Q = H144 / (Math.exp(KB_K * H144) - 1);
 
   // ---------------- materials ----------------
   const PLANCOL = {
     hound: { skin: '#5a4636', sec: '#2a201a', rough: 0.85, blood: 0x6a0c0c, tex: 'skin' },
-    imp: { skin: '#9a3a26', sec: '#3a1a12', rough: 0.6, blood: 0x5a0a0a, tex: 'scales' },
+    imp: { skin: '#6e2e24', sec: '#2a1612', rough: 0.6, blood: 0x5a0a0a, tex: 'scales' },
     skeleton: { skin: '#d6cab0', sec: '#5a4a3a', rough: 0.7, blood: 0x6a6050, tex: 'skin' },
     slime: { skin: '#5aa040', sec: '#2a5a20', rough: 0.15, blood: 0x4a8a20, tex: 'skin', trans: 0.82 },
     bat: { skin: '#3a2c2a', sec: '#1a1212', rough: 0.9, blood: 0x5a0a0a, tex: 'skin' },
@@ -19,22 +26,31 @@
     gargoyle: { skin: '#6e6a64', sec: '#3c3834', rough: 0.95, blood: 0x5a5650, tex: 'rock' },
     beetle: { skin: '#26384a', sec: '#141a20', rough: 0.25, metal: 0.3, blood: 0x6a8a20, tex: 'scales' },
     wraith: { skin: '#2a2a36', sec: '#0e0e14', rough: 0.95, blood: 0x30304a, tex: 'skin', trans: 0.85 },
-    mushroom: { skin: '#9a3420', sec: '#d8ccb0', rough: 0.7, blood: 0x8aa040, tex: 'skin' },
+    mushroom: { skin: '#74402c', sec: '#b8ab8e', rough: 0.7, blood: 0x8aa040, tex: 'skin' },
     golem: { skin: '#7a7066', sec: '#4a4440', rough: 0.95, blood: 0x6a6056, tex: 'rock' },
-    shaman: { skin: '#4a2a5a', sec: '#d8ccb0', rough: 0.9, blood: 0x6a0c0c, tex: 'skin' },
-    mantis: { skin: '#5a7a3a', sec: '#2a3a1a', rough: 0.45, blood: 0x6a9a20, tex: 'scales' },
-    worm: { skin: '#8a6050', sec: '#3a2a20', rough: 0.5, blood: 0x7a3010, tex: 'scales' },
-    mimic: { skin: '#8a5a30', sec: '#c8a050', rough: 0.6, blood: 0x6a0c0c, tex: 'skin' },
+    shaman: { skin: '#32283a', sec: '#d8ccb0', rough: 0.9, blood: 0x6a0c0c, tex: 'skin' },
+    mantis: { skin: '#48562f', sec: '#252d18', rough: 0.45, blood: 0x6a9a20, tex: 'scales' },
+    worm: { skin: '#74524a', sec: '#3a2a20', rough: 0.5, blood: 0x7a3010, tex: 'scales' },
+    mimic: { skin: '#5e442c', sec: '#3a3836', rough: 0.45, blood: 0x6a0c0c, tex: 'skin' },
   };
+  // (a coat of its own kind for each, where gfx.js can make it: a pelt, a shell, a hide, a cloth)
+  const XTEX = { golem: 'rock', gargoyle: 'rock', mimic: 'walnut', hound: 'fur', bat: 'fur', spider: 'chitin', beetle: 'chitin', mantis: 'chitin', brute: 'leather', imp: 'leather', worm: 'leather', mushroom: 'leather', wraith: 'weave', shaman: 'weave',
+    villager: 'leather', scarecrow: 'weave', knight: 'steel', archer: 'bone', drowned: 'bone', leech: 'leather', smith: 'leather', seraph: 'bone' };
   function mkMats(def, opts) {
     const pc = PLANCOL[def.plan];
     const t = G.Tex.tex;
-    const tx = pc.tex === 'rock' ? t.rock : t[pc.tex] || t.skin;
+    const bt = def.plan === 'skeleton' && G.GFX && G.GFX.tex ? G.GFX.tex('bone') : null; // (old bone: gfx.js)
+    const tx = bt || (pc.tex === 'rock' ? t.rock : t[pc.tex] || t.skin);
     const col = opts && opts.ally ? '#7a9ab0' : def.color || pc.skin;
     const skin = new THREE.MeshStandardMaterial({ color: col, roughness: pc.rough, metalness: pc.metal || 0, map: tx.map, normalMap: tx.normalMap });
+    if (bt) { skin.roughnessMap = bt.orm; skin.aoMap = bt.orm; skin.roughness = 0.95; }
+    const xt = !bt && XTEX[def.plan] && G.GFX && G.GFX.tex ? G.GFX.tex(XTEX[def.plan]) : null;
+    if (xt) { skin.map = xt.map; skin.normalMap = xt.normalMap; skin.roughnessMap = xt.orm; skin.aoMap = xt.orm; skin.roughness = Math.min(1, pc.rough + 0.35); skin.color.multiplyScalar(1.25); } // (these surfaces are pale, to be tinted: a little brighter under them)
     if (pc.trans) { skin.transparent = true; skin.opacity = pc.trans; }
-    if (def.plan === 'slime') { skin.emissive = new THREE.Color(col).multiplyScalar(0.25); }
+    if (def.plan === 'slime') { skin.color.multiplyScalar(0.2); skin.emissive = new THREE.Color(col).multiplyScalar(0.025); skin.roughness = 0.1; skin.map = null; skin.normalScale = new THREE.Vector2(0.3, 0.3); skin.opacity = 0.8; } // (wet, and without the pattern of a hide: a jelly)
     const sec = new THREE.MeshStandardMaterial({ color: pc.sec, roughness: 0.7, map: t.smooth.map });
+    if (def.plan === 'mimic') { sec.metalness = 0.7; sec.roughness = 0.6; sec.map = null; }   // (iron bands)
+    if (bt) { sec.map = t.metal.map; sec.normalMap = t.metal.normalMap; sec.metalness = 0.6; sec.roughness = 0.85; sec.color.set('#c2b6a4'); } // (a skeleton's iron: helmet, sword, shield)
     const eyeCol = opts && opts.ally ? '#80d0ff' : def.eye || (def.plan === 'skeleton' ? '#ff9040' : '#ffcc40');
     const eye = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: eyeCol, emissiveIntensity: 2.2 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x120c0a, roughness: 0.8 });
@@ -42,21 +58,21 @@
     let orn = null;
     switch (def.orn) {
       case 'horns': orn = new THREE.MeshStandardMaterial({ color: 0x3a3028, roughness: 0.5 }); break;
-      case 'ember': orn = new THREE.MeshStandardMaterial({ color: 0x2a1008, emissive: 0xff6a20, emissiveIntensity: 1.8 }); break;
-      case 'ice': orn = new THREE.MeshStandardMaterial({ color: 0xcfefff, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.85, emissive: 0x204060 }); break;
-      case 'spikes': orn = new THREE.MeshStandardMaterial({ color: 0x8aa040, emissive: 0x2a4000, roughness: 0.4 }); break;
-      case 'sparks': orn = new THREE.MeshStandardMaterial({ color: 0x202020, emissive: 0xffe070, emissiveIntensity: 1.6 }); break;
-      case 'wisps': orn = new THREE.MeshStandardMaterial({ color: 0x0a0810, emissive: 0x6020a0, emissiveIntensity: 0.8 }); break;
-      case 'bones': orn = new THREE.MeshStandardMaterial({ color: 0xe0d8c0, roughness: 0.6 }); break;
-      case 'crystal': orn = new THREE.MeshStandardMaterial({ color: 0x80b8ff, emissive: 0x2050a0, emissiveIntensity: 0.9, roughness: 0.05, metalness: 0.3 }); break;
-      case 'abyss': orn = new THREE.MeshStandardMaterial({ color: 0x0a0408, emissive: 0x8a0a1a, emissiveIntensity: 1.2, roughness: 0.3 }); break;
+      case 'ember': orn = new THREE.MeshStandardMaterial({ color: 0x2a1008, emissive: 0xff5a18, emissiveIntensity: 1.3 }); break;
+      case 'ice': orn = new THREE.MeshStandardMaterial({ color: 0x6e8a9c, roughness: 0.16, metalness: 0.1, transparent: true, opacity: 0.88, emissive: 0x0a1822, flatShading: true }); break;
+      case 'spikes': orn = new THREE.MeshStandardMaterial({ color: 0x464e28, emissive: 0x0c1200, roughness: 0.55 }); break;
+      case 'sparks': orn = new THREE.MeshStandardMaterial({ color: 0x202020, emissive: 0xffe070, emissiveIntensity: 1.3 }); break;
+      case 'wisps': orn = new THREE.MeshStandardMaterial({ color: 0x0a0810, emissive: 0x3a2060, emissiveIntensity: 0.7 }); break;
+      case 'bones': orn = new THREE.MeshStandardMaterial({ color: 0xa89e88, roughness: 0.7 }); break;
+      case 'crystal': orn = new THREE.MeshStandardMaterial({ color: 0x48648c, emissive: 0x122c54, emissiveIntensity: 0.5, roughness: 0.12, metalness: 0.3, flatShading: true }); break;
+      case 'abyss': orn = new THREE.MeshStandardMaterial({ color: 0x0a0408, emissive: 0x5a0610, emissiveIntensity: 0.5, roughness: 0.4 }); break;
     }
     return { skin, sec, eye, dark, tooth, orn, all: [skin, sec, eye, dark, tooth].concat(orn ? [orn] : []) };
   }
 
   // ---------------- model builders ----------------
   function mesh(parent, geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) {
-    const m = new THREE.Mesh(geo, mat); m.scale.set(sx, sy, sz); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0);
+    const m = new THREE.Mesh((geo === PG.box && PG.rbox) || geo, mat); m.scale.set(sx, sy, sz); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); // (a body's boxes have their edges softened)
     m.castShadow = true; parent.add(m); return m;
   }
   function joint(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; }
@@ -69,21 +85,50 @@
     return { hip, kn };
   }
   const B = {};
+  // the hound: a lean, deep-chested beast. Its parts are laid down as balls, rods and wedges where the masses of such a body are - the
+  // ribs, the tucked belly, the haunches, the shoulders' hump, the neck; the skull, the cheeks, a long muzzle - and melted into one hide
+  // joint by joint (gfx.js). The joints, what moves them and what a shot hits are as they were.
   B.hound = function (root, M) {
     const body = joint(root, 0, 0.78, 0);
-    mesh(body, PG.sph, M.skin, 0.26, 0.24, 0.5, 0, 0, 0);
-    mesh(body, PG.sph, M.skin, 0.28, 0.27, 0.3, 0, 0.04, 0.28);
+    mesh(body, PG.sph, M.skin, 0.235, 0.29, 0.35, 0, -0.03, 0.2);           // ribs
+    mesh(body, PG.sph, M.skin, 0.17, 0.185, 0.3, 0, 0.045, -0.16);          // the belly, tucked up
+    mesh(body, PG.sph, M.skin, 0.215, 0.235, 0.23, 0, 0.02, -0.4);          // haunches
+    mesh(body, PG.sph, M.skin, 0.17, 0.17, 0.2, 0, 0.17, 0.33);             // the hump of the shoulders
+    mesh(body, PG.sph, M.skin, 0.135, 0.16, 0.2, 0, 0.14, 0.5, -0.5);       // the neck's root
+    for (const s of [-1, 1]) { mesh(body, PG.sph, M.skin, 0.09, 0.2, 0.15, s * 0.17, -0.02, 0.32); mesh(body, PG.sph, M.skin, 0.1, 0.21, 0.17, s * 0.15, 0.0, -0.38); } // shoulder blades, thighs' tops
     const neck = joint(body, 0, 0.12, 0.48);
+    mesh(neck, PG.sph, M.skin, 0.115, 0.13, 0.17, 0, 0.05, 0.05, -0.4);
     const head = joint(neck, 0, 0.06, 0.12);
-    mesh(head, PG.box, M.skin, 0.26, 0.22, 0.3, 0, 0, 0.05);
-    mesh(head, PG.box, M.skin, 0.16, 0.12, 0.22, 0, -0.04, 0.26);
-    const jaw = joint(head, 0, -0.1, 0.1);
-    mesh(jaw, PG.box, M.sec, 0.14, 0.05, 0.26, 0, 0, 0.12);
-    for (const s of [-1, 1]) { mesh(head, PG.sph, M.eye, 0.03, 0.03, 0.03, s * 0.08, 0.05, 0.19); mesh(head, PG.cone, M.skin, 0.05, 0.12, 0.05, s * 0.09, 0.15, -0.02, -0.3); for (let i = 0; i < 3; i++) mesh(head, PG.cone, M.tooth, 0.012, 0.05, 0.012, s * 0.05, -0.1, 0.22 + i * 0.05, Math.PI); }
-    const L = [];
-    for (const [x, z] of [[-0.15, 0.35], [0.15, 0.35], [-0.15, -0.35], [0.15, -0.35]]) L.push(leg(body, M, x, -0.05, z, 0.72, 0.1));
+    mesh(head, PG.sph, M.skin, 0.125, 0.115, 0.16, 0, 0.02, 0.03);          // skull
+    mesh(head, PG.box, M.skin, 0.2, 0.05, 0.1, 0, 0.075, 0.11, 0.25);       // brow
+    for (const s of [-1, 1]) mesh(head, PG.sph, M.skin, 0.075, 0.075, 0.1, s * 0.075, -0.035, 0.07); // cheeks
+    mesh(head, PG.box, M.skin, 0.115, 0.085, 0.2, 0, -0.01, 0.22);          // muzzle
+    mesh(head, PG.box, M.skin, 0.085, 0.07, 0.12, 0, -0.005, 0.33);         // its end
+    mesh(head, PG.sph, M.dark, 0.036, 0.03, 0.03, 0, 0.012, 0.392);         // nose
+    const jaw = joint(head, 0, -0.07, 0.1);
+    mesh(jaw, PG.box, M.skin, 0.095, 0.045, 0.26, 0, 0, 0.12);
+    mesh(jaw, PG.box, M.dark, 0.07, 0.01, 0.2, 0, 0.024, 0.13);             // the dark of the mouth
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.eye, 0.026, 0.02, 0.016, s * 0.07, 0.045, 0.155);
+      mesh(head, PG.cone, M.skin, 0.045, 0.15, 0.028, s * 0.085, 0.14, -0.045, -0.55, 0, -s * 0.2);   // ears, laid back
+      for (let i = 0; i < 3; i++) mesh(head, PG.cone, M.tooth, 0.011, i === 2 ? 0.065 : 0.04, 0.011, s * 0.043, -0.062, 0.2 + i * 0.07, Math.PI);
+      mesh(jaw, PG.cone, M.tooth, 0.01, 0.05, 0.01, s * 0.036, 0.045, 0.235);
+    }
+    // a leg: thigh, a thin shank, a paw with its claws (the two joints the gait works are the hip and the hock)
+    const hleg = (x, z, rear) => {
+      const len = 0.72, hip = joint(body, x, -0.05, z);
+      mesh(hip, PG.sph, M.skin, rear ? 0.08 : 0.065, 0.21, rear ? 0.125 : 0.09, 0, -len * 0.23, rear ? -0.02 : 0);
+      const kn = joint(hip, 0, -len * 0.5, 0);
+      mesh(kn, PG.cyl8, M.skin, 0.04, len * 0.46, 0.046, 0, -len * 0.23, rear ? 0.02 : 0, rear ? -0.12 : 0.04);
+      mesh(kn, PG.sph, M.skin, 0.05, 0.1, 0.06, 0, -0.06, rear ? -0.01 : 0);   // (the swell of the forearm under the joint)
+      mesh(kn, PG.sph, M.skin, 0.055, 0.04, 0.085, 0, -len * 0.5 + 0.035, 0.035);
+      for (const cx of [-0.03, 0, 0.03]) mesh(kn, PG.cone, M.dark, 0.011, 0.04, 0.011, cx, -len * 0.5 + 0.02, 0.115, Math.PI / 2 + 0.3);
+      return { hip, kn };
+    };
+    const L = [hleg(-0.15, 0.35, false), hleg(0.15, 0.35, false), hleg(-0.15, -0.35, true), hleg(0.15, -0.35, true)];
     const tail = joint(body, 0, 0.08, -0.48);
-    mesh(tail, PG.cone, M.skin, 0.06, 0.5, 0.06, 0, 0, -0.22, -Math.PI / 2 - 0.4);
+    mesh(tail, PG.cone, M.skin, 0.055, 0.5, 0.055, 0, 0, -0.22, -Math.PI / 2 - 0.4);
+    mesh(tail, PG.sph, M.skin, 0.06, 0.06, 0.1, 0, 0.02, -0.06);
     return {
       J: { body, head, jaw, tail, L }, h: 1.15, r: 0.5,
       hits: [{ n: head, r: 0.2, part: 'head', o: V(0, 0, 0.1) }, { n: body, r: 0.32, part: 'body', o: V(0, 0, 0.25) }, { n: body, r: 0.3, part: 'body', o: V(0, 0, -0.25) }],
@@ -101,18 +146,53 @@
       },
     };
   };
+  // the imp: a gaunt, pot-bellied devil - a cage of ribs over a small round belly, a hunched back, a big head with a jutting brow, a
+  // pointed chin and a wide mouth of small teeth, long ears, two horns swept back; thin arms to clawed hands, a goat's legs, a tail with
+  // a barb. Laid down as masses and melted into one hide joint by joint (gfx.js); joints, gait and what a shot hits as before.
   B.imp = function (root, M) {
     const hips = joint(root, 0, 0.55, 0);
+    mesh(hips, PG.sph, M.skin, 0.12, 0.09, 0.1);
     const torso = joint(hips, 0, 0.05, 0);
-    mesh(torso, PG.sph, M.skin, 0.2, 0.26, 0.16, 0, 0.18, 0);
+    mesh(torso, PG.sph, M.skin, 0.165, 0.19, 0.13, 0, 0.26, 0);              // ribs
+    mesh(torso, PG.sph, M.skin, 0.13, 0.13, 0.13, 0, 0.08, 0.035);           // belly
+    mesh(torso, PG.sph, M.skin, 0.13, 0.12, 0.1, 0, 0.36, -0.07);            // the hunch
+    mesh(torso, PG.sph, M.skin, 0.06, 0.08, 0.06, 0, 0.44, 0.01);            // neck
+    for (const s of [-1, 1]) mesh(torso, PG.sph, M.skin, 0.07, 0.06, 0.065, s * 0.17, 0.35, 0);   // shoulders
     const head = joint(torso, 0, 0.5, 0.02);
-    mesh(head, PG.sph, M.skin, 0.17, 0.16, 0.16);
-    for (const s of [-1, 1]) { mesh(head, PG.sph, M.eye, 0.035, 0.03, 0.02, s * 0.07, 0.02, 0.13); mesh(head, PG.cone, M.sec, 0.04, 0.18, 0.04, s * 0.09, 0.15, -0.02, -0.4, 0, s * 0.4); mesh(head, PG.cone, M.skin, 0.03, 0.1, 0.02, s * 0.17, 0.02, 0, 0, 0, -s * 1.3); }
-    mesh(head, PG.box, M.dark, 0.1, 0.02, 0.02, 0, -0.06, 0.14);
+    mesh(head, PG.sph, M.skin, 0.155, 0.145, 0.15);
+    mesh(head, PG.box, M.skin, 0.25, 0.045, 0.08, 0, 0.055, 0.115, 0.3);     // brow
+    mesh(head, PG.cone, M.skin, 0.085, 0.14, 0.08, 0, -0.14, 0.055, Math.PI); // chin
+    mesh(head, PG.sph, M.skin, 0.03, 0.04, 0.045, 0, -0.01, 0.15);           // nose
+    mesh(head, PG.box, M.dark, 0.13, 0.016, 0.03, 0, -0.07, 0.125);          // mouth
+    for (let i = 0; i < 5; i++) mesh(head, PG.cone, M.tooth, 0.008, 0.026, 0.008, (i - 2) * 0.026, -0.068 - (i % 2) * 0.012, 0.143, i % 2 ? 0 : Math.PI);
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.eye, 0.03, 0.022, 0.016, s * 0.068, 0.012, 0.128);
+      mesh(head, PG.cone, M.sec, 0.036, 0.14, 0.036, s * 0.085, 0.15, -0.01, -0.5, 0, s * 0.35);                    // horns: a root,
+      mesh(head, PG.cone, M.sec, 0.024, 0.13, 0.024, s * 0.108, 0.205, -0.07, -1.05, 0, s * 0.3);                  // and the sweep back
+      mesh(head, PG.cone, M.skin, 0.032, 0.15, 0.016, s * 0.2, 0.035, -0.01, 0, 0, -s * 1.15);                      // ears
+    }
     const arms = [];
-    for (const s of [-1, 1]) { const sh = joint(torso, s * 0.2, 0.32, 0); mesh(sh, PG.box, M.skin, 0.06, 0.32, 0.06, 0, -0.15, 0); const hand = joint(sh, 0, -0.32, 0); mesh(hand, PG.sph, M.sec, 0.05, 0.05, 0.05); arms.push({ sh, hand }); }
-    const L = [leg(hips, M, -0.1, 0, 0, 0.55, 0.08), leg(hips, M, 0.1, 0, 0, 0.55, 0.08)];
-    const tail = joint(hips, 0, 0, -0.12); mesh(tail, PG.cone, M.skin, 0.025, 0.4, 0.025, 0, -0.1, -0.15, -2.2);
+    for (const s of [-1, 1]) {
+      const sh = joint(torso, s * 0.2, 0.32, 0);
+      mesh(sh, PG.sph, M.skin, 0.04, 0.1, 0.045, 0, -0.08, 0);
+      mesh(sh, PG.cyl8, M.skin, 0.026, 0.18, 0.028, 0, -0.22, 0.005);
+      const hand = joint(sh, 0, -0.32, 0);
+      mesh(hand, PG.sph, M.skin, 0.042, 0.04, 0.048);
+      for (let i = 0; i < 3; i++) mesh(hand, PG.cone, M.dark, 0.011, 0.06, 0.011, (i - 1) * 0.03, -0.05, 0.03, Math.PI - 0.5);
+      arms.push({ sh, hand });
+    }
+    const ileg = (x) => {
+      const len = 0.55, hip = joint(hips, x, 0, 0);
+      mesh(hip, PG.sph, M.skin, 0.058, 0.155, 0.075, 0, -len * 0.24, 0.01);
+      const kn = joint(hip, 0, -len * 0.5, 0);
+      mesh(kn, PG.cyl8, M.skin, 0.028, len * 0.44, 0.032, 0, -len * 0.23, -0.015, -0.12);
+      mesh(kn, PG.sph, M.sec, 0.04, 0.035, 0.065, 0, -len * 0.5 + 0.03, 0.02);                                       // a cloven foot
+      return { hip, kn };
+    };
+    const L = [ileg(-0.1), ileg(0.1)];
+    const tail = joint(hips, 0, 0, -0.12);
+    mesh(tail, PG.cone, M.skin, 0.025, 0.4, 0.025, 0, -0.1, -0.15, -2.2);
+    mesh(tail, PG.cone, M.sec, 0.04, 0.09, 0.012, 0, -0.245, -0.345, -2.2);                                          // the barb
     const orb = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xff8030, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     orb.scale.setScalar(0.001); arms[1].hand.add(orb);
     return {
@@ -172,13 +252,46 @@
       },
     };
   };
+  // The skeleton as bones (gfx.js): the same joints, and so the same walk and swing and the same places to be hit; only what hangs on
+  // the joints is changed - a skull with its jaw, ribs, a spine, the long bones, a helmet on some, a sword, a shield on some.
+  const skeletonPlain = B.skeleton;
+  B.skeleton = function (root, M, opts) {
+    const R = skeletonPlain(root, M, opts), K = G.GFX && G.GFX.bones ? G.GFX.bones() : null;
+    if (!K) return R;
+    const J = R.J, hips = J.spine.parent, arms = J.arms, L = J.L, shield = arms[0].hand.children.some((c) => c.isMesh);
+    for (const n of [hips, J.spine, J.head, arms[0].sh, arms[0].el, arms[0].hand, arms[1].sh, arms[1].el, arms[1].hand, L[0].hip, L[0].kn, L[1].hip, L[1].kn]) for (let i = n.children.length - 1; i >= 0; i--) if (n.children[i].isMesh) n.remove(n.children[i]);
+    const put = (parent, geo, mat, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); m.castShadow = true; parent.add(m); return m; };
+    put(hips, K.pelvis, M.skin, 0, -0.01, 0);
+    put(J.spine, K.lumbar, M.skin, 0, 0.0, -0.05); put(J.spine, K.chest, M.skin, 0, 0.2, 0.01); put(J.spine, K.neck, M.skin, 0, 0.535, -0.05);
+    put(J.head, K.skull, M.skin, 0, -0.02, 0);
+    const jaw = joint(J.head, 0, -0.008, 0); put(jaw, K.jaw, M.skin);
+    for (const s of [-1, 1]) mesh(J.head, PG.sph, M.eye, 0.007, 0.007, 0.007, s * 0.031, 0.038, 0.054);
+    if (!opts.ally && Math.random() < 0.5) put(J.head, K.helmet, M.sec, 0, 0.048, -0.012, -0.08, 0, 0.04);
+    for (let i = 0; i < 2; i++) { const a = arms[i], pos = i === 1; put(a.sh, pos ? K.humP : K.humN, M.skin); put(a.el, K.forearm, M.skin); put(a.hand, K.hand, M.skin, 0, 0, 0, 0, pos ? 0 : Math.PI, 0); }
+    put(arms[1].hand, K.sword, M.sec, 0, -0.07, 0.03);
+    if (shield) put(arms[0].hand, K.shield, M.sec, 0, -0.02, 0.06);
+    for (let i = 0; i < 2; i++) { const l = L[i], pos = i === 1; put(l.hip, pos ? K.femP : K.femN, M.skin); put(l.kn, pos ? K.shinP : K.shinN, M.skin); put(l.kn, K.foot, M.skin, 0, -0.372, 0); }
+    const an = R.animate;
+    R.animate = function (a) { an(a); jaw.rotation.x = 0.05 + Math.max(0, a.atk || 0) * 0.4 + (a.wind || 0) * 0.25 + Math.max(0, Math.sin((a.t || 0) * 7.3) * Math.sin((a.t || 0) * 1.1) - 0.5) * 0.3; };
+    return R;
+  };
+  // the slime: a heap of dark jelly that sags onto the floor and creeps - what it has taken still inside it (a skull, a few bones),
+  // bubbles rising through it, a core that glows where a heart would be, a wet trail under it. No face. It squashes and stretches as
+  // it did.
   B.slime = function (root, M) {
     const body = joint(root, 0, 0, 0);
-    const blob = mesh(body, PG.sph, M.skin, 0.62, 0.55, 0.62, 0, 0.55, 0);
-    const core = mesh(body, PG.sph, M.sec, 0.22, 0.2, 0.22, 0, 0.5, 0);
+    const FG = G.GFX && G.GFX.foeGeo, PP = G.Props.PG;
+    const blob = mesh(body, (FG && FG('slime')) || PG.sph, M.skin, 0.62, 0.55, 0.62, 0, 0.55, 0);
+    mesh(body, PG.sph, M.skin, 0.8, 0.03, 0.76, 0.05, 0.015, -0.03);                                                   // what it leaves on the floor
+    for (const [x, z, r] of [[0.66, 0.32, 0.15], [-0.6, -0.42, 0.12], [-0.22, 0.74, 0.1], [0.3, -0.7, 0.08]]) mesh(body, PG.sph, M.skin, r, 0.025, r, x, 0.015, z);
+    if (PP.skullB) { mesh(body, PP.skullB, M.tooth, 1.2, 1.2, 1.2, 0.13, 0.2, 0.2, -0.5, 0.7, 0.35); mesh(body, PP.skullD, M.dark, 1.2, 1.2, 1.2, 0.13, 0.2, 0.2, -0.5, 0.7, 0.35); }
+    for (const [x, y, z, l, rx, rz] of [[-0.22, 0.3, 0.1, 0.36, 0.5, 1.1], [0.05, 0.62, -0.2, 0.3, -0.7, 0.4], [-0.12, 0.2, -0.25, 0.26, 1.3, -0.5], [0.25, 0.45, -0.05, 0.2, 0.2, -1.2]]) {
+      const b = joint(body, x, y, z); b.rotation.set(rx, 0, rz);
+      mesh(b, PG.cyl8, M.tooth, 0.014, l, 0.014); mesh(b, PG.sph, M.tooth, 0.026, 0.022, 0.026, 0, l / 2, 0); mesh(b, PG.sph, M.tooth, 0.024, 0.02, 0.024, 0, -l / 2, 0);
+    }
+    for (const [x, y, z, r] of [[0.2, 0.35, 0.15, 0.05], [-0.25, 0.6, -0.1, 0.04], [0.05, 0.8, -0.2, 0.035], [-0.1, 0.3, 0.3, 0.03], [0.3, 0.7, 0.1, 0.025], [-0.32, 0.4, 0.22, 0.02]]) mesh(body, PG.sph, M.sec, r, r, r, x, y, z);
+    const core = mesh(body, PG.sph, M.eye, 0.055, 0.055, 0.055, 0, 0.5, 0);
     const face = joint(body, 0, 0.62, 0.45);
-    for (const s of [-1, 1]) mesh(face, PG.sph, M.eye, 0.07, 0.09, 0.04, s * 0.15, 0.08, 0.05);
-    mesh(face, PG.box, M.dark, 0.2, 0.04, 0.04, 0, -0.08, 0.06);
     return {
       J: { body, blob, face }, h: 1.1, r: 0.6,
       hits: [{ n: body, r: 0.25, part: 'head', o: V(0, 0.75, 0.25) }, { n: body, r: 0.55, part: 'body', o: V(0, 0.5, 0) }],
@@ -194,19 +307,39 @@
       },
     };
   };
+  // the bat: a furred body with a ruff at the neck, a pug face with a folded nose and great ears; each wing an arm and three long
+  // fingers with the skin stretched between them and scalloped at its edge. The wing's two joints are as they were.
   B.bat = function (root, M) {
     const body = joint(root, 0, 0, 0);
-    mesh(body, PG.sph, M.skin, 0.2, 0.22, 0.3);
+    mesh(body, PG.sph, M.skin, 0.17, 0.19, 0.27, 0, 0, -0.02);
+    mesh(body, PG.sph, M.skin, 0.19, 0.17, 0.15, 0, 0.03, 0.14);             // chest
+    mesh(body, PG.sph, M.skin, 0.15, 0.13, 0.11, 0, 0.09, 0.23);             // the ruff
     const head = joint(body, 0, 0.12, 0.26);
-    mesh(head, PG.sph, M.skin, 0.13, 0.12, 0.13);
-    for (const s of [-1, 1]) { mesh(head, PG.cone, M.skin, 0.05, 0.16, 0.03, s * 0.07, 0.14, -0.02, 0, 0, -s * 0.3); mesh(head, PG.sph, M.eye, 0.025, 0.025, 0.02, s * 0.05, 0.03, 0.11); mesh(head, PG.cone, M.tooth, 0.01, 0.04, 0.01, s * 0.02, -0.08, 0.1, Math.PI); }
+    mesh(head, PG.sph, M.skin, 0.115, 0.105, 0.115);
+    mesh(head, PG.sph, M.skin, 0.06, 0.05, 0.06, 0, -0.03, 0.09);            // muzzle
+    mesh(head, PG.sph, M.dark, 0.03, 0.035, 0.02, 0, 0.0, 0.14);             // the nose's leaf
+    mesh(head, PG.box, M.dark, 0.07, 0.012, 0.03, 0, -0.065, 0.1);           // mouth
+    for (const s of [-1, 1]) {
+      mesh(head, PG.cone, M.skin, 0.055, 0.2, 0.022, s * 0.075, 0.15, -0.02, -0.15, 0, -s * 0.3);    // ears
+      mesh(head, PG.cone, M.dark, 0.032, 0.14, 0.008, s * 0.075, 0.14, -0.005, -0.15, 0, -s * 0.3);  // their hollows
+      mesh(head, PG.sph, M.eye, 0.02, 0.02, 0.016, s * 0.05, 0.03, 0.1);
+      mesh(head, PG.cone, M.tooth, 0.008, 0.04, 0.008, s * 0.022, -0.08, 0.105, Math.PI);
+    }
     const wings = [];
     for (const s of [-1, 1]) {
       const sh = joint(body, s * 0.15, 0.06, 0);
-      mesh(sh, PG.box, M.sec, 0.45, 0.015, 0.36, s * 0.24, 0, -0.05);
+      mesh(sh, PG.cyl8, M.skin, 0.02, 0.46, 0.02, s * 0.23, 0, 0.1, 0, 0, Math.PI / 2);                 // the arm, along the wing's leading edge
+      mesh(sh, PG.box, M.sec, 0.45, 0.01, 0.34, s * 0.24, 0, -0.07);                                    // the skin from arm to flank
+      for (let i = 0; i < 3; i++) mesh(sh, PG.cone, M.sec, 0.075, 0.1, 0.006, s * (0.1 + i * 0.15), 0, -0.275, Math.PI / 2);   // its scalloped edge
       const tip = joint(sh, s * 0.46, 0, 0);
-      mesh(tip, PG.box, M.sec, 0.45, 0.012, 0.3, s * 0.22, 0, -0.1);
-      mesh(tip, PG.box, M.skin, 0.45, 0.03, 0.03, s * 0.22, 0, 0.05);
+      mesh(tip, PG.sph, M.skin, 0.028, 0.028, 0.028);                                                   // the wrist, and its hooked thumb
+      mesh(tip, PG.cone, M.dark, 0.012, 0.06, 0.012, 0, 0.01, 0.045, Math.PI / 2 - 0.4);
+      for (let i = 0; i < 3; i++) {                                                                     // three fingers fanned out, skin between
+        const a = 0.12 + i * 0.5, len = 0.46 - i * 0.07, dx = Math.cos(a) * len, dz = -Math.sin(a) * len + (i === 0 ? 0.05 : 0);
+        mesh(tip, PG.cyl8, M.skin, 0.011, len, 0.011, s * dx / 2, 0, dz / 2 + (i === 0 ? 0.05 : 0), Math.PI / 2, 0, -s * (Math.PI / 2 - Math.atan2(-dz, dx)));
+      }
+      mesh(tip, PG.box, M.sec, 0.43, 0.008, 0.3, s * 0.215, 0, -0.1);
+      for (let i = 0; i < 3; i++) mesh(tip, PG.cone, M.sec, 0.07, 0.09, 0.005, s * (0.08 + i * 0.14), 0, -0.285, Math.PI / 2);
       wings.push({ sh, tip, s });
     }
     const L = [leg(body, M, -0.08, -0.15, -0.1, 0.25, 0.03), leg(body, M, 0.08, -0.15, -0.1, 0.25, 0.03)];
@@ -222,23 +355,41 @@
       },
     };
   };
+  // the spider: a great hunting spider - a swollen abdomen with its mark and spinnerets, a low shield of a fore-body, eight eyes in two
+  // rows, heavy jaws that carry the fangs, two feelers; each leg a hip-ball, a thick thigh, a knee, a thin shin tapering to a claw.
+  // The legs' joints (hip, thigh, knee) and the gait are as they were.
   B.spider = function (root, M) {
     const body = joint(root, 0, 0.5, 0);
-    const abd = mesh(body, PG.sph, M.skin, 0.38, 0.32, 0.46, 0, 0.12, -0.45);
-    mesh(body, PG.sph, M.sec, 0.12, 0.05, 0.25, 0, 0.42, -0.45);
+    const abd = mesh(body, PG.sph, M.skin, 0.36, 0.3, 0.46, 0, 0.14, -0.47);
+    mesh(body, PG.sph, M.sec, 0.1, 0.03, 0.2, 0, 0.42, -0.5);                 // its mark: an hourglass, two lobes
+    mesh(body, PG.sph, M.sec, 0.07, 0.03, 0.1, 0, 0.4, -0.3);
+    for (const s of [-1, 1]) mesh(body, PG.cone, M.skin, 0.035, 0.1, 0.035, s * 0.05, 0.05, -0.92, -Math.PI / 2 - 0.3);   // spinnerets
+    mesh(body, PG.sph, M.skin, 0.1, 0.09, 0.1, 0, 0.06, -0.08);               // the waist
     const head = joint(body, 0, 0.05, 0.15);
-    mesh(head, PG.sph, M.skin, 0.24, 0.18, 0.26);
-    for (let i = 0; i < 4; i++) mesh(head, PG.sph, M.eye, 0.035, 0.035, 0.03, (i % 2 ? 1 : -1) * (0.05 + (i > 1 ? 0.07 : 0)), 0.1 + (i > 1 ? -0.03 : 0), 0.22);
+    mesh(head, PG.sph, M.skin, 0.24, 0.15, 0.27, 0, 0.0, -0.02);              // the fore-body's shield
+    mesh(head, PG.sph, M.skin, 0.15, 0.11, 0.13, 0, 0.05, 0.15);              // the face
+    for (let i = 0; i < 8; i++) { const row = i < 4 ? 0 : 1, k = (i % 4) - 1.5; mesh(head, PG.sph, M.eye, row ? 0.014 : 0.021, row ? 0.014 : 0.021, 0.014, k * (row ? 0.075 : 0.055), 0.1 + row * 0.045, 0.255 - row * 0.05 - Math.abs(k) * 0.012); }
     const fangs = [];
-    for (const s of [-1, 1]) { const f = joint(head, s * 0.07, -0.08, 0.2); mesh(f, PG.cone, M.dark, 0.03, 0.14, 0.03, 0, -0.06, 0.02, Math.PI - 0.3); fangs.push(f); }
+    for (const s of [-1, 1]) {
+      const f = joint(head, s * 0.07, -0.08, 0.2);
+      mesh(f, PG.sph, M.skin, 0.05, 0.075, 0.055, 0, 0.0, 0.03);              // the jaw
+      mesh(f, PG.cone, M.dark, 0.025, 0.13, 0.025, 0, -0.1, 0.035, Math.PI - 0.25);
+      fangs.push(f);
+      mesh(head, PG.cyl8, M.skin, 0.022, 0.2, 0.022, s * 0.15, -0.03, 0.27, 1.1, 0, -s * 0.25);   // feelers
+    }
     const legs = [];
     for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
       const hip = joint(body, s * 0.18, 0.02, 0.2 - i * 0.14);
       hip.rotation.y = s * (0.6 - i * 0.4) + (s < 0 ? Math.PI : 0);
+      mesh(hip, PG.sph, M.skin, 0.05, 0.05, 0.05);
       const up = joint(hip, 0, 0, 0); up.rotation.z = 0.7;
-      mesh(up, PG.box, M.skin, 0.55, 0.05, 0.05, 0.27, 0, 0);
+      mesh(up, PG.cyl8, M.skin, 0.036, 0.55, 0.036, 0.27, 0, 0, 0, 0, Math.PI / 2);
+      mesh(up, PG.sph, M.skin, 0.045, 0.045, 0.045, 0.1, 0, 0);
       const kn = joint(up, 0.55, 0, 0); kn.rotation.z = -1.9;
-      mesh(kn, PG.box, M.skin, 0.65, 0.04, 0.04, 0.32, 0, 0);
+      mesh(kn, PG.sph, M.skin, 0.042, 0.042, 0.042);
+      mesh(kn, PG.cyl8, M.skin, 0.024, 0.5, 0.024, 0.25, 0, 0, 0, 0, Math.PI / 2);
+      mesh(kn, PG.cone, M.dark, 0.022, 0.17, 0.022, 0.57, 0, 0, 0, 0, -Math.PI / 2);     // the foot's claw
+      for (const b of [0.14, 0.3, 0.42]) mesh(kn, PG.cone, M.dark, 0.006, 0.05, 0.006, b, 0.03, 0, 0, 0, -0.5);   // bristles
       legs.push({ hip, up, kn, ph: i * 1.3 + (s > 0 ? Math.PI : 0) });
     }
     return {
@@ -254,32 +405,66 @@
       },
     };
   };
+  // the brute: a great stooping ogre - a barrel of ribs over a gut, slabs of chest and back, a neck sunk between heaped shoulders, a
+  // heavy brow and an undershot jaw with tusks, long arms thick at the forearm, big hands and feet with their toes. A loincloth of hide
+  // with a belt; a club that is a tree's limb, bound with iron. Laid down as masses and melted into one hide joint by joint (gfx.js).
   B.brute = function (root, M) {
     const hips = joint(root, 0, 1.25, 0);
-    mesh(hips, PG.sph, M.skin, 0.5, 0.35, 0.4);
-    mesh(hips, PG.box, M.sec, 0.75, 0.35, 0.5, 0, -0.15, 0);
+    mesh(hips, PG.sph, M.skin, 0.47, 0.34, 0.39);
+    mesh(hips, PG.sph, M.skin, 0.4, 0.3, 0.3, 0, 0.12, 0.2);                 // the gut hanging over the belt
+    mesh(hips, PG.cyl, M.sec, 0.5, 0.11, 0.43, 0, 0.0, 0.02);                // belt
+    mesh(hips, PG.box, M.sec, 0.42, 0.5, 0.05, 0, -0.3, 0.36, -0.12); mesh(hips, PG.box, M.sec, 0.5, 0.42, 0.05, 0, -0.26, -0.36, 0.1);   // the hide, front and back
+    mesh(hips, PG.box, M.dark, 0.12, 0.13, 0.04, 0, 0.0, 0.445);             // buckle
     const torso = joint(hips, 0, 0.2, 0);
-    mesh(torso, PG.sph, M.skin, 0.6, 0.6, 0.45, 0, 0.45, 0.05);
-    mesh(torso, PG.sph, M.skin, 0.45, 0.4, 0.42, 0, 0.1, 0.18);
+    mesh(torso, PG.sph, M.skin, 0.56, 0.5, 0.44, 0, 0.42, 0.04);             // ribs
+    mesh(torso, PG.sph, M.skin, 0.43, 0.36, 0.4, 0, 0.08, 0.17);             // belly
+    for (const s of [-1, 1]) { mesh(torso, PG.sph, M.skin, 0.27, 0.2, 0.17, s * 0.24, 0.6, 0.33); mesh(torso, PG.sph, M.skin, 0.3, 0.3, 0.2, s * 0.27, 0.62, -0.26); mesh(torso, PG.sph, M.skin, 0.3, 0.22, 0.27, s * 0.38, 0.86, -0.04); } // chest, back, the heap of the shoulder
+    mesh(torso, PG.sph, M.skin, 0.2, 0.2, 0.2, 0, 0.9, 0.14);                // neck
     const head = joint(torso, 0, 1.0, 0.25);
-    mesh(head, PG.sph, M.skin, 0.24, 0.22, 0.25);
-    mesh(head, PG.box, M.skin, 0.3, 0.12, 0.2, 0, -0.12, 0.08);
-    for (const s of [-1, 1]) { mesh(head, PG.sph, M.eye, 0.035, 0.03, 0.02, s * 0.09, 0.04, 0.22); mesh(head, PG.cone, M.tooth, 0.04, 0.16, 0.04, s * 0.11, -0.05, 0.2, 0.2); }
+    mesh(head, PG.sph, M.skin, 0.215, 0.2, 0.235, 0, 0.02, -0.01);           // skull
+    mesh(head, PG.box, M.skin, 0.34, 0.075, 0.13, 0, 0.065, 0.17, 0.3);      // brow
+    mesh(head, PG.sph, M.skin, 0.075, 0.07, 0.085, 0, -0.025, 0.225);        // nose
+    mesh(head, PG.box, M.skin, 0.3, 0.14, 0.22, 0, -0.145, 0.09);            // jaw
+    mesh(head, PG.box, M.skin, 0.22, 0.07, 0.1, 0, -0.165, 0.2);             // chin, thrust out
+    mesh(head, PG.box, M.dark, 0.17, 0.014, 0.03, 0, -0.085, 0.212);         // the line of the mouth
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.eye, 0.026, 0.02, 0.016, s * 0.09, 0.022, 0.2);
+      mesh(head, PG.cone, M.tooth, 0.034, 0.15, 0.034, s * 0.105, -0.045, 0.2, 0.2, 0, s * 0.12);   // tusks
+      mesh(head, PG.sph, M.skin, 0.045, 0.085, 0.03, s * 0.215, 0.0, -0.01, 0, 0, s * 0.25);        // ears
+    }
     const arms = [];
     for (const s of [-1, 1]) {
       const sh = joint(torso, s * 0.62, 0.7, 0);
-      mesh(sh, PG.sph, M.skin, 0.25, 0.25, 0.25);
-      mesh(sh, PG.box, M.skin, 0.22, 0.65, 0.22, 0, -0.35, 0);
+      mesh(sh, PG.sph, M.skin, 0.24, 0.25, 0.25);
+      mesh(sh, PG.sph, M.skin, 0.155, 0.36, 0.165, 0, -0.33, 0);             // upper arm
       const el = joint(sh, 0, -0.68, 0);
-      mesh(el, PG.box, M.skin, 0.2, 0.62, 0.2, 0, -0.31, 0);
-      const hand = joint(el, 0, -0.66, 0); mesh(hand, PG.sph, M.skin, 0.17, 0.15, 0.17);
+      mesh(el, PG.sph, M.skin, 0.15, 0.2, 0.16, 0, -0.14, 0.01);             // the swell of the forearm
+      mesh(el, PG.cyl8, M.skin, 0.1, 0.5, 0.105, 0, -0.38, 0);
+      mesh(el, PG.cyl, M.sec, 0.118, 0.13, 0.122, 0, -0.52, 0);              // a bracer of hide
+      const hand = joint(el, 0, -0.66, 0);
+      mesh(hand, PG.sph, M.skin, 0.14, 0.12, 0.155);
+      for (let i = 0; i < 4; i++) mesh(hand, PG.sph, M.skin, 0.042, 0.075, 0.048, (i - 1.5) * 0.068, -0.1, 0.07);    // knuckles and fingers, curled
+      mesh(hand, PG.sph, M.skin, 0.045, 0.06, 0.07, -s * 0.13, -0.03, 0.08);                                        // thumb
       arms.push({ sh, el, hand });
     }
     const club = joint(arms[1].hand, 0, 0, 0);
-    mesh(club, PG.cyl, M.sec, 0.06, 0.9, 0.06, 0, 0, 0.4, Math.PI / 2);
-    mesh(club, PG.cyl, M.sec, 0.16, 0.5, 0.16, 0, 0, 0.85, Math.PI / 2);
-    for (let i = 0; i < 4; i++) mesh(club, PG.cone, M.dark, 0.04, 0.12, 0.04, Math.cos(i * 1.57) * 0.16, Math.sin(i * 1.57) * 0.16, 0.85, 0, 0, i * 1.57 - Math.PI / 2);
-    const L = [leg(hips, M, -0.3, -0.2, 0, 1.1, 0.24), leg(hips, M, 0.3, -0.2, 0, 1.1, 0.24)];
+    mesh(club, PG.cyl, M.sec, 0.055, 0.9, 0.06, 0, 0, 0.4, Math.PI / 2);
+    mesh(club, PG.cyl, M.sec, 0.15, 0.5, 0.17, 0, 0, 0.85, Math.PI / 2);
+    mesh(club, PG.sph, M.sec, 0.16, 0.14, 0.17, 0, 0, 1.1); mesh(club, PG.sph, M.sec, 0.07, 0.06, 0.07, 0, 0, -0.06);       // its knotted head, the butt
+    for (const z of [0.66, 1.02]) mesh(club, PG.cyl, M.dark, 0.165, 0.045, 0.185, 0, 0, z, Math.PI / 2);                 // iron bands
+    for (let i = 0; i < 6; i++) mesh(club, PG.cone, M.dark, 0.035, 0.13, 0.035, Math.cos(i * 1.047) * 0.17, Math.sin(i * 1.047) * 0.17, 0.78 + (i % 2) * 0.16, 0, 0, i * 1.047 - Math.PI / 2);
+    // a leg: a heavy thigh, a calf, a broad foot with its toes (the joints the walk works are the hip and the knee, as before)
+    const bleg = (x) => {
+      const len = 1.1, hip = joint(hips, x, -0.2, 0);
+      mesh(hip, PG.sph, M.skin, 0.2, 0.36, 0.22, 0, -len * 0.24, 0.0);
+      const kn = joint(hip, 0, -len * 0.5, 0);
+      mesh(kn, PG.sph, M.skin, 0.15, 0.24, 0.17, 0, -0.18, -0.03);           // calf
+      mesh(kn, PG.cyl8, M.skin, 0.1, len * 0.42, 0.11, 0, -len * 0.27, 0);
+      mesh(kn, PG.sph, M.skin, 0.15, 0.085, 0.24, 0, -len * 0.5 + 0.07, 0.09);   // foot
+      for (let i = 0; i < 3; i++) mesh(kn, PG.sph, M.skin, 0.05, 0.05, 0.07, (i - 1) * 0.085, -len * 0.5 + 0.05, 0.31);
+      return { hip, kn };
+    };
+    const L = [bleg(-0.3), bleg(0.3)];
     return {
       J: { hips, torso, head, arms, L, club }, h: 3.0, r: 0.95,
       hits: [{ n: head, r: 0.28, part: 'head' }, { n: torso, r: 0.62, part: 'body', o: V(0, 0.4, 0.05) }, { n: hips, r: 0.48, part: 'body' }, { n: L[0].hip, r: 0.25, part: 'body', o: V(0, -0.5, 0) }, { n: L[1].hip, r: 0.25, part: 'body', o: V(0, -0.5, 0) }],
@@ -298,30 +483,70 @@
     };
   };
   // gargoyle: a crouching stone fiend held aloft by heavy wings; it picks up a stone and throws it
+  // the gargoyle: a carved beast of stone, crouched forward - a deep chest and a hollow belly, a hound's skull with a heavy brow, a
+  // beaked snout, two ribbed horns; a wing of three stone fingers with the web between them; arms with talons, bent haunches, a tail
+  // of joints ending in a barb. Its edges stay those of cut stone. Joints, flight and what a shot hits as before.
   B.gargoyle = function (root, M) {
     const body = joint(root, 0, 0.2, 0);
-    mesh(body, PG.box, M.skin, 0.5, 0.55, 0.42, 0, 0.1, 0, 0.35);
-    mesh(body, PG.box, M.sec, 0.52, 0.12, 0.44, 0, -0.12, 0.05, 0.35);
+    mesh(body, PG.sph, M.skin, 0.25, 0.27, 0.22, 0, 0.2, 0.06, 0.35);        // chest
+    mesh(body, PG.sph, M.skin, 0.19, 0.2, 0.18, 0, -0.03, -0.05, 0.35);      // belly
+    mesh(body, PG.box, M.skin, 0.36, 0.1, 0.24, 0, 0.36, 0.0, 0.35);         // the yoke of the shoulders
+    for (let i = 0; i < 4; i++) mesh(body, PG.box, M.sec, 0.06, 0.07, 0.07, 0, 0.36 - i * 0.12, -0.2 + i * 0.03, 0.35 + 0.78);   // the spine's knobs
+    mesh(body, PG.box, M.sec, 0.4, 0.07, 0.3, 0, -0.14, 0.02, 0.35);         // a girdle
     const head = joint(body, 0, 0.42, 0.2);
-    mesh(head, PG.box, M.skin, 0.3, 0.28, 0.32);
-    mesh(head, PG.box, M.skin, 0.22, 0.12, 0.18, 0, -0.1, 0.17);
-    for (const s of [-1, 1]) { mesh(head, PG.cone, M.sec, 0.05, 0.3, 0.05, s * 0.12, 0.2, -0.05, -0.5, 0, s * 0.35); mesh(head, PG.box, M.eye, 0.06, 0.03, 0.02, s * 0.07, 0.04, 0.17); }
+    mesh(head, PG.sph, M.skin, 0.15, 0.14, 0.17, 0, 0.0, -0.02);
+    mesh(head, PG.box, M.skin, 0.27, 0.07, 0.12, 0, 0.07, 0.1, 0.35);        // brow
+    mesh(head, PG.box, M.skin, 0.15, 0.1, 0.2, 0, -0.04, 0.17);              // snout
+    mesh(head, PG.cone, M.skin, 0.06, 0.12, 0.05, 0, -0.03, 0.31, Math.PI / 2 + 0.5);   // its hooked end
+    mesh(head, PG.box, M.skin, 0.13, 0.05, 0.18, 0, -0.12, 0.13);            // jaw
+    mesh(head, PG.box, M.dark, 0.1, 0.012, 0.15, 0, -0.092, 0.15);
+    for (const s of [-1, 1]) {
+      mesh(head, PG.cone, M.sec, 0.05, 0.2, 0.05, s * 0.11, 0.18, -0.04, -0.5, 0, s * 0.35);
+      mesh(head, PG.cone, M.sec, 0.03, 0.16, 0.03, s * 0.155, 0.3, -0.13, -1.1, 0, s * 0.3);
+      mesh(head, PG.box, M.eye, 0.05, 0.022, 0.016, s * 0.07, 0.03, 0.16);
+      mesh(head, PG.cone, M.skin, 0.04, 0.13, 0.02, s * 0.17, 0.06, -0.03, 0, 0, -s * 1.1);     // ears
+      mesh(head, PG.cone, M.tooth, 0.012, 0.045, 0.012, s * 0.045, -0.085, 0.24, Math.PI);
+    }
     const wings = [];
     for (const s of [-1, 1]) {
       const sh = joint(body, s * 0.22, 0.25, -0.15);
-      mesh(sh, PG.box, M.skin, 0.65, 0.05, 0.08, s * 0.32, 0, 0);
-      mesh(sh, PG.box, M.sec, 0.6, 0.02, 0.5, s * 0.32, 0, -0.25);
+      mesh(sh, PG.box, M.skin, 0.65, 0.06, 0.07, s * 0.32, 0, 0);            // the arm of the wing
+      mesh(sh, PG.sph, M.skin, 0.07, 0.07, 0.07, 0, 0, 0);
+      mesh(sh, PG.box, M.sec, 0.6, 0.016, 0.46, s * 0.32, -0.01, -0.25);
+      for (let i = 0; i < 3; i++) mesh(sh, PG.cone, M.sec, 0.1, 0.13, 0.008, s * (0.14 + i * 0.2), -0.01, -0.5, Math.PI / 2);
       const tip = joint(sh, s * 0.64, 0, 0);
-      mesh(tip, PG.box, M.sec, 0.55, 0.02, 0.45, s * 0.26, 0, -0.22); mesh(tip, PG.cone, M.skin, 0.04, 0.16, 0.04, s * 0.52, 0, 0, 0, 0, -s * Math.PI / 2);
+      mesh(tip, PG.sph, M.skin, 0.055, 0.055, 0.055);
+      mesh(tip, PG.cone, M.dark, 0.02, 0.1, 0.02, 0, 0.03, 0.07, Math.PI / 2 - 0.5);            // the thumb's hook
+      for (let i = 0; i < 3; i++) { const a = 0.1 + i * 0.42, len = 0.56 - i * 0.07; mesh(tip, PG.box, M.skin, len, 0.035, 0.035, s * Math.cos(a) * len / 2, 0, -Math.sin(a) * len / 2, 0, s * a, 0); }
+      mesh(tip, PG.box, M.sec, 0.52, 0.014, 0.42, s * 0.26, -0.01, -0.22);
+      for (let i = 0; i < 3; i++) mesh(tip, PG.cone, M.sec, 0.09, 0.12, 0.007, s * (0.1 + i * 0.17), -0.01, -0.45, Math.PI / 2);
       wings.push({ sh, tip, s });
     }
     const arms = [];
-    for (const s of [-1, 1]) { const a = joint(body, s * 0.28, 0.2, 0.15); mesh(a, PG.box, M.skin, 0.1, 0.38, 0.1, 0, -0.18, 0.05, 0.4); arms.push(a); }
+    for (const s of [-1, 1]) {
+      const a = joint(body, s * 0.28, 0.2, 0.15);
+      mesh(a, PG.sph, M.skin, 0.075, 0.075, 0.075);
+      mesh(a, PG.box, M.skin, 0.09, 0.22, 0.1, 0, -0.1, 0.02, 0.4); mesh(a, PG.box, M.skin, 0.075, 0.2, 0.08, 0, -0.27, 0.1, 0.1);
+      mesh(a, PG.sph, M.skin, 0.06, 0.05, 0.07, 0, -0.38, 0.12);
+      for (let i = 0; i < 3; i++) mesh(a, PG.cone, M.dark, 0.014, 0.07, 0.014, (i - 1) * 0.035, -0.43, 0.16, Math.PI - 0.6);
+      arms.push(a);
+    }
     // the stone in its right hand: the very model the thrown one uses (same scale, so what you see is what hits)
     const rock = mesh(arms[1], PG.dode, G.world.mats.rock, 0.26, 0.26, 0.26, 0, -0.42, 0.1); rock.visible = false;
     let relT = null; // when the throw was released (the arm swings through from there)
-    const L = [leg(body, M, -0.14, -0.2, 0, 0.35, 0.06), leg(body, M, 0.14, -0.2, 0, 0.35, 0.06)];
-    const tail = joint(body, 0, -0.1, -0.25); for (let i = 0; i < 3; i++) mesh(tail, PG.box, M.sec, 0.05, 0.05, 0.25, 0, -i * 0.06, -0.12 - i * 0.22, 0.3);
+    const gleg = (x) => {
+      const len = 0.35, hip = joint(body, x, -0.2, 0);
+      mesh(hip, PG.sph, M.skin, 0.08, 0.12, 0.1, 0, -len * 0.2, 0.02);       // haunch
+      const kn = joint(hip, 0, -len * 0.5, 0);
+      mesh(kn, PG.box, M.skin, 0.055, len * 0.5, 0.06, 0, -len * 0.25, -0.01);
+      mesh(kn, PG.box, M.skin, 0.085, 0.04, 0.13, 0, -len * 0.5 + 0.02, 0.035);
+      for (let i = 0; i < 3; i++) mesh(kn, PG.cone, M.dark, 0.012, 0.06, 0.012, (i - 1) * 0.03, -len * 0.5 + 0.015, 0.12, Math.PI / 2 + 0.4);
+      return { hip, kn };
+    };
+    const L = [gleg(-0.14), gleg(0.14)];
+    const tail = joint(body, 0, -0.1, -0.25);
+    for (let i = 0; i < 4; i++) mesh(tail, PG.box, M.sec, 0.055 - i * 0.008, 0.055 - i * 0.008, 0.2, 0, -i * 0.05, -0.1 - i * 0.18, 0.3);
+    mesh(tail, PG.cone, M.sec, 0.06, 0.12, 0.016, 0, -0.22, -0.84, -Math.PI / 2 - 0.3);          // the barb
     return {
       J: { body, head, wings, rock }, h: 1.4, r: 0.6, fly: true,
       hits: [{ n: head, r: 0.2, part: 'head' }, { n: body, r: 0.38, part: 'body', o: V(0, 0.1, 0) }, { n: wings[0].sh, r: 0.25, part: 'body', o: V(-0.4, 0, -0.2) }, { n: wings[1].sh, r: 0.25, part: 'body', o: V(0.4, 0, -0.2) }],
@@ -340,7 +565,9 @@
   };
   B.eye = function (root, M) {
     const body = joint(root, 0, 0, 0);
-    const ball = mesh(body, PG.sph, M.skin, 0.62, 0.6, 0.6);
+    const FG = G.GFX && G.GFX.foeGeo; // (a finely turned ball, a ring round the iris, tentacles that taper with a knuckle at each joint: gfx.js)
+    const ball = mesh(body, (FG && FG('ball')) || PG.sph, M.skin, 0.62, 0.6, 0.6);
+    if (FG) mesh(body, PG.torus, M.dark, 0.31, 0.31, 0.12, 0, 0, 0.555);
     const iris = mesh(body, PG.sph, M.sec, 0.32, 0.32, 0.12, 0, 0, 0.53);
     const pupil = mesh(body, PG.sph, M.eye, 0.13, 0.15, 0.06, 0, 0, 0.63);
     const lidT = joint(body, 0, 0, 0); mesh(lidT, PG.sph, M.sec, 0.65, 0.35, 0.62, 0, 0.32, -0.03);
@@ -349,7 +576,7 @@
       const a0 = i / 6 * Math.PI * 2;
       let j = joint(body, Math.cos(a0) * 0.35, -0.45, Math.sin(a0) * 0.35);
       const segs = [];
-      for (let k = 0; k < 4; k++) { mesh(j, PG.cyl8, M.sec, 0.06 - k * 0.012, 0.28, 0.06 - k * 0.012, 0, -0.14, 0); segs.push(j); j = joint(j, 0, -0.27, 0); }
+      for (let k = 0; k < 4; k++) { const tr = 0.06 - k * 0.012; mesh(j, (FG && FG('taper')) || PG.cyl8, M.sec, tr, 0.28, tr, 0, -0.14, 0); if (FG) mesh(j, PG.sph, M.sec, tr, tr, tr); segs.push(j); j = joint(j, 0, -0.27, 0); }
       tent.push({ segs, ph: i });
     }
     return {
@@ -366,20 +593,28 @@
   };
   B.beetle = function (root, M) {
     const body = joint(root, 0, 0.6, 0);
-    mesh(body, PG.sph, M.skin, 0.7, 0.45, 0.95, 0, 0.1, -0.1);
-    mesh(body, PG.box, M.dark, 0.02, 0.3, 1.6, 0, 0.42, -0.1);
+    // (two ribbed wing-cases with the seam between them, a broad shield before them, a flat belly; a small head under a curved horn,
+    // heavy jaws, feelers; six legs of three joints with spurs)
+    mesh(body, PG.sph, M.skin, 0.68, 0.44, 0.84, 0, 0.1, -0.2);
+    mesh(body, PG.sph, M.skin, 0.58, 0.36, 0.42, 0, 0.1, 0.52);                                                         // the shield
+    mesh(body, PG.sph, M.dark, 0.6, 0.16, 0.95, 0, -0.14, -0.05);                                                       // belly
+    mesh(body, PG.box, M.dark, 0.022, 0.1, 1.3, 0, 0.5, -0.25); mesh(body, PG.box, M.dark, 1.0, 0.1, 0.03, 0, 0.42, 0.24);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) mesh(body, PG.sph, M.dark, 0.018, 0.02, 0.6 - i * 0.07, s * (0.16 + i * 0.16), 0.455 - i * i * 0.04, -0.22, -0.02 - i * 0.012);   // ribs of the wing-cases
     const head = joint(body, 0, 0.0, 0.85);
-    mesh(head, PG.sph, M.skin, 0.42, 0.3, 0.32);
-    mesh(head, PG.cone, M.sec, 0.12, 0.55, 0.12, 0, 0.25, 0.25, 0.6);
+    mesh(head, PG.sph, M.skin, 0.34, 0.24, 0.3);
+    mesh(head, PG.cone, M.sec, 0.12, 0.4, 0.12, 0, 0.22, 0.22, 0.6); mesh(head, PG.cone, M.sec, 0.075, 0.34, 0.075, 0, 0.5, 0.36, -0.15);   // the horn, bent back at its end
+    for (const s of [-1, 1]) mesh(head, PG.cyl8, M.dark, 0.014, 0.34, 0.014, s * 0.2, 0.06, 0.38, 1.2, 0, -s * 0.5);    // feelers
     const mand = [];
     for (const s of [-1, 1]) { const m = joint(head, s * 0.22, -0.1, 0.25); mesh(m, PG.cone, M.dark, 0.06, 0.32, 0.06, s * 0.05, 0, 0.12, Math.PI / 2, 0, s * 0.4); mand.push(m); mesh(head, PG.sph, M.eye, 0.05, 0.05, 0.04, s * 0.24, 0.08, 0.2); }
     const legs = [];
     for (let i = 0; i < 3; i++) for (const s of [-1, 1]) {
       const hip = joint(body, s * 0.55, -0.1, 0.35 - i * 0.4); hip.rotation.y = s < 0 ? Math.PI : 0;
       const up = joint(hip, 0, 0, 0); up.rotation.z = 0.5;
-      mesh(up, PG.box, M.dark, 0.45, 0.08, 0.08, 0.22, 0, 0);
+      mesh(up, PG.sph, M.dark, 0.07, 0.07, 0.07); mesh(up, PG.sph, M.dark, 0.24, 0.055, 0.06, 0.22, 0, 0);
       const kn = joint(up, 0.45, 0, 0); kn.rotation.z = -1.6;
-      mesh(kn, PG.box, M.dark, 0.5, 0.06, 0.06, 0.25, 0, 0);
+      mesh(kn, PG.sph, M.dark, 0.055, 0.055, 0.055); mesh(kn, PG.cyl8, M.dark, 0.03, 0.5, 0.03, 0.25, 0, 0, 0, 0, Math.PI / 2);
+      for (const b of [0.2, 0.36]) mesh(kn, PG.cone, M.dark, 0.012, 0.07, 0.012, b, 0.035, 0, 0, 0, -0.5);
+      mesh(kn, PG.cone, M.dark, 0.026, 0.14, 0.026, 0.56, 0, 0, 0, 0, -Math.PI / 2);
       legs.push({ up, hip, ph: i * 2 + (s > 0 ? Math.PI : 0) });
     }
     return {
@@ -397,11 +632,16 @@
   };
   B.wraith = function (root, M) {
     const body = joint(root, 0, 1.2, 0);
-    const robe = mesh(body, PG.cone, M.skin, 0.5, 1.5, 0.45, 0, -0.35, 0);
+    // (a shroud hanging in folds from stooped shoulders, a deep hood with a skull far back in it, two points of light for eyes)
+    const FGw = G.GFX && G.GFX.foeGeo, PPw = G.Props.PG;
+    const robe = mesh(body, (FGw && FGw('robe')) || PG.cone, M.skin, 0.5, 1.5, 0.45, 0, -0.35, 0);
+    mesh(body, PG.sph, M.skin, 0.4, 0.2, 0.24, 0, 0.32, -0.03); mesh(body, PG.sph, M.skin, 0.26, 0.24, 0.24, 0, 0.42, -0.14);     // shoulders, the hood's fall
     const head = joint(body, 0, 0.55, 0.05);
-    mesh(head, PG.sph, M.skin, 0.25, 0.27, 0.26);
-    mesh(head, PG.sph, M.dark, 0.17, 0.19, 0.12, 0, -0.02, 0.17);
-    for (const s of [-1, 1]) mesh(head, PG.sph, M.eye, 0.04, 0.025, 0.02, s * 0.07, 0.0, 0.27);
+    mesh(head, PG.sph, M.skin, 0.25, 0.27, 0.26, 0, 0.0, -0.03);
+    mesh(head, PG.cone, M.skin, 0.17, 0.3, 0.17, 0, 0.24, -0.14, -0.8);
+    mesh(head, PG.sph, M.dark, 0.18, 0.21, 0.12, 0, -0.03, 0.15);
+    if (PPw.skullB) { mesh(head, PPw.skullB, M.tooth, 1.25, 1.25, 1.1, 0, -0.17, 0.04); mesh(head, PPw.skullD, M.dark, 1.25, 1.25, 1.1, 0, -0.17, 0.04); }
+    for (const s of [-1, 1]) mesh(head, PG.sph, M.eye, 0.016, 0.016, 0.014, s * 0.045, -0.047, 0.165);
     const rags = [];
     for (let i = 0; i < 8; i++) { const a0 = i / 8 * Math.PI * 2; const r = joint(body, Math.cos(a0) * 0.42, -1.0, Math.sin(a0) * 0.38); mesh(r, PG.box, M.skin, 0.15, 0.6, 0.02, 0, -0.25, 0, 0, -a0); rags.push(r); }
     const arms = [];
@@ -420,16 +660,19 @@
       },
     };
   };
+  // the mushroom: a grave-fungus as tall as a man - a domed cap with its rim rolled under and gills beneath, warts over it, a stalk
+  // swollen at the foot with a torn ring; a face sunk into the stalk under the cap's shadow. The cap still swells and flattens as it did.
   B.mushroom = function (root, M) {
+    const FG = G.GFX && G.GFX.foeGeo;
     const body = joint(root, 0, 0, 0);
     const stem = joint(body, 0, 0.3, 0);
-    mesh(stem, PG.cyl, M.sec, 0.25, 0.9, 0.25, 0, 0.45, 0);
+    mesh(stem, (FG && FG('stem')) || PG.cyl, M.sec, 0.25, 0.9, 0.25, 0, 0.45, 0);
     const cap = joint(stem, 0, 0.95, 0);
-    const capM = mesh(cap, PG.sph, M.skin, 0.75, 0.42, 0.75, 0, 0.1, 0);
-    mesh(cap, PG.cyl, M.sec, 0.68, 0.04, 0.68, 0, -0.05, 0);
-    for (let i = 0; i < 9; i++) { const a0 = i * 2.3; const rr = 0.25 + (i % 3) * 0.15; mesh(cap, PG.sph, M.tooth, 0.07, 0.03, 0.07, Math.cos(a0) * rr, 0.38 - rr * 0.35, Math.sin(a0) * rr, -Math.sin(a0) * rr, 0, Math.cos(a0) * rr); }
-    for (const s of [-1, 1]) mesh(stem, PG.sph, M.eye, 0.04, 0.05, 0.03, s * 0.09, 0.7, 0.23);
-    mesh(stem, PG.box, M.dark, 0.12, 0.03, 0.02, 0, 0.55, 0.25);
+    const capM = mesh(cap, (FG && FG('cap')) || PG.sph, M.skin, 0.75, 0.42, 0.75, 0, 0.1, 0);
+    if (!FG) mesh(cap, PG.cyl, M.sec, 0.68, 0.04, 0.68, 0, -0.05, 0);
+    for (let i = 0; i < 11; i++) { const a0 = i * 2.3, rr = 0.16 + (i % 4) * 0.13, sz = 0.035 + (i % 3) * 0.018; mesh(cap, PG.sph, M.tooth, sz, sz * 0.45, sz, Math.cos(a0) * rr, 0.36 - rr * rr * 0.42, Math.sin(a0) * rr, -Math.sin(a0) * rr, 0, Math.cos(a0) * rr); }
+    for (const s of [-1, 1]) { mesh(stem, PG.sph, M.dark, 0.05, 0.055, 0.03, s * 0.09, 0.7, 0.19); mesh(stem, PG.sph, M.eye, 0.022, 0.026, 0.018, s * 0.09, 0.695, 0.205); }   // eyes, deep in their hollows
+    mesh(stem, PG.box, M.dark, 0.15, 0.035, 0.03, 0, 0.56, 0.2); for (let i = 0; i < 4; i++) mesh(stem, PG.cone, M.tooth, 0.012, 0.035, 0.012, (i - 1.5) * 0.035, 0.565, 0.215, i % 2 ? 0 : Math.PI);
     const roots = [];
     for (let i = 0; i < 4; i++) { const r = joint(body, Math.cos(i * 1.57 + 0.78) * 0.22, 0.3, Math.sin(i * 1.57 + 0.78) * 0.22); mesh(r, PG.cone, M.sec, 0.07, 0.35, 0.07, 0, -0.15, 0, Math.PI); roots.push(r); }
     return {
@@ -445,28 +688,52 @@
       },
     };
   };
-  B.golem = function (root, M) {
+  // the golem: a giant of piled rock - a breast of two great stones with a cleft between them and a light in the cleft, a belly stone,
+  // boulders for shoulders, a small head sunk between them with a brow and two slits of light; arms of three stones ending in fists
+  // with knuckles, legs like pillars on broad feet; moss where the rain reaches (not on one that keeps a gate in the dry). Joints, the
+  // heart's pulse and what a shot hits as before.
+  B.golem = function (root, M, opts, def) {
+    const D = PG.dode, I = PG.ico || PG.dode;
     const hips = joint(root, 0, 1.3, 0);
-    mesh(hips, PG.dode, M.skin, 0.5, 0.35, 0.4);
+    mesh(hips, D, M.skin, 0.5, 0.35, 0.4); mesh(hips, I, M.skin, 0.3, 0.26, 0.3, 0, -0.1, 0.08, 0.4, 0.7, 0);
     const torso = joint(hips, 0, 0.3, 0);
-    mesh(torso, PG.box, M.skin, 1.1, 0.9, 0.7, 0, 0.45, 0, 0.05, 0, 0);
-    mesh(torso, PG.dode, M.skin, 0.5, 0.4, 0.4, 0.4, 0.95, -0.1);
-    mesh(torso, PG.dode, M.skin, 0.45, 0.35, 0.4, -0.45, 0.9, -0.05);
-    const glow = mesh(torso, PG.sph, M.eye, 0.12, 0.12, 0.05, 0, 0.5, 0.36);
+    mesh(torso, D, M.skin, 0.46, 0.4, 0.42, 0, 0.18, 0.02, 0.5, 1.1, 0.3);                                               // belly
+    for (const s of [-1, 1]) mesh(torso, D, M.skin, 0.37, 0.44, 0.4, s * 0.39, 0.58, 0.06, 0.2 + s * 0.2, s * 0.5, s * 0.15);   // the two stones of the breast
+    mesh(torso, D, M.skin, 0.62, 0.5, 0.36, 0, 0.56, -0.2, 0.3, 0.2, 0);                                                 // back
+    mesh(torso, I, M.skin, 0.3, 0.2, 0.28, 0, 0.92, -0.05, 0.2, 0.5, 0);                                                 // the yoke under the head
+    mesh(torso, D, M.skin, 0.5, 0.4, 0.4, 0.4, 0.95, -0.1); mesh(torso, D, M.skin, 0.45, 0.35, 0.4, -0.45, 0.9, -0.05);
+    mesh(torso, PG.sph, M.dark, 0.16, 0.3, 0.1, 0, 0.54, 0.2);                                                           // the cleft
+    const glow = mesh(torso, PG.sph, M.eye, 0.085, 0.085, 0.085, 0, 0.5, 0.27);
     const head = joint(torso, 0, 1.05, 0.12);
-    mesh(head, PG.box, M.skin, 0.38, 0.3, 0.35);
-    for (const s of [-1, 1]) mesh(head, PG.box, M.eye, 0.07, 0.03, 0.02, s * 0.1, 0.02, 0.18);
+    mesh(head, D, M.skin, 0.24, 0.2, 0.22, 0, 0, 0, 0.3, 0.6, 0); mesh(head, I, M.skin, 0.22, 0.09, 0.14, 0, 0.1, 0.12, 0.25, 0, 0);
+    mesh(head, I, M.skin, 0.15, 0.1, 0.14, 0, -0.13, 0.08, 0, 0.5, 0);
+    for (const s of [-1, 1]) mesh(head, PG.box, M.eye, 0.075, 0.022, 0.02, s * 0.09, 0.02, 0.19, 0, 0, -s * 0.2);
     const arms = [];
     for (const s of [-1, 1]) {
       const sh = joint(torso, s * 0.75, 0.75, 0);
-      mesh(sh, PG.dode, M.skin, 0.32, 0.3, 0.32);
-      mesh(sh, PG.dode, M.skin, 0.25, 0.4, 0.25, 0, -0.45, 0);
+      mesh(sh, D, M.skin, 0.32, 0.3, 0.32, 0, 0, 0, 0.3, s * 0.4, 0);
+      mesh(sh, D, M.skin, 0.25, 0.38, 0.25, 0, -0.45, 0, 0, 0.6, 0);
       const el = joint(sh, 0, -0.8, 0);
-      mesh(el, PG.dode, M.skin, 0.24, 0.38, 0.24, 0, -0.3, 0);
-      mesh(el, PG.dode, M.skin, 0.35, 0.3, 0.35, 0, -0.75, 0.05);
+      mesh(el, I, M.skin, 0.2, 0.18, 0.2);
+      mesh(el, D, M.skin, 0.24, 0.36, 0.24, 0, -0.3, 0, 0, 1.0, 0.1);
+      mesh(el, D, M.skin, 0.35, 0.3, 0.35, 0, -0.75, 0.05, 0.4, 0.3, 0);
+      for (let k = 0; k < 3; k++) mesh(el, I, M.skin, 0.12, 0.13, 0.12, (k - 1) * 0.2, -0.93, 0.2, 0.3, k, 0);            // knuckles
       arms.push({ sh, el });
     }
-    const L = [leg(hips, M, -0.32, -0.15, 0, 1.15, 0.32), leg(hips, M, 0.32, -0.15, 0, 1.15, 0.32)];
+    const gleg = (x) => {
+      const hip = joint(hips, x, -0.15, 0);
+      mesh(hip, D, M.skin, 0.27, 0.36, 0.27, 0, -0.26, 0, 0.2, x * 2, 0);
+      const kn = joint(hip, 0, -0.575, 0);
+      mesh(kn, I, M.skin, 0.2, 0.17, 0.21, 0, 0, 0.04);
+      mesh(kn, D, M.skin, 0.23, 0.3, 0.23, 0, -0.28, 0, 0, 0.8, 0.1);
+      mesh(kn, D, M.skin, 0.3, 0.15, 0.38, 0, -0.5, 0.06, 0, 0.3, 0);                                                    // foot
+      return { hip, kn };
+    };
+    const L = [gleg(-0.32), gleg(0.32)];
+    if (!(def && def.fieldFoe)) {
+      const moss = new THREE.MeshStandardMaterial({ color: 0x343f1e, roughness: 1 }); M.all.push(moss);
+      for (const [j, x, y, z, r, rx, rz] of [[torso, 0.42, 1.24, -0.12, 0.27, 0, -0.25], [torso, -0.5, 1.16, -0.04, 0.23, 0.1, 0.3], [torso, 0.05, 1.0, -0.4, 0.3, -0.6, 0], [head, -0.05, 0.17, -0.03, 0.15, -0.2, 0.1], [arms[0].sh, -0.08, 0.24, 0, 0.2, 0, 0.4]]) mesh(j, PG.sph, moss, r, r * 0.2, r * 0.85, x, y, z, rx, 0, rz);
+    }
     return {
       J: { torso, head, arms, L, glow }, h: 3.2, r: 1.0,
       hits: [{ n: head, r: 0.28, part: 'head' }, { n: torso, r: 0.7, part: 'body', o: V(0, 0.45, 0) }, { n: hips, r: 0.45, part: 'body' }, { n: arms[0].el, r: 0.3, part: 'body', o: V(0, -0.6, 0) }, { n: arms[1].el, r: 0.3, part: 'body', o: V(0, -0.6, 0) }],
@@ -479,24 +746,48 @@
         arms[1].sh.rotation.x = Math.sin(w) * 0.3 * a.mv - a.wind * (a.throwing ? 3.0 : 2.6) + a.atk * 3.2;
         torso.rotation.x = 0.1 - a.wind * 0.3 + a.atk * 0.5 - a.flinch * 0.15;
         hips.position.y = 1.3 + Math.abs(Math.sin(w)) * 0.06;
-        glow.scale.setScalar(0.12 * (1 + Math.sin(a.t * 3) * 0.15));
+        glow.scale.setScalar(0.085 * (1 + Math.sin(a.t * 3) * 0.15));
       },
     };
   };
+  // the shaman: a hooded shaman in a robe to the ground, hanging in folds - a mask of bone under the hood with horns through it, wide
+  // sleeves and thin hands, a rope at the waist with charms on it; a crooked staff with a skull bound to its head, a light in the skull.
   B.shaman = function (root, M) {
+    const FG = G.GFX && G.GFX.foeGeo, PP = G.Props.PG;
     const hips = joint(root, 0, 0.9, 0);
-    const robe = mesh(hips, PG.cone, M.skin, 0.45, 1.1, 0.4, 0, -0.35, 0);
+    const robe = mesh(hips, (FG && FG('robe')) || PG.cone, M.skin, 0.45, 1.1, 0.4, 0, -0.35, 0);
+    mesh(hips, PG.torus, M.sec, 0.2, 0.2, 0.3, 0, 0.12, 0, Math.PI / 2);                              // the rope
+    for (let i = 0; i < 3; i++) mesh(hips, PG.sph, M.tooth, 0.025, 0.04, 0.02, -0.1 + i * 0.07, 0.0 - i * 0.03, 0.2);   // charms of bone
     const torso = joint(hips, 0, 0.1, 0);
-    mesh(torso, PG.sph, M.skin, 0.28, 0.4, 0.22, 0, 0.3, 0);
+    mesh(torso, PG.sph, M.skin, 0.26, 0.36, 0.2, 0, 0.3, 0);
+    mesh(torso, PG.sph, M.skin, 0.3, 0.16, 0.2, 0, 0.56, -0.02);                                      // shoulders under the cloth
+    mesh(torso, PG.sph, M.skin, 0.2, 0.2, 0.19, 0, 0.66, -0.07);                                      // the hood's fall behind
     const head = joint(torso, 0, 0.78, 0.03);
-    mesh(head, PG.sph, M.skin, 0.2, 0.22, 0.2);
-    mesh(head, PG.box, M.sec, 0.24, 0.3, 0.06, 0, -0.02, 0.18);
-    for (const s of [-1, 1]) { mesh(head, PG.sph, M.eye, 0.03, 0.02, 0.02, s * 0.06, 0.03, 0.22); mesh(head, PG.cone, M.sec, 0.03, 0.25, 0.03, s * 0.12, 0.25, 0, -0.2, 0, s * 0.4); }
+    mesh(head, PG.sph, M.skin, 0.2, 0.22, 0.2, 0, 0.01, -0.02);                                       // the hood
+    mesh(head, PG.cone, M.skin, 0.13, 0.22, 0.13, 0, 0.2, -0.09, -0.7);                               // its peak
+    mesh(head, PG.sph, M.dark, 0.14, 0.17, 0.08, 0, -0.01, 0.13);                                     // the dark inside it
+    mesh(head, PG.sph, M.sec, 0.105, 0.14, 0.05, 0, -0.01, 0.17);                                     // the mask
+    mesh(head, PG.box, M.sec, 0.07, 0.07, 0.04, 0, -0.14, 0.165);                                     // its long chin
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.dark, 0.032, 0.026, 0.02, s * 0.045, 0.025, 0.205); mesh(head, PG.sph, M.eye, 0.014, 0.012, 0.012, s * 0.045, 0.025, 0.21);
+      mesh(head, PG.cone, M.sec, 0.03, 0.2, 0.03, s * 0.12, 0.22, 0.0, -0.2, 0, s * 0.4); mesh(head, PG.cone, M.sec, 0.018, 0.14, 0.018, s * 0.175, 0.37, -0.03, -0.5, 0, s * 0.1);
+    }
+    for (let i = 0; i < 3; i++) mesh(head, PG.box, M.dark, 0.008, 0.05, 0.01, (i - 1) * 0.03, -0.09, 0.212);   // the mask's teeth, scored
     const arms = [];
-    for (const s of [-1, 1]) { const sh = joint(torso, s * 0.3, 0.55, 0); mesh(sh, PG.cone, M.skin, 0.09, 0.55, 0.09, 0, -0.25, 0); const hand = joint(sh, 0, -0.5, 0.05); arms.push({ sh, hand }); }
+    for (const s of [-1, 1]) {
+      const sh = joint(torso, s * 0.3, 0.55, 0);
+      mesh(sh, PG.cone, M.skin, 0.11, 0.55, 0.12, 0, -0.25, 0, Math.PI);                              // a wide sleeve, open at the wrist
+      mesh(sh, PG.sph, M.skin, 0.09, 0.1, 0.1, 0, -0.02, 0);
+      const hand = joint(sh, 0, -0.5, 0.05);
+      mesh(hand, PG.sph, M.sec, 0.04, 0.05, 0.045); for (let i = 0; i < 3; i++) mesh(hand, PG.cone, M.sec, 0.01, 0.07, 0.01, (i - 1) * 0.025, -0.06, 0.02, Math.PI - 0.4);
+      arms.push({ sh, hand });
+    }
     const staff = joint(arms[1].hand, 0, 0, 0);
-    mesh(staff, PG.cyl8, M.sec, 0.025, 1.9, 0.025, 0, 0.3, 0);
-    mesh(staff, PG.sph, M.eye, 0.07, 0.07, 0.07, 0, 1.25, 0);
+    mesh(staff, PG.cyl8, M.sec, 0.025, 1.0, 0.027, 0, -0.15, 0); mesh(staff, PG.cyl8, M.sec, 0.022, 0.95, 0.025, 0.02, 0.8, 0, 0, 0, -0.045);   // crooked: two lengths, not quite in line
+    mesh(staff, PG.sph, M.sec, 0.04, 0.04, 0.04, 0.005, 0.34, 0);
+    if (PP.skullB) { mesh(staff, PP.skullB, M.tooth, 1.05, 1.05, 1.05, 0.045, 1.2, 0); mesh(staff, PP.skullD, M.dark, 1.05, 1.05, 1.05, 0.045, 1.2, 0); }
+    mesh(staff, PG.sph, M.eye, 0.035, 0.035, 0.035, 0.045, 1.31, 0.04);
+    for (const a of [0.6, 2.4, 4.4]) mesh(staff, PG.box, M.dark, 0.006, 0.16, 0.01, 0.045 + Math.cos(a) * 0.05, 1.14, Math.sin(a) * 0.05);   // cords it hangs by
     const orbs = [];
     for (let i = 0; i < 3; i++) { const o = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0x8fd0ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); o.scale.setScalar(0.25); torso.add(o); orbs.push(o); }
     return {
@@ -514,28 +805,41 @@
   };
   B.mantis = function (root, M) {
     const abd = joint(root, 0, 1.0, 0);
-    mesh(abd, PG.sph, M.skin, 0.25, 0.22, 0.6, 0, 0, -0.45, 0.3);
+    // (a ringed abdomen under folded wing-cases, a long neck of a thorax, a three-cornered head with great eyes, jaws and feelers; the
+    // raptorial arms: a stout haunch, a broad toothed blade, a hooked claw; thin legs with knees and feet)
+    for (let i = 0; i < 5; i++) mesh(abd, PG.sph, M.skin, 0.22 - i * 0.03, 0.2 - i * 0.027, 0.17, 0, -0.035 + i * 0.07, -0.12 - i * 0.2, 0.3);
+    for (const s of [-1, 1]) mesh(abd, PG.sph, M.sec, 0.12, 0.035, 0.55, s * 0.08, 0.2, -0.5, 0.3, 0, s * 0.25);     // wing-cases
+    mesh(abd, PG.cone, M.skin, 0.05, 0.16, 0.04, 0, 0.36, -1.08, -Math.PI / 2 + 0.3);
     const thorax = joint(abd, 0, 0.05, 0.05);
-    mesh(thorax, PG.box, M.skin, 0.16, 0.9, 0.16, 0, 0.45, 0.05, 0.25);
+    mesh(thorax, PG.cyl8, M.skin, 0.075, 0.9, 0.085, 0, 0.45, 0.05, 0.25);
+    mesh(thorax, PG.sph, M.skin, 0.12, 0.13, 0.12, 0, 0.82, 0.16); mesh(thorax, PG.sph, M.skin, 0.11, 0.1, 0.12, 0, 0.06, -0.03);
     const head = joint(thorax, 0, 0.98, 0.25);
-    mesh(head, PG.cone, M.skin, 0.2, 0.3, 0.12, 0, 0, 0.08, Math.PI / 2 + 0.3);
-    for (const s of [-1, 1]) mesh(head, PG.sph, M.eye, 0.08, 0.08, 0.06, s * 0.15, 0.04, 0.0);
+    mesh(head, PG.sph, M.skin, 0.15, 0.085, 0.1, 0, 0.03, 0.0);
+    mesh(head, PG.cone, M.skin, 0.1, 0.2, 0.08, 0, -0.03, 0.1, Math.PI / 2 + 0.75);
+    for (const s of [-1, 1]) {
+      mesh(head, PG.sph, M.dark, 0.075, 0.085, 0.065, s * 0.14, 0.05, 0.0); mesh(head, PG.sph, M.eye, 0.022, 0.03, 0.02, s * 0.165, 0.055, 0.045);
+      mesh(head, PG.cone, M.dark, 0.018, 0.09, 0.018, s * 0.03, -0.11, 0.2, Math.PI / 2 + 1.0, 0, s * 0.4);            // jaws
+      mesh(head, PG.cyl8, M.sec, 0.006, 0.5, 0.006, s * 0.09, 0.27, 0.1, 0.35, 0, -s * 0.3);                             // feelers
+    }
     const arms = [];
     for (const s of [-1, 1]) {
       const sh = joint(thorax, s * 0.12, 0.75, 0.2);
-      mesh(sh, PG.box, M.skin, 0.07, 0.55, 0.07, 0, -0.25, 0.05);
+      mesh(sh, PG.sph, M.skin, 0.06, 0.06, 0.06); mesh(sh, PG.sph, M.skin, 0.055, 0.28, 0.07, 0, -0.26, 0.05);
       const el = joint(sh, 0, -0.52, 0.05);
-      mesh(el, PG.box, M.sec, 0.03, 0.7, 0.1, 0, 0.32, 0.02);
-      for (let k = 0; k < 4; k++) mesh(el, PG.cone, M.tooth, 0.015, 0.06, 0.015, 0, 0.1 + k * 0.14, 0.08, Math.PI / 2);
+      mesh(el, PG.sph, M.skin, 0.05, 0.05, 0.05);
+      mesh(el, PG.sph, M.sec, 0.022, 0.36, 0.075, 0, 0.32, 0.02);
+      for (let k = 0; k < 7; k++) mesh(el, PG.cone, M.tooth, 0.012, 0.05 + (k % 2) * 0.025, 0.012, 0, 0.08 + k * 0.085, 0.085, Math.PI / 2);
+      mesh(el, PG.cone, M.dark, 0.02, 0.17, 0.02, 0, 0.72, 0.07, 0.75);                                               // the claw
       arms.push({ sh, el });
     }
     const legs = [];
     for (let i = 0; i < 2; i++) for (const s of [-1, 1]) {
       const hip = joint(abd, s * 0.12, 0, 0.1 - i * 0.35);
       const up = joint(hip, 0, 0, 0); up.rotation.z = s * -0.9;
-      mesh(up, PG.box, M.skin, 0.04, 0.7, 0.04, 0, -0.35, 0);
+      mesh(up, PG.cyl8, M.skin, 0.024, 0.7, 0.024, 0, -0.35, 0); mesh(up, PG.sph, M.skin, 0.04, 0.04, 0.04);
       const kn = joint(up, 0, -0.7, 0); kn.rotation.z = s * 1.3;
-      mesh(kn, PG.box, M.skin, 0.035, 0.75, 0.035, 0, -0.37, 0);
+      mesh(kn, PG.sph, M.skin, 0.034, 0.034, 0.034); mesh(kn, PG.cyl8, M.skin, 0.017, 0.72, 0.017, 0, -0.36, 0);
+      mesh(kn, PG.cone, M.dark, 0.016, 0.09, 0.016, 0, -0.76, 0, Math.PI);
       legs.push({ hip, ph: i * Math.PI + (s > 0 ? Math.PI / 2 : 0) });
     }
     return {
@@ -551,19 +855,30 @@
       },
     };
   };
+  // the worm: a blind borer - a head of plates over a round mouth, a lip of flesh, three rings of teeth leaning in, four hooked jaws
+  // that open with it; behind it ring after ring, each under a plate of its own, bristles along the flanks, a spike at the tail.
   B.worm = function (root, M) {
     const head = joint(root, 0, 0.8, 0);
-    mesh(head, PG.sph, M.skin, 0.55, 0.5, 0.6);
+    mesh(head, PG.sph, M.skin, 0.55, 0.5, 0.52, 0, 0, -0.05);
+    mesh(head, PG.sph, M.sec, 0.58, 0.3, 0.5, 0, 0.25, -0.1); mesh(head, PG.sph, M.sec, 0.4, 0.14, 0.3, 0, 0.36, 0.2, 0.35);                 // a carapace over the crown, its brow
     const mouth = joint(head, 0, 0, 0.45);
-    for (let i = 0; i < 10; i++) { const a0 = i / 10 * Math.PI * 2; mesh(mouth, PG.cone, M.tooth, 0.04, 0.2, 0.04, Math.cos(a0) * 0.3, Math.sin(a0) * 0.3, 0.05, Math.PI / 2 + Math.sin(a0) * 0.5, 0, -Math.cos(a0) * 0.5); }
-    mesh(mouth, PG.sph, M.dark, 0.32, 0.32, 0.1, 0, 0, 0.0);
-    for (let i = 0; i < 4; i++) mesh(head, PG.sph, M.eye, 0.04, 0.04, 0.03, Math.cos(i * 1.57 + 0.78) * 0.35, Math.sin(i * 1.57 + 0.78) * 0.35, 0.38);
+    for (let i = 0; i < 12; i++) { const a0 = i / 12 * Math.PI * 2; mesh(mouth, PG.sph, M.sec, 0.078, 0.078, 0.06, Math.cos(a0) * 0.33, Math.sin(a0) * 0.33, 0.05); }   // the lip, in lobes
+    mesh(mouth, PG.sph, M.dark, 0.31, 0.31, 0.08, 0, 0, 0.03); mesh(mouth, PG.sph, M.dark, 0.15, 0.15, 0.2, 0, 0, -0.05);
+    for (let k = 0; k < 3; k++) { const n = 14 - k * 4, rr = 0.27 - k * 0.075; for (let i = 0; i < n; i++) { const a0 = (i + k * 0.5) / n * Math.PI * 2; mesh(mouth, PG.cone, M.tooth, 0.03 - k * 0.006, 0.17 - k * 0.04, 0.03 - k * 0.006, Math.cos(a0) * rr, Math.sin(a0) * rr, 0.09 - k * 0.03, Math.PI / 2 + Math.sin(a0) * 0.5, 0, -Math.cos(a0) * 0.5); } }
+    for (let i = 0; i < 4; i++) {   // (the jaws: out from the lip, forward, and hooked back in)
+      const a0 = i * Math.PI / 2 + Math.PI / 4, j = joint(mouth, Math.cos(a0) * 0.37, Math.sin(a0) * 0.37, 0.04); j.rotation.z = a0 - Math.PI / 2;
+      mesh(j, PG.sph, M.sec, 0.07, 0.07, 0.07); mesh(j, PG.cone, M.dark, 0.06, 0.3, 0.05, 0, 0.07, 0.12, 1.0); mesh(j, PG.cone, M.tooth, 0.032, 0.2, 0.032, 0, 0.07, 0.33, 2.3);
+    }
+    for (let i = 0; i < 4; i++) mesh(head, PG.sph, M.eye, 0.025, 0.025, 0.02, Math.cos(i * 1.57) * 0.43, Math.sin(i * 1.57) * 0.4, 0.34);
     const segs = [];
     for (let i = 0; i < 9; i++) {
       const s = new THREE.Group();
       const r = 0.5 - i * 0.035;
-      mesh(s, PG.sph, M.skin, r, r * 0.95, r * 0.7);
-      mesh(s, PG.torus, M.sec, r * 0.95, r * 0.95, 0.6);
+      mesh(s, PG.sph, M.skin, r, r * 0.92, 0.4);
+      mesh(s, PG.sph, M.sec, r * 0.8, r * 0.24, 0.42, 0, r * 0.72, -0.04, -0.14);                                          // its plate
+      for (const sd of [-1, 1]) { mesh(s, PG.sph, M.dark, 0.03, 0.04, 0.03, sd * r * 0.96, r * 0.12, 0); for (const dz of [-0.1, 0.1]) mesh(s, PG.cone, M.dark, 0.018, 0.2, 0.018, sd * r * 0.98, -r * 0.3, dz, 0, 0, sd * 2.1); }
+      if (i === 8) mesh(s, PG.cone, M.sec, 0.11, 0.5, 0.11, 0, 0.02, -0.38, -Math.PI / 2);
+      s.position.set(0, 0.8 - (i + 1) * 0.06, -(i + 1) * 0.55);       // (laid out behind the head until it moves: animateWorm puts them on its trail)
       root.add(s); segs.push(s);
     }
     return {
@@ -575,17 +890,41 @@
       },
     };
   };
+  // the mimic: an oak chest bound in iron like any other in these halls (props.js) - until the lid lifts: a roof of raw flesh, fangs
+  // of all sizes above and below, a thick tongue, eyes far back in the dark, coins it has swallowed; four jointed legs folded under
+  // it. What moved moves as before.
+  let MIMG = null;
   B.mimic = function (root, M) {
+    const PP = G.Props.PG, bx = PP.cbox || PG.box;
+    if (!MIMG) MIMG = new THREE.CylinderGeometry(1, 1, 1, 18, 1, false, 0, Math.PI);      // (half a drum: turned on its side, the upper half)
+    const flesh = new THREE.MeshStandardMaterial({ color: 0x5a1418, roughness: 0.32 }), roof = new THREE.MeshStandardMaterial({ color: 0x4a1014, roughness: 0.32, side: THREE.BackSide }), gold = new THREE.MeshStandardMaterial({ color: 0x8c7036, metalness: 0.8, roughness: 0.45 });
+    const tongueM = new THREE.MeshStandardMaterial({ color: 0x6a1c24, roughness: 0.28 }); M.all.push(flesh, roof, gold, tongueM);
     const body = joint(root, 0, 0.35, 0);
-    mesh(body, PG.box, M.skin, 1.0, 0.55, 0.7, 0, 0.27, 0);
+    mesh(body, bx, M.skin, 1.1, 0.55, 0.7, 0, 0.275, 0); mesh(body, bx, M.skin, 1.16, 0.07, 0.76, 0, 0.035, 0);
+    for (const x of [-0.36, 0.36]) { mesh(body, bx, M.sec, 0.075, 0.57, 0.72, x, 0.28, 0); for (const y of [0.14, 0.42]) mesh(body, PG.sph, M.sec, 0.022, 0.022, 0.016, x, y, 0.362); }
+    mesh(body, bx, M.sec, 0.13, 0.16, 0.03, 0, 0.44, 0.355); mesh(body, PG.sph, M.dark, 0.016, 0.03, 0.01, 0, 0.42, 0.372);            // the lock plate, its keyhole
+    mesh(body, bx, flesh, 1.02, 0.04, 0.62, 0, 0.535, 0);                                                                           // the floor of the mouth
+    for (let i = 0; i < 9; i++) mesh(body, PG.cyl, gold, 0.036, 0.008, 0.036, -0.3 + (i % 5) * 0.13 + (i > 4 ? 0.06 : 0), 0.562 + (i % 2) * 0.006, -0.12 + (i > 4 ? 0.1 : 0) + (i % 3) * 0.02, (i % 3) * 0.2, 0, (i % 2) * 0.25);
     const lid = joint(body, 0, 0.55, -0.35);
-    mesh(lid, PG.box, M.skin, 1.0, 0.25, 0.7, 0, 0.12, 0.35);
-    for (let i = 0; i < 8; i++) { mesh(lid, PG.cone, M.tooth, 0.03, 0.1, 0.03, -0.42 + i * 0.12, -0.03, 0.66, Math.PI); mesh(body, PG.cone, M.tooth, 0.03, 0.1, 0.03, -0.42 + i * 0.12, 0.58, 0.31); }
-    for (const bx of [-0.35, 0.35]) mesh(body, PG.box, M.sec, 0.08, 0.57, 0.72, bx, 0.28, 0);
-    const tongue = mesh(body, PG.box, new THREE.MeshStandardMaterial({ color: 0xa02838 }), 0.2, 0.04, 0.5, 0, 0.55, 0.4);
-    for (const s of [-1, 1]) mesh(lid, PG.sph, M.eye, 0.05, 0.05, 0.03, s * 0.2, 0.2, 0.7);
+    mesh(lid, MIMG, M.skin, 0.35, 1.1, 0.35, 0, 0, 0.35, 0, 0, Math.PI / 2);
+    mesh(lid, MIMG, roof, 0.335, 1.06, 0.335, 0, 0, 0.35, 0, 0, Math.PI / 2);
+    for (const x of [-0.36, 0.36]) mesh(lid, MIMG, M.sec, 0.358, 0.075, 0.358, x, 0, 0.35, 0, 0, Math.PI / 2);
+    mesh(lid, MIMG, M.sec, 0.358, 0.07, 0.358, 0, 0, 0.35, 0, 0, Math.PI / 2);
+    for (let i = 0; i < 9; i++) { const h = 0.09 + (i * 7 % 3) * 0.04; mesh(lid, PG.cone, M.tooth, 0.028, h, 0.028, -0.44 + i * 0.11, -h / 2 + 0.012, 0.665, Math.PI); }
+    for (let i = 0; i < 8; i++) { const h = 0.07 + ((i * 5 + 1) % 3) * 0.035; mesh(body, PG.cone, M.tooth, 0.026, h, 0.026, -0.4 + i * 0.115, 0.55 + h / 2, 0.305); }
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { mesh(lid, PG.cone, M.tooth, 0.022, 0.07 + k * 0.015, 0.022, s * 0.5, -0.03, 0.22 + k * 0.16, Math.PI); mesh(body, PG.cone, M.tooth, 0.02, 0.06, 0.02, s * 0.5, 0.58, 0.02 - k * 0.15 + 0.2); }
+    const tongue = joint(body, 0, 0.565, 0.02);
+    for (let k = 0; k < 5; k++) mesh(tongue, PG.sph, tongueM, 0.115 - k * 0.014, 0.036, 0.1, Math.sin(k * 1.3) * 0.02, 0.012 + k * 0.004, 0.06 + k * 0.135);
+    for (const s of [-1, 1]) { mesh(lid, PG.sph, M.eye, 0.034, 0.028, 0.02, s * 0.15, 0.13, 0.1); mesh(lid, PG.sph, M.eye, 0.018, 0.016, 0.012, s * 0.31, 0.08, 0.17); }
+    const mleg = (x, z) => {
+      const s = Math.sign(x), hip = joint(body, x, 0.04, z);
+      mesh(hip, PG.sph, M.dark, 0.07, 0.07, 0.07); mesh(hip, PG.cyl8, M.dark, 0.036, 0.26, 0.036, s * 0.1, 0.065, 0, 0, 0, -s * 1.0);
+      const kn = joint(hip, s * 0.2, 0.13, 0);
+      mesh(kn, PG.sph, M.dark, 0.046, 0.046, 0.046); mesh(kn, PG.cyl8, M.dark, 0.024, 0.46, 0.024, s * 0.045, -0.22, 0, 0, 0, s * 0.2); mesh(kn, PG.cone, M.dark, 0.022, 0.1, 0.022, s * 0.1, -0.49, 0, Math.PI, 0, s * 0.2);
+      return { hip, kn };
+    };
     const L = [];
-    for (const [x, z] of [[-0.35, 0.25], [0.35, 0.25], [-0.35, -0.25], [0.35, -0.25]]) L.push(leg(body, M, x, 0, z, 0.38, 0.06, M.sec));
+    for (const [x, z] of [[-0.42, 0.25], [0.42, 0.25], [-0.42, -0.25], [0.42, -0.25]]) L.push(mleg(x, z));
     // coin glint
     const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: 0xffd060, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); gl.scale.setScalar(0.6); gl.position.set(0, 0.5, 0.2); body.add(gl);
     return {
@@ -606,16 +945,23 @@
     if (!M.orn) return;
     const o = m.orn, head = o.head, back = o.back;
     const z0 = o.backZ[0], z1 = o.backZ[1];
+    // (what marks a variant: grown out of the body, not stuck on it - horns in two lengths that curve, embers sunk in cracks, ice and
+    // crystal in six-sided spikes of unequal height, a ridge of spines, bones lashed to the back, thorns of the dark. The dice are
+    // thrown as often as before)
+    const GP = G.GFX && G.GFX.propGeo, crys = GP && GP('crystal') ? GP('crystal')[0].g : PG.oct3, lb = GP && GP('longbone') ? GP('longbone')[0].g : null;
     switch (def.orn) {
-      case 'horns': for (const s of [-1, 1]) { mesh(head, PG.cone, M.orn, 0.06, 0.4, 0.06, s * 0.14, 0.18, -0.05, -0.6, 0, s * 0.5); } break;
-      case 'ember': for (let i = 0; i < 6; i++) mesh(back, PG.sph, M.orn, 0.08, 0.04, 0.08, U.rand(-0.15, 0.15), o.backY, U.lerp(z0, z1, i / 5)); break;
-      case 'ice': for (let i = 0; i < 5; i++) mesh(back, PG.oct3, M.orn, 0.08, 0.28, 0.08, U.rand(-0.12, 0.12), o.backY + 0.1, U.lerp(z0, z1, i / 4), U.rand(-0.5, 0.5), 0, U.rand(-0.5, 0.5)); break;
-      case 'spikes': for (let i = 0; i < 6; i++) mesh(back, PG.cone, M.orn, 0.05, 0.24, 0.05, 0, o.backY + 0.08, U.lerp(z0, z1, i / 5), -0.5); break;
-      case 'sparks': for (let i = 0; i < 4; i++) mesh(back, PG.sph, M.orn, 0.04, 0.04, 0.04, U.rand(-0.2, 0.2), o.backY + U.rand(0, 0.1), U.lerp(z0, z1, i / 3)); break;
-      case 'wisps': for (let i = 0; i < 3; i++) mesh(back, PG.cone, M.orn, 0.08, 0.35, 0.08, U.rand(-0.15, 0.15), o.backY + 0.12, U.lerp(z0, z1, i / 2), -0.8 + U.rand(-0.3, 0.3)); break;
-      case 'bones': for (let i = 0; i < 4; i++) mesh(back, PG.box, M.orn, 0.3, 0.04, 0.08, 0, o.backY + 0.02, U.lerp(z0, z1, i / 3)); mesh(head, PG.box, M.orn, 0.2, 0.05, 0.15, 0, 0.14, 0.05); break;
-      case 'crystal': for (let i = 0; i < 6; i++) mesh(back, PG.oct3, M.orn, 0.09, 0.35, 0.09, U.rand(-0.18, 0.18), o.backY + 0.15, U.lerp(z0, z1, i / 5), U.rand(-0.6, 0.6), 0, U.rand(-0.6, 0.6)); break;
-      case 'abyss': for (let i = 0; i < 7; i++) mesh(back, PG.cone, M.orn, 0.07, 0.4, 0.07, U.rand(-0.2, 0.2), o.backY + 0.1, U.lerp(z0, z1, i / 6), -0.6 + U.rand(-0.4, 0.4), 0, U.rand(-0.4, 0.4)); for (const s of [-1, 1]) mesh(head, PG.cone, M.orn, 0.05, 0.35, 0.05, s * 0.12, 0.2, -0.05, -0.7, 0, s * 0.6); break;
+      case 'horns': for (const s of [-1, 1]) { mesh(head, PG.cone, M.orn, 0.06, 0.28, 0.06, s * 0.14, 0.15, -0.045, -0.4, 0, -s * 0.7); mesh(head, PG.cone, M.orn, 0.036, 0.26, 0.036, s * 0.215, 0.31, -0.105, -0.55, 0, -s * 0.12); } break;
+      case 'ember': for (let i = 0; i < 6; i++) { const x = U.rand(-0.15, 0.15), z = U.lerp(z0, z1, i / 5); mesh(back, PG.sph, M.dark, 0.11, 0.03, 0.09, x, o.backY - 0.004, z, 0, i, 0); mesh(back, PG.sph, M.orn, 0.07, 0.03, 0.045, x, o.backY, z, 0, i, 0); } break;
+      case 'ice': for (let i = 0; i < 5; i++) { const x = U.rand(-0.12, 0.12), rx = U.rand(-0.5, 0.5), rz = U.rand(-0.5, 0.5), z = U.lerp(z0, z1, i / 4), h = 0.2 + (i % 3) * 0.09; mesh(back, crys, M.orn, 0.055, h * 0.55, 0.055, x, o.backY + h * 0.3, z, rx, i, rz); mesh(back, crys, M.orn, 0.035, h * 0.3, 0.035, x + 0.06, o.backY + h * 0.12, z + 0.04, rx + 0.5, i * 2, rz - 0.4); } break;
+      case 'spikes': for (let i = 0; i < 6; i++) { const z = U.lerp(z0, z1, i / 5), h = 0.2 + Math.sin(i * 0.9 + 0.6) * 0.09; mesh(back, PG.cone, M.orn, 0.045, h, 0.06, 0, o.backY + h * 0.4, z, -0.5); for (const s of [-1, 1]) mesh(back, PG.cone, M.orn, 0.028, h * 0.6, 0.035, s * 0.09, o.backY + h * 0.2, z + 0.03, -0.5, 0, -s * 0.5); } break;
+      case 'sparks': for (let i = 0; i < 4; i++) { const x = U.rand(-0.2, 0.2), y = o.backY + U.rand(0, 0.1), z = U.lerp(z0, z1, i / 3); mesh(back, PG.sph, M.dark, 0.05, 0.03, 0.05, x, y - 0.01, z); mesh(back, PG.sph, M.orn, 0.03, 0.03, 0.03, x, y + 0.012, z); } break;
+      case 'wisps': for (let i = 0; i < 3; i++) { const x = U.rand(-0.15, 0.15), z = U.lerp(z0, z1, i / 2), rx = -0.8 + U.rand(-0.3, 0.3); mesh(back, PG.cone, M.orn, 0.07, 0.34, 0.05, x, o.backY + 0.12, z, rx); mesh(back, PG.cone, M.orn, 0.035, 0.2, 0.03, x + 0.07, o.backY + 0.08, z - 0.03, rx - 0.3, 0, -0.5); } break;
+      case 'bones':
+        for (let i = 0; i < 4; i++) { const z = U.lerp(z0, z1, i / 3); if (lb) mesh(back, lb, M.orn, 0.02, 0.36 - (i % 2) * 0.05, 0.02, 0, o.backY + 0.06, z, 0, 0.12 * (i % 2 ? 1 : -1), Math.PI / 2); else mesh(back, PG.box, M.orn, 0.3, 0.04, 0.08, 0, o.backY + 0.02, z); }
+        if (lb) { mesh(back, PG.box, M.dark, 0.02, 0.012, Math.abs(z1 - z0) + 0.12, 0.07, o.backY + 0.085, (z0 + z1) / 2); mesh(back, PG.box, M.dark, 0.02, 0.012, Math.abs(z1 - z0) + 0.12, -0.07, o.backY + 0.085, (z0 + z1) / 2); }   // (the cords they are lashed with)
+        mesh(head, PG.sph, M.orn, 0.08, 0.02, 0.07, 0, 0.125, 0.045, 0.2); for (const s of [-1, 1]) mesh(head, PG.cone, M.orn, 0.02, 0.09, 0.02, s * 0.07, 0.2, 0.0, -0.3, 0, -s * 0.3); break;
+      case 'crystal': for (let i = 0; i < 6; i++) { const h = 0.24 + (i * 7 % 4) * 0.07; mesh(back, crys, M.orn, 0.06, h * 0.55, 0.06, U.rand(-0.18, 0.18), o.backY + h * 0.35, U.lerp(z0, z1, i / 5), U.rand(-0.6, 0.6), i, U.rand(-0.6, 0.6)); } break;
+      case 'abyss': for (let i = 0; i < 7; i++) { const h = 0.22 + (i % 3) * 0.08; mesh(back, PG.cone, M.orn, 0.045, h, 0.032, U.rand(-0.2, 0.2), o.backY + h * 0.3, U.lerp(z0, z1, i / 6), -0.6 + U.rand(-0.4, 0.4), 0, U.rand(-0.4, 0.4)); } for (const s of [-1, 1]) { mesh(head, PG.cone, M.orn, 0.05, 0.22, 0.05, s * 0.12, 0.16, -0.04, -0.5, 0, -s * 0.8); mesh(head, PG.cone, M.orn, 0.035, 0.26, 0.035, s * 0.215, 0.34, -0.11, -0.6, 0, -s * 0.1); } break;
     }
   }
 
@@ -624,7 +970,10 @@
     const M = mkMats(def, opts);
     const root = new THREE.Group();
     const inner = new THREE.Group(); root.add(inner);
-    const m = B[def.plan](inner, M, opts);
+    const m = B[def.plan](inner, M, opts, def);
+    // (the blocks hung on each joint melted into one surface: gfx.js. Only with the full look on: it costs a moment at a body's first making)
+    // (the kind named: a second body of it takes the first one's melting as it was found, gfx.js recipes)
+    if (G.GFX && G.GFX.fuse && G.Post && G.Post.active) { try { G.GFX.fuse(inner, m, M, def.plan, { recipe: (def.id || def.plan) + (opts.ally ? '|ally' : '') }); } catch (e) { /* the body stays as it was built */ } }
     addOrnaments(m, def, M);
     const s = def.size * (opts.scale || 1);
     inner.scale.setScalar(s);
@@ -640,6 +989,43 @@
 
   // ---------------- enemy entity ----------------
   const TINT = new THREE.Color(), FLASH = new THREE.Color(), AURA_C = new THREE.Color(), MUTC = new THREE.Color();
+  // the mark a marked foe bears: two strokes of red paint crossed, ragged, run a little (one material for all, kept)
+  let _daubM = null;
+  const daubMat = () => {
+    if (_daubM) return _daubM;
+    const T = G.Tex, fb = T.pn.fb;
+    const tex = T.pixTex(64, (u, v, o) => {
+      const x = u * 2 - 1, y = v * 2 - 1, n = fb(u * 6, v * 6, 81, 3), n2 = fb(u * 14, v * 3, 83, 2);
+      const d1 = Math.abs(x - y) / 1.414, d2 = Math.abs(x + y) / 1.414, w = 0.11 + 0.06 * (n - 0.5);
+      const along = Math.max(Math.abs(x + y), Math.abs(x - y)) / 1.414;
+      let a = Math.max(1 - Math.min(1, d1 / w), 1 - Math.min(1, d2 / w)) * (along < 0.75 + 0.15 * n ? 1 : 0) * (0.75 + 0.5 * n2);
+      if (y > 0.1 && Math.abs(x - 0.18 * Math.sin(u * 9)) < 0.03 && y < 0.55 + 0.3 * n) a = Math.max(a, 0.7); // (a run down from it)
+      o[0] = 0.55; o[1] = 0.05; o[2] = 0.03; o[3] = Math.min(1, Math.max(0, a * 1.4 - 0.1));
+    });
+    return (_daubM = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  };
+  E.daubMat = () => daubMat();
+  // the materials a foe is given beside its body, made in one place: the foe's own (below) and the warm-up's samples (E.warmSamples)
+  // are then the same, and so need the same shaders
+  const eliteRingMat = () => new THREE.MeshBasicMaterial({ color: G.fx.tone ? G.fx.tone(0xc89a40).multiplyScalar(0.55) : 0x8a6a2a, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }); // (a dull band of old gold, not a lit hoop)
+  const hullMat = (col) => new THREE.MeshBasicMaterial({ color: col, side: THREE.BackSide, fog: false });
+  const beamMat = (col) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false });
+  const curseRingMat = () => new THREE.MeshBasicMaterial({ color: 0x140c10, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }); // (a scorched ring on the floor, not a lit hexagon)
+  // What a foe can turn into after it is built, as samples for the warm-up (warmup.js) to keep alive for good: a foe that goes unseen
+  // (its materials all made see-through: another shader for each), the elite's band, a marked foe's outline and beam, the curse ring.
+  // A shader no living material uses any more is thrown away: without these, every unseen mantis made its own again as it came
+  // (a third of a second the first time, some 20 ms after), and the first marked target of a session made one.
+  E.warmSamples = function () {
+    const g = new THREE.Group(), seen = new Set();
+    for (const d of G.ENEMIES || []) {
+      if (!d.cloak) continue;
+      const k = d.plan + '|' + d.variant; if (seen.has(k)) continue; seen.add(k);
+      try { const m = E.buildModel(d, { scale: 1 }); for (const x of m.M.all) x.transparent = true; g.add(m.group); } catch (e) { /* made when it first comes */ }
+    }
+    const PGl = G.Props.PG;
+    for (const mat of [eliteRingMat(), hullMat(0xd04a24), beamMat(0xd04a24), curseRingMat()]) g.add(new THREE.Mesh(PGl.box, mat));
+    return g;
+  };
   const ELITE_MODS = [
     { id: 'fast', name: '俊足', icon: '💨' }, { id: 'bomb', name: '爆死', icon: '💥' },
     { id: 'vamp', name: '吸血', icon: '🩸' }, { id: 'armored', name: '装甲', icon: '🛡️' }, { id: 'rage', name: '狂暴', icon: '😡' },
@@ -697,14 +1083,13 @@
       // born with an element: the body glows with it
       if (def.auFix && G.Elem) { const c = new THREE.Color(G.Elem.BY[def.auFix].hex).multiplyScalar(0.35); for (const m of this.model.M.all) if (m.emissive) m.emissive.add(c); }
       if (this.elite) {
-        const ring = new THREE.Mesh(new THREE.RingGeometry(this.radius * 1.1, this.radius * 1.35, 32), new THREE.MeshBasicMaterial({ color: 0xffc040, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+        const ring = new THREE.Mesh(new THREE.RingGeometry(this.radius * 1.12, this.radius * 1.3, 48), eliteRingMat());
         ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; this.model.group.add(ring); this.ring = ring;
         for (const m of this.model.M.all) if (m.emissive && m !== this.model.M.eye) { m.emissive.add(new THREE.Color(0x2a1a00)); }
       }
-      if (def.aura) {
-        const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 3.5, 40), new THREE.MeshBasicMaterial({ color: 0x8a0a2a, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; this.model.group.add(ring); this.auraRing = ring;
-      }
+      // (the abyss's aura, where it hurts: a dark murk on the floor about it to its reach, its edge a dull red - vfx.js area, held while
+      // it lives: animate touches it)
+      if (def.aura && G.vfx && G.vfx.area) this.auraArea = G.vfx.area(this.pos.clone(), 3.5, 'dark', Infinity, { follow: this, col: [0x4a1010, 0x9a2a20], alpha: 0.8, lease: 0.3 });
       // spawn effect
       G.fx.ring(this.pos, this.radius * 2.2, 0x9a2a1a, 0.8);
       G.fx.smoke(this.pos.clone().setY(this.pos.y + 0.3), 10, 1.2, 0x1a1012, 1.2, 1.2);
@@ -738,6 +1123,7 @@
       if (!cleared && !this.noReward && !this.custom && !this.boss && !this.noLoot && G.Inv) G.Inv.addCorpse(this);
       if (this.mut && !cleared) G.Depth.onDeath(this);
       G.sfx.monsterDie(this.pos, this.def.sound, this.def.pitch);
+      if (this.def.plan === 'skeleton' && G.sfx.bones) G.sfx.bones(this.pos); // (its bones coming apart)
       G.fx.blood(this.centerPos(), null, this.bloodColor, 18);
       if (this.eliteMod && this.eliteMod.id === 'bomb' && !cleared) { setTimeout(() => C.explode(this.centerPos(), 4.5, this.dmg * 1.5, { enemy: true, src: 'explosion' }), 400); G.fx.telegraph(this.pos, 4.5, 0.4, 0xff6020); }
       if (this.def.plan === 'mushroom' && !cleared) { C.zone(this.pos.clone(), 3.5, 5, 'acid', this.dmg * 0.6, { enemy: true }); G.fx.smoke(this.centerPos(), 14, 1.5, 0x6a8a2a, 0.5, 1.5); }
@@ -751,6 +1137,9 @@
       }
       if (this.ring) this.ring.visible = false;
       if (this.auraRing) this.auraRing.visible = false;
+      if (this.auraArea) { this.auraArea.end(0.5); this.auraArea = null; }
+      if (this._coatK) this.coat(null); // (a frozen foe's rime cracks off as it falls; any coat goes with the body)
+      this.unpose(); if (this._daub) { G.scene.remove(this._daub); this._daub = null; }
       if (this.bar) { this.bar.el.style.display = 'none'; this.bar.used = false; this.bar = null; }
       return true;
     }
@@ -761,6 +1150,7 @@
       C.updateStatus(this, dt);
       if (!this.alive) return;
       const sdt = dt * G.game.enemyTimeScale;
+      this._fdt = sdt; // (this frame's length, for the chances its choices take: tryAttack)
       if (this.hasteT > 0) this.hasteT -= sdt;
       if (this.mut) G.Depth.tickEnemy(this, sdt);
       this.flinch = Math.max(0, this.flinch - sdt * 3);
@@ -812,7 +1202,7 @@
       // dodge when aimed at
       if ((def.dodge) && this.dodgeCd <= 0 && !this.attackState && st.stun <= 0 && this.hasLOS && distH < 30) {
         const f = P.forward(); const to = this.centerPos().sub(G.camera.position).normalize();
-        if (f.dot(to) > 0.995 && Math.random() < 0.5) {
+        if (f.dot(to) > 0.995 && Math.random() < per144(0.5, sdt)) {
           this.dodgeCd = 2.2;
           const side = V(-to.z, 0, to.x).multiplyScalar(Math.random() < 0.5 ? -1 : 1);
           if (def.blink || def.variant === 'shadow') this.blink(side, 5);
@@ -824,7 +1214,7 @@
       // face movement or target
       const faceT = this.attackState || distH < 12 || def.ai === 'ranged';
       const wantYaw = faceT && !(st.fear > 0) ? Math.atan2(toT.x, toT.z) : (mx || mz) ? Math.atan2(mx, mz) : this.yaw;
-      if (!(st.stun > 0 || st.frozen > 0) && !(this.attackState && this.attackState.lockYaw)) this.yaw += U.wrapAngle(wantYaw - this.yaw) * Math.min(1, dt * (this.big ? 4 : 8));
+      if (!(st.stun > 0 || st.frozen > 0) && !(this.attackState && this.attackState.lockYaw)) this.yaw += U.wrapAngle(wantYaw - this.yaw) * per144(Math.min(1, H144 * (this.big ? 4 : 8)), dt);
       this.physics(sdt, mx, mz, speed);
       // anti-stuck: wanted to move for a while but barely did -> sidestep / hop
       this._stT = (this._stT || 0) + dt;
@@ -942,7 +1332,7 @@
       if (['lunge', 'pounce', 'slash', 'slam', 'bounce', 'dashslash', 'charge'].includes(k) && this.barredFrom(tgt)) return; // no melee through prison bars
       switch (k) {
         case 'lunge': if (distH < 6.5 && Math.abs(dy) < 2.5) begin(0.35); break;
-        case 'pounce': if (distH < def.range && Math.abs(dy) < 3) begin(0.4); else if (distH < 18 && Math.random() < 0.02) begin(0.4, { web: true }); break;
+        case 'pounce': if (distH < def.range && Math.abs(dy) < 3) begin(0.4); else if (distH < 18 && Math.random() < per144(0.02, this._fdt || H144)) begin(0.4, { web: true }); break; // (its web: a 2% chance a frame of a 144 Hz screen, about one every 0.35 s it waits, at any rate)
         case 'slash': if (distH < atkRange + this.radius && Math.abs(dy) < 2) begin(0.45); break;
         case 'slam': if (distH < atkRange + this.radius * 0.5 && Math.abs(dy) < 2.5) begin(0.9); break;
         case 'bounce': if (distH < 6 && Math.abs(dy) < 2.5) begin(0.45); break;
@@ -1175,11 +1565,13 @@
     physics(dt, mx, mz, speed) {
       const w = G.world;
       const fly = this.flyer || (this.attackState && this.attackState.kind === 'swoop');
-      // knockback decay
-      const kd = Math.exp(-6 * dt);
+      // knockback decay: what the shove (vel, a blow, a leap, a dodge) carries it this frame is its exact path over the frame, in the
+      // share of it a 144 Hz screen gave (KB_Q); at 144 Hz that is the speed already died for the frame, as it always was
+      const kd = Math.exp(-KB_K * dt), kq = dt > 1e-6 && dt !== H144 ? (1 - kd) * KB_Q / dt : kd;
+      const kvx = this.vel.x * kq, kvz = this.vel.z * kq;
       this.vel.x *= kd; this.vel.z *= kd;
       if (this.kbT > 0) this.kbT -= dt;
-      let dx = mx * speed + this.vel.x, dz = mz * speed + this.vel.z;
+      let dx = mx * speed + kvx, dz = mz * speed + kvz;
       // separation
       for (const o of E.list) {
         if (o === this || !o.alive || o.custom) continue;
@@ -1257,15 +1649,19 @@
       // the void (chasms, the gaps between the sky islands): a walker never steps, leaps or is jostled out over an edge on its own;
       // only a blow of yours (knockback) can throw it off
       const edge = !w.trench && !(this.kbT > 0), air = !this.grounded, sx = this.pos.x, sz = this.pos.z;
+      // (each test looks at the ground where the body's front would be; a frame that moves it further than about its own radius - a long
+      // frame on a slow PC, a leap - is looked at all along the way, never only at its end: else a leap could clear a gap on paper and
+      // leave the body over it)
+      const er = Math.min(this.radius, 0.6) + 0.15;
       if (edge) {
-        const r = Math.min(this.radius, 0.6) + 0.15;
-        if (dx && !w.edgeSafe(this.pos, this.pos.x + dx * dt + Math.sign(dx) * r, this.pos.z, air)) { dx = 0; this.vel.x = 0; }
-        if (dz && !w.edgeSafe(this.pos, this.pos.x, this.pos.z + dz * dt + Math.sign(dz) * r, air)) { dz = 0; this.vel.z = 0; }
-        if (dx && dz && !w.edgeSafe(this.pos, this.pos.x + dx * dt + Math.sign(dx) * r * 0.7, this.pos.z + dz * dt + Math.sign(dz) * r * 0.7, air)) { if (Math.abs(dx) < Math.abs(dz)) dx = 0; else dz = 0; } // (round an outer corner of the edge)
+        const r = er;
+        if (dx && !this.edgeWay(w, this.pos, dx * dt, 0, Math.sign(dx) * r, 0, er, air)) { dx = 0; this.vel.x = 0; }
+        if (dz && !this.edgeWay(w, this.pos, 0, dz * dt, 0, Math.sign(dz) * r, er, air)) { dz = 0; this.vel.z = 0; }
+        if (dx && dz && !this.edgeWay(w, this.pos, dx * dt, dz * dt, Math.sign(dx) * r * 0.7, Math.sign(dz) * r * 0.7, er, air)) { if (Math.abs(dx) < Math.abs(dz)) dx = 0; else dz = 0; } // (round an outer corner of the edge)
       }
       this.hitWallFlag = this.pushOut(dx * dt, dz * dt, this.pos.y + 0.6, this.pos.y + this.height);
       // (nor is it shoved out over the edge by a wall it slid along: a railing's end, a pillar by the brink)
-      if (edge && (this.pos.x !== sx || this.pos.z !== sz) && !w.edgeSafe((this._eq || (this._eq = V())).set(sx, this.pos.y, sz), this.pos.x, this.pos.z, air)) { this.pos.x = sx; this.pos.z = sz; }
+      if (edge && (this.pos.x !== sx || this.pos.z !== sz) && !this.edgeWay(w, (this._eq || (this._eq = V())).set(sx, this.pos.y, sz), this.pos.x - sx, this.pos.z - sz, 0, 0, er, air)) { this.pos.x = sx; this.pos.z = sz; }
       // nor ever on to floor you cannot walk to (a ledge a blow lifts it on to, a pit it is shoved down into, a wall's top): whatever moves
       // it (its own steps, a shove, a blow), it stops where that floor begins. Over the void a blow still throws it off (a fall).
       if ((this.pos.x !== sx || this.pos.z !== sz) && !this.boss && E.walkOk(sx, sz, this.pos.y) && !E.walkOk(this.pos.x, this.pos.z, this.pos.y)) {
@@ -1294,7 +1690,10 @@
       } else this.swimUpT = 0;
       // vertical / ground
       this.vel.y -= 22 * dt;
-      let ny = this.pos.y + this.vel.y * dt;
+      if (deepQ && deepQ.open && this.vel.y < -E.SINK_OPEN) this.vel.y = -E.SINK_OPEN; // (water with no bed, the frozen lake: a body sinks through it, it does not fall)
+      // (in the air out of the water it rises and falls as it did on a 144 Hz screen, at any rate: by the speed after this frame's gravity,
+      // and 22·dt·(dt − 1/144)/2 more - nothing at 144 Hz. A leap so goes as high and as far, and lands when it did, on any screen)
+      let ny = this.pos.y + this.vel.y * dt + (deepQ || this.grounded ? 0 : 11 * dt * (dt - H144));
       // rising (a blow, a leap): the head stops under what is over it. Without this the wall test (pushOut) found the body's centre inside
       // the slab the head had entered and threw it sideways to the slab's edge: a tall foe struck in a low room, out through its wall
       if (this.vel.y > 0 && !this.boss && !this.tramp && !deepQ) {
@@ -1327,6 +1726,13 @@
         G.sfx.bounce(this.pos, 9); G.sfx.lava(this.pos);
       }
       this.clampBounds();
+    }
+    // world.edgeSafe all along a move from p by (ex, ez), the point looked at (ox, oz) ahead of the body's centre: in pieces no longer
+    // than step (one piece - the end alone, as before - for a move shorter than that, as nearly every move of a frame at 60 Hz and up is)
+    edgeWay(w, p, ex, ez, ox, oz, step, air) {
+      const n = Math.max(1, Math.ceil(Math.hypot(ex, ez) / step - 1e-9));
+      for (let k = n; k >= 1; k--) if (!w.edgeSafe(p, p.x + ex * k / n + ox, p.z + ez * k / n + oz, air)) return false;
+      return true;
     }
     clampBounds() { const w = G.world; this.pos.z = U.clamp(this.pos.z, 0.5, w.D - 0.5); if (w.nooks) { const [lo, hi] = w.xLimits(this.pos.z, this.pos.y, 0.5); this.pos.x = U.clamp(this.pos.x, lo, hi); } else this.pos.x = U.clamp(this.pos.x, 0.5, w.W - 0.5); }
     // would this body, at (x, z) at its height, be over a roof (something whose underside is over the head room of the floor there and
@@ -1397,6 +1803,7 @@
       const fin = (v) => (Number.isFinite(v) ? v : 0);
       if (m.J && !m.worm) m.animate({ walk: fin(this.walk), mv: fin(this.mv), atk: fin(this.atk), wind: fin(this.wind), flinch: fin(this.flinch), t: this.animT, stunned, throwing: this.attackState && this.attackState.throwing });
       if (m.worm) this.animateWorm(dt);
+      this.pose(dt);
       if (this.atk > 0 && !this.attackState) this.atk = Math.max(0, this.atk - dt * 3);
       // hit flash & status tint: every condition recolours the body so it reads at a glance
       const flash = Math.max(0, 1 - (G.game.time - this.lastHitT) * 8);
@@ -1406,20 +1813,24 @@
       let aura = null, auraK = 0;
       const addT = (r, g, b, k) => { tint.r += r * k; tint.g += g * k; tint.b += b * k; };
       const want = (c, k) => { if (k > auraK) { aura = c; auraK = k; } };
-      if (this.cursed) { addT(0.16, 0.0, 0.24, 0.75 + 0.25 * Math.sin(gt * 3 + ph)); want(0x9a30ff, 0.55); }
-      if (this.mut) { MUTC.set(this.mutCol); addT(MUTC.r * 0.18, MUTC.g * 0.18, MUTC.b * 0.18, 0.7 + 0.3 * Math.sin(gt * 4 + ph)); want(this.mutCol, 0.6); }
+      // (each condition shows on the body as what it is: smouldering, sick, rimed, blackened. No halo of colour: what rises off it and
+      // runs over it is in updateAura)
+      const flick = 0.55 + 0.25 * Math.sin(gt * 9.3 + ph) + 0.2 * Math.sin(gt * 23.1 + ph * 3);
+      if (this.cursed) { addT(-0.1, -0.1, -0.09, 1); want(0x1a141a, 0.55); }
+      if (this.mut) { if (G.fx.tone) G.fx.tone(this.mutCol, MUTC); else MUTC.set(this.mutCol); addT(MUTC.r * 0.12, MUTC.g * 0.12, MUTC.b * 0.12, 0.7 + 0.3 * Math.sin(gt * 4 + ph)); want(this.mutCol, 0.6); }
       if (this.stalker) { addT(-0.2, -0.2, -0.2, 1); want(0x300008, 0.95); }
-      if (this.champion) { addT(0.22, 0.02, 0.0, 0.8); want(0xff3018, 0.6); }
+      if (this.champion) { addT(0.16, 0.035, 0.0, 0.8); want(0xff3018, 0.6); }
       if (this.tgtFx) { const k = 0.6 + 0.4 * Math.sin(gt * 6 + ph); this.tgtFx.om.color.setHex(this.tgtFx.col).multiplyScalar(0.7 + 0.6 * k); this.tgtFx.beam.material.opacity = 0.22 + 0.25 * k; }
-      if (S.burn > 0) { addT(0.55, 0.2, 0.0, pulse); want(0xff6a10, 0.9); }
-      if (S.poison > 0) { addT(0.08, 0.38, 0.0, pulse * Math.min(1, 0.4 + (S.poisonStacks || 1) * 0.12)); want(0x70e020, 0.8); }
-      if (S.frozen > 0) { addT(0.2, 0.4, 0.6, 1); want(0xa0e0ff, 1); }
-      else if (S.frost > 0) { addT(0.05, 0.16, 0.3, Math.min(1, 0.3 + (S.frostStacks || 0) * 0.15)); want(0x80c8ff, 0.7); }
-      if (S.shock > 0) { addT(0.35, 0.35, 0.15, Math.random()); want(0xfff0a0, 0.85); }
-      if (S.stun > 0 && !(S.frozen > 0)) { addT(0.2, 0.18, 0.02, 0.6); want(0xffe040, 0.7); }
-      if (S.slow > 0) addT(0.0, 0.06, 0.14, 1);
-      if (S.mark > 0) { addT(0.3, 0.06, 0.06, pulse); want(0xff4040, 0.5); }
-      if (S.fear > 0) { addT(0.12, 0.0, 0.18, pulse); want(0x8040c0, 0.6); }
+      if (S.burn > 0) { addT(0.34, 0.085, 0.0, flick); want(0xff6a10, 0.9); }
+      if (S.poison > 0) { addT(0.07, 0.085, 0.0, Math.min(1, 0.5 + (S.poisonStacks || 1) * 0.12)); want(0x70e020, 0.8); }
+      if (S.frozen > 0) { addT(0.16, 0.19, 0.22, 1); want(0xa0e0ff, 1); }
+      else if (S.frost > 0) { addT(0.05, 0.065, 0.085, Math.min(1, 0.3 + (S.frostStacks || 0) * 0.15)); want(0x80c8ff, 0.7); }
+      if (S.shock > 0) { addT(0.1, 0.14, 0.24, Math.random() < 0.15 ? 1 : 0); want(0xfff0a0, 0.85); }
+      if (S.stun > 0 && !(S.frozen > 0)) want(0xffe040, 0.7);
+      if (S.slow > 0) addT(0.0, 0.02, 0.05, 1);
+      if (S.mark > 0) { addT(0.3, 0.035, 0.02, pulse); want(0xff4040, 0.5); }
+      if (S.fear > 0) { addT(0.11, 0.115, 0.13, 0.7 + 0.3 * Math.sin(gt * 13 + ph)); want(0x8040c0, 0.6); }   // (blanched)
+      { const ck = S.frozen > 0 ? 'rime' : S.poison > 0 ? 'poison' : S.frost > 0 ? 'frost' : null; if (ck !== (this._coatK || null)) this.coat(ck); }
       for (const mat of m.M.all) {
         if (mat === m.M.eye || !mat.emissive) continue;
         if (!mat.userData.base) mat.userData.base = mat.emissive.clone();
@@ -1431,43 +1842,82 @@
       const def = this.def;
       if (def.orn === 'ember' && Math.random() < dt * 6) G.fx.flameLick(this.pos.x + U.rand(-0.3, 0.3), this.pos.y + this.height * 0.7, this.pos.z + U.rand(-0.3, 0.3), 0.6);
       if (def.orn === 'wisps' && Math.random() < dt * 8) G.fx.norm.spawn(this.pos.x, this.pos.y + this.height * 0.7, this.pos.z, U.rand(-0.3, 0.3), 0.5, U.rand(-0.3, 0.3), 1, 0.2, 0.6, 0.05, 0.02, 0.08, 0.6, -0.2, 1);
-      if (def.orn === 'sparks' && Math.random() < dt * 4) G.fx.sparks(this.centerPos(), null, 2, 0xffe080, 3);
-      if (def.orn === 'ice' && Math.random() < dt * 3) G.fx.norm.spawn(this.pos.x, this.pos.y + this.height * 0.5, this.pos.z, 0, -0.3, 0, 1, 0.15, 0.5, 0.85, 0.92, 1, 0.4, 0, 1);
+      if (def.orn === 'sparks' && Math.random() < dt * 4) G.fx.arcsOn(this.centerPos(), this.radius * 0.7, this.height * 0.6, 1);
+      if (def.orn === 'ice' && Math.random() < dt * 3) G.fx.norm.spawn(this.pos.x, this.pos.y + this.height * 0.5, this.pos.z, 0, -0.3, 0, 1, 0.15, 0.5, 0.78, 0.82, 0.86, 0.36, 0.05, 1);
       if (this.auraRing) this.auraRing.rotation.z += dt;
+      if (this.auraArea) this.auraArea.touch();
       if (this.ring) this.ring.rotation.z -= dt * 2;
     }
-    // soft additive glow around the body (status / curse aura) + small tell-tale particles
+    // what shows about a body in each condition, read from six metres without the bar's marks (col / k, the strongest condition's
+    // colour, are no longer drawn as a halo: each condition is the thing it is, in its shape, its movement and how much of it there is).
+    // Burning: flames on it (combat.js). Poisoned: a murk in blotches on it (coat), drips and a murk at its feet (combat.js). Shocked:
+    // arcs running over it (combat.js). Frozen: rimed over (coat). Chilled: frost settling on what faces up (coat), cold air pouring off it.
     updateAura(dt, col, k) {
-      const m = this.model;
-      if (!this.auraSpr) {
-        if (!col) return;
-        this.auraSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
-        m.group.add(this.auraSpr);
+      const S = this.st, gt = G.game.time, p = this.pos, h = this.height, r = this.radius, R = Math.random;
+      if (this.auraSpr) this.auraSpr.visible = false;
+      if (this.cloaked) return;
+      const rx = () => (R() - 0.5) * r * 1.3, ry = () => p.y + h * (0.25 + R() * 0.65);
+      if (S.frozen > 0 && R() < dt * 9) G.fx.norm.spawn(p.x + rx(), ry(), p.z + rx(), 0, -0.25, 0, 1.4, 0.2, 0.8, 0.8, 0.84, 0.88, 0.34, 0.15, 1.5);
+      if (S.frozen > 0 && R() < dt * 4) G.fx.add.spawn(p.x + rx(), ry(), p.z + rx(), 0, 0, 0, 0.22, 0.05, 0.02, 0.75, 0.8, 0.86, 0.9, 0, 0);
+      else if (S.frost > 0 && R() < dt * (6 + (S.frostStacks || 0) * 2)) G.fx.norm.spawn(p.x + rx() * 0.7, p.y + h * (0.55 + R() * 0.4), p.z + rx() * 0.7, 0, -0.35, 0, 1.3, 0.15, 0.75, 0.8, 0.84, 0.88, 0.36, 0.2, 1.2);
+      // stunned: no stars. Dust shaken off it hangs and drifts round its head; at its feet, a ring of dust where it sagged
+      if (S.stun > 0 && !(S.frozen > 0)) {
+        if (R() < dt * 20) { const a = gt * 2.2 + R() * 6.283, rr = Math.max(0.3, r * 0.75); G.fx.norm.spawn(p.x + Math.cos(a) * rr, p.y + h * (0.88 + R() * 0.18), p.z + Math.sin(a) * rr, -Math.sin(a) * 0.7, -0.05, Math.cos(a) * 0.7, 1.1, 0.16, 0.42, 0.52, 0.49, 0.44, 0.42, 0.05, 0.6); }
+        if (R() < dt * 12) { const a = R() * 6.283, rr = r * (0.9 + R() * 0.4); G.fx.norm.spawn(p.x + Math.cos(a) * rr, p.y + 0.08, p.z + Math.sin(a) * rr, Math.cos(a) * 0.5, 0.15, Math.sin(a) * 0.5, 1.2, 0.25, 0.7, 0.5, 0.47, 0.42, 0.4, 0.1, 1.5); }
       }
-      const sp = this.auraSpr, gt = G.game.time;
-      const target = col ? 0.32 + 0.3 * k : 0;
-      sp.material.opacity = U.damp(sp.material.opacity, target * (0.85 + 0.15 * Math.sin(gt * 6 + (this.phase || 0))), 8, dt);
-      if (col) sp.material.color.lerp(AURA_C.set(col), Math.min(1, dt * 8));
-      const h = this.height, r = this.radius;
-      sp.position.set(0, h * 0.5, 0);
-      sp.scale.set(Math.max(r * 3.4, h * 0.9), h * 1.5, 1);
-      sp.visible = sp.material.opacity > 0.01 && !this.cloaked;
-      // stun stars & curse wisps
-      const S = this.st;
-      if (S.stun > 0 && !(S.frozen > 0) && Math.random() < dt * 14) {
-        const a = gt * 6 + Math.random() * 6.28, rr = Math.max(0.35, this.radius * 0.7);
-        G.fx.add.spawn(this.pos.x + Math.cos(a) * rr, this.pos.y + this.height + 0.25, this.pos.z + Math.sin(a) * rr, -Math.sin(a) * 1.5, 0.2, Math.cos(a) * 1.5, 0.35, 0.08, 0.02, 1, 0.9, 0.3, 1, 0, 0);
-      }
-      if (this.cursed && Math.random() < dt * 7) G.fx.norm.spawn(this.pos.x + U.rand(-this.radius, this.radius), this.pos.y + U.rand(0, this.height * 0.6), this.pos.z + U.rand(-this.radius, this.radius), 0, U.rand(0.8, 1.6), 0, 1.0, 0.18, 0.5, 0.35, 0.05, 0.55, 0.85, -0.2, 1);
-      if (this.champion && Math.random() < dt * 6) G.fx.add.spawn(this.pos.x + U.rand(-this.radius, this.radius), this.pos.y + U.rand(0, this.height), this.pos.z + U.rand(-this.radius, this.radius), 0, U.rand(1, 2), 0, 0.6, 0.08, 0.02, 1, 0.3, 0.1, 0.9, 0, 0);
-      if (S.frost > 0 && !(S.frozen > 0) && Math.random() < dt * 4) G.fx.norm.spawn(this.pos.x + U.rand(-0.3, 0.3), this.pos.y + this.height * U.rand(0.3, 0.9), this.pos.z + U.rand(-0.3, 0.3), 0, -0.2, 0, 1, 0.1, 0.4, 0.8, 0.92, 1, 0.6, 0, 1);
+      // cursed: black smoke pouring up off it; a champion: embers going up off it
+      if (this.cursed && R() < dt * 16) G.fx.norm.spawn(p.x + rx(), p.y + R() * h * 0.8, p.z + rx(), 0, 0.7 + R() * 0.7, 0, 1.3, 0.35, 1.15, 0.13, 0.12, 0.125, 0.8, -0.2, 1); // (grey-black: black alone is lost against a dark ground)
+      if (this.champion && R() < dt * 6) G.fx.add.spawn(p.x + rx(), p.y + R() * h, p.z + rx(), 0, 1 + R(), 0, 0.6, 0.05, 0.02, 1.0, 0.4, 0.1, 0.9, -0.2, 0.3);
+      // marked: a cross daubed in red on its chest (always the side toward the eye: it is painted on it, front and back)
+      if (S.mark > 0) {
+        if (!this._daub) { this._daub = new THREE.Sprite(daubMat()); this._daub.renderOrder = 6; G.scene.add(this._daub); }
+        const c = this.centerPos(), cam = G.camera.position, dx = cam.x - c.x, dz = cam.z - c.z, l = Math.hypot(dx, dz) || 1, sz = Math.max(0.3, Math.min(0.7, r * 0.75));
+        this._daub.position.set(c.x + dx / l * r * 0.75, p.y + h * 0.66, c.z + dz / l * r * 0.75); this._daub.scale.set(sz, sz, 1); this._daub.visible = true;
+      } else if (this._daub) this._daub.visible = false;
+      // marked: blood running down it; afraid: it is pale, and its breath comes fast in grey puffs
+      if (S.mark > 0 && R() < dt * 9) G.fx.drops.spawn(p.x + rx() * 0.5, p.y + h * (0.45 + R() * 0.4), p.z + rx() * 0.5, 0, -0.3, 0, 0.6, 0.028, 0.34, 0.02, 0.015, 9.8, 0.3, 0.06);
+      if (S.fear > 0 && R() < dt * 12) { const f = this.yaw || 0; G.fx.norm.spawn(p.x + Math.sin(f) * r * 0.6, p.y + h * 0.88, p.z + Math.cos(f) * r * 0.6, Math.sin(f) * 1.2 + (R() - 0.5) * 0.4, 0.2, Math.cos(f) * 1.2 + (R() - 0.5) * 0.4, 0.9, 0.18, 0.75, 0.74, 0.76, 0.78, 0.6, -0.15, 2); }
       if (this.cursedRing) { this.cursedRing.rotation.z -= dt * 0.8; this.cursedRing.material.opacity = 0.35 + 0.15 * Math.sin(gt * 3 + (this.phase || 0)); }
+    }
+    // how it stands, seen: stunned, the body sags forward and sways in a slow circle; afraid, it shrinks back from you, low, and
+    // trembles. Laid over its own pose by adding to its inner frame and taking the same back (whatever else turns that frame keeps
+    // its own); the hit spots ride on the body as they always do. Nothing of how it moves, aims or strikes changes.
+    pose(dt) {
+      const I = this.model && this.model.inner; if (!I || this.model.worm) return;
+      const S = this.st, gt = G.game.time, ph = this.phase || 0;
+      const free = this.state !== 'revive' && this.state !== 'spawn' && !this.dyingVisual;
+      const ws = free && S.stun > 0 && !(S.frozen > 0) ? 1 : 0, wf = free && S.fear > 0 && !(S.frozen > 0) ? 1 : 0;
+      this._sk = (this._sk || 0) + (ws - (this._sk || 0)) * Math.min(1, dt * 5); this._fk = (this._fk || 0) + (wf - (this._fk || 0)) * Math.min(1, dt * 6);
+      const sk = this._sk, fk = this._fk, h = this.height || 1.6;
+      const rx = sk * (0.2 + 0.06 * Math.sin(gt * 2.2 + ph)) - fk * 0.14;
+      const rz = sk * 0.08 * Math.cos(gt * 2.2 + ph) + fk * 0.03 * Math.sin(gt * 47 + ph * 3);
+      const px = fk * 0.014 * Math.sin(gt * 53 + ph), pz = -fk * 0.12, py = -fk * 0.07 * h;
+      const o = this._po || (this._po = [0, 0, 0, 0, 0]);
+      I.rotation.x += rx - o[0]; I.rotation.z += rz - o[1]; I.position.x += px - o[2]; I.position.z += pz - o[3]; I.position.y += py - o[4];
+      o[0] = rx; o[1] = rz; o[2] = px; o[3] = pz; o[4] = py;
+    }
+    // (the pose laid over it, taken back: when it falls)
+    unpose() { const I = this.model && this.model.inner, o = this._po; if (!I || !o) return; I.rotation.x -= o[0]; I.rotation.z -= o[1]; I.position.x -= o[2]; I.position.z -= o[3]; I.position.y -= o[4]; this._po = null; this._sk = this._fk = 0; }
+    // a coat over every part of it while a condition holds: 'rime' (frozen: a pale, rough, half-clear skin of ice), 'frost' (chilled:
+    // frost on what faces up), 'poison' (a sick murk in blotches). A thing over its surface, a little proud of it; when the rime goes
+    // it cracks off in chips
+    coat(kind) {
+      const m = this.model, was = this._coatK;
+      for (const hm of this._coat || []) if (hm.parent) hm.parent.remove(hm);
+      if (was === 'rime' && (this._coat || []).length) G.fx.iceBurst(this.centerPos(), 10, 2.5);
+      this._coat = null; this._coatK = kind || null;
+      const V = G.vfx, mat = !kind || !V ? null : kind === 'rime' ? V.rimeMat : V.coatMat && V.coatMat[kind];
+      if (!mat) return;
+      const list = [];
+      m.group.traverse((o) => { if (!o.isMesh || !o.geometry || o.userData.tgtHull || o.userData.rime || (o.material && (o.material.transparent || o.material.blending === THREE.AdditiveBlending))) return; list.push(o); });
+      const sc = kind === 'rime' ? 1.045 : 1.03;
+      this._coat = list.map((o) => { const hm = new THREE.Mesh(o.geometry, mat); hm.userData.rime = true; hm.raycast = () => {}; hm.scale.setScalar(sc); hm.castShadow = false; o.add(hm); return hm; });
     }
     // hunt targets / champions: a bright silhouette outline, a sky beam seen through walls, a big nameplate (see updateBars)
     markTarget(champ) {
       if (this.tgtFx) return;
-      const col = champ ? 0xff3a1a : 0xffc830;
-      const om = new THREE.MeshBasicMaterial({ color: col, side: THREE.BackSide, fog: false });
+      const col = champ ? 0xd04a24 : 0xd8a840;   // (an ember red, an old gold: still plain at a distance, not a neon)
+      const om = hullMat(col);
       const hulls = [];
       this.model.group.traverse((o) => {
         if (!o.isMesh || o.userData.tgtHull || !o.geometry || (o.material && (o.material.transparent || o.material.blending === THREE.AdditiveBlending))) return;
@@ -1478,7 +1928,7 @@
         h.scale.setScalar(1.12); h.castShadow = false; h.renderOrder = -1; o.add(h);
       }
       const top = this.height * (this.model.scale || 1) + 0.6;
-      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false }));
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 40, 10, 1, true), beamMat(col));
       beam.position.y = top + 20; beam.renderOrder = 6; beam.raycast = () => {}; this.model.group.add(beam);
       this.tgtFx = { om, beam, col };
     }
@@ -1499,7 +1949,7 @@
     makeCurseRing(col) {
       if (this.cursedRing) return;
       const r = this.radius;
-      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.2, r * 1.65, 6), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.2, r * 1.65, 48), curseRingMat()); // (col no longer drawn)
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; this.model.group.add(ring); this.cursedRing = ring;
     }
     animateWorm(dt) {
@@ -1520,6 +1970,8 @@
         wp.y -= (i + 1) * 0.06 * m.scale;
         const lp = wp.applyMatrix4(inv);
         m.J.segs[i].position.copy(lp);
+        const pv = i ? m.J.segs[i - 1].position : m.J.head.position, dx = pv.x - lp.x, dz = pv.z - lp.z;
+        if (dx * dx + dz * dz > 0.0004) m.J.segs[i].rotation.y = Math.atan2(dx, dz);
       }
       m.animate({ atk: this.atk, wind: 0, t: G.game.time });
     }
@@ -1569,6 +2021,8 @@
     remove() {
       this.removed = true;
       G.scene.remove(this.model.group);
+      if (this._daub) { G.scene.remove(this._daub); this._daub = null; } // (the daub is the scene's, not the body's: it goes with it)
+      if (this.auraArea) { this.auraArea.end(0.2); this.auraArea = null; }
       for (const m of this.model.M.all) m.dispose();
       if (this.bar) { this.bar.el.style.display = 'none'; this.bar.used = false; this.bar = null; }
       if (this.tele) G.fx.endTelegraph(this.tele);
@@ -1700,6 +2154,7 @@
   // better place after a dive that could not reach you; how soon it tries again when it broke one off
   E.SWIM_RISE = 1.4; E.SWIM_KEEP = 0.5; // m/s: a foe rising up the deep water to climb out onto a ledge; s it keeps rising after it stops pressing
   E.SWIM_GIVEUP = 1.5; E.SWIM_SINK = 3; // s afloat at the surface, still not out, before it lets go and sinks; s it then stays down
+  E.SINK_OPEN = 5; // m/s: the fastest a foe sinks in water with no bed under it (the frozen lake)
   // ---- the air a flyer may be in, worked out once for each area's ground plan: over the floor you can walk to from where you came in (or
   // from where you stand), and a little beyond it: 2 m over a wall, a pillar or the rock beside it, 6 m out over the void beside it. A
   // flyer never moves out of it (physics, fly): not into the rock round a mine's tunnels, not over the wall round a field, not out over the

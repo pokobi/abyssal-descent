@@ -12,10 +12,13 @@ const PORT = +process.env.COOP_PORT || 9801;
     const q = '&local=1&lat=30&jit=10', room = 'T' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(300);
     const a = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=GuestA${q}`);
+    await a.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await a.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     const b = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=GuestB${q}`);
+    await b.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await b.until('window.G && G.Coop && G.Coop.id === 2', 90000);
     await sleep(800);
     check(await a.eval('G.Coop.players.size') === 3 && await a.eval('G.Coop.players.get(2).name') === 'GuestB', 'the first guest knows the second');
@@ -26,6 +29,7 @@ const PORT = +process.env.COOP_PORT || 9801;
     for (const p of [h, a, b]) await p.eval(off);
     await h.eval('G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1');
     for (const p of [a, b]) { await p.until('G.game.run && G.Coop.fpOk !== undefined', 60000); await p.eval('G.game.dev = { god: true, speed: 1 }; 1'); }
+    for (const pg of [h, a, b]) await pg.running();
     check(await a.eval('G.Coop.fpOk') && await b.eval('G.Coop.fpOk'), 'all three built the same world');
     await sleep(2500);
     await a.eval('G.player.pos.x += 2; 1');

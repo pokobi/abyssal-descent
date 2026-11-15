@@ -170,7 +170,9 @@
       const fixed = side === 'N' ? z0 : side === 'S' ? z1 - T : side === 'W' ? x0 : x1 - T;
       for (let s = a0; s < a1 - 0.01; s += 1) {
         const e = Math.min(a1, s + 1), m = (s + e) / 2, hh = top * (0.6 + 0.4 * Math.abs(Math.sin(m * 1.7 + x0)));
-        const B = (y0, y1) => { if (y1 - y0 < 0.05) return; if (horiz) w.solid('wall', s, y0, fixed, e, y1, fixed + T, { uv: 2.5 }); else w.solid('wall', fixed, y0, s, fixed + T, y1, e, { uv: 2.5 }); };
+        // (each piece of the wall up to its broken top; on the top, what is left of its last course, now and then a stone fallen at its foot: LG.ruinTop)
+        const B = (y0, y1) => { if (y1 - y0 < 0.05) return; if (horiz) w.solid('wall', s, y0, fixed, e, y1, fixed + T, { uv: 2.5 }); else w.solid('wall', fixed, y0, s, fixed + T, y1, e, { uv: 2.5 });
+          if (y1 > 2 && LG.ruinTop) { const ay = w._atY || 0, tg = LG._tag; LG._tag = 'ruins'; try { LG.ruinTop(w, horiz ? (a, yy, d) => [a, yy, fixed + d] : (a, yy, d) => [fixed + d, yy, a], s, e, y1 + ay, 0, T, ay); } finally { LG._tag = tg; } } };
         if (doors[side] && Math.abs(m - mid) < 1.1) { if (hh > 3.2) B(3.0, hh); continue; }
         if (Math.abs(m - mid) > 1.6 && Math.round(m) % 3 === 0 && hh > h2 + 1.6) { B(0, h2 + 0.6); B(h2 + 1.8, hh); continue; } // upper window
         B(0, hh);
@@ -202,8 +204,9 @@
   // a broken column lying on its side (along x or z)
   function fallenColumn(w, rng, x, z, alongX) {
     const L = rng.range(3.5, 5.5), r = 0.45;
-    if (alongX) { w.batch.geo('trim', PG().cyl8, Mx(x, r, z, r, L, r, 0, 0, Math.PI / 2)); w.addCollider(x - L / 2, 0, z - r, x + L / 2, r * 2, z + r, { surf: 'stone' }); }
-    else { w.batch.geo('trim', PG().cyl8, Mx(x, r, z, r, L, r, Math.PI / 2, 0, 0)); w.addCollider(x - r, 0, z - L / 2, x + r, r * 2, z + L / 2, { surf: 'stone' }); }
+    // (drawn as its drums lying in a line where it fell, LG.fallenDrums; its box as it was)
+    if (alongX) { if (LG.fallenDrums) LG.fallenDrums(w, x, z, true, L, r); else w.batch.geo('trim', PG().cyl8, Mx(x, r, z, r, L, r, 0, 0, Math.PI / 2)); w.addCollider(x - L / 2, 0, z - r, x + L / 2, r * 2, z + r, { surf: 'stone' }); }
+    else { if (LG.fallenDrums) LG.fallenDrums(w, x, z, false, L, r); else w.batch.geo('trim', PG().cyl8, Mx(x, r, z, r, L, r, Math.PI / 2, 0, 0)); w.addCollider(x - r, 0, z - L / 2, x + r, r * 2, z + L / 2, { surf: 'stone' }); }
     P().rubble(w, x + (alongX ? L / 2 + 0.6 : 0), 0, z + (alongX ? 0 : L / 2 + 0.6), rng, 0.8);
   }
   // a triumphal arch across a way along z (piers either side, a walkway on top that burns: see fireTops)
@@ -216,15 +219,80 @@
     for (const sx of [-1, 1]) P().statue(w, x + sx * (span / 2 + pw / 2), z + d / 2 + 0.6, 0, 0, rng, 0.75);
   }
 
-  // far beyond the city walls: the broken towers of the rest of the city against the sunset (visual only)
+  // far beyond the city walls: the rest of the city against the sunset (visual only). Towers that taper a little as they rise, some
+  // still roofed - a parapet of merlons on corbels and a steep slated spire - the rest broken off, their tops ragged and one corner
+  // fallen deeper; at the foot of some a long hall under a gabled roof; all of it rising out of the dark under the bridge into the
+  // haze, shaded by the far country's own light (levelgen.js farMat: the windows dark in the walls, the air before it all).
+  // The same throws of the dice as the boxes and cones took, so that everything thrown after them falls as before.
   function skyline(w, rng, W, D) {
     w.deferred.push((grp) => {
-      const m = new THREE.MeshStandardMaterial({ color: 0x3a2a2a, emissive: 0x1a0c08, roughness: 1, flatShading: true, fog: false });
+      const P = [], N = [], C = [], Uv = [], I = [];
+      const hsh = (a, b, k) => { const n = Math.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453; return n - Math.floor(n); };
+      const STONE = new THREE.Color('#77655a'), ROOF = new THREE.Color('#3c3232'), DARK = new THREE.Color('#2a2224');
+      // a quad a b c d (counter-clockwise seen from outside); col its colour, uv its facade coordinates [u0, v0, u1, v1] or none
+      const quad = (a, b, c, d, col, uv) => {
+        const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+        let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; const l = Math.hypot(...n) || 1; n = n.map((v) => v / l);
+        const o = P.length / 3, pts = [a, b, c, d], us = uv ? [[uv[0], uv[1]], [uv[2], uv[1]], [uv[2], uv[3]], [uv[0], uv[3]]] : null;
+        pts.forEach((p, i) => { P.push(p[0], p[1], p[2]); N.push(n[0], n[1], n[2]); const k = 0.55 + 0.45 * Math.min(1, Math.max(0, (p[1] + 30) / 40)); C.push(col.r * k, col.g * k, col.b * k); if (us) Uv.push(us[i][0], us[i][1]); else Uv.push(-1, -1); });
+        I.push(o, o + 1, o + 2, o, o + 2, o + 3);
+      };
+      const tri = (a, b, c, col) => { const o = P.length / 3, e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]; let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; const l = Math.hypot(...n) || 1; for (const p of [a, b, c]) { P.push(...p); N.push(n[0] / l, n[1] / l, n[2] / l); C.push(col.r, col.g, col.b); Uv.push(-1, -1); } I.push(o, o + 1, o + 2); };
+      // a box ring of 4 walls round a footprint (half sizes hx, hz at the bottom, narrowing by taper to the top), turned by ry about x, z
+      const box = (x, z, hx, hz, ry, y0, y1, col, taper, tops, uvOn) => {
+        const c = Math.cos(ry), s = Math.sin(ry), at = (u, v, y, k) => { const px = u * (1 - k), pz = v * (1 - k); return [x + px * c - pz * s, y, z + px * s + pz * c]; };
+        const cr = [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]], tp = taper || 0;
+        let u0 = 0;
+        for (let e = 0; e < 4; e++) {
+          const A = cr[e], B = cr[(e + 1) % 4], len = Math.hypot(B[0] - A[0], B[1] - A[1]), segs = tops ? Math.max(2, Math.round(len / 2.2)) : 1;
+          for (let j = 0; j < segs; j++) {
+            const t0 = j / segs, t1 = (j + 1) / segs, ya = tops ? tops(e, j, segs) : y1;
+            const kb = 0, kt = tp * (ya - y0) / Math.max(1, y1 - y0);
+            const pa = [A[0] + (B[0] - A[0]) * t0, A[1] + (B[1] - A[1]) * t0], pb = [A[0] + (B[0] - A[0]) * t1, A[1] + (B[1] - A[1]) * t1];
+            // (counter-clockwise from outside: the corners go round the other way, so the quad runs b, a at the bottom)
+            quad(at(pb[0], pb[1], y0, kb), at(pa[0], pa[1], y0, kb), at(pa[0], pa[1], ya, kt), at(pb[0], pb[1], ya, kt), col, uvOn ? [u0 + len * t1, y0, u0 + len * t0, ya] : null);
+          }
+          u0 += len;
+        }
+        return at;
+      };
       for (let i = 0; i < 34; i++) {
-        const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.9, 150), h = rng.range(12, 46), s = rng.range(5, 12);
-        const t = new THREE.Mesh(PG().box, m); t.scale.set(s, h, s * rng.range(0.6, 1.4)); t.position.set(W / 2 + Math.cos(a) * r, h / 2 - 2, D / 2 + Math.sin(a) * r); t.rotation.y = rng.range(0, 3); grp.add(t);
-        if (rng.chance(0.4)) { const c = new THREE.Mesh(PG().cone, m); c.scale.set(s * 0.6, s, s * 0.6); c.position.set(t.position.x, h - 2 + s / 2, t.position.z); grp.add(c); }
+        const a = rng.range(0, Math.PI * 2), r = rng.range(Math.max(W, D) * 0.9, 150), h = rng.range(12, 46), s = rng.range(5, 12), k = rng.range(0.6, 1.4), ry = rng.range(0, 3), roofed = rng.chance(0.4);
+        const x = W / 2 + Math.cos(a) * r, z = D / 2 + Math.sin(a) * r, y0 = -72, y1 = h - 2, hx = s / 2, hz = s * k / 2, q = hsh(x, z, 1), col = STONE.clone().multiplyScalar(0.82 + 0.3 * hsh(x, z, 2));
+        if (roofed) {
+          box(x, z, hx, hz, ry, y0, y1, col, 0.06, null, true);
+          // (the parapet on corbels, a little out from the wall; its merlons; a steep slated spire inside it)
+          const ox = hx * 0.94 + 0.45, oz = hz * 0.94 + 0.45, py = y1 + 1.3;
+          box(x, z, ox, oz, ry, y1 - 0.2, py, col, 0, null, false);
+          const c = Math.cos(ry), sn = Math.sin(ry), rot = (u, v, y) => [x + u * c - v * sn, y, z + u * sn + v * c];
+          quad(rot(-ox, -oz, y1 - 0.2), rot(ox, -oz, y1 - 0.2), rot(hx * 0.94, -hz * 0.94, y1 - 1.1), rot(-hx * 0.94, -hz * 0.94, y1 - 1.1), DARK, null);
+          quad(rot(ox, oz, y1 - 0.2), rot(-ox, oz, y1 - 0.2), rot(-hx * 0.94, hz * 0.94, y1 - 1.1), rot(hx * 0.94, hz * 0.94, y1 - 1.1), DARK, null);
+          for (const [u, v, len, alongX] of [[0, -oz, ox * 2, true], [0, oz, ox * 2, true], [-ox, 0, oz * 2, false], [ox, 0, oz * 2, false]]) {
+            const n = Math.max(2, Math.floor(len / 1.7));
+            for (let m = 0; m < n; m++) { const t = -len / 2 + (m + 0.5) * len / n, mx = alongX ? t : u, mz = alongX ? v : t; const p = rot(mx, mz, 0); box(p[0], p[2], alongX ? 0.42 : 0.28, alongX ? 0.28 : 0.42, ry, py, py + 1.1, col, 0, null, false); }
+          }
+          const rh = Math.max(hx, hz) * (1.5 + 0.8 * q), ix = ox - 0.35, iz = oz - 0.35, apex = rot(0, 0, py + rh), e = py - 0.3;
+          const RC = ROOF.clone().multiplyScalar(0.85 + 0.3 * hsh(x, z, 3));
+          tri(rot(ix, -iz, e), rot(-ix, -iz, e), apex, RC); tri(rot(ix, iz, e), rot(ix, -iz, e), apex, RC); tri(rot(-ix, iz, e), rot(ix, iz, e), apex, RC); tri(rot(-ix, -iz, e), rot(-ix, iz, e), apex, RC);
+        } else {
+          // (broken off: the top ragged, a run of it fallen deeper at one corner)
+          const deep = Math.floor(q * 4);
+          box(x, z, hx, hz, ry, y0, y1, col, 0.05, (e, j, n) => y1 - 1.2 * hsh(x + e, z + j, 4) * 3 - (e === deep && j >= n / 2 ? 3 + 7 * hsh(x, z, 5) * (j + 1) / n : 0) - (e === (deep + 1) % 4 && j < n / 2 ? 2 + 5 * hsh(x, z, 6) * (n / 2 - j) / n : 0), true);
+        }
+        // (a long hall at its foot under a gabled roof, on one side of it)
+        if (hsh(x, z, 7) < 0.45) {
+          const c = Math.cos(ry), sn = Math.sin(ry), side = hsh(x, z, 8) < 0.5 ? 1 : -1, L = s * (1.4 + hsh(x, z, 9)), wd = s * 0.42, eave = Math.min(y1 - 4, 4 + 6 * hsh(x, z, 10)), ridge = eave + wd * 0.9;
+          const cx = x + (hx + L / 2) * side * c, cz = z + (hx + L / 2) * side * sn;
+          box(cx, cz, L / 2, wd, ry, y0, eave, col.clone().multiplyScalar(0.92), 0, null, true);
+          const rot = (u, v, y) => [cx + u * c - v * sn, y, cz + u * sn + v * c], RC = ROOF.clone().multiplyScalar(0.9);
+          quad(rot(L / 2 + 0.3, -wd - 0.4, eave - 0.3), rot(-L / 2 - 0.3, -wd - 0.4, eave - 0.3), rot(-L / 2 - 0.3, 0, ridge), rot(L / 2 + 0.3, 0, ridge), RC, null);
+          quad(rot(-L / 2 - 0.3, wd + 0.4, eave - 0.3), rot(L / 2 + 0.3, wd + 0.4, eave - 0.3), rot(L / 2 + 0.3, 0, ridge), rot(-L / 2 - 0.3, 0, ridge), RC, null);
+          tri(rot(L / 2, wd, eave), rot(L / 2, -wd, eave), rot(L / 2, 0, ridge), col); tri(rot(-L / 2, -wd, eave), rot(-L / 2, wd, eave), rot(-L / 2, 0, ridge), col);
+        }
       }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(Uv, 2)); g.setIndex(I);
+      const m = new THREE.Mesh(g, LG.farMat(w, 1)); m.onBeforeRender = LG.farSync; m.frustumCulled = false; grp.add(m);
     });
   }
 
@@ -239,7 +307,7 @@
       if (sx < 0 && Math.abs(z - nz) < 4) continue;
       P().pillarRound(w, cx + sx * (hw + 1.2), z, 0, rng.chance(0.2) ? rng.range(2, 4) : 7, 0.45, false, rng);
     }
-    for (let z = gz1 + 8; z < D - 6; z += 15) for (const sx of [-1, 1]) { if (sx < 0 && Math.abs(z - nz) < 6) continue; w.solid('block', cx + sx * (side - 1.4) - 1, 0, z - 1, cx + sx * (side - 1.4) + 1, 1, z + 1, { uv: 1 }); P().statue(w, cx + sx * (side - 1.4), z, 1, sx < 0 ? Math.PI / 2 : -Math.PI / 2, rng, 0.9); }
+    for (let z = gz1 + 8; z < D - 6; z += 15) for (const sx of [-1, 1]) { if (sx < 0 && Math.abs(z - nz) < 6) continue; w.solid('block', cx + sx * (side - 1.4) - 1, 0, z - 1, cx + sx * (side - 1.4) + 1, 1, z + 1, { uv: 1 }); if (LG.pedestal) LG.pedestal(w, cx + sx * (side - 1.4), z, 1, 0, 1, { cap: false }); P().statue(w, cx + sx * (side - 1.4), z, 1, sx < 0 ? Math.PI / 2 : -Math.PI / 2, rng, 0.9); }
     for (let z = gz1 + 12; z < D - 6; z += 18) for (const sx of [-1, 1]) P().brazier(w, cx + sx * (hw - 0.8), 0, z, 0.9, true);
     // the great arch over the gate
     const gate = 3.2;
@@ -248,20 +316,71 @@
     w.solid('block', cx - gate - 2.4, 6.4, gz0 - 0.5, cx + gate + 2.4, 9.5, gz1 + 0.5, { uv: 3 });
     w.solid('trim', cx - gate - 2.7, 9.5, gz0 - 0.8, cx + gate + 2.7, 10.0, gz1 + 0.8, { uv: 2, noGrapple: true });
     w.addCollider(cx - gate - 2.7, 10, gz0 - 0.8, cx + gate + 2.7, 13, gz1 + 0.8, { noGrapple: true });
+    // (its opening drawn with a round head: an arch of wedge stones through the gate's depth, the corners over its haunches filled up to the
+    // lintel's boxes - they stand in the opening's box, which still lets you through there; LG.archDraw)
+    if (LG.archDraw) LG.archDraw(w, (u, y, d) => [cx + u, y, gz0 - 0.58 + d], gate, 3.8, 2.6, gz1 - gz0 + 1.16, 6.4, { fill: 'block', out: gate, gy: 0 });
     for (const sx of [-1, 1]) w.addLight(cx + sx * (gate + 1.2), 6, gz1 + 1.5, { flame: 0.3, intensity: 7, range: 11, color: '#ffa050', prio: 1.2 });
     w.bossGate = { x: cx, z0: gz0, z1: gz1, w: gate * 2 };
     w.deferred.push((grp) => { const pc = H.portcullis(w, gate * 2 - 0.2, 6.2); pc.position.set(cx, 5.8, gz1 - 0.2); grp.add(pc); w.bossGate.pc = pc; });
     skyline(w, rng, W, D);
     return { nz, side: -1, nx: cx - hw - 2.4 };
   }
+  // the parapets along the bridge's deck (par[x]: the z of each 1.8 m stretch that stands, 0.45 thick, 1 m high, the boxes the field laid):
+  // the narrow slots between neighbours filled (one wall, as it was built), a coping of long stones along the top, weathered to a low
+  // ridge and standing out over both faces; where a stretch has fallen the coping ends broken and its stones lie on the deck below it
+  function parapetDress(w, par, ZN, ZS) {
+    const M = LG.mason(w), lo = M.lo, hs = (a, b, k) => { const n = Math.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453; return n - Math.floor(n); };
+    for (const k in par) {
+      const ex = +k, zs = par[k].slice().sort((a, b) => a - b);
+      // (the runs of stretches standing side by side)
+      const runs = []; for (const z of zs) { const r = runs[runs.length - 1]; if (r && z - r[1] < 2.01) r[1] = z; else runs.push([z, z]); }
+      for (const [r0, r1] of runs) {
+        const z0 = r0, z1 = r1 + 1.8;
+        for (let z = r0; z < r1; z += 2) w.visual('wall', ex, 0, z + 1.8, ex + 0.45, 1.0, z + 2, { uv: 1.5 });
+        // the coping: a broken end where the run stops short of the bridge's end
+        const brA = z0 > ZN + 0.5, brB = z1 < ZS - 0.5;
+        let z = z0;
+        while (z < z1 - 0.05) {
+          const e = Math.min(z1, z + 1.1 + 0.6 * hs(ex, z, 1)), first = z === z0, last = e >= z1 - 0.01, v = M.var(ex, 1, z), t = 0.88;
+          const ra = first && brA ? 0.25 + 0.3 * hs(ex, z, 2) : 0, rb = last && brB ? 0.25 + 0.3 * hs(ex, z, 3) : 0;
+          const P = [[ex - 0.07, 0.98, z + ra * 0.3], [ex - 0.07, 0.98, e - rb * 0.3], [ex + 0.08, 1.16, z + ra], [ex + 0.08, 1.16, e - rb], [ex + 0.52, 0.98, z + ra * 0.3], [ex + 0.52, 0.98, e - rb * 0.3], [ex + 0.37, 1.16, z + ra], [ex + 0.37, 1.16, e - rb]];
+          // (bit 0 along z, bit 1 up, bit 2 across x: the hexahedron's corners in that order)
+          M.hexa('trim', P, 0.02, { gy: 0, top: 1.2, tint: [v[0] * t, v[1] * t, v[2] * t], n: 0.008, chip: first || last ? 0.5 : 0.18, chipS: 0.07, uv: 1.4 });
+          z = e;
+        }
+        // (the coping of the fallen stretch beyond a broken end: a stone or two lying on the deck by the foot of the parapet)
+        if (!lo) for (const [zz, sg] of [[z0, -1], [z1, 1]]) {
+          if ((sg < 0 && !brA) || (sg > 0 && !brB) || hs(ex, zz, 4) < 0.3) continue;
+          const side = ex < w.W / 2 ? 1 : -1, cx = ex + 0.225 + side * (0.55 + 0.4 * hs(ex, zz, 5)), cz = zz + sg * (0.5 + 0.6 * hs(ex, zz, 6)), v = M.var(cx, 0, cz);
+          if (!w.query(cx - 0.3, -0.3, cz - 0.6, cx + 0.3, -0.02, cz + 0.6).some((c) => c.y1 > -0.05 && c.y1 < 0.05 && c.x0 <= cx - 0.3 && c.x1 >= cx + 0.3 && c.z0 <= cz - 0.6 && c.z1 >= cz + 0.6)) continue;   // (only on the deck: not over a hole where it fell in)
+          M.blk('trim', cx, -0.02, cz, 0.2, 0.17, 0.5, (hs(ex, zz, 7) - 0.5) * 1.4, 0.02, { gy: 0, top: 0.2, tint: [v[0] * 0.8, v[1] * 0.8, v[2] * 0.8], n: 0.01, chip: 0.6, chipS: 0.06, uv: 1.4, foot: true }, [(hs(ex, zz, 8) - 0.5) * 0.3, (hs(ex, zz, 9) - 0.5) * 0.3]);
+        }
+      }
+    }
+  }
+  // the face of a cliff the field lays as a box of rock (a0..a1 along x at z = zf, its face looking along nz, h high over the deck): lumps
+  // of broken rock sunk into it here and there, and along its top, so that its edges are not a box's (drawn only, by the place)
+  function cliffFace(w, a0, a1, zf, nz, h) {
+    const T = G.Terrain; if (!T || !T.boulder) return;
+    const R = new G.RNG((Math.round(a0 * 13 + a1 * 7 + zf * 3) >>> 0) + 991);   // (dice of its own: the area's are not touched)
+    for (let a = a0 + 0.8; a < a1 - 0.6; a += R.range(2.2, 3.6)) {
+      // (sunk into the face: a lump reaches 0.95 of its size either way, so its middle stands that far back, less the 0.3 m it may stand out)
+      const s = R.range(1.2, 2.2), y = R.range(-0.6, h * 0.55), sz = s * R.range(0.8, 1.1);
+      T.boulder(w, a, y, zf - nz * (sz * 0.95 - 0.3), s * R.range(0.9, 1.3), s * R.range(0.8, 1.2), sz, R, { collide: false });
+      const s2 = R.range(1.4, 2.4);
+      T.boulder(w, a + R.range(-0.8, 0.8), h - s2 * 0.75, zf - nz * R.range(0.4, 1.4), s2 * R.range(1, 1.4), s2 * R.range(0.7, 1.0), s2 * R.range(1, 1.4), R, { collide: false });
+    }
+  }
   // (the fallen city's area itself: field_dusk.js, the city on the great bridge; it builds with these pieces)
-  F._dusk = { ruinBlock, fallenColumn, arch, skyline };
+  F._dusk = { ruinBlock, fallenColumn, arch, skyline, parapetDress, cliffFace };
   F.SHELL.dusk = {
     outdoor: true, wallH: 4.5, road: roadDusk,
     ring(w, rng, W, AD, last) {
       // a broken balustrade with column stumps round the field (low: the sunset stays in view)
       const gaps = last ? [] : LG.gateXs(W, 3).map((g) => [g - 2.6, g + 2.6]);
-      const bal = (x0, z0, x1, z1) => { w.solid('block', x0, 0, z0, x1, 1.2, z1, { uv: 1 }); w.visual('trim', x0 - 0.05, 1.2, z0 - 0.05, x1 + 0.05, 1.32, z1 + 0.05, { uv: 1 }); };
+      // (drawn as a balustrade with a baluster gone here and there, LG.balustrade; its old coping's box kept for what reads the drawn boxes)
+      const bal = (x0, z0, x1, z1) => { if (!LG.balustrade) { w.solid('block', x0, 0, z0, x1, 1.2, z1, { uv: 1 }); w.visual('trim', x0 - 0.05, 1.2, z0 - 0.05, x1 + 0.05, 1.32, z1 + 0.05, { uv: 1 }); return; }
+        LG.hard(w, 'block', x0, 0, z0, x1, 1.2, z1); LG.balustrade(w, x0, z0, x1, z1, 1.2, { toward: [W / 2, AD / 2], broken: true }); if (w.visBoxes) w.visBoxes.push([x0 - 0.05, 1.2, z0 - 0.05, x1 + 0.05, 1.32, z1 + 0.05]); };
       let x = 0.2; for (const [a, b] of gaps) { if (a > x) bal(x, 0.2, a, 0.7); x = b; } if (x < W - 0.2) bal(x, 0.2, W - 0.2, 0.7);
       bal(0.2, 0.7, 0.7, AD); bal(W - 0.7, 0.7, W - 0.2, AD);
       for (let z = 8; z < AD - 4; z += 12) for (const px of [1.5, W - 1.5]) P().pillarRound(w, px, z, 0, rng.range(2.5, 6), 0.45, true, rng);

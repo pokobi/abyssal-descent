@@ -119,16 +119,17 @@
     G.ui.coinPop(a, reason);
     G.sfx.coins(Math.min(5, Math.ceil(a / 20)));
   };
-  let coinGeo = null, coinMat = null, orbMat = null;
+  let coinGeo = null, coinMat = null, orbMat = null, coreMat = null;
   C.spawnPickup = function (kind, pos, value) {
     if (!coinGeo) {
-      coinGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.025, 12); coinGeo.rotateX(Math.PI / 2);
-      coinMat = new THREE.MeshStandardMaterial({ color: 0xe8b84a, metalness: 1, roughness: 0.28, emissive: 0x3a2400 });
-      orbMat = new THREE.MeshBasicMaterial({ color: 0xff5a4a });
+      const cg = G.GFX && G.GFX.wareGeo ? G.GFX.wareGeo('coin') : null;   // (a struck coin of old gold: a rim, a cross, a ring. gfx.js)
+      if (cg) coinGeo = cg[0].g; else { coinGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.025, 12); coinGeo.rotateX(Math.PI / 2); }
+      coinMat = new THREE.MeshStandardMaterial({ color: 0xb8923a, metalness: 1, roughness: 0.36, emissive: 0x2a1a00 });
+      orbMat = new THREE.MeshBasicMaterial({ color: 0xb02a20, transparent: true, opacity: 0.72 }); coreMat = new THREE.MeshBasicMaterial({ color: 0xffd0b0 });   // (a bead of red glass, a light at its heart)
     }
     let m;
     if (kind === 'coin') m = new THREE.Mesh(coinGeo, coinMat);
-    else { m = new THREE.Mesh(G.Props.PG.sph, orbMat); m.scale.setScalar(0.16); }
+    else { m = new THREE.Mesh(G.Props.PG.sph, orbMat); m.scale.setScalar(0.15); const c = new THREE.Mesh(G.Props.PG.sph, coreMat); c.scale.setScalar(0.42); m.add(c); }
     m.position.copy(pos);
     G.scene.add(m);
     const a = Math.random() * 6.28;
@@ -249,7 +250,7 @@
         e.shield -= sd; shieldDealt = sd;
         dmg = P.has('o_shieldpierce') ? dmg * 0.25 : 0;
         if (src !== 'dot' && !info.silent) {
-          if (!e._bubT || G.game.time - e._bubT > 0.08) { e._bubT = G.game.time; G.fx.bubble(e.centerPos(), e.radius * G.enemies.shieldK, 0xbfe2ff, e.centerRef); }
+          if (!e._bubT || G.game.time - e._bubT > 0.08) { e._bubT = G.game.time; G.fx.bubble(e.centerPos(), e.radius * G.enemies.shieldK, 0xbfe2ff, e.centerRef, pos); }
           if (src === 'bullet') { G.fx.sparks(pos, null, 7, 0xcfe8ff, 6); G.sfx.hitShield(pos); }
         }
       }
@@ -382,7 +383,7 @@
         s.frostStacks = (s.frostStacks || 0) + stacks; s.frost = 4;
         // freezing follows the same rule: bosses only get slowed, and a thawed foe can't be refrozen right away
         if (s.frostStacks >= 5 && (e.boss || G.game.time < (e.freezeImmuneUntil || 0))) { s.frostStacks = 4; break; }
-        if (s.frostStacks >= 5) { s.frozen = 2.0; e.freezeImmuneUntil = G.game.time + 2.0 + 4; s.frostStacks = 0; G.sfx.ice(e.pos); G.fx.sparks(e.centerPos(), null, 14, 0xd0f0ff, 5); }
+        if (s.frostStacks >= 5) { s.frozen = 2.0; e.freezeImmuneUntil = G.game.time + 2.0 + 4; s.frostStacks = 0; G.sfx.ice(e.pos); G.fx.iceBurst(e.centerPos(), 12, 3.5); }
         if (G.Elem) G.Elem.fromStatus(e, 'ice'); // (chilling leaves ice on the foe)
         break;
       case 'poison': {
@@ -391,7 +392,7 @@
         s.poisonStacks = Math.min(max, (s.poisonStacks || 0) + stacks); s.poison = 5;
         if (P.has('x_toxburst') && s.poisonStacks >= 5) {
           s.poisonStacks = 0;
-          G.fx.smoke(e.centerPos(), 10, 1.5, 0x6a9a2a, 0.5, 1.2);
+          G.fx.gas(e.centerPos(), 10, 1.5);
           for (const o of C.inRadius(e.pos, 4)) { C.damageEnemy(o, C.scale(30), { src: 'buff', proc: true, silent: o !== e }); if (o !== e) C.status(o, 'poison', 2); }
         }
         break;
@@ -405,7 +406,7 @@
           if (P.has('h_overcurrent')) { const t = C.nearest(e.pos, 8, e); if (t) { G.fx.lightning(e.centerPos(), t.centerPos()); C.status(t, 'shock', 1); } }
           s._shockLock = false;
         }
-        G.fx.sparks(e.centerPos(), null, 5, 0xfff0a0, 4);
+        G.fx.arcsOn(e.centerPos(), e.radius * 0.8, e.height * 0.7, 3); G.fx.sparks(e.centerPos(), null, 2, 0xffd8a8, 3);
         if (G.Elem) G.Elem.fromStatus(e, 'volt'); // (shock leaves volt on the foe)
         break;
       case 'slow': s.slow = 4; break;
@@ -413,25 +414,42 @@
       case 'root': s.root = stacks; break;
     }
   };
+  // The gap a 144 Hz screen gave a wait of iv that was started afresh each time (the screen the game's feel was set on): whole 1/144 s
+  // frames until it was spent - iv made up to a whole number of them, and where it was a whole number already, often one more (the
+  // floating point leaves a crumb: 0.5 s was 73 frames, 0.507 s). The ticks below keep those gaps at every frame rate.
+  const H144 = 1 / 144, w144 = new Map();
+  function wait144(iv) {
+    let r = w144.get(iv); if (r !== undefined) return r;
+    let t = iv, n = 0; while (t > 0 && n < 100000) { t -= H144; n++; }
+    r = n * H144; if (w144.size > 512) w144.clear(); w144.set(iv, r); return r;
+  }
+  const TICK144 = wait144(0.5);
   C.updateStatus = function (e, dt) {
     const s = e.st;
     if (G.Elem) G.Elem.tick(e, dt);
     for (const k of ['stun', 'fear', 'root', 'slow', 'wade', 'mark', 'frozen', 'shock', 'vuln']) if (s[k] > 0) s[k] -= dt;
     if (s.frost > 0) { s.frost -= dt; if (s.frost <= 0) s.frostStacks = 0; }
     if (s.nailT > 0) { s.nailT -= dt; if (s.nailT <= 0) s.nails = 0; }
-    s.tick = (s.tick || 0) - dt;
-    if (s.tick <= 0) {
-      s.tick = 0.5;
-      if (s.burn > 0) {
+    // the burning / poison ticks, every "0.5 s" on the foe's own clock: the 73 frames a 144 Hz screen counted for it (TICK144). The time
+    // past a tick is carried to the next (no frame rate stretches the gap: a 30 Hz screen gave 0.53 s, a 60 Hz one 0.52 s). A tick counts
+    // if the status still covered the moment it fell due (at: how far into this frame that was; a status covers the frame it was put on
+    // from that frame's start to its end, the end included): never a 9th on the frame a burn's time runs out on, as at 120 Hz.
+    // (A foe's first tick falls at the end of its first frame.)
+    if (s.tick === undefined) s.tick = dt;
+    s.tick -= dt;
+    if (s.tick <= 1e-9) {
+      const at = dt + s.tick;
+      s.tick = Math.max(s.tick, -TICK144) + TICK144;
+      if (s.burn > 0 && s.burn - at > -1e-7) {
         C.damageEnemy(e, s.burnDps * 0.5, { src: 'dot', elem: 'fire' });
         G.fx.flameLick(e.pos.x, e.pos.y + e.height * 0.5, e.pos.z, 1.2);
         if (P.has('x_spread') && Math.random() < 0.35) { const t = C.nearest(e.pos, 4, e); if (t && !(t.st.burn > 0)) C.status(t, 'burn', 1); }
       }
-      if (s.poison > 0 && s.poisonStacks > 0) C.damageEnemy(e, (s.poisonPow || C.scale(2.4)) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
+      if (s.poison > 0 && s.poison - at > -1e-7 && s.poisonStacks > 0) C.damageEnemy(e, (s.poisonPow || C.scale(2.4)) * s.poisonStacks * 0.5 * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0)), { src: 'dot', elem: 'poison' });
     }
     if (s.burn > 0) { s.burn -= dt; if (s.burn <= 0) s.burnLv = 0; if (Math.random() < dt * 14) G.fx.flameLick(e.pos.x + U.rand(-0.3, 0.3), e.pos.y + e.height * U.rand(0.2, 0.8), e.pos.z + U.rand(-0.3, 0.3), 0.8); }
-    if (s.poison > 0) { s.poison -= dt; if (s.poison <= 0) s.poisonStacks = 0; if (Math.random() < dt * 5) G.fx.norm.spawn(e.pos.x, e.pos.y + e.height * 0.6, e.pos.z, U.rand(-0.3, 0.3), -0.5, U.rand(-0.3, 0.3), 0.8, 0.12, 0.3, 0.45, 0.7, 0.15, 0.7, 2, 0.5); }
-    if (s.shock > 0 && Math.random() < dt * 8) G.fx.sparks(e.centerPos(), null, 2, 0xfff0a0, 3);
+    if (s.poison > 0) { s.poison -= dt; if (s.poison <= 0) s.poisonStacks = 0; if (Math.random() < dt * 16) G.fx.drops.spawn(e.pos.x + U.rand(-0.3, 0.3) * e.radius, e.pos.y + e.height * U.rand(0.3, 0.8), e.pos.z + U.rand(-0.3, 0.3) * e.radius, 0, -0.2, 0, 0.6, 0.02, 0.24, 0.27, 0.07, 9.8, 0.3, 0.05); if (Math.random() < dt * 8) G.fx.norm.spawn(e.pos.x + U.rand(-0.6, 0.6) * e.radius, e.pos.y + 0.15, e.pos.z + U.rand(-0.6, 0.6) * e.radius, U.rand(-0.3, 0.3), 0.08, U.rand(-0.3, 0.3), 2.0, 0.45, 1.8, 0.34, 0.36, 0.14, 0.55, 0.04, 1.2); } // (it drips a sick fluid; a murk pools at its feet)
+    if (s.shock > 0 && Math.random() < dt * 24) G.fx.arcsOn(e.centerPos(), e.radius * 0.75, e.height * 0.75, Math.random() < 0.4 ? 2 : 1); // (arcs running over it, one after another)
     if (s.shock <= 0) s.shockLv = 0;
   };
   C.speedMul = function (e) {
@@ -451,7 +469,7 @@
     const d = (s.poisonPow || C.scale(2.4)) * s.poisonStacks * s.poison * (1 + P.stats.poisonDmg + (P.stats.dotDmg || 0));
     s.poison = 0; s.poisonStacks = 0;
     C.damageEnemy(e, d, { src: 'dot', elem: 'poison' });
-    G.fx.smoke(e.centerPos(), 10, 1.4, 0x6a9a2a, 0.5, 1.0);
+    G.fx.gas(e.centerPos(), 10, 1.4);
   };
   C.spreadStatus = function (e, r) {
     const s = e.st;
@@ -482,7 +500,7 @@
       else { G.fx.explosion(pos, r, info.color || 0xff9a40); G.sfx.explosion(pos, r / 4); }
     }
     const d = P.pos.distanceTo(pos);
-    G.player.addShake(Math.max(0, (info.small ? 0.25 : 0.7) * (1 - d / (r * 4))));
+    G.player.addShake(Math.max(0, (info.small ? 0.25 : 0.7) * (1 - d / (r * 4))), pos); // (thrown away from the blast)
     if (info.enemy) {
       // enemy explosion hurts the player
       if (d < r + 0.4 && C.blastReaches(pos)) C.damagePlayer(dmg * (1 - 0.5 * d / (r + 0.4)), { src: 'explosion', pos, attacker: info.attacker, elem: info.elem });
@@ -659,7 +677,7 @@
     G.game.areaDamage += dmg + osHit;
     G.ui.damageFlash(Math.min(1, (dmg + osHit) / 30), info.pos || (info.attacker && info.attacker.pos));
     G.sfx.hurt(dmg + osHit);
-    P.addShake(Math.min(0.6, 0.15 + (dmg + osHit) / 60));
+    P.addShake(Math.min(0.6, 0.15 + (dmg + osHit) / 60), info.pos || (info.attacker && info.attacker.pos) || null); // (knocked away from what struck)
     P.hurtKick = Math.min(1, (dmg + osHit) / 25);
     // statuses on player
     const ps = P.st;
@@ -687,7 +705,15 @@
     if (kind.startsWith('gl_')) { g = G.GrenFX.build(kind.slice(3)); g.userData.kind = kind; G.scene.add(g); return g; } // a throwable's own model
     const add = (geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => { const mm = new THREE.Mesh(geo, mat); mm.scale.set(sx, sy, sz); mm.position.set(x || 0, y || 0, z || 0); mm.rotation.set(rx || 0, ry || 0, rz || 0); g.add(mm); return mm; };
     g = new THREE.Group();
-    const glow = (c, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.setScalar(s); g.add(sp); return sp; };
+    const glow = (c, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: G.fx.tone ? G.fx.tone(c) : c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.setScalar(s); g.add(sp); return sp; };
+    // (the shots that are things - a rocket, a shell, an arrow, a nail, a harpoon, a spear, a boulder - are shaped in gfx.js shotGeo;
+    // their glows are as they were. Without those shapes, the rods and cones below)
+    const SG = G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo(kind) : null;
+    if (SG) {
+      for (const q of SG) { const mm = add(q.g, mats[q.m] || mats.iron, 1, 1, 1); mm.castShadow = true; }
+      if (kind === 'rocket') glow(0xffa050, 0.6).position.z = 0.35; else if (kind === 'spear') glow(0xffe0a0, 0.5).position.z = -1;
+      g.userData.kind = kind; G.scene.add(g); return g;
+    }
     switch (kind) {
       case 'rocket': add(PG.cyl8, mats.iron, 0.07, 0.6, 0.07, 0, 0, 0, Math.PI / 2); add(PG.cone, mats.iron, 0.07, 0.18, 0.07, 0, 0, -0.38, -Math.PI / 2); glow(0xffa050, 0.6).position.z = 0.35; break;
       case 'grenade': add(PG.sph, mats.iron, 0.09, 0.11, 0.09); add(PG.cyl8, mats.brass, 0.03, 0.05, 0.03, 0, 0.11, 0); break;
@@ -700,20 +726,20 @@
       case 'sickle': { if (!C._sickGeo) C._sickGeo = new THREE.TorusGeometry(0.42, 0.06, 4, 14, Math.PI * 1.25); const b = new THREE.Mesh(C._sickGeo, mats.iron); g.add(b); add(PG.box, mats.woodDark, 0.05, 0.42, 0.05, 0.42, -0.2, 0); glow(0xff8030, 0.5); break; } // (the scarecrow's: spun as it flies)
       case 'spear': add(PG.cyl8, mats.woodDark, 0.03, 1.8, 0.03, 0, 0, 0, Math.PI / 2); add(PG.cone, mats.iron, 0.07, 0.35, 0.07, 0, 0, -1.05, -Math.PI / 2); glow(0xffe0a0, 0.5).position.z = -1; break;
       // the magic ones: a body you can see (boiling fire, a fresnel shell, a crystal) inside the glow; the hit size is SHOT_VIS below
-      case 'icespear': { add(PG.oct3, new THREE.MeshStandardMaterial({ color: 0xd0f0ff, emissive: 0x4a90c0, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.9 }), 0.14, 0.14, 1.0); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0.05, 0.05, 0.7); glow(0xbfe8ff, 1.0); break; }
-      case 'orb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0xb060ff, 0xffd0ff, 'energy')); sh.scale.setScalar(0.32); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0xffe8ff }), 0.12, 0.12, 0.12); glow(0xc070ff, 0.8); break; }
-      case 'soul': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6ab8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.28); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0xf0f8ff }), 0.1, 0.1, 0.1); glow(0x9fd8ff, 0.6); break; }
+      case 'icespear': { add(PG.oct3, new THREE.MeshStandardMaterial({ color: 0xd4e0e8, emissive: 0x2a3e4a, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.9 }), 0.14, 0.14, 1.0); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0.05, 0.05, 0.7); glow(0xbfe8ff, 1.0); break; }
+      case 'orb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6a5e68, 0xb0a4ac, 'energy')); sh.scale.setScalar(0.32); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x9a8e96 }), 0.12, 0.12, 0.12); glow(0xc070ff, 0.5); break; }
+      case 'soul': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6ab8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.28); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x8a96a2 }), 0.1, 0.1, 0.1); glow(0x9fd8ff, 0.4); break; }
       case 'fireball': { const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.42); g.add(fb); glow(0xff8a30, 1.3); glow(0xffe0a0, 0.4); break; }
       case 'bigfire': { add(PG.dode, new THREE.MeshStandardMaterial({ color: 0x2a1a12, emissive: 0x801800, emissiveIntensity: 0.9, roughness: 0.9, flatShading: true }), 0.55, 0.55, 0.55); const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.95); g.add(fb); glow(0xff7a20, 2.6); glow(0xffe0a0, 0.9); break; }
-      case 'spit': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x6a9a20, emissive: 0x2a4a00, roughness: 0.2 }), 0.14, 0.14, 0.14); break;
-      case 'acid': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x9ac020, emissive: 0x4a6a00, roughness: 0.2 }), 0.3, 0.3, 0.3); glow(0x9ad040, 1.0); break;
+      case 'spit': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x4e5420, emissive: 0x141800, roughness: 0.2 }), 0.14, 0.14, 0.14); break;
+      case 'acid': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x5c6224, emissive: 0x1c2200, roughness: 0.2 }), 0.3, 0.3, 0.3); glow(0x9ad040, 0.8); break;
       case 'web': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.9 }), 0.16, 0.16, 0.16); break;
       case 'spore': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x8aa040, emissive: 0x1a2a00, roughness: 0.9, transparent: true, opacity: 0.8 }), 0.25, 0.25, 0.25); break;
       case 'boulder': add(PG.dode, mats.rock, 0.6, 0.55, 0.6); break;
       case 'rock': { const sp = new THREE.Group(); g.add(sp); g.userData.spin = sp; const st = new THREE.Mesh(PG.dode, mats.rock); st.scale.setScalar(0.26); sp.add(st); break; } // a tumbling stone: scale = the held one, radius = what hits
       case 'frostorb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x9ad8ff, 0xffffff, 'ice')); sh.scale.setScalar(0.38); g.add(sh); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xe8f8ff }), 0.14, 0.14, 0.14); glow(0xbfe8ff, 1.0); break; }
-      case 'waterorb': { add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x2f8dff, emissive: 0x0a3a80, roughness: 0.05, transparent: true, opacity: 0.8 }), 0.22, 0.22, 0.22); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4aa8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.26); g.add(sh); glow(0x5fb0ff, 0.9); break; }
-      case 'darkorb': { add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x0a0410 }), 0.24, 0.24, 0.24); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x8a30ff, 0xe0b0ff, 'spiral')); sh.scale.setScalar(0.34); g.add(sh); glow(0xa040ff, 1.1); break; }
+      case 'waterorb': { add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x46606c, emissive: 0x0a1a22, roughness: 0.05, transparent: true, opacity: 0.8 }), 0.22, 0.22, 0.22); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4aa8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.26); g.add(sh); glow(0x5fb0ff, 0.9); break; }
+      case 'darkorb': { add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x0a0410 }), 0.24, 0.24, 0.24); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4a3e4a, 0x9a8c96, 'spiral')); sh.scale.setScalar(0.34); g.add(sh); glow(0x6a5a6a, 0.8); break; }
       default: glow(0xffffff, 0.4);
     }
     g.userData.kind = kind;
@@ -751,32 +777,50 @@
   function trail(p, dt) {
     if (p.look) { G.GrenFX.trail(p, dt); return; }
     // a player's projectile with an element leaves a trail of its colour
-    if (p.owner === 'player' && p.info && p.info.el && G.Elem && G.Elem.BY[p.info.el] && Math.random() < 0.8) { const c = new THREE.Color(G.Elem.BY[p.info.el].hex); G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.32, 0.22, 0.02, c.r, c.g, c.b, 0.9, 0, 1); }
+    if (p.owner === 'player' && p.info && p.info.el && G.Elem && G.Elem.BY[p.info.el] && Math.random() < 0.8) { const c = G.fx.tone ? G.fx.tone(G.Elem.BY[p.info.el].hex) : new THREE.Color(G.Elem.BY[p.info.el].hex); G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.32, 0.22, 0.02, c.r, c.g, c.b, 0.9, 0, 1); }
     switch (p.kind) {
       case 'rocket': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(0, 0.5), U.rand(-0.3, 0.3), 1.2, 0.2, 1.0, 0.5, 0.48, 0.45, 0.5, -0.3, 1); G.fx.flame.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.08, 0.35, 0.1, 1.5, 0.9, 0.4, 1, 0, 0); break;
       case 'fireball': case 'bigfire': G.fx.flameLick(p.pos.x, p.pos.y - 0.1, p.pos.z, p.kind === 'bigfire' ? 2.5 : 1.0); break;
-      case 'orb': case 'darkorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.25, 0.02, 0.6, 0.3, 1.0, 0.8, 0, 1); break;
-      case 'soul': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.5, 0.8, 1.0, 0.8, 0, 1); break;
-      case 'waterorb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.4, 0.4), U.rand(-0.6, 0), U.rand(-0.4, 0.4), 0.35, 0.18, 0.02, 0.25, 0.6, 1.0, 0.8, 4, 1); break;
-      case 'frostorb': case 'icespear': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.2, 0.02, 0.7, 0.9, 1.0, 0.8, 0, 1); break;
+      case 'orb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.22, 0.02, 0.5, 0.42, 0.55, 0.8, 0, 1); break;
+      case 'darkorb': if (Math.random() < 0.85) G.fx.norm.spawn(p.pos.x + U.rand(-0.1, 0.1), p.pos.y + U.rand(-0.1, 0.1), p.pos.z + U.rand(-0.1, 0.1), U.rand(-0.25, 0.25), U.rand(-0.05, 0.3), U.rand(-0.25, 0.25), U.rand(0.7, 1.2), 0.25, U.rand(0.55, 0.9), 0.04, 0.036, 0.038, 0.6, -0.12, 1.4); if (Math.random() < 0.12) G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.4, 0.4), U.rand(0, 0.5), U.rand(-0.4, 0.4), 0.45, 0.035, 0.01, 0.65, 0.2, 0.05, 0.9, -0.2, 0.6); break; // (dark smoke behind it, an ember now and then)
+      case 'soul': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.58, 0.68, 0.78, 0.8, 0, 1); break;
+      case 'waterorb': G.fx.drops.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.6, 0.6), U.rand(-0.6, 0.4), U.rand(-0.6, 0.6), 0.4, 0.012, 0.5, 0.58, 0.62, 9.8, 0.3, 0.03); break; // (water shed as it flies: drops)
+      case 'frostorb': case 'icespear': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.4, 0.1), U.rand(-0.3, 0.3), 0.6, 0.12, 0.45, 0.78, 0.82, 0.86, 0.4, 0.2, 1); break; // (cold air trailing off it)
       case 'rock': { const sp = p.mesh.userData.spin; if (sp) { sp.rotation.x += dt * 11; sp.rotation.z += dt * 6; } if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.2, 0.2), U.rand(-0.1, 0.3), U.rand(-0.2, 0.2), 0.45, 0.06, 0.16, 0.55, 0.52, 0.47, 0.5, -0.1, 1); break; }
-      case 'acid': case 'spit': if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, -1, 0, 0.5, 0.08, 0.04, 0.5, 0.7, 0.1, 0.9, 5, 0); break;
+      case 'acid': case 'spit': if (Math.random() < 0.5) G.fx.drops.spawn(p.pos.x, p.pos.y, p.pos.z, 0, -1, 0, 0.5, 0.014, 0.26, 0.28, 0.08, 9.8, 0.2, 0.03); break;
       case 'bolt': case 'harpoon': case 'spear': case 'arrow': if (Math.random() < 0.4) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.04, 0.08, 0.7, 0.7, 0.7, 0.25, 0, 0); break;
     }
   }
-  const tmpD = V();
+  const tmpD = V(), tmpS = V();
+  // The game's feel was set on a 144 Hz screen (H144, above), and the rounds' flight is kept to what that screen gave at every rate:
+  //  - a round under gravity moved each frame by its speed after that frame's gravity. On a 144 Hz screen that is the exact arc of a
+  //    launch grav/288 m/s lower than the real one; a frame of dt now moves by that speed plus grav·dt·(dt − 1/144)/2 upward (nothing
+  //    at 144 Hz), which flies that same arc whatever dt is (a 30 Hz screen dropped them short, a 240 Hz one carried them long);
+  //  - the rounds that bounce and roll (grenades, the launcher's, the clusters) bounce on the frame they meet the floor, and roll as many
+  //    small bounces: they move in fixed steps of 1/144 s instead, so where they bounce, where they come to rest and when they blow are
+  //    those of a 144 Hz screen at any rate. (On a faster screen, a frame with no step of its own draws it between its last two.)
   function updateProjectiles(dt) {
     const pdt = dt;
     for (let i = C.projectiles.length - 1; i >= 0; i--) {
-      const p = C.projectiles[i];
+      const p = C.projectiles[i]; if (!p) continue;
       const sdt = p.owner === 'enemy' ? pdt * G.game.enemyTimeScale : pdt;
+      if (p.bounce && p.fuse !== undefined) {
+        p.acc = (p.acc || 0) + sdt;
+        let gone = false;
+        for (let n = 0; p.acc >= H144 * 0.9999 && n < 40 && !gone; n++) { p.acc -= H144; (p.prev || (p.prev = V())).copy(p.pos); gone = stepProjectile(p, H144); }
+        if (!gone && sdt < H144 * 0.9999 && p.prev && !p.stuck) p.mesh.position.lerpVectors(p.prev, p.pos, U.clamp(p.acc / H144, 0, 1));
+      } else stepProjectile(p, sdt);
+    }
+  }
+  // one step of dt for a round: true when it is gone (blown, spent, stuck as a mine)
+  function stepProjectile(p, sdt) {
       p.t += sdt; p.life -= sdt;
       if (p.stuck) {
         if (p.stuckTo && p.stuckTo.alive) p.pos.copy(p.stuckTo.centerPos()).add(p.stuckOff);
         p.mesh.position.copy(p.pos);
-        if (p.fuse !== undefined) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); remove(i); } }
-        else if (p.life <= 0) remove(i);
-        continue;
+        if (p.fuse !== undefined) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); return remove(p); } }
+        else if (p.life <= 0) return remove(p);
+        return false;
       }
       // homing
       if (p.homing) {
@@ -785,20 +829,22 @@
         const tp = p.owner === 'enemy' ? G.player.chestPos() : tgt ? tgt.centerPos() : null;
         if (tp) {
           const desired = tp.sub(p.pos).normalize().multiplyScalar(p.vel.length());
-          p.vel.lerp(desired, Math.min(1, p.homing * sdt));
+          p.vel.lerp(desired, sdt === H144 ? Math.min(1, p.homing * sdt) : 1 - Math.pow(Math.max(0, 1 - p.homing * H144), sdt / H144)); // (as far round a frame of a 144 Hz screen turned it, at any rate)
         }
       }
       p.vel.y -= p.grav * sdt;
-      const step = p.vel.length() * sdt;
+      const arc = p.grav && sdt !== H144; // (no lift to add on a 1/144 s frame: the old sums, to the last bit)
+      if (arc) { tmpS.copy(p.vel).multiplyScalar(sdt); tmpS.y += p.grav * sdt * (sdt - H144) / 2; }
+      const step = arc ? tmpS.length() : p.vel.length() * sdt;
       if (step <= 1e-6) {
         p.mesh.position.copy(p.pos);
         let fin = false;
         if (p.fuse !== undefined) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); fin = true; } }
         if (!fin && p.life <= 0) { if (p.explode) detonate(p); fin = true; }
-        if (fin) remove(i);
-        continue;
+        if (fin) return remove(p);
+        return false;
       }
-      tmpD.copy(p.vel).divideScalar(p.vel.length());
+      if (arc) tmpD.copy(tmpS).divideScalar(step); else tmpD.copy(p.vel).divideScalar(p.vel.length());
       let done = false, bounced = false;
       // world
       const wh = G.world.raycast(p.pos, tmpD, step + p.radius * 0.5);
@@ -809,7 +855,7 @@
         const e = enemyHit.e;
         p.hit.add(e);
         const hp = p.pos.clone().addScaledVector(tmpD, enemyHit.t);
-        if (p.sticky) { p.stuck = true; p.stuckTo = e; p.stuckOff = hp.clone().sub(e.centerPos()); p.pos.copy(hp); G.sfx.bounce(hp, 4); continue; }
+        if (p.sticky) { p.stuck = true; p.stuckTo = e; p.stuckOff = hp.clone().sub(e.centerPos()); p.pos.copy(hp); G.sfx.bounce(hp, 4); return false; }
         if (p.explode) { p.pos.copy(hp); detonate(p); done = true; }
         else {
           const info = Object.assign({ src: 'bullet', head: enemyHit.part === 'head', headMul: p.headMul || 2, dir: tmpD.clone(), pos: hp, part: enemyHit.part, weapon: p.weapon }, p.info || {});
@@ -834,14 +880,14 @@
           p.pos.addScaledVector(n, 0.05);
           if (Math.abs(vn) > 2) G.sfx.bounce(p.pos, Math.abs(vn));
           if (p.vel.length() < 1.2 && n.y > 0.5) { p.vel.set(0, 0, 0); p.grav = 0; p.rest = true; }
-        } else if (p.sticky) { p.stuck = true; p.pos.addScaledVector(wh.normal, 0.05); G.sfx.bounce(p.pos, 3); continue; }
-        else if (p.mine) { p.vel.set(0, 0, 0); p.grav = 0; p.armed = 0.6; p.pos.y += 0.05; C.mines.push({ pos: p.pos.clone(), mesh: p.mesh, dmg: p.dmg, r: p.explode || 4, armed: 0.6, info: p.info }); C.projectiles.splice(i, 1); continue; }
+        } else if (p.sticky) { p.stuck = true; p.pos.addScaledVector(wh.normal, 0.05); G.sfx.bounce(p.pos, 3); return false; }
+        else if (p.mine) { p.vel.set(0, 0, 0); p.grav = 0; p.armed = 0.6; p.pos.y += 0.05; C.mines.push({ pos: p.pos.clone(), mesh: p.mesh, dmg: p.dmg, r: p.explode || 4, armed: 0.6, info: p.info }); const j = C.projectiles.indexOf(p); if (j >= 0) C.projectiles.splice(j, 1); return true; }
         else {
           if (p.explode) detonate(p);
           else {
             if (!(G.Water && G.Water.shot(wh.point))) { G.fx.sparks(wh.point, wh.normal, 5, 0xffd0a0, 4); G.fx.dust(wh.point, wh.normal, 0x8a8070, 3); } // (into the water: a splash)
             if (p.onHitWorld) p.onHitWorld(wh);
-            if (p.kind === 'bolt' || p.kind === 'harpoon' || p.kind === 'spear' || p.kind === 'arrow' || p.kind === 'nail') { p.stuck = true; p.life = Math.min(p.life, 4); p.mesh.position.copy(p.pos); continue; }
+            if (p.kind === 'bolt' || p.kind === 'harpoon' || p.kind === 'spear' || p.kind === 'arrow' || p.kind === 'nail') { p.stuck = true; p.life = Math.min(p.life, 4); p.mesh.position.copy(p.pos); return false; }
           }
           done = true;
         }
@@ -858,13 +904,13 @@
       if (!done && p.fuse !== undefined && !p.stuck) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); done = true; } }
       if (!done && p.life <= 0) { if (p.explode) detonate(p); done = true; }
       if (p.pos.y < G.world.killY - 10) done = true;
-      if (done) remove(i);
-    }
-    function remove(i) { const p = C.projectiles[i]; releaseMesh(p.mesh); C.projectiles.splice(i, 1); if (p.onEnd) p.onEnd(p); }
+      if (done) return remove(p);
+      return false;
+    function remove(p) { const j = C.projectiles.indexOf(p); if (j < 0) return true; releaseMesh(p.mesh); C.projectiles.splice(j, 1); if (p.onEnd) p.onEnd(p); return true; }
   }
   function interceptors(p) {
     const pl = G.player;
-    if (pl.wardT > 0 && p.pos.distanceTo(pl.chestPos()) < 3.2) { G.fx.bubble(pl.chestPos(), 3.2, 0xd0b0ff); G.fx.sparks(p.pos, null, 8, 0xd0b0ff, 4); return true; }
+    if (pl.wardT > 0 && p.pos.distanceTo(pl.chestPos()) < 3.2) { G.fx.bubble(pl.chestPos(), 3.2, 0xd0b0ff, null, p.pos); G.fx.sparks(p.pos, null, 6, 0xffd8b0, 4); return true; }
     if (pl.has('z_orbs')) {
       for (const o of pl.orbPositions || []) if (o.distanceTo(p.pos) < 0.7) { G.fx.sparks(p.pos, null, 10, 0xd0e0ff, 5); G.sfx.hitShield(p.pos); return true; }
     }
@@ -931,13 +977,19 @@
     const pl = G.player;
     for (let i = C.zones.length - 1; i >= 0; i--) {
       const z = C.zones[i];
+      if (!z._tk) { z._tk = 1; if (z.tick <= 0) z.tick = dt; } // (its first tick falls at the end of its first frame)
       z.t += dt; z.tick -= dt;
       if (z.follow) z.pos.set(pl.pos.x, pl.pos.y, pl.pos.z);
       const p = z.pos, r = z.r;
       G.vfx.zoneTick(z, dt); // (its look: a ground area drawn exactly to r, and what rises from it: vfx.js, shared with the co-op pictures)
-      if (z.tick <= 0) {
-        z.tick = z.interval || 0.5;
-        const dmg = z.dps * z.tick;
+      // its ticks, every interval of its own time from its first frame - the gap a 144 Hz screen counted for it (wait144: 0.5 s was
+      // 0.507 s there). The time past one is carried to the next, and one counts while the area still lasts at the moment it falls due
+      // (its end not included): as many as a 144 Hz screen gave, at every frame rate
+      const iv = z.interval || 0.5, gap = wait144(iv);
+      if (z.tick <= 1e-9 && z.t + z.tick >= z.dur - 1e-7) z.tick = 1; // (falls due only at or after its end: none)
+      if (z.tick <= 1e-9) {
+        z.tick = Math.max(z.tick, -gap) + gap;
+        const dmg = z.dps * iv;
         if (z.enemy) {
           // hazard to the player
           if (Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r && Math.abs(pl.pos.y - p.y) < 2) {
@@ -956,7 +1008,7 @@
             else if (z.kind === 'whirl') C.damageEnemy(e, dmg, { src: 'skill', sk: z.sk, proc: true, noMarker: true });
             else if (z.kind === 'arrowrain' || z.kind === 'grasp' || z.kind === 'holy') { C.damageEnemy(e, dmg * (z.kind === 'holy' && e.def.undead ? 3 : 1), { src: 'skill', sk: z.sk, proc: true, noMarker: true }); if (z.kind === 'grasp') e.st.root = Math.max(e.st.root || 0, 0.6); }
           }
-          if (z.kind === 'heal' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) { C.heal(z.hps * z.tick, true); pl.healZoneT = 0.6; }
+          if (z.kind === 'heal' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) { C.heal(z.hps * iv, true); pl.healZoneT = 0.6; }
           if (z.kind === 'smoke' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) pl.smokeT = 0.6;
         }
       }

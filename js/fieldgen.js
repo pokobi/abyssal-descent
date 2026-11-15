@@ -39,16 +39,10 @@
   F.deadTree = function (w, x, z, rng, s) {
     s = s || 1;
     w.addCollider(x - 0.3 * s, 0, z - 0.3 * s, x + 0.3 * s, 4.5 * s, z + 0.3 * s, { surf: 'wood' });
-    const trunk = Mx(x, 2.2 * s, z, 0.32 * s, 4.4 * s, 0.32 * s, rng.range(-0.08, 0.08), 0, rng.range(-0.08, 0.08));
-    w.batch.geo('woodDark', PG().cyl8, trunk);
-    const n = rng.int(4, 6);
-    for (let i = 0; i < n; i++) {
-      const a = rng.range(0, Math.PI * 2), y = rng.range(2.4, 4.2) * s, L = rng.range(1.2, 2.4) * s, tilt = rng.range(0.6, 1.1);
-      const cx = x + Math.cos(a) * L * 0.42 * Math.sin(tilt), cz = z + Math.sin(a) * L * 0.42 * Math.sin(tilt);
-      w.batch.geo('woodDark', PG().cyl8, Mx(cx, y + L * 0.3, cz, 0.12 * s, L, 0.12 * s, Math.sin(a) * tilt, 0, -Math.cos(a) * tilt));
-      // twigs
-      w.batch.geo('woodDark', PG().cyl8, Mx(cx + Math.cos(a) * L * 0.3, y + L * 0.55, cz + Math.sin(a) * L * 0.3, 0.05 * s, L * 0.5, 0.05 * s, Math.sin(a + 0.8) * 0.9, 0, -Math.cos(a + 0.8) * 0.9));
-    }
+    // (a dead tree of levelgen.js; the dice thrown as the old sticks threw them: everything thrown after falls as before)
+    rng.range(-0.08, 0.08); rng.range(-0.08, 0.08); const n = rng.int(4, 6);
+    for (let i = 0; i < n; i++) { rng.range(0, Math.PI * 2); rng.range(2.4, 4.2); rng.range(1.2, 2.4); rng.range(0.6, 1.1); }
+    w.deferred.push((grp) => G.LevelGen.tree(grp, w, x, 0, z, new G.RNG(1), s * 0.8, { kind: 'dead', lod: 0 }));
   };
   F.tombs = function (w, x0, z0, x1, z1, rng, facing) {
     // two rows of graves with mounds and the odd candle
@@ -120,11 +114,19 @@
     opts = opts || {};
     w.solid('block', x0 - 3, y, z0 - 3, x1 + 3, y + 1.2, z1 + 3, { uv: 4 });
     w.ceilingY = y;
+    const zsB = [];
     for (let z = z0 + 5; z < z1 - 2; z += opts.beamStep || 7) {
       if (opts.ruined && rng.chance(0.3)) continue;
+      zsB.push(z);
       w.visual('woodDark', x0, y - 0.7, z - 0.35, x1, y, z + 0.35, { uv: 2 });
+      // (its ends rest on stone corbels in the side walls, two courses each standing out farther: drawn only, nothing thrown for them)
+      if (LG.mason) { const M = LG.mason(w); for (const [xf, s] of [[x0, 1], [x1, -1]]) for (let k = 0; k < 2; k++) { const yb = y - 1.62 + k * 0.46, o0 = 0.12 + k * 0.24, o1 = 0.34 + k * 0.26, v = M.var(xf, yb, z); M.hexa('trim', [[xf - s * 0.04, yb, z - 0.3], [xf - s * 0.04, yb, z + 0.3], [xf - s * 0.04, yb + 0.45, z - 0.3], [xf - s * 0.04, yb + 0.45, z + 0.3], [xf + s * o0, yb, z - 0.3], [xf + s * o0, yb, z + 0.3], [xf + s * o1, yb + 0.45, z - 0.3], [xf + s * o1, yb + 0.45, z + 0.3]], 0.015, { gy: 0, top: y, tint: [v[0] * 0.85, v[1] * 0.85, v[2] * 0.85], n: 0.004, chip: 0.15, chipS: 0.04 }); } }
       if (rng.chance(0.5)) P().chain(w, rng.range(x0 + 4, x1 - 4), y - rng.range(2.5, 5), z, rng.range(2.5, 4.5));
     }
+    // (between the beams the ceiling is coffered: joists of dark wood framed into them every 7 m, LG.coffers; drawn only, no dice)
+    if (LG.coffers && opts.coffers !== false) LG.coffers(w, x0, z0, x1, z1, y, zsB, 7, opts.cofferX, opts.frost);
+    // (a frozen hall: hoarfrost on the beams, icicles off them; drawn only, no dice)
+    if (opts.frost && LG.beamFrost) LG.beamFrost(w, x0, x1, y, zsB);
     const nch = opts.chandeliers ?? 2;
     for (let i = 0; i < nch; i++) P().chandelier(w, rng.range(x0 + 10, x1 - 10), y - rng.range(4, 6), rng.range(z0 + 12, z1 - 12), y - 0.7);
   };
@@ -194,8 +196,9 @@
       w.solid('block', a + 0.2, -12, (z0 + z1) / 2 - 0.6, b - 0.2, -0.6, (z0 + z1) / 2 + 0.6, { uv: 3 });                 // arch support down into the dark
       P().torch(w, a, 1.6, z0 + 0.5, 'px'); P().torch(w, b, 1.6, z1 - 0.5, 'nx');
     }
-    w.solid('trim', 3, 0, z0 - 0.3, W - 3, 0.25, z0, { uv: 1, tag: 'lip' });
-    w.solid('trim', 3, 0, z1, W - 3, 0.25, z1 + 0.3, { uv: 1, tag: 'lip' });
+    // (the lips along the chasm: kerb stones, worn, a joint open here and there; their boxes stop you as before)
+    LG.hard(w, 'trim', 3, 0, z0 - 0.3, W - 3, 0.25, z0, { tag: 'lip' }); LG.hard(w, 'trim', 3, 0, z1, W - 3, 0.25, z1 + 0.3, { tag: 'lip' });
+    LG.coping(w, (a, y, d) => [a, y, z0 - 0.3 + d], 3, W - 3, -0.02, 0.26, -0.02, 0.32, { len: [0.6, 1.1] }); LG.coping(w, (a, y, d) => [a, y, z1 - 0.02 + d], 3, W - 3, -0.02, 0.26, 0, 0.34, { len: [0.6, 1.1] });
     w.visual('dark', 3, -14, z0, W - 3, -13.9, z1, { uv: 4, grad: false });
     for (let x = 10; x < W - 6; x += 14) w.addLight(x, -6, (z0 + z1) / 2, { flame: 0, intensity: 14, range: 14, color: glow || '#5a7ae0', emit: false, prio: 0.7 });
     w.abyss = { z0, z1 };
@@ -308,7 +311,7 @@
     w.layout = layout;
     if (layout === 'nave') {
       // two rows of heavy piers up to the vault
-      for (const sx of [-1, 1]) for (let z = 16; z < D - 14; z += 9) { const x = W / 2 + sx * rng.range(9, 12); if (occ.free(x - 1.5, z - 1.5, x + 1.5, z + 1.5)) { occ.mark(x - 1.5, z - 1.5, x + 1.5, z + 1.5); P().pillarSquare(w, x, z, 0, HT, 1.6); if (rng.chance(0.5)) P().torch(w, x, 3.4, z + 0.95, 'pz'); } }
+      for (const sx of [-1, 1]) for (let z = 16; z < D - 14; z += 9) { const x = W / 2 + sx * rng.range(9, 12); if (occ.free(x - 1.5, z - 1.5, x + 1.5, z + 1.5)) { occ.mark(x - 1.5, z - 1.5, x + 1.5, z + 1.5); LG.pillar(w, x, z, 0, HT, 1.6); if (rng.chance(0.5)) P().torch(w, x, 3.4, z + 0.95, 'pz'); } }
     } else if (layout === 'gallery') {
       // a raised gallery along one wall with stairs and a colonnade
       const side = rng.chance(0.5) ? 'W' : 'E', depth = rng.int(8, 10), h = 3.5;
@@ -393,8 +396,8 @@
     for (let z = gz1 + 5; z < D - 3; z += 6) for (const sx of [-1, 1]) {
       if (sx < 0 && Math.abs(z - nz) < 7) continue;
       const x = cx + sx * (hw - 0.6);
-      if (ruined && rng.chance(0.3)) { P().pillarSquare(w, x, z, 0, rng.range(2, 6), 1.0); P().rubble(w, x - sx * 1.2, 0, z, rng, 1); continue; }
-      P().pillarSquare(w, x, z, 0, HC, 1.0);
+      if (ruined && rng.chance(0.3)) { LG.pillar(w, x, z, 0, rng.range(2, 6), 1.0, null, { broken: true }); P().rubble(w, x - sx * 1.2, 0, z, rng, 1); continue; }
+      LG.pillar(w, x, z, 0, HC, 1.0);
       if ((z / 6) % 2 < 1) P().torch(w, x - sx * 0.65, 3.6, z, sx < 0 ? 'px' : 'nx'); else if (rng.chance(0.5)) P().banner(w, cx + sx * hw, 9, z + 3, sx < 0 ? 'px' : 'nx', 5, ruined ? 0x101a3a : 0x4a0e0e);
     }
     P().rug(w, cx - hw - 3, nz, 0, 5, 8, [0.18, 0.12, 0.08]);
@@ -508,9 +511,9 @@
     }
     // the dark below, glowing violet-red far down
     w.visual('voidglow', -40, -34, -60, W + 40, -33.9, LEDGE, { uv: 6, grad: false }); // (on past the open north side, under the guardian)
-    for (let z = 8; z < LEDGE; z += 18) for (let x = 8; x < W; x += 20) w.addLight(x, -20, z, { flame: 0, intensity: 14, range: 20, color: '#ff3a8a', emit: false, prio: 0.6, steady: true });
+    for (let z = 8; z < LEDGE; z += 18) for (let x = 8; x < W; x += 20) w.addLight(x, -20, z, { flame: 0, intensity: 14, range: 20, color: '#9a4a30', emit: false, prio: 0.6, steady: true });
     // the entrance ledge: braziers and a low parapet
-    for (const sx of [-1, 1]) { P().brazier(w, cx + sx * 12, 0, LEDGE + 3, 1.2); P().pillarSquare(w, cx + sx * 20, LEDGE + 2, 0, 9, 1.4); }
+    for (const sx of [-1, 1]) { P().brazier(w, cx + sx * 12, 0, LEDGE + 3, 1.2); LG.pillar(w, cx + sx * 20, LEDGE + 2, 0, 9, 1.4); }
     w.visual('trim', 4, 0, LEDGE - 0.3, W - 4, 0.3, LEDGE, { uv: 1 });
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
     w.isBoss = true;

@@ -16,8 +16,10 @@ process.env.COOP_W = process.env.COOP_W || '1280'; process.env.COOP_H = process.
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.save.data.settings.dmgNums = true; G.game.startRun({ id: 'normal', lv: 0 }, 0); G.game.dev = { god: true, speed: 1 }; 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(800);
     // the guardian's arena: wide and flat. Step in once so the fight starts, then send the guardian away for good.
     await p.eval("G.bosses.forArea = () => 'colossus'; G.game.area = 4; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.enterArea(5, 'boss'); 1");

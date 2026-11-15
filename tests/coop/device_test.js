@@ -18,12 +18,15 @@ const PORT = +process.env.COOP_PORT || 9441;
     const q = '&local=1&lat=40&jit=20', room = 'D' + Math.random().toString(36).slice(2, 6).toUpperCase();
     h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(300);
     g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
+    await g.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     await h.eval("G.save.data.settings.volume = 0; G.sfx.setVolume(0); 1"); await g.eval("G.save.data.settings.volume = 0; G.sfx.setVolume(0); 1");
     await h.eval(`G.Coop.diff = { id: 'hard', lv: 0 }; G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1`);
     await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
+    for (const pg of [h, g]) await pg.running();
     await g.eval('G.game.dev = { god: true, speed: 1 }; 1');
     const go = async (field, area) => {
       await h.eval(`G.Run.field = () => '${field}'; 1`); await g.eval(`G.Run.field = () => '${field}'; G.Coop.fpOk = undefined; 1`);
@@ -155,6 +158,7 @@ const PORT = +process.env.COOP_PORT || 9441;
       // (the newcomer is told to build this field before it joins: it opens the room itself once the override is in)
       const t = await ch.page(`http://127.0.0.1:${PORT}/coop.html?name=Third${q}`);
       await t.until('window.G && G.Coop && G.Coop.open && G.game.state === "title"', 90000);
+      await t.booted();
       await t.eval(`G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.Run.field = () => 'dusk'; G.Coop.open('${room}', false, 'Third'); 1`);
       await t.until('G.Coop.id === 2', 60000);
       let inArea = false; try { await t.until("G.game.area === 5 && G.game.stage === 'combat' && !!G.world && (G.world.gims || []).length > 0", 40000); inArea = true; } catch (e) { /* */ }

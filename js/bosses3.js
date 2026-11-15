@@ -5,6 +5,7 @@
 (function () {
   const BS = G.bosses, U = G.U;
   const { mat, mesh, joint, V } = BS.h;
+  const smesh = BS.h.smesh;
   const Boss = BS.Boss;
   let P, C, PG;
   const env = () => { P = G.player; C = G.combat; PG = G.Props.PG; };
@@ -47,36 +48,36 @@
       const r = this.root;
       this.bodyJ = joint(r, 0, 3.2, 0);
       const B = this.bodyJ;
-      mesh(B, PG.sph, scale, 1.7, 1.45, 3.4);
-      mesh(B, PG.sph, belly, 1.35, 1.0, 3.0, 0, -0.5, 0.1);
-      for (let i = 0; i < 7; i++) mesh(B, PG.cone, horn, 0.2, 0.75, 0.2, 0, 1.35, -2.0 + i * 0.65, -0.3);
-      for (const s of [-1, 1]) mesh(B, PG.box, this.veinM, 0.07, 0.07, 4.6, s * 0.95, 0.65, 0);
+      smesh(B, PG.sph, scale, 1.7, 1.45, 3.4);
+      smesh(B, PG.sph, belly, 1.35, 1.0, 3.0, 0, -0.5, 0.1);
+      for (let i = 0; i < 7; i++) smesh(B, PG.cone, horn, 0.2, 0.75, 0.2, 0, 1.35, -2.0 + i * 0.65, -0.3);
+      for (const s of [-1, 1]) smesh(B, PG.box, this.veinM, 0.07, 0.07, 4.6, s * 0.95, 0.65, 0);
       // neck & head
       this.neck = [];
       let prev = joint(B, 0, 0.6, 2.7);
-      for (let i = 0; i < 3; i++) { const sg = joint(prev, 0, 0.22, i ? 1.0 : 0); mesh(sg, PG.sph, scale, 0.72 - i * 0.08, 0.72 - i * 0.08, 0.95, 0, 0, 0.45); this.neck.push(sg); prev = sg; }
+      for (let i = 0; i < 3; i++) { const sg = joint(prev, 0, 0.22, i ? 1.0 : 0); smesh(sg, PG.sph, scale, 0.72 - i * 0.08, 0.72 - i * 0.08, 0.95, 0, 0, 0.45); this.neck.push(sg); prev = sg; }
       this.head = joint(prev, 0, 0.1, 1.15);
-      mesh(this.head, PG.box, scale, 0.95, 0.72, 1.6, 0, 0, 0.55);
-      for (const s of [-1, 1]) { mesh(this.head, PG.cone, horn, 0.13, 1.2, 0.13, s * 0.35, 0.45, -0.25, -1.9, 0, s * 0.35); mesh(this.head, PG.sph, eyeM, 0.12, 0.08, 0.12, s * 0.38, 0.18, 0.95); }
+      smesh(this.head, PG.box, scale, 0.95, 0.72, 1.6, 0, 0, 0.55);
+      for (const s of [-1, 1]) { smesh(this.head, PG.cone, horn, 0.13, 1.2, 0.13, s * 0.35, 0.45, -0.25, -1.9, 0, s * 0.35); smesh(this.head, PG.sph, eyeM, 0.12, 0.08, 0.12, s * 0.38, 0.18, 0.95); }
       this.jaw = joint(this.head, 0, -0.28, 0.15);
-      mesh(this.jaw, PG.box, scale, 0.8, 0.22, 1.35, 0, -0.08, 0.6);
-      for (let i = 0; i < 5; i++) mesh(this.jaw, PG.cone, horn, 0.05, 0.16, 0.05, -0.3 + i * 0.15, 0.08, 1.15);
+      smesh(this.jaw, PG.box, scale, 0.8, 0.22, 1.35, 0, -0.08, 0.6);
+      for (let i = 0; i < 5; i++) smesh(this.jaw, PG.cone, horn, 0.05, 0.16, 0.05, -0.3 + i * 0.15, 0.08, 1.15);
       this.mouth = joint(this.head, 0, -0.15, 1.45);
       // tail
       this.tail = [];
       prev = joint(B, 0, 0.1, -3.0);
-      for (let i = 0; i < 6; i++) { const sg = joint(prev, 0, 0, i ? -1.05 : 0); mesh(sg, PG.sph, scale, 0.6 - i * 0.08, 0.55 - i * 0.07, 0.8, 0, 0, -0.5); this.tail.push(sg); prev = sg; }
-      mesh(prev, PG.cone, horn, 0.4, 0.9, 0.12, 0, 0.1, -1.0, -Math.PI / 2);
+      for (let i = 0; i < 6; i++) { const sg = joint(prev, 0, 0, i ? -1.05 : 0); smesh(sg, PG.sph, scale, 0.6 - i * 0.08, 0.55 - i * 0.07, 0.8, 0, 0, -0.5); this.tail.push(sg); prev = sg; }
+      smesh(prev, PG.cone, horn, 0.4, 0.9, 0.12, 0, 0.1, -1.0, -Math.PI / 2);
       // legs
       this.legs = [];
-      for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) { const hp = joint(B, sx * 1.15, -0.6, sz * 1.5); mesh(hp, PG.cyl8, scale, 0.32, 1.5, 0.32, 0, -0.75, 0); const kn = joint(hp, 0, -1.5, 0); mesh(kn, PG.cyl8, belly, 0.24, 1.3, 0.24, 0, -0.6, 0.15, 0.25); mesh(kn, PG.box, horn, 0.5, 0.15, 0.6, 0, -1.25, 0.35); this.legs.push({ hp, kn }); }
+      for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) { const hp = joint(B, sx * 1.15, -0.6, sz * 1.5); smesh(hp, PG.cyl8, scale, 0.32, 1.5, 0.32, 0, -0.75, 0); const kn = joint(hp, 0, -1.5, 0); smesh(kn, PG.cyl8, belly, 0.24, 1.3, 0.24, 0, -0.6, 0.15, 0.25); smesh(kn, PG.box, horn, 0.5, 0.15, 0.6, 0, -1.25, 0.35); this.legs.push({ hp, kn }); }
       // wings: bone arm + membrane fan (custom triangles)
       this.wings = [];
       for (const s of [-1, 1]) {
         const sh = joint(B, s * 1.25, 0.95, 0.6);
-        mesh(sh, PG.cyl8, scale, 0.18, 4.2, 0.18, s * 2.1, 0.2, 0, 0, 0, Math.PI / 2 - s * 0.1);
+        smesh(sh, PG.cyl8, scale, 0.18, 4.2, 0.18, s * 2.1, 0.2, 0, 0, 0, Math.PI / 2 - s * 0.1);
         const tip = joint(sh, s * 4.2, 0.4, 0);
-        mesh(tip, PG.cyl8, scale, 0.12, 3.4, 0.12, s * 1.5, 0, -0.8, 0.5, 0, Math.PI / 2);
+        smesh(tip, PG.cyl8, scale, 0.12, 3.4, 0.12, s * 1.5, 0, -0.8, 0.5, 0, Math.PI / 2);
         const g = new THREE.BufferGeometry();
         const v = [0, 0, 0, s * 4.2, 0.4, 0, s * 7.2, 0.5, -1.6, s * 4.2, 0.4, 0, s * 6.4, -0.1, -3.4, s * 7.2, 0.5, -1.6, 0, 0, 0, s * 6.4, -0.1, -3.4, s * 4.2, 0.4, 0, 0, 0, 0, s * 3.2, -0.2, -3.6, s * 6.4, -0.1, -3.4, 0, 0, 0, 0, -0.1, -2.8, s * 3.2, -0.2, -3.6];
         g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals();
@@ -294,41 +295,59 @@
   // ======================================================================
   // 10) THE ABYSS KING — final boss of every 50 areas. Phase 1: the crowned giant. At 0 HP he is reborn as the Avatar of the Abyss
   //     (phase 2; shielded by void anchors, beams blocked by pillars), and at 35% the edge of the world falls away (phase 3).
+  // (a king in black plate: a keeled breast over lames, a great collar, shoulders in three lames with a row of spikes, a mantle in
+  // folds from them and a skirt of cloth in tatters; a closed helm with a slit of light, a crown of tall points about it and its
+  // stone at the brow; arms and legs with their swells, cops at elbow and knee, gauntlets, pointed shoes. Only the materials it was
+  // given - it fades with them. The joints, the crown and its stone are as they were)
+  const gearOf = (parent, name, MM, x, y, z, rx, ry, rz, sc) => {
+    const d = G.GFX && G.GFX.foeGear ? G.GFX.foeGear(name) : null; if (!d) return null;
+    const g = joint(parent, x, y, z); g.rotation.set(rx || 0, ry || 0, rz || 0); if (Array.isArray(sc)) g.scale.set(sc[0], sc[1], sc[2]); else g.scale.setScalar(sc);
+    for (const q of d) { const m = new THREE.Mesh(q.g, MM[q.m] || MM.def); m.castShadow = true; g.add(m); }
+    return g;
+  };
   function giant(root, o) {
-    const J = {}, s = o.s;
+    const J = {}, s = o.s, A = o.armor, T = o.trim;
     J.body = joint(root, 0, o.hip, 0);
-    mesh(J.body, PG.box, o.armor, 1.0 * s, 0.55 * s, 0.65 * s);
-    mesh(J.body, PG.box, o.cape, 1.1 * s, 0.9 * s, 0.7 * s, 0, -0.55 * s, 0); // tassets
+    smesh(J.body, PG.sph, A, 0.55 * s, 0.32 * s, 0.38 * s);
+    smesh(J.body, PG.cyl8, T, 0.52 * s, 0.1 * s, 0.37 * s, 0, 0.16 * s, 0);
+    { let any = false; for (const a of [-1.0, -0.35, 0.35, 1.0, 2.1, 3.14, 4.2]) any = !!gearOf(J.body, 'tatter', { cloth: o.cape }, Math.sin(a) * 0.46 * s, 0.08 * s, Math.cos(a) * 0.32 * s, 0.05, a, 0, [3.4 * s, 3.2 * s, 3 * s]) || any; if (!any) smesh(J.body, PG.box, o.cape, 1.1 * s, 0.9 * s, 0.7 * s, 0, -0.55 * s, 0); }
+    for (const sx of [-1, 1]) smesh(J.body, PG.box, A, 0.38 * s, 0.5 * s, 0.06 * s, sx * 0.26 * s, -0.32 * s, 0.3 * s, -0.14, 0, 0);
     J.torso = joint(J.body, 0, 0.25 * s, 0);
-    mesh(J.torso, PG.box, o.armor, 1.3 * s, 1.2 * s, 0.8 * s, 0, 0.6 * s, 0);
-    mesh(J.torso, PG.box, o.trim, 1.4 * s, 0.16 * s, 0.85 * s, 0, 1.15 * s, 0);
-    mesh(J.torso, PG.box, o.trim, 0.12 * s, 1.0 * s, 0.86 * s, 0, 0.6 * s, 0);
-    for (const sx of [-1, 1]) { mesh(J.torso, PG.sph, o.armor, 0.42 * s, 0.34 * s, 0.42 * s, sx * 0.78 * s, 1.15 * s, 0); for (let k = 0; k < 3; k++) mesh(J.torso, PG.cone, o.trim, 0.06 * s, 0.35 * s, 0.06 * s, sx * (0.68 + k * 0.12) * s, 1.45 * s, 0); }
-    mesh(J.torso, PG.box, o.cape, 1.3 * s, 2.3 * s, 0.05 * s, 0, -0.1 * s, -0.45 * s, 0.1);
+    smesh(J.torso, PG.sph, A, 0.66 * s, 0.54 * s, 0.44 * s, 0, 0.78 * s, 0.02 * s); smesh(J.torso, PG.sph, A, 0.52 * s, 0.44 * s, 0.36 * s, 0, 0.3 * s, 0.02 * s);
+    smesh(J.torso, PG.sph, A, 0.15 * s, 0.42 * s, 0.15 * s, 0, 0.78 * s, 0.4 * s);                                                   // the keel of the breast
+    smesh(J.torso, PG.sph, T, 0.035 * s, 0.4 * s, 0.035 * s, 0, 0.78 * s, 0.545 * s);                                                // a gilt line down it
+    for (let i = 0; i < 3; i++) smesh(J.torso, PG.cyl8, i === 1 ? T : A, (0.54 + i * 0.02) * s, 0.07 * s, (0.39 + i * 0.012) * s, 0, (0.42 - i * 0.13) * s, 0.02 * s);
+    smesh(J.torso, PG.cyl8, T, 0.56 * s, 0.1 * s, 0.4 * s, 0, 1.2 * s, 0); smesh(J.torso, PG.cyl8, A, 0.3 * s, 0.24 * s, 0.3 * s, 0, 1.32 * s, 0);   // the collar, the gorget
+    for (const sx of [-1, 1]) {
+      for (let k = 0; k < 3; k++) smesh(J.torso, PG.sph, k === 1 ? T : A, (0.42 - k * 0.05) * s, (0.3 - k * 0.04) * s, (0.42 - k * 0.04) * s, sx * (0.78 + k * 0.1) * s, (1.17 - k * 0.14) * s, 0, 0, 0, -sx * (0.25 + k * 0.2));
+      for (let k = 0; k < 3; k++) smesh(J.torso, PG.cone, T, 0.05 * s, (0.4 - k * 0.07) * s, 0.05 * s, sx * (0.66 + k * 0.14) * s, (1.52 - k * 0.07) * s, 0, 0, 0, -sx * (0.2 + k * 0.25));
+    }
+    if (!gearOf(J.torso, 'cape', { cloth: o.cape }, 0, 1.3 * s, -0.4 * s, 0.1, 0, 0, [1.7 * s, 2.5 * s, 1.9 * s])) smesh(J.torso, PG.box, o.cape, 1.3 * s, 2.3 * s, 0.05 * s, 0, -0.1 * s, -0.45 * s, 0.1);
     J.head = joint(J.torso, 0, 1.5 * s, 0);
-    mesh(J.head, PG.box, o.armor, 0.5 * s, 0.62 * s, 0.56 * s);
-    mesh(J.head, PG.box, o.glow, 0.36 * s, 0.05 * s, 0.05 * s, 0, 0.05 * s, 0.29 * s);
+    if (!gearOf(J.head, 'helm', { steel: A, trim: T, dark: A, mail: A }, 0, -0.27 * s, 0, 0, 0, 0, 1.55 * s)) smesh(J.head, PG.box, A, 0.5 * s, 0.62 * s, 0.56 * s);
+    smesh(J.head, PG.box, o.glow, 0.3 * s, 0.03 * s, 0.03 * s, 0, -0.01 * s, 0.29 * s);
     J.crown = joint(J.head, 0, 0.36 * s, 0);
-    mesh(J.crown, PG.cyl8, o.trim, 0.33 * s, 0.12 * s, 0.33 * s);
-    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; mesh(J.crown, PG.cone, o.trim, 0.06 * s, 0.32 * s, 0.06 * s, Math.cos(a) * 0.3 * s, 0.2 * s, Math.sin(a) * 0.3 * s); }
-    J.gem = mesh(J.crown, PG.oct, o.gem, 0.1 * s, 0.14 * s, 0.1 * s, 0, 0.05 * s, 0.33 * s);
+    smesh(J.crown, PG.cyl8, T, 0.31 * s, 0.1 * s, 0.33 * s, 0, -0.16 * s, 0);
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2 + 0.31, hh = (k % 2 ? 0.26 : 0.5) * s; smesh(J.crown, PG.cone, T, 0.05 * s, hh, 0.03 * s, Math.cos(a) * 0.3 * s, -0.11 * s + hh / 2, Math.sin(a) * 0.32 * s, Math.sin(a) * 0.16, -a, -Math.cos(a) * 0.16); }
+    J.gem = mesh(J.crown, PG.oct, o.gem, 0.08 * s, 0.12 * s, 0.07 * s, 0, -0.14 * s, 0.335 * s);
     J.arms = [];
     for (const sx of [-1, 1]) {
       const sh = joint(J.torso, sx * 0.85 * s, 1.0 * s, 0);
-      mesh(sh, PG.cyl8, o.armor, 0.2 * s, 0.85 * s, 0.2 * s, 0, -0.42 * s, 0);
+      smesh(sh, PG.sph, A, 0.22 * s, 0.26 * s, 0.23 * s, 0, -0.06 * s, 0); smesh(sh, PG.sph, A, 0.19 * s, 0.42 * s, 0.2 * s, 0, -0.42 * s, 0);
       const el = joint(sh, 0, -0.85 * s, 0);
-      mesh(el, PG.cyl8, o.trim, 0.18 * s, 0.8 * s, 0.18 * s, 0, -0.4 * s, 0);
+      smesh(el, PG.sph, T, 0.19 * s, 0.19 * s, 0.2 * s); smesh(el, PG.cyl8, A, 0.16 * s, 0.62 * s, 0.17 * s, 0, -0.4 * s, 0); smesh(el, PG.cyl8, T, 0.19 * s, 0.1 * s, 0.2 * s, 0, -0.7 * s, 0);
       const hand = joint(el, 0, -0.82 * s, 0);
-      mesh(hand, PG.box, o.armor, 0.22 * s, 0.22 * s, 0.22 * s);
+      smesh(hand, PG.sph, A, 0.15 * s, 0.17 * s, 0.12 * s); for (let i = 0; i < 3; i++) smesh(hand, PG.sph, A, 0.045 * s, 0.12 * s, 0.055 * s, (i - 1) * 0.09 * s, -0.18 * s, 0.03 * s);
       J.arms.push({ sh, el, hand });
     }
     J.legs = [];
     for (const sx of [-1, 1]) {
       const hp = joint(J.body, sx * 0.32 * s, -0.1 * s, 0);
-      mesh(hp, PG.cyl8, o.armor, 0.24 * s, 1.05 * s, 0.24 * s, 0, -0.52 * s, 0);
+      smesh(hp, PG.sph, A, 0.25 * s, 0.56 * s, 0.27 * s, 0, -0.5 * s, 0.01 * s);
       const kn = joint(hp, 0, -1.05 * s, 0);
-      mesh(kn, PG.cyl8, o.trim, 0.2 * s, 1.0 * s, 0.2 * s, 0, -0.5 * s, 0);
-      mesh(kn, PG.box, o.armor, 0.34 * s, 0.18 * s, 0.5 * s, 0, -1.0 * s, 0.1 * s);
+      smesh(kn, PG.sph, T, 0.21 * s, 0.21 * s, 0.23 * s, 0, 0, 0.03 * s);
+      smesh(kn, PG.sph, A, 0.19 * s, 0.36 * s, 0.21 * s, 0, -0.38 * s, -0.03 * s); smesh(kn, PG.cyl8, A, 0.15 * s, 0.9 * s, 0.16 * s, 0, -0.5 * s, 0);
+      smesh(kn, PG.box, A, 0.32 * s, 0.18 * s, 0.5 * s, 0, -1.0 * s, 0.1 * s); smesh(kn, PG.cone, A, 0.13 * s, 0.3 * s, 0.1 * s, 0, -1.02 * s, 0.47 * s, Math.PI / 2);
       J.legs.push({ hp, kn });
     }
     return J;
@@ -340,25 +359,29 @@
       this.maxHp = Math.round(5200 * this.hpScale); this.hp = this.maxHp;
       this.waves = []; this.fx = []; this.anchors = []; this.orbs = []; this.echoes = [];
       this.form = 1;
-      this.armorM = mat('#16121c', { roughness: 0.35, metalness: 0.7, transparent: true });
-      this.trimM = mat('#c8a040', { roughness: 0.3, metalness: 1, transparent: true });
-      this.capeM = mat('#2a0838', { roughness: 0.8, side: THREE.DoubleSide, transparent: true });
-      this.glowM = mat('#000', { emissive: 0xb050ff, emissiveIntensity: 3.5, transparent: true });
-      this.gemM = mat('#300040', { emissive: 0xd060ff, emissiveIntensity: 3, roughness: 0.1, transparent: true });
+      this.armorM = mat('#16131a', { roughness: 0.55, metalness: 0.7, transparent: true });
+      this.trimM = mat('#8c7036', { roughness: 0.45, metalness: 1, transparent: true });
+      this.capeM = mat('#1e0a22', { roughness: 0.95, side: THREE.DoubleSide, transparent: true });
+      this.glowM = mat('#000', { emissive: 0x8a3a1c, emissiveIntensity: 1.5, transparent: true });   // (its seams burn a deep ember, not a violet light)
+      this.gemM = mat('#2a0c08', { emissive: 0xa0401c, emissiveIntensity: 1.8, roughness: 0.1, transparent: true });
       this.kingG = joint(this.root, 0, 0, 0);
       this.J = giant(this.kingG, { s: 2.3, hip: 4.6, armor: this.armorM, trim: this.trimM, cape: this.capeM, glow: this.glowM, gem: this.gemM });
       // the greatsword
       const hand = this.J.arms[1].hand;
       this.sword = joint(hand, 0, 0, 0.2);
-      mesh(this.sword, PG.box, this.trimM, 0.18, 0.18, 1.1, 0, 0, -0.2);
-      mesh(this.sword, PG.box, this.trimM, 1.4, 0.18, 0.22, 0, 0, 0.4);
-      mesh(this.sword, PG.box, mat('#2a2030', { metalness: 0.9, roughness: 0.2 }), 0.42, 0.1, 6.6, 0, 0, 3.8);
-      mesh(this.sword, PG.box, this.glowM, 0.08, 0.12, 6.2, 0, 0, 3.8);
+      // (a king's sword: a wheel pommel, a guard drawn down at its ends, a broad blade with a ridge, the light a thin line in its fuller)
+      if (gearOf(this.sword, 'greatsword', { leather: this.armorM, iron: this.trimM, blade: this.bladeM = mat('#2e2a34', { metalness: 0.9, roughness: 0.4, transparent: true }), dark: this.glowM }, 0, 0, 0.35, 0, 0, 0, 5.3)) { /* shaped */ }
+      else {
+        smesh(this.sword, PG.box, this.trimM, 0.18, 0.18, 1.1, 0, 0, -0.2);
+        smesh(this.sword, PG.box, this.trimM, 1.4, 0.18, 0.22, 0, 0, 0.4);
+        smesh(this.sword, PG.box, mat('#2a2030', { metalness: 0.9, roughness: 0.2 }), 0.42, 0.1, 6.6, 0, 0, 3.8);
+        smesh(this.sword, PG.box, this.glowM, 0.08, 0.12, 6.2, 0, 0, 3.8);
+      }
       this.sword.rotation.x = Math.PI / 2;
-      this.kmats = [this.armorM, this.trimM, this.capeM, this.glowM, this.gemM];
+      this.kmats = [this.armorM, this.trimM, this.capeM, this.glowM, this.gemM].concat(this.bladeM ? [this.bladeM] : []);
       // a halo above the crown and a rune circle that follows him across the floor
-      this.haloK = mesh(this.J.head, PG.torus, this.glowM, 0.55 * 2.3, 0.55 * 2.3, 0.55 * 2.3, 0, 1.3 * 2.3, -0.2, Math.PI / 2);
-      const rt = new THREE.Mesh(new THREE.RingGeometry(5.2, 6, 6, 1), new THREE.MeshBasicMaterial({ color: 0xa040ff, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      this.haloK = mesh(this.J.head, PG.torus, this.glowM, 0.55 * 2.3, 0.55 * 2.3, 0.14 * 2.3, 0, 1.3 * 2.3, -0.2, Math.PI / 2);   // (a thin ring, not a tube of light)
+      const rt = new THREE.Mesh(new THREE.RingGeometry(5.2, 6, 64, 1), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xa040ff), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
       const rt2 = new THREE.Mesh(new THREE.RingGeometry(3.6, 3.9, 48, 1), rt.material);
       this.rune = new THREE.Group(); this.rune.add(rt); this.rune.add(rt2); rt.rotation.x = rt2.rotation.x = -Math.PI / 2; this.own(this.rune);
       this.body = this.part({ name: def.name, hitW: [{ n: this.J.torso, r: 1.6, part: 'body', o: V(0, 1.3, 0) }, { n: this.J.body, r: 1.3, part: 'body' }, { n: this.J.legs[0].kn, r: 0.7, part: 'body', o: V(0, -1, 0) }, { n: this.J.legs[1].kn, r: 0.7, part: 'body', o: V(0, -1, 0) }], radius: 2, height: 9 });
@@ -370,7 +393,7 @@
       const seat = world.throneSeat || V(world.arenaCenter.x, 0, 6);
       this.pos.set(seat.x, 0, seat.z + 1.5); this.yaw = 0;
       this.state = 'rise'; this.stT = 0; this.cd = 2;
-      this.light = { pos: this.pos.clone(), color: '#a040ff', intensity: 10, range: 22, flame: 0, emit: false, ph: 0, prio: 5 };
+      this.light = { pos: this.pos.clone(), color: '#c06030', intensity: 10, range: 22, flame: 0, emit: false, ph: 0, prio: 5 };
       world.lightSources.push(this.light);
       G.ui.toast('👑 深淵の王が玉座から立ち上がる……', 'warn');
     }
@@ -540,7 +563,7 @@
       if (t > 1.6 && !this._tint) { this._tint = true; G.game.tintScene && G.game.tintScene('#6a28c0', 0.4); G.fx.flash(this.pos.clone().setY(6), 0xc060ff, 120, 0.6, 60); G.sfx.thunder && G.sfx.thunder(1); }
       if (t > 1.6 && t < 5) {
         // a pillar of the void swallows him
-        if (!this.pillar) { this.pillar = new THREE.Mesh(new THREE.CylinderGeometry(2, 3.5, 60, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0x8030ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); this.pillar.position.set(this.pos.x, 30, this.pos.z); this.own(this.pillar); }
+        if (!this.pillar) { this.pillar = new THREE.Mesh(new THREE.CylinderGeometry(2, 3.5, 60, 24, 1, true), new THREE.MeshBasicMaterial({ color: G.fx.tone(0x8030ff), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); this.pillar.position.set(this.pos.x, 30, this.pos.z); this.own(this.pillar); }
         this.pillar.material.opacity = Math.min(0.5, (t - 1.6) * 0.4) * (t > 4.2 ? Math.max(0, 1 - (t - 4.2) / 0.8) : 1);
         this.pillar.rotation.y += dt * 2;
         if (Math.random() < dt * 6) { const a = Math.random() * 6.28, d = U.rand(6, 28); const q = V(c.x + Math.cos(a) * d, 0.04, c.z + Math.sin(a) * d); G.fx.decal(q, V(0, 1, 0), 'crack', U.rand(3, 6), true); G.fx.lightning(q.clone().setY(30), q, 0xb060ff); }
@@ -563,32 +586,32 @@
     }
     buildAvatar() {
       const av = this.avatar = joint(this.root, 0, 0, 0);
-      const ob = mat('#0c0810', { roughness: 0.25, metalness: 0.6 });
-      const crack = this.crackM = mat('#000', { emissive: 0xa040ff, emissiveIntensity: 3 });
+      const ob = mat('#0c0810', { roughness: 0.42, metalness: 0.6 });
+      const crack = this.crackM = mat('#000', { emissive: 0x9038e0, emissiveIntensity: 2 });
       const eyeW = mat('#f0e8ff', { roughness: 0.2 }), iris = mat('#000', { emissive: 0xff2060, emissiveIntensity: 4 });
       this.coreM = mat('#200030', { emissive: 0xff40c0, emissiveIntensity: 4, roughness: 0.05 });
       // torso & wisp tail
-      mesh(av, PG.sph, ob, 3.2, 3.8, 2.6, 0, 0, 0);
-      for (let i = 0; i < 6; i++) mesh(av, PG.box, crack, 0.08, U.rand(1.5, 3.5), 0.08, U.rand(-2.2, 2.2), U.rand(-1.5, 1.5), 2.3, 0, 0, U.rand(-0.8, 0.8));
+      smesh(av, PG.sph, ob, 3.2, 3.8, 2.6, 0, 0, 0);
+      for (let i = 0; i < 6; i++) smesh(av, PG.box, crack, 0.08, U.rand(1.5, 3.5), 0.08, U.rand(-2.2, 2.2), U.rand(-1.5, 1.5), 2.3, 0, 0, U.rand(-0.8, 0.8));
       this.tailW = mesh(av, PG.cone, mat('#1a0828', { transparent: true, opacity: 0.75, emissive: 0x300050 }), 2.4, 7, 2.4, 0, -6.5, 0, Math.PI);
       this.coreJ = joint(av, 0, 0.4, 2.3);
       this.coreMesh = mesh(this.coreJ, PG.oct, this.coreM, 0.9, 1.3, 0.9);
       // head: horned mask with three eyes
       const head = this.avHead = joint(av, 0, 4.6, 0.3);
-      mesh(head, PG.box, ob, 2.0, 2.3, 1.6);
-      for (const s of [-1, 1]) mesh(head, PG.cone, ob, 0.35, 3.2, 0.35, s * 1.0, 2.2, -0.2, -0.3, 0, s * 0.5);
-      for (const [x, y, sc] of [[-0.55, 0.2, 0.32], [0.55, 0.2, 0.32], [0, 0.85, 0.42]]) { mesh(head, PG.sph, eyeW, sc, sc, sc * 0.6, x, y, 0.82); mesh(head, PG.sph, iris, sc * 0.45, sc * 0.45, sc * 0.3, x, y, 0.98); }
+      smesh(head, PG.box, ob, 2.0, 2.3, 1.6);
+      for (const s of [-1, 1]) smesh(head, PG.cone, ob, 0.35, 3.2, 0.35, s * 1.0, 2.2, -0.2, -0.3, 0, s * 0.5);
+      for (const [x, y, sc] of [[-0.55, 0.2, 0.32], [0.55, 0.2, 0.32], [0, 0.85, 0.42]]) { smesh(head, PG.sph, eyeW, sc, sc, sc * 0.6, x, y, 0.82); smesh(head, PG.sph, iris, sc * 0.45, sc * 0.45, sc * 0.3, x, y, 0.98); }
       // halo of eyes
       this.halo = joint(av, 0, 5.2, -1.6);
-      mesh(this.halo, PG.torus, crack, 4.2, 4.2, 4.2);
-      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; const g = joint(this.halo, Math.cos(a) * 4.2, Math.sin(a) * 4.2, 0); mesh(g, PG.sph, eyeW, 0.42, 0.42, 0.3); mesh(g, PG.sph, iris, 0.2, 0.2, 0.15, 0, 0, 0.18); }
+      smesh(this.halo, PG.torus, crack, 4.2, 4.2, 1.4);
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; const g = joint(this.halo, Math.cos(a) * 4.2, Math.sin(a) * 4.2, 0); smesh(g, PG.sph, eyeW, 0.42, 0.42, 0.3); smesh(g, PG.sph, iris, 0.2, 0.2, 0.15, 0, 0, 0.18); }
       // four arms
       this.avArms = [];
       for (const [sx, y, l] of [[-1, 1.6, 7], [1, 1.6, 7], [-1, -0.8, 5], [1, -0.8, 5]]) {
         const sh = joint(av, sx * 3.0, y, 0);
-        mesh(sh, PG.cyl8, ob, 0.45, l, 0.45, 0, -l / 2, 0);
+        smesh(sh, PG.cyl8, ob, 0.45, l, 0.45, 0, -l / 2, 0);
         const hd = joint(sh, 0, -l, 0);
-        for (let k = 0; k < 4; k++) mesh(hd, PG.cone, crack, 0.12, 1.2, 0.12, -0.4 + k * 0.27, -0.6, 0.2, Math.PI, 0, 0);
+        for (let k = 0; k < 4; k++) smesh(hd, PG.cone, crack, 0.12, 1.2, 0.12, -0.4 + k * 0.27, -0.6, 0.2, Math.PI, 0, 0);
         sh.rotation.z = sx * 0.6;
         this.avArms.push({ sh, sx, base: sx * 0.6 });
       }
@@ -671,7 +694,7 @@
       if (!a.warned) { a.warned = true; G.ui.toastSmall('⚠ 虚無の烈風 — しゃがんで踏ん張るか、柱の陰へ！'); G.sfx.whoosh && G.sfx.whoosh(1.4, 0.35, true); G.sfx.magic(o, 'dark'); }
       if (a.t < WIND) {
         if (Math.random() < dt * 70) { const an = Math.random() * 6.28, r = U.rand(2, 10); G.fx.norm.spawn(o.x + Math.cos(an) * r, U.rand(0.3, 2.5), o.z + Math.sin(an) * r, Math.cos(an) * 10, 0.2, Math.sin(an) * 10, 0.9, 0.2, 0.9, 0.55, 0.35, 0.85, 0.45, 0, 0.6); }
-        if (!a.ring) { a.ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.4, 48), new THREE.MeshBasicMaterial({ color: 0xc080ff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); a.ring.rotation.x = -Math.PI / 2; a.ring.position.set(o.x, 0.1, o.z); this.own(a.ring); }
+        if (!a.ring) { a.ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.4, 48), new THREE.MeshBasicMaterial({ color: G.fx.tone(0xc080ff), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); a.ring.rotation.x = -Math.PI / 2; a.ring.position.set(o.x, 0.1, o.z); this.own(a.ring); }
         a.ring.scale.setScalar(1 + a.t / WIND * 3);
         return;
       }
@@ -696,7 +719,7 @@
       G.sfx.thunder && G.sfx.thunder(1); P.addShake(0.8);
       G.game.tintScene && G.game.tintScene('#a01850', 0.2);
       const c = this.world.arenaCenter;
-      const m = this.edgeRing = new THREE.Mesh(new THREE.CylinderGeometry(this.edgeR(), this.edgeR(), 14, 64, 1, true), new THREE.MeshBasicMaterial({ color: 0x6020c0, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+      const m = this.edgeRing = new THREE.Mesh(new THREE.CylinderGeometry(this.edgeR(), this.edgeR(), 14, 64, 1, true), new THREE.MeshBasicMaterial({ color: G.fx.tone(0x6020c0), transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
       m.position.set(c.x, 7, c.z); this.own(m);
       G.ui.toast('☠ 外周（紫の壁の外）は虚無 — 内側で戦え', 'warn');
     }
@@ -783,7 +806,7 @@
           const q = P.pos.clone().setY(0);
           G.fx.telegraph(q.clone().setY(0.02), 3.8, 1.0, 0xff3080);
           const hand = new THREE.Group(); const ob = mat('#0c0810', { roughness: 0.3, metalness: 0.5 });
-          mesh(hand, PG.box, ob, 2.6, 0.8, 3.2, 0, 0, 0); for (let k = 0; k < 4; k++) mesh(hand, PG.cone, this.crackM, 0.22, 1.6, 0.22, -0.9 + k * 0.6, -0.6, 1.6, Math.PI / 2 + 0.6, 0, 0);
+          smesh(hand, PG.box, ob, 2.6, 0.8, 3.2, 0, 0, 0); for (let k = 0; k < 4; k++) smesh(hand, PG.cone, this.crackM, 0.22, 1.6, 0.22, -0.9 + k * 0.6, -0.6, 1.6, Math.PI / 2 + 0.6, 0, 0);
           hand.position.set(q.x, 22, q.z); this.own(hand);
           const h0 = performance.now();
           const iv = setInterval(() => {
@@ -798,7 +821,7 @@
       } else if (a.k === 'pull') {
         if (!a.vx) {
           a.vx = true; G.ui.toastSmall('⚠ 深淵の渦 — 中心から離れろ！（スプリント）'); G.sfx.magic(c, 'dark');
-          const m = a.ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 4.5, 48), new THREE.MeshBasicMaterial({ color: 0x8030ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+          const m = a.ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 4.5, 48), new THREE.MeshBasicMaterial({ color: G.fx.tone(0x8030ff), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
           m.rotation.x = -Math.PI / 2; m.position.set(this.pos.x, 0.08, this.pos.z); this.own(m);
         }
         const vc = a.ring.position;
@@ -897,7 +920,7 @@
             G.sfx.whoosh(0.8, 0.6); break;
           case 'hunter': {
             const m = e.pos.clone().setY(e.h * 0.7), dir = e.aim.clone().sub(m).normalize();
-            const wh = G.world.raycast(m, dir, 200); G.fx.beam(m, wh ? wh.point : m.clone().addScaledVector(dir, 120), 0xffd0ff, 0.08, 0.2); G.sfx.gun('sniper', {});
+            const wh = G.world.raycast(m, dir, 200); G.fx.beam(m, wh ? wh.point : m.clone().addScaledVector(dir, 120), 0xffd0ff, 0.08, 0.2); G.sfx.gun('sniper', { pos: m });
             const pc = P.chestPos(), tt = pc.clone().sub(m).dot(dir);
             if (tt > 0 && (!wh || tt < wh.t) && pc.clone().sub(m.clone().addScaledVector(dir, tt)).length() < 0.9) this.hurtPlayer(30, 'ranged', m);
             break;
@@ -962,7 +985,7 @@
     const listN = G.enemies.list.length, sceneKids = new Set(G.scene.children);
     const toast = G.ui.toast, toastS = G.ui.toastSmall; G.ui.toast = () => {}; G.ui.toastSmall = () => {};
     let b = null;
-    try { b = new Cls(def, level || 5, fake); } catch (err) { console.error(err); } finally { G.ui.toast = toast; G.ui.toastSmall = toastS; }
+    try { b = new Cls(def, level || 5, fake); BS.melt(b); } catch (err) { console.error(err); } finally { G.ui.toast = toast; G.ui.toastSmall = toastS; }
     // undo every side effect: parts registered as enemies, extra objects dropped into the scene
     const added = G.enemies.list.splice(listN); for (const p of added) { p.alive = false; p.removed = true; }
     for (const o of G.scene.children.slice()) if (!sceneKids.has(o) && (!b || o !== b.root)) G.scene.remove(o);

@@ -100,13 +100,13 @@
         if (!e.alive || e.ally) continue;
         const c = e.centerPos(); if (!r.cuts.some(([a, b]) => segDist(c, a, b) < 1.1 + (e.radius || 0.5))) continue;
         if (e.boss || e.elite) { const t0 = r.hit.get(e) || 0; if (G.game.time - t0 < 1) continue; r.hit.set(e, G.game.time); C.damageEnemy(e, r.dmg, { src: 'skill', sk: 'sk_rift', noMarker: false }); }
-        else { G.fx.sparks(c, null, 14, 0xb08aff, 5); C.damageEnemy(e, e.hp + (e.shield || 0) + 1, { src: 'skill', sk: 'sk_rift', fixed: true, noMarker: true }); }
+        else { G.fx.sparks(c, null, 10, 0xffd8b0, 5); C.damageEnemy(e, e.hp + (e.shield || 0) + 1, { src: 'skill', sk: 'sk_rift', fixed: true, noMarker: true }); }
       }
       for (const p of C.projectiles || []) if (p.owner === 'enemy' && p.pos && r.cuts.some(([a, b]) => segDist(p.pos, a, b) < 1.2)) { p.life = 0; p.dead = true; }
     }
   };
   A.shadows = null;
-  A.shadowEnd = function () { if (!A.shadows) return; for (const s of A.shadows.list) { G.scene.remove(s.g); G.fx.smoke(s.g.position, 6, 0.8, 0x2a1a40, 0.5, 1); } A.shadows = null; };
+  A.shadowEnd = function () { if (!A.shadows) return; for (const s of A.shadows.list) { G.scene.remove(s.g); G.fx.smoke(s.g.position, 6, 0.8, 0x1c1a1e, 0.5, 1); } A.shadows = null; };
   A.shadowTick = function (dt) {
     const S = A.shadows; if (!S) return;
     S.t -= dt; if (S.t <= 0 || S.area !== G.game.area || P.dead) return A.shadowEnd();
@@ -122,7 +122,7 @@
       let e = a.e;
       if (isMelee) { e = null; let bd = 3.2; for (const o of G.enemies.inRadius(s.g.position, 3.2)) { if (!o.alive || o.ally) continue; const d = o.pos.distanceTo(s.g.position); if (d < bd) { bd = d; e = o; } } }
       if (!e || !e.alive) continue;
-      G.fx.tracer(from, e.centerPos(), 0x9a6aff, 0.025, 0.12);
+      G.fx.tracer(from, e.centerPos(), 0xb4aeb8, 0.025, 0.12);
       C.damageEnemy(e, dmg * S.k, { src: isMelee ? 'melee' : 'bullet', proc: true, noMarker: true });
     }
   };
@@ -131,6 +131,7 @@
     A.updateUltAuras && A.updateUltAuras(dt);
     A.riftTick(dt); A.shadowTick(dt);
     if (P.temps && P.temps.has('ult_godfall')) for (const sk of P.skills) if (sk && !(sk.def && sk.def.ult) && sk.cd > 0) sk.cd = 0; // (神降ろし: no cooldowns)
+    A.tickUseCut();
     A.tickUseQueue();
     for (let i = 0; i < 4; i++) {
       const sk = P.skills[i]; if (!sk) continue;
@@ -296,8 +297,8 @@
         if (g > -Infinity) target.y = Math.max(target.y, g);
         P.pos.copy(target); G.world.depenetrate(P.pos, P.hw, P.height);
         P.vel.multiplyScalar(0.4); P.grounded = false;
-        G.fx.smoke(from, 10, 0.8, 0x6a5a8a, 0.5, 0.8); G.fx.sparks(P.chestPos(), null, 14, 0xc0a0ff, 5);
-        G.vfx.burst(from, 1.1, 0xa070ff); G.vfx.burst(P.chestPos(), 0.9, 0xd0b0ff); G.vfx.tube(from, P.chestPos(), 0.35, 0x9a70ff, 0.25, { alpha: 0.55, speed: 10 });
+        G.fx.smoke(from, 10, 0.8, 0x5a5652, 0.5, 0.8); G.fx.dust(P.pos.clone(), new THREE.Vector3(0, 1, 0), 0x7a746a, 6); // (the air it left rushing in: a puff of dust where it stood and where it is)
+        G.vfx.burst(from, 1.1, 0x8a8580); G.vfx.burst(P.chestPos(), 0.9, 0x8a8580); G.vfx.tube(from, P.chestPos(), 0.35, 0xa8a4a0, 0.25, { alpha: 0.3, speed: 10, core: false });
         G.sfx.magic(P.pos); G.sfx.whoosh(0.2, 0.7);
         if (m.x_arrive) C.explode(P.pos.clone().add(V(0, 1, 0)), 4, sc(100), { src: 'skill', color: 0xc0a0ff, knock: 8 });
         if (m.x_frost) C.zone(fromFeet, 4, 4, 'frost', 0);
@@ -406,7 +407,7 @@
         const f = P.forward(), o = P.chestPos().addScaledVector(f, 1.2);
         const cuts = [[o.clone(), o.clone().addScaledVector(f, len)]];
         if (m.x_twin) { const side = V(-f.z, 0, f.x).normalize(), mid = o.clone().addScaledVector(f, len / 2); cuts.push([mid.clone().addScaledVector(side, -len / 2), mid.clone().addScaledVector(side, len / 2)]); }
-        for (const [a, b] of cuts) G.vfx.tube(a, b, 1.1, 0x7a40ff, dur, { c2: 0xf0e0ff, speed: 6 });
+        for (const [a, b] of cuts) G.vfx.tube(a, b, 1.1, 0x4a4250, dur, { c2: 0xd0c8d4, speed: 6 }); // (a tear in the air: dark, its edge pale)
         A.rifts.push({ cuts, t: dur, dmg: sc(p.dmg), hit: new Map(), area: G.game.area });
         G.sfx.magic(P.pos, 'dark'); G.sfx.whoosh(0.8, 1.6);
         break;
@@ -426,7 +427,7 @@
           const side = n === 2 ? (i ? 1 : -1) * 1.6 : (i - 1) * 1.6, back = n === 2 ? 0.4 : (i === 1 ? 1.2 : 0.4);
           G.scene.add(g); A.shadows.list.push({ g, side, back });
         }
-        A.shadowTick(0); G.fx.smoke(P.pos, 10, 1.2, 0x2a1a40, 0.6, 1.2); G.sfx.magic(P.pos, 'dark');
+        A.shadowTick(0); G.fx.smoke(P.pos, 10, 1.2, 0x1c1a1e, 0.6, 1.2); G.sfx.magic(P.pos, 'dark');
         break;
       }
       case 'sk_scale': {
@@ -551,7 +552,7 @@
         const a = aim(60, true); if (!a.e) { G.ui.toastSmall('🎯 対象がいない'); ok = false; break; }
         const targets = [a.e];
         if (m.x_multi) for (const e of G.enemies.inRadius(a.e.pos, 10)) { if (targets.length >= 3) break; if (!targets.includes(e)) targets.push(e); }
-        for (const e of targets) { C.status(e, 'mark', p.dur); e.st.markMul = 1 + 0.4 * (1 + 0.5 * (ek - 1)); e.st.markKillReset = true; G.vfx.area(e.pos.clone(), 1.2, 'blood', p.dur, { follow: e, col: [0xff3a2a, 0xff9070], alpha: 0.85 }); }
+        for (const e of targets) { C.status(e, 'mark', p.dur); e.st.markMul = 1 + 0.4 * (1 + 0.5 * (ek - 1)); e.st.markKillReset = true; G.vfx.area(e.pos.clone(), 1.2, 'mark', p.dur, { follow: e, col: [0xff3a2a, 0xff9070], alpha: 0.85 }); }
         G.sfx.magic(a.e.pos, 'dark'); break;
       }
       case 'toxic': { const a = aim(40); C.zone(a.floorPt, p.r, p.dur, 'poison', sc(18), { stacks: m.x_virulent ? 2 : 1 }); G.sfx.spit(a.floorPt); break; }
@@ -603,7 +604,7 @@
         for (const e of P.history) if (e.t <= t0) h = e;
         if (!h) { ok = false; break; }
         const from = P.pos.clone();
-        G.fx.smoke(P.chestPos(), 8, 0.8, 0x4a6a8a, 0.4, 0.8); G.vfx.burst(P.chestPos(), 1.0, 0x80b0ff);
+        G.fx.smoke(P.chestPos(), 8, 0.8, 0x5a6066, 0.4, 0.8); G.vfx.burst(P.chestPos(), 1.0, 0x9098a0);
         P.pos.copy(h.p); P.vel.set(0, 0, 0); P.hp = Math.max(P.hp, h.hp); G.world.depenetrate(P.pos, P.hw, P.height);
         { const hl = 0.02 * A.totalLv(sk); if (hl > 0) C.heal(P.stats.maxHp * hl); } // each level: +2% max HP healed on the way back
         if (m.x_heal) C.heal(P.stats.maxHp * 0.2);
@@ -644,7 +645,7 @@
         G.sfx.whoosh(0.6, 1.0, true); P.fovKick = 12; for (let i = 0; i < 20; i++) G.fx.norm.spawn(P.pos.x, P.pos.y, P.pos.z, U.rand(-3, 3), U.rand(-1, 0), U.rand(-3, 3), 0.6, 0.3, 1.2, 0.8, 0.8, 0.8, 0.4, 0, 2); break;
       default: ok = false;
     }
-    if (ok) { A.consume(sk); G.sfx.ui('skill'); }
+    if (ok) { A.consume(sk); G.sfx.ui('skill'); if (P.cutReload) P.cutReload(); } // (a skill that went off puts down a reload under way: player.js cutReload)
   }
 
   // ---------------- ally skeletons ----------------
@@ -656,7 +657,7 @@
     m.group.position.copy(pos);
     G.scene.add(m.group);
     // it climbs out of a dark circle in the floor, through a burst of bone
-    G.vfx.area(pos.clone(), 1.3, 'dark', 1.5, { col: [0x3a1a5a, 0x9a70ff] }); G.vfx.spikes([pos.clone()], { kind: 'bone', r: 1.4, h: 0.8, n: 5, dur: 0.45 });
+    G.vfx.area(pos.clone(), 1.3, 'dark', 1.5, { col: [0x2a2028, 0x6a5a68] }); G.vfx.spikes([pos.clone()], { kind: 'bone', r: 1.4, h: 0.8, n: 5, dur: 0.45 });
     G.fx.smoke(pos.clone().add(V(0, 0.3, 0)), 8, 1, 0x3a2a4a, 1, 1);
     const ent = { pos: pos.clone(), vel: V(), yaw: 0, radius: 0.4, height: 1.8, def, anim: m, cd: 0, walk: 0, atk: 0 };
     C.addAlly({
@@ -753,7 +754,11 @@
     if (pr.wheel) {
       const id = G.ui.itemWheelClose();
       if (id) { if (pr.slot === 'g') { P.grenadeSel = id; G.GrenHold.refresh(); } else P.isel[pr.slot] = id; G.sfx.ui('click'); G.ui.refreshItems(); }
-    } else if (pr.slot === 'g') G.GrenHold.toggle();
+    } else if (pr.slot === 'g') {
+      // readying a throwable takes the hands: what else had them is put down (player.js stopActions); the key again puts it away
+      if (!G.GrenHold.active() && Object.values(P.grenades || {}).some((n) => n > 0)) { if (P.handsBlocked()) { A.press = null; return; } P.beginHands('grenade'); }
+      G.GrenHold.toggle();
+    }
     else A.useSlot(pr.slot);
     A.press = null;
   };
@@ -783,6 +788,39 @@
     else A.useQueue = null; // refused (HP already full, no room to set it down ...): its own message says why
     if (q.left <= 0) A.useQueue = null;
   };
+  // ---------------- an item in the hands put down by a fresh press of fire or of the sights ----------------
+  // A press of either button that was not down already (down now and up the frame before, or pressed and let go within one frame - the
+  // mobile buttons and a quick click alike) puts the item in the hands down the way any other action does (player.js stopActions: given
+  // back if it has not taken effect yet, kept if it has; its sounds cut off), stops a queue, and brings the weapon back up over a weapon's
+  // own draw (weapons.js equip: 0.35 s). A button held on through that then fires / aims with no new press. A button already down when
+  // the use began does nothing until it is let go and pressed again. Not a throwable (no usingId), not with the bag, a sheet or the wheel up
+  const USE_CUT_RAISE = 0.35;
+  A.useCut = null;   // { fire, ads }: what cut the last use short, while the weapon comes back up
+  const btnPrev = [false, false];
+  A.tickUseCut = function () {
+    const W = G.weapons, IA = G.ItemAnim;
+    const fresh = (b, j) => !!((I.mpressed[b] && (!btnPrev[j] || I.mreleased[b])) || (I.mouse[b] && !btnPrev[j]));
+    const f = fresh(0, 0), a = fresh(2, 1);
+    btnPrev[0] = !!I.mouse[0]; btnPrev[1] = !!I.mouse[2];
+    if (!I.mouse[2]) W.heldHeavy = false;
+    const uc = A.useCut;
+    if (uc) {
+      // (a gun that fires a shot a pull, or a burst, fires off the trigger's buffer: kept full while the trigger is held through the draw)
+      if (W.switchT > 0 && uc.fire && I.mouse[0]) W.trigBuf = Math.max(W.trigBuf || 0, 0.13);
+      if (!(W.switchT > 0)) A.useCut = null;
+    }
+    if (!(f || a)) return;
+    const id = A.usingId;
+    if (!id || !IA.busy() || !IA.left(id)) return;
+    if (G.game.state !== 'playing' || P.dead || P.pileState || (G.ui.statusOpen && G.ui.statusOpen()) || A.wheelOpen() || (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen())) return;
+    // (never back later than the use itself would have ended: the draw is cut to what was left of the motion)
+    const raise = Math.min(USE_CUT_RAISE, IA.left(id)[1]);
+    A.cancelUseQueue('🍶 まとめて使うのを中止した');
+    P.beginHands('aim');
+    W.switchT = Math.max(W.switchT || 0, raise);
+    A.useCut = { fire: f, ads: a };
+    if (a && P.meleeMode) W.heldHeavy = true;   // (melee.js: the heavy blow, which wants a fresh press, starts when the draw is done if the button is still down)
+  };
   // ---------------- utility items ----------------
   A.useItemId = function (id, fromQueue) {
     if (P.duelLock) { G.sfx.ui('deny'); return; } // sealed in a duel (duel.js)
@@ -791,14 +829,19 @@
     if (d.revive) { G.ui.toastSmall('🧚 所持しているだけで効果を発揮'); return; }
     if (d.heal && P.hp >= P.stats.maxHp && !d.temp && !d.maxHp && !d.os && !d.cleanse && !d.ambrosia) { G.ui.toastSmall('❤️ HPは満タン'); G.sfx.ui('deny'); return; }
     if (d.forge) { const w = P.meleeMode || !P.weapon ? P.melee : P.weapon; if (!w || w.id === (G.BARE_MELEE || 'fists') || (w.lv || 0) >= G.Areas.forgeCap(w)) { G.ui.toastSmall('🔨 強化できる武器を持っていない（上限に達している）'); G.sfx.ui('deny'); return; } }
-    if (G.ItemAnim.busy()) return;
+    // the same item already in the hands: the key again changes nothing. Another one: the one in the hands is put down (given back if it
+    // has not taken effect yet) and this one is used (player.js stopActions)
+    if (G.ItemAnim.busy() && G.ItemAnim.left(id)) return;
+    if (P.handsBlocked() || !P.itemCount(id)) return;
     if (d.chest) {
       const w = G.world; const f = P.forward(); f.y = 0; f.normalize(); const pt = P.pos.clone().addScaledVector(f, 2.5);
       if (!(w.boxFree(pt.x - 0.7, pt.y + 0.05, pt.z - 0.7, pt.x + 0.7, pt.y + 1, pt.z + 0.7) && w.groundAt(V(pt.x, pt.y + 0.3, pt.z), 0.3, 1) > -Infinity)) { G.ui.toastSmall('🗺️ ここには出せない'); return; }
     }
+    P.beginHands(fromQueue ? 'queue' : 'item');
     if (!P.takeItem(id)) return;
     G.ui.refreshItems();
-    G.ItemAnim.play(G.ItemAnim.kindOf(id), id, () => A.applyItem(id));
+    A.usingId = id;   // (what is in the hands: given back if it is put down before it takes effect)
+    G.ItemAnim.play(G.ItemAnim.kindOf(id), id, () => A.applyItem(id), () => { if (A.usingId === id) A.usingId = null; });
     // centre gauge until the healing is done (the motion, plus any heal-over-time that follows)
     if (d.heal) P.healGauge = { t: 0, id, over: d.over || 0, icon: it.icon };
   };

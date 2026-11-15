@@ -14,6 +14,7 @@ const PORT = +process.env.COOP_PORT || 9883;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); 1");
     // hard and extra 1-3 cleared: extra 4 is the highest you can play
     await p.eval("(() => { const c = G.Run.rec(); c.hard = c.hard || 1; for (let k = 1; k <= 10; k++) delete c['extra' + k]; c.extra1 = c.extra2 = c.extra3 = 1; delete G.save.data.extraLv; G.save.write(); })(); 1");
@@ -57,6 +58,7 @@ const PORT = +process.env.COOP_PORT || 9883;
     await p.eval('G.save.write(); location.reload(); 1').catch(() => {});
     await sleep(1500);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     lv = await open();
     ok(lv === 5, `after a reload: still that level (${lv})`);
     const errs = p.errs || [];

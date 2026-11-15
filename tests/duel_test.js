@@ -3,6 +3,8 @@
 // for the reading time, every blow flashes gold first, a press in the window parries (no damage, gauge down), a press too early or a held key fails
 // (damage taken), the gauge emptied by parries breaks (12% of health, stagger), and a duel that runs out leaves the gauge as a shield that ordinary
 // damage wears down at half rate before health can fall; the second duel comes at 35%.
+// The rule is shown as a large guide (not a toast) all through the waiting time: the bound key as a keycap (a changed binding shows), the seconds
+// left; the first duel of a run adds the rules in three lines, later ones do not; at the fight it gives way to the band, whose key is a keycap too.
 //   node tests/duel_test.js [ids...]
 const path = require('path');
 const { serve, launch, sleep } = require('./coop/cdp');
@@ -16,8 +18,10 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.volume = 0; G.save.write(); G.sfx.setVolume && G.sfx.setVolume(0); G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until("!!G.game.run && !!G.world", 30000);
+    await p.running();
     await sleep(500);
     // blows on the player are counted, not felt
     await p.eval("window.__hits = []; const d0 = G.combat.damagePlayer; G.combat.damagePlayer = function (dmg, info) { if (info && info.attacker && info.attacker.boss) { __hits.push({ t: G.Duel.cur ? G.Duel.cur.t : -1, dmg }); return 0; } return d0.apply(this, arguments); }; 1");
@@ -25,6 +29,9 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
     // the bot rides on the game's own frame (a background tab gives requestAnimationFrame no time): the key goes down the frame a blow flashes, up two frames later
     await p.eval("window.__auto = null; window.__up = 0; const u0 = G.bosses.update; G.bosses.update = function (dt) { const r = u0.apply(this, arguments); const d = G.Duel.cur, k = G.BIND.reload[0]; if (window.__up > 0 && --window.__up === 0) G.input.keys[k] = false; if (d && d.combo && window.__auto === 'ok') for (const s of d.combo.list) if (s.flashed && !s.done && !s.parried && !s._p) { s._p = true; G.input.keys[k] = true; G.Duel._kt = performance.now(); window.__up = 2; } return r; }; 1");
     const press = () => p.eval("G.input.keys[G.BIND.reload[0]] = true; 1").then(() => sleep(60)).then(() => p.eval("G.input.keys[G.BIND.reload[0]] = false; 1"));
+    // the guide of the waiting time, as it stands now
+    const GUIDE = "(() => { const g = document.querySelector('#duel-ov .dv-guide'), k = g && g.querySelector('.dg-k .dv-key'), n = g && g.querySelector('.dg-n'); return { on: !!g && /\\bon\\b/.test(g.className) && getComputedStyle(g).display !== 'none', rule: !!g && /金色に光った瞬間に/.test(g.textContent) && /でパリィ/.test(g.textContent), key: k ? k.textContent.trim() : '', want: G.Duel.keyName(), n: n ? +n.textContent : -1, more: !!g && /\\bmore\\b/.test(g.className) && getComputedStyle(g.querySelector('.dg-more')).display !== 'none' }; })()";
+    let firstDuel = true;
     for (const id of IDS) {
       console.log(`--- ${id}`);
       await p.eval(`G.bosses.forArea = () => '${id}'; G.bosses.clear(); G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.enterArea(5, 'boss'); 1`);
@@ -39,10 +46,21 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
       await p.eval('(() => { window.__toasts = []; if (!G.ui.__tw) { const t0 = G.ui.toast; G.ui.toast = function (m) { (window.__toasts = window.__toasts || []).push(String(m)); return t0.apply(this, arguments); }; G.ui.__tw = 1; } return 1; })()');
       await p.eval("(() => { const b = G.bosses.active; b.hp = b.maxHp * 0.69; return 1; })()");
       await p.until('!!G.Duel.cur', 5000).catch(() => {});
-      const st = JSON.parse(await p.eval("JSON.stringify({ on: !!G.Duel.cur, lock: !!G.player.duelLock, melee: !!G.player.meleeMode, ring: !!(G.Duel.cur && G.Duel.cur.ring), ov: document.getElementById('duel-ov').className, toast: __toasts.some((t) => /金色に光った瞬間/.test(t) && t.length < 60), R: G.Duel.cur && G.Duel.cur.R, half: Math.min(G.world.W, G.world.arenaD || G.world.D) / 2, cam: G.avatar.tpK, wg: G.bosses.active.duelSt.wg / G.bosses.active.maxHp, foes: G.enemies.list.filter((e) => e.alive && !e.boss).length })"));
+      await p.until("!!document.querySelector('#duel-ov .dv-guide.on')", 3000).catch(() => {});
+      const st = JSON.parse(await p.eval("JSON.stringify({ on: !!G.Duel.cur, lock: !!G.player.duelLock, melee: !!G.player.meleeMode, ring: !!(G.Duel.cur && G.Duel.cur.ring), ov: document.getElementById('duel-ov').className, toast: __toasts.some((t) => /金色に光った瞬間/.test(t)), guide: " + GUIDE + ", R: G.Duel.cur && G.Duel.cur.R, half: Math.min(G.world.W, G.world.arenaD || G.world.D) / 2, cam: G.avatar.tpK, wg: G.bosses.active.duelSt.wg / G.bosses.active.maxHp, foes: G.enemies.list.filter((e) => e.alive && !e.boss).length })"));
       console.log('     ', JSON.stringify(st));
       check(st.on && st.lock && st.melee && st.ring, 'at 70% a duel starts: the melee weapon in hand, locked, a ring');
-      check(/on/.test(st.ov) && st.toast, 'the rule is shown as a short toast');
+      check(/on/.test(st.ov) && st.guide.on && st.guide.rule && st.guide.key === st.guide.want && st.guide.key.length > 0, 'the rule is shown as a large guide, the key drawn as a keycap ' + JSON.stringify(st.guide));
+      check(!st.toast, 'and not again as a toast');
+      check(st.guide.n >= 1 && st.guide.n <= Math.ceil(await p.eval('G.Duel.INTRO + G.Duel.READ')), 'it counts down the seconds to the fight (' + st.guide.n + ')');
+      check(st.guide.more === firstDuel, firstDuel ? 'the first duel of the run adds the rules in three lines' : 'a later duel of the run does not repeat them');
+      firstDuel = false;
+      // a changed binding shows at once
+      await p.eval("G.BIND.reload.unshift('KeyT'); 1"); await sleep(250); await p.frames(4);
+      const gk = JSON.parse(await p.eval('JSON.stringify(' + GUIDE + ')'));
+      await p.eval("G.BIND.reload.shift(); 1"); await sleep(250); await p.frames(4);
+      const gk2 = JSON.parse(await p.eval('JSON.stringify(' + GUIDE + ')'));
+      check(gk.key === 'T' && gk2.key === st.guide.key && gk2.on, `the guide shows the key as it is bound (${gk.key} / ${gk2.key})`);
       check(Math.abs(st.R * 2 - st.half) < 0.5, `the ring is half the stage across (${st.R * 2} of ${st.half * 2})`);
       await p.until('G.avatar.tpK > 0.9', 8000).catch(() => {});
       check((await p.eval('G.avatar.tpK')) > 0.9 && (await p.eval('G.avatar.root.visible')), 'the camera goes third person, the body is shown');
@@ -61,6 +79,8 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
       await p.until('!G.Duel.cur || !G.Duel.cur.combo', 12000);
       const missed = (await p.eval('__hits.length')) - h0;
       check(missed > 0, `blows not parried land (${missed})`);
+      const band = JSON.parse(await p.eval("JSON.stringify({ guide: !!document.querySelector('#duel-ov .dv-guide.on'), me: !!document.querySelector('#duel-ov .dv-low.me'), key: (document.querySelector('#duel-ov .dv-low kbd.dv-key') || {}).textContent || '', want: G.Duel.keyName(), vis: getComputedStyle(document.querySelector('#duel-ov .dv-low')).visibility })"));
+      check(!band.guide && band.me && band.key === band.want && band.vis === 'visible', 'in the fight the guide is gone and the band shows the key as a keycap ' + JSON.stringify(band));
       check(await p.eval('G.bosses.active.duelSt.wg / G.bosses.active.maxHp > 0.119'), 'and take nothing off the gauge');
       // parry: wait for each flash and press inside the window
       // the in-page bot presses the key the frame each blow flashes (the test's own polling is far too slow for a 0.3 s window)
@@ -107,6 +127,9 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
       await p.eval("(() => { const b = G.bosses.active; b.hp = b.maxHp * 0.34; return 1; })()");
       await p.until('!!G.Duel.cur', 5000).catch(() => {});
       check(await p.eval('!!G.Duel.cur && G.bosses.active.duelSt.n === 2'), 'the second duel comes at 35%');
+      await p.until("!!document.querySelector('#duel-ov .dv-guide.on')", 3000).catch(() => {});
+      const gd2 = JSON.parse(await p.eval('JSON.stringify(' + GUIDE + ')'));
+      check(gd2.on && gd2.rule && !gd2.more, 'the second duel shows the guide again, without the three lines ' + JSON.stringify(gd2));
       await p.eval('G.Duel.cur.t = Math.max(G.Duel.cur.t, G.Duel.cur.readUntil); G.Duel.cur.fightT = G.Duel.limit() - 0.5; 1');
       await p.until('!G.Duel.cur', 5000);
       const sh = JSON.parse(await p.eval("JSON.stringify({ wg: G.bosses.active.duelSt.wg, max: G.bosses.active.duelSt.wgMax, hp: G.bosses.active.hp, lbl: document.getElementById('boss-duel').className })"));

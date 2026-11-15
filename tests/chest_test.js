@@ -16,8 +16,10 @@ const FIELDS = ['grave', 'hamlet', 'dusk', 'battlefield', 'gate', 'catacombs', '
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(400);
     const ev = async (js) => JSON.parse(await p.eval(`JSON.stringify((() => { ${js} })())`));
     // the chests of an area of a field, built as the game builds it

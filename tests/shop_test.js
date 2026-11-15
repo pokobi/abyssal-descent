@@ -12,8 +12,10 @@ const PORT = +process.env.COOP_PORT || 9995;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); G.game.dev = { god: true, speed: 1 }; 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(600);
     await p.eval("G.game.run.freeArea = -1; G.game.rewardPending = null; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.area = 17; G.game.enterArea(18, 'shop'); 1");
     await p.until("G.game.stage === 'shop' && !!G.game.shop && G.game.shop.offers.length > 10", 20000);

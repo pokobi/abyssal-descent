@@ -261,8 +261,8 @@
     catacombs: { icon: '⚰️', rarity: 'rare', desc: '高い丸天井の下に南北へ延びる、細長い納骨の大回廊。両側の壁は骨を納めた棚が段々に積み上がり、高さ4.5mと9mの二段の通路が続く。段は正面の階段で上り下りし、一段目どうしは回廊をまたぐ石橋でつながる。一段目の壁には鉄格子の扉のある小さな納骨室が掘られ、扉を閉めれば敵は叩き壊すまで足止めされる。交差部に骨の塔が立つものや、段の一部が崩れてがれきの坂になったものもある。' },
     castle: { icon: '🏰', rarity: 'rare', desc: '血の色の月の下、山の斜面に三段に築かれた古城。入口は天守のある上の郭で、門は一番下の外郭にある。段の縁の胸壁から下の郭を見下ろし、門楼の下の階段で下りる。胸壁を越えて飛び降りることもできるが、上るには階段しかない。外郭の歩廊の大釜を傾けると、城壁の下に煮え油が流れ落ちて燃え上がる。' },
     flooded: { icon: '🌊', rarity: 'rare', desc: '洞窟の底に沈んだ町。水の上に出ているのは壁と屋根だけで、壁の上と平らな屋根、通りをまたぐアーチと板が道になる。その間の水は深く、下りられるが、胸まで浸かって歩みは遅く、ほとんど跳べない（水の魔物は平気で動く）。所々に水から上がる階段がある。水門の車輪を回すと激流が通りを横切り、水の中の敵を押し流す。' },
-    foundry: { icon: '🔥', rarity: 'rare', desc: '溶けた鉄の湖の上に建つ、まだ機械の動く古い溶鉱炉。床はなく、鉄張りの作業場が二つの高さで溶鉄から立ち、足場の渡り廊下が必ずどこかへつながる。その間を、隙間を往復する台車、低い作業場から高い作業場へ上がる昇降台、上に立つ者を運ぶコンベアが動く。落ちると熱に弾き返され、元の場所に戻る。吊られたるつぼを撃つと、真下に溶鉄が降り注ぐ。' },
-    frozen: { icon: '❄️', rarity: 'epic', desc: '凍りついた地底湖の上に建つ霊廟の大広間。戦う床は氷そのもので、よく滑る。爆発や落ちてきた氷柱でひびが入り、二度目で割れて、下の冷たい水に落ちると最後に立っていた岸へ戻される（敵は戻らない）。割れた所はしばらくで凍り直す。湖の周りは石の岸、氷の中には墓の島が立ち、天井からは氷柱が落ちてくる。' },
+    foundry: { icon: '🔥', rarity: 'epic', desc: '溶けた鉄の湖の上に建つ、まだ機械の動く古い溶鉱炉。床はなく、鉄張りの作業場が二つの高さで溶鉄から立ち、足場の渡り廊下が必ずどこかへつながる。その間を、隙間を往復する台車、低い作業場から高い作業場へ上がる昇降台、上に立つ者を運ぶコンベアが動く。落ちると熱に弾き返され、元の場所に戻る。吊られたるつぼを撃つと、真下に溶鉄が降り注ぐ。' },
+    frozen: { icon: '❄️', rarity: 'rare', desc: '凍りついた地底湖の上に建つ霊廟の大広間。戦う床は氷そのもので、よく滑る。爆発や落ちてきた氷柱でひびが入り、二度目で割れて、下の冷たい水に落ちると最後に立っていた岸へ戻される（敵は戻らない）。割れた所はしばらくで凍り直す。湖の周りは石の岸、氷の中には墓の島が立ち、天井からは氷柱が落ちてくる。' },
     sanctum: { icon: '☁️', rarity: 'epic', desc: '深淵の底に広がる、偽りの空に浮かぶ聖域。白い石の島々を広い橋がつなぎ、雲の下は闇。島の縁の風の像を目覚めさせると、突風が島を横切り、敵を奈落へ押し流す。' },
     ruin: { icon: '🕳️', rarity: 'epic', desc: '迷宮の最奥、蒼い炎が燃える廃都。中層と同じ、南北に延びる谷で二分された3階建てで、谷底には蒼炎が流れる。崩落が進み、柱は折れ、各階の床の裂け目からも蒼炎が噴き出す（触れると高レベルの炎上）。「湧き墓」が中層より多く、鉄格子の部屋に多く立つ。' },
   };
@@ -312,6 +312,8 @@
     for (const b of G.BOSSES) if (!(G.RETIRED_BOSSES || []).includes(b.id)) { const st = bossStats(b); if (st) mx = Math.max(mx, st.hp); }
     return mx * 1.1;
   }
+  // the game's baked surfaces copied for this renderer (they live in the game renderer's context and come out black here: gfx.js)
+  const port = (root) => (G.GFX && G.GFX.portable ? G.GFX.portable(root, renderer) : root);
   function mount3d(host, o) {
     if (!renderer) {
       canvas = document.createElement('canvas');
@@ -326,7 +328,8 @@
       scene.add(new THREE.HemisphereLight(0xb0a8a0, 0x302820, 1.2));
       const k = new THREE.DirectionalLight(0xffe0c0, 2.2); k.position.set(2, 3, 2); scene.add(k);
       const r2 = new THREE.DirectionalLight(0x8090c0, 1.0); r2.position.set(-2, 1, -2); scene.add(r2);
-      scene.environment = G.envTex || null;
+      // the game's reflections (G.envTex) live in the game renderer's own context and read as black here: a copy for this renderer
+      scene.environment = G.StatusUI && G.StatusUI.envFor ? G.StatusUI.envFor(renderer) : null;
       cam = new THREE.PerspectiveCamera(35, 380 / 260, 0.01, 100);
     }
     host.appendChild(canvas);
@@ -335,7 +338,7 @@
     if (tab === 'boss') {
       const m = G.bosses.buildModelOnly(o.id, BOSS_REF);
       if (!m) { host.innerHTML = `<div class="cd-icon">${o.icon}</div>`; return; }
-      const r = m.root; r.updateMatrixWorld(true);
+      const r = m.root; port(r); r.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(r); const c = box.getCenter(new THREE.Vector3()); const sz = box.getSize(new THREE.Vector3());
       r.position.sub(c);
       const g = new THREE.Group(); g.add(r); model = g;
@@ -344,14 +347,14 @@
       scene.add(model); if (!raf) loop(); return;
     }
     if (tab === 'weapon' || tab === 'melee') {
-      model = tab === 'melee' ? G.weapons.meleeDisplayModel(o) : G.weapons.displayModel(o);
+      model = port(tab === 'melee' ? G.weapons.meleeDisplayModel(o) : G.weapons.displayModel(o));
       const box = new THREE.Box3().setFromObject(model); const c = box.getCenter(new THREE.Vector3()); const sz = box.getSize(new THREE.Vector3()).length();
       model.position.sub(c);
       const g = new THREE.Group(); g.add(model); model = g;
       cam.position.set(0, sz * 0.25, sz * 1.6); cam.lookAt(0, 0, 0);
     } else {
       const m = G.enemies.buildModel(o);
-      model = m.group;
+      model = port(m.group);
       const h = m.h, s = Math.max(h, m.r * 2.5);
       model.position.y = -h * 0.5;
       const g = new THREE.Group(); g.add(model); model = g;

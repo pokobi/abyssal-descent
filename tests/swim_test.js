@@ -15,8 +15,10 @@ const PORT = +process.env.COOP_PORT || 9871;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000); await sleep(400);
+    await p.running();
     await p.eval("(() => { G.Run.field = () => 'flooded'; G.game.seed = 1017; G.game.area = 2; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.enterArea(3, 'combat'); })(); 1");
     await p.until("G.world && G.world.biome === 'flooded' && !!G.world.deepWater", 40000); await sleep(1500);
     if (process.env.FOE_TRACE) await p.eval('window.__trace = []; 1');
@@ -31,7 +33,9 @@ const PORT = +process.env.COOP_PORT || 9871;
       out.bed = +c.y.toFixed(2);
       // crouched on the bed: the eyes under the surface
       K[B.crouch[0]] = true; GM.step(0.05, 30);
-      out.camY = +G.camera.position.y.toFixed(2); out.under = G.Water.underOn(); out.tint = !!document.querySelector('#underwater.on'); out.fog = +G.scene.fog.density.toFixed(3);
+      // (the water's look: drawn in the frame on medium and high quality (post.js, G.Post.water.mode 2), or a tint over it on low; the
+      // haze is the scene's own fog, as before)
+      out.camY = +G.camera.position.y.toFixed(2); out.under = G.Water.underOn(); out.tint = !!(G.Post && G.Post.active ? G.Post.water && G.Post.water.mode === 2 : (document.getElementById('uw-tint') || {}).style && +document.getElementById('uw-tint').style.opacity > 0); out.fog = +G.scene.fog.density.toFixed(3);;
       K[B.crouch[0]] = false; GM.step(0.05, 6);
       // hold jump: up to the surface, and a hop out of the water at the top
       K[B.jump[0]] = true; G.input.pressed[B.jump[0]] = true;

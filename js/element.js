@@ -269,9 +269,16 @@
     if (!cur || EL.auraLeft(e) < EL.AURA_T - 1) EL.setAura(e, el, EL.AURA_T); // (kept topped up: re-sent to co-op screens once a second at most)
     return true;
   };
-  EL.envPlayer = function (el, wait) {
+  // react (the ground's water and ice, fields.js): water and ice on you together freeze you there as they would a foe (EL.freezePlayer);
+  // in the grace after a thaw the new one only takes the other's place. No other pair reacts from the ground or the sky
+  EL.envPlayer = function (el, wait, react) {
     if (!P || P.dead || !el || !EL.BY[el] || !EL.BY[el].aura) return false;
     const cur = EL.playerAura(), now = G.game.time, dur = EL.SELF_T * Math.max(0.1, 1 - sx('elSelfT'));
+    if (react && cur && cur !== el && (pair(cur, el) || {}).id === 'freeze') {
+      if (EL.freezePlayer()) return true;
+      if (P.elFrozen > 0) return false;
+      P._envBare = 0; P.au = { el, t: now + dur }; return true;
+    }
     if (cur && cur !== el && !(el === 'water' && cur === 'fire')) { P._envBare = 0; return false; }
     if (!cur && wait) { if (!P._envBare) { P._envBare = now; return false; } if (now - P._envBare < wait) return false; }
     P._envBare = 0;
@@ -315,8 +322,10 @@
       const pos = e.centerPos();
       switch (id) {
         case 'boil': case 'thaw':
-          G.fx.sparks(pos, null, 14, id === 'boil' ? 0xffc080 : 0xffd0e0, 6);
-          if (id === 'boil') G.fx.smoke && G.fx.smoke(pos, 6, 1.2, 0xe8e8f0, 0.5, 1.0);
+          // (boil: water flashing to steam on something hot; thaw: ice melting off in steam and running water)
+          G.fx.steam(pos, id === 'boil' ? 12 : 8, id === 'boil' ? 1.2 : 0.9);
+          if (id === 'thaw') { G.fx.iceBurst(pos, 6, 2, 0.8); for (let i = 0; i < 10; i++) G.fx.drops.spawn(pos.x + G.U.rand(-0.3, 0.3), pos.y + G.U.rand(-0.2, 0.4), pos.z + G.U.rand(-0.3, 0.3), G.U.rand(-0.6, 0.6), G.U.rand(0, 1.2), G.U.rand(-0.6, 0.6), 0.6, 0.012, 0.55, 0.6, 0.64, 9.8, 0.3, 0.03); }
+          else G.fx.sparks(pos, null, 5, 0xffc080, 4);
           break;
         case 'freeze': {
           const s = e.st, now = G.game.time;
@@ -327,18 +336,18 @@
             s.frozen = Math.max(s.frozen || 0, t); e._elFrozen = true; s.frostStacks = 0;
             e.freezeImmuneUntil = now + t + 4;
           } else s.elSlow = Math.max(s.elSlow || 0, 2);
-          G.sfx.ice(e.pos); G.fx.sparks(pos, null, 16, 0xd0f0ff, 5);
+          G.sfx.ice(e.pos); G.fx.iceBurst(pos, 14, 3.5);
           break;
         }
         case 'shatter': {
           e.st.frozen = 0; e._elFrozen = false;
-          G.fx.sparks(pos, null, 26, 0xe8f8ff, 9); G.sfx.ice(e.pos);
+          G.fx.iceBurst(pos, 30, 7, 1.5); G.fx.dust(pos, null, 0x9aa0a4, 4); G.sfx.ice(e.pos);
           rxHit(e, EL.scale(120) * EL.effMul('shatter'), 'shatter');
           break;
         }
         case 'blast': {
           const r = 4 * (1 + sx('rxBlastR'));
-          G.fx.explosion(pos, r, 0xff6aa8, { decal: false }); G.sfx.explosion(pos, 0.7);
+          G.fx.explosion(pos, r, 0xff8a40, { decal: false }); G.fx.arcsOn(pos, r * 0.3, 1.2, 4); G.sfx.explosion(pos, 0.7);
           const dmg = EL.scale(90) * EL.effMul('blast');
           for (const o of G.enemies.inRadius(e.pos, r)) {
             const d = o.pos.clone().sub(e.pos).setY(0); if (d.lengthSq() < 0.01) d.set(1, 0, 0);
@@ -350,13 +359,13 @@
           const s = e.st;
           s.leak = 4; s.leakK = EL.scale(14) * EL.effMul('leak') * (1 + sx('rxLeak')); s.leakT = 0;
           if (e.alive) C.status(e, 'shock', 1);
-          G.fx.sparks(pos, null, 12, 0xb0c8ff, 6);
+          G.fx.arcsOn(pos, (e.radius || 0.6) * 0.9, (e.height || 1.6) * 0.7, 5); for (let i = 0; i < 8; i++) G.fx.drops.spawn(pos.x, pos.y, pos.z, G.U.rand(-2, 2), G.U.rand(0.5, 2.5), G.U.rand(-2, 2), 0.5, 0.01, 0.55, 0.6, 0.64, 9.8, 0.3, 0.025);
           break;
         }
         case 'brittle': {
           const s = e.st;
           s.brittle = 8; s.brittleK = (e.boss ? 0.15 : 0.25) * (1 + EL.effK(EL.mastery()) * 0.5) * cls() + sx('rxBrittle');
-          G.fx.sparks(pos, null, 12, 0xd8c8ff, 5);
+          G.fx.arcsOn(pos, (e.radius || 0.6) * 0.8, (e.height || 1.6) * 0.6, 3); G.fx.iceBurst(pos, 8, 2.5, 0.8);
           break;
         }
         case 'swirl': {
@@ -398,7 +407,7 @@
       if (s.leakT <= 0) {
         s.leakT = 0.5;
         rxHit(e, s.leakK || EL.scale(14), 'leak', { silent: false });
-        G.fx.sparks(e.centerPos(), null, 4, 0xb0c8ff, 4);
+        G.fx.arcsOn(e.centerPos(), (e.radius || 0.6) * 0.8, (e.height || 1.6) * 0.6, 2);
         // it runs on into foes that are wet
         const r = 6 + (P.has('rx_leakR') ? 3 : 0);
         for (const o of G.enemies.inRadius(e.pos, r)) {
@@ -448,11 +457,50 @@
   EL.dropCrystal = function (pos, el) {
     if (!G.scene) return;
     const col = EL.BY[el] ? EL.BY[el].hex : 0xe0a640;
-    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9 }));
+    const m = EL.crystalModel(col);
     const floor = G.world && G.world.floorBelow ? G.world.floorBelow(pos.x, pos.y + 1, pos.z) : pos.y;
     m.position.set(pos.x, floor + 0.7, pos.z);
     G.scene.add(m);
     EL.crystals.push({ m, el, t: 10, base: floor + 0.7 });
+  };
+  // (晶壁: a growth of crystal on a broken lump of rock - seven six-sided columns of unequal girth and length, each ending in a point,
+  // leaning out from one root. Each face its own shade, darker toward the root and where it is thick: a mineral with body, not a pane.
+  // The colour is in the vertices, so one shape is made per element and kept)
+  const crysGeos = {};
+  const _hc = (i, k) => { const n = Math.sin(i * 12.9898 + k * 78.233 + 4.1) * 43758.5453; return n - Math.floor(n); };
+  EL.crystalModel = function (col) {
+    const key = col >>> 0;
+    if (!crysGeos[key]) {
+      const MIN = { fire: 0x5c3c2a, water: 0x3e586a, ice: 0x9aa6ae, volt: 0x5a6484, wind: 0x5a7468, earth: 0x86703e };
+      const elId = (EL.LIST.find((x) => x.hex === col) || {}).id, tint = new THREE.Color(MIN[elId] || 0x7a746c);
+      const rock = new THREE.Color(0x3a3530), parts = [];
+      const lump = new THREE.IcosahedronGeometry(0.24, 1), lp = lump.attributes.position;
+      for (let i = 0; i < lp.count; i++) { const x = lp.getX(i), y = lp.getY(i), z = lp.getZ(i), f = 0.78 + 0.4 * _hc(i, 3); lp.setXYZ(i, x * f * 1.15, Math.max(-0.05, y * f * 0.42), z * f); }
+      parts.push([lump.toNonIndexed(), rock, 0.5]);
+      const cols = [[0, 0, 0.13, 0.62], [0.9, 0.55, 0.09, 0.42], [2.1, 0.62, 0.1, 0.46], [3.0, 0.48, 0.07, 0.33], [4.0, 0.7, 0.08, 0.3], [5.1, 0.42, 0.11, 0.5], [5.9, 0.85, 0.06, 0.24]];
+      for (const [an, tilt, rw, h] of cols) {
+        const pr = new THREE.CylinderGeometry(rw * 0.9, rw, h, 6, 1); pr.translate(0, h / 2, 0);
+        const tp = new THREE.ConeGeometry(rw * 0.9, rw * 2.2, 6, 1); tp.translate(0, h + rw * 1.1, 0);
+        for (const g of [pr, tp]) { g.rotateY(_hc(an, 9) * 1.0); g.rotateZ(tilt); g.rotateY(an); g.translate(Math.cos(an) * rw * 0.6, 0.04, Math.sin(an) * rw * 0.6); parts.push([g.toNonIndexed(), tint, 1]); }
+      }
+      let n = 0; for (const [g] of parts) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), cl = new Float32Array(n * 3); let k = 0, f = 0;
+      for (const [g, c, kind] of parts) {
+        const ps = g.attributes.position.array; pos.set(ps, k * 3);
+        for (let v = 0; v < g.attributes.position.count; v += 3, f++) {
+          const sh = kind === 1 ? 0.5 + 0.75 * _hc(f, 1) : 0.6 + 0.5 * _hc(f, 2);
+          for (let q = 0; q < 3; q++) { const y = ps[(v + q) * 3 + 1], root = kind === 1 ? 0.45 + 0.55 * Math.min(1, Math.max(0, y / 0.5)) : 1, j = (k + v + q) * 3; cl[j] = c.r * sh * root; cl[j + 1] = c.g * sh * root; cl[j + 2] = c.b * sh * root; }
+        }
+        k += g.attributes.position.count; g.dispose();
+      }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(cl, 3)); geo.computeVertexNormals(); geo.translate(0, -0.32, 0);
+      crysGeos[key] = geo;
+    }
+    const base = (G.vfx && G.vfx.crystalMat) ? G.vfx.crystalMat.clone() : new THREE.MeshStandardMaterial({ roughness: 0.45, flatShading: true, vertexColors: true });
+    const c = G.fx.tone ? G.fx.tone(col) : new THREE.Color(col);
+    base.color.setRGB(1, 1, 1); base.emissive.copy(c).multiplyScalar(0.025); base.roughness = 0.42; base.metalness = 0; base.vertexColors = true; base.transparent = false; base.opacity = 1; base.needsUpdate = true;
+    const m = new THREE.Mesh(crysGeos[key], base); m.scale.setScalar(1.15);
+    return m;
   };
   EL.pickCrystal = function (c) {
     const sh = 40 * (1 + sx('rxCrystal'));
@@ -471,14 +519,14 @@
       const d = c.m.position.distanceTo(P.chestPos());
       if (pull && d < 9) c.m.position.lerp(P.chestPos(), Math.min(1, dt * 4));
       else c.m.position.y = c.base + Math.sin(c.t * 3) * 0.12;
-      if (c.t < 2) c.m.material.opacity = 0.9 * c.t / 2;
+      if (c.t < 2) c.m.scale.setScalar(1.15 * Math.max(0.05, c.t / 2));
       if (!P.dead && d < 1.7) { EL.pickCrystal(c); c.t = 0; }
-      if (c.t <= 0) { G.scene.remove(c.m); c.m.geometry.dispose(); c.m.material.dispose(); EL.crystals.splice(i, 1); }
+      if (c.t <= 0) { G.scene.remove(c.m); c.m.material.dispose(); EL.crystals.splice(i, 1); } // (the shape is shared: only its own material goes)
     }
     EL.tickPlayer(dt);
     EL.bossTick();
   };
-  EL.clear = function () { for (const c of EL.crystals) { if (G.scene) G.scene.remove(c.m); } EL.crystals.length = 0; if (P) { P.au = null; P.elFrozen = 0; P.elLeak = 0; P.elBrittle = 0; } };
+  EL.clear = function () { for (const c of EL.crystals) { if (G.scene) G.scene.remove(c.m); } EL.crystals.length = 0; if (P) { P.au = null; if (P.elFrozen > 0) EL.thawPlayer(true); P.elFrozen = 0; P.frzEl = 0; P.frzGrace = 0; P.elLeak = 0; P.elBrittle = 0; } };
 
   // ---------------------------------------------------------------- the player's side
   EL.playerAura = () => (P && P.au && P.au.t > G.game.time ? P.au.el : null);
@@ -492,24 +540,65 @@
     if (cur === el) { P.au.t = G.game.time + dur; return mul; }
     const r = pair(cur, el);
     if (!r) return mul;
+    // (frozen already, or the grace after a thaw: no freeze; the blow's element takes the other's place)
+    if (r.id === 'freeze' && !EL.canFreeze()) { if (!(P.elFrozen > 0)) P.au = { el, t: G.game.time + dur }; return mul; }
     P.au = null;
     const soft = Math.max(0.1, 1 - sx('elSelfRes'));
     const res = Math.max(EL.selfRes(cur), EL.selfRes(el));
     const sc = 1 + 0.1 * Math.max(0, (G.game.area || 1) - 1);
     const rx = EL.RX[r.id];
-    G.ui.toastSmall(`${EL.BY[cur].icon}${EL.BY[el].icon} ${rx.name}`);
+    if (r.id !== 'freeze') G.ui.toastSmall(`${EL.BY[cur].icon}${EL.BY[el].icon} ${rx.name}`); // (frozen: the screen says it, pstatus.js)
     switch (r.id) {
       case 'boil': case 'thaw': mul *= 1 + ((r.amp >= 2 ? 1.5 : 1.3) - 1) * soft; break;
-      case 'freeze': P.elFrozen = 1; G.sfx.ice(P.pos); break;
+      case 'freeze': EL.freezePlayer(); break;
       case 'blast': setTimeout(() => { if (P && !P.dead) C.damagePlayer(20 * sc * (1 - res) * soft, { src: 'react', fixed: true }); }, 0); P.addShake(0.4); break;
       case 'leak': P.elLeak = 3; P.elLeakK = 4 * sc * (1 - res) * soft; P.elLeakT = 0.5; break;
       case 'brittle': P.elBrittle = 5; break;
     }
     return mul;
   };
+  // ---------------------------------------------------------------- frozen solid
+  // Water and ice on you together freeze you, as they freeze a foe: from a blow that brings the other one, or from the ground (wet,
+  // stepping out onto ice; on ice, going into water), anywhere. For T s you can only look about: player.js holds every other input for
+  // the frame (G.input.hold) and puts down whatever was under way (P.stopActions). Each fresh press of jump cracks the ice: TAP s off,
+  // but it never ends before MIN of its whole length. Thawed, GRACE s in which nothing freezes you again (elements still land). No
+  // shatter on you: the blows land as they would. What it looks like: pstatus.js (and post.js); on the other screens: coop/body.js.
+  EL.PFZ = { T: 2.8, TAP: 0.22, MIN: 0.5, GRACE: 2 };
+  const sfx = (k, a, alt) => { const f = G.sfx && G.sfx[k]; if (f) f(a); else if (alt) alt(); }; // (a sound of the ice when audio.js has it, else the plain ice)
+  EL.canFreeze = () => !!P && !P.dead && !(P.elFrozen > 0) && !(P.invulnT > 0) && G.game.time >= (P.frzGrace || 0);
+  EL.freezePlayer = function () {
+    if (!EL.canFreeze()) return false;
+    const F = EL.PFZ;
+    P.au = null; P.elFrozen = F.T; P.frzT0 = F.T; P.frzEl = 0; P.frzTaps = 0;
+    if (P.stopActions) P.stopActions('freeze');
+    sfx('frostCrack', 1, () => G.sfx.ice(P.pos)); sfx('frostMuffle', true);
+    if (G.fx.iceBurst) G.fx.iceBurst(P.chestPos(), 16, 2.4, 1.1);
+    if (EL.onPlayerFreeze) EL.onPlayerFreeze(true);
+    return true;
+  };
+  // a fresh press of jump while frozen
+  EL.tapFrozen = function () {
+    if (!P || !(P.elFrozen > 0)) return;
+    const F = EL.PFZ;
+    P.elFrozen = Math.max(P.elFrozen - F.TAP, P.frzT0 * F.MIN - P.frzEl, 0);
+    P.frzTaps = (P.frzTaps || 0) + 1;
+    sfx('frostCrack', 0.45 + Math.min(0.4, P.frzTaps * 0.04), () => G.sfx.ice(P.pos));
+    if (EL.onFrostTap) EL.onFrostTap();
+    if (P.elFrozen <= 0) EL.thawPlayer();
+  };
+  EL.thawPlayer = function (quiet) {
+    if (!P) return;
+    const was = P.elFrozen > 0 || P.frzEl > 0;
+    P.elFrozen = 0; P.frzEl = 0;
+    if (!was) return;
+    P.frzGrace = G.game.time + EL.PFZ.GRACE;
+    sfx('frostMuffle', false);
+    if (!quiet && !P.dead) { sfx('frostBreak', undefined, () => G.sfx.ice(P.pos)); if (G.fx.iceBurst) G.fx.iceBurst(P.chestPos(), 30, 4.5, 1.5); }
+    if (EL.onPlayerFreeze) EL.onPlayerFreeze(false);
+  };
   EL.tickPlayer = function (dt) {
     if (!P) return;
-    if (P.elFrozen > 0) P.elFrozen -= dt;
+    if (P.elFrozen > 0) { if (P.dead) EL.thawPlayer(true); else { P.elFrozen -= dt; P.frzEl = (P.frzEl || 0) + dt; if (P.elFrozen <= 0) EL.thawPlayer(); } }
     if (P.elBrittle > 0) P.elBrittle -= dt;
     if (P.elLeak > 0) {
       P.elLeak -= dt; P.elLeakT -= dt;

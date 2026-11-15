@@ -17,8 +17,10 @@ const FIELDS = { hamlet: 'bell', dusk: 'pillar', castle: 'oil', flooded: 'sluice
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'hard', lv: 0 }, 0); G.game.seed = 424242; 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(500);
     // helpers in the page: build an area of a field, foes standing still, how the foes are
     await p.eval(`(() => {

@@ -165,15 +165,19 @@ function audit(o) {
     for (const sl of w.shopSlots || []) {
       const tx = sl.x, ty = sl.y + 0.35, tz = sl.z, nx = sl.nx, nz = sl.nz;
       let n = 0, blocked = 0; const by = {};
+      const of = G.game.shop && G.game.shop.offers ? G.game.shop.offers.find((q) => q.slot === sl) : null;   // (what stands there: so that a hidden ware can be told)
+      // (a gun or blade on show turns, and is up to 1.4 m long: an arm of it - a crossbow's bow, most of all - comes between the eye and
+      // its own middle. That is the ware being seen, not the ware being hidden: nothing within its own reach counts)
+      const own = of && (of.kind === 'weapon' || of.kind === 'melee') ? 0.8 : 0.45;
       for (const d of [3, 4.5, 6]) for (const an of [-0.61, 0, 0.61]) {
         const vx = nx * Math.cos(an) - nz * Math.sin(an), vz = nx * Math.sin(an) + nz * Math.cos(an);
         const x = tx + vx * d, z = tz + vz * d, y = 1.6;
         if (x < 0.5 || z < 0.5 || x > w.W - 0.5 || z > w.D - 0.5 || inside(x, 1.0, z, 0.2) || inside(x, y, z, 0.1)) continue;
         n++;
         const dx = tx - x, dy = ty - y, dz = tz - z, L = Math.hypot(dx, dy, dz);
-        if (ray(x, y, z, dx / L, dy / L, dz / L, L - 0.45) < L - 0.5) { blocked++; const m = mlist[tmat[lastHit]]; by[m] = (by[m] || 0) + 1; }
+        if (ray(x, y, z, dx / L, dy / L, dz / L, L - own) < L - own - 0.05) { blocked++; const m = mlist[tmat[lastHit]]; by[m] = (by[m] || 0) + 1; }
       }
-      out.push({ x: +tx.toFixed(1), z: +tz.toFixed(1), n, blocked, by });
+      out.push({ x: +tx.toFixed(1), z: +tz.toFixed(1), n, blocked, by, it: of ? of.kind + ':' + ((of.obj && (of.obj.id || of.obj.name)) || '') : '' });
     }
     return { W: w.W, D: w.D, tris: NT, slots: out };
   }
@@ -302,8 +306,10 @@ const FIELDS_ALL = ['grave', 'gate', 'halls', 'ruin', ...FIELDS];
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(500);
     if (process.env.AUDIT_PRE) await p.eval(process.env.AUDIT_PRE + '; 1'); // (debugging: code run in the page before the areas are built)
     await p.eval(`window.__audit = ${audit.toString()}; const pl = G.FieldGen.pickLayout; G.FieldGen.pickLayout = function (rng, field, list) { (window.__lay = window.__lay || {})[field] = list; return pl.apply(this, arguments); }; 1`);
@@ -337,7 +343,7 @@ const FIELDS_ALL = ['grave', 'gate', 'halls', 'ruin', ...FIELDS];
           const r = JSON.parse(await p.eval(`JSON.stringify(window.__audit(${JSON.stringify({ skipMats, only: 'shopview' })}))`));
           const bad = r.slots.filter((q) => q.n >= 4 && q.blocked >= 2);
           serious += bad.length; total += r.slots.length;
-          console.log(`${tag}: ${r.slots.length} wares, ${bad.length} hidden${bad.length ? '  <- ' + bad.map((q) => `(${q.x},${q.z}) ${q.blocked}/${q.n} ${JSON.stringify(q.by)}`).join(' ') : ''}`);
+          console.log(`${tag}: ${r.slots.length} wares, ${bad.length} hidden${bad.length ? '  <- ' + bad.map((q) => `(${q.x},${q.z}) ${q.it || ''} ${q.blocked}/${q.n} ${JSON.stringify(q.by)}`).join(' ') : ''}`);
           continue;
         }
         if (SIGNS) {

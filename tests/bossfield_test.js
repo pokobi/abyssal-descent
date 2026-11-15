@@ -56,8 +56,10 @@ if (!window.__errHooked) { window.__errHooked = true; const oe = console.error; 
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'hard', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000); await sleep(500);
+    await p.running();
     await p.eval(PAGE);
     for (const id of ids) {
       const fields = process.argv[3] && process.argv[3] !== 'all' ? process.argv[3].split(',') : id === 'madman' ? MID.concat(LOW) : MID;

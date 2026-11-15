@@ -15,8 +15,10 @@ const PORT = +process.env.COOP_PORT || 9905;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.volume = 0; G.sfx.setVolume && G.sfx.setVolume(0); G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; G.game.startRun({ id: 'normal', lv: 0 }, 1); 1");
     await p.until('!!G.game.run && !!G.world', 30000); await sleep(800);
+    await p.running();
     await p.eval(`window.__toasts = []; const t0 = G.ui.toast; G.ui.toast = function (m) { if (/常連客/.test(m)) window.__toasts.push(m); return t0.apply(this, arguments); };
       setInterval(() => { if (G.game.state === 'paused' || G.game.state === 'resuming') G.game.state = 'playing'; }, 100); // (headless: no pointer lock)
       window.__free = () => (G.game.shop ? G.game.shop.offers.filter((o) => o.free).map((o) => ({ sold: !!o.sold, kind: o.kind, name: o.obj.name })) : []); 1`);

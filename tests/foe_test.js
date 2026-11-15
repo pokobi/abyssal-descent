@@ -14,8 +14,10 @@ const only = process.argv.slice(2);
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'hard', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(600);
     const foes = await p.eval("JSON.stringify(G.ENEMIES.filter((e) => e.fields).map((e) => [e.id, e.fields[0], e.attack, e.name]))").then(JSON.parse);
     const nf = await p.eval("G.Run.TIERS.flat().filter((f) => G.Run.ready(f) && !['grave', 'gate', 'halls', 'ruin'].includes(f)).length");

@@ -13,13 +13,16 @@ const PORT = +process.env.COOP_PORT || 9951;
     const url = (n, host) => `http://127.0.0.1:${PORT}/coop.html?room=${room}${host ? '&host=1' : ''}&name=${n}${q}`;
     const h = await ch.page(url('Host', true));
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(300);
     let g = await ch.page(url('Guest'));
+    await g.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     const off = 'G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
     await h.eval(off); await g.eval(off);
     await h.eval('G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1');
     await g.until('G.game.run && G.Coop.fpOk !== undefined', 60000);
+    for (const pg of [h, g]) await pg.running();
     await sleep(3000);
     await g.eval("G.game.run.coins = 777; G.Coop.send({ t: 'sv', d: Object.assign(G.game.playerSnap(), { coins: 777 }) }); 1");
     await sleep(500);

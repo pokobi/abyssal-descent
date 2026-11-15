@@ -220,7 +220,8 @@
     // dry grass in tufts over the slopes (decor only), set on the smooth surface the eye sees
     for (let i = 0; i < 340; i++) {
       const x = rng.range(4, W - 4), z = rng.range(4, D - 4), y = T.surface(hf, x, z), s = rng.range(0.7, 1.35);
-      for (let k = 0; k < 2; k++) w.batch.geo('vine', PG().plane, P().M(x, y + 0.2 * s, z, 0.75 * s, 0.5 * s, 1, 0, k * Math.PI / 2 + rng.range(0, 1), 0), { su: 0.6, sv: 0.5, tint: [1.15, 1.05, 0.62] });
+      const r0 = rng.range(0, 1), r1 = rng.range(0, 1);
+      if (!P().tuft(w, x, y, z, s * 1.15, [1.25, 1.1, 0.66], 4, 1.4, (px, pz) => T.surface(hf, px, pz))) for (let k = 0; k < 2; k++) w.batch.geo('vine', PG().plane, P().M(x, y + 0.2 * s, z, 0.75 * s, 0.5 * s, 1, 0, k * Math.PI / 2 + (k ? r1 : r0), 0), { su: 0.6, sv: 0.5, tint: [1.15, 1.05, 0.62] });
     }
     // ---- the bounds: crags west and east, the cliff at the north with the gates hewn into it, the crags round the way in
     H.perimeter(w, rng, W, D, { gates, h: 9, walls: false, beams: 0, stub: 3.5 });

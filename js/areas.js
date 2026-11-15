@@ -53,6 +53,51 @@
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
+  // The face of each kind of gate's sign is the same every time: drawn once a session and shared by every sign of that kind (drawn at
+  // the clear, three of them held its frame for some 15 ms). Nothing disposes them: a world's dispose leaves materials and textures be.
+  const FACES = {};
+  const faceOf = (k) => FACES[k] || (FACES[k] = labelTex(AR.TYPES[k]));
+  // drawn ahead (AR.prepClear) once the letters it writes are loaded: a canvas writes letters whose font has not come yet in a
+  // stand-in font, and the face would keep it. Sent to the GPU then too, so its first sight does not wait on the upload.
+  const FACE_FONTS = ['900 44px "Noto Sans JP"', '500 24px "Noto Sans JP"'];
+  const facing = new Set(); // (the kinds whose letters are being loaded)
+  function drawFaceAhead(k) {
+    const T = AR.TYPES[k]; if (!T || FACES[k] || facing.has(k)) return;
+    const make = () => { facing.delete(k); if (FACES[k]) return; const t = faceOf(k); try { if (G.renderer && G.renderer.initTexture) G.renderer.initTexture(t); } catch (e) { /* sent at its first sight */ } };
+    const fs = document.fonts; let ready = true;
+    try { if (fs && fs.check) ready = fs.check(FACE_FONTS[0], T.name) && fs.check(FACE_FONTS[1], T.hint); } catch (e) { ready = true; }
+    if (ready || !fs || !fs.load) { make(); return; }
+    facing.add(k);
+    Promise.all([fs.load(FACE_FONTS[0], T.name), fs.load(FACE_FONTS[1], T.hint)]).then(make, make);
+  }
+  // Worked out while an area is being readied (game.js enterArea, behind the black fade, while its shaders are made): where each gate's
+  // sign will hang (AR.signPlace: some 70 rays a gate, 5 - 30 ms each - it reads only what is built and never moves) and the faces of the
+  // signs this area's gates will show (the same draw of rollGates as at the clear). At the clear they all fell in one frame. One gate a
+  // task, so the page goes on drawing the fade; the promise is settled when every sign has its place (the faces may come later).
+  AR.prepClear = function (w) {
+    if (!w || !w.exits || !w.exits.some((ex) => !ex.open)) return Promise.resolve();
+    const list = w.exits.filter((ex) => !ex.open && !ex.signAt), n = GM.area + 1;
+    return new Promise((done) => {
+      let faces = true;
+      const step = () => {
+        if (faces) {
+          faces = false;
+          if (G.world === w) { try { for (const k of AR.rollGates(n)) drawFaceAhead(k); } catch (e) { /* drawn at the clear */ } }
+          // (the clear's tolling, made ahead into its buffer and not played, where audio.js offers it: G.sfx.prime)
+          try { if (G.sfx && G.sfx.prime) G.sfx.prime('clear'); } catch (e) { /* made when it is first played */ }
+          setTimeout(step, 0); return;
+        }
+        const ex = list.shift();
+        if (!ex || G.world !== w) { done(); return; }
+        try { if (!ex.open) ex.signAt = AR.signPlace(w, ex); } catch (e) { /* placed at the clear */ }
+        setTimeout(step, 0);
+      };
+      setTimeout(step, 0);
+    });
+  };
+  // the sounds of the clear (game.js clearArea, the gates here), each in a frame of its own a few frames on: made in the clear's frame,
+  // they added to it (the clear's tolling 20 ms the first time, the grinding stone 10 ms every time)
+  AR.later = function (n, fn) { let k = n; const f = () => { if (--k <= 0) { try { fn(); } catch (e) { console.warn(e); } } else requestAnimationFrame(f); }; requestAnimationFrame(f); };
   AR.openGates = function (instant, preset) {
     const w = G.world;
     if (!w.exits) return;
@@ -68,13 +113,13 @@
       ex.col.alive = false;
       ex.light.on = true; ex.light.intensity = 30; ex.light.color = T.color;
       if (ex.glow) ex.glow.material.color.set(T.color);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(T), transparent: true, depthWrite: false }));
-      const sg = AR.signPlace(w, ex); // over the frame, under whatever ceiling is above it
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: faceOf(ex.type), transparent: true, depthWrite: false }));
+      const sg = ex.signAt || AR.signPlace(w, ex); // over the frame, under whatever ceiling is above it (worked out ahead: AR.prepClear)
       ex.labelY = sg.y; ex.lowSign = sg.low;
       sp.scale.set(SIGN_W * sg.k, SIGN_H * sg.k, 1); sp.position.set(ex.x, ex.labelY, sg.z);
       w.group.add(sp); ex.label = sp;
     });
-    if (!instant) { G.sfx.stoneGrind(V(w.W / 2, 2, 0), 2); G.sfx.bell(); }
+    if (!instant) { const at = V(w.W / 2, 2, 0); AR.later(3, () => G.sfx.stoneGrind(at, 2)); AR.later(4, () => G.sfx.bell()); }
   };
 
   // ---------------- the sign over an open gate ----------------
@@ -229,10 +274,16 @@
     const h = w.miniHeal;
     w.addCollider(h.x - 0.7, h.y, h.z - 0.7, h.x + 0.7, h.y + 0.9, h.z + 0.7);
     const bg = new THREE.Group(); bg.position.copy(h);
-    const base = new THREE.Mesh(G.Props.PG.oct, w.mats.trim); base.scale.set(0.75, 0.9, 0.75); base.position.y = 0.45; bg.add(base);
-    const water = new THREE.Mesh(G.Props.PG.cyl, new THREE.MeshBasicMaterial({ color: 0x60ff90, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })); water.scale.set(0.6, 0.02, 0.6); water.position.y = 0.92; bg.add(water);
+    // (a basin of carved stone on a stem - a foot, a waisted stem, a bowl with a thick lip and two bands cut round it - inside the same
+    // 0.7 m it always took; dark clear water standing in it; a breath of steam off the water now and then; a faint gold light over it)
+    const prof = [[0.56, 0], [0.6, 0.05], [0.52, 0.13], [0.3, 0.19], [0.22, 0.3], [0.22, 0.48], [0.3, 0.55], [0.5, 0.64], [0.64, 0.76], [0.69, 0.86], [0.66, 0.91], [0.6, 0.9], [0.56, 0.84], [0.4, 0.8], [0.001, 0.78]];
+    const bowl = new THREE.Mesh(new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 28), w.mats.trim); bg.add(bowl);
+    for (const [r, y, tb] of [[0.3, 0.55, 0.028], [0.66, 0.8, 0.022], [0.53, 0.1, 0.03]]) { const band = new THREE.Mesh(new THREE.TorusGeometry(r, tb, 6, 32), w.mats.trim); band.rotation.x = Math.PI / 2; band.position.y = y; bg.add(band); }
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.58, 32), new THREE.MeshStandardMaterial({ color: 0x060c0e, emissive: 0x140f06, roughness: 0.12, metalness: 0, envMapIntensity: 0.35, transparent: true, opacity: 0.94, depthWrite: false }));
+    water.rotation.x = -Math.PI / 2; water.position.y = 0.86; bg.add(water);
+    water.onBeforeRender = () => { const t = G.game.time; if (t - (water.userData.t || 0) < 0.22) return; water.userData.t = t; const a = Math.random() * 6.283, d = Math.random() * 0.45; G.fx.norm.spawn(h.x + Math.cos(a) * d, h.y + 0.9, h.z + Math.sin(a) * d, (Math.random() - 0.5) * 0.08, 0.18 + Math.random() * 0.12, (Math.random() - 0.5) * 0.08, 2.2, 0.12, 0.55, 0.74, 0.73, 0.7, 0.16, -0.03, 0.4); };
     w.group.add(bg);
-    w.lightSources.push({ pos: h.clone().add(V(0, 1.4, 0)), color: '#70ff9a', intensity: 4, range: 5, flame: 0, emit: false, ph: 0, prio: 1.5, steady: true });
+    w.lightSources.push({ pos: h.clone().add(V(0, 1.3, 0)), color: '#d8b070', intensity: 1.4, range: 3.4, flame: 0, emit: false, ph: 0, prio: 1.5, steady: true });
     S.healPos = h.clone().setY(h.y + 1.0);
   }
   function buildStand(w, x, z, y) {
@@ -682,15 +733,16 @@
           consume: () => { G.Inv.remove(P.bag, it); } });
       }
     }
-    for (const c of G.Inv.pcs(P)) for (const o of c.items) {
-      if (o.type === 'part' && G.PART_BY_ID && G.PART_BY_ID[o.id]) {
-        const d = G.PART_BY_ID[o.id];
-        for (let k = 0; k < (o.n || 1); k++) {
-          out.push({ uid: `prt:${o.uid}:${k}`, cat: 'part', rarity: d.rarity, tier: G.RARITY[d.rarity].tier, icon: d.icon, name: d.name, badge: '',
-            sub: d.desc || '', d, it: o,
-            consume: () => { if (o.n > 1) { o.n--; G.Inv.changed(c); } else G.Inv.remove(c, o); } });
-        }
+    // weapon parts (a count per rarity, inventory.js P.parts); a legendary part has no rarity above it, so it is not offered
+    if (G.Parts) for (const r of G.Parts.R) {
+      const d = G.PART_BY_ID[G.Parts.id(r)];
+      if (!G.Parts.next(r)) continue;
+      for (let k = 0; k < G.Parts.count(r); k++) {
+        out.push({ uid: `prt:${r}:${k}`, cat: 'part', rarity: r, tier: G.RARITY[r].tier, icon: d.icon, name: d.name, badge: '',
+          sub: d.desc || '', d, consume: () => { G.Inv.takeParts(P, r, 1); } });
       }
+    }
+    for (const c of G.Inv.pcs(P)) for (const o of c.items) {
       if (o.type === 'item' && G.ITEM_BY_ID[o.id]) {
         const d = G.ITEM_BY_ID[o.id];
         for (let k = 0; k < (o.n || 1); k++) {
@@ -781,19 +833,14 @@
       return;
     }
     if (a.cat === 'part') {
-      const PT = G.Parts, r = RAR_BY_TIER[targetTier];
-      const fams = [...new Set([a.d.fam, b.d.fam])];
-      let mine = fams.filter((f) => PT.has(f, r)).map((f) => G.PART_BY_ID[PT.id(f, r)]);
-      if (tA >= 4) mine = mine.filter((x) => x.id !== a.d.id && x.id !== b.d.id); // (legendary with legendary: never the same part back)
-      const rest = PT.FAMS.filter((f) => !fams.includes(f.id) && PT.has(f.id, r)), others = [];
-      while (others.length < 3 && rest.length) { const f = U.weighted(rest, (x) => (G.Classes ? G.Classes.partW(x.id) : 1), Math.random); others.push(G.PART_BY_ID[PT.id(f.id, r)]); rest.splice(rest.indexOf(f), 1); } // (the class's kinds of part x1.5 - x2)
-      const cands = mine.concat(others).slice(0, 3);
-      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}（${G.RARITY[d.rarity].name}）`, sub: `<span class="cd-line">${U.esc(d.desc || '')}</span>`, onPick: () => {
+      // two parts of a rarity -> one of the next (a part has no kind of weapon, so there is just the one result)
+      const PT = G.Parts, to = PT.next(a.rarity), d = to && G.PART_BY_ID[PT.id(to)];
+      const opts = d ? [{ icon: d.icon, label: `${d.short}（${G.RARITY[d.rarity].name}）`, sub: `<span class="cd-line">${U.esc(d.desc || '')}</span>`, onPick: () => {
         consumeBoth();
-        G.Inv.give(P, 'part', d.id, 1); G.ui.refreshItems();
-        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}（${G.RARITY[d.rarity].name}）`, 'good'); G.ui.itemCard(d, '[部品練成]');
-      } }));
-      alchChoiceModal(`🔧 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
+        G.Inv.addParts(P, d.rarity, 1, true); G.ui.refreshItems();
+        alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}`, 'good'); G.ui.itemCard(d, '[部品練成]');
+      } }] : [];
+      alchChoiceModal(`🔧 練成結果（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、1つ上のレアリティの武器の部品を練成する。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
     if (a.cat === 'att') {

@@ -6,7 +6,7 @@
 //  * Entity icons (attachments, guns, melee weapons, armour) are specific drawings, carried in text as private-use characters
 //    (G.Icons.ch(key)) that the same observer swaps in. Attachments are drawn here by hand (side views of the actual parts).
 //  * Canvas text (3D labels, shop sprites) draws the same shapes through Path2D: G.Icons.fillText / drawIcon.
-// Emoji not in the table (coins, plain text symbols) are left as they are on purpose.
+// Emoji not in the table (plain text symbols: arrows, marks) are left as they are on purpose.
 // ---------------------------------------------------------------------------------------------------------------------------
 (function () {
   const IC = (G.Icons = {});
@@ -342,8 +342,20 @@
   const SPEC = {}, FALLBACK = {};
   // overshield (next to the HP): a see-through light-blue shield with a pale rim
   const OS = () => [{ d: PATHS.shield || '', c: '#8fdcff', o: 0.62, ring: '#d8f4ff' }, { d: PATHS.shield || '', c: '#ffffff', o: 0.2, s: 0.6, x: 102, y: 90 }];
-  IC.def = function (key, layers, fallback) { SPEC[key] = layers; if (fallback) FALLBACK[key] = fallback; delete SVG[key]; return key; };
+  IC.def = function (key, layers, fallback) { SPEC[key] = layers; if (fallback) FALLBACK[key] = fallback; delete SVG[key]; dropImg(key); return key; };
   IC.has = (key) => !!SPEC[key];
+  IC.keys = () => Object.keys(SPEC);
+  // (emoji that still reached the page as the system's own coloured pictures: the coin - a disc with a raised rim and a lozenge struck
+  // in it, drawn here - and those that had no drawing yet, given the nearest of the silhouettes there are)
+  PATHS['coin'] = 'M20 256a236 236 0 1 1 472 0a236 236 0 1 1 -472 0z M60 256a196 196 0 1 0 392 0a196 196 0 1 0 -392 0z M80 256a176 176 0 1 1 352 0a176 176 0 1 1 -352 0z M256 150L170 256L256 362L342 256z';
+  Object.assign(EMO, {
+    '🪙': ['coin', '#e2b24a'], '💠': ['cut-diamond', '#8fd0ff'], '🔧': ['spanner', '#c8c0b0'], '🌌': ['night-sky', '#9a8ad8'], '🗂': ['card-joker', '#e8c870'],
+    '🕊': ['swallow', '#e8e4d8'], '🏚': ['house', '#b09a7a'], '☣': ['biohazard', '#a8d848'], '🔢': ['histogram', '#e8c870'], '⚫': ['plain-circle', '#4a4a50'], '⚪': ['plain-circle', '#e0dcd0'],
+    '⬛': ['stone-block', '#5a5650'], '♨': ['fog', '#ffb070'], '🌡': ['flame', '#ff9a6a'], '🔸': ['cut-diamond', '#ffa040'], '📋': ['scroll-unfurled', '#d8c8a0'], '➕': ['heart-plus', '#72d46a'],
+    '🦊': ['wolf-head', '#ff9a50'], '🐗': ['rhinoceros-horn', '#c8a880'], '🐂': ['rhinoceros-horn', '#d8b890'], '🌳': ['sprout', '#7ac860'], '🌇': ['sunrise', '#ffb060'], '🌐': ['vortex', '#b8a0ff'],
+    '🌸': ['flower-star', '#ffa8c8'], '🐝': ['cricket', '#f0c840'], '🤐': ['silenced', '#b0b8c0'], '🐚': ['snail', '#d8c8b0'], '🧟': ['hooded-figure', '#9ab890'], '🎃': ['drama-masks', '#e89a40'],
+    '🫧': ['water-drop', '#a0d8f0'], '😇': ['angel-outfit', '#fff0b0'], '🗽': ['moai', '#b0b0a8'], '🫕': ['bubbling-flask', '#c8a060'], '🛞': ['gears', '#b0a898'], '⛏': ['warhammer', '#c0b8a8'],
+  });
   for (const e in EMO) { const [n, c] = EMO[e]; if (PATHS[n]) SPEC['e:' + e] = [big(n, c)]; }
 
   // private-use characters stand for entity icons inside ordinary strings
@@ -404,15 +416,100 @@
     return SVG[key];
   }
   IC.svg = svgOf;
-  IC.html = (key, cls) => (SPEC[key] ? `<i class="gx${cls ? ' ' + cls : ''}">${svgOf(key)}</i>` : '');
+  // ---------------- bitmap form (what the page shows) ----------------
+  // An inline SVG is drawn path by path - its outline group through an offscreen layer of its own - into every tile it touches,
+  // each time the tile is rasterised; and a screen that becomes visible (the inventory, opened) has all its tiles rasterised at
+  // once. So the page shows each drawing as a bitmap: an <img> of a PNG made once in the browser from the very same SVG (drawn
+  // into a canvas at BN x BN by the browser's own SVG renderer), which the GPU keeps as a texture and draws as one quad.
+  // A drawing goes on the page first as the inline SVG (so it shows at once, exactly as before) and asks for its bitmap; the
+  // bitmap is made when the page is idle, and then every copy of the drawing on the page is switched over to it (and any made
+  // after). The two look the same: same drawing, same box.
+  // Outlines may reach a little past the 552-unit box (the inline SVG lets them overflow): the bitmap covers a margin of IPAD
+  // units all round, and css (.gx > img) sets the image that much larger and back, so the drawing lands where the inline one is.
+  const IPAD = 48, BMP = {}, HOLD = {}, ASKED = {};
+  // pixels across a bitmap: enough for the largest icon box (a big inventory cell on a 4K screen) without being enlarged;
+  // smaller boxes are drawn from it scaled down (the GPU's image cache keeps a pre-shrunk copy per size)
+  const BN = Math.min(256, 128 * Math.max(1, Math.ceil((window.devicePixelRatio || 1) - 0.01)));
+  const gradDef = (id, c) => `<linearGradient id="${id}" x1="0" y1="0" x2="0.25" y2="1"><stop offset="0" stop-color="${mix(c, '#ffffff', 0.5)}"/><stop offset="0.45" stop-color="${c}"/><stop offset="1" stop-color="${mix(c, '#000000', 0.42)}"/></linearGradient>`;
+  // the drawing as a standalone SVG document (its gradients inside it, the margin round it)
+  function svgDoc(key) {
+    const s = svgOf(key); if (!s) return '';
+    const body = s.slice(s.indexOf('>') + 1, s.lastIndexOf('</svg>'));
+    const used = {}; body.replace(/url\(#(gxg[0-9a-fA-F]+)\)/g, (m, id) => { used[id] = 1; return m; });
+    const defsTxt = Object.keys(used).map((id) => gradDef(id, '#' + id.slice(3))).join('');
+    const o = -20 - IPAD, w = 552 + 2 * IPAD;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${o} ${o} ${w} ${w}" width="${w}" height="${w}"><defs>${defsTxt}</defs>${body}</svg>`;
+  }
+  const imgTag = (u) => `<img alt="" draggable="false" decoding="sync" src="${u}">`;
+  const boxTag = (key, cls) => `<i class="gx${cls ? ' ' + cls : ''}" data-ic="${key}">${BMP[key] ? imgTag(BMP[key]) : svgOf(key)}</i>`;
+  IC.html = (key, cls) => { if (!SPEC[key]) return ''; wantBmp(key); return boxTag(key, cls); };
   // emoji / icon character / key -> markup (anything unknown is returned as text)
   IC.of = (v, cls) => { const k = SPEC[v] ? v : IC.keyOf(String(v).replace(/️/g, '')); return k ? IC.html(k, cls) : String(v); };
   const tplCache = {};
-  function iconNode(key) {
+  function iconNode(key, noBmp) {
     let t = tplCache[key];
-    if (!t) { t = document.createElement('i'); t.className = 'gx'; t.innerHTML = svgOf(key); tplCache[key] = t; }
+    if (!t) { const h = document.createElement('div'); h.innerHTML = boxTag(key); t = h.firstChild; tplCache[key] = t; }
+    if (!noBmp) wantBmp(key);
     return t.cloneNode(true);
   }
+  // making the bitmaps: a queue worked through in idle time, a few at a time
+  const bq = [];
+  let bqOn = false, bInFlight = 0, bCan = null;
+  const idleCb = window.requestIdleCallback || ((f) => setTimeout(() => f({ timeRemaining: () => 8, didTimeout: true }), 60));
+  function wantBmp(key) {
+    if (BMP[key] || ASKED[key] || !SPEC[key]) return;
+    ASKED[key] = 1; bq.push(key); pump();
+  }
+  // (no deadline: only truly idle time is used, so the loading and a busy frame are never held up by it - until then the inline
+  // drawing simply stays)
+  function pump() { if (bqOn || !bq.length) return; bqOn = true; idleCb(work); }
+  function work(dl) {
+    bqOn = false;
+    while (bq.length && bInFlight < 4 && (dl.didTimeout || dl.timeRemaining() > 4)) makeBmp(bq.shift());
+    if (bq.length && bInFlight < 4) pump();
+  }
+  function makeBmp(key) {
+    const doc = svgDoc(key); if (!doc) return;
+    bInFlight++;
+    const su = URL.createObjectURL(new Blob([doc], { type: 'image/svg+xml' }));
+    const done = () => { URL.revokeObjectURL(su); bInFlight--; pump(); };
+    const im = new Image();
+    im.onerror = () => { ASKED[key] = 0; done(); };
+    im.onload = () => {
+      if (!bCan) bCan = document.createElement('canvas');
+      bCan.width = bCan.height = BN;
+      // (a canvas kept in main memory: one on the GPU would have to be read back to make the PNG, and a read back waits for
+      // everything the GPU has queued - the game's frames - stalling the page for as long as that takes)
+      const g = bCan.getContext('2d', { willReadFrequently: true });
+      g.clearRect(0, 0, BN, BN); g.drawImage(im, 0, 0, BN, BN);
+      im.onload = im.onerror = null; im.removeAttribute('src'); // (the SVG document behind it is no longer needed)
+      bCan.toBlob((b) => {
+        if (!b || !SPEC[key] || BMP[key]) { done(); return; }
+        const pu = URL.createObjectURL(b);
+        // (held decoded for the page's life: a new <img> of it finds it in the memory cache and shows it in the same frame)
+        const keep = new Image(); keep.decoding = 'sync';
+        keep.onload = () => { HOLD[key] = keep; useBmp(key, pu); done(); };
+        keep.onerror = () => { URL.revokeObjectURL(pu); ASKED[key] = 0; done(); };
+        keep.src = pu;
+      }, 'image/png');
+    };
+    im.src = su;
+  }
+  // a bitmap is ready: it is used from now on, and the copies on the page are switched to it
+  function useBmp(key, u) {
+    BMP[key] = u; delete tplCache[key];
+    const h = document.createElement('div'); h.innerHTML = imgTag(u); const tpl = h.firstChild;
+    for (const el of document.querySelectorAll('.gx[data-ic="' + CSS.escape(key) + '"]')) swapIn(el, tpl);
+  }
+  function swapIn(el, tpl) { const s = el.firstElementChild; if (s && s.nodeName.toLowerCase() === 'svg') el.replaceChild(tpl.cloneNode(true), s); }
+  // switch the drawings in a part kept off the page (put back on it) to the bitmaps made meanwhile
+  IC.refresh = function (root) {
+    if (!root || !root.querySelectorAll) return;
+    for (const el of root.querySelectorAll('.gx[data-ic]')) { const u = BMP[el.getAttribute('data-ic')]; if (u && el.firstElementChild && el.firstElementChild.nodeName.toLowerCase() === 'svg') { const h = document.createElement('div'); h.innerHTML = imgTag(u); swapIn(el, h.firstChild); } }
+  };
+  // (a drawing defined again: its bitmap and its cached node are made afresh)
+  function dropImg(key) { if (BMP[key]) { URL.revokeObjectURL(BMP[key]); delete BMP[key]; delete HOLD[key]; } ASKED[key] = 0; delete tplCache[key]; }
+  IC.bmpState = () => ({ made: Object.keys(BMP).length, queued: bq.length, inFlight: bInFlight, size: BN });
 
   // ---------------- canvas ----------------
   const p2d = {};
@@ -734,6 +831,225 @@
   for (const [k, col, b] of [['fire', '#ff6a3a', 'flame'], ['water', '#3f9dff', 'water-drop'], ['ice', '#a8ecff', 'snowflake-2'], ['volt', '#b88cff', 'power-lightning'], ['wind', '#4fd8c0', 'tornado'], ['earth', '#e0a640', 'rock']]) {
     if (PATHS['cut-diamond'] && PATHS[b]) ATT['c_' + k] = [big('cut-diamond', col), badge(b, col)];
   }
+  // ======================================================================================================
+  // Consumables: drawn as the things they are, side on, in their own dull colours (gauze is unbleached, a draught the colour of what is
+  // in its glass, iron is grey) - not as the emoji of what they do. One silhouette each, its parts told apart by their fills
+  // ======================================================================================================
+  const EL = (cx, cy, rx, ry) => `M${cx - rx} ${cy}a${rx} ${ry} 0 1 0 ${2 * rx} 0a${rx} ${ry} 0 1 0 ${-2 * rx} 0Z`;
+  const ring = (cx, cy, r0, r1, c) => EV(O(cx, cy, r0) + O(cx, cy, r1), c);
+  // a pin grenade's fuze on top of a body whose top is at y: the fuze, the spoon down its side, the ring of the pin
+  const fuzeSet = (y, x1) => [
+    L(PG(x1 - 14, y - 4, x1 + 12, y - 12, x1 + 44, y + 40, x1 + 46, y + 170, x1 + 30, y + 168, x1 + 26, y + 46), '#83878a'),
+    L(R(214, y - 58, 84, 62, 10), '#9a8456'), L(R(226, y - 82, 60, 30, 8), '#8a7650'),
+    ring(198, y - 50, 36, 22, '#a8905a'),
+  ];
+  const can = (c, top) => L(R(164, top, 184, 450 - top, 30), c);
+  const II = {};
+  // (shapes worked out as points: an ellipse turned by rot, from a0 to a1; a curve through points; a band along a line, its far end torn;
+  // lines across a band - its weave and its folds)
+  const PP = (pts) => 'M' + pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L') + 'Z';
+  const ellP = (cx, cy, rx, ry, rot, n, a0, a1) => { const c = Math.cos(rot), s = Math.sin(rot), o = []; a0 = a0 || 0; a1 = a1 === undefined ? Math.PI * 2 : a1; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n, x = Math.cos(a) * rx, y = Math.sin(a) * ry; o.push([cx + x * c - y * s, cy + x * s + y * c]); } return o; };
+  const curveP = (ctrl, n) => { const p = [ctrl[0]].concat(ctrl, [ctrl[ctrl.length - 1]]), o = []; for (let i = 1; i < p.length - 2; i++) for (let k = 0; k < n; k++) { const t = k / n, a = p[i - 1], b = p[i], c = p[i + 1], d = p[i + 2]; o.push([0, 1].map((j) => 0.5 * (2 * b[j] + (-a[j] + c[j]) * t + (2 * a[j] - 5 * b[j] + 4 * c[j] - d[j]) * t * t + (-a[j] + 3 * b[j] - 3 * c[j] + d[j]) * t * t * t))); } o.push(ctrl[ctrl.length - 1]); return o; };
+  const frame = (pts, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; };
+  const bandP = (pts, hw, torn) => { const Lf = [], Rt = [], n = pts.length; for (let i = 0; i < n; i++) { const [tx, ty] = frame(pts, i), w = hw(i / (n - 1)); Lf.push([pts[i][0] - ty * w, pts[i][1] + tx * w]); Rt.push([pts[i][0] + ty * w, pts[i][1] - tx * w]); } const end = []; if (torn) { const a = Lf[n - 1], b = Rt[n - 1], [tx, ty] = frame(pts, n - 1); torn.forEach((o, k) => { const t = k / (torn.length - 1); end.push([a[0] + (b[0] - a[0]) * t + tx * o, a[1] + (b[1] - a[1]) * t + ty * o]); }); } return Lf.concat(end, Rt.reverse()); };
+  const hatchP = (pts, hw, n, w) => { let d = ''; const m = pts.length; for (let k = 1; k < n; k++) { const i = Math.floor(k * (m - 1) / n), [tx, ty] = frame(pts, i), h = hw(i / (m - 1)) * 0.86, c = pts[i]; d += PP([[c[0] - ty * h - tx * w / 2, c[1] + tx * h - ty * w / 2], [c[0] - ty * h + tx * w / 2, c[1] + tx * h + ty * w / 2], [c[0] + ty * h + tx * w / 2, c[1] - tx * h + ty * w / 2], [c[0] + ty * h - tx * w / 2, c[1] - tx * h - ty * w / 2]]); } return d; };
+  // a roll lying along angle th about (cx, cy): its body, the near end with its turns and their seams, lines of its weave along it
+  const rollIcon = (cx, cy, R, Lh, th, lin, lin2, lind, seam) => {
+    const ax = Math.cos(th), ay = Math.sin(th), far = [cx + ax * Lh, cy + ay * Lh], near = [cx - ax * Lh, cy - ay * Lh], rx = R * 0.42;
+    const weave = [-0.6, -0.2, 0.2, 0.6].map((k) => { const nx = -ay * R * k, ny = ax * R * k, a = [near[0] + nx, near[1] + ny], b = [far[0] + nx, far[1] + ny]; return PP([[a[0] - ay * 3, a[1] + ax * 3], [b[0] - ay * 3, b[1] + ax * 3], [b[0] + ay * 3, b[1] - ax * 3], [a[0] + ay * 3, a[1] - ax * 3]]); }).join('');
+    return [L(PP(ellP(near[0], near[1], rx, R, th, 40, HALF, HALF * 3).concat(ellP(far[0], far[1], rx, R, th, 40, -HALF, HALF))), lin), L(PP(ellP(near[0], near[1], rx, R, th, 40)), lind),
+      EV([0.8, 0.68, 0.52, 0.4].map((k) => PP(ellP(near[0], near[1], rx * k, R * k, th, 40))).join(''), seam), L(PP(ellP(near[0], near[1], rx * 0.16, R * 0.16, th, 24)), '#7a6c56'), L(weave, lin2, { o: 0.7 })];
+  };
+  const HALF = Math.PI / 2;
+  // a roll of gauze lying aslant, its free end come off it in a wide band that waves down to the right and is torn across, the weave and
+  // the folds lined across it, a safety pin through it (side on and end on it was a roll of paper; this reads as cloth unrolling)
+  II.h_bandage = (() => {
+    const tail = curveP([[232, 250], [318, 316], [420, 290], [488, 360], [440, 470]], 12), hw = (t) => 74 - 14 * t;
+    return Z([L(PP(bandP(tail, hw, [0, 18, 5, 22, 3, 20, 8, 15, 0])), '#c2b496'), L(hatchP(tail, hw, 9, 6), '#a89a7e', { o: 0.8 })]
+      .concat(rollIcon(178, 170, 124, 104, -0.55, '#d4c8aa', '#c2b496', '#e2d8c0', '#8e8068'), [L(PG(332, 318, 430, 292, 433, 306, 335, 332), '#a88c52')]), 0.9);
+  })();
+  // the first-aid kit: a canvas pouch, its flap and buckle, a faded red cross, a strap to carry it
+  II.h_medkit = [
+    L('M190 168C190 76 322 76 322 168L294 168C294 108 218 108 218 168Z', '#6a4a30'),
+    L(R(86, 158, 340, 272, 46), '#998764'),
+    L('M98 172L414 172L402 262C340 286 172 286 110 262Z', '#857350'),
+    L(R(230, 236, 52, 42, 8), '#a88c50'), L(R(243, 247, 26, 20, 4), '#46382a'),
+    L('M236 310h40v28h28v40h-28v28h-40v-28h-28v-40h28z', '#7c3a2e'),
+  ];
+  // a glass syringe: thumb ring, plunger, flange, the barrel with what is in it and its marks, the needle
+  II.h_regen = Z([
+    ring(256, 58, 30, 16, '#aeaca2'), L(R(248, 84, 16, 72, 4), '#a09e96'), L(R(170, 150, 172, 24, 11), '#b2b0a6'),
+    L(R(204, 168, 104, 214, 16), '#aab6b2'), L(R(216, 240, 80, 132, 8), '#6a7a3a'), L(R(212, 226, 88, 18, 4), '#2a2622'),
+    ...[0, 1, 2, 3, 4].map((i) => L(R(214, 254 + i * 24, i % 2 ? 20 : 34, 6, 2), '#34342e')),
+    L(PG(224, 380, 288, 380, 272, 406, 240, 406), '#b2b0a6'), L(R(240, 404, 32, 24, 6), '#a0844a'), L(PG(252, 426, 260, 426, 258, 500, 254, 500), '#c8c8c0'),
+  ], 0.95, -38);
+  // the elixir: an apothecary's phial, dark with what is in it, a label in a hand, waxed over its cork
+  II.h_elixir = [
+    L('M224 104L288 104L288 156C300 178 352 196 352 248L352 420C352 448 336 462 310 462L202 462C176 462 160 448 160 420L160 248C160 196 212 178 224 156Z', '#5a2628'),
+    L(R(174, 252, 14, 170, 7), '#b8bcb2', { o: 0.55 }),
+    L(R(184, 286, 150, 114, 6), '#cfc09a'), ...[0, 1, 2].map((i) => L(R(204, 318 + i * 24, i === 1 ? 90 : 110, 7, 3), '#5c4a36')),
+    L('M210 108C210 74 302 74 302 108L310 132L202 132Z', '#6a2620'), L(R(232, 58, 48, 36, 8), '#9c7650'),
+  ];
+  // holy water: a pilgrim's flask of pewter, a cross struck on it, a cord through its loops
+  II.h_water = [
+    L('M146 214C120 120 168 34 256 26C344 34 392 120 366 214L346 208C368 130 330 52 256 48C182 52 144 130 166 208Z', '#86765a'),
+    ring(176, 196, 34, 20, '#8e8c82'), ring(336, 196, 34, 20, '#8e8c82'),
+    L(R(222, 112, 68, 64, 10), '#97958b'), L(R(210, 100, 92, 24, 9), '#a2a096'), L(R(230, 62, 52, 42, 8), '#9c7650'),
+    L(O(256, 306, 148), '#a2a096'), ring(256, 306, 148, 124, '#87857b'),
+    L(R(242, 212, 28, 188, 6), '#78766c'), L(R(186, 268, 140, 28, 6), '#78766c'),
+  ];
+  // the god's wine: a stoneware flask, brown glaze run unevenly over its shoulder, bare clay below, a cord at its neck
+  II.h_ambrosia = [
+    L('M198 150L314 150C330 172 392 212 392 304C392 404 340 462 256 462C172 462 120 404 120 304C120 212 182 172 198 150Z', '#663a1e'),
+    L('M126 352C170 380 208 346 256 370C304 394 344 350 386 360C378 420 330 462 256 462C182 462 136 420 126 352Z', '#a3825c'),
+    L(R(212, 92, 88, 66, 14), '#663a1e'), L(R(200, 80, 112, 26, 10), '#704424'), L(R(222, 36, 68, 50, 10), '#9c7650'),
+    L(R(204, 128, 104, 16, 8), '#84745a'), L(R(156, 230, 18, 110, 9), '#a86e46', { o: 0.6 }),
+  ];
+  // iron-skin tonic: a flat bottle of brown glass ribbed at its edges, a label, a cork
+  II.u_iron = [
+    L('M226 96L286 96L286 150C320 160 362 170 362 210L362 430C362 452 346 464 324 464L188 464C166 464 150 452 150 430L150 210C150 170 192 160 226 150Z', '#4e2c14'),
+    L(R(158, 220, 12, 230, 6), '#2e1a0c'), L(R(342, 220, 12, 230, 6), '#2e1a0c'),
+    L(R(184, 250, 144, 160, 8), '#cfc09a'), ...[0, 1, 2, 3].map((i) => L(R(202, 282 + i * 26, i === 0 ? 108 : 86, 8, 3), '#5c4a36')),
+    L(R(222, 84, 68, 22, 8), '#5a3418'), L(R(232, 44, 48, 44, 8), '#9c7650'),
+  ];
+  // the vanishing draught: a slim vial of clear glass, a ground stopper, a tag on a string
+  II.u_invis = [
+    L(R(212, 108, 88, 360, 44), '#9aa6a8'), L(R(224, 220, 64, 236, 32), '#bcc6c4'), L(R(222, 120, 14, 300, 7), '#dfe6e4', { o: 0.6 }),
+    L(R(206, 92, 100, 28, 10), '#a6b2b4'), L(O(256, 70, 34), '#aab6b8'),
+    L('M300 150L356 176L340 236L286 212Z', '#cfc09a'),
+  ];
+  // the fairy's bottle: round, long in the neck, sealed; what is in it pale and clouded
+  II.h_fairy = [
+    L(R(230, 112, 52, 120, 12), '#a6aaa4'), L(O(256, 334, 132), '#a6aaa4'), L(EL(256, 360, 108, 96), '#d4d0c2'),
+    L(R(174, 300, 16, 80, 8), '#e4e6e2', { o: 0.6 }), L('M218 116C218 84 294 84 294 116L300 136L212 136Z', '#6a2620'), L(R(234, 62, 44, 36, 8), '#9c7650'),
+  ];
+  // the grenades, side on, the fuze up: each its own body
+  const knobs = () => { const o = []; for (const [y, hw] of [[198, 96], [252, 122], [308, 128], [364, 116], [414, 86]]) { const w = hw * 1.7 / 4; for (let i = 0; i < 4; i++) o.push(L(R(256 - hw * 0.85 + i * w + 4, y - 22, w - 8, 44, 10), '#737a68')); } return o; };
+  II.g_frag = [...fuzeSet(146, 290), L(EL(256, 300, 130, 156), '#555c4e'), ...knobs()];
+  II.g_fire = [...fuzeSet(140, 300), can('#68321f', 140), L(R(156, 196, 200, 30, 8), '#8e7638'), L(R(206, 296, 100, 96, 16), '#a2662a'), L(R(222, 306, 16, 70, 8), '#d8a060', { o: 0.5 })];
+  II.g_cryo = [...fuzeSet(140, 300), can('#848c8e', 140), L(R(156, 222, 200, 26, 8), '#4a6680'), L(R(156, 372, 200, 26, 8), '#4a6680'), ...[[184, 168], [214, 156], [260, 160], [300, 150], [326, 170], [236, 182]].map(([x, y]) => L(O(x, y, 11), '#cfd8dc'))];
+  II.g_shock = [
+    L(R(226, 62, 16, 120, 6), '#929290'), L(R(272, 62, 16, 120, 6), '#929290'), L(O(234, 58, 15), '#a48450'), L(O(280, 58, 15), '#a48450'),
+    L(R(204, 160, 104, 280, 20), '#bfb396'), L(EL(256, 190, 98, 36), '#c6ba9c'), L(EL(256, 280, 112, 40), '#c6ba9c'), L(EL(256, 380, 124, 44), '#c6ba9c'), L(EL(256, 440, 104, 26), '#b4a88c'),
+    ...[0, 1, 2].map((i) => L(R(198, 304 + i * 20, 116, 11, 5), '#9a5e36')),
+  ];
+  II.g_toxic = [...fuzeSet(140, 300), can('#56664a', 140), L(R(156, 196, 200, 28, 8), '#3a5430'), ...[188, 228, 268, 308].map((x) => L(O(x + 6, 300, 13), '#232a20')), ...[208, 248, 288].map((x) => L(O(x + 6, 340, 13), '#232a20')), L(R(156, 400, 200, 10, 5), '#6a8a48')];
+  II.g_sticky = [
+    L('M70 360C80 300 180 290 256 290C332 290 432 300 442 360C452 410 360 430 256 430C152 430 60 410 70 360Z', '#44502a'),
+    ...[-3, -2, -1, 0, 1, 2, 3].map((i) => L(PG(256 + i * 44 - 14, 300, 256 + i * 44 + 14, 300, 256 + i * 50, 262), '#5a5e5a')),
+    L(R(136, 250, 240, 80, 26), '#545856'), L(EL(256, 252, 120, 28), '#6a6e6a'), L(O(256, 250, 16), '#5a2a22'),
+  ];
+  II.g_water = [
+    L('M256 470C150 470 96 400 104 322C112 242 180 192 222 172L222 124L290 124L290 172C332 192 400 242 408 322C416 400 362 470 256 470Z', '#644630'),
+    L(R(200, 118, 112, 42, 14), '#44526c'), L('M300 130L362 112L376 160L318 156Z', '#44526c'), L('M212 130L150 104L132 150L194 156Z', '#3e4a62'),
+    L(R(214, 92, 84, 30, 10), '#84745a'), L(R(140, 300, 20, 100, 10), '#8a6a4c', { o: 0.6 }),
+  ];
+  II.g_flash = [...fuzeSet(140, 290), L(R(176, 140, 160, 314, 20), '#959b9f'), L(R(168, 176, 176, 22, 8), '#bdbdb2'), L(R(168, 410, 176, 22, 8), '#bdbdb2'), ...[204, 238, 272, 306].map((x) => L(O(x, 260, 13), '#2a2e32')), ...[221, 255, 289].map((x) => L(O(x, 330, 13), '#2a2e32'))];
+  II.g_hole = [
+    L(O(256, 292, 142), '#33333a'), L(O(256, 292, 40), '#141418'), L(O(244, 280, 12), '#4a4a54'),
+    Object.assign(EV(EL(256, 292, 206, 62) + EL(256, 292, 188, 46), '#68686e'), { gr: 24 }),
+    Object.assign(EV(EL(256, 292, 176, 54) + EL(256, 292, 160, 40), '#5e5e64'), { gr: -38 }),
+  ];
+  II.g_nail = [
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => Object.assign(L(R(248, 90, 16, 120, 4), '#95958f'), { gr: i * 45 + 10 })),
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => Object.assign(L(R(236, 80, 40, 18, 6), '#a6a69e'), { gr: i * 45 + 10 })),
+    L(O(256, 256, 138), '#73543c'), EV(EL(256, 256, 140, 30) + EL(256, 256, 140, 16), '#84745a'),
+  ];
+  II.g_shatter = [
+    L(PG(256, 92, 344, 196, 344, 336, 256, 440, 168, 336, 168, 196), '#93acb0'), L(PG(256, 92, 300, 196, 300, 336, 256, 440), '#b2c6c8'),
+    ...[[180, 120, 'M200 100C120 160 120 360 200 420L216 412C142 356 142 166 216 108Z'], [332, 120, 'M312 100C392 160 392 360 312 420L296 412C370 356 370 166 296 108Z']].map((q) => L(q[2], '#7e858c')),
+    L(R(204, 80, 104, 26, 10), '#868d94'), L(R(204, 414, 104, 26, 10), '#868d94'),
+  ];
+  II.g_dyna = [
+    L('M262 118C262 84 300 60 336 46L346 62C312 76 282 94 282 120Z', '#3a3430'), L(O(342, 52, 13), '#9a5a2e'),
+    L(R(136, 116, 76, 336, 34), '#6e2e22'), L(R(218, 104, 76, 348, 34), '#7a3426'), L(R(300, 116, 76, 336, 34), '#6e2e22'),
+    L(R(126, 184, 260, 20, 9), '#98804a'), L(R(126, 370, 260, 20, 9), '#98804a'),
+  ];
+  // a plate of armour to slip into a vest: forged steel dished a little, its top edge rolled, a leather lining at its sides, riveted, the
+  // armourer's stamp
+  II.u_plate = [
+    L('M110 120C200 96 312 96 402 120L384 424C306 452 206 452 128 424Z', '#5a3c26'),
+    L('M126 112C204 86 308 86 386 112L366 418C296 444 216 444 146 418Z', '#8e9294'),
+    L('M164 142C222 126 290 126 348 142L334 392C288 408 224 408 178 392Z', '#a2a6a6'),
+    L('M120 104C202 74 310 74 392 104L388 128C306 100 206 100 124 128Z', '#7c8082'),
+    ...[[150, 168], [362, 168], [154, 290], [358, 290], [162, 396], [350, 396]].map(([x, y]) => L(O(x, y, 12), '#94763c')),
+    EV(O(256, 186, 26) + O(256, 186, 18), '#74787a'), L(R(252, 166, 8, 40, 3), '#74787a'),
+  ];
+  // the golden apple: ripened to gold, russet on its cheek, its stalk and one leaf
+  II.h_apple = [
+    L('M256 150C226 118 160 108 122 150C80 196 86 300 132 372C166 426 206 450 236 438C248 432 264 432 276 438C306 450 346 426 380 372C426 300 432 196 390 150C352 108 286 118 256 150Z', '#a8822c'),
+    L('M300 300C340 280 380 300 382 340C362 384 330 410 300 404C280 380 280 330 300 300Z', '#7e5a26', { o: 0.75 }),
+    L(R(150, 200, 30, 110, 15), '#d8b868', { o: 0.5 }),
+    L('M250 160C246 120 258 84 280 58L294 66C274 92 264 122 266 160Z', '#4a3420'),
+    L('M286 98C320 62 382 58 418 80C392 120 330 132 290 112Z', '#55603a'),
+  ];
+  // the smith-god's hammer: a cross-peen head forged and chamfered, its face bright with use, a band of old gold let into it; the
+  // handle of ash, dark where it is held
+  II.u_hammer = Z([
+    L(PG(244, 186, 270, 186, 284, 470, 250, 478), '#7a5636'), L(PG(247, 370, 280, 368, 284, 470, 250, 478), '#4e3424'),
+    L(R(150, 108, 202, 86, 10), '#5c5e5c'), L(PG(350, 112, 412, 136, 428, 151, 412, 166, 350, 190), '#5c5e5c'),
+    L(R(108, 98, 54, 106, 14), '#9a9c98'), L(R(196, 106, 16, 90, 4), '#8e7238'), L(R(290, 106, 16, 90, 4), '#8e7238'),
+    L(R(242, 96, 30, 12, 3), '#7a5636'),
+  ], 1.05, -16);
+  // the master's repair kit: a roll of leather laid open, the rest of it still rolled, tools in its pockets - an awl, pliers, a small
+  // hammer, a spool of waxed thread
+  II.u_repair = [
+    L('M64 236L370 204L430 384L124 420Z', '#5a3a24'), L(R(366, 168, 74, 236, 36), '#4a2e1c'), L(EL(403, 172, 37, 16), '#6a4630'),
+    L(R(150, 150, 26, 110, 10), '#7a5636'), L(PG(158, 150, 168, 150, 164, 86, 162, 86), '#a2a29a'),
+    L(PG(206, 154, 222, 152, 240, 250, 226, 252), '#9a9a94'), L(PG(232, 152, 248, 154, 236, 252, 222, 250), '#8a8a84'),
+    L(R(274, 128, 50, 22, 6), '#6a6c6a'), L(R(292, 146, 12, 100, 5), '#7a5636'),
+    L(O(344, 190, 30), '#8a7a58'), L(O(344, 190, 12), '#5a4a34'),
+    L('M120 340L426 308L438 384L132 420Z', '#3e2818'), ...[200, 270, 340].map((x) => L(PG(x, 330, x + 6, 330, x + 14, 400, x + 8, 400), '#2e1e14')),
+  ];
+  // ---- valuables (no use, worth coins): old gold, silver, dark stone, bone and wood; no stone shines ----
+  const gold = '#94783a', goldDk = '#7a6230', silver = '#a2a29a', bone = '#c4b89c', wood = '#4a3426';
+  // a worn gold coin: its rim, a cross struck on it and a ring of letters, nearly rubbed away
+  II.v_coinold = [L(O(256, 256, 190), goldDk), L(O(256, 256, 160), gold), EV(O(256, 256, 138) + O(256, 256, 120), '#83692f'), L(R(240, 160, 32, 192, 8), '#83692f'), L(R(160, 240, 192, 32, 8), '#83692f')];
+  // a silver ring with a flat seal on it
+  II.v_ring = [EV(EL(256, 300, 160, 130) + EL(256, 300, 122, 94), silver), L(R(196, 120, 120, 70, 22), '#8e8e86'), L(EL(256, 154, 40, 20), '#6e6e68')];
+  // prayer beads of dark wood, with a small cross
+  II.v_beads = [...Array.from({ length: 16 }, (_, i) => { const a = i / 16 * Math.PI * 2 - 0.2; return L(O(256 + Math.cos(a) * 150, 220 + Math.sin(a) * 120, 22), wood); }), L(R(240, 330, 32, 140, 6), '#5a4030'), L(R(204, 370, 104, 30, 6), '#5a4030')];
+  // two dice of bone, their pips sunk
+  II.v_bone = [L(PG(70, 210, 210, 170, 300, 260, 300, 410, 160, 450, 70, 360), bone), L(PG(240, 150, 380, 110, 450, 190, 430, 320, 300, 350, 250, 260), '#b4a88c'),
+    ...[[130, 300], [190, 360], [250, 330], [340, 200], [380, 260]].map(([x, y]) => L(O(x, y, 15), '#5a4c3a'))];
+  // a shard of obsidian: black glass broken to sharp facets (dark; one face catching the light)
+  II.v_shard = [L(PG(170, 70, 330, 140, 420, 330, 300, 450, 140, 400, 96, 220), '#24242a'), L(PG(170, 70, 330, 140, 300, 300, 200, 260), '#3e3e46'), L(PG(330, 140, 420, 330, 300, 300), '#30303a')];
+  // an amber charm: a drop of amber with something caught in it, in a bronze bezel, on a cord
+  II.v_amulet = [L('M180 80C200 40 312 40 332 80L320 96C300 70 212 70 192 96Z', '#6a5a40'), L(EL(256, 290, 130, 170), '#6e5a32'), L(EL(256, 290, 104, 142), '#8a5a1e'), L(EL(232, 250, 30, 46), '#a87028', { o: 0.7 }), L(PG(250, 300, 270, 280, 290, 320, 262, 340), '#3e2a14')];
+  // a silver candlestick: a broad foot, a turned stem with its knops, a wide drip pan, a thick stub of candle run with wax, no flame
+  II.v_candle = [L(R(204, 70, 104, 130, 16), '#bdb39a'), L('M204 120C190 140 196 170 212 176L218 128Z', '#cfc5aa'), L(R(252, 44, 8, 30, 3), '#3a3028'), L(EL(256, 204, 120, 30), silver), L(PG(238, 226, 274, 226, 286, 420, 226, 420), silver), L(EL(256, 280, 40, 20), '#8e8e86'), L(EL(256, 350, 34, 18), '#8e8e86'), L('M120 470L392 470C380 430 320 416 256 416C192 416 132 430 120 470Z', silver), L(R(110, 462, 292, 26, 10), '#8e8e86')];
+  // a ceremonial dagger, its edge dulled, a gilt hilt
+  II.v_dagger = Z([L(PG(244, 40, 268, 40, 282, 330, 256, 360, 230, 330), '#9a9a94'), L(PG(254, 50, 258, 50, 262, 330, 256, 340, 250, 330), '#7e7e78'), L(R(176, 330, 160, 30, 12), gold), L(R(240, 360, 32, 90, 10), '#5a3a28'), L(O(256, 470, 26), gold)], 1, 35);
+  // a blood ruby: a dark red stone cut smooth, in claws of old gold (dark, not lit from within)
+  II.v_ruby = [L(EL(256, 270, 170, 140), goldDk), ...[[110, 180], [400, 180], [110, 360], [400, 360]].map(([x, y]) => L(O(x, y, 26), gold)), L(EL(256, 270, 136, 108), '#4e0e12'), L(EL(222, 236, 46, 30), '#7a1c1e', { o: 0.8 })];
+  // the abyss sapphire: a deep blue stone, nearly black, in silver
+  II.v_sapph = [L(EL(256, 270, 170, 140), '#7e7e78'), ...[[110, 180], [400, 180], [110, 360], [400, 360]].map(([x, y]) => L(O(x, y, 26), silver)), L(EL(256, 270, 136, 108), '#141c34'), L(EL(222, 236, 46, 30), '#2e3e66', { o: 0.8 })];
+  // a gold necklace: a hanging chain of links, a pendant set with a dark stone
+  II.v_neck = [...Array.from({ length: 13 }, (_, i) => { const t = i / 12, a = Math.PI * (0.08 + 0.84 * t); return EV(EL(256 + Math.cos(a) * 190, 120 + Math.sin(a) * 210, 20, 15) + EL(256 + Math.cos(a) * 190, 120 + Math.sin(a) * 210, 9, 6), gold); }), L(PG(256, 330, 320, 400, 256, 480, 192, 400), gold), L(PG(256, 360, 296, 400, 256, 448, 216, 400), '#4a1416')];
+  // a rusted sceptre: an iron rod gone to rust, rings of old gold, a crown of points at its head
+  II.v_scepter = Z([L(R(240, 160, 32, 330, 14), '#6a4630'), ...[200, 300, 420].map((y) => L(R(228, y, 56, 22, 8), gold)), L(PG(196, 160, 316, 160, 330, 90, 300, 120, 286, 66, 256, 104, 226, 66, 212, 120, 182, 90), gold), L(O(256, 132, 18), '#4e1c18'), L(O(256, 492, 20), gold)], 1, 30);
+  // a small idol of ebony: a figure seated on a block carved in the round - a long head with its eyes and mouth cut in, the arms down
+  // to the hands joined on the belly, the knees drawn up
+  II.v_idol = [L(R(146, 436, 220, 44, 8), '#241a12'), L(EL(214, 396, 46, 40), '#3a2a1e'), L(EL(298, 396, 46, 40), '#3a2a1e'),
+    L('M206 372C192 314 196 262 222 240L290 240C316 262 320 314 306 372Z', '#33251a'), L(R(240, 222, 32, 26, 8), '#2e2218'),
+    L('M206 256C178 290 186 340 238 344L244 324C210 320 206 292 224 268Z', '#46342a'), L('M306 256C334 290 326 340 274 344L268 324C302 320 306 292 288 268Z', '#46342a'), L(EL(256, 334, 26, 16), '#4a382a'),
+    L(EL(256, 152, 58, 80), '#3a2a1e'), L(EL(234, 150, 15, 6), '#140e0a'), L(EL(278, 150, 15, 6), '#140e0a'), L(R(240, 196, 32, 8, 3), '#140e0a'), L(R(252, 150, 8, 34, 3), '#2a1e14'),
+    L(R(208, 82, 96, 16, 6), '#2a1e14')];
+  // the golden chalice: a deep bowl, a knop on its stem, a broad foot
+  II.v_chalice = [L('M136 70L376 70C376 190 330 250 256 260C182 250 136 190 136 70Z', gold), L(R(148, 70, 216, 26, 10), '#a68a48'), L(R(240, 256, 32, 150, 10), goldDk), L(EL(256, 320, 44, 26), gold), L('M150 470L362 470C352 430 300 404 256 404C212 404 160 430 150 470Z', gold), L(R(144, 462, 224, 22, 10), goldDk)];
+  // the saint's skull, gilded and worn (bone through the gilding)
+  II.v_skull = [{ d: PATHS['death-skull'] || '', c: '#8a7448' }];
+  // the jewel casket: a small chest bound with iron, its lock
+  II.v_casket = [{ d: PATHS['locked-chest'] || '', c: '#7a5a34' }];
+  // the fallen crown: dented gold, its stones dark
+  II.v_crown = [{ d: PATHS['jewel-crown'] || '', c: '#8e7238' }];
+  // the ancient icon: a panel of wood in its frame, a saint painted on a ground of old gold, a halo about the head
+  II.v_icon = [L(R(110, 60, 292, 392, 12), '#4a3220'), L(R(140, 90, 232, 332, 6), '#94783a'), L(O(256, 180, 64), '#b8964a'), L(O(256, 186, 40), '#6a4e34'), L('M196 420L316 420L300 260C290 236 222 236 212 260Z', '#3e2626'), L(PG(236, 270, 276, 270, 268, 420, 244, 420), '#5a3a30')];
+  // the abyss heart: a lump of dark red crystal, raw, broken faces
+  II.v_heart = [L(PG(256, 60, 380, 130, 430, 280, 360, 430, 220, 460, 110, 360, 90, 200, 160, 110), '#3a0e10'), L(PG(256, 60, 380, 130, 300, 240, 200, 200, 160, 110), '#5e1618'), L(PG(380, 130, 430, 280, 300, 240), '#4a1214'), L(PG(200, 200, 300, 240, 360, 430, 220, 460), '#2c0a0c')];
+  // the primordial relic: an ancient jar of clay
+  II.v_relic = [{ d: PATHS['amphora'] || '', c: '#8a6a4a' }];
+  IC.itemIcons = II;
   IC.applyData = function () {
     IC.def('ui:os', OS());
     for (const [k, layers] of Object.entries(ATT)) IC.def('att:' + k, layers);
@@ -760,8 +1076,12 @@
       d.icon = IC.ch(key, d.icon);
     }
     // a few items whose emoji is shared with something else get their own drawing
-    const ITEMX = { h_medkit: ['medical-pack', '#e8484a'], v_casket: ['locked-chest', '#ffd34a'] };
-    for (const list of [G.ITEMS, G.VALUABLES]) if (list) for (const it of list) { const x = ITEMX[it.id]; if (x && PATHS[x[0]]) { IC.def('item:' + it.id, [big(x[0], x[1])]); it.icon = IC.ch('item:' + it.id, it.icon); } }
+    const ITEMX = { h_troll: ['heart-organ', '#6e2c2a'] };
+    for (const list of [G.ITEMS, G.VALUABLES]) if (list) for (const it of list) {
+      const d = II[it.id], x = ITEMX[it.id];
+      if (d) { IC.def('item:' + it.id, d); it.icon = IC.ch('item:' + it.id, it.icon); }
+      else if (x && PATHS[x[0]]) { IC.def('item:' + it.id, [big(x[0], x[1])]); it.icon = IC.ch('item:' + it.id, it.icon); }
+    }
     if (G.ARMOR_SLOTS) for (const s of G.ARMOR_SLOTS) { const n = ARMOR[s.id] && ARMOR[s.id].plate; if (n) { IC.def('aslot:' + s.id, [big(n, '#9a8a70')]); s.icon = IC.ch('aslot:' + s.id, s.icon); } }
   };
   IC.warm = function () {
@@ -771,7 +1091,7 @@
     const box = document.createElement('div');
     box.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:240px;height:240px;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1';
     for (const k in SPEC) {
-      box.appendChild(iconNode(k));
+      box.appendChild(iconNode(k, true)); // (the inline drawings, warmed; a bitmap is made only for what is actually shown)
       for (const l of SPEC[k]) if (l.d) path2d(l.d);
     }
     if (document.body) {

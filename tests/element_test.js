@@ -12,8 +12,13 @@ const PORT = +process.env.COOP_PORT || 9993;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
+    // (the run starts once the loading is done, as it does in play: started while the shaders were still being made behind the loading
+    // screen, the frame loop had not begun yet - the camera still at the world's origin, the foe put 'in front of it' 100 m from you)
+    await p.until("document.getElementById('loading').classList.contains('done')", 120000);
     await p.eval("G.save.data.settings.volume = 0; G.save.write(); G.sfx.setVolume && G.sfx.setVolume(0); G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; G.game.startRun({ id: 'normal', lv: 0 }, 0); G.game.dev = { god: true, speed: 1 }; 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(800);
     // a quiet test bench: no foes of the area, crits off, a dummy far from walls
     await p.eval(`(() => {
@@ -127,7 +132,14 @@ const PORT = +process.env.COOP_PORT || 9993;
     check(await p.eval("(() => { const P = G.player; P.cls = 'soldier'; P.resetRun(); const no = G.Elem.hasSource(P); let attr = 0; for (let i = 0; i < 40; i++) attr += G.game.rollBuffs(4).filter((b) => G.Elem.isElementBoon(b)).length; P.cls = 'mage'; P.resetRun(); const yes = G.Elem.hasSource(P); let attr2 = 0; for (let i = 0; i < 40; i++) attr2 += G.game.rollBuffs(4).filter((b) => G.Elem.isElementBoon(b)).length; P.cls = 'soldier'; P.resetRun(); return !no && attr === 0 && yes && attr2 > 0; })()"), 'element boons: never offered to a soldier with no element, offered to the mage');
     // ---- shots and blades in their element's colour
     check(await p.eval("(() => { T.clean(); const P = G.player; const w = G.weapons.make('starter'); w.atts.core = 'c_volt'; w.ver++; P.weapons = [w]; P.wIdx = 0; const cols = []; const t0 = G.fx.tracer; G.fx.tracer = (a, b, c) => cols.push(c); try { G.weapons.shoot(w, G.weapons.stats(w)); } finally { G.fx.tracer = t0; } return cols.includes(G.Elem.BY.volt.hex); })()"), 'a gun with a volt core fires purple tracers');
-    check(await p.eval("(() => { const P = G.player; P.melee = G.weapons.makeMelee('m_ember'); G.weapons.melee.equip(true); let film = 0; G.weapons.vmRoot.traverse((o) => { if (o.material && o.material.blending === THREE.AdditiveBlending && o.material.color && o.material.color.getHex() === G.Elem.BY.fire.hex) film++; }); P.melee = G.weapons.makeMelee('m_basic'); G.weapons.melee.equip(true); return film > 0; })()"), 'an elemental melee weapon wears a skin of its colour');
+    // (an element put on by a core is shown by a skin of its colour; a weapon born with one shows it in what it is made of: no skin, and
+    // a material on it that its plain kin does not have - 焔刃 against 時雨, 氷牙 against the combat knife, 鳴神 against the war hammer)
+    r = await p.eval(`(() => { const P = G.player, W = G.weapons, out = [];
+      const look = (m, el) => { P.melee = m; W.melee.equip(true); const o = { film: 0, mats: new Set() }; W.vmRoot.traverse((x) => { if (!x.isMesh || !x.material || !x.visible) return; const mt = x.material; if (mt.blending === THREE.AdditiveBlending && mt.color && el && mt.color.getHex() === G.Elem.BY[el].hex) o.film++; else if (mt.color) o.mats.add(mt.color.getHex() + '/' + (mt.vertexColors ? 'v' : '') + '/' + (mt.map ? mt.map.uuid : '') + '/' + mt.metalness + '/' + mt.roughness); }); return o; };
+      const core = W.makeMelee('m_katana'); core.atts.core = 'c_fire'; const c = look(core, 'fire'); out.push('core:' + c.film);
+      for (const [id, plain] of [['m_ember', 'm_katana'], ['m_frost', 'm_knife'], ['m_thunder', 'm_hammer']]) { const el = G.MELEE_BY_ID[id].el, a = look(W.makeMelee(id), el), b = look(W.makeMelee(plain), el); out.push(id + ':' + el + ':' + a.film + ':' + [...a.mats].filter((k) => !b.mats.has(k)).length); }
+      P.melee = W.makeMelee('m_basic'); W.melee.equip(true); return out.join(' '); })()`);
+    check(/^core:[1-9]/.test(r) && /m_ember:fire:0:[1-9]/.test(r) && /m_frost:ice:0:[1-9]/.test(r) && /m_thunder:volt:0:[1-9]/.test(r), 'an element from a core puts a skin of its colour on the melee weapon; one born with its element has no skin and a blade or fittings of its own (' + r + ')');
     check(await p.eval("G.Tutorial && /属性/.test(String(G.Tutorial.STEPS ? G.Tutorial.STEPS.map((s) => s.title).join() : document.documentElement.innerHTML)) || true"), '(tutorial step checked in class_test)');
 
     // ---- wording: statuses are named as statuses, elements as elements

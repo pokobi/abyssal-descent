@@ -18,8 +18,10 @@ const only = process.argv.slice(2);
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(500);
     const keys = await p.eval(`JSON.stringify(Object.keys(G.FieldGen.gen))`).then(JSON.parse);
     const list = only.length ? keys.filter((k) => only.includes(k)) : keys;

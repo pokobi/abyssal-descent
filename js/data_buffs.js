@@ -302,7 +302,10 @@
   // ---------- sturdier defence (plain, always-on survivability) ----------
   add('d_vital', '頑健', '🏋️', 'common', 'defense', '最大HP+20。', { mods: { maxHp: 20 }, max: 5 });
   add('d_bonecage', '骨の籠手', '🦴', 'common', 'defense', '最大HP+10、被ダメ-4%。', { mods: { maxHp: 10, armor: 0.04 }, max: 3 });
-  add('d_healboost', '治癒の才', '🩹', 'common', 'defense', '回復量+30%。', { mods: { healMul: 0.3 }, max: 3 });
+  add('d_healboost', '治癒の才', '🩹', 'common', 'defense', '回復量+30%、包帯を巻く時間-15%。', { mods: { healMul: 0.3 }, max: 3 });
+  // quicker hands with what is carried (the stat useFast is read by G.ItemAnim.useMul; stacks add up, a throw is not touched)
+  add('d_deft', '手際', '🧤', 'common', 'defense', '回復・強化アイテムの使用時間-15%。', { mods: { useFast: 0.15 }, max: 3 });
+  add('d_fieldcraft', '野戦の心得', '🎒', 'rare', 'defense', '回復・強化アイテムの使用時間-25%。', { mods: { useFast: 0.25 } });
   add('d_plate', '板金鎧', '🛡️', 'uncommon', 'defense', '被ダメ-8%。', { mods: { armor: 0.08 }, max: 3 });
   add('d_bloodpact', '溢れる生命', '🫀', 'uncommon', 'defense', '最大HP+25%。', { mods: { maxHpPct: 0.25 }, max: 2 });
   add('d_light', '身軽', '🍃', 'uncommon', 'defense', 'スプリント中とスライディング中、被ダメ-15%。', { hooks: { preDamaged(c) { if (P.sprinting || P.sliding) c.red += 0.15; } } });

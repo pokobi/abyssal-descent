@@ -12,16 +12,19 @@ const PORT = +process.env.COOP_PORT || 9011;
     const q = '&local=1&lat=40&jit=20', room = 'F' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(300);
     const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
+    await g.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     const off = 'G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
     await h.eval(off); await g.eval(off);
     await h.eval('G.Coop.begin(); 1');
     await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
+    for (const pg of [h, g]) await pg.running();
     await sleep(2500);
     const foes = 'G.enemies.list.filter((e) => e.alive && !e.custom && e._nid && e.state !== "spawn")';
-    await g.until(`${foes}.length >= 2`, 20000);
+    await g.until(`${foes}.length >= 2`, 60000);   // (the foes come by the game's time: on a busy machine its frames are fewer)
     // ---- the guest finishes a foe, hit by hit (never dying at 1 hp)
     await g.eval(`(() => { G.game.dev = { god: true, speed: 1 }; const e = ${foes}[0]; window.__id = e._nid; window.__hp0 = e.hp; })(); 1`);
     const id = +(await g.eval('window.__id'));

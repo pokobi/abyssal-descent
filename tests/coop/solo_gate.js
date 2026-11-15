@@ -19,6 +19,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   try {
     const p = await ch.page('http://127.0.0.1:8790/index.html');
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     check(await p.eval('typeof G.Coop === "undefined" && typeof Peer === "undefined"'), 'no co-op code in the solo page');
     const bot = JSON.stringify(fs.readFileSync(path.join(ROOT, 'tests', 'bot.js'), 'utf8'));
     await p.eval(`G.game.debug = true; (0, eval)(${bot}); 1`);

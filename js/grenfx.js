@@ -23,10 +23,34 @@
       glass: s(0xd8f0ff, { roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.4 }),
       water: s(0x9ad8ff, { transparent: true, opacity: 0.8, emissive: 0x3070b0, emissiveIntensity: 0.5 }),
       oil: s(0xd07020, { transparent: true, opacity: 0.85, emissive: 0x803000, emissiveIntensity: 0.4 }),
-      goo: s(0x90e040, { roughness: 0.15, transparent: true, opacity: 0.85, emissive: 0x2a5000, emissiveIntensity: 0.5 }),
-      crystal: new THREE.MeshStandardMaterial({ color: 0x80f0ff, emissive: 0x30a0c0, emissiveIntensity: 0.9, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.85 }),
+      goo: s(0x4c6c26, { roughness: 0.15, transparent: true, opacity: 0.9, emissive: 0x1a3000, emissiveIntensity: 0.4 }),
+      crystal: new THREE.MeshStandardMaterial({ color: 0xa8d0d8, emissive: 0x205868, emissiveIntensity: 0.5, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.85 }),
+      // (what the shaped ones are made of, gfx.js grenGeo: cast iron, tin, old brass, copper, clay, glazed clay, hide, cord, waxed paper; the
+      // bands that tell them apart are dull paint)
+      iron: s(0x3c403e, { roughness: 0.7, metalness: 0.6 }), tin: s(0x74787a, { roughness: 0.5, metalness: 0.8 }), brassOld: s(0x8c7036, { roughness: 0.5, metalness: 0.8 }), copper: s(0x8a4a2a, { roughness: 0.45, metalness: 0.85 }),
+      clay: s(0x6a4a36, { roughness: 0.97, metalness: 0 }), ceramicW: s(0xb0a48c, { roughness: 0.35, metalness: 0 }), hide: s(0x3e2c1e, { roughness: 0.6, metalness: 0 }), rope: s(0x7a6a4a, { roughness: 1, metalness: 0 }),
+      paperOld: s(0x54241c, { roughness: 0.95, metalness: 0 }), verdigris: s(0x5a6a4a, { roughness: 0.6, metalness: 0.6 }), wood: s(0x4a3524, { roughness: 0.85, metalness: 0 }),
+      cRed: s(0x74201a, { roughness: 0.65, metalness: 0.3 }), cBlue: s(0x26406c, { roughness: 0.7, metalness: 0.2 }), cYellow: s(0x9a8222, { roughness: 0.7, metalness: 0.2 }), cGreen: s(0x33562a, { roughness: 0.7, metalness: 0.2 }), cWhite: s(0xa6a69c, { roughness: 0.7, metalness: 0.1 }),
       gBlue: e(0x60b0ff), gYellow: e(0xffe040, 1.4), gRed: e(0xff2010, 2), gPurple: e(0xa050ff, 1.6), gOrange: e(0xff8020, 1.8), gGreen: e(0x70ff40, 1.1), gHoly: e(0xfff0b0, 1.2), gWhite: e(0xffffff, 1.2),
     };
+    // (what the shaped ones are made of, given the surfaces of gfx.js: sand-cast iron with its pits and rust, paint chipped to the metal,
+    // worn steel and brass, hide, cord, clay; the colours dull. Nothing on them glows but what really burns: the dynamite's fuse, and
+    // the match smouldering in the limpet's fuze)
+    const X = G.GFX || {}, it = (n) => (X.itemTex ? X.itemTex(n) : null), ex = (n) => (X.tex ? X.tex(n) : null);
+    const sf = (t, metal) => (t ? Object.assign({ map: t.map, normalMap: t.normalMap, roughnessMap: t.orm, aoMap: t.orm }, metal ? { metalnessMap: t.orm, metalness: 1 } : {}) : {});
+    const cast = it('castIron'), paint = it('paintWorn'), steelT = ex('steel'), hideT = ex('leather'), weave = ex('weave'), rock = ex('rock'), poly = ex('polymer');
+    const pt = (c) => s(c, Object.assign({ roughness: 1 }, sf(paint, true)));
+    Object.assign(M, {
+      iron: s(0x8a8e88, Object.assign({ roughness: 1 }, sf(cast, true))), verdigris: s(0x5c6852, Object.assign({ roughness: 1 }, sf(cast, true))),
+      tin: s(0x8a8c88, Object.assign({ roughness: 0.7, metalness: 0.8 }, sf(steelT))), brassOld: s(0x8a6e38, Object.assign({ roughness: 0.75, metalness: 0.85 }, sf(steelT))), copper: s(0x7a4a2e, Object.assign({ roughness: 0.7, metalness: 0.85 }, sf(steelT))),
+      cRed: pt(0x4c2c24), cBlue: pt(0x34465a), cYellow: pt(0x75683a), cGreen: pt(0x3a4a2e), cWhite: pt(0x8e8c84),
+      paperOld: s(0x38211a, Object.assign({ roughness: 1, metalness: 0 }, hideT ? { normalMap: hideT.normalMap, roughnessMap: hideT.orm, normalScale: new THREE.Vector2(0.5, 0.5) } : {})),
+      hide: s(0x3e2c1e, Object.assign({ roughness: 0.75, metalness: 0 }, hideT ? { normalMap: hideT.normalMap, normalScale: new THREE.Vector2(0.25, 0.25) } : {})), rope: s(0x6a5a40, Object.assign({ roughness: 1, metalness: 0 }, sf(weave))),
+      clay: s(0x6a4a36, Object.assign({ roughness: 1, metalness: 0 }, sf(rock))), ceramicW: s(0x9a9080, Object.assign({ roughness: 0.4, metalness: 0 }, poly ? { normalMap: poly.normalMap, normalScale: new THREE.Vector2(0.4, 0.4) } : {})),
+      goo: s(0x2a3016, { roughness: 0.3, metalness: 0 }), oil: s(0x5a3410, { roughness: 0.2, metalness: 0, transparent: true, opacity: 0.9 }),
+      glass: s(0x8a9898, { roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.35 }), ice: s(0x8aa4ac, { roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.85 }),
+      ember: e(0xc85a20, 0.9),
+    });
     return M;
   }
   const PG = () => G.Props.PG;
@@ -38,11 +62,26 @@
   function lever(g, m, top) { mesh(g, 'box', m, 0.014, 0.09, 0.028, 0.05, top - 0.04, 0, 0, 0, -0.25); ring(g, M.brass, 0.022, top + 0.02, 0.3).position.x = -0.03; }
 
   // ---------------- models ----------------
+  const KNOWN = { g_frag: 1, g_fire: 1, g_water: 1, g_cryo: 1, g_shock: 1, g_toxic: 1, g_sticky: 1, g_flash: 1, g_hole: 1, g_nail: 1, g_shatter: 1, g_dyna: 1, g_decoy: 1 };
   GF.build = function (id, scale) {
     mats();
     const root = new THREE.Group(), g = new THREE.Group();
     root.add(g); root.userData.spin = g;
-    switch (id) {
+    // (shaped in gfx.js: turned bodies, fuzes, spoons and pins. What moves or blinks by itself is hung on here, where it always was)
+    const NP = G.GFX && G.GFX.grenGeo ? G.GFX.grenGeo(KNOWN[id] ? id : 'g_frag') : null;
+    if (NP) {
+      let bag = null; const ud = root.userData;
+      for (const q of NP) {
+        const o = new THREE.Mesh(q.g, M[q.m] || M.dark);
+        if (q.tag === 'bag') { o.scale.set(0.085, 0.075, 0.085); ud.bag = bag = o; g.add(o); }
+        else if (q.tag === 'onbag') (bag || g).add(o);
+        else if (q.tag === 'ring0') { o.rotation.x = 1.2; g.add(o); (ud.rings = ud.rings || [])[0] = o; }
+        else if (q.tag === 'ring1') { o.rotation.set(2.1, 1.0, 0); g.add(o); (ud.rings = ud.rings || [])[1] = o; }
+        else { g.add(o); if (q.tag === 'pin') ud.pin = o; else if (q.tag === 'spoon') ud.spoon = o; }   // (the pin's ring and the spoon: grenhold.js)
+      }
+      if (id === 'g_sticky') ud.led = sph(g, M.ember, 0.0055, 0, 0.033, 0);   // (a slow match smouldering in its fuze: it flickers)
+      if (id === 'g_dyna') { ud.fuseLine = cyl(g, M.tape, 0.004, 0.1, 0.008, 0.16, 0.03, 0, 0, 0.35); ud.fuse = sph(g, M.gOrange, 0.0075, -0.008, 0.21, 0.03); }
+    } else switch (id) {
       case 'g_fire': { // a red incendiary can: a fuel window shows the oil inside, a white-hot cap (it takes in the old fire bottle and thermite)
         cyl(g, M.red, 0.052, 0.17); cyl(g, M.orange, 0.054, 0.03, 0, 0.045); cyl(g, M.oil, 0.044, 0.07, 0, -0.025);
         for (const a of [0, Math.PI]) mesh(g, 'box', M.dark, 0.012, 0.075, 0.03, Math.cos(a) * 0.05, -0.025, Math.sin(a) * 0.05);
@@ -109,6 +148,7 @@
     if (sp) { sp.rotation.x += dt * (id === 'g_dyna' ? 9 : id === 'g_water' ? 6 : 14); sp.rotation.z += dt * 3; }
     if (ud.rings) { ud.rings[0].rotation.z += dt * 8; ud.rings[1].rotation.x += dt * 6; }
     if (ud.led) ud.led.visible = Math.sin(G.game.time * 30) > 0;
+    if (ud.pin && ud.pin.visible) { ud.pin.visible = false; if (ud.spoon) ud.spoon.visible = false; }   // (thrown: its pin pulled, its spoon flown)
     switch (id) {
       case 'g_fire': if (r < 0.7) G.fx.flame.spawn(x, y, z, U.rand(-0.2, 0.2), 0.4, U.rand(-0.2, 0.2), 0.25, 0.12, 0.03, 1.5, 0.7, 0.25, 1, -1, 1); break;
       case 'g_water': { // the bag wobbles and drips

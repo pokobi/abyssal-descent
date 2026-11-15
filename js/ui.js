@@ -10,6 +10,7 @@
 
   UI.init = function () {
     P = G.player;
+    UI.fontsReady = UI.warmFonts(); // (the start waits for it a while behind the loading screen: game.js)
     UI.el = {
       hud: $('hud'), hpBar: $('hp-bar'), hpFill: $('hp-fill'), hpTrail: $('hp-trail'), hpText: $('hp-text'), osFill: $('os-fill'), coinVal: $('coin-val'), coins: $('coins'), coinPops: $('coin-pops'),
       runMeta: $('run-meta'), wName: $('weapon-name'), wAtts: $('weapon-atts'), ammoMag: $('ammo-mag'), ammoMax: $('ammo-max'), ammo: $('ammo'), reloadBar: $('reload-bar'), wSlots: $('weapon-slots'),
@@ -33,6 +34,25 @@
     });
     UI.dirHits = [];
     UI.buildAbilityRow();
+  };
+
+  // The faces come from the net in pieces, a piece when a character of it is first shown - and the page lays its text out again when the
+  // piece arrives, in the middle of whatever is happening. So every character the game can show is asked for at once, at the start: the
+  // characters are read out of the game's own scripts (already in the browser's cache) and out of the page.
+  UI.warmFonts = async function () {
+    // (not on a phone: fetching every piece at once there held the game up far longer than the pieces arriving one by one ever did)
+    if (window.G_MOBILE || !document.fonts || !document.fonts.load || !window.fetch) return;
+    try {
+      const set = new Set(), eat = (t) => { for (const ch of t) if (ch.charCodeAt(0) > 0x2000) set.add(ch); };
+      const srcs = Array.from(document.scripts).map((e) => e.src).filter((u) => u && u.indexOf(location.origin) === 0);
+      const texts = await Promise.all(srcs.map((u) => fetch(u, { cache: 'force-cache' }).then((r) => r.text()).catch(() => '')));
+      for (const t of texts) eat(t);
+      eat(document.documentElement.innerHTML);
+      const text = Array.from(set).join(''), latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-%/.,:x';
+      const faces = [["500 16px 'Shippori Mincho'", text], ["700 16px 'Shippori Mincho'", text], ["400 16px 'Zen Antique'", text],
+        ['500 16px Spectral', latin], ['700 16px Spectral', latin], ['700 16px Cinzel', latin], ['900 16px Cinzel', latin], ["900 16px 'Cinzel Decorative'", latin]];
+      await Promise.all(faces.map((f) => document.fonts.load(f[0], f[1]).catch(() => null)));
+    } catch (e) { /* (no net, or a browser without it: the faces then come as they are needed, or the fallbacks stand) */ }
   };
 
   // ---------------- small helpers ----------------
@@ -159,7 +179,8 @@
     el.style.opacity = on ? 1 : 0; UI.el.crosshair.style.opacity = on ? 0 : UI.el.crosshair.style.opacity;
   };
   UI.scopeRange = function (txt, foe) { const t = UI._x8rng; if (!t) return; if (t.textContent !== txt) t.textContent = txt; const c = foe ? '#ff5038' : '#ffb040'; if (t.getAttribute('fill') !== c) t.setAttribute('fill', c); };
-  UI.pileIndicator = function (on) { UI.el.pileInd.classList.toggle('hidden', !on); };
+  // (set every frame from the player's own state, player.js update: the DOM is touched only when it changes)
+  UI.pileIndicator = function (on) { on = !!on; if (UI._pileOn === on) return; UI._pileOn = on; UI.el.pileInd.classList.toggle('hidden', !on); };
   UI.grappleHint = function (pv, state, cd) {
     const ch = UI.el.crosshair, gi = UI.el.grappleInd;
     const ok = pv && pv.ok && state === 'none' && cd <= 0;
@@ -619,7 +640,7 @@
     UI._ikey = o.key;
     p.classList.remove('hidden');
     p.style.setProperty('--rc', o.rc || 'var(--line)');
-    p.innerHTML = `<div class="ip-head"><div class="ip-icon">${o.icon}${G.Elem.badge(o.el)}</div><div><div class="ip-name">${U.esc(o.name)}</div><div class="ip-cat">${o.cat || ''}${o.el ? ' ' + G.Elem.chip(o.el) : ''}</div></div></div>${o.desc ? `<div class="ip-desc">${o.desc}</div>` : ''}${o.stats ? `<div class="ip-stats">${o.stats}</div>` : ''}${o.note ? `<div class="ip-note">${o.note}</div>` : ''}<div class="ip-foot"><div class="ip-price ${o.afford === false ? 'no' : ''}">${o.price !== undefined ? '🪙 ' + (typeof o.price === 'string' ? o.price : U.fmt(o.price)) : ''}</div>${o.action === null ? '' : `<div class="ip-key">${G.K('interact')} ${o.action || '購入'}</div>`}</div>`;
+    p.innerHTML = `<div class="ip-head"><div class="ip-icon${o.kc ? ' ' + o.kc : ''}">${o.icon}${G.Elem.badge(o.el)}</div><div><div class="ip-name">${U.esc(o.name)}</div><div class="ip-cat">${o.cat || ''}${o.el ? ' ' + G.Elem.chip(o.el) : ''}</div></div></div>${o.desc ? `<div class="ip-desc">${o.desc}</div>` : ''}${o.stats ? `<div class="ip-stats">${o.stats}</div>` : ''}${o.note ? `<div class="ip-note">${o.note}</div>` : ''}<div class="ip-foot"><div class="ip-price ${o.afford === false ? 'no' : ''}">${o.price !== undefined ? '🪙 ' + (typeof o.price === 'string' ? o.price : U.fmt(o.price)) : ''}</div>${o.action === null ? '' : `<div class="ip-key">${G.K('interact')} ${o.action || '購入'}</div>`}</div>`;
   };
   // ---- centre-screen hold gauge (ornate chests) ----
   UI.holdRing = function (k, mode, o) {
@@ -652,16 +673,79 @@
   UI.showHud = function (on) { UI.el.hud.classList.toggle('hidden', !on); };
   UI.statusOverlay = function (on, force, compact) {
     const o = UI.el.statusOv;
-    if (!on) { o.classList.add('hidden'); if (G.StatusUI) G.StatusUI.unmount(); return; }
+    if (!on) { if (!o._parked) o.classList.add('hidden'); if (G.StatusUI) G.StatusUI.unmount(); return; }
     // holding Tab auto-repeats keydown: only build the sheet once per press, otherwise it keeps jumping back to the top
-    if (!o.classList.contains('hidden') && !force) return;
+    if (!o.classList.contains('hidden') && !o._parked && !force) return;
+    if (o._inv) { o._inv = false; o._h = null; unplace(o); } // (the inventory's short sheet is replaced: the next inventory opening builds it again)
     const keep = o.scrollTop;
-    o.classList.remove('hidden');
+    unpark(o); o.classList.remove('hidden');
     o.innerHTML = UI.statusHTML(compact);
     o.scrollTop = force ? keep : 0;
     if (G.StatusUI) G.StatusUI.mount(o);
   };
-  UI.statusOpen = () => !UI.el.statusOv.classList.contains('hidden');
+  UI.statusOpen = () => !UI.el.statusOv.classList.contains('hidden') && !UI.el.statusOv._parked;
+  // The inventory's status column (invui.js) lives in the same overlay. It is patched in place (UI.morph: only what changed is
+  // rebuilt), and while the inventory is closed - or shows a chest - it is parked instead of hidden: invisible, its contents skipped
+  // (content-visibility) so the closing and opening of the inventory neither restyle nor lay it out again. Unparking replays its
+  // pop-in, as showing it did.
+  const PARK = [['display', 'block', 'important'], ['visibility', 'hidden', ''], ['content-visibility', 'hidden', ''], ['animation', 'none', '']];
+  const POS = ['left', 'top', 'width', 'height', 'right', 'bottom'];
+  function park(o) { if (o._parked) return; o._parked = true; for (const [k, v, p] of PARK) o.style.setProperty(k, v, p); }
+  function unpark(o) { if (!o._parked) return; o._parked = false; for (const [k] of PARK) o.style.removeProperty(k); }
+  function unplace(o) { if (!o._pos) return; o._pos = null; for (const k of POS) o.style.removeProperty(k); }
+  UI.statusSheet = function (on) {
+    const o = UI.el.statusOv;
+    if (!on) { if (o._inv && !o.classList.contains('hidden')) park(o); else if (!o._parked) o.classList.add('hidden'); return; }
+    if (!o._st) { o._st = 1; o.addEventListener('scroll', () => { o._top = o.scrollTop; }, { passive: true }); }
+    if (!o._inv) { o._inv = true; o._h = null; o.textContent = ''; o._top = 0; }
+    const html = UI.statusHTML(true), off = o._parked || o.classList.contains('hidden');
+    if (o._h !== html) { UI.morph(o, html); o._h = html; }
+    unpark(o); o.classList.remove('hidden');
+    if (off && o._top) o.scrollTop = 0; // (every opening starts at the top of the sheet, as before)
+  };
+  // where the status column sits over the inventory's left cell (only written when it moved)
+  UI.statusPlace = function (r) {
+    const o = UI.el.statusOv, k = r.left + ',' + r.top + ',' + r.width + ',' + r.height;
+    if (o._pos === k) return;
+    o._pos = k;
+    o.style.setProperty('left', r.left + 'px', 'important'); o.style.setProperty('top', r.top + 'px', 'important');
+    o.style.setProperty('width', r.width + 'px', 'important'); o.style.setProperty('height', r.height + 'px', 'important');
+    o.style.setProperty('right', 'auto', 'important'); o.style.setProperty('bottom', 'auto', 'important');
+  };
+  // ---- patching markup in place: the new markup is parsed off the page and its icon characters drawn the way the page's icon pass
+  // (icons.js) draws them; then only the nodes that differ are changed, so whatever stayed the same keeps its layout, its paint and
+  // its listeners. Children with a key (an item cell: data-where + data-uid; a 3D preview: data-pv) are matched by the key.
+  const nkey = (n) => (n.nodeType !== 1 ? null : n.hasAttribute('data-uid') ? 'u' + n.getAttribute('data-where') + ':' + n.getAttribute('data-uid') : n.hasAttribute('data-pv') ? 'p' + n.getAttribute('data-pv') : null);
+  function syncAttrs(a, b) {
+    const ba = b.attributes, aa = a.attributes;
+    for (let i = 0; i < ba.length; i++) { const t = ba[i]; if (a.getAttribute(t.name) !== t.value) a.setAttribute(t.name, t.value); }
+    if (aa.length !== ba.length) for (let i = aa.length - 1; i >= 0; i--) if (!b.hasAttribute(aa[i].name)) a.removeAttribute(aa[i].name);
+  }
+  function syncNode(a, b) {
+    if (a.nodeType !== 1) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+    syncAttrs(a, b);
+    if (a.nodeName !== 'CANVAS') syncKids(a, b); // (a canvas keeps what is drawn in it)
+  }
+  function syncKids(a, b) {
+    const nb = Array.from(b.childNodes);
+    let want = null, live = null;
+    for (const n of nb) { const k = nkey(n); if (k) (want || (want = new Set())).add(k); }
+    // keyed children that are gone are taken out first, so the ones that stay keep their order and need no moving
+    for (const n of Array.from(a.childNodes)) { const k = nkey(n); if (!k) continue; if (want && want.has(k) && !(live && live.has(k))) (live || (live = new Map())).set(k, n); else a.removeChild(n); }
+    for (let i = 0; i < nb.length; i++) {
+      const y = nb[i], x = a.childNodes[i] || null, k = nkey(y), m = k && live ? live.get(k) : null;
+      if (m) { live.delete(k); if (m !== x) a.insertBefore(m, x); syncNode(m, y); continue; }
+      if (!x) { a.appendChild(y); continue; }
+      if (!k && !nkey(x)) { if (x.nodeType === y.nodeType && x.nodeName === y.nodeName) syncNode(x, y); else a.replaceChild(y, x); continue; }
+      a.insertBefore(y, x);
+    }
+    while (a.childNodes.length > nb.length) a.removeChild(a.lastChild);
+  }
+  UI.morph = function (el, html) {
+    const t = document.createElement('template'); t.innerHTML = html;
+    if (G.Icons && G.Icons.scan) for (const n of Array.from(t.content.childNodes)) G.Icons.scan(n);
+    syncKids(el, t.content);
+  };
   UI.statusScroll = function (dy) {
     const o = UI.el.statusOv, step = Math.sign(dy) * Math.min(400, Math.max(40, Math.abs(dy)));
     // scroll the sheet itself, or a scrollable column inside it if the sheet has no room to move
@@ -810,6 +894,7 @@
     const S = G.save.data.settings;
     if (S.askTutorial === undefined) S.askTutorial = true;
     const rowR = (id, label, min, max, step, fmt) => `<div class="set-row"><span>${label}</span><input type="range" id="s-${id}" min="${min}" max="${max}" step="${step}" value="${S[id]}"><span class="v" id="v-${id}">${fmt(S[id])}</span></div>`;
+    if (S.motionBlur === undefined) S.motionBlur = true; // (a save from before the setting: on)
     const rowC = (id, label) => `<div class="set-row"><span>${label}</span><input type="checkbox" id="s-${id}" ${S[id] ? 'checked' : ''}><span></span></div>`;
     const s = UI.screen(`<div class="panel" style="width:min(640px,94vw)"><h2>⚙️ 設定</h2>
       ${rowR('sens', '🖱️ マウス感度', 0.1, 3, 0.05, (v) => (+v).toFixed(2))}
@@ -820,6 +905,8 @@
       ${rowR('bob', '🚶 視点の揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
       <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（軽量：低解像度・影なし・簡易ライト）</option><option value="med">中（標準：解像度1.0倍・影は軽め）</option><option value="high">高（最高画質）</option></select><span></span></div>
       ${rowC('dmgNums', '🔢 ダメージ表記')}${rowC('crouchToggle', '🧎 しゃがみ切替式')}${rowC('autoSprint', `🏃 常に走る（${G.K('sprint')}で歩く）`)}${rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')}${rowC('invertY', '↕️ 上下反転')}${rowC('fullscreen', '⛶ 開始時フルスクリーン')}${rowC('showFps', '📈 FPS表示')}${rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認')}
+      ${rowC('motionBlur', '💨 モーションブラー（画質が中・高の時）')}
+      <div class="set-row"><span>🔊 音の種類</span><select id="s-sound"><option value="new">新しい音</option><option value="classic">元の音</option></select><span></span></div>
       <div class="set-row"><span>⌨️ キー配置</span><button class="btn small" id="s-keys">キー設定を開く</button><span></span></div>
       <div class="set-row"><span>🗑️ データのリセット</span><button class="btn small" id="s-reset">リセットする…</button><span></span></div>
       <div style="margin-top:18px;text-align:right"><button class="btn" id="s-back">↩ 戻る</button></div></div>`, 'dim');
@@ -830,8 +917,10 @@
       const inp = s.querySelector('#s-' + id), v = s.querySelector('#v-' + id);
       inp.oninput = () => { S[id] = +inp.value; v.textContent = inp.parentElement.querySelector('.v').textContent = id === 'fov' ? S[id] + '°' : id === 'volume' || id === 'shake' || id === 'bob' ? Math.round(S[id] * 100) + '%' : (+S[id]).toFixed(2); if (id === 'volume') G.sfx.setVolume(S[id]); G.save.write(); };
     }
-    for (const id of ['dmgNums', 'crouchToggle', 'autoSprint', 'sprintToggle', 'invertY', 'fullscreen', 'showFps', 'askTutorial']) { const inp = s.querySelector('#s-' + id); inp.onchange = () => { S[id] = inp.checked; G.save.write(); }; }
+    for (const id of ['dmgNums', 'crouchToggle', 'autoSprint', 'sprintToggle', 'invertY', 'fullscreen', 'showFps', 'askTutorial', 'motionBlur']) { const inp = s.querySelector('#s-' + id); inp.onchange = () => { S[id] = inp.checked; G.save.write(); }; }
     s.querySelector('#s-quality').onchange = (e) => { S.quality = e.target.value; G.save.write(); G.game.applyQuality(); };
+    s.querySelector('#s-sound').value = S.sound === 'classic' ? 'classic' : 'new';
+    s.querySelector('#s-sound').onchange = (e) => { S.sound = e.target.value; G.save.write(); if (G.sfx.applySet) G.sfx.applySet(); };
     s.querySelector('#s-back').onclick = () => { G.sfx.ui('click'); back(); };
   };
   // data reset: choose what, then confirm (nothing can be undone); the page reloads afterwards

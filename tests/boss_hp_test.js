@@ -12,6 +12,7 @@ const PORT = +process.env.COOP_PORT || 9995;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     for (const diff of ['normal', 'hard']) {
       const rows = JSON.parse(await p.eval(`(() => {
         const R = G.Run, GM = G.game, keep = R.cur, ka = GM.area, out = [];

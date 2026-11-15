@@ -125,6 +125,13 @@
     if (it.type === 'item' && d.cat === 'grenade' && G.GrenHold && G.GrenHold.active()) G.GrenHold.putAway(true);
     pay(unit * n, d.name + (n > 1 ? ` ×${n}` : ''));
   }
+  // weapon parts are a count per rarity (inventory.js P.parts), not things in the bag
+  const partUnit = (r) => G.Inv.value(G.Inv.make('part', G.Parts.id(r), 1));
+  function sellParts(r, n) {
+    const p = P(), d = G.PART_BY_ID[G.Parts.id(r)]; n = Math.min(n || 1, G.Parts.count(r));
+    if (n <= 0 || !G.Inv.takeParts(p, r, n)) return;
+    pay(partUnit(r) * n, d.name + (n > 1 ? ` ×${n}` : ''));
+  }
   function rows() {
     const p = P(), IV = G.Inv, out = [];
     const guns = G.weapons.gunsInOrder();
@@ -141,7 +148,13 @@
       const cat = it.type === 'item' ? (d.cat === 'grenade' ? 'grenade' : 'item') : it.type === 'gun' ? 'weapon' : it.type;
       const unit = IV.value(Object.assign({}, it, { n: 1 })), ask = it.type === 'armor' && !!(it.ench && it.ench.length); // enchanted armour is confirmed first
       const sub = it.type === 'armor' ? `${G.ARMOR_SLOT_BY_ID[d.slot].name}防具・防御力${d.def}${it.ench && it.ench.length ? '・' + it.ench.map(G.enchantText).join(' ') : ''}` : it.type === 'valuable' ? '金品（売却専用）' : it.type === 'att' ? 'アタッチメント（インベントリ）' : IV.isArm(it) ? `${it.type === 'gun' ? '銃' : '近接武器'}（インベントリ）${it.gun && it.gun.lv ? '・強化+' + it.gun.lv : ''}` : d.passive ? '所持品（常時効果）' : cat === 'grenade' ? '投擲物' : '消耗品';
-      out.push({ cat, icon: it.type === 'armor' ? G.armorIcon(d) : d.icon, el: G.Elem.itemTag(it), rc: d.rarity, name: d.name + (it.n > 1 ? ` ×${it.n}` : ''), sub, v: unit, n: it.n, act: () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, 1), 0); } else { sellInst(it, 1); PW.open(); } }, actAll: it.n > 1 ? () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, it.n), 0); } else { sellInst(it, it.n); PW.open(); } } : null });
+      out.push({ cat, icon: it.type === 'armor' ? G.armorIcon(d) : d.icon, kc: G.InvUI && G.InvUI.kindCls ? G.InvUI.kindCls(it) : '', el: G.Elem.itemTag(it), rc: d.rarity, name: d.name + (it.n > 1 ? ` ×${it.n}` : ''), sub, v: unit, n: it.n, act: () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, 1), 0); } else { sellInst(it, 1); PW.open(); } }, actAll: it.n > 1 ? () => { if (ask) { GM()._keepModal = true; setTimeout(() => confirmArmor(it, it.n), 0); } else { sellInst(it, it.n); PW.open(); } } : null });
+    }
+    if (G.Parts) for (const r of G.Parts.R) {
+      const n = G.Parts.count(r); if (!n) continue;
+      const d = G.PART_BY_ID[G.Parts.id(r)], NEED = G.Parts.NEED;
+      out.push({ cat: 'part', icon: d.icon, el: '', rc: r, name: d.name + (n > 1 ? ` ×${n}` : ''), sub: n >= NEED ? `武器の部品（${NEED}つ揃っている：作業台で武器にできる）` : '武器の部品', v: partUnit(r), n,
+        act: () => { sellParts(r, 1); PW.open(); }, actAll: n > 1 ? () => { sellParts(r, n); PW.open(); } : null });
     }
     return out;
   }
@@ -213,9 +226,9 @@
       };
     }
     if (tab === 'part') {
-      const parts = p.bag.items.filter((o) => o.type === 'part');
-      const count = parts.reduce((n, o) => n + (o.n || 1), 0);
-      const sum = parts.reduce((s, o) => s + IV.value(o), 0);
+      const parts = G.Parts ? G.Parts.R.filter((r) => G.Parts.count(r) > 0) : [];
+      const count = parts.reduce((n, r) => n + G.Parts.count(r), 0);
+      const sum = parts.reduce((s, r) => s + partUnit(r) * G.Parts.count(r), 0);
       return {
         label: `🔧 部品を一括売却（${count}点 +${fmt(sum)}🪙）`,
         count,
@@ -223,9 +236,9 @@
         act: () => {
           if (!parts.length) return;
           // (a set of three is a weapon at the workbench: worth a second look before it goes for a few coins)
-          const sets = parts.filter((o) => (o.n || 1) >= 3).length;
-          confirmBulk('🔧 部品を一括売却しますか？', `部品 <b>${count}点</b>`, sum, sets ? `3つ揃って組み立てられる部品 <b>${sets}種</b>` : '', () => {
-            for (const o of parts.slice()) IV.remove(p.bag, o);
+          const sets = parts.filter((r) => G.Parts.count(r) >= G.Parts.NEED).length;
+          confirmBulk('🔧 部品を一括売却しますか？', `武器の部品 <b>${count}点</b>`, sum, sets ? `${G.Parts.NEED}つ揃って組み立てられるレアリティ <b>${sets}種</b>` : '', () => {
+            for (const r of parts) IV.takeParts(p, r, G.Parts.count(r));
             pay(sum, `部品${count}点`);
             G.ui.toast(`🔧 部品 ${count}点を売却した（+${fmt(sum)}🪙）`, 'good');
           });
@@ -289,7 +302,7 @@
       <div class="pw-head"><h2>⚖️ 買取屋</h2><span>買値の<b>${Math.round(PW.RATE * 100)}%</b>で買い取る（金品は満額・武器は強化に使ったコインの${Math.round(G.Areas.FORGE_REFUND * 100)}%を上乗せ）</span>${G.ui.coinBox()}</div>
       <div class="pw-tabs">${CATS.map(([k, n]) => { const c = k === 'all' ? all.length : all.filter((r) => r.cat === k).length; return `<span class="pw-tab${PW.tab === k ? ' on' : ''}${c ? '' : ' none'}" data-t="${k}">${n} <small>${c}</small></span>`; }).join('')}</div>
       <div class="pw-bulk">${bulk ? `<button class="btn${bulk.primary && bulk.count ? ' primary' : ''}" id="pw-bulk-btn" ${bulk.count ? '' : 'disabled'}>${bulk.label}</button>` : ''}</div>
-      <div class="pw-list">${list.length ? list.map((r, i) => `<div class="pw-row${r.no ? ' no' : ''}" style="--rc:${R(r.rc || 'common')}"><span class="pw-ic">${r.icon}${G.Elem.badge(r.el)}</span><div class="pw-t"><b>${U.esc(r.name)}</b><small>${U.esc(r.sub)}</small></div><span class="pw-v">${r.no ? '—' : '+' + fmt(r.v) + '🪙' + (r.n > 1 ? '<small>/1個</small>' : '')}</span>${r.no ? '' : `<button class="btn small" data-s="${i}">売る</button>`}${r.actAll ? `<button class="btn small" data-a="${i}">すべて（+${fmt(r.v * r.n)}）</button>` : ''}</div>`).join('') : '<div class="pw-none">売れるものがない</div>'}</div>
+      <div class="pw-list">${list.length ? list.map((r, i) => `<div class="pw-row${r.no ? ' no' : ''}" style="--rc:${R(r.rc || 'common')}"><span class="pw-ic${r.kc ? ' ' + r.kc : ''}">${r.icon}${G.Elem.badge(r.el)}</span><div class="pw-t"><b>${U.esc(r.name)}</b><small>${U.esc(r.sub)}</small></div><span class="pw-v">${r.no ? '—' : '+' + fmt(r.v) + '🪙' + (r.n > 1 ? '<small>/1個</small>' : '')}</span>${r.no ? '' : `<button class="btn small" data-s="${i}">売る</button>`}${r.actAll ? `<button class="btn small" data-a="${i}">すべて（+${fmt(r.v * r.n)}）</button>` : ''}</div>`).join('') : '<div class="pw-none">売れるものがない</div>'}</div>
       <div style="text-align:right;margin-top:10px"><button class="btn" id="pw-close">🚶 取引を終える</button></div></div>`, 'dim');
     s.querySelectorAll('.pw-tab').forEach((t) => t.onclick = () => { PW.tab = t.dataset.t; G.sfx.ui('click'); PW.open(); });
     s.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => list[+b.dataset.s].act());

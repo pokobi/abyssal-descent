@@ -13,8 +13,10 @@ const PORT = +process.env.COOP_PORT || 9981;
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000);
+    await p.running();
     await sleep(500);
     await p.eval("G.Run.field = () => 'pillars'; G.game.area = 15; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.enterArea(16, 'combat'); 1");
     await p.until("G.world && G.world.biome === 'pillars' && !!G.world.pillars", 40000).catch(async (e) => { console.log(await p.eval("JSON.stringify({ f: G.world && G.world.field, b: G.world && G.world.biome, st: G.game.state, stage: G.game.stage, area: G.game.area })"), p.errs.slice(0, 3)); throw e; });

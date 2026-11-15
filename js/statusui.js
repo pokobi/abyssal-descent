@@ -238,6 +238,36 @@
 
   // ---------------- 3D weapon previews ----------------
   const PV = { r: null, scene: null, cam: null, items: [], raf: 0, W: 448, H: 256 };
+  // The game's reflections (G.envTex, a PMREM map) live in the game renderer's own context: another renderer samples them as black.
+  // SU.envFor(renderer) gives that renderer a copy: the map's half-float texels read straight back from the game's context (a few ms,
+  // no shader). Baking the room again in the new context (G.Tex.makeEnv) is the fallback only: its blur shader takes seconds to compile
+  let envData = null;
+  function envRead() {
+    if (envData) return envData;
+    const main = G.renderer, t = G.envTex; if (!main || !t || !t.image) return null;
+    const gl = main.getContext(), wt = main.properties.get(t).__webglTexture, w = t.image.width, h = t.image.height;
+    if (!wt || !w || !h || typeof WebGL2RenderingContext === 'undefined' || !(gl instanceof WebGL2RenderingContext)) return null;
+    const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING), fb = gl.createFramebuffer();
+    try {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, wt, 0);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) return null;
+      const b = new Uint16Array(w * h * 4); while (gl.getError()) { /* clear older errors */ }
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.HALF_FLOAT, b);
+      if (gl.getError()) return null;
+      let lit = 0; for (let i = 0; i < b.length; i += 4 * 97) if (b[i] & 0x7fff) lit++;
+      if (!lit) return null;   // (nothing read: the fallback)
+      return (envData = { b, w, h, cs: t.colorSpace });
+    } finally { gl.bindFramebuffer(gl.FRAMEBUFFER, prev); gl.deleteFramebuffer(fb); }
+  }
+  SU.envFor = function (renderer) {
+    let e = null; try { e = envRead(); } catch (err) { e = null; }
+    if (e) {
+      const d = new THREE.DataTexture(e.b, e.w, e.h, THREE.RGBAFormat, THREE.HalfFloatType);
+      d.mapping = THREE.CubeUVReflectionMapping; d.colorSpace = e.cs; d.minFilter = d.magFilter = THREE.LinearFilter; d.generateMipmaps = false; d.needsUpdate = true;
+      return d;
+    }
+    try { return G.Tex && G.Tex.makeEnv ? G.Tex.makeEnv(renderer) : null; } catch (err) { return null; }
+  };
   function pvInit() {
     if (PV.r) return true;
     try {
@@ -251,14 +281,15 @@
     const k = new THREE.DirectionalLight(0xffe8d0, 3.6); k.position.set(2, 3, 3); PV.scene.add(k);
     const r2 = new THREE.DirectionalLight(0x8090c0, 1.1); r2.position.set(-3, 1, -2); PV.scene.add(r2);
     const f = new THREE.DirectionalLight(0xffffff, 1.4); f.position.set(0, 0.5, 4); PV.scene.add(f);
-    PV.scene.environment = G.envTex || null;
+    PV.scene.environment = SU.envFor(PV.r);   // (the game's reflections copied for this renderer: black otherwise)
     PV.cam = new THREE.PerspectiveCamera(28, PV.W / PV.H, 0.01, 100);
     return true;
   }
-  function pvFrame() {
-    if (!PV.items.length) return;
+  function pvFrame(items) {
+    items = items || PV.items;
+    if (!items.length) return;
     const t = performance.now() / 1000;
-    for (const it of PV.items) {
+    for (const it of items) {
       PV.scene.add(it.g);
       it.g.rotation.y = it.kind === 'gun' ? -Math.PI / 2 + Math.sin(t * 0.8 + it.ph) * 0.6 : t * 0.7 + it.ph;
       PV.cam.position.set(0, it.d * 0.12, it.d); PV.cam.lookAt(0, 0, 0);
@@ -272,7 +303,7 @@
     if (!UI.statusOpen() && !(G.InvUI && G.InvUI.isOpen())) { SU.unmount(); return; }
     pvFrame();
   }
-  SU.renderOnce = pvFrame;
+  SU.renderOnce = () => pvFrame();
   // bounds of what is actually drawn (hidden parts of a display model must not enlarge the frame)
   function visBox(root) {
     root.updateMatrixWorld(true);
@@ -284,22 +315,39 @@
     })(root);
     return box.isEmpty() ? new THREE.Box3(new THREE.Vector3(-0.2, -0.1, -0.2), new THREE.Vector3(0.2, 0.1, 0.2)) : box;
   }
+  // the models already made, by weapon and parts (the inventory mounts the same few again at every opening and every change in the
+  // bag): made, fitted and copied for this renderer once; the oldest are let go past a dozen or so
+  const pvModels = new Map();
+  function pvModel(it) {
+    const key = it.kind + '|' + (it.def.id || it.def.name) + '|' + (it.atts ? JSON.stringify(it.atts) : '');
+    let m = pvModels.get(key);
+    if (m) { pvModels.delete(key); pvModels.set(key, m); return m; }
+    let model; try { model = it.kind === 'melee' ? G.weapons.meleeDisplayModel(it.def) : G.weapons.displayModel(it.def, it.atts); } catch (e) { return null; }
+    if (G.GFX && G.GFX.portable) G.GFX.portable(model, PV.r);   // (the game's baked surfaces copied for this renderer: black otherwise)
+    const box = visBox(model), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    model.position.sub(c);
+    const g = new THREE.Group(); g.add(model);
+    // guns are seen side-on (barrel across the frame); melee weapons spin, fitted by their bounding sphere
+    const half = Math.tan(THREE.MathUtils.degToRad(PV.cam.fov / 2)), asp = PV.W / PV.H;
+    const d = it.kind === 'gun' ? Math.max(sz.z * 1.12 / (2 * half * asp), sz.y * 1.35 / (2 * half), 0.25) : Math.max(sz.length() * 0.5 / half * 1.15, 0.3);
+    m = { key, g, d };
+    pvModels.set(key, m);
+    if (pvModels.size > 16) pvModels.delete(pvModels.keys().next().value);
+    return m;
+  }
   SU.mount = function (root) {
     const list = pend; pend = [];
     SU.unmount();
     if (!list.length || !pvInit()) return;
-    const half = Math.tan(THREE.MathUtils.degToRad(PV.cam.fov / 2)), asp = PV.W / PV.H;
     PV.items = list.map((it, i) => {
       const cv = root.querySelector(`canvas[data-pv="${it.id}"]`); if (!cv) return null;
-      let model; try { model = it.kind === 'melee' ? G.weapons.meleeDisplayModel(it.def) : G.weapons.displayModel(it.def, it.atts); } catch (e) { return null; }
-      const box = visBox(model), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
-      model.position.sub(c);
-      const g = new THREE.Group(); g.add(model);
-      // guns are seen side-on (barrel across the frame); melee weapons spin, fitted by their bounding sphere
-      const d = it.kind === 'gun' ? Math.max(sz.z * 1.12 / (2 * half * asp), sz.y * 1.35 / (2 * half), 0.25) : Math.max(sz.length() * 0.5 / half * 1.15, 0.3);
-      return { cv, ctx: cv.getContext('2d'), g, d, kind: it.kind, ph: i * 1.3 };
+      const m = pvModel(it); if (!m) return null;
+      // (a canvas kept from the last time - the inventory patches its markup in place - already shows this weapon: it is not drawn
+      // again before the next frame)
+      const fresh = cv._pv !== m.key; cv._pv = m.key;
+      return { cv, ctx: cv._ctx || (cv._ctx = cv.getContext('2d')), g: m.g, d: m.d, kind: it.kind, ph: i * 1.3, fresh };
     }).filter(Boolean);
-    pvFrame();
+    pvFrame(PV.items.filter((x) => x.fresh));
     PV.raf = requestAnimationFrame(pvLoop);
   };
   // the preview renderer, created and its shaders compiled once, ahead of the first Tab / chest screen
@@ -310,12 +358,19 @@
       const g = new THREE.Group();
       if (d) g.add(G.weapons.displayModel(d, {}));
       if (G.MELEE && G.MELEE[0]) g.add(G.weapons.meleeDisplayModel(G.MELEE[0]));
+      if (G.GFX && G.GFX.portable) G.GFX.portable(g, PV.r);
       PV.scene.add(g); PV.scene.updateMatrixWorld(true);
       PV.cam.position.set(0, 0.1, 1.2); PV.cam.lookAt(0, 0, 0);
       PV.r.compile(PV.scene, PV.cam);
       PV.r.render(PV.scene, PV.cam);
       PV.scene.remove(g);
     } catch (e) { /* ignore */ }
+    // the class screen's figure (classes.js) wears baked cloth and leather: read back for its renderer when the page is idle, after the
+    // loading screen, so that neither the boot nor the first opening of that screen pays for it (about 10 ms)
+    const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
+    idle(() => { try { const X = G.GFX; if (!X || !X.portRead || !X.tex) return; const g = new THREE.Group(); for (const n of ['weave', 'leather']) { const t = X.tex(n); if (t) g.add(new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.orm }))); } X.portRead(g); } catch (e) { /* read when the screen opens */ } }, { timeout: 8000 });
   };
+  // the queued previews are dropped (markup made without being put on the page: the inventory's patch while it is closed)
+  SU.drop = () => { pend = []; };
   SU.unmount = function () { if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = 0; PV.items = []; };
 })();

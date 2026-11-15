@@ -43,6 +43,9 @@ window.__wt = (function () {
       p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
       await p.send('Emulation.setDeviceMetricsOverride', { width: 1745, height: 982, deviceScaleFactor: 1.1, mobile: false });
       await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+      // (the loading screen is still up when the title is reached: behind it the start's own warm-up runs on - the shaders, then the
+      // carved shapes. Nobody can start a run before it is taken down, so neither does this)
+      await p.until("document.getElementById('loading').classList.contains('done')", 120000);
       await p.eval(`G.save.data.settings.volume = 0; G.sfx.setVolume && G.sfx.setVolume(0); G.save.data.settings.quality = 'high'; G.save.data.settings.askTutorial = false; G.Run.field = () => '${f}'; G.game.startRun({ id: 'normal', lv: 0 }, 0); 1`);
       await p.until("!!G.game.run && !!G.world && !G.game._warming", 60000);
       await p.eval("G.game.dev = { god: true, speed: 1 }; 1");

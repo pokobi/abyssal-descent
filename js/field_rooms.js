@@ -19,7 +19,7 @@
     T.crags(w, rng, 'W', -2, D + 2, sd0, sd1, 6, 9, gy); T.crags(w, rng, 'E', -2, D + 2, sd0, sd1, 6, 9, gy);
     let a = -2; for (const g of [...LG.gateXs(W, o.gates || 1), W + 8]) { if (g - 6 > a + 0.5) T.crags(w, rng, 'N', a, g - 6, 1.5, 3, 7, 10, gy); a = g + 6; }
     T.crags(w, rng, 'S', -2, W / 2 - 7.5, o.keep ? 0.3 : 1.5, o.keep ? 0.6 : 3, 6, 9, gy); T.crags(w, rng, 'S', W / 2 + 7.5, W + 2, o.keep ? 0.3 : 1.5, o.keep ? 0.6 : 3, 6, 9, gy);
-    for (let i = 0; i < 40; i++) { const x = rng.range(4, W - 4), z = rng.range(4, D - 4); if (!clear(o, x, z, 0.5)) continue; for (let k = 0; k < 2; k++) w.batch.geo('vine', PG().plane, P().M(x, 0.2, z, 0.7, 0.45, 1, 0, k * Math.PI / 2 + rng.range(0, 1), 0), { su: 0.6, sv: 0.5, tint: [1.15, 1.05, 0.62] }); }
+    for (let i = 0; i < 40; i++) { const x = rng.range(4, W - 4), z = rng.range(4, D - 4); if (!clear(o, x, z, 0.5)) continue; const r0 = rng.range(0, 1), r1 = rng.range(0, 1); if (!P().tuft(w, x, 0, z, 1, [1.25, 1.1, 0.66], 3, 0.9)) for (let k = 0; k < 2; k++) w.batch.geo('vine', PG().plane, P().M(x, 0.2, z, 0.7, 0.45, 1, 0, k * Math.PI / 2 + (k ? r1 : r0), 0), { su: 0.6, sv: 0.5, tint: [1.15, 1.05, 0.62] }); }
     w.addLight(W / 2, 6, D / 2, { flame: 0, intensity: 6, range: 24, color: '#ffd8b0', emit: false, prio: 0.8 });
   };
   // ---- a round chamber cut in the rock at the foot of a shaft, the night sky high above, chains hanging down
@@ -55,7 +55,7 @@
     { let ax = -2; for (const g of [...LG.gateXs(W, o.gates || 1), W + 7]) { if (g - 5.5 > ax) w.solid('rock', ax, -20, -3, g - 5.5, 12, 0, { uv: 6, grad: false }); ax = g + 5.5; } }
     for (const [a, b] of [[-2, W / 2 - 7.5], [W / 2 + 7.5, W + 2]]) w.solid('rock', a, -20, D, b, 10, D + 3, { uv: 6, grad: false });
     for (const x of [0, W - 0.4]) for (let z = 1; z < D - 1; z += 2) if (rng.chance(0.75)) w.solid('block', x, 0, z, x + 0.4, 0.8, z + 1.6, { uv: 1.5 });
-    for (let k = 0; k < 16; k++) { const sx = k % 2 ? -1 : 1, x = sx < 0 ? -rng.range(2, 9) : W + rng.range(2, 9), z = rng.range(0, D), h = rng.range(-6, 4); w.visual('block', x - 1.6, -40, z - 1.6, x + 1.6, h, z + 1.6, { uv: 3 }); }
+    for (let k = 0; k < 16; k++) { const sx = k % 2 ? -1 : 1, x = sx < 0 ? -Math.max(4, rng.range(2, 9)) : W + Math.max(4, rng.range(2, 9)), z = rng.range(0, D), h = rng.range(-6, 4); w.visual('block', x - 1.6, -40, z - 1.6, x + 1.6, h, z + 1.6, { uv: 3 }); }   // (the pillars in the dark stand 2.4 m and more clear of the platform's edge: nothing to jump for that is not there)
     w.killY = -9; w.noRim = true;
     for (let z = 6; z < D; z += 12) for (const x of [-4, W + 4]) w.addLight(x, -6, z, { flame: 0, intensity: 12, range: 16, color: '#7a4ad8', emit: false, prio: 0.5 });
   };
@@ -97,7 +97,7 @@
   S.castle = function (w, rng, W, D, o) {
     H.floors(w, W, D, null, 'floor');
     H.perimeter(w, rng, W, D, { gates: o.gates, h: 13, top: 16, beams: 0 });
-    for (const sx of [-1, 1]) for (let z = 6; z < D - 4; z += 6) { const x = W / 2 + sx * (W / 2 - 5); if (clear(o, x, z, 0.8)) P().pillarSquare(w, x, z, 0, 13, 1.0); P().banner(w, sx < 0 ? 0 : W, 10, z + 3, sx < 0 ? 'px' : 'nx', 5, 0x5a0a0a); }
+    for (const sx of [-1, 1]) for (let z = 6; z < D - 4; z += 6) { const x = W / 2 + sx * (W / 2 - 5); if (clear(o, x, z, 0.8)) LG.pillar(w, x, z, 0, 13, 1.0); P().banner(w, sx < 0 ? 0 : W, 10, z + 3, sx < 0 ? 'px' : 'nx', 5, 0x5a0a0a); }
     for (const x of [0, W]) for (let z = 4; z < D - 4; z += 6) w.visual('dark', x === 0 ? 0 : W - 0.03, 5, z, x === 0 ? 0.03 : W, 11, z + 1.4, { uv: 1, grad: false });
   };
   // ---- a hall the water has come into: the floor under a hand's depth of it, falls from the walls, the dark vault
@@ -112,13 +112,16 @@
     w.animated.push({ kind: 'uvflow', mat: w.mats.water, sp: [0, -0.04] });
   };
   // ---- a hall of the works: iron plates underfoot with the melt glowing through grates, furnace mouths in the walls
+  // (the melt under the grates lies a hand under your feet: it burns as shallow lava does, fields.js addHot - for you only, the foes walk over it;
+  // each mouth is a glowing panel flush on the wall (the wall's plinth and hangings stand before parts of it): its light stands out in the
+  // room and draws no flame of its own (emit: false) - one drawn there hung in the air, or behind the plinth. So no w.fireSpots column either)
   S.foundry = function (w, rng, W, D, o) {
     H.floors(w, W, D, null, 'floor');
     w.visual('iron', 0, 0, 0, W, 0.02, D, { uv: 2, grad: false });
-    for (const [x, z] of [[6, 7], [W - 6, 7], [6, D - 7], [W - 6, D - 7]]) { w.visual('lava', x - 1.2, 0.025, z - 1.2, x + 1.2, 0.035, z + 1.2, { uv: 1, grad: false }); for (let u = -1; u <= 1; u += 0.5) w.visual('iron', x + u - 0.05, 0.035, z - 1.2, x + u + 0.05, 0.06, z + 1.2, { uv: 1 }); w.addLight(x, 0.8, z, { flame: 0.4, intensity: 6, range: 8, color: '#ff6a20', emit: false, prio: 0.5 }); }
+    for (const [x, z] of [[6, 7], [W - 6, 7], [6, D - 7], [W - 6, D - 7]]) { w.visual('lava', x - 1.2, 0.025, z - 1.2, x + 1.2, 0.035, z + 1.2, { uv: 1, grad: false }); for (let u = -1; u <= 1; u += 0.5) w.visual('iron', x + u - 0.05, 0.035, z - 1.2, x + u + 0.05, 0.06, z + 1.2, { uv: 1 }); w.addLight(x, 0.8, z, { flame: 0.4, intensity: 6, range: 8, color: '#ff6a20', emit: false, prio: 0.5 }); if (G.Fields && G.Fields.addHot) G.Fields.addHot(w, x - 1.2, z - 1.2, x + 1.2, z + 1.2, 0, true); }
     H.perimeter(w, rng, W, D, { gates: o.gates, h: 14, top: 16, beams: 0 });
     w.solid('rock', -3, 14, -3, W + 3, 16, D + 3, { uv: 6, grad: false });
-    for (const x of [0, W]) for (let z = 8; z < D - 6; z += 10) { w.visual('glow', x === 0 ? 0 : W - 0.03, 0.6, z, x === 0 ? 0.03 : W, 2.0, z + 2.2, { uv: 1, grad: false, tint: [1, 0.45, 0.1] }); w.addLight(x === 0 ? 1.2 : W - 1.2, 1.4, z + 1.1, { flame: 0.6, intensity: 6, range: 8, color: '#ff7a30', prio: 0.7 }); }
+    for (const x of [0, W]) for (let z = 8; z < D - 6; z += 10) { w.visual('glow', x === 0 ? 0 : W - 0.03, 0.6, z, x === 0 ? 0.03 : W, 2.0, z + 2.2, { uv: 1, grad: false, tint: [1, 0.45, 0.1] }); w.addLight(x === 0 ? 1.2 : W - 1.2, 1.4, z + 1.1, { flame: 0.6, intensity: 6, range: 8, color: '#ff7a30', prio: 0.7, emit: false }); }
   };
   // ---- a hall of ice: the floor a sheet of ice, pillars sheathed in it, icicles over the vault
   S.frozen = function (w, rng, W, D, o) {

@@ -8,6 +8,11 @@
 // Nothing here changes what is drawn; it only moves work to a moment where nobody is looking.
 // ---------------------------------------------------------------------------------------------------------------------------
 (function () {
+  // (with post.js on, the frame is drawn to its own target: shaders must be compiled for that, or each compiles again at its first draw)
+  const CMP = (r, sc, cam) => (G.Post ? G.Post.withTarget(() => r.compile(sc, cam)) : r.compile(sc, cam));
+  // (and drawn once into that target, small: see Post.drawWarm)
+  const DRAW = (sc, cam, held) => { if (G.Post && G.Post.drawWarm) G.Post.drawWarm(sc, cam, held); };
+  const fxWarm = (fn) => { if (G.fx && G.fx.withWarm) G.fx.withWarm(fn); else fn(); };
   const W = (G.Warm = { log: false });
   const TEXKEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap'];
   const now = () => performance.now();
@@ -28,7 +33,7 @@
     const t0 = now();
     try {
       sc.updateMatrixWorld(true);
-      if (G.fx && G.fx.withWarm) G.fx.withWarm(() => r.compile(sc, cam)); else r.compile(sc, cam);
+      fxWarm(() => { CMP(r, sc, cam); DRAW(sc, cam); });
       const n = uploadTextures(sc, r);
       if (W.log) console.log('[warm] world', (now() - t0).toFixed(0) + 'ms', n + ' textures');
     } catch (e) { console.warn('warm world failed', e); }
@@ -40,7 +45,7 @@
     const r = G.renderer, sc = G.scene, cam = G.camera;
     if (!r || !sc || !cam) return Promise.resolve();
     const t0 = now();
-    try { sc.updateMatrixWorld(true); if (G.fx && G.fx.withWarm) G.fx.withWarm(() => r.compile(sc, cam)); else r.compile(sc, cam); uploadTextures(sc, r); } catch (e) { console.warn('warm world failed', e); return Promise.resolve(); }
+    try { sc.updateMatrixWorld(true); if (G.fx && G.fx.withWarm) G.fx.withWarm(() => CMP(r, sc, cam)); else CMP(r, sc, cam); uploadTextures(sc, r); } catch (e) { console.warn('warm world failed', e); return Promise.resolve(); }
     const tc = now() - t0;
     // compile() only starts the links; the page used to block on them at the first draw. Wait for the drivers here instead (polling, not blocking).
     return new Promise((resolve) => {
@@ -49,7 +54,7 @@
         let pending = false;
         const ps = r.info.programs || [];
         for (let i = 0; i < ps.length; i++) { const p = ps[i]; if (p && p.isReady && !p.isReady()) { pending = true; break; } }
-        if (!pending || now() > deadline) { if (G.Perf && G.Perf.note) G.Perf.note(`シェーダー準備 ${Math.round(now() - t0)}ms（呼び出し ${Math.round(tc)}ms）${pending ? ' 時間切れ' : ''}`); resolve(); }
+        if (!pending || now() > deadline) { try { fxWarm(() => DRAW(sc, cam)); } catch (e) { /* ignore */ } if (G.Perf && G.Perf.note) G.Perf.note(`シェーダー準備 ${Math.round(now() - t0)}ms（呼び出し ${Math.round(tc)}ms）${pending ? ' 時間切れ' : ''}`); resolve(); }
         else setTimeout(tick, 8);
       };
       tick();
@@ -66,6 +71,12 @@
     const tmp = new THREE.Group(); tmp.position.set(0, -800, 0);
     const seen = new Set();
     for (const d of G.ENEMIES) { const k = d.plan + '|' + d.variant; if (seen.has(k)) continue; seen.add(k); try { tmp.add(G.enemies.buildModel(d, { scale: 1 }).group); } catch (e) { /* ignore */ } }
+    // (a field's own foe is built from its own plan, and some are shaped by which one they are - the miner, the pikeman: each of them is
+    // built once, so that none has its body melted for the first time as it comes. Built and let go: its materials are those of the
+    // one kept above, and the warm-up of every area need not draw it again)
+    if (!W._fieldFoes) { W._fieldFoes = true; for (const d of G.ENEMIES) if (d.fieldFoe) { try { G.enemies.buildModel(d, { scale: 1 }); } catch (e) { /* made when it first comes */ } } }
+    // (and what a foe may turn into once it is out - unseen, elite, marked, cursed: enemies.js warmSamples)
+    if (G.enemies.warmSamples) { try { tmp.add(G.enemies.warmSamples()); } catch (e) { /* ignore */ } }
     if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id)); } catch (e) { /* ignore */ } } // every throwable's materials, so the first throw doesn't stall
     return tmp;
   }
@@ -99,7 +110,7 @@
     // a chest left closed when the area is cleared: its beam, ring and ripple (game.js, seen through walls; a see-through two-sided
     // material is drawn back then front: two shaders each)
     add(() => {
-      const g = new THREE.Group(), c = 0xffe0a0, base = { color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide };
+      const g = new THREE.Group(), c = 0xd8c098, base = { color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide };
       g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false })));
       g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 11, 12, 1, true), new THREE.MeshBasicMaterial(Object.assign({ fog: false }, base))));
       g.add(new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 32), new THREE.MeshBasicMaterial(Object.assign({}, base))));
@@ -107,7 +118,7 @@
     });
     // the healing basin's water and the hint drawn round it when you are hurt (game.js updateHealHint)
     add(() => {
-      const g = new THREE.Group(), PG = G.Props.PG, c = 0x60ff90;
+      const g = new THREE.Group(), PG = G.Props.PG, c = 0xd8b878;
       g.add(new THREE.Mesh(PG.cyl, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })));
       g.add(new THREE.Mesh(PG.oct, new THREE.MeshBasicMaterial({ color: c, side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false })));
       g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 8, 12, 1, true), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })));
@@ -116,15 +127,29 @@
     });
     return kit;
   };
+  // the shapes that take a moment to cut the first time they are asked for (the carved statues, gfx.js propGeo): made here, behind
+  // the loading screen, a breath between each - not in the middle of a fight, where each held a frame for a quarter of a second
+  async function warmShapes() {
+    const GP = G.GFX && G.GFX.propGeo; if (!GP) return;
+    for (const n of ['statue0', 'statue1', 'statue2', 'statue3', 'tuft', 'crate', 'shelf', 'book', 'rack', 'cage', 'wellhead', 'brazier', 'sconce', 'chandelier']) { try { GP(n); } catch (e) { /* made when asked for */ } await new Promise((r) => setTimeout(r, 0)); }
+    // (and each class's clothes over the common figure: melted once here, so that the first frame of a run does not stop to do it)
+    if (G.avatar && G.avatar.buildFigure && G.Classes && G.Classes.BY) for (const c in G.Classes.BY) { try { const F = G.avatar.buildFigure(); G.avatar.dress(F.J, c); } catch (e) { /* when it is first worn */ } await new Promise((r) => setTimeout(r, 0)); }
+  }
   W.bootAsync = async function () {
     const r = G.renderer; if (!r) return;
     const t0 = now();
     const tmp = W.enemyModels();
+    // (the open-air sky: its shader and its clouds' noise, here and not with the first open-air area - game.js skyWarm)
+    let skyOff = null; try { if (G.game && G.game.skyWarm) skyOff = G.game.skyWarm(); } catch (e) { /* made with the first sky */ }
+    // (shaders first - the world, then the gun in the hands; the carved shapes after them)
     try { await W.worldAsync(8000); } catch (e) { /* ignore */ }
     if (tmp) { G.scene.remove(tmp); }
+    if (skyOff) skyOff();
     try { warmViewmodel(r); } catch (e) { /* ignore */ }
+    try { await warmShapes(); } catch (e) { /* ignore */ }
     try { if (G.Icons && G.Icons.warm) G.Icons.warm(); } catch (e) { /* ignore */ }
     try { if (G.PStatus && G.PStatus.warm) G.PStatus.warm(); } catch (e) { /* ignore */ }
+    try { const b = document.getElementById('buff-vig'); if (b && !b.className) { b.className = 'shield inv'; b.style.setProperty('--lc', '200,140,90'); b.style.opacity = 0.02; setTimeout(() => { if (b.className === 'shield inv') b.className = 'ult'; setTimeout(() => { if (b.className === 'ult') { b.className = ''; b.style.opacity = 0; } }, 250); }, 250); } } catch (e) { /* ignore */ }   // (the screen-edge looks drawn once, faintly, behind the loading screen: their first painting costs here, not on the first invulnerability)
     try { if (G.StatusUI && G.StatusUI.warm) G.StatusUI.warm(); } catch (e) { /* ignore */ }
     if (W.log) console.log('[warm] bootAsync', (now() - t0).toFixed(0) + 'ms');
   };
@@ -140,13 +165,18 @@
       // every sight once (their glass, their glowing stones, the open hoods seen from inside are shaders of their own)
       if (G.WEAPON_BY_ID.n_scout) for (const a of G.ATTACHMENTS || []) if (a.slot === 'optic') { try { tmp.add(Wp.displayModel(G.WEAPON_BY_ID.n_scout, { optic: a.id })); } catch (e) { /* ignore */ } }
       if (G.MELEE && G.MELEE[0]) { try { tmp.add(Wp.meleeDisplayModel(G.MELEE[0])); } catch (e) { /* ignore */ } }
-      if (G.ItemAnim) for (const k of ['throw', 'bandage', 'drink', 'inject', 'eat', 'plate', 'device']) { try { tmp.add(G.ItemAnim.build(k, null)); } catch (e) { /* ignore */ } }
+      if (G.ItemAnim) { if (G.ItemAnim.warm) { try { G.ItemAnim.warm(tmp); } catch (e) { /* ignore */ } } else for (const k of ['throw', 'bandage', 'drink', 'inject', 'eat', 'plate', 'device']) { try { tmp.add(G.ItemAnim.build(k, null)); } catch (e) { /* ignore */ } } }
       if (G.GrenFX) for (const it of G.ITEMS || []) if (it.cat === 'grenade') { try { tmp.add(G.GrenFX.build(it.id, 0.42)); } catch (e) { /* ignore */ } }
       if (G.ItemAnim) { try { const h = new THREE.Group(); G.ItemAnim.hand(h, true); tmp.add(h); } catch (e) { /* ignore */ } }
       // see-through hands and gun (影の舞, the invisibility draught: pstatus.js ghostMesh): their shader variants, once
-      if (G.PStatus && G.PStatus.ghostWarm && Wp.buildGun && G.WEAPON_BY_ID.n_scout) { try { const gm = Wp.buildGun(G.WEAPON_BY_ID.n_scout, {}, true).group; G.PStatus.ghostWarm(gm); tmp.add(gm); } catch (e) { /* ignore */ } }
+      // (one arm of every kind, not one arm: their sights and fittings differ in what they are made of, and the first turn unseen
+      // with a rifle in hand made a shader on the spot)
+      if (G.PStatus && G.PStatus.ghostWarm && Wp.buildGun && G.WEAPONS) { const seen = new Set(); for (const d of G.WEAPONS) { if (!d || seen.has(d.arch)) continue; seen.add(d.arch); try { const gm = Wp.buildGun(d, {}, true).group; G.PStatus.ghostWarm(gm); tmp.add(gm); } catch (e) { /* ignore */ } } }
+      // (and the glowing points of a sight - plain colour that the tone mapping leaves alone: no arm built bare carries one, and the first
+      // turn unseen with a sight fitted made that shader on the spot)
+      if (G.PStatus && G.PStatus.ghostWarm) { try { const gg = new THREE.Group(); for (const tm of [true, false]) gg.add(new THREE.Mesh(G.Props.PG.cyl, new THREE.MeshBasicMaterial({ color: 0xffa020, toneMapped: tm }))); G.PStatus.ghostWarm(gg); tmp.add(gg); } catch (e) { /* ignore */ } }
       Wp.vmScene.updateMatrixWorld(true);
-      r.compile(Wp.vmScene, Wp.vmCam);
+      CMP(r, Wp.vmScene, Wp.vmCam); DRAW(Wp.vmScene, Wp.vmCam, true);
       uploadTextures(Wp.vmScene, r);
     } catch (e) { console.warn('warm viewmodel failed', e); }
     Wp.vmScene.remove(tmp);
@@ -156,7 +186,9 @@
   W.boot = function () {
     const r = G.renderer; if (!r) return;
     const t0 = now();
+    let skyOff = null; try { if (G.game && G.game.skyWarm) skyOff = G.game.skyWarm(); } catch (e) { /* made with the first sky */ }
     try { W.world(); } catch (e) { /* ignore */ }
+    if (skyOff) skyOff();
     try { warmViewmodel(r); } catch (e) { /* ignore */ }
     try { if (G.Icons && G.Icons.warm) G.Icons.warm(); } catch (e) { /* ignore */ }
     try { if (G.PStatus && G.PStatus.warm) G.PStatus.warm(); } catch (e) { /* ignore */ }

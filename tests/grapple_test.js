@@ -48,8 +48,10 @@ window.__grap = function () {
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.askTutorial = false; G.save.data.settings.volume = 0; G.sfx.setVolume(0); G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000); await sleep(400);
+    await p.running();
     await p.eval(PAGE);
     if (process.env.GRAPPLE_PRE) await p.eval(process.env.GRAPPLE_PRE + '; 1'); // (debugging: code run in the page first)
     for (const f of fields) {

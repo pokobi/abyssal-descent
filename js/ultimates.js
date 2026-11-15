@@ -246,6 +246,7 @@
     }
     if (!ok) return;
     // ---- casting an ultimate ----
+    if (P.cutReload) P.cutReload(); // (an ultimate that went off puts down a reload under way: player.js cutReload)
     sk.cd = A.cdOf(sk); sk.maxCd = sk.cd;
     if (C.skOnCast(id)) sk.cd = 0;
     if (st.ultEcho && Math.random() < 0.2) { sk.cd *= 0.5; G.ui.toastSmall('🔁 残響：アルティメットのクールタイム半減'); }

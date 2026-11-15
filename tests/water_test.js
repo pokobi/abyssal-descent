@@ -77,7 +77,8 @@ const PORT = +process.env.COOP_PORT || 9969;
     check(hm && hm.streams === 1 && Math.abs(hm.flow[0]) > 0.3, `the village stream runs across the village (${JSON.stringify(hm)})`);
     // ---- the sounds (measured before the master volume)
     const quiet = await ev('return 1');
-    const snd = async (js, ms) => { await p.eval(`(async () => { ${js} })()`); return p.eval(`T.meter(${ms}).then((r) => JSON.stringify(r))`).then(JSON.parse); };
+    // (the meter starts in the same turn as the sound: started a round trip later, on a page with heavier frames it began after a short sound had gone by)
+    const snd = async (js, ms) => p.eval(`(async () => { const m = T.meter(${ms}); ${js}; return JSON.stringify(await m); })()`).then(JSON.parse);
     await p.eval("G.Water.holdBeds = true; G.sfx.waterBed({ wade: 0, fall: 0, brook: 0, lap: 0 }); 1"); await sleep(800);
     const base = await snd('', 300);
     const R = {
@@ -89,9 +90,15 @@ const PORT = +process.env.COOP_PORT || 9969;
     };
     await p.eval("G.sfx.waterBed({ wade: 0, fall: 1, fallPan: 0.3, brook: 0, lap: 0 }); 1"); await sleep(900); R.falls = await snd('', 500);
     await p.eval("G.sfx.waterBed({ wade: 0, fall: 0, brook: 1, brookPan: -0.3, lap: 0 }); 1"); await sleep(900); R.brook = await snd('', 500);
-    await p.eval("G.sfx.waterBed({ wade: 0, fall: 0, brook: 0, lap: 1 }); 1"); await sleep(900); R.lap = await snd('', 500);
+    await p.eval("G.sfx.waterBed({ wade: 0, fall: 0, brook: 0, lap: 1 }); 1"); await sleep(900); R.lap = await snd('', 3400);   // (it swells and ebbs over some three seconds: a half second could fall in a trough)
     await p.eval("G.sfx.waterBed({ wade: 1, fall: 0, brook: 0, lap: 0 }); 1"); await sleep(900); R.wade = await snd('', 500);
-    await p.eval("G.sfx.waterBed({ wade: 0, fall: 0, brook: 0, lap: 0 }); 1"); await sleep(1200); R.off = await snd('', 300);
+    // (what is left once the beds are shut, and the same a little later: the middle one of three half-second stretches each - one short
+    // sound of something else falling in a stretch (it happened now and then: one sound peaking near 0.4, never a bed) does not count)
+    const still = async () => { const r = []; for (let i = 0; i < 3; i++) r.push(await snd('', 500)); r.sort((x, y) => x.rms - y.rms); return r[1]; };
+    await p.eval("G.sfx.waterBed({ wade: 0, fall: 0, brook: 0, lap: 0 }); 1"); await sleep(1200); R.off = await still();
+    // (the area's own rumble swells and ebbs by itself: what is left after the beds are shut is compared with the same stretch a little later,
+    // when nothing of the water can be left - not with one short moment at the start, which may have fallen in a trough of it)
+    await sleep(600); const base2 = await still();
     // (the area's own low rumble always plays: what a sound adds over it is its loudness)
     const ex = (r) => Math.sqrt(Math.max(0, r.rms * r.rms - base.rms * base.rms));
     await p.eval('G.Water.holdBeds = false; 1');
@@ -99,7 +106,7 @@ const PORT = +process.env.COOP_PORT || 9969;
     console.log('     sound rms/peak:', Object.entries(R).map(([k, v]) => `${k} ${v.rms.toFixed(3)}/${v.peak.toFixed(2)}`).join('  '), ' (silence', base.rms.toFixed(3) + ')');
     for (const k of ['step', 'land', 'splash', 'shot', 'rush', 'falls', 'brook', 'lap', 'wade']) check((ex(R[k]) > 0.006 || R[k].peak > base.peak * 1.4 + 0.02) && R[k].peak < 0.9, `sound: ${k} plays, and does not clip (adds ${ex(R[k]).toFixed(3)}, peak ${R[k].peak.toFixed(2)})`);
     // (the rumble under it all swells and ebbs by itself: within a third of it is silence)
-    check(R.off.rms < base.rms * 1.3 && R.off.rms < R.falls.rms * 0.5, `sound: the beds fall silent when there is no water near (${R.off.rms.toFixed(3)} against ${base.rms.toFixed(3)})`);
+    check(R.off.rms < Math.max(base.rms, base2.rms) * 1.3 && R.off.rms < R.falls.rms * 0.5, `sound: the beds fall silent when there is no water near (${R.off.rms.toFixed(3)} against ${base.rms.toFixed(3)} at the start, ${base2.rms.toFixed(3)} after)`);
     check(ex(R.splash) > ex(R.shot), 'sound: a big splash is louder than a shot into the water');
     check(ex(R.falls) > ex(R.lap), 'sound: a fall roars louder than still water laps');
     const errs = await ev("return window.__e.slice()");

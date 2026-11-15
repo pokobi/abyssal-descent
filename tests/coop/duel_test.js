@@ -18,13 +18,16 @@ const ID = process.argv[2] || 'madman';
     const q = `&local=1&lat=${process.env.COOP_LAT || 40}&jit=${process.env.COOP_JIT || 20}`, room = 'D' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const h = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&host=1&name=Host${q}`);
     await h.until('window.G && G.Coop && G.Coop.role === "host" && G.game.state === "title"', 90000);
+    await h.booted();
     await sleep(300);
     const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
+    await g.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     const off = 'G.save.data.settings.volume = 0; G.sfx.setVolume && G.sfx.setVolume(0); G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
     await h.eval(off); await g.eval(off);
     await h.eval('G.Coop.begin(); 1');
     await g.until('G.game.run && G.Coop.fpOk !== undefined', 60000);
+    for (const pg of [h, g]) await pg.running();
     // blows from the guardian are counted, not felt; a bot presses guard the frame a blow flashes when this machine's player is the duellist
     const rig = "window.__hits = 0; window.__auto = false; window.__up = 0; const d0 = G.combat.damagePlayer; G.combat.damagePlayer = function (dmg, info) { if (info && info.attacker && info.attacker.boss) { __hits++; return 0; } return d0.apply(this, arguments); }; const u0 = G.bosses.update; G.bosses.update = function (dt) { const r = u0.apply(this, arguments); const d = G.Duel.cur, k = G.BIND.reload[0]; if (window.__up > 0 && --window.__up === 0) G.input.keys[k] = false; if (d && d.combo && window.__auto && G.Duel.mine()) for (const s of d.combo.list) if (s.flashed && !s.done && !s.parried && !s._p) { s._p = true; G.input.keys[k] = true; G.Duel._kt = performance.now(); window.__up = 2; } return r; }; 1";
     await h.eval(rig); await g.eval(rig);
@@ -42,16 +45,21 @@ const ID = process.argv[2] || 'madman';
     await sleep(800);
     await g.eval("(() => { const b = G.bosses.active, P = G.player; P.pos.set(b.pos.x, P.pos.y, b.pos.z + 5); return 1; })()");
     await h.eval("(() => { const b = G.bosses.active, P = G.player; P.pos.set(b.pos.x + 9, P.pos.y, b.pos.z + 14); return 1; })()");
+    // (the host has the guest where it was put - by the network, not the clock: a busy machine sends it later - and the guest the host)
+    const near = (pg) => pg.until('(() => { const b = G.bosses.active; return [...G.Coop.players.values()].some((rp) => rp.id !== G.Coop.id && !!rp.pos && (G.Coop.role === "host" ? rp.pos.distanceTo(b.pos) < 7 : rp.pos.distanceTo(b.pos) > 12)); })()', 8000).catch(() => {});
+    await near(h); await near(g);
     await sleep(800); await settle();
     await h.eval('(() => { window.__toasts = []; if (!G.ui.__tw) { const t0 = G.ui.toast; G.ui.toast = function (m) { (window.__toasts = window.__toasts || []).push(String(m)); return t0.apply(this, arguments); }; G.ui.__tw = 1; } return 1; })()'); await g.eval('(() => { window.__toasts = []; if (!G.ui.__tw) { const t0 = G.ui.toast; G.ui.toast = function (m) { (window.__toasts = window.__toasts || []).push(String(m)); return t0.apply(this, arguments); }; G.ui.__tw = 1; } return 1; })()');
     await h.eval('(() => { const b = G.bosses.active; b.hp = b.maxHp * 0.69; return 1; })()');
     await h.until('!!G.Duel.cur', 5000).catch(() => {});
     await g.until('!!G.Duel.cur', 5000).catch(() => {});
-    const s1 = JSON.parse(await g.eval("JSON.stringify({ toast: __toasts.some((t) => /金色に光った瞬間/.test(t)), on: !!G.Duel.cur, who: G.Duel.cur && G.Duel.cur.who, lock: !!G.player.duelLock, ov: document.getElementById('duel-ov').className, ring: !!(G.Duel.cur && G.Duel.cur.ring) })"));
+    await g.until("!!document.querySelector('#duel-ov .dv-guide.on')", 3000).catch(() => {});
+    const s1 = JSON.parse(await g.eval("JSON.stringify({ toast: !!document.querySelector('#duel-ov .dv-guide.on') && /金色に光った瞬間/.test(document.querySelector('#duel-ov .dv-guide').textContent), on: !!G.Duel.cur, who: G.Duel.cur && G.Duel.cur.who, lock: !!G.player.duelLock, ov: document.getElementById('duel-ov').className, ring: !!(G.Duel.cur && G.Duel.cur.ring) })"));
     const h1 = JSON.parse(await h.eval("JSON.stringify({ on: !!G.Duel.cur, who: G.Duel.cur && G.Duel.cur.who, lock: !!G.player.duelLock, ov: document.getElementById('duel-ov').className, np: G.Duel.cur && G.Duel.cur.np, lim: G.Duel.limit() })"));
     console.log('      guest', JSON.stringify(s1), 'host', JSON.stringify(h1));
     check(s1.on && h1.on && s1.who === 1 && h1.who === 1, 'the duel starts on both, with the guest (nearest) as duellist');
-    check(s1.lock && /on/.test(s1.ov) && s1.toast, 'the guest is locked in, told the rule in a toast');
+    check(s1.lock && /on/.test(s1.ov) && s1.toast, 'the guest is locked in, shown the rule in the large guide');
+    check(!(await h.eval("!!document.querySelector('#duel-ov .dv-guide.on')")), 'the host, watching, is not shown the guide');
     check(!h1.lock && /watch/.test(h1.ov), 'the host is not: it watches, free to move and shoot');
     check(h1.lim === 35, 'two players: 35 s (15 s each, 35 at least)');
     // the host is kept outside the ring, the guest inside
@@ -95,11 +103,11 @@ const ID = process.argv[2] || 'madman';
     await h.until('G.Duel.cur && G.Duel.cur.who === 0', 20000).catch(() => {});
     await g.until('G.Duel.cur && G.Duel.cur.who === 0', 5000).catch(() => {});
     await sleep(600);
-    const sw = JSON.parse(await h.eval("JSON.stringify({ toast: __toasts.some((t) => /金色に光った瞬間/.test(t)), who: G.Duel.cur && G.Duel.cur.who, lock: !!G.player.duelLock, melee: G.player.meleeMode, ov: document.getElementById('duel-ov').className, d: Math.hypot(G.player.pos.x - G.Duel.cur.c.x, G.player.pos.z - G.Duel.cur.c.z) })"));
+    const sw = JSON.parse(await h.eval("JSON.stringify({ toast: !!document.querySelector('#duel-ov .dv-guide.on') && /金色に光った瞬間/.test(document.querySelector('#duel-ov .dv-guide').textContent), who: G.Duel.cur && G.Duel.cur.who, lock: !!G.player.duelLock, melee: G.player.meleeMode, ov: document.getElementById('duel-ov').className, d: Math.hypot(G.player.pos.x - G.Duel.cur.c.x, G.player.pos.z - G.Duel.cur.c.z) })"));
     const gsw = JSON.parse(await g.eval("JSON.stringify({ who: G.Duel.cur && G.Duel.cur.who, lock: !!G.player.duelLock, ov: document.getElementById('duel-ov').className })"));
     console.log('      after 15 s: host', JSON.stringify(sw), 'guest', JSON.stringify(gsw));
     check(sw.who === 0 && gsw.who === 0, 'after 15 s the duel passes to the host, on both machines');
-    check(sw.lock && sw.melee && sw.toast && sw.d < 8, 'the host is brought into the ring, melee in hand, told the rule');
+    check(sw.lock && sw.melee && sw.toast && sw.d < 8, 'the host is brought into the ring, melee in hand, shown the rule in the guide');
     check(!gsw.lock && /watch/.test(gsw.ov), 'the guest is let go');
     // the host duellist goes down: it passes back at once
     await h.eval('G.player.dead = true; 1');

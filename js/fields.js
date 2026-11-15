@@ -56,8 +56,16 @@
       F.add(w, kind, r.x0, r.z0, r.x1, r.z1, { y });
     }
   };
+  // Lava that is drawn already (a casting room's melt under its grates, field_rooms.js) but was never a field: only what it does - it
+  // burns you as shallow lava does (player.js postMove) and leaves fire on you (envTick). Not a field: no bubbles, sound or light of its own,
+  // and not in w.lavaZones (what is laid out round the lava, and the ambient sound, stay as they were). pOnly: on a foe's way - foes are left alone
+  F.addHot = function (w, x0, z0, x1, z1, y, pOnly) {
+    (w.hotZones || (w.hotZones = [])).push({ kind: 'lava', x0, z0, x1, z1, y: y || 0, pOnly: !!pOnly });
+  };
   F.add = function (w, kind, x0, z0, x1, z1, opts) {
-    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue) };
+    // (opts.deep -> lavaDeep: a lava lake or pit you only end up in by a fall, which burns in full; any other lava is shallow and milder,
+    // player.js postMove. Not z.deep: that is the depth of water over its bed, zoneAt and water.js)
+    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue), lavaDeep: !!(opts && opts.deep) };
     w.fields = w.fields || [];
     w.fields.push(f);
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -115,29 +123,52 @@
   const ELTIP = { water: '💧 水に入ると、自分にも敵にも水属性が付く', fire: '🔥 溶岩や炎の上では、自分にも敵にも炎属性が付く', ice: '❄️ 氷の上では、自分にも敵にも氷属性が付く' };
   let envT = 0;
   const zoneAt = (z, p, up) => p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && p.y < (z.y || 0) + up && p.y > (z.y || 0) - 0.3 - (z.deep || 0); // (z.deep: water that deep over its bed)
+  // under the face of deep water (w.deepWater: also where a lid of ice lies over it, the frozen lake, and no pool of w.waterZones is open)
+  const underDeep = (w, p, up) => !!w.deepWater && w.deepWater.some((d) => p.x > d.x0 && p.x < d.x1 && p.z > d.z0 && p.z < d.z1 && p.y < d.y + up);
+  // Floors of ice (a collider whose surface is ice: the frozen lake's tiles and the ice round them, player.js surfaceBelow) are an ice
+  // sheet too: standing on one leaves ice on you and on the foes, as the ice patches do. w._iceFl: the area has any (worked out once)
+  const iceFloors = (w) => { if (w._iceFl === undefined) w._iceFl = (w.colliders || []).some((c) => c.surf === 'ice'); return w._iceFl; };
+  const footQ = [];
+  // (what is under the feet, r round them: at the rim of a hole the body stands on the ice beside it, its middle over the water)
+  const onIce = (w, p, r) => { footQ.length = 0; w.query(p.x - r, p.y - 0.1, p.z - r, p.x + r, p.y + 0.01, p.z + r, footQ); let b = null; for (const c of footQ) if (!b || c.y1 > b.y1 + 0.01 || (c.y1 > b.y1 - 0.01 && c.surf === 'ice')) b = c; footQ.length = 0; return !!b && b.surf === 'ice' && p.y - b.y1 < 0.06; };
   function envTick(dt) {
     const w = G.world, P = G.player, EL = G.Elem; if (!w || !EL) return;
     envT -= dt; if (envT > 0) return; envT = 0.25;
     const zones = [];
     for (const z of w.waterZones) zones.push([z, 'water']);
     for (const z of w.lavaZones) zones.push([z, 'fire']);
+    for (const z of w.hotZones || []) zones.push([z, 'fire']);
     for (const f of w.fields || []) if (f.kind === 'ice' || (f.kind === 'oil' && f.burnT > 0)) zones.push([f, ZEL[f.kind]]);
-    if (!zones.length) return;
-    if (!P.dead) for (const [z, el] of zones) {
-      if (!zoneAt(z, P.pos, el === 'water' ? 0.25 : 0.2) || (el !== 'water' && !P.grounded)) continue;
-      if (el === 'water' && P.st.burn > 0) { P.st.burn = 0; G.fx.smoke && G.fx.smoke(P.pos.clone().setY(P.pos.y + 0.5), 6, 0.6, 0x9aa4aa, 0.5, 0.8); }
-      if (EL.envPlayer(el) && !seen.k['el:' + el]) { seen.k['el:' + el] = true; G.ui.toastSmall(ELTIP[el]); }
-      break;
+    const ice = iceFloors(w);
+    if (!zones.length && !w.deepWater && !ice) return;
+    if (!P.dead) {
+      let el = null;
+      for (const [z, e] of zones) { if (!zoneAt(z, P.pos, e === 'water' ? 0.25 : 0.2) || (e !== 'water' && !P.grounded)) continue; el = e; break; }
+      if (!el && underDeep(w, P.pos, 0.25)) el = 'water';
+      if (!el && ice && P.grounded && onIce(w, P.pos, P.hw - 0.02)) el = 'ice';
+      if (el) {
+        if (el === 'water' && P.st.burn > 0) { P.st.burn = 0; G.fx.smoke && G.fx.smoke(P.pos.clone().setY(P.pos.y + 0.5), 6, 0.6, 0x9aa4aa, 0.5, 0.8); }
+        // (water and ice from the ground freeze you if the other is on you, element.js; the rest is only laid on)
+        if (EL.envPlayer(el, 0, el === 'water' || el === 'ice') && !seen.k['el:' + el]) { seen.k['el:' + el] = true; G.ui.toastSmall(ELTIP[el]); }
+      }
     }
     for (const e of G.enemies.list) {
       if (!e.alive || e._rep || e.custom || e.flyer || e.burrowed) continue;
-      for (const [z, el] of zones) {
-        if (!zoneAt(z, e.pos, 0.5)) continue;
-        EL.give(e, el);
-        if (el === 'water' && e.st && e.st.burn) { e.st.burn = 0; e.st.burnLv = 0; }
-        break;
-      }
+      let el = null;
+      for (const [z, k] of zones) { if (!z.pOnly && zoneAt(z, e.pos, 0.5)) { el = k; break; } } // (pOnly: lava on a foe's way, addHot - it would burn them as they walk)
+      // (the guardians are left out of the deep water and the floors of ice, as out of the weather)
+      if (!el && !e.boss && underDeep(w, e.pos, 0.5)) el = 'water';
+      if (!el && !e.boss && ice && e.grounded !== false && onIce(w, e.pos, Math.min(0.5, (e.radius || 0.5) * 0.6))) el = 'ice';
+      if (!el) continue;
+      EL.give(e, el);
+      if (el === 'water' && e.st && e.st.burn) { e.st.burn = 0; e.st.burnLv = 0; }
     }
+  }
+  // the first time you go into water with no bed under it (the frozen lake): how to keep afloat
+  function deepTip(w, P) {
+    if (seen.k.deep || P.dead || !w.deepWater || !P.swimming) return;
+    if (!w.deepWater.some((d) => d.open && P.pos.x > d.x0 && P.pos.x < d.x1 && P.pos.z > d.z0 && P.pos.z < d.z1)) return;
+    seen.k.deep = true; G.ui.toastSmall(`💧 深い水：${G.K('jump')} 長押しで浮き上がる・縁へ進みながら長押しで上がる。沈み続けると奈落`);
   }
   function boilLava(f, dt, dist) {
     const cam = G.camera.position, blue = !!f.blue, y = f.y + 0.05;
@@ -171,6 +202,8 @@
     }
     if (!seen || seen.run !== G.game.run) seen = { run: G.game.run, k: {} };
     envTick(dt);
+    if (w && w.deepWater) deepTip(w, P);
+    if (w && w.floes && G.FieldGen && G.FieldGen.tickFloes) G.FieldGen.tickFloes(w, dt); // (the broken ice afloat in its hole: field_frozen.js)
     if (!w || !w.fields || !w.fields.length || P.dead) { if (G.sfx.boilBed) G.sfx.boilBed(0); return; }
     tick -= dt; hurtT -= dt;
     const doTick = tick <= 0; if (doTick) tick = 0.25;
@@ -182,7 +215,9 @@
       const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
       // boiling lava: bubbles swell and pop in a splash of droplets, steam and embers drift off it (looks and sounds only; the hit area is unchanged)
       if (f.kind === 'lava') {
-        const ddx = Math.max(f.x0 - cam.x, 0, cam.x - f.x1), ddz = Math.max(f.z0 - cam.z, 0, cam.z - f.z1), dist = Math.hypot(ddx, ddz);
+        // (f.vdist: a lake of melt under the whole area, the foundry's - heard by how far above it you are too, k m a metre over head height;
+        // a patch on the floor, the halls' trench: by the way across alone, as before)
+        const ddx = Math.max(f.x0 - cam.x, 0, cam.x - f.x1), ddz = Math.max(f.z0 - cam.z, 0, cam.z - f.z1), dist = Math.hypot(ddx, ddz, f.vdist ? Math.max(0, cam.y - f.y - 1.6) * f.vdist : 0);
         if (dist < boilNear) { boilNear = dist; boilBlue = !!f.blue; }
         if (dist < 45 && Math.abs(cam.y - f.y) < 28) boilLava(f, dt, dist);
       }

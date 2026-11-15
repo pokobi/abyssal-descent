@@ -16,9 +16,11 @@ const LIMIT = +(process.env.CLEAR_SECS || 150);
   try {
     const p = await ch.page(`http://127.0.0.1:${PORT}/index.html?pc=1`);
     await p.until("window.G && G.game && G.game.state === 'title'", 90000);
+    await p.booted();
     await p.eval("G.save.data.settings.volume = 0; G.save.write(); G.sfx.setVolume && G.sfx.setVolume(0); G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; 1");
     await p.eval("G.game.startRun({ id: 'normal', lv: 0 }, 0); 1");
     await p.until('!!G.game.run && !!G.world', 30000); await sleep(1500);
+    await p.running();
     await p.eval(fs.readFileSync(path.join(ROOT, 'tests/bot.js'), 'utf8') + '; 1');
     // the watcher: at every update of the foes (game time, not the wall clock: a busy page's timers run late)
     await p.eval(`(() => {

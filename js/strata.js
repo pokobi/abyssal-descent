@@ -170,7 +170,7 @@
       w.solid('block', wl, T.y, zr, wl + 0.8, -0.5, z1, { uv: 2 }); w.solid('block', er - 0.8, T.y, zr, er, -0.5, z1, { uv: 2 });
       if (zr === Zn) w.solid('block', wl, T.y, zr, er, -0.5, zr + 0.8, { uv: 2 });
       if (z1 === Zs) w.solid('block', wl, T.y, z1 - 0.8, er, -0.5, z1, { uv: 2 });
-      G.Fields.add(w, 'lava', wl + 0.8, zr + (zr === Zn ? 0.8 : 0), er - 0.8, z1 - (z1 === Zs ? 0.8 : 0), { blue: ruined, y: T.y, noLight: true });
+      G.Fields.add(w, 'lava', wl + 0.8, zr + (zr === Zn ? 0.8 : 0), er - 0.8, z1 - (z1 === Zs ? 0.8 : 0), { blue: ruined, y: T.y, noLight: true, deep: true });
       zr = z1;
     }
     for (let z = Zn + 6; z < Zs - 2; z += 12) w.addLight((cl(WL[0], z) + cl(ER[0], z)) / 2, 0.4, z, { flame: 0, intensity: 16, range: 15, color: ruined ? '#3a8aff' : '#ff6a20', prio: 1.1, emit: false });
@@ -180,7 +180,8 @@
     for (const gx of LG.gateXs(W, gates || 1)) occ.mark(gx - 6, 0, gx + 6, 9, 2);
     occ.mark(W / 2 - 13, 8, W / 2 + 13, 16, 2);
     occ.mark(0, 0, W, 2, 2); occ.mark(0, D - 2, W, D, 2); occ.mark(0, 0, 2, D, 2); occ.mark(W - 2, 0, W, D, 2);
-    F_ceiling(w, rng, W, D, HT, ruined);
+    // (the ceiling's coffers only over the chasm, where it is seen from every storey: over the halves only the top storey looks up at it)
+    { let a = W, b = 0; for (let z = Zn; z < Zs; z++) { a = Math.min(a, cl(WL[0], z)); b = Math.max(b, cl(ER[0], z)); } F_ceiling(w, rng, W, D, HT, ruined, [a - 2, b + 2]); }
 
     // per storey and half: what lies on it (occupancy), the holes cut in it, the railings around them
     const lv = { W: [], E: [] };
@@ -336,7 +337,10 @@
           w.solid(fm, q.x0, y - 0.3, q.z0, q.x1, y, q.z1, { uv: 4, grad: false });
           w.solid('block', q.x0, y - 0.75, q.z0, q.x1, y - 0.3, q.z1, { uv: 3 });
         }
+        // (the lip: kerb stones along the edge over the slab's thickness, worn, a joint open here and there, a corner broken now and then:
+        // LG.coping; under them the band of the old trim strip)
         w.visual('trim', rn.e - 0.12, y - 0.85, rn.x0, rn.e + 0.12, y - 0.6, rn.x1, { uv: 1 });
+        if (LG.coping && rn.x1 - rn.x0 > 0.5) { const sg = s === 'W' ? 1 : -1, ex = rn.e; LG._tag = 'kerbs'; LG.coping(w, (a, yy, d) => [ex + sg * (d - 0.3), yy, a], rn.x0, rn.x1, y - 0.62, y + 0.008, 0, 0.34, { len: [1.4, 2.4], plain: true }); LG._tag = null; }
         // broken stones lying along the lip (much heavier in the ruin)
         for (let m = 0, cnt = ruined ? rng.int(2, 4) : (rng.chance(0.5) ? 1 : 0); m < cnt && rn.x1 - rn.x0 > 1.2; m++) {
           const z = rng.range(rn.x0 + 0.5, rn.x1 - 0.5), x = rn.e + (s === 'W' ? -rng.range(0.3, 0.9) : rng.range(0.3, 0.9));
@@ -357,10 +361,10 @@
         if (stands && b.occ.free(x - 1, z - 1, x + 1, z + 1) && L.holes.every((h) => x + 1 < h.x0 || x - 1 > h.x1 || z + 1 < h.z0 || z - 1 > h.z1)) {
           b.occ.mark(x - 1, z - 1, x + 1, z + 1, 2);
           if (ruined && rng.chance(0.65)) {
-            P().pillarSquare(w, x, z, Y[k - 1], rng.range(1.6, 4.2), 1.1);
+            LG.pillar(w, x, z, Y[k - 1], rng.range(1.6, 4.2), 1.1, null, { broken: true, lite: true });   // (broken off, its top course ragged: levelgen.js LG.pillar)
             P().rubble(w, x + (s === 'W' ? -1.1 : 1.1), Y[k - 1], z, rng, 1.35);
             box(w, 'block', x + rng.range(-0.8, 0.8), Y[k - 1] + 0.28, z + rng.range(-0.8, 0.8), 0.75, 0.55, 1.4, rng.range(0, 3.14), rng.range(-0.35, 0.35), rng.range(-0.25, 0.25));
-          } else P().pillarSquare(w, x, z, Y[k - 1], SP - 0.75, 1.1);
+          } else LG.pillar(w, x, z, Y[k - 1], SP - 0.75, 1.1, null, { lite: true });
         }
       }
     }
@@ -408,8 +412,8 @@
     w.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
     return w;
   }
-  function F_ceiling(w, rng, W, D, HT, ruined) {
-    FG.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, ruined });
+  function F_ceiling(w, rng, W, D, HT, ruined, cofferX) {
+    FG.ceiling(w, rng, 0, 0, W, D, HT, { chandeliers: 0, ruined, cofferX });
     if (ruined) {
       for (let i = 0; i < 14; i++) {
         const x = rng.range(6, W - 12), z = rng.range(8, D - 14), sx = rng.range(3.5, 7.5), sz = rng.range(3.5, 7.5);
@@ -465,10 +469,10 @@
       const q = o.place(rng, 2, 2, 1.6); if (!q) continue;
       if (ruined && rng.chance(0.65)) {
         const ph = rng.range(1.6, 4.6);
-        P().pillarSquare(w, q.x0 + 1, q.z0 + 1, y, ph, 1.1);
+        LG.pillar(w, q.x0 + 1, q.z0 + 1, y, ph, 1.1, null, { broken: true, lite: true });
         P().rubble(w, q.x0 + 1.9, y, q.z0 + 1, rng, 1.35);
         box(w, 'block', q.x0 + 1 + rng.range(-0.7, 0.7), y + 0.25, q.z0 + 1 + rng.range(-0.7, 0.7), 0.8, 0.5, 1.3, rng.range(0, 3.14), rng.range(-0.35, 0.35), rng.range(-0.25, 0.25));
-      } else P().pillarSquare(w, q.x0 + 1, q.z0 + 1, y, h, 1.1);
+      } else LG.pillar(w, q.x0 + 1, q.z0 + 1, y, h, 1.1, null, { lite: true });
     }
     // stretches of wall (a broken, uneven top on the fourth field)
     for (let i = 0, n = Math.round(area / 650); i < n; i++) {

@@ -8,6 +8,26 @@
   G.grappleCdOf = (st) => (st.grappleBase || G.GRAPPLE_CD) * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0))); // (the class sets the base: 15-28 s, see classes.js)
   const U = G.U, I = G.input;
   const V = G.U.V;
+  // How a frame's change of speed is laid out along the way: the same path at every frame rate. The feel was tuned at 144 Hz, where a
+  // frame changed the speed first and then moved at the new speed for the whole 1/144 s - a path that runs half a 144 Hz frame (LEAD)
+  // ahead of the one an exact sum gives. Each frame now moves along that path exactly, however long it is: a jump as high, a stop as
+  // long, a slide as far at 30 Hz as at 240 Hz, and all of them as they were at 144 Hz.
+  const LEAD = 1 / 288;
+  // A speed heading for a target at a steady a (m/s²), d away from it at the frame's start: how far short of the target it is on average
+  // over the frame (dt), along that path (the path reaches the target LEAD sooner than the speed itself)
+  const shortOf = (d, a, dt) => { const d1 = Math.max(0, d - a * LEAD); return d1 >= a * dt ? d1 - a * dt / 2 : d1 * d1 / (2 * a * dt); };
+  // Deep water, jump held: the pull of the water up toward G.SWIM_UP against the fall, solved over the frame. It was one step a frame (take
+  // off the fall, then close 7·dt of the gap to SWIM_UP), which rose faster the longer the frame; the rise is now the one that step gave at
+  // 144 Hz at every rate: the speed it settles at (SWIM_UP − g·SWIM_GK) and how fast it gets there (SWIM_K, 1/s) are that step's
+  const SWIM_K = -Math.log(1 - 7 / 144) * 144, SWIM_GK = (1 - 7 / 144) / 7;
+  // The shake's spring (see addShake), solved exactly over each frame. It was stepped once a frame, which swung it harder the shorter the
+  // frame; its numbers are now those of the spring as it ran at 144 Hz (7 Hz, damped to settle in two or three swings, stepped once a
+  // 1/144 s frame): s, the damping (1/s); w, the swing (rad/s); w2 = s² + w²; kick, what a kick of the old step is in this one
+  const SHK = (() => {
+    const h = 1 / 144, W2 = 1936, D = 26.4, a = 1 - D * h, m = Math.sqrt(a), th = Math.acos((a + 1 - W2 * h * h) / (2 * m));
+    const s = -Math.log(m) / h, w = th / h;
+    return { s, w, w2: s * s + w * w, kick: th * a / (m * Math.sin(th)), xs: ['x', 'y', 'z', 'p', 'r'], vs: ['vx', 'vy', 'vz', 'vp', 'vr'] };
+  })();
   const BASE = {
     maxHp: 100, maxHpPct: 0, hpRegen: 0, armor: 0, moveSpeed: 0, jumpPower: 0, maxJumps: 1, airControl: 0,
     dmg: 0, headMul: 0, critChance: 0.05, critMul: 1.5, fireRate: 0, reloadSpeed: 0, magSize: 0, spread: 0, recoil: 0, adsSpeed: 0, range: 0,
@@ -74,7 +94,7 @@
       this.sliding = false; this.slideT = 0; this.slideEndT = -10;
       this.mantle = null; this.airDashUsed = false;
       this.fov = 75; this.shake = 0; this.bobPhase = 0; this.bobAmt = 0; this.stepDist = 0; this.footL = false;
-      this.recoilRecover = 0; this.hurtKick = 0;
+      this.rc = null; this.hurtKick = 0;
       this.speedH = 0;
       this.grapple = { state: 'none', t: 0, point: V(), hook: V(), endT: -10, enemy: null, normal: V(0, 1, 0) };
       this.grappleCd = 0;
@@ -157,8 +177,54 @@
     eyePos() { return G.camera.position.clone(); }
     chestPos() { return V(this.pos.x, this.pos.y + this.height * 0.65, this.pos.z); }
     forward() { return V(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch)); }
-    addShake(a) { this.shake = Math.min(1.2, this.shake + a * G.save.data.settings.shake); }
-    addRecoil(p, y) { this.pitch += p; this.yaw += y; this.recoilRecover += p * 0.55; }
+    // The view shaken. a: how hard (about 0..1). from (optional): where the blow came from, a point in the world - the view is thrown
+    // away from it. Two things make the shake: a kick on a spring (the head thrown, swinging back and settling in two or three swings)
+    // and a rumble laid over it (smooth, never the same twice, the low part of it stronger the harder the blow). Both scale with the
+    // setting (設定 → 画面揺れ).
+    addShake(a, from) {
+      const k = a * G.save.data.settings.shake; if (!(k > 0)) return;
+      this.shake = Math.min(1.2, this.shake + k);
+      const sp = this.shSp || (this.shSp = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, p: 0, r: 0, vp: 0, vr: 0, t: Math.random() * 100 });
+      // (in the view's own frame: x right, y up, z back. No source given: a jolt up through the ground, down and back)
+      let dx = (Math.random() - 0.5) * 0.9, dy = -0.3 - Math.random() * 0.4, dz = 0.25 + Math.random() * 0.4;
+      if (from && from.isVector3) {
+        let wx = this.pos.x - from.x, wy = this.pos.y + this.eyeH - from.y, wz = this.pos.z - from.z; const l = Math.hypot(wx, wy, wz);
+        if (l > 0.05) { wx /= l; wy /= l; wz /= l; const c = Math.cos(this.yaw), sn = Math.sin(this.yaw); dx = wx * c - wz * sn + (Math.random() - 0.5) * 0.25; dy = wy * 0.6 - 0.15; dz = wx * sn + wz * c; }
+      }
+      const m = Math.min(1, k) * SHK.kick;
+      sp.vx += dx * m * 2.6; sp.vy += dy * m * 2.2; sp.vz += dz * m * 2.6;
+      sp.vp += (dz * 0.8 - dy * 0.5 + (Math.random() - 0.5) * 0.4) * m * 1.9; sp.vr += (dx * 1.4 + (Math.random() - 0.5) * 0.5) * m * 1.9;
+    }
+    // A shot's kick on the view (radians: p up, y sideways; see W.recoilShot). It is not put on at once but over a few frames, at the
+    // gun's own pace (o.tau: a pistol snaps up, a rocket heaves); a share of it (o.ret up, o.retH sideways) is kept to come back once the
+    // firing stops (after o.delay s), eased in and out at o.k (a critically damped return: no spring snapping it back). The rest stays:
+    // that much the shooter pulls back down by hand.
+    addRecoil(p, y, o) {
+      o = o || {};
+      const rc = this.rc || (this.rc = { pp: 0, py: 0, tau: 0.02, x: 0, y: 0, vx: 0, vy: 0, k: 9, delay: 0.08 });
+      rc.pp += p; rc.py += y; rc.tau = o.tau || 0.02; rc.k = o.k || 9; rc.delay = o.delay || 0.08;
+      rc.x += p * (o.ret === undefined ? 0.5 : o.ret); rc.y += y * (o.retH === undefined ? 0.25 : o.retH); rc.vx = 0; rc.vy = 0;
+    }
+    resetRecoil() { this.rc = null; }
+    // the view's recoil, each frame (postMove): the kick still to be laid on, then (the firing over) what comes back
+    updateRecoil(dt) {
+      const rc = this.rc; if (!rc) return;
+      if (rc.pp || rc.py) {
+        const k = 1 - Math.exp(-dt / rc.tau), a = rc.pp * k, b = rc.py * k;
+        this.pitch += a; this.yaw += b; rc.pp -= a; rc.py -= b;
+        if (Math.abs(rc.pp) < 1e-6 && Math.abs(rc.py) < 1e-6) { this.pitch += rc.pp; this.yaw += rc.py; rc.pp = 0; rc.py = 0; }
+      }
+      // (the return comes back only for the part of the frame past the delay - LEAD: as at 144 Hz - not for the whole of the frame it starts in)
+      const since = G.game.time - this.lastShotT - rc.delay + LEAD;
+      if (since > 0 && (rc.x > 1e-6 || Math.abs(rc.y) > 1e-6)) {
+        const w = rc.k, T = Math.min(dt, since, 0.05), n = Math.max(1, Math.ceil(w * T / 0.12)), h = T / n;
+        for (let i = 0; i < n; i++) {
+          rc.vx += (-w * w * rc.x - 2 * w * rc.vx) * h; let dx = rc.vx * h; if (rc.x + dx < 0) dx = -rc.x; rc.x += dx; this.pitch += dx;
+          if (rc.y) { rc.vy += (-w * w * rc.y - 2 * w * rc.vy) * h; let dy = rc.vy * h; if (Math.sign(rc.y + dy) !== Math.sign(rc.y)) dy = -rc.y; rc.y += dy; this.yaw += dy; }
+        }
+      }
+      if (!rc.pp && !rc.py && rc.x <= 1e-6 && Math.abs(rc.y) <= 1e-6) this.rc = null;
+    }
     // ---- inventory: items are grouped by category slot (4 heal / 5 guard / 6 boost / 7 tool) ----
     itemCount(id) { return this.bag ? G.Inv.countAll(this, 'item', id) : 0; }
     // the items sitting in a consumable pocket (key 4 / key 5 / G)
@@ -216,7 +282,7 @@
       this.lastSafe.copy(this.pos);
       this.history = [];
       this.st = {};
-      this.eyeOff = 0; this.landDip = 0;
+      this.eyeOff = 0; this.landDip = 0; this.rc = null;
       if (this.slideLoop) { this.slideLoop.stop(); this.slideLoop = null; }
     }
 
@@ -225,7 +291,12 @@
       this._rfT = (this._rfT || 0) - dt; if (this._rfT <= 0) { this._rfT = 0.5; if (!(G.InvUI && G.InvUI.isOpen())) this.refillPockets(); }
       const w = G.world, S = G.save.data.settings, st = this.stats;
       const t = G.game.time;
+      // the pile driver's label follows its state, whatever ended it (the slam, a fall into the pit, a respawn, being carried off by a guardian ...)
+      G.ui.pileIndicator(!!this.pileState && !this.dead);
       if (this.dead) return this.updateDeadCam(dt);
+      // frozen solid (凍結, element.js): only the look. A fresh press of jump cracks the ice; every other input of this frame is held
+      // back (input.js I.hold: the weapons, the skills, the items, the bag read nothing pressed), jump too, once its press is taken here
+      if (this.elFrozen > 0) { const tap = I.hit('jump'); I.hold(); if (tap && G.Elem) G.Elem.tapFrozen(); }
       this.updateLook(dt);
       // timers
       this.coyote -= dt; this.jumpBuf -= dt; this.grappleCd = Math.max(0, this.grappleCd - dt);
@@ -281,11 +352,13 @@
       }
 
       // ---- slide ----
-      if (this.grounded && crouchHit && this.speedH > 7.0 && !this.sliding && !this.pileState) this.startSlide();
+      // (only out of a run: crouch pressed while sprinting slides, however slow the run still is; crouch at any other time is a crouch,
+      // however fast a blast, a slope, a skill or the ice has you going)
+      if (this.grounded && crouchHit && this.sprinting && !this.sliding && !this.pileState && !(this.elFrozen > 0)) this.startSlide(wx, wz);
       if (this.sliding) {
         this.slideT += dt;
         if (!wantCrouch && !S.crouchToggle && this.slideT > 0.25) this.endSlide();
-        else if (this.speedH < 4.5 || this.slideT > 1.25 || !this.grounded && this.slideT > 0.3) this.endSlide();
+        else if (this.speedH < (this.slideEndV || 4.5) || this.slideT > 1.25 || !this.grounded && this.slideT > 0.3) this.endSlide();
       }
       // ---- crouch state (head room check) ----
       const wantLow = wantCrouch || this.sliding;
@@ -331,10 +404,16 @@
       targetSpeed *= this.fieldSpeed || 1;
 
       const g = 22 * (st.lowGrav > 0 ? 0.55 : 1);
+      // What this frame's steady pushes (the legs, the fall, a slide's drag, the rope) change the speed by is laid along the way (see LEAD):
+      // the frame moves at the end speed less corr (physics). A speed set outright (a launch, a ladder, the water's hold) has none of it
+      const corr = this._corr || (this._corr = V()); corr.set(0, 0, 0);
+      const lf = dt > 0 ? 0.5 - LEAD / dt : 0; this._lf = lf;
+      const vx0 = this.vel.x, vy0 = this.vel.y, vz0 = this.vel.z;
       // horizontal
       const hv = V(this.vel.x, 0, this.vel.z);
       if (this.grapple.state === 'attached') {
         this.updateGrapplePull(dt, wx, wz);
+        corr.set((this.vel.x - vx0) * lf, (this.vel.y - vy0) * lf, (this.vel.z - vz0) * lf);
       } else if (this.pileState === 'fall' || this.dragT > 0) {
         // locked (pile fall / dragged by a chain)
       } else if (this.grounded && !this.sliding) {
@@ -343,7 +422,11 @@
         const dx = tx - this.vel.x, dz = tz - this.vel.z;
         const dl = Math.hypot(dx, dz);
         const step = Math.min(dl, accel * dt);
-        if (dl > 0) { this.vel.x += dx / dl * step; this.vel.z += dz / dl * step; }
+        if (dl > 0) {
+          const ux = dx / dl, uz = dz / dl, sh = shortOf(dl, accel, dt);
+          this.vel.x += ux * step; this.vel.z += uz * step;
+          corr.x = this.vel.x - (tx - ux * sh); corr.z = this.vel.z - (tz - uz * sh);
+        }
       } else if (this.sliding) {
         const fr = 2.4 / (this.fieldSlide || 1);
         const sp = hv.length();
@@ -351,6 +434,7 @@
         if (sp > 0) { this.vel.x *= ns / sp; this.vel.z *= ns / sp; }
         // small steering
         this.vel.x += wx * 4 * dt; this.vel.z += wz * 4 * dt;
+        corr.x = (this.vel.x - vx0) * lf; corr.z = (this.vel.z - vz0) * lf;
       } else {
         // air control: accelerate toward wish but don't exceed max(current, target)
         const ac = 22 * (1 + st.airControl);
@@ -360,24 +444,26 @@
         const cap = Math.max(cur, targetSpeed);
         if (nl > cap) { this.vel.x *= cap / nl; this.vel.z *= cap / nl; }
         if (wl === 0 && !this.has('m_bunny')) { this.vel.x *= Math.exp(-0.6 * dt); this.vel.z *= Math.exp(-0.6 * dt); }
+        corr.x = (this.vel.x - vx0) * lf; corr.z = (this.vel.z - vz0) * lf;
       }
-      // vertical
-      if (this.liftVy != null) this.vel.y = this.liftVy; // held by the last guardian's gravity reversal (bosses6.js)
+      // vertical (_gN: the fall laid on this frame; _ay: the speed up it changes by, a second, for the landing's own speed in physics)
+      this._gN = 0; this._ay = 0;
+      if (this.liftVy != null) { this.vel.y = this.liftVy; corr.y = 0; } // held by the last guardian's gravity reversal (bosses6.js)
       else if (this.pileState !== 'charge') {
-        if (this.grapple.state === 'attached') this.vel.y -= g * 0.6 * dt;
-        else this.vel.y -= g * dt;
+        const gN = this.grapple.state === 'attached' ? g * 0.6 : g;
+        this.vel.y -= gN * dt; corr.y -= gN * dt * lf; this._gN = gN; this._ay = -gN;
       }
       // jump
       if (this.jumpBuf > 0 && !this.pileState && !(this.dragT > 0) && this.liftVy == null) {
         if (this.grounded || this.coyote > 0) {
-          this.vel.y = 7.6 * (1 + st.jumpPower) * (this.fieldJump || 1);
+          this.launchY(7.6 * (1 + st.jumpPower) * (this.fieldJump || 1), dt);
           if (this.sliding) { const run = this._slideRun; this.endSlide(); if (run) this._sjRun = true; const hs = Math.hypot(this.vel.x, this.vel.z); if (hs > 0) { const k = Math.min(1.08, 15 / hs); this.vel.x *= k; this.vel.z *= k; } }
           this.grounded = false; this.coyote = 0; this.jumpBuf = 0; this.jumps = 1;
           G.sfx.jump(); G.buffs.emit('onJump', { air: false });
           if (this.crouching && !wantCrouch) this.crouching = false;
         } else if (this.jumps < st.maxJumps && this.grapple.state !== 'attached') {
           this.jumps = Math.max(1, this.jumps) + 1;
-          this.vel.y = 7.2 * (1 + st.jumpPower);
+          this.launchY(7.2 * (1 + st.jumpPower), dt);
           if (wl > 0) { const hs = Math.max(Math.hypot(this.vel.x, this.vel.z), targetSpeed * 0.8); this.vel.x = wx * hs; this.vel.z = wz * hs; }
           this.jumpBuf = 0;
           G.sfx.whoosh(0.25, 0.5, true);
@@ -385,17 +471,29 @@
           G.buffs.emit('onJump', { air: true });
         }
       }
-      if (this.grapple.state === 'attached' && I.hit('jump')) { this.detachGrapple(true); }
+      if (this.grapple.state === 'attached' && I.hit('jump')) { const vs = this.vel.y + this._gN * dt; this.detachGrapple(true); this.launchY(Math.max(vs, 0) + 6.5, dt); }
       this.swim(dt);
-      if (G.Strata.ladders.length && this.grapple.state !== 'attached' && !this.pileState) G.Strata.ladder(this, fwdIn > 0 || I.down('jump'), dt);
+      if (G.Strata.ladders.length && this.grapple.state !== 'attached' && !this.pileState && G.Strata.ladder(this, fwdIn > 0 || I.down('jump'), dt)) { corr.set(0, 0, 0); this._ay = 0; }
       // speed cap safety
-      const vmax = 60; if (this.vel.length() > vmax) this.vel.setLength(vmax);
+      const vmax = 60, vl = this.vel.length(); if (vl > vmax) { this.vel.multiplyScalar(vmax / vl); corr.multiplyScalar(vmax / vl); }
 
       this.physics(dt);
       this.updateGrapple(dt);
       this.postMove(dt, wl, false);
     }
-    walkSpeed() { return 6.2 * (1 + this.stats.moveSpeed + this.clsMove()) * this.moveMul(); }
+    // A launch up (a jump, the hop out of deep water, the leap off the rope): v taken at the frame's start, with this frame's fall laid on
+    // it as on any other frame (see LEAD), so that it rises as high as it did at 144 Hz at every frame rate
+    launchY(v, dt) { const g = this._gN || 0; this.vel.y = v + 2 * g * LEAD - g * dt; if (this._corr) this._corr.y = -g * dt * (this._lf || 0); this._ay = -g; }
+    walkSpeed() { return 6.2 * (1 +this.stats.moveSpeed + this.clsMove()) * this.moveMul(); }
+    // what is holding your run down right now (the same factors as the speed target above: slowed, frozen, wading, mud / thorns / deep
+    // ground), as one share of it; your gear and class are not in it. A slide out of the run is held down with it (see startSlide)
+    runDrag() {
+      let k = 1;
+      if (this.st.slow > 0) k *= Math.max(0.4, 0.7 - 0.1 * ((this.st.slowLv || 1) - 1));
+      if (this.elFrozen > 0) k = 0;
+      if (this.inWater) k *= 0.9;
+      return k * (this.fieldSpeed || 1);
+    }
     clsMove() { return G.Classes ? G.Classes.moveAdd() : 0; } // 連斬 (剣士)
     moveMul() { const mm = G.weapons.meleeMoveMul(); if (mm) return mm; const cs = G.weapons.curStats; return cs ? cs.moveMul : 1; }
 
@@ -406,13 +504,22 @@
       const n = Math.max(1, Math.ceil(dt / (1 / 120)));
       const sdt = dt / n;
       let landed = false, stepped = 0, hitWall = false;
+      // the frame moves at its mean speed along the way (update: the end speed less corr); what a wall, the floor or a ceiling stops of
+      // that stops the speed itself too
+      const c = this._corr, vm = this._vm || (this._vm = V());
+      vm.set(this.vel.x - (c ? c.x : 0), this.vel.y - (c ? c.y : 0), this.vel.z - (c ? c.z : 0));
+      if (c) c.set(0, 0, 0);
+      const mx = vm.x, my = vm.y, mz = vm.z, y0 = this.pos.y;
       for (let i = 0; i < n; i++) {
-        const r = w.moveBox(this.pos, this.vel, sdt, this.hw, this.height, { canStep: this.grounded || this.coyote > 0 || this.sliding, stepH: 0.5 });
+        const r = w.moveBox(this.pos, vm, sdt, this.hw, this.height, { canStep: this.grounded || this.coyote > 0 || this.sliding, stepH: 0.5 });
         if (r.landed) landed = true;
         if (r.stepped) stepped += r.stepped;
         if (r.hitWall) hitWall = true;
         if (r.landed && this.vel.y <= 0) this.grounded = true;
       }
+      if (mx !== 0 && vm.x === 0) this.vel.x = 0;
+      if (my !== 0 && vm.y === 0) this.vel.y = 0;
+      if (mz !== 0 && vm.z === 0) this.vel.z = 0;
       // ground probe
       const gnd = w.groundAt(this.pos, this.hw, 0.08);
       const onGround = gnd > -Infinity && this.pos.y - gnd < 0.06 && this.vel.y <= 0.01;
@@ -423,11 +530,24 @@
         if (g2 > -Infinity && this.pos.y - g2 < 0.58) { this.pos.y = g2; this.grounded = true; this.vel.y = 0; }
         else { this.grounded = false; this.coyote = 0.12; }
       } else this.grounded = false;
-      if (G.Strata.ropes.length) G.Strata.support(this, dt, preVy);
+      // A landing: the speed the feet met the floor at. Not the speed at the frame's end, which a longer frame overshoots (or, when the
+      // feet are set down on a floor still a few cm under them, falls short of): the fall from the frame's start down to the floor, along
+      // the frame's path (see LEAD), whatever the frame's length. The landing's dip, shake, sound and boons. tau: when in the frame the
+      // feet came within the probe's 6 cm of it (the moment a landing is taken: postMove eases the dip and the shake from then on)
+      let vImp = preVy, tau = dt;
+      const ay = this._ay || 0;
+      if (this.grounded && !wasGrounded && ay < 0) {
+        const fy = onGround ? Math.min(this.pos.y, gnd) : this.pos.y, s0 = my - ay * dt / 2;
+        const fallTo = (y) => -Math.sqrt(Math.max(0, s0 * s0 - 2 * ay * (y0 - y)));
+        vImp = Math.min(0, fallTo(fy) - ay * LEAD);
+        tau = y0 > fy + 0.06 ? U.clamp((fallTo(fy + 0.06) - s0) / ay, 0, dt) : 0;
+      }
+      if (G.Strata.ropes.length) G.Strata.support(this, dt, vImp);
       if (stepped > 0) { this.eyeOff -= Math.min(0.5, stepped); }
       // landing
       if (this.grounded && !wasGrounded) {
-        const fall = -preVy;
+        const fall = -vImp;
+        this._landAge = Math.max(0, dt - tau + LEAD); // (LEAD: as at 144 Hz)
         this.jumps = 0; this.airDashUsed = false;
         if (this.pileState === 'fall') this.pileImpact();
         else if (fall > 3) {
@@ -471,23 +591,100 @@
       if (G.Strata.onRope) return 'metal';
       const a = G.world.query(this.pos.x - 0.1, this.pos.y - 0.1, this.pos.z - 0.1, this.pos.x + 0.1, this.pos.y + 0.01, this.pos.z + 0.1);
       let best = null; for (const c of a) if (!best || c.y1 > best.y1) best = c;
-      return best ? best.surf : 'stone';
+      const w = G.world, surf = best ? best.surf : 'stone';
+      // (where the ground is turf: the ground itself is turf, what is built on it or paved over it is not)
+      if (surf === 'stone' && w.mats && w.mats.biome && w.mats.biome.floorTex === 'grass' && (!best || !best.mk || best.mk === 'floor')) {
+        const x = this.pos.x, z = this.pos.z, y = this.pos.y;
+        for (const q of w.paved || []) if (x >= q[0] && x <= q[2] && z >= q[1] && z <= q[3] && Math.abs(y - q[4]) < 0.3) return 'stone';
+        return 'grass';
+      }
+      return surf;
     }
     // deep water (the drowned town, w.deepWater): hold jump and you swim up to the surface, chest out of the water, and at the top you hop
     // up out of it (held, you bob: up, a hop, back into the water, a hop... ). Moving at a wall's top while you hold jump, you climb onto
     // it (tryMantle). Let go and you sink back, slowly.
+    // Water with no bed under it (d.open, the frozen lake): going in through its face throws up a splash with its sound (in the drowned
+    // town the landing on the bed does that).
     swim(dt) {
       const w = G.world; this.swimming = false;
+      const py = this._swY; this._swY = this.pos.y;
       if (!w || !w.deepWater || this.pileState || this.grapple.state === 'attached' || this.liftVy != null || this.mantle) return;
       const d = w.deepWater.find((q) => this.pos.x > q.x0 && this.pos.x < q.x1 && this.pos.z > q.z0 && this.pos.z < q.z1);
+      if (d && d.open && py !== undefined && py > d.y && this.pos.y <= d.y && this.vel.y < -3.5 && G.Water) G.Water.splash(V(this.pos.x, d.y, this.pos.z), Math.min(1.2, 0.2 - this.vel.y * 0.08), { silent: false }); // (not the fall back from a hop at the face)
       if (!d || this.pos.y > d.y - 0.3) return;
       this.swimming = true;
-      const top = d.y - G.SWIM_FLOAT;
+      // (frozen in the water: held where it is, afloat; neither sinking nor drifting)
+      const c = this._corr || (this._corr = V());
+      if (this.elFrozen > 0) { this.vel.y = 0; const k = Math.exp(-dt * 4); this.vel.x *= k; this.vel.z *= k; c.set(0, 0, 0); this._ay = 0; return; }
+      const top = d.y - G.SWIM_FLOAT, g = this._gN || 0;
+      const vs = this.vel.y + g * dt; // (the speed up at the frame's start: before this frame's fall, after a launch)
       if (I.down('jump')) {
-        if (this.pos.y < top - 0.05) this.vel.y = Math.max(this.vel.y, this.vel.y + (G.SWIM_UP - this.vel.y) * Math.min(1, 7 * dt));
-        else if (this.vel.y < G.SWIM_HOP * 0.5) { this.vel.y = G.SWIM_HOP; this.grounded = false; if (G.Water) G.Water.splash(this.pos, 0.7, { silent: true }); } // (at the top: a hop out of the water)
-      } else if (this.vel.y < -G.SWIM_SINK) this.vel.y = -G.SWIM_SINK; // (the water holds you back as you sink)
+        if (this.pos.y < top - 0.05) {
+          if (vs < G.SWIM_UP) { // (faster than that - a jump off the bed - only the fall slows it)
+            const ve = G.SWIM_UP - g * SWIM_GK, ek = Math.exp(-SWIM_K * dt), v1 = ve + (vs - ve) * ek;
+            const mean = dt > 0 ? ve + (vs - ve) * (1 - ek) / (SWIM_K * dt) : v1;
+            this.vel.y = v1; c.y = v1 - mean; this._ay = dt > 0 ? (v1 - vs) / dt : 0;
+          }
+        } else if (this.vel.y < G.SWIM_HOP * 0.5) { // (at the top: a hop out of the water)
+          // (fallen back in since the last frame, held: the hop goes as high as from where the water was met, d.y - 0.3 - not from however
+          // deep under it the fall got by this frame's start, deeper the longer the frame; LEAD: as at 144 Hz)
+          const under = py !== undefined && py > d.y - 0.3 && vs < 0 ? d.y - 0.3 - this.pos.y + vs * LEAD : 0;
+          this.launchY(Math.sqrt(Math.max(0, G.SWIM_HOP * G.SWIM_HOP + 2 * g * under)), dt); this.grounded = false; if (G.Water) G.Water.splash(this.pos, 0.7, { silent: true });
+        }
+      } else if (vs <= -G.SWIM_SINK) { this.vel.y = -G.SWIM_SINK; c.y = 0; this._ay = 0; } // (the water holds you back as you sink)
+      else if (this.vel.y < -G.SWIM_SINK) { this.vel.y = -G.SWIM_SINK; c.y = this.vel.y - (-G.SWIM_SINK + shortOf(vs + G.SWIM_SINK, g, dt)); } // (reaching that speed in this frame)
     }
+    // Every action under way is put down at once (frozen solid, element.js; for anything else that must stop the hands): a reload, an item
+    // being used (one that has not taken effect yet is given back), a melee swing, a throwable being readied or aimed, the item wheel, a hold on something (a chest,
+    // a body, a gate), a queue of items, a slide, a run, the grapple, the bag. Aiming and firing need nothing: they stop with the input.
+    // With keep (an action that takes the hands is starting: 'reload', 'item', 'queue', 'grenade', 'melee', 'switch', 'search', 'pile', 'aim' (an item put
+    // down by fire or the sights, abilities.js tickUseCut), or one a module adds to handsHooks, such as a revive): only what takes the hands is put down, all of it but that one - one at a time,
+    // the one started last goes on. The run, the slide, the grapple, the item wheel and the bag are left as they are; what was cut short
+    // says so (a line in the feed, a click). An item cut short before it takes effect is given back, used or not; a reload starts over the next time
+    // (a gun loaded shell by shell keeps the shells already in: weapons.js interruptReload).
+    stopActions(why, keep) {
+      const A = G.abilities, IA = G.ItemAnim, GM = G.game, W = G.weapons, hands = !!keep, cut = [];
+      if (keep !== 'reload') for (const w of this.weapons || []) if (w && w.reloading) { if (W.interruptReload) W.interruptReload(w); else { w.reloading = false; w.reloadT = 0; } if (w === this.weapon) cut.push('🔄 リロードを中断'); }
+      if (IA && IA.busy && IA.busy()) {   // (an item starting: the one already in the hands is another one, useItemId)
+        const id = A && A.usingId, l = IA.left ? IA.left() : null, it = id && G.ITEM_BY_ID[id];
+        IA.abort(); if (A) A.usingId = null;
+        if (l && l[0] > 0 && id) {
+          if (this.healGauge && this.healGauge.id === id) this.healGauge = null;
+          if (G.Inv && G.Inv.give) G.Inv.give(this, 'item', id, 1); if (G.ui.refreshItems) G.ui.refreshItems();
+          if (it) cut.push(`${it.icon} ${it.name}を中断（使わずに戻した）`);
+        }
+      }
+      if (keep !== 'grenade' && G.GrenHold && G.GrenHold.active && G.GrenHold.active()) G.GrenHold.putAway(true);
+      if (A) {
+        if (!hands && A.press) { if (A.press.wheel && G.ui.itemWheelClose) G.ui.itemWheelClose(); A.press = null; }
+        if (keep !== 'queue' && A.cancelUseQueue) A.cancelUseQueue();
+      }
+      if (keep !== 'search' && GM.search && GM.cancelSearch) { GM.cancelSearch(); if (hands) cut.push('探索を中断'); }
+      if (keep !== 'melee' && W.stopSwing) { W.stopSwing(); if (W.dropGuard) W.dropGuard(); }
+      for (const k in this.handsHooks || {}) if (k !== keep) { const h = this.handsHooks[k]; if (h.active()) { h.stop(); if (hands && h.word) cut.push(h.word); } }
+      if (hands) {
+        if (keep !== 'switch') { if (W.switchT > 0) W.switchT = 0; if (W.endDraw) W.endDraw(); }
+        const cw = this.weapon; if (cw) { cw.charge = 0; cw.burstQ = 0; } // (a railgun's charge, the rest of a burst: not kept either)
+        // (said in the feed at the side: the middle of the screen is where the new action's own ring and label come up)
+        if (cut.length) { G.sfx.mech('click', 0, 0.5); for (const c of cut) G.ui.feed(c); }
+        return;
+      }
+      if (this.sliding) this.endSlide();
+      this.sprintToggle = false; this.sprinting = false; this._sjRun = false; this.crouchToggle = false;
+      if (this.grapple.state === 'attached' || this.grapple.state === 'firing') this.detachGrapple(false);
+      if (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen()) G.InvUI.close();
+    }
+    // An action that takes the hands begins (kind: see stopActions): whatever else had them is put down. handsBlocked: none can begin now
+    // (the pile driver's slam has the whole body).
+    beginHands(kind) { this.stopActions('start', kind); }
+    // A skill or an ultimate has gone off (abilities.js castSkill, ultimates.js castUlt): a reload under way is put down, as by any other action
+    // (it starts over the next time; a gun loaded shell by shell keeps the shells already in). Nothing else is: an item, a throwable, the run, a jump and the grapple go on
+    cutReload() {
+      const W = G.weapons; let cut = false;
+      for (const w of this.weapons || []) if (w && w.reloading) { if (W.interruptReload) W.interruptReload(w); else { w.reloading = false; w.reloadT = 0; } if (w === this.weapon && !(W.stats && w.mag >= W.stats(w).mag)) cut = true; }
+      if (cut) { G.sfx.mech('click', 0, 0.5); G.ui.feed('🔄 リロードを中断'); } // (not said when the skill itself filled the gun: 過負荷's x_reload)
+    }
+    handsBlocked() { return !!this.pileState; }
     fellInPit() {
       const wf = G.world.fallFrac || 0.15;
       let dmg = this.has('m_feather') ? 0 : Math.round(this.stats.maxHp * wf);
@@ -508,18 +705,53 @@
       G.ui.fadeFlash();
     }
 
+    // An open fire the body is in (w.fireSpots, props.js: a brazier's flames over its coals, a torch's on its brand): a mild burn, for
+    // you alone - the foes do not walk round them. A spot is a column (x, z, r) from y0 to y1 where the flames are drawn; the body is a box.
+    // Those a body standing on the floor under them does not reach are left out, once, the first time (a torch high on a wall: only a jump
+    // right under it would put the head in it - not something stepped into by mistake)
+    // (a body can stand under or in it: the floor under the flames - a brazier's own basket, for one stood on - with room for a body over it,
+    // and the flames lower than its head)
+    fireReach(w, f) {
+      const fl = w.floorBelow(f.x, f.y1, f.z);
+      if (!(fl > -50) || f.y0 - fl >= this.standH) return false;
+      const h = Math.min(0.3, this.hw);
+      return w.boxFree(f.x - h, fl + 0.05, f.z - h, f.x + h, fl + Math.max(0.3, Math.min(this.standH, f.y0 - fl)) - 0.05, f.z + h) && w.groundAt(V(f.x, fl + 0.3, f.z), h, 0.5) > fl - 0.1;
+    }
+    fireTouch(w, dt) {
+      if (!w._fireReach) {
+        w._fireReach = true;
+        for (const f of w.fireSpots) f.off = !this.fireReach(w, f);
+      }
+      const p = this.pos, hw = this.hw, top = p.y + this.height;
+      let hot = false;
+      for (const f of w.fireSpots) if (!f.off && Math.abs(p.x - f.x) < hw + f.r && Math.abs(p.z - f.z) < hw + f.r && p.y < f.y1 && top > f.y0) { hot = true; break; }
+      if (!hot) return;
+      this._fireT = (this._fireT || 0) - dt;
+      if (this._fireT <= 0) { this._fireT = Math.max(0, this._fireT + 0.5); G.combat.damagePlayer(1.5 + G.game.area * 0.15, { src: 'aoe', elem: 'fire' }); }
+      this.st.burn = Math.max(this.st.burn || 0, 2); this.st.burnMul = Math.max(this.st.burnMul || 1, 1); this.st.burnLv = Math.max(this.st.burnLv || 1, 1);
+    }
     postMove(dt, wl, mantling) {
       const S = G.save.data.settings, w = G.world;
       this.speedH = Math.hypot(this.vel.x, this.vel.z);
       // hazards / surfaces
       this.inWater = false;
-      for (const z of w.waterZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < 0.2) this.inWater = true;
-      if (this.grounded && !G.Strata.onRope) for (const z of w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
+      // (a pool's own face, z.y: the frozen lake's water lies 1.2 m under the ice; and the deep water under a lid of ice is water too)
+      for (const z of w.waterZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2) this.inWater = true;
+      if (!this.inWater && w.deepWater) for (const d of w.deepWater) if (this.pos.x > d.x0 && this.pos.x < d.x1 && this.pos.z > d.z0 && this.pos.z < d.z1 && this.pos.y < d.y + 0.2) this.inWater = true;
+      // (w.hotZones: lava seen where there is no field of it - a casting room's grates, fields.js addHot: it burns as shallow lava does)
+      if (this.grounded && !G.Strata.onRope) for (const z of w.hotZones ? w.lavaZones.concat(w.hotZones) : w.lavaZones) if (this.pos.x > z.x0 && this.pos.x < z.x1 && this.pos.z > z.z0 && this.pos.z < z.z1 && this.pos.y < (z.y || 0) + 0.2 && this.pos.y > (z.y || 0) - 0.3) {
         this._lavaT = (this._lavaT || 0) - dt;
-        if (this._lavaT <= 0) { this._lavaT = 0.4; G.combat.damagePlayer(5 + G.game.area * 0.6, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }
-        // lava sets you alight with a fierce, long burn (it hurts several times more than an ordinary one)
-        this.st.burn = Math.max(this.st.burn || 0, 5); this.st.burnMul = 4; this.st.burnLv = Math.max(this.st.burnLv || 1, 3);
+        // (z.lavaDeep: a lake or a pit of melt you only end up in by a fall - the foundry's deep melt, the great spiral's bottom - hurts in full.
+        // Anything else lying on the ground, easily stepped in by mistake - a patch, a trench, a trough, blue fire - hurts half as much)
+        const deep = !!z.lavaDeep;
+        // (every 0.4 s stood in it: what a frame runs past the moment is carried, the same count at every frame rate)
+        if (this._lavaT <= 0) { this._lavaT = Math.max(0, this._lavaT + 0.4); G.combat.damagePlayer(deep ? 5 + G.game.area * 0.6 : 2.5 + G.game.area * 0.3, { src: 'aoe', elem: 'fire' }); G.sfx.lava(this.pos); }
+        // deep lava sets you alight with a fierce, long burn (it hurts several times more than an ordinary one); shallow lava with a short,
+        // mild one (a fiercer burn already on you is not softened by it)
+        if (deep) { this.st.burn = Math.max(this.st.burn || 0, 5); this.st.burnMul = 4; this.st.burnLv = Math.max(this.st.burnLv || 1, 3); }
+        else { this.st.burn = Math.max(this.st.burn || 0, 2); this.st.burnMul = Math.max(this.st.burnMul || 1, 1.5); this.st.burnLv = Math.max(this.st.burnLv || 1, 1); }
       }
+      if (w.fireSpots && w.fireSpots.length) this.fireTouch(w, dt);
       // footsteps
       if (this.grounded && this.speedH > 1.2 && !this.sliding) {
         this.stepDist += this.speedH * dt;
@@ -534,25 +766,44 @@
       } else this.bobAmt = U.damp(this.bobAmt, 0, 6, dt);
       // camera
       this.eyeOff = U.damp(this.eyeOff, 0, 12, dt);
-      this.landDip = U.damp(this.landDip, 0, 7, dt);
-      this.shake = Math.max(0, this.shake - dt * 1.6);
+      // (a landing in this frame: the dip and the shake ease only from the moment of it - physics, landAge)
+      const dtL = this._landAge != null ? this._landAge : dt; this._landAge = null;
+      this.landDip = U.damp(this.landDip, 0, 7, dtL);
+      this.shake = Math.max(0, this.shake - dtL * 1.6);
       this.hurtKick = Math.max(0, this.hurtKick - dt * 3);
-      // recoil recovery
-      if (this.recoilRecover > 0 && G.game.time - this.lastShotT > 0.08) { const r = Math.min(this.recoilRecover, dt * 2.2); this.pitch -= r; this.recoilRecover -= r; }
+      // recoil: the kick laid on, what comes back
+      this.updateRecoil(dt);
       this.pitch = U.clamp(this.pitch, -1.55, 1.55);
       const cam = G.camera;
       const bobK = S.bob * this.bobAmt * (G.weapons.adsT > 0.5 ? 0.25 : 1);
-      const bobY = Math.abs(Math.sin(this.bobPhase)) * 0.055 * bobK;
+      // (a walk: the head rises and falls on each step - coming down a little sharply, as a heel does - sways with the weight from foot
+      // to foot, and tips with it)
+      const bobY = Math.pow(Math.abs(Math.sin(this.bobPhase)), 1.35) * 0.055 * bobK;
       const bobX = Math.cos(this.bobPhase) * 0.035 * bobK;
+      const bobR = -Math.cos(this.bobPhase) * 0.0045 * bobK, bobP = Math.sin(this.bobPhase * 2) * 0.0028 * bobK;
       const sh = this.shake * this.shake;
+      // the shake (see addShake): the spring, then the rumble over it
+      let shX = 0, shY = 0, shZ = 0, shp = 0, shy = 0, shr = 0;
+      const sp = this.shSp;
+      if (sp) {
+        // (the spring solved exactly over the frame: SHK)
+        const e = Math.exp(-SHK.s * dt), cw = e * Math.cos(SHK.w * dt), sw = e * Math.sin(SHK.w * dt) / SHK.w;
+        for (let i = 0; i < 5; i++) { const kx = SHK.xs[i], kv = SHK.vs[i], x = sp[kx], v = sp[kv]; sp[kx] = x * cw + (v + SHK.s * x) * sw; sp[kv] = v * cw - (SHK.w2 * x + SHK.s * v) * sw; }
+        sp.t += dt;
+        const t = sp.t, lo = Math.min(1, this.shake), hi = 1 - lo * 0.45;
+        const n3 = (a, b, c) => Math.sin(t * 69 + a) * 0.5 + Math.sin(t * 109 + b) * 0.32 + Math.sin(t * 183 + c) * 0.18;
+        shp = sp.p + (n3(0.3, 1.7, 4.1) * hi + Math.sin(t * 31 + 2.2) * lo * 0.6) * sh * 0.021;
+        shy = (n3(2.9, 0.4, 5.3) * hi + Math.sin(t * 27 + 0.7) * lo * 0.6) * sh * 0.017;
+        shr = sp.r + (n3(4.7, 3.1, 1.2) * hi + Math.sin(t * 23 + 5.0) * lo * 0.7) * sh * 0.019;
+        shX = sp.x + n3(1.1, 5.9, 2.4) * sh * 0.005; shY = sp.y + n3(3.6, 2.2, 0.9) * sh * 0.005; shZ = sp.z;
+      }
       const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
-      cam.position.set(this.pos.x + rx * bobX, this.pos.y + this.eyeH + this.eyeOff + this.landDip + bobY, this.pos.z + rz * bobX);
+      cam.position.set(this.pos.x + rx * (bobX + shX) - rz * shZ, this.pos.y + this.eyeH + this.eyeOff + this.landDip + bobY + shY, this.pos.z + rz * (bobX + shX) + rx * shZ);
       // tilt (strafe & slide)
       const strafe = (I.down('right') ? 1 : 0) - (I.down('left') ? 1 : 0);
       const targetRoll = (this.sliding ? 0.07 : 0) - strafe * 0.018 * (this.grounded ? 1 : 0.5) + (this.grapple.state === 'attached' ? -strafe * 0.05 : 0);
       this.roll = U.damp(this.roll, targetRoll, 8, dt);
-      const shp = (Math.random() - 0.5) * sh * 0.05, shy = (Math.random() - 0.5) * sh * 0.05, shr = (Math.random() - 0.5) * sh * 0.04;
-      cam.rotation.set(this.pitch + shp + this.hurtKick * 0.03, this.yaw + shy, this.roll + shr, 'YXZ');
+      cam.rotation.set(this.pitch + shp + bobP + this.hurtKick * 0.03, this.yaw + shy, this.roll + shr + bobR, 'YXZ');
       // third-person camera for grapple swings and the pile driver
       const gs = this.grapple.state;
       const wantTP = gs === 'firing' || gs === 'attached' || gs === 'reelEnemy' || !!this.pileState || (this.pileLandT || 0) > 0 || !!this.duelLock; // (a duel, duel.js: third person all through)
@@ -603,8 +854,11 @@
       const slow = G.game.timeScale < 1 ? 1 : 1;
       const wheel = G.abilities.wheelOpen && G.abilities.wheelOpen();
       if (!wheel) {
-        this.yaw -= I.mx * sens * slow;
-        this.pitch -= I.my * sens * (S.invertY ? -1 : 1);
+        const dy = -I.mx * sens * slow, dp = -I.my * sens * (S.invertY ? -1 : 1);
+        this.yaw += dy; this.pitch += dp;
+        // pulling against the recoil by hand takes that much off what would come back by itself (no return past where you brought it)
+        const rc = this.rc;
+        if (rc) { if (dp < 0 && rc.x > 0) rc.x = Math.max(0, rc.x + dp); if (dy * rc.y < 0) rc.y = Math.sign(rc.y) * Math.max(0, Math.abs(rc.y) - Math.abs(dy)); }
       }
       this.pitch = U.clamp(this.pitch, -1.55, 1.55);
       // keep yaw bounded without any visible reset (pure modulo of a full turn)
@@ -615,24 +869,38 @@
       const sdt = dt / Math.max(0.3, 1 - (this.stats.statusRes || 0)); // armour: statuses wear off sooner
       const dr = Math.max(0.1, 1 - (this.stats.dotRes || 0));
       for (const k of ['slow', 'shock']) if (s[k] > 0) { s[k] -= sdt; if (s[k] <= 0) s[k + 'Lv'] = 0; }
+      // the ticks come every 0.5 s on the clock: what a frame runs past one is carried to the next (the same number of ticks at every frame
+      // rate). A tick is dealt by what is still on you at its moment in the frame: none at or after the moment a burn / poison runs out
       s.tick = (s.tick || 0) - dt;
-      if (s.tick <= 0) {
-        s.tick = 0.5;
+      if (s.tick < -0.5) s.tick = 0; // (a long stall: one tick, not a burst of them)
+      while (s.tick <= 0) {
+        const worn = (dt + s.tick) * (sdt / Math.max(1e-9, dt)); // (how much of each has worn off by the tick's moment)
+        s.tick += 0.5;
         const sc = (1 + 0.1 * (G.game.area - 1)) * dr;
-        if (s.burn > 0) { G.combat.damagePlayer(1.6 * sc * (s.burnMul || 1) * (0.7 + 0.3 * (s.burnLv || 1)), { src: 'dot', elem: null }); }
-        if (s.poison > 0) { G.combat.damagePlayer(0.8 * sc * (s.poisonStacks || 1), { src: 'dot' }); }
+        if (s.burn - worn > 1e-6) { G.combat.damagePlayer(1.6 * sc * (s.burnMul || 1) * (0.7 + 0.3 * (s.burnLv || 1)), { src: 'dot', elem: null }); }
+        if (s.poison - worn > 1e-6) { G.combat.damagePlayer(0.8 * sc * (s.poisonStacks || 1), { src: 'dot' }); }
       }
       if (s.burn > 0) { s.burn -= sdt; if (s.burn <= 0) { s.burnMul = 1; s.burnLv = 0; } }
       if (s.poison > 0) { s.poison -= sdt; if (s.poison <= 0) s.poisonStacks = 0; }
     }
 
     // ---- slide ----
-    startSlide() {
+    // wx, wz: the way the keys push (flat, unit; 0 when none)
+    startSlide(wx, wz) {
       this.sliding = true; this.slideT = 0; this.crouching = true;
-      this._slideRun = !!(this.sprinting || this.sprintToggle); // a slide out of a run: the run carries on when the slide is over
-      const hs = Math.hypot(this.vel.x, this.vel.z) || 1;
-      const boost = Math.max(hs, 12.8 * (1 + this.stats.slideBoost));
-      this.vel.x *= boost / hs; this.vel.z *= boost / hs;
+      this._slideRun = true; // a slide only comes out of a run: the run carries on when the slide is over
+      // which way: the way you are going; barely moving yet (the first step of a run), the way you push, or face
+      const hs = Math.hypot(this.vel.x, this.vel.z);
+      let dx = -Math.sin(this.yaw), dz = -Math.cos(this.yaw);
+      if (hs > 0.5) { dx = this.vel.x / hs; dz = this.vel.z / hs; } else if (wx || wz) { dx = wx; dz = wz; }
+      // how fast: the slide's own speed (滑走 and gear change it), held down when the run itself is held down by more than a wade or thorns
+      // (slowed, mud, deep ground: no slide out of it faster than out of a free run). Out of the first step of a run it starts at 60% of
+      // that, rising to all of it at 7 m/s (the run's own pace: a slide out of a run at 7 m/s or more is as it always was), so it is never
+      // ahead of where the run would have got. It ends when it has lost 40% of its speed (at 4.5 m/s at most)
+      const top = 12.8 * (1 + this.stats.slideBoost) * Math.pow(Math.min(1, this.runDrag() / 0.8), 2);
+      const sp = Math.max(hs, top * (0.6 + 0.4 * Math.min(1, hs / 7)));
+      this.vel.x = dx * sp; this.vel.z = dz * sp; this.speedH = sp;
+      this.slideEndV = Math.min(4.5, sp * 0.6);
       G.sfx.whoosh(0.25, 0.4);
       this.slideLoop = G.sfx.loop('slide');
       this.fovKick = 4;
@@ -818,6 +1086,7 @@
       };
     }
     startPile() {
+      this.beginHands('pile'); // (the slam takes the whole body: a reload, an item, a throwable, a search ... are put down)
       this.pileState = 'charge';
       this.pileStartY = this.pos.y;
       this.pileT = this.pileTMax = this.stats.pileFast ? 0.16 : 0.32;
@@ -828,7 +1097,6 @@
       if (this.stats.techShield) G.combat.timedShield(20 * this.stats.techShield, 6, 120);
       G.sfx.whoosh(0.35, 0.6, true);
       G.sfx.magic(this.pos, 'dark');
-      G.ui.pileIndicator(true);
     }
     pileImpact() {
       const st = this.stats;
@@ -864,7 +1132,6 @@
       this.landDip = -0.45;
       this.pileState = null;
       this.pileLandT = 0.45;
-      G.ui.pileIndicator(false);
       G.buffs.emit('onSkill', { skill: { id: 'pile' } });
       if (st.pileBounce && !this._pileBounced) { this._pileBounced = true; this.vel.y = 12; this.grounded = false; this.pileFree = true; }
       else this._pileBounced = false;

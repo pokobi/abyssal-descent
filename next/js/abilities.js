@@ -131,6 +131,7 @@
     A.updateUltAuras && A.updateUltAuras(dt);
     A.riftTick(dt); A.shadowTick(dt);
     if (P.temps && P.temps.has('ult_godfall')) for (const sk of P.skills) if (sk && !(sk.def && sk.def.ult) && sk.cd > 0) sk.cd = 0; // (神降ろし: no cooldowns)
+    A.tickUseCut();
     A.tickUseQueue();
     for (let i = 0; i < 4; i++) {
       const sk = P.skills[i]; if (!sk) continue;
@@ -786,6 +787,39 @@
     if (P.itemCount(q.id) < have) q.left--;
     else A.useQueue = null; // refused (HP already full, no room to set it down ...): its own message says why
     if (q.left <= 0) A.useQueue = null;
+  };
+  // ---------------- an item in the hands put down by a fresh press of fire or of the sights ----------------
+  // A press of either button that was not down already (down now and up the frame before, or pressed and let go within one frame - the
+  // mobile buttons and a quick click alike) puts the item in the hands down the way any other action does (player.js stopActions: given
+  // back if it has not taken effect yet, kept if it has; its sounds cut off), stops a queue, and brings the weapon back up over a weapon's
+  // own draw (weapons.js equip: 0.35 s). A button held on through that then fires / aims with no new press. A button already down when
+  // the use began does nothing until it is let go and pressed again. Not a throwable (no usingId), not with the bag, a sheet or the wheel up
+  const USE_CUT_RAISE = 0.35;
+  A.useCut = null;   // { fire, ads }: what cut the last use short, while the weapon comes back up
+  const btnPrev = [false, false];
+  A.tickUseCut = function () {
+    const W = G.weapons, IA = G.ItemAnim;
+    const fresh = (b, j) => !!((I.mpressed[b] && (!btnPrev[j] || I.mreleased[b])) || (I.mouse[b] && !btnPrev[j]));
+    const f = fresh(0, 0), a = fresh(2, 1);
+    btnPrev[0] = !!I.mouse[0]; btnPrev[1] = !!I.mouse[2];
+    if (!I.mouse[2]) W.heldHeavy = false;
+    const uc = A.useCut;
+    if (uc) {
+      // (a gun that fires a shot a pull, or a burst, fires off the trigger's buffer: kept full while the trigger is held through the draw)
+      if (W.switchT > 0 && uc.fire && I.mouse[0]) W.trigBuf = Math.max(W.trigBuf || 0, 0.13);
+      if (!(W.switchT > 0)) A.useCut = null;
+    }
+    if (!(f || a)) return;
+    const id = A.usingId;
+    if (!id || !IA.busy() || !IA.left(id)) return;
+    if (G.game.state !== 'playing' || P.dead || P.pileState || (G.ui.statusOpen && G.ui.statusOpen()) || A.wheelOpen() || (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen())) return;
+    // (never back later than the use itself would have ended: the draw is cut to what was left of the motion)
+    const raise = Math.min(USE_CUT_RAISE, IA.left(id)[1]);
+    A.cancelUseQueue('🍶 まとめて使うのを中止した');
+    P.beginHands('aim');
+    W.switchT = Math.max(W.switchT || 0, raise);
+    A.useCut = { fire: f, ads: a };
+    if (a && P.meleeMode) W.heldHeavy = true;   // (melee.js: the heavy blow, which wants a fresh press, starts when the draw is done if the button is still down)
   };
   // ---------------- utility items ----------------
   A.useItemId = function (id, fromQueue) {

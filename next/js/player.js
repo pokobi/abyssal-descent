@@ -637,8 +637,8 @@
     // Every action under way is put down at once (frozen solid, element.js; for anything else that must stop the hands): a reload, an item
     // being used (one that has not taken effect yet is given back), a melee swing, a throwable being readied or aimed, the item wheel, a hold on something (a chest,
     // a body, a gate), a queue of items, a slide, a run, the grapple, the bag. Aiming and firing need nothing: they stop with the input.
-    // With keep (an action that takes the hands is starting: 'reload', 'item', 'queue', 'grenade', 'melee', 'switch', 'search', 'pile', or
-    // one a module adds to handsHooks, such as a revive): only what takes the hands is put down, all of it but that one - one at a time,
+    // With keep (an action that takes the hands is starting: 'reload', 'item', 'queue', 'grenade', 'melee', 'switch', 'search', 'pile', 'aim' (an item put
+    // down by fire or the sights, abilities.js tickUseCut), or one a module adds to handsHooks, such as a revive): only what takes the hands is put down, all of it but that one - one at a time,
     // the one started last goes on. The run, the slide, the grapple, the item wheel and the bag are left as they are; what was cut short
     // says so (a line in the feed, a click). An item cut short before it takes effect is given back, used or not; a reload starts over the next time
     // (a gun loaded shell by shell keeps the shells already in: weapons.js interruptReload).

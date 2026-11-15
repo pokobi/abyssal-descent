@@ -731,7 +731,7 @@
     const blocked = !!ms.draw || W.switchT > 0 || P.mantle || P.pileState || W.anim.throwT > 0 || G.ItemAnim.busy() || G.GrenHold.active() || G.abilities.wheelOpen();
     guardTick(dt, blocked);
     if (P.duelLock) { /* no attacks in a duel (duel.js) */ } else if (ms.ph === 'idle' && !blocked && !gd.on) {
-      if (I.mpressed[2]) startHeavy(s);
+      if (I.mpressed[2] || (W.heldHeavy && I.mouse[2])) { W.heldHeavy = false; startHeavy(s); }   // (heldHeavy: an item put down by this button, abilities.js tickUseCut)
       else if (I.mouse[0]) startLight(s);
     } else if (ms.ph === 'light' && !blocked && !gd.on && ms.t >= ms.dur * 0.8 && (I.mouse[0] || I.mpressed[0])) {
       if (I.mpressed[2]) startHeavy(s); else startLight(s);

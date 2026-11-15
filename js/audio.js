@@ -21,7 +21,7 @@
   // Two sets of sound, chosen in the settings (設定 → 音の種類). 'new' (the default): rooms and open ground answer differently (a
   // reverb with early reflections whose high end dies first, a far echo outdoors), what is behind you is duller, a shot has weight under
   // it, the metal of the action and the place answering back, a blast throws debris that falls after it. 'classic': as it was.
-  const NEW = () => G.save.data.settings.sound !== 'classic';
+  const NEW = () => true;   // (the old synthesized set is no longer offered: an old save's 'classic' is passed over)
   const outdoor = () => { const b = G.world && G.world.mats && G.world.mats.biome; return !!(b && b.outdoor); };
   A.volume = G.save.data.settings.volume;
   A.listener = { x: 0, y: 0, z: 0 };

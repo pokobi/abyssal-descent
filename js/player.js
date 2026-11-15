@@ -8,6 +8,7 @@
   G.grappleCdOf = (st) => (st.grappleBase || G.GRAPPLE_CD) * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0))); // (the class sets the base: 15-28 s, see classes.js)
   const U = G.U, I = G.input;
   const V = G.U.V;
+  const FIRE_STAGES = new Set(['combat', 'elite', 'cursed', 'boss']); // the areas where a brazier's or a torch's flames burn (fireTouch)
   // How a frame's change of speed is laid out along the way: the same path at every frame rate. The feel was tuned at 144 Hz, where a
   // frame changed the speed first and then moved at the new speed for the whole 1/144 s - a path that runs half a 144 Hz frame (LEAD)
   // ahead of the one an exact sum gives. Each frame now moves along that path exactly, however long it is: a jump as high, a stop as
@@ -754,7 +755,8 @@
         if (deep) { this.st.burn = Math.max(this.st.burn || 0, 5); this.st.burnMul = 4; this.st.burnLv = Math.max(this.st.burnLv || 1, 3); }
         else { this.st.burn = Math.max(this.st.burn || 0, 2); this.st.burnMul = Math.max(this.st.burnMul || 1, 1.5); this.st.burnLv = Math.max(this.st.burnLv || 1, 1); }
       }
-      if (w.fireSpots && w.fireSpots.length) this.fireTouch(w, dt);
+      // (the open fires burn only where there is a fight: combat, elite hunt, cursed arena, guardian - not in the shop, the shrine, the vault...)
+      if (w.fireSpots && w.fireSpots.length && FIRE_STAGES.has(G.game.stage)) this.fireTouch(w, dt);
       // footsteps
       if (this.grounded && this.speedH > 1.2 && !this.sliding) {
         this.stepDist += this.speedH * dt;

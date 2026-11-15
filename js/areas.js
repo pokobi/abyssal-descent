@@ -582,7 +582,7 @@
     { id: 'ambush', npc: '物乞いの老人', icon: '🧓', text: '「…近う寄れ…」\n（どこか様子がおかしい）',
       opts: () => [{ icon: '⚔️', label: '近づく', sub: '???', run: () => { G.ui.toast('罠だ！ 魔物が現れた！', 'warn'); for (let i = 0; i < 2 + Math.floor(GM.area / G.Run.CYCLE); i++) GM.spawnEnemy({ elite: true, near: true }); GM.ambushReward = true; } }] },
     { id: 'spirit', npc: '囚われた精霊', icon: '🧚', text: '「封印を解いて…あなたの力を少しだけ分けて…」',
-      opts: () => [{ icon: '💔', label: '生命力を分け与える', sub: '現在HPの40%を失う → 使い魔を得る', run: () => { P.hp = Math.max(1, P.hp * 0.6); const b = P.has('z_owl') ? 'z_wolf' : 'z_owl'; P.addBuff(b); G.ui.itemCard(G.BUFF_BY_ID[b], '[使い魔]'); } }] },
+      opts: () => [{ icon: '💔', label: 'HPを分け与える', sub: '現在HPの40%を失う → 使い魔を得る', run: () => { P.hp = Math.max(1, P.hp * 0.6); const b = P.has('z_owl') ? 'z_wolf' : 'z_owl'; P.addBuff(b); G.ui.itemCard(G.BUFF_BY_ID[b], '[使い魔]'); } }] },
     { id: 'purifier', npc: '浄化の僧', icon: '📿', text: '「呪いに蝕まれておるな。祓ってしんぜよう」',
       opts: () => { const cs = AR.curses(); return [{ icon: '✨', label: `全ての呪いを祓う（${cost(140)}🪙）`, sub: cs.length ? `呪い ${cs.length}種` : '呪いはない', disabled: !cs.length || GM.run.coins < cost(140), run: () => { GM.run.coins -= cost(140); for (const id of cs) { P.buffs.delete(id); } P.recalc(); G.ui.toast('✨ 全ての呪いが祓われた', 'good'); } },
         { icon: '🙏', label: '祈りを受ける', sub: 'HPを50%回復', run: () => { G.combat.heal(P.stats.maxHp * 0.5); G.sfx.heal(); } }]; } },

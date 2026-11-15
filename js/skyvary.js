@@ -80,7 +80,7 @@
       D('mist', '朝霧', 3, { fogD: 2.6, fog: '#8a9098', k: 0.65, amb: 1.05, sunK: 0.5, cl: CL.mist, haze: 1.5 }),
       D('rain', '冷たい雨', 2, { fogD: 1.5, fog: '#3a4048', k: 0.55, moonI: 0.6, amb: 0.88, sky: ['#14181e', '#2c323a', '#565c62'], sunK: 0.15, p: [P.rain], flash: true, el: 'water', bolt: true, cl: CL.rain }),
       D('crimson', '赤い朝焼け', 1, { fog: '#7a4a40', k: 0.45, hemiS: '#c08070', sky: ['#1e1a24', '#6a3a34', '#d08060'], sunCol: [1.0, 0.55, 0.38], cl: Object.assign([], CL.dusk, { 6: 0.5 }) }),   // (fewer far banks: lit red they would stand out)
-      D('crows', '灰の舞う', 1, { fog: '#6a6460', k: 0.4, fogD: 1.3, p: [P.ash], cl: CL.ash }),
+      D('crows', '舞う灰', 1, { fog: '#6a6460', k: 0.4, fogD: 1.3, p: [P.ash], cl: CL.ash }),
     ],
     // 入口
     shaft: [
@@ -99,7 +99,7 @@
     gate: [
       D('base', '', 5),
       D('dim', '灯の乏しい夜', 2, { amb: 0.74, hemiI: 0.82, fogD: 1.15 }),
-      D('dust', '塵の舞う', 2, { fog: '#2a2620', k: 0.3, p: [P.dust] }),
+      D('dust', '舞う塵', 2, { fog: '#2a2620', k: 0.3, p: [P.dust] }),
       D('mist', '冷えた霧', 1, { fogD: 1.7, fog: '#1c2634', k: 0.5 }),
     ],
     catacombs: [
@@ -117,7 +117,7 @@
     halls: [
       D('base', '', 5),
       D('ember', '火の粉', 2, { p: [P.ember], el: 'fire' }),
-      D('dust', '塵の舞う', 2, { p: [P.dust] }),
+      D('dust', '舞う塵', 2, { p: [P.dust] }),
     ],
     flooded: [
       D('base', '', 5),
@@ -132,7 +132,7 @@
     // 深層
     ruin: [
       D('base', '', 5),
-      D('ash', '灰降る', 2, { fog: '#141824', k: 0.4, p: [P.ash] }),
+      D('ash', '降る灰', 2, { fog: '#141824', k: 0.4, p: [P.ash] }),
       D('blaze', '蒼炎の昂ぶり', 2, { hemiS: '#6a9cff', k: 0.4, amb: 1.15, p: [P.blueEmber], el: 'fire' }),
     ],
     frozen: [
@@ -152,7 +152,7 @@
       D('base', '偽りの空', 4, { cl: CL.day }),
       D('dusk', '暮れない夕刻', 2, { fog: '#b8a0a4', k: 0.5, sky: ['#3a3848', '#9a8286', '#d8b498'], hemiS: '#d0a0b8', k2: 0.3, cl: CL.dusk }),
       D('white', '白昼の虚無', 2, { fog: '#e8ecf4', k: 0.6, fogD: 1.6, amb: 1.1, stars: false, sunK: 0.6, sky: ['#d8e0f0', '#eef2fa', '#ffffff'], cl: [0.85, 0.08, 0, 0, 0.4, 0.8, 0], haze: 2 }),
-      D('feather', '羽の降る', 1, { p: [P.feather], cl: CL.day }),
+      D('feather', '降る羽', 1, { p: [P.feather], cl: CL.day }),
     ],
   };
 

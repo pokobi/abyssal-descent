@@ -7,7 +7,7 @@
   CL.LIST = [
     { id: 'soldier', name: '兵士', icon: '🪖', col: '#9ab070', gun: 'a_ranger', melee: 'm_basic', skill: 'spear', ult: 'ult_armory', grapple: 18,
       mods: { buffChoices: 1 }, minus: 'なし', favName: 'なし', fav: null,
-      look: 'オリーブ色の戦闘服とヘルメット', role: '何でもこなす基準のクラス' },
+      look: 'オリーブ色の戦闘服とヘルメット', role: '何でもこなす' },
     { id: 'assault', name: '突撃兵', icon: '💨', col: '#ff6a50', gun: 's_wasp', melee: 'm_basic', skill: 'dash', ult: 'ult_berserk', grapple: 15,
       mods: { moveSpeed: 0.1 }, minus: '20m以上の敵への与ダメ-20%', favName: 'SMG・ショットガン（作業台でもおすすめ）、機動・連射・装填の加護',
       fav: (o) => o.kind === 'weapon' && (o.arch === 'smg' || o.arch === 'shotgun' || o.arch === 'autoshotgun'), look: '赤いバンダナとゴーグルの軽装', role: '近距離で暴れる' },
@@ -61,7 +61,6 @@
   CL.PERKS = PERKS; CL.PERK = {};
   for (const cls in PERKS) PERKS[cls].forEach((pair, t) => pair.forEach((pk, k) => { Object.assign(pk, { cls, tier: t + 1, slot: k ? 'B' : 'A' }); CL.PERK[pk.id] = pk; }));
   CL.TIER = ['一の巻', '二の巻'];
-  CL.TIER_TAG = ['固有効果を伸ばす', '新しい戦い方'];
   CL.BY = Object.fromEntries(CL.LIST.map((c) => [c.id, c]));
   CL.DEFAULT = 'soldier';
   CL.of = (id) => CL.BY[id] || CL.BY[CL.DEFAULT];
@@ -360,7 +359,7 @@
     const got = taken || [];
     return `<div class="cls-pk">${pairs.map((pair, t) => {
       const pick = pair.find((pk) => got.indexOf(pk.id) >= 0), open = !taken || t <= got.length;
-      return `<div class="cls-pk-t${taken && !pick && !open ? ' later' : ''}"><div class="cls-pk-h">📜 秘伝 ${CL.TIER[t]}<small>${CL.TIER_TAG[t]}</small>${taken && !pick ? `<em>${t === got.length ? '次の守護者で選ぶ' : 'まだ選べない'}</em>` : ''}</div>
+      return `<div class="cls-pk-t${taken && !pick && !open ? ' later' : ''}"><div class="cls-pk-h">📜 秘伝 ${CL.TIER[t]}${taken && !pick ? `<em>${t === got.length ? '次の守護者で選ぶ' : 'まだ選べない'}</em>` : ''}</div>
         ${pair.map((pk) => `<div class="cls-pk-c${pick ? (pick === pk ? ' on' : ' off') : ''}"><span class="cls-pk-ic">${pk.icon}</span><div><b>${esc(pk.name)}</b>${pick === pk ? '<i>会得</i>' : ''}<small>${esc(pk.desc)}</small></div></div>`).join('')}</div>`;
     }).join('')}</div>`;
   };
@@ -375,7 +374,7 @@
     G.input.exitLock();
     const pair = pairs[tier], nextPair = pairs[tier + 1];
     const card = (pk, i) => `<div class="card pk-card" data-i="${i}" style="--rc:${c.col};animation-delay:${i * 0.14}s"><span class="c-key">${i + 1}</span>
-      <div class="pk-ic">${pk.icon}</div><div class="pk-name">${esc(pk.name)}</div><div class="pk-tag">${CL.TIER_TAG[tier]}</div><div class="pk-desc">${esc(pk.desc)}</div></div>`;
+      <div class="pk-ic">${pk.icon}</div><div class="pk-name">${esc(pk.name)}</div><div class="pk-desc">${esc(pk.desc)}</div></div>`;
     const mine = CL.perksOf(P).map((id) => CL.PERK[id]);
     const foot = (mine.length ? `<div class="pk-f"><span>会得した秘伝</span>${mine.map((pk) => `<b>${pk.icon} ${esc(pk.name)}</b>`).join('')}</div>` : '')
       + (nextPair ? `<div class="pk-f dim"><span>次の守護者で（${CL.TIER[tier + 1]}）</span>${nextPair.map((pk) => `<b>${pk.icon} ${esc(pk.name)}</b>`).join('<i>／</i>')}</div>` : '');

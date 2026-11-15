@@ -198,7 +198,7 @@
       const mc = PT.makeCost(r, free), uc = to ? PT.upCost(to, free) : 0;
       const top = `<div class="pb-sel" style="--rc:${G.ui.R(r)}"><span class="pb-big">${f ? f.icon : PT.ICON}</span><div><div class="pb-nm">${f ? `${esc(f.name)}の武器` : esc(d.short)}</div><div>${RN(r)}の部品　所持 <b>${n}</b> / ${PT.NEED}</div></div></div>`;
       if (cands) {
-        return `${top}<div class="pb-sec">どれを組み立てますか？<small>（${esc(f.name)}・${RN(r)}の全${cands.cands.length}種）</small></div><div class="pb-cands${cands.cands.length > 3 ? ' many' : ''}">${cands.cands.map((w, i) => `<button class="pb-cand" data-w="${i}" style="--rc:${G.ui.R(w.rarity)}"><span class="pb-ci">${w.icon}</span><div><b>${esc(w.name)}</b><small>${esc(w.cat || '')}</small><div class="pb-cs">${w.kind === 'melee' ? G.Areas.meleeCard(w) : G.Areas.gunCard(w)}</div></div></button>`).join('')}</div>
+        return `${top}<div class="pb-sec">組み立てる武器<small>（${esc(f.name)}・${RN(r)}の全${cands.cands.length}種）</small></div><div class="pb-cands${cands.cands.length > 3 ? ' many' : ''}">${cands.cands.map((w, i) => `<button class="pb-cand" data-w="${i}" style="--rc:${G.ui.R(w.rarity)}"><span class="pb-ci">${w.icon}</span><div><b>${esc(w.name)}</b><small>${esc(w.cat || '')}</small><div class="pb-cs">${w.kind === 'melee' ? G.Areas.meleeCard(w) : G.Areas.gunCard(w)}</div></div></button>`).join('')}</div>
           <div class="pb-note">部品${PT.NEED}つ${mc ? `と ${U.fmt(mc)}🪙` : ''}は、選んだときに使う。</div><button class="btn" id="pb-cback">↩ やめる</button>`;
       }
       const canMake = !!f && n >= PT.NEED && coins >= mc, canUp = !!to && n >= PT.NEED && coins >= uc;

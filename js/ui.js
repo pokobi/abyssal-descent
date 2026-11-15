@@ -815,8 +815,8 @@
       const S = G.save.data.settings;
       if (S.askTutorial === false) return go();
       G.sfx.init(); G.sfx.ui('open');
-      UI.choice('📘 チュートリアルを受けますか？', '基本操作（移動・射撃・近接・グラップル・パイルドライバー）、アイテムや投擲物の使い方とホイール、エリアの流れまで、実際に体を動かしながら学べます（約5〜8分）。<br>チュートリアルが終わると、そのまま本編が始まります。', [
-        { icon: '📘', label: 'チュートリアルを受ける', sub: 'はじめての方におすすめ', onPick: () => { G.sfx.ui('select'); G.Tutorial.start({ diff: diffPick, slot: slotPick }); } },
+      UI.choice('📘 チュートリアルを受けますか？', '基本操作（移動・射撃・近接・グラップル・パイルドライバー）、アイテムと投擲物の使い方とホイール、エリアの流れ（約5〜8分）。<br>終わると、そのまま本編が始まります。', [
+        { icon: '📘', label: 'チュートリアルを受ける', onPick: () => { G.sfx.ui('select'); G.Tutorial.start({ diff: diffPick, slot: slotPick }); } },
         { icon: '⚔️', label: 'すぐに本編を始める', onPick: () => { G.sfx.ui('select'); G.game.startRun(diffPick, slotPick); } },
         { icon: '🚫', label: '今後は聞かずに本編を始める', sub: '設定からいつでも戻せます', onPick: () => { S.askTutorial = false; G.save.write(); G.sfx.ui('select'); G.game.startRun(diffPick, slotPick); } },
       ], () => UI.title());
@@ -875,18 +875,18 @@
     const k = (a, b) => `<kbd>${a}</kbd><span>${b}</span>`;
     const s = UI.screen(`<div class="panel" style="width:min(820px,94vw)"><h2>🎮 操作方法</h2>
       <div class="keys">
-        ${k(['forward', 'left', 'back', 'right'].map(G.K).join(' '), '移動')}${k(G.K('jump'), 'ジャンプ（段差の前で押し続けるとよじ登り）')}${k('空中で' + G.K('crouch'), 'パイルドライバー（標準装備・強化で成長）')}
+        ${k(['forward', 'left', 'back', 'right'].map(G.K).join(' '), '移動')}${k(G.K('jump'), 'ジャンプ（段差の前で押し続けるとよじ登り）')}${k('空中で' + G.K('crouch'), 'パイルドライバー')}
         ${k(G.K('sprint'), '歩く（標準は常に走る・設定で変更可）')}${k(G.BIND.crouch.map(G.input.codeName).filter((v, i, a) => a.indexOf(v) === i).join(' / '), 'しゃがみ（スプリント中でスライディング）')}
         ${k('左クリック', '射撃 ／ 近接武器時は連撃')}${k('右クリック', 'ADS（照準） ／ 近接武器時は重撃（隙大）')}
         ${k(G.K('reload'), 'リロード（近接武器では押している間 防御：正面の攻撃を軽減、照準右のゲージを消費）')}${k(G.K('w3'), `近接武器に持ち替え（${G.K('w3')}は近接武器の固定枠・持っている間は移動が速い）`)}
         ${k(G.K('grapple'), `グラップル（押し続けて巻き取り / 離すと解除 / ${G.K('jump')}で跳躍解除）`)}${k(G.K('interact'), 'インタラクト（購入・宝箱・出口）')}
-        ${k(G.input.skillKey(0), 'アルティメット（強力・CT約2分）')}${k([1, 2, 3].map((i) => G.input.skillKey(i)).join(' / '), 'スキル（持ち物画面でドラッグして入れ替え）')}
+        ${k(G.input.skillKey(0), 'アルティメット（CT約2分）')}${k([1, 2, 3].map((i) => G.input.skillKey(i)).join(' / '), 'スキル（持ち物画面でドラッグして入れ替え）')}
         ${k(G.K('grenade'), '投擲物を投げる（長押しで選択ホイール）')}${k(G.K('cycleGrenade'), '投擲物の切替')}
         ${k(['item1', 'item2'].map(G.K).join(' / '), '消耗品の使用（どちらの枠にも入る）・長押しで選択ホイール')}${k(['w1', 'w2', 'w3'].map(G.K).join('・') + ' / ホイール', '武器の切替（ホイールは全武器を順に）')}${k(G.K('status'), '銃1・銃2の入れ替え（持ち物画面で銃どうしをドラッグ）')}
         ${k(G.K('status') + ' / ' + G.K('inventory'), '持ち物・装備・ステータスの画面（防具・アタッチメントの付け替え、武器1/2の入れ替え、持ち物の整理、加護や効果の一覧）')}${k('Esc / I', 'ポーズ（Iはもう一度押すと再開）')}
       </div>
       <h3>🗺️ 流れ</h3>
-      <div style="font-size:13.5px;line-height:1.7;color:#ddd3c0">エリアの目標を達成すると北の3つの門が開き、行き先（戦闘・精鋭・射的・邂逅・商人・宝物庫・祠・鍛冶場・呪いの闘技場 など）を自由に選べます。門の前には旅の商人（または古の交換石機）も店を出します。7エリアごとに守護者（ボス）が待ち構え（その手前の6つ目は、商人だけの準備の間）、最後の守護者を倒すとクリアです（ボス戦の舞台は守護者ごとに変わります）。敵はエリアが進むほど強く（Lv表示）、一部はシールドを持ちます（EMP・電撃・爆発が有効）。コインは撃破・クリア・ボーナス・宝箱・破壊可能オブジェクトから得られます。</div>
+      <div style="font-size:13.5px;line-height:1.7;color:#ddd3c0">エリアの目標を達成すると北の3つの門が開き、行き先（戦闘・精鋭・射的・邂逅・商人・宝物庫・祠・鍛冶場・呪いの闘技場 など）を自由に選べます。門の前には旅の商人（または古の交換石機）も店を出します。7エリアごとに守護者（ボス）が待ち構え（その手前の6つ目は、商人だけの準備の間）、最後の守護者を倒すとクリアです。敵はエリアが進むほど強く（Lv表示）、一部はシールドを持ちます（EMP・電撃・爆発が有効）。コインは撃破・クリア・ボーナス・宝箱・破壊可能オブジェクトから得られます。</div>
       <div style="margin-top:18px;text-align:right"><button class="btn" id="h-back">↩ 戻る</button></div></div>`, 'dim');
     s.querySelector('#h-back').onclick = () => { G.sfx.ui('click'); back(); };
   };
@@ -903,7 +903,7 @@
       ${rowR('volume', '🔊 音量', 0, 1, 0.01, (v) => Math.round(v * 100) + '%')}
       ${rowR('shake', '📳 画面揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
       ${rowR('bob', '🚶 視点の揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
-      <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（軽量：低解像度・影なし・簡易ライト）</option><option value="med">中（標準：解像度1.0倍・影は軽め）</option><option value="high">高（最高画質）</option></select><span></span></div>
+      <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低（低解像度・影なし・簡易ライト）</option><option value="med">中（解像度1.0倍・影は軽め）</option><option value="high">高</option></select><span></span></div>
       ${rowC('dmgNums', '🔢 ダメージ表記')}${rowC('crouchToggle', '🧎 しゃがみ切替式')}${rowC('autoSprint', `🏃 常に走る（${G.K('sprint')}で歩く）`)}${rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')}${rowC('invertY', '↕️ 上下反転')}${rowC('fullscreen', '⛶ 開始時フルスクリーン')}${rowC('showFps', '📈 FPS表示')}${rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認')}
       ${rowC('motionBlur', '💨 モーションブラー（画質が中・高の時）')}
       <div class="set-row"><span>🔊 音の種類</span><select id="s-sound"><option value="new">新しい音</option><option value="classic">元の音</option></select><span></span></div>

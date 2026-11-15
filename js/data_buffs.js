@@ -15,36 +15,36 @@
 
   // ---------- tiered stat buffs ----------
   const ST = [
-    ['dmg', '火力強化', '💪', [0.08, 0.14, 0.22], (v) => `与ダメ+${Math.round(v * 100)}%`],
-    ['maxHp', 'HP強化', '❤️', [15, 25, 40], (v) => `最大HP+${v}`],
-    ['fireRate', '速射', '🔁', [0.07, 0.12, 0.18], (v) => `連射速度+${Math.round(v * 100)}%`],
-    ['reloadSpeed', '早装填', '♻️', [0.12, 0.2, 0.3], (v) => `リロード速度+${Math.round(v * 100)}%`],
-    ['magSize', '弾倉拡張', '📦', [0.15, 0.25, 0.4], (v) => `装弾数+${Math.round(v * 100)}%`],
-    ['moveSpeed', '俊足', '👟', [0.05, 0.09, 0.14], (v) => `移動速度+${Math.round(v * 100)}%`],
-    ['critChance', '会心', '💢', [0.05, 0.08, 0.12], (v) => `会心率+${Math.round(v * 100)}%`],
-    ['critMul', '会心ダメージ', '💥', [0.2, 0.35, 0.55], (v) => `会心ダメージ+${Math.round(v * 100)}%`],
-    ['headMul', '首狩り', '🎯', [0.2, 0.35, 0.5], (v) => `ヘッドショット倍率+${Math.round(v * 100)}%`],
-    ['armor', '鎧', '🛡️', [0.04, 0.07, 0.1], (v) => `被ダメ-${Math.round(v * 100)}%`],
-    ['hpRegen', '再生', '💚', [0.6, 1.0, 1.6], (v) => `毎秒HP+${v}回復`],
-    ['lifesteal', '吸血', '🩸', [0.02, 0.03, 0.045], (v) => `吸血+${(v * 100).toFixed(1)}%`],
-    ['cdr', '瞑想', '⏳', [0.06, 0.1, 0.15], (v) => `スキルのクールタイム-${Math.round(v * 100)}%`],
-    ['elMastery', '属性熟練', '🔮', [20, 35, 55], (v) => `属性熟練+${v}（属性反応が強くなる）`],
-    ['coinMul', '強欲', '🪙', [0.1, 0.18, 0.28], (v) => `コイン獲得量+${Math.round(v * 100)}%`],
-    ['skillDmg', '魔力', '🔮', [0.08, 0.12, 0.18], (v) => `スキルダメージ+${Math.round(v * 100)}%`],
-    ['explosionDmg', '爆破', '💣', [0.12, 0.2, 0.32], (v) => `爆発ダメージ+${Math.round(v * 100)}%`],
-    ['shieldDmg', '盾砕き', '🔨', [0.25, 0.4, 0.6], (v) => `シールドへのダメージ+${Math.round(v * 100)}%`],
-    ['spread', '精密', '📐', [-0.1, -0.17, -0.25], (v) => `弾の拡散${Math.round(v * 100)}%`],
-    ['recoil', '安定', '🧘', [-0.12, -0.2, -0.3], (v) => `反動${Math.round(v * 100)}%`],
-    ['jumpPower', '跳躍', '🦘', [0.08, 0.14, 0.2], (v) => `ジャンプ力+${Math.round(v * 100)}%`],
-    ['grappleCd', '鉤縄習熟', '⚓', [0.12, 0.2, 0.3], (v) => `グラップルのクールタイム-${Math.round(v * 100)}%`],
-    ['elemChance', '異常親和', '☣️', [0.05, 0.08, 0.12], (v) => `全攻撃に${Math.round(v * 100)}%で状態異常を付与（武器の状態異常／なければランダム）`],
-    ['pickupRange', '磁力', '🧲', [2, 3.5, 5], (v) => `コイン・回復の取得範囲+${v}m`],
-    ['bossDmg', '英雄', '👑', [0.1, 0.18, 0.28], (v) => `ボスへのダメージ+${Math.round(v * 100)}%`],
-    ['range', '射程', '📏', [0.15, 0.25, 0.4], (v) => `有効射程+${Math.round(v * 100)}%`],
-    ['meleeDmg', '剛腕', '👊', [0.3, 0.5, 0.8], (v) => `近接ダメージ+${Math.round(v * 100)}%`],
-    ['slideBoost', '滑走', '🛷', [0.15, 0.25, 0.4], (v) => `スライディング速度+${Math.round(v * 100)}%`],
-    ['grenadeDmg', '擲弾兵', '🧨', [0.15, 0.25, 0.4], (v) => `投擲物ダメージ+${Math.round(v * 100)}%`],
-    ['adsSpeed', '早撃ち', '👁️', [0.15, 0.25, 0.35], (v) => `ADS速度+${Math.round(v * 100)}%`],
+    ['dmg', '火力強化', '💪', [0.08, 0.14, 0.22], (v) => `与ダメ+${Math.round(v * 100)}%。`],
+    ['maxHp', 'HP強化', '❤️', [15, 25, 40], (v) => `最大HP+${v}。`],
+    ['fireRate', '速射', '🔁', [0.07, 0.12, 0.18], (v) => `連射速度+${Math.round(v * 100)}%。`],
+    ['reloadSpeed', '早装填', '♻️', [0.12, 0.2, 0.3], (v) => `リロード速度+${Math.round(v * 100)}%。`],
+    ['magSize', '弾倉拡張', '📦', [0.15, 0.25, 0.4], (v) => `装弾数+${Math.round(v * 100)}%。`],
+    ['moveSpeed', '俊足', '👟', [0.05, 0.09, 0.14], (v) => `移動速度+${Math.round(v * 100)}%。`],
+    ['critChance', '会心', '💢', [0.05, 0.08, 0.12], (v) => `会心率+${Math.round(v * 100)}%。`],
+    ['critMul', '会心ダメージ', '💥', [0.2, 0.35, 0.55], (v) => `会心ダメージ+${Math.round(v * 100)}%。`],
+    ['headMul', '首狩り', '🎯', [0.2, 0.35, 0.5], (v) => `ヘッドショット倍率+${Math.round(v * 100)}%。`],
+    ['armor', '鎧', '🛡️', [0.04, 0.07, 0.1], (v) => `被ダメ-${Math.round(v * 100)}%。`],
+    ['hpRegen', '再生', '💚', [0.6, 1.0, 1.6], (v) => `毎秒HP+${v}回復。`],
+    ['lifesteal', '吸血', '🩸', [0.02, 0.03, 0.045], (v) => `吸血+${(v * 100).toFixed(1)}%。`],
+    ['cdr', '瞑想', '⏳', [0.06, 0.1, 0.15], (v) => `スキルのクールタイム-${Math.round(v * 100)}%。`],
+    ['elMastery', '属性熟練', '🔮', [20, 35, 55], (v) => `属性熟練+${v}（属性反応が強くなる）。`],
+    ['coinMul', '強欲', '🪙', [0.1, 0.18, 0.28], (v) => `コイン獲得量+${Math.round(v * 100)}%。`],
+    ['skillDmg', '魔力', '🔮', [0.08, 0.12, 0.18], (v) => `スキルダメージ+${Math.round(v * 100)}%。`],
+    ['explosionDmg', '爆破', '💣', [0.12, 0.2, 0.32], (v) => `爆発ダメージ+${Math.round(v * 100)}%。`],
+    ['shieldDmg', '盾砕き', '🔨', [0.25, 0.4, 0.6], (v) => `シールドへのダメージ+${Math.round(v * 100)}%。`],
+    ['spread', '精密', '📐', [-0.1, -0.17, -0.25], (v) => `弾の拡散${Math.round(v * 100)}%。`],
+    ['recoil', '安定', '🧘', [-0.12, -0.2, -0.3], (v) => `反動${Math.round(v * 100)}%。`],
+    ['jumpPower', '跳躍', '🦘', [0.08, 0.14, 0.2], (v) => `ジャンプ力+${Math.round(v * 100)}%。`],
+    ['grappleCd', '鉤縄習熟', '⚓', [0.12, 0.2, 0.3], (v) => `グラップルのクールタイム-${Math.round(v * 100)}%。`],
+    ['elemChance', '異常親和', '☣️', [0.05, 0.08, 0.12], (v) => `全攻撃に${Math.round(v * 100)}%で状態異常を付与（武器の状態異常／なければランダム）。`],
+    ['pickupRange', '磁力', '🧲', [2, 3.5, 5], (v) => `コイン・回復の取得範囲+${v}m。`],
+    ['bossDmg', '英雄', '👑', [0.1, 0.18, 0.28], (v) => `ボスへのダメージ+${Math.round(v * 100)}%。`],
+    ['range', '射程', '📏', [0.15, 0.25, 0.4], (v) => `有効射程+${Math.round(v * 100)}%。`],
+    ['meleeDmg', '剛腕', '👊', [0.3, 0.5, 0.8], (v) => `近接ダメージ+${Math.round(v * 100)}%。`],
+    ['slideBoost', '滑走', '🛷', [0.15, 0.25, 0.4], (v) => `スライディング速度+${Math.round(v * 100)}%。`],
+    ['grenadeDmg', '擲弾兵', '🧨', [0.15, 0.25, 0.4], (v) => `投擲物ダメージ+${Math.round(v * 100)}%。`],
+    ['adsSpeed', '早撃ち', '👁️', [0.15, 0.25, 0.35], (v) => `ADS速度+${Math.round(v * 100)}%。`],
   ];
   const TIER = [['I', 'common'], ['II', 'uncommon'], ['III', 'rare']];
   for (const [k, name, icon, vals, df] of ST) {
@@ -52,25 +52,25 @@
   }
 
   // ---------- trade-offs ----------
-  add('t_glass', 'ガラスの大砲', '🏺', 'rare', 'trade', '与ダメ+40%、最大HP-30%', { mods: { dmg: 0.4, maxHpPct: -0.3 } });
-  add('t_heavy', '強打', '🔨', 'uncommon', 'trade', '与ダメ+25%、連射速度-15%', { mods: { dmg: 0.25, fireRate: -0.15 } });
-  add('t_spray', '乱射', '🌧️', 'uncommon', 'trade', '連射速度+30%、拡散+30%', { mods: { fireRate: 0.3, spread: 0.3 } });
-  add('t_jugg', '重戦車', '🐘', 'rare', 'trade', '最大HP+60、移動速度-10%', { mods: { maxHp: 60, moveSpeed: -0.1 } });
-  add('t_sprinter', '韋駄天', '⚡', 'uncommon', 'trade', '移動速度+20%、最大HP-15', { mods: { moveSpeed: 0.2, maxHp: -15 } });
-  add('t_blood', '血の契約', '🩸', 'rare', 'trade', '吸血+5%、自然再生を失う', { mods: { lifesteal: 0.05, hpRegen: -99 } });
-  add('t_bigmag', '大容量主義', '🛢️', 'uncommon', 'trade', '装弾数+80%、リロード速度-25%', { mods: { magSize: 0.8, reloadSpeed: -0.25 } });
-  add('t_quick', '早業', '🤹', 'uncommon', 'trade', 'リロード速度+50%、装弾数-20%', { mods: { reloadSpeed: 0.5, magSize: -0.2 } });
-  add('t_sniper', '狙撃の構え', '🔭', 'rare', 'trade', 'ADS中の与ダメ+30%、腰だめの拡散+40%', { mods: { adsDmg: 0.3, hipSpread: 0.4 } });
-  add('t_miser', '守銭奴', '💰', 'uncommon', 'trade', 'コイン獲得量+40%、ショップの価格+15%', { mods: { coinMul: 0.4, shopDiscount: -0.15 } });
-  add('t_gamble', '博打打ち', '🎲', 'rare', 'trade', '会心率+15%、会心ダメージ-20%', { mods: { critChance: 0.15, critMul: -0.2 } });
-  add('t_overclock', 'オーバークロック', '🔥', 'rare', 'trade', 'スキルのクールタイム-25%、最大HP-20', { mods: { cdr: 0.25, maxHp: -20 } });
-  add('t_tank', '城壁', '🏰', 'uncommon', 'trade', '被ダメ-12%、移動速度-8%', { mods: { armor: 0.12, moveSpeed: -0.08 } });
-  add('t_junkie', '興奮剤中毒', '💊', 'uncommon', 'trade', '連射速度+20%・移動速度+10%、被ダメ+10%', { mods: { fireRate: 0.2, moveSpeed: 0.1, armor: -0.1 } });
-  add('t_hollow', '空ろな器', '🫙', 'rare', 'trade', '与ダメ+20%、回復量-40%', { mods: { dmg: 0.2, healMul: -0.4 } });
-  add('t_cursed', '呪われた金貨', '🪙', 'rare', 'trade', 'コイン獲得量+60%、敵の攻撃力+15%', { mods: { coinMul: 0.6, enemyDmg: 0.15 } });
-  add('t_light', '軽装', '🪶', 'uncommon', 'trade', '移動速度+12%・ジャンプ力+15%、装弾数-15%', { mods: { moveSpeed: 0.12, jumpPower: 0.15, magSize: -0.15 } });
-  add('t_bulwark', '不動の砦', '🗿', 'rare', 'trade', '最大HP+40・被ダメ-8%、ジャンプ力-20%', { mods: { maxHp: 40, armor: 0.08, jumpPower: -0.2 } });
-  add('t_chaos', '混沌の加護', '🌀', 'epic', 'trade', '与ダメ+30%・会心率+10%、敵のHP+20%', { mods: { dmg: 0.3, critChance: 0.1, enemyHp: 0.2 } });
+  add('t_glass', 'ガラスの大砲', '🏺', 'rare', 'trade', '与ダメ+40%、最大HP-30%。', { mods: { dmg: 0.4, maxHpPct: -0.3 } });
+  add('t_heavy', '強打', '🔨', 'uncommon', 'trade', '与ダメ+25%、連射速度-15%。', { mods: { dmg: 0.25, fireRate: -0.15 } });
+  add('t_spray', '乱射', '🌧️', 'uncommon', 'trade', '連射速度+30%、拡散+30%。', { mods: { fireRate: 0.3, spread: 0.3 } });
+  add('t_jugg', '重戦車', '🐘', 'rare', 'trade', '最大HP+60、移動速度-10%。', { mods: { maxHp: 60, moveSpeed: -0.1 } });
+  add('t_sprinter', '韋駄天', '⚡', 'uncommon', 'trade', '移動速度+20%、最大HP-15。', { mods: { moveSpeed: 0.2, maxHp: -15 } });
+  add('t_blood', '血の契約', '🩸', 'rare', 'trade', '吸血+5%、自然再生を失う。', { mods: { lifesteal: 0.05, hpRegen: -99 } });
+  add('t_bigmag', '大容量主義', '🛢️', 'uncommon', 'trade', '装弾数+80%、リロード速度-25%。', { mods: { magSize: 0.8, reloadSpeed: -0.25 } });
+  add('t_quick', '早業', '🤹', 'uncommon', 'trade', 'リロード速度+50%、装弾数-20%。', { mods: { reloadSpeed: 0.5, magSize: -0.2 } });
+  add('t_sniper', '狙撃の構え', '🔭', 'rare', 'trade', 'ADS中の与ダメ+30%、腰だめの拡散+40%。', { mods: { adsDmg: 0.3, hipSpread: 0.4 } });
+  add('t_miser', '守銭奴', '💰', 'uncommon', 'trade', 'コイン獲得量+40%、ショップの価格+15%。', { mods: { coinMul: 0.4, shopDiscount: -0.15 } });
+  add('t_gamble', '博打打ち', '🎲', 'rare', 'trade', '会心率+15%、会心ダメージ-20%。', { mods: { critChance: 0.15, critMul: -0.2 } });
+  add('t_overclock', 'オーバークロック', '🔥', 'rare', 'trade', 'スキルのクールタイム-25%、最大HP-20。', { mods: { cdr: 0.25, maxHp: -20 } });
+  add('t_tank', '城壁', '🏰', 'uncommon', 'trade', '被ダメ-12%、移動速度-8%。', { mods: { armor: 0.12, moveSpeed: -0.08 } });
+  add('t_junkie', '興奮剤中毒', '💊', 'uncommon', 'trade', '連射速度+20%・移動速度+10%、被ダメ+10%。', { mods: { fireRate: 0.2, moveSpeed: 0.1, armor: -0.1 } });
+  add('t_hollow', '空ろな器', '🫙', 'rare', 'trade', '与ダメ+20%、回復量-40%。', { mods: { dmg: 0.2, healMul: -0.4 } });
+  add('t_cursed', '呪われた金貨', '🪙', 'rare', 'trade', 'コイン獲得量+60%、敵の攻撃力+15%。', { mods: { coinMul: 0.6, enemyDmg: 0.15 } });
+  add('t_light', '軽装', '🪶', 'uncommon', 'trade', '移動速度+12%・ジャンプ力+15%、装弾数-15%。', { mods: { moveSpeed: 0.12, jumpPower: 0.15, magSize: -0.15 } });
+  add('t_bulwark', '不動の砦', '🗿', 'rare', 'trade', '最大HP+40・被ダメ-8%、ジャンプ力-20%。', { mods: { maxHp: 40, armor: 0.08, jumpPower: -0.2 } });
+  add('t_chaos', '混沌の加護', '🌀', 'epic', 'trade', '与ダメ+30%・会心率+10%、敵のHP+20%。', { mods: { dmg: 0.3, critChance: 0.1, enemyHp: 0.2 } });
 
   // ---------- helpers for mechanic buffs ----------
   const sc = (v) => (C ? C.scale(v) : v);
@@ -121,7 +121,7 @@
   });
   add('h_first', '先制の一撃', '🗡️', 'uncommon', 'offense', 'HP満タンの敵へのダメージ+40%。', { hooks: { preHit(c) { if (c.e.hp >= c.e.maxHp && c.e.shield <= 0) c.bonus += 0.4; } } });
   add('h_low', '処刑人', '⚰️', 'rare', 'offense', 'HP30%以下の敵へのダメージ+35%。', { hooks: { preHit(c) { if (c.e.hp < c.e.maxHp * 0.3) c.bonus += 0.35; } } });
-  add('h_execute', '慈悲なき刃', '💀', 'legendary', 'offense', 'HP12%以下の通常の敵を即死させる。', { hooks: { preHit(c) { if (!c.e.boss && c.e.hp < c.e.maxHp * 0.12) c.execute = true; } } });
+  add('h_execute', '慈悲なき刃', '💀', 'legendary', 'offense', 'HP12%以下の敵（ボス以外）を即死させる。', { hooks: { preHit(c) { if (!c.e.boss && c.e.hp < c.e.maxHp * 0.12) c.execute = true; } } });
   add('h_synergy', '相乗効果', '🌈', 'rare', 'element', '敵の状態異常1種につき与ダメ+10%。', { hooks: { preHit(c) { c.bonus += 0.1 * C.statusCount(c.e); } } });
   add('h_inferno', '業火', '🔥', 'uncommon', 'element', '炎上ダメージ+60%。', { mods: { burnDmg: 0.6 }, max: 3 });
   add('h_shatter', '砕氷', '🧊', 'rare', 'element', '凍結中の敵へのダメージ+50%。', { hooks: { preHit(c) { if (c.e.st && c.e.st.frozen > 0) c.bonus += 0.5; } } });
@@ -131,7 +131,7 @@
   add('h_critheal', '会心の癒し', '💖', 'uncommon', 'defense', '会心時にHP+2。', { max: 3, hooks: { onHit(c, n) { if (c.crit && !c.proc) C.heal(2 * n); } } });
   add('h_critcd', '冴え', '💫', 'rare', 'skill', '会心時、スキルのクールタイム-0.3秒。', { hooks: { onHit(c) { if (c.crit && !c.proc) C.cdReduce(0.3); } } });
   add('h_hsammo', '精密射撃', '🎯', 'uncommon', 'offense', 'ヘッドショット時30%で弾を1発返却。', { hooks: { onHit(c) { if (c.head && isWeapon(c) && Math.random() < 0.3) C.refillN(1); } } });
-  add('h_concuss', '脳震盪', '😵', 'rare', 'offense', 'ヘッドショットで敵を0.5秒スタン（3秒に1回/敵）。', { hooks: { onHit(c) { if (c.head && !c.proc && !c.e.boss && (c.e._concT || 0) < G.game.time) { c.e._concT = G.game.time + 3; C.stun(c.e, 0.5); } } } });
+  add('h_concuss', '脳震盪', '😵', 'rare', 'offense', 'ヘッドショットで敵を0.5秒スタン（同じ敵には3秒に1回・ボス無効）。', { hooks: { onHit(c) { if (c.head && !c.proc && !c.e.boss && (c.e._concT || 0) < G.game.time) { c.e._concT = G.game.time + 3; C.stun(c.e, 0.5); } } } });
   add('h_close', '近接戦闘', '👊', 'common', 'offense', '8m以内の敵へのダメージ+20%。', { max: 3, hooks: { preHit(c, n) { if (c.dist < 8) c.bonus += 0.2 * n; } } });
   add('h_long', '遠射', '🔭', 'common', 'offense', '25m以上離れた敵へのダメージ+25%。', { max: 3, hooks: { preHit(c, n) { if (c.dist > 25) c.bonus += 0.25 * n; } } });
   add('h_ads', '集中射撃', '👁️', 'uncommon', 'offense', 'ADS中の与ダメ+15%。', { max: 3, mods: { adsDmg: 0.15 } });
@@ -164,10 +164,10 @@
   add('m_bunny', '慣性の達人', '🐇', 'uncommon', 'mobility', '着地時の減速がなくなり、空中制御+60%。', { mods: { airControl: 0.6 }, flag: true });
   add('m_slidereload', '滑りながら装填', '♻️', 'uncommon', 'mobility', 'スライディング開始時、リロード中なら即座に完了する。', { hooks: { onSlide() { C.finishReload(); } } });
   add('m_slideshield', '滑走の盾', '🛡️', 'uncommon', 'defense', 'スライディング中の被ダメ-50%。', { hooks: { preDamaged(c) { if (P.sliding) c.red += 0.5; } } });
-  add('m_landshock', '着地衝撃', '💥', 'uncommon', 'mobility', '高所（落下速度大）から着地すると周囲に衝撃波。', { hooks: { onLand(c) { if (c.speed > 13) C.explode(P.pos.clone().setY(P.pos.y + 0.3), 4.5, sc(25) + c.speed * 2, { src: 'buff', proc: true, color: 0xd0b080, small: true, knock: 8 }); } } });
+  add('m_landshock', '着地衝撃', '💥', 'uncommon', 'mobility', '高い所から着地すると、周囲4.5mに衝撃波（ダメージ＋ノックバック）。', { hooks: { onLand(c) { if (c.speed > 13) C.explode(P.pos.clone().setY(P.pos.y + 0.3), 4.5, sc(25) + c.speed * 2, { src: 'buff', proc: true, color: 0xd0b080, small: true, knock: 8 }); } } });
   add('m_feather', '羽毛の加護', '🪶', 'common', 'mobility', '奈落への落下ダメージ無効、空中制御+30%。', { mods: { airControl: 0.3 }, flag: true });
   add('m_grapdmg', '鉤縄の一撃', '⚓', 'rare', 'mobility', 'グラップル中と解除後2秒間、与ダメ+30%。', { hooks: { preHit(c) { if (P.grapple.state === 'attached' || G.game.time - P.grapple.endT < 2) c.bonus += 0.3; } } });
-  add('m_grapenemy', '獲物の鉤爪', '🪝', 'epic', 'mobility', '敵にグラップル可能。命中した敵を引き寄せてダメージ＋スタン。', { flag: true });
+  add('m_grapenemy', '獲物の鉤爪', '🪝', 'epic', 'mobility', '敵にグラップル可能（ボス以外）。命中した敵を引き寄せてダメージ＋スタン。', { flag: true });
   add('m_graprange', '長鎖', '⛓️', 'common', 'mobility', 'グラップル射程+15m。', { mods: { grappleRange: 15 }, max: 2 });
   // ---- grapple (its cooldown is 15 s by default, so these matter) ----
   add('g_oil', '鉤縄の油', '🛢️', 'uncommon', 'mobility', 'グラップルのクールタイム-25%。', { mods: { grappleCd: 0.25 }, max: 3 });
@@ -203,7 +203,7 @@
   add('d_blast', '爆風耐性', '💣', 'common', 'defense', '爆発・範囲攻撃の被ダメ-50%。', { hooks: { preDamaged(c) { if (c.src === 'explosion' || c.src === 'aoe') c.red += 0.5; } } });
   add('d_laststand', '最後の抵抗', '⚔️', 'rare', 'defense', 'HP25%以下で被ダメ-35%。', { hooks: { preDamaged(c) { if (P.hp < P.stats.maxHp * 0.25) c.red += 0.35; } } });
   add('d_phoenix', '不死鳥', '🐦', 'mythic', 'defense', '周回中1回だけ、死亡時にHP全快で復活し周囲に大爆発を起こす。', { flag: true });
-  add('d_vampaura', '吸血の霧', '🌫️', 'epic', 'defense', '周囲6mの敵から毎秒、吸血で生命力を奪う。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.5; let tot = 0; for (const e of C.inRadius(P.pos, 6)) { C.damageEnemy(e, sc(4) * n, { src: 'buff', proc: true, silent: true }); tot += Math.max(1.2, G.player.stats.maxHp * 0.003); } if (tot) C.leech(tot * n); } } });
+  add('d_vampaura', '吸血の霧', '🌫️', 'epic', 'defense', '周囲6mの敵に0.5秒ごとにダメージを与え、範囲内の敵の数に応じてHPを回復する。', { hooks: { tick(dt, n, s) { s.t = (s.t || 0) - dt; if (s.t > 0) return; s.t = 0.5; let tot = 0; for (const e of C.inRadius(P.pos, 6)) { C.damageEnemy(e, sc(4) * n, { src: 'buff', proc: true, silent: true }); tot += Math.max(1.2, G.player.stats.maxHp * 0.003); } if (tot) C.leech(tot * n); } } });
   add('d_iron', '鉄の皮膚', '🪖', 'legendary', 'defense', '1回の被ダメが最大HPの25%を超えなくなる。', { flag: true });
   add('d_cleanse', '浄化の加護', '✨', 'uncommon', 'defense', '状態異常の持続時間-60%。', { flag: true });
 
@@ -214,7 +214,7 @@
   add('e_reroll', '運命の再配', '🎲', 'uncommon', 'economy', '加護を選ぶたびに、無料リロールが2回になる（通常1回）。', { flag: true, max: 1 });
   add('e_luck', '幸運', '🍀', 'uncommon', 'economy', '高レアリティの加護・商品が出やすくなる。', { mods: { luck: 0.35 }, max: 3 });
   add('e_treasure', '宝探し', '🗺️', 'uncommon', 'economy', '各エリアに宝箱が1つ追加される。', { mods: { extraChests: 1 }, max: 3 });
-  add('e_chestbonus', '宝箱の主', '📦', 'common', 'economy', '宝箱から得られるコイン+50%、中身も高レアリティになりやすい（宝箱のみ・幸運+0.5相当）。', { mods: { chestBonus: 0.5 }, max: 3 });
+  add('e_chestbonus', '宝箱の主', '📦', 'common', 'economy', '宝箱から得られるコイン+50%、宝箱の中身が高レアリティになりやすい。', { mods: { chestBonus: 0.5 }, max: 3 });
   add('e_speedrun', '速攻', '⏱️', 'uncommon', 'economy', '速攻クリアボーナスが2倍。', { flag: true });
   add('e_flawless', '無傷の誇り', '🏅', 'uncommon', 'economy', '無傷クリアボーナスが2倍、無傷クリア毎に最大HP+3。', { hooks: { onAreaClear(c) { if (c.flawless) { P.permMaxHp += 3; P.recalc(); } } } });
   add('e_free', '常連客', '🎁', 'epic', 'economy', 'ショップの商品が1つ無料になる（エリアごとに1回・リロールでは増えない）。', { flag: true });
@@ -285,7 +285,7 @@
   add('o_opening', '開幕の号砲', '📯', 'uncommon', 'offense', 'エリア開始から10秒間、与ダメ+50%・連射速度+25%。', { hooks: { onAreaStart() { C.temp('o_opening', 10, { dmg: 0.5, fireRate: 0.25 }, '📯'); } } });
   add('o_closer', '幕引き', '🎬', 'rare', 'offense', '残り敵が3体以下になると与ダメ+40%。', { hooks: { preHit(c) { if (G.enemies.aliveCount() <= 3) c.bonus += 0.4; } } });
   add('o_bloodlust', '血の渇望', '🧛', 'rare', 'defense', '状態異常が1つでも付いた敵への与ダメの4%を回復。', { hooks: { onHit(c) { if (c.e.st && C.statusCount(c.e) > 0 && !c.proc) C.heal(c.dmg * 0.04); } } });
-  add('o_meleeshock', '雷拳', '🤜', 'uncommon', 'offense', '近接攻撃が雷撃を伴い、周囲に連鎖する。', { hooks: { onHit(c) { if (c.src === 'melee') C.chain(c.e, 3, c.dmg * 0.5, 8, { src: 'buff', proc: true, elem: 'shock' }); } } });
+  add('o_meleeshock', '雷拳', '🤜', 'uncommon', 'offense', '近接攻撃の命中時、近くの敵3体へ雷撃が連鎖する（ダメージ50%）。', { hooks: { onHit(c) { if (c.src === 'melee') C.chain(c.e, 3, c.dmg * 0.5, 8, { src: 'buff', proc: true, elem: 'shock' }); } } });
   add('o_meleecd', '格闘術', '🥋', 'uncommon', 'melee', '近接攻撃の間隔-15%、近接ダメージ+15%。', { mods: { meleeDmg: 0.15, meleeCd: 0.15 } });
   add('o_grenadecd', '投擲の名手', '🎯', 'uncommon', 'offense', '投擲物の飛距離+35%、ダメージ+20%。', { mods: { grenadeDmg: 0.2, throwPow: 0.35 } });
   add('o_scavenger', '漁り屋', '🦝', 'common', 'economy', '敵が稀に回復の雫を落とすようになる（+8%）。', { mods: { healDrop: 0.08 }, max: 3 });
@@ -368,7 +368,7 @@
   relic('r_hourglass', '時の砂時計', '⌛', 6000, 'グラップルで張り付いている間、周囲の時間が40%遅くなる。', { rarity: 'mythic', hooks: { tick() { if (P.grapple && P.grapple.state === 'attached') { G.game.chronoT = Math.max(G.game.chronoT || 0, 0.12); G.game.chronoSlow = 0.4; } } } });
   relic('r_thunder', '雷槌の欠片', '🌩️', 5000, 'パイルドライバー着地時、周囲18mの敵6体に落雷（パイルドライバーの威力の60%）。', { hooks: { onPile(c) { const es = G.enemies.inRadius(c.pos, 18).filter((e) => !e.ally).slice(0, 6); for (const e of es) { const p = e.centerPos(); G.fx.lightning(p.clone().add(V(0, 14, 0)), p, 0xd0e0ff); C.damageEnemy(e, c.dmg * 0.6, { src: 'skill', proc: true, elem: 'shock', pos: p }); } if (es.length) G.sfx.zap(c.pos); } } });
   relic('r_crown', '亡者の王冠', '👑', 4500, '敵を倒すと25%でHP+4%回復し、スキルのクールタイムが1秒縮む。', { hooks: { onKill() { if (Math.random() < 0.25) { C.heal(P.stats.maxHp * 0.04, true); C.cdReduce(1); } } } });
-  relic('r_mirror', '鏡の盾', '🪞', 4000, '被ダメ-10%。受けたダメージの60%を攻撃者へ跳ね返す。', { mods: { armor: 0.1 }, hooks: { onDamaged(c) { if (c.attacker && c.attacker.alive && !c.attacker.boss) C.damageEnemy(c.attacker, c.raw * 0.6, { src: 'buff', proc: true }); } } });
+  relic('r_mirror', '鏡の盾', '🪞', 4000, '被ダメ-10%。受けたダメージの60%を攻撃者へ跳ね返す（ボスには跳ね返らない）。', { mods: { armor: 0.1 }, hooks: { onDamaged(c) { if (c.attacker && c.attacker.alive && !c.attacker.boss) C.damageEnemy(c.attacker, c.raw * 0.6, { src: 'buff', proc: true }); } } });
   relic('r_chalice', '血盟の杯', '🍷', 4500, 'HP50%以下の間、与ダメ+40%・与ダメの3%を回復。', { hooks: { preHit(c) { if (P.hp < P.stats.maxHp * 0.5) c.bonus += 0.4; }, onHit(c) { if (P.hp < P.stats.maxHp * 0.5 && !c.proc) C.heal(c.dmg * 0.03, true); } } });
   relic('r_compass', '異変の羅針盤', '🧭', 3500, '異変の起きているエリアでは与ダメ+20%。異変エリアのクリア時にコイン+（300＋エリア×25）。', { hooks: { preHit(c) { if (G.Depth.cur && G.Depth.cur.list.length) c.bonus += 0.2; }, onAreaClear() { if (G.Depth.cur && G.Depth.cur.list.length) C.coins(300 + G.game.area * 25, null, '羅針盤'); } } });
   relic('r_gravity', '重力核', '🕳️', 5500, 'パイルドライバーが落下中に周囲の敵を吸い寄せ、ダメージ+50%。', { mods: { pileVacuum: 1, pileDmg: 0.5 } });
@@ -385,9 +385,9 @@
 
   // ---------- pile driver upgrades (innate ability that grows with you) ----------
   const PT = [['I', 'common'], ['II', 'uncommon'], ['III', 'rare']];
-  [0.3, 0.5, 0.8].forEach((v, i) => add('p_dmg' + (i + 1), '剛拳 ' + PT[i][0], '🔨', PT[i][1], 'pile', `パイルドライバーのダメージ+${Math.round(v * 100)}%`, { mods: { pileDmg: v }, max: 4 }));
-  [0.2, 0.3, 0.45].forEach((v, i) => add('p_rad' + (i + 1), '衝撃波拡大 ' + PT[i][0], '🌊', PT[i][1], 'pile', `パイルドライバーの範囲+${Math.round(v * 100)}%`, { mods: { pileRadius: v }, max: 4 }));
-  [0.15, 0.25].forEach((v, i) => add('p_cd' + (i + 1), '連撃の構え ' + PT[i][0], '⏳', PT[i + 1][1], 'pile', `パイルドライバーのクールタイム-${Math.round(v * 100)}%`, { mods: { pileCd: v }, max: 3 }));
+  [0.3, 0.5, 0.8].forEach((v, i) => add('p_dmg' + (i + 1), '剛拳 ' + PT[i][0], '🔨', PT[i][1], 'pile', `パイルドライバーのダメージ+${Math.round(v * 100)}%。`, { mods: { pileDmg: v }, max: 4 }));
+  [0.2, 0.3, 0.45].forEach((v, i) => add('p_rad' + (i + 1), '衝撃波拡大 ' + PT[i][0], '🌊', PT[i][1], 'pile', `パイルドライバーの範囲+${Math.round(v * 100)}%。`, { mods: { pileRadius: v }, max: 4 }));
+  [0.15, 0.25].forEach((v, i) => add('p_cd' + (i + 1), '連撃の構え ' + PT[i][0], '⏳', PT[i + 1][1], 'pile', `パイルドライバーのクールタイム-${Math.round(v * 100)}%。`, { mods: { pileCd: v }, max: 3 }));
   add('p_fast', '早詠唱', '⚡', 'uncommon', 'pile', 'パイルドライバーの詠唱時間-60%、落下速度+30%。', { mods: { pileFast: 1 } });
   add('p_fire', '灼熱の着弾', '🔥', 'rare', 'pile', '着弾点に5秒間燃える炎の亀裂を残す。', { mods: { pileFire: 1 } });
   add('p_shock', '雷撃の着弾', '⚡', 'rare', 'pile', '着弾時、範囲外の敵4体へ雷撃が連鎖する。', { mods: { pileShock: 1 } });
@@ -421,8 +421,8 @@
 
   // ---------- 技 augments: skills and ultimates get as many ways to grow as the pile driver ----------
   // (the pile driver is a skill too: skill damage, skill CD and the on-hit augments below apply to it)
-  [0.1, 0.16, 0.24].forEach((v, i) => add('sa_dmg' + (i + 1), '術式強化 ' + PT[i][0], '🔮', PT[i][1], 'skill', `スキルのダメージ+${Math.round(v * 100)}%`, { mods: { skillDmg: v }, max: 4 }));
-  [0.06, 0.1].forEach((v, i) => add('sa_cd' + (i + 1), '高速詠唱 ' + PT[i][0], '⏳', PT[i + 1][1], 'skill', `スキルのクールタイム-${Math.round(v * 100)}%`, { mods: { skillCd: v }, max: 2 }));
+  [0.1, 0.16, 0.24].forEach((v, i) => add('sa_dmg' + (i + 1), '術式強化 ' + PT[i][0], '🔮', PT[i][1], 'skill', `スキルのダメージ+${Math.round(v * 100)}%。`, { mods: { skillDmg: v }, max: 4 }));
+  [0.06, 0.1].forEach((v, i) => add('sa_cd' + (i + 1), '高速詠唱 ' + PT[i][0], '⏳', PT[i + 1][1], 'skill', `スキルのクールタイム-${Math.round(v * 100)}%。`, { mods: { skillCd: v }, max: 2 }));
   add('sa_area', '術式拡張', '⭕', 'uncommon', 'skill', '全スキルの範囲・射程+12%。', { mods: { skillRad: 0.12 }, max: 2 });
   add('sa_dur', '持続詠唱', '⌛', 'uncommon', 'skill', '全スキルの効果時間+15%。', { mods: { skillDur: 0.15 }, max: 2 });
   add('sa_charge', '多重充填', '🔋', 'rare', 'skill', 'チャージ式スキルのチャージ数+1。', { mods: { skillCharges: 1 }, max: 2 });
@@ -431,9 +431,9 @@
   add('sa_shock', '雷鳴の術式', '⚡', 'rare', 'skill', 'スキル・アルティメットの命中時、15%で近くの2体へ雷撃が連鎖する。', { mods: { techShock: 0.6 }, max: 2 });
   add('sa_stun', '衝撃の術式', '💫', 'uncommon', 'skill', 'スキル・アルティメットの命中時、15%で0.6秒スタン（ボス無効）。', { mods: { techStun: 1 } });
   add('sa_vamp', '吸命の術式', '🩸', 'rare', 'skill', 'スキル・アルティメットの与ダメの2%を吸血で回復。', { mods: { techVamp: 0.5 }, max: 3 });
-  add('sa_shield', '術式障壁', '🛡️', 'uncommon', 'skill', 'スキルを使う度に、6秒間だけ持続するシールド+12（最大120）。', { mods: { techShield: 0.6 }, max: 2 });
-  [0.12, 0.2, 0.3].forEach((v, i) => add('ua_dmg' + (i + 1), '終の一撃 ' + PT[i][0], '🌟', PT[i][1], 'ult', `アルティメットのダメージ+${Math.round(v * 100)}%`, { mods: { ultDmg: v }, max: 3 }));
-  [0.06, 0.1].forEach((v, i) => add('ua_cd' + (i + 1), '覚醒の刻 ' + PT[i][0], '⏳', PT[i + 1][1], 'ult', `アルティメットのクールタイム-${Math.round(v * 100)}%`, { mods: { ultCd: v }, max: 2 }));
+  add('sa_shield', '術式障壁', '🛡️', 'uncommon', 'skill', 'スキルを使う度に、6秒間持続するシールド+12（最大120）。', { mods: { techShield: 0.6 }, max: 2 });
+  [0.12, 0.2, 0.3].forEach((v, i) => add('ua_dmg' + (i + 1), '終の一撃 ' + PT[i][0], '🌟', PT[i][1], 'ult', `アルティメットのダメージ+${Math.round(v * 100)}%。`, { mods: { ultDmg: v }, max: 3 }));
+  [0.06, 0.1].forEach((v, i) => add('ua_cd' + (i + 1), '覚醒の刻 ' + PT[i][0], '⏳', PT[i + 1][1], 'ult', `アルティメットのクールタイム-${Math.round(v * 100)}%。`, { mods: { ultCd: v }, max: 2 }));
   add('ua_dur', '永き奇跡', '⌛', 'rare', 'ult', 'アルティメットの効果時間+15%。', { mods: { ultDur: 0.15 }, max: 2 });
   add('ua_charge', '魂の充填', '💠', 'rare', 'ult', '敵を倒す度にアルティメットのクールタイム-1秒。', { max: 3, hooks: { onKill(c, n) { C.ultReduce(1 * n); } } });
   add('ua_heal', '再起の光', '💚', 'uncommon', 'ult', 'アルティメット使用時、最大HPの12.5%を回復。', { mods: { ultHeal: 0.5 }, max: 2 });
@@ -458,7 +458,7 @@
       for (const e of G.enemies.inRadius(P.pos, 8)) if (e.alive && !e.ally) C.status(e, tgt, 3);
       G.fx.ring(P.pos.clone().setY(P.pos.y + 0.2), 8, 0xc0e8ff, 0.5); G.ui.toastSmall('🪞 反転の鎧：状態異常を跳ね返した');
     } } });
-  add('m_myth', '疾風の理', '🍃', 'mythic', 'mobility', '移動が速いほど、スキルとグラップルのクールタイムが速く減る（スプリント中は1.5倍、スライディング・グラップル中は2倍）。', { hooks: {
+  add('m_myth', '疾風の理', '🍃', 'mythic', 'mobility', 'スプリント中はスキルとグラップルのクールタイムが1.5倍、スライディング中とグラップル中は2倍の速さで減る。', { hooks: {
     tick(dt) { const g = P.grapple && P.grapple.state && P.grapple.state !== 'none'; const k = P.sliding || g ? 1 : P.sprinting ? 0.5 : 0; if (!k) return;
       for (const sk of P.skills) if (sk && !(sk.def && sk.def.ult) && sk.cd > 0) sk.cd = Math.max(0, sk.cd - dt * k);
       if (P.grappleCd > 0) P.grappleCd = Math.max(0, P.grappleCd - dt * k); } } });
@@ -507,7 +507,7 @@
     onHit(c) { if (c.src === 'melee' && !c.heavy && c.e && c.e.alive && now() - (G.weapons.guardEndT ?? -9) < 0.5) C.stun(c.e, 1); } } });
   add('k_chainheavy', '溜め返し', '🔁', 'rare', 'melee', '重撃を当てると、4秒以内の次の重撃の溜め時間-50%。', { hooks: { onMeleeHit(c) { if (c.heavy) G.weapons.fastHeavyUntil = now() + 4; } } });
   add('k_steel', '斬鉄', '⚔️', 'rare', 'melee', '近接攻撃が、前面の装甲による軽減を無視し、精鋭の「装甲」のシールドに2倍のダメージを与える。', { hooks: { preHit(c) { if (isM(c) && c.e && c.e.eliteMod && c.e.eliteMod.id === 'armored') c.shieldBonus += 1; } } });
-  add('k_weaponway', '武器の真髄', '📜', 'epic', 'melee', '持っている近接武器の種類で効果が変わる。刀剣：会心率+20%／打撃：重撃のスタン時間+100%／長柄：リーチ+1m／大鎌：与ダメの3%を吸収／ナイフ：攻撃の間隔-15%／斧：重撃の範囲+50%／格闘：近接ダメージ+30%。', { hooks: {
+  add('k_weaponway', '武器の真髄', '📜', 'epic', 'melee', '持っている近接武器の種類で効果が変わる。刀剣：会心率+20%／打撃：重撃で1.2秒スタン／長柄：リーチ+1m／大鎌：与ダメの3%を吸収／ナイフ：攻撃の間隔-15%／斧：重撃の範囲+50%／格闘：近接ダメージ+30%。', { hooks: {
     preHit(c) { if (!isM(c)) return; const k = P.melee && P.melee.def.mcat; if (k === 'blade' && Math.random() < 0.2) c.forceCrit = true; if (k === 'fist') c.bonus += 0.3; },
     onHit(c) { if (c.src !== 'melee' || c.proc || !c.e) return; const k = P.melee && P.melee.def.mcat; if (k === 'scythe') C.leech(c.dmg || 0, 0.03); if (k === 'blunt' && c.heavy && c.e.alive) C.stun(c.e, 1.2); } } });
   add('k_zanshin', '残心', '🧘', 'epic', 'melee', '近接で敵を倒すと、近接武器のガードが全回復し、2秒間被ダメ-40%。', { hooks: {

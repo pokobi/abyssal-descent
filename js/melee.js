@@ -111,9 +111,9 @@
     const out = [];
     if (d.traitDesc) out.push('✦ ' + d.traitDesc);
     if (d.el && G.Elem && G.Elem.BY[d.el]) out.push(`${G.Elem.BY[d.el].icon} ${G.Elem.BY[d.el].name}属性`);
-    if (d.elem && MELEM[d.elem]) out.push(`${MELEM[d.elem][0]} ${MELEM[d.elem][1]}付与 ${Math.round((d.elemChance || 0) * 100)}%（重撃100%）`);
+    if (d.elem && MELEM[d.elem]) out.push(`${MELEM[d.elem][0]} ${MELEM[d.elem][1]}付与 ${Math.round((d.elemChance || 0) * 100)}%`);
     if (d.shieldMul && d.shieldMul > 1) out.push(`🛡️ シールド特効 +${Math.round((d.shieldMul - 1) * 100)}%`);
-    if (d.lifesteal) out.push(`🩸 吸血 ${Math.round(d.lifesteal * 100)}%`);
+    if (d.lifesteal) out.push(`🩸 吸血 +${Math.round(d.lifesteal * 100)}%`);
     if (d.critChance) out.push(`🎯 会心率 +${Math.round(d.critChance * 100)}%`);
     if (d.headMul && d.headMul > 1.55) out.push(`💀 頭部 ×${d.headMul}`);
     return out;

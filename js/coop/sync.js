@@ -398,7 +398,7 @@
     GM.startSearch = function (it) {
       if (K.live && it && it.type === 'chest' && it.owner !== undefined && it.owner !== K.id) {
         const rp = K.players.get(it.owner);
-        if (rp && !(rp.dead && (it._deadT || 0) > 30)) { G.ui.toastSmall(`🔒 ${rp.name} の宝箱です（自分の色の宝箱を開けよう）`); G.sfx.ui('deny'); return; }
+        if (rp && !(rp.dead && (it._deadT || 0) > 30)) { G.ui.toastSmall(`🔒 ${rp.name} の宝箱です（開けられるのは自分の色の宝箱）`); G.sfx.ui('deny'); return; }
       }
       return ss.apply(GM, arguments);
     };

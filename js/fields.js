@@ -15,7 +15,7 @@
   const U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
   F.KINDS = {
     water: { name: '浅瀬', icon: '💧', tip: '浅瀬：少し遅くなる・炎上が消える・自分にも中の敵にも水属性が付く' },
-    lava: { name: '溶岩', icon: '🌋', tip: '溶岩：踏むと激しく燃え、炎属性が付く（敵は燃えないが炎属性が付く）' },
+    lava: { name: '溶岩', icon: '🌋', tip: '溶岩：踏むと激しく燃え、炎属性が付く（敵は燃えず、炎属性だけが付く）' },
     // (a blue-flame patch is a 'lava' field with blue = true: the same burning, in the ruined depths)
     moss: { name: '苔', icon: '🌿', tip: '苔：足が滑る・スライディングが伸びる' },
     ice: { name: '氷床', icon: '❄️', tip: '氷床：とても滑る・自分にも上の敵にも氷属性が付く' },
@@ -23,7 +23,7 @@
     poison: { name: '毒沼', icon: '☠️', tip: '毒沼：浸かると毒を受ける（敵も）' },
     holy: { name: '聖泉', icon: '✨', tip: '聖泉：立っている間HPが回復する（枯れるまで）' },
     oil: { name: '油溜まり', icon: '🛢️', tip: '油溜まり：炎や爆発で引火し、しばらく燃え続ける（燃えている間は炎属性が付く）' },
-    thorns: { name: '茨の茂み', icon: '🌵', tip: '茨：動くと傷つく・遅くなる（敵も傷つく）' },
+    thorns: { name: '茨の茂み', icon: '🌵', tip: '茨の茂み：動くと傷つく・遅くなる（敵も傷つく）' },
     vent: { name: '上昇気流', icon: '🌀', tip: '上昇気流：乗ると高く打ち上げられる' },
   };
   // which gimmicks each biome likes (plus a little of everything)
@@ -243,7 +243,7 @@
       const onGround = P.grounded && feet.y < f.y + 0.25 && feet.y > f.y - 0.3;
       const pin = inside(f, feet) && (f.kind === 'vent' ? feet.y < f.y + 1 && feet.y > f.y - 0.3 : onGround);
       if (pin) {
-        const tk = f.blue ? 'blue' : f.kind; if (!seen.k[tk]) { seen.k[tk] = true; if (ZEL[f.kind]) seen.k['el:' + ZEL[f.kind]] = true; G.ui.toastSmall(f.blue ? '🔵 蒼炎：踏むと激しく燃え、炎属性が付く（敵は燃えないが炎属性が付く）' : `${F.KINDS[f.kind].icon} ${F.KINDS[f.kind].tip}`); }
+        const tk = f.blue ? 'blue' : f.kind; if (!seen.k[tk]) { seen.k[tk] = true; if (ZEL[f.kind]) seen.k['el:' + ZEL[f.kind]] = true; G.ui.toastSmall(f.blue ? '🔵 蒼炎：踏むと激しく燃え、炎属性が付く（敵は燃えず、炎属性だけが付く）' : `${F.KINDS[f.kind].icon} ${F.KINDS[f.kind].tip}`); }
         switch (f.kind) {
           case 'moss': P.fieldSlip = 0.35; P.fieldSlide = 1.5; break;
           case 'ice': P.fieldSlip = 0.12; P.fieldSlide = 1.8; break;

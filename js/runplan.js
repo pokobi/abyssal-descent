@@ -6,7 +6,7 @@
 
   // fields: graveyard (outdoor night) / gate (dungeon entrance) / halls (deep multi-storey dungeon) / ruin (the ruined depths)
   R.DIFFS = {
-    easy: { name: 'イージー', en: 'EASY', icon: '🌙', col: '#7acb6a', areas: 14, mul: 0.65, segs: [['grave', 3], ['grave', 5]], depth: [0, 0], desc: '初めての方に。短めの冒険で、敵も穏やか。' },
+    easy: { name: 'イージー', en: 'EASY', icon: '🌙', col: '#7acb6a', areas: 14, mul: 0.65, segs: [['grave', 3], ['grave', 5]], depth: [0, 0], desc: '短めの冒険で、敵も穏やか。' },
     normal: { name: 'ノーマル', en: 'NORMAL', icon: '⚔️', col: '#e0c070', areas: 21, mul: 1, segs: [['grave', 3], ['gate', 5], ['halls', 7]], depth: [0, 0, 0], desc: '標準の難易度。' },
     hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 21, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
     extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#d0405a', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },

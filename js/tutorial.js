@@ -48,8 +48,8 @@
   // ch: the chapter. check(s, dt) returns progress 0..1 (or true when done); setup(s) runs when the step starts.
   const CH = ['📘 はじめに', '🏃 動き', '⚔️ 戦い', '🎒 道具と持ち物', '🌟 成長と進行'];
   const STEPS = [
-    { ch: 0, title: 'ようこそ、深淵へ', info: true,
-      body: () => ul('実際に操作しながら、基本を覚えます（5分ほど）。', 'ここでは<b>倒されません</b>。HPが減っても自動で戻ります。', pc(`${NEXT()} 次へ　${k('ホイール長押し')} この手順を飛ばす`, `${k('次へ')} で進む　${k('飛ばす')} でその手順を飛ばす（パネルのボタン）`), pc(`${k('Esc')} ポーズ（チュートリアルの終了もここから）`, `${k('⏸')} ポーズ（チュートリアルの終了もここから）`)) },
+    { ch: 0, title: '進め方', info: true,
+      body: () => ul('ここでは<b>倒されない</b>（HPは自動で戻る）', pc(`${NEXT()} 次へ　${k('ホイール長押し')} この手順を飛ばす`, `${k('次へ')} で進む　${k('飛ばす')} でその手順を飛ばす（パネルのボタン）`), pc(`${k('Esc')} ポーズ（チュートリアルの終了もここから）`, `${k('⏸')} ポーズ（チュートリアルの終了もここから）`)) },
 
     { ch: 1, title: '見回す・歩く・走る',
       body: () => ul(pc(`${k('マウス')} 見回す　${WASD()} 歩く`, `${k('画面の右側をドラッグ')} 見回す　${k('左のスティック')} 歩く`), G.save.data.settings.autoSprint ? pc(`普段は<b>自動で走る</b>（${K('sprint')} を押している間は歩き）`, '普段は<b>自動で走る</b>') : pc(`${K('sprint')} を一度押すと<b>走る</b>（止まる・撃つ・ADSまで続く）`, `${K('sprint')} で<b>走る</b>（止まる・撃つ・ADSまで続く）`)),
@@ -77,14 +77,14 @@
       goal: (s) => parts([['持ち替え', s.m], ['連撃', s.l], ['重撃', s.h], ['防御', s.gd]]),
       check: (s) => { const ms = G.weapons.ms; if (P.meleeMode) { s.m = true; if (ms && ms.ph === 'light') s.l = true; if (ms && (ms.ph === 'hwind' || ms.ph === 'hrec')) s.h = true; if (G.weapons.guarding()) s.gd = true; } return (s.m ? 0.25 : 0) + (s.l ? 0.25 : 0) + (s.h ? 0.25 : 0) + (s.gd ? 0.25 : 0); } },
     { ch: 2, title: '実戦',
-      body: () => ul('敵が現れた。倒してみよう。', '敵の頭上の<b>赤いバー</b>はHP、<b>青いバー</b>はシールド（爆発・電撃に弱い）', '床に出る<b>赤い円</b>は攻撃の予告。円の外へ'),
+      body: () => ul('敵の頭上の<b>赤いバー</b>はHP、<b>青いバー</b>はシールド（爆発・電撃に弱い）', '床に出る<b>赤い円</b>は攻撃の予告。円の外へ'),
       goal: (s) => `敵を倒す（${s.kills || 0} / ${s.spawned ? s.spawned.length || 1 : 3}）`,
       setup: (s) => { s.spawned = []; if (P.weapon) P.weapon.mag = G.weapons.stats(P.weapon).mag; for (let i = 0; i < 3; i++) { const e = GM.spawnEnemy({ near: true, noMut: true }); if (e) { e.noReward = false; s.spawned.push(e); } } G.ui.toast('⚔️ 敵が現れた！', 'warn'); },
       check: (s) => { const n = s.spawned.length; s.kills = s.spawned.filter((e) => !e.alive).length; return n ? s.kills / n : 1; } },
 
     { ch: 3, title: '漁る（亡骸・宝箱）',
       body: () => ul(pc(`亡骸や宝箱の前で ${K('interact')}：調べ始める（終わるまで見続ける）`, `亡骸や宝箱を ${k('タップ')}：調べ始める（終わるまで画面の真ん中に映す）`), '中身の画面で<b>「すべて取る」</b>：一度に回収（ドラッグで1つずつも）', '空になった亡骸・宝箱は、暗くなる'),
-      tip: () => '目の前に亡骸と宝箱を置きました。どちらからでも大丈夫です。',
+      tip: () => '目の前に亡骸と宝箱を置いた。順番は自由。',
       goal: (s) => parts([['亡骸を調べる', s.c1], ['宝箱を開ける', s.c2]]),
       setup: (s) => {
         // the fight may have ended far away: a body and a chest are put side by side in front of you, and whichever you open first is fine
@@ -95,19 +95,19 @@
       check: (s) => { if (G.Inv.corpses.some((c) => c.searched && !s.bodies0.has(c))) s.c1 = true; if (G.world.interactables.some((i) => i.type === 'chest' && i.opened && !s.chests0.has(i))) s.c2 = true; return (s.c1 ? 0.5 : 0) + (s.c2 ? 0.5 : 0); } },
     { ch: 3, title: '消耗品・投擲物',
       body: () => ul(`${K('item1')} ${K('item2')}：消耗品を使う（<b>長押し</b>で種類を選ぶ）`, `${K('grenade')}：投擲物を構える → ${k(pc('左クリック', '射撃'))} 投げる／${k(pc('右クリック', '構え'))} 転がす`, pc(`投擲物の種類は ${K('grenade')} 長押し、または ${K('cycleGrenade')}`, `投擲物の種類は ${K('grenade')} を長押し`)),
-      tip: () => '回復薬と破片手榴弾を渡しました。所持数は画面下中央。',
+      tip: () => '回復薬と手榴弾を渡した。所持数は画面下中央。',
       goal: (s) => parts([[`${G.K('item1')} で回復する`, s.a], ['投擲物を投げる', (s.thrown || 0) > 0]]),
       setup: () => { P.hp = Math.min(P.hp, P.stats.maxHp * 0.6); top('h_bandage', 2); top('h_medkit', 1); top('g_frag', 2); top('g_fire', 1); G.ui.refreshItems(); },
       check: (s) => { if (G.ItemAnim.busy()) s.a = true; return (s.a ? 0.5 : 0) + ((s.thrown || 0) > 0 ? 0.5 : 0); } },
     { ch: 3, title: 'スキル・アルティメット',
-      body: () => ul(`${k(G.input.skillKey(1))}${k(G.input.skillKey(2))}${k(G.input.skillKey(3))}：スキル（商人やイベントで手に入る）。練習用に「ダッシュ」を入れました`, `${k(G.input.skillKey(0))}：アルティメット（下中央の金色の枠）。とても強いが、再使用まで長い（100秒前後）`),
+      body: () => ul(`${k(G.input.skillKey(1))}${k(G.input.skillKey(2))}${k(G.input.skillKey(3))}：スキル（商人やイベントで手に入る）。練習用に「ダッシュ」を入れた`, `${k(G.input.skillKey(0))}：アルティメット（下中央の金色の枠）。再使用まで長い（100秒前後）`),
       tip: () => 'チュートリアルの兵士のアルティメットは「無限兵装」（15秒間、弾薬無限・連射速度+80%）。本編ではクラスごとに違う。',
       goal: (s) => parts([[`${G.input.skillKey(1)} でスキル`, s.a], [`${G.input.skillKey(0)} でアルティメット`, s.b]]),
       setup: (s) => { P.skills[1] = G.abilities.makeSlot('dash'); if (G.ui.buildAbilityRow) G.ui.buildAbilityRow(); s.ch = P.skills[1].charges; const u = P.skills[0]; if (u) u.cd = 0; },
       check: (s) => { const sk = P.skills[1], u = P.skills[0]; if (sk && (sk.cd > 0 || sk.charges < s.ch)) s.a = true; if (u && u.cd > 0) s.b = true; return (s.a ? 0.5 : 0) + (s.b ? 0.5 : 0); } },
     { ch: 3, title: '持ち物・アタッチメント',
-      body: () => ul(pc(`${K('status')} 持ち物を開く／閉じる（${k('Esc')} でも閉じる）`, `${K('status')} 持ち物を開く／画面の ${k('✕ 閉じる')} で閉じる`), pc(`<b>ドラッグ</b>で動かす　${k('R')} 回転　${k('右クリック')} メニュー（武器は長押しで捨てる）　${k('ダブルクリック')} 使う・装備`, `<b>ドラッグ</b>で動かす　<b>長押し</b>でメニュー　<b>ダブルタップ</b>で使う・装備`), '枠の外へドラッグで捨てる　<b>⇅ 整理</b>で並べ替え', '<b>レッドドット</b>を渡しました。銃の枠へドラッグ（付く場所が光る）'),
-      tip: () => '開いている間も、ゲームは止まりません。',
+      body: () => ul(pc(`${K('status')} 持ち物を開く／閉じる（${k('Esc')} でも閉じる）`, `${K('status')} 持ち物を開く／画面の ${k('✕ 閉じる')} で閉じる`), pc(`<b>ドラッグ</b>で動かす　${k('R')} 回転　${k('右クリック')} メニュー（武器は長押しで捨てる）　${k('ダブルクリック')} 使う・装備`, `<b>ドラッグ</b>で動かす　<b>長押し</b>でメニュー　<b>ダブルタップ</b>で使う・装備`), '枠の外へドラッグで捨てる　<b>⇅ 整理</b>で並べ替え', '<b>レッドドット</b>を渡した。銃の枠へドラッグ（付く場所が光る）'),
+      tip: () => '開いている間も、ゲームは止まらない。',
       goal: (s) => parts([['持ち物を開く', s.o], ['レッドドットを銃に付ける', P.weapons.some((w) => w.atts.optic === 'o_reddot')]]),
       setup: () => { if (!P.weapons.some((w) => w.atts.optic === 'o_reddot') && !P.attStash.includes('o_reddot')) { G.Inv.noAuto = true; P.attStash.push('o_reddot'); G.Inv.noAuto = false; } },
       check: (s) => { if (invOpen()) s.o = true; const att = P.weapons.some((w) => w.atts.optic === 'o_reddot'); return (s.o ? 0.4 : 0) + (att ? 0.6 : 0); } },
@@ -123,7 +123,7 @@
       body: () => ul('目の前に<b>💧水のスライム</b>（いつも水属性。反応しても消えない）',
         '銃に<b>🔥炎の属性コア</b>を付けた。撃つと水に炎で<b>沸騰</b>（1.5倍）',
         `<b>❄️冷凍手榴弾</b>を ${K('grenade')} で投げると、水に氷で<b>凍結</b>`),
-      tip: () => pc('反応の名前は、敵の上に大きな文字で出ます。種類と効果は図鑑の「属性反応」。', ''),
+      tip: () => pc('反応の名前は、敵の上に大きな文字で出る。種類と効果は図鑑の「属性反応」。', ''),
       goal: (s) => parts([['沸騰を起こす', s.boil], ['凍結を起こす', s.freeze]]),
       setup: (s) => {
         const rx = (GM.run && GM.run.rx) || {}; s.rx0 = { boil: rx.boil || 0, freeze: rx.freeze || 0 };
@@ -147,28 +147,28 @@
       },
       done: (s) => { if (s.core) { const { w, prev } = s.core; if (prev) w.atts.core = prev; else delete w.atts.core; w.ver++; if (!P.meleeMode && w === P.weapon) G.weapons.equip(true); G.ui.refreshWeapon(); } } },
     { ch: 4, title: '加護（その周回の強化）',
-      body: () => ul('エリアの<b>目標</b>を達成すると、<b>加護</b>を1つ選べる', '加護は、その周回の間ずっと続く強化。取るほど強くなる', '枠の色がレアリティ。気に入らなければ<b>リロール</b>'),
+      body: () => ul('エリアの<b>目標</b>を達成すると、<b>加護</b>を1つ選べる', '加護は、その周回の間ずっと続く強化', '枠の色がレアリティ。<b>リロール</b>で候補を引き直せる'),
       vis: (s) => tiles((s.sample || []).map((b) => [b.icon, b.name, RAR[b.rarity] || b.rarity, `var(--c-${b.rarity})`])),
-      goal: (s) => (s.opened ? '好きな加護を1つ選ぶ' : pc(`<span>${NEXT()} で加護の選択画面を開く</span>`, '<button class="tut-btn" data-a="next">加護の選択画面を開く ▶</button>')),
+      goal: (s) => (s.opened ? '加護を1つ選ぶ' : pc(`<span>${NEXT()} で加護の選択画面を開く</span>`, '<button class="tut-btn" data-a="next">加護の選択画面を開く ▶</button>')),
       setup: (s) => { s.sample = GM.rollBuffs(3); },
       check: (s) => {
         if (!s.opened && (s.tap || s.mNext || I.hit('interact') || I.pressed.Enter || I.pressed.NumpadEnter)) { // (the wheel counts when it is let go: held, it skips the step)
           nextEat(); s.opened = true;
-          GM.offerBuffs(false, { title: 'CHOOSE A BOON', sub: '練習：好きな加護を1つ選ぼう（選ぶとこの周回ずっと有効）', onPicked: () => { s.picked = true; } });
+          GM.offerBuffs(false, { title: 'CHOOSE A BOON', sub: '練習：加護を1つ選ぶ', onPicked: () => { s.picked = true; } });
         }
         return s.picked ? 1 : s.opened ? 0.5 : 0;
       } },
     { ch: 4, title: '次のエリアを選ぶ',
       body: () => ul('エリアをクリアすると、奥の壁に<b>門が3つ</b>開く。門の上の<b>看板</b>が行き先', '戦闘・商人・祠…と中身が違う。入ったら戻れない'),
       vis: () => tiles(['combat', 'shop', 'shrine'].map((id) => [AT(id).icon, AT(id).name, AT(id).hint.split('／')[0], AT(id).color])),
-      tip: () => '練習用に門を開けました（北の壁、まっすぐ約10秒）。入っても本編には進みません。',
+      tip: () => '練習用に門を開けた（北の壁、まっすぐ約10秒）。入っても本編には進まない。',
       goal: () => 'どれかの門に入る',
       setup: () => { G.Areas.openGates(false, ['combat', 'shop', 'shrine']); },
       check: (s) => (s.gate ? 1 : 0) },
     { ch: 4, title: '画面の見方', info: true, hud: true,
-      body: () => ul('光っている枠が、それぞれの表示です。', '🪔 魂の灯火：倒れた時に1つ使って、そのエリアの最初から復活') },
-    { ch: 4, title: '準備完了！', info: true, finish: true,
-      body: () => ul('<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は商人だけの<b>準備の間</b>', `進行は自動で保存。操作は ${pc(k('Esc'), k('⏸'))} →「操作方法」でいつでも確認できます`) },
+      body: () => ul('光っている枠が、それぞれの表示', '🪔 魂の灯火：倒れた時に1つ使って、そのエリアの最初から復活') },
+    { ch: 4, title: '守護者と保存', info: true, finish: true,
+      body: () => ul('<b>7エリアごとに守護者</b>（ボス）。その手前の6つ目は商人だけの<b>準備の間</b>', `進行は自動で保存。操作は ${pc(k('Esc'), k('⏸'))} →「操作方法」で確認できる`) },
   ];
   // the screen regions the "画面の見方" step outlines: [selector(s), label, where the label goes (default: below / above)]
   const HUD_MAP = [
@@ -191,7 +191,7 @@
     GM.objective = { tutorial: true, icon: '📘', text: () => `チュートリアル ${idx + 1}/${STEPS.length}`, progress: () => (idx + (st ? st.prog || 0 : 0)) / STEPS.length, done: false };
     GM.mimicT = -1;
     G.ui.setArea('TUTORIAL', '📘 チュートリアル — 訓練場');
-    G.ui.banner('TUTORIAL', '— 深淵へ降りる前に、身体を慣らそう —');
+    G.ui.banner('TUTORIAL', '— 訓練場 —');
     for (const e of G.enemies.list) if (e.alive && !e.custom) { e.noReward = true; e.alive = false; if (e.remove) e.remove(); }
     ensureEl();
     idx = 0; begin();
@@ -209,7 +209,7 @@
   };
   T.finish = function () {
     T.stop();
-    G.ui.toast('⚔️ 本編を開始します', 'good');
+    G.ui.toast('⚔️ 本編を開始', 'good');
     // the class is chosen here (the tutorial itself is always the soldier); from the title menu the slot and the difficulty are asked first
     const o = T.next || {}; T.next = null;
     const back = () => G.game.toTitle();
@@ -266,14 +266,14 @@
   function render(fresh) {
     const s = STEPS[idx];
     const goal = typeof s.goal === 'function' ? s.goal(st) : s.goal;
-    const wait = !s.info && st.prog >= 1 && invOpen() ? '<span class="tut-wait">閉じると次へ進みます</span>' : '';
+    const wait = !s.info && st.prog >= 1 && invOpen() ? '<span class="tut-wait">閉じると次へ進む</span>' : '';
     const pct = Math.round((st.prog || 0) * 100);
     const tip = s.tip ? s.tip() : '', phone = M();
     const foot = s.info
       ? (phone ? `<div class="tut-foot"><button class="tut-btn" data-a="next">${s.finish ? '本編へ ▶' : '次へ ▶'}</button></div>` : `<div class="tut-foot"><span>${NEXT()} ${s.finish ? '本編へ' : '次へ'}</span></div>`)
       : `<div class="tut-goal">${goal}${wait}</div><div class="tut-bar"><div style="width:${pct}%"></div></div>`
-        + (phone ? '<div class="tut-foot"><span>やってみよう</span><button class="tut-btn sub" data-a="skip">飛ばす ▶</button></div>'
-          : `<div class="tut-foot"><span>やってみよう</span><span class="tut-skip" style="--p:${Math.round(Math.min(1, (st.holdT || 0) / SKIP_HOLD) * 100)}%">${k('ホイール長押し')} 飛ばす</span></div>`);
+        + (phone ? '<div class="tut-foot"><span></span><button class="tut-btn sub" data-a="skip">飛ばす ▶</button></div>'
+          : `<div class="tut-foot"><span></span><span class="tut-skip" style="--p:${Math.round(Math.min(1, (st.holdT || 0) / SKIP_HOLD) * 100)}%">${k('ホイール長押し')} 飛ばす</span></div>`);
     const html = `<div class="tut-h"><span>${CH[s.ch]}</span><b>${idx + 1} / ${STEPS.length}</b></div>
       <div class="tut-t">${s.title}</div><div class="tut-b">${s.body()}</div>${s.vis ? s.vis(st) : ''}${tip ? `<div class="tut-tip">💡 ${tip}</div>` : ''}
       ${foot}`;
@@ -283,7 +283,7 @@
     if (s.hud) showMap(); else hideMap();
   }
 
-  T.onGate = function (ex) { if (st && !st.gate) { st.gate = ex.type || 'combat'; G.ui.toastSmall('🚪 本番ならここで次のエリアへ（練習なので進みません）'); } };
+  T.onGate = function (ex) { if (st && !st.gate) { st.gate = ex.type || 'combat'; G.ui.toastSmall('🚪 練習なので次のエリアへは進まない'); } };
   T.update = function (dt) {
     if (!T.active || !st) return;
     const s = STEPS[idx];
@@ -292,7 +292,7 @@
     if (st.prevGround && !P.grounded && P.vel.y > 2) st.jumps++;
     st.prevGround = P.grounded;
     // the tutorial is a safe place
-    if (P.hp < P.stats.maxHp * 0.35) { P.hp = P.stats.maxHp * 0.7; G.ui.toastSmall('📘 チュートリアル中なのでHPを回復しました'); }
+    if (P.hp < P.stats.maxHp * 0.35) { P.hp = P.stats.maxHp * 0.7; G.ui.toastSmall('📘 HPを回復した（チュートリアル中）'); }
     for (const k2 in P.st) if (P.st[k2] > 4) P.st[k2] = 4;
     if (I.pressed.Backspace) { delete I.pressed.Backspace; return next(true); }
     if (st.mSkip && !s.info) return next(true);

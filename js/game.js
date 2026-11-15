@@ -790,7 +790,7 @@
     GM.route = []; GM.rewardPending = null;
     GM.enterArea(1, 'combat');
     if (G.Warm && !GM._uiWarmed) { GM._uiWarmed = true; G.Warm.ui(); }
-    setTimeout(() => { G.ui.itemCard(G.ITEM_BY_ID.h_bandage, `[${G.K('item1')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.h_medkit, `[${G.K('item2')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.g_frag, `[${G.K('grenade')} で構え→クリックで投擲]`, { noBanner: true }); G.ui.toastSmall('💡 Tab で持ち物・装備・ステータスをまとめて確認できます'); }, 3200);
+    setTimeout(() => { G.ui.itemCard(G.ITEM_BY_ID.h_bandage, `[${G.K('item1')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.h_medkit, `[${G.K('item2')} で使用]`, { noBanner: true }); G.ui.itemCard(G.ITEM_BY_ID.g_frag, `[${G.K('grenade')} で構え→クリックで投擲]`, { noBanner: true }); G.ui.toastSmall(`💡 ${G.K('status')}：持ち物・装備・ステータス`); }, 3200);
   };
   // ---------------- attachments: stash & moving between weapons ----------------
   GM.stashAtts = function (w) { if (!w) return; for (const sl in w.atts) if (w.atts[sl]) P.attStash.push(w.atts[sl]); w.atts = {}; w.ver++; };
@@ -1497,7 +1497,7 @@
     const S = GM.shop;
     if (!GM.areaCleared || P.dead || !S || !S.healPos || S.healUsed || P.hp >= P.stats.maxHp * 0.5) return;
     GM.healHint = true;
-    G.ui.toast(`💚 HPが半分を切っています — 癒しの水盆（${G.Areas.miniHealCost()}🪙）で回復できます`, 'good');
+    G.ui.toast(`💚 HPが半分を切っている — 癒しの水盆（${G.Areas.miniHealCost()}🪙）で回復できる`, 'good');
     G.sfx.ui('rare');
   };
   GM.clearArea = clearArea;
@@ -2069,7 +2069,7 @@
       G.ui.showInteract({ key: 'sell' + coins, icon: '⚖️', name: '買取屋', rc: '#e0c070', cat: `持ち物を売る（買値の${Math.round(G.Pawn.RATE * 100)}%）`, desc: '武器・近接武器・アタッチメント・部品・防具・消耗品・投擲物・スキル・金品を売却できる。', action: '売る' });
     } else if (best.type === 'reroll') {
       const cost = GM.rerollCost();
-      G.ui.showInteract({ key: 'reroll' + coins, icon: '🎲', name: '運命の祭壇', cat: 'ショップの品揃えを入れ替える', desc: '売れ残った商品を全て新しいものに入れ替えます。使う度に価格が上がります。', price: cost, afford: coins >= cost, action: 'リロール' });
+      G.ui.showInteract({ key: 'reroll' + coins, icon: '🎲', name: '運命の祭壇', cat: 'ショップの品揃えを入れ替える', desc: '売れ残った商品を全て新しいものに入れ替える。使う度に価格が上がる。', price: cost, afford: coins >= cost, action: 'リロール' });
     } else if (best.type === 'fountain') {
       const cost = GM.fountainCost();
       if (P.hp >= P.stats.maxHp) { const bc = GM.blessCost(); G.ui.showInteract({ key: 'bless' + coins + (GM.run.blessN || 0), icon: '💖', name: '泉の祝福', cat: '最大HP+12（永続・何度でも）', desc: `HPは満タン。祝福を受けると最大HPが永続的に増える（現在 ${P.stats.maxHp}・購入${GM.run.blessN || 0}回）`, price: bc, afford: coins >= bc, action: '祝福' }); }

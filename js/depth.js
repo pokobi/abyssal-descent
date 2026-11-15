@@ -15,8 +15,8 @@
   // Each mutation changes how a foe behaves. Shown as icons on the HP bar and as a coloured aura.
   D.MUTS = [
     { id: 'blink', name: '瞬身', icon: '🌀', col: 0x60a0ff, desc: '被弾すると一定確率でプレイヤーの近くへ瞬間移動する。' },
-    { id: 'warden', name: '守護', icon: '🛡️', col: 0x80d0ff, desc: '周囲の仲間にシールドを張り続ける。最優先で倒せ。' },
-    { id: 'volatile', name: '爆裂', icon: '💥', col: 0xff7020, desc: '倒されると少し遅れて爆発する。離れて倒せ。' },
+    { id: 'warden', name: '守護', icon: '🛡️', col: 0x80d0ff, desc: '周囲の仲間にシールドを張り続ける。' },
+    { id: 'volatile', name: '爆裂', icon: '💥', col: 0xff7020, desc: '倒されると少し遅れて爆発する。' },
     { id: 'undying', name: '不屈', icon: '♻️', col: 0xe0e0a0, desc: '一度だけHP40%で蘇る。' },
     { id: 'haste', name: '疾風', icon: '💨', col: 0x80ffb0, desc: '自分と周囲の仲間の移動速度を上げる。' },
     { id: 'leech', name: '吸魂', icon: '🩸', col: 0xc01030, desc: '攻撃を当てると少し回復する。' },
@@ -209,8 +209,8 @@
   // ---------------------------------------------------------------- anomalies
   D.ANOMS = [
     { id: 'darkness', name: '暗黒', icon: '🌑', desc: '光が奪われる。手元の灯りだけが頼り。' },
-    { id: 'meteor', name: '隕石雨', icon: '☄️', desc: '頭上から火球が降り注ぐ。赤い円から離れろ。' },
-    { id: 'stalker', name: '追跡者', icon: '👁️‍🗨️', desc: 'しばらくすると倒せない追跡者が現れ、ゆっくり追ってくる。早くエリアを片付けろ。' },
+    { id: 'meteor', name: '隕石雨', icon: '☄️', desc: '頭上から火球が降り注ぐ。落ちる所に赤い円が出る。' },
+    { id: 'stalker', name: '追跡者', icon: '👁️‍🗨️', desc: 'しばらくすると倒せない追跡者が現れ、ゆっくり追ってくる。エリアを片付けると消える。' },
     { id: 'miasma', name: '瘴気', icon: '☁️', desc: '毒の霧が漂い、プレイヤーに寄ってくる。中にいるとHPが削れる。' },
   ];
   D.ANOM_BY_ID = Object.fromEntries(D.ANOMS.map((a) => [a.id, a]));
@@ -337,7 +337,7 @@
   // codex entries (mutations & anomalies are "discovered" when first met)
   D.CODEX = [
     { id: 'mut_pileres', name: '衝撃耐性 Ⅰ〜Ⅲ', icon: '🪨', rarity: 'epic', desc: 'パイルドライバーの衝撃を受け流す。Ⅰ: -30% / Ⅱ: -55% / Ⅲ: -75%。\n（深層で現れ、深くなるほど高レベルが出る。地面から2m以上浮いている飛行型も衝撃波が半減する）', cat: '耐性' },
-    ...D.MUTS.map((m) => ({ id: 'mut_' + m.id, name: '変異: ' + m.name, icon: m.icon, rarity: 'epic', desc: m.desc + '\n（深層で、深く潜るほど多くの敵に付く。さらに深いと2つ重なることも）', cat: '変異' })),
+    ...D.MUTS.map((m) => ({ id: 'mut_' + m.id, name: '変異: ' + m.name, icon: m.icon, rarity: 'epic', desc: m.desc + '\n（深層で、深く潜るほど多くの敵に付く。さらに深いと複数重なることも）', cat: '変異' })),
     ...D.ANOMS.map((a) => ({ id: 'anom_' + a.id, name: '異変: ' + a.name, icon: a.icon, rarity: 'legendary', desc: a.desc + '\n（深層の戦闘エリアで発生することがある）', cat: '異変' })),
   ];
 })();

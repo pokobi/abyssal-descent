@@ -673,16 +673,79 @@
   UI.showHud = function (on) { UI.el.hud.classList.toggle('hidden', !on); };
   UI.statusOverlay = function (on, force, compact) {
     const o = UI.el.statusOv;
-    if (!on) { o.classList.add('hidden'); if (G.StatusUI) G.StatusUI.unmount(); return; }
+    if (!on) { if (!o._parked) o.classList.add('hidden'); if (G.StatusUI) G.StatusUI.unmount(); return; }
     // holding Tab auto-repeats keydown: only build the sheet once per press, otherwise it keeps jumping back to the top
-    if (!o.classList.contains('hidden') && !force) return;
+    if (!o.classList.contains('hidden') && !o._parked && !force) return;
+    if (o._inv) { o._inv = false; o._h = null; unplace(o); } // (the inventory's short sheet is replaced: the next inventory opening builds it again)
     const keep = o.scrollTop;
-    o.classList.remove('hidden');
+    unpark(o); o.classList.remove('hidden');
     o.innerHTML = UI.statusHTML(compact);
     o.scrollTop = force ? keep : 0;
     if (G.StatusUI) G.StatusUI.mount(o);
   };
-  UI.statusOpen = () => !UI.el.statusOv.classList.contains('hidden');
+  UI.statusOpen = () => !UI.el.statusOv.classList.contains('hidden') && !UI.el.statusOv._parked;
+  // The inventory's status column (invui.js) lives in the same overlay. It is patched in place (UI.morph: only what changed is
+  // rebuilt), and while the inventory is closed - or shows a chest - it is parked instead of hidden: invisible, its contents skipped
+  // (content-visibility) so the closing and opening of the inventory neither restyle nor lay it out again. Unparking replays its
+  // pop-in, as showing it did.
+  const PARK = [['display', 'block', 'important'], ['visibility', 'hidden', ''], ['content-visibility', 'hidden', ''], ['animation', 'none', '']];
+  const POS = ['left', 'top', 'width', 'height', 'right', 'bottom'];
+  function park(o) { if (o._parked) return; o._parked = true; for (const [k, v, p] of PARK) o.style.setProperty(k, v, p); }
+  function unpark(o) { if (!o._parked) return; o._parked = false; for (const [k] of PARK) o.style.removeProperty(k); }
+  function unplace(o) { if (!o._pos) return; o._pos = null; for (const k of POS) o.style.removeProperty(k); }
+  UI.statusSheet = function (on) {
+    const o = UI.el.statusOv;
+    if (!on) { if (o._inv && !o.classList.contains('hidden')) park(o); else if (!o._parked) o.classList.add('hidden'); return; }
+    if (!o._st) { o._st = 1; o.addEventListener('scroll', () => { o._top = o.scrollTop; }, { passive: true }); }
+    if (!o._inv) { o._inv = true; o._h = null; o.textContent = ''; o._top = 0; }
+    const html = UI.statusHTML(true), off = o._parked || o.classList.contains('hidden');
+    if (o._h !== html) { UI.morph(o, html); o._h = html; }
+    unpark(o); o.classList.remove('hidden');
+    if (off && o._top) o.scrollTop = 0; // (every opening starts at the top of the sheet, as before)
+  };
+  // where the status column sits over the inventory's left cell (only written when it moved)
+  UI.statusPlace = function (r) {
+    const o = UI.el.statusOv, k = r.left + ',' + r.top + ',' + r.width + ',' + r.height;
+    if (o._pos === k) return;
+    o._pos = k;
+    o.style.setProperty('left', r.left + 'px', 'important'); o.style.setProperty('top', r.top + 'px', 'important');
+    o.style.setProperty('width', r.width + 'px', 'important'); o.style.setProperty('height', r.height + 'px', 'important');
+    o.style.setProperty('right', 'auto', 'important'); o.style.setProperty('bottom', 'auto', 'important');
+  };
+  // ---- patching markup in place: the new markup is parsed off the page and its icon characters drawn the way the page's icon pass
+  // (icons.js) draws them; then only the nodes that differ are changed, so whatever stayed the same keeps its layout, its paint and
+  // its listeners. Children with a key (an item cell: data-where + data-uid; a 3D preview: data-pv) are matched by the key.
+  const nkey = (n) => (n.nodeType !== 1 ? null : n.hasAttribute('data-uid') ? 'u' + n.getAttribute('data-where') + ':' + n.getAttribute('data-uid') : n.hasAttribute('data-pv') ? 'p' + n.getAttribute('data-pv') : null);
+  function syncAttrs(a, b) {
+    const ba = b.attributes, aa = a.attributes;
+    for (let i = 0; i < ba.length; i++) { const t = ba[i]; if (a.getAttribute(t.name) !== t.value) a.setAttribute(t.name, t.value); }
+    if (aa.length !== ba.length) for (let i = aa.length - 1; i >= 0; i--) if (!b.hasAttribute(aa[i].name)) a.removeAttribute(aa[i].name);
+  }
+  function syncNode(a, b) {
+    if (a.nodeType !== 1) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+    syncAttrs(a, b);
+    if (a.nodeName !== 'CANVAS') syncKids(a, b); // (a canvas keeps what is drawn in it)
+  }
+  function syncKids(a, b) {
+    const nb = Array.from(b.childNodes);
+    let want = null, live = null;
+    for (const n of nb) { const k = nkey(n); if (k) (want || (want = new Set())).add(k); }
+    // keyed children that are gone are taken out first, so the ones that stay keep their order and need no moving
+    for (const n of Array.from(a.childNodes)) { const k = nkey(n); if (!k) continue; if (want && want.has(k) && !(live && live.has(k))) (live || (live = new Map())).set(k, n); else a.removeChild(n); }
+    for (let i = 0; i < nb.length; i++) {
+      const y = nb[i], x = a.childNodes[i] || null, k = nkey(y), m = k && live ? live.get(k) : null;
+      if (m) { live.delete(k); if (m !== x) a.insertBefore(m, x); syncNode(m, y); continue; }
+      if (!x) { a.appendChild(y); continue; }
+      if (!k && !nkey(x)) { if (x.nodeType === y.nodeType && x.nodeName === y.nodeName) syncNode(x, y); else a.replaceChild(y, x); continue; }
+      a.insertBefore(y, x);
+    }
+    while (a.childNodes.length > nb.length) a.removeChild(a.lastChild);
+  }
+  UI.morph = function (el, html) {
+    const t = document.createElement('template'); t.innerHTML = html;
+    if (G.Icons && G.Icons.scan) for (const n of Array.from(t.content.childNodes)) G.Icons.scan(n);
+    syncKids(el, t.content);
+  };
   UI.statusScroll = function (dy) {
     const o = UI.el.statusOv, step = Math.sign(dy) * Math.min(400, Math.max(40, Math.abs(dy)));
     // scroll the sheet itself, or a scrollable column inside it if the sheet has no room to move

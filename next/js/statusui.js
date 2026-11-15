@@ -285,10 +285,11 @@
     PV.cam = new THREE.PerspectiveCamera(28, PV.W / PV.H, 0.01, 100);
     return true;
   }
-  function pvFrame() {
-    if (!PV.items.length) return;
+  function pvFrame(items) {
+    items = items || PV.items;
+    if (!items.length) return;
     const t = performance.now() / 1000;
-    for (const it of PV.items) {
+    for (const it of items) {
       PV.scene.add(it.g);
       it.g.rotation.y = it.kind === 'gun' ? -Math.PI / 2 + Math.sin(t * 0.8 + it.ph) * 0.6 : t * 0.7 + it.ph;
       PV.cam.position.set(0, it.d * 0.12, it.d); PV.cam.lookAt(0, 0, 0);
@@ -302,7 +303,7 @@
     if (!UI.statusOpen() && !(G.InvUI && G.InvUI.isOpen())) { SU.unmount(); return; }
     pvFrame();
   }
-  SU.renderOnce = pvFrame;
+  SU.renderOnce = () => pvFrame();
   // bounds of what is actually drawn (hidden parts of a display model must not enlarge the frame)
   function visBox(root) {
     root.updateMatrixWorld(true);
@@ -314,23 +315,39 @@
     })(root);
     return box.isEmpty() ? new THREE.Box3(new THREE.Vector3(-0.2, -0.1, -0.2), new THREE.Vector3(0.2, 0.1, 0.2)) : box;
   }
+  // the models already made, by weapon and parts (the inventory mounts the same few again at every opening and every change in the
+  // bag): made, fitted and copied for this renderer once; the oldest are let go past a dozen or so
+  const pvModels = new Map();
+  function pvModel(it) {
+    const key = it.kind + '|' + (it.def.id || it.def.name) + '|' + (it.atts ? JSON.stringify(it.atts) : '');
+    let m = pvModels.get(key);
+    if (m) { pvModels.delete(key); pvModels.set(key, m); return m; }
+    let model; try { model = it.kind === 'melee' ? G.weapons.meleeDisplayModel(it.def) : G.weapons.displayModel(it.def, it.atts); } catch (e) { return null; }
+    if (G.GFX && G.GFX.portable) G.GFX.portable(model, PV.r);   // (the game's baked surfaces copied for this renderer: black otherwise)
+    const box = visBox(model), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    model.position.sub(c);
+    const g = new THREE.Group(); g.add(model);
+    // guns are seen side-on (barrel across the frame); melee weapons spin, fitted by their bounding sphere
+    const half = Math.tan(THREE.MathUtils.degToRad(PV.cam.fov / 2)), asp = PV.W / PV.H;
+    const d = it.kind === 'gun' ? Math.max(sz.z * 1.12 / (2 * half * asp), sz.y * 1.35 / (2 * half), 0.25) : Math.max(sz.length() * 0.5 / half * 1.15, 0.3);
+    m = { key, g, d };
+    pvModels.set(key, m);
+    if (pvModels.size > 16) pvModels.delete(pvModels.keys().next().value);
+    return m;
+  }
   SU.mount = function (root) {
     const list = pend; pend = [];
     SU.unmount();
     if (!list.length || !pvInit()) return;
-    const half = Math.tan(THREE.MathUtils.degToRad(PV.cam.fov / 2)), asp = PV.W / PV.H;
     PV.items = list.map((it, i) => {
       const cv = root.querySelector(`canvas[data-pv="${it.id}"]`); if (!cv) return null;
-      let model; try { model = it.kind === 'melee' ? G.weapons.meleeDisplayModel(it.def) : G.weapons.displayModel(it.def, it.atts); } catch (e) { return null; }
-      if (G.GFX && G.GFX.portable) G.GFX.portable(model, PV.r);   // (the game's baked surfaces copied for this renderer: black otherwise)
-      const box = visBox(model), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
-      model.position.sub(c);
-      const g = new THREE.Group(); g.add(model);
-      // guns are seen side-on (barrel across the frame); melee weapons spin, fitted by their bounding sphere
-      const d = it.kind === 'gun' ? Math.max(sz.z * 1.12 / (2 * half * asp), sz.y * 1.35 / (2 * half), 0.25) : Math.max(sz.length() * 0.5 / half * 1.15, 0.3);
-      return { cv, ctx: cv.getContext('2d'), g, d, kind: it.kind, ph: i * 1.3 };
+      const m = pvModel(it); if (!m) return null;
+      // (a canvas kept from the last time - the inventory patches its markup in place - already shows this weapon: it is not drawn
+      // again before the next frame)
+      const fresh = cv._pv !== m.key; cv._pv = m.key;
+      return { cv, ctx: cv._ctx || (cv._ctx = cv.getContext('2d')), g: m.g, d: m.d, kind: it.kind, ph: i * 1.3, fresh };
     }).filter(Boolean);
-    pvFrame();
+    pvFrame(PV.items.filter((x) => x.fresh));
     PV.raf = requestAnimationFrame(pvLoop);
   };
   // the preview renderer, created and its shaders compiled once, ahead of the first Tab / chest screen
@@ -353,5 +370,7 @@
     const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
     idle(() => { try { const X = G.GFX; if (!X || !X.portRead || !X.tex) return; const g = new THREE.Group(); for (const n of ['weave', 'leather']) { const t = X.tex(n); if (t) g.add(new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.orm }))); } X.portRead(g); } catch (e) { /* read when the screen opens */ } }, { timeout: 8000 });
   };
+  // the queued previews are dropped (markup made without being put on the page: the inventory's patch while it is closed)
+  SU.drop = () => { pend = []; };
   SU.unmount = function () { if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = 0; PV.items = []; };
 })();

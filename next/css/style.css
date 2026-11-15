@@ -1368,12 +1368,15 @@ body.inv-open #toasts, body.inv-open #feed, body.inv-open #banner, body.inv-open
 /* ---------------- vector icons (js/icons.js) ---------------- */
 .gx { display: inline-block; width: 1.18em; height: 1.18em; vertical-align: -0.24em; line-height: 0; flex: none; }
 .gx svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.55)); }
+/* the drawing as an image (icons.js imgOf): the image has a margin of 48 units round the 552-unit box, so it is 648/552 of the
+   icon's size and set back by 48/552 - the drawing lands where the inline SVG's did, outlines past the box included */
+.gx > img { display: block; width: 117.391304%; height: 117.391304%; max-width: none; margin: -8.695652% 0 0 -8.695652%; pointer-events: none; -webkit-user-drag: none; user-select: none; -webkit-touch-callout: none; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.55)); }
 /* armour: the drawing carries the material colour, the disc is just a dark plate with a ring of it */
 .amat::before, .amat.mat-chain::before, .amat.mat-scale::before, .amat.mat-cloth::before { background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--mc) 26%, #1c1712), #0e0b08 72%); box-shadow: inset 0 0 0 0.06em color-mix(in srgb, var(--mc) 75%, #000), 0 0 0.25em color-mix(in srgb, var(--mc) 40%, transparent); }
 .amat > span { font-size: 0.86em; }
 
 #hp-text .os-num .gx { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 0.05em; }
-#hp-text .os-num .gx svg { filter: drop-shadow(0 0 3px rgba(120,200,255,0.7)); }
+#hp-text .os-num .gx svg, #hp-text .os-num .gx > img { filter: drop-shadow(0 0 3px rgba(120,200,255,0.7)); }
 
 /* weapon cards: where a change comes from. amber = the weapon itself (upgrade level, attachments), cyan = buffs / damage-up / enchantments */
 .sd.sp2 { color: inherit; }
@@ -1667,7 +1670,7 @@ html.m *::-webkit-scrollbar { width: 6px; height: 6px; }
 .cx-sort select { pointer-events: auto; padding: 5px 8px; background: rgba(0,0,0,0.5); border: 1px solid var(--line); color: var(--text); border-radius: 4px; font-family: inherit; font-size: 12.5px; }
 .cx-sort + input { margin-left: 0; }
 /* inside the inventory / status / alchemy screens icons carry no drop-shadow filter (one filter layer per icon is costly with dozens of tiles) */
-#inv-ui .gx svg, #status-overlay .gx svg, .alch-panel .gx svg { filter: none; }
+#inv-ui .gx svg, #status-overlay .gx svg, .alch-panel .gx svg, #inv-ui .gx > img, #status-overlay .gx > img, .alch-panel .gx > img { filter: none; }
 /* text colours shared by the cards and hover texts: numbers in gold, an item's extra effects in gold, enchantments in purple (as in the inventory's hover card) */
 .cd-n { color: #ffd27a; font-weight: 800; }
 .cd-line { display: block; margin: 3px 0; line-height: 1.5; }

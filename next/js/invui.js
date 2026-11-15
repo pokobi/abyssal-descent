@@ -318,7 +318,7 @@
       const specs = IV.SPEC.map((S) => `<div class="iv-spec" data-spec="${S.id}"><div class="iv-sph"><span>${S.icon} ${S.name}</span><kbd>${G.K(S.key)}</kbd></div>${gridEl(P.spec[S.id], 'spec:' + S.id)}</div>`).join('') + (loot ? '' : partsBox());
       // the screen of this view on the page (the other one kept off it)
       const s = screens[loot ? 'loot' : 'tab'] || (screens[loot ? 'loot' : 'tab'] = makeScreen(loot)), sec = s._sec;
-      if (scr !== s) { if (scr) scr.remove(); root.insertBefore(s, root.firstChild); scr = s; }
+      if (scr !== s) { if (scr) scr.remove(); if (G.Icons.refresh) G.Icons.refresh(s); root.insertBefore(s, root.firstChild); scr = s; } // (refresh: drawings in the screen kept off the page take the bitmaps made meanwhile)
       setAttr(s, 'data-kf', KF);
       setAttr(s, 'style', loot ? `--cs:${CS}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px` : `--cs:${CS}px;--sw:${sw}px;--aw:${aw}px;--hw:${hW}px;--hs:${hS}px;--ft:${footH}px;--gap:${gap}px;width:${IW}px;height:${IH}px;left:${padX}px;top:${padY}px`);
       // (the kind filter: in the title line of the Tab screen; on a line of its own when looting, where the title line holds the parts)

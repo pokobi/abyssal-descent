@@ -342,8 +342,9 @@
   const SPEC = {}, FALLBACK = {};
   // overshield (next to the HP): a see-through light-blue shield with a pale rim
   const OS = () => [{ d: PATHS.shield || '', c: '#8fdcff', o: 0.62, ring: '#d8f4ff' }, { d: PATHS.shield || '', c: '#ffffff', o: 0.2, s: 0.6, x: 102, y: 90 }];
-  IC.def = function (key, layers, fallback) { SPEC[key] = layers; if (fallback) FALLBACK[key] = fallback; delete SVG[key]; return key; };
+  IC.def = function (key, layers, fallback) { SPEC[key] = layers; if (fallback) FALLBACK[key] = fallback; delete SVG[key]; dropImg(key); return key; };
   IC.has = (key) => !!SPEC[key];
+  IC.keys = () => Object.keys(SPEC);
   // (emoji that still reached the page as the system's own coloured pictures: the coin - a disc with a raised rim and a lozenge struck
   // in it, drawn here - and those that had no drawing yet, given the nearest of the silhouettes there are)
   PATHS['coin'] = 'M20 256a236 236 0 1 1 472 0a236 236 0 1 1 -472 0z M60 256a196 196 0 1 0 392 0a196 196 0 1 0 -392 0z M80 256a176 176 0 1 1 352 0a176 176 0 1 1 -352 0z M256 150L170 256L256 362L342 256z';
@@ -415,15 +416,100 @@
     return SVG[key];
   }
   IC.svg = svgOf;
-  IC.html = (key, cls) => (SPEC[key] ? `<i class="gx${cls ? ' ' + cls : ''}">${svgOf(key)}</i>` : '');
+  // ---------------- bitmap form (what the page shows) ----------------
+  // An inline SVG is drawn path by path - its outline group through an offscreen layer of its own - into every tile it touches,
+  // each time the tile is rasterised; and a screen that becomes visible (the inventory, opened) has all its tiles rasterised at
+  // once. So the page shows each drawing as a bitmap: an <img> of a PNG made once in the browser from the very same SVG (drawn
+  // into a canvas at BN x BN by the browser's own SVG renderer), which the GPU keeps as a texture and draws as one quad.
+  // A drawing goes on the page first as the inline SVG (so it shows at once, exactly as before) and asks for its bitmap; the
+  // bitmap is made when the page is idle, and then every copy of the drawing on the page is switched over to it (and any made
+  // after). The two look the same: same drawing, same box.
+  // Outlines may reach a little past the 552-unit box (the inline SVG lets them overflow): the bitmap covers a margin of IPAD
+  // units all round, and css (.gx > img) sets the image that much larger and back, so the drawing lands where the inline one is.
+  const IPAD = 48, BMP = {}, HOLD = {}, ASKED = {};
+  // pixels across a bitmap: enough for the largest icon box (a big inventory cell on a 4K screen) without being enlarged;
+  // smaller boxes are drawn from it scaled down (the GPU's image cache keeps a pre-shrunk copy per size)
+  const BN = Math.min(256, 128 * Math.max(1, Math.ceil((window.devicePixelRatio || 1) - 0.01)));
+  const gradDef = (id, c) => `<linearGradient id="${id}" x1="0" y1="0" x2="0.25" y2="1"><stop offset="0" stop-color="${mix(c, '#ffffff', 0.5)}"/><stop offset="0.45" stop-color="${c}"/><stop offset="1" stop-color="${mix(c, '#000000', 0.42)}"/></linearGradient>`;
+  // the drawing as a standalone SVG document (its gradients inside it, the margin round it)
+  function svgDoc(key) {
+    const s = svgOf(key); if (!s) return '';
+    const body = s.slice(s.indexOf('>') + 1, s.lastIndexOf('</svg>'));
+    const used = {}; body.replace(/url\(#(gxg[0-9a-fA-F]+)\)/g, (m, id) => { used[id] = 1; return m; });
+    const defsTxt = Object.keys(used).map((id) => gradDef(id, '#' + id.slice(3))).join('');
+    const o = -20 - IPAD, w = 552 + 2 * IPAD;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${o} ${o} ${w} ${w}" width="${w}" height="${w}"><defs>${defsTxt}</defs>${body}</svg>`;
+  }
+  const imgTag = (u) => `<img alt="" draggable="false" decoding="sync" src="${u}">`;
+  const boxTag = (key, cls) => `<i class="gx${cls ? ' ' + cls : ''}" data-ic="${key}">${BMP[key] ? imgTag(BMP[key]) : svgOf(key)}</i>`;
+  IC.html = (key, cls) => { if (!SPEC[key]) return ''; wantBmp(key); return boxTag(key, cls); };
   // emoji / icon character / key -> markup (anything unknown is returned as text)
   IC.of = (v, cls) => { const k = SPEC[v] ? v : IC.keyOf(String(v).replace(/️/g, '')); return k ? IC.html(k, cls) : String(v); };
   const tplCache = {};
-  function iconNode(key) {
+  function iconNode(key, noBmp) {
     let t = tplCache[key];
-    if (!t) { t = document.createElement('i'); t.className = 'gx'; t.innerHTML = svgOf(key); tplCache[key] = t; }
+    if (!t) { const h = document.createElement('div'); h.innerHTML = boxTag(key); t = h.firstChild; tplCache[key] = t; }
+    if (!noBmp) wantBmp(key);
     return t.cloneNode(true);
   }
+  // making the bitmaps: a queue worked through in idle time, a few at a time
+  const bq = [];
+  let bqOn = false, bInFlight = 0, bCan = null;
+  const idleCb = window.requestIdleCallback || ((f) => setTimeout(() => f({ timeRemaining: () => 8, didTimeout: true }), 60));
+  function wantBmp(key) {
+    if (BMP[key] || ASKED[key] || !SPEC[key]) return;
+    ASKED[key] = 1; bq.push(key); pump();
+  }
+  // (no deadline: only truly idle time is used, so the loading and a busy frame are never held up by it - until then the inline
+  // drawing simply stays)
+  function pump() { if (bqOn || !bq.length) return; bqOn = true; idleCb(work); }
+  function work(dl) {
+    bqOn = false;
+    while (bq.length && bInFlight < 4 && (dl.didTimeout || dl.timeRemaining() > 4)) makeBmp(bq.shift());
+    if (bq.length && bInFlight < 4) pump();
+  }
+  function makeBmp(key) {
+    const doc = svgDoc(key); if (!doc) return;
+    bInFlight++;
+    const su = URL.createObjectURL(new Blob([doc], { type: 'image/svg+xml' }));
+    const done = () => { URL.revokeObjectURL(su); bInFlight--; pump(); };
+    const im = new Image();
+    im.onerror = () => { ASKED[key] = 0; done(); };
+    im.onload = () => {
+      if (!bCan) bCan = document.createElement('canvas');
+      bCan.width = bCan.height = BN;
+      // (a canvas kept in main memory: one on the GPU would have to be read back to make the PNG, and a read back waits for
+      // everything the GPU has queued - the game's frames - stalling the page for as long as that takes)
+      const g = bCan.getContext('2d', { willReadFrequently: true });
+      g.clearRect(0, 0, BN, BN); g.drawImage(im, 0, 0, BN, BN);
+      im.onload = im.onerror = null; im.removeAttribute('src'); // (the SVG document behind it is no longer needed)
+      bCan.toBlob((b) => {
+        if (!b || !SPEC[key] || BMP[key]) { done(); return; }
+        const pu = URL.createObjectURL(b);
+        // (held decoded for the page's life: a new <img> of it finds it in the memory cache and shows it in the same frame)
+        const keep = new Image(); keep.decoding = 'sync';
+        keep.onload = () => { HOLD[key] = keep; useBmp(key, pu); done(); };
+        keep.onerror = () => { URL.revokeObjectURL(pu); ASKED[key] = 0; done(); };
+        keep.src = pu;
+      }, 'image/png');
+    };
+    im.src = su;
+  }
+  // a bitmap is ready: it is used from now on, and the copies on the page are switched to it
+  function useBmp(key, u) {
+    BMP[key] = u; delete tplCache[key];
+    const h = document.createElement('div'); h.innerHTML = imgTag(u); const tpl = h.firstChild;
+    for (const el of document.querySelectorAll('.gx[data-ic="' + CSS.escape(key) + '"]')) swapIn(el, tpl);
+  }
+  function swapIn(el, tpl) { const s = el.firstElementChild; if (s && s.nodeName.toLowerCase() === 'svg') el.replaceChild(tpl.cloneNode(true), s); }
+  // switch the drawings in a part kept off the page (put back on it) to the bitmaps made meanwhile
+  IC.refresh = function (root) {
+    if (!root || !root.querySelectorAll) return;
+    for (const el of root.querySelectorAll('.gx[data-ic]')) { const u = BMP[el.getAttribute('data-ic')]; if (u && el.firstElementChild && el.firstElementChild.nodeName.toLowerCase() === 'svg') { const h = document.createElement('div'); h.innerHTML = imgTag(u); swapIn(el, h.firstChild); } }
+  };
+  // (a drawing defined again: its bitmap and its cached node are made afresh)
+  function dropImg(key) { if (BMP[key]) { URL.revokeObjectURL(BMP[key]); delete BMP[key]; delete HOLD[key]; } ASKED[key] = 0; delete tplCache[key]; }
+  IC.bmpState = () => ({ made: Object.keys(BMP).length, queued: bq.length, inFlight: bInFlight, size: BN });
 
   // ---------------- canvas ----------------
   const p2d = {};
@@ -1005,7 +1091,7 @@
     const box = document.createElement('div');
     box.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:240px;height:240px;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1';
     for (const k in SPEC) {
-      box.appendChild(iconNode(k));
+      box.appendChild(iconNode(k, true)); // (the inline drawings, warmed; a bitmap is made only for what is actually shown)
       for (const l of SPEC[k]) if (l.d) path2d(l.d);
     }
     if (document.body) {

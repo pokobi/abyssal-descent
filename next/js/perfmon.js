@@ -147,7 +147,8 @@
     const s = stats(); if (!s) return;
     const col = (v, a, b) => (v < a ? '#7be07b' : v < b ? '#f0c050' : '#ff6a5a');
     const rows = PF.spikes.slice(-6).reverse().map((k) => { const c = causeOf(k); return `<div style="color:${c.startsWith('GC') ? '#9ad' : c.startsWith('JS') ? '#fc8' : c.startsWith('GPU') ? '#c9f' : c.startsWith('画面') ? '#8df' : '#f99'}">${rel(k.at).toFixed(1)}s ${k.iv.toFixed(1)}ms ${c}</div>`; }).join('');
-    panel.innerHTML = `<b style="color:${col(1000 / s.fps, 17, 25)}">${s.fps.toFixed(0)} fps</b>  平均${s.avg.toFixed(1)}ms  中央${s.p50.toFixed(1)}  99%:${s.p99.toFixed(1)}  最大${s.max.toFixed(0)}<br>`
+    const capTxt = G.game && G.game.fpsCap && G.game.fpsCap() ? ` (上限${G.game.fpsCap()})` : '';
+    panel.innerHTML = `<b style="color:${col(1000 / s.fps, 17, 25)}">${s.fps.toFixed(0)} fps</b>${capTxt}  平均${s.avg.toFixed(1)}ms  中央${s.p50.toFixed(1)}  99%:${s.p99.toFixed(1)}  最大${s.max.toFixed(0)}<br>`
       + `1%low <b style="color:${col(1000 / s.low1, 22, 34)}">${s.low1.toFixed(0)}fps</b>  JS ${s.js.toFixed(1)}ms/frame  ${gpuTxt(s)}<br>`
       + `ヒープ ${s.heap.toFixed(0)}MB  生成 <b style="color:${col(s.alloc, 8, 20)}">${s.alloc.toFixed(1)}MB/s</b>  GC ${s.gcPerMin.toFixed(0)}回/分<br>`
       + `描画 ${s.calls}回  ${(s.tris / 1000).toFixed(0)}k tri（1フレーム全体）  geo${s.geoms} tex${s.tex}<br>`
@@ -155,7 +156,7 @@
   }
   PF.report = function () {
     const s = stats();
-    const L = [`ABYSSAL DESCENT perf report  ${new Date().toISOString()}`, `UA: ${navigator.userAgent}`, `screen ${innerWidth}x${innerHeight} dpr ${devicePixelRatio} quality ${G.save.data.settings.quality} canvas ${G.renderer ? G.renderer.domElement.width + 'x' + G.renderer.domElement.height : '-'}`];
+    const L = [`ABYSSAL DESCENT perf report  ${new Date().toISOString()}`, `UA: ${navigator.userAgent}`, `screen ${innerWidth}x${innerHeight} dpr ${devicePixelRatio} quality ${G.save.data.settings.quality} canvas ${G.renderer ? G.renderer.domElement.width + 'x' + G.renderer.domElement.height : '-'} fps cap ${G.game && G.game.fpsCap ? G.game.fpsCap() || 'screen' : '-'} screen ${G.game && G.game.screenHz ? G.game.screenHz().toFixed(1) + 'Hz' : '-'}`];
     try { const g2 = G.renderer.getContext(), e = g2.getExtension('WEBGL_debug_renderer_info'); if (e) L.push('GPU: ' + g2.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch (e) { /* ignore */ }
     if (s) L.push(`fps ${s.fps.toFixed(1)} avg ${s.avg.toFixed(1)}ms p50 ${s.p50.toFixed(1)} p99 ${s.p99.toFixed(1)} max ${s.max.toFixed(0)} 1%low ${s.low1.toFixed(0)}fps js ${s.js.toFixed(1)}ms ${s.gpu != null ? `gpu ${s.gpu.toFixed(1)}ms gpu95 ${s.gpu95.toFixed(1)}ms` : s.gpuOk ? 'gpu -' : 'gpu n/a'} heap ${s.heap.toFixed(0)}MB alloc ${s.alloc.toFixed(1)}MB/s gc ${s.gcPerMin.toFixed(0)}/min calls ${s.calls} tris ${s.tris} (whole frame)`);
     L.push(`spikes ${PF.spikes.length}  longtasks ${longTasks.length}  long frames ${loafs.length}${loafObs ? '' : ' (n/a)'}  (time = when the slow frame began, from the start of the measurement)`);

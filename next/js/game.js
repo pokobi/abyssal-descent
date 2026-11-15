@@ -7,6 +7,10 @@
   const LIGHT_K = 6;
   let renderer, scene, camera, hemi, amb, moon, P;
   let last = performance.now(), fpsAcc = 0, fpsN = 0;
+  // how many of a thing that comes `rate` times a second come in a frame of dt (x = rate * dt): its whole part, plus one more with the
+  // chance of the rest. Under one a frame it draws as `Math.random() < x` always did; over one (more than one a frame: a slow frame, a low
+  // frame rate) the count is not cut down to one a frame.
+  const spawnN = (x) => { const f = Math.floor(x); return f + (Math.random() < x - f ? 1 : 0); };
 
   // ---------------- boot ----------------
   async function boot() {
@@ -50,6 +54,7 @@
     G.weapons.init(renderer); G.weapons.setEnv(G.envTex);
     G.avatar.init(scene);
     G.combat.init(); G.Elem.init(); G.enemies.init(); G.Areas.init(); G.Depth.init(); G.Rooms2.init(); G.MidSave.init(); Object.assign(G.Areas.TYPES, G.Rooms2.TYPES); G.abilities.init(); G.bosses.init(); G.ui.init(); G.bindBuffs(); G.Dev && G.Dev.init();
+    GM.hookFpsCapSetting();
     I.el = renderer.domElement;
     renderer.domElement.addEventListener('click', () => { if (GM.state === 'playing' && !I.locked) I.requestLock(); });
     G.on('lockchange', onLock);
@@ -594,7 +599,7 @@
         E.y = ny; E.col.y1 = ny; E.col.y0 = ny - 0.7; E.mesh.position.y = ny;
         if (inXZ && P.pos.y > ny - dy - 0.9 && P.pos.y < ny + 0.6) { P.pos.y = Math.max(P.pos.y, ny); if (P.vel.y < 0) P.vel.y = 0; P.grounded = true; }
         P.addShake(dt * 0.25);
-        if (Math.random() < dt * 30) G.fx.add.spawn(U.rand(E.x0, E.x1), ny - 0.4, U.rand(E.z0, E.z1), U.rand(-0.5, 0.5), -U.rand(1, 3), U.rand(-0.5, 0.5), 0.8, 0.12, 0.02, 0.8, 0.5, 1, 0.9, 2, 0.5);
+        for (let n = spawnN(dt * 30); n > 0; n--) G.fx.add.spawn(U.rand(E.x0, E.x1), ny - 0.4, U.rand(E.z0, E.z1), U.rand(-0.5, 0.5), -U.rand(1, 3), U.rand(-0.5, 0.5), 0.8, 0.12, 0.02, 0.8, 0.5, 1, 0.9, 2, 0.5);
         if (ny >= E.y1) { E.state = 'top'; G.sfx.bell && G.sfx.bell(); G.fx.ring(V((E.x0 + E.x1) / 2, ny + 0.05, (E.z0 + E.z1) / 2), 4, 0xb070ff, 0.6); }
       }
     }
@@ -633,10 +638,10 @@
     if (skyDome && F.sky) { ['top', 'mid', 'hor'].forEach((u, i) => skyDome.material.uniforms[u].value.copy(F.sky[i]).lerp(DAWN.sky[i], k)); if (k > 0.5) skyDome.material.uniforms.uStars.value = 0; }
     G.fx.setFog(scene.fog.color, scene.fog.density);
     // the eclipse burns into a rising sun
-    if (w.eclipse) { w.eclipse.children.forEach((ch) => { if (ch.material && ch.material.color) ch.material.color.lerp(new THREE.Color(ch.material.blending === THREE.AdditiveBlending ? '#ffe0a0' : '#fff6d0'), Math.min(1, dt * 1.5)); }); w.eclipse.position.y += dt * 4 * (1 - k); }
+    if (w.eclipse) { w.eclipse.children.forEach((ch) => { if (ch.material && ch.material.color) ch.material.color.lerp(new THREE.Color(ch.material.blending === THREE.AdditiveBlending ? '#ffe0a0' : '#fff6d0'), 1 - Math.exp(-dt * 1.5)); }); w.eclipse.position.y += dt * 4 * (1 - k); }
     if (D.beam) { D.beam.material.opacity = Math.min(0.35, D.t * 0.25) * (D.t > 8 ? Math.max(0, 1 - (D.t - 8) / 4) : 1); D.beam.rotation.y += dt * 0.3; }
     // golden motes rise from the whole island for a while
-    if (D.t < 14 && Math.random() < dt * 60) { const c = w.arenaCenter, a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 26; G.fx.add.spawn(c.x + Math.cos(a) * r, 0.2, c.z + Math.sin(a) * r, 0, U.rand(1, 3), 0, U.rand(2, 4), U.rand(0.08, 0.16), 0.02, 1.2, 1.0, 0.6, 1, -0.3, 0.2); }
+    if (D.t < 14) for (let n = spawnN(dt * 60); n > 0; n--) { const c = w.arenaCenter, a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 26; G.fx.add.spawn(c.x + Math.cos(a) * r, 0.2, c.z + Math.sin(a) * r, 0, U.rand(1, 3), 0, U.rand(2, 4), U.rand(0.08, 0.16), 0.02, 1.2, 1.0, 0.6, 1, -0.3, 0.2); }
   }
   function updateDread(dt) {
     const w = G.world, b = GM.moodBase;
@@ -669,7 +674,7 @@
     if (GM.drone) GM.drone.set(GM.bossEngaged ? 0.35 : k);
     const cp = camera.position;
     // falling ash, embers, dark wisps creeping up from the ground
-    if (Math.random() < dt * (4 + k * 30)) G.fx.norm.spawn(cp.x + U.rand(-12, 12), cp.y + U.rand(3, 8), cp.z + U.rand(-14, 6), U.rand(-0.3, 0.3), -U.rand(0.4, 0.9), U.rand(-0.3, 0.3), 7, 0.05, 0.05, 0.25, 0.22, 0.2, 0.8, 0, 0);
+    for (let n = spawnN(dt * (4 + k * 30)); n > 0; n--) G.fx.norm.spawn(cp.x + U.rand(-12, 12), cp.y + U.rand(3, 8), cp.z + U.rand(-14, 6), U.rand(-0.3, 0.3), -U.rand(0.4, 0.9), U.rand(-0.3, 0.3), 7, 0.05, 0.05, 0.25, 0.22, 0.2, 0.8, 0, 0);
     if (k > 0.25 && Math.random() < dt * k * 22) G.fx.add.spawn(cp.x + U.rand(-10, 10), cp.y + U.rand(-1.5, 1), cp.z + U.rand(-12, 4), U.rand(-0.3, 0.3), U.rand(0.5, 1.4), U.rand(-0.3, 0.3), 2.2, 0.06, 0.01, 1, 0.35, 0.1, 0.9, 0, 0);
     if (k > 0.35 && Math.random() < dt * k * 14) G.fx.norm.spawn(cp.x + U.rand(-8, 8), P.pos.y + 0.05, cp.z + U.rand(-10, 3), U.rand(-0.1, 0.1), U.rand(0.3, 0.7), U.rand(-0.1, 0.1), 2.5, 0.35, 1.2, 0.06, 0.0, 0.05, 0.55, -0.1, 1);
     if (!GM.bossEngaged) {
@@ -1274,7 +1279,7 @@
       return;
     }
     fireT += dt; fireTick -= dt; fireWarnT -= dt; fireCool = 0.35;
-    if (Math.random() < dt * (30 + fireLv * 6)) G.fx.flameLick(P.pos.x + U.rand(-0.5, 0.5), P.pos.y + 0.05, P.pos.z + U.rand(-0.5, 0.5), 1.2 + fireLv * 0.08);
+    for (let n = spawnN(dt * (30 + fireLv * 6)); n > 0; n--) G.fx.flameLick(P.pos.x + U.rand(-0.5, 0.5), P.pos.y + 0.05, P.pos.z + U.rand(-0.5, 0.5), 1.2 + fireLv * 0.08);
     if (fireT < 0.25) return;
     if (fireWarnT <= 0) { fireWarnT = 4; G.ui.toast('🔥 高所は炎に包まれている！ 降りろ！', 'warn'); }
     if (fireTick <= 0) { fireTick = 0.5; fireLv++; G.combat.damagePlayer((4 + GM.area * 0.25) * (1 + (fireLv - 1) * 0.5), { src: 'aoe', elem: 'fire', pos: P.pos.clone() }); }
@@ -1364,7 +1369,7 @@
           a.p = Math.min(1, a.p + dt / DUR);
           const lk = Math.floor(a.p * 3 + 1e-6) / 3;
           if (lk > (a.lock || 0) && a.p < 1) { a.lock = lk; G.sfx.ui('level'); G.fx.ring(V(a.x, a.y, a.z), 2.8 * lk, 0xffd080, 0.5); }
-          if (Math.random() < dt * (20 + a.p * 40)) { const an = Math.random() * 6.28; G.fx.add.spawn(a.x + Math.cos(an) * 2.7, a.y + 0.1, a.z + Math.sin(an) * 2.7, 0, 2 + a.p * 3, 0, 0.8, 0.15, 0.02, 1.4, 0.8, 0.3, 1, -0.5, 0.5); }
+          for (let n = spawnN(dt * (20 + a.p * 40)); n > 0; n--) { const an = Math.random() * 6.28; G.fx.add.spawn(a.x + Math.cos(an) * 2.7, a.y + 0.1, a.z + Math.sin(an) * 2.7, 0, 2 + a.p * 3, 0, 0.8, 0.15, 0.02, 1.4, 0.8, 0.3, 1, -0.5, 0.5); }
           // chanting that speeds up and climbs as the rite nears completion
           a.chT = (a.chT || 0) - dt;
           if (a.chT <= 0) { a.chT = 0.55 - a.p * 0.33; G.sfx.chant ? G.sfx.chant(a.p, V(a.x, a.y + 1, a.z)) : G.sfx.crackle(P.pos); }
@@ -2628,14 +2633,81 @@
     }
   }
 
+  // ---------------- frame-rate cap ----------------
+  // The setting fpsCap: 0 = as often as the screen refreshes (the browser's requestAnimationFrame, as it always was), otherwise
+  // the most frames a second. The browser still calls every refresh; a call that comes before the next capped frame is due does
+  // nothing at all (no update, no drawing, no input read), and the frame that does run gets the real time since the last one that ran.
+  // When the cap does not divide the screen's rate (60 on 144 Hz), the due time is accumulated (+ 1/cap each frame run, never
+  // reset from the clock while it keeps up), so the count per second is exact and the refresh nearest each due time is the one
+  // taken: the intervals alternate between the two nearest whole numbers of refreshes (2 and 3 at 144 / 60) and no error piles up.
+  const FPS_CAPS = [30, 60, 90, 120, 144, 165, 240];
+  GM.FPS_CAPS = FPS_CAPS;
+  GM.makeFrameCap = function () {
+    let due = 0;
+    return {
+      // true = leave this refresh out. refMs: the screen's refresh interval (half of it is the leeway: the refresh nearest the due time runs)
+      skip(now, cap, refMs) {
+        if (!(cap > 0)) { due = 0; return false; }
+        const T = 1000 / cap, slack = Math.min(T, refMs > 0 ? refMs : 4) * 0.5;
+        if (due && now < due - slack) return true;
+        // (fallen more than a whole interval behind - a stall, a hidden tab, a machine slower than the cap: start again from now)
+        due = due && now - due < T ? due + T : now + T;
+        return false;
+      },
+      reset() { due = 0; },
+    };
+  };
+  const capGate = GM.makeFrameCap();
+  // the screen's refresh rate: the median interval between the browser's calls (every call, those left out included), measured
+  // all the time; the shortest median seen is kept (a heavy scene slows the calls down, it never makes the screen slower)
+  const hzIv = new Float64Array(90);
+  let hzN = 0, hzLast = 0, hzMs = 0;
+  function measureHz(now) {
+    const d = now - hzLast; hzLast = now;
+    if (!(d > 0.5 && d < 200)) return;
+    hzIv[hzN % hzIv.length] = d; hzN++;
+    if (hzN >= 30 && hzN % 30 === 0) {
+      const a = Array.from(hzIv.subarray(0, Math.min(hzN, hzIv.length))).sort((x, y) => x - y), med = a[a.length >> 1];
+      if (!hzMs || med < hzMs) hzMs = med;
+    }
+  }
+  // measured refresh rate in Hz (0 = not known yet)
+  GM.screenHz = () => (hzMs ? 1000 / hzMs : 0);
+  GM.fpsCap = () => +(G.save.data.settings.fpsCap || 0);
+  // the setting, added to the settings screen next to the graphics quality (same row parts as the others)
+  function fpsCapRow() {
+    const S = G.save.data.settings, q = document.querySelector('#screens #s-quality');
+    if (!q || document.getElementById('s-fpsCap')) return;
+    const hz = GM.screenHz(), cur = GM.fpsCap();
+    const caps = FPS_CAPS.filter((c) => !hz || c <= hz * 1.03 || c === cur);
+    const opts = [`<option value="0">画面に合わせる${hz ? `（${Math.round(hz)}）` : ''}</option>`].concat(caps.map((c) => `<option value="${c}">${c}</option>`)).join('');
+    q.closest('.set-row').insertAdjacentHTML('afterend', `<div class="set-row"><span>⏱️ フレームレートの上限</span><select id="s-fpsCap">${opts}</select><span></span></div>`);
+    const sel = document.getElementById('s-fpsCap');
+    sel.value = String(caps.includes(cur) ? cur : 0);
+    sel.onchange = () => { S.fpsCap = +sel.value; G.save.write(); capGate.reset(); };
+  }
+  GM.hookFpsCapSetting = function () {
+    const settings0 = G.ui.settings;
+    if (!settings0 || settings0._fpsCap) return;
+    G.ui.settings = function (back) { settings0.call(G.ui, back); fpsCapRow(); };
+    G.ui.settings._fpsCap = true;
+  };
+
   // ---------------- main loop ----------------
   function frame(now) {
     requestAnimationFrame(frame);
+    measureHz(now);
+    // (a cap at the screen's own rate or within 3% under it caps nothing: left to the screen, so that a 144 Hz screen that really
+    // refreshes at 144.1 does not drop a frame every few seconds)
+    const cap = GM.fpsCap();
+    if (capGate.skip(now, hzMs && cap * hzMs >= 970 ? 0 : cap, hzMs)) return;
+    GM.frameN = (GM.frameN || 0) + 1;
     const PF = G.Perf; if (PF && PF.on) PF.begin(now);
-    let dt = Math.min(0.05, (now - last) / 1000);
+    const real = (now - last) / 1000;
+    let dt = Math.min(0.05, real);
     last = now;
     if (GM._warming) { I.endFrame(); if (PF && PF.on) PF.end(); return; } // the new area's shaders are compiling: run and draw nothing
-    fpsAcc += dt; fpsN++;
+    fpsAcc += real > 0 && real < 1 ? real : dt; fpsN++;
     if (fpsAcc > 0.5) { G.ui.fps(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
     try {
       if (GM.state === 'playing' || GM.state === 'dead') update(dt);

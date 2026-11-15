@@ -372,9 +372,13 @@
     if (plan === 'syringe') cur.rel.push({ obj: item, k: pl.a.toss + 0.05, fall: pl.a.toss + 0.05, v: new V3(0.9, 0.5, 0.25), spin: new V3(9, 3, 14) });
     if (plan === 'plate') cur.rel.push({ obj: item, k: pl.a.seat, fall: 9, v: new V3() });
     g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
-    if (vis === 'drink') G.sfx.mech('click', 0, 0.6);
-    if (vis === 'bandage') G.sfx.whoosh(0.5, 0.25);
-    if (vis === 'plate') G.sfx.mech('magOut', 0, 0.8);
+    // the sounds of the use, laid on the stages of its motion (audio.js useBegin; the old set of sounds keeps its two of old)
+    cur.snd = G.sfx.useBegin ? G.sfx.useBegin(id, IA.stages(id)) : null;
+    if (!cur.snd) {
+      if (vis === 'drink') G.sfx.mech('click', 0, 0.6);
+      if (vis === 'bandage') G.sfx.whoosh(0.5, 0.25);
+      if (vis === 'plate') G.sfx.mech('magOut', 0, 0.8);
+    }
     return true;
   };
   const P = () => G.player;
@@ -625,6 +629,7 @@
     if (!cur) return;
     const c = cur;
     c.t += dt;
+    if (c.snd) G.sfx.useTick(c.snd, c.t, dt);
     const k = Math.min(1, c.t / c.dur);
     if (!c.keys) c.keys = keysFor(c.plan);
     // what is let go of: posed at the moment it leaves the hand, taken into the room there; it falls from its own moment on
@@ -643,19 +648,23 @@
     if (!c.applied && k >= c.apply) {
       c.applied = true;
       const v = c.vis;
-      if (v === 'drink') G.sfx.drink && G.sfx.drink();
-      if (v === 'eat') G.sfx.melee && G.sfx.melee(false);
-      if (v === 'inject') G.sfx.mech('click', 0, 1);
-      if (v === 'plate') G.sfx.mech('magIn', 0, 1);
+      if (!c.snd) {
+        if (v === 'drink') G.sfx.drink && G.sfx.drink();
+        if (v === 'eat') G.sfx.melee && G.sfx.melee(false);
+        if (v === 'inject') G.sfx.mech('click', 0, 1);
+        if (v === 'plate') G.sfx.mech('magIn', 0, 1);
+      }
       try { c.onApply && c.onApply(); } catch (e) { console.error(e); }
     }
     if (k >= 1) {
+      if (c.snd) G.sfx.useEnd(c.snd, false);
       drop(c);
       cur = null;
       c.onDone && c.onDone();
     }
   };
   // drop whatever is being used WITHOUT applying it (a revive puts the inventory back as it was)
-  IA.abort = function () { if (!cur) return; drop(cur); cur = null; };
-  IA.cancel = function () { if (!cur) return; if (!cur.applied && cur.onApply) { try { cur.onApply(); } catch (e) { console.error(e); } } drop(cur); cur = null; };
+  // (either way the sounds of the use are cut off: audio.js useEnd)
+  IA.abort = function () { if (!cur) return; if (cur.snd) G.sfx.useEnd(cur.snd, true); drop(cur); cur = null; };
+  IA.cancel = function () { if (!cur) return; if (!cur.applied && cur.onApply) { try { cur.onApply(); } catch (e) { console.error(e); } } if (cur.snd) G.sfx.useEnd(cur.snd, true); drop(cur); cur = null; };
 })();

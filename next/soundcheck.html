@@ -34,6 +34,11 @@
   .vol input { flex: 1; min-width: 0; accent-color: var(--gold); height: 32px; }
   .vol output { width: 4.5em; text-align: right; font-weight: 700; color: var(--gold2); }
   #st { font-size: 12px; color: var(--dim); margin-top: 18px; }
+  #items { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--line); }
+  #items .row { margin-bottom: 8px; }
+  #itnow { font-size: 14px; color: var(--gold2); min-height: 1.6em; margin: 4px 0 8px; line-height: 1.5; }
+  #itmul { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  button.stop { width: 100%; }
 </style>
 </head>
 <body>
@@ -67,11 +72,22 @@
     <h2>比べる用の音</h2>
     <div class="row" id="others"></div>
   </section>
+  <section id="items">
+    <h2>アイテムを使う音</h2>
+    <div id="itnow" aria-live="polite">品を押すと、使い終わるまで鳴る</div>
+    <div class="row" id="itbtn"></div>
+    <h2>速さ</h2>
+    <div class="row" id="itmul"></div>
+    <button class="stop" id="itstop">途中でやめる</button>
+  </section>
   <div id="st">読み込み中</div>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 <script src="js/util.js"></script>
 <script src="js/sndbank.js"></script>
 <script src="js/audio.js"></script>
+<script src="js/data_items.js"></script>
+<script src="js/itemanim.js"></script>
 <script>
 (function () {
   'use strict';
@@ -185,6 +201,68 @@
     $('st').textContent = ok ? '準備完了' : '読み込み中';
     if (ok) { clearInterval(st); prep(); }
   }, 300);
+})();
+</script>
+<script>
+// the sounds of using an item: the game's own (audio.js useBegin / useTick / useEnd), laid on the stages of the item's motion as
+// itemanim.js gives them (IA.stages: PLAN, times the speed). The effect at its moment as abilities.js plays it (a heal: the drink, and
+// the mending 0.3 s after; a shield: the cell). 途中でやめる puts the use down as the game does when it is cut short
+(function () {
+  'use strict';
+  const A = G.sfx, IA = G.ItemAnim;
+  const ITEMS = [['h_bandage', '包帯'], ['h_medkit', '救急キット'], ['h_regen', '注射'], ['h_elixir', '飲む物'], ['h_apple', '林檎'], ['h_troll', 'トロールの心臓'], ['h_herb', '薬草'], ['u_plate', '鎧板']];
+  const MULS = [[1, '100％'], [0.75, '75％'], [0.5, '50％（加護）']];
+  // (the stages by name, as said here: the moments themselves are itemanim.js's)
+  const SAY = { draw: '取り出す', unwind: '端を引き出す', wind: '巻く 1周目', turn2: '巻く 2周目', turn3: '巻く 3周目', turn4: '巻く 4周目', pin: '端を押さえる', press2: '端を押さえる 2回目', lower: '下ろす',
+    reach: '手を伸ばす', unclasp: '留め金を外す', open: '蓋を返す', takeOut: '中から出す', ready: '腕へ', jab: '刺す', squeeze: '絞る', out: '抜く', away: '手を離す', uncap: 'キャップを掴む', capOff: 'キャップを抜く',
+    aim: '腕へ', capDrop: 'キャップが落ちる', push: '押し込む', toss: '放る', twist: '栓をねじる', pop: '栓が抜ける', raise: '口へ', gulp1: '飲む 1回目', gulp2: '飲む 2回目', gulp3: '飲む 3回目',
+    bite1: 'かじる 1回目', bite2: 'かじる 2回目', bite3: 'かじる 3回目', look: '裏返して見る', insert: '胸へ', slip: '縁を差し込む', push1: '押し込む 1回目', push2: '押し込む 2回目', seat: '収まる', pat1: '叩く 1回目', pat2: '叩く 2回目', use: '操作' };
+  const $ = (id) => document.getElementById(id);
+  const S = { mul: 1, id: null };
+  let run = null;
+  const nameOf = (id) => (ITEMS.find((q) => q[0] === id) || [id, id])[1];
+  function say(txt) { $('itnow').textContent = txt; }
+  function stop(cut) {
+    if (!run) return;
+    for (const t of run.timers) clearTimeout(t);
+    if (run.h) A.useEnd(run.h, cut);
+    cancelAnimationFrame(run.raf);
+    run = null;
+  }
+  function play(id) {
+    stop(true);
+    A.init(); A.setVolume(A.volume || 0.8);
+    const keep = IA.useMul; IA.useMul = () => S.mul;
+    const st = IA.stages(id); IA.useMul = keep;
+    const it = G.ITEM_BY_ID[id], d = (it && it.data) || {};
+    const r = { id, st, h: A.useBegin(id, st), t0: performance.now(), last: performance.now(), applied: false, timers: [], raf: 0, i: 0 };
+    run = r;
+    const head = nameOf(id) + ' ' + st.dur.toFixed(2) + '秒（速さ ' + Math.round(S.mul * 100) + '％）';
+    say(head + ' ／ ' + SAY.draw);
+    const step = () => {
+      if (run !== r) return;
+      const now = performance.now(), t = (now - r.t0) / 1000, dt = (now - r.last) / 1000; r.last = now;
+      A.useTick(r.h, t, dt);
+      while (r.i + 1 < st.stages.length && st.stages[r.i + 1][1] <= t) r.i++;
+      if (!r.applied && t >= st.apply) {
+        r.applied = true;
+        if (d.heal) { A.drink(); r.timers.push(setTimeout(() => A.heal(), 300)); }
+        if (d.os) A.mech('cell');
+      }
+      if (t >= st.dur) { A.useEnd(r.h, false); r.h = null; say(head + ' ／ 終わり'); r.timers.push(setTimeout(() => { if (run === r) run = null; }, 1500)); return; }
+      say(head + ' ／ ' + (SAY[st.stages[r.i][0]] || st.stages[r.i][0]) + (r.applied ? ' ／ 効果' : ''));
+      r.raf = requestAnimationFrame(step);
+    };
+    r.raf = requestAnimationFrame(step);
+  }
+  function draw() {
+    for (const b of document.querySelectorAll('#items [data-ik]')) b.classList.toggle('on', String(S[b.dataset.ik]) === b.dataset.val);
+  }
+  const mk = (parent, k, val, txt, on) => { const b = document.createElement('button'); if (k) { b.dataset.ik = k; b.dataset.val = String(val); } b.textContent = txt; b.addEventListener('click', on); $(parent).appendChild(b); return b; };
+  for (const [id, nm] of ITEMS) mk('itbtn', 'id', id, nm, () => { S.id = id; draw(); play(id); });
+  for (const [m, nm] of MULS) mk('itmul', 'mul', m, nm, () => { S.mul = m; draw(); });
+  $('itstop').addEventListener('click', () => { if (run && run.h) { const nm = nameOf(run.id); stop(true); say(nm + ' ／ 途中でやめた'); } });
+  draw();
 })();
 </script>
 </body>

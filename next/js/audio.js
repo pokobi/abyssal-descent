@@ -1552,16 +1552,339 @@
   };
   A.drink = function () {
     if (!ctx) return;
+    // (an item in the hands has sounds of its own for its whole use, the swallows of a draught among them: the old gulp, laid over them
+    // at the moment it takes effect, is not)
+    if (NEW() && A._use) return;
     if (NEW()) { SN.drink(); return; }
     const t = ctx.currentTime, out = dest(null, 0.1); out.gain.value = 0.5;
     for (let i = 0; i < 4; i++) nz({ t: t + i * 0.12, f: [['bandpass', vr(700, 0.2), 4, 400, 0.08]], g: 0.4, d: 0.08, to: out });
   };
   A.death = function () {
     if (!ctx) return;
+    if (A._use) A.useEnd(A._use, true);   // (what the hands were doing is cut short with the life)
     const t = ctx.currentTime, out = dest(null, 0.9);
     tn({ t, f0: 90, f1: 25, d: 2.2, g: 0.8, to: out, type: 'sine' });
     nz({ t, buf: 'brown', f: [['lowpass', 600, 0.7, 80, 2]], g: 0.9, a: 0.05, d: 2.2, to: out });
   };
+
+  // ---------- an item in use (itemanim.js): what the hands make of it, stage by stage ----------
+  // A use's motion goes by stages (itemanim.js PLAN; IA.stages gives them in seconds, the quickening of a perk in them). Each stage has
+  // sounds of its own: linen drawn off a roll and wound on, a canvas kit's stud and flap, a cork twisted and drawn, swallows, teeth in
+  // an apple, a steel plate pushed home into its carrier. Each is a take written into a buffer (mono: the hands are in front of the
+  // face) by the parts below and the ones above (knockIn, ringIn, thudIn, lowIn, breathIn), a couple of takes of each, never two of
+  // a row alike. They are laid on the moments of the stages by the game's own clock, a frame ahead (A.useTick); a use put down cuts
+  // them off in a few hundredths of a second, and nothing of it comes after (A.useEnd). Nothing in them reaches far over 5 kHz.
+  // (a band-pass whose middle moves, f0 to f1 Hz (exponentially), at q: a state-variable filter run over an array in place, its peak
+  // brought to 0 dB)
+  function svfRun(x, f0, f1, q, sr) {
+    const n = x.length, r = Math.pow(f1 / f0, 1 / Math.max(1, n - 1)), dq = 1 / q, top = sr * 0.16;
+    let f = f0, lo = 0, bp = 0;
+    for (let i = 0; i < n; i++) { const k = 2 * Math.sin((Math.PI * Math.min(f, top)) / sr); lo += k * bp; const hi = x[i] - lo - dq * bp; bp += k * hi; x[i] = bp * dq; f *= r; }
+    return x;
+  }
+  // (what a band of noise f wide at q keeps of white noise: its level brought back up by this)
+  const bandK = (f, q, sr) => Math.sqrt((sr * q) / (Math.PI * f));
+  // cloth, skin and canvas worked against each other: noise in a band moving from f0 to f1, a swell over d s (its top at o.a, 0..1),
+  // its level jagged (fibres catching: o.grain, 0..1), and o.cr times a second a fibre or a fold giving with a tick
+  function rubIn(L, R, i0, d, f0, f1, q, g, o, sr) {
+    o = o || {};
+    const n = Math.min(L.length - i0, Math.round(d * sr)); if (n <= 8) return;
+    const x = work(4, n), a = o.a === undefined ? 0.4 : o.a, gr = o.grain === undefined ? 0.5 : o.grain, cr = (o.cr || 0) / sr, st = Math.max(1, Math.round(sr * 0.0015)), kd = Math.exp(-1 / (0.0003 * sr));
+    let s = 1, tk = 0;
+    for (let j = 0; j < n; j++) {
+      if (j % st === 0) s += (1 - gr + gr * 4 * Math.random() * Math.random() - s) * 0.6;
+      if (cr && Math.random() < cr) tk += (1.5 + 3 * Math.random()) * (o.crg || 1);
+      const u = j / n, e = u < a ? u / a : Math.pow((1 - u) / (1 - a), 1.3);
+      x[j] = (Math.random() * 2 - 1) * e * (Math.max(0, s) + tk); tk *= kd;
+    }
+    svfRun(x, f0, f1, q, sr);
+    const k = g * bandK(Math.sqrt(f0 * f1), q, sr) * 0.6;
+    for (let j = 0; j < n; j++) { L[i0 + j] += x[j] * k; R[i0 + j] += x[j] * k; }
+  }
+  // crackling - fibres tearing, a crust breaking under teeth, a thin tube crumpling: ticks r0 going to r1 a second over d s, each a few
+  // tenths of a ms of noise, their sizes uneven (most small, a few big), through a band at f
+  function crackIn(L, R, i0, d, r0, r1, f, q, g, sr) {
+    const n = Math.min(L.length - i0, Math.round(d * sr)); if (n <= 8) return;
+    const x = work(5, n), kd = Math.exp(-1 / (0.00025 * sr));
+    let tk = 0;
+    for (let j = 0; j < n; j++) { const u = j / n; if (Math.random() < (r0 + (r1 - r0) * u) / sr) tk += Math.pow(Math.random(), 2.2) * 2 + 0.15; x[j] = (Math.random() * 2 - 1) * tk; tk *= kd; }
+    svfRun(x, f, f, q, sr);
+    const k = g * bandK(f, q, sr) * 0.5;
+    for (let j = 0; j < n; j++) { L[i0 + j] += x[j] * k; R[i0 + j] += x[j] * k; }
+  }
+  // a creak: a thing held against another slipping in jerks (a cork in its neck, a strap, a rubber plunger in its glass) - a pulse at
+  // each slip, p0 going to p1 a second, never quite even, each ringing a body at f (and at 1.8 f)
+  function creakIn(L, R, i0, d, p0, p1, f, q, g, sr) {
+    const n = Math.min(L.length - i0, Math.round(d * sr)); if (n <= 8) return;
+    const x = work(5, n), y = work(6, n);
+    let ph = Math.random();
+    for (let j = 0; j < n; j++) { const u = j / n; ph += (p0 * Math.pow(p1 / p0, u)) / sr; if (ph >= 1) { ph -= 1 + (Math.random() - 0.5) * 0.35; const v = Math.pow(Math.sin(Math.PI * u), 0.5) * (0.5 + Math.random() * 0.5); x[j] = v; y[j] = v; } }
+    svfRun(x, f, f, q, sr); svfRun(y, f * 1.8, f * 1.8, q * 1.2, sr);
+    const k = g * q * 0.9;
+    for (let j = 0; j < n; j++) { const v = (x[j] + 0.5 * y[j]) * k; L[i0 + j] += v; R[i0 + j] += v; }
+  }
+  // a bubble in a liquid: a short tone rising as it forms and closes (a bloop), dying in d s
+  function bubIn(L, R, i0, f0, d, g, sr) {
+    const n = Math.min(L.length - i0, Math.round(d * 4 * sr)); if (n <= 0) return;
+    let ph = Math.random() * 6.283;
+    for (let j = 0; j < n; j++) { const t = j / sr; ph += (2 * Math.PI * f0 * (1 + 0.9 * (1 - Math.exp(-t / (d * 0.8))))) / sr; const v = g * Math.sin(ph) * Math.min(1, t / 0.0015) * Math.exp(-t / d); L[i0 + j] += v; R[i0 + j] += v; }
+  }
+  // (things struck that come into these: thin glass, a brass stud, a nickel cap, a steel plate held in the hands - each [Hz, level, s])
+  const GLS = () => [[vr(2100, 0.1), 0.3, 0.06], [vr(3400, 0.1), 0.15, 0.04]];
+  const PLT = (t60) => [[vr(420, 0.06), 0.4, t60 * 1.5], [vr(1010, 0.06), 0.3, t60 * 1.2], [vr(1730, 0.06), 0.2, t60], [vr(2650, 0.06), 0.1, t60 * 0.8]];
+  // the takes: key -> [how many takes, length (s), build(X, sr, at), a last low-pass (Hz)]. X is written twice (as the left and the
+  // right of the parts): it is one channel
+  const UT = {};
+  const ut = (key, n, secs, lp, build) => { UT[key] = [n, secs, build, lp]; };
+  // the other things the hands do: a sleeve and the arm in it moving (lowered, raised), a gloved hand shifting its grip
+  ut('u:sleeve', 3, 0.45, 4000, (X, sr, at) => { rubIn(X, X, 0, vr(0.34, 0.1), vr(700, 0.1), vr(480, 0.1), 1.1, 0.5, { a: 0.35, grain: 0.6, cr: 25 }, sr); rubIn(X, X, at(0.05), 0.2, 1500, 1200, 1.6, 0.12, { a: 0.5, grain: 0.7 }, sr); if (Math.random() < 0.5) gearIn(X, X, at(0.1), 0.05, sr); });
+  ut('u:cloth', 3, 0.22, 4500, (X, sr, at) => { rubIn(X, X, 0, vr(0.16, 0.15), vr(1100, 0.1), vr(1300, 0.1), 1.3, 0.4, { a: 0.4, grain: 0.6, cr: 40 }, sr); thudIn(X, X, at(0.01), 900, 0.01, 0.25, sr); });
+  // the bandage (a linen roll): taken up; its end drawn off (the cloth tearing a little from the roll), twice; wound on four times, each
+  // turn tighter (over the top of the arm quick and bright, under it slower, the roll's layers parting as it turns, the last of a turn
+  // drawn snug); the end pressed down twice
+  ut('u:band:draw', 2, 0.5, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.38, 800, 1200, 1.1, 0.5, { a: 0.3, cr: 30 }, sr); rubIn(X, X, at(0.1), 0.14, 1700, 1400, 1.8, 0.35, { a: 0.4, grain: 0.7, cr: 60 }, sr); thudIn(X, X, at(0.12), 800, 0.012, 0.35, sr); });
+  ut('u:band:pull0', 2, 0.32, 4500, (X, sr, at) => { rubIn(X, X, 0, vr(0.22, 0.1), 1300, 2100, 1.4, 0.5, { a: 0.6, grain: 0.8, cr: 180 }, sr); crackIn(X, X, at(vr(0.1, 0.15)), 0.12, 300, 900, 2200, 1.2, 0.35, sr); });
+  ut('u:band:pull1', 2, 0.2, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.12, 1500, 2000, 1.4, 0.4, { a: 0.5, grain: 0.8, cr: 150 }, sr); crackIn(X, X, at(0.03), 0.06, 200, 400, 2000, 1.2, 0.15, sr); });
+  for (let i = 0; i < 4; i++) {
+    const k = i / 3;
+    ut('u:band:wind' + i, 2, 0.5, 4500, (X, sr, at) => {
+      rubIn(X, X, 0, vr(0.2, 0.1), vr(1000 + 150 * k, 0.08), vr(1400 + 200 * k, 0.08), 1.2 + 0.6 * k, 0.55 + 0.1 * k, { a: 0.45, grain: 0.6, cr: 60 + 60 * k }, sr);
+      rubIn(X, X, at(0.17), vr(0.28, 0.1), 800 + 100 * k, 650 + 100 * k, 1.1 + 0.4 * k, 0.3 + 0.05 * k, { a: 0.4, grain: 0.5, cr: 40 + 30 * k }, sr);
+      crackIn(X, X, at(0.02), 0.4, 70, 50, 1800, 1, 0.12, sr);
+      if (i) rubIn(X, X, at(0.36), 0.08, 1100 + 200 * k, 1300 + 200 * k, 3 + 2 * k, 0.2 * k, { a: 0.3, grain: 0.9 }, sr);
+    });
+  }
+  for (let i = 0; i < 2; i++) ut('u:band:pat' + i, 2, 0.22, 3500, (X, sr, at) => { thudIn(X, X, 0, vr(750 + 100 * i, 0.1), 0.018 - 0.004 * i, 0.9 - 0.2 * i, sr); lowIn(X, X, 0, vr(170 + 20 * i, 0.1), 120 + 10 * i, 0.025 - 0.005 * i, 0.25 - 0.1 * i, sr); rubIn(X, X, 0, 0.06, 1200 + 100 * i, 900 + 100 * i, 1.2, 0.25, { a: 0.2, grain: 0.6, cr: 80 }, sr); });
+  // the kit (a canvas pouch on a leather strap, a brass stud on its flap; linen, paper, a glass phial and the syrette in it): brought up;
+  // the stud undone; the flap thrown back and flopping over; the hand in it, digging, the syrette out of its loop; the needle in and a
+  // breath through the teeth; the syrette's tin tube squeezed flat; out, and the breath let go; the kit lowered
+  ut('u:kit:draw', 2, 0.55, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.36, 650, 950, 1, 0.5, { a: 0.35, grain: 0.6, cr: 20 }, sr); creakIn(X, X, at(0.08), 0.16, 70, 120, 650, 5, 0.3, sr); ringIn(X, X, at(vr(0.2, 0.15)), GLS(), 0.12, 0.2, 0, sr); thudIn(X, X, at(0.22), 500, 0.02, 0.45, sr); knockIn(X, X, at(0.2), vr(700, 0.1), 0.12, 0, sr); });
+  ut('u:kit:stud', 2, 0.25, 4800, (X, sr, at) => { rubIn(X, X, 0, 0.07, 1000, 1400, 1.4, 0.3, { a: 0.7, grain: 0.7 }, sr); knockIn(X, X, at(0.06), vr(1500, 0.08), 0.8, 0, sr); ringIn(X, X, at(0.06), [[vr(2500, 0.06), 0.4, 0.03], [vr(3900, 0.06), 0.2, 0.02]], 0.35, 0.5, 0, sr); thudIn(X, X, at(0.065), 1200, 0.006, 0.4, sr); });
+  ut('u:kit:flap', 2, 0.3, 4000, (X, sr) => rubIn(X, X, 0, vr(0.2, 0.1), 700, 1100, 1, 0.45, { a: 0.5, grain: 0.5, cr: 15 }, sr));
+  ut('u:kit:flop', 2, 0.2, 4000, (X, sr) => { thudIn(X, X, 0, 900, 0.012, 0.6, sr); rubIn(X, X, 0, 0.08, 900, 700, 1.1, 0.3, { a: 0.15 }, sr); lowIn(X, X, 0, 220, 160, 0.02, 0.15, sr); });
+  ut('u:kit:dig', 2, 0.5, 4800, (X, sr, at) => { rubIn(X, X, 0, 0.4, 900, 1300, 1, 0.4, { a: 0.5, grain: 0.7, cr: 40 }, sr); crackIn(X, X, at(0.08), 0.25, 80, 140, 2000, 0.9, 0.25, sr); ringIn(X, X, at(vr(0.22, 0.2)), GLS(), 0.25, 0.5, 0, sr); ringIn(X, X, at(vr(0.32, 0.1)), GLS(), 0.1, 0.4, 0, sr); });
+  ut('u:kit:out', 2, 0.25, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.12, 1400, 1900, 1.5, 0.4, { a: 0.7, grain: 0.7, cr: 60 }, sr); knockIn(X, X, at(0.11), 1200, 0.25, 0, sr); ringIn(X, X, at(0.11), [[vr(2900, 0.08), 0.2, 0.03]], 0.1, 0.3, 0, sr); });
+  ut('u:kit:squeeze', 2, 0.5, 4500, (X, sr, at) => { crackIn(X, X, 0, 0.42, 90, 30, 1700, 1.3, 0.5, sr); creakIn(X, X, at(0.02), 0.38, 35, 25, 800, 4, 0.25, sr); rubIn(X, X, 0, 0.4, 500, 400, 1.5, 0.12, { a: 0.3, grain: 0.8 }, sr); });
+  ut('u:kit:lower', 2, 0.5, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.3, 900, 650, 1, 0.45, { a: 0.4, grain: 0.6, cr: 20 }, sr); creakIn(X, X, at(0.1), 0.12, 110, 70, 650, 5, 0.25, sr); ringIn(X, X, at(vr(0.25, 0.15)), GLS(), 0.08, 0.2, 0, sr); thudIn(X, X, at(0.3), 500, 0.02, 0.3, sr); });
+  // (both doses: the needle into the skin and a breath drawn sharp through the teeth; drawn out, and the breath let go)
+  ut('u:jab', 2, 0.45, 4000, (X, sr, at) => { thudIn(X, X, 0, 600, 0.008, 0.35, sr); knockIn(X, X, 0, vr(320, 0.1), 0.25, 0, sr); breathIn(X, X, at(0.02), vr(0.26, 0.1), 0.55, false, sr); });
+  ut('u:out', 2, 0.42, 4000, (X, sr, at) => { rubIn(X, X, 0, 0.04, 1600, 1400, 2, 0.25, { a: 0.3 }, sr); breathIn(X, X, at(0.04), vr(0.32, 0.1), 0.5, true, sr); });
+  // the syringe (glass, a rubber plunger, a nickel cap on its needle): taken up; the cap into the other fist and pulled off (a squeak,
+  // a tick), let fall and landing on the floor (a little tube of metal, bouncing, rolling); in; the plunger dragging down its glass and
+  // bottoming; out; tossed aside (the air) and landing on the floor, glass and metal, bouncing and rolling away
+  ut('u:syr:draw', 2, 0.3, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.2, 900, 1300, 1.2, 0.4, { cr: 30 }, sr); ringIn(X, X, at(0.14), [[vr(2600, 0.1), 0.25, 0.04], [vr(4100, 0.1), 0.12, 0.03]], 0.12, 0.3, 0, sr); thudIn(X, X, at(0.14), 900, 0.008, 0.25, sr); });
+  ut('u:syr:grip', 2, 0.12, 4500, (X, sr) => { thudIn(X, X, 0, 900, 0.008, 0.4, sr); rubIn(X, X, 0, 0.06, 1400, 1200, 1.4, 0.25, { a: 0.3 }, sr); });
+  ut('u:syr:cap', 2, 0.2, 4800, (X, sr, at) => { creakIn(X, X, 0, 0.07, 260, 180, 2300, 8, 0.35, sr); knockIn(X, X, at(0.065), vr(1700, 0.08), 0.4, 0, sr); ringIn(X, X, at(0.065), [[vr(2800, 0.06), 0.3, 0.05], [vr(4400, 0.06), 0.15, 0.03]], 0.25, 0.4, 0, sr); });
+  ut('u:syr:capland', 2, 0.55, 4500, (X, sr, at) => {
+    for (const [tt, gb] of [[0, 1], [vr(0.09, 0.15), 0.45], [vr(0.15, 0.1), 0.2]]) { ringIn(X, X, at(tt), [[vr(2700, 0.08), 0.35, 0.07], [vr(4300, 0.08), 0.2, 0.05], [vr(1500, 0.1), 0.15, 0.05]], gb, 0.6, 0, sr); knockIn(X, X, at(tt), 1200, gb * 0.3, 0, sr); }
+    crackIn(X, X, at(0.18), 0.25, 60, 20, 3000, 2, 0.06, sr);
+  });
+  ut('u:syr:push', 2, 0.5, 4500, (X, sr, at) => { creakIn(X, X, 0, 0.44, 95, 55, 1150, 6, 0.35, sr); rubIn(X, X, 0, 0.44, 1200, 1000, 3, 0.12, { a: 0.4, grain: 0.5 }, sr); ringIn(X, X, at(0.02), [[vr(1700, 0.05), 0.15, 0.3]], 0.05, 0, 0, sr); });
+  ut('u:syr:home', 2, 0.15, 4500, (X, sr) => { knockIn(X, X, 0, vr(950, 0.08), 0.5, 0, sr); ringIn(X, X, 0, [[vr(2300, 0.05), 0.25, 0.04], [vr(3600, 0.05), 0.12, 0.03]], 0.2, 0.3, 0, sr); });
+  ut('u:syr:toss', 2, 0.2, 3500, (X, sr) => rubIn(X, X, 0, 0.14, 500, 900, 0.9, 0.3, { a: 0.6, grain: 0.2 }, sr));
+  ut('u:syr:land', 2, 0.7, 4800, (X, sr, at) => {
+    for (const [tt, gb] of [[0, 0.9], [vr(0.11, 0.15), 0.4], [vr(0.18, 0.1), 0.2]]) { ringIn(X, X, at(tt), [[vr(2100, 0.1), 0.4, 0.09], [vr(3300, 0.1), 0.3, 0.06], [vr(5000, 0.1), 0.12, 0.04]], gb, 0.6, 0, sr); knockIn(X, X, at(tt), 900, gb * 0.3, 0, sr); }
+    crackIn(X, X, at(0.2), 0.35, 50, 15, 2600, 2, 0.07, sr); rubIn(X, X, at(0.2), 0.35, 2400, 2000, 3, 0.03, { a: 0.2, grain: 0.8 }, sr);
+  });
+  // a draught (a corked vessel of glass or stoneware): taken from the belt, the glass knocking, the liquid in it moving; the cork twisted
+  // (it squeaks in its neck, one way and back), drawn (a creak rising) and out (a low pop, the air after it); tipped up (the liquid going
+  // over, the lip at the mouth); three swallows, each a glug in the vessel and the throat's swallow under it, each a little different; down
+  ut('u:drk:draw', 2, 0.55, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.3, 800, 1200, 1.1, 0.35, { cr: 25 }, sr); ringIn(X, X, at(0.12), [[vr(1800, 0.1), 0.25, 0.06], [vr(3100, 0.1), 0.15, 0.04]], 0.15, 0.3, 0, sr); rubIn(X, X, at(0.1), 0.3, 350, 650, 1.6, 0.3, { a: 0.3, grain: 0.9 }, sr); bubIn(X, X, at(vr(0.18, 0.1)), vr(380, 0.15), 0.025, 0.25, sr); bubIn(X, X, at(vr(0.27, 0.1)), vr(300, 0.15), 0.03, 0.2, sr); });
+  for (let i = 0; i < 2; i++) ut('u:drk:tw' + i, 2, 0.16, 4800, (X, sr) => { creakIn(X, X, 0, vr(0.12, 0.1), vr(i ? 90 : 70, 0.15), vr(i ? 60 : 120, 0.15), vr(i ? 1250 : 1400, 0.1), 7, 0.5, sr); rubIn(X, X, 0, 0.1, 1800, 1600, 2.5, 0.08, { a: 0.5, grain: 0.9 }, sr); });
+  ut('u:drk:pull', 2, 0.12, 4800, (X, sr) => creakIn(X, X, 0, 0.08, 110, 200, 1500, 6, 0.35, sr));
+  ut('u:drk:pop', 2, 0.3, 4500, (X, sr, at) => { lowIn(X, X, 0, vr(520, 0.08), 360, 0.018, 0.8, sr); knockIn(X, X, 0, vr(600, 0.1), 0.5, 0, sr); thudIn(X, X, 0, 1500, 0.004, 0.4, sr); rubIn(X, X, at(0.005), 0.05, 2200, 1800, 1.2, 0.1, { a: 0.1 }, sr); bubIn(X, X, at(0.06), vr(420, 0.1), 0.02, 0.15, sr); });
+  ut('u:drk:raise', 2, 0.45, 4000, (X, sr, at) => { rubIn(X, X, 0, 0.35, 300, 600, 1.5, 0.35, { a: 0.5, grain: 0.9 }, sr); bubIn(X, X, at(vr(0.15, 0.2)), vr(340, 0.15), 0.03, 0.2, sr); });
+  ut('u:drk:lip', 2, 0.12, 4500, (X, sr) => { ringIn(X, X, 0, [[vr(2000, 0.08), 0.2, 0.04], [vr(3300, 0.08), 0.1, 0.03]], 0.12, 0.3, 0, sr); thudIn(X, X, 0, 900, 0.005, 0.2, sr); });
+  for (let i = 0; i < 3; i++) {
+    ut('u:drk:g' + i, 2, 0.42, 3500, (X, sr, at) => {
+      bubIn(X, X, 0, vr(260 + 25 * i, 0.1), 0.035, 0.7, sr); bubIn(X, X, at(vr(0.05, 0.2)), vr(330 - 20 * i, 0.12), 0.03, 0.45, sr); if (i === 1) bubIn(X, X, at(vr(0.08, 0.2)), vr(240, 0.12), 0.03, 0.35, sr);
+      rubIn(X, X, 0, 0.14, 400, 700, 1.4, 0.25, { a: 0.3, grain: 0.9 }, sr);
+      lowIn(X, X, at(0.11 + 0.01 * i), vr(140, 0.08), 85, 0.035, 0.7, sr); knockIn(X, X, at(0.1 + 0.01 * i), vr(420, 0.1), 0.35, 0, sr); thudIn(X, X, at(0.1 + 0.01 * i), 450, 0.02, 0.4, sr);
+      if (i === 2) breathIn(X, X, at(0.24), 0.14, 0.2, true, sr);
+    });
+  }
+  ut('u:drk:lower', 2, 0.55, 4000, (X, sr, at) => { rubIn(X, X, 0, 0.3, 700, 500, 1.1, 0.3, { a: 0.4, cr: 20 }, sr); rubIn(X, X, at(0.06), 0.25, 330, 550, 1.6, 0.25, { a: 0.4, grain: 0.9 }, sr); bubIn(X, X, at(vr(0.2, 0.15)), vr(300, 0.1), 0.03, 0.2, sr); ringIn(X, X, at(0.32), [[vr(1800, 0.1), 0.2, 0.05], [vr(3000, 0.1), 0.1, 0.03]], 0.08, 0.3, 0, sr); });
+  // food: taken from the pouch; three bites, each the teeth going in, the bite torn away and chewed - a golden apple (a hard skin
+  // snapping and its flesh crunching, juicy), a troll's heart (wet meat giving, sinew drawn out and tearing), herbs (leaves crushed, a
+  // stalk snapping); down, and swallowed
+  ut('u:eat:draw', 2, 0.4, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.3, 800, 1200, 1.1, 0.4, { cr: 25 }, sr); thudIn(X, X, at(0.12), 700, 0.012, 0.3, sr); });
+  for (let i = 0; i < 3; i++) {
+    const c3 = [vr(0.18, 0.1), vr(0.26, 0.08), vr(0.34, 0.06)];
+    ut('u:eat:apple' + i, 2, 0.48, 4000, (X, sr, at) => {
+      crackIn(X, X, 0, 0.05, 2500, 900, i ? 2200 : 2600, 0.9, 0.9 - 0.1 * i, sr); knockIn(X, X, 0, vr(i ? 900 : 1100, 0.1), 0.4 - 0.1 * i, 0, sr); thudIn(X, X, 0, 1800, 0.006, 0.4, sr);
+      crackIn(X, X, at(0.03), 0.12, 700, 150, 2000, 1, 0.45, sr); rubIn(X, X, at(0.03), 0.1, 1400, 1100, 1.6, 0.2, { a: 0.3, grain: 0.9 }, sr);
+      c3.forEach((tt, c) => { crackIn(X, X, at(tt), 0.05, 900, 200, 1300, 1, 0.25 * (1 - 0.2 * c), sr); lowIn(X, X, at(tt), 130, 90, 0.02, 0.25, sr); });
+    });
+    ut('u:eat:heart' + i, 2, 0.48, 3500, (X, sr, at) => {
+      rubIn(X, X, 0, 0.14, 450, 750, 1.2, 0.8, { a: 0.25, grain: 1, cr: 120 }, sr); thudIn(X, X, 0, 700, 0.015, 0.6, sr); lowIn(X, X, 0, vr(150, 0.1), 100, 0.03, 0.3, sr);
+      crackIn(X, X, at(0.05), 0.12, 250, 80, 900, 1.5, 0.35, sr); creakIn(X, X, at(0.05), 0.1, 40, 25, 600, 3, 0.2, sr);
+      c3.forEach((tt) => { rubIn(X, X, at(tt), 0.07, 500, 400, 1.3, 0.3, { a: 0.4, grain: 1, cr: 80 }, sr); lowIn(X, X, at(tt), 120, 85, 0.02, 0.2, sr); });
+    });
+    ut('u:eat:herb' + i, 2, 0.48, 4200, (X, sr, at) => {
+      crackIn(X, X, 0, 0.06, 1500, 600, 3000, 0.8, 0.35, sr); knockIn(X, X, at(0.01), vr(1500, 0.1), 0.3, 0, sr); ringIn(X, X, at(0.01), [[vr(1900, 0.1), 0.2, 0.015]], 0.1, 0.3, 0, sr);
+      crackIn(X, X, at(0.04), 0.12, 400, 100, 2400, 1, 0.25, sr); rubIn(X, X, at(0.04), 0.1, 2000, 1800, 1.5, 0.1, { a: 0.3, grain: 0.8 }, sr);
+      c3.forEach((tt) => { crackIn(X, X, at(tt), 0.05, 500, 150, 1600, 1, 0.15, sr); lowIn(X, X, at(tt), 140, 95, 0.015, 0.15, sr); });
+    });
+  }
+  ut('u:eat:lower', 2, 0.5, 3500, (X, sr, at) => { lowIn(X, X, 0, vr(135, 0.08), 85, 0.035, 0.6, sr); knockIn(X, X, 0, vr(400, 0.1), 0.3, 0, sr); thudIn(X, X, 0, 450, 0.02, 0.35, sr); rubIn(X, X, at(0.12), 0.3, 700, 500, 1.1, 0.25, { cr: 20 }, sr); });
+  // the plate (forged steel, slid into a carrier on the chest): drawn out of its pouch, the steel ringing a little in the hand; turned
+  // over and back (a glove on its edge); to the chest; its edge into the carrier; pushed down twice (sliding, and stopping on the
+  // straps); home; patted twice, steel under canvas
+  ut('u:plt:draw', 2, 0.5, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.3, 1000, 750, 1.3, 0.55, { a: 0.5, grain: 0.6, cr: 40 }, sr); ringIn(X, X, at(0.28), PLT(0.1), 0.3, 0.2, 0, sr); knockIn(X, X, at(0.28), vr(380, 0.1), 0.4, 0, sr); thudIn(X, X, at(0.29), 700, 0.01, 0.3, sr); });
+  for (let i = 0; i < 2; i++) ut('u:plt:turn' + i, 2, 0.25, 4500, (X, sr, at) => { rubIn(X, X, 0, 0.14, 1300 + 150 * i, 1600, 2, 0.3, { a: 0.5, grain: 0.8, cr: 60 }, sr); ringIn(X, X, at(0.1), PLT(0.05), 0.1, 0.1, 0, sr); thudIn(X, X, at(0.1), 900, 0.006, 0.2, sr); });
+  ut('u:plt:chest', 2, 0.4, 4000, (X, sr, at) => { rubIn(X, X, 0, 0.3, 700, 1000, 1, 0.45, { a: 0.6, cr: 30 }, sr); gearIn(X, X, at(0.25), 0.1, sr); });
+  ut('u:plt:slip', 2, 0.3, 4500, (X, sr) => { rubIn(X, X, 0, 0.18, 1100, 900, 1.6, 0.5, { a: 0.3, grain: 0.8, cr: 80 }, sr); knockIn(X, X, 0, vr(650, 0.1), 0.35, 0, sr); ringIn(X, X, 0, PLT(0.05), 0.12, 0.2, 0, sr); });
+  for (let i = 0; i < 2; i++) {
+    ut('u:plt:push' + i, 2, 0.25, 4500, (X, sr) => rubIn(X, X, 0, vr(0.2, 0.1), 900 - 50 * i, 600 - 50 * i, 1.4, 0.55, { a: 0.85, grain: 0.6, cr: 50 }, sr));
+    ut('u:plt:stop' + i, 2, 0.3, 4000, (X, sr) => { knockIn(X, X, 0, vr(280 - 30 * i, 0.08), 0.9, 0, sr); lowIn(X, X, 0, vr(120 - 10 * i, 0.08), 80, 0.04, 0.5, sr); thudIn(X, X, 0, 600, 0.02, 0.6, sr); ringIn(X, X, 0, PLT(0.08), 0.2, 0.1, 0, sr); });
+    ut('u:plt:pat' + i, 2, 0.3, 4000, (X, sr) => { knockIn(X, X, 0, vr(330 + 30 * i, 0.08), 0.8 - 0.1 * i, 0, sr); ringIn(X, X, 0, [[vr(440, 0.05), 0.3, 0.09], [vr(1050, 0.05), 0.25, 0.07], [vr(1800, 0.05), 0.12, 0.05]], 0.3, 0.2, 0, sr); thudIn(X, X, 0, 700, 0.015, 0.5, sr); rubIn(X, X, 0, 0.05, 1100, 900, 1.2, 0.2, { a: 0.2 }, sr); });
+  }
+  ut('u:plt:seat', 2, 0.4, 3500, (X, sr, at) => { lowIn(X, X, 0, vr(100, 0.06), 62, 0.05, 0.6, sr); knockIn(X, X, 0, vr(230, 0.08), 0.7, 0, sr); thudIn(X, X, 0, 450, 0.025, 0.5, sr); creakIn(X, X, at(0.02), 0.12, 50, 35, 700, 4, 0.2, sr); });
+  // a tool or a token worked in the hand
+  ut('u:dev:use', 2, 0.3, 4500, (X, sr, at) => { knockIn(X, X, 0, vr(800, 0.1), 0.5, 0, sr); ringIn(X, X, 0, [[vr(1500, 0.08), 0.3, 0.05], [vr(2600, 0.08), 0.15, 0.03]], 0.2, 0.3, 0, sr); rubIn(X, X, at(0.03), 0.12, 1200, 1000, 1.4, 0.3, { cr: 40 }, sr); });
+  // the sounds of a use on its stages: [s, take, { max: cut off after (s), floor: on the floor ahead and to the right }]. st is
+  // IA.stages(id): { plan, dur, apply, stages: [[name, s], ...] }. What follows another of its own line is cut where that one begins
+  const FOOD = { h_apple: 'apple', h_troll: 'heart' };
+  function useCues(id, st) {
+    const S = {}, d = st.dur, C = [];
+    for (const [nm, s] of st.stages) S[nm] = s;
+    const q = (t, k, o) => C.push(Object.assign({ t: Math.max(0, t), k }, o));
+    // (a line of them, each cut where the next begins: ts holds one moment more than keys, where the last of them is cut)
+    const line = (ts, keys) => keys.forEach((k, i) => q(ts[i], k, { max: ts[i + 1] - ts[i] }));
+    switch (st.plan) {
+      case 'bandage': {
+        const pull2 = S.unwind + 0.62 * (S.wind - S.unwind);
+        q(0, 'u:band:draw'); line([S.unwind, pull2, S.wind], ['u:band:pull0', 'u:band:pull1']);
+        line([S.wind, S.turn2, S.turn3, S.turn4, S.pin], ['u:band:wind0', 'u:band:wind1', 'u:band:wind2', 'u:band:wind3']);
+        line([S.pin, S.press2, S.lower], ['u:band:pat0', 'u:band:pat1']); q(S.lower, 'u:sleeve');
+        break;
+      }
+      case 'kit': {
+        const flop = S.takeOut - 0.03 * d, out = S.takeOut + 0.07 * d;
+        q(0, 'u:kit:draw'); q(S.reach, 'u:cloth'); q(S.unclasp, 'u:kit:stud'); q(S.open, 'u:kit:flap', { max: flop - S.open }); q(flop, 'u:kit:flop');
+        line([S.takeOut, out], ['u:kit:dig']); q(out, 'u:kit:out'); q(S.ready, 'u:cloth');
+        q(S.jab, 'u:jab'); line([S.squeeze, S.out], ['u:kit:squeeze']); q(S.out, 'u:out'); q(S.away, 'u:cloth'); q(S.lower, 'u:kit:lower');
+        break;
+      }
+      case 'syringe': {
+        const home = S.out - 0.02 * d;
+        q(0, 'u:syr:draw'); q(S.uncap, 'u:syr:grip'); q(S.capOff, 'u:syr:cap'); q(S.aim, 'u:cloth');
+        q(S.capDrop + 0.5, 'u:syr:capland', { floor: 1.6 }); q(S.jab, 'u:jab'); line([S.push, home], ['u:syr:push']); q(home, 'u:syr:home');
+        q(S.out, 'u:out'); q(S.toss, 'u:syr:toss'); q(S.toss + 0.05 * d + 0.6, 'u:syr:land', { floor: 2.2 }); q(S.lower, 'u:sleeve');
+        break;
+      }
+      case 'drink': {
+        const tw2 = S.twist + 0.5 * (S.pop - S.twist), give = S.pop + 0.55 * (S.away - S.pop);
+        q(0, 'u:drk:draw'); q(S.reach, 'u:cloth'); line([S.twist, tw2, S.pop], ['u:drk:tw0', 'u:drk:tw1']);
+        line([S.pop, give], ['u:drk:pull']); q(give, 'u:drk:pop'); q(S.away, 'u:cloth'); q(S.raise, 'u:drk:raise', { max: S.gulp1 - 0.01 * d - S.raise });
+        q(S.gulp1 - 0.01 * d, 'u:drk:lip'); line([S.gulp1, S.gulp2, S.gulp3, S.lower], ['u:drk:g0', 'u:drk:g1', 'u:drk:g2']); q(S.lower, 'u:drk:lower');
+        break;
+      }
+      case 'eat': {
+        const f = FOOD[id] || 'herb';
+        q(0, 'u:eat:draw'); q(S.raise, 'u:cloth');
+        line([S.bite1, S.bite2, S.bite3, S.lower], ['u:eat:' + f + '0', 'u:eat:' + f + '1', 'u:eat:' + f + '2']); q(S.lower, 'u:eat:lower');
+        break;
+      }
+      case 'plate': {
+        const s1 = S.push1 + 0.06 * d, s2 = S.push2 + 0.06 * d;
+        q(0, 'u:plt:draw'); line([S.look, S.look + 0.09 * d, S.insert], ['u:plt:turn0', 'u:plt:turn1']); q(S.insert, 'u:plt:chest', { max: S.slip - S.insert });
+        q(S.slip, 'u:plt:slip', { max: S.push1 - S.slip }); line([S.push1, s1], ['u:plt:push0']); q(s1, 'u:plt:stop0'); line([S.push2, s2], ['u:plt:push1']); q(s2, 'u:plt:stop1');
+        q(S.seat, 'u:plt:seat'); line([S.pat1, S.pat2, S.lower], ['u:plt:pat0', 'u:plt:pat1']); q(S.lower, 'u:sleeve');
+        break;
+      }
+      // (a tool: up, worked, turned over in the hand a while, down)
+      default: q(0, 'u:cloth'); if (S.use !== undefined) { q(S.use, 'u:dev:use'); q(S.use + 0.2 * d, 'u:cloth'); q(S.use + 0.38 * d, 'u:cloth'); } if (S.lower !== undefined) q(S.lower, 'u:sleeve');
+    }
+    return C.sort((a, b) => a.t - b.t);
+  }
+  // (a take of one of them: made the first times it is asked for, then one of those that is not the last one played)
+  const useSets = {};
+  A.useStats = { made: 0, ms: 0, worst: 0, by: {}, bytes: 0 };
+  function useTake(k, fresh) {
+    const D = UT[k]; if (!D) return null;
+    const set = useSets[k] || (useSets[k] = []);
+    if (set.length >= D[0]) { if (fresh) return null; let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === set.last) i = (i + 1) % set.length; set.last = i; return set[i]; }
+    const t0 = performance.now(), sr = ctx.sampleRate, b = ctx.createBuffer(1, Math.max(1, Math.round(D[1] * sr)), sr), X = b.getChannelData(0);
+    D[2](X, sr, (s) => Math.round(s * sr));
+    if (D[3]) { bqRun(X, 'lp', D[3], 0.7, sr); bqRun(X, 'lp', D[3], 0.7, sr); }
+    // (brought to one loudness by its loudest 100 ms, not by its peak: a take with one big tick in it is not left the quieter for it)
+    const w = Math.round(0.1 * sr), hop = Math.round(0.01 * sr); let e = 0, top = 0;
+    for (let i = 0; i < X.length; i++) { e += X[i] * X[i]; if (i >= w) e -= X[i - w] * X[i - w]; if (i % hop === 0 || i === X.length - 1) top = Math.max(top, e / Math.min(w, i + 1)); }
+    const fo = Math.min(X.length, Math.round(0.01 * sr)), kn = 0.25 / (Math.sqrt(top) || 1);   // (its last 10 ms brought down to nothing: no take ends on a click)
+    for (let i = 0; i < X.length; i++) X[i] *= kn * Math.min(1, (X.length - i) / fo);
+    set.push(b); set.last = set.length - 1;
+    const ms = performance.now() - t0; A.useStats.made++; A.useStats.ms += ms; A.useStats.worst = Math.max(A.useStats.worst, ms); A.useStats.by[k] = Math.max(A.useStats.by[k] || 0, ms); A.useStats.bytes += X.length * 4;
+    return b;
+  }
+  // (every take made in the time the page has to spare, from when the sound starts: none is made in the middle of a use)
+  let usePrepQ = null;
+  A.usePrep = function () {
+    if (!ctx || usePrepQ) return;
+    usePrepQ = []; for (const k in UT) for (let i = 0; i < UT[k][0]; i++) usePrepQ.push(k);
+    const run = (dl) => {
+      const t0 = performance.now();
+      while (usePrepQ.length) { useTake(usePrepQ.shift(), true); if (!dl || dl.timeRemaining() < 4 || performance.now() - t0 > 8) break; }
+      if (usePrepQ.length) later();
+    };
+    const later = () => { if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 1500 }); else setTimeout(run, 30); };
+    later();
+  };
+  // (begun a few seconds after the sound itself starts - at the title, or as a run is first made - in the time the page has to spare)
+  { const init0 = A.init; A.init = function () { const had = !!ctx; init0.apply(this, arguments); if (!had && ctx) setTimeout(() => A.usePrep(), 3000); }; }
+  // each take's level: a hand's work, some 5 dB under a walking step on stone at the most (its K-weighted loudness), the small things of
+  // it (a glove shifting, a sleeve) further under
+  const UL = { 'u:sleeve': 0.0116, 'u:cloth': 0.0098, 'u:band:draw': 0.0149, 'u:band:pull0': 0.0214, 'u:band:pull1': 0.0192, 'u:band:wind0': 0.0173, 'u:band:wind1': 0.0185, 'u:band:wind2': 0.0192, 'u:band:wind3': 0.0237, 'u:band:pat0': 0.0687, 'u:band:pat1': 0.0552, 'u:kit:draw': 0.0168, 'u:kit:stud': 0.0289, 'u:kit:flap': 0.0173, 'u:kit:flop': 0.0475, 'u:kit:dig': 0.0171, 'u:kit:out': 0.0161, 'u:jab': 0.0185, 'u:kit:squeeze': 0.0204, 'u:out': 0.0187, 'u:kit:lower': 0.0165, 'u:syr:draw': 0.0169, 'u:syr:grip': 0.0255, 'u:syr:cap': 0.0241, 'u:syr:capland': 0.0408, 'u:syr:push': 0.018, 'u:syr:home': 0.0609, 'u:syr:toss': 0.0151, 'u:syr:land': 0.0508, 'u:drk:draw': 0.0171, 'u:drk:tw0': 0.0226, 'u:drk:tw1': 0.0224, 'u:drk:pull': 0.0268, 'u:drk:pop': 0.0802, 'u:drk:raise': 0.0188, 'u:drk:lip': 0.0532, 'u:drk:g0': 0.0371, 'u:drk:g1': 0.0344, 'u:drk:g2': 0.0329, 'u:drk:lower': 0.017, 'u:eat:draw': 0.016, 'u:eat:apple0': 0.0518, 'u:eat:apple1': 0.0445, 'u:eat:apple2': 0.0359, 'u:eat:heart0': 0.0416, 'u:eat:heart1': 0.0374, 'u:eat:heart2': 0.0358, 'u:eat:herb0': 0.0402, 'u:eat:herb1': 0.0397, 'u:eat:herb2': 0.0353, 'u:eat:lower': 0.0513, 'u:plt:draw': 0.0197, 'u:plt:turn0': 0.015, 'u:plt:turn1': 0.0148, 'u:plt:chest': 0.0162, 'u:plt:slip': 0.0245, 'u:plt:push0': 0.0246, 'u:plt:push1': 0.0256, 'u:plt:stop0': 0.062, 'u:plt:stop1': 0.0692, 'u:plt:seat': 0.0668, 'u:plt:pat0': 0.0809, 'u:plt:pat1': 0.0694, 'u:dev:use': 0.0482 };
+  function useFire(h, c, when) {
+    const b = useTake(c.k); if (!b) return;
+    let pos = null;
+    if (c.floor) { const w = 0.6 + (A.listenerYawNeg || 0), Lz = A.listener; pos = { x: Lz.x + Math.sin(w) * c.floor * 0.7, y: Lz.y - 1.5, z: Lz.z - Math.cos(w) * c.floor * 0.7 }; }
+    const out = dest(pos, c.floor ? 0.3 : 0.1), src = ctx.createBufferSource(), g = out.gain.value * (UL[c.k] || 0.03), rate = vr(1, 0.02);
+    out.gain.value = g; src.buffer = b; src.playbackRate.value = rate; src.connect(out); src.start(when);
+    let until = when + b.duration / rate;
+    if (c.max && c.max < b.duration / rate) { const e = when + Math.max(0.03, c.max); out.gain.setValueAtTime(g, Math.max(when, e - 0.04)); out.gain.linearRampToValueAtTime(0, e); src.stop(e + 0.005); until = e; }
+    h.live.push({ out, src, when, until });
+  }
+  // a use begins (itemanim.js IA.play): its sounds, from the stages of its motion. null in the old set of sounds (it keeps its old ones)
+  A.useBegin = function (id, st) {
+    if (!ctx || !NEW() || !st || !st.stages) return null;
+    if (A._use) A.useEnd(A._use, true);
+    A.usePrep();
+    const h = { id, cues: useCues(id, st), i: 0, t: 0, live: [], end: false };
+    A._use = h; A.useTick(h, 0, 0);
+    return h;
+  };
+  // the use's own clock (t s since it began; dt the frame's): what falls due in the next tenth of a second is laid on its moment now. The takes
+  // of what is coming are made a little ahead, one a frame, if they are not made already
+  A.useTick = function (h, t, dt) {
+    if (!h || h.end || !ctx) return;
+    h.t = t;
+    const now = ctx.currentTime, look = 0.1;   // (a tenth of a second ahead: a long frame next does not leave a sound late)
+    while (h.i < h.cues.length && h.cues[h.i].t <= t + look) { const c = h.cues[h.i++]; useFire(h, c, now + Math.max(0, c.t - t)); }
+    for (let j = h.i; j < h.cues.length && h.cues[j].t <= t + 0.6; j++) { const D = UT[h.cues[j].k]; if (D && (useSets[h.cues[j].k] || []).length < 1) { useTake(h.cues[j].k, true); break; } }
+    if (h.live.length > 12) h.live = h.live.filter((q) => q.until > now);
+  };
+  // a use over: done in full (what comes after it - a thing tossed landing - still comes, on its moment), or cut short (cut: put down,
+  // struck out of the hands, the hands wanted for something else, death) - all of it brought down to nothing in 60 ms, and none to come
+  A.useEnd = function (h, cut) {
+    if (!h || h.end) return;
+    h.end = true; if (A._use === h) A._use = null;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    if (!cut) { for (; h.i < h.cues.length; h.i++) { const c = h.cues[h.i]; useFire(h, c, now + Math.max(0, c.t - h.t)); } return; }
+    for (const q of h.live) {
+      if (q.until <= now) continue;
+      try {
+        const gp = q.out.gain;
+        if (q.when >= now) { gp.cancelScheduledValues(0); gp.value = 0; q.src.stop(now); continue; }
+        gp.cancelScheduledValues(now); gp.setValueAtTime(gp.value, now); gp.linearRampToValueAtTime(0, now + 0.06); q.src.stop(now + 0.07);
+      } catch (e) { /* already stopped */ }
+    }
+    h.live = [];
+  };
+  // (for the sound page and the tools: the sounds a use would have, without playing them)
+  A.useCues = (id, st) => useCues(id, st).map((c) => ({ t: c.t, k: c.k, g: UL[c.k] || 0.03, max: c.max || 0, floor: c.floor || 0 }));
+  A.useLevels = UL;
 
   // ---------- monsters ----------
   // kinds: growl, snarl, screech, roar, hiss, chitter, groan, gurgle, wail, rumble, buzz

@@ -53,6 +53,51 @@
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
+  // The face of each kind of gate's sign is the same every time: drawn once a session and shared by every sign of that kind (drawn at
+  // the clear, three of them held its frame for some 15 ms). Nothing disposes them: a world's dispose leaves materials and textures be.
+  const FACES = {};
+  const faceOf = (k) => FACES[k] || (FACES[k] = labelTex(AR.TYPES[k]));
+  // drawn ahead (AR.prepClear) once the letters it writes are loaded: a canvas writes letters whose font has not come yet in a
+  // stand-in font, and the face would keep it. Sent to the GPU then too, so its first sight does not wait on the upload.
+  const FACE_FONTS = ['900 44px "Noto Sans JP"', '500 24px "Noto Sans JP"'];
+  const facing = new Set(); // (the kinds whose letters are being loaded)
+  function drawFaceAhead(k) {
+    const T = AR.TYPES[k]; if (!T || FACES[k] || facing.has(k)) return;
+    const make = () => { facing.delete(k); if (FACES[k]) return; const t = faceOf(k); try { if (G.renderer && G.renderer.initTexture) G.renderer.initTexture(t); } catch (e) { /* sent at its first sight */ } };
+    const fs = document.fonts; let ready = true;
+    try { if (fs && fs.check) ready = fs.check(FACE_FONTS[0], T.name) && fs.check(FACE_FONTS[1], T.hint); } catch (e) { ready = true; }
+    if (ready || !fs || !fs.load) { make(); return; }
+    facing.add(k);
+    Promise.all([fs.load(FACE_FONTS[0], T.name), fs.load(FACE_FONTS[1], T.hint)]).then(make, make);
+  }
+  // Worked out while an area is being readied (game.js enterArea, behind the black fade, while its shaders are made): where each gate's
+  // sign will hang (AR.signPlace: some 70 rays a gate, 5 - 30 ms each - it reads only what is built and never moves) and the faces of the
+  // signs this area's gates will show (the same draw of rollGates as at the clear). At the clear they all fell in one frame. One gate a
+  // task, so the page goes on drawing the fade; the promise is settled when every sign has its place (the faces may come later).
+  AR.prepClear = function (w) {
+    if (!w || !w.exits || !w.exits.some((ex) => !ex.open)) return Promise.resolve();
+    const list = w.exits.filter((ex) => !ex.open && !ex.signAt), n = GM.area + 1;
+    return new Promise((done) => {
+      let faces = true;
+      const step = () => {
+        if (faces) {
+          faces = false;
+          if (G.world === w) { try { for (const k of AR.rollGates(n)) drawFaceAhead(k); } catch (e) { /* drawn at the clear */ } }
+          // (the clear's tolling, made ahead into its buffer and not played, where audio.js offers it: G.sfx.prime)
+          try { if (G.sfx && G.sfx.prime) G.sfx.prime('clear'); } catch (e) { /* made when it is first played */ }
+          setTimeout(step, 0); return;
+        }
+        const ex = list.shift();
+        if (!ex || G.world !== w) { done(); return; }
+        try { if (!ex.open) ex.signAt = AR.signPlace(w, ex); } catch (e) { /* placed at the clear */ }
+        setTimeout(step, 0);
+      };
+      setTimeout(step, 0);
+    });
+  };
+  // the sounds of the clear (game.js clearArea, the gates here), each in a frame of its own a few frames on: made in the clear's frame,
+  // they added to it (the clear's tolling 20 ms the first time, the grinding stone 10 ms every time)
+  AR.later = function (n, fn) { let k = n; const f = () => { if (--k <= 0) { try { fn(); } catch (e) { console.warn(e); } } else requestAnimationFrame(f); }; requestAnimationFrame(f); };
   AR.openGates = function (instant, preset) {
     const w = G.world;
     if (!w.exits) return;
@@ -68,13 +113,13 @@
       ex.col.alive = false;
       ex.light.on = true; ex.light.intensity = 30; ex.light.color = T.color;
       if (ex.glow) ex.glow.material.color.set(T.color);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(T), transparent: true, depthWrite: false }));
-      const sg = AR.signPlace(w, ex); // over the frame, under whatever ceiling is above it
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: faceOf(ex.type), transparent: true, depthWrite: false }));
+      const sg = ex.signAt || AR.signPlace(w, ex); // over the frame, under whatever ceiling is above it (worked out ahead: AR.prepClear)
       ex.labelY = sg.y; ex.lowSign = sg.low;
       sp.scale.set(SIGN_W * sg.k, SIGN_H * sg.k, 1); sp.position.set(ex.x, ex.labelY, sg.z);
       w.group.add(sp); ex.label = sp;
     });
-    if (!instant) { G.sfx.stoneGrind(V(w.W / 2, 2, 0), 2); G.sfx.bell(); }
+    if (!instant) { const at = V(w.W / 2, 2, 0); AR.later(3, () => G.sfx.stoneGrind(at, 2)); AR.later(4, () => G.sfx.bell()); }
   };
 
   // ---------------- the sign over an open gate ----------------

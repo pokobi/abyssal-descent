@@ -994,9 +994,11 @@
       fade.classList.add('on'); GM._warming = true;
       // (what turns up later in the area, as samples: their shaders made now with the rest; the compile is started at once, so they leave at once)
       const kit = G.Warm.lateKit ? G.Warm.lateKit() : null; if (kit) G.scene.add(kit);
-      GM._warmP = G.Warm.worldAsync().then(() => { GM._warming = false; if (!had) fade.classList.remove('on'); });
+      // (and, while the drivers compile, where the gates' signs will hang and their faces: areas.js prepClear - they held the clear's frame)
+      const prep = G.Areas.prepClear ? G.Areas.prepClear(w) : null;
+      GM._warmP = Promise.all([G.Warm.worldAsync(), prep]).then(() => { GM._warming = false; if (!had) fade.classList.remove('on'); });
       if (kit) G.scene.remove(kit);
-    } else if (G.Warm) G.Warm.world();
+    } else { if (G.Warm) G.Warm.world(); if (G.Areas.prepClear) G.Areas.prepClear(w); }
   };
   function layoutName(l) { return { courtyard: '中庭', halls: '回廊', chasm: '大裂谷', terrace: '段丘', crypt: '納骨堂' }[l] || '遺構'; }
 
@@ -1461,7 +1463,7 @@
     if (flawless && stage !== 'trial') { const b = Math.round(G.Run.income((80 + n * 10) * (P.has('e_flawless') ? 2 : 1))); setTimeout(() => { G.combat.coins(b, null, '無傷'); G.ui.feed(`🏅 無傷ボーナス +${b}`, 'big'); }, 900); }
     G.buffs.emit('onAreaClear', { flawless, time: t });
     if (stage !== 'trial') G.ui.banner(bossKill && G.Run.isLast(GM.area) ? 'FALLEN' : 'AREA CLEAR', bossKill ? (G.Run.isLast(GM.area) ? '— 最後の守護者は倒れた —' : '— 守護者は倒れた —') : '— 次の道を選べ —');
-    G.sfx.ui('clear');
+    if (G.Areas.later) G.Areas.later(2, () => G.sfx.ui('clear')); else G.sfx.ui('clear'); // (a frame of its own: its first making took 20 ms of the clear's frame)
     if (!(bossKill && G.Run.isLast(GM.area))) G.Areas.openGates(); // the last guardian ends the run: no road onward
     if (stage !== 'boss') setTimeout(() => G.Areas.spawnMiniShop(), 600);
     if (G.save.data.records.bestArea < n) G.save.data.records.bestArea = n;

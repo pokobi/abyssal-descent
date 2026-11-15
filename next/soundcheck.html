@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14110e">
-<title>銃声の聴き比べ 第4回</title>
+<title>銃声の聴き比べ 第5回</title>
 <style>
   :root {
     --bg: #14110e; --panel: #1d1914; --line: #4a3d2a; --gold: #c9a45c; --gold2: #e6c98a; --text: #e9e2d2; --dim: #9a8f7c; --on: #3a2f1c;
@@ -44,7 +44,7 @@
 <body>
 <main>
   <div id="now" aria-live="polite"></div>
-  <h1>銃声の聴き比べ 第4回</h1>
+  <h1>銃声の聴き比べ 第5回</h1>
   <section>
     <h2>銃</h2>
     <div class="row g" id="guns"></div>
@@ -96,26 +96,27 @@
   G.save.data.settings.sound = 'new';
   A.volume = 0.8;
   // each gun's versions: [the plan in audio.js (A.gunFlavor), the mark on its button, its name (in the line on top), what its button
-  // says under the mark when not its name]. 'pub' is the shot before round 3, 2 round 3's, A / B / C round 4's; B is the game's own.
-  // The assault rifle and the submachine gun: the one they passed with, to compare the rest with
-  const R4 = [['pub', '前', '変える前'], [2, '今', '第3回'], ['A', 'A', '明るく'], ['B', 'B', '明るく派手', '明るく派手（既定）'], ['C', 'C', 'さらに派手']], OK = [[2, '合格', '', '比べる用']];
+  // says under the mark when not its name]. 'pub' is the shot before round 3, C round 4's (the game's own), D / E / F round 5's.
+  // The assault rifle, the submachine gun and the pistol: the one they passed with (the rifle's and the submachine gun's 2, the
+  // pistol's B), to compare the rest with
+  const R5 = [['pub', '前', '変える前'], ['C', 'C', '第4回', '第4回（既定）'], ['D', 'D', '鋭く締まった'], ['E', 'E', '鋭く広がる'], ['F', 'F', '広がる 最大']], OK = [[2, '合格', '', '比べる用']], OKB = [['B', '合格', '', '比べる用']];
   const GUNS = [
     ['rifle', 'アサルトライフル', 630, 'a_ranger', OK],
     ['smg', 'SMG', 870, 's_wasp', OK],
-    ['pistol', '拳銃', 400, 'starter', R4],
-    ['shotgun', '散弾銃', 72, 'g_breacher', R4],
-    ['sniper', '狙撃銃', 46, 'n_scout', R4],
-    ['revolver', 'リボルバー', 150, 'r_judge', R4],
-    ['lmg', 'LMG', 680, 'l_bulwark', R4],
+    ['pistol', '拳銃', 400, 'starter', OKB],
+    ['shotgun', '散弾銃', 72, 'g_breacher', R5],
+    ['sniper', '狙撃銃', 46, 'n_scout', R5],
+    ['revolver', 'リボルバー', 150, 'r_judge', R5],
+    ['lmg', 'LMG', 680, 'l_bulwark', R5],
   ];
   const MODES = [['one', '単発'], ['three', '3発'], ['auto', '連射（1秒）']];
   const PLACES = [['in', '屋内'], ['out', '屋外']];
-  const S = { v: 'B', mode: 'one', place: 'in', gun: 'shotgun', vol: 100, amb: true };
+  const S = { v: 'C', mode: 'one', place: 'in', gun: 'shotgun', vol: 100, amb: true };
   const $ = (id) => document.getElementById(id);
   const label = (list, k) => (list.find((q) => q[0] === k) || [])[1];
   const gun = () => GUNS.find((q) => q[0] === S.gun);
-  // (a gun's own version: B where it has one)
-  const defV = () => (gun()[4].some((q) => q[0] === 'B') ? 'B' : gun()[4][0][0]);
+  // (a gun's own version: C where it has one, else its one)
+  const defV = () => (gun()[4].some((q) => q[0] === 'C') ? 'C' : gun()[4][0][0]);
   const ver = () => gun()[4].find((q) => q[0] === S.v) || gun()[4].find((q) => q[0] === defV());
 
   function setWorld() {

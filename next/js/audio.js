@@ -564,6 +564,7 @@
       if (brb && p.brroom) addIn(H, brb, br0, p.brroom);
       bqRun(H, 'lp', p.erlp || 2800, 0.7, sr); bqRun(H, 'hp', 250, 0.7, sr);
       const tap = (S, ms, g, pan) => {
+        if (p.wid !== undefined) pan = Math.max(-1, Math.min(1, pan * p.wid));
         const d = at((ms * vr(1, 0.12)) / 1000), gg = g * (Math.random() < 0.3 ? -1 : 1), gl = gg * Math.min(1, 1 - pan), gr = gg * Math.min(1, 1 + pan);
         for (let i = 0; i + d < len; i++) { const v = S[i]; L[i + d] += v * gl; R[i + d] += v * gr; }
       };
@@ -587,6 +588,7 @@
     if (p.popx && !p.poppre) popIn(L, R, at(0.0003), p, sr);
     // (a plan's: the bright head over the drive, kept as sharp as it was made; the air the report leaves hissing after it)
     if (brb && !p.brpre) { addIn(L, brb, br0, 1); addIn(R, brb, br0, 1); }
+    if (p.edx && !p.edpost) edgeIn(L, R, at(p.ed0 || 0), p, sr);
     if (p.airx) airIn(L, R, at(p.air0 || 0.003), p, sr);
     // (a plan's: the top over some 6 kHz taken down a little, so that the louder shot is no harder on the ear than the published one)
     if (p.hicut) { bqRun(L, 'lp', p.hicut, 0.6, sr); bqRun(R, 'lp', p.hicut, 0.6, sr); }
@@ -599,6 +601,7 @@
     }
     // (a plan's: a low blow of its own over the drive, its overtones with it)
     if (p.lowx && !p.lowpre) { const i0 = at(0.0015 + (p.lowd || 0)), lt = p.lowt || 0.07; lowIn(lw(L, i0, lt), lw(R, i0, lt), i0, 105, 58, lt, p.lowx, sr, p.lowa); lowIn(lw(L, i0, lt * 0.8), lw(R, i0, lt * 0.8), i0, 230, 125, lt * 0.8, p.low2x || 0, sr, p.lowa); }
+    if (p.vly !== undefined) valleyIn(L, R, p, sr);
     let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
     if (pk > 1) for (let i = 0; i < len; i++) { L[i] /= pk; R[i] /= pk; }
     return buf;
@@ -647,8 +650,9 @@
   // ---------- each gun's own shot (the game's, and soundcheck.html's rounds 3 and 4) ----------
   // A take as shotTake makes it from SHOT alone is the shot as it was published ('pub'). Each kind has plans laid over that: round 3's
   // 2, with 1 a milder and 3 a stronger one the same way; round 4's A / B / C over 2 (see R4 below). The game's own is a kind's B where it
-  // has one (every gun but the assault rifle and the submachine gun), its 2 where not. A.gunFlavor: 0 the game's own, 'pub' the
-  // published shot, 1-3 / 'A' / 'B' / 'C' a kind's plan (one it has not falls back to the game's own).
+  // has one (every gun but the assault rifle and the submachine gun), its 2 where not - unless GDEF names another (round 5: C for all but
+  // the pistol, the assault rifle and the submachine gun). A.gunFlavor: 0 the game's own, 'pub' the published shot, 1-3 / 'A'-'F' a
+  // kind's plan (one it has not falls back to the game's own).
   // What a plan sets over SHOT's: lowx / low2x: a low blow laid over the drive (105 Hz falling to 58, 230 to 125), lowt: how fast it
   // dies (s); pcut: the push cut at (s); headx: a wide head (1-4 kHz), headt: how fast it dies (s), headd: driven, headpost: laid over
   // the drive; bodyx: a short body under it - bodyf (Hz), bodya (s to rise), bodyh (s held), bodyt (s to die), bodyc (s, cut), bodyn
@@ -747,6 +751,51 @@
   r4B('rail', (q) => O(q, lit('B', { brx: 2, brt: 0.001, brs: 0.7, airx: 0.1, airt: 0.05, clip: 4 }), { lvl: q.lvl + 0.5 }));
   r4B('harpoon', (q) => O(q, lit('B', { brx: 0.6, airx: 0.03, clip: 3 }), { lvl: q.lvl + 0.3 }));
   r4B('nail', (q) => O(q, lit('B', { brx: 0.8, brt2: 0.004, brc: 0.012, airx: 0, clip: 3 }), { lvl: q.lvl + 0.3 }));
+  // (round 5: C for the rest too, each as the gun nearest it - the marksman's rifle as the sniper's, the rotary gun as the machine gun's,
+  // short, what is launched a brighter launch - and C the game's own for all of them)
+  const r4C = (kind, f) => { GUNP[kind].C = (p, r) => f(GUNP[kind][2](p, r), p, r); };
+  r4C('dmr', (q) => O(q, lit('C', { brs: 0.7, brt: 0.001, brx: 2.6, airx: 0.2, airt: 0.06 }), { nw: q.nw * 1.35 }, louder(q, 'C', [0, 0, 1.4])));
+  r4C('minigun', (q) => O(q, lit('C', { brx: 2.2, brt2: 0.004, brc: 0.012, airx: 0.05, airt: 0.015, clip: 5 }), { lvl: q.lvl + 1.2 }));
+  r4C('rocket', (q) => O(q, lit('C', { brx: 1.7, brt2: 0.014, brc: 0.04, airx: 0.16, airt: 0.08, clip: 5 }), { lvl: q.lvl + 1.2 }));
+  r4C('gl', (q) => O(q, lit('C', { brx: 1.7, brt2: 0.009, brc: 0.026, airx: 0.09, clip: 5 }), { lvl: q.lvl + 1.2 }));
+  r4C('rail', (q) => O(q, lit('C', { brx: 2.8, brt: 0.001, brs: 0.7, airx: 0.16, airt: 0.07, clip: 5 }), { lvl: q.lvl + 1.2 }));
+  r4C('harpoon', (q) => O(q, lit('C', { brx: 0.85, airx: 0.05, clip: 4 }), { lvl: q.lvl + 0.7 }));
+  r4C('nail', (q) => O(q, lit('C', { brx: 1.1, brt2: 0.004, brc: 0.012, airx: 0, clip: 4 }), { lvl: q.lvl + 0.7 }));
+  // Round 5, over C. D sharp and tight: a sharp head of its own at the very front (edgeIn), laid in after the take's level is set and not
+  // bent at all, the take a little under it (topx), moved behind it and brought in under it, and a valley after it (valleyIn). The take
+  // itself is bent into its top by fewer dB than C's. Its own front (the front's burst, the round's crack, the wide head, the step) is
+  // left to the sharp head and taken down, so that it does not stand in the sharp head's place and its peak leaves the body the room it
+  // had; its bright head is smaller and comes after the valley (br0), so that what follows the gap is not dull; the low blow a little
+  // smaller and later; the room's returns and the air drawn in to the middle and shorter. E: D's head, and the report thrown out round
+  // you after it (spreadIn; the room's returns and the air wider and longer). F: E as far as it goes. A gun fired once pulls the rest
+  // down deeper and for longer round it.
+  const R5 = { D: 0, E: 1, F: 2 };
+  const qv = (q, p, k) => (q[k] !== undefined ? q[k] : p[k]);
+  const sharpP = (q, p, k, one, o) => O({ edpost: 1, edsh: 0.0018, edx: 1, edh: 0.0013, ed1: 0.0005, ed2: 0.0009, eds: 0.5, edc: 0.0033, edhp: 1800, edlp: 15000, edg: 3, edf: 0.3, edfi: 0.005, edtx: 0.9, topx: 0.72,
+    vly: 0.3, vl0: 0.0003, vl1: 0.0065, vl2: 0.015, vlhp: 1000, clip: 6, lowx: q.lowx * 0.6, low2x: (q.low2x || 0) * 0.85, lowd: (q.lowd || 0) + 0.001,
+    brx: q.brx * 0.4, br0: 0.007, brs: 0.3, fl: qv(q, p, 'fl') * 0.3, nw: qv(q, p, 'nw') * 0.4, headx: (q.headx || 0) * 0.3, fw: p.fw * 0.42, duck: one ? [q.duck[0] * 1.12, q.duck[1] * 1.4, q.duck[2] * 1.25] : q.duck },
+  k ? { airx: q.airx * [1, 1.5, 2][k], airt: q.airt * [1, 1.4, 1.9][k], wid: [1, 1.3, 1.6][k], tl: qv(q, p, 'tl') * [1, 1.25, 1.6][k] } : { er: qv(q, p, 'er') * 0.7, ech: qv(q, p, 'ech') * 0.6, tl: qv(q, p, 'tl') * 0.7, airt: q.airt * 0.7, airw: 0.35, wid: 0.4 }, o);
+  // (the spread, E (k 1) and F (2): a room's walls throwing it back bright, close round you, and its air after; open ground: a few near
+  // returns and the far ones coming back from all round, one after another, rolling off)
+  const sprP = (k, room, o) => (k ? O(room ? { spn: [0, 10, 18][k], sp0: 0.008, sp1: [0, 0.045, 0.07][k], spg: [0, 0.35, 0.5][k], sphp: 700, splp: 9000, spf: [0, 6, 12][k], sf0: 0.05, sf1: [0, 0.16, 0.3][k], sfg: [0, 0.1, 0.16][k], sft: [0, 0.07, 0.14][k], sflp: 5000, spw: [0, 0.85, 1][k], spsrc: 0.03 }
+    : { spn: [0, 6, 10][k], sp0: 0.008, sp1: [0, 0.035, 0.05][k], spg: [0, 0.25, 0.35][k], sphp: 600, splp: 8000, spf: [0, 14, 22][k], sf0: 0.08, sf1: [0, 0.65, 1][k], sfg: [0, 0.8, 1][k], sft: [0, 0.4, 0.6][k], sflp: 6000, spw: [0, 0.85, 1][k], spsrc: 0.04, len: [0, 0.75, 1.1][k] }, o) : {});
+  const r5 = (kind, f) => { for (const v of ['D', 'E', 'F']) GUNP[kind][v] = (p, r) => f(v, R5[v], GUNP[kind].C(p, r), p, r); };
+  // the shotgun: its cracks drawn closer to the front; in D the head in the middle and its cracks close round it, in E and F the head
+  // in the middle and what bursts after it thrown out wide - it bursts round you
+  r5('shotgun', (v, k, q, p, r) => O(q, sharpP(q, p, k, true, { edh: 0.001, vly: 0.55, edf: 0.5, clip: 7.5, popd: 0.0001, popT: 0.026, popk: 0.35, popw: [0.35, 1.4, 1.66][k], popw0: [0.2, 0.25, 0.3][k], popc: 0.012 }), sprP(k, r, r ? { spn: [0, 12, 20][k], spg: [0, 0.75, 0.85][k], sp1: [0, 0.065, 0.09][k] } : { spf: [0, 16, 24][k], sfg: [0, 1, 1.2][k], spn: [0, 9, 12][k], sp1: [0, 0.06, 0.07][k], spg: [0, 0.35, 0.42][k] })));
+  // the sniper's rifle: the round's crack first and sharpest of all (an N-wave of its own on the head); on open ground what rolls away
+  // after it longest
+  r5('sniper', (v, k, q, p, r) => O(q, sharpP(q, p, k, true, { edn: 0.5, edd: 0.00012 }), sprP(k, r, r ? {} : { sf1: [0, 0.9, 1.3][k], sft: [0, 0.45, 0.7][k], sfg: [0, 1.15, 1.6][k], spg: [0, 0.25, 0.45][k], len: [0, 1, 1.4][k] })));
+  // the revolver: a big round's crack, broader and a little longer than the pistol's
+  r5('revolver', (v, k, q, p, r) => O(q, sharpP(q, p, k, true, { edh: 0.0015, ed2: 0.0012, edhp: 1500, edn: 0.3, edd: 0.0002 }), sprP(k, r)));
+  // the machine gun: each shot's head held a little longer, the take further under it and its low blow and air shorter, so that in fast
+  // fire what is left of one shot sits as far under the next one's head as in C; its spread short and low, and as much on each side
+  // with opposite signs (spside) - wide round you, nothing of it in the middle where the next head is
+  r5('lmg', (v, k, q, p, r) => O(q, sharpP(q, p, k, false, { edh: 0.0024, edc: 0.0045, edf: 0.45, topx: 0.62, clip: 5, vly: 0.2, brx: q.brx * 0.25, br0: 0.011, lowx: q.lowx * 0.3, low2x: (q.low2x || 0) * 0.5, lowt: q.lowt * 0.7,
+    airx: q.airx * [1, 1, 1][k], airt: q.airt * [0.42, 0.5, 0.55][k], tl: qv(q, p, 'tl') * [0.7, 1, 1][k] }),
+    sprP(k, r, { spside: 1, spn: [0, 5, 8][k], sp1: [0, 0.025, 0.035][k], spf: [0, 5, 8][k], sf0: 0.07, sf1: [0, 0.35, 0.5][k], sfg: r ? [0, 0.15, 0.3][k] : [0, 0.5, 0.55][k], sft: [0, 0.2, 0.3][k], len: qv(q, p, 'len') })));
+  // (the version each kind is played at in the game, where it is not its B or its 2)
+  const GDEF = { shotgun: 'C', sniper: 'C', revolver: 'C', lmg: 'C', dmr: 'C', minigun: 'C', rocket: 'C', gl: 'C', rail: 'C', harpoon: 'C', nail: 'C' };
   // (the published take's loudness, K-weighted energy of its first 300 ms in dB at 48 kHz, by kind and place: the mean of 60 takes made
   // with the recordings, written down here so that a plan's take is set to it without published takes being made first)
   const KPUB = { 'pistol:in': 23.7, 'pistol:out': 23.5, 'revolver:in': 25.3, 'revolver:out': 25.2, 'smg:in': 22.7, 'smg:out': 23, 'rifle:in': 24.6, 'rifle:out': 24.6, 'dmr:in': 24.8, 'dmr:out': 24.9,
@@ -780,11 +829,18 @@
   // (A shotgun's report bursting: not one crack but a scatter of small ones over its first popT s - the load and the gas leaving the
   // muzzle in pulses - each a burst of noise of some popd s, thicker and stronger at first (popk: how much), each a little to one side
   // or the other; all of it kept between 500 Hz and 4 kHz, nothing of it high enough to hurt. M: their sum written there too)
+  // (a plan's popw: the cracks spread that wide (1: as made), popw0 as wide as that at the first of them, popw by popc s - the head itself
+  // kept in the middle, what bursts after it thrown out to the sides)
+  function popPan(p, pan, j0, sr) {
+    if (p.popw === undefined) return pan;
+    const k = Math.min(1, j0 / ((p.popc || 0.01) * sr)), w = (p.popw0 === undefined ? p.popw : p.popw0) * (1 - k) + p.popw * k;
+    return Math.max(-1, Math.min(1, pan * w));
+  }
   function popIn(L, R, i0, p, sr, M) {
     const T = p.popT || 0.018, n = Math.min(L.length - i0, Math.round((T + 0.006) * sr)), pk0 = p.popk || 1, pd = p.popd || 0.0003; if (n <= 0) return;
     const x = new Float32Array(n), y = new Float32Array(n);
     for (let k = 0; k < p.popn; k++) {
-      const j0 = Math.round(T * Math.pow(Math.random(), 1 + 0.6 * pk0) * sr), te = pd * (0.4 + Math.random()) * sr, m = Math.round(te * 6), a = (0.35 + 0.65 * Math.random()) * Math.exp((-1.2 * pk0 * j0) / (T * sr)) * (Math.random() < 0.5 ? -1 : 1), pan = Math.random() * 1.2 - 0.6, gl = Math.min(1, 1 - pan), gr = Math.min(1, 1 + pan);
+      const j0 = Math.round(T * Math.pow(Math.random(), 1 + 0.6 * pk0) * sr), te = pd * (0.4 + Math.random()) * sr, m = Math.round(te * 6), a = (0.35 + 0.65 * Math.random()) * Math.exp((-1.2 * pk0 * j0) / (T * sr)) * (Math.random() < 0.5 ? -1 : 1), pan = popPan(p, Math.random() * 1.2 - 0.6, j0, sr), gl = Math.min(1, 1 - pan), gr = Math.min(1, 1 + pan);
       for (let j = 0; j < m && j0 + j < n; j++) { const v = (Math.random() * 2 - 1) * a * Math.exp(-j / te); x[j0 + j] += v * gl; y[j0 + j] += v * gr; }
     }
     const lo = p.popl || 500, hi = p.poph || 4000;
@@ -825,7 +881,92 @@
     const e = (j) => (j < a ? j / a : Math.exp((j - a) * k));
     let pk = 0; for (let j = 0; j < n; j++) { const w = e(j); pk = Math.max(pk, Math.abs(x[j] * w), Math.abs(x[j + o] * w)); }
     const g = p.airx / (pk || 1);
-    for (let j = 0; j < n; j++) { const w = e(j) * g; L[i0 + j] += x[j] * w; R[i0 + j] += x[j + o] * w; }
+    if (p.airw === undefined) { for (let j = 0; j < n; j++) { const w = e(j) * g; L[i0 + j] += x[j] * w; R[i0 + j] += x[j + o] * w; } return; }
+    const aw = p.airw;
+    for (let j = 0; j < n; j++) { const w = e(j) * g; L[i0 + j] += x[j] * w; R[i0 + j] += (x[j + o] * aw + x[j] * (1 - aw)) * w; }
+  }
+  // (Round 5's sharp head: the crack of the report at its very front - noise from edhp Hz (some 4 kHz) up to edlp, up in a twentieth of a
+  // ms, held edh s, then a sharp part (eds of it) dying in ed1 s and the rest in ed2 s, cut at edc s (a few ms: a crack, not a hiss);
+  // broad, so that no narrow band stands out of it; edn: a round's crack of its own on it (an N-wave of edd s, edn of the noise's peak);
+  // the whole driven by edg last, so that its ms stands dense at its peak. Laid over the drive, in the
+  // middle: edx at its peak. top: laid in after the take's level is set (edpost) - not bent with it, edx of top (the take's own top, or
+  // edtx of TOP where the take is set lower under it), kept under it by fitIn;
+  // the take moved edsh s later first, so that the sharpest of the head stands alone in front of the take's own front, and that front
+  // brought in under it from edf of itself over edfi s)
+  function edgeIn(L, R, i0, p, sr, top) {
+    const c = p.edc || 0.003, n = Math.min(L.length - i0, Math.round(c * sr)); if (n <= 8) return;
+    const x = new Float32Array(n), a = Math.max(1, Math.round(0.00005 * sr)), h = a + Math.round((p.edh || 0) * sr), k1 = (p.ed1 || 0.0004) * sr, k2 = (p.ed2 || 0.0015) * sr, s1 = p.eds === undefined ? 0.6 : p.eds, fo = Math.max(2, Math.round(c * 0.35 * sr));
+    for (let j = 0; j < n; j++) x[j] = (Math.random() * 2 - 1) * (j < a ? (j + 1) / (a + 1) : j < h ? 1 : s1 * Math.exp(-(j - h) / k1) + (1 - s1) * Math.exp(-(j - h) / k2)) * (j > n - fo ? (n - j) / fo : 1);
+    const hp = p.edhp || 3000; bqRun(x, 'hp', hp, 0.7, sr); bqRun(x, 'hp', hp, 0.7, sr); bqRun(x, 'lp', p.edlp || 15000, 0.7, sr);
+    let pk = 0; for (let j = 0; j < n; j++) pk = Math.max(pk, Math.abs(x[j]));
+    if (p.edn) { const m = Math.max(3, Math.round((p.edd || 0.00015) * sr)), j0 = Math.round(0.0001 * sr); for (let j = 0; j <= m && j0 + j < n; j++) x[j0 + j] += p.edn * pk * (1 - (2 * j) / m); }
+    if (p.edg) { const td = ftanh(p.edg); for (let j = 0; j < n; j++) x[j] = ftanh((p.edg * x[j]) / (pk || 1)) / td; }
+    pk = 0; for (let j = 0; j < n; j++) pk = Math.max(pk, Math.abs(x[j]));
+    const sc = top || 1, g = (p.edx * sc) / (pk || 1); for (let j = 0; j < n; j++) x[j] *= g;
+    if (top && p.edsh) { const k = Math.min(L.length - 1, Math.round(p.edsh * sr)), fi = Math.round((p.edfi || 0) * sr), f0 = p.edf === undefined ? 1 : p.edf; for (const X of [L, R]) { X.copyWithin(k, 0, X.length - k); X.fill(0, 0, k); for (let j = 0; j < fi && k + j < X.length; j++) X[k + j] *= f0 + (1 - f0) * (j / fi); } }
+    if (top) { A.shotStats.edfit = Math.min(A.shotStats.edfit === undefined ? 1 : A.shotStats.edfit, fitIn(L, R, x, x, i0, top, sr)); return; }
+    for (let j = 0; j < n; j++) { L[i0 + j] += x[j]; R[i0 + j] += x[j]; }
+  }
+  // (yl / yr laid into a take from i0, turned down where the sum would go over top: a gain under 1 round each such place only - down a
+  // third of a ms before it, back in 8 ms - so that what is laid in never takes the take over its top. Returns the share of it that went
+  // in (its energy, 1: all of it))
+  function fitIn(L, R, yl, yr, i0, top, sr) {
+    const n = Math.min(yl.length, L.length - i0), q = new Float32Array(n).fill(1);
+    for (const [X, Y] of [[L, yl], [R, yr]]) for (let j = 0; j < n; j++) { const y = Y[j], x = X[i0 + j], v = x + y; if (v > top && y > 0) q[j] = Math.min(q[j], Math.max(0, (top - x) / y)); else if (v < -top && y < 0) q[j] = Math.min(q[j], Math.max(0, (-top - x) / y)); }
+    const ka = Math.exp(-1 / (0.0003 * sr)), kr = Math.exp(-1 / (0.008 * sr));
+    for (let j = n - 2; j >= 0; j--) q[j] = Math.min(q[j], 1 - (1 - q[j + 1]) * ka);
+    for (let j = 1; j < n; j++) q[j] = Math.min(q[j], 1 - (1 - q[j - 1]) * kr);
+    let e0 = 0, e1 = 0;
+    for (let j = 0; j < n; j++) { const a = yl[j] * yl[j] + yr[j] * yr[j]; e0 += a; e1 += a * q[j] * q[j]; L[i0 + j] += yl[j] * q[j]; R[i0 + j] += yr[j] * q[j]; }
+    return e0 ? e1 / e0 : 1;
+  }
+  // (Round 5's valley after the head: what is over vlhp Hz taken down to vly of itself from vl0 s, held so to vl1 s and back by vl2 s,
+  // the low blow under it left as it is - so that the head stands out of what follows it with a gap round it, as a shot's crack does)
+  function valleyIn(L, R, p, sr) {
+    const i0 = Math.round(p.vl0 * sr), i1 = Math.round(p.vl1 * sr), i2 = Math.round(p.vl2 * sr), n = Math.min(L.length, i2), d = 1 - p.vly, ra = Math.max(1, Math.round(0.0008 * sr));
+    for (const X of [L, R]) {
+      const h = X.slice(0, n), f = p.vlhp || 1200; bqRun(h, 'hp', f, 0.7, sr); bqRun(h, 'hp', f, 0.7, sr);
+      for (let j = i0; j < n; j++) { const w = j < i0 + ra ? (j - i0) / ra : j < i1 ? 1 : 0.5 + 0.5 * Math.cos((Math.PI * (j - i1)) / (i2 - i1)); X[j] -= h[j] * d * w; }
+    }
+  }
+  // (Round 5's spread: the report thrown back round you, after its head, from both sides and from further off - written into a take
+  // after its level is set, so that it neither takes the head's level down nor stands over its top. Its source: the take's own first
+  // spsrc s, the middle of it. Near returns (spn of them, sp0-sp1 s after, spg, sphp-splp Hz, the later darker): each side at a time
+  // and a sign of its own, spw wide - wide round you, and little of them in the middle (spside of them as much on each side, of opposite
+  // signs and at the same time: wide, and nothing of them in the middle, where the next shot's head is). Far ones (spf of them, sf0-sf1 s after, sfg
+  // dying in sft s): each a few returns close together, the further the duller (sflp at the first, a fifth of it at the last), thrown
+  // to either side. Turned down where it would go over the take's top (fitIn))
+  function spreadIn(b, pl) {
+    const p = pl.p, sr = b.sampleRate, L = b.getChannelData(0), R = b.getChannelData(1), len = b.length, top = (TOP * (p.edtx || pl.topx || 1)) / (p.lv * pl.gv);
+    const ns = Math.min(len, Math.round((p.spsrc || 0.03) * sr)), S = new Float32Array(ns), fo = Math.round(ns * 0.3);
+    for (let i = 0; i < ns; i++) S[i] = (L[i] + R[i]) * 0.5 * (i > ns - fo ? (ns - i) / fo : 1);
+    const yl = new Float32Array(len), yr = new Float32Array(len), w = p.spw === undefined ? 0.9 : p.spw;
+    const band = (lo, hi) => { const y = Float32Array.from(S); bqRun(y, 'hp', lo, 0.7, sr); bqRun(y, 'hp', lo, 0.7, sr); bqRun(y, 'lp', hi, 0.7, sr); return y; };
+    // (src's g of it, at d s on the left and d + dd on the right, each side's share by pan, each side's sign its own)
+    const put = (X, Y, d, dd, g, pan) => {
+      const sl = Math.random() < 0.5 ? -1 : 1, sg = Math.random() < 0.5 ? -1 : 1, side = p.spside && Math.random() < p.spside, il = Math.round(d * sr), ir = side ? il : Math.round((d + dd) * sr);
+      const gl = side ? g * sl : g * Math.min(1, 1 - pan) * sl, gr = side ? -g * sl : g * Math.min(1, 1 + pan) * sg;
+      for (let j = 0; j < ns && il + j < len; j++) yl[il + j] += (X[j] + Y[j]) * gl;
+      for (let j = 0; j < ns && ir + j < len; j++) yr[ir + j] += (X[j] + Y[j]) * gr;
+    };
+    if (p.spn) {
+      const N1 = band(p.sphp || 700, p.splp || 9000), N2 = band(p.sphp || 700, (p.splp || 9000) * 0.45), Xa = new Float32Array(ns), Xb = new Float32Array(ns), span = p.sp1 - p.sp0;
+      for (let k = 0; k < p.spn; k++) {
+        const u = (k + Math.random()) / p.spn, d = p.sp0 + span * u, g = p.spg * (0.55 + 0.45 * Math.random()) * Math.exp(-1.2 * u), pan = (k % 2 ? 1 : -1) * w * (0.55 + 0.45 * Math.random());
+        for (let j = 0; j < ns; j++) { Xa[j] = N1[j] * (1 - u); Xb[j] = N2[j] * u; }
+        put(Xa, Xb, d, (Math.random() * 2 - 1) * 0.0012, g, pan);
+      }
+    }
+    if (p.spf) {
+      const F1 = band(250, p.sflp || 5000), F2 = band(250, (p.sflp || 5000) * 0.45), F3 = band(200, (p.sflp || 5000) * 0.2), Xa = new Float32Array(ns), Xb = new Float32Array(ns), span = p.sf1 - p.sf0;
+      for (let k = 0; k < p.spf; k++) {
+        const u = Math.pow((k + Math.random()) / p.spf, 1.3), d = p.sf0 + span * u, g = p.sfg * (0.5 + 0.5 * Math.random()) * Math.exp(-(d - p.sf0) / p.sft);
+        const m = u < 0.5 ? u * 2 : u * 2 - 1, X = u < 0.5 ? F1 : F2, Y = u < 0.5 ? F2 : F3;
+        for (let j = 0; j < ns; j++) { Xa[j] = X[j] * (1 - m); Xb[j] = Y[j] * m; }
+        for (const [dt, gg] of [[0, 1], [0.002 + Math.random() * 0.004, 0.6], [0.005 + Math.random() * 0.007, 0.35]]) put(Xa, Xb, d + dt, (Math.random() * 2 - 1) * 0.002, g * gg, (Math.random() * 2 - 1) * w);
+      }
+    }
+    A.shotStats.spr = Math.min(A.shotStats.spr === undefined ? 1 : A.shotStats.spr, fitIn(L, R, yl, yr, 0, top, sr));
   }
   // (The rest of the sound - the place's own, steps, voices, all that goes the common way - pulled down as your own shot goes off, and
   // back. In fast fire each shot pulls it down less (no deeper than DUCKCAP), holds it less and lets it back sooner: the fire never shuts
@@ -892,7 +1033,7 @@
   // (until they have, its takes are of the layers alone, kept apart), its loudness, what it pulls down, and the key its takes are kept under
   function shotPlan(kind, supp, auto, room, fl) {
     if (fl === undefined) fl = A.gunFlavor;
-    const base = SHOT[kind] || SHOT.rifle, P = fl === 'pub' ? null : GUNP[kind], n = P ? (P[fl] ? fl : P.B ? 'B' : P[2] ? 2 : 0) : 0, q = n ? P[n](base, room) : null;
+    const base = SHOT[kind] || SHOT.rifle, P = fl === 'pub' ? null : GUNP[kind], n = P ? (P[fl] ? fl : P[GDEF[kind]] ? GDEF[kind] : P.B ? 'B' : P[2] ? 2 : 0) : 0, q = n ? P[n](base, room) : null;
     let p = supp ? suppOf(kind) : q ? O({ hicut: 9000 }, base, q) : base;
     if (auto) p = O({}, p, { act: 'autoshot', len: 0.3, lv: p.lv * 0.85 });   // (a self-loading shotgun: its bolt works, there is no pump)
     // (a suppressed shot is not changed by the plan, only pulled down round less)
@@ -906,6 +1047,8 @@
   function shotMake(pl) {
     const t0 = performance.now(), b = shotTake(pl.kind, pl.p, pl.recs, pl.room), S = A.shotStats;
     if (pl.lvl !== null) levelTake(b, pl);
+    if (pl.lvl !== null && pl.p.edx && pl.p.edpost) edgeIn(b.getChannelData(0), b.getChannelData(1), Math.round((pl.p.ed0 || 0) * b.sampleRate), pl.p, b.sampleRate, (TOP * (pl.p.edtx || pl.topx || 1)) / (pl.p.lv * pl.gv));
+    if (pl.lvl !== null && (pl.p.spn || pl.p.spf)) spreadIn(b, pl);
     const ms = performance.now() - t0;
     S.made++; S.ms += ms; S.max = Math.max(S.max, ms); S.log.push(pl.key + ' ' + ms.toFixed(1)); if (S.log.length > 200) S.log.shift();
     (shotSets[pl.key] || (shotSets[pl.key] = [])).push(b); return b;

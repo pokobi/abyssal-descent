@@ -1384,7 +1384,13 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     // the box, about its own middle (weapons.js sets it), and the belt up from it to the feed: it comes away with the box
     const MG = [X.makeRbox(0.09, 0.1, 0.1, 0.008, 1), Geo.xf(X.makeRbox(0.094, 0.012, 0.104, 0.004, 1), [0, 0.046, 0])];
     const BL = []; for (let i = 0; i < 6; i++) BL.push(Geo.rod([0.012, 0.056 + i * 0.011, -0.016], [0.012, 0.056 + i * 0.011, 0.016], 0.0048, 8));
-    return (lmgc = { metal: fit(ME), steel: fit(ST), poly: fit(PO), mag: fit(MG), belt: fit(BL) });
+    // flip-up sights on the ends of the rail: a post between two ears in front, a plate with a ring to look through behind. They are a
+    // piece of their own (weapons.js lines the gun up on them and folds them away under an optic); their feet stay with the rail
+    const RY = 0.13, SL = 0.145, ff = 0.162, fr = 0.038, IR = [rb(0.003, SL - RY, 0.004, 0.0006, 0, (SL + RY) / 2, ff)];
+    ME.push(rb(0.02, 0.006, 0.026, 0.0012, 0, RY + 0.003, ff), rb(0.022, 0.006, 0.026, 0.0012, 0, RY + 0.003, fr));
+    for (const sx of [-1, 1]) IR.push(rb(0.003, SL - RY + 0.006, 0.014, 0.001, sx * 0.008, (SL + RY) / 2 + 0.003, ff));
+    IR.push(Geo.xf(ext(rrect(0, SL - 0.002, 0.019, (SL - RY) * 2 - 0.002, 0.003, 2), 0.004, 0.0006, [circle(0, SL, 0.0056, 16)]), [0, 0, -fr]));
+    return (lmgc = { metal: fit(ME), steel: fit(ST), poly: fit(PO), mag: fit(MG), belt: fit(BL), irons: fit(IR) });
   };
 
   // ---- hand weapons (melee.js). Each is a list of parts { g: a geometry about its own middle, at: where that middle goes, m: which of the
@@ -1951,6 +1957,11 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       gpart('brass', [tubeZ([[0.0005, 0.25], [0.011, 0.25], [0.011, 0.43], [0.016, 0.436], [0.016, 0.444], [0.0005, 0.444]], 0.03), rodG([0, 0.076, -0.18], [0, 0.076, -0.36], 0.0035, 6), rodG([0, -0.016, -0.18], [0, -0.016, -0.36], 0.0035, 6),
         rodG([0, 0.076, -0.18], [0, 0.05, -0.16], 0.0035, 6), rodG([0, -0.016, -0.18], [0, 0.01, -0.16], 0.0035, 6)]),
       gpart('glow', ball(0.025, [0, 0.03, -0.46])),
+      // iron sights: a post between two ears clamped to the front of the upper rod, a plate with a ring to look through on the back of
+      // the receiver. Their own piece (weapons.js lines the gun up on them and folds them away under an optic); the clamp and foot stay
+      gpart('metal', [rb(0.02, 0.008, 0.016, 0.0015, 0, 0.078, 0.36), rb(0.024, 0.006, 0.02, 0.0012, 0, 0.065, -0.08)]),
+      gpart('metal', [rb(0.003, 0.012, 0.004, 0.0006, 0, 0.086, 0.36), rb(0.003, 0.016, 0.012, 0.001, -0.008, 0.088, 0.36), rb(0.003, 0.016, 0.012, 0.001, 0.008, 0.088, 0.36),
+        Geo.xf(ext(rrect(0, 0.082, 0.02, 0.038, 0.003, 2), 0.004, 0.0006, [circle(0, 0.092, 0.0056, 16)]), [0, 0, 0.08])], 'irons'),
       gpart('brass', tubeZ([[0.0005, -0.082], [0.02, -0.08], [0.03, -0.066], [0.03, 0.028], [0.02, 0.04], [0.008, 0.044], [0.008, 0.056], [0.0005, 0.056]], 0.0, 0.05, 18), 'mag', { tank: { r: 0.03, len: 0.13, axis: 'z' } }),
       gpart('poly', [gripG(0.12, -0.03, -0.135), stockG(0.15, 0.4, 0.05, -0.035)]),
     ] };

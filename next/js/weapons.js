@@ -412,7 +412,7 @@
         const LM = G.GFX && G.GFX.lmgParts ? G.GFX.lmgParts() : null;
         if (LM) {
           const part = (geo, m, parent) => { const o = new THREE.Mesh(geo, m); (parent || g).add(o); return o; };
-          part(LM.metal, metal); part(LM.poly, poly); part(LM.steel, mats.steel);
+          part(LM.metal, metal); part(LM.poly, poly); part(LM.steel, mats.steel); if (LM.irons) M.irons = [part(LM.irons, metal)];
           M.mag = part(LM.mag, metal); M.mag.position.set(0.03, -0.07, -0.04); part(LM.belt, mats.brass, M.mag);
           M.bolt = box(0.012, 0.02, 0.04, 0.04, 0.04, 0.02, mats.steel);
           M.muzzle.set(0, 0.025, -0.82); M.opticZ = -0.1; M.sightY = 0.135; M.ironY = 0.135; M.railY = 0.13; M.fore.set(0, -0.03, -0.3); M.grip.set(0, -0.06, 0.12);
@@ -982,6 +982,7 @@
       else if (id === 't_hair') { box(0.004, 0.03, 0.007, 0, ty, tz, AM.steel2); box(0.005, 0.006, 0.009, 0, ty - 0.017, tz - 0.002, glowM(0xff5030)); }
       else if (id === 't_auto') { box(0.01, 0.034, 0.06, tx, ty + 0.03, tz + 0.04, AM.dark); box(0.012, 0.008, 0.02, tx + 0.003, ty + 0.034, tz + 0.03, AM.steel2); box(0.0045, 0.006, 0.006, tx + 0.006, ty + 0.045, tz + 0.058, glowM(0xff4030)); }
       else if (id === 't_bolt' && def.arch === 'revolver') { box(0.014, 0.0035, 0.018, 0, 0.0625, 0.078, AM.steel2, -0.1); for (let i = 0; i < 4; i++) box(0.0145, 0.001, 0.0016, 0, 0.0638 + i * 0.00045, 0.071 + i * 0.0045, AM.dark); }   // (a revolver has no bolt: a wide target spur, its top cut across, on the hammer - under the rear notch)
+      else if (id === 't_bolt' && def.arch === 'shotgun' && M.bolt && M.bolt.isMesh) { const pg = M.bolt.geometry; if (!pg.boundingBox) pg.computeBoundingBox(); const bb = pg.boundingBox, c = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3()); for (const k of [-0.36, 0.36]) box(sz.x + 0.003, sz.y + 0.003, 0.008, c.x, c.y, c.z + k * sz.z, AM.steel2, 0, 0, 0, M.bolt); }   // (a pump gun has no bolt: steel ferrules round the fore-end, a slicker, stiffer slide - they ride with it)
       else if (id === 't_bolt') { rod(V(tx - 0.002, ty + 0.05, tz + 0.04), V(tx + 0.038, ty + 0.056, tz + 0.04), 0.004, AM.steel2); const kn = new THREE.Mesh(PG.sph, AM.dark); kn.scale.setScalar(0.011); kn.position.set(tx + 0.042, ty + 0.057, tz + 0.04); g.add(kn); }
       else if (id === 't_crit') { box(0.008, 0.03, 0.04, tx, ty + 0.03, tz + 0.03, AM.dark); const gm = new THREE.Mesh(PG.sph, glowM(0xff3040)); gm.scale.set(0.006, 0.011, 0.009); gm.position.set(tx + 0.006, ty + 0.03, tz + 0.03); g.add(gm); box(0.0035, 0.004, 0.05, tx + 0.003, ty + 0.012, tz + 0.03, AM.gold); }
       else if (id === 't_charge') { cyl(0.011, 0.07, tx + 0.008, ty + 0.034, tz + 0.03, AM.dark); for (const s of [-0.02, 0.02]) cyl(0.0125, 0.007, tx + 0.008, ty + 0.034, tz + 0.03 + s, glowM(0x60c8ff)); }

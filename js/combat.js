@@ -619,7 +619,10 @@
     info = info || {};
     if (P.invulnT > 0 || (G.game.dev && G.game.dev.god)) return 0;
     if (G.Classes && G.Classes.parry(amount, info)) return 0; // 見切り (剣士): parried
-    // info.fixed: an exact share of max HP (the last guardian's gravity crash): no scaling, defence, armour or dodge; shields and guard buffs still count
+    // info.fixed: an exact share of max HP (the last guardian's gravity crash): no scaling, defence, armour or dodge; shields and guard buffs still count.
+    // A fall into the void (src 'fall') is fixed and more: straight off the HP, past the overshield, the guard, the shield and the caps below
+    const fall = info.src === 'fall';
+    if (fall) info.fixed = true;
     if (!info.fixed) {
       amount *= 1 + P.stats.enemyDmg;
       if (G.game.enrage && G.game.enrage.lv && info.src !== 'fall' && info.src !== 'dot') amount *= G.game.enrage.dmg; // a fight that drags on (see game.js updateEnrage)
@@ -642,9 +645,9 @@
     if (iron > 0) armor = Math.min(0.85, 1 - (1 - armor) * (1 - iron));
     { const kk = G.Classes ? G.Classes.knockK() : 1; if (kk < 1 && !P._knockSnap) { P._knockSnap = P.vel.clone(); P._knockK = kk; } } // 根を張る (重装兵): knocked half as far (player.js)
     let dmg = amount * (1 - armor);
-    if (G.weapons.guardAbsorb) dmg = G.weapons.guardAbsorb(dmg, info); // a melee guard held up towards the hit
-    if (G.Classes) dmg = G.Classes.shieldAbsorb(dmg, info); // 携行防盾 (重装兵): the shield raised with the sights
-    if (P.has('d_iron')) dmg = Math.min(dmg, P.stats.maxHp * 0.25);
+    if (G.weapons.guardAbsorb && !fall) dmg = G.weapons.guardAbsorb(dmg, info); // a melee guard held up towards the hit
+    if (G.Classes && !fall) dmg = G.Classes.shieldAbsorb(dmg, info); // 携行防盾 (重装兵): the shield raised with the sights
+    if (P.has('d_iron') && !fall) dmg = Math.min(dmg, P.stats.maxHp * 0.25);
     // 天秤の祈り: the foes around you take the blow instead (x3: their health runs on a bigger scale)
     if (dmg > 0 && P.temps.has('sk_scale') && G.abilities.scale && !info.fall) {
       const A = G.abilities, r = A.scale.r, foes = G.enemies.inRadius(P.pos, r).filter((e) => e.alive && !e.ally).slice(0, 3);
@@ -653,11 +656,11 @@
       G.fx.ring(P.pos.clone().setY(P.pos.y + 1), 1, 0xffe090, 0.25);
       return 0;
     }
-    if (dmg > 0 && P.temps.has('ambrosia')) setTimeout(() => { if (!P.dead) C.heal(dmg * 0.5, true); }, 0); // (神酒)
+    if (dmg > 0 && P.temps.has('ambrosia') && !fall) setTimeout(() => { if (!P.dead) C.heal(dmg * 0.5, true); }, 0); // (神酒)
     if (dmg <= 0) return 0;
     if (G.Classes && !info.fixed) G.Classes.onHurt();
     let osHit = 0;
-    if (P.os > 0) { osHit = Math.min(P.os, dmg); P.os -= osHit; dmg -= osHit; }
+    if (P.os > 0 && !fall) { osHit = Math.min(P.os, dmg); P.os -= osHit; dmg -= osHit; }
     // lethal-blow protection (buffs: 踏みとどまり / 不死身): from high HP a single hit can't kill you outright
     const und = P.has('d_undying');
     if ((und || P.has('d_grit')) && dmg >= P.hp && P.hp >= P.stats.maxHp * (und ? 0.5 : 0.8) && G.game.time - (P.lastGuardT ?? -99) > (und ? 10 : 25)) {

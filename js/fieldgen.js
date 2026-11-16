@@ -491,7 +491,7 @@
     w.killY = -24; // deep: you watch yourself fall a while before the void takes you
     w.arenaCenter = V(cx, 0, cz);
     w.bossPillars = [];
-    w.fallFrac = 0.32; w.fallSpot = V(cx, 0.1, AD - 4); // a fall costs 32% x the enemy-damage factor (1.25) = about 40% of max HP
+    w.fallSpot = V(cx, 0.1, AD - 4); // (a fall costs 30% of max HP, as everywhere: player.js fellInPit)
     // once the fight is on you come back on the whole tile nearest to where you fell (the ledge is sealed then, see bosses6.js TR.seal)
     w.fallSpotAt = (p) => { const TR = G.bosses.terrain; if (TR.stage) return TR.stageSpot(p); const t = TR.nearestSafe(p); return t && G.game.bossEngaged ? V(t.cx, 0.1, t.cz) : w.fallSpot; };
     w.ledgeZ = LEDGE;

@@ -3,6 +3,7 @@
 (function () {
   // the grapple's cooldown: 15 s, shortened by the grapple-cooldown stat (never below 15% of that)
   G.GRAPPLE_CD = 15;
+  G.FALL_FRAC = 0.3; // a fall into the void costs this share of max HP (fellInPit)
   G.TUNNEL_TOP = 4.5; // m: the feet below this in an exit's opening (6 m high) to be let into its tunnel past the map's bounds
   G.SWIM_FLOAT = 0.75; G.SWIM_UP = 3.2; G.SWIM_SINK = 2.4; G.SWIM_HOP = 6.2; // deep water: the feet this far under the surface at the top (chest out); m/s up while jump is held; the fastest you sink; the hop out at the top (m/s)
   G.grappleCdOf = (st) => (st.grappleBase || G.GRAPPLE_CD) * (1 - Math.min(0.85, Math.max(-1, st.grappleCd || 0))); // (the class sets the base: 15-28 s, see classes.js)
@@ -690,8 +691,8 @@
     }
     handsBlocked() { return !!this.pileState; }
     fellInPit() {
-      const wf = G.world.fallFrac || 0.15;
-      let dmg = this.has('m_feather') ? 0 : Math.round(this.stats.maxHp * wf);
+      // a fall into the void: 30% of max HP, every field alike, straight off the HP - past the overshield, defence and armour (combat.js src 'fall')
+      let dmg = this.has('m_feather') ? 0 : Math.round(this.stats.maxHp * G.FALL_FRAC);
       if (G.world.fallSpot) { dmg = Math.min(dmg, Math.max(0, Math.floor(this.hp) - 1)); this.pos.copy(G.world.fallSpotAt ? G.world.fallSpotAt(this.pos) : G.world.fallSpot); } // the last field: a heavy fall that never kills, then back on the nearest whole tile
       else {
         this.pos.copy(this.lastSafe);

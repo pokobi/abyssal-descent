@@ -1673,6 +1673,9 @@ html.m *::-webkit-scrollbar { width: 6px; height: 6px; }
 #inv-ui .gx svg, #status-overlay .gx svg, .alch-panel .gx svg, #inv-ui .gx > img, #status-overlay .gx > img, .alch-panel .gx > img { filter: none; }
 /* text colours shared by the cards and hover texts: numbers in gold, an item's extra effects in gold, enchantments in purple (as in the inventory's hover card) */
 .cd-n { color: #ffd27a; font-weight: 800; }
+.cd-n.cd-up { color: #7ed36a; }
+.cd-n.cd-down { color: #ff7a5a; }
+.cd-was { opacity: 0.6; font-size: 0.92em; }
 .cd-line { display: block; margin: 3px 0; line-height: 1.5; }
 .cd-fx { color: #ffd890; }
 .cd-en { color: #c9a0ff; }

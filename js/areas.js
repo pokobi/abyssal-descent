@@ -670,6 +670,23 @@
   const r1 = (v) => Math.round(v * 10) / 10;
   const gunCard = (d) => { const tr = d.trait && G.WEAPON_TRAITS[d.trait]; return `<span class="cd-line cd-dim">🔫 ${U.esc(d.cat || '')}</span><span class="cd-line">ダメージ <b class="cd-n">${r1(d.dmg)}</b></span><span class="cd-line">連射 <b class="cd-n">${r1(d.rpm)}</b>　装弾 <b class="cd-n">${r1(d.mag)}</b></span>${tr ? `<span class="cd-line cd-fx">◆ ${U.esc(tr.name)}：${U.esc(tr.desc)}</span>` : ''}${d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : ''}`; };
   AR.gunCard = (d) => gunCard(d); AR.meleeCard = (d) => meleeCard(d);
+  // the same cards set against what you hold, as the shop does (game.js describeOffer): each number as you would hold the result - its
+  // forge level and your own stats - with the one in your hand after it in brackets, green where it is better, red where worse
+  const cmpLine = (label, a, b, fmt, low) => { const c = b == null || Math.abs(a - b) < 1e-6 ? '' : (low ? a < b : a > b) ? ' cd-up' : ' cd-down'; return `<span class="cd-line">${label} <b class="cd-n${c}">${fmt(a)}</b>${b == null ? '' : ` <span class="cd-was">(${fmt(b)})</span>`}</span>`; };
+  const gunCmpCard = (d, lv) => {
+    const tr = d.trait && G.WEAPON_TRAITS[d.trait], W = G.weapons;
+    const s = W.stats({ id: d.id, def: d, atts: {}, lv: lv || 0, ver: 0 }), c = P.weapon ? W.stats(P.weapon) : null;
+    const nd = s.dmg * (s.pellets || 1), cd = c ? c.dmg * (c.pellets || 1) : null, R0 = (v) => Math.round(v);
+    return `<span class="cd-line cd-dim">🔫 ${U.esc(d.cat || '')}</span>` + cmpLine('ダメージ', nd, cd, R0) + cmpLine('連射', s.rpm, c && c.rpm, R0)
+      + cmpLine('DPS', nd * s.rpm / 60, c && cd * c.rpm / 60, R0) + cmpLine('装弾', s.mag, c && c.mag, R0) + cmpLine('リロード', s.reload, c && c.reload, (v) => v.toFixed(1) + '秒', true)
+      + (tr ? `<span class="cd-line cd-fx">◆ ${U.esc(tr.name)}：${U.esc(tr.desc)}</span>` : '') + (d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : '');
+  };
+  const meleeCmpCard = (d, lv) => {
+    const W = G.weapons, s = W.meleeStats({ id: d.id, def: d, lv: lv || 0, atts: {} }), c = P.melee ? W.meleeStats(P.melee) : null, R0 = (v) => Math.round(v);
+    return `<span class="cd-line cd-dim">🗡️ 近接武器（${U.esc(d.cat || '')}）</span>` + cmpLine('ダメージ', s.dmg, c && c.dmg, R0) + cmpLine('間隔', s.swing, c && c.swing, (v) => v.toFixed(2) + '秒', true)
+      + cmpLine('DPS', s.dmg / s.swing, c && c.dmg / c.swing, R0) + cmpLine('リーチ', s.range, c && c.range, (v) => +v.toFixed(1) + 'm')
+      + (d.traitDesc ? `<span class="cd-line cd-fx">◆ ${U.esc(d.traitDesc)}</span>` : '') + (d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : '');
+  };
   const meleeCard = (d) => `<span class="cd-line cd-dim">🗡️ 近接武器（${U.esc(d.cat || '')}）</span><span class="cd-line">ダメージ <b class="cd-n">${r1(d.dmg)}</b></span><span class="cd-line">間隔 <b class="cd-n">${r1(d.swing)}</b>秒　リーチ <b class="cd-n">${r1(d.range)}</b>m</span>${d.traitDesc ? `<span class="cd-line cd-fx">◆ ${U.esc(d.traitDesc)}</span>` : ''}${d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : ''}`;
   // "A+15%、B+8%、C-15%。" -> one gold line per effect
   const effLines = (txt) => String(txt || '').split(/[、。]/).map((t) => t.trim()).filter(Boolean).map((t) => `<span class="cd-line cd-fx">◆ ${U.esc(t)}</span>`).join('');
@@ -814,7 +831,7 @@
       const meleePool = G.MELEE.filter((x) => !G.isDefaultMelee(x.id) && x.id !== a.d.id && x.id !== b.d.id && (allowMythic ? (x.mythic || (tA === 4 && G.RARITY[x.rarity].tier === 4)) : (!x.mythic && G.RARITY[x.rarity].tier === targetTier)));
       const pool = (!a.gun || !b.gun) && meleePool.length ? gunPool.concat(meleePool) : gunPool;
       const cands = U.shuffle(pool.slice()).slice(0, 3);
-      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}${capLv(d) ? ' +' + capLv(d) : ''}（${G.RARITY[d.rarity].name}）`, sub: d.kind === 'melee' ? meleeCard(d) : gunCard(d), onPick: () => {
+      const opts = cands.map((d) => ({ icon: d.icon, label: `${d.name}${capLv(d) ? ' +' + capLv(d) : ''}（${G.RARITY[d.rarity].name}）`, sub: d.kind === 'melee' ? meleeCmpCard(d, capLv(d)) : gunCmpCard(d, capLv(d)), onPick: () => {
         consumeBoth();
         const stash = (it) => { if (G.Inv.stow(P, it) > 0) { G.Inv.dropToGround(it, P.pos.clone().add(V(0, 0.4, 0))); G.ui.toastSmall('🎒 インベントリに空きがないので足元に置いた'); } };
         if (d.kind === 'melee') {
@@ -829,7 +846,7 @@
         G.weapons.order(); G.ui.refreshWeapon(); G.ui.refreshItems(); P.recalc();
         alchFx(); G.ui.toast(`⚗️ ${a.d.name} ＋ ${b.d.name} → ${d.icon} ${d.name}${capLv(d) ? ' +' + capLv(d) : ''}`, 'good'); G.ui.itemCard(d, '[武器練成]');
       } }));
-      alchChoiceModal(`🔫 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する${newLv ? `（強化値 +${newLv} を継承・武器の上限まで）` : ''}。`, opts, RAR_BY_TIER[targetTier], a, b);
+      alchChoiceModal(`🔫 練成結果の選択（${rarName}）`, `${a.d.icon} ${a.d.name} ＋ ${b.d.icon} ${b.d.name} から、次のうち1つを練成する${newLv ? `（強化値 +${newLv} を継承・武器の上限まで）` : ''}。（ ）内は今持っている武器の値。`, opts, RAR_BY_TIER[targetTier], a, b);
       return;
     }
     if (a.cat === 'part') {

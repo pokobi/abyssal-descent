@@ -172,8 +172,8 @@
   };
   // a field without a pool of its own draws from its tier's first field (the guardians' strength follows the segment, not the place)
   R.bossPool = (f) => R.BOSS_POOLS[f] || R.BOSS_POOLS[R.baseOf(f)] || [];
-  // the small, quick guardians (bosses7.js) make up about a third of every field's draw, however many big ones the field has
-  R.SMALL_SHARE = 1 / 3;
+  // the small, quick guardians (bosses7.js) make up about a fifth of every field's draw, however many big ones the field has
+  R.SMALL_SHARE = 1 / 5;
   const isSmall = (id) => !!(G.BOSS_BY_ID[id] && G.BOSS_BY_ID[id].small);
   // a run never meets the same guardian twice: the earlier guardians of the run are drawn first (drawn from the run's own random key, so a restarted area meets the same one), then excluded
   R.bossFor = function (n) {

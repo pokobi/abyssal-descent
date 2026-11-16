@@ -893,25 +893,36 @@
   UI.settings = function (back) {
     const S = G.save.data.settings;
     if (S.askTutorial === undefined) S.askTutorial = true;
+    if (S.motionBlur === undefined) S.motionBlur = true; // (a save from before the setting: on)
+    if (S.bright === undefined) S.bright = 1;
     // number settings: [min, max, step, shown as (x100 = percent), unit]; each has a slider and a box to type the value in
-    const NUM = { sens: [0.1, 3, 0.01, 1, ''], adsSens: [0.2, 1.5, 0.01, 1, ''], fov: [80, 120, 1, 1, '°'], volume: [0, 1, 0.01, 100, '%'], shake: [0, 1.5, 0.01, 100, '%'], bob: [0, 1.5, 0.01, 100, '%'] };
+    const NUM = { sens: [0.1, 3, 0.01, 1, ''], adsSens: [0.2, 1.5, 0.01, 1, ''], fov: [80, 120, 1, 1, '°'], bright: [0.5, 1.5, 0.01, 100, '%'], volume: [0, 1, 0.01, 100, '%'], shake: [0, 1.5, 0.01, 100, '%'], bob: [0, 1.5, 0.01, 100, '%'] };
     const shown = (id, v) => { const [, , st, k] = NUM[id]; return k === 100 ? String(Math.round(v * 100)) : st >= 1 ? String(Math.round(v)) : (+v).toFixed(2); };
     const rowR = (id, label) => { const [min, max, step, k, unit] = NUM[id]; return `<div class="set-row"><span>${label}</span><input type="range" id="s-${id}" min="${min}" max="${max}" step="${step}" value="${S[id]}"><span class="v" id="v-${id}"><input type="number" class="set-num" id="n-${id}" min="${min * k}" max="${max * k}" step="${step * k}" value="${shown(id, S[id])}"><span class="set-unit">${unit}</span></span></div>`; };
-    if (S.motionBlur === undefined) S.motionBlur = true; // (a save from before the setting: on)
     const rowC = (id, label) => `<div class="set-row"><span>${label}</span><input type="checkbox" id="s-${id}" ${S[id] ? 'checked' : ''}><span></span></div>`;
-    const s = UI.screen(`<div class="panel" style="width:min(640px,94vw)"><h2>⚙️ 設定</h2>
-      ${rowR('sens', '🖱️ マウス感度')}
-      ${rowR('adsSens', '🎯 ADS感度倍率')}
-      ${rowR('fov', '👁️ 視野角（水平）')}
-      ${rowR('volume', '🔊 音量')}
-      ${rowR('shake', '📳 画面揺れ')}
-      ${rowR('bob', '🚶 視点の揺れ')}
-      <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低</option><option value="med">中</option><option value="high">高</option></select><span></span></div>
-      ${rowC('dmgNums', '🔢 ダメージ表記')}${rowC('crouchToggle', '🧎 しゃがみ切替式')}${rowC('autoSprint', `🏃 常に走る（${G.K('sprint')}で歩く）`)}${rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')}${rowC('invertY', '↕️ 上下反転')}${rowC('fullscreen', '⛶ 開始時フルスクリーン')}${rowC('showFps', '📈 FPS表示')}${rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認')}
-      ${rowC('motionBlur', '💨 モーションブラー（画質が中・高の時）')}
-      <div class="set-row"><span>⌨️ キー配置</span><button class="btn small" id="s-keys">キー設定を開く</button><span></span></div>
-      <div class="set-row"><span>🗑️ データのリセット</span><button class="btn small" id="s-reset">リセットする…</button><span></span></div>
+    const head = (t) => `<div class="set-head">${t}</div>`;
+    // the tabs and what is on each (the frame-rate cap is put in after the quality row by game.js, the phone's layout button above the tabs by mobile.js)
+    const TABS = [
+      ['ctrl', '🎮 操作', head('視点') + rowR('sens', '🖱️ マウス感度') + rowR('adsSens', '🎯 ADS感度倍率') + rowC('invertY', '↕️ 上下反転')
+        + head('移動') + rowC('crouchToggle', '🧎 しゃがみ切替式') + rowC('autoSprint', `🏃 常に走る（${G.K('sprint')}で歩く）`) + rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')
+        + head('キー') + `<div class="set-row"><span>⌨️ キー配置</span><button class="btn small" id="s-keys">キー設定を開く</button><span></span></div>`],
+      ['view', '🖥️ 映像', head('見え方') + rowR('bright', '☀️ 明るさ') + rowR('fov', '👁️ 視野角（水平）')
+        + head('画質') + `<div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低</option><option value="med">中</option><option value="high">高</option></select><span></span></div>` + rowC('motionBlur', '💨 モーションブラー（画質が中・高の時）') + rowC('fullscreen', '⛶ 開始時フルスクリーン')
+        + head('揺れ') + rowR('shake', '📳 画面揺れ') + rowR('bob', '🚶 視点の揺れ')],
+      ['misc', '🔊 音・その他', head('音') + rowR('volume', '🔊 音量')
+        + head('表示') + rowC('dmgNums', '🔢 ダメージ表記') + rowC('showFps', '📈 FPS表示')
+        + head('ゲーム') + rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認') + `<div class="set-row"><span>🗑️ データのリセット</span><button class="btn small" id="s-reset">リセットする…</button><span></span></div>`],
+    ];
+    const tab0 = TABS.some((t) => t[0] === UI._setTab) ? UI._setTab : 'ctrl';
+    const s = UI.screen(`<div class="panel set-panel"><h2>⚙️ 設定</h2>
+      <div class="set-tabs">${TABS.map(([k, t]) => `<button class="set-tab${k === tab0 ? ' on' : ''}" data-tab="${k}">${t}</button>`).join('')}</div>
+      <div class="set-body">${TABS.map(([k, , h]) => `<div class="set-page" data-page="${k}"${k === tab0 ? '' : ' hidden'}>${h}</div>`).join('')}</div>
       <div style="margin-top:18px;text-align:right"><button class="btn" id="s-back">↩ 戻る</button></div></div>`, 'dim');
+    s.querySelectorAll('.set-tab').forEach((b) => b.onclick = () => {
+      G.sfx.ui('click'); UI._setTab = b.dataset.tab;
+      s.querySelectorAll('.set-tab').forEach((x) => x.classList.toggle('on', x === b));
+      s.querySelectorAll('.set-page').forEach((x) => { x.hidden = x.dataset.page !== b.dataset.tab; });
+    });
     s.querySelector('#s-reset').onclick = () => { G.sfx.ui('click'); UI.resetData(() => UI.settings(back)); };
     s.querySelector('#s-quality').value = S.quality;
     s.querySelector('#s-keys').onclick = () => { G.sfx.ui('click'); UI.keyConfig(() => UI.settings(back)); };
@@ -922,6 +933,7 @@
         x = +(Math.round(Math.min(max, Math.max(min, x)) / step) * step).toFixed(2);
         S[id] = x; inp.value = x; num.value = shown(id, x);
         if (id === 'volume') G.sfx.setVolume(x);
+        if (id === 'bright' && G.game.applyBright) G.game.applyBright();
         G.save.write();
       };
       inp.oninput = () => set(+inp.value);

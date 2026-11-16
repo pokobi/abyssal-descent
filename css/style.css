@@ -305,6 +305,14 @@ button { font-family: inherit; }
 .set-row .v { text-align: right; color: var(--gold2); font-variant-numeric: tabular-nums; }
 .set-row .set-num { pointer-events: auto; width: 64px; background: #1d1813; color: var(--gold2); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; font: inherit; text-align: right; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
 .set-row .set-num::-webkit-inner-spin-button, .set-row .set-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.panel.set-panel { width: min(640px, 94vw); display: flex; flex-direction: column; }
+.set-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.set-tab { pointer-events: auto; flex: 1; background: transparent; color: var(--dim); border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; padding: 8px 6px; font: inherit; font-size: 14px; cursor: pointer; margin-bottom: -1px; }
+.set-tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.set-tab.on { color: var(--gold2); background: rgba(16,13,10,1); border-color: var(--line); }
+.set-body { min-height: 420px; }
+.set-head { margin: 14px 0 2px; color: var(--gold); font-size: 12px; letter-spacing: 2px; opacity: .85; border-bottom: 1px solid rgba(220,190,130,0.18); padding-bottom: 3px; }
+.set-page > .set-head:first-child { margin-top: 6px; }
 .set-row .set-unit { display: inline-block; width: 14px; margin-left: 3px; text-align: left; }
 .set-row .set-num:focus { outline: 1px solid var(--gold); }
 

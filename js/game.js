@@ -117,8 +117,11 @@
     });
     pass(scene); pass(G.weapons && G.weapons.vmScene);
   };
+  // the brightness setting: a share of the screen's exposure (the same number reaches the post pass, post.js: exposure)
+  GM.applyBright = function () { renderer.toneMappingExposure = 1.05 * (+G.save.data.settings.bright || 1); };
   GM.applyQuality = function () {
     const key = G.save.data.settings.quality, q = QP[key] || QP.high;
+    GM.applyBright();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pr));
     renderer.shadowMap.enabled = q.shadow;
     renderer.shadowMap.type = q.soft === false ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;

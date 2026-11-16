@@ -1210,6 +1210,7 @@
     if (I.hit('reload') && !w.reloading && w.mag < s.mag && !s.flame || I.hit('reload') && s.flame && !w.reloading && w.mag < s.mag) W.startReload(w, s);
     if (w.reloading) {
       w.reloadT -= dt;
+      if (s.reloadSeq === 'shells') W.shellsIn(w, s);
       W.reloadSounds(w, s);
       if (w.reloadT <= 0) {
         w.reloading = false; w.mag = s.mag; w.contT = 0; w.etOn = false;
@@ -1290,15 +1291,24 @@
     let dur = s.reload;
     if (w.mag === 0 && P.has('s_tactical')) dur *= 0.6;
     w.reloading = true; w.reloadT = dur; w.reloadDur = dur; w.reloadEvents = 0;
+    w.reloadBase = w.mag; w.reloadMiss = Math.max(0, s.mag - w.mag); w.reloadIn = 0; // (shell by shell: see shellsIn)
     w.burstQ = 0; w.charge = 0;
     G.buffs.emit('onReload', { weapon: w, empty: w.mag === 0 });
   };
+  // A gun loaded shell by shell: the shells it was short go in one at a time, evenly over the first 85% of the reload (the pump
+  // follows at 90%). Each one is in the magazine - and on the ammo counter - the moment it goes in, with its own click.
+  W.shellsIn = function (w, s, quiet) {
+    if (!(w.reloadDur > 0) || w.reloadBase == null) return;
+    const k = 1 - Math.max(0, w.reloadT) / w.reloadDur, miss = w.reloadMiss || 0;
+    const n = Math.min(miss, Math.floor(miss * k / 0.85 + 1e-9));
+    while ((w.reloadIn || 0) < n) { w.reloadIn = (w.reloadIn || 0) + 1; w.mag = Math.min(s.mag, w.reloadBase + w.reloadIn); if (!quiet) G.sfx.mech('shell'); }
+  };
   // A reload cut short (another action began, the gun was put away): it starts over the next time. A gun loaded shell by shell keeps
-  // the shells already in: as many of those it was short as the share of the time spent (the last tenth is the pump).
+  // the shells already in.
   W.interruptReload = function (w) {
     if (!w || !w.reloading) return;
     const s = W.stats(w);
-    if (s.reloadSeq === 'shells' && w.reloadDur > 0) { const k = 1 - w.reloadT / w.reloadDur, miss = Math.max(0, s.mag - w.mag); w.mag += Math.min(miss, Math.floor(miss * k / 0.9)); }
+    if (s.reloadSeq === 'shells') W.shellsIn(w, s, true);
     w.reloading = false; w.reloadT = 0;
   };
   W.reloadSounds = function (w, s) {
@@ -1307,7 +1317,7 @@
       mag: [[0.15, 'magOut'], [0.6, 'magIn'], [0.85, 'boltFwd']],
       cyl: [[0.1, 'cylinder'], [0.45, 'shell'], [0.75, 'magIn'], [0.9, 'click']],
       bolt: [[0.12, 'boltBack'], [0.5, 'magIn'], [0.85, 'boltFwd']],
-      shells: [[0.15, 'shell'], [0.35, 'shell'], [0.55, 'shell'], [0.75, 'shell'], [0.9, 'pump']],
+      shells: [[0.9, 'pump']], // (the shells' own clicks: shellsIn)
       box: [[0.1, 'boltBack'], [0.3, 'magOut'], [0.65, 'magIn'], [0.9, 'boltFwd']],
       tube: [[0.2, 'magOut'], [0.7, 'magIn'], [0.9, 'click']],
       tank: [[0.15, 'magOut'], [0.6, 'cell'], [0.85, 'click']],

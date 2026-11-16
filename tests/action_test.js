@@ -124,8 +124,10 @@ function page() {
   for (let i = 0; i < 600 && IA.busy(); i++) frame();
   frame(['KeyR']); D.reloadCut.restart = +(P.weapon.reloadT / P.weapon.reloadDur).toFixed(3);
   // a shotgun loaded shell by shell keeps the shells already in
-  reset(false); frame(['Digit2']); secs(0.5); P.weapon.mag = 1; const sm = W.stats(P.weapon).mag; frame(['KeyR']); secs(P.weapon.reloadDur * 0.6);
-  frame(['Digit4']); frame(); D.shells = { mag: P.weapon.mag, max: sm, reloading: P.weapon.reloading };
+  reset(false); frame(['Digit2']); secs(0.5); P.weapon.mag = 1; const sm = W.stats(P.weapon).mag; frame(['KeyR']); const srd = P.weapon.reloadDur; const sAt = [];
+  for (const f of [0.1, 0.3, 0.45]) { secs(srd * f - (sAt.length ? [0.1, 0.3, 0.45][sAt.length - 1] * srd : 0)); sAt.push(P.weapon.mag); }   // (the counter while the shells go in)
+  secs(srd * 0.15);
+  frame(['Digit4']); frame(); D.shells = { mag: P.weapon.mag, max: sm, reloading: P.weapon.reloading, during: sAt };
   // an item put down before it takes effect is given back; after, it is spent
   reset(false); const n0 = P.itemCount('h_bandage'), hp0 = P.hp; frame(['Digit4']); frame(); secs(0.3); toasts.length = 0; frame(['KeyR']); frame();
   D.itemBack = { count: P.itemCount('h_bandage') - n0, hp: P.hp - hp0, gauge: !!P.healGauge, busy: IA.busy(), said: toasts.join(' / ') };
@@ -264,6 +266,7 @@ function page() {
       ok(!D.reloadCut.reloading && D.reloadCut.mag === 0 && D.reloadCut.restart > 0.97, `a bandage puts a reload down; no rounds come in, and the next reload starts over (${D.reloadCut.restart})`);
       ok(/リロードを中断/.test(D.reloadCut.said), 'it says so: ' + D.reloadCut.said);
       ok(!D.shells.reloading && D.shells.mag > 1 && D.shells.mag < D.shells.max, `a shotgun put down at 60% keeps the shells already in (${D.shells.mag} of ${D.shells.max})`);
+  { const d = D.shells.during; ok(d[0] >= 1 && d[1] > d[0] && d[2] > d[1] && d[2] <= D.shells.mag, `a shotgun's ammo counter goes up one shell at a time while it reloads (${d.join(' → ')} → ${D.shells.mag})`); }
       ok(D.itemBack.count === 0 && D.itemBack.hp === 0 && !D.itemBack.gauge && !D.itemBack.busy, 'a bandage put down before it takes effect is given back, no heal, no gauge');
       ok(/中断/.test(D.itemBack.said), 'it says so: ' + D.itemBack.said);
       ok(D.itemSpent.count === -1 && D.itemSpent.healed, 'one put down after it took effect is spent, and has healed');

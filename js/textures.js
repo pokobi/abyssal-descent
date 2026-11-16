@@ -636,6 +636,9 @@ float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32);
         totalEmissiveRadiance += ${blue ? 'vec3(a1 * 0.02, a1 * 0.1, a1 * 0.3)' : 'vec3(a1 * 0.3, a1 * 0.08, 0.0)'};
       }`);
     };
+    // (the two kinds share this function's text, which is what three.js keys its compiled programs by: without a key of its own, the
+    // one compiled first - blue fire, warmed up early - was handed to molten iron too, and the lava boiled in blue)
+    m.customProgramCacheKey = () => (blue ? 'boilBlue' : 'boilLava');
     m.needsUpdate = true;
   }
   // the colour of a world material varied in broad patches by place (the world's position, two scales of some 9 and 27 m and one of

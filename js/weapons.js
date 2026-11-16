@@ -1300,18 +1300,27 @@
     P.beginHands('reload');   // (an item, a throwable, a search ... are put down: player.js stopActions)
     let dur = s.reload;
     if (w.mag === 0 && P.has('s_tactical')) dur *= 0.6;
+    const miss = Math.max(0, s.mag - w.mag);
+    // Shell by shell: the reload stat is the time to fill it from empty; a shell takes 85% of it / the magazine and the pump the
+    // other 15%, so a gun short of 1 shell is done far sooner than one short of 5 (every shell in at the same pace: see shellsIn).
+    w.reloadPer = 0; w.reloadPump = false;
+    if (s.reloadSeq === 'shells' && s.mag > 0) { w.reloadPer = dur * SHELL_PART / s.mag; dur = w.reloadPer * miss + dur * (1 - SHELL_PART); }
     w.reloading = true; w.reloadT = dur; w.reloadDur = dur; w.reloadEvents = 0;
-    w.reloadBase = w.mag; w.reloadMiss = Math.max(0, s.mag - w.mag); w.reloadIn = 0; // (shell by shell: see shellsIn)
+    w.reloadBase = w.mag; w.reloadMiss = miss; w.reloadIn = 0; // (shell by shell: see shellsIn)
     w.burstQ = 0; w.charge = 0;
     G.buffs.emit('onReload', { weapon: w, empty: w.mag === 0 });
   };
-  // A gun loaded shell by shell: the shells it was short go in one at a time, evenly over the first 85% of the reload (the pump
-  // follows at 90%). Each one is in the magazine - and on the ammo counter - the moment it goes in, with its own click.
+  // A gun loaded shell by shell: the shells it was short go in one at a time, one every reloadPer seconds whatever the count (the
+  // reload is as long as the shells it needs: startReload), then the pump. Each one is in the magazine - and on the ammo counter -
+  // the moment it goes in, with its own click.
+  const SHELL_PART = 0.85;
   W.shellsIn = function (w, s, quiet) {
     if (!(w.reloadDur > 0) || w.reloadBase == null) return;
-    const k = 1 - Math.max(0, w.reloadT) / w.reloadDur, miss = w.reloadMiss || 0;
-    const n = Math.min(miss, Math.floor(miss * k / 0.85 + 1e-9));
+    const el = w.reloadDur - Math.max(0, w.reloadT), miss = w.reloadMiss || 0, per = w.reloadPer > 0 ? w.reloadPer : w.reloadDur * SHELL_PART / Math.max(1, miss);
+    const n = Math.min(miss, Math.floor(el / per + 1e-9));
     while ((w.reloadIn || 0) < n) { w.reloadIn = (w.reloadIn || 0) + 1; w.mag = Math.min(s.mag, w.reloadBase + w.reloadIn); if (!quiet) G.sfx.mech('shell'); }
+    // the pump: a third of the closing part after the last shell (as before: 85% shells, pump at 90%, done at 100% from empty)
+    if (!quiet && !w.reloadPump && n >= miss && w.reloadT <= (w.reloadDur - miss * per) * (2 / 3)) { w.reloadPump = true; G.sfx.mech('pump'); }
   };
   // A reload cut short (another action began, the gun was put away): it starts over the next time. A gun loaded shell by shell keeps
   // the shells already in.
@@ -1327,7 +1336,7 @@
       mag: [[0.15, 'magOut'], [0.6, 'magIn'], [0.85, 'boltFwd']],
       cyl: [[0.1, 'cylinder'], [0.45, 'shell'], [0.75, 'magIn'], [0.9, 'click']],
       bolt: [[0.12, 'boltBack'], [0.5, 'magIn'], [0.85, 'boltFwd']],
-      shells: [[0.9, 'pump']], // (the shells' own clicks: shellsIn)
+      shells: [], // (the shells' own clicks and the pump: shellsIn)
       box: [[0.1, 'boltBack'], [0.3, 'magOut'], [0.65, 'magIn'], [0.9, 'boltFwd']],
       tube: [[0.2, 'magOut'], [0.7, 'magIn'], [0.9, 'click']],
       tank: [[0.15, 'magOut'], [0.6, 'cell'], [0.85, 'click']],

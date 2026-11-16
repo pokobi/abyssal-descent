@@ -66,15 +66,17 @@
   HX.update = function (dt) {
     if (!G.player || !G.game.run) return;
     ensure();
-    // ---- healing item gauge (centre ring until the heal is complete) ----
+    // ---- item use gauge (centre ring until the item takes effect) ----
     const hg = P.healGauge;
     if (hg) {
-      // the ring only covers the use motion (until the item has been used); the heal-over-time that follows shows on the HP bar alone
+      // The ring runs to the moment the effect lands (itemanim.js PLAN apply), not to the end of the motion: it is full exactly when
+      // the heal / the boost is given. The rest of the motion (the hand going down) and any heal-over-time show without it.
       hg.t += dt;
-      const lf = G.ItemAnim.left(hg.id), left = lf ? lf[1] : 0;
+      const lf = G.ItemAnim.left(hg.id), left = lf ? lf[0] : 0;
       if (!hg.total && left > 0) hg.total = left;
       hg.total = Math.max(hg.total || 0, left, 0.05);
-      if (P.dead || left <= 0) { P.healGauge = null; if (!G.game.search) G.ui.holdRing(-1); }
+      if (P.dead || !lf) { P.healGauge = null; if (!G.game.search) G.ui.holdRing(-1); }
+      else if (left <= 0) { P.healGauge = null; if (!(G.game.chestHold > 0) && !G.game.search) G.ui.holdRing(1, 'done', { label: '使用した' }); }
       else if (!(G.game.chestHold > 0) && !G.game.search) { hg.k = Math.max(hg.k || 0, Math.min(0.999, 1 - left / hg.total)); const q = G.abilities.useQueue; G.ui.holdRing(hg.k, 'pry', { center: hg.icon, label: q && q.id === hg.id && q.left > 0 ? `使用中…（あと${q.left}個）` : '使用中…', cls: 'heal' }); }
     }
     // ---- invulnerability (every frame: it is short-lived) ----

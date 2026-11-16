@@ -842,8 +842,8 @@
     G.ui.refreshItems();
     A.usingId = id;   // (what is in the hands: given back if it is put down before it takes effect)
     G.ItemAnim.play(G.ItemAnim.kindOf(id), id, () => A.applyItem(id), () => { if (A.usingId === id) A.usingId = null; });
-    // centre gauge until the healing is done (the motion, plus any heal-over-time that follows)
-    if (d.heal) P.healGauge = { t: 0, id, over: d.over || 0, icon: it.icon };
+    // centre gauge until the item takes effect (hudextra.js): every item used with a motion, the healing and the boosting alike
+    P.healGauge = { t: 0, id, over: d.over || 0, icon: it.icon };
   };
   A.applyItem = function (id) {
     const u = { id };

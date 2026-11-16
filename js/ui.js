@@ -643,7 +643,7 @@
     p.innerHTML = `<div class="ip-head"><div class="ip-icon${o.kc ? ' ' + o.kc : ''}">${o.icon}${G.Elem.badge(o.el)}</div><div><div class="ip-name">${U.esc(o.name)}</div><div class="ip-cat">${o.cat || ''}${o.el ? ' ' + G.Elem.chip(o.el) : ''}</div></div></div>${o.desc ? `<div class="ip-desc">${o.desc}</div>` : ''}${o.stats ? `<div class="ip-stats">${o.stats}</div>` : ''}${o.note ? `<div class="ip-note">${o.note}</div>` : ''}<div class="ip-foot"><div class="ip-price ${o.afford === false ? 'no' : ''}">${o.price !== undefined ? '🪙 ' + (typeof o.price === 'string' ? o.price : U.fmt(o.price)) : ''}</div>${o.action === null ? '' : `<div class="ip-key">${G.K('interact')} ${o.action || '購入'}</div>`}</div>`;
   };
   // ---- centre-screen hold gauge (ornate chests) ----
-  UI.holdRing = function (k, mode, o) {
+  UI.holdRing = function (k, mode, o) { // (mode 'done': the ring full with a tick for a moment; o.label its words, else 開いた！)
     let el = UI._hr;
     if (!el) {
       el = UI._hr = document.createElement('div'); el.id = 'hold-ring';
@@ -657,7 +657,7 @@
     if (mode === 'done') {
       UI._hrDone = now + 450;
       el.className = 'on done'; el.style.setProperty('--p', '100%');
-      el.querySelector('.hr-key').textContent = '✓'; el.querySelector('.hr-lab').textContent = '開いた！';
+      el.querySelector('.hr-key').textContent = '✓'; el.querySelector('.hr-lab').textContent = (o && o.label) || '開いた！';
       return;
     }
     if (now < (UI._hrDone || 0)) return;

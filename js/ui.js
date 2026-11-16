@@ -896,7 +896,7 @@
     // number settings: [min, max, step, shown as (x100 = percent), unit]; each has a slider and a box to type the value in
     const NUM = { sens: [0.1, 3, 0.01, 1, ''], adsSens: [0.2, 1.5, 0.01, 1, ''], fov: [80, 120, 1, 1, '°'], volume: [0, 1, 0.01, 100, '%'], shake: [0, 1.5, 0.01, 100, '%'], bob: [0, 1.5, 0.01, 100, '%'] };
     const shown = (id, v) => { const [, , st, k] = NUM[id]; return k === 100 ? String(Math.round(v * 100)) : st >= 1 ? String(Math.round(v)) : (+v).toFixed(2); };
-    const rowR = (id, label) => { const [min, max, step, k, unit] = NUM[id]; return `<div class="set-row"><span>${label}</span><input type="range" id="s-${id}" min="${min}" max="${max}" step="${step}" value="${S[id]}"><span class="v" id="v-${id}"><input type="number" class="set-num" id="n-${id}" min="${min * k}" max="${max * k}" step="${step * k}" value="${shown(id, S[id])}">${unit}</span></div>`; };
+    const rowR = (id, label) => { const [min, max, step, k, unit] = NUM[id]; return `<div class="set-row"><span>${label}</span><input type="range" id="s-${id}" min="${min}" max="${max}" step="${step}" value="${S[id]}"><span class="v" id="v-${id}"><input type="number" class="set-num" id="n-${id}" min="${min * k}" max="${max * k}" step="${step * k}" value="${shown(id, S[id])}"><span class="set-unit">${unit}</span></span></div>`; };
     if (S.motionBlur === undefined) S.motionBlur = true; // (a save from before the setting: on)
     const rowC = (id, label) => `<div class="set-row"><span>${label}</span><input type="checkbox" id="s-${id}" ${S[id] ? 'checked' : ''}><span></span></div>`;
     const s = UI.screen(`<div class="panel" style="width:min(640px,94vw)"><h2>⚙️ 設定</h2>

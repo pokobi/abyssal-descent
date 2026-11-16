@@ -305,6 +305,7 @@ button { font-family: inherit; }
 .set-row .v { text-align: right; color: var(--gold2); font-variant-numeric: tabular-nums; }
 .set-row .set-num { pointer-events: auto; width: 64px; background: #1d1813; color: var(--gold2); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; font: inherit; text-align: right; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
 .set-row .set-num::-webkit-inner-spin-button, .set-row .set-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.set-row .set-unit { display: inline-block; width: 14px; margin-left: 3px; text-align: left; }
 .set-row .set-num:focus { outline: 1px solid var(--gold); }
 
 /* buff select */

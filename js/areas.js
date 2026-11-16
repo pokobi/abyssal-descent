@@ -675,16 +675,18 @@
   const cmpLine = (label, a, b, fmt, low) => { const c = b == null || Math.abs(a - b) < 1e-6 ? '' : (low ? a < b : a > b) ? ' cd-up' : ' cd-down'; return `<span class="cd-line">${label} <b class="cd-n${c}">${fmt(a)}</b>${b == null ? '' : ` <span class="cd-was">(${fmt(b)})</span>`}</span>`; };
   const gunCmpCard = (d, lv) => {
     const tr = d.trait && G.WEAPON_TRAITS[d.trait], W = G.weapons;
-    const s = W.stats({ id: d.id, def: d, atts: {}, lv: lv || 0, ver: 0 }), c = P.weapon ? W.stats(P.weapon) : null;
-    const nd = s.dmg * (s.pellets || 1), cd = c ? c.dmg * (c.pellets || 1) : null, R0 = (v) => Math.round(v);
-    return `<span class="cd-line cd-dim">🔫 ${U.esc(d.cat || '')}</span>` + cmpLine('ダメージ', nd, cd, R0) + cmpLine('連射', s.rpm, c && c.rpm, R0)
-      + cmpLine('DPS', nd * s.rpm / 60, c && cd * c.rpm / 60, R0) + cmpLine('装弾', s.mag, c && c.mag, R0) + cmpLine('リロード', s.reload, c && c.reload, (v) => v.toFixed(1) + '秒', true)
+    // (the numbers come from weapons.js gunView, the same as the shop, inventory and status screens)
+    const s = W.gunView({ id: d.id, def: d, atts: {}, lv: lv || 0, ver: 0 }), c = P.weapon ? W.gunView(P.weapon) : null, R0 = (v) => Math.round(v);
+    return `<span class="cd-line cd-dim">🔫 ${U.esc(d.cat || '')}</span>` + cmpLine('ダメージ', s.shot, c && c.shot, R0) + cmpLine('連射', s.rpm, c && c.rpm, R0)
+      + cmpLine('DPS', s.dps, c && c.dps, R0) + cmpLine('装弾', s.mag, c && c.mag, R0) + cmpLine('リロード', s.reload, c && c.reload, (v) => v.toFixed(1) + '秒', true)
       + (tr ? `<span class="cd-line cd-fx">◆ ${U.esc(tr.name)}：${U.esc(tr.desc)}</span>` : '') + (d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : '');
   };
+  AR.gunCmpCard = (d, lv) => gunCmpCard(d, lv);
+  AR.meleeCmpCard = (d, lv) => meleeCmpCard(d, lv);
   const meleeCmpCard = (d, lv) => {
-    const W = G.weapons, s = W.meleeStats({ id: d.id, def: d, lv: lv || 0, atts: {} }), c = P.melee ? W.meleeStats(P.melee) : null, R0 = (v) => Math.round(v);
+    const W = G.weapons, s = W.meleeView({ id: d.id, def: d, lv: lv || 0, atts: {} }), c = P.melee ? W.meleeView(P.melee) : null, R0 = (v) => Math.round(v);
     return `<span class="cd-line cd-dim">🗡️ 近接武器（${U.esc(d.cat || '')}）</span>` + cmpLine('ダメージ', s.dmg, c && c.dmg, R0) + cmpLine('間隔', s.swing, c && c.swing, (v) => v.toFixed(2) + '秒', true)
-      + cmpLine('DPS', s.dmg / s.swing, c && c.dmg / c.swing, R0) + cmpLine('リーチ', s.range, c && c.range, (v) => +v.toFixed(1) + 'm')
+      + cmpLine('DPS', s.dps, c && c.dps, R0) + cmpLine('リーチ', s.range, c && c.range, (v) => +v.toFixed(1) + 'm')
       + (d.traitDesc ? `<span class="cd-line cd-fx">◆ ${U.esc(d.traitDesc)}</span>` : '') + (d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : '');
   };
   const meleeCard = (d) => `<span class="cd-line cd-dim">🗡️ 近接武器（${U.esc(d.cat || '')}）</span><span class="cd-line">ダメージ <b class="cd-n">${r1(d.dmg)}</b></span><span class="cd-line">間隔 <b class="cd-n">${r1(d.swing)}</b>秒　リーチ <b class="cd-n">${r1(d.range)}</b>m</span>${d.traitDesc ? `<span class="cd-line cd-fx">◆ ${U.esc(d.traitDesc)}</span>` : ''}${d.desc ? `<span class="cd-line cd-dim">${U.esc(d.desc)}</span>` : ''}`;

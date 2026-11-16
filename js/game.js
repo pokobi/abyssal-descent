@@ -2179,6 +2179,7 @@
     G.ui.holdRing(k, 'pry', { center: S.icon, label: S.label, cls: 'search' });
     if (k >= 1) { GM.search = null; G.ui.holdRing(1, 'done'); S.onDone(); }
   }
+  GM.describeOffer = (o) => describeOffer(o);
   function describeOffer(o) {
     const ob = o.obj;
     let stats = '', note = '', cat = '', action = '購入';
@@ -2191,23 +2192,24 @@
     }
     if (o.kind === 'weapon') {
       cat = `🔫 ${ob.cat} · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
-      const cur = P.weapon ? G.weapons.stats(P.weapon) : { dmg: 0, pellets: 1, rpm: 0, mag: 0, reload: 0, spread: 0 }; // no gun in hand: everything is a gain
+      const cur = P.weapon ? G.weapons.gunView(P.weapon) : { shot: 0, rpm: 0, dps: 0, mag: 0, reload: 0, spread: 0 }; // no gun in hand: everything is a gain
       const cmp = (label, a, b, fmt, better) => { const up = better === 'low' ? a < b : a > b; const cls = Math.abs(a - b) < 1e-6 ? '' : up ? 'up' : 'down'; return `<div>${label} <b class="${cls}">${fmt(a)}</b> <span style="opacity:.6">(${fmt(b)})</span></div>`; };
       // the gun on the shelf as you would hold it: its forge level and your own stats, the same as the one in your hand (not its bare Lv0 numbers)
-      const sh = G.weapons.stats({ id: ob.id, def: ob, atts: {}, lv: o.lv || 0, ver: 0 });
-      const nd = sh.dmg * (sh.pellets || 1), cd = cur.dmg * (cur.pellets || 1);
-      stats = cmp('💥ダメージ', nd, cd, (v) => Math.round(v)) + cmp('🔁連射', sh.rpm, cur.rpm, (v) => Math.round(v)) + cmp('📊DPS', nd * sh.rpm / 60, cd * cur.rpm / 60, (v) => Math.round(v)) + cmp('📦装弾数', sh.mag, cur.mag, (v) => v) + cmp('♻️リロード', sh.reload, cur.reload, (v) => v.toFixed(1) + 's', 'low') + cmp('🎯拡散', sh.spread, cur.spread, (v) => v.toFixed(1) + '°', 'low');
+      // (the numbers come from weapons.js gunView, the same as the inventory and status screens)
+      const sh = G.weapons.gunView({ id: ob.id, def: ob, atts: {}, lv: o.lv || 0, ver: 0 });
+      stats = cmp('💥ダメージ', sh.shot, cur.shot, (v) => Math.round(v)) + cmp('🔁連射', sh.rpm, cur.rpm, (v) => Math.round(v)) + cmp('📊DPS', sh.dps, cur.dps, (v) => Math.round(v)) + cmp('📦装弾数', sh.mag, cur.mag, (v) => v) + cmp('♻️リロード', sh.reload, cur.reload, (v) => v.toFixed(1) + 's', 'low') + cmp('🎯拡散', sh.spread, cur.spread, (v) => v.toFixed(1) + '°', 'low');
       if (ob.trait) note += `${G.WEAPON_TRAITS[ob.trait].icon} ${G.WEAPON_TRAITS[ob.trait].name}: ${G.WEAPON_TRAITS[ob.trait].desc}　`;
       if (P.weapons.length >= P.stats.weaponSlots) note += '⚠ 武器スロット満杯：購入時に交換する武器を選択（旧武器は下取り）';
     } else if (o.kind === 'melee') {
       cat = `🗡️ 近接武器（${ob.cat}） · ${G.RARITY[ob.rarity].name}${o.lv ? `　⚒️強化済み +${o.lv}` : ''}`;
       // both as you would swing them: their forge levels and your own stats (the one on the shelf may come forged)
-      const cur = G.weapons.meleeStats(P.melee), sm = G.weapons.meleeStats({ id: ob.id, def: ob, lv: o.lv || 0, atts: {} });
+      // (the numbers come from weapons.js meleeView, the same as the inventory and status screens)
+      const curD = P.melee.def, cur = G.weapons.meleeView(P.melee), sm = G.weapons.meleeView({ id: ob.id, def: ob, lv: o.lv || 0, atts: {} });
       const cmp = (label, a, b, fmt, better) => { const up = better === 'low' ? a < b : a > b; const cls = Math.abs(a - b) < 1e-6 ? '' : up ? 'up' : 'down'; return `<div>${label} <b class="${cls}">${fmt(a)}</b> <span style="opacity:.6">(${fmt(b)})</span></div>`; };
-      stats = cmp('💥ダメージ', sm.dmg, cur.dmg, (v) => Math.round(v)) + cmp('⚡攻撃間隔', sm.swing, cur.swing, (v) => v.toFixed(2) + 's', 'low') + cmp('📊DPS', sm.dmg / sm.swing, cur.dmg / cur.swing, (v) => Math.round(v)) + cmp('📏リーチ', sm.range, cur.range, (v) => +v.toFixed(1) + 'm') + cmp('🔨重撃', sm.heavy[0], cur.heavy[0], (v) => '×' + v) + cmp('👟移動', sm.moveMul, cur.moveMul, (v) => '×' + v.toFixed(2));
+      stats = cmp('💥ダメージ', sm.dmg, cur.dmg, (v) => Math.round(v)) + cmp('⚡攻撃間隔', sm.swing, cur.swing, (v) => v.toFixed(2) + 's', 'low') + cmp('📊DPS', sm.dps, cur.dps, (v) => Math.round(v)) + cmp('📏リーチ', sm.range, cur.range, (v) => +v.toFixed(1) + 'm') + cmp('🔨重撃', sm.heavyDmg, cur.heavyDmg, (v) => Math.round(v)) + cmp('👟移動', sm.moveMul, cur.moveMul, (v) => '×' + v.toFixed(2));
       if (ob.traitDesc) note += '✦ ' + ob.traitDesc + '　';
       { const tv = G.Pawn.tradeValue(P.melee, true); if (tv > 0) note += `♻️ 今の${P.melee.def.name}は下取り +${U.fmt(tv)}🪙　`; }
-      note += `⚠ 現在の ${cur.icon}${cur.name} と交換（${G.K('w3')}）`;
+      note += `⚠ 現在の ${curD.icon}${curD.name} と交換（${G.K('w3')}）`;
     } else if (o.kind === 'forge') {
       cat = '⚒️ 強化サービス'; note = `購入時に強化する武器を選ぶ（上限はレアリティで決まる: ${G.Areas.capText()}）・価格は武器の強化値で変わる`;
     } else if (o.kind === 'tome') {

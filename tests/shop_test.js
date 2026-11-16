@@ -48,6 +48,24 @@ const PORT = +process.env.COOP_PORT || 9995;
     check(pr.got === pr.want, `a forged legendary costs base x (1 + 0.1 x ${pr.lv}) x area, with no per-visit rise (${pr.got} / want ${pr.want})`);
     check(pr.skill === pr.skill0, `other wares keep the per-visit rise (${pr.skill} / want ${pr.skill0})`);
 
+    // 3. the shop and the forge show the same damage / DPS as the inventory (与ダメ and 近接ダメージ included)
+    const vw = await p.eval(`(() => {
+      const P = G.player, W = G.weapons, GM = G.game; P.stats.dmg = (P.stats.dmg || 0) + 0.6; P.stats.meleeDmg = (P.stats.meleeDmg || 0) + 0.5;
+      const pair = (h, label) => { const m = new RegExp(label + ' ([0-9]+) [(]([0-9]+)[)]').exec(h.replace(/<[^>]+>/g, '')); return m ? [+m[1], +m[2]] : null; };
+      const md = G.MELEE.find((d) => d.id !== P.melee.def.id && d.id !== (G.BARE_MELEE || 'fists')), gd = G.WEAPONS.find((d) => !P.weapon || d.id !== P.weapon.def.id);
+      const sm = GM.describeOffer({ kind: 'melee', obj: md, lv: 0 }).stats, sg = GM.describeOffer({ kind: 'weapon', obj: gd, lv: 0 }).stats;
+      const fm = G.Areas.meleeCmpCard(md, 0), fg = G.Areas.gunCmpCard(gd, 0);
+      const inv = { mDmg: Math.round(W.meleeStats(P.melee).dmg * W.meleeDmgMul()), mDps: Math.round(W.meleeDps(P.melee)), gDps: P.weapon ? Math.round(W.gunDps(P.weapon)) : 0 };
+      const shopM = { dmg: pair(sm, '💥ダメージ'), dps: pair(sm, '📊DPS') }, shopG = pair(sg, '📊DPS'), forgeMd = pair(fm, 'DPS'), forgeG = pair(fg, 'DPS');
+      const offM = Math.round(W.meleeStats({ id: md.id, def: md, lv: 0, atts: {} }).dmg * W.meleeDmgMul());
+      P.stats.dmg -= 0.6; P.stats.meleeDmg -= 0.5;
+      return { inv, shopM, shopG, forgeMd, forgeG, offM, gun: !!P.weapon };
+    })()`);
+    const eq = (a, b) => !!a && a[1] === b;
+    check(eq(vw.shopM.dmg, vw.inv.mDmg) && eq(vw.shopM.dps, vw.inv.mDps) && vw.shopM.dmg[0] === vw.offM, `the shop's melee damage / DPS match the inventory with 与ダメ・近接ダメージ up (${JSON.stringify(vw.shopM)} / inventory ${JSON.stringify(vw.inv)}, offered ${vw.offM})`);
+    check(eq(vw.forgeMd, vw.inv.mDps), `the forge's melee DPS matches the inventory (${JSON.stringify(vw.forgeMd)} / ${vw.inv.mDps})`);
+    check(vw.gun && eq(vw.shopG, vw.inv.gDps) && eq(vw.forgeG, vw.inv.gDps), `the shop's and the forge's gun DPS match the inventory (${JSON.stringify(vw.shopG)} ${JSON.stringify(vw.forgeG)} / ${vw.inv.gDps})`);
+
     // 3. the last gun can be sold, after a warning; then you fight with the melee weapon
     await p.eval("(() => { const P = G.player; P.weapons.length = 1; P.wIdx = 0; P.wOrder = null; G.weapons.order(); G.weapons.equip(false); G.ui.clearScreen(); G.game.state = 'playing'; G.Pawn.tab = 'all'; G.Pawn.open(); })(); 1");
     await sleep(300);

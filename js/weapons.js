@@ -68,9 +68,19 @@
   W.dps = function (s) { return s.dmg * (s.pellets || 1) * s.rpm / 60; };
   // the DPS every screen shows (status, inventory): the gun's own numbers x 与ダメ; a melee weapon also takes 近接ダメージ
   W.dmgMul = () => Math.max(0.1, 1 + (G.player.stats.dmg || 0));
-  W.gunDps = (w) => W.dps(W.stats(w)) * W.dmgMul();
   W.meleeDmgMul = () => { const st = G.player.stats; return Math.max(0.1, 1 + (st.dmg || 0) + (st.meleeDmg || 0)); };
-  W.meleeDps = (m) => { const s = W.meleeStats(m); return s.dmg * W.meleeDmgMul() / s.swing; };
+  // The shown numbers of a weapon, as it hits in your hands (its forge level, your stats, 与ダメ / 近接ダメージ).
+  // Every screen that shows a weapon's damage or DPS (shop, forge, inventory, status) takes them from here, so they can never disagree.
+  W.gunView = (w) => {
+    const s = W.stats(w), hit = s.dmg * W.dmgMul(), pellets = s.pellets || 1, shot = hit * pellets;
+    return { s, hit, pellets, shot, rpm: s.rpm, dps: shot * s.rpm / 60, mag: s.mag, reload: s.reload, spread: s.spread };
+  };
+  W.meleeView = (m) => {
+    const s = W.meleeStats(m), dmg = s.dmg * W.meleeDmgMul();
+    return { s, dmg, heavy: s.heavy[0], heavyDmg: dmg * s.heavy[0], swing: s.swing, dps: dmg / s.swing, range: s.range, moveMul: s.moveMul };
+  };
+  W.gunDps = (w) => W.gunView(w).dps;
+  W.meleeDps = (m) => W.meleeView(m).dps;
 
   // ---------------- scope lens ----------------
   // No second render of the world: the screen is rendered once (zoomed a little), and the central square of that finished frame is copied

@@ -298,11 +298,14 @@ button { font-family: inherit; }
 .col { display: flex; flex-direction: column; gap: 10px; }
 
 /* settings */
-.set-row { display: grid; grid-template-columns: 200px 1fr 60px; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 14px; }
+.set-row { display: grid; grid-template-columns: 200px 1fr 92px; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 14px; }
 .set-row input[type=range] { pointer-events: auto; width: 100%; accent-color: var(--gold); }
 .set-row select, .set-row input[type=checkbox] { pointer-events: auto; accent-color: var(--gold); }
 .set-row select { background: #1d1813; color: var(--text); border: 1px solid var(--line); padding: 4px; border-radius: 4px; }
 .set-row .v { text-align: right; color: var(--gold2); font-variant-numeric: tabular-nums; }
+.set-row .set-num { pointer-events: auto; width: 64px; background: #1d1813; color: var(--gold2); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; font: inherit; text-align: right; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
+.set-row .set-num::-webkit-inner-spin-button, .set-row .set-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.set-row .set-num:focus { outline: 1px solid var(--gold); }
 
 /* buff select */
 .bs-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }

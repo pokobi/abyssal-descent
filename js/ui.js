@@ -893,16 +893,19 @@
   UI.settings = function (back) {
     const S = G.save.data.settings;
     if (S.askTutorial === undefined) S.askTutorial = true;
-    const rowR = (id, label, min, max, step, fmt) => `<div class="set-row"><span>${label}</span><input type="range" id="s-${id}" min="${min}" max="${max}" step="${step}" value="${S[id]}"><span class="v" id="v-${id}">${fmt(S[id])}</span></div>`;
+    // number settings: [min, max, step, shown as (x100 = percent), unit]; each has a slider and a box to type the value in
+    const NUM = { sens: [0.1, 3, 0.01, 1, ''], adsSens: [0.2, 1.5, 0.01, 1, ''], fov: [80, 120, 1, 1, '°'], volume: [0, 1, 0.01, 100, '%'], shake: [0, 1.5, 0.01, 100, '%'], bob: [0, 1.5, 0.01, 100, '%'] };
+    const shown = (id, v) => { const [, , st, k] = NUM[id]; return k === 100 ? String(Math.round(v * 100)) : st >= 1 ? String(Math.round(v)) : (+v).toFixed(2); };
+    const rowR = (id, label) => { const [min, max, step, k, unit] = NUM[id]; return `<div class="set-row"><span>${label}</span><input type="range" id="s-${id}" min="${min}" max="${max}" step="${step}" value="${S[id]}"><span class="v" id="v-${id}"><input type="number" class="set-num" id="n-${id}" min="${min * k}" max="${max * k}" step="${step * k}" value="${shown(id, S[id])}">${unit}</span></div>`; };
     if (S.motionBlur === undefined) S.motionBlur = true; // (a save from before the setting: on)
     const rowC = (id, label) => `<div class="set-row"><span>${label}</span><input type="checkbox" id="s-${id}" ${S[id] ? 'checked' : ''}><span></span></div>`;
     const s = UI.screen(`<div class="panel" style="width:min(640px,94vw)"><h2>⚙️ 設定</h2>
-      ${rowR('sens', '🖱️ マウス感度', 0.1, 3, 0.05, (v) => (+v).toFixed(2))}
-      ${rowR('adsSens', '🎯 ADS感度倍率', 0.2, 1.5, 0.05, (v) => (+v).toFixed(2))}
-      ${rowR('fov', '👁️ 視野角（水平）', 80, 120, 1, (v) => v + '°')}
-      ${rowR('volume', '🔊 音量', 0, 1, 0.01, (v) => Math.round(v * 100) + '%')}
-      ${rowR('shake', '📳 画面揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
-      ${rowR('bob', '🚶 視点の揺れ', 0, 1.5, 0.05, (v) => Math.round(v * 100) + '%')}
+      ${rowR('sens', '🖱️ マウス感度')}
+      ${rowR('adsSens', '🎯 ADS感度倍率')}
+      ${rowR('fov', '👁️ 視野角（水平）')}
+      ${rowR('volume', '🔊 音量')}
+      ${rowR('shake', '📳 画面揺れ')}
+      ${rowR('bob', '🚶 視点の揺れ')}
       <div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低</option><option value="med">中</option><option value="high">高</option></select><span></span></div>
       ${rowC('dmgNums', '🔢 ダメージ表記')}${rowC('crouchToggle', '🧎 しゃがみ切替式')}${rowC('autoSprint', `🏃 常に走る（${G.K('sprint')}で歩く）`)}${rowC('sprintToggle', '🏃 スプリント切替式（常に走るがOFFの時）')}${rowC('invertY', '↕️ 上下反転')}${rowC('fullscreen', '⛶ 開始時フルスクリーン')}${rowC('showFps', '📈 FPS表示')}${rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認')}
       ${rowC('motionBlur', '💨 モーションブラー（画質が中・高の時）')}
@@ -912,9 +915,18 @@
     s.querySelector('#s-reset').onclick = () => { G.sfx.ui('click'); UI.resetData(() => UI.settings(back)); };
     s.querySelector('#s-quality').value = S.quality;
     s.querySelector('#s-keys').onclick = () => { G.sfx.ui('click'); UI.keyConfig(() => UI.settings(back)); };
-    for (const id of ['sens', 'adsSens', 'fov', 'volume', 'shake', 'bob']) {
-      const inp = s.querySelector('#s-' + id), v = s.querySelector('#v-' + id);
-      inp.oninput = () => { S[id] = +inp.value; v.textContent = inp.parentElement.querySelector('.v').textContent = id === 'fov' ? S[id] + '°' : id === 'volume' || id === 'shake' || id === 'bob' ? Math.round(S[id] * 100) + '%' : (+S[id]).toFixed(2); if (id === 'volume') G.sfx.setVolume(S[id]); G.save.write(); };
+    for (const id of Object.keys(NUM)) {
+      const [min, max, step, k] = NUM[id], inp = s.querySelector('#s-' + id), num = s.querySelector('#n-' + id);
+      // clamp to the range and snap to the step, then show it in both the slider and the box
+      const set = (x) => {
+        x = +(Math.round(Math.min(max, Math.max(min, x)) / step) * step).toFixed(2);
+        S[id] = x; inp.value = x; num.value = shown(id, x);
+        if (id === 'volume') G.sfx.setVolume(x);
+        G.save.write();
+      };
+      inp.oninput = () => set(+inp.value);
+      num.onchange = () => { const x = parseFloat(num.value); if (isFinite(x)) set(x / k); else num.value = shown(id, S[id]); };
+      num.onkeydown = (e) => { if (e.key === 'Enter') num.blur(); };
     }
     for (const id of ['dmgNums', 'crouchToggle', 'autoSprint', 'sprintToggle', 'invertY', 'fullscreen', 'showFps', 'askTutorial', 'motionBlur']) { const inp = s.querySelector('#s-' + id); inp.onchange = () => { S[id] = inp.checked; G.save.write(); }; }
     s.querySelector('#s-quality').onchange = (e) => { S.quality = e.target.value; G.save.write(); G.game.applyQuality(); };

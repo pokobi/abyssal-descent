@@ -113,12 +113,13 @@
   };
   // ---- a hall of the works: iron plates underfoot with the melt glowing through grates, furnace mouths in the walls
   // (the melt under the grates lies a hand under your feet: it burns as shallow lava does, fields.js addHot - for you only, the foes walk over it;
+  // not in the merchant's hall (o.keep), where nothing on the floor hurts: there the grates only glow;
   // each mouth is a glowing panel flush on the wall (the wall's plinth and hangings stand before parts of it): its light stands out in the
   // room and draws no flame of its own (emit: false) - one drawn there hung in the air, or behind the plinth. So no w.fireSpots column either)
   S.foundry = function (w, rng, W, D, o) {
     H.floors(w, W, D, null, 'floor');
     w.visual('iron', 0, 0, 0, W, 0.02, D, { uv: 2, grad: false });
-    for (const [x, z] of [[6, 7], [W - 6, 7], [6, D - 7], [W - 6, D - 7]]) { w.visual('lava', x - 1.2, 0.025, z - 1.2, x + 1.2, 0.035, z + 1.2, { uv: 1, grad: false }); for (let u = -1; u <= 1; u += 0.5) w.visual('iron', x + u - 0.05, 0.035, z - 1.2, x + u + 0.05, 0.06, z + 1.2, { uv: 1 }); w.addLight(x, 0.8, z, { flame: 0.4, intensity: 6, range: 8, color: '#ff6a20', emit: false, prio: 0.5 }); if (G.Fields && G.Fields.addHot) G.Fields.addHot(w, x - 1.2, z - 1.2, x + 1.2, z + 1.2, 0, true); }
+    for (const [x, z] of [[6, 7], [W - 6, 7], [6, D - 7], [W - 6, D - 7]]) { w.visual('lava', x - 1.2, 0.025, z - 1.2, x + 1.2, 0.035, z + 1.2, { uv: 1, grad: false }); for (let u = -1; u <= 1; u += 0.5) w.visual('iron', x + u - 0.05, 0.035, z - 1.2, x + u + 0.05, 0.06, z + 1.2, { uv: 1 }); w.addLight(x, 0.8, z, { flame: 0.4, intensity: 6, range: 8, color: '#ff6a20', emit: false, prio: 0.5 }); if (G.Fields && G.Fields.addHot && !o.keep) G.Fields.addHot(w, x - 1.2, z - 1.2, x + 1.2, z + 1.2, 0, true); }
     H.perimeter(w, rng, W, D, { gates: o.gates, h: 14, top: 16, beams: 0 });
     w.solid('rock', -3, 14, -3, W + 3, 16, D + 3, { uv: 6, grad: false });
     for (const x of [0, W]) for (let z = 8; z < D - 6; z += 10) { w.visual('glow', x === 0 ? 0 : W - 0.03, 0.6, z, x === 0 ? 0.03 : W, 2.0, z + 2.2, { uv: 1, grad: false, tint: [1, 0.45, 0.1] }); w.addLight(x === 0 ? 1.2 : W - 1.2, 1.4, z + 1.1, { flame: 0.6, intensity: 6, range: 8, color: '#ff7a30', prio: 0.7, emit: false }); }

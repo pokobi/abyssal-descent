@@ -223,7 +223,7 @@
   add('e_bandolier', '弾薬帯', '🎗️', 'uncommon', 'economy', 'エリア開始時に破片手榴弾+1。', { max: 3, hooks: { onAreaStart(c, n) { P.addItem('g_frag', n); } } });
   add('e_destroy', '破壊衝動', '🪓', 'common', 'economy', '破壊可能オブジェクトからのコイン+100%、破壊時に稀に回復薬。', { flag: true });
   add('e_chestbless', '宝箱の祝福', '🎁', 'rare', 'economy', '宝箱を開けると20秒間ランダムな強化を得る。', { hooks: { onChest() { const opts = [['dmg', 0.3, '💪'], ['fireRate', 0.3, '🔁'], ['moveSpeed', 0.3, '👟'], ['armor', 0.3, '🛡️'], ['critChance', 0.2, '💢']]; const o = opts[Math.floor(Math.random() * opts.length)]; C.temp('e_chestbless', 20, { [o[0]]: o[1] }, o[2]); } } });
-  add('e_stealth', '隠密', '🤫', 'uncommon', 'offense', 'エリア開始時5秒間、敵に発見されない。その間の与ダメ+100%。', { hooks: { onAreaStart() { C.temp('e_stealth', 5, { invis: 1 }, '🤫'); }, preHit(c) { if (P.stats.invis > 0) c.bonus += 1.0; } } });
+  add('e_stealth', '隠密', '🤫', 'uncommon', 'offense', 'エリア開始時5秒間、透明になる。その間の与ダメ+100%。', { hooks: { onAreaStart() { C.temp('e_stealth', 5, { invis: 1 }, '🤫'); }, preHit(c) { if (P.stats.invis > 0) c.bonus += 1.0; } } });
   add('e_hawk', '鷹の目', '🦅', 'rare', 'skill', '25m以上でのヘッドショット時、スキルのクールタイム-1秒。', { hooks: { onHit(c) { if (c.head && c.dist > 25 && !c.proc) C.cdReduce(1); } } });
   add('e_bounty', '賞金首', '💰', 'uncommon', 'economy', '精鋭撃破時のコイン×2。', { flag: true });
   add('e_salvage', '鉄屑回収', '🔩', 'common', 'economy', '武器の下取り額が、価格の30%分さらに増える。', { flag: true });

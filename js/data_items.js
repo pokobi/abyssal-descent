@@ -31,7 +31,7 @@
     ['u_plate', 'util', '鎧板', '🛡️', 'epic', 280, 'オーバーシールド+50。', { os: 50 }],
     ['u_hammer', 'util', '鍛冶神の槌', '🔨', 'legendary', 1200, '鍛冶の神が振るったと伝わる槌。インベントリで武器へドラッグ＆ドロップして使う。対象の武器（銃か近接武器）の強化値+2（武器の上限まで）。', { forge: 2 }],
     ['u_iron', 'util', '鉄皮の薬', '🪨', 'uncommon', 130, '10秒間、被ダメ-50%。', { temp: { armor: 0.5 }, dur: 10 }],
-    ['u_invis', 'util', '透明薬', '👻', 'rare', 190, '8秒間透明になり、敵に狙われなくなる。', { invis: 8 }],
+    ['u_invis', 'util', '透明薬', '👻', 'rare', 190, '8秒間透明になり、敵に狙われなくなる（同じ場所から撃ち続けると見つかる）。', { invis: 8 }],
     // repair kit: not a pocket item - it is dragged onto an armour piece on the inventory screen (see js/invui.js)
     ['u_repair', 'util', '名工の補修具', '🛠️', 'epic', 380, '名工が遺した携帯用の補修具。インベントリで防具へドラッグ＆ドロップして使う。対象の防具の耐久を+150修復する（最大値まで）。', { repair: 150 }],
   ];

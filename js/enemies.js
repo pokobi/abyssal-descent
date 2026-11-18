@@ -1180,8 +1180,16 @@
         return;
       }
       // perception
-      this.losT -= dt; if (this.repoT > 0) this.repoT -= dt;
-      const tgt = this.target();
+      this.losT -= dt; if (this.repoT > 0) this.repoT -= dt; if (this.spotT > 0) this.spotT -= dt;
+      let tgt = this.target();
+      // a shot heard (or taken) while it cannot see you, or while a decoy holds it: it goes to look where the shot came from (E.probe)
+      // instead. It does not know where you are: the place is only where the shot was. (While it sees you this is never used.)
+      const iv = this.inv && G.game.time < this.inv.end ? this.inv : null;
+      const probe = iv && ((tgt.isPlayer && tgt.invisible) || (tgt.decoy && iv.hit)) ? iv : null;
+      if (probe) {
+        if (this.attackState) { this.attackState = null; this.atk = 0; this.wind = 0; if (this.tele) { G.fx.endTelegraph(this.tele); this.tele = null; } } // (a blow at the decoy is let go: it turns to the shot)
+        const g = probe.goal; tgt = { pos: g, eye: V(g.x, g.y + 1.4, g.z), vel: V(), invisible: false, isPlayer: false, probe: true };
+      }
       const toT = tgt.pos.clone().sub(this.pos);
       const distH = Math.hypot(toT.x, toT.z);
       if (this.losT <= 0) { this.losT = 0.2 + Math.random() * 0.1; this.hasLOS = G.world.los(V(this.pos.x, this.pos.y + this.height * 0.7, this.pos.z), tgt.eye); }
@@ -1193,6 +1201,7 @@
       if (st.stun > 0 || st.frozen > 0 || st.root > 0) { this.wind = 0; if (this.tele) { G.fx.endTelegraph(this.tele); this.tele = null; } if (this.attackState && st.stun > 0) { this.attackState = null; this.atk = 0; } }
       else if (st.fear > 0) { const l = distH || 1; mx = -toT.x / l; mz = -toT.z / l; speed *= 1.1; this.attackState = null; this.wind = 0; }
       else if (this.attackState) { const r = this.updateAttack(sdt, tgt, toT, distH); if (r) { mx = r.x; mz = r.z; speed = r.speed ?? speed; } }
+      else if (probe) { const r = this.probeMove(probe, toT, distH, sdt); mx = r.x; mz = r.z; speed *= r.k; }
       else if (blind) { this.wanderT = (this.wanderT || 0) - dt; if (this.wanderT <= 0) { this.wanderT = 2; this.wanderA = Math.random() * 6.28; } mx = Math.cos(this.wanderA); mz = Math.sin(this.wanderA); speed *= 0.4; }
       else {
         const mv = this.decideMove(tgt, toT, distH, sdt);
@@ -1231,6 +1240,8 @@
       this.updateHits();
     }
     target() {
+      // given away (E.heardShot: shots from one place, again and again): it goes for you for a few seconds, invisible or not, decoy or not
+      if (this.spotT > 0 && !P.dead) return { pos: P.pos, eye: P.chestPos(), vel: P.vel, invisible: false, isPlayer: true, spotted: true };
       const d = C.getDecoy();
       // 不屈の城塞 draws every foe within 15 m to you (over a decoy or the mercenary)
       const taunted = P.temps && P.temps.has('ult_bastion') && !P.dead && this.pos.distanceTo(P.pos) < 15;
@@ -1246,6 +1257,23 @@
         if (wantM) return { pos: mc.ent.pos, eye: V(mc.ent.pos.x, mc.ent.pos.y + 1.3, mc.ent.pos.z), vel: V(), invisible: false, isPlayer: false, ally: mc };
       } else this.aggroM = false;
       return { pos: P.pos, eye: P.chestPos(), vel: P.vel, invisible: P.stats.invis > 0 || P.smokeT > 0, isPlayer: true };
+    }
+    // going to look where a shot came from (E.probe): there at a walk, then round the place for a few seconds, then it gives up
+    probeMove(iv, toT, distH, dt) {
+      const o = { x: 0, z: 0, k: 0.8 }, sp = iv.p, now = G.game.time;
+      if (!iv.at && Math.hypot(sp.x - this.pos.x, sp.z - this.pos.z) < 2.2) { iv.at = true; iv.end = Math.min(iv.end, now + E.SEARCH); iv.gT = 0; }
+      if (iv.at) {
+        iv.gT -= dt; o.k = 0.45;
+        if (iv.gT <= 0 || distH < 0.7) { iv.gT = 1.2 + Math.random(); const a = Math.random() * 6.283, r = 1 + Math.random() * 2.5; iv.goal.set(sp.x + Math.cos(a) * r, sp.y, sp.z + Math.sin(a) * r); }
+      }
+      if (distH < 0.6) return o;
+      // the way there: the ground routes lead to you (or to the decoy), so they are only taken while that is by the place it goes to
+      // (else they would lead it to where you have gone); otherwise straight, as a foe that cannot see you wanders
+      const w = G.world, dc = C.getDecoy(), ft = dc ? dc.pos : P.pos;
+      let f = null;
+      if (!this.flyer && !this.hasLOS && Math.hypot(ft.x - iv.goal.x, ft.z - iv.goal.z) < 6) f = w.flowDir(this.pos.x, this.pos.z, o, this.pos.y) || w.blockedDir(this.pos.x, this.pos.z, this.pos.y, o);
+      if (!f) { const l = distH || 1; o.x = toT.x / l; o.z = toT.z / l; }
+      return o;
     }
     // prison bars / a shut gate between this walker and its target (looked up a few times a second)
     barredFrom(tgt) {
@@ -2111,7 +2139,55 @@
     const a = E.raycastAll(o, d, maxT, excl, pad);
     return a.length ? a[0] : null;
   };
-  E.onDamaged = function (e, info) { e.aware = true; if (e.cloaked && e.cloakOn) e.setCloak(false); };
+  E.onDamaged = function (e, info) {
+    e.aware = true; if (e.cloaked && e.cloakOn) e.setCloak(false);
+    // hurt by you (not by a burn, a chain, a lasting zone, an ally): it turns to where the blow came from and goes to look there, even
+    // while you are invisible or a decoy holds it. A round or a blast: from where the last shot was fired; anything else: where you stand.
+    const src = info && info.src || 'bullet';
+    if (info && info.proc) return;
+    if (src !== 'bullet' && src !== 'explosion' && src !== 'melee' && src !== 'skill') return;
+    const ls = E.lastShot, from = (src === 'bullet' || src === 'explosion') && ls && G.game.time - ls.t < 3 && G.game.time >= ls.t ? ls.p : P.pos;
+    E.probe(e, from, true);
+    if (src === 'melee') E.noise(P.pos, E.MELEE_R); // (a blow and the cry it brings out: heard close by only)
+  };
+
+  // ---------------- gunfire heard ----------------
+  // Invisible, in smoke, or with a decoy out, foes do not know where you are - but they hear your shots. A shot is heard within a reach
+  // that goes by the kind of gun (E.HEAR, m), a quarter of it with a suppressor or a silent gun (E.QUIET); a foe that hears it goes to
+  // look where it was fired from (E.probe), and one that is hit always does. This does not make it go for you: it only knows the place.
+  // Firing again and again from about one place gives you away (E.SPOT: the 3rd shot within 6 s from within 4 m - shots closer together
+  // than 0.4 s, a burst, count as one): the foes that hear it go for you for 4 s, invisible or not. A foe a decoy holds only turns from
+  // it when it is hit (and then is given away like the rest, while it looks). While a foe can see you none of this changes what it does.
+  E.HEAR = { pistol: 30, revolver: 35, smg: 30, rifle: 40, burst: 40, dmr: 40, sniper: 50, shotgun: 50, autoshotgun: 50, lmg: 50, minigun: 50, rocket: 55, gl: 55, rail: 50, flame: 20, nail: 20, tesla: 25, harpoon: 15, crossbow: 12 };
+  E.QUIET = 0.25; E.MELEE_R = 6; E.SEARCH = 4; E.PROBE_T = 12;
+  E.SPOT = { n: 3, t: 6, r: 4, gap: 0.4, dur: 4 };
+  const shotLog = [];
+  E.probe = function (e, at, hit) {
+    if (!e || !e.alive || e.custom || e.boss || e.ally || e.def.ai === 'flee') return; // (one that runs from you does not come looking)
+    const now = G.game.time, iv = e.inv || (e.inv = { p: V(), goal: V(), end: 0, at: false, hit: false, gT: 0 });
+    iv.hit = !!hit || (iv.hit && now < iv.end);
+    iv.p.copy(at); iv.goal.copy(at); iv.at = false; iv.gT = 0; iv.end = now + E.PROBE_T;
+  };
+  // a sound at pos heard within r (no giving away)
+  E.noise = function (pos, r) {
+    for (const e of E.list) if (e.alive && !e.custom && !e.boss && !e.ally && e.pos.distanceTo(pos) < r) E.probe(e, P.pos, false);
+  };
+  // your shot (weapons.js W.fire): from the muzzle at pos, by a gun of the kind arch, quiet with a suppressor / a silent gun
+  E.heardShot = function (pos, arch, quiet) {
+    const now = G.game.time, r = (E.HEAR[arch] || 40) * (quiet ? E.QUIET : 1), S = E.SPOT, h = P.pos;
+    E.lastShot = { p: h.clone(), t: now };
+    while (shotLog.length && (now - shotLog[0].t > S.t || shotLog[0].t > now)) shotLog.shift(); // (the clock starts again with a new run)
+    const last = shotLog[shotLog.length - 1];
+    if (!last || now - last.t >= S.gap) shotLog.push({ x: h.x, y: h.y, z: h.z, t: now });
+    let n = 0; for (const s of shotLog) if (Math.hypot(s.x - h.x, s.y - h.y, s.z - h.z) < S.r) n++;
+    const given = n >= S.n, d = C.getDecoy();
+    for (const e of E.list) {
+      if (!e.alive || e.custom || e.boss || e.ally || e.pos.distanceTo(pos) > r) continue;
+      const held = d && e.inv && e.inv.hit && now < e.inv.end; // (one a decoy holds that is already looking for you)
+      E.probe(e, h, held);
+      if (given && (!d || held || d.pos.distanceTo(e.pos) >= 40)) e.spotT = S.dur;
+    }
+  };
   E.groundMove = function (ent, dx, dz, speed, dt) {
     const w = G.world, r = 0.35;
     ent.pos.x += dx * speed * dt; ent.pos.z += dz * speed * dt;

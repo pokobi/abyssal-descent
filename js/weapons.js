@@ -1419,7 +1419,9 @@
     }
     // feedback
     const silent = model && model.suppressed || w.def.trait === 'silent' || !!s.hush;
-    if (s.proj && s.sound !== 'nail') G.sfx.launcher(s.sound); else if (s.sound === 'tesla') { G.sfx.zap(null); G.sfx.gun('nail', { vol: 0.5 }); } else if (s.sound === 'rail') G.sfx.launcher('rail'); else G.sfx.gun(s.sound, { suppressed: silent, auto: s.auto || s.autoShot, id: w.def.id, trait: w.def.trait, rar: w.def.rarity });
+    if (s.proj && s.sound !== 'nail') G.sfx.launcher(s.sound); else if (s.sound === 'tesla') { G.sfx.zap(null); G.sfx.gun('nail', { vol: 0.5, suppressed: silent }); } else if (s.sound === 'rail') { if (silent) G.sfx.gun('rail', { suppressed: true, id: w.def.id, trait: w.def.trait, rar: w.def.rarity }); else G.sfx.launcher('rail'); } else G.sfx.gun(s.sound, { suppressed: silent, auto: s.auto || s.autoShot, id: w.def.id, trait: w.def.trait, rar: w.def.rarity });
+    // the foes round about hear it (enemies.js E.heardShot): how far goes by the kind of gun, a quarter of it suppressed
+    if (G.enemies.heardShot) G.enemies.heardShot(muzzle, w.def.arch, silent);
     const hider = model && model.flashHider ? 0.4 : 1; // (フラッシュハイダー: a smaller muzzle flash)
     if (!silent) G.fx.flash(muzzle, 0xffb060, (s.sound === 'shotgun' ? 45 : 25) * hider, 0.06, hider < 1 ? 7 : 10);
     anim.flash = silent ? 0.02 : hider < 1 ? 0.03 : 0.05; anim.flashS = silent ? 0.35 : hider < 1 ? 0.6 : 1;   // (a suppressor: a spark of it; a flash hider: a small one without its jet)

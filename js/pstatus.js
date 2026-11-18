@@ -405,9 +405,14 @@
     // ---- heal over time (timed items only; permanent regen buffs are not shown) ----
     let pending = 0, healing = false;
     for (const [id, tm] of P.temps) if (id.startsWith('regen_') && tm.t > 0 && tm.mods && tm.mods.hpRegen) { healing = true; pending += tm.t * tm.mods.hpRegen * Math.max(0, 1 + (P.stats.healMul || 0)); }
+    // a healing item in the hands that has not taken effect yet (its motion still running: abilities.js useItemId, itemanim.js): the heal it
+    // will give, the instant ones and the over-time ones alike. Put down before it takes effect (given back, player.js stopActions), or once it
+    // has taken effect (then the HP itself, or the heal-over-time above, carries on), it no longer counts
+    { const A = G.abilities, IA = G.ItemAnim, id = A && A.usingId, it = id && G.ITEM_BY_ID[id], lf = it && it.data && it.data.heal > 0 && IA && IA.busy() ? IA.left(id) : null;
+      if (lf && lf[0] > 0) pending += it.data.heal * Math.max(0, 1 + (P.stats.healMul || 0)); }
     const mx = P.stats.maxHp;
     if (ghost) {
-      // heal-over-time (bandage, regen potion): a guide segment shows where the HP bar will end up
+      // heal-over-time (bandage, regen potion) and a healing item being used: a guide segment shows where the HP bar will end up
       const hpNow = Math.max(0, P.hp);
       const tgt = pending > 0 && !P.dead ? Math.min(mx, hpNow + pending) : 0;
       const gw = (tgt > 0 ? U.clamp(tgt / mx, 0, 1) * 100 : 0).toFixed(1) + '%', go = tgt > hpNow + 0.5 ? 1 : 0;

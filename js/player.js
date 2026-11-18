@@ -18,10 +18,11 @@
   // A speed heading for a target at a steady a (m/s²), d away from it at the frame's start: how far short of the target it is on average
   // over the frame (dt), along that path (the path reaches the target LEAD sooner than the speed itself)
   const shortOf = (d, a, dt) => { const d1 = Math.max(0, d - a * LEAD); return d1 >= a * dt ? d1 - a * dt / 2 : d1 * d1 / (2 * a * dt); };
-  // Deep water, jump held: the pull of the water up toward G.SWIM_UP against the fall, solved over the frame. It was one step a frame (take
-  // off the fall, then close 7·dt of the gap to SWIM_UP), which rose faster the longer the frame; the rise is now the one that step gave at
-  // 144 Hz at every rate: the speed it settles at (SWIM_UP − g·SWIM_GK) and how fast it gets there (SWIM_K, 1/s) are that step's
-  const SWIM_K = -Math.log(1 - 7 / 144) * 144, SWIM_GK = (1 - 7 / 144) / 7;
+  // Deep water, jump held: the pull of the water up toward G.SWIM_UP against the fall, solved over the frame, settling at SWIM_UP itself
+  // at every frame rate (SWIM_K, 1/s: how fast it gets there, from the old 7·dt step at 144 Hz). The old solve settled at
+  // SWIM_UP − g·(1−7/144)/7 ≈ 0.2 m/s - a sixteenth of the documented speed, 8 s and more to the surface - because the step it
+  // reproduced spent nearly all of SWIM_UP cancelling the fall.
+  const SWIM_K = -Math.log(1 - 7 / 144) * 144;
   // The shake's spring (see addShake), solved exactly over each frame. It was stepped once a frame, which swung it harder the shorter the
   // frame; its numbers are now those of the spring as it ran at 144 Hz (7 Hz, damped to settle in two or three swings, stepped once a
   // 1/144 s frame): s, the damping (1/s); w, the swing (rad/s); w2 = s² + w²; kick, what a kick of the old step is in this one
@@ -626,7 +627,7 @@
       if (I.down('jump')) {
         if (this.pos.y < top - 0.05) {
           if (vs < G.SWIM_UP) { // (faster than that - a jump off the bed - only the fall slows it)
-            const ve = G.SWIM_UP - g * SWIM_GK, ek = Math.exp(-SWIM_K * dt), v1 = ve + (vs - ve) * ek;
+            const ve = G.SWIM_UP, ek = Math.exp(-SWIM_K * dt), v1 = ve + (vs - ve) * ek;
             const mean = dt > 0 ? ve + (vs - ve) * (1 - ek) / (SWIM_K * dt) : v1;
             this.vel.y = v1; c.y = v1 - mean; this._ay = dt > 0 ? (v1 - vs) / dt : 0;
           }

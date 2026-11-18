@@ -3,7 +3,8 @@
 //   - walkers never walk, leap or get jostled off an edge into the void on their own (sky islands, the foundry's chasm);
 //   - one thrown off by your knockback dies, and its body lies on the nearest ground by the edge (searchable); a flyer shot down
 //     over the void too; a body never hangs in the air;
-//   - water, lava, an ice sheet and burning oil leave their element on you and on the foes in them (fields.js);
+//   - water, lava, an ice sheet and burning oil leave their element on you and on the foes in them (fields.js); the grates in the
+//     works' rooms only glow: they burn nothing;
 //   - the weather keeps its element on everyone (rain: water, snow: ice, embers: fire), never over another one, and lightning
 //     strikes (on a wet foe: 漏電); the falling icicles leave ice (weather.js, fieldgen_t4.js).
 //   node tests/hazard_test.js
@@ -73,21 +74,21 @@ async function hotGrate() {
   await hotEnter(['foundry', 'event', 4242]);
   const w = G.world, V = (x, y, z) => new THREE.Vector3(x, y, z), H = window.__H;
   if (w.biome !== 'foundry' || w.field) return JSON.stringify({ err: 'not the works hall: ' + w.biome + ' / ' + w.field });
-  const hz = (w.hotZones || [])[0]; if (!hz) return JSON.stringify({ err: 'no grate' });
-  const cx = (hz.x0 + hz.x1) / 2, cz = (hz.z0 + hz.z1) / 2;
-  const out = { area: G.game.area };
-  out.me = await H.stand(V(cx, hz.y + 0.01, cz), 3);
-  // a foe on the grate, a foe on the floor away from it; then the same grate without its mark (pOnly): fire on the foe, as on any lava
+  // the grates: the glowing melt laid in the floor at the hall's corners (field_rooms.js S.foundry, w.visual 'lava' 2.4 m square, so in w.paved)
+  const corners = [[6, 7], [w.W - 6, 7], [6, w.D - 7], [w.W - 6, w.D - 7]];
+  const grates = (w.paved || []).filter((q) => Math.abs(q[2] - q[0] - 2.4) < 0.05 && Math.abs(q[3] - q[1] - 2.4) < 0.05 && q[4] < 0.05 && corners.some(([x, z]) => Math.abs((q[0] + q[2]) / 2 - x) < 0.01 && Math.abs((q[1] + q[3]) / 2 - z) < 0.01));
+  if (!grates.length) return JSON.stringify({ err: 'no grate' });
+  const g = grates[0], cx = (g[0] + g[2]) / 2, cz = (g[1] + g[3]) / 2;
+  const out = { area: G.game.area, grates: grates.length, hot: (w.hotZones || []).length };
+  out.me = await H.stand(V(cx, 0.06, cz), 3);
+  // a foe on the grate, a foe on the floor away from it
   const def = G.ENEMIES.find((d) => !d.flyer && !d.el && !d.boss) || G.ENEMIES[0];
-  const mk = (x, z) => { const e = G.enemies.spawn(def, 9, V(x, 0, z), { noLoot: true }); e.state = 'idle'; e.speed = 0; e.atkCd = 99; e.au = null; return e; };
+  const mk = (x, z) => { const e = G.enemies.spawn(def, 9, V(x, 0, z), { noLoot: true, noMut: true }); e.state = 'idle'; e.speed = 0; e.atkCd = 99; e.au = null; return e; };
   const ox = cx < w.W / 2 ? w.W / 2 : w.W / 2 - 2, oz = w.D / 2;
   const a = mk(cx, cz), b = mk(ox, oz);
-  const t0 = G.game.time; while (G.game.time - t0 < 1) { a.pos.set(cx, hz.y, cz); b.pos.set(ox, 0, oz); await H.sl(30); }
-  out.foeOn = G.Elem.auraOf(a) || null; out.foeOff = G.Elem.auraOf(b) || null;
+  const t0 = G.game.time; while (G.game.time - t0 < 1.5) { a.pos.set(cx, 0.06, cz); b.pos.set(ox, 0, oz); await H.sl(30); }
+  out.foeOn = G.Elem.auraOf(a) || null; out.foeOff = G.Elem.auraOf(b) || null; out.foeBurn = +((a.st && a.st.burn) || 0).toFixed(2); out.foeHp = +(a.hp / a.maxHp).toFixed(3);
   G.enemies.clear();
-  hz.pOnly = false;
-  const c = mk(cx, cz); const t1 = G.game.time; while (G.game.time - t1 < 1) { c.pos.set(cx, hz.y, cz); await H.sl(30); }
-  out.foeUnmarked = G.Elem.auraOf(c) || null; hz.pOnly = true; G.enemies.clear();
   return JSON.stringify(out);
 }
 
@@ -108,8 +109,10 @@ async function hotGrate() {
       const H = window.__H = {};
       // (waits run on the game's own clock: right after an area is built, or under load, it runs behind the wall clock)
       H.sl = (ms) => new Promise((res) => { const g0 = G.game.time, r0 = performance.now(); const tick = () => { if (G.game.time - g0 >= ms / 1000 || performance.now() - r0 > ms * 8 + 4000) res(); else setTimeout(tick, 15); }; tick(); });
-      H.enter = (field, mood) => { const R = G.Run, GM = G.game; R._f0 = R._f0 || R.field; R.field = () => field; G.Sky.force = mood || ((G.Sky.V[field] || [])[0] || {}).id;
-        G.enemies.clear(); GM.transitioning = false; G.ui.clearScreen(); GM.state = 'playing'; GM.enterArea(9, 'combat'); G.enemies.clear(); GM.objective = null; GM.waves = null; GM.dev = { speed: 1 }; GM.areaCleared = false;
+      // (seed: the area built on that seed, the same layout every time, the run's own seed kept for the rest; none: the run's, a new one each run)
+      H.enter = (field, mood, seed) => { const R = G.Run, GM = G.game, s0 = GM.seed; R._f0 = R._f0 || R.field; R.field = () => field; G.Sky.force = mood || ((G.Sky.V[field] || [])[0] || {}).id;
+        if (seed != null) GM.seed = seed;
+        G.enemies.clear(); GM.transitioning = false; G.ui.clearScreen(); GM.state = 'playing'; GM.enterArea(9, 'combat'); GM.seed = s0; G.enemies.clear(); GM.objective = null; GM.waves = null; GM.dev = { speed: 1 }; GM.areaCleared = false;
         if (G.Warm && G.Warm.world) G.Warm.world(); }; // (its shaders compiled now, as the game does behind the fade between areas)
       H.edgeCells = () => { const w = G.world, out = [];
         for (let z = 2; z < w.Dn - 2; z++) for (let x = 2; x < w.Wn - 2; x++) { const i = z * w.Wn + x; if (w.nb[i] || w.nf[i] < -0.5 || w.nf[i] > 0.5 || w.npen[i] > 0.36 || (w.reachMask && !w.reachMask[i])) continue;
@@ -117,6 +120,16 @@ async function hotGrate() {
           for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (w.voidBelow(px + dx, 0.5, pz + dz)) { v = [dx / 2, dz / 2]; break; }
           if (v) out.push({ x: px, y: w.nf[i], z: pz, vx: v[0], vz: v[1] }); }
         return out; };
+      // from edge cell c out along (vx, vz): how far to the void, or what stops a body on the way first (a wall at body height, floor no
+      // foe may be on: E.walkOk) - [kind, m]
+      H.wayOut = (c, max) => { const w = G.world;
+        for (let d = 0; d <= (max || 3); d += 0.1) { const x = c.x + c.vx * d, z = c.z + c.vz * d;
+          if (w.voidBelow(x, c.y, z)) return ['void', +d.toFixed(1)];
+          if (!w.boxFree(x - 0.35, c.y + 0.5, z - 0.35, x + 0.35, c.y + 1.7, z + 0.35)) return ['wall', +d.toFixed(1)];
+          if (!G.enemies.walkOk(x, z, c.y)) return ['noWalk', +d.toFixed(1)]; }
+        return ['none', max || 3]; };
+      // edge cells in turn from a third of the way along (as the test always took), the first that passes ok(c)
+      H.edgePick = (ok) => { const edge = H.edgeCells(), n = edge.length; for (let k = 0; k < n; k++) { const c = edge[(Math.floor(n / 3) + k) % n]; if (ok(c)) return c; } return null; };
       // a spot on dry, plain ground (no water, lava or field patch under it, not a floor of ice: the frozen lake's ice leaves ice of its own)
       H.dry = (x, z, k) => { const w = G.world, y = w.nf[k]; return ![...w.waterZones, ...w.lavaZones, ...(w.fields || [])].some((q) => x > q.x0 - 1.5 && x < q.x1 + 1.5 && z > q.z0 - 1.5 && z < q.z1 + 1.5 && y < (q.y || 0) + 0.4) && !w.query(x - 1, y - 0.1, z - 1, x + 1, y + 0.01, z + 1).some((c) => c.surf === 'ice'); };
       H.walkers = () => G.ENEMIES.filter((d) => !d.special && !d.flyer && !d.hover && !d.custom && !d.boss && !d.burrow && (!d.fields || d.fields.includes(G.world.field)) && (d.unlockK ?? 0) <= 2);
@@ -157,12 +170,15 @@ async function hotGrate() {
     }
 
     // ---------------- 2) thrown off by your blow: it dies, its body lies by the edge ----------------
-    for (const field of ['sanctum', 'foundry']) {
+    // (each on one fixed layout; the edge it is thrown off has a clear way out to the void - no railing, pillar or ledge in between - and
+    // you stand 4 m back from it, never on the foe's own cell)
+    for (const [field, seed] of [['sanctum', 2], ['foundry', 3]]) {
       const r = await p.eval(`(async () => {
-        const H = window.__H, P = G.player; H.enter('${field}'); await H.sl(400);
-        const w = G.world, edge = H.edgeCells(); const c = edge[Math.floor(edge.length / 3)];
-        P.pos.set(c.x - c.vx * 4, c.y + 0.05, c.z - c.vz * 4); G.game.dev.god = true;
-        if (!w.boxFree(P.pos.x - 0.3, P.pos.y + 0.1, P.pos.z - 0.3, P.pos.x + 0.3, P.pos.y + 1.8, P.pos.z + 0.3)) P.pos.set(c.x, c.y + 0.05, c.z);
+        const H = window.__H, P = G.player; H.enter('${field}', null, ${seed}); await H.sl(400);
+        const w = G.world, back = (c) => [c.x - c.vx * 4, c.y + 0.05, c.z - c.vz * 4];
+        const c = H.edgePick((c) => { const wo = H.wayOut(c, 2.5), b = back(c); return wo[0] === 'void' && w.boxFree(b[0] - 0.3, b[1] + 0.1, b[2] - 0.3, b[0] + 0.3, b[1] + 1.8, b[2] + 0.3) && !w.voidBelow(b[0], c.y, b[2]); });
+        if (!c) return JSON.stringify({ err: 'no edge with a clear way out to the void' });
+        P.pos.set(...back(c)); P.vel.set(0, 0, 0); G.game.dev.god = true;
         const def = H.walkers()[2];
         const e = G.enemies.spawn(def, 9, new THREE.Vector3(c.x, c.y, c.z), {}); e.state = 'idle'; e.speed = 0; e.atkCd = 99;
         H.falls = 0;
@@ -172,14 +188,18 @@ async function hotGrate() {
         await H.sl(600);
         const corpse = G.Inv.corpses.find((k) => k.e === e);
         const res = { fell: H.falls, alive: e.alive, corpse: !!corpse, y: +e.pos.y.toFixed(2), overVoid: w.voidBelow(e.pos.x, e.pos.y, e.pos.z), dEdge: +Math.hypot(e.pos.x - c.x, e.pos.z - c.z).toFixed(1), aboveFloor: +(e.pos.y - w.floorBelow(e.pos.x, e.pos.y + 0.3, e.pos.z)).toFixed(2) };
+        // (still standing: where, and what lies from there on toward the void)
+        if (e.alive) res.stuck = { at: [+e.pos.x.toFixed(2), +e.pos.z.toFixed(2)], from: [c.x, c.z, c.vx, c.vz], way: H.wayOut({ x: e.pos.x, y: e.pos.y, z: e.pos.z, vx: c.vx, vz: c.vz }, 3), st: e.state, kbT: +(e.kbT || 0).toFixed(2), r: e.radius };
         G.game.dev.god = false; return JSON.stringify(res);
       })()`).then(JSON.parse);
       console.log(field, 'knocked off:', JSON.stringify(r));
+      if (r.err) { check(false, `${field}: set up (${r.err})`); continue; }
       check(r.fell === 1 && !r.alive, `${field}: your knockback can still throw a foe into the void (it dies)`);
       check(r.corpse && !r.overVoid && r.aboveFloor < 0.1 && r.dEdge < 8, `${field}: its body lies on the ground by the edge, ${r.dEdge} m from where it went over, and can be searched`);
       // a flyer shot down over the void
       const f = await p.eval(`(async () => {
-        const H = window.__H, P = G.player, w = G.world, edge = H.edgeCells(); const c = edge[Math.floor(edge.length * 0.6)];
+        const H = window.__H, P = G.player, w = G.world, edge = H.edgeCells();
+        const c = edge.slice(Math.floor(edge.length * 0.6)).concat(edge).find((c) => w.voidBelow(c.x + c.vx * 3, c.y + 2.5, c.z + c.vz * 3)) || edge[Math.floor(edge.length * 0.6)]; // (one with the void 3 m out from it, where the flyer is put)
         const def = G.ENEMIES.find((d) => d.flyer && !d.special && !d.fields && (d.unlockK ?? 0) <= 2);
         const at = new THREE.Vector3(c.x + c.vx * 3, c.y + 2.5, c.z + c.vz * 3);
         const e = G.enemies.spawn(def, 9, at, {}); e.state = 'idle'; e.speed = 0; e.atkCd = 99;
@@ -250,14 +270,22 @@ async function hotGrate() {
     }
 
     // ---------------- 4) the weather ----------------
-    for (const [field, mood, el] of [['grave', 'rain', 'water'], ['grave', 'snow', 'ice'], ['halls', 'ember', 'fire'], ['frozen', 'snow', 'ice'], ['flooded', 'drip', 'water']]) {
+    // (each on one fixed layout; each foe in the open as the weather itself sees it - weather.js roofed at the foe, its own height -
+    // and on dry, plain ground; no mutation on it: 無効化 takes no element)
+    for (const [field, mood, el, seed] of [['grave', 'rain', 'water', 21], ['grave', 'snow', 'ice', 22], ['halls', 'ember', 'fire', 23], ['frozen', 'snow', 'ice', 24], ['flooded', 'drip', 'water', 25]]) {
       const r = await p.eval(`(async () => {
-        const H = window.__H, P = G.player, EL = G.Elem; H.enter('${field}', '${mood}'); await H.sl(300);
+        const H = window.__H, P = G.player, EL = G.Elem, Wx = G.Weather; H.enter('${field}', '${mood}', ${seed}); await H.sl(300);
         const w = G.world; G.game.dev.god = true; P.au = null;
-        const es = []; for (let i = 0; i < 3; i++) { const c = w.randomOpenCell(G.game.arng, (x, z, k) => (!w.reachMask || w.reachMask[k]) && H.dry(x, z, k) && !G.Weather.roofed(x, w.nf[k], z, 2.4)); /* (in the open: under a roof the sky does not reach) */ const e = G.enemies.spawn(H.walkers()[i], 9, new THREE.Vector3(c.x, c.y, c.z), { noLoot: true }); e.state = 'idle'; e.speed = 0; e.atkCd = 99; es.push(e); }
+        const es = []; for (let i = 0; i < 3; i++) for (let tries = 0; tries < 20; tries++) {
+          const c = w.randomOpenCell(G.game.arng, (x, z, k) => (!w.reachMask || w.reachMask[k]) && H.dry(x, z, k) && !Wx.roofed(x, w.nf[k], z, 2.4)); /* (in the open: under a roof the sky does not reach) */
+          const e = G.enemies.spawn(H.walkers()[i], 9, new THREE.Vector3(c.x, c.y, c.z), { noLoot: true, noMut: true }); e.state = 'idle'; e.speed = 0; e.atkCd = 99;
+          if (tries < 19 && Wx.roofed(e.pos.x, e.pos.y, e.pos.z, e.height || 1.7)) { e.remove(); G.enemies.list.splice(G.enemies.list.indexOf(e), 1); continue; }
+          es.push(e); break; }
         const other = '${el}' === 'fire' ? 'ice' : 'fire'; EL.setAura(es[2], other, 30); // (an element of the player's on a foe: the weather leaves it alone)
         await H.sl(3600);
         const res = { mood: w.sky && w.sky.id, el: w.sky && w.sky.el, me: EL.playerAura(), foes: es.map((e) => EL.auraOf(e)) };
+        // (a foe without the weather's element: what about it)
+        res.odd = es.slice(0, 2).filter((e) => EL.auraOf(e) !== '${el}').map((e) => ({ id: e.def.id, alive: e.alive, at: [+e.pos.x.toFixed(2), +e.pos.y.toFixed(2), +e.pos.z.toFixed(2)], h: e.height, roofed: Wx.roofed(e.pos.x, e.pos.y, e.pos.z, e.height || 1.7), auFix: e.auFix || null, mut: e.mut ? Object.keys(e.mut) : null, bare: e._envBare || 0, t: +G.game.time.toFixed(2) }));
         G.game.dev.god = false; G.enemies.clear(); return JSON.stringify(res);
       })()`).then(JSON.parse);
       console.log(field, mood, JSON.stringify(r));
@@ -284,9 +312,14 @@ async function hotGrate() {
         Wx.boltAt(P.pos.clone().setY(w.floorBelow(P.pos.x, P.pos.y + 1, P.pos.z)));
         await H.sl(200);
         const res = { wet, leak, took, meWet, hurt: Math.round(mhp - P.hp), myLeak: (P.elLeak || 0) > 0 };
-        // natural bolts during a fight (a fresh foe that the bolts never wear down)
+        // natural bolts during a fight (a fresh foe that the bolts never wear down). A bolt is tried every 6-13 s, by you or by a foe within
+        // 30 m of you, on open ground under the sky (weather.js spotNear); a try that finds no such spot is lost. So you stand out in the
+        // open (no roof over you or 3 m round you) and the foe 6-25 m off: where you came in may be under the gate's arch
         G.game.dev.god = true; G.game.areaCleared = false;
-        const c2 = w.randomOpenCell(G.game.arng, (x, z, k) => (!w.reachMask || w.reachMask[k]) && H.dry(x, z, k) && Math.hypot(x - P.pos.x, z - P.pos.z) > 6);
+        const sky = (x, y, z) => !Wx.roofed(x, y, z, 1.8) && w.boxFree(x - 0.3, y + 0.1, z - 0.3, x + 0.3, y + 1.8, z + 0.3) && w.floorBelow(x, y + 1.5, z) > w.killY;
+        const cp = w.randomOpenCell(G.game.arng, (x, z, k) => (!w.reachMask || w.reachMask[k]) && H.dry(x, z, k) && Math.hypot(x - e.pos.x, z - e.pos.z) > 4 && [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3]].every(([dx, dz]) => sky(x + dx, w.nf[k], z + dz)));
+        if (cp) { P.pos.set(cp.x, cp.y + 0.05, cp.z); P.vel.set(0, 0, 0); }
+        const c2 = w.randomOpenCell(G.game.arng, (x, z, k) => (!w.reachMask || w.reachMask[k]) && H.dry(x, z, k) && Math.hypot(x - P.pos.x, z - P.pos.z) > 6 && Math.hypot(x - P.pos.x, z - P.pos.z) < 25) || w.randomOpenCell(G.game.arng, (x, z, k) => (!w.reachMask || w.reachMask[k]) && H.dry(x, z, k) && Math.hypot(x - P.pos.x, z - P.pos.z) > 6);
         const e2 = G.enemies.spawn(H.walkers()[1], 9, new THREE.Vector3(c2.x, c2.y, c2.z), { noLoot: true }); e2.state = 'idle'; e2.speed = 0; e2.atkCd = 99;
         const s0 = Wx.strikes; for (let i = 0; i < 300 && Wx.strikes - s0 < 1; i++) { await H.sl(100); for (const o of [e, e2]) if (o.alive) o.hp = o.maxHp; }
         res.natural = Wx.strikes - s0; G.game.dev.god = false; G.enemies.clear();
@@ -362,15 +395,15 @@ async function hotGrate() {
         check(fire.side.n === 0 && !fire.side.st.burn, `right beside the brazier: nothing (${fire.side.n} hits)`);
         check(fire.torches.high > 0 && fire.torches.highOn === 0, `torches out of reach (flame 1.8 m or more over the floor) are left out: ${fire.torches.high} of ${fire.torches.all}, ${fire.torches.highOn} left in`);
       }
-      // a hall of the works (the foundry's room): its grates burn you as shallow lava does; a foe on them gets no element
+      // a hall of the works (the foundry's rooms: the merchant's hall, the forge, the shrine, an event ...): the melt glows through the grates at
+      // its corners, but in no room does it burn (2026-11-19: nothing on a room's floor hurts) - no hot zone, no hit, no burn, no element
       const grate = JSON.parse(await p.eval('hotGrate()'));
       console.log('grate:', JSON.stringify(grate));
       if (grate.err) check(false, 'grate: set up (' + grate.err + ')');
       else {
-        const want = +(2.5 + 0.3 * grate.area).toFixed(3);
-        check(grate.me.n >= 4 && grate.me.amts.length === 1 && Math.abs(grate.me.amts[0] - want) < 0.01 && grate.me.gap > 0.37 && grate.me.gap < 0.5, `the works' grates: ${want} (2.5+0.3a) every 0.4 s, as shallow lava (${grate.me.n} hits of ${JSON.stringify(grate.me.amts)}, every ${grate.me.gap} s)`);
-        check(grate.me.st.burn > 1.5 && grate.me.st.burn <= 2 && grate.me.st.burnMul === 1.5 && grate.me.st.burnLv === 1, `... and the shallow burn (${JSON.stringify(grate.me.st)})`);
-        check(!grate.foeOn && !grate.foeOff && grate.foeUnmarked === 'fire', `a foe on the grate gets no element, nor one on the floor by it (${grate.foeOn}, ${grate.foeOff}; the same grate unmarked: ${grate.foeUnmarked})`);
+        check(grate.hot === 0, `the works' rooms lay no burning floor (${grate.hot} hot zones; ${grate.grates} grates glow)`);
+        check(grate.me.n === 0 && !(grate.me.st.burn > 0), `standing on a grate 3 s: no hit, no burn (${grate.me.n} hits, ${JSON.stringify(grate.me.st)})`);
+        check(!grate.foeOn && !grate.foeOff && !(grate.foeBurn > 0) && grate.foeHp === 1, `a foe on the grate gets no element, no burn, no harm, nor one on the floor by it (${grate.foeOn}, ${grate.foeOff}, burn ${grate.foeBurn}, hp ${grate.foeHp})`);
       }
     }
     check(p.errs.length === 0, `no page errors${p.errs.length ? ' — ' + p.errs.slice(0, 3).join(' | ').slice(0, 500) : ''}`);

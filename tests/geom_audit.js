@@ -299,7 +299,9 @@ const FIELDS_ALL = ['grave', 'gate', 'halls', 'ruin', ...FIELDS];
   const want = (process.argv[2] && process.argv[2] !== 'all') ? process.argv[2].split(',') : SIGNS || SHOPV || MINIV ? FIELDS_ALL : FIELDS;
   const kinds = (process.argv[3] || 'combat,shop,event,shrine,forge,alchemy,boss').split(',');
   const seeds = +(process.argv[4] || 2);
-  const skipMats = (process.env.AUDIT_SKIP || 'water,lava,glow,web,fire,flame,vine').split(',');
+  // (a tree's leaves and its thin twigs are not stood on nor walked into: drawn only, as they are meant to be. Its trunk and boughs,
+  // tree_bark / tree_dead, are still looked at)
+  const skipMats = (process.env.AUDIT_SKIP || 'water,lava,glow,web,fire,flame,vine,tree_leaf,tree_twig').split(',');
   const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
   const out = OUT ? fs.createWriteStream(OUT) : null;
   let total = 0, serious = 0;

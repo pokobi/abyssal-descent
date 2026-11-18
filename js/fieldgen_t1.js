@@ -113,6 +113,7 @@
     w.solid('floor', 0, -1, gz1, W, 0, D, { uv: 2 });
     w.visual('cobble', cx - hw, 0, gz1, cx + hw, 0.03, D, { uv: 2, grad: false });
     w.solid('block', 0, 0, gz1, cx - side, 4.6, D, { uv: 3 }); w.solid('block', cx + side, 0, gz1, W, 4.6, D, { uv: 3 });
+    F.roadEnd(w, W, D, side, 4.6);
     // the last houses of the village face the street: gables, dark doors, shuttered windows, lamps
     const nz = gz1 + (D - gz1) * 0.45;
     for (let z = gz1 + 4; z < D - 6; z += 10) for (const sx of [-1, 1]) {

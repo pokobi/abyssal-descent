@@ -117,7 +117,12 @@
     for (const [i, j] of links) bridge(isl[i], isl[j], 2.4);
     for (let k = 0; k < 2 && isl.length > 3; k++) { const a = rng.int(2, isl.length - 1), b = rng.int(0, isl.length - 1); if (a !== b && !links.some(([i, j]) => (i === a && j === b) || (i === b && j === a))) { bridge(isl[a], isl[b], 2.0); links.push([a, b]); } }
     for (let i = 0; i < W * D; i++) if (pit[i]) occ.a[i] = 1;
-    H.floors(w, W, D, pit, 'floor');
+    // (a crack of sky one cell wide, left where two fills - an island's edge and a bridge, two lobes - meet on a slant: the floor drawn
+    // round it closed over most of it, a row of small holes to look at, but each cell of it was a metre's drop through. The floor is laid
+    // over it; what stands where is still placed as before (occ keeps it marked))
+    const pitF = pit.slice(), solidAt = (x, z) => x >= 0 && z >= 0 && x < W && z < D && !pit[z * W + x];
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) if (pit[z * W + x] && ((solidAt(x - 1, z) && solidAt(x + 1, z)) || (solidAt(x, z - 1) && solidAt(x, z + 1)))) pitF[z * W + x] = 0;
+    H.floors(w, W, D, pitF, 'floor');
     H.perimeter(w, rng, W, D, { gates, h: 9, noBal: true });
     w.layout = 'islands';
     w.killY = -12; w.noRim = true;

@@ -360,6 +360,14 @@
   }
 
   // ---------------------------------------------------------------- guardian approach (flat; no stairs anywhere)
+  // the road's far end, either side of the gate you came in by: the perimeter dresses nothing at the south of a guardian's field
+  // (levelgen dressWalls) and its wall there (WALL_T thick, the outer wall's height) only stops you - between the road's side walls
+  // and the gate's piers you looked out over the land through a wall you could not pass. The road's own wall closes it (drawn only)
+  F.roadEnd = function (w, W, D, side, h) {
+    const cx = W / 2, g = 4.4;
+    w.visual('block', cx - side, 0, D, cx - g, h, D + 0.7, { uv: 3 }); w.visual('block', cx + g, 0, D, cx + side, h, D + 0.7, { uv: 3 });
+    w.visual('block', cx - 2.64, 0, D, cx + 2.64, 7.4, D + 0.7, { uv: 2.5 });   // (and behind the gate's closed portcullis, the wall's face, as levelgen dressWalls draws it in the other fields)
+  };
   function roadGrave(w, rng, W, AD, D) {
     const cx = W / 2, gz0 = AD, gz1 = AD + 3, hw = 4.5;
     w.solid('floor', 0, -1, gz1, W, 0, D, { uv: 2 });
@@ -367,6 +375,7 @@
     // cemetery walls either side of the road; the land beyond is graves under the moon
     const side = 15;
     w.solid('block', 0, 0, gz1, cx - side, 4.6, D, { uv: 3 }); w.solid('block', cx + side, 0, gz1, W, 4.6, D, { uv: 3 });
+    F.roadEnd(w, W, D, side, 4.6);
     for (let z = gz1 + 6; z < D - 4; z += 7) for (const sx of [-1, 1]) {
       const fx = cx + sx * (hw + 1.2);
       F.fence(w, fx, z, fx, z + 5, 1.2, []);

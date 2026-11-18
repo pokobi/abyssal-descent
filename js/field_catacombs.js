@@ -240,11 +240,23 @@
       w.solid('block', a, T1 - 0.7, za, b, T1, zb, { uv: 2 });
       // (the arch that carries it: a low arch from terrace to terrace under the deck, the masonry between the two, a rib proud of each face.
       // To look at; it springs above a head's height)
-      if (G.GFX && G.GFX.archSpandrel) {
-        const half = (b - a) / 2, rise = 1.5, y0 = T1 - 0.7 - rise, mt = new THREE.Matrix4().makeTranslation((a + b) / 2, y0, bz);
+      // (a stair up to the first terrace may run under it by its springing - place() lets a bridge cross a stair's lower half, with head
+      // room under the deck: the arch is not let down onto a head there. It springs no lower than a head's height (1.95 m) over the
+      // highest step under it - a flatter arch - and where that leaves it no rise to speak of it is not drawn, nor the corbel on that
+      // side: the deck lies on the terraces as a slab. Before, it sprang at 2.3 m over steps 1.75 - 2 m high, and one walked through it)
+      let need = 0; const under = [];
+      for (const st of stairs) {
+        if (st.lv) continue;
+        const z0s = st.za + 2.4, run = runs(0, T1), zA = Math.max(za, st.za), zB = Math.min(zb, z0s + run);
+        if (zB <= zA) continue;
+        need = Math.max(need, (zA <= z0s ? T1 : T1 - (zA - z0s) / run * T1) + 1.95); under.push(X(st.s, D1));
+      }
+      const rise = need ? Math.min(1.5, T1 - 0.7 - need) : 1.5;
+      if (G.GFX && G.GFX.archSpandrel && rise >= 0.35) {
+        const half = (b - a) / 2, y0 = T1 - 0.7 - rise, mt = new THREE.Matrix4().makeTranslation((a + b) / 2, y0, bz);
         w.batch.geo('block', G.GFX.archSpandrel(half, rise, 3.1, 24), mt);
         w.batch.geo('trim', G.GFX.archRib(half, rise, 0.34, 3.5, 24), mt);
-        for (const sx of [a, b]) w.visual('trim', sx - 0.35, y0 - 0.9, bz - 1.75, sx + 0.35, y0, bz + 1.75, { uv: 1.5 });   // (the corbel it springs from)
+        for (const sx of [a, b]) if (!under.some((ux) => Math.abs(ux - sx) < 0.5)) w.visual('trim', sx - 0.35, y0 - 0.9, bz - 1.75, sx + 0.35, y0, bz + 1.75, { uv: 1.5 });   // (the corbel it springs from)
       }
       w.solid('wall', a, T1, za, b, T1 + 0.95, za + 0.3, { uv: 2 }); w.solid('trim', a, T1 + 0.95, za - 0.04, b, T1 + 1.05, za + 0.34, { uv: 1 });
       w.solid('wall', a, T1, zb - 0.3, b, T1 + 0.95, zb, { uv: 2 }); w.solid('trim', a, T1 + 0.95, zb - 0.34, b, T1 + 1.05, zb + 0.04, { uv: 1 });

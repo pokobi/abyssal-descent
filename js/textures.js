@@ -490,7 +490,7 @@
   // 2: the dungeon entrance: dim, high ceilings, barred openings onto the night outside
   T.BIOMES.gate = { name: '冥門の回廊', stone: '#9a948a', stone2: '#837d74', floor: '#7c766c', trim: '#b2aa9c', rock: '#625c54', wood: '#6e5a46', fog: '#121826', fogD: 0.016, hemiS: '#7a88a8', hemiG: '#221c16', amb: 0.44, moon: '#a8bce8', moonI: 1.1, torch: '#ff9a50', cloth: '#5a1e1e', accent: 'bones', grates: true };
   // 3: deeper: several storeys, stairs and wooden ramps, no daylight at all
-  T.BIOMES.halls = { name: '螺旋の大迷宮', stone: '#8a8074', stone2: '#72695e', floor: '#6c6458', trim: '#a0968a', rock: '#564e46', wood: '#7a6046', fog: '#120e0a', fogD: 0.02, hemiS: '#6a6070', hemiG: '#241a12', amb: 0.3, moon: '#d0b890', moonI: 0.5, torch: '#ff8a40', cloth: '#4a2a12', accent: 'bones', storeys: true };
+  T.BIOMES.halls = { name: '溶岩溝の大迷宮', stone: '#8a8074', stone2: '#72695e', floor: '#6c6458', trim: '#a0968a', rock: '#564e46', wood: '#7a6046', fog: '#120e0a', fogD: 0.02, hemiS: '#6a6070', hemiG: '#241a12', amb: 0.3, moon: '#d0b890', moonI: 0.5, torch: '#ff8a40', cloth: '#4a2a12', accent: 'bones', storeys: true };
   // 4: the ruined depths: the same vertical build, collapsed, lit by blue flames (braziers, torches and the patches of blue fire in the floor)
   T.BIOMES.ruin = { name: '蒼炎の廃都', stone: '#666e82', stone2: '#545c70', floor: '#4e566a', trim: '#8690a8', rock: '#40485a', wood: '#403a4e', fog: '#070d19', fogD: 0.018, hemiS: '#5e76ad', hemiG: '#151c30', amb: 0.33, moon: '#7a9ee8', moonI: 0.58, torch: '#4a9cff', flame: 0x4a9cff, cloth: '#142450', accent: 'bones', storeys: true, ruined: true };
   // the very last guardian's field: a crimson-violet sky and stone over a bottomless dark (not a fire / blue-fire place like the others)

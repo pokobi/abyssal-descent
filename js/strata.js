@@ -1,8 +1,10 @@
 'use strict';
 // Fields 3 and 4 (halls / ruin). The area is built around a chasm that runs north-south (the way from the spawn to the exits):
 //   - the spawn lies south of its end and the three exits on the north wall, so a floor strip is left at both ends of the chasm
-//   - the chasm splits the area into a west and an east half; each half is a stack of three tall storeys joined by stairs, wooden ramps and ladders
-//   - between the halves: bare plank bridges (every storey has at least one) and, separately, thin tightropes that you balance across
+//   - the chasm splits the area into a west and an east half; each half has two tall storeys of full floor joined by stairs, wooden ramps and ladders,
+//     and above them a third level that is only a gallery along the outer wall (4-5 m deep, a low wall along its edge), reached from the second
+//     storey by one flight per side that rises beside the gallery into a landing bay. The area is about as walkable as any other field's
+//   - between the halves: bare plank bridges (the two full storeys have at least one each; none to the galleries) and, separately, a few thin tightropes
 //   - at the bottom of the chasm runs a trench of lava (blue in the ruin): nothing spawns there, monsters will not walk in,
 //     and one knocked in is thrown back out (enemies.js); the player burns and can climb out by the low ledges
 //   - barred prison rooms are dug into the west / east walls; some are shut by an iron gate (the player opens it in 2 s, a monster whose way leads
@@ -12,7 +14,7 @@
   const P = () => G.Props;
   const V = G.U.V;
   const S = (G.Strata = { ropes: [], ladders: [], doors: [], onRope: false });
-  const NS = 18, SS = 10;           // the floor left north / south of the chasm (the exits and the mini shop / the spawn)
+  const NS = 14, SS = 9;            // the floor left north / south of the chasm (the exits and the mini shop / the spawn)
   const _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _v = new THREE.Vector3(), _s = new THREE.Vector3();
   // a box with yaw / pitch / roll (order YXZ: yaw last) into the static batch
   function box(w, mk, x, y, z, sx, sy, sz, ry, rx, rz, tint) {
@@ -131,8 +133,8 @@
   const bail = (why) => { if (G.dbgStrata) G.dbgStrata.push(why); return null; };
   function gen(area, seed, extraChests, gates, kind, ruined) {
     const rng = new G.RNG(seed);
-    const size = 80 + (seed % 4) * 4;
-    const W = size, D = size + rng.int(0, 3) * 4;
+    const size = 56 + (seed % 3) * 4;
+    const W = size, D = size + rng.int(0, 2) * 4;
     const w = new G.World(W, D, ruined ? 'ruin' : 'halls');
     w._fmask = new Uint8Array(W * D); w._floorDone = {}; w.platTops = [];
     const occ = H.Occ(W, D);
@@ -142,20 +144,51 @@
     const Zn = NS, Zs = D - SS;
     const cxm = W / 2 + rng.range(-1, 1);
     // per storey, per metre of z: the west half ends at WL[k][z], the east half starts at ER[k][z].
-    // Each edge is made of runs 3-11 m long, set back 0-3 m at random: the gap is always 14 m or more.
+    // Each edge is made of runs 3-11 m long, set back 0-3 m at random: the gap is always 10 m or more.
+    // The top level (k = 2) is only the gallery along the outer wall: its edge is 4-5 m out from the wall, in runs 4-9 m long.
     const WL = [], ER = [];
     for (let k = 0; k < NL; k++) {
-      const gap = 14 + rng.int(0, 3), base = Math.round(cxm + rng.range(-0.5, 0.5) - gap / 2), l = new Int16Array(D), r = new Int16Array(D);
+      if (k === NL - 1) {
+        const l = new Int16Array(D), r = new Int16Array(D);
+        for (const [arr, sg] of [[l, -1], [r, 1]]) { let z = 0; while (z < D) { const L = rng.int(4, 9), dd = rng.int(4, 5); for (let i = z; i < Math.min(D, z + L); i++) arr[i] = sg < 0 ? dd : W - dd; z += L; } }
+        WL.push(l); ER.push(r); continue;
+      }
+      const gap = 10 + rng.int(0, 3), base = Math.round(cxm + rng.range(-0.5, 0.5) - gap / 2), l = new Int16Array(D), r = new Int16Array(D);
       for (const [arr, sg] of [[l, -1], [r, 1]]) {
         let z = 0;
         while (z < D) { const L = rng.int(ruined ? 2 : 3, ruined ? 8 : 11), j = rng.int(0, ruined ? 4 : 3); for (let i = z; i < Math.min(D, z + L); i++) arr[i] = sg < 0 ? base - j : base + gap + j; z += L; }
       }
       WL.push(l); ER.push(r);
     }
+    // the way up to each gallery: one flight on the second storey running along z right beside the gallery's edge, its top in a landing bay
+    // that the gallery widens into (4 m more, over the flight and the 3 m you step off onto). Worked out here, before the occupancy of the
+    // storeys, because the bay is part of the gallery's outline; built further down
+    // It keeps to the north end of its half (the south end only if that will not do): the rest of the second storey is left whole for the
+    // flight up from the ground, whose foot cannot be in the north strip (the exits' reserve).
+    const GW = 2.8, glen = LG.stairsLen(SP), bays = {};
+    for (const s of ['W', 'E']) {
+      for (let t = 0; t < 80 && !bays[s]; t++) {
+        const dirS = rng.chance(0.5), north = t < 40, lim = rng.int(5, 8);
+        const e = north ? (dirS ? lim + 3 : Math.ceil(lim + 2.5 + glen)) : (dirS ? Math.floor(D - lim - 2.5 - glen) : D - lim - 3);
+        const za = dirS ? e : e - glen, zb = dirS ? e + glen : e;
+        const exitA = dirS ? e - 3 : e, exitB = dirS ? e : e + 3, footA = dirS ? zb : za - 2.5, footB = dirS ? zb + 2.5 : za;
+        const bz0 = Math.floor(Math.min(za, exitA) - 0.5), bz1 = Math.ceil(Math.max(zb, exitB) + 0.5);
+        if (bz0 < 3 || bz1 > D - 3 || Math.min(za, footA) < 5 || Math.max(zb, footB) > D - 3) continue;
+        const g = s === 'W' ? amax(WL[2], bz0, bz1 - 1) : amin(ER[2], bz0, bz1 - 1), bx = s === 'W' ? g + 4 : g - 4;
+        // the stairwell: from the gallery's edge to 0.35 m short of the bay's edge (the railing of the well stands on that rim)
+        const hole = s === 'W' ? { x0: g + 0.35, z0: za, x1: bx - 0.35, z1: zb } : { x0: bx + 0.35, z0: za, x1: g - 0.35, z1: zb };
+        const c = (hole.x0 + hole.x1) / 2, zl = Math.min(za, footA) - 1, zh = Math.max(zb, footB) + 1;
+        // clear of the second storey's chasm edge by 3 m all along it
+        if (s === 'W' ? c + GW / 2 + 3.8 > amin(WL[1], zl, zh) : c - GW / 2 - 3.8 < amax(ER[1], zl, zh)) continue;
+        for (let z = bz0; z < bz1; z++) (s === 'W' ? WL : ER)[2][z] = bx;
+        bays[s] = { dirS, e, c, za, zb, exitA, exitB, footA, footB, bz0, bz1, hole, wood: rng.chance(0.4) };
+      }
+      if (!bays[s]) return bail('gallery ' + s);
+    }
     // the slabs shut out the light from above: a brighter fill and thinner haze than the open halls had
     w.envOverride = ruined ? { amb: 0.72, hemiS: '#6880b8', hemiG: '#1c243c', fog: '#0a1222', fogD: 0.011 } : { amb: 1.1, hemiS: '#a8968a', hemiG: '#4a3a2a', fog: '#1c1610', fogD: 0.01 };
     const T = { zN: Zn, zS: Zs, w: WL[0], e: ER[0], y: -1.0, blue: ruined };
-    w.trench = T; w.strata = { Y, WL, ER, HT, Zn, Zs };
+    w.trench = T; w.strata = { Y, WL, ER, HT, Zn, Zs, bays };
     w.navLayers = NL + 3; w.navPadX = 12;
     w.navHazard = (x, y, z) => y > HT - 1 || (z > Zn && z < Zs && y < -0.2 && x > cl(WL[0], z) && x < cl(ER[0], z));
     // ground: floors on both halves and the two end strips, the trench between (rock bed, a low ledge on every side to climb out by, lava)
@@ -180,8 +213,8 @@
     for (const gx of LG.gateXs(W, gates || 1)) occ.mark(gx - 6, 0, gx + 6, 9, 2);
     occ.mark(W / 2 - 13, 8, W / 2 + 13, 16, 2);
     occ.mark(0, 0, W, 2, 2); occ.mark(0, D - 2, W, D, 2); occ.mark(0, 0, 2, D, 2); occ.mark(W - 2, 0, W, D, 2);
-    // (the ceiling's coffers only over the chasm, where it is seen from every storey: over the halves only the top storey looks up at it)
-    { let a = W, b = 0; for (let z = Zn; z < Zs; z++) { a = Math.min(a, cl(WL[0], z)); b = Math.max(b, cl(ER[0], z)); } F_ceiling(w, rng, W, D, HT, ruined, [a - 2, b + 2]); }
+    // (the ceiling's coffers wherever it is seen from below: the second storey is open to it now, all but the galleries along the walls)
+    F_ceiling(w, rng, W, D, HT, ruined, [4, W - 4]);
 
     // per storey and half: what lies on it (occupancy), the holes cut in it, the railings around them
     const lv = { W: [], E: [] };
@@ -252,7 +285,16 @@
       return false;
     };
     w.ladders = [];
-    for (const s of ['W', 'E']) for (let k = 0; k < NL - 1; k++) {
+    // the flights up to the galleries first (their place was settled with the galleries' outline)
+    for (const s of ['W', 'E']) {
+      const b = bays[s], lo = lv[s][1], hi = lv[s][2], xr = [b.c - GW / 2 - 0.8, b.c + GW / 2 + 0.8];
+      if (!lo.occ.free(xr[0], Math.min(b.za, b.footA), xr[1], Math.max(b.zb, b.footB))) return bail('gallery flight ' + s);
+      if (b.wood) FG.ramp(w, b.dirS ? 'S' : 'N', b.e, b.c, GW, Y[1], Y[2]); else H.stairs(w, b.dirS ? 'S' : 'N', b.e, b.c, GW, Y[1], Y[2], 'trim');
+      lo.occ.mark(xr[0], Math.min(b.za, b.footA), xr[1], Math.max(b.zb, b.footB), 2);
+      hi.holes.push(b.hole); hi.par.push({ r: b.hole, open: b.dirS ? 'N' : 'S' });
+      hi.occ.mark(b.hole.x0 - 0.5, Math.min(b.za, b.exitA) - 0.5, b.hole.x1 + 0.5, Math.max(b.zb, b.exitB) + 0.5, 2);
+    }
+    for (const s of ['W', 'E']) for (let k = 0; k < NL - 2; k++) {
       if (!flight(s, k, rng.chance(0.45)) && !flight(s, k, false)) return bail('flight ' + s + k);
       if (rng.chance(0.35)) { if (rng.chance(0.6)) ladder(s, k); else flight(s, k, rng.chance(0.5)); }
     }
@@ -278,10 +320,10 @@
       }
       return false;
     };
-    for (let k = 0; k < NL; k++) {
+    for (let k = 0; k < NL - 1; k++) {
       if (!across(k)) return bail('across ' + k);
-      if (rng.chance(0.75)) across(k);
-      if (rng.chance(0.4)) across(k);
+      if (rng.chance(0.6)) across(k);
+      if (rng.chance(0.25)) across(k);
     }
     // ---- tightropes: a thin chain across the gap (a separate thing from the bridges, and entirely at random) ----
     w.ropes = [];
@@ -304,17 +346,17 @@
       }
       return false;
     };
-    for (let k = 0; k < NL; k++) { if (rng.chance(0.6)) rope(k); if (rng.chance(0.3)) rope(k); }
+    for (let k = 0; k < NL - 1; k++) { if (rng.chance(0.55)) rope(k); if (rng.chance(0.15)) rope(k); }
     // keep the chasm edges of the upper storeys clear of furniture and chests
     for (let k = 1; k < NL; k++) for (let z = 0; z < D; z++) { lv.W[k].occ.mark(WL[k][z] - 1.5, z, WL[k][z], z + 1, 1); lv.E[k].occ.mark(ER[k][z], z, ER[k][z] + 1.5, z + 1, 1); }
 
-    // ---- barred prison rooms dug into the outer (west / east) walls: on most storeys of both sides, often two or three ----
+    // ---- barred prison rooms dug into the outer (west / east) walls: one or two on each full storey (none off the galleries) ----
     w.doors = [];
     const ctx = { notches: [], nooks: [], ruined };
-    for (const s of ['W', 'E']) for (let k = 0; k < NL; k++) {
-      if (rng.chance(0.85)) cell(w, rng, lv[s][k].occ, s, k, Y[k], W, D, area, fm, ctx);
-      if (rng.chance(0.5)) cell(w, rng, lv[s][k].occ, s, k, Y[k], W, D, area, fm, ctx);
-      if (rng.chance(0.2)) cell(w, rng, lv[s][k].occ, s, k, Y[k], W, D, area, fm, ctx);
+    for (let k = 0; k < NL - 1; k++) {
+      const s0 = rng.chance(0.5) ? 'W' : 'E', s1 = s0 === 'W' ? 'E' : 'W';
+      const one = cell(w, rng, lv[s0][k].occ, s0, k, Y[k], W, D, area, fm, ctx) || cell(w, rng, lv[s1][k].occ, s1, k, Y[k], W, D, area, fm, ctx);
+      if (one && rng.chance(0.5)) cell(w, rng, lv[s1][k].occ, s1, k, Y[k], W, D, area, fm, ctx);
     }
     w.nooks = ctx.nooks;
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT, beams: 0, notches: ctx.notches });
@@ -343,8 +385,42 @@
         if (LG.coping && rn.x1 - rn.x0 > 0.5) { const sg = s === 'W' ? 1 : -1, ex = rn.e; LG._tag = 'kerbs'; LG.coping(w, (a, yy, d) => [ex + sg * (d - 0.3), yy, a], rn.x0, rn.x1, y - 0.62, y + 0.008, 0, 0.34, { len: [1.4, 2.4], plain: true }); LG._tag = null; }
         // broken stones lying along the lip (much heavier in the ruin)
         for (let m = 0, cnt = ruined ? rng.int(2, 4) : (rng.chance(0.5) ? 1 : 0); m < cnt && rn.x1 - rn.x0 > 1.2; m++) {
-          const z = rng.range(rn.x0 + 0.5, rn.x1 - 0.5), x = rn.e + (s === 'W' ? -rng.range(0.3, 0.9) : rng.range(0.3, 0.9));
+          const z = rng.range(rn.x0 + 0.5, rn.x1 - 0.5), x = rn.e + (s === 'W' ? -1 : 1) * (rng.range(0.3, 0.9) + (k === NL - 1 ? 0.45 : 0)); // (inside the gallery's railing)
           box(w, 'block', x, y + 0.1, z, rng.range(0.3, 0.7), rng.range(0.14, 0.32), rng.range(0.35, 0.85), rng.range(0, 3), rng.range(-0.22, 0.22), rng.range(-0.22, 0.22));
+        }
+      }
+      // the gallery's railing: a low wall with a coping, along its edge and across every step in it, so that nobody walks off by mistake
+      // (none where the stairwell's own railing already stands on the edge of the landing bay)
+      if (k === NL - 1) {
+        const RT = 0.35, rr = runs(s === 'W' ? WL[k] : ER[k]);
+        const rail = (x0, z0, x1, z1, ax) => {
+          const len = ax === 'z' ? z1 - z0 : x1 - x0; if (len < 0.1) return;
+          // (the ruin's is broken into lengths of uneven height, never below the knee)
+          const parts = [];
+          if (ruined) for (let a = 0; a < len - 0.01;) { const b = Math.min(len, a + rng.range(1.4, 3.2)); parts.push([a, b, rng.range(0.62, 0.92)]); a = b; }
+          else parts.push([0, len, 0.9]);
+          for (const [a, b, h] of parts) {
+            const [p0, q0, p1, q1] = ax === 'z' ? [x0, z0 + a, x1, z0 + b] : [x0 + a, z0, x0 + b, z1];
+            w.solid('wall', p0, y, q0, p1, y + h, q1, { uv: 2 });
+            w.addCollider(p0, y + h, q0, p1, y + h + 0.1, q1);
+            if (LG.coping) {
+              LG._tag = 'copings';
+              if (ax === 'z') LG.coping(w, (u, yy, d) => [p0 + d, yy, u], q0, q1, y + h - 0.03, y + h + 0.12, -0.05, RT + 0.05, { ridge: 0.05, plain: true });
+              else LG.coping(w, (u, yy, d) => [u, yy, q0 + d], p0, p1, y + h - 0.03, y + h + 0.12, -0.05, RT + 0.05, { ridge: 0.05, plain: true });
+              LG._tag = null;
+            }
+          }
+        };
+        const skip = L.par.map((p) => { const r = p.r; return { e: s === 'W' ? r.x1 + RT : r.x0 - RT, a: r.z0 - (p.open === 'N' ? 0 : RT) + RT, b: r.z1 + (p.open === 'S' ? 0 : RT) - RT }; });
+        for (let i = 0; i < rr.length; i++) {
+          const rn = rr[i];
+          let segs = [[rn.x0, rn.x1]];
+          for (const q of skip) if (Math.abs(q.e - rn.e) < 0.05) segs = segs.flatMap(([a, b]) => [[a, Math.min(b, q.a)], [Math.max(a, q.b), b]]).filter(([a, b]) => b - a > 0.05);
+          for (const [a, b] of segs) rail(s === 'W' ? rn.e - RT : rn.e, a, s === 'W' ? rn.e : rn.e + RT, b, 'z');
+          // the step to the next run: across x, on the side of the deeper one
+          const nx = rr[i + 1]; if (!nx) continue;
+          const deepNext = s === 'W' ? nx.e > rn.e : nx.e < rn.e, zz = rn.x1;
+          rail(Math.min(rn.e, nx.e) - (s === 'W' ? RT : 0), deepNext ? zz : zz - RT, Math.max(rn.e, nx.e) + (s === 'W' ? 0 : RT), deepNext ? zz + RT : zz, 'x');
         }
       }
       for (const p of L.par) {
@@ -381,8 +457,10 @@
       const y = Y[k], L = lv[s][k];
       const r = s === 'W' ? { x0: 0, z0: 0, x1: amin(WL[k], 0, D), z1: D } : { x0: amax(ER[k], 0, D), z0: 0, x1: W, z1: D };
       for (let z = 7; z < D - 3; z += 13) if (!nR(s, k, z)) P().torch(w, s === 'W' ? 0 : W, y + 3.2, z, s === 'W' ? 'px' : 'nx');
+      if (k === NL - 1) { gallery(w, rng, s, y, W, D, bays[s], ruined); continue; }
       dress(w, rng, L.occ, y, k, r, ruined);
-      cover(w, rng, L.occ, y, k, r, ruined, k < NL - 1 ? SP - 0.75 : SP);
+      // (the second storey is open up to the vault now: its full-height pillars carry on up to it)
+      cover(w, rng, L.occ, y, k, r, ruined, k < NL - 2 ? SP - 0.75 : HT - y);
     }
 
     // ---- chests: as many as in any field (levelgen.js chestCount: one to three by depth and difficulty; a vault hall keeps its six).
@@ -393,7 +471,7 @@
     let placed = 0;
     if (kind !== 'vault') for (let i = 0, guard = 0; placed < nChest && order.length && guard < nChest * 6; guard++, i++) if (rooms[order[i % order.length]].chest(tierOf())) placed++;
     for (; placed < nChest; placed++) for (let t = 0; t < 12; t++) {
-      const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 1), r = lv[s][k].occ.place(rng, 2, 2, 1); if (!r) continue;
+      const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 2), r = lv[s][k].occ.place(rng, 2, 2, 1); if (!r) continue;
       if (LG.chestSpotFree(w, r.x0 + 1, Y[k], r.z0 + 1)) { P().chest(w, r.x0 + 1, r.z0 + 1, Y[k], rng.range(0, 6), tierOf()); break; }
     }
     // ---- spawn graves: about three on the third field, about five on the fourth; most stand in the rooms ----
@@ -401,7 +479,7 @@
       let done = false;
       if (order.length && rng.chance(0.8)) for (let t = 0; t < order.length && !done; t++) done = !!rooms[order[(i + t) % order.length]].grave();
       for (let t = 0; t < 12 && !done; t++) {
-        const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 1), r = lv[s][k].occ.place(rng, 2, 2, 1.2); if (!r) continue;
+        const s = rng.chance(0.5) ? 'W' : 'E', k = rng.int(0, NL - 2), r = lv[s][k].occ.place(rng, 2, 2, 1.2); if (!r) continue;
         G.Graves.add(w, r.x0 + 1, Y[k], r.z0 + 1, rng.range(0, 6)); done = true;
       }
     }
@@ -420,6 +498,17 @@
         w.visual('dark', x, HT - 0.04, z, x + sx, HT - 0.02, z + sz, { uv: 1, grad: false });
         box(w, 'woodDark', x + sx * 0.5, HT - rng.range(0.6, 1.6), z + sz * 0.5, 0.35, 0.35, sx * 0.85, rng.range(0, 3.14), rng.range(0.2, 0.55), rng.range(-0.2, 0.2));
       }
+    }
+  }
+  // the few things left along a gallery: crates, barrels and bones against the outer wall, kept off the landing bay (b) and its flight
+  function gallery(w, rng, s, y, W, D, b, ruined) {
+    for (let i = 0, n = Math.round(D / 9); i < n; i++) {
+      const z = rng.range(3, D - 3), t = rng.next(), x = s === 'W' ? rng.range(0.7, 1.0) : W - rng.range(0.7, 1.0);
+      if (z > b.bz0 - 1.5 && z < b.bz1 + 1.5) continue;
+      if (t < 0.3) P().crate(w, x, z, y, rng);
+      else if (t < 0.5) P().barrel(w, x, z, y, rng, false);
+      else if (t < 0.8 || !ruined) P().bones(w, x + (s === 'W' ? 0.4 : -0.4), y, z, rng);
+      else P().rubble(w, x + (s === 'W' ? 0.3 : -0.3), y, z, rng, rng.range(0.8, 1.2));
     }
   }
   // furnishing for one storey of one half (y: its floor; r: the part of it clear of the ragged chasm edge)

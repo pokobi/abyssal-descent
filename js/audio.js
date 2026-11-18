@@ -410,10 +410,17 @@
   // A suppressed shot: the gas let out through the baffles (a dull puff, no front to it; a supersonic round still cracks, less), the
   // body and the push smaller - and over it the action working, which is most of what is heard of it. [how heavy, the puff's Hz, its level]
   const SUPP = { pistol: [0.9, 950, 1], revolver: [1.1, 800, 0.9], smg: [0.85, 850, 1], rifle: [1.1, 620, 1.08], dmr: [1.2, 560, 0.9], sniper: [1.3, 500, 1], shotgun: [1.4, 420, 0.9], lmg: [1.15, 600, 1], minigun: [0.8, 800, 1], nail: [0.7, 1100, 1] };
-  const suppOf = (kind) => {
-    const p = SHOT[kind] || SHOT.rifle, [k, pf, sl] = SUPP[kind] || [1, 700, 1];
+  // q: the kind's own plan (the version the game plays it at, see GUNP / GDEF), or nothing for the published shot. The suppressed shot is
+  // made over that plan, so that each gun keeps its own weight behind the can - a heavy rifle's low blow and body, a pistol's small one:
+  // made from SHOT alone, every suppressed gun was the same light puff and lost the weight its plan gives it (a sniper's rifle with a
+  // suppressor on it sounded as none of the new set). What the can takes away it takes from the plan too: the wide and the bright head,
+  // the edge, the shotgun's cracks, the burst and the air after it; the low blow and the body stay, a little smaller.
+  const suppOf = (kind, q) => {
+    const p0 = SHOT[kind] || SHOT.rifle, [k, pf, sl] = SUPP[kind] || [1, 700, 1];
+    const p = q ? Object.assign({}, p0, q, { headx: 0, brx: 0, edx: 0, popx: 0, kx: 0, lnx: 0, bsx: 0, airx: 0, spn: 0, spf: 0, lowx: (q.lowx || 0) * 0.7, low2x: (q.low2x || 0) * 0.5,
+      bodyx: (q.bodyx || 0) * 0.6, thick: q.thick ? q.thick * 0.5 : 0, hicut: 9000 }) : p0;
     return Object.assign({}, p, { fc: 2600, fl: 0.08 * k, nw: p.nw * 0.5, fw: 0.16 * k, fT: p.fT * 1.8, bf: pf, bl: 0.55 * k, b1: 0.009 * k, b2: 0.03 * k, dr: 1.3, bb: p.bb * 0.5, bbf: p.bbf * 1.3, bb2: p.bb2 * 0.6,
-      bg: p.bg * 0.55, bd: p.bd * 0.8, ag: p.ag * 1.3, rv: 0, er: p.er * 0.45, ech: p.ech * 0.3, tail: p.tail * 0.3, tl: p.tl * 0.2, lv: p.lv * 0.55 * sl, wet: 0.1 });
+      bg: p.bg * 0.55, bd: p.bd * 0.8, ag: p.ag * 1.3, rv: 0, er: p.er * 0.45, ech: p.ech * 0.3, tail: p.tail * 0.3, tl: p.tl * 0.2, lv: p0.lv * 0.55 * sl, wet: 0.1 });
   };
   // The actions, as what happens in them: ['s', s after the shot, from Hz, to Hz, how long (s), level] a part sliding over another;
   // ['k', s after, Hz, level] the dull knock of a heavy part stopped (its mass); ['r', s after, modes [[Hz, level, s to die away], ...],
@@ -1121,13 +1128,13 @@
   function shotPlan(kind, supp, auto, room, fl) {
     if (fl === undefined) fl = A.gunFlavor;
     const base = SHOT[kind] || SHOT.rifle, P = fl === 'pub' ? null : GUNP[kind], n = P ? (P[fl] ? fl : P[GDEF[kind]] ? GDEF[kind] : P.B ? 'B' : P[2] ? 2 : 0) : 0, q = n ? P[n](base, room) : null;
-    let p = supp ? suppOf(kind) : q ? O({ hicut: 9000 }, base, q) : base;
+    let p = supp ? suppOf(kind, q) : q ? O({ hicut: 9000 }, base, q) : base;
     if (auto) p = O({}, p, { act: 'autoshot', len: 0.3, lv: p.lv * 0.85 });   // (a self-loading shotgun: its bolt works, there is no pump)
     // (a suppressed shot is not changed by the plan, only pulled down round less)
     const duck = q && q.duck ? (supp ? [q.duck[0] * 0.35, q.duck[1] * 0.6, q.duck[2] * 0.6] : q.duck) : null;
     const bk = p.rv && usable('gun_' + kind) ? SB.bank['gun_' + kind] : null, recs = bk ? bk.f.map((f) => bufs[f] || (fetchBuf(f), null)).filter(Boolean) : [];
     return { kind, p, recs, room, auto, n, lvl: q && !supp ? q.lvl || 0 : null, duck, shave: q && !supp ? q.shave : undefined, clip: q && !supp ? q.clip : 0, topx: q && !supp ? q.topx : undefined, gv: fl === 'pub' ? 1 : GUNV, kk: kind + (auto ? ':a' : '') + (room ? ':in' : ':out'),
-      key: (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out') + (recs.length ? ':r' : '') + (n && !supp ? ':' + n : '') };
+      key: (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out') + (recs.length ? ':r' : '') + (n ? ':' + n : '') };
   }
   // (for the measurements: docs/tools/gf3_*.js, gf4_*.js)
   A.shotLab = { plan: shotPlan, take: (pl) => shotTake(pl.kind, pl.p, pl.recs, pl.room), kEnergy, level: levelTake, KPUB, GUNP };
@@ -1201,6 +1208,9 @@
   A.gun = function (kind, opts) {
     if (!ctx || !voice(1)) return;
     opts = opts || {};
+    // (the arc thrower's shot is the nail gun's at half, as weapons.js plays your own: a friend's comes here as 'tesla', which has no
+    // shot of its own and was the assault rifle's layers)
+    if (kind === 'tesla') { kind = 'nail'; opts = Object.assign({}, opts, { vol: (opts.vol || 1) * 0.5 }); }
     if (NEW()) { newShot(kind, opts); return; }
     // (the old set, as it was)
     const gv = gunVoice(GUN[opts.suppressed ? 'suppressed' : kind] || GUN.rifle, opts.suppressed ? {} : opts), p = gv.p;

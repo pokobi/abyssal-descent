@@ -68,7 +68,7 @@
   function arm(b) {
     const s = (b.duelSt = { n: 0, wg: 0, wgMax: 0, stunT: 0 });
     const pt0 = b.phaseText.bind(b);
-    b.phaseText = () => (D.cur && D.cur.b === b ? `⚔ 決闘中 — 金色に光った瞬間に${D.keyName()}でパリィ（白いゲージを削り切ればブレイク）` : s.stunT > 0 ? `💥 ブレイク — 総攻撃の好機！（被ダメ×${D.STUN_MUL}）` : s.wg > 0 ? '⚪ 白いゲージ（盾）を削り切るまで本体は無傷' : pt0());
+    b.phaseText = () => (D.cur && D.cur.b === b ? `⚔ 決闘中 — 金色に光った瞬間に${D.keyName()}でパリィ（ブレイクゲージを削り切ればブレイク）` : s.stunT > 0 ? `💥 ブレイク — 総攻撃の好機！（被ダメ×${D.STUN_MUL}）` : s.wg > 0 ? '⚪ ブレイクゲージ（盾）を削り切るまで本体は無傷' : pt0());
     // its health only falls while no white gauge is left; what would have come off goes into the gauge instead (at a rate)
     let hp = b.hp;
     Object.defineProperty(b, 'hp', { configurable: true, get: () => hp, set: (v) => {
@@ -86,7 +86,7 @@
   }
   function shieldGone(b) {
     G.fx.sparks(b.main.centerPos(), null, 24, 0xffffff, 8); G.sfx.shieldBreak && G.sfx.shieldBreak(b.pos);
-    G.ui.toast('⚪ 白いゲージが砕けた — 本体に攻撃が通る', 'good');
+    G.ui.toast('⚪ ブレイクゲージが砕けた — 本体に攻撃が通る', 'good');
   }
 
   // ---------------------------------------------------------------- the loop
@@ -160,7 +160,7 @@
     leaveMe(d);
     if (me) G.player.invulnT = Math.max(G.player.invulnT || 0, 1);
     if (D.authority) { stopBoss(b); if (b.recover && !broke) b.recover(1.5); }
-    if (!broke && b.duelSt.wg > 0) G.ui.toast('⏳ 決闘の時間切れ — 白いゲージが盾として残った（削り切るまで本体は無傷）', 'warn');
+    if (!broke && b.duelSt.wg > 0) G.ui.toast('⏳ 決闘の時間切れ — ブレイクゲージが盾として残った（削り切るまで本体は無傷）', 'warn');
     D.onEnd(d, broke);
   };
   D.abort = function () { const d = D.cur; if (!d) return; D.cur = null; dropRing(d); leaveMe(d); };
@@ -559,7 +559,7 @@ html.m #duel-ov .dv-low.me .dv-key { font-size: 1.3em; }
       OV.innerHTML = '<div class="dv-frame"></div><div class="dv-bar t"></div><div class="dv-bar b"></div><div class="dv-flash"></div><div class="dv-banner"></div><div class="dv-pop"></div><div class="dv-low"><div class="dv-lt"></div><div class="dv-time"><i></i></div></div>'
         + '<div class="dv-guide"><div class="dg-h"><b>決闘</b></div><div class="dg-row"><div class="dg-main"><span><em>金色</em>に光った瞬間に</span><span class="dg-k"></span><span>でパリィ</span></div>'
         + '<div class="dg-cd"><small>開始まで</small><span><b class="dg-n"></b><small>秒</small></span></div></div><div class="dg-bar"><i></i></div>'
-        + '<div class="dg-more"><div><b>押しっぱなしは効かない</b> — 光る前から押していると失敗する</div><div>パリィのたびに白いゲージが削れる。削り切ると<b>ブレイク</b> — 総攻撃の好機</div><div>失敗すると一撃を受ける。時間切れなら白いゲージが盾として残る</div></div></div>'
+        + '<div class="dg-more"><div><b>押しっぱなしは効かない</b> — 光る前から押していると失敗する</div><div>パリィのたびにブレイクゲージが削れる。削り切ると<b>ブレイク</b> — 総攻撃の好機</div><div>失敗すると一撃を受ける。時間切れならブレイクゲージが盾として残る</div></div></div>'
         + '<svg class="dv-arrow"><path class="da-p"></path><path class="da-h"></path></svg><div class="dv-ring"></div>';
       document.body.appendChild(OV);
     }

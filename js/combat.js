@@ -48,6 +48,16 @@
   C.osMax = () => P.stats.maxHp * 2;
   C.overshield = function (amount, cap) { if (!P) return; const lim = Math.min(cap || C.osMax(), C.osMax()); P.os = Math.min(Math.max(P.os, lim), P.os + amount); };
   // a shield that only lasts `dur` seconds
+  // How much of the overshield is timed (it runs out by itself, ultimates.js), and spending it: a hit takes the timed part first, the part
+  // that runs out soonest first of all (it would be gone anyway), then the lasting part. The HUD blinks the timed part (ui.js).
+  C.osTemp = () => { const a = P && P.tShields; if (!a || !a.length) return 0; let s = 0; for (const x of a) s += Math.max(0, x.left); return Math.min(Math.max(0, P.os), s); };
+  C.osTempLeft = () => { const a = P && P.tShields; let m = Infinity; if (a) for (const x of a) if (x.left > 0.01) m = Math.min(m, x.t); return m; };
+  C.spendOs = function (n) {
+    const a = P && P.tShields; if (!a || !a.length || !(n > 0)) return;
+    a.sort((p, q) => p.t - q.t);
+    for (const s of a) { const k = Math.min(Math.max(0, s.left), n); s.left -= k; n -= k; if (n <= 0) break; }
+    for (let i = a.length - 1; i >= 0; i--) if (!(a[i].left > 0.01)) a.splice(i, 1);
+  };
   C.timedShield = function (amount, dur, cap) { if (!P) return; const b = P.os; C.overshield(amount, cap); const add = P.os - b; if (add > 0) (P.tShields || (P.tShields = [])).push({ left: add, t: dur }); };
   C.temp = function (id, dur, mods, icon, label) {
     const ex = P.temps.get(id);
@@ -660,7 +670,7 @@
     if (dmg <= 0) return 0;
     if (G.Classes && !info.fixed) G.Classes.onHurt();
     let osHit = 0;
-    if (P.os > 0 && !fall) { osHit = Math.min(P.os, dmg); P.os -= osHit; dmg -= osHit; }
+    if (P.os > 0 && !fall) { osHit = Math.min(P.os, dmg); P.os -= osHit; dmg -= osHit; C.spendOs(osHit); }
     // lethal-blow protection (buffs: 踏みとどまり / 不死身): from high HP a single hit can't kill you outright
     const und = P.has('d_undying');
     if ((und || P.has('d_grit')) && dmg >= P.hp && P.hp >= P.stats.maxHp * (und ? 0.5 : 0.8) && G.game.time - (P.lastGuardT ?? -99) > (und ? 10 : 25)) {

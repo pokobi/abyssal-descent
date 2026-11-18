@@ -833,7 +833,7 @@
   GM.slotsUsed = () => { let n = 0; for (let i = 1; i <= GM.SLOTS; i++) if (GM.loadRun(i)) n++; return n; };
   GM.playerSnap = function () {
     return {
-      cls: P.cls, perks: (P.perks || []).slice(), hp: P.hp, os: P.os || 0, revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
+      cls: P.cls, perks: (P.perks || []).slice(), hp: P.hp, os: P.os || 0, ts: (P.tShields || []).map((s) => ({ left: s.left, t: s.t })), revives: P.revives, permMaxHp: P.permMaxHp || 0, phoenixUsed: !!P.phoenixUsed, miserArea: P.miserArea,
       buffs: [...P.buffs], buffState: P.buffState,
       weapons: P.weapons.map((w) => ({ id: w.id, atts: w.atts, lv: w.lv || 0, forge: w.forge || undefined, mag: w.mag, kills: w.kills || 0, el: w.el || undefined, kit: w.kit ? 1 : undefined, soul: w.soul || undefined, soulArea: w.soul ? w.soulArea : undefined })), wIdx: P.wIdx, kitAtts: P.kitAtts || [],
       wOrder: G.weapons.order().map((t) => (t === 'm' ? 'm' : t ? P.weapons.indexOf(t) : null)),
@@ -917,7 +917,7 @@
     P.isel = Object.assign({ c1: null, c2: null }, d.isel && d.isel.c1 !== undefined ? d.isel : {});
     P.revives = d.revives ?? 3;
     P.recalc();
-    P.hp = Math.min(P.stats.maxHp, d.hp || P.stats.maxHp); P.os = d.os || 0;
+    P.hp = Math.min(P.stats.maxHp, d.hp || P.stats.maxHp); P.os = d.os || 0; P.tShields = (d.ts || []).map((s) => ({ left: +s.left || 0, t: +s.t || 0 }));
     P.miserArea = d.miserArea;
     for (const id of coresBack) P.attStash.push(id); // (cores taken off weapons that carry an element of their own go to the stash)
     G.weapons.dirty = true;

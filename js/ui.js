@@ -421,7 +421,18 @@
     { const hk = Math.ceil(Math.max(0, P.hp)) + '|' + st.maxHp + '|' + (P.os > 0.5 ? Math.ceil(P.os) : 0) + '|' + (P.revives || 0); if (UI._hk !== hk) { UI._hk = hk; e.hpText.innerHTML = `${Math.ceil(Math.max(0, P.hp))}<small> / ${st.maxHp}</small>${P.os > 0.5 ? ` <span class="os-num" title="オーバーシールド">${G.Icons ? G.Icons.html('ui:os') : '🛡'}+${Math.ceil(P.os)}</span>` : ''} <span class="revives" title="魂の灯火（死亡時に燃えて復活する）">🪔×${P.revives || 0}</span>`; } }
     { // both bars share one scale: past max HP the HP bar gets shorter and the overshield bar fills the whole length
       const mx = Math.max(st.maxHp, P.os, 50);
-      sStyle(e.hpBar, 'width', (st.maxHp / mx * 100).toFixed(1) + '%'); sStyle(e.osFill, 'width', Math.min(100, P.os / mx * 100).toFixed(1) + '%'); }
+      // the lasting part first, then the timed part (combat.js osTemp: spent first by a hit, so it sits at the end), blinking - faster and
+      // faster as the one that runs out soonest nears its end
+      const tmp = G.combat.osTemp ? G.combat.osTemp() : 0, perm = Math.max(0, P.os - tmp), pk = Math.min(100, perm / mx * 100), tk = Math.max(0, Math.min(100 - pk, tmp / mx * 100));
+      sStyle(e.hpBar, 'width', (st.maxHp / mx * 100).toFixed(1) + '%'); sStyle(e.osFill, 'width', pk.toFixed(1) + '%');
+      if (!e.osTemp) { e.osTemp = document.createElement('div'); e.osTemp.id = 'os-temp'; e.osFill.parentNode.appendChild(e.osTemp); }
+      sStyle(e.osTemp, 'left', pk.toFixed(1) + '%'); sStyle(e.osTemp, 'width', tk.toFixed(1) + '%');
+      if (tk > 0) {
+        const tl = G.combat.osTempLeft(), f = 1 + 6 * U.clamp(1 - tl / 5, 0, 1); // (blinks a second at 5 s or more left, 7 a second at the end)
+        UI._osPh = ((UI._osPh || 0) + dt * f * Math.PI * 2) % (Math.PI * 2);
+        sStyle(e.osTemp, 'opacity', (0.3 + 0.7 * (0.5 + 0.5 * Math.cos(UI._osPh))).toFixed(2));
+      } else UI._osPh = 0;
+    }
     sStyle(e.lowhp, 'opacity', hpk < 0.3 ? ((0.5 + Math.sin(G.game.time * 6) * 0.25) * (1 - hpk / 0.3)).toFixed(3) : 0);
     if (hpk < 0.3 && !P.dead) { UI._hb = (UI._hb || 0) - dt; if (UI._hb <= 0) { UI._hb = 0.5 + hpk * 2; G.sfx.heartbeat(1 - hpk / 0.3); } }
     // ammo

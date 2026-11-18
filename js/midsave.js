@@ -120,7 +120,7 @@
       P.temps = new Map((pl.temps || []).map(([id, t]) => [id, Object.assign({}, t)])); P.recalc();
       (pl.skillCd || []).forEach((c, i) => { const s = P.skills[i]; if (s && c) { s.cd = c.cd; s.charges = c.charges; s.maxCd = G.abilities.cdOf(s); } });
       P.grappleCd = pl.grappleCd || 0; P.pileCd = pl.pileCd || 0; P.pileFree = !!pl.pileFree; G.weapons.devour = pl.devour || 0; // (喰魂の大鎌: its stacks last the area)
-      P.hp = Math.min(P.stats.maxHp, pl.hp); P.os = pl.os || 0;
+      P.hp = Math.min(P.stats.maxHp, pl.hp); P.os = pl.os || 0; P.tShields = (pl.ts || []).map((s) => ({ left: +s.left || 0, t: +s.t || 0 }));
       G.weapons.equip(true);
       if (pl.meleeMode) G.weapons.setMelee();
       if (S.kind === 'boss') return applyBoss(S);

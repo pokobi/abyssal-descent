@@ -130,7 +130,8 @@ button { font-family: inherit; }
 #hp-wrap { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
 #hp-icon { font-size: 22px; color: var(--hp2); }
 #hp-bars { width: clamp(120px, 19vw, 280px); }
-#os-bar { height: 5px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
+#os-bar { position: relative; height: 5px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
+#os-temp { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: linear-gradient(90deg, #8cc8ff, #f0f8ff); box-shadow: 0 0 4px rgba(200,230,255,0.8); transition: left .15s, width .15s; }
 #os-fill { height: 100%; width: 0; background: linear-gradient(90deg, #6aa8d8, #cfe8ff); transition: width .15s; }
 #hp-bar { position: relative; transition: width .2s; height: 16px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
 #hp-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #e8483a, #a3241c); transition: width .1s; }

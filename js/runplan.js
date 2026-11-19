@@ -9,7 +9,7 @@
     easy: { name: 'イージー', en: 'EASY', icon: '🌙', col: '#7acb6a', areas: 14, mul: 0.65, segs: [['grave', 3], ['grave', 5]], depth: [0, 0], desc: '短めの冒険で、敵も穏やか。' },
     normal: { name: 'ノーマル', en: 'NORMAL', icon: '⚔️', col: '#e0c070', areas: 21, mul: 1, segs: [['grave', 3], ['gate', 5], ['halls', 7]], depth: [0, 0, 0], desc: '標準の難易度。' },
     hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 21, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], borrow: [[], [], [2]], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
-    extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#d0405a', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], borrow: [[2, 1], [2, 1], [2, 1]], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
+    extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#78b0f0', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], borrow: [[2, 1], [2, 1], [2, 1]], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
   };
   R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟', hamlet: '廃村', dusk: '黄昏の都', catacombs: '地下墓所', castle: '古城', flooded: '水没回廊', foundry: '溶鉱炉', frozen: '霊廟', sanctum: '聖域', battlefield: '古戦場', shaft: '大縦坑', mine: '坑道', pillars: '石柱の海', spire: '逆さの尖塔' };
   // ---- the fields of a run: four depth tiers of three fields each. A difficulty's segments name the tier (by its first field, as above);

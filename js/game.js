@@ -730,14 +730,21 @@
   GM.updateDread = updateDread;
 
   // ---------------- run flow ----------------
-  // the world behind the title screens: a random one, or (the hidden extra mode on the difficulty screen) the blue-flame ruin of field 4
-  GM.titleWorld = function (ruin) {
-    let w;
-    if (ruin) {
-      const keep = G.Run.cur; G.Run.cur = { id: 'extra', lv: 1 };
-      try { w = G.LevelGen.generate(13, (Math.random() * 1e9) >>> 0); } finally { G.Run.cur = keep; }
-    } else w = G.LevelGen.generate(1 + Math.floor(Math.random() * 25), (Math.random() * 1e9) >>> 0);
-    setWorld(w);
+  // The world behind the title screens. The standard ones: a field of the surface, the entrance or the middle depths - never a deep one,
+  // whatever was played last. The hidden extra mode on the difficulty screen (deep): one of the fields its segments draw (runplan.js
+  // drawPool: the deep tier at twice the weight, with the tiers it borrows), in the blue of the deep segments (world.js G.Blue).
+  function titleGen(deep) {
+    const R = G.Run, keepCur = R.cur, keepField = R.field, ok = (f) => R.ready(f) && !(R.RETIRED && R.RETIRED.has(f));
+    let pool = [];
+    if (deep) { for (const f of R.drawPool('ruin', R.DIFFS.extra, 0)) if (ok(f)) for (let i = R.drawWeight ? R.drawWeight('ruin', f) : 1; i > 0; i--) pool.push(f); }
+    else pool = R.TIERS.slice(0, 3).flat().filter((f) => ok(f) || R.TIERS.some((t) => t[0] === f));
+    const f = pool[Math.floor(Math.random() * pool.length)] || (deep ? 'foundry' : 'grave');
+    R.cur = deep ? { id: 'extra', lv: 1 } : { id: 'normal', lv: 0 }; R.field = () => f; R._blueGen = !!deep;
+    try { return G.LevelGen.generate(deep ? 13 : 1 + Math.floor(Math.random() * 21), (Math.random() * 1e9) >>> 0); }
+    finally { R.cur = keepCur; R.field = keepField; R._blueGen = false; }
+  }
+  GM.titleWorld = function (deep) {
+    setWorld(titleGen(deep));
     GM.titleT = 0;
   };
   // the screen looks of a run (invulnerability, buffs, statuses, low HP, the trial clock ...) are driven by the update while you play:
@@ -757,7 +764,7 @@
     I.exitLock();
     G.ui.showHud(false);
     G.ui.bossBar(null);
-    const w = G.LevelGen.generate(1 + Math.floor(Math.random() * 25), (Math.random() * 1e9) >>> 0);
+    const w = titleGen(false);
     setWorld(w);
     GM.titleT = 0;
     G.weapons.hidden(true);

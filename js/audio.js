@@ -3046,17 +3046,35 @@
       stop() { out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4); setTimeout(() => { try { oscs.forEach((o) => o.stop()); src.stop(); lfo.stop(); } catch (e) {} }, 1600); },
     };
   };
-  // the hidden "extra" difficulty: a sinking sound. k = 0 .. 1 (extra 1 .. 10): the lower, the heavier.
-  // sting: a long fall in pitch into the sub-bass, with a dull thud; drone: sub tones that sit lower (and louder) the higher the level
-  A.hellSting = function (k) {
+  // The hidden "extra" difficulty. k = 0 .. 1 (extra 1 .. 10): the lower, the heavier.
+  // sting: the way down (ui.js: the dark closes in over half a second, then the world changes) - air drawn in as the dark closes, then,
+  // as it changes, the floor going out from under (a sub tone falling away), one dull blow, and a great iron door far below: a toll of
+  // partials that do not agree, dying over three seconds, with cold air after it. short: only the toll, smaller (a step of the level).
+  // rise: the way back up - the same air, let out. drone: sub tones that sit lower (and louder) the higher the level.
+  A.hellSting = function (k, short) {
     if (!ctx) return;
     k = Math.max(0, Math.min(1, k || 0));
-    const t = ctx.currentTime, out = dest(null, 0.5); out.gain.value = 0.9;
-    const lo = 34 - k * 14; // 34 Hz at extra 1, 20 Hz at extra 10
-    tn({ t, f0: 130 - k * 30, f1: lo, d: 2.8 + k * 1.2, g: 0.9, to: out, type: 'sine' });
-    tn({ t: t + 0.05, f0: 190, f1: lo * 1.5, d: 2.2, g: 0.35, to: out, type: 'triangle', lp: 260 });
-    nz({ t, buf: 'brown', f: [['lowpass', 420 - k * 200, 0.7, 60, 2.6]], g: 0.8, a: 0.04, d: 2.6 + k, to: out });
-    tn({ t: t + 0.02, f0: 70, f1: 24, d: 0.5, g: 1.0, to: out, type: 'sine' }); // the thud
+    const t0 = ctx.currentTime, out = dest(null, 0.5); out.gain.value = 0.85;
+    const hit = short ? t0 : t0 + 0.54, m = short ? 0.55 : 1;
+    if (!short) {
+      nz({ t: t0, buf: 'brown', f: [['bandpass', 160, 0.9, 760, 0.52]], g: 0.55, a: 0.46, d: 0.56, to: out });
+      nz({ t: t0, buf: 'pink', f: [['highpass', 1800, 0.6, 5200, 0.52]], g: 0.08, a: 0.48, d: 0.56, to: out });
+      tn({ t: t0, f0: 92, f1: 50, d: 0.56, g: 0.3, to: out, type: 'sine' });
+      tn({ t: hit, f0: 78, f1: 31 - k * 9, d: 2.8 + k * 1.2, g: 0.85, to: out, type: 'sine' });
+      tn({ t: hit, f0: 60, f1: 25, d: 0.34, g: 0.95, to: out, type: 'sine' });
+      nz({ t: hit, buf: 'brown', f: [['lowpass', 300, 0.7, 70, 0.5]], g: 0.6, a: 0.004, d: 0.55, to: out });
+      nz({ t: hit + 0.08, buf: 'white', f: [['bandpass', 3200, 0.5]], g: 0.045, a: 0.5, d: 3.0, to: out });
+    }
+    const base = 104 - k * 26;
+    for (const [r, g, d] of [[1, 0.3, 3.6], [1.47, 0.2, 3.0], [2.09, 0.13, 2.3], [2.56, 0.09, 1.9], [3.34, 0.06, 1.3], [4.2, 0.035, 0.9]])
+      tn({ t: hit + 0.012, f0: base * r, f1: base * r * 0.988, d: d * (short ? 0.6 : 1), g: g * m, to: out, type: 'sine' });
+  };
+  A.hellRise = function () {
+    if (!ctx) return;
+    const t0 = ctx.currentTime, out = dest(null, 0.4); out.gain.value = 0.6;
+    nz({ t: t0, buf: 'brown', f: [['bandpass', 520, 0.8, 150, 0.9]], g: 0.4, a: 0.3, d: 1.0, to: out });
+    tn({ t: t0, f0: 46, f1: 74, d: 0.7, g: 0.3, to: out, type: 'sine' });
+    tn({ t: t0 + 0.54, f0: 196, f1: 194, d: 1.4, g: 0.07, to: out, type: 'sine' });
   };
   A.hellDrone = function (k) {
     if (!ctx) return { set() {}, stop() {} };

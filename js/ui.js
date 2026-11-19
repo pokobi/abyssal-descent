@@ -1209,7 +1209,7 @@
       <div style="text-align:center;margin-top:22px"><button class="btn" id="df-back">↩ 戻る</button></div></div>`, G.game.state === 'title' ? '' : 'solid');
     const cardsEl = s.querySelector('.df-cards'), wrap = s.querySelector('.df-wrap');
     const stopDrone = (restore) => { if (drone) { drone.stop(); drone = null; } if (watch) { clearInterval(watch); watch = null; } if (restore && G.game.titleWorld) G.game.titleWorld(false); };
-    // the backdrop of the hidden mode is the blue-flame ruin of field 4 (the title scene's world is swapped, and swapped back)
+    // the backdrop of the hidden mode is one of the deep segments' fields, in their blue (game.js titleWorld: swapped in, and swapped back)
     let watch = null;
     // the higher the level, the thicker the fog of the ruin behind the cards
     const applyLevel = () => { const k = lvK(); s.style.setProperty('--hk', k.toFixed(3)); const f = extra && G.scene && G.scene.fog; if (f && f.density !== undefined) { if (f._b === undefined) f._b = f.density; f.density = f._b * (1 + k * 0.9); } };
@@ -1219,7 +1219,7 @@
       s.classList.toggle('df-hell', extra); applyLevel();
       const upd = () => { const b = s.querySelector('#df-xlv'); if (b) { b.textContent = `エクストラ ${xlv}`; s.querySelector('#df-xmul').textContent = xlv >= 10 ? '至高の試練' : ''; } };
       upd();
-      s.querySelectorAll('[data-x]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const nx = xlv + (+b.dataset.x); if (nx >= 1 && nx <= R.maxExtra()) { xlv = nx; upd(); applyLevel(); G.sfx.ui('click'); if (G.sfx.hellSting) G.sfx.hellSting(lvK() * 0.8); if (drone) drone.set(lvK()); } else G.sfx.ui('deny'); });
+      s.querySelectorAll('[data-x]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const nx = xlv + (+b.dataset.x); if (nx >= 1 && nx <= R.maxExtra()) { xlv = nx; upd(); applyLevel(); G.sfx.ui('click'); if (G.sfx.hellSting) G.sfx.hellSting(lvK() * 0.8, true); if (drone) drone.set(lvK()); } else G.sfx.ui('deny'); });
       s.querySelectorAll('[data-sw]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); setExtra(b.dataset.sw === '1'); });
       cardsEl.querySelectorAll('.df-card').forEach((c) => c.onclick = () => {
         const id = c.dataset.id; G.sfx.ui('select'); stopDrone(false);
@@ -1227,34 +1227,40 @@
         onPick({ id, lv: id === 'extra' ? xlv : 0 });
       });
     };
-    // switching between hard and extra: the cards melt away (blur + shrink) while the world behind blurs and washes out, swap, then both focus back in
+    // Going down to the hidden mode (and back up): the cards sink away as the dark closes in from the edges of the screen, the world is
+    // changed in the dark, then the one card comes up out of it while a pale blue light climbs the screen once. The sound (audio.js
+    // hellSting) draws breath with the dark and strikes as the world changes.
     let veiling = false;
-    const veil = (swap) => {
+    const veil = (swap, down) => {
       if (veiling) return; veiling = true;
-      const c = G.renderer && G.renderer.domElement, T = 'filter 0.3s ease, transform 0.3s ease, opacity 0.3s ease';
-      wrap.style.transition = T; if (c) c.style.transition = T;
-      wrap.style.opacity = '0'; wrap.style.filter = 'blur(8px)'; wrap.style.transform = 'scale(0.96)';
-      if (c) { c.style.filter = 'blur(12px) brightness(1.5)'; c.style.transform = 'scale(1.05)'; }
+      const c = G.renderer && G.renderer.domElement, dy = down ? 44 : -44;
+      let ov = s.querySelector('.df-veil'); if (!ov) { ov = document.createElement('div'); ov.className = 'df-veil'; s.insertBefore(ov, s.firstChild); }
+      wrap.style.transition = 'filter 0.44s ease-in, transform 0.44s ease-in, opacity 0.4s ease-in';
+      wrap.style.opacity = '0'; wrap.style.filter = 'blur(5px)'; wrap.style.transform = `translateY(${dy}px) scale(0.97)`;
+      if (c) { c.style.transition = 'filter 0.46s ease-in, transform 0.5s ease-in'; c.style.filter = 'brightness(0.06) blur(3px)'; c.style.transform = 'scale(1.045)'; }
+      ov.classList.add('on');
       setTimeout(() => {
         swap();
-        wrap.style.transition = 'none'; wrap.style.transform = 'scale(1.04)'; void wrap.offsetWidth;
-        wrap.style.transition = T; wrap.style.opacity = '1'; wrap.style.filter = 'none'; wrap.style.transform = 'none';
-        if (c) { c.style.filter = ''; c.style.transform = ''; }
-        setTimeout(() => { wrap.style.transition = ''; wrap.style.filter = ''; wrap.style.transform = ''; wrap.style.opacity = ''; if (c) c.style.transition = ''; veiling = false; }, 330);
-      }, 320);
+        wrap.style.transition = 'none'; wrap.style.transform = `translateY(${-dy * 0.55}px) scale(0.985)`; void wrap.offsetWidth;
+        wrap.style.transition = 'filter 0.7s ease-out, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s ease-out';
+        wrap.style.opacity = '1'; wrap.style.filter = 'none'; wrap.style.transform = 'none';
+        if (c) { c.style.transition = 'filter 1.2s ease-out, transform 1.4s ease-out'; c.style.filter = ''; c.style.transform = ''; }
+        ov.classList.remove('on');
+        if (down && s.isConnected) { const r = document.createElement('div'); r.className = 'df-rise'; s.insertBefore(r, wrap); setTimeout(() => r.remove(), 1500); }
+        setTimeout(() => { wrap.style.transition = ''; wrap.style.filter = ''; wrap.style.transform = ''; wrap.style.opacity = ''; if (c) c.style.transition = ''; veiling = false; }, 900);
+      }, 540);
     };
-    const setExtra = (on) => veil(() => {
+    const setExtra = (on) => { if (veiling) return; if (on && G.sfx.hellSting) G.sfx.hellSting(lvK()); else if (!on && G.sfx.hellRise) G.sfx.hellRise(); veil(() => {
       if (!s.isConnected) return;
       extra = on; render();
       if (on) {
-        if (G.sfx.hellSting) G.sfx.hellSting(lvK());
         if (!drone && G.sfx.hellDrone) drone = G.sfx.hellDrone(lvK());
         if (G.game.titleWorld) G.game.titleWorld(true);
         if (G.scene.fog) G.scene.fog._b = undefined;
         applyLevel();
         if (!watch) watch = setInterval(() => { if (!s.isConnected) stopDrone(false); }, 300);
-      } else { stopDrone(true); G.sfx.ui('click'); }
-    });
+      } else stopDrone(true);
+    }, on); };
     render();
     s.querySelector('#df-back').onclick = () => { G.sfx.ui('click'); stopDrone(extra); back(); };
   };

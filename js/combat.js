@@ -855,24 +855,51 @@
     if (p.owner === 'enemy' && P.has('pact_fang')) p.vel.multiplyScalar(1.25);
     p.mesh = projMesh(o.look || o.kind);
     p.mesh.position.copy(p.pos);
+    // a shot thrown from the hand (castanim.js visFrom, while a held throw is let go): drawn from where the hand lets go on the screen and
+    // carried onto its own way over its first moments (visStep). Only the drawing: where it is, and what it hits, are p.pos as ever
+    // (how far behind the hand, along the line of sight, its drawn start is: a long thing - a spear, a stake - further, so that the whole
+    // of it lies ahead of the eye; and how small a ball of fire or water is drawn as it leaves the hand, growing to its own size)
+    if (p.mesh.userData.visS) { p.mesh.scale.setScalar(1); p.mesh.userData.visS = false; }
+    // (your own spear and stake are shaped with the point to -z, and an object's lookAt turns its +z to where it looks: they flew point
+    // last. Turned the other way round, they fly point first)
+    if (p.owner === 'player' && (p.kind === 'spear' || p.kind === 'harpoon')) p.headFwd = true;
+    if (p.owner === 'player' && G.CastAnim && G.CastAnim.visFrom) {
+      const vk = VIS_K[p.kind] || VIS_K.def, vf = G.CastAnim.visFrom(vk[0]);
+      if (vf) {
+        p.vis = { off: vf.sub(p.pos), T: G.CastAnim.VIS_T || 0.12, s0: vk[1] }; p.mesh.position.add(p.vis.off);
+        if (vk[1] < 1) { p.mesh.scale.setScalar(vk[1]); p.mesh.userData.visS = true; }
+        if (p.vel.lengthSq() > 0.01) { const fl = p.headFwd ? -1 : 1; p.mesh.lookAt(p.mesh.position.x + p.vel.x * fl, p.mesh.position.y + p.vel.y * fl, p.mesh.position.z + p.vel.z * fl); }
+      }
+    }
     C.projectiles.push(p);
     return p;
   };
+  // the drawn way of a shot off the hand (spawnProjectile): from the hand, onto its own way, smoothly (at its own speed from the first)
+  const VIS_K = { spear: [1.6, 1], harpoon: [1.25, 1], icespear: [1.5, 0.75], fireball: [1.15, 0.3], waterorb: [1.0, 0.45], darkorb: [1.0, 0.45], mine: [1.5, 0.45], def: [0.9, 1] };
+  function visStep(p) {
+    const k = p.t / p.vis.T;
+    if (k >= 1 || p.stuck) { visEnd(p); return; }
+    const e = k * k * (3 - 2 * k);
+    p.mesh.position.addScaledVector(p.vis.off, 1 - e);
+    if (p.mesh.userData.visS) p.mesh.scale.setScalar(p.vis.s0 + (1 - p.vis.s0) * e);
+  }
+  function visEnd(p) { p.vis = null; if (p.mesh.userData.visS) { p.mesh.scale.setScalar(1); p.mesh.userData.visS = false; } }
   function trail(p, dt) {
     if (p.look) { G.GrenFX.trail(p, dt); return; }
+    const pos = p.vis ? p.mesh.position : p.pos;   // (what it sheds is shed where it is seen)
     // a player's projectile with an element leaves a trail of its colour
-    if (p.owner === 'player' && p.info && p.info.el && G.Elem && G.Elem.BY[p.info.el] && Math.random() < 0.8) { const c = G.fx.tone ? G.fx.tone(G.Elem.BY[p.info.el].hex) : new THREE.Color(G.Elem.BY[p.info.el].hex); G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.32, 0.22, 0.02, c.r, c.g, c.b, 0.9, 0, 1); }
+    if (p.owner === 'player' && p.info && p.info.el && G.Elem && G.Elem.BY[p.info.el] && Math.random() < 0.8) { const c = G.fx.tone ? G.fx.tone(G.Elem.BY[p.info.el].hex) : new THREE.Color(G.Elem.BY[p.info.el].hex); G.fx.add.spawn(pos.x, pos.y, pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.32, 0.22, 0.02, c.r, c.g, c.b, 0.9, 0, 1); }
     switch (p.kind) {
-      case 'rocket': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(0, 0.5), U.rand(-0.3, 0.3), 1.2, 0.2, 1.0, 0.5, 0.48, 0.45, 0.5, -0.3, 1); G.fx.flame.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.08, 0.35, 0.1, 1.5, 0.9, 0.4, 1, 0, 0); break;
-      case 'fireball': case 'bigfire': G.fx.flameLick(p.pos.x, p.pos.y - 0.1, p.pos.z, p.kind === 'bigfire' ? 2.5 : 1.0); break;
-      case 'orb': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.22, 0.02, 0.5, 0.42, 0.55, 0.8, 0, 1); break;
-      case 'darkorb': if (Math.random() < 0.85) G.fx.norm.spawn(p.pos.x + U.rand(-0.1, 0.1), p.pos.y + U.rand(-0.1, 0.1), p.pos.z + U.rand(-0.1, 0.1), U.rand(-0.25, 0.25), U.rand(-0.05, 0.3), U.rand(-0.25, 0.25), U.rand(0.7, 1.2), 0.25, U.rand(0.55, 0.9), 0.04, 0.036, 0.038, 0.6, -0.12, 1.4); if (Math.random() < 0.12) G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.4, 0.4), U.rand(0, 0.5), U.rand(-0.4, 0.4), 0.45, 0.035, 0.01, 0.65, 0.2, 0.05, 0.9, -0.2, 0.6); break; // (dark smoke behind it, an ember now and then)
-      case 'soul': G.fx.add.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.58, 0.68, 0.78, 0.8, 0, 1); break;
-      case 'waterorb': G.fx.drops.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.6, 0.6), U.rand(-0.6, 0.4), U.rand(-0.6, 0.6), 0.4, 0.012, 0.5, 0.58, 0.62, 9.8, 0.3, 0.03); break; // (water shed as it flies: drops)
-      case 'frostorb': case 'icespear': G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.3, 0.3), U.rand(-0.4, 0.1), U.rand(-0.3, 0.3), 0.6, 0.12, 0.45, 0.78, 0.82, 0.86, 0.4, 0.2, 1); break; // (cold air trailing off it)
-      case 'rock': { const sp = p.mesh.userData.spin; if (sp) { sp.rotation.x += dt * 11; sp.rotation.z += dt * 6; } if (Math.random() < 0.5) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, U.rand(-0.2, 0.2), U.rand(-0.1, 0.3), U.rand(-0.2, 0.2), 0.45, 0.06, 0.16, 0.55, 0.52, 0.47, 0.5, -0.1, 1); break; }
-      case 'acid': case 'spit': if (Math.random() < 0.5) G.fx.drops.spawn(p.pos.x, p.pos.y, p.pos.z, 0, -1, 0, 0.5, 0.014, 0.26, 0.28, 0.08, 9.8, 0.2, 0.03); break;
-      case 'bolt': case 'harpoon': case 'spear': case 'arrow': if (Math.random() < 0.4) G.fx.norm.spawn(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.3, 0.04, 0.08, 0.7, 0.7, 0.7, 0.25, 0, 0); break;
+      case 'rocket': G.fx.norm.spawn(pos.x, pos.y, pos.z, U.rand(-0.3, 0.3), U.rand(0, 0.5), U.rand(-0.3, 0.3), 1.2, 0.2, 1.0, 0.5, 0.48, 0.45, 0.5, -0.3, 1); G.fx.flame.spawn(pos.x, pos.y, pos.z, 0, 0, 0, 0.08, 0.35, 0.1, 1.5, 0.9, 0.4, 1, 0, 0); break;
+      case 'fireball': case 'bigfire': G.fx.flameLick(pos.x, pos.y - 0.1, pos.z, p.kind === 'bigfire' ? 2.5 : 1.0); break;
+      case 'orb': G.fx.add.spawn(pos.x, pos.y, pos.z, U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), U.rand(-0.3, 0.3), 0.4, 0.22, 0.02, 0.5, 0.42, 0.55, 0.8, 0, 1); break;
+      case 'darkorb': if (Math.random() < 0.85) G.fx.norm.spawn(pos.x + U.rand(-0.1, 0.1), pos.y + U.rand(-0.1, 0.1), pos.z + U.rand(-0.1, 0.1), U.rand(-0.25, 0.25), U.rand(-0.05, 0.3), U.rand(-0.25, 0.25), U.rand(0.7, 1.2), 0.25, U.rand(0.55, 0.9), 0.04, 0.036, 0.038, 0.6, -0.12, 1.4); if (Math.random() < 0.12) G.fx.add.spawn(pos.x, pos.y, pos.z, U.rand(-0.4, 0.4), U.rand(0, 0.5), U.rand(-0.4, 0.4), 0.45, 0.035, 0.01, 0.65, 0.2, 0.05, 0.9, -0.2, 0.6); break; // (dark smoke behind it, an ember now and then)
+      case 'soul': G.fx.add.spawn(pos.x, pos.y, pos.z, 0, 0, 0, 0.3, 0.2, 0.02, 0.58, 0.68, 0.78, 0.8, 0, 1); break;
+      case 'waterorb': G.fx.drops.spawn(pos.x, pos.y, pos.z, U.rand(-0.6, 0.6), U.rand(-0.6, 0.4), U.rand(-0.6, 0.6), 0.4, 0.012, 0.5, 0.58, 0.62, 9.8, 0.3, 0.03); break; // (water shed as it flies: drops)
+      case 'frostorb': case 'icespear': G.fx.norm.spawn(pos.x, pos.y, pos.z, U.rand(-0.3, 0.3), U.rand(-0.4, 0.1), U.rand(-0.3, 0.3), 0.6, 0.12, 0.45, 0.78, 0.82, 0.86, 0.4, 0.2, 1); break; // (cold air trailing off it)
+      case 'rock': { const sp = p.mesh.userData.spin; if (sp) { sp.rotation.x += dt * 11; sp.rotation.z += dt * 6; } if (Math.random() < 0.5) G.fx.norm.spawn(pos.x, pos.y, pos.z, U.rand(-0.2, 0.2), U.rand(-0.1, 0.3), U.rand(-0.2, 0.2), 0.45, 0.06, 0.16, 0.55, 0.52, 0.47, 0.5, -0.1, 1); break; }
+      case 'acid': case 'spit': if (Math.random() < 0.5) G.fx.drops.spawn(pos.x, pos.y, pos.z, 0, -1, 0, 0.5, 0.014, 0.26, 0.28, 0.08, 9.8, 0.2, 0.03); break;
+      case 'bolt': case 'harpoon': case 'spear': case 'arrow': if (Math.random() < 0.4) G.fx.norm.spawn(pos.x, pos.y, pos.z, 0, 0, 0, 0.3, 0.04, 0.08, 0.7, 0.7, 0.7, 0.25, 0, 0); break;
     }
   }
   const tmpD = V(), tmpS = V();
@@ -899,6 +926,7 @@
   // one step of dt for a round: true when it is gone (blown, spent, stuck as a mine)
   function stepProjectile(p, sdt) {
       p.t += sdt; p.life -= sdt;
+      if (p.vis && p.stuck) visEnd(p);
       if (p.stuck) {
         if (p.stuckTo && p.stuckTo.alive) p.pos.copy(p.stuckTo.centerPos()).add(p.stuckOff);
         p.mesh.position.copy(p.pos);
@@ -922,6 +950,7 @@
       const step = arc ? tmpS.length() : p.vel.length() * sdt;
       if (step <= 1e-6) {
         p.mesh.position.copy(p.pos);
+        if (p.vis) visStep(p);
         let fin = false;
         if (p.fuse !== undefined) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); fin = true; } }
         if (!fin && p.life <= 0) { if (p.explode) detonate(p); fin = true; }
@@ -965,7 +994,7 @@
           if (Math.abs(vn) > 2) G.sfx.bounce(p.pos, Math.abs(vn));
           if (p.vel.length() < 1.2 && n.y > 0.5) { p.vel.set(0, 0, 0); p.grav = 0; p.rest = true; }
         } else if (p.sticky) { p.stuck = true; p.pos.addScaledVector(wh.normal, 0.05); G.sfx.bounce(p.pos, 3); return false; }
-        else if (p.mine) { p.vel.set(0, 0, 0); p.grav = 0; p.armed = 0.6; p.pos.y += 0.05; C.mines.push({ pos: p.pos.clone(), mesh: p.mesh, dmg: p.dmg, r: p.explode || 4, armed: 0.6, info: p.info }); const j = C.projectiles.indexOf(p); if (j >= 0) C.projectiles.splice(j, 1); return true; }
+        else if (p.mine) { if (p.vis) visEnd(p); p.vel.set(0, 0, 0); p.grav = 0; p.armed = 0.6; p.pos.y += 0.05; C.mines.push({ pos: p.pos.clone(), mesh: p.mesh, dmg: p.dmg, r: p.explode || 4, armed: 0.6, info: p.info }); const j = C.projectiles.indexOf(p); if (j >= 0) C.projectiles.splice(j, 1); return true; }
         else {
           if (p.explode) detonate(p);
           else {
@@ -979,7 +1008,8 @@
       if (!done && !p.stuck) {
         if (!p.rest && !bounced) p.pos.addScaledVector(tmpD, step);
         p.mesh.position.copy(p.pos);
-        if (p.vel.lengthSq() > 0.01) p.mesh.lookAt(p.pos.x + p.vel.x, p.pos.y + p.vel.y, p.pos.z + p.vel.z);
+        if (p.vis) visStep(p);
+        if (p.vel.lengthSq() > 0.01) { const fl = p.headFwd ? -1 : 1; p.mesh.lookAt(p.mesh.position.x + p.vel.x * fl, p.mesh.position.y + p.vel.y * fl, p.mesh.position.z + p.vel.z * fl); }
         if (p.look === 'sickle') p.mesh.rotateX(p.t * 16);
         trail(p, sdt);
         // ward / orbs / player-side interceptors

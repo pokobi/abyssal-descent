@@ -40,6 +40,8 @@
   const GUARD_MIN = 0.25, GUARD_REST = 1.6, GUARD_REGEN = 0.09; // seconds without a blocked hit before it refills; share of the gauge per second (the same for every weapon)
   W.guarding = () => !!(gd.on && P && P.meleeMode);
   W.meleePhase = () => (ms.draw ? 'draw' : ms.ph);   // what the melee weapon is doing: idle / light / hwind / hrec / draw
+  // the hand weapon's left hand and what the weapon is (castanim.js: a skill's motion of the left hand alone may take its place)
+  W.meleeLeft = () => (mm ? { l: mm.l, model: mm.def.model } : null);
   // a swing or a heavy blow cut short (frozen solid, another action began: player.js stopActions): it ends where it is, no blow lands
   W.stopSwing = () => { if (ms.ph !== 'idle') { ms.ph = 'idle'; ms.t = 0; ms.lungeT = 0; ms.hitDone = true; } };
   W.endDraw = () => { ms.draw = null; };

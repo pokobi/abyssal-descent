@@ -339,7 +339,7 @@
       case 'chain': case 'chain2': {
         const a = aim(40 * (1 + m.area), true);
         if (!a.e) { G.ui.toastSmall('⚡ 対象がいない'); ok = false; break; }
-        G.fx.lightning(P.handPos(), a.e.centerPos(), 0xe0ecff);
+        G.fx.lightning((G.CastAnim && G.CastAnim.visFrom && G.CastAnim.visFrom()) || P.handPos(), a.e.centerPos(), 0xe0ecff);   // (drawn from the finger tip that lets it go: castanim.js)
         C.damageEnemy(a.e, sc(p.dmg), { src: 'skill', elem: 'shock', shieldMul: 2 });
         C.chain(a.e, p.n - 1 + (m.x_jumps ? 3 : 0), sc(p.dmg) * 0.8, 12 * (1 + m.area), { src: 'skill', elemChance: id === 'chain2' ? 1 : 0.5 });
         G.sfx.zap(a.e.pos);

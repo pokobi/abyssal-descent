@@ -219,7 +219,7 @@
     w.deferred.push((grp) => {
       const g = new THREE.Group();
       const plate = new THREE.Mesh(PG().box, w.mats.iron); plate.scale.set(x1 - x0, 0.35, z1 - z0); plate.position.y = -0.175; g.add(plate);
-      const rim = new THREE.Mesh(PG().box, new THREE.MeshStandardMaterial({ color: 0x2a1a10, emissive: 0xff6a20, emissiveIntensity: 0.8 })); rim.scale.set(x1 - x0 + 0.06, 0.06, z1 - z0 + 0.06); rim.position.y = -0.33; g.add(rim);
+      const rim = new THREE.Mesh(PG().box, new THREE.MeshStandardMaterial({ color: 0x2a1a10, emissive: (w.blue && G.Blue ? G.Blue.light(0xff6a20) : 0xff6a20), emissiveIntensity: 0.8 })); rim.scale.set(x1 - x0 + 0.06, 0.06, z1 - z0 + 0.06); rim.position.y = -0.33; g.add(rim);
       for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const ch = new THREE.Mesh(PG().cyl8, w.mats.iron); ch.scale.set(0.06, dy ? 30 : 0.6, 0.06); ch.position.set(sx * ((x1 - x0) / 2 - 0.2), dy ? 15 : 0.3, sz * ((z1 - z0) / 2 - 0.2)); g.add(ch); }
       g.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); grp.add(g); m.mesh = g;
     });

@@ -677,14 +677,39 @@
   // a single flame lick (call repeatedly for torches)
   // (a flame is brighter than the wall it lights: drawn no brighter than white, it was lost before a wall a hand away from it)
   const FLAME_K = 4;
+  // ---- the deep's blue (w.blue, docs/extra_blue_plan.md): the fires a field is lit by - torches, braziers, candles, a chandelier's - burn
+  // a pale cold blue there; a fire of the fight (a burning body, a fire bomb, a foe's flames) keeps its own colour. The field's fires all
+  // come by one road: game.js updateWorldFx calls flameLick at a light source's flame point (s.fp || s.pos) with the field's flame
+  // colour. A fire of the fight is thrown about a body, never at such a point to the last digit - so the point says which it is. The
+  // points are kept per world, looked over again when the list changes and once a second (a light moved, put out, or added)
+  let decoW = null, decoN = -1, decoT = 0, decoSet = null;
+  function decoFlame(w, x, y, z) {
+    const L = w.lightSources; if (!L) return false;
+    const now = performance.now();
+    if (w !== decoW || L.length !== decoN || now - decoT > 1000) {
+      decoW = w; decoN = L.length; decoT = now; decoSet = new Set();
+      for (const s of L) if (s && s.emit && s.flame) { const p = s.fp || s.pos; if (p) decoSet.add(p.x + ',' + p.y + ',' + p.z); }
+    }
+    return decoSet.has(x + ',' + y + ',' + z);
+  }
+  FX.decoFlame = decoFlame;
+  // (the blue: the field's flame colour (or a fire's own orange, where the field has none) turned by world.js G.Blue.light - the one
+  // blue every cold light of the deep is given, the ruin's: white-blue at the heart where the tongues lie thick, plain blue at their
+  // thin edges. Kept per colour)
+  const BLUE_FLAME = 0x4a9cff, blueOf = new Map();
+  const flameBlue = (c) => { const k = c == null ? 0xff9a40 : c; let b = blueOf.get(k); if (b === undefined) { b = G.Blue && G.Blue.light ? G.Blue.light(k) : BLUE_FLAME; blueOf.set(k, b); } return b; };
   FX.flameLick = function (x, y, z, s, color) {
-    const c = rgb(color || 0xff9a40), S = 0.3 * Math.pow(s, 1.15), FK = FLAME_K * (s > 1 ? 1 / Math.sqrt(s) : 1);   // (a great fire is many tongues over one another: each is drawn the dimmer, or a bed of them is white)
+    const w = G.world, blue = !!(w && w.blue && w.mats && w.mats.biome && color === w.mats.biome.flame && decoFlame(w, x, y, z));
+    const c = rgb(blue ? flameBlue(color) : color || 0xff9a40), S = 0.3 * Math.pow(s, 1.15), FK = FLAME_K * (s > 1 ? 1 / Math.sqrt(s) : 1);   // (a great fire is many tongues over one another: each is drawn the dimmer, or a bed of them is white)
+    // (what a tongue cools to as it dies: a fire's to a dull red; the blue to a deep dim blue, not to a red that would read as a fire's)
+    const er = blue ? 0.5 : 1.2, eg = blue ? 0.62 : 0.6, eb = blue ? 0.55 : 0.25, er2 = blue ? 0.45 : 1.2, eg2 = blue ? 0.55 : 0.45, eb2 = blue ? 0.5 : 0.15;
     // (the flame itself stands where it burns, its root at the wick: a tongue that the next replaces before it is gone. It was a puff
     // sent up half a metre, which over a candle is a string of small flames in the air)
-    FX.flame.spawn(x + rs(0.02 * s), y + S * 0.4, z + rs(0.02 * s), rs(0.04 * s), 0.14 * s, rs(0.04 * s), 0.3 + Math.random() * 0.16, S * (1.05 + Math.random() * 0.3), S * 0.8, c.r * FK, c.g * FK, c.b * FK, 0.9, 0, 0, c.r * 1.2, c.g * 0.6, c.b * 0.25);
+    FX.flame.spawn(x + rs(0.02 * s), y + S * 0.4, z + rs(0.02 * s), rs(0.04 * s), 0.14 * s, rs(0.04 * s), 0.3 + Math.random() * 0.16, S * (1.05 + Math.random() * 0.3), S * 0.8, c.r * FK, c.g * FK, c.b * FK, 0.9, 0, 0, c.r * er, c.g * eg, c.b * eb);
     // (tongues torn off it and carried up: a fire of some size throws more of them, and higher)
-    if (Math.random() < Math.min(0.7, 0.12 + s * 0.22)) FX.flame.spawn(x + rs(0.05 * s), y + S * 0.6, z + rs(0.05 * s), rs(0.12 * s), (0.7 + Math.random() * 0.6) * s, rs(0.12 * s), 0.3 + Math.random() * 0.25, S * 0.6, S * 0.12, c.r * 1.4, c.g * 1.1, c.b * 0.8, 0.8, -0.4, 1.2, c.r * 1.2, c.g * 0.45, c.b * 0.15);
-    if (Math.random() < 0.08) FX.add.spawn(x, y + 0.1, z, rs(0.4), 1.2 + Math.random(), rs(0.4), 0.8 + Math.random() * 0.6, 0.03, 0.01, 1.5, 0.8, 0.3, 1, -0.2, 0.3);
+    if (Math.random() < Math.min(0.7, 0.12 + s * 0.22)) FX.flame.spawn(x + rs(0.05 * s), y + S * 0.6, z + rs(0.05 * s), rs(0.12 * s), (0.7 + Math.random() * 0.6) * s, rs(0.12 * s), 0.3 + Math.random() * 0.25, S * 0.6, S * 0.12, c.r * 1.4, c.g * 1.1, c.b * 0.8, 0.8, -0.4, 1.2, c.r * er2, c.g * eg2, c.b * eb2);
+    // (an ember thrown up: orange from a fire, a pale blue spark from the blue)
+    if (Math.random() < 0.08) { if (blue) FX.add.spawn(x, y + 0.1, z, rs(0.4), 1.2 + Math.random(), rs(0.4), 0.8 + Math.random() * 0.6, 0.03, 0.01, 0.42, 0.78, 1.5, 1, -0.2, 0.3); else FX.add.spawn(x, y + 0.1, z, rs(0.4), 1.2 + Math.random(), rs(0.4), 0.8 + Math.random() * 0.6, 0.03, 0.01, 1.5, 0.8, 0.3, 1, -0.2, 0.3); }
     if (Math.random() < 0.06) FX.norm.spawn(x, y + 0.4 * s, z, rs(0.1), 0.6, rs(0.1), 1.5, 0.15 * s, 0.6 * s, 0.1, 0.09, 0.08, 0.25, -0.1, 0.5);
   };
   FX.fireBurst = function (p, r, color) {

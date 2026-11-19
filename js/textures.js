@@ -603,6 +603,21 @@ float wFoam = 0.0, wFall = 0.0;
     };
     m.customProgramCacheKey = () => 'water2';
   }
+  // ---- the deep's blue (w.blue, docs/extra_blue_plan.md): the wax of a candle, lit warm by its own flame, glows a cold blue there (the
+  // field's other glows are swapped whole, world.js G.Blue.mats). The materials are one set per kind of field
+  // and a field of a kind may or may not be in the deep, so it is not baked into them: a uniform read as each frame is drawn says
+  // whether the field now shown is blue (G.world.blue), and the shader moves the colour over. Its brightness is kept: the brightest of
+  // its channels, laid on a pale blue
+  T.deepBlueU = { get value() { const w = G.world; return w && w.blue ? 1 : 0; } };
+  const DEEP_BLUE = 'vec3(0.46, 0.68, 1.0)';
+  function deepEmissive(m) {   // (a lit surface with a glow of its own, MeshStandardMaterial: only the glow)
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uDeepBlue = T.deepBlueU;
+      sh.fragmentShader = 'uniform float uDeepBlue;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  totalEmissiveRadiance = mix(totalEmissiveRadiance, ${DEEP_BLUE} * max(totalEmissiveRadiance.r, max(totalEmissiveRadiance.g, totalEmissiveRadiance.b)), uDeepBlue);`);
+    };
+    m.customProgramCacheKey = () => 'deepEmissive';
+  }
   function boil(m, blue) {
     m.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = T.lavaT;
@@ -746,6 +761,9 @@ float mN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
     M.vc = {};
     for (const k in M) { const m = M[k]; if (m && m.isMaterial) { if (m.isMeshStandardMaterial) { const c = m.clone(); c.vertexColors = true; M.vc[k] = c; } else M.vc[k] = m; } }
     boil(M.vc.lava, false); boil(M.vc.bluefire, true); // the copies the world is actually drawn with
+    // (the deep's blue on the candles' wax, lit warm by its own flame. The glows and the lava of a blue field are swapped whole by
+    // world.js G.Blue.mats)
+    deepEmissive(M.vc.candle); deepEmissive(M.candle);
     waterize(M.vc.water);
     // (broad patches across the world, metres wide, so that a picture repeated every few metres is not read as a pattern: the turf
     // greener and drier in drifts, the stone lighter and darker; macro below)

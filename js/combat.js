@@ -803,7 +803,7 @@
       case 'grenade': add(PG.sph, mats.iron, 0.09, 0.11, 0.09); add(PG.cyl8, mats.brass, 0.03, 0.05, 0.03, 0, 0.11, 0); break;
       case 'bottle': add(PG.cyl8, mats.water, 0.07, 0.2, 0.07); add(PG.cyl8, mats.cloth2, 0.025, 0.1, 0.025, 0, 0.14, 0); glow(0xff9040, 0.3).position.y = 0.2; break;
       case 'dyna': for (let i = 0; i < 3; i++) add(PG.cyl8, mats.ceramic, 0.035, 0.25, 0.035, (i - 1) * 0.07, 0, 0); break;
-      case 'mine': add(PG.cyl, mats.iron, 0.2, 0.06, 0.2); add(PG.sph, mats.glow, 0.03, 0.03, 0.03, 0, 0.04, 0); break;
+      case 'mine': add(PG.cyl, mats.iron, 0.2, 0.06, 0.2); add(PG.sph, Object.getPrototypeOf(mats).glow || mats.glow, 0.03, 0.03, 0.03, 0, 0.04, 0); break; // (your own mine keeps its warm lamp in the blue depths: the area's materials are a wrapped copy there, world.js G.Blue.mats)
       case 'bolt': case 'arrow': add(PG.box, mats.woodDark, 0.025, 0.025, 0.7); add(PG.cone, mats.iron, 0.03, 0.1, 0.03, 0, 0, -0.38, -Math.PI / 2); add(PG.box, mats.cloth2, 0.005, 0.06, 0.12, 0, 0, 0.3); break;
       case 'nail': add(PG.box, mats.iron, 0.012, 0.012, 0.12); break;
       case 'harpoon': add(PG.box, mats.iron, 0.03, 0.03, 1.0); add(PG.cone, mats.iron, 0.06, 0.2, 0.06, 0, 0, -0.55, -Math.PI / 2); break;

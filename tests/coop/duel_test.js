@@ -126,6 +126,15 @@ const ID = process.argv[2] || 'madman';
     console.log('      break: host', JSON.stringify(br), 'guest', JSON.stringify(gbr));
     check(!br.duel && br.wg === 0 && br.hp < 0.6 && br.stun > 2, 'parried down to nothing: BREAK on the host (12% of its health, stagger)');
     check(!gbr.duel && !gbr.lock && gbr.wg === 0, 'and the duel is over for the guest too');
+    // the break's 防御ダウン (combat.js C.defDownOf reads duelSt.stunT) is the guest's too: its own blows count it, its guardian's bar shows the cracked shield
+    await g.until('G.bosses.active.duelSt.stunT > 0 && !!document.querySelector(".boss-dd")', 3000).catch(() => {});
+    const gdd = JSON.parse(await g.eval("JSON.stringify({ st: G.bosses.active.duelSt.stunT, dd: G.combat.defDownOf(G.bosses.active.parts[0]), icon: !!document.querySelector('.boss-dd') })"));
+    check(gdd.st > 0 && gdd.dd >= 0.69 && gdd.icon, `the break's 防御ダウン reaches the guest (${JSON.stringify(gdd)})`);
+    // 防御ダウン put on the guardian by the host reaches the guest, by source
+    await h.eval('G.combat.defDown(G.bosses.active.parts[0], "tst", 0.4, 30); 1');
+    await g.until('!!(G.bosses.active.defDown && G.bosses.active.defDown.tst)', 3000).catch(() => {});
+    check(await g.eval('!!(G.bosses.active.defDown && G.bosses.active.defDown.tst && Math.abs(G.bosses.active.defDown.tst.v - 0.4) < 0.01)'), '防御ダウン on the guardian reaches the guest');
+    await h.eval('G.bosses.active.defDown = null; 1');
     await g.eval('window.__auto = false; 1');
     // the second duel, left to run out: the shield stays, the guest sees it
     await h.until('G.bosses.active.duelSt.stunT <= 0', 20000).catch(() => {});

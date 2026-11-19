@@ -168,6 +168,7 @@
         // the element on it (yours shows at once and is sent up; the host's word wins otherwise)
         if (!e.auFix && !(e._auT > now - 500)) e.au = a[13] ? { el: G.Elem.of(a[13]), t: GM.time + (a[14] || 0) } : null;
         e._elFrozen = !!(a[7] & 128); if (a[15]) e.st.brittleK = a[15];
+        K.applyDD(e, a[16]); // (防御ダウン: the cracked shield on its bar, and what your own blows are worked out with)
         // your own last hits are ahead of what the host has seen yet
         if (!(e._hitT > now - 400)) { if (a[5] < e.hp - 0.5) { e.lastHitT = GM.time; e.flinch = Math.min(1, e.flinch + 0.2); } e.hp = a[5]; e.shield = a[6]; }
       }
@@ -195,12 +196,34 @@
       // a blow that throws the foe back must throw the real one
       let kn = 0;
       if (info && info.knock && !e.boss) { const d = info.dir || e.pos.clone().sub(P.pos).setY(0).normalize(); kn = [r2(d.x), r2(d.z), r2(info.knock)]; }
-      if (dh > 0 || ds > 0) { e._hitT = performance.now(); e._pk = info || e._pk; pushHit(e, dh, ds, kn); }
+      // (what it was hit by goes up too: a foe the host owns turns to look where the blow came from, as in solo E.onDamaged; a proc does not)
+      const hs = info && info.proc ? 0 : (info && info.src) || 'bullet';
+      if (dh > 0 || ds > 0) { e._hitT = performance.now(); e._pk = info || e._pk; pushHit(e, dh, ds, kn, hs); }
       // (the real kill is the host's: until its word comes the foe stands at 1)
       if (e.hp <= 0 && e.alive) e.hp = 1;
       return r;
     };
-    function pushHit(e, dh, ds, kn) { hits.push([e._nid, r2(Math.max(0, dh)), r2(Math.max(0, ds)), kn || 0]); }
+    function pushHit(e, dh, ds, kn, hs) { hits.push([e._nid, r2(Math.max(0, dh)), r2(Math.max(0, ds)), kn || 0, hs || 0]); }
+    // 防御ダウン (combat.js C.defDown / C.defStack) you put on a foe: worked out here with your build (総崩れ's x1.5 included), shown at once, and sent
+    // to the host as the share and time it came to, where it is merged in as it is (raw). The host's whole map of it comes back with each snapshot.
+    const dd0 = C.defDown, dst0 = C.defStack, ddOut = new Map();
+    const noteDD = (e, id) => {
+      if (!remoteOf(e)) return;
+      const h = C.defHolder(e), c = h && h.defDown && h.defDown[id]; if (!c) return;
+      (h._ddMine || (h._ddMine = {}))[id] = performance.now();
+      ddOut.set(e._nid + '|' + id, [e._nid, id, +c.v.toFixed(3), +c.t.toFixed(2)]);
+    };
+    C.defDown = function (e, id, v, t, o) { const r = dd0.call(C, e, id, v, t, o); noteDD(e, id); return r; };
+    C.defStack = function (e, id, step, max, t) { const r = dst0.call(C, e, id, step, max, t); noteDD(e, id); return r; };
+    // the host's 防御ダウン on a foe (or the guardian), by source: taken as it is, except a source you have just put on yourself and the host has not echoed yet
+    K.applyDD = function (h, list) {
+      if (!h) return;
+      const now = performance.now(), m = h.defDown, mine = h._ddMine;
+      let out = null;
+      if (m && mine) for (const id in m) if (mine[id] > now - 500 && m[id].t > 0) (out || (out = {}))[id] = m[id];
+      if (list) for (const [id, v, t] of list) { const c = out && out[id]; (out || (out = {}))[id] = c ? { v: Math.max(c.v, v), t: Math.max(c.t, t) } : { v, t }; }
+      h.defDown = out;
+    };
     C.killEnemy = function (e, info, ov) {
       if (!net && remoteOf(e) && !(info && info.src === 'clear')) return; // (health is read back by C.damageEnemy above, after this: clamping it here would swallow the blow that kills)
       return ke.call(C, e, info, ov);
@@ -279,6 +302,9 @@
       const now = performance.now();
       if (!(b._hitT > now - 400)) b.hp = m.hp;
       b.shield = m.sh; b.maxShield = m.mxs; b.pos.set(...m.pos); b.yaw = m.yaw; b._ph = m.ph;
+      // 防御ダウン on the whole guardian, and the duel's break (its 70%: combat.js C.defDownOf reads duelSt.stunT), for the bar and your own blows
+      K.applyDD(b, m.dd);
+      if (b.duelSt) b.duelSt.stunT = m.ds || 0;
       if (m.pa) b.phase = m.pa;
       if (m.cs && b.constructs) for (const [pi, x, y, z] of m.cs) { const c = b.constructs.find((q) => q.p === b.parts[pi]); if (c) c.pos.set(x, y, z); }
       // the last guardian's second form: the same set piece runs here (the fall of the crown, the climb to the sky floor), carried by its own code
@@ -357,6 +383,7 @@
     // ---------------- once per net beat ----------------
     K.onNet = function () {
       if (hits.length) { K.send({ t: 'hit', h: hits }); hits = []; }
+      if (ddOut.size) { K.send({ t: 'dd', a: [...ddOut.values()] }); ddOut.clear(); }
       K.flushStatus();
       { const O = GM.objective; if (O && O.altars && !GM.areaCleared) GM.ritualMarkers(O); }
       if (!GM.run || !G.world) return;

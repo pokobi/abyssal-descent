@@ -134,7 +134,9 @@
   K.handlers.pg = function (m, from) { K.send({ t: 'pn', ts: m.ts }, from); };
   K.handlers.pn = function (m, from) { const rp = K.players.get(from); if (rp) rp.rtt = Math.round(performance.now() - m.ts); };
 
-  K.handlers.sh = function (m) {
+  K.handlers.sh = function (m, from) {
+    // the host's foes hear a guest's shot (host.js)
+    if (K.role === 'host' && K.remoteShot && from) { try { K.remoteShot(m, from); } catch (e) { console.error(e); } }
     if (m.i !== K.id) {
       G.fx.tracer(V(...m.a), V(...m.b), 0xffd080, 0.03, 0.09);
       try {
@@ -374,15 +376,22 @@
     GM().toTitle = function () { K.live = false; K.quit(); };
     // your shots are drawn on the others' screens (a line from you along your aim, a few per second at most)
     const sh = G.weapons.shoot;
-    let shotT = 0;
+    let shotT = 0, heard = null, loud = null;
+    // what solo's W.shoot tells the foes of your shot (enemies.js E.heardShot: the muzzle, the kind of gun, suppressed or not) goes out with it, so the
+    // host's foes hear a guest's shots too (host.js K.remoteShot). Of the shots between two messages the loudest is sent.
+    const hs = G.enemies.heardShot;
+    if (hs) G.enemies.heardShot = function (pos, arch, quiet) { if (K.own > 0) heard = { p: pos.clone(), arch, quiet: !!quiet }; return hs.call(this, pos, arch, quiet); };
     G.weapons.shoot = function (w, st) {
-      K.own++;
+      K.own++; heard = null;
       let r; try { r = sh.call(G.weapons, w, st); } finally { K.own--; }
+      if (heard && (!loud || (loud.quiet && !heard.quiet))) loud = heard;
       const now = performance.now();
       if (K.live && now - shotT > 110) {
         shotT = now;
         const P = G.player, c = G.camera, d = V(0, 0, -1).applyQuaternion(c.quaternion), a = P.chestPos().add(d.clone().multiplyScalar(0.6)), b = a.clone().addScaledVector(d, st && st.proj ? 12 : 45);
-        K.send({ t: 'sh', i: K.id, a: K.vec(a), b: K.vec(b), snd: st && st.sound || '', pj: st && st.proj ? 1 : 0 });
+        const m = { t: 'sh', i: K.id, a: K.vec(a), b: K.vec(b), snd: st && st.sound || '', pj: st && st.proj ? 1 : 0 };
+        if (loud) { m.ar = loud.arch || ''; m.q = loud.quiet ? 1 : 0; m.m = K.vec(loud.p); m.o = K.vec(P.pos); loud = null; }
+        K.send(m);
       }
       return r;
     };

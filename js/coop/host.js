@@ -73,6 +73,11 @@
     }
     // ---------------- foes go for whoever is nearest (a little stickiness so they do not flip between two) ----------------
     function pick(e) {
+      // given away by someone's shots (E.heardShot / K.remoteShot): it goes for the one who fired, while that lasts
+      if (e.spotT > 0 && e._spotBy !== undefined) {
+        if (e._spotBy === 0) { if (!P.dead) { e._cp = 0; return null; } }
+        else { const rp = K.players.get(e._spotBy); if (rp && !rp.dead) { e._cp = rp.id; return rp; } }
+      }
       let best = P.dead ? null : 0, bd = P.dead ? 1e9 : e.pos.distanceTo(P.pos);
       if (e._cp === 0) bd *= 0.8;
       if (!P.dead && bd < 15 && P.temps.has('ult_bastion')) bd *= 0.01; // (不屈の城塞 draws them in)
@@ -261,16 +266,68 @@
     };
     const find = (id) => (id < 0 ? BS.active && BS.active.parts[-id - 1] : known.get(id));
     K.handlers.hit = function (m, from) {
-      for (const [id, dh, ds, kn] of m.h) {
+      const rp = K.players.get(from);
+      for (const [id, dh, ds, kn, hs] of m.h) {
         const e = find(id); if (!e || !e.alive || e.dying) continue;
         if (ds && e.shield > 0) { e.shield = Math.max(0, e.shield - ds); if (e.shield <= 0 && e.onShieldBreak) e.onShieldBreak(); }
         if (dh > 0) {
-          // the guest's machine already worked out armour, marks and shields: this is the plain result
-          const mul = e.dmgMul, sh = e.shield, mk = e.st.mark; e.dmgMul = null; e.shield = 0; e.st.mark = 0;
-          try { dm.call(C, e, dh, { src: 'dot', silent: true, noBuffs: true, remote: from, proc: true, noSkOn: true }); } finally { if (e.alive) { e.dmgMul = mul; e.shield = sh; e.st.mark = mk; } }
+          // the guest's machine already worked out armour, marks, shields, 脆化 and the defence (its own 防御無視, the 防御ダウン the host sends it, the duel's
+          // break): this is the plain result. Nothing of the host's own is put on it again (C.defK would add the host's 防御無視 and count the 防御ダウン twice).
+          const mul = e.dmgMul, sh = e.shield, mk = e.st.mark, br = e.st.brittle, vu = e.st.vuln, dk = C.defK;
+          e.dmgMul = null; e.shield = 0; e.st.mark = 0; e.st.brittle = 0; e.st.vuln = 0; C.defK = () => 1;
+          try { dm.call(C, e, dh, { src: 'dot', silent: true, noBuffs: true, remote: from, proc: true, noSkOn: true }); } finally { C.defK = dk; if (e.alive) { e.dmgMul = mul; e.shield = sh; e.st.mark = mk; e.st.brittle = br; e.st.vuln = vu; } }
           G.fx.blood(e.centerPos(), null, e.bloodColor, 3);
         }
         if (kn && !e.boss && e.knockback) e.knockback(V(kn[0], 0, kn[1]), kn[2]);
+        if (hs && rp) hurtBy(e, hs, rp);
+      }
+    };
+    // a foe hurt by a guest goes to look where the blow came from, as solo's E.onDamaged does for you (a round or a blast: where that guest last fired from;
+    // anything else: where the guest stands), even while the guest is invisible or a decoy holds it. A blow in close is heard close by.
+    function hurtBy(e, src, rp) {
+      if (!e.alive || (src !== 'bullet' && src !== 'explosion' && src !== 'melee' && src !== 'skill')) return;
+      const ls = rp.lastShot, now = GM.time;
+      E.probe(e, (src === 'bullet' || src === 'explosion') && ls && now - ls.t < 3 && now >= ls.t ? ls.p : rp.to, true);
+      if (src === 'melee') { const p0 = P.pos.clone(); P.pos.copy(rp.to); try { E.noise(rp.to, E.MELEE_R); } finally { P.pos.copy(p0); } } // (E.noise sends them to "the player": here the guest)
+    }
+    // 防御ダウン a guest put on a foe (client.js): the share and time it came to there, merged in as it is (the guest's own 総崩れ is already in it)
+    K.handlers.dd = function (m) {
+      for (const [nid, id, v, t] of m.a) { const e = find(nid); if (e && (e.alive || e.multiPart)) C.defDown(e, id, v, t, { raw: true }); }
+    };
+    // the 防御ダウン on a foe (or the guardian) by source, as the guests are told of it
+    K.ddRow = function (h) {
+      if (!h || !h.defDown) return 0;
+      const a = []; for (const id in h.defDown) { const c = h.defDown[id]; if (c.t > 0) a.push([id, Math.round(c.v * 1000) / 1000, r2(c.t)]); }
+      return a.length ? a : 0;
+    };
+    // ---------------- gunfire heard (enemies.js E.heardShot) ----------------
+    // Solo's E.heardShot counts the shots of "the player" in one log of its own, and makes a foe it gives you away to go for "the player". A guest's shot
+    // (core.js, the 'sh' message: the kind of gun, suppressed or not, the muzzle and where the guest stood) is heard here the same way, from the guest's
+    // muzzle, counted in a log of that guest's own, and a foe it is given away to goes for that guest (pick() below). Your own shots are solo's, marked yours.
+    const hs0 = E.heardShot;
+    E.heardShot = function (pos, arch, quiet) {
+      for (const e of E.list) e._sp0 = e.spotT;
+      const r = hs0.call(E, pos, arch, quiet);
+      for (const e of E.list) if (e.spotT > 0 && e.spotT !== e._sp0) e._spotBy = 0;
+      return r;
+    };
+    K.remoteShot = function (m, from) {
+      const rp = K.players.get(from);
+      if (m.ar === undefined || !rp || !rp.id || rp.dead || !E.HEAR) return;
+      const now = GM.time, S = E.SPOT, r = (E.HEAR[m.ar] || 40) * (m.q ? E.QUIET : 1);
+      const h = m.o ? V(...m.o) : rp.to.clone(), pos = m.m ? V(...m.m) : h;
+      rp.lastShot = { p: h, t: now };
+      const log = rp.shotLog || (rp.shotLog = []);
+      while (log.length && (now - log[0].t > S.t || log[0].t > now)) log.shift();
+      const last = log[log.length - 1];
+      if (!last || now - last.t >= S.gap) log.push({ x: h.x, y: h.y, z: h.z, t: now });
+      let n = 0; for (const s of log) if (Math.hypot(s.x - h.x, s.y - h.y, s.z - h.z) < S.r) n++;
+      const given = n >= S.n, d = C.getDecoy();
+      for (const e of E.list) {
+        if (!e.alive || e.custom || e.boss || e.ally || e.pos.distanceTo(pos) > r) continue;
+        const held = d && e.inv && e.inv.hit && now < e.inv.end;
+        E.probe(e, h, held);
+        if (given && (!d || held || d.pos.distanceTo(e.pos) >= 40)) { e.spotT = S.dur; e._spotBy = rp.id; }
       }
     };
     // what the guests are told of a foe's statuses (shown there), and what a guest puts on a foe (merged in here, where it ticks)
@@ -345,7 +402,7 @@
           add.push(esRow(e));
         }
         const fl = (e.burrowed ? 1 : 0) | (e.untargetable ? 2 : 0) | (e.invuln ? 4 : 0) | (e.st.stun > 0 ? 8 : 0) | (e.st.frozen > 0 ? 16 : 0) | (e.state === 'spawn' ? 32 : 0) | (e.model.group.visible ? 0 : 64) | (e._elFrozen ? 128 : 0);
-        snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0), K.statusBits(e), [e.st.poisonStacks | 0, e.st.frostStacks | 0, e.st.burnLv | 0, e.st.markMul || 0], e.auFix ? 0 : G.Elem.idx(G.Elem.auraOf(e)), r2(G.Elem.auraLeft(e)), r2(e.st.brittleK || 0)]);
+        snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0), K.statusBits(e), [e.st.poisonStacks | 0, e.st.frostStacks | 0, e.st.burnLv | 0, e.st.markMul || 0], e.auFix ? 0 : G.Elem.idx(G.Elem.auraOf(e)), r2(G.Elem.auraLeft(e)), r2(e.st.brittleK || 0), K.ddRow(e)]);
       }
       if (add.length) K.send({ t: 'es', a: add });
       for (const [id, e] of known) {
@@ -383,6 +440,7 @@
       if (b.constructs) for (const c of b.constructs) if (!c._sent) { c._sent = true; K.send({ t: 'bcn', pi: b.parts.indexOf(c.p), tile: c.tile ? BS.terrain.tiles().indexOf(c.tile) : -1, seg: c.seg ? b.stg.segs.indexOf(c.seg) : -1 }); }
       if (b.holes) for (const h of b.holes) if (!h._sent) { h._sent = true; K.send({ t: 'bhl', c: K.vec(h.c) }); }
       K.send({ t: 'b', pa: b.phase, cs: b.constructs ? b.constructs.map((c) => [b.parts.indexOf(c.p), r2(c.pos.x), r2(c.pos.y), r2(c.pos.z)]) : undefined, hp: Math.round(b.hp), sh: Math.round(b.shield || 0), mxs: Math.round(b.maxShield || 0), pos: K.vec(b.pos), yaw: r2(b.yaw), ph: b.phaseText ? b.phaseText() : '', nodes, parts,
+        dd: K.ddRow(b), ds: b.duelSt && b.duelSt.stunT > 0 ? r2(b.duelSt.stunT) : 0,
         st: typeof b.state === 'string' ? b.state : '', tl: BS.terrain && G.world.final ? scan(BS.terrain.tiles()) : undefined, sg: b.stg ? scan(b.stg.segs) : undefined });
     };
     function sendObjective() {

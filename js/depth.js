@@ -26,9 +26,10 @@
     { id: 'frenzy', name: '狂乱', icon: '😈', col: 0xff3030, desc: 'HPが40%を切ると速く、攻撃間隔も短くなる。' },
     { id: 'nullify', name: '無効化', icon: '🚫', col: 0xb0b0b0, desc: '状態異常・属性とスタンを一切受けない。' },
     { id: 'hardshell', name: '硬殻', icon: '🐚', col: 0xc8b89a, desc: '最大HPの60%にあたる硬いシールドを纏っている。' },
+    { id: 'ironface', name: '鉄面', icon: '⛓️', col: 0x8a8c90, desc: '防御ダウンと防御無視が、半分しか効かない。' }, // (combat.js C.defK)
   ];
   // the one-character chip each shows on the HP bar (enemies.js)
-  const CHIP = { blink: '瞬', warden: '守', volatile: '爆', undying: '不', haste: '疾', leech: '吸', gravity: '重', mirror: '鏡', splitter: '分', frenzy: '狂', nullify: '無', hardshell: '硬' };
+  const CHIP = { blink: '瞬', warden: '守', volatile: '爆', undying: '不', haste: '疾', leech: '吸', gravity: '重', mirror: '鏡', splitter: '分', frenzy: '狂', nullify: '無', hardshell: '硬', ironface: '鉄' };
   for (const m of D.MUTS) m.ch = CHIP[m.id];
   D.MUT_BY_ID = Object.fromEntries(D.MUTS.map((m) => [m.id, m]));
 

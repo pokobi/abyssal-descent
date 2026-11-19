@@ -125,6 +125,9 @@
     ['groundpound', '地裂掌', '👊', 'rare', 3100, 9, '地面を叩き、前方扇状に衝撃の亀裂を走らせる。パイルドライバーのクールタイムを2秒短縮。', { dmg: 120, r: 12 }],
     ['anchorstorm', '鉤鎖乱舞', '⛓️', 'epic', 4200, 16, '周囲の敵最大6体へ鎖を撃ち込み、自分の元へ引き寄せてスタンさせる。', { n: 6, r: 22 }],
     ['flight', '飛翔', '🪽', 'rare', 2800, 12, '真上へ大きく飛び上がり、3秒間滑空できる。', { dur: 3 }],
+    // the enemy's defence (防御ダウン: combat.js C.defDown)
+    ['sk_pile', '破甲杭', '🔩', 'rare', 3000, 12, '視線の先へ杭を撃ち込む。当たった敵と、周り4mの敵に120ダメージと防御ダウン35%（8秒）。', { dmg: 120, r: 4, down: 0.35, t: 8 }],
+    ['sk_acid', '腐蝕の雨', '🌧️', 'epic', 3800, 20, '狙った所（半径6m）に8秒間、酸の雨を降らせる。中の敵に防御ダウン25%と毎秒15ダメージ。', { r: 6, dur: 8, dps: 15, down: 0.25 }],
   ];
   G.SKILLS = SK.map(([id, name, icon, rarity, price, cd, desc, p]) => ({ id, name, icon, rarity, price, cd, desc, p, kind: 'skill' }));
   G.SKILL_BY_ID = Object.fromEntries(G.SKILLS.map((s) => [s.id, s]));

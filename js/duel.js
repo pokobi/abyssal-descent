@@ -4,7 +4,7 @@
 // is forced into your hand and guns / skills / items / attacks are sealed. A white gauge appears under its health bar; while any of it is left its health
 // cannot fall. It attacks only in melee, with a golden flash just before each blow lands: pressing guard (reload) in that moment parries (no damage, the
 // gauge loses a sixth). Pressing outside it, or holding the key from before, fails and the blow lands. Empty the gauge -> BREAK: 12% of its health and a
-// 5 s stagger (x1.5 damage taken). If time runs out the gauge stays as a shield that ordinary damage wears down at half rate before its health can fall.
+// 5 s stagger (防御ダウン 70%: combat.js C.defDownOf reads the stagger; a guardian's halving does not touch it). If time runs out the gauge stays as a shield that ordinary damage wears down at half rate before its health can fall.
 (function () {
   const D = (G.Duel = {});
   const U = G.U, V = (x, y, z) => new THREE.Vector3(x || 0, y || 0, z || 0);
@@ -12,7 +12,7 @@
   D.AT = [0.7, 0.35]; // health shares that call a duel
   D.GAUGE = 0.12; // the white gauge, as a share of max health
   D.PARRY = 1 / 6; // one parry takes this much of it
-  D.BREAK = 0.12; D.STUN = 5; D.STUN_MUL = 1.5;
+  D.BREAK = 0.12; D.STUN = 5; D.STUN_DOWN = 0.7;
   D.OUT_EFF = 0.1; // damage from anyone else while the duel lasts (co-op), into the gauge
   D.AFTER_EFF = 0.5; // a gauge left after the duel: ordinary damage wears it down at this rate
   D.INTRO = 1.5; D.READ = 4; D.LIMIT = 35;
@@ -68,7 +68,7 @@
   function arm(b) {
     const s = (b.duelSt = { n: 0, wg: 0, wgMax: 0, stunT: 0 });
     const pt0 = b.phaseText.bind(b);
-    b.phaseText = () => (D.cur && D.cur.b === b ? `⚔ 決闘中 — 金色に光った瞬間に${D.keyName()}でパリィ（ブレイクゲージを削り切ればブレイク）` : s.stunT > 0 ? `💥 ブレイク — 総攻撃の好機！（被ダメ×${D.STUN_MUL}）` : s.wg > 0 ? '⚪ ブレイクゲージ（盾）を削り切るまで本体は無傷' : pt0());
+    b.phaseText = () => (D.cur && D.cur.b === b ? `⚔ 決闘中 — 金色に光った瞬間に${D.keyName()}でパリィ（ブレイクゲージを削り切ればブレイク）` : s.stunT > 0 ? `💥 ブレイク — 総攻撃の好機！（防御ダウン${Math.round(D.STUN_DOWN * 100)}%）` : s.wg > 0 ? '⚪ ブレイクゲージ（盾）を削り切るまで本体は無傷' : pt0());
     // its health only falls while no white gauge is left; what would have come off goes into the gauge instead (at a rate)
     let hp = b.hp;
     Object.defineProperty(b, 'hp', { configurable: true, get: () => hp, set: (v) => {
@@ -80,8 +80,6 @@
       }
       hp = v;
     } });
-    const dm0 = b.main.dmgMul;
-    b.main.dmgMul = (info, ctx) => (s.stunT > 0 ? D.STUN_MUL : dm0 ? dm0(info, ctx) : 1);
     b.duelStyle = STYLE[b.def.id];
   }
   function shieldGone(b) {
@@ -253,7 +251,7 @@
     G.fx.dmgNum && G.fx.dmgNum(b.main.centerPos(), 'BREAK ' + dmg, 'crit');
     G.fx.sparks(b.main.centerPos(), null, 40, 0xffffff, 12); G.sfx.shieldBreak && G.sfx.shieldBreak(b.pos); G.sfx.explosion && G.sfx.explosion(b.pos, 0.8);
     D.breakFx(b);
-    G.ui.toast(`💥 ブレイク！ ${b.def.name}が崩れた — ${D.STUN}秒間 総攻撃（被ダメ×${D.STUN_MUL}）`, 'good');
+    G.ui.toast(`💥 ブレイク！ ${b.def.name}が崩れた — ${D.STUN}秒間 防御ダウン${Math.round(D.STUN_DOWN * 100)}%`, 'good');
     D.finish(true);
     if (!b.dead) { st.stunT = D.STUN; stopBoss(b); }
   };

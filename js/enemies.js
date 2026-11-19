@@ -2308,14 +2308,21 @@
   };
 
   // ---------------- health bars (DOM, pooled) ----------------
+  // 防御ダウン on the foe (combat.js C.defDownOf): a small shield split by a crack, beside the trait chips while it lasts. No number (pokobi
+  // 2026-11-19). The two halves of worn iron sit a hair apart; the old gilt rim is broken along the crack. (The guardian's bar uses it too.)
+  E.DD_ICON = '<svg viewBox="0 0 12 14" width="14" height="16" aria-label="防御ダウン">'
+    + '<path d="M6.3 0.9L1 2.4V6.6C1 10 3.4 12.2 6 13.1L5.3 9.5L7 6.6L5.1 4.4Z" fill="#7a7268" stroke="#c2a670" stroke-width="0.8" stroke-linejoin="round"/>'
+    + '<path d="M6.3 0.9L11 2.4V6.6C11 10 8.6 12.2 6 13.1L5.3 9.5L7 6.6L5.1 4.4Z" transform="translate(0.9 0.45)" fill="#4a443e" stroke="#9a8458" stroke-width="0.8" stroke-linejoin="round"/>'
+    + '<path d="M6.3 0.9L5.1 4.4L7 6.6L5.3 9.5L6 13.1" transform="translate(0.45 0.2)" stroke="#0c0a08" stroke-width="1.1" fill="none" stroke-linejoin="round"/>'
+    + '<path d="M2.4 3.4L5.2 2.6M2.3 5.2L2.6 9" stroke="#a39888" stroke-width="0.5" fill="none" opacity="0.7"/></svg>';
   function getBar() {
     let b = E.bars.find((x) => !x.used);
     if (!b) {
       const el = document.createElement('div'); el.className = 'ebar';
       // name row (rank by colour + a small 精鋭 tag), then: element badge | health | trait chips, the shield, the full trait names (the foe you aim at), statuses
-      el.innerHTML = '<div class="en"><span class="rk">精鋭</span><span class="lv"></span><span class="nm"></span></div><div class="hrow"><span class="eb"></span><div class="hb"><div class="tr"></div><div class="fl"></div></div><span class="ch"></span></div><div class="sb"><div class="fl"></div></div><div class="xn"></div><div class="st"></div>';
+      el.innerHTML = '<div class="en"><span class="rk">精鋭</span><span class="lv"></span><span class="nm"></span></div><div class="hrow"><span class="eb"></span><div class="hb"><div class="tr"></div><div class="fl"></div></div><span class="ch"></span><span class="dd" style="display:none;flex:none;width:14px;height:16px;margin-left:-6px;line-height:0;filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)">' + E.DD_ICON + '</span></div><div class="sb"><div class="fl"></div></div><div class="xn"></div><div class="st"></div>';
       E.barRoot.appendChild(el);
-      b = { el, lv: el.querySelector('.lv'), nm: el.querySelector('.nm'), tr: el.querySelector('.hb .tr'), fl: el.querySelector('.hb .fl'), sb: el.querySelector('.sb'), sfl: el.querySelector('.sb .fl'), st: el.querySelector('.st'), eb: el.querySelector('.eb'), ch: el.querySelector('.ch'), xn: el.querySelector('.xn'), used: false };
+      b = { el, lv: el.querySelector('.lv'), nm: el.querySelector('.nm'), tr: el.querySelector('.hb .tr'), fl: el.querySelector('.hb .fl'), sb: el.querySelector('.sb'), sfl: el.querySelector('.sb .fl'), st: el.querySelector('.st'), eb: el.querySelector('.eb'), ch: el.querySelector('.ch'), xn: el.querySelector('.xn'), dd: el.querySelector('.dd'), used: false };
       E.bars.push(b);
     }
     b.used = true; b.key = null; b.el.style.display = ''; if (b.el._s) b.el._s.display = '';
@@ -2367,6 +2374,7 @@
       }
       { const hw = (Math.max(0, e.hp) / e.maxHp * 100).toFixed(1) + '%'; sty(b.fl, 'width', hw); sty(b.tr, 'width', hw); }
       sty(b.sb, 'display', e.maxShield > 0 ? '' : 'none');
+      sty(b.dd, 'display', C.defDownOf && C.defDownOf(e) > 0 ? '' : 'none'); // 防御ダウン: the cracked shield while it lasts
       if (e.maxShield > 0) sty(b.sfl, 'width', (e.shield / e.maxShield * 100).toFixed(1) + '%');
       const s = e.st, R = (n) => ['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ', 'Ⅺ', 'Ⅻ', 'XIII'][Math.min(13, Math.max(1, n || 1))] || 'Ⅰ'; let icons = '';
       if (s.burn > 0) icons += '🔥' + R(s.burnLv || 1) + ' '; if (s.frost > 0 || s.frozen > 0) icons += (s.frozen > 0 ? '🧊' : '❄️' + R(s.frostStacks || 1)) + ' '; if (s.poison > 0) icons += '☠️' + R(s.poisonStacks || 1) + ' '; if (s.shock > 0) icons += '⚡' + R(s.shockLv || 1) + ' '; if (s.stun > 0) icons += '💫'; if (!e.boss && G.game.time < (e.stunImmuneUntil || 0)) icons += '🛡️'; if (s.slow > 0) icons += '🐌'; if (s.mark > 0) icons += '🎯'; if (s.fear > 0) icons += '😱';

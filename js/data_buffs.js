@@ -96,7 +96,7 @@
   add('k_ash', '灰燼', '🔥', 'uncommon', 'element', '撃破時、周囲4mの敵を炎上させる。', { hooks: { onKill(c) { for (const e of C.inRadius(c.pos, 4)) C.status(e, 'burn', 2); } } });
   add('k_icegrave', '氷葬', '❄️', 'uncommon', 'element', '撃破時、周囲4mの敵に冷気を付与。', { hooks: { onKill(c) { for (const e of C.inRadius(c.pos, 4)) C.status(e, 'frost', 2); } } });
   add('k_grapple', '鉤縄の補充', '⚓', 'uncommon', 'mobility', '撃破時、35%でグラップルのクールタイムをリセット。', { hooks: { onKill() { if (Math.random() < 0.35) P.grappleCd = 0; } } });
-  add('k_overkill', '過剰殺傷', '🔪', 'rare', 'offense', '撃破時の超過ダメージが最も近い敵に転移する。', { hooks: { onKill(c) { if (c.overkill > 1) { const t = C.nearest(c.pos, 12, c.e); if (t) C.damageEnemy(t, c.overkill, { src: 'buff', proc: true }); } } } });
+  add('k_overkill', '過剰殺傷', '🔪', 'rare', 'offense', '撃破時の超過ダメージが最も近い敵に転移する。', { hooks: { onKill(c) { if (c.overkill > 1) { const t = C.nearest(c.pos, 12, c.e); if (t) C.damageEnemy(t, c.overkill, { src: 'buff', proc: true, fixed: true }); } } } });
   add('k_soul', '魂弾', '👻', 'epic', 'offense', '撃破時、追尾する魂弾が近くの敵へ飛ぶ（ダメージ大）。', { max: 2, hooks: { onKill(c, n) { for (let i = 0; i < n; i++) C.soulBolt(c.pos, sc(45)); } } });
   add('k_multi', '連続撃破報酬', '🏅', 'common', 'economy', 'マルチキルのコインボーナス+100%。', { flag: true });
   add('k_headpop', '爆頭', '🎇', 'epic', 'offense', 'ヘッドショットで撃破すると頭部が爆発し、半径4mにダメージ。', { hooks: { onKill(c) { if (c.head) C.explode(c.pos, 4, sc(60), { src: 'buff', proc: true, color: 0xffcc66 }); } } });
@@ -518,6 +518,28 @@
     onGuard(c, n, s) { s.store = Math.min(2000, (s.store || 0) + (c.cut || 0) * 0.5 + (c.amount || 0) * 0.5); },
     onHit(c, n, s) { if (c.src !== 'melee' || c.proc || !c.e || !(s.store > 0)) return; const v = s.store; s.store = 0; if (c.e.alive) { C.damageEnemy(c.e, v, { src: 'melee', proc: true, pos: c.e.centerPos() }); G.fx.sparks(c.e.centerPos(), null, 12, 0xffe090, 5); } } } });
   add('k_demon', '剣鬼', '👹', 'legendary', 'melee', '近接の通常攻撃の4回目が、溜めなしの重撃になる。近接ダメージ+30%。', { mods: { meleeDmg: 0.3 } });
+  // ---------- the enemy's defence (防御ダウン / 防御無視: combat.js C.defK; a hit is x 2 / (2 - down - ignore), at most x2) ----------
+  add('k_breaker', '破甲の重撃', '🔨', 'uncommon', 'melee', '近接の重撃が当たると、その敵に防御ダウン20%（6秒）。', { hooks: { onHit(c) { if (c.src === 'melee' && c.heavy && c.e && c.e.alive) C.defDown(c.e, 'k_breaker', 0.2, 6); } } });
+  add('o_penetrate', '貫徹', '🎯', 'epic', 'offense', '銃の攻撃の防御無視+15%。', { mods: { defIgnoreGun: 0.15 } });
+  add('o_vital', '急所の知識', '💢', 'rare', 'offense', '会心の一撃は、防御無視+30%。', { flag: true });
+  add('k_rearstrike', '背面打ち', '🗡️', 'rare', 'melee', '背後からの近接攻撃は、防御無視+40%。', { flag: true });
+  add('o_expose', '剥き出し', '💔', 'epic', 'offense', '敵のシールドを割ると、その敵に防御ダウン30%（8秒）。', { hooks: { onShieldBreak(c) { if (c.e) C.defDown(c.e, 'o_expose', 0.3, 8); } } });
+  // (綻び: the hits of the last 2 s on that foe; from the sixth on, every hit puts it on again)
+  add('o_fray', '綻び', '🧵', 'uncommon', 'offense', '同じ敵に2秒以内に6回当てると、その敵に防御ダウン15%（5秒）。', { hooks: { onHit(c) {
+    const e = c.e; if (!e || !e.alive) return; const t = now(), a = (e._fray || []).filter((x) => t - x < 2); a.push(t); e._fray = a.slice(-12);
+    if (a.length >= 6) C.defDown(e, 'o_fray', 0.15, 5); } } });
+  add('el_heatarmor', '熱で緩む鎧', '🔥', 'uncommon', 'element', '燃えている敵は、防御ダウン15%（燃えている間）。', { flag: true });
+  add('p_pilemark', '杭打ちの痕', '🔨', 'uncommon', 'pile', 'パイルドライバーの衝撃を受けた敵に、防御ダウン25%（6秒）。', { hooks: { onHit(c) { if (c.pile && c.e && c.e.alive) C.defDown(c.e, 'p_pilemark', 0.25, 6); } } });
+  add('o_collapse', '総崩れ', '🏚️', 'legendary', 'offense', '自分が付ける防御ダウンの割合が1.5倍になる（決闘のブレイクは別）。防御ダウン中の敵を倒すと、周り6mの敵に防御ダウン20%（6秒）が広がる。', { hooks: { onKill(c) {
+    const e = c.e; if (!e || !(C.defDownOf(e) > 0)) return;
+    let n = 0; for (const o of C.inRadius(e.pos, 6)) if (o !== e && o.alive && !o.ally) { C.defDown(o, 'o_collapse', 0.2, 6, { raw: true }); n++; }
+    if (n) { const p = e.pos.clone(); p.y += 0.15; G.fx.ring(p, 6, 0xb8a888, 0.45); G.fx.dust(p, G.U.V(0, 1, 0), 0x6a6052, 6); } } } });
+  // 砕きの祈り: offered only at a shrine (祈りの祠, areas.js sets G.Areas.shrineOffer while its choice is up); it lasts through the next
+  // area entered (the shrine itself has no foes), then leaves on its own
+  add('sh_crush', '砕きの祈り', '🙏', 'rare', 'offense', '次に入るエリアの間、防御無視+20%。', { mods: { defIgnore: 0.2 }, shrine: true, hooks: { onAreaStart(c, n, s) {
+    s.k = (s.k || 0) + 1; if (s.k < 2) return;
+    P.buffs.delete('sh_crush'); delete P.buffState.sh_crush; P.recalc(); if (G.ui) { G.ui._itemsDirty = true; G.ui.toastSmall('🙏 砕きの祈りの効き目が切れた'); } } } });
+  Object.defineProperty(BUFFS[BUFFS.length - 1], 'max', { get: () => (G.Areas && G.Areas.shrineOffer && G.game && G.game.stage === 'shrine' ? 1 : 0), configurable: true }); // (in the shrine's own area only: a choice cut short never leaves it open)
   G.isTech = (b) => b.cat === 'pile' || b.cat === 'skill' || b.cat === 'ult';
   G.BUFFS = BUFFS;
   G.BUFF_BY_ID = Object.fromEntries(BUFFS.map((b) => [b.id, b]));

@@ -232,8 +232,8 @@
             if (!e.alive) continue;
             VX.pillar(e.pos.clone(), 0.7, 14, 0xff2a48, 0.3, { c2: 0xffd0d8, ground: false, speed: 9 });
             VX.slash(e.centerPos(), P.pos.clone().sub(e.pos).setY(0).normalize(), 1.6, 2.6, 0xff4060, { tilt: 0.9, dur: 0.16 });
-            if (!e.boss && e.hp < e.maxHp * th) { C.damageEnemy(e, e.hp + 1, Object.assign({ noBuffs: true }, info)); kills++; continue; }
-            C.damageEnemy(e, e.maxHp * (e.boss ? 0.06 : 0.25) * k * (1 + (st.ultDmg || 0)) * (1 + m.dmg), Object.assign({ noBuffs: true }, info));
+            if (!e.boss && e.hp < e.maxHp * th) { C.damageEnemy(e, e.hp + 1, Object.assign({ noBuffs: true }, info, { fixed: true })); kills++; continue; }
+            C.damageEnemy(e, e.maxHp * (e.boss ? 0.06 : 0.25) * k * (1 + (st.ultDmg || 0)) * (1 + m.dmg), Object.assign({ noBuffs: true }, info, { fixed: true }));
             if (!e.alive) kills++;
           }
           if (m.x_refund && kills) { C.ultReduce(3 * kills); G.ui.toastSmall(`🔁 断罪の連鎖：CT-${3 * kills}秒`); }

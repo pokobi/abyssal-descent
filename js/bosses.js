@@ -646,7 +646,7 @@
         if (k >= 1) { this.root.scale.setScalar(1); this.teleporting = false; this.act = null; this.cd = 1.0; }
       }
     }
-    emp(pos, r) { for (const w of this.wards) if (w.alive && w.centerRef.distanceTo(pos) < r + 2) C.damageEnemy(w, w.maxHp * 0.6, { src: 'skill', proc: true }); }
+    emp(pos, r) { for (const w of this.wards) if (w.alive && w.centerRef.distanceTo(pos) < r + 2) C.damageEnemy(w, w.maxHp * 0.6, { src: 'skill', proc: true, fixed: true }); }
     extraDispose() {}
   }
 

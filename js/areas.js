@@ -1123,7 +1123,7 @@
   };
   AR.useShrine = function (it) {
     const cs = AR.curses();
-    const opts = [{ icon: '🙏', label: '祈る', sub: 'HP全回復 ＋ 装備中の防具の耐久も全回復 ＋ スキル・アルティメット／グラップル／防御の強化を一つ選ぶ', onPick: () => { it.used = true; G.combat.heal(9999); G.Inv.repair(P, 'equip', 1); G.sfx.bell(); setTimeout(() => GM.offerBuffs(false, { filter: (b) => G.isTech(b) || b.cat === 'defense' || (b.cat === 'mobility' && /グラップル|鉤/.test(b.desc + b.name)), title: 'BLESSING', sub: '祠の加護 — 一つを選べ' }), 50); } }];
+    const opts = [{ icon: '🙏', label: '祈る', sub: 'HP全回復 ＋ 装備中の防具の耐久も全回復 ＋ スキル・アルティメット／グラップル／防御の強化を一つ選ぶ', onPick: () => { it.used = true; G.combat.heal(9999); G.Inv.repair(P, 'equip', 1); G.sfx.bell(); setTimeout(() => { AR.shrineOffer = true; GM.offerBuffs(false, { filter: (b) => G.isTech(b) || b.cat === 'defense' || b.shrine || (b.cat === 'mobility' && /グラップル|鉤/.test(b.desc + b.name)), title: 'BLESSING', sub: '祠の加護 — 一つを選べ', after: () => { AR.shrineOffer = false; } }); }, 50); } }];
     if (cs.length) opts.push({ icon: '✨', label: '浄化を願う', sub: `呪いを一つ解き、HPを50%回復（${cs.map((id) => G.BUFF_BY_ID[id].name).join('・')}）`, onPick: () => { it.used = true; AR.removeCurse(cs[0]); G.combat.heal(P.stats.maxHp * 0.5); } });
     opts.push({ icon: '🚶', label: '立ち去る', onPick: () => {} });
     GM.modal('⛩️ 祈りの祠', '静かな祠だ。ここで祈れば力が満ちる。（一度だけ）', opts);

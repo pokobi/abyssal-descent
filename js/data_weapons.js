@@ -54,6 +54,7 @@
     ['d_hawk', 'dmr', 'ホークアイ', 'rare', { dmg: 1.15, headMul: 1.15 }, null, 'black', '鷹の目のような精度。'],
     ['d_glacier', 'dmr', '氷河', 'epic', { dmg: 1.25 }, 'cryo', 'steel', '冷気弾で敵を凍結させる。'],
     ['d_saint', 'dmr', '聖者の裁定', 'legendary', { dmg: 1.4, rpm: 1.2 }, 'pierce', 'gold', '貫通弾を撃つ黄金の選抜射手銃。'],
+    ['d_borer', 'dmr', '穿岩の長銃', 'legendary', { dmg: 1.35, rpm: 1.1, headMul: 1.1 }, 'borer', 'steel', '岩をも穿つ重い弾を撃つ、鈍い鉄色の選抜射手銃。'],
     ['n_scout', 'sniper', 'スカウト SR', 'common', { dmg: 0.82, rpm: 1.15 }, null, 'tan', '軽量なボルトアクション式の狙撃銃。威力は控えめだが扱いやすい。'],
     ['n_longbow', 'sniper', 'ロングボウ SR', 'rare', {}, null, 'tan', 'ボルトアクション式の大口径狙撃銃。'],
     ['n_widow', 'sniper', 'ウィドウメイカー', 'epic', { dmg: 1.2, headMul: 1.2 }, 'execute', 'black', '弱った獲物を確実に仕留める。'],
@@ -138,6 +139,7 @@
     moon: { icon: '🌙', name: '月影', desc: '6発目ごとに確定会心・2体貫通・冷気。会心で倒すとカウント+2' },
     crown: { icon: '👑', name: '王権', desc: 'ヘッドショットで王印。王印の敵が倒れると周囲10mの敵へ移る' },
     tide: { icon: '🌊', name: '蒼海', desc: '水属性。水が付いた敵には散弾が全弾収束' },
+    borer: { icon: '⛏️', name: '穿岩', desc: '防御無視+25%。ヘッドショットのたびに防御ダウン10%（重なって最大30%、5秒）' },
   };
   for (const [id, arch, name, rarity, mods, trait, finish, desc] of V) {
     const A = ARCH[arch];
@@ -233,6 +235,9 @@
     ['a_pierce', 'ammo', '貫通弾', '➶', 'rare', 420, { 'pierce+': 1 }, null, '敵を1体追加で貫通。', GUNLIKE],
     ['a_bleed', 'ammo', '破砕弾', '🔨', 'uncommon', 280, { 'shred+': 1 }, null, '同じ敵に当て続けると、1発ごとに与ダメ+3%（最大+30%）。1.5秒当てないと元に戻る。', GUNLIKE],
     ['a_vamp', 'ammo', '吸血弾', '🦇', 'epic', 560, { 'lifesteal+': 0.03 }, null, '吸血+3%。', GUNLIKE],
+    // the enemy's defence (combat.js C.defK / C.defOnHit)
+    ['a_hardcore', 'ammo', '硬芯弾', '🔩', 'legendary', 650, { 'defIgnore+': 0.3 }, null, '防御無視+30%。', GUNLIKE],
+    ['a_drill', 'ammo', '削岩弾', '⛏️', 'epic', 520, { 'gnaw+': 1 }, null, '当たるたび、その敵に防御ダウン3%（重なって最大30%、最後に当ててから4秒）。', GUNLIKE],
     ['o_reflex', 'optic', 'リフレックスサイト', '🟠', 'common', 190, { adsTime: 0.8, adsSpread: 0.9 }, 'reflex', '等倍の照準器。ADS速度+20%、ADS時の拡散-10%。', GUNLIKE],
     ['o_marksman', 'optic', 'マークスマンスコープ', '🔍', 'rare', 400, { magnify: 3, headMul: 1.12, adsSpread: 0.8, range: 1.15 }, 'x3', '3倍。射程+15%、ヘッドショット倍率+12%。（ハンドガン・SMG・ショットガン、矢や擲弾などを撃ち出す武器は不可）', SCOPE_LONG],
     ['m_amp', 'muzzle', '増幅マズル', '🔊', 'uncommon', 250, { dmg: 1.1, recoil: 1.1 }, 'amp', 'ダメージ+10%、反動+10%。', GUNLIKE],
@@ -324,11 +329,12 @@
     ['m_kusanagi', '神器「天叢雲」', '🌀', 'mythic', 'blade', { guard: [0.6, 60, 60], dmg: 88, swing: 0.38, range: 3.2, arc: 0.5, heavy: [3.2, 0.5, 0.5], moveMul: 1.15, knock: 5, critChance: 0.15 }, 'iai', 'katana', '雲を裂いたと伝わる神剣。重撃は居合：前方20mの敵を一瞬で斬り抜け、0.6秒後にまとめて大ダメージを与える。'],
     ['m_abyss', '神器「深淵の槍」', '🔱', 'mythic', 'spear', { guard: [0.5, 60, 50], dmg: 80, swing: 0.5, range: 4.4, arc: 0.82, heavy: [2.6, 0.45, 0.5], moveMul: 1.1, knock: 7 }, 'abyssSpear', 'spear', '深淵の底で鍛えられた投げ槍。重撃で投げると刺さった場所に重力場ができる。もう一度重撃で手元へ呼び戻し、通り道の敵を貫く。'],
     ['m_holy', '聖剣「黎明」', '✨', 'legendary', 'blade', { guard: [0.55, 65, 60], dmg: 88, swing: 0.4, range: 3.2, arc: 0.45, heavy: [2.6, 0.38, 0.45], moveMul: 1.14, knock: 6, critChance: 0.1 }, 'beam', 'holy', '光の聖剣。重撃で貫通する光の斬撃を飛ばす。'],
+    ['m_ram', '破城鎚', '🔨', 'legendary', 'blunt', { guard: [0.6, 110, 65], dmg: 108, swing: 0.76, range: 2.8, arc: 0.4, heavy: [2.8, 0.64, 0.7], moveMul: 1.03, knock: 16, shieldMul: 1.6 }, 'breach', 'hammer', '城門を打ち破るための鉄の大槌。重撃が当たると、その敵に防御ダウン40%（6秒）。'],
   ];
   const MTRAIT = {
     sweep: '横薙ぎ：攻撃範囲が広い', lunge: '居合：重撃で前方へ踏み込む', quake: '地震：重撃で周囲に衝撃波＋スタン', pierceLine: '貫通：直線上の敵をまとめて貫く',
     flameWave: '炎波：重撃で炎の斬撃波を放つ', bash: '盾撃：重撃で盾を叩きつけ、長く怯ませる', devour: '喰魂：変異体を倒すほど強化', midas: '黄金：殴るとコイン、重撃でコインを消費して威力3倍', reap: '刈取：ほぼ全方位攻撃・吸血', thunder: '落雷：連鎖雷、重撃で落雷', beam: '光刃：重撃で貫通する光の斬撃',
-    iai: '居合：重撃で前方20mを斬り抜け、0.6秒後にまとめて大ダメージ', abyssSpear: '深淵の槍：重撃で投げて重力場、もう一度重撃で呼び戻して貫く',
+    iai: '居合：重撃で前方20mを斬り抜け、0.6秒後にまとめて大ダメージ', breach: '破城：重撃が当たった敵に防御ダウン40%（6秒）', abyssSpear: '深淵の槍：重撃で投げて重力場、もう一度重撃で呼び戻して貫く',
   };
   G.MELEE = ML.map(([id, name, icon, rarity, mcat, s, trait, model, desc]) => Object.assign({ id, name, icon, rarity, mcat, cat: MCAT[mcat], trait, traitDesc: trait ? MTRAIT[trait] : null, model, desc, kind: 'melee', price: id === 'fists' || id === 'm_basic' ? 0 : MPRICE[rarity] + Math.round(s.dmg / s.swing / 10) * 10, critChance: 0, headMul: 1.5, shieldMul: 1, lifesteal: 0, elem: null, elemChance: 0 }, s));
   const MYTHM = { m_devour: 9500, m_midas: 6500, m_kusanagi: 9000, m_abyss: 9500 };

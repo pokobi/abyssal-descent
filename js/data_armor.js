@@ -119,6 +119,7 @@
     { id: 'grapple', name: 'グラップルCT短縮', min: 1, max: 10, stat: 'grappleCd' },
     { id: 'coin', name: 'コイン獲得', min: 1, max: 10, stat: 'coinMul' },
     { id: 'vamp', name: '吸血', min: 0.5, max: 3, stat: 'lifesteal' },
+    { id: 'defign', name: '防御無視', min: 1, max: 6, stat: 'defIgnore' },   // the enemy's defence ignored (combat.js C.defK)
     // elements (element.js): 属性熟練 is a plain number, 属性耐性 is drawn for one element
     { id: 'elm', name: '属性熟練', min: 4, max: 30, stat: 'elMastery', flat: true },
     { id: 'elres', name: '属性耐性', min: 2, max: 15, stat: 'elRes_', perEl: true },

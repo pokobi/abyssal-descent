@@ -177,8 +177,75 @@
     }
   }
 
+  // ---------------- enemy defence (防御ダウン / 防御無視) ----------------
+  // Every foe holds a defence that keeps half of a blow out (its toughness so far already counts it in). What strips it lets more
+  // through: a hit is x 2 / (2 - down - ignore), the two together at most 100% (x2). Nothing stripped: x1, the numbers as before.
+  // 防御ダウン sits on the foe: per source { v: share, t: seconds left }; a source put on again keeps the larger share and the longer
+  // time, different sources add up. A guardian's whole body shares one (the boss, not each part) and takes it at half; the duel's break
+  // (duel.js) is its own 70% and is not halved. 防御無視 is the attacker's: P.stats.defIgnore, the gun's (its parts, 穿岩),
+  // a skill augment's, a boon's for this one blow, info.defIgnore. 鉄面 (a mutation) takes both at half.
+  // Not scaled: what is an exact share or amount (info.fixed: the break's 12%, executes, a share of max HP), the field's own harm (src 'env').
+  C.DEF_BREAK = 0.7;
+  const defHolder = (e) => { const B = G.bosses && G.bosses.active; return e && e.multiPart && B && B.parts && B.parts.includes(e) ? B : e; };
+  C.defHolder = defHolder;
+  const ddBoost = () => (P && P.has('o_collapse') ? 1.5 : 1); // 総崩れ: every share you put on x1.5 (the break is not yours)
+  C.defDown = function (e, id, v, t, o) {
+    const h = defHolder(e); if (!h || h.dead || (e.alive === false && !e.multiPart)) return;
+    if (!(o && o.raw)) v *= ddBoost();
+    const m = h.defDown || (h.defDown = {}), c = m[id];
+    if (c && c.t > 0) { c.v = Math.max(c.v, v); c.t = Math.max(c.t, t); } else m[id] = { v, t };
+  };
+  // a share that builds a step a hit up to max, held for t s from the last hit (削岩弾, 穿岩の長銃, 削り刃)
+  C.defStack = function (e, id, step, max, t) {
+    const h = defHolder(e); if (!h || h.dead || (e.alive === false && !e.multiPart)) return;
+    const k = ddBoost(), m = h.defDown || (h.defDown = {}), c = m[id];
+    m[id] = { v: Math.min(max * k, (c && c.t > 0 ? c.v : 0) + step * k), t };
+  };
+  // the 防御ダウン on a foe now, as it counts (a guardian's halved, the break added), 0..1
+  C.defDownOf = function (e) {
+    const h = defHolder(e); if (!h) return 0;
+    let s = 0;
+    if (h.defDown) for (const id in h.defDown) { const c = h.defDown[id]; if (c.t > 0) s += c.v; }
+    if (e.st && e.st.burn > 0 && P && P.has('el_heatarmor')) s += 0.15 * ddBoost(); // 熱で緩む鎧: while it burns
+    if (e.boss || h.boss) s *= 0.5;
+    if (h.duelSt && h.duelSt.stunT > 0) s += (G.Duel && G.Duel.STUN_DOWN) || C.DEF_BREAK; // (the duel's break: duel.js)
+    return Math.min(1, s);
+  };
+  C.defIgnoreOf = function (e, info, src, crit) {
+    let v = (P.stats.defIgnore || 0) + (info.defIgnore || 0);
+    const w = info.weapon, gun = (src === 'bullet' || src === 'explosion') && w && w.def && w.def.kind === 'weapon';
+    if (gun) { v += P.stats.defIgnoreGun || 0; v += G.weapons.stats(w).defIgnore || 0; if (w.def.trait === 'borer') v += 0.25; }
+    if (crit && P.has('o_vital')) v += 0.3;
+    if (src === 'melee' && info.backstab && P.has('k_rearstrike')) v += 0.4;
+    const sk = info.sk || ((src === 'skill' || src === 'explosion') && C.curSk);
+    if (sk && G.abilities && G.abilities.skm) v += 0.4 * (G.abilities.skm(sk).x_dpierce || 0); // 貫く穂先 (投槍)
+    return Math.max(0, v);
+  };
+  C.defK = function (e, info, src, crit) {
+    if (info.fixed || info.forceExecute || src === 'env') return 1;
+    let down = C.defDownOf(e), ig = C.defIgnoreOf(e, info, src, crit);
+    if (e.mut && e.mut.ironface) { down *= 0.5; ig *= 0.5; }
+    const t = Math.min(1, down + ig);
+    return t > 0 ? 2 / (2 - t) : 1;
+  };
+  // what strips the defence as a blow lands: 削岩弾 (each round), 穿岩の長銃 (each headshot), 破城鎚 (a heavy blow)
+  C.defOnHit = function (e, info, src) {
+    const w = info.weapon;
+    if (src === 'bullet' && w && w.def && w.def.kind === 'weapon') {
+      if (G.weapons.stats(w).gnaw) C.defStack(e, 'gnaw', 0.03, 0.3, 4);
+      if (w.def.trait === 'borer' && info.head) C.defStack(e, 'borer', 0.1, 0.3, 5);
+    }
+    if (src === 'melee' && info.heavy && P.melee && P.melee.def && P.melee.def.trait === 'breach') C.defDown(e, 'breach', 0.4, 6);
+  };
+  function tickDefMap(m, dt) { for (const id in m) { m[id].t -= dt; if (m[id].t <= 0) delete m[id]; } }
+  function updateDefence(dt) {
+    const L = G.enemies && G.enemies.list;
+    if (L) for (const e of L) if (e.defDown) { if (!e.alive && !e.multiPart) e.defDown = null; else tickDefMap(e.defDown, dt); }
+    const b = G.bosses && G.bosses.active; if (b && b.defDown) tickDefMap(b.defDown, dt);
+  }
+
   // ---------------- damage to enemies ----------------
-  const SHIELD_BASE = { bullet: 0.6, melee: 0.6, explosion: 0.9, skill: 1.0, buff: 0.7, dot: 0.3, ally: 0.6, react: 1.0 };
+  const SHIELD_BASE ={ bullet: 0.6, melee: 0.6, explosion: 0.9, skill: 1.0, buff: 0.7, dot: 0.3, ally: 0.6, react: 1.0 };
   C.damageEnemy = function (e, amount, info) {
     if (!e || !e.alive || e.dying || e.state === 'undying') return 0; // an undying foe lying down before it rises takes nothing
     info = info || {};
@@ -193,7 +260,7 @@
       return 0;
     }
     const dist = P.pos.distanceTo(e.pos);
-    const ctx = { e, bonus: 0, head: !!info.head, src, dist, weapon: info.weapon, proc: !!info.proc, execute: false, crit: false, part: info.part, lowHit: info.lowHit, shieldBonus: 0, heavy: !!info.heavy, backstab: !!info.backstab, forceCrit: false };
+    const ctx = { e, bonus: 0, head: !!info.head, src, dist, weapon: info.weapon, proc: !!info.proc, execute: false, crit: false, part: info.part, lowHit: info.lowHit, shieldBonus: 0, heavy: !!info.heavy, backstab: !!info.backstab, forceCrit: false, pile: !!info.pile };
     if (!info.noBuffs && src !== 'dot') G.buffs.emit('preHit', ctx);
     let add = st.dmg + ctx.bonus;
     if (src === 'skill') add += st.skillDmg + (info.ult ? st.ultDmg || 0 : 0);
@@ -233,6 +300,8 @@
       dmg *= 1 + 0.03 * e._shred.n;
     }
     if (e.dmgMul) dmg *= e.dmgMul(info, ctx);
+    // the foe's defence (防御ダウン / 防御無視): before the front armour and the shield, so a shield takes it too
+    { const dk = C.defK(e, info, src, crit); if (dk !== 1) dmg *= dk; }
     // front armour (beetles etc.)
     let armored = false;
     if (e.def.frontArmor && src !== 'dot' && !e.st.stun && !(src === 'melee' && P.has('k_steel'))) { // (斬鉄: melee ignores front armour)
@@ -306,6 +375,7 @@
       if (info.knock && !e.boss) e.knockback(info.dir || e.pos.clone().sub(P.pos).setY(0).normalize(), info.knock);
     }
     ctx.dmg = dealt + shieldDealt; ctx.pos = pos;
+    if (!info.proc && src !== 'dot' && dealt + shieldDealt > 0) C.defOnHit(e, info, src);
     if (!info.proc && src !== 'dot') G.buffs.emit('onHit', ctx);
     G.enemies.onDamaged(e, info);
     if (e.mut) G.Depth.onHurt(e, info, dealt + shieldDealt);
@@ -996,6 +1066,16 @@
       if (z.follow) z.pos.set(pl.pos.x, pl.pos.y, pl.pos.z);
       const p = z.pos, r = z.r;
       G.vfx.zoneTick(z, dt); // (its look: a ground area drawn exactly to r, and what rises from it: vfx.js, shared with the co-op pictures)
+      // 腐蝕の雨: the acid pool's look (vfx.js) and the rain coming down into it - thin dull streaks and the hiss where they land
+      if (z.rain && z.t < z.dur - 0.2) {
+        // (falling streaks, slanting a little with the wind, dying out in the last 3 m; where they land, a small pale hiss)
+        for (let n = 0, m = dt * r * r * 6; n < m || Math.random() < m - n; n++) {
+          if (n > 14) break;
+          const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * r, x = p.x + Math.cos(a) * d, zz = p.z + Math.sin(a) * d, h = Math.random() * 3;
+          G.fx.tracer(V(x + 0.3, p.y + h + 4, zz + 0.08), V(x, p.y + h, zz), 0xb0b08a, 0.014, 0.13); // (4 m: a flying streak, fx.js)
+          if (Math.random() < 0.35) G.fx.norm.spawn(x, p.y + 0.08, zz, 0, 0.35, 0, 0.6, 0.14, 0.55, 0.46, 0.47, 0.34, 0.32, -0.05, 0.5);
+        }
+      }
       // its ticks, every interval of its own time from its first frame - the gap a 144 Hz screen counted for it (wait144: 0.5 s was
       // 0.507 s there). The time past one is carried to the next, and one counts while the area still lasts at the moment it falls due
       // (its end not included): as many as a 144 Hz screen gave, at every frame rate
@@ -1020,6 +1100,7 @@
             else if (z.kind === 'smoke') e.blindT = 1;
             else if (z.kind === 'gravity') { /* pull handled continuously below */ }
             else if (z.kind === 'whirl') C.damageEnemy(e, dmg, { src: 'skill', sk: z.sk, proc: true, noMarker: true });
+            else if (z.kind === 'acid') { if (z.down) C.defDown(e, 'acidrain', z.down, iv + 0.15); if (dmg) C.damageEnemy(e, dmg, { src: 'skill', sk: z.sk, proc: true, noMarker: true }); } // 腐蝕の雨: 防御ダウン while inside
             else if (z.kind === 'arrowrain' || z.kind === 'grasp' || z.kind === 'holy') { C.damageEnemy(e, dmg * (z.kind === 'holy' && e.def.undead ? 3 : 1), { src: 'skill', sk: z.sk, proc: true, noMarker: true }); if (z.kind === 'grasp') e.st.root = Math.max(e.st.root || 0, 0.6); }
           }
           if (z.kind === 'heal' && Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < r) { C.heal(z.hps * iv, true); pl.healZoneT = 0.6; }
@@ -1176,6 +1257,7 @@
     updateMines(dt);
     updateAllies(dt);
     updateAuras(dt);
+    updateDefence(dt);
   };
   C.clear = function () {
     for (const p of C.projectiles) releaseMesh(p.mesh);

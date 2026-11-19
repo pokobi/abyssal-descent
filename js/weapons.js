@@ -251,6 +251,7 @@
       metal.metalness = 0.9; metal.roughness = 0.42;   // (old gilt, worn: the steel's own grain under it, no light of its own to speak of)
       if (def.id === 'y_maw') { metal.color.setHex(0x241a2a); metal.emissive.setHex(0x120618); metal.emissiveIntensity = 0.2; poly.color.setHex(0x8c7036); }
       else if (def.id === 'y_storm') { metal.color.setHex(0xb8c4cc); metal.emissive.setHex(0x16303e); metal.emissiveIntensity = 0.2; poly.color.setHex(0x8c7036); }
+      else if (def.id === 'd_borer') { metal.color.setHex(0x4c4a48); metal.metalness = 0.85; metal.roughness = 0.55; poly.color.setHex(0x3a2a1c); } // 穿岩の長銃: dull dark iron and an old dark stock, no gilt
       else if (def.id === 'm_hell') { metal.color.setHex(0x9a6428); metal.emissive.setHex(0x2c0e02); metal.emissiveIntensity = 0.22; poly.color.setHex(0x220c0a); }
       else { metal.color.setHex(0x86693a); metal.emissive.setHex(0x120a02); metal.emissiveIntensity = 0.12; poly.color.setHex(0x2a1014); poly.emissive.setHex(0x0a0204); poly.emissiveIntensity = 0.1; }
     }

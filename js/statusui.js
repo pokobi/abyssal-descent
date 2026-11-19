@@ -169,7 +169,7 @@
 
   // ---------------- stats, items, perks ----------------
   const GROUPS = [
-    ['攻撃', ['dmg', 'fireRate', 'reloadSpeed', 'critChance', 'critMul', 'headMul', 'skillDmg', 'explosionDmg', 'shieldDmg']],
+    ['攻撃', ['dmg', 'fireRate', 'reloadSpeed', 'critChance', 'critMul', 'headMul', 'skillDmg', 'explosionDmg', 'shieldDmg', 'defIgnore', 'defIgnoreGun']],
     ['生存', ['maxHp', 'defense', 'armor', 'hpRegen', 'lifesteal']],
     ['属性', ['elMastery', 'elRes_fire', 'elRes_water', 'elRes_ice', 'elRes_volt', 'elRes_wind', 'elRes_earth']],
     ['機動・その他', ['moveSpeed', 'weight', 'maxJumps', 'grappleRange', 'cdr', 'coinMul', 'luck']],

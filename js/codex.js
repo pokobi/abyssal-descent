@@ -2,6 +2,7 @@
 // Encyclopedia of every buff, weapon, attachment, item, skill, monster and boss (with live 3D previews).
 (function () {
   const CX = (G.codex = {});
+  CX.DEF_NOTE = '敵はみなダメージを抑える防御を持つ。防御ダウン・防御無視を合わせて100%で、ダメージは2倍になる。';
   const U = G.U;
   let renderer = null, scene = null, cam = null, model = null, raf = 0, canvas = null, animState = null;
   const TABS = [
@@ -159,7 +160,11 @@
     const want3d = tab === 'weapon' || tab === 'enemy' || tab === 'melee' || tab === 'boss';
     if (want3d) html += `<div id="cx-3d"></div>`; else html += `<div class="cd-icon">${o.mat ? G.armorIcon(o) : o.icon}</div>`;
     html += `<div class="cd-name">${U.esc(o.name)}</div><div class="cd-cat">${rar ? rar.name + ' · ' : ''}${catText(o)}${disc(tab, o) ? ' · ✅ 発見済み' : ' · ❔ 未発見'}</div>${G.Elem.tagOf(o) ? `<div style="text-align:center;margin-top:4px">${G.Elem.chip(o)}</div>` : ''}`;
-    html += `<div class="cd-desc">${U.descHTML(o.desc)}</div><div class="cd-stats">`;
+    html += `<div class="cd-desc">${U.descHTML(o.desc)}</div>`;
+    // the word explained where it is used (a boon, skill, part, weapon or mutation that strips or keeps the enemy's defence: combat.js C.defK)
+    { const tr = o.trait && G.WEAPON_TRAITS && G.WEAPON_TRAITS[o.trait], txt = (o.desc || '') + (o.traitDesc || '') + (tr && tab === 'weapon' ? tr.desc : '');
+      if (/防御ダウン|防御無視/.test(txt)) html += `<div style="margin-top:6px;font-size:12px;color:var(--dim)">🛡 ${CX.DEF_NOTE}</div>`; }
+    html += `<div class="cd-stats">`;
     if (tab === 'weapon') {
       const s = o;
       html += bar('💥', 'ダメージ', s.dmg * (s.pellets || 1), 320, Math.round(s.dmg) + (s.pellets > 1 ? '×' + s.pellets : ''));

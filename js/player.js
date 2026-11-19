@@ -43,6 +43,7 @@
     elIcd: 0, elAuraT: 0, elSelfT: 0, elSelfRes: 0, rxFreezeT: 0, rxBlastR: 0, rxLeak: 0, rxCrystal: 0, rxBrittle: 0, rxSwirlR: 0, rxSwirlT: 0, // (the element boons: element.js)
     skillCd: 0, skillRad: 0, skillDur: 0, skillCharges: 0, techBurn: 0, techFrost: 0, techShock: 0, techStun: 0, techVamp: 0, techShield: 0,
     ultDmg: 0, ultCd: 0, ultDur: 0, ultCharge: 0, ultHeal: 0, ultShield: 0, ultOver: 0, ultEcho: 0, ultTech: 0,
+    defIgnore: 0, defIgnoreGun: 0, // the enemy's defence ignored (combat.js C.defK): every attack / the gun's only (貫徹)
     pileDmg: 0, pileRadius: 0, pileCd: 0, pileFast: 0, pileFire: 0, pileShock: 0, pileFrost: 0, pileStun: 0, pileVacuum: 0, pileBounce: 0, pileShield: 0, pileHeal: 0, pileHeight: 0, pileShieldMul: 0, pileMeteor: 0,
   };
   G.PLAYER_BASE = BASE;
@@ -73,6 +74,8 @@
     defense: '防具の防御力。受けるダメージが ×100÷(100＋防御力) になる。',
     weight: '防具の重さ。重いほど移動が遅くなる（布の防具は重さ0）。',
     shieldDmg: '敵のシールドに与えるダメージが増える。',
+    defIgnore: '敵の防御を無視する割合。防御ダウンと合わせて100%まで。100%で敵へのダメージが2倍。',
+    defIgnoreGun: '銃の攻撃だけにかかる防御無視（上の防御無視に足される）。防御ダウンと合わせて100%まで。100%で敵へのダメージが2倍。',
     maxJumps: '空中も含めて続けて跳べる回数。',
     grappleRange: 'グラップルが届く距離。',
     luck: 'レアリティの高い物が出やすくなる。',
@@ -83,7 +86,7 @@
     maxHp: ['❤️', '最大HP', 'n'], armor: ['🛡️', '被ダメ軽減', 'p'], dmg: ['💪', '与ダメ', 'p'], fireRate: ['🔁', '連射', 'p'], reloadSpeed: ['♻️', 'リロード', 'p'],
     critChance: ['💢', '会心率', 'p'], critMul: ['💥', '会心ダメージ', 'cd'], headMul: ['🎯', 'HS倍率', 'p'], moveSpeed: ['👟', '移動', 'p'], hpRegen: ['💚', '再生/秒', 'n'],
     lifesteal: ['🩸', '吸血', 'p'], cdr: ['⏳', 'CT短縮', 'p'], coinMul: ['🪙', 'コイン獲得', 'p'], skillDmg: ['🔮', 'スキル', 'p'],
-    explosionDmg: ['💣', '爆発', 'p'], defense: ['🛡️', '防御力', 'n'], weight: ['⚖️', '重さ', 'n'], shieldDmg: ['🔨', '対シールド', 'p'], maxJumps: ['🪽', 'ジャンプ回数', 'n'], grappleRange: ['⚓', 'グラップル射程', 'n'], luck: ['🍀', '幸運', 'p'],
+    explosionDmg: ['💣', '爆発', 'p'], defense: ['🛡️', '防御力', 'n'], weight: ['⚖️', '重さ', 'n'], shieldDmg: ['🔨', '対シールド', 'p'], defIgnore: ['⛏️', '防御無視', 'p'], defIgnoreGun: ['🎯', '防御無視（銃）', 'p'], maxJumps: ['🪽', 'ジャンプ回数', 'n'], grappleRange: ['⚓', 'グラップル射程', 'n'], luck: ['🍀', '幸運', 'p'],
   };
 
   class Player {

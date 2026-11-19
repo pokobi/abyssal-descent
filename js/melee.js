@@ -423,7 +423,8 @@
         tipY = 0.33; break;
       }
       case 'hammer': {
-        if (has('hammer')) { tipY = put(wg, 'hammer', MMb); break; }
+        // (破城鎚: the war hammer's shape in blackened steel and cast iron on a black-stained haft - a siege tool, not a knight's arm)
+        if (has('hammer')) { tipY = put(wg, 'hammer', def.id === 'm_ram' ? Object.assign({}, MMb, { blade: MMb.blackSteel, steel: MMb.iron, gold: MMb.iron, goldBr: MMb.iron, wood: MMb.darkWood }) : MMb); break; }
         cyl(wg, 0.020, 0.62, 0, 0.20, 0, mats.wood);
         for (const y of [-0.09, 0.12, 0.38]) box(wg, 0.044, 0.018, 0.044, 0, y, 0, mats.steel);
         box(wg, 0.09, 0.09, 0.18, 0, 0.49, -0.01, dark);

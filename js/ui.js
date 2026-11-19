@@ -621,7 +621,8 @@
     const ew = bA && bA.elAtk && EL ? `<span class="boss-el" style="--ec:${EL.BY[bA.elAtk].col}" title="扱う属性">${EL.BY[bA.elAtk].icon}</span>` : '';
     const au = p0 && EL ? EL.auraOf(p0) : null;
     const ea = au ? `<span class="boss-au" style="--ec:${EL.BY[au].col}" title="付いている属性">${EL.BY[au].icon}</span>` : '';
-    const nm = `${o.lv ? `<span class="boss-lv">Lv.${UI.bossLv(o.lv)}</span>` : ''}${ew}${U.esc(o.name)}  —  ${U.esc(o.title)}${ea}`;
+    const dd = p0 && G.combat.defDownOf && G.combat.defDownOf(p0) > 0 && G.enemies.DD_ICON ? `<span class="boss-dd" title="防御ダウン" style="display:inline-block;width:0;height:21px;overflow:visible;white-space:nowrap;vertical-align:-4px;line-height:0;filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 2px #000)">${G.enemies.DD_ICON.replace('width="14" height="16"', 'width="18" height="21" style="margin-left:6px"')}</span>` : '';
+    const nm = `${o.lv ? `<span class="boss-lv">Lv.${UI.bossLv(o.lv)}</span>` : ''}${ew}${U.esc(o.name)}  —  ${U.esc(o.title)}${ea}${dd}`;
     if (e.bossName._h !== nm) { e.bossName.innerHTML = nm; e.bossName._h = nm; }
     // multi-boss fights (the twins): one bar per boss, side by side
     let sp = document.getElementById('boss-split');

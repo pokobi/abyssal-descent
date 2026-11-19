@@ -119,9 +119,9 @@ const IDS = process.argv.slice(2).length ? process.argv.slice(2) : ['madman', 'h
       console.log('      after the parries', JSON.stringify(br));
       check(!br.duel && br.wg === 0 && Math.abs(br.hp - 0.57) < 0.011 && br.stun > 3, 'emptied by parries: BREAK, 12% of its health and a stagger');
       check(!br.lock && !br.melee, 'the duel is over: unlocked, the gun back in hand');
-      // in the stagger it takes x1.5
-      const mul = await p.eval("G.bosses.active.main.dmgMul({ src: 'bullet' }, {})");
-      check(mul === 1.5, 'staggered: damage x1.5 (' + mul + ')');
+      // in the stagger its defence is down 70% (x1.54; a guardian's halving does not touch the break)
+      const mul = JSON.parse(await p.eval("JSON.stringify({ down: G.combat.defDownOf(G.bosses.active.main), k: G.combat.defK(G.bosses.active.main, { src: 'bullet' }, 'bullet', false) })"));
+      check(Math.abs(mul.down - 0.7) < 1e-9 && Math.abs(mul.k - 2 / 1.3) < 1e-9, 'staggered: defence down 70%, damage x1.54 (' + JSON.stringify(mul) + ')');
       // the second duel at 35%, left to run out: the gauge stays as a shield
       await p.until('G.bosses.active.duelSt.stunT <= 0', 8000);
       await p.eval("(() => { const b = G.bosses.active; b.hp = b.maxHp * 0.34; return 1; })()");

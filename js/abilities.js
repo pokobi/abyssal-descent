@@ -481,6 +481,34 @@
         G.sfx.whoosh(0.8, 0.5);
         break;
       }
+      case 'sk_pile': {
+        // 破甲杭: an iron stake shot where you look. Where it strikes (a foe or a wall), the foe it hit and every foe within r take the
+        // blow and lose their defence (防御ダウン, combat.js C.defDown)
+        const o = P.handPos(); const a = aim(80, true); const tgt = a.e ? a.e.centerPos() : a.wh ? a.wh.point : a.o.clone().addScaledVector(a.d, 80);
+        const d = tgt.sub(o).normalize();
+        const down = p.down + 0.1 * (m.x_deep || 0), dt0 = p.t + 4 * (m.x_linger || 0), r = p.r, dmg = sc(p.dmg);
+        C.spawnProjectile({ kind: 'harpoon', pos: o, vel: d.multiplyScalar(70), grav: 1.5, owner: 'player', dmg, explode: r, radius: 0.2, life: 3, info: { src: 'skill', shieldMul: 1.5 }, onDetonate: (pr) => {
+          const pt = pr.pos.clone();
+          G.vfx.nova(pt.clone(), r, 0.22, { style: 'shock', dome: false });
+          G.fx.sparks(pt, null, 22, 0xffd8a0, 8); G.fx.debris(pt, G.world.mats.rock, 5, 0.25, 6); G.fx.dust(pt, V(0, 1, 0), 0x7a6a50, 6);
+          G.sfx.impact(pt, 'metal'); G.sfx.explosion(pt, 0.35); P.addShake(0.15);
+          for (const e of G.enemies.inRadius(pt, r + 3)) {
+            if (!e.alive || e.ally || e.centerPos().distanceTo(pt) - (e.radius || 0.5) > r) continue;
+            C.damageEnemy(e, dmg, { src: 'skill', shieldMul: 1.5, knock: 4, dir: e.pos.clone().sub(pt).setY(0.3).normalize(), noMarker: true });
+            C.defDown(e, 'sk_pile', down, dt0);
+          }
+        } });
+        G.sfx.whoosh(0.25, 1.3); G.sfx.mech('grab');
+        break;
+      }
+      case 'sk_acid': {
+        // 腐蝕の雨: acid rain over the spot you aim at for dur s: 防御ダウン while inside and a little damage every second
+        // (the pool's look: the acid zone, vfx.js; the rain: combat.js updateZones)
+        const a = aim(45); const r = p.r + 2 * (m.x_wide || 0);
+        C.zone(a.floorPt, r, p.dur, 'acid', sc(p.dps), { rain: true, down: p.down + 0.1 * (m.x_thick || 0), interval: 0.5 });
+        G.sfx.whoosh(0.8, 0.45); G.sfx.spit(a.floorPt);
+        break;
+      }
       case 'spikes': {
         const f0 = P.forward(); f0.y = 0; f0.normalize();
         const start = P.pos.clone();
@@ -579,7 +607,7 @@
         for (const e of G.enemies.inRadius(P.pos, p.r)) {
           if (e.boss || e.hp > e.maxHp * th) continue;
           G.fx.beam(e.centerPos(), P.chestPos(), 0x9fd8ff, 0.04, 0.5);
-          C.damageEnemy(e, e.hp + e.shield + 1, { src: 'skill' }); n++;
+          C.damageEnemy(e, e.hp + e.shield + 1, { src: 'skill', fixed: true }); n++;
         }
         if (!n) { G.ui.toastSmall('⚰️ 収穫できる魂がない'); ok = false; break; }
         G.vfx.area(P.pos.clone(), p.r, 'dark', 0.6, { col: [0x2a4a6a, 0x9fd8ff] });

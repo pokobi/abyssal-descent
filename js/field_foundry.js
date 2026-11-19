@@ -57,6 +57,14 @@
     w.solid('trim', 0, -0.4, pz0 - 0.4, W, 0.2, pz0, { uv: 1 }); w.solid('trim', 0, -0.4, pz1, W, 0.2, pz1 + 0.4, { uv: 1 });
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT + 2, beams: 0 });
     w.solid('rock', -3, HT, -3, W + 3, HT + 2, D + 3, { uv: 6, grad: false });
+    // (the side walls stand on the landings' level: over the melt they are carried down into it on the bedrock the landings are cut
+    // from - one face of rock from the walls' foot to under the melt's top, standing a hand out under their plinth, and a pier of it
+    // under each pilaster. Without it the walls ended in the air at y 0 and the fog showed under them. Drawn only; no dice)
+    for (const sx of [0, W]) {
+      const s = sx ? -1 : 1;
+      w.visual('rock', Math.min(sx - s * 1.2, sx + s * 0.3), MY - 0.6, pz0 - 0.4, Math.max(sx - s * 1.2, sx + s * 0.3), 0, pz1 + 0.4, { uv: 6, grad: false, skip: { bottom: true } });
+      for (let z = 8; z < D - 2; z += 8) if (z > pz0 + 0.8 && z < pz1 - 0.8) w.visual('rock', Math.min(sx, sx + s * 1.05), MY - 0.6, z - 0.8, Math.max(sx, sx + s * 1.05), 0, z + 0.8, { uv: 6, grad: false, skip: { bottom: true } });
+    }
     // ---- the bays (low ones at the landings' height, high ones on gantries), the catwalks of a tree over them
     const bays = [];
     for (let r = 0; r < nR; r++) for (let c = 0; c < nC; c++) {

@@ -9,6 +9,16 @@
   const gateGap = (W, gates, x, half) => LG.gateXs(W, gates || 1).some((g) => Math.abs(g - x) < half);
   // o.keep (the merchant's hall, levelgen.js LG.SHOP_KEEP): the places the hall keeps bare; a thing r across at (x, z) goes there only if clear of them
   const clear = (o, x, z, r) => !(o.keep || []).some(([x0, z0, x1, z1]) => x + r > x0 && x - r < x1 && z + r > z0 && z - r < z1);
+  // the rock beyond a cave room's bounds: the rock round a rounded chamber (a height grid of the room's own cells) leaves the middle of
+  // each side open to the edge of the area, and the fog or the sky showed through there. A band of rock outside all four sides, from
+  // under the floor up to h, but for the openings of the gates (their short stretches of wall, stub either side) and of the way in.
+  // Drawn only (nothing is thrown; the bounds stop you as they did)
+  const caveBand = (w, W, D, o, h, stub) => {
+    const R = (x0, z0, x1, z1) => { if (x1 - x0 > 0.3 && z1 - z0 > 0.3) w.visual('rock', x0, -2, z0, x1, h, z1, { uv: 6, grad: false, skip: { bottom: true } }); };
+    R(-3, -3, 0, D + 3); R(W, -3, W + 3, D + 3);
+    let a = 0; for (const g of [...LG.gateXs(W, o.gates || 1), W + 100]) { R(a, -3, Math.min(W, g - 2.5 - stub), 0); a = g + 2.5 + stub; }
+    R(0, D, W / 2 - 4.6 - stub, D + 3); R(W / 2 + 4.6 + stub, D, W, D + 3);
+  };
 
   // ---- outdoors on the hills: crags round a patch of grass, the hosts' banners, a camp fire
   S.battlefield = function (w, rng, W, D, o) {
@@ -30,6 +40,7 @@
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) { const i = z * W + x, d = Math.pow(Math.pow(Math.abs(x + 0.5 - cx) / rx, 4) + Math.pow(Math.abs(z + 0.5 - cz) / rz, 4), 0.25); if (d < 1 || (z < 6 && gateGap(W, o.gates, x + 0.5, 6)) || (z > D - 6 && Math.abs(x + 0.5 - cx) < 6)) { rk.m[i] = 0; continue; } rk.h[i] = 16 + Math.sin(x * 0.7 + z) * 0.6; }
     T.build(w, rk, { mk: 'rock', uv: 5, cliff: 1.2 });
     T.skyCap(w, rk); // (open to the sky: nobody gets up onto the rock round the chamber)
+    caveBand(w, W, D, o, 16, 3);
     w.groundTop = null; w.groundGrid = null;
     for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2, r = Math.min(rx, rz) * 0.6; if (!clear(o, cx + Math.cos(a) * r, cz + Math.sin(a) * r, 0.6)) continue; w.batch.geo('iron', PG().cyl8, new THREE.Matrix4().compose(V(cx + Math.cos(a) * r, 18, cz + Math.sin(a) * r), new THREE.Quaternion(), V(0.12, 24, 0.12))); }
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; w.addLight(cx + Math.cos(a) * (rx - 1), 3.4, cz + Math.sin(a) * (rz - 1), { flame: 1, intensity: 6, range: 10 }); }
@@ -43,6 +54,7 @@
     T.build(w, rk, { mk: 'rock', uv: 5, cliff: 1.2 });
     w.groundTop = null; w.groundGrid = null;
     w.solid('rock', -3, 9, -3, W + 3, 11, D + 3, { uv: 6, grad: false });
+    caveBand(w, W, D, o, 9, 2.5);
     for (let k = 0; k < 18; k++) { const L = rng.range(0.8, 2.4); w.batch.geo('rock', PG().cone, new THREE.Matrix4().compose(V(rng.range(4, W - 4), 9 - L / 2, rng.range(4, D - 4)), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0)), V(rng.range(0.5, 1), L, rng.range(0.5, 1)))); }
     for (let x = 6; x < W - 4; x += 7) for (const z of [1.2, D - 1.2]) { if ((z < 5 && gateGap(W, o.gates, x, 5)) || (z > D - 5 && Math.abs(x - cx) < 6)) continue; w.solid('woodDark', x - 0.15, 0, z - 0.15, x + 0.15, 8.6, z + 0.15, { uv: 1 }); }
     for (const [x, z] of [[5, D / 2], [W - 5, D / 2], [W / 2 - 9, 6], [W / 2 + 9, D - 6]]) if (clear(o, x, z, 0.5)) F.lantern(w, x, z, '#ffb060');

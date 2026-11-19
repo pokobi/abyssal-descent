@@ -91,7 +91,10 @@
     // ---- the bounds of the gallery (rock round it, a roof of rock) and the gates in its north wall
     H.perimeter(w, rng, W, D, { gates, h: 12, walls: false, beams: 0, stub: 3.5, southY: TOP });
     w.solid('rock', -3, 12, -3, W + 3, 15, GAL, { uv: 6, grad: false });
-    { let ax = -3; for (const g of [...LG.gateXs(W, gates), W + 9]) { const e = g - 6; if (e > ax) w.solid('rock', ax, 0, -3, e, 12, 0, { uv: 6, grad: false }); ax = g + 6; } }
+    // (the rock the north wall stands on, under the gallery's floor level: the wall's foot is worked broken like all rock, and with
+    // nothing under it the fog showed through the gap along the floor, right through the wall's 3 m. A core of plain rock (unworked:
+    // only seen through the broken foot) fills it from a hand behind the face, over the bedrock under the floor's level (its top kept 5 cm clear of the wall's foot: boxes that touch hide the faces between them). Drawn only)
+    { let ax = -3; for (const g of [...LG.gateXs(W, gates), W + 9]) { const e = g - 6; if (e > ax) { w.solid('rock', ax, 0, -3, e, 12, 0, { uv: 6, grad: false }); w.visual('rock', ax, -2, -3, e, -0.05, 0, { uv: 6, grad: false, skip: { bottom: true } }); w.visual('rock', ax, 0, -2.9, e, 1.6, -0.25, { uv: 6, grad: false, flat: true, skip: { bottom: true, top: true } }); } ax = g + 6; } }
     for (const g of LG.gateXs(W, gates)) { P().brazier(w, g - 5, 0, 4.5, 1, true); P().brazier(w, g + 5, 0, 4.5, 1, true); }
     for (let x = 10; x < W - 6; x += 12) { LG.pillar(w, x, GAL - 1.2, 0, 12, 1.1); P().torch(w, x, 3.6, GAL - 2, 'nz'); }
     occ.mark(0, GAL - 3, W, GAL + 1, 2);

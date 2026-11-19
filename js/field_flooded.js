@@ -31,6 +31,15 @@
     w.solid('trim', 0, -0.3, wz0 - 0.4, W, 0.12, wz0, { uv: 1 }); w.solid('trim', 0, -0.3, wz1, W, 0.12, wz1 + 0.4, { uv: 1 });
     H.perimeter(w, rng, W, D, { gates, h: HT, top: HT + 2, beams: 0 });
     w.solid('rock', -3, HT, -3, W + 3, HT + 2, D + 3, { uv: 6, grad: false });
+    // (under the water the town's walls go on down to its bed: the side walls stood on the water's face, the landings' fronts stopped
+    // at y -1, and through the water the fog showed under them. A face of the walls' masonry from there to under the bed, down the
+    // sides and under each landing's front, and a pier under each pilaster. Drawn only; no dice)
+    for (const sx of [0, W]) {
+      const s = sx ? -1 : 1;
+      w.visual('block', Math.min(sx - s * 1.2, sx), BED - 0.6, wz0 - 0.4, Math.max(sx - s * 1.2, sx), 0, wz1 + 0.4, { uv: 4, skip: { bottom: true } });
+      for (let z = 8; z < D - 2; z += 8) if (z > wz0 + 0.8 && z < wz1 - 0.8) w.visual('wall', Math.min(sx, sx + s * 0.9), BED - 0.6, z - 0.7, Math.max(sx, sx + s * 0.9), 0, z + 0.7, { uv: 3, skip: { bottom: true } });
+    }
+    w.visual('block', 0, BED - 0.6, wz0 - 1.2, W, -1, wz0, { uv: 4, skip: { bottom: true } }); w.visual('block', 0, BED - 0.6, wz1, W, -1, wz1 + 1.2, { uv: 4, skip: { bottom: true } });
     // ---- the blocks: walls round each (their tops the ways), some filled to a flat roof, the water inside the others
     const blk = [];
     for (let r = 0; r < nR; r++) for (let c = 0; c < nC; c++) {

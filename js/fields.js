@@ -65,7 +65,7 @@
   F.add = function (w, kind, x0, z0, x1, z1, opts) {
     // (opts.deep -> lavaDeep: a lava lake or pit you only end up in by a fall, which burns in full; any other lava is shallow and milder,
     // player.js postMove. Not z.deep: that is the depth of water over its bed, zoneAt and water.js)
-    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue), lavaDeep: !!(opts && opts.deep) };
+    const f = { kind, x0, z0, x1, z1, y: (opts && opts.y) || 0, t: 0, cap: kind === 'holy' ? 60 : 0, burnT: 0, blue: !!(opts && opts.blue) || (kind === 'lava' && !!w.blue), lavaDeep: !!(opts && opts.deep) };
     w.fields = w.fields || [];
     w.fields.push(f);
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;

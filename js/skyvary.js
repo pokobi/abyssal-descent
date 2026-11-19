@@ -177,7 +177,7 @@
   const mixHex = (a, b, k) => { const c = new THREE.Color(a).lerp(new THREE.Color(b), k); return '#' + c.getHexString(); };
   // the field's light and fog with a mood laid over them (a copy: the field's own table is never changed)
   S.env = function (B, v) {
-    if (!v) return B;
+    if (!v) return B && B.blue && G.Blue ? G.Blue.env(B) : B;   // (a world of the blue depths: its table leaned blue, world.js G.Blue)
     const o = Object.assign({}, B), k = v.k ?? 0.5;
     if (v.fog) o.fog = mixHex(B.fog, v.fog, k);
     if (v.fogD) o.fogD = B.fogD * v.fogD;
@@ -196,7 +196,7 @@
     if (open && v.cl) o.cl = v.cl;
     if (open && v.haze) o.haze = v.haze;
     if (open && v.under) o.under = v.under;
-    return o;
+    return B.blue && G.Blue ? G.Blue.env(o) : o;   // (the mood laid on, then the whole leaned blue again: a warm mood turns cold too)
   };
 
   // ---------------------------------------------------------------- particles around the camera
@@ -454,7 +454,9 @@
     const open = !!(B && (B.outdoor || B.sky));   // (a field under the sky: what falls from it stops at roofs)
     roof = open ? roofFor(w) : null;
     const q = (G.save && G.save.data.settings.quality) || 'high', k = (q === 'low' ? 0.35 : q === 'med' ? 0.65 : 1) * (document.documentElement.classList.contains('m') ? 0.6 : 1);
-    for (const spec of v.p || []) for (const m of make(spec, k, open)) { scene.add(m); live.push(m); }
+    // (a world of the blue depths: the embers that drift in its air burn cold too - only their colour; the weather's element stays)
+    const cold = (spec) => { if (!(w && w.blue && G.Blue && spec.col != null && G.Blue.warm(spec.col))) return spec; return Object.assign({}, spec, { col: parseInt(G.Blue.light(spec.col).slice(1), 16) }); };
+    for (const spec of v.p || []) for (const m of make(cold(spec), k, open)) { scene.add(m); live.push(m); }
     flash = v.flash ? { next: 6 + Math.random() * 10, t: -1 } : null;
     // (the bolt's shader, made now with the area - in its place in the scene, a thing of no size - not with the first bolt)
     if (v.bolt) {

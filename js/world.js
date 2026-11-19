@@ -1231,12 +1231,79 @@
   }
   G.Batch = Batch;
 
+  // ---------------- the blue of the depths ----------------
+  // The deep segments (runplan.js R.blue) burn cold: their decorative fires and lights are blue and their fog and light lean blue, the
+  // field's own stone and earth kept. A world made while G.Run._blueGen is set (game.js enterArea, just round the generation) carries
+  // w.blue from its first line on, so the generators, the lights and the lava read it while they build. The fight's fire is not touched.
+  const Blue = (G.Blue = {});
+  const BH = { h: 0, s: 0, l: 0 }, bc = new THREE.Color(), bc2 = new THREE.Color();
+  const lum = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  // is this colour a warm one (red .. orange .. yellow, with some colour in it)?
+  Blue.warm = (c) => { bc.set(c); bc.getHSL(BH, THREE.SRGBColorSpace); return BH.s > 0.12 && (BH.h <= 0.2 || BH.h >= 0.93); };
+  // a warm light's colour turned cold: the hue moved to the blue of the ruin's flame ('#3a8aff'), its saturation kept, its lightness held
+  // within #3a8aff .. #7ab8ff (a pale candle -> the pale end, a deep ember -> the deep end), its saturation held under 0.85 (a cold flame,
+  // not an electric one); cold, green, purple and white lights stay.
+  // Takes a hex string, a number or a Color; gives a '#rrggbb' string (or the input itself, unchanged)
+  Blue.light = (c) => {
+    if (c == null) return c;
+    bc.set(c); bc.getHSL(BH, THREE.SRGBColorSpace);
+    if (!(BH.s > 0.12 && (BH.h <= 0.2 || BH.h >= 0.93))) return c;
+    const l = Math.min(0.74, Math.max(0.55, BH.l));
+    bc.setHSL(0.598 - (l - 0.55) * 0.05, Math.min(0.85, BH.s), l, THREE.SRGBColorSpace);
+    return '#' + bc.getHexString();
+  };
+  // an air colour (fog, sky light, ground light, moon) laid onto a blue hue and saturation, its brightness (luminance) kept
+  Blue.air = (c, h, s) => {
+    if (c == null) return c;
+    bc.set(c); const y0 = lum(bc); bc.getHSL(BH, THREE.SRGBColorSpace);
+    bc2.setHSL(h, s, Math.max(0.02, BH.l), THREE.SRGBColorSpace);
+    const y1 = lum(bc2), k = y1 > 1e-6 ? y0 / y1 : 1;
+    bc2.setRGB(Math.min(1, bc2.r * k), Math.min(1, bc2.g * k), Math.min(1, bc2.b * k));
+    return '#' + bc2.getHexString();
+  };
+  // a field's light and fog table leaned blue (a copy; the ruin's '#0a1222' fog, '#6880b8' / '#1c243c' hemisphere is the measure):
+  // the same brightness everywhere, only hue and saturation moved. Applied twice it gives the same table
+  Blue.env = (B) => {
+    if (!B) return B;
+    const o = Object.assign({}, B);
+    o.blue = true;
+    if (o.fog) o.fog = Blue.air(o.fog, 0.6, 0.5);
+    if (o.hemiS) o.hemiS = Blue.air(o.hemiS, 0.615, 0.35);
+    if (o.hemiG) o.hemiG = Blue.air(o.hemiG, 0.62, 0.35);
+    if (o.moon) o.moon = Blue.air(o.moon, 0.6, 0.28);
+    if (Array.isArray(o.sky)) o.sky = o.sky.map((c) => (typeof c === 'string' ? Blue.air(c, 0.6, 0.42) : c));
+    if (Array.isArray(o.sunCol)) { bc.setRGB(o.sunCol[0], o.sunCol[1], o.sunCol[2]); const y0 = lum(bc); bc.getHSL(BH, THREE.SRGBColorSpace); bc2.setHSL(0.6, 0.3, BH.l, THREE.SRGBColorSpace); const k = y0 / Math.max(1e-6, lum(bc2)); o.sunCol = [bc2.r * k, bc2.g * k, bc2.b * k]; }
+    if (Array.isArray(o.under) && typeof o.under[0] === 'string') o.under = [Blue.air(o.under[0], 0.6, 0.45), o.under[1]];
+    if (o.torch != null) o.torch = Blue.light(o.torch);
+    if (o.flame != null) { const f = Blue.light(o.flame); o.flame = typeof o.flame === 'number' && typeof f === 'string' ? parseInt(f.slice(1), 16) : f; }
+    return o;
+  };
+  // the materials a blue world is drawn with: the field's own, but its lava the blue flame's, its glow (furnace mouths, lit windows,
+  // embers in a grate) a cold one, and its table of light and fog leaned blue. One per field, made once
+  const blueMatCache = new Map();
+  let blueGlow = null;
+  Blue.mats = (M) => {
+    let o = blueMatCache.get(M);
+    if (o) return o;
+    if (!blueGlow) blueGlow = new THREE.MeshBasicMaterial({ color: Blue.air(Blue.light(M.glow ? M.glow.color.getHex() : 0xffb060), 0.598, 0.72) });
+    o = Object.create(M);
+    o.biome = Blue.env(M.biome);
+    o.lava = M.bluefire || M.lava;
+    o.glow = blueGlow;
+    if (M.vc) o.vc = Object.assign({}, M.vc, { lava: M.vc.bluefire || M.vc.lava, glow: blueGlow });
+    o.blue = true;
+    blueMatCache.set(M, o);
+    return o;
+  };
+
   // ---------------- world ----------------
   const TERR_M = 0.8; // (while the player moves: how far under the drawn surface of a terrain its column's top may stand; the queries reach down by it)
   class World {
     constructor(W, D, biome) {
       this.W = W; this.D = D; this.biome = biome; this.zo = 0; this.Dn = D; this.xo = 0; this.Wn = W;
+      this.blue = !!(G.Run && G.Run._blueGen); // (the deep segments' cold fire: set before anything is built, G.Blue above)
       this.mats = G.Tex.materials(biome);
+      if (this.blue) this.mats = G.Blue.mats(this.mats);
       this.batch = new Batch();
       this.colliders = [];
       this.hash = new Map();
@@ -2060,10 +2127,17 @@
     // ---- lights ----
     addLight(x, y, z, o) {
       this.lightSources.push(Object.assign({ pos: new THREE.Vector3(x, y, z), color: this.mats.biome.torch, intensity: 9, range: 13, flame: 1, emit: true, ph: Math.random() * 100 }, o || {}));
+      if (this.blue) this.blueLight(this.lightSources[this.lightSources.length - 1]);
+    }
+    // a light of a blue world turned cold if it is warm (its strength and reach kept); once each
+    blueLight(s) {
+      if (!s || s.blued) return;
+      s.blued = true; s.color = G.Blue.light(s.color);
     }
 
     flushDeferred() { const d = this.deferred; this.deferred = []; for (const f of d) f(this.group); }
     finalize(scene, quality) {
+      if (this.blue) for (const s of this.lightSources) this.blueLight(s); // (the ones the generators pushed themselves: candles, fixtures, room lamps)
       if (G.Props && G.Props.meadow && quality !== 'low') { try { G.Props.meadow(this); } catch (e) { /* no grass */ } }   // (grass over the open turf: props.js)
       for (const f of this.deferred) f(this.group);
       this.deferred = [];

@@ -932,10 +932,14 @@
     const gates = G.Run.isBoss(n + 1) || G.Run.isPrep(n + 1) ? 1 : 3;
     const seed = (GM.seed ^ U.hashStr('area' + n + kind)) >>> 0;
     let w;
-    if (kind === 'shop') w = G.LevelGen.shop(n, seed, gates);
-    else if (kind === 'boss') w = G.LevelGen.boss(n, seed, G.bosses.forArea(n));
-    else if (G.Areas.ROOMS.includes(kind) || kind === 'trial') w = G.LevelGen.room(n, seed, kind, gates);
-    else w = G.LevelGen.generate(n, seed, { extraChests: P.stats.extraChests, gates, kind });
+    // the deep segments burn cold (runplan.js R.blue): the world made now carries w.blue from its first line (world.js G.Blue)
+    G.Run._blueGen = !!(G.Run.blue && G.Run.blue(n));
+    try {
+      if (kind === 'shop') w = G.LevelGen.shop(n, seed, gates);
+      else if (kind === 'boss') w = G.LevelGen.boss(n, seed, G.bosses.forArea(n));
+      else if (G.Areas.ROOMS.includes(kind) || kind === 'trial') w = G.LevelGen.room(n, seed, kind, gates);
+      else w = G.LevelGen.generate(n, seed, { extraChests: P.stats.extraChests, gates, kind });
+    } finally { G.Run._blueGen = false; }
     setWorld(w);
     if (w.field) G.save.mark('items', 'stage_' + w.field);
     if (G.Run.drawOn()) { const f = G.Run.field(n), L = G.save.data.lastFields || (G.save.data.lastFields = []); if (f && !L.includes(f)) { L.push(f); G.save.write(); } } // (a field this game went into: passed over in the next game, runplan.js)

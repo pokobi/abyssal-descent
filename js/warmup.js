@@ -134,6 +134,8 @@
     for (const n of ['statue0', 'statue1', 'statue2', 'statue3', 'tuft', 'crate', 'shelf', 'book', 'rack', 'cage', 'wellhead', 'brazier', 'sconce', 'chandelier']) { try { GP(n); } catch (e) { /* made when asked for */ } await new Promise((r) => setTimeout(r, 0)); }
     // (the hands: the open one that searches is carved and given its bones here, not with the first body searched: gfx.js warmHands)
     if (G.GFX && G.GFX.warmHands) { try { G.GFX.warmHands(); } catch (e) { /* made when first searched */ } await new Promise((r) => setTimeout(r, 0)); }
+    // (the arms of the skills' motions: their own open hands and sleeves, made and posed once - castanim.js warm)
+    if (G.CastAnim && G.CastAnim.warm) { try { G.CastAnim.warm(); } catch (e) { /* made with the first cast */ } }
     // (and each class's clothes over the common figure: melted once here, so that the first frame of a run does not stop to do it)
     if (G.avatar && G.avatar.buildFigure && G.Classes && G.Classes.BY) for (const c in G.Classes.BY) { try { const F = G.avatar.buildFigure(); G.avatar.dress(F.J, c); } catch (e) { /* when it is first worn */ } await new Promise((r) => setTimeout(r, 0)); }
   }

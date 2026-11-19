@@ -667,7 +667,8 @@
   IA.update = function (dt) {
     const holding = G.GrenHold && G.GrenHold.active();
     const searching = !!(G.game && G.game.search) && !cur;
-    IA.lower = U.damp(IA.lower, cur || holding || searching ? 1 : 0, cur || holding || searching ? 14 : 8, dt);
+    const casting = !!(G.CastAnim && G.CastAnim.lowerWant);   // (a skill's motion that needs the weapon out of the way: castanim.js)
+    IA.lower = U.damp(IA.lower, cur || holding || searching || casting ? 1 : 0, cur || holding || searching || casting ? 14 : 8, dt);
     rummage(dt, searching);
     if (!cur) return;
     const c = cur;

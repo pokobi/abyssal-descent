@@ -1226,6 +1226,7 @@
     // (the hand weapons' arms dressed whenever one is taken up: W.dressHands)
     if (W.melee && !W.melee.dressed) { const eq = W.melee.equip; W.melee.equip = function (im) { eq.call(this, im); W.dressHands(W.vmRoot); }; W.melee.dressed = true; W.dressHands(W.vmRoot); }
     G.ItemAnim.update(dt);
+    if (G.CastAnim) G.CastAnim.update(dt);   // (a skill's motion of the arms: castanim.js)
     W.traitTick(dt); if (W.spearTick) W.spearTick(dt);
     if (W.dirty) { W.ver++; W.dirty = false; }
     const w = P.weapon;
@@ -1414,6 +1415,7 @@
     return sp;
   };
   W.shoot = function (w, s) {
+    if (G.CastAnim) G.CastAnim.cut('fire');   // (a shot cuts a skill's motion short at once)
     if (G.game.search) G.game.cancelSearch('撃ったので探索を中断した');
     const st = P.stats, t = G.game.time;
     // ammo
@@ -1656,6 +1658,7 @@
 
   // flamethrower: cone damage tick
   W.fireFlame = function (w, s) {
+    if (G.CastAnim) G.CastAnim.cut('fire');   // (a shot cuts a skill's motion short at once)
     if (G.game.search) G.game.cancelSearch('撃ったので探索を中断した');
     if (!(P.stats.infAmmo > 0) && Math.random() >= s.ammoSave) w.mag--;
     P.lastShotT = G.game.time;
@@ -1749,6 +1752,8 @@
     if (anim.melee > 0) { const k = Math.sin((1 - anim.melee / 0.42) * Math.PI); p.z -= 0.12 * k; p.x -= 0.08 * k; ry += 0.5 * k; rz -= 0.4 * k; }
     // item in use: weapon dips out of the way
     if (G.ItemAnim.lower > 0.001) { const k = G.ItemAnim.lower; p.y -= 0.34 * k; p.x += 0.06 * k; rx -= 0.6 * k; }
+    // a skill's motion of the left hand alone: the gun held in the right hand only, its weight letting it sag and roll out a little
+    if (G.CastAnim && G.CastAnim.one > 0.001) { const k = G.CastAnim.one; p.x += 0.025 * k; p.y -= 0.02 * k; p.z += 0.015 * k; rx -= 0.06 * k; ry -= 0.05 * k; rz -= 0.14 * k; }
     // grenade throw
     if (anim.throwT > 0) { anim.throwT -= dt; const k = Math.sin(Math.min(1, anim.throwT / 0.4) * Math.PI); p.y -= 0.2 * k; rx -= 0.4 * k; }
     // grapple: gun tilts aside

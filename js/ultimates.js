@@ -245,6 +245,7 @@
       default: ok = false;
     }
     if (!ok) return;
+    if (G.CastAnim) G.CastAnim.cast(id);   // (the arms' motion of the cast: castanim.js)
     // ---- casting an ultimate ----
     if (P.cutReload) P.cutReload(); // (an ultimate that went off puts down a reload under way: player.js cutReload)
     sk.cd = A.cdOf(sk); sk.maxCd = sk.cd;

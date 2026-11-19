@@ -217,9 +217,12 @@
     if (P.liftLock || P.duelLock) { G.sfx.ui('deny'); G.ui.abilityDeny(sk); return; } // held up by the last guardian's gravity reversal (bosses6.js) / in a duel (duel.js)
     if (!A.ready(sk)) { G.sfx.ui('deny'); G.ui.abilityDeny(sk); return; }
     if (A.isUlt(sk)) return A.castUlt(sk);
-    const id = sk.id, prev = C.curSk;
-    C.curSk = id;
-    try { castSkill(sk); } finally { C.curSk = prev; }
+    const id = sk.id, CA = G.CastAnim;
+    if (CA && CA.pending(id)) return;   // (its throw is being swung: it goes off as the hand comes through)
+    const run = () => { const prev = C.curSk; C.curSk = id; try { castSkill(sk); } finally { C.curSk = prev; } };
+    // a throw holds its effect back until the hand is swung through (at most CA.MAX_DELAY s: castanim.js)
+    if (CA && CA.hold(id, run)) return;
+    run();
   };
   // range / duration augments (all skills + this skill's own) scale the skill's numbers
   A.scaleP = function (sk, bare) {
@@ -674,6 +677,8 @@
       default: ok = false;
     }
     if (ok) { A.consume(sk); G.sfx.ui('skill'); if (P.cutReload) P.cutReload(); } // (a skill that went off puts down a reload under way: player.js cutReload)
+    // the arms' motion of the cast (castanim.js; a held throw is already under way)
+    if (G.CastAnim) { if (ok) G.CastAnim.cast(id); else G.CastAnim.fail(id); }
   }
 
   // ---------------- ally skeletons ----------------

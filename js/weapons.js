@@ -163,8 +163,13 @@
       poly: mk(Object.assign({ color: 0x2a2b2e, metalness: 0.05, roughness: 0.8 }, sx('polymer') || { roughness: 0.72, normalMap: t.skin.normalMap })),
       wood: mk(Object.assign({ color: 0x6e4428, metalness: 0, roughness: 1 }, sx('walnut') || { color: 0x8a5a34, roughness: 0.55, map: t.planks.map, normalMap: t.planks.normalMap })),
       brass: mk({ color: 0xc89a50, metalness: 1, roughness: 0.3 }),
-      glove: mk(Object.assign({ color: 0x5a4532, metalness: 0, roughness: 0.95 }, sx('leather') || { color: 0x2a221c, roughness: 0.85, normalMap: t.skin.normalMap })),
-      sleeve: mk(Object.assign({ color: 0x5c5c50, metalness: 0, roughness: 1 }, sx('weave') || { color: 0x3a3a34, roughness: 0.95, map: t.cloth.map, normalMap: t.cloth.normalMap })),
+      // (the gloves' leather, worn; the hard leather over their knuckles and the straps at their wrists, darker; the sleeves' wool; the
+      // bracers' old leather and the iron of their buckles)
+      glove: mk(Object.assign({ color: 0x4a3626, metalness: 0, roughness: 1 }, sx('glove') || { color: 0x2a221c, roughness: 0.85, normalMap: t.skin.normalMap })),
+      gloveDk: mk(Object.assign({ color: 0x30241a, metalness: 0, roughness: 0.9 }, sx('glove') || { color: 0x1c1610, roughness: 0.8, normalMap: t.skin.normalMap })),
+      sleeve: mk(Object.assign({ color: 0x4a443b, metalness: 0, roughness: 1 }, sx('wool') || { color: 0x3a3a34, roughness: 0.95, map: t.cloth.map, normalMap: t.cloth.normalMap })),
+      bracer: mk(Object.assign({ color: 0x3e2c1e, metalness: 0, roughness: 1 }, sx('leather') || { color: 0x2a1e14, roughness: 0.85, normalMap: t.skin.normalMap })),
+      iron: mk(Object.assign({ color: 0x5e5a52, metalness: 0.8, roughness: 0.75 }, sx('steel') || { roughness: 0.6 })),
       lens: mk({ color: 0x8aa0b0, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.08, depthWrite: false }),
       glow: new THREE.MeshBasicMaterial({ color: 0xff3020 }),
       coil: mk({ color: 0xb08040, metalness: 1, roughness: 0.35, emissive: 0x302010 }),
@@ -1003,16 +1008,16 @@
     if (showHands !== false) {
       const hand = (p, right) => {
         const hg = new THREE.Group(); hg.position.copy(p);
-        // (a gloved hand closed on the grip, one rounded shape with a pad over the knuckles and a strap at the wrist: gfx.js)
+        // (a gloved hand closed on the grip - its fingers jointed, the hard leather over its knuckles, the strap at its wrist: gfx.js;
+        // the sleeve back from the glove's cuff along the forearm, a bracer over it: W.armOn)
         const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right) : null;
-        if (hs) { hg.add(new THREE.Mesh(hs.hand, mats.glove), new THREE.Mesh(hs.pad, mats.poly), new THREE.Mesh(hs.strap, mats.sleeve)); }
+        if (hs) { hg.add(new THREE.Mesh(hs.hand, mats.glove), new THREE.Mesh(hs.pad, mats.gloveDk), new THREE.Mesh(hs.strap, mats.gloveDk)); }
         else {
           const palm = new THREE.Mesh(PG.box, mats.glove); palm.scale.set(0.05, 0.075, 0.075); hg.add(palm);
           const fing = new THREE.Mesh(PG.box, mats.glove); fing.scale.set(0.055, 0.035, 0.06); fing.position.set(right ? -0.022 : 0.022, 0.0, -0.01); hg.add(fing);
           const thumb = new THREE.Mesh(PG.box, mats.glove); thumb.scale.set(0.02, 0.02, 0.05); thumb.position.set(right ? 0.02 : -0.02, 0.035, -0.02); thumb.rotation.y = right ? -0.3 : 0.3; hg.add(thumb);
         }
-        const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.038, 0.42, 0.038); arm.rotation.x = Math.PI / 2 - 0.35; arm.rotation.z = right ? 0.25 : -0.45; arm.position.set(right ? 0.06 : -0.08, -0.08, 0.2); hg.add(arm);
-        const cuff = new THREE.Mesh(PG.cyl8, mats.glove); cuff.scale.set(0.034, 0.05, 0.034); cuff.rotation.x = Math.PI / 2 - 0.35; cuff.rotation.z = right ? 0.25 : -0.45; cuff.position.set(right ? 0.012 : -0.012, -0.015, 0.035); hg.add(cuff);
+        if (!W.armOn(hg, right, right ? W.ARM_R : W.ARM_L, [1, 0.25, 0])) { const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.038, 0.42, 0.038); arm.rotation.x = Math.PI / 2 - 0.35; arm.rotation.z = right ? 0.25 : -0.45; arm.position.set(right ? 0.06 : -0.08, -0.08, 0.2); hg.add(arm); }
         g.add(hg);
         return hg;
       };
@@ -1025,6 +1030,41 @@
     return M;
   }
   W.buildGun = buildGun;
+  // the way each forearm runs back from the glove's cuff on a gun (the hand's own space; the left one is mirrored in x)
+  W.ARM_R = [0.3, -0.45, 0.85]; W.ARM_L = [0.6, -0.15, 0.8];
+  // a sleeve on a hand's forearm (gfx.js sleeve: the wool, a bracer of leather over it, the iron of its buckles), from the cuff of the
+  // glove (gfx.js HAND_WRIST; mirrored for the left hand) along dir, its back (where the buckles are) turned towards back. null where
+  // there are no such shapes
+  const SLV_M = { cloth: 'sleeve', bracer: 'bracer', strap: 'gloveDk', iron: 'iron' };
+  W.armOn = function (hg, right, dir, back, len) {
+    const X = G.GFX; if (!X || !X.sleeve || !X.HAND_WRIST || !mats) return null;
+    const s = right ? 1 : -1, at = X.HAND_WRIST.at, a = new THREE.Group();
+    for (const q of X.sleeve(len)) a.add(new THREE.Mesh(q.g, mats[SLV_M[q.m]]));
+    const z = new THREE.Vector3(dir[0] * s, dir[1], dir[2]).normalize(), y = new THREE.Vector3(back[0] * s, back[1], back[2]), x = new THREE.Vector3();
+    y.addScaledVector(z, -y.dot(z)).normalize(); x.crossVectors(y, z);
+    a.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); a.position.set(at[0] * s, at[1], at[2]);
+    a.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
+    a.userData.arm = true; hg.add(a); return a;
+  };
+  // the hand weapons' arms (melee.js) are plain bars of sleeve (userData.sleeve): each is given the sleeve's shape, from the glove's cuff
+  // to where the bar ended; the hard leather and the strap of their gloves are given the leather of the guns' gloves
+  W.dressHands = function (root) {
+    const X = G.GFX, cyl8 = G.Props && G.Props.PG && G.Props.PG.cyl8; if (!root || !mats || !X || !X.hand || !X.sleeve || !cyl8) return root;
+    const parts = new Set();
+    for (const r of [true, false]) { const h = X.hand(r, true); parts.add(h.pad); parts.add(h.strap); }
+    const bars = [];
+    root.traverse((o) => { if (!o.isMesh) return; if (o.userData.sleeve && o.geometry === cyl8) bars.push(o); else if (parts.has(o.geometry) && (o.material === mats.poly || o.material === mats.sleeve)) o.material = mats.gloveDk; });
+    // (bare hands: the hollow of each fist filled - X.hand's fist is closed round a grip)
+    const bare = G.player && G.player.meleeMode && G.player.melee && G.player.melee.def && G.player.melee.def.model === 'fists';
+    if (bare && X.fistCore) for (const r of [true, false]) { const hg = X.hand(r, true).hand; root.traverse((o) => { if (o.isMesh && o.geometry === hg && !o.userData.core) { o.userData.core = true; const c = new THREE.Mesh(X.fistCore(r), o.material); c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale); c.frustumCulled = false; o.parent.add(c); } }); }
+    for (const b of bars) {
+      const hg = b.parent, right = b.position.x >= 0, s = right ? 1 : -1, at = X.HAND_WRIST.at, ax = new THREE.Vector3(0, 1, 0).applyQuaternion(b.quaternion);
+      const d = b.position.clone().addScaledVector(ax, b.scale.y / 2).sub(new THREE.Vector3(at[0] * s, at[1], at[2])), len = Math.min(0.45, Math.max(0.24, d.length()));
+      d.normalize(); hg.remove(b);
+      const a = W.armOn(hg, right, [d.x * s, d.y, d.z], [1, 0.25, 0], len); if (a) a.userData.sleeve = true;
+    }
+    return root;
+  };
   // display model for shop / codex (no hands)
   W.dbgModel = () => model;   // (the gun in hand, for the tools that measure it: docs/tools)
   W.displayModel = function (def, atts) { if (!mats) return new THREE.Group(); const m = buildGun(def, atts || {}, false); m.group.rotation.order = 'ZXY'; m.group.rotation.set(0.18, Math.PI * 0.56, 0.38); return m.group; };
@@ -1183,6 +1223,8 @@
     xrOn = xr; gxOn = gx;
   };
   W.update = function (dt) {
+    // (the hand weapons' arms dressed whenever one is taken up: W.dressHands)
+    if (W.melee && !W.melee.dressed) { const eq = W.melee.equip; W.melee.equip = function (im) { eq.call(this, im); W.dressHands(W.vmRoot); }; W.melee.dressed = true; W.dressHands(W.vmRoot); }
     G.ItemAnim.update(dt);
     W.traitTick(dt); if (W.spearTick) W.spearTick(dt);
     if (W.dirty) { W.ver++; W.dirty = false; }

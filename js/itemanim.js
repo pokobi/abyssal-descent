@@ -143,8 +143,18 @@
   }
   // where the glove's cuff ends on the right hand of gfx.js and the way the forearm runs back from it (the left: the same in a mirror)
   const WR = new V3(0.046, -0.066, 0.08), DR = new V3(0.016, -0.036, 0.052).normalize(), ZV = new V3(0, 0, 1);
-  // a sleeve back from the cuff of a hand, along its forearm (gfx.js sleeveArm; a plain bar where it is missing)
+  // the sleeve's parts (gfx.js sleeve: the wool, a bracer of leather, its straps and buckles) as meshes under g; false where there are none
+  function sleeveParts(g, len) {
+    const X = G.GFX, W = G.weapons.mats; if (!X || !X.sleeve || !W.bracer) return false;
+    const MS = { cloth: M.sleeve, bracer: W.bracer, strap: W.gloveDk, iron: W.iron };
+    for (const q of X.sleeve(len)) { const o = new THREE.Mesh(q.g, MS[q.m] || M.sleeve); o.frustumCulled = false; g.add(o); }
+    return true;
+  }
+  // a sleeve back from the cuff of a hand, along its forearm (weapons.js armOn: the sleeve of the guns' hands; gfx.js sleeveArm, or a
+  // plain bar, where it is missing)
   function sleeveOn(g, right) {
+    const X = G.GFX, Wp = G.weapons;
+    if (Wp.armOn && X && X.HAND_WRIST) { const a = Wp.armOn(g, right, X.HAND_WRIST.dir, [1, 0.25, 0], 0.3); if (a) return a; }
     const s = new THREE.Group(); g.add(s);
     if (!putG(s, 'sleeveArm')) { const a = cyl(s, M.sleeve, 0.038, 0.42, 0, 0, 0.2); a.rotation.x = HX; }
     s.position.set(right ? WR.x : -WR.x, WR.y, WR.z); s.quaternion.setFromUnitVectors(ZV, new V3(right ? DR.x : -DR.x, DR.y, DR.z));
@@ -152,19 +162,20 @@
   }
   function hand(p, right) {
     const g = new THREE.Group(); p.add(g);
-    // (a gloved hand closed round what it holds, a pad over its knuckles: gfx.js. Then the sleeve back from its cuff)
+    // (a gloved hand closed round what it holds - jointed fingers, the panel sewn on its back, the strap at its wrist: gfx.js. Then the
+    // sleeve back from its cuff, a bracer over it)
     const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right, true) : null, W = G.weapons.mats;
-    if (hs) g.add(new THREE.Mesh(hs.hand, M.glove), new THREE.Mesh(hs.pad, W.poly || M.gun));
+    if (hs) g.add(new THREE.Mesh(hs.hand, M.glove), new THREE.Mesh(hs.pad, W.gloveDk || W.poly || M.gun));
     else { box(g, M.glove, 0.05, 0.075, 0.075); box(g, M.glove, 0.055, 0.035, 0.06, right ? -0.022 : 0.022, 0, -0.01); }
     g.userData.arm = sleeveOn(g, right);
-    if (hs) g.add(new THREE.Mesh(hs.strap, M.sleeve));
+    if (hs) g.add(new THREE.Mesh(hs.strap, W.gloveDk || M.sleeve));
     return g;
   }
   // a hand alone (its sleeve is laid by the caller)
   function bareHand(p, right) {
     const g = new THREE.Group(); p.add(g);
     const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right, true) : null;
-    if (hs) g.add(new THREE.Mesh(hs.hand, M.glove), new THREE.Mesh(hs.pad, G.weapons.mats.poly || M.gun), new THREE.Mesh(hs.strap, M.sleeve));
+    if (hs) { const W = G.weapons.mats; g.add(new THREE.Mesh(hs.hand, M.glove), new THREE.Mesh(hs.pad, W.gloveDk || W.poly || M.gun), new THREE.Mesh(hs.strap, W.gloveDk || M.sleeve)); }
     else box(g, M.glove, 0.05, 0.075, 0.075);
     return g;
   }
@@ -293,7 +304,7 @@
     if (!putG(roll, 'bandRoll')) cyl(roll, M.cloth, 0.0185, 0.045, 0, 0, 0, 0, 0, HX);
     const rh = bareHand(RH, true); rh.position.y = -0.058;   // (the roll stands out of the thumb's side of the fist)
     const taut = new THREE.Mesh(new THREE.BufferGeometry(), M.linen); taut.geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(12), 3)); taut.geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 0, 1, 1], 2)); taut.geometry.setIndex([0, 2, 1, 1, 2, 3]); taut.frustumCulled = false; F.add(taut);
-    const sl = new THREE.Group(); root.add(sl); if (!putG(sl, 'sleeveArm')) { const a = cyl(sl, M.sleeve, 0.038, 0.3, 0, 0, 0.15); a.rotation.x = HX; }
+    const sl = new THREE.Group(); root.add(sl); if (!sleeveParts(sl, 0.3) && !putG(sl, 'sleeveArm')) { const a = cyl(sl, M.sleeve, 0.038, 0.3, 0, 0, 0.15); a.rotation.x = HX; }
     const part = wrap && wrap.userData.part, BD = (G.GFX && G.GFX.BAND) || { R: 0.0185, W: 0.045, K: 25 };
     c.b = { F, wrap, RH, spin, roll, rh, taut, sl, path: part ? part.path : null, seg: part ? part.seg : 0, Ltot: part ? part.L : 0.5, W: part ? part.W : BD.W, R: BD.R, K: BD.K, rest: new V3(0.2, -0.13, 0.13) };
     for (const o of [F, sl]) o.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = false; } });
@@ -561,41 +572,73 @@
     }
     c.item.scale.setScalar(sc * c.item.userData.bs);
   }
-  // ------------------------------------------------ searching a chest / corpse: both hands dig in front of you, in a loop
-  // (the gun is lowered meanwhile). Faster as the search nears its end; the hands sink in and out smoothly.
-  let rum = null;
-  // one whole hand, palm down: forearm + cuff + palm + four fingers + thumb, all joined (reads as a single hand)
+  // ------------------------------------------------ searching a chest / corpse: both hands go into it in front of you, in a loop
+  // (the gun is lowered meanwhile). Each hand reaches in open, its fingers spread; presses down; closes, raking back what is there, the
+  // wrist turning; lifts and opens again - each finger a little after the one before, the two hands out of step. Faster as the search
+  // nears its end; the hands sink in and out smoothly.
+  let rum = null, DIG = null;   // (DIG: the two hands, made once and kept)
+  // one hand, palm down, with its forearm in its sleeve (gfx.js openHand: bent at its joints each frame; the left one is the right one
+  // seen in a mirror). Where there is no such hand: a plain one of boxes, as of old
   function digHand(p, side) {
     const g = new THREE.Group(); p.add(g);
-    const fore = cyl(g, M.sleeve, 0.03, 0.34, 0, 0, 0.215, Math.PI / 2, 0, 0);       // forearm running back toward the camera
-    cyl(g, M.glove, 0.034, 0.05, 0, 0, 0.06, Math.PI / 2, 0, 0);                    // cuff
-    box(g, M.glove, 0.084, 0.03, 0.09, 0, 0, 0);                                                // palm / back of the hand
+    const X = G.GFX, W = G.weapons.mats;
+    if (X && X.openHand && X.sleeve) {
+      g.scale.x = side;   // (the left hand: the right in a mirror)
+      const wr = new THREE.Group(); wr.position.z = 0.05; g.add(wr);   // (the wrist: the hand turns about it, the forearm stays)
+      const oh = X.openHand();
+      wr.add(new THREE.Mesh(oh.hand, M.glove), new THREE.Mesh(oh.pad, W.gloveDk || M.glove), new THREE.Mesh(oh.strap, W.gloveDk || M.glove));
+      const arm = new THREE.Group(); arm.position.set(0, 0, 0.05 + 0.0625); arm.rotation.x = -0.06; g.add(arm); sleeveParts(arm, 0.34);
+      g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
+      return { g, wr, oh };
+    }
+    const fore = cyl(g, M.sleeve, 0.03, 0.34, 0, 0, 0.215, Math.PI / 2, 0, 0);
+    cyl(g, M.glove, 0.034, 0.05, 0, 0, 0.06, Math.PI / 2, 0, 0);
+    box(g, M.glove, 0.084, 0.03, 0.09, 0, 0, 0);
     const fingers = new THREE.Group(); fingers.position.set(0, -0.002, -0.044); g.add(fingers);
     for (let i = 0; i < 4; i++) { const f = box(fingers, M.glove, 0.017, 0.02, 0.058, -0.03 + i * 0.02, 0, -0.027); f.scale.z = i === 0 || i === 3 ? 0.05 : 0.058; }
-    const th = box(g, M.glove, 0.02, 0.022, 0.05, -side * 0.048, -0.006, -0.012, 0, -side * 0.6, 0);  // thumb on the inner side
-    return { g, fingers, th, fore };
+    box(g, M.glove, 0.02, 0.022, 0.05, -side * 0.048, -0.006, -0.012, 0, -side * 0.6, 0);
+    return { g, fingers, fore };
   }
+  const sm01 = (v) => { const t = Math.min(1, Math.max(0, v)); return t * t * (3 - 2 * t); };
+  // how closed the hand is at a moment a of its loop (0 open, reaching in; 1 closed, raking back)
+  const closed = (a) => sm01((0.5 - 0.5 * Math.cos(a)) * 1.25 - 0.12);
+  const _DF = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], _DT = [0, 0, 0, 0];
   function rummage(dt, on) {
     if (!G.weapons.vmRoot) return;
     if (on && !rum) {
       mats();
       if (!root) { root = new THREE.Group(); G.weapons.vmScene.add(root); }
-      const g = new THREE.Group(); root.add(g);
-      const l = digHand(g, -1), r = digHand(g, 1);
-      rum = { g, l, r, t: 0, k: 0 };
+      if (!DIG) { const g = new THREE.Group(); DIG = { g, l: digHand(g, -1), r: digHand(g, 1) }; }
+      root.add(DIG.g);
+      rum = { g: DIG.g, l: DIG.l, r: DIG.r, t: 0, k: 0 };
     }
     if (!rum) return;
     rum.k = U.damp(rum.k, on ? 1 : 0, on ? 9 : 10, dt);
     const S = G.game.search, prog = S ? Math.min(1, S.t / Math.max(0.01, S.dur)) : 1;
     rum.t += dt * (7 + prog * 5);
     const t = rum.t, sink = (1 - rum.k) * 0.42;
-    // each hand: forward / back strokes with a scoop at the bottom, the two out of phase
     const pose = (H, side, ph) => {
       const a = t + ph, s = Math.sin(a), c = Math.cos(a), h = H.g;
-      // reach forward (fingers open) -> press down and pull back (fingers curl) -> lift
-      h.position.set(side * (0.105 + c * 0.015), -0.08 - sink + Math.max(0, s) * 0.035, -0.44 + c * 0.05);
-      h.rotation.set(0.32 + Math.max(0, -s) * 0.3, side * 0.18 + c * 0.06, side * (-0.12 + s * 0.08));
-      H.fingers.rotation.x = 0.12 + Math.max(0, -s) * 0.7;
+      if (!H.oh) {
+        // (the hand of boxes: forward / back strokes with a scoop at the bottom)
+        h.position.set(side * (0.105 + c * 0.015), -0.08 - sink + Math.max(0, s) * 0.035, -0.44 + c * 0.05);
+        h.rotation.set(0.32 + Math.max(0, -s) * 0.3, side * 0.18 + c * 0.06, side * (-0.12 + s * 0.08));
+        H.fingers.rotation.x = 0.12 + Math.max(0, -s) * 0.7;
+        return;
+      }
+      const k = closed(a);
+      // the hand: in and down while open, back and a little up while it closes; the forearm turning (the palm towards the middle as it rakes)
+      h.position.set(side * (0.1 + 0.008 * Math.sin(a * 0.5 + side)), -0.1 - sink + 0.022 * s - 0.012 * k, -0.43 + 0.045 * c);
+      h.rotation.set(0.42 + 0.12 * k + 0.04 * Math.sin(a * 2), side * (0.16 + 0.05 * c), side * (-0.16 + 0.2 * k - 0.05 * s));
+      // the wrist: bent down as the fingers rake, a little from side to side as they feel about
+      H.wr.rotation.set(-0.1 + 0.38 * k, 0.07 * Math.sin(a * 2 + 0.6), 0.05 * Math.sin(a * 1.5));
+      // the fingers, each a little after the one before (the first leads); while open they spread and feel about
+      for (let f = 0; f < 4; f++) {
+        const kf = closed(a - f * 0.2), q = _DF[f], feel = (1 - kf) * 0.08 * Math.sin(a * 3.1 + f * 1.7);
+        q[0] = -0.08 + 1.12 * kf + feel; q[1] = 0.12 + 1.35 * kf + feel * 1.5; q[2] = 0.08 + 0.95 * kf; q[3] = (1 - kf) * 0.09 * (f - 1.5);
+      }
+      const kt = closed(a - 0.3); _DT[0] = 0.1 + 0.14 * kt; _DT[1] = 0.15 + 0.32 * kt; _DT[2] = 0.18 + 0.48 * kt; _DT[3] = 0.12 - 0.2 * kt;
+      H.oh.pose(_DF, _DT);
     };
     pose(rum.l, -1, 0); pose(rum.r, 1, Math.PI);
     rum.g.position.set(0, 0, 0);

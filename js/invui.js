@@ -27,7 +27,7 @@
     G.ui.el.hud.appendChild(root); // inside the HUD layer, so the message areas (toasts, banners ...) can sit above the dark backdrop without being moved
     root.addEventListener('contextmenu', (e) => e.preventDefault());
     // (a right click on an item opens the menu in its own handler, which runs first: do not close it again here)
-    root.addEventListener('pointerdown', (e) => { if (e.button === 2 && e.target.closest('.iv-it, .iv-wbox')) return; if (!menu || !menu.contains(e.target)) closeMenu(); });
+    root.addEventListener('pointerdown', (e) => { if (e.button === 2 && e.target.closest('.iv-it, .iv-wbox, .iv-eq')) return; if (!menu || !menu.contains(e.target)) closeMenu(); });
     window.addEventListener('resize', onResize);
   }
   function parkRoot(on) {
@@ -195,7 +195,7 @@
   function eqBox(S, cls) {
     const it = P.equip[S.id], d = it && IV.def(it);
     return `<div class="iv-eq ${cls || ''}${it ? ' on' : ''}" data-eq="${S.id}" style="--rc:${d ? R(d.rarity) : '#3a332a'}">
-      <span class="iv-eql">${S.name}</span>${it ? `<div class="iv-it t-armor" data-uid="${it.uid}" data-where="eq:${S.id}" style="--rc:${R(d.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.95)}">${G.armorIcon(d)}</span><em class="iv-def">🛡${d.def}</em>${it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : ''}${durBar(it)}</div>` : `<span class="iv-ghosticon">${S.icon}</span>`}</div>`;
+      <span class="iv-eql">${S.name}</span>${IV.locked(P, S.id) ? '<b class="iv-eqlock" title="自動で替えない">🔒</b>' : ''}${it ? `<div class="iv-it t-armor" data-uid="${it.uid}" data-where="eq:${S.id}" style="--rc:${R(d.rarity)};position:relative;width:100%;height:100%"><span class="iv-ic" style="font-size:${px(CS * 0.95)}">${G.armorIcon(d)}</span><em class="iv-def">🛡${d.def}</em>${it.ench && it.ench.length ? `<i class="iv-ench">${'✦'.repeat(it.ench.length)}</i>` : ''}${durBar(it)}</div>` : `<span class="iv-ghosticon">${S.icon}</span>`}</div>`;
   }
   // the melee weapon's one socket: the 属性コア (closed on a weapon with an element of its own, absent on bare hands)
   function meleeCore(m) {
@@ -258,11 +258,12 @@
   function setAttr(el, k, v) { if (el.getAttribute(k) !== v) el.setAttribute(k, v); }
   // listeners go on the cells once: a patch keeps the cells that did not change (with theirs) and brings in new ones without
   function wireAll(s) {
-    for (const el of s.querySelectorAll('.iv-it, .iv-pt, .iv-wbox, .iv-sk, .iv-merc')) {
+    for (const el of s.querySelectorAll('.iv-it, .iv-pt, .iv-wbox, .iv-sk, .iv-merc, .iv-eq[data-eq]')) {
       if (el._w) continue;
       el._w = 1;
       const c = el.classList;
       if (c.contains('iv-it')) wire(el);
+      else if (c.contains('iv-eq')) wireEq(el);
       else if (c.contains('iv-pt')) wirePart(el);
       else if (c.contains('iv-sk')) wireBox(el, 's');
       else if (c.contains('iv-merc')) wireMerc(el);
@@ -879,11 +880,41 @@
     if (it.type === 'armor' && !f.eq) opts.push(['🛡️ 装備する', () => { IV.equip(P, it, f.from); render(); }]);
     if (IV.isArm(it)) opts.push([`${it.type === 'gun' ? '🔫' : '🗡️'} 装備する${it.type === 'gun' && P.weapons.length >= P.stats.weaponSlots ? '（持っている銃と入れ替え）' : it.type === 'melee' && P.melee && P.melee.id !== (G.BARE_MELEE || 'fists') ? '（今の近接武器と入れ替え）' : ''}`, () => { if (GM.equipArm(it, f.from)) G.sfx.mech('switch'); else G.sfx.ui('deny'); render(); }]);
     if (f.eq) opts.push(['📥 外す', () => { IV.unequip(P, f.eq); render(); }]);
+    if (f.eq) opts.push(lockOpt(f.eq));
     if (IV.openCont && !f.eq) opts.push([isMine(f.from) ? '📤 箱へ移す' : '📥 インベントリへ', () => quickMove(f)]);
     if (IV.stacks(it) && it.n > 1 && !f.eq) opts.push(['✂️ 半分に分ける', () => { const k = Math.floor(it.n / 2); const part = IV.make(it.type, it.id, k); const s = IV.findSpot(f.from, part); if (!s) { G.sfx.ui('deny'); return; } it.n -= k; Object.assign(part, s); f.from.items.push(part); IV.changed(f.from); render(); }]);
     if (!f.eq) opts.push(['↻ 回転', () => { const [w, h] = IV.baseSize(it); const nr = !it.rot; const [ww, hh] = nr ? [h, w] : [w, h]; if (IV.fits(f.from, ww, hh, it.x, it.y, it)) { it.rot = nr; IV.changed(f.from); render(); } else G.sfx.ui('deny'); }]);
     opts.push(['🗑️ 捨てる', () => discard(f)]);
     popMenu(opts, e);
+  }
+  // the lock on an armour part: the automatic choice (picking up, a spare after a break) leaves a locked part alone
+  function lockOpt(slot) { return IV.locked(P, slot) ? ['🔓 自動で替えてよい', () => { IV.setLock(P, slot, false); G.sfx.ui('click'); render(); }] : ['🔒 自動で替えない', () => { IV.setLock(P, slot, true); G.sfx.ui('click'); render(); }]; }
+  // a bare armour slot: right click (or a long press on a phone) opens just the lock
+  function wireEq(el) {
+    el.addEventListener('pointerdown', (e) => {
+      if (UIV.viewOnly || e.target.closest('.iv-it')) return;
+      if (e.button === 2) { e.preventDefault(); closeMenu(); hideTip(); popMenu([lockOpt(el.dataset.eq)], e); }
+    });
+    // long press (touch): the slot's menu, a worn piece's or a bare slot's; a drag already begun is put back
+    el.addEventListener('pointerdown', (e) => {
+      if (UIV.viewOnly || e.pointerType !== 'touch') return;
+      const x0 = e.clientX, y0 = e.clientY;
+      const stop = () => { clearTimeout(tm); window.removeEventListener('pointermove', mv, true); window.removeEventListener('pointerup', stop, true); window.removeEventListener('pointercancel', stop, true); };
+      const mv = (ev) => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 12) stop(); };
+      const tm = setTimeout(() => {
+        stop(); if (drag) abortDrag();
+        const itEl = el.querySelector('.iv-it');
+        if (itEl) openMenu(itEl, { clientX: x0, clientY: y0 }); else popMenu([lockOpt(el.dataset.eq)], { clientX: x0, clientY: y0 });
+      }, 550);
+      window.addEventListener('pointermove', mv, true); window.addEventListener('pointerup', stop, true); window.addEventListener('pointercancel', stop, true);
+    });
+  }
+  // a drag dropped where it began (nothing moves)
+  function abortDrag() {
+    window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
+    if (!drag) return;
+    drag.ghost.remove(); drag.el.classList.remove('iv-dragging'); if (drag.guide) drag.guide.remove();
+    clearMarks(); drag = null; render();
   }
   function popMenu(opts, e) {
     menu = document.createElement('div'); menu.className = 'iv-menu';

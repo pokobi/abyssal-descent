@@ -1139,6 +1139,8 @@ body.boss-on #objective { display: none; }
 .iv-eq { position: relative; display: flex; align-items: center; justify-content: center; border-style: dashed; background: rgba(8,7,6,0.92); }
 .iv-eq.on { border-style: solid; border-color: var(--rc); background: linear-gradient(160deg, color-mix(in srgb, var(--rc) 20%, rgba(20,16,12,0.95)), rgba(14,11,8,0.95)); }
 .iv-eql { position: absolute; left: 0.5em; top: 0.3em; font-size: 0.85em; color: #a99d88; z-index: 2; pointer-events: none; }
+/* the lock on an armour part (no automatic change): a small dim padlock in the top right corner */
+.iv-eqlock { position: absolute; right: 0.35em; top: 0.25em; font-size: 0.75em; font-weight: normal; line-height: 1; z-index: 3; pointer-events: none; opacity: 0.85; filter: grayscale(0.4) drop-shadow(0 1px 1px rgba(0,0,0,0.9)); }
 .iv-ghosticon { font-size: 2.6em; opacity: 0.2; }
 .iv-eq .iv-it { border: none; background: none; cursor: grab; }
 .iv-eq .iv-def { top: auto; bottom: 0.2em; left: 0.4em; font-size: 0.9em; }

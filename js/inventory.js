@@ -28,20 +28,26 @@
     const worn = Object.keys(P.equip).filter((k) => P.equip[k]);
     if (!worn.length) return;
     const tot = worn.reduce((s, k) => s + (WEAR_SHARE[k] || 0.1), 0), pts = IV.WEAR_K * dmg / Math.max(20, P.stats.maxHp);
-    let broke = false;
+    const broke = [];
     for (const k of worn) {
       const it = P.equip[k], was = IV.durFrac(it);
       it.dur = IV.durOf(it) - pts * (WEAR_SHARE[k] || 0.1) / tot;
       const d = G.ARMOR_BY_ID[it.id];
       if (it.dur <= 0) {
-        P.equip[k] = null; broke = true;
+        P.equip[k] = null; broke.push(k);
         G.sfx.shieldBreak && G.sfx.shieldBreak(P.pos); G.sfx.mech('magOut', 0, 1);
         G.ui.toast(`💥 ${d.name} が壊れた！`, 'warn'); G.ui.feed(`💥 ${d.name} が壊れた`, 'big');
       } else if (was > 0.2 && IV.durFrac(it) <= 0.2) {
         G.ui.toastSmall(`⚠ ${d.name} の耐久が残りわずか`); G.sfx.ui('deny');
       }
     }
-    if (broke) P.recalc();
+    if (broke.length) P.recalc();
+    // a spare of the same part from the bag goes on in place of a broken piece (IV.spareFor; locked parts are left bare)
+    for (const k of broke) {
+      if (IV.noAuto || IV.locked(P, k) || P.equip[k]) continue;
+      const sp = IV.spareFor(P, k); if (!sp || !IV.equip(P, sp, P.bag)) continue;
+      G.ui.toastSmall(`🛡 予備の ${G.ARMOR_BY_ID[sp.id].name} を装備した`);
+    }
     if (G.InvUI && G.InvUI.isOpen && G.InvUI.isOpen()) IV.onChange && IV.onChange();
   };
   // repair: which = 'equip' | 'all' (also what is in the bag); frac = share of the missing durability restored (1 = fully)
@@ -269,20 +275,80 @@
       if (it.n <= 0) return 0;
       for (const c of list) if (IV.put(c, it) === 0) return 0;
     }
-    // armour for a part you have nothing on goes straight on
-    if (it.type === 'armor' && !IV.noAuto && P.equip) {
-      const d = G.ARMOR_BY_ID[it.id];
-      if (d && !P.equip[d.slot] && IV.equip(P, it, null)) { if (G.ui && G.ui.toastSmall) G.ui.toastSmall(`🛡 ${d.name} を装備した`); return 0; }
-      // the very same piece (same kind and rarity) with more durability replaces the worn one; enchanted pieces are never swapped automatically
-      const cur = d && P.equip[d.slot];
-      if (cur && cur.id === it.id && !(cur.ench && cur.ench.length) && !(it.ench && it.ench.length) && IV.durOf(it) > IV.durOf(cur)) {
-        const a = Math.round(IV.durOf(cur)), b = Math.round(IV.durOf(it)), m = IV.durMax(it);
-        if (IV.equip(P, it, null)) { if (G.ui && G.ui.toastSmall) G.ui.toastSmall(`🛡 ${d.name} を耐久の高い方に付け替えた（${a}→${b} / ${m}）`); return 0; }
-      }
-    }
+    // armour goes straight on when that part is bare, or when it scores 10% or more above the piece worn there (IV.autoWear)
+    if (it.type === 'armor' && !IV.noAuto && P.equip && IV.autoWear(P, it)) return 0;
     const left = IV.put(P.bag, it);
     if (left === 0 && it.type === 'att') IV.autoAtt(P, it);
     return left;
+  };
+  // ---- automatic armour choice ----
+  // One score per piece, in defence points: defence + what its fixed effects and enchantments are worth - what its weight costs,
+  // all scaled down as the piece wears out (a piece about to break is never chosen over a sound one).
+  // SCORE_W: defence points per 1.0 of a stat (an enchantment of v% adds v/100; 属性熟練, 最大HP and 再生 are plain numbers).
+  // One point of defence is about +1% effective HP (damage x 100 / (100 + defence)), the yardstick for the rest.
+  IV.SCORE_W = {
+    dmg: 100, armor: 120, healMul: 40, critChance: 50, critMul: 15, moveSpeed: 80, reloadSpeed: 40, luck: 50, skillDmg: 50, meleeDmg: 40,
+    explosionDmg: 40, cdr: 80, grappleCd: 30, coinMul: 40, lifesteal: 200, defIgnore: 70, elMastery: 0.25, elRes_: 12,
+    statusRes: 20, dotRes: 12, blastRes: 25, maxHp: 0.6, hpRegen: 10, sprintRamp: 60, jumpPower: 15, slideBoost: 8, airControl: 5, meleeCd: 30, recoil: -40,
+  };
+  IV.SCORE_WT = 1.8; // per 1.0 of weight: it costs 2.2% move speed (applyArmor), at 80 points per 1.0 of speed
+  IV.AUTO_GAIN = 1.1; // a piece must score this much of the worn one to replace it
+  const scoreW = (k) => IV.SCORE_W[k] ?? (k.startsWith('elRes_') ? IV.SCORE_W.elRes_ : 0);
+  // full value down to 60% durability, then falling to a quarter at 0
+  IV.durK = (it) => 0.25 + 0.75 * Math.min(1, IV.durFrac(it) / 0.6);
+  // the stat mods one piece brings (fixed effects + enchantments), the way applyArmor adds them
+  IV.pieceMods = function (it) {
+    const d = it && G.ARMOR_BY_ID[it.id], m = {}; if (!d) return m;
+    for (const f of d.fixed) for (const k in f.mods) m[k] = (m[k] || 0) + f.mods[k];
+    for (const e of it.ench || []) { const E = G.ENCHANT_BY_ID[e.id]; if (!E) continue; const k = E.perEl ? E.stat + (e.el || 'fire') : E.stat; m[k] = (m[k] || 0) + (E.flat ? e.v : e.v / 100); }
+    return m;
+  };
+  IV.score = function (it) {
+    const d = it && G.ARMOR_BY_ID[it.id]; if (!d) return 0;
+    let s = d.def - d.weight * IV.SCORE_WT;
+    const m = IV.pieceMods(it); for (const k in m) s += m[k] * scoreW(k);
+    return s * IV.durK(it);
+  };
+  IV.better = (a, b) => { const sa = IV.score(a), sb = IV.score(b); return sb > 0 ? sa >= sb * IV.AUTO_GAIN && sa > sb : sa > sb; };
+  // locks (🔒, set in the inventory screen): a locked part is never changed automatically. Kept with the run (IV.snap / IV.load)
+  IV.locked = (P, slot) => !!(P && P.armLock && P.armLock[slot]);
+  IV.setLock = function (P, slot, on) { if (!P.armLock) P.armLock = {}; if (on) P.armLock[slot] = true; else delete P.armLock[slot]; if (P.bag) IV.changed(P.bag); };
+  // the main two differences between two pieces, for the notice ("防御+3、会心率+2%")
+  const DIFF_NAME = { statusRes: '状態異常の短縮', dotRes: '炎上と毒の軽減', blastRes: '爆発の軽減', sprintRamp: 'スプリント加速', jumpPower: 'ジャンプ力', slideBoost: 'スライディング加速', airControl: '空中制御', meleeCd: '近接の間隔短縮', recoil: '反動', hpRegen: '再生/秒' };
+  const diffName = (k) => { const E = G.ENCHANTS.find((e) => e.stat === k); if (E && !E.perEl) return [E.name, !E.flat]; if (DIFF_NAME[k]) return [DIFF_NAME[k], k !== 'hpRegen']; const N = G.STAT_NAMES && G.STAT_NAMES[k]; return N ? [N[1], N[2] !== 'n'] : [k, true]; };
+  const signed = (v) => (v > 0 ? '+' : '') + v;
+  IV.diffText = function (a, b) {
+    const da = G.ARMOR_BY_ID[a.id], db = b ? G.ARMOR_BY_ID[b.id] : null, out = [];
+    out.push({ v: (da.def - (db ? db.def : 0)), t: (x) => `防御${signed(x)}` });
+    out.push({ v: Math.round(((db ? db.weight : 0) - da.weight) * 100) / 100, k: IV.SCORE_WT, t: (x) => `重さ${signed(-x)}` });
+    const ma = IV.pieceMods(a), mb = b ? IV.pieceMods(b) : {};
+    for (const k of new Set([...Object.keys(ma), ...Object.keys(mb)])) {
+      const v = (ma[k] || 0) - (mb[k] || 0); if (Math.abs(v) < 1e-6) continue;
+      const [nm, pct] = diffName(k); out.push({ v, k: scoreW(k), t: (x) => `${nm}${signed(pct ? Math.round(x * 1000) / 10 : Math.round(x * 10) / 10)}${pct ? '%' : ''}` });
+    }
+    // the durability, when it is what made the difference
+    const fa = IV.durFrac(a), fb = b ? IV.durFrac(b) : 1;
+    if (b && Math.abs(fa - fb) > 0.05) out.push({ v: fa - fb, k: 20, t: () => `耐久${Math.round(fb * 100)}→${Math.round(fa * 100)}%` });
+    return out.filter((o) => Math.abs(o.v) > 1e-6).sort((x, y) => Math.abs(y.v * (y.k ?? 1)) - Math.abs(x.v * (x.k ?? 1))).slice(0, 2).map((o) => o.t(o.v)).join('、');
+  };
+  // A: a piece you pick up (whatever way it comes in through IV.stow) goes on when its part is bare, or when it scores 10% or more above
+  // what is worn there; the piece taken off goes to the bag, or onto the floor at your feet when the bag is full
+  IV.autoWear = function (P, it) {
+    const d = G.ARMOR_BY_ID[it.id]; if (!d || IV.locked(P, d.slot)) return false;
+    const cur = P.equip[d.slot];
+    if (!cur) { if (!IV.equip(P, it, null)) return false; if (G.ui && G.ui.toastSmall) G.ui.toastSmall(`🛡 ${d.name} を装備した`); return true; }
+    if (!IV.better(it, cur)) return false;
+    const dc = G.ARMOR_BY_ID[cur.id], diff = IV.diffText(it, cur);
+    if (!IV.equip(P, it, null)) return false;
+    const onFloor = !P.bag.items.includes(cur);
+    if (G.ui && G.ui.toastSmall) G.ui.toastSmall(`🛡 ${dc ? dc.name : '?'} → ${d.name}${diff ? `（${diff}）` : ''}${onFloor ? '　外した物は足元に置いた' : ''}`);
+    return true;
+  };
+  // E: a piece that broke is replaced by the best spare of that part in the bag (not on a locked part)
+  IV.spareFor = function (P, slot) {
+    let best = null, bs = -Infinity;
+    for (const o of P.bag ? P.bag.items : []) { if (o.type !== 'armor') continue; const d = G.ARMOR_BY_ID[o.id]; if (!d || d.slot !== slot) continue; const s = IV.score(o); if (s > bs) { bs = s; best = o; } }
+    return best;
   };
   // a picked-up attachment goes straight onto a gun that can use it and has the socket free (the gun on key 1 first, then key 2)
   IV.autoAtt = function (P, it) {
@@ -300,6 +366,7 @@
     P.spec = {};
     for (const S of IV.SPEC) { const c = IV.container(4, 1, S.name, 'spec'); c.accept = (it) => IV.specOf(it) === (S.id === 'g' ? 'g' : 'c'); P.spec[S.id] = c; }
     P.equip = { head: null, chest: null, legs: null, hands: null, feet: null };
+    P.armLock = {};
     P.parts = {};
   };
   // count views used everywhere else
@@ -374,9 +441,10 @@
   // ---------------- serialisation (mid-run save) ----------------
   IV.ser = (it) => ({ t: it.type, id: it.id, n: it.n, x: it.x, y: it.y, r: it.rot ? 1 : 0, e: it.ench, d: it.dur, g: it.gun });
   IV.de = (o) => IV.make(o.t, o.id, o.n, Object.assign({ x: o.x, y: o.y, rot: !!o.r, ench: o.e }, (o.d !== undefined && o.d !== null ? { dur: o.d } : {}), o.g ? { gun: o.g } : {}));
-  IV.snap = (P) => ({ bag: P.bag.items.map(IV.ser), spec: Object.fromEntries(Object.entries(P.spec || {}).map(([k, c]) => [k, c.items.map(IV.ser)])), equip: Object.fromEntries(Object.entries(P.equip).map(([k, v]) => [k, v ? IV.ser(v) : null])), parts: Object.assign({}, P.parts || {}) });
+  IV.snap = (P) => ({ bag: P.bag.items.map(IV.ser), spec: Object.fromEntries(Object.entries(P.spec || {}).map(([k, c]) => [k, c.items.map(IV.ser)])), equip: Object.fromEntries(Object.entries(P.equip).map(([k, v]) => [k, v ? IV.ser(v) : null])), parts: Object.assign({}, P.parts || {}), lock: Object.keys(P.armLock || {}).filter((k) => P.armLock[k]) });
   IV.load = function (P, d) {
     IV.setupPlayer(P);
+    if (d && Array.isArray(d.lock)) for (const k of d.lock) if (G.ARMOR_SLOT_BY_ID[k]) P.armLock[k] = true;
     if (d && d.parts) for (const r in d.parts) { const n = +d.parts[r] || 0; if (n > 0 && partR(r)) P.parts[r] = (P.parts[r] || 0) + n; }
     if (d && d.bag) {
       const retired = (o) => { const pr = o.t === 'item' && G.RETIRED_ITEMS && G.RETIRED_ITEMS[o.id]; if (pr) P.retiredCoins = (P.retiredCoins || 0) + Math.round(pr * 0.5) * (o.n || 1); };

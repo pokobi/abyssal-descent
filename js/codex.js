@@ -270,6 +270,7 @@
     frozen: { icon: '❄️', rarity: 'rare', desc: '凍りついた地底湖の上に建つ霊廟の大広間。戦う床は氷そのもので、よく滑る。爆発や落ちてきた氷柱でひびが入り、二度目で割れて、下の冷たい水に落ちると最後に立っていた岸へ戻される（敵は戻らない）。割れた所はしばらくで凍り直す。湖の周りは石の岸、氷の中には墓の島が立ち、天井からは氷柱が落ちてくる。' },
     sanctum: { icon: '☁️', rarity: 'epic', desc: '深淵の底に広がる、偽りの空に浮かぶ聖域。白い石の島々を広い橋がつなぎ、雲の下は闇。島の縁の風の像を目覚めさせると、突風が島を横切り、敵を奈落へ押し流す。' },
     ruin: { icon: '🕳️', rarity: 'epic', desc: '迷宮の最奥、蒼い炎が燃える廃都。中層と同じ、南北に延びる谷で二分された3階建てで、谷底には蒼炎が流れる。崩落が進み、柱は折れ、各階の床の裂け目からも蒼炎が噴き出す（触れると高レベルの炎上）。「湧き墓」が中層より多く、鉄格子の部屋に多く立つ。' },
+    spire: { icon: '⛪', rarity: 'epic', desc: '奈落へ逆さに落ちて谷に挟まった大聖堂。天井だったヴォールトの丸みを歩き、交差部の大穴の下には、逆さの鐘楼が奈落へ突き出している。東西の切れ目の先は奈落。' },
   };
   let STAGES = null;
   function stages() {
@@ -281,9 +282,11 @@
     STAGES = keys.map((key, i) => {
       const B = G.Tex.BIOMES[key], F = FIELD_INFO[key];
       const where = [];
+      // (a retired field, met only in a run that drew it before, is in no segment's draw while its pool has another field)
+      const retired = !!(R.RETIRED && R.RETIRED.has(key) && R.drawPool && R.drawPool(key).some((f) => f !== key && R.ready(f)));
       const same = (f) => (R.drawPool ? R.drawPool(f).includes(key) : f === key); // (the segments that draw this field: the middle tiers share one pool)
-      for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (same(f)) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
-      return { id: 'stage_' + key, key, idx: i, name: B.name, icon: F.icon, rarity: F.rarity, desc: F.desc, where };
+      for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (same(f) && !retired) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
+      return { id: 'stage_' + key, key, idx: i, name: B ? B.name : R.FIELD_NAME[key] || key, icon: F.icon, rarity: F.rarity, desc: retired ? F.desc + '（今は新しいランには現れない）' : F.desc, where };
     });
     return STAGES;
   }

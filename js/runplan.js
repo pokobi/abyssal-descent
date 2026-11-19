@@ -11,7 +11,7 @@
     hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 21, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
     extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#d0405a', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
   };
-  R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟', hamlet: '廃村', dusk: '黄昏の都', catacombs: '地下墓所', castle: '古城', flooded: '水没回廊', foundry: '溶鉱炉', frozen: '霊廟', sanctum: '聖域', battlefield: '古戦場', shaft: '大縦坑', mine: '坑道', pillars: '石柱の海' };
+  R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟', hamlet: '廃村', dusk: '黄昏の都', catacombs: '地下墓所', castle: '古城', flooded: '水没回廊', foundry: '溶鉱炉', frozen: '霊廟', sanctum: '聖域', battlefield: '古戦場', shaft: '大縦坑', mine: '坑道', pillars: '石柱の海', spire: '逆さの尖塔' };
   // ---- the fields of a run: four depth tiers of three fields each. A difficulty's segments name the tier (by its first field, as above);
   // every run draws one field of that tier per segment (never the same one twice in a run while there is another to take), so the
   // depth, foe numbers and strength of each segment stay exactly what they were and only the place changes.
@@ -19,7 +19,7 @@
     ['grave', 'hamlet', 'dusk', 'battlefield'], // 地上
     ['gate', 'catacombs', 'castle', 'shaft'], // 入口
     ['halls', 'flooded', 'frozen', 'mine'], // 中層
-    ['ruin', 'foundry', 'sanctum', 'pillars'], // 深層
+    ['ruin', 'foundry', 'sanctum', 'pillars', 'spire'], // 深層
   ];
   R.tierOf = (f) => R.TIERS.findIndex((t) => t.includes(f));
   R.baseOf = (f) => { const t = R.TIERS[R.tierOf(f)]; return t ? t[0] : f; };
@@ -27,6 +27,9 @@
   // What the segment holds stays its own (its depth, foes' strength, guardians: R.segBase), only the place is drawn from the eight.
   R.MERGED = [1, 2];
   R.drawPool = (base) => { const t = R.tierOf(base); return t < 0 ? [base] : R.MERGED.includes(t) ? R.MERGED.flatMap((k) => R.TIERS[k]) : R.TIERS[t]; };
+  // retired fields: still the key of their tier (segs, BOSS_POOLS, segBase) and still built for a run that drew them before (its
+  // run.fields keep them), but a new draw passes them over whenever their pool has any other field (the blue-fire ruin gave way to the spire)
+  R.RETIRED = new Set(['ruin']);
   R.isField = (f) => R.ready(f) || R.TIERS.some((t) => t[0] === f); // (the first field of a tier is always there)
   R.segBase = (n) => R.def().segs[R.seg(n)][0]; // the tier a segment belongs to (by its first field): what decides its guardians
   // a field joins the draw once its generator exists (fieldgen.js registers them)
@@ -39,7 +42,7 @@
     const D = R.DIFFS[d.id] || R.DIFFS.normal, out = [], used = new Set(), av = new Set(avoid || []);
     const rng = new G.RNG(((seed || 1) ^ G.U.hashStr('fields:' + d.id)) >>> 0);
     for (const [base] of D.segs) {
-      const t = R.drawPool(base), cand = t.filter((f) => f === base || R.isField(f));
+      const t = R.drawPool(base), all = t.filter((f) => f === base || R.isField(f)), live = all.filter((f) => !R.RETIRED.has(f)), cand = live.length ? live : all;
       const fresh = cand.filter((f) => !used.has(f)), pref = fresh.filter((f) => !av.has(f)), from = pref.length ? pref : fresh.length ? fresh : cand;
       const f = from[Math.floor(rng.next() * from.length) % from.length] || base;
       used.add(f); out.push(f);

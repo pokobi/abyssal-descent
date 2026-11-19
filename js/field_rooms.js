@@ -147,6 +147,41 @@
     if (FZ) { FZ.vaultIcicles(w, rng, W, D, 12, 24); for (const [x, z] of [[4, 6], [W - 4, 6], [4, D - 6], [W - 4, D - 6]]) if (clear(o, x, z, 1.2)) FZ.icePillar(w, rng, x, z, 12); }
   };
 
+  // ---- the inverted cathedral (field_spire.js): one bay of its vaulting, its crown laid level for the room's things (the webs filled
+  // flush with rubble and stone, the ribs' mouldings still showing in the floor as a star about the keystone); its sides the broken
+  // stumps of its walls, the abyss beyond them, the chasm's two walls of rock north and south; out over the void two of its piers
+  // still rising, the arch between them hanging as a cradle, a lamp on a chain under it
+  S.spire = function (w, rng, W, D, o) {
+    const SP = F._spire; if (!SP) return S.pillars(w, rng, W, D, o);
+    H.floors(w, W, D, null, 'block');
+    w.solid('trim', 0, -6, 0, W, -1, D, { uv: 3, grad: false });
+    H.perimeter(w, rng, W, D, { gates: o.gates, h: 9, walls: false, beams: 0, stub: 3 });
+    const gxs = LG.gateXs(W, o.gates || 1);
+    { let ax = -6; for (const g of [...gxs, W + 12]) { if (g - 5.5 > ax) w.addCollider(ax, -40, -6, g - 5.5, 60, 0, { surf: 'stone' }).noFire = true; ax = g + 5.5; } }
+    for (const [a, b] of [[-6, W / 2 - 7.5], [W / 2 + 7.5, W + 6]]) w.addCollider(a, -40, D, b, 60, D + 6, { surf: 'stone' }).noFire = true;
+    SP.chasmFace(w, -70, W + 70, 0, -1, -40, 22, gxs);
+    SP.chasmFace(w, -70, W + 70, D, 1, -40, 22, null, [W / 2 - 7, W / 2 + 7]);
+    // the ribs in the floor: the diagonals to the keystone, the ridge both ways, flush (3 cm)
+    const flat = SP.ribProf(1).map(([s, u]) => [s, Math.max(-0.02, u * 0.25)]), cx = W / 2, cz = D / 2;
+    const line = (ax, az, bx, bz, k) => { const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.6)), pts = []; for (let i = 0; i <= n; i++) pts.push([ax + (bx - ax) * i / n, 0.005, az + (bz - az) * i / n]); SP.sweep(w, 'trim', pts, flat.map(([s, u]) => [s * k, u]), { tint: [0.9, 0.88, 0.85] }); };
+    for (const [x, z] of [[1.2, 1.2], [W - 1.2, 1.2], [1.2, D - 1.2], [W - 1.2, D - 1.2]]) line(x, z, cx, cz, 1);
+    line(1.2, cz, W - 1.2, cz, 0.8); line(cx, 1.2, cx, D - 1.2, 0.8);
+    line(1.2, 1.2, W - 1.2, 1.2, 1.3); line(1.2, D - 1.2, W - 1.2, D - 1.2, 1.3);
+    if (!o.keep) { w.batch.geo('trim', new THREE.CylinderGeometry(1, 1, 1, 24), new THREE.Matrix4().compose(V(cx, 0.02, cz), new THREE.Quaternion(), V(0.75, 0.04, 0.75)), { tint: [0.86, 0.84, 0.8] }); }
+    // its sides: the outer walls' stumps, low and broken, open on the abyss here and there (the merchant's stalls stand inside them)
+    const RS = { w, occ: H.Occ(W, D) };
+    for (const [c, sg] of [[0.5, -1], [W - 0.5, 1]]) {
+      SP.wallRun(RS, { x0: c, z0: 0.5, x1: c, z1: D - 0.5, th: 1.0, foot: () => 0, prof: (t) => { const g = Math.sin(t * 0.55 + c) > 0.82 ? -0.3 : 0.55 + 0.6 * Math.abs(Math.sin(t * 0.37 + c * 0.1)); return g; }, key: 900 + c, below: -6 });
+      for (let z = 6; z < D - 3; z += 7) SP.pier(RS, c + sg * 1.4, z, -6, 7 + 2.5 * Math.abs(Math.sin(z + c)), false, false);
+    }
+    // out in the void: two piers still standing to the old floor, the arch between them a cradle, a lamp on a chain under it
+    const px = -5.5, z0 = D * 0.32, z1 = z0 + 7;
+    SP.pier(RS, px, z0, -30, 52, false, true); SP.pier(RS, px, z1, -30, 52, false, true);
+    SP.hangArch(RS, px, z0 + 1, px, z1 - 1, 16.5, 4, 1.2, 0.95, 3);
+    SP.hangChain(RS, px + 0.2, 16.5 - 4 - 1, (z0 + z1) / 2, 6, 'lamp');
+    w.killY = -9; w.noRim = true;
+    for (let z = 6; z < D; z += 12) for (const x of [-4, W + 4]) w.addLight(x, -6, z, { flame: 0, intensity: 12, range: 16, color: '#7f93b4', emit: false, prio: 0.5 });
+  };
   // the hook in LG.room / LG.shop: the field's shell when it has one, else the stone hall (the caller builds that itself)
   LG.shellFor = (w) => S[w.biome] || null;
 })();

@@ -154,6 +154,12 @@
       D('white', '白昼の虚無', 2, { fog: '#e8ecf4', k: 0.6, fogD: 1.6, amb: 1.1, stars: false, sunK: 0.6, sky: ['#d8e0f0', '#eef2fa', '#ffffff'], cl: [0.85, 0.08, 0, 0, 0.4, 0.8, 0], haze: 2 }),
       D('feather', '降る羽', 1, { p: [P.feather], cl: CL.day }),
     ],
+    // (inside the hanging spire, under its own stone: nothing falls from a sky, so no mood lays an element - only dust and a cold haze)
+    spire: [
+      D('base', '', 5),
+      D('dust', '舞う塵', 2, { p: [P.dust] }),
+      D('haze', '冷えた靄', 2, { fogD: 1.5, fog: '#161a22', k: 0.45, amb: 0.92 }),
+    ],
   };
 
   // ---------------------------------------------------------------- choosing and applying

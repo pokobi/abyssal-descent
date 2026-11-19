@@ -317,10 +317,15 @@
   const preloadSamples = () => {
     try {
       const guns = [];
-      for (const k in SB.bank) for (const f of SB.bank[k].f) { const q = fetchBuf(f); if (k.startsWith('gun_')) guns.push(q); }
+      // (a lazy set - the old version's gun recordings, only played when soundcheck.html asks for that version - is fetched when asked
+      // for: see A.fetchLazy)
+      for (const k in SB.bank) { if (SB.bank[k].lazy) continue; for (const f of SB.bank[k].f) { const q = fetchBuf(f); if (k.startsWith('gun_') || RSET.test(k)) guns.push(q); } }
       gunsIn = Promise.all(guns); gunsIn.then(() => { if (NEW()) shotWarm(!outdoor()); });
     } catch (e) { /* none, then */ }
   };
+  // (the recorded gun set's keys: gs_ a shot near, gq_ suppressed, gr_ a place answering, gd_ a shot far off - see shotPlan)
+  const RSET = /^g[sqrd]_/;
+  A.fetchLazy = () => { const q = []; for (const k in SB.bank) if (SB.bank[k].lazy) for (const f of SB.bank[k].f) q.push(fetchBuf(f)); return Promise.all(q); };
   // key, where (or nothing: in the head), level, speed, how much of the room (or the bank's own)
   const smp = (key, pos, vol, rate, wet) => {
     if (!ctx || !usable(key)) return false;
@@ -1091,7 +1096,7 @@
   // clip dB), sample by sample - the head and the low blow riding on each other are bent into it where they meet, not turned down round
   // it, so that nothing of the head's level is lost (what is bent only adds to its top); with shave 0 nothing is turned down after that
   function levelTake(b, pl) {
-    const kp = KPUB[pl.kk]; if (kp === undefined) return;
+    const kp = pl.kref !== undefined ? pl.kref : KPUB[pl.kk]; if (kp === undefined) return 1;   // (kref: a recorded take's own target, see RKREF)
     const C = [b.getChannelData(0), b.getChannelData(1)], n = b.length, sr = b.sampleRate, top = (TOP * (pl.topx || 1)) / (pl.p.lv * pl.gv);
     const sv = pl.shave === undefined ? SHAVE : pl.shave, gk = () => Math.pow(10, (kp + 10 * Math.log10(sr / 48000) + pl.lvl - 10 * Math.log10(kEnergy(b) || 1e-12)) / 20);
     let pk = 0; for (const d of C) for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i]));
@@ -1107,13 +1112,14 @@
     }
     const g = Math.min(gK, (top * Math.pow(10, sv / 20)) / (pk || 1));
     // (nothing over the top: the gain alone)
-    if (g * pk <= top) { for (const d of C) for (let i = 0; i < n; i++) d[i] *= g; return; }
+    if (g * pk <= top) { for (const d of C) for (let i = 0; i < n; i++) d[i] *= g; return g; }
     const q = work(0, n), ka = Math.exp(-1 / (0.0004 * sr)), kr = Math.exp(-1 / (0.012 * sr));
     for (let i = 0; i < n; i++) { const m = Math.max(Math.abs(C[0][i]), Math.abs(C[1][i])) * g; q[i] = m > top ? top / m : 1; }
     for (let i = n - 2; i >= 0; i--) q[i] = Math.min(q[i], 1 - (1 - q[i + 1]) * ka);
     let lo = 1; for (let i = 1; i < n; i++) { q[i] = Math.min(q[i], 1 - (1 - q[i - 1]) * kr); lo = Math.min(lo, q[i]); }
     for (const d of C) for (let i = 0; i < n; i++) d[i] *= g * q[i];
     A.shotStats.shave = Math.max(A.shotStats.shave || 0, -20 * Math.log10(lo));
+    return g;
   }
   // (a soft top: each sample brought gi up, what is then under 0.7 left as it is and what is over it bent into the last 0.3 under 1, then
   // taken back down by go - what was under the knee comes back as it was. pk: the peak before; returns the peak after)
@@ -1123,27 +1129,152 @@
     for (const d of C) for (let i = 0; i < n; i++) { const a = Math.abs(d[i]); if (a > lim) { const v = (kn + w * ftanh((a * gi - kn) / w)) * go; d[i] = d[i] < 0 ? -v : v; if (v > m) m = v; } else if (a > m) m = a; }
     return Math.min(m, pk);
   }
+  // ---------- the recorded shot (2026-11-20: the game's own for every gun that has recordings) ----------
+  // A shot made of recordings of real guns (snd/g*_*.ogg, all CC0: snd/SOURCES_GUNS.md). At its heart one shot of the kind, near (gs_:
+  // a different one each take, its speed a little off), and the place answering it from recordings too: in a room, hard early returns
+  // made of the shot itself thrown back off the stone close round (short and dense, the top dulled) and the tail of a shot fired
+  // indoors (gr_in); on open ground, the ground's one return and the long return of a mountain (gr_out: the slap, a swell some 0.5 s
+  // after, a second one later). Only the push in the chest under it is synthesized, kept under 150 Hz. A shot far off - a foe's, a
+  // friend's - is a far recording (gd_: the top gone, its returns carrying it), laid in over the near one as the distance grows
+  // (newShot, RFAR). A suppressed shot is a suppressed recording (gq_), lighter or heavier by the gun (SUPP's weight, as suppOf keeps
+  // it). Each take is the shot with its early returns, and which of the place's tails go with it (buf.tail: the recordings shared, not
+  // copied into each take), played smaller in fast fire as the old roll was. A take is set to the loudness the old version's take had (RKREF), so that nothing is louder or quieter than it was.
+  // RP, by kind: rate the recordings' speed; lo the push's level (against the shot's peak), lf its Hz (from, to), lt how fast it dies
+  // (s); er the room's early returns, ri the room's tail, gnd the ground's return, ro the mountain's; far the far set, frate its speed;
+  // sq the suppressed set; clip: dB its peak may be bent into the soft top to reach its loudness (levelTake: a recording's peak is
+  // sharp, and a heavy gun's old take was loud for its peak - 10 to 12.5 dB bent in it)
+  const RP = {
+    pistol: { clip: 5, rate: 1, lo: 0.2, lf: [95, 55], lt: 0.03, er: 1, ri: 0.3, gnd: 0.3, ro: 0.4, far: 'shot', frate: 1.08, sq: 'pistol' },
+    revolver: { clip: 7, rate: 0.98, lo: 0.28, lf: [85, 48], lt: 0.045, er: 1, ri: 0.34, gnd: 0.32, ro: 0.48, far: 'shot', frate: 1, sq: 'pistol' },
+    smg: { rate: 1, lo: 0.15, lf: [105, 60], lt: 0.022, er: 0.9, ri: 0.24, gnd: 0.28, ro: 0.32, far: 'auto', frate: 1.1, sq: 'smg' },
+    rifle: { rate: 1, lo: 0.24, lf: [90, 52], lt: 0.04, er: 1, ri: 0.3, gnd: 0.3, ro: 0.45, far: 'shot', frate: 1, sq: 'rifle' },
+    dmr: { rate: 0.99, lo: 0.3, lf: [85, 48], lt: 0.05, er: 1, ri: 0.34, gnd: 0.32, ro: 0.5, far: 'shot', frate: 0.95, sq: 'rifle' },
+    sniper: { clip: 5, rate: 0.98, lo: 0.38, lf: [75, 42], lt: 0.07, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.6, far: 'shot', frate: 0.9, sq: 'heavy' },
+    shotgun: { clip: 6.5, rate: 0.98, lo: 0.36, lf: [80, 45], lt: 0.06, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.55, far: 'shotgun', frate: 1, sq: 'heavy' },
+    lmg: { clip: 6, rate: 0.98, lo: 0.26, lf: [88, 50], lt: 0.04, er: 0.95, ri: 0.28, gnd: 0.3, ro: 0.42, far: 'auto', frate: 0.95, sq: 'rifle' },
+    minigun: { rate: 1.03, lo: 0.13, lf: [110, 65], lt: 0.018, er: 0.8, ri: 0.18, gnd: 0.26, ro: 0.26, far: 'auto', frate: 1.05, sq: 'smg' },
+  };
+  // (from how far a shot begins to be the far recording, and by how far it is all of it (m) - see newShot)
+  const RFAR = [12, 55];
+  // (a room's early returns: [ms after, level, pan] - close stone all round, so many and soon, gone by some 35 ms)
+  const RER = [[1.9, 0.32, -0.6], [3.1, 0.3, 0.55], [4.4, 0.27, -0.25], [5.8, 0.25, 0.7], [7.5, 0.22, -0.5], [9.4, 0.19, 0.3], [11.8, 0.16, -0.7], [14.6, 0.13, 0.6], [18, 0.1, -0.2], [22, 0.08, 0.45], [27, 0.06, -0.4], [33, 0.045, 0.2]];
+  // (the old version's take's loudness - K-weighted energy of its first 300 ms in dB at 48 kHz, the mean of 12 takes made as shotMake
+  // made them, with the recordings it had: docs/tools/snd_gunkref.js - by suppressed, kind, a self-loading shotgun, place (a suppressed
+  // self-loading shotgun as a suppressed shotgun). A recorded take is set to it, and played at the old version's level: as loud as it was)
+  const RKREF = { 'pistol:in': 26.5, 'pistol:out': 26.3, 'revolver:in': 29.7, 'revolver:out': 30.4, 'smg:in': 22.8, 'smg:out': 22.9, 'rifle:in': 25.4, 'rifle:out': 25.4, 'dmr:in': 27.7, 'dmr:out': 27.8, 'sniper:in': 29.7, 'sniper:out': 30.2, 'shotgun:in': 30.2, 'shotgun:out': 30.6, 'shotgun:a:in': 31.8, 'shotgun:a:out': 32.4, 'lmg:in': 28.5, 'lmg:out': 28.7, 'minigun:in': 23.6, 'minigun:out': 23.6, 's:pistol:in': 22.6, 's:pistol:out': 22.7, 's:revolver:in': 23.6, 's:revolver:out': 23.7, 's:smg:in': 22.4, 's:smg:out': 22.1, 's:rifle:in': 24.3, 's:rifle:out': 24.4, 's:dmr:in': 24.5, 's:dmr:out': 24.8, 's:sniper:in': 25.4, 's:sniper:out': 25.9, 's:shotgun:in': 25.5, 's:shotgun:out': 25.4, 's:lmg:in': 25, 's:lmg:out': 25.1, 's:minigun:in': 21.9, 's:minigun:out': 21.8 };
+  const RLOAD = (key) => { const b = SB.bank[key]; return b ? b.f.map((f) => bufs[f] || (fetchBuf(f), null)).filter(Boolean) : []; };
+  const rLast = {};
+  const rPick = (arr, k) => { let i = Math.floor(Math.random() * arr.length); if (arr.length > 1 && i === rLast[k]) i = (i + 1) % arr.length; rLast[k] = i; return arr[i]; };
+  // (a recording read into X from i0 at speed r, its file's peak (0.89, as they were made) brought to g; mute: nothing of it - the take
+  // with its recordings left out, for the measurements: docs/tools/snd_recshare2.js)
+  function recIn(X, i0, buf, r, g, mute) {
+    const s = buf.getChannelData(0), n = Math.max(0, Math.min(X.length - i0, Math.floor((s.length - 2) / r))), k0 = g / 0.89;
+    if (!mute) for (let i = 0; i < n; i++) { const q = i * r, k = Math.floor(q), w = q - k; X[i0 + i] += (s[k] * (1 - w) + s[k + 1] * w) * k0; }
+    return n;
+  }
+  // (the push: a falling tone rising in 2 ms and dying in lt, run twice through a low-pass at 140 Hz - nothing of it over 150 Hz)
+  function pushIn(X, R, k, sr) {
+    const n = Math.min(X.length, Math.round(R.lt * 7 * sr)), a = Math.round(0.002 * sr), kd = Math.exp(-1 / (R.lt * sr)), kf = Math.exp(-1 / (0.025 * sr));
+    let ph = 0, e = 1, q = 1;
+    for (let j = 0; j < n; j++) { ph += (2 * Math.PI * (R.lf[1] + (R.lf[0] - R.lf[1]) * q)) / sr; q *= kf; X[j] = Math.sin(ph) * (j < a ? j / a : e) * R.lo * k; if (j >= a) e *= kd; }
+    const Y = X.subarray(0, Math.min(X.length, n + Math.round(0.03 * sr))); bqRun(Y, 'lp', 140, 0.6, sr); bqRun(Y, 'lp', 140, 0.6, sr);
+  }
+  // the place's tail: two different returns, one on each side (wide, as a place answers from all round), from d0 s at level g; lp:
+  // dulled (Hz). What is kept with a take is only which returns and how (the recordings themselves are shared, played as they are
+  // when the shot is: playTail) - written out into a buffer only for the measurements (bakeTail)
+  function placeIn(key, g, d0, lp) {
+    const set = RLOAD(key); if (!set.length || !g) return null;
+    const a = rPick(set, key + ':l'), c = set.length > 1 ? rPick(set.filter((x) => x !== a), key + ':r') : a;
+    return { a, c, r: vr(1, 0.04), g, d0, lp };
+  }
+  const TAILW = [[-1, 0, 1], [1, 0.0013, 1.01]];   // ([pan, s later, speed] of the two returns)
+  function bakeTail(d, mute) {
+    const sr = ctx.sampleRate, i0 = Math.round(d.d0 * sr), n = i0 + Math.round(0.0013 * sr) + Math.floor((Math.max(d.a.length, d.c.length) - 2) / (d.r * 0.99));
+    const t = ctx.createBuffer(2, n, sr), TL = t.getChannelData(0), TR = t.getChannelData(1);
+    recIn(TL, i0, d.a, d.r, d.g, mute); recIn(TR, i0 + Math.round(TAILW[1][1] * sr), d.c, d.r * TAILW[1][2], d.g, mute);
+    if (d.lp) { bqRun(TL, 'lp', d.lp, 0.7, sr); bqRun(TR, 'lp', d.lp, 0.7, sr); }
+    return t;
+  }
+  function playTail(d, g, rate, to, t) {
+    TAILW.forEach(([pan, dt, k], i) => {
+      const s = ctx.createBufferSource(), v = ctx.createGain(), pn = ctx.createStereoPanner();
+      s.buffer = i ? d.c : d.a; s.playbackRate.value = d.r * k * rate; v.gain.value = (g * d.g) / 0.89; pn.pan.value = pan;
+      let n = s; if (d.lp) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = d.lp; f.Q.value = 0.7; s.connect(f); n = f; }
+      n.connect(v); v.connect(pn); pn.connect(to); s.start(t + d.d0 + dt);
+    });
+  }
+  // one recorded take: {b: the shot and its early returns, t: the place's tail (or null) - written out into a buffer unless live}
+  function recTake(pl, mute, live) {
+    const sr = ctx.sampleRate, R = pl.R, room = pl.room, rec = rPick(pl.recs, pl.key), far = pl.far;
+    const r = (far ? R.frate : R.rate) * vr(1, far ? 0.04 : 0.03), n = Math.floor((rec.length - 2) / r) + Math.round(0.04 * sr);
+    const b = ctx.createBuffer(2, n, sr), L = b.getChannelData(0), Rr = b.getChannelData(1), D = work(0, n), H = work(1, n);
+    recIn(D, 0, rec, r, 1, mute);
+    // (far off, the top is gone - the far recordings of a machine gun keep some of theirs; in a room the shot comes through the stone:
+    // duller still)
+    if (far) bqRun(D, 'lp', room ? 2400 : 3000, 0.7, sr);
+    if (R.slp) bqRun(D, 'lp', R.slp, 0.7, sr);
+    for (let i = 0; i < n; i++) { L[i] = D[i]; Rr[i] = D[i]; H[i] = D[i]; }
+    if (!far) {
+      bqRun(H, 'lp', room ? 5000 : 3000, 0.7, sr); bqRun(H, 'hp', 250, 0.7, sr);
+      const tap = (ms, g, pan) => {
+        const d = Math.round((ms * vr(1, 0.1) * sr) / 1000), gg = g * (Math.random() < 0.3 ? -1 : 1), gl = gg * Math.min(1, 1 - pan), gr = gg * Math.min(1, 1 + pan);
+        for (let i = 0; i + d < n; i++) { L[i + d] += H[i] * gl; Rr[i + d] += H[i] * gr; }
+      };
+      if (room) for (const [ms, g, pan] of RER) tap(ms, g * R.er, pan); else tap(3.1, R.gnd, 0);
+      if (R.lo) { const X = work(2, n); pushIn(X, R, 1, sr); for (let i = 0; i < n; i++) { L[i] += X[i]; Rr[i] += X[i]; } }
+    }
+    let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(Rr[i]));
+    if (pk > 1) for (let i = 0; i < n; i++) { L[i] /= pk; Rr[i] /= pk; }
+    const k = pk > 1 ? 1 / pk : 1;
+    const t = room ? placeIn('gr_in', R.ri * k * (far ? 1.6 : 1), far ? 0.012 : 0.006, far ? 1800 : 0) : placeIn('gr_out', R.ro * k * (far ? 1.4 : 1), far ? 0.03 : 0.02, 0);
+    return { b, t: t && !live ? bakeTail(t, mute) : t };
+  }
+  const RSLP = { pistol: 6000, smg: 4200, rifle: 4000, heavy: 4500 };
+  // the plan of a recorded shot, laid over the old version's (old: its level, what it pulls down, its case, the working after it)
+  function recPlan(kind, supp, auto, room, far, old) {
+    let R = RP[kind];
+    // (suppressed: the suppressed recording a little slower and its push bigger the heavier the gun, its top dulled - the can's own hiss
+    // and the action's clatter in the recordings (the machine pistol's most of all) stood over the shot - and the place answering less)
+    if (supp) { const w = (SUPP[kind] || [1])[0]; R = O({}, R, { rate: R.rate * (1.06 - 0.06 * w), lo: R.lo * 0.45 * w, er: R.er * 0.6, ri: R.ri * 0.45, ro: R.ro * 0.35, gnd: R.gnd * 0.6, slp: RSLP[R.sq] }); }
+    const set = supp ? 'gq_' + R.sq : far ? 'gd_' + R.far : 'gs_' + kind, kk = (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out');
+    return { kind, p: O({}, old.p, { tail: 0, wet: old.p.wet * 0.6 }), R, recs: RLOAD(set), room, auto, far, supp, n: 'R', lvl: 0, kref: RKREF[kk] !== undefined ? RKREF[kk] : RKREF[kk.replace(':a', '')],
+      duck: old.duck, clip: R.clip || 4, shave: 3, topx: 1, gv: old.gv, kk, key: 'R:' + kk + (far ? ':far' : '') };
+  }
   // what a shot of this kind is, here and now: its layers (the plan fl picks laid over them), the recordings of it that have arrived
   // (until they have, its takes are of the layers alone, kept apart), its loudness, what it pulls down, and the key its takes are kept under
-  function shotPlan(kind, supp, auto, room, fl) {
+  // (fl: 0 the game's own - the recorded shot (recPlan) for a kind in RP once its recordings are in, the old version until then and for
+  // the rest; 'R' the recorded shot; 'old' the old version, as the game played it before (soundcheck.html's 前の版); far: a far take)
+  function shotPlan(kind, supp, auto, room, fl, far) {
     if (fl === undefined) fl = A.gunFlavor;
+    const useR = !!RP[kind] && (fl === 0 || fl === 'R') && !A.noSamples;
+    if (fl === 'R' || fl === 'old') fl = 0;
     const base = SHOT[kind] || SHOT.rifle, P = fl === 'pub' ? null : GUNP[kind], n = P ? (P[fl] ? fl : P[GDEF[kind]] ? GDEF[kind] : P.B ? 'B' : P[2] ? 2 : 0) : 0, q = n ? P[n](base, room) : null;
     let p = supp ? suppOf(kind, q) : q ? O({ hicut: 9000 }, base, q) : base;
     if (auto) p = O({}, p, { act: 'autoshot', len: 0.3, lv: p.lv * 0.85 });   // (a self-loading shotgun: its bolt works, there is no pump)
     // (a suppressed shot is not changed by the plan, only pulled down round less)
     const duck = q && q.duck ? (supp ? [q.duck[0] * 0.35, q.duck[1] * 0.6, q.duck[2] * 0.6] : q.duck) : null;
     const bk = p.rv && usable('gun_' + kind) ? SB.bank['gun_' + kind] : null, recs = bk ? bk.f.map((f) => bufs[f] || (fetchBuf(f), null)).filter(Boolean) : [];
-    return { kind, p, recs, room, auto, n, lvl: q && !supp ? q.lvl || 0 : null, duck, shave: q && !supp ? q.shave : undefined, clip: q && !supp ? q.clip : 0, topx: q && !supp ? q.topx : undefined, gv: fl === 'pub' ? 1 : GUNV, kk: kind + (auto ? ':a' : '') + (room ? ':in' : ':out'),
+    const old = { kind, p, recs, room, auto, n, lvl: q && !supp ? q.lvl || 0 : null, duck, shave: q && !supp ? q.shave : undefined, clip: q && !supp ? q.clip : 0, topx: q && !supp ? q.topx : undefined, gv: fl === 'pub' ? 1 : GUNV, kk: kind + (auto ? ':a' : '') + (room ? ':in' : ':out'),
       key: (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out') + (recs.length ? ':r' : '') + (n ? ':' + n : '') };
+    if (useR) { const r = recPlan(kind, supp, auto, room, !!far && !supp, old); if (r.recs.length) return r; }
+    return old;
   }
   // (for the measurements: docs/tools/gf3_*.js, gf4_*.js)
-  A.shotLab = { plan: shotPlan, take: (pl) => shotTake(pl.kind, pl.p, pl.recs, pl.room), kEnergy, level: levelTake, KPUB, GUNP };
+  A.shotLab = { plan: shotPlan, take: (pl, mute) => (pl.R ? recTake(pl, mute) : shotTake(pl.kind, pl.p, pl.recs, pl.room)), kEnergy, level: levelTake, KPUB, GUNP, RKREF, RP, RFAR, rLast, make: (pl) => shotMake(pl), bake: (d) => bakeTail(d) };
   function shotMake(pl) {
-    const t0 = performance.now(), b = shotTake(pl.kind, pl.p, pl.recs, pl.room), S = A.shotStats;
-    if (pl.lvl !== null) levelTake(b, pl);
-    if (pl.lvl !== null && pl.p.edx && pl.p.edpost) edgeIn(b.getChannelData(0), b.getChannelData(1), Math.round((pl.p.ed0 || 0) * b.sampleRate), pl.p, b.sampleRate, (TOP * (pl.p.edtx || pl.topx || 1)) / (pl.p.lv * pl.gv));
-    if (pl.lvl !== null && pl.p.bsx && !pl.p.bspre) burstPost(b, pl);
-    if (pl.lvl !== null && (pl.p.spn || pl.p.spf)) spreadIn(b, pl);
+    const t0 = performance.now(), S = A.shotStats;
+    let b;
+    if (pl.R) {
+      // (a recorded take: set to its loudness, and its place's tail by the same gain)
+      const o = recTake(pl, false, true), g = levelTake(o.b, pl); b = o.b;
+      if (o.t) { o.t.g *= g; b.tail = o.t; }
+    } else {
+      b = shotTake(pl.kind, pl.p, pl.recs, pl.room);
+      if (pl.lvl !== null) levelTake(b, pl);
+      if (pl.lvl !== null && pl.p.edx && pl.p.edpost) edgeIn(b.getChannelData(0), b.getChannelData(1), Math.round((pl.p.ed0 || 0) * b.sampleRate), pl.p, b.sampleRate, (TOP * (pl.p.edtx || pl.topx || 1)) / (pl.p.lv * pl.gv));
+      if (pl.lvl !== null && pl.p.bsx && !pl.p.bspre) burstPost(b, pl);
+      if (pl.lvl !== null && (pl.p.spn || pl.p.spf)) spreadIn(b, pl);
+    }
     const ms = performance.now() - t0;
     S.made++; S.ms += ms; S.max = Math.max(S.max, ms); S.log.push(pl.key + ' ' + ms.toFixed(1)); if (S.log.length > 200) S.log.shift();
     (shotSets[pl.key] || (shotSets[pl.key] = [])).push(b); return b;
@@ -1156,9 +1287,9 @@
     const run = (dl) => {
       const t0 = performance.now(), budget = dl && !dl.didTimeout && dl.timeRemaining ? dl.timeRemaining() - 2 : 6;
       do {
-        const [kind, supp, auto, room, fl] = shotQ.shift(), pl = shotPlan(kind, supp, auto, room, fl), set = shotSets[pl.key];
+        const [kind, supp, auto, room, fl, far] = shotQ.shift(), pl = shotPlan(kind, supp, auto, room, fl, far), set = shotSets[pl.key];
         if (pl.p.rv && !pl.recs.length && usable('gun_' + kind)) { if (!set || !set.length) shotMake(pl); continue; }   // (its recordings are still on their way: one take of the layers alone, to fire with until they come)
-        if (!set || set.length < 5) shotMake(pl);
+        if (!set || set.length < (pl.R ? 6 : 5)) shotMake(pl);   // (a recorded kind: a take more, each one being one of a few recordings)
       } while (shotQ.length && performance.now() - t0 < budget);
       shotIdle = false; shotFill();
     };
@@ -1175,16 +1306,37 @@
   }
   // (soundcheck.html: the plans of a kind made ready before they are fired, in the time the page has to spare)
   A.shotPrep = function (kind, fls, room) { if (!ctx || !NEW()) return; gunsIn.then(() => { for (const fl of fls) shotQ.push([kind, false, false, room, fl]); shotFill(); }); };
+  // (one of a plan's takes, never the same one twice running; the first written now, the rest queued for the time the page has to spare)
+  function takeOf(pl, q) {
+    const set = shotSets[pl.key];
+    if (!set || !set.length) { const b = shotMake(pl); for (let i = 0; i < 4; i++) shotQ.push(q); shotFill(); return b; }
+    let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === shotLast[pl.key]) i = (i + 1) % set.length; shotLast[pl.key] = i; return set[i];
+  }
+  const tailLast = {};
   function newShot(kind, opts) {
     const supp = !!opts.suppressed, room = !outdoor(), auto = kind === 'shotgun' && !!opts.auto, v = Math.pow(opts.vol || 1, 0.4), t = ctx.currentTime, fl = A.gunFlavor;
-    const pl = shotPlan(kind, supp, auto, room, fl), p = pl.p, set = shotSets[pl.key];
-    let buf;
-    if (!set || !set.length) { buf = shotMake(pl); for (let i = 0; i < 4; i++) shotQ.push([kind, supp, auto, room, fl]); shotFill(); }
-    else { let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === shotLast[pl.key]) i = (i + 1) % set.length; shotLast[pl.key] = i; buf = set[i]; }
+    const pl = shotPlan(kind, supp, auto, room, fl), p = pl.p, buf = takeOf(pl, [kind, supp, auto, room, fl]);
     // (each named gun a little off the next one's pitch)
-    const at = opts.pos || null, out = dest(at, p.wet, gunDry), src = ctx.createBufferSource();
-    out.gain.value = v * p.lv * pl.gv * vr(1, 0.05); src.buffer = buf; src.playbackRate.value = (opts.id && !supp ? 0.97 + hr(hs(opts.id), 1) * 0.06 : 1) * vr(1, 0.015);
-    src.connect(out); src.start(t);
+    const at = opts.pos || null, out = dest(at, p.wet, gunDry), src = ctx.createBufferSource(), rate = (opts.id && !supp ? 0.97 + hr(hs(opts.id), 1) * 0.06 : 1) * vr(1, 0.015);
+    out.gain.value = v * p.lv * pl.gv * vr(1, 0.05); src.buffer = buf; src.playbackRate.value = rate;
+    if (!pl.R) { src.connect(out); src.start(t); }
+    else {
+      // A recorded shot. How far off it is: a foe's from its place; a friend's (no place and no gun's id: coop/core.js plays it at 0.8 -
+      // d / 80 for d m off) from that level; opts.dist where the caller knows it. From RFAR[0] m the far recording comes in over the near
+      // one, by RFAR[1] m it is all of it (as much of the one going as of the other coming: the loudness is the fall-off's alone)
+      let dist = opts.dist;
+      if (dist === undefined && at && Number.isFinite(at.x + at.y + at.z)) { const L = A.listener; dist = Math.hypot(at.x - L.x, at.y - L.y, at.z - L.z); }
+      if (dist === undefined && !at && !opts.id && opts.vol !== undefined) dist = Math.max(0, (0.8 - opts.vol) * 80);
+      const m0 = supp ? 0 : Math.min(1, Math.max(0, ((dist || 0) - RFAR[0]) / (RFAR[1] - RFAR[0]))), m = m0 * m0 * (3 - 2 * m0), gn = Math.cos((m * Math.PI) / 2), gf = Math.sin((m * Math.PI) / 2);
+      // (the place's tail: in fast fire each shot's share of it smaller, so that the fire's tail is as one shot's - a foe's fire and your own apart)
+      const tk = at || !opts.id ? 'o' : 'm', share = Math.max(0.25, Math.min(1, (t - (tailLast[tk] || -9)) / 0.35)); tailLast[tk] = t;
+      const play = (b, g) => {
+        const s1 = ctx.createBufferSource(), g1 = ctx.createGain(); g1.gain.value = g; s1.buffer = b; s1.playbackRate.value = rate; s1.connect(g1); g1.connect(out); s1.start(t);
+        if (b.tail) playTail(b.tail, g * share, rate, out, t);
+      };
+      if (gn > 0.02) play(buf, gn);
+      if (gf > 0.02) { const fp = shotPlan(kind, false, auto, room, fl, true); if (fp.R && fp.far) play(takeOf(fp, [kind, false, auto, room, fl, true]), gf); else play(buf, gf); }
+    }
     // (the rest pulled down round your own shot only: one asked for from a place - a foe's, a guardian's - or with no gun's id - a friend's -
     // is another's, and leaves the rest as it is)
     const own = !at && !!opts.id;

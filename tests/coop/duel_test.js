@@ -22,7 +22,7 @@ const ID = process.argv[2] || 'madman';
     await sleep(300);
     const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
     await g.booted();   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
-    await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
+    await g.until('window.G && G.Coop && G.Coop.id === 1', 180000);
     const off = 'G.save.data.settings.volume = 0; G.sfx.setVolume && G.sfx.setVolume(0); G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
     await h.eval(off); await g.eval(off);
     await h.eval('G.Coop.begin(); 1');
@@ -35,11 +35,11 @@ const ID = process.argv[2] || 'madman';
     await h.eval(`G.bosses.forArea = () => '${ID}'; G.game.area = 4; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; 1`);
     await g.eval(`G.bosses.forArea = () => '${ID}'; G.Coop.fpOk = undefined; G.ui.clearScreen(); G.game.state = 'playing'; 1`);
     await h.eval("G.Coop.go(5, 'boss'); 1");
-    await g.until('G.game.stage === "boss" && G.Coop.fpOk !== undefined', 25000);
+    await g.until('G.game.stage === "boss" && G.Coop.fpOk !== undefined', 90000); // (the guardian's hall built on both machines: a long while on a busy one)
     await sleep(600); await settle();
     await h.eval("G.player.pos.set(G.world.arenaCenter.x, 0.1, (G.world.ledgeZ || G.world.arenaD) - 6); G.player.grounded = true; 1");
-    await g.until('!!G.bosses.active', 20000);
-    await h.until('!!G.bosses.active', 5000);
+    await g.until('!!G.bosses.active', 60000);
+    await h.until('!!G.bosses.active', 20000);
     check(await g.eval('!!G.bosses.active.duelSt'), 'the guest\'s guardian can duel');
     // the guest stands nearest the guardian: it becomes the first duellist
     await sleep(800);
@@ -49,6 +49,14 @@ const ID = process.argv[2] || 'madman';
     const near = (pg) => pg.until('(() => { const b = G.bosses.active; return [...G.Coop.players.values()].some((rp) => rp.id !== G.Coop.id && !!rp.pos && (G.Coop.role === "host" ? rp.pos.distanceTo(b.pos) < 7 : rp.pos.distanceTo(b.pos) > 12)); })()', 8000).catch(() => {});
     await near(h); await near(g);
     await sleep(800); await settle();
+    // (a busy machine: put back where they were meant to stand until the host sees the guest by the guardian, the guest the host away from it)
+    for (let i = 0; i < 15; i++) {
+      const ok = (await h.eval('(() => { const b = G.bosses.active, rp = G.Coop.players.get(1); return !!(rp && rp.pos && rp.pos.distanceTo(b.pos) < 7 && G.player.pos.distanceTo(b.pos) > 12); })()')) && (await g.eval('(() => { const b = G.bosses.active, rp = G.Coop.players.get(0); return !!(rp && rp.pos && rp.pos.distanceTo(b.pos) > 12); })()'));
+      if (ok) break;
+      await g.eval("(() => { const b = G.bosses.active, P = G.player; P.pos.set(b.pos.x, P.pos.y, b.pos.z + 5); P.vel.set(0, 0, 0); return 1; })()");
+      await h.eval("(() => { const b = G.bosses.active, P = G.player; P.pos.set(b.pos.x + 9, P.pos.y, b.pos.z + 14); P.vel.set(0, 0, 0); return 1; })()");
+      await sleep(2000); await settle();
+    }
     await h.eval('(() => { window.__toasts = []; if (!G.ui.__tw) { const t0 = G.ui.toast; G.ui.toast = function (m) { (window.__toasts = window.__toasts || []).push(String(m)); return t0.apply(this, arguments); }; G.ui.__tw = 1; } return 1; })()'); await g.eval('(() => { window.__toasts = []; if (!G.ui.__tw) { const t0 = G.ui.toast; G.ui.toast = function (m) { (window.__toasts = window.__toasts || []).push(String(m)); return t0.apply(this, arguments); }; G.ui.__tw = 1; } return 1; })()');
     await h.eval('(() => { const b = G.bosses.active; b.hp = b.maxHp * 0.69; return 1; })()');
     await h.until('!!G.Duel.cur', 5000).catch(() => {});

@@ -67,12 +67,19 @@ const PORT = +process.env.COOP_PORT || 9994;
     await g.until(`G.combat.defDownOf(${rep}) > 0.29`, 3000).catch(() => {});
     check(Math.abs(await g.eval(`G.combat.defDownOf(${rep})`) - 0.3) < 0.01, '防御ダウン on the host\'s foe reaches the guest (30%)');
     // (the bar is up while the foe is looked at: the guest turned to it)
-    await g.eval(`(() => { const P = G.player, e = ${rep}, c = e.centerPos(), o = G.camera.position; const dx = c.x - o.x, dy = c.y - o.y, dz = c.z - o.z; P.yaw = Math.atan2(-dx, -dz); P.pitch = Math.atan2(dy, Math.hypot(dx, dz)); e.showBar = true; })(); ${play}`);
-    await g.frames(6);
-    // (the bar is put up by the guest's own frames: looked at again for a moment if it is not up yet)
-    for (let i = 0; i < 8 && !(await g.eval(`(() => { const e = ${rep}; G.enemies.updateBars(); return !!(e.bar && e.bar.dd.style.display === ''); })()`)); i++) await g.frames(3);
-    const bar = await g.eval(`(() => { const e = ${rep}; G.enemies.updateBars(); if (e.bar) return e.bar.dd.style.display; const s = {}; G.fx.project(new THREE.Vector3(e.pos.x, e.pos.y + e.height + 0.35, e.pos.z), s); return 'no bar ' + JSON.stringify({ alive: e.alive, st: e.state, bur: e.burrowed, cl: e.cloakOn, ut: e.untargetable, nb: e.noBar, d: +e.pos.distanceTo(G.player.pos).toFixed(1), scr: s, gs: G.game.state }); })()`);
-    check(bar === '', `the cracked shield on the guest's bar of that foe is shown (display "${bar}")`);
+    // Each try turns the player to the foe, and the camera itself as well, and reads the bar in the same breath (no frame between to turn it away);
+    // the foe must be on the screen then. On a busy machine a frame may still move the view: tried again, a few frames on, until it is.
+    const lookBar = `(() => { const P = G.player, e = ${rep}; if (!e) return 'gone'; e.showBar = true; e.lastHitT = G.game.time; const cam = G.camera, c = e.centerPos(), o = cam.position;
+      const dx = c.x - o.x, dy = c.y - o.y, dz = c.z - o.z; P.yaw = Math.atan2(-dx, -dz); P.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+      cam.lookAt(c); cam.updateMatrixWorld(true);
+      const s = {}; G.fx.project(new THREE.Vector3(e.pos.x, e.pos.y + e.height + 0.35, e.pos.z), s);
+      const on = s.x >= 0 && s.x <= innerWidth && s.y >= 0 && s.y <= innerHeight;
+      G.enemies.updateBars();
+      return on && e.bar ? 'bar ' + e.bar.dd.style.display : 'off ' + JSON.stringify({ scr: s, w: innerWidth, h: innerHeight, bar: !!e.bar, st: e.state, d: +e.pos.distanceTo(P.pos).toFixed(1), gs: G.game.state }); })()`;
+    let look = '';
+    for (let i = 0; i < 15; i++) { await g.eval(play); look = await g.eval(lookBar); if (look === 'bar ') break; await g.frames(3); }
+    console.log('      bar look: ' + look);
+    check(look === 'bar ', `the cracked shield on the guest's bar of that foe is shown, the foe on the guest's screen (${look})`);
     const d3 = await hit(0, 0);
     check(d0 > 0 && Math.abs(d3 / d0 - 2 / 1.7) < 0.06, `and the guest's blow counts it (x${(d3 / (d0 || 1)).toFixed(3)}, want x${(2 / 1.7).toFixed(3)})`);
     // 防御ダウン the guest puts on (a skill, a perk, a round of 削岩弾): reaches the host

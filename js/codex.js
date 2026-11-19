@@ -284,8 +284,8 @@
       const where = [];
       // (a retired field, met only in a run that drew it before, is in no segment's draw while its pool has another field)
       const retired = !!(R.RETIRED && R.RETIRED.has(key) && R.drawPool && R.drawPool(key).some((f) => f !== key && R.ready(f)));
-      const same = (f) => (R.drawPool ? R.drawPool(f).includes(key) : f === key); // (the segments that draw this field: the middle tiers share one pool)
-      for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (same(f) && !retired) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
+      const same = (f, D, k) => (R.drawPool ? R.drawPool(f, D, k).includes(key) : f === key); // (the segments that draw this field: the middle tiers share one pool, a harder difficulty borrows shallower tiers)
+      for (const d of ['easy', 'normal', 'hard', 'extra'].filter((x) => x !== 'extra' || extraOpen())) R.DIFFS[d].segs.forEach(([f], k) => { if (same(f, R.DIFFS[d], k) && !retired) where.push(`${R.DIFFS[d].name} 区分${k + 1}`); });
       return { id: 'stage_' + key, key, idx: i, name: B ? B.name : R.FIELD_NAME[key] || key, icon: F.icon, rarity: F.rarity, desc: retired ? F.desc + '（今は新しいランには現れない）' : F.desc, where };
     });
     return STAGES;

@@ -8,8 +8,8 @@
   R.DIFFS = {
     easy: { name: 'イージー', en: 'EASY', icon: '🌙', col: '#7acb6a', areas: 14, mul: 0.65, segs: [['grave', 3], ['grave', 5]], depth: [0, 0], desc: '短めの冒険で、敵も穏やか。' },
     normal: { name: 'ノーマル', en: 'NORMAL', icon: '⚔️', col: '#e0c070', areas: 21, mul: 1, segs: [['grave', 3], ['gate', 5], ['halls', 7]], depth: [0, 0, 0], desc: '標準の難易度。' },
-    hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 21, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
-    extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#d0405a', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
+    hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 21, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], borrow: [[], [], [2]], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
+    extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#d0405a', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], borrow: [[2, 1], [2, 1], [2, 1]], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
   };
   R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟', hamlet: '廃村', dusk: '黄昏の都', catacombs: '地下墓所', castle: '古城', flooded: '水没回廊', foundry: '溶鉱炉', frozen: '霊廟', sanctum: '聖域', battlefield: '古戦場', shaft: '大縦坑', mine: '坑道', pillars: '石柱の海', spire: '逆さの尖塔' };
   // ---- the fields of a run: four depth tiers of three fields each. A difficulty's segments name the tier (by its first field, as above);
@@ -26,12 +26,30 @@
   // The two middle tiers (the entrance's and the middle depths') are one pool: a segment of either draws from all eight of their fields.
   // What the segment holds stays its own (its depth, foes' strength, guardians: R.segBase), only the place is drawn from the eight.
   R.MERGED = [1, 2];
-  R.drawPool = (base) => { const t = R.tierOf(base); return t < 0 ? [base] : R.MERGED.includes(t) ? R.MERGED.flatMap((k) => R.TIERS[k]) : R.TIERS[t]; };
+  const ownPool = (base) => { const t = R.tierOf(base); return t < 0 ? [base] : R.MERGED.includes(t) ? R.MERGED.flatMap((k) => R.TIERS[k]) : R.TIERS[t]; };
+  // Deeper difficulties widen a segment's draw: DIFFS[d].borrow[k] lists the tiers (indices of R.TIERS) segment k borrows on top of its own
+  // (hard's deep segment also draws the middle depths; every extra segment draws the deep, middle and entrance tiers; never the surface).
+  // R.drawPool(base, D, k) is that segment's whole draw; R.drawPool(base) alone is every field a segment of that tier may draw in any difficulty
+  // (what the codex and the tests ask: "can this field be met there").
+  const withBorrow = (own, tiers) => { const out = own.slice(); for (const t of tiers || []) for (const f of R.TIERS[t] || []) if (!out.includes(f)) out.push(f); return out; };
+  R.drawPool = function (base, D, k) {
+    const own = ownPool(base);
+    if (D) return withBorrow(own, D.borrow && D.borrow[k]);
+    let out = own;
+    for (const id in R.DIFFS) { const E = R.DIFFS[id]; E.segs.forEach(([b], j) => { if (b === base) out = withBorrow(out, E.borrow && E.borrow[j]); }); }
+    return out;
+  };
+  // a segment's own tier weighs twice a borrowed one (so an extra segment meets a deep field half of the time: 4x2 of 4x2 + 8x1)
+  R.drawWeight = (base, f) => (ownPool(base).includes(f) ? 2 : 1);
   // retired fields: still the key of their tier (segs, BOSS_POOLS, segBase) and still built for a run that drew them before (its
   // run.fields keep them), but a new draw passes them over whenever their pool has any other field (the blue-fire ruin gave way to the spire)
   R.RETIRED = new Set(['ruin']);
   R.isField = (f) => R.ready(f) || R.TIERS.some((t) => t[0] === f); // (the first field of a tier is always there)
   R.segBase = (n) => R.def().segs[R.seg(n)][0]; // the tier a segment belongs to (by its first field): what decides its guardians
+  // whether area n is in a deep segment (hard's last, every extra one): later used for the "blue depths" look of whatever field it drew.
+  // R.blueForce (true / false) overrides it for shots and tests; null leaves it to the segment.
+  R.blueForce = null;
+  R.blue = (n) => (R.blueForce != null ? !!R.blueForce : R.segBase(n) === 'ruin');
   // a field joins the draw once its generator exists (fieldgen.js registers them)
   R.ready = (f) => !!(G.FieldGen && G.FieldGen.gen && G.FieldGen.gen[f]);
   // legacy: a run saved before the draw existed keeps the fields it was made with (its saved area is rebuilt from them)
@@ -41,12 +59,16 @@
   R.fieldsFor = function (seed, d, avoid) {
     const D = R.DIFFS[d.id] || R.DIFFS.normal, out = [], used = new Set(), av = new Set(avoid || []);
     const rng = new G.RNG(((seed || 1) ^ G.U.hashStr('fields:' + d.id)) >>> 0);
-    for (const [base] of D.segs) {
-      const t = R.drawPool(base), all = t.filter((f) => f === base || R.isField(f)), live = all.filter((f) => !R.RETIRED.has(f)), cand = live.length ? live : all;
+    D.segs.forEach(([base], k) => {
+      const t = R.drawPool(base, D, k), all = t.filter((f) => f === base || R.isField(f)), live = all.filter((f) => !R.RETIRED.has(f)), cand = live.length ? live : all;
       const fresh = cand.filter((f) => !used.has(f)), pref = fresh.filter((f) => !av.has(f)), from = pref.length ? pref : fresh.length ? fresh : cand;
-      const f = from[Math.floor(rng.next() * from.length) % from.length] || base;
+      // one draw per segment, weighted (equal weights pick exactly what floor(r * n) picked before, so normal / easy runs are unchanged)
+      const ws = from.map((x) => R.drawWeight(base, x)), tot = ws.reduce((a, b) => a + b, 0);
+      let x = rng.next() * tot, f = from[from.length - 1];
+      for (let i = 0; i < from.length; i++) { x -= ws[i]; if (x < 0) { f = from[i]; break; } }
+      f = f || base;
       used.add(f); out.push(f);
-    }
+    });
     return out;
   };
   let fieldsKey = '', fieldsVal = null;

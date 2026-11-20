@@ -12,17 +12,15 @@
   const CA = G.CastAnim; if (!CA || !CA.move) return;
   const GQ = [0.35, 0.35, -2.3], RQ = [-0.4, 0.1, 0.5];
   const IN = [0.2, -0.3, -0.25], INQ = [0.6, 0.05, -0.6];
-  // a fist clenched hard (the fingers rolled in tight, the thumb laid across them): an ultimate's fist is a strained one
-  const TF = { f: [0, 1, 2, 3].map((i) => [2.05 + i * 0.04, 2.25, 1.55, (i - 1.5) * -0.02]), t: [1.15, 1.05, 0.95, 0.15] };
-  // (fists are turned so their backs and knuckles face the eye: seen from the palm side, curled fingers read as a claw)
-  const FQ = [1.3, 0.3, -0.2];
+  // (a fist held up before the body is turned with its back to the eye: castanim.js CA.FIST_Q)
+  const FQ = CA.FIST_Q || [1.3, 0.3, -0.2];
   const M = CA.move;
 
   // 不屈の城塞: the fist driven into the open palm before the chest (a pledge), then both forearms brought up as a guard before the face
   // and held there, the body set low and square behind it
   M('u_bastion', () => ({ dur: 1.4, hit: 0.13, both: true,
     main: [
-      { t: 0, p: [0.22, -0.32, -0.24], q: [0.6, 0.1, -0.9], f: TF },
+      { t: 0, p: [0.22, -0.32, -0.24], q: [0.6, 0.1, -0.9], f: 'fist' },
       { t: 0.07, p: [0.12, -0.11, -0.3], q: [0.8, 0.05, -1.3], e: 'o' },
       { t: 0.13, p: [0.0, -0.115, -0.37], q: [0.25, 0.9, -0.2], e: 'i' },
       { t: 0.18, p: [0.005, -0.113, -0.368], e: 'o', s: 0.003 },
@@ -35,7 +33,7 @@
       { t: 0.1, p: [0.045, -0.115, -0.39], q: [1.45, -0.05, -1.57], f: 'flat', e: 'o' },
       { t: 0.14, p: [0.055, -0.116, -0.385], e: 'o', s: 0.002 },
       { t: 0.5, p: [0.055, -0.114, -0.385], e: 'l', s: 0.0015 },
-      { t: 0.68, p: [0.1, -0.01, -0.35], q: FQ, f: TF, e: 'o' },
+      { t: 0.68, p: [0.1, -0.01, -0.35], q: FQ, f: 'fist', e: 'o' },
       { t: 1.05, p: [0.103, -0.015, -0.352], e: 'l', s: 0.0016 },
       { t: 1.4, p: 'rest', q: RQ, f: 'rest', e: 's' }],
     body: [{ t: 0 }, { t: 0.07, p: 0.008, f: -0.01 }, { t: 0.15, d: 0.03, p: -0.025, f: 0.025 }, { t: 0.5, d: 0.03, p: -0.022, f: 0.02 },
@@ -50,7 +48,7 @@
       { t: 0.2 + d, p: [0.24, 0.09, -0.46], q: [1.85, -0.1, -0.3], f: 'clawOpen', e: 'o' },
       { t: 0.34 + d, p: [0.235, 0.11, -0.47], e: 's', s: 0.001 },
       { t: 0.44 + d, p: [0.225, 0.095, -0.45], q: [1.75, 0, -0.7], f: 'claw', e: 'i' },
-      { t: 0.5 + d, p: [0.22, 0.09, -0.44], f: TF, e: 'o', s: 0.003 },
+      { t: 0.5 + d, p: [0.22, 0.09, -0.44], f: 'fist', e: 'o', s: 0.003 },
       { t: 0.95 + d, p: [0.13, -0.12, -0.4], q: FQ, e: 'i' },
       { t: 1.05 + d, p: [0.13, -0.135, -0.39], e: 'o', s: 0.002 },
       { t: 1.5, p: 'rest', q: RQ, f: 'rest', e: 's' }];
@@ -64,15 +62,15 @@
   M('u_bell', () => {
     // the clasped fists' middle, in the view's true space (x + right), and the time of each place
     const path = [
-      [0, [0.2, -0.22, -0.32]], [0.09, [0.0, 0.07, -0.5]], [0.2, [-0.08, 0.09, -0.48]], [0.45, [0.02, -0.06, -0.36]],
-      [0.76, [-0.2, -0.06, -0.3]], [0.9, [0.0, 0.07, -0.5]], [1.0, [0.08, 0.09, -0.48]], [1.3, [0.0, -0.06, -0.34]],
-      [1.62, [0.0, -0.2, -0.3]], [1.8, [0.0, 0.08, -0.5]], [1.92, [0.0, 0.1, -0.49]], [2.1, [0.0, -0.02, -0.42]]];
+      [0, [0.2, -0.22, -0.32]], [0.09, [0.05, 0.02, -0.52]], [0.2, [-0.03, 0.04, -0.5]], [0.45, [0.02, -0.06, -0.36]],
+      [0.76, [-0.2, -0.06, -0.3]], [0.9, [-0.05, 0.02, -0.52]], [1.0, [0.03, 0.04, -0.5]], [1.3, [0.0, -0.06, -0.34]],
+      [1.62, [0.0, -0.2, -0.3]], [1.8, [0.0, 0.03, -0.52]], [1.92, [0.0, 0.05, -0.51]], [2.1, [0.0, -0.02, -0.42]]];
     const E = ['', 'i', 'o', 's', 's', 'i', 'o', 's', 's', 'i', 'o', 'l'];
     // main is the left arm (its x turned over), off the right; the two fists a hand's breadth apart, the right one a little higher
-    const keys = (mx, dx, dy) => path.map(([t, p], i) => ({ t, p: [mx * (p[0] + dx), p[1] + dy, p[2]], q: [1.2, 0.1, -1.5], f: TF, e: E[i] || 'q', s: i % 4 === 2 ? 0.002 : 0 }))
+    const keys = (mx, dx, dy) => path.map(([t, p], i) => ({ t, p: [mx * (p[0] + dx), p[1] + dy, p[2]], q: [1.2, 0.1, -1.5], f: 'fist', e: E[i] || 'q', s: i % 4 === 2 ? 0.002 : 0 }))
       .concat([{ t: 2.45, p: 'rest', q: RQ, f: 'rest', e: 's' }]);
     const body = [{ t: 0 }];
-    for (const [t0, y] of [[0, 1], [0.81, -1], [1.71, 0]]) body.push({ t: t0 + 0.1, p: 0.05, d: -0.01, y: 0.025 * y, r: 0.012 * y, f: 0.015 }, { t: t0 + 0.4, p: 0.0, d: 0.015, y: -0.01 * y });
+    for (const [t0, y] of [[0, 1], [0.81, -1], [1.71, 0]]) body.push({ t: t0 + 0.1, p: 0.05, d: -0.01, y: -0.025 * y, r: -0.012 * y, f: 0.015 }, { t: t0 + 0.4, p: 0.0, d: 0.015, y: 0.01 * y });
     body.push({ t: 2.1, p: 0.02, d: 0.005 }, { t: 2.45 });
     return { dur: 2.45, hit: 0.09, both: true, main: keys(-1, -0.028, 0), off: keys(1, 0.028, 0.012), body,
       jolt: [[0.09, 0.12], [0.9, 0.12], [1.8, 0.16]],
@@ -84,10 +82,10 @@
   M('u_godfall', () => {
     const k = (d) => [
       { t: 0, p: IN, q: INQ, f: 'relax' },
-      { t: 0.24 + d, p: [0.27, 0.08, -0.45], q: [2.0, -0.2, 0.3], f: 'splay', e: 'o' },
-      { t: 0.7 + d, p: [0.285, 0.1, -0.45], e: 's', s: 0.0015 },
+      { t: 0.24 + d, p: [0.3, 0.02, -0.44], q: [2.0, -0.3, 0.45], f: 'splay', e: 'o' },
+      { t: 0.7 + d, p: [0.31, 0.04, -0.44], e: 's', s: 0.0015 },
       { t: 1.1 + d, p: [0.12, -0.06, -0.4], q: FQ, f: 'claw', e: 's' },
-      { t: 1.22 + d, p: [0.11, -0.085, -0.39], f: TF, e: 'o', s: 0.003 },
+      { t: 1.22 + d, p: [0.11, -0.085, -0.39], f: 'fist', e: 'o', s: 0.003 },
       { t: 1.4, p: [0.11, -0.088, -0.385], e: 'l', s: 0.002 },
       { t: 1.8, p: 'rest', q: RQ, f: 'rest', e: 's' }];
     return { dur: 1.8, hit: 0.24, both: true, main: k(0), off: k(0.015),
@@ -103,7 +101,7 @@
       { t: 0.1, p: [0.07, -0.065, -0.52], q: [1.62, -0.06, -0.1], f: 'splay', e: 'o' },
       { t: 0.16, p: [0.074, -0.068, -0.525], e: 'o', s: 0.001 },
       { t: 0.34, p: [0.074, -0.07, -0.52], f: 'clawOpen', e: 's' },
-      { t: 0.42, p: [0.075, -0.08, -0.505], q: [1.35, -0.1, -0.6], f: TF, e: 'i' },
+      { t: 0.42, p: [0.075, -0.08, -0.505], q: [1.35, -0.1, -0.6], f: 'fist', e: 'i' },
       { t: 0.5, p: [0.075, -0.081, -0.504], e: 'o', s: 0.0025 },
       { t: 1.0, p: [0.075, -0.082, -0.503], e: 'l', s: 0.0004 },
       { t: 1.35, p: 'grip', q: GQ, f: 'grip', e: 's' }],
@@ -114,7 +112,7 @@
   // shaking (the body hunched over them, trembling harder), and at last driven out and down
   M('u_berserk', () => {
     const k = (d) => [
-      { t: 0, p: [0.24, -0.28, -0.22], q: [0.6, 0.1, -0.9], f: TF },
+      { t: 0, p: [0.24, -0.28, -0.22], q: [0.6, 0.1, -0.9], f: 'fist' },
       { t: 0.06, p: [0.2, -0.1, -0.3], q: [0.4, 0.6, -0.6], e: 'o' },
       { t: 0.12 + d, p: [0.045, -0.105, -0.4], q: [0.2, 1.2, 0.0], e: 'i' },
       { t: 0.17 + d, p: [0.05, -0.104, -0.398], e: 'o', s: 0.003 },
@@ -135,7 +133,7 @@
       { t: 0.14, p: [0.075, -0.02, -0.48], q: [0.7, 0.2, -1.0], f: 'clawOpen', e: 'o' },
       { t: 0.3, p: [0.075, -0.025, -0.48], f: 'claw', e: 's', s: 0.0012 },
       { t: 0.62, p: [0.085, -0.13, -0.46], q: [0.9, 0.3, -2.7], e: 's', s: 0.002 },
-      { t: 0.7, p: [0.085, -0.135, -0.455], f: TF, e: 'i' },
+      { t: 0.7, p: [0.085, -0.135, -0.455], f: 'fist', e: 'i' },
       { t: 0.8, p: [0.085, -0.135, -0.455], e: 'l', s: 0.004 },
       { t: 1.0, p: [0.2, -0.15, -0.38], q: [0.7, 0.2, -2.2], e: 'o' },
       { t: 1.45, p: 'rest', q: RQ, f: 'rest', e: 's' }],
@@ -144,11 +142,11 @@
       { t: 0.16, p: [0.075, -0.16, -0.47], q: [0.9, -0.2, -2.5], f: 'clawOpen', e: 'o' },
       { t: 0.3, p: [0.075, -0.155, -0.47], f: 'claw', e: 's', s: 0.0012 },
       { t: 0.62, p: [0.085, -0.04, -0.47], q: [0.8, -0.2, -0.7], e: 's', s: 0.002 },
-      { t: 0.7, p: [0.085, -0.035, -0.465], f: TF, e: 'i' },
+      { t: 0.7, p: [0.085, -0.035, -0.465], f: 'fist', e: 'i' },
       { t: 0.8, p: [0.085, -0.035, -0.465], e: 'l', s: 0.004 },
       { t: 1.0, p: [0.2, -0.06, -0.38], q: [0.7, -0.1, -0.8], e: 'o' },
       { t: 1.45, p: 'rest', q: RQ, f: 'rest', e: 's' }],
-    body: [{ t: 0 }, { t: 0.14, f: 0.03 }, { t: 0.62, f: 0.035, r: 0.035, d: 0.015, s: 0.002 }, { t: 0.72, f: 0.03, r: 0.03, d: 0.028, p: -0.02 }, { t: 1.0, f: -0.01, r: 0.0 }, { t: 1.45 }],
+    body: [{ t: 0 }, { t: 0.14, f: 0.03 }, { t: 0.62, f: 0.035, r: -0.035, d: 0.015, s: 0.002 }, { t: 0.72, f: 0.03, r: -0.03, d: 0.028, p: -0.02 }, { t: 1.0, f: -0.01, r: 0 }, { t: 1.45 }],
     jolt: [[0.7, 0.14]], snd: [[0, 'cl', 1], [0.06, 'sw', 0.2, 0.14], [0.35, 'cl', 1.2], [0.68, 'cl', 1.6], [0.95, 'sw', 0.22, 0.18]] }));
 
   // 天罰: the left hand flung straight up at the sky, open (the gun kept in the right), and the head after it; then brought down hard,
@@ -156,8 +154,8 @@
   M('u_judgement', () => ({ dur: 1.25, hit: 0.1, both: false,
     main: [
       { t: 0, p: [0.17, -0.25, -0.3], q: [0.5, 0, -0.9], f: 'relax' },
-      { t: 0.1, p: [0.22, 0.1, -0.45], q: [1.8, -0.1, -0.2], f: 'splay', e: 'o' },
-      { t: 0.28, p: [0.22, 0.115, -0.46], e: 's', s: 0.0015 },
+      { t: 0.1, p: [0.27, 0.03, -0.43], q: [1.85, -0.2, -0.1], f: 'splay', e: 'o' },
+      { t: 0.28, p: [0.27, 0.045, -0.44], e: 's', s: 0.0015 },
       { t: 0.42, p: [0.08, -0.095, -0.52], q: [-0.1, 0.15, 0.0], f: 'splay', e: 'i' },
       { t: 0.48, p: [0.07, -0.1, -0.515], e: 'o', s: 0.002 },
       { t: 0.9, p: [0.075, -0.102, -0.51], f: 'flat', e: 'l', s: 0.0008 },
@@ -170,8 +168,8 @@
   M('u_phoenix', () => {
     const k = (d, z) => [
       { t: 0, p: IN, q: INQ, f: 'relax' },
-      { t: 0.18 + d, p: [-0.06, -0.06, z], q: FQ, f: TF, e: 'o' },
-      { t: 0.46, p: [-0.055, -0.07, z + 0.02], e: 'l', s: 0.003 },
+      { t: 0.18 + d, p: [-0.085, -0.035, z], q: [1.25, 0.7, -0.6], f: 'fist', e: 'o' },
+      { t: 0.46, p: [-0.08, -0.045, z + 0.02], e: 'l', s: 0.003 },
       { t: 0.62 + d, p: [0.29, 0.0, -0.43], q: [0.45, -0.3, 1.15], f: 'splay', e: 'o' },
       { t: 1.1, p: [0.3, 0.015, -0.43], e: 'l', s: 0.001 },
       { t: 1.55, p: 'rest', q: RQ, f: 'rest', e: 's' }];
@@ -180,20 +178,34 @@
       jolt: [[0.62, 0.13]], snd: [[0, 'cl', 1], [0.16, 'cl', 1.1], [0.5, 'sw', 0.35, 0.3]] };
   });
 
-  // 無限兵装: the left hand leaves the fore-end, takes hold of the gun on top of its receiver and racks it hard back and home (the
-  // ultimate's own bolt sounds come at 0 and 0.15 s), and slaps it on the way back to the fore-end. The places are set from where the
-  // hand holds the gun (tick, below); with no gun in hand it is a fist raised and clenched
-  const RACK = [[-0.025, 0.155, 0.09], [-0.025, 0.15, 0.17], [-0.025, 0.155, 0.07], [-0.01, 0.12, 0.05]];
-  M('u_armory', () => ({ dur: 0.75, hit: 0.15, both: false,
-    main: [
-      { t: 0, p: 'grip', q: GQ, f: 'grip' },
-      { t: 0.06, p: [0.12, -0.02, -0.42], q: [0.15, 0.2, 0.2], f: 'hold', e: 'o' },
-      { t: 0.12, p: [0.12, -0.03, -0.38], q: [0.0, 0.2, 0.25], f: TF, e: 'i' },
-      { t: 0.17, p: [0.12, -0.02, -0.43], q: [0.15, 0.2, 0.2], f: 'release', e: 'i' },
-      { t: 0.3, p: [0.12, -0.03, -0.44], q: [0.2, 0.25, 0.1], f: 'flat', e: 'o' },
-      { t: 0.75, p: 'grip', q: GQ, f: 'grip', e: 's' }],
-    body: [{ t: 0 }, { t: 0.06, f: 0.01, p: -0.01 }, { t: 0.13, f: -0.025, p: 0.012, d: 0.01 }, { t: 0.2, f: 0.02, p: -0.012, d: 0.012 }, { t: 0.45, f: 0.008 }, { t: 0.75 }],
-    jolt: [[0.12, 0.06], [0.18, 0.1]], snd: [[0, 'cl', 1.2], [0.28, 'cp', 0.8]] }));
+  // 無限兵装: the left hand leaves the fore-end, comes down flat on top of the gun's receiver, takes hold of it and racks it hard back
+  // and home (the ultimate's own bolt sounds come at 0 and 0.15 s), slaps it, and goes back to the fore-end - every place set from the
+  // gun in hand (castanim.js 'gun', found from each gun's own model). With no gun in that hand (a hand weapon, the gun lowered), a fist
+  // raised and clenched hard instead
+  M('u_armory', () => {
+    const QG = [0.05, 0.15, 0.05];
+    if (!CA.gunNow()) return { dur: 0.75, hit: 0.12, both: false,
+      main: [
+        { t: 0, p: IN, q: INQ, f: 'relax' },
+        { t: 0.12, p: [0.12, -0.06, -0.4], q: FQ, f: 'fist', e: 'o' },
+        { t: 0.2, p: [0.12, -0.04, -0.41], e: 'o', s: 0.003 },
+        { t: 0.3, p: [0.12, -0.07, -0.4], e: 'q', s: 0.002 },
+        { t: 0.75, p: 'grip', q: GQ, f: 'grip', e: 's' }],
+      body: [{ t: 0 }, { t: 0.12, p: 0.02, d: -0.008, s: 0.0015 }, { t: 0.4, p: 0.012 }, { t: 0.75 }],
+      jolt: [[0.12, 0.08]], snd: [[0, 'cl', 1.2], [0.1, 'sw', 0.18, 0.12]] };
+    return { dur: 0.75, hit: 0.1, both: false,
+      main: [
+        { t: 0, p: 'grip', q: GQ, f: 'grip' },
+        { t: 0.06, p: ['gun', 0.0, 0.03, -0.01], q: QG, f: 'clawOpen', e: 'o' },
+        { t: 0.1, p: 'gun', q: QG, f: 'hold', e: 'i' },
+        { t: 0.145, p: ['gun', 0.0, 0.004, 0.075], q: [0.0, 0.15, 0.05], f: 'fist', e: 'o' },
+        { t: 0.19, p: ['gun', 0.0, 0.0, -0.005], q: QG, f: 'release', e: 'i' },
+        { t: 0.25, p: ['gun', 0.0, 0.035, 0.0], f: 'flat', e: 'o' },
+        { t: 0.3, p: 'gun', e: 'i' },
+        { t: 0.75, p: 'grip', q: GQ, f: 'grip', e: 's' }],
+      body: [{ t: 0 }, { t: 0.06, f: 0.01, p: -0.012 }, { t: 0.145, f: -0.025, p: 0.012, d: 0.01 }, { t: 0.2, f: 0.02, p: -0.014, d: 0.012 }, { t: 0.3, d: 0.01 }, { t: 0.5, f: 0.006 }, { t: 0.75 }],
+      jolt: [[0.145, 0.06], [0.19, 0.1], [0.3, 0.04]], snd: [[0, 'cl', 1.2], [0.3, 'cp', 0.8]] };
+  });
 
   // 亡者の軍勢: the hands brought up from below, palms up and clawed as if under the earth, and lifted slowly and heavily up to the
   // chest, shaking with the weight - the dead raised; the body starts bowed low and rises with them
@@ -307,7 +319,7 @@
         { t: 0.15, p: out, q: qo, f: 'clawOpen', e: 'o' },
         { t: 0.33, p: inn, q: qi, f: 'claw', e: 'i' },
         { t: 0.52, p: out, q: qo, f: 'clawOpen', e: 'o' },
-        { t: 0.72, p: [0.11, -0.13, -0.34], q: [0.6, 0.3, -0.3], f: TF, e: 'i' },
+        { t: 0.72, p: [0.11, -0.13, -0.34], q: [0.6, 0.3, -0.3], f: 'fist', e: 'i' },
         { t: 0.8, p: [0.11, -0.13, -0.34], e: 'o', s: 0.004 },
         { t: 1.0, p: [0.115, -0.135, -0.34], e: 'l', s: 0.003 },
         { t: 1.35, p: 'rest', q: RQ, f: 'rest', e: 's' }],
@@ -316,11 +328,11 @@
         { t: 0.18, p: inn, q: qi, f: 'claw', e: 'o' },
         { t: 0.36, p: out, q: qo, f: 'clawOpen', e: 'o' },
         { t: 0.55, p: inn, q: qi, f: 'claw', e: 'i' },
-        { t: 0.72, p: [0.11, -0.12, -0.35], q: [0.6, 0.3, -0.3], f: TF, e: 's' },
+        { t: 0.72, p: [0.11, -0.12, -0.35], q: [0.6, 0.3, -0.3], f: 'fist', e: 's' },
         { t: 0.8, p: [0.11, -0.12, -0.35], e: 'o', s: 0.004 },
         { t: 1.0, p: [0.115, -0.125, -0.35], e: 'l', s: 0.003 },
         { t: 1.35, p: 'rest', q: RQ, f: 'rest', e: 's' }],
-      body: [{ t: 0 }, { t: 0.15, f: 0.03, y: 0.015 }, { t: 0.34, f: -0.01, y: -0.015 }, { t: 0.52, f: 0.03, y: 0.015 }, { t: 0.74, f: -0.02, d: 0.03, p: -0.02, s: 0.002 }, { t: 1.0, d: 0.03, p: -0.015, s: 0.003 }, { t: 1.35 }],
+      body: [{ t: 0 }, { t: 0.15, f: 0.03, y: -0.015 }, { t: 0.34, f: -0.01, y: 0.015 }, { t: 0.52, f: 0.03, y: -0.015 }, { t: 0.74, f: -0.02, d: 0.03, p: -0.02, s: 0.002 }, { t: 1.0, d: 0.03, p: -0.015, s: 0.003 }, { t: 1.35 }],
       jolt: [[0.33, 0.06], [0.55, 0.06], [0.74, 0.12]],
       snd: [[0, 'cl', 1], [0.1, 'sw', 0.2, 0.12], [0.32, 'cl', 1], [0.44, 'sw', 0.2, 0.12], [0.54, 'cl', 1.2], [0.72, 'cl', 1.5]] };
   });
@@ -333,8 +345,8 @@
       { t: 0.12 + d, p: [0.1, -0.09, -0.42], q: [0.55, 0.2, -1.5], f: 'clawOpen', e: 'o' },
       { t: 0.35 + d, p: [0.09, -0.095, -0.4], q: [0.5, 0.25, -1.52], f: 'claw', e: 's', s: 0.002 },
       { t: 0.55, p: [0.085, -0.1, -0.38], e: 'l', s: 0.005 },
-      { t: 0.63 + d, p: [0.3, -0.18, -0.44], q: [0.4, -0.3, -0.3], f: 'splay', e: 'o' },
-      { t: 0.95, p: [0.31, -0.2, -0.42], f: 'relax', e: 's', s: 0.0015 },
+      { t: 0.63 + d, p: [0.24, -0.115, -0.48], q: [0.75, -0.35, -0.25], f: 'splay', e: 'o' },
+      { t: 0.95, p: [0.25, -0.125, -0.475], f: 'relax', e: 's', s: 0.0015 },
       { t: 1.25, p: 'rest', q: RQ, f: 'rest', e: 's' }];
     return { dur: 1.25, hit: 0.12, both: true, main: k(0), off: k(0.008),
       body: [{ t: 0 }, { t: 0.12, d: 0.01 }, { t: 0.55, d: 0.035, p: -0.02, s: 0.004 }, { t: 0.65, d: -0.01, p: 0.02, f: 0.025 }, { t: 0.95, f: 0.01 }, { t: 1.25 }],
@@ -345,7 +357,7 @@
   // the body rises with the fists drawn up before the chest, clenched and shaking with the new strength
   M('u_titan', () => {
     const k = (d) => [
-      { t: 0, p: [0.2, 0.02, -0.25], q: [-0.6, 0.1, -1.3], f: TF },
+      { t: 0, p: [0.2, 0.02, -0.25], q: [-0.6, 0.1, -1.3], f: 'fist' },
       { t: 0.08 + d, p: [0.18, 0.15, -0.36], q: [-1.1, 0.1, -1.3], e: 'o' },
       { t: 0.16 + d, p: [0.1, -0.17, -0.5], q: [-0.25, 0.1, -1.35], e: 'i' },
       { t: 0.21 + d, p: [0.1, -0.158, -0.495], e: 'o', s: 0.004 },
@@ -362,9 +374,9 @@
   // to the sides as the blades go round
   M('u_bladestorm', () => {
     const k = (d) => [
-      { t: 0, p: [0.3, -0.3, -0.2], q: [0.15, 0.6, -1.5], f: 'blade' },
-      { t: d * 0.6, p: [0.3, -0.3, -0.2], e: 's' },
-      { t: d + 0.03, p: [0.32, -0.04, -0.28], q: [0.15, 0.6, -1.5], e: 'o' },
+      { t: 0, p: [0.26, -0.46, -0.2], q: [0.15, 0.6, -1.5], f: 'blade' },
+      { t: d * 0.75, p: [0.27, -0.44, -0.22], e: 's' },
+      { t: d + 0.035, p: [0.27, -0.06, -0.34], q: [0.15, 0.6, -1.5], e: 'o' },
       { t: d + 0.06, p: [0.22, -0.05, -0.43], q: [0.12, 0.3, -1.52], e: 'i' },
       { t: d + 0.11, p: [0.0, -0.075, -0.48], q: [0.1, -0.15, -1.55], e: 'l' },
       { t: d + 0.2, p: [-0.24, -0.13, -0.36], q: [0.05, -0.75, -1.6], e: 'o' },
@@ -372,7 +384,7 @@
       { t: 0.95, p: [0.32, -0.125, -0.415], e: 'l', s: 0.001 },
       { t: 1.25, p: 'rest', q: RQ, f: 'rest', e: 's' }];
     return { dur: 1.25, hit: 0.11, both: true, main: k(0), off: k(0.2),
-      body: [{ t: 0 }, { t: 0.13, y: 0.04, r: 0.02, f: 0.015 }, { t: 0.33, y: -0.04, r: -0.02, f: 0.015 }, { t: 0.62, f: 0.02, d: 0.015 }, { t: 0.95, d: 0.012 }, { t: 1.25 }],
+      body: [{ t: 0 }, { t: 0.13, y: -0.04, r: -0.02, f: 0.015 }, { t: 0.33, y: 0.04, r: 0.02, f: 0.015 }, { t: 0.62, f: 0.02, d: 0.015 }, { t: 0.95, d: 0.012 }, { t: 1.25 }],
       jolt: [[0.11, 0.08], [0.31, 0.08]], snd: [[0, 'cl', 1], [0.03, 'sw', 0.3, 0.16], [0.23, 'sw', 0.32, 0.16], [0.55, 'cl', 0.9]] };
   });
 
@@ -381,22 +393,14 @@
   M('u_execution', () => ({ dur: 2.5, hit: 2.0, both: false,
     main: [
       { t: 0, p: [0.17, -0.25, -0.3], q: [0.5, 0, -0.9], f: 'relax' },
-      { t: 0.22, p: [0.23, 0.09, -0.46], q: [1.7, 0, -1.57], f: 'blade', e: 'o' },
-      { t: 1.0, p: [0.232, 0.095, -0.46], e: 'l', s: 0.0012 },
-      { t: 1.82, p: [0.235, 0.125, -0.44], q: [1.95, 0, -1.57], e: 's', s: 0.002 },
-      { t: 2.0, p: [0.02, -0.13, -0.5], q: [-0.25, 0, -1.57], e: 'i' },
-      { t: 2.06, p: [0.022, -0.14, -0.49], e: 'o', s: 0.002 },
+      { t: 0.22, p: [0.21, -0.02, -0.5], q: [1.75, 0.15, -1.57], f: 'blade', e: 'o' },
+      { t: 1.0, p: [0.212, -0.015, -0.5], e: 'l', s: 0.0012 },
+      { t: 1.82, p: [0.2, 0.03, -0.49], q: [1.95, 0.1, -1.57], e: 's', s: 0.002 },
+      { t: 2.0, p: [0.05, -0.1, -0.42], q: [-0.15, 0, -1.57], e: 'i' },
+      { t: 2.06, p: [0.052, -0.11, -0.415], e: 'o', s: 0.002 },
       { t: 2.5, p: 'grip', q: GQ, f: 'grip', e: 's' }],
     body: [{ t: 0 }, { t: 0.22, p: 0.035, d: -0.008 }, { t: 1.0, p: 0.04, d: -0.01, s: 0.0005 }, { t: 1.84, p: 0.055, d: -0.015 }, { t: 2.03, p: -0.06, d: 0.045, f: 0.045 }, { t: 2.2, p: -0.05, d: 0.035, f: 0.03 }, { t: 2.5 }],
     jolt: [[2.0, 0.18]], snd: [[0, 'cl', 1], [0.05, 'sw', 0.15, 0.16], [1.88, 'sw', 0.38, 0.14]] }));
-
-  // (the armoury's rack: its places on the gun set once from where the hand held it, when there is a gun in that hand)
-  const rackTick = (c) => {
-    if (c._rack) return; c._rack = 1;
-    if (!c.oneHand || !c.grip || c.melee) return;
-    const ks = c.arms[0] && c.arms[0].ks; if (!ks) return;
-    for (let i = 0; i < RACK.length; i++) { const k = ks[i + 1]; if (k) k.P.copy(c.grip).add(new THREE.Vector3(RACK[i][0], RACK[i][1], RACK[i][2])); }
-  };
 
   CA.table({
     ult_bastion: { m: 'u_bastion' },          // 不屈の城塞: fist to palm, then a guard
@@ -408,7 +412,7 @@
     ult_blackhole: { m: 'u_blackhole' },      // 虚無の渦: space wrung between the hands
     ult_judgement: { m: 'u_judgement' },      // 天罰: up to the sky, down on the ground
     ult_phoenix: { m: 'u_phoenix' },          // 鳳凰転生: arms crossed, flung up like wings
-    ult_armory: { m: 'u_armory', tick: rackTick },   // 無限兵装: the gun racked
+    ult_armory: { m: 'u_armory' },            // 無限兵装: the gun racked
     ult_legion: { m: 'u_legion' },            // 亡者の軍勢: the dead lifted from the ground
     ult_tsunami: { m: 'u_tsunami' },          // 大海嘯: scooped up low and pushed out
     ult_cryo: { m: 'u_cryo' },                // 絶対零度: both palms slammed down and held

@@ -53,7 +53,9 @@
     press: fing((i) => [-0.32, 0.08, 0.04, sp(i) * 0.15], [0.05, 0.08, 0.1, 0.1]),
     // the edge of the hand: fingers straight and close, the thumb in along the palm
     blade: fing((i) => [0.04, 0.03, 0.02, -sp(i) * 0.03], [0.3, 0.22, 0.12, -0.28]),
-    fist: fing((i) => [1.9 + i * 0.04, 2.05, 1.4, 0], [1.0, 1.0, 0.9, -0.6]),
+    // clenched hard: the fingers rolled tight into the palm and the thumb laid across the first two of them (a thumb left hanging
+    // below the fist, or out to its side, reads as a claw from the palm side)
+    fist: fing((i) => [1.95 + i * 0.04, 2.1, 1.45, 0], [1.6, 0.8, 0.5, 0.9]),
     // closed round a thing to be thrown
     hold: fing((i) => [0.82 + i * 0.05, 0.95, 0.6, sp(i) * 0.06], [0.45, 0.42, 0.35, 0.12]),
     // just let go: open, the fingers trailing
@@ -71,18 +73,26 @@
     pray: fing((i) => [0.06, 0.06, 0.04, sp(i) * 0.01], [0.2, 0.15, 0.1, -0.15]),
   };
   CA.FING = FING;
+  // the turn of a fist held up before the body with its back and knuckles to the eye (seen from the palm side, curled fingers read as
+  // a claw): for a fist raised, braced or shaken
+  CA.FIST_Q = [1.3, 0.3, -0.2];
   const fingArr = (f) => { const F = typeof f === 'string' ? FING[f] || FING.rest : f; return F.f.flat().concat(F.t); };
 
   // ------------------------------------------------ the moves
   // A move: (o) => { dur, rel, hit, both, release, relP, main: [keys], off: [keys] | null, body: [body keys], jolt: [[t, a]],
-  // snd: [[t, kind, a, len]] }. o: the table's entry (its values: side, speed, angle, hold, high, f, at ...). dur: its length (s); rel:
+  // snd: [[t, kind, a, len]], prop: () => Object3D }. o: the table's entry (its values: side, speed, angle, hold, high, f, at ...).
+  // dur: its length (s); rel:
   // the moment the effect leaves the hand (s, for a release); hit: the moment the hand is in place for the effect (s; o.at moves it);
   // both: two hands (else the main hand alone; off may still give the other hand a small part when both). relP: where the palm (or the
   // finger tip) lets the shot go, in the view's space (o.hand overrides it). Keys (seconds, written for the right hand):
   //   { t, p: [x, y, z] | 'grip' | 'rest' | 'hand', q: [rx, ry, rz], f: finger preset | { f, t }, e: easing to it, s: tremor (m), pt }
   //   p: where the wrist is, in the view's space (the eye at the origin, -z ahead; ~0.45 m out is the hands' distance). 'grip': where
   //      the hand holds the gun (or out of sight below when it is lowered); 'rest': down out of sight; 'hand': the palm (pt 'tip': the
-  //      finger tip) on relP, where the shot leaves the hand; 'hand+': a little out past it, settling.
+  //      finger tip) on relP, where the shot leaves the hand; 'hand+': a little out past it, settling. ['grip', dx, dy, dz]: that far
+  //      from where the hand holds the gun; 'gun' / ['gun', dx, dy, dz]: (that far from) the wrist of a hand laid flat on top of the
+  //      gun's receiver, over its ejection port - found for each gun from its own model, so it is on the gun whatever the gun. Both
+  //      only mean something for the left hand alone with a gun in the right (CA.gripNow() / CA.gunNow() say whether there is one:
+  //      a move asks them when it is built and gives other keys when there is none); without, they fall back to 'rest'.
   //   q: the hand's turn (Euler XYZ). [0, 0, 0]: palm down, fingers ahead. [1.5, 0, 0]: palm ahead, fingers up. [0, 0, -1.57]: palm
   //      in towards the middle (a blade). [0, 0, 1.57]: palm out to the side. [0, 0, 3.1]: palm up.
   //   Left out: as the key before. e: q (in and out, the default), o (out: sets off fast, settles), i (in: gathers speed), s (smoother),
@@ -91,7 +101,9 @@
   // rolled (rad, + the head tipped to the left), y: turned to the left (rad), s: a tremor (rad) }; left out: 0. Eased smoothly key to
   // key. jolt: [t, a] the view shaken at t (player.js addShake a). snd: [t, kind, a, len]: 'sw' an arm swung through the air
   // (sfx.whoosh), 'cl' the cloth of the sleeve and the glove (sfx.mech grab), 'th' a hand on the ground (sfx.land on the floor under
-  // you), 'cp' the hands met.
+  // you), 'cp' the hands met. prop: a thing held in the main hand for the motion's length (a watch in the palm ...): made by the move
+  // (made once and kept by it), put in the hand's own space (the wrist at the origin, palm down, fingers to -z) as the motion starts
+  // and taken out of the hand as it ends or is cut; the move's tick may show and hide it (c.prop).
   const MOVES = {};
   CA.MOVES = MOVES;
   CA.move = (name, fn) => { MOVES[name] = fn; };
@@ -352,6 +364,7 @@
     const out = { dur: tm(mv.dur), rel: mv.rel !== undefined ? tm(mv.rel) : tm(hit), both: !!mv.both, side: e.side || 'L', main: fix(mv.main), off: fix(mv.off), release: !!(mv.release || e.release) && e.release !== false, tick: e.tick || mv.tick || null };
     out.delay = out.release ? Math.min(MAX_DELAY, out.rel) : 0;
     out.relP = e.hand || mv.relP || REL_P;
+    out.prop = typeof mv.prop === 'function' ? mv.prop : null;
     out.body = bk > 0 && mv.body ? mv.body.map((k) => ({ t: tm(k.t), d: (k.d || 0) * bk, f: (k.f || 0) * bk, p: (k.p || 0) * bk, r: (k.r || 0) * bk, y: (k.y || 0) * bk, s: (k.s || 0) * bk })) : null;
     out.jolt = bk > 0 && mv.jolt ? mv.jolt.map(([t, a]) => [tm(t), a * bk]) : [];
     out.snd = !e.quiet && mv.snd ? mv.snd.map((s) => [tm(s[0])].concat(s.slice(1))).sort((a, b) => a[0] - b[0]) : [];
@@ -429,7 +442,13 @@
   function resolve(keys, c, s) {
     const out = []; let p = null, q = REST_Q, f = 'rest';
     const at = (P) => {
-      if (P === 'grip') return c.oneHand && s < 0 && c.grip ? c.grip.clone() : REST_P.clone();
+      const name = Array.isArray(P) && typeof P[0] === 'string' ? P[0] : P;
+      const d = Array.isArray(P) && typeof P[0] === 'string' ? new V3(+P[1] || 0, +P[2] || 0, +P[3] || 0) : null;
+      if (name === 'grip' || name === 'gun') {
+        const base = c.oneHand && s < 0 ? (name === 'gun' ? c.gun : c.grip) : null;
+        if (!base) return REST_P.clone();
+        return d ? base.clone().add(d) : base.clone();
+      }
       if (P === 'rest') return REST_P.clone();
       return null;
     };
@@ -443,7 +462,7 @@
         if (pp === 'hand+') tgt.add(new V3(-0.006, 0.004, -0.012));
         if (pp === 'hand') c.relTip = k.pt === 'tip';
         P = tgt.sub((k.pt === 'tip' ? TIP : PALM).clone().applyQuaternion(Q));
-      } else P = Array.isArray(pp) ? new V3(pp[0], pp[1], pp[2]) : at(pp) || REST_P.clone();
+      } else P = Array.isArray(pp) && typeof pp[0] !== 'string' ? new V3(pp[0], pp[1], pp[2]) : at(pp) || REST_P.clone();
       out.push({ t: k.t, P, Q, F: fingArr(ff), e: k.e || 'q', s: k.s || 0 });
       p = pp === 'hand' || pp === 'hand+' ? [P.x, P.y, P.z] : pp; q = qq; f = ff;
     }
@@ -497,7 +516,8 @@
     let i = 0; while (i < ks.length - 2 && t > ks[i + 1].t) i++;
     const a = ks[i], b = ks[Math.min(ks.length - 1, i + 1)], u0 = U.clamp((t - a.t) / Math.max(1e-4, b.t - a.t), 0, 1), u = u0 * u0 * (3 - 2 * u0);
     for (const k of BK) out[k] = a[k] + (b[k] - a[k]) * u;
-    const m = c.side < 0 ? -1 : 1;
+    // (a motion of the left hand alone leans and turns the other way; one of both hands is as it is written)
+    const m = c.side < 0 && !c.both ? -1 : 1;
     out.r *= m; out.y *= m;
     return out;
   }
@@ -546,8 +566,23 @@
   function gripPoint() {
     const W = G.weapons, m = W.dbgModel && W.dbgModel(); if (!m || !m.lHand || G.player.meleeMode) return null;
     m.group.updateMatrixWorld(true); const p = m.lHand.getWorldPosition(new V3());
-    return new V3(-p.x, p.y, p.z).add(new V3(0.0, -0.015, 0.065));   // (its wrist: behind the fist that holds the fore-end)
+    return sagged(new V3(-p.x, p.y, p.z).add(new V3(0.0, -0.015, 0.065)));   // (its wrist: behind the fist that holds the fore-end)
   }
+  // a point on the gun as it will be once the motion of the left hand alone has let it sag in the right hand (weapons.js: the gun
+  // held in one hand drops and moves out a little as CA.one comes up; a point taken before that would leave the hand above the gun)
+  function sagged(v) { const k = 1 - CA.one; v.x -= 0.025 * k; v.y -= 0.02 * k; v.z += 0.015 * k; return v; }
+  // where the wrist of a hand laid flat on the gun's receiver is (in the arms' right-handed space: x turned over): on top of it over the
+  // ejection port, a little to the hand's own side so the palm lies on it rather than in it; null where there is no gun in hand
+  function gunPoint() {
+    const W = G.weapons, m = W.dbgModel && W.dbgModel(); if (!m || !m.group || G.player.meleeMode) return null;
+    m.group.updateMatrixWorld(true);
+    const ej = m.ejector || new V3(0.03, 0.05, 0), top = Math.max(m.railY || 0.06, ej.y + 0.012);
+    const p = m.group.localToWorld(new V3(0, top + 0.022, ej.z + 0.03));
+    return sagged(new V3(-p.x, p.y, p.z));
+  }
+  // for a move as it is built: where the hand holds the gun / the point on its receiver now (arrays, in the arms' space), or null
+  CA.gripNow = () => { try { const g = gripPoint(); return g ? [g.x, g.y, g.z] : null; } catch (e) { return null; } };
+  CA.gunNow = () => { try { const g = gunPoint(); return g ? [g.x, g.y, g.z] : null; } catch (e) { return null; } };
   // a hand weapon's left hand (melee.js W.meleeLeft): free (nothing in it, or the fists' left fist, which this hand takes the place of),
   // or busy (the twin fangs' second blade, a shield): { free, l, grip }
   const BUSY_LEFT = { twin: 1, buckler: 1, tower: 1 };
@@ -583,17 +618,18 @@
     const P = G.player, W = G.weapons;
     const side = mv.side === 'R' ? 1 : -1, melee = !!P.meleeMode;
     const ml = melee ? meleeLeft() : null;
-    const grip = melee ? ml.grip : gripPoint();
+    const grip = melee ? ml.grip : gripPoint(), gun = melee ? null : gunPoint();
     // the left hand alone, with a gun (or a hand weapon that leaves the left hand free) in the right: the weapon stays up and this hand
     // takes the place of its left one
     const oneHand = !mv.both && side < 0 && (melee ? ml.free : !!grip);
     const c = cur = { id, t: opts.freeze !== undefined ? opts.freeze : 0, freeze: opts.freeze, dur: mv.dur, rel: mv.rel, oneHand, lower: !oneHand, both: mv.both, side,
-      w: P.weapon, melee, fire: opts.fire || null, fired: false, area: G.game && G.game.area, tick: mv.tick, grip, relP: mv.relP, relTip: false,
+      w: P.weapon, melee, fire: opts.fire || null, fired: false, area: G.game && G.game.area, tick: mv.tick, grip, gun, relP: mv.relP, relTip: false,
       body: mv.body, jolt: mv.jolt.slice(), snd: mv.snd, si: 0, arms: [] };
     const main = side < 0 ? rig.L : rig.R, other = side < 0 ? rig.R : rig.L;
     c.arms.push({ A: main, ks: resolve(mv.main, c, main.side) });
     if (mv.both) c.arms.push({ A: other, ks: resolve(mv.off || mv.main, c, other.side) });
     for (const a of c.arms) a.A.g.visible = true;
+    if (mv.prop) { try { const o = mv.prop(); if (o) { o.visible = true; main.hand.add(o); c.prop = o; } } catch (e) { console.error(e); } }
     if (oneHand) {
       if (melee) { if (ml.l) { c.lHand = ml.l; ml.l.visible = false; } }
       else { const m = W.dbgModel(); c.lHand = m.lHand; m.lHand.visible = false; }
@@ -625,6 +661,7 @@
   function stop(c, now) {
     if (c.fire && !c.fired) release(c);
     for (const a of c.arms) a.A.g.visible = false;
+    if (c.prop && c.prop.parent) c.prop.parent.remove(c.prop);
     if (c.lHand) c.lHand.visible = true;
     if (cur === c) cur = null;
   }

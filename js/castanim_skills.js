@@ -34,6 +34,12 @@
     hook: fing((i) => [0.25 + i * 0.03, 1.35, 1.0, sp(i) * 0.05], [0.4, 0.45, 0.4, 0.1]),
     // the fingers flicked open and back (a sprinkle, a flick of water)
     flick: fing((i) => [-0.22 + i * 0.03, -0.1, 0.0, sp(i) * 0.18], [0.1, 0.05, 0.0, 0.2]),
+    // a watch cradled in the palm: the fingers a little curled under its rim, the thumb raised clear of it / pressed down on its crown
+    cradle: fing((i) => [0.35 + i * 0.06, 0.5, 0.35, sp(i) * 0.05], [0.1, 0.0, 0.0, 0.5]),
+    cradlePress: fing((i) => [0.4 + i * 0.06, 0.55, 0.4, sp(i) * 0.05], [0.6, 0.5, 0.4, 0.5]),
+    // a knob taken between the thumb and the first two fingers, the other two closed out of the way
+    pinch: fing((i) => (i < 2 ? [0.55 + i * 0.05, 0.95, 0.5, (i ? -0.04 : 0.04)] : [1.35 + i * 0.05, 1.5, 1.0, 0]), [0.75, 0.45, 0.3, 0.6]),
+    pinchOpen: fing((i) => (i < 2 ? [0.3 + i * 0.05, 0.5, 0.25, (i ? -0.08 : 0.08)] : [1.3 + i * 0.05, 1.45, 0.95, 0]), [0.35, 0.15, 0.1, 0.7]),
   };
   const fx = (n) => FX[n] || n;
   // where the gun's own left hand is now (castanim.js gripPoint: the wrist behind the fist on the fore-end), or null
@@ -130,8 +136,8 @@
   mv('sk_javelin', () => {
     const r = 0.12;
     return { dur: 0.72, rel: r, hit: r, release: true, relP: [0.075, -0.045, -0.5], main: [
-      { t: 0, p: [0.27, 0.13, 0.08], q: [2.1, -0.15, -1.35], f: 'hold' },
-      { t: 0.06, p: [0.2, 0.05, -0.24], q: [1.55, -0.1, -1.4], e: 'i' },
+      { t: 0, p: [0.16, 0.08, -0.05], q: [2.1, -0.15, -1.35], f: 'hold' },
+      { t: 0.06, p: [0.11, 0.01, -0.45], q: [1.55, -0.1, -1.4], e: 'i' },
       { t: r, p: 'hand', q: [1.05, 0.0, -1.45], f: 'release', e: 'l' },
       { t: r + 0.08, p: [0.04, -0.09, -0.53], q: [0.35, 0.15, -1.45], f: 'point', e: 'o' },
       { t: 0.4, p: [0.03, -0.13, -0.5], q: [0.2, 0.2, -1.4], f: 'relax', e: 's' },
@@ -262,7 +268,7 @@
       { t: 0.52, p: B, q: qb, e: 'o' },
       { t: 0.8, p: 'rest', q: REST_Q, f: 'rest', e: 'i' }];
     return { dur: 0.8, hit: 0.07, both: true, main: F(keys(0)), off: F(keys(1)),
-      body: [{ t: 0 }, { t: 0.08, f: 0.02 }, { t: 0.24, f: -0.03, p: 0.01, y: -0.01 }, { t: 0.36, f: -0.01, y: 0.01 }, { t: 0.52, f: -0.035, p: 0.012, y: -0.008 }, { t: 0.8 }],
+      body: [{ t: 0 }, { t: 0.08, f: 0.02 }, { t: 0.24, f: -0.03, p: 0.01, y: 0.01 }, { t: 0.36, f: -0.01, y: -0.01 }, { t: 0.52, f: -0.035, p: 0.012, y: 0.008 }, { t: 0.8 }],
       jolt: [[0.24, 0.05], [0.36, 0.04], [0.52, 0.05]], snd: [[0, 'cl', 1], [0.1, 'cl', 1.3], [0.22, 'cl', 1.1], [0.38, 'cl', 1.3], [0.5, 'cl', 1.1]] };
   });
   // ---- 地雷散布: a low side-arm sow: the handful swung up from the hip and swept across the body, the fingers opening as it goes so
@@ -464,32 +470,32 @@
     jolt: [[0.62, 0.03]], snd: [[0, 'cl', 0.8], [0.22, 'cl', 0.9], [0.44, 'cl', 0.9], [0.6, 'cl', 1.2]] }));
   // ---- 魂の収穫: a reaper's stroke: the edge of the hand swung from high out at the side down across the body, then the souls taken
   // in the fist and drawn to the chest
-  mv('sk_reap', () => ({ dur: 0.85, hit: 0.08, main: [
-    { t: 0, p: 'grip', q: GRIP_Q, f: 'grip' },
-    { t: 0.06, p: [0.3, 0.04, -0.32], q: [0.55, 0.45, -1.45], f: 'blade', e: 'o' },
-    { t: 0.15, p: [-0.1, -0.17, -0.43], q: [0.15, -0.55, -1.65], e: 'i' },
-    { t: 0.22, p: [-0.15, -0.21, -0.38], e: 'o' },
+  mv('sk_reap', () => ({ dur: 0.85, hit: 0.05, main: [
+    { t: 0, p: [0.36, 0.08, -0.24], q: [0.55, 0.5, -1.45], f: 'blade' },
+    { t: 0.05, p: [0.1, -0.08, -0.46], q: [0.3, 0.0, -1.55], e: 'i' },
+    { t: 0.1, p: [-0.12, -0.18, -0.42], q: [0.15, -0.55, -1.65], e: 'o' },
+    { t: 0.2, p: [-0.15, -0.21, -0.38], e: 'o' },
     { t: 0.38, p: [-0.02, -0.12, -0.42], q: [1.2, 0, 2.6], f: 'clawOpen', e: 's' },
     { t: 0.46, p: [0.06, -0.15, -0.3], q: [1.45, 0, 3.0], f: 'fist', e: 'o' },
     { t: 0.85, p: 'grip', q: GRIP_Q, f: 'grip', e: 's' }],
-    body: [{ t: 0 }, { t: 0.06, y: -0.02, p: 0.012 }, { t: 0.17, y: 0.035, r: 0.02, p: -0.02, d: 0.01 }, { t: 0.48, f: -0.015, p: 0.01 }, { t: 0.85 }],
-    jolt: [[0.46, 0.03]], snd: [[0, 'cl', 0.9], [0.07, 'sw', 0.32, 0.2], [0.44, 'cl', 1.2]] }));
+    body: [{ t: 0, y: -0.02, p: 0.012 }, { t: 0.12, y: 0.035, r: 0.02, p: -0.02, d: 0.01 }, { t: 0.48, f: -0.015, p: 0.01 }, { t: 0.85 }],
+    jolt: [[0.05, 0.03], [0.46, 0.03]], snd: [[0, 'cl', 0.9], [0.01, 'sw', 0.32, 0.2], [0.44, 'cl', 1.2]] }));
   // ---- 次元斬: the edge of the hand raised high over the middle of the view and cut straight down through it - the air split
-  mv('sk_cleave', () => ({ dur: 0.66, hit: 0.14, main: [
-    { t: 0, p: 'grip', q: GRIP_Q, f: 'grip' },
-    { t: 0.08, p: [0.06, 0.12, -0.34], q: [1.95, 0.0, -1.57], f: 'blade', e: 'o' },
-    { t: 0.14, p: [0.035, -0.08, -0.48], q: [0.7, 0, -1.57], e: 'i' },
-    { t: 0.19, p: [0.03, -0.21, -0.44], q: [0.1, 0, -1.57], e: 'o' },
-    { t: 0.32, p: [0.035, -0.22, -0.43], e: 's' },
+  mv('sk_cleave', () => ({ dur: 0.66, hit: 0.05, main: [
+    { t: 0, p: [0.08, 0.13, -0.46], q: [1.95, 0.0, -1.57], f: 'blade' },
+    { t: 0.05, p: [0.04, -0.06, -0.48], q: [0.8, 0, -1.57], e: 'i' },
+    { t: 0.1, p: [0.03, -0.21, -0.44], q: [0.1, 0, -1.57], e: 'o' },
+    { t: 0.3, p: [0.035, -0.22, -0.43], e: 's' },
     { t: 0.66, p: 'grip', q: GRIP_Q, f: 'grip', e: 's' }],
-    body: [{ t: 0 }, { t: 0.08, p: 0.02, d: -0.008 }, { t: 0.18, p: -0.035, d: 0.016, f: 0.025 }, { t: 0.35, p: -0.01 }, { t: 0.66 }],
-    jolt: [[0.16, 0.06]], snd: [[0, 'cl', 0.9], [0.1, 'sw', 0.34, 0.14]] }));
+    body: [{ t: 0, p: 0.02, d: -0.008 }, { t: 0.09, p: -0.035, d: 0.016, f: 0.025 }, { t: 0.32, p: -0.01 }, { t: 0.66 }],
+    jolt: [[0.06, 0.06]], snd: [[0, 'cl', 0.9], [0.0, 'sw', 0.34, 0.14]] }));
   // ---- 刃の旋風: the hand, fingers spread, swung round in a flat circle before the body, outward and back - the blades set spinning
   mv('sk_whirl', () => {
-    const c = [0.06, -0.09, -0.41];
-    const ks = loop(0.06, 0.42, 10, (u) => {
+    const c = [0.06, -0.085, -0.44];
+    const ks = loop(0.06, 0.42, 12, (u) => {
       const a = Math.PI * 0.5 - u * Math.PI * 2;
-      return { p: [c[0] + Math.cos(a) * 0.22, c[1] + 0.015 * Math.sin(u * 6.28), c[2] - Math.sin(a) * 0.1], q: [0.05, a - Math.PI * 0.5, 0.15], f: 'splay' };
+      // (the ring is tilted up toward the eye: laid flat, it would be seen edge on, a hand going left and right)
+      return { p: [c[0] + Math.cos(a) * 0.2, c[1] + Math.sin(a) * 0.07, c[2] - Math.sin(a) * 0.07], q: [0.25 + 0.2 * Math.sin(a), a - Math.PI * 0.5, 0.15], f: 'splay' };
     });
     return { dur: 0.72, hit: 0.06, main: [
       { t: 0, p: 'grip', q: GRIP_Q, f: 'grip' },
@@ -522,32 +528,67 @@
     body: [{ t: 0 }, { t: 0.14, p: -0.025, d: 0.01 }, { t: 0.52, p: 0.0, d: 0.0 }, { t: 0.62, p: 0.025, d: -0.008 }, { t: 1.0 }],
     jolt: [[0.6, 0.04]], snd: [[0, 'cl', 0.8], [0.3, 'cl', 0.7], [0.56, 'sw', 0.18, 0.12]] }));
 
-  // ---- 時間減速: a watch held in the hand before the chest, palm up; the thumb presses its crown and the hand closes round it
-  mv('sk_watch', () => ({ dur: 0.95, hit: 0.12, main: F([
+  // ---- 時間減速: a pocket watch of old brass is held up in the palm before the chest, its face to the eye; the thumb is lifted and
+  // pressed hard down on its crown (the moment time slows), and the hand closes over the watch as it goes back to the gun
+  let watch = null;
+  function watchProp() {
+    if (watch) return watch;
+    const g = new THREE.Group();
+    const brass = new THREE.MeshStandardMaterial({ color: 0x6e5532, metalness: 0.85, roughness: 0.45 });
+    // the face: old ivory, its hours, two dark hands (drawn once on a small canvas)
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const x = cv.getContext('2d');
+    x.fillStyle = '#a99c80'; x.fillRect(0, 0, 128, 128);
+    const gr = x.createRadialGradient(64, 64, 20, 64, 64, 64); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(40,30,15,0.45)');
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+    x.strokeStyle = '#2a2218'; x.lineWidth = 3; x.beginPath(); x.arc(64, 64, 56, 0, 6.283); x.stroke();
+    for (let h = 0; h < 12; h++) { const a = h / 12 * 6.283, r0 = h % 3 ? 47 : 42; x.lineWidth = h % 3 ? 2 : 4; x.beginPath(); x.moveTo(64 + Math.sin(a) * r0, 64 - Math.cos(a) * r0); x.lineTo(64 + Math.sin(a) * 53, 64 - Math.cos(a) * 53); x.stroke(); }
+    x.lineCap = 'round'; x.lineWidth = 5; x.beginPath(); x.moveTo(64, 64); x.lineTo(64 + 22, 64 - 18); x.stroke();
+    x.lineWidth = 3; x.beginPath(); x.moveTo(64, 64); x.lineTo(64 - 8, 64 - 38); x.stroke();
+    x.fillStyle = '#2a2218'; x.beginPath(); x.arc(64, 64, 4, 0, 6.283); x.fill();
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const faceM = new THREE.MeshStandardMaterial({ map: tex, metalness: 0, roughness: 0.55 });
+    // (the hand's own space: palm down (-y), fingers to -z, the thumb to -x: the watch lies under the palm, face down and out, its
+    // crown turned toward the thumb)
+    const cs = new THREE.Mesh(new THREE.CylinderGeometry(0.0215, 0.0215, 0.008, 32), brass);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.019, 0.0018, 6, 32), brass); rim.rotation.x = Math.PI / 2; rim.position.y = -0.0045;
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.0185, 32), faceM); face.rotation.x = Math.PI / 2; face.position.y = -0.0042;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.0022, 0.0022, 0.005, 10), brass); stem.rotation.x = Math.PI / 2; stem.position.z = -0.0235;
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.0038, 0.0038, 0.0045, 12), brass); crown.rotation.x = Math.PI / 2; crown.position.z = -0.0275;
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.0065, 0.0012, 6, 16), brass); bow.rotation.x = Math.PI / 2; bow.position.z = -0.0355;
+    const w = new THREE.Group(); w.add(cs, rim, face, stem, crown, bow);
+    w.rotation.y = Math.PI * 0.3; w.position.set(-0.004, -0.034, -0.052);
+    g.add(w);
+    g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
+    return (watch = g);
+  }
+  mv('sk_watch', () => ({ dur: 0.95, hit: 0.12, prop: watchProp, main: F([
     { t: 0, p: 'grip', q: GRIP_Q, f: 'grip' },
-    { t: 0.1, p: [0.04, -0.15, -0.34], q: [0.0, 0.15, 2.95], f: 'cup', e: 'o' },
-    { t: 0.18, f: 'watch', e: 's' },
-    { t: 0.3, f: 'watchPress', e: 'i' },
-    { t: 0.36, f: 'watch', e: 'o' },
-    { t: 0.55, p: [0.04, -0.145, -0.34], q: [0.25, 0.15, 2.6], f: 'fist', e: 's' },
+    { t: 0.1, p: [0.05, -0.115, -0.36], q: [0.75, 0.2, 3.0], f: 'cradle', e: 'o' },
+    { t: 0.22, p: [0.05, -0.11, -0.355], f: { f: FX.cradle.f, t: [0.0, -0.15, -0.1, 0.55] }, e: 's' },
+    { t: 0.3, f: 'cradlePress', e: 'i', s: 0.0015 },
+    { t: 0.4, f: 'cradle', e: 'o' },
+    { t: 0.6, p: [0.05, -0.12, -0.36], q: [0.55, 0.2, 2.9], f: 'watch', e: 's' },
     { t: 0.95, p: 'grip', q: GRIP_Q, f: 'grip', e: 's' }]),
-    body: [{ t: 0 }, { t: 0.14, p: -0.045, d: 0.006 }, { t: 0.55, p: -0.04, d: 0.006 }, { t: 0.95 }],
-    jolt: [[0.3, 0.015]], snd: [[0, 'cl', 0.8], [0.3, 'cl', 1.6]] }));
-  // ---- 時間逆行: the open hand held up, palm out, and turned back round a circle against the clock, then snatched back to the shoulder
+    body: [{ t: 0 }, { t: 0.14, p: -0.05, d: 0.006 }, { t: 0.3, p: -0.055, d: 0.008 }, { t: 0.6, p: -0.04, d: 0.006 }, { t: 0.95 }],
+    jolt: [[0.3, 0.02]], snd: [[0, 'cl', 0.8], [0.3, 'cl', 1.6]] }));
+  // ---- 時間逆行: a dial in the air taken between the thumb and the first two fingers and wound back hard, twice (the hand lets go and
+  // takes it again between the turns), then snatched back to the shoulder
   mv('sk_unwind', () => {
-    const c = [0.09, -0.07, -0.46];
-    const ks = loop(0.08, 0.42, 8, (u) => {
-      const a = Math.PI * 0.5 + u * Math.PI * 2;
-      return { p: [c[0] + Math.cos(a) * 0.06, c[1] + Math.sin(a) * 0.05, c[2]], q: [1.45, -0.05, -0.15 + u * 1.5], f: 'claw' };
-    });
-    return { dur: 0.78, hit: 0.08, main: [
+    const P0 = [0.075, -0.06, -0.46], qa = (z) => [1.05, 0.0, z];
+    return { dur: 0.78, hit: 0.08, main: F([
       { t: 0, p: 'grip', q: GRIP_Q, f: 'grip' },
-      { t: 0.08, p: [c[0], c[1] + 0.05, c[2]], q: [1.45, -0.05, -0.15], f: 'clawOpen', e: 'o' },
-      ...ks,
-      { t: 0.52, p: [0.2, -0.1, -0.22], q: [1.1, 0.4, -0.6], f: 'fist', e: 'o' },
-      { t: 0.78, p: 'grip', q: GRIP_Q, f: 'grip', e: 's' }],
-      body: [{ t: 0 }, { t: 0.1, f: 0.01 }, { t: 0.42, f: 0.01 }, { t: 0.54, f: -0.04, p: 0.015 }, { t: 0.78 }],
-      jolt: [[0.52, 0.03]], snd: [[0, 'cl', 0.8], [0.12, 'sw', 0.08, 0.3], [0.46, 'sw', 0.2, 0.1]] };
+      { t: 0.08, p: P0, q: qa(0.5), f: 'pinchOpen', e: 'o' },
+      { t: 0.11, f: 'pinch', e: 'i' },
+      { t: 0.22, q: qa(-0.9), e: 'q', s: 0.0008 },
+      { t: 0.26, f: 'pinchOpen', e: 'o' },
+      { t: 0.3, q: qa(0.5), e: 'q' },
+      { t: 0.33, f: 'pinch', e: 'i' },
+      { t: 0.44, q: qa(-0.9), e: 'q', s: 0.0008 },
+      { t: 0.54, p: [0.2, -0.1, -0.22], q: [1.1, 0.4, -0.6], f: 'fist', e: 'o' },
+      { t: 0.78, p: 'grip', q: GRIP_Q, f: 'grip', e: 's' }]),
+      body: [{ t: 0 }, { t: 0.1, f: 0.012 }, { t: 0.44, f: 0.012 }, { t: 0.56, f: -0.04, p: 0.015 }, { t: 0.78 }],
+      jolt: [[0.54, 0.03]], snd: [[0, 'cl', 0.8], [0.11, 'cl', 0.9], [0.33, 'cl', 0.9], [0.48, 'sw', 0.2, 0.1]] };
   });
   // ---- 透明化: the palm drawn down over the face from the brow, like a veil pulled down; the hand passes off below
   mv('sk_veil', () => ({ dur: 0.62, hit: 0.1, main: [
@@ -587,7 +628,7 @@
       { t: 0.85, p: [0.22, -0.11, -0.42], e: 'l' },
       { t: 1.1, p: 'rest', q: REST_Q, f: 'rest', e: 'i' }];
     return { dur: 1.1, hit: 0.14, both: true, main: keys(1), off: keys(-1),
-      body: [{ t: 0 }, { t: 0.14, d: 0.006, r: 0.008 }, { t: 0.34, r: -0.007 }, { t: 0.52, r: 0.003 }, { t: 0.7, p: -0.008 }, { t: 1.1 }],
+      body: [{ t: 0 }, { t: 0.14, d: 0.006, r: -0.008 }, { t: 0.34, r: 0.007 }, { t: 0.52, r: -0.003 }, { t: 0.7, p: -0.008 }, { t: 1.1 }],
       snd: [[0, 'cl', 1], [0.3, 'cl', 0.5]] };
   });
   // ---- 癒しの泉: both hands cupped together low before the body, as water is taken from a spring, lifted, and parted palms up
@@ -618,22 +659,37 @@
   // ---- 弾幕: the gun is slapped twice on its side with the flat of the hand, as if to wake it (or, a hand weapon held, the fist struck
   // into the palm): its bolt goes back with it
   mv('sk_slap', () => {
-    const g = gripNow();
-    if (!g) return { dur: 0.55, hit: 0.1, main: [
-      { t: 0, p: [0.17, -0.28, -0.3], q: [0.6, 0.1, -1.0], f: 'relax' },
-      { t: 0.1, p: [0.06, -0.12, -0.38], q: [1.0, 0.1, -1.45], f: 'fist', e: 'i' },
-      { t: 0.2, p: [0.1, -0.08, -0.4], e: 'o' },
-      { t: 0.27, p: [0.06, -0.12, -0.38], e: 'i' },
-      { t: 0.55, p: 'grip', q: GRIP_Q, f: 'grip', e: 's' }],
-      body: [{ t: 0 }, { t: 0.1, d: 0.008 }, { t: 0.27, d: 0.008 }, { t: 0.55 }], jolt: [[0.1, 0.03], [0.27, 0.03]], snd: [[0.09, 'cp', 0.8], [0.26, 'cp', 0.8]] };
-    const on = [-0.1, -0.115, -0.37], up = [-0.065, -0.045, -0.37], QF = [-0.25, 0.6, 0.1];
+    const g = CA.gunNow ? CA.gunNow() : gripNow();
+    // (no gun in the right hand: a hand weapon is lowered and the right fist is struck twice into the open left palm before the chest)
+    if (!g) {
+      const palm = [0.05, -0.12, -0.38], PQ = [1.45, -0.05, -1.57];
+      return { dur: 0.6, hit: 0.1, both: true,
+        main: [
+          { t: 0, p: [0.17, -0.3, -0.28], q: [0.8, 0.1, -1.2], f: 'relax' },
+          { t: 0.08, p: palm, q: PQ, f: 'flat', e: 'o' },
+          { t: 0.3, p: [palm[0], palm[1] - 0.003, palm[2]], e: 'l', s: 0.0015 },
+          { t: 0.6, p: 'rest', q: [-0.4, 0.1, 0.5], f: 'rest', e: 's' }],
+        off: [
+          { t: 0, p: [0.2, -0.3, -0.26], q: [0.6, 0.1, -0.9], f: 'fist' },
+          { t: 0.06, p: [0.11, -0.1, -0.33], q: [0.5, 0.4, -0.4], e: 'o' },
+          { t: 0.1, p: [-0.015, -0.12, -0.375], q: [0.3, 0.9, -0.3], e: 'i' },
+          { t: 0.17, p: [0.1, -0.1, -0.34], e: 'o' },
+          { t: 0.22, p: [-0.015, -0.12, -0.375], e: 'i' },
+          { t: 0.3, p: [-0.01, -0.118, -0.37], e: 'o', s: 0.002 },
+          { t: 0.6, p: 'rest', q: [-0.4, 0.1, 0.5], f: 'rest', e: 's' }],
+        body: [{ t: 0 }, { t: 0.1, d: 0.008, p: -0.008 }, { t: 0.22, d: 0.01, p: -0.01 }, { t: 0.6 }],
+        jolt: [[0.1, 0.03], [0.22, 0.04]], snd: [[0.09, 'cp', 0.9], [0.21, 'cp', 1.0]] };
+    }
+    // (the wrist out to the gun's left side and down from its top, the palm turned in flat against the receiver; drawn out from it
+    // between the slaps)
+    const on = ['gun', 0.035, -0.06, 0.02], up = ['gun', 0.1, -0.03, 0.02], QF = [0.05, 0.05, -1.45], QU = [0.25, 0.1, -1.2];
     return { dur: 0.6, hit: 0.1, main: [
       { t: 0, p: 'grip', q: GRIP_Q, f: 'grip' },
-      { t: 0.06, p: up, q: [0.35, 0.55, 0.1], f: 'flat', e: 'o' },
+      { t: 0.06, p: up, q: QU, f: 'flat', e: 'o' },
       { t: 0.1, p: on, q: QF, e: 'i' },
-      { t: 0.17, p: up, q: [0.35, 0.55, 0.1], e: 'o' },
+      { t: 0.17, p: up, q: QU, e: 'o' },
       { t: 0.22, p: on, q: QF, e: 'i' },
-      { t: 0.3, p: [on[0], on[1] + 0.01, on[2]], e: 'o' },
+      { t: 0.3, p: ['gun', 0.045, -0.055, 0.02], e: 'o' },
       { t: 0.6, p: 'grip', q: GRIP_Q, f: 'grip', e: 's' }],
       body: [{ t: 0 }, { t: 0.1, d: 0.006, p: -0.008 }, { t: 0.22, d: 0.008, p: -0.01 }, { t: 0.6 }],
       jolt: [[0.1, 0.03], [0.22, 0.04]], snd: [[0.09, 'cp', 0.7], [0.21, 'cp', 0.9]] };
@@ -698,8 +754,8 @@
     warcry: { m: 'sk_roar' },                                    // 鬨の声: the fist shaken overhead
     summon: { m: 'sk_puppet' },                                  // 骸骨兵召喚: drawn up on strings
     // ---- on yourself
-    chrono: { m: 'sk_watch' },                                   // 時間減速: a watch's crown pressed
-    rewind: { m: 'sk_unwind' },                                  // 時間逆行: a circle turned back, snatched back
+    chrono: { m: 'sk_watch', tick: (c, t) => { if (c.prop) c.prop.visible = t < 0.8; } },   // 時間減速: a pocket watch's crown pressed
+    rewind: { m: 'sk_unwind' },                                  // 時間逆行: a dial pinched and wound back, snatched back
     cloak: { m: 'sk_veil' },                                     // 透明化: a veil drawn down over the face
     sk_shadow: { m: 'sk_cross' },                                // 影分身: two fingers of each hand crossed
     sk_scale: { m: 'sk_scales' },                                // 天秤の祈り: the pans of a scale

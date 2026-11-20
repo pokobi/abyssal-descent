@@ -73,6 +73,10 @@
     <div class="row" id="supps"></div>
   </section>
   <section>
+    <h2>命中の音（撃つたびに、当たった時の音も鳴らす）</h2>
+    <div class="row" id="hits"></div>
+  </section>
+  <section>
     <h2>銃声の音量</h2>
     <div class="vol"><input type="range" id="vol" min="60" max="160" step="10" value="100" aria-label="銃声の音量"><output id="volv">100％</output></div>
   </section>
@@ -123,9 +127,12 @@
   // from 12 m the far recording comes in, by 55 m it is all of it)
   const FROMS = [[0, '自分'], [8, '8m先の敵'], [25, '25m先の敵'], [40, '40m先の敵'], [70, '70m先の敵']];
   const SUPPS = [[0, 'なし'], [1, 'あり']];
+  // (the sounds of a hit with each shot, as the game plays them in the same frame as your shot: the body struck (combat.js hitFlesh),
+  // the head (headshot), the hit told (ui.js hitMarker's hitConfirm) - a kill's as a headshot that kills)
+  const HITS = [['', 'なし'], ['body', '胴撃ち'], ['head', 'ヘッドショット'], ['kill', 'キル']];
   const MODES = [['one', '単発'], ['three', '3発'], ['auto', '連射（1秒）']];
   const PLACES = [['in', '屋内'], ['out', '屋外']];
-  const S = { v: 'R', mode: 'one', place: 'in', gun: 'rifle', vol: 100, amb: true, from: 0, supp: 0 };
+  const S = { v: 'R', mode: 'one', place: 'in', gun: 'rifle', vol: 100, amb: true, from: 0, supp: 0, hit: '' };
   const $ = (id) => document.getElementById(id);
   const label = (list, k) => (list.find((q) => q[0] === k) || [])[1];
   const gun = () => GUNS.find((q) => q[0] === S.gun);
@@ -154,6 +161,7 @@
     const o = { vol: Math.pow(S.vol / 100, 2.5), suppressed: !!S.supp };
     if (S.from) o.pos = { x: 0, y: 1.6, z: -S.from }; else { o.id = gun()[3]; o.rar = 'common'; }
     A.gun(S.gun, o);
+    if (S.hit && !S.from) { const pos = { x: 0, y: 1.2, z: -8 }; A.hitFlesh(pos, false, S.hit !== 'body'); if (S.hit !== 'body') A.headshot(S.hit === 'kill'); A.hitConfirm(S.hit === 'kill'); }
   }
   let timers = [];
   function fire(mode) {
@@ -189,7 +197,7 @@
   }
   function draw() {
     const vv = ver();
-    $('now').textContent = gun()[1] + ' 版 ' + vv[1] + (vv[2] ? ' ' + vv[2] : '') + ' ／ ' + label(MODES, S.mode) + ' ／ ' + label(PLACES, S.place) + ' ／ ' + label(FROMS, S.from) + (S.supp ? ' ／ 消音' : '') + ' ／ 銃声 ' + S.vol + '％';
+    $('now').textContent = gun()[1] + ' 版 ' + vv[1] + (vv[2] ? ' ' + vv[2] : '') + ' ／ ' + label(MODES, S.mode) + ' ／ ' + label(PLACES, S.place) + ' ／ ' + label(FROMS, S.from) + (S.supp ? ' ／ 消音' : '') + (S.hit ? ' ／ ' + label(HITS, S.hit) : '') + ' ／ 銃声 ' + S.vol + '％';
     for (const b of document.querySelectorAll('[data-k]')) b.classList.toggle('on', String(S[b.dataset.k]) === b.dataset.val);
     $('volv').textContent = S.vol + '％';
   }
@@ -200,6 +208,7 @@
   for (const [p, nm] of PLACES) btn('places', 'place', p, nm, '', () => { S.place = p; draw(); wake(); setWorld(); prep(); });
   for (const [d, nm] of FROMS) btn('froms', 'from', d, nm, '', () => { S.from = d; draw(); fire('one'); });
   for (const [k, nm] of SUPPS) btn('supps', 'supp', k, nm, '', () => { S.supp = k; draw(); fire('one'); });
+  for (const [k, nm] of HITS) btn('hits', 'hit', k, nm, '', () => { S.hit = k; if (S.from) S.from = 0; draw(); fire('one'); });
   $('fire').addEventListener('click', () => fire());
   $('vol').addEventListener('input', (e) => { S.vol = +e.target.value; draw(); });
   $('vol').addEventListener('change', () => fire('one'));

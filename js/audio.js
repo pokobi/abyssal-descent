@@ -327,7 +327,7 @@
   const RSET = /^g[sqrd]_/;
   A.fetchLazy = () => { const q = []; for (const k in SB.bank) if (SB.bank[k].lazy) for (const f of SB.bank[k].f) q.push(fetchBuf(f)); return Promise.all(q); };
   // key, where (or nothing: in the head), level, speed, how much of the room (or the bank's own)
-  const smp = (key, pos, vol, rate, wet) => {
+  const smp = (key, pos, vol, rate, wet, bus) => {
     if (!ctx || !usable(key)) return false;
     const b = SB.bank[key], n = b.f.length;
     let i = Math.floor(Math.random() * n); if (n > 1 && i === lastOf[key]) i = (i + 1) % n;   // (never the same one twice running)
@@ -338,7 +338,7 @@
     try {
       const src = ctx.createBufferSource(); src.buffer = buf;
       src.playbackRate.value = (rate || 1) * (b.rate || 1) * vr(1, b.p === undefined ? 0.05 : b.p);
-      const out = dest(pos || null, wet === undefined ? (b.wet === undefined ? 0.2 : b.wet) : wet, b.bus === 'gun' ? gunBus : undefined);   // (a gun's recording goes the way the synthesized shot went: through the bus that thickens it)
+      const out = dest(pos || null, wet === undefined ? (b.wet === undefined ? 0.2 : b.wet) : wet, bus || (b.bus === 'gun' ? gunBus : undefined));   // (a gun's recording goes the way the synthesized shot went: through the bus that thickens it)
       out.gain.value *= (vol === undefined || vol === null ? 1 : vol) * (b.v || 1) * vr(1, 0.1);
       src.connect(out); src.start();
     } catch (e) { return false; }
@@ -1361,6 +1361,13 @@
     let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === shotLast[pl.key]) i = (i + 1) % set.length; shotLast[pl.key] = i; return set[i];
   }
   const tailLast = {};
+  // (the sounds of a hit - the body struck, the head, the kill - are heard over your own shot, which goes off in the same frame: they
+  // go the guns' own way (gunDry), round what pulls the rest down as your shot goes off (they were pulled down 4-10 dB with it), and
+  // when your shot went off a moment ago they are laid in HITD after its burst, not on it. The recorded shots, brighter over 2 kHz than
+  // the synthesized ones were, covered the head's crack (some 1.7-3.2 kHz): it is higher now, over the shot's top - see A.headshot)
+  let lastOwnT = -9;
+  const HITD = 0.035;
+  const hitT = () => { const t = ctx.currentTime; return t - lastOwnT < 0.1 ? Math.max(t, lastOwnT + HITD) : t; };
   function newShot(kind, opts) {
     const supp = !!opts.suppressed, room = !outdoor(), auto = kind === 'shotgun' && !!opts.auto, v = Math.pow(opts.vol || 1, 0.4), t = ctx.currentTime, fl = A.gunFlavor;
     const pl = shotPlan(kind, supp, auto, room, fl, false, rId(opts)), p = pl.p, buf = takeOf(pl, [kind, supp, auto, room, fl, false, rId(opts)]);
@@ -1390,6 +1397,7 @@
     // (the rest pulled down round your own shot only: one asked for from a place - a foe's, a guardian's - or with no gun's id - a friend's -
     // is another's, and leaves the rest as it is)
     const own = !at && !!opts.id;
+    if (own) lastOwnT = t;
     if (own && pl.duck) duckOthers(t, pl.duck);
     // (on open ground the roll after it; in fast fire each shot's share of it is smaller, so that the fire rolls as one shot would)
     if (!room && p.tail) {
@@ -1746,9 +1754,9 @@
   // ---------- combat ----------
   A.hitFlesh = function (pos, head, big) {
     if (!ctx) return;
-    if (!head && smp('hit_flesh', pos, big ? 1 : 0.7, big ? 0.9 : 1, 0.15)) return;
+    if (!head && smp('hit_flesh', pos, big ? 1 : 0.7, big ? 0.9 : 1, 0.15, gunDry)) return;
     if (!voice(0.3)) return;
-    const t = ctx.currentTime, out = dest(pos, 0.15);
+    const t = ctx.currentTime, out = dest(pos, 0.15, gunDry);
     out.gain.value = big ? 1 : 0.7;
     nz({ t, buf: 'pink', f: [['lowpass', vr(900, 0.2), 1.2]], g: 0.7, d: 0.07, to: out });
     tn({ t, f0: vr(160, 0.1), f1: 70, d: 0.06, g: 0.4, to: out });
@@ -1761,11 +1769,17 @@
       tn({ t, f0: 900, f1: 500, d: 0.05, g: 0.08, to: o2 });
     }
   };
+  // (a hit told: a short tick high up (3.4 kHz), over the shot's top; a kill, two ticks, the second lower, and a dull knock under them -
+  // the three, a body struck, the head and a kill, each its own)
   A.hitConfirm = function (kill) {
     if (!ctx) return;
-    const t = ctx.currentTime, out = dest(null, 0.05); out.gain.value = kill ? 0.55 : 0.3;
-    nz({ t, f: [['bandpass', kill ? 1400 : 2000, 4]], g: 0.4, d: 0.03, to: out });
-    if (kill) { tn({ t, f0: 180, f1: 60, d: 0.18, g: 0.5, to: out, type: 'triangle' }); nz({ t: t + 0.02, buf: 'pink', f: [['lowpass', 900]], g: 0.4, d: 0.2, to: out }); }
+    const t = hitT(), out = dest(null, 0.05, gunDry); out.gain.value = kill ? 0.6 : 0.22;
+    nz({ t, f: [['bandpass', 3400, 4]], g: 0.5, d: 0.022, to: out });
+    if (kill) {
+      nz({ t: t + 0.055, f: [['bandpass', 2500, 4]], g: 0.45, d: 0.03, to: out });
+      tn({ t: t + 0.05, f0: 520, f1: 300, d: 0.09, g: 0.12, to: out, type: 'triangle', lp: 1500 });
+      nz({ t: t + 0.05, buf: 'pink', f: [['bandpass', 1100, 1.2]], g: 0.14, d: 0.12, to: out });
+    }
   };
   A.hitShield = function (pos) {
     if (!ctx || smp('hit_shield', pos, 0.7, 1, 0.4) || !voice(0.3)) return;
@@ -1799,17 +1813,20 @@
     tn({ t, f0: 150, f1: 42, d: 0.35, g: 0.75, to: out, type: 'triangle', lp: 400 });
     nz({ t, buf: 'brown', f: [['lowpass', 600, 0.7, 120, 0.4]], g: 0.6, d: 0.4, to: out });
   };
-  // headshot: crisp skull crack + bone crunch + a short dull metallic "tock" so it reads instantly
+  // headshot: a hard, very short crack high up (4-7 kHz, over the shot's top), the bone giving in a few dry crunches (2.6-4 kHz), and a
+  // short hard knock of it (inharmonic, damped fast) - nothing low: the shot fills that, and a low body of it was lost under the shot
   A.headshot = function (kill) {
     if (!ctx) return;
-    const t = ctx.currentTime, out = dest(null, 0.12);
-    out.gain.value = kill ? 0.85 : 0.7;
-    nz({ t, f: [['bandpass', 3200, 2.2]], g: 0.75, d: 0.018, to: out });              // crack
-    for (let i = 0; i < 4; i++) nz({ t: t + 0.006 + i * 0.011, f: [['bandpass', vr(1700, 0.25), 3]], g: 0.35, d: 0.014, to: out }); // crunch
-    tn({ t, f0: 1250, f1: 1180, d: 0.16, g: 0.14, to: out });                        // tock (inharmonic, damped)
-    tn({ t, f0: 3080, d: 0.07, g: 0.05, to: out });
-    tn({ t, f0: 220, f1: 90, d: 0.09, g: 0.5, to: out, type: 'triangle', lp: 500 });   // body
-    if (kill) { nz({ t: t + 0.03, buf: 'pink', f: [['lowpass', 1400, 0.8, 300, 0.25]], g: 0.6, d: 0.25, to: out }); tn({ t: t + 0.02, f0: 110, f1: 45, d: 0.3, g: 0.6, to: out, type: 'triangle', lp: 300 }); }
+    const t = hitT(), out = dest(null, 0.1, gunDry);
+    out.gain.value = kill ? 0.42 : 0.38;
+    nz({ t, f: [['bandpass', 5200, 1.4]], g: 1.1, d: 0.014, to: out });                // crack
+    nz({ t, f: [['highpass', 4000]], g: 0.5, d: 0.009, to: out });
+    for (let i = 0; i < 3; i++) nz({ t: t + 0.006 + i * 0.009, f: [['bandpass', vr(3300, 0.15), 3.5]], g: 0.5, d: 0.012, to: out }); // crunch
+    tn({ t, f0: 2950, f1: 2800, d: 0.07, g: 0.14, to: out });                          // knock
+    tn({ t, f0: 4620, d: 0.05, g: 0.07, to: out });
+    tn({ t, f0: 1900, f1: 1700, d: 0.05, g: 0.1, to: out });
+    // (a kill: the skull giving way after the crack - a short dull crunch in the middle, not a low boom: the shot's own low is there)
+    if (kill) { nz({ t: t + 0.03, buf: 'pink', f: [['bandpass', 1300, 1]], g: 0.7, d: 0.12, to: out }); tn({ t: t + 0.025, f0: 420, f1: 220, d: 0.1, g: 0.35, to: out, type: 'triangle', lp: 1200 }); }
   };
   A.ricochet = function (pos) {
     if (!ctx || !voice(0.3) || Math.random() < 0.5) return;

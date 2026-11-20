@@ -20,12 +20,45 @@
   D.on = () => live;
   const stripSave = () => { if (GM && GM.run) { GM.run.dev = true; if (GM.slot) { GM.clearRun(); GM.slot = null; } } };
   D.enable = function () { live = true; document.body.classList.add('dev-on'); stripSave(); G.sfx.ui('rare'); };
-  D.disable = function () { live = false; document.body.classList.remove('dev-on'); };
+  D.disable = function () { live = false; document.body.classList.remove('dev-on'); if (blueSet) { G.Run.blueForce = null; blueSet = false; } };
+
+  // ---- playtest field: the place every area is built in while dev mode is on ----
+  // The choice is kept on its own key (not in the save), so it outlives a reload; it only acts while dev mode is on again.
+  // field: '' = the run's own draw, else a field id (R.FIELD_NAME). blue: null = the segment decides, true / false = the deep blue look forced.
+  const PICK_KEY = 'abyss_dev_field_v1';
+  D.pick = { field: '', blue: null };
+  try { const d = JSON.parse(localStorage.getItem(PICK_KEY) || 'null'); if (d && typeof d === 'object') { D.pick.field = typeof d.field === 'string' ? d.field : ''; D.pick.blue = d.blue === true || d.blue === false ? d.blue : null; } } catch (e) { /* storage unavailable */ }
+  const savePick = () => { try { localStorage.setItem(PICK_KEY, JSON.stringify(D.pick)); } catch (e) { /* storage unavailable */ } };
+  // a shared game's guest builds the host's fields (they come with every area): the networking layer replaces this to say so
+  D.follow = () => false;
+  let blueSet = false;
+  // Called right before an area is built. Only the place changes: each segment keeps its depth, foes and guardians (R.segBase).
+  // The run's own draw is kept aside (run.drawnFields) and put back once the choice is "auto" again or dev mode is off.
+  D.applyPick = function () {
+    const R = G.Run, run = GM && GM.run;
+    if (D.follow()) return;
+    const on = D.on(), f = on ? D.pick.field : '';
+    if (run && Array.isArray(run.fields)) {
+      if (f && R.FIELD_NAME[f] && R.isField(f)) { if (!run.drawnFields) run.drawnFields = run.fields.slice(); run.fields = run.fields.map(() => f); }
+      else if (run.drawnFields) { run.fields = run.drawnFields.slice(); delete run.drawnFields; }
+    }
+    if (on && D.pick.blue != null) { R.blueForce = D.pick.blue; blueSet = true; } else if (blueSet) { R.blueForce = null; blueSet = false; }
+  };
   D.init = function () {
     GM = G.game; P = G.player; I = G.input;
     if (S().devMode) { S().devMode = false; G.save.write(); }
     // cheats are read by the game loop / combat (see the hooks at the bottom)
     GM.dev = { god: false, oneHit: false, noCd: false, freeze: false, speed: 1 };
+    // the playtest field takes hold as each area is entered (a field this game went into while one is picked is not noted for the next game's draw)
+    const ea = GM.enterArea;
+    GM.enterArea = function (n, kind) {
+      const picked = D.on() && !!D.pick.field && !D.follow(), L = G.save.data.lastFields, keepL = picked ? (Array.isArray(L) ? L.slice() : []) : null;
+      D.applyPick();
+      try { return ea.apply(this, arguments); } finally {
+        const now = G.save.data.lastFields;
+        if (keepL && Array.isArray(now) && now.length !== keepL.length) { G.save.data.lastFields = keepL; G.save.write(); }
+      }
+    };
     const badge = document.createElement('div'); badge.id = 'dev-badge'; badge.innerHTML = 'DEV <small>F9</small>'; document.body.appendChild(badge);
     const info = document.createElement('div'); info.id = 'dev-info'; document.body.appendChild(info);
     window.addEventListener('keydown', (e) => {
@@ -118,10 +151,22 @@
       ACT.codex = () => { const c = G.save.data.codex; for (const e of G.ENEMIES) c.enemies[e.id] = 1; for (const b of G.BOSSES) c.bosses[b.id] = 1; for (const b of G.BUFFS) c.buffs[b.id] = 1; for (const a of [].concat(G.WEAPONS, G.MELEE, G.ATTACHMENTS, G.ITEMS, G.SKILLS)) c.items[a.id] = 1; G.save.data.records.bestArea = Math.max(G.save.data.records.bestArea || 0, 300); G.save.write(); toast('図鑑を全開放'); };
       ACT.tut = () => { if (panel) panel.remove(); panel = null; back = null; G.Tutorial && G.Tutorial.start ? G.Tutorial.start() : toast('チュートリアルなし'); };
       ACT.off = () => { D.disable(); D.close(); G.ui.toast('🛠 デバッグモードを終了しました', 'good'); };
+      // rebuild the area you are in, in the picked field (same area number and kind)
+      ACT.rebuild = () => { const n = GM.area, k = GM.stage; D.bossArea = n; GM.enterArea(n, k); toast(`AREA ${n} を ${RP.FIELD_NAME[RP.field(n)] || RP.field(n)} で作り直した`); };
+      const RP = G.Run, fieldNow = inRun() ? RP.field(GM.area) : '', drawn = inRun() && GM.run ? GM.run.drawnFields || GM.run.fields : null;
+      const TIER_NAME = ['地上', '入口', '中層', '深層'];
+      const fieldOpts = RP.TIERS.map((t, i) => `<optgroup label="${TIER_NAME[i] || '—'}">${t.map((f) => `<option value="${f}" ${D.pick.field === f ? 'selected' : ''} ${RP.isField(f) ? '' : 'disabled'}>${esc(RP.FIELD_NAME[f] || f)}${RP.RETIRED.has(f) ? '（引退）' : ''}${RP.isField(f) ? '' : '（未実装）'}</option>`).join('')}</optgroup>`).join('')
+        + Object.keys(RP.FIELD_NAME).filter((f) => RP.tierOf(f) < 0).map((f) => `<option value="${f}" ${D.pick.field === f ? 'selected' : ''}>${esc(RP.FIELD_NAME[f])}（区分なし）</option>`).join('');
+      const blueSel = `<select id="dv-blue">${[['', '自動'], ['1', 'オン'], ['0', 'オフ']].map(([v, n]) => `<option value="${v}" ${(D.pick.blue == null ? '' : D.pick.blue ? '1' : '0') === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
+      const fieldSec = `${sec('フィールド（試し遊び）')}
+        <div class="dv-row">場所 <select id="dv-field"><option value="" ${D.pick.field ? '' : 'selected'}>自動（抽選のまま）</option>${fieldOpts}</select> 青の深層 ${blueSel}</div>
+        ${inRun() ? `<div class="dv-row">${btn('rebuild', '🔁 今のエリアをこの場所で作り直す', 'pri')}${btn('next', '⏭ 次のエリア')}<span class="dv-note">今: ${esc(RP.FIELD_NAME[fieldNow] || fieldNow || '—')}${drawn ? ' ・ このランの抽選: ' + drawn.map((f) => esc(RP.FIELD_NAME[f] || f)).join(' → ') : ''}</span></div>` : ''}
+        <div class="dv-note">指定している間、どの区間も（商人の間・守護者の間も）この場所で作られます。深さ・敵の強さ・守護者は区間のまま。変えると次に入るエリアから効きます。指定は再読み込みしても残り、デバッグモードの間だけ効きます。</div>`;
       const bosses = G.BOSSES.filter((b) => !b.codexOnly).map((b) => `<option value="${b.id}">${b.icon || '👿'} ${esc(b.name)}</option>`).join('');
       return `${sec('ラン')}
         <div class="dv-row">難易度 <select id="dv-diff">${['easy', 'normal', 'hard'].map((k) => `<option value="${k}:0" ${G.Run.cur.id === k ? 'selected' : ''}>${G.Run.DIFFS[k].name}</option>`).join('')}${Array.from({ length: 10 }, (_, i) => `<option value="extra:${i + 1}" ${G.Run.cur.id === 'extra' && G.Run.cur.lv === i + 1 ? 'selected' : ''}>エクストラ${i + 1}</option>`).join('')}</select></div>
         <div class="dv-row">${btn('start', '▶ 新しいランを開始')}${btn('startFinal', '🌑 新しいランでラスボスへ')}</div>
+        ${fieldSec}
         ${inRun() ? `${sec('エリア移動')}
         <div class="dv-row">エリア ${num('dv-area', GM.area || 1)} 種類 <select id="dv-kind">${AREA_KINDS.map((k) => `<option value="${k}" ${k === GM.stage ? 'selected' : ''}>${kindName(k)}</option>`).join('')}</select></div>
         <div class="dv-row">ボス <select id="dv-boss"><option value="">（エリア番号どおり）</option>${bosses}</select> ${btn('go', '🚪 移動', 'pri')}</div>
@@ -303,6 +348,11 @@
     const ic = panel.querySelector('#dv-icount'); if (ic) ic.onchange = () => { query.icount = Math.max(1, Math.min(999, +ic.value | 0 || 1)); };
     const bc = panel.querySelector('#dv-bcat'); if (bc) bc.onchange = () => { query.bcat = bc.value; render(); };
     const en = panel.querySelector('#dv-en'); if (en) en.onchange = () => { query.en = en.value; };
+    // the playtest field / blue look: kept at once, they take hold from the next area entered (or the rebuild button)
+    const fs = panel.querySelector('#dv-field');
+    if (fs) fs.onchange = () => { D.pick.field = fs.value; savePick(); stripSave(); toast(fs.value ? `場所を「${G.Run.FIELD_NAME[fs.value]}」に指定（次のエリアから）` : '場所を自動（抽選）に戻した（次のエリアから）'); };
+    const bs = panel.querySelector('#dv-blue');
+    if (bs) bs.onchange = () => { D.pick.blue = bs.value === '' ? null : bs.value === '1'; savePick(); stripSave(); toast(`青の深層: ${bs.value === '' ? '自動' : bs.value === '1' ? 'オン' : 'オフ'}（次のエリアから）`); };
     // typing in the panel must not drive the game
     panel.querySelectorAll('input, select').forEach((el) => el.addEventListener('keydown', (e) => e.stopPropagation()));
   }

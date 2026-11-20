@@ -4,6 +4,8 @@
 (function () {
   const K = G.Coop;
   const V = G.U.V;
+  // a guest's areas are built in the fields the host sends (its debug panel's playtest field is the host's call, devmode.js)
+  if (G.Dev) G.Dev.follow = () => K.role === 'guest';
   const r2 = (v) => Math.round(v * 100) / 100;
   K.vec = (v) => [r2(v.x), r2(v.y), r2(v.z)];
   // numbers, strings and vectors only: callbacks and object references stay home

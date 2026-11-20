@@ -48,8 +48,15 @@ const only = process.argv.slice(2);
         // between two cells, and with one of them outside the walkable floor (the lip of a channel, the edge of the map) the foe had no route
         // and stood there, or was held 3 m from you - a run failed about one time in ten on where it was put, not on what the foe did
         const walk = (x, z, y) => { const n = w.navIdx(x, z, y + 0.1); return n >= 0 && !w.nb[n] && (!w.reachMask || !!w.reachMask[n]); };
+        // (and not by deep water: the drowned town's walks run along its channel. A lunge that fell short there, or the foe going round you
+        // after it, put it in the channel two metres under you; from the water it does not strike up at you, and climbing out by the stairs
+        // took it longer than its 10 s - about one run in six. Water under ice, that it cannot fall into, is left as it is)
+        const byDeep = (x, z) => (w.deepWater || []).some((q) => !q.lid && x > q.x0 - 3 && x < q.x1 + 3 && z > q.z0 - 3 && z < q.z1 + 3);
+        // (and a way straight through between the two: walkable floor at its height and room for a body all along it. A railing or a low
+        // wall between them that the foe could see over but not get past held it 3 m off - it pressed at it, its blow never reached you)
+        const clear = (c) => { for (let t = 0.1; t < 0.95; t += 0.1) { const z = c.z - 6.5 * t; if (!walk(c.x, z, c.y) || !w.boxFree(c.x - 0.45, c.y + 0.3, z - 0.45, c.x + 0.45, c.y + 1.8, z + 0.45)) return false; } return true; };
         let at = null;
-        for (let k = 0; k < 400 && !at; k++) { const c = w.randomOpenCell(GM.arng, (x, z, i) => !w.reachMask || w.reachMask[i]); if (!c) continue; const ahead = { x: c.x, y: c.y, z: c.z - 6.5 }; const fy = w.floorBelow(ahead.x, c.y + 1.5, ahead.z); if (isFinite(fy) && Math.abs(fy - c.y) < 0.3 && w.boxFree(ahead.x - 0.8, fy + 0.1, ahead.z - 0.8, ahead.x + 0.8, fy + 2.5, ahead.z + 0.8) && walk(ahead.x, ahead.z - 0.4, fy) && walk(ahead.x, ahead.z + 0.4, fy) && w.groundAt(new THREE.Vector3(c.x, c.y + 0.5, c.z - 3), 0.3, 1) > -Infinity) at = [c, Object.assign(ahead, { y: fy })]; }
+        for (let k = 0; k < 400 && !at; k++) { const c = w.randomOpenCell(GM.arng, (x, z, i) => !w.reachMask || w.reachMask[i]); if (!c) continue; const ahead = { x: c.x, y: c.y, z: c.z - 6.5 }; if (byDeep(c.x, c.z) || byDeep(ahead.x, ahead.z) || byDeep(c.x, c.z - 3.25) || !clear(c)) continue; const fy = w.floorBelow(ahead.x, c.y + 1.5, ahead.z); if (isFinite(fy) && Math.abs(fy - c.y) < 0.3 && w.boxFree(ahead.x - 0.8, fy + 0.1, ahead.z - 0.8, ahead.x + 0.8, fy + 2.5, ahead.z + 0.8) && walk(ahead.x, ahead.z - 0.4, fy) && walk(ahead.x, ahead.z + 0.4, fy) && w.groundAt(new THREE.Vector3(c.x, c.y + 0.5, c.z - 3), 0.3, 1) > -Infinity) at = [c, Object.assign(ahead, { y: fy })]; }
         if (!at) return JSON.stringify({ err: 'no spot' });
         P.pos.set(at[0].x, at[0].y + 0.05, at[0].z); P.vel.set(0, 0, 0); P.yaw = 0; P.hp = P.stats.maxHp;
         const e = G.enemies.spawn(def, 10, new THREE.Vector3(at[1].x, at[1].y + (def.flyer ? 3 : 0), at[1].z), { noLoot: true });

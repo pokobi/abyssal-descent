@@ -78,7 +78,7 @@
     const putRay = (m) => { let h = rays.get(m.id); if (!h || h.gone) { K._fxNet = true; try { h = vray.call(VX, m.c, m.c2 ?? undefined, m.al ?? undefined); } finally { K._fxNet = false; } rays.set(m.id, h); } h.set(V(...m.a), V(...m.b), m.r, m.rv ?? undefined); if (rays.size > 40) for (const [k, v] of rays) if (v.gone) rays.delete(k); };
     // sounds go the same way, a few at a time: skills, the guardian's attacks, and on the host the foes' growls and swings (the guests' foes are puppets and make none)
     let sndN = 0;
-    for (const fn of ['monster', 'magic', 'whoosh', 'attackWind', 'rumble', 'mech', 'shieldBreak', 'thunder', 'bell', 'chain', 'zap', 'fire', 'stoneGrind', 'swing', 'impact', 'spit', 'ice']) {
+    for (const fn of ['monster', 'magic', 'whoosh', 'attackWind', 'rumble', 'mech', 'shieldBreak', 'thunder', 'bell', 'chain', 'zap', 'fire', 'stoneGrind', 'swing', 'impact', 'spit', 'ice', 'plantFoeNet']) {
       const f = G.sfx[fn]; if (!f) continue;
       G.sfx[fn] = function () {
         if ((own() || (K.ownS > 0 && !K._fxNet)) && sndN < 10) { sndN++; push(['s', fn, Array.prototype.map.call(arguments, enc)]); }

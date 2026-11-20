@@ -20,7 +20,8 @@ const only = process.argv.slice(2);
     await p.running();
     await sleep(600);
     const foes = await p.eval("JSON.stringify(G.ENEMIES.filter((e) => e.fields).map((e) => [e.id, e.fields[0], e.attack, e.name]))").then(JSON.parse);
-    const nf = await p.eval("G.Run.TIERS.flat().filter((f) => G.Run.ready(f) && !['grave', 'gate', 'halls', 'ruin'].includes(f)).length");
+    // (a retired field, R.RETIRED, is no longer drawn for a new run and has no foes of its own)
+    const nf = await p.eval("G.Run.TIERS.flat().filter((f) => G.Run.ready(f) && !['grave', 'gate', 'halls', 'ruin'].includes(f) && !(G.Run.RETIRED && G.Run.RETIRED.has(f))).length");
     check(foes.length === nf * 2, `two foes for each of the ${nf} new fields (${foes.length})`);
     // the draw: each only in its field
     const pool = await p.eval(`JSON.stringify((() => { const out = {}; for (const f of G.Run.TIERS.flat()) out[f] = G.game.enemyPool(40, f).filter(([e]) => e.fields).map(([e]) => e.id); return out; })())`).then(JSON.parse);
@@ -51,8 +52,9 @@ const only = process.argv.slice(2);
         e.state = 'chase'; e.atkCd = 0.2; e.aware = true;
         const hp0 = G.game.run.dmgTaken || 0;
         let attacked = false, ended = false, maxT = 0;
-        // (a few tries: a lunge can fall short from where it happened to start; it should land within some 10 s)
-        for (let i = 0; i < 200; i++) { await sl(50); if (e.attackState && e.attackState.kind === '${attack}') attacked = true; if (attacked && !e.attackState) ended = true; if (attacked && ended && i > 60 && ((G.game.run.dmgTaken || 0) > hp0 || '${attack}' === 'raise')) break; P.hp = P.stats.maxHp; P.invulnT = 0; }
+        // (a few tries: a lunge can fall short from where it happened to start; it should land within some 10 s. An attack still under way
+        // when the 10 s are up is waited on to its end - up to 5 s more - not cut off: one begun late was counted as never finished)
+        for (let i = 0; i < 300; i++) { await sl(50); if (e.attackState && e.attackState.kind === '${attack}') attacked = true; if (attacked && !e.attackState) ended = true; if (attacked && ended && i > 60 && ((G.game.run.dmgTaken || 0) > hp0 || '${attack}' === 'raise')) break; if (i >= 199 && !(attacked && !ended)) break; P.hp = P.stats.maxHp; P.invulnT = 0; }
         const took = (G.game.run.dmgTaken || 0) - hp0, raised = G.enemies.list.filter((o) => o.alive && o.raisedBy === e).length;
         const model = !!(e.model && e.model.group && e.model.hits && e.model.hits.length);
         e.alive = false; e.remove && e.remove(); G.enemies.clear();

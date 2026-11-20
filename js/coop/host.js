@@ -46,7 +46,7 @@
     const alivePlayers = () => [...K.players.values()].filter((p) => p.id !== 0 && !p.dead);
     const tv0 = V(), tv1 = V();
     // run fn as if guest rp were the player. Whatever the foe does to "the player" meanwhile (a grab, a slow, a pull) is not the host's: it is taken back and sent to the guest
-    const SW = ['dragT', 'pullT', 'pullSpd', 'liftVy', 'liftLock', 'gravFreeAt', 'invulnT', 'mirTip'];
+    const SW = ['dragT', 'pullT', 'pullSpd', 'liftVy', 'liftLock', 'gravFreeAt', 'invulnT', 'mirTip', 'joltT', 'joltDmg'];   // (joltT / joltDmg: the current a grab leaves in you, fieldfoes.js)
     const s0 = new Array(SW.length);
     function withTarget(rp, fn) {
       tv0.copy(P.pos); tv1.copy(P.vel);

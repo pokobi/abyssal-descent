@@ -2435,6 +2435,7 @@
   // kinds: growl, snarl, screech, roar, hiss, chitter, groan, gurgle, wail, rumble, buzz
   A.monster = function (pos, kind, pitch, vol) {
     if (!ctx) return;
+    if (kind === 'machine') { A.plantFoe(pos, 'mIdle'); return; }   // (the plant's crawler has no voice: a servo, see A.plantFoe)
     pitch = pitch || 1; vol = vol || 1;
     if (smp('mon_' + kind, pos, 0.75 * vol, pitch, 0.45)) return;
     if (!voice(1)) return;
@@ -2498,6 +2499,7 @@
   A.bones = function (pos, vol) { if (ctx) smp('bones', pos, vol || 0.8, 1, 0.3); };
   A.monsterDie = function (pos, kind, pitch) {
     if (!ctx) return;
+    if (kind === 'machine') { A.plantFoe(pos, 'mDie'); return; }
     if (smp('mon_die', pos, 0.7, (pitch || 1) * 0.9, 0.4)) { const t = ctx.currentTime, out = dest(pos, 0.3); tn({ t: t + 0.2, f0: 90, f1: 40, d: 0.2, g: 0.4, to: out, type: 'triangle' }); return; }
     A.monster(pos, kind === 'chitter' ? 'hiss' : kind === 'slosh' ? 'gurgle' : 'groan', (pitch || 1) * 0.9, 0.9);
     const t = ctx.currentTime, out = dest(pos, 0.3);
@@ -3732,4 +3734,80 @@
     const t = ctx.currentTime, out = dest(pos, 0.4); out.gain.value = 0.3;
     nz({ t, buf: 'brown', f: [['bandpass', vr(200, 0.3), 3, 90, 0.4]], g: 0.6, a: 0.02, d: 0.4, to: out });
   };
+  // ---------- the power station's own two (fieldfoes.js: 感電した作業員, 暴走した点検機) ----------
+  // The dead lineman: the knock of its good boot and the scuff of the dragged one, the crackle when the current jerks through it, the
+  // buzz rising in its arms (with a breath drawn) before it takes hold, the hold's strike, the charge gathering as it falls and its
+  // going. The inspection crawler: its motor's whine with the rattle of its track plates and their rumble (a take a little over 0.4 s,
+  // played over and over while it moves, each fading over the next), faster in the run; a servo when it stands; the wind-up's relay,
+  // spooling motor and buzzer; the lurch into the run, the slam, the whine of the charge gathering and the crack of the ring; its
+  // death (the motor running down and stuttering, a short, parts knocking off, a hiss). Written into takes as the plant's current is
+  // (fxPlay: [takes, length s, level, build]). Levels set against the foes' own: docs/tools/snd_plantfoe.js
+  const MOTOR = () => humTab([1, 0.55, 0.4, 0.3, 0.22, 0.15, 0.1, 0.08], 1.6);
+  const clatter = (L, R, sr, at, d, n, g) => { for (let k = 0; k < n; k++) ringIn(L, R, at(Math.random() * d), [[vr(2100, 0.25), 0.4, 0.025], [vr(3500, 0.2), 0.2, 0.02], [vr(900, 0.2), 0.3, 0.03]], g * (0.4 + Math.random() * 0.6), 0.6, Math.random() * 0.8 - 0.4, sr); };
+  const swell = (d) => (t) => Math.sin(Math.PI * Math.min(1, t / d));
+  const PFS = {
+    wStep: [4, 0.3, 0.16, (L, R, sr, at) => { thudIn(L, R, 0, 420, 0.016, 1, sr); slideIn(L, R, at(0.004), 1800, 3200, 0.045, 0.18, 0, sr); }],
+    wDrag: [4, 0.5, 0.08, (L, R, sr) => { slideIn(L, R, 0, 600, 1500, 0.42, 0.9, Math.random() * 0.4 - 0.2, sr); thudIn(L, R, 0, 300, 0.012, 0.35, sr); }],
+    wTwitch: [3, 0.45, 0.18, (L, R, sr, at) => {
+      arcCrackIn(L, R, 0, 1, 2 + Math.floor(Math.random() * 3), 0.04, Math.random() * 0.6 - 0.3, sr); sparksIn(L, R, at(0.01), 0.28, 320, 30, 0.9, 3600, sr);
+      buzzIn(L, R, 0, 0.25, humTab(HUMF, 2), EHZ, EHZ, 1, (t) => Math.min(1, t / 0.004) * Math.exp(-t / 0.08), 0.35, sr); gearIn(L, R, at(0.015), 0.35, sr); thudIn(L, R, at(0.01), 250, 0.02, 0.4, sr);
+    }],
+    wWind: [3, 0.85, 0.15, (L, R, sr, at) => {
+      buzzIn(L, R, 0, 0.82, humTab(HUMA, 2.6), 50, 68, 0.8, (t) => Math.min(1, t / 0.6) * (t < 0.78 ? 1 : Math.max(0, (0.82 - t) / 0.04)), 0.5, sr);
+      sizzleIn(L, R, 0, 0.82, (t) => Math.pow(Math.min(1, t / 0.8), 1.5), 0.8, 2600, 1, 4, sr); sparksIn(L, R, at(0.1), 0.7, 20, 260, 0.8, 3000, sr); breathIn(L, R, at(0.05), 0.55, 0.22, false, sr);
+    }],
+    wHit: [3, 0.55, 0.55, (L, R, sr, at) => {
+      thudIn(L, R, 0, 650, 0.03, 1.1, sr); lowIn(L, R, 0, 120, 60, 0.05, 0.6, sr); arcCrackIn(L, R, at(0.004), 1.2, 4, 0.03, 0, sr);
+      sizzleIn(L, R, at(0.004), 0.4, (t) => Math.exp(-t / 0.12), 0.7, 3000, 1, 4, sr); sparksIn(L, R, at(0.006), 0.3, 400, 30, 0.8, 3800, sr); gearIn(L, R, at(0.01), 0.4, sr);
+    }],
+    wDie: [2, 0.72, 0.23, (L, R, sr) => {
+      sizzleIn(L, R, 0, 0.68, (t) => Math.pow(t / 0.68, 1.3), 0.9, 2800, 1, 5, sr); buzzIn(L, R, 0, 0.68, humTab(HUMA, 3), 50, 95, 0.68, (t) => Math.min(1, t / 0.65), 0.45, sr); sparksIn(L, R, 0, 0.68, 30, 300, 0.7, 3400, sr);
+    }],
+    wZap: [2, 0.7, 0.8, (L, R, sr, at) => {
+      arcCrackIn(L, R, 0, 1.4, 6, 0.05, 0, sr); lowIn(L, R, 0, 140, 50, 0.07, 0.9, sr); thudIn(L, R, 0, 900, 0.02, 0.8, sr);
+      sparksIn(L, R, at(0.004), 0.5, 500, 15, 1.2, 4200, sr); sizzleIn(L, R, at(0.004), 0.5, (t) => Math.exp(-t / 0.1), 0.6, 3200, 1, 4, sr);
+    }],
+    mMove: [3, 0.62, 0.08, (L, R, sr, at) => {
+      const f = vr(115, 0.04), env = swell(0.62);
+      buzzIn(L, R, 0, 0.62, MOTOR(), f, f * 1.02, 0.6, env, 0.45, sr); buzzIn(L, R, 0, 0.62, humTab([1], 1), f * 7.3, f * 7.3, 1, env, 0.05, sr);
+      clatter(L, R, sr, at, 0.58, 8, 0.22); slideIn(L, R, 0, 180, 520, 0.62, 0.35, 0, sr);
+    }],
+    mRun: [3, 0.45, 0.17, (L, R, sr, at) => {
+      const f = vr(190, 0.04), env = swell(0.45);
+      buzzIn(L, R, 0, 0.45, MOTOR(), f, f * 1.03, 0.45, env, 0.5, sr); buzzIn(L, R, 0, 0.45, humTab([1], 1), f * 7.3, f * 7.3, 1, env, 0.06, sr);
+      clatter(L, R, sr, at, 0.42, 12, 0.3); slideIn(L, R, 0, 200, 700, 0.45, 0.5, 0, sr);
+    }],
+    mIdle: [3, 0.42, 0.06, (L, R, sr, at) => { buzzIn(L, R, 0, 0.3, humTab([1, 0.3, 0.2], 1.2), 420, 610, 0.25, swell(0.3), 0.25, sr); ringIn(L, R, at(0.31), [[vr(2400, 0.1), 0.4, 0.02], [vr(4100, 0.1), 0.2, 0.015]], 0.3, 0.8, 0, sr); }],
+    mWind: [2, 1.12, 0.16, (L, R, sr, at) => {
+      ringIn(L, R, 0, [[160, 0.5, 0.06], [540, 0.35, 0.04], [1900, 0.15, 0.02]], 0.5, 1, 0, sr); thudIn(L, R, 0, 500, 0.012, 0.5, sr);
+      buzzIn(L, R, at(0.02), 1.06, MOTOR(), 90, 420, 1.0, (t) => Math.min(1, t / 0.2) * (t < 1.0 ? 1 : Math.max(0, (1.06 - t) / 0.06)), 0.45, sr);
+      buzzIn(L, R, at(0.02), 1.06, humTab([1], 1), 600, 2900, 1.0, (t) => Math.min(1, t / 0.3) * (t < 1.0 ? 1 : 0), 0.06, sr);
+      const bz = humTab([1, 0, 0.33, 0, 0.2, 0, 0.14, 0, 0.11], 2.4);
+      for (let i = 0; i < 3; i++) buzzIn(L, R, at(0.06 + i * 0.32), 0.16, bz, 430, 430, 1, (t) => Math.min(1, t / 0.005) * Math.max(0, Math.min(1, (0.16 - t) / 0.01)), 0.3, sr);
+    }],
+    mCharge: [2, 0.55, 0.55, (L, R, sr, at) => {
+      ringIn(L, R, 0, [[130, 0.6, 0.1], [360, 0.4, 0.07], [1050, 0.25, 0.05], [2300, 0.1, 0.03]], 0.8, 1, 0, sr); thudIn(L, R, 0, 500, 0.03, 1, sr);
+      buzzIn(L, R, 0, 0.5, MOTOR(), 420, 360, 0.5, (t) => Math.exp(-t / 0.2), 0.4, sr); slideIn(L, R, 0, 200, 700, 0.5, 0.4, 0, sr); clatter(L, R, sr, at, 0.3, 6, 0.3);
+    }],
+    mHit: [2, 0.5, 0.6, (L, R, sr) => { ringIn(L, R, 0, [[205, 0.6, 0.18], [540, 0.5, 0.14], [1290, 0.3, 0.08], [2700, 0.15, 0.05]], 0.9, 1, 0, sr); thudIn(L, R, 0, 800, 0.025, 1.2, sr); lowIn(L, R, 0, 95, 55, 0.06, 0.7, sr); }],
+    mRingW: [2, 0.7, 0.23, (L, R, sr, at) => {
+      buzzIn(L, R, 0, 0.62, humTab([1, 0.05], 1), 1700, 5600, 0.62, (t) => (0.2 + 0.8 * Math.min(1, t / 0.62)) * Math.min(1, t / 0.02), 0.09, sr);
+      sizzleIn(L, R, 0, 0.62, (t) => Math.pow(t / 0.62, 1.4), 0.7, 3000, 1, 5, sr); sparksIn(L, R, at(0.1), 0.52, 10, 200, 0.6, 3400, sr); buzzIn(L, R, 0, 0.62, humTab(HUMF, 2), EHZ, EHZ, 1, (t) => Math.min(1, t / 0.6), 0.25, sr);
+    }],
+    mRing: [2, 0.8, 0.68, (L, R, sr, at) => {
+      arcCrackIn(L, R, 0, 1.5, 7, 0.06, 0, sr); lowIn(L, R, 0, 130, 45, 0.09, 1, sr); thudIn(L, R, 0, 1100, 0.025, 0.9, sr);
+      buzzIn(L, R, 0, 0.3, humTab(HUMA, 3), EHZ, EHZ, 1, (t) => Math.exp(-t / 0.1), 0.45, sr); sparksIn(L, R, at(0.004), 0.6, 600, 15, 1.2, 4200, sr); sizzleIn(L, R, at(0.004), 0.55, (t) => Math.exp(-t / 0.14), 0.6, 3200, 1, 4, sr);
+    }],
+    mDie: [2, 1.75, 0.36, (L, R, sr, at) => {
+      buzzIn(L, R, 0, 1.3, MOTOR(), 380, 32, 1.3, (t) => Math.max(0, 1 - t / 1.3) * (Math.sin(t * 41) > -0.6 ? 1 : 0.2), 0.5, sr);
+      arcCrackIn(L, R, 0, 1.2, 4, 0.04, 0, sr); arcCrackIn(L, R, at(0.25), 0.7, 3, 0.03, 0.3, sr); sparksIn(L, R, 0, 1.0, 260, 8, 0.9, 3800, sr);
+      ringIn(L, R, at(0.45), [[120, 0.6, 0.12], [330, 0.4, 0.08], [980, 0.2, 0.05]], 0.6, 1, -0.2, sr); ringIn(L, R, at(0.85), [[700, 0.5, 0.06], [1650, 0.3, 0.04], [3100, 0.15, 0.02]], 0.4, 1, 0.3, sr);
+      slideIn(L, R, at(0.1), 2500, 5000, 1.4, 0.18, 0, sr);
+    }],
+  };
+  A.plantFoe = function (pos, kind) {
+    const d = PFS[kind]; if (!ctx || !d || !voice(d[1])) return;
+    fxPlay('pf:' + kind, d[0], d[1], d[3], d[2], pos || null, 0.3, null, 12000);
+  };
+  A.plantFoeNet = function (pos, kind) { A.plantFoe(pos, kind); };   // (the same: an attack's, which fxsync.js sends to the other players)
 })();

@@ -29,6 +29,8 @@
     leech: { skin: '#3a1a1c', sec: '#7a2a2a', rough: 0.2, blood: 0x6a0a0a, tex: 'skin' },
     smith: { skin: '#5e4636', sec: '#2a1a12', rough: 0.7, blood: 0x6a1a0a, tex: 'skin' },
     seraph: { skin: '#6a665e', sec: '#7a5f2e', rough: 0.4, blood: 0xc8b890, tex: 'skin' },
+    lineman: { skin: '#3a2f28', sec: '#1c1916', rough: 0.85, blood: 0x2a1610, tex: 'skin' },
+    rover: { skin: '#8a7a48', sec: '#2a2826', rough: 0.7, metal: 0.4, blood: 0x14120f, tex: 'skin' },
   });
 
   // ---------------------------------------------------------------- materials of a body's own, things shaped in gfx.js
@@ -423,6 +425,547 @@
     };
   };
 
+  // ---------------------------------------------------------------- the power station's own (廃発電所): shapes and pictures of theirs
+  // (made once and shared by every body of the kind: remove() throws away a body's materials, never these)
+  const GEO = {};
+  const gk = (k, f) => GEO[k] || (GEO[k] = f());
+  const XG = () => G.GFX.Geo;
+  const rbx = (w, h, d, r, n) => (G.GFX && G.GFX.makeRbox ? G.GFX.makeRbox(w, h, d, r, n || 1) : new THREE.BoxGeometry(w, h, d));
+  const part = (parent, geo, mat, x, y, z, rx, ry, rz, s) => { const m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); if (s) { if (Array.isArray(s)) m.scale.set(s[0], s[1], s[2]); else m.scale.setScalar(s); } m.castShadow = true; parent.add(m); return m; };
+  const fr = (x) => x - Math.floor(x);
+  // a picture drawn once into a canvas (kept)
+  const CANV = {};
+  function canv(k, w, h, draw, srgb) {
+    if (CANV[k]) return CANV[k];
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(cv); if (srgb !== false) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return (CANV[k] = t);
+  }
+  const rng0 = (sd) => () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  // the scars a strike of current leaves on skin (Lichtenberg figures): feathered branches out from where it went in, white on clear
+  // (the material tints them and lights them)
+  const lichTex = () => canv('lich', 256, 256, (g, S) => {
+    const rnd = rng0(91);
+    g.lineCap = 'round'; g.lineJoin = 'round'; g.shadowColor = 'rgba(255,255,255,0.5)'; g.shadowBlur = 2.5;
+    const br = (x, y, a, wd, len, d) => {
+      if (d > 6 || wd < 0.35 || len < 3) return;
+      const n = 4 + Math.floor(rnd() * 4); let px = x, py = y;
+      for (let i = 0; i < n; i++) {
+        a += (rnd() - 0.5) * 0.8;
+        const nx = px + Math.cos(a) * len / n, ny = py + Math.sin(a) * len / n;
+        g.lineWidth = wd; g.strokeStyle = `rgba(255,255,255,${(0.45 + 0.55 * Math.min(1, wd / 2.5)).toFixed(2)})`;
+        g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.stroke();
+        px = nx; py = ny; wd *= 0.9;
+        if (rnd() < 0.6) br(px, py, a + (rnd() < 0.5 ? -1 : 1) * (0.35 + rnd() * 0.75), wd * 0.6, len * 0.55, d + 1);
+      }
+      br(px, py, a + (rnd() - 0.5) * 0.4, wd * 0.8, len * 0.75, d + 1);
+    };
+    for (let k = 0; k < 3; k++) br(S * (0.18 + 0.32 * k + (rnd() - 0.5) * 0.1), -2, Math.PI / 2 + (rnd() - 0.5) * 0.5, 3.2, S * 0.5, 0);
+  });
+  // cloth burnt through: a ragged hole (the charred skin under it), its edge charred black and curling, the scorch spreading brown about
+  // it and fading, threads frayed at the edge
+  const burnTex = () => canv('burn', 128, 128, (g, W, H) => {
+    const rnd = rng0(67), cx = W / 2, cy = H / 2;
+    const blob = (r0, jag, sy) => { g.beginPath(); for (let i = 0; i <= 48; i++) { const a = (i / 48) * 6.283, r = r0 * (1 + (rnd() - 0.5) * jag + 0.18 * Math.sin(a * 3 + 1.3)); const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * sy; if (i) g.lineTo(x, y); else g.moveTo(x, y); } g.closePath(); g.fill(); };
+    g.filter = 'blur(6px)'; for (let i = 0; i < 4; i++) { g.fillStyle = `rgba(58,38,20,${0.18 + i * 0.06})`; blob(54 - i * 9, 0.25, 0.85); }
+    g.filter = 'blur(1.2px)'; g.fillStyle = 'rgba(16,12,10,0.96)'; blob(27, 0.45, 0.8);
+    g.filter = 'none'; g.fillStyle = 'rgba(42,30,24,1)'; blob(15, 0.6, 0.75); g.fillStyle = 'rgba(70,40,28,0.8)'; for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(cx + (rnd() - 0.5) * 18, cy + (rnd() - 0.5) * 12, 1 + rnd() * 3, 0.5 + rnd() * 1.5, rnd() * 3, 0, 6.3); g.fill(); }
+    g.strokeStyle = 'rgba(20,16,12,0.9)'; g.lineWidth = 1; for (let i = 0; i < 30; i++) { const a = rnd() * 6.283, r = 24 + rnd() * 6; g.beginPath(); g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.8); g.lineTo(cx + Math.cos(a) * (r + 3 + rnd() * 6), cy + Math.sin(a) * (r + 3 + rnd() * 6) * 0.8); g.stroke(); }
+  });
+  // a spasm: now and then the current jerks through the dead lineman (0..1; the same on every screen from its own clock)
+  const spasm = (t) => { const P0 = 2.3, c = Math.floor(t / P0), s = 0.6 + 1.3 * fr(Math.sin(c * 12.9898 + 4.1) * 43758.5453), l = t - c * P0 - s; return l > 0 && l < 0.36 ? Math.sin((l / 0.36) * Math.PI) : 0; };
+  const ZAP_T = 0.65;   // (the dead lineman: how long after it falls its charge goes)
+
+  // 感電した作業員: a lineman killed by the current, still charged. A coverall gone stiff with soot and burnt through in places, one
+  // sleeve burnt off at the elbow, bands of old reflective tape; a hard hat with a peak, its yellow faded and chipped; thick rubber
+  // gauntlets and boots; a belt with a pouch of tools and the ring for a safety line; a tag on a cord at the neck. The skin charred dark,
+  // and the feathered scars of the current up the neck, over a temple and down the bare forearm (they light as the charge gathers in
+  // it). It drags its left leg; now and then the current jerks through it and it stops (spasm)
+  B.lineman = function (root, M) {
+    PGs();
+    const th = 0.6, legL = 0.86, w = 0.34, hr = 0.125, hu = 0.16, al = 0.31;
+    const suit = wear(M, 0x3d3e32, 'weave', { roughness: 1 }, 13), suitD = wear(M, 0x35362c, 'weave', { roughness: 1 }, 13), char = wear(M, 0x120f0d, 'weave', { roughness: 1, side: THREE.DoubleSide }, 9);
+    const rub = wear(M, 0x1d1b1a, 'polymer', { roughness: 0.55 }), rubD = wear(M, 0x171615, 'polymer', { roughness: 0.6, side: THREE.DoubleSide }), sole = wear(M, 0x0e0d0c, 'polymer', { roughness: 0.9 });
+    const hide = wear(M, 0x30241a, 'leather'), steel = wear(M, 0x4e4b46, 'steel', { metalness: 0.75, roughness: 0.6 }), grip = wear(M, 0x4e221b, 'polymer', { roughness: 0.6 });
+    const hatM = wear(M, 0x4a4026, 'paintWorn', { roughness: 0.85 }), tape = wear(M, 0x46453f, null, { roughness: 0.6, metalness: 0.1 }), tagM = wear(M, 0x5c5545, 'label', { roughness: 0.9 }), redM = wear(M, 0x521c16, null, { roughness: 0.8 });
+    const teeth = wear(M, 0x4a4234, null, { roughness: 0.6 }), cordM = wear(M, 0x2a2622, 'weave', { roughness: 1 }, 8);
+    const lt = lichTex(), scar = new THREE.MeshStandardMaterial({ color: 0x55302a, map: lt, roughness: 0.7, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, emissive: 0x9ab4ff, emissiveMap: lt, emissiveIntensity: 0 });
+    M.all.push(scar);
+    M.eye.emissiveIntensity = 0.16;
+    { const t = TX('leather'); if (t) { const k = M.skin; k.map = t.map; k.normalMap = t.normalMap; k.roughnessMap = t.orm; k.aoMap = t.orm; k.roughness = 1; k.userData.uvk = 9; } }   // (charred skin: dry, cracked fine)
+    const Hm = humanoid(root, M, { leg: legL, torso: th, width: w, head: hr, hunch: hu, arm: al, torsoMat: suit, armMat: suit, legMat: suit, hipMat: suit, handMat: rub, footMat: rub, neckMat: M.skin, noHead: true });
+    const { spine, hips, head, arms, L } = Hm;
+    // the coverall, loose over the ribs and bagging at the belt; the seat
+    mesh(spine, PG.sph, suit, 0.2, 0.232, 0.172, 0, 0.4, 0.05, hu); mesh(spine, PG.sph, suit, 0.176, 0.19, 0.158, 0, 0.17, 0.02);
+    mesh(spine, PG.sph, suit, 0.18, 0.2, 0.152, 0, 0.42, -0.03, hu * 0.5);
+    mesh(hips, PG.sph, suit, 0.19, 0.15, 0.162, 0, -0.03, 0);
+    // (folds: where it bags over the belt, at the small of the back, in the crook of each sleeve)
+    for (let i = 0; i < 4; i++) { const a = -0.9 + i * 0.6; mesh(spine, PG.sph, suit, 0.07, 0.022, 0.03, Math.sin(a) * 0.17, 0.085 + (i % 2) * 0.012, 0.026 + Math.cos(a) * 0.15, 0, a, 0.15 * (i - 1.5)); }
+    for (const a of arms) { mesh(a.sh, PG.sph, suit, 0.064, 0.165, 0.068, 0, -0.15, 0); mesh(a.sh, PG.sph, suit, 0.058, 0.024, 0.05, 0, -al + 0.03, 0.03, 0.4); }
+    mesh(arms[0].el, PG.sph, suit, 0.055, 0.13, 0.058, 0, -0.12, 0.004);
+    // its collar laid open, the placket down the front with the zip, a breast pocket with its flap, a name tape
+    mesh(spine, PG.cyl8, suitD, 0.078, 0.05, 0.072, 0, th - 0.005, hu * th * 0.82, hu);
+    for (const s of [-1, 1]) mesh(spine, PG.box, suitD, 0.075, 0.012, 0.075, s * 0.062, th - 0.03, 0.155, -0.95, s * 0.35, s * 0.45);
+    mesh(spine, PG.box, suitD, 0.032, 0.25, 0.014, 0.012, 0.4, 0.243, hu - 0.18); mesh(spine, PG.box, suitD, 0.032, 0.17, 0.014, 0.012, 0.16, 0.198, 0.12);
+    mesh(spine, PG.box, steel, 0.008, 0.2, 0.006, 0.012, 0.42, 0.252, hu - 0.18);
+    mesh(spine, PG.box, suitD, 0.105, 0.115, 0.016, 0.105, 0.43, 0.228, hu - 0.15, 0.22); mesh(spine, PG.box, suitD, 0.11, 0.038, 0.02, 0.106, 0.485, 0.236, hu - 0.3, 0.22);
+    mesh(spine, PG.box, tagM, 0.09, 0.03, 0.006, -0.1, 0.47, 0.236, hu - 0.15, -0.22);
+    // where it burnt through: on the back, at the belly, on the left thigh - each a hole with its charred edge and the scorch about it,
+    // laid on the cloth's own curve (burnShell: a piece of the ellipsoid the cloth there is, a little proud of it)
+    const burnM = new THREE.MeshStandardMaterial({ map: burnTex(), transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); M.all.push(burnM);
+    const burn = (j, k, ps, pl, ts, tl, c, r, rx, kz) => part(j, gk('ln_burn' + k, () => new THREE.SphereGeometry(1, 12, 8, ps, pl, ts, tl)), burnM, c[0], c[1], c[2], rx || 0, 0, 0, [r[0] * 1.09, r[1] * 1.07, r[2] * (kz || 1.09)]);
+    burn(spine, 'b', Math.PI * 1.5 - 0.3, 1.1, 0.5, 0.95, [0, 0.42, -0.03], [0.18, 0.2, 0.152], hu * 0.5, 1.32);   // (the back melts out further than its ball: deeper)
+    burn(spine, 'f', 0.75, 0.6, 1.25, 0.6, [0, 0.17, 0.02], [0.176, 0.19, 0.158]);
+    burn(L[0].hip, 't', 1.2, 0.8, 1.35, 0.55, [0, -legL * 0.24, 0.005], [0.1, legL * 0.28, 0.108]);
+    // the right sleeve burnt off at the elbow: the forearm bare; the burnt end of the sleeve, rags of it
+    for (const c of arms[1].el.children) if (c.isMesh && c.material === suit) c.material = M.skin;
+    mesh(arms[1].sh, PG.cyl8, char, 0.064, 0.05, 0.068, 0, -al + 0.02, 0.0);
+    gear(arms[1].sh, 'tatter', { cloth: char }, 0.02, -al + 0.0, 0.05, 0.15, 0.3, 0, [0.32, 0.3, 0.4]); gear(arms[1].sh, 'tatter', { cloth: char }, -0.045, -al + 0.0, -0.02, 0.1, -2.0, 0, [0.28, 0.24, 0.4]);
+    mesh(arms[0].el, PG.cyl8, suitD, 0.058, 0.07, 0.062, 0, -al * 0.72, 0);                                          // (the left: its cuff)
+    // bands of reflective tape about the upper arms and the shins
+    for (const a of arms) mesh(a.sh, PG.cyl8, tape, 0.078, 0.032, 0.082, 0, -0.17, 0);
+    // the trousers' legs, bagging; knee patches; rubber boots to the calf over them, a lip at the top, thick soles, toe caps
+    for (const l of L) {
+      mesh(l.hip, PG.sph, suit, 0.1, legL * 0.28, 0.108, 0, -legL * 0.24, 0.005);
+      mesh(l.kn, PG.cyl8, suit, 0.07, 0.24, 0.074, 0, -0.1, 0); mesh(l.kn, PG.sph, suitD, 0.062, 0.075, 0.026, 0, -0.01, 0.056);
+      mesh(l.kn, PG.cyl8, tape, 0.075, 0.03, 0.079, 0, -0.14, 0);
+      mesh(l.kn, PG.cyl8, rub, 0.066, 0.26, 0.072, 0, -0.31, 0); mesh(l.kn, PG.cyl8, rubD, 0.073, 0.026, 0.078, 0, -0.18, 0);
+      mesh(l.kn, PG.box, rub, 0.108, 0.085, 0.25, 0, -0.392, 0.048); mesh(l.kn, PG.sph, rub, 0.056, 0.046, 0.062, 0, -0.392, 0.152);
+      mesh(l.kn, PG.box, sole, 0.114, 0.026, 0.272, 0, -0.424, 0.05); mesh(l.kn, PG.box, sole, 0.112, 0.032, 0.07, 0, -0.42, -0.06);
+    }
+    // thick gauntlets: the hand swollen in them, the cuff flaring up the forearm
+    const cuff = gk('ln_cuff', () => XG().lathe([[0.043, -0.03], [0.049, 0.01], [0.06, 0.07], [0.068, 0.115], [0.071, 0.125], [0.066, 0.128], [0.06, 0.12]], 18));
+    for (const a of arms) {
+      mesh(a.hand, PG.sph, rub, 0.055, 0.064, 0.039, 0, -0.012, 0.004);
+      for (let i = 0; i < 3; i++) mesh(a.hand, PG.sph, rub, 0.019, 0.05, 0.021, (i - 1) * 0.03, -0.075, 0.012);
+      mesh(a.hand, PG.sph, rub, 0.02, 0.036, 0.021, (a === arms[0] ? 1 : -1) * 0.05, -0.025, 0.022);
+      part(a.hand, cuff, rubD, 0, 0, 0);
+    }
+    // the belt, its buckle and the ring for a safety line; a pouch of tools on the right hip
+    mesh(hips, PG.torus, hide, 0.228, 0.18, 0.34, 0, 0.075, 0, Math.PI / 2); mesh(hips, PG.box, steel, 0.052, 0.042, 0.012, 0, 0.075, 0.188);
+    mesh(hips, PG.torus, steel, 0.026, 0.03, 0.25, -0.21, 0.035, 0.07, 0.2, 1.2, 0);
+    const pj = joint(hips, 0.215, 0.05, 0.05); pj.rotation.y = 0.45;
+    mesh(pj, PG.box, hide, 0.075, 0.15, 0.13, 0, -0.065, 0); mesh(pj, PG.box, hide, 0.08, 0.055, 0.135, 0.008, -0.005, 0, 0, 0, -0.12);
+    mesh(pj, PG.cyl8, grip, 0.011, 0.075, 0.011, -0.01, 0.045, 0.035, 0.12, 0, 0.1); mesh(pj, PG.cyl8, steel, 0.003, 0.05, 0.003, -0.005, 0.1, 0.04, 0.12, 0, 0.1);
+    mesh(pj, PG.cyl8, grip, 0.008, 0.09, 0.008, -0.005, 0.05, -0.02, -0.15, 0, -0.08); mesh(pj, PG.cyl8, grip, 0.008, 0.09, 0.008, 0.005, 0.05, -0.04, -0.25, 0, 0.12);
+    mesh(pj, PG.box, steel, 0.018, 0.04, 0.012, 0.0, 0.1, -0.03, -0.2);
+    mesh(pj, PG.box, hatM, 0.02, 0.06, 0.03, -0.012, 0.035, -0.055);
+    // the head, made here (the frame's is a mannequin's): the skull, the brow standing out, the cheekbones, the jaw a little open; charred,
+    // the lips burnt off the teeth, the nose gone to a hole, the eyes sunk and clouded; the ears burnt to stubs. The big masses melt into
+    // one surface with the neck
+    const hd = joint(head, 0, -0.028, 0.004);   // (the head sits down on its neck)
+    mesh(spine, PG.sph, M.skin, 0.058, 0.07, 0.062, 0, th + 0.07, hu * th * 0.9 - 0.005);
+    const gum = wear(M, 0x2e1612, null, { roughness: 0.5 });
+    mesh(hd, PG.sph, M.skin, 0.093, 0.104, 0.106, 0, 0.122, -0.012);
+    mesh(hd, PG.sph, M.skin, 0.06, 0.052, 0.058, 0, 0.068, 0.052);
+    mesh(hd, PG.box, M.skin, 0.1, 0.04, 0.085, 0, 0.026, 0.044, -0.18); mesh(hd, PG.sph, M.skin, 0.034, 0.028, 0.03, 0, 0.016, 0.094);
+    for (const s of [-1, 1]) mesh(hd, PG.sph, M.skin, 0.024, 0.04, 0.032, s * 0.05, 0.042, 0.004, 0, 0, s * 0.2);
+    mesh(hd, PG.sph, M.skin, 0.08, 0.026, 0.036, 0, 0.152, 0.08, 0.35);
+    for (const s of [-1, 1]) { mesh(hd, PG.sph, M.skin, 0.024, 0.016, 0.026, s * 0.055, 0.09, 0.066, 0, s * 0.4, 0); mesh(hd, PG.sph, M.skin, 0.014, 0.028, 0.02, s * 0.097, 0.115, -0.008); }
+    mesh(hd, PG.sph, M.skin, 0.013, 0.026, 0.016, 0, 0.112, 0.1, 0.3);
+    mesh(hd, PG.sph, M.dark, 0.016, 0.019, 0.006, 0, 0.086, 0.106, -0.3);
+    for (const s of [-1, 1]) { mesh(hd, PG.sph, M.dark, 0.026, 0.02, 0.006, s * 0.034, 0.121, 0.092, 0, s * 0.35, 0); mesh(hd, PG.sph, M.eye, 0.0075, 0.0065, 0.004, s * 0.034, 0.119, 0.095); }
+    mesh(hd, PG.box, M.dark, 0.062, 0.03, 0.02, 0, 0.049, 0.098);
+    mesh(hd, PG.box, gum, 0.062, 0.007, 0.01, 0, 0.066, 0.106, 0.15);
+    for (let i = 0; i < 8; i++) { const a = (i - 3.5) * 0.19; mesh(hd, PG.box, teeth, 0.0072, 0.011 - (i % 3) * 0.0015, 0.005, Math.sin(a) * 0.043, 0.058, 0.067 + Math.cos(a) * 0.043, 0.08, a, (i % 2 - 0.5) * 0.15); }
+    for (let i = 0; i < 7; i++) { if (i === 2) continue; const a = (i - 3) * 0.19; mesh(hd, PG.box, teeth, 0.0068, 0.0095, 0.005, Math.sin(a) * 0.04, 0.04, 0.066 + Math.cos(a) * 0.04, -0.1, a, 0); }
+    // the hard hat: a dome with a rib over the crown, a peak and a rolled rim, the strap under the chin; pushed back and askew
+    const hatG = gk('ln_hat', () => {
+      // (a turned profile is given from its foot up: its faces then look outward)
+      const Geo = XG(), dome = Geo.lathe([[0.0005, 0.136], [0.045, 0.133], [0.085, 0.121], [0.115, 0.099], [0.135, 0.071], [0.147, 0.041], [0.152, 0.013], [0.153, 0.0], [0.147, -0.002]].reverse(), 30);
+      const peak = new THREE.LatheGeometry([[0.148, 0.004], [0.185, -0.012], [0.203, -0.024], [0.206, -0.032], [0.198, -0.03], [0.148, -0.006]].reverse().map((p) => new THREE.Vector2(p[0], p[1])), 16, -1.0, 2.0);
+      const rim = Geo.lathe([[0.148, 0.007], [0.16, 0.0], [0.163, -0.009], [0.157, -0.013], [0.147, -0.007]].reverse(), 30);
+      const rib = Geo.xf(new THREE.TorusGeometry(0.126, 0.012, 6, 18, Math.PI), [0, 0.004, 0], [0, Math.PI / 2, 0], [1, 1.06, 1]);
+      const g = Geo.merge([dome, peak, rim, rib]), uv = g.attributes.uv.array; for (let i = 0; i < uv.length; i++) uv[i] *= 3;   // (its chips and grime at their size)
+      return g;
+    });
+    part(hd, hatG, hatM, 0, 0.142, -0.014, -0.16, 0, 0.1, [0.78, 0.84, 0.86]);
+    mesh(hd, PG.box, M.dark, 0.003, 0.045, 0.004, 0.05, 0.142 + 0.085, 0.062, -0.5, 0, 0.6);                    // (a crack in it)
+    mesh(hd, PG.torus, cordM, 0.1, 0.125, 0.06, 0, 0.1, 0.012, -0.3, 0, 0);
+    // a tag on a cord about the neck: the danger tag of a lockout, its red band, its eyelet
+    mesh(spine, PG.torus, cordM, 0.068, 0.075, 0.12, 0, th + 0.005, hu * th * 0.86, Math.PI / 2 - hu);
+    const tag = joint(spine, 0, th - 0.11, 0.255);
+    for (const s of [-1, 1]) mesh(spine, PG.cyl8, cordM, 0.0035, 0.13, 0.0035, s * 0.024, th - 0.05, 0.205, -0.65, 0, -s * 0.3);
+    part(tag, gk('ln_tag', () => rbx(0.052, 0.078, 0.004, 0.006, 1)), tagM, 0, -0.04, 0, 0.05);
+    part(tag, gk('ln_tagb', () => rbx(0.053, 0.017, 0.005, 0.003, 1)), redM, 0, -0.013, 0.0004, 0.05);
+    mesh(tag, PG.torus, steel, 0.007, 0.007, 0.1, 0, -0.002, 0.001);
+    // the scars of the current, laid over the skin: up the right side of the neck, over the right temple and cheek, down the bare forearm
+    part(spine, gk('ln_sc_neck', () => new THREE.CylinderGeometry(1, 1.1, 1, 18, 1, true, -2.7, 2.5)), scar, 0, th + 0.045, hu * th * 0.9, hu * 0.4, 0, 0, [0.057, 0.15, 0.062]);
+    part(hd, gk('ln_sc_face', () => new THREE.SphereGeometry(1, 16, 10, 0.05, 1.25, 0.95, 1.0)), scar, 0, 0.122, -0.012, 0, 0, 0, [0.1, 0.112, 0.114]);
+    part(arms[1].el, gk('ln_sc_arm', () => new THREE.CylinderGeometry(0.057, 0.043, al * 0.86, 18, 1, true)), scar, 0, -al * 0.48, 0.003);
+    return {
+      J: Object.assign(Hm, { tag, scar }), h: Hm.h, r: 0.42, mats: [suit, rub],
+      hits: [{ n: head, r: 0.15, part: 'head', o: V(0, 0.085, 0.012) }, { n: spine, r: 0.27, part: 'body', o: V(0, 0.32, 0) }, { n: hips, r: 0.22, part: 'body', o: V(0, -0.3, 0) }], orn: { head, back: spine, backZ: [-0.2, -0.2], backY: 0.42 },
+      animate(a) {
+        const sp = spasm(a.t), jit = Math.sin(a.t * 57) * sp, jit2 = Math.sin(a.t * 43 + 1.3) * sp;
+        const wk = a.walk, mv = a.mv * (1 - sp), sw = Math.sin(wk);
+        // a limp: the right leg steps, the left is dragged after it, stiff, its foot turned out
+        L[1].hip.rotation.x = -sw * 0.62 * mv; L[1].kn.rotation.x = Math.max(0, -sw) * 0.85 * mv;
+        L[0].hip.rotation.x = sw * 0.28 * mv + 0.04; L[0].kn.rotation.x = 0.06 + Math.max(0, sw) * 0.14 * mv; L[0].hip.rotation.y = -0.22; L[0].hip.rotation.z = 0.05;
+        hips.position.y = Hm.hipY - 0.015 + (sw > 0 ? -sw * 0.045 : -sw * 0.015) * mv;   // (it sinks onto the bad leg)
+        hips.rotation.z = sw * 0.07 * mv + jit * 0.05;
+        spine.rotation.x = 0.16 - a.wind * 0.22 + a.atk * 0.35 - a.flinch * 0.4 + jit2 * 0.07;
+        spine.rotation.z = -0.07 + sw * 0.05 * mv + jit * 0.12;
+        head.rotation.z = 0.26 + jit * 0.35 + a.wind * Math.sin(a.t * 71) * 0.06; head.rotation.x = -0.08 + jit2 * 0.22 - a.wind * 0.28; head.rotation.y = Math.sin(a.t * 0.9) * 0.15;
+        // the arms hang a little before it; in the wind-up both come up, the hands open, shaking with the current; then they close on you
+        const lift = a.wind, sh = Math.sin(a.t * 63) * 0.07 * lift;
+        for (let s = 0; s < 2; s++) {
+          const A = arms[s], out = s ? 1 : -1;
+          A.sh.rotation.x = -0.22 - Math.sin(wk + s * Math.PI) * 0.15 * mv - lift * 1.3 - a.atk * 0.15 + sh + jit * 0.3 * out;
+          A.sh.rotation.z = out * (0.1 + lift * 0.22 - a.atk * 0.42 + jit2 * 0.25);
+          A.el.rotation.x = -0.35 - lift * 0.5 + a.atk * 0.25 + jit * 0.4;
+          A.hand.rotation.x = -0.15 + lift * 0.45 - a.atk * 0.3;
+        }
+        tag.rotation.x = Math.sin(wk * 2) * 0.15 * mv + jit * 0.4 + a.atk * 0.3;
+        scar.emissiveIntensity = lift * 1.4 + sp * 0.5 + a.atk * 0.8;
+      },
+      // falling: it stands rigid and shaking while the charge in it goes (ZAP_T), then drops; a twitch or two after
+      die(e) {
+        const T = e.deathT, I = e.model.inner, side = e.yaw > 0 ? 1 : -1;
+        const k = Math.min(1, Math.max(0, (T - ZAP_T) / 0.5)), kk = k * k * (3 - 2 * k);
+        I.rotation.z = kk * 1.45 * side; I.position.y = -kk * e.radius * 0.4;
+        const shk = T < ZAP_T ? Math.min(1, T / 0.12) : Math.max(0, 1 - (T - ZAP_T) / 1.2) * 0.45, q = Math.sin(T * 71) * shk, q2 = Math.sin(T * 53 + 2) * shk;
+        spine.rotation.x = -0.12 + q2 * 0.1; spine.rotation.z = q * 0.12; head.rotation.x = -0.45 + q * 0.25; head.rotation.z = q2 * 0.3;
+        for (let s = 0; s < 2; s++) { const A = arms[s], out = s ? 1 : -1; A.sh.rotation.x = -0.5 + q * 0.3; A.sh.rotation.z = out * (0.75 + q2 * 0.25); A.el.rotation.x = -0.2 + q * 0.3; }
+        scar.emissiveIntensity = T < ZAP_T ? 2 * (T / ZAP_T) : Math.max(0, 2 - (T - ZAP_T) * 5);
+      },
+    };
+  };
+
+  // 暴走した点検機 (the plant's inspection crawler): the pictures on it - black and yellow chevrons on its bumper, worn to the metal; its
+  // maker's plate of brass with the letters struck into it; a number stencilled on its flank; the stripe of its turning lamp; the beam
+  // the lamp throws
+  const hazTex = () => canv('rv_haz', 256, 64, (g, W, H) => {
+    const rnd = rng0(17);
+    g.fillStyle = '#a8913c'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#1a1816'; for (let x = -H; x < W + H; x += 40) { g.beginPath(); g.moveTo(x, H); g.lineTo(x + 20, H); g.lineTo(x + 20 + H, 0); g.lineTo(x + H, 0); g.closePath(); g.fill(); }
+    for (let i = 0; i < 90; i++) { const x = rnd() * W, y = rnd() * H, l = 3 + rnd() * 18; g.strokeStyle = `rgba(${90 + rnd() * 40 | 0},${84 + rnd() * 30 | 0},${74 + rnd() * 20 | 0},${0.5 + rnd() * 0.5})`; g.lineWidth = 0.6 + rnd() * 1.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y + (rnd() - 0.5) * 4); g.stroke(); }
+    for (let i = 0; i < 26; i++) { const x = rnd() * W, y = rnd() * H, r = 1 + rnd() * 5; g.fillStyle = `rgba(${70 + rnd() * 30 | 0},${40 + rnd() * 16 | 0},${22},${0.5 + rnd() * 0.4})`; g.beginPath(); g.ellipse(x, y, r * 1.6, r, rnd() * 3, 0, 6.3); g.fill(); }
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(20,18,14,0)'); gr.addColorStop(1, 'rgba(20,18,14,0.55)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  });
+  const plateTex = () => canv('rv_plate', 256, 128, (g, W, H) => {
+    const rnd = rng0(29);
+    g.fillStyle = '#7d6a40'; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 1400; i++) { const v = rnd(); g.fillStyle = `rgba(${v < 0.5 ? '40,32,18' : '170,150,100'},${0.05 + rnd() * 0.12})`; g.fillRect(rnd() * W, rnd() * H, 1 + rnd() * 3, 1); }
+    g.strokeStyle = 'rgba(30,24,14,0.85)'; g.lineWidth = 3; g.strokeRect(9, 9, W - 18, H - 18);
+    g.fillStyle = 'rgba(28,22,12,0.92)'; g.font = 'bold 22px sans-serif'; g.textBaseline = 'middle';
+    g.fillText('保守点検車  TK-3', 22, 33); g.font = '17px sans-serif'; g.fillText('製造番号  0412', 22, 62); g.fillText('DC 48V    1973', 22, 88);
+    g.fillStyle = 'rgba(255,240,200,0.12)'; g.fillText('DC 48V    1973', 23, 89);
+    for (const [x, y] of [[16, 16], [W - 16, 16], [16, H - 16], [W - 16, H - 16]]) { g.fillStyle = '#4a3c22'; g.beginPath(); g.arc(x, y, 5, 0, 6.3); g.fill(); }
+    const gr = g.createRadialGradient(W * 0.4, H * 0.5, 10, W * 0.5, H * 0.5, W * 0.6); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(30,20,8,0.45)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  });
+  const stencilTex = () => canv('rv_sten', 256, 128, (g, W, H) => {
+    const rnd = rng0(53);
+    g.fillStyle = 'rgba(22,20,18,0.72)'; g.font = 'bold 60px sans-serif'; g.textBaseline = 'middle'; g.fillText('点検3', 14, 60);
+    g.font = 'bold 20px sans-serif'; g.fillText('高電圧  注意', 16, 116);
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(0,0,0,${0.3 + rnd() * 0.7})`; g.beginPath(); g.ellipse(rnd() * W, rnd() * H, 1 + rnd() * 6, 0.6 + rnd() * 2.5, rnd() * 3, 0, 6.3); g.fill(); }
+    for (let i = 0; i < 12; i++) { g.fillRect(0, (i / 12) * H + rnd() * 4, W, 1); }   // (the stencil's bridges)
+  });
+  // the dirt of years over its paint, laid on each face: on the flanks and ends, rust run down from the seams and rivets, oil and road
+  // grime rising from below, rust come through where the paint is chipped, scuffs; on the deck, dust lying, oil spilt, boot marks of rust
+  const grimeTex = (k, seed, deck) => canv('rv_grime' + k, 512, 256, (g, W, H) => {
+    const rnd = rng0(seed);
+    g.filter = 'blur(3px)';
+    if (!deck) {
+      for (let x = -8; x < W + 8; x += 6) { const h = H * (0.22 + 0.3 * rnd()), gr = g.createLinearGradient(0, H, 0, H - h); gr.addColorStop(0, 'rgba(16,13,10,0.8)'); gr.addColorStop(0.6, 'rgba(22,18,13,0.35)'); gr.addColorStop(1, 'rgba(22,18,13,0)'); g.fillStyle = gr; g.fillRect(x, H - h, 9, h); }
+      for (let i = 0; i < 70; i++) { const x = rnd() * W, y0 = rnd() < 0.6 ? rnd() * H * 0.12 : rnd() * H * 0.6, l = 25 + rnd() * 170, wd = 1 + rnd() * 4, a = 0.3 + rnd() * 0.45, gr = g.createLinearGradient(0, y0, 0, y0 + l); gr.addColorStop(0, `rgba(92,48,22,${a})`); gr.addColorStop(0.3, `rgba(80,42,20,${a * 0.7})`); gr.addColorStop(1, 'rgba(80,42,20,0)'); g.fillStyle = gr; g.fillRect(x, y0, wd, l); }
+    } else {
+      for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${104 + rnd() * 20 | 0},${96 + rnd() * 18 | 0},${82 + rnd() * 14 | 0},${0.05 + rnd() * 0.08})`; g.beginPath(); g.ellipse(rnd() * W, rnd() * H, 50 + rnd() * 110, 30 + rnd() * 60, rnd() * 3, 0, 6.3); g.fill(); }
+      for (let i = 0; i < 6; i++) { g.fillStyle = `rgba(14,12,9,${0.25 + rnd() * 0.25})`; g.beginPath(); g.ellipse(rnd() * W, rnd() * H, 6 + rnd() * 22, 4 + rnd() * 12, rnd() * 3, 0, 6.3); g.fill(); }
+    }
+    g.filter = 'blur(0.6px)';
+    for (let i = 0; i < 26; i++) { const r = 1 + rnd() * 5, x = rnd() * W, y = rnd() < 0.5 ? rnd() * H * 0.15 : rnd() * H; g.fillStyle = `rgba(${58 + rnd() * 20 | 0},${34 + rnd() * 10 | 0},${18},${0.4 + rnd() * 0.4})`; g.beginPath(); g.ellipse(x, y, r * (0.6 + rnd() * 0.6), r * (1 + rnd() * 1.5), rnd() * 0.4 - 0.2, 0, 6.3); g.fill(); }
+    for (let i = 0; i < 60; i++) { const x = rnd() * W, y = rnd() * H, l = 4 + rnd() * 26; g.strokeStyle = `rgba(${150 + rnd() * 40 | 0},${140 + rnd() * 30 | 0},${118},${0.15 + rnd() * 0.3})`; g.lineWidth = 0.6 + rnd(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y + (rnd() - 0.5) * 6); g.stroke(); }
+  });
+  const stripeTex = () => canv('rv_stripe', 64, 16, (g, W, H) => {
+    const d = g.createImageData(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const u = x / W, k = Math.exp(-Math.pow((fr(u - 0.25 + 0.5) - 0.5) / 0.09, 2)), o = (y * W + x) * 4, v = Math.round(255 * (0.05 + 0.95 * k)); d.data[o] = v; d.data[o + 1] = v; d.data[o + 2] = v; d.data[o + 3] = 255; }
+    g.putImageData(d, 0, 0);
+  });
+  const beamTex = () => canv('rv_beam', 128, 32, (g, W, H) => {
+    const d = g.createImageData(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const u = x / W, v = (y + 0.5) / H - 0.5, k = Math.pow(1 - u, 1.6) * Math.exp(-Math.pow(v / (0.12 + u * 0.3), 2)) * Math.min(1, u * 12), o = (y * W + x) * 4, c = Math.round(255 * k); d.data[o] = c; d.data[o + 1] = c; d.data[o + 2] = c; d.data[o + 3] = 255; }
+    g.putImageData(d, 0, 0);
+  });
+  // the track: the run of its plates is a loop of two straights and two half circles about the end wheels (the sprocket behind, the
+  // idler before). trackAt(s): where along it the plate s metres from the front of the lower run sits (z, y) and how it is turned (a: about
+  // x; a plate laid flat under the track is a = 0, its grouser out)
+  const TR = 0.17, TZ = 0.48, TY = 0.2, TS = TZ * 2, TA = Math.PI * TR, TL = 2 * TS + 2 * TA, TN = 40;
+  function trackAt(s) {
+    if (s < TS) return [TZ - s, TY - TR, 0];
+    s -= TS; if (s < TA) { const g = s / TR; return [-TZ - Math.sin(g) * TR, TY - Math.cos(g) * TR, g]; }
+    s -= TA; if (s < TS) return [-TZ + s, TY + TR, Math.PI];
+    s -= TS; const g = s / TR; return [TZ + Math.sin(g) * TR, TY + Math.cos(g) * TR, Math.PI + g];
+  }
+  // a track's belt of plates, its own (it is moved round as the crawler drives): set(ph) lays every plate where it is after ph metres
+  function trackBelt() {
+    const Geo = XG(), T = gk('rv_cleat', () => Geo.merge([Geo.xf(rbx(0.17, 0.022, 0.064, 0.005, 1), [0, 0, 0]), Geo.xf(rbx(0.15, 0.02, 0.016, 0.004, 1), [0, -0.02, 0]), Geo.xf(rbx(0.032, 0.026, 0.034, 0.006, 1), [0, 0.022, 0]), Geo.xf(new THREE.CylinderGeometry(0.006, 0.006, 0.175, 6), [0, 0.002, 0.033], [0, 0, Math.PI / 2])]));
+    const tp = T.attributes.position.array, tn = T.attributes.normal.array, tu = T.attributes.uv.array, nv = tp.length / 3;
+    const pos = new Float32Array(TN * nv * 3), nor = new Float32Array(TN * nv * 3), uv = new Float32Array(TN * nv * 2);
+    for (let i = 0; i < TN; i++) uv.set(tu, i * nv * 2);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    let last = NaN;
+    const set = (ph) => {
+      if (ph === last) return; last = ph;
+      for (let i = 0; i < TN; i++) {
+        const q = trackAt(fr((i * TL / TN + ph) / TL) * TL), c = Math.cos(q[2]), sn = Math.sin(q[2]);
+        for (let j = 0, o = i * nv * 3; j < nv; j++, o += 3) {
+          const y = tp[j * 3 + 1], z = tp[j * 3 + 2], ny = tn[j * 3 + 1], nz = tn[j * 3 + 2];
+          pos[o] = tp[j * 3]; pos[o + 1] = y * c - z * sn + q[1]; pos[o + 2] = y * sn + z * c + q[0];
+          nor[o] = tn[j * 3]; nor[o + 1] = ny * c - nz * sn; nor[o + 2] = ny * sn + nz * c;
+        }
+      }
+      g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true;
+    };
+    set(0); g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, TY, 0), TZ + TR + 0.1); g.boundingBox = new THREE.Box3(new THREE.Vector3(-0.1, -0.05, -TZ - TR - 0.05), new THREE.Vector3(0.1, TY + TR + 0.05, TZ + TR + 0.05));
+    return { g, set };
+  }
+  // the crawler's fixed parts, by what they are made of (one shape for each, melted from all of its parts: few draws)
+  function roverGeo() {
+    return gk('rover', () => {
+      const Geo = XG(), R = {}, add = (k, g) => (R[k] = R[k] || []).push(g);
+      const box = (w, h, d, x, y, z, rx, ry, rz, r) => Geo.xf(rbx(w, h, d, r ?? Math.min(w, h, d) * 0.22, 1), [x, y, z], [rx || 0, ry || 0, rz || 0]);
+      const cyl = (r, h, x, y, z, rx, ry, rz, seg) => Geo.xf(new THREE.CylinderGeometry(r, r, h, seg || 12), [x, y, z], [rx || 0, ry || 0, rz || 0]);
+      const dot = (r, x, y, z) => Geo.xf(new THREE.SphereGeometry(r, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2), [x, y, z]);
+      const dotX = (r, x, y, z, s) => Geo.xf(new THREE.SphereGeometry(r, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2), [x, y, z], [0, 0, -s * Math.PI / 2]);
+      const dotZ = (r, x, y, z, s) => Geo.xf(new THREE.SphereGeometry(r, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2), [x, y, z], [s * Math.PI / 2, 0, 0]);
+      const tube = (pts, r, n) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p[0], p[1], p[2]))), n || 20, r, 6, false);
+      // the hull: a box with its front raked in two plates, its back a little leaned, every edge with a weld's round; a seam along each
+      // flank where the upper plates meet the lower, rivets along it and along the deck's edges
+      {
+        const s = new THREE.Shape(), P = [[-0.6, 0.2], [0.46, 0.2], [0.62, 0.36], [0.6, 0.5], [0.44, 0.7], [-0.52, 0.7], [-0.62, 0.6]];
+        s.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) s.lineTo(P[i][0], P[i][1]); s.closePath();
+        const g = new THREE.ExtrudeGeometry(s, { depth: 0.56, bevelEnabled: true, bevelThickness: 0.022, bevelSize: 0.02, bevelSegments: 2, curveSegments: 1 });
+        g.translate(0, 0, -0.28); g.rotateY(-Math.PI / 2);
+        const uv = g.attributes.uv.array; for (let i = 0; i < uv.length; i++) uv[i] *= 2.4;
+        add('paint', g);
+      }
+      for (const sx of [-1, 1]) {
+        add('iron', box(0.008, 0.014, 1.02, sx * 0.303, 0.42, -0.06, 0, 0, 0, 0.003));
+        for (let z = -0.54; z < 0.44; z += 0.076) { add('paint', dotX(0.008, sx * 0.303, 0.44, z, sx)); add('paint', dot(0.008, sx * 0.27, 0.722, z)); }
+      }
+      for (let x = -0.24; x <= 0.241; x += 0.06) add('paint', dotZ(0.008, x, 0.63, -0.62, -1));
+      // the back: louvres before a fan, in a frame; the maker's plate; a tow ring under it
+      add('iron', box(0.34, 0.2, 0.02, -0.08, 0.38, -0.618, -0.05, 0, 0, 0.006));
+      for (let i = 0; i < 5; i++) add('dark', box(0.3, 0.008, 0.034, -0.08, 0.31 + i * 0.036, -0.632, 0.7, 0, 0, 0.002));
+      add('plate', box(0.15, 0.075, 0.004, 0.17, 0.5, -0.624, -0.05, Math.PI, 0, 0.001));
+      for (const [x, y] of [[0.105, 0.47], [0.235, 0.47], [0.105, 0.53], [0.235, 0.53]]) add('brass', dotZ(0.005, x, y, -0.628, -1));
+      add('iron', Geo.xf(new THREE.TorusGeometry(0.045, 0.012, 6, 14, Math.PI), [0, 0.215, -0.64], [Math.PI / 2, 0, 0])); add('iron', box(0.12, 0.05, 0.05, 0, 0.23, -0.615, 0, 0, 0, 0.01));
+      // the deck: the housing of its batteries at the back with a lipped lid and two lifting handles; a cable out of it to the mast and
+      // another down the left to the arm; a whip aerial, bent
+      add('paint', box(0.5, 0.14, 0.34, 0, 0.785, -0.3, 0, 0, 0, 0.02)); add('paint', box(0.52, 0.022, 0.36, 0, 0.862, -0.3, 0, 0, 0, 0.008));
+      for (const sx of [-1, 1]) for (const z of [-0.18, -0.42]) add('steel', Geo.rod([sx * 0.12, 0.873, z], [sx * 0.12, 0.9, z], 0.007, 6));
+      for (const sx of [-1, 1]) add('steel', Geo.rod([sx * 0.12, 0.9, -0.18], [sx * 0.12, 0.9, -0.42], 0.007, 6));
+      for (const sx of [-1, 1]) add('iron', box(0.012, 0.1, 0.3, sx * 0.256, 0.78, -0.3, 0, 0, 0, 0.003));
+      // the tether's reel on the deck: two flanged cheeks on stands, the cable wound on it in turns, its end led off to the mast
+      {
+        const rx = 0.07, ry = 0.85, rz = 0.06, fl = Geo.lathe([[0.0005, -0.006], [0.115, -0.006], [0.118, -0.003], [0.118, 0.003], [0.115, 0.006], [0.0005, 0.006]], 22);
+        for (const s of [-1, 1]) { add('paint', Geo.xf(fl.clone(), [rx + s * 0.085, ry, rz], [0, 0, Math.PI / 2])); add('iron', box(0.014, 0.13, 0.06, rx + s * 0.1, 0.785, rz, 0, 0, 0, 0.004)); }
+        add('steel', cyl(0.012, 0.23, rx, ry, rz, 0, 0, Math.PI / 2));
+        for (let i = 0; i < 7; i++) add('cable', Geo.xf(new THREE.TorusGeometry(0.075 + (i % 2) * 0.004, 0.011, 5, 22), [rx - 0.066 + i * 0.022, ry, rz], [0, Math.PI / 2, 0]));
+        add('cable', tube([[rx, ry + 0.085, rz], [rx - 0.02, ry + 0.05, rz + 0.12], [0.03, 0.79, 0.22], [0.0, 0.8, 0.29]], 0.01));
+        add('iron', box(0.05, 0.03, 0.03, rx + 0.17, 0.79, rz, 0, 0, 0, 0.006)); add('steel', Geo.rod([rx + 0.17, 0.8, rz], [rx + 0.13, 0.85, rz], 0.006, 5));   // (its crank)
+      }
+      // a junction box on the left flank, its conduit run back along the seam; grab handles on the housing's flanks
+      add('iron', box(0.035, 0.11, 0.14, -0.318, 0.55, 0.22, 0, 0, 0, 0.008)); add('iron', box(0.04, 0.02, 0.15, -0.32, 0.61, 0.22, 0, 0, 0, 0.005));
+      for (let i = 0; i < 4; i++) add('steel', Geo.xf(new THREE.CylinderGeometry(0.005, 0.005, 0.006, 6), [-0.337, 0.515 + (i >> 1) * 0.07, 0.17 + (i & 1) * 0.1], [0, 0, Math.PI / 2]));
+      add('steel', Geo.rod([-0.316, 0.5, 0.18], [-0.316, 0.47, 0.15], 0.012, 6)); add('steel', Geo.rod([-0.316, 0.47, 0.15], [-0.316, 0.47, -0.5], 0.012, 6));
+      for (const z of [0.05, -0.2, -0.45]) add('iron', box(0.02, 0.03, 0.02, -0.316, 0.47, z, 0, 0, 0, 0.004));
+      for (const sx of [-1, 1]) { add('steel', Geo.rod([sx * 0.262, 0.83, -0.2], [sx * 0.285, 0.83, -0.22], 0.007, 5)); add('steel', Geo.rod([sx * 0.285, 0.83, -0.22], [sx * 0.285, 0.83, -0.38], 0.007, 5)); add('steel', Geo.rod([sx * 0.285, 0.83, -0.38], [sx * 0.262, 0.83, -0.4], 0.007, 5)); }
+      // a panel torn off the right flank before the hatch: the dark inside, the plate still hanging by a corner, bent out, and the
+      // wiring pulled out of it, hanging in loops
+      add('dark', Geo.xf(new THREE.PlaneGeometry(0.16, 0.12), [0.3045, 0.545, 0.33], [0, Math.PI / 2, 0]));
+      add('iron', box(0.006, 0.012, 0.17, 0.307, 0.61, 0.33, 0, 0, 0, 0.002)); add('iron', box(0.006, 0.012, 0.17, 0.307, 0.482, 0.33, 0, 0, 0, 0.002)); add('iron', box(0.006, 0.13, 0.012, 0.307, 0.546, 0.412, 0, 0, 0, 0.002));
+      add('paint', Geo.xf(rbx(0.008, 0.13, 0.15, 0.003, 1), [0.338, 0.43, 0.29], [0.55, 0, -0.42]));
+      add('wireR', tube([[0.3, 0.58, 0.3], [0.33, 0.52, 0.31], [0.335, 0.46, 0.33], [0.32, 0.44, 0.36], [0.31, 0.5, 0.38]], 0.006, 16));
+      add('wireB', tube([[0.3, 0.56, 0.36], [0.325, 0.5, 0.37], [0.34, 0.43, 0.35], [0.345, 0.39, 0.32]], 0.0055, 14));
+      add('cable', tube([[0.3, 0.6, 0.34], [0.32, 0.56, 0.3], [0.33, 0.5, 0.27], [0.325, 0.47, 0.25]], 0.007, 14));
+      add('copper', Geo.rod([0.345, 0.39, 0.32], [0.35, 0.37, 0.315], 0.002, 4)); add('copper', Geo.rod([0.345, 0.39, 0.32], [0.342, 0.372, 0.33], 0.002, 4));
+      // a louvred vent in the front plate between the lamps, two towing eyes under the bumper
+      add('iron', box(0.2, 0.09, 0.02, 0, 0.43, 0.618, -0.14, 0, 0, 0.005));
+      for (let i = 0; i < 4; i++) add('dark', box(0.18, 0.006, 0.026, 0, 0.4 + i * 0.02, 0.624, 0.55, 0, 0, 0.002));
+      for (const sx of [-1, 1]) add('iron', Geo.xf(new THREE.TorusGeometry(0.028, 0.009, 6, 12), [sx * 0.12, 0.2, 0.63], [0, 0, 0]));
+      // the dirt over the paint, face by face (just proud of each; the profile's faces from the bevel outward)
+      // (a plane's picture laid at its own size: tile metres across each repeat of it)
+      const tiled = (g, w, h, tile) => { const uv = g.attributes.uv.array; for (let i = 0; i < uv.length; i += 2) { uv[i] *= w / tile; uv[i + 1] *= h / (tile * 0.5); } return g; };
+      const slab = (k, p0, p1, wd, x) => { const dz = p1[0] - p0[0], dy = p1[1] - p0[1], l = Math.hypot(dz, dy), nz = dy / l, ny = -dz / l; add(k, Geo.xf(tiled(new THREE.PlaneGeometry(wd, l), wd, l, k === 'gtop' ? 0.9 : 0.62), [x || 0, (p0[1] + p1[1]) / 2 + ny * 0.0235, (p0[0] + p1[0]) / 2 + nz * 0.0235], [Math.atan2(-ny, nz), 0, 0])); };
+      // (given in the profile's own order, so that each faces out; the back's upright, its picture the right way up)
+      slab('gside', [0.46, 0.2], [0.62, 0.36], 0.6); slab('gside', [0.62, 0.36], [0.6, 0.5], 0.6); slab('gside', [0.6, 0.5], [0.44, 0.7], 0.6);
+      slab('gtop', [0.44, 0.7], [-0.52, 0.7], 0.6); slab('gtop', [-0.52, 0.7], [-0.62, 0.6], 0.6);
+      add('gside', Geo.xf(tiled(new THREE.PlaneGeometry(0.6, 0.4), 0.6, 0.4, 0.62), [0, 0.4, -0.6345], [0, Math.PI, 0]));
+      for (const sx of [-1, 1]) add('gside', Geo.xf(tiled(new THREE.PlaneGeometry(1.24, 0.3), 1.24, 0.3, 0.62), [sx * 0.3055, 0.575, -0.07], [0, sx * Math.PI / 2, 0]));
+      for (const sx of [-1, 1]) add('gtop', Geo.xf(tiled(new THREE.PlaneGeometry(1.1, 0.2), 1.1, 0.2, 0.9), [sx * 0.42, 0.4335, -0.01], [-Math.PI / 2, 0, Math.PI / 2]));
+      add('cable', tube([[-0.18, 0.84, -0.13], [-0.24, 0.76, 0.0], [-0.22, 0.732, 0.18], [-0.19, 0.76, 0.3], [-0.17, 0.74, 0.33]], 0.012));
+      add('cable', tube([[-0.2, 0.86, -0.13], [-0.26, 0.74, -0.06], [-0.3, 0.6, -0.02], [-0.306, 0.52, 0.05]], 0.008));
+      add('steel', cyl(0.018, 0.03, -0.2, 0.872, -0.45)); add('steel', Geo.rod([-0.2, 0.88, -0.45], [-0.21, 1.12, -0.47], 0.004, 5)); add('steel', Geo.rod([-0.21, 1.12, -0.47], [-0.17, 1.24, -0.58], 0.0035, 5));
+      add('dark', Geo.xf(new THREE.SphereGeometry(0.009, 6, 4), [-0.17, 1.24, -0.58]));
+      // the lamp's post
+      add('steel', Geo.lathe([[0.0005, 0.873], [0.035, 0.873], [0.03, 0.9], [0.022, 0.9], [0.022, 0.93], [0.0005, 0.93]], 12).translate(0.15, 0, -0.36));
+      // fenders over the tracks, bent down at either end, on brackets from the hull
+      for (const sx of [-1, 1]) {
+        add('paint', box(0.205, 0.014, 1.12, sx * 0.42, 0.425, -0.01, 0, 0, 0, 0.005));
+        add('paint', box(0.205, 0.014, 0.15, sx * 0.42, 0.385, 0.61, 0.62, 0, 0, 0.005)); add('paint', box(0.205, 0.014, 0.15, sx * 0.42, 0.385, -0.63, -0.62, 0, 0, 0.005));
+        for (const z of [-0.4, 0, 0.4]) add('iron', box(0.12, 0.035, 0.03, sx * 0.34, 0.405, z, 0, 0, 0, 0.006));
+        add('paint', box(0.008, 0.06, 1.0, sx * 0.524, 0.4, -0.01, 0, 0, 0, 0.003));
+      }
+      // the front: a bumper of rubbed chevrons on two brackets; two lamps in housings with wire guards, one lens broken
+      add('haz', box(0.66, 0.085, 0.06, 0, 0.25, 0.672, 0, 0, 0, 0.012)); for (const sx of [-1, 1]) add('iron', box(0.04, 0.04, 0.09, sx * 0.2, 0.25, 0.62, 0, 0, 0, 0.008));
+      const lampH = Geo.lathe([[0.0005, -0.04], [0.038, -0.04], [0.046, -0.024], [0.048, 0.016], [0.045, 0.028], [0.04, 0.025]], 16);
+      for (const sx of [-1, 1]) {
+        const x = sx * 0.2, y = 0.655, z = 0.5;
+        add('steel', Geo.xf(lampH.clone(), [x, y, z], [Math.PI / 2, 0, 0])); add('iron', box(0.03, 0.05, 0.05, x, y - 0.05, z - 0.03, 0, 0, 0, 0.006));
+        add('glass', Geo.xf(new THREE.CylinderGeometry(0.04, 0.04, 0.006, 16), [x, y, z + 0.026], [Math.PI / 2, 0, 0]));
+        add('steel', Geo.xf(new THREE.TorusGeometry(0.043, 0.003, 4, 16), [x, y, z + 0.034])); add('steel', Geo.rod([x - 0.042, y, z + 0.034], [x + 0.042, y, z + 0.034], 0.0025, 4)); add('steel', Geo.rod([x, y - 0.042, z + 0.034], [x, y + 0.042, z + 0.034], 0.0025, 4));
+      }
+      for (const [a, l] of [[0.4, 0.034], [1.9, 0.03], [3.0, 0.026], [4.4, 0.02]]) add('crack', box(l, 0.0025, 0.002, -0.2 + Math.cos(a) * l * 0.5, 0.655 + Math.sin(a) * l * 0.5, 0.531, 0, 0, a, 0.0008));
+      // the flank's stencil (left), the hatch's frame (right)
+      add('sten', Geo.xf(new THREE.PlaneGeometry(0.4, 0.2), [-0.3045, 0.56, -0.12], [0, -Math.PI / 2, 0]));
+      add('iron', box(0.008, 0.24, 0.38, 0.302, 0.47, -0.05, 0, 0, 0, 0.003));
+      // the tracks' inner frames, the arms of the road wheels
+      for (const sx of [-1, 1]) { add('iron', box(0.03, 0.11, 0.86, sx * 0.348, 0.2, 0, 0, 0, 0, 0.008)); for (const z of [-0.26, 0, 0.26]) add('iron', Geo.rod([sx * 0.35, 0.2, z + 0.08], [sx * 0.38, 0.13, z], 0.014, 6)); }
+      const out = {}; for (const k in R) out[k] = Geo.merge(R[k]);
+      return out;
+    });
+  }
+  // a wheel of the track, its axle along x: r its radius, w its width; teeth: a sprocket's; holes: the lightening holes of an idler
+  const wheelGeo = (k, r, w, teeth, holes) => gk('rv_w_' + k, () => {
+    const Geo = XG(), L = [Geo.xf(Geo.lathe([[0.0005, -w / 2], [r * 0.3, -w / 2], [r * 0.33, -w * 0.4], [r * 0.88, -w * 0.4], [r, -w * 0.32], [r, w * 0.32], [r * 0.88, w * 0.4], [r * 0.33, w * 0.4], [r * 0.3, w / 2], [0.0005, w / 2]], 22), [0, 0, 0], [0, 0, Math.PI / 2])];
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; for (const s of [-1, 1]) L.push(Geo.xf(new THREE.CylinderGeometry(r * 0.06, r * 0.06, 0.012, 6), [s * w / 2, Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2], [0, 0, Math.PI / 2])); }
+    if (teeth) for (let i = 0; i < teeth; i++) { const a = i / teeth * Math.PI * 2; L.push(Geo.xf(rbx(w * 0.7, 0.03, 0.03, 0.006, 1), [0, Math.cos(a) * (r + 0.008), Math.sin(a) * (r + 0.008)], [a, 0, 0])); }
+    const D = [];
+    if (holes) for (let i = 0; i < holes; i++) { const a = i / holes * Math.PI * 2; for (const s of [-1, 1]) D.push(Geo.xf(new THREE.CylinderGeometry(r * 0.17, r * 0.17, 0.004, 10), [s * (w * 0.4 + 0.002), Math.cos(a) * r * 0.58, Math.sin(a) * r * 0.58], [0, 0, Math.PI / 2])); }
+    return { iron: Geo.merge(L), dark: D.length ? Geo.merge(D) : null };
+  });
+  // 暴走した点検機: the plant's tracked inspection crawler, run on long after the plant - a hull of plate in a worn yellow, chipped to the
+  // rust, its seams riveted; tracks of linked steel plates over a sprocket, an idler and road wheels, fenders over them; a hatch on its
+  // flank, a maker's plate on its back, its number stencilled; two lamps at the front (one broken); a camera on a mast before (its lens
+  // cracked, a red light behind it - the weak spot), a turning lamp on a post at the back in its wire cage; an arm folded along the deck
+  // with a probe of insulators at its end; cables over the deck and one torn, hanging. It shakes as it runs and sparks drop from it
+  B.rover = function (root, M) {
+    PGs();
+    const RG = roverGeo();
+    const paint = wear(M, 0x5d5230, 'paintWorn', { roughness: 0.8, metalness: 0.25 }), iron = wear(M, 0x3a3632, 'castIron', { roughness: 0.85, metalness: 0.6 }), steel = wear(M, 0x5a5650, 'steel', { metalness: 0.8, roughness: 0.55 });
+    const brass = wear(M, 0x7a6638, 'steel', { metalness: 0.85, roughness: 0.45 }), cableM = wear(M, 0x161514, 'polymer', { roughness: 0.6 }), copper = wear(M, 0x8a5634, 'steel', { metalness: 0.9, roughness: 0.4 });
+    const grey = wear(M, 0x4a4a46, 'paintWorn', { roughness: 0.7, metalness: 0.3 }), insul = wear(M, 0x6e5e4a, null, { roughness: 0.25 }), trackM = wear(M, 0x2c2a27, 'castIron', { metalness: 0.55, roughness: 0.8 });
+    const glass = new THREE.MeshStandardMaterial({ color: 0x0b0c0d, roughness: 0.06, metalness: 0.3 }), crack = new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.3 });
+    const haz = new THREE.MeshStandardMaterial({ map: hazTex(), roughness: 0.75, metalness: 0.25 }), plate = new THREE.MeshStandardMaterial({ map: plateTex(), roughness: 0.45, metalness: 0.75 });
+    const sten = new THREE.MeshStandardMaterial({ map: stencilTex(), transparent: true, depthWrite: false, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const amber = new THREE.MeshStandardMaterial({ color: 0x4a2c08, roughness: 0.25, emissive: 0xff8a1a, emissiveMap: stripeTex(), emissiveIntensity: 0.05 });
+    const beamM = new THREE.MeshBasicMaterial({ color: 0xff9a30, map: beamTex(), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const dirt = (t) => new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false, roughness: 0.92, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    const gside = dirt(grimeTex('s', 41, false)), gtop = dirt(grimeTex('t', 43, true));
+    M.all.push(glass, crack, haz, plate, sten, amber, beamM, gside, gtop);
+    M.eye.emissiveIntensity = 1.1;
+    const wireR = wear(M, 0x5a201a, 'polymer', { roughness: 0.5 }), wireB = wear(M, 0x2a3440, 'polymer', { roughness: 0.5 });
+    const MM = { paint, iron, steel, brass, cable: cableM, dark: M.dark, glass, crack, haz, plate, sten, gside, gtop, wireR, wireB, copper };
+    const body = joint(root, 0, 0, 0);
+    for (const k in RG) if (MM[k]) part(body, RG[k], MM[k], 0, 0, 0);
+    // the hatch on the right flank: hung from its top edge (it falls open when the crawler dies)
+    const hatch = joint(body, 0.31, 0.575, -0.05);
+    part(hatch, gk('rv_hatch', () => rbx(0.014, 0.2, 0.34, 0.004, 1)), paint, 0.002, -0.1, 0);
+    part(hatch, gk('rv_hinge', () => XG().merge([-0.12, 0.12].map((z) => XG().xf(new THREE.CylinderGeometry(0.011, 0.011, 0.07, 8), [0.006, 0, z], [Math.PI / 2, 0, 0])))), steel, 0, 0, 0);
+    part(hatch, gk('rv_latch', () => XG().merge([XG().xf(rbx(0.012, 0.03, 0.05, 0.003, 1), [0.012, -0.17, 0.0]), XG().rod([0.02, -0.17, -0.02], [0.03, -0.17, 0.02], 0.004, 5)].concat([[-0.15, -0.015], [0.15, -0.015], [-0.15, -0.185], [0.15, -0.185]].map(([z, y]) => XG().xf(new THREE.CylinderGeometry(0.007, 0.007, 0.006, 6), [0.01, y, z], [0, 0, Math.PI / 2]))))), steel, 0, 0, 0);
+    // the tracks (on the ground: the body sways above them)
+    const tracks = [], wheels = [];
+    for (const sx of [-1, 1]) {
+      const tj = joint(root, sx * 0.43, 0, 0), belt = trackBelt();
+      part(tj, belt.g, trackM, 0, 0, 0).castShadow = true;
+      const wl = (k, r, w, teeth, holes, y, z) => { const j = joint(tj, 0, y, z), G0 = wheelGeo(k, r, w, teeth, holes); part(j, G0.iron, iron, 0, 0, 0); if (G0.dark) part(j, G0.dark, M.dark, 0, 0, 0); wheels.push({ j, r }); };
+      wl('spr', 0.148, 0.13, 12, 0, TY, -TZ); wl('idl', 0.15, 0.12, 0, 5, TY, TZ);
+      for (const z of [-0.26, 0, 0.26]) wl('road', 0.085, 0.12, 0, 0, 0.13, z);
+      for (const z of [-0.2, 0.2]) wl('roll', 0.034, 0.08, 0, 0, 0.323, z);
+      tracks.push({ tj, belt });
+    }
+    // the camera on its mast: a pan yoke, the housing, its lens hooded and cracked, a red light behind the glass
+    const mast = joint(body, 0, 0.72, 0.3);
+    part(mast, gk('rv_mast', () => XG().merge([XG().lathe([[0.0005, 0], [0.04, 0], [0.04, 0.015], [0.022, 0.025], [0.022, 0.12], [0.03, 0.125], [0.03, 0.135], [0.0005, 0.135]], 12)])), steel, 0, 0, 0);
+    const pan = joint(mast, 0, 0.135, 0);
+    part(pan, gk('rv_yoke', () => XG().merge([XG().xf(rbx(0.16, 0.012, 0.05, 0.004, 1), [0, 0.006, 0]), XG().xf(rbx(0.012, 0.08, 0.05, 0.004, 1), [-0.078, 0.045, 0]), XG().xf(rbx(0.012, 0.08, 0.05, 0.004, 1), [0.078, 0.045, 0])])), grey, 0, 0, 0);
+    const cam = joint(pan, 0, 0.065, 0);
+    part(cam, gk('rv_cam', () => rbx(0.13, 0.085, 0.12, 0.014, 2)), grey, 0, 0, -0.005);
+    part(cam, gk('rv_lens', () => XG().xf(XG().lathe([[0.0005, 0], [0.036, 0], [0.036, 0.035], [0.032, 0.046], [0.026, 0.046], [0.026, 0.04], [0.0005, 0.04]], 16), [0, 0, 0.055], [Math.PI / 2, 0, 0])), steel, 0, 0, 0);
+    part(cam, gk('rv_hood', () => XG().xf(new THREE.CylinderGeometry(0.042, 0.042, 0.05, 14, 1, true, -Math.PI * 0.6, Math.PI * 1.2), [0, 0, 0.115], [Math.PI / 2, 0, 0])), grey, 0, 0, 0).material.side = THREE.DoubleSide;
+    part(cam, gk('rv_lglass', () => XG().xf(new THREE.CylinderGeometry(0.027, 0.027, 0.004, 16), [0, 0, 0.098], [Math.PI / 2, 0, 0])), glass, 0, 0, 0);
+    part(cam, gk('rv_lcrack', () => XG().merge([[0.5, 0.024], [2.1, 0.02], [3.6, 0.018], [5.0, 0.016]].map(([a, l]) => XG().xf(rbx(l, 0.0018, 0.0015, 0.0006, 1), [Math.cos(a) * l * 0.5 + 0.004, Math.sin(a) * l * 0.5 - 0.003, 0.1015], [0, 0, a])))), crack, 0, 0, 0);
+    const eye = mesh(cam, PG.sph, M.eye, 0.007, 0.007, 0.004, 0.004, -0.003, 0.094);
+    for (const sx of [-1, 1]) mesh(cam, PG.cyl8, steel, 0.012, 0.012, 0.012, sx * 0.07, 0, 0, 0, 0, Math.PI / 2);
+    // the turning lamp: an amber dome turning in its wire cage on the post, the beam it throws while it turns
+    const lampJ = joint(body, 0.15, 0.93, -0.36), spin = joint(lampJ, 0, 0, 0);
+    part(lampJ, gk('rv_lbase', () => XG().lathe([[0.0005, 0], [0.056, 0], [0.058, 0.012], [0.05, 0.026], [0.0005, 0.026]], 16)), M.dark, 0, 0, 0);
+    part(spin, gk('rv_dome', () => XG().lathe([[0.0005, 0.135], [0.02, 0.133], [0.035, 0.125], [0.045, 0.108], [0.05, 0.08], [0.052, 0.03], [0.052, 0.024], [0.0005, 0.024]].reverse(), 18)), amber, 0, 0, 0);
+    part(lampJ, gk('rv_cage', () => XG().merge([0, Math.PI / 3, Math.PI * 2 / 3].map((a) => XG().xf(new THREE.TorusGeometry(0.062, 0.0035, 4, 14, Math.PI), [0, 0.03, 0], [0, a, 0], [1, 1.75, 1])).concat([XG().xf(new THREE.TorusGeometry(0.062, 0.0035, 4, 20), [0, 0.03, 0], [Math.PI / 2, 0, 0])]))), steel, 0, 0, 0);
+    const beams = [part(spin, gk('rv_beam1', () => new THREE.PlaneGeometry(1.4, 0.34).translate(0.72, 0.08, 0)), beamM, 0, 0, 0), part(spin, gk('rv_beam2', () => new THREE.PlaneGeometry(1.4, 0.34).translate(0.72, 0, 0).rotateX(Math.PI / 2).translate(0, 0.08, 0)), beamM, 0, 0, 0)];
+    for (const b of beams) { b.castShadow = false; b.renderOrder = 5; b.visible = false; }
+    // the arm, folded back along the deck: a turret, an upper arm with its ram, a forearm with a coiled cable round it, a probe of
+    // insulators with a hook of copper at its end
+    const arm0 = joint(body, -0.17, 0.725, 0.34);
+    part(arm0, gk('rv_turret', () => XG().merge([XG().lathe([[0.0005, 0], [0.065, 0], [0.065, 0.03], [0.055, 0.045], [0.0005, 0.045]], 16), XG().xf(rbx(0.016, 0.07, 0.06, 0.004, 1), [-0.04, 0.07, 0]), XG().xf(rbx(0.016, 0.07, 0.06, 0.004, 1), [0.04, 0.07, 0])])), steel, 0, 0, 0);
+    const a1 = joint(arm0, 0, 0.08, 0);
+    part(a1, gk('rv_a1', () => XG().merge([XG().xf(rbx(0.05, 0.37, 0.055, 0.008, 1), [0, 0.185, 0]), XG().xf(new THREE.CylinderGeometry(0.03, 0.03, 0.09, 12), [0, 0, 0], [0, 0, Math.PI / 2]), XG().xf(new THREE.CylinderGeometry(0.026, 0.026, 0.08, 12), [0, 0.37, 0], [0, 0, Math.PI / 2])])), paint, 0, 0, 0);
+    part(a1, gk('rv_ram', () => XG().merge([XG().rod([0, 0.04, 0.045], [0, 0.22, 0.045], 0.014, 8), XG().xf(new THREE.CylinderGeometry(0.009, 0.009, 0.06, 6), [0, 0.04, 0.045], [0, 0, Math.PI / 2])])), iron, 0, 0, 0);
+    part(a1, gk('rv_ramr', () => XG().rod([0, 0.22, 0.045], [0, 0.33, 0.04], 0.007, 6)), steel, 0, 0, 0);
+    const a2 = joint(a1, 0, 0.37, 0);
+    part(a2, gk('rv_a2', () => XG().merge([XG().xf(rbx(0.042, 0.3, 0.046, 0.007, 1), [0, 0.15, 0]), XG().xf(new THREE.CylinderGeometry(0.024, 0.024, 0.06, 10), [0, 0.3, 0], [0, 0, Math.PI / 2])])), grey, 0, 0, 0);
+    part(a2, gk('rv_coil', () => { const P = []; for (let i = 0; i <= 60; i++) { const u = i / 60, a = u * Math.PI * 2 * 5; P.push(new THREE.Vector3(Math.cos(a) * 0.036, 0.03 + u * 0.24, Math.sin(a) * 0.036)); } return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(P), 120, 0.006, 5, false); }), cableM, 0, 0, 0);
+    const a3 = joint(a2, 0, 0.3, 0);
+    part(a3, gk('rv_ins', () => { const p = [[0.0005, 0]]; for (let i = 0; i < 4; i++) { const y = 0.02 + i * 0.035; p.push([0.013, y], [0.03, y + 0.006], [0.031, y + 0.012], [0.013, y + 0.02]); } p.push([0.013, 0.17], [0.0005, 0.17]); return XG().lathe(p, 14); }), insul, 0, 0, 0);
+    part(a3, gk('rv_probe', () => XG().rod([0, 0.17, 0], [0, 0.25, 0], 0.005, 6)), steel, 0, 0, 0);
+    part(a3, gk('rv_hook', () => XG().merge([XG().rod([0, 0.25, 0], [0, 0.28, 0], 0.006, 6), XG().xf(new THREE.TorusGeometry(0.018, 0.004, 5, 10, Math.PI * 1.3), [0, 0.296, 0.0], [0, Math.PI / 2, 0])])), copper, 0, 0, 0);
+    const tip = joint(a3, 0, 0.3, 0);
+    // the cable torn out at the back corner, hanging, its copper splayed
+    const cab = joint(body, 0.25, 0.66, -0.6);
+    part(cab, gk('rv_torn', () => new THREE.TubeGeometry(new THREE.CatmullRomCurve3([[0, 0, 0], [0.01, -0.07, -0.04], [0.0, -0.18, -0.05], [-0.02, -0.29, -0.035]].map((p) => new THREE.Vector3(...p))), 16, 0.011, 6, false)), cableM, 0, 0, 0);
+    part(cab, gk('rv_fray', () => XG().merge([[0.01, 0.01], [-0.012, 0.006], [0.004, -0.012], [-0.006, -0.008], [0.013, -0.004]].map(([dx, dz]) => XG().rod([-0.02, -0.29, -0.035], [-0.02 + dx * 2.5, -0.33 - Math.abs(dx) * 1.5, -0.035 + dz * 2.5], 0.0018, 4)))), copper, 0, 0, 0);
+    const fold = (f) => { a1.rotation.x = -1.48 + f * 1.95; a2.rotation.x = 2.98 - f * 1.75; a3.rotation.x = 0.12 + f * 0.25; };
+    fold(0);
+    const eye0 = M.eye;
+    return {
+      J: { body, hatch, tracks, wheels, mast, pan, cam, lampJ, spin, beams, arm0, a1, a2, a3, tip, cab, eye }, h: 1.12, r: 0.62, mats: [],
+      hits: [{ n: cam, r: 0.1, part: 'head', o: V(0, 0, 0.02) }, { n: body, r: 0.4, part: 'body', o: V(0, 0.48, 0.22) }, { n: body, r: 0.4, part: 'body', o: V(0, 0.5, -0.3) }, { n: body, r: 0.26, part: 'body', o: V(-0.43, 0.22, 0) }, { n: body, r: 0.26, part: 'body', o: V(0.43, 0.22, 0) }],
+      orn: { head: cam, back: body, backZ: [-0.35, 0.2], backY: 0.78 },
+      animate(a) {
+        // the tracks go round with how far it has come; the wheels with them
+        const ph = a.walk / 3.2;
+        for (const t of tracks) t.belt.set(ph);
+        for (const w of wheels) w.j.rotation.x = ph / w.r;
+        // the hull shakes on its motor, bumps as it runs, lurches into the charge
+        const run = a.atk >= 0.95 ? 1 : 0, ring = a.atk > 0 && a.atk < 0.95 ? 1 : 0;
+        body.position.y = Math.sin(a.t * 37) * 0.0025 * (0.5 + a.mv + run) + Math.abs(Math.sin(a.walk * 1.9)) * 0.008 * a.mv;
+        body.rotation.x = -0.015 * a.mv + Math.sin(a.walk * 1.1) * 0.01 * a.mv - a.wind * 0.025 * (1 - ring) + run * 0.04 - a.flinch * 0.06;
+        body.rotation.z = Math.sin(a.walk * 0.8 + 1) * 0.014 * a.mv + Math.sin(a.t * 29) * 0.004 * run + a.flinch * 0.04 * Math.sin(a.t * 40);
+        // the camera looks about; in an attack it holds on you
+        const busy = Math.max(a.wind, a.atk > 0 ? 1 : 0), glitch = fr(Math.sin(Math.floor(a.t * 1.7) * 91.7) * 43758.5) > 0.86 ? Math.sin(a.t * 60) * 0.12 : 0;
+        pan.rotation.y = (Math.sin(a.t * 0.55) * 0.7 + Math.sin(a.t * 1.3) * 0.2) * (1 - busy) + glitch;
+        cam.rotation.x = 0.12 + Math.sin(a.t * 0.8) * 0.08 * (1 - busy) - busy * 0.05 + glitch * 0.5;
+        eye0.emissiveIntensity = fr(Math.sin(Math.floor(a.t * 11) * 12.9898) * 43758.5) > 0.88 ? 0.15 : 1.1 + busy * 0.8;
+        // the arm: folded while it roams; out before it, probe low, in the run; raised in the ring's gathering
+        const f = Math.min(1, Math.max(a.wind * 1.4 * (1 - ring), run, ring));
+        fold(f); if (ring) { a2.rotation.x = 2.98 - 1.25; a3.rotation.x = 0.6 + Math.sin(a.t * 47) * 0.05 * a.wind; }
+        // the lamp turns while it means to strike
+        const on = busy > 0.01 ? 1 : 0;
+        spin.rotation.y = a.t * 7.5; amber.emissiveIntensity = on ? 2.4 : 0.05;
+        for (const b of beams) b.visible = !!on; beamM.opacity = on ? 0.32 : 0;
+        cab.rotation.x = Math.sin(a.t * 2.1) * 0.12 + a.mv * 0.2 + run * 0.3; cab.rotation.z = Math.sin(a.t * 1.7) * 0.1;
+        hatch.rotation.z = Math.abs(Math.sin(a.t * 23)) * 0.012 * (a.mv + run);
+      },
+      // it stops dead: the lamp's dome blown off its post (it falls behind it), the hatch falls open and swings, the arm drops, the hull
+      // settles down on one side; the camera's light goes out. (Worked out from the time since it died: a body found dead lies the same)
+      die(e) {
+        const T = e.deathT, I = e.model.inner, side = e.yaw > 0 ? 1 : -1, k = Math.min(1, T / 0.45), kk = k * k * (3 - 2 * k);
+        I.rotation.z = kk * 0.09 * side; I.rotation.x = kk * 0.06; I.position.y = -kk * 0.05;
+        const t = Math.max(0, T - 0.12), vy = 2.6, vz = -0.9, g = 9.8, land = (vy + Math.sqrt(vy * vy + 2 * g * 0.86)) / g, tt = Math.min(t, land);
+        spin.position.set(0, vy * tt - g * tt * tt / 2, vz * tt); spin.rotation.set(tt * 7, 0, tt * 3); if (T < 0.12) spin.position.set(0, 0, 0);
+        amber.emissiveIntensity = 0; for (const b of beams) b.visible = false;
+        hatch.rotation.z = Math.min(1.25, T * 6) + Math.exp(-T * 2.5) * Math.sin(T * 9) * 0.3 * Math.min(1, T * 6);
+        a1.rotation.x = -1.48 + Math.min(1, T * 3) * 0.5; a2.rotation.x = 2.98 - Math.min(1, T * 3) * 0.6; a3.rotation.x = 0.12 + Math.min(1, T * 3) * 0.9;
+        cam.rotation.x = 0.12 + Math.min(1, T * 2) * 0.45; pan.rotation.y = 0.35 * side * Math.min(1, T * 2);
+        eye0.emissiveIntensity = T < 0.4 && Math.sin(T * 60) > 0 ? 1.2 : 0;
+        cab.rotation.x = Math.sin(T * 3) * 0.2 * Math.exp(-T);
+      },
+    };
+  };
+
   // ---------------------------------------------------------------- the foes
   const ENEMIES = G.ENEMIES;
   const base = { variant: 'field', vicon: '', flyer: false, hover: false, big: false, elem: null, el: null, elRes: null, shield: 0, revive: false, dodge: false, aura: false, undead: false, frontArmor: 0, split: false, web: false, cloak: false, blink: false, color: null, eye: null, orn: null, special: false, fieldFoe: true };
@@ -475,6 +1018,11 @@
     desc: '石柱の海の底から来る影の祈祷師。杖で闇を叩くと、獲物の足元に輪が浮かび、そこが揺れて打ちのめす。足元が沈む柱なら、その柱がすぐに沈み始める。' });
   add({ id: 'ff_voidray', fields: ['pillars'], plan: 'bat', name: '闇泳ぎのエイ', icon: '🦇', hp: 130, dmg: 10, speed: 7.5, size: 1.75, attack: 'gust', range: 14, cd: 3.4, ai: 'ranged', flyer: true, h: 1.0, sound: 'screech', pitch: 0.5, unlockK: 4, rarity: 'uncommon', color: '#2a2040', eye: '#e0a0ff',
     desc: '柱の間の闇を泳ぐ大きなエイ。翼を打って突風を送り、獲物を柱の縁から闇へ押し出す。' });
+  // (the power station's two: the plant's live floors and wires do not hurt them, elecProof - elec.js)
+  add({ id: 'ff_lineman', fields: ['plant'], plan: 'lineman', name: '感電した作業員', icon: '⚡', hp: 160, dmg: 18, speed: 3.9, size: 1, attack: 'shockgrab', range: 2.5, cd: 2.4, ai: 'melee', h: 1.8, undead: true, el: 'volt', elRes: { volt: 0.6 }, elem: 'shock', sound: 'groan', pitch: 0.8, unlockK: 3, rarity: 'common', eye: '#b8c4d0', elecProof: true, plantFx: 'lineman', deathZap: true,
+    desc: '発電所で感電死した作業員の亡骸。体に電気を溜めたまま、片足を引きずって歩き、時々痙攣して止まる。腕に放電が走ると掴みかかり、掴まれると打撃のあとも少しの間しびれが続く。倒れる時に溜まった電気を周りへ放つ。電気の床や帯では傷つかない。' });
+  add({ id: 'ff_rover', fields: ['plant'], plan: 'rover', name: '暴走した点検機', icon: '🚨', hp: 230, dmg: 20, speed: 4.6, size: 1.2, attack: 'surge', range: 15, cd: 3.8, ai: 'melee', h: 1.35, shield: 0.35, el: 'volt', elRes: { volt: 0.6 }, elem: 'shock', sound: 'machine', pitch: 1, unlockK: 3, rarity: 'uncommon', eye: '#ff5a30', elecProof: true, plantFx: 'rover',
+    desc: '発電所の保守に使われていた自走の点検機。壊れたまま動き続けている。回転灯が回りモーターが唸ると、足元に引いた線の上を突進し、止まった所で周りへ放電の輪を広げる。線の上から横へ外れ、輪が出たら外へ。車体は硬いが、前のカメラは脆い。電気の床や帯では傷つかない。' });
   G.ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
 
   // ---------------------------------------------------------------- what happens when they spawn / die
@@ -853,9 +1401,196 @@
     },
   };
 
+  // ---------------------------------------------------------------- the power station's two
+  const snd = (pos, kind) => G.sfx.plantFoe && G.sfx.plantFoe(pos, kind);          // (heard on this screen only: what every screen makes for itself)
+  const sndNet = (pos, kind) => G.sfx.plantFoeNet && G.sfx.plantFoeNet(pos, kind);  // (an attack's: sent to the others as well, fxsync.js)
+  const ARC = 0xc8d8f0, _a = V(), _b = V();
+  const JOLT_T = 1.6, JOLT_TICK = 0.4, ZAP_R = 2.3;
+  // 感電した作業員: both arms come up before it, shaking, the current running up them to the open hands (the wind-up); then it lurches in
+  // and takes hold of you: the blow, and the current goes on through you for a moment after it lets go (P.joltT: shock damage in
+  // ticks, the jolt below; sent to a guest it holds with the rest of what a foe does to you, coop host.js)
+  K.shockgrab = {
+    melee: true,
+    can: (e, tgt, toT, d) => (d < e.def.range && Math.abs(toT.y) < 2 ? 0.8 : null),
+    update(e, A, dt, tgt, toT, d, inWind) {
+      if (inWind) { if (!A.snd) { A.snd = true; sndNet(e.pos, 'wWind'); } e.yaw = Math.atan2(toT.x, toT.z); return { x: 0, z: 0 }; }
+      if (!A.leapt) { A.leapt = true; const l = Math.max(d, 1), sp = 7.5; e.vel.x = toT.x / l * sp; e.vel.z = toT.z / l * sp; e.vel.y = 3.4; e.grounded = false; }
+      const t = A.t - A.wind;
+      e.atk = Math.min(1, t * 5);
+      if (!A.hit && Math.hypot(tgt.pos.x - e.pos.x, tgt.pos.z - e.pos.z) < e.radius + 1.0 && Math.abs(tgt.pos.y - e.pos.y) < 1.8) {
+        A.hit = true; hitP(e, tgt, e.dmg);
+        if (tgt === Pl() || tgt.isPlayer) { const P = Pl(); P.joltT = JOLT_T; P.joltDmg = e.dmg * 0.12; }
+        const to = tgt.eye ? tgt.eye.clone() : tgt.pos.clone().setY(tgt.pos.y + 1.1);
+        for (const a of e.model.J.arms) { a.hand.getWorldPosition(_a); G.fx.arcBolt(_a, to.clone().add(V((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.3)), { col: ARC, w: 0.045, life: 0.14, branches: 1, rough: 0.3 }); }
+        G.fx.sparks(to, null, 8, 0xd8e4ff, 4);
+        sndNet(to, 'wHit');
+      }
+      if ((t > 0.3 && e.grounded) || t > 1.6) endA(e);
+      return { x: 0, z: 0, speed: 0 };
+    },
+  };
+  // 暴走した点検機: its lamp turns, its motor winds up and a buzzer sounds while a lane is marked before it (the wind-up); it runs down
+  // the lane (a blow and a shove if it meets you); it stops, raises its probe and gathers the charge while a ring is marked about it;
+  // then it lets go: a ring of discharge. (The ring's gathering is told to the model, and to the other screens' copies, as atk 0.5 with
+  // wind 0..1 over it; the run is atk 1)
+  K.surge = {
+    min: 3.5,
+    can: (e, tgt, toT, d) => (d < e.def.range && (d > 3.5 || e._backT > 1.2) && Math.abs(toT.y) < 2 ? 1.0 : null),
+    update(e, A, dt, tgt, toT, d, inWind) {
+      const R = 3.2, RW = 0.6, SP = 12;
+      if (!A.lane) {
+        const dir = V(toT.x, 0, toT.z).normalize(), len = Math.min(e.def.range + 2, d + 3), a = e.pos.clone();
+        const fy = G.world.floorBelow(a.x, a.y + 1, a.z); if (isFinite(fy) && fy > -50) a.y = fy;
+        A.lane = { a, b: a.clone().addScaledVector(dir, len), dir, len };
+        A.tl = G.fx.teleLine(a, A.lane.b, 1.7, A.wind, 0xffb050);
+        sndNet(e.pos, 'mWind');
+      }
+      const dir = A.lane.dir;
+      if (inWind) { e.yaw = Math.atan2(dir.x, dir.z); return { x: 0, z: 0, speed: 0 }; }
+      if (A.tl) { G.fx.endTeleLine(A.tl); A.tl = null; sndNet(e.pos, 'mCharge'); A.p0 = e.pos.clone(); A.lp = e.pos.clone(); A.stuck = 0; }
+      const t = A.t - A.wind;
+      if (A.stop == null) {
+        e.atk = 1; e.yaw = Math.atan2(dir.x, dir.z);
+        if (!A.hit && Math.hypot(tgt.pos.x - e.pos.x, tgt.pos.z - e.pos.z) < e.radius + 0.75 && Math.abs(tgt.pos.y - e.pos.y) < 1.8) {
+          A.hit = true; hitP(e, tgt, e.dmg, 'melee');
+          if (tgt === Pl()) { const P = Pl(); P.vel.x += dir.x * 9; P.vel.z += dir.z * 9; P.vel.y = Math.max(P.vel.y, 3.5); P.grounded = false; }
+          sndNet(e.pos, 'mHit');
+        }
+        // (a wall in the way stops it: it has not got anywhere for a moment)
+        const moved = Math.hypot(e.pos.x - A.lp.x, e.pos.z - A.lp.z); A.lp.copy(e.pos); A.stuck = moved < SP * dt * 0.2 ? A.stuck + dt : 0;
+        if (Math.hypot(e.pos.x - A.p0.x, e.pos.z - A.p0.z) < A.lane.len - 0.2 && t < 1.4 && A.stuck < 0.15) {
+          if (Math.random() < dt * 25) G.fx.dust(e.pos.clone(), V(-dir.x, 0.5, -dir.z), 0x6a6050, 1);
+          return { x: dir.x, z: dir.z, speed: SP };
+        }
+        A.stop = t; A.c = e.pos.clone(); const fy = G.world.floorBelow(A.c.x, A.c.y + 1, A.c.z); if (isFinite(fy) && fy > -50) A.c.y = fy;
+        e.tele = G.fx.telegraph(A.c.clone().setY(A.c.y + 0.03), R, RW, 0x7f9ee0);
+        sndNet(e.pos, 'mRingW');
+      }
+      const u = t - A.stop;
+      e.atk = 0.5; e.wind = Math.min(1, u / RW);
+      if (!A.ring && u >= RW) {
+        A.ring = true; if (e.tele) { G.fx.endTelegraph(e.tele); e.tele = null; }
+        G.vfx.nova(A.c.clone(), R, 0.3, { style: 'emp', dome: false, ground: 0xa8c0ff });
+        e.model.J.tip.getWorldPosition(_a); for (let i = 0; i < 5; i++) { const a = Math.random() * 6.283, q = A.c.clone().add(V(Math.cos(a) * R * 0.8, 0.05, Math.sin(a) * R * 0.8)); G.fx.arcBolt(_a, q, { col: ARC, w: 0.05, life: 0.13, branches: 1, rough: 0.3 }); }
+        G.fx.flash(_a, 0xbcd4ff, 12, 0.12, 8);
+        sndNet(A.c, 'mRing');
+        if (Math.hypot(tgt.pos.x - A.c.x, tgt.pos.z - A.c.z) < R && tgt.pos.y - A.c.y < 1.8 && tgt.pos.y - A.c.y > -1.2) hitP(e, tgt, e.dmg * 0.8, 'aoe');
+      }
+      if (u > RW + 0.35) endA(e);
+      return { x: 0, z: 0, speed: 0 };
+    },
+  };
+  // what they do between their attacks, on every screen (each makes its own: run from animate, which every copy of a foe runs)
+  const AMB = {
+    lineman(e, dt, near) {
+      const J = e.model.J, R = Math.random, c = e.centerPos(), h = e.height, sp = spasm(e.animT || 0);
+      // the current jerking through it: a burst of arcs over it and its crackle; more while the spasm lasts
+      if (sp > 0 && !(e._spP > 0)) { G.fx.arcsOn(c, 0.22, h * 0.7, 3, ARC); if (near) snd(c, 'wTwitch'); }
+      e._spP = sp;
+      if (sp > 0 && R() < dt * 22) G.fx.arcsOn(c, 0.2, h * 0.75, 1, ARC);
+      // a small arc over it now and then; a wisp of smoke off it
+      if (R() < dt * 1.1) G.fx.arcsOn(c, 0.18, h * 0.6, 1, 0xb8c8e8);
+      if (R() < dt * 0.7) G.fx.smoke(V(c.x + (R() - 0.5) * 0.3, e.pos.y + h * 0.8, c.z + (R() - 0.5) * 0.3), 1, 0.16, 0x2e2b28, 0.35, 1.4);
+      // the wind-up: the current running up its arms into the hands
+      if (e.wind > 0.05) {
+        for (const a of J.arms) if (R() < dt * 18 * e.wind) { a.sh.getWorldPosition(_a); a.hand.getWorldPosition(_b); G.fx.arcBolt(_a, _b, { col: ARC, w: 0.025, life: 0.05 + R() * 0.04, branches: R() < 0.4 ? 1 : 0, minSeg: 0.05, rough: 0.35, restrike: 0 }); }
+        if (R() < dt * 10 * e.wind) { J.arms[R() < 0.5 ? 0 : 1].hand.getWorldPosition(_b); G.fx.sparks(_b, null, 2, 0xd8e4ff, 3); }
+      }
+      // its steps: the good foot set down, the bad one dragged after it
+      const ph = Math.floor((e.walk || 0) / Math.PI);
+      if (e.mv > 0.2 && ph !== e._stepP) { e._stepP = ph; if (near) snd(e.pos, ph % 2 ? 'wDrag' : 'wStep'); }
+    },
+    rover(e, dt, near) {
+      const J = e.model.J, R = Math.random, run = e.atk >= 0.95, q = _a;
+      // sparks dropping out of it as it goes (out of the torn panel, from under the hull), a puff out of its vent
+      if (R() < dt * (0.6 + e.mv * 3 + (run ? 10 : 0))) { q.set(R() < 0.5 ? 0.33 : (R() - 0.5) * 0.5, 0.42 + R() * 0.12, R() < 0.5 ? 0.33 : (R() - 0.5) * 0.8); J.body.localToWorld(q); G.fx.sparks(q, V(0, -1, 0), 2 + (R() * 3 | 0), 0xffc890, 2.5); }
+      if (R() < dt * 0.5) { q.set(-0.08, 0.38, -0.68); J.body.localToWorld(q); G.fx.smoke(q, 1, 0.2, 0x2a2826, 0.35, 1.2); }
+      // its motor and tracks over and over while it moves (a take every 0.42 s, each fading in and out over the next); still, a servo
+      e._motT = (e._motT || 0) - dt;
+      if (e._motT <= 0 && (e.mv > 0.15 || run)) { e._motT = run ? 0.3 : 0.42; if (near) snd(e.pos, run ? 'mRun' : 'mMove'); }
+      else if (e._motT <= -3.2) { e._motT = 0; if (near) snd(e.pos, 'mIdle'); }
+      // arcs at its probe while the charge gathers
+      if (e.wind > 0.05 && R() < dt * 20 * e.wind) { J.tip.getWorldPosition(q); G.fx.arcsOn(q, 0.06, 0.12, 1, 0xd0e0ff); }
+    },
+  };
+  // as they fall (worked out each frame of the fall; a body found dead was never killed here, and gets none of it)
+  const DFX = {
+    lineman(e, T0, T, dt) {
+      if (!e._zapOn) return;
+      const c = e.centerPos(), R = Math.random;
+      if (T < ZAP_T && R() < dt * 30) G.fx.arcsOn(c, 0.25, e.height * 0.8, 1, ARC);
+      if (T0 < ZAP_T && T >= ZAP_T) {
+        // the charge goes out of it into the floor about it: it hurts whoever is in the ring - on each screen, that screen's own player
+        const p = e.pos;
+        for (let i = 0; i < 7; i++) { const a = R() * 6.283, r = ZAP_R * (0.45 + R() * 0.55), q = V(p.x + Math.cos(a) * r, p.y + 0.05, p.z + Math.sin(a) * r); const fy = G.world.floorBelow(q.x, p.y + 1, q.z); if (isFinite(fy) && fy > -50) q.y = fy + 0.03; G.fx.arcBolt(c, q, { col: 0xd0e0ff, w: 0.05, life: 0.14, branches: 1, rough: 0.3 }); G.fx.sparks(q, V(0, 1, 0), 3, 0xd8e4ff, 4); }
+        G.fx.flash(c, 0xbcd4ff, 14, 0.14, 7);
+        G.vfx.nova(p.clone(), ZAP_R, 0.22, { style: 'emp', dome: false, ground: 0xa8c0ff });
+        snd(c, 'wZap');
+        const P = Pl(); if (!P.dead && Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < ZAP_R + 0.3 && Math.abs(P.pos.y - p.y) < 1.8) C().damagePlayer(e.dmg * 0.7, { src: 'aoe', attacker: e, pos: c, elem: 'shock' });
+      }
+      if (T > ZAP_T && T < ZAP_T + 1.5 && R() < dt * 4) G.fx.arcsOn(c, 0.3, 0.4, 1, ARC);
+    },
+    rover(e, T0, T, dt) {
+      if (!e._wreck) return;
+      const J = e.model.J, R = Math.random, q = _a;
+      if (!e._wreckB) {
+        e._wreckB = true;
+        J.lampJ.getWorldPosition(q); G.fx.sparks(q, V(0, 1, 0), 16, 0xffc890, 6); G.fx.smoke(q, 4, 0.5, 0x2a2826, 1, 1.6);
+        J.hatch.getWorldPosition(q); G.fx.sparks(q, null, 12, 0xffd0a0, 5); G.fx.flash(q, 0xffd0a0, 8, 0.1, 5);
+        G.fx.arcsOn(e.centerPos(), 0.4, 0.5, 4, 0xd0e0ff);
+      }
+      if (T < 1.2 && R() < dt * 14 * (1.2 - T)) { J.hatch.localToWorld(q.set(0.02, -0.1, (R() - 0.5) * 0.3)); G.fx.sparks(q, V(0, -1, 0), 2, 0xffc890, 3); }
+      if (T < 5 && R() < dt * 6 * Math.max(0.2, 1 - T / 5)) { J.body.localToWorld(q.set((R() - 0.5) * 0.4, 0.75, (R() - 0.5) * 0.6)); G.fx.smoke(q, 1, 0.35, 0x232120, 0.6, 2.2); }
+    },
+  };
+  const animE0 = EP.animate;
+  EP.animate = function (dt) {
+    animE0.call(this, dt);
+    const f = this.def.plantFx;
+    if (f && this.alive && !this.dying && this.state !== 'spawn') { const d = this.pos.distanceTo(G.camera.position); if (d < 40) AMB[f](this, dt, d < 26); }
+  };
+  const die0 = EP.die;
+  EP.die = function (info) {
+    const r = die0.call(this, info), real = r && !(info && info.src === 'clear');
+    if (real && this.def.deathZap) {
+      this._zapOn = true;
+      // (its ring marked by the host or alone; a guest is sent the host's)
+      if (!this._rep) { const p = this.pos.clone(), fy = G.world.floorBelow(p.x, p.y + 1, p.z); if (isFinite(fy) && fy > -50) p.y = fy; G.fx.telegraph(p.setY(p.y + 0.03), ZAP_R, ZAP_T, 0x7f9ee0); }
+      snd(this.centerPos(), 'wDie');
+    }
+    if (real && this.def.plantFx === 'rover') this._wreck = true;
+    return r;
+  };
+  const ud0 = EP.updateDeath;
+  EP.updateDeath = function (dt) {
+    const T0 = this.deathT, r = ud0.call(this, dt);
+    if (this.removed) return r;
+    if (this.model.die) this.model.die(this);
+    const f = this.def.plantFx; if (f && DFX[f]) DFX[f](this, T0, this.deathT, dt);
+    return r;
+  };
+  // the current a grab left in you: shock damage in ticks while P.joltT runs down (each screen its own player; a guest is sent the
+  // hold's joltT and joltDmg by the host - coop host.js / client.js)
+  const eu0 = E.update;
+  E.update = function (dt) {
+    const r = eu0.apply(this, arguments), P = Pl();
+    if (P) {
+      const j = P.joltT || 0;
+      if (j > (P._joltPrev || 0) + 1e-6) P._joltN = 0;   // (taken hold of again: the count starts over)
+      if (j > 0) {
+        P.joltT = Math.max(0, j - dt);
+        const n = Math.min(Math.round(JOLT_T / JOLT_TICK), Math.floor((JOLT_T - P.joltT) / JOLT_TICK + 1e-6));
+        while ((P._joltN || 0) < n) { P._joltN = (P._joltN || 0) + 1; if (!P.dead) { C().damagePlayer(P.joltDmg || 2, { src: 'dot', elem: 'shock', pos: P.pos.clone() }); if (G.sfx.elecShock) G.sfx.elecShock(false); if (P.addShake) P.addShake(0.05); } }
+      }
+      P._joltPrev = P.joltT || 0;
+    }
+    return r;
+  };
+
   // an attack that wants a run-up (min): closer than that, the foe backs away from you to get it. (A melee foe stops once you are well
   // inside its reach, and these two had no blow for that close: they stood at arm's length and did nothing, for as long as you stayed)
   EP.decideMove = function (tgt, toT, distH, dt) {
+    if (this.def.plantFx === 'lineman' && spasm(this.animT || 0) > 0.05) { this._backT = 0; return { x: 0, z: 0 }; }   // (the dead lineman stops while the current jerks through it)
     const k = K[this.def.attack];
     if (k && k.min && distH < k.min && this.hasLOS && Math.abs(toT.y) < 1.2 && !this.barredFrom(tgt)) {
       this._backT = (this._backT || 0) + dt;

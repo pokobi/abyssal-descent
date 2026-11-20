@@ -247,7 +247,7 @@
         }
       }
       for (const e of Gm.foes()) {
-        if (e.burrowed || e._elecF === E.fr || !onZone(d, e.pos, 0.35)) continue;
+        if (e.burrowed || (e.def && e.def.elecProof) || e._elecF === E.fr || !onZone(d, e.pos, 0.35)) continue;   // (elecProof: the plant's own two, fieldfoes.js - charged already, or a machine)
         e._elecF = E.fr;
         e._elecT = (e._elecT ?? 0) - dt;
         if (e._elecT > 0) continue;
@@ -268,7 +268,7 @@
         strikeAt(_q.clone(), P.chestPos ? P.chestPos() : P.pos.clone().setY(P.pos.y + 1.1), true);
       }
       for (const e of Gm.foes()) {
-        if (e.burrowed) continue;
+        if (e.burrowed || (e.def && e.def.elecProof)) continue;
         if ((e._arcT || 0) > G.game.time || !bodyNear(d, e.pos, e.height || 1.6, (e.radius || 0.5) * 0.6 + T.arcR)) continue;
         e._arcT = G.game.time + T.arcCd;
         const k = knockDir(d, e.pos);

@@ -259,7 +259,7 @@
     // what a foe did to you besides the damage: grabs, pulls, slows, being thrown off a grapple
     K.handlers.pfx = function (m) {
       const o = m.o;
-      for (const k of ['dragT', 'pullT', 'pullSpd', 'gravFreeAt', 'mirTip']) if (k in o) P[k] = o[k];
+      for (const k of ['dragT', 'pullT', 'pullSpd', 'gravFreeAt', 'mirTip', 'joltT', 'joltDmg']) if (k in o) P[k] = o[k];
       if ('invulnT' in o) P.invulnT = Math.max(P.invulnT || 0, o.invulnT || 0);
       if (o.slow) P.st.slow = Math.max(P.st.slow || 0, o.slow);
       if (o.shock) P.st.shock = Math.max(P.st.shock || 0, o.shock);

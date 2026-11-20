@@ -7,6 +7,29 @@
   const V = G.U.V;
   const rot = (o, x, y, z, k) => { o.rotation.x += (x - o.rotation.x) * k; o.rotation.y += (y - o.rotation.y) * k; o.rotation.z += (z - o.rotation.z) * k; };
 
+  // Where another player's grapple line ends on this screen. Once their hook holds, they say what it is in (core.js: rp.ha, the collider's
+  // number and the point in it): the line goes to that point of this screen's own copy of it, so it moves with a moving plate, a sliding
+  // door or a falling pillar here (the point they send would be where it was on their screen a moment ago). The thing gone here (broken,
+  // fallen away), the line goes too. Flying, or a thing not found the same here (a box added since), the point they send.
+  const _he = new THREE.Vector3();
+  K.hookEnd = function (rp) {
+    if (!rp.hk) return null;
+    const hk = V(rp.hk[0], rp.hk[1], rp.hk[2]), a = rp.ha, w = G.world;
+    if (!a || !w) return hk;
+    const c = w.colliders[a[0]]; if (!c) return hk;
+    if (a[1]) {
+      const o = (c.follow && c.follow()) || (c.gim && c.gim.root) || null;
+      if (!o) return hk;
+      if (!o.parent) return null;
+      o.updateMatrixWorld(true); _he.set(a[2], a[3], a[4]).applyMatrix4(o.matrixWorld);
+    } else {
+      if (c.alive === false) return null;
+      _he.set(c.x0 + a[2], c.y0 + a[3], c.z0 + a[4]);
+    }
+    // (a number that names another thing here: too far from where they say it is)
+    return _he.distanceTo(hk) < 15 ? _he.clone() : hk;
+  };
+
   K.buildBody = function (name, col, cls) {
     const j = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); parent.add(g); return g; };
     // the same figure as your own (avatar.js), with materials of its own
@@ -60,7 +83,8 @@
     const hk = Math.max(0.001, Math.min(1, rp.hp / (rp.maxHp || 1)));
     B.hpFg.scale.x = 0.8 * hk; B.hpFg.material.color.setHex(hk < 0.3 ? 0xff5a40 : hk < 0.6 ? 0xffc040 : 0x6fd06f); B.hpFg.visible = B.hpBg.visible = !rp.dead;
     // the grapple line
-    if (rp.hk) G.fx.seg(V(rp.pos.x, rp.pos.y + 1.2, rp.pos.z), V(rp.hk[0], rp.hk[1], rp.hk[2]), 0xc0b090, 0.03, 0.05);
+    const end = K.hookEnd(rp);
+    if (end) G.fx.seg(V(rp.pos.x, rp.pos.y + 1.2, rp.pos.z), end, 0xc0b090, 0.03, 0.05);
     // orbiting blades
     if ((rp.bl || 0) !== (B.blN || 0)) {
       for (const m of B.blades || []) B.root.remove(m);

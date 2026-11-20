@@ -376,6 +376,23 @@
       };
     }
 
+    // ---------------- the foundry's moving plates: the host's clock is everyone's ----------------
+    // Each screen runs its plates to and fro on its own clock from the moment it came into the area (field_foundry.js tickMovers), so they
+    // were where they were on no other screen: someone riding one, or hooked to one, was seen beside it. The host says every two seconds
+    // how far each is through its round; a screen more than a moment off takes the host's.
+    if (FG && FG.tickMovers) {
+      const tm = FG.tickMovers; let mvT = 0;
+      FG.tickMovers = function (w, dt) {
+        const r = tm.call(FG, w, dt);
+        if (K.live && K.role === 'host' && w.movers && w.movers.length) { mvT += dt; if (mvT > 2) { mvT = 0; K.send({ t: 'mv', a: GM.area, s: w.movers.map((m) => Math.round(m.t * 100) / 100) }); } }
+        return r;
+      };
+      K.handlers.mv = function (m) {
+        const w = G.world; if (K.role === 'host' || m.a !== GM.area || !w || !w.movers) return;
+        m.s.forEach((t, i) => { const mv = w.movers[i]; if (mv && Math.abs(mv.t - t) > 0.15) mv.t = t; });
+      };
+    }
+
     // ---------------- the end of the run: the first through the rift takes everyone along ----------------
     const vic = GM.victory;
     GM.victory = function () { const was = GM.won; vic.call(GM); if (!was && GM.won && K.live) K.send({ t: 'won' }); };

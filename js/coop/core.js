@@ -110,6 +110,13 @@
   }
   // 不屈の城塞 on a team-mate within 8 m: a quarter off what you suffer (G.Classes.allyGuard, read by C.damagePlayer)
   G.Classes.allyGuard = function () { if (!K.live && !K.players.size) return false; for (const rp of K.players.values()) { if (rp.id === K.id || rp.dead || !rp.bz) continue; if (rp.to.distanceTo(G.player.pos) < 8) return true; } return false; };
+  // what the hook is in, once it holds (player.js grapple.anchor): the collider (by its number, the same on every screen) and the point in
+  // it - in the drawing that moves with it (1: a sliding door, a falling pillar), or off the collider's corner (0: a moving plate). The
+  // others draw the line to that point of their own copy of it, so the line's end goes with it there (body.js K.hookEnd)
+  const hookOn = (P) => {
+    const gr = P.grapple, a = gr && gr.state === 'attached' && gr.anchor; if (!a || !a.c || a.c.idx === undefined) return 0;
+    const v = a.o ? a.local : a.off; return [a.c.idx, a.o ? 1 : 0, +v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+  };
   K.sendSelf = function () {
     const P = G.player, W = G.weapons, f = (v) => +v.toFixed(2);
     const mm = P.meleeMode && P.melee, w = mm ? P.melee.id : P.weapon ? P.weapon.id : '';
@@ -120,13 +127,14 @@
       pl: P.pileState === 'charge' ? 1 : P.pileState === 'fall' ? 2 : 0, gr: P.grapple && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? 1 : 0,
       bl: (P.buffs.get('z_blades') || 0) * 2 + (P.bladesT > 0 ? P.bladesN || 6 : 0),
       hk: P.grapple && P.grapple.hook && (P.grapple.state === 'attached' || P.grapple.state === 'firing') ? [f(P.grapple.hook.x), f(P.grapple.hook.y), f(P.grapple.hook.z)] : 0,
+      ha: hookOn(P),
       ps: (P.st.burn > 0 ? 1 : 0) | (P.st.poison > 0 ? 2 : 0) | (P.st.shock > 0 ? 4 : 0) | (P.st.slow > 0 ? 8 : 0) | (P.invisT > 0 || P.smokeT > 0 ? 16 : 0) | (P.wardT > 0 ? 32 : 0) | (P.elFrozen > 0 ? 64 : 0),
       tb: [...P.temps.values()].filter((t) => t.icon).slice(0, 4).map((t) => t.icon).join(''), k: P.cls, bz: P.temps.has('ult_bastion') ? 1 : 0 });
   };
   K.handlers.p = function (m) {
     const rp = K.players.get(m.i); if (!rp || m.i === K.id) return;
     rp.to.set(m.x, m.y, m.z); rp.vel.set(m.vx, m.vy, m.vz); rp.yaw = m.yaw; rp.pitch = m.pt; rp.hp = m.hp; rp.maxHp = m.mx; rp.dead = !!m.d; rp.rev = m.r;
-    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr; rp.ps = m.ps | 0; rp.tb = m.tb || ''; rp.hk = m.hk; rp.bl = m.bl | 0; rp.cls = m.k || rp.cls; rp.bz = m.bz | 0;
+    rp.gnd = m.g; rp.cr = m.c; rp.sp = m.s; rp.ads = m.a / 10; rp.w = m.w; rp.mm = m.m; rp.rl = m.rl; rp.sw = m.sw; rp.gd = m.gd; rp.pl = m.pl; rp.gr = m.gr; rp.ps = m.ps | 0; rp.tb = m.tb || ''; rp.hk = m.hk; rp.ha = m.ha || 0; rp.bl = m.bl | 0; rp.cls = m.k || rp.cls; rp.bz = m.bz | 0;
     if (rp.first === undefined) { rp.first = 1; rp.pos.copy(rp.to); }
     if (K.role === 'host') for (const o of K.players.keys()) if (o && o !== m.i) K.net.send(o, m);
   };

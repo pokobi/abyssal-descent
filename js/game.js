@@ -1015,10 +1015,18 @@
       const kit = G.Warm.lateKit ? G.Warm.lateKit() : null; if (kit) G.scene.add(kit);
       // (and, while the drivers compile, where the gates' signs will hang and their faces: areas.js prepClear - they held the clear's frame)
       const prep = G.Areas.prepClear ? G.Areas.prepClear(w) : null;
-      GM._warmP = Promise.all([G.Warm.worldAsync(), prep]).then(() => { GM._warming = false; if (!had) fade.classList.remove('on'); });
+      GM._warmP = Promise.all([G.Warm.worldAsync(), prep]).then(() => { if (G.world === w) firstFrameAhead(); GM._warming = false; if (!had) fade.classList.remove('on'); });
       if (kit) G.scene.remove(kit);
     } else { if (G.Warm) G.Warm.world(); if (G.Areas.prepClear) G.Areas.prepClear(w); }
   };
+  // What the first frame after an area's fade did for the first time, done while it is still black (the end of enterArea's warm-up):
+  // the sound set for the new place (indoors / out: audio.js applySet, with the guns' shots readied for it - the first sound of the area
+  // did it, in that frame), and the HUD written and laid out once (ui.js update / layoutCenter: the first frame read the layout of the
+  // whole HUD, built while it was black, and waited on it). The first frame of play held the page some 0.15 - 0.3 s with them.
+  function firstFrameAhead() {
+    try { if (G.sfx && G.sfx.applySet) G.sfx.applySet(); } catch (e) { /* readied at the first sound */ }
+    try { if (GM.run && P.weapons && G.ui.update) { G.ui.update(0); if (G.ui.layoutCenter) G.ui.layoutCenter(); void document.body.offsetHeight; } } catch (e) { /* laid out in the first frame */ }
+  }
   function layoutName(l) { return { courtyard: '中庭', halls: '回廊', chasm: '大裂谷', terrace: '段丘', crypt: '納骨堂' }[l] || '遺構'; }
 
   // ---------------- objectives ----------------

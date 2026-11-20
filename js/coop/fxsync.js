@@ -198,6 +198,10 @@
         h.prev.copy(p.pos);
       }
     };
+    // (both after every step of the shots: a page that gets no animation frames - a tab not on screen, a busy machine - has its world
+    // run in a run of steps at once by core.js, and a homing picture must find its foe and end at it on each of them, as the real one does)
+    const cu = C.update;
+    C.update = function () { const r = cu.apply(this, arguments); if (K.live) { if (sticks.length) stickNow(); if (homers.length) homeNow(); } return r; };
     // ---------------- explosions ----------------
     const ex = C.explode;
     C.explode = function (pos, r, dmg, info) {
@@ -343,8 +347,6 @@
     K.onFrame = function (dt) {
       if (base) base(dt);
       if (!K.live) return;
-      if (sticks.length) stickNow();
-      if (homers.length) homeNow();
       sendT -= dt;
       sndN = 0;
       scanAuras();

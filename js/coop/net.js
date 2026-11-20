@@ -47,13 +47,23 @@
       const d = ev.data;
       if (d.to !== me) return;
       deliver(() => {
-        if (d.hi && isHost) { const id = next++; ids.set(id, d.from); bc.postMessage({ to: d.from, ok: id }); t.onpeer(id); return; }
+        if (d.hi && isHost) {
+          // (a guest says hello again until it is answered: one already taken in is answered again with its own number)
+          const known = [...ids].find(([, g]) => g === d.from);
+          if (known) { bc.postMessage({ to: d.from, ok: known[0] }); return; }
+          const id = next++; ids.set(id, d.from); bc.postMessage({ to: d.from, ok: id }); t.onpeer(id); return;
+        }
+        if (d.ok && gid !== null) return;
         if (d.ok) { gid = d.ok; t.onpeer(0); return; }
         t.onmsg(isHost ? [...ids].find(([, g]) => g === d.from)[0] : 0, d.m);
       });
     };
     if (isHost) setTimeout(() => t.onopen && t.onopen(), 0);
-    else setTimeout(() => bc.postMessage({ to: 0, from: me, hi: 1 }), 0);
+    else {
+      // (a hello can go before the host's page listens - a busy machine loads it late: said again every second until it is answered)
+      const hello = () => { if (closed || gid !== null) return; bc.postMessage({ to: 0, from: me, hi: 1 }); setTimeout(hello, 1000); };
+      setTimeout(hello, 0);
+    }
     t.send = (id, m) => { if (closed) return; bc.postMessage({ to: isHost ? ids.get(id) : 0, from: me, m }); };
     t.close = () => { closed = true; bc.close(); };
     return t;

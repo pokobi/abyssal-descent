@@ -779,6 +779,22 @@
 
   // ---------------- projectiles ----------------
   const projMeshes = {};
+  // the materials of the shots' own stuff (gfx.js shotGeo names them in m), each made once; the mine's lamp is the area's own (in the
+  // blue depths the area's materials are a wrapped copy, world.js G.Blue.mats, and the lamp keeps its warm light), the rest the world's
+  const PMAT_DEF = {
+    silk: { color: 0xcfccc0, emissive: 0x161614, roughness: 0.55, transparent: true, opacity: 0.6, depthWrite: false },
+    slime: { color: 0xbab5a2, emissive: 0x121210, roughness: 0.12, transparent: true, opacity: 0.8 },
+    spit: { color: 0x4a4626, emissive: 0x0e0e04, roughness: 0.12, transparent: true, opacity: 0.94 },
+    acid: { color: 0x9aa83a, emissive: 0x1a2004, roughness: 0.06, transparent: true, opacity: 0.6, depthWrite: false },
+    acidB: { color: 0xd4dc96, emissive: 0x1a2004, roughness: 0.04, transparent: true, opacity: 0.45, depthWrite: false },
+    sporeSac: { color: 0x4a4630, emissive: 0x0a0a04, roughness: 0.92 },
+    sporeDust: { color: 0x5e5a46, emissive: 0x0c0c08, roughness: 1, metalness: 0 },
+    edge: { color: 0x8c8a84, roughness: 0.32, metalness: 0.85 },
+    ember: { color: 0x2a1a12, emissive: 0x801800, emissiveIntensity: 0.9, roughness: 0.9 },
+  };
+  const pmats = {};
+  const pmat = (m, mats) => m === 'lamp' ? (Object.getPrototypeOf(mats).glow || mats.glow) : PMAT_DEF[m] ? (pmats[m] || (pmats[m] = new THREE.MeshStandardMaterial(PMAT_DEF[m]))) : mats[m] || mats.iron;
+  const SG_OWN = { icespear: 1, rock: 1, bigfire: 1 };   // (shaped in gfx.js too, but put together below: the ice's own ice, the stone's spin, the fire about its core)
   function projMesh(kind) {
     const pool = projMeshes[kind] || (projMeshes[kind] = []);
     const m = pool.pop();
@@ -792,10 +808,12 @@
     const glow = (c, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: G.fx.tone ? G.fx.tone(c) : c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.setScalar(s); g.add(sp); return sp; };
     // (the shots that are things - a rocket, a shell, an arrow, a nail, a harpoon, a spear, a boulder - are shaped in gfx.js shotGeo;
     // their glows are as they were. Without those shapes, the rods and cones below)
-    const SG = kind !== 'icespear' && G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo(kind) : null;   // (the ice spear's shape is from there too, in its own ice below)
+    const SG = !SG_OWN[kind] && G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo(kind) : null;
     if (SG) {
-      for (const q of SG) { const mm = add(q.g, mats[q.m] || mats.iron, 1, 1, 1); mm.castShadow = true; }
+      for (const q of SG) { const mm = add(q.g, pmat(q.m, mats), 1, 1, 1); mm.castShadow = true; }
       if (kind === 'rocket') glow(0xffa050, 0.6).position.z = 0.35; else if (kind === 'spear') glow(0xffe0a0, 0.5).position.z = -1;
+      else if (kind === 'acid') { const rim = new THREE.Mesh(SG[0].g, G.vfx.shellMat(0x56621c, 0x76862a, 'ice')); rim.scale.setScalar(1.02); g.add(rim); glow(0x9ad040, 0.45); } // (only its rim glows, faintly)
+      else if (kind === 'sickle') glow(0xff8030, 0.5);
       g.userData.kind = kind; G.scene.add(g); return g;
     }
     switch (kind) {
@@ -817,13 +835,13 @@
       case 'orb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6a5e68, 0xb0a4ac, 'energy')); sh.scale.setScalar(0.32); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x9a8e96 }), 0.12, 0.12, 0.12); glow(0xc070ff, 0.5); break; }
       case 'soul': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6ab8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.28); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x8a96a2 }), 0.1, 0.1, 0.1); glow(0x9fd8ff, 0.4); break; }
       case 'fireball': { const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.42); g.add(fb); glow(0xff8a30, 1.3); glow(0xffe0a0, 0.4); break; }
-      case 'bigfire': { add(PG.dode, new THREE.MeshStandardMaterial({ color: 0x2a1a12, emissive: 0x801800, emissiveIntensity: 0.9, roughness: 0.9, flatShading: true }), 0.55, 0.55, 0.55); const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.95); g.add(fb); glow(0xff7a20, 2.6); glow(0xffe0a0, 0.9); break; }
+      case 'bigfire': { const BG = G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo('bigfire') : null; if (BG) add(BG[0].g, pmat('ember', mats), 1, 1, 1); else add(PG.dode, pmat('ember', mats), 0.55, 0.55, 0.55); const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.95); g.add(fb); glow(0xff7a20, 2.6); glow(0xffe0a0, 0.9); break; }
       case 'spit': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x4e5420, emissive: 0x141800, roughness: 0.2 }), 0.14, 0.14, 0.14); break;
       case 'acid': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x5c6224, emissive: 0x1c2200, roughness: 0.2 }), 0.3, 0.3, 0.3); glow(0x9ad040, 0.8); break;
       case 'web': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.9 }), 0.16, 0.16, 0.16); break;
       case 'spore': add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x8aa040, emissive: 0x1a2a00, roughness: 0.9, transparent: true, opacity: 0.8 }), 0.25, 0.25, 0.25); break;
       case 'boulder': add(PG.dode, mats.rock, 0.6, 0.55, 0.6); break;
-      case 'rock': { const sp = new THREE.Group(); g.add(sp); g.userData.spin = sp; const st = new THREE.Mesh(PG.dode, mats.rock); st.scale.setScalar(0.26); sp.add(st); break; } // a tumbling stone: scale = the held one, radius = what hits
+      case 'rock': { const sp = new THREE.Group(); g.add(sp); g.userData.spin = sp; const RG = G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo('rock') : null; if (RG) sp.add(new THREE.Mesh(RG[0].g, mats.rock)); else { const st = new THREE.Mesh(PG.dode, mats.rock); st.scale.setScalar(0.26); sp.add(st); } break; } // a tumbling stone: scale = the held one, radius = what hits
       case 'frostorb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x9ad8ff, 0xffffff, 'ice')); sh.scale.setScalar(0.38); g.add(sh); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xe8f8ff }), 0.14, 0.14, 0.14); glow(0xbfe8ff, 1.0); break; }
       case 'waterorb': { add(PG.sph, new THREE.MeshStandardMaterial({ color: 0x46606c, emissive: 0x0a1a22, roughness: 0.05, transparent: true, opacity: 0.8 }), 0.22, 0.22, 0.22); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4aa8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.26); g.add(sh); glow(0x5fb0ff, 0.9); break; }
       case 'darkorb': { add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x0a0410 }), 0.24, 0.24, 0.24); const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x4a3e4a, 0x9a8c96, 'spiral')); sh.scale.setScalar(0.34); g.add(sh); glow(0x6a5a6a, 0.8); break; }
@@ -880,7 +898,7 @@
   // the shapes that have a point (gfx.js shotGeo, and the rods of projMesh), all with it to -z: the number is how much of the drawn
   // shape lies ahead of its middle less how deep its point goes in when it sticks in a wall (the middle is where it met the wall: the
   // drawing is drawn back by this along its own length, so that only the point is in; a nail goes in nearly to its head)
-  const NOSE_FWD = { rocket: 0, grenade: 0, icespear: 0, bolt: 0.31, arrow: 0.31, nail: -0.035, harpoon: 0.42, spear: 1.0 };
+  const NOSE_FWD = { rocket: 0, grenade: 0, icespear: 0, web: 0, spit: 0, acid: 0, bolt: 0.31, arrow: 0.31, nail: -0.035, harpoon: 0.42, spear: 1.0 };
   // the drawn way of a shot off the hand (spawnProjectile): from the hand, onto its own way, smoothly (at its own speed from the first)
   const VIS_K = { spear: [1.6, 1], harpoon: [1.25, 1], icespear: [1.5, 0.75], fireball: [1.15, 0.3], waterorb: [1.0, 0.45], darkorb: [1.0, 0.45], mine: [1.5, 0.45], def: [0.9, 1] };
   function visStep(p) {

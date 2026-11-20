@@ -2845,6 +2845,120 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const core = iceCrystal([[-0.86, 0], [-0.6, 0.022], [0.0, 0.04], [0.6, 0.048]], [1, 0.9, 1.05, 0.95, 1.0, 0.92], a, [0.02, -0.02, 0.03, 0, 0.01, -0.03], [0, 0, 0, 0, 0, 0, 0]);
     return [{ g: Geo.merge([body].concat(spurs)), m: 'iceBody' }, { g: core, m: 'iceCore' }];
   };
+  // ---- the rest of what flies, each its own thing (combat.js projMesh gives them their own materials, by the names in m): a wad of
+  // web, a gob of spit, a drop of acid, a puff of spores, a thrown stone, the scarecrow's sickle, a thrown mine, the core of a falling fire
+  const hsh3 = (x, y, z) => { const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return n - Math.floor(n); };
+  const triGeo = (P, both) => {   // triangles from a flat list; both: each also the other way round, so it is seen from either side
+    if (both) { const n = P.length; for (let i = 0; i < n; i += 9) P.push(P[i], P[i + 1], P[i + 2], P[i + 6], P[i + 7], P[i + 8], P[i + 3], P[i + 4], P[i + 5]); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals(); return g;
+  };
+  // a strand along pts, r0 thick at its start, thinning to nothing at its end (k: how soon it thins)
+  const strand = (pts, r0, sides, k) => {
+    const n = pts.length, rings = [], P = [];
+    for (let i = 0; i < n; i++) {
+      const p = new THREE.Vector3(...pts[i]), t = new THREE.Vector3(...pts[Math.min(n - 1, i + 1)]).sub(new THREE.Vector3(...pts[Math.max(0, i - 1)])).normalize();
+      const u = new THREE.Vector3().crossVectors(t, Math.abs(t.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize(), v = new THREE.Vector3().crossVectors(t, u);
+      const r = r0 * Math.pow(1 - i / (n - 1), k || 0.7) + 0.0003, ring = [];
+      for (let j = 0; j < sides; j++) { const an = j / sides * Math.PI * 2, o = u.clone().multiplyScalar(Math.cos(an)).addScaledVector(v, Math.sin(an)); ring.push([p.clone().addScaledVector(o, r), o]); }
+      rings.push(ring);
+    }
+    // (wound outward - u x v is its way along - and lit round, as a thread is: no flat ribbons)
+    const Nn = [], put = (q) => { P.push(q[0].x, q[0].y, q[0].z); Nn.push(q[1].x, q[1].y, q[1].z); };
+    for (let i = 0; i + 1 < n; i++) for (let j = 0; j < sides; j++) { const a = rings[i][j], b = rings[i][(j + 1) % sides], c = rings[i + 1][j], d = rings[i + 1][(j + 1) % sides]; put(a); put(b); put(c); put(b); put(d); put(c); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3)); return g;
+  };
+  // a soft lump (a gob, a sac, a bead): a ball pushed in and out by place, smooth
+  const lump = (r, det, amp, seed, at, sc) => {
+    const g = new THREE.IcosahedronGeometry(1, det), ps = g.attributes.position, nr = g.attributes.normal;
+    for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), f = r * (1 + amp * (hsh3(x * 3 + seed, y * 3, z * 3) - 0.5) * 2); ps.setXYZ(i, x * f * (sc ? sc[0] : 1), y * f * (sc ? sc[1] : 1), z * f * (sc ? sc[2] : 1)); nr.setXYZ(i, x, y, z); }
+    if (at) g.translate(at[0], at[1], at[2]); return g;
+  };
+  // a stone broken flat (gfx boulder's way: corners near one another pushed alike), then cut by planes: flat breaks, chipped corners
+  const brokenStone = (seed, cuts) => {
+    const g = new THREE.IcosahedronGeometry(1, 2), ps = g.attributes.position, q = (v) => Math.round(v * 2.2) / 2.2;
+    const pl = []; for (let i = 0; i < cuts; i++) { const a = hsh3(seed, i, 1) * Math.PI * 2, b = Math.acos(hsh3(seed, i, 2) * 2 - 1); pl.push([Math.sin(b) * Math.cos(a), Math.cos(b), Math.sin(b) * Math.sin(a), 0.62 + 0.24 * hsh3(seed, i, 3)]); }
+    for (let i = 0; i < ps.count; i++) {
+      const x0 = ps.getX(i), y0 = ps.getY(i), z0 = ps.getZ(i), f = 0.82 + 0.3 * hsh3(q(x0) + seed, q(y0), q(z0)) + 0.05 * hsh3(x0 * 9, y0 * 9, z0 * 9);
+      let x = x0 * f, y = y0 * f, z = z0 * f;
+      for (const [nx, ny, nz, d] of pl) { const s = x * nx + y * ny + z * nz; if (s > d) { x -= nx * (s - d); y -= ny * (s - d); z -= nz * (s - d); } }
+      ps.setXYZ(i, x, y, z);
+    }
+    g.computeVertexNormals(); return g;
+  };
+  // the web: a small bead of slime, a wad of strands wound about it, and strands streaming out behind (+z), thinning, a few torn loose
+  SHOT.web = () => {
+    const wad = [], tail = [];
+    for (let i = 0; i < 12; i++) {   // wound about the bead, each about its own tilt
+      const ax = new THREE.Vector3(hsh3(i, 1, 7) - 0.5, hsh3(i, 2, 7) - 0.5, hsh3(i, 3, 7) - 0.5).normalize(), u = new THREE.Vector3().crossVectors(ax, new THREE.Vector3(0.3, 1, 0.2)).normalize(), v = new THREE.Vector3().crossVectors(ax, u);
+      const R = 0.055 + 0.075 * hsh3(i, 4, 7), a0 = hsh3(i, 5, 7) * 6, pts = [];
+      for (let j = 0; j < 15; j++) { const an = a0 + j * 0.27, rr = R * (1 + 0.12 * Math.sin(j * 0.9 + i)); pts.push(u.clone().multiplyScalar(Math.cos(an) * rr).addScaledVector(v, Math.sin(an) * rr).toArray()); }
+      wad.push(strand(pts, 0.0035 + 0.003 * hsh3(i, 6, 7), 4, 0.3));
+    }
+    for (let i = 0; i < 15; i++) {   // streaming behind; the last four torn loose, off on their own
+      const loose = i >= 11, L = loose ? 0.28 + 0.2 * hsh3(i, 1, 9) : 0.35 + 0.5 * hsh3(i, 1, 9), an = i * 2.4, rad = loose ? 0.13 + 0.07 * hsh3(i, 2, 9) : 0.03 + 0.05 * hsh3(i, 2, 9);
+      const x0 = Math.cos(an) * rad, y0 = Math.sin(an) * rad, z0 = loose ? 0.22 + 0.2 * hsh3(i, 3, 9) : 0.02, pts = [];
+      for (let j = 0; j < 9; j++) { const t = j / 8, w = Math.sin(t * 5 + i) * 0.03 * t; pts.push([x0 * (1 + t * 0.8) + w, y0 * (1 + t * 0.8) + Math.cos(t * 4 + i * 1.3) * 0.025 * t - t * t * 0.04, z0 + t * L]); }
+      tail.push(strand(pts, loose ? 0.0025 : 0.003 + 0.0045 * hsh3(i, 4, 9), 4, 0.8));
+    }
+    return [{ g: lump(0.045, 2, 0.3, 3, null, [1.1, 0.85, 1.25]), m: 'slime' }, { g: Geo.merge(wad.concat(tail)), m: 'silk' }];
+  };
+  // a gob of spit: round ahead, drawn out into a tail behind, uneven; two or three drops strung out after it
+  const drop = (prof, seg, amp, seed) => { const g = lathe(prof.slice().reverse(), seg), ps = g.attributes.position; for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), an = Math.atan2(y, x), f = 1 + amp * (0.6 * Math.sin(an * 3 + seed + z * 9) + 0.4 * Math.sin(an * 2 - seed * 2 + z * 17)); ps.setXYZ(i, x * f, y * f, z); } g.computeVertexNormals(); return g; };   // (pushed in and out in slow waves round it and along it: a liquid's skin, not facets)
+  SHOT.spit = () => [{ g: Geo.merge([drop([[0.0005, -0.1], [0.05, -0.09], [0.085, -0.06], [0.1, -0.02], [0.095, 0.03], [0.07, 0.09], [0.04, 0.16], [0.016, 0.23], [0.0005, 0.29]].map(([r, f]) => [r, -f]), 18, 0.09, 1),
+    lump(0.03, 1, 0.2, 2, [0.01, -0.01, 0.38]), lump(0.021, 1, 0.2, 3, [-0.025, 0.012, 0.5]), lump(0.014, 0, 0.2, 4, [0.02, -0.03, 0.6])]), m: 'spit' }];
+  // a drop of acid: as big as its sting, clear yellow-green, beaded with bubbles on its skin, a thin drip running off behind and down
+  SHOT.acid = () => {
+    const body = drop([[0.0005, -0.27], [0.14, -0.24], [0.23, -0.16], [0.27, -0.04], [0.25, 0.08], [0.19, 0.2], [0.1, 0.32], [0.045, 0.42], [0.0005, 0.48]].map(([r, f]) => [r, -f]), 22, 0.05, 5);
+    const prof = [[-0.27, 0], [-0.24, 0.14], [-0.16, 0.23], [-0.04, 0.27], [0.08, 0.25], [0.2, 0.19], [0.32, 0.1]], rAt = (z) => { for (let j = 1; j < prof.length; j++) if (z <= prof[j][0]) return prof[j - 1][1] + (prof[j][1] - prof[j - 1][1]) * (z - prof[j - 1][0]) / (prof[j][0] - prof[j - 1][0]); return 0.1; };
+    const bub = []; for (let i = 0; i < 9; i++) { const z = -0.2 + 0.45 * hsh3(i, 1, 4), an = i * 2.3 + hsh3(i, 2, 4), r = rAt(z) * 0.93, s = 0.01 + 0.018 * hsh3(i, 3, 4); bub.push(lump(s, 1, 0.1, i, [Math.cos(an) * r, Math.sin(an) * r, z])); }
+    const pts = []; for (let j = 0; j < 8; j++) { const t = j / 7; pts.push([0.01 * Math.sin(t * 3), -0.03 - t * t * 0.16, 0.42 + t * 0.42]); }
+    return [{ g: body, m: 'acid' }, { g: strand(pts, 0.035, 7, 0.9), m: 'acid' }, { g: Geo.merge(bub), m: 'acidB' }];
+  };
+  // a puff of spores: a small torn sac, and about it a cloud of fine grains (tiny four-sided specks), thicker near the sac
+  SHOT.spore = () => {
+    const dust = []; for (let i = 0; i < 60; i++) {
+      const a = hsh3(i, 1, 3) * Math.PI * 2, b = Math.acos(hsh3(i, 2, 3) * 2 - 1), r = 0.09 + 0.19 * Math.pow(hsh3(i, 3, 3), 0.7), s = 0.005 + 0.008 * hsh3(i, 4, 3);
+      const t = new THREE.TetrahedronGeometry(s, 0); t.rotateX(i); t.rotateY(i * 1.3); t.translate(Math.sin(b) * Math.cos(a) * r, Math.cos(b) * r * 0.8, Math.sin(b) * Math.sin(a) * r * 1.15); dust.push(t);
+    }
+    return [{ g: lump(0.072, 2, 0.16, 7, null, [1, 0.86, 1.08]), m: 'sporeSac' }, { g: Geo.merge(dust), m: 'sporeDust' }];
+  };
+  // a thrown stone (about 0.26 across its middle, as what hits): broken flat, its corners knocked off
+  SHOT.rock = () => { const g = brokenStone(11, 7); g.scale(0.27, 0.23, 0.29); return [{ g: boxUV(g, 3.5), m: 'rock' }]; };
+  // the core of a falling fire (the meteor, the burning boulders): a lump of stone burning through, inside its fire
+  SHOT.bigfire = () => { const g = brokenStone(23, 6); g.scale(0.52, 0.48, 0.55); return [{ g, m: 'ember' }]; };
+  // the scarecrow's sickle, in the plane x-y about its middle (combat.js turns it upright along its way and wheels it): a crescent
+  // blade, single-edged (the edge on its inside, thin; the back thick), narrowing to its point; a short wooden haft below its heel, a
+  // ferrule where the blade's tang goes in
+  SHOT.sickle = () => {
+    const P = [], Q = [], N = 26, a0 = -0.06, a1 = 2.9, BT = [], BB = [], MT = [], MB = [], E = [];
+    for (let i = 0; i <= N; i++) {
+      const s = i / N, an = a0 + (a1 - a0) * s, Ro = 0.42 - 0.04 * s * s, w = 0.11 * Math.pow(1 - s, 0.62) + 0.002, th = 0.014 * (1 - 0.7 * s) + 0.001, c = Math.cos(an), sn = Math.sin(an), rb = Ro - w * 0.68;
+      BT.push([c * Ro, sn * Ro, th / 2]); BB.push([c * Ro, sn * Ro, -th / 2]); MT.push([c * rb, sn * rb, th * 0.32]); MB.push([c * rb, sn * rb, -th * 0.32]); E.push([c * (Ro - w), sn * (Ro - w), 0]);
+    }
+    const t3 = (L, a, b, c) => L.push(...a, ...b, ...c);
+    for (let i = 0; i < N; i++) {
+      t3(P, BT[i], MT[i], BT[i + 1]); t3(P, BT[i + 1], MT[i], MT[i + 1]); t3(P, BB[i], BB[i + 1], MB[i]); t3(P, BB[i + 1], MB[i + 1], MB[i]); t3(P, BT[i], BT[i + 1], BB[i]); t3(P, BB[i], BT[i + 1], BB[i + 1]);
+      t3(Q, MT[i], E[i], MT[i + 1]); t3(Q, MT[i + 1], E[i], E[i + 1]); t3(Q, MB[i], MB[i + 1], E[i]); t3(Q, MB[i + 1], E[i + 1], E[i]);
+    }
+    t3(P, BT[0], BB[0], MT[0]); t3(P, MT[0], BB[0], MB[0]); t3(Q, MT[0], MB[0], E[0]);
+    const hx = Math.cos(a0) * 0.38;
+    const haft = Geo.lathe([[0.0005, -0.47], [0.017, -0.47], [0.02, -0.45], [0.021, -0.3], [0.019, -0.16], [0.018, -0.1], [0.0005, -0.1]], 8); haft.translate(hx, 0, 0);
+    const ferr = Geo.lathe([[0.0005, -0.125], [0.024, -0.125], [0.025, -0.11], [0.025, -0.06], [0.021, -0.05], [0.0005, -0.05]], 8); ferr.translate(hx, 0, 0);
+    const tang = new THREE.BoxGeometry(0.03, 0.06, 0.01); tang.translate(hx, -0.03, 0);
+    return [{ g: Geo.merge([triGeo(P, true), tang]), m: 'iron' }, { g: triGeo(Q, true), m: 'edge' }, { g: haft, m: 'woodDark' }, { g: ferr, m: 'brass' }];
+  };
+  // a thrown mine, its up y (it lands flat, combat.js): a squat iron case with ribs round its rim, a raised pressure plate, a fuze
+  // in the middle with its prongs, and a small lamp set in the plate
+  SHOT.mine = () => {
+    const body = Geo.lathe([[0.0005, -0.03], [0.17, -0.03], [0.188, -0.024], [0.194, -0.006], [0.192, 0.014], [0.178, 0.028], [0.13, 0.031], [0.0005, 0.031]], 20);
+    const plate = Geo.lathe([[0.122, 0.028], [0.124, 0.04], [0.118, 0.045], [0.04, 0.047], [0.0005, 0.047]], 20);
+    const ribs = []; for (let i = 0; i < 16; i++) { const b = new THREE.BoxGeometry(0.016, 0.034, 0.022); b.translate(0, 0, 0.192); b.rotateY(i * Math.PI / 8); ribs.push(b); }
+    const fuze = Geo.lathe([[0.0005, 0.046], [0.018, 0.046], [0.018, 0.054], [0.012, 0.058], [0.012, 0.068], [0.0005, 0.07]], 10);
+    const prongs = []; for (let i = 0; i < 3; i++) { const c = new THREE.CylinderGeometry(0.0025, 0.003, 0.024, 4); c.rotateZ(0.35); c.translate(0.012, 0.078, 0); c.rotateY(i * Math.PI * 2 / 3); prongs.push(c); }
+    const cup = Geo.lathe([[0.012, 0.044], [0.017, 0.046], [0.017, 0.052], [0.013, 0.052]], 10); cup.translate(0.085, 0, 0.02);
+    const band = Geo.lathe([[0.1955, -0.004], [0.1955, 0.006], [0.193, 0.006], [0.193, -0.004]], 20);
+    return [{ g: Geo.merge([body, plate, fuze, cup].concat(ribs, prongs)), m: 'iron' }, { g: band, m: 'brass' }, { g: lump(0.011, 1, 0, 0, [0.085, 0.05, 0.02]), m: 'lamp' }];
+  };
   X.shotGeo = function (kind) { if (shotC[kind] !== undefined) return shotC[kind]; let r = null; try { r = SHOT[kind] ? SHOT[kind]() : null; } catch (e) { console.warn('gfx: no shot', kind, e); (X.gearErr = X.gearErr || {})['shot_' + kind] = String(e); r = null; } return (shotC[kind] = r); };
   X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
 

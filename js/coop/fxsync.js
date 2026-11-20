@@ -106,12 +106,13 @@
     A.summonSkeleton = withOwn(A.summonSkeleton);
 
     // ---------------- projectiles ----------------
-    const PJ = ['kind', 'look', 'grav', 'life', 'radius', 'fuse', 'bounce', 'sticky', 'explode', 'pierce'];
+    const PJ = ['kind', 'look', 'grav', 'life', 'radius', 'fuse', 'bounce', 'sticky', 'explode', 'pierce', 'homing'];
     const sp = C.spawnProjectile;
     C.spawnProjectile = function (o) {
       const p = sp.call(C, o);
       if (K.live && !K._pjNet && o.owner === 'player' && !o.mine && o.pos && o.vel) {
         const m = { pos: enc(o.pos), vel: enc(o.vel), who: K.id };
+        if (o.homing && o.target && o.target._nid) m.tg = o.target._nid; // (the foe a homing one is aimed at: the same foe on every screen)
         for (const k of PJ) if (o[k] !== undefined && typeof o[k] !== 'function' && typeof o[k] !== 'object') m[k] = o[k];
         push(['p', m]);
       }
@@ -142,19 +143,22 @@
       }
       return null;
     };
-    const sticks = [];
+    const sticks = [], homers = [];
     const putProjectile = (m) => {
       const o = { owner: 'remote', dmg: 0, info: { src: 'explosion', remoteViz: true }, pos: V(...m.pos.$v), vel: V(...m.vel.$v) };
       for (const k of PJ) if (m[k] !== undefined) o[k] = m[k];
       o.life = Math.min(o.life || 6, 8);
       // (the foe it ends at: the first if it sticks or bursts, else the one past as many as it pierces)
       const n = o.sticky || o.explode ? 1 : Math.floor(Math.max(0, o.pierce || 0)) + 1;
-      const f = n <= 20 ? nthFoe(o, n) : null;
+      // (a homing one turns: no flight to foresee. It is steered and ended as it flies: homeNow)
+      if (o.homing && m.tg) o.target = G.enemies.list.find((e) => e._nid === m.tg && e.alive) || null;
+      const f = n <= 20 && !o.homing ? nthFoe(o, n) : null;
       if (f && !o.sticky) o.life = Math.min(o.life, f.t);
       let p;
       K._pjNet = true;
       try { p = sp.call(C, o); } finally { K._pjNet = false; }
       if (f && o.sticky && p) sticks.push({ p, e: f.e, t: f.t, off: f.p.clone().sub(f.e.centerPos()) });
+      if (o.homing && p) homers.push({ p, n, seen: new Set(), prev: p.pos.clone() });
     };
     // (a sticky picture reaching its foe: stuck to it, as combat.js sticks a real one)
     const stickNow = () => {
@@ -165,6 +169,33 @@
         sticks.splice(i, 1);
         if (!s.e.alive) continue;
         p.stuck = true; p.stuckTo = s.e; p.stuckOff = s.off; p.pos.copy(s.e.centerPos()).add(s.off); p.mesh.position.copy(p.pos);
+      }
+    };
+    // A homing picture (a homing gun's round, a soul bolt): combat.js turns any shot with homing towards its target while that lives; the
+    // shooter's own screen picks the nearest foe within 30 m (enemies.js nearest) when it has none or it falls, and so is it done here.
+    // It ends where its shooter's would: at the foe it meets, the first if it sticks or bursts, else the one past as many as it pierces,
+    // each foe counted once - looked for along the way it moved since it was last looked at.
+    const homeNow = () => {
+      for (let i = homers.length - 1; i >= 0; i--) {
+        const h = homers[i], p = h.p;
+        if (!C.projectiles.includes(p) || p.stuck || p.life <= 0) { homers.splice(i, 1); continue; }
+        if (!p.target || !p.target.alive) p.target = G.enemies.nearest(p.pos, 30);
+        _d.subVectors(p.pos, h.prev); const L = _d.length();
+        if (L > 1e-6) {
+          _d.divideScalar(L);
+          for (const hit of G.enemies.raycastAll(h.prev, _d, L, h.seen, p.radius || 0.12)) {
+            if (!(hit.t >= 0) || hit.t > L) continue;
+            h.seen.add(hit.e);
+            if (h.seen.size < h.n) continue;
+            const at = h.prev.clone().addScaledVector(_d, hit.t);
+            homers.splice(i, 1);
+            if (p.sticky) { p.stuck = true; p.stuckTo = hit.e; p.stuckOff = at.clone().sub(hit.e.centerPos()); p.pos.copy(at); }
+            else { p.pos.copy(at); p.life = 0; }
+            p.mesh.position.copy(p.pos);
+            break;
+          }
+        }
+        h.prev.copy(p.pos);
       }
     };
     // ---------------- explosions ----------------
@@ -313,6 +344,7 @@
       if (base) base(dt);
       if (!K.live) return;
       if (sticks.length) stickNow();
+      if (homers.length) homeNow();
       sendT -= dt;
       sndN = 0;
       scanAuras();

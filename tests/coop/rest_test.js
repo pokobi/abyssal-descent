@@ -215,6 +215,38 @@ const PORT = +process.env.COOP_PORT || 9952;
       check(ok(a) && ok(b), `and its picture ends there on the host and on the second guest (life ${a ? a.life : '-'} / ${b ? b.life : '-'} s)`);
       await sleep(400);
     }
+    // ---- homing shots: the picture turns to the foe on the other screens too, and ends there
+    // (the picture made next on a page, followed every frame: how well it heads for the foe at first and at best, and how far from a foe it ends)
+    const follow = `window.__follow = () => { const n0 = window.__PJ.length, r = { first: null, best: -2, gone: false };
+      const f = () => { const rec = window.__PJ[n0]; if (!rec) return requestAnimationFrame(f); const p = rec.p;
+        const foes = G.enemies.list.filter((e) => e.alive && !e.custom);
+        if (!G.combat.projectiles.includes(p)) { r.gone = true; r.endD = +Math.min(...foes.map((e) => e.centerPos().distanceTo(p.pos))).toFixed(2); r.t = +(p.t || 0).toFixed(2); r.tgt = p.target ? p.target._nid : 0; return; }
+        const t = p.target && p.target.alive ? p.target : null;
+        if (t) { const k = +p.vel.clone().normalize().dot(t.centerPos().sub(p.pos).normalize()).toFixed(3); if (r.first === null) r.first = k; r.best = Math.max(r.best, k); }
+        requestAnimationFrame(f); };
+      f(); return r; }; 1`;
+    // (only the test's own foes stand now: one of the area's elsewhere could be the nearest to a homing shot's start)
+    await h.eval(`(() => { const keep = [window.__F].concat(window.__L3); for (const e of G.enemies.list) if (e.alive && !e.custom && !keep.includes(e)) { e.alive = false; e.remove(); e.removed = true; } return 1; })()`);
+    await sleep(800);
+    await h.eval(follow); await g2.eval(follow);
+    const homing = async (name, js, want) => {
+      await h.eval('window.__HR = window.__follow(); 1'); await g2.eval('window.__HR = window.__follow(); 1');
+      await g.eval(`(() => { const e = ${rep}, c = e.centerPos(), from = c.clone(); from.x += 6; ${js} return 1; })()`);
+      if (want.kill) { await sleep(150); await h.eval(want.kill); }
+      for (const pg of [h, g2]) await pg.until('window.__HR.gone', 8000).catch(() => {});
+      const a = JSON.parse(await h.eval('JSON.stringify(window.__HR)')), b = JSON.parse(await g2.eval('JSON.stringify(window.__HR)'));
+      // (turned: its heading came round towards the foe - by more than 0.15 of the cosine where it started well off it, to within 25 degrees otherwise)
+      const ok = (x) => x.gone && (want.turn ? x.first !== null && x.first < 0.7 && x.best > x.first + 0.15 : x.best > 0.9) && x.endD < 1.3 && (!want.tgt || x.tgt === want.tgt);
+      check(ok(a) && ok(b), `${name}: on the host and the second guest its picture turns to the foe and ends there (host ${JSON.stringify(a)} / second guest ${JSON.stringify(b)})`);
+      await sleep(300);
+    };
+    // a soul bolt (C.soulBolt: aimed at a foe, homing 9), let go upward and to the side as the game lets it go
+    await homing('a soul bolt aimed at the first foe', `const d = new THREE.Vector3(0, 0.4, 1).normalize(); C0 = G.combat.spawnProjectile({ kind: 'soul', pos: from, vel: d.multiplyScalar(22), owner: 'player', dmg: 1, homing: 9, target: e, radius: 0.3, life: 3, info: { src: 'buff', proc: true, noMarker: true } });`.replace('C0 = ', ''), { turn: true, tgt: id });
+    // a homing gun's round (no target of its own: the nearest foe), fired slow and 60 degrees off the foe: its straight line passes 5 m wide of it
+    await homing('a homing crossbow bolt (森王の長弓)', `const d = c.clone().sub(from).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 1.05); G.combat.spawnProjectile({ kind: 'bolt', pos: from, vel: d.multiplyScalar(20), grav: 0, owner: 'player', dmg: 1, radius: 0.12, life: 6, pierce: 0, homing: 5, info: { src: 'bullet' } });`, { turn: true });
+    await homing('a homing rocket (流星)', `const d = c.clone().sub(from).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 1.05); G.combat.spawnProjectile({ kind: 'rocket', pos: from, vel: d.multiplyScalar(20), grav: 0, owner: 'player', dmg: 1, radius: 0.25, life: 6, explode: 2, homing: 5, info: { src: 'explosion' } });`, { turn: true });
+    // a soul bolt whose foe falls before it gets there: it turns to the nearest one left, as on its shooter's screen
+    await homing('a soul bolt whose foe falls on the way', `const t = G.enemies.list.find((x) => x._nid === ${ids3[1]}); const d = new THREE.Vector3(0, 0.4, 1).normalize(); G.combat.spawnProjectile({ kind: 'soul', pos: from, vel: d.multiplyScalar(9), owner: 'player', dmg: 1, homing: 9, target: t, radius: 0.3, life: 4, info: { src: 'buff', proc: true, noMarker: true } });`, { kill: `(() => { const e = window.__L3[1]; e.hp = 1; G.combat.damageEnemy(e, 1e7, { src: 'bullet', fixed: true }); return 1; })()` });
     // a sticky shot sticks to the foe on the other screens too, and goes with it
     {
       const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
@@ -239,7 +271,7 @@ const PORT = +process.env.COOP_PORT || 9952;
     }
     for (const pg of [g2]) if (pg.errs.length) h.errs.push(...pg.errs.map((x) => 'g2: ' + x));
     check(!h.errs.length && !g.errs.length, 'no errors ' + h.errs.concat(g.errs).slice(0, 3).join(' | ').slice(0, 600));
-  } catch (e) { console.log('STOPPED: ' + e.message); for (const pg of [globalThis.__h, globalThis.__g, globalThis.__g2]) if (pg) console.log('errs: ' + pg.errs.slice(0, 4).join(' | ').slice(0, 900)); throw e; } finally { ch.close(); srv.close(); }
+  } catch (e) { console.log('STOPPED: ' + e.message); for (const pg of [globalThis.__h, globalThis.__g, globalThis.__g2]) if (pg) console.log('coop: ' + await pg.eval('JSON.stringify({ id: G.Coop && G.Coop.id, role: G.Coop && G.Coop.role, live: G.Coop && G.Coop.live, st: G.game && G.game.state, booted: !!(document.getElementById("loading") && document.getElementById("loading").classList.contains("done")), n: G.Coop && G.Coop.players && G.Coop.players.size, href: location.href })').catch((x) => 'eval failed ' + x.message)); for (const pg of [globalThis.__h, globalThis.__g, globalThis.__g2]) if (pg) console.log('errs: ' + pg.errs.slice(0, 4).join(' | ').slice(0, 900)); throw e; } finally { ch.close(); srv.close(); }
   console.log(fails.length ? `\nREST TEST FAILED (${fails.length})` : '\nREST TEST PASSED');
   process.exit(fails.length ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

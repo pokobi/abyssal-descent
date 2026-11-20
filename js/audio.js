@@ -1181,7 +1181,7 @@
   // (which of a set's recordings a gun is: a rare or better gun's from its id - half of them the set's own first, the rest one of the
   // others - and the first for a common or uncommon one (the kind's plain gun sounds as the kind) and a shot with no gun's id; the same
   // gun always the same. rid: the id to go by, or nothing - see rId)
-  const rId = (o) => (o.rar === 'common' || o.rar === 'uncommon' ? null : o.id);
+  const rId = (o) => (o.rar === 'common' || o.rar === 'uncommon' ? null : o.id || o.rid); // (rid: a friend's gun in co-op, coop/core.js)
   const rIdx = (key, id) => { const b = SB.bank[key], n = b ? b.f.length : 0; if (!id || n < 2) return 0; const h = hs(id); return hr(h, 11) < 0.5 ? 0 : 1 + Math.floor(hr(h, 12) * (n - 1)); };
   // (a recording read into X from i0 at speed r, its file's peak (0.89, as they were made) brought to g; mute: nothing of it - the take
   // with its recordings left out, for the measurements: docs/tools/snd_recshare2.js)

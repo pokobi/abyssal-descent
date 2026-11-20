@@ -19,7 +19,9 @@ const PORT = +process.env.COOP_PORT || 9011;
     await g.until('window.G && G.Coop && G.Coop.id === 1', 90000);
     const off = 'G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
     await h.eval(off); await g.eval(off);
-    await h.eval('G.Coop.begin(); 1');
+    // (both players untouchable until a step that hurts one of them on purpose: the foes of the area fight all along, and a host they
+    // had worn down - or put down - would take nothing from the blasts below)
+    await h.eval('G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1');
     await g.until('G.game.run && G.game.state === "playing" && G.Coop.fpOk !== undefined', 60000);
     for (const pg of [h, g]) await pg.running();
     await sleep(2500);
@@ -35,16 +37,36 @@ const PORT = +process.env.COOP_PORT || 9011;
     check(await g.eval(`!G.enemies.list.some((x) => x._nid === ${id} && x.alive)`), 'and is dead on the guest');
     check(await g.eval('G.game.run.kills >= 1'), 'the kill counts for the guest');
     // ---- a real shot: the guest aims at a foe with the camera and fires the gun in hand
-    await g.until(`${foes}.length >= 1`, 20000);
-    await g.eval(`(() => { const P = G.player, e = ${foes}[0], c = e.centerPos(); window.__s = e._nid; window.__sh = e.hp + (e.shield || 0); const dx = c.x - P.pos.x, dz = c.z - P.pos.z, L = Math.hypot(dx, dz) || 1; P.pos.x = c.x - dx / L * 5; P.pos.z = c.z - dz / L * 5; P.pos.y = e.pos.y; P.vel.set(0, 0, 0); })(); 1`);
-    await sleep(200);
-    await g.eval(`(() => { const P = G.player, e = G.enemies.list.find((x) => x._nid === window.__s), c = e.centerPos(), o = G.camera.position; const dx = c.x - o.x, dy = c.y - o.y, dz = c.z - o.z; P.yaw = Math.atan2(-dx, -dz); P.pitch = Math.atan2(dy, Math.hypot(dx, dz)); })(); 1`);
-    await sleep(150);
-    await g.eval(`(() => { const W = G.weapons, P = G.player, w = P.weapon; w.mag = 20; w.reloading = false; G.ui.clearScreen(); G.game.state = 'playing'; const e = G.enemies.list.find((x) => x._nid === window.__s), c = e.centerPos(), o = G.camera.position; const dx = c.x - o.x, dy = c.y - o.y, dz = c.z - o.z; P.yaw = Math.atan2(-dx, -dz); P.pitch = Math.atan2(dy, Math.hypot(dx, dz)); G.camera.rotation.set(P.pitch, P.yaw, 0, 'YXZ'); G.camera.updateMatrixWorld(true); W.shoot(w, W.stats(w)); })(); 1`);
-    await sleep(600);
-    const sid = +(await g.eval('window.__s')), sh = +(await g.eval('window.__sh'));
-    const after = await h.eval(`(() => { const e = G.enemies.list.find((x) => x._nid === ${sid}); return e && e.alive ? e.hp + (e.shield || 0) : -1; })()`);
-    check(after < sh, `a real shot of the guest took health off the host's foe (${Math.round(sh)} -> ${Math.round(after)})`);
+    // (the foes are held still on the host from here: a real shot is aimed at the foe where the guest sees it, and a small foe on the move
+    // - a slime, a bat - was often somewhere else by the time the round flew; the guest's copies follow the host's still ones)
+    await h.eval('G.game.dev = { god: true, speed: 1, freeze: true }; 1');
+    await sleep(500);
+    // the guest stands 5 m off a foe it can see, aims at it with the camera and fires the gun in hand. The guest is put on open ground
+    // with nothing between (a place picked blindly put the guest inside a wall or behind a pillar now and then): a few foes are tried
+    const pickShot = `(() => { const P = G.player, w = G.world, list = ${foes}.filter((e) => !e.burrowed && !e.untargetable && !e.invuln);
+      for (const e of list) { const c = e.centerPos(), gy = w.floorBelow(c.x, e.pos.y + 0.5, c.z);
+        // (the ground under the foe, not its feet: a bat or a crow flies well above it)
+        for (let k = 0; k < 48; k++) { const a = k / 16 * Math.PI * 2, R = [5, 4, 6.5][Math.floor(k / 16)], x = c.x + Math.cos(a) * R, z = c.z + Math.sin(a) * R, y = w.floorBelow(x, gy + 2, z);
+          if (!(y > gy - 1.2 && y < gy + 1.2) || !w.boxFree(x - 0.4, y + 0.05, z - 0.4, x + 0.4, y + 1.9, z + 0.4)) continue;
+          const eye = new THREE.Vector3(x, y + 1.6, z); if (!w.los(eye, c)) continue;
+          window.__s = e._nid; window.__sh = e.hp + (e.shield || 0); P.pos.set(x, y + 0.02, z); P.vel.set(0, 0, 0); return e._nid; } }
+      return 0; })()`;
+    const aimFire = `(() => { const W = G.weapons, P = G.player, w = P.weapon; w.mag = 20; w.reloading = false; G.ui.clearScreen(); G.game.state = 'playing'; const e = G.enemies.list.find((x) => x._nid === window.__s), c = e.centerPos(), o = G.camera.position; const dx = c.x - o.x, dy = c.y - o.y, dz = c.z - o.z; P.yaw = Math.atan2(-dx, -dz); P.pitch = Math.atan2(dy, Math.hypot(dx, dz)); G.camera.rotation.set(P.pitch, P.yaw, 0, 'YXZ'); G.camera.updateMatrixWorld(true); W.shoot(w, W.stats(w)); })(); 1`;
+    let sh = 0, after = 0, tries = 0, sid = 0;
+    for (; tries < 3; tries++) {
+      await g.until(`${foes}.length >= 1`, 20000);
+      sid = await g.eval(pickShot); if (!sid) { await sleep(500); continue; }
+      sh = +(await g.eval('window.__sh'));
+      await g.frames(6);
+      await g.eval(aimFire);
+      await h.until(`(() => { const e = G.enemies.list.find((x) => x._nid === ${sid}); return !e || !e.alive || e.hp + (e.shield || 0) < ${sh}; })()`, 3000).catch(() => {});
+      after = await h.eval(`(() => { const e = G.enemies.list.find((x) => x._nid === ${sid}); return e && e.alive ? e.hp + (e.shield || 0) : -1; })()`);
+      if (after < sh) break;
+      await sleep(800); // (the gun's own pace before the next round)
+    }
+    if (!(sid && after < sh)) console.log('      shot: ' + await g.eval(`JSON.stringify({ field: G.world.field, foes: ${foes}.map((e) => [e.def.id, e.state, !!e.flyer, Math.round(e.pos.y * 10) / 10]) })`));
+    check(sid && after < sh, `a real shot of the guest took health off the host's foe (${Math.round(sh)} -> ${Math.round(after)}, shot ${tries + 1})`);
+    await h.eval('G.game.dev = { god: true, speed: 1 }; 1');
     // ---- a status the guest puts on a foe ticks on the host; one the host puts on shows on the guest
     await g.until(`${foes}.length >= 1`, 20000);
     await g.eval(`(() => { const e = ${foes}[0]; window.__b = e._nid; G.combat.status(e, 'burn', 2); })(); 1`);
@@ -61,9 +83,15 @@ const PORT = +process.env.COOP_PORT || 9011;
     check(await g.until('G.combat.projectiles.some((p) => p.owner === "remote")', 3000).then(() => true, () => false), 'a grenade thrown by the host flies on the guest screen');
     await sleep(900);
     // ---- an explosion of the host's grenade beside the guest hurts the guest
-    await g.eval('G.game.dev = { god: false, speed: 1 }; G.player.invulnT = 0; G.player.hp = G.player.stats.maxHp; window.__hp = G.player.hp; 1');
+    // (the one hurt: mortal, and nothing of its own between it and the blow - no time unhurt, no overshield (a crystal picked up, a perk),
+    // no shield of a skill: a friend's grenade is 2% of its damage, a couple of points, and an overshield took all of it. Still, so that
+    // where the other screen sees it is where it is; the health looked at until it drops, not once after a set time)
+    const bare = 'G.game.dev = { god: false, speed: 1 }; (() => { const P = G.player; P.invulnT = 0; P.os = 0; P.tShields = []; P.vel.set(0, 0, 0); P.hp = P.stats.maxHp; window.__hp = P.hp; return 1; })()';
+    const seenAt = async (pg, other, id) => { const p = JSON.parse(await pg.eval('JSON.stringify(G.player.pos)')); await other.until(`G.Coop.players.get(${id}).to.distanceTo(new THREE.Vector3(${p.x}, ${p.y}, ${p.z})) < 0.8`, 5000).catch(() => {}); };
+    await g.eval(bare);
+    await seenAt(g, h, 1);
     await h.eval("(() => { const p = G.Coop.players.get(1).to.clone(); G.combat.explode(p, 5, 120, { src: 'explosion', grenade: true }); })(); 1");
-    await sleep(900);
+    await g.until('G.player.hp < window.__hp', 5000).catch(() => {});
     check(await g.eval('G.player.hp < window.__hp'), 'a grenade of someone else that goes off beside you hurts you');
     check(+(await g.eval('window.__fx')) >= 1, 'its explosion is drawn on the guest screen');
     // ---- every kind of projectile the game has, thrown by the host: each one is drawn on the guest with no error
@@ -78,15 +106,18 @@ const PORT = +process.env.COOP_PORT || 9011;
     const seen = JSON.parse(await g.eval('JSON.stringify([...window.__seen])'));
     check(list.every(([, look]) => seen.includes(look)), `all ${list.length} kinds of projectile were drawn on the guest` + (list.length === seen.length ? '' : ' (missing: ' + list.filter(([, l]) => !seen.includes(l)).map((x) => x[1]).join(' ') + ')'));
     // ---- a blow of a foe that has picked the guest (the host sends it down the wire)
-    await g.eval('G.game.dev = { god: false, speed: 1 }; G.player.invulnT = 0; G.player.hp = G.player.stats.maxHp; window.__hp = G.player.hp; 1');
+    await g.eval(bare);
     await h.eval("(() => { G.Coop.swap = G.Coop.players.get(1); try { G.combat.damagePlayer(10, { src: 'melee' }); } finally { G.Coop.swap = null; } })(); 1");
-    await sleep(700);
+    await g.until('G.player.hp < window.__hp', 5000).catch(() => {});
     check(await g.eval('G.player.hp < window.__hp'), 'a blow the host works out for a foe on the guest lands on the guest');
     // ---- the other way round, and a skill's ring
-    await h.eval('G.game.dev = { god: false, speed: 1 }; G.player.invulnT = 0; G.player.hp = G.player.stats.maxHp; window.__hp = G.player.hp; 1');
+    await g.eval('G.game.dev = { god: true, speed: 1 }; 1');
+    await h.eval(bare);
+    await seenAt(h, g, 0);
     await g.eval("(() => { const p = G.Coop.players.get(0).to.clone(); G.combat.explode(p, 5, 120, { src: 'explosion', grenade: true }); })(); 1");
-    await sleep(900);
+    await h.until('G.player.hp < window.__hp', 5000).catch(() => {});
     check(await h.eval('G.player.hp < window.__hp'), 'and the guest grenade hurts the host');
+    await h.eval('G.game.dev = { god: true, speed: 1 }; 1');
     // ---- zones and auras of the other player: nothing breaks, nothing stays
     await h.eval("(() => { const P = G.player; G.combat.zone(P.pos.clone(), 4, 2, 'fire', 0); G.abilities.auras.push({ kind: 'fire', t: 2, r: 4, dps: 0, follow: true, col: 0xff7030 }); G.abilities.auras.push({ kind: 'holy', t: 2, r: 4, dps: 0, c: P.pos.clone() }); })(); 1");
     await sleep(600);

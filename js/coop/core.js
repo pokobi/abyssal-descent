@@ -140,8 +140,10 @@
     if (m.i !== K.id) {
       G.fx.tracer(V(...m.a), V(...m.b), 0xffd080, 0.03, 0.09);
       try {
+        // (how far off it is goes as the level: audio.js reads the distance back from it, 0.8 - d / 80, and mixes in the far recording from 12 m. The
+        // gun's id goes as rid, not id: an id marks your own gun there, its empties and the rest pulled down. Suppressed or not: m.q, as the foes hear it)
         const d = G.player.pos.distanceTo(V(...m.a)), vol = Math.max(0.05, 0.8 - d / 80);
-        if (m.snd) { if (m.pj && m.snd !== 'nail') G.sfx.launcher(m.snd); else G.sfx.gun(m.snd, { vol }); }
+        if (m.snd) { if (m.pj && m.snd !== 'nail') G.sfx.launcher(m.snd); else G.sfx.gun(m.snd, { vol, suppressed: !!m.q, auto: !!m.au, rid: m.gi, rar: m.gr }); }
       } catch (e) { /* a sound that cannot be played is not worth an error */ }
     }
     if (K.role === 'host') for (const o of K.players.keys()) if (o && o !== m.i) K.net.send(o, m);
@@ -390,6 +392,9 @@
         shotT = now;
         const P = G.player, c = G.camera, d = V(0, 0, -1).applyQuaternion(c.quaternion), a = P.chestPos().add(d.clone().multiplyScalar(0.6)), b = a.clone().addScaledVector(d, st && st.proj ? 12 : 45);
         const m = { t: 'sh', i: K.id, a: K.vec(a), b: K.vec(b), snd: st && st.sound || '', pj: st && st.proj ? 1 : 0 };
+        // (the gun, for its own recording on the others' screens: a named one has one of its own; and fast fire)
+        if (w && w.def) { m.gi = w.def.id; m.gr = w.def.rarity; }
+        if (st && (st.auto || st.autoShot)) m.au = 1;
         if (loud) { m.ar = loud.arch || ''; m.q = loud.quiet ? 1 : 0; m.m = K.vec(loud.p); m.o = K.vec(P.pos); loud = null; }
         K.send(m);
       }

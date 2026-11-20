@@ -267,17 +267,20 @@
     const find = (id) => (id < 0 ? BS.active && BS.active.parts[-id - 1] : known.get(id));
     K.handlers.hit = function (m, from) {
       const rp = K.players.get(from);
-      for (const [id, dh, ds, kn, hs] of m.h) {
+      for (const [id, dh, ds, kn, hs, nl] of m.h) {
         const e = find(id); if (!e || !e.alive || e.dying) continue;
         if (ds && e.shield > 0) { e.shield = Math.max(0, e.shield - ds); if (e.shield <= 0 && e.onShieldBreak) e.onShieldBreak(); }
         if (dh > 0) {
-          // the guest's machine already worked out armour, marks, shields, 脆化 and the defence (its own 防御無視, the 防御ダウン the host sends it, the duel's
-          // break): this is the plain result. Nothing of the host's own is put on it again (C.defK would add the host's 防御無視 and count the 防御ダウン twice).
-          const mul = e.dmgMul, sh = e.shield, mk = e.st.mark, br = e.st.brittle, vu = e.st.vuln, dk = C.defK;
-          e.dmgMul = null; e.shield = 0; e.st.mark = 0; e.st.brittle = 0; e.st.vuln = 0; C.defK = () => 1;
-          try { dm.call(C, e, dh, { src: 'dot', silent: true, noBuffs: true, remote: from, proc: true, noSkOn: true }); } finally { C.defK = dk; if (e.alive) { e.dmgMul = mul; e.shield = sh; e.st.mark = mk; e.st.brittle = br; e.st.vuln = vu; } }
+          // the guest's machine already worked out armour, marks, shields, 脆化, the nails in it and the defence (its own 防御無視, the 防御ダウン the host sends
+          // it, the duel's break): this is the plain result. Nothing of the host's own is put on it again (C.defK would add the host's 防御無視 and count the
+          // 防御ダウン twice; the nails, the host's count of them, are the guest's too and were counted there).
+          const mul = e.dmgMul, sh = e.shield, mk = e.st.mark, br = e.st.brittle, vu = e.st.vuln, na = e.st.nails, dk = C.defK;
+          e.dmgMul = null; e.shield = 0; e.st.mark = 0; e.st.brittle = 0; e.st.vuln = 0; e.st.nails = 0; C.defK = () => 1;
+          try { dm.call(C, e, dh, { src: 'dot', silent: true, noBuffs: true, remote: from, proc: true, noSkOn: true }); } finally { C.defK = dk; if (e.alive) { e.dmgMul = mul; e.shield = sh; e.st.mark = mk; e.st.brittle = br; e.st.vuln = vu; e.st.nails = na; } }
           G.fx.blood(e.centerPos(), null, e.bloodColor, 3);
         }
+        // the nails that blow left in it (a nail gun's round: combat.js, +3% damage taken each, up to 5, for 8 s): one count of them for everyone, kept here
+        if (nl > 0 && e.alive) { e.st.nails = Math.min(5, (e.st.nails || 0) + nl); e.st.nailT = 8; }
         if (kn && !e.boss && e.knockback) e.knockback(V(kn[0], 0, kn[1]), kn[2]);
         if (hs && rp) hurtBy(e, hs, rp);
       }
@@ -339,7 +342,25 @@
         for (const k in o) e.st[k] = Math.max(+e.st[k] || 0, o[k]);
         e._dotBy = from;
       }
+      const rp = K.players.get(from);
+      if (rp && m.b) rp.dotB = m.b;
     };
+    // The burning and the poison a guest put on a foe tick here (combat.js C.updateStatus), as solo's would on that guest's own screen: the foe's defence
+    // is stripped by that guest's 防御無視, 熱で緩む鎧 and 総崩れ (sent with its statuses: [defIgnore, heat armour, collapse, poison damage, damage over
+    // time]), never the host's, and the poison's ticks grow by that guest's poison and damage-over-time boons. A status the host puts on is the host's again.
+    const dk0 = C.defK, st0 = C.status;
+    C.defK = function (e, info, src, crit) {
+      const rp = K.live && src === 'dot' && info && info.remote === undefined && e && e._dotBy ? K.players.get(e._dotBy) : null, b = rp && rp.dotB;
+      if (!b) return dk0.call(C, e, info, src, crit);
+      const S = P.stats, di = S.defIgnore, own = Object.prototype.hasOwnProperty.call(P, 'has'), h0 = P.has;
+      S.defIgnore = b[0] || 0;
+      P.has = function (id) { return id === 'el_heatarmor' ? !!b[1] : id === 'o_collapse' ? !!b[2] : h0.call(this, id); };
+      let k;
+      try { k = dk0.call(C, e, info, src, crit); } finally { S.defIgnore = di; if (own) P.has = h0; else delete P.has; }
+      if (info.elem === 'poison') k *= (1 + (b[3] || 0) + (b[4] || 0)) / Math.max(0.1, 1 + (S.poisonDmg || 0) + (S.dotDmg || 0));
+      return k;
+    };
+    C.status = function (e) { if (e && e._dotBy) e._dotBy = 0; return st0.apply(C, arguments); };
     // a status a guest's reaction stopped (element.js): stopped here too, where it ticks
     K.handlers.xs = function (m) { for (const [id, el] of m.a) { const e = find(id); if (e && e.alive) G.Elem.stopStatus(e, el); } };
     // the element a guest left on a foe, or spent in a reaction (element.js): taken as it is
@@ -402,7 +423,7 @@
           add.push(esRow(e));
         }
         const fl = (e.burrowed ? 1 : 0) | (e.untargetable ? 2 : 0) | (e.invuln ? 4 : 0) | (e.st.stun > 0 ? 8 : 0) | (e.st.frozen > 0 ? 16 : 0) | (e.state === 'spawn' ? 32 : 0) | (e.model.group.visible ? 0 : 64) | (e._elFrozen ? 128 : 0);
-        snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0), K.statusBits(e), [e.st.poisonStacks | 0, e.st.frostStacks | 0, e.st.burnLv | 0, e.st.markMul || 0], e.auFix ? 0 : G.Elem.idx(G.Elem.auraOf(e)), r2(G.Elem.auraLeft(e)), r2(e.st.brittleK || 0), K.ddRow(e)]);
+        snap.push([e._nid, r2(e.pos.x), r2(e.pos.y), r2(e.pos.z), r2(e.yaw), Math.round(e.hp), Math.round(e.shield), fl, r2(e.atk || 0), r2(e.wind || 0), r2(e.mv || 0), K.statusBits(e), [e.st.poisonStacks | 0, e.st.frostStacks | 0, e.st.burnLv | 0, e.st.markMul || 0], e.auFix ? 0 : G.Elem.idx(G.Elem.auraOf(e)), r2(G.Elem.auraLeft(e)), r2(e.st.brittleK || 0), K.ddRow(e), e.st.nails > 0 ? e.st.nails : 0]);
       }
       if (add.length) K.send({ t: 'es', a: add });
       for (const [id, e] of known) {
@@ -440,7 +461,7 @@
       if (b.constructs) for (const c of b.constructs) if (!c._sent) { c._sent = true; K.send({ t: 'bcn', pi: b.parts.indexOf(c.p), tile: c.tile ? BS.terrain.tiles().indexOf(c.tile) : -1, seg: c.seg ? b.stg.segs.indexOf(c.seg) : -1 }); }
       if (b.holes) for (const h of b.holes) if (!h._sent) { h._sent = true; K.send({ t: 'bhl', c: K.vec(h.c) }); }
       K.send({ t: 'b', pa: b.phase, cs: b.constructs ? b.constructs.map((c) => [b.parts.indexOf(c.p), r2(c.pos.x), r2(c.pos.y), r2(c.pos.z)]) : undefined, hp: Math.round(b.hp), sh: Math.round(b.shield || 0), mxs: Math.round(b.maxShield || 0), pos: K.vec(b.pos), yaw: r2(b.yaw), ph: b.phaseText ? b.phaseText() : '', nodes, parts,
-        dd: K.ddRow(b), ds: b.duelSt && b.duelSt.stunT > 0 ? r2(b.duelSt.stunT) : 0,
+        dd: K.ddRow(b), ds: b.duelSt && b.duelSt.stunT > 0 ? r2(b.duelSt.stunT) : 0, nl: b.parts.some((p) => p.st && p.st.nails > 0) ? b.parts.map((p) => (p.st && p.st.nails) | 0) : 0,
         st: typeof b.state === 'string' ? b.state : '', tl: BS.terrain && G.world.final ? scan(BS.terrain.tiles()) : undefined, sg: b.stg ? scan(b.stg.segs) : undefined });
     };
     function sendObjective() {

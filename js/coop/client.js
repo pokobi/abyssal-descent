@@ -169,6 +169,7 @@
         if (!e.auFix && !(e._auT > now - 500)) e.au = a[13] ? { el: G.Elem.of(a[13]), t: GM.time + (a[14] || 0) } : null;
         e._elFrozen = !!(a[7] & 128); if (a[15]) e.st.brittleK = a[15];
         K.applyDD(e, a[16]); // (防御ダウン: the cracked shield on its bar, and what your own blows are worked out with)
+        K.applyNails(e, a[17]);
         // your own last hits are ahead of what the host has seen yet
         if (!(e._hitT > now - 400)) { if (a[5] < e.hp - 0.5) { e.lastHitT = GM.time; e.flinch = Math.min(1, e.flinch + 0.2); } e.hp = a[5]; e.shield = a[6]; }
       }
@@ -190,20 +191,25 @@
     const remoteOf = (e) => e && (e._rep || (e.boss && e._nid));
     C.damageEnemy = function (e, amount, info) {
       if (!remoteOf(e)) return dm.call(C, e, amount, info);
-      const h0 = e.hp, s0 = e.shield || 0;
+      const h0 = e.hp, s0 = e.shield || 0, n0 = (e.st && e.st.nails) || 0;
       const r = dm.call(C, e, amount, info);
       const dh = h0 - e.hp, ds = s0 - (e.shield || 0);
+      // (a nail it left in the foe: the host keeps the one count of them; shown here at once, and the host's word taken back after)
+      const nl = Math.max(0, ((e.st && e.st.nails) || 0) - n0);
+      if (nl) e._nlT = performance.now();
       // a blow that throws the foe back must throw the real one
       let kn = 0;
       if (info && info.knock && !e.boss) { const d = info.dir || e.pos.clone().sub(P.pos).setY(0).normalize(); kn = [r2(d.x), r2(d.z), r2(info.knock)]; }
       // (what it was hit by goes up too: a foe the host owns turns to look where the blow came from, as in solo E.onDamaged; a proc does not)
       const hs = info && info.proc ? 0 : (info && info.src) || 'bullet';
-      if (dh > 0 || ds > 0) { e._hitT = performance.now(); e._pk = info || e._pk; pushHit(e, dh, ds, kn, hs); }
+      if (dh > 0 || ds > 0) { e._hitT = performance.now(); e._pk = info || e._pk; pushHit(e, dh, ds, kn, hs, nl); }
       // (the real kill is the host's: until its word comes the foe stands at 1)
       if (e.hp <= 0 && e.alive) e.hp = 1;
       return r;
     };
-    function pushHit(e, dh, ds, kn, hs) { hits.push([e._nid, r2(Math.max(0, dh)), r2(Math.max(0, ds)), kn || 0, hs || 0]); }
+    function pushHit(e, dh, ds, kn, hs, nl) { const a = [e._nid, r2(Math.max(0, dh)), r2(Math.max(0, ds)), kn || 0, hs || 0]; if (nl) a.push(nl); hits.push(a); }
+    // the host's count of the nails in a foe (or in a guardian's parts), unless you have just put one in yourself and its word has not caught up
+    K.applyNails = function (e, n) { if (!e || !e.st || e._nlT > performance.now() - 600) return; e.st.nails = n | 0; e.st.nailT = n ? 8 : 0; };
     // 防御ダウン (combat.js C.defDown / C.defStack) you put on a foe: worked out here with your build (総崩れ's x1.5 included), shown at once, and sent
     // to the host as the share and time it came to, where it is merged in as it is (raw). The host's whole map of it comes back with each snapshot.
     const dd0 = C.defDown, dst0 = C.defStack, ddOut = new Map();
@@ -240,7 +246,10 @@
     G.Elem.onNetStatus = function (e) { if (remoteOf(e)) sendStatus(e); };
     const xsOut = [];
     G.Elem.onNetStop = function (e, el) { if (remoteOf(e)) xsOut.push([e._nid, el]); };
-    K.flushStatus = function () { if (ssOut.size) { K.send({ t: 'ss', a: [...ssOut] }); ssOut.clear(); } if (axOut.size) { K.send({ t: 'ax', a: [...axOut.values()] }); axOut.clear(); } if (xsOut.length) { K.send({ t: 'xs', a: xsOut.splice(0) }); } };
+    // (what of your build the burning and poison you put on count with where they tick, on the host: your 防御無視, 熱で緩む鎧, 総崩れ, poison and
+    // damage-over-time boons - host.js C.defK)
+    const dotBuild = () => [+(P.stats.defIgnore || 0).toFixed(3), P.has('el_heatarmor') ? 1 : 0, P.has('o_collapse') ? 1 : 0, +(P.stats.poisonDmg || 0).toFixed(3), +(P.stats.dotDmg || 0).toFixed(3)];
+    K.flushStatus = function () { if (ssOut.size) { K.send({ t: 'ss', a: [...ssOut], b: dotBuild() }); ssOut.clear(); } if (axOut.size) { K.send({ t: 'ax', a: [...axOut.values()] }); axOut.clear(); } if (xsOut.length) { K.send({ t: 'xs', a: xsOut.splice(0) }); } };
     // ---------------- what comes down the wire and hurts ----------------
     K.handlers.dmg = function (m) {
       C.damagePlayer(m.a, { src: m.s, elem: m.e, el: m.l || undefined, fixed: !!m.f, pos: m.p ? V(...m.p) : null });
@@ -304,6 +313,7 @@
       b.shield = m.sh; b.maxShield = m.mxs; b.pos.set(...m.pos); b.yaw = m.yaw; b._ph = m.ph;
       // 防御ダウン on the whole guardian, and the duel's break (its 70%: combat.js C.defDownOf reads duelSt.stunT), for the bar and your own blows
       K.applyDD(b, m.dd);
+      b.parts.forEach((p, i) => K.applyNails(p, m.nl ? m.nl[i] : 0));
       if (b.duelSt) b.duelSt.stunT = m.ds || 0;
       if (m.pa) b.phase = m.pa;
       if (m.cs && b.constructs) for (const [pi, x, y, z] of m.cs) { const c = b.constructs.find((q) => q.p === b.parts[pi]); if (c) c.pos.set(x, y, z); }

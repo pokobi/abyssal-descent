@@ -106,7 +106,7 @@
     A.summonSkeleton = withOwn(A.summonSkeleton);
 
     // ---------------- projectiles ----------------
-    const PJ = ['kind', 'look', 'grav', 'life', 'radius', 'fuse', 'bounce', 'sticky', 'explode'];
+    const PJ = ['kind', 'look', 'grav', 'life', 'radius', 'fuse', 'bounce', 'sticky', 'explode', 'pierce'];
     const sp = C.spawnProjectile;
     C.spawnProjectile = function (o) {
       const p = sp.call(C, o);
@@ -121,6 +121,12 @@
       const o = { owner: 'remote', dmg: 0, info: { src: 'explosion', remoteViz: true }, pos: V(...m.pos.$v), vel: V(...m.vel.$v) };
       for (const k of PJ) if (m[k] !== undefined) o[k] = m[k];
       o.life = Math.min(o.life || 6, 8);
+      // A nail goes no further than the first foe in its way, as it does on its shooter's screen (a picture flies through foes: it would stick in the
+      // wall behind one for its 4 s). Its line is taken straight; one that pierces goes on.
+      if (o.kind === 'nail' && !(o.pierce > 0) && G.enemies.raycast) {
+        const sp = o.vel.length();
+        if (sp > 0) { const hit = G.enemies.raycast(o.pos, o.vel.clone().divideScalar(sp), sp * o.life, o.radius || 0.12); if (hit && hit.t >= 0) o.life = Math.min(o.life, hit.t / sp); }
+      }
       K._pjNet = true;
       try { sp.call(C, o); } finally { K._pjNet = false; }
     };

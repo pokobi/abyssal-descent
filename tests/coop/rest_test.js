@@ -132,8 +132,67 @@ const PORT = +process.env.COOP_PORT || 9952;
       const hd2 = (0.8 - b[1].vol) * 80;
       check(Math.abs(hd2 - dist) < 2.5, `from how far off it was (the level says ${hd2.toFixed(1)} m, the guest stands ${dist.toFixed(1)} m off)`);
     }
+    // ---------------- 4. a guest's pointed shots drawn on the other screens (the host's, and a second guest's) ----------------
+    // a second guest comes in (a run under way)
+    const g2 = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest2${q}`); globalThis.__g2 = g2;
+    await g2.until('window.G && G.Coop && G.Coop.id >= 2 && G.game.run && G.world && G.Coop.fpOk !== undefined', 180000);
+    await g2.eval(off); await g2.running(undefined, 120000);
+    await g2.eval('G.game.dev = { god: true, speed: 1 }; ' + play);
+    await g2.until(`G.enemies.list.some((x) => x._nid === ${id} && x.alive)`, 15000).catch(() => {});
+    check(await g2.eval(`G.enemies.list.some((x) => x._nid === ${id} && x.alive)`), 'a second guest comes in and sees the test\'s foe');
+    // (every picture of someone else's shot made on a screen: the shot, and the life it was given)
+    const rec = `(() => { const L = G.combat.projectiles; window.__PJ = []; L.push = function (p) { if (p && p.owner === 'remote') window.__PJ.push({ p, life0: p.life }); return Array.prototype.push.apply(this, arguments); }; return 1; })()`;
+    await h.eval(rec); await g2.eval(rec);
+    // the guest's shot at the foe: from 6 m off its side, straight at it - or lobbed (t: the time it takes on its arc, its line straight
+    // ahead passing well over the foe)
+    const fire = (o) => g.eval(`(() => { const e = ${rep}, c = e.centerPos(), from = c.clone(); from.x += ${o.dx || 6}; from.y += ${o.dy || 0};
+      let v; if (${o.t || 0}) { v = c.clone().sub(from).divideScalar(${o.t || 1}); v.y += 0.5 * ${o.grav || 0} * ${o.t || 1}; } else v = c.clone().sub(from).normalize().multiplyScalar(${o.speed || 60});
+      const p = G.combat.spawnProjectile(Object.assign({ pos: from, vel: v, owner: 'player', dmg: 1, radius: 0.12, life: 6, info: { src: 'bullet' } }, ${JSON.stringify(o.pj)}));
+      window.__own = p; return JSON.stringify({ over: ${o.t ? `+(from.y + v.y * (c.x - from.x) / v.x - c.y).toFixed(2)` : 0} }); })()`);
+    const lastPic = async (pg, n0) => { await pg.until(`window.__PJ.length > ${n0}`, 5000).catch(() => {}); return JSON.parse(await pg.eval(`JSON.stringify(window.__PJ.length > ${n0} ? (() => { const r = window.__PJ[window.__PJ.length - 1]; return { kind: r.p.kind, life: +r.life0.toFixed(3), pierce: r.p.pierce || 0 }; })() : null)`)); };
+    const shots = [
+      { name: 'a crossbow bolt (no pierce)', pj: { kind: 'bolt', grav: 5, pierce: 0 }, speed: 95, cut: true },
+      { name: 'an arrow', pj: { kind: 'arrow', grav: 2, pierce: 0 }, speed: 70, cut: true },
+      { name: 'a harpoon', pj: { kind: 'harpoon', grav: 4, pierce: 0 }, speed: 85, cut: true },
+      { name: 'a stake (破甲杭: it bursts where it strikes)', pj: { kind: 'harpoon', grav: 1.5, pierce: 0, explode: 3, life: 3 }, speed: 70, cut: true },
+      { name: 'a nail', pj: { kind: 'nail', grav: 3, pierce: 0 }, speed: 140, cut: true },
+      { name: 'a lobbed arrow (its straight line passes over the foe)', pj: { kind: 'arrow', grav: 9.8, pierce: 0 }, dx: 9, t: 0.7, grav: 9.8, cut: true, arc: true },
+      { name: 'a crossbow bolt that pierces (2)', pj: { kind: 'bolt', grav: 5, pierce: 2 }, speed: 95, cut: false },
+      { name: 'a spear (it pierces all)', pj: { kind: 'spear', grav: 3, pierce: 99, life: 4 }, speed: 65, cut: false },
+    ];
+    for (const s of shots) {
+      const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
+      const info = JSON.parse(await fire(s));
+      const a = await lastPic(h, n0), b = await lastPic(g2, m0);
+      const ok = (x) => x && (s.cut ? x.life < (s.arc ? 0.85 : 0.3) && (!s.arc || x.life > 0.45) : x.life >= 2.5);
+      check(ok(a) && ok(b), `${s.name}: ${s.cut ? 'ends at the foe' : 'goes on through'} on the host and on the second guest (life ${a ? a.life : '-'} / ${b ? b.life : '-'} s${s.arc ? `; the straight line passes ${info.over} m over the foe's middle` : ''})`);
+      await sleep(250);
+    }
+    // a sticky shot sticks to the foe on the other screens too, and goes with it
+    {
+      const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
+      await fire({ pj: { kind: 'grenade', grav: 0, sticky: true, fuse: 2.5, explode: 0.5 }, speed: 30 });
+      await h.until(`window.__PJ.length > ${n0} && window.__PJ[window.__PJ.length - 1].p.stuck`, 5000).catch(() => {});
+      await g2.until(`window.__PJ.length > ${m0} && window.__PJ[window.__PJ.length - 1].p.stuck`, 5000).catch(() => {});
+      const hs = await h.eval(`(() => { const r = window.__PJ[window.__PJ.length - 1]; return !!r && r.p.stuck && r.p.stuckTo === window.__F; })()`);
+      const gs2 = await g2.eval(`(() => { const r = window.__PJ[window.__PJ.length - 1]; return !!r && r.p.stuck && !!r.p.stuckTo && r.p.stuckTo._nid === ${id}; })()`);
+      const own = await g.eval('!!(window.__own && window.__own.stuck && window.__own.stuckTo && window.__own.stuckTo._nid === ' + id + ')');
+      check(own && hs && gs2, `a sticky one sticks to the foe on the guest's own screen (${own}), on the host's (${hs}) and on the second guest's (${gs2})`);
+    }
+    // the way a pointed one is drawn: point first, the same on the screen it was fired on and on the others (combat.js NOSE_FWD)
+    {
+      const n0 = await h.eval('window.__PJ.length');
+      await fire({ pj: { kind: 'spear', grav: 0, pierce: 99, life: 4 }, dx: 14, speed: 20 });
+      await h.until(`window.__PJ.length > ${n0}`, 5000).catch(() => {});
+      await h.frames(4); await g.frames(4);
+      const way = 'const f = new THREE.Vector3(0, 0, -1).applyQuaternion(p.mesh.quaternion), v = p.vel.clone().normalize(); return [+f.dot(v).toFixed(3), !!p.headFwd];';
+      const hw = await h.eval(`(() => { const p = window.__PJ[window.__PJ.length - 1].p; ${way} })()`);
+      const gw = await g.eval(`(() => { const p = window.__own; ${way} })()`);
+      check(hw[0] > 0.95 && gw[0] > 0.95 && hw[1] && gw[1], `a spear is drawn point first on the guest's screen (${gw[0]}) and on the host's (${hw[0]})`);
+    }
+    for (const pg of [g2]) if (pg.errs.length) h.errs.push(...pg.errs.map((x) => 'g2: ' + x));
     check(!h.errs.length && !g.errs.length, 'no errors ' + h.errs.concat(g.errs).slice(0, 3).join(' | ').slice(0, 600));
-  } catch (e) { console.log('STOPPED: ' + e.message); for (const pg of [globalThis.__h, globalThis.__g]) if (pg) console.log('errs: ' + pg.errs.slice(0, 4).join(' | ').slice(0, 900)); throw e; } finally { ch.close(); srv.close(); }
+  } catch (e) { console.log('STOPPED: ' + e.message); for (const pg of [globalThis.__h, globalThis.__g, globalThis.__g2]) if (pg) console.log('errs: ' + pg.errs.slice(0, 4).join(' | ').slice(0, 900)); throw e; } finally { ch.close(); srv.close(); }
   console.log(fails.length ? `\nREST TEST FAILED (${fails.length})` : '\nREST TEST PASSED');
   process.exit(fails.length ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

@@ -117,18 +117,48 @@
       }
       return p;
     };
+    // A picture of someone else's shot flies through the foes on this screen (only its shooter's screen strikes them). A pointed one that
+    // does not pierce - a nail, a bolt, an arrow, a harpoon or stake, a spear - goes no further than the first foe in its way, as on its
+    // shooter's screen (it would stick in the wall behind it for 4 s); a sticky one sticks to that foe and goes with it. The first foe is
+    // looked for along its flight, its fall included, up to the first wall; one that moves on meanwhile is let be.
+    const ENDS = { nail: 1, bolt: 1, arrow: 1, harpoon: 1, spear: 1 };
+    const _a = V(), _b = V(), _d = V();
+    const firstFoe = (o) => {
+      const sp = o.vel.length(); if (!(sp > 0) || !G.enemies.raycast) return null;
+      const g = o.grav || 0, at = (t, out) => out.copy(o.pos).addScaledVector(o.vel, t).setY(o.pos.y + o.vel.y * t - 0.5 * g * t * t);
+      const step = Math.min(0.1, Math.max(1 / 60, 3 / sp));
+      for (let t = 0; t < o.life; t += step) {
+        const t1 = Math.min(o.life, t + step);
+        at(t, _a); at(t1, _b); _d.subVectors(_b, _a); const L = _d.length(); if (L < 1e-6) continue; _d.divideScalar(L);
+        const hit = G.enemies.raycast(_a, _d, L, o.radius || 0.12), wh = G.world.raycast(_a, _d, L);
+        if (hit && hit.t >= 0 && (!wh || hit.t <= wh.t)) return { t: t + (t1 - t) * hit.t / L, e: hit.e, p: _a.clone().addScaledVector(_d, hit.t) };
+        if (wh) return null;
+      }
+      return null;
+    };
+    const sticks = [];
     const putProjectile = (m) => {
       const o = { owner: 'remote', dmg: 0, info: { src: 'explosion', remoteViz: true }, pos: V(...m.pos.$v), vel: V(...m.vel.$v) };
       for (const k of PJ) if (m[k] !== undefined) o[k] = m[k];
       o.life = Math.min(o.life || 6, 8);
-      // A nail goes no further than the first foe in its way, as it does on its shooter's screen (a picture flies through foes: it would stick in the
-      // wall behind one for its 4 s). Its line is taken straight; one that pierces goes on.
-      if (o.kind === 'nail' && !(o.pierce > 0) && G.enemies.raycast) {
-        const sp = o.vel.length();
-        if (sp > 0) { const hit = G.enemies.raycast(o.pos, o.vel.clone().divideScalar(sp), sp * o.life, o.radius || 0.12); if (hit && hit.t >= 0) o.life = Math.min(o.life, hit.t / sp); }
-      }
+      const ends = ENDS[o.kind] && !(o.pierce > 0) && !o.bounce;
+      const f = ends || o.sticky ? firstFoe(o) : null;
+      if (f && ends && !o.sticky) o.life = Math.min(o.life, f.t);
+      let p;
       K._pjNet = true;
-      try { sp.call(C, o); } finally { K._pjNet = false; }
+      try { p = sp.call(C, o); } finally { K._pjNet = false; }
+      if (f && o.sticky && p) sticks.push({ p, e: f.e, t: f.t, off: f.p.clone().sub(f.e.centerPos()) });
+    };
+    // (a sticky picture reaching its foe: stuck to it, as combat.js sticks a real one)
+    const stickNow = () => {
+      for (let i = sticks.length - 1; i >= 0; i--) {
+        const s = sticks[i], p = s.p;
+        if (!C.projectiles.includes(p) || p.stuck) { sticks.splice(i, 1); continue; }
+        if (p.t < s.t) continue;
+        sticks.splice(i, 1);
+        if (!s.e.alive) continue;
+        p.stuck = true; p.stuckTo = s.e; p.stuckOff = s.off; p.pos.copy(s.e.centerPos()).add(s.off); p.mesh.position.copy(p.pos);
+      }
     };
     // ---------------- explosions ----------------
     const ex = C.explode;
@@ -275,6 +305,7 @@
     K.onFrame = function (dt) {
       if (base) base(dt);
       if (!K.live) return;
+      if (sticks.length) stickNow();
       sendT -= dt;
       sndN = 0;
       scanAuras();

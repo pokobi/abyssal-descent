@@ -487,6 +487,26 @@
   // a spasm: now and then the current jerks through the dead lineman (0..1; the same on every screen from its own clock)
   const spasm = (t) => { const P0 = 2.3, c = Math.floor(t / P0), s = 0.6 + 1.3 * fr(Math.sin(c * 12.9898 + 4.1) * 43758.5453), l = t - c * P0 - s; return l > 0 && l < 0.36 ? Math.sin((l / 0.36) * Math.PI) : 0; };
   const ZAP_T = 0.65;   // (the dead lineman: how long after it falls its charge goes)
+  // The small parts a body keeps as they are (gfx.js fuse melts only the materials it is given: the skin and the body's own cloth) put
+  // together joint by joint, one shape for each material - the same look in a fraction of the draws (the dead lineman was some 220 draws
+  // a body, twice a drowned man's). The shapes are the same for every body of the kind (built alike, in the same order): kept by where
+  // they are. keep: materials and meshes left alone (what fuse melts, what the model holds on to)
+  const MERGED = {};
+  function mergeParts(key, root, keep) {
+    const joints = []; root.traverse((o) => { if (!o.isMesh) joints.push(o); });
+    joints.forEach((g, gi) => {
+      const by = new Map();
+      for (const c of g.children) if (c.isMesh && !keep.has(c) && !keep.has(c.material) && !c.children.length && c.visible) { if (!by.has(c.material)) by.set(c.material, []); by.get(c.material).push(c); }
+      let mi = 0;
+      for (const [mat, list] of by) {
+        const k = key + '|' + gi + '|' + mi++ + '|' + list.length;
+        if (list.length < 2) continue;
+        const geo = MERGED[k] || (MERGED[k] = XG().merge(list.map((c) => { c.updateMatrix(); return c.geometry.clone().applyMatrix4(c.matrix); })));
+        for (const c of list) g.remove(c);
+        const m = new THREE.Mesh(geo, mat); m.castShadow = true; g.add(m);
+      }
+    });
+  }
 
   // 感電した作業員: a lineman killed by the current, still charged. A coverall gone stiff with soot and burnt through in places, one
   // sleeve burnt off at the elbow, bands of old reflective tape; a hard hat with a peak, its yellow faded and chipped; thick rubber
@@ -658,6 +678,7 @@
     part(spine, gk('ln_sc_neck', () => new THREE.CylinderGeometry(1, 1.1, 1, 18, 1, true, -2.7, 2.5)), scar, 0, th + 0.04, hu * th * 0.9 - 0.004, hu * 0.4, 0, 0, [0.055, 0.15, 0.06]);
     part(hd, gk('ln_sc_face', () => new THREE.SphereGeometry(1, 16, 10, 0.05, 1.25, 0.95, 1.0)), scar, 0, 0.122, -0.012, 0, 0, 0, [0.1, 0.112, 0.114]);
     part(arms[1].el, gk('ln_sc_arm', () => new THREE.CylinderGeometry(0.057, 0.043, al * 0.86, 18, 1, true)), scar, 0, -al * 0.48, 0.003);
+    mergeParts('ln', root, new Set([M.skin, M.sec, suit, rub]));
     return {
       J: Object.assign(Hm, { tag, scar }), h: Hm.h, r: 0.42, mats: [suit, rub],
       hits: [{ n: head, r: 0.15, part: 'head', o: V(0, 0.085, 0.012) }, { n: spine, r: 0.27, part: 'body', o: V(0, 0.32, 0) }, { n: hips, r: 0.22, part: 'body', o: V(0, -0.3, 0) }], orn: { head, back: spine, backZ: [-0.2, -0.2], backY: 0.42 },
@@ -1026,6 +1047,7 @@
     const fold = (f) => { a1.rotation.x = -1.48 + f * 1.95; a2.rotation.x = 2.98 - f * 1.75; a3.rotation.x = 0.12 + f * 0.25; };
     fold(0);
     const eye0 = M.eye;
+    mergeParts('rv', root, new Set([...beams, eye, beamM, amber]));
     return {
       J: { body, hatch, tracks, wheels, mast, pan, cam, lampJ, spin, domeJ, beams, arm0, a1, a2, a3, tip, cab, eye }, h: 1.12, r: 0.62, mats: [],
       hits: [{ n: cam, r: 0.1, part: 'head', o: V(0, 0, 0.02) }, { n: body, r: 0.4, part: 'body', o: V(0, 0.48, 0.22) }, { n: body, r: 0.4, part: 'body', o: V(0, 0.5, -0.3) }, { n: body, r: 0.26, part: 'body', o: V(-0.43, 0.22, 0) }, { n: body, r: 0.26, part: 'body', o: V(0.43, 0.22, 0) }],

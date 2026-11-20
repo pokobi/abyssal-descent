@@ -1151,21 +1151,24 @@
   // light, and the top is not to be cut to make them heavy): the push longer and bigger (lo, lt - short for a gun fired fast, so that
   // its lows do not pile up into a mud), bd dB the recording's own body lifted round bf Hz (150-400 Hz), bt the body ringing on after
   // the burst - the recording's 150-400 Hz thrown back at 7-85 ms (to 41 ms for a gun fired fast: bq). Heavier from the pistol up:
-  // pistol < smg < rifle < marksman's < shotgun, sniper's. md dB the middle (some 900 Hz) taken down, broad: the loudness is held
+  // pistol < smg < rifle < marksman's < shotgun, sniper's. Round 4 (heard as light still): the push falls to some 30 Hz (lf) and rises in
+  // la - the loudness is held K-weighted, which counts 30-40 Hz 6-8 dB under its level, so the push there takes little of the room the
+  // top and the body need, and rising after the burst it does not raise the take's peak; the body's returns on to 150 ms (RBT); the
+  // middle cut broader and deeper (md, round 850 Hz). md dB the middle taken down, broad: the loudness is held
   // where it was (K-weighted), and the low and the top could not both be more of it with the middle as it was
   const RP = {
-    pistol: { clip: 5, rate: 1, hs: 0, lo: 0.7, lf: [95, 55], lt: 0.055, bd: 6, bf: 240, bt: 0.32, md: 2, er: 1, ri: 0.3, gnd: 0.3, ro: 0.4, far: 'shot', frate: 1.08, sq: 'pistol' },
-    revolver: { clip: 9, rate: 1, hs: 5, hf: 2500, lo: 0.5, lf: [85, 48], lt: 0.07, bd: 8, bf: 210, bt: 0.45, md: 2, er: 1, ri: 0.34, gnd: 0.32, ro: 0.48, far: 'shot', frate: 1, sq: 'pistol' },
-    smg: { rate: 1, hs: 6, hf: 3000, lo: 0.55, lf: [105, 60], lt: 0.026, bd: 9, bf: 240, bt: 0.42, bq: 1, md: 3, er: 0.9, ri: 0.24, gnd: 0.28, ro: 0.32, far: 'auto', frate: 1.1, sq: 'smg' },
-    rifle: { rate: 1, hs: 4, hf: 3000, lo: 0.8, lf: [90, 52], lt: 0.07, bd: 6, bf: 215, bt: 0.4, md: 2, er: 1, ri: 0.3, gnd: 0.3, ro: 0.45, far: 'shot', frate: 1, sq: 'rifle' },
-    dmr: { rate: 1, hs: 9, lo: 0.95, lf: [85, 48], lt: 0.08, bd: 9, bf: 200, bt: 0.5, md: 5, er: 1, ri: 0.34, gnd: 0.32, ro: 0.5, far: 'shot', frate: 0.95, sq: 'rifle' },
-    sniper: { clip: 5, rate: 1, hs: 0, lo: 0.75, lf: [75, 42], lt: 0.1, bd: 10.5, bf: 185, bt: 0.7, md: 3, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.6, far: 'shot', frate: 0.9, sq: 'heavy' },
-    shotgun: { clip: 6.5, rate: 1, hs: 5, lo: 0.8, lf: [80, 45], lt: 0.09, bd: 7.5, bf: 180, bt: 0.52, md: 3, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.55, far: 'shotgun', frate: 1, sq: 'heavy' },
-    lmg: { clip: 6, rate: 1, hs: 4.5, hf: 2500, lo: 0.7, lf: [88, 50], lt: 0.045, bd: 8, bf: 200, bt: 0.36, bq: 1, md: 2.5, er: 0.95, ri: 0.28, gnd: 0.3, ro: 0.42, far: 'auto', frate: 0.95, sq: 'rifle' },
-    minigun: { rate: 1, hs: 3.5, lo: 0.65, lf: [110, 65], lt: 0.022, bd: 9, bf: 230, bt: 0.28, bq: 1, md: 2, er: 0.8, ri: 0.18, gnd: 0.26, ro: 0.26, far: 'auto', frate: 1.05, sq: 'smg' },
+    pistol: { clip: 5, rate: 1, hs: 1.5, lo: 1.2, lf: [62, 32], lt: 0.07, bd: 9, bf: 240, bt: 0.4, md: 11, er: 1, ri: 0.3, gnd: 0.3, ro: 0.4, far: 'shot', frate: 1.08, sq: 'pistol' },
+    revolver: { clip: 9, rate: 1, hs: 8, hf: 2500, lo: 1.25, lf: [56, 30], lt: 0.09, la: 0.012, bd: 11, bf: 210, bt: 0.6, md: 11, er: 1, ri: 0.34, gnd: 0.32, ro: 0.48, far: 'shot', frate: 1, sq: 'pistol' },
+    smg: { rate: 1, hs: 10.5, hf: 3000, lo: 1.8, lf: [66, 34], lt: 0.03, la: 0.01, bd: 11.5, bf: 240, bt: 0.5, bq: 1, md: 11, er: 0.9, ri: 0.24, gnd: 0.28, ro: 0.32, far: 'auto', frate: 1.1, sq: 'smg' },
+    rifle: { rate: 1, hs: 6.5, hf: 3000, lo: 2, lf: [58, 30], lt: 0.09, la: 0.012, bd: 9.5, bf: 215, bt: 0.55, md: 11, er: 1, ri: 0.3, gnd: 0.3, ro: 0.45, far: 'shot', frate: 1, sq: 'rifle' },
+    dmr: { rate: 1, hs: 13, lo: 3.1, lf: [55, 29], lt: 0.1, la: 0.012, bd: 12.5, bf: 200, bt: 0.65, md: 13, er: 1, ri: 0.34, gnd: 0.32, ro: 0.5, far: 'shot', frate: 0.95, sq: 'rifle' },
+    sniper: { clip: 7, rate: 1, hs: 5, lo: 1.75, lf: [52, 28], lt: 0.13, la: 0.012, bd: 12.5, bf: 185, bt: 0.85, md: 11, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.6, far: 'shot', frate: 0.9, sq: 'heavy' },
+    shotgun: { clip: 8, rate: 1, hs: 6.5, lo: 1.45, lf: [54, 29], lt: 0.12, la: 0.016, bd: 11.5, bf: 180, bt: 0.7, md: 11, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.55, far: 'shotgun', frate: 1, sq: 'heavy' },
+    lmg: { clip: 8, rate: 1, hs: 6, hf: 2500, lo: 1.7, lf: [60, 32], lt: 0.05, la: 0.012, bd: 12.5, bf: 200, bt: 0.45, bq: 1, md: 11, er: 0.95, ri: 0.28, gnd: 0.3, ro: 0.42, far: 'auto', frate: 0.95, sq: 'rifle' },
+    minigun: { rate: 1, hs: 5, lo: 1.15, lf: [70, 36], lt: 0.024, bd: 11, bf: 230, bt: 0.33, bq: 1, md: 10, er: 0.8, ri: 0.18, gnd: 0.26, ro: 0.26, far: 'auto', frate: 1.05, sq: 'smg' },
   };
   // (the body's returns after the burst: [ms after, level])
-  const RBT = [[7, 0.9], [15, 0.75], [26, 0.6], [41, 0.45], [60, 0.32], [85, 0.2]];
+  const RBT = [[7, 0.9], [15, 0.75], [26, 0.6], [41, 0.45], [60, 0.32], [85, 0.2], [112, 0.13], [148, 0.08]];
   // (from how far a shot begins to be the far recording, and by how far it is all of it (m) - see newShot)
   const RFAR = [12, 55];
   // (a room's early returns: [ms after, level, pan] - close stone all round, so many and soon, gone by some 35 ms)
@@ -1191,10 +1194,12 @@
     return n;
   }
   // (the push: a falling tone rising in 2 ms and dying in lt, run twice through a low-pass at 140 Hz - nothing of it over 150 Hz)
+  // (round 4: it rises in la (8 ms), not at once - its own peak then comes after the burst's sharp one instead of on it, and the take's
+  // peak is no higher for it: the push could be made bigger without the whole being turned down, its top with it)
   function pushIn(X, R, k, sr) {
-    const n = Math.min(X.length, Math.round(R.lt * 7 * sr)), a = Math.round(0.002 * sr), kd = Math.exp(-1 / (R.lt * sr)), kf = Math.exp(-1 / (0.025 * sr));
+    const n = Math.min(X.length, Math.round(R.lt * 7 * sr)), a = Math.max(1, Math.round((R.la === undefined ? 0.008 : R.la) * sr)), kd = Math.exp(-1 / (R.lt * sr)), kf = Math.exp(-1 / (0.025 * sr));
     let ph = 0, e = 1, q = 1;
-    for (let j = 0; j < n; j++) { ph += (2 * Math.PI * (R.lf[1] + (R.lf[0] - R.lf[1]) * q)) / sr; q *= kf; X[j] = Math.sin(ph) * (j < a ? j / a : e) * R.lo * k; if (j >= a) e *= kd; }
+    for (let j = 0; j < n; j++) { ph += (2 * Math.PI * (R.lf[1] + (R.lf[0] - R.lf[1]) * q)) / sr; q *= kf; const r = j < a ? Math.sin((Math.PI / 2) * (j / a)) : e; X[j] = Math.sin(ph) * r * r * R.lo * k; if (j >= a) e *= kd; }
     const Y = X.subarray(0, Math.min(X.length, n + Math.round(0.03 * sr))); bqRun(Y, 'lp', 140, 0.6, sr); bqRun(Y, 'lp', 140, 0.6, sr);
   }
   // the place's tail: two different returns, one on each side (wide, as a place answers from all round), from d0 s at level g; lp:
@@ -1240,8 +1245,8 @@
       for (let i = 0; i < n; i++) D[i] += X[i] * k;
       if (R.bt) for (const [ms, g] of RBT) { if (R.bq && ms > 41) break; const d = Math.round((ms * sr) / 1000), gg = g * R.bt; for (let i = 0; i + d < n; i++) D[i + d] += Y[i] * gg; }
     }
-    // (its middle taken down a little, broad round 900 Hz: the recording less so much of its own band there)
-    if (R.md && !far) { const X = work(2, n); for (let i = 0; i < n; i++) X[i] = D[i]; bqRun(X, 'bp', 900, 0.6, sr); const k = 1 - Math.pow(10, -R.md / 20); for (let i = 0; i < n; i++) D[i] -= X[i] * k; }
+    // (its middle taken down, broad round 850 Hz - some 350 Hz to 1.9 kHz: the recording less so much of its own band there)
+    if (R.md && !far) { const X = work(2, n); for (let i = 0; i < n; i++) X[i] = D[i]; bqRun(X, 'bp', 850, 0.45, sr); const k = 1 - Math.pow(10, -R.md / 20); for (let i = 0; i < n; i++) D[i] -= X[i] * k; }
     // (its top over 3.5 kHz lifted: the recording and so much more of its high-passed self)
     if (R.hs && !far) { const X = work(2, n); for (let i = 0; i < n; i++) X[i] = D[i]; bqRun(X, 'hp', R.hf || 3500, 0.7, sr); const k = Math.pow(10, R.hs / 20) - 1; for (let i = 0; i < n; i++) D[i] += X[i] * k; }
     for (let i = 0; i < n; i++) { L[i] = D[i]; Rr[i] = D[i]; H[i] = D[i]; }
@@ -1268,7 +1273,7 @@
     // (suppressed: the suppressed recording a little slower and its push bigger the heavier the gun, its top dulled - the can's own hiss
     // and the action's clatter in the recordings (the machine pistol's most of all) stood over the shot - and the place answering less;
     // a little of the weight too, the quiet kept: the push smaller, the body a little)
-    if (supp) { const w = (SUPP[kind] || [1])[0]; R = O({}, R, { rate: R.rate * (1.06 - 0.06 * w), hs: 0, lo: R.lo * 0.3 * w, bd: (R.bd || 0) * 0.7 + 1.5, bt: (R.bt || 0) * 0.6, md: 0, er: R.er * 0.6, ri: R.ri * 0.45, ro: R.ro * 0.35, gnd: R.gnd * 0.6, slp: RSLP[R.sq] }); }
+    if (supp) { const w = (SUPP[kind] || [1])[0]; R = O({}, R, { rate: R.rate * (1.06 - 0.06 * w), hs: 0, lo: R.lo * 0.08 * w, bd: (R.bd || 0) * 0.55 + 0.5, bt: (R.bt || 0) * 0.6, md: 7, er: R.er * 0.6, ri: R.ri * 0.45, ro: R.ro * 0.35, gnd: R.gnd * 0.6, slp: RSLP[R.sq] }); }
     // (a far shot is the far set's first, whatever the gun: far off one is not told from another)
     const set = supp ? 'gq_' + R.sq : far ? 'gd_' + R.far : 'gs_' + kind, kk = (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out'), ri = far ? 0 : rIdx(set, id);
     return { kind, p: O({}, old.p, { tail: 0, wet: old.p.wet * 0.6 }), R, recs: RLOAD(set, ri), ri, room, auto, far, supp, n: 'R', lvl: 0, kref: RKREF[kk] !== undefined ? RKREF[kk] : RKREF[kk.replace(':a', '')],
@@ -1818,7 +1823,7 @@
   A.headshot = function (kill) {
     if (!ctx) return;
     const t = hitT(), out = dest(null, 0.1, gunDry);
-    out.gain.value = kill ? 0.42 : 0.38;
+    out.gain.value = kill ? 0.47 : 0.43;
     nz({ t, f: [['bandpass', 5200, 1.4]], g: 1.1, d: 0.014, to: out });                // crack
     nz({ t, f: [['highpass', 4000]], g: 0.5, d: 0.009, to: out });
     for (let i = 0; i < 3; i++) nz({ t: t + 0.006 + i * 0.009, f: [['bandpass', vr(3300, 0.15), 3.5]], g: 0.5, d: 0.012, to: out }); // crunch

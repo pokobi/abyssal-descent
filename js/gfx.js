@@ -2806,6 +2806,45 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     for (let i = 0; i < ps.count; i++) { const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i), f = 0.8 + 0.34 * h(q(x), q(y), q(z)) + 0.06 * h(x * 9, y * 9, z * 9); ps.setXYZ(i, x * f * 0.6, y * f * 0.55, z * f * 0.6); }
     g.computeVertexNormals(); return [{ g: boxUV(g, 1.2), m: 'rock' }];
   };
+  // the ice spear (the skill's, the frost guardian's volleys and shards): a six-sided crystal, a sharp point ahead (-z) thickening
+  // toward a back broken off like ice, its faces flat (no rounding: a crystal's faces); its six faces of unlike widths, as grown. A few
+  // small spurs of ice grown out of its shaft, leaning back. [body + spurs, core]: the core a thin crystal inside, white, seen through
+  const iceCrystal = (rings, k, a, back, back2) => {
+    const P = [], tri = (p, q, s) => P.push(p[0], p[1], p[2], q[0], q[1], q[2], s[0], s[1], s[2]);
+    const at = (z, r, i) => [Math.cos(a[i % 6]) * r * k[i % 6], Math.sin(a[i % 6]) * r * k[i % 6], z];
+    const sl = back.slope || 0; back = back.map((d, i) => d + sl * Math.cos(a[i] - 0.6)); back2 = back2.map((d, i) => d + (i < 6 ? sl * 0.55 * Math.cos(a[i] - 0.6) : 0));   // (a break across it at a slant)
+    for (let j = 0; j + 1 < rings.length; j++) {
+      const [za, ra] = rings[j], [zb, rb] = rings[j + 1], last = j + 2 === rings.length;
+      for (let i = 0; i < 6; i++) {
+        const A0 = at(za, ra, i), A1 = at(za, ra, i + 1), B0 = at(zb + (last ? back[i] : 0), rb, i), B1 = at(zb + (last ? back[(i + 1) % 6] : 0), rb, i + 1);
+        if (ra > 0) tri(A0, A1, B0);
+        tri(A1, B1, B0);
+      }
+    }
+    // the broken end: the rim, an inner ring stepped in and out, a middle a little sunk
+    const [ze, re] = rings[rings.length - 1];
+    for (let i = 0; i < 6; i++) {
+      const L0 = at(ze + back[i], re, i), L1 = at(ze + back[(i + 1) % 6], re, i + 1), M0 = at(ze + back2[i], re * 0.55, i), M1 = at(ze + back2[(i + 1) % 6], re * 0.55, i + 1), C = [re * 0.08, -re * 0.05, ze + back2[6]];
+      tri(L0, L1, M0); tri(L1, M1, M0); tri(M0, M1, C);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals(); return g;
+  };
+  SHOT.icespear = () => {
+    const k = [1.0, 0.84, 1.1, 0.92, 1.05, 0.88], a = [0, 0.07, -0.05, 0.04, -0.08, 0.05].map((d, i) => i * Math.PI / 3 + d);
+    const R = [[-1.0, 0], [-0.8, 0.04], [-0.5, 0.068], [0.0, 0.095], [0.45, 0.115], [0.74, 0.125]], rAt = (z) => { for (let j = 1; j < R.length; j++) if (z <= R[j][0]) return R[j - 1][1] + (R[j][1] - R[j - 1][1]) * (z - R[j - 1][0]) / (R[j][0] - R[j - 1][0]); return R[R.length - 1][1]; };
+    const bk = [0.03, -0.035, 0.05, -0.01, 0.02, -0.04]; bk.slope = 0.13;
+    const body = iceCrystal(R, k, a, bk, [-0.03, 0.025, -0.05, 0.03, -0.02, 0.01, -0.01]);
+    // spurs: on a face (between two corners), leaning out and back, of unlike sizes
+    const spurs = [[-0.32, 0, 0.09, 0.017], [-0.06, 3, 0.13, 0.022], [0.16, 1, 0.1, 0.018], [0.36, 4, 0.17, 0.028], [0.55, 2, 0.12, 0.023]].map(([z, i, h, r]) => {
+      const c0 = Math.cos(a[i]) * k[i], s0 = Math.sin(a[i]) * k[i], c1 = Math.cos(a[(i + 1) % 6]) * k[(i + 1) % 6], s1 = Math.sin(a[(i + 1) % 6]) * k[(i + 1) % 6];
+      const rr = rAt(z), bx = (c0 + c1) * 0.5 * rr * 0.92, by = (s0 + s1) * 0.5 * rr * 0.92;
+      const out = new THREE.Vector3(bx, by, 0).normalize(), d = out.multiplyScalar(0.62).add(new THREE.Vector3(0, 0, 0.78)).normalize();
+      const g = new THREE.ConeGeometry(r, h, 3).toNonIndexed(); g.rotateY(i * 0.7); g.translate(0, h * 0.5 - r * 0.6, 0);
+      g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d)); g.translate(bx, by, z); g.computeVertexNormals(); return g;
+    });
+    const core = iceCrystal([[-0.86, 0], [-0.6, 0.022], [0.0, 0.04], [0.6, 0.048]], [1, 0.9, 1.05, 0.95, 1.0, 0.92], a, [0.02, -0.02, 0.03, 0, 0.01, -0.03], [0, 0, 0, 0, 0, 0, 0]);
+    return [{ g: Geo.merge([body].concat(spurs)), m: 'iceBody' }, { g: core, m: 'iceCore' }];
+  };
   X.shotGeo = function (kind) { if (shotC[kind] !== undefined) return shotC[kind]; let r = null; try { r = SHOT[kind] ? SHOT[kind]() : null; } catch (e) { console.warn('gfx: no shot', kind, e); (X.gearErr = X.gearErr || {})['shot_' + kind] = String(e); r = null; } return (shotC[kind] = r); };
   X.foeGear = function (name) { if (gearC[name] !== undefined) return gearC[name]; let r = null; try { r = GEAR[name] ? GEAR[name]() : null; } catch (e) { console.warn('gfx: no gear', name, e); r = null; } return (gearC[name] = r); };
 

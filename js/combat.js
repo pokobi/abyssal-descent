@@ -792,7 +792,7 @@
     const glow = (c, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.spr.soft, color: G.fx.tone ? G.fx.tone(c) : c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.setScalar(s); g.add(sp); return sp; };
     // (the shots that are things - a rocket, a shell, an arrow, a nail, a harpoon, a spear, a boulder - are shaped in gfx.js shotGeo;
     // their glows are as they were. Without those shapes, the rods and cones below)
-    const SG = G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo(kind) : null;
+    const SG = kind !== 'icespear' && G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo(kind) : null;   // (the ice spear's shape is from there too, in its own ice below)
     if (SG) {
       for (const q of SG) { const mm = add(q.g, mats[q.m] || mats.iron, 1, 1, 1); mm.castShadow = true; }
       if (kind === 'rocket') glow(0xffa050, 0.6).position.z = 0.35; else if (kind === 'spear') glow(0xffe0a0, 0.5).position.z = -1;
@@ -810,7 +810,10 @@
       case 'sickle': { if (!C._sickGeo) C._sickGeo = new THREE.TorusGeometry(0.42, 0.06, 4, 14, Math.PI * 1.25); const b = new THREE.Mesh(C._sickGeo, mats.iron); g.add(b); add(PG.box, mats.woodDark, 0.05, 0.42, 0.05, 0.42, -0.2, 0); glow(0xff8030, 0.5); break; } // (the scarecrow's: spun as it flies)
       case 'spear': add(PG.cyl8, mats.woodDark, 0.03, 1.8, 0.03, 0, 0, 0, Math.PI / 2); add(PG.cone, mats.iron, 0.07, 0.35, 0.07, 0, 0, -1.05, -Math.PI / 2); glow(0xffe0a0, 0.5).position.z = -1; break;
       // the magic ones: a body you can see (boiling fire, a fresnel shell, a crystal) inside the glow; the hit size is SHOT_VIS below
-      case 'icespear': { add(PG.oct3, new THREE.MeshStandardMaterial({ color: 0xd4e0e8, emissive: 0x2a3e4a, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.9 }), 0.14, 0.14, 1.0); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0.05, 0.05, 0.7); glow(0xbfe8ff, 1.0); break; }
+      case 'icespear': { // a crystal of ice (gfx.js shotGeo): clear pale ice about a white core, its edges and cracks catching blue light
+        const IG = G.GFX && G.GFX.shotGeo ? G.GFX.shotGeo('icespear') : null, ice = new THREE.MeshStandardMaterial({ color: 0x9cb8cc, emissive: 0x1a3046, emissiveIntensity: 0.8, roughness: 0.04, metalness: 0.15, transparent: true, opacity: 0.58, depthWrite: false });
+        if (IG) { add(IG[1].g, new THREE.MeshBasicMaterial({ color: 0xf2f8fc }), 1, 1, 1); add(IG[0].g, ice, 1, 1, 1); const rim = new THREE.Mesh(IG[0].g, G.vfx.shellMat(0x5c7c94, 0xd0dee8, 'ice')); rim.scale.setScalar(1.015); g.add(rim); glow(0xa8c8dc, 0.55); break; }
+        add(PG.oct3, new THREE.MeshStandardMaterial({ color: 0xd4e0e8, emissive: 0x2a3e4a, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.9 }), 0.14, 0.14, 1.0); add(PG.oct3, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0.05, 0.05, 0.7); glow(0xbfe8ff, 1.0); break; }
       case 'orb': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6a5e68, 0xb0a4ac, 'energy')); sh.scale.setScalar(0.32); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x9a8e96 }), 0.12, 0.12, 0.12); glow(0xc070ff, 0.5); break; }
       case 'soul': { const sh = new THREE.Mesh(G.vfx.geo.sph, G.vfx.shellMat(0x6ab8ff, 0xe0f4ff, 'energy')); sh.scale.setScalar(0.28); g.add(sh); add(PG.sph, new THREE.MeshBasicMaterial({ color: 0x8a96a2 }), 0.1, 0.1, 0.1); glow(0x9fd8ff, 0.4); break; }
       case 'fireball': { const fb = new THREE.Mesh(G.vfx.geo.sph, G.vfx.fireMat()); fb.scale.setScalar(0.42); g.add(fb); glow(0xff8a30, 1.3); glow(0xffe0a0, 0.4); break; }
@@ -877,7 +880,7 @@
   // the shapes that have a point (gfx.js shotGeo, and the rods of projMesh), all with it to -z: the number is how much of the drawn
   // shape lies ahead of its middle less how deep its point goes in when it sticks in a wall (the middle is where it met the wall: the
   // drawing is drawn back by this along its own length, so that only the point is in; a nail goes in nearly to its head)
-  const NOSE_FWD = { rocket: 0, grenade: 0, bolt: 0.31, arrow: 0.31, nail: -0.035, harpoon: 0.42, spear: 1.0 };
+  const NOSE_FWD = { rocket: 0, grenade: 0, icespear: 0, bolt: 0.31, arrow: 0.31, nail: -0.035, harpoon: 0.42, spear: 1.0 };
   // the drawn way of a shot off the hand (spawnProjectile): from the hand, onto its own way, smoothly (at its own speed from the first)
   const VIS_K = { spear: [1.6, 1], harpoon: [1.25, 1], icespear: [1.5, 0.75], fireball: [1.15, 0.3], waterorb: [1.0, 0.45], darkorb: [1.0, 0.45], mine: [1.5, 0.45], def: [0.9, 1] };
   function visStep(p) {

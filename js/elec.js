@@ -112,6 +112,7 @@
     (w.elec.zones || []).forEach((s, k) => mk('zone', s, k));
     (w.elec.arcs || []).forEach((s, k) => mk('arc', s, k));
     if (E.list.length && G.sfx.elecPrep) G.sfx.elecPrep(); // (the running sounds' loops written now, not at the first surge)
+    if (E.list.length && G.sfx.plantFoePrep) G.sfx.plantFoePrep(); // (and its own foes' and drums' sounds, a little at a time behind the black screen: audio.js)
   };
   // the switch box: a shot-only collider a little larger than the box the field drew (so a shot meets it first), a sphere for blows and
   // blasts, and the red lamp on its face (dark until its device is live). b.y: the box's middle; ry: the way its face looks

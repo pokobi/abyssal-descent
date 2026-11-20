@@ -2663,6 +2663,7 @@
     A.chain(dur * 0.8, 0.35);
   };
   A.breakObj = function (pos, mat) {
+    if (mat === 'metal') { A.drumBreak(pos); return; }   // (the power station's steel drums: the only things of metal that break, field_plant.js)
     if (!ctx || smp('break_' + (mat === 'wood' || mat === 'ceramic' ? mat : 'stone'), pos, 0.8, 1, 0.4)) return;
     const t = ctx.currentTime, out = dest(pos, 0.4);
     // shards / rubble: n pieces landing over sp seconds, each a strike of one set of notes (a set per size)
@@ -3810,4 +3811,62 @@
     fxPlay('pf:' + kind, d[0], d[1], d[3], d[2], pos || null, 0.3, null, 12000);
   };
   A.plantFoeNet = function (pos, kind) { A.plantFoe(pos, kind); };   // (the same: an attack's, which fxsync.js sends to the other players)
+  // A steel drum of the power station broken (field_plant.js; combat.js breakDestructible gives its material, 'metal'): its thin side
+  // buckling in with a hollow knock (the low thump of the panel, the shell ringing), a second pop as it caves, the thud of it going over,
+  // the lid sprung off - its clang, then rattling down faster and faster as it settles - and what was in it glugging out and running
+  const DRUMS = [3, 1.5, 0.19, (L, R, sr, at) => {
+    const shell = () => [[vr(235, 0.06), 0.5, 0.32], [vr(400, 0.06), 0.42, 0.28], [vr(660, 0.06), 0.3, 0.2], [vr(1080, 0.06), 0.2, 0.14], [vr(1720, 0.06), 0.12, 0.09], [vr(2600, 0.06), 0.06, 0.06]];
+    lowIn(L, R, 0, 190, 92, 0.05, 0.85, sr); thudIn(L, R, 0, 700, 0.022, 0.9, sr); ringIn(L, R, at(0.002), shell(), 0.55, 1, -0.1, sr); slideIn(L, R, at(0.004), 1800, 3600, 0.06, 0.25, 0, sr);
+    const t2 = vr(0.085, 0.25); lowIn(L, R, at(t2), 150, 85, 0.035, 0.45, sr); ringIn(L, R, at(t2), shell().map((m) => [m[0] * 1.08, m[1], m[2] * 0.6]), 0.3, 0.7, 0.15, sr);
+    const t3 = vr(0.27, 0.15); thudIn(L, R, at(t3), 400, 0.03, 1, sr); lowIn(L, R, at(t3), 110, 55, 0.06, 0.6, sr); ringIn(L, R, at(t3 + 0.003), shell().map((m) => [m[0] * 0.95, m[1] * 0.7, m[2]]), 0.25, 0.6, 0, sr);
+    // (the lid: sprung off, its clang, then on its rim rattling down faster and faster)
+    const tl = t3 + vr(0.05, 0.3), lid = [[vr(830, 0.05), 0.5, 0.18], [vr(1960, 0.05), 0.3, 0.11], [vr(3350, 0.05), 0.16, 0.06]], pan = Math.random() * 0.8 - 0.4;
+    ringIn(L, R, at(tl), lid, 0.4, 1, pan, sr);
+    let tt = tl + 0.16, gap = 0.11, g = 0.22; while (tt < 1.38 && gap > 0.012) { ringIn(L, R, at(tt), lid.map((m) => [m[0] * vr(1, 0.02), m[1], m[2] * 0.4]), g, 0.5, pan, sr); tt += gap; gap *= 0.84; g *= 0.93; }
+    // (what was in it: glugs as it runs out, and the pour)
+    slideIn(L, R, at(t3 + 0.08), 380, 900, 0.9, 0.3, -pan * 0.5, sr);
+    for (let i = 0, t = t3 + 0.1; i < 6 && t < 1.35; i++, t += vr(0.12, 0.4)) {
+      const n = Math.min(L.length - at(t), Math.round(0.07 * sr)), f0 = vr(190, 0.3), gg = 0.3 * (1 - i / 7);
+      for (let j = 0, ph = 0; j < n; j++) { const u = j / n; ph += (2 * Math.PI * f0 * (1 + u * 1.1)) / sr; const v = Math.sin(ph) * Math.sin(Math.PI * u) * gg; L[at(t) + j] += v; R[at(t) + j] += v; }
+    }
+  }];
+  A.drumBreak = function (pos) {
+    if (!ctx || !voice(DRUMS[1])) return;
+    fxPlay('drum:break', DRUMS[0], DRUMS[1], DRUMS[3], DRUMS[2], pos || null, 0.4, null, 12000);
+  };
+  // The takes of a sound written ahead, not played: as fxPlay writes them (the same build, the same levelling to its peak), up to its
+  // count. Returns whether there was one left to write
+  function fxTake(key, n, secs, build, lp) {
+    const set = fxSets[key] || (fxSets[key] = []);
+    if (set.length >= n) return false;
+    const sr = ctx.sampleRate, b = ctx.createBuffer(2, Math.max(1, Math.round(secs * sr)), sr), L = b.getChannelData(0), R = b.getChannelData(1);
+    build(L, R, sr, (x) => Math.round(x * sr));
+    if (lp) for (const c of [L, R]) { bqRun(c, 'lp', lp, 0.7, sr); bqRun(c, 'lp', lp, 0.7, sr); }
+    let pk = 0; for (let i = 0; i < L.length; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
+    for (let i = 0; i < L.length; i++) { L[i] /= pk || 1; R[i] /= pk || 1; }
+    set.push(b);
+    return true;
+  }
+  // The power station's own sounds (its two foes', its drums') written ahead when one of its areas is made (elec.js setup, behind the
+  // black screen while the area's shaders are made): written as they were first played, each first few took up to 25 ms on the spot - the
+  // first wind-up, the first fall. Written a little at a time (a take or two, some 4 ms, then 16 ms left to the page: longer slices held
+  // the black screen up, the warm-up's own checks waiting behind them), so neither the black screen nor play is held up; one
+  // asked for meanwhile is written as before. A.prepStats: how long it took in all, in how many slices
+  A.prepStats = { plant: null };
+  let prepping = false;
+  A.plantFoePrep = function () {
+    if (!ctx || prepping) return;
+    const jobs = Object.keys(PFS).map((k) => ['pf:' + k, PFS[k][0], PFS[k][1], PFS[k][3]]).concat([['drum:break', DRUMS[0], DRUMS[1], DRUMS[3]]]);
+    if (jobs.every((j) => (fxSets[j[0]] || []).length >= j[1])) return;
+    prepping = true;
+    const st = A.prepStats.plant = { ms: 0, slices: 0, takes: 0, start: performance.now(), end: 0 };
+    let i = 0;
+    const slice = () => {
+      const t0 = performance.now();
+      try { while (i < jobs.length && performance.now() - t0 < 4) { const [k, n, secs, build] = jobs[i]; if (fxTake(k, n, secs, build, 12000)) st.takes++; else i++; } } catch (e) { i = jobs.length; }
+      st.ms += performance.now() - t0; st.slices++;
+      if (i < jobs.length) setTimeout(slice, 16); else { prepping = false; st.end = performance.now(); st.ms = +st.ms.toFixed(1); }
+    };
+    setTimeout(slice, 0);
+  };
 })();

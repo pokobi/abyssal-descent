@@ -1540,6 +1540,8 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const k = Math.floor(hsh(x, z, 130) * 8);
     w0.deferred.push((grp) => { const g = drumMesh(w0, x, y, z, explosive, k); grp.add(g); d.mesh = g; });
     d.plantDrum = true; d.mat = 'metal'; d.surf = 'metal'; if (d.col) d.col.surf = 'metal';
+    // (what any screen that sees it broken leaves: its shards in steel, and the crushed drum with its oil - drumRemains)
+    d.shards = 'prust'; d.remains = drumRemains;
     return d;
   }
   // (a drum broken: the shards in steel - the world's wooden material swapped for the call only - then the crushed drum and its oil left)
@@ -1551,16 +1553,22 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       const M = G.world.mats, own = Object.prototype.hasOwnProperty.call(M, 'wood'), wd = M.wood;
       M.wood = M.prust || wd;
       try { b0.apply(this, arguments); } finally { if (own) M.wood = wd; else delete M.wood; }
+      drumRemains(d);
+    };
+    C.breakDestructible._plant = true;
+  };
+  // (the crushed drum, its lid knocked off and its oil, left on the floor where the drum stood)
+  function drumRemains(d) {
+      if (!d || !G.world) return;
+      const M = G.world.mats;
       try {
-        const g = new THREE.Group(), body = new THREE.Mesh(drumGeo(), M.prust); body.scale.set(1.15, 0.3, 0.8); body.rotation.set(0.5, Math.random() * 6, 0.25); body.position.y = 0.12; g.add(body);
+        const g = new THREE.Group(), body = new THREE.Mesh(drumGeo(), M.prust); g.name = 'drumRemains'; body.scale.set(1.15, 0.3, 0.8); body.rotation.set(0.5, Math.random() * 6, 0.25); body.position.y = 0.12; g.add(body);
         const lid = new THREE.Mesh(cylG(16), M.pcast); lid.scale.set(DRUM_R, 0.02, DRUM_R); lid.position.set(0.6, 0.02, -0.3); lid.rotation.set(0.1, 0, 0.12); g.add(lid);
         const oil = new THREE.Mesh(gk('oilQuad', () => { const g2 = new THREE.PlaneGeometry(1, 1); g2.rotateX(-Math.PI / 2); const uv = g2.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.25, 0.5 + uv.getY(i) * 0.5); return g2; }), GC.oilMat || (GC.oilMat = (() => { const m = GC.decalMat.clone(); m.opacity = 0.55; m.color.setRGB(0.7, 0.68, 0.66); return m; })())); oil.scale.set(1.8, 1, 1.5); oil.position.y = 0.01; g.add(oil);
         g.position.set(d.pos.x, d.col ? d.col.y0 : d.pos.y - 0.5, d.pos.z); g.traverse((o) => { if (o.isMesh) { o.castShadow = o !== oil; o.receiveShadow = true; } });
         G.world.group.add(g);
       } catch (e) { /* (the remains are only looks) */ }
-    };
-    C.breakDestructible._plant = true;
-  };
+  }
   const PR0 = {};
   const withLamps = (fn) => { const PR = G.Props, t0 = PR.torch, b0 = PR.brazier, c0 = PR.chandelier, br0 = PR.barrel, bn0 = PR.banner; PR0.barrel = br0; PR.torch = elTorch; PR.brazier = elBrazier; PR.chandelier = elChandelier; PR.barrel = elBarrel; PR.banner = elBanner; try { return fn(); } finally { PR.torch = t0; PR.brazier = b0; PR.chandelier = c0; PR.barrel = br0; PR.banner = bn0; } };
   // (a cloth banner: a works has none - a warning plate on the wall where it would hang)

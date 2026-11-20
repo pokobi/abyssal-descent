@@ -33,7 +33,7 @@ const openAt = async (ch, url) => { if (!PIN) return ch.page(url); const pg = aw
       const pg = await openAt(ch, `http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`);
       await pg.booted(240000);
       try { await pg.until('window.G && G.Coop && G.Coop.id >= 1', 60000); g = pg; } catch (e) {
-        console.log('      (the guest did not get into the room: opened again) ' + await pg.eval('JSON.stringify({ id: G.Coop.id, n: G.Coop.players.size })').catch(() => '?') + ' / host ' + await h.eval('JSON.stringify({ players: [...G.Coop.players.keys()], seen: document.visibilityState })'));
+        console.log('      (the guest did not get into the room: opened again) ' + await pg.eval('JSON.stringify({ id: G.Coop.id, n: G.Coop.players.size, ver: window.COOP_VER, said: G.Coop.lobbyEl ? G.Coop.lobbyEl.textContent.replace(/\s+/g, " ").slice(-80) : "" })').catch(() => '?') + ' host ver ' + await h.eval('window.COOP_VER') + ' / host ' + await h.eval('JSON.stringify({ players: [...G.Coop.players.keys()], seen: document.visibilityState })'));
         await pg.close();
         // (the host's page, behind the newer ones, may have been frozen by the browser: a frozen page hears nothing. It is woken and brought to the front)
         await h.send('Page.bringToFront'); await h.send('Page.setWebLifecycleState', { state: 'active' }); await sleep(500);

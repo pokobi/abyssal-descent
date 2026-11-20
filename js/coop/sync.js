@@ -180,7 +180,9 @@
       const d = G.world.destructibles[m.i]; if (!d || !d.alive) return;
       const mats = G.world.mats;
       C.removeDestructibleSilent(d);
-      G.fx.debris(d.pos, d.mat === 'ceramic' ? mats.ceramic : mats.wood, d.type === 'urn' ? 10 : 12, d.type === 'urn' ? 0.12 : 0.2, 6);
+      // (a thing that says what it breaks into and what it leaves - the works' steel drums: field_plant.js - does so here too)
+      G.fx.debris(d.pos, (d.shards && mats[d.shards]) || (d.mat === 'ceramic' ? mats.ceramic : mats.wood), d.type === 'urn' ? 10 : 12, d.type === 'urn' ? 0.12 : 0.2, 6);
+      if (d.remains) { try { d.remains(d); } catch (e) { console.error(e); } }
       G.fx.dust(d.pos, null, 0x7a6a50, 6);
       G.sfx.breakObj(d.pos, d.mat);
       if (d.explosive) { const dd = P.pos.distanceTo(d.pos); if (dd < 4) C.damagePlayer(25 * (1 - dd / 4), { src: 'explosion', pos: d.pos }); }

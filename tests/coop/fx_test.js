@@ -86,12 +86,20 @@ const PORT = +process.env.COOP_PORT || 9011;
     // (the one hurt: mortal, and nothing of its own between it and the blow - no time unhurt, no overshield (a crystal picked up, a perk),
     // no shield of a skill: a friend's grenade is 2% of its damage, a couple of points, and an overshield took all of it. Still, so that
     // where the other screen sees it is where it is; the health looked at until it drops, not once after a set time)
+    // (what came of a blast on each page - a friend's blast heard ('x'), every blow worked out and what it did - told if a check fails)
+    const xlog = `(() => { if (window.__xl) return 1; window.__xl = []; const K = G.Coop, C = G.combat, P = G.player;
+      const fx = K.handlers.fx; K.handlers.fx = function (m) { for (const e of m.e || []) if (e[0] === 'x') window.__xl.push({ x: e[1], d: +P.pos.distanceTo(new THREE.Vector3(...e[1].p)).toFixed(2), ff: K.ff, st: G.game.state }); return fx.apply(this, arguments); };
+      const dp = C.damagePlayer; C.damagePlayer = function (a, i) { const s = { hp: +P.hp.toFixed(1), os: P.os, inv: P.invulnT, st: G.game.state, god: !!(G.game.dev && G.game.dev.god), dead: P.dead }; const r = dp.apply(this, arguments); window.__xl.push({ dp: +(+a).toFixed(2), r, src: i && i.src, s, hp1: +P.hp.toFixed(1) }); return r; };
+      return 1; })()`;
+    await h.eval(xlog); await g.eval(xlog);
+    const told = async (pg) => pg.eval('JSON.stringify(window.__xl.slice(-6))');
     const bare = 'G.game.dev = { god: false, speed: 1 }; (() => { const P = G.player; P.invulnT = 0; P.os = 0; P.tShields = []; P.vel.set(0, 0, 0); P.hp = P.stats.maxHp; window.__hp = P.hp; return 1; })()';
     const seenAt = async (pg, other, id) => { const p = JSON.parse(await pg.eval('JSON.stringify(G.player.pos)')); await other.until(`G.Coop.players.get(${id}).to.distanceTo(new THREE.Vector3(${p.x}, ${p.y}, ${p.z})) < 0.8`, 5000).catch(() => {}); };
     await g.eval(bare);
     await seenAt(g, h, 1);
     await h.eval("(() => { const p = G.Coop.players.get(1).to.clone(); G.combat.explode(p, 5, 120, { src: 'explosion', grenade: true }); })(); 1");
     await g.until('G.player.hp < window.__hp', 5000).catch(() => {});
+    if (!(await g.eval('G.player.hp < window.__hp'))) console.log('      guest: ' + await told(g) + ' / host: ' + await told(h));
     check(await g.eval('G.player.hp < window.__hp'), 'a grenade of someone else that goes off beside you hurts you');
     check(+(await g.eval('window.__fx')) >= 1, 'its explosion is drawn on the guest screen');
     // ---- every kind of projectile the game has, thrown by the host: each one is drawn on the guest with no error
@@ -116,6 +124,7 @@ const PORT = +process.env.COOP_PORT || 9011;
     await seenAt(h, g, 0);
     await g.eval("(() => { const p = G.Coop.players.get(0).to.clone(); G.combat.explode(p, 5, 120, { src: 'explosion', grenade: true }); })(); 1");
     await h.until('G.player.hp < window.__hp', 5000).catch(() => {});
+    if (!(await h.eval('G.player.hp < window.__hp'))) console.log('      host: ' + await told(h) + ' / guest: ' + await told(g));
     check(await h.eval('G.player.hp < window.__hp'), 'and the guest grenade hurts the host');
     await h.eval('G.game.dev = { god: true, speed: 1 }; 1');
     // ---- zones and auras of the other player: nothing breaks, nothing stays

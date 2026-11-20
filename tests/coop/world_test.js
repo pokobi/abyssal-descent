@@ -76,6 +76,25 @@ const secs = +process.argv[2] || 5;
     }
     check(doorDone, 'a door was found to test');
     check(destDone, 'a breakable thing was found to test');
+    // ---- the works' steel drums (廃発電所, field_plant.js): one broken on either screen leaves its crushed drum and oil on the other too
+    {
+      const pin = "G.Run.field = () => 'plant'; G.Run.legacy = false; 1";
+      await h.eval(pin); await g.eval(pin);
+      await go(8, 'combat');
+      await sleep(300);
+      const drums = JSON.parse(await h.eval("JSON.stringify(G.world.destructibles.map((d, i) => d.alive && d.plantDrum && !d.explosive ? i : -1).filter((i) => i >= 0))"));
+      check(await h.eval('G.world.field') === 'plant' && drums.length >= 2, `two of the works' drums to break (${await h.eval('G.world.field')}: ${drums.length})`);
+      if (drums.length >= 2) {
+        const left = (pg, i) => pg.eval(`(() => { const d = G.world.destructibles[${i}]; return G.world.group.children.some((c) => c.name === 'drumRemains' && Math.hypot(c.position.x - d.pos.x, c.position.z - d.pos.z) < 0.1); })()`);
+        await g.eval(`G.combat.breakDestructible(G.world.destructibles[${drums[0]}]); 1`);
+        await h.until(`G.world.destructibles[${drums[0]}].alive === false`, 5000).catch(() => {});
+        check(await g.eval(`G.world.destructibles[${drums[0]}].alive === false`) && await left(g, drums[0]), 'a drum the guest breaks leaves its crushed drum on the guest\'s screen');
+        check(await h.eval(`G.world.destructibles[${drums[0]}].alive === false`) && await left(h, drums[0]), 'and on the host\'s');
+        await h.eval(`G.combat.breakDestructible(G.world.destructibles[${drums[1]}]); 1`);
+        await g.until(`G.world.destructibles[${drums[1]}].alive === false`, 5000).catch(() => {});
+        check(await left(h, drums[1]) && await g.eval(`G.world.destructibles[${drums[1]}].alive === false`) && await left(g, drums[1]), 'a drum the host breaks leaves its crushed drum on the guest\'s screen too');
+      }
+    }
     // ---- getting a teammate up
     await h.eval('G.game.dev = { god: false, speed: 1 }; 1'); await g.eval('G.game.dev = { god: false, speed: 1 }; 1');
     await sleep(200);

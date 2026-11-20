@@ -28,7 +28,7 @@ exports.launch = async function (port) {
   // one a browser still holds is left)
   try { const T = os.tmpdir(), old = Date.now() - 6 * 3600e3; for (const n of fs.readdirSync(T)) if (n.startsWith('abyss-cdp-')) { const q = path.join(T, n); try { if (fs.statSync(q).mtimeMs < old) fs.rmSync(q, { recursive: true, force: true }); } catch (e) { /* in use */ } } } catch (e) { /* nothing to tidy */ }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'abyss-cdp-'));
-  const ch = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--mute-audio', '--no-first-run', ...GPU_ARGS, '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--window-size=480,300', 'about:blank'], { stdio: 'ignore' });
+  const ch = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--mute-audio', '--no-first-run', ...GPU_ARGS, '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling', '--window-size=480,300', 'about:blank'], { stdio: 'ignore' });
   let ver = null;
   for (let i = 0; i < 60 && !ver; i++) { await sleep(250); try { ver = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json(); } catch (e) { /* still starting */ } }
   if (!ver) throw new Error('chrome did not start');
@@ -47,6 +47,8 @@ exports.launch = async function (port) {
       };
       const send = (method, params) => new Promise((r) => { const i = ++id; wait.set(i, r); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
       await send('Runtime.enable'); await send('Page.enable'); await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      // (a page behind the others is never frozen by the browser: a frozen page runs nothing and hears nothing - BroadcastChannel included)
+      await send('Page.setWebLifecycleState', { state: 'active' });
       if (process.env.COOP_W) await send('Emulation.setDeviceMetricsOverride', { width: +process.env.COOP_W, height: +process.env.COOP_H, deviceScaleFactor: 1, mobile: false });
       await send('Page.addScriptToEvaluateOnNewDocument', { source: "try{const k='abyssal_descent_save_v1';const d=JSON.parse(localStorage.getItem(k)||'{}');d.settings=Object.assign(d.settings||{},{volume:0});"+(process.env.COOP_HARD?"d.records=d.records||{};d.records.clears={hard:1};":"")+"localStorage.setItem(k,JSON.stringify(d));}catch(e){}" });
       await send('Page.navigate', { url });

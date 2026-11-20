@@ -718,7 +718,7 @@
         GM.bossEngaged = true;
         if (w.ledgeZ) G.bosses.terrain.seal(w);
         const g = w.bossGate;
-        w.addCollider(g.x - g.w / 2, 0, g.z0, g.x + g.w / 2, 7, g.z1 + 0.2, { surf: 'metal', noGrapple: true });
+        w.addCollider(g.x - g.w / 2, 0, g.z0, g.x + g.w / 2, 7, g.z1 + 0.2, { surf: 'metal' });   // (the portcullis: iron, it holds the hook)
         GM.gateDrop = 0.0001;
         G.sfx.mech('boltFwd', 0, 1.6); G.sfx.explosion(V(g.x, 1, g.z1), 0.5); P.addShake(0.5);
         GM.objective = { icon: '👑', text: () => '守護者を討伐せよ', progress: () => G.bosses.active ? 1 - Math.max(0, G.bosses.active.hp) / G.bosses.active.maxHp : 1 };

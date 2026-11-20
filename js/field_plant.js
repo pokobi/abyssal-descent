@@ -369,7 +369,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     rod('prust', ax, y + 0.55, az, bx, y + 0.55, bz, 0.017, 5);
     const tz = dz ? 0 : 0.004, tx2 = dx ? 0 : 0.004;
     vb('prust', ax - tx2, y, az - tz, bx + tx2, y + 0.1, bz + tz, { uv: 1, grad: false });
-    if (!(o && o.noCol)) { const c = w.addCollider(Math.min(ax, bx) - (dz ? 0.05 : 0), y, Math.min(az, bz) - (dx ? 0.05 : 0), Math.max(ax, bx) + (dz ? 0.05 : 0), y + 1.1, Math.max(az, bz) + (dx ? 0.05 : 0), { surf: 'metal', noGrapple: true, tag: 'grate' }); c.vis = true; }
+    if (!(o && o.noCol)) { const c = w.addCollider(Math.min(ax, bx) - (dz ? 0.05 : 0), y, Math.min(az, bz) - (dx ? 0.05 : 0), Math.max(ax, bx) + (dz ? 0.05 : 0), y + 1.1, Math.max(az, bz) + (dx ? 0.05 : 0), { surf: 'metal', tag: 'grate' }); c.vis = true; }
   }
   // the rails round a rect at y, but for the open stretches: open = { N: [[a, b]], S: ..., W: ..., E: ... } (N: the z0 side, W: the x0 side)
   function railRect(x0, z0, x1, z1, y, open) {
@@ -427,7 +427,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       rod('prust', KT[0], KT[1], KT[2], KB[0], KB[1], KB[2], 0.017, 6);
       for (let i = 1; i < n; i += 3) { const u = e + sg * (i + 0.5) * run, y = h1 - i * rise, p = P3(u, y, v + sd * 0.03); rod('prust', p[0], y, p[2], p[0], y + 1.02, p[2], 0.02, 6); }
       // (its side: per tread, a thin box from the tread up: you do not step off the side of a stair)
-      for (let i = 1; i < n; i++) { const top = h1 - i * rise, a = e + sg * i * run, b = e + sg * (i + 1) * run, p0 = P3(Math.min(a, b), top, v + sd * 0.02), p1 = P3(Math.max(a, b), top + 1.05, v + sd * 0.08); const k = w.addCollider(Math.min(p0[0], p1[0]), top, Math.min(p0[2], p1[2]), Math.max(p0[0], p1[0]), top + 1.05, Math.max(p0[2], p1[2]), { surf: 'metal', noGrapple: true, tag: 'grate' }); k.vis = true; }
+      for (let i = 1; i < n; i++) { const top = h1 - i * rise, a = e + sg * i * run, b = e + sg * (i + 1) * run, p0 = P3(Math.min(a, b), top, v + sd * 0.02), p1 = P3(Math.max(a, b), top + 1.05, v + sd * 0.08); const k = w.addCollider(Math.min(p0[0], p1[0]), top, Math.min(p0[2], p1[2]), Math.max(p0[0], p1[0]), top + 1.05, Math.max(p0[2], p1[2]), { surf: 'metal', tag: 'grate' }); k.vis = true; }
     }
     const f0 = P3(Math.min(uT, uB), 0, c - wd / 2), f1 = P3(Math.max(uT, uB), 0, c + wd / 2);
     mark(f0[0], f0[2], f1[0], f1[2]);
@@ -557,7 +557,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     if (floorY !== undefined) { const b2 = L(0.15, -BOXH / 2, -BOXD / 2 + 0.06); rod('prust', b2[0], b2[1], b2[2], b2[0], floorY, b2[2], 0.022, 8); }
     let ax0 = 1e9, ax1 = -1e9, az0 = 1e9, az1 = -1e9;
     for (const [lx, lz] of [[-0.24, -0.15], [0.24, -0.15], [-0.24, 0.15], [0.24, 0.15]]) { const p = L(lx, 0, lz); ax0 = Math.min(ax0, p[0]); ax1 = Math.max(ax1, p[0]); az0 = Math.min(az0, p[2]); az1 = Math.max(az1, p[2]); }
-    const k = col(ax0, y - 0.38, az0, ax1, y + 0.38, az1, { noGrapple: true }); k.elecBox = id;
+    const k = col(ax0, y - 0.38, az0, ax1, y + 0.38, az1, {}); k.elecBox = id;
     return { x, y, z, ry };
   }
   // an insulator post on its short steel pedestal (the arcs' ends; also the yard's bus supports): foot at y0, its cap's clamp at the returned height
@@ -570,7 +570,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     const top = y0 + ped + 0.11 + hIns;
     gg('pcast', cylG(10), Mx(x, top + 0.04, z, 0.09, 0.08, 0.09));
     gg('pcopper', boxG(), Mx(x, top + 0.11, z, 0.1, 0.06, 0.06));
-    col(x - 0.14, y0, z - 0.14, x + 0.14, top + 0.12, z + 0.14, { noGrapple: true });
+    col(x - 0.14, y0, z - 0.14, x + 0.14, top + 0.12, z + 0.14, {});
     return top + 0.12;
   }
   // a slack line from a to b, hanging sag under the straight between them (a tube of n lengths)
@@ -612,7 +612,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       for (let i = 0; i < 4; i++) for (let j = 0; j < 6; j++) { const hv = hsh(w0 + i * 3.1, plane + j * 1.7, 9); if (hv > 0.3) continue; const A = P2(w0 + i * cw + 0.02, y0 + j * ch + 0.02, fd), B = P2(w0 + (i + 1) * cw - 0.02, y0 + (j + 1) * ch - 0.02, fd + 0.004); vb(hv < 0.08 ? 'prust' : 'pglass', A[0], A[1], A[2], B[0], B[1], B[2], { uv: 1, grad: false, tint: hv < 0.08 ? [0.6, 0.6, 0.6] : [1, 1, 1], skip: alongX ? { px: true, nx: true, top: true, bottom: true } : { pz: true, nz: true, top: true, bottom: true } }); }
       { const st = P2((w0 + w1) / 2, (y0 + 1.15) / 2, -0.013); decal(6, st[0], st[1], st[2], (w1 - w0) * 0.9, y0 - 1.15, 'w', alongX ? 0 : -out, alongX ? -out : 0); }
       if (o.dark) { const A = P2(w0 - 0.3, y0 - 0.3, t + 1.2), B = P2(w1 + 0.3, y1 + 0.3, t + 1.3); vb('rock', A[0], A[1], A[2], B[0], B[1], B[2], { uv: 4, grad: false, flat: true, tint: [0.22, 0.22, 0.22] }); }
-      col(...(() => { const A = P2(w0, y0, 0), B = P2(w1, y1, t); return [Math.min(A[0], B[0]), A[1], Math.min(A[2], B[2]), Math.max(A[0], B[0]), B[1], Math.max(A[2], B[2])]; })(), { tag: 'grate', noGrapple: true });
+      col(...(() => { const A = P2(w0, y0, 0), B = P2(w1, y1, t); return [Math.min(A[0], B[0]), A[1], Math.min(A[2], B[2]), Math.max(A[0], B[0]), B[1], Math.max(A[2], B[2])]; })(), { tag: 'grate' });
     }
     // the pilasters (H columns proud of the inner face), their bases and the haunches of the roof truss over them
     for (const p of pilAt) { if (holes.some((h) => h[0] - 0.3 < p && h[1] + 0.3 > p && h[2] < 1)) continue; const A = P2(p, 0, -0.2), B = P2(p, RY, -0.2); mem('prust', hsecG(0.4, 0.3, 0.014, 0.02), A[0], 0, A[2], B[0], RY, B[2], alongX ? 0 : 1, 0, alongX ? 1 : 0); const c0 = P2(p - 0.18, 0, -0.42), c1 = P2(p + 0.18, RY, 0); col(Math.min(c0[0], c1[0]), 0, Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), RY, Math.max(c0[2], c1[2])); const b0 = P2(p - 0.3, 0, -0.5), b1 = P2(p + 0.3, 0.25, 0); vb('pconc', b0[0], 0, b0[2], b1[0], 0.25, b1[2], { uv: 1, tint: [0.7, 0.68, 0.65] }); }
@@ -749,7 +749,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     // a steel door (the north door into the yard), standing open
     gg('ppaint', boxG(), Mx(BX + 0.9, 1.1, 3.6 - 0.02, 1.0, 2.2, 0.05, 0, 0.3, 0), { tint: PAINT.dkgreen, su: 1, sv: 2.2 });
     // the roof: corrugated sheet on purlins and trusses; the trusses on the pilasters, a span over the switch room's bay and one over the hall
-    { const c = w.addCollider(-3, RY, -3, BXO + 0.6, RY + 1.6, D + 3, { noGrapple: true, surf: 'metal' }); c.vis = true; w.skyCap(-3, RY + 1.6, -3, BXO + 0.6, D + 3); }
+    { const c = w.addCollider(-3, RY, -3, BXO + 0.6, RY + 1.6, D + 3, { surf: 'metal' }); c.vis = true; w.skyCap(-3, RY + 1.6, -3, BXO + 0.6, D + 3); }
     vb('pcorr', -0.6, RY + 0.25, -0.6, BXO + 0.3, RY + 0.3, D + 0.6, { uv: 1, grad: false, skip: { top: true }, tint: [0.42, 0.42, 0.42] });
     for (let x = 1.5; x < BXO; x += 3) mem('prust', chanG(0.22, 0.07, 0.008), x, RY + 0.11, -0.6, x, RY + 0.11, D + 0.6, 0, 1, 0, { su: 0.5, sv: D });
     for (let z = 6; z < D - 1; z += 6) { if (z % 12 === 6) truss(0, 16, z, RY - 1.6, RY); truss(16, BX, z, RY - 2.4, RY); }
@@ -1449,7 +1449,7 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     shellWall(true, 0, -1, -0.6, RW + 0.6, gx.map((g) => [g - 3.5, g + 3.5, -1, 8]), top);
     shellWall(true, RD, 1, -0.6, RW + 0.6, [[RW / 2 - 5.6, RW / 2 + 5.6, -1, 8]], top);
     shellWall(false, 0, -1, 0, RD, [], top); shellWall(false, RW, 1, 0, RD, [], top);
-    { const c = w.addCollider(-3, top, -3, RW + 3, top + 1.5, RD + 3, { noGrapple: true, surf: 'metal' }); c.vis = true; }
+    { const c = w.addCollider(-3, top, -3, RW + 3, top + 1.5, RD + 3, { surf: 'metal' }); c.vis = true; }
     vb('pcorr', -0.6, top + 0.25, -0.6, RW + 0.6, top + 0.3, RD + 0.6, { uv: 1, grad: false, skip: { top: true }, tint: [0.42, 0.42, 0.42] });
     for (let z = 6; z < RD - 1; z += 6) truss(0, RW, z, top - 2.0, top);
     // the crane's runways along both sides and its bridge parked over the middle

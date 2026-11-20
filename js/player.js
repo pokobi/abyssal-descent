@@ -89,6 +89,23 @@
     explosionDmg: ['💣', '爆発', 'p'], defense: ['🛡️', '防御力', 'n'], weight: ['⚖️', '重さ', 'n'], shieldDmg: ['🔨', '対シールド', 'p'], defIgnore: ['⛏️', '防御無視', 'p'], defIgnoreGun: ['🎯', '防御無視（銃）', 'p'], maxJumps: ['🪽', 'ジャンプ回数', 'n'], grappleRange: ['⚓', 'グラップル射程', 'n'], luck: ['🍀', '幸運', 'p'],
   };
 
+  // ---- what the grapple's hook is in ----
+  const HOOK_RAY = { bars: true, filter: (c) => !c.hookThrough };
+  // the thing it follows: a mesh that moves while its collider stays put or is gone for a while (c.follow(): a sliding door; a device's
+  // root, G.Gim: a pillar falling), else the collider itself (moved in place: a moving plate, a lift; c.alive false: broken, opened)
+  function hookAnchor(c, p) {
+    if (!c) return null;
+    const o = (c.follow && c.follow()) || (c.gim && c.gim.root) || null;
+    if (o && o.parent) { o.updateMatrixWorld(true); return { c, o, local: o.worldToLocal(p.clone()) }; }
+    return { c, off: new THREE.Vector3(p.x - c.x0, p.y - c.y0, p.z - c.z0) };
+  }
+  // puts the hook's point where its thing is now; false once the thing is gone
+  function followAnchor(a, out) {
+    if (a.o) { if (!a.o.parent) return false; a.o.updateMatrixWorld(true); out.copy(a.local).applyMatrix4(a.o.matrixWorld); return true; }
+    const c = a.c; if (c.alive === false) return false;
+    out.set(c.x0 + a.off.x, c.y0 + a.off.y, c.z0 + a.off.z);
+    return true;
+  }
   class Player {
     constructor() {
       this.pos = V(); this.vel = V();
@@ -965,8 +982,9 @@
       this.grapplePreview = null;
       if (gr.state === 'none' && this.grappleCd <= 0) {
         const o = G.camera.position, d = this.forward();
-        const h = G.world.raycast(o, d, range + 25);
-        if (h) this.grapplePreview = { point: h.point, normal: h.normal, ok: h.t <= range && !h.c.noGrapple, dist: h.t };
+        // (the hook strikes iron bars it passes between for shots and sight; it goes through boxes that stand for nothing drawn, c.hookThrough)
+        const h = G.world.raycast(o, d, range + 25, HOOK_RAY);
+        if (h) this.grapplePreview = { point: h.point, normal: h.normal, ok: h.t <= range && !h.c.noGrapple, dist: h.t, c: h.c };
         if (this.has('m_grapenemy')) { const eh = G.enemies.raycast(o, d, Math.min(range, h ? h.t : range), 0.3); if (eh && !eh.e.boss) this.grapplePreview = { point: o.clone().addScaledVector(d, eh.t), normal: d.clone().negate(), ok: true, dist: eh.t, enemy: eh.e }; }
       }
       if (I.hit('grapple') && !this.pileState && !this.liftLock && !this.duelLock) {
@@ -977,6 +995,7 @@
           G.sfx.grappleFire();
           if (pv && pv.ok) {
             gr.state = 'firing'; gr.t = 0; gr.point.copy(pv.point); gr.normal.copy(pv.normal); gr.enemy = pv.enemy || null;
+            gr.anchor = pv.enemy ? null : hookAnchor(pv.c, pv.point);
           } else {
             gr.state = 'miss'; gr.t = 0;
             gr.point.copy(G.camera.position).addScaledVector(this.forward(), Math.min(range, pv ? pv.dist : range));
@@ -984,6 +1003,12 @@
           }
         }
       }
+      // what the hook is in moves it along (a moving plate, a lift, a sliding door, a falling pillar); gone, it lets go
+      if ((gr.state === 'firing' || gr.state === 'attached') && gr.anchor && !followAnchor(gr.anchor, gr.point)) {
+        gr.anchor = null;
+        if (gr.state === 'attached') this.detachGrapple(false); else { gr.state = 'retract'; this.grappleCd = Math.max(this.grappleCd, 0.5); }
+      }
+      if (gr.state === 'attached') gr.hook.copy(gr.point);
       if (gr.state === 'firing' || gr.state === 'miss') {
         gr.t += dt;
         const target = gr.enemy && gr.enemy.alive ? gr.enemy.centerPos() : gr.point;
@@ -1069,7 +1094,7 @@
     detachGrapple(jumpBoost) {
       const gr = this.grapple;
       if (gr.state === 'attached' && jumpBoost) { this.vel.y = Math.max(this.vel.y, 0) + 6.5; G.sfx.jump(); }
-      gr.state = 'retract';
+      gr.state = 'retract'; gr.anchor = null;
       gr.endT = G.game.time;
       this.grappleCd = G.grappleCdOf(this.stats);
     }

@@ -211,7 +211,7 @@
   // a moving plate: (x0..x1, z0..z1) at y, travelling (dx, dy, dz) and back, stopping at each end; carries what stands on it
   function mover(w, x0, z0, x1, z1, y, dx, dy, dz, rng) {
     // (its collider is filed in the spatial hash over its whole travel, then set to where it is)
-    const col = w.addCollider(Math.min(x0, x0 + dx), y - 0.35, Math.min(z0, z0 + dz), Math.max(x1, x1 + dx), y + Math.max(0, dy), Math.max(z1, z1 + dz), { surf: 'metal', noGrapple: true });
+    const col = w.addCollider(Math.min(x0, x0 + dx), y - 0.35, Math.min(z0, z0 + dz), Math.max(x1, x1 + dx), y + Math.max(0, dy), Math.max(z1, z1 + dz), { surf: 'metal' });
     col.x0 = x0; col.x1 = x1; col.z0 = z0; col.z1 = z1; col.y0 = y - 0.35; col.y1 = y;
     col.navIgnore = true; col.noFire = true; col.tag = 'bridge';
     const m = { col, x0, z0, x1, z1, y, dx, dy, dz, ox: 0, oy: 0, oz: 0, t: rng.range(0, 10), period: dy ? 9 : 7.5, mesh: null };

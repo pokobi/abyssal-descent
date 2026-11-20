@@ -24,7 +24,7 @@
       for (const z of [lo - 0.9, hi + 0.9]) P().candles(w, x + f * (T + 0.45), 0, z, rng, true);
     }
     w.doors = w.doors || [];
-    const c = w.addCollider(x - 0.06, 0, lo + 0.02, x + 0.06, dh, hi - 0.02, { surf: 'metal', noGrapple: true });
+    const c = w.addCollider(x - 0.06, 0, lo + 0.02, x + 0.06, dh, hi - 0.02, { surf: 'metal' });
     c.bars = true; c.navIgnore = true; c.alive = false; // (monsters plan their way through it; it starts open)
     const door = { axis: 'z', plane: x, lo, hi, y: 0, h: dh, hinge: 0, face: rng.chance(0.5) ? 1 : -1, col: c, hp: 100, state: 'open', s0: 'open', leaves: 2 };
     const it = { type: 'celldoor', pos: V(x, 1.2, (lo + hi) / 2), door, opened: true };
@@ -210,7 +210,7 @@
     w.solid('block', 0, 0, gz0, cx - gate, 8, gz1, { uv: 4 }); w.solid('block', cx + gate, 0, gz0, W, 8, gz1, { uv: 4 });
     for (const sx of [-1, 1]) tower(w, rng, cx + sx * (gate + 2.6), gz1 + 1.4, 2.6, 10);
     w.solid('block', cx - gate, 7, gz0, cx + gate, 9.5, gz1, { uv: 3 });
-    w.addCollider(cx - gate, 9.5, gz0, cx + gate, 14, gz1, { noGrapple: true });
+    w.addCollider(cx - gate, 9.5, gz0, cx + gate, 14, gz1, { noGrapple: true }).hookThrough = true;   // (nothing drawn there but the fire bed on its top: the grapple's hook goes through it, c.hookThrough; fires and the rest as they were)
     for (const sx of [-1, 1]) w.addLight(cx + sx * (gate + 0.8), 5.5, gz1 + 4.4, { flame: 0.3, intensity: 7, range: 11, color: '#ff6a40', prio: 1.2 });
     w.bossGate = { x: cx, z0: gz0, z1: gz1, w: gate * 2 };
     w.deferred.push((grp) => { const pc = H.portcullis(w, gate * 2 - 0.2, 6.2); pc.position.set(cx, 5.8, gz1 - 0.2); grp.add(pc); w.bossGate.pc = pc; });

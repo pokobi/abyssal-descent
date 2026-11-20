@@ -66,7 +66,7 @@
       if (isl.some((r) => cx > r.x0 && cx < r.x1 && cz > r.z0 && cz < r.z1)) continue;
       if (chan && cx > chan.x0 && cx < chan.x1) { cx0 = Math.min(cx0, x0); cx1 = Math.max(cx1, x0 + TS); cell[k * nX + i] = -2; continue; }
       cell[k * nX + i] = w.iceTiles.length;
-      const col = w.addCollider(x0, -0.5, z0, x0 + TS, 0, z0 + TS, { surf: 'ice', noGrapple: true });
+      const col = w.addCollider(x0, -0.5, z0, x0 + TS, 0, z0 + TS, { surf: 'ice' });
       // (zone: its open water while it is broken, put in w.waterZones and taken out again by setTile)
       w.iceTiles.push({ k: w.iceTiles.length, x0, z0, x1: x0 + TS, z1: z0 + TS, col, hp: 2, t: 0, mesh: null, crack: null, zone: { x0, z0, x1: x0 + TS, z1: z0 + TS, y: WY, deep: DEEP, lake: true } });
     }

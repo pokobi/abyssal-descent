@@ -1411,7 +1411,7 @@
       w.solid('block', 0, LOW - 1, zL, W, 0, zC, { uv: 2 });
       w.solid('cobble', 0, LOW - 2, zC, W, LOW, zS, { uv: 2 });
       const x0 = cx - 3, x1 = cx + 3, z0 = zC, z1 = zC + 6;
-      const col = w.addCollider(x0, LOW - 0.4, z0, x1, LOW + 0.3, z1, { surf: 'metal', noGrapple: true });
+      const col = w.addCollider(x0, LOW - 0.4, z0, x1, LOW + 0.3, z1, { surf: 'metal' });
       w.elevator = { x0, x1, z0, z1, col, y: LOW + 0.3, y0: LOW + 0.3, y1: 0.02, state: 'idle', t: 0, ride: 0 };
       // the shaft: four obsidian posts with violet runes, chains and a glowing rune disc that rides up with the platform
       for (const [px, pz] of [[x0 - 0.5, z0 + 0.4], [x1 + 0.5, z0 + 0.4], [x0 - 0.5, z1 - 0.4], [x1 + 0.5, z1 - 0.4]]) {
@@ -3220,13 +3220,13 @@
       for (const sx of [-1, 1]) {
         const x0 = sx < 0 ? cx - gate - 9 : cx + gate, x1 = sx < 0 ? cx - gate : cx + gate + 9;
         w.solid('block', x0, 0, gz0 - 1, x1, 22, gz1 + 5, { uv: 4 });
-        for (let x = x0 + 0.3; x < x1 - 0.5; x += 1.8) w.solid('block', x, 22, gz1 + 4.2, x + 0.9, 23.2, gz1 + 5, { uv: 2, noGrapple: true });
+        for (let x = x0 + 0.3; x < x1 - 0.5; x += 1.8) w.solid('block', x, 22, gz1 + 4.2, x + 0.9, 23.2, gz1 + 5, { uv: 2 });
         w.visual('trim', x0 - 0.1, 21.4, gz1 + 4.9, x1 + 0.1, 22, gz1 + 5.1, { uv: 1 });
         for (const y of [9, 14, 18]) { const sxp = (x0 + x1) / 2; w.visual('glow', sxp - 0.18, y, gz1 + 5.01, sxp + 0.18, y + 1.3, gz1 + 5.05, { uv: 1, grad: false }); }
         w.addLight((x0 + x1) / 2, 14, gz1 + 6.2, { flame: 0, intensity: 2.5, range: 8, color: '#ff3a20', emit: false, prio: 0.9 });
         P().banner(w, (x0 + x1) / 2, 19, gz1 + 5, 'pz', 9, 0x5a0808);
       }
-      for (let x = 0.3; x < W - 0.5; x += 1.8) if (Math.abs(x - cx) > gate + 9.5) w.solid('block', x, FH, gz1 - 0.7, x + 0.9, FH + 1.1, gz1, { uv: 2, noGrapple: true });
+      for (let x = 0.3; x < W - 0.5; x += 1.8) if (Math.abs(x - cx) > gate + 9.5) w.solid('block', x, FH, gz1 - 0.7, x + 0.9, FH + 1.1, gz1, { uv: 2 });
       gateFrame(w, cx, gz1, 'N');
       P().brazier(w, cx - gate - 1.4, 0, gz1 + 7.5, 1.0, true); P().brazier(w, cx + gate + 1.4, 0, gz1 + 7.5, 1.0, true);
       w.bossGate = { x: cx, z0: gz0, z1: gz1, w: gate * 2 };

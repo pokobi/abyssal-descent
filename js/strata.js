@@ -95,7 +95,7 @@
       for (const ry of [0.12, 1.3, 2.5, 3.6]) { w.visual('iron', xf - 0.04, y + ry, z0, xf + 0.04, y + ry + 0.06, da, { uv: 1 }); w.visual('iron', xf - 0.04, y + ry, db, xf + 0.04, y + ry + 0.06, z1, { uv: 1 }); }
       w.visual('iron', xf - 0.04, y + hc - 0.14, z0, xf + 0.04, y + hc - 0.06, z1, { uv: 1 });
       w.visual('iron', xf - 0.05, y + dh - 0.04, da - 0.06, xf + 0.05, y + dh + 0.04, db + 0.06, { uv: 1 });
-      const bar = (a, y0, b, y1, block) => { const c = w.addCollider(xf - 0.06, y0, a, xf + 0.06, y1, b, { surf: 'metal', noGrapple: true }); c.bars = true; if (block) c.navBlock = true; return c; };
+      const bar = (a, y0, b, y1, block) => { const c = w.addCollider(xf - 0.06, y0, a, xf + 0.06, y1, b, { surf: 'metal' }); c.bars = true; if (block) c.navBlock = true; return c; };
       bar(z0, y, da, y + hc, true); bar(db, y, z1, y + hc, true); bar(da, y + dh, db, y + hc, false);
       // every room keeps an iron gate in the doorway
       {
@@ -762,7 +762,7 @@
         const ux = sg * Math.cos(phi), uz = -sg * Math.sin(phi);
         for (const [a, b] of [[0.05, wd / 2], [wd / 2, wd - 0.02]]) {
           const x0 = d.plane + ux * a, z0 = hz + uz * a, x1 = d.plane + ux * b, z1 = hz + uz * b;
-          d.leafCols.push(w.addCollider(Math.min(x0, x1) - 0.06, d.y, Math.min(z0, z1) - 0.06, Math.max(x0, x1) + 0.06, d.y + d.h, Math.max(z0, z1) + 0.06, { surf: 'metal', noGrapple: true, tag: 'grate' })); // (bars: seen through, and they stop you)
+          d.leafCols.push(w.addCollider(Math.min(x0, x1) - 0.06, d.y, Math.min(z0, z1) - 0.06, Math.max(x0, x1) + 0.06, d.y + d.h, Math.max(z0, z1) + 0.06, { surf: 'metal', tag: 'grate' })); // (bars: seen through, and they stop you)
         }
       }
       const Pl = G.player; if (!built && Pl && Pl.pos && w.depenetrate) w.depenetrate(Pl.pos, Pl.hw, Pl.height); // (not while the area is being put up: you are not in it yet)

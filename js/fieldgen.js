@@ -32,8 +32,8 @@
       for (let u = p + 0.08; u < q; u += 0.22) box(u, 0.18, u + 0.035, h + 0.18 * ((Math.round(u / 0.22) % 2) ? 1 : 0.5), 0.02, 'iron', false); // bars with spikes
       for (let u = p; u <= q + 0.01; u += Math.max(1.2, (q - p) / Math.ceil((q - p) / 2.4))) box(u - 0.06, 0, u + 0.06, h + 0.25, 0.06, 'iron', false); // posts
       // (tag 'grate': you see through between its bars, and it stops you)
-      if (alongX) w.addCollider(p, 0, c - 0.08, q, h + 0.2, c + 0.08, { surf: 'metal', noGrapple: true, tag: 'grate' });
-      else w.addCollider(c - 0.08, 0, p, c + 0.08, h + 0.2, q, { surf: 'metal', noGrapple: true, tag: 'grate' });
+      if (alongX) w.addCollider(p, 0, c - 0.08, q, h + 0.2, c + 0.08, { surf: 'metal', tag: 'grate' });
+      else w.addCollider(c - 0.08, 0, p, c + 0.08, h + 0.2, q, { surf: 'metal', tag: 'grate' });
     }
   };
   F.deadTree = function (w, x, z, rng, s) {
@@ -300,7 +300,7 @@
       const xw = side < 0 ? 0 : W, zc = (a + b) / 2;
       // bars + sill
       for (let z = a + 0.2; z < b; z += 0.4) w.visual('iron', xw - 0.06 + side * -1.5, y0, z - 0.03, xw + 0.06 + side * -1.5, y1, z + 0.03, { uv: 1 });
-      w.addCollider(side < 0 ? -3 : W, y0, a, side < 0 ? 0 : W + 3, y1, b, { surf: 'metal', noGrapple: true });
+      w.addCollider(side < 0 ? -3 : W, y0, a, side < 0 ? 0 : W + 3, y1, b, { surf: 'metal' });
       w.visual('trim', side < 0 ? -0.4 : W, y0 - 0.25, a - 0.2, side < 0 ? 0 : W + 0.4, y0, b + 0.2, { uv: 1 });
       // the night beyond, and moonlight falling in
       F.nightPane(w, side < 0 ? -3.2 : W + 3.2, (y0 + y1) / 2, zc, (b - a) + 2, (y1 - y0) + 2, side < 0 ? Math.PI / 2 : -Math.PI / 2, rng.chance(0.25));
@@ -419,8 +419,9 @@
     w.visual('trim', cx - gate - 0.6, 0, gz1, cx - gate, dh + 0.6, gz1 + 0.3, { uv: 1 }); w.visual('trim', cx + gate, 0, gz1, cx + gate + 0.6, dh + 0.6, gz1 + 0.3, { uv: 1 });
     w.visual('trim', cx - gate - 0.6, dh, gz1, cx + gate + 0.6, dh + 0.6, gz1 + 0.3, { uv: 1 });
     for (const sx of [-1, 1]) w.addLight(cx + sx * (gate + 1.2), 5, gz1 + 1.2, { flame: 0.3, intensity: 7, range: 10, color: ruined ? '#4a8aff' : '#ff9a50', prio: 1.2 });
-    const col = w.addCollider(cx - gate, 0, gz0 + 1.2, cx + gate, dh, gz1 - 0.6, { surf: 'stone', noGrapple: true });
+    const col = w.addCollider(cx - gate, 0, gz0 + 1.2, cx + gate, dh, gz1 - 0.6, { surf: 'stone' });
     const door = { x: cx, gate, dh, z: (gz0 + gz1) / 2 + 0.3, col, k: 0, mesh: null, state: 'closed' };
+    col.follow = () => door.mesh;   // (a grapple's hook in it slides away with the door, player.js)
     w.deferred.push((grp) => {
       const g = new THREE.Group();
       const slab = new THREE.Mesh(PG().box, w.mats.block); slab.scale.set(gate * 2, dh, 1.0); slab.position.y = dh / 2; g.add(slab);

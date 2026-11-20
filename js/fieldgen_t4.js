@@ -217,7 +217,7 @@
     w.solid('block', 0, 0, gz0, cx - gate, 9, gz1, { uv: 4 }); w.solid('block', cx + gate, 0, gz0, W, 9, gz1, { uv: 4 });
     for (const sx of [-1, 1]) w.solid('trim', cx + sx * gate + (sx < 0 ? -1.4 : 0), 0, gz0 - 0.5, cx + sx * gate + (sx > 0 ? 1.4 : 0), 10.5, gz1 + 0.5, { uv: 2 });
     w.solid('block', cx - gate - 1.4, 7, gz0 - 0.5, cx + gate + 1.4, 10.5, gz1 + 0.5, { uv: 3 });
-    w.addCollider(cx - gate - 1.4, 10.5, gz0 - 0.5, cx + gate + 1.4, 14, gz1 + 0.5, { noGrapple: true });
+    w.addCollider(cx - gate - 1.4, 10.5, gz0 - 0.5, cx + gate + 1.4, 14, gz1 + 0.5, { noGrapple: true }).hookThrough = true;   // (nothing drawn there but the fire bed on its top: the grapple's hook goes through it, c.hookThrough; fires and the rest as they were)
     for (const sx of [-1, 1]) { P().statue(w, cx + sx * (gate + 3.4), gz1 + 2, 0, 0, rng, 1.2); w.addLight(cx + sx * (gate + 0.8), 6, gz1 + 1.6, { flame: 0.3, intensity: 7, range: 11, color: '#ffd090', prio: 1.2 }); }
     w.bossGate = { x: cx, z0: gz0, z1: gz1, w: gate * 2 };
     w.deferred.push((grp) => { const pc = H.portcullis(w, gate * 2 - 0.2, 6.2); pc.position.set(cx, 5.8, gz1 - 0.2); grp.add(pc); w.bossGate.pc = pc; });

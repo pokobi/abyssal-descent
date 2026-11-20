@@ -25,7 +25,7 @@
   };
   // a collider that belongs to it: shots that strike it reach it (o.shotOnly: shots alone, nothing walks into it)
   Gm.col = function (w, g, x0, y0, z0, x1, y1, z1, o) {
-    const c = w.addCollider(x0, y0, z0, x1, y1, z1, Object.assign({ noGrapple: true, surf: 'stone' }, o || {}));
+    const c = w.addCollider(x0, y0, z0, x1, y1, z1, Object.assign({ surf: 'stone' }, o || {}));
     c.gim = g; if (o && o.shotOnly) c.shotOnly = true;
     (g.cols = g.cols || []).push(c);
     return c;

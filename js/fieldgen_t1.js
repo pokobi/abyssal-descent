@@ -23,8 +23,8 @@
       box(p, h * 0.42, q, h * 0.42 + 0.09, 0.04); box(p, h * 0.82, q, h * 0.82 + 0.09, 0.04);
       for (let u = p; u <= q + 0.01; u += Math.max(1.4, (q - p) / Math.ceil((q - p) / 2.2))) box(Math.min(u, q) - 0.07, 0, Math.min(u, q) + 0.07, h + 0.12, 0.07);
       // (tag 'grate': you see through between its rails, and it stops you)
-      if (alongX) w.addCollider(p, 0, c - 0.08, q, h, c + 0.08, { surf: 'wood', noGrapple: true, tag: 'grate' });
-      else w.addCollider(c - 0.08, 0, p, c + 0.08, h, q, { surf: 'wood', noGrapple: true, tag: 'grate' });
+      if (alongX) w.addCollider(p, 0, c - 0.08, q, h, c + 0.08, { surf: 'wood', tag: 'grate' });
+      else w.addCollider(c - 0.08, 0, p, c + 0.08, h, q, { surf: 'wood', tag: 'grate' });
     }
   };
   // a timber palisade: sharpened stakes side by side (the guardian's ring in the hamlet)
@@ -54,7 +54,7 @@
     s = s || 1;
     w.batch.geo('wood', PG().cyl, Mx(x, 0.6 * s, z, 1.05 * s, 1.2 * s, 1.05 * s), { tint: STRAW });
     w.batch.geo('wood', PG().cone, Mx(x, 1.5 * s, z, 1.1 * s, 0.7 * s, 1.1 * s), { tint: STRAW });
-    w.roundCollider(x, z, 1.05 * s, 0, 1.5 * s, { surf: 'wood', noGrapple: true }); // (round: the cylinder of hay, radius 1.05)
+    w.roundCollider(x, z, 1.05 * s, 0, 1.5 * s, { surf: 'wood' }); // (round: the cylinder of hay, radius 1.05)
   }
   // a broken farm cart, along x or along z
   function cart(w, rng, x, z, alongX) {
@@ -68,7 +68,7 @@
       if (alongX) w.batch.geo('woodDark', PG().cyl8, Mx(x, 0.55, z + sd * (hz + 0.08), 0.55, 0.1, 0.55, Math.PI / 2, 0, 0));
       else w.batch.geo('woodDark', PG().cyl8, Mx(x + sd * (hx + 0.08), 0.55, z, 0.55, 0.1, 0.55, 0, 0, Math.PI / 2));
     }
-    w.addCollider(x - hx, 0, z - hz, x + hx, y + 0.14, z + hz, { surf: 'wood', noGrapple: true });
+    w.addCollider(x - hx, 0, z - hz, x + hx, y + 0.14, z + hz, { surf: 'wood' });
     if (alongX) w.visual('woodDark', x + hx, 0.5, z - 0.05, x + hx + 1.6, 0.6, z + 0.05, { uv: 1 }); else w.visual('woodDark', x - 0.05, 0.5, z + hz, x + 0.05, 0.6, z + hz + 1.6, { uv: 1 });
     if (rng.chance(0.6)) P().crate(w, x + rng.range(-0.4, 0.4), z + rng.range(-0.3, 0.3), y + 0.14, rng, 0.8);
   }
@@ -135,9 +135,9 @@
     for (const sx of [-1, 1]) {
       const tx = cx + sx * (gate + 1.1);
       w.solid('woodDark', tx - 1.1, 0, gz0 - 0.6, tx + 1.1, 7.2, gz1 + 0.6, { uv: 2 });
-      w.solid('wood', tx - 1.4, 7.2, gz0 - 0.9, tx + 1.4, 7.5, gz1 + 0.9, { uv: 1, noGrapple: true });
+      w.solid('wood', tx - 1.4, 7.2, gz0 - 0.9, tx + 1.4, 7.5, gz1 + 0.9, { uv: 1 });
       w.batch.geo('woodDark', PG().cone, Mx(tx, 8.6, (gz0 + gz1) / 2, 1.9, 2.2, 2.4, 0, Math.PI / 4, 0));
-      w.addCollider(tx - 1.4, 7.5, gz0 - 0.9, tx + 1.4, 10, gz1 + 0.9, { noGrapple: true });
+      w.addCollider(tx - 1.4, 7.5, gz0 - 0.9, tx + 1.4, 10, gz1 + 0.9, {});
       P().skull(w, tx, 6.6, gz1 + 0.62, 0, 1.3);
       w.addLight(tx, 6.8, gz1 + 1.4, { flame: 0.3, intensity: 7, range: 11, color: '#ff8a40', prio: 1.2 });
     }
@@ -317,8 +317,8 @@
     w.solid('block', 0, 0, gz0, cx - gate, 6.5, gz1, { uv: 4 }); w.solid('block', cx + gate, 0, gz0, W, 6.5, gz1, { uv: 4 });
     for (const sx of [-1, 1]) w.solid('block', cx + sx * gate + (sx < 0 ? -2.4 : 0), 0, gz0 - 0.5, cx + sx * gate + (sx > 0 ? 2.4 : 0), 9.5, gz1 + 0.5, { uv: 3 });
     w.solid('block', cx - gate - 2.4, 6.4, gz0 - 0.5, cx + gate + 2.4, 9.5, gz1 + 0.5, { uv: 3 });
-    w.solid('trim', cx - gate - 2.7, 9.5, gz0 - 0.8, cx + gate + 2.7, 10.0, gz1 + 0.8, { uv: 2, noGrapple: true });
-    w.addCollider(cx - gate - 2.7, 10, gz0 - 0.8, cx + gate + 2.7, 13, gz1 + 0.8, { noGrapple: true });
+    w.solid('trim', cx - gate - 2.7, 9.5, gz0 - 0.8, cx + gate + 2.7, 10.0, gz1 + 0.8, { uv: 2 });
+    w.addCollider(cx - gate - 2.7, 10, gz0 - 0.8, cx + gate + 2.7, 13, gz1 + 0.8, { noGrapple: true }).hookThrough = true;   // (nothing drawn there but the fire bed on its top: the grapple's hook goes through it, c.hookThrough; fires and the rest as they were)
     // (its opening drawn with a round head: an arch of wedge stones through the gate's depth, the corners over its haunches filled up to the
     // lintel's boxes - they stand in the opening's box, which still lets you through there; LG.archDraw)
     if (LG.archDraw) LG.archDraw(w, (u, y, d) => [cx + u, y, gz0 - 0.58 + d], gate, 3.8, 2.6, gz1 - gz0 + 1.16, 6.4, { fill: 'block', out: gate, gy: 0 });

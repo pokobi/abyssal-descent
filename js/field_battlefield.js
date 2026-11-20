@@ -109,7 +109,7 @@
         if (h1 <= h0) continue;
         const a = base.clone().addScaledVector(dir, h0 / dir.y), b = base.clone().addScaledVector(dir, h1 / dir.y);
         if (b.y < y) continue;
-        w.addCollider(Math.min(a.x, b.x) - 0.07, Math.max(y, a.y), Math.min(a.z, b.z) - 0.07, Math.max(a.x, b.x) + 0.07, b.y, Math.max(a.z, b.z) + 0.07, { surf: 'wood', noGrapple: true });
+        w.addCollider(Math.min(a.x, b.x) - 0.07, Math.max(y, a.y), Math.min(a.z, b.z) - 0.07, Math.max(a.x, b.x) + 0.07, b.y, Math.max(a.z, b.z) + 0.07, { surf: 'wood' });
       }
       w.batch.geo('iron', PG().cone, Mx(px + tip.x, y + L * 0.4 + tip.y, pz + tip.z, 0.07, 0.3, 0.07, rx, 0, rz));
     }
@@ -123,7 +123,7 @@
     const r = rig(w, x, y, z, ry);
     r.part('woodDark', 0, h - 0.3, 0, 1.3, 0.06, 0.06);
     for (let k = 0; k < 3; k++) { const L = rng.range(1.0, 2.2); r.part('cloth', -0.42 + k * 0.42, h - 0.35 - L / 2, 0.04, 0.4, L, 0.03, rng.range(-0.08, 0.08), 0, rng.range(-0.06, 0.06), null, HOST[host]); }
-    w.addCollider(x - 0.12, y, z - 0.12, x + 0.12, y + h, z + 0.12, { surf: 'wood', noGrapple: true });
+    w.addCollider(x - 0.12, y, z - 0.12, x + 0.12, y + h, z + 0.12, { surf: 'wood' });
   }
   // a cold camp fire (a few still smoulder), its ring of stones, a fallen tent
   function camp(w, rng, x, y, z, lit) {
@@ -325,9 +325,9 @@
       T.at(w, 2.2, () => F.palisade(w, xa, (gz0 + gz1) / 2, xb, (gz0 + gz1) / 2, 2.6, []));
       const tx = cx + s * (gate + 1.1);
       w.solid('woodDark', tx - 1.1, 0, gz0 - 0.6, tx + 1.1, 7.2, gz1 + 0.6, { uv: 2 });
-      w.solid('wood', tx - 1.4, 7.2, gz0 - 0.9, tx + 1.4, 7.5, gz1 + 0.9, { uv: 1, noGrapple: true });
+      w.solid('wood', tx - 1.4, 7.2, gz0 - 0.9, tx + 1.4, 7.5, gz1 + 0.9, { uv: 1 });
       w.batch.geo('woodDark', PG().cone, Mx(tx, 8.6, (gz0 + gz1) / 2, 1.9, 2.2, 2.4, 0, Math.PI / 4, 0));
-      w.addCollider(tx - 1.4, 7.5, gz0 - 0.9, tx + 1.4, 10, gz1 + 0.9, { noGrapple: true });
+      w.addCollider(tx - 1.4, 7.5, gz0 - 0.9, tx + 1.4, 10, gz1 + 0.9, {});
       banner(w, rng, tx + s * 2.2, 2.2, gz1 + 0.2, s < 0 ? 0 : 1);
       w.addLight(tx, 6.8, gz1 + 1.4, { flame: 0.3, intensity: 7, range: 11, color: '#ff8a40', prio: 1.2 });
     }

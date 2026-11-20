@@ -1335,10 +1335,23 @@
     // (a gun with something on its muzzle may be suppressed: its suppressed takes are made too - a few ms of spare time, if not)
     for (const w of (P && P.weapons) || []) {
       const d = w && w.def, k = d && (d.sound === 'tesla' ? 'nail' : d.sound); if (!SHOT[k]) continue;
-      const auto = !!(k === 'shotgun' && d.autoShot); const rid = rId({ id: d.id, rar: d.rarity }); shotQ.push([k, false, auto, room, 0, false, rid]); if (d.trait === 'silent' || (w.atts && w.atts.muzzle)) shotQ.push([k, true, auto, room, 0, false, rid]);
+      // (a launcher's shot is played without its gun's name (A.launcher: newShot(kind, {})): its takes made the same way, or the first
+      // launch wrote one on the spot)
+      const auto = !!(k === 'shotgun' && d.autoShot); const rid = LAUNCH.has(k) ? rId({}) : rId({ id: d.id, rar: d.rarity }); shotQ.push([k, false, auto, room, 0, false, rid]); if (d.trait === 'silent' || (w.atts && w.atts.muzzle)) shotQ.push([k, true, auto, room, 0, false, rid]);
     }
     shotFill();
   }
+  const LAUNCH = new Set(['rocket', 'gl', 'rail', 'harpoon', 'crossbow']);
+  // (a gun come into the hands any way at all - taken from the ground or bought straight into a free hand, not only changed to with
+  // its click (mech 'switch'): weapons.js equip asks, and the takes of the guns now held are queued for the time the page has to spare,
+  // once for each set of guns and place. Their first shot wrote its first take on the spot: 10 - 50 ms)
+  let gunKey = '';
+  A.gunPrep = function () {
+    if (!ctx || !NEW()) return;
+    const P = G.player, k = ((P && P.weapons) || []).map((w) => (w && w.def ? w.def.id + (w.atts && w.atts.muzzle ? '+s' : '') : '')).join(',') + '|' + outdoor();
+    if (k === gunKey) return;
+    gunKey = k; shotWarm(!outdoor());
+  };
   // (soundcheck.html: the plans of a kind made ready before they are fired, in the time the page has to spare)
   A.shotPrep = function (kind, fls, room) { if (!ctx || !NEW()) return; gunsIn.then(() => { for (const fl of fls) shotQ.push([kind, false, false, room, fl]); shotFill(); }); };
   // (one of a plan's takes, never the same one twice running; the first written now, the rest queued for the time the page has to spare)
@@ -1924,7 +1937,11 @@
   // turn, a little different each time. fxPlay: [key, how many takes, length (s), build, level, where (null: in the head), room, speed,
   // a last low-pass over the whole (Hz: so that nothing of it reaches far over 6 kHz)]
   const fxSets = {};
+  // (priming: A.sndPrep asks the sounds below what they would write - the key, the takes, the build - without playing them: fxPlay then
+  // only notes it and gives back a level that leads nowhere)
+  let priming = null, primeOut = null;
   function fxPlay(key, n, secs, build, gain, pos, wet, rate, lp) {
+    if (priming) { if (!priming.has(key)) priming.set(key, [key, n, secs, build, lp]); return primeOut || (primeOut = ctx.createGain()); }
     const set = fxSets[key] || (fxSets[key] = []);
     let b;
     if (set.length < n) {
@@ -3869,4 +3886,39 @@
     };
     setTimeout(slice, 0);
   };
+  // The body's, the hands' and the interface's own sounds (SN: struck, mended, a jump and a landing on each ground, time held back and
+  // let go, warded, the clear, a level, the ratchet, the clock ...), all their takes written ahead once a session, a little at a time
+  // as the power station's are (some 4 ms, then 16 ms left to the page), from a moment after the sound starts. Each was written the
+  // first times it was played, in that frame (2 - 14 ms a take: the clear's 13, a landing on iron 8, time held back 7). What each would
+  // write is asked of the sound itself (fxPlay priming: nothing is played), so every take is as it would have been. A.prepStats.snd
+  let sndPrepped = false;
+  A.sndPrep = function () {
+    if (!ctx || sndPrepped || !NEW()) return;
+    sndPrepped = true;
+    const asks = [() => SN.hurt(10), () => SN.jump()];
+    for (const s of ['stone', 'wood', 'grass', 'ice', 'metal']) for (const k of [0.2, 0.5, 0.9]) asks.push(() => SN.land(k, s));
+    asks.push(() => SN.heal(), () => SN.ok(), () => SN.clear(), () => SN.level(), () => SN.timeIn(0), () => SN.timeOut(0), () => SN.timeTick(0),
+      () => SN.invulnOn(), () => SN.invulnHum(), () => SN.invulnOff());
+    for (const k of [0, 1 / 3, 2 / 3, 1]) asks.push(() => SN.invulnTick(k));
+    for (const k of [0, 1, 2, 3, 4]) asks.push(() => SN.focus(k));
+    for (const l of [0, 1, 2]) asks.push(() => SN.tick(l, 5));
+    asks.push(() => SN.duelTurn(true), () => SN.duelTurn(false), () => SN.drink());
+    priming = new Map();
+    try { for (const a of asks) { try { a(); } catch (e) { /* written when first played */ } } } finally { const m = priming; priming = null; A._sndJobs = [...m.values()]; }
+    // (first, the guns' own shared ones: open ground's answer to a shot (tails, 3) and the brass case landing (cases, 4) - the first
+    // shots out of doors wrote one each, some 12 ms)
+    const jobs = [() => (tails.length < 3 ? (tailTake(), true) : false), () => (cases.length < 4 ? (caseTake(), true) : false)].concat(A._sndJobs);
+    const st = A.prepStats.snd = { ms: 0, slices: 0, takes: 0, jobs: jobs.length, start: performance.now(), end: 0 };
+    let i = 0;
+    const slice = () => {
+      const t0 = performance.now();
+      try { while (i < jobs.length && performance.now() - t0 < 4) { const j = jobs[i]; if (typeof j === 'function' ? j() : fxTake(j[0], j[1], j[2], j[3], j[4])) st.takes++; else i++; } } catch (e) { i = jobs.length; }
+      st.ms += performance.now() - t0; st.slices++;
+      if (i < jobs.length) setTimeout(slice, 16); else { st.end = performance.now(); st.ms = +st.ms.toFixed(1); }
+    };
+    setTimeout(slice, 0);
+  };
+  // (begun a moment after the sound itself starts - at the title, or as a run is first made, a guest's as well - and, if an area is being
+  // readied then, after its black screen: not in it, where the slices would wait on the area's own warm-up and it on them)
+  { const init1 = A.init; A.init = function () { const had = !!ctx; init1.apply(this, arguments); if (!had && ctx) setTimeout(() => { const GM = G.game; (GM && GM._warming && GM._warmP ? GM._warmP : Promise.resolve()).then(() => setTimeout(() => A.sndPrep(), 300), () => A.sndPrep()); }, 1200); }; }
 })();

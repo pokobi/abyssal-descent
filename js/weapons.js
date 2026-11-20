@@ -1076,6 +1076,7 @@
     if (model) vmRoot.remove(model.group);
     model = buildGun(w.def, w.atts, true);
     vmRoot.add(model.group);
+    if (G.sfx.gunPrep) G.sfx.gunPrep(); // (the shots of the guns now in hand made ahead, in spare time: audio.js)
     if (model.pip) W.pipMaterial().uniforms.uKind.value = model.pipKind || 0; // (the reticle of this scope)
     if (W.melee) W.melee.show(false);
     W.switchT = immediate ? 0 : 0.35;

@@ -63,7 +63,7 @@
     w.solid('block', x0, 0, z1 - 0.5, cx - 0.9, h, z1, { uv: 2 }); w.solid('block', cx + 0.9, 0, z1 - 0.5, x1, h, z1, { uv: 2 });
     w.solid('block', cx - 0.9, 2.4, z1 - 0.5, cx + 0.9, h, z1, { uv: 2 });
     w.solid('trim', x0 - 0.3, h, z0 - 0.3, x1 + 0.3, h + 0.35, z1 + 0.3, { uv: 2 });
-    w.solid('trim', x0 + 0.4, h + 0.35, z0 + 0.4, x1 - 0.4, h + 0.8, z1 - 0.4, { uv: 2, noGrapple: true });
+    w.solid('trim', x0 + 0.4, h + 0.35, z0 + 0.4, x1 - 0.4, h + 0.8, z1 - 0.4, { uv: 2 });
     // pediment + columns
     w.visual('trim', cx - 1.6, h - 0.6, z1, cx + 1.6, h, z1 + 0.25, { uv: 1 });
     for (const sx of [-1.3, 1.3]) w.solid('trim', cx + sx - 0.2, 0, z1, cx + sx + 0.2, h - 0.6, z1 + 0.4, { uv: 1 });

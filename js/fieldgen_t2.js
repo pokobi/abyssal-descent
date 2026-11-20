@@ -94,7 +94,7 @@
     // the parapet on the bailey side, open where a stair arrives; merlons on the wall top behind are the curtain's own
     const ex = side < 0 ? x1 - 0.35 : x0;
     w.solid('wall', ex, h, z0 + L + 0.2, ex + 0.35, h + 1.0, z1 - L - 0.2, { uv: 1.5 });
-    for (let z = z0 + L + 2; z < z1 - L - 1; z += 3) w.solid('block', ex - 0.05, h + 1.0, z, ex + 0.4, h + 1.45, z + 1.2, { uv: 1, noGrapple: true });
+    for (let z = z0 + L + 2; z < z1 - L - 1; z += 3) w.solid('block', ex - 0.05, h + 1.0, z, ex + 0.4, h + 1.45, z + 1.2, { uv: 1 });
     occ.mark(x0 - 1, z0, x1 + 1, z1);
     for (let z = z0 + L + 4; z < z1 - L - 3; z += 10) { P().brazier(w, (x0 + x1) / 2, h, z, 0.8); P().banner(w, ex + (side < 0 ? 0.36 : -0.01), h - 0.3, z + 5, side < 0 ? 'px' : 'nx', 3, RED); }
     // a cauldron of boiling oil (煮え油の大釜, gimmick_a.js) set in one of the crenels, over a patch of the bailey kept clear below it:
@@ -120,12 +120,12 @@
   // a square tower: solid, crenellated, banners, a lit arrow slit (a landmark at the corners of the bailey)
   function tower(w, rng, x, z, s, h) {
     w.solid('block', x - s, 0, z - s, x + s, h, z + s, { uv: 3 });
-    w.solid('trim', x - s - 0.25, h, z - s - 0.25, x + s + 0.25, h + 0.35, z + s + 0.25, { uv: 2, noGrapple: true });
+    w.solid('trim', x - s - 0.25, h, z - s - 0.25, x + s + 0.25, h + 0.35, z + s + 0.25, { uv: 2 });   // (its cap and merlons hold the hook; the column over its top keeps anyone off it)
     // (its merlons: the boxes that stop you as they were, drawn as merlons with their copings; corbels under the cap, a battered foot:
     // towerDraw, by the place)
-    for (let k = -s; k < s - 0.4; k += 1.4) for (const [a, b] of [[x + k, z - s - 0.25], [x + k, z + s - 0.35], [x - s - 0.25, z + k], [x + s - 0.35, z + k]]) LG.hard(w, 'block', a, h + 0.35, b, a + 0.7, h + 1.25, b + 0.6, { noGrapple: true });
+    for (let k = -s; k < s - 0.4; k += 1.4) for (const [a, b] of [[x + k, z - s - 0.25], [x + k, z + s - 0.35], [x - s - 0.25, z + k], [x + s - 0.35, z + k]]) LG.hard(w, 'block', a, h + 0.35, b, a + 0.7, h + 1.25, b + 0.6);
     towerDraw(w, x, z, s, h);
-    w.addCollider(x - s, h + 0.35, z - s, x + s, h + 6, z + s, { noGrapple: true }).noFire = true;   // (no fire bed hung in the air on its top, fireTops: nobody gets up there)
+    { const c = w.addCollider(x - s, h + 0.35, z - s, x + s, h + 6, z + s, { noGrapple: true }); c.noFire = true; c.ghost = true; }   // (no fire bed hung in the air on its top, fireTops: nobody gets up there. Nothing is drawn there, so shots, sight and the hook pass through it, as through fireTops' columns)
     for (const [dx, dz] of [[0, 1], [1, 0], [-1, 0]]) w.visual('glow', x + dx * (s + 0.02) - (dz ? 0.12 : 0.02), h * 0.6, z + dz * (s + 0.02) - (dx ? 0.12 : 0.02), x + dx * (s + 0.02) + (dz ? 0.12 : 0.02), h * 0.6 + 1.2, z + dz * (s + 0.02) + (dx ? 0.12 : 0.02), { uv: 1, grad: false });
     P().banner(w, x, h - 1, z + s + 0.01, 'pz', 4, RED);
   }
@@ -187,7 +187,7 @@
     w.solid('woodDark', x0, 0, z0, x1, 3.2, z0 + 0.3, { uv: 2 });
     for (let x = x0; x <= x1 + 0.01; x += (x1 - x0) / Math.max(2, Math.round((x1 - x0) / 3))) { w.solid('woodDark', x - 0.12, 0, z1 - 0.24, x + 0.12, 2.6, z1, { uv: 1 }); if (x < x1 - 1) w.solid('wood', x + 0.1, 0, z0 + 0.3, x + 0.25, 1.4, z1 - 1.2, { uv: 1 }); }
     w.batch.geo('woodDark', PG().box, Mx((x0 + x1) / 2, 3.0, (z0 + z1) / 2, x1 - x0 + 0.6, 0.1, z1 - z0 + 0.9, 0.18, 0, 0));
-    w.addCollider(x0, 2.7, z0, x1, 3.3, z1, { noGrapple: true });
+    w.addCollider(x0, 2.7, z0, x1, 3.3, z1);
     w.visual('wood', x0 + 0.3, 0, z0 + 0.3, x1 - 0.3, 0.06, z1 - 0.3, { uv: 2, grad: false, tint: [1.2, 1.05, 0.62] });
   }
   // (the castle's area itself: field_castle.js, three baileys down a hillside; it builds with these pieces)
@@ -198,7 +198,7 @@
     w.solid('floor', 0, -1, gz1, W, 0, D, { uv: 2 });
     w.visual('cobble', cx - hw, 0, gz1, cx + hw, 0.03, D, { uv: 2, grad: false });
     w.solid('block', 0, 0, gz1, cx - side, 8, D, { uv: 3 }); w.solid('block', cx + side, 0, gz1, W, 8, D, { uv: 3 });
-    for (const sx of [-1, 1]) for (let x = cx + sx * side; Math.abs(x - cx) < 40 && x > 0 && x < W; x += sx * 1.8) w.solid('block', x - 0.45, 8, D - 1, x + 0.45, 9, D, { uv: 1, noGrapple: true });
+    for (const sx of [-1, 1]) for (let x = cx + sx * side; Math.abs(x - cx) < 40 && x > 0 && x < W; x += sx * 1.8) w.solid('block', x - 0.45, 8, D - 1, x + 0.45, 9, D, { uv: 1 });
     const nz = gz1 + (D - gz1) * 0.45;
     for (let z = gz1 + 6; z < D - 4; z += 8) for (const sx of [-1, 1]) {
       if (sx < 0 && Math.abs(z - nz) < 6) continue;
@@ -221,9 +221,9 @@
     ring(w, rng, W, AD, last) {
       // the inner curtain: a crenellated wall round the field, gaps for the gates north
       const gaps = last ? [] : LG.gateXs(W, 3).map((g) => [g - 2.6, g + 2.6]);
-      const wallZ = (x0, x1) => { w.solid('block', x0, 0, 0.2, x1, 6, 1.2, { uv: 3 }); for (let x = x0 + 0.2; x < x1 - 0.6; x += 1.6) w.solid('block', x, 6, 0.2, x + 0.8, 6.9, 0.7, { uv: 1, noGrapple: true }); };
+      const wallZ = (x0, x1) => { w.solid('block', x0, 0, 0.2, x1, 6, 1.2, { uv: 3 }); for (let x = x0 + 0.2; x < x1 - 0.6; x += 1.6) w.solid('block', x, 6, 0.2, x + 0.8, 6.9, 0.7, { uv: 1 }); };
       let x = 0.2; for (const [a, b] of gaps) { if (a > x) wallZ(x, a); x = b; } if (x < W - 0.2) wallZ(x, W - 0.2);
-      for (const [x0, x1] of [[0.2, 1.2], [W - 1.2, W - 0.2]]) { w.solid('block', x0, 0, 1.2, x1, 6, AD, { uv: 3 }); for (let z = 1.4; z < AD - 0.6; z += 1.6) w.solid('block', x0, 6, z, x1, 6.9, z + 0.8, { uv: 1, noGrapple: true }); }
+      for (const [x0, x1] of [[0.2, 1.2], [W - 1.2, W - 0.2]]) { w.solid('block', x0, 0, 1.2, x1, 6, AD, { uv: 3 }); for (let z = 1.4; z < AD - 0.6; z += 1.6) w.solid('block', x0, 6, z, x1, 6.9, z + 0.8, { uv: 1 }); }
     },
     dress(w, rng, W, AD) {
       for (let z = 10; z < AD - 6; z += 14) { P().banner(w, 1.2, 5.6, z, 'px', 3.6, RED); P().banner(w, W - 1.2, 5.6, z + 7, 'nx', 3.6, RED); }

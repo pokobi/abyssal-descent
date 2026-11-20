@@ -45,8 +45,9 @@
       }
       const band = (y) => { if (alongX) w.visual('wood', p, y, c - 0.26, q, y + 0.16, c - 0.2, { uv: 1 }); else w.visual('wood', c + 0.2, y, p, c + 0.26, y + 0.16, q, { uv: 1 }); };
       band(h * 0.3); band(h * 0.72);
-      if (alongX) w.addCollider(p, 0, c - 0.22, q, h + 0.4, c + 0.22, { surf: 'wood', noGrapple: true });
-      else w.addCollider(c - 0.22, 0, p, c + 0.22, h + 0.4, q, { surf: 'wood', noGrapple: true });
+      // (the stakes hold the hook; their tops in a guardian's ring burn like any top up there, fireTops)
+      if (alongX) w.addCollider(p, 0, c - 0.22, q, h + 0.4, c + 0.22, { surf: 'wood' });
+      else w.addCollider(c - 0.22, 0, p, c + 0.22, h + 0.4, q, { surf: 'wood' });
     }
   };
   function haystack(w, x, z, s) {
@@ -94,12 +95,13 @@
     w.solid('wall', x - s, 0, z - s, x + s, h, z + s, { uv: 3 });
     w.solid('trim', x - s - 0.2, h, z - s - 0.2, x + s + 0.2, h + 0.4, z + s + 0.2, { uv: 2 });
     // the open belfry: four corner piers and the bell, then the steep roof
-    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) w.solid('trim', x + dx * (s - 0.35) - 0.35, h + 0.4, z + dz * (s - 0.35) - 0.35, x + dx * (s - 0.35) + 0.35, h + 3.2, z + dz * (s - 0.35) + 0.35, { uv: 1, noGrapple: true });
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) w.solid('trim', x + dx * (s - 0.35) - 0.35, h + 0.4, z + dz * (s - 0.35) - 0.35, x + dx * (s - 0.35) + 0.35, h + 3.2, z + dz * (s - 0.35) + 0.35, { uv: 1 });
     if (G.Gim) G.Gim.bellTower(w, x, z, h, s, rx || 1); // (the bell: 弔いの鐘, gimmick_a.js; its rope hangs down the rx face)
     else w.batch.geo('brass', PG().bowl, Mx(x, h + 2.4, z, 1.5, 2.6, 1.5, Math.PI, 0, 0)); // (the bell, mouth down)
-    w.solid('trim', x - s - 0.3, h + 3.2, z - s - 0.3, x + s + 0.3, h + 3.55, z + s + 0.3, { uv: 2, noGrapple: true });
+    w.solid('trim', x - s - 0.3, h + 3.2, z - s - 0.3, x + s + 0.3, h + 3.55, z + s + 0.3, { uv: 2 });
     w.batch.geo('woodDark', PG().cone, Mx(x, h + 5.4, z, s * 1.55, 3.7, s * 1.55, 0, Math.PI / 8, 0));
-    w.addCollider(x - s, h + 3.55, z - s, x + s, h + 7, z + s, { noGrapple: true });
+    w.addCollider(x - s, h + 3.55, z - s, x + s, h + 7, z + s);
+    w.skyCap(x - s, h + 7, z - s, x + s, z + s);   // (the roof holds the hook, but nobody stands on its point: an invisible column over it, which shots, sight and the hook pass through)
     w.addLight(x, h + 1.6, z, { flame: 0.2, intensity: 6, range: 12, color: '#ffb070', prio: 0.8 });
   }
 
@@ -123,7 +125,7 @@
       w.visual('dark', sx < 0 ? x1 : x0 - 0.02, 2.6, (z0 + z1) / 2 - 0.5, sx < 0 ? x1 + 0.02 : x0, 3.3, (z0 + z1) / 2 + 0.5, { uv: 1, grad: false });
       w.batch.geo('woodDark', PG().box, Mx((x0 + x1) / 2 + sx * 0.6, h + 0.9, (z0 + z1) / 2, d * 0.6, 0.12, 8.2, 0, 0, sx * 0.55));
       w.batch.geo('woodDark', PG().box, Mx((x0 + x1) / 2 - sx * 1.6, h + 0.9, (z0 + z1) / 2, d * 0.6, 0.12, 8.2, 0, 0, -sx * 0.55));
-      w.addCollider(x0, h, z0, x1, h + 2, z1, { noGrapple: true });
+      w.addCollider(x0, h, z0, x1, h + 2, z1); w.skyCap(x0, h + 2, z0, x1, z1);   // (the roof holds the hook; nobody stands on its box's flat top)
       if (!(sx < 0 && Math.abs(z + 3 - nz) < 8)) { if (rng.chance(0.5)) haystack(w, cx + sx * (hw + 3), z + 3.5, 0.8); else if (rng.chance(0.5)) P().barrel(w, cx + sx * (hw + 2.4), z + 2, 0, rng); } // (the merchant's nook stays clear)
       if ((z / 10) % 2 < 1) F.lantern(w, cx + sx * (hw + 0.6), z + 5, '#ffb070');
     }

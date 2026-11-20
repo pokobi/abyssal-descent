@@ -29,7 +29,7 @@
     const CUR = 5.2;
     for (const b of B) for (const [x0, x1] of [[-1.2, 0], [W, W + 1.2]]) {
       w.solid('wall', x0, -1, b.z0, x1, b.y + CUR, b.z1, { uv: 3 });
-      for (let z = b.z0 + 0.3; z < b.z1 - 0.8; z += 1.8) LG.hard(w, 'block', x0, b.y + CUR, z, x1, b.y + CUR + 1, z + 0.9, { noGrapple: true });
+      for (let z = b.z0 + 0.3; z < b.z1 - 0.8; z += 1.8) LG.hard(w, 'block', x0, b.y + CUR, z, x1, b.y + CUR + 1, z + 0.9);   // (they hold the hook: the curtain stands outside the bounds)
     }
     w.solid('wall', -1.2, -1, D, W + 1.2, TOPY + CUR, D + 1.2, { uv: 3 });
     H.perimeter(w, rng, W, D, { gates, h: CUR + 1, walls: false, beams: 0, stub: 3, southY: TOPY });
@@ -57,7 +57,7 @@
         if (stairs.some((s) => s.e === e && Math.abs(x + 0.9 - s.x) < s.wd / 2 + 2.6)) continue;
         if ((Math.floor(x / 2) + k * 3) % 9 === 0) continue;
         w.solid('wall', x, y, e, x + 1.8, y + 1.0, e + 0.4, { uv: 1.5 });
-        if (Math.floor(x / 2) % 2 === 0) { LG.hard(w, 'block', x + 0.2, y + 1.0, e, x + 1.0, y + 1.6, e + 0.4, { noGrapple: true }); rmer.push([x + 0.6, y + 1.0, e]); }
+        if (Math.floor(x / 2) % 2 === 0) { LG.hard(w, 'block', x + 0.2, y + 1.0, e, x + 1.0, y + 1.6, e + 0.4); rmer.push([x + 0.6, y + 1.0, e]); }
         rpar.push([x, x + 1.8, y, e]);
       }
       // the face of the retaining wall: buttresses, torches, banners hanging down it

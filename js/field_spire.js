@@ -381,7 +381,7 @@
     }
     // the broken head: a few lumps of the last drum (if it does not go on up)
     if (!tall) for (let k = 0; k < 4; k++) { const a = k * 1.7 + hsh(x, z, 26) * 6, rr = R * (0.2 + 0.5 * hsh(x, k, 27)); M.blk('trim', x + Math.cos(a) * rr, top - 0.05, z + Math.sin(a) * rr, R * 0.32, top + 0.12 + 0.25 * hsh(z, k, 28), R * 0.28, a, 0.03, { chip: 0.5, chipS: 0.1, n: 0.03 }); }
-    { const c = w.addCollider(x - R - r, y0 - 0.4, z - R - r, x + R + r, top, z + R + r, { surf: 'stone', noGrapple: !!tall }); if (tall) c.noFire = true; }   // (no one gets up a pier with no hold on it: no fire bed on its head, fireTops)
+    { const c = w.addCollider(x - R - r, y0 - 0.4, z - R - r, x + R + r, top, z + R + r, { surf: 'stone' }); if (tall) { c.noFire = true; w.skyCap(x - R - r, top, z - R - r, x + R + r, z + R + r); } }   // (a tall pier holds the hook like any stone, but its head is no perch: no fire bed on it (fireTops), an invisible column over it instead, which shots, sight and the hook pass through)
     S.occ.mark(x - R - 1, z - R - 1, x + R + 1, z + R + 1, 2);
   }
 
@@ -547,6 +547,8 @@
     // (the rock round the ledges stops you: the north face between the gates, the south face either side of the way in)
     const gxs = LG.gateXs(W, gates);
     let ax = -6; for (const g of [...gxs, W + 12]) { const e = g - 5; if (e > ax) w.addCollider(ax, -60, -6, e, 70, 0.2, { surf: 'stone' }).noFire = true; ax = g + 5; }
+    // (over each gate the chasm's rock above its opening (chasmFace, open below 9.2) holds the hook too; the nav grid does not see it)
+    for (const g of gxs) { const c = w.addCollider(g - 5, 9.2, -6, g + 5, 70, 0.2, { surf: 'stone' }); c.noFire = true; c.navIgnore = true; }
     for (const [a, b] of [[-6, 35], [49, W + 6]]) w.addCollider(a, -60, LAND_S + 4, b, 70, D + 6, { surf: 'stone' }).noFire = true;
     w.addCollider(-6, -60, D, W + 6, 70, D + 6, { surf: 'stone' }).noFire = true;   // (the chasm's walls go on up out of reach: no tops to stand on, no fire beds)
     S.gxs = gxs;
@@ -729,6 +731,15 @@
       const t = (i + 0.5) / nv, y = yAt(t) - dep, x = ax + ux * t * L, z = az + uz * t * L, hh = 0.3 + 1.6 * hsh(x, z, 72);
       M.blk('trim', x, y - hh, z, 0.25 + 0.1 * hsh(x, z, 73), y + 0.02, wd * 0.42, Math.atan2(uz, ux), 0.02, { chip: 0.6, chipS: 0.12, n: 0.04, gy: y - 30 });
     }
+    // (it holds the hook: a box round each voussoir. Nobody stands in the cradle: an invisible column over each box, which shots, sight
+    // and the hook pass through; no fire bed on it (fireTops), and the nav grid does not see it, as it did not before)
+    for (let i = 0; i < nv; i++) {
+      const t0 = i / nv, t1 = (i + 1) / nv, ya = yAt(t0), yb = yAt(t1), yhi = Math.max(ya, yb), ylo = Math.min(ya, yb) - dep;
+      const xa = ax + ux * t0 * L, za = az + uz * t0 * L, xb = ax + ux * t1 * L, zb = az + uz * t1 * L, ex = Math.abs(px) * wd / 2, ez = Math.abs(pz) * wd / 2;
+      const x0 = Math.min(xa, xb) - ex, x1 = Math.max(xa, xb) + ex, z0 = Math.min(za, zb) - ez, z1 = Math.max(za, zb) + ez;
+      const c = w.addCollider(x0, ylo, z0, x1, yhi, z1, { surf: 'stone' }); c.noFire = true; c.navIgnore = true;
+      w.skyCap(x0, yhi, z0, x1, z1);
+    }
     return { yAt, L, ux, uz };
   }
   function buildHigh(S) {
@@ -790,6 +801,8 @@
     for (const [px, pz] of ring) for (const yy of [y, y + 0.7 + 0.15 * hsh(px, pz, 94)]) { GR.p.push(px, yy, pz); const nx = px - cx, nz = pz - cz, l = Math.hypot(nx, nz) || 1; GR.n.push(nx / l, 0, nz / l); GR.u.push((px + pz) / 1.5, yy / 1.5); GR.c.push(0.6, 0.6, 0.62); }
     for (let i = 0; i < nA; i++) { const a = b2 + i * 2, b = b2 + ((i + 1) % nA) * 2; GR.i.push(a, b, a + 1, b, b + 1, a + 1); }
     M.box('trim', cx - 0.9, y - 0.05, cz - 1.3, cx + 0.9, y + 0.02, cz + 1.3, 0.01, { tint: [0.55, 0.52, 0.5], plain: true, gy: y - 30 });
+    // (it holds the hook over the part of it that is surely there; nobody stands on it: an invisible column over it, no fire bed, unseen by the nav grid)
+    { const c = w.addCollider(cx - rx * 0.6, y, cz - rz * 0.6, cx + rx * 0.6, y + 0.7, cz + rz * 0.6, { surf: 'stone' }); c.noFire = true; c.navIgnore = true; w.skyCap(cx - rx * 0.6, y + 0.7, cz - rz * 0.6, cx + rx * 0.6, cz + rz * 0.6); }
   }
 
   // ================================================================ under the vault: the roofs, the walls, the tower and the spire

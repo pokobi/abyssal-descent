@@ -201,11 +201,12 @@
     w.platTops.push({ x0: ix0 + 0.5, z0: iz0 + 0.5, x1: ix1 - 0.5, z1: hz0 - 0.5, y: R1, cx: (ix0 + ix1) / 2, cz: (iz0 + hz0) / 2 });
     w.addLight((ix0 + ix1) / 2, R1 + 2.2, (iz0 + iz1) / 2, { flame: 0.4, intensity: 3, range: 7, color: '#ffa860', prio: 0.4 });
     // the roof: a ceiling slab and the two pitches over it
-    w.solid('woodDark', x0 - 0.1, h - 0.25, z0 - 0.1, x1 + 0.1, h, z1 + 0.1, { uv: 2, noGrapple: true });
+    w.solid('woodDark', x0 - 0.1, h - 0.25, z0 - 0.1, x1 + 0.1, h, z1 + 0.1, { uv: 2 });
     const along = (x1 - x0) >= (z1 - z0), cxm = (x0 + x1) / 2, czm = (z0 + z1) / 2;
     if (along) for (const s of [-1, 1]) { const m = Mx(cxm, h + 1.0, czm + s * (z1 - z0) / 4, x1 - x0 + 0.5, 0.18, (z1 - z0) / 2 * 1.16, s * 0.55, 0, 0); w.batch.geo('woodDark', PG().box, m); shingles(w, m); }
     else for (const s of [-1, 1]) { const m = Mx(cxm + s * (x1 - x0) / 4, h + 1.0, czm, (x1 - x0) / 2 * 1.16, 0.18, z1 - z0 + 0.5, 0, 0, -s * 0.55); w.batch.geo('woodDark', PG().box, m); shingles(w, m); }
-    w.addCollider(x0, h, z0, x1, h + 2.1, z1, { noGrapple: true });
+    w.addCollider(x0, h, z0, x1, h + 2.1, z1);
+    w.skyCap(x0, h + 2.1, z0, x1, z1);   // (the steep roof holds the hook, but its box's flat top is no place to stand: an invisible column over it, which shots, sight and the hook pass through)
     // ---- the gable walls under the two pitches, a ridge beam, a chimney of stone (to look at)
     {
       const hw = (along ? z1 - z0 : x1 - x0) / 2, rise = hw * 0.62, len = along ? x1 - x0 : z1 - z0;

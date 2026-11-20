@@ -12,9 +12,9 @@
   // the rock beyond a cave room's bounds: the rock round a rounded chamber (a height grid of the room's own cells) leaves the middle of
   // each side open to the edge of the area, and the fog or the sky showed through there. A band of rock outside all four sides, from
   // under the floor up to h, but for the openings of the gates (their short stretches of wall, stub either side) and of the way in.
-  // Drawn only (nothing is thrown; the bounds stop you as they did)
+  // Nothing is thrown; the bounds stop you as they did. Its boxes hold the hook (it is rock you see); no fire bed on them, unseen by the nav grid
   const caveBand = (w, W, D, o, h, stub) => {
-    const R = (x0, z0, x1, z1) => { if (x1 - x0 > 0.3 && z1 - z0 > 0.3) w.visual('rock', x0, -2, z0, x1, h, z1, { uv: 6, grad: false, skip: { bottom: true } }); };
+    const R = (x0, z0, x1, z1) => { if (x1 - x0 > 0.3 && z1 - z0 > 0.3) { w.visual('rock', x0, -2, z0, x1, h, z1, { uv: 6, grad: false, skip: { bottom: true } }); const c = w.addCollider(x0, -2, z0, x1, h, z1, { surf: 'stone' }); c.noFire = true; c.navIgnore = true; } };
     R(-3, -3, 0, D + 3); R(W, -3, W + 3, D + 3);
     let a = 0; for (const g of [...LG.gateXs(W, o.gates || 1), W + 100]) { R(a, -3, Math.min(W, g - 2.5 - stub), 0); a = g + 2.5 + stub; }
     R(0, D, W / 2 - 4.6 - stub, D + 3); R(W / 2 + 4.6 + stub, D, W, D + 3);
@@ -159,6 +159,9 @@
     const gxs = LG.gateXs(W, o.gates || 1);
     { let ax = -6; for (const g of [...gxs, W + 12]) { if (g - 5.5 > ax) w.addCollider(ax, -40, -6, g - 5.5, 60, 0, { surf: 'stone' }).noFire = true; ax = g + 5.5; } }
     for (const [a, b] of [[-6, W / 2 - 7.5], [W / 2 + 7.5, W + 6]]) w.addCollider(a, -40, D, b, 60, D + 6, { surf: 'stone' }).noFire = true;
+    // (over the gates and the way in, the chasm's rock above their openings (chasmFace) holds the hook too; the nav grid does not see it)
+    for (const g of gxs) { const c = w.addCollider(g - 5.5, 9.2, -6, g + 5.5, 60, 0, { surf: 'stone' }); c.noFire = true; c.navIgnore = true; }
+    { const c = w.addCollider(W / 2 - 7.5, 9.5, D, W / 2 + 7.5, 60, D + 6, { surf: 'stone' }); c.noFire = true; c.navIgnore = true; }
     SP.chasmFace(w, -70, W + 70, 0, -1, -40, 22, gxs);
     SP.chasmFace(w, -70, W + 70, D, 1, -40, 22, null, [W / 2 - 7, W / 2 + 7]);
     // the ribs in the floor: the diagonals to the keystone, the ridge both ways, flush (3 cm)

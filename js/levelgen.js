@@ -290,16 +290,17 @@
       sideWall(-WALL_T, 0); sideWall(W, W + WALL_T);
     }
     if (!OUT) {
-      // upper cave rock band (not grapplable) - visually distinct
-      for (const [a, b, c, d] of [[-WALL_T, -WALL_T, W + WALL_T, 0], [-WALL_T, D, W + WALL_T, D + WALL_T], [-WALL_T, sideZ0, 0, D], [W, sideZ0, W + WALL_T, D]]) w.solid('rock', a, H, b, c, TOP, d, { uv: 6, noGrapple: true, grad: false });
+      // upper cave rock band: rock holds the hook like any wall (it stands outside the area's bounds, which nothing passes, so the rope
+      // takes no one over it)
+      for (const [a, b, c, d] of [[-WALL_T, -WALL_T, W + WALL_T, 0], [-WALL_T, D, W + WALL_T, D + WALL_T], [-WALL_T, sideZ0, 0, D], [W, sideZ0, W + WALL_T, D]]) w.solid('rock', a, H, b, c, TOP, d, { uv: 6, grad: false });
     } else if (OUT === 'ruins') {
       // crenellated city walls under an open sky
-      const mer = (x0, z0, x1, z1) => { const c = hard(w, 'block', x0, H, z0, x1, H + 1.0, z1, { noGrapple: true }); if (c && !own) (w._mers || (w._mers = [])).push(c); return c; };   // (a cemetery's or a village's wall has no parapet: its boxes are left undrawn)
+      const mer = (x0, z0, x1, z1) => { const c = hard(w, 'block', x0, H, z0, x1, H + 1.0, z1); if (c && !own) (w._mers || (w._mers = [])).push(c); if (c && own) c.ghost = true; return c; };   // (a cemetery's or a village's wall has no parapet: its boxes are left undrawn, so shots, sight and the hook pass through them; drawn merlons hold the hook: they stand outside the bounds)
       for (let x = -WALL_T + 0.3; x < W + WALL_T - 1; x += 1.8) { if (!opts.openNorth) mer(x, -WALL_T, x + 0.9, -WALL_T + 0.7); mer(x, D + WALL_T - 0.7, x + 0.9, D + WALL_T); }
       for (let z = 0.3; z < D - 1; z += 1.8) { mer(-WALL_T, z, -WALL_T + 0.7, z + 0.9); mer(W + WALL_T - 0.7, z, W + WALL_T, z + 0.9); }
     } else {
       // sky island: the temple facade on the north gets a golden crest
-      w.solid('trim', -WALL_T, H, -WALL_T, W + WALL_T, H + 0.6, 0, { uv: 2, noGrapple: true });
+      w.solid('trim', -WALL_T, H, -WALL_T, W + WALL_T, H + 0.6, 0, { uv: 2 });
       // open edges guarded by a low balustrade (the edge of the world is unmistakable)
       // (opts.noBal: islands over the void keep no rail along the area's edge; opts.balD: the rail ends there — a guardian's island, its road a bridge)
       // (drawn as a balustrade, balustrade(); the box of its old coping kept in w.visBoxes, for what reads them - areas.js, the signs)

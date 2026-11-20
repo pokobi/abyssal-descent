@@ -860,9 +860,9 @@
     // (how far behind the hand, along the line of sight, its drawn start is: a long thing - a spear, a stake - further, so that the whole
     // of it lies ahead of the eye; and how small a ball of fire or water is drawn as it leaves the hand, growing to its own size)
     if (p.mesh.userData.visS) { p.mesh.scale.setScalar(1); p.mesh.userData.visS = false; }
-    // (your own spear and stake are shaped with the point to -z, and an object's lookAt turns its +z to where it looks: they flew point
-    // last. Turned the other way round, they fly point first)
-    if (p.owner === 'player' && (p.kind === 'spear' || p.kind === 'harpoon')) p.headFwd = true;
+    // (the shots with a point are shaped with it to -z, and an object's lookAt turns its +z to where it looks: they flew point last.
+    // Turned the other way round, they fly point first; by the shape drawn, so a foe's, yours and a friend's fly alike)
+    p.headFwd = NOSE_FWD[p.mesh.userData.kind] !== undefined;
     if (p.owner === 'player' && G.CastAnim && G.CastAnim.visFrom) {
       const vk = VIS_K[p.kind] || VIS_K.def, vf = G.CastAnim.visFrom(vk[0]);
       if (vf) {
@@ -874,6 +874,10 @@
     C.projectiles.push(p);
     return p;
   };
+  // the shapes that have a point (gfx.js shotGeo, and the rods of projMesh), all with it to -z: the number is how much of the drawn
+  // shape lies ahead of its middle less how deep its point goes in when it sticks in a wall (the middle is where it met the wall: the
+  // drawing is drawn back by this along its own length, so that only the point is in; a nail goes in nearly to its head)
+  const NOSE_FWD = { rocket: 0, grenade: 0, bolt: 0.31, arrow: 0.31, nail: -0.035, harpoon: 0.42, spear: 1.0 };
   // the drawn way of a shot off the hand (spawnProjectile): from the hand, onto its own way, smoothly (at its own speed from the first)
   const VIS_K = { spear: [1.6, 1], harpoon: [1.25, 1], icespear: [1.5, 0.75], fireball: [1.15, 0.3], waterorb: [1.0, 0.45], darkorb: [1.0, 0.45], mine: [1.5, 0.45], def: [0.9, 1] };
   function visStep(p) {
@@ -930,6 +934,7 @@
       if (p.stuck) {
         if (p.stuckTo && p.stuckTo.alive) p.pos.copy(p.stuckTo.centerPos()).add(p.stuckOff);
         p.mesh.position.copy(p.pos);
+        if (p.stickBack) p.mesh.position.add(p.stickBack);
         if (p.fuse !== undefined) { p.fuse -= sdt; if (p.fuse <= 0) { detonate(p); return remove(p); } }
         else if (p.life <= 0) return remove(p);
         return false;
@@ -994,13 +999,13 @@
           if (Math.abs(vn) > 2) G.sfx.bounce(p.pos, Math.abs(vn));
           if (p.vel.length() < 1.2 && n.y > 0.5) { p.vel.set(0, 0, 0); p.grav = 0; p.rest = true; }
         } else if (p.sticky) { p.stuck = true; p.pos.addScaledVector(wh.normal, 0.05); G.sfx.bounce(p.pos, 3); return false; }
-        else if (p.mine) { if (p.vis) visEnd(p); p.vel.set(0, 0, 0); p.grav = 0; p.armed = 0.6; p.pos.y += 0.05; C.mines.push({ pos: p.pos.clone(), mesh: p.mesh, dmg: p.dmg, r: p.explode || 4, armed: 0.6, info: p.info }); const j = C.projectiles.indexOf(p); if (j >= 0) C.projectiles.splice(j, 1); return true; }
+        else if (p.mine) { if (p.vis) visEnd(p); p.mesh.rotation.set(0, Math.atan2(p.vel.x, p.vel.z), 0); p.vel.set(0, 0, 0); p.grav = 0; p.armed = 0.6; p.pos.y += 0.05; p.mesh.position.copy(p.pos); C.mines.push({ pos: p.pos.clone(), mesh: p.mesh, dmg: p.dmg, r: p.explode || 4, armed: 0.6, info: p.info }); const j = C.projectiles.indexOf(p); if (j >= 0) C.projectiles.splice(j, 1); return true; }
         else {
           if (p.explode) detonate(p);
           else {
             if (!(G.Water && G.Water.shot(wh.point))) { G.fx.sparks(wh.point, wh.normal, 5, 0xffd0a0, 4); G.fx.dust(wh.point, wh.normal, 0x8a8070, 3); } // (into the water: a splash)
             if (p.onHitWorld) p.onHitWorld(wh);
-            if (p.kind === 'bolt' || p.kind === 'harpoon' || p.kind === 'spear' || p.kind === 'arrow' || p.kind === 'nail') { p.stuck = true; p.life = Math.min(p.life, 4); p.mesh.position.copy(p.pos); return false; }
+            if (p.kind === 'bolt' || p.kind === 'harpoon' || p.kind === 'spear' || p.kind === 'arrow' || p.kind === 'nail') { p.stuck = true; p.life = Math.min(p.life, 4); p.mesh.position.copy(p.pos); stickBack(p); return false; }
           }
           done = true;
         }
@@ -1010,7 +1015,7 @@
         p.mesh.position.copy(p.pos);
         if (p.vis) visStep(p);
         if (p.vel.lengthSq() > 0.01) { const fl = p.headFwd ? -1 : 1; p.mesh.lookAt(p.mesh.position.x + p.vel.x * fl, p.mesh.position.y + p.vel.y * fl, p.mesh.position.z + p.vel.z * fl); }
-        if (p.look === 'sickle') p.mesh.rotateX(p.t * 16);
+        if (p.look === 'sickle') { p.mesh.rotateX(p.t * 16); p.mesh.rotateY(Math.PI / 2); } // (a thrown blade wheels over and over, its blade upright along its way: the ring is turned into that plane, then spun top first)
         trail(p, sdt);
         // ward / orbs / player-side interceptors
         if (p.owner === 'enemy' && interceptors(p)) done = true;
@@ -1021,6 +1026,13 @@
       if (done) return remove(p);
       return false;
     function remove(p) { const j = C.projectiles.indexOf(p); if (j < 0) return true; releaseMesh(p.mesh); C.projectiles.splice(j, 1); if (p.onEnd) p.onEnd(p); return true; }
+  }
+  // a pointed shot stuck in a wall: its drawing drawn back along its own length (NOSE_FWD), the point in and the shaft out. Only the drawing
+  function stickBack(p) {
+    const k = p.headFwd ? NOSE_FWD[p.mesh.userData.kind] : 0;
+    if (!k) return;
+    p.stickBack = V(0, 0, k).applyQuaternion(p.mesh.quaternion);
+    p.mesh.position.add(p.stickBack);
   }
   function interceptors(p) {
     const pl = G.player;

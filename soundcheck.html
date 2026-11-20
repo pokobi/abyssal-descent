@@ -84,6 +84,10 @@
     <h2>比べる用の音</h2>
     <div class="row" id="others"></div>
   </section>
+  <section>
+    <h2>リロード（選んでいる銃と版で）</h2>
+    <div class="row" id="reloads"></div>
+  </section>
   <section id="items">
     <h2>アイテムを使う音</h2>
     <div id="itnow" aria-live="polite">品を押すと、使い終わるまで鳴る</div>
@@ -218,6 +222,36 @@
   btn('others', '', '', '敵の声', '', () => { wake(); A.monster({ x: 0, y: 1.6, z: -9 }, 'snarl', 1, 1); });
   btn('others', '', '', '敵の銃声', '', () => { wake(); A.gunFlavor = S.v; for (let i = 0; i < 4; i++) setTimeout(() => A.gun('smg', { vol: 0.6, pos: { x: 9, y: 1.5, z: -18 } }), i * 110); });
   btn('others', 'amb', true, '環境音', '', () => { S.amb = !S.amb; wake(); setWorld(); draw(); });
+  // the reload of the gun picked, as the game plays it (weapons.js startReload / reloadSounds / shellsIn): from empty or with rounds left.
+  // 新: the recorded steps (audio.js reloadPlan, its parts asked for when the page opens); 前: the synthesized steps as they were.
+  // [its arch (the gun's kind), its reload (s), its magazine, how it is loaded] - data_weapons.js
+  const RL = { pistol: ['pistol', 1.25, 14, 'mag'], revolver: ['revolver', 2.1, 6, 'cyl'], smg: ['smg', 1.7, 32, 'mag'], rifle: ['rifle', 2.0, 30, 'mag'], dmr: ['dmr', 2.2, 15, 'mag'],
+    sniper: ['sniper', 2.8, 5, 'bolt'], shotgun: ['shotgun', 2.5, 6, 'shells'], lmg: ['lmg', 4.0, 100, 'box'], minigun: ['minigun', 5.0, 250, 'box'] };
+  const OLDSEQ = { mag: [[0.15, 'magOut'], [0.6, 'magIn'], [0.85, 'boltFwd']], cyl: [[0.1, 'cylinder'], [0.45, 'shell'], [0.75, 'magIn'], [0.9, 'click']], bolt: [[0.12, 'boltBack'], [0.5, 'magIn'], [0.85, 'boltFwd']],
+    box: [[0.1, 'boltBack'], [0.3, 'magOut'], [0.65, 'magIn'], [0.9, 'boltFwd']] };
+  let rlTimers = [];
+  function reload(empty) {
+    wake();
+    for (const t of rlTimers) clearTimeout(t); rlTimers = []; if (A.reloadStop) A.reloadStop();
+    const [arch, dur0, mag, seq] = RL[S.gun], at = (k, f) => rlTimers.push(setTimeout(f, k * 1000));
+    // (the gun in the hands, as audio.js reads it for the weight of its parts)
+    G.player = { weapons: [{ def: { arch } }], wIdx: 0 };
+    const left = empty ? 0 : Math.floor(mag / 2), miss = mag - left;
+    if (seq === 'shells') {
+      // shell by shell: 85 % of the reload is the shells from empty, one every per s; the pump after them, from empty only (新)
+      const per = (dur0 * 0.85) / mag, dur = per * miss + dur0 * 0.15;
+      for (let i = 1; i <= miss; i++) at(per * i, () => (S.v === 'old' || !A.reloadPart ? A.mech('shell') : A.reloadPart('rl_g_shell', 'shell')));
+      if (S.v === 'old' || empty) at(per * miss + (dur - per * miss) / 3, () => (S.v === 'old' || !A.reloadPart ? A.mech('pump') : A.reloadPart('rl_g_pump', 'pump')));
+      $('now').textContent = gun()[1] + ' リロード ' + (empty ? '空から' : '途中から') + ' ' + dur.toFixed(2) + '秒';
+      return;
+    }
+    const plan = S.v !== 'old' && A.reloadPlan ? A.reloadPlan(arch, seq, empty, dur0) : null;
+    if (plan) for (const [k, f] of plan) at(k * dur0, f); else for (const [k, n] of OLDSEQ[seq] || []) at(k * dur0, () => A.mech(n));
+    $('now').textContent = gun()[1] + ' リロード ' + (empty ? '空から' : '途中から') + ' ' + dur0.toFixed(2) + '秒' + (plan ? '' : '（合成）');
+  }
+  btn('reloads', '', '', '空からリロード', '', () => reload(true));
+  btn('reloads', '', '', '途中からリロード', '', () => reload(false));
+  btn('reloads', '', '', 'リロードを途中でやめる', '', () => { for (const t of rlTimers) clearTimeout(t); rlTimers = []; if (A.reloadStop) A.reloadStop(); });
   // keys: 0-1 the versions in their order (0 the new one, 1 the one before it), space fires
   document.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;

@@ -1352,6 +1352,8 @@
     if (s.reloadSeq === 'shells' && s.mag > 0) { w.reloadPer = dur * SHELL_PART / s.mag; dur = w.reloadPer * miss + dur * (1 - SHELL_PART); }
     w.reloading = true; w.reloadT = dur; w.reloadDur = dur; w.reloadEvents = 0;
     w.reloadBase = w.mag; w.reloadMiss = miss; w.reloadIn = 0; // (shell by shell: see shellsIn)
+    // (its sounds: the recorded steps of its kind, from empty (a round to chamber) or not - audio.js reloadPlan; null: the synthesized ones)
+    w.reloadEmpty = w.mag === 0; w.reloadPlan = G.sfx.reloadPlan ? G.sfx.reloadPlan(w.def.arch, s.reloadSeq, w.reloadEmpty, dur) : null;
     w.burstQ = 0; w.charge = 0;
     G.buffs.emit('onReload', { weapon: w, empty: w.mag === 0 });
   };
@@ -1363,9 +1365,10 @@
     if (!(w.reloadDur > 0) || w.reloadBase == null) return;
     const el = w.reloadDur - Math.max(0, w.reloadT), miss = w.reloadMiss || 0, per = w.reloadPer > 0 ? w.reloadPer : w.reloadDur * SHELL_PART / Math.max(1, miss);
     const n = Math.min(miss, Math.floor(el / per + 1e-9));
-    while ((w.reloadIn || 0) < n) { w.reloadIn = (w.reloadIn || 0) + 1; w.mag = Math.min(s.mag, w.reloadBase + w.reloadIn); if (!quiet) G.sfx.mech('shell'); }
-    // the pump: a third of the closing part after the last shell (as before: 85% shells, pump at 90%, done at 100% from empty)
-    if (!quiet && !w.reloadPump && n >= miss && w.reloadT <= (w.reloadDur - miss * per) * (2 / 3)) { w.reloadPump = true; G.sfx.mech('pump'); }
+    while ((w.reloadIn || 0) < n) { w.reloadIn = (w.reloadIn || 0) + 1; w.mag = Math.min(s.mag, w.reloadBase + w.reloadIn); if (!quiet) G.sfx.reloadPart ? G.sfx.reloadPart('rl_g_shell', 'shell') : G.sfx.mech('shell'); }
+    // the pump: worked as the last shell is in (its sound is some 0.3 s to the slide home, in the closing part) - only from empty: with
+    // a round left in, one is in the chamber already (the sound alone: the reload is as long as before)
+    if (!quiet && !w.reloadPump && n >= miss && (w.reloadBase === 0 || w.reloadT <= (w.reloadDur - miss * per) * (2 / 3))) { w.reloadPump = true; if (w.reloadBase === 0) G.sfx.reloadPart ? G.sfx.reloadPart('rl_g_pump', 'pump') : G.sfx.mech('pump'); }
   };
   // A reload cut short (another action began, the gun was put away): it starts over the next time. A gun loaded shell by shell keeps
   // the shells already in.
@@ -1374,6 +1377,7 @@
     const s = W.stats(w);
     if (s.reloadSeq === 'shells') W.shellsIn(w, s, true);
     w.reloading = false; w.reloadT = 0;
+    if (G.sfx.reloadStop) G.sfx.reloadStop();   // (what of its sound is still going stops with it)
   };
   W.reloadSounds = function (w, s) {
     const k = 1 - w.reloadT / w.reloadDur;
@@ -1387,7 +1391,9 @@
       tank: [[0.15, 'magOut'], [0.6, 'cell'], [0.85, 'click']],
       cell: [[0.15, 'magOut'], [0.55, 'cell'], [0.85, 'click']],
     }[s.reloadSeq] || [];
-    while (w.reloadEvents < seqs.length && k >= seqs[w.reloadEvents][0]) { G.sfx.mech(seqs[w.reloadEvents][1]); w.reloadEvents++; }
+    // (the recorded steps where its kind has them (startReload: w.reloadPlan), each one a thing to play; the synthesized ones by name)
+    const plan = w.reloadPlan || seqs;
+    while (w.reloadEvents < plan.length && k >= plan[w.reloadEvents][0]) { const e = plan[w.reloadEvents][1]; if (typeof e === 'function') e(); else G.sfx.mech(e); w.reloadEvents++; }
   };
 
   W.muzzleWorld = function () {

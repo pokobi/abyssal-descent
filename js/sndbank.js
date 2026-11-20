@@ -4,7 +4,8 @@
 // gets. A sound that is not listed here, or whose files have not arrived, is synthesized as before. Where each file comes from: snd/SOURCES.md
 // (made by a script from the sources; every one of them CC0). The guns' recorded set (gs_ / gq_ / gr_ / gd_, 2026-11-20) is not played as
 // these are but made into each shot by audio.js (recTake), and was made by docs/tools/snd_gunbuild.py: where its files come from is
-// snd/SOURCES_GUNS.md. Each set's first is its kind's own recording (audio.js rIdx). lazy: not fetched at the start (the old version's gun recordings: soundcheck.html asks for them, A.fetchLazy)
+// snd/SOURCES_GUNS.md. Each set's first is its kind's own recording (audio.js rIdx). lazy: not fetched at the start (the old version's gun recordings: soundcheck.html asks for them, A.fetchLazy; the
+// reload's recorded parts rl_*: asked for when a gun of their kind is taken up, audio.js rlFetch)
 (function () {
   window.G = window.G || {};
   G.SND = {
@@ -68,6 +69,29 @@
  "gd_shot": { "f": [ "gd_shot_1.ogg" ] },
  "gd_auto": { "f": [ "gd_auto_1.ogg" ] },
  "gd_shotgun": { "f": [ "gd_shotgun_1.ogg" ] },
+ "rl_b_close": { "f": [ "rl_b_close.ogg" ], "lazy": 1 },
+ "rl_b_open": { "f": [ "rl_b_open.ogg" ], "lazy": 1 },
+ "rl_b_round": { "f": [ "rl_b_round.ogg" ], "lazy": 1 },
+ "rl_c_close": { "f": [ "rl_c_close.ogg" ], "lazy": 1 },
+ "rl_c_eject": { "f": [ "rl_c_eject.ogg" ], "lazy": 1 },
+ "rl_c_in": { "f": [ "rl_c_in.ogg" ], "lazy": 1 },
+ "rl_c_open": { "f": [ "rl_c_open.ogg" ], "lazy": 1 },
+ "rl_d_in": { "f": [ "rl_d_in.ogg" ], "lazy": 1 },
+ "rl_d_out": { "f": [ "rl_d_out.ogg" ], "lazy": 1 },
+ "rl_g_pump": { "f": [ "rl_g_pump.ogg" ], "lazy": 1 },
+ "rl_g_shell": { "f": [ "rl_g_shell.ogg" ], "lazy": 1 },
+ "rl_h_charge": { "f": [ "rl_h_charge.ogg" ], "lazy": 1 },
+ "rl_p_in": { "f": [ "rl_p_in.ogg" ], "lazy": 1 },
+ "rl_p_out": { "f": [ "rl_p_out.ogg" ], "lazy": 1 },
+ "rl_p_rel": { "f": [ "rl_p_rel.ogg" ], "lazy": 1 },
+ "rl_r_in": { "f": [ "rl_r_in.ogg" ], "lazy": 1 },
+ "rl_r_out": { "f": [ "rl_r_out.ogg" ], "lazy": 1 },
+ "rl_r_rel": { "f": [ "rl_r_rel.ogg" ], "lazy": 1 },
+ "rl_s_cock": { "f": [ "rl_s_cock.ogg" ], "lazy": 1 },
+ "rl_s_in": { "f": [ "rl_s_in.ogg" ], "lazy": 1 },
+ "rl_s_out": { "f": [ "rl_s_out.ogg" ], "lazy": 1 },
+ "rl_t_in": { "f": [ "rl_t_in.ogg" ], "lazy": 1 },
+ "rl_t_lock": { "f": [ "rl_t_lock.ogg" ], "lazy": 1 },
  "amb_wind": { "f": [  "amb_wind_1.ogg" ], "v": 1.2 },
  "amb_deep": { "f": [  "amb_wind_1.ogg" ], "v": 1.6, "rate": 0.42 },
  "amb_fire": { "f": [  "amb_fire_1.ogg" ], "v": 2.6 },

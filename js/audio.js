@@ -1300,7 +1300,7 @@
     return old;
   }
   // (for the measurements: docs/tools/gf3_*.js, gf4_*.js)
-  A.shotLab = { rId, plan: shotPlan, take: (pl, mute) => (pl.R ? recTake(pl, mute) : shotTake(pl.kind, pl.p, pl.recs, pl.room)), kEnergy, level: levelTake, KPUB, GUNP, RKREF, RP, RFAR, rLast, make: (pl) => shotMake(pl), bake: (d) => bakeTail(d) };
+  A.shotLab = { mechTake: (k, a) => mechTake(k, a), rId, plan: shotPlan, take: (pl, mute) => (pl.R ? recTake(pl, mute) : shotTake(pl.kind, pl.p, pl.recs, pl.room)), kEnergy, level: levelTake, KPUB, GUNP, RKREF, RP, RFAR, rLast, make: (pl) => shotMake(pl), bake: (d) => bakeTail(d) };
   function shotMake(pl) {
     const t0 = performance.now(), S = A.shotStats;
     let b;
@@ -1339,6 +1339,7 @@
     const P = G.player;
     // (a gun with something on its muzzle may be suppressed: its suppressed takes are made too - a few ms of spare time, if not)
     for (const w of (P && P.weapons) || []) {
+      if (w && w.def) rlFetch(w.def.arch);   // (its reload's recorded parts: see A.reloadPlan)
       const d = w && w.def, k = d && (d.sound === 'tesla' ? 'nail' : d.sound); if (!SHOT[k]) continue;
       // (a launcher's shot is played without its gun's name (A.launcher: newShot(kind, {})): its takes made the same way, or the first
       // launch wrote one on the spot)
@@ -1543,6 +1544,77 @@
       stop() { g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.06); setTimeout(() => { try { src.stop(); } catch (e) {} }, 400); if (lfo) lfo.stop(); },
     };
   };
+
+  // ---------- the reload, recorded (2026-11-21) ----------
+  // Each step of a reload is a recording of a real gun's (snd/rl_*.ogg, CC0: snd/SOURCES_GUNS.md), played at the moment the hands do it
+  // (weapons.js: the magazine leaves the gun from k 0.12 to 0.30 of the reload and is seated by 0.62). RLPLAN, by the gun's kind
+  // (RLC): [k, the part, how it is laid on k ('s' its start, 'p' its loudest moment - a magazine struck home, a bolt stopped), its
+  // speed, 1: only from empty (the slide or the bolt let go, the gun cocked: a round is chambered) / 2: only when not]. A part that is
+  // no recording (no 'rl_') is the synthesized step it names (A.mech): an LMG's feed cover. The same gun is the same sound every time
+  // (the parts are the kind's; a hair of pitch and level off only). Until a kind's parts are in, and for the kinds with none (the
+  // grenade launcher, the crossbow, the harpoon, the rail gun, the arc thrower, the flamethrower), the reload is the synthesized
+  // steps as before. A part is set to the level the synthesized step it stands for had (RLV: its energy made that step's, by
+  // docs/tools/snd_reloadlv.js) - as loud as the reload was.
+  const RLC = { pistol: 'p', revolver: 'c', smg: 's', rifle: 'r', burst: 'r', nail: 'r', dmr: 'd', autoshotgun: 'd', lmg: 'h', minigun: 'h', sniper: 'b', shotgun: 'g', rocket: 't' };
+  // (the reload a kind's plan is for: a kind loaded otherwise keeps its synthesized steps)
+  const RLSEQ = { p: 'mag', s: 'mag', r: 'mag', d: 'mag', h: 'box', b: 'bolt', c: 'cyl', t: 'tube', g: 'shells' };
+  const RLPLAN = {
+    p: [[0.12, 'rl_p_out', 's'], [0.62, 'rl_p_in', 'p'], [0.84, 'rl_p_rel', 'p', 1, 1]],
+    s: [[0.12, 'rl_s_out', 's'], [0.62, 'rl_s_in', 'p'], [0.93, 'rl_s_cock', 'p', 1, 1]],
+    r: [[0.12, 'rl_r_out', 's'], [0.62, 'rl_r_in', 'p'], [0.84, 'rl_r_rel', 'p', 1, 1]],
+    d: [[0.12, 'rl_d_out', 's'], [0.62, 'rl_d_in', 'p'], [0.84, 'rl_r_rel', 'p', 0.92, 1]],
+    h: [[0.06, 'click', 's'], [0.14, 'rl_d_out', 's', 0.85], [0.62, 'rl_r_in', 'p', 0.85], [0.78, 'boltFwd', 's'], [0.93, 'rl_h_charge', 'p', 1, 1]],
+    b: [[0.1, 'rl_b_open', 's'], [0.3, 'rl_b_round', 's'], [0.42, 'rl_b_round', 's', 1.03], [0.54, 'rl_b_round', 's', 0.97], [0.8, 'rl_b_close', 's']],
+    c: [[0.08, 'rl_c_open', 's'], [0.22, 'rl_c_eject', 's'], [0.45, 'rl_c_in', 's'], [0.6, 'rl_c_in', 's', 1.03], [0.86, 'rl_c_close', 'p']],
+    t: [[0.25, 'rl_t_in', 's'], [0.86, 'rl_t_lock', 'p']],
+    g: [],   // (a shotgun's shells and its pump come one by one: weapons.js shellsIn, A.reloadPart)
+  };
+  // (the synthesized step each part stands for - its level is that step's, see A.mech's MECHV - and RLV, the part's own level against it)
+  const RLK = { rl_p_out: 'magOut', rl_p_in: 'magIn', rl_p_rel: 'boltFwd', rl_s_out: 'magOut', rl_s_in: 'magIn', rl_s_cock: 'boltBack', rl_r_out: 'magOut', rl_r_in: 'magIn', rl_r_rel: 'boltFwd',
+    rl_d_out: 'magOut', rl_d_in: 'magIn', rl_h_charge: 'boltBack', rl_b_open: 'boltBack', rl_b_close: 'boltFwd', rl_b_round: 'shell', rl_g_shell: 'shell', rl_g_pump: 'pump',
+    rl_c_open: 'cylinder', rl_c_eject: 'cylinder', rl_c_in: 'shell', rl_c_close: 'click', rl_t_in: 'magIn', rl_t_lock: 'click' };
+  const RLV = { rl_p_out: 1.769, rl_p_in: 0.822, rl_p_rel: 1.347, rl_s_out: 1.786, rl_s_in: 0.722, rl_s_cock: 0.584, rl_r_out: 1.149, rl_r_in: 0.569, rl_r_rel: 0.479, rl_d_out: 1.404, rl_d_in: 0.922, rl_h_charge: 0.713, rl_b_open: 1.513, rl_b_close: 1.211, rl_b_round: 1.601, rl_g_shell: 0.701, rl_g_pump: 0.876, rl_c_open: 3.542, rl_c_eject: 1.18, rl_c_in: 2.559, rl_c_close: 0.759, rl_t_in: 0.689, rl_t_lock: 1.08 };
+  const rlSrc = [];
+  // (a part's loudest moment, s from its start: found once)
+  const rlPeak = (b) => { if (b.pkT === undefined) { const d = b.getChannelData(0); let m = 0, at = 0; for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > m) { m = v; at = i; } } b.pkT = at / b.sampleRate; } return b.pkT; };
+  const rlParts = (c) => (RLPLAN[c] || []).map((e) => e[1]).filter((n) => n.startsWith('rl_')).concat(c === 'g' ? ['rl_g_shell', 'rl_g_pump'] : []);
+  // (the parts of the guns in the hands asked for when the guns are: shotWarm)
+  const rlFetch = (arch) => { const c = RLC[arch]; if (c) for (const n of rlParts(c)) RLOAD(n); };
+  const rlLevel = (part, arch) => (MECHV[RLK[part]] || 0.25) * Math.sqrt(WT[arch] || 1) * (RLV[part] || 1);
+  // one part of a reload, now (fb: the synthesized step played instead while it is not in; rate: its speed)
+  A.reloadPart = function (part, fb, rate, vol) {
+    if (!ctx) return;
+    const b = RLOAD(part)[0];
+    if (!b) { if (fb) A.mech(fb, 0, vol); return; }
+    if (!voice(Math.min(1.5, b.duration))) return;
+    const out = dest(null, 0.08), src = ctx.createBufferSource(), e = { src, out };
+    out.gain.value = (vol || 1) * rlLevel(part, handArch()) * vr(1, 0.045); src.buffer = b; src.playbackRate.value = (rate || 1) * vr(1, 0.01);
+    src.connect(out); src.start(); rlSrc.push(e);
+    src.onended = () => { const i = rlSrc.indexOf(e); if (i >= 0) rlSrc.splice(i, 1); };
+  };
+  // (a reload cut short: what of it is still sounding stops at once, faded in a few ms)
+  A.reloadStop = function () {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    for (const e of rlSrc.splice(0)) { try { e.out.gain.cancelScheduledValues(t); e.out.gain.setTargetAtTime(0, t, 0.01); e.src.stop(t + 0.06); } catch (x) { /* already stopped */ } }
+  };
+  // a reload's steps for weapons.js: [[k to start it at, play it], ...] in order, or null (the synthesized steps, as before). dur: the
+  // reload's length (s) - a part laid on its loudest moment is started that much before it
+  A.reloadPlan = function (arch, seq, empty, dur) {
+    const c = RLC[arch], pl = c && RLPLAN[c];
+    if (!pl || !pl.length || RLSEQ[c] !== seq || !(dur > 0)) return null;
+    let ready = true; for (const n of rlParts(c)) if (!RLOAD(n).length) ready = false;
+    if (!ready) return null;
+    const out = [];
+    for (const [k, part, al, rate, only] of pl) {
+      if ((only === 1 && !empty) || (only === 2 && empty)) continue;
+      if (!part.startsWith('rl_')) { out.push([k, () => A.mech(part)]); continue; }
+      const ks = al === 'p' ? k - rlPeak(RLOAD(part)[0]) / (rate || 1) / dur : k;
+      out.push([Math.max(0, ks), () => A.reloadPart(part, null, rate)]);
+    }
+    return out.sort((a, b) => a[0] - b[0]);
+  };
+  A.reloadInfo = { RLC, RLPLAN, RLK, RLV, rlPeak, parts: rlParts, live: () => rlSrc.length };
 
   // mechanical sounds: reload parts
   // (the new set) The action and the reload as the hands hear them, close and dry. A heavy part stopped is the dull knock of its mass

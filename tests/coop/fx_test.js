@@ -97,7 +97,7 @@ const PORT = +process.env.COOP_PORT || 9011;
     // ---- every kind of projectile the game has, thrown by the host: each one is drawn on the guest with no error
     const kinds = await h.eval("JSON.stringify(['rocket', 'arrow', 'nail', 'bolt', 'harpoon', 'spear', 'icespear', 'orb', 'soul', 'fireball', 'bigfire', 'darkorb', 'frostorb', 'rock', 'bottle', 'dyna', 'grenade'].map((k) => [k, k]).concat(G.ITEMS.filter((i) => i.cat === 'grenade').map((i) => ['grenade', 'gl_' + i.id])))");
     const list = JSON.parse(kinds);
-    await g.eval('window.__seen = new Set(); setInterval(() => { for (const p of G.combat.projectiles) if (p.owner === "remote") window.__seen.add(p.look || p.kind); }, 30); 1');
+    await g.eval('window.__seen = new Set(); (() => { const a = G.combat.projectiles, push = a.push; a.push = function (p) { if (p && p.owner === "remote") window.__seen.add(p.look || p.kind); return push.apply(a, arguments); }; })(); 1');   // (taken as each picture is made, not by looking now and then: one whose way meets a foe at once is gone within a frame, as on the thrower's screen)
     for (const [k, look] of list) {
       await h.eval(`G.combat.spawnProjectile({ kind: ${JSON.stringify(k)}, look: ${look === k ? 'undefined' : JSON.stringify(look)}, pos: G.player.pos.clone().add(new THREE.Vector3(0, 1.6, 0)), vel: new THREE.Vector3(0, 3, -10), grav: 8, owner: 'player', dmg: 1, radius: 0.12, life: 2, explode: 3, info: { src: 'explosion' } }); 1`);
       await sleep(60);

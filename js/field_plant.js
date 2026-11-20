@@ -657,8 +657,20 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
     w.plantInfo = { zc: S.zc, layout };   // (for the tools)
     const ww = FB.finish(w, rng, occ, W, D, area, kind, extraChests);
     ww.spawn = { x: W / 2, y: 0, z: D - 4.5, yaw: 0 };
+    spawnOnFloor(ww);
     w = null; occ = null;
     return ww;
+  }
+  // where foes are set down (world.js randomOpenCell: game.js spawnEnemy, the altars, depth.js): of the cells the walkers' ways reach,
+  // only those whose ground is the floor itself and where a body stands clear of everything built here - not a cell a pump's skid, a
+  // drum or a rack reaches into (its middle still the floor's, but a big foe set down there stood half in the thing, and was pushed out
+  // on top of it). The things themselves are left as they are: you climb onto them as before
+  const SPAWN_R = 0.5, SPAWN_H = 1.9;
+  const spawnClear = (ww, x, y, z) => ww.boxFree(x - SPAWN_R, y + 0.05, z - SPAWN_R, x + SPAWN_R, y + SPAWN_H, z + SPAWN_R) && Math.abs(ww.floorBelow(x, y + 0.3, z) - y) < 0.06;
+  function spawnOnFloor(ww) {
+    const base = ww.randomOpenCell;
+    ww.randomOpenCell = function (rng, filter) { return base.call(this, rng, (x, z, i) => (!filter || filter(x, z, i)) && spawnClear(this, x, this.nf[i], z)); };
+    ww.spawnClear = (x, y, z) => spawnClear(ww, x, y, z);   // (for the tools)
   }
   F.gen.plant = genPlant;
 

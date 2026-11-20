@@ -4,7 +4,7 @@
 // gets. A sound that is not listed here, or whose files have not arrived, is synthesized as before. Where each file comes from: snd/SOURCES.md
 // (made by a script from the sources; every one of them CC0). The guns' recorded set (gs_ / gq_ / gr_ / gd_, 2026-11-20) is not played as
 // these are but made into each shot by audio.js (recTake), and was made by docs/tools/snd_gunbuild.py: where its files come from is
-// snd/SOURCES_GUNS.md. lazy: not fetched at the start (the old version's gun recordings: soundcheck.html asks for them, A.fetchLazy)
+// snd/SOURCES_GUNS.md. Each set's first is its kind's own recording (audio.js rIdx). lazy: not fetched at the start (the old version's gun recordings: soundcheck.html asks for them, A.fetchLazy)
 (function () {
   window.G = window.G || {};
   G.SND = {
@@ -50,24 +50,24 @@
  "mon_die": { "f": [  "mon_die_1.ogg",  "mon_die_2.ogg",  "mon_die_3.ogg",  "mon_die_4.ogg" ], "v": 0.5, "p": 0.1, "wet": 0.35 },
  "melee_slice": { "f": [  "melee_slice_1.ogg",  "melee_slice_2.ogg",  "melee_slice_3.ogg" ], "v": 0.35, "p": 0.08, "wet": 0.12 },
  "launch_crossbow": { "f": [  "launch_crossbow_1.ogg",  "launch_crossbow_2.ogg",  "launch_crossbow_3.ogg",  "launch_crossbow_4.ogg" ], "v": 0.45, "p": 0.05, "wet": 0.2 },
- "gs_pistol": { "f": [ "gs_pistol_1.ogg", "gs_pistol_2.ogg", "gs_pistol_3.ogg", "gs_pistol_4.ogg", "gs_pistol_5.ogg", "gs_pistol_6.ogg" ] },
- "gs_revolver": { "f": [ "gs_revolver_1.ogg", "gs_revolver_2.ogg", "gs_revolver_3.ogg", "gs_revolver_4.ogg" ] },
- "gs_smg": { "f": [ "gs_smg_1.ogg", "gs_smg_2.ogg", "gs_smg_3.ogg", "gs_smg_4.ogg", "gs_smg_5.ogg" ] },
- "gs_rifle": { "f": [ "gs_rifle_1.ogg", "gs_rifle_2.ogg", "gs_rifle_3.ogg", "gs_rifle_4.ogg", "gs_rifle_5.ogg" ] },
- "gs_dmr": { "f": [ "gs_dmr_1.ogg", "gs_dmr_2.ogg", "gs_dmr_3.ogg", "gs_dmr_4.ogg", "gs_dmr_5.ogg" ] },
- "gs_sniper": { "f": [ "gs_sniper_1.ogg", "gs_sniper_2.ogg", "gs_sniper_3.ogg", "gs_sniper_4.ogg", "gs_sniper_5.ogg" ] },
- "gs_shotgun": { "f": [ "gs_shotgun_1.ogg", "gs_shotgun_2.ogg", "gs_shotgun_3.ogg", "gs_shotgun_4.ogg" ] },
- "gs_lmg": { "f": [ "gs_lmg_1.ogg", "gs_lmg_2.ogg", "gs_lmg_3.ogg", "gs_lmg_4.ogg", "gs_lmg_5.ogg" ] },
- "gs_minigun": { "f": [ "gs_minigun_1.ogg", "gs_minigun_2.ogg", "gs_minigun_3.ogg", "gs_minigun_4.ogg" ] },
- "gq_pistol": { "f": [ "gq_pistol_1.ogg", "gq_pistol_2.ogg", "gq_pistol_3.ogg", "gq_pistol_4.ogg" ] },
- "gq_smg": { "f": [ "gq_smg_1.ogg", "gq_smg_2.ogg", "gq_smg_3.ogg" ] },
- "gq_rifle": { "f": [ "gq_rifle_1.ogg", "gq_rifle_2.ogg", "gq_rifle_3.ogg" ] },
- "gq_heavy": { "f": [ "gq_heavy_1.ogg", "gq_heavy_2.ogg", "gq_heavy_3.ogg" ] },
- "gr_in": { "f": [ "gr_in_1.ogg", "gr_in_2.ogg", "gr_in_3.ogg", "gr_in_4.ogg" ] },
- "gr_out": { "f": [ "gr_out_1.ogg", "gr_out_2.ogg", "gr_out_3.ogg", "gr_out_4.ogg" ] },
- "gd_shot": { "f": [ "gd_shot_1.ogg", "gd_shot_2.ogg", "gd_shot_3.ogg", "gd_shot_4.ogg", "gd_shot_5.ogg" ] },
- "gd_auto": { "f": [ "gd_auto_1.ogg", "gd_auto_2.ogg", "gd_auto_3.ogg", "gd_auto_4.ogg" ] },
- "gd_shotgun": { "f": [ "gd_shotgun_1.ogg", "gd_shotgun_2.ogg" ] },
+ "gs_pistol": { "f": [ "gs_pistol_1.ogg", "gs_pistol_2.ogg", "gs_pistol_3.ogg", "gs_pistol_4.ogg", "gs_pistol_5.ogg" ] },
+ "gs_revolver": { "f": [ "gs_revolver_1.ogg", "gs_revolver_2.ogg", "gs_revolver_3.ogg" ] },
+ "gs_smg": { "f": [ "gs_smg_1.ogg", "gs_smg_2.ogg" ] },
+ "gs_rifle": { "f": [ "gs_rifle_1.ogg", "gs_rifle_2.ogg" ] },
+ "gs_dmr": { "f": [ "gs_dmr_1.ogg", "gs_dmr_2.ogg", "gs_dmr_3.ogg" ] },
+ "gs_sniper": { "f": [ "gs_sniper_1.ogg", "gs_sniper_2.ogg", "gs_sniper_3.ogg" ] },
+ "gs_shotgun": { "f": [ "gs_shotgun_1.ogg", "gs_shotgun_2.ogg", "gs_shotgun_3.ogg" ] },
+ "gs_lmg": { "f": [ "gs_lmg_1.ogg", "gs_lmg_2.ogg" ] },
+ "gs_minigun": { "f": [ "gs_minigun_1.ogg", "gs_minigun_2.ogg" ] },
+ "gq_pistol": { "f": [ "gq_pistol_1.ogg", "gq_pistol_2.ogg" ] },
+ "gq_smg": { "f": [ "gq_smg_1.ogg", "gq_smg_2.ogg" ] },
+ "gq_rifle": { "f": [ "gq_rifle_1.ogg", "gq_rifle_2.ogg" ] },
+ "gq_heavy": { "f": [ "gq_heavy_1.ogg" ] },
+ "gr_in": { "f": [ "gr_in_1.ogg", "gr_in_2.ogg" ] },
+ "gr_out": { "f": [ "gr_out_1.ogg", "gr_out_2.ogg" ] },
+ "gd_shot": { "f": [ "gd_shot_1.ogg" ] },
+ "gd_auto": { "f": [ "gd_auto_1.ogg" ] },
+ "gd_shotgun": { "f": [ "gd_shotgun_1.ogg" ] },
  "amb_wind": { "f": [  "amb_wind_1.ogg" ], "v": 1.2 },
  "amb_deep": { "f": [  "amb_wind_1.ogg" ], "v": 1.6, "rate": 0.42 },
  "amb_fire": { "f": [  "amb_fire_1.ogg" ], "v": 2.6 },

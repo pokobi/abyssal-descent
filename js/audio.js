@@ -1131,29 +1131,41 @@
   }
   // ---------- the recorded shot (2026-11-20: the game's own for every gun that has recordings) ----------
   // A shot made of recordings of real guns (snd/g*_*.ogg, all CC0: snd/SOURCES_GUNS.md). At its heart one shot of the kind, near (gs_:
-  // a different one each take, its speed a little off), and the place answering it from recordings too: in a room, hard early returns
-  // made of the shot itself thrown back off the stone close round (short and dense, the top dulled) and the tail of a shot fired
+  // one recording a gun, always the same - each kind's first is its own, a named gun may be given another by its id (rIdx): a gun
+  // sounds as itself every time, only its pitch and level a hair off at each shot), its top over 3.5 kHz lifted a little (hs: the
+  // crack of it), and the place answering it from recordings too: in a room, hard early returns made of the shot itself thrown back
+  // off the stone close round (short and dense, the very top dulled) and the tail of a shot fired
   // indoors (gr_in); on open ground, the ground's one return and the long return of a mountain (gr_out: the slap, a swell some 0.5 s
   // after, a second one later). Only the push in the chest under it is synthesized, kept under 150 Hz. A shot far off - a foe's, a
   // friend's - is a far recording (gd_: the top gone, its returns carrying it), laid in over the near one as the distance grows
   // (newShot, RFAR). A suppressed shot is a suppressed recording (gq_), lighter or heavier by the gun (SUPP's weight, as suppOf keeps
   // it). Each take is the shot with its early returns, and which of the place's tails go with it (buf.tail: the recordings shared, not
   // copied into each take), played smaller in fast fire as the old roll was. A take is set to the loudness the old version's take had (RKREF), so that nothing is louder or quieter than it was.
-  // RP, by kind: rate the recordings' speed; lo the push's level (against the shot's peak), lf its Hz (from, to), lt how fast it dies
+  // RP, by kind: rate the recordings' speed (1: the pitch is moved where it is played, not by reading the recording slower - that dulled
+  // its top); hs dB its top over 3.5 kHz (hf Hz where a kind says) is lifted by
+  // (none where the recording is sharp already - the pistol's, the sniper's rifle's: more of it was hard on the ear); lo the push's level (against the shot's peak; kept small: more of it took the
+  // crack's share of the whole), lf its Hz (from, to), lt how fast it dies
   // (s); er the room's early returns, ri the room's tail, gnd the ground's return, ro the mountain's; far the far set, frate its speed;
   // sq the suppressed set; clip: dB its peak may be bent into the soft top to reach its loudness (levelTake: a recording's peak is
-  // sharp, and a heavy gun's old take was loud for its peak - 10 to 12.5 dB bent in it)
+  // sharp, and a heavy gun's old take was loud for its peak - 10 to 12.5 dB bent in it). The weight (round 3: the shots were heard as
+  // light, and the top is not to be cut to make them heavy): the push longer and bigger (lo, lt - short for a gun fired fast, so that
+  // its lows do not pile up into a mud), bd dB the recording's own body lifted round bf Hz (150-400 Hz), bt the body ringing on after
+  // the burst - the recording's 150-400 Hz thrown back at 7-85 ms (to 41 ms for a gun fired fast: bq). Heavier from the pistol up:
+  // pistol < smg < rifle < marksman's < shotgun, sniper's. md dB the middle (some 900 Hz) taken down, broad: the loudness is held
+  // where it was (K-weighted), and the low and the top could not both be more of it with the middle as it was
   const RP = {
-    pistol: { clip: 5, rate: 1, lo: 0.2, lf: [95, 55], lt: 0.03, er: 1, ri: 0.3, gnd: 0.3, ro: 0.4, far: 'shot', frate: 1.08, sq: 'pistol' },
-    revolver: { clip: 7, rate: 0.98, lo: 0.28, lf: [85, 48], lt: 0.045, er: 1, ri: 0.34, gnd: 0.32, ro: 0.48, far: 'shot', frate: 1, sq: 'pistol' },
-    smg: { rate: 1, lo: 0.15, lf: [105, 60], lt: 0.022, er: 0.9, ri: 0.24, gnd: 0.28, ro: 0.32, far: 'auto', frate: 1.1, sq: 'smg' },
-    rifle: { rate: 1, lo: 0.24, lf: [90, 52], lt: 0.04, er: 1, ri: 0.3, gnd: 0.3, ro: 0.45, far: 'shot', frate: 1, sq: 'rifle' },
-    dmr: { rate: 0.99, lo: 0.3, lf: [85, 48], lt: 0.05, er: 1, ri: 0.34, gnd: 0.32, ro: 0.5, far: 'shot', frate: 0.95, sq: 'rifle' },
-    sniper: { clip: 5, rate: 0.98, lo: 0.38, lf: [75, 42], lt: 0.07, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.6, far: 'shot', frate: 0.9, sq: 'heavy' },
-    shotgun: { clip: 6.5, rate: 0.98, lo: 0.36, lf: [80, 45], lt: 0.06, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.55, far: 'shotgun', frate: 1, sq: 'heavy' },
-    lmg: { clip: 6, rate: 0.98, lo: 0.26, lf: [88, 50], lt: 0.04, er: 0.95, ri: 0.28, gnd: 0.3, ro: 0.42, far: 'auto', frate: 0.95, sq: 'rifle' },
-    minigun: { rate: 1.03, lo: 0.13, lf: [110, 65], lt: 0.018, er: 0.8, ri: 0.18, gnd: 0.26, ro: 0.26, far: 'auto', frate: 1.05, sq: 'smg' },
+    pistol: { clip: 5, rate: 1, hs: 0, lo: 0.7, lf: [95, 55], lt: 0.055, bd: 6, bf: 240, bt: 0.32, md: 2, er: 1, ri: 0.3, gnd: 0.3, ro: 0.4, far: 'shot', frate: 1.08, sq: 'pistol' },
+    revolver: { clip: 9, rate: 1, hs: 5, hf: 2500, lo: 0.5, lf: [85, 48], lt: 0.07, bd: 8, bf: 210, bt: 0.45, md: 2, er: 1, ri: 0.34, gnd: 0.32, ro: 0.48, far: 'shot', frate: 1, sq: 'pistol' },
+    smg: { rate: 1, hs: 6, hf: 3000, lo: 0.55, lf: [105, 60], lt: 0.026, bd: 9, bf: 240, bt: 0.42, bq: 1, md: 3, er: 0.9, ri: 0.24, gnd: 0.28, ro: 0.32, far: 'auto', frate: 1.1, sq: 'smg' },
+    rifle: { rate: 1, hs: 4, hf: 3000, lo: 0.8, lf: [90, 52], lt: 0.07, bd: 6, bf: 215, bt: 0.4, md: 2, er: 1, ri: 0.3, gnd: 0.3, ro: 0.45, far: 'shot', frate: 1, sq: 'rifle' },
+    dmr: { rate: 1, hs: 9, lo: 0.95, lf: [85, 48], lt: 0.08, bd: 9, bf: 200, bt: 0.5, md: 5, er: 1, ri: 0.34, gnd: 0.32, ro: 0.5, far: 'shot', frate: 0.95, sq: 'rifle' },
+    sniper: { clip: 5, rate: 1, hs: 0, lo: 0.75, lf: [75, 42], lt: 0.1, bd: 10.5, bf: 185, bt: 0.7, md: 3, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.6, far: 'shot', frate: 0.9, sq: 'heavy' },
+    shotgun: { clip: 6.5, rate: 1, hs: 5, lo: 0.8, lf: [80, 45], lt: 0.09, bd: 7.5, bf: 180, bt: 0.52, md: 3, er: 1.05, ri: 0.38, gnd: 0.34, ro: 0.55, far: 'shotgun', frate: 1, sq: 'heavy' },
+    lmg: { clip: 6, rate: 1, hs: 4.5, hf: 2500, lo: 0.7, lf: [88, 50], lt: 0.045, bd: 8, bf: 200, bt: 0.36, bq: 1, md: 2.5, er: 0.95, ri: 0.28, gnd: 0.3, ro: 0.42, far: 'auto', frate: 0.95, sq: 'rifle' },
+    minigun: { rate: 1, hs: 3.5, lo: 0.65, lf: [110, 65], lt: 0.022, bd: 9, bf: 230, bt: 0.28, bq: 1, md: 2, er: 0.8, ri: 0.18, gnd: 0.26, ro: 0.26, far: 'auto', frate: 1.05, sq: 'smg' },
   };
+  // (the body's returns after the burst: [ms after, level])
+  const RBT = [[7, 0.9], [15, 0.75], [26, 0.6], [41, 0.45], [60, 0.32], [85, 0.2]];
   // (from how far a shot begins to be the far recording, and by how far it is all of it (m) - see newShot)
   const RFAR = [12, 55];
   // (a room's early returns: [ms after, level, pan] - close stone all round, so many and soon, gone by some 35 ms)
@@ -1162,9 +1174,15 @@
   // made them, with the recordings it had: docs/tools/snd_gunkref.js - by suppressed, kind, a self-loading shotgun, place (a suppressed
   // self-loading shotgun as a suppressed shotgun). A recorded take is set to it, and played at the old version's level: as loud as it was)
   const RKREF = { 'pistol:in': 26.5, 'pistol:out': 26.3, 'revolver:in': 29.7, 'revolver:out': 30.4, 'smg:in': 22.8, 'smg:out': 22.9, 'rifle:in': 25.4, 'rifle:out': 25.4, 'dmr:in': 27.7, 'dmr:out': 27.8, 'sniper:in': 29.7, 'sniper:out': 30.2, 'shotgun:in': 30.2, 'shotgun:out': 30.6, 'shotgun:a:in': 31.8, 'shotgun:a:out': 32.4, 'lmg:in': 28.5, 'lmg:out': 28.7, 'minigun:in': 23.6, 'minigun:out': 23.6, 's:pistol:in': 22.6, 's:pistol:out': 22.7, 's:revolver:in': 23.6, 's:revolver:out': 23.7, 's:smg:in': 22.4, 's:smg:out': 22.1, 's:rifle:in': 24.3, 's:rifle:out': 24.4, 's:dmr:in': 24.5, 's:dmr:out': 24.8, 's:sniper:in': 25.4, 's:sniper:out': 25.9, 's:shotgun:in': 25.5, 's:shotgun:out': 25.4, 's:lmg:in': 25, 's:lmg:out': 25.1, 's:minigun:in': 21.9, 's:minigun:out': 21.8 };
-  const RLOAD = (key) => { const b = SB.bank[key]; return b ? b.f.map((f) => bufs[f] || (fetchBuf(f), null)).filter(Boolean) : []; };
+  // (the recordings of a set that have arrived, each with its file's name on it (for the measurements); ri: only the ri-th, or none yet)
+  const RLOAD = (key, ri) => { const b = SB.bank[key]; if (!b) return []; const fs = ri === undefined ? b.f : b.f[ri] ? [b.f[ri]] : [b.f[0]];
+    return fs.map((f) => { const x = bufs[f]; if (!x) { fetchBuf(f); return null; } x.nm = f; return x; }).filter(Boolean); };
   const rLast = {};
-  const rPick = (arr, k) => { let i = Math.floor(Math.random() * arr.length); if (arr.length > 1 && i === rLast[k]) i = (i + 1) % arr.length; rLast[k] = i; return arr[i]; };
+  // (which of a set's recordings a gun is: a rare or better gun's from its id - half of them the set's own first, the rest one of the
+  // others - and the first for a common or uncommon one (the kind's plain gun sounds as the kind) and a shot with no gun's id; the same
+  // gun always the same. rid: the id to go by, or nothing - see rId)
+  const rId = (o) => (o.rar === 'common' || o.rar === 'uncommon' ? null : o.id);
+  const rIdx = (key, id) => { const b = SB.bank[key], n = b ? b.f.length : 0; if (!id || n < 2) return 0; const h = hs(id); return hr(h, 11) < 0.5 ? 0 : 1 + Math.floor(hr(h, 12) * (n - 1)); };
   // (a recording read into X from i0 at speed r, its file's peak (0.89, as they were made) brought to g; mute: nothing of it - the take
   // with its recordings left out, for the measurements: docs/tools/snd_recshare2.js)
   function recIn(X, i0, buf, r, g, mute) {
@@ -1184,8 +1202,8 @@
   // when the shot is: playTail) - written out into a buffer only for the measurements (bakeTail)
   function placeIn(key, g, d0, lp) {
     const set = RLOAD(key); if (!set.length || !g) return null;
-    const a = rPick(set, key + ':l'), c = set.length > 1 ? rPick(set.filter((x) => x !== a), key + ':r') : a;
-    return { a, c, r: vr(1, 0.04), g, d0, lp };
+    // (always the same two: the set's first on the left, its second on the right)
+    return { a: set[0], c: set[1] || set[0], r: 1, g, d0, lp };
   }
   const TAILW = [[-1, 0, 1], [1, 0.0013, 1.01]];   // ([pan, s later, speed] of the two returns)
   function bakeTail(d, mute) {
@@ -1205,22 +1223,36 @@
   }
   // one recorded take: {b: the shot and its early returns, t: the place's tail (or null) - written out into a buffer unless live}
   function recTake(pl, mute, live) {
-    const sr = ctx.sampleRate, R = pl.R, room = pl.room, rec = rPick(pl.recs, pl.key), far = pl.far;
-    const r = (far ? R.frate : R.rate) * vr(1, far ? 0.04 : 0.03), n = Math.floor((rec.length - 2) / r) + Math.round(0.04 * sr);
+    const sr = ctx.sampleRate, R = pl.R, room = pl.room, rec = pl.recs[0], far = pl.far;
+    const r = far ? R.frate : R.rate, n = Math.floor((rec.length - 2) / r) + Math.round(0.04 * sr);
     const b = ctx.createBuffer(2, n, sr), L = b.getChannelData(0), Rr = b.getChannelData(1), D = work(0, n), H = work(1, n);
     recIn(D, 0, rec, r, 1, mute);
     // (far off, the top is gone - the far recordings of a machine gun keep some of theirs; in a room the shot comes through the stone:
     // duller still)
     if (far) bqRun(D, 'lp', room ? 2400 : 3000, 0.7, sr);
     if (R.slp) bqRun(D, 'lp', R.slp, 0.7, sr);
+    // (its body lifted: the recording and so much more of its own band round bf; and that band ringing on after the burst, thrown back
+    // a few times over 7-85 ms, each return smaller - the body of the report held on, all of it the recording's)
+    if ((R.bd || R.bt) && !far) {
+      const X = work(2, n); for (let i = 0; i < n; i++) X[i] = D[i]; bqRun(X, 'bp', R.bf, 0.9, sr);
+      const k = Math.pow(10, (R.bd || 0) / 20) - 1, Y = work(3, n);
+      for (let i = 0; i < n; i++) Y[i] = X[i];
+      for (let i = 0; i < n; i++) D[i] += X[i] * k;
+      if (R.bt) for (const [ms, g] of RBT) { if (R.bq && ms > 41) break; const d = Math.round((ms * sr) / 1000), gg = g * R.bt; for (let i = 0; i + d < n; i++) D[i + d] += Y[i] * gg; }
+    }
+    // (its middle taken down a little, broad round 900 Hz: the recording less so much of its own band there)
+    if (R.md && !far) { const X = work(2, n); for (let i = 0; i < n; i++) X[i] = D[i]; bqRun(X, 'bp', 900, 0.6, sr); const k = 1 - Math.pow(10, -R.md / 20); for (let i = 0; i < n; i++) D[i] -= X[i] * k; }
+    // (its top over 3.5 kHz lifted: the recording and so much more of its high-passed self)
+    if (R.hs && !far) { const X = work(2, n); for (let i = 0; i < n; i++) X[i] = D[i]; bqRun(X, 'hp', R.hf || 3500, 0.7, sr); const k = Math.pow(10, R.hs / 20) - 1; for (let i = 0; i < n; i++) D[i] += X[i] * k; }
     for (let i = 0; i < n; i++) { L[i] = D[i]; Rr[i] = D[i]; H[i] = D[i]; }
     if (!far) {
-      bqRun(H, 'lp', room ? 5000 : 3000, 0.7, sr); bqRun(H, 'hp', 250, 0.7, sr);
-      const tap = (ms, g, pan) => {
-        const d = Math.round((ms * vr(1, 0.1) * sr) / 1000), gg = g * (Math.random() < 0.3 ? -1 : 1), gl = gg * Math.min(1, 1 - pan), gr = gg * Math.min(1, 1 + pan);
+      bqRun(H, 'lp', room ? 7500 : 6000, 0.7, sr); bqRun(H, 'hp', 250, 0.7, sr);
+      // (each return where it is, every third turned over: no chance in a take, so that a gun's takes are all the same)
+      const tap = (ms, g, pan, j) => {
+        const d = Math.round((ms * sr) / 1000), gg = g * (j % 3 === 2 ? -1 : 1), gl = gg * Math.min(1, 1 - pan), gr = gg * Math.min(1, 1 + pan);
         for (let i = 0; i + d < n; i++) { L[i + d] += H[i] * gl; Rr[i + d] += H[i] * gr; }
       };
-      if (room) for (const [ms, g, pan] of RER) tap(ms, g * R.er, pan); else tap(3.1, R.gnd, 0);
+      if (room) RER.forEach(([ms, g, pan], j) => tap(ms, g * R.er, pan, j)); else tap(3.1, R.gnd, 0, 0);
       if (R.lo) { const X = work(2, n); pushIn(X, R, 1, sr); for (let i = 0; i < n; i++) { L[i] += X[i]; Rr[i] += X[i]; } }
     }
     let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(Rr[i]));
@@ -1229,22 +1261,25 @@
     const t = room ? placeIn('gr_in', R.ri * k * (far ? 1.6 : 1), far ? 0.012 : 0.006, far ? 1800 : 0) : placeIn('gr_out', R.ro * k * (far ? 1.4 : 1), far ? 0.03 : 0.02, 0);
     return { b, t: t && !live ? bakeTail(t, mute) : t };
   }
-  const RSLP = { pistol: 6000, smg: 4200, rifle: 4000, heavy: 4500 };
+  const RSLP = { pistol: 5000, smg: 4200, rifle: 4000, heavy: 4500 };
   // the plan of a recorded shot, laid over the old version's (old: its level, what it pulls down, its case, the working after it)
-  function recPlan(kind, supp, auto, room, far, old) {
+  function recPlan(kind, supp, auto, room, far, old, id) {
     let R = RP[kind];
     // (suppressed: the suppressed recording a little slower and its push bigger the heavier the gun, its top dulled - the can's own hiss
-    // and the action's clatter in the recordings (the machine pistol's most of all) stood over the shot - and the place answering less)
-    if (supp) { const w = (SUPP[kind] || [1])[0]; R = O({}, R, { rate: R.rate * (1.06 - 0.06 * w), lo: R.lo * 0.45 * w, er: R.er * 0.6, ri: R.ri * 0.45, ro: R.ro * 0.35, gnd: R.gnd * 0.6, slp: RSLP[R.sq] }); }
-    const set = supp ? 'gq_' + R.sq : far ? 'gd_' + R.far : 'gs_' + kind, kk = (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out');
-    return { kind, p: O({}, old.p, { tail: 0, wet: old.p.wet * 0.6 }), R, recs: RLOAD(set), room, auto, far, supp, n: 'R', lvl: 0, kref: RKREF[kk] !== undefined ? RKREF[kk] : RKREF[kk.replace(':a', '')],
-      duck: old.duck, clip: R.clip || 4, shave: 3, topx: 1, gv: old.gv, kk, key: 'R:' + kk + (far ? ':far' : '') };
+    // and the action's clatter in the recordings (the machine pistol's most of all) stood over the shot - and the place answering less;
+    // a little of the weight too, the quiet kept: the push smaller, the body a little)
+    if (supp) { const w = (SUPP[kind] || [1])[0]; R = O({}, R, { rate: R.rate * (1.06 - 0.06 * w), hs: 0, lo: R.lo * 0.3 * w, bd: (R.bd || 0) * 0.7 + 1.5, bt: (R.bt || 0) * 0.6, md: 0, er: R.er * 0.6, ri: R.ri * 0.45, ro: R.ro * 0.35, gnd: R.gnd * 0.6, slp: RSLP[R.sq] }); }
+    // (a far shot is the far set's first, whatever the gun: far off one is not told from another)
+    const set = supp ? 'gq_' + R.sq : far ? 'gd_' + R.far : 'gs_' + kind, kk = (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out'), ri = far ? 0 : rIdx(set, id);
+    return { kind, p: O({}, old.p, { tail: 0, wet: old.p.wet * 0.6 }), R, recs: RLOAD(set, ri), ri, room, auto, far, supp, n: 'R', lvl: 0, kref: RKREF[kk] !== undefined ? RKREF[kk] : RKREF[kk.replace(':a', '')],
+      duck: old.duck, clip: R.clip || 4, shave: 3, topx: 1, gv: old.gv, kk, key: 'R:' + kk + (far ? ':far' : '') + ':' + ri };
   }
   // what a shot of this kind is, here and now: its layers (the plan fl picks laid over them), the recordings of it that have arrived
   // (until they have, its takes are of the layers alone, kept apart), its loudness, what it pulls down, and the key its takes are kept under
   // (fl: 0 the game's own - the recorded shot (recPlan) for a kind in RP once its recordings are in, the old version until then and for
-  // the rest; 'R' the recorded shot; 'old' the old version, as the game played it before (soundcheck.html's 前の版); far: a far take)
-  function shotPlan(kind, supp, auto, room, fl, far) {
+  // the rest; 'R' the recorded shot; 'old' the old version, as the game played it before (soundcheck.html's 前の版); far: a far take;
+  // id: the gun's (which recording it is: rIdx))
+  function shotPlan(kind, supp, auto, room, fl, far, id) {
     if (fl === undefined) fl = A.gunFlavor;
     const useR = !!RP[kind] && (fl === 0 || fl === 'R') && !A.noSamples;
     if (fl === 'R' || fl === 'old') fl = 0;
@@ -1256,11 +1291,11 @@
     const bk = p.rv && usable('gun_' + kind) ? SB.bank['gun_' + kind] : null, recs = bk ? bk.f.map((f) => bufs[f] || (fetchBuf(f), null)).filter(Boolean) : [];
     const old = { kind, p, recs, room, auto, n, lvl: q && !supp ? q.lvl || 0 : null, duck, shave: q && !supp ? q.shave : undefined, clip: q && !supp ? q.clip : 0, topx: q && !supp ? q.topx : undefined, gv: fl === 'pub' ? 1 : GUNV, kk: kind + (auto ? ':a' : '') + (room ? ':in' : ':out'),
       key: (supp ? 's:' : '') + kind + (auto ? ':a' : '') + (room ? ':in' : ':out') + (recs.length ? ':r' : '') + (n ? ':' + n : '') };
-    if (useR) { const r = recPlan(kind, supp, auto, room, !!far && !supp, old); if (r.recs.length) return r; }
+    if (useR) { const r = recPlan(kind, supp, auto, room, !!far && !supp, old, id); if (r.recs.length) return r; }
     return old;
   }
   // (for the measurements: docs/tools/gf3_*.js, gf4_*.js)
-  A.shotLab = { plan: shotPlan, take: (pl, mute) => (pl.R ? recTake(pl, mute) : shotTake(pl.kind, pl.p, pl.recs, pl.room)), kEnergy, level: levelTake, KPUB, GUNP, RKREF, RP, RFAR, rLast, make: (pl) => shotMake(pl), bake: (d) => bakeTail(d) };
+  A.shotLab = { rId, plan: shotPlan, take: (pl, mute) => (pl.R ? recTake(pl, mute) : shotTake(pl.kind, pl.p, pl.recs, pl.room)), kEnergy, level: levelTake, KPUB, GUNP, RKREF, RP, RFAR, rLast, make: (pl) => shotMake(pl), bake: (d) => bakeTail(d) };
   function shotMake(pl) {
     const t0 = performance.now(), S = A.shotStats;
     let b;
@@ -1287,9 +1322,9 @@
     const run = (dl) => {
       const t0 = performance.now(), budget = dl && !dl.didTimeout && dl.timeRemaining ? dl.timeRemaining() - 2 : 6;
       do {
-        const [kind, supp, auto, room, fl, far] = shotQ.shift(), pl = shotPlan(kind, supp, auto, room, fl, far), set = shotSets[pl.key];
+        const [kind, supp, auto, room, fl, far, id] = shotQ.shift(), pl = shotPlan(kind, supp, auto, room, fl, far, id), set = shotSets[pl.key];
         if (pl.p.rv && !pl.recs.length && usable('gun_' + kind)) { if (!set || !set.length) shotMake(pl); continue; }   // (its recordings are still on their way: one take of the layers alone, to fire with until they come)
-        if (!set || set.length < (pl.R ? 6 : 5)) shotMake(pl);   // (a recorded kind: a take more, each one being one of a few recordings)
+        if (!set || set.length < (pl.R ? 1 : 5)) shotMake(pl);   // (a recorded shot: one take - a gun sounds the same each time)
       } while (shotQ.length && performance.now() - t0 < budget);
       shotIdle = false; shotFill();
     };
@@ -1300,7 +1335,7 @@
     // (a gun with something on its muzzle may be suppressed: its suppressed takes are made too - a few ms of spare time, if not)
     for (const w of (P && P.weapons) || []) {
       const d = w && w.def, k = d && (d.sound === 'tesla' ? 'nail' : d.sound); if (!SHOT[k]) continue;
-      const auto = !!(k === 'shotgun' && d.autoShot); shotQ.push([k, false, auto, room, 0]); if (d.trait === 'silent' || (w.atts && w.atts.muzzle)) shotQ.push([k, true, auto, room, 0]);
+      const auto = !!(k === 'shotgun' && d.autoShot); const rid = rId({ id: d.id, rar: d.rarity }); shotQ.push([k, false, auto, room, 0, false, rid]); if (d.trait === 'silent' || (w.atts && w.atts.muzzle)) shotQ.push([k, true, auto, room, 0, false, rid]);
     }
     shotFill();
   }
@@ -1309,16 +1344,18 @@
   // (one of a plan's takes, never the same one twice running; the first written now, the rest queued for the time the page has to spare)
   function takeOf(pl, q) {
     const set = shotSets[pl.key];
-    if (!set || !set.length) { const b = shotMake(pl); for (let i = 0; i < 4; i++) shotQ.push(q); shotFill(); return b; }
+    if (!set || !set.length) { const b = shotMake(pl); if (!pl.R) { for (let i = 0; i < 4; i++) shotQ.push(q); shotFill(); } return b; }
     let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === shotLast[pl.key]) i = (i + 1) % set.length; shotLast[pl.key] = i; return set[i];
   }
   const tailLast = {};
   function newShot(kind, opts) {
     const supp = !!opts.suppressed, room = !outdoor(), auto = kind === 'shotgun' && !!opts.auto, v = Math.pow(opts.vol || 1, 0.4), t = ctx.currentTime, fl = A.gunFlavor;
-    const pl = shotPlan(kind, supp, auto, room, fl), p = pl.p, buf = takeOf(pl, [kind, supp, auto, room, fl]);
+    const pl = shotPlan(kind, supp, auto, room, fl, false, rId(opts)), p = pl.p, buf = takeOf(pl, [kind, supp, auto, room, fl, false, rId(opts)]);
     // (each named gun a little off the next one's pitch)
-    const at = opts.pos || null, out = dest(at, p.wet, gunDry), src = ctx.createBufferSource(), rate = (opts.id && !supp ? 0.97 + hr(hs(opts.id), 1) * 0.06 : 1) * vr(1, 0.015);
-    out.gain.value = v * p.lv * pl.gv * vr(1, 0.05); src.buffer = buf; src.playbackRate.value = rate;
+    // (a recorded shot: its pitch a hair off at each shot (+-1.2 %) and its level (+-0.4 dB), nothing more)
+    const at = opts.pos || null, out = dest(at, p.wet, gunDry), src = ctx.createBufferSource(), rate = (opts.id && !supp ? 0.97 + hr(hs(opts.id), 1) * 0.06 : 1) * vr(1, pl.R ? 0.012 : 0.015);
+    out.gain.value = v * p.lv * pl.gv * vr(1, pl.R ? 0.045 : 0.05); src.buffer = buf; src.playbackRate.value = rate;
+    if (pl.R) A.shotStats.play = [pl.key, pl.recs[0] && pl.recs[0].nm, rate, out.gain.value];
     if (!pl.R) { src.connect(out); src.start(t); }
     else {
       // A recorded shot. How far off it is: a foe's from its place; a friend's (no place and no gun's id: coop/core.js plays it at 0.8 -
@@ -1335,7 +1372,7 @@
         if (b.tail) playTail(b.tail, g * share, rate, out, t);
       };
       if (gn > 0.02) play(buf, gn);
-      if (gf > 0.02) { const fp = shotPlan(kind, false, auto, room, fl, true); if (fp.R && fp.far) play(takeOf(fp, [kind, false, auto, room, fl, true]), gf); else play(buf, gf); }
+      if (gf > 0.02) { const fp = shotPlan(kind, false, auto, room, fl, true, rId(opts)); if (fp.R && fp.far) play(takeOf(fp, [kind, false, auto, room, fl, true, rId(opts)]), gf); else play(buf, gf); }
     }
     // (the rest pulled down round your own shot only: one asked for from a place - a foe's, a guardian's - or with no gun's id - a friend's -
     // is another's, and leaves the rest as it is)
@@ -3364,6 +3401,325 @@
     const t = ctx.currentTime, out = dest(null, 0.1); out.gain.value = 0.18 * (v || 1);
     nz({ t, buf: 'pink', f: [['bandpass', vr(450, 0.4), 0.9]], g: 0.25, a: 0.6 + Math.random() * 0.6, d: 1.8 + Math.random() * 1.4, to: out });
     nz({ t: t + 0.3, buf: 'pink', f: [['bandpass', vr(1300, 0.3), 2.5]], g: 0.07, a: 0.8, d: 1.6, to: out });
+  };
+  // ---------- the power plant's electricity (elec.js: live floors, high-voltage arcs, their switch boxes) ----------
+  // Real current, not rays: the hum of 50 Hz mains and its overtones (a transformer's core hums at twice the line, 100 Hz, and the
+  // overtones carry it to small speakers), the sizzle of a discharge bunched at every half cycle of the current, the crack of an arc
+  // striking, the knock and ring of a contactor pulling in and of a breaker's latch thrown. Every sound is written into buffers (a few
+  // takes of each, played in turn). The running sound of a live device is a loop written once (whole cycles of 50 Hz; its noise run
+  // twice through its filters and the second pass kept, so its end meets its start: no seam), played through a chain of its own that
+  // follows you. A running sound fades out by itself 0.3 s after its device last asked for it (a pause, death, an area left: no ask,
+  // no sound), at most four run at once (the nearest), and none farther than 42 m.
+  const EHZ = 50;
+  A.elecStats = { prep: {}, mix: {} };
+  // one cycle of mains hum: harmonics of 50 Hz at these levels (index 0 = 50 Hz), driven into a soft clip by drive (its rasp);
+  // ph: the harmonics' phases (random when not given)
+  function humTab(amps, drive, ph) {
+    const P = Math.round(ctx.sampleRate / EHZ), t = new Float32Array(P);
+    ph = ph || amps.map(() => Math.random() * 6.283);
+    let pk = 0;
+    for (let i = 0; i < P; i++) { let v = 0; for (let h = 0; h < amps.length; h++) if (amps[h]) v += amps[h] * Math.sin((2 * Math.PI * (h + 1) * i) / P + ph[h]); t[i] = v; pk = Math.max(pk, Math.abs(v)); }
+    const k = ftanh(drive);
+    for (let i = 0; i < P; i++) t[i] = ftanh((drive * t[i]) / (pk || 1)) / k;
+    return t;
+  }
+  const tabAt = (t, ph) => { const P = t.length, i0 = Math.floor(ph), f = ph - i0, i = i0 % P; return t[i] + (t[(i + 1) % P] - t[i]) * f; };
+  // (the hum of a live floor's plates, of a wire's arc - rougher, more overtones - and of the hall's supply coming up)
+  const HUMF = [0.2, 1, 0.3, 0.45, 0.12, 0.2, 0.05, 0.1, 0, 0.05, 0, 0.03];
+  const HUMA = [0.35, 1, 0.55, 0.5, 0.3, 0.35, 0.2, 0.25, 0.12, 0.15, 0.08, 0.1, 0.05, 0.06];
+  const HUMW = [0.35, 1, 0.4, 0.5, 0.2, 0.3, 0.1, 0.15, 0.05, 0.08];
+  // |sin| of the line, sharpened: the current peaks twice a cycle, and a discharge sizzles in bunches at each peak (0..1)
+  const pulse = (i, sr, e) => Math.pow(Math.abs(Math.sin((Math.PI * 2 * EHZ * i) / sr)), e);
+  // a tick of noise (a spark, a strike) written from i0, te samples to fall by e; wrap: round the end of x to its start (a loop)
+  function tickIn(x, i0, amp, te, wrap) {
+    const n = x.length, m = Math.ceil(te * 7);
+    for (let j = 0; j < m; j++) { let k = i0 + j; if (k >= n) { if (!wrap) break; k -= n; } x[k] += (Math.random() * 2 - 1) * amp * Math.exp(-j / te); }
+  }
+  // a loop's filters: x is one period; run twice through them, the second pass kept (it starts where the first ended)
+  function loopRun(x, fl, sr) {
+    const n = x.length, y = new Float32Array(2 * n); y.set(x); y.set(x, n);
+    for (const [ty, f, q] of fl) bqRun(y, ty, f, q, sr);
+    x.set(y.subarray(n)); return x;
+  }
+  // a slow wander that loops: sines of whole turns in n samples (-1..1), as a table (worked out every 32 samples: it moves slowly)
+  function wander(n, ms) {
+    const ph = ms.map(() => Math.random() * 6.283), w = new Float32Array(n);
+    for (let i = 0; i < n; i += 32) { let v = 0; for (let k = 0; k < ms.length; k++) v += Math.sin((2 * Math.PI * ms[k] * i) / n + ph[k]); v /= ms.length; for (let j = i, e = Math.min(n, i + 32); j < e; j++) w[j] = v; }
+    return w;
+  }
+  // pulse() over one cycle of the line, as a table (a loop's worth of it read from here)
+  function pulseTab(sr, e) { const P = Math.round(sr / EHZ), t = new Float32Array(P); for (let i = 0; i < P; i++) t[i] = pulse(i, sr, e); return t; }
+  // a gate that loops: stretches s0..s1 s long, each at a level of its own (the discharge busier a while, then quieter), eased
+  function gateLoop(n, sr, s0, s1, lo, hi) {
+    const g = new Float32Array(n); let i = 0;
+    while (i < n) { const len = Math.round((s0 + Math.random() * (s1 - s0)) * sr), v = lo + Math.pow(Math.random(), 1.5) * (hi - lo); for (let j = 0; j < len && i < n; j++, i++) g[i] = v; }
+    const k = Math.exp(-1 / (0.012 * sr)), o = Float32Array.from(g); let s = o[n - 1];
+    for (let r = 0; r < 2; r++) for (let j = 0; j < n; j++) { s = o[j] + (s - o[j]) * k; if (r) g[j] = s; }
+    return g;
+  }
+  // an arc striking: m strikes of noise a few tenths of a ms each, within span s (the first the loudest), high-passed - a crack
+  function arcCrackIn(L, R, i0, g, m, span, pan, sr) {
+    const n = Math.min(L.length - i0, Math.round((span * 2 + 0.01) * sr)); if (n <= 0) return;
+    const x = new Float32Array(n);
+    let o = 0;
+    for (let s = 0; s < m && o < n; s++) { tickIn(x, o, s ? 0.35 + Math.random() * 0.5 : 1, (0.00015 + Math.random() * 0.00035) * sr, false); o += Math.round(((Math.random() * 2 * span) / Math.max(1, m - 1)) * sr) + 1; }
+    bqRun(x, 'hp', 700, 0.7, sr);
+    const gl = g * Math.min(1, 1 - pan), gr = g * Math.min(1, 1 + pan);
+    for (let j = 0; j < n; j++) { L[i0 + j] += x[j] * gl; R[i0 + j] += x[j] * gr; }
+  }
+  // the buzz of the current: the hum's cycle (tab) played d s from i0, its pitch going f0 to f1 Hz in fd s, at env(t) * g
+  function buzzIn(L, R, i0, d, tab, f0, f1, fd, env, g, sr) {
+    const n = Math.min(L.length - i0, Math.round(d * sr)), P = tab.length; let ph = Math.random() * P;
+    for (let j = 0; j < n; j++) { const t = j / sr, f = f0 * Math.pow(f1 / f0, Math.min(1, t / fd)); ph += (P * f) / sr; if (ph >= P) ph -= P; const v = tabAt(tab, ph) * env(t) * g; L[i0 + j] += v; R[i0 + j] += v; }
+  }
+  // the sizzle (ジジジ): noise bunched at the current's peaks (e: how sharply), at env(t) * g, through a band at f; each ear its own
+  function sizzleIn(L, R, i0, d, env, g, f, q, e, sr) {
+    const n = Math.min(L.length - i0, Math.round(d * sr)); if (n <= 0) return;
+    for (const X of [L, R]) {
+      const z = new Float32Array(n);
+      for (let j = 0; j < n; j++) z[j] = (Math.random() * 2 - 1) * (0.15 + 0.85 * pulse(j, sr, e)) * env(j / sr);
+      bqRun(z, 'bp', f, q, sr); bqRun(z, 'hp', f * 0.45, 0.7, sr);
+      for (let j = 0; j < n; j++) X[i0 + j] += z[j] * g;
+    }
+  }
+  // sparks spitting (パチパチ): ticks r0 going to r1 a second over d s, uneven (most small), each to a side of its own, through f
+  function sparksIn(L, R, i0, d, r0, r1, g, f, sr) {
+    const n = Math.min(L.length - i0, Math.round(d * sr)); if (n <= 0) return;
+    const xl = new Float32Array(n), xr = new Float32Array(n);
+    for (let j = 0; j < n; j++) {
+      const u = j / n;
+      if (Math.random() < (r0 * Math.pow(r1 / r0, u)) / sr) { const a = Math.pow(Math.random(), 2) * (1 - 0.7 * u), p = Math.random() * 2 - 1, te = (0.00006 + Math.random() * 0.00025) * sr; tickIn(xl, j, a * Math.min(1, 1 - p), te, false); tickIn(xr, j, a * Math.min(1, 1 + p), te, false); }
+    }
+    for (const x of [xl, xr]) { bqRun(x, 'bp', f, 0.7, sr); bqRun(x, 'hp', 1500, 0.7, sr); }
+    for (let j = 0; j < n; j++) { L[i0 + j] += xl[j] * g; R[i0 + j] += xr[j] * g; }
+  }
+  // the running sound of a live device, as a loop: kind 'zone' (a live floor: a low, broad hum, a soft sizzle, sparse crackle, now
+  // and then a spark leaping a gap on the plates) or 'arc' (a live wire: the harsh buzz of an arc burning, a roar of noise pulsing at
+  // the current's peaks, a dense crackle and the snaps of its channel jumping)
+  const ELOOP = {};
+  function elecLoop(kind) {
+    const sr = ctx.sampleRate, arc = kind === 'arc', P = Math.round(sr / EHZ), n = P * (arc ? 90 : 120);
+    const b = ctx.createBuffer(2, n, sr), C = [b.getChannelData(0), b.getChannelData(1)];
+    const amps = arc ? HUMA : HUMF, drive = arc ? 2.8 : 1.5, ph = amps.map(() => Math.random() * 6.283);
+    // (each ear the same 50 and 100 Hz, its upper harmonics at phases of their own: wide, and nothing cancels when the two are summed)
+    const tabs = [humTab(amps, drive, ph), humTab(amps, drive, ph.map((p, h) => (h > 1 ? Math.random() * 6.283 : p)))];
+    const wb = wander(n, arc ? [2, 5, 11] : [1, 3, 7]), ww = wander(n, [4, 9, 17]);
+    const gate = gateLoop(n, sr, arc ? 0.04 : 0.08, arc ? 0.25 : 0.4, arc ? 0.35 : 0.15, 1);
+    const ev = [], sn = [];
+    for (let e = 0, m = Math.round((arc ? 110 : 34) * (n / sr)); e < m; e++) { const i0 = Math.floor(Math.random() * n); ev.push([i0, Math.pow(Math.random(), 2.4) * (0.4 + 0.6 * gate[i0]), (0.00008 + Math.random() * 0.0003) * sr, (Math.random() * 2 - 1) * (arc ? 0.25 : 0.7)]); }
+    for (let e = 0, m = Math.round((arc ? 9 : 2.2) * (n / sr)); e < m; e++) {
+      const st = []; let o = 0;
+      for (let s = 0, k = 1 + Math.floor(Math.random() * (arc ? 4 : 2)); s < k; s++) { st.push([o, s ? 0.3 + Math.random() * 0.4 : 1, (0.0002 + Math.random() * 0.0003) * sr]); o += Math.round((0.0008 + Math.random() * 0.003) * sr); }
+      sn.push([Math.floor(Math.random() * n), 0.6 + 0.4 * Math.random(), (Math.random() * 2 - 1) * (arc ? 0.2 : 0.6), st]);
+    }
+    const mix = { hum: 0, sizzle: 0, crackle: 0, snap: 0 }, rms = (x, g) => { let s = 0; for (let i = 0; i < n; i++) s += x[i] * x[i]; return Math.sqrt(s / n) * g; };
+    // the sizzle: noise bunched at the current's peaks, busier and quieter by turns (one for both ears: the right reads it 9 half
+    // cycles later - the same bunching, other noise)
+    const z = new Float32Array(n), pz = pulseTab(sr, arc ? 3 : 6), off = (P / 2) * 9;
+    for (let i = 0, j = 0; i < n; i++, j++) { if (j === P) j = 0; z[i] = (Math.random() * 2 - 1) * (0.2 + 0.8 * pz[j]) * gate[i] * (arc ? 0.7 + 0.3 * ww[i] : 1); }
+    loopRun(z, arc ? [['bp', 1500, 0.45], ['hp', 450, 0.7]] : [['bp', 3400, 0.7], ['hp', 1600, 0.7], ['lp', 6500, 0.7]], sr);
+    const zg = arc ? 0.88 : 0.8, kg = arc ? 5.5 : 8, qg = arc ? 2.8 : 3.6;
+    for (let c = 0; c < 2; c++) {
+      const X = C[c], t = tabs[c], side = c ? 1 : -1;
+      const hg = arc ? 0.5 : 0.62;
+      for (let i = 0, j = 0; i < n; i++, j++) { if (j === P) j = 0; X[i] = t[j] * hg * (arc ? 0.75 + 0.25 * wb[i] : 0.88 + 0.12 * wb[i]); }
+      if (!c) mix.hum = rms(X, 1);
+      // the crackle, and the snaps (a little louder, a strike or a few)
+      const k = new Float32Array(n), q = new Float32Array(n);
+      for (const [i0, a, te, pan] of ev) tickIn(k, i0, a * Math.min(1, 1 + side * pan), te, true);
+      loopRun(k, arc ? [['bp', 3200, 0.6], ['hp', 900, 0.7]] : [['bp', 2600, 0.6], ['hp', 900, 0.7], ['lp', 6500, 0.7]], sr);
+      for (const [i0, a, pan, st] of sn) for (const [o, sa, te] of st) tickIn(q, (i0 + o) % n, a * sa * Math.min(1, 1 + side * pan), te, true);
+      loopRun(q, arc ? [['hp', 500, 0.7]] : [['hp', 500, 0.7], ['lp', 6500, 0.7]], sr);
+      if (!c) { mix.sizzle = rms(z, zg); mix.crackle = rms(k, kg); mix.snap = rms(q, qg); }
+      for (let i = 0, j = c ? off : 0; i < n; i++, j++) { if (j >= n) j -= n; X[i] += z[j] * zg + k[i] * kg + q[i] * qg; }
+    }
+    // (brought to one level by its rms, not its highest peak: the sparks are random, and a loop scaled by its biggest one came out
+    // some dB louder or quieter each time it was written; the few peaks left over 0.7 are bent softly under 1)
+    let sq = 0, pk = 0; for (const X of C) for (let i = 0; i < n; i++) sq += X[i] * X[i];
+    const sc = 0.1 / (Math.sqrt(sq / (2 * n)) || 1);
+    for (const X of C) for (let i = 0; i < n; i++) { let v = X[i] * sc; const a = Math.abs(v); if (a > 0.7) v = Math.sign(v) * (0.7 + 0.29 * ftanh((a - 0.7) / 0.29)); X[i] = v; pk = Math.max(pk, Math.abs(v)); }
+    for (const m in mix) mix[m] = +(20 * Math.log10(Math.max(1e-9, mix[m] * sc))).toFixed(1);
+    mix.peak = +pk.toFixed(2);
+    A.elecStats.mix[kind] = mix;
+    return b;
+  }
+  // the loops written ahead (elec.js asks when an area with devices is set up; once a session: one of each kind, some tens of ms;
+  // each running sound starts somewhere else in it, a little faster or slower, with the sparks of elec.js over it)
+  A.elecPrep = function () {
+    if (!ctx) return;
+    A.elecStats.loops = ELOOP;
+    for (const k of ['zone', 'arc']) if (!ELOOP[k]) { const t0 = performance.now(); ELOOP[k] = [elecLoop(k)]; A.elecStats.prep[k] = +(performance.now() - t0).toFixed(1); }
+  };
+  // the running sounds: one per live device, kept by key (the device). k: its level (0..1)
+  const EHUM = { zone: 0.29, arc: 0.38 }, HUMMAX = 4, HUMFAR = 42;
+  const hums = new Map(); let humSweep = 0;
+  function humEnd(h, fade) {
+    if (!hums.has(h.key)) return;
+    hums.delete(h.key);
+    const now = ctx.currentTime;
+    try { h.g.gain.cancelScheduledValues(now); h.g.gain.setTargetAtTime(0.0001, now, fade || 0.05); } catch (e) { /* gone */ }
+    setTimeout(() => { try { h.src.stop(); } catch (e) { /* stopped */ } for (const x of [h.src, h.g, h.lp, h.p, h.s]) try { x.disconnect(); } catch (e) { /* none */ } }, ((fade || 0.05) * 8 + 0.05) * 1000);
+    if (!hums.size && humSweep) { clearInterval(humSweep); humSweep = 0; }
+  }
+  function humStart(key, kind) {
+    A.elecPrep();
+    const set = ELOOP[kind] || ELOOP.zone, buf = set[Math.floor(Math.random() * set.length)];
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.playbackRate.value = vr(1, 0.012);
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 16000;
+    const p = ctx.createStereoPanner(), s = ctx.createGain(); s.gain.value = 0;
+    src.connect(g); g.connect(lp); lp.connect(p); p.connect(dry); p.connect(s); s.connect(revSend);
+    src.start(ctx.currentTime, Math.random() * buf.duration);
+    const h = { key, kind, src, g, lp, p, s, dist: 0, seen: 0, at: -1 };
+    hums.set(key, h);
+    // (a sweep for the ones no longer asked for: a running sound fades by its own automation, this lets its nodes go)
+    if (!humSweep) humSweep = setInterval(() => { const now = performance.now(); for (const x of [...hums.values()]) if (now - x.seen > 700) humEnd(x, 0.05); }, 300);
+    return h;
+  }
+  // (elec.js, every frame a device is live) where its sound comes from (the nearest point of the floor or the wire to you)
+  A.elecHum = function (key, kind, pos, k) {
+    if (!ctx || !pos || ctx.state !== 'running') return;
+    const L = A.listener, dx = pos.x - L.x, dy = pos.y - L.y, dz = pos.z - L.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (!Number.isFinite(dist)) return;
+    let h = hums.get(key);
+    if (!h) {
+      if (dist >= HUMFAR) return;
+      if (hums.size >= HUMMAX) {
+        let worst = null; for (const x of hums.values()) if (!worst || x.dist > worst.dist) worst = x;
+        if (worst.dist <= dist) return;
+        humEnd(worst, 0.1);
+      }
+      h = humStart(key, kind);
+    }
+    h.dist = dist; h.seen = performance.now();
+    if (dist >= HUMFAR) { humEnd(h, 0.15); return; }
+    const now = ctx.currentTime;
+    if (now - h.at < 0.08) return;
+    h.at = now;
+    // as dest() places a sound: the fall-off with distance, the air taking the highs, what is behind you duller, the pan; the room more
+    const att = 1 / (1 + Math.max(0, dist - 2) * 0.09), edge = Math.min(1, (HUMFAR - dist) / 8);
+    const lv = Math.max(0.0001, EHUM[kind] * att * edge * (k === undefined ? 1 : k));
+    const ang = Math.atan2(dx, -dz) - (A.listenerYawNeg || 0), c = Math.cos(ang);
+    let f = Math.max(900, 16000 / (1 + dist * 0.08)); if (c < 0) f *= 0.62 + 0.38 * (1 + c);
+    const gg = h.g.gain;
+    gg.cancelScheduledValues(now); gg.setTargetAtTime(lv, now, 0.06);
+    gg.setTargetAtTime(0.0001, now + 0.3, 0.06);   // (the dead man's fade: asked for again before then, it is pushed back)
+    h.lp.frequency.setTargetAtTime(f, now, 0.08);
+    h.p.pan.setTargetAtTime(Math.max(-0.85, Math.min(0.85, Math.sin(ang) * Math.min(1, dist / 4))), now, 0.08);
+    h.s.gain.setTargetAtTime(0.22 * (1 + Math.min(1.5, dist * 0.03)), now, 0.1);
+  };
+  // stop one running sound (key), or every one (no key)
+  A.elecHumStop = function (key, fade) {
+    if (!ctx) return;
+    if (key === undefined || key === null) { for (const h of [...hums.values()]) humEnd(h, fade); return; }
+    const h = hums.get(key); if (h) humEnd(h, fade);
+  };
+  A.elecHumN = () => hums.size;
+  // the warning (about d s, in the whole hall): the plant's supply coming up - its hum climbing from low and slow to 50 Hz and loud,
+  // the building's weight under it - stuttering with the lamps (dips held a few frames, more of them toward the end), the contacts
+  // chattering at each dip, a sizzle swelling into the moment it goes live. Returns { keep(), stop(fade) }: kept alive by keep() every
+  // frame of the warning; left without it (a pause), it fades in 0.25 s, and after 0.6 s without it stays silent (a stall of a frame or
+  // two lets it come back)
+  A.elecWarn = function (d) {
+    if (!ctx) return null;
+    d = d || 1.5;
+    const secs = d + 0.4, gain = 0.42;
+    const out = fxPlay('e:warn', 2, secs, (L, R, sr) => {
+      const n = L.length, P = Math.round(sr / EHZ), base = HUMW.map(() => Math.random() * 6.283);
+      const tl = humTab(HUMW, 1.3, base), tr = humTab(HUMW, 1.3, base.map((p, h) => (h > 1 ? Math.random() * 6.283 : p)));
+      const st = new Float32Array(n), ks = Math.exp(-1 / (0.004 * sr)), chat = [];
+      let seg = 0, lv = 1, sm = 1;
+      for (let i = 0; i < n; i++) {
+        const u = Math.min(1, i / (d * sr));
+        if (--seg <= 0) { seg = Math.round((0.033 + Math.random() * 0.1) * sr); const dip = i < d * sr && Math.random() < 0.2 + 0.45 * u; lv = dip ? 0.3 + Math.random() * 0.3 : 0.9 + Math.random() * 0.2; if (dip) chat.push(i); }
+        sm = lv + (sm - lv) * ks; st[i] = sm;
+      }
+      const env = (t) => (t < d ? 0.05 + 0.95 * Math.pow(t / d, 1.8) : Math.exp(-(t - d) / 0.08));
+      let ph = 0;
+      for (let i = 0; i < n; i++) { const t = i / sr, u = Math.min(1, t / d), f = EHZ * (0.62 + 0.38 * (1 - Math.pow(1 - u, 2.2))); ph += (P * f) / sr; if (ph >= P) ph -= P; const e = env(t) * st[i] * 0.8; L[i] += tabAt(tl, ph) * e; R[i] += tabAt(tr, ph) * e; }
+      const w = new Float32Array(n);
+      for (let i = 0; i < n; i++) w[i] = (Math.random() * 2 - 1) * env(i / sr);
+      bqRun(w, 'lp', 110, 0.7, sr); bqRun(w, 'lp', 110, 0.7, sr);
+      for (let i = 0; i < n; i++) { L[i] += w[i] * 2.2; R[i] += w[i] * 2.2; }
+      for (const i of chat) arcCrackIn(L, R, i, 0.12 + 0.25 * (i / n), 1 + Math.floor(Math.random() * 3), 0.01, Math.random() * 1.2 - 0.6, sr);
+      sizzleIn(L, R, 0, secs, (t) => Math.pow(Math.min(1, t / d), 2.5) * (t < d ? 1 : Math.exp(-(t - d) / 0.05)), 0.22, 3800, 0.8, 6, sr);
+    }, gain, null, 0.35, 1, 9000);
+    let last = ctx.currentTime;
+    const gg = out.gain;
+    gg.setValueAtTime(gain, last); gg.setTargetAtTime(0.0001, last + 0.25, 0.05);
+    return {
+      keep() { const now = ctx.currentTime; if (now - last > 0.6 || now - last < 0.08) return; last = now; gg.cancelScheduledValues(now); gg.setValueAtTime(gain, now); gg.setTargetAtTime(0.0001, now + 0.25, 0.05); },
+      stop(fade) { last = -9; const now = ctx.currentTime; gg.cancelScheduledValues(now); gg.setTargetAtTime(0.0001, now, fade || 0.06); },
+    };
+  };
+  // gone live (at pos): the crack of the current striking, the knock and ring of the contactor pulling in, and the buzz coming on hard
+  // (the rush of current at the start) and settling as the running sound takes over (ブゥン)
+  A.elecOn = function (pos, kind) {
+    if (!ctx || !voice(0.9)) return;
+    const arc = kind === 'arc';
+    fxPlay(arc ? 'e:on:a' : 'e:on:z', 3, 0.9, (L, R, sr, at) => {
+      arcCrackIn(L, R, 0, 1, arc ? 5 : 3, arc ? 0.03 : 0.02, 0, sr);
+      thudIn(L, R, 0, 1400, 0.008, arc ? 0.5 : 0.35, sr);
+      knockIn(L, R, at(0.004), vr(240, 0.1), 0.45, 0, sr);
+      ringIn(L, R, at(0.004), [[vr(860, 0.05), 0.25, 0.14], [vr(1590, 0.05), 0.18, 0.1], [vr(2630, 0.05), 0.1, 0.07]], 0.35, 0.6, 0, sr);
+      buzzIn(L, R, at(0.008), 0.88, humTab(arc ? HUMA : HUMF, arc ? 2.4 : 1.8), EHZ * 1.04, EHZ, 0.15, (t) => Math.min(1, t / 0.006) * (0.45 + 0.55 * Math.exp(-t / 0.08)) * Math.min(1, Math.max(0, 0.88 - t) / 0.4), 0.55, sr);
+      if (arc) sizzleIn(L, R, at(0.006), 0.4, (t) => Math.exp(-t / 0.12), 0.6, 1500, 0.5, 3, sr);
+      else sizzleIn(L, R, at(0.006), 0.35, (t) => Math.exp(-t / 0.1), 0.35, 3400, 0.7, 6, sr);
+    }, 0.4, pos, 0.3, null, 12000);
+  };
+  // dropped (at pos): the breaker's latch thrown (バチン: a hard snap of steel), the arc torn as its contacts part, and the hum running
+  // down, lower and darker as it dies (ブゥン…, about 0.6 s)
+  A.elecOff = function (pos, kind) {
+    if (!ctx || !voice(0.8)) return;
+    const arc = kind === 'arc';
+    fxPlay(arc ? 'e:off:a' : 'e:off:z', 3, 0.82, (L, R, sr, at) => {
+      ringIn(L, R, 0, [[vr(2300, 0.05), 0.3, 0.05], [vr(3700, 0.05), 0.22, 0.035], [vr(5600, 0.05), 0.12, 0.025]], 0.5, 1.2, 0, sr);
+      knockIn(L, R, 0, vr(420, 0.1), 0.7, 0, sr);
+      arcCrackIn(L, R, at(0.002), arc ? 0.9 : 0.6, arc ? 4 : 2, 0.03, 0, sr);
+      const tb = humTab(arc ? HUMA : HUMF, arc ? 2.2 : 1.5), td = humTab([1, 0.6, 0.15, 0.1], 1.1), i0 = at(0.006), n = Math.min(L.length - i0, Math.round(0.78 * sr)), P = tb.length;
+      let ph = 0;
+      for (let j = 0; j < n; j++) { const t = j / sr, f = EHZ * Math.pow(0.52, Math.min(1, t / 0.6)), e = Math.min(1, t / 0.004) * Math.exp(-t / 0.25) * Math.min(1, (0.78 - t) / 0.12); ph += (P * f) / sr; if (ph >= P) ph -= P; const v = (tabAt(tb, ph) * e + tabAt(td, ph) * (1 - e)) * e * 0.75; L[i0 + j] += v; R[i0 + j] += v; }
+      if (arc) sizzleIn(L, R, at(0.004), 0.15, (t) => Math.exp(-t / 0.04), 0.5, 1800, 0.5, 3, sr);
+    }, arc ? 0.5 : 0.42, pos, 0.3, null, 11000);
+  };
+  // a switch box shorted by a shot or a blow (at pos): the bang of the fault (パン), its buzz the instant before the box gives, the steel
+  // cabinet ringing from inside and its door rattling once, sparks spraying out thick and thinning, a fizz under them
+  A.elecShort = function (pos) {
+    if (!ctx || !voice(0.9)) return;
+    fxPlay('e:short', 3, 0.9, (L, R, sr, at) => {
+      tickIn(L, 0, 1, 0.0011 * sr, false); tickIn(R, 0, 1, 0.0011 * sr, false);
+      lowIn(L, R, 0, 160, 70, 0.03, 0.7, sr);
+      thudIn(L, R, 0, 900, 0.015, 0.7, sr);
+      buzzIn(L, R, 0, 0.07, humTab(HUMA, 3), EHZ, EHZ, 1, (t) => Math.min(1, Math.max(0, 0.07 - t) / 0.03), 0.3, sr);
+      const cab = [[vr(185, 0.06), 0.3, 0.28], [vr(310, 0.06), 0.35, 0.3], [vr(470, 0.06), 0.3, 0.24], [vr(690, 0.06), 0.22, 0.2], [vr(1040, 0.06), 0.18, 0.15], [vr(1520, 0.06), 0.12, 0.11], [vr(2280, 0.06), 0.08, 0.08]];
+      ringIn(L, R, at(0.001), cab, 0.5, 0, 0, sr);
+      ringIn(L, R, at(vr(0.05, 0.3)), cab, 0.14, 0.3, 0.2, sr);
+      sparksIn(L, R, at(0.004), 0.6, 450, 15, 1.4, 4200, sr);
+      sizzleIn(L, R, at(0.004), 0.3, (t) => Math.exp(-t / 0.08), 0.18, 5000, 0.6, 1, sr);
+    }, 0.85, pos, 0.3, null, 13000);
+  };
+  // the current through you (ジッ: a floor's tick; big: a wire's strike, longer, with the crack of it) - in the head, small, under the
+  // sound of being hurt
+  A.elecShock = function (big) {
+    if (!ctx || !voice(0.25)) return;
+    fxPlay(big ? 'e:shock:b' : 'e:shock', 3, big ? 0.22 : 0.15, (L, R, sr) => {
+      const d = big ? 0.19 : 0.12, env = (t) => Math.min(1, t / 0.002) * (t < d * 0.6 ? 1 : Math.max(0, 1 - (t - d * 0.6) / (d * 0.4)));
+      sizzleIn(L, R, 0, d, env, 1, 2800, 1, 4, sr);
+      buzzIn(L, R, 0, d, humTab([0, 1, 0.6, 0.7, 0.4, 0.5, 0.3, 0.3], 2.6), EHZ, EHZ, 1, env, 0.25, sr);
+      if (big) arcCrackIn(L, R, 0, 0.9, 3, 0.02, 0, sr);
+    }, big ? 0.085 : 0.08, null, 0.05, null, 9000);
+  };
+  // a spark leaping (at pos), over the running sound and in the warning: 'warn' (small: the plates and insulators trying), 'zone' (a
+  // spark across a floor's plates), 'arc' (a wire's channel jumping, or striking a body): a crack, a few sparks after, a breath of buzz
+  const SNAPK = { warn: [0.35, 0.16], zone: [0.65, 0.22], arc: [1, 0.34] };
+  A.elecSnap = function (pos, kind) {
+    if (!ctx || !voice(0.3)) return;
+    const [s, gain] = SNAPK[kind] || SNAPK.zone;
+    fxPlay('e:snap:' + kind, 4, 0.32, (L, R, sr, at) => {
+      arcCrackIn(L, R, 0, 1, 1 + Math.floor(Math.random() * (1 + 3 * s)), 0.012, Math.random() * 0.6 - 0.3, sr);
+      sparksIn(L, R, at(0.006), 0.2 + 0.1 * s, 120 * s + 40, 10, 0.5 + 0.4 * s, 3200, sr);
+      buzzIn(L, R, at(0.002), 0.04 + 0.08 * s, humTab(kind === 'arc' ? HUMA : HUMF, 1.5 + 1.5 * s), EHZ, EHZ, 1, (t) => Math.min(1, t / 0.003) * Math.exp(-t / (0.02 + 0.04 * s)), 0.35, sr);
+    }, gain, pos, 0.3, null, 12000);
   };
   A.crackle = function (pos) {
     if (!ctx || smp('crackle', pos, 0.25, 1, 0.2) || !voice(0.2)) return;

@@ -84,7 +84,8 @@ window.__wt = (function () {
     })()`));
     console.log('      ' + pf.rep.split('\n').slice(3, 6).join('\n      '));
     const big = pf.spikes.filter((x) => x[0] >= 150);
-    check(big.some((x) => x[1] >= 150 && /HUD/.test(x[2])) && /\n\S+s\s+\d+(\.\d)?ms \(js 1[5-9]\d[^\n]*JS HUD/.test(pf.rep), `perf monitor: a frame our code made slow (160 ms in the HUD) is reported as JS HUD, on that frame (${JSON.stringify(big)})`);
+    // (the slow frame's own script: the 160 ms put in, and that frame's usual work besides - on a busy machine up to some hundreds of ms)
+    check(big.some((x) => x[1] >= 150 && /HUD/.test(x[2])) && /\n\S+s\s+\d+(\.\d)?ms \(js (1[5-9]\d|[2-9]\d\d)[^\n]*JS HUD/.test(pf.rep), `perf monitor: a frame our code made slow (160 ms in the HUD) is reported as JS HUD, on that frame (${JSON.stringify(big)})`);
     const calls = +((pf.rep.match(/calls (\d+)/) || [])[1] || 0);
     check(calls > 40 && /gpu (\d|-|n\/a)/.test(pf.rep) && /long frames \d+/.test(pf.rep), `perf monitor: the whole frame's draw calls (${calls}), the GPU time and the browser's long frames are in the report`);
     check(!p.errs.length, 'no page errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 400));

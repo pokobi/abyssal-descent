@@ -101,10 +101,12 @@
   function judge(f, iv, gc) {
     if (iv > 0 && iv < 1000) hist.push([iv, f.js]);
     if (hist.length > 600) hist.shift();
-    // spike = clearly slower than the recent median, or just slow in absolute terms
-    if (hist.length <= 30 || !(iv > 0)) return;
-    const med = median(hist.map((x) => x[0]));
-    if (!(iv > Math.max(26, med * 1.7) && iv < 5000)) return;
+    // spike = clearly slower than the recent median, or just slow in absolute terms. (In the first 30 frames there is no median yet:
+    // a frame over 50 ms is one all the same. They were all let go, and on a busy machine - frames coming slowly after the measurement
+    // was turned on - a stall seconds in was not written down at all)
+    if (!(iv > 0)) return;
+    const med = hist.length > 30 ? median(hist.map((x) => x[0])) : 0;
+    if (!(iv > Math.max(hist.length > 30 ? 26 : 50, med * 1.7) && iv < 5000)) return;
     let top = '', tv = 0;
     for (const k in f.phases) if (f.phases[k] > tv) { tv = f.phases[k]; top = k; }
     const G_ = G.game;
@@ -119,8 +121,10 @@
   }
   function causeOf(k) {
     const gpu = k.frame && k.frame.gpu, lf = loafOf(k);
+    // (a frame most of which was our own script is that script's, a collection in it or not: the heap is only looked at between frames,
+    // so a collection anywhere in the interval marked a frame held by a slow HUD as the collector's)
+    if (k.js > k.iv * 0.5) return `JS ${k.top || '?'} ${k.topMs.toFixed(1)}ms${k.gc ? '（GC あり）' : ''}`;
     if (k.gc) return 'GC（メモリ回収）';
-    if (k.js > k.iv * 0.5) return `JS ${k.top || '?'} ${k.topMs.toFixed(1)}ms`;
     if (lf && lf.styleLayout > Math.max(12, k.iv * 0.3)) return `画面（HTML）の配置・描画 ${Math.round(lf.styleLayout)}ms`;
     if (lf && lf.script > k.iv * 0.5) return `JS（フレームの外）${Math.round(lf.script)}ms ${lf.who || ''}`;
     if (gpu != null && gpu > k.iv * 0.5) return `GPU ${gpu.toFixed(1)}ms`;

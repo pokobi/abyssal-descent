@@ -62,7 +62,7 @@ python -m http.server 8000
 ## 技術メモ
 
 - フレームワーク・ビルド工程を使わない JavaScript と、[Three.js](https://threejs.org/)（CDN から読み込み）
-- テクスチャと効果音はプログラムで生成しており、外部の音声ファイルは使用していません
+- テクスチャはプログラムで生成しています。効果音はプログラムでの合成と CC0 の録音素材、BGM は CC0 と CC BY の楽曲を使っています（出どころは `snd/SOURCES.md`、`snd/bgm/SOURCES_BGM.md`）
 - `js/` にゲーム本体、`css/` に画面のスタイル、`tests/` に開発用の確認スクリプトがあります
 
 ---
@@ -96,3 +96,13 @@ The silhouettes were recoloured (gradient fill and outline) for this game. Icons
 The attachment icons (optics, muzzles, barrels, magazines, grips, stocks, rounds, triggers) and some gun icons
 (sniper / marksman rifles, shotgun, LMG, rocket & grenade launchers, railgun, tesla gun, nail gun, harpoon gun) are original
 drawings made for this game; their small corner badges reuse the game-icons.net silhouettes listed above.
+
+Music by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License (http://creativecommons.org/licenses/by/4.0/):
+
+- "Ossuary 4 - Animate" Kevin MacLeod (incompetech.com)
+- "Ossuary 5 - Rest" Kevin MacLeod (incompetech.com)
+- "Black Vortex" Kevin MacLeod (incompetech.com)
+- "Industrial Cinematic" Kevin MacLeod (incompetech.com)
+- "Lightless Dawn" Kevin MacLeod (incompetech.com)
+
+Other music (CC0): yd, Tsorthan Grove, SubspaceAudio and vitalezzz, via [OpenGameArt.org](https://opengameart.org/). The tracks were trimmed and levelled for this game; sources are listed in `snd/bgm/SOURCES_BGM.md`.

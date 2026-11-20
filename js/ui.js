@@ -908,7 +908,7 @@
     if (S.motionBlur === undefined) S.motionBlur = true; // (a save from before the setting: on)
     if (S.bright === undefined) S.bright = 1;
     // number settings: [min, max, step, shown as (x100 = percent), unit]; each has a slider and a box to type the value in
-    const NUM = { sens: [0.1, 3, 0.01, 1, ''], adsSens: [0.2, 1.5, 0.01, 1, ''], fov: [80, 120, 1, 1, '°'], bright: [0.5, 1.5, 0.01, 100, '%'], volume: [0, 1, 0.01, 100, '%'], shake: [0, 1.5, 0.01, 100, '%'], bob: [0, 1.5, 0.01, 100, '%'] };
+    const NUM = { sens: [0.1, 3, 0.01, 1, ''], adsSens: [0.2, 1.5, 0.01, 1, ''], fov: [80, 120, 1, 1, '°'], bright: [0.5, 1.5, 0.01, 100, '%'], volume: [0, 1, 0.01, 100, '%'], bgm: [0, 1, 0.01, 100, '%'], shake: [0, 1.5, 0.01, 100, '%'], bob: [0, 1.5, 0.01, 100, '%'] };
     const shown = (id, v) => { const [, , st, k] = NUM[id]; return k === 100 ? String(Math.round(v * 100)) : st >= 1 ? String(Math.round(v)) : (+v).toFixed(2); };
     const rowR = (id, label) => { const [min, max, step, k, unit] = NUM[id]; return `<div class="set-row"><span>${label}</span><input type="range" id="s-${id}" min="${min}" max="${max}" step="${step}" value="${S[id]}"><span class="v" id="v-${id}"><input type="number" class="set-num" id="n-${id}" min="${min * k}" max="${max * k}" step="${step * k}" value="${shown(id, S[id])}"><span class="set-unit">${unit}</span></span></div>`; };
     const rowC = (id, label) => `<div class="set-row"><span>${label}</span><input type="checkbox" id="s-${id}" ${S[id] ? 'checked' : ''}><span></span></div>`;
@@ -921,7 +921,7 @@
       ['view', '🖥️ 映像', head('見え方') + rowR('bright', '☀️ 明るさ') + rowR('fov', '👁️ 視野角（水平）')
         + head('画質') + `<div class="set-row"><span>🖥️ 画質</span><select id="s-quality"><option value="low">低</option><option value="med">中</option><option value="high">高</option></select><span></span></div>` + rowC('motionBlur', '💨 モーションブラー（画質が中・高の時）') + rowC('fullscreen', '⛶ 開始時フルスクリーン')
         + head('揺れ') + rowR('shake', '📳 画面揺れ') + rowR('bob', '🚶 視点の揺れ')],
-      ['misc', '🔊 音・その他', head('音') + rowR('volume', '🔊 音量')
+      ['misc', '🔊 音・その他', head('音') + rowR('volume', '🔊 音量') + rowR('bgm', '🎵 BGM の音量')
         + head('表示') + rowC('dmgNums', '🔢 ダメージ表記') + rowC('showFps', '📈 FPS表示')
         + head('ゲーム') + rowC('askTutorial', '📘 新しく始める時にチュートリアルを確認') + `<div class="set-row"><span>🗑️ データのリセット</span><button class="btn small" id="s-reset">リセットする…</button><span></span></div>`],
     ];
@@ -945,6 +945,7 @@
         x = +(Math.round(Math.min(max, Math.max(min, x)) / step) * step).toFixed(2);
         S[id] = x; inp.value = x; num.value = shown(id, x);
         if (id === 'volume') G.sfx.setVolume(x);
+        if (id === 'bgm' && G.bgm) G.bgm.setVolume(x);
         if (id === 'bright' && G.game.applyBright) G.game.applyBright();
         G.save.write();
       };

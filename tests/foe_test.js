@@ -35,6 +35,11 @@ const only = process.argv.slice(2);
         R._f0 = R._f0 || R.field; R.field = () => '${field}';
         G.enemies.clear(); GM.transitioning = false; G.ui.clearScreen(); GM.state = 'playing';
         GM.enterArea(9, 'combat'); G.enemies.clear(); GM.objective = null; GM.waves = null;
+        // (a new area's shaders are made behind a black screen, and nothing runs until they are (game.js GM._warming). The foe was put
+        // down at once and its 10 s counted from there: with the warm-up running long - a busy machine, more kinds of foe to make ready -
+        // it stood frozen for seconds of them and did not attack, or a lunge started before a stall overshot. Wait for the area first)
+        for (let k = 0; k < 600 && GM._warming; k++) await sl(50);
+        G.enemies.clear(); await sl(300);
         GM.dev = { speed: 1 };
         const e0 = window.__errs = (window.__errs || 0);
         const def = G.ENEMY_BY_ID['${id}'];
@@ -53,8 +58,12 @@ const only = process.argv.slice(2);
         const hp0 = G.game.run.dmgTaken || 0;
         let attacked = false, ended = false, maxT = 0;
         // (a few tries: a lunge can fall short from where it happened to start; it should land within some 10 s. An attack still under way
-        // when the 10 s are up is waited on to its end - up to 5 s more - not cut off: one begun late was counted as never finished)
-        for (let i = 0; i < 300; i++) { await sl(50); if (e.attackState && e.attackState.kind === '${attack}') attacked = true; if (attacked && !e.attackState) ended = true; if (attacked && ended && i > 60 && ((G.game.run.dmgTaken || 0) > hp0 || '${attack}' === 'raise')) break; if (i >= 199 && !(attacked && !ended)) break; P.hp = P.stats.maxHp; P.invulnT = 0; }
+        // when the 10 s are up is waited on to its end - up to 5 s more - not cut off: one begun late was counted as never finished.
+        // The seconds are the game's own (GM.time), not the clock on the wall: early in a session the page can hang for seconds at a time
+        // (what the start of a run still makes ready - a busy machine makes it longer), and the foe stands frozen through them; counted on
+        // the wall, the first foe tried lost most of its 10 s to that and did not attack, or its lunge started on the far side of a hang)
+        const gt0 = GM.time, w0 = performance.now(), gt = () => GM.time - gt0;
+        for (let i = 0; performance.now() - w0 < 60000; i++) { await sl(50); if (e.attackState && e.attackState.kind === '${attack}') attacked = true; if (attacked && !e.attackState) ended = true; if (attacked && ended && gt() > 3 && ((G.game.run.dmgTaken || 0) > hp0 || '${attack}' === 'raise')) break; if (gt() >= 10 && !(attacked && !ended)) break; if (gt() >= 15) break; P.hp = P.stats.maxHp; P.invulnT = 0; }
         const took = (G.game.run.dmgTaken || 0) - hp0, raised = G.enemies.list.filter((o) => o.alive && o.raisedBy === e).length;
         const model = !!(e.model && e.model.group && e.model.hits && e.model.hits.length);
         e.alive = false; e.remove && e.remove(); G.enemies.clear();

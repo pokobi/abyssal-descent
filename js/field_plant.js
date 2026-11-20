@@ -1508,7 +1508,72 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
       w0.addLight(x, y + h + 0.6, z, { flame: 0, emit: false, steady: true, intensity: 7 * s, range: 12, color: '#ffd2a0', elecLamp: true });
     } finally { w = sw; }
   }
-  const withLamps = (fn) => { const PR = G.Props, t0 = PR.torch, b0 = PR.brazier, c0 = PR.chandelier; PR.torch = elTorch; PR.brazier = elBrazier; PR.chandelier = elChandelier; try { return fn(); } finally { PR.torch = t0; PR.brazier = b0; PR.chandelier = c0; } };
+  // ---- the barrels of the works: steel drums. The game's barrel is made as ever (its health, what it drops, whether it blows up: props.js
+  // P.barrel), then its wooden look is taken back and a drum drawn in its place: the rolled rims, the two rolling hoops, the lid's two
+  // bungs, dents, the paint worn and run with oil; the ones that blow up red with a yellow band and the warning plate. A drum broken:
+  // steel shards (combat.js breakDestructible, wrapped below), a crushed drum and its oil left on the floor
+  const DRUM_R = 0.34, DRUM_H = 1.06;
+  const drumGeo = () => GC.drumGeo || (GC.drumGeo = (() => { const pts = [[0.001, 0.0], [DRUM_R - 0.02, 0.0], [DRUM_R + 0.012, 0.012], [DRUM_R + 0.012, 0.035], [DRUM_R, 0.045]]; for (const h of [DRUM_H / 3, DRUM_H * 2 / 3]) pts.push([DRUM_R, h - 0.04], [DRUM_R + 0.016, h - 0.015], [DRUM_R + 0.016, h + 0.015], [DRUM_R, h + 0.04]); pts.push([DRUM_R, DRUM_H - 0.045], [DRUM_R + 0.012, DRUM_H - 0.035], [DRUM_R + 0.012, DRUM_H - 0.012], [DRUM_R - 0.02, DRUM_H], [DRUM_R - 0.03, DRUM_H - 0.012], [0.001, DRUM_H - 0.012]); return G.GFX.Geo.lathe(pts, 22); })());
+  const DRUM_COL = [[0.4, 0.48, 0.4], [0.16, 0.16, 0.15], [0.5, 0.36, 0.24], [0.32, 0.36, 0.4]];
+  function drumMesh(w0, x, y, z, explosive, k) {
+    const M = w0.mats, g = new THREE.Group(), tint = explosive ? [0.62, 0.12, 0.08] : DRUM_COL[k % DRUM_COL.length], rusty = !explosive && k % 4 === 2;
+    const body = new THREE.Mesh(drumGeo(), rusty ? M.prust : (GC['drumM' + tint.join()] || (GC['drumM' + tint.join()] = (() => { const m = M.ppaint.clone(); m.color.setRGB(tint[0] * 1.05, tint[1] * 1.05, tint[2] * 1.05); return m; })())));
+    g.add(body);
+    for (const [bx, bz, r] of [[0.17, 0.06, 0.045], [-0.15, -0.1, 0.03]]) { const b = new THREE.Mesh(cylG(10), M.pcast); b.scale.set(r, 0.025, r); b.position.set(bx, DRUM_H - 0.0, bz); g.add(b); }
+    if (explosive) {
+      const band = new THREE.Mesh(cylG(22, true), GC.drumBand || (GC.drumBand = (() => { const m = M.ppaint.clone(); m.color.setRGB(1.1, 0.85, 0.2); return m; })())); band.scale.set(DRUM_R + 0.004, 0.12, DRUM_R + 0.004); band.position.y = DRUM_H / 2; g.add(band);
+      const pl = new THREE.Mesh(gk('signq0', () => { const g2 = new THREE.PlaneGeometry(1, 1); const uv = g2.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.012 + uv.getX(i) * 0.476, 0.512 + uv.getY(i) * 0.476); return g2; }), M.psign); pl.scale.set(0.24, 0.24, 1); pl.position.set(0, DRUM_H * 0.76, DRUM_R + 0.006); g.add(pl);
+    }
+    // (oil run down its side from the bungs)
+    const run = new THREE.Mesh(gk('drumRun', () => { const g2 = new THREE.PlaneGeometry(1, 1); const uv = g2.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5 + uv.getX(i) * 0.25, uv.getY(i) * 0.5); return g2; }), GC.decalMat || (GC.decalMat = new THREE.MeshStandardMaterial({ map: decalTex(), transparent: true, depthWrite: false, roughness: 0.9, metalness: 0, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })));
+    run.scale.set(0.3, 0.7, 1); run.position.set(0, DRUM_H - 0.38, DRUM_R + 0.012); run.rotation.y = 0.6 + k; run.position.set(Math.sin(0.6 + k) * (DRUM_R + 0.012), DRUM_H - 0.38, Math.cos(0.6 + k) * (DRUM_R + 0.012)); g.add(run);
+    // (dented: squeezed a little out of round, leaning a hair)
+    const dn = hsh(x, z, 131); g.scale.set(1 + (dn - 0.5) * 0.05, 1, 1 - (dn - 0.5) * 0.06); g.rotation.set((hsh(x, z, 132) - 0.5) * 0.04, hsh(x, z, 133) * 6.28, (hsh(x, z, 134) - 0.5) * 0.04);
+    g.position.set(x, y, z);
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = o !== run; o.receiveShadow = true; } });
+    return g;
+  }
+  function elBarrel(w0, x, z, y, rng0, explosive) {
+    const n0 = w0.deferred.length, d = PR0.barrel(w0, x, z, y, rng0, explosive);
+    w0.deferred.splice(n0);   // (the wooden barrel's own drawing, not wanted here)
+    plantMats(w0); hookBreak();
+    const k = Math.floor(hsh(x, z, 130) * 8);
+    w0.deferred.push((grp) => { const g = drumMesh(w0, x, y, z, explosive, k); grp.add(g); d.mesh = g; });
+    d.plantDrum = true; d.mat = 'metal'; d.surf = 'metal'; if (d.col) d.col.surf = 'metal';
+    return d;
+  }
+  // (a drum broken: the shards in steel - the world's wooden material swapped for the call only - then the crushed drum and its oil left)
+  const hookBreak = () => {
+    const C = G.combat; if (!C || !C.breakDestructible || C.breakDestructible._plant) return;
+    const b0 = C.breakDestructible;
+    C.breakDestructible = function (d) {
+      if (!d || !d.plantDrum || !d.alive || !G.world) return b0.apply(this, arguments);
+      const M = G.world.mats, own = Object.prototype.hasOwnProperty.call(M, 'wood'), wd = M.wood;
+      M.wood = M.prust || wd;
+      try { b0.apply(this, arguments); } finally { if (own) M.wood = wd; else delete M.wood; }
+      try {
+        const g = new THREE.Group(), body = new THREE.Mesh(drumGeo(), M.prust); body.scale.set(1.15, 0.3, 0.8); body.rotation.set(0.5, Math.random() * 6, 0.25); body.position.y = 0.12; g.add(body);
+        const lid = new THREE.Mesh(cylG(16), M.pcast); lid.scale.set(DRUM_R, 0.02, DRUM_R); lid.position.set(0.6, 0.02, -0.3); lid.rotation.set(0.1, 0, 0.12); g.add(lid);
+        const oil = new THREE.Mesh(gk('oilQuad', () => { const g2 = new THREE.PlaneGeometry(1, 1); g2.rotateX(-Math.PI / 2); const uv = g2.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.25, 0.5 + uv.getY(i) * 0.5); return g2; }), GC.oilMat || (GC.oilMat = (() => { const m = GC.decalMat.clone(); m.opacity = 0.55; m.color.setRGB(0.7, 0.68, 0.66); return m; })())); oil.scale.set(1.8, 1, 1.5); oil.position.y = 0.01; g.add(oil);
+        g.position.set(d.pos.x, d.col ? d.col.y0 : d.pos.y - 0.5, d.pos.z); g.traverse((o) => { if (o.isMesh) { o.castShadow = o !== oil; o.receiveShadow = true; } });
+        G.world.group.add(g);
+      } catch (e) { /* (the remains are only looks) */ }
+    };
+    C.breakDestructible._plant = true;
+  };
+  const PR0 = {};
+  const withLamps = (fn) => { const PR = G.Props, t0 = PR.torch, b0 = PR.brazier, c0 = PR.chandelier, br0 = PR.barrel, bn0 = PR.banner; PR0.barrel = br0; PR.torch = elTorch; PR.brazier = elBrazier; PR.chandelier = elChandelier; PR.barrel = elBarrel; PR.banner = elBanner; try { return fn(); } finally { PR.torch = t0; PR.brazier = b0; PR.chandelier = c0; PR.barrel = br0; PR.banner = bn0; } };
+  // (a cloth banner: a works has none - a warning plate on the wall where it would hang)
+  function elBanner(w0, x, y, z, dir) { const sw = w; w = w0; try { plantMats(w0); const d = { px: [1, 0], nx: [-1, 0], pz: [0, 1], nz: [0, -1] }[dir] || [0, 1]; sign(x + d[0] * 0.02, Math.min(y - 1.2, 3.2), z + d[1] * 0.02, d[0], d[1], 0.55, 1); } finally { w = sw; } }
+  // ---- the stone of the shared halls (the merchant's hall's stalls and altar, the rooms, the guardian's hall and its road) in this
+  // field: dressed stone, flags and setts are drawn as cast concrete, the brick stays brick. A table of materials of the world's own
+  function concreteHalls(w0) {
+    if (!w0 || !w0.mats || w0.mats._plantHall) return;
+    const M = plantMats(w0), base = w0.mats, o = Object.create(base), vc = Object.assign({}, base.vc);
+    const cc = (k, t) => { const m = M.vc.pconc.clone(); m.color.setRGB(t[0], t[1], t[2]); return m; };
+    vc.block = cc('block', [0.78, 0.76, 0.72]); vc.trim = cc('trim', [0.86, 0.84, 0.8]); vc.floor = cc('floor', [0.6, 0.58, 0.55]); vc.cobble = cc('cobble', [0.56, 0.54, 0.51]);
+    o.vc = vc; o._plantHall = true; w0.mats = o;
+  }
   // (lights the builders set down bare with a flame on them - the guardian's road's door lamps: the bulb's steady light, a wall lamp drawn
   // a little behind it)
   const unflame = (ww) => { if (!ww || !ww.lightSources) return ww; for (const s2 of ww.lightSources.slice()) if (s2.flame > 0 && s2.intensity > 0 && !s2.fp && !s2.elecLamp) { s2.flame = 0; s2.emit = false; s2.steady = true; s2.color = '#ffd2a0'; s2.elecLamp = true; elTorch(ww, s2.pos.x, s2.pos.y - 0.7, s2.pos.z - 0.9, 'pz', true); } return ww; };
@@ -1516,12 +1581,53 @@ void mat(vec2 uv, out float h, out vec3 col, out float rough, out float metal){
   // (the rooms' hook, field_rooms.js LG.shellFor: this field's shell for a world of this field, the others' as they were)
   const hookShell = () => {
     // (the merchant's hall, the rooms, the guardian's hall of this field: built with the lamps above in place of torches and braziers)
-    for (const k of ['shop', 'room', 'boss']) { const f0 = LG[k]; if (!f0 || f0._plant) continue; LG[k] = function (area, ...r) { return G.Tex && G.Tex.biomeFor && G.Tex.biomeFor(area) === 'plant' ? withLamps(() => unflame(f0.call(this, area, ...r))) : f0.call(this, area, ...r); }; LG[k]._plant = true; }
+    for (const k of ['shop', 'room', 'boss']) { const f0 = LG[k]; if (!f0 || f0._plant) continue; LG[k] = function (area, ...r) { return G.Tex && G.Tex.biomeFor && G.Tex.biomeFor(area) === 'plant' ? withLamps(() => { const ww = unflame(f0.call(this, area, ...r)); concreteHalls(ww); return ww; }) : f0.call(this, area, ...r); }; LG[k]._plant = true; }
+    hookBreak();
     if (!LG.shellFor || LG.shellFor._plant) return;
     const base = LG.shellFor;
     LG.shellFor = (w0) => (w0 && w0.biome === 'plant' ? plantShell : base(w0));
     LG.shellFor._plant = true;
   };
   hookShell();
+  // ---- the guardian's way in and hall (fieldgen.js LG.boss: F.SHELL[field]): the shared road and arena, the same shapes and the same
+  // boxes; on them the works' things - pipes and lagged mains along the road's walls on brackets, cable trays over them, the steel
+  // door's frame, wall lamps, the floor's marks; over the arena a roof of trusses; switchboards and a transformer cage by its walls
+  F.SHELL.plant = Object.assign({}, F.SHELL.hall, {
+    road(w0, rng0, RW, AD, RD) {
+      const nook = FB.roadHall(w0, rng0, RW, AD, RD, false), cx = RW / 2, sw = w; w = w0;
+      try {
+        plantMats(w0);
+        for (const sx of [-1, 1]) {
+          const x = cx + sx * 5.6;
+          for (const [y, r, lag] of [[4.6, 0.22, true], [5.15, 0.13, false], [9.5, 0.28, true]]) pipe([[x - sx * r * 1.4, y, AD + 3.6], [x - sx * r * 1.4, y, RD - 0.6]], r, { lag, fl: lag ? 0 : 3.2 });
+          for (let z = AD + 5; z < RD - 1; z += 3) { vb('prust', x - sx * 0.7, 4.25, z - 0.04, x + sx * 0.3, 4.32, z + 0.04, { uv: 1 }); vb('prust', x - sx * 0.8, 9.1, z - 0.04, x + sx * 0.3, 9.17, z + 0.04, { uv: 1 }); }
+          const tx = x - sx * 0.85;
+          vb('prust', tx - 0.3, 6.2, AD + 4, tx + 0.3, 6.215, RD - 1, { uv: 1, grad: false }); for (const e of [-0.3, 0.3]) vb('prust', tx + e - 0.012, 6.2, AD + 4, tx + e + 0.012, 6.32, RD - 1, { uv: 1, grad: false });
+          for (let k = 0; k < 5; k++) rod('prub', tx - 0.22 + k * 0.11, 6.26, AD + 4, tx - 0.22 + k * 0.11, 6.26, RD - 1, 0.035, 6);
+          for (let z = AD + 6; z < RD - 1; z += 4.5) vb('prust', Math.min(tx - 0.32, x), 6.12, z - 0.03, Math.max(tx + 0.32, x), 6.2, z + 0.03, { uv: 1 });
+        }
+        for (let z = AD + 8; z < RD - 2; z += 7) { decal(0, cx + (hsh(z, 1, 141) - 0.5) * 6, 0.006, z, 2 + hsh(z, 2, 142) * 2, 2 + hsh(z, 3, 143) * 2, 'f', hsh(z, 4, 144) * 6); decal(2, cx + (hsh(z, 5, 145) - 0.5) * 8, 0.007, z + 3, 2.5, 2.5, 'f', hsh(z, 6, 146) * 6); }
+        for (const x of [cx - 4.2, cx + 4.2]) for (let z = AD + 6; z < RD - 2; z += 1.1) { if (hsh(x, z, 147) < 0.35) continue; vb('ppaint', x - 0.05, 0.0, z, x + 0.05, 0.003, z + 0.8, { uv: 1, grad: false, tint: [0.62, 0.5, 0.16], skip: { bottom: true, px: true, nx: true, pz: true, nz: true } }); }
+        // (the door into the hall: a steel frame round the opening, its warning plates)
+        const gz1 = AD + 3;
+        for (const sx of [-1, 1]) { mem('prust', hsecG(0.3, 0.3, 0.014, 0.02), cx + sx * 3.35, 0, gz1 + 0.35, cx + sx * 3.35, 8.4, gz1 + 0.35, 1, 0, 0, { su: 1, sv: 8 }); sign(cx + sx * 4.6, 2.0, gz1 + 0.32, 0, 1, 0.5, sx > 0 ? 1 : 0); }
+        mem('prust', hsecG(0.4, 0.3, 0.014, 0.02), cx - 3.6, 8.3, gz1 + 0.35, cx + 3.6, 8.3, gz1 + 0.35, 0, 1, 0, { su: 1, sv: 7 });
+        flushDecals(w0);
+      } finally { w = sw; }
+      return nook;
+    },
+    ring(w0, rng0, RW, AD) {
+      F.ceiling(w0, rng0, 0, 0, RW, AD, 24, { chandeliers: 0 });
+      const sw = w; w = w0;
+      try { plantMats(w0); for (let z = 8; z < AD - 4; z += 8) truss(0, RW, z, 21.4, 23.9); for (const x of [RW * 0.3, RW * 0.5, RW * 0.7]) for (const z of [AD * 0.25, AD * 0.5, AD * 0.75]) lamp(x, 19.5, z, 21.4, true, { s: 1.5, I: 14, R: 30, kind: x === RW * 0.5 ? 'hg' : 'sod', prio: 1.0 }); }
+      finally { w = sw; }
+    },
+    dress(w0, rng0, RW, AD) {
+      const sw = w; w = w0;
+      try { plantMats(w0); for (const [x, s2] of [[0.5, 1], [RW - 0.5, -1]]) { pipe([[x + s2 * 0.1, 6.2, 2], [x + s2 * 0.1, 6.2, AD - 2]], 0.24, { lag: true }); pipe([[x + s2 * 0.15, 6.8, 2], [x + s2 * 0.15, 6.8, AD - 2]], 0.14, { fl: 3 }); } flushDecals(w0); }
+      finally { w = sw; }
+    },
+    text: { sub: '— 発電所の奥へ —', icon: '⚡', obj: '配管の続く通路を進め — 扉をくぐると戦いが始まる' },
+  });
   F._plant = { hookShell, mats: plantMats, PROF };
 })();

@@ -168,6 +168,53 @@ const PORT = +process.env.COOP_PORT || 9952;
       check(ok(a) && ok(b), `${s.name}: ${s.cut ? 'ends at the foe' : 'goes on through'} on the host and on the second guest (life ${a ? a.life : '-'} / ${b ? b.life : '-'} s${s.arc ? `; the straight line passes ${info.over} m over the foe's middle` : ''})`);
       await sleep(250);
     }
+    // ---- a shot that pierces ends at the foe past as many as it pierces; one that bursts, at the first foe
+    // (two more foes of the test's own in a line behind the first, away from the guest's side: 2 m and 4 m on)
+    const more = JSON.parse(await h.eval(`(() => { const F = window.__F, out = [];
+      for (const dx of [-2, -4]) { const e = G.game.spawnEnemy({ def: G.ENEMY_BY_ID.skeleton_normal, at: { x: F.pos.x + dx, y: F.pos.y, z: F.pos.z } });
+        e.maxHp = e.hp = 1e6; e.state = 'chase'; e.stateT = 0; e.model.inner.position.y = 0; e.model.group.scale.setScalar(1); e.shield = e.maxShield = 0; e.mut = null; e.pos.set(F.pos.x + dx, F.pos.y, F.pos.z); if (e.updateHits) e.updateHits(); out.push(e); }
+      window.__L3 = out; return JSON.stringify(out.map((e) => [e.pos.x, e.pos.y, e.pos.z])); })()`));
+    await h.until('window.__L3.every((e) => e._nid > 0)', 8000).catch(() => {});
+    const ids3 = JSON.parse(await h.eval('JSON.stringify(window.__L3.map((e) => e._nid))'));
+    for (const pg of [g, g2]) await pg.until(`${JSON.stringify(ids3)}.every((n) => G.enemies.list.some((x) => x._nid === n && x.alive && x.pos.distanceTo(x._n ? x._n.pos : x.pos) < 0.2))`, 10000).catch(() => {});
+    console.log(`      a line of three foes: the first at ${JSON.stringify(await g.eval(`(() => { const c = ${rep}.centerPos(); return [+c.x.toFixed(2), +c.z.toFixed(2)]; })()`))}, then ${JSON.stringify(more.map((p) => [+p[0].toFixed(2), +p[2].toFixed(2)]))}`);
+    {
+      // the times the bolt (95 m/s from 6 m off the first) reaches the second and the third foe's middle
+      const t2 = 8 / 95, t3 = 10 / 95;
+      const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
+      await fire({ pj: { kind: 'bolt', grav: 0, pierce: 2 }, speed: 95 });
+      const a = await lastPic(h, n0), b = await lastPic(g2, m0);
+      const ok = (x) => x && x.life > t2 && x.life < t3 + 0.01;
+      check(ok(a) && ok(b), `a crossbow bolt that pierces 2 ends in the third foe on the host and on the second guest (life ${a ? a.life : '-'} / ${b ? b.life : '-'} s; the second foe at ${t2.toFixed(3)} s, the third at ${t3.toFixed(3)} s)`);
+      await sleep(250);
+    }
+    const bursts = [
+      { name: 'a rocket', pj: { kind: 'rocket', grav: 0, explode: 4.5, life: 6 }, speed: 46 },
+      { name: 'a grenade launcher\'s round', pj: { kind: 'grenade', grav: 18, explode: 4, fuse: 1.6, bounce: true, life: 6 }, t: 6 / 32, grav: 18 },
+      { name: 'a fireball', pj: { kind: 'fireball', grav: 0, explode: 3, life: 4 }, speed: 40 },
+    ];
+    for (const s of bursts) {
+      const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
+      await fire(s);
+      const a = await lastPic(h, n0), b = await lastPic(g2, m0);
+      const ok = (x) => x && x.life < 0.3;
+      check(ok(a) && ok(b), `${s.name}: the picture ends at the first foe, where it bursts (life ${a ? a.life : '-'} / ${b ? b.life : '-'} s)`);
+      await sleep(400);
+    }
+    // a thrown grenade (fuse 1.4 s, it bounces): on its thrower's screen it bursts where it meets a foe in the air (combat.js: a shot that
+    // bursts, bursts on the foe it meets), so its picture ends there too
+    {
+      const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
+      const t0 = await g.eval('G.game.time');
+      await fire({ pj: { kind: 'grenade', look: 'gl_g_frag', grav: 18, explode: 3.5, fuse: 1.4, bounce: true, life: 10, info: { src: 'explosion', grenade: true } }, dx: 7, t: 0.45, grav: 18 });
+      const a = await lastPic(h, n0), b = await lastPic(g2, m0);
+      await g.until(`!G.combat.projectiles.includes(window.__own)`, 5000).catch(() => {});
+      const own = JSON.parse(await g.eval(`JSON.stringify({ gone: +(G.game.time - ${t0}).toFixed(2), d: +window.__own.pos.distanceTo(${rep}.centerPos()).toFixed(2) })`));
+      check(own.gone < 1.2 && own.d < 1.5, `a thrown grenade bursts on the foe it meets in the air, on its thrower's screen (gone after ${own.gone} s, ${own.d} m from the foe; its fuse was 1.4 s)`);
+      const ok = (x) => x && x.life > 0.25 && x.life < 0.5;
+      check(ok(a) && ok(b), `and its picture ends there on the host and on the second guest (life ${a ? a.life : '-'} / ${b ? b.life : '-'} s)`);
+      await sleep(400);
+    }
     // a sticky shot sticks to the foe on the other screens too, and goes with it
     {
       const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');

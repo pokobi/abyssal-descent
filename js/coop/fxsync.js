@@ -117,21 +117,27 @@
       }
       return p;
     };
-    // A picture of someone else's shot flies through the foes on this screen (only its shooter's screen strikes them). A pointed one that
-    // does not pierce - a nail, a bolt, an arrow, a harpoon or stake, a spear - goes no further than the first foe in its way, as on its
-    // shooter's screen (it would stick in the wall behind it for 4 s); a sticky one sticks to that foe and goes with it. The first foe is
-    // looked for along its flight, its fall included, up to the first wall; one that moves on meanwhile is let be.
-    const ENDS = { nail: 1, bolt: 1, arrow: 1, harpoon: 1, spear: 1 };
+    // A picture of someone else's shot flies through the foes on this screen (only its shooter's screen strikes them). On its shooter's
+    // screen a shot that meets a foe (combat.js, the projectiles' step) sticks to it if it is sticky, else bursts there if it bursts (a
+    // rocket, a launcher's round, a fireball, a thrown grenade still in the air), else strikes it and goes on through as many more as it
+    // pierces, ending at the next (a bolt that pierces 2 ends in the third foe; a spear that pierces 99 goes through them all). The
+    // picture does the same here: it ends at that foe (it would fly on behind it, and a pointed one stick in the wall there for 4 s), or
+    // sticks to it and goes with it. The foes are looked for along its flight, its fall included, up to the first wall, each counted
+    // once; one that moves on meanwhile is let be. Bounces are not followed: one that meets the ground first goes on as before.
     const _a = V(), _b = V(), _d = V();
-    const firstFoe = (o) => {
-      const sp = o.vel.length(); if (!(sp > 0) || !G.enemies.raycast) return null;
+    const nthFoe = (o, n) => {
+      const sp = o.vel.length(); if (!(sp > 0) || !G.enemies.raycastAll || !(n >= 1)) return null;
       const g = o.grav || 0, at = (t, out) => out.copy(o.pos).addScaledVector(o.vel, t).setY(o.pos.y + o.vel.y * t - 0.5 * g * t * t);
-      const step = Math.min(0.1, Math.max(1 / 60, 3 / sp));
+      const step = Math.min(0.1, Math.max(1 / 60, 3 / sp)), seen = new Set();
       for (let t = 0; t < o.life; t += step) {
         const t1 = Math.min(o.life, t + step);
         at(t, _a); at(t1, _b); _d.subVectors(_b, _a); const L = _d.length(); if (L < 1e-6) continue; _d.divideScalar(L);
-        const hit = G.enemies.raycast(_a, _d, L, o.radius || 0.12), wh = G.world.raycast(_a, _d, L);
-        if (hit && hit.t >= 0 && (!wh || hit.t <= wh.t)) return { t: t + (t1 - t) * hit.t / L, e: hit.e, p: _a.clone().addScaledVector(_d, hit.t) };
+        const wh = G.world.raycast(_a, _d, L), end = wh ? wh.t : L;
+        for (const hit of G.enemies.raycastAll(_a, _d, end, seen, o.radius || 0.12)) {
+          if (!(hit.t >= 0) || hit.t > end) continue;
+          seen.add(hit.e);
+          if (seen.size >= n) return { t: t + (t1 - t) * hit.t / L, e: hit.e, p: _a.clone().addScaledVector(_d, hit.t) };
+        }
         if (wh) return null;
       }
       return null;
@@ -141,9 +147,10 @@
       const o = { owner: 'remote', dmg: 0, info: { src: 'explosion', remoteViz: true }, pos: V(...m.pos.$v), vel: V(...m.vel.$v) };
       for (const k of PJ) if (m[k] !== undefined) o[k] = m[k];
       o.life = Math.min(o.life || 6, 8);
-      const ends = ENDS[o.kind] && !(o.pierce > 0) && !o.bounce;
-      const f = ends || o.sticky ? firstFoe(o) : null;
-      if (f && ends && !o.sticky) o.life = Math.min(o.life, f.t);
+      // (the foe it ends at: the first if it sticks or bursts, else the one past as many as it pierces)
+      const n = o.sticky || o.explode ? 1 : Math.floor(Math.max(0, o.pierce || 0)) + 1;
+      const f = n <= 20 ? nthFoe(o, n) : null;
+      if (f && !o.sticky) o.life = Math.min(o.life, f.t);
       let p;
       K._pjNet = true;
       try { p = sp.call(C, o); } finally { K._pjNet = false; }

@@ -160,6 +160,12 @@
       D('dust', '舞う塵', 2, { p: [P.dust] }),
       D('haze', '冷えた靄', 2, { fogD: 1.5, fog: '#161a22', k: 0.45, amb: 0.92 }),
     ],
+    // (the power station stands in a cave, its hall under a roof: dust and a stale haze only)
+    plant: [
+      D('base', '', 5),
+      D('dust', '舞う塵', 2, { p: [P.dust] }),
+      D('haze', '淀んだ靄', 2, { fogD: 1.4, fog: '#12161c', k: 0.4, amb: 0.94 }),
+    ],
   };
 
   // ---------------------------------------------------------------- choosing and applying

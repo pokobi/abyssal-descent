@@ -2448,7 +2448,7 @@
   }
   LG.hard = hard;
   // the kind of enclosure a field is built with (its walls and its gates: perimeter, gateFrame)
-  const WALLKIND = { grave: 'cemetery', hamlet: 'village', dusk: 'fort', ruins: 'fort', castle: 'fort', bloodmoon: 'fort', battlefield: 'fort', crimson: 'fort', foundry: 'works', forge: 'works', flooded: 'cavern', mine: 'mine', shaft: 'rock', pillars: 'rock', sanctum: 'sky', sky: 'sky', void: 'sky', catacombs: 'crypt', frozen: 'crypt' };
+  const WALLKIND = { grave: 'cemetery', hamlet: 'village', dusk: 'fort', ruins: 'fort', castle: 'fort', bloodmoon: 'fort', battlefield: 'fort', crimson: 'fort', foundry: 'works', plant: 'works', forge: 'works', flooded: 'cavern', mine: 'mine', shaft: 'rock', pillars: 'rock', sanctum: 'sky', sky: 'sky', void: 'sky', catacombs: 'crypt', frozen: 'crypt' };
   const wallKind = (w) => WALLKIND[w.biome] || (w.mats.biome.outdoor === 'ruins' ? 'fort' : w.mats.biome.outdoor === 'sky' ? 'sky' : 'hall');
   LG.wallKind = wallKind;
 

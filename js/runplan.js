@@ -11,7 +11,7 @@
     hard: { name: 'ハード', en: 'HARD', icon: '🔥', col: '#e07040', areas: 21, mul: 1.5, segs: [['gate', 3], ['halls', 6], ['ruin', 9]], depth: [0, 8, 16], borrow: [[], [], [2]], desc: '手強い敵が待ち受け、深層の変異体や異変が現れる。' },
     extra: { name: 'エクストラ', en: 'EXTRA', icon: '☠️', col: '#78b0f0', areas: 21, mul: 3, segs: [['ruin', 6], ['ruin', 10], ['ruin', 10]], depth: [6, 22, 34], borrow: [[2, 1], [2, 1], [2, 1]], desc: '最も過酷な挑戦。魂の灯火は一つも灯らない。' },
   };
-  R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟', hamlet: '廃村', dusk: '黄昏の都', catacombs: '地下墓所', castle: '古城', flooded: '水没回廊', foundry: '溶鉱炉', frozen: '霊廟', sanctum: '聖域', battlefield: '古戦場', shaft: '大縦坑', mine: '坑道', pillars: '石柱の海', spire: '逆さの尖塔' };
+  R.FIELD_NAME = { grave: '墓所', gate: '関門', halls: '回廊', ruin: '廃墟', hamlet: '廃村', dusk: '黄昏の都', catacombs: '地下墓所', castle: '古城', flooded: '水没回廊', foundry: '溶鉱炉', frozen: '霊廟', sanctum: '聖域', battlefield: '古戦場', shaft: '大縦坑', mine: '坑道', pillars: '石柱の海', spire: '逆さの尖塔', plant: '廃発電所' };
   // ---- the fields of a run: four depth tiers of three fields each. A difficulty's segments name the tier (by its first field, as above);
   // every run draws one field of that tier per segment (never the same one twice in a run while there is another to take), so the
   // depth, foe numbers and strength of each segment stay exactly what they were and only the place changes.
@@ -19,7 +19,7 @@
     ['grave', 'hamlet', 'dusk', 'battlefield'], // 地上
     ['gate', 'catacombs', 'castle', 'shaft'], // 入口
     ['halls', 'flooded', 'frozen', 'mine'], // 中層
-    ['ruin', 'foundry', 'sanctum', 'pillars', 'spire'], // 深層
+    ['ruin', 'foundry', 'sanctum', 'pillars', 'spire', 'plant'], // 深層
   ];
   R.tierOf = (f) => R.TIERS.findIndex((t) => t.includes(f));
   R.baseOf = (f) => { const t = R.TIERS[R.tierOf(f)]; return t ? t[0] : f; };
@@ -42,8 +42,8 @@
   // a segment's own tier weighs twice a borrowed one (so an extra segment meets a deep field half of the time: 4x2 of 4x2 + 8x1)
   R.drawWeight = (base, f) => (ownPool(base).includes(f) ? 2 : 1);
   // retired fields: still the key of their tier (segs, BOSS_POOLS, segBase) and still built for a run that drew them before (its
-  // run.fields keep them), but a new draw passes them over whenever their pool has any other field (the blue-fire ruin gave way to the spire)
-  R.RETIRED = new Set(['ruin']);
+  // run.fields keep them), but a new draw passes them over whenever their pool has any other field (the blue-fire ruin gave way to the spire, the spire to the power station)
+  R.RETIRED = new Set(['ruin', 'spire']);
   R.isField = (f) => R.ready(f) || R.TIERS.some((t) => t[0] === f); // (the first field of a tier is always there)
   R.segBase = (n) => R.def().segs[R.seg(n)][0]; // the tier a segment belongs to (by its first field): what decides its guardians
   // whether area n is in a deep segment (hard's last, every extra one): later used for the "blue depths" look of whatever field it drew.

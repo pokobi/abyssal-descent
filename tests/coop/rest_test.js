@@ -9,7 +9,7 @@
 //   COOP_PORT=9952 node tests/coop/rest_test.js
 const path = require('path');
 const { serve, launch, sleep } = require('./cdp');
-const ROOT = path.resolve(__dirname, '..', '..');
+const ROOT = path.resolve(process.env.FX_ROOT || path.resolve(__dirname, '..', '..')); // (FX_ROOT: another copy of the game to run against)
 const PORT = +process.env.COOP_PORT || 9952;
 (async () => {
   const srv = await serve(ROOT, PORT), ch = await launch(PORT + 1000);
@@ -23,7 +23,7 @@ const PORT = +process.env.COOP_PORT || 9952;
     await sleep(300);
     const g = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest${q}`); globalThis.__g = g;
     await g.booted();
-    await g.until('window.G && G.Coop && G.Coop.id === 1', 120000);
+    await g.until('window.G && G.Coop && G.Coop.id === 1', 180000);
     const off = 'G.renderer.render = () => {}; G.renderer.compile = () => {}; G.Warm = null; 1';
     await h.eval(off); await g.eval(off);
     await h.eval('G.Coop.begin(); G.game.dev = { god: true, speed: 1 }; 1');
@@ -135,6 +135,7 @@ const PORT = +process.env.COOP_PORT || 9952;
     // ---------------- 4. a guest's pointed shots drawn on the other screens (the host's, and a second guest's) ----------------
     // a second guest comes in (a run under way)
     const g2 = await ch.page(`http://127.0.0.1:${PORT}/coop.html?room=${room}&name=Guest2${q}`); globalThis.__g2 = g2;
+    await g2.booted(240000);   // (the page's boot first: a busy machine can take long over it, and the room is joined meanwhile)
     await g2.until('window.G && G.Coop && G.Coop.id >= 2 && G.game.run && G.world && G.Coop.fpOk !== undefined', 180000);
     await g2.eval(off); await g2.running(undefined, 120000);
     await g2.eval('G.game.dev = { god: true, speed: 1 }; ' + play);
@@ -143,12 +144,38 @@ const PORT = +process.env.COOP_PORT || 9952;
     // (every picture of someone else's shot made on a screen: the shot, and the life it was given)
     const rec = `(() => { const L = G.combat.projectiles; window.__PJ = []; L.push = function (p) { if (p && p.owner === 'remote') window.__PJ.push({ p, life0: p.life }); return Array.prototype.push.apply(this, arguments); }; return 1; })()`;
     await h.eval(rec); await g2.eval(rec);
-    // the guest's shot at the foe: from 6 m off its side, straight at it - or lobbed (t: the time it takes on its arc, its line straight
-    // ahead passing well over the foe)
-    const fire = (o) => g.eval(`(() => { const e = ${rep}, c = e.centerPos(), from = c.clone(); from.x += ${o.dx || 6}; from.y += ${o.dy || 0};
-      let v; if (${o.t || 0}) { v = c.clone().sub(from).divideScalar(${o.t || 1}); v.y += 0.5 * ${o.grav || 0} * ${o.t || 1}; } else v = c.clone().sub(from).normalize().multiplyScalar(${o.speed || 60});
-      const p = G.combat.spawnProjectile(Object.assign({ pos: from, vel: v, owner: 'player', dmg: 1, radius: 0.12, life: 6, info: { src: 'bullet' } }, ${JSON.stringify(o.pj)}));
-      window.__own = p; return JSON.stringify({ over: ${o.t ? `+(from.y + v.y * (c.x - from.x) / v.x - c.y).toFixed(2)` : 0} }); })()`);
+    // Where the guest fires from: a place round the foe (R m off, on its +x side and up to 75 degrees either way of it: the test's other
+    // foes stand on its -x side) that is clear - not inside anything, the foe in sight, and the shot's own way free of walls and roofs:
+    // straight at the foe, along its whole arc for a lobbed one, the first few metres for one let go off to the side (a homing one).
+    // A field is drawn anew every run, a narrow lane or a low roof among them: a place picked blindly put the shot into a wall now and then.
+    //   o: { R (6), fixed (only straight off its +x side), speed | t + grav (lobbed: the time it takes on its arc),
+    //        side (radians off the foe, either way) | up (to the side square to the foe, rising by this much); clear (metres free ahead) }
+    // Returns { from, v, deg, sg } or null.
+    await g.eval(`window.__aim = (o) => {
+      const w = G.world, e = ${rep}, c = e.centerPos(), up = new THREE.Vector3(0, 1, 0);
+      const free = (q) => w.boxFree(q.x - 0.2, q.y - 0.2, q.z - 0.2, q.x + 0.2, q.y + 0.2, q.z + 0.2);
+      const open = (a, b) => { const d = b.clone().sub(a), L = d.length(); return L < 1e-6 || !w.raycast(a, d.divideScalar(L), L); };
+      const arc = (from, v, gr, T) => { let a = from.clone(); for (let i = 1; i <= 16; i++) { const t = T * i / 16, b = from.clone().addScaledVector(v, t); b.y -= 0.5 * gr * t * t; if (!open(a, b)) return false; a = b; } return true; };
+      for (const deg of o.fixed ? [0] : [0, 20, -20, 40, -40, 60, -60, 75, -75]) {
+        const a = deg * Math.PI / 180, R = o.R || 6, from = c.clone().add(new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R));
+        if (!free(from) || !w.los(from, c)) continue;
+        const to = c.clone().sub(from).normalize();
+        if (o.t) { const v = c.clone().sub(from).divideScalar(o.t); v.y += 0.5 * o.grav * o.t; if (arc(from, v, o.grav, o.t * 0.97)) return { from, v, deg }; continue; }
+        if (o.side !== undefined || o.up !== undefined) {
+          for (const sg of [1, -1]) {
+            const d = o.up !== undefined ? to.clone().cross(up).multiplyScalar(sg).addScaledVector(up, o.up).normalize() : to.clone().applyAxisAngle(up, o.side * sg);
+            if (open(from, from.clone().addScaledVector(d, o.clear || 4))) return { from, v: d.multiplyScalar(o.speed), deg, sg };
+          }
+          continue;
+        }
+        if (open(from, c)) return { from, v: to.multiplyScalar(o.speed || 60), deg };
+      }
+      return null;
+    }; 1`);
+    const fire = (o) => g.eval(`(() => { const s = window.__aim(${JSON.stringify({ R: o.R, fixed: o.fixed, speed: o.speed, t: o.t, grav: o.grav })});
+      if (!s) return JSON.stringify({ ok: false });
+      const p = G.combat.spawnProjectile(Object.assign({ pos: s.from, vel: s.v, owner: 'player', dmg: 1, radius: 0.12, life: 6, info: { src: 'bullet' } }, ${JSON.stringify(o.pj)}));
+      window.__own = p; return JSON.stringify({ ok: true, deg: s.deg, over: ${o.t ? `+(0.5 * ${o.grav} * ${o.t} * ${o.t}).toFixed(2)` : 0} }); })()`);
     const lastPic = async (pg, n0) => { await pg.until(`window.__PJ.length > ${n0}`, 5000).catch(() => {}); return JSON.parse(await pg.eval(`JSON.stringify(window.__PJ.length > ${n0} ? (() => { const r = window.__PJ[window.__PJ.length - 1]; return { kind: r.p.kind, life: +r.life0.toFixed(3), pierce: r.p.pierce || 0 }; })() : null)`)); };
     const shots = [
       { name: 'a crossbow bolt (no pierce)', pj: { kind: 'bolt', grav: 5, pierce: 0 }, speed: 95, cut: true },
@@ -156,7 +183,7 @@ const PORT = +process.env.COOP_PORT || 9952;
       { name: 'a harpoon', pj: { kind: 'harpoon', grav: 4, pierce: 0 }, speed: 85, cut: true },
       { name: 'a stake (破甲杭: it bursts where it strikes)', pj: { kind: 'harpoon', grav: 1.5, pierce: 0, explode: 3, life: 3 }, speed: 70, cut: true },
       { name: 'a nail', pj: { kind: 'nail', grav: 3, pierce: 0 }, speed: 140, cut: true },
-      { name: 'a lobbed arrow (its straight line passes over the foe)', pj: { kind: 'arrow', grav: 9.8, pierce: 0 }, dx: 9, t: 0.7, grav: 9.8, cut: true, arc: true },
+      { name: 'a lobbed arrow (its straight line passes over the foe)', pj: { kind: 'arrow', grav: 9.8, pierce: 0 }, R: 9, t: 0.7, grav: 9.8, cut: true, arc: true },
       { name: 'a crossbow bolt that pierces (2)', pj: { kind: 'bolt', grav: 5, pierce: 2 }, speed: 95, cut: false },
       { name: 'a spear (it pierces all)', pj: { kind: 'spear', grav: 3, pierce: 99, life: 4 }, speed: 65, cut: false },
     ];
@@ -182,7 +209,8 @@ const PORT = +process.env.COOP_PORT || 9952;
       // the times the bolt (95 m/s from 6 m off the first) reaches the second and the third foe's middle
       const t2 = 8 / 95, t3 = 10 / 95;
       const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
-      await fire({ pj: { kind: 'bolt', grav: 0, pierce: 2 }, speed: 95 });
+      const lf = JSON.parse(await fire({ pj: { kind: 'bolt', grav: 0, pierce: 2 }, speed: 95, fixed: true }));
+      if (!lf.ok) console.log('      (the line of foes cannot be shot along from its own end here: ' + JSON.stringify(lf) + ')');
       const a = await lastPic(h, n0), b = await lastPic(g2, m0);
       const ok = (x) => x && x.life > t2 && x.life < t3 + 0.01;
       check(ok(a) && ok(b), `a crossbow bolt that pierces 2 ends in the third foe on the host and on the second guest (life ${a ? a.life : '-'} / ${b ? b.life : '-'} s; the second foe at ${t2.toFixed(3)} s, the third at ${t3.toFixed(3)} s)`);
@@ -206,7 +234,7 @@ const PORT = +process.env.COOP_PORT || 9952;
     {
       const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
       const t0 = await g.eval('G.game.time');
-      await fire({ pj: { kind: 'grenade', look: 'gl_g_frag', grav: 18, explode: 3.5, fuse: 1.4, bounce: true, life: 10, info: { src: 'explosion', grenade: true } }, dx: 7, t: 0.45, grav: 18 });
+      await fire({ pj: { kind: 'grenade', look: 'gl_g_frag', grav: 18, explode: 3.5, fuse: 1.4, bounce: true, life: 10, info: { src: 'explosion', grenade: true } }, R: 7, t: 0.45, grav: 18 });
       const a = await lastPic(h, n0), b = await lastPic(g2, m0);
       await g.until(`!G.combat.projectiles.includes(window.__own)`, 5000).catch(() => {});
       const own = JSON.parse(await g.eval(`JSON.stringify({ gone: +(G.game.time - ${t0}).toFixed(2), d: +window.__own.pos.distanceTo(${rep}.centerPos()).toFixed(2) })`));
@@ -220,7 +248,7 @@ const PORT = +process.env.COOP_PORT || 9952;
     const follow = `window.__follow = () => { const n0 = window.__PJ.length, r = { first: null, best: -2, gone: false };
       const f = () => { const rec = window.__PJ[n0]; if (!rec) return requestAnimationFrame(f); const p = rec.p;
         const foes = G.enemies.list.filter((e) => e.alive && !e.custom);
-        if (!G.combat.projectiles.includes(p)) { r.gone = true; r.endD = +Math.min(...foes.map((e) => e.centerPos().distanceTo(p.pos))).toFixed(2); r.t = +(p.t || 0).toFixed(2); r.tgt = p.target ? p.target._nid : 0; return; }
+        if (!G.combat.projectiles.includes(p)) { r.gone = true; r.why = { stuck: !!p.stuck, life: +p.life.toFixed(2), at: [+p.pos.x.toFixed(2), +p.pos.y.toFixed(2), +p.pos.z.toFixed(2)] }; r.endD = +Math.min(...foes.map((e) => e.centerPos().distanceTo(p.pos))).toFixed(2); r.t = +(p.t || 0).toFixed(2); r.tgt = p.target ? p.target._nid : 0; return; }
         const t = p.target && p.target.alive ? p.target : null;
         if (t) { const k = +p.vel.clone().normalize().dot(t.centerPos().sub(p.pos).normalize()).toFixed(3); if (r.first === null) r.first = k; r.best = Math.max(r.best, k); }
         requestAnimationFrame(f); };
@@ -229,9 +257,10 @@ const PORT = +process.env.COOP_PORT || 9952;
     await h.eval(`(() => { const keep = [window.__F].concat(window.__L3); for (const e of G.enemies.list) if (e.alive && !e.custom && !keep.includes(e)) { e.alive = false; e.remove(); e.removed = true; } return 1; })()`);
     await sleep(800);
     await h.eval(follow); await g2.eval(follow);
-    const homing = async (name, js, want) => {
+    const homing = async (name, js, want) => { // (js: the shot, from \`from\` with velocity \`s.v\`; want.aim: how it is let go, see __aim)
       await h.eval('window.__HR = window.__follow(); 1'); await g2.eval('window.__HR = window.__follow(); 1');
-      await g.eval(`(() => { const e = ${rep}, c = e.centerPos(), from = c.clone(); from.x += 6; ${js} return 1; })()`);
+      const shot = JSON.parse(await g.eval(`(() => { const s = window.__aim(${JSON.stringify(want.aim)}); if (!s) return 'null'; const e = ${rep}, from = s.from; ${js} return JSON.stringify({ deg: s.deg, side: s.sg }); })()`));
+      if (!shot) { check(false, `${name}: a clear place to fire it from (none found round the foe)`); return; }
       if (want.kill) { await sleep(150); await h.eval(want.kill); }
       for (const pg of [h, g2]) await pg.until('window.__HR.gone', 8000).catch(() => {});
       const a = JSON.parse(await h.eval('JSON.stringify(window.__HR)')), b = JSON.parse(await g2.eval('JSON.stringify(window.__HR)'));
@@ -241,12 +270,12 @@ const PORT = +process.env.COOP_PORT || 9952;
       await sleep(300);
     };
     // a soul bolt (C.soulBolt: aimed at a foe, homing 9), let go upward and to the side as the game lets it go
-    await homing('a soul bolt aimed at the first foe', `const d = new THREE.Vector3(0, 0.4, 1).normalize(); C0 = G.combat.spawnProjectile({ kind: 'soul', pos: from, vel: d.multiplyScalar(22), owner: 'player', dmg: 1, homing: 9, target: e, radius: 0.3, life: 3, info: { src: 'buff', proc: true, noMarker: true } });`.replace('C0 = ', ''), { turn: true, tgt: id });
+    await homing('a soul bolt aimed at the first foe', `G.combat.spawnProjectile({ kind: 'soul', pos: from, vel: s.v, owner: 'player', dmg: 1, homing: 9, target: e, radius: 0.3, life: 3, info: { src: 'buff', proc: true, noMarker: true } });`, { turn: true, tgt: id, aim: { up: 0.4, speed: 22, clear: 3 } });
     // a homing gun's round (no target of its own: the nearest foe), fired slow and 60 degrees off the foe: its straight line passes 5 m wide of it
-    await homing('a homing crossbow bolt (森王の長弓)', `const d = c.clone().sub(from).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 1.05); G.combat.spawnProjectile({ kind: 'bolt', pos: from, vel: d.multiplyScalar(20), grav: 0, owner: 'player', dmg: 1, radius: 0.12, life: 6, pierce: 0, homing: 5, info: { src: 'bullet' } });`, { turn: true });
-    await homing('a homing rocket (流星)', `const d = c.clone().sub(from).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 1.05); G.combat.spawnProjectile({ kind: 'rocket', pos: from, vel: d.multiplyScalar(20), grav: 0, owner: 'player', dmg: 1, radius: 0.25, life: 6, explode: 2, homing: 5, info: { src: 'explosion' } });`, { turn: true });
+    await homing('a homing crossbow bolt (森王の長弓)', `G.combat.spawnProjectile({ kind: 'bolt', pos: from, vel: s.v, grav: 0, owner: 'player', dmg: 1, radius: 0.12, life: 6, pierce: 0, homing: 5, info: { src: 'bullet' } });`, { turn: true, aim: { side: 1.05, speed: 20, clear: 4 } });
+    await homing('a homing rocket (流星)', `G.combat.spawnProjectile({ kind: 'rocket', pos: from, vel: s.v, grav: 0, owner: 'player', dmg: 1, radius: 0.25, life: 6, explode: 2, homing: 5, info: { src: 'explosion' } });`, { turn: true, aim: { side: 1.05, speed: 20, clear: 4 } });
     // a soul bolt whose foe falls before it gets there: it turns to the nearest one left, as on its shooter's screen
-    await homing('a soul bolt whose foe falls on the way', `const t = G.enemies.list.find((x) => x._nid === ${ids3[1]}); const d = new THREE.Vector3(0, 0.4, 1).normalize(); G.combat.spawnProjectile({ kind: 'soul', pos: from, vel: d.multiplyScalar(9), owner: 'player', dmg: 1, homing: 9, target: t, radius: 0.3, life: 4, info: { src: 'buff', proc: true, noMarker: true } });`, { kill: `(() => { const e = window.__L3[1]; e.hp = 1; G.combat.damageEnemy(e, 1e7, { src: 'bullet', fixed: true }); return 1; })()` });
+    await homing('a soul bolt whose foe falls on the way', `const t = G.enemies.list.find((x) => x._nid === ${ids3[1]}); G.combat.spawnProjectile({ kind: 'soul', pos: from, vel: s.v, owner: 'player', dmg: 1, homing: 9, target: t, radius: 0.3, life: 4, info: { src: 'buff', proc: true, noMarker: true } });`, { aim: { up: 0.4, speed: 9, clear: 3 }, kill: `(() => { const e = window.__L3[1]; e.hp = 1; G.combat.damageEnemy(e, 1e7, { src: 'bullet', fixed: true }); return 1; })()` });
     // a sticky shot sticks to the foe on the other screens too, and goes with it
     {
       const n0 = await h.eval('window.__PJ.length'), m0 = await g2.eval('window.__PJ.length');
@@ -261,7 +290,7 @@ const PORT = +process.env.COOP_PORT || 9952;
     // the way a pointed one is drawn: point first, the same on the screen it was fired on and on the others (combat.js NOSE_FWD)
     {
       const n0 = await h.eval('window.__PJ.length');
-      await fire({ pj: { kind: 'spear', grav: 0, pierce: 99, life: 4 }, dx: 14, speed: 20 });
+      await fire({ pj: { kind: 'spear', grav: 0, pierce: 99, life: 4 }, R: 14, speed: 20 });
       await h.until(`window.__PJ.length > ${n0}`, 5000).catch(() => {});
       await h.frames(4); await g.frames(4);
       const way = 'const f = new THREE.Vector3(0, 0, -1).applyQuaternion(p.mesh.quaternion), v = p.vel.clone().normalize(); return [+f.dot(v).toFixed(3), !!p.headFwd];';

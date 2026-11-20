@@ -105,6 +105,7 @@
       if (G.Gim && G.Gim.list.some((g) => g.used)) K.send({ t: 'gms', u: G.Gim.save(), a: GM.area }, to);
       G.world.destructibles.forEach((d, i) => { if (!d.alive) K.send({ t: 'ds', i, a: GM.area }, to); });
       if (K.groundSnap) K.groundSnap(to);
+      if (K.elecSnap) K.elecSnap(to);
     };
     // ---------------- things on the ground ----------------
     const dg = IV.dropToGround, pu = IV.pickUp;
@@ -312,6 +313,65 @@
         else for (const [k, hp] of m.s) FG.iceSet(w, k, hp);
       };
       K.handlers.gq = function (m, from) { if (K.role === 'host' && m.a === GM.area) K.groundSnap(from); };
+    }
+
+    // ---------------- the power plant's live devices (elec.js): the host's clock is everyone's ----------------
+    // The host alone runs the surges: when one comes, which devices warn, go live, drop dead and sleep, and their end when the area is
+    // cleared. Every change is sent as it happens ('el'), and how they all stand every few seconds ('els', per: a screen that stopped a
+    // while catches up). A guest runs no clock of its own (G.Elec.follows) and plays each change out on its own screen; a guest who
+    // strikes a live switch box tells the host ('elh'), who stops it for everyone. A screen that builds such an area asks how it stands
+    // ('elq'; a newcomer is told in catchUp). What a live device does to a player, each screen does to its own; to the foes, the host.
+    // Their effects are made on each screen: never mirrored again by the effect relay (fxsync).
+    const EL = G.Elec;
+    if (EL && EL.apply && EL.snap) {
+      const ST = ['off', 'warn', 'on', 'dying'];
+      const r2 = (v) => Math.round(v * 100) / 100;
+      const host = () => K.live && K.role === 'host';
+      const row = (d) => [d.id, ST.indexOf(d.state), r2(d.t), r2(d.sleep)];
+      const quiet = (fn) => { K._noMirror = (K._noMirror || 0) + 1; try { return fn(); } finally { K._noMirror--; } };
+      EL.follows = () => K.live && K.role !== 'host';
+      K.elecSnap = function (to, periodic) {
+        if (!EL.list.length) return;
+        K.send({ t: 'els', a: GM.area, s: EL.list.map(row), per: periodic ? 1 : 0 }, to);
+      };
+      // (the host: what changed since it was last sent - a state, or a sleep begun or ended)
+      const flush = () => {
+        if (!host() || !EL.list.length) return;
+        const ch = [];
+        for (const d of EL.list) { const k = d.state + (d.sleep > 0 ? '+' : ''); if (d._sk !== k) { d._sk = k; ch.push(row(d)); } }
+        if (ch.length) K.send({ t: 'el', a: GM.area, s: ch });
+      };
+      let elT = 0;
+      const eu = EL.update, es = EL.setup, eo = EL.boxOut, ebh = G.Gim.K.elecbox && G.Gim.K.elecbox.hit;
+      EL.update = function (dt) {
+        quiet(() => eu.call(EL, dt));
+        if (!host() || !EL.list.length) return;
+        flush();
+        elT += dt; if (elT > 4) { elT = 0; K.elecSnap(undefined, true); }
+      };
+      EL.setup = function (w) {
+        const r = es.call(EL, w);
+        elT = 0;
+        if (K.live && K.role !== 'host' && EL.list.length) K.send({ t: 'elq', a: GM.area });
+        return r;
+      };
+      EL.boxOut = function (d, by) { const r = eo.call(EL, d, by); flush(); return r; };
+      if (ebh) G.Gim.K.elecbox.hit = function () { const a = arguments; return quiet(() => ebh.apply(this, a)); };
+      EL.onBox = function (d, by) {
+        if (!(K.live && K.role !== 'host')) return false;
+        K.send({ t: 'elh', a: GM.area, id: d.id, by });
+        return true;
+      };
+      K.handlers.elh = function (m) {
+        if (!host() || m.a !== GM.area) return;
+        const d = EL.list.find((x) => x.id === m.id);
+        if (d) quiet(() => EL.boxOut(d, m.by || 'bullet'));
+      };
+      K.handlers.elq = function (m, from) { if (K.role === 'host' && m.a === GM.area) K.elecSnap(from); };
+      K.handlers.el = K.handlers.els = function (m) {
+        if (K.role === 'host' || m.a !== GM.area || !EL.list.length) return;
+        quiet(() => EL.apply(m.s.map(([id, s, t, sl]) => [id, ST[s], t, sl]), { per: !!m.per }));
+      };
     }
 
     // ---------------- the end of the run: the first through the rift takes everyone along ----------------

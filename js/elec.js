@@ -138,20 +138,29 @@
 
   // ---------------------------------------------------------------- the clock of surges
   const fighting = () => { const GM = G.game; return !GM.areaCleared && GM.stage !== 'title'; };
+  // E.follows (set from outside, a function): while it returns true this screen runs no clock of its own - no surge comes, a warning
+  // never turns live by itself - and every change of state comes from E.apply (the looks, the sounds and what a live device does to
+  // this screen's own player still run here). The ending of the fight (the area cleared) still drops them all here.
+  E.follows = null;
+  const following = () => !!(E.follows && E.follows());
   E.update = function (dt) {
     if (!E.list.length) return;
     const P = G.player, fight = fighting();
     for (const d of E.list) if (d.sleep > 0) d.sleep = Math.max(0, d.sleep - dt);
+    const fol = following();
     if (fight) {
-      if (!E.warn) { E.waveT -= dt; if (E.waveT <= 0) E.surge(); }
+      if (!E.warn) { if (!fol) { E.waveT -= dt; if (E.waveT <= 0) E.surge(); } }
       else {
         E.warn.t += dt;
         if (E.warnSnd) E.warnSnd.keep();
         flicker(E.warn.t / T.prelude);
         if (E.warn.t >= T.prelude) {
-          endFlicker(true);
-          for (const d of E.warn.devs) if (d.state === 'warn') goLive(d);
-          E.warn = null; E.warnSnd = null;
+          if (!fol) {
+            endFlicker(true);
+            for (const d of E.warn.devs) if (d.state === 'warn') goLive(d);
+            E.warn = null; E.warnSnd = null;
+          } else if (!E.warn.devs.some((d) => d.state === 'warn')) endWarn(true);
+          // (following: the devices go live on the word given to E.apply; the stutter goes on until then)
         }
       }
     } else {
@@ -189,8 +198,9 @@
     if (d.kind === 'zone') return Math.hypot(Math.max(d.x0 - p.x, 0, p.x - d.x1), Math.max(d.z0 - p.z, 0, p.z - d.z1), (p.y - d.y) * 2);
     return segPt(d.a, d.b, p, _q);
   }
-  function goLive(d) {
+  function goLive(d, quiet) {
     d.state = 'on'; d.t = 0;
+    if (quiet) return; // (one found already running: no burst of its start)
     if (G.sfx.elecOn) G.sfx.elecOn(sndPt(d).clone(), d.kind);
     if (d.kind === 'arc') { G.fx.arcBolt(d.a, d.b, { col: COL, w: 0.12, life: 0.2, rough: 0.12, branches: 2, minSeg: 0.15 }); G.fx.flash(d.c, 0xbcd4ff, 60, 0.14, 12); }
     else { G.fx.flash(d.c.clone().setY(d.y + 0.6), 0xbcd4ff, 45, 0.14, Math.max(d.hx, d.hz) * 2 + 6); for (let i = 0; i < 6; i++) crawl(d, 1.4, 0.04); }
@@ -308,17 +318,30 @@
       const live = d.state === 'on' || d.state === 'warn';
       G.fx.sparks(pos || b.p, b.f, live ? 6 : 4, SPARK, 4);
       if (!live) return;
-      drop(d, true);
-      E.lastDrop = { dev: d.id, by: kind, t: G.game.time, sleep: d.sleep };
-      // the box itself shorts out: a burst of sparks from its face, a blue-white flash, a puff of smoke, and its lamp goes out
-      G.fx.sparks(b.lampP, V(b.f.x, -0.3, b.f.z), 10, SPARK, 5);
-      G.fx.arcBolt(b.lampP, b.lampP.clone().addScaledVector(b.f, 0.35).add(V(U.rand(-0.2, 0.2), U.rand(-0.3, 0.1), U.rand(-0.2, 0.2))), { col: COL, w: 0.05, life: 0.1, branches: 1, minSeg: 0.04, rough: 0.3 });
-      G.fx.flash(b.lampP, 0xd0e0ff, 30, 0.1, 6);
-      G.fx.smoke(b.lampP, 3, 0.35, 0x3a3834, 0.5, 1.4);
-      if (G.sfx.elecShort) G.sfx.elecShort(b.p.clone());
-      b.dark = 0.25;
+      // (E.onBox, set from outside: returns true when stopping it is not this screen's to decide - it was told elsewhere)
+      if (E.onBox && E.onBox(d, kind)) return;
+      E.boxOut(d, kind);
     },
   };
+  E.onBox = null;
+  // a device stopped at its box: it drops dead and sleeps, and the box shorts out
+  E.boxOut = function (d, by) {
+    if (!d || !(d.state === 'on' || d.state === 'warn')) return false;
+    drop(d, true);
+    E.lastDrop = { dev: d.id, by, t: G.game.time, sleep: d.sleep };
+    shortBox(d);
+    return true;
+  };
+  function shortBox(d) {
+    const b = d.box; if (!b) return;
+    // the box itself shorts out: a burst of sparks from its face, a blue-white flash, a puff of smoke, and its lamp goes out
+    G.fx.sparks(b.lampP, V(b.f.x, -0.3, b.f.z), 10, SPARK, 5);
+    G.fx.arcBolt(b.lampP, b.lampP.clone().addScaledVector(b.f, 0.35).add(V(U.rand(-0.2, 0.2), U.rand(-0.3, 0.1), U.rand(-0.2, 0.2))), { col: COL, w: 0.05, life: 0.1, branches: 1, minSeg: 0.04, rough: 0.3 });
+    G.fx.flash(b.lampP, 0xd0e0ff, 30, 0.1, 6);
+    G.fx.smoke(b.lampP, 3, 0.35, 0x3a3834, 0.5, 1.4);
+    if (G.sfx.elecShort) G.sfx.elecShort(b.p.clone());
+    b.dark = 0.25;
+  }
   const LAMP_ON = new THREE.Color(3.2, 0.32, 0.16), LAMP_OFF = new THREE.Color(0x2a0a08), _lc = new THREE.Color();
   function lamp(d, dt) {
     const b = d.box; if (!b) return;
@@ -479,6 +502,50 @@
     flick = null;
     if (surge && world) G.fx.flash(G.player ? G.player.pos.clone().setY(G.player.pos.y + 3) : V(), 0xd8e4ff, 8, 0.12, 30);
   }
+
+  // the warning over (surge: the devices went live, with the flash that goes with it; otherwise called off, its hum cut)
+  function endWarn(surge) {
+    endFlicker(surge);
+    if (!surge && E.warnSnd) E.warnSnd.stop(0.15);
+    E.warn = null; E.warnSnd = null;
+  }
+
+  // ---------------------------------------------------------------- how the devices stand, taken out and put back
+  // E.snap(): one row a device, [id, state ('off' | 'warn' | 'on' | 'dying'), seconds in that state, seconds it still sleeps].
+  // E.apply(rows, o): this screen's devices made to stand as the rows say, each change played out here as it would be had it
+  // happened here (the warning's stutter and hum, a device going live, one dropping dead, its box shorting out when it was
+  // stopped there - a row that comes with sleep). o.per: a regular word, not a change: a device a step from it (dying where the
+  // word says off, or off where it says dying) is only the moment the word took, and is left as it is.
+  E.snap = () => E.list.map((d) => [d.id, d.state, Math.round(d.t * 100) / 100, Math.round(d.sleep * 100) / 100]);
+  E.apply = function (rows, o) {
+    const per = !!(o && o.per);
+    for (const r of rows || []) {
+      const d = E.list.find((x) => x.id === r[0]); if (!d) continue;
+      const st = r[1], t = +r[2] || 0, sl = +r[3] || 0, was = d.state;
+      if (st === was) { if (!per && (st === 'warn' || st === 'on') && Math.abs(d.t - t) > 0.5) d.t = t; d.sleep = sl; continue; }
+      if ((st === 'off' && was === 'dying') || (st === 'dying' && was === 'off')) { d.sleep = sl; continue; }
+      if (st === 'warn') {
+        if (was === 'on' && G.sfx.elecHumStop) G.sfx.elecHumStop(d, 0.03);
+        // (a warning of its own: a fresh one unless one is still coming for another device)
+        if (!E.warn || !E.warn.devs.some((x) => x !== d && x.state === 'warn')) {
+          if (E.warn) endFlicker();
+          if (E.warnSnd) E.warnSnd.stop(0.05);
+          E.warn = { t, devs: [] };
+          E.warnSnd = G.sfx.elecWarn && T.prelude - t > 0.15 ? G.sfx.elecWarn(T.prelude - t) : null;
+        }
+        d.state = 'warn'; d.t = t;
+        if (!E.warn.devs.includes(d)) E.warn.devs.push(d);
+      } else if (st === 'on') {
+        goLive(d, t > 0.6);
+        d.t = t;
+        if (E.warn && !E.warn.devs.some((x) => x.state === 'warn')) endWarn(true);
+      } else if (was === 'on' || was === 'warn') {
+        drop(d, false);
+        if (sl > 0) { shortBox(d); E.lastDrop = { dev: d.id, by: 'told', t: G.game.time, sleep: sl }; }
+      }
+      d.sleep = sl;
+    }
+  };
 
   // ---------------------------------------------------------------- hooks (gimmick.js: an area's devices are built when it starts, and run on game time)
   const build0 = Gm.build, update0 = Gm.update;

@@ -716,8 +716,31 @@
     if (!ensureRig()) return false;
     const F = fingArr('rest');
     for (const A of [rig.L, rig.R]) { poseArm(A, REST_P, toQ(REST_Q, new QT()), F); A.g.visible = false; }
+    warmProps();
     return true;
   };
+  // the things some moves hold in the hand (the pocket watch of 時間減速, its face drawn on a canvas): made once here, with their shaders
+  // made for the hands' scene and their faces sent to the GPU. The first cast made them on the spot - a shader of their own (no other
+  // thing in the hands' scene has a drawn face on that material), the canvas drawn and sent - and held that frame.
+  function warmProps() {
+    const W = G.weapons, R = G.renderer; if (!W || !W.vmScene || !W.vmCam || !R) return;
+    const tmp = new THREE.Group(); tmp.position.set(0, -0.1, -0.4);
+    for (const k in MOVES) {
+      let mv = null; try { mv = MOVES[k]({}); } catch (e) { mv = null; }
+      if (!mv || typeof mv.prop !== 'function') continue;
+      try { const o = mv.prop(); if (o && !o.parent) { o.visible = true; tmp.add(o); } } catch (e) { /* made with the first cast */ }
+    }
+    if (!tmp.children.length) return;
+    W.vmScene.add(tmp); W.vmScene.updateMatrixWorld(true);
+    try {
+      const cmp = () => R.compile(W.vmScene, W.vmCam);
+      if (G.Post && G.Post.withTarget) G.Post.withTarget(cmp); else cmp();
+      if (G.Post && G.Post.drawWarm) G.Post.drawWarm(W.vmScene, W.vmCam, true);
+      tmp.traverse((o) => { const m = o.material; if (m && m.map) { try { R.initTexture(m.map); } catch (e) { /* sent at its first sight */ } } });
+    } catch (e) { /* made with the first cast */ }
+    W.vmScene.remove(tmp);
+    for (const o of tmp.children.slice()) tmp.remove(o);
+  }
   // every id in the tables, and the moves
   CA.ids = () => Object.keys(TABLE);
   CA.moves = () => Object.keys(MOVES);

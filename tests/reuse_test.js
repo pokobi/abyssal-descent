@@ -1,7 +1,7 @@
 'use strict';
 // No shader made on the spot for things that come and go (fx.js FX.srKeep, pstatus.js ghostMat / PS.ghostWarm, vfx.js warm list): after an
 // area's warm-up, blasts' shock rings (again and again), turning invisible (影の舞) twice, and the great wave (大海嘯) make no new shader
-// program, and none of them holds the page's own thread (script, style, layout) over a quarter of a second.
+// program, and none of them holds the page with over a quarter of a second of its own CPU (script, style, layout).
 // (A frame that comes late while the page's own work was short is not theirs: the browser's GPU process then builds shaders for its
 // own drawing of the page's HTML (a browser started with an empty profile has none of them saved: seconds of it), or shares the GPU
 // with other browsers on the machine. Those are written out for information, with the page's share of the frame.)
@@ -41,7 +41,7 @@ const PORT = +process.env.COOP_PORT || 9995;
       // a heartbeat on the page's own thread (a timer, again and again): a gap in it is the time that thread was held - by the page's
       // scripts, style, layout, a collection - less the GL waits above. The GPU process held up alone does not stop it.
       let hb = performance.now(); window.__hb = [];
-      const beat = () => { const n = performance.now(), g = n - hb; if (g > 100) { const wait = window.__glw.filter(([t]) => t >= hb && t <= n).reduce((s, x) => s + x[1], 0); window.__hb.push({ ctx: ctxAt(hb), d: Math.round(g), own: Math.round(Math.max(0, g - wait)), wait: Math.round(wait) }); } hb = n; setTimeout(beat, 0); };
+      const beat = () => { const n = performance.now(), g = n - hb; if (g > 100) { const wait = window.__glw.filter(([t]) => t >= hb && t <= n).reduce((s, x) => s + x[1], 0); window.__hb.push({ t: hb, ctx: ctxAt(hb), d: Math.round(g), own: Math.round(Math.max(0, g - wait)), wait: Math.round(wait) }); } hb = n; setTimeout(beat, 0); };
       setTimeout(beat, 0);
       const known = new Set(R.info.programs.map((q) => q.id)); let last = performance.now();
       const who = (prog) => { const out = []; const look = (root, tag) => root && root.traverse((o) => { if (out.length > 1 || !o.material) return; for (const m of Array.isArray(o.material) ? o.material : [o.material]) { const pr = R.properties.get(m); if (pr && pr.currentProgram === prog) out.push(tag + ' ' + m.type + (m.isShaderMaterial ? '{' + Object.keys(m.uniforms).join(',') + '}' : '') + (m.transparent ? ' transp' : '')); } }); look(G.scene, 'world'); look(G.weapons.vmScene, 'vm'); return out.join(' | '); };
@@ -50,7 +50,17 @@ const PORT = +process.env.COOP_PORT || 9995;
         requestAnimationFrame(tick); };
       requestAnimationFrame(tick); return 1;
     })()`);
-    const ctx = (c) => p.eval(`window.__ctx = '${c}'; window.__ctxAt.push([performance.now(), '${c}']); 1`);
+    // the page's own CPU: the browser's count of the CPU time the page's main thread used (Performance.getMetrics ThreadTime, answered
+    // off that thread), read every 20 ms from here. For each stretch the heartbeat above found the thread held, what it used of the CPU
+    // in it is the page's own work (scripts, style, layout, collections, a shader made on the spot). Time the thread spent waiting - on
+    // the GPU process, or for the machine's other programs to let it run - is not counted: a busy machine stretches the wall clock, not this.
+    await p.send('Performance.enable', { timeDomain: 'timeTicks' });
+    const metrics = async () => { const r = await p.send('Performance.getMetrics'); const o = {}; for (const x of (r.result && r.result.metrics) || []) o[x.name] = x.value; return o; };
+    // (the page's clock against the browser's: performance.now() read between two readings)
+    let off = 0; { let best = Infinity; for (let i = 0; i < 5; i++) { const a = await metrics(), pn = await p.eval('performance.now()'), b = await metrics(); const span = b.Timestamp - a.Timestamp; if (span < best) { best = span; off = pn - (a.Timestamp + b.Timestamp) * 500; } } }
+    let cur = '', polling = true; const cpu = [];
+    const poll = (async () => { while (polling) { const o = await metrics(); if (o.ThreadTime != null) cpu.push([o.Timestamp * 1000 + off, o.ThreadTime * 1000]); await sleep(20); } })();
+    const ctx = (c) => { cur = c; return p.eval(`window.__ctx = '${c}'; window.__ctxAt.push([performance.now(), '${c}']); 1`); };
     // shock rings, three times over (each made, drawn, thrown away)
     for (let i = 0; i < 3; i++) {
       await ctx('ring ' + i);
@@ -72,17 +82,23 @@ const PORT = +process.env.COOP_PORT || 9995;
     await ctx('tsunami');
     await p.eval("(() => { const P = G.player; P.cls = 'mage'; P.resetRun(); P.meleeMode = false; G.weapons.equip(true); G.ui.clearScreen(); G.game.state = 'playing'; const sk = P.skills[0]; sk.cd = 0; G.abilities.cast(sk); return sk.id; })()");
     await sleep(3000);
+    polling = false; await poll;
+    // (the CPU used between the last reading before the stretch and the first after it, less the stretch's share of the page's usual use)
+    const usual = cpu.length > 1 ? (cpu[cpu.length - 1][1] - cpu[0][1]) / Math.max(1, cpu[cpu.length - 1][0] - cpu[0][0]) : 0;
+    const cpuIn = (t0, t1) => { let a = null, b = null; for (const x of cpu) { if (x[0] <= t0) a = x; if (x[0] >= t1 && !b) b = x; } return a && b ? { own: Math.max(0, b[1] - a[1] - usual * ((b[0] - a[0]) - (t1 - t0))), slack: (b[0] - a[0]) - (t1 - t0) } : null; };
     const newp = JSON.parse(await p.eval('JSON.stringify(window.__newp)'));
     const long = JSON.parse(await p.eval('JSON.stringify(window.__long)'));
     await sleep(300);
     const mine = JSON.parse(await p.eval('JSON.stringify(window.__hb)')).filter((x) => /^(ring|shadow|tsunami)/.test(x.ctx));
+    for (const x of mine) { const c = cpuIn(x.t, x.t + x.d); x.cpu = c ? Math.round(c.own) : null; }
     console.log('      new programs: ' + (newp.length ? newp.join('\n                    ') : 'none'));
     console.log('      long frames: ' + (long.join(', ') || 'none'));
-    console.log("      the page's own thread held (ms): " + (mine.map((x) => `${x.ctx} ${x.d}${x.wait ? ' (GL wait ' + x.wait + ')' : ''}`).join(', ') || 'never over 0.1 s'));
+    console.log("      the page's thread held (wall clock, ms): " + (mine.map((x) => `${x.ctx} ${x.d}${x.wait ? ' (GL wait ' + x.wait + ')' : ''}`).join(', ') || 'never over 0.1 s'));
+    console.log("      ... and the CPU the page used in each (ms): " + (mine.map((x) => `${x.ctx} ${x.d} wall / ${x.cpu} cpu`).join(', ') || 'none') + ` (${cpu.length} readings, usual use ${Math.round(usual * 100)}%)`);
     check(!newp.some((x) => /uR,uHW,uCol,uA/.test(x)), 'shock rings: their shader is made once (the warm-up) and kept, never again on the spot');
     check(!newp.some((x) => /^\[shadow/.test(x) && /vm .*transp/.test(x)), '影の舞: the see-through hands and gun make no shader on the spot (the first time or again)');
     check(!newp.some((x) => /uFront/.test(x)), '大海嘯: its sheet of water is made in the warm-up');
-    check(!mine.some((x) => x.own > 250), "the page's own thread is never held over 0.25 s by them: " + (mine.map((x) => x.ctx + ' ' + x.own + 'ms').join(', ') || 'never over 0.1 s'));
+    check(cpu.length > 50 && !mine.some((x) => x.cpu == null || x.cpu > 250), "no frame of theirs holds the page with over 0.25 s of its own CPU: " + (mine.map((x) => x.ctx + ' ' + x.cpu + 'ms').join(', ') || 'never held over 0.1 s'));
     check(!p.errs.length, 'no page errors ' + p.errs.slice(0, 3).join(' | ').slice(0, 500));
   } catch (e) { console.error(e); fails.push(String(e)); }
   finally { await ch.close(); srv.close(); }

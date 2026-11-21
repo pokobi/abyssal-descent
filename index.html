@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ABYSSAL DESCENT — 深淵降下</title>
+<script>
+/* An address with ?coop (or ?coop=1; a room can follow, as in ?coop&join=CODE) is the co-op page: it moves to coop.html with the same query and the rest
+   of this page is never read (no script of it runs, so nothing is saved here). coop.html loads this page itself with COOP_VER set, so it never moves twice. */
+(function () { var q = location.search; if (!window.COOP_VER && /[?&]coop(=1?)?(&|$)/.test(q)) { location.replace('coop.html' + q + location.hash); document.write('<plaintext style="display:none">'); } })();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">

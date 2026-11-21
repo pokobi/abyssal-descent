@@ -37,10 +37,12 @@ exports.launch = async function (port) {
       const t = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
       const ws = new WebSocket(t.webSocketDebuggerUrl);
       await new Promise((r, x) => { ws.onopen = r; ws.onerror = x; });
-      let id = 0; const wait = new Map(), errs = [];
+      let id = 0; const wait = new Map(), errs = [], reqs = [];
       ws.onmessage = (ev) => {
         const m = JSON.parse(ev.data);
         if (m.id && wait.has(m.id)) { wait.get(m.id)(m); wait.delete(m.id); }
+        // (every address the page asks for, once the test has turned the Network domain on for it)
+        if (m.method === 'Network.requestWillBeSent') reqs.push(m.params.request.url);
         if (m.method === 'Runtime.exceptionThrown') { const d = m.params.exceptionDetails; errs.push((d.exception && d.exception.description || d.text).slice(0, 400)); }
         if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'warning' && process.env.COOP_WARN) console.log('WARN', m.params.args.map((a) => a.value || '').join(' ').slice(0, 400));
         if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') errs.push(m.params.args.map((a) => a.value || a.description || '').join(' ').slice(0, 400));
@@ -53,7 +55,7 @@ exports.launch = async function (port) {
       await send('Page.addScriptToEvaluateOnNewDocument', { source: "try{const k='abyssal_descent_save_v1';const d=JSON.parse(localStorage.getItem(k)||'{}');d.settings=Object.assign(d.settings||{},{volume:0});"+(process.env.COOP_HARD?"d.records=d.records||{};d.records.clears={hard:1};":"")+"localStorage.setItem(k,JSON.stringify(d));}catch(e){}" });
       await send('Page.navigate', { url });
       return {
-        errs, send,
+        errs, reqs, send,
         async eval(expr) {
           const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true, allowUnsafeEvalBlockedByCSP: true });
           if (r.result.exceptionDetails) throw new Error((r.result.exceptionDetails.exception && r.result.exceptionDetails.exception.description) || r.result.exceptionDetails.text);

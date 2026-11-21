@@ -2,7 +2,7 @@
 
 ### [▶ ブラウザで遊ぶ（https://pokobi.github.io/abyssal-descent/）](https://pokobi.github.io/abyssal-descent/)
 
-協力プレイ（テスト版）: <https://pokobi.github.io/abyssal-descent/coop.html> — 開発中のテスト用です。最大3人で、部屋コードで参加します。
+協力プレイ（テスト版）: タイトル画面の「協力プレイ」から始めます（直接開く場合は <https://pokobi.github.io/abyssal-descent/coop.html>）。開発中のテスト用です。最大3人で、部屋コードまたは招待リンクで参加します。
 
 ブラウザで動作する3DのFPSローグライトです。インストールは不要で、ページを開くだけで遊べます。
 

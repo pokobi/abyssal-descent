@@ -236,74 +236,130 @@
   // a live 3D model canvas for other screens: build the html, then call SU.mount(root) once it is in the page
   SU.preview = (kind, def, atts) => preview(kind, def, atts);
 
-  // ---------------- 3D weapon previews ----------------
-  const PV = { r: null, scene: null, cam: null, items: [], raf: 0, W: 448, H: 256 };
-  // The game's reflections (G.envTex, a PMREM map) live in the game renderer's own context: another renderer samples them as black.
-  // SU.envFor(renderer) gives that renderer a copy: the map's half-float texels read straight back from the game's context (a few ms,
-  // no shader). Baking the room again in the new context (G.Tex.makeEnv) is the fallback only: its blur shader takes seconds to compile
-  let envData = null;
-  function envRead() {
-    if (envData) return envData;
-    const main = G.renderer, t = G.envTex; if (!main || !t || !t.image) return null;
-    const gl = main.getContext(), wt = main.properties.get(t).__webglTexture, w = t.image.width, h = t.image.height;
-    if (!wt || !w || !h || typeof WebGL2RenderingContext === 'undefined' || !(gl instanceof WebGL2RenderingContext)) return null;
-    const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING), fb = gl.createFramebuffer();
+  // ---------------- small 3D views, drawn by the game's own renderer ----------------
+  // The weapon cards, the class screen's figure and the codex's model are drawn by the game's renderer into a target of their own and
+  // copied to a 2D canvas: none has a WebGL context of its own. (A phone allows a page only a few, and Chrome takes the oldest - the
+  // game's - when there are too many; each held its drawing buffer, reflections and copies of the game's baked surfaces - from some
+  // 10 to 20 MB each - and the class screen's and the codex's stayed after they were closed. A context made at each opening instead
+  // had its shaders and reflections to make again: a second or two on a phone.)
+  // (the target is marked as XR's: three r158 then draws into it as it draws to the screen - the renderer's tone mapping and sRGB
+  // out - where any other target is given linear colour. Its storage is plain 8-bit (RGBA8, not sRGB), so the bytes read back are those
+  // a canvas of its own would have shown; 4 samples, as that canvas's antialias)
+  const PPB = 0x88EB, _cc = new THREE.Color();
+  const liveR = () => { const R = G.renderer; return R && !R.getContext().isContextLost() ? R : null; };
+  // the game renderer lent to a view: whatever of its state is changed is put back as it was (the frame's target, clearing, clear
+  // colour, exposure, tone mapping, its draw counts, a shadow redraw it was asked for)
+  SU.lend = function (fn) {
+    const R = liveR(); if (!R) return;
+    const sm = R.shadowMap, st = { rt: R.getRenderTarget(), ac: R.autoClear, ex: R.toneMappingExposure, tm: R.toneMapping, ca: R.getClearAlpha(), ar: R.info.autoReset, su: sm.needsUpdate };
+    R.getClearColor(_cc);
     try {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, wt, 0);
-      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) return null;
-      const b = new Uint16Array(w * h * 4); while (gl.getError()) { /* clear older errors */ }
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.HALF_FLOAT, b);
-      if (gl.getError()) return null;
-      let lit = 0; for (let i = 0; i < b.length; i += 4 * 97) if (b[i] & 0x7fff) lit++;
-      if (!lit) return null;   // (nothing read: the fallback)
-      return (envData = { b, w, h, cs: t.colorSpace });
-    } finally { gl.bindFramebuffer(gl.FRAMEBUFFER, prev); gl.deleteFramebuffer(fb); }
-  }
-  SU.envFor = function (renderer) {
-    let e = null; try { e = envRead(); } catch (err) { e = null; }
-    if (e) {
-      const d = new THREE.DataTexture(e.b, e.w, e.h, THREE.RGBAFormat, THREE.HalfFloatType);
-      d.mapping = THREE.CubeUVReflectionMapping; d.colorSpace = e.cs; d.minFilter = d.magFilter = THREE.LinearFilter; d.generateMipmaps = false; d.needsUpdate = true;
-      return d;
+      R.autoClear = true; R.toneMappingExposure = 1; R.toneMapping = THREE.ACESFilmicToneMapping; R.setClearColor(0x000000, 0); R.info.autoReset = false;
+      return fn(R, R.getContext());
+    } finally {
+      R.setRenderTarget(st.rt); R.autoClear = st.ac; R.toneMappingExposure = st.ex; R.toneMapping = st.tm; R.setClearColor(_cc, st.ca); R.info.autoReset = st.ar; sm.needsUpdate = st.su;
     }
-    try { return G.Tex && G.Tex.makeEnv ? G.Tex.makeEnv(renderer) : null; } catch (err) { return null; }
   };
+  // SU.view(): one such view. size(w, h) sets its picture's size; frame(jobs, now) draws each job - { ctx, draw(R) }: draw renders a
+  // scene with R, whose target is already the view's - and puts the picture on the job's 2D context: at once when `now` (or without
+  // WebGL2); otherwise copied on the GPU into a pixel buffer and put on a later frame, once a fence says the GPU is done (a plain read
+  // back waits for the GPU to finish everything before it, the game's own frame too: on a phone that halved the frame rate behind
+  // the inventory). dispose() lets its target and buffer go.
+  SU.view = function () {
+    const V = { rt: null, w: 0, h: 0, img: null, buf: null, rd: null, async: false };
+    V.size = function (w, h) {
+      w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+      if (V.rt && V.w === w && V.h === h) return true;
+      const R = liveR(); if (!R) return false;
+      V.drop(); V.w = w; V.h = h; V.img = new ImageData(w, h); V.buf = new Uint8Array(w * h * 4);
+      if (V.rt) { V.rt.setSize(w, h); return true; }
+      V.async = !!R.capabilities.isWebGL2;
+      V.rt = new THREE.WebGLRenderTarget(w, h, { samples: V.async ? 4 : 0, colorSpace: THREE.SRGBColorSpace });
+      if (V.async) V.rt.texture.internalFormat = 'RGBA8';
+      V.rt.isXRRenderTarget = true;
+      return true;
+    };
+    // the picture read back (rows bottom-up, colour premultiplied by alpha, as a canvas with alpha holds it) put on a 2D canvas
+    const put = (ctx, src, off) => {
+      const d = V.img.data, row = V.w * 4;
+      for (let y = 0; y < V.h; y++) { const s = off + (V.h - 1 - y) * row; d.set(src.subarray(s, s + row), y * row); }
+      for (let i = 3; i < d.length; i += 4) { const a = d[i]; if (a && a < 255) { const k = 255 / a; d[i - 3] *= k; d[i - 2] *= k; d[i - 1] *= k; } }
+      ctx.putImageData(V.img, 0, 0);
+    };
+    V.frame = function (jobs, now) {
+      const R = liveR(); if (!R || !V.rt || !jobs.length) return;
+      if (now || !V.async) {
+        SU.lend((R2) => { for (const j of jobs) { R2.setRenderTarget(V.rt); j.draw(R2); R2.readRenderTargetPixels(V.rt, 0, 0, V.w, V.h, V.buf); put(j.ctx, V.buf, 0); } });
+        return;
+      }
+      const gl = R.getContext(), S = V.w * V.h * 4, n = jobs.length;
+      let D = V.rd;
+      if (D && D.fence) {
+        if (gl.getSyncParameter(D.fence, gl.SYNC_STATUS) !== gl.SIGNALED) return;   // (not drawn yet: the canvases keep their last picture)
+        gl.deleteSync(D.fence); D.fence = null;
+        gl.bindBuffer(PPB, D.pbo); gl.getBufferSubData(PPB, 0, D.data, 0, D.n * S); gl.bindBuffer(PPB, null);
+        for (let i = 0; i < D.n; i++) if (jobs[i] && D.ctx[i] === jobs[i].ctx) put(jobs[i].ctx, D.data, i * S);
+      }
+      if (!D || D.cap < n) {
+        V.drop();
+        const pbo = gl.createBuffer(); gl.bindBuffer(PPB, pbo); gl.bufferData(PPB, n * S, gl.STREAM_READ); gl.bindBuffer(PPB, null);
+        D = V.rd = { pbo, cap: n, data: new Uint8Array(n * S), fence: null, n: 0, ctx: [] };
+      }
+      SU.lend((R2) => {
+        for (let i = 0; i < n; i++) {
+          R2.setRenderTarget(V.rt); jobs[i].draw(R2);
+          // (the target's resolved picture: bound as three binds it to read it back - readRenderTargetPixels - and copied into the buffer)
+          R2.state.bindFramebuffer(gl.FRAMEBUFFER, R2.properties.get(V.rt).__webglFramebuffer);
+          gl.bindBuffer(PPB, D.pbo); gl.readPixels(0, 0, V.w, V.h, gl.RGBA, gl.UNSIGNED_BYTE, i * S); gl.bindBuffer(PPB, null);
+        }
+      });
+      D.n = n; D.ctx = jobs.map((j) => j.ctx); D.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush();
+    };
+    // (a read under way dropped - its picture is of what is no longer shown - and the pixel buffer let go)
+    V.drop = function () {
+      const D = V.rd; V.rd = null; if (!D) return;
+      try { const gl = G.renderer.getContext(); if (D.fence) gl.deleteSync(D.fence); gl.deleteBuffer(D.pbo); } catch (e) { /* gone with the context */ }
+    };
+    V.dispose = function () { V.drop(); if (V.rt) V.rt.dispose(); V.rt = null; V.w = V.h = 0; V.img = V.buf = null; };
+    return V;
+  };
+
+  // ---------------- 3D weapon previews ----------------
+  const PV = { scene: null, cam: null, view: null, items: [], raf: 0, W: 448, H: 256 };
   function pvInit() {
-    if (PV.r) return true;
-    try {
-      const canvas = document.createElement('canvas');
-      PV.r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
-    } catch (e) { PV.r = null; return false; }
-    PV.r.setPixelRatio(1); PV.r.setSize(PV.W, PV.H, false);
-    PV.r.outputColorSpace = THREE.SRGBColorSpace; PV.r.toneMapping = THREE.ACESFilmicToneMapping;
+    const R = liveR(); if (!R) return false;
+    if (PV.scene) return true;
+    PV.view = SU.view(); if (!PV.view.size(PV.W, PV.H)) { PV.view = null; return false; }
     PV.scene = new THREE.Scene();
     PV.scene.add(new THREE.HemisphereLight(0xc8c4bc, 0x50483c, 2.4));
     const k = new THREE.DirectionalLight(0xffe8d0, 3.6); k.position.set(2, 3, 3); PV.scene.add(k);
     const r2 = new THREE.DirectionalLight(0x8090c0, 1.1); r2.position.set(-3, 1, -2); PV.scene.add(r2);
     const f = new THREE.DirectionalLight(0xffffff, 1.4); f.position.set(0, 0.5, 4); PV.scene.add(f);
-    PV.scene.environment = SU.envFor(PV.r);   // (the game's reflections copied for this renderer: black otherwise)
+    // (the game's own reflections: the same context, nothing to copy)
+    try { PV.scene.environment = G.envTex || (G.Tex && G.Tex.makeEnv ? G.Tex.makeEnv(R) : null); } catch (e) { PV.scene.environment = null; }
     PV.cam = new THREE.PerspectiveCamera(28, PV.W / PV.H, 0.01, 100);
     return true;
   }
-  function pvFrame(items) {
+  // a card's job for the view: its model put in the scene, turned, framed, drawn, and taken out again
+  const pvJobs = (items, t) => items.map((it) => ({ ctx: it.ctx, draw(R) {
+    PV.scene.add(it.g);
+    it.g.rotation.y = it.kind === 'gun' ? -Math.PI / 2 + Math.sin(t * 0.8 + it.ph) * 0.6 : t * 0.7 + it.ph;
+    PV.cam.position.set(0, it.d * 0.12, it.d); PV.cam.lookAt(0, 0, 0);
+    R.render(PV.scene, PV.cam);
+    PV.scene.remove(it.g);
+  } }));
+  // (drawn and put at once: the cards new on the screen, so that none shows empty)
+  function pvFrame(items, now) {
     items = items || PV.items;
-    if (!items.length) return;
-    const t = performance.now() / 1000;
-    for (const it of items) {
-      PV.scene.add(it.g);
-      it.g.rotation.y = it.kind === 'gun' ? -Math.PI / 2 + Math.sin(t * 0.8 + it.ph) * 0.6 : t * 0.7 + it.ph;
-      PV.cam.position.set(0, it.d * 0.12, it.d); PV.cam.lookAt(0, 0, 0);
-      PV.r.render(PV.scene, PV.cam);
-      it.ctx.clearRect(0, 0, PV.W, PV.H); it.ctx.drawImage(PV.r.domElement, 0, 0, PV.W, PV.H);
-      PV.scene.remove(it.g);
-    }
+    if (!items.length || !pvInit()) return;
+    PV.view.frame(pvJobs(items, performance.now() / 1000), now);
   }
   function pvLoop() {
     PV.raf = requestAnimationFrame(pvLoop);
     if (!UI.statusOpen() && !(G.InvUI && G.InvUI.isOpen())) { SU.unmount(); return; }
     pvFrame();
   }
-  SU.renderOnce = () => pvFrame();
+  SU.renderOnce = () => pvFrame(null, true);
   // bounds of what is actually drawn (hidden parts of a display model must not enlarge the frame)
   function visBox(root) {
     root.updateMatrixWorld(true);
@@ -323,7 +379,6 @@
     let m = pvModels.get(key);
     if (m) { pvModels.delete(key); pvModels.set(key, m); return m; }
     let model; try { model = it.kind === 'melee' ? G.weapons.meleeDisplayModel(it.def) : G.weapons.displayModel(it.def, it.atts); } catch (e) { return null; }
-    if (G.GFX && G.GFX.portable) G.GFX.portable(model, PV.r);   // (the game's baked surfaces copied for this renderer: black otherwise)
     const box = visBox(model), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
     model.position.sub(c);
     const g = new THREE.Group(); g.add(model);
@@ -347,10 +402,11 @@
       const fresh = cv._pv !== m.key; cv._pv = m.key;
       return { cv, ctx: cv._ctx || (cv._ctx = cv.getContext('2d')), g: m.g, d: m.d, kind: it.kind, ph: i * 1.3, fresh };
     }).filter(Boolean);
-    pvFrame(PV.items.filter((x) => x.fresh));
+    pvFrame(PV.items.filter((x) => x.fresh), true);
     PV.raf = requestAnimationFrame(pvLoop);
   };
-  // the preview renderer, created and its shaders compiled once, ahead of the first Tab / chest screen
+  // the previews' target made and their shaders compiled once (the game renderer's, as they are drawn into the target: tone mapped,
+  // sRGB out), ahead of the first Tab / chest screen
   SU.warm = function () {
     if (!pvInit()) return;
     try {
@@ -358,19 +414,23 @@
       const g = new THREE.Group();
       if (d) g.add(G.weapons.displayModel(d, {}));
       if (G.MELEE && G.MELEE[0]) g.add(G.weapons.meleeDisplayModel(G.MELEE[0]));
-      if (G.GFX && G.GFX.portable) G.GFX.portable(g, PV.r);
       PV.scene.add(g); PV.scene.updateMatrixWorld(true);
       PV.cam.position.set(0, 0.1, 1.2); PV.cam.lookAt(0, 0, 0);
-      PV.r.compile(PV.scene, PV.cam);
-      PV.r.render(PV.scene, PV.cam);
+      SU.lend((R) => { R.setRenderTarget(PV.view.rt); R.compile(PV.scene, PV.cam); R.render(PV.scene, PV.cam); });
       PV.scene.remove(g);
     } catch (e) { /* ignore */ }
-    // the class screen's figure (classes.js) wears baked cloth and leather: read back for its renderer when the page is idle, after the
-    // loading screen, so that neither the boot nor the first opening of that screen pays for it (about 10 ms)
+    // the class screen's figure, as its view draws it (classes.js CL.warmView): made when the page is idle, after the loading screen,
+    // so that neither the boot nor the first opening of that screen pays for it. Its reflections are made here, behind the loading
+    // screen (CL.warmEnv: a blur that held the title for a moment when it was made at idle)
+    if (SU._clsWarm) return; SU._clsWarm = true;
+    try { if (G.Classes && G.Classes.warmEnv) G.Classes.warmEnv(); } catch (e) { /* made at the first opening */ }
     const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
-    idle(() => { try { const X = G.GFX; if (!X || !X.portRead || !X.tex) return; const g = new THREE.Group(); for (const n of ['weave', 'leather']) { const t = X.tex(n); if (t) g.add(new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.orm }))); } X.portRead(g); } catch (e) { /* read when the screen opens */ } }, { timeout: 8000 });
+    idle(() => { try { if (G.Classes && G.Classes.warmView) G.Classes.warmView(); } catch (e) { /* made at the first opening */ } }, { timeout: 8000 });
   };
   // the queued previews are dropped (markup made without being put on the page: the inventory's patch while it is closed)
   SU.drop = () => { pend = []; };
-  SU.unmount = function () { if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = 0; PV.items = []; };
+  SU.unmount = function () {
+    if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = 0; PV.items = [];
+    if (PV.view) PV.view.drop();   // (a read still under way: its pictures are of cards no longer shown)
+  };
 })();

@@ -4,7 +4,7 @@
   const CX = (G.codex = {});
   CX.DEF_NOTE = '敵はみなダメージを抑える防御を持つ。防御ダウン・防御無視を合わせて100%で、ダメージは2倍になる。';
   const U = G.U;
-  let renderer = null, scene = null, cam = null, model = null, raf = 0, canvas = null, animState = null;
+  let view = null, ctx = null, scene = null, cam = null, model = null, raf = 0, canvas = null, animState = null;
   const TABS = [
     ['buff', '🌟 加護', () => G.BUFFS.filter((b) => b.cat !== 'pact' && !b.skill)],
     ['weapon', '🔫 武器', () => G.WEAPONS],
@@ -107,7 +107,14 @@
     };
     renderGrid();
   };
-  CX.close = function () { cancelAnimationFrame(raf); raf = 0; if (model && scene) scene.remove(model); model = null; };
+  CX.close = function () { cancelAnimationFrame(raf); raf = 0; if (model && scene) scene.remove(model); model = null; drop3d(); };
+  // the 3D view gone (the codex closed, or a page of it without one): its target and buffer let go, made again for the next model
+  // shown. (The reflections are the game's own, G.envTex: not disposed here)
+  function drop3d() {
+    if (!view) return;
+    view.dispose();
+    view = ctx = scene = cam = canvas = null; model = null; animState = null;
+  }
   function list() {
     const t = TABS.find((x) => x[0] === tab);
     let a = t[2]();
@@ -321,24 +328,20 @@
     for (const b of G.BOSSES) if (!(G.RETIRED_BOSSES || []).includes(b.id)) { const st = bossStats(b); if (st) mx = Math.max(mx, st.hp); }
     return mx * 1.1;
   }
-  // the game's baked surfaces copied for this renderer (they live in the game renderer's context and come out black here: gfx.js)
-  const port = (root) => (G.GFX && G.GFX.portable ? G.GFX.portable(root, renderer) : root);
+  // The model is drawn by the game's own renderer into a target of its own and put on a 2D canvas (statusui.js SU.view: no WebGL
+  // context of its own - one held its drawing buffer, reflections and copies of the game's surfaces after the codex was closed)
   function mount3d(host, o) {
-    if (!renderer) {
-      canvas = document.createElement('canvas');
-      try {
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-      } catch (e) { renderer = null; host.innerHTML = `<div class="cd-icon">${o.icon}</div>`; return; }
-      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-      renderer.setSize(380, 260);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    if (!view) {
+      const pr = Math.min(2, window.devicePixelRatio || 1);
+      view = G.StatusUI && G.StatusUI.view ? G.StatusUI.view() : null;
+      if (!view || !view.size(380 * pr, 260 * pr)) { view = null; host.innerHTML = `<div class="cd-icon">${o.icon}</div>`; return; }
+      canvas = document.createElement('canvas'); canvas.width = view.w; canvas.height = view.h;
+      canvas.style.width = '380px'; canvas.style.height = '260px'; ctx = canvas.getContext('2d');
       scene = new THREE.Scene();
       scene.add(new THREE.HemisphereLight(0xb0a8a0, 0x302820, 1.2));
       const k = new THREE.DirectionalLight(0xffe0c0, 2.2); k.position.set(2, 3, 2); scene.add(k);
       const r2 = new THREE.DirectionalLight(0x8090c0, 1.0); r2.position.set(-2, 1, -2); scene.add(r2);
-      // the game's reflections (G.envTex) live in the game renderer's own context and read as black here: a copy for this renderer
-      scene.environment = G.StatusUI && G.StatusUI.envFor ? G.StatusUI.envFor(renderer) : null;
+      scene.environment = G.envTex || null;   // (the game's own reflections: the same renderer)
       cam = new THREE.PerspectiveCamera(35, 380 / 260, 0.01, 100);
     }
     host.appendChild(canvas);
@@ -347,23 +350,23 @@
     if (tab === 'boss') {
       const m = G.bosses.buildModelOnly(o.id, BOSS_REF);
       if (!m) { host.innerHTML = `<div class="cd-icon">${o.icon}</div>`; return; }
-      const r = m.root; port(r); r.updateMatrixWorld(true);
+      const r = m.root; r.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(r); const c = box.getCenter(new THREE.Vector3()); const sz = box.getSize(new THREE.Vector3());
       r.position.sub(c);
       const g = new THREE.Group(); g.add(r); model = g;
       const s = Math.max(sz.x, sz.y, sz.z);
       cam.position.set(0, s * 0.18, s * 1.55); cam.lookAt(0, 0, 0); cam.far = s * 10; cam.updateProjectionMatrix();
-      scene.add(model); if (!raf) loop(); return;
+      scene.add(model); draw3d(true); if (!raf) loop(); return;
     }
     if (tab === 'weapon' || tab === 'melee') {
-      model = port(tab === 'melee' ? G.weapons.meleeDisplayModel(o) : G.weapons.displayModel(o));
+      model = tab === 'melee' ? G.weapons.meleeDisplayModel(o) : G.weapons.displayModel(o);
       const box = new THREE.Box3().setFromObject(model); const c = box.getCenter(new THREE.Vector3()); const sz = box.getSize(new THREE.Vector3()).length();
       model.position.sub(c);
       const g = new THREE.Group(); g.add(model); model = g;
       cam.position.set(0, sz * 0.25, sz * 1.6); cam.lookAt(0, 0, 0);
     } else {
       const m = G.enemies.buildModel(o);
-      model = port(m.group);
+      model = m.group;
       const h = m.h, s = Math.max(h, m.r * 2.5);
       model.position.y = -h * 0.5;
       const g = new THREE.Group(); g.add(model); model = g;
@@ -371,15 +374,17 @@
       animState = m;
       if (m.worm) { m.J.segs.forEach((sg, i) => sg.position.set(0, 0.8 - i * 0.05, -0.6 * (i + 1))); }
     }
-    scene.add(model);
+    scene.add(model); draw3d(true);
     if (!raf) loop();
   }
   function loop() {
     raf = requestAnimationFrame(loop);
-    if (!document.getElementById('cx-3d')) { cancelAnimationFrame(raf); raf = 0; return; }
+    if (!document.getElementById('cx-3d')) { cancelAnimationFrame(raf); raf = 0; drop3d(); return; }
     const t = performance.now() / 1000;
     if (model) model.rotation.y = t * 0.6;
     if (animState && animState.animate && !animState.worm) animState.animate({ walk: t * 6, mv: 1, atk: Math.max(0, Math.sin(t * 1.3)) * 0.6, wind: 0, flinch: 0, t });
-    renderer.render(scene, cam);
+    draw3d();
   }
+  // (at once when a model is new on the page, so that it does not show the last one or nothing for a frame)
+  function draw3d(now) { if (now && model) model.rotation.y = performance.now() / 1000 * 0.6; if (view && scene) view.frame([{ ctx, draw: (R) => R.render(scene, cam) }], now); }
 })();

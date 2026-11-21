@@ -485,12 +485,39 @@
         </div>
       </div>`;
   };
-  // the preview: its own small renderer (made once, its canvas moved into each screen), a figure in the class's clothes holding its gun, slowly turning (drag to turn it)
-  const PV = { r: null, cv: null, scene: null, cam: null, fig: null, raf: 0, yaw: 0.5, drag: null };
+  // the preview: a figure in the class's clothes holding its gun, slowly turning (drag to turn it). Drawn by the game's own renderer
+  // into a target of its own and put on a 2D canvas (statusui.js SU.view: no WebGL context of its own - the one it had stayed after
+  // the screen was closed, and one made at each opening took a second or two on a phone to make its shaders and reflections again).
+  // The scene and its reflections are made once a session (the reflections behind the loading screen: CL.warmEnv); the view and its
+  // canvas (moved into each screen) while the screen is open
+  const PV = { view: null, cv: null, ctx: null, pr: 1, scene: null, env: null, cam: null, fig: null, raf: 0, yaw: 0.5, drag: null };
   function pvInit() {
-    if (PV.r) return true;
-    try { PV.cv = document.createElement('canvas'); PV.cv.className = 'cls-cv'; PV.r = new THREE.WebGLRenderer({ canvas: PV.cv, antialias: true, alpha: true }); } catch (e) { PV.r = null; return false; }
-    PV.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); PV.r.outputColorSpace = THREE.SRGBColorSpace; PV.r.toneMapping = THREE.ACESFilmicToneMapping;
+    if (!PV.scene) pvScene();
+    pvEnv();
+    if (PV.view) return true;
+    const SU = G.StatusUI; if (!G.renderer || !SU || !SU.view) return false;
+    PV.pr = Math.min(2, window.devicePixelRatio || 1); PV.view = SU.view();
+    if (!PV.view.size(300 * PV.pr, 400 * PV.pr)) { PV.view = null; return false; }
+    PV.cv = document.createElement('canvas'); PV.cv.className = 'cls-cv'; PV.ctx = PV.cv.getContext('2d');
+    return true;
+  }
+  // something for the metal to reflect (a dim room with a warm light above): without it plate and steel come out black. Made with the
+  // game's renderer, once, and kept (some 6 MB): made at each opening it took from 5 ms to a second - three's PMREM makes and lets
+  // go a material of its own each time, and its shader went with it now and then
+  function pvEnv() {
+    if (PV.env || !G.renderer || !G.StatusUI || !G.StatusUI.lend) return;
+    try {
+      const env = new THREE.Scene(), pm = new THREE.PMREMGenerator(G.renderer);
+      env.add(new THREE.Mesh(new THREE.SphereGeometry(10, 16, 12), new THREE.MeshBasicMaterial({ color: 0x4e473c, side: THREE.BackSide })));   // (dim: the walls of a vault, not a studio's white)
+      const lamp = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: 0xfff0d8 })); lamp.position.set(0, 8, 2); lamp.rotation.x = Math.PI / 2; env.add(lamp);
+      const side = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ color: 0x9a9080 })); side.position.set(-8, 2, 0); side.rotation.y = Math.PI / 2; env.add(side);
+      G.StatusUI.lend(() => { PV.env = pm.fromScene(env, 0.04).texture; }); pm.dispose();
+      env.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    } catch (e) { PV.env = null; /* plain lights only */ }
+    if (PV.scene) PV.scene.environment = PV.env;
+  }
+  CL.warmEnv = function () { try { if (!PV.scene) pvScene(); pvEnv(); } catch (e) { /* made at the first opening */ } };
+  function pvScene() {
     PV.scene = new THREE.Scene();
     // (lit as a figure by a lamp in a dark vault: a warm key from in front and a little above, a weak cool fill from the other side,
     // a dim sky / floor bounce, and an edge light from behind to part it from the dark - the class's colour only a touch in it)
@@ -501,16 +528,38 @@
     PV.disc = new THREE.Mesh(new THREE.CircleGeometry(0.75, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 }));
     PV.disc.rotation.x = -Math.PI / 2; PV.disc.position.y = 0.005; PV.scene.add(PV.disc);
     PV.cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-    // something for the metal to reflect (a dim room with a warm light above): without it plate and steel come out black
-    try {
-      const env = new THREE.Scene(), pm = new THREE.PMREMGenerator(PV.r);
-      env.add(new THREE.Mesh(new THREE.SphereGeometry(10, 16, 12), new THREE.MeshBasicMaterial({ color: 0x4e473c, side: THREE.BackSide })));   // (dim: the walls of a vault, not a studio's white)
-      const lamp = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: 0xfff0d8 })); lamp.position.set(0, 8, 2); lamp.rotation.x = Math.PI / 2; env.add(lamp);
-      const side = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ color: 0x9a9080 })); side.position.set(-8, 2, 0); side.rotation.y = Math.PI / 2; env.add(side);
-      PV.scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
-    } catch (e) { /* plain lights only */ }
-    return true;
   }
+  // the screen gone (its canvas off the page): the view let go, and the figure (made again at the next opening)
+  function pvDrop() {
+    if (PV.fig) PV.scene.remove(PV.fig.root);
+    try { if (PV.view) PV.view.dispose(); } catch (e) { /* gone with the context */ }
+    PV.view = PV.cv = PV.ctx = PV.fig = PV.cls = null; PV.drag = null;
+  }
+  // made once when the page is idle (statusui.js SU.warm): every class's figure, so that its shaders - as this view draws them: its
+  // lights, its reflections, tone mapped to sRGB - and the reflections' blur are made before the first opening, which otherwise
+  // stopped for them. The shaders are only started here (the drivers link them on threads of their own); the figures are drawn once
+  // into the view when they are done (the first draw into a target of a kind makes some drivers build a shader again: post.js)
+  CL.warmView = function () {
+    if (PV.view || !pvInit()) return;
+    let g = null;
+    try {
+      g = new THREE.Group(); for (const c of CL.LIST) { try { g.add(figureOf(c).root); } catch (e) { /* made at its opening */ } }
+      PV.scene.add(g); PV.cam.position.set(0, 1.3, 5.6); PV.cam.lookAt(0, 0.95, 0);
+      G.StatusUI.lend((R) => { R.setRenderTarget(PV.view.rt); R.compile(PV.scene, PV.cam); });
+    } catch (e) { /* made at the first opening */ }
+    if (g) PV.scene.remove(g);
+    pvDrop();
+    if (!g) return;
+    const R = G.renderer, t0 = performance.now();
+    const tick = () => {
+      let pending = false; for (const p of R.info.programs || []) if (p && p.isReady && !p.isReady()) { pending = true; break; }
+      if (pending && performance.now() - t0 < 10000) { setTimeout(tick, 50); return; }
+      if (PV.view || !pvInit()) return;   // (the screen is open: it draws its figure itself)
+      try { PV.scene.add(g); G.StatusUI.lend((R2) => { R2.setRenderTarget(PV.view.rt); R2.render(PV.scene, PV.cam); }); } catch (e) { /* drawn at the first opening */ }
+      PV.scene.remove(g); pvDrop();
+    };
+    setTimeout(tick, 50);
+  };
   const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
   function figureOf(c) {
     const F = G.avatar.buildFigure(), J = F.J;
@@ -541,20 +590,21 @@
     if (PV.cv.parentNode !== host) { host.innerHTML = ''; host.appendChild(PV.cv); }
     if (PV.fig) PV.scene.remove(PV.fig.root);
     PV.fig = figureOf(c); PV.scene.add(PV.fig.root); PV.cls = c;
-    // (the baked cloth, leather and gun surfaces belong to the game's renderer: this one is given copies, or they come out black)
-    if (G.GFX && G.GFX.portable) G.GFX.portable(PV.fig.root, PV.r);
     PV.disc.material.color.set(c.col); PV.rim.color.set(0xe8dcc8).lerp(new THREE.Color(c.col), 0.22);
+    CL.pvFrame(undefined, true);
     if (!PV.raf) PV.raf = requestAnimationFrame(pvLoop);
   }
   CL._pv = PV;
   function pvLoop(t) {
-    if (!PV.cv || !PV.cv.isConnected) { PV.raf = 0; return; }
+    if (!PV.cv || !PV.cv.isConnected) { PV.raf = 0; pvDrop(); return; }
     PV.raf = requestAnimationFrame(pvLoop);
     CL.pvFrame(t);
   }
-  CL.pvFrame = function (t) {
-    const w = PV.cv.clientWidth || 300, h = PV.cv.clientHeight || 400, pr = PV.r.getPixelRatio();
-    if (PV.cv.width !== Math.round(w * pr) || PV.cv.height !== Math.round(h * pr)) { PV.r.setSize(w, h, false); PV.cam.aspect = w / h; PV.cam.updateProjectionMatrix(); }
+  CL.pvFrame = function (t, now) {
+    if (!PV.view) return;
+    const w = PV.cv.clientWidth || 300, h = PV.cv.clientHeight || 400, W = Math.floor(w * PV.pr), H = Math.floor(h * PV.pr);
+    if (PV.cv.width !== W || PV.cv.height !== H) { PV.cv.width = W; PV.cv.height = H; PV.cam.aspect = w / h; PV.cam.updateProjectionMatrix(); }
+    if (!PV.view.size(W, H)) return;
     if (!PV.drag) PV.yaw += 0.0016; // (a slow turn)
     const F = PV.fig; if (!F) return;
     t = t || performance.now();
@@ -562,7 +612,7 @@
     F.J.chest.rotation.y = Math.sin(t / 900) * 0.04; F.J.body.position.y = 0.95 + Math.sin(t / 700) * 0.008;
     if (F.J.orbs) G.avatar.orbTick(F.J, 1 / 60, PV.cls && PV.cls.atts && PV.cls.atts.core ? G.ATT_BY_ID[PV.cls.atts.core].mods.el : null);
     PV.cam.position.set(0, 1.3, 5.6); PV.cam.lookAt(0, 0.95, 0);
-    PV.r.render(PV.scene, PV.cam);
+    PV.view.frame([{ ctx: PV.ctx, draw: (R) => R.render(PV.scene, PV.cam) }], now);
   };
   CL.select = function (onPick, back) {
     const UI = G.ui; let cur = CL.last();

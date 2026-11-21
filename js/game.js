@@ -214,15 +214,22 @@
   };
   // after the GPU was taken away twice in a minute (see ctxReload), fewer pixels again: one step, two steps
   const SAFE_PR = [1, 0.8, 0.65];
-  // normal maps off on low (kept on the material so high / medium bring them back)
+  // normal maps off on low (set aside so high / medium bring them back). What is written on the material's userData is only the
+  // texture's id, never the texture: Material.clone() copies userData through JSON, so a texture kept there came out of a clone made
+  // on low as a plain object (and its picture was drawn to a data URL on the way, on every clone). Put back as the normal map on
+  // high, that object has no matrix and the renderer threw on every frame the clone was drawn. A clone finds the texture by the id.
+  const NM_OFF = new Map();   // texture id -> the texture (held weakly: the material that set it aside keeps it alive, _nmKeep)
+  const nmPut = (t) => { if (NM_OFF.size > 400) for (const [k, r] of NM_OFF) if (!r.deref()) NM_OFF.delete(k); NM_OFF.set(t.uuid, typeof WeakRef === 'function' ? new WeakRef(t) : { deref: () => t }); };
+  const nmGet = (id) => { const r = typeof id === 'string' ? NM_OFF.get(id) : null; return (r && r.deref()) || null; };
   GM.qualityMaterials = function () {
     const q = QP[G.save.data.settings.quality] || QP.high;
     const pass = (root) => root && root.traverse((o) => {
       if (!o.material) return;
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
         if (!m.isMeshStandardMaterial) continue;
-        if (!q.nm && m.normalMap) { m.userData._nm = m.normalMap; m.normalMap = null; m.needsUpdate = true; }
-        else if (q.nm && !m.normalMap && m.userData._nm) { m.normalMap = m.userData._nm; m.userData._nm = null; m.needsUpdate = true; }
+        if (m.normalMap && !m.normalMap.isTexture) { m.normalMap = null; m.needsUpdate = true; }   // (never a thing the renderer cannot read)
+        if (!q.nm && m.normalMap) { nmPut(m.normalMap); m._nmKeep = m.normalMap; m.userData._nm = m.normalMap.uuid; m.normalMap = null; m.needsUpdate = true; }
+        else if (q.nm && !m.normalMap && m.userData._nm) { const t = m._nmKeep || nmGet(m.userData._nm); m._nmKeep = null; m.userData._nm = null; if (t && t.isTexture) { m.normalMap = t; m.needsUpdate = true; } }
       }
     });
     pass(scene); pass(G.weapons && G.weapons.vmScene);

@@ -19,18 +19,20 @@ const PORT = +process.env.COOP_PORT || 9983;
     await p.until('!!G.game.run && !!G.world', 30000);
     await p.running();
     await sleep(500);
+    const gt = () => p.eval('G.game.time');
+    const waitT = async (dt) => { const t0 = await gt(); await p.until(`G.game.time - ${t0} > ${dt}`, 60000); };
     const enter = async (field, n, want) => {
       for (let t = 0; t < 8; t++) {
         await p.eval(`G.Run.field = () => '${field}'; G.game.seed = ${1234 + 97} * ${t + 1}; G.game.area = ${n - 1}; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.enterArea(${n}, 'combat'); 1`);
         await p.until(`G.world && G.world.biome === '${field}'`, 40000);
-        await sleep(800);
+        // (the new area's shaders are made behind the black screen first, and no frame runs until they are (game.js GM._warming):
+        // waited for, then a moment of the game's own time - a wall-clock wait could end before a single frame had run)
+        await p.running(); await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; 1"); await waitT(0.5);
         await p.eval("G.enemies.clear(); G.game.objective = null; G.game.waves = null; G.ui.clearScreen(); G.game.state = 'playing'; G.game.dev = { god: true, speed: 1 }; 1");
         if (await p.eval(want)) return true;
       }
       return false;
     };
-    const gt = () => p.eval('G.game.time');
-    const waitT = async (dt) => { const t0 = await gt(); await p.until(`G.game.time - ${t0} > ${dt}`, 60000); };
     // ---- the foundry
     check(await enter('foundry', 16, "G.world.movers && G.world.movers.some((m) => !m.dy) && G.world.movers.some((m) => m.dy) && G.world.belts && G.world.belts.length > 0"), 'the foundry has carriages, lifts and belts');
     // a carriage: stand on it as it waits at its start, ride it across
@@ -58,8 +60,8 @@ const PORT = +process.env.COOP_PORT || 9983;
       let at = null; for (let k = 0; k < 400 && !at; k++) { const x = d.x0 + 2 + Math.random() * (d.x1 - d.x0 - 4), z = d.z0 + 2 + Math.random() * (d.z1 - d.z0 - 4); const y = w.floorBelow(x, 0.3, z); if (y < -1.4 && y > -2 && w.boxFree(x - 0.4, y + 0.05, z - 0.4, x + 0.4, y + 1.9, z + 0.4)) at = [x, y, z]; }
       if (!at) return JSON.stringify({ err: 'no deep spot' });
       P.pos.set(at[0], at[1] + 0.02, at[2]); P.vel.set(0, 0, 0); P.grounded = true;
-      await new Promise((r) => setTimeout(r, 400));
-      return JSON.stringify({ sp: P.fieldSpeed, jp: P.fieldJump, y: P.pos.y }); })()`).then(JSON.parse);
+      const t0 = G.game.time; for (let k = 0; k < 300 && G.game.time - t0 < 0.4; k++) await new Promise((r) => setTimeout(r, 50));   // (0.4 s of the game's own time)
+      return JSON.stringify({ sp: P.fieldSpeed, jp: P.fieldJump, y: P.pos.y, dt: Math.round((G.game.time - t0) * 100) / 100, st: G.game.state }); })()`).then(JSON.parse);
     check(!f.err && f.sp <= 0.55 && f.jp <= 0.55, `chest-deep in the water you wade slowly and hardly jump (${JSON.stringify(f)})`);
     check(p.errs.length === 0, `no page errors${p.errs.length ? ' — ' + p.errs.slice(0, 2).join(' | ').slice(0, 300) : ''}`);
   } catch (e) { console.log('crashed', e && e.message || e); fails.push('crashed'); }

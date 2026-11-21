@@ -76,7 +76,7 @@ const PORT = +process.env.COOP_PORT || 9995;
       const r = JSON.parse(await p.eval(`(async () => {
         const w = G.player.weapons[0]; w.atts.optic = 'o_8x'; w.ver++; G.weapons.equip(true); G.enemies.clear();
         let up = 0;
-        for (let i = 0; i < 60 && up < 6; i++) {
+        for (let i = 0; i < 200 && up < 6; i++) {
           if (G.game.state !== 'playing') { G.ui.clearScreen(); G.game.state = 'playing'; }
           G.player.meleeMode = false; G.input.mouse[2] = true;
           await new Promise((res) => setTimeout(res, 150));
@@ -85,7 +85,12 @@ const PORT = +process.env.COOP_PORT || 9995;
         const el = document.getElementById('scope-overlay'); const t = el.querySelector('.x8rng');
         return JSON.stringify({ on: el.style.opacity === '1', kind: el.dataset.kind, svg: !!el.querySelector('.x8 svg'), txt: t ? t.textContent : '', scoped: !!G.weapons.isScoped, up });
       })()`));
-      await p.eval("G.input.mouse[2] = false; 1"); await sleep(800);
+      // lowered, then waited for in the game's own time, not the clock: the first time a sight is raised or lowered the page's next
+      // frame can be seconds late on the test machine (the browser's first drawing of what changes on the screen, not the game's
+      // frame, which stays short), and a wall-clock wait ended before the gun had come down at all
+      await p.eval(`(async () => { G.input.mouse[2] = false; const t0 = G.game.time;
+        for (let i = 0; i < 600 && G.game.time - t0 < 0.5; i++) { if (G.game.state !== 'playing') { G.ui.clearScreen(); G.game.state = 'playing'; } G.input.mouse[2] = false; await new Promise((res) => setTimeout(res, 50)); }
+        return 1; })()`);
       check(r.on && r.kind === 'x8' && r.svg && r.scoped && /^(\d+ m|--- m)$/.test(r.txt), 'the 8x blacks the screen out round its eyepiece; the rangefinder reads ' + JSON.stringify(r));
       check(await p.eval("document.getElementById('scope-overlay').style.opacity === '0'"), 'and lowering the gun lifts it');
     }

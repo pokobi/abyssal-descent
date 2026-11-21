@@ -24,6 +24,8 @@
   window.G_MOBILE = !!m;
   if (m) {
     document.documentElement.classList.add('m');
+    /* (from the first paint: no zoom, and the page under the notch and the rounded corners too - mobile.js keeps its controls inside the safe area) */
+    var vp = document.querySelector('meta[name=viewport]'); if (vp) vp.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
     var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'css/mobile.css'; document.head.appendChild(l);
   }
 })();

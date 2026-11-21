@@ -37,10 +37,84 @@ const PORT = +process.env.COOP_PORT || 9981;
     await p.eval("G.renderer.compile = () => {}; G.Warm = null; G.save.data.settings.askTutorial = false; G.game.startRun({ id: 'normal', lv: 0 }, 0); G.game.dev = { god: true, speed: 1 }; 1");
     // (the run going: its area's shaders made (_warming), and its frames running - the game's time moving)
     await p.until("document.documentElement.classList.contains('m-play')", 60000); await p.running('playing'); await p.gameFor(0.3);   // (a phone keeps playing: no pointer lock to lose)
+    // (counts the phone layer's fullscreen requests, for the messages below)
+    await p.eval('(() => { const f = document.documentElement.requestFullscreen; window.__fsN = 0; document.documentElement.requestFullscreen = function () { window.__fsN++; return f.apply(this, arguments); }; })(); 1');
     const W = await p.eval('innerWidth'), H = await p.eval('innerHeight');
     console.log('screen', W, H, 'field', await p.eval('G.world.biome + (G.world.layout ? "/" + G.world.layout : "")'));
     check(await p.eval('document.querySelectorAll("#m-tiles .ab").length') >= 9, 'skills and items are placed as buttons of their own');
     check(await p.eval('document.querySelector("[data-id=use]").style.display') === 'none', 'there is no interact button by default');
+    // the buttons' signs are drawn (an emoji is drawn by the phone in its own bright colours), and nothing on the screen covers anything else
+    check(await p.eval('[...document.querySelectorAll("#m-btns .mb")].every((b) => !!b.querySelector(".mi svg") && !/[\\u{1F300}-\\u{1FAFF}\\u2600-\\u27BF]/u.test(b.textContent))'), 'every button carries a drawn sign, no emoji');
+    check(await p.eval('document.querySelector("[data-id=ping]").style.display') === 'none', 'no ping button where the game has no ping');
+    // (at the sizes of real phones, landscape: the test's own window is far smaller than any phone. Round buttons are compared as circles)
+    const touchF = (type, pts) => p.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([id, x, y]) => ({ id, x, y })) });
+    for (const [sw, sh] of [[844, 390], [667, 375]]) {
+      await p.send('Emulation.setDeviceMetricsOverride', { width: sw, height: sh, deviceScaleFactor: 1, mobile: false }); await sleep(400); await p.eval('window.__mobile.layout(); 1'); await sleep(500);
+      const lay = await p.eval(`(() => { const W = innerWidth, H = innerHeight, els = [...document.querySelectorAll('#m-btns .mb'), ...document.querySelectorAll('#m-tiles .ab')].filter((e) => e.offsetParent && getComputedStyle(e).display !== 'none'), bad = [];
+        const R = els.map((e) => [e.dataset.id || e.className.split(' ').slice(0, 2).join('.'), e.getBoundingClientRect(), e.classList.contains('mb')]);
+        for (const [n, r] of R) if (r.left < 0 || r.top < 0 || r.right > W || r.bottom > H) bad.push(n + ' off screen');
+        for (let i = 0; i < R.length; i++) for (let j = i + 1; j < R.length; j++) {
+          const [na, a, ca] = R[i], [nb, b, cb] = R[j];
+          const hit = ca && cb ? Math.hypot(a.left + a.width / 2 - b.left - b.width / 2, a.top + a.height / 2 - b.top - b.height / 2) < (a.width + b.width) / 2 - 1
+            : Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+          if (hit) bad.push(na + ' x ' + nb);
+        }
+        const small = R.filter(([n, r]) => Math.min(r.width, r.height) < (W >= 800 ? 40 : 31)).map(([n, r]) => n + ':' + Math.round(r.width));
+        const hb = document.getElementById('hud-bl').getBoundingClientRect(), fr = document.querySelector('[data-id=fire]').getBoundingClientRect();
+        return JSON.stringify({ W, H, n: R.length, bad, small, hp: Math.round(hb.right), fire: Math.round(fr.left) }); })()`);
+      const lyo = JSON.parse(lay);
+      check(lyo.W === sw && lyo.n >= 16 && !lyo.bad.length, `${sw}x${sh}: the buttons and tiles lie apart, all on the screen ` + lay);
+      check(!lyo.small.length, `${sw}x${sh}: and none is smaller than ${sw >= 800 ? 40 : 31} px (a small phone: the tiles share less room) ` + lyo.small.join(','));
+      if (sw !== 844) continue;
+      // a tap on the weapon / ammo panel takes up the next weapon
+      { const tok0 = await p.eval('String(G.weapons.curTok() === "m" ? "m" : G.player.wIdx)'), wi = await p.eval('(() => { const r = document.getElementById("weapon-info").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
+        // (a tap is a finger down and up within 300 ms: a slow frame of the headless browser can hold the two apart for longer - then it is tapped once more)
+        for (let i = 0; i < 2; i++) {
+          await touchF('touchStart', [[3, wi[0], wi[1]]]); await touchF('touchEnd', []);
+          if (await p.until(`String(G.weapons.curTok() === "m" ? "m" : G.player.wIdx) !== ${JSON.stringify(tok0)}`, 3000).then(() => true, () => false)) break;
+        }
+        check(await p.eval('String(G.weapons.curTok() === "m" ? "m" : G.player.wIdx)') !== tok0, 'a tap on the ammo panel takes up the next weapon ' + await p.eval(`JSON.stringify([innerWidth, innerHeight, !!document.fullscreenElement, window.__fsN || 0, ${JSON.stringify(wi)}, (document.elementFromPoint(${wi[0]}, ${wi[1]}) || {}).id, G.game.state, G.input.locked])`));
+        await p.eval('window.__mobile.tapKey(G.BIND.w1[0]); 1'); await p.until('G.player.meleeMode === false && G.weapons.switchT <= 0', 4000).catch(() => {}); }
+    }
+    await p.send('Emulation.clearDeviceMetricsOverride'); await sleep(400); await p.eval('window.__mobile.layout(); 1'); await sleep(300);
+    // the controls screen names the phone's controls; the settings hold the phone's options and none of the keyboard's
+    await p.eval('G.game.state = "modal"; G.ui.help(() => {}); 1'); await sleep(200);
+    const helpTxt = await p.eval('(document.querySelector("#screens .keys") || {}).textContent || ""');
+    check(helpTxt.includes('右側をドラッグ') && !/クリック|マウス|Ctrl|Shift|Esc/.test(helpTxt), 'the controls screen lists the touch controls');
+    await p.eval('G.ui.settings(() => {}); 1'); await sleep(200);
+    check(await p.eval('!document.getElementById("s-keys") && !!document.getElementById("m-menu") && !!document.getElementById("m-vib")'), 'the settings offer the touch options, not the key binding');
+    const mz0 = await p.eval('getComputedStyle(document.documentElement).getPropertyValue("--mz")');
+    await p.eval('(() => { const m = document.getElementById("m-menu"); m.value = 1.2; m.onchange(); })(); 1');
+    const mz1 = await p.eval('getComputedStyle(document.documentElement).getPropertyValue("--mz")');
+    check(+mz1 > +mz0, `the menus can be made bigger (${mz0} -> ${mz1})`);
+    await p.eval('(() => { const m = document.getElementById("m-menu"); m.value = 1; m.onchange(); })(); G.ui.clearScreen(); G.game.state = "playing"; 1'); await sleep(200);
+    // the bag: a second finger's tap turns the item being carried (the R key), and it is the first finger that drops it
+    // (a stock or a barrel: two cells by one, so that a turn shows)
+    await p.eval('(() => { const a = G.ATTACHMENTS.find((d) => d.slot === "barrel" || d.slot === "stock"); if (a) G.Inv.stow(G.player, G.Inv.make("att", a.id, 1)); })(); G.game.state = "inv"; G.InvUI.open(null); 1'); await sleep(400);
+    const turn = await p.eval(`(() => { const ev = (el, t, id, x, y) => el.dispatchEvent(new PointerEvent(t, { pointerId: id, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true, pointerType: 'touch' }));
+      for (const el of document.querySelectorAll('#inv-ui .iv-it')) {
+        const r = el.getBoundingClientRect(); if (!r.width) continue;
+        ev(el, 'pointerdown', 51, r.left + 4, r.top + 4); ev(window, 'pointermove', 51, r.left + 30, r.top + 20);
+        const g = document.querySelector('.iv-ghost'); if (!g) continue;
+        const a = [g.style.width, g.style.height]; if (a[0] === a[1]) { ev(window, 'pointerup', 51, r.left + 4, r.top + 4); continue; }
+        ev(document.body, 'pointerdown', 52, 20, 20); const b = [g.style.width, g.style.height]; ev(window, 'pointerup', 52, 20, 20);
+        const still = !!document.querySelector('.iv-ghost'); ev(window, 'pointerup', 51, r.left + 4, r.top + 4);
+        return JSON.stringify({ a, b, still, gone: !document.querySelector('.iv-ghost') });
+      } return 'null'; })()`);
+    const tn = JSON.parse(turn);
+    if (tn) check(tn.b[0] === tn.a[1] && tn.b[1] === tn.a[0] && tn.still && tn.gone, 'a second finger turns the item being carried in the bag, the first one drops it ' + turn);
+    else console.log('   (no item of two sizes in the bag: the turn is not tried)');
+    // a finger held still on an item opens its menu (the PC's right click), and lifting it leaves the menu up
+    const held = await p.eval(`(() => { const el = [...document.querySelectorAll('#inv-ui .iv-it')].find((e) => e.getBoundingClientRect().width); if (!el) return null; const r = el.getBoundingClientRect(), x = r.left + 6, y = r.top + 6;
+      el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 61, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true, pointerType: 'touch' })); window.__hold = [x, y]; return 1; })()`);
+    if (held) {
+      await sleep(900);
+      const m1 = await p.eval('JSON.stringify([!!document.querySelector(".iv-menu"), !!document.querySelector(".iv-ghost")])');
+      await p.eval('window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 61, button: 0, clientX: __hold[0], clientY: __hold[1], bubbles: true, cancelable: true, pointerType: "touch" })); 1'); await sleep(200);
+      const m2 = await p.eval('!!document.querySelector(".iv-menu")');
+      check(m1 === '[true,false]' && m2, 'a finger held on an item in the bag opens its menu ' + m1 + ' ' + m2);
+    }
+    await p.eval('G.InvUI.isOpen() && G.InvUI.close(); G.game.state = "playing"; 1'); await sleep(300);
     // fingers: touch points are sent as the whole current set
     const touch = (type, pts) => p.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([id, x, y]) => ({ id, x, y })) });
     const yaw = () => p.eval('G.player.yaw');
@@ -153,7 +227,7 @@ const PORT = +process.env.COOP_PORT || 9981;
     await sleep(300);
     const rl = await p.eval('(() => { const r = document.querySelector("[data-id=reload]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
     if (process.env.MDBG) console.log('   dbg switch', await p.eval('JSON.stringify(window.__swLog)'), '\n   frames', await p.eval('JSON.stringify(window.__fr.slice(-45))'));
-    check(await p.eval('G.player.meleeMode === true'), 'the melee weapon is in hand ' + await p.eval('JSON.stringify([G.game.state, !!G.game.search, G.player.dead, G.player.pileState, G.player.grapple.state, G.player.melee && G.player.melee.id, G.player.weapons.length])'));
+    check(await p.eval('G.player.meleeMode === true'), 'the melee weapon is in hand ' + await p.eval('JSON.stringify([innerWidth, innerHeight, !!document.fullscreenElement, window.__fsN, G.game.state, !!G.game.search, G.player.dead, G.player.pileState, G.player.grapple.state, G.player.melee && G.player.melee.id, G.player.weapons.length])'));
     await touch('touchStart', [[8, rl[0], rl[1]]]);
     // (the headless game runs slowly: give the guard up to 3 s of real time to come up)
     for (let i = 0; i < 30 && !(await p.eval('G.weapons.guarding() === true')); i++) await sleep(100);

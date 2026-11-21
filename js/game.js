@@ -21,7 +21,9 @@
     await G.Tex.init((k) => { ldFill.style.width = Math.round(k * 80) + '%'; });
     G.Props.init();
     ldText.textContent = 'レンダラを初期化中…';
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    const MC = window.G_MOBILE ? GM.MOBILE_CAP : null;
+    try { GM.gfxSafe = Math.max(0, Math.min(2, +localStorage.getItem(CTX_SAFE) || 0)); } catch (e) { GM.gfxSafe = 0; }
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: MC ? 'default' : 'high-performance' });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
@@ -29,10 +31,12 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.autoClear = false;
     document.getElementById('canvas-wrap').appendChild(renderer.domElement);
-    renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); G.ui.toast('⚠ グラフィックスコンテキストが失われました。ページを再読み込みしてください。', 'warn'); });
+    renderer.domElement.addEventListener('webglcontextlost', onCtxLost, false);
+    renderer.domElement.addEventListener('webglcontextrestored', onCtxRestored, false);
     G.renderer = renderer;
     // the finer surfaces (gfx.js) are baked on the GPU now that there is one, and the frame's passes (post.js) made ready
-    if (G.GFX) G.GFX.upgradeTextures(renderer, G.save.data.settings.quality === 'high' ? 1024 : 512);
+    if (G.GFX && MC) G.GFX.maxPx = MC.tex;
+    if (G.GFX) G.GFX.upgradeTextures(renderer, MC ? MC.tex : G.save.data.settings.quality === 'high' ? 1024 : 512);
     if (G.Post) { try { G.Post.init(renderer); } catch (e) { G.Post.failed = true; } }
     scene = G.scene = new THREE.Scene();
     camera = G.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 400);
@@ -63,6 +67,11 @@
     // browsers keep audio muted until the page has been clicked / a key pressed: start the sound with the very first of those, wherever it lands (title screen included)
     { const wake = () => { G.sfx.init(); window.removeEventListener('pointerdown', wake, true); window.removeEventListener('keydown', wake, true); }; window.addEventListener('pointerdown', wake, true); window.addEventListener('keydown', wake, true); }
     document.addEventListener('visibilitychange', () => { if (document.hidden && GM.state === 'playing') pause(); if (document.hidden) G.sfx.suspend(); else G.sfx.resume(); });
+    // back in view (another app, a locked screen, the page restored from the browser's back-forward cache): the next frame counts its
+    // time from now, not from before it was hidden, and the frame cap starts again (dt is held to 0.05 s all the same)
+    const backInView = () => { last = performance.now(); capGate.reset(); };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) backInView(); });
+    window.addEventListener('pageshow', (e) => { if (!e.persisted) return; backInView(); if (GM.state === 'playing') pause(); G.sfx.resume(); });
     window.addEventListener('keydown', (e) => {
       // Tab and B open the same screen: gear, bag, weapons + attachments and the full status sheet side by side
       // (also right after closing it: the "click to resume" wait must not swallow the key)
@@ -94,6 +103,75 @@
     if (G.ui.fontsReady) { ldText.textContent = '書体を準備中…'; await Promise.race([G.ui.fontsReady, new Promise((r) => setTimeout(r, 6000))]); }
     setTimeout(() => document.getElementById('loading').classList.add('done'), 300);
     requestAnimationFrame(frame);
+    ctxAfterBoot();
+  }
+
+  // ---------------- the GPU taken away (webglcontextlost) ----------------
+  // A phone short of memory (or a GPU driver that resets) takes the page's WebGL context away, and the canvas shows nothing (white).
+  // What the GPU made for the game goes with it - the baked surfaces and sprites (gfx.js), the sky's noise, the environment map, the
+  // post pass's patterns - and all of it cannot be made again in place with any certainty. So the frames stop (nothing is updated or
+  // drawn: no time passes in the run), the run is saved where it stands (midsave.js), a notice covers the screen, and the page is
+  // reloaded: once the context is back (webglcontextrestored), or after CTX_WAIT ms without it. After the reload the run goes on by
+  // itself from that save - the same area, where it stood (a guardian's area: before its gate, as a resumed save always does).
+  // Two such reloads within CTX_SPAN ms start the next page one graphics step lower (and once at the lowest, with fewer pixels).
+  const CTX_LOG = 'abyss_ctxloss', CTX_RESUME = 'abyss_ctxresume', CTX_SAFE = 'abyss_gfxsafe', CTX_WAIT = 5000, CTX_SPAN = 60000;
+  GM.ctxLost = false;
+  let ctxTimer = 0;
+  // the notice over the screen (a plain element of its own: the screens of ui.js may be what is broken)
+  GM.ctxNotice = function (text) {
+    let el = document.getElementById('ctx-notice');
+    if (!text) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div'); el.id = 'ctx-notice';
+      el.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:#0b0908;color:#d8cfc2;font:600 18px/1.6 system-ui,sans-serif;letter-spacing:.06em;text-align:center;padding:16px;pointer-events:auto';
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+  };
+  function onCtxLost(e) {
+    e.preventDefault(); // (without it the context is never given back)
+    if (GM.ctxLost) return;
+    GM.ctxLost = true; GM.ctxLostAt = performance.now();
+    // (what draws outside the frame - the shader warm-ups that run in pieces after an area is made, a late bake - draws nothing now:
+    // on a lost context Three's shader checks read null and throw, and the page is about to be reloaded anyway)
+    for (const k of ['render', 'compile', 'compileAsync', 'initTexture', 'readRenderTargetPixels', 'copyFramebufferToTexture']) if (typeof renderer[k] === 'function') renderer[k] = k === 'compileAsync' ? () => Promise.resolve() : () => {};
+    try { G.MidSave.tick(true); } catch (er) { /* (the save every 3 s stands) */ }
+    try { G.sfx.suspend(); } catch (er) { /* no sound yet */ }
+    GM.ctxNotice('描画を復旧しています…');
+    clearTimeout(ctxTimer); ctxTimer = setTimeout(ctxReload, CTX_WAIT);
+  }
+  function onCtxRestored() { clearTimeout(ctxTimer); ctxTimer = setTimeout(ctxReload, 200); }
+  GM.ctxReload = ctxReload;
+  function ctxReload() {
+    clearTimeout(ctxTimer);
+    const now = Date.now();
+    try {
+      let log = JSON.parse(localStorage.getItem(CTX_LOG) || '[]').filter((t) => now - t < CTX_SPAN);
+      log.push(now);
+      if (log.length >= 2) {
+        // twice within the minute: one step lower (high -> med -> low, then low with fewer pixels)
+        const S = G.save.data.settings, steps = ['high', 'med', 'low'], i = steps.indexOf(S.quality);
+        if (i >= 0 && i < steps.length - 1) S.quality = steps[i + 1];
+        else localStorage.setItem(CTX_SAFE, String(Math.min(2, (+localStorage.getItem(CTX_SAFE) || 0) + 1)));
+        G.save.write();
+        sessionStorage.setItem(CTX_RESUME + '.lowered', '1');
+        log = [];
+      }
+      localStorage.setItem(CTX_LOG, JSON.stringify(log));
+    } catch (er) { /* storage unavailable: reloaded all the same */ }
+    try { if (GM.run && GM.slot && GM.loadRun()) sessionStorage.setItem(CTX_RESUME, JSON.stringify({ slot: GM.slot, t: now })); } catch (er) { /* then the title */ }
+    GM.ctxNotice('描画を復旧しています…（再読み込み中）');
+    GM.debug = true; // (the "leave this page?" question, input.js, is for a player closing the tab, not for this)
+    location.reload();
+  }
+  // after a reload of that kind: the run goes on by itself
+  function ctxAfterBoot() {
+    let r = null, lowered = false;
+    try { r = JSON.parse(sessionStorage.getItem(CTX_RESUME) || 'null'); sessionStorage.removeItem(CTX_RESUME); lowered = sessionStorage.getItem(CTX_RESUME + '.lowered') === '1'; sessionStorage.removeItem(CTX_RESUME + '.lowered'); } catch (e) { r = null; }
+    const note = () => { if (lowered) G.ui.toast('⚠ 描画が続けて失われたため、画質を一段下げました（設定で変えられます）', 'warn'); };
+    if (!r || !(Date.now() - r.t < 5 * 60000) || !GM.loadRun(r.slot)) { note(); return; }
+    // (it waits on the pause menu: the player was not looking at the screen while it came back, and takes it up when ready)
+    setTimeout(() => { if (GM.state !== 'title') return; try { GM.continueRun(r.slot); } catch (e) { /* the title then */ } note(); setTimeout(() => { if (GM.state === 'playing' && !GM.transitioning) pause(); }, 1200); }, 400);
   }
   // graphics settings. High is the full look and is never touched; medium and low trade looks for speed in earnest:
   // render scale, shadows, number of live lights, particle amount, normal maps, draw distance (with the fog thickened to hide it)
@@ -104,6 +182,17 @@
     // (post: the frame goes through post.js - contact shadow, glow, grade; msaa: its samples, the screen's own smoothing does not reach it)
   };
   GM.QP = QP;
+  // Phones (window.G_MOBILE; a PC never reads this). What makes a phone fail is GPU memory: Android's Chrome takes the page's WebGL
+  // context away (the screen goes white) or ends the tab when it runs short, and the longer the play the nearer it is. So on a phone,
+  // whatever quality is chosen, these caps hold. Each says what it costs the look; set one to null to lift it.
+  GM.MOBILE_CAP = {
+    tex: 256,    // the baked surfaces (gfx.js bake: walls, floors, gear), px across; PC 512 / 1024 on high. Finer grain softer up close (the phone's few pixels hide most of it) - about 100 MB less
+    pr: 1.0,     // the most render pixels per screen pixel (medium / high; low is 0.6 on every machine); PC high 1.5. Edges a little softer on high
+    shadow: 1024, // the moon's shadow map, px across; PC high 2048. Shadow edges a little softer - 12 MB less
+    msaa: 2,     // the post pass's smoothing samples (medium / high); PC high 4. Edges a little more stepped on high
+  };
+  // after the GPU was taken away twice in a minute (see ctxReload), fewer pixels again: one step, two steps
+  const SAFE_PR = [1, 0.8, 0.65];
   // normal maps off on low (kept on the material so high / medium bring them back)
   GM.qualityMaterials = function () {
     const q = QP[G.save.data.settings.quality] || QP.high;
@@ -122,17 +211,18 @@
   GM.applyQuality = function () {
     const key = G.save.data.settings.quality, q = QP[key] || QP.high;
     GM.applyBright();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pr));
+    const MC = window.G_MOBILE ? GM.MOBILE_CAP : null;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, (MC && MC.pr ? Math.min(q.pr, MC.pr) : q.pr) * SAFE_PR[GM.gfxSafe || 0]));
     renderer.shadowMap.enabled = q.shadow;
     renderer.shadowMap.type = q.soft === false ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     moon.castShadow = q.shadow;
-    const sz = q.size || 1024;
+    const sz = MC && MC.shadow ? Math.min(q.size || 1024, MC.shadow) : q.size || 1024;
     if (moon.shadow.mapSize.x !== sz) { moon.shadow.mapSize.set(sz, sz); if (moon.shadow.map) { moon.shadow.map.dispose(); moon.shadow.map = null; } }
     camera.far = q.far; camera.updateProjectionMatrix();
     if (GM._fogBase !== undefined) { scene.fog.density = GM._fogBase * q.fogK; G.fx.setFog(scene.fog.color.getStyle(), scene.fog.density); }
     G.LightPool.active = q.lights;
     G.fx.keep = q.keep;
-    if (G.Post) { G.Post.active = !!q.post && !G.Post.failed; G.Post.msaa = q.msaa || 0; if (!G.Post.active) renderer.setRenderTarget(null); }
+    if (G.Post) { G.Post.active = !!q.post && !G.Post.failed; G.Post.msaa = MC && MC.msaa != null ? Math.min(q.msaa || 0, MC.msaa) : q.msaa || 0; if (!G.Post.active) renderer.setRenderTarget(null); }
     GM.qualityMaterials();
     scene.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => m.needsUpdate = true); } });
     onResize();
@@ -1916,6 +2006,17 @@
     for (const o of offers) buildPedestal(o, w);
   }
   GM.buildPedestal = buildPedestal;
+  // a stand's price tag: one texture per text and colour, shared. Made anew each time, they were never let go - a world's dispose keeps
+  // materials and textures, and the warm-up builds every kind of stand each area (warmup.js) - and the GPU memory grew by some 3 MB an
+  // area. Past PRICE_MAX the oldest is disposed: a stand still showing it only has it sent to the GPU again.
+  const priceTexes = new Map(), PRICE_MAX = 64;
+  function priceTex(text, color) {
+    const k = text + '|' + color; let t = priceTexes.get(k);
+    if (t) { priceTexes.delete(k); priceTexes.set(k, t); return t; }
+    t = G.Tex.textTex(text, { color, size: 30 }); priceTexes.set(k, t);
+    if (priceTexes.size > PRICE_MAX) { const [k0, t0] = priceTexes.entries().next().value; priceTexes.delete(k0); t0.dispose(); }
+    return t;
+  }
   function buildPedestal(o, w) {
     const g = new THREE.Group();
     const s = o.slot;
@@ -1959,7 +2060,7 @@
     g.add(disp);
     const icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.iconTex(o.obj.icon, rc), transparent: true, depthWrite: false }));
     icon.scale.setScalar(0.55); icon.position.y = 1.15; g.add(icon);
-    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.Tex.textTex(o.free ? '無料!' : '🪙' + GM.priceLabel(o), { color: o.free ? '#8f8' : '#f1d79b', size: 30 }), transparent: true, depthWrite: false }));
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: priceTex(o.free ? '無料!' : '🪙' + GM.priceLabel(o), o.free ? '#8f8' : '#f1d79b'), transparent: true, depthWrite: false }));
     tag.scale.set(0.9, 0.22, 1); tag.position.y = 1.55; g.add(tag);
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 32), new THREE.MeshBasicMaterial({ color: rc, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.01; g.add(ring);
@@ -2726,6 +2827,10 @@
   // ---------------- main loop ----------------
   function frame(now) {
     requestAnimationFrame(frame);
+    // the GPU taken away: nothing is updated or drawn until the page is reloaded (ctxReload). (The context is lost at once, its event comes a
+    // little later: a frame between the two would draw on a lost context, and Three's shader checks throw there)
+    if (!GM.ctxLost && renderer.getContext().isContextLost()) onCtxLost({ preventDefault() {} });
+    if (GM.ctxLost) { last = now; return; }
     measureHz(now);
     // (a cap at the screen's own rate or within 3% under it caps nothing: left to the screen, so that a 144 Hz screen that really
     // refreshes at 144.1 does not drop a frame every few seconds)

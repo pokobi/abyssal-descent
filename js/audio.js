@@ -134,7 +134,11 @@
   };
   A.setVolume = (v) => { A.volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); if (gunOut) gunOut.gain.setTargetAtTime(v, ctx.currentTime, 0.05); };
   A.suspend = () => { if (ctx && ctx.state === 'running') ctx.suspend(); };
-  A.resume = () => { if (ctx && ctx.state === 'suspended') ctx.resume(); };
+  // (a phone that switched apps, took a call or locked its screen can leave the context 'interrupted' (Safari) or still 'suspended' after
+  // the page is back: resume() may then only take with a touch, so the next touch of a page that is in view asks again. A context made
+  // to sleep while the page is hidden stays asleep until it is in view)
+  A.resume = () => { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed' && !document.hidden) { const p = ctx.resume(); if (p && p.catch) p.catch(() => {}); } };
+  for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, () => { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed' && !document.hidden) A.resume(); }, true);
   A.now = () => (ctx ? ctx.currentTime : 0);
   // (tests: a meter on everything before the master volume, so a muted game can still be measured)
   A.tap = () => { if (!ctx) return null; if (!A._tap) { A._tap = ctx.createAnalyser(); A._tap.fftSize = 2048; dry.connect(A._tap); gunDry.connect(A._tap); } return A._tap; };

@@ -464,6 +464,7 @@
     g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.fillStyle = opts.color || '#f1d79b';
     (G.Icons ? G.Icons.fillText : (g2, t2, x2, y2, o2) => { if (o2 && o2.stroke) g2.strokeText(t2, x2, y2); g2.fillText(t2, x2, y2); })(g, text, w / 2, h / 2, { stroke: true });
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    t.userData.own = true; // (made for one thing, never shared by a cache: the world that holds it disposes it with itself, world.js dispose)
     return t;
   };
 

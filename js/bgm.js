@@ -236,6 +236,8 @@
     else { ctx.resume(); for (const t of all) if (t.started) for (const v of t.p) if (v.wasOn && !t.bad) play(v.el); }
   });
   // settings.bgm (0..1) is read every tick; this only makes the change heard at once
+  // a phone back from another app: the context may still be asleep (or 'interrupted', Safari) until the next touch
+  for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, () => { if (ctx && !hidden && ctx.state !== 'running' && ctx.state !== 'closed') { const p = ctx.resume(); if (p && p.catch) p.catch(() => {}); const all = [cur, ...dying].filter(Boolean); for (const t of all) if (t.started && !t.bad) for (const v of t.p) if (v.wasOn) play(v.el); } }, true);
   B.setVolume = (v) => { const s = S(); s.bgm = Math.max(0, Math.min(1, +v || 0)); if (ctx && out) out.gain.setTargetAtTime(level(), ctx.currentTime, 0.05); };
   // what is playing now (tests, and the tools)
   B.state = () => ({ ctx: ctx ? ctx.state : null, track: cur ? cur.id : null, want: want ? want.id : null, mood, level: level(), place: placeNow(), load: cur ? { kb: cur.kb, ms: cur.readyT && cur.askT ? Math.round(cur.readyT - cur.askT) : null } : null });

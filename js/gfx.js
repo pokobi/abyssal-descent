@@ -90,8 +90,10 @@ void main(){
   };
   X.pendingMat = (key) => { const m = pending[key]; delete pending[key]; return m; };
   // bake one surface: three square targets (colour in sRGB, normal, occlusion / roughness / metalness)
+  X.maxPx = 0; // (when set, the most pixels across any baked surface: phones, game.js MOBILE_CAP.tex)
   X.bake = function (renderer, px, body, o) {
     o = o || {}; ready();
+    if (X.maxPx > 0) px = Math.min(px, X.maxPx);
     const mat = o.mat || surfMat(body);
     const rt = (srgb) => { const t = new THREE.WebGLRenderTarget(px, px, { depthBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, anisotropy: 8 }); if (srgb) t.texture.colorSpace = THREE.SRGBColorSpace; return t; };
     const hgt = new THREE.WebGLRenderTarget(px, px, { depthBuffer: false, type: THREE.HalfFloatType, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });

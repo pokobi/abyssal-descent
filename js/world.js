@@ -2239,6 +2239,12 @@
     dispose(scene) {
       scene.remove(this.group);
       this.group.traverse((o) => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
+      // the textures made for one thing of this world (a sign's face, a price tag, a dropped item's mark: userData.own, textures.js textTex,
+      // props.js label). Materials and the shared textures stay: the next world may use them, and making them again would stall it.
+      // (Left alone, the own ones piled up on the GPU area after area. One a cache still holds is only sent up again when next used.)
+      const own = new Set();
+      this.group.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null; if (ms) for (const m of ms) if (m && m.map && m.map.userData && m.map.userData.own) own.add(m.map); });
+      for (const t of own) t.dispose();
     }
   }
   World.SKY_Y = 500; // the top of a skyCap: high over anything a hook or a jump reaches

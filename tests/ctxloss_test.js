@@ -33,6 +33,9 @@ const MOBILE = process.env.MOBILE !== '0';
       await lose(); await sleep(400);
       const now = JSON.parse(await p.eval("JSON.stringify({ lost: !!G.game.ctxLost, note: (document.getElementById('ctx-notice') || {}).textContent || '', t: G.game.time })"));
       check(now.lost && /描画を復旧/.test(now.note), `${name}: the loss is seen and the notice covers the screen`);
+      // the foes as the loss saved them (midsave.js, written at the loss): these must all be back after the reload. (Foes the area had not
+      // sent yet are not in it: the area goes on sending them after the resume, as it would have)
+      const saved = opt.foes ? JSON.parse(await p.eval("JSON.stringify(((G.game.loadRun() || {}).mid || {}).enemies || [])")) : [];
       await sleep(700);
       const t1 = await p.eval('G.game.time').catch(() => null);
       check(t1 === null || t1 === now.t, `${name}: no time passes while the GPU is away (${t0} -> ${now.t} -> ${t1})`);
@@ -51,10 +54,19 @@ const MOBILE = process.env.MOBILE !== '0';
       console.log('     ' + name + ' before ' + JSON.stringify(before) + ' after ' + JSON.stringify(after));
       check(after.area === before.area && after.stage === before.stage, `${name}: the same area goes on (${before.area} ${before.stage} -> ${after.area} ${after.stage})`);
       if (opt.pos !== false) { const d = Math.hypot(after.pos[0] - before.pos[0], after.pos[1] - before.pos[1]); check(d < 1.5, `${name}: where the player stood (${d.toFixed(2)} m off)`); }
-      if (opt.foes) check(Math.abs(after.foes - before.foes) <= 1, `${name}: the same foes (${before.foes} -> ${after.foes})`);
+      if (opt.foes) {
+        // each saved foe back: the same kind with the same health, one for one (where it stands is not compared: between the resume and
+        // the pause menu coming up the foes run at the player for a moment)
+        const live = JSON.parse(await p.eval("JSON.stringify(G.enemies.list.filter((e) => e.alive && !e.custom && !e.ally && e.def).map((e) => ({ id: e.def.id, hp: Math.round(e.hp) })))"));
+        const pool = live.slice(); let back = 0;
+        for (const s of saved) { const i = pool.findIndex((e) => e.id === s.id && e.hp === Math.round(s.hp)); if (i >= 0) { pool.splice(i, 1); back++; } }
+        check(saved.length > 0 && back === saved.length, `${name}: the same foes (saved ${saved.length}, back ${back}; ${before.foes} alive before, ${after.foes} after)` + (back === saved.length ? '' : ' saved ' + JSON.stringify(saved.map((s) => [s.id, Math.round(s.hp)])) + ' live ' + JSON.stringify(live)));
+      }
       await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.player.invulnT = 999; 1");
       return after;
     };
+    // foes out first (an area sends its first ones a moment after it starts), so that "the same foes" has something to compare
+    await p.until('G.enemies.list.some((e) => e.alive && !e.custom && !e.ally && e.state !== "spawn")', 60000).catch(() => {});
     // walk a little first, so that "where the player stood" is not the area's start
     await p.eval("G.player.pos.x += 2; G.player.pos.z += 1.5; G.world.depenetrate(G.player.pos, G.player.hw, G.player.height); 1"); await sleep(600);
     await scene('fight, context back', true, { foes: true });

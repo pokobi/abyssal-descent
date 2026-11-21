@@ -47,7 +47,9 @@ const PORT = +process.env.COOP_PORT || 9995;
     await p.eval("(() => { const b = document.querySelector('.slot-new, [data-slot]'); if (b) b.click(); return 1; })()"); await sleep(400);
     await p.eval("(() => { const c = document.querySelector('.df-card[data-id=\"normal\"]'); if (c) c.click(); return 1; })()"); await sleep(500);
     await p.eval("document.querySelector('.cls-item[data-c=\"sniper\"]').click(); document.querySelector('#cls-go').click(); 1");
-    await p.until("!!G.game.run && !!G.world && G.game.state === 'playing'", 60000); await sleep(800);
+    await p.until("!!G.game.run && !!G.world && G.game.state === 'playing'", 60000);
+    // (the first area's shaders are made behind the black screen, and nothing runs until they are (game.js GM._warming): no aiming either)
+    await p.running(); await sleep(800);
     const vm = (optic) => p.eval(`(() => { const P = G.player; const w = P.weapons[0]; ${optic === null ? 'delete w.atts.optic;' : `w.atts.optic = '${optic}';`} w.ver++; P.meleeMode = false; G.weapons.equip(true); const m = G.weapons.getModel(); return JSON.stringify({ so: !!m.scopeOptic, pip: !!m.pip, sy: m.sightY, kind: m.scopeKind || '', dot: !!m.dotSight, winH: m.winH || 0, spin: (m.spin || []).length, pk: m.pip ? G.weapons.pipMaterial().uniforms.uKind.value : -1 }); })()`).then(JSON.parse);
     const kitVm = await vm('o_x2');
     check(kitVm.so && kitVm.pip && kitVm.kind === 'x2' && kitVm.pk === 0, 'the class rifle shows the 2x scope: a lens with its own reticle ' + JSON.stringify(kitVm));
@@ -60,7 +62,10 @@ const PORT = +process.env.COOP_PORT || 9995;
     check(dots.o_seer.spin === 1 && dots.o_god.spin === 0 && dots.o_hunter.spin === 0, 'the epic and better sights kept plain: 千里眼 one thin turning ring of runes, the others none');
     {
       // a dot sight's window covers about 40% of the screen's height while aiming
-      await vm('o_reddot'); await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.enemies.clear(); G.input.mouse[2] = true; 1"); await sleep(1500);
+      // (fully aimed: counted by the game's own aiming, not the clock - a busy machine's slow frames take their time)
+      await vm('o_reddot'); await p.eval("G.ui.clearScreen(); G.game.state = 'playing'; G.enemies.clear(); G.input.mouse[2] = true; 1");
+      // (an area cleared by the clean-up may put a screen up and drop the sights: set it back, as the 8x below does)
+      await p.until("(G.game.state !== 'playing' && (G.ui.clearScreen(), G.game.state = 'playing'), G.player.meleeMode = false, G.input.mouse[2] = true, G.weapons.adsT > 0.99)", 30000).catch(() => {}); await p.frames(3);
       const cover = await p.eval("(() => { const m = G.weapons.getModel(); const d = -(m.group.position.z + m.winZ); return Math.round(2 * Math.atan(m.winH / d) * 180 / Math.PI / 50 * 100) / 100; })()");
       await p.eval("G.input.mouse[2] = false; 1"); await sleep(600);
       check(cover > 0.33 && cover < 0.47, 'aiming through a red dot, its window covers about 40% of the screen height (' + cover + ')');

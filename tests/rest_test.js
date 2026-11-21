@@ -25,12 +25,20 @@ const PORT = +process.env.COOP_PORT || 9987;
     const enter = async (field, n) => {
       await p.eval(`G.Run.field = () => '${field}'; G.game.area = ${n - 1}; G.game.transitioning = false; G.ui.clearScreen(); G.game.state = 'playing'; G.game.enterArea(${n}, 'combat'); 1`);
       await p.until(`G.world && G.world.biome === '${field}' && !!G.game.objective`, 40000);
+      // (a new area's shaders are made behind the black screen, and nothing runs until they are (game.js GM._warming): the game's
+      // clock stands still, and with it the foes' marks (E.restSet is worked out once per moment of game time). Wait for its frames)
+      await p.running();
       await sleep(600);
       // the area's own waves are stopped: only the foes set down here
       await p.eval("(() => { G.enemies.clear(); const O = G.game.objective; O.wave = O.waves.length; G.ui.clearScreen(); G.game.state = 'playing'; G.game.dev = { god: true, speed: 1 }; })(); 1");
+      // (an area emptied like this counts as cleared whenever no foe is left, and its reward screen (state 'buff') stops the weather and
+      // the foes' marks, which are only worked out while playing: kept off for the whole of the test)
+      await p.eval("clearInterval(window.__kg); window.__kg = setInterval(() => { const GM = G.game; if (GM.areaCleared || GM.rewardPending || GM.state === 'buff') { GM.areaCleared = false; GM.rewardPending = null; G.ui.clearScreen(); GM.state = 'playing'; } }, 50); 1");
     };
     // (setting foes down after the area's own were cleared away: the area must not count as cleared, nor its reward screen come up)
     const settle = () => p.eval("G.game.areaCleared = false; G.game.rewardPending = null; G.ui.clearScreen(); G.game.state = 'playing'; 1");
+    // (the foes' marks are worked out once per moment of game time (E.restSet): after a change, wait for game time to pass, not the clock -
+    // a slow frame of a busy machine would leave the last answer standing)
     const DEF = "G.ENEMIES.filter((d) => !d.flyer && !d.boss && G.ENEMY_BY_ID[d.id] && !d.revive && !d.ranged)[2]";
     // a foe set down at a reachable spot picked by pred(x, y, z), standing still
     const foeAt = (pred) => p.eval(`(() => { const w = G.world, P = G.player; const c = w.randomOpenCell({ next: Math.random }, (x, z, idx) => (!w.reachMask || w.reachMask[idx]) && (${pred})(x, w.nf[idx], z));
@@ -43,21 +51,21 @@ const PORT = +process.env.COOP_PORT || 9987;
     for (let i = 0; i < 4; i++) await foeAt(farHidden);
     await settle();
     check(await p.eval('window.__F.length === 4 && window.__F.every((e) => e && e.alive)'), 'four foes set down far off, out of sight');
-    await sleep(300);
+    await p.gameFor(0.3);
     check(await p.eval('G.enemies.restSet() === null && !document.querySelector(".tgt-edge.rest:not([style*=\\"none\\"])")'), 'four left in a fight just begun: none pointed at');
     await p.eval('window.__F.slice(0, 2).forEach((e) => G.combat.damageEnemy(e, 1e9, { src: "test" })); 1');
     await settle();
-    await sleep(600);
+    await p.gameFor(0.6);
     const marks = await p.eval('[...document.querySelectorAll(".tgt-edge.rest")].filter((m) => m.style.display !== "none").length');
     if (marks !== 2) console.log('  diag2', await p.eval('JSON.stringify({ st: G.game.state, cl: G.game.areaCleared, obj: !!G.game.objective, stage: G.game.stage, n: G.enemies.list.filter((e) => e.alive).length, ob: window.__ob || [] })'));
     check(await p.eval('(G.enemies.restSet() || new Set()).size') === 2 && marks === 2, `two left: both pointed at (${marks} marks)`);
     // nobody fighting for a while: every foe left is pointed at
     for (let i = 0; i < 3; i++) await foeAt(farHidden);
     await settle();
-    await sleep(300);
+    await p.gameFor(0.3);
     check(await p.eval('G.enemies.restSet() === null'), 'five left again, a fight going on: none pointed at');
     await p.eval('G.game.areaStartT = G.game.time - 30; G.player.lastHurtT = -99; G.enemies.list.forEach((e) => { e.lastHitT = -99; }); 1');
-    await sleep(400);
+    await p.gameFor(0.4);
     check(await p.eval('(G.enemies.restSet() || new Set()).size') === 5, 'nobody fighting for 20 s: all five pointed at');
     // one far off and out of sight is left where it is: pointed at, never moved to you (it only ever walks: no jump of more than a few metres)
     await p.eval('window.__F.forEach((e, i) => { if (i !== 2 && e.alive) G.combat.damageEnemy(e, 1e9, { src: "test" }); }); 1');

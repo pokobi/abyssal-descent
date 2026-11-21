@@ -1,5 +1,5 @@
 'use strict';
-// 沈む石柱の海 (field_pillars.js): a pillar that sinks takes you down with it (into the dark: back on safe ground, 15% of your HP),
+// 沈む石柱の海 (field_pillars.js): a pillar that sinks takes you down with it (into the dark: back on safe ground, 30% of your max HP),
 // foes stop counting it as ground while it goes, and it comes back up whole. Also: the sinking ones run on their own clock.
 //   node tests/pillar_test.js
 const path = require('path');
@@ -30,6 +30,9 @@ const PORT = +process.env.COOP_PORT || 9981;
       window.__p = p; for (const q of w.pillars) if (q !== p) q.next = 1e9; // (only this one moves)
       P.pos.set((p.x0 + p.x1) / 2, p.top + 0.05, (p.z0 + p.z1) / 2); P.vel.set(0, 0, 0); P.hp = P.stats.maxHp; P.grounded = true;
       const ni = w.navIdx((p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2);
+      // every hit you take from here on, with where it came from and what it cost (the fall itself is src 'fall')
+      window.__hits = []; const C = G.combat, dp = C.damagePlayer;
+      C.damagePlayer = function (amount, info) { const h0 = P.hp, r = dp.apply(this, arguments); __hits.push({ src: info && info.src, cost: +(h0 - P.hp).toFixed(2) }); return r; };
       window.__t0 = G.game.time; G.FieldGen.sinkNow(w, p);
       return { n: w.pillars.length, top: p.top, nf0: w.nf[ni], hp: P.hp, max: P.stats.maxHp };
     })())`).then(JSON.parse);
@@ -43,10 +46,13 @@ const PORT = +process.env.COOP_PORT || 9981;
     const s2 = await p.eval(`JSON.stringify({ st: __p.st, y: __p.y, py: G.player.pos.y })`).then(JSON.parse);
     check(s2.st === 'sink' && s2.y < __top(s0) - 1 && s2.py < s0.top - 1 && s2.py - s2.y < 4, `then it sinks, you going down with it (pillar ${s2.y.toFixed(2)}, you ${s2.py.toFixed(2)})`);
     await p.until('G.game.time - __t0 > 7', 30000);
-    const s3 = await p.eval(`JSON.stringify({ st: __p.st, alive: __p.col.alive, py: G.player.pos.y, hp: G.player.hp, safe: !G.world.voidBelow(G.player.pos.x, G.player.pos.y, G.player.pos.z) })`).then(JSON.parse);
+    const s3 = await p.eval(`JSON.stringify({ st: __p.st, alive: __p.col.alive, py: G.player.pos.y, hp: G.player.hp, safe: !G.world.voidBelow(G.player.pos.x, G.player.pos.y, G.player.pos.z), hits: __hits, frac: G.FALL_FRAC })`).then(JSON.parse);
     check(s3.st === 'down' && !s3.alive, `it lies down in the dark (no ground there: ${s3.st}, ${s3.alive})`);
     check(s3.py > -1.5 && s3.safe, `riding it down puts you back on safe ground (y ${s3.py.toFixed(2)})`);
-    check(s3.hp < s0.hp && s3.hp >= s0.hp - s0.max * 0.25, `and costs some of your HP (${s0.hp} -> ${s3.hp})`);
+    // a fall into the void costs G.FALL_FRAC (30%) of max HP straight off the HP, once (player.js fellInPit; 6fa558e made it the same everywhere)
+    const falls = s3.hits.filter((h) => h.src === 'fall'), other = s3.hits.filter((h) => h.src !== 'fall');
+    check(falls.length === 1 && Math.abs(falls[0].cost - Math.round(s0.max * s3.frac)) < 0.01 && s3.hp < s0.hp,
+      `and costs ${Math.round(s3.frac * 100)}% of your max HP, once (${s0.hp} -> ${s3.hp}; the fall: ${falls.map((h) => h.cost).join(', ') || 'none'}${other.length ? '; other hits: ' + JSON.stringify(other) : ''})`);
     await p.until("__p.st === 'up'", 40000);
     const s4 = await p.eval(`JSON.stringify((() => { const w = G.world, p = __p, ni = w.navIdx((p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2); return { y: p.y, top: p.top, alive: p.col.alive, y1: p.col.y1, nf: w.nf[ni] }; })())`).then(JSON.parse);
     check(Math.abs(s4.y - s4.top) < 0.01 && s4.alive && Math.abs(s4.y1 - s4.top) < 0.01, `it rises back whole (${s4.y.toFixed(2)} / ${s4.top})`);

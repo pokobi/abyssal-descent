@@ -61,11 +61,53 @@
     });
   };
   // one model of every enemy kind, parked far below the world, so every shader they need exists before the first fight
+  // (as stand-ins: standIns below. Built once a session, and the same group is parked in every area's late kit)
   W.enemyModels = function () {
-    const sc = G.scene, tmp = enemyGroup(); if (!sc || !tmp) return null;
-    sc.add(tmp);
+    const sc = G.scene; if (!sc) return null;
+    if (!W._enemies) { const g = enemyGroup(); W._enemies = g ? standIns(g) : null; }
+    const tmp = W._enemies; if (!tmp) return null;
+    tmp.position.set(0, -800, 0); sc.add(tmp);
     return tmp;
   };
+  // The samples cut down to what the warm-up needs of them. A shader is made for a material, the kind of object (mesh, sprite,
+  // line, instanced) and what its geometry carries (attributes and their sizes, morph targets) - the area's lights, fog and shadows
+  // being the same for all. So one stand-in per such set (sharing the part's geometry and material) makes every shader the full
+  // models made: about 1,300 objects instead of some 14,500 parts, held for the whole session and drawn once at every area's
+  // warm-up. (A stand-in is drawn by the warm-up if any part it stands for would be: compile makes the hidden ones as well)
+  function standIns(src) {
+    const out = new THREE.Group(), seen = new Map();
+    const shown = (o) => { for (let p = o; p && p !== src; p = p.parent) if (!p.visible) return false; return true; };
+    const geoSig = (g) => {
+      if (!g) return '';
+      const a = Object.keys(g.attributes).sort().map((k) => k + g.attributes[k].itemSize).join(',');
+      const m = Object.keys(g.morphAttributes || {}).sort().map((k) => k + g.morphAttributes[k].length).join(',');
+      return a + '/' + m + (g.morphTargetsRelative ? 'r' : '');
+    };
+    // (made bare, not cloned: a clone copies the part's userData through JSON, and some parts keep references there)
+    const make = (o) => {
+      if (o.isInstancedMesh || o.isSkinnedMesh) return o.clone(false);
+      if (o.isSprite) return new THREE.Sprite(o.material);
+      if (o.isLineSegments) return new THREE.LineSegments(o.geometry, o.material);
+      if (o.isLineLoop) return new THREE.LineLoop(o.geometry, o.material);
+      if (o.isLine) return new THREE.Line(o.geometry, o.material);
+      if (o.isPoints) return new THREE.Points(o.geometry, o.material);
+      if (o.isMesh) return new THREE.Mesh(o.geometry, o.material);
+      return null;
+    };
+    src.traverse((o) => {
+      if (!o.material || o === src) return;
+      try {
+        const ms = Array.isArray(o.material) ? o.material : [o.material];
+        const key = ms.map((m) => m.uuid).join(',') + '|' + o.type + (o.instanceColor ? 'c' : '') + (o.receiveShadow ? 'R' : '') + (o.castShadow ? 'C' : '') + '|' + geoSig(o.geometry);
+        const v = shown(o), had = seen.get(key);
+        if (had) { if (v) had.visible = true; return; }
+        const c = make(o); if (!c) return;
+        c.position.set(0, 0, 0); c.quaternion.identity(); c.scale.set(1, 1, 1); c.visible = v; c.receiveShadow = o.receiveShadow; c.castShadow = o.castShadow;
+        seen.set(key, c); out.add(c);
+      } catch (e) { /* (that part's shader is made when it first comes) */ }
+    });
+    return out;
+  }
   function enemyGroup() {
     if (!G.enemies || !G.enemies.buildModel || !G.ENEMIES) return null;
     const tmp = new THREE.Group(); tmp.position.set(0, -800, 0);

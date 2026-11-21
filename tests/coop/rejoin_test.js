@@ -32,7 +32,13 @@ const PORT = +process.env.COOP_PORT || 9951;
     await sleep(9500);
     check(await h.eval('G.Coop.players.size') === 1, 'the guest dropped out');
     g = await ch.page(url('Guest'));
-    await g.until('window.G && G.Coop && G.Coop.id >= 2 && G.game.run && G.Coop.fpOk !== undefined', 90000);
+    // (when the way back in times out, what each side was at is told: the rare time-out of joining a room)
+    await g.until('window.G && G.Coop && G.Coop.id >= 2 && G.game.run && G.Coop.fpOk !== undefined', 90000).catch(async (e) => {
+      const st = "JSON.stringify(window.G && G.Coop ? { id: G.Coop.id, role: G.Coop.role, live: G.Coop.live, run: !!G.game.run, st: G.game.state, area: G.game.area, tr: !!G.game.transitioning, warm: !!G.game._warming, fp: G.Coop.fpOk, err: (document.getElementById('cl-err') || {}).textContent, players: [...G.Coop.players.values()].map((p) => [p.id, p.name, Math.round(performance.now() - p.seen)]), loading: !!(document.getElementById('loading') && document.getElementById('loading').classList.contains('done')) } : 'no G')";
+      console.log('guest', await g.eval(st).catch((x) => x.message)); console.log('host', await h.eval(st).catch((x) => x.message));
+      console.log('errs', h.errs.concat(g.errs).slice(0, 4).join(' | ').slice(0, 600));
+      throw e;
+    });
     await g.eval(off);
     check(await g.eval('G.Coop.fpOk') === true, 'the returning guest builds the same world');
     check(await g.eval('G.game.area') === await h.eval('G.game.area'), 'and stands in the same area');

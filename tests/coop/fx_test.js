@@ -80,7 +80,8 @@ const PORT = +process.env.COOP_PORT || 9011;
     // ---- throwables
     await g.eval('window.__pj = 0; const sp = G.combat.spawnProjectile; G.combat.spawnProjectile = function (o) { if (o.owner === "remote") window.__pj++; return sp.call(G.combat, o); }; window.__fx = 0; for (const f of ["explosion", "ring"]) { const o = G.fx[f]; G.fx[f] = function () { if (G.Coop._fxNet) window.__fx++; return o.apply(G.fx, arguments); }; } 1');
     await h.eval("(() => { const P = G.player; G.combat.spawnProjectile({ kind: 'grenade', pos: P.pos.clone().add(new THREE.Vector3(0, 1.5, 0)), vel: new THREE.Vector3(0, 6, -8), grav: 18, owner: 'player', dmg: 50, radius: 0.12, life: 10, fuse: 1.2, bounce: true, explode: 4, info: { src: 'explosion', grenade: true } }); })(); 1");
-    check(await g.until('G.combat.projectiles.some((p) => p.owner === "remote")', 3000).then(() => true, () => false), 'a grenade thrown by the host flies on the guest screen');
+    // (counted as it is made, not only looked for in flight: a grenade lives 1.2 s, and a busy page can look past all of it)
+    check(await g.until('window.__pj > 0 || G.combat.projectiles.some((p) => p.owner === "remote")', 3000).then(() => true, () => false), 'a grenade thrown by the host flies on the guest screen');
     await sleep(900);
     // ---- an explosion of the host's grenade beside the guest hurts the guest
     // (the one hurt: mortal, and nothing of its own between it and the blow - no time unhurt, no overshield (a crystal picked up, a perk),

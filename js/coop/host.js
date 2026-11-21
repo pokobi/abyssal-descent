@@ -18,6 +18,8 @@
       const f = L[k];
       L[k] = function (...a) {
         const seed = a[1];
+        // (the others are told first: building an area holds this page for some seconds on a slow machine, and that silence is not a lost line - core.js)
+        if (K.building) K.building();
         if (k === 'generate') a[2] = Object.assign({}, a[2], { extraChests: 0, chestMul: K.chestMul ? K.chestMul() : 1 }); // (chests: as many again for each player)
         return K.seeded(seed ^ 0x5eed, () => f.apply(L, a));
       };

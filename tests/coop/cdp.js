@@ -59,7 +59,11 @@ exports.launch = async function (port) {
           if (r.result.exceptionDetails) throw new Error((r.result.exceptionDetails.exception && r.result.exceptionDetails.exception.description) || r.result.exceptionDetails.text);
           return r.result.result.value;
         },
-        async until(expr, ms) { const t0 = Date.now(); while (Date.now() - t0 < (ms || 60000)) { let v = null; try { v = await this.eval(expr); } catch (e) { /* page still loading */ } if (v) return v; await sleep(200); } throw new Error('timeout: ' + expr); },
+        async until(expr, ms) { const t0 = Date.now(); while (Date.now() - t0 < (ms || 60000)) { let v = null; try { v = await this.eval(expr); } catch (e) { /* page still loading */ } if (v) return v; await sleep(200); }
+          // (a co-op page turned away for another version: a script was changed on disk between the loads of two pages - another hand editing js/ meanwhile -
+          // and the test's failure is not the game's. Said so, with what the lobby says)
+          let lob = ''; try { lob = await this.eval("(document.getElementById('cl-err') || {}).textContent || ''"); } catch (e) { /* no page */ }
+          throw new Error('timeout: ' + expr + (/バージョン/.test(lob || '') ? ' [VERSION MISMATCH: a script changed between page loads - ' + lob + ']' : lob ? ' [lobby: ' + lob + ']' : '')); },
         // The boot is over: the loading screen gone and the game's frames running (game.js boot). The title (G.game.state 'title') is up
         // well before that - its shaders and the faces of the text are still being made, the loading screen still covers it, and no frame
         // has run yet: a player cannot start a run then, and a test that does acts on a game that is not going yet.

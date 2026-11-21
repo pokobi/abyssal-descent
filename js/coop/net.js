@@ -10,25 +10,35 @@
   const PREFIX = 'abyssal-descent-coop-';
   N.code = function () { const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)]; return s; };
 
+  // how long the room may take to be reached (the broker for a host; the broker and the line to the host for a guest) before it is given up, in ms
+  N.WAIT = 15000;
   N.peer = function (code, isHost) {
     const t = { onpeer() {}, onmsg() {}, onleave() {}, onerror() {} };
-    const conns = new Map(); let next = 1, closed = false;
-    const peer = new Peer(isHost ? PREFIX + code : undefined, { debug: 0 });
+    const conns = new Map(); let next = 1, closed = false, up = false, peer = null;
+    t.send = (id, m) => { const c = conns.get(id); if (c && c.open) c.send(m); };
+    t.close = () => { closed = true; clearTimeout(tm); try { if (peer) peer.destroy(); } catch (e) { /* already gone */ } };
+    // (before the room is reached, any trouble ends the try with a message; after, the broker's trouble is not the players' - their lines stand)
+    const fail = (why) => { if (up || closed) return; t.close(); t.onerror(why); };
+    const tm = setTimeout(() => fail(isHost ? '仲介サーバにつながりません（しばらくしてから試してください）' : 'ホストにつながりません（部屋コードを確かめるか、しばらくしてから試してください。回線の組み合わせによっては、つながらない事があります）'), N.WAIT);
+    // (the PeerJS script comes from a CDN: blocked or offline, there is no Peer)
+    if (typeof Peer !== 'function') { setTimeout(() => fail('通信の部品（PeerJS）を読み込めませんでした。ネットワークや広告ブロックの設定を確かめて、再読み込みしてください'), 0); return t; }
+    try { peer = new Peer(isHost ? PREFIX + code : undefined, { debug: 0 }); } catch (e) { setTimeout(() => fail('接続エラー: ' + e.message), 0); return t; }
     const hook = (c, id) => {
       conns.set(id, c);
       c.on('data', (m) => t.onmsg(id, m));
       c.on('close', () => { if (conns.delete(id) && !closed) t.onleave(id); });
       c.on('error', () => { if (conns.delete(id) && !closed) t.onleave(id); });
     };
-    peer.on('error', (e) => t.onerror(e.type === 'peer-unavailable' ? '部屋が見つかりません' : e.type === 'unavailable-id' ? 'その部屋コードは使われています' : '接続エラー: ' + e.type));
+    const reached = () => { up = true; clearTimeout(tm); };
+    peer.on('error', (e) => fail(e.type === 'peer-unavailable' ? '部屋が見つかりません' : e.type === 'unavailable-id' ? 'その部屋コードは使われています' : '接続エラー: ' + e.type));
     if (isHost) {
-      peer.on('open', () => t.onopen && t.onopen());
+      peer.on('open', () => { reached(); if (t.onopen) t.onopen(); });
       peer.on('connection', (c) => { const id = next++; c.on('open', () => { hook(c, id); t.onpeer(id); }); });
+      // a host that lost the broker still has its players, but nobody new can find the room: it asks again a few seconds later
+      peer.on('disconnected', () => { if (up && !closed) setTimeout(() => { try { if (!closed && peer.disconnected && !peer.destroyed) peer.reconnect(); } catch (e) { /* tried */ } }, 3000); });
     } else {
-      peer.on('open', () => { const c = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' }); c.on('open', () => { hook(c, 0); t.onpeer(0); }); });
+      peer.on('open', () => { const c = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' }); c.on('open', () => { reached(); hook(c, 0); t.onpeer(0); }); });
     }
-    t.send = (id, m) => { const c = conns.get(id); if (c && c.open) c.send(m); };
-    t.close = () => { closed = true; try { peer.destroy(); } catch (e) { /* already gone */ } };
     return t;
   };
 

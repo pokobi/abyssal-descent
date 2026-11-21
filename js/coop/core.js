@@ -49,6 +49,8 @@
   #coop-back{position:fixed;inset:0;z-index:8500;display:none;align-items:center;justify-content:center;background:rgba(8,6,4,.55);font-family:'Noto Sans JP',sans-serif;color:#f2e6cc;cursor:pointer}
   #coop-back .cb-box{display:flex;flex-direction:column;gap:10px;align-items:center;padding:18px 26px;background:rgba(14,11,8,.95);border:1px solid rgba(220,190,130,.34);border-radius:6px}
   #coop-back button{padding:7px 14px;border-radius:4px;font:inherit;cursor:pointer;background:rgba(14,11,8,.96);border:1px solid rgba(220,190,130,.34);color:#e8d6b0}
+  #coop-wait{position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:8400;padding:8px 18px;background:rgba(14,11,8,.92);border:1px solid rgba(255,140,90,.5);border-radius:4px;font:700 14px 'Noto Sans JP',sans-serif;color:#ffb090;display:none;pointer-events:none}
+  html.m #coop-wait{zoom:.7}
   #coop-msg{position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:8400;padding:8px 18px;background:rgba(14,11,8,.9);border:1px solid rgba(220,190,130,.34);border-radius:4px;font:700 15px 'Noto Sans JP',sans-serif;color:#ffd27a;display:none;pointer-events:none}
   `;
   const el = (tag, id, html) => { const e = document.createElement(tag); if (id) e.id = id; if (html) e.innerHTML = html; document.body.appendChild(e); return e; };
@@ -62,12 +64,22 @@
     for (const id of K.players.keys()) if (id) K.net.send(id, m);
   };
   K.handlers = {};
+  const gone = {}, FROM_HOST = { no: 1, room: 1, roster: 1, left: 1, diff: 1, gone: 1 };
   const onMsg = (from, m) => {
-    const rp = K.players.get(from);
-    if (rp) rp.seen = performance.now();
-    const h = K.handlers[m.t];
-    if (!h) return;
-    try { h(m, from); } catch (e) { console.error(e); }
+    try {
+      if (!m || typeof m !== 'object') return;
+      const rp = K.players.get(from);
+      if (rp) rp.seen = performance.now();
+      // a guest the host let go (it was silent too long: a tab put away, a phone on another app) that still talks on the open line is told so,
+      // once a second at most, so it can come back in (K.handlers.gone) instead of playing on alone
+      else if (K.role === 'host' && from && K.live && m.t !== 'hi') { const n = performance.now(); if (!gone[from] || n - gone[from] > 1000) { gone[from] = n; K.net.send(from, { t: 'gone' }); } return; }
+      // (what only the host says is not taken from a guest, nor the other way round: a guest's 'no' once closed the host's own line, and a 'room' or
+      // 'roster' rewrote its list of players - one bad message took the whole room down)
+      if (K.role === 'host' ? FROM_HOST[m.t] : m.t === 'hi') return;
+      const h = K.handlers[m.t];
+      if (!h) return;
+      h(m, from);
+    } catch (e) { console.error(e); }
   };
   K.msg = function (t) { const b = K.msgEl; b.textContent = t; b.style.display = 'block'; clearTimeout(K._mt); K._mt = setTimeout(() => { b.style.display = 'none'; }, 3500); };
 
@@ -178,16 +190,43 @@
     G.weapons.hidden(false);
     G.sfx.heal(); G.ui.showHud(true);
   };
-  K.ended = function (title, sub) {
+  // (rejoin: a guest cut off is offered the way back into the same room, with what it carried - the host keeps it by name, host.js K.saved)
+  K.ended = function (title, sub, rejoin) {
     K.live = false;
     const g = GM();
     g.state = 'modal'; G.input.exitLock();
+    if (K.waitEl) K.waitEl.style.display = 'none';
     const b = K.backEl; b.style.display = 'flex'; b.onclick = null;
-    b.innerHTML = `<div class="cb-box"><b style="font-size:20px;color:#ffd27a">${title}</b><div>${sub || ''}</div>${K.statsHTML ? K.statsHTML() : ''}<button id="coop-quit">部屋を出る</button></div>`;
+    const rj = rejoin && K.role === 'guest' && K.code ? '<button id="coop-rejoin">入り直す</button>' : '';
+    b.innerHTML = `<div class="cb-box"><b style="font-size:20px;color:#ffd27a">${title}</b><div>${sub || ''}</div>${K.statsHTML ? K.statsHTML() : ''}${rj}<button id="coop-quit">部屋を出る</button></div>`;
     document.getElementById('coop-quit').onclick = () => K.quit();
+    if (rj) document.getElementById('coop-rejoin').onclick = () => K.rejoin();
   };
-  // leaving the room: the page is simply reloaded (the browser's "leave this page?" question is for solo runs, so it is switched off first)
-  K.quit = function () { GM().debug = true; location.reload(); };
+  // the page again, with only the line's own settings of this one (the test line and its delays) and, to go straight into a room, its code and the name
+  const pageUrl = (room, host) => {
+    const p = new URLSearchParams();
+    for (const k of ['local', 'lat', 'jit']) if (qs.has(k)) p.set(k, qs.get(k));
+    if (room) { p.set('room', room); if (host) p.set('host', '1'); p.set('name', K.name || ''); }
+    return location.pathname + '?' + p.toString();
+  };
+  // leaving the room: the page is loaded again, without the room in its address - so it is not joined again (the browser's "leave this page?"
+  // question is for solo runs, so it is switched off first)
+  K.quit = function () { GM().debug = true; location.href = pageUrl(); };
+  K.rejoin = function () { GM().debug = true; location.href = pageUrl(K.code, false); };
+  // the host let this guest go while it was away
+  K.handlers.gone = function () { if (K.role === 'guest' && K.live) K.ended('接続が途切れ、部屋から外れました', '入り直すと、持っていた物はそのままで戻れます', true); };
+  // the other side is about to build an area (seconds without a word on a slow machine): it is waited for longer meanwhile
+  // (e: the building is over and the usual wait holds again. Over means more than the area made: its shaders made too (_warming) and two frames drawn -
+  // the first frames of a new area can hold a page for seconds more on a busy GPU. A page that draws no frames (put away) never says it: the 30 s run out)
+  K.handlers.wt = function (m, from) { const rp = K.players.get(from); if (rp) rp.waitT = m.e ? 0 : performance.now() + 30000; };
+  K.building = function () {
+    if (!K.live || !K.net) return;
+    K.send({ t: 'wt' });
+    const n = (K._wtN = (K._wtN || 0) + 1), g = GM();
+    const done = () => { if (n === K._wtN && K.net) K.send({ t: 'wt', e: 1 }); };
+    const look = () => { if (n !== K._wtN) return; if (g._warming || g.transitioning) { setTimeout(look, 250); return; } requestAnimationFrame(() => requestAnimationFrame(done)); };
+    setTimeout(look, 0);
+  };
 
   // ---------------- the loop around the game's own ----------------
   // the solo game stops while a menu is open; here the others are still fighting, so the world goes on (without your keys)
@@ -199,7 +238,7 @@
   }
   K.clearKeys = clearKeys;
   const stopped = (s) => s === 'paused' || s === 'modal' || s === 'resuming';
-  let last = 0, netT = 0, seenT = 0;
+  let last = 0, netT = 0, lastWatch = 0;
   function tick(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     K._fN = (K._fN || 0) + 1; if (now - (K._fT0 || 0) > 2000) { K.fps = Math.round(K._fN * 1000 / (now - (K._fT0 || now - 2000))); K._fN = 0; K._fT0 = now; }
@@ -225,8 +264,8 @@
       hud();
       updateBack();
       unstick(dt);
-      seenT -= dt;
-      if (seenT <= 0) { seenT = 1; watchPeers(); K._pgT = (K._pgT || 0) + 1; if (K._pgT % 2 === 0) K.send({ t: 'pg', ts: performance.now() }); }
+      // (once a second of real time: a page whose frames hardly come still looks every second)
+      if (performance.now() - lastWatch >= 1000) { watchPeers(); K._pgT = (K._pgT || 0) + 1; if (K._pgT % 2 === 0) K.send({ t: 'pg', ts: performance.now() }); }
     } catch (e) { console.error(e); }
   }
   // Another player can take the area on while a screen of yours is up, so the game's state can end up saying "a screen is open" with nothing on the screen, and then no
@@ -260,21 +299,43 @@
       b.onclick = (e) => { if (e.target.id === 'coop-quit') { K.quit(); return; } b.style.display = 'none'; I.requestLock(); };
     } else if (!want && b.style.display === 'flex' && K.live) b.style.display = 'none';
   }
+  // How long one is heard nothing from before being let go: a guest 8 s (it can come back in with what it carried); the host 20 s, as everyone's
+  // run ends with it. 30 s more while the other side said it builds an area (K.building).
+  const GUEST_WAIT = 8000, HOST_WAIT = 20000;
   function watchPeers() {
     const now = performance.now();
+    // (this page itself did not run for a while - its own area being built, its tab put away, a phone on another app: what came meanwhile is still
+    // waiting to be read, so nobody's silence is counted over that time. Without this, a host that built an area for some seconds let go every guest at once)
+    if (now - lastWatch > 3000) for (const rp of K.players.values()) rp.seen = Math.max(rp.seen, now);
+    lastWatch = now;
     // (a guest only hears the host directly: the other guests come and go by the host's word)
-    for (const rp of [...K.players.values()]) if (rp.id !== K.id && (K.role === 'host' || rp.id === 0) && now - rp.seen > 8000) K.drop(rp.id);
+    for (const rp of [...K.players.values()]) {
+      if (rp.id === K.id || (K.role !== 'host' && rp.id !== 0)) continue;
+      const q = now - rp.seen, lim = (rp.id === 0 ? HOST_WAIT : GUEST_WAIT) + (rp.waitT > now ? 30000 : 0);
+      if (q > lim) { console.warn('coop: no word from ' + rp.name + ' for ' + Math.round(q / 1000) + ' s: let go'); K.drop(rp.id); }
+    }
+    // a guest says so while the host is quiet
+    if (K.role === 'guest' && K.waitEl) {
+      const h0 = K.players.get(0), q = h0 ? now - h0.seen : 0, show = K.live && q > 3000;
+      if (show) K.waitEl.textContent = `ホストからの応答を待っています…（${Math.round(q / 1000)}秒）`;
+      K.waitEl.style.display = show ? 'block' : 'none';
+    }
   }
   K.drop = function (id) {
     const rp = K.players.get(id); if (!rp) return;
     K.players.delete(id);
     if (rp.body) G.scene.remove(rp.body.root);
-    if (K.role === 'guest') { if (K.live) K.ended('ホストとの接続が切れました', '周回は終了します'); else K.lobbyErr('ホストとの接続が切れました'); return; }
+    if (K.role === 'guest') {
+      if (K.live) K.ended('ホストとの接続が切れました', '周回は終了します', true);
+      else { const body = K.lobbyEl.querySelector('#cl-body'); body.innerHTML = '<button id="cl-back">↩ ロビーに戻る</button>'; body.querySelector('#cl-back').onclick = () => K.quit(); K.lobbyErr('ホストとの接続が切れました'); }
+      return;
+    }
     K.msg(`${rp.name} が抜けた`);
     if (K.onLeave) K.onLeave(rp);
     K.send({ t: 'left', i: id, r: roster() });
+    if (!K.live) roomScreen();
   };
-  K.handlers.left = function (m) { const rp = K.players.get(m.i); if (rp) { K.players.delete(m.i); if (rp.body) G.scene.remove(rp.body.root); K.msg(`${rp.name} が抜けた`); } };
+  K.handlers.left = function (m) { const rp = K.players.get(m.i); if (rp) { K.players.delete(m.i); if (rp.body) G.scene.remove(rp.body.root); K.msg(`${rp.name} が抜けた`); if (!K.live) roomScreen(); } };
 
   // ---------------- lobby ----------------
   function lobby() {
@@ -323,11 +384,20 @@
   }
   K.handlers.diff = function (m) { K.diff = m.d; if (m.ff !== undefined) K.ff = m.ff; roomScreen(); };
   K.open = function (code, isHost, name) {
+    // (the game is wrapped for a room once, at the first try: a second try - after a wrong code, a refusal, a broker that did not answer -
+    // starts over on a fresh page instead of wrapping it all again)
+    if (K._opens) { K.name = name; GM().debug = true; location.href = pageUrl(code, isHost); return; }
+    K._opens = 1;
     K.code = code; K.name = name; K.role = isHost ? 'host' : 'guest';
     const lat = +qs.get('lat') || 0, jit = +qs.get('jit') || 0;
     const t = K.net = qs.has('local') ? N().local(code, isHost, { lat, jit }) : N().peer(code, isHost);
     t.onmsg = onMsg;
-    t.onerror = (m) => { K.lobbyErr(m); K.role = null; };
+    // (net.js reports only what keeps the room from being reached; once in, a broker's trouble is no reason to stop - the lines between players stand)
+    t.onerror = (m) => { if (K.live) { K.msg('⚠ ' + m); return; } K.lobbyErr(m); };
+    if (!isHost) {
+      // (a host that never answers - gone, stuck, or a line that opened to nobody)
+      setTimeout(() => { if (K.role === 'guest' && !K._inRoom && K.net) { K.lobbyErr('ホストから応答がありません（部屋コードを確かめるか、しばらくしてから試してください）'); try { K.net.close(); } catch (e) { /* gone */ } K.net = null; } }, +qs.get('jw') || 25000);
+    }
     t.onleave = (id) => K.drop(id);
     if (isHost) {
       K.id = 0; K.addPlayer(0, name);
@@ -349,6 +419,10 @@
   K.handlers.hi = function (m, from) {
     const rp = K.players.get(from); if (!rp) return;
     if (m.v !== window.COOP_VER) { K.send({ t: 'no', why: 'ゲームのバージョンが違います。ページを再読み込みしてください' }, from); K.players.delete(from); return; }
+    // the same name coming in while its old line has gone quiet: the same player back from a reload, not a fourth one (the old place is let go first,
+    // or a full room of three turns its own member away until the old line times out). A member that is still talking is never taken for it.
+    const old = [...K.players.values()].find((p) => p.id && p.id !== from && p.name === m.name && performance.now() - p.seen > 2000);
+    if (old) K.drop(old.id);
     if (K.players.size > K.MAX) { K.send({ t: 'no', why: '部屋が満員です' }, from); K.players.delete(from); return; }
     rp.name = m.name;
     for (const o of K.players.keys()) if (o && o !== from) K.send({ t: 'roster', r: roster() }, o);
@@ -359,9 +433,9 @@
     if (K.live) { for (const [id, nm] of m.r) if (!K.players.has(id)) { K.addPlayer(id, nm); K.feed(`${G.U.esc(nm)} が参加した`, true); } return; }
     K.players.clear(); for (const [id, nm] of m.r) K.addPlayer(id, nm); roomScreen();
   };
-  K.handlers.no = function (m) { K.lobbyErr(m.why); K.net.close(); K.net = null; };
+  K.handlers.no = function (m) { if (K.live || !K.net) return; K.lobbyErr(m.why); K.net.close(); K.net = null; };
   K.handlers.room = function (m) {
-    K.id = m.id; K.diff = m.d || K.diff; if (m.ff !== undefined) K.ff = m.ff;
+    K.id = m.id; K._inRoom = true; K.diff = m.d || K.diff; if (m.ff !== undefined) K.ff = m.ff;
     K.players.clear();
     for (const [id, nm] of m.r) K.addPlayer(id, nm);
     K.lobbyErr('');
@@ -380,6 +454,7 @@
     K.hudEl = el('div', 'coop-hud'); K.hudEl.style.display = 'none';
     K.backEl = el('div', 'coop-back');
     K.msgEl = el('div', 'coop-msg');
+    K.waitEl = el('div', 'coop-wait');
     // your own falling: the world must not stop behind a death screen
     GM().playerDied = function () { K.onDown(); };
     // the title screens have no place here: back to the title means back to the lobby
@@ -432,6 +507,9 @@
     const auto = qs.get('room');
     if (auto) K.open(auto, qs.has('host'), qs.get('name') || (qs.has('host') ? 'H' : 'G'));
   }
-  const wait = () => { if (G.game && G.game.state === 'title') start(); else setTimeout(wait, 100); };
-  window.addEventListener('load', wait);
+  // (the rest of js/coop and the wire must be in before the lobby opens: a room in the address is opened at once and needs every part)
+  const ready = () => window.CoopNet && K.installHost && K.installGuest && K.installSync && K.installFx && K.installTeam && K.installBossObjHost && K.installBossObjGuest && K.buildBody;
+  const wait = () => { if (G.game && G.game.state === 'title' && ready()) start(); else setTimeout(wait, 100); };
+  // (loaded after the page has finished loading - put in later by a script - it starts at once: the load event is long past)
+  if (document.readyState === 'complete') wait(); else window.addEventListener('load', wait);
 })();

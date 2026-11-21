@@ -107,8 +107,10 @@ const MOBILE = process.env.MOBILE !== '0';
       await scene('second loss in a minute (1)', true, { pos: false });
       const s = await scene('second loss in a minute (2)', true, { pos: false, keepLog: true });
       check(s.q === 'low', `twice in a minute: quality one step lower (med -> ${s.q})`);
+      // (told once play is under way again - the area up, the pause menu left (scene() leaves it): before that it would go unseen)
+      const told = await p.until("[...document.querySelectorAll('.toast, #toasts *')].some((e) => /画質を一段下げ/.test(e.textContent))", 8000).then(() => true, () => false);
       const toast = await p.eval("[...document.querySelectorAll('.toast, #toasts *')].map((e) => e.textContent).join(' | ')");
-      check(/画質を一段下げ/.test(toast), 'twice in a minute: the player is told (' + toast.slice(0, 80) + ')');
+      check(told, 'twice in a minute: the player is told, once back in play (' + toast.slice(0, 80) + ')');
       // and once more at the lowest: fewer pixels
       await p.eval("localStorage.removeItem('abyss_ctxloss'); 1");
       await scene('at the lowest (1)', true, { pos: false });

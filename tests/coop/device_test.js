@@ -75,31 +75,44 @@ const PORT = +process.env.COOP_PORT || 9441;
       const me0 = c.kind === 'gale' && [await meAt(h, 1.8), await meAt(g, -1.8)];
       await sleep(600);
       const s0 = await fst(fi);
+      // (the waits below are counted on each page's game clock, not in real time: a page can stop for seconds on a busy machine - its
+      // frames and its messages wait meanwhile - and then runs the world on in big steps (core.js). Real time only caps them)
+      const gt = (p) => p.eval('G.game.time');
+      const waitOn = async (p, t0, dt, cond) => { const T = Date.now(); for (;;) { if (await cond()) return true; if ((await gt(p)) - t0 > dt || Date.now() - T > 40000) return cond(); await sleep(150); } };
+      const [th0, tg0] = [await gt(h), await gt(g)];
       await g.eval(`G.Gim.trigger(G.Gim.list[${gm.i}], { by: 'use' }); 1`);
       let seen = false; try { await h.until(`!!G.Gim.list[${gm.i}].used`, 3000); seen = true; } catch (e) { /* */ }
       check(seen, `${c.field}: set off by the guest, it goes off on the host`);
       // (what it does comes at its own moment on the host's clock: wait for it, a while past the moment)
       let s = await fst(fi);
-      for (let k = 0; k < Math.ceil((c.wait + 2.5) / 0.15) && !c.ok(s, s0, gm); k++) { await sleep(150); s = await fst(fi); }
+      await waitOn(h, th0, c.wait + 2.5, async () => c.ok(s = await fst(fi), s0, gm));
       check(c.ok(s, s0, gm), `${c.field}: the host's monster is ${c.what} (${JSON.stringify({ hp: +s.hp.toFixed(2), hurts: s.hurts, stun: +s.stun.toFixed(2), moved: +Math.hypot(s.x - s0.x, s.z - s0.z).toFixed(1), alive: s.alive })})`);
       if (!c.ok(s, s0, gm)) console.log('     ', JSON.stringify({ spot, s0, gm, t: await h.eval(`G.Gim.list[${gm.i}].t`), foes: await h.eval('G.Gim.foes().length'), n: await h.eval('G.enemies.list.length'), st: await h.eval('G.game.state + "/" + G.game.stage + "/" + G.game.areaCleared + "/" + G.game.time.toFixed(2)') }));
       if (me0) {
         // each player is carried toward the edge (or over it) on their own screen
-        for (const [p, who, i] of [[h, 'host', 0], [g, 'guest', 1]]) {
-          const r = await p.eval('[G.player.pos.x, G.player.pos.z, G.player.__fell]'), al = (r[0] - me0[i][0]) * gm.dx + (r[1] - me0[i][1]) * gm.dz;
+        for (const [p, who, i, t0] of [[h, 'host', 0, th0], [g, 'guest', 1, tg0]]) {
+          // (its own screen's gale, on its own clock: until it has blown there as long as on the host)
+          let r, al;
+          await waitOn(p, t0, c.wait, async () => { r = await p.eval('[G.player.pos.x, G.player.pos.z, G.player.__fell]'); al = (r[0] - me0[i][0]) * gm.dx + (r[1] - me0[i][1]) * gm.dz; return r[2] > 0 || al > 1.5; });
           check(r[2] > 0 || al > 1.5, `${c.field}: the ${who} standing in it is carried toward the edge (${r[2] ? 'over it' : al.toFixed(1) + ' m'})`);
           await p.eval('delete G.player.fellInPit; 1');
         }
       }
       // the guest's copy of it shows the same
       if (s.alive) {
-        await sleep(700);
-        const gs = JSON.parse(await g.eval(`JSON.stringify((() => { const e = G.enemies.list.find((e) => e._nid === ${s.nid}); return e ? { hp: e.alive ? e.hp / e.maxHp : 0, x: e.pos.x, z: e.pos.z } : null; })())`));
-        const hs = await fst(fi);
-        // (a burning one keeps losing health and a swept one keeps moving: the copy follows a moment behind)
-        const okH = hs.hp > 0.97 ? gs && gs.hp > 0.97 : gs && gs.hp < 0.97;
-        const mv = Math.hypot(hs.x - s0.x, hs.z - s0.z), okP = gs && (mv < 1 ? Math.hypot(gs.x - hs.x, gs.z - hs.z) < 1 : Math.hypot(gs.x - s0.x, gs.z - s0.z) > mv * 0.5);
-        check(okH && okP, `${c.field}: and the guest sees it so ${JSON.stringify({ g: gs && { hp: +gs.hp.toFixed(2) }, h: +hs.hp.toFixed(2) })}`);
+        // (a burning one keeps losing health and a swept one keeps moving: the copy follows a moment behind - given up to 3 s of the
+        // guest's own clock, so that a guest page that stopped a while catches up first; a copy that never follows still fails)
+        let gs, hs, okH, okP;
+        const tg1 = await gt(g);
+        await waitOn(g, tg1, 3, async () => {
+          gs = JSON.parse(await g.eval(`JSON.stringify((() => { const e = G.enemies.list.find((e) => e._nid === ${s.nid} && e._rep); return e ? { hp: e.alive ? e.hp / e.maxHp : 0, x: e.pos.x, z: e.pos.z } : null; })())`));
+          hs = await fst(fi);
+          okH = hs.hp > 0.97 ? gs && gs.hp > 0.97 : gs && gs.hp < 0.97;
+          const mv = Math.hypot(hs.x - s0.x, hs.z - s0.z);
+          okP = gs && (mv < 1 ? Math.hypot(gs.x - hs.x, gs.z - hs.z) < 1 : Math.hypot(gs.x - s0.x, gs.z - s0.z) > mv * 0.5);
+          return okH && okP;
+        });
+        check(okH && okP, `${c.field}: and the guest sees it so ${JSON.stringify({ g: gs && { hp: +gs.hp.toFixed(2), x: +gs.x.toFixed(1), z: +gs.z.toFixed(1) }, h: { hp: +hs.hp.toFixed(2), x: +hs.x.toFixed(1), z: +hs.z.toFixed(1) } })}`);
       }
       // a second device set off by the host goes off for the guest
       const n2 = await h.eval(`G.Gim.list.findIndex((g, i) => i !== ${gm.i} && !g.used)`);

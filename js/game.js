@@ -159,6 +159,7 @@
       }
       localStorage.setItem(CTX_LOG, JSON.stringify(log));
     } catch (er) { /* storage unavailable: reloaded all the same */ }
+    try { sessionStorage.setItem(CTX_RESUME + '.lost', '1'); } catch (er) { /* (then the minute counts the reload too) */ }
     try { if (GM.run && GM.slot && GM.loadRun()) sessionStorage.setItem(CTX_RESUME, JSON.stringify({ slot: GM.slot, t: now })); } catch (er) { /* then the title */ }
     GM.ctxNotice('描画を復旧しています…（再読み込み中）');
     GM.debug = true; // (the "leave this page?" question, input.js, is for a player closing the tab, not for this)
@@ -168,10 +169,30 @@
   function ctxAfterBoot() {
     let r = null, lowered = false;
     try { r = JSON.parse(sessionStorage.getItem(CTX_RESUME) || 'null'); sessionStorage.removeItem(CTX_RESUME); lowered = sessionStorage.getItem(CTX_RESUME + '.lowered') === '1'; sessionStorage.removeItem(CTX_RESUME + '.lowered'); } catch (e) { r = null; }
-    const note = () => { if (lowered) G.ui.toast('⚠ 描画が続けて失われたため、画質を一段下げました（設定で変えられます）', 'warn'); };
+    // The minute of CTX_SPAN is a minute of play: the reload and the boot (long on a slow phone, half a minute or more) are not in it.
+    // The loss that brought this page is dated from now, the page being back; two losses a minute apart in play still count as twice.
+    try {
+      if (sessionStorage.getItem(CTX_RESUME + '.lost') === '1') {
+        sessionStorage.removeItem(CTX_RESUME + '.lost');
+        const log = JSON.parse(localStorage.getItem(CTX_LOG) || '[]');
+        if (log.length) { log[log.length - 1] = Date.now(); localStorage.setItem(CTX_LOG, JSON.stringify(log)); }
+      }
+    } catch (e) { /* storage unavailable */ }
+    // The player is told once they can see it. A toast lasts 3 s, and a resumed run is still being made behind the fade (and the shader
+    // warm-up) for longer than that, then waits on the pause menu: told then, it was never seen. So it comes when play is under way
+    // again (the area up, the pause menu left), or at the title when nothing was resumed.
+    let armed = false;
+    const note = () => {
+      if (!lowered) return;
+      const iv = setInterval(() => {
+        const ld = document.getElementById('loading'); if (ld && !ld.classList.contains('done')) return;
+        if (!((GM.state === 'title' && !GM.run) || (armed && GM.state === 'playing' && !GM.transitioning && !GM._warming))) return;
+        clearInterval(iv); G.ui.toast('⚠ 描画が続けて失われたため、画質を一段下げました（設定で変えられます）', 'warn');
+      }, 250);
+    };
     if (!r || !(Date.now() - r.t < 5 * 60000) || !GM.loadRun(r.slot)) { note(); return; }
     // (it waits on the pause menu: the player was not looking at the screen while it came back, and takes it up when ready)
-    setTimeout(() => { if (GM.state !== 'title') return; try { GM.continueRun(r.slot); } catch (e) { /* the title then */ } note(); setTimeout(() => { if (GM.state === 'playing' && !GM.transitioning) pause(); }, 1200); }, 400);
+    setTimeout(() => { if (GM.state !== 'title') return; try { GM.continueRun(r.slot); } catch (e) { /* the title then */ } note(); setTimeout(() => { if (GM.state === 'playing' && !GM.transitioning) pause(); armed = true; }, 1200); }, 400);
   }
   // graphics settings. High is the full look and is never touched; medium and low trade looks for speed in earnest:
   // render scale, shadows, number of live lights, particle amount, normal maps, draw distance (with the fog thickened to hide it)

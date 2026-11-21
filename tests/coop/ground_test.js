@@ -49,8 +49,17 @@ const PORT = +process.env.COOP_PORT || 9451;
     const sts = (p) => p.eval("JSON.stringify(G.world.pillars.map((q) => q.st))").then(JSON.parse);
     // a 沈め手's stamp on the host: the pillar sinks on the guest too
     const k = await h.eval("G.world.pillars.findIndex((q) => q.st === 'up' && q.next - q.t > 3)");
+    // (a pillar on the guest's screen never leaves 'up' on its own (sync.js): whatever step it is in once it has, the host's word came.
+    // Waited for until both pages' game clocks have gone 4 s on, not 4 s of real time: a page can stop for seconds on a busy machine,
+    // the host's word waiting with it, and then run the world on in big steps (core.js) - warn, sink and down can pass in one of them)
+    const [th0, tg0] = [await gt(h), await gt(g)];
     await h.eval(`G.FieldGen.sinkNow(G.world, G.world.pillars[${k}]); 1`);
-    const gotIt = await g.until(`['warn', 'sink'].includes(G.world.pillars[${k}].st)`, 4000).then(() => true, () => false);
+    let gotIt = false;
+    for (const T = Date.now(); Date.now() - T < 40000;) {
+      if (await g.eval(`G.world.pillars[${k}].st !== 'up'`)) { gotIt = true; break; }
+      if ((await gt(h)) - th0 > 4 && (await gt(g)) - tg0 > 4) break;
+      await sleep(100);
+    }
     check(k >= 0 && gotIt, `pillars: a pillar the host's 沈め手 stamps on starts to sink on the guest's screen too (pillar ${k})`);
     // many turns: start every pillar on the host soon, then watch both screens side by side
     await h.eval("G.world.pillars.forEach((q) => { if (q.st === 'up') q.next = q.t + Math.random() * 8; }); 1");

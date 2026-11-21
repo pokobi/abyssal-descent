@@ -31,7 +31,8 @@
     door.it = it; c.door = door; w.doors.push(door); w.interactables.push(it);
   }
   // an ossuary wall face: rows of skulls in dark niches (visual, on a wall along x or z, facing dir)
-  function ossuary(w, rng, a0, a1, c, alongX, face, y0) {
+  // (skip: nothing of it is built, but rng gives as many numbers as if it were - what is built after it stays where it was for a seed)
+  function ossuary(w, rng, a0, a1, c, alongX, face, y0, skip) {
     // (the niche built out of the wall: a sill under each row and a lintel over it, piers between the bays; in it the ends of stacked
     // long bones, and the skulls set along the top of them, each turned a little its own way)
     const PGs = PG(), deep = 0.3;
@@ -39,8 +40,8 @@
     const ry0 = alongX ? (face > 0 ? 0 : Math.PI) : (face > 0 ? Math.PI / 2 : -Math.PI / 2);
     for (let y = y0 + 0.9; y < y0 + 4.2; y += 1.1) {
       if (rng.chance(0.25)) continue;
-      slab('dark', a0 + 0.3, a1 - 0.3, y, y + 0.55, 0.02, 0.06, { uv: 1, grad: false });
-      if (a1 - a0 > 1.4) {
+      if (!skip) slab('dark', a0 + 0.3, a1 - 0.3, y, y + 0.55, 0.02, 0.06, { uv: 1, grad: false });
+      if (a1 - a0 > 1.4 && !skip) {
         slab('trim', a0 + 0.16, a1 - 0.16, y - 0.13, y, 0, deep + 0.05, { uv: 1.2, grad: false });
         slab('trim', a0 + 0.16, a1 - 0.16, y + 0.55, y + 0.69, 0, deep - 0.04, { uv: 1.2, grad: false });
         { // (each row of niches is a ledge out of the wall: it stops you and can be stood on, like the wall it is built out of)
@@ -56,7 +57,7 @@
           else P().inst(w, 'bone', PGs.boneEnds, Mx(c + face * d, y, u, bw - 0.3, 0.3, 0.2, 0, face > 0 ? Math.PI / 2 : -Math.PI / 2, 0), [0.62, 0.58, 0.5]);
         }
       }
-      for (let u = a0 + 0.55; u < a1 - 0.4; u += 0.55) if (rng.chance(0.7)) {
+      for (let u = a0 + 0.55; u < a1 - 0.4; u += 0.55) if (rng.chance(0.7) && !skip) {
         const ry = ry0 + (((u * 7.3 + y * 3.1) % 1) - 0.5) * 0.7, yy = y + (a1 - a0 > 1.4 && PGs.boneEnds ? 0.3 : 0.02);
         if (alongX) P().skull(w, u, yy, c + face * 0.17, ry, 0.95); else P().skull(w, c + face * 0.17, yy, u, ry, 0.95);
       }
@@ -75,7 +76,11 @@
     },
     ring(w, rng, W, AD) { F.ceiling(w, rng, 0, 0, W, AD, 24, { chandeliers: 3 }); },
     dress(w, rng, W, AD) {
-      for (let x = 8; x < W - 6; x += 10) ossuary(w, rng, x - 3, x + 3, 0.02, true, 1, 0);
+      // the north wall's rows of niches leave its exit gates bare, and the stone piers of their frames either side (levelgen.js gateFrame):
+      // laid all along it, three of them stood right across the three ways out, a ledge of shelves from 0.77 m up that nobody passes
+      // (the last guardian's hall has no exits: there the wall is lined all the way)
+      const gates = (w.exits || []).map((ex) => [ex.gx0 - 2, ex.gx1 + 2]);
+      for (let x = 8; x < W - 6; x += 10) ossuary(w, rng, x - 3, x + 3, 0.02, true, 1, 0, gates.some(([a, b]) => x + 3 > a && x - 3 < b));
       for (let z = 10; z < AD - 8; z += 10) { ossuary(w, rng, z - 3, z + 3, 0.02, false, 1, 0); ossuary(w, rng, z - 3, z + 3, W - 0.02, false, -1, 0); }
       for (let i = 0; i < 6; i++) P().web(w, rng.chance(0.5) ? rng.range(2, 8) : rng.range(W - 8, W - 2), rng.range(8, 16), rng.range(4, AD - 6), rng.range(0, 3), rng.range(2.5, 4));
     },

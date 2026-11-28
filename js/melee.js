@@ -154,14 +154,18 @@
     const gTrim = isMidas ? mk({ color: 0x2e1c14, metalness: 0.35, roughness: 0.6 }) : null;
     const gGem = isMidas ? mk({ color: 0x4a1210, metalness: 0.15, roughness: 0.2, emissive: 0x4a1210, emissiveIntensity: 0.1 }) : null;
     const NPg = G.GFX && G.GFX.meleeParts ? G.GFX.meleeParts : null;
+    // (where the gilt plates of the gauntlet go on hand.js's fist: x, y, z, the turn about y)
+    const MIDAS_FIT = W.MIDAS_FIT || [0.0203, 0, 0.0143, 0.25];
     const fist = (p, right) => {
       const s = right ? 1 : -1;
       if (isMidas && NPg && NPg('midas') && G.GFX.hand) {
         // (a gauntlet of gilt plates over the gloved fist: gfx.js midas, mirrored for the left hand)
         // (the glove under it black-brown, so the old gold stands off it; the engraved lines and rivets dark gold)
-        if (!buildMelee.midasGlove || buildMelee.midasGlove.map !== mats.glove.map) { const gm = mats.glove.clone(); gm.color.multiplyScalar(0.42); buildMelee.midasGlove = gm; buildMelee.midasLine = mk({ color: 0x4e3a1c, metalness: 0.75, roughness: 0.58 }); }
-        const hs = G.GFX.hand(right, true), hand = new THREE.Mesh(hs.hand, buildMelee.midasGlove); p.add(hand, new THREE.Mesh(hs.strap, mats.sleeve));
-        const gp = new THREE.Group(); if (!right) gp.scale.x = -1; p.add(gp);
+        if (!buildMelee.midasGlove || buildMelee.midasGlove.map !== mats.glove.map) { const gm = mats.glove.clone(); gm.color.multiplyScalar(0.42); if (G.GFX.Hand && G.GFX.Hand.dress) G.GFX.Hand.dress(gm, 'glove'); buildMelee.midasGlove = gm; buildMelee.midasLine = mk({ color: 0x4e3a1c, metalness: 0.75, roughness: 0.58 }); }
+        const hs = G.GFX.hand(right, true), hand = new THREE.Mesh(hs.hand, buildMelee.midasGlove); p.add(hand, new THREE.Mesh(hs.strap, mats.gloveDk));
+        const gm = new THREE.Group(), gp = new THREE.Group(); if (!right) gm.scale.x = -1; gm.add(gp); p.add(gm);
+        // (the plates were laid on an older, narrower fist: turned about its knuckles and set out onto the back of hand.js's fist)
+        gp.rotation.y = MIDAS_FIT[3]; gp.position.set(MIDAS_FIT[0], MIDAS_FIT[1], MIDAS_FIT[2]);
         for (const q of NPg('midas').parts) { const o = new THREE.Mesh(q.g, q.m === 'gilt' ? gGold : buildMelee.midasLine); o.position.set(q.at[0], q.at[1], q.at[2]); gp.add(o); }
         const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); arm.userData.sleeve = true; p.add(arm);
         return hand;
@@ -221,7 +225,7 @@
       // (a gloved hand closed to a fist round the grip: gfx.js)
       const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right, true) : null;
       if (hs) {
-        const hand = new THREE.Mesh(hs.hand, mats.glove); p.add(hand, new THREE.Mesh(hs.pad, mats.poly), new THREE.Mesh(hs.strap, mats.sleeve));
+        const hand = new THREE.Mesh(hs.hand, mats.glove); p.add(hand, new THREE.Mesh(hs.pad, mats.gloveDk), new THREE.Mesh(hs.strap, mats.gloveDk));
         const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.04, 0.42, 0.04); arm.rotation.x = Math.PI / 2 - 0.25; arm.position.set(right ? 0.03 : -0.03, -0.06, 0.22); arm.userData.sleeve = true; p.add(arm);
         return hand;
       }

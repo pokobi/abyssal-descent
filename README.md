@@ -63,6 +63,7 @@ python -m http.server 8000
 
 - フレームワーク・ビルド工程を使わない JavaScript と、[Three.js](https://threejs.org/)（CDN から読み込み）
 - テクスチャはプログラムで生成しています。効果音はプログラムでの合成と CC0 の録音素材、BGM は CC0 と CC BY の楽曲を使っています（出どころは `snd/SOURCES.md`、`snd/bgm/SOURCES_BGM.md`）
+- 一人称の手の形は、WebXR Input Profiles の generic-hand（MIT License）を土台に作り直しています
 - `js/` にゲーム本体、`css/` に画面のスタイル、`tests/` に開発用の確認スクリプトがあります
 
 ---
@@ -106,3 +107,5 @@ Music by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By At
 - "Lightless Dawn" Kevin MacLeod (incompetech.com)
 
 Other music (CC0): yd, Tsorthan Grove, SubspaceAudio and vitalezzz, via [OpenGameArt.org](https://opengameart.org/). The tracks were trimmed and levelled for this game; sources are listed in `snd/bgm/SOURCES_BGM.md`.
+
+Hand model: the first-person hands are built from the generic hand of [WebXR Input Profiles](https://github.com/immersive-web/webxr-input-profiles) (`packages/assets/profiles/generic-hand`), MIT License, Copyright (c) 2019 Amazon. The mesh was reshaped into a glove for this game; the full notice is at the head of `js/handdata.js`.

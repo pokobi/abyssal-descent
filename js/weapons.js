@@ -147,9 +147,10 @@
     vmScene = new THREE.Scene();
     vmCam = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.01, 10);
     vmRoot = new THREE.Group(); vmScene.add(vmRoot);
-    vmScene.add(new THREE.HemisphereLight(0xb0a8b0, 0x3a2a20, 1.5));
+    const hemi = new THREE.HemisphereLight(0xb0a8b0, 0x3a2a20, 1.5); vmScene.add(hemi);
     const key = new THREE.DirectionalLight(0xffd8b0, 2.4); key.position.set(1, 2, 1); vmScene.add(key);
     const rim = new THREE.DirectionalLight(0x8090c0, 1.0); rim.position.set(-1, 0.5, -1); vmScene.add(rim);
+    VL.hemi = hemi; VL.key = key; VL.rim = rim;
     vmLight = new THREE.PointLight(0xffb060, 0, 3, 2); vmLight.position.set(0.1, -0.05, -0.8); vmScene.add(vmLight);
     W.vmScene = vmScene; W.vmCam = vmCam; W.vmKey = key; W.vmRoot = vmRoot;
     W.getModel = () => model;
@@ -163,10 +164,11 @@
       poly: mk(Object.assign({ color: 0x2a2b2e, metalness: 0.05, roughness: 0.8 }, sx('polymer') || { roughness: 0.72, normalMap: t.skin.normalMap })),
       wood: mk(Object.assign({ color: 0x6e4428, metalness: 0, roughness: 1 }, sx('walnut') || { color: 0x8a5a34, roughness: 0.55, map: t.planks.map, normalMap: t.planks.normalMap })),
       brass: mk({ color: 0xc89a50, metalness: 1, roughness: 0.3 }),
-      // (the gloves' leather, worn; the hard leather over their knuckles and the straps at their wrists, darker; the sleeves' wool; the
-      // bracers' old leather and the iron of their buckles)
-      glove: mk(Object.assign({ color: 0x4a3626, metalness: 0, roughness: 1 }, sx('glove') || { color: 0x2a221c, roughness: 0.85, normalMap: t.skin.normalMap })),
-      gloveDk: mk(Object.assign({ color: 0x30241a, metalness: 0, roughness: 0.9 }, sx('glove') || { color: 0x1c1610, roughness: 0.8, normalMap: t.skin.normalMap })),
+      // (the gloves' leather: light tanned hide, ochre, a little sheen on it - its grain, seams, stitches, creases and wear drawn on the
+      // hand by hand.js (H.dress); the straps at their wrists a darker, oiled leather; the sleeves' wool; the bracers' old leather and
+      // the iron of their buckles)
+      glove: mk({ color: 0x7a5f3a, metalness: 0, roughness: 0.64 }),
+      gloveDk: mk(Object.assign({ color: 0x5e3f28, metalness: 0, roughness: 0.9 }, sx('glove') || { color: 0x4a3220, roughness: 0.8, normalMap: t.skin.normalMap })),
       sleeve: mk(Object.assign({ color: 0x4a443b, metalness: 0, roughness: 1 }, sx('wool') || { color: 0x3a3a34, roughness: 0.95, map: t.cloth.map, normalMap: t.cloth.normalMap })),
       bracer: mk(Object.assign({ color: 0x3e2c1e, metalness: 0, roughness: 1 }, sx('leather') || { color: 0x2a1e14, roughness: 0.85, normalMap: t.skin.normalMap })),
       iron: mk(Object.assign({ color: 0x5e5a52, metalness: 0.8, roughness: 0.75 }, sx('steel') || { roughness: 0.6 })),
@@ -176,6 +178,7 @@
       railGlow: mk({ color: 0x404850, emissive: 0x6080a0, emissiveIntensity: 0.8, metalness: 0.6, roughness: 0.3 }),
       tank: mk({ color: 0x6a2a1a, metalness: 0.6, roughness: 0.5 }),
     };
+    if (G.GFX && G.GFX.Hand && G.GFX.Hand.dress) { G.GFX.Hand.dress(mats.glove, 'glove'); G.GFX.Hand.dress(mats.gloveDk, 'strap'); }
     W.mats = mats;
     // The flash at the muzzle. Seen from behind the gun it is a burst of flame thrown out to all sides, never twice the same: four
     // pictures of it, of which each frame of a shot is one, turned any way. Before the muzzle a jet of flame stands out along the
@@ -1006,23 +1009,39 @@
     }
     // ---- hands ----
     if (showHands !== false) {
-      const hand = (p, right) => {
+      const hand = (p, right, cup) => {
         const hg = new THREE.Group(); hg.position.copy(p);
-        // (a gloved hand closed on the grip - its fingers jointed, the hard leather over its knuckles, the strap at its wrist: gfx.js;
-        // the sleeve back from the glove's cuff along the forearm, a bracer over it: W.armOn)
-        const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right) : null;
+        // (a gloved hand closed on the grip - its fingers jointed, the hard leather over its knuckles, the strap at its wrist: hand.js;
+        // the sleeve back from the glove's cuff along the forearm, a bracer over it: W.armOn. cup: the left hand closed round the
+        // right one on a handgun's grip)
+        const hs = G.GFX && G.GFX.hand ? G.GFX.hand(right, cup) : null;
         if (hs) { hg.add(new THREE.Mesh(hs.hand, mats.glove), new THREE.Mesh(hs.pad, mats.gloveDk), new THREE.Mesh(hs.strap, mats.gloveDk)); }
         else {
           const palm = new THREE.Mesh(PG.box, mats.glove); palm.scale.set(0.05, 0.075, 0.075); hg.add(palm);
           const fing = new THREE.Mesh(PG.box, mats.glove); fing.scale.set(0.055, 0.035, 0.06); fing.position.set(right ? -0.022 : 0.022, 0.0, -0.01); hg.add(fing);
           const thumb = new THREE.Mesh(PG.box, mats.glove); thumb.scale.set(0.02, 0.02, 0.05); thumb.position.set(right ? 0.02 : -0.02, 0.035, -0.02); thumb.rotation.y = right ? -0.3 : 0.3; hg.add(thumb);
         }
-        if (!W.armOn(hg, right, right ? W.ARM_R : W.ARM_L, [1, 0.25, 0])) { const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.038, 0.42, 0.038); arm.rotation.x = Math.PI / 2 - 0.35; arm.rotation.z = right ? 0.25 : -0.45; arm.position.set(right ? 0.06 : -0.08, -0.08, 0.2); hg.add(arm); }
+        const wr = G.GFX && (right || cup ? G.GFX.HAND_WRIST : G.GFX.HAND_WRIST_FORE);
+        if (!W.armOn(hg, right, wr ? wr.dir : right ? W.ARM_R : W.ARM_L, [1, 0.25, 0], undefined, wr)) { const arm = new THREE.Mesh(PG.cyl8, mats.sleeve); arm.scale.set(0.038, 0.42, 0.038); arm.rotation.x = Math.PI / 2 - 0.35; arm.rotation.z = right ? 0.25 : -0.45; arm.position.set(right ? 0.06 : -0.08, -0.08, 0.2); hg.add(arm); }
         g.add(hg);
         return hg;
       };
       M.rHand = hand(M.grip.clone().add(V(0.005, -0.01, 0.0)), true);
-      M.lHand = hand(M.fore.clone().add(V(-0.01, -0.03, 0.0)), false);
+      const pistol = def.arch === 'pistol' || def.arch === 'revolver';
+      if (pistol) { M.lHand = hand(M.rHand.position.clone().add(V(-0.032, -0.008, -0.01)), false, true); M.lHand.rotation.y = -0.25; }
+      else {
+        // the left hand (hand.js fore: the underside of what it holds 3 cm over it) set against the underside of the fore-end over it
+        // (the underside: the first of the gun met going up from well under the fore-end, along its middle)
+        const lp = M.fore.clone().add(V(-0.01, -0.03, 0.0)), parts = []; let lo = Infinity;
+        g.updateMatrixWorld(true);
+        g.traverse((o) => { if (o.isMesh && o.geometry && o.geometry.attributes.position) parts.push(o); });
+        const rc = new THREE.Raycaster(), up = new THREE.Vector3(0, 1, 0).transformDirection(g.matrixWorld), inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+        rc.set(V(M.fore.x, M.fore.y - 0.2, M.fore.z).applyMatrix4(g.matrixWorld), up); rc.far = 0.35;
+        const hit = rc.intersectObjects(parts, false).filter((h) => { let p = h.object; while (p && p !== M.rHand) p = p.parent; return !p; })[0];
+        if (hit) lo = hit.point.applyMatrix4(inv).y;
+        if (lo < M.fore.y + 0.12) lp.y = lo - 0.03;
+        M.lHand = hand(lp, false);
+      }
     }
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
     if (def.arch === 'pistol' || def.arch === 'revolver') { g.scale.setScalar(1.3); M.sightY *= 1.3; for (const k of ['winH', 'winZ', 'lensZ', 'lensR']) if (M[k] !== undefined) M[k] *= 1.3; }
@@ -1031,14 +1050,14 @@
   }
   W.buildGun = buildGun;
   // the way each forearm runs back from the glove's cuff on a gun (the hand's own space; the left one is mirrored in x)
-  W.ARM_R = [0.3, -0.45, 0.85]; W.ARM_L = [0.6, -0.15, 0.8];
+  W.ARM_R = [0.3, -0.45, 0.85]; W.ARM_L = [0.6, -0.45, 0.66];
   // a sleeve on a hand's forearm (gfx.js sleeve: the wool, a bracer of leather over it, the iron of its buckles), from the cuff of the
-  // glove (gfx.js HAND_WRIST; mirrored for the left hand) along dir, its back (where the buckles are) turned towards back. null where
-  // there are no such shapes
+  // glove (hand.js HAND_WRIST, or the cuff given as wr; mirrored for the left hand) along dir, its back (where the buckles are) turned
+  // towards back. null where there are no such shapes
   const SLV_M = { cloth: 'sleeve', bracer: 'bracer', strap: 'gloveDk', iron: 'iron' };
-  W.armOn = function (hg, right, dir, back, len) {
+  W.armOn = function (hg, right, dir, back, len, wr) {
     const X = G.GFX; if (!X || !X.sleeve || !X.HAND_WRIST || !mats) return null;
-    const s = right ? 1 : -1, at = X.HAND_WRIST.at, a = new THREE.Group();
+    const s = right ? 1 : -1, at = (wr || X.HAND_WRIST).at, a = new THREE.Group();
     for (const q of X.sleeve(len)) a.add(new THREE.Mesh(q.g, mats[SLV_M[q.m]]));
     const z = new THREE.Vector3(dir[0] * s, dir[1], dir[2]).normalize(), y = new THREE.Vector3(back[0] * s, back[1], back[2]), x = new THREE.Vector3();
     y.addScaledVector(z, -y.dot(z)).normalize(); x.crossVectors(y, z);
@@ -1054,9 +1073,9 @@
     for (const r of [true, false]) { const h = X.hand(r, true); parts.add(h.pad); parts.add(h.strap); }
     const bars = [];
     root.traverse((o) => { if (!o.isMesh) return; if (o.userData.sleeve && o.geometry === cyl8) bars.push(o); else if (parts.has(o.geometry) && (o.material === mats.poly || o.material === mats.sleeve)) o.material = mats.gloveDk; });
-    // (bare hands: the hollow of each fist filled - X.hand's fist is closed round a grip)
+    // (bare hands: each closed tight on nothing - X.hand's fist is closed round a grip)
     const bare = G.player && G.player.meleeMode && G.player.melee && G.player.melee.def && G.player.melee.def.model === 'fists';
-    if (bare && X.fistCore) for (const r of [true, false]) { const hg = X.hand(r, true).hand; root.traverse((o) => { if (o.isMesh && o.geometry === hg && !o.userData.core) { o.userData.core = true; const c = new THREE.Mesh(X.fistCore(r), o.material); c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale); c.frustumCulled = false; o.parent.add(c); } }); }
+    if (bare && X.fistBare) for (const r of [true, false]) { const hg = X.hand(r, true).hand, fb = X.fistBare(r).hand; root.traverse((o) => { if (o.isMesh && o.geometry === hg) o.geometry = fb; }); }
     for (const b of bars) {
       const hg = b.parent, right = b.position.x >= 0, s = right ? 1 : -1, at = X.HAND_WRIST.at, ax = new THREE.Vector3(0, 1, 0).applyQuaternion(b.quaternion);
       const d = b.position.clone().addScaledVector(ax, b.scale.y / 2).sub(new THREE.Vector3(at[0] * s, at[1], at[2])), len = Math.min(0.45, Math.max(0.24, d.length()));
@@ -1806,6 +1825,134 @@
   };
   function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
 
+  // ---------------- the view model's light, taken from the place ----------------
+  // The hands and the gun are drawn in a scene of their own (vmScene) with lights of their own; those lights follow the world's at the
+  // player. The hemisphere takes the world's sky / ground light (its hemisphere and ambient as they are now: the field, the sky's mood,
+  // the dawn, the dark of the deep). The key takes the sun where nothing stands between the camera and it, and the near lamps
+  // (LightPool) as the world draws them, with their colour and, in part, their direction as seen from the camera. The rim and the
+  // reflections (the materials' envMapIntensity) go with the sky light. A floor keeps the hand, the gun and the sight readable where the
+  // world is black. The world is read a few times a second and the lights follow it smoothly (a new area: at once).
+  // All this is laid over the lights only while vmScene is drawn and put back after, so what other code sets on them (pstatus.js: the
+  // key's colour; game.js setDarkness: their strength) still holds, as a share of the defaults. Only strengths, colours and the key's
+  // direction change: no light is added or taken away (no new shader variants).
+  const VL = (W.vl = { on: true, hemi: null, key: null, rim: null, w: null, t: 0, last: 0, snap: true, stamp: 0, out: null });
+  const VL_H0 = 1.5, VL_K0 = 2.4, VL_R0 = 1.0, VL_KC0 = new THREE.Color(0xffd8b0), VL_RC0 = new THREE.Color(0x8090c0), VL_KP0 = new THREE.Vector3(1, 2, 1).normalize();
+  // the gains on the world's sky light and direct light (below 1: the hand is near, lit all over, with no shade of the place on it, and
+  // the leather is paler than the stone; at 1 it stood out of every dark field); the floor (the luminance of the light on a hand facing
+  // the camera: the sky's and half the key's); the caps; the sky light at which the rim and the reflections are as they were made
+  // (and their bounds: the reflections were 2.2 of the world's 0.35); how far the key turns toward where the light comes from; how much
+  // of the colour of the sky light and of the lamps is taken off (a torch on the ochre leather is otherwise orange); the least share of
+  // the sky light that comes from the key's side (the hand's shape where nothing else lights it)
+  const VK = (VL.k = { ga: 0.55, gd: 0.38, floor: 0.28, capA: 1.4, capD: 2.5, aref: 0.75, envMin: 0.3, envMax: 0.6, dirMix: 0.65, desA: 0.3, desD: 0.45, keyMin: 0.4 });
+  const vlT = { dir: new THREE.Color(), dv: new THREE.Vector3() };
+  const vlC = { sky: new THREE.Color(), gnd: new THREE.Color(), dir: new THREE.Color(), dv: new THREE.Vector3() };
+  const vlS = { c: new THREE.Color(), t: new THREE.Color(), v: new THREE.Vector3(), o: new THREE.Vector3(), q: new THREE.Quaternion(), mats: [], base: [], hc: new THREE.Color(), hg: new THREE.Color(), kc: new THREE.Color(), rc: new THREE.Color(), kp: new THREE.Vector3(), sv: { hI: 0, hc: new THREE.Color(), hg: new THREE.Color(), kI: 0, kc: new THREE.Color(), kp: new THREE.Vector3(), rI: 0, rc: new THREE.Color() } };
+  const vlLum = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  const vlDesat = (c, k) => { const l = vlLum(c); c.r += (l - c.r) * k; c.g += (l - c.g) * k; c.b += (l - c.b) * k; return c; };
+  const vlSkip = { filter: (c) => !c.skyCap };
+  function vlTarget() {
+    const L = G.game && G.game.lights, w = G.world;
+    if (!L || !L.hemi || !w || !G.camera) return false;
+    const m = L.moon, c = vlS.c, cam = G.camera.getWorldPosition(vlS.o);
+    vlT.dir.setRGB(0, 0, 0); vlT.dv.set(0, 0, 0);
+    // the sun (or the moon), where the way to it is open
+    if (m && m.intensity > 0 && m.target) {
+      const d = vlS.v.copy(m.position).sub(m.target.position).normalize();
+      if (!w.raycast(cam, d, 90, vlSkip)) { c.copy(m.color).multiplyScalar(m.intensity); vlT.dir.add(c); vlT.dv.addScaledVector(d, vlLum(c)); }
+    }
+    // the near lamps, as the world lights itself with them (a point light of decay 2 and its range's window)
+    const LP = G.LightPool;
+    if (LP && LP.lights) for (const l of LP.lights) {
+      if (!l.visible || !(l.intensity > 0)) continue;
+      const d = vlS.v.copy(l.position).sub(cam), r = Math.max(0.35, d.length());
+      const win = l.distance > 0 ? Math.pow(Math.max(0, 1 - Math.pow(r / l.distance, 4)), 2) : 1;
+      if (win <= 0) continue;
+      c.copy(l.color).multiplyScalar(l.intensity * win / (r * r)); vlT.dir.add(c); vlT.dv.addScaledVector(d, vlLum(c) / r);
+    }
+    return true;
+  }
+  // the place's sky light as it is this frame (the world's own changes at once: a flash of lightning, the dark of the deep)
+  function vlSky() {
+    const L = G.game && G.game.lights; if (!L || !L.hemi) return false;
+    const h = L.hemi, a = L.amb, c = vlS.c;
+    vlC.sky.copy(h.color).multiplyScalar(h.intensity); vlC.gnd.copy(h.groundColor).multiplyScalar(h.intensity);
+    if (a) { c.copy(a.color).multiplyScalar(a.intensity); vlC.sky.add(c); vlC.gnd.add(c); }
+    return true;
+  }
+  // set the lights (and the materials' reflections) for this draw; false: leave them as they are
+  function vlApply() {
+    if (!VL.on || !VL.hemi || !G.camera) return false;
+    const now = performance.now(), dt = Math.min(0.1, Math.max(0, (now - (VL.last || now)) / 1000)); VL.last = now;
+    if (VL.w !== G.world) { VL.w = G.world; VL.snap = true; VL.t = 0; }
+    VL.t -= dt;
+    if (VL.t <= 0 || VL.snap) {
+      VL.t = 0.12;
+      if (!vlTarget()) return false;
+      if (VL.snap) { VL.snap = false; vlC.dir.copy(vlT.dir); vlC.dv.copy(vlT.dv); }
+    }
+    if (!vlSky()) return false;
+    // the light of where you stand follows in some 0.25 s: a step into a doorway or past a lamp is not a jump
+    const k = 1 - Math.exp(-dt * 4);
+    vlC.dir.lerp(vlT.dir, k); vlC.dv.lerp(vlT.dv, k);
+    const S = vlS, hc = vlDesat(S.hc.copy(vlC.sky), VK.desA).multiplyScalar(VK.ga), hg = vlDesat(S.hg.copy(vlC.gnd), VK.desA).multiplyScalar(VK.ga), kc = vlDesat(S.kc.copy(vlC.dir), VK.desD).multiplyScalar(VK.gd);
+    let la = vlLum(hc), ld = vlLum(kc);
+    if (la > VK.capA) { hg.multiplyScalar(VK.capA / la); hc.multiplyScalar(VK.capA / la); la = VK.capA; }
+    if (ld > VK.capD) { kc.multiplyScalar(VK.capD / ld); ld = VK.capD; }
+    // where the place has no direct light, a share of its sky light comes from the key's own side, so the hand keeps its shape
+    const ldw = ld;
+    if (ld < VK.keyMin * la && la > 1e-4) {
+      const part = VK.keyMin * la - ld; kc.add(S.c.copy(hc).multiplyScalar(part / la)); ld += part;
+      const f = Math.max(0.3, 1 - 0.5 * part / la); hc.multiplyScalar(f); hg.multiplyScalar(f); la *= f;
+    }
+    // the floor, in the colour of the place's sky light as it is (its colour not taken off: in the dark, the floor is most of what
+    // lights the hand, and it carries the place's hue - the blue of the depths, the red of a blood moon); a cool grey where there is none
+    const tot = la + ld * 0.5;
+    if (tot < VK.floor) {
+      const l0 = vlLum(vlC.sky), t = l0 > 1e-4 ? S.t.copy(vlC.sky).multiplyScalar(1 / l0) : S.t.setRGB(0.92, 0.96, 1.1), add = VK.floor - tot;
+      hc.add(S.c.copy(t).multiplyScalar(add)); hg.add(S.c.copy(t).multiplyScalar(add * 0.35)); la = vlLum(hc);
+    }
+    const sv = S.sv, H = VL.hemi, K = VL.key, R = VL.rim;
+    VL.saved = true; sv.hI = H.intensity; sv.hc.copy(H.color); sv.hg.copy(H.groundColor); sv.kI = K.intensity; sv.kc.copy(K.color); sv.kp.copy(K.position); sv.rI = R.intensity; sv.rc.copy(R.color);
+    // hemisphere (its strength as a share of the default: setDarkness)
+    const hm = Math.max(1e-4, hc.r, hc.g, hc.b, hg.r, hg.g, hg.b);
+    H.color.copy(hc).multiplyScalar(1 / hm); H.groundColor.copy(hg).multiplyScalar(1 / hm); H.intensity = hm * (sv.hI / VL_H0);
+    // key: the place's direct light; its colour over pstatus.js's tint (the key's colour against the default), turned part way to it
+    const km = Math.max(kc.r, kc.g, kc.b);
+    if (km > 1e-4) K.color.copy(kc).multiplyScalar(1 / km).multiply(S.c.setRGB(sv.kc.r / VL_KC0.r, sv.kc.g / VL_KC0.g, sv.kc.b / VL_KC0.b));
+    K.intensity = km * (sv.kI / VL_K0);
+    const dl = vlC.dv.length();
+    if (dl > 1e-5) {
+      G.camera.getWorldQuaternion(S.q).invert();
+      const dv = S.v.copy(vlC.dv).multiplyScalar(1 / dl).applyQuaternion(S.q);
+      const mx = VK.dirMix * (ld > 1e-5 ? ldw / ld : 0);
+      S.kp.copy(VL_KP0).multiplyScalar(1 - mx).addScaledVector(dv, mx);
+      if (S.kp.lengthSq() < 1e-4) S.kp.copy(VL_KP0);
+      K.position.copy(S.kp.normalize());
+    }
+    // rim and reflections: with the sky light
+    const ka = la / VK.aref;
+    R.intensity = VL_R0 * Math.min(1.2, Math.max(0.25, ka)) * (sv.rI / VL_R0);
+    if (la > 1e-4) { S.t.copy(hc).multiplyScalar(1 / la); R.color.copy(VL_RC0).multiply(S.c.setRGB(0.5 + 0.5 * S.t.r, 0.5 + 0.5 * S.t.g, 0.5 + 0.5 * S.t.b)); }
+    const ke = Math.min(VK.envMax, Math.max(VK.envMin, ka)), st = ++VL.stamp;
+    S.mats.length = 0; S.base.length = 0;
+    vmScene.traverse((o) => {
+      const ms = o.material; if (!ms) return;
+      for (const m of Array.isArray(ms) ? ms : [ms]) {
+        if (!m || m._vlS === st || typeof m.envMapIntensity !== 'number') continue;
+        m._vlS = st; S.mats.push(m); S.base.push(m.envMapIntensity); m.envMapIntensity *= ke;
+      }
+    });
+    VL.out = { la, ld, ke, dir: vlLum(vlT.dir) };
+    return true;
+  }
+  function vlRestore() {
+    if (!VL.saved) return; VL.saved = false;
+    const S = vlS, sv = S.sv, H = VL.hemi, K = VL.key, R = VL.rim;
+    H.intensity = sv.hI; H.color.copy(sv.hc); H.groundColor.copy(sv.hg); K.intensity = sv.kI; K.color.copy(sv.kc); K.position.copy(sv.kp); R.intensity = sv.rI; R.color.copy(sv.rc);
+    for (let i = 0; i < S.mats.length; i++) S.mats[i].envMapIntensity = S.base[i];
+    S.mats.length = 0; S.base.length = 0;
+  }
+
   W.render = function (renderer) {
     if (!vmScene) return;
     if (pip && pip.on) {
@@ -1828,7 +1975,8 @@
     vmCam.fov = 58 - W.adsT * 8;
     vmCam.updateProjectionMatrix();
     renderer.clearDepth();
-    renderer.render(vmScene, vmCam);
+    try { vlApply(); } catch (e) { VL.on = false; }   // (should it ever fail, the lights as they were made, from then on)
+    try { renderer.render(vmScene, vmCam); } finally { vlRestore(); }
   };
   W.pipOn = function () { return !!(pip && pip.on); };
   W.hidden = function (h) { if (vmRoot) vmRoot.visible = !h; };
